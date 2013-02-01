@@ -21,14 +21,16 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 
-	__CPUINIT
+#include <asm/assembler.h>
 
+	__CPUINIT
 /*
  * Armada XP specific entry point for secondary CPUs.
  * We add the CPU to the coherency fabric and then jump to secondary
  * startup
  */
 ENTRY(armada_xp_secondary_startup)
+ ARM_BE8(setend	be )			@ go BE8 if entered LE
 
 	bl	ll_add_cpu_to_smp_group
 

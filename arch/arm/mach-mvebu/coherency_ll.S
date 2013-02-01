@@ -62,6 +62,7 @@ ENTRY(ll_get_coherency_cpumask)
 	and	r3, r3, #15
 	mov	r2, #(1 << 24)
 	lsl	r3, r2, r3
+ARM_BE8(rev	r3, r3)
 	mov	pc, lr
 ENDPROC(ll_get_coherency_cpumask)
 
