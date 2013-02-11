@@ -281,12 +281,38 @@ static int xhci_plat_remove(struct platform_device *pdev)
 	return plat_of->remove(pdev);
 }
 
+#ifdef CONFIG_PM
+static int xhci_plat_suspend(struct device *dev)
+{
+	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+
+	return xhci_suspend(xhci);
+}
+
+static int xhci_plat_resume(struct device *dev)
+{
+	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+
+	return xhci_resume(xhci, 0);
+}
+
+static const struct dev_pm_ops xhci_plat_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(xhci_plat_suspend, xhci_plat_resume)
+};
+#define DEV_PM_OPS	(&xhci_plat_pm_ops)
+#else
+#define DEV_PM_OPS	NULL
+#endif /* CONFIG_PM */
+
 static struct platform_driver usb_xhci_driver = {
 	.probe		= xhci_plat_probe,
 	.remove		= xhci_plat_remove,
 	.shutdown	= xhci_plat_remove,
 	.driver	= {
 		.name = "xhci-hcd",
+		.pm = DEV_PM_OPS,
 		.of_match_table = of_match_ptr(usb_xhci_of_match),
 	},
 };
