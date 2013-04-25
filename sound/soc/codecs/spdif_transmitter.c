@@ -31,7 +31,7 @@ static struct snd_soc_codec_driver soc_codec_spdif_dit;
 
 static struct snd_soc_dai_driver dit_stub_dai = {
 	.name		= "dit-hifi",
-	.playback 	= {
+	.playback	= {
 		.stream_name	= "Playback",
 		.channels_min	= 1,
 		.channels_max	= 384,
