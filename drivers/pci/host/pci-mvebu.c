@@ -11,6 +11,7 @@
 #include <linux/clk.h>
 #include <linux/module.h>
 #include <linux/mbus.h>
+#include <linux/msi.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/of_address.h>
@@ -103,6 +104,7 @@ struct mvebu_pcie_port;
 struct mvebu_pcie {
 	struct platform_device *pdev;
 	struct mvebu_pcie_port *ports;
+	struct msi_chip *msi;
 	struct resource io;
 	struct resource realio;
 	struct resource mem;
@@ -673,6 +675,12 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 	return bus;
 }
 
+void mvebu_pcie_add_bus(struct pci_bus *bus)
+{
+	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
+	bus->msi = pcie->msi;
+}
+
 resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
 					  const struct resource *res,
 					  resource_size_t start,
@@ -709,6 +717,7 @@ static void __init mvebu_pcie_enable(struct mvebu_pcie *pcie)
 	hw.map_irq        = mvebu_pcie_map_irq;
 	hw.ops            = &mvebu_pcie_ops;
 	hw.align_resource = mvebu_pcie_align_resource;
+	hw.add_bus        = mvebu_pcie_add_bus;
 
 	pci_common_init(&hw);
 }
@@ -731,6 +740,21 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
 		return NULL;
 
 	return devm_request_and_ioremap(&pdev->dev, &regs);
+}
+
+static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+{
+	struct device_node *msi_node;
+
+	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
+				    "msi-parent", 0);
+	if (!msi_node)
+		return;
+
+	pcie->msi = of_pci_find_msi_chip_by_node(msi_node);
+
+	if (pcie->msi)
+		pcie->msi->dev = &pcie->pdev->dev;
 }
 
 #define DT_FLAGS_TO_TYPE(flags)       (((flags) >> 24) & 0x03)
@@ -910,6 +934,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
 
 		i++;
 	}
+
+	mvebu_pcie_msi_enable(pcie);
 
 	mvebu_pcie_enable(pcie);
 
