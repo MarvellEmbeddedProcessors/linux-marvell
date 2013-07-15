@@ -195,6 +195,8 @@ int fixed_phy_add(unsigned int irq, int phy_id,
 
 	list_add_tail(&fp->node, &fmb->phys);
 
+	mdiobus_scan(fmb->mii_bus, phy_id);
+
 	return 0;
 
 err_regs:
