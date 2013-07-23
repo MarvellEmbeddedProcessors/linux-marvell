@@ -20,7 +20,11 @@
 
 	mbus {
 		compatible = "marvell,kirkwood-mbus", "simple-bus";
+		#address-cells = <2>;
+		#size-cells = <1>;
 		controller = <&mbusc>;
+		pcie-mem-aperture = <0xe0000000 0x10000000>; /* 256 MiB memory space */
+		pcie-io-aperture  = <0xf2000000 0x100000>;   /*   1 MiB    I/O space */
 	};
 
 	ocp@f1000000 {
