@@ -13,6 +13,16 @@
 		bootargs = "console=ttyS0,115200n8";
 	};
 
+	mbus {
+		pcie-controller {
+			status = "okay";
+
+			pcie@1,0 {
+				status = "okay";
+			};
+		};
+	};
+
 	ocp@f1000000 {
 		i2c@11000 {
 			status = "okay";
