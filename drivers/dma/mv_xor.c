@@ -76,7 +76,7 @@ static u32 mv_desc_get_src_addr(struct mv_xor_desc_slot *desc,
 				int src_idx)
 {
 	struct mv_xor_desc *hw_desc = desc->hw_desc;
-	return hw_desc->phy_src_addr[src_idx];
+	return hw_desc->phy_src_addr[mv_phy_src_idx(src_idx)];
 }
 
 
@@ -112,32 +112,32 @@ static void mv_desc_set_src_addr(struct mv_xor_desc_slot *desc,
 				 int index, dma_addr_t addr)
 {
 	struct mv_xor_desc *hw_desc = desc->hw_desc;
-	hw_desc->phy_src_addr[index] = addr;
+	hw_desc->phy_src_addr[mv_phy_src_idx(index)] = addr;
 	if (desc->type == DMA_XOR)
 		hw_desc->desc_command |= (1 << index);
 }
 
 static u32 mv_chan_get_current_desc(struct mv_xor_chan *chan)
 {
-	return __raw_readl(XOR_CURR_DESC(chan));
+	return readl_relaxed(XOR_CURR_DESC(chan));
 }
 
 static void mv_chan_set_next_descriptor(struct mv_xor_chan *chan,
 					u32 next_desc_addr)
 {
-	__raw_writel(next_desc_addr, XOR_NEXT_DESC(chan));
+	writel_relaxed(next_desc_addr, XOR_NEXT_DESC(chan));
 }
 
 static void mv_chan_unmask_interrupts(struct mv_xor_chan *chan)
 {
-	u32 val = __raw_readl(XOR_INTR_MASK(chan));
+	u32 val = readl_relaxed(XOR_INTR_MASK(chan));
 	val |= XOR_INTR_MASK_VALUE << (chan->idx * 16);
-	__raw_writel(val, XOR_INTR_MASK(chan));
+	writel_relaxed(val, XOR_INTR_MASK(chan));
 }
 
 static u32 mv_chan_get_intr_cause(struct mv_xor_chan *chan)
 {
-	u32 intr_cause = __raw_readl(XOR_INTR_CAUSE(chan));
+	u32 intr_cause = readl_relaxed(XOR_INTR_CAUSE(chan));
 	intr_cause = (intr_cause >> (chan->idx * 16)) & 0xFFFF;
 	return intr_cause;
 }
@@ -154,20 +154,20 @@ static void mv_xor_device_clear_eoc_cause(struct mv_xor_chan *chan)
 {
 	u32 val = ~(3 << (chan->idx * 16));
 	dev_dbg(mv_chan_to_devp(chan), "%s, val 0x%08x\n", __func__, val);
-	__raw_writel(val, XOR_INTR_CAUSE(chan));
+	writel_relaxed(val, XOR_INTR_CAUSE(chan));
 }
 
 static void mv_xor_device_clear_err_status(struct mv_xor_chan *chan)
 {
 	u32 val = 0xFFFF0000 >> (chan->idx * 16);
-	__raw_writel(val, XOR_INTR_CAUSE(chan));
+	writel_relaxed(val, XOR_INTR_CAUSE(chan));
 }
 
 static void mv_set_mode(struct mv_xor_chan *chan,
 			       enum dma_transaction_type type)
 {
 	u32 op_mode;
-	u32 config = __raw_readl(XOR_CONFIG(chan));
+	u32 config = readl_relaxed(XOR_CONFIG(chan));
 
 	switch (type) {
 	case DMA_XOR:
@@ -189,7 +189,14 @@ static void mv_set_mode(struct mv_xor_chan *chan,
 
 	config &= ~0x7;
 	config |= op_mode;
-	__raw_writel(config, XOR_CONFIG(chan));
+
+#if defined(__BIG_ENDIAN)
+	config |= XOR_DESCRIPTOR_SWAP;
+#else
+	config &= ~XOR_DESCRIPTOR_SWAP;
+#endif
+
+	writel_relaxed(config, XOR_CONFIG(chan));
 	chan->current_type = type;
 }
 
@@ -204,7 +211,7 @@ static void mv_chan_activate(struct mv_xor_chan *chan)
 
 static char mv_chan_is_busy(struct mv_xor_chan *chan)
 {
-	u32 state = __raw_readl(XOR_ACTIVATION(chan));
+	u32 state = readl_relaxed(XOR_ACTIVATION(chan));
 
 	state = (state >> 4) & 0x3;
 
@@ -786,22 +793,22 @@ static void mv_dump_xor_regs(struct mv_xor_chan *chan)
 {
 	u32 val;
 
-	val = __raw_readl(XOR_CONFIG(chan));
+	val = readl_relaxed(XOR_CONFIG(chan));
 	dev_err(mv_chan_to_devp(chan), "config       0x%08x\n", val);
 
-	val = __raw_readl(XOR_ACTIVATION(chan));
+	val = readl_relaxed(XOR_ACTIVATION(chan));
 	dev_err(mv_chan_to_devp(chan), "activation   0x%08x\n", val);
 
-	val = __raw_readl(XOR_INTR_CAUSE(chan));
+	val = readl_relaxed(XOR_INTR_CAUSE(chan));
 	dev_err(mv_chan_to_devp(chan), "intr cause   0x%08x\n", val);
 
-	val = __raw_readl(XOR_INTR_MASK(chan));
+	val = readl_relaxed(XOR_INTR_MASK(chan));
 	dev_err(mv_chan_to_devp(chan), "intr mask    0x%08x\n", val);
 
-	val = __raw_readl(XOR_ERROR_CAUSE(chan));
+	val = readl_relaxed(XOR_ERROR_CAUSE(chan));
 	dev_err(mv_chan_to_devp(chan), "error cause  0x%08x\n", val);
 
-	val = __raw_readl(XOR_ERROR_ADDR(chan));
+	val = readl_relaxed(XOR_ERROR_ADDR(chan));
 	dev_err(mv_chan_to_devp(chan), "error addr   0x%08x\n", val);
 }
 
