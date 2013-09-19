@@ -677,13 +677,13 @@ static int mvebu_v7_pmsu_register_cpufreq(int cpu)
 	 * no function to do so), and simply cancel the
 	 * registration of the cpufreq device.
 	 */
-		ret = opp_add(cpu_dev, clk_get_rate(clk), 0);
+		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk), 0);
 	if (ret) {
 		clk_put(clk);
 		return ret;
 	}
 
-		ret = opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
+		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
 	if (ret) {
 		clk_put(clk);
 		return ret;

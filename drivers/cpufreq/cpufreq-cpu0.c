@@ -52,13 +52,13 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
 
 	if (!IS_ERR(cpu_reg)) {
 		rcu_read_lock();
-		opp = opp_find_freq_ceil(cpu_dev, &freq_Hz);
+		opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_Hz);
 		if (IS_ERR(opp)) {
 			rcu_read_unlock();
 			pr_err("failed to find OPP for %ld\n", freq_Hz);
 			return PTR_ERR(opp);
 		}
-		volt = opp_get_voltage(opp);
+		volt = dev_pm_opp_get_voltage(opp);
 		rcu_read_unlock();
 		tol = volt * voltage_tolerance / 100;
 		volt_old = regulator_get_voltage(cpu_reg);
@@ -160,7 +160,7 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
 		goto out_put_clk;
 	}
 
-	ret = opp_init_cpufreq_table(cpu_dev, &freq_table);
+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
 	if (ret) {
 		pr_err("failed to init cpufreq table: %d\n", ret);
 		goto out_put_clk;
@@ -184,12 +184,12 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
 		for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
 			;
 		rcu_read_lock();
-		opp = opp_find_freq_exact(cpu_dev,
+		opp = dev_pm_opp_find_freq_exact(cpu_dev,
 				freq_table[0].frequency * 1000, true);
-		min_uV = opp_get_voltage(opp);
-		opp = opp_find_freq_exact(cpu_dev,
+		min_uV = dev_pm_opp_get_voltage(opp);
+		opp = dev_pm_opp_find_freq_exact(cpu_dev,
 				freq_table[i-1].frequency * 1000, true);
-		max_uV = opp_get_voltage(opp);
+		max_uV = dev_pm_opp_get_voltage(opp);
 		rcu_read_unlock();
 		ret = regulator_set_voltage_time(cpu_reg, min_uV, max_uV);
 		if (ret > 0)
@@ -218,12 +218,6 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
 
 out_free_table:
 	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
-out_put_clk:
-	if (!IS_ERR(cpu_clk))
-		clk_put(cpu_clk);
-out_put_reg:
-	if (!IS_ERR(cpu_reg))
-		regulator_put(cpu_reg);
 out_put_node:
 	of_node_put(np);
 	return ret;
@@ -233,7 +227,7 @@ static int cpu0_cpufreq_remove(struct platform_device *pdev)
 {
 	cpufreq_cooling_unregister(cdev);
 	cpufreq_unregister_driver(&cpu0_cpufreq_driver);
-	opp_free_cpufreq_table(cpu_dev, &freq_table);
+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
 
 	return 0;
 }
