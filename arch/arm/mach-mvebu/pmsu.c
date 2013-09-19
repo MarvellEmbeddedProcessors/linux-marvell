@@ -32,7 +32,7 @@
 #include <linux/mvebu-v7-cpuidle.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
-#include <linux/opp.h>
+#include <linux/pm_opp.h>
 #include <linux/smp.h>
 #include <linux/resource.h>
 #include <linux/slab.h>
