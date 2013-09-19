@@ -875,7 +875,7 @@ static ssize_t show_available_freqs(struct device *d,
 {
 	struct devfreq *df = to_devfreq(d);
 	struct device *dev = df->dev.parent;
-	struct opp *opp;
+	struct dev_pm_opp *opp;
 	ssize_t count = 0;
 	unsigned long freq = 0;
 
@@ -1000,10 +1000,11 @@ module_exit(devfreq_exit);
  * under the locked area. The pointer returned must be used prior to unlocking
  * with rcu_read_unlock() to maintain the integrity of the pointer.
  */
-struct opp *devfreq_recommended_opp(struct device *dev, unsigned long *freq,
-				    u32 flags)
+struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
+					   unsigned long *freq,
+					   u32 flags)
 {
-	struct opp *opp;
+	struct dev_pm_opp *opp;
 
 	if (flags & DEVFREQ_FLAG_LEAST_UPPER_BOUND) {
 		/* The freq is an upper bound. opp should be lower */
