@@ -36,6 +36,18 @@ static struct thermal_cooling_device *cdev;
 
 static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
 {
+	return cpufreq_frequency_table_verify(policy, freq_table);
+}
+
+static unsigned int cpu0_get_speed(unsigned int cpu)
+{
+	return clk_get_rate(cpu_clk) / 1000;
+}
+
+static int cpu0_set_target(struct cpufreq_policy *policy,
+			   unsigned int target_freq, unsigned int relation)
+{
+	struct cpufreq_freqs freqs;
 	struct dev_pm_opp *opp;
 	unsigned long volt = 0, volt_old = 0, tol = 0;
 	unsigned int old_freq, new_freq;
@@ -172,7 +184,7 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
 		transition_latency = CPUFREQ_ETERNAL;
 
 	if (!IS_ERR(cpu_reg)) {
-		struct opp *opp;
+		struct dev_pm_opp *opp;
 		unsigned long min_uV, max_uV;
 		int i;
 
