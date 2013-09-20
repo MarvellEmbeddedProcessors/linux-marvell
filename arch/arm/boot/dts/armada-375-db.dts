@@ -1,0 +1,41 @@
+/*
+ * Device Tree file for Marvell Armada 375 evaluation board
+ * (DB-88F6720)
+ *
+ *  Copyright (C) 2013 Marvell
+ *
+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
+ *
+ * This file is licensed under the terms of the GNU General Public
+ * License version 2.  This program is licensed "as is" without any
+ * warranty of any kind, whether express or implied.
+ */
+
+/dts-v1/;
+#include "armada-375.dtsi"
+
+/ {
+	model = "Marvell Armada 375 Development Board";
+	compatible = "marvell,a375-db", "marvell,armada375";
+
+	chosen {
+		bootargs = "console=ttyS0,115200 earlyprintk";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x40000000>; /* 1 GB */
+	};
+
+	soc {
+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
+
+		internal-regs {
+			serial@12000 {
+				clock-frequency = <200000000>;
+				status = "okay";
+			};
+		};
+	};
+};
