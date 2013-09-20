@@ -5,6 +5,7 @@ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
 
 obj-y				 += system-controller.o
 obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
+obj-$(CONFIG_MACH_ARMADA_375) += armada-375.o
 obj-$(CONFIG_ARCH_MVEBU)	 += \
 	coherency.o coherency_ll.o pmsu.o cpu-reset.o \
 	common.o
