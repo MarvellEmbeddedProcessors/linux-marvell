@@ -235,6 +235,19 @@ MV_STATUS mvNetaHwfTxqInit(int tx_port, int txp, int txq)
 	return MV_OK;
 }
 
+MV_STATUS mvNetaHwfTxqNextIndexGet(int port, int tx_port, int txp, int txq, int *val)
+{
+	MV_U32				regVal;
+
+	regVal = NETA_HWF_TX_PORT_MASK(tx_port + txp) | NETA_HWF_TXQ_MASK(txq) | NETA_HWF_REG_MASK(3);
+	MV_REG_WRITE(NETA_HWF_TX_PTR_REG(port), regVal);
+
+	regVal = MV_REG_READ(NETA_HWF_MEMORY_REG(port));
+	if (val)
+		*val = (int)((regVal >> 16) & 0x3fff);
+
+	return MV_OK;
+}
 
 /*******************************************************************************
  * mvNetaHwfTxqEnable - Enable / Disable HWF from the rx_port to tx_port/txp/txq

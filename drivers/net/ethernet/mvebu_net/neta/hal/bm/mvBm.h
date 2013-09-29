@@ -100,12 +100,15 @@ extern MV_U8 *mvBmVirtBase;
 /* INLINE functions */
 static INLINE void mvBmPoolPut(int poolId, MV_ULONG bufPhysAddr)
 {
-	*((MV_ULONG *)((unsigned)mvBmVirtBase | (poolId << BM_POOL_ACCESS_OFFS))) = (MV_ULONG)(MV_32BIT_LE(bufPhysAddr));
+	volatile MV_U32 *poolAddr = (MV_U32 *)((unsigned)mvBmVirtBase | (poolId << BM_POOL_ACCESS_OFFS));
+
+	*poolAddr = MV_32BIT_LE((MV_U32)bufPhysAddr);
 }
 
 static INLINE MV_ULONG mvBmPoolGet(int poolId)
 {
-	MV_U32	bufPhysAddr = *(MV_U32 *)((unsigned)mvBmVirtBase | (poolId << 8));
+	volatile MV_U32 *poolAddr = (MV_U32 *)((unsigned)mvBmVirtBase | (poolId << BM_POOL_ACCESS_OFFS));
+	MV_U32	bufPhysAddr = *poolAddr;
 
 	return (MV_ULONG)(MV_32BIT_LE(bufPhysAddr));
 }
