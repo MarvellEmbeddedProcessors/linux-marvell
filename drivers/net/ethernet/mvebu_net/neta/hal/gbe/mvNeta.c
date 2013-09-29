@@ -2195,7 +2195,6 @@ void mvNetaRxReset(int port)
 	MV_REG_WRITE(NETA_PORT_RX_RESET_REG(port), 0);
 }
 
-
 /* Reset all TXQs */
 void mvNetaTxpReset(int port, int txp)
 {
@@ -2270,7 +2269,6 @@ void mvNetaRxqAddrSet(int port, int queue, int descrNum)
 		     netaDescVirtToPhys(pQueueCtrl, (MV_U8 *)pQueueCtrl->pFirst));
 	MV_REG_WRITE(NETA_RXQ_SIZE_REG(pPortCtrl->portNo, queue), descrNum);
 }
-
 
 /*******************************************************************************
 * mvNetaTxqInit - Allocate required memory and initialize TXQ descriptor ring.
