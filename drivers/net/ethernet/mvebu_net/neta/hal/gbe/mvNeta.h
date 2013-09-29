@@ -533,6 +533,30 @@ static INLINE int mvNetaTxqSentDescNumGet(int port, int txp, int txq)
 	return sent_desc;
 }
 
+/* Invalidate TXQ descriptor - buffer will not be sent, buffer will not be returned */
+static INLINE void mvNetaTxqDescInv(NETA_TX_DESC *pTxDesc)
+{
+	pTxDesc->command |= NETA_TX_HWF_MASK;
+	pTxDesc->command &= ~NETA_TX_BM_ENABLE_MASK;
+	pTxDesc->hw_cmd |= NETA_TX_ES_MASK;
+}
+
+/* Return: 1 - TX descriptor is valid, 0 - TX descriptor is invalid */
+static INLINE int mvNetaTxqDescIsValid(NETA_TX_DESC *pTxDesc)
+{
+	return ((pTxDesc->hw_cmd & NETA_TX_ES_MASK) == 0);
+}
+
+/* Get index of descripotor to be processed next in the specific TXQ */
+static INLINE int mvNetaTxqNextIndexGet(int port, int txp, int txq)
+{
+	MV_U32 regVal;
+
+	regVal = MV_REG_READ(NETA_TXQ_INDEX_REG(port, txp, txq));
+
+	return (regVal & NETA_TXQ_NEXT_DESC_INDEX_MASK) >> NETA_TXQ_NEXT_DESC_INDEX_OFFS;
+}
+
 /* Get number of TX descriptors didn't send by HW yet and waiting for TX */
 static INLINE int mvNetaTxqPendDescNumGet(int port, int txp, int txq)
 {
@@ -827,6 +851,7 @@ MV_STATUS mvNetaHwfTxqEnable(int port, int p, int txp, int txq, int enable);
 MV_STATUS mvNetaHwfTxqDropSet(int port, int p, int txp, int txq, int thresh, int bits);
 MV_STATUS mvNetaHwfMhSrcSet(int port, MV_NETA_HWF_MH_SRC src);
 MV_STATUS mvNetaHwfMhSelSet(int port, MV_U8 mhSel);
+MV_STATUS mvNetaHwfTxqNextIndexGet(int port, int tx_port, int txp, int txq, int *val);
 
 void mvNetaHwfRxpRegs(int port);
 void mvNetaHwfTxpRegs(int port, int p, int txp);

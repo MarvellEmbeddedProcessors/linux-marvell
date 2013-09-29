@@ -592,7 +592,10 @@ void mvEthPortCounters(int port, int mib)
 	mvEthMibPrint(port, mib, ETH_MIB_EXCESSIVE_COLLISION, "EXCESSIVE_COLLISION");
 	mvEthMibPrint(port, mib, ETH_MIB_COLLISION, "COLLISION");
 	mvEthMibPrint(port, mib, ETH_MIB_LATE_COLLISION, "LATE_COLLISION");
-
+#ifdef MV_ETH_PMT_NEW
+	mvEthRegPrint0(NETA_TX_BAD_FCS_CNTR_REG(port, mib), "NETA_TX_BAD_FCS_CNTR_REG");
+	mvEthRegPrint0(NETA_TX_DROP_CNTR_REG(port, mib), "NETA_TX_DROP_CNTR_REG");
+#endif
 	mvOsPrintf("\n[FC control]\n");
 	mvEthMibPrint(port, mib, ETH_MIB_UNREC_MAC_CONTROL_RECEIVED, "UNREC_MAC_CONTROL_RECEIVED");
 	mvEthMibPrint(port, mib, ETH_MIB_GOOD_FC_RECEIVED, "GOOD_FC_RECEIVED");

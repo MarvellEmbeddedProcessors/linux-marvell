@@ -315,6 +315,10 @@ extern "C" {
 #define NETA_HWF_TXQ_OFFS                   8
 #define NETA_HWF_TXQ_ALL_MASK               (0x7 << NETA_HWF_TXQ_OFFS)
 #define NETA_HWF_TXQ_MASK(txq)              ((txq) << NETA_HWF_TXQ_OFFS)
+
+#define NETA_HWF_REG_OFFS                   0
+#define NETA_HWF_REG_ALL_MASK               (0x7 << NETA_HWF_REG_OFFS)
+#define NETA_HWF_REG_MASK(reg)              ((reg) << NETA_HWF_REG_OFFS)
 /*-----------------------------------------------------------------------------------*/
 
 #define NETA_HWF_DROP_TH_REG(p)             (NETA_REG_BASE(p) + 0x1d40)
