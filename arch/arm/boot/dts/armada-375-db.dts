@@ -32,6 +32,20 @@
 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
 
 		internal-regs {
+			i2c0: i2c@11000 {
+				status = "okay";
+				clock-frequency = <100000>;
+				pinctrl-0 = <&i2c0_pins>;
+				pinctrl-names = "default";
+			};
+
+			i2c1: i2c@11100 {
+				status = "okay";
+				clock-frequency = <100000>;
+				pinctrl-0 = <&i2c1_pins>;
+				pinctrl-names = "default";
+			};
+
 			serial@12000 {
 				clock-frequency = <200000000>;
 				status = "okay";
