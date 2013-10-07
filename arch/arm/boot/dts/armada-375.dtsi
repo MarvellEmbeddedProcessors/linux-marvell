@@ -165,6 +165,12 @@
 				};
 			};
 
+			rtc@10300 {
+				compatible = "marvell,orion-rtc";
+				reg = <0x10300 0x20>;
+				interrupts = <0 21 0x4>;
+			};
+
 			serial@12000 {
 				compatible = "snps,dw-apb-uart";
 				reg = <0x12000 0x100>;
