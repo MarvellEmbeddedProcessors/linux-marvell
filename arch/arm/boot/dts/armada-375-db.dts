@@ -46,6 +46,21 @@
 				pinctrl-names = "default";
 			};
 
+			mvsdio@d4000 {
+				pinctrl-0 = <&sdio_pins &sdio_st_pins>;
+				pinctrl-names = "default";
+				status = "okay";
+				cd-gpios = <&gpio1 12 0>;
+				wp-gpios = <&gpio1 13 0>;
+			};
+
+			pinctrl {
+				sdio_st_pins: sdio-st-pins {
+					marvell,pins = "mpp44", "mpp45";
+					marvell,function = "gpio";
+				};
+			};
+
 			serial@12000 {
 				clock-frequency = <200000000>;
 				status = "okay";
