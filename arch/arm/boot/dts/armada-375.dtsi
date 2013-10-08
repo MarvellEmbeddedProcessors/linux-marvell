@@ -72,6 +72,13 @@
 				      <0xc100 0x100>;
 			};
 
+			gateclk: clock-gating-control@18220 {
+				compatible = "marvell,armada-375-gating-clock";
+				reg = <0x18220 0x4>;
+				clocks = <&coreclk 0>;
+				#clock-cells = <1>;
+			};
+
 			gpio0: gpio@18100 {
 				compatible = "marvell,orion-gpio";
 				reg = <0x18100 0x40>;
