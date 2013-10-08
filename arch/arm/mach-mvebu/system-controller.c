@@ -45,6 +45,13 @@ const struct mvebu_system_controller armada_370_xp_system_controller = {
 	.system_soft_reset = 0x1,
 };
 
+const struct mvebu_system_controller armada_375_system_controller = {
+	.rstoutn_mask_offset = 0x54,
+	.system_soft_reset_offset = 0x58,
+	.rstoutn_mask_reset_out_en = 0x1,
+	.system_soft_reset = 0x1,
+};
+
 const struct mvebu_system_controller orion_system_controller = {
 	.rstoutn_mask_offset = 0x108,
 	.system_soft_reset_offset = 0x10c,
@@ -59,6 +66,9 @@ static struct of_device_id of_system_controller_table[] = {
 	}, {
 		.compatible = "marvell,armada-370-xp-system-controller",
 		.data = (void *) &armada_370_xp_system_controller,
+	}, {
+		.compatible = "marvell,armada-375-system-controller",
+		.data = (void *) &armada_375_system_controller,
 	},
 	{ /* end of list */ },
 };
