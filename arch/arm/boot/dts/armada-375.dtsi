@@ -160,6 +160,18 @@
 				interrupts = <1 15 0x4>;
 			};
 
+			mvsdio@d4000 {
+				compatible = "marvell,orion-sdio";
+				reg = <0xd4000 0x200>;
+				interrupts = <0 25 0x4>;
+				clocks = <&gateclk 17>;
+				bus-width = <4>;
+				cap-sdio-irq;
+				cap-sd-highspeed;
+				cap-mmc-highspeed;
+				status = "disabled";
+			};
+
 			pinctrl {
 				compatible = "marvell,mv88f6720-pinctrl";
 				reg = <0x18000 0x24>;
@@ -172,6 +184,12 @@
 				i2c1_pins: i2c1-pins {
 					marvell,pins = "mpp61",  "mpp62";
 					marvell,function = "i2c1";
+				};
+
+				sdio_pins: sdio-pins {
+					marvell,pins = "mpp24",  "mpp25", "mpp26",
+						     "mpp27", "mpp28", "mpp29";
+					marvell,function = "sd";
 				};
 			};
 
