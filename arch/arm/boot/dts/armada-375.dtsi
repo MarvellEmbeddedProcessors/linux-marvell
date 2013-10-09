@@ -212,6 +212,15 @@
 				interrupts = <0 21 0x4>;
 			};
 
+			sata@a0000 {
+				compatible = "marvell,orion-sata";
+				reg = <0xa0000 0x5000>;
+				interrupts = <0 26 0x4>;
+				clocks = <&gateclk 14>, <&gateclk 20>;
+				clock-names = "0", "1";
+				status = "disabled";
+			};
+
 			scu@c000 {
 				compatible = "arm,cortex-a9-scu";
 				reg = <0xc000 0x58>;
