@@ -61,6 +61,11 @@
 				};
 			};
 
+			sata@a0000 {
+				nr-ports = <1>;
+				status = "okay";
+			};
+
 			serial@12000 {
 				clock-frequency = <200000000>;
 				status = "okay";
