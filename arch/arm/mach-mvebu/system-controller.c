@@ -35,6 +35,8 @@ struct mvebu_system_controller {
 
 	u32 rstoutn_mask_reset_out_en;
 	u32 system_soft_reset;
+
+	u32 resume_boot_addr;
 };
 static struct mvebu_system_controller *mvebu_sc;
 
@@ -50,6 +52,7 @@ const struct mvebu_system_controller armada_375_system_controller = {
 	.system_soft_reset_offset = 0x58,
 	.rstoutn_mask_reset_out_en = 0x1,
 	.system_soft_reset = 0x1,
+	.resume_boot_addr = 0xd4,
 };
 
 const struct mvebu_system_controller orion_system_controller = {
@@ -96,6 +99,15 @@ void mvebu_restart(char mode, const char *cmd)
 		;
 }
 
+#ifdef CONFIG_SMP
+void armada_375_set_bootaddr(void *boot_addr)
+{
+	WARN_ON(system_controller_base == NULL);
+	writel(virt_to_phys(boot_addr), system_controller_base +
+	       mvebu_sc->resume_boot_addr);
+}
+#endif
+
 static int __init mvebu_system_controller_init(void)
 {
 	struct device_node *np;
@@ -103,7 +115,7 @@ static int __init mvebu_system_controller_init(void)
 	np = of_find_matching_node(NULL, of_system_controller_table);
 	if (np) {
 		const struct of_device_id *match =
-		    of_match_node(of_system_controller_table, np);
+			of_match_node(of_system_controller_table, np);
 		BUG_ON(!match);
 		system_controller_base = of_iomap(np, 0);
 		mvebu_sc = (struct mvebu_system_controller *)match->data;
@@ -112,4 +124,4 @@ static int __init mvebu_system_controller_init(void)
 	return 0;
 }
 
-arch_initcall(mvebu_system_controller_init);
+early_initcall(mvebu_system_controller_init);
