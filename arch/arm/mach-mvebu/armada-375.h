@@ -14,7 +14,10 @@
 #define __MACH_ARMADA_375_H
 
 #ifdef CONFIG_SMP
+#define ARMADA_375_MAX_CPUS 2
+
 void armada_375_set_bootaddr(void *boot_addr);
+extern struct smp_operations armada_375_smp_ops;
 #endif
 
 #endif /* __MACH_ARMADA_375_H */
