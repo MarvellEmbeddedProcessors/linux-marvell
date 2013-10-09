@@ -17,6 +17,7 @@
 static struct of_device_id of_cpu_reset_table[] = {
 	{.compatible = "marvell,armada-370-cpu-reset", .data = (void*) 1 },
 	{.compatible = "marvell,armada-xp-cpu-reset",  .data = (void*) 4 },
+	{.compatible = "marvell,armada-375-cpu-reset", .data = (void*) 2 },
 	{ /* end of list */ },
 };
 
