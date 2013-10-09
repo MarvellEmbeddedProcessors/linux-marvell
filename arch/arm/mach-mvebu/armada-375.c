@@ -25,10 +25,28 @@
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
+#include <asm/smp_scu.h>
 #include <asm/mach/time.h>
 #include <asm/signal.h>
+#include "armada-375.h"
 #include "common.h"
 #include "coherency.h"
+
+static struct of_device_id of_scu_table[] = {
+	{ .compatible = "arm,cortex-a9-scu" },
+	{ },
+};
+
+static void __init armada_375_scu_enable(void)
+{
+	void __iomem *scu_base;
+
+	struct device_node *np = of_find_matching_node(NULL, of_scu_table);
+	if (np) {
+		scu_base = of_iomap(np, 0);
+		scu_enable(scu_base);
+	}
+}
 
 /*
  * Early versions of Armada 375 SoC have a bug where the BootROM
@@ -54,6 +72,7 @@ static void __init armada_375_timer_and_clk_init(void)
 {
 	mvebu_clocks_init();
 	clocksource_of_init();
+	armada_375_scu_enable();
 	coherency_init();
 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
 	l2x0_of_init(0, ~0UL);
@@ -67,6 +86,7 @@ static const char * const armada_375_dt_compat[] = {
 };
 
 DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
+	.smp		= smp_ops(armada_375_smp_ops),
 	.map_io		= debug_ll_io_init,
 	.init_irq	= irqchip_init,
 	.init_time	= armada_375_timer_and_clk_init,
