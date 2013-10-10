@@ -36,6 +36,13 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a9";
 			reg = <0>;
+			resets = <&cpurst 0>;
+		};
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a9";
+			reg = <1>;
+			resets = <&cpurst 1>;
 		};
 	};
 
@@ -63,6 +70,12 @@
 				compatible = "marvell,armada-375-core-clock";
 				reg = <0xe8204 0x04>;
 				#clock-cells = <1>;
+			};
+
+			cpurst: cpurst@20800 {
+				compatible = "marvell,armada-375-cpu-reset";
+				reg = <0x20800 0x10>;
+				#reset-cells = <1>;
 			};
 
 			gic: interrupt-controller@1e001000 {
@@ -197,6 +210,11 @@
 				compatible = "marvell,orion-rtc";
 				reg = <0x10300 0x20>;
 				interrupts = <0 21 0x4>;
+			};
+
+			scu@c000 {
+				compatible = "arm,cortex-a9-scu";
+				reg = <0xc000 0x58>;
 			};
 
 			serial@12000 {
