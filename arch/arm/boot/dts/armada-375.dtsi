@@ -66,6 +66,11 @@
 			#size-cells = <1>;
 			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
 
+			coherency-fabric@21010 {
+				compatible = "marvell,armada-375-coherency-fabric";
+				reg = <0x21010 0x1c>;
+			};
+
 			coreclk: mvebu-sar@r8204 {
 				compatible = "marvell,armada-375-core-clock";
 				reg = <0xe8204 0x04>;
