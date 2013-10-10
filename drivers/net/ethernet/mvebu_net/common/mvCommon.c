@@ -387,3 +387,31 @@ MV_U8 mvReverseBits(MV_U8 num)
 	num = (num & 0xAA) >> 1 | (num & 0x55) << 1;
 	return num;
 }
+/*******************************************************************************
+* mvCountMaskBits
+*
+* DESCRIPTION:
+*       This function count 1 in mask bit
+*
+* INPUT:
+*	num - MV_U8 number to count
+*
+* OUTPUT:
+*       None
+*
+* RETURN:
+*	number of 1 in mask
+*
+*******************************************************************************/
+MV_U32 mvCountMaskBits(MV_U8 mask)
+{
+	int i;
+	MV_U32 c = 0;
+
+	for (i = 0; i < 8; i++) {
+		if (mask & 1)
+			c++;
+		mask = mask >> 1;
+	}
+	return c;
+}
