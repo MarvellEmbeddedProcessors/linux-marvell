@@ -384,6 +384,7 @@ void mvAsciiToHex(const char *asciiStr, char *hexStr);
 void mvBinToHex(const MV_U8 *bin, char *hexStr, int size);
 void mvBinToAscii(const MV_U8 *bin, char *asciiStr, int size);
 MV_U8 mvReverseBits(MV_U8 num);
+MV_U32 mvCountMaskBits(MV_U8 mask);
 
 MV_STATUS mvMacStrToHex(const char *macStr, MV_U8 *macHex);
 MV_STATUS mvMacHexToStr(MV_U8 *macHex, char *macStr);
