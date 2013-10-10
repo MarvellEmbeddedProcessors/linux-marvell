@@ -73,8 +73,8 @@ static void __init armada_375_timer_and_clk_init(void)
 	mvebu_clocks_init();
 	clocksource_of_init();
 	armada_375_scu_enable();
-	coherency_init();
 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+	coherency_init();
 	l2x0_of_init(0, ~0UL);
 	hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
 			"imprecise external abort");
