@@ -373,6 +373,11 @@ extern "C" {
 #define MV_88F6720_Z1_ID	0x0
 #define MV_88F6720_Z1_NAME	"Z1"
 
+/* Armada 38x Family */
+#define MV_88F68XX		0x6800
+#define MV_6810_DEV_ID		0x6810
+#define MV_6820_DEV_ID		0x6820
+
 /* BobCat2  Family */
 #define MV_BOBCAT2_DEV_ID		0xFC00
 
