@@ -133,6 +133,17 @@ config MV_XOR
 	---help---
 	  Enable support for the Marvell XOR engine.
 
+config MV_MEMCPY
+	bool "Marvell MEMCPY engine support"
+	depends on PLAT_ORION
+	select DMA_ENGINE
+	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
+	help
+	  Enable support for the Marvell MEMCPY engine
+	  This driver only supports the memcpy and drops
+	  the support for memset and xor in favor of more
+	  efficient operation.
+
 config MX3_IPU
 	bool "MX3x Image Processing Unit support"
 	depends on ARCH_MXC
