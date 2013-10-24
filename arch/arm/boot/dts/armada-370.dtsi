@@ -181,6 +181,13 @@
 				#clock-cells = <1>;
 			};
 
+			memcpy@60800 {
+				compatible = "marvell,orion-memcpy";
+				reg = <0x60800 0x100>;
+				marvell,coalescing = <1>;
+				status = "okay";
+			};
+
 			xor@60800 {
 				compatible = "marvell,orion-xor";
 				reg = <0x60800 0x100
