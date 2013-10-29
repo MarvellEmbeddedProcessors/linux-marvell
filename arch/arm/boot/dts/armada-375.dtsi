@@ -259,6 +259,12 @@
 						     "mpp27", "mpp28", "mpp29";
 					marvell,function = "sd";
 				};
+
+				spi0_pins: spi0-pins {
+					marvell,pins = "mpp0",  "mpp1", "mpp4",
+						     "mpp5", "mpp8", "mpp9";
+					marvell,function = "spi0";
+				};
 			};
 
 			rtc@10300 {
@@ -296,6 +302,28 @@
 				reg-shift = <2>;
 				interrupts = <0 13 4>;
 				reg-io-width = <1>;
+				status = "disabled";
+			};
+
+			spi0: spi@10600 {
+				compatible = "marvell,orion-spi";
+				reg = <0x10600 0x50>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				cell-index = <0>;
+				interrupts = <0 1 0x4>;
+				clocks = <&coreclk 0>;
+				status = "disabled";
+			};
+
+			spi1: spi@10680 {
+				compatible = "marvell,orion-spi";
+				reg = <0x10680 0x50>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				cell-index = <1>;
+				interrupts = <0 63 0x4>;
+				clocks = <&coreclk 0>;
 				status = "disabled";
 			};
 
