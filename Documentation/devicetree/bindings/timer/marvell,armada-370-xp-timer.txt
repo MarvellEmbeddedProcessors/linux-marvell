@@ -1,9 +1,11 @@
-Marvell Armada 370 and Armada XP Timers
----------------------------------------
+Marvell Armada 370, 375 and XP Timers
+-------------------------------------
 
 Required properties:
-- compatible: Should be either "marvell,armada-370-timer" or
-  "marvell,armada-xp-timer" as appropriate.
+- compatible: Should be either:
+    - "marvell,armada-370-timer"
+    - "marvell,armada-375-timer"
+    - "marvell,armada-xp-timer"
 - interrupts: Should contain the list of Global Timer interrupts and
   then local timer interrupts
 - reg: Should contain location and length for timers register. First
@@ -11,6 +13,9 @@ Required properties:
   local/private timers.
 
 Clocks required for compatible = "marvell,armada-370-timer":
+- clocks : Must contain a single entry describing the clock input
+
+Clocks required for compatible = "marvell,armada-375-timer":
 - clocks : Must contain a single entry describing the clock input
 
 Clocks required for compatible = "marvell,armada-xp-timer":
