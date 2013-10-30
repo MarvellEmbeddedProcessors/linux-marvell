@@ -15,11 +15,14 @@
  * used as clock_event_device.
  *
  * ---
- * Clocksource driver for Armada 370 and Armada XP SoC.
+ * Clocksource driver for Armada 370, Armada 375 and Armada XP SoC.
  * This driver implements one compatible string for each SoC, given
  * each has its own characteristics:
  *
  *   * Armada 370 has no 25 MHz fixed timer.
+ *
+ *   * Armada 375 has a non-usable 25 Mhz fixed timer, due to hardware
+ *     issues.
  *
  *   * Armada XP cannot work properly without such 25 MHz fixed timer as
  *     doing otherwise leads to using a clocksource whose frequency varies
@@ -317,3 +320,16 @@ static void __init armada_370_timer_init(struct device_node *np)
 }
 CLOCKSOURCE_OF_DECLARE(armada_370, "marvell,armada-370-timer",
 		       armada_370_timer_init);
+
+static void __init armada_375_timer_init(struct device_node *np)
+{
+	struct clk *clk = of_clk_get(np, 0);
+
+	BUG_ON(IS_ERR(clk));
+	timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
+	timer25Mhz = false;
+
+	armada_370_xp_timer_common_init(np);
+}
+CLOCKSOURCE_OF_DECLARE(armada_375, "marvell,armada-375-timer",
+		       armada_375_timer_init);
