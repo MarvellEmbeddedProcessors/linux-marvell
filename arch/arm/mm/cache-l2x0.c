@@ -776,7 +776,7 @@ static const struct of_device_id l2x0_ids[] __initconst = {
 	{}
 };
 
-int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+int __init l2x0_of_init_common(u32 aux_val, u32 aux_mask, bool is_coherent)
 {
 	struct device_node *np;
 	const struct l2x0_of_data *data;
@@ -813,8 +813,32 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
 
 	of_init = true;
 	memcpy(&outer_cache, &data->outer_cache, sizeof(outer_cache));
+
+	/*
+	 * PL310 newer than r3p2 don't need an outer cache sync
+	 * operation when the system is operating with hardware
+	 * coherency enabled, as it is done directly in hardware.
+	 */
+	if (of_device_is_compatible(np, "arm,pl310-cache")) {
+		u32 l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
+			L2X0_CACHE_ID_RTL_MASK;
+		if (l2x0_revision >= L2X0_CACHE_ID_RTL_R3P2 && is_coherent)
+			outer_cache.sync = NULL;
+	}
+
 	l2x0_init(l2x0_base, aux_val, aux_mask);
 
 	return 0;
 }
+
+int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+{
+	return l2x0_of_init_common(aux_val, aux_mask, false);
+}
+
+int __init l2x0_of_init_coherent(u32 aux_val, u32 aux_mask)
+{
+	return l2x0_of_init_common(aux_val, aux_mask, true);
+}
+
 #endif

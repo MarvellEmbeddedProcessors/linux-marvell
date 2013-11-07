@@ -110,6 +110,7 @@
 extern void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask);
 #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
 extern int l2x0_of_init(u32 aux_val, u32 aux_mask);
+extern int l2x0_of_init_coherent(u32 aux_val, u32 aux_mask);
 #else
 static inline int l2x0_of_init(u32 aux_val, u32 aux_mask)
 {
