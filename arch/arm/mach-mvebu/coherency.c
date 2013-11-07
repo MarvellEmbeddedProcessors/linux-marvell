@@ -38,6 +38,7 @@ static void __iomem *coherency_cpu_base;
 #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
 
 enum {
+	COHERENCY_FABRIC_TYPE_NONE,
 	COHERENCY_FABRIC_TYPE_ARMADA_370_XP,
 };
 
@@ -149,7 +150,7 @@ static void __init armada_370_coherency_init(struct device_node *np)
 	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
 }
 
-int __init coherency_init(void)
+static int coherency_type(void)
 {
 	struct device_node *np;
 
@@ -183,17 +184,36 @@ int __init coherency_init(void)
 		int type;
 
 		type = (int) match->data;
-		pr_info("Initializing Coherency fabric\n");
+
+		/* Armada 370/XP coherency works in both UP and SMP */
 		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
-			armada_370_coherency_init(np);
+			return type;
 	}
+
+	return COHERENCY_FABRIC_TYPE_NONE;
+}
+
+int coherency_available(void)
+{
+	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
+}
+
+int __init coherency_init(void)
+{
+	int type = coherency_type();
+	struct device_node *np;
+
+	np = of_find_matching_node(NULL, of_coherency_table);
+
+	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
+		armada_370_coherency_init(np);
 
 	return 0;
 }
 
 static int __init coherency_late_init(void)
 {
-	if (of_find_matching_node(NULL, of_coherency_table))
+	if (coherency_available())
 		bus_register_notifier(&platform_bus_type,
 				      &mvebu_hwcc_platform_nb);
 	return 0;
