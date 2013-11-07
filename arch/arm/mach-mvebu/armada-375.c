@@ -48,6 +48,20 @@ static void __init armada_375_scu_enable(void)
 	}
 }
 
+static void __iomem *
+armada_375_ioremap_caller(unsigned long phys_addr, size_t size,
+			  unsigned int mtype, void *caller)
+{
+	struct resource pcie_mem;
+
+	mvebu_mbus_get_pcie_mem_aperture(&pcie_mem);
+
+	if (pcie_mem.start <= phys_addr && (phys_addr + size) <= pcie_mem.end)
+		mtype = MT_MEMORY_SO;
+
+	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
+}
+
 /*
  * Early versions of Armada 375 SoC have a bug where the BootROM
  * leaves an external data abort pending. The kernel is hit by this
@@ -74,6 +88,8 @@ static void __init armada_375_timer_and_clk_init(void)
 	clocksource_of_init();
 	armada_375_scu_enable();
 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+	arch_ioremap_caller = armada_375_ioremap_caller;
+	pci_ioremap_set_mem_type(MT_MEMORY_SO);
 	coherency_init();
 	l2x0_of_init(0, ~0UL);
 	hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
