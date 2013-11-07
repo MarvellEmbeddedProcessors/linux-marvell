@@ -40,7 +40,7 @@ static void __init armada_370_xp_timer_and_clk_init(void)
 	mvebu_clocks_init();
 	clocksource_of_init();
 	coherency_init();
-	BUG_ON(mvebu_mbus_dt_init());
+	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
 #ifdef CONFIG_CACHE_L2X0
 	l2x0_of_init(0, ~0UL);
 #endif
