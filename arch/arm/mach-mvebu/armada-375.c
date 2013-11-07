@@ -91,7 +91,10 @@ static void __init armada_375_timer_and_clk_init(void)
 	arch_ioremap_caller = armada_375_ioremap_caller;
 	pci_ioremap_set_mem_type(MT_MEMORY_SO);
 	coherency_init();
-	l2x0_of_init(0, ~0UL);
+	if (coherency_available())
+		l2x0_of_init_coherent(0, ~0UL);
+	else
+		l2x0_of_init(0, ~0UL);
 	hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
 			"imprecise external abort");
 }
