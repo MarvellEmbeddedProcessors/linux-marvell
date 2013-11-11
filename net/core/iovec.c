@@ -101,6 +101,26 @@ int memcpy_toiovecend(const struct iovec *iov, unsigned char *kdata,
 EXPORT_SYMBOL(memcpy_toiovecend);
 
 /*
+ *	In kernel copy to iovec. Returns -EFAULT on error.
+ *
+ *	Note: this modifies the original iovec.
+ */
+void memcpy_tokerneliovec(struct iovec *iov, unsigned char *kdata, int len)
+{
+	while (len > 0) {
+		if (iov->iov_len) {
+			int copy = min_t(unsigned int, iov->iov_len, len);
+			memcpy(iov->iov_base, kdata, copy);
+			len -= copy;
+			kdata += copy;
+			iov->iov_base += copy;
+			iov->iov_len -= copy;
+		}
+		iov++;
+	}
+}
+
+/*
  *	Copy iovec from kernel. Returns -EFAULT on error.
  */
 

@@ -317,6 +317,7 @@ extern int memcpy_toiovecend(const struct iovec *v, unsigned char *kdata,
 			     int offset, int len);
 extern int move_addr_to_kernel(void __user *uaddr, int ulen, struct sockaddr_storage *kaddr);
 extern int put_cmsg(struct msghdr*, int level, int type, int len, void *data);
+extern void memcpy_tokerneliovec(struct iovec *iov, unsigned char *kdata, int len);
 
 struct timespec;
 
