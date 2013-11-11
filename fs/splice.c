@@ -34,6 +34,10 @@
 #include <linux/compat.h>
 #include "internal.h"
 
+struct common_mempool;
+static struct common_mempool/*struct gen_pool*/ * rcv_pool = NULL;
+static struct common_mempool/*struct gen_pool*/ * kvec_pool = NULL;
+
 /*
  * Attempt to steal a page from a pipe buffer. This should perhaps go into
  * a vm helper function, it's already simplified quite a bit by the
@@ -1415,6 +1419,264 @@ static long do_splice(struct file *in, loff_t __user *off_in,
 	return -EINVAL;
 }
 
+/****************************** POOL MANAGER *************************************/
+/* Forward declarations */
+typedef struct common_mempool common_mempool_t;
+void* common_mempool_alloc(common_mempool_t* pool);
+void common_mempool_free(common_mempool_t* pool, void* mem);
+common_mempool_t* common_mempool_get(void* mem);
+common_mempool_t*  common_mempool_create(uint32_t number_of_entries, uint32_t entry_size);
+void  common_mempool_destroy(common_mempool_t* pool);
+int32_t common_mempool_get_number_of_free_entries(common_mempool_t* pool);
+int32_t common_mempool_get_number_of_entries(common_mempool_t* pool);
+int32_t common_mempool_get_entry_size(common_mempool_t* pool);
+
+/* Implementation */
+#define COMMON_MPOOL_HDR_FLAGS_ALLOCATED 0x00000001
+#define COMMON_MPOOL_HDR_MAGIC           0xa5a5a508
+#define COMMON_MPOOL_FTR_MAGIC           0xa5a5a509
+#define COMMON_MPOOL_ALIGN4(size) ((size)+4) & 0xFFFFFFFC;
+#define COMMON_MPOOL_CHECK_ALIGNED4(ptr) ((((uint32_t)(ptr)) & 0x00000003) == 0)
+#define MAX_PAGES_PER_RECVFILE		64
+
+typedef struct common_mpool_hdr
+{
+  struct common_mpool_hdr* next;
+  common_mempool_t*        pool;
+  uint32_t flags;
+  uint32_t magic;
+} common_mpool_hdr_t;
+
+typedef struct
+{
+	uint32_t magic;
+	common_mempool_t* pool;
+} common_mpool_ftr_t;
+
+struct common_mempool
+{
+	common_mpool_hdr_t*  head;
+	common_mpool_hdr_t*  tail;
+	uint32_t		number_of_free_entries;
+	spinlock_t		lock;
+	uint32_t                 data_size; /* size of data section in pool entry */
+	uint32_t                 pool_entry_size; /* size of pool entry */
+	/* parameters passed on init */
+	uint32_t                 number_of_entries;
+	uint32_t                 entry_size;
+	uint8_t*                 mem;
+};
+
+bool common_mempool_check_internal(common_mempool_t * pool,
+					void * ptr,
+					common_mpool_hdr_t * hdr,
+					common_mpool_ftr_t * ftr)
+{
+	if (!ptr) {
+		printk(KERN_ERR "illegal ptr NULL");
+		return false;
+	}
+
+	if (!COMMON_MPOOL_CHECK_ALIGNED4(ptr)) {
+		printk(KERN_ERR "ptr not aligned %p",ptr);
+		return false;
+	}
+
+	if (hdr->magic != COMMON_MPOOL_HDR_MAGIC) {
+		printk(KERN_ERR "illegal hdr magic %x for ptr %p",hdr->magic,ptr);
+		return false;
+	}
+
+	if (ftr->magic != COMMON_MPOOL_FTR_MAGIC) {
+		printk(KERN_ERR "illegal ftr magic %x for ptr %p",ftr->magic,ptr);
+		return false;
+	}
+
+	if (hdr->pool != pool || ftr->pool != pool) {
+		printk(KERN_ERR "inconsistent size hdr->pool: %p ftr->pool: %p for ptr %p",hdr->pool,ftr->pool,ptr);
+		return false;
+	}
+
+	if (!(hdr->flags & COMMON_MPOOL_HDR_FLAGS_ALLOCATED)) {
+		printk(KERN_ERR "ptr %p was not allocated",ptr);
+		return false;
+	}
+	return true;
+}
+
+void* common_mempool_alloc(common_mempool_t* pool)
+{
+	common_mpool_hdr_t* hdr;
+
+	if (!pool || !pool->head || pool->number_of_free_entries == 0) {
+		return NULL;
+	}
+	spin_lock_bh(&pool->lock);
+	hdr = pool->head;
+	pool->head = pool->head->next;
+
+	if (!pool->head) {
+		pool->tail = NULL;
+	}
+
+	hdr->flags = COMMON_MPOOL_HDR_FLAGS_ALLOCATED;
+	pool->number_of_free_entries--;
+	spin_unlock_bh(&pool->lock);
+	return ((uint8_t*)hdr+sizeof(common_mpool_hdr_t));
+}
+
+void common_mempool_free(common_mempool_t* pool, void* ptr)
+{
+	common_mpool_hdr_t* hdr;
+	common_mpool_ftr_t* ftr;
+
+	if (!pool || !ptr) {
+		return;
+	}
+	if (!COMMON_MPOOL_CHECK_ALIGNED4(ptr)) {
+		printk(KERN_ERR "ptr not aligned %p",ptr);
+		return;
+	}
+	spin_lock_bh(&pool->lock);
+	hdr = (common_mpool_hdr_t*)((uint8_t*)ptr-sizeof(common_mpool_hdr_t));
+	ftr = (common_mpool_ftr_t*)((uint8_t*)ptr+pool->data_size);
+
+	if (!common_mempool_check_internal(pool,ptr,hdr,ftr)) {
+		printk(KERN_ERR "invalid ptr %p",ptr);
+		spin_unlock_bh(&pool->lock);
+		return;
+	}
+
+	hdr->flags ^= COMMON_MPOOL_HDR_FLAGS_ALLOCATED;
+	hdr->next = NULL;
+
+	if (!pool->head) {
+		pool->head = pool->tail = hdr;
+	} else {
+		pool->tail->next = hdr;
+		pool->tail = hdr;
+	}
+
+	pool->number_of_free_entries++;
+	spin_unlock_bh(&pool->lock);
+}
+
+common_mempool_t*  common_mempool_create(uint32_t number_of_entries,
+						uint32_t entry_size)
+{
+	uint32_t i;
+	uint32_t aligned_entry_size;
+	uint32_t pool_entry_size;
+	common_mpool_hdr_t* hdr;
+	common_mpool_hdr_t* next_hdr;
+	common_mpool_ftr_t* ftr;
+	common_mempool_t* pool;
+
+	aligned_entry_size = COMMON_MPOOL_ALIGN4(entry_size);
+	pool_entry_size = COMMON_MPOOL_ALIGN4(sizeof(common_mpool_hdr_t) +
+					aligned_entry_size +
+					sizeof(common_mpool_ftr_t));
+
+	pool = kmalloc((sizeof(common_mempool_t) + pool_entry_size*number_of_entries), GFP_ATOMIC);
+
+	if (!pool) {
+		return NULL;
+	}
+
+	pool->entry_size = entry_size;
+	pool->number_of_entries = number_of_entries;
+	pool->data_size  = aligned_entry_size;
+	pool->pool_entry_size = pool_entry_size;
+	pool->number_of_free_entries = number_of_entries;
+	pool->mem = (uint8_t*)(pool+1);
+	pool->head = (common_mpool_hdr_t*)pool->mem;
+	spin_lock_init(&pool->lock);
+
+	for (i=0;i<number_of_entries;i++) {
+		hdr = (common_mpool_hdr_t*)&pool->mem[pool_entry_size*i];
+		ftr = (common_mpool_ftr_t*)((uint8_t*)hdr+sizeof(common_mpool_hdr_t)+aligned_entry_size);
+		hdr->magic = COMMON_MPOOL_HDR_MAGIC;
+		hdr->pool = pool;
+		hdr->flags = 0;
+		ftr->magic = COMMON_MPOOL_FTR_MAGIC;
+		ftr->pool = pool;
+
+		if (i < (number_of_entries-1)) {
+			next_hdr = (common_mpool_hdr_t*)&pool->mem[pool_entry_size*(i+1)];
+		} else {
+			pool->tail = hdr;
+			next_hdr = NULL;
+		}
+
+		hdr->next = next_hdr;
+	}
+	return pool;
+}
+
+void  common_mempool_destroy(common_mempool_t* pool)
+{
+	if (!pool) {
+		return;
+	}
+
+	kfree(pool);
+}
+
+int32_t common_mempool_get_number_of_free_entries(common_mempool_t* pool)
+{
+	if (!pool) {
+		return -1;
+	}
+
+	return (int32_t)pool->number_of_free_entries;
+}
+
+int32_t common_mempool_get_number_of_entries(common_mempool_t* pool)
+{
+	if (!pool) {
+		return -1;
+	}
+	return (int32_t)pool->number_of_entries;
+}
+
+int32_t common_mempool_get_entry_size(common_mempool_t* pool)
+{
+	if (!pool) {
+		return -1;
+	}
+	return (int32_t)pool->entry_size;
+}
+
+common_mempool_t* common_mempool_get(void* ptr)
+{
+	common_mpool_hdr_t* hdr;
+	common_mpool_ftr_t* ftr;
+
+	if (!ptr) {
+		return NULL;
+	}
+	if (!COMMON_MPOOL_CHECK_ALIGNED4(ptr)) {
+		return NULL;
+	}
+	hdr = (common_mpool_hdr_t*)((uint8_t*)ptr-sizeof(common_mpool_hdr_t));
+	ftr = (common_mpool_ftr_t*)((uint8_t*)ptr + hdr->pool->data_size);
+
+	if (hdr->magic != COMMON_MPOOL_HDR_MAGIC) {
+		printk(KERN_ERR "illegal hdr magic %x for ptr %p",hdr->magic,ptr);
+		return NULL;
+	}
+	if (ftr->magic != COMMON_MPOOL_FTR_MAGIC) {
+		printk(KERN_ERR "illegal ftr magic %x for ptr %p",ftr->magic,ptr);
+		return NULL;
+	}
+	if (hdr->pool != ftr->pool || !hdr->pool) {
+		printk(KERN_ERR "inconsistent size hdr->pool: %p ftr->pool: %p for ptr %p",hdr->pool,ftr->pool,ptr);
+		return false;
+	}
+	return hdr->pool;
+}
+/****************************** POOL MANAGER *************************************/
+
 /*
  * Map an iov into an array of pages and offset/length tupples. With the
  * partial_page structure, we can map several non-contiguous ranges into
@@ -2094,3 +2356,23 @@ SYSCALL_DEFINE4(tee, int, fdin, int, fdout, size_t, len, unsigned int, flags)
 
 	return error;
 }
+
+static int __init init_splice_pools(void)
+{
+	unsigned int rcv_pool_size= sizeof(struct recvfile_ctl_blk) * MAX_PAGES_PER_RECVFILE;
+	unsigned int kve_pool_size= sizeof(struct kvec) * MAX_PAGES_PER_RECVFILE;
+
+	rcv_pool =  common_mempool_create((8 * num_possible_cpus()), rcv_pool_size);
+	kvec_pool = common_mempool_create((8 * num_possible_cpus()), kve_pool_size);
+	if (!rcv_pool || !kvec_pool)
+	{
+		return -ENOMEM;
+	}
+/*
+	printk(KERN_ERR "%s rcv %p (sz:%d) kvec %p (sz:%d) per %d core\n",
+		__FUNCTION__, rcv_pool, rcv_pool_size, kvec_pool, kve_pool_size, num_possible_cpus());
+*/
+	return 0;
+}
+
+fs_initcall(init_splice_pools);
