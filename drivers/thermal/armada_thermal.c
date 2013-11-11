@@ -26,8 +26,6 @@
 
 #define THERMAL_VALID_OFFSET		9
 #define THERMAL_VALID_MASK		0x1
-#define THERMAL_TEMP_OFFSET		10
-#define THERMAL_TEMP_MASK		0x1ff
 
 /* Thermal Manager Control and Status Register */
 #define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
@@ -58,6 +56,10 @@ struct armada_thermal_ops {
 	unsigned long coef_b;
 	unsigned long coef_m;
 	unsigned long coef_div;
+
+	/* Offset and mask to access the sensor temperature */
+	unsigned int temp_offset;
+	unsigned int temp_mask;
 };
 
 static void armadaxp_init_sensor(struct armada_thermal_priv *priv)
@@ -126,7 +128,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
 	}
 
 	reg = readl_relaxed(priv->sensor);
-	reg = (reg >> THERMAL_TEMP_OFFSET) & THERMAL_TEMP_MASK;
+	reg = (reg >> priv->ops->temp_offset) & priv->ops->temp_mask;
 
 	/* Get formula coeficients */
 	b = priv->ops->coef_b;
@@ -143,6 +145,8 @@ static struct thermal_zone_device_ops ops = {
 
 static const struct armada_thermal_ops armadaxp_ops = {
 	.init_sensor = armadaxp_init_sensor,
+	.temp_offset = 10,
+	.temp_mask = 0x1ff,
 	.coef_b = 3153000000UL,
 	.coef_m = 10000000UL,
 	.coef_div = 13825,
@@ -151,6 +155,8 @@ static const struct armada_thermal_ops armadaxp_ops = {
 static const struct armada_thermal_ops armada370_ops = {
 	.is_valid = armada_is_valid,
 	.init_sensor = armada370_init_sensor,
+	.temp_offset = 10,
+	.temp_mask = 0x1ff,
 	.coef_b = 3153000000UL,
 	.coef_m = 10000000UL,
 	.coef_div = 13825,
