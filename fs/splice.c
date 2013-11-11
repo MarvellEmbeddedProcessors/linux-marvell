@@ -32,6 +32,8 @@
 #include <linux/gfp.h>
 #include <linux/socket.h>
 #include <linux/compat.h>
+#include <linux/net.h>
+#include <net/sock.h>
 #include "internal.h"
 
 struct common_mempool;
@@ -540,10 +542,8 @@ ssize_t generic_file_splice_read(struct file *in, loff_t *ppos,
 		len = left;
 
 	ret = __generic_file_splice_read(in, ppos, pipe, len, flags);
-	if (ret > 0) {
+	if (ret > 0)
 		*ppos += ret;
-		file_accessed(in);
-	}
 
 	return ret;
 }
@@ -715,18 +715,19 @@ static int pipe_to_sendpage(struct pipe_inode_info *pipe,
 {
 	struct file *file = sd->u.file;
 	loff_t pos = sd->pos;
-	int more;
+	int ret, more;
 
-	if (!likely(file->f_op && file->f_op->sendpage))
-		return -EINVAL;
+	ret = buf->ops->confirm(pipe, buf);
+	if (!ret) {
+		more = (sd->flags & SPLICE_F_MORE) ? MSG_MORE : 0;
+		if (sd->len < sd->total_len && pipe->nrbufs > 1)
+			more |= MSG_SENDPAGE_NOTLAST;
 
-	more = (sd->flags & SPLICE_F_MORE) ? MSG_MORE : 0;
+		ret = file->f_op->sendpage(file, buf->page, buf->offset,
+					   sd->len, &pos, more);
+	}
 
-	if (sd->len < sd->total_len && pipe->nrbufs > 1)
-		more |= MSG_SENDPAGE_NOTLAST;
-
-	return file->f_op->sendpage(file, buf->page, buf->offset,
-				    sd->len, &pos, more);
+	return ret;
 }
 
 /*
@@ -1033,12 +1034,9 @@ generic_file_splice_write(struct pipe_inode_info *pipe, struct file *out,
 
 		mutex_lock_nested(&inode->i_mutex, I_MUTEX_CHILD);
 		ret = file_remove_suid(out);
-		if (!ret) {
-			ret = file_update_time(out);
-			if (!ret)
-				ret = splice_from_pipe_feed(pipe, &sd,
-							    pipe_to_file);
-		}
+		if (!ret)
+			ret = splice_from_pipe_feed(pipe, &sd,
+						    pipe_to_file);
 		mutex_unlock(&inode->i_mutex);
 	} while (ret > 0);
 	splice_from_pipe_end(pipe, &sd);
@@ -1677,6 +1675,157 @@ common_mempool_t* common_mempool_get(void* ptr)
 }
 /****************************** POOL MANAGER *************************************/
 
+ssize_t generic_splice_from_socket(struct file *file, struct socket *sock,
+				     loff_t __user *ppos, size_t count)
+{
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
+	loff_t pos;
+	int count_tmp;
+	int err = 0;
+	int i = 0;
+	int nr_pages = 0;
+	int page_cnt_est= count/PAGE_SIZE + 1;
+	struct recvfile_ctl_blk *rv_cb = NULL;
+	struct kvec *iov = NULL;
+	struct msghdr msg;
+	long rcvtimeo;
+	int ret;
+
+	if (copy_from_user(&pos, ppos, sizeof(loff_t)))
+		return -EFAULT;
+
+	if (count > MAX_PAGES_PER_RECVFILE * PAGE_SIZE) {
+		printk("%s: count(%u) exceeds maxinum\n", __func__, count);
+		return -EINVAL;
+	}
+	mutex_lock(&inode->i_mutex);
+
+	/*
+	 * TODO: Convert to sb_{start/end}_write et. al.
+	 *
+	 * vfs_check_frozen(inode->i_sb, SB_FREEZE_WRITE);
+	 */
+	sb_start_pagefault(inode->i_sb);
+
+	/* We can write back this queue in page reclaim */
+	current->backing_dev_info = mapping->backing_dev_info;
+
+	err = generic_write_checks(file, &pos, &count, S_ISBLK(inode->i_mode));
+	if (err != 0 || count == 0)
+		goto done;
+
+	file_remove_suid(file);
+	file_update_time(file);
+
+	if (unlikely(!rcv_pool || !kvec_pool))
+		goto done;
+
+	rv_cb = (struct recvfile_ctl_blk *)common_mempool_alloc(rcv_pool);
+	iov = (struct kvec *)common_mempool_alloc(kvec_pool);
+
+	if (!rv_cb || !iov) {
+		printk(KERN_ERR "Failed to get pool mem for %d pages (rv_cb %p iov %p)\n", page_cnt_est, rv_cb, iov);
+		goto done;
+	}
+
+	count_tmp = count;
+	do {
+		unsigned long bytes;	/* Bytes to write to page */
+		unsigned long offset;	/* Offset into pagecache page */
+		struct page *pageP;
+		void *fsdata;
+
+		offset = (pos & (PAGE_CACHE_SIZE - 1));
+		bytes = PAGE_CACHE_SIZE - offset;
+		if (bytes > count_tmp)
+			bytes = count_tmp;
+		ret = mapping->a_ops->write_begin(file, mapping, pos, bytes,
+						  AOP_FLAG_UNINTERRUPTIBLE,
+						  &pageP, &fsdata);
+
+		if (unlikely(ret)) {
+			err = ret;
+			goto cleanup;
+		}
+
+		rv_cb[nr_pages].rv_page = pageP;
+		rv_cb[nr_pages].rv_pos = pos;
+		rv_cb[nr_pages].rv_count = bytes;
+		rv_cb[nr_pages].rv_fsdata = fsdata;
+		iov[nr_pages].iov_base = kmap(pageP) + offset;
+		iov[nr_pages].iov_len = bytes;
+		nr_pages++;
+		count_tmp -= bytes;
+		pos += bytes;
+	} while (count_tmp);
+
+	/* IOV is ready, receive the date from socket now */
+	msg.msg_name = NULL;
+	msg.msg_namelen = 0;
+	msg.msg_iov = (struct iovec *)&iov[0];
+	msg.msg_iovlen = nr_pages ;
+	msg.msg_control = NULL;
+	msg.msg_controllen = 0;
+	msg.msg_flags = MSG_KERNSPACE;
+	rcvtimeo = sock->sk->sk_rcvtimeo;
+	sock->sk->sk_rcvtimeo = 8 * HZ;
+
+	ret = kernel_recvmsg(sock, &msg, &iov[0], nr_pages, count,
+			     MSG_WAITALL | MSG_NOCATCHSIG);
+
+	sock->sk->sk_rcvtimeo = rcvtimeo;
+	if(ret != count)
+		err = -EPIPE;
+	else
+		err = 0;
+
+	if (unlikely(err < 0)) {
+		goto cleanup;
+	}
+
+	for(i=0,count=0;i < nr_pages;i++) {
+		kunmap(rv_cb[i].rv_page);
+		ret = mapping->a_ops->write_end(file, mapping,
+						rv_cb[i].rv_pos,
+						rv_cb[i].rv_count,
+						rv_cb[i].rv_count,
+						rv_cb[i].rv_page,
+						rv_cb[i].rv_fsdata);
+		if (unlikely(ret < 0))
+			printk("%s: write_end fail,ret = %d\n", __func__, ret);
+		count += rv_cb[i].rv_count;
+	}
+	balance_dirty_pages_ratelimited(mapping);
+	if (copy_to_user(ppos, &pos, sizeof(loff_t)))
+		err = -EFAULT;
+done:
+	sb_end_pagefault(inode->i_sb);
+	current->backing_dev_info = NULL;
+	common_mempool_free(rcv_pool, (void*)rv_cb);
+	common_mempool_free(kvec_pool, (void*)iov);
+
+	mutex_unlock(&inode->i_mutex);
+	return err ? err : count;
+cleanup:
+	for(i = 0; i < nr_pages; i++) {
+		kunmap(rv_cb[i].rv_page);
+		ret = mapping->a_ops->write_end(file, mapping,
+						rv_cb[i].rv_pos,
+						rv_cb[i].rv_count,
+						rv_cb[i].rv_count,
+						rv_cb[i].rv_page,
+						rv_cb[i].rv_fsdata);
+	}
+	sb_end_pagefault(inode->i_sb);
+	current->backing_dev_info = NULL;
+	common_mempool_free(rcv_pool, (void*)rv_cb);
+	common_mempool_free(kvec_pool, (void*)iov);
+
+	mutex_unlock(&inode->i_mutex);
+	return err ? err : count;
+}
+
 /*
  * Map an iov into an array of pages and offset/length tupples. With the
  * partial_page structure, we can map several non-contiguous ranges into
@@ -2003,12 +2152,33 @@ SYSCALL_DEFINE6(splice, int, fd_in, loff_t __user *, off_in,
 		size_t, len, unsigned int, flags)
 {
 	struct fd in, out;
-	long error;
+	int error;
+	struct socket *sock = NULL;
 
 	if (unlikely(!len))
 		return 0;
 
 	error = -EBADF;
+	/* check if fd_in is a socket */
+	sock = sockfd_lookup(fd_in, &error);
+	if (sock) {
+		if (!sock->sk)
+			goto nosock;
+		out = fdget(fd_out);
+		if (out.file) {
+			if (!(out.file->f_mode & FMODE_WRITE))
+				goto done;
+			if (!out.file->f_op->splice_from_socket)
+				goto done;
+			error = out.file->f_op->splice_from_socket(out.file, sock, off_out, len);
+		}
+done:
+		fdput(out);
+nosock:
+		fput(sock->file);
+		return error;
+	}
+
 	in = fdget(fd_in);
 	if (in.file) {
 		if (in.file->f_mode & FMODE_READ) {
