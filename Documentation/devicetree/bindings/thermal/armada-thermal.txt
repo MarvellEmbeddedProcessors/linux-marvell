@@ -4,6 +4,7 @@ Required properties:
 
 - compatible:	Should be set to one of the following:
 		marvell,armada370-thermal
+		marvell,armada375-thermal
 		marvell,armadaxp-thermal
 
 - reg:		Device's register space.
