@@ -1813,7 +1813,7 @@ cleanup:
 		ret = mapping->a_ops->write_end(file, mapping,
 						rv_cb[i].rv_pos,
 						rv_cb[i].rv_count,
-						rv_cb[i].rv_count,
+						0,
 						rv_cb[i].rv_page,
 						rv_cb[i].rv_fsdata);
 	}
