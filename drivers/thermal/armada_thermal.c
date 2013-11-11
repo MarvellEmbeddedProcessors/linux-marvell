@@ -106,6 +106,22 @@ static void armada370_init_sensor(struct armada_thermal_priv *priv)
 	mdelay(10);
 }
 
+static void armada375_init_sensor(struct armada_thermal_priv *priv)
+{
+       unsigned long reg;
+
+       /* TODO: Remove magic values! */
+       reg = 0x8011e214;
+       writel(reg, priv->control);
+
+       /* TODO: Remove magic values! */
+       reg = readl_relaxed(priv->control + 0x4);
+       reg = 0x00a80909;
+       writel(reg, priv->control + 0x4);
+
+       mdelay(10);
+}
+
 static bool armada_is_valid(struct armada_thermal_priv *priv)
 {
 	unsigned long reg = readl_relaxed(priv->sensor);
@@ -162,6 +178,15 @@ static const struct armada_thermal_ops armada370_ops = {
 	.coef_div = 13825,
 };
 
+static const struct armada_thermal_ops armada375_ops = {
+	.init_sensor = armada375_init_sensor,
+	.temp_offset = 0,
+	.temp_mask = 0x1ff,
+	.coef_b = 3171900000UL,
+	.coef_m = 10000000UL,
+	.coef_div = 13553,
+};
+
 static const struct of_device_id armada_thermal_id_table[] = {
 	{
 		.compatible = "marvell,armadaxp-thermal",
@@ -170,6 +195,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
 	{
 		.compatible = "marvell,armada370-thermal",
 		.data       = &armada370_ops,
+	},
+	{
+		.compatible = "marvell,armada375-thermal",
+		.data       = &armada375_ops,
 	},
 	{
 		/* sentinel */
