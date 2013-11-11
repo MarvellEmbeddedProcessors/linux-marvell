@@ -121,6 +121,73 @@ out:
 	return NULL;
 }
 
+#ifdef CONFIG_SPLICE_NET_DMA_SUPPORT
+struct dma_pinned_list *dma_pin_kernel_iovec_pages(struct iovec *iov, size_t len)
+{
+	struct dma_pinned_list *local_list;
+	struct page **pages;
+	int i, j;
+	int nr_iovecs = 0;
+	int iovec_len_used = 0;
+	int iovec_pages_used = 0;
+
+	/* determine how many iovecs/pages there are, up front */
+	do {
+		iovec_len_used += iov[nr_iovecs].iov_len;
+		iovec_pages_used += num_pages_spanned(&iov[nr_iovecs]);
+		nr_iovecs++;
+	} while (iovec_len_used < len);
+
+	/* single kmalloc for pinned list, page_list[], and the page arrays */
+	local_list = kmalloc(sizeof(*local_list)
+		+ (nr_iovecs * sizeof (struct dma_page_list))
+		+ (iovec_pages_used * sizeof (struct page*)), GFP_KERNEL);
+	if (!local_list)
+		goto out;
+
+	/* list of pages starts right after the page list array */
+	pages = (struct page **) &local_list->page_list[nr_iovecs];
+
+	local_list->nr_iovecs = 0;
+
+	for (i = 0; i < nr_iovecs; i++) {
+		struct dma_page_list *page_list = &local_list->page_list[i];
+		int offset;
+
+		len -= iov[i].iov_len;
+
+		if (!access_ok(VERIFY_WRITE, iov[i].iov_base, iov[i].iov_len))
+			goto unpin;
+
+		page_list->nr_pages = num_pages_spanned(&iov[i]);
+		page_list->base_address = iov[i].iov_base;
+
+		page_list->pages = pages;
+		pages += page_list->nr_pages;
+
+		for (offset=0, j=0; j < page_list->nr_pages; j++, offset+=PAGE_SIZE) {
+			page_list->pages[j] = phys_to_page(__pa((unsigned int)page_list->base_address) + offset);
+		}
+		local_list->nr_iovecs = i + 1;
+	}
+
+	return local_list;
+
+unpin:
+	kfree(local_list);
+out:
+	return NULL;
+}
+
+void dma_unpin_kernel_iovec_pages(struct dma_pinned_list *pinned_list)
+{
+	if (!pinned_list)
+		return;
+
+	kfree(pinned_list);
+}
+#endif
+
 void dma_unpin_iovec_pages(struct dma_pinned_list *pinned_list)
 {
 	int i, j;
