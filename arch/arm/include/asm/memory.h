@@ -80,7 +80,11 @@
  */
 #define IOREMAP_MAX_ORDER	24
 
+#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+#define CONSISTENT_END		(0xffc00000UL)
+#else
 #define CONSISTENT_END		(0xffe00000UL)
+#endif
 
 #else /* CONFIG_MMU */
 

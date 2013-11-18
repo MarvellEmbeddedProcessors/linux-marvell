@@ -862,6 +862,13 @@ config MIGHT_HAVE_CACHE_L2X0
 	  instead of this option, thus preventing the user from
 	  inadvertently configuring a broken kernel.
 
+config MV_SUPPORT_64KB_PAGE_SIZE
+	bool "Support 64KB page size"
+	depends on ARCH_ARMADA_XP
+	default n
+	help
+	  This option enables 64KB pages.
+
 config CACHE_L2X0
 	bool "Enable the L2x0 outer cache controller" if MIGHT_HAVE_CACHE_L2X0
 	default MIGHT_HAVE_CACHE_L2X0

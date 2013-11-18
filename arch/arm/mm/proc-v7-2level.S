@@ -76,10 +76,25 @@ ENTRY(cpu_v7_set_pte_ext)
 #ifdef CONFIG_MMU
 	str	r1, [r0]			@ linux version
 
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+	mov	r3, #0x7C
+	and	r3, r3, r0
+	mov	r3, r3, lsl #4
+	bic	r0, r0, #0x3FC
+	bic	r0, r0, #0x400
+	orr	r0, r0, r3
+#endif
 	bic	r3, r1, #0x000003f0
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+	bic	r3, r3, #0x00000F000
+#endif
 	bic	r3, r3, #PTE_TYPE_MASK
 	orr	r3, r3, r2
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+	orr	r3, r3, #PTE_EXT_AP0 | 1
+#else
 	orr	r3, r3, #PTE_EXT_AP0 | 2
+#endif
 
 	tst	r1, #1 << 4
 	orrne	r3, r3, #PTE_EXT_TEX(1)
@@ -103,6 +118,27 @@ ENTRY(cpu_v7_set_pte_ext)
  ARM(	str	r3, [r0, #2048]! )
  THUMB(	add	r0, r0, #2048 )
  THUMB(	str	r3, [r0] )
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+	@ Need to duplicate the entry 16 times because of overlapping in PTE index bits.
+	str	r3, [r0, #4]
+	str	r3, [r0, #8]
+	str	r3, [r0, #12]
+	str	r3, [r0, #16]
+	str	r3, [r0, #20]
+	str	r3, [r0, #24]
+	str	r3, [r0, #28]
+	mcr	p15, 0, r0, c7, c10, 1	@ flush_pte
+	add	r0, r0, #32
+	str	r3, [r0]
+	str	r3, [r0, #4]
+	str	r3, [r0, #8]
+	str	r3, [r0, #12]
+	str	r3, [r0, #16]
+	str	r3, [r0, #20]
+	str	r3, [r0, #24]
+	str	r3, [r0, #28]
+	ALT_SMP(mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+#endif
 	ALT_SMP(W(nop))
 	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
 #endif
