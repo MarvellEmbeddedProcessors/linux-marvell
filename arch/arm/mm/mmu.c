@@ -29,6 +29,10 @@
 #include <asm/system_info.h>
 #include <asm/traps.h>
 
+#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+#include <asm/fixmap.h>
+#endif
+
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/pci.h>
@@ -608,7 +612,11 @@ static void __init *early_alloc(unsigned long sz)
 static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned long prot)
 {
 	if (pmd_none(*pmd)) {
-		pte_t *pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+	pte_t *pte = early_alloc(PAGE_SIZE);
+#else
+	pte_t *pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+#endif
 		__pmd_populate(pmd, __pa(pte), prot);
 	}
 	BUG_ON(pmd_bad(*pmd));
@@ -967,6 +975,30 @@ void __init debug_ll_io_init(void)
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
 
+#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+/* Create L1 Mapping for High-Mem pages. */
+static void __init map_highmem_pages(void)
+{
+	struct map_desc map;
+	unsigned long addr;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	for (addr = FIXADDR_START; addr < FIXADDR_TOP; addr += SZ_1M) {
+		map.pfn = __phys_to_pfn(virt_to_phys((void*)addr));
+		map.virtual = addr;
+		map.length = PAGE_SIZE;
+		map.type = MT_DEVICE;
+		create_mapping(&map);
+
+		/* Clear the L2 entry. */
+		pmd = pmd_offset(pgd_offset_k(addr), addr);
+		pte = pte_offset_kernel(pmd, addr);
+		set_pte_ext(pte, __pte(0), 0);
+	}
+}
+#endif
+
 /*
  * vmalloc=size forces the vmalloc area to be exactly 'size'
  * bytes. This can be used to increase (or decrease) the vmalloc
@@ -1251,6 +1283,10 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 	map.length = PAGE_SIZE;
 	map.type = MT_LOW_VECTORS;
 	create_mapping(&map);
+
+#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+	map_highmem_pages();
+#endif
 
 	/*
 	 * Ask the machine support to map in the statically mapped devices.

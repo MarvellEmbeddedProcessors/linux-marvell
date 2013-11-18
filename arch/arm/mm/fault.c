@@ -112,8 +112,20 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 		pte = pte_offset_map(pmd, addr);
 		printk(", *pte=%08llx", (long long)pte_val(*pte));
 #ifndef CONFIG_ARM_LPAE
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+		{
+			unsigned long pte_ptr = (unsigned long)pte;
+			unsigned long tmp = pte_ptr;
+			pte_ptr += (PTE_HWTABLE_PTRS * sizeof(void *));
+			pte_ptr &= ~0x7FC;
+			tmp &= 0x7C;
+			pte_ptr += (tmp << 4);
+			printk(", *ppte=%08llx", (long long)pte_val((pte_t *)pte_ptr));
+		}
+#else
 		printk(", *ppte=%08llx",
 		       (long long)pte_val(pte[PTE_HWTABLE_PTRS]));
+#endif
 #endif
 		pte_unmap(pte);
 	} while(0);

@@ -559,9 +559,9 @@ ENDPROC(sys_fstatfs64_wrapper)
  * offset, we return EINVAL.
  */
 sys_mmap2:
-#if PAGE_SHIFT > 12
-		tst	r5, #PGOFF_MASK
-		moveq	r5, r5, lsr #PAGE_SHIFT - 12
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+		tst	r5, #0xF		@ PGOFF_MASK
+		moveq	r5, r5, lsr #4		@ PAGE_SHIFT - 12
 		streq	r5, [sp, #4]
 		beq	sys_mmap_pgoff
 		mov	r0, #-EINVAL

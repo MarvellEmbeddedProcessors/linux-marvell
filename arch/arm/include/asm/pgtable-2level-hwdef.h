@@ -65,7 +65,11 @@
 /*
  *   - extended small page/tiny page
  */
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#define PTE_EXT_XN		(_AT(pteval_t, 1) << 15)	/* v6 */
+#else
 #define PTE_EXT_XN		(_AT(pteval_t, 1) << 0)		/* v6 */
+#endif
 #define PTE_EXT_AP_MASK		(_AT(pteval_t, 3) << 4)
 #define PTE_EXT_AP0		(_AT(pteval_t, 1) << 4)
 #define PTE_EXT_AP1		(_AT(pteval_t, 2) << 4)
@@ -73,7 +77,11 @@
 #define PTE_EXT_AP_UNO_SRW	(PTE_EXT_AP0)
 #define PTE_EXT_AP_URO_SRW	(PTE_EXT_AP1)
 #define PTE_EXT_AP_URW_SRW	(PTE_EXT_AP1|PTE_EXT_AP0)
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#define PTE_EXT_TEX(x)		(_AT(pteval_t, (x)) << 12)	/* Large Page */
+#else
 #define PTE_EXT_TEX(x)		(_AT(pteval_t, (x)) << 6)	/* v5 */
+#endif
 #define PTE_EXT_APX		(_AT(pteval_t, 1) << 9)		/* v6 */
 #define PTE_EXT_COHERENT	(_AT(pteval_t, 1) << 9)		/* XScale3 */
 #define PTE_EXT_SHARED		(_AT(pteval_t, 1) << 10)	/* v6 */

@@ -18,22 +18,34 @@ extern pmd_t *top_pmd;
 /* PFN alias flushing, for VIPT caches */
 #define FLUSH_ALIAS_START	0xffff4000
 
+static inline pmd_t *pmd_off_k(unsigned long virt)
+{
+	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
+}
+
 static inline void set_top_pte(unsigned long va, pte_t pte)
 {
-	pte_t *ptep = pte_offset_kernel(top_pmd, va);
+	pte_t *ptep;
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+	ptep = pte_offset_kernel(pmd_off_k(va), va);
+#else
+	ptep = pte_offset_kernel(top_pmd, va);
+#endif
 	set_pte_ext(ptep, pte, 0);
 	local_flush_tlb_kernel_page(va);
 }
 
 static inline pte_t get_top_pte(unsigned long va)
 {
-	pte_t *ptep = pte_offset_kernel(top_pmd, va);
-	return *ptep;
-}
+	pte_t *ptep;
 
-static inline pmd_t *pmd_off_k(unsigned long virt)
-{
-	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
+#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+	ptep = pte_offset_kernel(pmd_off_k(va), va);
+#else
+	ptep = pte_offset_kernel(top_pmd, va);
+#endif
+
+	return *ptep;
 }
 
 struct mem_type {

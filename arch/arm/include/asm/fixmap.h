@@ -13,8 +13,13 @@
  * 0xfffe0000 and 0xfffeffff.
  */
 
+#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+#define FIXADDR_START		0xffc00000UL
+#define FIXADDR_TOP		0xfff00000UL
+#else
 #define FIXADDR_START		0xfff00000UL
 #define FIXADDR_TOP		0xfffe0000UL
+#endif
 #define FIXADDR_SIZE		(FIXADDR_TOP - FIXADDR_START)
 
 #define FIX_KMAP_BEGIN		0
