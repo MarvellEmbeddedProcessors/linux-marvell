@@ -657,6 +657,7 @@ static inline MV_STATUS mv_eth_l2fw_tx(struct eth_pbuf *pkt, struct eth_port *pp
 			return MV_DROPPED;
 		}
 	}
+	mv_neta_wmb();
 	mvNetaTxqPendDescAdd(pp->port, pp->txp, txq, 1);
 
 	mv_eth_unlock(txq_ctrl, flags);
@@ -838,8 +839,7 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 	} /* of while */
 
 	/* Update RxQ management counters */
-	mvOsCacheIoSync();
-
+	mv_neta_wmb();
 	mvNetaRxqDescNumUpdate(pp->port, rxq, rx_done, rx_filled);
 
 	return rx_done;
