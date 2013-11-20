@@ -157,6 +157,11 @@ int mv_eth_skb_recycle(struct sk_buff *skb);
 		MV_ETH_LIGHT_UNLOCK(flags)		      \
 }
 
+#if defined(CONFIG_CPU_SHEEVA_PJ4B_V7) || defined(CONFIG_CPU_SHEEVA_PJ4B_V6)
+#  define mv_neta_wmb()
+#else
+#  define mv_neta_wmb() wmb()
+#endif
 
 /******************************************************
  * rx / tx queues --                                  *
