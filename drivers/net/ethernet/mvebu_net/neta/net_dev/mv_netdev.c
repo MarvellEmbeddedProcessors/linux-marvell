@@ -1863,7 +1863,7 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 	}
 
 	/* Update RxQ management counters */
-	mvOsCacheIoSync();
+	mv_neta_wmb();
 	mvNetaRxqDescNumUpdate(pp->port, rxq, rx_done, rx_filled);
 
 	return rx_done;
@@ -2029,6 +2029,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 #endif /* CONFIG_MV_PON */
 
 	/* Enable transmit */
+	mv_neta_wmb();
 	mvNetaTxqPendDescAdd(pp->port, tx_spec.txp, tx_spec.txq, frags);
 
 	STAT_DBG(txq_ctrl->stats.txq_tx += frags);
@@ -2315,6 +2316,7 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	STAT_DBG(priv->stats.tx_tso_bytes += totalBytes);
 	STAT_DBG(txq_ctrl->stats.txq_tx += totalDescNum);
 
+	mv_neta_wmb();
 	mvNetaTxqPendDescAdd(priv->port, txq_ctrl->txp, txq_ctrl->txq, totalDescNum);
 /*
 	printk(KERN_ERR "mv_eth_tx_tso EXIT: totalDescNum=%d\n", totalDescNum);
@@ -2364,7 +2366,7 @@ static void mv_eth_rxq_drop_pkts(struct eth_port *pp, int rxq)
 		mv_eth_rxq_refill(pp, rxq, pkt, pool, rx_desc);
 	}
 	if (rx_done) {
-		mvOsCacheIoSync();
+		mv_neta_wmb();
 		mvNetaRxqDescNumUpdate(pp->port, rxq, rx_done, rx_done);
 	}
 }
@@ -3003,6 +3005,8 @@ int mv_eth_poll(struct napi_struct *napi, int budget)
 
 		if (!(pp->flags & MV_ETH_F_IFCAP_NETMAP)) {
 			local_irq_save(flags);
+
+			mv_neta_wmb();
 			MV_REG_WRITE(NETA_INTR_NEW_MASK_REG(pp->port),
 			     (MV_ETH_MISC_SUM_INTR_MASK | MV_ETH_TXDONE_INTR_MASK | MV_ETH_RX_INTR_MASK));
 
