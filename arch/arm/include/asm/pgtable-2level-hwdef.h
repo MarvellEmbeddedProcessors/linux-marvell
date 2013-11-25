@@ -65,7 +65,7 @@
 /*
  *   - extended small page/tiny page
  */
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT
 #define PTE_EXT_XN		(_AT(pteval_t, 1) << 15)	/* v6 */
 #else
 #define PTE_EXT_XN		(_AT(pteval_t, 1) << 0)		/* v6 */
@@ -77,7 +77,7 @@
 #define PTE_EXT_AP_UNO_SRW	(PTE_EXT_AP0)
 #define PTE_EXT_AP_URO_SRW	(PTE_EXT_AP1)
 #define PTE_EXT_AP_URW_SRW	(PTE_EXT_AP1|PTE_EXT_AP0)
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT
 #define PTE_EXT_TEX(x)		(_AT(pteval_t, (x)) << 12)	/* Large Page */
 #else
 #define PTE_EXT_TEX(x)		(_AT(pteval_t, (x)) << 6)	/* v5 */

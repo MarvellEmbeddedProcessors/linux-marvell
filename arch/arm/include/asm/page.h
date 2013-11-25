@@ -11,11 +11,25 @@
 #define _ASMARM_PAGE_H
 
 /* PAGE_SHIFT determines the page size */
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_8KB_SW_PAGE_SIZE_SUPPORT
+#define PAGE_SHIFT		13
+#define MV_PAGE_SIZE_STR	"8KB SW Page Size"
+#elif defined(CONFIG_MV_16KB_SW_PAGE_SIZE_SUPPORT)
+#define PAGE_SHIFT		14
+#define MV_PAGE_SIZE_STR	"16KB SW Page Size"
+#elif defined(CONFIG_MV_32KB_SW_PAGE_SIZE_SUPPORT)
+#define PAGE_SHIFT		15
+#define MV_PAGE_SIZE_STR	"32KB SW Page Size"
+#elif defined(CONFIG_MV_64KB_SW_PAGE_SIZE_SUPPORT)
 #define PAGE_SHIFT		16
+#define MV_PAGE_SIZE_STR	"64KB SW Page Size"
+#elif defined(CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT)
+#define PAGE_SHIFT		16
+#define MV_PAGE_SIZE_STR	"64KB MMU Page Size"
 #else
 #define PAGE_SHIFT		12
 #endif
+
 #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
 #define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
 

@@ -6,7 +6,7 @@
  * or page size, whichever is greater since the cache aliases
  * every size/ways bytes.
  */
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
 #define	SHMLBA	(16 << 10)		 /* attach addr a multiple of (4 * 4096) */
 #else
 #define	SHMLBA	(4 * PAGE_SIZE)		 /* attach addr a multiple of this */

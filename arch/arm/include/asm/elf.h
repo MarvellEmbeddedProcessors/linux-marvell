@@ -110,7 +110,7 @@ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
 
 #define CORE_DUMP_USE_REGSET
 
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
 #define ELF_EXEC_PAGESIZE	PAGE_SIZE
 #else
 #define ELF_EXEC_PAGESIZE	4096

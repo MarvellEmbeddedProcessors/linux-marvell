@@ -29,7 +29,7 @@
 #include <asm/system_info.h>
 #include <asm/traps.h>
 
-#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+#if defined(CONFIG_MV_LARGE_PAGE_SUPPORT) && defined(CONFIG_HIGHMEM)
 #include <asm/fixmap.h>
 #endif
 
@@ -612,10 +612,10 @@ static void __init *early_alloc(unsigned long sz)
 static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr, unsigned long prot)
 {
 	if (pmd_none(*pmd)) {
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
-	pte_t *pte = early_alloc(PAGE_SIZE);
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
+		pte_t *pte = early_alloc(PAGE_SIZE);
 #else
-	pte_t *pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
+		pte_t *pte = early_alloc(PTE_HWTABLE_OFF + PTE_HWTABLE_SIZE);
 #endif
 		__pmd_populate(pmd, __pa(pte), prot);
 	}
@@ -975,7 +975,7 @@ void __init debug_ll_io_init(void)
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
 
-#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+#if defined(CONFIG_MV_LARGE_PAGE_SUPPORT) && defined(CONFIG_HIGHMEM)
 /* Create L1 Mapping for High-Mem pages. */
 static void __init map_highmem_pages(void)
 {
@@ -1284,7 +1284,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 	map.type = MT_LOW_VECTORS;
 	create_mapping(&map);
 
-#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+#if defined(CONFIG_MV_LARGE_PAGE_SUPPORT) && defined(CONFIG_HIGHMEM)
 	map_highmem_pages();
 #endif
 

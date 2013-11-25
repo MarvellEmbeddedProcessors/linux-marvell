@@ -70,8 +70,8 @@
  */
 
 
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
-#define PTRS_PER_PTE		32	/* (512 / (64K / 4K)) */
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
+#define PTRS_PER_PTE		(512 >> (PAGE_SHIFT-12))
 #define PTE_HWTABLE_PTRS	(512)
 #else
 #define PTRS_PER_PTE		512

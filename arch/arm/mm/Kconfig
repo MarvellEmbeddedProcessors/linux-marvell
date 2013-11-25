@@ -862,12 +862,80 @@ config MIGHT_HAVE_CACHE_L2X0
 	  instead of this option, thus preventing the user from
 	  inadvertently configuring a broken kernel.
 
-config MV_SUPPORT_64KB_PAGE_SIZE
-	bool "Support 64KB page size"
-	depends on ARCH_ARMADA_XP
-	default n
+config MV_LARGE_PAGE_SUPPORT
+	bool
+
+choice
+	prompt "Kernel Large Page Support"
+	default MV_NO_LARGE_PAGE_SUPPORT
 	help
-	  This option enables 64KB pages.
+	  Support kennel large pages (> 4KB), this includes MMU large pages
+	  (64KB) and software emulation of large pages (using 4KB MMU pages).
+	  Select one of the page sizes below. Notice that using 64KB modes
+	  will require building the file-system with 64KB enabled compiler
+	  (basically changing the default prodocued elf alignment to 64KB)
+
+config MV_NO_LARGE_PAGE_SUPPORT
+	bool "Disabled - Use default"
+	help
+	  Use kernel default page size (4KB).
+	  If you are not sure, select this option.
+	  This option does not make any changes to default kernel page size
+	  MMU management.
+
+config MV_8KB_SW_PAGE_SIZE_SUPPORT
+	bool "8KB software page size support"
+#	depends on !HIGHMEM
+	select MV_LARGE_PAGE_SUPPORT
+	help
+	  The kernel uses 8KB pages, MMU page table will still use 4KB pages.
+	  This feature provides higher performance (specifically in NAS
+	  applications) at the expense of higher memory fragmentation. This also
+	  enables support for large storage volumes up to 32TB.
+
+config MV_16KB_SW_PAGE_SIZE_SUPPORT
+	bool "16KB software page size support"
+#	depends on !HIGHMEM
+	select MV_LARGE_PAGE_SUPPORT
+	help
+	  The kernel uses 16KB pages, MMU page table will still use 4KB pages.
+	  This feature provides higher performance (specifically in NAS
+	  applications) at the expense of higher memory fragmentation. This also
+	  enables support for large storage volumes up to 64TB.
+
+config MV_32KB_SW_PAGE_SIZE_SUPPORT
+	bool "32KB software page size support"
+#	depends on !HIGHMEM
+	select MV_LARGE_PAGE_SUPPORT
+	help
+	  The kernel uses 32KB pages, MMU page table will still use 4KB pages.
+	  This feature provides higher performance (specifically in NAS
+	  applications) at the expense of higher memory fragmentation. This also
+	  enables support for large storage volumes up to 64TB.
+
+config MV_64KB_SW_PAGE_SIZE_SUPPORT
+	bool "64KB software page size support"
+#	depends on !HIGHMEM
+	select MV_LARGE_PAGE_SUPPORT
+	help
+	  The kernel uses 64KB pages, MMU page table will still use 4KB pages.
+	  This feature provides higher performance (specifically in NAS
+	  applications) at the expense of higher memory fragmentation. This also
+	  enables support for large storage volumes up to 128TB.
+	  If you need 64KB pages, consider using the MV_64KB_MMU_PAGE_SIZE_SUPPORT
+	  option.
+
+config MV_64KB_MMU_PAGE_SIZE_SUPPORT
+	bool "64KB MMU page size support"
+	select MV_LARGE_PAGE_SUPPORT
+	help
+	  The kernel uses 64KB pages. The page-table will use large-pages (64KB)
+	  as well.
+	  This feature provides higher performance (specifically in NAS
+	  applications) at the expense of higher memory fragmentation. This also
+	  enables support for large storage volumes up to 128TB.
+
+endchoice
 
 config CACHE_L2X0
 	bool "Enable the L2x0 outer cache controller" if MIGHT_HAVE_CACHE_L2X0

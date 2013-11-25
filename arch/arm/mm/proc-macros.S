@@ -139,26 +139,10 @@
 	.macro	armv6_set_pte_ext pfx
 	str	r1, [r0], #2048			@ linux version
 
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
-	mov     r3, #0x7C
-	and     r3, r3, r0
-	mov     r3, r3, lsl #4
-	bic     r0, r0, #0x3FC
-	bic     r0, r0, #0x400
-	orr     r0, r0, r3
-#endif
-
 	bic	r3, r1, #0x000003fc
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
-	bic	r3, r3, #0x00000F000
-#endif
 	bic	r3, r3, #PTE_TYPE_MASK
 	orr	r3, r3, r2
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
-	orr	r3, r3, #PTE_EXT_AP0 | 1
-#else
 	orr	r3, r3, #PTE_EXT_AP0 | 2
-#endif
 
 	adr	ip, \pfx\()_mt_table
 	and	r2, r1, #L_PTE_MT_MASK
@@ -187,31 +171,7 @@
 	movne	r3, #0
 
 	str	r3, [r0]
-
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
-	@ Need to duplicate the entry 16 times because of overlapping in PTE index bits.
-	str	r3, [r0, #4]
-	str	r3, [r0, #8]
-	str	r3, [r0, #12]
-	str	r3, [r0, #16]
-	str	r3, [r0, #20]
-	str	r3, [r0, #24]
-	str	r3, [r0, #28]
-	str	r3, [r0, #32]
-	str	r3, [r0, #36]
-	str	r3, [r0, #40]
-	str	r3, [r0, #44]
-	str	r3, [r0, #48]
-	str	r3, [r0, #52]
-	str	r3, [r0, #56]
-	str	r3, [r0, #60]
-#endif /* CONFIG_MV_SUPPORT_64KB_PAGE_SIZE */
-
 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
-	add	r0, r0, #32
-	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-#endif
 	.endm
 
 
