@@ -53,7 +53,11 @@ ENTRY(v7wbi_flush_user_tlb_range)
 #endif
 	ALT_UP(mcr	p15, 0, r0, c8, c7, 1)	@ TLB invalidate U MVA
 
+#if defined(CONFIG_MV_LARGE_PAGE_SUPPORT) && !defined(CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT)
+	add	r0, r0, #0x1000
+#else
 	add	r0, r0, #PAGE_SZ
+#endif /* CONFIG_MV_LARGE_PAGE_SUPPORT && !CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT */
 	cmp	r0, r1
 	blo	1b
 	dsb
@@ -81,7 +85,11 @@ ENTRY(v7wbi_flush_kern_tlb_range)
 	ALT_SMP(mcr	p15, 0, r0, c8, c3, 1)	@ TLB invalidate U MVA (shareable)
 #endif
 	ALT_UP(mcr	p15, 0, r0, c8, c7, 1)	@ TLB invalidate U MVA
+#if defined(CONFIG_MV_LARGE_PAGE_SUPPORT) && !defined(CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT)
+	add	r0, r0, #0x1000
+#else
 	add	r0, r0, #PAGE_SZ
+#endif /* CONFIG_MV_LARGE_PAGE_SUPPORT && !CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT */
 	cmp	r0, r1
 	blo	1b
 	dsb

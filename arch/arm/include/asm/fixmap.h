@@ -13,7 +13,7 @@
  * 0xfffe0000 and 0xfffeffff.
  */
 
-#if defined(CONFIG_MV_SUPPORT_64KB_PAGE_SIZE) && defined(CONFIG_HIGHMEM)
+#if defined(CONFIG_MV_LARGE_PAGE_SUPPORT) && defined(CONFIG_HIGHMEM)
 #define FIXADDR_START		0xffc00000UL
 #define FIXADDR_TOP		0xfff00000UL
 #else

@@ -26,7 +26,7 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
 static inline void set_top_pte(unsigned long va, pte_t pte)
 {
 	pte_t *ptep;
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
 	ptep = pte_offset_kernel(pmd_off_k(va), va);
 #else
 	ptep = pte_offset_kernel(top_pmd, va);
@@ -39,7 +39,7 @@ static inline pte_t get_top_pte(unsigned long va)
 {
 	pte_t *ptep;
 
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
 	ptep = pte_offset_kernel(pmd_off_k(va), va);
 #else
 	ptep = pte_offset_kernel(top_pmd, va);

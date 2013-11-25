@@ -2008,7 +2008,7 @@ struct vm_area_struct *find_vma(struct mm_struct *mm, unsigned long addr)
 			vma_tmp = rb_entry(rb_node,
 					   struct vm_area_struct, vm_rb);
 
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
 			/* Take into account a wrap-around of the
 			** vm_end field to 0x0. e.g. vm_start =
 			** 0xFFFF0000 size PAGE_SIZE.

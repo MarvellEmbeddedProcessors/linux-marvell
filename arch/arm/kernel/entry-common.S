@@ -558,10 +558,31 @@ ENDPROC(sys_fstatfs64_wrapper)
  * Note: off_4k (r5) is always units of 4K.  If we can't do the requested
  * offset, we return EINVAL.
  */
+
+#ifdef CONFIG_MV_8KB_SW_PAGE_SIZE_SUPPORT
+#define PGOFF_MASK 0x1
+#define PGOFF_SHIFT 1
+#elif defined(CONFIG_MV_16KB_SW_PAGE_SIZE_SUPPORT)
+#define PGOFF_MASK 0x3
+#define PGOFF_SHIFT 2
+#elif defined(CONFIG_MV_32KB_SW_PAGE_SIZE_SUPPORT)
+#define PGOFF_MASK 0x7
+#define PGOFF_SHIFT 3
+#elif defined(CONFIG_MV_64KB_SW_PAGE_SIZE_SUPPORT)
+#define PGOFF_MASK 0xF
+#define PGOFF_SHIFT 4
+#elif defined(CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT)
+#define PGOFF_MASK 0xF
+#define PGOFF_SHIFT 4
+#else
+#define PGOFF_MASK 0x0
+#define PGOFF_SHIFT 0
+#endif
+
 sys_mmap2:
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
-		tst	r5, #0xF		@ PGOFF_MASK
-		moveq	r5, r5, lsr #4		@ PAGE_SHIFT - 12
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
+		tst	r5, #PGOFF_MASK
+		moveq	r5, r5, lsr #PGOFF_SHIFT
 		streq	r5, [sp, #4]
 		beq	sys_mmap_pgoff
 		mov	r0, #-EINVAL

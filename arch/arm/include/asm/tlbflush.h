@@ -372,9 +372,19 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
 static inline void
 local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
 {
+#if !defined(CONFIG_MV_LARGE_PAGE_SUPPORT) || defined(CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT)
 	const int zero = 0;
+#endif
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
 
+#if defined(CONFIG_MV_LARGE_PAGE_SUPPORT) && !defined(CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT)
+	if (tlb_flag(TLB_WB))
+		dsb();
+
+	uaddr = (uaddr & PAGE_MASK);
+	__cpu_flush_user_tlb_range(uaddr, uaddr + PAGE_SIZE, vma);
+
+#else
 	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
 
 	if (tlb_flag(TLB_WB))
@@ -398,16 +408,26 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", uaddr);
 #endif
 
+#endif /* CONFIG_MV_LARGE_PAGE_SUPPORT && !CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT */
 	if (tlb_flag(TLB_BARRIER))
 		dsb();
 }
 
 static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
 {
+#if !defined(CONFIG_MV_LARGE_PAGE_SUPPORT) || defined(CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT)
 	const int zero = 0;
+#endif
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
 
 	kaddr &= PAGE_MASK;
+
+#if defined(CONFIG_MV_LARGE_PAGE_SUPPORT) && !defined(CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT)
+	if (tlb_flag(TLB_WB))
+		dsb();
+
+	__cpu_flush_kern_tlb_range(kaddr, kaddr + PAGE_SIZE);
+#else
 
 	if (tlb_flag(TLB_WB))
 		dsb();
@@ -422,6 +442,7 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
 	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", kaddr);
 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", kaddr);
 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", kaddr);
+#endif /* CONFIG_MV_LARGE_PAGE_SUPPORT && !CONFIG_MV_64KB_MMU_PAGE_SIZE_SUPPORT */
 
 	if (tlb_flag(TLB_BARRIER)) {
 		dsb();

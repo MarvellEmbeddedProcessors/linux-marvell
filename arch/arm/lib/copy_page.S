@@ -28,7 +28,7 @@ ENTRY(copy_page)
 		stmfd	sp!, {r4, lr}			@	2
 	PLD(	pld	[r1, #0]		)
 	PLD(	pld	[r1, #L1_CACHE_BYTES]		)
-#ifdef CONFIG_MV_SUPPORT_64KB_PAGE_SIZE
+#ifdef CONFIG_MV_LARGE_PAGE_SUPPORT
 		ldr	r2, =COPY_COUNT
 #else
 		mov	r2, #COPY_COUNT			@	1
