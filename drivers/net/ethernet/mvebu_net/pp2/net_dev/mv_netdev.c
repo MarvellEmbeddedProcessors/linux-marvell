@@ -3368,7 +3368,7 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 		/* the same MTU for all Ports/Queues */
 
 		for (txp = 0; txp < pp->txp_num; txp++)
-			mvPp2V0ClsHwMtuSet(MV_PPV2_PORT_PHYS(pp->port), txp, mtu/*TODO fix size*/);
+			mvPp2V0ClsHwMtuSet(MV_PPV2_PORT_PHYS(pp->port), txp, RX_PKT_SIZE(mtu));
 #endif /* CONFIG_MV_ETH_PP2_1 */
 
 		mvPp2ClsHwOversizeRxqSet(MV_PPV2_PORT_PHYS(pp->port), pp->first_rxq);
