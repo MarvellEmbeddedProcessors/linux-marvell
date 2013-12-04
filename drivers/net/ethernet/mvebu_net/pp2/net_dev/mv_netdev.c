@@ -136,7 +136,7 @@ static u32 mv_eth_netdev_fix_features(struct net_device *dev, u32 features);
 static netdev_features_t mv_eth_netdev_fix_features(struct net_device *dev, netdev_features_t features);
 #endif
 
-static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, MV_ULONG *phys_addr);
+static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, MV_ULONG *phys_addr, gfp_t gfp_mask);
 static MV_STATUS mv_eth_pool_create(int pool, int capacity);
 static int mv_eth_pool_add(int pool, int buf_num);
 static int mv_eth_pool_free(int pool, int num);
@@ -1422,7 +1422,7 @@ int mv_eth_skb_recycle(struct sk_buff *skb)
 
 		mv_eth_skb_print(skb);
 */
-		skb = mv_eth_skb_alloc(ppool, &phys_addr);
+		skb = mv_eth_skb_alloc(ppool, &phys_addr,  GFP_ATOMIC);
 		if (!skb) {
 			pr_err("Linux processing - Can't refill\n");
 			return 1;
@@ -1446,11 +1446,11 @@ EXPORT_SYMBOL(mv_eth_skb_recycle);
 
 #endif /* CONFIG_NET_SKB_RECYCLE */
 
-static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, MV_ULONG *phys_addr)
+static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, MV_ULONG *phys_addr, gfp_t gfp_mask)
 {
 	struct sk_buff *skb;
 
-	skb = dev_alloc_skb(pool->pkt_size);
+	skb = __dev_alloc_skb(pool->pkt_size, gfp_mask);
 	if (!skb) {
 		STAT_ERR(pool->stats.skb_alloc_oom++);
 		return NULL;
@@ -1542,7 +1542,7 @@ inline int mv_eth_refill(struct bm_pool *ppool, __u32 bm, int is_recycle)
 		return 0;
 
 	/* No recycle or too many buffers are in use - alloc new skb */
-	skb = mv_eth_skb_alloc(ppool, &phys_addr);
+	skb = mv_eth_skb_alloc(ppool, &phys_addr, GFP_ATOMIC);
 	if (!skb) {
 		pr_err("Linux processing - Can't refill\n");
 		return 1;
@@ -2666,7 +2666,7 @@ static int mv_eth_pool_add(int pool, int buf_num)
 	for (i = 0; i < buf_num; i++) {
 		if (!MV_ETH_BM_POOL_IS_HWF(bm_pool->type)) {
 			/* Allocate skb for pool used for SWF */
-			skb = mv_eth_skb_alloc(bm_pool, &phys_addr);
+			skb = mv_eth_skb_alloc(bm_pool, &phys_addr, GFP_KERNEL);
 			if (!skb)
 				break;
 
