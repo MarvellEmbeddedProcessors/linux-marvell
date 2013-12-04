@@ -1324,6 +1324,14 @@ int mv_eth_skb_recycle(struct sk_buff *skb)
 		STAT_DBG(pool->stats.skb_hw_cookie_err++);
 		goto err;
 	}
+	/*
+	WA for Linux network stack issue that prevent skb recycle.
+	If dev_kfree_skb_any called from interrupt context or interrupts disabled context
+	skb->users will be zero when skb_recycle callback function is called.
+	In such case skb_recycle_check function returns error because skb->users != 1.
+	*/
+	if (atomic_read(&skb->users) == 0)
+		atomic_set(&skb->users, 1);
 
 	if (skb_recycle_check(skb, pool->pkt_size)) {
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
