@@ -500,9 +500,13 @@ struct bm_pool {
 /* BM cookie (32 bits) definition */
 /* bits[0-7]   - Flags  */
 /*      bit0 - bm_cookie is invalid for SKB recycle */
-#define MV_ETH_BM_COOKIE_F_INVALID		0
+#define MV_ETH_BM_COOKIE_F_INVALID_BIT		0
+#define MV_ETH_BM_COOKIE_F_INVALID		(1 << 0)
+
 /*      bit7 - buffer is guaranteed */
-#define MV_ETH_BM_COOKIE_F_GRNTD_OFF		7
+#define MV_ETH_BM_COOKIE_F_GRNTD_BIT		7
+#define MV_ETH_BM_COOKIE_F_GRNTD		(1 << 7)
+
 /* bits[8-15]  - PoolId */
 #define MV_ETH_BM_COOKIE_POOL_OFFS		8
 /* bits[16-23] - Qset   */
@@ -512,7 +516,7 @@ struct bm_pool {
 
 static inline int mv_eth_bm_cookie_grntd_get(__u32 cookie)
 {
-	return (cookie >> MV_ETH_BM_COOKIE_F_GRNTD_OFF) & 0x1;
+	return (cookie & MV_ETH_BM_COOKIE_F_GRNTD) >> MV_ETH_BM_COOKIE_F_GRNTD_BIT;
 }
 
 static inline int mv_eth_bm_cookie_qset_get(__u32 cookie)
@@ -551,7 +555,7 @@ static inline __u32 mv_eth_bm_cookie_build(struct pp2_rx_desc *rx_desc)
 	return ((pool & 0xFF) << MV_ETH_BM_COOKIE_POOL_OFFS) |
 		((cpu & 0xFF) << MV_ETH_BM_COOKIE_CPU_OFFS) |
 		((qset & 0xFF) << MV_ETH_BM_COOKIE_QSET_OFFS) |
-		((grntd & 0x1) << MV_ETH_BM_COOKIE_F_GRNTD_OFF);
+		((grntd & 0x1) << MV_ETH_BM_COOKIE_F_GRNTD_BIT);
 
 }
 
