@@ -272,6 +272,16 @@ static INLINE MV_U32 mvPp2TxqDescCsum(int l3_offs, int l3_proto, int ip_hdr_len,
 	return command;
 }
 
+static INLINE MV_VOID mvPp2GbeCpuInterruptsDisable(int port, int cpuMask)
+{
+	mvPp2WrReg(MV_PP2_ISR_ENABLE_REG(port), MV_PP2_ISR_DISABLE_INTERRUPT(cpuMask));
+}
+
+static INLINE MV_VOID mvPp2GbeCpuInterruptsEnable(int port, int cpuMask)
+{
+	mvPp2WrReg(MV_PP2_ISR_ENABLE_REG(port), MV_PP2_ISR_ENABLE_INTERRUPT(cpuMask));
+}
+
 /* Get Giga port handler */
 static INLINE MV_PP2_PORT_CTRL *mvPp2PortHndlGet(int port)
 {
