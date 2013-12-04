@@ -8,6 +8,7 @@ Required properties:
 		 marvell,armadaxp-mbus
 		 marvell,armada370-mbus
 		 marvell,armada375-mbus
+		 marvell,armada380-mbus
 		 marvell,armadaxp-mbus
 		 marvell,kirkwood-mbus
 		 marvell,dove-mbus
