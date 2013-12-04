@@ -160,6 +160,35 @@ static const struct mvebu_soc_descr __initconst armada_375_gating_descr[] = {
 };
 #endif
 
+#ifdef CONFIG_MACH_ARMADA_380
+static const struct mvebu_soc_descr __initconst armada_380_gating_descr[] = {
+	{ "audio", NULL, 0 },
+	{ "ge2", NULL, 2 },
+	{ "ge1", NULL, 3 },
+	{ "ge0", NULL, 4 },
+	{ "pex1", NULL, 5 },
+	{ "pex2", NULL, 6 },
+	{ "pex3", NULL, 7 },
+	{ "pex0", NULL, 8 },
+	{ "usb3h0", NULL, 9 },
+	{ "usb3h1", NULL, 10 },
+	{ "usb3d", NULL, 11 },
+	{ "bm", NULL, 13 },
+	{ "crypto0z", NULL, 14 },
+	{ "sata0", NULL, 15 },
+	{ "crypto1z", NULL, 16 },
+	{ "sdio", NULL, 17 },
+	{ "usb2", NULL, 18 },
+	{ "crypto1", NULL, 21 },
+	{ "xor0", NULL, 22 },
+	{ "crypto0", NULL, 23 },
+	{ "tdm", NULL, 25 },
+	{ "xor1", NULL, 28 },
+	{ "sata1", NULL, 30 },
+	{ }
+};
+#endif
+
 #ifdef CONFIG_MACH_ARMADA_XP
 static const struct mvebu_soc_descr __initconst armada_xp_gating_descr[] = {
 	{ "audio", NULL, 0 },
@@ -253,6 +282,13 @@ static const __initdata struct of_device_id clk_gating_match[] = {
 	{
 		.compatible = "marvell,armada-375-gating-clock",
 		.data = armada_375_gating_descr,
+	},
+#endif
+
+#ifdef CONFIG_MACH_ARMADA_380
+	{
+		.compatible = "marvell,armada-380-gating-clock",
+		.data = armada_380_gating_descr,
 	},
 #endif
 
