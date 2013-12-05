@@ -91,8 +91,7 @@ int mv_eth_start(struct net_device *dev)
 		}
 
 		/* unmask interrupts */
-		mv_eth_interrupts_unmask(priv);
-		smp_call_function_many(cpu_online_mask, (smp_call_func_t)mv_eth_interrupts_unmask, (void *)priv, 1);
+		on_each_cpu(mv_eth_interrupts_unmask, priv, 1);
 
 		printk(KERN_NOTICE "%s: started\n", dev->name);
 	}
