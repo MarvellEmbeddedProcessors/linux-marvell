@@ -1415,6 +1415,7 @@ struct xhci_hcd {
 	__u32		hcc_params;
 
 	spinlock_t	lock;
+	void           *priv;
 
 	/* packed release number */
 	u8		sbrn;
@@ -1550,6 +1551,9 @@ static inline struct usb_hcd *xhci_to_hcd(struct xhci_hcd *xhci)
 {
 	return xhci->main_hcd;
 }
+
+int common_xhci_plat_probe(struct platform_device *pdev, void *priv);
+int common_xhci_plat_remove(struct platform_device *dev);
 
 #ifdef CONFIG_USB_XHCI_HCD_DEBUGGING
 #define XHCI_DEBUG	1
