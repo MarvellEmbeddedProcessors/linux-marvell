@@ -1,0 +1,28 @@
+Marvell Armada CPU reset controller
+===================================
+
+Please also refer to reset.txt in this directory for common reset
+controller binding usage.
+
+Required properties:
+- compatible: Should be "marvell,armada-<chip>-cpu-reset"
+- reg: should be register base and length as documented in the
+  datasheet for the CPU reset register
+- #reset-cells: 1, which allows to pass the CPU hardware ID when
+  referencing this cpu reset block. See the example below.
+
+cpurst: cpurst@20800 {
+	compatible = "marvell,armada-xp-cpu-reset";
+	reg = <0x20800 0x20>;
+	reset-cells = <1>;
+};
+
+And to associate a CPU to its reset controller:
+
+cpu@0 {
+	device_type = "cpu";
+	compatible = "marvell,sheeva-v7";
+	reg = <0>;
+	clocks = <&cpuclk 0>;
+	resets = <&cpurst 0>;
+};

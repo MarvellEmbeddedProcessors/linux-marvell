@@ -19,6 +19,7 @@ config ARCH_MVEBU
 	select ARCH_REQUIRE_GPIOLIB
 	select MIGHT_HAVE_PCI
 	select PCI_QUIRKS if PCI
+	select RESET_CONTROLLER
 
 if ARCH_MVEBU
 
