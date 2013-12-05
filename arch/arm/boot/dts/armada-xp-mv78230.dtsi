@@ -33,6 +33,7 @@
 			compatible = "marvell,sheeva-v7";
 			reg = <0>;
 			clocks = <&cpuclk 0>;
+			resets = <&cpurst 0>;
 		};
 
 		cpu@1 {
@@ -40,6 +41,7 @@
 			compatible = "marvell,sheeva-v7";
 			reg = <1>;
 			clocks = <&cpuclk 1>;
+			resets = <&cpurst 1>;
 		};
 	};
 
