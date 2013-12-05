@@ -1,0 +1,338 @@
+config MV_ETH_PP2_1
+	bool "Support PPv2.1 version (A0)"
+	default n
+ 	---help---
+	PPv2.1 support (Avanta-LP A0)
+	PPv2.1 enable various features such as:
+	* Qsets support
+	* TX descriptors chunks mechanism
+	* See PPv2.1 MAS for more info
+
+config MV_ETH_PP2_CLS2
+	bool
+	default y
+	---help---
+
+config MV_ETH_PP2_CLS3
+	bool
+	default y
+	---help---
+
+config MV_ETH_PP2_CLS4
+	bool
+	default y
+	---help---
+
+config MV_ETH_PP2_CLS_MC
+	bool
+	default y
+	---help---
+
+config MV_ETH_HWF
+	bool "Enable Harware Forwarding"
+	default y
+	---help---
+
+menu "BM configuration"
+
+choice
+	prompt "BM pool assignment mode"
+	default MV_ETH_BM_SWF_HWF_MODE
+	---help---
+	Determines how BM pools are divided among GBE ports
+
+config MV_ETH_BM_SWF_HWF_MODE
+	bool "SWF / HWF seperation"
+	---help---
+	BM pools are not shared between SWF and HWF.
+	Short pools are shared between all ports.
+	When BM pool is used only by HWF, then SW can allocate smaller buffers for same packet size
+	Configuration is changable in Run-Time
+
+config MV_ETH_BM_PER_PORT_MODE
+	bool "Per Port"
+	---help---
+	BM pools are shared beteen HWF and SWF.
+	BM pools are not shared between different ports.
+	When BM pool is used only by HWF, then SW can allocate smaller buffers for same packet size
+	Configuration is changable in Run-Time
+
+endchoice
+
+config MV_ETH_BM_LONG_BUF_NUM
+	int "number of buffers for BM long pool"
+	default 1024
+	---help---
+	The number of long buffers is relevant for all long BM pools
+
+config MV_ETH_BM_SHORT_BUF_NUM
+	int "number of buffers for BM short pool"
+	default 2048
+	---help---
+	The number of short buffers is relevant for all short BM pools
+
+endmenu
+
+menu "Rx/Tx Queue configuration"
+
+config  MV_ETH_RXQ
+        int "Number of RX queues per port"
+        default 8
+        ---help---
+          Multiple RX queue support.
+
+config  MV_ETH_TXQ
+        int "Number of TX queues"
+        default 1
+        ---help---
+          Multiple TX queue support.
+
+config MV_ETH_RXQ_DESC
+	int "Number of Rx descriptors"
+	depends on MV_ETH_PP2
+	default 128
+        ---help---
+	The number of Rx descriptors in each Rx queue.
+
+config MV_ETH_RXQ_DEF
+        int "Default RXQ to recieve packets"
+        default 0
+        ---help---
+
+config MV_ETH_TXQ_DESC
+	int "Number of Tx descriptors"
+	depends on MV_ETH_PP2
+	default 532
+        ---help---
+	The number of Tx descriptors in each Tx queue.
+
+config MV_ETH_TXQ_DEF
+        int "Default TXQ to send local generated packets"
+        default 0
+        ---help---
+
+config MV_ETH_TXQ_HWF_DESC
+	int "Number of HWF Tx descriptors"
+	depends on MV_ETH_PP2
+	default 16
+        ---help---
+	The number of HWF dedicated Tx descriptors in each Tx queue.
+
+config MV_ETH_AGGR_TXQ_SIZE
+	int "Number of aggregated Tx descriptors"
+	depends on MV_ETH_PP2
+	default 256
+        ---help---
+	The number of Tx descriptors in each aggregated Tx queue.
+
+config MV_ETH_TEMP_TXQ_SIZE
+	int "Number of temporary Txq descriptors (for switching between HWF and SWF)"
+	depends on (MV_ETH_PP2 && MV_ETH_HWF)
+	default 512
+        ---help---
+
+config MV_ETH_TEMP_TXQ_HWF_SIZE
+	int "Number of temporary Txq HWF descriptors (for switching between HWF and SWF)"
+	depends on (MV_ETH_PP2 && MV_ETH_HWF)
+	default 256
+        ---help---
+
+endmenu
+
+menu "IP/TCP/UDP Offloading"
+
+config  MV_ETH_TSO
+        bool "TSO Support for Marvell network interface"
+	default y
+        ---help---
+        Marvell network driver compiled with TSO (TCP Segmentation Offload) support.
+
+endmenu
+
+menu "Control and Statistics"
+
+config  MV_ETH_DEBUG_CODE
+	bool "Add run-time debug code"
+	default n
+	---help---
+	Enable run-time enable/disable enter debug code blocks
+
+config  MV_ETH_STAT_ERR
+        bool "Collect error statistics"
+        default y
+	---help---
+	Marvell network interface driver collect minimal number of statistics.
+	Only for error conditions. Can be displayed using mv_eth_tool.
+
+config  MV_ETH_STAT_INF
+        bool "Collect event statistics"
+        default y
+        ---help---
+	Marvell network interface driver collect event statistics.
+	Provide more information about driver functionality and almost doesn't
+	effect performance. Can be displayed using mv_eth_tool.
+
+config  MV_ETH_STAT_DBG
+        bool "Collect debug statistics"
+        default n
+        ---help---
+	Marvell network interface driver collect a lot of statistics.
+	Used for Debug mode. Decrease performance. Can be displayed using mv_eth_tool.
+
+config  MV_ETH_STAT_DIST
+        bool "Collect debug distribution statistics"
+        default n
+        ---help---
+        Marvell network interface driver collect a lot of statistics.
+        Used for Debug mode. Decrease performance. Can be displayed using mv_eth_tool.
+
+endmenu
+
+menu "Advanced Features"
+
+config  NET_SKB_HEADROOM
+        int "SKB headroom size"
+        default 64
+        ---help---
+          Customize SKB headroom size. Must be power of 2.
+
+config NET_SKB_RECYCLE
+        bool "Skb recycle"
+        default y
+        ---help---
+          Work-in-progress and experimental.
+
+          This option enables skb's to be returned via a callback at kfree to
+          the allocator to make a fastpath for very skb consuming network
+          applications.
+
+config NET_SKB_RECYCLE_DEF
+        depends on NET_SKB_RECYCLE
+        int "Default value for SKB recycle:  0 - disable, 1 - enable"
+        default 1
+        ---help---
+
+config  MV_ETH_TX_DONE_TIMER_PERIOD
+        int "Periodical Tx Done timer period"
+        default 10
+        ---help---
+          Periodical timer period for Tx Done operation in [msec].
+
+config  MV_ETH_CLEANUP_TIMER_PERIOD
+        int "Periodical Cleanup timer period"
+        default 10
+        ---help---
+          Periodical timer period for cleanup operation in [msec].
+
+config  MV_ETH_TXDONE_ISR
+	bool "Use interrupt to process TX_DONE event"
+	default n
+	---help---
+	When chosen TX_DONE event will be process in interrupt mode
+	When unchosen TX_DONE event will be processed in polling mode
+
+config  MV_ETH_TXDONE_COAL_PKTS
+	int "Threshold for TX_DONE event trigger"
+	default 16
+	---help---
+	Number of packets will be sent before TX_DONE event will be triggered
+	by interrupt or polling.
+
+config  MV_ETH_RX_COAL_PKTS
+        int "Threshold [number of packets] for RX interrupt"
+        default 32
+        ---help---
+        Number of packets will be received before RX interrupt will be generated by HW.
+
+config  MV_ETH_RX_COAL_USEC
+        int "Threshold [usec] for RX interrupt"
+        default 100
+        ---help---
+        Time delay in usec before RX interrupt will be generated by HW if number of
+	received packets larger than 0 but smaller than MV_ETH_RX_COAL_PKTS
+
+config  MV_ETH_RX_DESC_PREFETCH
+	bool "Enable RX descriptor prefetch"
+	default n
+	---help---
+	Use pld instruction to prefetch one RX descriptor ahead
+
+config  MV_ETH_RX_PKT_PREFETCH
+        bool "Enable RX packet prefetch"
+        default n
+        ---help---
+        Use pld instruction to prefetch first two cache lines of received packet data
+
+config MV_ETH_RX_SPECIAL
+        bool "Enable special RX processing"
+        default n
+        ---help---
+        Enable special RX processing for packets with RI_RX_SEPCIAL PNC result info bit set
+
+config MV_ETH_TX_SPECIAL
+	bool "Enable special TX processing"
+	default n
+	---help---
+	Enable special TX processing for packets with signal header (SH)
+
+config MV_ETH_L2FW
+	bool "L2 Forwarding support"
+	default n
+	---help---
+	Enable L2 Forwarding support for received packets.
+	Three modes are supported: Send packet without change, Swap MAC DA<->SA,
+	Copy the whole packet and swap MAC
+
+config MV_ETH_L2SEC
+	bool "L2 Forwarding IPSec support"
+	depends on MV_ETH_L2FW
+	default n
+	---help---
+	Handle encrypted packets with CESA.
+
+config MV_ETH_L2FW_DEBUG
+	depends on MV_ETH_L2FW
+	bool "Add run-time L2FW debug code"
+	default n
+	---help---
+	Enable L2FW run-time enable/disable enter debug code blocks
+
+config MV_ETH_RX_POLL_WEIGHT
+	int "poll weight for the RX poll() function"
+	default 64
+	range 1 255
+	---help---
+	poll weight for the RX poll() function; must be less or equal to 255
+
+config MV_ETH_EXTRA_BUF_SIZE
+	int "Extra buffer size in bytes"
+	default 120
+	range 120 16384
+	---help---
+	Size of buffers allocated for extra pool and used in special cases like TSO,
+	fragmentattion and others
+
+config MV_ETH_EXTRA_BUF_NUM
+        int "Number of extra buffers allocated for each port"
+        default MV_ETH_TXQ_DESC
+	---help---
+	Number of extra buffers allocated for each port
+endmenu
+
+menu "PON support for Network driver"
+	depends on MV_INCLUDE_PON
+
+config MV_PON_TXP_DEF
+        int "Default T-CONT to send local generated packets"
+        depends on MV_INCLUDE_PON
+        default 0
+        ---help---
+
+config MV_PON_TXQ_DEF
+        int "Default TXQ to send local generated packets"
+        depends on MV_INCLUDE_PON
+        default 0
+        ---help---
+
+endmenu
+
