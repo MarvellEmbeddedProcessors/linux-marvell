@@ -1,0 +1,366 @@
+/*******************************************************************************
+Copyright (C) Marvell International Ltd. and its affiliates
+
+This software file (the "File") is owned and distributed by Marvell
+International Ltd. and/or its affiliates ("Marvell") under the following
+alternative licensing terms.  Once you have made an election to distribute the
+File under one of the following license alternatives, please (i) delete this
+introductory statement regarding license alternatives, (ii) delete the two
+license alternatives that you have not elected to use and (iii) preserve the
+Marvell copyright notice above.
+
+********************************************************************************
+Marvell Commercial License Option
+
+If you received this File from Marvell and you have entered into a commercial
+license agreement (a "Commercial License") with Marvell, the File is licensed
+to you under the terms of the applicable Commercial License.
+
+********************************************************************************
+Marvell GPL License Option
+
+If you received this File from Marvell, you may opt to use, redistribute and/or
+modify this File in accordance with the terms and conditions of the General
+Public License Version 2, June 1991 (the "GPL License"), a copy of which is
+available along with the File in the license.txt file or by writing to the Free
+Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 or
+on the worldwide web at http://www.gnu.org/licenses/gpl.txt.
+
+THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE IMPLIED
+WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE ARE EXPRESSLY
+DISCLAIMED.  The GPL License provides additional details about this warranty
+disclaimer.
+********************************************************************************
+Marvell BSD License Option
+
+If you received this File from Marvell, you may opt to use, redistribute and/or
+modify this File under the following licensing terms.
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+    *   Redistributions of source code must retain the above copyright notice,
+	this list of conditions and the following disclaimer.
+
+    *   Redistributions in binary form must reproduce the above copyright
+	notice, this list of conditions and the following disclaimer in the
+	documentation and/or other materials provided with the distribution.
+
+    *   Neither the name of Marvell nor the names of its contributors may be
+	used to endorse or promote products derived from this software without
+	specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+*******************************************************************************/
+
+#ifndef __mvEmacReg_h__
+#define __mvEmacReg_h__
+
+
+
+/* Emac Control (emac_cr) */
+#define MV_EMAC_CR_REG								0x0000
+#define MV_EMAC_CR_ENQ_EN_OFFS		0
+#define MV_EMAC_CR_ENQ_EN_MASK    \
+		(0x00000001 << MV_EMAC_CR_ENQ_EN_OFFS)
+
+#define MV_EMAC_CR_RESERVED_OFFS		1
+#define MV_EMAC_CR_RESERVED_MASK    \
+		(0x00000001 << MV_EMAC_CR_RESERVED_OFFS)
+
+#define MV_EMAC_CR_LOOPBACK_EN_OFFS		2
+#define MV_EMAC_CR_LOOPBACK_EN_MASK    \
+		(0x00000001 << MV_EMAC_CR_LOOPBACK_EN_OFFS)
+
+
+/* Emac Enq Control (EMAC_ENQ_CR) */
+#define MV_EMAC_ENQ_CR_REG								0x0010
+#define MV_EMAC_ENQ_CR_ENQ_CR_CFH_OFFSET_OFFS		0
+#define MV_EMAC_ENQ_CR_ENQ_CR_CFH_OFFSET_MASK    \
+		(0x0000000f << MV_EMAC_ENQ_CR_ENQ_CR_CFH_OFFSET_OFFS)
+
+#define MV_EMAC_ENQ_CR_ENQ_CR_ADD_MH_OFFS		4
+#define MV_EMAC_ENQ_CR_ENQ_CR_ADD_MH_MASK    \
+		(0x00000001 << MV_EMAC_ENQ_CR_ENQ_CR_ADD_MH_OFFS)
+
+#define MV_EMAC_ENQ_CR_ENQ_CR_TIMESTAMP_FROM_DESCRIPTOR_OFFS		5
+#define MV_EMAC_ENQ_CR_ENQ_CR_TIMESTAMP_FROM_DESCRIPTOR_MASK    \
+		(0x00000001 << MV_EMAC_ENQ_CR_ENQ_CR_TIMESTAMP_FROM_DESCRIPTOR_OFFS)
+
+
+/* Emac Enq Cfh Mh (EMAC_ENQ_CFH_MH) */
+#define MV_EMAC_ENQ_CFH_MH_REG								0x0014
+#define MV_EMAC_ENQ_CFH_MH_EMAC_ENQ_CFH_MH_OFFS		0
+#define MV_EMAC_ENQ_CFH_MH_EMAC_ENQ_CFH_MH_MASK    \
+		(0x0000ffff << MV_EMAC_ENQ_CFH_MH_EMAC_ENQ_CFH_MH_OFFS)
+
+
+/* Emac Enq Descriptor Word 0 (EMAC_ENQ_DESC_W0) */
+#define MV_EMAC_ENQ_DESC_W0_REG								0x0018
+#define MV_EMAC_ENQ_DESC_W0_EMAC_ENQ_DESC_W0_31_16_OFFS		0
+#define MV_EMAC_ENQ_DESC_W0_EMAC_ENQ_DESC_W0_31_16_MASK    \
+		(0x0000ffff << MV_EMAC_ENQ_DESC_W0_EMAC_ENQ_DESC_W0_31_16_OFFS)
+
+
+/* Emac Enq Descriptor Word 1 (EMAC_ENQ_DESC_W1) */
+#define MV_EMAC_ENQ_DESC_W1_REG								0x001c
+#define MV_EMAC_ENQ_DESC_W1_EMAC_ENQ_DESC_W1_OFFS		0
+
+/* Emac Axi Configuration (EMAC_AXI_CFG) */
+#define MV_EMAC_AXI_CFG_REG								0x0030
+#define MV_EMAC_AXI_CFG_AXI4_ENQ_QUEUE_NUM_OFFS		0
+#define MV_EMAC_AXI_CFG_AXI4_ENQ_QUEUE_NUM_MASK    \
+		(0x00000fff << MV_EMAC_AXI_CFG_AXI4_ENQ_QUEUE_NUM_OFFS)
+
+#define MV_EMAC_AXI_CFG_AXI4_DEQ_PORT_NUM_OFFS		12
+#define MV_EMAC_AXI_CFG_AXI4_DEQ_PORT_NUM_MASK    \
+		(0x00000fff << MV_EMAC_AXI_CFG_AXI4_DEQ_PORT_NUM_OFFS)
+
+
+/* Emac Pfc Timer Wait  Cycles (EMAC_PFC_WCYC) */
+#define MV_EMAC_PFC_WCYC_REG								0x0034
+#define MV_EMAC_PFC_WCYC_PFC_TIMER_WAIT_CYCLES_OFFS		0
+#define MV_EMAC_PFC_WCYC_PFC_TIMER_WAIT_CYCLES_MASK    \
+		(0x000001ff << MV_EMAC_PFC_WCYC_PFC_TIMER_WAIT_CYCLES_OFFS)
+
+
+/* Emac Pfc Address (EMAC_PFC_TBL_ADDR)_ */
+#define MV_EMAC_PFC_TBL_ADDR_REG(n)							(0x0060 + n*4)
+#define MV_EMAC_PFC_TBL_ADDR_PFC_TBL_ADDR_OFFS		0
+#define MV_EMAC_PFC_TBL_ADDR_PFC_TBL_ADDR_MASK    \
+		(0x0fffffff << MV_EMAC_PFC_TBL_ADDR_PFC_TBL_ADDR_OFFS)
+
+
+/* Emac Pfc Pause Value(EMAC_PFC_TBL_PAUSE_VAL)_ */
+#define MV_EMAC_PFC_TBL_PAUSE_VAL_REG(n)							(0x0080 + n*4)
+#define MV_EMAC_PFC_TBL_PAUSE_VAL_PFC_TBL_PAUSE_VAL_OFFS		0
+
+/* Emac Pfc Resume Value(EMAC_PFC_TBL_RESUME_VAL)_ */
+#define MV_EMAC_PFC_TBL_RESUME_VAL_REG(n)							(0x00a0 + n*4)
+#define MV_EMAC_PFC_TBL_RESUME_VAL_PFC_TBL_RESUME_VAL_OFFS		0
+
+/* Emac Enq Dropped Packets Counter (EMAC_ENQ_DRP_PKT_CNT) */
+#define MV_EMAC_ENQ_DRP_PKT_CNT_REG								0x00c0
+#define MV_EMAC_ENQ_DRP_PKT_CNT_ENQ_DRP_PKT_CNT_OFFS		0
+
+/* Emac Enq Xoff Counter (EMAC_ENQ_XOFF_CNT) */
+#define MV_EMAC_ENQ_XOFF_CNT_REG								0x00c4
+#define MV_EMAC_ENQ_XOFF_CNT_ENQ_XOFF_CNT_OFFS		0
+
+/* Emac Deq Control (EMAC_DEQ_CR) */
+#define MV_EMAC_DEQ_CR_REG								0x00d0
+#define MV_EMAC_DEQ_CR_DEQ_STRM_DESC_SIZE_OFFS		0
+#define MV_EMAC_DEQ_CR_DEQ_STRM_DESC_SIZE_MASK    \
+		(0x00000003 << MV_EMAC_DEQ_CR_DEQ_STRM_DESC_SIZE_OFFS)
+
+#define MV_EMAC_DEQ_CR_DEQ_STRIP_MH_OFFS		2
+#define MV_EMAC_DEQ_CR_DEQ_STRIP_MH_MASK    \
+		(0x00000001 << MV_EMAC_DEQ_CR_DEQ_STRIP_MH_OFFS)
+
+#define MV_EMAC_DEQ_CR_DEQ_FIFO_UNDRN_PROT_TH_OFFS		4
+#define MV_EMAC_DEQ_CR_DEQ_FIFO_UNDRN_PROT_TH_MASK    \
+		(0x000000ff << MV_EMAC_DEQ_CR_DEQ_FIFO_UNDRN_PROT_TH_OFFS)
+
+#define MV_EMAC_DEQ_CR_DEQ_TX_SOP_DESC_PTP_ACTION_OFFS		12
+#define MV_EMAC_DEQ_CR_DEQ_TX_SOP_DESC_PTP_ACTION_MASK    \
+		(0x0000000f << MV_EMAC_DEQ_CR_DEQ_TX_SOP_DESC_PTP_ACTION_OFFS)
+
+#define MV_EMAC_DEQ_CR_DEQ_TX_SOP_DESC_INGRS_TIME_STMP_FROM_CFH_OFFS		16
+#define MV_EMAC_DEQ_CR_DEQ_TX_SOP_DESC_INGRS_TIME_STMP_FROM_CFH_MASK    \
+		(0x00000001 << MV_EMAC_DEQ_CR_DEQ_TX_SOP_DESC_INGRS_TIME_STMP_FROM_CFH_OFFS)
+
+
+/* Emac Deq Minimum Packet Length (EMAC_MIN_PKT_LEN) */
+#define MV_EMAC_MIN_PKT_LEN_REG								0x00d4
+#define MV_EMAC_MIN_PKT_LEN_DEQ_MIN_PKT_LEN_OFFS		0
+#define MV_EMAC_MIN_PKT_LEN_DEQ_MIN_PKT_LEN_MASK    \
+		(0x0000007f << MV_EMAC_MIN_PKT_LEN_DEQ_MIN_PKT_LEN_OFFS)
+
+
+/* Emac Deq Rtc Value From Descriptor (EMAC_DEQ_RTC_STRM_VAL) */
+#define MV_EMAC_DEQ_RTC_STRM_VAL_REG								0x00d8
+#define MV_EMAC_DEQ_RTC_STRM_VAL_DEQ_RTC_STRM_VAL_OFFS		0
+
+/* Emac Deq Rtc Value From Port (EMAC_DEQ_RTC_PORT_VAL) */
+#define MV_EMAC_DEQ_RTC_PORT_VAL_REG								0x00dc
+#define MV_EMAC_DEQ_RTC_PORT_VAL_DEQ_RTC_PORT_VAL_OFFS		0
+
+/* Debug State Machines Status (EMAC_DBG_SM_STATUS) */
+#define MV_EMAC_DBG_SM_STATUS_REG								0x0100
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_ENQ_FC_STATE_OFFS		0
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_ENQ_FC_STATE_MASK    \
+		(0x0000000f << MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_ENQ_FC_STATE_OFFS)
+
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_ENQ_STATE_OFFS		4
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_ENQ_STATE_MASK    \
+		(0x0000000f << MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_ENQ_STATE_OFFS)
+
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_AXI4_W_STATE_OFFS		8
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_AXI4_W_STATE_MASK    \
+		(0x0000000f << MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_AXI4_W_STATE_OFFS)
+
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_AXI4_AW_STATE_OFFS		12
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_AXI4_AW_STATE_MASK    \
+		(0x0000000f << MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_AXI4_AW_STATE_OFFS)
+
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_DEQ_STATE_OFFS		16
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_DEQ_STATE_MASK    \
+		(0x0000000f << MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_DEQ_STATE_OFFS)
+
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_APB_ARB_STATE_OFFS		20
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_APB_ARB_STATE_MASK    \
+		(0x0000000f << MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_APB_ARB_STATE_OFFS)
+
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_APB2MG_STATE_OFFS		24
+#define MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_APB2MG_STATE_MASK    \
+		(0x0000000f << MV_EMAC_DBG_SM_STATUS_DBG_SM_STATUS_APB2MG_STATE_OFFS)
+
+
+/* Debug Fill Level Status 1 (EMAC_DBG_FIFO_FILL_LVL1) */
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_REG								0x0104
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_PFC_FIFO_OFFS		0
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_PFC_FIFO_MASK    \
+		(0x000000ff << MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_PFC_FIFO_OFFS)
+
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_PKT_FIFO_OFFS		8
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_PKT_FIFO_MASK    \
+		(0x000000ff << MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_PKT_FIFO_OFFS)
+
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_LEN_FIFO_OFFS		16
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_LEN_FIFO_MASK    \
+		(0x000000ff << MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_LEN_FIFO_OFFS)
+
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_EOP_FIFO_OFFS		24
+#define MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_EOP_FIFO_MASK    \
+		(0x000000ff << MV_EMAC_DBG_FIFO_FILL_LVL1_DBG_FIFO_FILL_LVL_ENQ_EOP_FIFO_OFFS)
+
+
+/* Debug Fill Level Status 2 (EMAC_DBG_FIFO_FILL_LVL2) */
+#define MV_EMAC_DBG_FIFO_FILL_LVL2_REG								0x0108
+#define MV_EMAC_DBG_FIFO_FILL_LVL2_DBG_FIFO_FILL_LVL_ENQ_CFH_FIFO_OFFS		0
+#define MV_EMAC_DBG_FIFO_FILL_LVL2_DBG_FIFO_FILL_LVL_ENQ_CFH_FIFO_MASK    \
+		(0x000000ff << MV_EMAC_DBG_FIFO_FILL_LVL2_DBG_FIFO_FILL_LVL_ENQ_CFH_FIFO_OFFS)
+
+#define MV_EMAC_DBG_FIFO_FILL_LVL2_DBG_FIFO_FILL_LVL_DEQ_PKT_FIFO_OFFS		8
+#define MV_EMAC_DBG_FIFO_FILL_LVL2_DBG_FIFO_FILL_LVL_DEQ_PKT_FIFO_MASK    \
+		(0x000000ff << MV_EMAC_DBG_FIFO_FILL_LVL2_DBG_FIFO_FILL_LVL_DEQ_PKT_FIFO_OFFS)
+
+
+/* Emac Spare (EMAC_SPR)_ */
+#define MV_EMAC_SPR_REG(n)							(0x0110 + n*4)
+#define MV_EMAC_SPR_EMAC_SPR_OFFS		0
+
+/* Wol Sleep (WOLSLP) */
+#define MV_WOLSLP_REG								0x0400
+#define MV_WOLSLP_SLEEPMODE_OFFS		0
+#define MV_WOLSLP_SLEEPMODE_MASK    \
+		(0x00000001 << MV_WOLSLP_SLEEPMODE_OFFS)
+
+
+/* Mac Destination Address High (WOL_MAC_DAH) */
+#define MV_WOL_MAC_DAH_REG								0x0410
+#define MV_WOL_MAC_DAH_MACDAHIGH_OFFS		0
+
+/* Mac Destination Address Low (WOL_MAC_DAL) */
+#define MV_WOL_MAC_DAL_REG								0x0414
+#define MV_WOL_MAC_DAL_MACDALOW_OFFS		0
+#define MV_WOL_MAC_DAL_MACDALOW_MASK    \
+		(0x0000ffff << MV_WOL_MAC_DAL_MACDALOW_OFFS)
+
+
+/* Wake-up Event Enable (WOLWEE) */
+#define MV_WOLWEE_REG								0x0420
+#define MV_WOLWEE_WAKEUPFRAME0_OFFS		0
+#define MV_WOLWEE_WAKEUPFRAME0_MASK    \
+		(0x00000001 << MV_WOLWEE_WAKEUPFRAME0_OFFS)
+
+#define MV_WOLWEE_WAKEUPFRAME1_OFFS		1
+#define MV_WOLWEE_WAKEUPFRAME1_MASK    \
+		(0x00000001 << MV_WOLWEE_WAKEUPFRAME1_OFFS)
+
+#define MV_WOLWEE_WAKEUPFRAME2_OFFS		2
+#define MV_WOLWEE_WAKEUPFRAME2_MASK    \
+		(0x00000001 << MV_WOLWEE_WAKEUPFRAME2_OFFS)
+
+#define MV_WOLWEE_WAKEUPFRAME3_OFFS		3
+#define MV_WOLWEE_WAKEUPFRAME3_MASK    \
+		(0x00000001 << MV_WOLWEE_WAKEUPFRAME3_OFFS)
+
+#define MV_WOLWEE_MAGICPATTERN_OFFS		4
+#define MV_WOLWEE_MAGICPATTERN_MASK    \
+		(0x00000001 << MV_WOLWEE_MAGICPATTERN_OFFS)
+
+
+/* Wake-up Frame Size (WOLWFS) */
+#define MV_WOLWFS_REG								0x0430
+#define MV_WOLWFS_PATTERN0SIZE_OFFS		0
+#define MV_WOLWFS_PATTERN0SIZE_MASK    \
+		(0x000000ff << MV_WOLWFS_PATTERN0SIZE_OFFS)
+
+#define MV_WOLWFS_PATTERN1SIZE_OFFS		8
+#define MV_WOLWFS_PATTERN1SIZE_MASK    \
+		(0x000000ff << MV_WOLWFS_PATTERN1SIZE_OFFS)
+
+#define MV_WOLWFS_PATTERN2SIZE_OFFS		16
+#define MV_WOLWFS_PATTERN2SIZE_MASK    \
+		(0x000000ff << MV_WOLWFS_PATTERN2SIZE_OFFS)
+
+#define MV_WOLWFS_PATTERN3SIZE_OFFS		24
+#define MV_WOLWFS_PATTERN3SIZE_MASK    \
+		(0x000000ff << MV_WOLWFS_PATTERN3SIZE_OFFS)
+
+
+/* Wake-up Frame Select (WOLWFSEL) */
+#define MV_WOLWFSEL_REG								0x0434
+#define MV_WOLWFSEL_PATTERNSELECT_OFFS		0
+#define MV_WOLWFSEL_PATTERNSELECT_MASK    \
+		(0x00000003 << MV_WOLWFSEL_PATTERNSELECT_OFFS)
+
+
+/* Wake-up Frame Data (WOLWFD) */
+#define MV_WOLWFD_REG(n)							(0x0500 + 4 * n)
+#define MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE3_OFFS		0
+#define MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE3_MASK    \
+		(0x000000ff << MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE3_OFFS)
+
+#define MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE2_OFFS		8
+#define MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE2_MASK    \
+		(0x000000ff << MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE2_OFFS)
+
+#define MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE1_OFFS		16
+#define MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE1_MASK    \
+		(0x000000ff << MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE1_OFFS)
+
+#define MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE0_OFFS		24
+#define MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE0_MASK    \
+		(0x000000ff << MV_WOLWFD_PATTERN_DWORD_NUMBER_BYTE0_OFFS)
+
+
+/* Wake-up Frame Mask (WOLWFM) */
+#define MV_WOLWFM_REG(n)							(0x0580 + 4 * n)
+#define MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE3MASK_OFFS		0
+#define MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE3MASK_MASK    \
+		(0x00000001 << MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE3MASK_OFFS)
+
+#define MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE2MASK_OFFS		8
+#define MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE2MASK_MASK    \
+		(0x00000001 << MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE2MASK_OFFS)
+
+#define MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE1MASK_OFFS		16
+#define MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE1MASK_MASK    \
+		(0x00000001 << MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE1MASK_OFFS)
+
+#define MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE0MASK_OFFS		24
+#define MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE0MASK_MASK    \
+		(0x00000001 << MV_WOLWFM_PATTERN_DWORD_NUMBER_BYTE0MASK_OFFS)
+
+#endif /* __mvEmacReg_h__ */
