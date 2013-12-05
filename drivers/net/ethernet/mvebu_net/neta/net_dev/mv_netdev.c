@@ -3538,8 +3538,7 @@ int mv_eth_port_resume(int port)
 		mv_eth_resume_internals(pp, pp->dev->mtu);
 		clear_bit(MV_ETH_F_STARTED_OLD_BIT, &(pp->flags));
 		if (pp->flags & MV_ETH_F_CONNECT_LINUX) {
-			mv_eth_interrupts_unmask(pp);
-			smp_call_function_many(cpu_online_mask, (smp_call_func_t)mv_eth_interrupts_unmask, (void *)pp, 1);
+			on_each_cpu(mv_eth_interrupts_unmask, pp, 1);
 		}
 	} else
 		clear_bit(MV_ETH_F_STARTED_BIT, &(pp->flags));
@@ -4879,8 +4878,7 @@ int mv_eth_suspend_internals(struct eth_port *pp)
 	}
 
 	/* mask all interrupts */
-	mv_eth_interrupts_mask(pp);
-	smp_call_function_many(cpu_online_mask, (smp_call_func_t)mv_eth_interrupts_mask, (void *)pp, 1);
+	on_each_cpu(mv_eth_interrupts_mask, pp, 1);
 
 	for_each_possible_cpu(cpu) {
 		pp->cpu_config[cpu]->causeRxTx = 0;
@@ -4918,7 +4916,7 @@ int mv_eth_stop_internals(struct eth_port *pp)
 		goto error;
 	}
 
-	mv_eth_interrupts_mask(pp);
+	on_each_cpu(mv_eth_interrupts_mask, pp, 1);
 
 	mdelay(10);
 
