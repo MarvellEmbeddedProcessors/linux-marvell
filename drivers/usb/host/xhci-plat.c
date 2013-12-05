@@ -14,6 +14,7 @@
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/of.h>
 
 #include "xhci.h"
 
@@ -186,11 +187,20 @@ static int xhci_plat_remove(struct platform_device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id usb_xhci_of_match[] = {
+	{ .compatible = "xhci-platform" },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+#endif
+
 static struct platform_driver usb_xhci_driver = {
 	.probe	= xhci_plat_probe,
 	.remove	= xhci_plat_remove,
 	.driver	= {
 		.name = "xhci-hcd",
+		.of_match_table = of_match_ptr(usb_xhci_of_match),
 	},
 };
 MODULE_ALIAS("platform:xhci-hcd");
