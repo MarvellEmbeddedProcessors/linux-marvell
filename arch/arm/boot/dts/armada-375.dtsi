@@ -475,5 +475,23 @@
 			};
 
 		};
+
+		/*
+		 * On Armada 375, USB2 host controller and USB3 host
+		 * controller are incompatible. That means that in the
+		 * dts of your board, you can either select the USB2
+		 * controller: marvell,orion-ehci or the USB3
+		 * controller: marvell,xhci-armada-375, but not
+		 * both. If both controllers are selected, then the
+		 * kernel will select the USB3 by default.
+		 */
+		usb3-controller {
+			compatible = "marvell,xhci-armada-375";
+			reg = <MBUS_ID(0x05, 0x00) 0 0x20000>,
+				<MBUS_ID(0xf0, 0x01) 0x5ff80 0x80>;
+			interrupts = <0 16 4>;
+			clocks = <&gateclk 16>;
+			status = "disabled";
+		};
 	};
 };
