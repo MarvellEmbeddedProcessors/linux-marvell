@@ -12,8 +12,8 @@
  * warranty of any kind, whether express or implied.
  *
  * The Armada 370 and Armada XP SOCs have a power management service
- * unit which is responsible for powering down and waking up CPUs and
- * other SOC units
+ * unit which is responsible for various tasks, including setting the
+ * boot address of secondary CPUs.
  */
 
 #include <linux/kernel.h>
@@ -24,10 +24,8 @@
 #include <asm/smp_plat.h>
 
 static void __iomem *pmsu_mp_base;
-static void __iomem *pmsu_reset_base;
 
 #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
-#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
 
 static struct of_device_id of_pmsu_table[] = {
 	{.compatible = "marvell,armada-370-xp-pmsu"},
@@ -35,13 +33,13 @@ static struct of_device_id of_pmsu_table[] = {
 };
 
 #ifdef CONFIG_SMP
-int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+void mvebu_pmsu_set_boot_addr(unsigned int cpu_id, void *boot_addr)
 {
-	int reg, hw_cpu;
+	int hw_cpu;
 
-	if (!pmsu_mp_base || !pmsu_reset_base) {
-		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
-		return 1;
+	if (!pmsu_mp_base) {
+		pr_warn("Can't set CPU boot address. PMSU is uninitialized\n");
+		return;
 	}
 
 	hw_cpu = cpu_logical_map(cpu_id);
@@ -49,12 +47,6 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
 	writel(virt_to_phys(boot_addr), pmsu_mp_base +
 			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
 
-	/* Release CPU from reset by clearing reset bit*/
-	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-	reg &= (~0x1);
-	writel(reg, pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
-
-	return 0;
 }
 #endif
 
@@ -66,7 +58,6 @@ static int __init armada_370_xp_pmsu_init(void)
 	if (np) {
 		pr_info("Initializing Power Management Service Unit\n");
 		pmsu_mp_base = of_iomap(np, 0);
-		pmsu_reset_base = of_iomap(np, 1);
 	}
 
 	return 0;
