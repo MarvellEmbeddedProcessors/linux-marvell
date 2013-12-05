@@ -313,6 +313,45 @@ static int mvPrsMacDaRangeAccept(int portMap, MV_U8 *da, MV_U8 *mask, unsigned i
 	return MV_OK;
 }
 
+
+/* delete all port's simple (not range) multicast entries */
+int mvPrsMcastDelAll(int port)
+{
+	MV_PP2_PRS_ENTRY pe;
+	int tid, index;
+	char da[MV_MAC_ADDR_SIZE], daMask[MV_MAC_ADDR_SIZE];
+
+	for (tid = PE_FIRST_FREE_TID ; tid <= PE_LAST_FREE_TID; tid++) {
+
+		if (!mvPp2PrsShadowIsValid(tid))
+			continue;
+
+		if (mvPp2PrsShadowLu(tid) != PRS_LU_MAC)
+			continue;
+
+		if (mvPp2PrsShadowUdf(tid) != PRS_UDF_MAC_DEF)
+			continue;
+
+		/* only simple mac entries */
+		pe.index = tid;
+		mvPp2PrsHwRead(&pe);
+
+		/* read mac addr from entry */
+		for (index = 0; index < MV_MAC_ADDR_SIZE; index++)
+			mvPp2PrsSwTcamByteGet(&pe, MV_ETH_MH_SIZE + index, &da[index], &daMask[index]);
+
+		if (MV_IS_BROADCAST_MAC(da))
+			continue;
+
+		if (MV_IS_MULTICAST_MAC(da))
+			/* delete mcast entry */
+			mvPrsMacDaAccept(port, da, 0);
+	}
+
+	return MV_OK;
+}
+
+
 /* TODO: use mvPrsMacDaRangeAccept */
 int mvPrsMacDaAccept(int port, unsigned char *da, int add)
 {
@@ -428,7 +467,7 @@ static int mvPrsMacDaRangeValid(unsigned int portMap, MV_U8 *da, MV_U8 *mask)
 
 		mvPp2PrsSwTcamPortMapGet(&pe, &entryPmap);
 
-		if ((mvPrsMacRangeIntersec(&pe, da, mask)) & !mvPrsMacRangeEquals(&pe, da, mask)) {
+		if ((mvPrsMacRangeIntersec(&pe, da, mask)) && !mvPrsMacRangeEquals(&pe, da, mask)) {
 			if (entryPmap & portMap) {
 				mvOsPrintf("%s: operation not supported, range intersection\n", __func__);
 				mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n",
@@ -1573,7 +1612,7 @@ static int mvPrsEthTypeValid(unsigned int portMap, unsigned short ethertype)
 			continue;
 
 		/* in default entries portmask must be 0xff */
-		if ((mvPp2PrsShadowUdf(tid) == PRS_UDF_L2_DEF) & (portMap != PORT_MASK)) {
+		if ((mvPp2PrsShadowUdf(tid) == PRS_UDF_L2_DEF) && (portMap != PORT_MASK)) {
 			mvOsPrintf("%s: operation not supported.\n", __func__);
 			mvOsPrintf("%s: ports map must be 0xFF for default ether type\n", __func__);
 			return MV_ERROR;
