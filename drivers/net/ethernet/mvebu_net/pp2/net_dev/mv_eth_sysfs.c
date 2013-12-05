@@ -44,7 +44,6 @@ static ssize_t mv_eth_help(char *buf)
 	int off = 0;
 
 	off += sprintf(buf+off, "cd                 bm          - move to BM sysfs directory\n");
-	off += sprintf(buf+off, "cd                 napi        - move to NAPI groups API sysfs directory\n");
 	off += sprintf(buf+off, "cd                 rx          - move to RX sysfs directory\n");
 	off += sprintf(buf+off, "cd                 tx          - move to TX sysfs directory\n");
 	off += sprintf(buf+off, "cd                 tx_sched    - move to TX Scheduler sysfs directory\n");
@@ -307,7 +306,6 @@ int mv_pp2_gbe_sysfs_init(struct kobject *pp2_kobj)
 	}
 
 	mv_pp2_bm_sysfs_init(gbe_kobj);
-	mv_pp2_napi_sysfs_init(gbe_kobj);
 	mv_pp2_rx_sysfs_init(gbe_kobj);
 	mv_pp2_tx_sysfs_init(gbe_kobj);
 	mv_pp2_tx_sched_sysfs_init(gbe_kobj);
@@ -328,7 +326,6 @@ int mv_pp2_gbe_sysfs_exit(struct kobject *pp2_kobj)
 	mv_pp2_tx_sched_sysfs_exit(gbe_kobj);
 	mv_pp2_tx_sysfs_exit(gbe_kobj);
 	mv_pp2_rx_sysfs_exit(gbe_kobj);
-	mv_pp2_napi_sysfs_exit(gbe_kobj);
 	mv_pp2_bm_sysfs_exit(gbe_kobj);
 #ifdef CONFIG_MV_ETH_HWF
 	mv_pp2_gbe_hwf_sysfs_exit(gbe_kobj);

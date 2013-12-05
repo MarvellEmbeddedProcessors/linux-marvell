@@ -35,7 +35,7 @@ mv_pp2-objs +=  $(PP2_COMMON_DIR)/mvPp2Common.o
 
 mv_pp2-objs += net_dev/mv_netdev.o net_dev/mv_ethernet.o net_dev/mv_eth_sysfs.o net_dev/mv_eth_tool.o
 mv_pp2-objs += net_dev/mv_eth_rx_sysfs.o net_dev/mv_eth_tx_sysfs.o net_dev/mv_eth_tx_sched_sysfs.o
-mv_pp2-objs += net_dev/mv_eth_napi_sysfs.o net_dev/mv_eth_pme_sysfs.o net_dev/mv_eth_pon_sysfs.o
+mv_pp2-objs += net_dev/mv_eth_pme_sysfs.o net_dev/mv_eth_pon_sysfs.o
 mv_pp2-objs += net_dev/mv_eth_bm_sysfs.o net_dev/mv_eth_qos_sysfs.o net_dev/mv_eth_dbg_sysfs.o
 
 ifeq ($(CONFIG_MV_ETH_HWF),y)
