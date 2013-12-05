@@ -72,6 +72,14 @@ static struct of_device_id of_system_controller_table[] = {
 	}, {
 		.compatible = "marvell,armada-375-system-controller",
 		.data = (void *) &armada_375_system_controller,
+	}, {
+		/*
+		 * As far as RSTOUTn and System soft reset registers
+		 * are concerned, Armada 38x is similar to Armada
+		 * 370/XP
+		 */
+		.compatible = "marvell,armada-380-system-controller",
+		.data = (void *) &armada_370_xp_system_controller,
 	},
 	{ /* end of list */ },
 };
