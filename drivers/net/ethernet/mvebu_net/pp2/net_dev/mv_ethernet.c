@@ -261,8 +261,7 @@ static int mv_eth_set_mac_addr_internals(struct net_device *dev, void *addr)
 	return 0;
 }
 
-
-void mv_eth_change_rx_flags(struct net_device *dev, int flags)
+void mv_eth_rx_set_rx_mode(struct net_device *dev)
 {
 	struct eth_port     *priv = MV_ETH_PRIV(dev);
 	int                 phyPort = MV_PPV2_PORT_PHYS(priv->port);
@@ -281,6 +280,9 @@ void mv_eth_change_rx_flags(struct net_device *dev, int flags)
 		mvPrsMacAllMultiSet(phyPort, 1);
 	else
 		mvPrsMacAllMultiSet(phyPort, 0);
+
+	/* remove all port's mcast enries */
+	mvPrsMcastDelAll(phyPort);
 
 	if (dev->flags & IFF_MULTICAST) {
 		if (!netdev_mc_empty(dev)) {
