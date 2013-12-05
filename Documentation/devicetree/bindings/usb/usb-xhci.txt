@@ -1,7 +1,7 @@
 USB xHCI controllers
 
 Required properties:
-  - compatible: should be "xhci-platform".
+  - compatible: should be "xhci-platform" or "xhci-armada-375"
   - reg: should contain address and length of the standard XHCI
     register set for the device.
   - interrupts: one XHCI interrupt should be described here.
