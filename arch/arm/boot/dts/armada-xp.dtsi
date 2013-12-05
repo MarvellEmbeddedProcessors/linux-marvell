@@ -48,7 +48,13 @@
 
 			armada-370-xp-pmsu@22000 {
 				compatible = "marvell,armada-370-xp-pmsu";
-				reg = <0x22100 0x400>, <0x20800 0x20>;
+				reg = <0x22100 0x400>;
+			};
+
+			cpurst: cpurst@20800 {
+				compatible = "marvell,armada-xp-cpu-reset";
+				reg = <0x20800 0x20>;
+				#reset-cells = <1>;
 			};
 
 			serial@12200 {
