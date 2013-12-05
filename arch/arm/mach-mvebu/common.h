@@ -19,4 +19,6 @@ void mvebu_restart(char mode, const char *cmd);
 
 void armada_xp_cpu_die(unsigned int cpu);
 
+int mvebu_boot_cpu(int cpu);
+
 #endif
