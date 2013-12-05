@@ -19,6 +19,7 @@
 #include <linux/of_device.h>
 
 #include "xhci.h"
+#include "xhci-mvebu.h"
 
 static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
@@ -221,10 +222,19 @@ static struct xhci_plat_ops xhci_plat_default = {
 };
 
 #ifdef CONFIG_OF
+struct xhci_plat_ops xhci_plat_mvebu = {
+	.probe =  xhci_mvebu_probe,
+	.remove =  xhci_mvebu_remove,
+};
+
 static const struct of_device_id usb_xhci_of_match[] = {
 	{
 		.compatible = "xhci-platform",
 		.data = (void *) &xhci_plat_default,
+	},
+	{
+		.compatible = "marvell,xhci-armada-375",
+		.data = (void *) &xhci_plat_mvebu,
 	},
 	{ },
 };
