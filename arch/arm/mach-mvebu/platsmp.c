@@ -85,7 +85,8 @@ static int __cpuinit armada_xp_boot_secondary(unsigned int cpu,
 {
 	pr_info("Booting CPU %d\n", cpu);
 
-	armada_xp_boot_cpu(cpu, armada_xp_secondary_startup);
+	mvebu_pmsu_set_boot_addr(cpu, armada_xp_secondary_startup);
+	mvebu_boot_cpu(cpu);
 
 	return 0;
 }
