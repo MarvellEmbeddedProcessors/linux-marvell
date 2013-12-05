@@ -156,6 +156,7 @@ int mvPrsMacDaAccept(int port, unsigned char *da, int add);
 int mvPrsMacDaRangeSet(unsigned portBmp, MV_U8 *da, MV_U8 *mask, unsigned int ri, unsigned int riMask, MV_BOOL finish);
 int mvPrsMacDaRangeDel(unsigned portBmp, MV_U8 *da, MV_U8 *mask);
 int mvPrsMacDropAllSet(int port, int add);
+int mvPrsMcastDelAll(int port);
 int mvPrsMhRxSpecialSet(int port, unsigned short mh, int add);
 int mvPrsMacPromiscousSet(int port, int add);
 int mvPrsMacAllMultiSet(int port, int add);

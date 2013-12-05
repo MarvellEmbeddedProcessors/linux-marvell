@@ -870,7 +870,7 @@ int         mv_eth_check_mtu_internals(struct net_device *dev, int mtu);
 int         mv_eth_check_mtu_valid(struct net_device *dev, int mtu);
 
 int         mv_eth_set_mac_addr(struct net_device *dev, void *mac);
-void        mv_eth_change_rx_flags(struct net_device *dev, int flags);
+void	    mv_eth_rx_set_rx_mode(struct net_device *dev);
 int         mv_eth_open(struct net_device *dev);
 int         mv_eth_port_suspend(int port);
 int         mv_eth_port_resume(int port);
