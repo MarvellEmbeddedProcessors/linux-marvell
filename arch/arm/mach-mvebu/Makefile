@@ -8,7 +8,7 @@ obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
 obj-$(CONFIG_MACH_ARMADA_375) += armada-375.o
 obj-$(CONFIG_ARCH_MVEBU)	 += \
 	coherency.o coherency_ll.o pmsu.o cpu-reset.o \
-	common.o
+	common.o usb-cluster.o
 ifeq ($(CONFIG_SMP),y)
 obj-$(CONFIG_MACH_ARMADA_XP)	 += platsmp.o headsmp.o
 obj-$(CONFIG_MACH_ARMADA_375)	 += platsmp-375.o headsmp-375.o
