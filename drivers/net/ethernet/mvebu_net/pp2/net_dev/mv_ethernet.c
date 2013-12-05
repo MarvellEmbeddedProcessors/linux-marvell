@@ -98,8 +98,7 @@ int mv_eth_start(struct net_device *dev)
 		}
 
 		/* unmask interrupts */
-		mv_eth_interrupts_unmask(priv);
-		smp_call_function_many(cpu_online_mask, (smp_call_func_t)mv_eth_interrupts_unmask, (void *)priv, 1);
+		on_each_cpu(mv_eth_interrupts_unmask, priv, 1);
 
 		/* Enable interrupts for all CPUs */
 		mvPp2GbeCpuInterruptsEnable(priv->port, priv->cpuMask);
@@ -142,8 +141,7 @@ int mv_eth_stop(struct net_device *dev)
 	/* Disable interrupts for all CPUs */
 	mvPp2GbeCpuInterruptsDisable(priv->port, priv->cpuMask);
 
-	mv_eth_interrupts_mask(priv);
-	smp_call_function_many(cpu_online_mask, (smp_call_func_t)mv_eth_interrupts_mask, (void *)priv, 1);
+	on_each_cpu(mv_eth_interrupts_mask, priv, 1);
 
 	/* make sure that the port finished its Rx polling */
 	for (group = 0; group < MV_ETH_MAX_RXQ; group++)
