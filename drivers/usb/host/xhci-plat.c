@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/dma-mapping.h>
+#include <linux/of_device.h>
 
 #include "xhci.h"
 
@@ -84,7 +85,8 @@ static const struct hc_driver xhci_plat_xhci_driver = {
 	.bus_resume =		xhci_bus_resume,
 };
 
-static int xhci_plat_probe(struct platform_device *pdev)
+int common_xhci_plat_probe(struct platform_device *pdev,
+			   void *priv)
 {
 	const struct hc_driver	*driver;
 	struct xhci_hcd		*xhci;
@@ -143,6 +145,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	/* USB 2.0 roothub is stored in the platform_device now. */
 	hcd = dev_get_drvdata(&pdev->dev);
 	xhci = hcd_to_xhci(hcd);
+	xhci->priv = priv;
 	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
 			dev_name(&pdev->dev), hcd);
 	if (!xhci->shared_hcd) {
@@ -180,7 +183,7 @@ put_hcd:
 	return ret;
 }
 
-static int xhci_plat_remove(struct platform_device *dev)
+int common_xhci_plat_remove(struct platform_device *dev)
 {
 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
@@ -197,13 +200,72 @@ static int xhci_plat_remove(struct platform_device *dev)
 	return 0;
 }
 
+static int default_xhci_plat_probe(struct platform_device *pdev)
+{
+	return common_xhci_plat_probe(pdev, NULL);
+}
+
+static int default_xhci_plat_remove(struct platform_device *pdev)
+{
+	return common_xhci_plat_remove(pdev);
+}
+
+struct xhci_plat_ops {
+	int (*probe)(struct platform_device *);
+	int (*remove)(struct platform_device *);
+};
+
+static struct xhci_plat_ops xhci_plat_default = {
+	.probe = default_xhci_plat_probe,
+	.remove =  default_xhci_plat_remove,
+};
+
 #ifdef CONFIG_OF
 static const struct of_device_id usb_xhci_of_match[] = {
-	{ .compatible = "xhci-platform" },
+	{
+		.compatible = "xhci-platform",
+		.data = (void *) &xhci_plat_default,
+	},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
 #endif
+
+static int xhci_plat_probe(struct platform_device *pdev)
+{
+	const struct xhci_plat_ops *plat_of = &xhci_plat_default;
+
+	if (pdev->dev.of_node) {
+		const struct of_device_id *match =
+			of_match_device(usb_xhci_of_match, &pdev->dev);
+		if (!match)
+			return -ENODEV;
+		plat_of = match->data;
+	}
+
+	if (!plat_of || !plat_of->probe)
+		return  -ENODEV;
+
+	return plat_of->probe(pdev);
+}
+
+static int xhci_plat_remove(struct platform_device *pdev)
+{
+	const struct xhci_plat_ops *plat_of = &xhci_plat_default;
+
+	if (pdev->dev.of_node) {
+		const struct of_device_id *match =
+			of_match_device(usb_xhci_of_match, &pdev->dev);
+		if (!match)
+			return -ENODEV;
+		plat_of = match->data;
+	}
+
+	if (!plat_of || !plat_of->remove)
+		return  -ENODEV;
+
+	return plat_of->remove(pdev);
+}
 
 static struct platform_driver usb_xhci_driver = {
 	.probe	= xhci_plat_probe,
