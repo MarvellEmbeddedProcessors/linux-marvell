@@ -58,7 +58,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
 }
 #endif
 
-int __init armada_370_xp_pmsu_init(void)
+static int __init armada_370_xp_pmsu_init(void)
 {
 	struct device_node *np;
 
