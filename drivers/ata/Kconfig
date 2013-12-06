@@ -89,6 +89,15 @@ config SATA_AHCI
 
 	  If unsure, say N.
 
+config SATA_AHCI_MV
+	tristate "Marvell AHCI SATA support"
+	help
+	  This option enables support for the Marvell Serial ATA
+	  platform AHCI controller.  Currently supports SOC devices
+	  compliant to AHCI rev. 1.0
+
+	  If unsure, say N.
+
 config SATA_AHCI_PLATFORM
 	tristate "Platform AHCI SATA support"
 	help
