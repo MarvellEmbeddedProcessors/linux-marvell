@@ -838,13 +838,13 @@ static inline void mv_eth_pool_refill(struct bm_pool *ppool, __u32 bm,
 	/* Refill BM pool */
 	STAT_DBG(ppool->stats.bm_put++);
 	MV_ETH_LIGHT_LOCK(flags);
-#ifdef CONFIG_MV_ETH_PP2_1
+
 	grntd =  mv_eth_bm_cookie_grntd_get(bm);
 	qset = mv_eth_bm_cookie_qset_get(bm);
+
+	/* if PPV2.0 HW ignore qset and grntd */
 	mvBmPoolQsetPut(pool, (MV_ULONG) phys_addr, (MV_ULONG) cookie, qset, grntd);
-#else
-	mvBmPoolPut(pool, phys_addr, cookie);
-#endif
+
 	MV_ETH_LIGHT_UNLOCK(flags);
 }
 

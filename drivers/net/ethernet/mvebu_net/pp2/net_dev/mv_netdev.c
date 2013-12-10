@@ -74,7 +74,6 @@ struct platform_device *plats[MV_ETH_MAX_PORTS];
 static void *sync_head;
 static u32   sync_rx_desc;
 
-
 static inline int mv_eth_tx_policy(struct eth_port *pp, struct sk_buff *skb);
 
 #ifdef CONFIG_NET_SKB_RECYCLE
@@ -600,7 +599,7 @@ int mv_eth_ctrl_pool_detach(int port, struct bm_pool *pool)
 	struct eth_port *pp = mv_eth_port_by_id(port);
 
 	if (pp == NULL) {
-		pr_err("%s: port %d doenst not exist\n" , __func__, port);
+		pr_err("%s: port %d does not exist\n" , __func__, port);
 		return -EINVAL;
 	}
 
@@ -631,6 +630,65 @@ int mv_eth_ctrl_pool_detach(int port, struct bm_pool *pool)
 	return MV_OK;
 }
 
+#ifdef CONFIG_MV_ETH_PP2_1
+static int mv_eth_hwf_long_pool_attach(int port, int pool)
+{
+	int txp, txq;
+	struct eth_port *pp = mv_eth_port_by_id(port);
+
+	if (pp == NULL) {
+		pr_err("%s: port %d does not exist\n" , __func__, port);
+		return -EINVAL;
+	}
+
+	for (txp = 0; txp < pp->txp_num; txp++)
+		for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
+			mvPp2TxqBmLongPoolSet(port, txp, txq, pool);
+
+	return MV_OK;
+}
+
+static int mv_eth_hwf_short_pool_attach(int port, int pool)
+{
+	int txp, txq;
+	struct eth_port *pp = mv_eth_port_by_id(port);
+
+	if (pp == NULL) {
+		pr_err("%s: port %d does not exist\n" , __func__, port);
+		return -EINVAL;
+	}
+
+	for (txp = 0; txp < pp->txp_num; txp++)
+		for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
+			mvPp2TxqBmShortPoolSet(port, txp, txq, pool);
+
+	return MV_OK;
+}
+
+#else
+
+/* Init classifer MTU */
+/* the same MTU for all Ports/Queues */
+static int mv_eth_tx_mtu_set(int port, int mtu)
+{
+	int txp;
+
+	struct eth_port *pp = mv_eth_port_by_id(port);
+
+	if (pp == NULL) {
+		pr_err("%s: port %d does not exist\n" , __func__, port);
+		return -EINVAL;
+	}
+
+	for (txp = 0; txp < pp->txp_num; txp++)
+		mvPp2V0ClsHwMtuSet(MV_PPV2_PORT_PHYS(port), txp, RX_PKT_SIZE(mtu));
+
+	return MV_OK;
+
+}
+
+#endif /* CONFIG_MV_ETH_PP2_1 */
+
 int mv_eth_ctrl_long_pool_set(int port, int pool)
 {
 	unsigned long flags = 0;
@@ -639,7 +697,7 @@ int mv_eth_ctrl_long_pool_set(int port, int pool)
 	int rxq, pkt_size = RX_PKT_SIZE(pp->dev->mtu);
 
 	if (pp == NULL) {
-		pr_err("%s: port %d doenst not exist\n" , __func__, port);
+		pr_err("%s: port %d does not exist\n" , __func__, port);
 		return -EINVAL;
 	}
 
@@ -679,7 +737,7 @@ int mv_eth_ctrl_short_pool_set(int port, int pool)
 	int rxq;
 
 	if (pp == NULL) {
-		pr_err("%s: port %d doenst not exist\n" , __func__, port);
+		pr_err("%s: port %d does not exist\n" , __func__, port);
 		return -EINVAL;
 	}
 
@@ -716,10 +774,10 @@ int mv_eth_ctrl_hwf_long_pool_set(int port, int pool)
 	unsigned long flags = 0;
 	struct eth_port *pp = mv_eth_port_by_id(port);
 	struct bm_pool *old_pool;
-	int txp, txq, pkt_size = RX_PKT_SIZE(pp->dev->mtu);
+	int pkt_size = RX_PKT_SIZE(pp->dev->mtu);
 
 	if (pp == NULL) {
-		pr_err("%s: port %d doenst not exist\n" , __func__, port);
+		pr_err("%s: port %d does not exist\n" , __func__, port);
 		return -EINVAL;
 	}
 
@@ -746,9 +804,7 @@ int mv_eth_ctrl_hwf_long_pool_set(int port, int pool)
 	MV_ETH_UNLOCK(&pp->hwf_pool_long->lock, flags);
 
 #ifdef CONFIG_MV_ETH_PP2_1
-	for (txp = 0; txp < pp->txp_num; txp++)
-		for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
-			mvPp2TxqBmLongPoolSet(pp->port, txp, txq, pp->hwf_pool_long->pool);
+	mv_eth_hwf_long_pool_attach(pp->port, pp->hwf_pool_long->pool);
 #else
 	mvPp2PortHwfBmPoolSet(pp->port, pp->hwf_pool_short->pool, pp->hwf_pool_long->pool);
 #endif
@@ -761,10 +817,9 @@ int mv_eth_ctrl_hwf_short_pool_set(int port, int pool)
 	unsigned long flags = 0;
 	struct eth_port *pp = mv_eth_port_by_id(port);
 	struct bm_pool *old_pool;
-	int txp, txq;
 
 	if (pp == NULL) {
-		pr_err("%s: port %d doenst not exist\n" , __func__, port);
+		pr_err("%s: port %d does not exist\n" , __func__, port);
 		return -EINVAL;
 	}
 
@@ -790,9 +845,7 @@ int mv_eth_ctrl_hwf_short_pool_set(int port, int pool)
 	MV_ETH_UNLOCK(&pp->hwf_pool_short->lock, flags);
 
 #ifdef CONFIG_MV_ETH_PP2_1
-	for (txp = 0; txp < pp->txp_num; txp++)
-		for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
-			mvPp2TxqBmShortPoolSet(pp->port, txp, txq, pp->hwf_pool_short->pool);
+	mv_eth_hwf_short_pool_attach(pp->port, pp->hwf_pool_short->pool);
 #else
 	mvPp2PortHwfBmPoolSet(pp->port, pp->hwf_pool_short->pool, pp->hwf_pool_long->pool);
 #endif
@@ -978,15 +1031,17 @@ int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int txq_size)
 	}
 
 	txq_ctrl->txq_size = txq_size;
+
+	/* right now, all cpus have same size */
+	/* relevant only for ppv2.1 */
+	cpu_size = (txq_ctrl->txq_size - txq_ctrl->hwf_size) / CONFIG_NR_CPUS;
+
 #ifdef CONFIG_MV_ETH_PP2_1
 	for_each_possible_cpu(cpu) {
 		txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
 		txq_cpu_ptr->txq_size = txq_size;
 	}
 #else
-	/* right now, all cpus have same size */
-	cpu_size = (txq_ctrl->txq_size - txq_ctrl->hwf_size) / CONFIG_NR_CPUS;
-
 	for_each_possible_cpu(cpu) {
 		txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
 		txq_cpu_ptr->txq_size = cpu_size;
@@ -3182,7 +3237,7 @@ int mv_eth_swf_bm_pool_init(struct eth_port *pp, int mtu)
 int mv_eth_hwf_bm_pool_init(struct eth_port *pp, int mtu)
 {
 	unsigned long flags = 0;
-	int txp, txq, pkt_size = RX_PKT_SIZE(mtu);
+	int pkt_size = RX_PKT_SIZE(mtu);
 
 	if (pp->hwf_pool_long == NULL) {
 		pp->hwf_pool_long = mv_eth_pool_use(MV_ETH_BM_HWF_LONG_POOL(pp->port),
@@ -3195,9 +3250,7 @@ int mv_eth_hwf_bm_pool_init(struct eth_port *pp, int mtu)
 		MV_ETH_UNLOCK(&pp->hwf_pool_long->lock, flags);
 
 #ifdef CONFIG_MV_ETH_PP2_1
-		for (txp = 0; txp < pp->txp_num; txp++)
-			for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
-				mvPp2TxqBmLongPoolSet(pp->port, txp, txq, pp->hwf_pool_long->pool);
+		mv_eth_hwf_long_pool_attach(pp->port, pp->hwf_pool_long->pool);
 #endif
 	}
 
@@ -3212,9 +3265,7 @@ int mv_eth_hwf_bm_pool_init(struct eth_port *pp, int mtu)
 		MV_ETH_UNLOCK(&pp->hwf_pool_short->lock, flags);
 
 #ifdef CONFIG_MV_ETH_PP2_1
-		for (txp = 0; txp < pp->txp_num; txp++)
-			for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
-				mvPp2TxqBmShortPoolSet(pp->port, txp, txq, pp->hwf_pool_short->pool);
+		mv_eth_hwf_short_pool_attach(pp->port, pp->hwf_pool_short->pool);
 #endif
 	}
 
@@ -3263,7 +3314,7 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 	u32 port;
 	struct eth_port *pp;
 	struct net_device *dev;
-	int mtu, err, txp, phys_port, speed, force_link = 0;
+	int mtu, err, phys_port, speed, force_link = 0;
 	struct mv_pp2_pdata *plat_data = (struct mv_pp2_pdata *)pdev->dev.platform_data;
 	u8 mac[MV_MAC_ADDR_SIZE];
 
@@ -3363,12 +3414,7 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 
 	if (mv_eth_pnc_ctrl_en) {
 #ifndef CONFIG_MV_ETH_PP2_1
-		int txp;
-		/* Init classifer MTU */
-		/* the same MTU for all Ports/Queues */
-
-		for (txp = 0; txp < pp->txp_num; txp++)
-			mvPp2V0ClsHwMtuSet(MV_PPV2_PORT_PHYS(pp->port), txp, RX_PKT_SIZE(mtu));
+		mv_eth_tx_mtu_set(port, mtu);
 #endif /* CONFIG_MV_ETH_PP2_1 */
 
 		mvPp2ClsHwOversizeRxqSet(MV_PPV2_PORT_PHYS(pp->port), pp->first_rxq);
@@ -4240,7 +4286,6 @@ MV_STATUS mv_eth_tx_done_ptks_coal_set(int port, int txp, int txq, MV_U32 value)
 ***********************************************************/
 int mv_eth_start_internals(struct eth_port *pp, int mtu)
 {
-	unsigned int status;
 	int rxq, txp, txq, err = 0;
 
 	if (test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags))) {
@@ -4445,7 +4490,7 @@ int mv_eth_change_mtu_internals(struct net_device *dev, int mtu)
 {
 	struct bm_pool *port_pool;
 	struct eth_port *pp = MV_ETH_PRIV(dev);
-	int pkt_size = RX_PKT_SIZE(mtu), pkts_num, txp;
+	int pkt_size = RX_PKT_SIZE(mtu), pkts_num;
 	unsigned long flags = 0;
 
 	if (test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags))) {
@@ -4510,8 +4555,7 @@ int mv_eth_change_mtu_internals(struct net_device *dev, int mtu)
 #endif
 
 #ifndef CONFIG_MV_ETH_PP2_1
-	for (txp = 0; txp < pp->txp_num; txp++)
-		mvPp2V0ClsHwMtuSet(MV_PPV2_PORT_PHYS(pp->port), txp, pkt_size);
+	mv_eth_tx_mtu_set(pp->port, pkt_size);
 #endif
 
 mtu_out:
