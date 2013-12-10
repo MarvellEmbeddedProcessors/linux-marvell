@@ -583,17 +583,20 @@ int mv_eth_tool_set_ringparam(struct net_device *netdev,
 	if (rxq_size != priv->rxq_ctrl[0].rxq_size)
 		for (rxq = 0; rxq < priv->rxq_num; rxq++)
 			mv_eth_ctrl_rxq_size_set(priv->port, rxq, rxq_size);
+
 #ifdef CONFIG_MV_ETH_PP2_1
 	hwf_size = txq_size - (nr_cpu_ids * priv->txq_ctrl[0].rsvd_chunk);
-	swf_size = hwf_size - (nr_cpu_ids * priv->txq_ctrl[0].rsvd_chunk);
 #else
 	hwf_size = txq_size/2;
 #endif
+	/* relevant only for ppv2.1 */
+	swf_size = hwf_size - (nr_cpu_ids * priv->txq_ctrl[0].rsvd_chunk);
 
 	if (txq_size != priv->txq_ctrl[0].txq_size)
 		for (txp = 0; txp < priv->txp_num; txp++)
 			for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++) {
 				mv_eth_ctrl_txq_size_set(priv->port, txp, txq, txq_size);
+				/* swf_size is ignored if ppv2.0 */
 				mv_eth_ctrl_txq_limits_set(priv->port, txp, txq, hwf_size, swf_size);
 			}
 
