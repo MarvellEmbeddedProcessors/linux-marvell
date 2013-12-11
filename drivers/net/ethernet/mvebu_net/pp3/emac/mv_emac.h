@@ -65,5 +65,71 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mvEmac_h__
 #define __mvEmac_h__
 
+/*--------------------------------------------------------------*/
+/*--------------------- EMAC globals ---------------------------*/
+/*--------------------------------------------------------------*/
 
-#endif /* __mvHmac_h__ */
+/* temporary defenition */
+#define MV_PP3_EMAC_MAX		4
+
+struct mv_pp3_emac_ctrl {
+	u32 base;
+	u32 flags;
+};
+
+/* mv_pp3_emac_ctrl flags */
+
+
+#define MV_PP3_EMAC_F_DEBUG_BIT		0
+#define MV_PP3_EMAC_F_ATTACH_BIT	1
+
+#define MV_PP3_EMAC_F_DEBUG		(1 << MV_PP3_EMAC_F_DEBUG_BIT)
+#define MV_PP3_EMAC_F_ATTACH		(1 << MV_PP3_EMAC_F_ATTACH_BIT)
+
+
+u32  mv_pp3_emac_reg_read(int port, u32 reg);
+
+void mv_pp3_emac_reg_write(int port, u32 reg, u32 data);
+
+void mv_pp3_emac_init(int port, u32 base);
+
+void mv_pp3_emac_qm_mapping(int port, int qm_port, int qm_q);
+
+void mv_pp3_emac_mh_en(int port, int en);
+
+void mv_pp3_emac_ts(int port, int from);
+
+void mv_pp3_emac_loopback(int port, int lb);
+
+void mv_pp3_emac_regs(int port);
+
+void mv_pp3_emac_debug(int port, int en);
+
+void mv_pp3_emac_rx_enable(int port, int en);
+
+int mv_pp3_emac_rx_desc_rsvd(int port, int bytes);
+
+void mv_pp3_emac_rx_mh(int port, short mh);
+
+void mv_pp3_emac_tx_min_pkt_len(int port, int bytes);
+
+/*--------------------------------------------------------------*/
+/*------------------------- PFC --------------------------------*/
+/*--------------------------------------------------------------*/
+
+#define MV_EMAC_PFC_PRIO_MAX	8
+
+void mv_pp3_emac_pfc_tbl_addr(int port, int prio, u32 val);
+void mv_pp3_emac_pfc_tbl_pause(int port, int prio, u32 val);
+void mv_pp3_emac_pfc_tbl_resume(int port, int prio, u32 val);
+void mv_pp3_emac_pfc_regs(int port);
+
+/*--------------------------------------------------------------*/
+/*-------------------------- WOL -------------------------------*/
+/*--------------------------------------------------------------*/
+
+void mv_pp3_emac_wol_regs(int port);
+/* TODO */
+
+
+#endif /* __mvEmac_h__ */

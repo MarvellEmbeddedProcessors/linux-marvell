@@ -68,6 +68,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/kernel.h>
 #include <linux/io.h>
 
+
 #define INLINE inline
 #define MV_PPV3_BASE_ADDR 0
 
