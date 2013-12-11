@@ -319,7 +319,7 @@ int mvPrsMcastDelAll(int port)
 {
 	MV_PP2_PRS_ENTRY pe;
 	int tid, index;
-	char da[MV_MAC_ADDR_SIZE], daMask[MV_MAC_ADDR_SIZE];
+	unsigned char da[MV_MAC_ADDR_SIZE], daMask[MV_MAC_ADDR_SIZE];
 
 	for (tid = PE_FIRST_FREE_TID ; tid <= PE_LAST_FREE_TID; tid++) {
 
