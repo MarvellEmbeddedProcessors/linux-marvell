@@ -67,12 +67,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #define MV_PP3_HMAC_MAX_FRAME			(16)
-#define MV_PP3_HMAC_DATAGRAM_SIZE		(16)
+#define MV_PP3_HMAC_DG_SIZE				(16)
 #define MV_PP3_CFH_MIN_SIZE				(32)
+#define MV_PP3_CFH_DG_NUM				(MV_PP3_CFH_MIN_SIZE \ MV_PP3_HMAC_DG_SIZE)
 #define MV_PP3_HMAC_Q_ALIGN				(256)
 
-extern struct pp3_uint_info pp3_hmac_gl;
-extern struct pp3_uint_info pp3_hmac_fr;
+extern struct pp3_unit_info pp3_hmac_gl;
+extern struct pp3_unit_info pp3_hmac_fr;
 
 struct mv_pp3_queue_ctrl {
 	u8 *first;
