@@ -76,8 +76,8 @@ static int mv_pp3_hmac_queue_create(struct mv_pp3_queue_ctrl *q_ctrl, int desc_n
 /* per frame bitmap to store queues state (allocated/free) */
 static unsigned int mv_pp3_hmac_queue_act[MV_PP3_HMAC_MAX_FRAME] = {0};
 /* */
-struct pp3_uint_info pp3_hmac_gl;
-struct pp3_uint_info pp3_hmac_fr;
+struct pp3_unit_info pp3_hmac_gl;
+struct pp3_unit_info pp3_hmac_fr;
 
 /* store unit base address = silicon base address + unit offset */
 void mv_pp3_hmac_gl_unit_base(unsigned int unit_offset)
@@ -103,7 +103,7 @@ u32 mv_pp3_hmac_rxq_init(int frame, int queue, int size, struct mv_pp3_queue_ctr
 		return 1;
 
 	qctrl->size = size;
-	mv_pp3_hmac_queue_create(qctrl, size * MV_PP3_HMAC_DATAGRAM_SIZE);
+	mv_pp3_hmac_queue_create(qctrl, size * MV_PP3_HMAC_DG_SIZE);
 /*	Write pointer to allocated memory to
 a.	rq_address_high table address bits [39:32]
 b.	rq_address_low table address bits [31:8], aligned to 256B
@@ -118,7 +118,7 @@ b.	rq_address_low table address bits [31:8], aligned to 256B
  * size is CFH size in datagrams (16 bytes each)     */
 void mv_pp3_hmac_txq_next_cfh(int frame, int queue, struct mv_pp3_queue_ctrl *qctrl, int size, u8 **cfh_ptr)
 {
-	if ((qctrl->next_proc + size * MV_PP3_HMAC_DATAGRAM_SIZE) > qctrl->last)
+	if ((qctrl->next_proc + size * MV_PP3_HMAC_DG_SIZE) > qctrl->last)
 		/* do FIFO wraparound */;
 
 	*cfh_ptr = qctrl->next_proc;
