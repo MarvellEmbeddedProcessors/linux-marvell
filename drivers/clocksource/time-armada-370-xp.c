@@ -24,6 +24,8 @@
  *   * Armada 375 has a non-usable 25 Mhz fixed timer, due to hardware
  *     issues.
  *
+ *   * Armada 380 has a 25 Mhz fixed timer.
+ *
  *   * Armada XP cannot work properly without such 25 MHz fixed timer as
  *     doing otherwise leads to using a clocksource whose frequency varies
  *     when doing cpufreq frequency changes.
@@ -333,3 +335,16 @@ static void __init armada_375_timer_init(struct device_node *np)
 }
 CLOCKSOURCE_OF_DECLARE(armada_375, "marvell,armada-375-timer",
 		       armada_375_timer_init);
+
+static void __init armada_380_timer_init(struct device_node *np)
+{
+	struct clk *clk = of_clk_get_by_name(np, "fixed");
+
+	/* The 25Mhz fixed clock is mandatory, and must always be available */
+	BUG_ON(IS_ERR(clk));
+	timer_clk = clk_get_rate(clk);
+
+	armada_370_xp_timer_common_init(np);
+}
+CLOCKSOURCE_OF_DECLARE(armada_380, "marvell,armada-380-timer",
+		       armada_380_timer_init);
