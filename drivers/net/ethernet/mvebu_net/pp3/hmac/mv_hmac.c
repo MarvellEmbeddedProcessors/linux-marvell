@@ -175,3 +175,12 @@ static int mv_pp3_hmac_queue_create(struct mv_pp3_queue_ctrl *q_ctrl, int desc_n
 	q_ctrl->last = q_ctrl->first + size;
 	return 0;
 }
+
+u32 mv_pp3_hmac_txq_init(int frame, int queue, int size, struct mv_pp3_queue_ctrl *qctrl)
+{
+	return 0;
+}
+
+void mv_pp3_hmac_txq_send(int frame, int queue, int size)
+{
+}
