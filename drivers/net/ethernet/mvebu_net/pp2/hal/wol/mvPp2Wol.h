@@ -69,7 +69,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif /* __cplusplus */
 
-#include "pp2/gbe/mvPp2Gbe.h"
+#include "gbe/mvPp2Gbe.h"
 
 /*********************************** RX Policer Registers *******************/
 

@@ -33,9 +33,8 @@ disclaimer.
 #include <linux/platform_device.h>
 #include "mvOs.h"
 #include "mvCommon.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
-#include "pp2/prs/mvPp2PrsHw.h"
-#include "pp2/prs/mvPp2Prs.h"
+#include "prs/mvPp2PrsHw.h"
+#include "prs/mvPp2Prs.h"
 
 
 static ssize_t mv_prs_high_help(char *b)

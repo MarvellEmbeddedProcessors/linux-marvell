@@ -65,8 +65,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mvEthGmacRegs_h__
 #define __mvEthGmacRegs_h__
 
+#ifdef CONFIG_ARCH_MVEBU
+#include "mvNetConfig.h"
+#else
 #include "mvSysEthConfig.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
+#endif
 
 #define ETH_MNG_EXTENDED_GLOBAL_CTRL_REG   (GOP_MNG_REG_BASE + 0x5c)
 

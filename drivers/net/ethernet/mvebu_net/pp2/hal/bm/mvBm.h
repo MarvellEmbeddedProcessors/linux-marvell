@@ -71,7 +71,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvStack.h"
 #include "mvList.h"
 #include "mv802_3.h"
-#include "pp2/common/mvPp2Common.h"
+#include "common/mvPp2Common.h"
 #include "mvBmRegs.h"
 
 typedef struct {

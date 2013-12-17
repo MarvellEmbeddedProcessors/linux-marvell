@@ -68,7 +68,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvDebug.h"
 #include "mvCommon.h"
 #include "mvOs.h"
-#include "mvSysEthConfig.h"
 
 #include "mvBm.h"
 

@@ -67,8 +67,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvDebug.h"
 #include "mvOs.h"
 
-#include "pp2/common/mvPp2Common.h"
-#include "pp2/gbe/mvPp2Gbe.h"
+#include "common/mvPp2Common.h"
+#include "gbe/mvPp2Gbe.h"
 #include "mvPp2DpiHw.h"
 
 MV_PP2_QUEUE_CTRL *mvPp2DpiReqQ;

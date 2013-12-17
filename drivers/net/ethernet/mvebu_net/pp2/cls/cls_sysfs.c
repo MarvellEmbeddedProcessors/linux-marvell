@@ -33,8 +33,7 @@ disclaimer.
 #include <linux/platform_device.h>
 #include "mvOs.h"
 #include "mvCommon.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
-#include "../../../mv_hal/pp2/cls/mvPp2ClsHw.h"
+#include "cls/mvPp2ClsHw.h"
 
 static MV_PP2_CLS_LKP_ENTRY	lkp_entry;
 static MV_PP2_CLS_FLOW_ENTRY	flow_entry;

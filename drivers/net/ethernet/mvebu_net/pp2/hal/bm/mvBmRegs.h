@@ -66,7 +66,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mvBmRegs_h__
 #define __mvBmRegs_h__
 
-#include "pp2/gbe/mvPp2GbeRegs.h"
 
 #ifdef __cplusplus
 extern "C" {
