@@ -38,12 +38,7 @@ disclaimer.
 
 #include "mvOs.h"
 #include "mvDebug.h"
-#include "dbg-trace.h"
-#include "mvSysHwConfig.h"
-#include "boardEnv/mvBoardEnvLib.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
-#include "eth-phy/mvEthPhy.h"
-#include "mvSysEthPhyApi.h"
+#include "mvEthPhy.h"
 #include "gmac/mvEthGmacApi.h"
 
 #include "gbe/mvPp2Gbe.h"
@@ -51,8 +46,6 @@ disclaimer.
 
 #include "mv_netdev.h"
 
-#include "mvOs.h"
-#include "mvSysHwConfig.h"
 #include "prs/mvPp2Prs.h"
 
 #define MV_ETH_TOOL_AN_TIMEOUT	5000
@@ -73,7 +66,7 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 {
 	struct eth_port 	*priv = MV_ETH_PRIV(netdev);
 	u16			lp_ad, stat1000;
-	MV_U32			mv_phy_addr;
+	MV_U32			phy_addr;
 	MV_ETH_PORT_SPEED 	speed;
 	MV_ETH_PORT_DUPLEX 	duplex;
 	MV_ETH_PORT_STATUS      status;
@@ -87,7 +80,7 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 			| SUPPORTED_100baseT_Full | SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII
 			| SUPPORTED_1000baseT_Full);
 
-	mv_phy_addr = mvBoardPhyAddrGet(priv->port);
+	phy_addr = priv->plat_data->phy_addr;
 
 	mvGmacLinkStatus(priv->port, &status);
 
@@ -116,16 +109,16 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 	}
 
 	cmd->port = PORT_MII;
-	cmd->phy_address = mv_phy_addr;
+	cmd->phy_address = phy_addr;
 	cmd->transceiver = XCVR_INTERNAL;
 	/* check if speed and duplex are AN */
 	mvGmacSpeedDuplexGet(priv->port, &speed, &duplex);
 	if (speed == MV_ETH_SPEED_AN && duplex == MV_ETH_DUPLEX_AN) {
 		cmd->lp_advertising = cmd->advertising = 0;
 		cmd->autoneg = AUTONEG_ENABLE;
-		mvEthPhyAdvertiseGet(mv_phy_addr, (MV_U16 *)&(cmd->advertising));
+		mvEthPhyAdvertiseGet(phy_addr, (MV_U16 *)&(cmd->advertising));
 
-		mvEthPhyRegRead(mv_phy_addr, MII_LPA, &lp_ad);
+		mvEthPhyRegRead(phy_addr, MII_LPA, &lp_ad);
 		if (lp_ad & LPA_LPACK)
 			cmd->lp_advertising |= ADVERTISED_Autoneg;
 		if (lp_ad & ADVERTISE_10HALF)
@@ -137,7 +130,7 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 		if (lp_ad & ADVERTISE_100FULL)
 			cmd->lp_advertising |= ADVERTISED_100baseT_Full;
 
-		mvEthPhyRegRead(mv_phy_addr, MII_STAT1000, &stat1000);
+		mvEthPhyRegRead(phy_addr, MII_STAT1000, &stat1000);
 		if (stat1000 & LPA_1000HALF)
 			cmd->lp_advertising |= ADVERTISED_1000baseT_Half;
 		if (stat1000 & LPA_1000FULL)
@@ -164,10 +157,10 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 int mv_eth_tool_restore_settings(struct net_device *netdev)
 {
 	struct eth_port 	*priv = MV_ETH_PRIV(netdev);
-	int 				mv_phy_speed, mv_phy_duplex;
-	MV_U32			    mv_phy_addr = mvBoardPhyAddrGet(priv->port);
-	MV_ETH_PORT_SPEED	mv_mac_speed;
-	MV_ETH_PORT_DUPLEX	mv_mac_duplex;
+	int			phy_speed, phy_duplex;
+	MV_U32			phy_addr = priv->plat_data->phy_addr;
+	MV_ETH_PORT_SPEED	mac_speed;
+	MV_ETH_PORT_DUPLEX	mac_duplex;
 	int			err = -EINVAL;
 
 	 if (priv == NULL)
@@ -175,16 +168,16 @@ int mv_eth_tool_restore_settings(struct net_device *netdev)
 
 	switch (priv->speed_cfg) {
 	case SPEED_10:
-		mv_phy_speed  = 0;
-		mv_mac_speed = MV_ETH_SPEED_10;
+		phy_speed  = 0;
+		mac_speed = MV_ETH_SPEED_10;
 		break;
 	case SPEED_100:
-		mv_phy_speed  = 1;
-		mv_mac_speed = MV_ETH_SPEED_100;
+		phy_speed  = 1;
+		mac_speed = MV_ETH_SPEED_100;
 		break;
 	case SPEED_1000:
-		mv_phy_speed  = 2;
-		mv_mac_speed = MV_ETH_SPEED_1000;
+		phy_speed  = 2;
+		mac_speed = MV_ETH_SPEED_1000;
 		break;
 	default:
 		return -EINVAL;
@@ -192,12 +185,12 @@ int mv_eth_tool_restore_settings(struct net_device *netdev)
 
 	switch (priv->duplex_cfg) {
 	case DUPLEX_HALF:
-		mv_phy_duplex = 0;
-		mv_mac_duplex = MV_ETH_DUPLEX_HALF;
+		phy_duplex = 0;
+		mac_duplex = MV_ETH_DUPLEX_HALF;
 		break;
 	case DUPLEX_FULL:
-		mv_phy_duplex = 1;
-		mv_mac_duplex = MV_ETH_DUPLEX_FULL;
+		phy_duplex = 1;
+		mac_duplex = MV_ETH_DUPLEX_FULL;
 		break;
 	default:
 		return -EINVAL;
@@ -206,10 +199,10 @@ int mv_eth_tool_restore_settings(struct net_device *netdev)
 	if (priv->autoneg_cfg == AUTONEG_ENABLE) {
 		err = mvGmacSpeedDuplexSet(priv->port, MV_ETH_SPEED_AN, MV_ETH_DUPLEX_AN);
 		if (!err)
-			err = mvEthPhyAdvertiseSet(mv_phy_addr, priv->advertise_cfg);
+			err = mvEthPhyAdvertiseSet(phy_addr, priv->advertise_cfg);
 		/* Restart AN on PHY enables it */
 		if (!err) {
-			err = mvEthPhyRestartAN(mv_phy_addr, MV_ETH_TOOL_AN_TIMEOUT);
+			err = mvEthPhyRestartAN(phy_addr, MV_ETH_TOOL_AN_TIMEOUT);
 			if (err == MV_TIMEOUT) {
 				MV_ETH_PORT_STATUS ps;
 
@@ -220,9 +213,9 @@ int mv_eth_tool_restore_settings(struct net_device *netdev)
 			}
 		}
 	} else if (priv->autoneg_cfg == AUTONEG_DISABLE) {
-		err = mvEthPhyDisableAN(mv_phy_addr, mv_phy_speed, mv_phy_duplex);
+		err = mvEthPhyDisableAN(phy_addr, phy_speed, phy_duplex);
 		if (!err)
-			err = mvGmacSpeedDuplexSet(priv->port, mv_mac_speed, mv_mac_duplex);
+			err = mvGmacSpeedDuplexSet(priv->port, mac_speed, mac_duplex);
 	} else {
 		err = -EINVAL;
 	}
@@ -352,7 +345,7 @@ void mv_eth_tool_get_regs(struct net_device *netdev,
 
 	memset(p, 0, MV_ETH_TOOL_REGS_LEN * sizeof(uint32_t));
 
-	regs->version = mvCtrlModelRevGet();
+	regs->version = priv->plat_data->ctrl_rev;
 
 	/* ETH port registers */
 	/* TODO read ETH registers into p - reference at NETA */
@@ -382,7 +375,7 @@ int mv_eth_tool_nway_reset(struct net_device *netdev)
 		return -EOPNOTSUPP;
 	}
 
-	phy_addr = mvBoardPhyAddrGet(priv->port);
+	phy_addr = priv->plat_data->phy_addr;
 	if (mvEthPhyRestartAN(phy_addr, MV_ETH_TOOL_AN_TIMEOUT) != MV_OK)
 		return -EINVAL;
 
@@ -693,7 +686,7 @@ int mv_eth_tool_set_pauseparam(struct net_device *netdev,
 	}
 	/* Only symmetric change for RX and TX flow control is allowed */
 	if (status == MV_OK) {
-		phy_addr = mvBoardPhyAddrGet(priv->port);
+		phy_addr = priv->plat_data->phy_addr;
 		status = mvEthPhyRestartAN(phy_addr, MV_ETH_TOOL_AN_TIMEOUT);
 	}
 	if (status != MV_OK)

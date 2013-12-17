@@ -68,6 +68,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvCommon.h"
 #include "mvOs.h"
 
+#ifdef CONFIG_ARCH_MVEBU
+#include "mvNetConfig.h"
+#else
+#include "mvSysEthConfig.h"
+#endif
+
 /*--------------------------------------------------------------------*/
 /*			PP2 COMMON MACROS			      */
 /*--------------------------------------------------------------------*/

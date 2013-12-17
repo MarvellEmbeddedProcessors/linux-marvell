@@ -73,8 +73,8 @@ extern "C" {
 #include "mvCommon.h"
 #include "mvOs.h"
 
-#include "pp2/common/mvPp2Common.h"
-#include "pp2/gbe/mvPp2Gbe.h"
+#include "common/mvPp2Common.h"
+#include "gbe/mvPp2Gbe.h"
 
 #define MV_PP2_DPI_CNTRS		16
 #define MV_PP2_DPI_MAX_PKT_SIZE		1024

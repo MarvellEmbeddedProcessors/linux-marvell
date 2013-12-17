@@ -69,8 +69,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvOs.h"
 
 #include "mvPp2Gbe.h"
-#include "pp2/prs/mvPp2Prs.h"
-#include "pp2/bm/mvBm.h"
+#include "prs/mvPp2Prs.h"
+#include "bm/mvBm.h"
 
 #define MV_PP2_RXQ_FREE 	-1
 

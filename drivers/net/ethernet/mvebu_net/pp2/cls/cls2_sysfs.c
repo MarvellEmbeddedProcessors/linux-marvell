@@ -33,8 +33,7 @@ disclaimer.
 #include <linux/platform_device.h>
 #include "mvOs.h"
 #include "mvCommon.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
-#include "../../../mv_hal/pp2/cls/mvPp2Cls2Hw.h"
+#include "cls/mvPp2Cls2Hw.h"
 
 
 static MV_PP2_CLS_C2_QOS_ENTRY		qos_entry;

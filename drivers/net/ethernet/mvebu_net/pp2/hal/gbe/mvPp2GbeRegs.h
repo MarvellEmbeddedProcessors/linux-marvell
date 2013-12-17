@@ -65,8 +65,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __MV_PP2_GBE_REGS_H__
 #define __MV_PP2_GBE_REGS_H__
 
+#ifdef CONFIG_ARCH_MVEBU
+#include "mvNetConfig.h"
+#else
 #include "mvSysEthConfig.h"
-#include "pp2/gmac/mvEthGmacApi.h"
+#endif
 
 /************************** PPv2 HW Configuration ***********************/
 

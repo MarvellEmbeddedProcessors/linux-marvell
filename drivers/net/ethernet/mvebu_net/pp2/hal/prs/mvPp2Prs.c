@@ -64,9 +64,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvOs.h"
 #include "mvCommon.h"
 #include "mv802_3.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
 #include "mvPp2Prs.h"
-#include "pp2/gbe/mvPp2Gbe.h"
+#include "gbe/mvPp2Gbe.h"
 #include "mvPp2PrsHw.h"
 
 #define PRS_DBG(X...)
