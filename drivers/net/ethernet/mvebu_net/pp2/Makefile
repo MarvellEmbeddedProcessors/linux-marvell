@@ -2,25 +2,26 @@
 # Makefile for the Marvell Gigabit Ethernet driver
 #
 
-ifneq ($(MACHINE),)
-include $(srctree)/$(MACHINE)/config/mvRules.mk
+ifeq ($(CONFIG_ARCH_MVEBU),y)
+PP2_HAL_DIR = hal
+else
+PP2_HAL_DIR = ../../mv_hal/pp2
 endif
 
-PP2_DIR       = ../../mv_hal/pp2
-PP2_GMAC_DIR  = ../../mv_hal/pp2/gmac
-PP2_GBE_DIR   = ../../mv_hal/pp2/gbe
-PP2_BM_DIR    = ../../mv_hal/pp2/bm
-PP2_PRS_DIR   = ../../mv_hal/pp2/prs
-PP2_CLS_DIR   = ../../mv_hal/pp2/cls
-PP2_PME_DIR   = ../../mv_hal/pp2/pme
-PP2_PLCR_DIR  = ../../mv_hal/pp2/plcr
-PP2_WOL_DIR   = ../../mv_hal/pp2/wol
-PP2_DPI_DIR   = ../../mv_hal/pp2/dpi
-PP2_COMMON_DIR= ../../mv_hal/pp2/common
+PP2_GMAC_DIR  = $(PP2_HAL_DIR)/gmac
+PP2_GBE_DIR   = $(PP2_HAL_DIR)/gbe
+PP2_BM_DIR    = $(PP2_HAL_DIR)/bm
+PP2_PRS_DIR   = $(PP2_HAL_DIR)/prs
+PP2_CLS_DIR   = $(PP2_HAL_DIR)/cls
+PP2_PME_DIR   = $(PP2_HAL_DIR)/pme
+PP2_PLCR_DIR  = $(PP2_HAL_DIR)/plcr
+PP2_WOL_DIR   = $(PP2_HAL_DIR)/wol
+PP2_DPI_DIR   = $(PP2_HAL_DIR)/dpi
+PP2_COMMON_DIR= $(PP2_HAL_DIR)/common
 
 mv_pp2-objs +=	$(PP2_GMAC_DIR)/mvEthGmacApi.o
-mv_pp2-objs +=	$(PP2_GBE_DIR)/mvPp2Gbe.o $(PP2_GBE_DIR)/mvPp2GbeDebug.o \
-		$(PP2_GBE_DIR)/mvPp2AddrDec.o
+mv_pp2-objs +=	$(PP2_GBE_DIR)/mvPp2Gbe.o $(PP2_GBE_DIR)/mvPp2GbeDebug.o
+#mv_pp2-objs +=  $(PP2_GBE_DIR)/mvPp2AddrDec.o
 mv_pp2-objs +=	$(PP2_BM_DIR)/mvBm.o
 mv_pp2-objs += 	$(PP2_PRS_DIR)/mvPp2PrsHw.o $(PP2_PRS_DIR)/mvPp2Prs.o
 mv_pp2-objs += 	$(PP2_CLS_DIR)/mvPp2ClsHw.o $(PP2_CLS_DIR)/mvPp2Cls2Hw.o \
@@ -53,7 +54,26 @@ ifeq ($(CONFIG_MV_ETH_L2FW),y)
 mv_pp2-objs += l2fw/l2fw_sysfs.o l2fw/mv_eth_l2fw.o
 endif
 
+ifeq ($(CONFIG_ARCH_MVEBU),y)
+
+ccflags-y       += $(MVEBU_NET_FLAGS)
+
+ccflags-y	+= $(INCLUDE_DIRS)
+
+ccflags-y       += -I$(PLAT_DIR)/pp2
+ccflags-y       += -I$(PLAT_DIR)/pp2/hal
+
+else
+
+ifneq ($(MACHINE),)
+include $(srctree)/$(MACHINE)/config/mvRules.mk
+endif
+
 ccflags-y       += -I$(PLAT_PATH_I)/$(HAL_PP2_DIR)
+ccflags-y       += -I$(PLAT_PATH_I)/$(HAL_ETHPHY_DIR)
+ccflags-y       += -I$(PLAT_PATH_I)/$(LSP_MUX_DIR)
+endif
+
 ifeq ($(NETMAP),y)
 ccflags-y       += -DCONFIG_NETMAP -I$(NETMAP_DIR) -I$(NETMAP_DIR)/../sys
 endif

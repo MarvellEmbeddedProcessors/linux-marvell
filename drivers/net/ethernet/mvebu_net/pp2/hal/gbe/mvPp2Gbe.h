@@ -69,12 +69,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvCommon.h"
 #include "mv802_3.h"
 #include "mvOs.h"
-#include "mvSysEthConfig.h"
+
 #include "mvPp2GbeRegs.h"
-#include "pp2/bm/mvBm.h"
-#include "pp2/gmac/mvEthGmacApi.h"
-#include "pp2/common/mvPp2Common.h"
-#include "pp2/prs/mvPp2PrsHw.h"
+#include "bm/mvBm.h"
+#include "gmac/mvEthGmacApi.h"
+#include "common/mvPp2Common.h"
+#include "prs/mvPp2PrsHw.h"
 
 #define PP2_CPU_CODE_IS_RX_SPECIAL(cpu_code)		((cpu_code) & RI_CPU_CODE_RX_SPEC_VAL)
 

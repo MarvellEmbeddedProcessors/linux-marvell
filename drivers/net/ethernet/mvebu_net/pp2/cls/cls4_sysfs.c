@@ -33,8 +33,7 @@ disclaimer.
 #include <linux/platform_device.h>
 #include "mvOs.h"
 #include "mvCommon.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
-#include "../../../mv_hal/pp2/cls/mvPp2Cls4Hw.h"
+#include "cls/mvPp2Cls4Hw.h"
 
 
 static MV_PP2_CLS_C4_ENTRY		C4;

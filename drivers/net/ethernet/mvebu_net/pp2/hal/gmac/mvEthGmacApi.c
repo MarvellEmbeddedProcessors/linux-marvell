@@ -62,7 +62,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *******************************************************************************/
 #include "mvEthGmacApi.h"
-#include "pp2/gbe/mvPp2Gbe.h"
+#include "gbe/mvPp2Gbe.h"
 
 void mvGmacPortEnable(int port)
 {

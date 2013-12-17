@@ -69,7 +69,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvOs.h"
 
 #include "mvPp2Gbe.h"
-#include "pp2/bm/mvBm.h"
+#include "bm/mvBm.h"
 
 #include "mvPp2GbeRegs.h"
 

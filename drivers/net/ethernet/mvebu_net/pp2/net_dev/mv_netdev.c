@@ -33,6 +33,7 @@ disclaimer.
 #include <linux/platform_device.h>
 #include <linux/skbuff.h>
 #include <linux/module.h>
+#include <linux/mbus.h>
 #include <linux/inetdevice.h>
 #include <linux/interrupt.h>
 #include <linux/mv_pp2.h>
@@ -42,17 +43,14 @@ disclaimer.
 
 #include "mvOs.h"
 #include "mvDebug.h"
-#include "dbg-trace.h"
-#include "mvSysHwConfig.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
-#include "eth-phy/mvEthPhy.h"
+#include "mvEthPhy.h"
 
 #include "gbe/mvPp2Gbe.h"
 #include "prs/mvPp2Prs.h"
 #include "prs/mvPp2PrsHw.h"
 #include "cls/mvPp2Classifier.h"
 
-#include "mv_mux/mv_mux_netdev.h"
+#include "mv_mux_netdev.h"
 #include "mv_netdev.h"
 #include "mv_eth_tool.h"
 #include "mv_eth_sysfs.h"
@@ -2482,7 +2480,7 @@ static void mv_eth_rxq_drop_pkts(struct eth_port *pp, int rxq)
 
 static int mv_eth_txq_done_force(struct eth_port *pp, struct tx_queue *txq_ctrl)
 {
-	int cpu, tx_done;
+	int cpu, tx_done = 0;
 	struct txq_cpu_ctrl *txq_cpu_ptr;
 
 	for_each_possible_cpu(cpu) {
@@ -2504,7 +2502,6 @@ inline u32 mv_eth_tx_done_pon(struct eth_port *pp, int *tx_todo)
 	int txp, txq;
 	struct tx_queue *txq_ctrl;
 	struct txq_cpu_ctrl *txq_cpu_ptr;
-
 	u32 tx_done = 0;
 
 	*tx_todo = 0;
@@ -3495,39 +3492,76 @@ void    mv_eth_hal_shared_init(struct mv_pp2_pdata *plat_data)
  * mv_eth_win_init --                                      *
  *   Win initilization                                     *
  ***********************************************************/
-void	mv_eth_win_init(void)
+void mv_eth_win_init(void)
 {
-	MV_UNIT_WIN_INFO *addrWinMap;
-	MV_STATUS status;
+	const struct mbus_dram_target_info *dram;
 	int i;
+	u32 enable;
 
-	addrWinMap = kmalloc(sizeof(MV_UNIT_WIN_INFO) * (MAX_TARGETS + 1), GFP_KERNEL);
-	if (addrWinMap == NULL)
-		return;
+	/* First disable all address decode windows */
+	enable = 0;
+	mvPp2WrReg(ETH_BASE_ADDR_ENABLE_REG, enable);
 
-	memset(addrWinMap, 0, sizeof(MV_UNIT_WIN_INFO) * (MAX_TARGETS + 1));
-	status = mvCtrlAddrWinMapBuild(addrWinMap, MAX_TARGETS + 1);
-	if (status != MV_OK) {
-		kfree(addrWinMap);
+	dram = mv_mbus_dram_info();
+	if (!dram) {
+		pr_err("%s: No DRAM information\n", __func__);
 		return;
 	}
-	for (i = 0; i < MAX_TARGETS; i++) {
-		if (addrWinMap[i].enable == MV_FALSE)
-			continue;
+	for (i = 0; i < dram->num_cs; i++) {
+		const struct mbus_dram_window *cs = dram->cs + i;
+		u32 baseReg, base = cs->base;
+		u32 sizeReg, size = cs->size;
+		u32 alignment;
+		u8 attr = cs->mbus_attr;
+		u8 target = dram->mbus_dram_target_id;
+
+		/* check if address is aligned to the size */
+		if (MV_IS_NOT_ALIGN(base, size)) {
+			pr_err("%s: Error setting window for cs #%d.\n"
+			   "Address 0x%08x is not aligned to size 0x%x.\n",
+			   __func__, i, base, size);
+			return;
+		}
+
+		if (!MV_IS_POWER_OF_2(size)) {
+			pr_err("%s: Error setting window for cs #%d.\n"
+				"Window size %u is not a power to 2.\n",
+				__func__, i, size);
+			return;
+		}
 
 #ifdef CONFIG_MV_SUPPORT_L2_DEPOSIT
 		/* Setting DRAM windows attribute to :
-		   0x3 - Shared transaction + L2 write allocate (L2 Deposit) */
-		if (MV_TARGET_IS_DRAM(i)) {
-			addrWinMap[i].attrib &= ~(0x30);
-			addrWinMap[i].attrib |= 0x30;
-		}
+			0x3 - Shared transaction + L2 write allocate (L2 Deposit) */
+		attr &= ~(0x30);
+		attr |= 0x30;
 #endif
+
+		baseReg = (base & ETH_WIN_BASE_MASK);
+		sizeReg = mvPp2RdReg(ETH_WIN_SIZE_REG(i));
+
+		/* set size */
+		alignment = 1 << ETH_WIN_SIZE_OFFS;
+		sizeReg &= ~ETH_WIN_SIZE_MASK;
+		sizeReg |= (((size / alignment) - 1) << ETH_WIN_SIZE_OFFS);
+
+		/* set attributes */
+		baseReg &= ~ETH_WIN_ATTR_MASK;
+		baseReg |= attr << ETH_WIN_ATTR_OFFS;
+
+		/* set target ID */
+		baseReg &= ~ETH_WIN_TARGET_MASK;
+		baseReg |= target << ETH_WIN_TARGET_OFFS;
+
+		mvPp2WrReg(ETH_WIN_BASE_REG(i), baseReg);
+		mvPp2WrReg(ETH_WIN_SIZE_REG(i), sizeReg);
+
+		enable |= (1 << i);
 	}
-	mvPp2WinInit(0, addrWinMap);
-	kfree(addrWinMap);
-	return;
+	/* Enable window */
+	mvPp2WrReg(ETH_BASE_ADDR_ENABLE_REG, enable);
 }
+
 
 /***********************************************************
  * mv_eth_port_suspend                                     *
@@ -3671,7 +3705,7 @@ static int	mv_eth_shared_probe(struct mv_pp2_pdata *plat_data)
 	tasklet_init(&link_tasklet, mv_eth_link_tasklet, 0);
 
 	/* request IRQ for link interrupts from GOP */
-	if (request_irq(IRQ_GLOBAL_GOP, mv_eth_link_isr, (IRQF_DISABLED|IRQF_SAMPLE_RANDOM), "mv_eth_link", NULL))
+	if (request_irq(IRQ_GLOBAL_GOP, mv_eth_link_isr, (IRQF_DISABLED), "mv_eth_link", NULL))
 		printk(KERN_ERR "%s: Could not request IRQ for GOP interrupts\n", __func__);
 
 	mvGmacIsrSummaryUnmask();

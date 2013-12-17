@@ -35,11 +35,8 @@ disclaimer.
 #include <linux/interrupt.h>
 
 #include "mvOs.h"
-#include "dbg-trace.h"
-#include "mvSysHwConfig.h"
-#include "boardEnv/mvBoardEnvLib.h"
 
-#include "eth-phy/mvEthPhy.h"
+#include "mvEthPhy.h"
 #include "gbe/mvPp2Gbe.h"
 #include "prs/mvPp2Prs.h"
 #include "cls/mvPp2ClsHw.h"
@@ -89,7 +86,7 @@ int mv_eth_start(struct net_device *dev)
 
 	if (priv->flags & MV_ETH_F_CONNECT_LINUX) {
 		/* connect to port interrupt line */
-		if (request_irq(dev->irq, mv_eth_isr, (IRQF_DISABLED|IRQF_SAMPLE_RANDOM), "mv_eth", priv)) {
+		if (request_irq(dev->irq, mv_eth_isr, (IRQF_DISABLED), "mv_eth", priv)) {
 			printk(KERN_ERR "cannot request irq %d for %s port %d\n", dev->irq, dev->name, priv->port);
 			for (group = 0; group < MV_ETH_MAX_RXQ; group++)
 				if (priv->napi_group[group] && priv->napi_group[group]->napi)
@@ -98,7 +95,7 @@ int mv_eth_start(struct net_device *dev)
 		}
 
 		/* unmask interrupts */
-		on_each_cpu(mv_eth_interrupts_unmask, priv, 1);
+		on_each_cpu(mv_eth_interrupts_unmask, (void *)priv, 1);
 
 		/* Enable interrupts for all CPUs */
 		mvPp2GbeCpuInterruptsEnable(priv->port, priv->cpuMask);
