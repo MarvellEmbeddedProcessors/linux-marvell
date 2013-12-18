@@ -1,0 +1,14 @@
+VPATH = $(DSDT_PATH)/src/driver $(DSDT_PATH)/src/msapi $(DSDT_PATH)/src/platform
+
+DSDT_INCLUDE = -I$(DSDT_PATH)/Include -I$(DSDT_PATH)/Include/h/driver -I$(DSDT_PATH)/Include/h/msApi -I$(DSDT_PATH)/Include/h/platform  -I$(DSDT_PATH)/../include
+
+DSDT_OBJS = ./gtDrvConfig.o ./gtDrvEvents.o ./gtHwCntl.o             \
+./gtBrgStu.o ./gtBrgFdb.o ./gtBrgStp.o ./gtBrgVlan.o ./gtBrgVtu.o ./gtEvents.o    \
+        gtPCSCtrl.o gtPhyCtrl.o gtPhyInt.o gtPortCtrl.o gtPortPav.o    \
+        gtPortRateCtrl.o gtPortRmon.o gtPortStat.o gtPortStatus.o    \
+        gtQosMap.o gtSysConfig.o gtSysCtrl.o gtSysStatus.o gtUtils.o \
+        gtVct.o gtVersion.o gtPIRL.o gtPIRL2.o        \
+            gtCCPVT.o gtPolicy.o \
+            gtPriTable.o gtWeight.o gtPTP.o gtPortLed.o gtMisc.o \
+            gtTCAM.o \
+        ./gtDebug.o ./gtMiiSmiIf.o ./gtSem.o ./platformDeps.o
