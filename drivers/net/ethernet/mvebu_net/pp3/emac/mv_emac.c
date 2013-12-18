@@ -289,6 +289,47 @@ void mv_pp3_emac_tx_min_pkt_len(int port, int bytes)
 
 	mv_pp3_emac_reg_write(port, MV_EMAC_MIN_PKT_LEN_REG, data);
 }
+/*
+set CFH lockId
+*/
+void mv_pp3_emac_rx_cfh_lock_id(int port, int lock_id)
+{
+	u32 data;
+
+	data = mv_pp3_emac_reg_read(port, MV_EMAC_ENQ_DESC_W0_REG);
+	data &= ~MV_EMAC_ENQ_DESC_W0_LOCKID_MASK;
+	data |= (lock_id << MV_EMAC_ENQ_DESC_W0_LOCKID_OFFS);
+
+	mv_pp3_emac_reg_write(port, MV_EMAC_ENQ_DESC_W0_REG, data);
+}
+
+/*
+set CFH reorder mode
+*/
+void mv_pp3_emac_rx_cfh_reorder_mode(int port, int mode)
+{
+	u32 data;
+
+	data = mv_pp3_emac_reg_read(port, MV_EMAC_ENQ_DESC_W0_REG);
+	data &= ~MV_EMAC_ENQ_DESC_W0_REORDER_MODE_MASK;
+	data |= (mode << MV_EMAC_ENQ_DESC_W0_REORDER_MODE_OFFS);
+
+	mv_pp3_emac_reg_write(port, MV_EMAC_ENQ_DESC_W0_REG, data);
+}
+
+/*
+set CFH deq mode
+*/
+void mv_pp3_emac_rx_cfh_deq_mode(int port, int mode)
+{
+	u32 data;
+
+	data = mv_pp3_emac_reg_read(port, MV_EMAC_ENQ_DESC_W0_REG);
+	data &= ~MV_EMAC_ENQ_DESC_W0_DEQ_MODE_MASK;
+	data |= (mode << MV_EMAC_ENQ_DESC_W0_DEQ_MODE_OFFS);
+
+	mv_pp3_emac_reg_write(port, MV_EMAC_ENQ_DESC_W0_REG, data);
+}
 
 /*--------------------------------------------------------------*/
 /*------------------------- PFC --------------------------------*/
