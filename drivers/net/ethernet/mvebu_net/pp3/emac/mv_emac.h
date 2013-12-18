@@ -107,6 +107,12 @@ void mv_pp3_emac_debug(int port, int en);
 
 void mv_pp3_emac_rx_enable(int port, int en);
 
+void mv_pp3_emac_rx_cfh_lock_id(int port, int lock_id);
+
+void mv_pp3_emac_rx_cfh_deq_mode(int port, int mode);
+
+void mv_pp3_emac_rx_cfh_reorder_mode(int port, int mode);
+
 int mv_pp3_emac_rx_desc_rsvd(int port, int bytes);
 
 void mv_pp3_emac_rx_mh(int port, short mh);
