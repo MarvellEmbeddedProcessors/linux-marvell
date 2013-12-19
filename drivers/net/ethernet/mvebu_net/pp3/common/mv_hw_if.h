@@ -68,9 +68,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/kernel.h>
 #include <linux/io.h>
 
-
 #define INLINE inline
-#define MV_PPV3_BASE_ADDR 0
 
 #define	MV_MAC_ADDR_SIZE	(6)
 #define MV_MAC_STR_SIZE		(20)
@@ -82,30 +80,48 @@ struct pp3_unit_info {
 
 /*
 	access_addr - absolute address: Silicon base + unit base + table base + entry offset
-	words_num   - number of words (32 bits) to read
+	words_num   - number of words (word = 32 bits) to read
 	data_ptr    - pointer to an array containing the read data
  */
-static INLINE int mv_pp3_hw_read(unsigned long access_addr, int words_num, u32 *data_ptr)
+static INLINE void mv_pp3_hw_read(u32 access_addr, int words_num, u32 *data_ptr)
 {
 	int i;
 
 	for (i = 0; i < words_num; i++)
 		data_ptr[i] = readl(access_addr + 4*i);
-
-	return 0;
 }
 
-static INLINE int mv_pp3_hw_write(unsigned long access_addr, int words_num, u32 *data_ptr)
+/*
+	access_addr - absolute address: Silicon base + unit base + table base + entry offset
+	words_num   - number of words (word = 32 bits) to write
+	data_ptr    - pointer to an array containing the write data
+ */
+static INLINE void mv_pp3_hw_write(u32 access_addr, int words_num, u32 *data_ptr)
 {
 	int i;
 
 	for (i = 0; i < words_num; i++)
 		writel(data_ptr[i], access_addr + 4*i);
-
-	return 0;
 }
 
+/*
+	access_addr - absolute address: Silicon base + unit base + register offset
+	return register value
+ */
+static INLINE u32 mv_pp3_hw_reg_read(u32 access_addr)
+{
+	return readl(access_addr);
+}
 
-int mv_hw_silicon_base_addr_get(unsigned long *siliconBase);
+/*
+	access_addr - absolute address: Silicon base + unit base + register offset
+	write data to register
+ */
+static INLINE void mv_pp3_hw_reg_write(u32 access_addr, u32 data)
+{
+	writel(data, access_addr);
+}
+
+int mv_hw_silicon_base_addr_get(u32 *siliconBase);
 
 #endif /* __mvHwIf_h__ */
