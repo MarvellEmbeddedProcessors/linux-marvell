@@ -1,0 +1,40 @@
+#
+# Marvell SoC network devices
+#
+
+config NET_VENDOR_MVEBU
+	bool "Marvell SoC network devices"
+	default y
+	depends on ARCH_MVEBU
+	---help---
+	  If you have a network (Ethernet) card belonging to this class, say Y
+	  and read the Ethernet-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>.
+
+if NET_VENDOR_MVEBU
+
+config MV_ETH_NETA
+
+	tristate "Marvell Armada 380 network interface support"
+	depends on MACH_ARMADA_380
+	---help---
+	  This driver supports the network interface units in the
+	  Marvell ARMADA 38x SoC family.
+
+if MV_ETH_NETA
+source drivers/net/ethernet/mvebu_net/neta/Kconfig
+endif
+
+config MV_ETH_PP2
+
+	tristate "Marvell Armada 375 network interface support"
+	depends on MACH_ARMADA_375
+	---help---
+	  This driver supports the network interface units in the
+	  Marvell ARMADA 375 SoC family.
+
+if MV_ETH_PP2
+source drivers/net/ethernet/mvebu_net/pp2/Kconfig
+endif
+
+endif # NET_VENDOR_MVEBU
