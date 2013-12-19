@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/irqchip/chained_irq.h>
 #include <linux/io.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
@@ -42,6 +43,7 @@
 #define ARMADA_370_XP_INT_SOURCE_CTL(irq)	(0x100 + irq*4)
 
 #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
+#define ARMADA_375_PPI_CAUSE			(0x10)
 
 #define ARMADA_370_XP_SW_TRIG_INT_OFFS           (0x4)
 #define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
@@ -352,6 +354,63 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
 	.xlate = irq_domain_xlate_onecell,
 };
 
+#ifdef CONFIG_PCI_MSI
+/*
+ * This function handles MSI for the case where the MPIC is a slave of
+ * another interrupt controller. We unfortunately cannot factorize
+ * this with the MSI handling code in armada_370_xp_handle_irq()
+ * because this function must call handle_IRQ() while the below
+ * function calls generic_handle_irq().
+ */
+static void armada_370_xp_mpic_handle_cascade_msi(void)
+{
+	u32 msimask, msinr;
+
+	msimask = readl_relaxed(per_cpu_int_base +
+				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
+		& PCI_MSI_DOORBELL_MASK;
+
+	writel(~msimask, per_cpu_int_base +
+	       ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
+
+	for (msinr = PCI_MSI_DOORBELL_START;
+	     msinr < PCI_MSI_DOORBELL_END; msinr++) {
+		int irq;
+
+		if (!(msimask & BIT(msinr)))
+			continue;
+
+		irq = irq_find_mapping(armada_370_xp_msi_domain,
+				       msinr - 16);
+		generic_handle_irq(irq);
+	}
+}
+#else
+static void armada_370_xp_mpic_handle_cascade_msi(void) { }
+#endif
+
+static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
+						  struct irq_desc *desc)
+{
+	struct irq_chip *chip = irq_get_chip(irq);
+	unsigned long irqmap, irqn;
+	unsigned int cascade_irq;
+
+	chained_irq_enter(chip, desc);
+
+	irqmap = readl_relaxed(per_cpu_int_base + ARMADA_375_PPI_CAUSE);
+	for_each_set_bit(irqn, &irqmap, BITS_PER_LONG) {
+		if (irqn == 1) {
+			armada_370_xp_mpic_handle_cascade_msi();
+		} else {
+			cascade_irq = irq_find_mapping(armada_370_xp_mpic_domain, irqn);
+			generic_handle_irq(cascade_irq);
+		}
+	}
+
+	chained_irq_exit(chip, desc);
+}
+
 static asmlinkage void __exception_irq_entry
 armada_370_xp_handle_irq(struct pt_regs *regs)
 {
@@ -427,6 +486,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
 					     struct device_node *parent)
 {
 	struct resource main_int_res, per_cpu_int_res;
+	int parent_irq;
 	u32 control;
 
 	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
@@ -455,8 +515,6 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
 
 	BUG_ON(!armada_370_xp_mpic_domain);
 
-	irq_set_default_host(armada_370_xp_mpic_domain);
-
 #ifdef CONFIG_SMP
 	armada_xp_mpic_smp_cpu_init();
 
@@ -472,7 +530,14 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
 
 	armada_370_xp_msi_init(node, main_int_res.start);
 
-	set_handle_irq(armada_370_xp_handle_irq);
+	parent_irq = irq_of_parse_and_map(node, 0);
+	if (parent_irq <= 0) {
+		irq_set_default_host(armada_370_xp_mpic_domain);
+		set_handle_irq(armada_370_xp_handle_irq);
+	} else {
+		irq_set_chained_handler(parent_irq,
+					armada_370_xp_mpic_handle_cascade_irq);
+	}
 
 	return 0;
 }
