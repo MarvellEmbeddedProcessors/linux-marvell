@@ -34,6 +34,7 @@
 #include <linux/of_gpio.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
+#include <linux/mbus.h>
 
 #include "sdhci.h"
 #include "sdhci-pltfm.h"
@@ -56,6 +57,60 @@
 #define SD_CE_ATA_2          0x10E
 #define SDCE_MISC_INT		(1<<2)
 #define SDCE_MISC_INT_EN	(1<<1)
+
+/*
+ * These registers are relative to the second register region, for the
+ * MBus bridge.
+ */
+#define SDHCI_WINDOW_CTRL(i)	(0x80 + ((i) << 3))
+#define SDHCI_WINDOW_BASE(i)	(0x84 + ((i) << 3))
+#define SDHCI_MAX_WIN_NUM	8
+
+static int mv_conf_mbus_windows(struct platform_device *pdev,
+				const struct mbus_dram_target_info *dram)
+{
+	int i;
+	void __iomem *regs;
+	struct resource *res;
+
+	if (!dram) {
+		dev_err(&pdev->dev, "no mbus dram info\n");
+		return -EINVAL;
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res) {
+		dev_err(&pdev->dev, "cannot get mbus registers\n");
+		return -EINVAL;
+	}
+
+	regs = ioremap(res->start, resource_size(res));
+	if (!regs) {
+		dev_err(&pdev->dev, "cannot map mbus registers\n");
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < SDHCI_MAX_WIN_NUM; i++) {
+		writel(0, regs + SDHCI_WINDOW_CTRL(i));
+		writel(0, regs + SDHCI_WINDOW_BASE(i));
+	}
+
+	for (i = 0; i < dram->num_cs; i++) {
+		const struct mbus_dram_window *cs = dram->cs + i;
+
+		/* Write size, attributes and target id to control register */
+		writel(((cs->size - 1) & 0xffff0000) |
+			(cs->mbus_attr << 8) |
+			(dram->mbus_dram_target_id << 4) | 1,
+			regs + SDHCI_WINDOW_CTRL(i));
+		/* Write base address to base register */
+		writel(cs->base, regs + SDHCI_WINDOW_BASE(i));
+	}
+
+	iounmap(regs);
+
+	return 0;
+}
 
 static void pxav3_set_private_registers(struct sdhci_host *host, u8 mask)
 {
@@ -186,6 +241,11 @@ static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
 static const struct of_device_id sdhci_pxav3_of_match[] = {
 	{
 		.compatible = "mrvl,pxav3-mmc",
+		.data = &sdhci_pxav3_pdata,
+	},
+	{
+		.compatible = "marvell,armada-380-sdhci",
+		.data = &sdhci_pxav3_pdata,
 	},
 	{},
 };
@@ -219,9 +279,11 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
 	struct device *dev = &pdev->dev;
+	struct device_node *np = pdev->dev.of_node;
 	struct sdhci_host *host = NULL;
 	struct sdhci_pxa *pxa = NULL;
 	const struct of_device_id *match;
+	const struct sdhci_pltfm_data *sdhci_pltfm_data;
 
 	int ret;
 	struct clk *clk;
@@ -230,11 +292,26 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 	if (!pxa)
 		return -ENOMEM;
 
-	host = sdhci_pltfm_init(pdev, &sdhci_pxav3_pdata);
+	match = of_match_device(of_match_ptr(sdhci_pxav3_of_match), &pdev->dev);
+
+	if (match)
+		sdhci_pltfm_data = match->data;
+	else
+		sdhci_pltfm_data = &sdhci_pxav3_pdata;
+
+	host = sdhci_pltfm_init(pdev, sdhci_pltfm_data);
 	if (IS_ERR(host)) {
 		kfree(pxa);
 		return PTR_ERR(host);
 	}
+
+	if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
+		ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
+		if (ret < 0)
+			goto err_clk_get;
+	}
+
+
 	pltfm_host = sdhci_priv(host);
 	pltfm_host->priv = pxa;
 
@@ -250,11 +327,11 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 	/* enable 1/8V DDR capable */
 	host->mmc->caps |= MMC_CAP_1_8V_DDR;
 
-	match = of_match_device(of_match_ptr(sdhci_pxav3_of_match), &pdev->dev);
 	if (match) {
 		mmc_of_parse(host->mmc);
 		sdhci_get_of_property(pdev);
 		pdata = pxav3_get_mmc_pdata(dev);
+
 	} else if (pdata) {
 		/* on-chip device */
 		if (pdata->flags & PXA_FLAG_CARD_PERMANENT)
