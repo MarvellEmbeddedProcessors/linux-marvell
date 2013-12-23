@@ -54,6 +54,7 @@ config MACH_ARMADA_375
 	select HAVE_ARM_TWD if LOCAL_TIMERS
 	select NEON
 	select PINCTRL_ARMADA_375
+	select USB_ARCH_HAS_XHCI
 	help
 	  Say 'Y' here if you want your kernel to support boards based
 	  on the Marvell Armada 375 SoC with device tree.
