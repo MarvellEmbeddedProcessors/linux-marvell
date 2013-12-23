@@ -236,6 +236,10 @@ static const struct of_device_id usb_xhci_of_match[] = {
 		.compatible = "marvell,xhci-armada-375",
 		.data = (void *) &xhci_plat_mvebu,
 	},
+	{
+		.compatible = "marvell,xhci-armada-380",
+		.data = (void *) &xhci_plat_mvebu,
+	},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
