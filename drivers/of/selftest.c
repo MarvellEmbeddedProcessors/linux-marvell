@@ -9,18 +9,24 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/device.h>
 
-static bool selftest_passed = true;
+static struct selftest_results {
+	int passed;
+	int failed;
+} selftest_results;
+
 #define selftest(result, fmt, ...) { \
 	if (!(result)) { \
-		pr_err("FAIL %s:%i " fmt, __FILE__, __LINE__, ##__VA_ARGS__); \
-		selftest_passed = false; \
+		selftest_results.failed++; \
+		pr_err("FAIL %s():%i " fmt, __func__, __LINE__, ##__VA_ARGS__); \
 	} else { \
-		pr_info("pass %s:%i\n", __FILE__, __LINE__); \
+		selftest_results.passed++; \
+		pr_debug("pass %s():%i\n", __func__, __LINE__); \
 	} \
 }
 
@@ -132,7 +138,6 @@ static void __init of_selftest_property_string(void)
 	struct device_node *np;
 	int rc;
 
-	pr_info("start\n");
 	np = of_find_node_by_path("/testcase-data/phandle-tests/consumer-a");
 	if (!np) {
 		pr_err("No testcase data in device tree\n");
