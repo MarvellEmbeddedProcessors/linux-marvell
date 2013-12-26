@@ -34,28 +34,31 @@ disclaimer.
 #include <linux/skbuff.h>
 #include <linux/inetdevice.h>
 #include <linux/mv_neta.h>
+#include <linux/mbus.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <linux/module.h>
 #include "mvOs.h"
 #include "mvDebug.h"
-#include "dbg-trace.h"
-#include "mvSysHwConfig.h"
-#include "boardEnv/mvBoardEnvLib.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
-#include "eth-phy/mvEthPhy.h"
+#include "mvEthPhy.h"
 
 #include "gbe/mvNeta.h"
 #include "bm/mvBm.h"
 #include "pnc/mvPnc.h"
 #include "pnc/mvTcam.h"
 #include "pmt/mvPmt.h"
-#include "mv_mux/mv_mux_netdev.h"
+#include "mv_mux_netdev.h"
 
 #include "mv_netdev.h"
 #include "mv_eth_tool.h"
 #include "mv_eth_sysfs.h"
-#include "cpu/mvCpuCntrs.h"
+
+#ifdef CONFIG_ARCH_MVEBU
+#include "mvNetConfig.h"
+#else
+#include "mvSysEthConfig.h"
+#include "ctrlEnv/mvCtrlEnvLib.h"
+#endif
 
 #if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
 #include <mv_neta_netmap.h>
@@ -64,6 +67,7 @@ disclaimer.
 static struct mv_mux_eth_ops mux_eth_ops;
 
 #ifdef CONFIG_MV_CPU_PERF_CNTRS
+#include "cpu/mvCpuCntrs.h"
 MV_CPU_CNTRS_EVENT	*event0 = NULL;
 MV_CPU_CNTRS_EVENT	*event1 = NULL;
 MV_CPU_CNTRS_EVENT	*event2 = NULL;
@@ -3194,7 +3198,7 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 {
 	u32 port;
 	struct eth_port *pp;
-	int mtu, err;
+	int mtu, err = 0;
 	struct net_device *dev;
 	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
 	u8 mac[MV_MAC_ADDR_SIZE];
@@ -3585,6 +3589,93 @@ void    mv_eth_hal_shared_init(struct mv_neta_pdata *plat_data)
  * mv_eth_win_init --                                      *
  *   Win initilization                                     *
  ***********************************************************/
+#ifdef CONFIG_ARCH_MVEBU
+void	mv_eth_win_init(int port)
+{
+	const struct mbus_dram_target_info *dram;
+	int i;
+	u32 enable = 0, protection = 0;
+
+	/* First disable all address decode windows */
+	for (i = 0; i < ETH_MAX_DECODE_WIN; i++)
+		enable |= (1 << i);
+
+	MV_REG_WRITE(ETH_BASE_ADDR_ENABLE_REG(port), enable);
+
+	/* Clear Base/Size/Remap registers for all windows */
+	for (i = 0; i < ETH_MAX_DECODE_WIN; i++) {
+		MV_REG_WRITE(ETH_WIN_BASE_REG(port, i), 0);
+		MV_REG_WRITE(ETH_WIN_SIZE_REG(port, i), 0);
+
+		if (i < ETH_MAX_HIGH_ADDR_REMAP_WIN)
+			MV_REG_WRITE(ETH_WIN_REMAP_REG(port, i), 0);
+	}
+
+	dram = mv_mbus_dram_info();
+	if (!dram) {
+		pr_err("%s: No DRAM information\n", __func__);
+		return;
+	}
+	for (i = 0; i < dram->num_cs; i++) {
+		const struct mbus_dram_window *cs = dram->cs + i;
+		u32 baseReg, base = cs->base;
+		u32 sizeReg, size = cs->size;
+		u32 alignment;
+		u8 attr = cs->mbus_attr;
+		u8 target = dram->mbus_dram_target_id;
+
+		/* check if address is aligned to the size */
+		if (MV_IS_NOT_ALIGN(base, size)) {
+			pr_err("%s: Error setting window for cs #%d.\n"
+			   "Address 0x%08x is not aligned to size 0x%x.\n",
+			   __func__, i, base, size);
+			return;
+		}
+
+		if (!MV_IS_POWER_OF_2(size)) {
+			pr_err("%s: Error setting window for cs #%d.\n"
+				"Window size %u is not a power to 2.\n",
+				__func__, i, size);
+			return;
+		}
+
+#ifdef CONFIG_MV_SUPPORT_L2_DEPOSIT
+		/* Setting DRAM windows attribute to :
+			0x3 - Shared transaction + L2 write allocate (L2 Deposit) */
+		attr &= ~(0x30);
+		attr |= 0x30;
+#endif
+
+		baseReg = (base & ETH_WIN_BASE_MASK);
+		sizeReg = MV_REG_READ(ETH_WIN_SIZE_REG(port, i));
+
+		/* set size */
+		alignment = 1 << ETH_WIN_SIZE_OFFS;
+		sizeReg &= ~ETH_WIN_SIZE_MASK;
+		sizeReg |= (((size / alignment) - 1) << ETH_WIN_SIZE_OFFS);
+
+		/* set attributes */
+		baseReg &= ~ETH_WIN_ATTR_MASK;
+		baseReg |= attr << ETH_WIN_ATTR_OFFS;
+
+		/* set target ID */
+		baseReg &= ~ETH_WIN_TARGET_MASK;
+		baseReg |= target << ETH_WIN_TARGET_OFFS;
+
+		MV_REG_WRITE(ETH_WIN_BASE_REG(port, i), baseReg);
+		MV_REG_WRITE(ETH_WIN_SIZE_REG(port, i), sizeReg);
+
+		enable &= ~(1 << i);
+		protection |= (FULL_ACCESS << (i * 2));
+	}
+	/* Set window protection */
+	MV_REG_WRITE(ETH_ACCESS_PROTECT_REG(port), protection);
+	/* Enable window */
+	MV_REG_WRITE(ETH_BASE_ADDR_ENABLE_REG(port), enable);
+}
+
+#else /* !CONFIG_ARCH_MVEBU */
+
 void 	mv_eth_win_init(int port)
 {
 	MV_UNIT_WIN_INFO addrWinMap[MAX_TARGETS + 1];
@@ -3611,6 +3702,7 @@ void 	mv_eth_win_init(int port)
 	mvNetaWinInit(port, addrWinMap);
 	return;
 }
+#endif /* CONFIG_ARCH_MVEBU */
 
 /***********************************************************
  * mv_eth_port_suspend                                     *

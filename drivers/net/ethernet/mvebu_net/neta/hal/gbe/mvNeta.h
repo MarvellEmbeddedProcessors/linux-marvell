@@ -68,6 +68,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+
 #include "mvTypes.h"
 #include "mvCommon.h"
 #include "mvOs.h"
@@ -84,6 +85,9 @@ extern "C" {
 # define mvNetaDebugPrintf(msg, ...)
 #endif /* CONFIG_MV_ETH_DEBUG_CODE */
 
+#ifndef MV_ETH_MAX_TCONT
+# define MV_ETH_MAX_TCONT 1
+#endif
 
 #ifdef CONFIG_MV_ETH_NFP
 
@@ -361,12 +365,6 @@ typedef struct {
 
 extern MV_NETA_PORT_CTRL **mvNetaPortCtrl;
 extern MV_NETA_HAL_DATA mvNetaHalData;
-
-#ifdef CONFIG_MV_PON
-#define MV_ETH_MAX_TCONT() 	CONFIG_MV_PON_TCONTS
-#else
-#define MV_ETH_MAX_TCONT()      1
-#endif /* CONFIG_MV_PON */
 
 /* Get Giga port handler */
 static INLINE MV_NETA_PORT_CTRL *mvNetaPortHndlGet(int port)

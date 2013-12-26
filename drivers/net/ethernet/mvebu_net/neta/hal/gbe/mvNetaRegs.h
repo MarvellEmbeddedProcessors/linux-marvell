@@ -70,7 +70,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif /* __cplusplus */
 
-#if !defined(CONFIG_OF)
+#ifdef CONFIG_ARCH_MVEBU
+#include "mvNetConfig.h"
+#else
 #include "mvSysEthConfig.h"
 #endif
 
