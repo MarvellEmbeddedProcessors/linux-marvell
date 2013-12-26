@@ -35,7 +35,9 @@ disclaimer.
 #include "mvCommon.h"
 #include "prs/mvPp2PrsHw.h"
 #include "prs/mvPp2Prs.h"
+#include "prs_sysfs.h"
 
+static struct kobject *prs_kobj;
 
 static ssize_t mv_prs_high_help(char *b)
 {
@@ -206,7 +208,6 @@ static struct attribute *prs_high_attrs[] = {
 };
 
 static struct attribute_group prs_high_group = {
-	.name = "prsHigh",
 	.attrs = prs_high_attrs,
 };
 
@@ -214,15 +215,27 @@ int mv_pp2_prs_high_sysfs_init(struct kobject *pp2_kobj)
 {
 	int err;
 
-	err = sysfs_create_group(pp2_kobj, &prs_high_group);
+	prs_kobj = kobject_create_and_add("prs", pp2_kobj);
+
+	if (!prs_kobj) {
+		pr_err("%s: cannot create gbe kobject\n", __func__);
+		return -ENOMEM;
+	}
+
+	err = sysfs_create_group(prs_kobj, &prs_high_group);
 	if (err)
-		pr_err("sysfs group %s failed %d\n", prs_high_group.name, err);
+		pr_err("sysfs group failed %d\n", err);
+
+	mv_pp2_prs_low_sysfs_init(prs_kobj);
 
 	return err;
+
 }
 
 int mv_pp2_prs_high_sysfs_exit(struct kobject *pp2_kobj)
 {
+	mv_pp2_prs_low_sysfs_exit(prs_kobj);
+
 	sysfs_remove_group(pp2_kobj, &prs_high_group);
 
 	return 0;
