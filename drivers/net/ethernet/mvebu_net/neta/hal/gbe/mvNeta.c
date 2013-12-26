@@ -118,7 +118,7 @@ int mvNetaTxpCheck(int port, int txp)
 		return 1;
 
 	if (MV_PON_PORT(port))
-		txpMax = MV_ETH_MAX_TCONT();
+		txpMax = MV_ETH_MAX_TCONT;
 
 	return mvNetaMaxCheck(txp, txpMax, "txp");
 }
@@ -179,7 +179,7 @@ void *mvNetaPortInit(int portNo, void *osHandle)
 
 #ifdef CONFIG_MV_PON
 	if (MV_PON_PORT(portNo))
-		pPortCtrl->txpNum = MV_ETH_MAX_TCONT();
+		pPortCtrl->txpNum = MV_ETH_MAX_TCONT;
 #endif /* CONFIG_MV_PON */
 
 	pPortCtrl->rxqNum = CONFIG_MV_ETH_RXQ;
@@ -3371,7 +3371,7 @@ MV_STATUS   mvNetaPonRxMibDefault(int mib)
 		/* Don't count default packets that not match Gem portID */
 		regVal &= ~NETA_PON_MIB_RX_VALID_MASK;
 	} else {
-		if (mvNetaMaxCheck(mib, MV_ETH_MAX_TCONT(), "tcont"))
+		if (mvNetaMaxCheck(mib, MV_ETH_MAX_TCONT, "tcont"))
 			return MV_BAD_PARAM;
 
 		regVal &= ~NETA_PON_MIB_RX_MIB_NO_MASK;
@@ -3388,7 +3388,7 @@ MV_STATUS   mvNetaPonRxMibGemPid(int mib, MV_U16 gemPid)
 	MV_U32	regVal;
 	int	i, free = -1;
 
-	if ((mib != -1) && mvNetaMaxCheck(mib, MV_ETH_MAX_TCONT(), "tcont"))
+	if ((mib != -1) && mvNetaMaxCheck(mib, MV_ETH_MAX_TCONT, "tcont"))
 		return MV_BAD_PARAM;
 
 	/* look for gemPid if exist of first free entry */

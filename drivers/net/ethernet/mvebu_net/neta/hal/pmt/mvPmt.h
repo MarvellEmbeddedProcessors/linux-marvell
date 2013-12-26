@@ -73,7 +73,6 @@ extern "C" {
 #include "mvTypes.h"
 #include "mvCommon.h"
 #include "mvOs.h"
-#include "ctrlEnv/mvCtrlEnvSpec.h"
 
 #define PMT_TEXT    16
 

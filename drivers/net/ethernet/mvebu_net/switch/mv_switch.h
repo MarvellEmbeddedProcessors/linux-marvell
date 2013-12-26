@@ -29,7 +29,7 @@ disclaimer.
 #define __mv_switch_h__
 
 #include "mv802_3.h"
-#include "mv_mux/mv_mux_netdev.h"
+#include "mv_mux_netdev.h"
 
 #define MV_SWITCH_DB_NUM			16
 
