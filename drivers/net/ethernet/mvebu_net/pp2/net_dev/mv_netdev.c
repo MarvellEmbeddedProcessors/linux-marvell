@@ -3612,7 +3612,6 @@ static void mv_eth_sysfs_exit(void)
 	mv_pp2_cls3_sysfs_exit(&pd->kobj);
 	mv_pp2_cls2_sysfs_exit(&pd->kobj);
 	mv_pp2_cls_sysfs_exit(&pd->kobj);
-	mv_pp2_prs_low_sysfs_exit(&pd->kobj);
 	mv_pp2_prs_high_sysfs_exit(&pd->kobj);
 	mv_pp2_gbe_sysfs_exit(&pd->kobj);
 	/* can't delete, we call to init/clean function from this sysfs */
@@ -3637,7 +3636,6 @@ static int mv_eth_sysfs_init(void)
 	}
 
 	mv_pp2_gbe_sysfs_init(&pd->kobj);
-	mv_pp2_prs_low_sysfs_init(&pd->kobj);
 	mv_pp2_prs_high_sysfs_init(&pd->kobj);
 	mv_pp2_cls_sysfs_init(&pd->kobj);
 	mv_pp2_cls2_sysfs_init(&pd->kobj);
