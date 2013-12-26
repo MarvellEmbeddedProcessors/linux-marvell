@@ -194,7 +194,6 @@ typedef struct mvPp2ClsC4RuleEntry {
 	unsigned int setIndex;
 	union {
 		MV_U32	words[MV_PP2_CLS_C4_TBL_WORDS];
-		MV_U8	bytes[MV_PP2_CLS_C4_TBL_WORDS * 4];
 		struct {
 			MV_U32 attr[MV_PP2_CLS4_FATTR_REG_NUM];
 			MV_U32 fdataArr[MV_PP2_CLS_C4_TBL_DATA_WORDS];

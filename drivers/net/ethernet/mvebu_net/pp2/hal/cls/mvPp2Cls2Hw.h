@@ -84,8 +84,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PP2_CLS2_TCAM_INV_INVALID			31
 #define MV_PP2_CLS2_TCAM_INV_INVALID_MASK		(1 << MV_PP2_CLS2_TCAM_INV_INVALID)
 
-#define TCAM_DATA_BYTE_OFFS(_offs_)			(((_offs_) - ((_offs_) % 2)) * 2 + ((_offs_) % 2))
-#define TCAM_DATA_MASK_OFFS(_offs_)			(((_offs_) * 2) - ((_offs_) % 2)  + 2)
 /*-------------------------------------------------------------------------------*/
 
 #define MV_PP2_CLS2_ACT_DATA_REG			(MV_PP2_REG_BASE + 0x1B30)
