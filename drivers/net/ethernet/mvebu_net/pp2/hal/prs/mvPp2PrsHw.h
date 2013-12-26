@@ -145,7 +145,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PP2_PRS_SRAM_DATA2_REG		(MV_PP2_REG_BASE + 0x120c)
 #define MV_PP2_PRS_SRAM_DATA3_REG		(MV_PP2_REG_BASE + 0x1210)
 /*-------------------------------------------------------------------------------*/
-/*TODO: Add API and sysfs commands for this reg */
 #define MV_PP2_PRS_EXP_REG			(MV_PP2_REG_BASE + 0x1214)
 #define MV_PP2_PRS_EXP_MISS			0
 #define MV_PP2_PRS_EXP_EXEED			1
@@ -180,7 +179,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define LU_BITS  				4
 #define LU_MASK					((1 << LU_BITS) - 1)
 
+/****************************************************************/
+/*			endians support				*/
+/****************************************************************/
+
+/* TODO: share endians support defenitions between parser and cls2  */
+
+#if defined(MV_CPU_LE)
+	#define PRS_HW_BYTE_OFFS(_offs_)	(_offs_)
+	#define TCAM_MASK_OFFS(_offs_)		((_offs_) + 2)
+#else
+	#define PRS_HW_BYTE_OFFS(_offs_)	((3 - ((_offs_) % 4)) + (((_offs_) / 4) * 4))
+	#define TCAM_MASK_OFFS(_offs_)		((_offs_) - 2)
+
+#endif
+
 /************************* TCAM structure **********************/
+/*little endian */
+#define TCAM_DATA_BYTE_OFFS_LE(_offs_)		(((_offs_) - ((_offs_) % 2)) * 2 + ((_offs_) % 2))
+#define TCAM_DATA_MASK_OFFS_LE(_offs_)		(((_offs_) * 2) - ((_offs_) % 2)  + 2)
+
+#define TCAM_BYTE_OFFS(_offs_)			PRS_HW_BYTE_OFFS(_offs_)
+#define TCAM_DATA_BYTE(_offs_)			(PRS_HW_BYTE_OFFS(TCAM_DATA_BYTE_OFFS_LE(_offs_)))
+#define TCAM_DATA_MASK(_offs_)			(PRS_HW_BYTE_OFFS(TCAM_DATA_MASK_OFFS_LE(_offs_)))
+
 /*
 ______________________________________________
 |  LKP ID  | PORT ID |    AI  | HEADER DATA  |
@@ -189,18 +211,15 @@ ______________________________________________
 reg 5 --> reg 0
 */
 
-#define TCAM_DATA_BYTE				0
+#define TCAM_DATA_OFFS				0
 #define TCAM_DATA_SIZE				8 /*bytes*/
 #define TCAM_DATA_MAX				(TCAM_DATA_SIZE - 1) /*bytes*/
 #define TCAM_DATA_WORD_MAX			((TCAM_DATA_SIZE / 4) - 1) /*words*/
-#define TCAM_AI_BYTE				16
-#define TCAM_AI_OFFS				0
+#define TCAM_AI_BYTE				TCAM_BYTE_OFFS(16)
 
-#define TCAM_PORT_BYTE				17
-#define TCAM_PORT_OFFS				0
+#define TCAM_PORT_BYTE				TCAM_BYTE_OFFS(17)
 
-#define TCAM_LU_BYTE				20
-#define TCAM_LU_OFFS				0
+#define TCAM_LU_BYTE				TCAM_BYTE_OFFS(20)
 
 /* Special bit in the TCAM register */
 #define TCAM_INV_BIT				31
@@ -209,13 +228,12 @@ reg 5 --> reg 0
 #define TCAM_INVALID				1
 #define TCAM_INV_WORD				5
 
-#define TCAM_DATA_BYTE_OFFS(_offs_)		(((_offs_) - ((_offs_) % 2)) * 2 + ((_offs_) % 2))
-#define TCAM_DATA_MASK_OFFS(_offs_)		(((_offs_) * 2) - ((_offs_) % 2)  + 2)
-#define TCAM_MASK_OFFS(_offs_)			((_offs_) + 2)
-
-
 
 /************************* SRAM structure **********************/
+/* convert bit offset to byte offset */
+#define SRAM_BIT_TO_BYTE(_bit_)			PRS_HW_BYTE_OFFS((_bit_) / 8)
+
+
 #define SRAM_RI_OFFS  					0
 #define SRAM_RI_BITS  					32
 #define SRAM_RI_MASK  					((1 << SRAM_RI_BITS) - 1)

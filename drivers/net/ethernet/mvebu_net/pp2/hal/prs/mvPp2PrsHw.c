@@ -108,6 +108,7 @@ void mvPp2PrsShadowUdfSet(int index, int udf)
 
 void mvPp2PrsShadowSet(int index, int lu, char *text)
 {
+
 	strncpy((char *)mvPrsShadowTbl[index].text, text, PRS_TEXT_SIZE);
 	mvPrsShadowTbl[index].text[PRS_TEXT_SIZE - 1] = 0;
 	mvPrsShadowTbl[index].valid = MV_TRUE;
@@ -512,7 +513,7 @@ int mvPp2PrsSwDump(MV_PP2_PRS_ENTRY *pe)
 	mvOsPrintf("%1.1x ", pe->tcam.word[i--] & 0xF);
 
 	while (i >= 0)
-		mvOsPrintf("%4.4x ", (MV_32BIT_LE_FAST(pe->tcam.word[i--])) & 0xFFFF);
+		mvOsPrintf("%4.4x ", (pe->tcam.word[i--]) & 0xFFFF);
 
 	mvOsPrintf("| ");
 
@@ -524,7 +525,7 @@ int mvPp2PrsSwDump(MV_PP2_PRS_ENTRY *pe)
 	mvOsPrintf("%1.1x ", (pe->tcam.word[i--] >> 16) & 0xF);
 
 	while (i >= 0)
-		mvOsPrintf("%4.4x ", ((MV_32BIT_LE_FAST(pe->tcam.word[i--]) >> 16)  & 0xFFFF));
+		mvOsPrintf("%4.4x ", ((pe->tcam.word[i--]) >> 16)  & 0xFFFF);
 
 	mvOsPrintf("| ");
 
@@ -585,10 +586,11 @@ int mvPp2PrsSwTcam(int enable)
 int mvPp2PrsSwTcamByteSet(MV_PP2_PRS_ENTRY *pe, unsigned int offs, unsigned char byte, unsigned char enable)
 {
 	PTR_VALIDATE(pe);
-
 	POS_RANGE_VALIDATE(offs, TCAM_DATA_MAX);
-	pe->tcam.byte[TCAM_DATA_BYTE_OFFS(offs)] = byte;
-	pe->tcam.byte[TCAM_DATA_MASK_OFFS(offs)] = enable;
+
+	pe->tcam.byte[TCAM_DATA_BYTE(offs)] = byte;
+	pe->tcam.byte[TCAM_DATA_MASK(offs)] = enable;
+
 	return MV_OK;
 }
 
@@ -605,8 +607,9 @@ int mvPp2PrsSwTcamByteGet(MV_PP2_PRS_ENTRY *pe, unsigned int offs, unsigned char
 
 	POS_RANGE_VALIDATE(offs, TCAM_DATA_MAX);
 
-	*byte = pe->tcam.byte[TCAM_DATA_BYTE_OFFS(offs)];
-	*enable = pe->tcam.byte[TCAM_DATA_MASK_OFFS(offs)];
+	*byte = pe->tcam.byte[TCAM_DATA_BYTE(offs)];
+	*enable = pe->tcam.byte[TCAM_DATA_MASK(offs)];
+
 	return MV_OK;
 }
 
@@ -617,32 +620,18 @@ int mvPp2PrsSwTcamWordSet(MV_PP2_PRS_ENTRY *pe, unsigned int offs, unsigned int 
 
 	PTR_VALIDATE(pe);
 	POS_RANGE_VALIDATE(offs, TCAM_DATA_WORD_MAX);
+
+#if defined(MV_CPU_BE)
+	word = MV_BYTE_SWAP_32BIT(word);
+	mask = MV_BYTE_SWAP_32BIT(mask);
+#endif
 	for (index = 0; index < DWORD_BYTES_LEN; index++) {
+
 		offset = (offs * DWORD_BYTES_LEN) + index;
 		byte = ((unsigned char *) &word)[index];
 		byteMask = ((unsigned char *) &mask)[index];
+
 		mvPp2PrsSwTcamByteSet(pe, offset, byte, byteMask);
-	}
-
-	return MV_OK;
-}
-
-int mvPp2PrsSwTcamWordGet(MV_PP2_PRS_ENTRY *pe, unsigned int offs, unsigned int *word, unsigned int *enable)
-{
-	int index, offset;
-	unsigned char byte, mask;
-
-	PTR_VALIDATE(pe);
-	PTR_VALIDATE(word);
-	PTR_VALIDATE(enable);
-
-	POS_RANGE_VALIDATE(offs, TCAM_DATA_WORD_MAX);
-
-	for (index = 0; index < DWORD_BYTES_LEN; index++) {
-		offset = (offs * DWORD_BYTES_LEN) + index;
-		mvPp2PrsSwTcamByteGet(pe, offset,  &byte, &mask);
-		((unsigned char *) word)[index] = byte;
-		((unsigned char *) enable)[index] = mask;
 	}
 
 	return MV_OK;
@@ -676,6 +665,7 @@ int mvPp2PrsSwTcamByteCmp(MV_PP2_PRS_ENTRY *pe, unsigned int offs, unsigned char
 	return 0 if equals ..else return 1
 	return MV_PRS_ERR if falied !
 */
+
 int mvPp2PrsSwTcamBytesCmp(MV_PP2_PRS_ENTRY *pe, unsigned int offs, unsigned int size, unsigned char *bytes)
 {
 	int status, index;
@@ -702,6 +692,7 @@ int mvPp2PrsSwTcamBytesIgnorMaskCmp(MV_PP2_PRS_ENTRY *pe, unsigned int offs, uns
 
 	for (index = 0; index < size; index++) {
 		mvPp2PrsSwTcamByteGet(pe, offs + index, &tcamByte, &tcamMask);
+
 		if (tcamByte != bytes[index])
 			return NOT_EQUALS;
 	}
@@ -922,8 +913,8 @@ int mvPp2PrsSwSramAiSetBit(MV_PP2_PRS_ENTRY *pe, unsigned char bit)
 	PTR_VALIDATE(pe);
 	POS_RANGE_VALIDATE(bit, (SRAM_AI_CTRL_BITS - 1));
 
-	pe->sram.byte[(SRAM_AI_OFFS + bit) / 8] |= (1  << ((SRAM_AI_OFFS + bit) % 8));
-	pe->sram.byte[(SRAM_AI_CTRL_OFFS + bit) / 8] |= (1  << ((SRAM_AI_CTRL_OFFS + bit) % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_AI_OFFS + bit)] |= (1  << ((SRAM_AI_OFFS + bit) % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_AI_CTRL_OFFS + bit)] |= (1  << ((SRAM_AI_CTRL_OFFS + bit) % 8));
 
 	return MV_OK;
 }
@@ -933,8 +924,8 @@ int mvPp2PrsSwSramAiClearBit(MV_PP2_PRS_ENTRY *pe, unsigned char bit)
 	PTR_VALIDATE(pe);
 	POS_RANGE_VALIDATE(bit, (SRAM_AI_CTRL_BITS - 1));
 
-	pe->sram.byte[(SRAM_AI_OFFS + bit) / 8] &= ~(1  << ((SRAM_AI_OFFS + bit) % 8));
-	pe->sram.byte[(SRAM_AI_CTRL_OFFS + bit) / 8] |= (1  << ((SRAM_AI_CTRL_OFFS + bit) % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_AI_OFFS + bit)] &= ~(1  << ((SRAM_AI_OFFS + bit) % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_AI_CTRL_OFFS + bit)] |= (1  << ((SRAM_AI_CTRL_OFFS + bit) % 8));
 
 	return MV_OK;
 }
@@ -968,11 +959,12 @@ int mvPp2PrsSwSramAiGet(MV_PP2_PRS_ENTRY *pe, unsigned int *bits, unsigned int *
 	PTR_VALIDATE(bits);
 	PTR_VALIDATE(enable);
 
-	*bits = (pe->sram.byte[SRAM_AI_OFFS/8] >> (SRAM_AI_OFFS % 8)) |
-			(pe->sram.byte[(SRAM_AI_OFFS+SRAM_AI_CTRL_BITS)/8] << (8 - (SRAM_AI_OFFS % 8)));
+	*bits = (pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_AI_OFFS)] >> (SRAM_AI_OFFS % 8)) |
+		(pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_AI_OFFS+SRAM_AI_CTRL_BITS)] << (8 - (SRAM_AI_OFFS % 8)));
 
-	*enable = (pe->sram.byte[SRAM_AI_CTRL_OFFS/8] >> (SRAM_AI_CTRL_OFFS % 8)) |
-			(pe->sram.byte[(SRAM_AI_CTRL_OFFS+SRAM_AI_CTRL_BITS)/8] << (8 - (SRAM_AI_CTRL_OFFS % 8)));
+	*enable = (pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_AI_CTRL_OFFS)] >> (SRAM_AI_CTRL_OFFS % 8)) |
+			(pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_AI_CTRL_OFFS+SRAM_AI_CTRL_BITS)] <<
+				(8 - (SRAM_AI_CTRL_OFFS % 8)));
 
 	*bits &= SRAM_AI_MASK;
 	*enable &= SRAM_AI_MASK;
@@ -1014,8 +1006,8 @@ int mvPp2PrsSwSramNextLuSet(MV_PP2_PRS_ENTRY *pe, unsigned int lu)
 
 	POS_RANGE_VALIDATE(lu, SRAM_NEXT_LU_MASK);
 
-	pe->sram.byte[SRAM_NEXT_LU_OFFS/8] &= ~(SRAM_NEXT_LU_MASK << (SRAM_NEXT_LU_OFFS % 8));
-	pe->sram.byte[SRAM_NEXT_LU_OFFS/8] |= (lu << (SRAM_NEXT_LU_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_NEXT_LU_OFFS)] &= ~(SRAM_NEXT_LU_MASK << (SRAM_NEXT_LU_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_NEXT_LU_OFFS)] |= (lu << (SRAM_NEXT_LU_OFFS % 8));
 	return MV_OK;
 }
 
@@ -1024,7 +1016,7 @@ int mvPp2PrsSwSramNextLuGet(MV_PP2_PRS_ENTRY *pe, unsigned int *lu)
 	PTR_VALIDATE(pe);
 	PTR_VALIDATE(lu);
 
-	*lu = pe->sram.byte[SRAM_NEXT_LU_OFFS / 8];
+	*lu = pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_NEXT_LU_OFFS)];
 	*lu = ((*lu) >> SRAM_NEXT_LU_OFFS % 8);
 	*lu &= SRAM_NEXT_LU_MASK;
 	return MV_OK;
@@ -1039,20 +1031,22 @@ int mvPp2PrsSwSramShiftSet(MV_PP2_PRS_ENTRY *pe, int shift, unsigned int op)
 
 	/* Set sign */
 	if (shift < 0) {
-		pe->sram.byte[SRAM_SHIFT_SIGN_BIT / 8] |= (1 << (SRAM_SHIFT_SIGN_BIT % 8));
+		pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_SHIFT_SIGN_BIT)] |= (1 << (SRAM_SHIFT_SIGN_BIT % 8));
 		shift = 0 - shift;
 	} else
-		pe->sram.byte[SRAM_SHIFT_SIGN_BIT / 8] &= ~(1 << (SRAM_SHIFT_SIGN_BIT % 8));
+		pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_SHIFT_SIGN_BIT)] &= ~(1 << (SRAM_SHIFT_SIGN_BIT % 8));
 
 	/* Set offset */
-	pe->sram.byte[SRAM_SHIFT_OFFS / 8] = (unsigned char)shift;
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_SHIFT_OFFS)] = (unsigned char)shift;
 
 	/* Reset and Set operation */
-	pe->sram.byte[SRAM_OP_SEL_SHIFT_OFFS / 8] &= ~(SRAM_OP_SEL_SHIFT_MASK << (SRAM_OP_SEL_SHIFT_OFFS % 8));
-	pe->sram.byte[SRAM_OP_SEL_SHIFT_OFFS / 8] |= (op << (SRAM_OP_SEL_SHIFT_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_SHIFT_OFFS)] &=
+		~(SRAM_OP_SEL_SHIFT_MASK << (SRAM_OP_SEL_SHIFT_OFFS % 8));
+
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_SHIFT_OFFS)] |= (op << (SRAM_OP_SEL_SHIFT_OFFS % 8));
 
 	/* Set base offset as current */
-	pe->sram.byte[SRAM_OP_SEL_BASE_OFFS / 8] &= ~(1 << (SRAM_OP_SEL_BASE_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_BASE_OFFS)] &= ~(1 << (SRAM_OP_SEL_BASE_OFFS % 8));
 
 	return MV_OK;
 }
@@ -1064,8 +1058,8 @@ int mvPp2PrsSwSramShiftGet(MV_PP2_PRS_ENTRY *pe, int *shift)
 	PTR_VALIDATE(pe);
 	PTR_VALIDATE(shift);
 
-	sign = pe->sram.byte[SRAM_SHIFT_SIGN_BIT / 8] & (1 << (SRAM_SHIFT_SIGN_BIT % 8));
-	*shift = ((int)(pe->sram.byte[SRAM_SHIFT_OFFS / 8])) & SRAM_SHIFT_MASK;
+	sign = pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_SHIFT_SIGN_BIT)] & (1 << (SRAM_SHIFT_SIGN_BIT % 8));
+	*shift = ((int)(pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_SHIFT_OFFS)])) & SRAM_SHIFT_MASK;
 
 	if (sign == 1)
 		*shift *= -1;
@@ -1078,7 +1072,7 @@ int mvPp2PrsSwSramShiftAbsUpdate(MV_PP2_PRS_ENTRY *pe, int shift, unsigned int o
 	mvPp2PrsSwSramShiftSet(pe, shift, op);
 
 	/* Set base offset as initial */
-	pe->sram.byte[SRAM_OP_SEL_BASE_OFFS / 8] |= (1 << (SRAM_OP_SEL_BASE_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_BASE_OFFS)] |= (1 << (SRAM_OP_SEL_BASE_OFFS % 8));
 
 	return MV_OK;
 }
@@ -1096,31 +1090,39 @@ int mvPp2PrsSwSramOffsetSet(MV_PP2_PRS_ENTRY *pe, unsigned int type, int offset,
 	if (offset < 0) {
 		offset = 0 - offset;
 		/* set sram offset sign bit */
-		pe->sram.byte[SRAM_OFFSET_SIGN_BIT / 8] |= (1 << (SRAM_OFFSET_SIGN_BIT % 8));
+		pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_SIGN_BIT)] |= (1 << (SRAM_OFFSET_SIGN_BIT % 8));
 	} else
-		pe->sram.byte[SRAM_OFFSET_SIGN_BIT / 8] &= ~(1 << (SRAM_OFFSET_SIGN_BIT % 8));
+		pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_SIGN_BIT)] &= ~(1 << (SRAM_OFFSET_SIGN_BIT % 8));
 
 	/* set offset value */
-	pe->sram.byte[SRAM_OFFSET_OFFS / 8] &= ~(SRAM_OFFSET_MASK << (SRAM_OFFSET_OFFS % 8));
-	pe->sram.byte[SRAM_OFFSET_OFFS / 8] |= (offset << (SRAM_OFFSET_OFFS % 8));
-	pe->sram.byte[(SRAM_OFFSET_OFFS + SRAM_OFFSET_BITS) / 8] &= ~(SRAM_OFFSET_MASK >> (8 - (SRAM_OFFSET_OFFS % 8)));
-	pe->sram.byte[(SRAM_OFFSET_OFFS + SRAM_OFFSET_BITS) / 8] |= (offset >> (8 - (SRAM_OFFSET_OFFS % 8)));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_OFFS)] &= ~(SRAM_OFFSET_MASK << (SRAM_OFFSET_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_OFFS)] |= (offset << (SRAM_OFFSET_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_OFFS + SRAM_OFFSET_BITS)] &=
+		~(SRAM_OFFSET_MASK >> (8 - (SRAM_OFFSET_OFFS % 8)));
+
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_OFFS + SRAM_OFFSET_BITS)] |=
+		(offset >> (8 - (SRAM_OFFSET_OFFS % 8)));
 
 	/* set offset type */
-	pe->sram.byte[SRAM_OFFSET_TYPE_OFFS / 8] &= ~(SRAM_OFFSET_TYPE_MASK << (SRAM_OFFSET_TYPE_OFFS % 8));
-	pe->sram.byte[SRAM_OFFSET_TYPE_OFFS / 8] |= (type << (SRAM_OFFSET_TYPE_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_TYPE_OFFS)] &=
+		~(SRAM_OFFSET_TYPE_MASK << (SRAM_OFFSET_TYPE_OFFS % 8));
+
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_TYPE_OFFS)] |= (type << (SRAM_OFFSET_TYPE_OFFS % 8));
 
 	/* Set offset operation */
-	pe->sram.byte[SRAM_OP_SEL_OFFSET_OFFS / 8] &= ~(SRAM_OP_SEL_OFFSET_MASK << (SRAM_OP_SEL_OFFSET_OFFS % 8));
-	pe->sram.byte[SRAM_OP_SEL_OFFSET_OFFS / 8] |= (op << (SRAM_OP_SEL_OFFSET_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_OFFSET_OFFS)] &=
+		~(SRAM_OP_SEL_OFFSET_MASK << (SRAM_OP_SEL_OFFSET_OFFS % 8));
 
-	pe->sram.byte[(SRAM_OP_SEL_OFFSET_OFFS + SRAM_OP_SEL_OFFSET_BITS) / 8] &=
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_OFFSET_OFFS)] |= (op << (SRAM_OP_SEL_OFFSET_OFFS % 8));
+
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_OFFSET_OFFS + SRAM_OP_SEL_OFFSET_BITS)] &=
 			 ~(SRAM_OP_SEL_OFFSET_MASK >> (8 - (SRAM_OP_SEL_OFFSET_OFFS % 8)));
-	pe->sram.byte[(SRAM_OP_SEL_OFFSET_OFFS + SRAM_OP_SEL_OFFSET_BITS) / 8] |=
+
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_OFFSET_OFFS + SRAM_OP_SEL_OFFSET_BITS)] |=
 			  (op >> (8 - (SRAM_OP_SEL_OFFSET_OFFS % 8)));
 
 	/* Set base offset as current */
-	pe->sram.byte[SRAM_OP_SEL_BASE_OFFS / 8] &= ~(1 << (SRAM_OP_SEL_BASE_OFFS % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_BASE_OFFS)] &= ~(1 << (SRAM_OP_SEL_BASE_OFFS % 8));
 
 	return MV_OK;
 }
@@ -1133,18 +1135,20 @@ int mvPp2PrsSwSramOffsetGet(MV_PP2_PRS_ENTRY *pe, unsigned int *type, int *offse
 	PTR_VALIDATE(offset);
 	PTR_VALIDATE(type);
 
-	*type = pe->sram.byte[SRAM_OFFSET_TYPE_OFFS/8] >> (SRAM_OFFSET_TYPE_OFFS % 8);
+	*type = pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_TYPE_OFFS)] >> (SRAM_OFFSET_TYPE_OFFS % 8);
 	*type &= SRAM_OFFSET_TYPE_MASK;
 
 
-	*offset = (pe->sram.byte[(SRAM_OFFSET_OFFS)/8] >> (SRAM_OFFSET_OFFS % 8)) & 0x7f;
-	*offset |= (pe->sram.byte[(SRAM_OFFSET_OFFS + SRAM_OFFSET_BITS)/8] << (8 - (SRAM_OFFSET_OFFS % 8))) & 0x80;
+	*offset = (pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_OFFS)] >> (SRAM_OFFSET_OFFS % 8)) & 0x7f;
+	*offset |= (pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_OFFS + SRAM_OFFSET_BITS)] <<
+			(8 - (SRAM_OFFSET_OFFS % 8))) & 0x80;
 
-	*op = (pe->sram.byte[SRAM_OP_SEL_OFFS/8] >> (SRAM_OP_SEL_OFFS % 8)) & 0x7;
-	*op |= (pe->sram.byte[(SRAM_OP_SEL_OFFS + SRAM_OP_SEL_BITS)/8] << (8 - (SRAM_OP_SEL_OFFS % 8))) & 0x18;
+	*op = (pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_OFFS)] >> (SRAM_OP_SEL_OFFS % 8)) & 0x7;
+	*op |= (pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OP_SEL_OFFS + SRAM_OP_SEL_BITS)] <<
+			(8 - (SRAM_OP_SEL_OFFS % 8))) & 0x18;
 
 	/* if signed bit is tes */
-	sign = pe->sram.byte[SRAM_OFFSET_SIGN_BIT/8] & (1 << (SRAM_OFFSET_SIGN_BIT % 8));
+	sign = pe->sram.byte[SRAM_BIT_TO_BYTE(SRAM_OFFSET_SIGN_BIT)] & (1 << (SRAM_OFFSET_SIGN_BIT % 8));
 	if (sign != 0)
 		*offset = 1-(*offset);
 
@@ -1156,7 +1160,7 @@ int mvPp2PrsSramBitSet(MV_PP2_PRS_ENTRY *pe, int bitNum)
 
 	PTR_VALIDATE(pe);
 
-	pe->sram.byte[bitNum/8] |= (1 << (bitNum % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(bitNum)] |= (1 << (bitNum % 8));
 	return MV_OK;
 }
 
@@ -1164,7 +1168,7 @@ int mvPp2PrsSramBitClear(MV_PP2_PRS_ENTRY *pe, int bitNum)
 {
 	PTR_VALIDATE(pe);
 
-	pe->sram.byte[bitNum/8] &= ~(1 << (bitNum % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(bitNum)] &= ~(1 << (bitNum % 8));
 	return MV_OK;
 }
 
@@ -1172,7 +1176,7 @@ int mvPp2PrsSramBitGet(MV_PP2_PRS_ENTRY *pe, int bitNum, unsigned int *bit)
 {
 	PTR_VALIDATE(pe);
 
-	*bit = pe->sram.byte[bitNum/8]  & (1 << (bitNum % 8));
+	*bit = pe->sram.byte[SRAM_BIT_TO_BYTE(bitNum)]  & (1 << (bitNum % 8));
 	*bit = (*bit) >> (bitNum % 8);
 	return MV_OK;
 }
