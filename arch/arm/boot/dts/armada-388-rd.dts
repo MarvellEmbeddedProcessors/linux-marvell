@@ -1,10 +1,10 @@
 /*
- * Device Tree file for Marvell Armada 385 evaluation board
- * (DB-88F6820)
+ * Device Tree file for Marvell Armada 388 Reference Design board
+ * (RB-88F6828-NAS)
  *
  *  Copyright (C) 2013 Marvell
  *
- * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ * Nadav Haklai <nadavh@marvell.com>
  *
  * This file is licensed under the terms of the GNU General Public
  * License version 2.  This program is licensed "as is" without any
@@ -15,8 +15,8 @@
 #include "armada-385-388.dtsi"
 
 / {
-	model = "Marvell Armada 385 Development Board";
-	compatible = "marvell,a385-db", "marvell,armada385", "marvell,armada38x";
+	model = "Marvell Armada 388 Reference Design";
+	compatible = "marvell,a388-rd", "marvell,armada388", "marvell,armada38x";
 
 	chosen {
 		bootargs = "console=ttyS0,115200 earlyprintk";
@@ -55,12 +55,12 @@
 			};
 
 			mdio {
-				phy0: ethernet-phy@0 {
-					reg = <0>;
+				phy0: ethernet-phy@1 {
+					reg = <1>;
 				};
 
-				phy1: ethernet-phy@1 {
-					reg = <1>;
+				phy1: ethernet-phy@0 {
+					reg = <0>;
 				};
 			};
 
@@ -96,6 +96,10 @@
 					spi-max-frequency = <108000000>;
 				};
 			};
+
+			usb3@f8000 {
+				status = "disabled";
+			};
 		};
 
 		pcie-controller {
@@ -110,7 +114,7 @@
 			};
 			pcie@2,0 {
 				/* Port 1, Lane 0 */
-				status = "okay";
+				status = "disabled";
 			};
 		};
 	};
