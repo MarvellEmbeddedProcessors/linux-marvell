@@ -477,7 +477,6 @@ static int mvPrsMacDaRangeValid(unsigned int portMap, MV_U8 *da, MV_U8 *mask)
 		} else if (mvPrsMacRangeEquals(&pe, da, mask) && (entryPmap != portMap) && (entryPmap & portMap)) {
 			mvOsPrintf("%s: operation not supported, range intersection\n", __func__);
 			mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n", __func__, entryPmap & portMap, tid);
-
 			return MV_ERROR;
 		}
 	}
@@ -1103,11 +1102,13 @@ static MV_PP2_PRS_ENTRY *mvPrsVlanFind(unsigned short tpid, int ai)
 
 	pe = mvPp2PrsSwAlloc(PRS_LU_VLAN);
 
-#ifndef CONFIG_CPU_BIG_ENDIAN
+#ifdef MV_CPU_LE
 	tpidArr[0] = ((unsigned char *)&tpid)[1];
 	tpidArr[1] = ((unsigned char *)&tpid)[0];
-#endif /* CONFIG_CPU_BIG_ENDIAN */
-
+#else
+	tpidArr[0] = ((unsigned char *)&tpid)[0];
+	tpidArr[1] = ((unsigned char *)&tpid)[1];
+#endif
 	/* Go through the all entires with PRS_LU_MAC */
 	for (tid = PE_FIRST_FREE_TID ; tid <= PE_LAST_FREE_TID; tid++) {
 		if ((!mvPp2PrsShadowIsValid(tid)) || (mvPp2PrsShadowLu(tid) != PRS_LU_VLAN))
@@ -1147,12 +1148,19 @@ static MV_PP2_PRS_ENTRY *mvPrsDoubleVlanFind(unsigned short tpid1, unsigned shor
 	unsigned char tpidArr1[2];
 	unsigned char tpidArr2[2];
 
-#ifndef CONFIG_CPU_BIG_ENDIAN
+#ifdef MV_CPU_LE
 	tpidArr1[0] = ((unsigned char *)&tpid1)[1];
 	tpidArr1[1] = ((unsigned char *)&tpid1)[0];
+
 	tpidArr2[0] = ((unsigned char *)&tpid2)[1];
 	tpidArr2[1] = ((unsigned char *)&tpid2)[0];
-#endif /* CONFIG_CPU_BIG_ENDIAN */
+#else /* MV_CPU_LE */
+	tpidArr1[0] = ((unsigned char *)&tpid1)[0];
+	tpidArr1[1] = ((unsigned char *)&tpid1)[1];
+
+	tpidArr2[0] = ((unsigned char *)&tpid2)[0];
+	tpidArr2[1] = ((unsigned char *)&tpid2)[1];
+#endif
 
 	pe = mvPp2PrsSwAlloc(PRS_LU_VLAN);
 
@@ -1623,7 +1631,8 @@ static int mvPrsEthTypeValid(unsigned int portMap, unsigned short ethertype)
 			mvPp2PrsSwTcamPortMapGet(&pe, &entryPmap);
 			if ((portMap & entryPmap) && (portMap != entryPmap)) {
 				mvOsPrintf("%s: operation not supported\n", __func__);
-				mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n", __func__, entryPmap & portMap, tid);
+				mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n",
+					__func__, entryPmap & portMap, tid);
 				return MV_ERROR;
 			}
 		}
@@ -2457,7 +2466,7 @@ int mvPrsFlowIdGen(int tid, int flowId, unsigned int res, unsigned int resMask, 
 	mvPp2PrsSwTcamPortMapSet(pe, portBmp);
 
 	/*update result data and mask*/
-	mvPp2PrsSwTcamWordSet(pe, TCAM_DATA_BYTE, res, resMask);
+	mvPp2PrsSwTcamWordSet(pe, TCAM_DATA_OFFS, res, resMask);
 
 	mvPp2PrsHwWrite(pe);
 
@@ -2522,6 +2531,7 @@ int mvPrsDefFlow(int port)
  *
  ******************************************************************************
  */
+
 int mvPrsDefaultInit(void)
 {
 	int    port, rc;
