@@ -78,10 +78,11 @@ static void __init armada_380_timer_and_clk_init(void)
 static const char * const armada_380_dt_compat[] = {
 	"marvell,armada380",
 	"marvell,armada385",
+	"marvell,armada388",
 	NULL,
 };
 
-DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 380/385 (Device Tree)")
+DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 380/385/388 (Device Tree)")
 	.smp		= smp_ops(armada_380_smp_ops),
 	.map_io		= debug_ll_io_init,
 	.init_irq	= irqchip_init,
