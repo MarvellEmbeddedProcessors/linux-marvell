@@ -31,6 +31,7 @@ disclaimer.
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/mv_neta.h>
 #include <net/ip.h>
 
 #include "mvCommon.h"
