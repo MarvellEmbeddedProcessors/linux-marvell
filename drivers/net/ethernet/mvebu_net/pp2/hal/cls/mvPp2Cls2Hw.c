@@ -477,7 +477,7 @@ int mvPp2ClsC2SwWordsDump(MV_PP2_CLS_C2_ENTRY *c2)
 	i = MV_PP2_CLS_C2_TCAM_WORDS - 1 ;
 
 	while (i >= 0)
-		mvOsPrintf("%4.4x ", (MV_32BIT_LE_FAST(c2->tcam.words[i--])) & 0xFFFF);
+		mvOsPrintf("%4.4x ", (c2->tcam.words[i--]) & 0xFFFF);
 
 	mvOsPrintf("| ");
 
@@ -491,7 +491,7 @@ int mvPp2ClsC2SwWordsDump(MV_PP2_CLS_C2_ENTRY *c2)
 	i = MV_PP2_CLS_C2_TCAM_WORDS - 1;
 
 	while (i >= 0)
-		mvOsPrintf("%4.4x ", ((MV_32BIT_LE_FAST(c2->tcam.words[i--]) >> 16)  & 0xFFFF));
+		mvOsPrintf("%4.4x ", ((c2->tcam.words[i--] >> 16)  & 0xFFFF));
 
 	mvOsPrintf("\n");
 
@@ -715,8 +715,8 @@ int mvPp2ClsC2TcamByteSet(MV_PP2_CLS_C2_ENTRY *c2, unsigned int offs, unsigned c
 
 	POS_RANGE_VALIDATE(offs, MV_PP2_CLS_C2_TCAM_DATA_BYTES);
 
-	c2->tcam.bytes[TCAM_DATA_BYTE_OFFS(offs)] = byte;
-	c2->tcam.bytes[TCAM_DATA_MASK_OFFS(offs)] = enable;
+	c2->tcam.bytes[TCAM_DATA_BYTE(offs)] = byte;
+	c2->tcam.bytes[TCAM_DATA_MASK(offs)] = enable;
 
 	return MV_OK;
 }
@@ -730,8 +730,8 @@ int mvPp2ClsC2TcamByteGet(MV_PP2_CLS_C2_ENTRY *c2, unsigned int offs, unsigned c
 
 	POS_RANGE_VALIDATE(offs, 8);
 
-	*byte = c2->tcam.bytes[TCAM_DATA_BYTE_OFFS(offs)];
-	*enable = c2->tcam.bytes[TCAM_DATA_MASK_OFFS(offs)];
+	*byte = c2->tcam.bytes[TCAM_DATA_BYTE(offs)];
+	*enable = c2->tcam.bytes[TCAM_DATA_MASK(offs)];
 	return MV_OK;
 }
 /*-------------------------------------------------------------------------------*/

@@ -1018,7 +1018,7 @@ int mvPp2ClsC3SwHekByteSet(MV_PP2_CLS_C3_ENTRY *c3, unsigned int offs, unsigned 
 	PTR_VALIDATE(c3);
 	POS_RANGE_VALIDATE(offs, ((MV_PP2_CLS_C3_EXT_HEK_WORDS*4) - 1));
 
-	c3->key.hek.bytes[offs] = byte;
+	c3->key.hek.bytes[HW_BYTE_OFFS(offs)] = byte;
 
 	return MV_OK;
 }
