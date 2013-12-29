@@ -37,23 +37,17 @@ modules.builtin
 #
 #
 #
-arch/arm/mach-armadaxp/armada_xp_family/
-arch/arm/mach-avantalp/avanta_lp_family/
-arch/arm/plat-armada/common/
-arch/arm/plat-armada/mv_hal/
-arch/arm/plat-armada/mv_drivers_lsp/mv_pp2/
 
 #
 # Top-level generic files
 #
 /tags
 /TAGS
-/linux
-/vmlinux
-/vmlinuz
-/System.map
-/Module.markers
-/Module.symvers
+vmlinux
+vmlinuz
+System.map
+Module.markers
+Module.symvers
 
 #
 # Debian directory (make deb-pkg)
