@@ -70,15 +70,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "hmac/mv_hmac.h"
 #include "hmac/mv_hmac_regs.h"
 
-/* local functions declaration */
-static int mv_pp3_hmac_queue_create(struct mv_pp3_queue_ctrl *q_ctrl, int desc_num);
-
-/* per frame bitmap to store queues state (allocated/free) */
+/* bitmap to store queues state (allocated/free) per frame */
 static unsigned int mv_pp3_hmac_queue_act[MV_PP3_HMAC_MAX_FRAME] = {0};
 /* */
 struct pp3_unit_info pp3_hmac_gl;
 struct pp3_unit_info pp3_hmac_fr;
 
+/* local functions declaration */
+static int mv_pp3_hmac_queue_create(struct mv_pp3_queue_ctrl *q_ctrl, int desc_num);
+
+/* general functions */
 /* store unit base address = silicon base address + unit offset */
 void mv_pp3_hmac_gl_unit_base(unsigned int unit_offset)
 {
@@ -94,56 +95,135 @@ void mv_pp3_hmac_frame_unit_base(unsigned int unit_offset, unsigned int ins_offs
 	pp3_hmac_fr.ins_offs = ins_offset;
 }
 
+/* configure queue to be used like BM queue */
+void mv_pp3_hmac_queue_bm_mode_cfg(int frame, int queue)
+{
+	u32 reg_data;
+
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_Q_MODE_OFFS, MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK, 1);
+
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
+}
+
+/* configure queue parameters used by QM queue
+ * qm_num - is a number of QM queue                   */
+void mv_pp3_hmac_queue_qm_mode_cfg(int frame, int queue, int qm_num)
+{
+	u32 reg_data;
+
+	/* configure queue to be QM queue */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_Q_MODE_OFFS, MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK, 0);
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
+	/* map QM queue number */
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_NUM_BPID_REG(queue), qm_num);
+}
+
+
+/* RX queue functions */
 /* Allocate memory and init RX queue HW facility
  * size is a queue size in datagrams (16 bytes each) */
 u32 mv_pp3_hmac_rxq_init(int frame, int queue, int size, struct mv_pp3_queue_ctrl *qctrl)
 {
+	u32 reg_data;
+
 	/* check if already created */
 	if ((mv_pp3_hmac_queue_act[frame] >> queue) & 1)
 		return 1;
 
 	qctrl->size = size;
+	qctrl->occ_dg = 0;
 	mv_pp3_hmac_queue_create(qctrl, size * MV_PP3_HMAC_DG_SIZE);
-/*	Write pointer to allocated memory to
-a.	rq_address_high table address bits [39:32]
-b.	rq_address_low table address bits [31:8], aligned to 256B
-3.	Store queue size in rq_size table, number of 16B units.
-4.	Configure Receive Threshold TBD.
-5.	Disable queue, hmac_%m_rec_q_%n_control set to 0.
-*/
+	/* Write pointer to allocated memory */
+	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_RQ_ADDR_LOW(queue), (u32)qctrl->first);
+	/* Store queue size in rq_size table, number of 16B units */
+	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_RQ_SIZE(queue), (u32)qctrl->size);
+	/* Configure Receive Threshold TBD */
+	/* Disable queue, hmac_%m_rec_q_%n_control set to 0 */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_REC_Q_CTRL_REG(queue));
+	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_OFFS, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 0);
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), reg_data);
+
+	/* mark queue as created */
+	mv_pp3_hmac_queue_act[frame] |= (1 << queue);
 	return 0;
 }
 
-/* Return pointer to first free CFH:
- * size is CFH size in datagrams (16 bytes each)     */
-void mv_pp3_hmac_txq_next_cfh(int frame, int queue, struct mv_pp3_queue_ctrl *qctrl, int size, u8 **cfh_ptr)
+void mv_pp3_hmac_rxq_flush(int frame, int queue)
 {
-	if ((qctrl->next_proc + size * MV_PP3_HMAC_DG_SIZE) > qctrl->last)
-		/* do FIFO wraparound */;
+	u32 data;
 
-	*cfh_ptr = qctrl->next_proc;
-	qctrl->next_proc += size;
-}
-
-void mv_pp3_hmac_rxq_reset(int frame, int queue)
-{
-	unsigned int data;
-
-	/* reset queue */
+	/* flush queue */
 	data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_REC_Q_CTRL_REG(queue));
 	data &= ~(MV_HMAC_REC_Q_CTRL_RCV_Q_FLUSH_MASK);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), data);
 }
 
-void mv_pp3_hmac_txq_qm_mode_cfg(int frame, int queue, int qm_num)
+void mv_pp3_hmac_rxq_enable(int frame, int queue)
 {
-	unsigned int data;
+	u32 reg_data;
 
-	data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
-	data &= ~(MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK); /* set mode to QM */
-	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), data);
+	/* Enable queue */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_REC_Q_CTRL_REG(queue));
+	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_OFFS, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 1);
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), reg_data);
 }
 
+void mv_pp3_hmac_rxq_disable(int frame, int queue)
+{
+	u32 reg_data;
+
+	/* Disable queue */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_REC_Q_CTRL_REG(queue));
+	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_OFFS, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 0);
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), reg_data);
+}
+
+/* TX queue functions */
+u32 mv_pp3_hmac_txq_init(int frame, int queue, int size, int cfh_size, struct mv_pp3_queue_ctrl *qctrl)
+{
+	u32 reg_data;
+
+	qctrl->size = size;
+	qctrl->occ_dg = 0;
+	qctrl->cfh_size = cfh_size;
+
+	mv_pp3_hmac_queue_create(qctrl, size * MV_PP3_HMAC_DG_SIZE);
+	/* Write pointer to allocated memory */
+	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_SQ_ADDR_LOW(queue), (u32)qctrl->first);
+	/* Store queue size in rq_size table, number of 16B units */
+	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_SQ_SIZE(queue), (u32)qctrl->size);
+	/* Configure Transmit Threshold TBD */
+	/* Disable queue */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 0);
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
+
+	return 0;
+}
+
+void mv_pp3_hmac_txq_enable(int frame, int queue)
+{
+	u32 reg_data;
+
+	/* Enable queue */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 1);
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
+}
+
+void mv_pp3_hmac_txq_disable(int frame, int queue)
+{
+	u32 reg_data;
+
+	/* Disable queue */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 0);
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
+}
+
+/* Local functions */
 /* allocate descriptors */
 static u8 *mv_pp3_queue_mem_alloc(int size)
 {
@@ -171,16 +251,43 @@ static int mv_pp3_hmac_queue_create(struct mv_pp3_queue_ctrl *q_ctrl, int desc_n
 
 	/* Make sure descriptor address is aligned */
 	/*q_ctrl->first = (char *)MV_ALIGN_UP((MV_ULONG) qCtrl->descBuf.bufVirtPtr, MV_PP2_DESC_Q_ALIGN);*/
-
-	q_ctrl->last = q_ctrl->first + size;
+	q_ctrl->size = size / MV_PP3_HMAC_DG_SIZE;
+	q_ctrl->end = q_ctrl->first + size;
 	return 0;
 }
 
-u32 mv_pp3_hmac_txq_init(int frame, int queue, int size, struct mv_pp3_queue_ctrl *qctrl)
+/* Print HMAC Frame unit register */
+static void mv_pp3_hmac_fr_reg_print(int frame, char *reg_name, u32 reg)
 {
-	return 0;
+	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg, mv_pp3_hmac_frame_reg_read(frame, reg));
 }
 
-void mv_pp3_hmac_txq_send(int frame, int queue, int size)
+/* dump hmac queue registers */
+void mv_pp3_hmac_rxq_regs(int frame, int queue)
 {
+	pr_info("-------------- HMAC RX (frame = %d, queue = %d) regs -----------\n", frame, queue);
+	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_CTRL", MV_HMAC_REC_Q_CTRL_REG(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_STATUS", MV_HMAC_REC_Q_STATUS_REG(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "TIMEOUT", MV_HMAC_REC_Q_TIMEOUT_REG(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "ADDR_LOW", MV_PP3_HMAC_RQ_ADDR_LOW(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_SIZE", MV_PP3_HMAC_RQ_SIZE(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "OCC_STATUS", MV_PP3_HMAC_RQ_OCC_STATUS(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "AXI_ATTR", MV_PP3_HMAC_RQ_AXI_ATTR(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "EVENT_GROUP", MV_PP3_HMAC_RQ_EVENT_GROUP(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "INT_THRESH", MV_PP3_HMAC_RQ_INT_THRESH(queue));
+}
+
+/* dump hmac queue registers */
+void mv_pp3_hmac_txq_regs(int frame, int queue)
+{
+	pr_info("-------------- HMAC TX (frame = %d, queue = %d) regs -----------\n", frame, queue);
+	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_CTRL", MV_HMAC_SEND_Q_CTRL_REG(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "QM_NUM", MV_HMAC_SEND_Q_NUM_BPID_REG(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_STATUS", MV_HMAC_SEND_Q_STATUS_REG(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "TIMEOUT", MV_HMAC_SEND_Q_TIMEOUT_REG(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "ADDR_LOW", MV_PP3_HMAC_SQ_ADDR_LOW(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_SIZE", MV_PP3_HMAC_SQ_SIZE(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "OCC_STATUS", MV_PP3_HMAC_SQ_OCC_STATUS(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "AXI_ATTR", MV_PP3_HMAC_SQ_AXI_ATTR(queue));
+	mv_pp3_hmac_fr_reg_print(frame, "EVENT_GROUP", MV_PP3_HMAC_SQ_EVENT_GROUP(queue));
 }
