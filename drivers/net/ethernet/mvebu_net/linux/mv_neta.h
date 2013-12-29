@@ -39,7 +39,7 @@ Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
 
     *   Redistributions of source code must retain the above copyright notice,
-	    this list of conditions and the following disclaimer.
+	this list of conditions and the following disclaimer.
 
     *   Redistributions in binary form must reproduce the above copyright
 	notice, this list of conditions and the following disclaimer in the
@@ -61,66 +61,56 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *******************************************************************************/
+/*  mv_neta.h */
 
-#ifndef __mv_net_config_h__
-#define __mv_net_config_h__
+#ifndef LINUX_MV_NETA_H
+#define LINUX_MV_NETA_H
 
-#ifdef CONFIG_MV_ETH_PP2
+#define MV_NETA_PORT_NAME	"mv_neta_port"
+struct mv_neta_pdata {
+	/* Global parameters common for all ports */
+	unsigned int  tclk;
+	unsigned int  pclk;
+	int           max_port;
+	int           max_cpu;
+	unsigned int  ctrl_model;
+	unsigned int  ctrl_rev;
 
-#define INTER_REGS_PHYS_BASE		0xF1000000
-#define INTER_REGS_VIRT_BASE		0xFBC00000
+	/* Per port parameters */
+	unsigned int  cpu_mask;
+	int           mtu;
 
-#define PP2_CPU0_VIRT_BASE		0xFEC00000
-#define PP2_CPU1_VIRT_BASE		0xFEC10000
+	/* Whether a PHY is present, and if yes, at which address. */
+	int      phy_addr;
 
-#define MV_PP2_REG_BASE                 (0xF0000)
-#define MV_ETH_BASE_ADDR                (0xC0000)
-#define LMS_REG_BASE                    (MV_ETH_BASE_ADDR)
-#define MIB_COUNTERS_REG_BASE           (MV_ETH_BASE_ADDR + 0x1000)
-#define GOP_MNG_REG_BASE                (MV_ETH_BASE_ADDR + 0x3000)
-#define GOP_REG_BASE(port)		(MV_ETH_BASE_ADDR + 0x4000 + ((port) / 2) * 0x3000 + ((port) % 2) * 0x1000)
-#define MV_PON_REGS_OFFSET                      (MV_ETH_BASE_ADDR + 0x8000)
+	/* Use this MAC address if it is valid */
+	u8       mac_addr[6];
 
-#define MV_PON_PORT_ID                  7
-#define MV_ETH_MAX_PORTS                4
-#define MV_ETH_MAX_RXQ                  16      /* Maximum number of RXQs can be mapped to each port */
-#define MV_ETH_MAX_TXQ                  8
-#define MV_ETH_RXQ_TOTAL_NUM            32      /* Total number of RXQs for usage by all ports */
-#define MV_ETH_MAX_TCONT                16      /* Maximum number of TCONTs supported by PON port */
-#define MV_ETH_TX_CSUM_MAX_SIZE         9800
+	/*
+	* If speed is 0, autonegotiation is enabled.
+	*   Valid values for speed: 0, SPEED_10, SPEED_100, SPEED_1000.
+	*   Valid values for duplex: DUPLEX_HALF, DUPLEX_FULL.
+	*/
+	int      speed;
+	int      duplex;
 
-#define IRQ_GLOBAL_GOP			82 /* Group of Ports (GOP) */
-#endif /* PP2 */
+	/* Port configuration: indicates if this port is LB, and if PCS block is active */
+	int	     lb_enable;
+	int	     is_sgmii;
+	int	     is_rgmii;
 
-#ifdef CONFIG_MV_ETH_NETA
+	/*
+	* How many RX/TX queues to use.
+	*/
+	int      rx_queue_count;
+	int      tx_queue_count;
 
-#define INTER_REGS_PHYS_BASE		0xF1000000
-#define INTER_REGS_VIRT_BASE		0xFBB00000
+	/*
+	* Override default RX/TX queue sizes if nonzero.
+	*/
+	int      rx_queue_size;
+	int      tx_queue_size;
+};
 
-#define MV_ETH_BASE_ADDR_PORT0		(0x00070000)
-#define MV_ETH_BASE_ADDR_PORT1_2	(0x00030000)	/* Port1 = 0x30000,  Port2 = 0x34000 */
-#define MV_ETH_REGS_BASE(p)		(((p) == 0) ? MV_ETH_BASE_ADDR_PORT0 : \
-					(MV_ETH_BASE_ADDR_PORT1_2 + (((p) - 1) * 0x4000)))
 
-#define SGMII_SERDES_CFG_REG(port)	(0x724A0 + ((port)%2)*0x4000 - ((port)/2)*0x40000)
-#define MV_PON_PORT(p)			MV_FALSE
-#define MV_ETH_MAX_TCONT		1
-
-#define MV_ETH_MAX_PORTS		3
-#define MV_ETH_MAX_RXQ			8
-#define MV_ETH_MAX_TXQ			8
-#define MV_ETH_TX_CSUM_MAX_SIZE		9800
-#define MV_PNC_TCAM_LINES		1024    /* TCAM num of entries */
-
-/* New GMAC module is used */
-#define MV_ETH_GMAC_NEW
-/* New WRR/EJP module is used */
-#define MV_ETH_WRR_NEW
-/* IPv6 parsing support for Legacy parser */
-#define MV_ETH_LEGACY_PARSER_IPV6
-
-#define NET_TH_RXTX_IRQ_NUM(x)		(/*IRQ_PRIV_PORT0_TH_RXTX + TBF */ ((x) * 2))
-
-#endif /* CONFIG_MV_ETH_NETA */
-
-#endif /* __mv_net_config_h__ */
+#endif  /* LINUX_MV_NETA_H */

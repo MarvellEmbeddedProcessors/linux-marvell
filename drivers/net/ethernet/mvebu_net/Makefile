@@ -28,8 +28,11 @@ ccflags-y	+= $(INCLUDE_DIRS)
 
 obj-y	+= common/mvCommon.o common/mvStack.o common/mvDebug.o
 obj-y	+= linux_oss/mvOs.o
-obj-y	+= phy/mvEthPhy.o phy/phy_sysfs.o
 
-obj-y	+= netmux/
+obj-$(CONFIG_MV_ETH_INCLUDE_PHY)	+= phy/mvEthPhy.o phy/phy_sysfs.o
 
+obj-$(CONFIG_MV_ETH_INCLUDE_NETMUX)	+= netmux/
+
+obj-$(CONFIG_MV_ETH_NETA) += neta/
 obj-$(CONFIG_MV_ETH_PP2) += pp2/
+
