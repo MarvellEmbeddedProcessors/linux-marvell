@@ -65,23 +65,53 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mvHmac_h__
 #define __mvHmac_h__
 
+#include "hmac/mv_hmac_regs.h"
 
 #define MV_PP3_HMAC_MAX_FRAME			(16)
 #define MV_PP3_HMAC_DG_SIZE				(16)
 #define MV_PP3_CFH_MIN_SIZE				(32)
-#define MV_PP3_CFH_DG_NUM				(MV_PP3_CFH_MIN_SIZE \ MV_PP3_HMAC_DG_SIZE)
+#define MV_PP3_CFH_MAX_SIZE				(128)
+#define MV_PP3_CFH_DG_NUM				(MV_PP3_CFH_MIN_SIZE / MV_PP3_HMAC_DG_SIZE)
 #define MV_PP3_HMAC_Q_ALIGN				(256)
+
+#define MV_PP3_HMAC_CFH_DUMMY			(0x8000)
 
 extern struct pp3_unit_info pp3_hmac_gl;
 extern struct pp3_unit_info pp3_hmac_fr;
 
 struct mv_pp3_queue_ctrl {
-	u8 *first;
-	u8 *next_proc;
-	u8 *last;
-	int   size;  /* number of 16 bytes units (datagram) in queue */
+	u8 *first;		/* pointer to first byte in queue */
+	u8 *next_proc;	/* pointer to next CFH to procces in queue */
+	u8 *end;		/* pointer to first byte not belong to queue */
+	int occ_dg;		/* number of occupated datagram in queue */
+	int dummy_dg;	/* number of dummy datagrams added by last wraparound */
+	int size;		/* number of 16 bytes units (datagram) in queue */
+	int cfh_size;	/* for queue with constant CFH size is number of datargarms in CFH, (or -1) */
 };
 
+/* CFH structure */
+struct cfh_common_format {
+
+	unsigned short pkt_length;
+	unsigned short seq_id_qe_cntrl;
+	unsigned short qm_cntrl;
+	unsigned char  cfh_length;
+	unsigned char  cfh_format;
+	unsigned int   tag1;
+	unsigned int   tag2;
+	unsigned int   addr_low;
+	unsigned short addr_high;
+	unsigned char  vm_id;
+	unsigned char  bp_id;
+	unsigned int   marker_low;
+	unsigned char  marker_high;
+	unsigned char  reserved0;
+	unsigned short qc_cntrl;
+};
+
+/*****************************************
+ *     Reigister acccess functions       *
+ *****************************************/
 static inline u32 mv_pp3_hmac_gl_reg_read(u32 reg)
 {
 	u32 reg_data;
@@ -94,28 +124,29 @@ static inline u32 mv_pp3_hmac_gl_reg_read(u32 reg)
 
 static inline u32 mv_pp3_hmac_frame_reg_read(int frameId, u32 reg)
 {
-	u32 reg_data;
 	u32 reg_addr;
 
 	reg_addr = pp3_hmac_fr.base_addr + pp3_hmac_fr.ins_offs * frameId + reg;
 	/* add debug print */
-	mv_pp3_hw_read(reg_addr, 1, &reg_data);
 
-	return reg_data;
+	return mv_pp3_hw_reg_read(reg_addr);
 }
 
 static inline void mv_pp3_hmac_gl_reg_write(u32 reg, u32 data)
 {
-	mv_pp3_hw_write(reg + pp3_hmac_gl.base_addr, 1, &data);
+	mv_pp3_hw_reg_write(reg + pp3_hmac_gl.base_addr, data);
 }
 
 static inline void mv_pp3_hmac_frame_reg_write(int frame_id, u32 reg, u32 data)
 {
 	u32 reg_addr = pp3_hmac_fr.base_addr + pp3_hmac_fr.ins_offs * frame_id + reg;
 
-	mv_pp3_hw_write(reg_addr, 1, &data);
+	mv_pp3_hw_reg_write(reg_addr, data);
 }
 
+/*****************************************
+ *        HMAC unit init functions       *
+ *****************************************/
 /* Init HMAC global unit base address
  * unit_offset = silicon base address + unit offset  */
 void mv_pp3_hmac_gl_unit_base(u32 unit_offset);
@@ -124,34 +155,165 @@ void mv_pp3_hmac_gl_unit_base(u32 unit_offset);
  * frame_offset - is an next frame unit offset       */
 void mv_pp3_hmac_frame_unit_base(u32 unit_offset, u32 frame_offset);
 
+/*****************************************
+ *           RX queue functions          *
+ *****************************************/
 /* Allocate memory and init RX queue HW facility
  * size is a queue size in datagrams (16 bytes each) */
 u32 mv_pp3_hmac_rxq_init(int frame, int queue, int size, struct mv_pp3_queue_ctrl *qctrl);
 void mv_pp3_hmac_rxq_flush(int frame, int queue);
 void mv_pp3_hmac_rxq_enable(int frame, int queue);
 void mv_pp3_hmac_rxq_disable(int frame, int queue);
-void mv_pp3_hmac_rxq_occ_get(int frame, int queue, int *size);
-void mv_pp3_hmac_rxq_next_cfh(int frame, int queue, int *size, u8 *cfh_ptr);
 
+/* Return number of received datagrams */
+static inline int mv_pp3_hmac_rxq_occ_get(int frame, int queue)
+{
+	return mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_RQ_OCC_STATUS(queue)) & MV_PP3_HMAC_OCC_COUNTER_MASK;
+}
+
+/* Write a number of processed datagram (16 bytes each) */
+static inline void mv_pp3_hmac_rxq_occ_set(int frame, int queue, int size)
+{
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_OCC_STATUS_UPDATE_REG(queue), size);
+}
+
+/* size - number of datagram in proccesed CFH */
+static inline u8 *mv_pp3_hmac_rxq_next_cfh(struct mv_pp3_queue_ctrl *qctrl, int *size)
+{
+	struct cfh_common_format *cfh;
+	int dg;
+	u8	*cfh_ptr;
+
+	/* Read 16 bytes of CFH pointed by "next_proc" field and calculate size of CFH in bytes */
+	cfh = (struct cfh_common_format *)qctrl->next_proc;
+	dg = cfh->cfh_length / MV_PP3_HMAC_DG_SIZE;
+
+	/* Store "next_proc" field value to return */
+	cfh_ptr = qctrl->next_proc;
+	/* Move "next_proc" pointer to next CFH ("next_proc" + size) */
+	qctrl->next_proc += cfh->cfh_length;
+
+	/* if get NULL CFH with "W" bit set, do wraparound */
+	if (cfh->qm_cntrl & MV_PP3_HMAC_CFH_DUMMY) {
+		qctrl->next_proc = qctrl->first;
+		/* return first CFH in queue */
+		cfh = (struct cfh_common_format *)qctrl->next_proc;
+		dg += cfh->cfh_length / MV_PP3_HMAC_DG_SIZE;
+	}
+	*size = dg;
+	return cfh_ptr;
+}
+
+/*****************************************
+ *           TX queue functions          *
+ *****************************************/
 /* Allocate memory and init TX queue HW facility:
  * size is a queue size in datagrams (16 bytes each) */
-u32 mv_pp3_hmac_txq_init(int frame, int queue, int size, struct mv_pp3_queue_ctrl *qctrl);
+u32 mv_pp3_hmac_txq_init(int frame, int queue, int size, int cfh_size, struct mv_pp3_queue_ctrl *qctrl);
 void mv_pp3_hmac_txq_flush(int frame, int queue);
 void mv_pp3_hmac_txq_enable(int frame, int queue);
 void mv_pp3_hmac_txq_disable(int frame, int queue);
-/* Return pointer to first free CFH:
- * size is CFH size in datagrams (16 bytes each)     */
-void mv_pp3_hmac_txq_next_cfh(int frame, int queue, struct mv_pp3_queue_ctrl *qctrl, int size, u8 **cfh_ptr);
-/* size - is number of datagrams to transmit         */
-void mv_pp3_hmac_txq_send(int frame, int queue, int size);
 
-/* configure queue parameters used by BM queue
- * bpid - is a buffer pool ID for allocation request
- * bm_alloc_count - is a size of the allocation
- * request in units of 16B                           */
-void mv_pp3_hmac_txq_bm_mode_cfg(int frame, int queue, int bpid, int bm_alloc_count);
+/* Check for space in the queue.
+ * Return 0 for positive answer, or 1 for negative.
+ * dg_num - number of datagrams we are looking for */
+static inline int mv_pp3_hmac_txq_check_for_space(int frame, int queue, struct mv_pp3_queue_ctrl *qctrl, int dg_num)
+{
+	if ((qctrl->size - qctrl->occ_dg) >= dg_num)
+		return 0;
+
+	qctrl->occ_dg = mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_SQ_OCC_STATUS(queue)) &
+					MV_PP3_HMAC_OCC_COUNTER_MASK;
+	return ((qctrl->size - qctrl->occ_dg) >= dg_num) ? 0 : 1;
+}
+
+/* Return number of free space in the end of queue (in datagrams) */
+static inline int mv_pp3_hmac_txq_free_room(struct mv_pp3_queue_ctrl *qctrl)
+{
+	return (qctrl->end - qctrl->next_proc) / MV_PP3_HMAC_DG_SIZE;
+}
+
+/* Return number of currently occupated datagrams in queue */
+static inline int mv_pp3_hmac_txq_occ_get(int frame, int queue, struct mv_pp3_queue_ctrl *qctrl)
+{
+	qctrl->occ_dg = mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_SQ_OCC_STATUS(queue)) &
+					MV_PP3_HMAC_OCC_COUNTER_MASK;
+	return qctrl->occ_dg;
+}
+
+/* Return pointer to first free one CFH from queue with constant CFH size
+ * (do queue wraparound, if needed) */
+static inline u8 *mv_pp3_hmac_const_txq_next_cfh(struct mv_pp3_queue_ctrl *qctrl)
+{
+	u8 *cfh_ptr;
+
+	if ((qctrl->cfh_size + qctrl->occ_dg) > qctrl->size)
+		return NULL;
+
+	cfh_ptr = qctrl->next_proc;
+	qctrl->next_proc += (qctrl->cfh_size * MV_PP3_HMAC_DG_SIZE);
+	qctrl->occ_dg += qctrl->cfh_size;
+
+	if (qctrl->next_proc == qctrl->end)
+		qctrl->next_proc = qctrl->first;
+
+	return cfh_ptr;
+}
+
+/* Return pointer to first free one CFH (run queue wraparound, if needed) :
+ * size is CFH size in datagrams (16 bytes each)     */
+static inline u8 *mv_pp3_hmac_txq_next_cfh(struct mv_pp3_queue_ctrl *qctrl, int size)
+{
+	u8 *cfh_ptr;
+	int end_free_dg;	/* number of free datagram in the queue end */
+	int start_free_dg;	/* number of free datagram in the queue start */
+
+	/* calculate number of unused datagram n the queue end */
+	end_free_dg = (qctrl->end - qctrl->next_proc) / MV_PP3_HMAC_DG_SIZE;
+	if (end_free_dg >= size) {
+		cfh_ptr = qctrl->next_proc;
+		qctrl->next_proc += (size * MV_PP3_HMAC_DG_SIZE);
+		qctrl->occ_dg += size;
+
+		return cfh_ptr;
+	}
+
+	/* There is not enough space in the queue end. */
+	/* Check and if possible to queue wraparound */
+	/* calculate number of unused datagrams in the queue start */
+	start_free_dg = (qctrl->size - qctrl->occ_dg) - end_free_dg;
+	if (start_free_dg < size)
+		/* not enough space in queue (cannot run wraparound) */
+		return NULL;
+
+	/* do FIFO wraparound */
+	/* return pointer to fisrt CFH and move next pointer to second CFH in queue */
+	if (qctrl->end != qctrl->next_proc) {
+		/* do wraparound with dummy CFH sent */
+		struct cfh_common_format *cfh = (struct cfh_common_format *)qctrl->next_proc;
+
+		cfh->pkt_length = end_free_dg * MV_PP3_HMAC_DG_SIZE;
+		cfh->qm_cntrl = MV_PP3_HMAC_CFH_DUMMY; /* set bit 'W' */
+		qctrl->dummy_dg = end_free_dg;
+	}
+	qctrl->next_proc = qctrl->first + (size * MV_PP3_HMAC_DG_SIZE);
+	qctrl->occ_dg += size;
+
+	return qctrl->first;
+}
+
+/* size - is number of datagrams to transmit         */
+static inline void mv_pp3_hmac_txq_send(int frame, int queue, int size, struct mv_pp3_queue_ctrl *qctrl)
+{
+	size += qctrl->dummy_dg;
+	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_OCC_STATUS_UPDATE_REG(queue), size);
+	qctrl->dummy_dg = 0;
+}
+
+/* configure queue parameters used by BM queue       */
+void mv_pp3_hmac_queue_bm_mode_cfg(int frame, int queue);
 /* configure queue parameters used by QM queue
  * q_num - is a number of QM queue                   */
-void mv_pp3_hmac_txq_qm_mode_cfg(int frame, int queue, int q_num);
+void mv_pp3_hmac_queue_qm_mode_cfg(int frame, int queue, int q_num);
 
 #endif /* __mvHmac_h__ */
