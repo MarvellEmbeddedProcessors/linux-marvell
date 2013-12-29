@@ -14,7 +14,6 @@ config NET_VENDOR_MVEBU
 if NET_VENDOR_MVEBU
 
 config MV_ETH_NETA
-
 	tristate "Marvell Armada 380 network interface support"
 	depends on MACH_ARMADA_380
 	---help---
@@ -26,7 +25,6 @@ source drivers/net/ethernet/mvebu_net/neta/Kconfig
 endif
 
 config MV_ETH_PP2
-
 	tristate "Marvell Armada 375 network interface support"
 	depends on MACH_ARMADA_375
 	---help---
@@ -36,5 +34,24 @@ config MV_ETH_PP2
 if MV_ETH_PP2
 source drivers/net/ethernet/mvebu_net/pp2/Kconfig
 endif
+
+config MV_ETH_INCLUDE_PHY
+	bool "Choose to compile Ethernet PHY support"
+	depends on MV_ETH_NETA || MV_ETH_PP2
+	default y
+	---help---
+	Use Marvell propriotary PHY driver for access PHY registers.
+	All kind of Marvell network drivers need it.
+	Driver provides APIs for reset PHY, restart autonegotiation and
+	change autonegotiation parameters of the PHY.
+	The driver located uner directory mvebu_net/phy
+
+config MV_ETH_INCLUDE_NETMUX
+	bool "Choose to compile Marvell NetMux support"
+	depends on MV_ETH_NETA || MV_ETH_PP2
+	default y
+	---help---
+	Use Marvell propriotary NETMUX driver for Virtual Networking interfaces support.
+	The driver located uner directory mvebu_net/netmux
 
 endif # NET_VENDOR_MVEBU
