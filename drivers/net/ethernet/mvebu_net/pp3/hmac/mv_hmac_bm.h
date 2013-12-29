@@ -91,7 +91,7 @@ u32 mv_pp3_hmac_bm_queue_init(int frame, int queue, int q_size,
 
 	size = MV_PP3_BM_PE_DG; /* number of descriptors * 1 datagrams (per PE) */
 	ret = mv_pp3_hmac_rxq_init(frame, queue, size, rxq_ctrl);
-	ret = mv_pp3_hmac_txq_init(frame, queue, size, txq_ctrl);
+	ret = mv_pp3_hmac_txq_init(frame, queue, size, MV_PP3_BM_PE_DG, txq_ctrl);
 
 	mv_pp3_hmac_queue_bm_mode_cfg(frame, queue);
 
@@ -128,7 +128,7 @@ int mv_pp3_hmac_bm_buff_free(int bp_id, u32 buff_addr, struct mv_pp3_queue_ctrl 
 	struct mv_pp3_hmac_bm_cfh *bm_cfh;
 
 	/* get pointer to PE and write parameters */
-	bm_cfh = (struct mv_pp3_hmac_bm_cfh *)mv_pp3_hmac_txq_next_cfh(qctrl, MV_PP3_BM_PE_SIZE);
+	bm_cfh = (struct mv_pp3_hmac_bm_cfh *)mv_pp3_hmac_const_txq_next_cfh(qctrl);
 	if (bm_cfh == NULL)
 		return 1;
 
