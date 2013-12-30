@@ -1809,6 +1809,10 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 		}
 		rx_done++;
 
+#if defined(MV_CPU_BE)
+		mvPPv2RxqDescSwap(rx_desc);
+#endif /* MV_CPU_BE */
+
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
 		if (pp->dbg_flags & MV_ETH_F_DBG_RX) {
 			printk(KERN_ERR "\n%s: port=%d, cpu=%d\n", __func__, pp->port, smp_processor_id());
@@ -2468,6 +2472,10 @@ static void mv_eth_rxq_drop_pkts(struct eth_port *pp, int rxq)
 		bm = mv_eth_bm_cookie_build(rx_desc);
 		pool = mv_eth_bm_cookie_pool_get(bm);
 		ppool = &mv_eth_pool[pool];
+
+#if defined(MV_CPU_BE)
+	mvPPv2RxqDescSwap(rx_desc);
+#endif /* MV_CPU_BE */
 
 		mv_eth_pool_refill(ppool, bm, rx_desc->bufPhysAddr, rx_desc->bufCookie);
 		mvOsCacheLineInv(NULL, rx_desc);
