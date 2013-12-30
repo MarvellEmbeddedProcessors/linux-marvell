@@ -331,6 +331,33 @@ static INLINE PP2_RX_DESC *mvPp2RxqDescGet(MV_PP2_PHYS_RXQ_CTRL *pRxq)
 	return pRxDesc;
 }
 
+#if defined(MV_CPU_BE)
+/* Swap RX descriptor to be BE */
+static INLINE void mvPPv2RxqDescSwap(PP2_RX_DESC *pRxDesc)
+{
+	pRxDesc->status = MV_BYTE_SWAP_32BIT(pRxDesc->status);
+	pRxDesc->parserInfo = MV_BYTE_SWAP_16BIT(pRxDesc->parserInfo);
+	pRxDesc->dataSize =  MV_BYTE_SWAP_16BIT(pRxDesc->dataSize);
+	pRxDesc->bufPhysAddr = MV_BYTE_SWAP_32BIT(pRxDesc->bufPhysAddr);
+	pRxDesc->bufCookie = MV_BYTE_SWAP_32BIT(pRxDesc->bufCookie);
+	pRxDesc->gemPortIdPktColor = MV_BYTE_SWAP_16BIT(pRxDesc->gemPortIdPktColor);
+	pRxDesc->csumL4 = MV_BYTE_SWAP_16BIT(pRxDesc->csumL4);
+	pRxDesc->classifyInfo = MV_BYTE_SWAP_16BIT(pRxDesc->classifyInfo);
+	pRxDesc->flowId = MV_BYTE_SWAP_32BIT(pRxDesc->flowId);
+}
+
+/* Swap TX descriptor to be BE */
+static INLINE void mvPPv2TxqDescSwap(PP2_TX_DESC *pTxDesc)
+{
+	pTxDesc->command = MV_BYTE_SWAP_32BIT(pTxDesc->command);
+	pTxDesc->dataSize = MV_BYTE_SWAP_16BIT(pTxDesc->dataSize);
+	pTxDesc->bufPhysAddr = MV_BYTE_SWAP_32BIT(pTxDesc->bufPhysAddr);
+	pTxDesc->bufCookie = MV_BYTE_SWAP_32BIT(pTxDesc->bufCookie);
+	pTxDesc->hwCmd[0] = MV_BYTE_SWAP_32BIT(pTxDesc->hwCmd[0]);
+	pTxDesc->hwCmd[1] = MV_BYTE_SWAP_32BIT(pTxDesc->hwCmd[1]);
+	pTxDesc->hwCmd[2] = MV_BYTE_SWAP_32BIT(pTxDesc->hwCmd[2]);
+}
+#endif
 /*-------------------------------------------------------------------------------*/
 /* Get number of RX descriptors occupied by received packets */
 static INLINE int mvPp2RxqBusyDescNumGet(int port, int rxq)

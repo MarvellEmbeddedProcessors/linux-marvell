@@ -715,7 +715,7 @@ static inline int mv_eth_aggr_desc_num_check(struct aggr_tx_queue *aggr_txq_ctrl
 static inline void mv_eth_tx_desc_flush(struct pp2_tx_desc *tx_desc)
 {
 #if defined(MV_CPU_BE)
-	/*mvNetaTxqDescSwap(tx_desc);*/
+	mvPPv2TxqDescSwap(tx_desc);
 #endif /* MV_CPU_BE */
 
 	mvOsCacheLineFlush(NULL, tx_desc);
