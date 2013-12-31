@@ -2934,19 +2934,6 @@ sub process {
 			}
 		}
 
-#CamelCase
-		while ($line =~ m{($Constant|$Lval)}g) {
-			my $var = $1;
-			if ($var !~ /$Constant/ &&
-			    $var =~ /[A-Z]\w*[a-z]|[a-z]\w*[A-Z]/ &&
-			    $var !~ /"^(?:Clear|Set|TestClear|TestSet|)Page[A-Z]/ &&
-			    !defined $camelcase{$var}) {
-				$camelcase{$var} = 1;
-				WARN("CAMELCASE",
-				     "Avoid CamelCase: <$var>\n" . $herecurr);
-			}
-		}
-
 #no spaces allowed after \ in define
 		if ($line=~/\#\s*define.*\\\s$/) {
 			WARN("WHITESPACE_AFTER_LINE_CONTINUATION",
