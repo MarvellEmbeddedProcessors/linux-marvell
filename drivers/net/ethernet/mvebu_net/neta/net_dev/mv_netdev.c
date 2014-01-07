@@ -1455,10 +1455,12 @@ static inline void mv_eth_txq_cpu_clean(struct eth_port *pp, struct tx_queue *tx
 		i = MV_NETA_QUEUE_NEXT_DESC(&txq_ctrl->q->queueCtrl, i);
 		count++;
 	}
-	printk(KERN_INFO "\n%s: port=%d, txp=%d, txq=%d, mode=CPU\n",
+	if (count > 0) {
+		pr_info("\n%s: port=%d, txp=%d, txq=%d, mode=CPU\n",
 			__func__, pp->port, txq_ctrl->txp, txq_ctrl->txq);
-	printk(KERN_INFO "Free %d buffers: from desc=%d to desc=%d, tx_count=%d\n",
+		pr_info("Free %d buffers: from desc=%d to desc=%d, tx_count=%d\n",
 			count, hw_txq_i, last_txq_i, txq_ctrl->txq_count);
+	}
 }
 
 #ifdef CONFIG_MV_ETH_HWF
@@ -1488,10 +1490,12 @@ static inline void mv_eth_txq_hwf_clean(struct eth_port *pp, struct tx_queue *tx
 		}
 		i = MV_NETA_QUEUE_NEXT_DESC(&txq_ctrl->q->queueCtrl, i);
 	}
-	printk(KERN_INFO "\n%s: port=%d, txp=%d, txq=%d, mode=HWF-%d\n",
+	if (count > 0) {
+		pr_info("\n%s: port=%d, txp=%d, txq=%d, mode=HWF-%d\n",
 			__func__, pp->port, txq_ctrl->txp, txq_ctrl->txq, rx_port);
-	printk(KERN_INFO "Free %d buffers to BM: from desc=%d to desc=%d\n",
+		pr_info("Free %d buffers to BM: from desc=%d to desc=%d\n",
 			count, hw_txq_i, last_txq_i);
+	}
 }
 #endif /* CONFIG_MV_ETH_HWF */
 
@@ -1520,9 +1524,6 @@ int mv_eth_txq_clean(int port, int txp, int txq)
 	else if (mode == MV_ETH_TXQ_HWF)
 		mv_eth_txq_hwf_clean(pp, txq_ctrl, rx_port);
 #endif /* CONFIG_MV_ETH_HWF */
-	else
-		printk(KERN_ERR "%s: port=%d, txp=%d, txq=%d is not in use\n",
-			__func__, pp->port, txp, txq);
 
 	return 0;
 }

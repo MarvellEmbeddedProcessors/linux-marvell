@@ -507,8 +507,10 @@ void mv_eth_stack_print(int port, MV_BOOL isPrintElements);
 extern struct bm_pool mv_eth_pool[MV_ETH_BM_POOLS];
 extern struct eth_port **mv_eth_ports;
 
-static inline void mv_eth_interrupts_unmask(struct eth_port *pp)
+static inline void mv_eth_interrupts_unmask(void *arg)
 {
+	struct eth_port *pp = arg;
+
 	/* unmask interrupts */
 	if (!test_bit(MV_ETH_F_FORCE_LINK_BIT, &(pp->flags)))
 		MV_REG_WRITE(NETA_INTR_MISC_MASK_REG(pp->port), NETA_CAUSE_LINK_CHANGE_MASK);
@@ -519,8 +521,10 @@ static inline void mv_eth_interrupts_unmask(struct eth_port *pp)
 		MV_ETH_RX_INTR_MASK));
 }
 
-static inline void mv_eth_interrupts_mask(struct eth_port *pp)
+static inline void mv_eth_interrupts_mask(void *arg)
 {
+	struct eth_port *pp = arg;
+
 	/* clear all ethernet port interrupts */
 	MV_REG_WRITE(NETA_INTR_MISC_CAUSE_REG(pp->port), 0);
 	MV_REG_WRITE(NETA_INTR_OLD_CAUSE_REG(pp->port), 0);
