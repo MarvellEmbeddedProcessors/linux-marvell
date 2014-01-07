@@ -141,14 +141,33 @@ void mvPp2RegPrintNonZero2(MV_U32 reg_addr, char *reg_name, MV_U32 index);
 /*			PNC COMMON DEFINETIONS			      */
 /*--------------------------------------------------------------------*/
 
+/*
+ HW_BYTE_OFFS
+ return HW byte offset in 4 bytes register
+ _offs_: native offset (LE)
+ LE example: HW_BYTE_OFFS(1) = 1
+ BE example: HW_BYTE_OFFS(1) = 2
+*/
+
 #if defined(MV_CPU_LE)
 	#define HW_BYTE_OFFS(_offs_)		(_offs_)
 #else
 	#define HW_BYTE_OFFS(_offs_)		((3 - ((_offs_) % 4)) + (((_offs_) / 4) * 4))
 #endif
 
+
 #define TCAM_DATA_BYTE_OFFS_LE(_offs_)		(((_offs_) - ((_offs_) % 2)) * 2 + ((_offs_) % 2))
 #define TCAM_DATA_MASK_OFFS_LE(_offs_)		(((_offs_) * 2) - ((_offs_) % 2)  + 2)
+
+/*
+ TCAM_DATA_BYTE/MASK
+ tcam data devide into 4 bytes registers
+ each register include 2 bytes of data and 2 bytes of mask
+ the next macros calc data/mask offset in 4 bytes register
+ _offs_: native offset (LE) in data bytes array
+ relevant only for TCAM data bytes
+ used by PRS and CLS2
+*/
 #define TCAM_DATA_BYTE(_offs_)			(HW_BYTE_OFFS(TCAM_DATA_BYTE_OFFS_LE(_offs_)))
 #define TCAM_DATA_MASK(_offs_)			(HW_BYTE_OFFS(TCAM_DATA_MASK_OFFS_LE(_offs_)))
 
