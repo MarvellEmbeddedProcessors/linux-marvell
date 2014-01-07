@@ -183,7 +183,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*			endians support				*/
 /****************************************************************/
 
-/* TODO: share endians support defenitions between parser and cls2  */
+/*
+  TCAM_MASK_OFFS
+  return tcam fileds (AI/LKP_ID/PRT_ID) mask offset
+  not relevant for TCAM_DATA bytes
+  _offs_: native offset if LE
+	  swapped offset if BE
+*/
 
 #if defined(MV_CPU_LE)
 	#define TCAM_MASK_OFFS(_offs_)		((_offs_) + 2)
