@@ -37,6 +37,8 @@ static void __init armada_370_xp_map_io(void)
 
 static void __init armada_370_xp_timer_and_clk_init(void)
 {
+	pr_notice("\n  LSP version: %s\n\n", LSP_VERSION);
+
 	mvebu_clocks_init();
 	clocksource_of_init();
 	coherency_init();
