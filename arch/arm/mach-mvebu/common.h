@@ -15,6 +15,8 @@
 #ifndef __ARCH_MVEBU_COMMON_H
 #define __ARCH_MVEBU_COMMON_H
 
+#define LSP_VERSION    "linux-3.10.21-2014_T1.0.initial"
+
 void mvebu_restart(char mode, const char *cmd);
 
 void armada_xp_cpu_die(unsigned int cpu);

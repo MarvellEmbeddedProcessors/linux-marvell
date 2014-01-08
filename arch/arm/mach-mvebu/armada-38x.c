@@ -62,6 +62,8 @@ armada_380_ioremap_caller(unsigned long phys_addr, size_t size,
 
 static void __init armada_380_timer_and_clk_init(void)
 {
+	pr_notice("\n  LSP version: %s\n\n", LSP_VERSION);
+
 	mvebu_clocks_init();
 	clocksource_of_init();
 	armada_380_scu_enable();
