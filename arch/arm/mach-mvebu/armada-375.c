@@ -84,6 +84,8 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
 
 static void __init armada_375_timer_and_clk_init(void)
 {
+	pr_notice("\n  LSP version: %s\n\n", LSP_VERSION);
+
 	mvebu_clocks_init();
 	clocksource_of_init();
 	armada_375_scu_enable();
