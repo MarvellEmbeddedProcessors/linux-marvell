@@ -53,16 +53,30 @@ disclaimer.
 #include "mv_eth_tool.h"
 #include "mv_eth_sysfs.h"
 
+#ifdef CONFIG_OF
+#include <linux/of.h>
+#include <linux/of_irq.h>
+#include <linux/of_mdio.h>
+#include <linux/of_net.h>
+#include <linux/of_address.h>
+#include <linux/clk.h>
+#include <linux/phy.h>
+#endif /* CONFIG_OF */
+
 #ifdef CONFIG_ARCH_MVEBU
 #include "mvNetConfig.h"
 #else
 #include "mvSysEthConfig.h"
 #include "ctrlEnv/mvCtrlEnvLib.h"
-#endif
+#endif /* CONFIG_ARCH_MVEBU */
 
 #if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
 #include <mv_neta_netmap.h>
 #endif
+
+#ifdef CONFIG_OF
+int port_vbase[MV_ETH_MAX_PORTS];
+#endif /* CONFIG_OF */
 
 static struct mv_mux_eth_ops mux_eth_ops;
 
@@ -118,6 +132,7 @@ int mv_eth_ctrl_recycle(int en)
 
 extern u8 mvMacAddr[CONFIG_MV_ETH_PORTS_NUM][MV_MAC_ADDR_SIZE];
 extern u16 mvMtu[CONFIG_MV_ETH_PORTS_NUM];
+static const u8 *mac_src[CONFIG_MV_ETH_PORTS_NUM];
 
 extern unsigned int switch_enabled_ports;
 
@@ -3194,6 +3209,21 @@ static int mv_eth_port_link_speed_fc(int port, MV_ETH_PORT_SPEED port_speed, int
 	return 0;
 }
 
+/* Get mac address */
+static void mv_eth_get_mac_addr(int port, unsigned char *addr)
+{
+	u32 mac_addr_l, mac_addr_h;
+
+	mac_addr_l = MV_REG_READ(ETH_MAC_ADDR_LOW_REG(port));
+	mac_addr_h = MV_REG_READ(ETH_MAC_ADDR_HIGH_REG(port));
+	addr[0] = (mac_addr_h >> 24) & 0xFF;
+	addr[1] = (mac_addr_h >> 16) & 0xFF;
+	addr[2] = (mac_addr_h >> 8) & 0xFF;
+	addr[3] = mac_addr_h & 0xFF;
+	addr[4] = (mac_addr_l >> 8) & 0xFF;
+	addr[5] = mac_addr_l & 0xFF;
+}
+
 /* Note: call this function only after mv_eth_ports_num is initialized */
 static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 {
@@ -3209,8 +3239,10 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 	printk(KERN_ERR "  o Loading network interface(s) for port #%d: cpu_mask=0x%x, mtu=%d\n",
 			port, plat_data->cpu_mask, plat_data->mtu);
 
+	mac_src[port] = "platform";
 	mtu = mv_eth_config_get(pdev, mac);
 	dev = mv_eth_netdev_init(mtu, mac, pdev);
+
 	if (!dev) {
 		printk(KERN_ERR "%s: can't create netdevice\n", __func__);
 		mv_eth_priv_cleanup(pp);
@@ -3263,8 +3295,8 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 		mvNetaPmtInit(port, (MV_NETA_PMT *)ioremap(PMT_GIGA_PHYS_BASE + port * 0x40000, PMT_MEM_SIZE));
 #endif /* CONFIG_MV_ETH_PMT */
 
-	printk(KERN_ERR "\t%s p=%d: mtu=%d, mac=" MV_MACQUAD_FMT "\n",
-		MV_PON_PORT(port) ? "pon" : "giga", port, mtu, MV_MACQUAD(mac));
+	pr_info("\t%s p=%d: mtu=%d, mac=" MV_MACQUAD_FMT " (%s)\n",
+		MV_PON_PORT(port) ? "pon" : "giga", port, mtu, MV_MACQUAD(mac), mac_src[port]);
 
 	handle_group_affinity(port);
 
@@ -3598,9 +3630,7 @@ void	mv_eth_win_init(int port)
 	u32 enable = 0, protection = 0;
 
 	/* First disable all address decode windows */
-	for (i = 0; i < ETH_MAX_DECODE_WIN; i++)
-		enable |= (1 << i);
-
+	enable = (1 << ETH_MAX_DECODE_WIN) - 1;
 	MV_REG_WRITE(ETH_BASE_ADDR_ENABLE_REG(port), enable);
 
 	/* Clear Base/Size/Remap registers for all windows */
@@ -3927,27 +3957,144 @@ oom:
 	return -ENOMEM;
 }
 
+#ifdef CONFIG_OF
+static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
+{
+	struct mv_neta_pdata *plat_data;
+	struct device_node *np = pdev->dev.of_node;
+	struct device_node *phy_node;
+	void __iomem *base_addr;
+	struct resource *res;
+	struct clk *clk;
+	phy_interface_t phy_mode;
+	const char *mac_addr = NULL;
+
+	/* Get port number */
+	if (of_property_read_u32(np, "eth,port-num", &pdev->id)) {
+		pr_err("could not get port number\n");
+		return NULL;
+	}
+
+	plat_data = kmalloc(sizeof(struct mv_neta_pdata), GFP_KERNEL);
+	if (plat_data == NULL) {
+		pr_err("could not allocate memory for plat_data\n");
+		return NULL;
+	}
+	memset(plat_data, 0, sizeof(struct mv_neta_pdata));
+
+	/* Get the register base */
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (res == NULL) {
+		pr_err("could not get resource information\n");
+		return NULL;
+	}
+
+	/* build virtual port base address */
+	base_addr = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+	if (!base_addr) {
+		pr_err("could not map neta registers\n");
+		return NULL;
+	}
+	port_vbase[pdev->id] = (int)base_addr;
+
+	/* get IRQ number */
+	if (pdev->dev.of_node) {
+		plat_data->irq = irq_of_parse_and_map(np, 0);
+		if (plat_data->irq == 0) {
+			pr_err("could not get IRQ number\n");
+			return NULL;
+		}
+	} else {
+		res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+		if (res == NULL) {
+			pr_err("could not get IRQ number\n");
+			return NULL;
+		}
+		plat_data->irq = res->start;
+	}
+	/* get MAC address */
+	mac_addr = of_get_mac_address(np);
+	if (mac_addr != NULL)
+		memcpy(plat_data->mac_addr, mac_addr, MV_MAC_ADDR_SIZE);
+
+	/* get phy smi address */
+	phy_node = of_parse_phandle(np, "phy", 0);
+	if (!phy_node) {
+		pr_err("no associated PHY\n");
+		return NULL;
+	}
+	if (of_property_read_u32(phy_node, "reg", &plat_data->phy_addr)) {
+		pr_err("could not PHY SMI address\n");
+		return NULL;
+	}
+
+	/* Get port MTU */
+	if (of_property_read_u32(np, "eth,port-mtu", &plat_data->mtu)) {
+		pr_err("could not get MTU\n");
+		return NULL;
+	}
+
+	/* Get port PHY mode */
+	phy_mode = of_get_phy_mode(np);
+	if (phy_mode < 0) {
+		pr_err("unknown PHY mode\n");
+		return NULL;
+	}
+	switch (phy_mode) {
+	case PHY_INTERFACE_MODE_SGMII:
+		plat_data->is_sgmii = 1;
+		plat_data->is_rgmii = 0;
+	break;
+	case PHY_INTERFACE_MODE_RGMII:
+		plat_data->is_sgmii = 0;
+		plat_data->is_rgmii = 1;
+	break;
+	default:
+		pr_err("unsupported PHY mode (%d)\n", phy_mode);
+		return NULL;
+	}
+
+	/* Global Parameters */
+	plat_data->tclk = 166666667;    /*mvBoardTclkGet();*/
+	plat_data->max_port = MV_ETH_MAX_PORTS;
+
+	/* Per port parameters */
+	plat_data->cpu_mask  = 0x3;
+	plat_data->duplex = DUPLEX_FULL;
+	plat_data->speed = MV_ETH_SPEED_AN;
+
+	pdev->dev.platform_data = plat_data;
+
+	clk = devm_clk_get(&pdev->dev, 0);
+	clk_prepare_enable(clk);
+
+	return plat_data;
+}
+#endif /* CONFIG_OF */
+
 /***********************************************************
  * mv_eth_probe --                                         *
  *   main driver initialization. loading the interfaces.   *
  ***********************************************************/
 static int mv_eth_probe(struct platform_device *pdev)
 {
-	int port = pdev->id;
-	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
+	int port;
 
+#ifdef CONFIG_OF
+	struct mv_neta_pdata *plat_data = mv_plat_data_get(pdev);
+	pdev->dev.platform_data = plat_data;
+#else
+	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
+#endif /* CONFIG_OF */
+
+	if (plat_data == NULL)
+		return -ENODEV;
+
+	port = pdev->id;
 	if (!mv_eth_initialized) {
 		if (mv_eth_shared_probe(plat_data))
 			return -ENODEV;
 	}
-/*
-	if(port == 0)
-		mvNetaPortPowerUp(port, 0, 1);
-	else if (port == 1);
-		mvNetaPortPowerUp(port, 0, 1);
-
-	printk(KERN_ERR " port = %d is_sgmii = %d, is_rgmii=%d\n", port ,plat_data->is_sgmii, plat_data->is_rgmii);
-*/
 
 	mvNetaPortPowerUp(port, plat_data->is_sgmii, plat_data->is_rgmii);
 
@@ -3965,7 +4112,7 @@ static int mv_eth_config_get(struct platform_device *pdev, MV_U8 *mac_addr)
 {
 	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
 
-	if (mac_addr)
+	if ((mac_addr) && (is_valid_ether_addr(plat_data->mac_addr)))
 		memcpy(mac_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
 
 	return plat_data->mtu;
@@ -3998,6 +4145,9 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
 	struct eth_port *pp;
 	struct cpu_ctrl	*cpuCtrl;
 	int port = pdev->id;
+#ifdef CONFIG_OF
+	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
+#endif
 
 	dev = alloc_etherdev_mq(sizeof(struct eth_port), CONFIG_MV_ETH_TXQ);
 	if (!dev)
@@ -4009,10 +4159,30 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
 
 	memset(pp, 0, sizeof(struct eth_port));
 	pp->dev = dev;
-	dev->irq = NET_TH_RXTX_IRQ_NUM(port);
 
 	dev->mtu = mtu;
+#ifdef CONFIG_OF
+	dev->irq = plat_data->irq;
+
+	if (!is_valid_ether_addr(plat_data->mac_addr)) {
+		mv_eth_get_mac_addr(port, mac);
+		if (is_valid_ether_addr(mac)) {
+			memcpy(plat_data->mac_addr, mac, MV_MAC_ADDR_SIZE);
+			memcpy(dev->dev_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
+			mac_src[port] = "hw config";
+		} else {
+			eth_hw_addr_random(dev);
+			mac_src[port] = "random";
+		}
+	} else {
+		memcpy(dev->dev_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
+		mac_src[port] = "platform";
+	}
+#else
+	dev->irq = NET_TH_RXTX_IRQ_NUM(port);
 	memcpy(dev->dev_addr, mac, MV_MAC_ADDR_SIZE);
+#endif /* CONFIG_OF */
+
 	dev->tx_queue_len = CONFIG_MV_ETH_TXQ_DESC;
 	dev->watchdog_timeo = 5 * HZ;
 	dev->netdev_ops = &mv_eth_netdev_ops;
@@ -6375,6 +6545,10 @@ static int mv_eth_remove(struct platform_device *pdev)
 
 	mv_eth_priv_cleanup(pp);
 
+#ifdef CONFIG_OF
+	mv_eth_shared_remove();
+#endif /* CONFIG_OF */
+
 #ifdef CONFIG_NETMAP
 	netmap_detach(pp->dev);
 #endif /* CONFIG_NETMAP */
@@ -6387,6 +6561,14 @@ static void mv_eth_shutdown(struct platform_device *pdev)
 	printk(KERN_INFO "Shutting Down Marvell Ethernet Driver\n");
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id mvneta_match[] = {
+	{ .compatible = "marvell,armada-370-neta" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, mvneta_match);
+#endif /* CONFIG_OF */
+
 static struct platform_driver mv_eth_driver = {
 	.probe = mv_eth_probe,
 	.remove = mv_eth_remove,
@@ -6397,9 +6579,15 @@ static struct platform_driver mv_eth_driver = {
 #endif /* CONFIG_CPU_IDLE */
 	.driver = {
 		.name = MV_NETA_PORT_NAME,
+#ifdef CONFIG_OF
+		.of_match_table = mvneta_match,
+#endif /* CONFIG_OF */
 	},
 };
 
+#ifdef CONFIG_OF
+module_platform_driver(mv_eth_driver);
+#else
 static int __init mv_eth_init_module(void)
 {
 	int err = platform_driver_register(&mv_eth_driver);
@@ -6414,6 +6602,7 @@ static void __exit mv_eth_exit_module(void)
 	mv_eth_shared_remove();
 }
 module_exit(mv_eth_exit_module);
+#endif /* CONFIG_OF */
 
 
 MODULE_DESCRIPTION("Marvell Ethernet Driver - www.marvell.com");
