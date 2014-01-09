@@ -79,7 +79,13 @@ extern "C" {
 /****************************************/
 /*        Ethernet Unit Registers       */
 /****************************************/
+#ifdef CONFIG_OF
+extern int port_vbase[MV_ETH_MAX_PORTS];
+
+#define ETH_REG_BASE(port)                  port_vbase[port]
+#else /* CONFIG_OF */
 #define ETH_REG_BASE(port)                  MV_ETH_REGS_BASE(port)
+#endif /* CONFIG_OF */
 
 #define ETH_PHY_ADDR_REG(port)              (ETH_REG_BASE(port) + 0x2000)
 #define ETH_SMI_REG(port)                   (ETH_REG_BASE(port) + 0x2004)
