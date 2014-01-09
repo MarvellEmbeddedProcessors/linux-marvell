@@ -76,8 +76,14 @@ extern "C" {
 #include "mvSysEthConfig.h"
 #endif
 
+#ifdef CONFIG_OF
+extern int port_vbase[MV_ETH_MAX_PORTS];
+#define NETA_REG_BASE(port)					port_vbase[port]
+/******* SERDES registers **************************************************/
+#define SGMII_SERDES_CFG_REG(p)				(NETA_REG_BASE(p) + 0x24A0)
+#else
 #define NETA_REG_BASE(port) 				MV_ETH_REGS_BASE(port)
-
+#endif /* CONFIG_OF */
 
 /************************** NETA TX Registers ******************************/
 
@@ -92,7 +98,7 @@ extern "C" {
 /************************** NETA RX Registers ******************************/
 
 /* PxRXyC: Port RX queues Configuration Register */
-#define NETA_RXQ_CONFIG_REG(p, q)        	(NETA_REG_BASE(p) + 0x1400 + ((q) << 2))
+#define NETA_RXQ_CONFIG_REG(p, q)           (NETA_REG_BASE(p) + 0x1400 + ((q) << 2))
 
 #define NETA_RXQ_HW_BUF_ALLOC_BIT           0
 #define NETA_RXQ_HW_BUF_ALLOC_MASK          (1 << NETA_RXQ_HW_BUF_ALLOC_BIT)
