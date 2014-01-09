@@ -99,6 +99,9 @@ struct mv_neta_pdata {
 	int	     is_sgmii;
 	int	     is_rgmii;
 
+	/* port interrupt line number */
+	int		 irq;
+
 	/*
 	* How many RX/TX queues to use.
 	*/
