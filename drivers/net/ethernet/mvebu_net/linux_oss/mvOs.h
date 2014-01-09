@@ -579,69 +579,66 @@ extern int reg_arry_index;
 	MV_PP2_CPU0_REG_WRITE(offset, val)
 #endif
 
-#define MV_REG_READ(offset)             \
-	(MV_MEMIO_LE32_READ(INTER_REGS_VIRT_BASE | (offset)))
+#define MV_REG_READ(offset)			MV_MEMIO_LE32_READ(offset)
 
 #if defined(REG_DEBUG)
 #define MV_REG_WRITE(offset, val)    \
-	MV_MEMIO_LE32_WRITE((INTER_REGS_VIRT_BASE | (offset)), (val)); \
+	MV_MEMIO_LE32_WRITE(((offset)), (val)); \
 	{ \
-		reg_arry[reg_arry_index][0] = (INTER_REGS_VIRT_BASE | (offset));\
+		reg_arry[reg_arry_index][0] = (offset);\
 		reg_arry[reg_arry_index][1] = (val);\
 		reg_arry_index++;\
 	}
 #else
-#define MV_REG_WRITE(offset, val)    \
-	MV_MEMIO_LE32_WRITE((INTER_REGS_VIRT_BASE | (offset)), (val))
+#define MV_REG_WRITE(offset, val)	MV_MEMIO_LE32_WRITE((offset), (val))
 #endif
 
-#define MV_REG_BYTE_READ(offset)        \
-	(MV_MEMIO8_READ((INTER_REGS_VIRT_BASE | (offset))))
+#define MV_REG_BYTE_READ(offset)	MV_MEMIO8_READ((offset))
 
 #if defined(REG_DEBUG)
 #define MV_REG_BYTE_WRITE(offset, val)  \
-	MV_MEMIO8_WRITE((INTER_REGS_VIRT_BASE | (offset)), (val)); \
+	MV_MEMIO8_WRITE((offset), (val)); \
 	{ \
-		reg_arry[reg_arry_index][0] = (INTER_REGS_VIRT_BASE | (offset));\
+		reg_arry[reg_arry_index][0] = (offset);\
 		reg_arry[reg_arry_index][1] = (val);\
 		reg_arry_index++;\
 	}
 #else
 #define MV_REG_BYTE_WRITE(offset, val)  \
-	MV_MEMIO8_WRITE((INTER_REGS_VIRT_BASE | (offset)), (val))
+	MV_MEMIO8_WRITE((offset), (val))
 #endif
 
 #if defined(REG_DEBUG)
 #define MV_REG_BIT_SET(offset, bitMask)                 \
-	(MV_MEMIO32_WRITE((INTER_REGS_VIRT_BASE | (offset)), \
-	(MV_MEMIO32_READ(INTER_REGS_VIRT_BASE | (offset)) | \
+	(MV_MEMIO32_WRITE((offset), \
+	(MV_MEMIO32_READ(offset) | \
 	MV_32BIT_LE_FAST(bitMask)))); \
 	{ \
-		reg_arry[reg_arry_index][0] = (INTER_REGS_VIRT_BASE | (offset));\
-		reg_arry[reg_arry_index][1] = (MV_MEMIO32_READ(INTER_REGS_VIRT_BASE | (offset)));\
+		reg_arry[reg_arry_index][0] = (offset);\
+		reg_arry[reg_arry_index][1] = (MV_MEMIO32_READ(offset));\
 		reg_arry_index++;\
 	}
 #else
 #define MV_REG_BIT_SET(offset, bitMask)                 \
-	(MV_MEMIO32_WRITE((INTER_REGS_VIRT_BASE | (offset)), \
-	(MV_MEMIO32_READ(INTER_REGS_VIRT_BASE | (offset)) | \
+	(MV_MEMIO32_WRITE((offset), \
+	(MV_MEMIO32_READ(offset) | \
 	MV_32BIT_LE_FAST(bitMask))))
 #endif
 
 #if defined(REG_DEBUG)
 #define MV_REG_BIT_RESET(offset, bitMask)                \
-	(MV_MEMIO32_WRITE((INTER_REGS_VIRT_BASE | (offset)), \
-	(MV_MEMIO32_READ(INTER_REGS_VIRT_BASE | (offset)) & \
+	(MV_MEMIO32_WRITE((offset), \
+	(MV_MEMIO32_READ(offset) & \
 	MV_32BIT_LE_FAST(~bitMask)))); \
 	{ \
-		reg_arry[reg_arry_index][0] = (INTER_REGS_VIRT_BASE | (offset));\
-		reg_arry[reg_arry_index][1] = (MV_MEMIO32_READ(INTER_REGS_VIRT_BASE | (offset)));\
+		reg_arry[reg_arry_index][0] = (offset);\
+		reg_arry[reg_arry_index][1] = (MV_MEMIO32_READ(offset));\
 		reg_arry_index++;\
 	}
 #else
 #define MV_REG_BIT_RESET(offset, bitMask)                \
-	(MV_MEMIO32_WRITE((INTER_REGS_VIRT_BASE | (offset)), \
-	(MV_MEMIO32_READ(INTER_REGS_VIRT_BASE | (offset)) & \
+	(MV_MEMIO32_WRITE((offset), \
+	(MV_MEMIO32_READ(offset) & \
 	MV_32BIT_LE_FAST(~bitMask))))
 #endif
 
