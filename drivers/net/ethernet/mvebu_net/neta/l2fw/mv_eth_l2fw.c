@@ -28,20 +28,25 @@ disclaimer.
 
 #include <linux/ctype.h>
 #include <linux/module.h>
-#include  <linux/interrupt.h>
+#include <linux/interrupt.h>
 
+#ifdef CONFIG_MV_INCLUDE_XOR
 #include "xor/mvXor.h"
 #include "xor/mvXorRegs.h"
 #include "mv_hal_if/mvSysXorApi.h"
+#endif /* CONFIG_MV_INCLUDE_XOR */
 
 #include "mvOs.h"
 #include "mv_eth_l2fw.h"
-#include "mv_neta/net_dev/mv_netdev.h"
 #include "gbe/mvNeta.h"
 #include "gbe/mvNetaRegs.h"
 #include "mvDebug.h"
-#include "mv_eth_l2sec.h"
+#ifdef CONFIG_ARCH_MVEBU
+#include "mvNetConfig.h"
+#else /* CONFIG_ARCH_MVEBU */
 #include "ctrlEnv/mvCtrlEnvLib.h"
+#endif /* CONFIG_ARCH_MVEBU */
+
 #include "gbe/mvNeta.h"
 
 #ifdef CONFIG_MV_ETH_L2SEC
@@ -58,8 +63,10 @@ static L2FW_RULE **l2fw_hash = NULL;
 
 static MV_U32 l2fw_jhash_iv;
 
+#ifdef CONFIG_MV_INCLUDE_XOR
 static MV_XOR_DESC *eth_xor_desc;
 static MV_LONG      eth_xor_desc_phys_addr;
+#endif /* CONFIG_MV_INCLUDE_XOR */
 
 struct eth_port_l2fw **mv_eth_ports_l2fw;
 static inline int       mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq);
@@ -450,6 +457,7 @@ struct eth_pbuf *eth_l2fw_copy_packet_withoutXor(struct eth_pbuf *pRxPktInfo)
 	return pTxPktInfo;
 }
 
+#ifdef CONFIG_MV_INCLUDE_XOR
 static inline
 struct eth_pbuf *eth_l2fw_copy_packet_withXor(struct eth_pbuf *pRxPktInfo)
 {
@@ -491,7 +499,6 @@ struct eth_pbuf *eth_l2fw_copy_packet_withXor(struct eth_pbuf *pRxPktInfo)
 	return pTxPktInfo;
 }
 
-#ifdef CONFIG_MV_INCLUDE_XOR
 void setXorDesc(void)
 {
 	unsigned int mode;
@@ -509,7 +516,6 @@ void setXorDesc(void)
 	dump_xor();
 	/* TODO mask xor intterupts*/
 }
-#endif
 
 static inline int xorReady(void)
 {
@@ -528,6 +534,7 @@ static inline int xorReady(void)
 
 	return 1;
 }
+#endif /* CONFIG_MV_INCLUDE_XOR */
 
 
 void l2fw(int cmd, int rx_port, int tx_port)
@@ -557,6 +564,7 @@ void l2fw(int cmd, int rx_port, int tx_port)
 	mv_eth_set_l2fw(ppl2fw, cmd, rx_port, tx_port);
 }
 
+#ifdef CONFIG_MV_INCLUDE_XOR
 void l2fw_xor(int rx_port, int threshold)
 {
 	int max_port = CONFIG_MV_ETH_PORTS_NUM - 1;
@@ -569,6 +577,7 @@ void l2fw_xor(int rx_port, int threshold)
 	mvOsPrintf("setting port %d threshold to %d in %s\n", rx_port, threshold, __func__);
 	mv_eth_ports_l2fw[rx_port]->xorThreshold = threshold;
 }
+#endif /* CONFIG_MV_INCLUDE_XOR */
 
 void l2fw_lookupEn(int rx_port, int enable)
 {
@@ -622,8 +631,10 @@ static inline MV_STATUS mv_eth_l2fw_tx(struct eth_pbuf *pkt, struct eth_port *pp
 		/*read_unlock(&pp->rwlock);*/
 		/* No resources: Drop */
 		pp->dev->stats.tx_dropped++;
+#ifdef CONFIG_MV_INCLUDE_XOR
 		if (withXor)
 			xorReady();
+#endif /* CONFIG_MV_INCLUDE_XOR */
 		return MV_DROPPED;
 	}
 	txq_ctrl->txq_count++;
@@ -647,6 +658,7 @@ static inline MV_STATUS mv_eth_l2fw_tx(struct eth_pbuf *pkt, struct eth_port *pp
 
 	mv_eth_tx_desc_flush(tx_desc);
 
+#ifdef CONFIG_MV_INCLUDE_XOR
 	if (withXor) {
 		if (!xorReady()) {
 			mvOsPrintf("MV_DROPPED in %s\n", __func__);
@@ -657,6 +669,7 @@ static inline MV_STATUS mv_eth_l2fw_tx(struct eth_pbuf *pkt, struct eth_port *pp
 			return MV_DROPPED;
 		}
 	}
+#endif /* CONFIG_MV_INCLUDE_XOR */
 	mv_neta_wmb();
 	mvNetaTxqPendDescAdd(pp->port, pp->txp, txq, 1);
 
@@ -781,13 +794,16 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 			break;
 
 		case CMD_L2FW_COPY_SWAP:
+#ifdef CONFIG_MV_INCLUDE_XOR
 			if (pkt->bytes >= ppl2fw->xorThreshold) {
 				newpkt = eth_l2fw_copy_packet_withXor(pkt);
 				if (newpkt)
 					status = mv_eth_l2fw_tx(newpkt, new_pp, 1, rx_desc);
 				else
 					status = MV_ERROR;
-			} else {
+			} else
+#endif /* CONFIG_MV_INCLUDE_XOR */
+			{
 					newpkt = eth_l2fw_copy_packet_withoutXor(pkt);
 					if (newpkt)
 						status = mv_eth_l2fw_tx(newpkt, new_pp, 0, rx_desc);
@@ -850,7 +866,7 @@ int mv_l2fw_init(void)
 	int size, port;
 	MV_U32 bytes;
 	MV_U32 regVal;
-	mv_eth_ports_l2fw_num = mvCtrlEthMaxPortGet();
+	mv_eth_ports_l2fw_num = MV_ETH_MAX_PORTS; /* mvCtrlEthMaxPortGet();*/
 	mvOsPrintf("in %s: mv_eth_ports_l2fw_num=%d\n", __func__, mv_eth_ports_l2fw_num);
 
 	size = mv_eth_ports_l2fw_num * sizeof(struct eth_port_l2fw *);

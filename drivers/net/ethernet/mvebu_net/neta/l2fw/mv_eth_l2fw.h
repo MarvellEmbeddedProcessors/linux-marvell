@@ -30,7 +30,7 @@ disclaimer.
 #define L2FW_MV_ETH_L2FW_H
 
 #include "mvOs.h"
-#include "mv_neta/net_dev/mv_netdev.h"
+#include "net_dev/mv_netdev.h"
 
 #define	L2FW_HASH_SIZE   (1 << 17)
 #define	L2FW_HASH_MASK   (L2FW_HASH_SIZE - 1)
