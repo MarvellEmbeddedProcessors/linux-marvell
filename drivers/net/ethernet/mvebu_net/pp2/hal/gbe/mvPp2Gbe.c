@@ -676,7 +676,8 @@ MV_PP2_PHYS_TXQ_CTRL *mvPp2TxqInit(int port, int txp, int txq, int descNum, int 
 	if (MV_PON_PORT(port))
 		desc = ptxq * descPerTxq;
 	else
-		desc = (mvPp2HalData.maxTcont * MV_ETH_MAX_TXQ * descPerTxq) + (port * MV_ETH_MAX_TXQ * descPerTxq);
+		desc = (mvPp2HalData.maxTcont * MV_ETH_MAX_TXQ * descPerTxq) +
+			(port * MV_ETH_MAX_TXQ * descPerTxq) + (txq * descPerTxq);
 
 	mvPp2WrReg(MV_PP2_TXQ_PREF_BUF_REG, MV_PP2_PREF_BUF_PTR(desc) | MV_PP2_PREF_BUF_SIZE_16 |
 				MV_PP2_PREF_BUF_THRESH(descPerTxq/2));
