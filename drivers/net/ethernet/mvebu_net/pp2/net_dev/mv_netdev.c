@@ -1585,6 +1585,10 @@ inline u32 mv_eth_txq_done(struct eth_port *pp, struct tx_queue *txq_ctrl)
 	printk(KERN_ERR "tx_done: txq_count=%d, port=%d, txp=%d, txq=%d, tx_done=%d\n",
 			txq_ctrl->txq_count, pp->port, txq_ctrl->txp, txq_ctrl->txq, tx_done);
 */
+	/* packet sent by outer tx function */
+	if (txq_cpu_ptr->txq_count < tx_done)
+		return tx_done;
+
 	mv_eth_txq_bufs_free(pp, txq_cpu_ptr, tx_done);
 
 	txq_cpu_ptr->txq_count -= tx_done;
@@ -4228,6 +4232,7 @@ int mv_eth_txq_clean(int port, int txp, int txq)
 		mvPp2TxqDrainSet(port, txp, txq, MV_FALSE);
 
 		/* release all transmitted packets */
+
 		tx_done = mv_eth_txq_done(pp, txq_ctrl);
 		if (tx_done > 0)
 			mvOsPrintf(KERN_INFO "%s: port=%d, txp=%d txq=%d: Free %d transmitted descriptors\n",
@@ -4268,8 +4273,6 @@ int mv_eth_txp_clean(int port, int txp)
 		mv_eth_txq_clean(port, txp, txq);
 
 	mvPp2TxPortFifoFlush(port, MV_FALSE);
-
-	mvPp2TxpReset(port, txp);
 
 	return 0;
 }
