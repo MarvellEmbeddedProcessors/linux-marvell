@@ -2481,6 +2481,7 @@ static void mv_eth_rxq_drop_pkts(struct eth_port *pp, int rxq)
 	mvPPv2RxqDescSwap(rx_desc);
 #endif /* MV_CPU_BE */
 
+
 		mv_eth_pool_refill(ppool, bm, rx_desc->bufPhysAddr, rx_desc->bufCookie);
 		mvOsCacheLineInv(NULL, rx_desc);
 	}
@@ -2653,9 +2654,7 @@ static int mv_eth_pool_free(int pool, int num)
 		if (va == 0)
 			break;
 
-		va = (MV_U32 *)MV_32BIT_LE((MV_U32)va);
-
-	/*	pr_info("%4d: phys_addr=0x%x, virt_addr=%p\n", i, pa, va);*/
+		/*pr_info("%4d: phys_addr=0x%x, virt_addr=%p\n", i, pa, va);*/
 
 		if (!MV_ETH_BM_POOL_IS_HWF(ppool->type)) {
 			mv_eth_skb_free((struct sk_buff *)va);
