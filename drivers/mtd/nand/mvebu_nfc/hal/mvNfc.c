@@ -2552,7 +2552,6 @@ static MV_STATUS mvNfcDeviceModeSet(MV_NFC_CTRL *nfcCtrl, MV_NFC_ONFI_MODE mode)
 }
 
 
-#ifdef MTD_NAND_NFC_INIT_RESET
 MV_STATUS mvNfcReset(void)
 {
 	MV_U32 reg;
@@ -2596,7 +2595,7 @@ MV_STATUS mvNfcReset(void)
 Error_3:
 	return errCode;
 }
-#endif
+
 /*******************************************************************************
 * mvNfcReadIdNative
 *
