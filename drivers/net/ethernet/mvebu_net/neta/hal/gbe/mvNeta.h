@@ -626,8 +626,6 @@ static INLINE void mvNetaRxDescFill(NETA_RX_DESC *pRxDesc, MV_U32 physAddr, MV_U
 #else
 	pRxDesc->bufPhysAddr = physAddr;
 #endif /* CONFIG_MV_ETH_BE_WA */
-
-	mvOsCacheLineFlush(NULL, pRxDesc);
 }
 
 /* Get pointer to next TX descriptor to be processed (send) by HW */
