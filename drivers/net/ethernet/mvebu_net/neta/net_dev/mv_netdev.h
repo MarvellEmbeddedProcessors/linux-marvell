@@ -708,11 +708,12 @@ static inline void mv_eth_rxq_refill(struct eth_port *pp, int rxq,
 		/* Refill BM pool */
 		STAT_DBG(pool->stats.bm_put++);
 		mvBmPoolPut(pkt->pool, (MV_ULONG) pkt->physAddr);
-		mvOsCacheLineInv(NULL, rx_desc);
+		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 	} else {
 		/* Refill Rx descriptor */
 		STAT_DBG(pp->stats.rxq_fill[rxq]++);
 		mvNetaRxDescFill(rx_desc, pkt->physAddr, (MV_U32)pkt);
+		mvOsCacheLineFlush(pp->dev->dev.parent, rx_desc);
 	}
 }
 
