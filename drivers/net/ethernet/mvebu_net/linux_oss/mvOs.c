@@ -106,7 +106,7 @@ void *mvOsIoCachedMalloc(void *osHandle, MV_U32 size, MV_ULONG *pPhyAddr,
 {
 	void *p = kmalloc(size, GFP_ATOMIC);
 	dma_addr_t dma_addr;
-	dma_addr = pci_map_single(osHandle, p, 0, PCI_DMA_BIDIRECTIONAL);
+	dma_addr = dma_map_single(osHandle, p, 0, DMA_BIDIRECTIONAL);
 	*pPhyAddr = (MV_ULONG)(dma_addr & 0xFFFFFFFF);
 	return p;
 }
@@ -114,7 +114,7 @@ void *mvOsIoUncachedMalloc(void *osHandle, MV_U32 size, MV_ULONG *pPhyAddr,
 			    MV_U32 *memHandle)
 {
 	dma_addr_t dma_addr;
-	void *ptr = pci_alloc_consistent(osHandle, size, &dma_addr);
+	void *ptr = dma_alloc_coherent(osHandle, size, &dma_addr, GFP_KERNEL);
 	*pPhyAddr = (MV_ULONG)(dma_addr & 0xFFFFFFFF);
 	return ptr;
 }
@@ -122,7 +122,7 @@ void *mvOsIoUncachedMalloc(void *osHandle, MV_U32 size, MV_ULONG *pPhyAddr,
 void mvOsIoUncachedFree(void *osHandle, MV_U32 size, MV_ULONG phyAddr, void *pVirtAddr,
 			 MV_U32 memHandle)
 {
-	pci_free_consistent(osHandle, size, pVirtAddr, (dma_addr_t)phyAddr);
+	dma_free_coherent(osHandle, size, pVirtAddr, (dma_addr_t)phyAddr);
 }
 
 void mvOsIoCachedFree(void *osHandle, MV_U32 size, MV_ULONG phyAddr, void *pVirtAddr,
