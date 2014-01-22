@@ -2175,7 +2175,6 @@ static void mvNetaDescRingReset(MV_NETA_QUEUE_CTRL *pQueueCtrl)
 
 	/* reset ring of descriptors */
 	memset(pDesc, 0, (descrNum * NETA_DESC_ALIGNED_SIZE));
-	mvOsCacheFlush(NULL, pDesc, (descrNum * NETA_DESC_ALIGNED_SIZE));
 	pQueueCtrl->nextToProc = 0;
 }
 
@@ -2191,6 +2190,8 @@ void mvNetaRxReset(int port)
 	for (rxq = 0; rxq < pPortCtrl->rxqNum ; rxq++) {
 		pRxqCtrl = mvNetaRxqHndlGet(port, rxq);
 		mvNetaDescRingReset(&pRxqCtrl->queueCtrl);
+		mvOsCacheFlush(pPortCtrl->osHandle, pRxqCtrl->queueCtrl.pFirst,
+		((pRxqCtrl->queueCtrl.lastDesc + 1) * NETA_DESC_ALIGNED_SIZE));
 	}
 	MV_REG_WRITE(NETA_PORT_RX_RESET_REG(port), 0);
 }
@@ -2206,6 +2207,8 @@ void mvNetaTxpReset(int port, int txp)
 	for (txq = 0; txq < pPortCtrl->txqNum; txq++) {
 		pTxqCtrl = mvNetaTxqHndlGet(port, txp, txq);
 		mvNetaDescRingReset(&pTxqCtrl->queueCtrl);
+		mvOsCacheFlush(pPortCtrl->osHandle, pTxqCtrl->queueCtrl.pFirst,
+		((pTxqCtrl->queueCtrl.lastDesc + 1) * NETA_DESC_ALIGNED_SIZE));
 	}
 	MV_REG_WRITE(NETA_PORT_TX_RESET_REG(port, txp), 0);
 }
@@ -2251,6 +2254,7 @@ MV_NETA_RXQ_CTRL *mvNetaRxqInit(int port, int queue, int descrNum)
 	pQueueCtrl->lastDesc = (descrNum - 1);
 
 	mvNetaDescRingReset(pQueueCtrl);
+	mvOsCacheFlush(pPortCtrl->osHandle, pQueueCtrl->pFirst, (pQueueCtrl->lastDesc + 1) * NETA_DESC_ALIGNED_SIZE);
 
 	mvNetaRxqAddrSet(port, queue, descrNum);
 
@@ -2315,6 +2319,7 @@ MV_NETA_TXQ_CTRL *mvNetaTxqInit(int port, int txp, int queue, int descrNum)
 	pQueueCtrl->lastDesc = (descrNum - 1);
 
 	mvNetaDescRingReset(pQueueCtrl);
+	mvOsCacheFlush(pPortCtrl->osHandle, pQueueCtrl->pFirst, (pQueueCtrl->lastDesc + 1) * NETA_DESC_ALIGNED_SIZE);
 
 	mvNetaTxqBandwidthSet(port, txp, queue);
 
