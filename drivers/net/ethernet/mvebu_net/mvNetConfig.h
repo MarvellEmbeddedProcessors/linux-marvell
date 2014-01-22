@@ -65,7 +65,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mv_net_config_h__
 #define __mv_net_config_h__
 
-#ifdef CONFIG_MV_ETH_PP2
+#if defined(CONFIG_MV_ETH_PP2) || defined(CONFIG_MV_ETH_PP2_MODULE)
 
 #define INTER_REGS_PHYS_BASE		0xF1000000
 #define INTER_REGS_VIRT_BASE		0xFBC00000
@@ -92,7 +92,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define IRQ_GLOBAL_GOP			82 /* Group of Ports (GOP) */
 #endif /* PP2 */
 
-#ifdef CONFIG_MV_ETH_NETA
+#if defined(CONFIG_MV_ETH_NETA) || defined(CONFIG_MV_ETH_NETA_MODULE)
 
 #define MV_PON_PORT(p)			MV_FALSE
 #define MV_ETH_MAX_TCONT		1
