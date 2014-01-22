@@ -151,29 +151,17 @@ extern void mv_early_printk(char *fmt, ...);
 #endif /* __KERNEL__ */
 
 #define mvOsIoVirtToPhy(pDev, pVirtAddr)        virt_to_dma((pDev), (pVirtAddr))
-/*    pci_map_single((pDev), (pVirtAddr), 0, PCI_DMA_BIDIRECTIONAL) */
 
 #define mvOsIoVirtToPhys(pDev, pVirtAddr)       virt_to_dma((pDev), (pVirtAddr))
 
-#define mvOsCacheFlushInv(pDev, p, size)                            \
-	pci_map_single((pDev), (p), (size), PCI_DMA_BIDIRECTIONAL)
-/*
- * This was omitted because as of 2.6.35 the Biderection performs only
- * flush for outer cache because of the speculative issues.
- * This should be replaced by Flush then invalidate
- *
-#define mvOsCacheClear(pDev, p, size )                              \
-	pci_map_single((pDev), (p), (size), PCI_DMA_BIDIRECTIONAL)
-*/
-
 #define mvOsCacheFlush(pDev, p, size)                              \
-	pci_map_single((pDev), (p), (size), PCI_DMA_TODEVICE)
+	dma_map_single((pDev), (p), (size), DMA_TO_DEVICE)
 
 #define mvOsCacheInvalidate(pDev, p, size)                          \
-	pci_map_single((pDev), (p), (size), PCI_DMA_FROMDEVICE)
+	dma_map_single((pDev), (p), (size), DMA_FROM_DEVICE)
 
 #define mvOsCacheUnmap(pDev, phys, size)                          \
-	pci_unmap_single((pDev), (dma_addr_t)(phys), (size), PCI_DMA_FROMDEVICE)
+	dma_unmap_single((pDev), (dma_addr_t)(phys), (size), DMA_FROM_DEVICE)
 
 #define CPU_PHY_MEM(x)              ((MV_U32)x)
 #define CPU_MEMIO_CACHED_ADDR(x)    ((void *)x)
@@ -263,18 +251,6 @@ static INLINE MV_U64 mvOsDivMod64(MV_U64 divided, MV_U64 divisor, MV_U64 *modulu
 	return division;
 }
 
-#if defined(MV_BRIDGE_SYNC_REORDER)
-extern MV_U32 *mvUncachedParam;
-
-static inline void mvOsBridgeReorderWA(void)
-{
-	volatile MV_U32 val = 0;
-
-	val = mvUncachedParam[0];
-}
-#endif
-
-
 /* Flash APIs */
 #define MV_FL_8_READ            MV_MEMIO8_READ
 #define MV_FL_16_READ           MV_MEMIO_LE16_READ
@@ -306,149 +282,29 @@ static inline void mvOsBridgeReorderWA(void)
 #define  DSBWA_4611(x)
 #endif
 
-#if defined(CONFIG_AURORA_IO_CACHE_COHERENCY)
-#define mvOsCacheLineFlushInv(handle, addr)
-#define mvOsCacheLineInv(handle, addr)
-#define mvOsCacheLineFlush(handle, addr)
-#define mvOsCacheMultiLineFlush(handle, addr, size)
-#define mvOsCacheMultiLineInv(handle, addr, size)
-#define mvOsCacheMultiLineFlushInv(handle, addr, size)
-#define mvOsCacheIoSync()	dma_io_sync()
-#else
-#define mvOsCacheIoSync()	/* Not needed in s/w cache coherency (SWCC) */
-/*************************************/
-/* FLUSH & INVALIDATE single D$ line */
-/*************************************/
-#if defined(CONFIG_L2_CACHE_ENABLE) || defined(CONFIG_CACHE_FEROCEON_L2)
-#define mvOsCacheLineFlushInv(handle, addr)                     \
-{                                                               \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c14, 1" : : "r" (addr));\
-	__asm__ __volatile__ ("mcr p15, 1, %0, c15, c10, 1" : : "r" (addr));\
-	__asm__ __volatile__ ("mcr p15, 0, r0, c7, c10, 4");		\
-}
-#elif defined(CONFIG_CACHE_AURORA_L2)
-#define mvOsCacheLineFlushInv(handle, addr)                     \
-{                                                               \
-	DSBWA_4611(addr);						 \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c14, 1" : : "r" (addr));  /* Clean and Inv D$ by MVA to PoC */ \
-	writel(__virt_to_phys((int)(((int)addr) & ~0x1f)), (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x7F0/*L2_FLUSH_PA*/)); \
-	writel(0x0, (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x700/*L2_SYNC*/)); \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr));  /* DSB */ \
-}
-#else
-#define mvOsCacheLineFlushInv(handle, addr)                     \
-{                                                               \
-	DSBWA_4611(addr);						 \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c14, 1" : : "r" (addr));\
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr)); \
-}
-#endif
-
-/*****************************/
-/* INVALIDATE single D$ line */
-/*****************************/
-#if defined(CONFIG_L2_CACHE_ENABLE) || defined(CONFIG_CACHE_FEROCEON_L2)
-#define mvOsCacheLineInv(handle, addr)                          \
-{                                                               \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c6, 1" : : "r" (addr)); \
-	__asm__ __volatile__ ("mcr p15, 1, %0, c15, c11, 1" : : "r" (addr)); \
-}
-#elif defined(CONFIG_CACHE_AURORA_L2)
-#define mvOsCacheLineInv(handle, addr)                          \
-{                                                               \
-	DSBWA_4413(addr);								\
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c6, 1" : : "r" (addr));   /* Invalidate D$ by MVA to PoC */ \
-	writel(__virt_to_phys(((int)addr) & ~0x1f), (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x770/*L2_INVALIDATE_PA*/)); \
-	writel(0x0, (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x700/*L2_SYNC*/)); \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr));  /* DSB */ \
-}
-#else
-#define mvOsCacheLineInv(handle, addr)                          \
-{                                                               \
-	DSBWA_4413(addr);							\
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c6, 1" : : "r" (addr)); \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr)); \
-}
-#endif
-
-/************************/
-/* FLUSH single D$ line */
-/************************/
-#if defined(CONFIG_L2_CACHE_ENABLE) || defined(CONFIG_CACHE_FEROCEON_L2)
-#define mvOsCacheLineFlush(handle, addr)                     \
-{                                                               \
-#if defined(CONFIG_SHEEVA_ERRATA_ARM_CPU_6043) || defined(CONFIG_SHEEVA_ERRATA_ARM_CPU_6124)
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c14, 1" : : "r" (addr));\
-#else
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 1" : : "r" (addr));\
-#endif
-	__asm__ __volatile__ ("mcr p15, 1, %0, c15, c9, 1" : : "r" (addr));\
-	__asm__ __volatile__ ("mcr p15, 0, r0, c7, c10, 4");          \
- }
- #elif defined(CONFIG_CACHE_AURORA_L2) && !defined(CONFIG_SHEEVA_ERRATA_ARM_CPU_6043) && !defined(CONFIG_SHEEVA_ERRATA_ARM_CPU_6124)
-
- #define mvOsCacheLineFlush(handle, addr)                     \
- {                                                               \
-	DSBWA_4611(addr);                                             \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 1" : : "r" (addr)); /* Clean D$ line by MVA to PoC */ \
-	writel(__virt_to_phys(((int)addr) & ~0x1f), (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x7B0/*L2_CLEAN_PA*/)); \
-	writel(0x0, (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x700/*L2_SYNC*/)); \
-	 __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr)); /* DSB */ \
- }
-
-#elif defined(CONFIG_CACHE_AURORA_L2) && (defined(CONFIG_SHEEVA_ERRATA_ARM_CPU_6043) || defined(CONFIG_SHEEVA_ERRATA_ARM_CPU_6124))
-#define mvOsCacheLineFlush(handle, addr)                     \
-{                                                               \
-	DSBWA_4611(addr);						 \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c14, 1" : : "r" (addr));\
-	writel(__virt_to_phys(((int)addr) & ~0x1f), (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x7B0/*L2_CLEAN_PA*/)); \
-	writel(0x0, (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x700/*L2_SYNC*/)); \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr)); /* DSB */ \
-}
-#else
-#define mvOsCacheLineFlush(handle, addr)                     \
-{                                                               \
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 1" : : "r" (addr));\
-	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr)); \
-}
-#endif
-
 #define MV_OS_CACHE_MULTI_THRESH	256
+
+static inline void mvOsCacheIoSync(void)
+{
+	/* TBD */
+}
+
+static inline void mvOsCacheLineFlush(void *handle, void *addr)
+{
+	dma_map_single(handle, addr, CPU_D_CACHE_LINE_SIZE, DMA_TO_DEVICE);
+}
+
+static inline void mvOsCacheLineInv(void *handle, void *addr)
+{
+	dma_map_single(handle, addr, CPU_D_CACHE_LINE_SIZE, DMA_FROM_DEVICE);
+}
 
 /* Flush multiple cache lines using mvOsCacheLineFlush to improve performance.              */
 /* addr is the pointer to start the flush operation from. It will be aligned to             */
 /* the beginning of the cache line automatically and the size will be adjusted accordingly. */
 static inline void mvOsCacheMultiLineFlush(void *handle, void *addr, int size)
 {
-	if (size <= MV_OS_CACHE_MULTI_THRESH) {
-		int shift = ((MV_ULONG)(addr) & (CPU_D_CACHE_LINE_SIZE - 1));
-		if (shift) {
-			addr -= shift; /* align address back to the beginning of a cache line */
-			size += shift;
-		}
-#if defined(CONFIG_CACHE_AURORA_L2)
-		DSBWA_4611(addr);
-		while (size > 0) {
-#if defined(CONFIG_SHEEVA_ERRATA_ARM_CPU_6043) || defined(CONFIG_SHEEVA_ERRATA_ARM_CPU_6124)
-			__asm__ __volatile__ ("mcr p15, 0, %0, c7, c14, 1" : : "r" (addr));
-#else
-			__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 1" : : "r" (addr)); /* Clean D$ line by MVA to PoC */
-#endif
-			writel(__virt_to_phys(((int)addr) & ~0x1f), (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x7B0/*L2_CLEAN_PA*/));
-			size -= CPU_D_CACHE_LINE_SIZE;
-			addr += CPU_D_CACHE_LINE_SIZE;
-		}
-		writel(0x0, (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x700/*L2_SYNC*/));
-		__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr)); /* DSB */
-#else
-		while (size > 0) {
-			mvOsCacheLineFlush(handle, addr);
-			size -= CPU_D_CACHE_LINE_SIZE;
-			addr += CPU_D_CACHE_LINE_SIZE;
-		}
-#endif /* CONFIG_CACHE_AURORA_L2 */
-	} else
-		pci_map_single(handle, addr, size, PCI_DMA_TODEVICE);
+	dma_map_single(handle, addr, size, DMA_TO_DEVICE);
 }
 
 /* Invalidate multiple cache lines using mvOsCacheLineInv to improve performance.           */
@@ -459,31 +315,7 @@ static inline void mvOsCacheMultiLineFlush(void *handle, void *addr, int size)
 /* DO NOT USE this function unless you are certain of this!                                 */
 static inline void mvOsCacheMultiLineInv(void *handle, void *addr, int size)
 {
-	if (size <= MV_OS_CACHE_MULTI_THRESH) {
-		int shift = ((MV_ULONG)(addr) & (CPU_D_CACHE_LINE_SIZE - 1));
-		if (shift) {
-			addr -= shift; /* align address back to the beginning of a cache line */
-			size += shift;
-		}
-#if defined(CONFIG_CACHE_AURORA_L2)
-		DSBWA_4413(addr);
-		while (size > 0) {
-			__asm__ __volatile__ ("mcr p15, 0, %0, c7, c6, 1" : : "r" (addr));   /* Invalidate D$ by MVA to PoC */
-			writel(__virt_to_phys(((int)addr) & ~0x1f), (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x770/*L2_INVALIDATE_PA*/));
-			size -= CPU_D_CACHE_LINE_SIZE;
-			addr += CPU_D_CACHE_LINE_SIZE;
-		}
-		writel(0x0, (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x700/*L2_SYNC*/));
-		__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr));  /* DSB */
-#else
-		while (size > 0) {
-			mvOsCacheLineInv(handle, addr);
-			size -= CPU_D_CACHE_LINE_SIZE;
-			addr += CPU_D_CACHE_LINE_SIZE;
-		}
-#endif  /* CONFIG_CACHE_AURORA_L2 */
-	} else
-		pci_map_single(handle, addr, size, PCI_DMA_FROMDEVICE);
+	dma_map_single(handle, addr, size, DMA_FROM_DEVICE);
 }
 
 /* Flush and invalidate multiple cache lines using mvOsCacheLineFlushInv to improve performance. */
@@ -491,50 +323,8 @@ static inline void mvOsCacheMultiLineInv(void *handle, void *addr, int size)
 /* the beginning of the cache line automatically and the size will be adjusted accordingly.      */
 static inline void mvOsCacheMultiLineFlushInv(void *handle, void *addr, int size)
 {
-	if (size <= MV_OS_CACHE_MULTI_THRESH) {
-		int shift = ((MV_ULONG)(addr) & (CPU_D_CACHE_LINE_SIZE - 1));
-		if (shift) {
-			addr -= shift; /* align address back to the beginning of a cache line */
-			size += shift;
-		}
-#if defined(CONFIG_CACHE_AURORA_L2)
-		DSBWA_4611(addr);
-		while (size > 0) {
-			__asm__ __volatile__ ("mcr p15, 0, %0, c7, c14, 1" : : "r" (addr));  /* Clean and Inv D$ by MVA to PoC */
-			writel(__virt_to_phys((int)(((int)addr) & ~0x1f)), (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x7F0/*L2_FLUSH_PA*/));
-			size -= CPU_D_CACHE_LINE_SIZE;
-			addr += CPU_D_CACHE_LINE_SIZE;
-		}
-		writel(0x0, (INTER_REGS_VIRT_BASE + MV_AURORA_L2_REGS_OFFSET + 0x700/*L2_SYNC*/));
-		__asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" : : "r" (addr));  /* DSB */
-#else
-		while (size > 0) {
-			mvOsCacheLineFlushInv(handle, addr);
-			size -= CPU_D_CACHE_LINE_SIZE;
-			addr += CPU_D_CACHE_LINE_SIZE;
-		}
-#endif  /* CONFIG_CACHE_AURORA_L2 */
-	} else
-		pci_map_single(handle, addr, size, PCI_DMA_BIDIRECTIONAL);
+	dma_map_single(handle, addr, size, DMA_BIDIRECTIONAL);
 }
-#endif /* CONFIG_AURORA_IO_CACHE_COHERENCY */
-
-static inline void mvOsPrefetch(const void *ptr)
-{
-	__asm__ __volatile__(
-		"pld\t%0"
-		:
-		: "o" (*(char *)ptr)
-		: "cc");
-}
-
-
-/* Flush CPU pipe */
-#define CPU_PIPE_FLUSH
-
-
-
-
 
 /* register manipulations  */
 
