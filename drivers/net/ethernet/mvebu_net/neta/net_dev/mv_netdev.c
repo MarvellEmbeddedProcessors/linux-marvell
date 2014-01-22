@@ -97,6 +97,9 @@ void handle_group_affinity(int port);
 void set_rxq_affinity(struct eth_port *pp, MV_U32 rxqAffinity, int group);
 static inline int mv_eth_tx_policy(struct eth_port *pp, struct sk_buff *skb);
 
+/* temporary global to store parent device pointer */
+static struct device *global_dev;
+
 /* uncomment if you want to debug the SKB recycle feature */
 /* #define ETH_SKB_DEBUG */
 
@@ -1250,7 +1253,7 @@ void mv_eth_pkt_print(struct eth_pbuf *pkt)
 	       pkt->osInfo, pkt->physAddr, pkt->pBuf);
 
 	mvDebugMemDump(pkt->pBuf + pkt->offset, 64, 1);
-	mvOsCacheInvalidate(NULL, pkt->pBuf + pkt->offset, 64);
+	mvOsCacheInvalidate(global_dev->parent, pkt->pBuf + pkt->offset, 64);
 }
 EXPORT_SYMBOL(mv_eth_pkt_print);
 
@@ -1363,7 +1366,7 @@ int mv_eth_skb_recycle(struct sk_buff *skb)
 #endif /* CONFIG_MV_ETH_DEBUG_CODE */
 
 		STAT_DBG(pool->stats.skb_recycled_ok++);
-		mvOsCacheInvalidate(NULL, skb->head, RX_BUF_SIZE(pool->pkt_size));
+		mvOsCacheInvalidate(global_dev->parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
 
 		status = mv_eth_pool_put(pool, pkt);
 
@@ -1410,13 +1413,13 @@ static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, struct eth_pbuf *p
 #else
 	*((MV_U32 *) skb->head) = (MV_U32)pkt;
 #endif /* !CONFIG_MV_ETH_BE_WA */
-	mvOsCacheLineFlush(NULL, skb->head);
+	mvOsCacheLineFlush(global_dev->parent, skb->head);
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
 	pkt->osInfo = (void *)skb;
 	pkt->pBuf = skb->head;
 	pkt->bytes = 0;
-	pkt->physAddr = mvOsCacheInvalidate(NULL, skb->head, RX_BUF_SIZE(pool->pkt_size));
+	pkt->physAddr = mvOsCacheInvalidate(global_dev->parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
 	pkt->offset = NET_SKB_PAD;
 	pkt->pool = pool->pool;
 
@@ -1677,7 +1680,7 @@ inline struct neta_rx_desc *mv_eth_rx_prefetch(struct eth_port *pp, MV_NETA_RXQ_
 	rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
 	if (rx_done == 0) {
 		/* First descriptor in the NAPI loop */
-		mvOsCacheLineInv(NULL, rx_desc);
+		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 		prefetch(rx_desc);
 	}
 	if ((rx_done + 1) == rx_todo) {
@@ -1686,7 +1689,7 @@ inline struct neta_rx_desc *mv_eth_rx_prefetch(struct eth_port *pp, MV_NETA_RXQ_
 	}
 	/* Prefetch next descriptor */
 	next_desc = mvNetaRxqDescGet(rx_ctrl);
-	mvOsCacheLineInv(NULL, next_desc);
+	mvOsCacheLineInv(pp->dev->dev.parent, next_desc);
 	prefetch(next_desc);
 
 	return rx_desc;
@@ -1728,7 +1731,7 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 		rx_desc = mv_eth_rx_prefetch(pp, rx_ctrl, rx_done, rx_todo);
 #else
 		rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
-		mvOsCacheLineInv(NULL, rx_desc);
+		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 		prefetch(rx_desc);
 #endif /* CONFIG_MV_ETH_RX_DESC_PREFETCH */
 
@@ -1760,7 +1763,7 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 		}
 
 		/* Speculative ICache prefetch WA: should be replaced with dma_unmap_single (invalidate l2) */
-		mvOsCacheMultiLineInv(NULL, pkt->pBuf + pkt->offset, rx_desc->dataSize);
+		mvOsCacheMultiLineInv(pp->dev->dev.parent, pkt->pBuf + pkt->offset, rx_desc->dataSize);
 
 #ifdef CONFIG_MV_ETH_RX_PKT_PREFETCH
 		prefetch(pkt->pBuf + pkt->offset);
@@ -2000,7 +2003,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 	/* FIXME: beware of nonlinear --BK */
 	tx_desc->dataSize = skb_headlen(skb);
 
-	tx_desc->bufPhysAddr = mvOsCacheFlush(NULL, skb->data, tx_desc->dataSize);
+	tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, skb->data, tx_desc->dataSize);
 
 	if (frags == 1) {
 		/*
@@ -2175,7 +2178,7 @@ static inline int mv_eth_tso_build_hdr_desc(struct neta_tx_desc *tx_desc, struct
 	tx_desc->command = mvNetaTxqDescCsum(mac_hdr_len, skb->protocol, ((u8 *)tcph - (u8 *)iph) >> 2, IPPROTO_TCP);
 	tx_desc->command |= NETA_TX_F_DESC_MASK;
 
-	tx_desc->bufPhysAddr = mvOsCacheFlush(NULL, data, tx_desc->dataSize);
+	tx_desc->bufPhysAddr = mvOsCacheFlush(priv->dev->dev.parent, data, tx_desc->dataSize);
 	mv_eth_shadow_inc_put(txq_ctrl);
 
 	mv_eth_tx_desc_flush(tx_desc);
@@ -2192,7 +2195,7 @@ static inline int mv_eth_tso_build_data_desc(struct neta_tx_desc *tx_desc, struc
 	size = MV_MIN(frag_size, data_left);
 
 	tx_desc->dataSize = size;
-	tx_desc->bufPhysAddr = mvOsCacheFlush(NULL, frag_ptr, size);
+	tx_desc->bufPhysAddr = mvOsCacheFlush(global_dev->parent, frag_ptr, size);
 	tx_desc->command = 0;
 	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = 0;
 
@@ -2383,7 +2386,7 @@ static void mv_eth_rxq_drop_pkts(struct eth_port *pp, int rxq)
 
 	for (i = 0; i < rx_done; i++) {
 		rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
-		mvOsCacheLineInv(NULL, rx_desc);
+		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 
 #if defined(MV_CPU_BE)
 		mvNetaRxqDescSwap(rx_desc);
@@ -2499,8 +2502,9 @@ static void mv_eth_tx_frag_process(struct eth_port *pp, struct sk_buff *skb, str
 		/* NETA_TX_BM_ENABLE_MASK = 0 */
 		/* NETA_TX_PKT_OFFSET_MASK = 0 */
 		tx_desc->dataSize = frag->size;
-		tx_desc->bufPhysAddr = mvOsCacheFlush(NULL, page_address(frag->page.p) + frag->page_offset,
-						      tx_desc->dataSize);
+		tx_desc->bufPhysAddr =
+			mvOsCacheFlush(pp->dev->dev.parent, page_address(frag->page.p) + frag->page_offset,
+			tx_desc->dataSize);
 
 		if (i == (skb_shinfo(skb)->nr_frags - 1)) {
 			/* Last descriptor */
@@ -4213,6 +4217,7 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
 	SET_ETHTOOL_OPS(dev, &mv_eth_tool_ops);
 
 	SET_NETDEV_DEV(dev, &pdev->dev);
+	global_dev = &pdev->dev;
 
 	dev->priv_flags |= IFF_UNICAST_FLT;
 
@@ -4267,7 +4272,7 @@ int mv_eth_hal_init(struct eth_port *pp)
 	}
 
 	/* Init port */
-	pp->port_ctrl = mvNetaPortInit(pp->port, NULL);
+	pp->port_ctrl = mvNetaPortInit(pp->port, pp->dev->dev.parent);
 	if (!pp->port_ctrl) {
 		printk(KERN_ERR "%s: failed to load port=%d\n", __func__, pp->port);
 		return -ENODEV;
@@ -4660,6 +4665,7 @@ static int mv_eth_rxq_fill(struct eth_port *pp, int rxq, int num)
 			memset(rx_desc, 0, sizeof(struct neta_rx_desc));
 
 			mvNetaRxDescFill(rx_desc, pkt->physAddr, (MV_U32)pkt);
+			mvOsCacheLineFlush(pp->dev->dev.parent, rx_desc);
 		} else {
 			printk(KERN_ERR "%s: rxq %d, %d of %d buffers are filled\n", __func__, rxq, i, num);
 			break;
@@ -4825,7 +4831,7 @@ int mv_eth_rx_reset(int port)
 			mvOsCacheIoSync();
 			for (i = 0; i < rx_done; i++) {
 				rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
-				mvOsCacheLineInv(NULL, rx_desc);
+				mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 
 #if defined(MV_CPU_BE)
 				mvNetaRxqDescSwap(rx_desc);
@@ -6324,14 +6330,14 @@ int mv_eth_wol_pkts_check(int port)
 
 		for (i = 0; i < rx_done; i++) {
 			rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
-			mvOsCacheLineInv(NULL, rx_desc);
+			mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 
 #if defined(MV_CPU_BE)
 			mvNetaRxqDescSwap(rx_desc);
 #endif /* MV_CPU_BE */
 
 			pkt = (struct eth_pbuf *)rx_desc->bufCookie;
-			mvOsCacheInvalidate(NULL, pkt->pBuf + pkt->offset, rx_desc->dataSize);
+			mvOsCacheInvalidate(pp->dev->dev.parent, pkt->pBuf + pkt->offset, rx_desc->dataSize);
 
 			if (mv_pnc_wol_pkt_match(pp->port, pkt->pBuf + pkt->offset, rx_desc->dataSize, &ruleId))
 				wakeup = 1;
