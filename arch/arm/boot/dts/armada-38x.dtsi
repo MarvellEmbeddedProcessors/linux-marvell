@@ -120,27 +120,36 @@
 			};
 
 			eth0: ethernet@70000 {
-				compatible = "marvell,armada-370-neta";
+				compatible = "marvell,neta";
 				reg = <0x70000 0x4000>;
 				interrupts-extended = <&mpic 8>;
 				clocks = <&gateclk 4>;
 				status = "disabled";
+				mac-address = [ 00 50 43 02 02 01 ];
+				eth,port-num    = <0>;
+				eth,port-mtu    = <1500>;
 			};
 
 			eth1: ethernet@30000 {
-				compatible = "marvell,armada-370-neta";
+				compatible = "marvell,neta";
 				reg = <0x30000 0x4000>;
 				interrupts-extended = <&mpic 10>;
 				clocks = <&gateclk 3>;
 				status = "disabled";
+				mac-address = [ 00 50 43 02 02 02 ];
+				eth,port-num    = <1>;
+				eth,port-mtu    = <1500>;
 			};
 
 			eth2: ethernet@34000 {
-				compatible = "marvell,armada-370-neta";
+				compatible = "marvell,neta";
 				reg = <0x34000 0x4000>;
 				interrupts-extended = <&mpic 12>;
 				clocks = <&gateclk 2>;
 				status = "disabled";
+				mac-address = [ 00 50 43 02 02 03 ];
+				eth,port-num    = <2>;
+				eth,port-mtu    = <1500>;
 			};
 
 			gateclk: clock-gating-control@18220 {
