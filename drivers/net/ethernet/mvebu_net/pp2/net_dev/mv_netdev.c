@@ -2473,14 +2473,13 @@ static void mv_eth_rxq_drop_pkts(struct eth_port *pp, int rxq)
 
 		rx_desc = mvPp2RxqNextDescGet(rx_ctrl);
 
+#if defined(MV_CPU_BE)
+		mvPPv2RxqDescSwap(rx_desc);
+#endif /* MV_CPU_BE */
+
 		bm = mv_eth_bm_cookie_build(rx_desc);
 		pool = mv_eth_bm_cookie_pool_get(bm);
 		ppool = &mv_eth_pool[pool];
-
-#if defined(MV_CPU_BE)
-	mvPPv2RxqDescSwap(rx_desc);
-#endif /* MV_CPU_BE */
-
 
 		mv_eth_pool_refill(ppool, bm, rx_desc->bufPhysAddr, rx_desc->bufCookie);
 		mvOsCacheLineInv(NULL, rx_desc);
