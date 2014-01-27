@@ -38,6 +38,9 @@
 #define AHCI_WINDOW_BASE(win)	(0x64 + ((win) << 4))
 #define AHCI_WINDOW_SIZE(win)	(0x68 + ((win) << 4))
 
+#define VENDOR_SPECIFIC_0_ADDR  0xa0
+#define VENDOR_SPECIFIC_0_DATA  0xa4
+
 static void ahci_mv_windows_config(struct ahci_host_priv *hpriv,
 				   const struct mbus_dram_target_info *dram)
 {
@@ -194,6 +197,12 @@ static int ahci_mv_probe(struct platform_device *pdev)
 		if (!(hpriv->port_map & (1 << i)))
 			ap->ops = &ata_dummy_port_ops;
 	}
+
+	/* Enabling regret bit to enables the SATA unit to regret
+	a request that didn't receive an acknowlegde and avoid a deadlock */
+
+	writel(0x4, hpriv->mmio + VENDOR_SPECIFIC_0_ADDR);
+	writel(0x80, hpriv->mmio + VENDOR_SPECIFIC_0_DATA);
 
 	rc = ahci_reset_controller(host);
 	if (rc) {
