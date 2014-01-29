@@ -21,8 +21,8 @@
 
 /* global data */
 struct pp3_dev_priv **pp3_ports;
-struct pp3_group_stats **pp3_groups;
-struct pp3_cpu *pp3_cpus;
+struct pp3_group **pp3_groups;
+struct pp3_cpu **pp3_cpus;
 static int pp3_ports_num;
 static int pp3_initialized;
 
@@ -225,6 +225,104 @@ static void __exit mv_pp3_cleanup_module(void)
 }
 module_exit(mv_pp3_cleanup_module);
 
+/****************************************************************
+ * mv_pp3_isr							*
+ *	rx events , group interrupt handle			*
+ ***************************************************************/
+irqreturn_t mv_pp3_isr(int irq, int group_id)
+{
+	int cpu = smp_processor_id();
+	struct pp3_group *group = &pp3_groups[cpu][group_id];
+	struct napi_struct *napi = group->napi;
+
+	STAT_INFO(group->stats.irq++);
+
+	/* TODO: interrupts Mask */
+
+	/* Verify that the device not already on the polling list */
+	if (napi_schedule_prep(napi)) {
+		/* schedule the work (rx+txdone+link) out of interrupt contxet */
+		__napi_schedule(napi);
+	} else {
+		STAT_INFO(group->stats.irq_err++);
+	}
+
+	/* TODO: interrupts unMask */
+
+	return IRQ_HANDLED;
+}
+
+/****************************************************************
+ * mv_pp3_poll							*
+ *	napi func - call to mv_pp3_rx for group's rxqs		*
+ ***************************************************************/
+int mv_pp3_poll(struct napi_struct *napi, int budget)
+{
+	int rx_done = 0;
+	struct pp3_dev_priv *priv = MV_PP3_PRIV(napi->dev);
+	struct pp3_group *group = priv->groups[smp_processor_id()];
+
+	if (!test_bit(MV_ETH_F_STARTED_BIT, &(priv->flags))) {
+		napi_complete(napi);
+		return rx_done;
+	}
+
+
+	STAT_INFO(group->stats.rx_poll++);
+
+	/* TODO */
+
+
+	while (budget > 0 /* && group rxqs are not empty */) {
+
+		/* TODO
+			select rx_queue
+			call to mv_pp3_rx()
+			update counters and budget
+		*/
+	}
+
+	if (budget > 0)
+		napi_complete(napi);
+
+
+	return rx_done;
+}
+
+/****************************************************************
+ * mv_pp3_linux_pool_isr					*
+ *	linux poll full interrupt handler			*
+ ***************************************************************/
+irqreturn_t mv_pp3_linux_pool_isr(int irq, int group_id)
+{
+	int cpu = smp_processor_id();
+	struct pp3_cpu *cpu_ctrl = pp3_cpus[cpu];
+
+	STAT_INFO(cpu_ctrl->stats.lnx_pool_irq++);
+
+	/* TODO: interrupts Mask */
+
+	tasklet_schedule(&cpu_ctrl->bm_msg_tasklet);
+
+	/* TODO: interrupts UnMask */
+
+	return IRQ_HANDLED;
+
+}
+
+void mv_pp3_bm_msg_tasklet(unsigned long data)
+{
+	/* TODO
+		while (pool is not empty)
+		1 - read cfh from bm_msg_queue
+		2 - get pool ID from cfh
+		3 - get buffer ptr from cfh
+		4 - if pool ID is linux_pool_tx
+			free buffer
+		    else
+			use callback function, send buffer ptr to application
+	*/
+}
 
 MODULE_DESCRIPTION("Marvell PPv3 Network Driver - www.marvell.com");
 MODULE_AUTHOR("Dmitri Epshtein <dima@marvell.com>");

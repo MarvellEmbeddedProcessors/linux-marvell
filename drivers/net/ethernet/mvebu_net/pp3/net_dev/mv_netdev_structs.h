@@ -37,7 +37,7 @@ disclaimer.
 struct pp3_dev_priv {
 	int			index;
 	struct mv_pp3_port_data *plat_data;
-	struct pp3_group	*group_ctrl[CONFIG_NR_CPUS];
+	struct pp3_group	*groups[CONFIG_NR_CPUS];
 	struct net_device	*dev;
 	unsigned long		flags;
 	unsigned char		emac_map;
@@ -73,6 +73,7 @@ struct pp3_group_stats {
 	unsigned int rx_err;
 	unsigned int rx_netif;
 	unsigned int rx_drop;
+	unsigned int rx_poll;
 };
 
 struct pp3_group {
@@ -89,6 +90,11 @@ struct pp3_group {
 	struct	pp3_group_stats	stats;
 };
 
+struct pp3_cpu_stats {
+	unsigned int lnx_pool_irq;
+	unsigned int lnx_pool_irq_err;
+};
+
 struct pp3_cpu {
 	int	cpu;
 	int	frames_num;
@@ -101,6 +107,9 @@ struct pp3_cpu {
 	struct	pp3_bm_pool	*tx_linux_pool;
 	struct	pp3_queue	*bm_msg_queue;
 	struct	pp3_queue	*fw_msg_queue;
+	struct	tasklet_struct	bm_msg_tasklet;
+	struct	tasklet_struct	fw_msg_tasklet;
+	struct	pp3_cpu_stats	stats;
 };
 
 struct pp3_xq_stats {
