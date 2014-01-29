@@ -32,16 +32,48 @@ disclaimer.
 /* according to num of emac units */
 #define MAX_ETH_DEVICES	4
 
+#define MV_PP3_PRIV(dev)	((struct pp3_dev_priv *)(netdev_priv(dev)))
+
 struct pp3_dev_priv {
 	int			index;
-	struct pp3_port_data *plat_data;
+	struct mv_pp3_port_data *plat_data;
 	struct pp3_group	*group_ctrl[CONFIG_NR_CPUS];
-	struct net_device      *dev;
+	struct net_device	*dev;
 	unsigned long		flags;
 	unsigned char		emac_map;
 };
 
-#define MV_PP3_PRIV(dev)	((struct mv_pp3_dev_priv *)(netdev_priv(dev)))
+/* Masks used for pp3_dev_priv flags */
+#define MV_ETH_F_STARTED_BIT		0
+#define MV_ETH_F_LINK_UP_BIT		1
+#define MV_ETH_F_CONNECT_LINUX_BIT	2
+#define MV_ETH_F_DBG_RX_BIT		3
+#define MV_ETH_F_DBG_TX_BIT		4
+#define MV_ETH_F_DBG_DUMP_BIT		5
+#define MV_ETH_F_DBG_ISR_BIT		6
+#define MV_ETH_F_DBG_POLL_BIT		7
+#define MV_ETH_F_DBG_BUFF_HDR_BIT	8
+
+
+#define MV_ETH_F_STARTED                (1 << MV_ETH_F_STARTED_BIT)
+#define MV_ETH_F_LINK_UP                (1 << MV_ETH_F_LINK_UP_BIT)
+#define MV_ETH_F_CONNECT_LINUX          (1 << MV_ETH_F_CONNECT_LINUX_BIT)
+#define MV_ETH_F_DBG_RX			(1 << MV_ETH_F_DBG_RX_BIT)
+#define MV_ETH_F_DBG_TX			(1 << MV_ETH_F_DBG_TX_BIT)
+#define MV_ETH_F_DBG_DUMP		(1 << MV_ETH_F_DBG_DUMP_BIT)
+#define MV_ETH_F_DBG_ISR		(1 << MV_ETH_F_DBG_ISR_BIT)
+#define MV_ETH_F_DBG_POLL		(1 << MV_ETH_F_DBG_POLL_BIT)
+#define MV_ETH_F_DBG_BUFF_HDR		(1 << MV_ETH_F_DBG_BUFF_HDR_BIT)
+
+
+
+struct pp3_group_stats {
+	unsigned int irq;
+	unsigned int irq_err;
+	unsigned int rx_err;
+	unsigned int rx_netif;
+	unsigned int rx_drop;
+};
 
 struct pp3_group {
 	int	rxqs_num;
@@ -54,9 +86,11 @@ struct pp3_group {
 	struct	pp3_bm_pool	*long_pool;
 	struct	pp3_bm_pool	*short_pool;
 	struct	pp3_bm_pool	*lro_pool;
+	struct	pp3_group_stats	stats;
 };
 
 struct pp3_cpu {
+	int	cpu;
 	int	frames_num;
 /*
 	not sure that pp3_frame is necessary
@@ -69,27 +103,27 @@ struct pp3_cpu {
 	struct	pp3_queue	*fw_msg_queue;
 };
 
-struct pp3_queue {
-	int frame;
-	struct pp3_rx_queue rxq;
-	struct pp3_tx_queue txq;
+struct pp3_xq_stats {
+	u32 success;
+	u32 err;
 };
-
 
 
 enum  pp3_q_type {
 	PP3_Q_TYPE_BM = 0,
 	PP3_Q_TYPE_QM = 1
-}
+};
 
 struct pp3_rxq {
+	int	frame_num;
 	int	logic_q;
 	int	phys_q;
 	enum	pp3_q_type		type;
 	struct	mv_pp3_queue_ctrl	*queue;
-	struct	pp3_dev_priv		*dev_priv
+	struct	pp3_dev_priv		*dev_priv;
 	int	pkt_coal;
 	int	time_coal;
+	struct	pp3_xq_stats		stats;
 	/*
 	not sure yet about this
 	struct	pp3_frame	*frame_ctrl;
@@ -97,17 +131,24 @@ struct pp3_rxq {
 };
 
 struct pp3_txq {
+	int	frame_num;
 	int	logic_q;
 	int	phys_q;
 	enum	pp3_q_type		type;
 	struct	mv_pp3_queue_ctrl	*queue;
-	struct	pp3_dev_priv		*dev_priv
+	struct	pp3_dev_priv		*dev_priv;
+	struct	pp3_xq_stats		stats;
 	/*
 	not sure yet about this
 	struct	pp3_frame	*frame_ctrl;
 	*/
 };
 
+struct pp3_queue {
+	int frame;
+	struct pp3_rxq rxq;
+	struct pp3_txq txq;
+};
 /* TODO define bm_pool */
 
 #endif /* __mv_netdev_structs_h__ */

@@ -17,42 +17,36 @@
 #include "hmac/mv_hmac.h"
 #include "hmac/mv_hmac_bm.h"
 #include "mv_netdev.h"
+#include "mv_netdev_structs.h"
 
 /* global data */
-static int mv_eth_initialized;
-static int mv_eth_ports_num;
+struct pp3_dev_priv **pp3_ports;
+struct pp3_group_stats **pp3_groups;
+struct pp3_cpu *pp3_cpus;
+static int pp3_ports_num;
+static int pp3_initialized;
 
-struct eth_port **mv_eth_ports;
 
-static int mv_eth_config_get(struct platform_device *pdev, u8 *mac_addr)
-{
-	struct mv_pp3_port_data *plat_data = (struct mv_pp3_port_data *)pdev->dev.platform_data;
-
-	if (mac_addr)
-		memcpy(mac_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
-
-	return plat_data->mtu;
-}
-
-/***************************************************************
- * mv_eth_netdev_init -- Allocate and initialize net_device    *
- *                   structure                                 *
+/****************************************************************
+ * mv_pp3_netdev_init						*
+ *	Allocate and initialize net_device structures		*
  ***************************************************************/
-struct net_device *mv_eth_netdev_init(int mtu, u8 *mac, struct platform_device *pdev)
+
+struct net_device *mv_pp3_netdev_init(int mtu, u8 *mac, struct platform_device *pdev)
 {
 	struct net_device *dev;
-	struct eth_port *dev_priv;
+	struct pp3_dev_priv *dev_priv;
 	struct resource *res;
 
-	dev = alloc_etherdev_mq(sizeof(struct eth_port), CONFIG_MV_ETH_TXQ);
+	dev = alloc_etherdev_mq(sizeof(struct pp3_dev_priv), CONFIG_MV_ETH_TXQ);
 	if (!dev)
 		return NULL;
 
-	dev_priv = (struct eth_port *)netdev_priv(dev);
+	dev_priv = (struct pp3_dev_priv *)netdev_priv(dev);
 	if (!dev_priv)
 		return NULL;
 
-	memset(dev_priv, 0, sizeof(struct eth_port));
+	memset(dev_priv, 0, sizeof(struct pp3_dev_priv));
 
 	dev_priv->dev = dev;
 
@@ -62,12 +56,11 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac, struct platform_device *
 
 	dev->mtu = mtu;
 	memcpy(dev->dev_addr, mac, MV_MAC_ADDR_SIZE);
+
 	dev->tx_queue_len = CONFIG_MV_ETH_TXQ_DESC;
 	dev->watchdog_timeo = 5 * HZ;
 
-	/*dev->netdev_ops = &mv_eth_netdev_ops;*/
-
-	/*SET_ETHTOOL_OPS(dev, &mv_eth_tool_ops);*/
+	/* TODO: init eth_tools */
 
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
@@ -75,32 +68,38 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac, struct platform_device *
 
 }
 
-static int mv_eth_load_network_interfaces(struct platform_device *pdev)
+static int mv_pp3_config_get(struct platform_device *pdev, unsigned char *mac_addr)
 {
-	u32 port, phys_port;
-	int mtu;
-	struct eth_port *pp;
-	struct net_device *dev;
 	struct mv_pp3_port_data *plat_data = (struct mv_pp3_port_data *)pdev->dev.platform_data;
+
+	if (mac_addr)
+		memcpy(mac_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
+
+	return plat_data->mtu;
+}
+
+static int mv_pp3_load_network_interfaces(struct platform_device *pdev)
+{
+	int mtu;
+	struct pp3_dev_priv *priv;
+	struct net_device *dev;
 	u8 mac[MV_MAC_ADDR_SIZE];
 
-	port = pdev->id;
-	phys_port = port; /*MV_PPV3_PORT_PHYS(port);*/
-	pr_info("  o Loading network interface(s) for port #%d: mtu=%d\n", port, plat_data->mtu);
+	mtu = mv_pp3_config_get(pdev, mac);
 
-	mtu = mv_eth_config_get(pdev, mac);
+	pr_info("  o Loading network interface(s) for port #%d: mtu=%d\n", pdev->id, mtu);
 
-	dev = mv_eth_netdev_init(mtu, mac, pdev);
+	dev = mv_pp3_netdev_init(mtu, mac, pdev);
 
 	if (dev == NULL) {
 		pr_err("\to %s: can't create netdevice\n", __func__);
 		return -EIO;
 	}
 
-	pp = (struct eth_port *)netdev_priv(dev);
-	pp->plat_data = plat_data;
+	priv = MV_PP3_PRIV(dev);
+	priv->plat_data = (struct mv_pp3_port_data *)pdev->dev.platform_data;
 
-	mv_eth_ports[port] = pp;
+	pp3_ports[pdev->id] = priv;
 
 	return 0;
 }
@@ -108,9 +107,7 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 /* Support per port for platform driver */
 static int mv_pp3_probe(struct platform_device *pdev)
 {
-	struct mv_pp3_port_data *plat_data = (struct mv_pp3_port_data *)pdev->dev.platform_data;
-
-	if (mv_eth_load_network_interfaces(pdev))
+	if (mv_pp3_load_network_interfaces(pdev))
 		return -ENODEV;
 
 	pr_info("Probing Marvell PPv3 Network Driver\n");
@@ -161,62 +158,29 @@ static struct platform_driver mv_pp3_driver = {
 */
 static int mv_pp3_shared_probe(struct platform_device *pdev)
 {
+	int size, ret;
 	struct mv_pp3_plat_data *plat_data = (struct mv_pp3_plat_data *)pdev->dev.platform_data;
-	struct resource *res;
-	int size;
 
-	int ret;
+	pp3_ports_num = plat_data->max_port;
 
-	ret = -EINVAL;
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (res == NULL)
-		goto out;
-/*
-	ret = -ENOMEM;
-	msp = kzalloc(sizeof(*msp), GFP_KERNEL);
-	if (msp == NULL)
-		goto out;
-*/
-	/*
-	 * Check whether the error interrupt is hooked up.
-	 */
-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-/*	if (res != NULL) {
-		int err;
+	/* TODO:
+		init sysfs
+		init window */
 
-		err = request_irq(res->start, mv643xx_eth_err_irq,
-				  IRQF_SHARED, "mv643xx_eth", msp);
-		if (!err) {
-			writel(ERR_INT_SMI_DONE, msp->base + ERR_INT_MASK);
-			msp->err_interrupt = res->start;
-		}
-	}*/
-
-	mv_eth_ports_num = plat_data->max_port;
-	/*mv_eth_sysfs_init();*/
-	/*mv_eth_win_init();*/
-	/*mv_eth_config_show();*/
-
-	size = mv_eth_ports_num * sizeof(struct eth_port *);
-	mv_eth_ports = kzalloc(size, GFP_KERNEL);
-	if (!mv_eth_ports)
+	size = pp3_ports_num * sizeof(struct pp3_dev_priv *);
+	pp3_ports = kzalloc(size, GFP_KERNEL);
+	if (!pp3_ports)
 		goto out;
 
-	memset(mv_eth_ports, 0, size);
+	memset(pp3_ports, 0, size);
 
-	/*if (mv_eth_bm_pools_init())
+	/* if (mv_eth_bm_pools_init())
 		goto oom;*/
 
-	/* Initialize tasklet for handle link events */
-	/*tasklet_init(&link_tasklet, mv_eth_link_tasklet, 0);*/
+	/* TODO: set links interrupt */
 
-	/* request IRQ for link interrupts from GOP */
-	/*if (request_irq(IRQ_GLOBAL_GOP, mv_eth_link_isr, (IRQF_DISABLED|IRQF_SAMPLE_RANDOM), "mv_eth_link", NULL))
-		printk(KERN_ERR "%s: Could not request IRQ for GOP interrupts\n", __func__);*/
+	pp3_initialized = 1;
 
-	mv_eth_initialized = 1;
-
-	/*platform_set_drvdata(pdev, msp);*/
 
 	return 0;
 
