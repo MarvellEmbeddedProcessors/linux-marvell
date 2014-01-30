@@ -31,12 +31,16 @@ disclaimer.
 
 /* according to num of emac units */
 #define MAX_ETH_DEVICES	4
+#define CONFIG_MV_ETH_RX_POLL_WEIGHT 64
+#define CONFIG_PP3_RX_COAL_USEC 10
+#define CONFIG_PP3_RX_COAL_PKTS 100
+
 
 #define MV_PP3_PRIV(dev)	((struct pp3_dev_priv *)(netdev_priv(dev)))
 
 struct pp3_dev_priv {
 	int			index;
-	struct mv_pp3_port_data *plat_data;
+	/* struct mv_pp3_port_data *plat_data; */
 	struct pp3_group	*groups[CONFIG_NR_CPUS];
 	struct net_device	*dev;
 	unsigned long		flags;
@@ -93,6 +97,9 @@ struct pp3_group {
 struct pp3_cpu_stats {
 	unsigned int lnx_pool_irq;
 	unsigned int lnx_pool_irq_err;
+	unsigned int lnx_fw_irq;
+	unsigned int lnx_fw_irq_err;
+
 };
 
 struct pp3_cpu {
@@ -128,7 +135,7 @@ struct pp3_rxq {
 	int	logic_q;
 	int	phys_q;
 	enum	pp3_q_type		type;
-	struct	mv_pp3_queue_ctrl	*queue;
+	struct	mv_pp3_queue_ctrl	*hmac_queue;
 	struct	pp3_dev_priv		*dev_priv;
 	int	pkt_coal;
 	int	time_coal;
@@ -144,7 +151,7 @@ struct pp3_txq {
 	int	logic_q;
 	int	phys_q;
 	enum	pp3_q_type		type;
-	struct	mv_pp3_queue_ctrl	*queue;
+	struct	mv_pp3_queue_ctrl	*hmac_queue;
 	struct	pp3_dev_priv		*dev_priv;
 	struct	pp3_xq_stats		stats;
 	/*
