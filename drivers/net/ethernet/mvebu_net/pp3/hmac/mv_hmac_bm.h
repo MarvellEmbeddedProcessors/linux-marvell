@@ -83,23 +83,24 @@ struct mv_pp3_hmac_bm_cfh {
 };
 
 /* configure queue parameters used by BM queue       */
-u32 mv_pp3_hmac_bm_queue_init(int frame, int queue, int q_size,
-	struct mv_pp3_queue_ctrl *rxq_ctrl, struct mv_pp3_queue_ctrl *txq_ctrl)
+static int mv_pp3_hmac_bm_queue_init(int frame, int queue, int q_size)
 {
-	u32 ret = 0;
 	int size;
+	void *rxq_ctrl, *txq_ctrl;
 
 	size = MV_PP3_BM_PE_DG; /* number of descriptors * 1 datagrams (per PE) */
-	ret = mv_pp3_hmac_rxq_init(frame, queue, size, rxq_ctrl);
-	ret = mv_pp3_hmac_txq_init(frame, queue, size, MV_PP3_BM_PE_DG, txq_ctrl);
+	rxq_ctrl = mv_pp3_hmac_rxq_init(frame, queue, size);
+	txq_ctrl = mv_pp3_hmac_txq_init(frame, queue, size, MV_PP3_BM_PE_DG);
+	if ((rxq_ctrl == NULL) || (txq_ctrl == NULL))
+		return -1;
 
 	mv_pp3_hmac_queue_bm_mode_cfg(frame, queue);
 
-	return ret;
+	return 0;
 }
 
 /* send to BM pool (bp_id) request for (buff_num) buffers */
-void mv_pp3_hmac_bm_buff_request(int frame, int queue, int bp_id, int buff_num)
+static void mv_pp3_hmac_bm_buff_request(int frame, int queue, int bp_id, int buff_num)
 {
 	u32 data;
 
@@ -110,7 +111,7 @@ void mv_pp3_hmac_bm_buff_request(int frame, int queue, int bp_id, int buff_num)
 
 /* process BM pool (bp_id) responce for (buff_num) buffers
  * return pointer to buffer and move to next CFH           */
-struct mv_pp3_hmac_bm_cfh *mv_pp3_hmac_bm_buff_get(struct mv_pp3_queue_ctrl *rxq_ctrl)
+static struct mv_pp3_hmac_bm_cfh *mv_pp3_hmac_bm_buff_get(struct mv_pp3_hmac_queue_ctrl *rxq_ctrl)
 {
 	struct mv_pp3_hmac_bm_cfh *bm_cfh;
 
@@ -123,12 +124,12 @@ struct mv_pp3_hmac_bm_cfh *mv_pp3_hmac_bm_buff_get(struct mv_pp3_queue_ctrl *rxq
 
 /* fill request for BM buffer release.
  * return ERROR, if no space for message */
-int mv_pp3_hmac_bm_buff_free(int bp_id, u32 buff_addr, struct mv_pp3_queue_ctrl *qctrl)
+static int mv_pp3_hmac_bm_buff_free(int bp_id, u32 buff_addr, int frame, int queue)
 {
 	struct mv_pp3_hmac_bm_cfh *bm_cfh;
 
 	/* get pointer to PE and write parameters */
-	bm_cfh = (struct mv_pp3_hmac_bm_cfh *)mv_pp3_hmac_const_txq_next_cfh(qctrl);
+	bm_cfh = (struct mv_pp3_hmac_bm_cfh *)mv_pp3_hmac_const_txq_next_cfh(frame, queue);
 	if (bm_cfh == NULL)
 		return 1;
 
