@@ -71,13 +71,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "hmac/mv_hmac_regs.h"
 
 /* bitmap to store queues state (allocated/free) per frame */
-static unsigned int mv_pp3_hmac_queue_act[MV_PP3_HMAC_MAX_FRAME] = {0};
+static u32 mv_pp3_hmac_queue_act[MV_PP3_HMAC_MAX_FRAME] = {0};
 /* */
 struct pp3_unit_info pp3_hmac_gl;
 struct pp3_unit_info pp3_hmac_fr;
 
+/* Array of pointers to HMAC queue control structure */
+struct mv_pp3_hmac_queue_ctrl *mv_hmac_rxq_handle[MV_PP3_HMAC_MAX_FRAME][MV_PP3_QUEUES_PER_FRAME];
+struct mv_pp3_hmac_queue_ctrl *mv_hmac_txq_handle[MV_PP3_HMAC_MAX_FRAME][MV_PP3_QUEUES_PER_FRAME];
+
+
 /* local functions declaration */
-static int mv_pp3_hmac_queue_create(struct mv_pp3_queue_ctrl *q_ctrl, int desc_num);
+static int mv_pp3_hmac_queue_create(struct mv_pp3_hmac_queue_ctrl *q_ctrl, int bytes);
 
 /* general functions */
 /* store unit base address = silicon base address + unit offset */
@@ -121,16 +126,23 @@ void mv_pp3_hmac_queue_qm_mode_cfg(int frame, int queue, int qm_num)
 }
 
 
-/* RX queue functions */
+/************************ RX queue functions **************************************************/
 /* Allocate memory and init RX queue HW facility
- * size is a queue size in datagrams (16 bytes each) */
-u32 mv_pp3_hmac_rxq_init(int frame, int queue, int size, struct mv_pp3_queue_ctrl *qctrl)
+ * size is a queue size in datagrams (16 bytes each)
+ * Returns - pointer to HMAC RX queue structure */
+void *mv_pp3_hmac_rxq_init(int frame, int queue, int size)
 {
+	struct mv_pp3_hmac_queue_ctrl *qctrl;
 	u32 reg_data;
 
 	/* check if already created */
 	if ((mv_pp3_hmac_queue_act[frame] >> queue) & 1)
-		return 1;
+		return NULL;
+
+	/* allocate hmac queue control stucture */
+	qctrl = kmalloc(sizeof(struct mv_pp3_hmac_queue_ctrl), GFP_KERNEL);
+	if (qctrl == NULL)
+		return NULL;
 
 	qctrl->size = size;
 	qctrl->occ_dg = 0;
@@ -146,8 +158,10 @@ u32 mv_pp3_hmac_rxq_init(int frame, int queue, int size, struct mv_pp3_queue_ctr
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), reg_data);
 
 	/* mark queue as created */
+	mv_hmac_rxq_handle[frame][queue] = qctrl;
 	mv_pp3_hmac_queue_act[frame] |= (1 << queue);
-	return 0;
+
+	return qctrl;
 }
 
 void mv_pp3_hmac_rxq_flush(int frame, int queue)
@@ -180,10 +194,48 @@ void mv_pp3_hmac_rxq_disable(int frame, int queue)
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), reg_data);
 }
 
-/* TX queue functions */
-u32 mv_pp3_hmac_txq_init(int frame, int queue, int size, int cfh_size, struct mv_pp3_queue_ctrl *qctrl)
+/* Connect one of queue RX events to SPI interrupt group
+Inputs:
+	event - HMAC Rx event
+	 * 0 - QM queue - Timeout or new items added to the queue
+	 *     BM queue - allocate completed
+	 * 1 - QM queue only - Receive queue almost full
+	group - SPI group for event (0 - 7)
+*/
+void mv_pp3_hmac_rxq_event_cfg(int frame, int queue, int event, int group)
 {
 	u32 reg_data;
+
+	/* Configure event group */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_RQ_EVENT_GROUP(queue));
+	if (event == 0) {
+		/* set group for event 0 */
+		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT0_GROUP_OFFS, MV_PP3_HMAC_RQ_EVENT0_GROUP_MASK, group);
+		/* enable event */
+		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT0_EN_OFFS, MV_PP3_HMAC_RQ_EVENT0_EN_MASK, 1);
+	} else if (event == 1) {
+		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT1_GROUP_OFFS, MV_PP3_HMAC_RQ_EVENT1_GROUP_MASK, group);
+		/* enable event */
+		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT1_EN_OFFS, MV_PP3_HMAC_RQ_EVENT1_EN_MASK, 1);
+	}
+	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_RQ_EVENT_GROUP(queue), reg_data);
+}
+
+
+/************************ TX queue functions **************************************************/
+/* Allocate memory and init TX queue HW facility
+ * size - queue size in datagrams (16 bytes each)
+ * cfh_size - if not 0, define queue with constant CFH size (number of datagrams in CFH)
+ * Returns - pointer to HMAC TX queue structure */
+void *mv_pp3_hmac_txq_init(int frame, int queue, int size, int cfh_size)
+{
+	struct mv_pp3_hmac_queue_ctrl *qctrl;
+	u32 reg_data;
+
+	/* allocate hmac queue control stucture */
+	qctrl = kmalloc(sizeof(struct mv_pp3_hmac_queue_ctrl), GFP_KERNEL);
+	if (qctrl == NULL)
+		return NULL;
 
 	qctrl->size = size;
 	qctrl->occ_dg = 0;
@@ -194,13 +246,16 @@ u32 mv_pp3_hmac_txq_init(int frame, int queue, int size, int cfh_size, struct mv
 	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_SQ_ADDR_LOW(queue), (u32)qctrl->first);
 	/* Store queue size in rq_size table, number of 16B units */
 	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_SQ_SIZE(queue), (u32)qctrl->size);
+
 	/* Configure Transmit Threshold TBD */
 	/* Disable queue */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
 	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 0);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
 
-	return 0;
+	mv_hmac_txq_handle[frame][queue] = qctrl;
+
+	return qctrl;
 }
 
 void mv_pp3_hmac_txq_enable(int frame, int queue)
@@ -236,16 +291,16 @@ static u8 *mv_pp3_queue_mem_alloc(int size)
 	return p_virt;
 }
 
-static int mv_pp3_hmac_queue_create(struct mv_pp3_queue_ctrl *q_ctrl, int desc_num)
+static int mv_pp3_hmac_queue_create(struct mv_pp3_hmac_queue_ctrl *q_ctrl, int bytes)
 {
 	int size;
 
+	size = bytes + MV_PP3_HMAC_Q_ALIGN;
 	/* Allocate memory for queue */
-	size = ((desc_num * MV_PP3_CFH_MIN_SIZE) + MV_PP3_HMAC_Q_ALIGN);
 	q_ctrl->first = mv_pp3_queue_mem_alloc(size);
 
 	if (q_ctrl->first == NULL) {
-		printk(KERN_ERR "%s: Can't allocate %d bytes for %d descr\n", __func__, size, desc_num);
+		pr_err("%s: Can't allocate %d bytes for HMAC queue.\n", __func__, size);
 		return 1;
 	}
 
@@ -256,7 +311,25 @@ static int mv_pp3_hmac_queue_create(struct mv_pp3_queue_ctrl *q_ctrl, int desc_n
 	return 0;
 }
 
-/* Print HMAC Frame unit register */
+/* Connect queue TX event to SPI interrupt group (BM queue only)
+Inputs:
+	group - SPI group for event (0 - 7)
+*/
+void mv_pp3_hmac_txq_event_cfg(int frame, int queue, int group)
+{
+	u32 reg_data;
+
+	/* Configure event group */
+	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_SQ_EVENT_GROUP(queue));
+	/* set group for event 0 */
+	U32_SET_FIELD(reg_data, MV_PP3_HMAC_SQ_EVENT_GROUP_OFFS, MV_PP3_HMAC_SQ_EVENT_GROUP_MASK, group);
+	/* enable event */
+	U32_SET_FIELD(reg_data, MV_PP3_HMAC_SQ_EVENT_EN_OFFS, MV_PP3_HMAC_SQ_EVENT_EN_MASK, 1);
+
+	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_SQ_EVENT_GROUP(queue), reg_data);
+}
+
+/************************ Print HMAC Frame unit register **************************************/
 static void mv_pp3_hmac_fr_reg_print(int frame, char *reg_name, u32 reg)
 {
 	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg, mv_pp3_hmac_frame_reg_read(frame, reg));
