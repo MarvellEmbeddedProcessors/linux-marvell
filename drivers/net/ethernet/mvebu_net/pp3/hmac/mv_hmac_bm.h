@@ -88,7 +88,7 @@ static int mv_pp3_hmac_bm_queue_init(int frame, int queue, int q_size)
 	int size;
 	void *rxq_ctrl, *txq_ctrl;
 
-	size = MV_PP3_BM_PE_DG; /* number of descriptors * 1 datagrams (per PE) */
+	size = MV_PP3_BM_PE_DG * q_size;
 	rxq_ctrl = mv_pp3_hmac_rxq_init(frame, queue, size);
 	txq_ctrl = mv_pp3_hmac_txq_init(frame, queue, size, MV_PP3_BM_PE_DG);
 	if ((rxq_ctrl == NULL) || (txq_ctrl == NULL))
@@ -104,36 +104,53 @@ static void mv_pp3_hmac_bm_buff_request(int frame, int queue, int bp_id, int buf
 {
 	u32 data;
 
-	/* 2 datagrams per buffer */
+	/* 1 datagram per buffer */
 	data = ((buff_num * MV_PP3_BM_PE_DG) << MV_HMAC_SEND_Q_NUM_BPID_BM_ALLOC_COUNT_OFFS) + bp_id;
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_NUM_BPID_REG(queue), data);
 }
 
 /* process BM pool (bp_id) responce for (buff_num) buffers
- * return pointer to buffer and move to next CFH           */
-static struct mv_pp3_hmac_bm_cfh *mv_pp3_hmac_bm_buff_get(struct mv_pp3_hmac_queue_ctrl *rxq_ctrl)
+ * return pool ID, physical and virtual address of buffer  */
+static int mv_pp3_hmac_bm_buff_get(int frame, int queue, int *bp_id, u32 *ph_addr, u32 *vr_addr)
 {
 	struct mv_pp3_hmac_bm_cfh *bm_cfh;
+	struct mv_pp3_hmac_queue_ctrl *rxq_ctrl = mv_hmac_rxq_handle[frame][queue];
 
 	bm_cfh = (struct mv_pp3_hmac_bm_cfh *)(rxq_ctrl->next_proc);
 	/* move queue current pointer to next CFH (each CFH 32 bytes) */
-	rxq_ctrl->next_proc += MV_PP3_BM_PE_SIZE;
+	if ((rxq_ctrl->next_proc + MV_PP3_BM_PE_SIZE) >= rxq_ctrl->end)
+		rxq_ctrl->next_proc = rxq_ctrl->first;
+	else
+		rxq_ctrl->next_proc += MV_PP3_BM_PE_SIZE;
 
-	return bm_cfh;
+	*bp_id = bm_cfh->bp_id;
+	*ph_addr = bm_cfh->buffer_addr_low;
+	*vr_addr = bm_cfh->marker_low;
+
+	return 0;
 }
 
 /* fill request for BM buffer release.
  * return ERROR, if no space for message */
-static int mv_pp3_hmac_bm_buff_free(int bp_id, u32 buff_addr, int frame, int queue)
+static int mv_pp3_hmac_bm_buff_put(int frame, int queue, int bp_id, u32 ph_addr, u32 vr_addr)
 {
 	struct mv_pp3_hmac_bm_cfh *bm_cfh;
+	struct mv_pp3_hmac_queue_ctrl *txq_ctrl = mv_hmac_txq_handle[frame][queue];
+
+	if ((txq_ctrl->cfh_size + txq_ctrl->occ_dg) > txq_ctrl->size)
+		return -1;
 
 	/* get pointer to PE and write parameters */
-	bm_cfh = (struct mv_pp3_hmac_bm_cfh *)mv_pp3_hmac_const_txq_next_cfh(frame, queue);
-	if (bm_cfh == NULL)
-		return 1;
+	bm_cfh = (struct mv_pp3_hmac_bm_cfh *)(txq_ctrl->next_proc);
+	txq_ctrl->next_proc += MV_PP3_BM_PE_SIZE;
+	txq_ctrl->occ_dg += MV_PP3_BM_PE_DG;
 
-	bm_cfh->buffer_addr_low = buff_addr;
+	/* do WA, if needed */
+	if (txq_ctrl->next_proc == txq_ctrl->end)
+		txq_ctrl->next_proc = txq_ctrl->first;
+
+	bm_cfh->buffer_addr_low = ph_addr;
+	bm_cfh->marker_low = vr_addr;
 	bm_cfh->bp_id = bp_id;
 
 	return 0;
