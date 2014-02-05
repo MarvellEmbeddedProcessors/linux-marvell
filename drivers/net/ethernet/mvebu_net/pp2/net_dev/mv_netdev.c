@@ -476,9 +476,9 @@ int mv_eth_ctrl_dbg_flag(int port, u32 flag, u32 val)
 		return -ENODEV;
 
 	if (val)
-		set_bit(bit_flag, (unsigned long *)&(pp->dbg_flags));
+		pp->dbg_flags |= (1 << bit_flag);
 	else
-		clear_bit(bit_flag, (unsigned long *)&(pp->dbg_flags));
+		pp->dbg_flags &= ~(1 << bit_flag);
 #endif /* CONFIG_MV_ETH_DEBUG_CODE */
 
 	return 0;
