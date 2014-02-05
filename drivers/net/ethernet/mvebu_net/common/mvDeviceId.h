@@ -360,11 +360,14 @@ extern "C" {
 #define MV_88F66X0_Z2_NAME      "Z2"
 #define MV_88F66X0_Z3_ID	0x2
 #define MV_88F66X0_Z3_NAME      "Z3"
+#define MV_88F66XX_A0_ID	0x3
+#define MV_88F66XX_A0_NAME	"A0"
 
-#define MV_88FX66X0_ID_ARRAY { \
+#define MV_88F66X0_ID_ARRAY { \
 	MV_88F66X0_Z1_NAME,\
 	MV_88F66X0_Z2_NAME,\
-	MV_88F66X0_Z3_NAME \
+	MV_88F66X0_Z3_NAME,\
+	MV_88F66XX_A0_NAME \
 };
 
 /* Armada 375 Family */
