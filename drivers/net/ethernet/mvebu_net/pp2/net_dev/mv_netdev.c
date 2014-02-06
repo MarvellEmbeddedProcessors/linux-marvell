@@ -1061,6 +1061,11 @@ int mv_eth_ctrl_txq_cpu_def(int port, int txp, int txq, int cpu)
 		return -EINVAL;
 	}
 
+	if (txq >= CONFIG_MV_ETH_TXQ) {
+		pr_err("txq #%d is out of range: from 0 to %d\n", txq, CONFIG_MV_ETH_TXQ - 1);
+		return -EINVAL;
+	}
+
 	if (mvPp2TxpCheck(port, txp))
 		return -EINVAL;
 
