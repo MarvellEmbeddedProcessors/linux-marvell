@@ -351,9 +351,14 @@ extern "C" {
 
 /* Avanta LP Family */
 #define MV_88F66X0		0x6600
-#define MV_6660_DEV_ID		0x6660
-#define MV_6650_DEV_ID		0x6650
 #define MV_6610_DEV_ID		0x6610
+#define MV_6610F_DEV_ID		0x610F
+#define MV_6650_DEV_ID		0x6650
+#define MV_6650F_DEV_ID		0x650F
+#define MV_6658_DEV_ID		0x6658
+#define MV_6660_DEV_ID		0x6660
+#define MV_6665_DEV_ID		0x6665
+
 #define MV_88F66X0_Z1_ID	0x0
 #define MV_88F66X0_Z1_NAME      "Z1"
 #define MV_88F66X0_Z2_ID	0x1
