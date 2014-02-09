@@ -2772,11 +2772,12 @@ void	*mv_eth_bm_pool_create(int pool, int capacity, MV_ULONG *pPhysAddr)
 	MV_ULONG physAddr;
 	void *pVirt;
 	MV_STATUS status;
+	int size = 2 * sizeof(MV_U32) * capacity;
 
-	pVirt = mvOsIoUncachedMalloc(NULL, sizeof(MV_U32) * capacity, &physAddr, NULL);
+	pVirt = mvOsIoUncachedMalloc(NULL, size, &physAddr, NULL);
 	if (pVirt == NULL) {
-		mvOsPrintf("%s: Can't allocate %d bytes for Long pool #%d\n",
-				__func__, MV_BM_POOL_CAP_MAX * sizeof(MV_U32), pool);
+		mvOsPrintf("%s: Can't allocate %d bytes for pool #%d\n",
+				__func__, size, pool);
 		return NULL;
 	}
 
@@ -2784,13 +2785,13 @@ void	*mv_eth_bm_pool_create(int pool, int capacity, MV_ULONG *pPhysAddr)
 	if (MV_IS_NOT_ALIGN((unsigned)pVirt, MV_BM_POOL_PTR_ALIGN)) {
 		mvOsPrintf("memory allocated for BM pool #%d is not %d bytes aligned\n",
 					pool, MV_BM_POOL_PTR_ALIGN);
-		mvOsIoCachedFree(NULL, sizeof(MV_U32) * capacity, physAddr, pVirt, 0);
+		mvOsIoCachedFree(NULL, size, physAddr, pVirt, 0);
 		return NULL;
 	}
 	status = mvBmPoolInit(pool, pVirt, physAddr, capacity);
 	if (status != MV_OK) {
 		mvOsPrintf("%s: Can't init #%d BM pool. status=%d\n", __func__, pool, status);
-		mvOsIoCachedFree(NULL, sizeof(MV_U32) * capacity, physAddr, pVirt, 0);
+		mvOsIoCachedFree(NULL, size, physAddr, pVirt, 0);
 		return NULL;
 	}
 
