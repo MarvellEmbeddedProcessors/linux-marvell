@@ -439,6 +439,7 @@ typedef struct mvPp2ClsLkpEntry {
 
 int mvPp2ClsHwLkpWrite(int lkpid, int way, MV_PP2_CLS_LKP_ENTRY *fe);
 int mvPp2ClsHwLkpRead(int lkpid, int way, MV_PP2_CLS_LKP_ENTRY *fe);
+int mvPp2ClsHwLkpClear(int lkpid, int way);
 int mvPp2ClsSwLkpDump(MV_PP2_CLS_LKP_ENTRY *fe);
 int mvPp2ClsHwLkpDump(void);
 /*PPv2.1 new counters MAS 3.20*/
@@ -469,6 +470,7 @@ typedef struct mvPp2ClsFlowEntry {
 
 int mvPp2ClsHwFlowWrite(int index, MV_PP2_CLS_FLOW_ENTRY *fe);
 int mvPp2ClsHwFlowRead(int index, MV_PP2_CLS_FLOW_ENTRY *fe);
+int mvPp2ClsHwFlowClear(int index);
 int mvPp2ClsSwFlowDump(MV_PP2_CLS_FLOW_ENTRY *fe);
 int mvPp2ClsHwFlowDump(void);
 int mvPp2V1ClsHwFlowHitsDump(void);

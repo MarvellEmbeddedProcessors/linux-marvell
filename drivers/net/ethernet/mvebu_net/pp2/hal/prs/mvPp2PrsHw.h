@@ -223,6 +223,9 @@ reg 5 --> reg 0
 #define TCAM_INVALID				1
 #define TCAM_INV_WORD				5
 
+#define TCAM_DATA_BYTE_OFFS(_offs_)		(((_offs_) - ((_offs_) % 2)) * 2 + ((_offs_) % 2))
+#define TCAM_DATA_MASK_OFFS(_offs_)		(((_offs_) * 2) - ((_offs_) % 2)  + 2)
+#define TCAM_MASK_OFFS(_offs_)			((_offs_) + 2)
 
 /************************* SRAM structure **********************/
 /* convert bit offset to byte offset */
@@ -365,8 +368,8 @@ reg 5 --> reg 0
 #define RI_L3_ADDR_MASK					(((1 << RI_L3_ADDR_BITS) - 1) << RI_L3_ADDR_OFFS)
 #define RI_L3_UCAST            				(0 << RI_L3_ADDR_OFFS)
 #define RI_L3_MCAST            				(1 << RI_L3_ADDR_OFFS)
-#define RI_L3_BCAST            				(2 << RI_L3_ADDR_OFFS)
-#define RI_L3_ANYCAST           			(3 << RI_L3_ADDR_OFFS)
+#define RI_L3_ANYCAST					(2 << RI_L3_ADDR_OFFS)
+#define RI_L3_BCAST					(3 << RI_L3_ADDR_OFFS)
 
 /* bit 17 */
 #define RI_IP_FRAG_BIT					17
@@ -381,6 +384,8 @@ reg 5 --> reg 0
 #define RI_UDF3_OFFS					20
 #define RI_UDF3_BITS					2
 #define RI_UDF3_MASK					(((1 << RI_UDF3_BITS) - 1) << RI_UDF3_OFFS)
+#define RI_UDF3_RX_SPEC_VAL				2
+#define RI_UDF3_RX_SPECIAL				(RI_UDF3_RX_SPEC_VAL << RI_UDF3_OFFS)
 
 /* Bits 22 - 24 */
 #define RI_L4_PROTO_OFFS				22
@@ -405,6 +410,7 @@ reg 5 --> reg 0
 #define RI_UDF7_OFFS					29
 #define RI_UDF7_BITS					2
 #define RI_UDF7_MASK					(((1 << RI_UDF7_BITS) - 1) << RI_UDF7_OFFS)
+#define RI_UDF7_IP6_LITE				(1 << RI_UDF7_OFFS)/* Indicates DS lite, in A0 version */
 
 /* bit 31 - drop */
 #define RI_DROP_BIT					31
@@ -450,6 +456,11 @@ void mvPp2PrsShadowFinSet(int index, MV_BOOL finish); /* set bit 111 (GEN_BIT) i
 MV_BOOL mvPp2PrsShadowFin(int index);
 void mvPp2PrsShadowClear(int index);
 void mvPp2PrsShadowClearAll(void);
+int mvPrsFlowIdGet(int flowId);
+void mvPrsFlowIdSet(int flowId);
+void mvPrsFlowIdClear(int flowId);
+void mvPrsFlowIdClearAll(void);
+int mvPrsFlowIdDump(void);
 int mvPp2PrsShadowLu(int index);
 int mvPp2PrsShadowIsValid(int index);
 int mvPp2PrsTcamFirstFree(int start, int end);
@@ -460,7 +471,11 @@ int mvPp2PrsTcamFirstFree(int start, int end);
 /*-------------------------------------------------------------------------------*/
 
 /* Parser Public TCAM APIs */
-#define MV_PP2_PRS_TCAM_SIZE 				(256)
+#define MV_PP2_PRS_TCAM_SIZE				(256)
+
+#define MV_PP2_PRS_FLOW_ID_SIZE				(64)
+#define MV_PP2_PRS_FIRST_FLOW_ID			(8) /* Flow ID 0~7 are reserved by LSP */
+#define MV_PP2_PRS_LAST_FLOW_ID				(64 - 1 - 4) /* Flow ID 60~63 are reserved by HW */
 
 #define MV_PP2_PRC_TCAM_WORDS				6
 #define MV_PP2_PRC_SRAM_WORDS				4
