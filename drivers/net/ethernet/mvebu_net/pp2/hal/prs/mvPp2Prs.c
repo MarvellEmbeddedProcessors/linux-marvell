@@ -1,64 +1,64 @@
 /*******************************************************************************
-Copyright (C) Marvell International Ltd. and its affiliates
+   Copyright (C) Marvell International Ltd. and its affiliates
 
-This software file (the "File") is owned and distributed by Marvell
-International Ltd. and/or its affiliates ("Marvell") under the following
-alternative licensing terms.  Once you have made an election to distribute the
-File under one of the following license alternatives, please (i) delete this
-introductory statement regarding license alternatives, (ii) delete the two
-license alternatives that you have not elected to use and (iii) preserve the
-Marvell copyright notice above.
-
-********************************************************************************
-Marvell Commercial License Option
-
-If you received this File from Marvell and you have entered into a commercial
-license agreement (a "Commercial License") with Marvell, the File is licensed
-to you under the terms of the applicable Commercial License.
+   This software file (the "File") is owned and distributed by Marvell
+   International Ltd. and/or its affiliates ("Marvell") under the following
+   alternative licensing terms.  Once you have made an election to distribute the
+   File under one of the following license alternatives, please (i) delete this
+   introductory statement regarding license alternatives, (ii) delete the two
+   license alternatives that you have not elected to use and (iii) preserve the
+   Marvell copyright notice above.
 
 ********************************************************************************
-Marvell GPL License Option
+   Marvell Commercial License Option
 
-If you received this File from Marvell, you may opt to use, redistribute and/or
-modify this File in accordance with the terms and conditions of the General
-Public License Version 2, June 1991 (the "GPL License"), a copy of which is
-available along with the File in the license.txt file or by writing to the Free
-Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 or
-on the worldwide web at http://www.gnu.org/licenses/gpl.txt.
+   If you received this File from Marvell and you have entered into a commercial
+   license agreement (a "Commercial License") with Marvell, the File is licensed
+   to you under the terms of the applicable Commercial License.
 
-THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE IMPLIED
-WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE ARE EXPRESSLY
-DISCLAIMED.  The GPL License provides additional details about this warranty
-disclaimer.
 ********************************************************************************
-Marvell BSD License Option
+   Marvell GPL License Option
 
-If you received this File from Marvell, you may opt to use, redistribute and/or
-modify this File under the following licensing terms.
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
+   If you received this File from Marvell, you may opt to use, redistribute and/or
+   modify this File in accordance with the terms and conditions of the General
+   Public License Version 2, June 1991 (the "GPL License"), a copy of which is
+   available along with the File in the license.txt file or by writing to the Free
+   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 or
+   on the worldwide web at http://www.gnu.org/licenses/gpl.txt.
 
-    *   Redistributions of source code must retain the above copyright notice,
+   THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE IMPLIED
+   WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE ARE EXPRESSLY
+   DISCLAIMED.  The GPL License provides additional details about this warranty
+   disclaimer.
+********************************************************************************
+   Marvell BSD License Option
+
+   If you received this File from Marvell, you may opt to use, redistribute and/or
+   modify this File under the following licensing terms.
+   Redistribution and use in source and binary forms, with or without modification,
+   are permitted provided that the following conditions are met:
+
+*   Redistributions of source code must retain the above copyright notice,
 	this list of conditions and the following disclaimer.
 
-    *   Redistributions in binary form must reproduce the above copyright
+*   Redistributions in binary form must reproduce the above copyright
 	notice, this list of conditions and the following disclaimer in the
 	documentation and/or other materials provided with the distribution.
 
-    *   Neither the name of Marvell nor the names of its contributors may be
+*   Neither the name of Marvell nor the names of its contributors may be
 	used to endorse or promote products derived from this software without
 	specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+   ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+   ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *******************************************************************************/
 #include "mvOs.h"
@@ -67,6 +67,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvPp2Prs.h"
 #include "gbe/mvPp2Gbe.h"
 #include "mvPp2PrsHw.h"
+#include "mvPp2Prs.h"
 
 #define PRS_DBG(X...)
 
@@ -116,8 +117,8 @@ static int mvPrsDblVlanAiFreeGet(void)
 
 
 /******************************************************************************
- * Common utilities
- ******************************************************************************/
+* Common utilities
+******************************************************************************/
 static MV_BOOL mvPp2PrsEtypeEquals(MV_PP2_PRS_ENTRY *pe, int offset, unsigned short ethertype)
 {
 	unsigned char etype[MV_ETH_TYPE_LEN];
@@ -139,13 +140,305 @@ static void mvPp2PrsMatchEtype(MV_PP2_PRS_ENTRY *pe, int offset, unsigned short 
 	mvPp2PrsSwTcamByteSet(pe, offset + 0, ethertype >> 8, 0xff);
 	mvPp2PrsSwTcamByteSet(pe, offset + 1, ethertype & 0xFF, 0xff);
 }
-
+#if 0
 static void mvPp2PrsMatchMh(MV_PP2_PRS_ENTRY *pe, unsigned short mh)
 {
 	PRS_DBG("%s\n", __func__);
 
 	mvPp2PrsSwTcamByteSet(pe, 0, mh >> 8, 0xff);
 	mvPp2PrsSwTcamByteSet(pe, 1, mh & 0xFF, 0xff);
+}
+#endif
+
+/******************************************************************************
+ *
+ * Marvell header Section
+ *
+ ******************************************************************************
+ */
+static MV_BOOL mvPrsMhRangeEquals(MV_PP2_PRS_ENTRY *pe, MV_U8 *mh, MV_U8 *mask)
+{
+	int index;
+	unsigned char tcamByte, tcamMask;
+
+	for (index = 0; index < MV_ETH_MH_SIZE; index++) {
+		mvPp2PrsSwTcamByteGet(pe, index, &tcamByte, &tcamMask);
+		if (tcamMask != mask[index])
+			return MV_FALSE;
+
+		if ((tcamMask & tcamByte) != (mh[index] & mask[index]))
+			return MV_FALSE;
+	}
+
+	return MV_TRUE;
+}
+
+static MV_BOOL mvPrsMhRangeIntersec(MV_PP2_PRS_ENTRY *pe, MV_U8 *mh, MV_U8 *mask)
+{
+	int index;
+	unsigned char tcamByte, tcamMask, commonMask;
+
+	for (index = 0; index < MV_ETH_MH_SIZE; index++) {
+		mvPp2PrsSwTcamByteGet(pe, index, &tcamByte, &tcamMask);
+
+		commonMask = mask[index] & tcamMask;
+
+		if ((commonMask & tcamByte) != (commonMask & mh[index]))
+			return MV_FALSE;
+	}
+	return MV_TRUE;
+}
+
+static MV_BOOL mvPrsMhInRange(MV_PP2_PRS_ENTRY *pe, MV_U8 *mh, MV_U8 *mask)
+{
+	int index;
+	unsigned char tcamByte, tcamMask;
+
+	for (index = 0; index < MV_ETH_MH_SIZE; index++) {
+		mvPp2PrsSwTcamByteGet(pe, index, &tcamByte, &tcamMask);
+		if ((tcamByte & mask[index]) != (mh[index] & mask[index]))
+			return MV_FALSE;
+	}
+
+	return MV_TRUE;
+}
+
+static MV_PP2_PRS_ENTRY *mvPrsMhRangeFind(int portMap, unsigned char *mh, unsigned char *mask)
+{
+	MV_PP2_PRS_ENTRY *pe;
+	int tid;
+	unsigned int entryPmap;
+
+	pe = mvPp2PrsSwAlloc(PRS_LU_MH);
+
+	/* Go through the all entires with PRS_LU_MAC */
+	for (tid = PE_FIRST_FREE_TID; tid <= PE_LAST_FREE_TID; tid++) {
+		if ((!mvPp2PrsShadowIsValid(tid)) || (mvPp2PrsShadowLu(tid) != PRS_LU_MH))
+			continue;
+
+		pe->index = tid;
+		mvPp2PrsHwRead(pe);
+
+		mvPp2PrsSwTcamPortMapGet(pe, &entryPmap);
+
+		if (mvPrsMhRangeEquals(pe, mh, mask) && (entryPmap == (unsigned int)portMap))
+			return pe;
+	}
+	mvPp2PrsSwFree(pe);
+	return NULL;
+}
+
+static int mvPrsMhRangeAccept(int portMap, MV_U8 *mh, MV_U8 *mask, unsigned int ri, unsigned int riMask, MV_BOOL finish)
+{
+	int tid, len;
+	MV_PP2_PRS_ENTRY *pe = NULL;
+
+	/* Scan TCAM and see if entry with this <MH, port> already exist */
+	pe = mvPrsMhRangeFind(portMap, mh, mask);
+
+	if (pe == NULL) {
+		/* entry not exist */
+		/* Go through the all entires from first to last */
+		tid = mvPp2PrsTcamFirstFree(PE_FIRST_FREE_TID, PE_LAST_FREE_TID);
+
+		/* Can't add - No free TCAM entries */
+		if (tid == MV_PRS_OUT_OF_RAGE) {
+			mvOsPrintf("%s: No free TCAM entiry\n", __func__);
+			mvPp2PrsSwFree(pe);
+			return MV_ERROR;
+		}
+
+		pe = mvPp2PrsSwAlloc(PRS_LU_MH);
+		pe->index = tid;
+		mvPp2PrsSwTcamPortMapSet(pe, portMap);
+		/* shift to MAC */
+		mvPp2PrsSwSramShiftSet(pe, MV_ETH_MH_SIZE, SRAM_OP_SEL_SHIFT_ADD);
+
+		mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+		mvPp2PrsSwSramFlowidGenSet(pe);
+
+		/* set MH range */
+		len = MV_ETH_MH_SIZE;
+
+		while (len--)
+			mvPp2PrsSwTcamByteSet(pe, len, mh[len], mask[len]);
+
+		/* Update mvPrsShadowTbl */
+		mvPp2PrsShadowSet(pe->index, PRS_LU_MH, "mh-range");
+
+	}
+
+	/* Set result info bits */
+	mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
+	finish ? mvPp2PrsSwSramFlowidGenSet(pe) : mvPp2PrsSwSramFlowidGenClear(pe);
+
+	/* Write entry to TCAM */
+	mvPp2PrsHwWrite(pe);
+
+	mvPp2PrsSwFree(pe);
+	return MV_OK;
+}
+
+static int mvPrsMhRangeValid(unsigned int portMap, MV_U8 *mh, MV_U8 *mask)
+{
+	MV_PP2_PRS_ENTRY pe;
+	unsigned int entryPmap;
+	int tid;
+
+	for (tid = PE_LAST_FREE_TID; tid >= PE_FIRST_FREE_TID; tid--) {
+		if (!mvPp2PrsShadowIsValid(tid) || (mvPp2PrsShadowLu(tid) != PRS_LU_MH))
+			continue;
+
+		pe.index = tid;
+		mvPp2PrsHwRead(&pe);
+
+		mvPp2PrsSwTcamPortMapGet(&pe, &entryPmap);
+
+		if ((mvPrsMhRangeIntersec(&pe, mh, mask)) & !mvPrsMhRangeEquals(&pe, mh, mask)) {
+			if (entryPmap & portMap) {
+				mvOsPrintf("%s: operation not supported, range intersection\n", __func__);
+				mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n",
+					   __func__, entryPmap & portMap, tid);
+				return MV_ERROR;
+			}
+
+		} else if (mvPrsMhRangeEquals(&pe, mh, mask) && (entryPmap != portMap) && (entryPmap & portMap)) {
+			mvOsPrintf("%s: operation not supported, range intersection\n", __func__);
+			mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n",
+				   __func__, entryPmap & portMap, tid);
+
+			return MV_ERROR;
+		}
+	}
+	return MV_OK;
+}
+
+int mvPrsMhSet(unsigned int portMap, unsigned short mh, unsigned short mh_mask, unsigned int ri, unsigned int riMask, MV_BOOL finish)
+{
+	MV_PP2_PRS_ENTRY pe;
+	int tid;
+	unsigned int entryPmap;
+	MV_BOOL done = MV_FALSE;
+	unsigned short n_mh;
+	unsigned short n_mh_mask;
+
+	/* step 1 - validation, ranges intersections are forbidden*/
+	n_mh = htons(mh);
+	n_mh_mask = htons(mh_mask);
+	if (mvPrsMhRangeValid(portMap, (unsigned char *)&n_mh, (unsigned char *)&n_mh_mask))
+		return MV_ERROR;
+
+	/* step 2 - update TCAM */
+	for (tid = PE_LAST_FREE_TID; tid >= PE_FIRST_FREE_TID; tid--) {
+		if (!mvPp2PrsShadowIsValid(tid) || !(mvPp2PrsShadowLu(tid) == PRS_LU_MH))
+			continue;
+
+		pe.index = tid;
+		mvPp2PrsHwRead(&pe);
+		mvPp2PrsSwTcamPortMapGet(&pe, &entryPmap);
+
+		if (mvPrsMhRangeEquals(&pe, (unsigned char *)&n_mh, (unsigned char *)&n_mh_mask) &&
+				       (entryPmap == portMap)) {
+			/* portMap and range are equals to TCAM entry*/
+			done = MV_TRUE;
+			mvPp2PrsSwSramRiUpdate(&pe, ri, riMask);
+			finish ? mvPp2PrsSwSramFlowidGenSet(&pe) : mvPp2PrsSwSramFlowidGenClear(&pe);
+			mvPp2PrsHwWrite(&pe);
+			continue;
+		}
+
+		/* PRS_UDF_MAC_DEF */
+		if (mvPrsMhInRange(&pe, (unsigned char *)&n_mh, (unsigned char *)&n_mh_mask) && (entryPmap & portMap)) {
+			mvPp2PrsSwSramRiUpdate(&pe, ri, riMask);
+			finish ? mvPp2PrsSwSramFlowidGenSet(&pe) : mvPp2PrsSwSramFlowidGenClear(&pe);
+			mvPp2PrsHwWrite(&pe);
+		}
+	}
+	/* step 3 - Add new range entry */
+	if (!done)
+		return mvPrsMhRangeAccept(portMap, (unsigned char *)&n_mh,
+					 (unsigned char *)&n_mh_mask, ri, riMask, finish);
+
+	return MV_OK;
+}
+
+int mvPrsMhDel(unsigned int portMap, unsigned short mh, unsigned short mh_mask)
+{
+	MV_PP2_PRS_ENTRY pe;
+	int tid;
+	unsigned int entryPmap;
+	MV_BOOL found = MV_FALSE;
+	unsigned short n_mh;
+	unsigned short n_mh_mask;
+
+	n_mh = htons(mh);
+	n_mh_mask = htons(mh_mask);
+
+	for (tid = PE_LAST_FREE_TID; tid >= PE_FIRST_FREE_TID; tid--) {
+		if (!mvPp2PrsShadowIsValid(tid) || !(mvPp2PrsShadowLu(tid) == PRS_LU_MH))
+			continue;
+
+		pe.index = tid;
+		mvPp2PrsHwRead(&pe);
+		mvPp2PrsSwTcamPortMapGet(&pe, &entryPmap);
+
+		/* differents ports */
+		if (!(entryPmap & portMap))
+			continue;
+
+		if (mvPrsMhRangeEquals(&pe, (unsigned char *)&n_mh, (unsigned char *)&n_mh_mask)) {
+			found = MV_TRUE;
+			entryPmap &= ~portMap;
+
+			if (!entryPmap) {
+				/* delete entry */
+				mvPp2PrsHwInv(pe.index);
+				mvPp2PrsShadowClear(pe.index);
+				continue;
+			}
+
+			/* update port map */
+			mvPp2PrsSwTcamPortMapSet(&pe, entryPmap);
+			mvPp2PrsHwWrite(&pe);
+			continue;
+		}
+
+		/* PRS_UDF_MH_RANGE */
+		if (!found) {
+			/* range entry not exist */
+			mvOsPrintf("%s: Error, entry not found\n", __func__);
+			return MV_ERROR;
+		}
+
+		/* range entry allready found, now fix all relevant default entries*/
+		if (mvPrsMhInRange(&pe, (unsigned char *)&n_mh, (unsigned char *)&n_mh_mask)) {
+			mvPp2PrsSwSramFlowidGenClear(&pe);
+			mvPp2PrsSwSramRiSet(&pe, mvPp2PrsShadowRi(tid), mvPp2PrsShadowRiMask(tid));
+			mvPp2PrsHwWrite(&pe);
+		}
+	}
+	return MV_OK;
+}
+
+/* Set default entry for Marvell header field */
+static int mvPp2PrsMhInit(void)
+{
+	MV_PP2_PRS_ENTRY pe;
+
+	mvPp2PrsSwClear(&pe);
+
+	pe.index = PE_MH_DEFAULT;
+	mvPp2PrsSwTcamLuSet(&pe, PRS_LU_MH);
+	mvPp2PrsSwSramShiftSet(&pe, MV_ETH_MH_SIZE, SRAM_OP_SEL_SHIFT_ADD);
+	mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_MAC);
+
+	/* Update mvPrsShadowTbl */
+	mvPp2PrsShadowSet(pe.index, PRS_LU_MH, "mh-default");
+
+	mvPp2PrsSwTcamPortMapSet(&pe, PORT_MASK);
+	mvPp2PrsHwWrite(&pe);
+
+	return MV_OK;
 }
 
 /******************************************************************************
@@ -172,13 +465,13 @@ char *mvPrsL2InfoStr(unsigned int l2_info)
 
 static MV_BOOL mvPrsMacRangeEquals(MV_PP2_PRS_ENTRY *pe, MV_U8 *da, MV_U8 *mask)
 {
-	int		index;
-	unsigned char 	tcamByte, tcamMask;
+	int index;
+	unsigned char tcamByte, tcamMask;
 
 	for (index = 0; index < MV_MAC_ADDR_SIZE; index++) {
-		mvPp2PrsSwTcamByteGet(pe, MV_ETH_MH_SIZE + index, &tcamByte, &tcamMask);
+		mvPp2PrsSwTcamByteGet(pe, index, &tcamByte, &tcamMask);
 		if (tcamMask != mask[index])
-			return	MV_FALSE;
+			return MV_FALSE;
 
 		if ((tcamMask & tcamByte) != (da[index] & mask[index]))
 			return MV_FALSE;
@@ -189,11 +482,11 @@ static MV_BOOL mvPrsMacRangeEquals(MV_PP2_PRS_ENTRY *pe, MV_U8 *da, MV_U8 *mask)
 
 static MV_BOOL mvPrsMacRangeIntersec(MV_PP2_PRS_ENTRY *pe, MV_U8 *da, MV_U8 *mask)
 {
-	int		index;
-	unsigned char 	tcamByte, tcamMask, commonMask;
+	int index;
+	unsigned char tcamByte, tcamMask, commonMask;
 
 	for (index = 0; index < MV_MAC_ADDR_SIZE; index++) {
-		mvPp2PrsSwTcamByteGet(pe, MV_ETH_MH_SIZE + index, &tcamByte, &tcamMask);
+		mvPp2PrsSwTcamByteGet(pe, index, &tcamByte, &tcamMask);
 
 		commonMask = mask[index] & tcamMask;
 
@@ -206,11 +499,11 @@ static MV_BOOL mvPrsMacRangeIntersec(MV_PP2_PRS_ENTRY *pe, MV_U8 *da, MV_U8 *mas
 
 static MV_BOOL mvPrsMacInRange(MV_PP2_PRS_ENTRY *pe, MV_U8* da, MV_U8* mask)
 {
-	int		index;
-	unsigned char 	tcamByte, tcamMask;
+	int index;
+	unsigned char tcamByte, tcamMask;
 
 	for (index = 0; index < MV_MAC_ADDR_SIZE; index++) {
-		mvPp2PrsSwTcamByteGet(pe, MV_ETH_MH_SIZE + index, &tcamByte, &tcamMask);
+		mvPp2PrsSwTcamByteGet(pe, index, &tcamByte, &tcamMask);
 		if ((tcamByte & mask[index]) != (da[index] & mask[index]))
 			return MV_FALSE;
 	}
@@ -259,7 +552,7 @@ static MV_PP2_PRS_ENTRY *mvPrsMacDaFind(int port, unsigned char *da)
 
 static int mvPrsMacDaRangeAccept(int portMap, MV_U8 *da, MV_U8 *mask, unsigned int ri, unsigned int riMask, MV_BOOL finish)
 {
-	int	tid, len;
+	int tid, len;
 	MV_PP2_PRS_ENTRY *pe = NULL;
 
 	/* Scan TCAM and see if entry with this <MAC DA, port> already exist */
@@ -270,8 +563,8 @@ static int mvPrsMacDaRangeAccept(int portMap, MV_U8 *da, MV_U8 *mask, unsigned i
 		/* find last simple mac entry*/
 		for (tid = PE_LAST_FREE_TID ; tid >= PE_FIRST_FREE_TID; tid--)
 			if (mvPp2PrsShadowIsValid(tid) && (mvPp2PrsShadowLu(tid) == PRS_LU_MAC) &&
-				(mvPp2PrsShadowUdf(tid) == PRS_UDF_MAC_DEF))
-					break;
+			    (mvPp2PrsShadowUdf(tid) == PRS_UDF_MAC_DEF))
+				break;
 
 		/* Go through the all entires from first to last */
 		tid = mvPp2PrsTcamFirstFree(tid + 1, PE_LAST_FREE_TID);
@@ -287,13 +580,13 @@ static int mvPrsMacDaRangeAccept(int portMap, MV_U8 *da, MV_U8 *mask, unsigned i
 		pe->index = tid;
 		mvPp2PrsSwTcamPortMapSet(pe, portMap);
 		/* shift to ethertype */
-		mvPp2PrsSwSramShiftSet(pe, MV_ETH_MH_SIZE + 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
+		mvPp2PrsSwSramShiftSet(pe, 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
 
 		/* set DA range */
 		len = MV_MAC_ADDR_SIZE;
 
 		while (len--)
-			mvPp2PrsSwTcamByteSet(pe, MV_ETH_MH_SIZE + len, da[len], mask[len]);
+			mvPp2PrsSwTcamByteSet(pe, len, da[len], mask[len]);
 
 		/* Update mvPrsShadowTbl */
 		mvPp2PrsShadowSet(pe->index, PRS_LU_MAC, "mac-range");
@@ -337,7 +630,7 @@ int mvPrsMcastDelAll(int port)
 
 		/* read mac addr from entry */
 		for (index = 0; index < MV_MAC_ADDR_SIZE; index++)
-			mvPp2PrsSwTcamByteGet(&pe, MV_ETH_MH_SIZE + index, &da[index], &daMask[index]);
+			mvPp2PrsSwTcamByteGet(&pe, index, &da[index], &daMask[index]);
 
 		if (MV_IS_BROADCAST_MAC(da))
 			continue;
@@ -355,8 +648,8 @@ int mvPrsMcastDelAll(int port)
 int mvPrsMacDaAccept(int port, unsigned char *da, int add)
 {
 	MV_PP2_PRS_ENTRY *pe = NULL;
-	unsigned int     len, ports, ri;
-	int              tid;
+	unsigned int len, ports, ri;
+	int tid;
 	char name[PRS_TEXT_SIZE];
 
 	/* Scan TCAM and see if entry with this <MAC DA, port> already exist */
@@ -368,13 +661,13 @@ int mvPrsMacDaAccept(int port, unsigned char *da, int add)
 			/* Can't remove - No such entry */
 			return MV_ERROR;
 		}
-		/* Create new TCAM entry */
+		 /* Create new TCAM entry */
 
 		/* find last range mac entry*/
 		for (tid = PE_FIRST_FREE_TID ; tid <= PE_LAST_FREE_TID; tid++)
 			if (mvPp2PrsShadowIsValid(tid) && (mvPp2PrsShadowLu(tid) == PRS_LU_MAC) &&
-				(mvPp2PrsShadowUdf(tid) == PRS_UDF_MAC_RANGE))
-					break;
+			    (mvPp2PrsShadowUdf(tid) == PRS_UDF_MAC_RANGE))
+				break;
 
 		/* Go through the all entires from first to last */
 		tid = mvPp2PrsTcamFirstFree(0, tid - 1);
@@ -416,15 +709,15 @@ int mvPrsMacDaAccept(int port, unsigned char *da, int add)
 	/* set match on DA */
 	len = MV_MAC_ADDR_SIZE;
 	while (len--)
-		mvPp2PrsSwTcamByteSet(pe, MV_ETH_MH_SIZE + len, da[len], 0xff);
+		mvPp2PrsSwTcamByteSet(pe, len, da[len], 0xff);
 
 	/* Set result info bits */
 	if (MV_IS_BROADCAST_MAC(da)) {
-		ri = RI_L2_BCAST | RI_MAC_ME_MASK;
+		ri = RI_L2_BCAST;
 		mvOsSPrintf(name, "bcast-port-%d", port);
 
 	} else if (MV_IS_MULTICAST_MAC(da)) {
-		ri = RI_L2_MCAST | RI_MAC_ME_MASK;
+		ri = RI_L2_MCAST;
 		mvOsSPrintf(name, "mcast-port-%d", port);
 	} else {
 		ri = RI_L2_UCAST | RI_MAC_ME_MASK;
@@ -436,7 +729,7 @@ int mvPrsMacDaAccept(int port, unsigned char *da, int add)
 	mvPp2PrsShadowRiSet(pe->index, ri, RI_L2_CAST_MASK | RI_MAC_ME_MASK);
 
 	/* shift to ethertype */
-	mvPp2PrsSwSramShiftSet(pe, MV_ETH_MH_SIZE + 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
+	mvPp2PrsSwSramShiftSet(pe, 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
 
 	/* Write entry to TCAM */
 	mvPp2PrsHwWrite(pe);
@@ -458,8 +751,8 @@ static int mvPrsMacDaRangeValid(unsigned int portMap, MV_U8 *da, MV_U8 *mask)
 
 	for (tid = PE_LAST_FREE_TID ; tid >= PE_FIRST_FREE_TID; tid--) {
 		if (!mvPp2PrsShadowIsValid(tid) || (mvPp2PrsShadowLu(tid) != PRS_LU_MAC) ||
-			(mvPp2PrsShadowUdf(tid) != PRS_UDF_MAC_RANGE))
-				continue;
+		    (mvPp2PrsShadowUdf(tid) != PRS_UDF_MAC_RANGE))
+			continue;
 
 		pe.index = tid;
 		mvPp2PrsHwRead(&pe);
@@ -470,13 +763,14 @@ static int mvPrsMacDaRangeValid(unsigned int portMap, MV_U8 *da, MV_U8 *mask)
 			if (entryPmap & portMap) {
 				mvOsPrintf("%s: operation not supported, range intersection\n", __func__);
 				mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n",
-					__func__, entryPmap & portMap, tid);
+					   __func__, entryPmap & portMap, tid);
 				return MV_ERROR;
 			}
 
 		} else if (mvPrsMacRangeEquals(&pe, da, mask) && (entryPmap != portMap) && (entryPmap & portMap)) {
 			mvOsPrintf("%s: operation not supported, range intersection\n", __func__);
-			mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n", __func__, entryPmap & portMap, tid);
+			mvOsPrintf("%s: user must delete portMap 0x%x from entry %d.\n",
+				   __func__, entryPmap & portMap, tid);
 			return MV_ERROR;
 		}
 	}
@@ -504,13 +798,13 @@ int mvPrsMacDaRangeSet(unsigned int portMap, MV_U8 *da, MV_U8 *mask, unsigned in
 		mvPp2PrsSwTcamPortMapGet(&pe, &entryPmap);
 
 		if ((mvPp2PrsShadowUdf(tid) == PRS_UDF_MAC_RANGE) &&
-			mvPrsMacRangeEquals(&pe, da, mask) && (entryPmap == portMap)) {
-				/* portMap and range are equals to TCAM entry*/
-				done = MV_TRUE;
-				mvPp2PrsSwSramRiUpdate(&pe, ri, riMask);
-				finish ? mvPp2PrsSwSramFlowidGenSet(&pe) : mvPp2PrsSwSramFlowidGenClear(&pe);
-				mvPp2PrsHwWrite(&pe);
-				continue;
+		    mvPrsMacRangeEquals(&pe, da, mask) && (entryPmap == portMap)) {
+			/* portMap and range are equals to TCAM entry*/
+			done = MV_TRUE;
+			mvPp2PrsSwSramRiUpdate(&pe, ri, riMask);
+			finish ? mvPp2PrsSwSramFlowidGenSet(&pe) : mvPp2PrsSwSramFlowidGenClear(&pe);
+			mvPp2PrsHwWrite(&pe);
+			continue;
 		}
 
 		/* PRS_UDF_MAC_DEF */
@@ -604,7 +898,7 @@ int mvPrsMacDropAllSet(int port, int add)
 
 		/* Non-promiscous mode for all ports - DROP unknown packets */
 		mvPp2PrsSwSramRiSetBit(&pe, RI_DROP_BIT);
-	/*	mvPp2PrsSwSramLuDoneSet(&pe);*/
+		/*	mvPp2PrsSwSramLuDoneSet(&pe);*/
 
 		mvPp2PrsSwSramFlowidGenSet(&pe);
 		mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_FLOWS);
@@ -646,7 +940,7 @@ int mvPrsMacPromiscousSet(int port, int add)
 		mvPp2PrsSwSramRiUpdate(&pe, RI_L2_UCAST, RI_L2_CAST_MASK);
 
 		/* shift to ethertype */
-		mvPp2PrsSwSramShiftSet(&pe, MV_ETH_MH_SIZE + 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
+		mvPp2PrsSwSramShiftSet(&pe, 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
 
 		/* mask all ports */
 		mvPp2PrsSwTcamPortMapSet(&pe, 0);
@@ -661,54 +955,65 @@ int mvPrsMacPromiscousSet(int port, int add)
 
 	return MV_OK;
 }
+
 /* 0 - reject, 1 - accept */
 int mvPrsMacAllMultiSet(int port, int add)
 {
 	MV_PP2_PRS_ENTRY pe;
+	unsigned int i, idx = 0;
+	char *rule_str[MAX_MAC_MC] = { "mcast-mac-ip4", "mcast-mac-ip6" };
 
 	/* Ethernet multicast address first byte is with 0x01 */
-	unsigned char da_mc = 0x01;
-	/* all multicast */
+	unsigned char da_mc[MAX_MAC_MC] = { 0x01, 0x33 };
 
-	if (mvPp2PrsShadowIsValid(PE_MAC_MC_ALL)) {
-		/* Entry exist - update port only */
-		pe.index = PE_MAC_MC_ALL;
-		mvPp2PrsHwRead(&pe);
-	} else {
-		/* Entry doesn't exist - create new */
-		mvPp2PrsSwClear(&pe);
+	for (i = IP4_MAC_MC; i < MAX_MAC_MC; i++) {
+		if (i == IP4_MAC_MC)
+			idx = PE_MAC_MC_ALL;
+		else
+			idx = PE_MAC_MC_IP6;
+		/* all multicast */
 
-		pe.index = PE_MAC_MC_ALL;
+		if (mvPp2PrsShadowIsValid(idx)) {
+			/* Entry exist - update port only */
+			pe.index = idx;
+			mvPp2PrsHwRead(&pe);
+		} else {
+			/* Entry doesn't exist - create new */
+			mvPp2PrsSwClear(&pe);
 
-		mvPp2PrsSwTcamLuSet(&pe, PRS_LU_MAC);
+			pe.index = idx;
 
-		/* Continue - set next lookup */
-		mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_DSA);
+			mvPp2PrsSwTcamLuSet(&pe, PRS_LU_MAC);
 
-		/* Set result info bits */
-		mvPp2PrsSwSramRiUpdate(&pe, RI_L2_MCAST, RI_L2_CAST_MASK);
+			/* Continue - set next lookup */
+			mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_DSA);
 
-		mvPp2PrsSwTcamByteSet(&pe, MV_ETH_MH_SIZE, da_mc, 0xff);
+			/* Set result info bits */
+			mvPp2PrsSwSramRiUpdate(&pe, RI_L2_MCAST, RI_L2_CAST_MASK);
 
-		/* shift to ethertype */
-		mvPp2PrsSwSramShiftSet(&pe, MV_ETH_MH_SIZE + 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
+			mvPp2PrsSwTcamByteSet(&pe, 0, da_mc[i], 0xff);
 
-		/* no ports */
-		mvPp2PrsSwTcamPortMapSet(&pe, 0);
+			/* shift to ethertype */
+		mvPp2PrsSwSramShiftSet(&pe, 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
 
-		/* Update mvPrsShadowTbl */
-		mvPp2PrsShadowSet(pe.index, PRS_LU_MAC, "mcast-all");
+			/* no ports */
+			mvPp2PrsSwTcamPortMapSet(&pe, 0);
+
+			/* Update mvPrsShadowTbl */
+			mvPp2PrsShadowSet(pe.index, PRS_LU_MAC, rule_str[i]);
+		}
+
+		mvPp2PrsSwTcamPortSet(&pe, port, add);
+
+		mvPp2PrsHwWrite(&pe);
 	}
-
-	mvPp2PrsSwTcamPortSet(&pe, port, add);
-
-	mvPp2PrsHwWrite(&pe);
 
 	return MV_OK;
 }
 
 int mvPrsMhRxSpecialSet(int port, unsigned short mh, int add)
 {
+#if 0 /* this function to be removed in future */
 	MV_PP2_PRS_ENTRY pe;
 
 	if (mvPp2PrsShadowIsValid(PE_RX_SPECIAL)) {
@@ -735,7 +1040,7 @@ int mvPrsMhRxSpecialSet(int port, unsigned short mh, int add)
 	mvPp2PrsSwTcamPortSet(&pe, port, add);
 
 	mvPp2PrsHwWrite(&pe);
-
+#endif
 	return MV_OK;
 }
 
@@ -749,11 +1054,12 @@ static int mvPp2PrsMacInit(void)
 	/* Non-promiscous mode for all ports - DROP unknown packets */
 	pe.index = PE_MAC_NON_PROMISCOUS;
 	mvPp2PrsSwTcamLuSet(&pe, PRS_LU_MAC);
-	mvPp2PrsSwSramRiSetBit(&pe, RI_DROP_BIT);
-/*	mvPp2PrsSwSramLuDoneSet(&pe);*/
+	/*	mvPp2PrsSwSramRiSetBit(&pe, RI_DROP_BIT); */
+	/*	mvPp2PrsSwSramLuDoneSet(&pe);*/
 
-	mvPp2PrsSwSramFlowidGenSet(&pe);
-	mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_FLOWS);
+	/*	mvPp2PrsSwSramFlowidGenSet(&pe);*/
+	mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_DSA);
+	mvPp2PrsSwSramShiftSet(&pe, 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
 
 	/* Update mvPrsShadowTbl */
 	mvPp2PrsShadowSet(pe.index, PRS_LU_MAC, "non-promisc");
@@ -763,12 +1069,11 @@ static int mvPp2PrsMacInit(void)
 
 	/* place holders only - no ports */
 	mvPrsMacDropAllSet(0, 0);
-	mvPrsMhRxSpecialSet(0, 0, 0);
 	mvPrsMacPromiscousSet(0, 0);
-	mvPrsMacAllMultiSet(0, 0);
 
 	return MV_OK;
 }
+
 /******************************************************************************
  *
  * DSA Section
@@ -1024,7 +1329,7 @@ int mvPp2PrsEtypeDsaModeSet(int port, int extand)
 int mvPp2PrsTagModeSet(int port, int type)
 {
 
-	POS_RANGE_VALIDATE(port, MV_PP2_MAX_PORTS-1);
+	POS_RANGE_VALIDATE(port, MV_PP2_MAX_PORTS - 1);
 
 	switch (type) {
 
@@ -1172,7 +1477,7 @@ static MV_PP2_PRS_ENTRY *mvPrsDoubleVlanFind(unsigned short tpid1, unsigned shor
 		pe->index = tid;
 		mvPp2PrsHwRead(pe);
 		if ((mvPp2PrsSwTcamBytesIgnorMaskCmp(pe, 0, 2, tpidArr1) == EQUALS) &&
-			(mvPp2PrsSwTcamBytesIgnorMaskCmp(pe, 4, 2, tpidArr2) == EQUALS)) {
+		    (mvPp2PrsSwTcamBytesIgnorMaskCmp(pe, 4, 2, tpidArr2) == EQUALS)) {
 
 			mvPp2PrsSwSramRiGet(pe, &bits, &enable);
 
@@ -1251,7 +1556,8 @@ static int mvPp2PrsVlanAdd(unsigned short tpid, int ai, unsigned int portBmp)
 
 		if (tid <= lastDouble) {
 			/* double vlan entries overlapping*/
-			mvOsPrintf("%s:Can't add entry, please remove unnecessary triple or single vlans entries.\n", __func__);
+			mvOsPrintf("%s:Can't add entry, please remove unnecessary triple or single vlans entries.\n",
+				   __func__);
 			return MV_ERROR;
 		}
 
@@ -1644,7 +1950,7 @@ int mvPrsEthTypeSet(int portMap, unsigned short ethertype, unsigned int ri, unsi
 {
 	MV_PP2_PRS_ENTRY pe;
 	int tid;
-	unsigned int  entryPmap;
+	unsigned int entryPmap;
 	MV_BOOL done = MV_FALSE;
 
 	/* step 1 - validation */
@@ -1894,6 +2200,46 @@ static int mvPp2PrsEtypeArp(void)
 	return MV_OK;
 }
 
+static int mvPp2PrsEtypeLbdt(void)
+{
+	int tid;
+	MV_PP2_PRS_ENTRY *pe;
+
+	/* Go through the all entires from first to last */
+	tid = mvPp2PrsTcamFirstFree(0, MV_PP2_PRS_TCAM_SIZE - 1);
+
+	/* Can't add - No free TCAM entries */
+	if (tid == MV_PRS_OUT_OF_RAGE) {
+		mvOsPrintf("%s: No free TCAM entiry\n", __func__);
+		return MV_ERROR;
+	}
+
+	pe = mvPp2PrsSwAlloc(PRS_LU_L2);
+
+	pe->index = tid;
+
+	mvPp2PrsMatchEtype(pe, 0, MV_IP_LBDT_TYPE);
+
+	/* generate flow in the next iteration*/
+	/*mvPp2PrsSwSramAiSetBit(pe, AI_DONE_BIT);*/
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+	mvPp2PrsSwSramFlowidGenSet(pe);
+	mvPp2PrsSwSramRiUpdate(pe, RI_CPU_CODE_RX_SPEC | RI_UDF3_RX_SPECIAL, RI_CPU_CODE_MASK | RI_UDF3_MASK);
+
+	/* set L3 offset */
+	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L3, MV_ETH_TYPE_LEN, SRAM_OP_SEL_OFFSET_ADD);
+
+	mvPp2PrsHwWrite(pe);
+
+	mvPp2PrsShadowSet(pe->index, PRS_LU_L2, "etype-lbdt");
+	mvPp2PrsShadowUdfSet(pe->index, PRS_UDF_L2_DEF);
+	mvPp2PrsShadowFinSet(pe->index, MV_TRUE);
+	mvPp2PrsShadowRiSet(pe->index, RI_CPU_CODE_RX_SPEC | RI_UDF3_RX_SPECIAL, RI_CPU_CODE_MASK | RI_UDF3_MASK);
+
+	mvPp2PrsSwFree(pe);
+
+	return MV_OK;
+}
 
 /* match ip6 */
 static int mvPp2PrsEtypeIp6(void)
@@ -1904,7 +2250,7 @@ static int mvPp2PrsEtypeIp6(void)
 	/* Go through the all entires from first to last */
 	tid = mvPp2PrsTcamFirstFree(0, MV_PP2_PRS_TCAM_SIZE - 1);
 
-		/* Can't add - No free TCAM entries */
+	/* Can't add - No free TCAM entries */
 	if (tid == MV_PRS_OUT_OF_RAGE) {
 		mvOsPrintf("%s: No free TCAM entiry\n", __func__);
 		return MV_ERROR;
@@ -1916,13 +2262,13 @@ static int mvPp2PrsEtypeIp6(void)
 
 	mvPp2PrsMatchEtype(pe, 0, MV_IP6_TYPE);
 
-	/* Skip eth_type + 4 bytes of IPV6 header */
-	mvPp2PrsSwSramShiftSet(pe, MV_ETH_TYPE_LEN + 4, SRAM_OP_SEL_SHIFT_ADD);
+	/* Skip DIP of IPV6 header */
+	mvPp2PrsSwSramShiftSet(pe, MV_ETH_TYPE_LEN + 8 + MV_MAX_L3_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
 
 	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP6);
 /*
 	there is no support in extension yet
-*/
+ */
 	mvPp2PrsSwSramRiUpdate(pe, RI_L3_IP6, RI_L3_PROTO_MASK);
 
 	/* set L3 offset */
@@ -1958,6 +2304,10 @@ static int mvPp2PrsEtypeUn(void)
 	mvPp2PrsSwSramRiUpdate(pe, RI_L3_UN, RI_L3_PROTO_MASK);
 
 	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* set L3 offset even it's unknown L3 */
+	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L3, MV_ETH_TYPE_LEN, SRAM_OP_SEL_OFFSET_ADD);
+
 	mvPp2PrsHwWrite(pe);
 
 	/* Update mvPrsShadowTbl */
@@ -1976,7 +2326,7 @@ static int mvPp2PrsEtypeUn(void)
  */
 static int mvPp2PrsEtypeInit(void)
 {
-	int    rc;
+	int rc;
 
 	PRS_DBG("%s\n", __func__);
 
@@ -1985,6 +2335,10 @@ static int mvPp2PrsEtypeInit(void)
 		return rc;
 
 	rc = mvPp2PrsEtypeArp();
+	if (rc)
+		return rc;
+
+	rc = mvPp2PrsEtypeLbdt();
 	if (rc)
 		return rc;
 
@@ -2129,9 +2483,56 @@ static int mvPp2PrsIpv4Pppoe(void)
 	return MV_OK;
 }
 
+/* Create entry for non-ip over PPPoE (for PPP LCP, IPCPv4, IPCPv6, etc) */
+static int mvPp2PrsNonipPppoe(void)
+{
+	int ret;
+	int tid;
+	MV_PP2_PRS_ENTRY *pe;
+
+	PRS_DBG("%s\n", __func__);
+
+	/** non-Ip over PPPoE **/
+
+	/* Go through the all entires from first to last */
+	tid = mvPp2PrsTcamFirstFree(0, MV_PP2_PRS_TCAM_SIZE - 1);
+
+	/* Can't add - No free TCAM entries */
+	if (tid == MV_PRS_OUT_OF_RAGE) {
+		mvOsPrintf("%s: No free TCAM entiry\n", __func__);
+		return MV_ERROR;
+	}
+
+	pe = mvPp2PrsSwAlloc(PRS_LU_PPPOE);
+	PTR_VALIDATE(pe);
+
+	pe->index = tid;
+
+	ret = mvPp2PrsSwSramRiUpdate(pe, RI_L3_UN, RI_L3_PROTO_MASK);
+	RET_VALIDATE(ret);
+
+	ret = mvPp2PrsSwSramFlowidGenSet(pe);
+	RET_VALIDATE(ret);
+
+	/* set L3 offset even it's unknown L3 */
+	ret = mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L3, MV_ETH_TYPE_LEN, SRAM_OP_SEL_OFFSET_ADD);
+	RET_VALIDATE(ret);
+
+	ret = mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+	RET_VALIDATE(ret);
+
+	ret = mvPp2PrsHwWrite(pe);
+	RET_VALIDATE(ret);
+
+	/* Update mvPrsShadowTbl */
+	mvPp2PrsShadowSet(pe->index, PRS_LU_PPPOE, "NonIP-over-PPPoE");
+	mvPp2PrsSwFree(pe);
+
+	return MV_OK;
+}
 
 /* match etype = PPPOE */
-static int mvPp2PrsPpppeInit(void)
+static int mvPp2PrsPppeInit(void)
 {
 	int rc;
 
@@ -2140,6 +2541,10 @@ static int mvPp2PrsPpppeInit(void)
 		return rc;
 
 	rc = mvPp2PrsIpv6Pppoe();
+	if (rc)
+		return rc;
+
+	rc = mvPp2PrsNonipPppoe();
 	if (rc)
 		return rc;
 
@@ -2156,7 +2561,7 @@ static int mvPp2PrsPpppeInit(void)
  */
 
 /* IPv4/TCP header parsing for fragmentation and L4 offset.  */
-static int mvPp2PrsIp4Proto(unsigned short proto)
+static int mvPp2PrsIp4Proto(unsigned short proto, unsigned int ri, unsigned int riMask)
 {
 	int tid;
 	MV_PP2_PRS_ENTRY *pe;
@@ -2179,11 +2584,14 @@ static int mvPp2PrsIp4Proto(unsigned short proto)
 	mvPp2PrsSwTcamByteSet(pe, 5, proto, 0xff);
 
 	if (proto == MV_IP_PROTO_TCP) {
-		mvPp2PrsSwSramRiUpdate(pe, RI_L4_TCP, RI_L4_PROTO_MASK);
+		mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
 		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-tcp");
 	} else if (proto == MV_IP_PROTO_UDP) {
-		mvPp2PrsSwSramRiUpdate(pe, RI_L4_UDP, RI_L4_PROTO_MASK);
+		mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
 		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-udp");
+	} else if (proto == MV_IP_PROTO_IGMP) {
+		mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-igmp");
 	} else {
 		mvOsPrintf("%s: IPv4 unsupported protocol %d\n", __func__, proto);
 		mvPp2PrsSwFree(pe);
@@ -2192,12 +2600,18 @@ static int mvPp2PrsIp4Proto(unsigned short proto)
 
 	/* set L4 offset */
 	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L4, sizeof(MV_IP_HEADER) - 4, SRAM_OP_SEL_OFFSET_ADD);
+	mvPp2PrsSwSramShiftSet(pe, 12, SRAM_OP_SEL_SHIFT_ADD);
 
-	/* Finished: go to flowid generation */
-	mvPp2PrsSwSramFlowidGenSet(pe);
-	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+	/* Next: go to IPV4 */
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP4);
+	/* Set sram AIbits */
+	mvPp2PrsSwSramAiUpdate(pe, (1 << IPV4_DIP_AI_BIT), (1 << IPV4_DIP_AI_BIT));
 
 	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* AI bits check */
+	mvPp2PrsSwTcamAiUpdate(pe, 0, (1 << IPV4_DIP_AI_BIT));
+
 	mvPp2PrsHwWrite(pe);
 
 	mvPp2PrsSwFree(pe);
@@ -2215,11 +2629,14 @@ static int mvPp2PrsIp4Proto(unsigned short proto)
 	mvPp2PrsSwSramRiSetBit(pe, RI_IP_FRAG_BIT);
 
 	if (proto == MV_IP_PROTO_TCP) {
-		mvPp2PrsSwSramRiUpdate(pe, RI_L4_TCP, RI_L4_PROTO_MASK);
+		mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
 		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-tcp-frag");
 	} else if (proto == MV_IP_PROTO_UDP) {
-		mvPp2PrsSwSramRiUpdate(pe, RI_L4_UDP, RI_L4_PROTO_MASK);
+		mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
 		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-udp-frag");
+	} else if (proto == MV_IP_PROTO_IGMP) {
+		mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-igmp-frag");
 	} else {
 		mvOsPrintf("%s: IPv4 unsupported protocol %d\n", __func__, proto);
 		mvPp2PrsSwFree(pe);
@@ -2228,6 +2645,63 @@ static int mvPp2PrsIp4Proto(unsigned short proto)
 
 	/* set L4 offset */
 	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L4, sizeof(MV_IP_HEADER) - 4, SRAM_OP_SEL_OFFSET_ADD);
+	mvPp2PrsSwSramShiftSet(pe, 12, SRAM_OP_SEL_SHIFT_ADD);
+
+	/* Next: go to IPV4 */
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP4);
+	/* Set sram AIbits */
+	mvPp2PrsSwSramAiUpdate(pe, (1 << IPV4_DIP_AI_BIT), (1 << IPV4_DIP_AI_BIT));
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+	/* AI bits check */
+	mvPp2PrsSwTcamAiUpdate(pe, 0, (1 << IPV4_DIP_AI_BIT));
+
+	mvPp2PrsHwWrite(pe);
+
+	mvPp2PrsSwFree(pe);
+
+	return MV_OK;
+}
+
+/* IPv4 L3 Multicast or borad cast.  1-MC, 2-BC */
+static int mvPp2PrsIp4Cast(unsigned short l3_cast)
+{
+	int tid;
+	MV_PP2_PRS_ENTRY *pe;
+
+	PRS_DBG("%s\n", __func__);
+
+	if (l3_cast != L3_MULTI_CAST &&
+	    l3_cast != L3_BROAD_CAST) {
+		mvOsPrintf("%s: Invalid Input\n", __func__);
+		return MV_ERROR;
+	}
+
+	/* Get free entry */
+	tid = mvPp2PrsTcamFirstFree(0, MV_PP2_PRS_TCAM_SIZE - 1);
+	if (tid == MV_PRS_OUT_OF_RAGE) {
+		mvOsPrintf("%s: No free TCAM entiry\n", __func__);
+		return MV_ERROR;
+	}
+	pe = mvPp2PrsSwAlloc(PRS_LU_IP4);
+	pe->index = tid;
+
+	if (l3_cast == L3_MULTI_CAST) {
+		mvPp2PrsSwTcamByteSet(pe, 0, 0xE0, 0xE0);
+		mvPp2PrsSwSramRiUpdate(pe, RI_L3_MCAST, RI_L3_ADDR_MASK);
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-mc");
+	} else if (l3_cast == L3_BROAD_CAST) {
+		mvPp2PrsSwTcamByteSet(pe, 0, 0xFF, 0xFF);
+		mvPp2PrsSwTcamByteSet(pe, 1, 0xFF, 0xFF);
+		mvPp2PrsSwTcamByteSet(pe, 2, 0xFF, 0xFF);
+		mvPp2PrsSwTcamByteSet(pe, 3, 0xFF, 0xFF);
+		mvPp2PrsSwSramRiUpdate(pe, RI_L3_BCAST, RI_L3_ADDR_MASK);
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-bc");
+	}
+
+	mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV4_DIP_AI_BIT), (1 << IPV4_DIP_AI_BIT));
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
 
 	/* Finished: go to flowid generation */
 	mvPp2PrsSwSramFlowidGenSet(pe);
@@ -2249,12 +2723,26 @@ static int mvPp2PrsIp4Init(void)
 
 	PRS_DBG("%s\n", __func__);
 
-	/* Set entries for TCP and UDP over IPv4 */
-	rc = mvPp2PrsIp4Proto(MV_IP_PROTO_TCP);
+	/* Set entries for TCP, UDP and IGMP over IPv4 */
+	rc = mvPp2PrsIp4Proto(MV_IP_PROTO_TCP, RI_L4_TCP, RI_L4_PROTO_MASK);
 	if (rc)
 		return rc;
 
-	rc = mvPp2PrsIp4Proto(MV_IP_PROTO_UDP);
+	rc = mvPp2PrsIp4Proto(MV_IP_PROTO_UDP, RI_L4_UDP, RI_L4_PROTO_MASK);
+	if (rc)
+		return rc;
+
+	/* IPv4 Broadcast */
+	rc = mvPp2PrsIp4Cast(L3_BROAD_CAST);
+	if (rc)
+		return rc;
+
+	/* IPv4 Multicast */
+	rc = mvPp2PrsIp4Cast(L3_MULTI_CAST);
+	if (rc)
+		return rc;
+
+	rc = mvPp2PrsIp4Proto(MV_IP_PROTO_IGMP, RI_CPU_CODE_RX_SPEC | RI_UDF3_RX_SPECIAL, RI_CPU_CODE_MASK | RI_UDF3_MASK);
 	if (rc)
 		return rc;
 
@@ -2262,20 +2750,46 @@ static int mvPp2PrsIp4Init(void)
 	pe = mvPp2PrsSwAlloc(PRS_LU_IP4);
 	pe->index = PE_IP4_PROTO_UN;
 
-	/* generate flow in the next iteration*/
-	mvPp2PrsSwSramFlowidGenSet(pe);
-	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+	/* Next: go to IPV4 */
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP4);
+	/* Set sram AIbits */
+	mvPp2PrsSwSramAiUpdate(pe, (1 << IPV4_DIP_AI_BIT), (1 << IPV4_DIP_AI_BIT));
 
 	/* Set result info bits */
 	mvPp2PrsSwSramRiUpdate(pe, RI_L4_OTHER, RI_L4_PROTO_MASK);
 
 	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L4, sizeof(MV_IP_HEADER) - 4, SRAM_OP_SEL_OFFSET_ADD);
+	mvPp2PrsSwSramShiftSet(pe, 12, SRAM_OP_SEL_SHIFT_ADD);
 
 	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* AI bits check */
+	mvPp2PrsSwTcamAiUpdate(pe, 0, (1 << IPV4_DIP_AI_BIT));
+
 	mvPp2PrsHwWrite(pe);
 
 	/* Update mvPrsShadowTbl */
 	mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-l4-unknown");
+
+	mvPp2PrsSwFree(pe);
+
+	/* Default IPv4 entry for unit cast address */
+	pe = mvPp2PrsSwAlloc(PRS_LU_IP4);
+	pe->index = PE_IP4_ADDR_UN;
+
+	mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV4_DIP_AI_BIT), (1 << IPV4_DIP_AI_BIT));
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	mvPp2PrsSwSramRiUpdate(pe, RI_L3_UCAST, RI_L3_ADDR_MASK);
+	mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-uc");
+
+	/* Finished: go to flowid generation */
+	mvPp2PrsSwSramFlowidGenSet(pe);
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+	mvPp2PrsHwWrite(pe);
 
 	mvPp2PrsSwFree(pe);
 
@@ -2290,7 +2804,7 @@ static int mvPp2PrsIp4Init(void)
 /* TODO continue from here */
 /* IPv6 - detect TCP */
 
-static int mvPp2PrsIp6Proto(unsigned short proto)
+static int mvPp2PrsIp6Proto(unsigned short proto, unsigned int ri, unsigned int riMask, MV_BOOL ip6_ext)
 {
 	int tid;
 	MV_PP2_PRS_ENTRY *pe;
@@ -2306,32 +2820,379 @@ static int mvPp2PrsIp6Proto(unsigned short proto)
 	pe = mvPp2PrsSwAlloc(PRS_LU_IP6);
 	pe->index = tid;
 
-	/* match TCP protocol */
-	mvPp2PrsSwTcamByteSet(pe, 2, proto, 0xff);
+	/* Match Protocol */
+	mvPp2PrsSwTcamByteSet(pe, 0, proto, 0xff);
 
+	/* Set Rule Shadow */
+	switch (proto) {
+	/* TCP */
+	case MV_IP_PROTO_TCP:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-tcp" : "ipv6-ext-tcp");
+		break;
 
-	if (proto == MV_IP_PROTO_TCP) {
-		mvPp2PrsSwSramRiUpdate(pe, RI_L4_TCP, RI_L4_PROTO_MASK);
-		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv6-tcp");
-	} else if (proto == MV_IP_PROTO_UDP) {
-		mvPp2PrsSwSramRiUpdate(pe, RI_L4_UDP, RI_L4_PROTO_MASK);
-		mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv4-udp");
-	} else {
-		mvOsPrintf("%s: IPv4 unsupported protocol %d\n", __func__, proto);
+	/* UDP */
+	case MV_IP_PROTO_UDP:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-udp" : "ipv6-ext-udp");
+		break;
+
+	/* ICMP */
+	case MV_IP_PROTO_ICMPV6:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-icmp" : "ipv6-ext-icmp");
+		break;
+
+	/* IPv4, for IPv6 DS Lite */
+	case MV_IP_PROTO_IPIP:
+		if (ip6_ext != MV_FALSE) {
+			mvOsPrintf("%s: IPv4 header not a IP6 extension header\n", __func__);
+			mvPp2PrsSwFree(pe);
+			return MV_ERROR;
+		}
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-lite-ip4");
+		break;
+
+	/* IPV6 Extension Header */
+
+	/* Hop-by-Hop Options Header, Dummy protocol for TCP */
+	case MV_IP_PROTO_NULL:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-nh-hh" : "ipv6-ext-nh-hh");
+		break;
+
+	/* Encapsulated IPv6 Header, IPv6-in-IPv4 tunnelling */
+	case MV_IP_PROTO_IPV6:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-nh-eh" : "ipv6-ext-nh-eh");
+		break;
+
+	/* Route header */
+	case MV_IP_PROTO_RH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-nh-rh" : "ipv6-ext-nh-rh");
+		break;
+
+	/* Fragment Header */
+	case MV_IP_PROTO_FH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-nh-fh" : "ipv6-ext-nh-fh");
+		break;
+#if 0
+	/* Encapsulation Security Payload protocol */
+	case MV_IP_PROTO_ESP:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-nh-esp" : "ipv6-ext-nh-esp");
+		break;
+#endif
+	/* Authentication Header */
+	case MV_IP_PROTO_AH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-nh-ah" : "ipv6-ext-nh-ah");
+		break;
+
+	/* Destination Options Header */
+	case MV_IP_PROTO_DH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-nh-dh" : "ipv6-ext-nh-dh");
+		break;
+
+	/* Mobility Header */
+	case MV_IP_PROTO_MH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, (MV_FALSE == ip6_ext) ? "ipv6-nh-mh" : "ipv6-ext-nh-mh");
+		break;
+
+	default:
+		mvOsPrintf("%s: IPv6 unsupported protocol %d\n", __func__, proto);
 		mvPp2PrsSwFree(pe);
 		return MV_ERROR;
 	}
-	/* Finished: go to flowid generation */
-	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
-	mvPp2PrsSwSramFlowidGenSet(pe);
+
+	/* Set TCAM and SRAM for TCP, UDP and IGMP */
+	if (proto == MV_IP_PROTO_TCP ||
+	    proto == MV_IP_PROTO_UDP ||
+	    proto == MV_IP_PROTO_ICMPV6 ||
+	    proto == MV_IP_PROTO_IPIP) {
+		/* Set TCAM AI */
+		if (MV_FALSE == ip6_ext)
+			mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_NO_EXT_AI_BIT), (1 << IPV6_NO_EXT_AI_BIT));
+		else
+			mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_EXT_AI_BIT), (1 << IPV6_EXT_AI_BIT));
+
+		/* Set result info */
+		mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
+
+		/* set L4 offset relatively to our current place */
+		if (MV_FALSE == ip6_ext)
+			mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L4, sizeof(MV_IP6_HEADER) - 6, SRAM_OP_SEL_OFFSET_ADD);
+		else
+			mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L4, 0, SRAM_OP_SEL_OFFSET_IP6_ADD);
+
+		/* Finished: go to LU Generation */
+		mvPp2PrsSwSramFlowidGenSet(pe);
+		mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+	} else { /* Set TCAM and SRAM for IPV6 Extension Header */
+		if (MV_FALSE == ip6_ext) { /* Case 1: xx is first NH of IPv6 */
+			/* Skip to NH */
+			mvPp2PrsSwSramShiftSet(pe, 34, SRAM_OP_SEL_SHIFT_ADD);
+
+			/* Set AI bit */
+			mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_NO_EXT_AI_BIT), (1 << IPV6_NO_EXT_AI_BIT));
+		} else { /* Case 2: xx is not first NH of IPv6 */
+			/* Skip to NH */
+			mvPp2PrsSwSramShiftSet(pe, 0, SRAM_OP_SEL_SHIFT_IP6_ADD);
+
+			/* Set AI bit */
+			mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_EXT_AI_BIT), (1 << IPV6_EXT_AI_BIT));
+		}
+
+		/* Next LU */
+		mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP6);
+
+		/* Set sram AIbits */
+		if (proto == MV_IP_PROTO_AH) {
+			mvPp2PrsSwSramAiUpdate(pe, (1 << IPV6_EXT_AH_AI_BIT), (1 << IPV6_EXT_AH_AI_BIT));
+			mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AI_BIT));
+			mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_NO_EXT_AI_BIT));
+		} else {
+			mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AH_AI_BIT));
+			mvPp2PrsSwSramAiUpdate(pe, (1 << IPV6_EXT_AI_BIT), (1 << IPV6_EXT_AI_BIT));
+			mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_NO_EXT_AI_BIT));
+		}
+
+		/* Set RI, IPv6 Ext */
+		mvPp2PrsSwSramRiUpdate(pe, RI_L3_IP6_EXT, RI_L3_PROTO_MASK);
+	}
 
 	/* All ports */
 	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
 
-	/* set L4 offset relatively to our current place */
-	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L4, sizeof(MV_IP6_HEADER) - 4, SRAM_OP_SEL_OFFSET_ADD);
-
+	/* Write HW */
 	mvPp2PrsHwWrite(pe);
+
+	/* Release SW entry */
+	mvPp2PrsSwFree(pe);
+
+	return MV_OK;
+}
+
+/* Parse the extension header on AH */
+static int mvPp2PrsIp6ProtoAh(unsigned short proto, unsigned int ri, unsigned int riMask)
+{
+	int tid;
+	MV_PP2_PRS_ENTRY *pe;
+
+	PRS_DBG("%s\n", __func__);
+
+	/* TCP, Not Fragmented */
+	tid = mvPp2PrsTcamFirstFree(0, MV_PP2_PRS_TCAM_SIZE - 1);
+	if (tid == MV_PRS_OUT_OF_RAGE) {
+		mvOsPrintf("%s: No free TCAM entiry\n", __func__);
+		return MV_ERROR;
+	}
+	pe = mvPp2PrsSwAlloc(PRS_LU_IP6);
+	pe->index = tid;
+
+	/* Match Protocol */
+	mvPp2PrsSwTcamByteSet(pe, 0, proto, 0xff);
+
+	/* Set Rule Shadow */
+	switch (proto) {
+	/* TCP */
+	case MV_IP_PROTO_TCP:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-tcp");
+		break;
+
+	/* UDP */
+	case MV_IP_PROTO_UDP:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-udp");
+		break;
+
+	/* ICMP */
+	case MV_IP_PROTO_ICMPV6:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-icmp");
+		break;
+
+	/* IPV6 Extension Header */
+
+	/* Hop-by-Hop Options Header, Dummy protocol for TCP */
+	case MV_IP_PROTO_NULL:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-nh-hh");
+		break;
+
+	/* Encapsulated IPv6 Header, IPv6-in-IPv4 tunnelling */
+	case MV_IP_PROTO_IPV6:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-nh-eh");
+		break;
+
+	/* Route header */
+	case MV_IP_PROTO_RH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-nh-rh");
+		break;
+
+	/* Fragment Header */
+	case MV_IP_PROTO_FH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-nh-fh");
+		break;
+
+	/* Authentication Header */
+	case MV_IP_PROTO_AH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-nh-ah");
+		break;
+
+	/* Destination Options Header */
+	case MV_IP_PROTO_DH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-nh-dh");
+		break;
+
+	/* Mobility Header */
+	case MV_IP_PROTO_MH:
+		mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-ah-nh-mh");
+		break;
+
+	default:
+		mvOsPrintf("%s: IPv6 unsupported extension header %d\n", __func__, proto);
+		mvPp2PrsSwFree(pe);
+		return MV_ERROR;
+	}
+
+	/* Set TCAM and SRAM for TCP, UDP and IGMP */
+	if (proto == MV_IP_PROTO_TCP ||
+	    proto == MV_IP_PROTO_UDP ||
+	    proto == MV_IP_PROTO_ICMPV6) {
+		/* Set result info */
+		mvPp2PrsSwSramRiUpdate(pe, ri, riMask);
+		/* Set sram AIbits */
+		mvPp2PrsSwSramAiUpdate(pe, (1 << IPV6_EXT_AH_L4_AI_BIT), (1 << IPV6_EXT_AH_L4_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AH_LEN_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AH_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_NO_EXT_AI_BIT));
+	} else {
+		/* Set sram AIbits */
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AH_L4_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, (1 << IPV6_EXT_AH_LEN_AI_BIT), (1 << IPV6_EXT_AH_LEN_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AH_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_NO_EXT_AI_BIT));
+	}
+
+	/* Set AI bit */
+	mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_EXT_AH_AI_BIT), (1 << IPV6_EXT_AH_AI_BIT));
+
+	/* Next LU */
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP6);
+
+	/* Set RI, IPv6 Ext */
+	mvPp2PrsSwSramRiUpdate(pe, RI_L3_IP6_EXT, RI_L3_PROTO_MASK);
+
+	/* All ports */
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* Write HW */
+	mvPp2PrsHwWrite(pe);
+
+	/* Release SW entry */
+	mvPp2PrsSwFree(pe);
+
+	return MV_OK;
+}
+
+/* Parse AH length field */
+static int mvPp2PrsIp6AhLen(unsigned char ah_len, MV_BOOL l4_off_set)
+{
+	int tid;
+	MV_PP2_PRS_ENTRY *pe;
+	char tmp_buf[15];
+
+	PRS_DBG("%s\n", __func__);
+
+	/* TCP, Not Fragmented */
+	tid = mvPp2PrsTcamFirstFree(0, MV_PP2_PRS_TCAM_SIZE - 1);
+	if (tid == MV_PRS_OUT_OF_RAGE) {
+		mvOsPrintf("%s: No free TCAM entiry\n", __func__);
+		return MV_ERROR;
+	}
+	pe = mvPp2PrsSwAlloc(PRS_LU_IP6);
+	pe->index = tid;
+
+	/* Match AH Len */
+	mvPp2PrsSwTcamByteSet(pe, 1, ah_len, 0xff);
+
+	/* Set Rule Shadow */
+	sprintf(tmp_buf, "ipv6-ah-len%d", ah_len);
+	mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, tmp_buf);
+
+	/* Set AI bit */
+	if (l4_off_set) {
+		mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_EXT_AH_L4_AI_BIT), (1 << IPV6_EXT_AH_L4_AI_BIT));
+		/* Set L4 offset */
+		mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L4,
+					(IPV6_EXT_EXCLUDE_BYTES + ah_len * IPV6_EXT_AH_UNIT_BYTES),
+					SRAM_OP_SEL_OFFSET_LKP_ADD);
+		/* Finished: go to LU Generation */
+		mvPp2PrsSwSramFlowidGenSet(pe);
+		mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+	} else {
+		mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_EXT_AH_LEN_AI_BIT), (1 << IPV6_EXT_AH_LEN_AI_BIT));
+		/* Set sram AIbits */
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AH_L4_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AH_LEN_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_EXT_AH_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, (1 << IPV6_EXT_AI_BIT), (1 << IPV6_EXT_AI_BIT));
+		mvPp2PrsSwSramAiUpdate(pe, 0, (1 << IPV6_NO_EXT_AI_BIT));
+
+		/* Skip to NH */
+		mvPp2PrsSwSramShiftSet(pe, (IPV6_EXT_EXCLUDE_BYTES + ah_len * IPV6_EXT_AH_UNIT_BYTES), SRAM_OP_SEL_SHIFT_ADD);
+
+		/* Next LU */
+		mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP6);
+	}
+
+	/* All ports */
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* Write HW */
+	mvPp2PrsHwWrite(pe);
+
+	/* Release SW entry */
+	mvPp2PrsSwFree(pe);
+
+	return MV_OK;
+}
+
+/* IPv6 L3 Multicast or borad cast.  1-MC */
+static int mvPp2PrsIp6Cast(unsigned short l3_cast)
+{
+	int tid;
+	MV_PP2_PRS_ENTRY *pe;
+
+	PRS_DBG("%s\n", __func__);
+
+	if (l3_cast != L3_MULTI_CAST) {
+		mvOsPrintf("%s: Invalid Input\n", __func__);
+		return MV_ERROR;
+	}
+
+	/* Get free entry */
+	tid = mvPp2PrsTcamFirstFree(0, MV_PP2_PRS_TCAM_SIZE - 1);
+	if (tid == MV_PRS_OUT_OF_RAGE) {
+		mvOsPrintf("%s: No free TCAM entiry\n", __func__);
+		return MV_ERROR;
+	}
+	pe = mvPp2PrsSwAlloc(PRS_LU_IP6);
+	pe->index = tid;
+
+	mvPp2PrsSwTcamByteSet(pe, 0, 0xFF, 0xFF);
+	mvPp2PrsSwSramRiUpdate(pe, RI_L3_MCAST, RI_L3_ADDR_MASK);
+	mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-mc");
+
+	mvPp2PrsSwTcamAiUpdate(pe, 0, (1 << IPV6_NO_EXT_AI_BIT));
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* Set sram AIbits */
+	mvPp2PrsSwSramAiUpdate(pe, (1 << IPV6_NO_EXT_AI_BIT), (1 << IPV6_NO_EXT_AI_BIT));
+
+	/* Shift back to IPV6 NH */
+	mvPp2PrsSwSramShiftSet(pe, -18, SRAM_OP_SEL_SHIFT_ADD);
+
+	/* Finished: go to flowid generation */
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP6);
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+	mvPp2PrsHwWrite(pe);
+
 	mvPp2PrsSwFree(pe);
 
 	return MV_OK;
@@ -2355,11 +3216,13 @@ static int mvPp2PrsIp6Init(void)
 	}
 	pe->index = tid;
 
-	mvPp2PrsSwTcamByteSet(pe, 3, 0x00, 0xff);
+	mvPp2PrsSwTcamByteSet(pe, 1, 0x00, 0xff);
 	mvPp2PrsSwSramRiUpdate(pe, (RI_L3_UN | RI_DROP_BIT), (RI_L3_PROTO_MASK | RI_DROP_MASK));
 
 	mvPp2PrsSwSramFlowidGenSet(pe);
 	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+	/* Update TCAM AI */
+	mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_NO_EXT_AI_BIT), (1 << IPV6_NO_EXT_AI_BIT));
 
 	mvPp2PrsHwWrite(pe);
 
@@ -2369,14 +3232,36 @@ static int mvPp2PrsIp6Init(void)
 	mvPp2PrsSwFree(pe);
 
 	/* Set entries for TCP and UDP over IPv6 */
-	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_TCP);
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_TCP,
+			      RI_L4_TCP,
+			      RI_L4_PROTO_MASK,
+			      MV_FALSE);
 	if (rc)
 		return rc;
 
-	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_UDP);
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_UDP,
+			      RI_L4_UDP,
+			      RI_L4_PROTO_MASK,
+			      MV_FALSE);
 	if (rc)
 		return rc;
 
+	/* IPv6 Multicast */
+	rc = mvPp2PrsIp6Cast(L3_MULTI_CAST);
+	if (rc)
+		return rc;
+
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_ICMPV6,
+			      RI_CPU_CODE_RX_SPEC | RI_UDF3_RX_SPECIAL, RI_CPU_CODE_MASK | RI_UDF3_MASK,
+			      MV_FALSE);
+	if (rc)
+		return rc;
+
+	/* IPv4 is the last header. This is similar case as 6-TCP or 17-UDP */
+	/* Result Info: UDF7=1, DS lite */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_IPIP, RI_UDF7_IP6_LITE, RI_UDF7_MASK, MV_FALSE);
+	if (rc)
+		return rc;
 
 	/* Default IPv6 entry for unknown protocols */
 	pe = mvPp2PrsSwAlloc(PRS_LU_IP6);
@@ -2393,15 +3278,191 @@ static int mvPp2PrsIp6Init(void)
 	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L4, sizeof(MV_IP6_HEADER) - 4, SRAM_OP_SEL_OFFSET_ADD);
 
 	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* AI bits check */
+	mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_NO_EXT_AI_BIT), (1 << IPV6_NO_EXT_AI_BIT));
+
 	mvPp2PrsHwWrite(pe);
 
 	/* Update mvPrsShadowTbl */
 	mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv6-l4-unknown");
 
 	mvPp2PrsSwFree(pe);
+
+	/* Default IPv6 entry for unknown Ext protocols */
+	pe = mvPp2PrsSwAlloc(PRS_LU_IP6);
+	pe->index = PE_IP6_EXT_PROTO_UN;
+
+	/* Finished: go to LU Generation */
+	mvPp2PrsSwSramFlowidGenSet(pe);
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_FLOWS);
+
+	/* Set result info bits */
+	mvPp2PrsSwSramRiUpdate(pe, RI_L4_OTHER, RI_L4_PROTO_MASK);
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* AI bits check */
+	mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_EXT_AI_BIT), (1 << IPV6_EXT_AI_BIT));
+
+	mvPp2PrsHwWrite(pe);
+
+	/* Update mvPrsShadowTbl */
+	mvPp2PrsShadowSet(pe->index, PRS_LU_IP4, "ipv6-ext-l4-unknown");
+
+	mvPp2PrsSwFree(pe);
+
+	/* Default IPv6 entry for unit cast address */
+	pe = mvPp2PrsSwAlloc(PRS_LU_IP6);
+	pe->index = PE_IP6_ADDR_UN;
+
+	mvPp2PrsSwTcamAiUpdate(pe, 0, (1 << IPV6_NO_EXT_AI_BIT));
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	mvPp2PrsSwSramRiUpdate(pe, RI_L3_UCAST, RI_L3_ADDR_MASK);
+	mvPp2PrsShadowSet(pe->index, PRS_LU_IP6, "ipv6-uc");
+
+	/* Finished: go to IPv6 again */
+	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP6);
+
+	/* Shift back to IPV6 NH */
+	mvPp2PrsSwSramShiftSet(pe, -18, SRAM_OP_SEL_SHIFT_ADD);
+
+	/* Set sram AIbits */
+	mvPp2PrsSwSramAiUpdate(pe, (1 << IPV6_NO_EXT_AI_BIT), (1 << IPV6_NO_EXT_AI_BIT));
+
+	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+	mvPp2PrsHwWrite(pe);
+
+	mvPp2PrsSwFree(pe);
+
 	return MV_OK;
 }
 
+/* Add IPv6 Next Header parse rule set */
+int mvPrsIp6NhSet(void)
+{
+	int rc;
+	unsigned char ah_len = 0;
+
+	/* Hop-by-Hop Options Header, Dummy protocol for TCP */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_NULL, 0, 0, MV_FALSE);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_NULL, 0, 0, MV_TRUE);
+	if (rc)
+		return rc;
+
+	/* Encapsulated IPv6 Header, IPv6-in-IPv4 tunnelling */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_IPV6, 0, 0, MV_FALSE);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_IPV6, 0, 0, MV_TRUE);
+	if (rc)
+		return rc;
+
+	/* Route header */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_RH, 0, 0, MV_FALSE);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_RH, 0, 0, MV_TRUE);
+	if (rc)
+		return rc;
+
+	/* Fragment Header */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_FH, 0, 0, MV_FALSE);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_FH, 0, 0, MV_TRUE);
+	if (rc)
+		return rc;
+
+	/* Authentication Header */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_AH, 0, 0, MV_FALSE);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_AH, 0, 0, MV_TRUE);
+	if (rc)
+		return rc;
+	/* Check NH on AH header */
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_NULL, 0, 0);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_IPV6, 0, 0);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_RH, 0, 0);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_FH, 0, 0);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_DH, 0, 0);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_MH, 0, 0);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_TCP, RI_L4_TCP, RI_L4_PROTO_MASK);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_UDP, RI_L4_UDP, RI_L4_PROTO_MASK);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6ProtoAh(MV_IP_PROTO_ICMPV6, RI_CPU_CODE_RX_SPEC | RI_UDF3_RX_SPECIAL, RI_CPU_CODE_MASK | RI_UDF3_MASK);
+	if (rc)
+		return rc;
+	/* Check AH length */
+	for (ah_len = IP6_AH_LEN_16B; ah_len < IP6_AH_LEN_MAX; ah_len++) {
+		rc = mvPp2PrsIp6AhLen(ah_len, MV_FALSE);
+		if (rc)
+			return rc;
+		/* Set L4 offset */
+		rc = mvPp2PrsIp6AhLen(ah_len, MV_TRUE);
+		if (rc)
+			return rc;
+	}
+
+	/* Destination Options Header */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_DH, 0, 0, MV_FALSE);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_DH, 0, 0, MV_TRUE);
+	if (rc)
+		return rc;
+
+	/* Mobility Header */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_MH, 0, 0, MV_FALSE);
+	if (rc)
+		return rc;
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_MH, 0, 0, MV_TRUE);
+	if (rc)
+		return rc;
+
+	/* L4 parse */
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_TCP,
+			      RI_L4_TCP,
+			      RI_L4_PROTO_MASK,
+			      MV_TRUE);
+	if (rc)
+		return rc;
+
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_UDP,
+			      RI_L4_UDP,
+			      RI_L4_PROTO_MASK,
+			      MV_TRUE);
+	if (rc)
+		return rc;
+
+	rc = mvPp2PrsIp6Proto(MV_IP_PROTO_ICMPV6,
+			      RI_CPU_CODE_RX_SPEC | RI_UDF3_RX_SPECIAL, RI_CPU_CODE_MASK | RI_UDF3_MASK,
+			      MV_TRUE);
+	if (rc)
+		return rc;
+
+	return MV_OK;
+}
 
 /*
  ******************************************************************************
@@ -2409,7 +3470,7 @@ static int mvPp2PrsIp6Init(void)
  * flows
  *
  ******************************************************************************
-*/
+ */
 
 static MV_PP2_PRS_ENTRY *mvPrsFlowFind(int flow)
 {
@@ -2420,7 +3481,7 @@ static MV_PP2_PRS_ENTRY *mvPrsFlowFind(int flow)
 	pe = mvPp2PrsSwAlloc(PRS_LU_FLOWS);
 
 	/* Go through the all entires with PRS_LU_MAC */
-	for (tid = MV_PP2_PRS_TCAM_SIZE-1; tid >= 0; tid--) {
+	for (tid = MV_PP2_PRS_TCAM_SIZE - 1; tid >= 0; tid--) {
 		if ((!mvPp2PrsShadowIsValid(tid)) || (mvPp2PrsShadowLu(tid) != PRS_LU_FLOWS))
 			continue;
 
@@ -2444,7 +3505,7 @@ int mvPrsFlowIdGen(int tid, int flowId, unsigned int res, unsigned int resMask, 
 	PRS_DBG("%s\n", __func__);
 
 	POS_RANGE_VALIDATE(flowId, FLOWID_MASK);
-	POS_RANGE_VALIDATE(tid, MV_PP2_PRS_TCAM_SIZE-1);
+	POS_RANGE_VALIDATE(tid, MV_PP2_PRS_TCAM_SIZE - 1);
 
 	/* Default configuration entry - overrwite is forbidden */
 	if (mvPp2PrsShadowIsValid(tid) && (mvPp2PrsShadowLu(tid) != PRS_LU_FLOWS)) {
@@ -2476,6 +3537,61 @@ int mvPrsFlowIdGen(int tid, int flowId, unsigned int res, unsigned int resMask, 
 
 }
 
+int mvPrsFlowIdDel(int tid)
+{
+	PRS_DBG("%s\n", __func__);
+
+	POS_RANGE_VALIDATE(tid, MV_PP2_PRS_TCAM_SIZE - 1);
+
+	/* Only handle valid flow type rule */
+	if (!mvPp2PrsShadowIsValid(tid) || (mvPp2PrsShadowLu(tid) != PRS_LU_FLOWS)) {
+		mvOsPrintf("%s: Error, Tcam entry is not use or not flow type\n", __func__);
+		return MV_ERROR;
+	}
+
+	mvPp2PrsHwInv(tid);
+	mvPp2PrsShadowClear(tid);
+
+	return MV_OK;
+
+}
+
+int mvPrsFlowIdFirstFreeGet(void)
+{
+	int fid;
+
+	for (fid = MV_PP2_PRS_FIRST_FLOW_ID; fid <= MV_PP2_PRS_LAST_FLOW_ID; fid++)
+		if (mvPrsFlowIdGet(fid) == MV_FALSE)
+			break;
+
+	if (fid <= MV_PP2_PRS_LAST_FLOW_ID)
+		return fid;
+
+	return MV_PP2_PRS_INVALID_FLOW_ID;
+}
+
+int mvPrsFlowIdLastFreeGet(void)
+{
+	int fid;
+
+	for (fid = MV_PP2_PRS_LAST_FLOW_ID; fid >= MV_PP2_PRS_FIRST_FLOW_ID; fid--)
+		if (mvPrsFlowIdGet(fid) == MV_FALSE)
+			break;
+
+	if (fid >=  MV_PP2_PRS_FIRST_FLOW_ID)
+		return fid;
+
+	return MV_PP2_PRS_INVALID_FLOW_ID;
+}
+
+int mvPrsFlowIdRelease(int flowId)
+{
+	POS_RANGE_VALIDATE(flowId, FLOWID_MASK);
+
+	mvPrsFlowIdClear(flowId);
+
+	return MV_OK;
+}
 
 int mvPrsDefFlow(int port)
 {
@@ -2506,6 +3622,7 @@ int mvPrsDefFlow(int port)
 
 		/* set flowID*/
 		mvPp2PrsSwSramAiUpdate(pe, FLOWID_DEF(port), FLOWID_MASK);
+		mvPrsFlowIdSet(FLOWID_DEF(port));
 		mvPp2PrsSwSramLuDoneSet(pe);
 
 		mvOsSPrintf(name, "def-flowId-port-%d", port);
@@ -2525,6 +3642,46 @@ int mvPrsDefFlow(int port)
 	return MV_OK;
 }
 
+int mvPrsDefFlowInit(void)
+{
+	MV_PP2_PRS_ENTRY *pe;
+	int tid;
+	int port;
+	char name[PRS_TEXT_SIZE];
+
+	PRS_DBG("%s\n", __func__);
+
+	for (port = 0; port < MV_PP2_MAX_PORTS; port++) {
+		/* Go through the all entires from last to fires */
+		tid = PE_FIRST_DEFAULT_FLOW - port;
+
+		if (tid == MV_PRS_OUT_OF_RAGE) {
+			mvOsPrintf("%s: No free TCAM entiry\n", __func__);
+			return MV_ERROR;
+		}
+
+		pe = mvPp2PrsSwAlloc(PRS_LU_FLOWS);
+		pe->index = tid;
+
+		mvPp2PrsSwTcamPortMapSet(pe, 0);
+
+		/* set flowID*/
+		mvPp2PrsSwSramAiUpdate(pe, FLOWID_DEF(port), FLOWID_MASK);
+		mvPrsFlowIdSet(FLOWID_DEF(port));
+		mvPp2PrsSwSramLuDoneSet(pe);
+
+		mvOsSPrintf(name, "def-flowId-port-%d", port);
+
+		/* Update mvPrsShadowTbl */
+		mvPp2PrsShadowSet(pe->index, PRS_LU_FLOWS, name);
+
+		mvPp2PrsHwWrite(pe);
+		mvPp2PrsSwFree(pe);
+
+	}
+	return MV_OK;
+}
+
 /******************************************************************************
  *
  * Paeser Init
@@ -2534,7 +3691,7 @@ int mvPrsDefFlow(int port)
 
 int mvPrsDefaultInit(void)
 {
-	int    port, rc;
+	int port, rc;
 
 	/*enable tcam table*/
 	mvPp2PrsSwTcam(1);
@@ -2544,12 +3701,21 @@ int mvPrsDefaultInit(void)
 
 	mvPp2PrsHwInvAll();
 	mvPp2PrsShadowClearAll();
+	mvPrsFlowIdClearAll();
 
 	/* TODO: Mask & clear all interrupts */
 
 	/* Always start from lookup = 0 */
 	for (port = 0; port < MV_PP2_MAX_PORTS; port++)
-		mvPp2PrsHwPortInit(port, PRS_LU_MAC, MV_PP2_PRS_PORT_LU_MAX, 0);
+		mvPp2PrsHwPortInit(port, PRS_LU_MH, MV_PP2_PRS_PORT_LU_MAX, 0);
+
+	rc = mvPrsDefFlowInit();
+	if (rc)
+		return rc;
+
+	rc = mvPp2PrsMhInit();
+	if (rc)
+		return rc;
 
 	rc = mvPp2PrsMacInit();
 	if (rc)
@@ -2567,7 +3733,7 @@ int mvPrsDefaultInit(void)
 	if (rc)
 		return rc;
 
-	rc = mvPp2PrsPpppeInit();
+	rc = mvPp2PrsPppeInit();
 	if (rc)
 		return rc;
 
@@ -2580,5 +3746,4 @@ int mvPrsDefaultInit(void)
 		return rc;
 
 	return MV_OK;
-
 }

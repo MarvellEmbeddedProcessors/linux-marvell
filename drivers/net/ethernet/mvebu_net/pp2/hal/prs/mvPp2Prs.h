@@ -88,6 +88,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define	DSA_ETHER_TYPE		0xDADA/*TODO set to default DSA ether type*/
 
+#define MV_PP2_PRS_INVALID_FLOW_ID	(0xFF) /* Invalid Flow ID */
 
 /* MAC entries , shadow udf */
 enum prs_udf {
@@ -100,6 +101,7 @@ enum prs_udf {
 
 /* LOOKUP ID */
 enum prs_lookup {
+	PRS_LU_MH,
 	PRS_LU_MAC,
 	PRS_LU_DSA,
 	PRS_LU_VLAN,
@@ -111,35 +113,76 @@ enum prs_lookup {
 	PRS_LU_LAST,
 };
 
+/* L3 cast enum */
+enum prs_l3_cast {
+	L3_UNIT_CAST,
+	L3_MULTI_CAST,
+	L3_BROAD_CAST
+};
+
+/* PP2 GMAC enum */
+enum prs_gmacs_enum {
+	INVALID_GMAC = -1,
+	ENUM_GMAC_0,
+	ENUM_GMAC_1,
+	ENUM_GMAC_LPK,
+	ENUM_PMAC = 7,
+	MAX_GMAC = ENUM_PMAC,
+	MAX_NUM_GMACS
+};
+
+/* Multicast MAC kinds */
+enum prs_mac_mc {
+	IP4_MAC_MC,
+	IP6_MAC_MC,
+	MAX_MAC_MC
+};
+
+/* IPV6 extension header length supported
+*  Calculate: Length = 8B + len * 4 */
+enum prs_ip6_ext_ah_len {
+	IP6_AH_LEN_16B = 2,
+	IP6_AH_LEN_20B = 3,
+	IP6_AH_LEN_24B = 4,
+	IP6_AH_LEN_28B = 5,
+	IP6_AH_LEN_32B = 6,
+	IP6_AH_LEN_36B = 7,
+	IP6_AH_LEN_MAX
+};
 
 /* Tcam entries ID */
-#define	PE_DROP_ALL					0
-#define	PE_RX_SPECIAL					1
-#define PE_FIRST_FREE_TID				2
+#define PE_DROP_ALL				0
+/* The TCAM rule for RX Special packets based on Marvell header is allocated dynamically */
+#define PE_FIRST_FREE_TID				1
 
+#define PE_LAST_FREE_TID	(MV_PP2_PRS_TCAM_SIZE - 31)
+#define PE_IP6_EXT_PROTO_UN	(MV_PP2_PRS_TCAM_SIZE - 30)
+#define PE_MAC_MC_IP6		(MV_PP2_PRS_TCAM_SIZE - 29) /* multicast for IPv6 */
+#define PE_IP6_ADDR_UN		(MV_PP2_PRS_TCAM_SIZE - 28)
+#define PE_IP4_ADDR_UN		(MV_PP2_PRS_TCAM_SIZE - 27)
+#define PE_LAST_DEFAULT_FLOW	(MV_PP2_PRS_TCAM_SIZE - 26)
+#define PE_FIRST_DEFAULT_FLOW	(MV_PP2_PRS_TCAM_SIZE - 19)
+/*#define PE_ETYPE_DSA		(MV_PP2_PRS_TCAM_SIZE - 19)*/
+#define PE_EDSA_TAGGED		(MV_PP2_PRS_TCAM_SIZE - 18)
+#define PE_EDSA_UNTAGGED	(MV_PP2_PRS_TCAM_SIZE - 17)
+#define PE_DSA_TAGGED		(MV_PP2_PRS_TCAM_SIZE - 16)
+#define PE_DSA_UNTAGGED		(MV_PP2_PRS_TCAM_SIZE - 15)
 
-#define PE_LAST_FREE_TID	(MV_PP2_PRS_TCAM_SIZE - 19)
-#define PE_ETYPE_DSA		(MV_PP2_PRS_TCAM_SIZE - 18)
-#define PE_EDSA_TAGGED		(MV_PP2_PRS_TCAM_SIZE - 17)
-#define PE_EDSA_UNTAGGED	(MV_PP2_PRS_TCAM_SIZE - 16)
-#define PE_DSA_TAGGED		(MV_PP2_PRS_TCAM_SIZE - 15)
-#define PE_DSA_UNTAGGED		(MV_PP2_PRS_TCAM_SIZE - 14)
+#define PE_ETYPE_EDSA_TAGGED	(MV_PP2_PRS_TCAM_SIZE - 14)
+#define PE_ETYPE_EDSA_UNTAGGED	(MV_PP2_PRS_TCAM_SIZE - 13)
+#define PE_ETYPE_DSA_TAGGED	(MV_PP2_PRS_TCAM_SIZE - 12)
+#define PE_ETYPE_DSA_UNTAGGED	(MV_PP2_PRS_TCAM_SIZE - 11)
 
-#define PE_ETYPE_EDSA_TAGGED	(MV_PP2_PRS_TCAM_SIZE - 13)
-#define PE_ETYPE_EDSA_UNTAGGED	(MV_PP2_PRS_TCAM_SIZE - 12)
-#define PE_ETYPE_DSA_TAGGED	(MV_PP2_PRS_TCAM_SIZE - 11)
-#define PE_ETYPE_DSA_UNTAGGED	(MV_PP2_PRS_TCAM_SIZE - 10)
-
-
+#define PE_MH_DEFAULT		(MV_PP2_PRS_TCAM_SIZE - 10) /* Marvell header default rule */
 #define PE_DSA_DEFAULT		(MV_PP2_PRS_TCAM_SIZE - 9)
 #define PE_IP6_PROTO_UN		(MV_PP2_PRS_TCAM_SIZE - 8)
 #define PE_IP4_PROTO_UN		(MV_PP2_PRS_TCAM_SIZE - 7)
 #define PE_ETH_TYPE_UN		(MV_PP2_PRS_TCAM_SIZE - 6)
-#define	PE_VLAN_DBL             (MV_PP2_PRS_TCAM_SIZE - 5) /* accept double vlan*/
-#define	PE_VLAN_NONE            (MV_PP2_PRS_TCAM_SIZE - 4) /* vlan default*/
-#define PE_MAC_MC_ALL   	(MV_PP2_PRS_TCAM_SIZE - 3) /* all multicast mode */
-#define PE_MAC_PROMISCOUS   	(MV_PP2_PRS_TCAM_SIZE - 2) /* promiscous mode */
-#define PE_MAC_NON_PROMISCOUS   (MV_PP2_PRS_TCAM_SIZE - 1) /* non-promiscous mode */
+#define PE_VLAN_DBL		(MV_PP2_PRS_TCAM_SIZE - 5) /* accept double vlan*/
+#define PE_VLAN_NONE		(MV_PP2_PRS_TCAM_SIZE - 4) /* vlan default*/
+#define PE_MAC_MC_ALL		(MV_PP2_PRS_TCAM_SIZE - 3) /* all multicast mode */
+#define PE_MAC_PROMISCOUS	(MV_PP2_PRS_TCAM_SIZE - 2) /* promiscous mode */
+#define PE_MAC_NON_PROMISCOUS	(MV_PP2_PRS_TCAM_SIZE - 1) /* non-promiscous mode */
 
 /*
  * Pre-defined FlowId assigment
@@ -147,6 +190,23 @@ enum prs_lookup {
 
 #define FLOWID_DEF(_port_)	(_port_)
 #define FLOWID_MASK	 	0x3F
+
+/*
+ * AI bits assigment
+*/
+#define IPV4_DIP_AI_BIT		0
+#define IPV6_NO_EXT_AI_BIT	0
+#define IPV6_EXT_AI_BIT		1
+#define IPV6_EXT_AH_AI_BIT	2
+#define IPV6_EXT_AH_LEN_AI_BIT	3
+#define IPV6_EXT_AH_L4_AI_BIT	4
+
+/*
+ * IPv6 extension header related
+*/
+#define IPV6_EXT_EXCLUDE_BYTES	8	/* IP6 excluding bytes in extension header, 8 bytes */
+#define IPV6_EXT_AH_UNIT_BYTES	4	/* The AH length units, 4 bytes */
+
 /*
  * Export API
  */
@@ -156,12 +216,18 @@ int mvPrsMacDaAccept(int port, unsigned char *da, int add);
 int mvPrsMacDaRangeSet(unsigned portBmp, MV_U8 *da, MV_U8 *mask, unsigned int ri, unsigned int riMask, MV_BOOL finish);
 int mvPrsMacDaRangeDel(unsigned portBmp, MV_U8 *da, MV_U8 *mask);
 int mvPrsMacDropAllSet(int port, int add);
+int mvPrsMhSet(unsigned int portMap, unsigned short mh, unsigned short mh_mask, unsigned int ri, unsigned int riMask, MV_BOOL finish);
+int mvPrsMhDel(unsigned int portMap, unsigned short mh, unsigned short mh_mask);
 int mvPrsMcastDelAll(int port);
 int mvPrsMhRxSpecialSet(int port, unsigned short mh, int add);
 int mvPrsMacPromiscousSet(int port, int add);
 int mvPrsMacAllMultiSet(int port, int add);
 int mvPrsDebugBasicInit(void);
 int mvPrsFlowIdGen(int tid, int flowId, unsigned int res, unsigned int resMask, int portBmp);
+int mvPrsFlowIdDel(int tid);
+int mvPrsFlowIdFirstFreeGet(void);
+int mvPrsFlowIdLastFreeGet(void);
+int mvPrsFlowIdRelease(int flowId);
 int mvPp2PrsTagModeSet(int port, int type);
 int mvPp2PrsEtypeDsaModeSet(int port, int extand);
 int mvPp2PrsEtypeDsaSet(unsigned int eType);
@@ -173,6 +239,7 @@ int mvPp2PrsSingleVlan(unsigned short tpid, unsigned int portBmp, int add);
 int mvPp2PrsVlanAllDel(void);
 char *mvPrsVlanInfoStr(unsigned int vlan_info);
 char *mvPrsL2InfoStr(unsigned int l2_info);
+int mvPrsIp6NhSet(void);
 /*
 int mvPrsMacDaDrop(int port, unsigned char *da, int add);
 */

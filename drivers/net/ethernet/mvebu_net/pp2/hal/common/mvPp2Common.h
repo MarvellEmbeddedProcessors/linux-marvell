@@ -105,6 +105,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	} \
 }
 
+#define RET_VALIDATE(_ret_) {\
+	if (_ret_ != MV_OK) {\
+		mvOsPrintf("%s: function call fail.\n", __func__);\
+		return MV_ERROR;\
+	} \
+}
+
+
 #define WARN_OOM(cond) if (cond) { mvOsPrintf("%s: out of memory\n", __func__); return NULL; }
 
 

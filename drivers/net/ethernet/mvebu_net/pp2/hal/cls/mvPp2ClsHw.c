@@ -404,6 +404,26 @@ int mvPp2ClsHwLkpRead(int lkpid, int way, MV_PP2_CLS_LKP_ENTRY *fe)
 }
 /*-------------------------------------------------------------------------------*/
 
+int mvPp2ClsHwLkpClear(int lkpid, int way)
+{
+	unsigned int regVal = 0;
+	MV_PP2_CLS_LKP_ENTRY fe;
+
+	POS_RANGE_VALIDATE(lkpid, MV_PP2_CLS_LKP_TBL_SIZE);
+	BIT_RANGE_VALIDATE(way);
+
+	/* clear entry */
+	mvPp2ClsSwLkpClear(&fe);
+	mvPp2ClsHwLkpWrite(lkpid, way, &fe);
+
+	/* clear shadow */
+	regVal = (way << MV_PP2_CLS_LKP_INDEX_WAY_OFFS) | (lkpid << MV_PP2_CLS_LKP_INDEX_LKP_OFFS);
+	mvClsLkpShadowTbl[regVal] = NOT_IN_USE;
+
+	return MV_OK;
+}
+/*-------------------------------------------------------------------------------*/
+
 int mvPp2ClsSwLkpDump(MV_PP2_CLS_LKP_ENTRY *fe)
 {
 	int int32bit;
@@ -572,6 +592,23 @@ int mvPp2ClsHwFlowRead(int index, MV_PP2_CLS_FLOW_ENTRY *fe)
 	fe->data[0] = mvPp2RdReg(MV_PP2_CLS_FLOW_TBL0_REG);
 	fe->data[1] = mvPp2RdReg(MV_PP2_CLS_FLOW_TBL1_REG);
 	fe->data[2] = mvPp2RdReg(MV_PP2_CLS_FLOW_TBL2_REG);
+
+	return MV_OK;
+}
+/*-------------------------------------------------------------------------------*/
+
+int mvPp2ClsHwFlowClear(int index)
+{
+	MV_PP2_CLS_FLOW_ENTRY fe;
+
+	POS_RANGE_VALIDATE(index, MV_PP2_CLS_FLOWS_TBL_SIZE);
+
+	/* Clear flow entry */
+	mvPp2ClsSwFlowClear(&fe);
+	mvPp2ClsHwFlowWrite(index, &fe);
+
+	/* clear shadow */
+	mvClsFlowShadowTbl[index] = NOT_IN_USE;
 
 	return MV_OK;
 }
