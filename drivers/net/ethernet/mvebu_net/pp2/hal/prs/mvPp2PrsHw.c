@@ -74,6 +74,7 @@ static int mvPp2PrsSwSramAiDump(MV_PP2_PRS_ENTRY *pe);
 /*-------------------------------------------------------------------------------*/
 
 PRS_SHADOW_ENTRY  mvPrsShadowTbl[MV_PP2_PRS_TCAM_SIZE];
+int  mvPrsFlowIdTbl[MV_PP2_PRS_FLOW_ID_SIZE];
 /******************************************************************************
  * Common utilities
  ******************************************************************************/
@@ -150,6 +151,41 @@ void mvPp2PrsShadowClearAll(void)
 		mvPrsShadowTbl[index].text[0] = 0;
 	}
 
+}
+
+int mvPrsFlowIdGet(int flowId)
+{
+	return mvPrsFlowIdTbl[flowId];
+}
+
+void mvPrsFlowIdSet(int flowId)
+{
+	mvPrsFlowIdTbl[flowId] = MV_TRUE;
+}
+
+void mvPrsFlowIdClear(int flowId)
+{
+	mvPrsFlowIdTbl[flowId] = MV_FALSE;
+}
+
+void mvPrsFlowIdClearAll(void)
+{
+	int index;
+
+	for (index = 0; index < MV_PP2_PRS_FLOW_ID_SIZE; index++)
+		mvPrsFlowIdTbl[index] = MV_FALSE;
+}
+
+int mvPrsFlowIdDump(void)
+{
+	int index;
+
+	for (index = 0; index < MV_PP2_PRS_FLOW_ID_SIZE; index++) {
+		if (mvPrsFlowIdGet(index) == MV_TRUE)
+			mvOsPrintf("Flow ID[%d]: In_USE\n", index);
+	}
+
+	return MV_OK;
 }
 
 static int mvPp2PrsFirstFreeGet(int from, int to)
@@ -632,6 +668,27 @@ int mvPp2PrsSwTcamWordSet(MV_PP2_PRS_ENTRY *pe, unsigned int offs, unsigned int 
 		byteMask = ((unsigned char *) &mask)[index];
 
 		mvPp2PrsSwTcamByteSet(pe, offset, byte, byteMask);
+	}
+
+	return MV_OK;
+}
+
+int mvPp2PrsSwTcamWordGet(MV_PP2_PRS_ENTRY *pe, unsigned int offs, unsigned int *word, unsigned int *enable)
+{
+	int index, offset;
+	unsigned char byte, mask;
+
+	PTR_VALIDATE(pe);
+	PTR_VALIDATE(word);
+	PTR_VALIDATE(enable);
+
+	POS_RANGE_VALIDATE(offs, TCAM_DATA_WORD_MAX);
+
+	for (index = 0; index < DWORD_BYTES_LEN; index++) {
+		offset = (offs * DWORD_BYTES_LEN) + index;
+		mvPp2PrsSwTcamByteGet(pe, offset,  &byte, &mask);
+		((unsigned char *) word)[index] = byte;
+		((unsigned char *) enable)[index] = mask;
 	}
 
 	return MV_OK;
