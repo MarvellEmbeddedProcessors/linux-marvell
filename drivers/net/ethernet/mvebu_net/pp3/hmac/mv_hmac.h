@@ -99,7 +99,7 @@ struct cfh_common_format {
 	unsigned short pkt_length;
 	unsigned short seq_id_qe_cntrl;
 	unsigned short qm_cntrl;
-	unsigned char  cfh_length;
+	unsigned char  cfh_length;	/* bytes */
 	unsigned char  cfh_format;
 	unsigned int   tag1;
 	unsigned int   tag2;
@@ -184,9 +184,10 @@ static inline void mv_pp3_hmac_rxq_occ_set(int frame, int queue, int size)
 
 /* Returns pointer to next CFH buffer and it size */
 /* size - number of datagram                      */
-static inline u8 *mv_pp3_hmac_rxq_next_cfh(struct mv_pp3_hmac_queue_ctrl *qctrl, int *size)
+static inline u8 *mv_pp3_hmac_rxq_next_cfh(int frame, int queue, int *size)
 {
 	struct cfh_common_format *cfh;
+	struct mv_pp3_hmac_queue_ctrl *qctrl = mv_hmac_rxq_handle[frame][queue];
 
 	/* Read 16 bytes of CFH pointed by "next_proc" field and calculate size of CFH in bytes */
 	cfh = (struct cfh_common_format *)qctrl->next_proc;
@@ -278,9 +279,9 @@ static inline u8 *mv_pp3_hmac_txq_next_cfh(int frame, int queue, int size)
 	int start_free_dg;	/* number of free datagram in the queue start */
 	struct mv_pp3_hmac_queue_ctrl *qctrl = mv_hmac_txq_handle[frame][queue];
 
-	/* calculate number of unused datagram n the queue end */
+	/* calculate number of unused datagram in the queue end */
 	end_free_dg = (qctrl->end - qctrl->next_proc) / MV_PP3_HMAC_DG_SIZE;
-	if (end_free_dg >= size) {
+	if ((end_free_dg >= size) && (end_free_dg < (MV_PP3_CFH_MAX_SIZE / MV_PP3_HMAC_DG_SIZE))) {
 		cfh_ptr = qctrl->next_proc;
 		qctrl->next_proc += (size * MV_PP3_HMAC_DG_SIZE);
 		qctrl->occ_dg += size;
