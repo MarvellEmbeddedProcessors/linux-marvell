@@ -139,7 +139,7 @@ static const struct mvebu_soc_descr __initconst armada_375_gating_descr[] = {
 	{ "pex0", NULL, 5 },
 	{ "pex1", NULL, 6 },
 	{ "audio", NULL, 8 },
-	{ "nand", NULL, 11 },
+	{ "nd_clk", "nand", 11 },
 	{ "sata0_link", "sata0_core", 14 },
 	{ "sata0_core", NULL, 15 },
 	{ "usb3", NULL, 16 },
