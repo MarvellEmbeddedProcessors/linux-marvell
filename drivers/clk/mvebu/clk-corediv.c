@@ -154,16 +154,8 @@ static int clk_corediv_set_rate(struct clk_hw *hwclk, unsigned long rate,
 	return 0;
 }
 
-static const struct clk_ops corediv_ops = {
-	.enable = clk_corediv_enable,
-	.disable = clk_corediv_disable,
-	.is_enabled = clk_corediv_is_enabled,
-	.recalc_rate = clk_corediv_recalc_rate,
-	.round_rate = clk_corediv_round_rate,
-	.set_rate = clk_corediv_set_rate,
-};
-
-static void __init mvebu_corediv_clk_init(struct device_node *node)
+static void __init
+mvebu_corediv_clk_init(struct device_node *node, const struct clk_ops *ops)
 {
 	struct clk_init_data init;
 	struct clk_corediv *corediv;
@@ -200,7 +192,7 @@ static void __init mvebu_corediv_clk_init(struct device_node *node)
 		init.num_parents = 1;
 		init.parent_names = &parent_name;
 		init.name = clk_name;
-		init.ops = &corediv_ops;
+		init.ops = ops;
 		init.flags = 0;
 
 		corediv[i].desc = mvebu_corediv_desc[i];
@@ -223,11 +215,20 @@ err_unmap:
 
 static void __init mvebu_corediv_clk_a370_init(struct device_node *node)
 {
+	static const struct clk_ops corediv_ops = {
+		.enable = clk_corediv_enable,
+		.disable = clk_corediv_disable,
+		.is_enabled = clk_corediv_is_enabled,
+		.recalc_rate = clk_corediv_recalc_rate,
+		.round_rate = clk_corediv_round_rate,
+		.set_rate = clk_corediv_set_rate,
+	};
+
 	enable_bit_offset = 24;
 	ratio_offset = 8;
 	ratio_reload = BIT(8);
 
-	mvebu_corediv_clk_init(node);
+	mvebu_corediv_clk_init(node, &corediv_ops);
 }
 CLK_OF_DECLARE(mvebu_corediv_a370_clk, "marvell,armada-370-corediv-clock",
 	       mvebu_corediv_clk_a370_init);
