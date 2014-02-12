@@ -18,9 +18,6 @@
 #include <asm/io.h>
 
 #define CORE_CLK_DIV_RATIO_MASK		0xff
-#define CORE_CLK_DIV_RATIO_RELOAD	BIT(8)
-#define CORE_CLK_DIV_ENABLE_OFFSET	24
-#define CORE_CLK_DIV_RATIO_OFFSET	0x8
 
 struct clk_corediv_desc {
 	unsigned int mask;
@@ -37,6 +34,10 @@ struct clk_corediv {
 
 static struct clk_onecell_data clk_data;
 
+static u32 ratio_reload;
+static u32 enable_bit_offset;
+static u32 ratio_offset;
+
 static const struct clk_corediv_desc mvebu_corediv_desc[] __initconst = {
 	{ .mask = 0x3f, .offset = 8, .fieldbit = 1 }, /* NAND clock */
 };
@@ -47,7 +48,7 @@ static int clk_corediv_is_enabled(struct clk_hw *hwclk)
 {
 	struct clk_corediv *corediv = to_corediv_clk(hwclk);
 	struct clk_corediv_desc *desc = &corediv->desc;
-	u32 enable_mask = BIT(desc->fieldbit) << CORE_CLK_DIV_ENABLE_OFFSET;
+	u32 enable_mask = BIT(desc->fieldbit) << enable_bit_offset;
 
 	return !!(readl(corediv->reg) & enable_mask);
 }
@@ -62,7 +63,7 @@ static int clk_corediv_enable(struct clk_hw *hwclk)
 	spin_lock_irqsave(&corediv->lock, flags);
 
 	reg = readl(corediv->reg);
-	reg |= (BIT(desc->fieldbit) << CORE_CLK_DIV_ENABLE_OFFSET);
+	reg |= (BIT(desc->fieldbit) << enable_bit_offset);
 	writel(reg, corediv->reg);
 
 	spin_unlock_irqrestore(&corediv->lock, flags);
@@ -80,7 +81,7 @@ static void clk_corediv_disable(struct clk_hw *hwclk)
 	spin_lock_irqsave(&corediv->lock, flags);
 
 	reg = readl(corediv->reg);
-	reg &= ~(BIT(desc->fieldbit) << CORE_CLK_DIV_ENABLE_OFFSET);
+	reg &= ~(BIT(desc->fieldbit) << enable_bit_offset);
 	writel(reg, corediv->reg);
 
 	spin_unlock_irqrestore(&corediv->lock, flags);
@@ -93,7 +94,7 @@ static unsigned long clk_corediv_recalc_rate(struct clk_hw *hwclk,
 	struct clk_corediv_desc *desc = &corediv->desc;
 	u32 reg, div;
 
-	reg = readl(corediv->reg + CORE_CLK_DIV_RATIO_OFFSET);
+	reg = readl(corediv->reg + ratio_offset);
 	div = (reg >> desc->offset) & desc->mask;
 	return parent_rate / div;
 }
@@ -126,17 +127,17 @@ static int clk_corediv_set_rate(struct clk_hw *hwclk, unsigned long rate,
 	spin_lock_irqsave(&corediv->lock, flags);
 
 	/* Write new divider to the divider ratio register */
-	reg = readl(corediv->reg + CORE_CLK_DIV_RATIO_OFFSET);
+	reg = readl(corediv->reg + ratio_offset);
 	reg &= ~(desc->mask << desc->offset);
 	reg |= (div & desc->mask) << desc->offset;
-	writel(reg, corediv->reg + CORE_CLK_DIV_RATIO_OFFSET);
+	writel(reg, corediv->reg + ratio_offset);
 
 	/* Set reload-force for this clock */
 	reg = readl(corediv->reg) | BIT(desc->fieldbit);
 	writel(reg, corediv->reg);
 
 	/* Now trigger the clock update */
-	reg = readl(corediv->reg) | CORE_CLK_DIV_RATIO_RELOAD;
+	reg = readl(corediv->reg) | ratio_reload;
 	writel(reg, corediv->reg);
 
 	/*
@@ -144,7 +145,7 @@ static int clk_corediv_set_rate(struct clk_hw *hwclk, unsigned long rate,
 	 * ratios request and the reload request.
 	 */
 	udelay(1000);
-	reg &= ~(CORE_CLK_DIV_RATIO_MASK | CORE_CLK_DIV_RATIO_RELOAD);
+	reg &= ~(CORE_CLK_DIV_RATIO_MASK | ratio_reload);
 	writel(reg, corediv->reg);
 	udelay(1000);
 
@@ -219,5 +220,14 @@ err_free_clks:
 err_unmap:
 	iounmap(base);
 }
-CLK_OF_DECLARE(mvebu_corediv_clk, "marvell,armada-370-corediv-clock",
-	       mvebu_corediv_clk_init);
+
+static void __init mvebu_corediv_clk_a370_init(struct device_node *node)
+{
+	enable_bit_offset = 24;
+	ratio_offset = 8;
+	ratio_reload = BIT(8);
+
+	mvebu_corediv_clk_init(node);
+}
+CLK_OF_DECLARE(mvebu_corediv_a370_clk, "marvell,armada-370-corediv-clock",
+	       mvebu_corediv_clk_a370_init);
