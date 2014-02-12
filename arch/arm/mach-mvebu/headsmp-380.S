@@ -14,7 +14,7 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 
-	__INIT
+	__CPUINIT
 ENTRY(a380_secondary_startup)
 	bl      v7_invalidate_l1
 	b	secondary_startup
