@@ -66,6 +66,7 @@ static struct  platform_device *pp2_sysfs;
 /*
 platform_device used in mv_eth_all_ports_probe only for debug
 */
+
 struct platform_device *plats[MV_ETH_MAX_PORTS];
 
 /* Temporary implementation for SWF to HWF transition */
