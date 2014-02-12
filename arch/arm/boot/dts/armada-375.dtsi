@@ -282,6 +282,15 @@
 						     "mpp5", "mpp8", "mpp9";
 					marvell,function = "spi0";
 				};
+
+				nand_pins: nand-pins {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+							"mpp3", "mpp4", "mpp5",
+							"mpp6", "mpp7", "mpp8",
+							"mpp9", "mpp10", "mpp11",
+							"mpp12", "mpp13";
+					marvell,function = "nand";
+				};
 			};
 
 			rtc@10300 {
@@ -435,6 +444,16 @@
 					dmacap,xor;
 					dmacap,memset;
 				};
+			};
+
+			nand: nand@d0000 {
+				compatible = "marvell,armada370-nand";
+				reg = <0xd0000 0x54>;
+				#address-cells = <1>;
+				#size-cells = <1>;
+				interrupts = <0 84 0x4>;
+				clocks = <&gateclk 11>;
+				status = "disabled";
 			};
 		};
 
