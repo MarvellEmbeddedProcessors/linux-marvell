@@ -158,6 +158,14 @@
 				#clock-cells = <1>;
 			};
 
+			coredivclk: corediv-clock@e8250 {
+				compatible = "marvell,armada-375-corediv-clock";
+				reg = <0xe8250 0xc>;
+				#clock-cells = <1>;
+				clocks = <&mainpll>;
+				clock-output-names = "nand";
+			};
+
 			gpio0: gpio@18100 {
 				compatible = "marvell,orion-gpio";
 				reg = <0x18100 0x40>;
