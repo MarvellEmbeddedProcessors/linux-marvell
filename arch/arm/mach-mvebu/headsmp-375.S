@@ -13,7 +13,7 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 
-	__INIT
+	__CPUINIT
 #ifdef CONFIG_A375_CPU1_ENABLE_WA
 
 #define CPU_RESUME_ADDR_REG 0xf10182d4
