@@ -43,6 +43,7 @@ static ssize_t mv_eth_help(char *b)
 
 	o += sprintf(b+o, "cat                    rxDmaRegs   - show RX DMA registers\n");
 	o += sprintf(b+o, "echo [p]             > rxFifoRegs  - show RX FIFO registers for port <p>\n");
+	o += sprintf(b+o, "echo [p] v           > rxWeight    - set weight for poll function, <v> - weight [0..255]\n");
 	o += sprintf(b+o, "echo [rxq]           > gRxqRegs    - show RXQ registers for global <rxq>\n");
 #ifdef CONFIG_MV_ETH_PP2_1
 	o += sprintf(b+o, "echo [p] [rxq]       > rxqCounters - show RXQ counters for <p/rxq>.\n");
@@ -99,6 +100,8 @@ static ssize_t mv_eth_port_store(struct device *dev,
 		mvPp2PortRxqRegs(p, v);
 	} else if (!strcmp(name, "rxFifoRegs")) {
 		mvPp2RxFifoRegs(p);
+	} else if (!strcmp(name, "rxWeight")) {
+		mv_eth_ctrl_set_poll_rx_weight(p, v);
 	} else if (!strcmp(name, "rxqSize")) {
 		mv_eth_ctrl_rxq_size_set(p, v, a);
 	} else if (!strcmp(name, "rxqCounters")) {
@@ -158,6 +161,7 @@ static DEVICE_ATTR(rxqShow,     S_IWUSR, NULL, mv_eth_port_store);
 static DEVICE_ATTR(gRxqRegs,    S_IWUSR, NULL, mv_eth_port_store);
 static DEVICE_ATTR(pRxqRegs,    S_IWUSR, NULL, mv_eth_port_store);
 static DEVICE_ATTR(rxFifoRegs,  S_IWUSR, NULL, mv_eth_port_store);
+static DEVICE_ATTR(rxWeight,	S_IWUSR, NULL, mv_eth_port_store);
 static DEVICE_ATTR(rxqSize,   	S_IWUSR, NULL, mv_eth_port_store);
 static DEVICE_ATTR(mhRxSpec,	S_IWUSR, NULL, mv_eth_rx_hex_store);
 static DEVICE_ATTR(prefetch,	S_IWUSR, NULL, mv_eth_port_store);
@@ -170,6 +174,7 @@ static struct attribute *mv_eth_attrs[] = {
 	&dev_attr_gRxqRegs.attr,
 	&dev_attr_pRxqRegs.attr,
 	&dev_attr_rxFifoRegs.attr,
+	&dev_attr_rxWeight.attr,
 	&dev_attr_rxqSize.attr,
 	&dev_attr_mhRxSpec.attr,
 	&dev_attr_prefetch.attr,

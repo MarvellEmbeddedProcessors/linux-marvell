@@ -4039,6 +4039,12 @@ oom:
 /* Show network driver configuration */
 void mv_eth_config_show(void)
 {
+#ifdef CONFIG_MV_ETH_PP2_1
+	pr_info("  o	PPv2.1 Giga driver\n");
+#else
+	pr_info("  o	PPv2.0 Giga driver\n");
+#endif
+
 	printk(KERN_ERR "  o %d Giga ports supported\n", mv_eth_ports_num);
 
 #ifdef CONFIG_MV_INCLUDE_PON
