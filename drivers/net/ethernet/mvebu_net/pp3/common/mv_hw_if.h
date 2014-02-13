@@ -73,6 +73,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define	MV_MAC_ADDR_SIZE	(6)
 #define MV_MAC_STR_SIZE		(20)
 
+/* Sets the field located at the specified in data.     */
+#define U32_SET_FIELD(data, mask, val)		((data) = (((data) & ~(mask)) | (val)))
+
 struct pp3_unit_info {
 	u32 base_addr; /* unit base address = silicon addr + unit offset */
 	u32 ins_offs;  /* unit instance offset - for multiple units */

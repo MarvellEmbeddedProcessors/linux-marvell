@@ -66,8 +66,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define __mvHmacRegs_h__
 
 /* includes */
-/* Sets the field located at the specified offset & length in data.     */
-#define U32_SET_FIELD(data, offset, mask, val)		((data) = (((data) & ~(mask)) | ((val) << (offset))))
 
 /* unit offset */
 #define MV_PP3_HMAC_GL_UNIT_OFFSET	0x30000
