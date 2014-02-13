@@ -106,7 +106,8 @@ void mv_pp3_hmac_queue_bm_mode_cfg(int frame, int queue)
 	u32 reg_data;
 
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
-	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_Q_MODE_OFFS, MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK, 1);
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK, 1 << MV_HMAC_SEND_Q_CTRL_Q_MODE_OFFS);
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_BM_PE_FORMAT_MASK, 1 << MV_HMAC_SEND_Q_CTRL_BM_PE_FORMAT_OFFS);
 
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
 }
@@ -119,7 +120,7 @@ void mv_pp3_hmac_queue_qm_mode_cfg(int frame, int queue, int qm_num)
 
 	/* configure queue to be QM queue */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
-	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_Q_MODE_OFFS, MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK, 0);
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK, 0);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
 	/* map QM queue number */
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_NUM_BPID_REG(queue), qm_num);
@@ -152,9 +153,9 @@ void *mv_pp3_hmac_rxq_init(int frame, int queue, int size)
 	/* Store queue size in rq_size table, number of 16B units */
 	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_RQ_SIZE(queue), (u32)qctrl->size);
 	/* Configure Receive Threshold TBD */
-	/* Disable queue, hmac_%m_rec_q_%n_control set to 0 */
+	/* Enable queue, hmac_%m_rec_q_%n_control set to 1 */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_REC_Q_CTRL_REG(queue));
-	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_OFFS, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 0);
+	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 1 << MV_HMAC_REC_Q_CTRL_RCV_Q_EN_OFFS);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), reg_data);
 
 	/* mark queue as created */
@@ -180,7 +181,7 @@ void mv_pp3_hmac_rxq_enable(int frame, int queue)
 
 	/* Enable queue */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_REC_Q_CTRL_REG(queue));
-	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_OFFS, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 1);
+	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 1 << MV_HMAC_REC_Q_CTRL_RCV_Q_EN_OFFS);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), reg_data);
 }
 
@@ -190,7 +191,7 @@ void mv_pp3_hmac_rxq_disable(int frame, int queue)
 
 	/* Disable queue */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_REC_Q_CTRL_REG(queue));
-	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_OFFS, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 0);
+	U32_SET_FIELD(reg_data, MV_HMAC_REC_Q_CTRL_RCV_Q_EN_MASK, 0);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_CTRL_REG(queue), reg_data);
 }
 
@@ -210,13 +211,13 @@ void mv_pp3_hmac_rxq_event_cfg(int frame, int queue, int event, int group)
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_RQ_EVENT_GROUP(queue));
 	if (event == 0) {
 		/* set group for event 0 */
-		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT0_GROUP_OFFS, MV_PP3_HMAC_RQ_EVENT0_GROUP_MASK, group);
+		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT0_GROUP_MASK, group << MV_PP3_HMAC_RQ_EVENT0_GROUP_OFFS);
 		/* enable event */
-		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT0_EN_OFFS, MV_PP3_HMAC_RQ_EVENT0_EN_MASK, 1);
+		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT0_EN_MASK, 1 << MV_PP3_HMAC_RQ_EVENT0_EN_OFFS);
 	} else if (event == 1) {
-		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT1_GROUP_OFFS, MV_PP3_HMAC_RQ_EVENT1_GROUP_MASK, group);
+		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT1_GROUP_MASK, group << MV_PP3_HMAC_RQ_EVENT1_GROUP_OFFS);
 		/* enable event */
-		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT1_EN_OFFS, MV_PP3_HMAC_RQ_EVENT1_EN_MASK, 1);
+		U32_SET_FIELD(reg_data, MV_PP3_HMAC_RQ_EVENT1_EN_MASK, 1 << MV_PP3_HMAC_RQ_EVENT1_EN_OFFS);
 	}
 	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_RQ_EVENT_GROUP(queue), reg_data);
 }
@@ -248,9 +249,9 @@ void *mv_pp3_hmac_txq_init(int frame, int queue, int size, int cfh_size)
 	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_SQ_SIZE(queue), (u32)qctrl->size);
 
 	/* Configure Transmit Threshold TBD */
-	/* Disable queue */
+	/* Enable queue */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
-	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 0);
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 1 << MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
 
 	mv_hmac_txq_handle[frame][queue] = qctrl;
@@ -264,7 +265,7 @@ void mv_pp3_hmac_txq_enable(int frame, int queue)
 
 	/* Enable queue */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
-	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 1);
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 1 << MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
 }
 
@@ -274,7 +275,7 @@ void mv_pp3_hmac_txq_disable(int frame, int queue)
 
 	/* Disable queue */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
-	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 0);
+	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK, 0);
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_SEND_Q_CTRL_REG(queue), reg_data);
 }
 
@@ -322,9 +323,9 @@ void mv_pp3_hmac_txq_event_cfg(int frame, int queue, int group)
 	/* Configure event group */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_SQ_EVENT_GROUP(queue));
 	/* set group for event 0 */
-	U32_SET_FIELD(reg_data, MV_PP3_HMAC_SQ_EVENT_GROUP_OFFS, MV_PP3_HMAC_SQ_EVENT_GROUP_MASK, group);
+	U32_SET_FIELD(reg_data, MV_PP3_HMAC_SQ_EVENT_GROUP_MASK, group << MV_PP3_HMAC_SQ_EVENT_GROUP_OFFS);
 	/* enable event */
-	U32_SET_FIELD(reg_data, MV_PP3_HMAC_SQ_EVENT_EN_OFFS, MV_PP3_HMAC_SQ_EVENT_EN_MASK, 1);
+	U32_SET_FIELD(reg_data, MV_PP3_HMAC_SQ_EVENT_EN_MASK, 1 << MV_PP3_HMAC_SQ_EVENT_EN_OFFS);
 
 	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_SQ_EVENT_GROUP(queue), reg_data);
 }
