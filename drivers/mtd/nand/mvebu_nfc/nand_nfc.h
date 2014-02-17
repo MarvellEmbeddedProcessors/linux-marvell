@@ -11,8 +11,7 @@
 #include "nfc/mvNfc.h"
 #include "nfc/mvNfcRegs.h"
 
-enum nfc_page_size
-{
+enum nfc_page_size {
 	NFC_PAGE_512B = 0,
 	NFC_PAGE_2KB,
 	NFC_PAGE_4KB,
@@ -30,7 +29,7 @@ struct nfc_platform_data {
 						   chip-selects.	  */
 	unsigned int		use_dma;	/* Enable/Disable DMA 1/0 */
 	MV_NFC_ECC_MODE		ecc_type;
-	struct mtd_partition *	parts;
+	struct mtd_partition	*parts;
 	unsigned int		nr_parts;
 };
 #endif /* __ASM_ARCH_ORION_NFC_H */
