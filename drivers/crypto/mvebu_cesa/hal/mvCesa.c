@@ -394,6 +394,10 @@ MV_STATUS mvCesaHalInit(int numOfSession, int queueDepth, void *osHandle, MV_CES
 			/* Support maximum of 4 outstanding read transactions */
 			MV_REG_BIT_SET(MV_CESA_TDMA_CTRL_REG(chan), MV_CESA_TDMA_OUTSTAND_NEW_MODE_BIT);
 			break;
+		case 0x6800: /* A38x */
+			MV_REG_BIT_SET(MV_CESA_TDMA_CTRL_REG(chan), MV_CESA_TDMA_OUTSTAND_OUT_OF_ORDER_3TRANS_BIT);
+			sha2CmdVal = BIT31;
+			break;
 		case 0x7800: /* AXP */
 			if (ctrlRev < 1) { /* Z1 step */
 #ifdef AURORA_IO_CACHE_COHERENCY
