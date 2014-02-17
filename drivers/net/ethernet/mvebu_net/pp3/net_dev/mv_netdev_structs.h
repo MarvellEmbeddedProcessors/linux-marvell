@@ -35,6 +35,9 @@ disclaimer.
 #define CONFIG_PP3_RX_COAL_USEC 10
 #define CONFIG_PP3_RX_COAL_PKTS 100
 
+/* Timer */
+#define MV_CPU_TX_DONE_TIMER_PERIOD 10
+
 
 #define MV_PP3_PRIV(dev)	((struct pp3_dev_priv *)(netdev_priv(dev)))
 
@@ -51,12 +54,12 @@ struct pp3_dev_priv {
 #define MV_ETH_F_STARTED_BIT		0
 #define MV_ETH_F_LINK_UP_BIT		1
 #define MV_ETH_F_CONNECT_LINUX_BIT	2
-#define MV_ETH_F_DBG_RX_BIT		3
-#define MV_ETH_F_DBG_TX_BIT		4
-#define MV_ETH_F_DBG_DUMP_BIT		5
-#define MV_ETH_F_DBG_ISR_BIT		6
-#define MV_ETH_F_DBG_POLL_BIT		7
-#define MV_ETH_F_DBG_BUFF_HDR_BIT	8
+#define MV_ETH_F_DBG_RX_BIT		4
+#define MV_ETH_F_DBG_TX_BIT		5
+#define MV_ETH_F_DBG_DUMP_BIT		6
+#define MV_ETH_F_DBG_ISR_BIT		7
+#define MV_ETH_F_DBG_POLL_BIT		8
+#define MV_ETH_F_DBG_BUFF_HDR_BIT	9
 
 
 #define MV_ETH_F_STARTED                (1 << MV_ETH_F_STARTED_BIT)
@@ -68,7 +71,6 @@ struct pp3_dev_priv {
 #define MV_ETH_F_DBG_ISR		(1 << MV_ETH_F_DBG_ISR_BIT)
 #define MV_ETH_F_DBG_POLL		(1 << MV_ETH_F_DBG_POLL_BIT)
 #define MV_ETH_F_DBG_BUFF_HDR		(1 << MV_ETH_F_DBG_BUFF_HDR_BIT)
-
 
 
 struct pp3_group_stats {
@@ -94,29 +96,34 @@ struct pp3_group {
 	struct	pp3_group_stats	stats;
 };
 
+#define MV_CPU_F_TX_DONE_TIMER_BIT	1
+#define MV_CPU_F_TX_DONE_TIMER          (1 << MV_CPU_F_TX_DONE_TIMER_BIT)
+
 struct pp3_cpu_stats {
 	unsigned int lnx_pool_irq;
 	unsigned int lnx_pool_irq_err;
 	unsigned int lnx_fw_irq;
 	unsigned int lnx_fw_irq_err;
-
 };
 
 struct pp3_cpu {
 	int	cpu;
-	int	frames_num;
+	int	frame_bmp;
 /*
 	not sure that pp3_frame is necessary
 	meanwhile not defined
 	struct	pp3_frame	**frame_ctrl;
 */
 	struct	pp3_dev_priv	*dev_priv[MAX_ETH_DEVICES];
-	struct	pp3_bm_pool	*tx_linux_pool;
+	struct	pp3_bm_pool	*tx_done_pool;
 	struct	pp3_queue	*bm_msg_queue;
-	struct	pp3_queue	*fw_msg_queue;
-	struct	tasklet_struct	bm_msg_tasklet;
-	struct	tasklet_struct	fw_msg_tasklet;
+	struct	tasklet_struct	*bm_msg_tasklet;
+	struct  timer_list	tx_done_timer;
 	struct	pp3_cpu_stats	stats;
+	unsigned long		flags;
+	int			tx_done_cnt;
+	int			chan_id;
+
 };
 
 struct pp3_xq_stats {
@@ -158,6 +165,15 @@ struct pp3_txq {
 	not sure yet about this
 	struct	pp3_frame	*frame_ctrl;
 	*/
+};
+
+struct	pp3_bm_pool {
+	int pool;
+	int capacity;
+	int buf_num;
+	int buf_size;
+	void *virt_base;
+	unsigned long phys_base;
 };
 
 struct pp3_queue {
