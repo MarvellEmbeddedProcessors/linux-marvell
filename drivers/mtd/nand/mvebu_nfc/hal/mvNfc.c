@@ -149,8 +149,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_CPU_TO_LE32(x)	(x)
 #endif
 
-#define DBGPRINT(x) 	printk x
-#define DBGLVL	 	KERN_INFO
+#define DBGPRINT(x)	printk(x)
+#define DBGLVL		KERN_INFO
 
 /***********/
 /* Typedef */
@@ -252,7 +252,7 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.tRC = 25,		/* tWC, ND_nRE cycle duration */
 	.tRH = 10,		/* tRH, ND_nRE high duration */
 	.tRP = 15,		/* tRP, ND_nRE pulse width */
-	.tR = 25000, 		/* tR = tR+tRR+tWB+1, ND_nWE high to ND_nRE low for read - 25000+20+100+1 */
+	.tR = 25000,		/* tR = tR+tRR+tWB+1, ND_nWE high to ND_nRE low for read - 25000+20+100+1 */
 	.tWHR = 60,		/* tWHR, ND_nWE high to ND_nRE low delay for status read */
 	.tAR = 10,		/* tAR, ND_ALE low to ND_nRE low delay */
 	.tRHW = 30,		/* tRHW, ND_nRE high to ND_nWE low delay */
@@ -370,7 +370,7 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.tRC = 40,		/* tWC, ND_nRE cycle duration */
 	.tRH = 15,		/* tRH, ND_nRE high duration */
 	.tRP = 25,		/* tRP, ND_nRE pulse width */
-	.tR = 25000, 		/* tR = data transfer from cell to register, maximum 60,000ns */
+	.tR = 25000,		/* tR = data transfer from cell to register, maximum 60,000ns */
 	.tWHR = 60,		/* tWHR, ND_nWE high to ND_nRE low delay for status read */
 	.tAR = 10,		/* tAR, ND_ALE low to ND_nRE low delay */
 	.tRHW = 30,		/* tRHW, ND_nRE high to ND_nWE low delay 32 clocks */
@@ -394,7 +394,7 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.tRC = 22,		/* tWC, ND_nRE cycle duration */
 	.tRH = 10,		/* tRH, ND_nRE high duration */
 	.tRP = 12,		/* tRP, ND_nRE pulse width */
-	.tR = 25000, 		/* tR = data transfer from cell to register, maximum 60,000ns */
+	.tR = 25000,		/* tR = data transfer from cell to register, maximum 60,000ns */
 	.tWHR = 60,		/* tWHR, ND_nWE high to ND_nRE low delay for status read */
 	.tAR = 10,		/* tAR, ND_ALE low to ND_nRE low delay */
 	.tRHW = 100,		/* tRHW, ND_nRE high to ND_nWE low delay 32 clocks */
@@ -418,7 +418,7 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.tRC = 22,		/* tWC, ND_nRE cycle duration */
 	.tRH = 10,		/* tRH, ND_nRE high duration */
 	.tRP = 12,		/* tRP, ND_nRE pulse width */
-	.tR = 25000, 		/* tR = data transfer from cell to register, maximum 60,000ns */
+	.tR = 25000,		/* tR = data transfer from cell to register, maximum 60,000ns */
 	.tWHR = 60,		/* tWHR, ND_nWE high to ND_nRE low delay for status read */
 	.tAR = 10,		/* tAR, ND_ALE low to ND_nRE low delay */
 	.tRHW = 100,		/* tRHW, ND_nRE high to ND_nWE low delay 32 clocks */
@@ -553,7 +553,7 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 };
 
 /* Defined Command set */
-#define 	MV_NFC_FLASH_SP_CMD_SET_IDX		0
+#define	MV_NFC_FLASH_SP_CMD_SET_IDX		0
 #define		MV_NFC_FLASH_LP_CMD_SET_IDX		1
 static MV_NFC_FLASH_CMD_SET flashCmdSet[] = {
 	{
@@ -645,9 +645,9 @@ static MV_STATUS mvNfcDeviceModeSet(MV_NFC_CTRL *nfcCtrl, MV_NFC_ONFI_MODE mode)
 *
 * RETURN:
 *       MV_OK		- On success,
-*	MV_BAD_PARAM 	- The required ECC mode not supported by flash.
+*	MV_BAD_PARAM	- The required ECC mode not supported by flash.
 *	MV_NOT_SUPPORTED- The underlying flash device is not supported by HAL.
-*	MV_TIMEOUT 	- Error accessing the underlying flahs device.
+*	MV_TIMEOUT	- Error accessing the underlying flahs device.
 *	MV_FAIL		- On failure
 *******************************************************************************/
 MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HAL_DATA *halData)
@@ -2305,7 +2305,7 @@ MV_STATUS mvNfcUnitStateStore(MV_U32 *stateData, MV_U32 *len)
 * mvDfcWait4Complete
 *
 * DESCRIPTION:
-*  	Wait for event or process to complete
+*       Wait for event or process to complete
 *
 * INPUT:
 *	statMask: bit to wait from in status register NDSR
@@ -2315,8 +2315,8 @@ MV_STATUS mvNfcUnitStateStore(MV_U32 *stateData, MV_U32 *len)
 *	None.
 *
 * RETURN:
-*       MV_OK		- On success,
-*	MV_TIMEOUT 	- Error accessing the underlying flahs device.
+*	MV_OK		- On success,
+*	MV_TIMEOUT	- Error accessing the underlying flahs device.
 *******************************************************************************/
 static MV_STATUS mvDfcWait4Complete(MV_U32 statMask, MV_U32 usec)
 {
@@ -2338,7 +2338,7 @@ static MV_STATUS mvDfcWait4Complete(MV_U32 statMask, MV_U32 usec)
 * mvNfcDeviceFeatureSet
 *
 * DESCRIPTION:
-*  	Set a NAND device feature according to user's request.
+*       Set a NAND device feature according to user's request.
 *
 * INPUT:
 *	nfcCtrl	- NFC control structure.
@@ -2351,8 +2351,8 @@ static MV_STATUS mvDfcWait4Complete(MV_U32 statMask, MV_U32 usec)
 *	None.
 *
 * RETURN:
-*       MV_OK		- On success,
-*	MV_TIMEOUT 	- Error accessing the underlying flahs device.
+*	MV_OK		- On success,
+*	MV_TIMEOUT	- Error accessing the underlying flahs device.
 *******************************************************************************/
 static MV_STATUS mvNfcDeviceFeatureSet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 addr, MV_U32 data0, MV_U32 data1)
 {
@@ -2422,7 +2422,7 @@ Error_1:
 * mvNfcDeviceFeatureGet
 *
 * DESCRIPTION:
-*  	Get a NAND device feature according to user's request.
+*       Get a NAND device feature according to user's request.
 *
 * INPUT:
 *	nfcCtrl	- NFC control structure.
@@ -2434,8 +2434,8 @@ Error_1:
 *	data1	- Bytes 4-7 of data.
 *
 * RETURN:
-*       MV_OK		- On success,
-*	MV_TIMEOUT 	- Error accessing the underlying flahs device.
+*	MV_OK		- On success,
+*	MV_TIMEOUT	- Error accessing the underlying flahs device.
 *******************************************************************************/
 static MV_STATUS mvNfcDeviceFeatureGet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 addr, MV_U32 *data0, MV_U32 *data1)
 {
@@ -2515,7 +2515,7 @@ Error_2:
 * mvNfcDeviceModeSet
 *
 * DESCRIPTION:
-*  	Change flash working mode according to the flags
+*       Change flash working mode according to the flags
 *	field.
 *
 * INPUT:
@@ -2526,9 +2526,9 @@ Error_2:
 *	None.
 *
 * RETURN:
-*       MV_OK		- On success,
-*	MV_BAD_VALUE    - Wrong mode
-*	MV_TIMEOUT 	- Error accessing the underlying flahs device.
+*	MV_OK		- On success,
+*	MV_BAD_VALUE	- Wrong mode
+*	MV_TIMEOUT	- Error accessing the underlying flahs device.
 *******************************************************************************/
 static MV_STATUS mvNfcDeviceModeSet(MV_NFC_CTRL *nfcCtrl, MV_NFC_ONFI_MODE mode)
 {
@@ -2609,8 +2609,8 @@ Error_3:
 *	id: Manufacturer and Device Id detected (valid only if return is MV_OK).
 *
 * RETURN:
-*       MV_OK		- On success,
-*	MV_TIMEOUT 	- Error accessing the underlying flahs device.
+*	MV_OK		- On success,
+*	MV_TIMEOUT	- Error accessing the underlying flahs device.
 *	MV_FAIL		- On failure
 *******************************************************************************/
 static MV_STATUS mvNfcReadIdNative(MV_NFC_CHIP_SEL cs, MV_U16 *id)
@@ -2733,71 +2733,73 @@ static MV_STATUS mvNfcTimingSet(MV_U32 tclk, MV_NFC_FLASH_INFO *flInfo)
 	trp_nfc = (trp - 1);
 
 	if (check_limit(tadl_nfc, 5) != tadl_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		tadl_nfc = check_limit(tadl_nfc, 5);
 	}
 
 	if (check_limit(tch_nfc, 3) != tch_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		tch_nfc = check_limit(tch_nfc, 3);
 	}
 
 	if (check_limit(tcs_nfc, 3) != tcs_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		tcs_nfc = check_limit(tcs_nfc, 3);
 	}
 
 	if (check_limit(twh_nfc, 3) != twh_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		twh_nfc = check_limit(twh_nfc, 3);
 	}
 
 	if (check_limit(twp_nfc, 3) != twp_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		twp_nfc = check_limit(twp_nfc, 3);
 	}
 
 	if (check_limit(trh_nfc, 3) != trh_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		trh_nfc = check_limit(trh_nfc, 3);
 	}
 
 	if (check_limit(trp_nfc, 4) != trp_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		trp_nfc = check_limit(trp_nfc, 4);
 	}
 
-	reg =  ((tadl_nfc << NFC_TMNG0_TADL_OFFS) | \
-		(0x1 << NFC_TMNG0_SEL_CNTR_OFFS) | \
-		(0x4 << NFC_TMNG0_RD_CNT_DEL_OFFS) | \
-		(tch_nfc << NFC_TMNG0_TCH_OFFS) | \
-		(tcs_nfc << NFC_TMNG0_TCS_OFFS) | \
-		(twh_nfc << NFC_TMNG0_TWH_OFFS) | \
-		(twp_nfc << NFC_TMNG0_TWP_OFFS) | \
-		(0x0 << NFC_TMNG0_SEL_NRE_EDGE_OFFS) | \
-		((trp_nfc >> 3) << NFC_TMNG0_ETRP_OFFS) | \
-		(trh_nfc << NFC_TMNG0_TRH_OFFS) | \
+	reg =  ((tadl_nfc << NFC_TMNG0_TADL_OFFS) |
+		(0x1 << NFC_TMNG0_SEL_CNTR_OFFS) |
+		(0x4 << NFC_TMNG0_RD_CNT_DEL_OFFS) |
+		(tch_nfc << NFC_TMNG0_TCH_OFFS) |
+		(tcs_nfc << NFC_TMNG0_TCS_OFFS) |
+		(twh_nfc << NFC_TMNG0_TWH_OFFS) |
+		(twp_nfc << NFC_TMNG0_TWP_OFFS) |
+		(0x0 << NFC_TMNG0_SEL_NRE_EDGE_OFFS) |
+		((trp_nfc >> 3) << NFC_TMNG0_ETRP_OFFS) |
+		(trh_nfc << NFC_TMNG0_TRH_OFFS) |
 		((trp_nfc & 0x7) << NFC_TMNG0_TRP_OFFS));
 	MV_REG_WRITE(NFC_TIMING_0_REG, reg);
 
 	/* Calculate the timing configurations for register1 */
 	tr_nfc = (ns_clk(flInfo->tR, clk2ns) - tch_nfc - 3);
-	trhw_nfc = (ns_clk(flInfo->tRHW, clk2ns) % 16) ? ((ns_clk(flInfo->tRHW, clk2ns) / 16) + 1) : (ns_clk(flInfo->tRHW, clk2ns) / 16);
+	trhw_nfc = (ns_clk(flInfo->tRHW, clk2ns) % 16) ? ((ns_clk(flInfo->tRHW,
+					clk2ns) / 16) + 1) : (ns_clk(flInfo->tRHW, clk2ns) / 16);
 
 	/*
 	 * For simplicity Assuming that tar == twhr
 	 * loop over all 16 possible values of tWHR_NFC and find smallest possible value (if possible!!!)
 	 */
 	twhr_nfc = 17; /* big number */
-	for (i=0; i<16; i++) {
-		if ( (maxx(twh_nfc, tch_nfc) + maxx (i, maxx(0, i - maxx(twh_nfc, tch_nfc))) + 2) >= ns_clk(flInfo->tWHR, clk2ns))
+	for (i = 0; i < 16; i++) {
+		if ((maxx(twh_nfc, tch_nfc) + maxx(i, maxx(0, i - maxx(twh_nfc, tch_nfc))) + 2) >=
+		     ns_clk(flInfo->tWHR, clk2ns))
 			if (twhr_nfc > i)
 				twhr_nfc = i;
 	}
 
 	if (twhr_nfc >= 16) {
 		twhr_nfc = 15; /* worst case - best we can do */
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 	}
 
 	tar_nfc = twhr_nfc; /* our initial assumption */
@@ -2814,29 +2816,29 @@ static MV_STATUS mvNfcTimingSet(MV_U32 tclk, MV_NFC_FLASH_INFO *flInfo)
 #endif
 
 	if (check_limit(tr_nfc, 16) != tr_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		tr_nfc = check_limit(tr_nfc, 16);
 	}
 
 	if (check_limit(trhw_nfc, 2) != trhw_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		trhw_nfc = check_limit(trhw_nfc, 2);
 	}
 
 	if (check_limit(twhr_nfc, 4) != twhr_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		twhr_nfc = check_limit(twhr_nfc, 4);
 	}
 
 	if (check_limit(tar_nfc, 4) != tar_nfc) {
-/*		ret = MV_OUT_OF_RANGE; */
+		/* ret = MV_OUT_OF_RANGE; */
 		tar_nfc = check_limit(tar_nfc, 5);
 	}
 
-	reg = ((tr_nfc << NFC_TMNG1_TR_OFFS) | \
-		(tr_pre_nfc << NFC_TMNG1_PRESCALE_OFFS) | \
-		(trhw_nfc << NFC_TMNG1_TRHW_OFFS) | \
-		(twhr_nfc << NFC_TMNG1_TWHR_OFFS) | \
+	reg = ((tr_nfc << NFC_TMNG1_TR_OFFS) |
+		(tr_pre_nfc << NFC_TMNG1_PRESCALE_OFFS) |
+		(trhw_nfc << NFC_TMNG1_TRHW_OFFS) |
+		(twhr_nfc << NFC_TMNG1_TWHR_OFFS) |
 		(tar_nfc << NFC_TMNG1_TAR_OFFS));
 #ifndef MTD_NAND_NFC_NEGLECT_RNB
 	reg |= (0x1 << NFC_TMNG1_WAIT_MODE_OFFS);
@@ -2869,7 +2871,7 @@ static MV_U32 mvNfcColBits(MV_U32 pg_size)
 		pg_size >>= 1;
 	};
 
-	return (shift - 1);
+	return shift - 1;
 }
 
 /*******************************************************************************

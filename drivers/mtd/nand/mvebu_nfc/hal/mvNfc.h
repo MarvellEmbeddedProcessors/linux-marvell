@@ -152,7 +152,7 @@ extern "C" {
 #endif
 
 /********************************/
-/* Enums and structures 	*/
+/* Enums and structures		*/
 /********************************/
 
 /* Maximum Chain length */
@@ -167,14 +167,14 @@ extern "C" {
 #define MV_NFC_MAX_CHUNK_SIZE		(2048)
 
 /* Nand controller status bits.		*/
-#define MV_NFC_STATUS_CMD_REQ 		0x1
-#define MV_NFC_STATUS_RDD_REQ 		0x2
-#define MV_NFC_STATUS_WRD_REQ 		0x4
-#define MV_NFC_STATUS_COR_ERROR 	0x8
-#define MV_NFC_STATUS_UNC_ERROR 	0x10
-#define MV_NFC_STATUS_BBD 		0x20	/* Bad Block Detected */
-#define MV_NFC_STATUS_CMDD 		0x80	/* Command Done */
-#define MV_NFC_STATUS_PAGED 		0x200	/* Page Done */
+#define MV_NFC_STATUS_CMD_REQ		0x1
+#define MV_NFC_STATUS_RDD_REQ		0x2
+#define MV_NFC_STATUS_WRD_REQ		0x4
+#define MV_NFC_STATUS_COR_ERROR		0x8
+#define MV_NFC_STATUS_UNC_ERROR		0x10
+#define MV_NFC_STATUS_BBD		0x20	/* Bad Block Detected */
+#define MV_NFC_STATUS_CMDD		0x80	/* Command Done */
+#define MV_NFC_STATUS_PAGED		0x200	/* Page Done */
 #define MV_NFC_STATUS_RDY		0x800	/* Device Ready */
 
 /* Nand controller interrupt bits.	*/
@@ -233,15 +233,15 @@ typedef enum {
 
 
 /*
- * 	ioMode		The access mode by which the unit will operate (PDMA / PIO).
- * 	eccMode		The ECC mode to configure the controller to.
- * 	ifMode		The NAND chip connection mode, 8-bit / 16-bit / gang mode.
- * 	autoStatusRead	Whether to automatically read the flash status after each
+ *	ioMode		The access mode by which the unit will operate (PDMA / PIO).
+ *	eccMode		The ECC mode to configure the controller to.
+ *	ifMode		The NAND chip connection mode, 8-bit / 16-bit / gang mode.
+ *	autoStatusRead	Whether to automatically read the flash status after each
  *			erase / write commands.
  *	tclk		System TCLK.
- * 	readyBypass	Whether to wait for the RnB sugnal to be deasserted after
+ *	readyBypass	Whether to wait for the RnB sugnal to be deasserted after
  *			waiting the tR or skip it and move directly to the next step.
- * 	osHandle	OS specific handle used for allocating command buffer
+ *	osHandle	OS specific handle used for allocating command buffer
  *	regsPhysAddr	Physical address of internal registers (used in DMA
  *			mode only)
  *	dataPdmaIntMask Interrupt mask for PDMA data channel (used in DMA mode
@@ -250,10 +250,10 @@ typedef enum {
  *			mode only).
  */
 typedef struct {
-	MV_NFC_IO_MODE 		ioMode;
-	MV_NFC_ECC_MODE 	eccMode;
-	MV_NFC_IF_MODE 		ifMode;
-	MV_BOOL 		autoStatusRead;
+	MV_NFC_IO_MODE		ioMode;
+	MV_NFC_ECC_MODE		eccMode;
+	MV_NFC_IF_MODE		ifMode;
+	MV_BOOL			autoStatusRead;
 	MV_U32			tclk;
 	MV_BOOL			readyBypass;
 	MV_VOID			*osHandle;
@@ -297,20 +297,20 @@ typedef enum {
 
 /*
  * Nand information structure.
- * 	flashId 	The ID of the flash information structure representing the timing
- *		    	and physical layout data of the flash device.
- *	cmdsetId  	The ID of the command-set structure holding the access
- *		   	commands for the flash device.
- *      flashWidth 	Flash device interface width in bits.
- * 	autoStatusRead	Whether to automatically read the flash status after each
- *		    	erase / write commands.
- * 	tclk		System TCLK.
- * 	readyBypass	Whether to wait for the RnB signal to be deasserted after
- * 			waiting the tR or skip it and move directly to the next step.
- *      ioMode		Controller access mode (PDMA / PIO).
- *      eccMode		Flash ECC mode (Hamming, BCH, None).
- *      ifMode		Flash interface mode.
- *      currC		The current flash CS currently being accessed.
+ *	flashId		The ID of the flash information structure representing the timing
+ *			and physical layout data of the flash device.
+ *	cmdsetId	The ID of the command-set structure holding the access
+ *			commands for the flash device.
+ *	flashWidth	Flash device interface width in bits.
+ *	autoStatusRead	Whether to automatically read the flash status after each
+ *			erase / write commands.
+ *	tclk		System TCLK.
+ *	readyBypass	Whether to wait for the RnB signal to be deasserted after
+ *			waiting the tR or skip it and move directly to the next step.
+ *	ioMode		Controller access mode (PDMA / PIO).
+ *	eccMode		Flash ECC mode (Hamming, BCH, None).
+ *	ifMode		Flash interface mode.
+ *	currC		The current flash CS currently being accessed.
  *	dataChanHndl	Pointer to the data DMA channel
  *	cmdChanHndl	Pointer to the command DMA Channel
  *	cmdBuff		Command buffer information (used in DMA only)
@@ -324,17 +324,17 @@ typedef enum {
 typedef struct {
 	MV_U32		flashIdx;
 	MV_U32		cmdsetIdx;
-	MV_U32 		flashWidth;
-	MV_U32 		dfcWidth;
-	MV_BOOL 	autoStatusRead;
+	MV_U32		flashWidth;
+	MV_U32		dfcWidth;
+	MV_BOOL		autoStatusRead;
 	MV_BOOL		readyBypass;
-	MV_NFC_IO_MODE 	ioMode;
-	MV_NFC_ECC_MODE eccMode;
-	MV_NFC_IF_MODE 	ifMode;
-	MV_NFC_CHIP_SEL currCs;
+	MV_NFC_IO_MODE	ioMode;
+	MV_NFC_ECC_MODE	eccMode;
+	MV_NFC_IF_MODE	ifMode;
+	MV_NFC_CHIP_SEL	currCs;
 #ifdef MV_INCLUDE_PDMA
-	MV_PDMA_CHANNEL dataChanHndl;
-	MV_PDMA_CHANNEL cmdChanHndl;
+	MV_PDMA_CHANNEL	dataChanHndl;
+	MV_PDMA_CHANNEL	cmdChanHndl;
 #endif
 	MV_BUF_INFO	cmdBuff;
 	MV_BUF_INFO	cmdDescBuff;
@@ -376,10 +376,10 @@ typedef struct {
  *			offset buffOffset[i].
  */
 typedef struct {
-	MV_NFC_CMD_TYPE cmd;
+	MV_NFC_CMD_TYPE	cmd;
 	MV_U32		pageAddr;
 	MV_U32		pageCount;
-	MV_U32 		*virtAddr;
+	MV_U32		*virtAddr;
 	MV_U32		physAddr;
 	MV_U32		numSgBuffs;
 	MV_U32		sgBuffAddr[MV_NFC_RW_MAX_BUFF_NUM];
@@ -401,28 +401,28 @@ struct MV_NFC_HAL_DATA {
 
 
 /********************************/
-/* Functions API 		*/
+/* Functions API		*/
 /********************************/
 MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HAL_DATA *halData);
 MV_STATUS mvNfcSelectChip(MV_NFC_CTRL *nfcCtrl, MV_NFC_CHIP_SEL chip);
-MV_STATUS mvNfcCommandPio(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD * cmd_desc, MV_BOOL next);
+MV_STATUS mvNfcCommandPio(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *cmd_desc, MV_BOOL next);
 MV_STATUS mvNfcCommandMultiple(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *descInfo, MV_U32 descCnt);
-MV_U32 	  mvNfcStatusGet(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *value);
+MV_U32    mvNfcStatusGet(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *value);
 MV_STATUS mvNfcIntrSet(MV_NFC_CTRL *nfcCtrl, MV_U32 intMask, MV_BOOL enable);
 MV_STATUS mvNfcReadWrite(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *virtBufAddr, MV_U32 physBuffAddr);
-MV_VOID   mvNfcReadWritePio(MV_NFC_CTRL *nfcCtrl, MV_U32 * buff, MV_U32 data_len, MV_NFC_PIO_RW_MODE mode);
+MV_VOID   mvNfcReadWritePio(MV_NFC_CTRL *nfcCtrl, MV_U32 *buff, MV_U32 data_len, MV_NFC_PIO_RW_MODE mode);
 MV_VOID   mvNfcAddress2RowConvert(MV_NFC_CTRL *nfcCtrl, MV_U32 address, MV_U32 *row, MV_U32 *colOffset);
 MV_VOID   mvNfcAddress2BlockConvert(MV_NFC_CTRL *nfcCtrl, MV_U32 address, MV_U32 *blk);
-MV_8 	 *mvNfcFlashModelGet(MV_NFC_CTRL *nfcCtrl);
+MV_8     *mvNfcFlashModelGet(MV_NFC_CTRL *nfcCtrl);
 MV_STATUS mvNfcFlashPageSizeGet(MV_NFC_CTRL *nfcCtrl, MV_U32 *size, MV_U32 *totalSize);
 MV_STATUS mvNfcFlashBlockSizeGet(MV_NFC_CTRL *nfcCtrl, MV_U32 *size);
 MV_STATUS mvNfcFlashBlockNumGet(MV_NFC_CTRL *nfcCtrl, MV_U32 *numBlocks);
 MV_STATUS mvNfcDataLength(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *data_len);
-MV_STATUS mvNfcTransferDataLength(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 * data_len);
+MV_STATUS mvNfcTransferDataLength(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *data_len);
 MV_STATUS mvNfcFlashIdGet(MV_NFC_CTRL *nfcCtrl, MV_U32 *flashId);
 MV_STATUS mvNfcUnitStateStore(MV_U32 *stateData, MV_U32 *len);
 MV_NFC_ECC_MODE mvNfcEccModeSet(MV_NFC_CTRL *nfcCtrl, MV_NFC_ECC_MODE eccMode);
-MV_U32 	  mvNfcBadBlockPageNumber(MV_NFC_CTRL *nfcCtrl);
+MV_U32    mvNfcBadBlockPageNumber(MV_NFC_CTRL *nfcCtrl);
 MV_STATUS mvNfcReset(void);
 
 #ifdef __cplusplus
