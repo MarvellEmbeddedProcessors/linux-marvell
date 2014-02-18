@@ -82,7 +82,7 @@ static void armada_370_xp_irq_mask(struct irq_data *d)
 {
 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
 
-	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
 		writel(hwirq, main_int_base +
 				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
 	else
@@ -94,7 +94,7 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
 {
 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
 
-	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
 		writel(hwirq, main_int_base +
 				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
 	else
@@ -293,7 +293,7 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
 				      unsigned int virq, irq_hw_number_t hw)
 {
 	armada_370_xp_irq_mask(irq_get_irq_data(virq));
-	if (hw != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+	if (hw > ARMADA_370_XP_MAX_PER_CPU_IRQS)
 		writel(hw, per_cpu_int_base +
 			ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
 	else
@@ -393,18 +393,22 @@ static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
 						  struct irq_desc *desc)
 {
 	struct irq_chip *chip = irq_get_chip(irq);
-	unsigned long irqmap, irqn;
+	unsigned long irqmap, irqn, cpuid;
 	unsigned int cascade_irq;
+	struct irq_data *irqd;
 
 	chained_irq_enter(chip, desc);
 
+	cpuid = raw_smp_processor_id();
 	irqmap = readl_relaxed(per_cpu_int_base + ARMADA_375_PPI_CAUSE);
 	for_each_set_bit(irqn, &irqmap, BITS_PER_LONG) {
 		if (irqn == 1) {
 			armada_370_xp_mpic_handle_cascade_msi();
 		} else {
 			cascade_irq = irq_find_mapping(armada_370_xp_mpic_domain, irqn);
-			generic_handle_irq(cascade_irq);
+			irqd = irq_get_irq_data(cascade_irq);
+			if (cpumask_test_cpu(cpuid, irqd->affinity))
+				generic_handle_irq(cascade_irq);
 		}
 	}
 
