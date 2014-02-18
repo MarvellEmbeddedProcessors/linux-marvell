@@ -18,4 +18,6 @@
 extern struct smp_operations armada_380_smp_ops;
 #endif
 
+#define IRQ_PRIV_MPIC_PPI_IRQ 31
+
 #endif /* __MACH_ARMADA_380_H */
