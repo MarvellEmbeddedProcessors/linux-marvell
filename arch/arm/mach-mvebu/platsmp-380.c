@@ -16,6 +16,8 @@
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/smp.h>
+#include <linux/cpu.h>
+#include <linux/irq.h>
 #include <asm/smp_scu.h>
 #include "armada-380.h"
 #include "common.h"
@@ -23,6 +25,7 @@
 #include "pmsu.h"
 
 extern void a380_secondary_startup(void);
+static struct notifier_block armada_380_secondary_cpu_notifier;
 
 static int __cpuinit armada_380_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
@@ -67,6 +70,13 @@ static void __init armada_380_smp_prepare_cpus(unsigned int max_cpus)
 
 	for (i = 0; i < max_cpus; i++)
 		set_cpu_present(i, true);
+
+	/*
+	 * Register notifier to unmask SOC Private Peripheral Interrupt on
+	 * second core. It have to be done here because the interrupt
+	 * cannot be enabled from another CPU.
+	 */
+	register_cpu_notifier(&armada_380_secondary_cpu_notifier);
 }
 
 struct smp_operations armada_380_smp_ops __initdata = {
@@ -76,4 +86,26 @@ struct smp_operations armada_380_smp_ops __initdata = {
 #ifdef CONFIG_HOTPLUG_CPU
 	.cpu_die		= armada_xp_cpu_die,
 #endif
+};
+
+/*
+ * CPU Notifier for enabling the SOC Private Peripheral Interrupts on CPU1.
+ */
+static int __cpuinit armada_380_secondary_init(struct notifier_block *nfb,
+					       unsigned long action, void *hcpu)
+{
+	struct irq_data *irqd;
+
+	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN) {
+		irqd = irq_get_irq_data(IRQ_PRIV_MPIC_PPI_IRQ);
+		if (irqd && irqd->chip && irqd->chip->irq_unmask)
+			irqd->chip->irq_unmask(irqd);
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __cpuinitdata armada_380_secondary_cpu_notifier = {
+	.notifier_call = armada_380_secondary_init,
+	.priority = INT_MIN,
 };
