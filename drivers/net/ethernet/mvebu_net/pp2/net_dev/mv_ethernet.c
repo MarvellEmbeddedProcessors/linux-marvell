@@ -86,7 +86,7 @@ int mv_eth_start(struct net_device *dev)
 
 	if (priv->flags & MV_ETH_F_CONNECT_LINUX) {
 		/* connect to port interrupt line */
-		if (request_irq(dev->irq, mv_eth_isr, (IRQF_DISABLED), "mv_eth", priv)) {
+		if (request_irq(dev->irq, mv_eth_isr, (IRQF_DISABLED), dev->name, priv)) {
 			printk(KERN_ERR "cannot request irq %d for %s port %d\n", dev->irq, dev->name, priv->port);
 			for (group = 0; group < MV_ETH_MAX_RXQ; group++)
 				if (priv->napi_group[group] && priv->napi_group[group]->napi)
