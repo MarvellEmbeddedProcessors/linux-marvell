@@ -20,6 +20,7 @@
 #include "mv_netdev_structs.h"
 
 /* global data */
+struct pp3_pool **pp3_pools;
 struct pp3_dev_priv **pp3_ports;
 struct pp3_group *pp3_groups[CONFIG_NR_CPUS][MAX_ETH_DEVICES];
 struct pp3_cpu **pp3_cpus;
@@ -42,7 +43,7 @@ static void mv_pp3_add_tx_done_timer(struct pp3_cpu *cpu_ctrl)
 static void mv_pp3_tx_done_timer_callback(unsigned long data)
 {
 	struct pp3_cpu *cpu_ctrl = (struct pp3_cpu *)data;
-	struct	pp3_bm_pool *tx_done_pool = cpu_ctrl->tx_done_pool;
+	struct	pp3_pool *tx_done_pool = cpu_ctrl->tx_done_pool;
 	struct	pp3_queue *bm_msg_queue = cpu_ctrl->bm_msg_queue;
 
 	clear_bit(MV_CPU_F_TX_DONE_TIMER_BIT, &cpu_ctrl->flags);
@@ -104,7 +105,7 @@ static int mv_pp3_poll(struct napi_struct *napi, int budget)
 	/* TODO */
 
 
-	while (budget > 0 /* && group rxqs are not empty */) {
+	while (budget > 0) { /* && group rxqs are not empty */
 
 		/* TODO
 			select rx_queue
@@ -146,7 +147,7 @@ void mv_pp3_bm_tasklet(unsigned long data)
 	int pool;
 	unsigned int  ph_addr, vr_addr;
 	struct	pp3_cpu *cpu_ctrl = (struct pp3_cpu *)data;
-	struct	pp3_bm_pool *tx_done_pool = cpu_ctrl->tx_done_pool;
+	struct	pp3_pool *tx_done_pool = cpu_ctrl->tx_done_pool;
 	struct	pp3_queue *bm_msg_queue = cpu_ctrl->bm_msg_queue;
 
 	while (mv_pp3_hmac_bm_buff_get(bm_msg_queue->frame, bm_msg_queue->rxq.phys_q,
@@ -160,6 +161,150 @@ void mv_pp3_bm_tasklet(unsigned long data)
 		/* TODO: else call calback function */
 	}
 }
+
+static unsigned char *pp3_hwf_buff_alloc(struct pp3_pool *ppool, unsigned long *phys_addr)
+{
+	unsigned char *buf;
+
+	buf = kmalloc(ppool->buf_size, GFP_ATOMIC);
+	if (!buf)
+		return NULL;
+
+	memset(buf, 0, ppool->buf_size);
+
+	/*
+	TODO
+	if (phys_addr != NULL)
+		*phys_addr = mvOsCacheInvalidate(NULL, buff, size);
+	*/
+	return buf;
+}
+
+static struct sk_buff *pp3_skb_alloc(struct pp3_pool *ppool, unsigned long *phys_addr, gfp_t gfp_mask)
+{
+	struct sk_buff *skb;
+
+	skb = __dev_alloc_skb(ppool->buf_size, gfp_mask);
+
+	if (!skb)
+		return NULL;
+
+	if (phys_addr)
+		*phys_addr = dma_map_single(NULL, skb->head, ppool->buf_size, DMA_FROM_DEVICE);
+
+	return skb;
+}
+
+static int pp3_pool_create(int pool, int capacity)
+{
+	struct pp3_pool *ppool;
+	unsigned long physAddr;
+	int size, ret_val;
+
+	if (capacity % 16) {
+		pr_err("%s: pool size must be multiple of 16\n", __func__);
+		return -EINVAL;
+	}
+
+	if ((pool < 0) || (pool >= MV_PP3_BM_POOLS)) {
+		pr_err("%s: pool=%d is out of range\n", __func__, pool);
+		return -EINVAL;
+	}
+
+	if (pp3_pools[pool] != NULL) {
+		pr_err("%s: pool=%d already exist\n", __func__, pool);
+		return -EINVAL;
+	}
+
+	/* init group napi */
+	pp3_pools[pool] = kmalloc(sizeof(struct pp3_pool), GFP_KERNEL);
+
+	ppool = pp3_pools[pool];
+
+	if (!ppool) {
+		pr_err("%s: out of memory\n", __func__);
+		return -ENOMEM;
+	}
+
+	memset(ppool, 0, sizeof(struct pp3_pool));
+
+	ppool->capacity = capacity;
+	ppool->flags = POOL_F_FREE;
+
+	size = 2 * sizeof(unsigned int) * capacity;
+/*
+	TODO: example in mainline driver
+	ppool->virt_base = dma_alloc_coherent(pp->dev->dev.parent, size, &ppool->phys_base, GFP_KERNEL);
+*/
+	if (!ppool->virt_base) {
+		pr_err("%s: out of memory\n", __func__);
+		goto oom;
+	}
+
+	/*
+	rev_val = bm_gp_pool_def_basic_init(pool, capacity, 0, ppool->phys_base, 1);
+	*/
+
+	if (!ret_val)
+		return 0;
+
+oom:
+	kfree(ppool->virt_base);
+	kfree(ppool);
+
+	pr_err("%s: failed\n", __func__);
+
+	return -ENOMEM;
+}
+
+
+static int pp3_pool_add(int pool, int buf_num, int frame, int queue)
+{
+	struct pp3_pool *ppool;
+	unsigned long phys_addr;
+	void *virt;
+	int size, i;
+
+	if ((pool < 0) || (pool >= MV_PP3_BM_POOLS)) {
+		pr_err("%s: pool=%d is out of range\n", __func__, pool);
+		return -EINVAL;
+	}
+
+	if ((pp3_pools == NULL) || (pp3_pools[pool] == NULL)) {
+		pr_err("%s: pool=%d is not initialized\n", __func__, pool);
+		return -EINVAL;
+	}
+
+	ppool = pp3_pools[pool];
+	size = ppool->buf_size;
+
+	if (size == 0) {
+		pr_err("%s: invalid pool #%d state: buf_size = %d\n", __func__, pool, size);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < buf_num; i++) {
+
+		virt =  (ppool->flags & POOL_F_HWF) ?
+					(void *)pp3_hwf_buff_alloc(ppool, &phys_addr) :
+					(void *)pp3_skb_alloc(ppool, &phys_addr, GFP_KERNEL);
+		if (!virt)
+			break;
+
+		mv_pp3_hmac_bm_buff_put(frame, queue, pool, (unsigned int)virt, phys_addr);
+	}
+
+	ppool->buf_num += i;
+
+	pr_info("%s %s %s %s pool #%d:  buf_size=%4d - %d of %d buffers added\n",
+		(ppool->flags & POOL_F_HWF) ? "HWF" : "SWF",
+		(ppool->flags & POOL_F_SHORT) ? "short" : "",
+		(ppool->flags & POOL_F_LONG) ? "long" : "",
+		(ppool->flags & POOL_F_LRO) ? "lro" : "",
+		 pool, size, i, buf_num);
+
+}
+
 
 /****************************************************************
  * mv_pp3_chan_callback						*
@@ -289,7 +434,7 @@ static int mv_pp3_dev_priv_init(int index, struct net_device *dev)
 
 		if (!group->napi) {
 			/* TODO: call cleanup function */
-			return -EIO;
+			return -ENOMEM;
 		}
 
 		memset(group->napi, 0, sizeof(struct napi_struct));
@@ -332,7 +477,7 @@ static int mv_pp3_load_network_interfaces(struct platform_device *pdev)
 
 	if (dev == NULL) {
 		pr_err("\to %s: can't create netdevice\n", __func__);
-		return -EIO;
+		return -ENOMEM;
 	}
 
 	ret = mv_pp3_dev_priv_init(pdev->id, dev);
@@ -422,6 +567,11 @@ static int mv_pp3_shared_probe(struct platform_device *pdev)
 			goto out;
 
 	memset(pp3_cpus, 0, size);
+
+
+	pp3_pools =  kzalloc(MV_PP3_BM_POOLS * sizeof(struct pp3_pool *), GFP_KERNEL);
+		if (!pp3_pools)
+			goto out;
 
 	/* if (mv_eth_bm_pools_init())
 		goto oom;*/
