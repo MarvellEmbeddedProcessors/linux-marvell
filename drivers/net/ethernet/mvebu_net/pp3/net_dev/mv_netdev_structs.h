@@ -90,9 +90,9 @@ struct pp3_group {
 	struct	pp3_txq		**txqs;
 	struct	pp3_cpu		*cpu_ctrl;
 	struct	napi_struct	*napi;
-	struct	pp3_bm_pool	*long_pool;
-	struct	pp3_bm_pool	*short_pool;
-	struct	pp3_bm_pool	*lro_pool;
+	struct	pp3_pool	*long_pool;
+	struct	pp3_pool	*short_pool;
+	struct	pp3_pool	*lro_pool;
 	struct	pp3_group_stats	stats;
 };
 
@@ -115,7 +115,7 @@ struct pp3_cpu {
 	struct	pp3_frame	**frame_ctrl;
 */
 	struct	pp3_dev_priv	*dev_priv[MAX_ETH_DEVICES];
-	struct	pp3_bm_pool	*tx_done_pool;
+	struct	pp3_pool	*tx_done_pool;
 	struct	pp3_queue	*bm_msg_queue;
 	struct	tasklet_struct	*bm_msg_tasklet;
 	struct  timer_list	tx_done_timer;
@@ -167,14 +167,22 @@ struct pp3_txq {
 	*/
 };
 
-struct	pp3_bm_pool {
+/* pools 8-35, buffers and pool memory in dram */
+struct	pp3_pool {
 	int pool;
 	int capacity;
 	int buf_num;
 	int buf_size;
 	void *virt_base;
 	unsigned long phys_base;
+	unsigned char flags;
 };
+
+#define POOL_F_FREE	0x01
+#define POOL_F_HWF	0x02
+#define POOL_F_LONG	0x04
+#define POOL_F_SHORT	0x08
+#define POOL_F_LRO	0x10
 
 struct pp3_queue {
 	int frame;
