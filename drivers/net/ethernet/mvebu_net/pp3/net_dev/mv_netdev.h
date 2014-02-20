@@ -34,6 +34,8 @@ disclaimer.
 #include <linux/mv_pp3.h>
 #include <net/ip.h>
 
+/* TODO remove next line */
+#define MV_PP3_BM_POOLS 20
 /******************************************************
  * driver statistics control --                       *
  ******************************************************/
