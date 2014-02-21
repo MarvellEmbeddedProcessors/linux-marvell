@@ -392,6 +392,13 @@ MV_STATUS mvCesaHalInit(int numOfSession, int queueDepth, void *osHandle, MV_CES
 				sha2CmdVal = BIT31;
 			}
 			break;
+		case 0x6600: /* Avanta-LP */
+			if (ctrlRev > 2) {
+				MV_REG_BIT_SET(MV_CESA_TDMA_CTRL_REG(chan),
+						       MV_CESA_TDMA_OUTSTAND_OUT_OF_ORDER_3TRANS_BIT);
+				sha2CmdVal = BIT31;
+			}
+			break;
 		case 0x6700: /* A370 */
 			/* Support maximum of 4 outstanding read transactions */
 			MV_REG_BIT_SET(MV_CESA_TDMA_CTRL_REG(chan), MV_CESA_TDMA_OUTSTAND_NEW_MODE_BIT);
