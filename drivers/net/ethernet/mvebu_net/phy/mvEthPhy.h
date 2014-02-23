@@ -102,6 +102,7 @@ extern "C" {
 #define MV_IS_MARVELL_OUI(_reg2, _reg3)		\
 	(((_reg2) == 0x0141) && (((_reg3)&0xFC00) == 0x0C00))
 
+MV_STATUS mvEthPhySmiAddrSet(MV_U32 smi_addr);
 MV_STATUS	mvEthPhyRegRead(MV_U32 phyAddr, MV_U32 regOffs, MV_U16 *data);
 MV_STATUS	mvEthPhyRegPrint(MV_U32 phyAddr, MV_U32 regOffs);
 void		mvEthPhyRegs(int phyAddr);
