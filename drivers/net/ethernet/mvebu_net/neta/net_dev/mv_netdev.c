@@ -4100,6 +4100,10 @@ static int mv_eth_probe(struct platform_device *pdev)
 			return -ENODEV;
 	}
 
+#ifdef CONFIG_OF
+	/* init SMI register */
+	mvEthPhySmiAddrSet(ETH_SMI_REG(port));
+#endif
 	mvNetaPortPowerUp(port, plat_data->is_sgmii, plat_data->is_rgmii);
 
 	mv_eth_win_init(port);
