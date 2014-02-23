@@ -182,8 +182,8 @@ static inline void mv_pp3_hmac_rxq_occ_set(int frame, int queue, int size)
 	mv_pp3_hmac_frame_reg_write(frame, MV_HMAC_REC_Q_OCC_STATUS_UPDATE_REG(queue), size);
 }
 
-/* Returns pointer to next CFH buffer and it size */
-/* size - number of datagram                      */
+/* Returns pointer to next recieved CFH buffer and it */
+/* size - number of datagram                          */
 static inline u8 *mv_pp3_hmac_rxq_next_cfh(int frame, int queue, int *size)
 {
 	struct cfh_common_format *cfh;
@@ -191,20 +191,19 @@ static inline u8 *mv_pp3_hmac_rxq_next_cfh(int frame, int queue, int *size)
 
 	/* Read 16 bytes of CFH pointed by "next_proc" field and calculate size of CFH in bytes */
 	cfh = (struct cfh_common_format *)qctrl->next_proc;
-
-	/* if get NULL CFH with "W" bit set, do wraparound */
-	if (cfh->qm_cntrl & MV_PP3_HMAC_CFH_DUMMY) {
+	/* Move "next_proc" pointer to next CFH ("next_proc" + size) */
+	qctrl->next_proc += cfh->cfh_length;
+	*size = cfh->cfh_length / MV_PP3_HMAC_DG_SIZE;
+	/* check if there is an end of queue */
+	if (qctrl->next_proc >= qctrl->end)
 		qctrl->next_proc = qctrl->first;
-		/* return first CFH in queue */
-		cfh = (struct cfh_common_format *)qctrl->next_proc;
-		*size = cfh->cfh_length / MV_PP3_HMAC_DG_SIZE;
+
+	/* if get empty CFH with "W" bit set, return NULL */
+	if (cfh->qm_cntrl & MV_PP3_HMAC_CFH_DUMMY) {
 		return NULL;
 	}
 
-	/* Move "next_proc" pointer to next CFH ("next_proc" + size) */
-	qctrl->next_proc += cfh->cfh_length;
-
-	*size = cfh->cfh_length / MV_PP3_HMAC_DG_SIZE;
+	/* return real CFH pointer */
 	return (u8 *)cfh;
 }
 
