@@ -47,7 +47,9 @@ static ssize_t mv_pp2_hwf_help(char *buf)
 	o += scnprintf(buf+o, PAGE_SIZE-o, "cat                    status  - show SWF to HWF switching status\n");
 	o += scnprintf(buf+o, PAGE_SIZE-o, "echo msec            > timeout - set SWF to HWF switching timeout\n");
 	o += scnprintf(buf+o, PAGE_SIZE-o, "echo id txq rxq msec > switch  - start SWF to HWF switching process\n");
-
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+	o += scnprintf(buf+o, PAGE_SIZE-o, "echo en              > c_inv   - on/off L1 and L2 cache invalidation\n");
+#endif
 	return o;
 }
 
@@ -114,7 +116,7 @@ static ssize_t mv_pp2_hwf_dec_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
-	int             err;
+	int             err = 0;
 	unsigned int    val;
 	unsigned long   flags;
 
@@ -129,6 +131,10 @@ static ssize_t mv_pp2_hwf_dec_store(struct device *dev,
 
 	if (!strcmp(name, "timeout")) {
 		fwd_switch_msec = val;
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+	} else if (!strcmp(name, "c_inv")) {
+		mv_pp2_cache_inv_wa_ctrl(val);
+#endif
 	} else {
 		err = 1;
 		printk(KERN_ERR "%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -147,6 +153,9 @@ static DEVICE_ATTR(regs,		S_IRUSR, mv_pp2_hwf_show, NULL);
 static DEVICE_ATTR(status,		S_IRUSR, mv_pp2_hwf_show, NULL);
 static DEVICE_ATTR(switch,		S_IWUSR, NULL, mv_pp2_hwf_store);
 static DEVICE_ATTR(timeout,		S_IWUSR, NULL, mv_pp2_hwf_dec_store);
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+static DEVICE_ATTR(c_inv,		S_IWUSR, NULL, mv_pp2_hwf_dec_store);
+#endif
 
 static struct attribute *mv_pp2_hwf_attrs[] = {
 	&dev_attr_help.attr,
@@ -154,6 +163,9 @@ static struct attribute *mv_pp2_hwf_attrs[] = {
 	&dev_attr_status.attr,
 	&dev_attr_switch.attr,
 	&dev_attr_timeout.attr,
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+	&dev_attr_c_inv.attr,
+#endif
 	NULL
 };
 

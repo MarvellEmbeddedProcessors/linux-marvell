@@ -336,3 +336,14 @@ config MV_PON_TXQ_DEF
 
 endmenu
 
+menu "ERRATA / WA"
+
+config MV_ETH_SWF_HWF_CORRUPTION_WA
+        bool "Prevent data corruption in IOCC mode"
+        depends on (AURORA_IO_CACHE_COHERENCY && MV_ETH_HWF)
+        default y
+        ---help---
+	Enable this feature to avoid data corruption in IOCC mode
+	when HWF and SWF traffic use buffers from the same BM pools.
+
+endmenu
