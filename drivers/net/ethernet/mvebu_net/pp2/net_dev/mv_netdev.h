@@ -1027,5 +1027,10 @@ MV_STATUS mv_eth_hwf_bm_create(int port, int mtuPktSize);
 void      mv_hwf_bm_dump(void);
 #endif /* CONFIG_MV_ETH_HWF && !CONFIG_MV_ETH_BM_CPU */
 
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+extern void ___dma_single_dev_to_cpu(const void *, size_t, enum dma_data_direction);
+void mv_pp2_cache_inv_wa_ctrl(int en);
+#endif
+
 #endif /* __mv_netdev_h__ */
 

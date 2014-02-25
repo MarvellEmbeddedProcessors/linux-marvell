@@ -59,6 +59,19 @@ disclaimer.
 
 #define MV_ETH_TX_PENDING_TIMEOUT_MSEC     1000
 
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+static unsigned int mv_pp2_swf_hwf_wa_en;
+void mv_pp2_cache_inv_wa_ctrl(int en)
+{
+	mv_pp2_swf_hwf_wa_en = en;
+}
+void mv_eth_iocc_l1_l2_cache_inv(unsigned char *v_start, int size)
+{
+	if (mv_pp2_swf_hwf_wa_en)
+		___dma_single_dev_to_cpu(v_start, size, DMA_FROM_DEVICE);
+}
+#endif /* CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA */
+
 static struct mv_mux_eth_ops mux_eth_ops;
 
 static struct  platform_device *pp2_sysfs;
@@ -134,7 +147,7 @@ static u32 mv_eth_netdev_fix_features(struct net_device *dev, u32 features);
 static netdev_features_t mv_eth_netdev_fix_features(struct net_device *dev, netdev_features_t features);
 #endif
 
-static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, MV_ULONG *phys_addr, gfp_t gfp_mask);
+static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, phys_addr_t *phys_addr, gfp_t gfp_mask);
 static MV_STATUS mv_eth_pool_create(int pool, int capacity);
 static int mv_eth_pool_add(int pool, int buf_num);
 static int mv_eth_pool_free(int pool, int num);
@@ -1435,7 +1448,7 @@ int mv_eth_skb_recycle(struct sk_buff *skb)
 {
 	int pool, cpu;
 	__u32 bm = skb->hw_cookie;
-	unsigned long phys_addr;
+	phys_addr_t phys_addr;
 	struct bm_pool *ppool;
 	bool is_recyclable;
 
@@ -1483,6 +1496,11 @@ int mv_eth_skb_recycle(struct sk_buff *skb)
 
 		phys_addr = dma_map_single(NULL, skb->head, RX_BUF_SIZE(ppool->pkt_size), DMA_FROM_DEVICE);
 		/*phys_addr = virt_to_phys(skb->head);*/
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+		/* Invalidate only part of the buffer used by CPU */
+		if ((ppool->type == MV_ETH_BM_MIXED_LONG) || (ppool->type == MV_ETH_BM_MIXED_SHORT))
+			mv_eth_iocc_l1_l2_cache_inv(skb->head, skb->len + skb_headroom(skb));
+#endif /* CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA */
 	} else {
 /*
 		pr_err("%s: Failed - skb=%p, pool=%d, bm_cookie=0x%x\n",
@@ -1514,25 +1532,33 @@ EXPORT_SYMBOL(mv_eth_skb_recycle);
 
 #endif /* CONFIG_NET_SKB_RECYCLE */
 
-static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, MV_ULONG *phys_addr, gfp_t gfp_mask)
+static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, phys_addr_t *phys_addr, gfp_t gfp_mask)
 {
 	struct sk_buff *skb;
+	phys_addr_t pa;
 
 	skb = __dev_alloc_skb(pool->pkt_size, gfp_mask);
 	if (!skb) {
 		STAT_ERR(pool->stats.skb_alloc_oom++);
 		return NULL;
 	}
-	if (phys_addr)
-		*phys_addr = dma_map_single(NULL, skb->head, RX_BUF_SIZE(pool->pkt_size), DMA_FROM_DEVICE);
-		/* *phys_addr = virt_to_phys(skb->head); */
+	/* pa = virt_to_phys(skb->head); */
+	if (phys_addr) {
+		pa = dma_map_single(NULL, skb->head, RX_BUF_SIZE(pool->pkt_size), DMA_FROM_DEVICE);
+		*phys_addr = pa;
+
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+		if ((pool->type == MV_ETH_BM_MIXED_LONG) || (pool->type == MV_ETH_BM_MIXED_SHORT))
+			mv_eth_iocc_l1_l2_cache_inv(skb->head, RX_BUF_SIZE(pool->pkt_size));
+#endif
+	}
 
 	STAT_DBG(pool->stats.skb_alloc_ok++);
 
 	return skb;
 }
 
-static unsigned char *mv_eth_hwf_buff_alloc(struct bm_pool *pool, MV_ULONG *phys_addr)
+static unsigned char *mv_eth_hwf_buff_alloc(struct bm_pool *pool, phys_addr_t *phys_addr)
 {
 	unsigned char *buff;
 	int size = RX_HWF_BUF_SIZE(pool->pkt_size);
@@ -1608,7 +1634,7 @@ EXPORT_SYMBOL(mv_eth_txq_done);
 inline int mv_eth_refill(struct bm_pool *ppool, __u32 bm, int is_recycle)
 {
 	struct sk_buff *skb;
-	MV_ULONG phys_addr;
+	phys_addr_t phys_addr;
 
 	if (is_recycle && (mv_eth_bm_in_use_read(ppool) < ppool->in_use_thresh))
 		return 0;
@@ -2710,7 +2736,7 @@ static int mv_eth_pool_add(int pool, int buf_num)
 	unsigned char *hwf_buff;
 	int i, buf_size, total_size;
 	__u32 bm = 0;
-	unsigned long phys_addr;
+	phys_addr_t phys_addr;
 
 	if (mvPp2MaxCheck(pool, MV_ETH_BM_POOLS, "bm_pool"))
 		return 0;
@@ -5072,9 +5098,12 @@ void mv_eth_status_print(void)
 	printk(KERN_ERR "totals: ports=%d\n", mv_eth_ports_num);
 
 #ifdef CONFIG_NET_SKB_RECYCLE
-	printk(KERN_ERR "SKB recycle = %s\n", mv_ctrl_recycle ? "Enabled" : "Disabled");
+	pr_info("SKB recycle                  : %s\n", mv_ctrl_recycle ? "Enabled" : "Disabled");
 #endif /* CONFIG_NET_SKB_RECYCLE */
 
+#ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+	pr_info("HWF + SWF data corruption WA : %s\n", mv_pp2_swf_hwf_wa_en ? "Enabled" : "Disabled");
+#endif /* CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA */
 }
 
 /***********************************************************************************
@@ -5094,10 +5123,10 @@ void mv_eth_port_status_print(unsigned int port)
 	printk(KERN_ERR "\n");
 	printk(KERN_ERR "port=%d, flags=0x%lx, rx_weight=%d\n", port, pp->flags, pp->weight);
 
-	pr_info("RX next descriptor prefetch : %s\n",
+	pr_info("RX next descriptor prefetch  : %s\n",
 			pp->flags & MV_ETH_F_RX_DESC_PREFETCH ? "Enabled" : "Disabled");
 
-	pr_info("RX packet header prefetch   : %s\n\n",
+	pr_info("RX packet header prefetch    : %s\n\n",
 			pp->flags & MV_ETH_F_RX_PKT_PREFETCH ? "Enabled" : "Disabled");
 
 	if (pp->flags & MV_ETH_F_CONNECT_LINUX)
