@@ -155,32 +155,27 @@ static struct attribute *mv_emac_attrs[] = {
 };
 
 static struct attribute_group mv_emac_group = {
+	.name = "emac",
 	.attrs = mv_emac_attrs,
 };
 
-static struct kobject *emac_kobj;
 
 int mv_pp3_emac_sysfs_init(struct kobject *pp3_kobj)
 {
 	int err;
 
-	emac_kobj = kobject_create_and_add("emac", pp3_kobj);
-	if (!emac_kobj) {
-		pr_err("%s: cannot create emac kobject\n", __func__);
-		return -ENOMEM;
-	}
-
-	err = sysfs_create_group(emac_kobj, &mv_emac_group);
+	err = sysfs_create_group(pp3_kobj, &mv_emac_group);
 	if (err) {
-		pr_err("sysfs group failed %d\n", err);
+		pr_err("sysfs group %s failed %d\n", mv_emac_group.name, err);
 		return err;
 	}
 
 	return err;
 }
 
-int mv_pp3_emac_sysfs_exit(struct kobject *emac_kobj)
+int mv_pp3_emac_sysfs_exit(struct kobject *pp3_kobj)
 {
-	/*TODO*/
+	sysfs_remove_group(pp3_kobj, &mv_emac_group);
+
 	return 0;
 }

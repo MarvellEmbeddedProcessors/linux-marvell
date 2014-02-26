@@ -125,6 +125,9 @@ static INLINE void mv_pp3_hw_reg_write(u32 access_addr, u32 data)
 	writel(data, access_addr);
 }
 
-int mv_hw_silicon_base_addr_get(u32 *siliconBase);
+static INLINE u32 mv_hw_silicon_base_addr_get(void)
+{
+	return 0xb0000000;
+}
 
 #endif /* __mvHwIf_h__ */

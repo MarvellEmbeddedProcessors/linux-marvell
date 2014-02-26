@@ -47,7 +47,10 @@ struct pp3_dev_priv {
 	struct pp3_group	*groups[CONFIG_NR_CPUS];
 	struct net_device	*dev;
 	unsigned long		flags;
-	unsigned char		emac_map;
+	int			rss_id;
+	int			rxqs_num;
+	int			txqs_num;
+
 };
 
 /* Masks used for pp3_dev_priv flags */
@@ -59,7 +62,8 @@ struct pp3_dev_priv {
 #define MV_ETH_F_DBG_DUMP_BIT		6
 #define MV_ETH_F_DBG_ISR_BIT		7
 #define MV_ETH_F_DBG_POLL_BIT		8
-#define MV_ETH_F_DBG_BUFF_HDR_BIT	9
+#define MV_ETH_F_INIT_BIT		9
+
 
 
 #define MV_ETH_F_STARTED                (1 << MV_ETH_F_STARTED_BIT)
@@ -70,7 +74,7 @@ struct pp3_dev_priv {
 #define MV_ETH_F_DBG_DUMP		(1 << MV_ETH_F_DBG_DUMP_BIT)
 #define MV_ETH_F_DBG_ISR		(1 << MV_ETH_F_DBG_ISR_BIT)
 #define MV_ETH_F_DBG_POLL		(1 << MV_ETH_F_DBG_POLL_BIT)
-#define MV_ETH_F_DBG_BUFF_HDR		(1 << MV_ETH_F_DBG_BUFF_HDR_BIT)
+#define MV_ETH_F_INIT			(1 << MV_ETH_F_INIT_BIT)
 
 
 struct pp3_group_stats {
@@ -109,11 +113,6 @@ struct pp3_cpu_stats {
 struct pp3_cpu {
 	int	cpu;
 	int	frame_bmp;
-/*
-	not sure that pp3_frame is necessary
-	meanwhile not defined
-	struct	pp3_frame	**frame_ctrl;
-*/
 	struct	pp3_dev_priv	*dev_priv[MAX_ETH_DEVICES];
 	struct	pp3_pool	*tx_done_pool;
 	struct	pp3_queue	*bm_msg_queue;
@@ -141,30 +140,29 @@ struct pp3_rxq {
 	int	frame_num;
 	int	logic_q;
 	int	phys_q;
+	int	size;
 	enum	pp3_q_type		type;
-	struct	mv_pp3_queue_ctrl	*hmac_queue;
 	struct	pp3_dev_priv		*dev_priv;
 	int	pkt_coal;
-	int	time_coal;
+	int	time_coal_profile;
 	struct	pp3_xq_stats		stats;
-	/*
-	not sure yet about this
-	struct	pp3_frame	*frame_ctrl;
-	*/
 };
 
 struct pp3_txq {
 	int	frame_num;
 	int	logic_q;
 	int	phys_q;
+	int	size;
 	enum	pp3_q_type		type;
-	struct	mv_pp3_queue_ctrl	*hmac_queue;
 	struct	pp3_dev_priv		*dev_priv;
 	struct	pp3_xq_stats		stats;
-	/*
-	not sure yet about this
-	struct	pp3_frame	*frame_ctrl;
-	*/
+};
+
+
+enum  pp3_pool_type {
+	PP3_POOL_TYPE_GP = 0,
+	PP3_POOL_TYPE_DRAM = 1,
+	PP3_POOL_TYPE_GPM = 2
 };
 
 /* pools 8-35, buffers and pool memory in dram */
@@ -176,19 +174,27 @@ struct	pp3_pool {
 	void *virt_base;
 	unsigned long phys_base;
 	unsigned char flags;
+	enum pp3_pool_type type;
 };
 
+/* flags in use only if type is GP */
 #define POOL_F_FREE	0x01
-#define POOL_F_HWF	0x02
-#define POOL_F_LONG	0x04
-#define POOL_F_SHORT	0x08
-#define POOL_F_LRO	0x10
+#define POOL_F_LONG	0x02
+#define POOL_F_SHORT	0x04
+#define POOL_F_LRO	0x18
 
 struct pp3_queue {
 	int frame;
 	struct pp3_rxq rxq;
 	struct pp3_txq txq;
 };
-/* TODO define bm_pool */
+
+struct pp3_frame {
+	int frame;
+	int time_coal[MV_PP3_FRM_TIME_COAL_NUM];
+	/*struct pp3_rxq **rxq;*/
+	/*struct pp3_txq **txq;*/
+};
 
 #endif /* __mv_netdev_structs_h__ */
+
