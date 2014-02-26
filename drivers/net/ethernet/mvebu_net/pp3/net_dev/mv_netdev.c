@@ -464,12 +464,13 @@ static const struct net_device_ops mv_pp3_netdev_ops = {
 /*---------------------------------------------------------------------------*/
 struct net_device *mv_pp3_netdev_init(struct platform_device *pdev)
 {
-	struct mv_pp3_port_data *plat_data = (struct mv_pp3_port_data *)pdev->dev.platform_data;
+	struct mv_pp3_port_data *port_data = (struct mv_pp3_port_data *)pdev->dev.platform_data;
 	struct pp3_dev_priv *dev_priv;
 	struct net_device *dev;
 	struct resource *res;
-	int rxqs_num = plat_data->group_rx_queue_count * nr_cpu_ids;
-	int txqs_num = plat_data->group_tx_queue_count * nr_cpu_ids;
+
+	int rxqs_num = port_data->group_rx_queue_count * nr_cpu_ids;
+	int txqs_num = port_data->group_tx_queue_count * nr_cpu_ids;
 
 	/* tx_queue_count from core.c */
 	dev = alloc_etherdev_mqs(sizeof(struct pp3_dev_priv), txqs_num, rxqs_num);
@@ -481,10 +482,10 @@ struct net_device *mv_pp3_netdev_init(struct platform_device *pdev)
 	BUG_ON(!res);
 	dev->irq = res->start;
 
-	dev->mtu = plat_data->mtu;
-	memcpy(dev->dev_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
+	dev->mtu = port_data->mtu;
+	memcpy(dev->dev_addr, port_data->mac_addr, MV_MAC_ADDR_SIZE);
 
-	dev->tx_queue_len = plat_data->tx_queue_size;
+	dev->tx_queue_len = port_data->tx_queue_size;
 	dev->watchdog_timeo = 5 * HZ;
 
 	SET_NETDEV_DEV(dev, &pdev->dev);
@@ -844,6 +845,8 @@ static int mv_pp3_sw_shared_probe(struct platform_device *pdev)
 	unsigned int silicon_base = mv_hw_silicon_base_addr_get();
 
 	struct mv_pp3_plat_data *plat_data = (struct mv_pp3_plat_data *)pdev->dev.platform_data;
+
+	pr_info("o pp3: init shared structures\n");
 
 	pp3_ports_num = plat_data->max_port;
 
