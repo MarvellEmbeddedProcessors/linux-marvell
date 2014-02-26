@@ -68,9 +68,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* includes */
 
 /* unit offset */
-#define MV_PP3_HMAC_GL_UNIT_OFFSET	0x30000
-#define MV_PP3_HMAC_FR_UNIT_OFFSET	0x200000
-
+#define MV_PP3_HMAC_GL_UNIT_OFFSET	0x0F0000
+#define MV_PP3_HMAC_FR_UNIT_OFFSET	0x100000
+#define MV_PP3_HMAC_FR_INST_OFFSET	0x010000
 /************************** HMAC GLOBAL regs *********************************************************/
 
 /* Hmac_eco */

@@ -65,6 +65,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mvEmac_h__
 #define __mvEmac_h__
 
+#include <linux/netdevice.h>
+
 /*--------------------------------------------------------------*/
 /*--------------------- EMAC globals ---------------------------*/
 /*--------------------------------------------------------------*/
@@ -86,12 +88,13 @@ struct mv_pp3_emac_ctrl {
 #define MV_PP3_EMAC_F_DEBUG		(1 << MV_PP3_EMAC_F_DEBUG_BIT)
 #define MV_PP3_EMAC_F_ATTACH		(1 << MV_PP3_EMAC_F_ATTACH_BIT)
 
+void mv_pp3_emac_unit_base(int index, u32 base);
 
 u32  mv_pp3_emac_reg_read(int port, u32 reg);
 
 void mv_pp3_emac_reg_write(int port, u32 reg, u32 data);
 
-void mv_pp3_emac_init(int port, u32 base);
+void mv_pp3_emac_init(int port);
 
 void mv_pp3_emac_qm_mapping(int port, int qm_port, int qm_q);
 
@@ -137,5 +140,11 @@ void mv_pp3_emac_pfc_regs(int port);
 void mv_pp3_emac_wol_regs(int port);
 /* TODO */
 
+/*--------------------------------------------------------------*/
+/*------------------------- SYSFS ------------------------------*/
+/*--------------------------------------------------------------*/
+
+int mv_pp3_emac_sysfs_exit(struct kobject *pp3_kobj);
+int mv_pp3_emac_sysfs_init(struct kobject *pp3_kobj);
 
 #endif /* __mvEmac_h__ */
