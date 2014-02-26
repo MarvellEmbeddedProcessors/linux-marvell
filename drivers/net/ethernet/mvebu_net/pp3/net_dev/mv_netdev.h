@@ -34,8 +34,27 @@ disclaimer.
 #include <linux/mv_pp3.h>
 #include <net/ip.h>
 
-/* TODO remove next line */
+/* TODO remove next lines */
 #define MV_PP3_BM_POOLS 20
+#define MV_PP3_EMACS	5
+#define MV_PP3_FRAMES	4
+
+#define MV_PP3_EMAC_BASE(_emac_) (0x000CA000 + (0x1000 * (_emac_)))
+#define MV_PP3_POOL_INIT_TIMEOUT_MSEC	1000
+#define BM_DRAM_POOL_CAPACITY		1024
+#define BM_GPM_POOL_CAPACITY		1024
+#define MV_PP3_LINUX_POOL_SIZE		1024
+#define MV_PP3_LONG_POOL_SIZE		1024
+#define MV_PP3_SHORT_POOL_SIZE		1024
+#define MV_PP3_LRO_POOL_SIZE		1024
+#define MV_PP3_GPM_POOL_0		0
+#define MV_PP3_GPM_POOL_1		1
+#define MV_PP3_DRAM_POOL_0		2
+#define MV_PP3_DRAM_POOL_1		3
+#define MV_PP3_FRM_TIME_COAL_NUM	2
+#define MV_PP3_FRM_TIME_COAL_0		64
+#define MV_PP3_RXQ_TIME_COAL_DEF_PROF	0
+#define MV_PP3_TXQ_TIME_COAL_DEF_PROF	0
 /******************************************************
  * driver statistics control --                       *
  ******************************************************/

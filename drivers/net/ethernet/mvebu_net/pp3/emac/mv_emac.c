@@ -106,7 +106,13 @@ static void mv_pp3_emac_reg_print(int port, char *reg_name, u32 reg)
 	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg, mv_pp3_emac_reg_read(port, reg));
 }
 
-void mv_pp3_emac_init(int port, u32 base)
+void mv_pp3_emac_unit_base(int port, u32 base)
+{
+	pp3_emac[port].base = base;
+	pp3_emac[port].flags |= MV_PP3_EMAC_F_ATTACH;
+}
+
+void mv_pp3_emac_init(int port)
 {
 	/* attach to QM */
 	/* TODO config the correct values of qm_q and qm_port */
@@ -114,9 +120,6 @@ void mv_pp3_emac_init(int port, u32 base)
 
 	/* enable MH */
 	mv_pp3_emac_mh_en(port, 1);
-
-	pp3_emac[port].base = base;
-	pp3_emac[port].flags |= MV_PP3_EMAC_F_ATTACH;
 }
 
 /* enable debug flag */
