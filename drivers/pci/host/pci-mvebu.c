@@ -736,9 +736,9 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
 
 	ret = of_address_to_resource(np, 0, &regs);
 	if (ret)
-		return NULL;
+		return ERR_PTR(ret);
 
-	return devm_request_and_ioremap(&pdev->dev, &regs);
+	return devm_ioremap_resource(&pdev->dev, &regs);
 }
 
 static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
@@ -897,9 +897,10 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
 		}
 
 		port->base = mvebu_pcie_map_registers(pdev, child, port);
-		if (!port->base) {
+		if (IS_ERR(port->base)) {
 			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
 				port->port, port->lane);
+			port->base = NULL;
 			continue;
 		}
 
