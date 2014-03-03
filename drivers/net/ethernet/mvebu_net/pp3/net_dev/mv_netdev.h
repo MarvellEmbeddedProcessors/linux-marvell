@@ -38,6 +38,7 @@ disclaimer.
 #define MV_PP3_BM_POOLS 20
 #define MV_PP3_EMACS	5
 #define MV_PP3_FRAMES	4
+#define MV_ETH_MH_SIZE  2
 
 #define MV_PP3_EMAC_BASE(_emac_) (0x000CA000 + (0x1000 * (_emac_)))
 #define MV_PP3_POOL_INIT_TIMEOUT_MSEC	1000
