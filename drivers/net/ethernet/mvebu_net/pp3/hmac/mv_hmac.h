@@ -65,6 +65,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mvHmac_h__
 #define __mvHmac_h__
 
+#include <linux/netdevice.h>
+
+#include "common/mv_hw_if.h"
 #include "hmac/mv_hmac_regs.h"
 
 #define MV_PP3_HMAC_MAX_FRAME			(16)
@@ -151,6 +154,7 @@ static inline void mv_pp3_hmac_frame_reg_write(int frame_id, u32 reg, u32 data)
 /*****************************************
  *        HMAC unit init functions       *
  *****************************************/
+void mv_pp3_hmac_init(void);
 /* Init HMAC global unit base address
  * unit_offset = silicon base address + unit offset  */
 void mv_pp3_hmac_gl_unit_base(u32 unit_offset);
@@ -304,7 +308,7 @@ static inline u8 *mv_pp3_hmac_txq_next_cfh(int frame, int queue, int size)
 
 		cfh->pkt_length = end_free_dg * MV_PP3_HMAC_DG_SIZE;
 		cfh->qm_cntrl = MV_PP3_HMAC_CFH_DUMMY; /* set bit 'W' */
-		qctrl->dummy_dg = end_free_dg;
+;		qctrl->dummy_dg = end_free_dg;
 	}
 	qctrl->next_proc = qctrl->first + (size * MV_PP3_HMAC_DG_SIZE);
 	qctrl->occ_dg += size;
@@ -328,5 +332,12 @@ void mv_pp3_hmac_queue_bm_mode_cfg(int frame, int queue);
  * q_num - is a number of QM queue                   */
 void mv_pp3_hmac_queue_qm_mode_cfg(int frame, int queue, int q_num);
 
+/* dump hmac queue registers */
+void mv_pp3_hmac_rxq_regs_dump(int frame, int queue);
+void mv_pp3_hmac_txq_regs_dump(int frame, int queue);
+void mv_pp3_hmac_frame_regs_dump(int frame);
+void mv_pp3_hmac_global_regs_dump(void);
+
+int mv_pp3_hmac_sysfs_init(struct kobject *pp3_kobj);
 
 #endif /* __mvHmac_h__ */

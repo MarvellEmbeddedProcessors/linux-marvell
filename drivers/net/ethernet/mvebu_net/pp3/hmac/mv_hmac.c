@@ -68,7 +68,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/slab.h>
 #include "common/mv_hw_if.h"
 #include "hmac/mv_hmac.h"
-#include "hmac/mv_hmac_regs.h"
 
 /* bitmap to store queues state (allocated/free) per frame */
 static u32 mv_pp3_hmac_queue_act[MV_PP3_HMAC_MAX_FRAME] = {0};
@@ -85,6 +84,15 @@ struct mv_pp3_hmac_queue_ctrl *mv_hmac_txq_handle[MV_PP3_HMAC_MAX_FRAME][MV_PP3_
 static int mv_pp3_hmac_queue_create(struct mv_pp3_hmac_queue_ctrl *q_ctrl, int bytes);
 
 /* general functions */
+/* HMAC unit init */
+void mv_pp3_hmac_init(void)
+{
+	int base = mv_hw_silicon_base_addr_get();
+
+	mv_pp3_hmac_gl_unit_base(base + MV_PP3_HMAC_GL_UNIT_OFFSET);
+	mv_pp3_hmac_frame_unit_base(base + MV_PP3_HMAC_FR_UNIT_OFFSET, MV_PP3_HMAC_FR_INST_OFFSET);
+}
+
 /* store unit base address = silicon base address + unit offset */
 void mv_pp3_hmac_gl_unit_base(unsigned int unit_offset)
 {
@@ -336,10 +344,16 @@ static void mv_pp3_hmac_fr_reg_print(int frame, char *reg_name, u32 reg)
 	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg, mv_pp3_hmac_frame_reg_read(frame, reg));
 }
 
-/* dump hmac queue registers */
-void mv_pp3_hmac_rxq_regs(int frame, int queue)
+static void mv_pp3_hmac_global_reg_print(char *reg_name, u32 reg)
 {
-	pr_info("-------------- HMAC RX (frame = %d, queue = %d) regs -----------\n", frame, queue);
+	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg, mv_pp3_hmac_gl_reg_read(reg));
+}
+
+/* dump hmac queue registers */
+void mv_pp3_hmac_rxq_regs_dump(int frame, int queue)
+{
+	pr_info("\n-------------- HMAC RX (frame = %d, queue = %d) regs (0x%x)-----------\n",
+		frame, queue, pp3_hmac_fr.base_addr + pp3_hmac_fr.ins_offs * frame);
 	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_CTRL", MV_HMAC_REC_Q_CTRL_REG(queue));
 	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_STATUS", MV_HMAC_REC_Q_STATUS_REG(queue));
 	mv_pp3_hmac_fr_reg_print(frame, "TIMEOUT", MV_HMAC_REC_Q_TIMEOUT_REG(queue));
@@ -352,9 +366,10 @@ void mv_pp3_hmac_rxq_regs(int frame, int queue)
 }
 
 /* dump hmac queue registers */
-void mv_pp3_hmac_txq_regs(int frame, int queue)
+void mv_pp3_hmac_txq_regs_dump(int frame, int queue)
 {
-	pr_info("-------------- HMAC TX (frame = %d, queue = %d) regs -----------\n", frame, queue);
+	pr_info("\n-------------- HMAC TX (frame = %d, queue = %d) regs (0x%x)-----------\n",
+		frame, queue, pp3_hmac_fr.base_addr + pp3_hmac_fr.ins_offs * frame);
 	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_CTRL", MV_HMAC_SEND_Q_CTRL_REG(queue));
 	mv_pp3_hmac_fr_reg_print(frame, "QM_NUM", MV_HMAC_SEND_Q_NUM_BPID_REG(queue));
 	mv_pp3_hmac_fr_reg_print(frame, "QUEUE_STATUS", MV_HMAC_SEND_Q_STATUS_REG(queue));
@@ -364,4 +379,30 @@ void mv_pp3_hmac_txq_regs(int frame, int queue)
 	mv_pp3_hmac_fr_reg_print(frame, "OCC_STATUS", MV_PP3_HMAC_SQ_OCC_STATUS(queue));
 	mv_pp3_hmac_fr_reg_print(frame, "AXI_ATTR", MV_PP3_HMAC_SQ_AXI_ATTR(queue));
 	mv_pp3_hmac_fr_reg_print(frame, "EVENT_GROUP", MV_PP3_HMAC_SQ_EVENT_GROUP(queue));
+}
+
+void mv_pp3_hmac_frame_regs_dump(int frame)
+{
+	pr_info("\n-------------- HMAC Frame %d regs -----------\n", frame);
+	mv_pp3_hmac_global_reg_print("VMID", MV_HMAC_VMID_FRAME_REG(frame));
+	mv_pp3_hmac_global_reg_print("Event Address Low", MV_HMAC_EVENT_ADDR_LOW_REG(frame));
+	mv_pp3_hmac_global_reg_print("Event Address High", MV_HMAC_EVENT_ADDR_HIGH_REG(frame));
+	mv_pp3_hmac_global_reg_print("DRAM Upd Timeout", MV_HMAC_DRAM_UPDATE_TIME_OUT_REG(frame));
+	mv_pp3_hmac_global_reg_print("DRAM Upd Threshold", MV_HMAC_DRAM_UPDATE_THRESHOLD_REG(frame));
+	mv_pp3_hmac_global_reg_print("AXI Protection Secure", MV_HMAC_AXI_PROT_SECURE_REG(frame));
+}
+
+void mv_pp3_hmac_global_regs_dump(void)
+{
+	pr_info("\n-------------- HMAC Golbal regs (0x%x) -----------\n", pp3_hmac_gl.base_addr);
+	mv_pp3_hmac_global_reg_print("ECO", MV_HMAC_ECO_REG);
+	mv_pp3_hmac_global_reg_print("BW Control", MV_HMAC_BW_CTRL_REG);
+	mv_pp3_hmac_global_reg_print("Receive QM Port", MV_HMAC_REC_QM_PORT_NUMBER_REG);
+	mv_pp3_hmac_global_reg_print("AXI Interrupt Cause", MV_HMAC_AXI_INT_CAUSE);
+	mv_pp3_hmac_global_reg_print("AXI Interrupt Mask", MV_HMAC_AXI_INT_MASK);
+	mv_pp3_hmac_global_reg_print("AXI Interrupt Syndrome", MV_HMAC_AXI_INT_SYNDROME);
+	mv_pp3_hmac_global_reg_print("MISC Interrupt Cause", MV_HMAC_MISC_INT_CAUSE);
+	mv_pp3_hmac_global_reg_print("MISC Interrupt Mask", MV_HMAC_MISC_INT_MASK);
+	mv_pp3_hmac_global_reg_print("MISC Interrupt Syndrome", MV_HMAC_MISC_INT_SYNDROME);
+	mv_pp3_hmac_global_reg_print("HMAC Busy", MV_HMAC_BUSY);
 }
