@@ -99,6 +99,43 @@ out:
 		l2x0_of_init(0, ~0UL);
 }
 
+static struct of_device_id of_mbusc_table[] = {
+	{ .compatible = "marvell,mbus-controller" },
+	{ },
+};
+
+static void __init armada_380_mbus_optimization(void)
+{
+	struct device_node *np;
+	void __iomem *mbus_units_base;
+	u32 val;
+
+	np = of_find_matching_node(NULL, of_mbusc_table);
+	if (np) {
+		mbus_units_base = of_iomap(np, 3);
+		BUG_ON(!mbus_units_base);
+
+		/* MBUS Units Priority Control Register -
+		Prioritize XOR, PCIe and GbEs (ID=4,6,3,7,8) DRAM access
+		GbE is High and others are Med */
+		__raw_writel(0x19180, mbus_units_base);
+
+		/* Fabric Units Priority Control Register -
+		Prioritize CPUs requests */
+		__raw_writel(0xA, mbus_units_base + 0x4);
+
+		/* MBUS Units Prefetch Control Register -
+		Pre-fetch enable for all IO masters */
+		__raw_writel(0xFFFF, mbus_units_base + 0x8);
+
+		/* Fabric Units Prefetch Control Register -
+		Enable the CPUs Instruction and Data prefetch */
+		__raw_writel(0x303, mbus_units_base + 0xC);
+
+		iounmap(mbus_units_base);
+	}
+}
+
 static void __iomem *
 armada_380_ioremap_caller(unsigned long phys_addr, size_t size,
 			  unsigned int mtype, void *caller)
@@ -119,6 +156,7 @@ static void __init armada_380_timer_and_clk_init(void)
 
 	mvebu_clocks_init();
 	clocksource_of_init();
+	armada_380_mbus_optimization();
 	armada_380_scu_enable();
 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
 	arch_ioremap_caller = armada_380_ioremap_caller;
