@@ -6,5 +6,6 @@ obj-$(CONFIG_MV_PP3) += mv_pp3.o
 
 ccflags-y       += -Idrivers/net/ethernet/marvell/pp3
 
-mv_pp3-objs := net_dev/mv_netdev.o hmac/mv_hmac.o emac/mv_emac.o emac/mv_emac_sysfs.o gop/mv_gop.o fw/mv_channel_if.o \
-		common/mv_stack.o
+mv_pp3-objs := net_dev/mv_netdev.o hmac/mv_hmac.o emac/mv_emac.o
+mv_pp3-objs += emac/mv_emac_sysfs.o hmac/mv_hmac_sysfs.o
+mv_pp3-objs += gop/mv_gop.o fw/mv_channel_if.o common/mv_stack.o
