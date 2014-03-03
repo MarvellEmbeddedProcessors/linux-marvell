@@ -77,15 +77,15 @@ extern "C" {
 
 #define MV_JHASH_MIX(a, b, c)        \
 {                                   \
-    a -= b; a -= c; a ^= (c>>13);   \
-    b -= c; b -= a; b ^= (a<<8);    \
-    c -= a; c -= b; c ^= (b>>13);   \
-    a -= b; a -= c; a ^= (c>>12);   \
-    b -= c; b -= a; b ^= (a<<16);   \
-    c -= a; c -= b; c ^= (b>>5);    \
-    a -= b; a -= c; a ^= (c>>3);    \
-    b -= c; b -= a; b ^= (a<<10);   \
-    c -= a; c -= b; c ^= (b>>15);   \
+	a -= b; a -= c; a ^= (c>>13);   \
+	b -= c; b -= a; b ^= (a<<8);    \
+	c -= a; c -= b; c ^= (b>>13);   \
+	a -= b; a -= c; a ^= (c>>12);   \
+	b -= c; b -= a; b ^= (a<<16);   \
+	c -= a; c -= b; c ^= (b>>5);    \
+	a -= b; a -= c; a ^= (c>>3);    \
+	b -= c; b -= a; b ^= (a<<10);   \
+	c -= a; c -= b; c ^= (b>>15);   \
 }
 
 #ifdef MV_VXWORKS
@@ -343,24 +343,24 @@ static inline MV_U32 mv_jhash_3words(MV_U32 a, MV_U32 b, MV_U32 c, MV_U32 initva
 #define MV_MACQUAD_FMT "%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x"
 
 #define MV_MACQUAD(addr) \
-	((unsigned char *)addr)[0], \
+	(((unsigned char *)addr)[0], \
 	((unsigned char *)addr)[1], \
 	((unsigned char *)addr)[2], \
 	((unsigned char *)addr)[3], \
 	((unsigned char *)addr)[4], \
-	((unsigned char *)addr)[5]
+	((unsigned char *)addr)[5])
 
 #define MV_IPQUAD_FMT         "%u.%u.%u.%u"
-#define MV_IPQUAD(ip)         ip[0], ip[1], ip[2], ip[3]
+#define MV_IPQUAD(ip)         (ip[0], ip[1], ip[2], ip[3])
 
-#define MV_IP_QUAD(ipAddr)    ((ipAddr >> 24) & 0xFF), ((ipAddr >> 16) & 0xFF), \
-				((ipAddr >> 8) & 0xFF), ((ipAddr >> 0) & 0xFF)
+#define MV_IP_QUAD(ipAddr)    (((ipAddr >> 24) & 0xFF), ((ipAddr >> 16) & 0xFF), \
+				((ipAddr >> 8) & 0xFF), ((ipAddr >> 0) & 0xFF))
 
 #define MV_IP6_FMT		"%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x"
-#define MV_IP6_ARG(L3)		L3[0], L3[1], L3[2], L3[3],	\
+#define MV_IP6_ARG(L3)		(L3[0], L3[1], L3[2], L3[3],	\
 				L3[4], L3[5], L3[6], L3[7],	\
 				L3[8], L3[9], L3[10], L3[11],	\
-				L3[12], L3[13], L3[14], L3[15]
+				L3[12], L3[13], L3[14], L3[15])
 
 #define MV_IS_POWER_OF_2(num) ((num != 0) && ((num & (num - 1)) == 0))
 
