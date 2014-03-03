@@ -97,17 +97,21 @@ extern MV_U32 mvDebug;
 extern MV_U32 mvDebugModules[MV_MODULE_MAX];
 
 #ifdef MV_DEBUG
-# define MV_DEBUG_PRINT(module, flags, msg)     mvOsPrintf msg
+# define MV_DEBUG_PRINT(module, flags, msg)     mvOsPrintf(msg)
 # define MV_DEBUG_CODE(module, flags, code)     code
 #elif defined(MV_RT_DEBUG)
-# define MV_DEBUG_PRINT(module, flags, msg)                    \
-    if ((mvDebug & (1<<(module))) &&                           \
-	((mvDebugModules[(module)] & (flags)) == (flags)))     \
-	mvOsPrintf msg
-# define MV_DEBUG_CODE(module, flags, code)                    \
-    if ((mvDebug & (1<<(module))) &&                           \
-	((mvDebugModules[(module)] & (flags)) == (flags)))     \
-	code
+# define MV_DEBUG_PRINT(module, flags, msg)			\
+do {								\
+	if ((mvDebug & (1<<(module))) &&			\
+	    ((mvDebugModules[(module)] & (flags)) == (flags)))	\
+		mvOsPrintf(msg)					\
+} while (0)
+# define MV_DEBUG_CODE(module, flags, code)			\
+do {								\
+	if ((mvDebug & (1<<(module))) &&			\
+	    ((mvDebugModules[(module)] & (flags)) == (flags)))	\
+		(code)						\
+} while (0)
 #else
 # define MV_DEBUG_PRINT(module, flags, msg)
 # define MV_DEBUG_CODE(module, flags, code)

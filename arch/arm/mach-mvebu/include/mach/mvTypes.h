@@ -155,22 +155,22 @@ typedef MV_U32 MV_KHZ;
 typedef MV_U32 MV_MHZ;
 typedef MV_U32 MV_HZ;
 
-/* This enumerator describes the set of commands that can be applied on   	*/
-/* an engine (e.g. IDMA, XOR). Appling a comman depends on the current   	*/
-/* status (see MV_STATE enumerator)                      					*/
-/* Start can be applied only when status is IDLE                         */
-/* Stop can be applied only when status is IDLE, ACTIVE or PAUSED        */
-/* Pause can be applied only when status is ACTIVE                          */
-/* Restart can be applied only when status is PAUSED                        */
+/* This enumerator describes the set of commands that can be applied on		*/
+/* an engine (e.g. IDMA, XOR). Appling a comman depends on the current		*/
+/* status (see MV_STATE enumerator)						*/
+/* Start can be applied only when status is IDLE				*/
+/* Stop can be applied only when status is IDLE, ACTIVE or PAUSED		*/
+/* Pause can be applied only when status is ACTIVE				*/
+/* Restart can be applied only when status is PAUSED				*/
 typedef enum _mvCommand {
-	MV_START,		/* Start     */
-	MV_STOP,		/* Stop     */
-	MV_PAUSE,		/* Pause    */
-	MV_RESTART		/* Restart  */
+	MV_START,		/* Star */
+	MV_STOP,		/* Stop */
+	MV_PAUSE,		/* Pause */
+	MV_RESTART		/* Restart */
 } MV_COMMAND;
 
 /* This enumerator describes the set of state conditions.					*/
-/* Moving from one state to other is stricted.   							*/
+/* Moving from one state to other is stricted.							*/
 typedef enum _mvState {
 	MV_IDLE,
 	MV_ACTIVE,
@@ -194,23 +194,23 @@ typedef struct _mvAddrWin {
 	MV_U64 size;		/* 64bit size           */
 } MV_ADDR_WIN;
 
-/* This binary enumerator describes protection attribute status             */
+/* This binary enumerator describes protection attribute status		*/
 typedef enum _mvProtRight {
-	ALLOWED,		/* Protection attribute allowed                         */
-	FORBIDDEN		/* Protection attribute forbidden                       */
+	ALLOWED,		/* Protection attribute allowed		*/
+	FORBIDDEN		/* Protection attribute forbidden	*/
 } MV_PROT_RIGHT;
 
-/* Unified struct for Rx and Tx packet operations. The user is required to 	*/
-/* be familier only with Tx/Rx descriptor command status.               	*/
+/* Unified struct for Rx and Tx packet operations. The user is required to	*/
+/* be familier only with Tx/Rx descriptor command status.			*/
 typedef struct _bufInfo {
-	MV_U32 cmdSts;		/* Tx/Rx command status                                     */
-	MV_U16 byteCnt;		/* Size of valid data in the buffer     */
-	MV_U16 bufSize;		/* Total size of the buffer             */
-	MV_U8 *pBuff;		/* Pointer to Buffer                    */
-	MV_U8 *pData;		/* Pointer to data in the Buffer        */
-	MV_U32 userInfo1;	/* Tx/Rx attached user information 1    */
-	MV_U32 userInfo2;	/* Tx/Rx attached user information 2    */
-	struct _bufInfo *pNextBufInfo;	/* Next buffer in packet            */
+	MV_U32 cmdSts;		/* Tx/Rx command status			*/
+	MV_U16 byteCnt;		/* Size of valid data in the buffer	*/
+	MV_U16 bufSize;		/* Total size of the buffer		*/
+	MV_U8 *pBuff;		/* Pointer to Buffer			*/
+	MV_U8 *pData;		/* Pointer to data in the Buffer	*/
+	MV_U32 userInfo1;	/* Tx/Rx attached user information 1	*/
+	MV_U32 userInfo2;	/* Tx/Rx attached user information 2	*/
+	struct _bufInfo *pNextBufInfo;	/* Next buffer in packet	*/
 } BUF_INFO;
 
 /* This structure contains information describing one of buffers
