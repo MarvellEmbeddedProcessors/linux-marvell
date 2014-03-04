@@ -5815,12 +5815,7 @@ void mv_eth_netdev_print(struct net_device *dev)
 			(unsigned int)(dev->flags), (unsigned int)(dev->gflags),
 			netif_running(dev), netif_oper_up(dev));
 
-	if (mv_eth_netdev_find(dev->ifindex)) {
-		struct eth_port *pp = MV_ETH_PRIV(dev);
-
-		if (pp)
-			printk(KERN_ERR "pp=%p\n", pp);
-	} else
+	if (!mv_eth_netdev_find(dev->ifindex))
 		/* mux net device */
 		mv_mux_netdev_print(dev);
 }
@@ -5851,8 +5846,9 @@ void mv_eth_port_status_print(unsigned int port)
 	if (!pp)
 		return;
 
-	printk(KERN_ERR "\n");
-	printk(KERN_ERR "port=%d, flags=0x%lx, rx_weight=%d\n", port, pp->flags, pp->weight);
+	pr_info("\nport=%d, flags=0x%lx, rx_weight=%d, %s\n", port, pp->flags, pp->weight,
+			pp->tagged ? "tagged" : "untagged");
+
 	if (pp->flags & MV_ETH_F_CONNECT_LINUX)
 		printk(KERN_ERR "%s: ", pp->dev->name);
 	else
@@ -5969,12 +5965,8 @@ void mv_eth_port_status_print(unsigned int port)
 	if (pp->dev)
 		mv_eth_netdev_print(pp->dev);
 
-	if (pp->tagged) {
-		printk(KERN_CONT "TAGGED PORT\n\n");
+	if (pp->tagged)
 		mv_mux_netdev_print_all(port);
-	} else
-		printk(KERN_CONT "UNTAGGED PORT\n");
-
 }
 
 /***********************************************************************************
