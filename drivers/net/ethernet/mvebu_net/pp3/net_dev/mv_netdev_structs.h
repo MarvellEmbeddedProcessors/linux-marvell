@@ -42,7 +42,7 @@ disclaimer.
 #define MV_PP3_PRIV(dev)	((struct pp3_dev_priv *)(netdev_priv(dev)))
 
 struct pp3_dev_priv {
-	int			index;
+	int			index; /*emac*/
 	/* struct mv_pp3_port_data *plat_data; */
 	struct pp3_group	*groups[CONFIG_NR_CPUS];
 	struct net_device	*dev;
@@ -116,6 +116,8 @@ struct pp3_cpu {
 	struct	pp3_dev_priv	*dev_priv[MAX_ETH_DEVICES];
 	struct	pp3_pool	*tx_done_pool;
 	struct	pp3_queue	*bm_msg_queue;
+	int			bm_msg_irq;
+	int			bm_msg_group;
 	struct	tasklet_struct	*bm_msg_tasklet;
 	struct  timer_list	tx_done_timer;
 	struct	pp3_cpu_stats	stats;
@@ -138,8 +140,9 @@ enum  pp3_q_type {
 
 struct pp3_rxq {
 	int	frame_num;
-	int	logic_q;
-	int	phys_q;
+	int	logic_q;	/*application q*/
+	int	sw_q;		/*hmac q*/
+	int	hw_q;		/*QM q*/
 	int	size;
 	enum	pp3_q_type		type;
 	struct	pp3_dev_priv		*dev_priv;
@@ -151,7 +154,8 @@ struct pp3_rxq {
 struct pp3_txq {
 	int	frame_num;
 	int	logic_q;
-	int	phys_q;
+	int	sw_q;
+	int	hw_q;
 	int	size;
 	enum	pp3_q_type		type;
 	struct	pp3_dev_priv		*dev_priv;
@@ -181,7 +185,7 @@ struct	pp3_pool {
 #define POOL_F_FREE	0x01
 #define POOL_F_LONG	0x02
 #define POOL_F_SHORT	0x04
-#define POOL_F_LRO	0x18
+#define POOL_F_LRO	0x08
 
 struct pp3_queue {
 	int frame;

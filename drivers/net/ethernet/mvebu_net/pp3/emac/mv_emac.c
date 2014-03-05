@@ -81,7 +81,7 @@ u32 mv_pp3_emac_reg_read(int port, u32 reg)
 {
 	u32 reg_data;
 
-	mv_pp3_hw_read(reg + pp3_emac[port].base, 1, &reg_data);
+	reg_data = mv_pp3_hw_reg_read(reg + pp3_emac[port].base);
 
 	if (pp3_emac[port].flags & MV_PP3_EMAC_F_DEBUG)
 		pr_info("read     : 0x%x = 0x%08x\n", reg, reg_data);
@@ -91,12 +91,12 @@ u32 mv_pp3_emac_reg_read(int port, u32 reg)
 
 void mv_pp3_emac_reg_write(int port, u32 reg, u32 data)
 {
-	mv_pp3_hw_write(reg + pp3_emac[port].base, 1, &data);
+	mv_pp3_hw_reg_write(reg + pp3_emac[port].base, data);
 
 	if (pp3_emac[port].flags & MV_PP3_EMAC_F_DEBUG) {
 		u32 reg_data;
 		pr_info("write    : 0x%x = 0x%08x\n", reg, data);
-		mv_pp3_hw_read(reg + pp3_emac[port].base, 1, &reg_data);
+		reg_data = mv_pp3_hw_reg_read(reg + pp3_emac[port].base);
 		pr_info("read back: 0x%x = 0x%08x\n", reg, reg_data);
 	}
 }
@@ -118,8 +118,16 @@ void mv_pp3_emac_init(int port)
 	/* TODO config the correct values of qm_q and qm_port */
 	mv_pp3_emac_qm_mapping(port, port, port);
 
-	/* enable MH */
-	mv_pp3_emac_mh_en(port, 1);
+	/* TODO */
+	/*mv_pp3_emac_rx_cfh_reorder_mode(int port, int lock_id);*/
+	/*mv_pp3_emac_rx_cfh_deq_mode(port, mode)*/
+
+	/* use hw defaults */
+	/*mv_pp3_emac_mh_en(port, 1);*/
+	/*mv_pp3_emac_rx_desc_rsvd(port, 2);*/
+	/* mv_pp3_emac_tx_min_pkt_len(int port, 60)*/
+	/*mv_pp3_emac_rx_enable(port,1);*/
+	/*mv_pp3_emac_loopback(port, 0)*/
 }
 
 /* enable debug flag */
