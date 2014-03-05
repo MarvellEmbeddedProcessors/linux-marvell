@@ -69,8 +69,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/io.h>
 
 #define MAX_CPU_NUM	2
+#define MV_PP3_EMAC_NUM	4
+
 
 #define MV_PP3_MSG_BUFF_SIZE	4096
-#define MV_PP3_MSGR_BUF_NUM		8
-
+#define MV_PP3_MSGR_BUF_NUM	8
+#define MV_PP3_GP_POOL_MIN	8
+#define MV_PP3_GP_POOL_MAX	35
+#define MV_PP3_POOL_MAX		35
 #endif /* __mvPp3Config_h__ */

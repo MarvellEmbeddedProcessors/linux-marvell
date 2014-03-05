@@ -64,8 +64,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mv_gmac_h__
 #define __mv_gmac_h__
 
-
-#include <linux/netdevice.h>
+#include "gmac/mv_gmac_regs.h"
 
 struct pp3_gmac_ctrl {
 	u32 base;

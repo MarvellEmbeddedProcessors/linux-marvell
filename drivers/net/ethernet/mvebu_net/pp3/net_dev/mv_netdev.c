@@ -21,10 +21,12 @@
 #include <linux/mv_pp3.h>
 #include <linux/dma-mapping.h>
 #include "common/mv_hw_if.h"
+#include "common/mv_pp3_config.h"
 #include "hmac/mv_hmac.h"
 #include "hmac/mv_hmac_bm.h"
 #include "emac/mv_emac.h"
 #include "fw/mv_channel_if.h"
+#include "gmac/mv_gmac.h"
 #include "mv_netdev.h"
 #include "mv_netdev_structs.h"
 
@@ -69,6 +71,7 @@ static int pp3_sysfs_init(void)
 
 	mv_pp3_emac_sysfs_init(&pd->kobj);
 	mv_pp3_hmac_sysfs_init(&pd->kobj);
+	pp3_dev_sysfs_init(&pd->kobj);
 
 	return 0;
 }
@@ -85,6 +88,7 @@ static void pp3_sysfs_exit(void)
 		return;
 	}
 
+	pp3_dev_sysfs_exit(&pd->kobj);
 	mv_pp3_emac_sysfs_exit(&pd->kobj);
 	platform_device_unregister(pp3_sysfs);
 }
@@ -110,7 +114,7 @@ static void mv_pp3_tx_done_timer_callback(unsigned long data)
 
 	clear_bit(MV_CPU_F_TX_DONE_TIMER_BIT, &cpu_ctrl->flags);
 
-	mv_pp3_hmac_bm_buff_request(bm_msg_queue->frame, bm_msg_queue->rxq.phys_q,
+	mv_pp3_hmac_bm_buff_request(bm_msg_queue->frame, bm_msg_queue->rxq.sw_q,
 					tx_done_pool->pool, 100 /*TODO - request according to counter value*/);
 
 	/* TODO: update counter */
@@ -205,7 +209,7 @@ void mv_pp3_bm_tasklet(unsigned long data)
 	struct	pp3_pool *tx_done_pool = cpu_ctrl->tx_done_pool;
 	struct	pp3_queue *bm_msg_queue = cpu_ctrl->bm_msg_queue;
 
-	while (mv_pp3_hmac_bm_buff_get(bm_msg_queue->frame, bm_msg_queue->rxq.phys_q,
+	while (mv_pp3_hmac_bm_buff_get(bm_msg_queue->frame, bm_msg_queue->rxq.sw_q,
 						&pool, &ph_addr, &vr_addr) != -1) {
 
 		if (pool == tx_done_pool->pool) {
@@ -339,6 +343,20 @@ static struct pp3_pool *pp3_pool_gp_create(int pool, int capacity)
 	struct pp3_pool *ppool;
 	unsigned int ret_val;
 
+	if (pp3_pools[pool]) {
+		if (pp3_pools[pool]->capacity != capacity) {
+			pr_err("%s: pool #%d already exist with capacity < %d\n", __func__, pool, capacity);
+			return NULL;
+		}
+
+		if (pp3_pools[pool]->type != PP3_POOL_TYPE_GP) {
+			pr_err("%s: pool #%d reserved for QM\n", __func__, pool);
+			return NULL;
+		}
+
+		return pp3_pools[pool];
+	}
+
 	ppool = pp3_pool_alloc(pool, 2 * capacity);
 
 	if (ppool == NULL) {
@@ -449,7 +467,6 @@ static int pp3_pool_add(int pool, int buf_num, int frame, int queue)
 		(ppool->flags & POOL_F_LRO) ? "lro" : "",
 		 pool, size, i, buf_num);
 }
-
 /*---------------------------------------------------------------------------*/
 /* channel callback function						     */
 /*---------------------------------------------------------------------------*/
@@ -527,18 +544,18 @@ struct net_device *mv_pp3_netdev_init(struct platform_device *pdev)
 
 static struct pp3_rxq *pp3_rxq_priv_init(int emac, int cpu)
 {
-	int logic_q, phys_q, frame, size;
+	int sw_q, hw_q, frame;
 	struct pp3_rxq *priv_rxq;
 
-	/*pp3_config_mngr_rxq(emac, cpu, &logic_q, &phys_q, &frame, &size);*/
+	/*mv_pp3_cfg_dp_nic_rxq_params_get(emac, cpu, &frame, &sw_q, &hw_q);*/
 	priv_rxq = kzalloc(sizeof(struct pp3_rxq), GFP_KERNEL);
 
 	if (priv_rxq) {
 		priv_rxq->frame_num = frame;
-		priv_rxq->logic_q = logic_q;
-		priv_rxq->phys_q = phys_q;
+		priv_rxq->sw_q = sw_q;
+		priv_rxq->hw_q = hw_q;
 		priv_rxq->type = PP3_Q_TYPE_QM;
-		priv_rxq->size = size;
+		priv_rxq->size = MV_PP3_DP_RXQ_SIZE;
 		priv_rxq->pkt_coal = CONFIG_PP3_RX_COAL_PKTS;
 		priv_rxq->time_coal_profile = MV_PP3_RXQ_TIME_COAL_DEF_PROF;
 	}
@@ -549,17 +566,17 @@ static struct pp3_rxq *pp3_rxq_priv_init(int emac, int cpu)
 
 static struct pp3_txq *pp3_txq_priv_init(int emac, int cpu)
 {
-	int logic_q, phys_q, frame, size;
+	int sw_q, hw_q, frame;
 	struct pp3_txq *priv_txq;
 
-	/*pp3_config_mngr_txq(index, cpu, &logic_q, &phys_q, &frame, &size);*/
+	/*mv_pp3_cfg_dp_nic_txq_params_get(emac, cpu, &frame, &sw_q, &hw_q)*/
 	priv_txq = kmalloc(sizeof(struct pp3_txq), GFP_KERNEL);
 
 	if (priv_txq) {
 		priv_txq->frame_num = frame;
-		priv_txq->logic_q = logic_q;
-		priv_txq->phys_q = phys_q;
-		priv_txq->size = size;
+		priv_txq->sw_q = sw_q;
+		priv_txq->hw_q = hw_q;
+		priv_txq->size = MV_PP3_DP_TXQ_SIZE;
 		priv_txq->type = PP3_Q_TYPE_QM;
 	}
 
@@ -693,9 +710,8 @@ static int mv_pp3_sw_probe(struct platform_device *pdev)
 
 	pp3_ports[pdev->id] = MV_PP3_PRIV(dev);
 
-	mv_pp3_emac_unit_base(pdev->id, mv_hw_silicon_base_addr_get()+MV_PP3_EMAC_BASE(pdev->id));
-
-	/* TODO: set GOP BASE */
+	mv_pp3_emac_unit_base(pdev->id, mv_hw_silicon_base_addr_get() + MV_PP3_EMAC_BASE(pdev->id));
+	pp3_gmac_unit_base(pdev->id, GMAC_REG_BASE(pdev->id) + mv_fpga_gop_base_addr_get());
 
 	pr_info("Probing Marvell PPv3 Network Driver\n");
 	return 0;
@@ -755,7 +771,7 @@ static int mv_pp3_hw_netif_start(struct pp3_dev_priv *dev_priv)
 	struct pp3_group *group_ctrl;
 
 	/* init EMAC */
-	for (i = 0; i < MV_PP3_EMACS; i++)
+	for (i = 0; i < MV_PP3_EMAC_NUM; i++)
 		/* TODO: suppot NSS mode */
 		mv_pp3_emac_init(dev_priv->index);
 
@@ -765,21 +781,21 @@ static int mv_pp3_hw_netif_start(struct pp3_dev_priv *dev_priv)
 		struct pp3_txq *txq_ctrl;
 		group_ctrl = pp3_groups[cpu][dev_priv->index];
 
-		/*pool = pp3_config_mngr_pool(dev_priv->index)*/
+		/*pool = mv_pp3_cfg_dp_long_bpid(dev_priv->index)*/
 		group_ctrl->long_pool = pp3_pool_gp_create(pool, MV_PP3_LONG_POOL_SIZE);
-		/*pool = pp3_config_mngr_pool(dev_priv->index)*/
+		/*pool = mv_pp3_cfg_dp_short_bpid(dev_priv->index)*/
 		group_ctrl->short_pool = pp3_pool_gp_create(pool, MV_PP3_SHORT_POOL_SIZE);
-		/*pool = pp3_config_mngr_pool(dev_priv->index)*/
+		/*pool = mv_pp3_cfg_dp_lro_bpid(dev_priv->index)*/
 		group_ctrl->lro_pool = pp3_pool_gp_create(pool, MV_PP3_LRO_POOL_SIZE);
 
 		for (i = 0; i < group_ctrl->rxqs_num; i++) {
 			rxq_ctrl =  group_ctrl->rxqs[i];
-			mv_pp3_hmac_rxq_init(rxq_ctrl->frame_num, rxq_ctrl->phys_q, rxq_ctrl->size);
+			mv_pp3_hmac_rxq_init(rxq_ctrl->frame_num, rxq_ctrl->sw_q, rxq_ctrl->size);
 		}
 
 		for (i = 0; i < group_ctrl->txqs_num; i++) {
 			txq_ctrl =  group_ctrl->txqs[i];
-			mv_pp3_hmac_txq_init(txq_ctrl->frame_num, txq_ctrl->phys_q, txq_ctrl->size, 0);
+			mv_pp3_hmac_txq_init(txq_ctrl->frame_num, txq_ctrl->sw_q, txq_ctrl->size, 0);
 		}
 	}
 
@@ -791,7 +807,7 @@ static int mv_pp3_hw_netif_start(struct pp3_dev_priv *dev_priv)
 static int mv_pp3_hw_shared_start(void)
 {
 	struct pp3_cpu *cpu_ctrl;
-	int cpu, pool, frame, queue, size;
+	int cpu, pool, frame, queue, q_size, group, irq;
 	unsigned int frames_bmp;
 
 	/* load fw */
@@ -806,16 +822,18 @@ static int mv_pp3_hw_shared_start(void)
 		pp3_cpus[cpu] = cpu_ctrl;
 
 		/* TODO: call to config manager: get frames bitmap per cpu */
-		/*pp3_config_mngr_frm_num(cpu, &frames_bmp);*/
+		/*mv_pp3_cfg_dp_frames_bm(int cpu, &frames_bmp);*/
 		cpu_ctrl->frame_bmp = frames_bmp;
 
 		/* TODO: call to config manager: get free pool id */
-		/* pool = pp3_config_mngr_bm_pool(pool_id);*/
+		/* pool = mv_pp3_cfg_dp_linux_bpid(cpu);*/
 		cpu_ctrl->tx_done_pool =  pp3_pool_gp_create(pool, MV_PP3_LINUX_POOL_SIZE);
 
 		/* TODO: call to config manager: get frame and queue num in order to manage bm pool */
-		/* pp3_config_mngr_bm_queue(cpu, &frame, &qeueu)*/
-		mv_pp3_hmac_bm_queue_init(frame, queue, size);
+		/*mv_pp3_cfg_dp_bmq_params_get(cpu, &frames_bmp, &qeueu, &q_size, &group, &irq);*/
+		cpu_ctrl->bm_msg_irq = irq;
+		cpu_ctrl->bm_msg_group = group;
+		mv_pp3_hmac_bm_queue_init(frame, queue, q_size);
 		cpu_ctrl->bm_msg_tasklet = kzalloc(sizeof(struct tasklet_struct), GFP_KERNEL);
 		tasklet_init(pp3_cpus[cpu]->bm_msg_tasklet, mv_pp3_bm_tasklet, (unsigned long)pp3_cpus[cpu]);
 
@@ -826,8 +844,8 @@ static int mv_pp3_hw_shared_start(void)
 		cpu_ctrl->tx_done_timer.data = (unsigned long)pp3_cpus[cpu];
 	}
 
-	/* TODO: QM init		*/
-	/* TODO: HMAC unit int	*/
+	/* TODO: QM  HW init	*/
+	/* TODO: HMAC HW unit int */
 
 	pp3_pools_dram_init(BM_DRAM_POOL_CAPACITY);
 	pp3_pools_dram_init(BM_GPM_POOL_CAPACITY);
@@ -835,7 +853,8 @@ static int mv_pp3_hw_shared_start(void)
 
 	/* TODO: start fw */
 	/* TODO: Channel create */
-	/* TODO: cpu_ctrl->chan_id = mv_pp3_chan_create(int size, 0, pp3_chan_callback);*/
+
+	cpu_ctrl->chan_id = mv_pp3_chan_create(MV_PP3_CHAN_SIZE, 0, pp3_chan_callback);
 
 	return 0;
 oom:
@@ -1036,7 +1055,209 @@ static void __exit mv_pp3_cleanup_module(void)
 module_exit(mv_pp3_cleanup_module);
 
 /*---------------------------------------------------------------------------*/
+/*				dump functions				     */
+/*---------------------------------------------------------------------------*/
 
+void pp3_netdev_pool_status_print(int pool)
+{
+	const char *str;
+	struct pp3_pool *ppool;
+
+	if ((pool < 0) || (pool >= MV_PP3_POOL_MAX)) {
+		pr_err("%s: Invalid pool number - %d\n", __func__, pool);
+		return;
+	}
+
+	if (!pp3_pools || (!pp3_pools[pool])) {
+		pr_err("Pool #%d not initialized\n", pool);
+		return;
+	}
+
+	ppool = pp3_pools[pool];
+
+	if (ppool->type == PP3_POOL_TYPE_GPM)
+		str = "GPM";
+	else if (ppool->type == PP3_POOL_TYPE_DRAM)
+		str = "DRAM";
+	else if (ppool->flags & POOL_F_FREE)
+		str = "FREE";
+	else if (ppool->flags & POOL_F_LONG)
+		str = "LONG";
+	else if (ppool->flags & POOL_F_SHORT)
+		str = "SHORT";
+	else if (ppool->flags & POOL_F_LRO)
+		str = "LRO";
+	else
+		str = "UNKNOWN";
+
+	pr_info("/n");
+	pr_info("pool #%d: pool type = %s, buffers num = %d, buffer size = %d\n",
+			pool, str, ppool->buf_num, ppool->buf_size);
+	pr_info("virt_base = 0x%p, phys_base = 0x%lu\n", ppool->virt_base, ppool->phys_base);
+
+	return;
+}
+/*---------------------------------------------------------------------------*/
+void pp3_netdev_cpu_status_print(int cpu)
+{
+	struct pp3_cpu *cpu_ctrl;
+	int linux_pool_id;
+
+	if ((cpu < 0) || (cpu >= MAX_CPU_NUM)) {
+		pr_err("%s: Invalid cpu number - %d\n", __func__, cpu);
+		return;
+	}
+
+	if (!pp3_cpus || (!pp3_cpus[cpu])) {
+		pr_err("cpu #%d group not initialized\n", cpu);
+		return;
+	}
+
+	cpu_ctrl = pp3_cpus[cpu];
+	pr_info("/n");
+	pr_info("cpu #%d: frames bitmap = 0x%x, bm_msg_irq = %d, bm_msg_groeup = %d, chan_id = %d\n", cpu,
+			cpu_ctrl->frame_bmp, cpu_ctrl->bm_msg_irq, cpu_ctrl->bm_msg_group, cpu_ctrl->chan_id);
+
+	linux_pool_id = cpu_ctrl->tx_done_pool ? cpu_ctrl->tx_done_pool->pool : -1;
+	pr_info("linux_pool = %d, tx_done_counter = %d\n", linux_pool_id, cpu_ctrl->tx_done_cnt);
+
+	return;
+}
+/*---------------------------------------------------------------------------*/
+void pp3_netdev_dev_status_print(int index)
+{
+	struct pp3_dev_priv *dev_priv;
+
+	if ((index < 0) || (index >= MV_PP3_EMAC_NUM)) {
+		pr_err("%s: Invalid interface number - %d\n", __func__, index);
+		return;
+	}
+	if (!pp3_ports || (!pp3_ports[index])) {
+		pr_err("interface #%d is not initialized\n", index);
+		return;
+	}
+
+	dev_priv = pp3_ports[index];
+
+	pr_info("/n");
+	pr_info("interface #%d: dev = 0x%p, flags = 0x%lu, rss_id = %d, rxqs_num= %d, txqs_num = %d\n",
+		index, dev_priv->dev, dev_priv->flags, dev_priv->rss_id, dev_priv->rxqs_num,  dev_priv->txqs_num);
+	return;
+}
+/*---------------------------------------------------------------------------*/
+
+void pp3_netdev_group_status_print(int index, int cpu)
+{
+	struct pp3_group  *grp_ctrl;
+	int lro_pool, long_pool, short_pool;
+
+	if ((index < 0) || (index >= MV_PP3_EMAC_NUM)) {
+		pr_err("%s: Invalid interface number - %d\n", __func__, index);
+		return;
+	}
+
+	if ((cpu < 0) || (cpu >= MAX_CPU_NUM)) {
+		pr_err("%s: Invalid cpu number - %d\n", __func__, cpu);
+		return;
+	}
+
+	grp_ctrl = pp3_groups[cpu][index];
+
+	if (!grp_ctrl) {
+		pr_err("cpu #%d group not initialized\n", cpu);
+		return;
+	}
+
+	pr_info("/n");
+	pr_info("group: cpu = %d, interface = %d, rxqs_num= %d, txqs_num = %d\n",
+			cpu, index, grp_ctrl->rxqs_num, grp_ctrl->txqs_num);
+
+	lro_pool = grp_ctrl->lro_pool ? grp_ctrl->lro_pool->pool : -1;
+	long_pool = grp_ctrl->long_pool ? grp_ctrl->long_pool->pool : -1;
+	short_pool = grp_ctrl->short_pool ? grp_ctrl->short_pool->pool : -1;
+
+	pr_info("short_pool = %d, long_pool = %d, lro_pool = %d\n", short_pool, long_pool, lro_pool);
+	return;
+}
+/*---------------------------------------------------------------------------*/
+void pp3_netdev_rxq_status_print(int index, int cpu, int queue)
+{
+	const char *type;
+	struct pp3_group *grp_ctrl;
+	struct pp3_rxq *rxq_ctrl;
+
+	if ((index < 0) || (index >= MV_PP3_EMAC_NUM)) {
+		pr_err("%s: Invalid interface number - %d\n", __func__, index);
+		return;
+	}
+
+	if ((cpu < 0) || (cpu >= MAX_CPU_NUM)) {
+		pr_err("%s: Invalid cpu number - %d\n", __func__, cpu);
+		return;
+	}
+
+	grp_ctrl = pp3_groups[cpu][index];
+
+	if (!grp_ctrl) {
+		pr_err("cpu #%d group not initialized\n", cpu);
+		return;
+	}
+
+	if (!grp_ctrl->rxqs || !grp_ctrl->rxqs[queue]) {
+		pr_err("queue #%d not initialized\n", queue);
+		return;
+	}
+
+	rxq_ctrl = grp_ctrl->rxqs[queue];
+	type = (rxq_ctrl->type ==  PP3_Q_TYPE_BM) ? "BM" : "QM";
+	pr_info("/n");
+	pr_info("interface #%d, cpu group #%d, queue #%d:\n", index, cpu, queue);
+	pr_info("frame = %d, logic_q = %d, sw_q = %d, hw_q = %d\n",
+			rxq_ctrl->frame_num, rxq_ctrl->logic_q, rxq_ctrl->hw_q, rxq_ctrl->sw_q);
+
+	pr_info("size = %d, type = %s, pkt_coal = %d, time_coal_frofile = %d\n",
+		rxq_ctrl->size, type, rxq_ctrl->pkt_coal, rxq_ctrl->time_coal_profile);
+	return;
+}
+/*---------------------------------------------------------------------------*/
+void pp3_netdev_txq_status_print(int index, int cpu, int queue)
+{
+	const char *type;
+	struct pp3_group *grp_ctrl;
+	struct pp3_txq *txq_ctrl;
+
+	if ((index < 0) || (index >= MV_PP3_EMAC_NUM)) {
+		pr_err("%s: Invalid interface number - %d\n", __func__, index);
+		return;
+	}
+
+	if ((cpu < 0) || (cpu >= MAX_CPU_NUM)) {
+		pr_err("%s: Invalid cpu number - %d\n", __func__, cpu);
+		return;
+	}
+
+	grp_ctrl = pp3_groups[cpu][index];
+
+	if (!grp_ctrl) {
+		pr_err("cpu #%d group not initialized\n", cpu);
+		return;
+	}
+
+	if (!grp_ctrl->txqs || !grp_ctrl->txqs[queue]) {
+		pr_err("queue #%d not initialized\n", queue);
+		return;
+	}
+
+	txq_ctrl = grp_ctrl->txqs[queue];
+	type = (txq_ctrl->type ==  PP3_Q_TYPE_BM) ? "BM" : "QM";
+	pr_info("/n");
+	pr_info("interface #%d, cpu group #%d, queue #%d:\n", index, cpu, queue);
+	pr_info("frame = %d, logic_q = %d, sw_q = %d, hw_q = %d\n",
+			txq_ctrl->frame_num, txq_ctrl->logic_q, txq_ctrl->sw_q, txq_ctrl->hw_q);
+	pr_info("size = %d, type = %s\n", txq_ctrl->size, type);
+	return;
+}
+/*---------------------------------------------------------------------------*/
 
 MODULE_DESCRIPTION("Marvell PPv3 Network Driver - www.marvell.com");
 MODULE_AUTHOR("Dmitri Epshtein <dima@marvell.com>");
