@@ -208,7 +208,7 @@ static int mv_pp2_dpi_do_request(char *data, int size, unsigned char *counters)
 			__func__, ready_num);
 
 	/* Process single response - copy counters */
-	mvOsCacheIoSync();
+	mvOsCacheIoSync(NULL);
 	mvPp2DpiResultGet(dpi_counters, MV_PP2_DPI_CNTRS);
 
 	/* Enable HW to reuse Response descriptors */

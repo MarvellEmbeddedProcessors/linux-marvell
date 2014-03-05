@@ -1716,7 +1716,7 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 #endif /* CONFIG_NETMAP */
 	/* Get number of received packets */
 	rx_done = mvNetaRxqBusyDescNumGet(pp->port, rxq);
-	mvOsCacheIoSync();
+	mvOsCacheIoSync(pp->dev->dev.parent);
 
 	if (rx_todo > rx_done)
 		rx_todo = rx_done;
@@ -2382,7 +2382,7 @@ static void mv_eth_rxq_drop_pkts(struct eth_port *pp, int rxq)
 		return;
 
 	rx_done = mvNetaRxqBusyDescNumGet(pp->port, rxq);
-	mvOsCacheIoSync();
+	mvOsCacheIoSync(pp->dev->dev.parent);
 
 	for (i = 0; i < rx_done; i++) {
 		rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
@@ -4832,7 +4832,7 @@ int mv_eth_rx_reset(int port)
 				continue;
 
 			rx_done = mvNetaRxqFreeDescNumGet(pp->port, rxq);
-			mvOsCacheIoSync();
+			mvOsCacheIoSync(pp->dev->dev.parent);
 			for (i = 0; i < rx_done; i++) {
 				rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
 				mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);

@@ -284,9 +284,10 @@ static INLINE MV_U64 mvOsDivMod64(MV_U64 divided, MV_U64 divisor, MV_U64 *modulu
 
 #define MV_OS_CACHE_MULTI_THRESH	256
 
-static inline void mvOsCacheIoSync(void)
+static inline void mvOsCacheIoSync(void *handle)
 {
-	/* TBD */
+	dma_sync_single_for_cpu(handle, (dma_addr_t) NULL,
+				CPU_D_CACHE_LINE_SIZE, DMA_FROM_DEVICE);
 }
 
 static inline void mvOsCacheLineFlush(void *handle, void *addr)

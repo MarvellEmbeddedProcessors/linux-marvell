@@ -531,7 +531,7 @@ inline struct sk_buff *eth_l2fw_copy_packet_withXor(struct sk_buff *skb, struct 
 	/* sync between giga and XOR to avoid errors (like checksum errors in TX)
 	   when working with IOCC */
 
-	mvOsCacheIoSync();
+	mvOsCacheIoSync(NULL);
 
 	bufPhysAddr =  mvOsCacheFlush(NULL, skb->data, bytes);
 	eth_xor_desc->srcAdd0    = bufPhysAddr + skb_headroom(skb) + MV_ETH_MH_SIZE + 30;
@@ -903,7 +903,7 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 	MV_U32 bufPhysAddr, bm;
 
 	rx_done = mvPp2RxqBusyDescNumGet(pp->port, rxq);
-	mvOsCacheIoSync();
+	mvOsCacheIoSync(NULL);
 
 	if ((rx_todo > rx_done) || (rx_todo < 0))
 		rx_todo = rx_done;
@@ -1066,7 +1066,7 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 	} /* of while */
 
 	/* Update RxQ management counters */
-	mvOsCacheIoSync();
+	mvOsCacheIoSync(NULL);
 	mvPp2RxqDescNumUpdate(pp->port, rxq, rx_done, rx_filled);
 
 	return rx_done;
