@@ -474,7 +474,7 @@ struct eth_pbuf *eth_l2fw_copy_packet_withXor(struct eth_pbuf *pRxPktInfo)
 	/* sync between giga and XOR to avoid errors (like checksum errors in TX)
 	   when working with IOCC */
 
-	mvOsCacheIoSync();
+	mvOsCacheIoSync(NULL);
 
 	eth_xor_desc->srcAdd0    = pRxPktInfo->physAddr + pRxPktInfo->offset + MV_ETH_MH_SIZE + 30;
 	eth_xor_desc->phyDestAdd = pTxPktInfo->physAddr + pTxPktInfo->offset + MV_ETH_MH_SIZE + 30;
@@ -697,7 +697,7 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 	int	ipOffset;
 
 	rx_done = mvNetaRxqBusyDescNumGet(pp->port, rxq);
-	mvOsCacheIoSync();
+	mvOsCacheIoSync(NULL);
 	if (rx_todo > rx_done)
 		rx_todo = rx_done;
 	rx_done = 0;
