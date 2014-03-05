@@ -213,7 +213,7 @@ void mv_pp3_bm_tasklet(unsigned long data)
 						&pool, &ph_addr, &vr_addr) != -1) {
 
 		if (pool == tx_done_pool->pool) {
-			dev_kfree_skb_any((struct sk_buff *)(&vr_addr));
+			kfree((char *)(&vr_addr));
 			cpu_ctrl->tx_done_cnt--;
 		}
 		/* talk with yelena ... if we use the same HMAC Q */
@@ -223,20 +223,20 @@ void mv_pp3_bm_tasklet(unsigned long data)
 }
 
 /*---------------------------------------------------------------------------*/
-
-static struct sk_buff *pp3_skb_alloc(struct pp3_pool *ppool, unsigned long *phys_addr, gfp_t gfp_mask)
+static unsigned char *pp3_frag_alloc(struct pp3_pool *ppool, unsigned long *phys_addr)
 {
-	struct sk_buff *skb;
+	unsigned char *buf;
 
-	skb = __dev_alloc_skb(ppool->buf_size, gfp_mask);
-
-	if (!skb)
+	buf = kmalloc(ppool->buf_size, GFP_ATOMIC);
+	if (!buf)
 		return NULL;
 
-	if (phys_addr)
-		*phys_addr = dma_map_single(NULL, skb->head, ppool->buf_size, DMA_FROM_DEVICE);
+	memset(buf, 0, ppool->buf_size);
 
-	return skb;
+	if (phys_addr != NULL)
+		*phys_addr = dma_map_single(NULL, buf, ppool->buf_size, DMA_FROM_DEVICE);
+
+	return buf;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -451,7 +451,7 @@ static int pp3_pool_add(int pool, int buf_num, int frame, int queue)
 
 	for (i = 0; i < buf_num; i++) {
 		/* alloc char * and add skb only in TX func */
-		virt =  (void *)pp3_skb_alloc(ppool, &phys_addr, GFP_KERNEL);
+		virt =  (void *)pp3_frag_alloc(ppool, &phys_addr);
 
 		if (!virt)
 			break;
@@ -511,7 +511,7 @@ struct net_device *mv_pp3_netdev_init(struct platform_device *pdev)
 	/*SET IN CORE.C to BASE*/
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	BUG_ON(!res);
-	dev->irq = res->start;
+	dev->irq = res->start;/*TODO: configurator */
 
 	dev->mtu = port_data->mtu;
 	memcpy(dev->dev_addr, port_data->mac_addr, MV_MAC_ADDR_SIZE);
@@ -520,6 +520,8 @@ struct net_device *mv_pp3_netdev_init(struct platform_device *pdev)
 	dev->watchdog_timeo = 5 * HZ;
 
 	SET_NETDEV_DEV(dev, &pdev->dev);
+	dev->netdev_ops = &mv_pp3_netdev_ops;
+	sprintf(dev->name, "nic%d", pdev->id);
 
 	dev_priv = MV_PP3_PRIV(dev);
 
@@ -530,6 +532,13 @@ struct net_device *mv_pp3_netdev_init(struct platform_device *pdev)
 	dev_priv->rxqs_num = rxqs_num;
 	dev_priv->txqs_num = txqs_num;
 
+
+	/*mv_eth_netdev_init_features*/
+	if (register_netdev(dev) < 0) {
+		dev_err(&pdev->dev, "failed to register\n");
+		goto err_free_netdev;
+	}
+
 /*
 	if (dma_set_mask(&pdev->dev, DMA_BIT_MASK(32))) {
 		pr_warning( "mydev: No suitable DMA available.\n");
@@ -538,6 +547,10 @@ struct net_device *mv_pp3_netdev_init(struct platform_device *pdev)
 	}
 */
 	return dev;
+
+err_free_netdev:
+	free_netdev(dev);
+	return NULL;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -1072,7 +1085,6 @@ void pp3_netdev_pool_status_print(int pool)
 		pr_err("Pool #%d not initialized\n", pool);
 		return;
 	}
-
 	ppool = pp3_pools[pool];
 
 	if (ppool->type == PP3_POOL_TYPE_GPM)
