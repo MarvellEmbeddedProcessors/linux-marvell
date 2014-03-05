@@ -36,7 +36,6 @@ disclaimer.
 
 /* TODO remove next lines */
 #define MV_PP3_BM_POOLS 20
-#define MV_PP3_EMACS	5
 #define MV_PP3_FRAMES	4
 #define MV_ETH_MH_SIZE  2
 
@@ -56,33 +55,23 @@ disclaimer.
 #define MV_PP3_FRM_TIME_COAL_0		64
 #define MV_PP3_RXQ_TIME_COAL_DEF_PROF	0
 #define MV_PP3_TXQ_TIME_COAL_DEF_PROF	0
-/******************************************************
- * driver statistics control --                       *
- ******************************************************/
-#ifdef CONFIG_MV_ETH_STAT_ERR
-#define STAT_ERR(c) c
-#else
-#define STAT_ERR(c)
-#endif
+#define MV_PP3_DP_RXQ_SIZE		512
+#define MV_PP3_DP_TXQ_SIZE		512
+#define MV_PP3_CHAN_SIZE		512
+/*---------------------------------------------------------------------------*/
+#define STAT_INFO
 
-#ifdef CONFIG_MV_ETH_STAT_INF
-#define STAT_INFO(c) c
-#else
-#define STAT_INFO(c)
-#endif
-
-#ifdef CONFIG_MV_ETH_STAT_DBG
-#define STAT_DBG(c) c
-#else
-#define STAT_DBG(c)
-#endif
-
-#ifdef CONFIG_MV_ETH_STAT_DIST
-#define STAT_DIST(c) c
-#else
-#define STAT_DIST(c)
-#endif
-
+int pp3_dev_sysfs_init(struct kobject *pp3_kobj);
+int pp3_dev_sysfs_exit(struct kobject *pp3_kobj);
+/*---------------------------------------------------------------------------*/
+/*				dump functions				     */
+/*---------------------------------------------------------------------------*/
+void pp3_netdev_pool_status_print(int pool);
+void pp3_netdev_cpu_status_print(int cpu);
+void pp3_netdev_dev_status_print(int index);
+void pp3_netdev_group_status_print(int index, int cpu);
+void pp3_netdev_rxq_status_print(int index, int cpu, int queue);
+void pp3_netdev_txq_status_print(int index, int cpu, int queue);
 
 /****************************************************************************
  * Rx buffer size: MTU + 2(Marvell Header) + 4(VLAN) + 14(MAC hdr) + 4(CRC) *
