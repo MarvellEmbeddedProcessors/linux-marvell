@@ -69,9 +69,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif
 
-#if !defined(CONFIG_OF)
 #include "mvSysNfcConfig.h"
-#endif
 
 /* NAND Flash Control Register */
 #define	NFC_CONTROL_REG			(MV_NFC_REGS_BASE + 0x0)

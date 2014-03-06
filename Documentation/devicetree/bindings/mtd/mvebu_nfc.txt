@@ -1,0 +1,59 @@
+* Marvell HAL based Nand Flash Controller driver device tree bindings
+
+Required properties:
+
+- compatible:			Should be "marvell,armada-nand"
+- reg:				The register base for the controller
+- interrupts:			The interrupt to map
+- #address-cells/#size-cells:	Set to <1> or <2> if the node includes partitions,
+				for more details see partition.txt file from
+				this folder
+- clocks:			Set clock that runs the controller
+- clock-frequency		SoC's Tclk frequency
+- nfc,nfc-dma			'0'/'1' for disable/enable DMA mode. Set always
+				to '0' - DMA mode not supported
+- nfc,nfc-width			Bus width - 8/16 bits
+- nfc,ecc-type			ECC mode options. Possible values:
+				0 - 1 bit
+				1 - 4 bit
+				2 - 8 bit
+				3 - 12 bit
+				4 - 16 bit
+				5 - disable ECC
+- nfc,num-cs			Chip-select
+
+Example:
+nfc: nand@d0000 {
+	compatible = "marvell,armada-nand";
+	interrupts = <0 84 0x4>;
+	reg = <0xd0000 0x400>;
+	clocks = <&coredivclk 0>;
+
+	#address-cells = <1>;
+	#size-cells = <1>;
+	clock-frequency = <200000000>;
+	status = "okay";
+
+	nfc,nfc-mode  = "normal";
+	nfc,nfc-dma   = <0>;
+	nfc,nfc-width = <8>;
+	nfc,ecc-type  = <1>;
+	nfc,num-cs    = <1>;
+
+	mtd0@00000000 {
+		label = "U-Boot";
+		reg = <0x00000000 0x00600000>;
+		read-only;
+	};
+
+	mtd1@00080000 {
+		label = "uImage";
+		reg = <0x00600000 0x00400000>;
+		read-only;
+	};
+
+	mtd2@00140000 {
+		label = "Root";
+		reg = <0x00a00000 0x3f600000>;
+	};
+};
