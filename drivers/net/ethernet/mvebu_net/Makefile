@@ -18,7 +18,7 @@ export PLAT_DIR
 
 INCLUDE_DIRS	+= -I$(PLAT_DIR)
 INCLUDE_DIRS	+= -I$(PLAT_DIR)/common
-INCLUDE_DIRS	+= -I$(PLAT_DIR)/linux_oss
+INCLUDE_DIRS	+= -I$(srctree)/arch/arm/mach-mvebu/linux_oss
 INCLUDE_DIRS	+= -I$(PLAT_DIR)/switch
 INCLUDE_DIRS	+= -I$(PLAT_DIR)/netmux
 INCLUDE_DIRS	+= -I$(PLAT_DIR)/phy
@@ -27,7 +27,6 @@ export INCLUDE_DIRS
 ccflags-y	+= $(INCLUDE_DIRS)
 
 obj-y	+= common/mvCommon.o common/mvStack.o common/mvDebug.o
-obj-y	+= linux_oss/mvOs.o
 
 obj-$(CONFIG_MV_ETH_INCLUDE_PHY)	+= phy/mvEthPhy.o phy/phy_sysfs.o
 
