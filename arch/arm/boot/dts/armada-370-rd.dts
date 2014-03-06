@@ -106,7 +106,6 @@
 			};
 
 			nand@d0000 {
-				status = "okay";
 				num-cs = <1>;
 				marvell,nand-keep-config;
 				marvell,nand-enable-arbiter;
@@ -123,6 +122,37 @@
 				partition@1000000 {
 					label = "Filesystem";
 					reg = <0x1000000 0x3f000000>;
+				};
+			};
+
+			/* 1GB Flash via NFC NAND controller */
+			nfc: nand-flash@d0000 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				clock-frequency = <200000000>;
+				status = "okay";
+
+				nfc,nfc-mode  = "normal";       /* normal or ganged */
+				nfc,nfc-dma   = <0>;            /* 0 for no, 1 for dma */
+				nfc,nfc-width = <8>;
+				nfc,ecc-type  = <1>;            /* 4 bit */
+				nfc,num-cs    = <1>;
+
+				mtd0@00000000 {
+					label = "U-Boot";
+					reg = <0x00000000 0x00300000>;
+					read-only;
+				};
+
+				mtd1@00080000 {
+					label = "uImage";
+					reg = <0x00300000 0x00400000>;
+					read-only;
+				};
+
+				mtd2@00140000 {
+					label = "Root";
+					reg = <0x00700000 0x3f900000>;
 				};
 			};
 		};
