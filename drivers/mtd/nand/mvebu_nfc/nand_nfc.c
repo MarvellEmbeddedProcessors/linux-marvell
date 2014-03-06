@@ -16,6 +16,7 @@
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/delay.h>
+#include <linux/clk.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
@@ -51,6 +52,8 @@
 #define NFC_SR_MASK		(0xfff)
 #define NFC_SR_BBD_MASK		(NFC_SR_CS0_BBD_MASK | NFC_SR_CS1_BBD_MASK)
 
+#define ARMADA_MAIN_PLL_FREQ	2000000000
+
 char *cmd_text[] = {
 	"MV_NFC_CMD_READ_ID",
 	"MV_NFC_CMD_READ_STATUS",
@@ -81,6 +84,8 @@ char *cmd_text[] = {
 };
 
 MV_U32 pg_sz[NFC_PAGE_SIZE_MAX_CNT] = {512, 2048, 4096, 8192, 16384};
+MV_U32 mv_nand_base;
+struct clk *nand_clk;
 
 /* error code and state */
 enum {
@@ -1488,6 +1493,28 @@ static void orion_nfc_init_nand(struct nand_chip *nand, struct orion_nfc_info *i
 	nand->chip_delay	= 25;
 }
 
+static void mvCtrlNandClkSet(int nClock)
+{
+	unsigned long rate;
+
+	/* Calculate target ECC clock rate basing
+	 * on 2GHz frequency and divider used in HAL */
+	rate = ARMADA_MAIN_PLL_FREQ / nClock;
+
+	clk_set_rate(nand_clk, rate);
+}
+
+static MV_STATUS mvSysNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl)
+{
+	struct MV_NFC_HAL_DATA halData;
+
+	memset(&halData, 0, sizeof(halData));
+
+	halData.mvCtrlNandClkSetFunction = mvCtrlNandClkSet;
+
+	return mvNfcInit(nfcInfo, nfcCtrl, &halData);
+}
+
 static int orion_nfc_probe(struct platform_device *pdev)
 {
 	struct orion_nfc_info *info;
@@ -1503,7 +1530,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	MV_NFC_INFO nfcInfo;
 	MV_STATUS status;
-	const char *compat;
+	MV_U32 mv_nand_offset;
 
 	/* Allocate all data: mtd_info -> nand_chip -> orion_nfc_info */
 	mtd = kzalloc(sizeof(struct mtd_info),	GFP_KERNEL);
@@ -1524,6 +1551,15 @@ static int orion_nfc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	nand_clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(nand_clk)) {
+		dev_err(&pdev->dev, "failed to get nand clock\n");
+		return PTR_ERR(nand_clk);
+	}
+	ret = clk_prepare_enable(nand_clk);
+	if (ret < 0)
+		return ret;
+
 	/* Hookup pointers */
 	info->pdev = pdev;
 	nand->priv = info;
@@ -1538,6 +1574,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	ret |= of_property_read_u32(np, "nfc,nfc-width", &info->nfc_width);
 	ret |= of_property_read_u32(np, "nfc,ecc-type", &info->ecc_type);
 	ret |= of_property_read_u32(np, "nfc,num-cs", &info->num_cs);
+	ret |= of_property_read_u32(np, "reg", &mv_nand_offset);
 
 	/* Determine the NAND Flash Controller mode for later usage */
 	info->nfc_mode = of_get_property(np, "nfc,nfc-mode", NULL);
@@ -1597,6 +1634,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	}
 #endif
 	/* Initialize NFC HAL */
+	mv_nand_base = (MV_U32)info->mmio_base;
 	nfcInfo.ioMode = (info->use_dma ? MV_NFC_PDMA_ACCESS : MV_NFC_PIO_ACCESS);
 	nfcInfo.eccMode = info->ecc_type;
 
@@ -1608,20 +1646,13 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	nfcInfo.tclk = info->tclk;
 	nfcInfo.readyBypass = MV_FALSE;
 	nfcInfo.osHandle = NULL;
-	nfcInfo.regsPhysAddr = INTER_REGS_BASE;
+	nfcInfo.regsPhysAddr = mv_nand_base - mv_nand_offset;
 #ifdef CONFIG_MV_INCLUDE_PDMA
 	nfcInfo.dataPdmaIntMask = MV_PDMA_END_OF_RX_INTR_EN | MV_PDMA_END_INTR_EN;
 	nfcInfo.cmdPdmaIntMask = 0x0;
 #endif
-	/* Configure base address for NFC HAL */
-	compat = of_get_property(np, "compatible", NULL);
-	if ((compat == NULL) ||
-	    (mv_hal_dev_set_base(compat, info->mmio_base) != MV_OK)) {
-		dev_err(&pdev->dev, "failed to configure HAL\n");
-		goto fail_put_clk;
-	}
 
-	status = mvNfcInit(&nfcInfo, &info->nfcCtrl);
+	status = mvSysNfcInit(&nfcInfo, &info->nfcCtrl);
 	if (status != MV_OK) {
 		dev_err(&pdev->dev, "mvNfcInit() failed. Returned %d\n",
 				status);
@@ -1698,6 +1729,7 @@ fail_free_buf:
 	} else
 		kfree(info->data_buff);
 fail_put_clk:
+	clk_disable_unprepare(nand_clk);
 	kfree(mtd);
 	kfree(nand);
 	kfree(info);
@@ -1710,6 +1742,8 @@ static int orion_nfc_remove(struct platform_device *pdev)
 	struct orion_nfc_info *info = (struct orion_nfc_info *)((struct nand_chip *)mtd->priv)->priv;
 
 	platform_set_drvdata(pdev, NULL);
+
+	clk_disable_unprepare(nand_clk);
 
 	/*del_mtd_device(mtd);*/
 	free_irq(info->irq, info);
@@ -1812,4 +1846,4 @@ module_exit(orion_nfc_exit);
 
 MODULE_ALIAS(DRIVER_NAME);
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("ArmadaXP NAND controller driver");
+MODULE_DESCRIPTION("Armada NAND controller driver");

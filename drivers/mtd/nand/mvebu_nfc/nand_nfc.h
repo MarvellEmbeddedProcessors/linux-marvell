@@ -8,8 +8,8 @@
 #ifdef CONFIG_MV_INCLUDE_PDMA
 #include "pdma/mvPdma.h"
 #endif
-#include "nfc/mvNfc.h"
-#include "nfc/mvNfcRegs.h"
+#include "hal/mvNfc.h"
+#include "hal/mvNfcRegs.h"
 
 enum nfc_page_size {
 	NFC_PAGE_512B = 0,

@@ -1,0 +1,52 @@
+config MTD_NAND_MARVELL
+	bool "NAND Flash support for Marvell Armada SoC"
+	depends on MACH_ARMADA_370_XP
+	default y
+	help
+	  This option enables the
+	  MTD support for NAND
+	  Flash on Marvell Armada
+	  machines.
+
+config MTD_NAND_NFC
+	tristate "MTD driver for the Armada Nand Flash Controller"
+	depends on MTD_NAND_MARVELL
+	default y
+	help
+	  This enables the driver
+	  for the NAND flash controller
+	  found in the Marvell
+	  Armada SoC devices.
+
+config MTD_NAND_NFC_GANG_SUPPORT
+	bool "NAND Ganged mode support for the NFC"
+	depends on MTD_NAND_NFC
+	default n
+	help
+	  This option enables the support for 2x8bit ganged mode in
+	  Marvell's NFC HAL driver and the MTD stack.
+
+config MTD_NAND_NFC_MLC_SUPPORT
+	bool "NAND MLC devices support for the NFC"
+	depends on MTD_NAND_NFC
+	default y
+	help
+	  This option allows support for Nand devices with non-standard
+	  page/oob layout. These devices are detected incorrectly with
+	  standard autodetection mechanism based on the READ_ID command.
+
+config MTD_NAND_NFC_INIT_RESET
+	bool "NAND Enable Reset on Initialization"
+	depends on MTD_NAND_NFC
+	default y
+	help
+	  This option forces NAND reset command on initialization. This
+	  is required by certain NAND vendors (Micron).
+
+config MTD_NAND_NFC_NEGLECT_RNB
+	bool "NAND Neglect Read/Busy Signal"
+	depends on MTD_NAND_NFC
+	default n
+	help
+	  This option forces allows operation withou the RnBx signal. In this
+	  mode, tR taken as worst case in every operation
