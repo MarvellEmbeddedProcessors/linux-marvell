@@ -416,5 +416,11 @@
 			#clock-cells = <0>;
 			clock-frequency = <25000000>;
 		};
+		/* 2 GHz fixed main PLL */
+		mainpll: mainpll {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <2000000000>;
+		};
 	};
 };
