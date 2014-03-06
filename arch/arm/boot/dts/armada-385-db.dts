@@ -96,6 +96,41 @@
 					spi-max-frequency = <108000000>;
 				};
 			};
+
+			/*
+			 * 1GB Flash via NFC NAND controller
+			 * by defeault disabled, because NFC
+			 * shares same pins with SPI0 and
+			 * requires SLM-1358 jumper
+			 */
+			nfc: nand@d0000 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+				clock-frequency = <200000000>;
+
+				nfc,nfc-mode  = "normal";	/* normal or ganged */
+				nfc,nfc-dma   = <0>;		/* 0 for no, 1 for dma */
+				nfc,nfc-width = <8>;
+				nfc,ecc-type  = <1>;		/* 4 bit */
+				nfc,num-cs    = <1>;
+
+				mtd0@00000000 {
+					label = "U-Boot";
+					reg = <0x00000000 0x00600000>;
+					read-only;
+				};
+
+				mtd1@00080000 {
+					label = "uImage";
+					reg = <0x00600000 0x00400000>;
+					read-only;
+				};
+
+				mtd2@00140000 {
+					label = "Root";
+					reg = <0x00a00000 0x3f600000>;
+				};
+			};
 		};
 
 		pcie-controller {
