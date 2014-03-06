@@ -89,7 +89,7 @@
 			cpuclk: clock-complex@18700 {
 				#clock-cells = <1>;
 				compatible = "marvell,armada-xp-cpu-clock";
-				reg = <0x18700 0xA0>;
+				reg = <0x18700 0x24>;
 				clocks = <&coreclk 1>;
 			};
 
