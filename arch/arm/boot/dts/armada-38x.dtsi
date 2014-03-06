@@ -106,6 +106,14 @@
 				#clock-cells = <1>;
 			};
 
+			coredivclk: corediv-clock@e4250 {
+				compatible = "marvell,armada-38x-corediv-clock";
+				reg = <0xe4250 0x8>;
+				#clock-cells = <1>;
+				clocks = <&mainpll>;
+				clock-output-names = "nand";
+			};
+
 			cpurst: cpurst@20800 {
 				compatible = "marvell,armada-380-cpu-reset";
 				reg = <0x20800 0x10>;
