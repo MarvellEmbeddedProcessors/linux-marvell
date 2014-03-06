@@ -87,6 +87,7 @@ extern struct mv_pp3_hmac_queue_ctrl *mv_hmac_rxq_handle[MV_PP3_HMAC_MAX_FRAME][
 extern struct mv_pp3_hmac_queue_ctrl *mv_hmac_txq_handle[MV_PP3_HMAC_MAX_FRAME][MV_PP3_QUEUES_PER_FRAME];
 
 struct mv_pp3_hmac_queue_ctrl {
+	u32 buf_ptr;
 	u8 *first;		/* pointer to first byte in queue */
 	u8 *next_proc;	/* pointer to next CFH to procces in queue */
 	u8 *end;		/* pointer to first byte not belong to queue */
@@ -284,7 +285,7 @@ static inline u8 *mv_pp3_hmac_txq_next_cfh(int frame, int queue, int size)
 
 	/* calculate number of unused datagram in the queue end */
 	end_free_dg = (qctrl->end - qctrl->next_proc) / MV_PP3_HMAC_DG_SIZE;
-	if ((end_free_dg >= size) && (end_free_dg < (MV_PP3_CFH_MAX_SIZE / MV_PP3_HMAC_DG_SIZE))) {
+	if ((end_free_dg >= size) && (end_free_dg >= (MV_PP3_CFH_MAX_SIZE / MV_PP3_HMAC_DG_SIZE))) {
 		cfh_ptr = qctrl->next_proc;
 		qctrl->next_proc += (size * MV_PP3_HMAC_DG_SIZE);
 		qctrl->occ_dg += size;
@@ -337,6 +338,9 @@ void mv_pp3_hmac_rxq_regs_dump(int frame, int queue);
 void mv_pp3_hmac_txq_regs_dump(int frame, int queue);
 void mv_pp3_hmac_frame_regs_dump(int frame);
 void mv_pp3_hmac_global_regs_dump(void);
+/* queue show functions */
+void mv_pp3_hmac_rx_queue_show(int frame, int queue);
+void mv_pp3_hmac_tx_queue_show(int frame, int queue);
 
 int mv_pp3_hmac_sysfs_init(struct kobject *pp3_kobj);
 
