@@ -1,3 +1,9 @@
+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+ENDIAN      = BE
+else
+ENDIAN      = LE
+endif
+
 ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
 	-I$(srctree)/arch/arm/plat-orion/include
 
@@ -16,3 +22,7 @@ obj-$(CONFIG_MACH_ARMADA_375)	 += platsmp-375.o headsmp-375.o
 obj-$(CONFIG_MACH_ARMADA_380)	 += platsmp-380.o headsmp-380.o
 endif
 obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+obj-y	+= linux_oss/mvOs.o
+
+COMMON_DIR	:= $(srctree)/arch/arm/mach-mvebu/include/mach
+ccflags-y	+= -I$(COMMON_DIR) -DMV_CPU_$(ENDIAN)
