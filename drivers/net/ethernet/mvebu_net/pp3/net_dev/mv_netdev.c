@@ -1,4 +1,5 @@
 /*#include <mvCopyright.h>*/
+#define MV_FPGA
 
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -12,12 +13,18 @@
 #include <asm/setup.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
+
+#ifdef MV_FPGA
+#include <linux/pci.h>
+#endif
+
 #include <linux/mv_pp3.h>
 #include <linux/dma-mapping.h>
 #include "common/mv_hw_if.h"
 #include "hmac/mv_hmac.h"
 #include "hmac/mv_hmac_bm.h"
 #include "emac/mv_emac.h"
+#include "fw/mv_channel_if.h"
 #include "mv_netdev.h"
 #include "mv_netdev_structs.h"
 
@@ -37,6 +44,12 @@ static int mv_pp3_dev_open(struct net_device *dev);
 static int mv_pp3_hw_shared_start(void);
 
 /*---------------------------------------------------------------------------*/
+static u32 mv_vbase_address;
+
+u32 mv_hw_silicon_base_addr_get(void)
+{
+	return mv_vbase_address;
+}
 
 static int pp3_sysfs_init(void)
 {
@@ -55,6 +68,7 @@ static int pp3_sysfs_init(void)
 	}
 
 	mv_pp3_emac_sysfs_init(&pd->kobj);
+	mv_pp3_hmac_sysfs_init(&pd->kobj);
 
 	return 0;
 }
@@ -679,7 +693,7 @@ static int mv_pp3_sw_probe(struct platform_device *pdev)
 
 	pp3_ports[pdev->id] = MV_PP3_PRIV(dev);
 
-	mv_pp3_emac_unit_base(pdev->id, MV_PP3_EMAC_BASE(pdev->id));
+	mv_pp3_emac_unit_base(pdev->id, mv_hw_silicon_base_addr_get()+MV_PP3_EMAC_BASE(pdev->id));
 
 	/* TODO: set GOP BASE */
 
@@ -846,8 +860,6 @@ static int mv_pp3_sw_shared_probe(struct platform_device *pdev)
 
 	struct mv_pp3_plat_data *plat_data = (struct mv_pp3_plat_data *)pdev->dev.platform_data;
 
-	pr_info("o pp3: init shared structures\n");
-
 	pp3_ports_num = plat_data->max_port;
 
 	pp3_sysfs_init();
@@ -878,6 +890,7 @@ static int mv_pp3_sw_shared_probe(struct platform_device *pdev)
 	/*mv_pp3_bm_unit_base(PP3_BM_BASE);*/
 	/*mv_pp3_qm_unit_base(PP3_QM_BASE);*/
 	/*mv_pp3_messenger_init();*/
+	/*on_each_cpu(mv_pp3_def_chan_create, &size, 1);*/
 
 	return 0;
 
@@ -924,7 +937,64 @@ static int mv_pp3_sw_shared_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef MV_FPGA
+static int mv_pp3_pci_probe(struct pci_dev *pdev,
+	const struct pci_device_id *ent)
+{
+	/* code below relevant fot FPGA only */
+	if (pci_enable_device(pdev)) {
+		pr_err("Cannot enable PCI device, aborting\n");
+		return -1;
+	}
+
+	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
+		pr_err("Cannot find proper PCI device base address, aborting\n");
+		return -ENODEV;
+	}
+
+	/* Override memory size to 1GB */
+	/* Disable BARs1 & 2 for FPGA platform - As they are irrelevant. */
+	/*pci_resource_start(pdev, 1) = 0x0;
+	pci_resource_end(pdev, 1) = 0x0;
+	pci_resource_start(pdev, 2) = 0x0;
+	pci_resource_end(pdev, 2) = 0x0;*/
+
+	if (pci_request_regions(pdev, "mv_pp3_pci")) {
+		pr_err("Cannot obtain PCI resources, aborting\n");
+		return -ENODEV;
+	}
+
+	if (pci_set_dma_mask(pdev, DMA_BIT_MASK(32))) {
+		pr_err("No usable DMA configuration, aborting\n");
+		return -ENODEV;
+	}
+
+	mv_vbase_address = (u32)pci_iomap(pdev, 0, 16*1024*1024);
+	if (!mv_vbase_address)
+		pr_err("Cannot map device registers, aborting\n");
+
+	pr_info("\nSYSTEM VIRTUAL base is 0x%0x.\n", mv_vbase_address);
+	return 0;
+}
+
+static void mv_pp3_pci_remove(struct pci_dev *pdev)
+{
+}
+
 /*---------------------------------------------------------------------------*/
+static DEFINE_PCI_DEVICE_TABLE(fpga_id_table) = {
+
+	{ 0x1234, 0x1234, PCI_ANY_ID, PCI_ANY_ID, 2, 0, },
+};
+MODULE_DEVICE_TABLE(pci, fpga_id_table);
+
+static struct pci_driver mv_pp3_pci_driver = {
+	.name	= "mv_pp3_pci",
+	.id_table = fpga_id_table,
+	.probe		= mv_pp3_pci_probe,
+	.remove		= mv_pp3_pci_remove,
+};
+#endif
 
 static struct platform_driver mv_pp3_shared_driver = {
 	.probe		= mv_pp3_sw_shared_probe,
@@ -935,12 +1005,17 @@ static struct platform_driver mv_pp3_shared_driver = {
 	},
 };
 
+
 /*---------------------------------------------------------------------------*/
 
 static int __init mv_pp3_init_module(void)
 {
 	int rc;
-
+#ifdef MV_FPGA
+	rc = pci_register_driver(&mv_pp3_pci_driver);
+	if (rc < 0)
+		pr_err("%sNo cards found, driver not installed.\n", __func__);
+#endif
 	rc = platform_driver_register(&mv_pp3_shared_driver);
 	if (!rc) {
 		rc = platform_driver_register(&mv_pp3_driver);
