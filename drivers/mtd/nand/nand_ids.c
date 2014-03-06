@@ -114,6 +114,8 @@ struct nand_flash_dev nand_flash_ids[] = {
 	/* 8 Gigabit */
 	EXTENDED_ID_NAND("NAND 1GiB 1,8V 8-bit",  0xA3, 1024, LP_OPTIONS),
 	EXTENDED_ID_NAND("NAND 1GiB 3,3V 8-bit",  0xD3, 1024, LP_OPTIONS),
+	{"NAND 1GiB 3,3V 8-bit", { { .dev_id = 0x38 } },
+		  4096, 1024, 524288, LP_OPTIONS},
 	EXTENDED_ID_NAND("NAND 1GiB 1,8V 16-bit", 0xB3, 1024, LP_OPTIONS16),
 	EXTENDED_ID_NAND("NAND 1GiB 3,3V 16-bit", 0xC3, 1024, LP_OPTIONS16),
 
@@ -125,7 +127,16 @@ struct nand_flash_dev nand_flash_ids[] = {
 
 	/* 32 Gigabit */
 	EXTENDED_ID_NAND("NAND 4GiB 1,8V 8-bit",  0xA7, 4096, LP_OPTIONS),
+#ifdef CONFIG_MTD_NAND_NFC_MLC_SUPPORT
+	/* 32 Gigabit - wrongly detected due to changes in READ_ID decoding */
+	{"NAND 4GiB 3,3V 8-bit", { { .dev_id = 0xD7 } },
+		4096, 4096, 524288, LP_OPTIONS},
+	/* 32 Gigabit - wrongly detected due to changes in READ_ID decoding */
+	{"NAND 8GiB 3,3V 8-bit", { { .dev_id = 0x88 } },
+		8192, 8192, 2097152, LP_OPTIONS},
+#else
 	EXTENDED_ID_NAND("NAND 4GiB 3,3V 8-bit",  0xD7, 4096, LP_OPTIONS),
+#endif
 	EXTENDED_ID_NAND("NAND 4GiB 1,8V 16-bit", 0xB7, 4096, LP_OPTIONS16),
 	EXTENDED_ID_NAND("NAND 4GiB 3,3V 16-bit", 0xC7, 4096, LP_OPTIONS16),
 

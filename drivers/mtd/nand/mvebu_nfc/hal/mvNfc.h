@@ -147,8 +147,6 @@ extern "C" {
 #if !defined(CONFIG_OF)
 #include "ctrlEnv/mvCtrlEnvSpec.h"
 #include "mvSysNfcConfig.h"
-#else
-#include "mvSysHwConfig.h"
 #endif
 
 /********************************/

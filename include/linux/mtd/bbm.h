@@ -126,6 +126,11 @@ struct nand_bbt_descr {
  */
 #define NAND_BBT_DYNAMICSTRUCT	0x80000000
 
+#ifdef CONFIG_MTD_NAND_NFC_MLC_SUPPORT
+/* Search the bad block indicators according to Marvell's Naked symantics */
+#define NAND_BBT_SCANMVCUSTOM	0x10000000
+#endif
+
 /* The maximum number of blocks to scan for a bbt */
 #define NAND_BBT_SCAN_MAXBLOCKS	4
 
