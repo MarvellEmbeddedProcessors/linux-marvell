@@ -73,6 +73,8 @@ static ssize_t mv_hmac_help(char *b)
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [f]         > f_regs      - Dump Global unit frame registers\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [f] [q]     > rxq_regs    - Dump Frame RX queue registers\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [f] [q]     > txq_regs    - Dump Frame TX queue registers\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "echo [f] [q]     > rxq_show    - Show RX queue status\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "echo [f] [q]     > txq_show    - Show TX queue status\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [u]         > reg_read    - Read Global unit register\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [u] [v]     > reg_write   - Write Global unit register\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [f] [u]     > f_reg_read  - Read Frame unit register\n");
@@ -124,6 +126,10 @@ static ssize_t mv_hmac_3_hex_store(struct device *dev,
 		mv_pp3_hmac_rxq_regs_dump(p, u);
 	else if (!strcmp(name, "txq_regs"))
 		mv_pp3_hmac_txq_regs_dump(p, u);
+	else if (!strcmp(name, "rxq_show"))
+		mv_pp3_hmac_rx_queue_show(p, u);
+	else if (!strcmp(name, "txq_show"))
+		mv_pp3_hmac_tx_queue_show(p, u);
 	else if (!strcmp(name, "reg_write"))
 		mv_pp3_hmac_gl_reg_write(p, u);
 	else if (!strcmp(name, "reg_read")) {
@@ -148,6 +154,8 @@ static DEVICE_ATTR(help, S_IRUSR, mv_hmac_show, NULL);
 static DEVICE_ATTR(f_regs, S_IWUSR, NULL, mv_hmac_3_hex_store);
 static DEVICE_ATTR(rxq_regs, S_IWUSR, NULL, mv_hmac_3_hex_store);
 static DEVICE_ATTR(txq_regs, S_IWUSR, NULL, mv_hmac_3_hex_store);
+static DEVICE_ATTR(rxq_show, S_IWUSR, NULL, mv_hmac_3_hex_store);
+static DEVICE_ATTR(txq_show, S_IWUSR, NULL, mv_hmac_3_hex_store);
 static DEVICE_ATTR(reg_write, S_IWUSR, NULL, mv_hmac_3_hex_store);
 static DEVICE_ATTR(reg_read, S_IWUSR, NULL, mv_hmac_3_hex_store);
 static DEVICE_ATTR(f_reg_write, S_IWUSR, NULL, mv_hmac_3_hex_store);
@@ -159,6 +167,8 @@ static struct attribute *mv_hmac_attrs[] = {
 	&dev_attr_f_regs.attr,
 	&dev_attr_rxq_regs.attr,
 	&dev_attr_txq_regs.attr,
+	&dev_attr_rxq_show.attr,
+	&dev_attr_txq_show.attr,
 	&dev_attr_reg_write.attr,
 	&dev_attr_reg_read.attr,
 	&dev_attr_f_reg_write.attr,

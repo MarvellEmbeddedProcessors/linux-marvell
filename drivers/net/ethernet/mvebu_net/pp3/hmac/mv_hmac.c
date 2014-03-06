@@ -69,6 +69,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "common/mv_hw_if.h"
 #include "hmac/mv_hmac.h"
 
+#ifdef PP3_DEBUG
+#define PP3_HMAC_DEBUG pr_info("\n%s::", __func__)
+#else
+#define PP3_HMAC_DEBUG
+#endif
+
 /* bitmap to store queues state (allocated/free) per frame */
 static u32 mv_pp3_hmac_queue_act[MV_PP3_HMAC_MAX_FRAME] = {0};
 /* */
@@ -81,7 +87,7 @@ struct mv_pp3_hmac_queue_ctrl *mv_hmac_txq_handle[MV_PP3_HMAC_MAX_FRAME][MV_PP3_
 
 
 /* local functions declaration */
-static int mv_pp3_hmac_queue_create(struct mv_pp3_hmac_queue_ctrl *q_ctrl, int bytes);
+static int mv_pp3_hmac_queue_create(struct mv_pp3_hmac_queue_ctrl *q_ctrl);
 
 /* general functions */
 /* HMAC unit init */
@@ -113,6 +119,7 @@ void mv_pp3_hmac_queue_bm_mode_cfg(int frame, int queue)
 {
 	u32 reg_data;
 
+	PP3_HMAC_DEBUG;
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
 	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK, 1 << MV_HMAC_SEND_Q_CTRL_Q_MODE_OFFS);
 	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_BM_PE_FORMAT_MASK, 1 << MV_HMAC_SEND_Q_CTRL_BM_PE_FORMAT_OFFS);
@@ -126,6 +133,7 @@ void mv_pp3_hmac_queue_qm_mode_cfg(int frame, int queue, int qm_num)
 {
 	u32 reg_data;
 
+	PP3_HMAC_DEBUG;
 	/* configure queue to be QM queue */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_HMAC_SEND_Q_CTRL_REG(queue));
 	U32_SET_FIELD(reg_data, MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK, 0);
@@ -144,6 +152,7 @@ void *mv_pp3_hmac_rxq_init(int frame, int queue, int size)
 	struct mv_pp3_hmac_queue_ctrl *qctrl;
 	u32 reg_data;
 
+	PP3_HMAC_DEBUG;
 	/* check if already created */
 	if ((mv_pp3_hmac_queue_act[frame] >> queue) & 1)
 		return NULL;
@@ -154,8 +163,7 @@ void *mv_pp3_hmac_rxq_init(int frame, int queue, int size)
 		return NULL;
 
 	qctrl->size = size;
-	qctrl->occ_dg = 0;
-	mv_pp3_hmac_queue_create(qctrl, size * MV_PP3_HMAC_DG_SIZE);
+	mv_pp3_hmac_queue_create(qctrl);
 	/* Write pointer to allocated memory */
 	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_RQ_ADDR_LOW(queue), (u32)qctrl->first);
 	/* Store queue size in rq_size table, number of 16B units */
@@ -215,6 +223,7 @@ void mv_pp3_hmac_rxq_event_cfg(int frame, int queue, int event, int group)
 {
 	u32 reg_data;
 
+	PP3_HMAC_DEBUG;
 	/* Configure event group */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_RQ_EVENT_GROUP(queue));
 	if (event == 0) {
@@ -241,16 +250,16 @@ void *mv_pp3_hmac_txq_init(int frame, int queue, int size, int cfh_size)
 	struct mv_pp3_hmac_queue_ctrl *qctrl;
 	u32 reg_data;
 
+	PP3_HMAC_DEBUG;
 	/* allocate hmac queue control stucture */
 	qctrl = kmalloc(sizeof(struct mv_pp3_hmac_queue_ctrl), GFP_KERNEL);
 	if (qctrl == NULL)
 		return NULL;
 
 	qctrl->size = size;
-	qctrl->occ_dg = 0;
+	mv_pp3_hmac_queue_create(qctrl);
 	qctrl->cfh_size = cfh_size;
 
-	mv_pp3_hmac_queue_create(qctrl, size * MV_PP3_HMAC_DG_SIZE);
 	/* Write pointer to allocated memory */
 	mv_pp3_hmac_frame_reg_write(frame, MV_PP3_HMAC_SQ_ADDR_LOW(queue), (u32)qctrl->first);
 	/* Store queue size in rq_size table, number of 16B units */
@@ -300,23 +309,28 @@ static u8 *mv_pp3_queue_mem_alloc(int size)
 	return p_virt;
 }
 
-static int mv_pp3_hmac_queue_create(struct mv_pp3_hmac_queue_ctrl *q_ctrl, int bytes)
+static int mv_pp3_hmac_queue_create(struct mv_pp3_hmac_queue_ctrl *q_ctrl)
 {
 	int size;
 
-	size = bytes + MV_PP3_HMAC_Q_ALIGN;
+	/* CFH buffer must be aligned to 256B */
+	size = q_ctrl->size * MV_PP3_HMAC_DG_SIZE + MV_PP3_HMAC_Q_ALIGN; /* in bytes */
 	/* Allocate memory for queue */
-	q_ctrl->first = mv_pp3_queue_mem_alloc(size);
+	q_ctrl->buf_ptr = (u32) mv_pp3_queue_mem_alloc(size);
+	q_ctrl->first = q_ctrl->buf_ptr;
+	/* TBD:(u8 *)MV_ALIGN_UP(q_ctrl->buf_ptr, MV_PP3_HMAC_Q_ALIGN);*/
 
 	if (q_ctrl->first == NULL) {
 		pr_err("%s: Can't allocate %d bytes for HMAC queue.\n", __func__, size);
 		return 1;
 	}
 
-	/* Make sure descriptor address is aligned */
-	/*q_ctrl->first = (char *)MV_ALIGN_UP((MV_ULONG) qCtrl->descBuf.bufVirtPtr, MV_PP2_DESC_Q_ALIGN);*/
-	q_ctrl->size = size / MV_PP3_HMAC_DG_SIZE;
+	q_ctrl->next_proc = q_ctrl->first;
+	q_ctrl->occ_dg = 0;
+	q_ctrl->dummy_dg = 0;
+	q_ctrl->cfh_size = 0;
 	q_ctrl->end = q_ctrl->first + size;
+
 	return 0;
 }
 
@@ -328,6 +342,7 @@ void mv_pp3_hmac_txq_event_cfg(int frame, int queue, int group)
 {
 	u32 reg_data;
 
+	PP3_HMAC_DEBUG;
 	/* Configure event group */
 	reg_data = mv_pp3_hmac_frame_reg_read(frame, MV_PP3_HMAC_SQ_EVENT_GROUP(queue));
 	/* set group for event 0 */
@@ -405,4 +420,30 @@ void mv_pp3_hmac_global_regs_dump(void)
 	mv_pp3_hmac_global_reg_print("MISC Interrupt Mask", MV_HMAC_MISC_INT_MASK);
 	mv_pp3_hmac_global_reg_print("MISC Interrupt Syndrome", MV_HMAC_MISC_INT_SYNDROME);
 	mv_pp3_hmac_global_reg_print("HMAC Busy", MV_HMAC_BUSY);
+}
+
+static void mv_pp3_hmac_queue_show(struct mv_pp3_hmac_queue_ctrl *rxq)
+{
+	pr_info("\n-------------- HMAC RX queue (0x%p) -----------", rxq);
+	pr_info("\n *first = 0x%p", rxq->first);
+	pr_info("\n *next = 0x%p", rxq->next_proc);
+	pr_info("\n *end = 0x%p", rxq->end);
+	pr_info("\n occ_dg = %d", rxq->occ_dg);
+	pr_info("\n dummy_dg = %d", rxq->dummy_dg);
+	pr_info("\n size = %d", rxq->size);
+	pr_info("\n cfh_size = %d", rxq->cfh_size);
+	pr_info("\n");
+
+	return;
+}
+
+
+void mv_pp3_hmac_rx_queue_show(int frame, int queue)
+{
+	return mv_pp3_hmac_queue_show(mv_hmac_rxq_handle[frame][queue]);
+}
+
+void mv_pp3_hmac_tx_queue_show(int frame, int queue)
+{
+	return mv_pp3_hmac_queue_show(mv_hmac_txq_handle[frame][queue]);
 }
