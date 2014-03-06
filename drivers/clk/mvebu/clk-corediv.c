@@ -248,3 +248,19 @@ static void __init mvebu_corediv_clk_a375_init(struct device_node *node)
 }
 CLK_OF_DECLARE(mvebu_corediv_a375_clk, "marvell,armada-375-corediv-clock",
 	       mvebu_corediv_clk_a375_init);
+
+static void __init mvebu_corediv_clk_a38x_init(struct device_node *node)
+{
+	static const struct clk_ops corediv_ops = {
+		.recalc_rate = clk_corediv_recalc_rate,
+		.round_rate = clk_corediv_round_rate,
+		.set_rate = clk_corediv_set_rate,
+	};
+
+	ratio_offset = 4;
+	ratio_reload = BIT(8);
+
+	mvebu_corediv_clk_init(node, &corediv_ops);
+}
+CLK_OF_DECLARE(mvebu_corediv_a38x_clk, "marvell,armada-38x-corediv-clock",
+	       mvebu_corediv_clk_a38x_init);
