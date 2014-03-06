@@ -265,6 +265,14 @@
 				clocks = <&coredivclk 0>;
 				status = "disabled";
 			};
+
+			nfc: nand-flash@d0000 {
+				compatible = "marvell,armada-nand";
+				interrupts = <113>;
+				reg = <0xd0000 0x400>;
+				status = "disabled";
+				clocks = <&coredivclk 0>;
+			};
 		};
 	};
 
