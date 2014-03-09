@@ -1,0 +1,66 @@
+OpenSWAN
+=========
+In order to explore the CESA through the OpenSWAN, please follow the next steps:
+
+1. Download openswan-2.6.38 (http://www.openswan.org/), then untar+unzip it.
+
+2. Apply the patch:
+	- 0001-marvell-patch-for-openswan-2.6.38.patch:
+		> Disable default DEBUG support.
+		> Enable OCF support.
+		> Set OCF flag CRYPTO_F_CBIMM to mark immediate callback handling.
+
+3. Compile:
+
+ + ipsec module (cross compilation) :
+  'make KERNELSRC=<path to this release, after config> module ARCH=arm CC=<path_to_cross_compile> LD=<path_to_cross_loader>'
+  then copy the module to the host FS: /lib/modules/<kernel_name>/kernel/net/ipsec/
+
+ + ipsec user (native) :
+  make sure that you have the kernel source on the FS.
+  'make KERNELSRC=<path to this release, after config> programs'
+  'make install'
+
+4. Before tunnel is enabled on target, reverse path filtering(rp_filter) must be disabled under sysfs, using
+      the following commands:
+      - echo 0  > /proc/sys/net/ipv4/conf/eth<x>/rp_filter
+      - echo 0  > /proc/sys/net/ipv4/conf/all/rp_filter
+      - echo 1  > /proc/sys/net/ipv4/ip_no_pmtu_disc
+Reverse Path Filtering(rp_filter): it is a technology that is used on IP routers to try and prevent source address spoofing,
+which is often used for DenialOfService attacks. RPF works by checking the source IP of each packet received on an interface
+against the routing table. If the best route for the source IP address does not use the same interface that the packet was received on the packet is dropped.
+
+5. Before tunnel is enabled on target, PMTU discovery must be disabled under procfs, using the following command:
+      - echo 1 > /proc/sys/net/ipv4/ip_no_pmtu_disc
+
+IPSec routing using encryption/authentication only:
+
+  basic vpn connection:
+  +++++++++++++++++++++
+ - platform: conncted with egiga.
+ - make sure you have 'ip' (part of the iproute package) installed.
+ - edit /etc/ipsec.conf (on both sides) ,check the "man ipsec.conf" :
+
+config setup
+        interfaces="ipsec0=eth0"    # Virtual/physical interfaces
+        klipsdebug="none"             # Debug KLIPS
+        plutodebug="none"             # Debug PLUTO
+
+conn dsmp_psk_vpn
+    type=tunnel                    # type of the connection: tunnel(default),passthrough,transport,reject,drop
+    authby=secret
+    left=192.168.1.1
+    leftsubnet=192.168.1.0/16
+    right=192.168.0.1              # Remote information
+    rightsubnet=192.168.0.0/16
+    auto=start                     # start this connection at startup
+
+
+ - edit /etc/ipsec.secrets (on both sides) to have shared secret.
+192.168.1.1 192.168.0.1 : PSK "123456"
+
+ - side1: 'ifconfig eth0 192.168.0.1 netmask 255.255.0.0'
+ - side2: 'ifconfig eth0 192.168.1.1 netmask 255.255.0.0'
+ - check connectivity: ping from side1 to 192.168.1.1
+ - '/etc/init.d/ipsec start' (on both sides), create new interface ipsec0.
+ - check connectivity: ping from side1 to 192.168.1.1 --> VPN is working (make sure by sniffing)

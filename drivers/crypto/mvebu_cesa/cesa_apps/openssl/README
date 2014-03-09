@@ -1,0 +1,20 @@
+OpenSSL
+===========
+ In order to explore the CESA unit through the OpenSSL, you have to use the
+ OpenSSL OCF cryptodev engine.
+ By default the cryptodev engine will use the CESA
+ accelerator.
+
+ o In case missing, create a crypto device: mknod /dev/crypto c 10 70
+ o Download latest openssl source package from http://www.openssl.org, then untar+unzip it.
+ o In case missing, copy from kernel crypto/ocf/cryptodev.h to file-system path: /usr/include/crypto .
+ o Run: ./config -DHAVE_CRYPTODEV no-shared
+ o and compile ...('make' and 'make install')
+
+ you can run a speed test to make sure everything is working:
+	openssl speed -evp des3 -elapsed
+ Modify /dev/crypto to /dev/crypto_tmp so that the speed test will use
+ now software encryption.
+ Run again:
+        openssl speed -evp des3 -elapsed
+ Compare results.
