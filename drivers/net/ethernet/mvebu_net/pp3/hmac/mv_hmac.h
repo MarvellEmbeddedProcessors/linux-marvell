@@ -285,7 +285,7 @@ static inline u8 *mv_pp3_hmac_txq_next_cfh(int frame, int queue, int size)
 
 	/* calculate number of unused datagram in the queue end */
 	end_free_dg = (qctrl->end - qctrl->next_proc) / MV_PP3_HMAC_DG_SIZE;
-	if ((end_free_dg >= size) && (end_free_dg >= (MV_PP3_CFH_MAX_SIZE / MV_PP3_HMAC_DG_SIZE))) {
+	if ((end_free_dg >= size) && (end_free_dg <= (MV_PP3_CFH_MAX_SIZE / MV_PP3_HMAC_DG_SIZE))) {
 		cfh_ptr = qctrl->next_proc;
 		qctrl->next_proc += (size * MV_PP3_HMAC_DG_SIZE);
 		qctrl->occ_dg += size;
