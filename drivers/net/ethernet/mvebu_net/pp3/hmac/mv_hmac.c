@@ -317,8 +317,7 @@ static int mv_pp3_hmac_queue_create(struct mv_pp3_hmac_queue_ctrl *q_ctrl)
 	size = q_ctrl->size * MV_PP3_HMAC_DG_SIZE + MV_PP3_HMAC_Q_ALIGN; /* in bytes */
 	/* Allocate memory for queue */
 	q_ctrl->buf_ptr = (u32) mv_pp3_queue_mem_alloc(size);
-	q_ctrl->first = q_ctrl->buf_ptr;
-	/* TBD:(u8 *)MV_ALIGN_UP(q_ctrl->buf_ptr, MV_PP3_HMAC_Q_ALIGN);*/
+	q_ctrl->first = (u8 *)MV_ALIGN_UP(q_ctrl->buf_ptr, MV_PP3_HMAC_Q_ALIGN);
 
 	if (q_ctrl->first == NULL) {
 		pr_err("%s: Can't allocate %d bytes for HMAC queue.\n", __func__, size);
