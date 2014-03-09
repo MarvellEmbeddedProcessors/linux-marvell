@@ -68,13 +68,336 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/kernel.h>
 #include <linux/io.h>
 
-#define MAX_CPU_NUM	2
-#define MV_PP3_EMAC_NUM	4
 
-
+#define MV_PP3_EMAC_NUM		4
 #define MV_PP3_MSG_BUFF_SIZE	4096
 #define MV_PP3_MSGR_BUF_NUM	8
 #define MV_PP3_GP_POOL_MIN	8
 #define MV_PP3_GP_POOL_MAX	35
 #define MV_PP3_POOL_MAX		35
+
+#define MV_PP3_NUM_MSG_IN_CHAN	10
+
+/* get messenger bm queue parameters (frame, queue, size)
+Outputs:
+	frame	- HMAC frame number
+	queue	- HMAC queue number
+	size	- max number of CFH messages in HMAC queue
+	group	- queue interrupt group
+	irq_off	- IRQ offset to connect queue ISR
+*/
+static inline int mv_pp3_cfg_msg_bmq_params_get(int *frame, int *queue, int *size, int *group, int *irq_off)
+{
+	if ((frame == NULL) || (queue == NULL) || (size == NULL) || (group == NULL) || (irq_off == NULL))
+		return -1;
+
+	*frame = 2;
+	*queue = 8;
+	*size = MV_PP3_NUM_MSG_IN_CHAN;
+	*group = 4;
+	*irq_off = 20; /*148;*/
+
+	return 0;
+}
+
+/* get messenger BM pool ID and number of buffer in the pool
+Outputs:
+	pool_id	- BM pool ID
+	size	- max number of of buffers in pool
+*/
+static inline int mv_pp3_cfg_msg_bm_pool_params_get(int *pool_id, int *size)
+{
+	if ((pool_id != NULL) && (size != NULL)) {
+		*pool_id = 19;
+		*size = 64 * MV_PP3_MSGR_BUF_NUM;
+		return 0;
+	}
+	return -1;
+}
+
+/* get channel HMAC SW parameters (free frame & queue & interrupt group)
+Inputs:
+	chan_num - channel ID
+Outputs:
+	frame	- HMAC frame number
+	queue	- HMAC queue number
+	size	- max number of CFH messages in HMAC queue
+	group	- queue interrupt group
+	irq_off	- IRQ offset to connect queue ISR
+*/
+static inline int mv_pp3_cfg_chan_sw_params_get(int chan_num, int *frame, int *queue, int *group, int *irq_off)
+{
+	if ((frame == NULL) || (queue == NULL) || (group == NULL) || (irq_off == NULL))
+		return -1;
+
+	*frame = 2;
+	*queue = chan_num;
+	*group = 2 + chan_num % 2;
+	*irq_off = (chan_num % 2) ? 19 : 18;
+
+	return 0;
+}
+
+/* get channel QM HW q number, messenger BM pool ID and buffer headroom
+Inputs:
+	chan_num - channel ID
+Outputs:
+	hwq_rx	- RX QM queue number
+	hwq_tx	- TX QM queue number
+	pool_id	- BM pool ID
+	b_hr	- buffer header
+*/
+static inline int mv_pp3_cfg_chan_hw_params_get(int chan_num, unsigned short *hwq_rx, unsigned char *hwq_tx,
+						unsigned char *pool_id, unsigned char *b_hr)
+{
+	if ((hwq_rx == NULL) || (hwq_tx == NULL) || (pool_id == NULL) || (b_hr == NULL))
+		return -1;
+
+	*hwq_rx = 368 + chan_num / 2;
+	*hwq_tx = 16 + chan_num / 2;
+	*pool_id = 19;
+	*b_hr = 32;
+
+	return 0;
+}
+
+/* get data path frames bitmap per cpu */
+static inline int mv_pp3_cfg_dp_frames_bm(int cpu, int *frames_bmp)
+{
+	if (frames_bmp == NULL)
+		return -1;
+
+	*frames_bmp = (cpu == 0) ? 1 : 2;
+	return 0;
+}
+
+/* get Linux buffers pool id per cpu */
+static inline int mv_pp3_cfg_dp_linux_bpid(int cpu)
+{
+	return (cpu == 0) ? 14 : 20;
+}
+
+/* get long buffers pool id per EMAC */
+static inline int mv_pp3_cfg_dp_long_bpid(int emac)
+{
+	switch (emac) {
+	case 0:
+		return 8;
+	case 1:
+		return 9;
+	case 2:
+		return 10;
+	case 3:
+		return 11;
+	default:
+		return -1;
+	}
+}
+
+/* get short buffers pool id per EMAC */
+static inline int mv_pp3_cfg_dp_short_bpid(int emac)
+{
+	return 12;
+}
+
+/* get LRO buffers pool id per EMAC */
+static inline int mv_pp3_cfg_dp_lro_bpid(int emac)
+{
+	return 13;
+}
+
+/* get NSS mode buffer pools ids */
+static inline int mv_pp3_cfg_nss_pools(int *long_p, int *short_p, int *lro_p, int *app_p)
+{
+	if ((long_p == NULL) || (short_p == NULL) || (lro_p == NULL) || (app_p == NULL))
+		return -1;
+
+	*long_p = 15;
+	*short_p = 16;
+	*lro_p = 17;
+	*app_p = 20;
+
+	return 0;
+}
+
+/* get frame and queue number in order to manage bm pools per cpu
+Inputs:
+	cpu	- CPU number
+Outputs:
+	frame	- HMAC frame number
+	queue	- HMAC queue number
+	size	- max number of CFH messages in HMAC queue
+	group	- queue interrupt group
+	irq_off	- IRQ offset to connect queue ISR
+*/
+static inline int mv_pp3_cfg_dp_bmq_params_get(int cpu, int *frame, int *queue, int *size, int *group, int *irq_off)
+{
+	if ((frame == NULL) || (queue == NULL) || (size == NULL) || (group == NULL) || (irq_off == NULL))
+		return -1;
+
+	switch (cpu) {
+	case 0:
+		*frame = 2;
+		*queue = 8;
+		*size = MV_PP3_NUM_MSG_IN_CHAN;
+		*group = 4;
+		*irq_off = 20;
+	break;
+	case 1:
+		*frame = 2;
+		*queue = 9;
+		*size = MV_PP3_NUM_MSG_IN_CHAN;
+		*group = 5;
+		*irq_off = 21;
+	break;
+	default:
+		return -1;
+	}
+
+	return 0;
+}
+
+/* get data path queue SW parameters
+Inputs:
+	emac	- emac number
+	cpu	- CPU number
+Outputs:
+	frame	- HMAC frame number
+	qbm	- HMAC queues bitmap; each emac use 2 queues for high/low priority traffic
+	group	- queue interrupt group
+	irq	- IRQ offset to connect queue ISR
+*/
+static inline int mv_pp3_cfg_dp_sw_params_get(int emac, int cpu, int *frame, int *qbm, int *group, int *irq)
+{
+	if ((frame == NULL) || (qbm == NULL) || (group == NULL) || (irq == NULL) || (emac > 3))
+		return -1;
+
+	*group = 0;
+	*frame = (cpu == 0) ? 0 : 1;
+	*irq = (cpu == 0) ? 128 : 136;
+	*qbm = (3 << (emac * 2));
+
+	return 0;
+}
+
+/* get data path queue HW parameters
+Inputs:
+	emac	- emac number
+Outputs:
+	hwq_rx	- RX QM first queue number
+	hwq_tx	- TX QM first queue number
+	emacs	- QM first queue number used by EMAC
+*/
+static inline int mv_pp3_cfg_dp_hw_params_get(int emac, int *hwq_rx, int *hwq_tx, int *emacq)
+{
+	if ((hwq_rx == NULL) || (hwq_tx == NULL) || (emacq == NULL) || (emac > 3))
+		return -1;
+
+	*hwq_rx = 304 + (emac * 8);
+	*hwq_tx = (3 << (emac * 2));
+	*emacq = 192 + (emac * 16);
+
+	return 0;
+}
+
+/* get data path queue SW parameters for NSS mode
+Inputs:
+	cpu	- cpu number
+Outputs:
+	frame	- HMAC frame number
+	first_q	- first HMAC queue number in queue groups
+	group	- queue interrupt group
+	irq	- IRQ offset to connect queue ISR
+*/
+static inline int mv_pp3_cfg_dp_nss_sw_params_get(int cpu, int *frame, int *first_q, int *group, int *irq)
+{
+	if ((frame == NULL) || (first_q == NULL) || (group == NULL) || (irq == NULL))
+		return -1;
+
+	*group = 1;
+	*frame = (cpu == 0) ? 0 : 1;
+	*irq = (cpu == 0) ? 1 : 9;
+	*first_q = 8;
+
+	return 0;
+}
+
+/* get data path queue HW parameters for NSS mode
+Inputs:
+	cpu	- cpu number
+Outputs:
+	first_rxq	- RX QM first queue number
+	first_txq	- TX QM first queue number
+*/
+static inline int mv_pp3_cfg_dp_nss_hw_params_get(int cpu, int *first_rxq, int *first_txq)
+{
+	if ((first_rxq == NULL) || (first_txq == NULL))
+		return -1;
+
+	*first_rxq = 336;
+	*first_txq = 8;
+
+	return 0;
+}
+
+/* get data path RX queue parameters for NIC mode
+Inputs:
+	emac	- emac number
+	cpu	- CPU number
+Outputs:
+	frame	- HMAC frame number
+	sw_rxq	- HMAC RX queue number
+	hw_rxq	- QM RX queue number
+*/
+static inline int mv_pp3_cfg_dp_nic_rxq_params_get(int emac, int cpu, int *frame, int *sw_rxq, int *hw_rxq)
+{
+	if ((frame == NULL) || (sw_rxq == NULL) || (hw_rxq == NULL) || (emac > 3))
+		return -1;
+
+	*frame = (cpu == 0) ? 0 : 1;
+	*sw_rxq = 0 + (emac * 2);
+	*hw_rxq = 304 + (emac * 8);
+
+	return 0;
+}
+
+/* get data path TX queue parameters for NIC mode
+Inputs:
+	emac	- emac number
+	cpu	- CPU number
+Outputs:
+	frame	- HMAC frame number
+	sw_txq	- HMAC TX queue number
+	hw_txq	- QM TX queue number
+*/
+static inline int mv_pp3_cfg_dp_nic_txq_params_get(int emac, int cpu, int *frame, int *sw_txq, int *hw_txq)
+{
+	if ((frame == NULL) || (sw_txq == NULL) || (hw_txq == NULL) || (emac > 3))
+		return -1;
+
+	*frame = (cpu == 0) ? 0 : 1;
+	*sw_txq = 0 + (emac * 2);
+	*hw_txq = 0 + (emac * 2);
+
+	return 0;
+}
+
+/* get data path queue interrupts parameters for NIC mode
+Inputs:
+	cpu	- cpu number
+Outputs:
+	group	- queue interrupt group
+	irq	- IRQ offset to connect queue ISR
+*/
+static inline int mv_pp3_cfg_dp_nic_inter_params_get(int cpu, int *group, int *irq)
+{
+	if ((group == NULL) || (irq == NULL))
+		return -1;
+
+	*group = 1;
+	*irq = (cpu == 0) ? 0 : 8;
+
+	return 0;
+}
+
 #endif /* __mvPp3Config_h__ */
