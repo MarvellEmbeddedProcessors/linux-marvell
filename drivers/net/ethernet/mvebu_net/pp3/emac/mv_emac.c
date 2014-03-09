@@ -84,7 +84,7 @@ u32 mv_pp3_emac_reg_read(int port, u32 reg)
 	reg_data = mv_pp3_hw_reg_read(reg + pp3_emac[port].base);
 
 	if (pp3_emac[port].flags & MV_PP3_EMAC_F_DEBUG)
-		pr_info("read     : 0x%x = 0x%08x\n", reg, reg_data);
+		pr_info("read     : 0x%04x = 0x%08x\n", reg, reg_data);
 
 	return reg_data;
 }
@@ -95,15 +95,15 @@ void mv_pp3_emac_reg_write(int port, u32 reg, u32 data)
 
 	if (pp3_emac[port].flags & MV_PP3_EMAC_F_DEBUG) {
 		u32 reg_data;
-		pr_info("write    : 0x%x = 0x%08x\n", reg, data);
+		pr_info("write    : 0x%04x = 0x%08x\n", reg, data);
 		reg_data = mv_pp3_hw_reg_read(reg + pp3_emac[port].base);
-		pr_info("read back: 0x%x = 0x%08x\n", reg, reg_data);
+		pr_info("read back: 0x%04x = 0x%08x\n", reg, reg_data);
 	}
 }
 
 static void mv_pp3_emac_reg_print(int port, char *reg_name, u32 reg)
 {
-	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg, mv_pp3_emac_reg_read(port, reg));
+	pr_info("  %-32s: 0x%04x = 0x%08x\n", reg_name, reg, mv_pp3_emac_reg_read(port, reg));
 }
 
 void mv_pp3_emac_unit_base(int port, u32 base)
@@ -134,9 +134,11 @@ void mv_pp3_emac_init(int port)
 void mv_pp3_emac_debug(int port, int en)
 {
 	if (en)
-		pp3_emac[port].flags |= MV_PP3_EMAC_F_DEBUG_BIT;
+		pp3_emac[port].flags |= MV_PP3_EMAC_F_DEBUG;
 	else
-		pp3_emac[port].flags &= ~MV_PP3_EMAC_F_DEBUG_BIT;
+		pp3_emac[port].flags &= ~MV_PP3_EMAC_F_DEBUG;
+
+
 }
 
 /* set QM Enq queu and Deq port */
@@ -209,7 +211,7 @@ void mv_pp3_emac_regs(int port)
 	mv_pp3_emac_reg_print(port, "DEQ_RTC_STRM_VAL", MV_EMAC_DEQ_RTC_STRM_VAL_REG);
 	mv_pp3_emac_reg_print(port, "DEQ_RTC_PORT_VAL", MV_EMAC_DEQ_RTC_PORT_VAL_REG);
 
-	pr_info("-------------- debug regs -----------\n");
+	pr_info("------------------------ debug regs ---------------------\n");
 
 	mv_pp3_emac_reg_print(port, "DBG_SM_STATUS", MV_EMAC_DBG_SM_STATUS_REG);
 	mv_pp3_emac_reg_print(port, "DBG_FIFO_FILL_LVL1", MV_EMAC_DBG_FIFO_FILL_LVL1_REG);
