@@ -35,13 +35,24 @@ static struct of_device_id of_scu_table[] = {
 	{ },
 };
 
+#define SCU_CTRL		0x00
+
 static void __init armada_380_scu_enable(void)
 {
 	void __iomem *scu_base;
+	u32 scu_ctrl;
 
 	struct device_node *np = of_find_matching_node(NULL, of_scu_table);
 	if (np) {
 		scu_base = of_iomap(np, 0);
+
+		scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
+		/* already enabled? */
+		if (!(scu_ctrl & 1)) {
+			/* Enable SCU Speculative linefills to L2 */
+			scu_ctrl |= (1 << 3);
+			__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
+		}
 		scu_enable(scu_base);
 	}
 }
