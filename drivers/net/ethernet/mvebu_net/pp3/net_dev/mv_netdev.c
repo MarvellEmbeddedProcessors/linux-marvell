@@ -26,9 +26,11 @@
 #include "hmac/mv_hmac_bm.h"
 #include "emac/mv_emac.h"
 #include "fw/mv_channel_if.h"
-#include "gmac/mv_gmac.h"
 #include "mv_netdev.h"
 #include "mv_netdev_structs.h"
+#ifdef MV_FPGA
+#include "gmac/mv_gmac.h"
+#endif
 
 /* global data */
 struct pp3_group *pp3_groups[CONFIG_NR_CPUS][MAX_ETH_DEVICES];
@@ -276,7 +278,7 @@ static struct pp3_pool *pp3_pool_alloc(int pool, int capacity)
 		return NULL;
 	}
 
-	if (pp3_pools[pool] != NULL) {
+	if (pp3_pools[pool]) {
 		pr_err("%s: pool=%d already exist\n", __func__, pool);
 		return NULL;
 	}
@@ -296,13 +298,14 @@ static struct pp3_pool *pp3_pool_alloc(int pool, int capacity)
 	ppool->flags = POOL_F_FREE;
 
 	size = sizeof(unsigned int) * capacity;
+
 /*
-	TODO: example in mainline driver, firt param ?
 	ppool->virt_base = dma_alloc_coherent(NULL, size, &ppool->phys_base, GFP_KERNEL);
-*/
+
 	if (!ppool->virt_base)
 		goto oom;
 
+*/
 	return ppool;
 
 oom:
@@ -319,7 +322,7 @@ oom:
 static int pp3_pool_init_complete(int pool)
 {
 	int count = 0;
-	unsigned int completed;
+	unsigned int completed = 1;
 
 	do {
 		if (count++ >= MV_PP3_POOL_INIT_TIMEOUT_MSEC) {
@@ -345,7 +348,8 @@ static struct pp3_pool *pp3_pool_gp_create(int pool, int capacity)
 
 	if (pp3_pools[pool]) {
 		if (pp3_pools[pool]->capacity != capacity) {
-			pr_err("%s: pool #%d already exist with capacity < %d\n", __func__, pool, capacity);
+			pr_err("%s: pool #%d already exist with capacity = %d\n",
+				__func__, pool, pp3_pools[pool]->capacity);
 			return NULL;
 		}
 
@@ -366,13 +370,17 @@ static struct pp3_pool *pp3_pool_gp_create(int pool, int capacity)
 
 	ppool->type = PP3_POOL_TYPE_GP;
 
-	/*ret_val = bm_gp_pool_def_basic_init(pool, 2 * capacity, 0, ppool->phys_base, 1);*/
+/*
+	ret_val = bm_gp_pool_def_basic_init(pool, 2 * capacity, 0, ppool->phys_base, 1);
 
 	if (!ret_val)
 		goto out;
+*/
 
 	if (pp3_pool_init_complete(pool))
 		goto out;
+
+	pr_info("%s: pool %d creation successed\n", __func__, pool);
 
 	return ppool;
 out:
@@ -414,10 +422,12 @@ static int pp3_pools_dram_init(int capacity)
 	ppool_0->type = PP3_POOL_TYPE_DRAM;
 	ppool_1->type = PP3_POOL_TYPE_DRAM;
 
-	/*ret_val = bm_qm_dram_pools_def_quick_init (capacity, 0, ppool_0->phys_base, 0, ppool_1->phys_base);*/
+/*
+	ret_val = bm_qm_dram_pools_def_quick_init (capacity, 0, ppool_0->phys_base, 0, ppool_1->phys_base);
 
 	if (!ret_val)
 		return ret_val;
+*/
 
 	return pp3_pool_init_complete(MV_PP3_DRAM_POOL_0) || pp3_pool_init_complete(MV_PP3_DRAM_POOL_1);
 }
@@ -724,8 +734,9 @@ static int mv_pp3_sw_probe(struct platform_device *pdev)
 	pp3_ports[pdev->id] = MV_PP3_PRIV(dev);
 
 	mv_pp3_emac_unit_base(pdev->id, mv_hw_silicon_base_addr_get() + MV_PP3_EMAC_BASE(pdev->id));
+#ifdef MV_FPGA
 	pp3_gmac_unit_base(pdev->id, GMAC_REG_BASE(pdev->id) + mv_fpga_gop_base_addr_get());
-
+#endif
 	pr_info("Probing Marvell PPv3 Network Driver\n");
 	return 0;
 }
@@ -796,19 +807,24 @@ static int mv_pp3_hw_netif_start(struct pp3_dev_priv *dev_priv)
 
 		/*pool = mv_pp3_cfg_dp_long_bpid(dev_priv->index)*/
 		group_ctrl->long_pool = pp3_pool_gp_create(pool, MV_PP3_LONG_POOL_SIZE);
+		group_ctrl->long_pool->flags = POOL_F_LONG;
 		/*pool = mv_pp3_cfg_dp_short_bpid(dev_priv->index)*/
 		group_ctrl->short_pool = pp3_pool_gp_create(pool, MV_PP3_SHORT_POOL_SIZE);
+		group_ctrl->long_pool->flags = POOL_F_SHORT;
 		/*pool = mv_pp3_cfg_dp_lro_bpid(dev_priv->index)*/
 		group_ctrl->lro_pool = pp3_pool_gp_create(pool, MV_PP3_LRO_POOL_SIZE);
+		group_ctrl->long_pool->flags = POOL_F_LRO;
 
 		for (i = 0; i < group_ctrl->rxqs_num; i++) {
 			rxq_ctrl =  group_ctrl->rxqs[i];
 			mv_pp3_hmac_rxq_init(rxq_ctrl->frame_num, rxq_ctrl->sw_q, rxq_ctrl->size);
+			mv_pp3_hmac_rxq_enable(rxq_ctrl->frame_num, rxq_ctrl->sw_q);
 		}
 
 		for (i = 0; i < group_ctrl->txqs_num; i++) {
 			txq_ctrl =  group_ctrl->txqs[i];
 			mv_pp3_hmac_txq_init(txq_ctrl->frame_num, txq_ctrl->sw_q, txq_ctrl->size, 0);
+			mv_pp3_hmac_txq_enable(txq_ctrl->frame_num, txq_ctrl->sw_q);
 		}
 	}
 
@@ -861,13 +877,13 @@ static int mv_pp3_hw_shared_start(void)
 	/* TODO: HMAC HW unit int */
 
 	pp3_pools_dram_init(BM_DRAM_POOL_CAPACITY);
-	pp3_pools_dram_init(BM_GPM_POOL_CAPACITY);
+	pp3_pools_gpm_init(BM_GPM_POOL_CAPACITY);
 	/*bm_enable();*/
 
 	/* TODO: start fw */
 	/* TODO: Channel create */
 
-	cpu_ctrl->chan_id = mv_pp3_chan_create(MV_PP3_CHAN_SIZE, 0, pp3_chan_callback);
+	/*cpu_ctrl->chan_id = mv_pp3_chan_create(MV_PP3_CHAN_SIZE, 0, pp3_chan_callback);*/
 
 	return 0;
 oom:
@@ -910,8 +926,7 @@ static int mv_pp3_sw_shared_probe(struct platform_device *pdev)
 
 	pp3_frames = kzalloc(MV_PP3_FRAMES * sizeof(struct pp3_frame *), GFP_KERNEL);
 
-	mv_pp3_hmac_gl_unit_base(silicon_base + MV_PP3_HMAC_GL_UNIT_OFFSET);
-	mv_pp3_hmac_frame_unit_base(silicon_base + MV_PP3_HMAC_FR_UNIT_OFFSET, MV_PP3_HMAC_FR_INST_OFFSET);
+	mv_pp3_hmac_init();
 
 	for (i = 0; i < MV_PP3_FRAMES; i++) {
 		pp3_frames[i] = kzalloc(sizeof(struct pp3_frame), GFP_KERNEL);
@@ -1103,8 +1118,9 @@ void pp3_netdev_pool_status_print(int pool)
 		str = "UNKNOWN";
 
 	pr_info("/n");
-	pr_info("pool #%d: pool type = %s, buffers num = %d, buffer size = %d\n",
-			pool, str, ppool->buf_num, ppool->buf_size);
+	pr_info("pool #%d : ppool = 0x%p, pool type = %s, buffers num = %d, buffer size = %d, capacity = %d\n",
+			pool, ppool, str, ppool->buf_num, ppool->buf_size, ppool->capacity);
+
 	pr_info("virt_base = 0x%p, phys_base = 0x%lu\n", ppool->virt_base, ppool->phys_base);
 
 	return;
@@ -1127,7 +1143,7 @@ void pp3_netdev_cpu_status_print(int cpu)
 
 	cpu_ctrl = pp3_cpus[cpu];
 	pr_info("/n");
-	pr_info("cpu #%d: frames bitmap = 0x%x, bm_msg_irq = %d, bm_msg_groeup = %d, chan_id = %d\n", cpu,
+	pr_info("cpu #%d: frames bitmap = 0x%x, bm_msg_irq = %d, bm_msg_group = %d, chan_id = %d\n", cpu,
 			cpu_ctrl->frame_bmp, cpu_ctrl->bm_msg_irq, cpu_ctrl->bm_msg_group, cpu_ctrl->chan_id);
 
 	linux_pool_id = cpu_ctrl->tx_done_pool ? cpu_ctrl->tx_done_pool->pool : -1;

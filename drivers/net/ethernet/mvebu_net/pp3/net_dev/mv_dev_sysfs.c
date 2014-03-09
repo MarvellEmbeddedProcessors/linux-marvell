@@ -41,10 +41,10 @@ static ssize_t pp3_dev_help(char *b)
 	o += sprintf(b+o, "echo [netif] [cpu]          > groupStatus      - print group status\n");
 	o += sprintf(b+o, "echo [pool]                 > poolStatus       - print BM pool status\n");
 	o += sprintf(b+o, "echo [cpu]                  > cpuStatus        - print cpu status\n");
-	o += sprintf(b+o, "echo [netif] [cpu [q]       > rxqStatus        - print rxq status\n");
-	o += sprintf(b+o, "echo [netif] [cpu [q]       > txqStatus        - print rxq status\n");
+	o += sprintf(b+o, "echo [netif] [cpu] [q]      > rxqStatus        - print rxq status\n");
+	o += sprintf(b+o, "echo [netif] [cpu] [q]      > txqStatus        - print rxq status\n");
 
-	o += sprintf(b+o, "All inputs in decimal\n");
+	o += sprintf(b+o, "\nAll inputs in decimal\n");
 
 	return o;
 }
