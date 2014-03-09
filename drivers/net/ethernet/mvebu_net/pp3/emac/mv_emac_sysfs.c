@@ -70,13 +70,12 @@ static ssize_t mv_emac_help(char *b)
 	int o = 0;
 
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p]         > regs     - Dump registers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p] [u]     > regRead  - Read register, address [u]\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p] [u] [v] > regWrite - Write register, address [u], value [v]\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p] [u] [v] > qmMapSet - Set QM mapping, [u] QM port, [v] QM queue\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p] [0|1]   > rxEn     - Enable / Disable rx\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p] [0|1]   > debug    - Enable / Disable debug outputs\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "parameters: [p] emac number\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "parameters: [p] emac number\n\n");
 
 	return o;
 }
@@ -116,8 +115,6 @@ static ssize_t mv_emac_3_hex_store(struct device *dev,
 		mv_pp3_emac_regs(p);
 	else if (!strcmp(name, "regWrite"))
 		mv_pp3_emac_reg_write(p, u, v);
-	else if (!strcmp(name, "regRead"))
-		mv_pp3_emac_reg_write(p, u, v);
 	else if (!strcmp(name, "debug"))
 		mv_pp3_emac_debug(p, u);
 	else if (!strcmp(name, "qmMapSet"))
@@ -137,7 +134,6 @@ static ssize_t mv_emac_3_hex_store(struct device *dev,
 static DEVICE_ATTR(help, S_IRUSR, mv_emac_show, NULL);
 static DEVICE_ATTR(regs, S_IWUSR, NULL, mv_emac_3_hex_store);
 static DEVICE_ATTR(regWrite, S_IWUSR, NULL, mv_emac_3_hex_store);
-static DEVICE_ATTR(regRead, S_IWUSR, NULL, mv_emac_3_hex_store);
 static DEVICE_ATTR(debug, S_IWUSR, NULL, mv_emac_3_hex_store);
 static DEVICE_ATTR(qmMapSet, S_IWUSR, NULL, mv_emac_3_hex_store);
 static DEVICE_ATTR(rxEn, S_IWUSR, NULL, mv_emac_3_hex_store);
@@ -147,7 +143,6 @@ static struct attribute *mv_emac_attrs[] = {
 	&dev_attr_help.attr,
 	&dev_attr_regs.attr,
 	&dev_attr_regWrite.attr,
-	&dev_attr_regRead.attr,
 	&dev_attr_debug.attr,
 	&dev_attr_qmMapSet.attr,
 	&dev_attr_rxEn.attr,
