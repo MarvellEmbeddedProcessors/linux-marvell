@@ -48,6 +48,45 @@ static void __init armada_375_scu_enable(void)
 	}
 }
 
+void __init armada_375_l2_enable(void)
+{
+	void __iomem *l2x0_base;
+	struct device_node *np;
+	unsigned int val;
+
+	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+	if (!np)
+		goto out;
+
+	l2x0_base = of_iomap(np, 0);
+	if (!l2x0_base) {
+		of_node_put(np);
+		goto out;
+	}
+
+	/* Configure the L2 PREFETCH and POWER registers */
+	val = 0x58800000;
+	/*
+	*  Support the following configuration:
+	*  Incr double linefill enable
+	*  Data prefetch enable
+	*  Double linefill enable
+	*  Double linefill on WRAP disable
+	*  NO prefetch drop enable
+	*/
+	writel_relaxed(val, l2x0_base + L2X0_PREFETCH_CTRL);
+	val = L2X0_DYNAMIC_CLK_GATING_EN;
+	writel_relaxed(val, l2x0_base + L2X0_POWER_CTRL);
+
+	iounmap(l2x0_base);
+	of_node_put(np);
+out:
+	if (coherency_available())
+		l2x0_of_init_coherent(0, ~0UL);
+	else
+		l2x0_of_init(0, ~0UL);
+}
+
 static void __iomem *
 armada_375_ioremap_caller(unsigned long phys_addr, size_t size,
 			  unsigned int mtype, void *caller)
@@ -93,10 +132,7 @@ static void __init armada_375_timer_and_clk_init(void)
 	arch_ioremap_caller = armada_375_ioremap_caller;
 	pci_ioremap_set_mem_type(MT_MEMORY_SO);
 	coherency_init();
-	if (coherency_available())
-		l2x0_of_init_coherent(0, ~0UL);
-	else
-		l2x0_of_init(0, ~0UL);
+	armada_375_l2_enable();
 	hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
 			"imprecise external abort");
 }
