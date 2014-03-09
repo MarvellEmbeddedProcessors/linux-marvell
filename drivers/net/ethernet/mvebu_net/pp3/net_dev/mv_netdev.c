@@ -1115,7 +1115,7 @@ void pp3_netdev_cpu_status_print(int cpu)
 	struct pp3_cpu *cpu_ctrl;
 	int linux_pool_id;
 
-	if ((cpu < 0) || (cpu >= MAX_CPU_NUM)) {
+	if ((cpu < 0) || (cpu >= CONFIG_NR_CPUS)) {
 		pr_err("%s: Invalid cpu number - %d\n", __func__, cpu);
 		return;
 	}
@@ -1168,7 +1168,7 @@ void pp3_netdev_group_status_print(int index, int cpu)
 		return;
 	}
 
-	if ((cpu < 0) || (cpu >= MAX_CPU_NUM)) {
+	if ((cpu < 0) || (cpu >= CONFIG_NR_CPUS)) {
 		pr_err("%s: Invalid cpu number - %d\n", __func__, cpu);
 		return;
 	}
@@ -1203,7 +1203,7 @@ void pp3_netdev_rxq_status_print(int index, int cpu, int queue)
 		return;
 	}
 
-	if ((cpu < 0) || (cpu >= MAX_CPU_NUM)) {
+	if ((cpu < 0) || (cpu >= CONFIG_NR_CPUS)) {
 		pr_err("%s: Invalid cpu number - %d\n", __func__, cpu);
 		return;
 	}
@@ -1243,7 +1243,7 @@ void pp3_netdev_txq_status_print(int index, int cpu, int queue)
 		return;
 	}
 
-	if ((cpu < 0) || (cpu >= MAX_CPU_NUM)) {
+	if ((cpu < 0) || (cpu >= CONFIG_NR_CPUS)) {
 		pr_err("%s: Invalid cpu number - %d\n", __func__, cpu);
 		return;
 	}
