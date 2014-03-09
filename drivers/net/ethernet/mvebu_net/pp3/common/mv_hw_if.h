@@ -73,6 +73,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define	MV_MAC_ADDR_SIZE	(6)
 #define MV_MAC_STR_SIZE		(20)
 
+/* Macro for testing aligment. Positive if number is NOT aligned   */
+#define MV_IS_NOT_ALIGN(number, align)      ((number) & ((align) - 1))
+
+/* Macro for alignment up. For example, MV_ALIGN_UP(0x0330, 0x20) = 0x0340   */
+#define MV_ALIGN_UP(number, align)                                          \
+(((number) & ((align) - 1)) ? (((number) + (align)) & ~((align)-1)) : (number))
+
+/* Macro for alignment down. For example, MV_ALIGN_UP(0x0330, 0x20) = 0x0320 */
+#define MV_ALIGN_DOWN(number, align) ((number) & ~((align)-1))
+
 /* Sets the field located at the specified in data.     */
 #define U32_SET_FIELD(data, mask, val)		((data) = (((data) & ~(mask)) | (val)))
 
@@ -122,6 +132,9 @@ static INLINE u32 mv_pp3_hw_reg_read(u32 access_addr)
  */
 static INLINE void mv_pp3_hw_reg_write(u32 access_addr, u32 data)
 {
+#ifdef PP3_DEBUG
+	pr_info("\nwrite reg 0x%x, data 0x%x", access_addr, data);
+#endif
 	writel(data, access_addr);
 }
 
