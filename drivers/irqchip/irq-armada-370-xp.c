@@ -61,7 +61,9 @@
 #define PCI_MSI_DOORBELL_END                    (32)
 #define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
 
+#ifdef CONFIG_SMP
 static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+#endif
 
 static void __iomem *per_cpu_int_base;
 static void __iomem *main_int_base;
@@ -82,7 +84,11 @@ static void armada_370_xp_irq_mask(struct irq_data *d)
 {
 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
 
+#ifdef CONFIG_SMP
 	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
+#else
+	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+#endif
 		writel(hwirq, main_int_base +
 				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
 	else
@@ -94,7 +100,11 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
 {
 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
 
+#ifdef CONFIG_SMP
 	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
+#else
+	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+#endif
 		writel(hwirq, main_int_base +
 				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
 	else
@@ -293,7 +303,11 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
 				      unsigned int virq, irq_hw_number_t hw)
 {
 	armada_370_xp_irq_mask(irq_get_irq_data(virq));
+#ifdef CONFIG_SMP
 	if (hw > ARMADA_370_XP_MAX_PER_CPU_IRQS)
+#else
+	if (hw != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
+#endif
 		writel(hw, per_cpu_int_base +
 			ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
 	else
@@ -395,7 +409,9 @@ static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
 	struct irq_chip *chip = irq_get_chip(irq);
 	unsigned long irqmap, irqn, cpuid;
 	unsigned int cascade_irq;
+#ifdef CONFIG_SMP
 	struct irq_data *irqd;
+#endif
 
 	chained_irq_enter(chip, desc);
 
@@ -406,9 +422,13 @@ static void armada_370_xp_mpic_handle_cascade_irq(unsigned int irq,
 			armada_370_xp_mpic_handle_cascade_msi();
 		} else {
 			cascade_irq = irq_find_mapping(armada_370_xp_mpic_domain, irqn);
+#ifdef CONFIG_SMP
 			irqd = irq_get_irq_data(cascade_irq);
 			if (cpumask_test_cpu(cpuid, irqd->affinity))
 				generic_handle_irq(cascade_irq);
+#else
+			generic_handle_irq(cascade_irq);
+#endif
 		}
 	}
 
