@@ -165,7 +165,7 @@ static ssize_t mv_cls3_store(struct device *dev,
 	if (!strcmp(name, "hw_read"))
 		mvPp2ClsC3HwRead(&c3, a);
 	else if (!strcmp(name, "hw_query_add"))
-		mvPp2ClsC3HwQueryAdd(&c3, a);
+		mvPp2ClsC3HwQueryAdd(&c3, a, NULL);
 	else if (!strcmp(name, "hw_add"))
 		mvPp2ClsC3HwAdd(&c3, a, b);
 	else if (!strcmp(name, "hw_ms_add"))/*PPv2.1 new feature MAS 3.12*/
