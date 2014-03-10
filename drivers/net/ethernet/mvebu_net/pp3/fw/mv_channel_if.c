@@ -80,19 +80,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* channel info */
 static struct mv_pp3_channel mv_pp3_chan_ctrl[MV_PP3_MAX_CHAN_NUM];
 /* number if active channels */
-static int mv_pp3_active_chan_num;
+static int mv_pp3_active_chan_num = CONFIG_NR_CPUS;
 
 /* stack of free buffers for messenger usage */
 void *mv_pp3_msgr_buffers;
 
 /* global one lock for all channels */
-spinlock_t msngr_channel_lock;
+static spinlock_t msngr_channel_lock;
 
 /* Init messenger facility - call ones */
 int mv_pp3_messenger_init(void)
 {
 	int bm_pool;
-	int frame, queue, size;
+	int frame, queue, size, group, irq_num;
 	int i;
 	void *buf_ptr;
 
@@ -100,15 +100,16 @@ int mv_pp3_messenger_init(void)
 	spin_lock_init(&msngr_channel_lock);
 
 	/* create HMAC queue for messenger pool interface */
-	/* get from configurator bm queue parameters (frame, queue, size) */
-	frame = queue = 0;
-	size = 0;
+	/* get bm queue parameters (frame, queue, size) */
+	mv_pp3_cfg_msg_bmq_params_get(&frame, &queue, &size, &group, &irq_num);
 	mv_pp3_hmac_bm_queue_init(frame, queue, size);
+	/* connect HMAC queue to interrupt group */
+	mv_pp3_hmac_rxq_event_cfg(frame, queue, MV_PP3_RX_CFH, group);
 
-	/* get from configurator GP pool number for messenger usage */
-	bm_pool = 20;
-	/* call to BM pool init wrapper - pool sixe */
-	/* mv_pp3_bm_pool_init(bm_pool, 64*8);*/
+	/* get GP pool number for messenger usage */
+	mv_pp3_cfg_msg_bm_pool_params_get(&bm_pool, &size);
+	/* call to BM pool init wrapper - pool size */
+	/* mv_pp3_bm_pool_init(bm_pool, size(64*8));*/
 
 	/* fill pool with buffers */
 	/* mv_pp3_bm_pool_bufs_add(bm_pool, MV_PP3_MSG_BUFF_SIZE, 10); */
@@ -142,23 +143,30 @@ int mv_pp3_chan_create(int size, int flags, mv_pp3_chan_rcv_func rcv_cb)
 	int chan_num;
 	int frame, queue;
 	int msg_flags;
-	int group;
+	int group, irq_num;
+	unsigned char txq;
+	int cpu = smp_processor_id();
+	unsigned long iflags = 0;
 
 	if (mv_pp3_active_chan_num == MV_PP3_MAX_CHAN_NUM)
 		return -1;
 
-	/* TBD - call to configurator for frame number and queue number to use */
-	frame = 0;
-	queue = 0;
+	/* the first channels must be defaults channels per cpu */
+	if (!(mv_pp3_chan_ctrl[cpu].flags & MV_PP3_F_CHANNEL_CREATED))
+		chan_num = cpu;
+	else {
+		MV_LOCK(&msngr_channel_lock, iflags);
+		/* get ID of current channnel */
+		chan_num = mv_pp3_active_chan_num++;
+		MV_UNLOCK(&msngr_channel_lock, iflags);
+	}
 
-	spin_lock(&msngr_channel_lock);
-	/* get ID of current channnel */
-	chan_num = mv_pp3_active_chan_num++;
-	spin_unlock(&msngr_channel_lock);
+	/* get free frame number and queue number to use by channel */
+	mv_pp3_cfg_chan_sw_params_get(chan_num, &frame, &queue, &group, &irq_num);
 
 	/* create HMAC queue pair */
-	mv_pp3_hmac_rxq_init(frame, queue, size*MV_PP3_CFH_MAX_SIZE);
-	mv_pp3_hmac_txq_init(frame, queue, size*MV_PP3_CFH_MAX_SIZE, 0);
+	mv_pp3_hmac_rxq_init(frame, queue, size*MV_PP3_CFH_MAX_SIZE/MV_PP3_HMAC_DG_SIZE);
+	mv_pp3_hmac_txq_init(frame, queue, size*MV_PP3_CFH_MAX_SIZE/MV_PP3_HMAC_DG_SIZE, 0);
 
 	mv_pp3_chan_ctrl[chan_num].size = size;
 	/* create queue for ready to be sent CFHs */
@@ -175,11 +183,9 @@ int mv_pp3_chan_create(int size, int flags, mv_pp3_chan_rcv_func rcv_cb)
 	mv_pp3_chan_ctrl[chan_num].id = chan_num;
 	mv_pp3_chan_ctrl[chan_num].flags = flags;
 	if (!(flags & MV_PP3_F_CPU_SHARED_CHANNEL))
-		mv_pp3_chan_ctrl[chan_num].cpu_num = smp_processor_id();
+		mv_pp3_chan_ctrl[chan_num].cpu_num = cpu;
 
 	/* connect HMAC queue to interrupt group */
-	/* TBD - call to configurator for SPI group */
-	group = 2;
 	mv_pp3_hmac_rxq_event_cfg(frame, queue, MV_PP3_RX_CFH, group);
 	/* TBD - init all ISR releated */
 	/* connect ISR to IRQ */
@@ -192,21 +198,24 @@ int mv_pp3_chan_create(int size, int flags, mv_pp3_chan_rcv_func rcv_cb)
 
 	/* build channel create message with SW and HW queues numbers */
 	msg.chan_id = chan_num;
-	/* TBD - get from configurator SW, HW q numbers and BM (rx/tx) pools IDs */
 	msg.hmac_sw_rxq = queue + 16 * frame;
-	msg.hmac_hw_rxq = 364;
-	msg.bm_pool_id = 20; /* BM pool for fw -> hmac messages */
-	msg.buf_headroom = 32;
+	/*  get HW q numbers and BM ID */
+	mv_pp3_cfg_chan_hw_params_get(chan_num, &msg.hmac_hw_rxq, &txq, &msg.bm_pool_id, &msg.buf_headroom);
 	msg.pool_buf_size = MV_PP3_MSG_BUFF_SIZE;
 
-	mv_pp3_chan_ctrl[chan_num].bm_pool_id = 20; /* BM pool for hmac -> fw messages */
-	mv_pp3_chan_ctrl[chan_num].buf_headroom = 32;
+	mv_pp3_chan_ctrl[chan_num].bm_pool_id = msg.bm_pool_id;
+	mv_pp3_chan_ctrl[chan_num].buf_headroom = msg.buf_headroom;
 
 	/* send message through CPU default channel */
 	msg_flags = 0;
-	mv_pp3_msg_send(smp_processor_id(), msg_ptr, sizeof(msg), msg_flags);
+	mv_pp3_msg_send(cpu, msg_ptr, sizeof(msg), msg_flags);
 
 	return chan_num;
+}
+
+int mv_pp3_def_chan_create(int *size)
+{
+	return mv_pp3_chan_create(*size, 0, NULL);
 }
 
 /* Prepare message CFH and trigger it sending to firmware.
@@ -225,10 +234,15 @@ int mv_pp3_msg_send(int chan, void *msg, int size, int flags)
 	char *msg_cfh;
 	int cfh_size;
 	u32 buf_addr;
-	unsigned long irq_flags;
+	unsigned long iflags = 0;
 
-	if (!(mv_pp3_chan_ctrl[chan].flags & MV_PP3_F_CHANNEL_CREATED))
+	if (!(mv_pp3_chan_ctrl[chan].flags & MV_PP3_F_CHANNEL_CREATED)) {
 		/* channel wasn't created */
+		pr_err("\n%s:: try send message to unknown channel %d",
+		__func__, chan);
+		return -1;
+	}
+	if (size > MV_PP3_MSG_BUFF_SIZE)
 		return -1;
 
 	if (size > (MV_PP3_CFH_MAX_SIZE - MV_PP3_CFH_MIN_SIZE))
@@ -241,12 +255,12 @@ int mv_pp3_msg_send(int chan, void *msg, int size, int flags)
 		cfh_size = (size + MV_PP3_CFH_MIN_SIZE)/MV_PP3_HMAC_DG_SIZE;
 
 	/* disable interrupt on the current cpu */
-	local_irq_save(irq_flags);
+	MV_LIGHT_LOCK(iflags);
 	/* get pointer to CFH */
 	cfh = (struct cfh_common_format *)mv_pp3_hmac_txq_next_cfh(mv_pp3_chan_ctrl[chan].frame,
 		mv_pp3_chan_ctrl[chan].hmac_rxq_num, cfh_size);
 	/* enable interrupt on the current cpu */
-	local_irq_restore(irq_flags);
+	MV_LIGHT_UNLOCK(iflags);
 	/* check CFH pointer */
 	if (cfh == NULL)
 		return -1;	/* no free CFH in queue */
@@ -278,18 +292,18 @@ int mv_pp3_msg_send(int chan, void *msg, int size, int flags)
 	cfh->cfh_format = (HMAC_CFH << MV_PP3_MCG_CFH_MODE_OFFS) + PP_MESSAGE;
 	cfh->tag2 = chan << MV_PP3_MCG_CHAN_ID_OFFS;
 
-	if (spin_trylock(&msngr_channel_lock))
+	if (MV_TRYLOCK(&msngr_channel_lock, iflags))
 		/* send CFH to FW */
 		mv_pp3_hmac_txq_send(mv_pp3_chan_ctrl[chan].frame, mv_pp3_chan_ctrl[chan].hmac_txq_num, cfh_size);
 	else {
 		/* store message for send it later */
 		/* disable interrupt on the current cpu */
-		local_irq_save(irq_flags);
+		MV_LIGHT_LOCK(iflags);
 		mv_pp3_chan_ctrl[chan].ready_to_send[mv_pp3_chan_ctrl[chan].free_ind++] = cfh_size;
 		if (mv_pp3_chan_ctrl[chan].free_ind == mv_pp3_chan_ctrl[chan].size)
 			mv_pp3_chan_ctrl[chan].free_ind = 0;
 		/* enable interrupt on the current cpu */
-		local_irq_restore(irq_flags);
+		MV_LIGHT_UNLOCK(iflags);
 	}
 
 	return 0;

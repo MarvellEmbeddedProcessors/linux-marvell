@@ -73,11 +73,49 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define	MV_MAC_ADDR_SIZE	(6)
 #define MV_MAC_STR_SIZE		(20)
 
+/******************************************************
+ * interrupt control --                               *
+ ******************************************************/
+#define MV_TRYLOCK(lock, flags)                               \
+	(in_interrupt() ? spin_trylock((lock)) :              \
+		spin_trylock_irqsave((lock), (flags)))
+
+#define MV_LOCK(lock, flags)					\
+do {								\
+	if (in_interrupt())					\
+		spin_lock((lock));				\
+	else							\
+		spin_lock_irqsave((lock), (flags));		\
+} while (0)
+
+#define MV_UNLOCK(lock, flags)					\
+do {								\
+	if (in_interrupt())					\
+		spin_unlock((lock));				\
+	else							\
+		spin_unlock_irqrestore((lock), (flags));	\
+} while (0)
+
+#define MV_LIGHT_LOCK(flags)					\
+do {								\
+	if (!in_interrupt())					\
+		local_irq_save(flags);				\
+} while (0)
+
+#define MV_LIGHT_UNLOCK(flags)					\
+do {								\
+	if (!in_interrupt())					\
+		local_irq_restore(flags);			\
+} while (0)
+
+/******************************************************
+ * align memory allocateion                           *
+ ******************************************************/
 /* Macro for testing aligment. Positive if number is NOT aligned   */
 #define MV_IS_NOT_ALIGN(number, align)      ((number) & ((align) - 1))
 
 /* Macro for alignment up. For example, MV_ALIGN_UP(0x0330, 0x20) = 0x0340   */
-#define MV_ALIGN_UP(number, align)                                          \
+#define MV_ALIGN_UP(number, align)                             \
 (((number) & ((align) - 1)) ? (((number) + (align)) & ~((align)-1)) : (number))
 
 /* Macro for alignment down. For example, MV_ALIGN_UP(0x0330, 0x20) = 0x0320 */
