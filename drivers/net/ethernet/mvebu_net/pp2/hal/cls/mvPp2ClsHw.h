@@ -472,6 +472,7 @@ int mvPp2ClsHwFlowWrite(int index, MV_PP2_CLS_FLOW_ENTRY *fe);
 int mvPp2ClsHwFlowRead(int index, MV_PP2_CLS_FLOW_ENTRY *fe);
 int mvPp2ClsHwFlowClear(int index);
 int mvPp2ClsSwFlowDump(MV_PP2_CLS_FLOW_ENTRY *fe);
+int mvPp2V1ClsHwLkpHitGet(int lkpid, int way,  unsigned int *cnt);
 int mvPp2ClsHwFlowDump(void);
 int mvPp2V1ClsHwFlowHitsDump(void);
 void mvPp2ClsSwFlowClear(MV_PP2_CLS_FLOW_ENTRY *fe);

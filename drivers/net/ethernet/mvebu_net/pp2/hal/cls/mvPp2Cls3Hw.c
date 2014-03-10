@@ -381,7 +381,7 @@ void mvPp2ClsC3HwInitCtrSet(int cntVal)
 
 /*-------------------------------------------------------------------------------*/
 
-static int mvPp2ClsC3HwQueryAddRelocate(int new_idx, int max_depth, int cur_depth)
+static int mvPp2ClsC3HwQueryAddRelocate(int new_idx, int max_depth, int cur_depth, MV_PP2_CLS3_HASH_PAIR *hash_pair_arr)
 {
 	int status, index_free, idx = 0;
 	unsigned char occupied_bmp;
@@ -433,7 +433,8 @@ static int mvPp2ClsC3HwQueryAddRelocate(int new_idx, int max_depth, int cur_dept
 			if (usedIndex[idx] == 0)
 				continue;
 
-			if (mvPp2ClsC3HwQueryAddRelocate(usedIndex[idx], max_depth, cur_depth+1) == MV_OK)
+			if (mvPp2ClsC3HwQueryAddRelocate(usedIndex[idx], max_depth,
+							cur_depth+1, hash_pair_arr) == MV_OK)
 				break;
 		}
 
@@ -451,6 +452,13 @@ static int mvPp2ClsC3HwQueryAddRelocate(int new_idx, int max_depth, int cur_dept
 	/*We do not chage extension tabe*/
 	status = mvPp2ClsC3HwAdd(&local_c3, index_free, local_c3.ext_index);
 
+	/* update the hash pair */
+	if (hash_pair_arr != NULL) {
+		hash_pair_arr->old_idx[hash_pair_arr->pair_num] = new_idx;
+		hash_pair_arr->new_idx[hash_pair_arr->pair_num] = index_free;
+		hash_pair_arr->pair_num++;
+	}
+
 	if (status != MV_OK) {
 		mvOsPrintf("%s:Error - mvPp2ClsC3HwAdd failed, depth = %d\\n", __func__, cur_depth);
 		return status;
@@ -463,7 +471,7 @@ static int mvPp2ClsC3HwQueryAddRelocate(int new_idx, int max_depth, int cur_dept
 
 
 /*-------------------------------------------------------------------------------*/
-int mvPp2ClsC3HwQueryAdd(MV_PP2_CLS_C3_ENTRY *c3, int max_search_depth)
+int mvPp2ClsC3HwQueryAdd(MV_PP2_CLS_C3_ENTRY *c3, int max_search_depth, MV_PP2_CLS3_HASH_PAIR *hash_pair_arr)
 {
 	int usedIndex[MV_PP2_CLS3_HASH_BANKS_NUM] = {0};
 	unsigned char occupied_bmp;
@@ -497,7 +505,8 @@ int mvPp2ClsC3HwQueryAdd(MV_PP2_CLS_C3_ENTRY *c3, int max_search_depth)
 			if (mvPp2ClsC3IsReservedIndex(usedIndex[idx]))
 				continue;
 
-			if (mvPp2ClsC3HwQueryAddRelocate(usedIndex[idx], max_search_depth, 0 /*curren depth*/) == MV_OK)
+			if (mvPp2ClsC3HwQueryAddRelocate(usedIndex[idx], max_search_depth,
+							0 /*curren depth*/, hash_pair_arr) == MV_OK)
 				break;
 		}
 
