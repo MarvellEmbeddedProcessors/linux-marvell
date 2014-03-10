@@ -102,9 +102,9 @@ struct mv_pp3_channel {
 	u8			hmac_txq_num;	/* HMAC queue number in frame */
 	u16			size;		/* max number of messages in queue */
 	u8			bm_pool_id;	/* used for messages that Host send to Firmware */
-	u8			buf_headroom;	/* headroom defined for BM pool */
+	u8			buf_headroom;	/* headroom defined for BM pool buffer */
 	u32			flags;
-	u8			cpu_num;	/* cpu number for non shared channel */
+	u8			cpu_num;		/* cpu number for non shared channel */
 	int			*ready_to_send;		/* list of CFH sizes waiting for send */
 	u16			ready_to_send_ind;	/* CFH index - ready_to_send */
 	u16			free_ind;		/* free index in ready for send */
@@ -124,6 +124,7 @@ Return:
 	negative - failure
 */
 int mv_pp3_chan_create(int size, int flags, mv_pp3_chan_rcv_func rcv_cb);
+int mv_pp3_def_chan_create(int *size);
 
 /* Prepare message CFH and trigger it sending to firmware.
 Inputs:
