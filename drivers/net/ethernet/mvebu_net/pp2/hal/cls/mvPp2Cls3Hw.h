@@ -396,7 +396,13 @@ typedef struct {
 #define MV_PP2_CLS_C3_HEK_WORDS				(3)
 #define MV_PP2_CLS_C3_HEK_BYTES				12 /* size in bytes */
 #define MV_PP2_CLS_C3_BANK_SIZE				(512)
+#define MV_PP2_CLS_C3_MAX_SEARCH_DEPTH			(16)
 
+typedef struct mvPp2Cls3HashPair {
+	unsigned short	pair_num;
+	unsigned short	old_idx[MV_PP2_CLS_C3_MAX_SEARCH_DEPTH];
+	unsigned short	new_idx[MV_PP2_CLS_C3_MAX_SEARCH_DEPTH];
+} MV_PP2_CLS3_HASH_PAIR;
 
 typedef struct mvPp2ClsC3Entry {
 	unsigned int 	index;
@@ -449,7 +455,7 @@ int mvPp2ClsC3SwDump(MV_PP2_CLS_C3_ENTRY *c3);
 void mvPp2ClsC3SwClear(MV_PP2_CLS_C3_ENTRY *c3);
 void mvPp2ClsC3HwInitCtrSet(int cntVal);
 int mvPp2ClsC3HwQuery(MV_PP2_CLS_C3_ENTRY *c3, unsigned char *occupied_bmp, int index[]);
-int mvPp2ClsC3HwQueryAdd(MV_PP2_CLS_C3_ENTRY *c3, int max_search_depth);
+int mvPp2ClsC3HwQueryAdd(MV_PP2_CLS_C3_ENTRY *c3, int max_search_depth, MV_PP2_CLS3_HASH_PAIR *hash_pair_arr);
 
 int mvPp2ClsC3HwMissRead(MV_PP2_CLS_C3_ENTRY *c3, int lkp_type);
 int mvPp2ClsC3HwMissDump(void);

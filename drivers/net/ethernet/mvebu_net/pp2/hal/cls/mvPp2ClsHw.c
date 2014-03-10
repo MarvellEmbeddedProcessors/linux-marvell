@@ -1124,7 +1124,7 @@ static int mvPp2V1ClsHwFlowHitGet(int index,  unsigned int *cnt)
 }
 /*-------------------------------------------------------------------------------*/
 
-static int mvPp2V1ClsHwLkpHitGet(int lkpid, int way,  unsigned int *cnt)
+int mvPp2V1ClsHwLkpHitGet(int lkpid, int way,  unsigned int *cnt)
 {
 
 	BIT_RANGE_VALIDATE(way);
