@@ -27,6 +27,7 @@
 #include "hmac/mv_hmac_bm.h"
 #include "emac/mv_emac.h"
 #include "fw/mv_channel_if.h"
+#include "fw/mv_fw.h"
 #include "mv_netdev.h"
 #include "mv_netdev_structs.h"
 #ifdef MV_FPGA
@@ -74,6 +75,7 @@ static int pp3_sysfs_init(void)
 
 	mv_pp3_emac_sysfs_init(&pd->kobj);
 	mv_pp3_hmac_sysfs_init(&pd->kobj);
+	mv_pp3_fw_sysfs_init(&pd->kobj);
 	pp3_dev_sysfs_init(&pd->kobj);
 
 	return 0;
@@ -93,6 +95,7 @@ static void pp3_sysfs_exit(void)
 
 	pp3_dev_sysfs_exit(&pd->kobj);
 	mv_pp3_emac_sysfs_exit(&pd->kobj);
+	mv_pp3_fw_sysfs_exit(&pd->kobj);
 	platform_device_unregister(pp3_sysfs);
 }
 
