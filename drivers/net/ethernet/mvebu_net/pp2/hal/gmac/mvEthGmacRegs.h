@@ -209,15 +209,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*-------------------------------------------------------------------------------*/
 
 /**** Port Interrupt Sub-Unit Registers ****/
-#define ETH_PORT_ISR_CAUSE_REG(p)	(ETH_REG_BASE(p) + 0x20)
+#define ETH_PORT_ISR_CAUSE_REG(p)		(ETH_REG_BASE(p) + 0x20)
 
-#define ETH_PORT_ISR_SUM_BIT		0
-#define ETH_PORT_ISR_SUM_MASK		(1 << ETH_PORT_ISR_SUM_BIT)
+#define ETH_PORT_ISR_SUM_BIT			0
+#define ETH_PORT_ISR_SUM_MASK			(1 << ETH_PORT_ISR_SUM_BIT)
 
-#define ETH_PORT_LINK_CHANGE_BIT	1
-#define ETH_PORT_LINK_CHANGE_MASK	(1 << ETH_PORT_LINK_CHANGE_BIT)
+#define ETH_PORT_LINK_CHANGE_BIT		1
+#define ETH_PORT_LINK_CHANGE_MASK		(1 << ETH_PORT_LINK_CHANGE_BIT)
 
-#define ETH_PORT_ISR_MASK_REG(p)	(ETH_REG_BASE(p) + 0x24)
+#define ETH_PORT_ISR_MASK_REG(p)		(ETH_REG_BASE(p) + 0x24)
+
+#define ETH_PORT_ISR_SUM_CAUSE_REG(p)		(ETH_REG_BASE(p) + 0xA0)
+#define ETH_PORT_ISR_SUM_MASK_REG(p)		(ETH_REG_BASE(p) + 0xA4)
+
+#define ETH_PORT_ISR_SUM_INTERN_BIT		0x1
+#define ETH_PORT_ISR_SUM_INTERN_MASK		(1 << ETH_PORT_ISR_SUM_INTERN_BIT)
 /*-------------------------------------------------------------------------------*/
 
 /****************************************/

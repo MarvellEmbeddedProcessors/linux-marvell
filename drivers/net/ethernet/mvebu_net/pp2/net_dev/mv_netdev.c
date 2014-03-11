@@ -3834,6 +3834,8 @@ static int mv_eth_probe(struct platform_device *pdev)
 			mvGmacPortLbSet(port, (plat_data->speed == SPEED_1000), is_sgmii);
 
 		mvGmacPortPowerUp(port, is_sgmii, is_rgmii);
+
+		mvGmacPortSumIsrUnmask(port);
 	}
 
 	if (mv_eth_load_network_interfaces(pdev))
