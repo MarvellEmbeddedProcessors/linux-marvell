@@ -656,6 +656,12 @@ void mvGmacPortRegs(int port)
 
 	mvGmacPrintReg(ETH_PORT_ISR_CAUSE_REG(port), "MV_GMAC_ISR_CAUSE_REG");
 	mvGmacPrintReg(ETH_PORT_ISR_MASK_REG(port), "MV_GMAC_ISR_MASK_REG");
+
+#ifdef CONFIG_MV_ETH_PP2_1
+	mvGmacPrintReg(ETH_PORT_ISR_SUM_CAUSE_REG(port), "MV_GMAC_ISR_SUM_CAUSE_REG");
+	mvGmacPrintReg(ETH_PORT_ISR_SUM_MASK_REG(port), "MV_GMAC_ISR_SUM_MASK_REG");
+#endif
+
 }
 
 
