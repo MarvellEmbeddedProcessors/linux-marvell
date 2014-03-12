@@ -80,6 +80,19 @@ extern "C" {
 
 #include "cesa/mvCesa.h"
 #include "cesa/mvCesaRegs.h"
+#include <linux/platform_device.h>
+#include <linux/of.h>
+#include <linux/of_irq.h>
+#include <linux/of_address.h>
+#include <linux/mbus.h>
+#include <linux/clk.h>
+
+/* #define CESA_DEBUGS */
+#ifdef CESA_DEBUGS
+#define dprintk(a...) printk(a)
+#else
+#define dprintk(a...)
+#endif
 
 
 	MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA_HAL_DATA *halData);
@@ -95,6 +108,9 @@ extern "C" {
 	void mv_bin_to_hex(const MV_U8 *bin, char *hexStr, int size);
 	MV_VOID mv_hex_to_bin(const char *pHexStr, MV_U8 *pBin, int size);
 	void mv_debug_mem_dump(void *addr, int size, int access);
+	MV_STATUS mvSysCesaInit(int numOfSession, int queueDepth,
+				 void *osHandle, struct platform_device *pdev);
+	int mv_get_cesa_resources(struct platform_device *pdev);
 
 #ifdef __cplusplus
 }

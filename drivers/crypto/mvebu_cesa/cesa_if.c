@@ -69,6 +69,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/spinlock.h>
 #include <linux/spinlock_types.h>
 
+#define WINDOW_CTRL(i)		(0xA04 + ((i) << 3))
+#define WINDOW_BASE(i)		(0xA00 + ((i) << 3))
 
 #define MV_CESA_IF_MAX_WEIGHT	0xFFFFFFFF
 
@@ -87,6 +89,11 @@ static MV_U32 resId;
 static spinlock_t chanLock[MV_CESA_CHANNELS];
 static DEFINE_SPINLOCK(cesaIfLock);
 static DEFINE_SPINLOCK(cesaIsrLock);
+
+/*
+ * Initialized in cesa_<mode>_probe, where <mode>: ocf or test
+ */
+MV_U32 mv_cesa_base[MV_CESA_CHANNELS], mv_cesa_tdma_base[MV_CESA_CHANNELS];
 
 MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA_HAL_DATA *halData)
 {
@@ -497,4 +504,194 @@ void mv_debug_mem_dump(void *addr, int size, int access)
 		}
 		mvOsPrintf("\n");
 	}
+}
+
+static void
+mv_cesa_conf_mbus_windows(const struct mbus_dram_target_info *dram, MV_U8 chan)
+{
+	int i;
+	void __iomem *base = (void __iomem *)mv_cesa_tdma_base[chan];
+	dprintk("%s base: %p, dram_n_cs: %x\n", __func__, base, dram->num_cs);
+
+	for (i = 0; i < 4; i++) {
+		writel(0, base + WINDOW_CTRL(i));
+		writel(0, base + WINDOW_BASE(i));
+	}
+
+	for (i = 0; i < dram->num_cs; i++) {
+		const struct mbus_dram_window *cs = dram->cs + i;
+
+		writel(((cs->size - 1) & 0xffff0000) |
+		    (cs->mbus_attr << 8) |
+		    (dram->mbus_dram_target_id << 4) | 1,
+		    base + WINDOW_CTRL(i));
+		writel(cs->base, base + WINDOW_BASE(i));
+
+		dprintk("%s %d: ctrlv 0x%x ctrl_addr: %p basev 0x%x\n",
+		    __func__, i, ((cs->size - 1) & 0xffff0000) |
+		    (cs->mbus_attr << 8) |
+		    (dram->mbus_dram_target_id << 4) | 1,
+		    base + WINDOW_CTRL(i), cs->base);
+	}
+}
+
+int
+mv_get_cesa_resources(struct platform_device *pdev)
+{
+	struct device_node *np;
+	struct resource *r;
+	MV_U8 chan = 0;
+
+	/*
+	 * Preparation resources for all CESA chan
+	 */
+	for_each_child_of_node(pdev->dev.of_node, np) {
+
+		/*
+		 * CESA base
+		 */
+		r = platform_get_resource(pdev, IORESOURCE_MEM, 2 * chan);
+		if (r == NULL) {
+			dev_err(&pdev->dev, "no IO memory resource defined\n");
+			return -ENODEV;
+		}
+
+		r = devm_request_mem_region(&pdev->dev, r->start,
+		    resource_size(r), pdev->name);
+		if (r == NULL) {
+			dev_err(&pdev->dev, "failed to request mem res\n");
+			return -EBUSY;
+		}
+
+		mv_cesa_base[chan] = (MV_U32)devm_ioremap(&pdev->dev,
+		    r->start, resource_size(r));
+
+
+		/*
+		 * TDMA base
+		 */
+		r = platform_get_resource(pdev, IORESOURCE_MEM, 2 * chan + 1);
+		if (r == NULL) {
+			dev_err(&pdev->dev, "no IO memory resource defined\n");
+			return -ENODEV;
+		}
+
+		r = devm_request_mem_region(&pdev->dev, r->start,
+		    resource_size(r), pdev->name);
+		if (r == NULL) {
+			dev_err(&pdev->dev, "failed to request mem res\n");
+			return -EBUSY;
+		}
+
+		mv_cesa_tdma_base[chan] = (MV_U32)devm_ioremap(&pdev->dev,
+		    r->start, resource_size(r));
+
+		/*
+		 * Debugs
+		 */
+		dprintk("%s: r->end 0x%x, r->end 0x%x\n", __func__,
+		    r->start, r->end);
+		dprintk("%s: c_base[%d] 0x%x, t_base[%d] 0x%x\n", __func__,
+		    chan, mv_cesa_base[chan], chan, mv_cesa_tdma_base[chan]);
+
+		chan++;
+	}
+
+	return 0;
+}
+
+/*
+ * Initialize CESA subsystem
+ * Based on mach-spec version of mvSysCesaInit (mvSysCesa.c)
+ */
+MV_STATUS mvSysCesaInit(int numOfSession, int queueDepth, void *osHandle,
+						  struct platform_device *pdev)
+{
+	MV_CESA_HAL_DATA halData;
+	MV_STATUS status;
+	MV_U8 chan = 0;
+	const struct mbus_dram_target_info *dram;
+	struct device_node *np, *np_sram;
+	struct resource res;
+	int err, ret;
+
+	np_sram = of_find_compatible_node(NULL, NULL, "marvell,cesa-sram");
+	if (!np_sram) {
+		dev_err(&pdev->dev, "Cannot find 'marvell,cesa-sram' node");
+		return -ENOENT;
+	}
+
+	dram = mv_mbus_dram_info();
+
+	/*
+	 * Preparation for each CESA chan
+	 */
+	for_each_child_of_node(pdev->dev.of_node, np) {
+
+		/*
+		 * (Re-)program MBUS remapping windows if we are asked to.
+		 */
+		if (dram)
+			mv_cesa_conf_mbus_windows(dram, chan);
+
+		/*
+		 * Read base addr from Security Accelerator SRAM (CESA)
+		 * needed for hal configuration (based on bootrom)
+		 */
+		err = of_address_to_resource(np_sram, chan, &res);
+		if (err < 0) {
+			dev_err(&pdev->dev, "Cannot get 'cesa-sram' addr");
+			return -ENOENT;
+		}
+
+		dprintk("%s r_start 0x%x, r_end 0x%x\n",
+		    __func__, res.start, res.end);
+
+		if (!request_mem_region(res.start, resource_size(&res),
+				    pdev->name)) {
+			dev_err(&pdev->dev, "failed to request mem res\n");
+			return -EBUSY;
+		}
+
+		halData.sramPhysBase[chan] = res.start;
+		halData.sramVirtBase[chan] = ioremap(res.start,
+				       resource_size(&res));
+
+		ret = of_property_read_u16(pdev->dev.of_node,
+		    "cesa,sramOffset", &halData.sramOffset[chan]);
+		if (ret != 0) {
+			dev_err(&pdev->dev,
+			    "missing or bad CESA sramOffset in dts\n");
+			return -ENOENT;
+		}
+
+		dprintk("%s: sram phys: 0x%lx, sram virt: %p, sram_off 0x%x\n",
+		    __func__, halData.sramPhysBase[chan],
+		    halData.sramVirtBase[chan], halData.sramOffset[chan]);
+
+		chan++;
+	}
+
+	/*
+	 * XXX: Instead of use mvCtrlModelGet() and mvCtrlRevGet() which uses
+	 * mach-spec functions (including PEX reg read), ctrlModel and ctrlRev
+	 * are taken from the dts
+	 */
+
+	np = pdev->dev.of_node;
+	ret = 0;
+	ret |= of_property_read_u16(np, "cesa,ctrlModel", &halData.ctrlModel);
+	ret |= of_property_read_u8(np, "cesa,ctrlRev", &halData.ctrlRev);
+	if (ret != 0) {
+		dev_err(&pdev->dev,
+		    "missing or bad CESA configuration from FDT\n");
+		return -ENOENT;
+	}
+
+	dprintk("%s: ctrlModel: %x, ctrlRev: %x\n",
+	    __func__, halData.ctrlModel, halData.ctrlRev);
+
+	status = mvCesaIfInit(numOfSession, queueDepth, osHandle, &halData);
+
+	return status;
 }

@@ -41,9 +41,7 @@ disclaimer.
 #include <linux/spinlock.h>
 #include "mvCommon.h"
 #include "mvOs.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
 #include "cesa_if.h" /* moved here before cryptodev.h due to include dependencies */
-#include "mvSysCesaApi.h"
 #include <cryptodev.h>
 #include <uio.h>
 
@@ -55,6 +53,10 @@ disclaimer.
 #include "cesa/mvCesaRegs.h"
 #include "cesa/AES/mvAes.h"
 #include "cesa/mvLru.h"
+
+#ifndef CONFIG_OF
+#error cesa_ocf driver supports only DT configuration
+#endif
 
 
 #undef RT_DEBUG
@@ -69,6 +71,8 @@ static int debug = 0;
 #undef dprintk
 #define dprintk(a...)
 #endif
+
+#define	DRIVER_NAME	"armada-cesa-ocf"
 
 /* interrupt handling */
 #undef CESA_OCF_TASKLET
@@ -127,8 +131,6 @@ static int 		cesa_ocf_newsession	(device_t, u_int32_t *, struct cryptoini *);
 static int 		cesa_ocf_freesession	(device_t, u_int64_t);
 static inline void 	cesa_callback		(unsigned long);
 static irqreturn_t	cesa_interrupt_handler	(int, void *);
-static int		cesa_ocf_init		(void);
-static void		cesa_ocf_exit		(void);
 #ifdef CESA_OCF_TASKLET
 static struct tasklet_struct cesa_ocf_tasklet;
 #endif
@@ -687,6 +689,8 @@ cesa_ocf_process(device_t dev, struct cryptop *crp, int hint)
 		goto p_error;
         }
 
+	dprintk("%s, status %d\n", __func__, status);
+
 	return 0;
 
 p_error:
@@ -1128,18 +1132,28 @@ extern int crypto_init(void);
  * our driver startup and shutdown routines
  */
 static int
-cesa_ocf_init(void)
+cesa_ocf_probe(struct platform_device *pdev)
 {
 	u8 chan = 0;
 	const char *irq_str[] = {"cesa0","cesa1"};
 	unsigned int mask;
+	struct device_node *np;
+	struct clk *clk;
+	int err;
 
-	if (mvCtrlPwrClckGet(CESA_UNIT_ID, 0) == MV_FALSE) {
-		printk("\nWarning CESA engine is powered Off\n");
-		return EINVAL;
+	if (!pdev->dev.of_node) {
+		dev_err(&pdev->dev, "CESA device node not available\n");
+		return -ENOENT;
 	}
 
-	dprintk("%s\n", __func__);
+	/* Not all platforms can gate the clock, so it is not
+	 * an error if the clock does not exists.
+	 */
+	clk = clk_get(&pdev->dev, NULL);
+	if (!IS_ERR(clk))
+		clk_prepare_enable(clk);
+
+	dev_info(&pdev->dev, "%s\n", __func__);
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,30))
 	crypto_init();
@@ -1153,8 +1167,8 @@ cesa_ocf_init(void)
 	cesa_ocf_pool = (struct cesa_ocf_process*)kmalloc((sizeof(struct cesa_ocf_process) *
 					CESA_OCF_POOL_SIZE), GFP_KERNEL);
 	if (cesa_ocf_pool == NULL) {
-		printk("%s,%d: ENOBUFS \n", __FILE__, __LINE__);
-		return EINVAL;
+		dev_err(&pdev->dev, "%s,%d: ENOBUFS\n", __FILE__, __LINE__);
+		return -EINVAL;
 	}
 
 	for (cesa_ocf_stack_idx = 0; cesa_ocf_stack_idx < CESA_OCF_POOL_SIZE; cesa_ocf_stack_idx++)
@@ -1168,11 +1182,18 @@ cesa_ocf_init(void)
 	if (cesa_ocf_id < 0)
 		panic("MV CESA crypto device cannot initialize!");
 
-	dprintk("%s,%d: cesa ocf device id is %d \n", __FILE__, __LINE__, cesa_ocf_id);
+	dprintk("%s,%d: cesa ocf device id is %d\n",
+					      __FILE__, __LINE__, cesa_ocf_id);
 
-	if( MV_OK != mvSysCesaInit(CESA_OCF_MAX_SES*5, CESA_Q_SIZE, NULL) ) {
-		printk("%s,%d: mvCesaInit Failed. \n", __FILE__, __LINE__);
-		return EINVAL;
+	err = mv_get_cesa_resources(pdev);
+	if (err != 0)
+		return err;
+
+	if (MV_OK !=
+	    mvSysCesaInit(CESA_OCF_MAX_SES*5, CESA_Q_SIZE, NULL, pdev)) {
+		dev_err(&pdev->dev, "%s,%d: mvCesaInit Failed.\n",
+							   __FILE__, __LINE__);
+		return -EINVAL;
 	}
 
 #ifdef CONFIG_MV_CESA_INT_COALESCING_SUPPORT
@@ -1181,7 +1202,23 @@ cesa_ocf_init(void)
 	mask = MV_CESA_CAUSE_ACC_DMA_MASK;
 #endif
 
-	for(chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+	/*
+	 * Preparation for each CESA chan
+	 */
+	for_each_child_of_node(pdev->dev.of_node, np) {
+		int irq;
+
+		/*
+		 * Get IRQ from FDT and map it to the Linux IRQ nr
+		 */
+		irq = irq_of_parse_and_map(np, 0);
+		if (!irq) {
+			dev_err(&pdev->dev, "IRQ nr missing in device tree\n");
+			return -ENOENT;
+		}
+
+		dprintk("%s: cesa irq %d, chan %d\n", __func__,
+					      irq, chan);
 
 		/* clear and unmask Int */
 		MV_REG_WRITE( MV_CESA_ISR_CAUSE_REG(chan), 0);
@@ -1190,11 +1227,14 @@ cesa_ocf_init(void)
 		chan_id[chan] = chan;
 
 		/* register interrupt */
-		if( request_irq( CESA_IRQ(chan), cesa_interrupt_handler,
+		if (request_irq(irq, cesa_interrupt_handler,
 				(IRQF_DISABLED) , irq_str[chan], &chan_id[chan]) < 0) {
-			printk("%s,%d: cannot assign irq %x\n", __FILE__, __LINE__, CESA_IRQ(chan));
-			return EINVAL;
+			dev_err(&pdev->dev, "%s,%d: cannot assign irq %x\n",
+			    __FILE__, __LINE__, irq);
+			return -EINVAL;
 		}
+
+		chan++;
 	}
 
 #ifdef CESA_OCF_TASKLET
@@ -1212,13 +1252,18 @@ cesa_ocf_init(void)
 	REGISTER(CRYPTO_SHA1_HMAC);
 #undef REGISTER
 
+#ifdef RT_DEBUG
+	mvCesaDebugRegs();
+#endif
 	return 0;
 }
 
-static void
-cesa_ocf_exit(void)
+static int
+cesa_ocf_remove(struct platform_device *pdev)
 {
+	struct device_node *np;
 	u8 chan = 0;
+	int irq;
 
 	dprintk("%s()\n", __func__);
 
@@ -1226,22 +1271,57 @@ cesa_ocf_exit(void)
 	cesa_ocf_id = -1;
 	kfree(cesa_ocf_pool);
 
-	for(chan = 0; chan < MV_CESA_CHANNELS; chan++) {
-		free_irq(CESA_IRQ(chan), NULL);
+	for_each_child_of_node(pdev->dev.of_node, np) {
+
+		irq = irq_of_parse_and_map(np, 0);
+		if (!irq) {
+			dev_err(&pdev->dev, "IRQ nr missing in device tree\n");
+			return -ENOENT;
+		}
+
+		free_irq(irq, NULL);
 
 		/* mask and clear Int */
 		MV_REG_WRITE( MV_CESA_ISR_MASK_REG(chan), 0);
 		MV_REG_WRITE( MV_CESA_ISR_CAUSE_REG(chan), 0);
 
+		chan++;
 	}
 
 	if( MV_OK != mvCesaIfFinish() ) {
-		printk("%s,%d: mvCesaFinish Failed. \n", __FILE__, __LINE__);
-		return;
+		dev_err(&pdev->dev, "%s,%d: mvCesaFinish Failed.\n",
+							   __FILE__, __LINE__);
+		return -EINVAL;
 	}
+	return 0;
 }
 
+static struct of_device_id mv_cesa_dt_ids[] = {
+	{ .compatible = "marvell,armada-cesa", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, mv_cesa_dt_ids);
+
+static struct platform_driver mv_cesa_driver = {
+	.driver = {
+		.name	= DRIVER_NAME,
+		.owner	= THIS_MODULE,
+		.of_match_table = of_match_ptr(mv_cesa_dt_ids),
+	},
+	.probe		= cesa_ocf_probe,
+	.remove		= cesa_ocf_remove,
+};
+
+static int __init cesa_ocf_init(void)
+{
+	return platform_driver_register(&mv_cesa_driver);
+}
 module_init(cesa_ocf_init);
+
+static void __exit cesa_ocf_exit(void)
+{
+	platform_driver_unregister(&mv_cesa_driver);
+}
 module_exit(cesa_ocf_exit);
 
 MODULE_LICENSE("Marvell/GPL");
