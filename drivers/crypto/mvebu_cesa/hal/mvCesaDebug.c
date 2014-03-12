@@ -72,6 +72,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cesa/mvCesaRegs.h"
 #include "cesa/mvCesa.h"
 #include "cesa/AES/mvAes.h"
+#ifdef CONFIG_OF
+#include "cesa_if.h"
+#endif
 
 static const char *mvCesaDebugStateStr(MV_CESA_STATE state)
 {
@@ -188,7 +191,11 @@ void mvCesaDebugMbuf(const char *str, MV_CESA_MBUF *pMbuf, int offset, int size)
 			   frag, pMbuf->pFrags[frag].bufVirtPtr, pMbuf->pFrags[frag].bufSize);
 		if (size > 0) {
 			len = MV_MIN(pMbuf->pFrags[frag].bufSize, size);
+#ifdef CONFIG_OF
+			mv_debug_mem_dump(pMbuf->pFrags[frag].bufVirtPtr + fragOffset, len, 1);
+#else
 			mvDebugMemDump(pMbuf->pFrags[frag].bufVirtPtr + fragOffset, len, 1);
+#endif
 			size -= len;
 			fragOffset = 0;
 		}
@@ -353,13 +360,25 @@ void mvCesaDebugSramSA(MV_CESA_SRAM_SA *pSramSA, int mode)
 
 	if (mode != 0) {
 		mvOsPrintf("cryptoKey=%p, maxCryptoKey=%d bytes\n", pSramSA->cryptoKey, MV_CESA_MAX_CRYPTO_KEY_LENGTH);
+#ifdef CONFIG_OF
+		mv_debug_mem_dump(pSramSA->cryptoKey, MV_CESA_MAX_CRYPTO_KEY_LENGTH, 1);
+#else
 		mvDebugMemDump(pSramSA->cryptoKey, MV_CESA_MAX_CRYPTO_KEY_LENGTH, 1);
+#endif
 
 		mvOsPrintf("macInnerIV=%p, maxInnerIV=%d bytes\n", pSramSA->macInnerIV, MV_CESA_MAX_DIGEST_SIZE);
+#ifdef CONFIG_OF
+		mv_debug_mem_dump(pSramSA->macInnerIV, MV_CESA_MAX_DIGEST_SIZE, 1);
+#else
 		mvDebugMemDump(pSramSA->macInnerIV, MV_CESA_MAX_DIGEST_SIZE, 1);
+#endif
 
 		mvOsPrintf("macOuterIV=%p, maxOuterIV=%d bytes\n", pSramSA->macOuterIV, MV_CESA_MAX_DIGEST_SIZE);
+#ifdef CONFIG_OF
+		mv_debug_mem_dump(pSramSA->macOuterIV, MV_CESA_MAX_DIGEST_SIZE, 1);
+#else
 		mvDebugMemDump(pSramSA->macOuterIV, MV_CESA_MAX_DIGEST_SIZE, 1);
+#endif
 	}
 }
 
@@ -416,7 +435,11 @@ void mvCesaDebugSA(short sid, int mode)
 
 		mvOsPrintf("\n\t Sram buffer: size=%d, pVirt=%p\n", MV_CESA_MAX_BUF_SIZE, cesaSramVirtPtr[chan]->buf);
 		if (mode != 0)
+#ifdef CONFIG_OF
+			mv_debug_mem_dump(cesaSramVirtPtr[chan]->buf, 64, 1);
+#else
 			mvDebugMemDump(cesaSramVirtPtr[chan]->buf, 64, 1);
+#endif
 
 		mvOsPrintf("\n");
 		mvOsPrintf("\n\t Sram descriptor: size=%d, pVirt=%p\n", (int)sizeof(MV_CESA_DESC),
@@ -428,7 +451,11 @@ void mvCesaDebugSA(short sid, int mode)
 		mvOsPrintf("\n\t Sram IV: size=%d, pVirt=%p\n", MV_CESA_MAX_IV_LENGTH, &cesaSramVirtPtr[chan]->cryptoIV);
 		if (mode != 0) {
 			mvOsPrintf("\n");
+#ifdef CONFIG_OF
+			mv_debug_mem_dump(cesaSramVirtPtr[chan]->cryptoIV, MV_CESA_MAX_IV_LENGTH, 1);
+#else
 			mvDebugMemDump(cesaSramVirtPtr[chan]->cryptoIV, MV_CESA_MAX_IV_LENGTH, 1);
+#endif
 		}
 		mvOsPrintf("\n");
 		mvCesaDebugSramSA(&cesaSramVirtPtr[chan]->sramSA, 0);

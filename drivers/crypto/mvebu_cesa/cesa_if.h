@@ -95,6 +95,10 @@ extern "C" {
 	MV_STATUS mvCesaIfPolicyGet(MV_CESA_POLICY *pCesaPolicy);
 	MV_VOID mvCesaIfDebugMbuf(const char *str, MV_CESA_MBUF *pMbuf, int offset, int size);
 
+	void mv_bin_to_hex(const MV_U8 *bin, char *hexStr, int size);
+	MV_VOID mv_hex_to_bin(const char *pHexStr, MV_U8 *pBin, int size);
+	void mv_debug_mem_dump(void *addr, int size, int access);
+
 #ifdef __cplusplus
 }
 #endif
