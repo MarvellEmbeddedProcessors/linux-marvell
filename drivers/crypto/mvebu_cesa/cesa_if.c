@@ -382,11 +382,6 @@ MV_STATUS mvCesaIfPolicyGet(MV_CESA_POLICY *pCesaPolicy)
 	return MV_OK;
 }
 
-MV_STATUS mvCesaIfTdmaWinInit(MV_U8 chan, MV_UNIT_WIN_INFO *addrWinMap)
-{
-	return mvCesaTdmaWinInit(chan, addrWinMap);
-}
-
 MV_STATUS mvCesaIfFinish(void)
 {
 	/* Free global resources */
