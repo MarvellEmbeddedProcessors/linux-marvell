@@ -1,15 +1,34 @@
 #
 # Makefile for the Marvell CESA driver
 #
-ifeq ($(CONFIG_PLAT_ARMADA),y)
-include $(srctree)/$(MACHINE)/config/mvRules.mk
+
+CPU_ARCH	= ARM
+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+ENDIAN      = BE
+else
+ENDIAN      = LE
 endif
 
-ifeq ($(CONFIG_MV_CESA_OCF),y)
-EXTRA_CFLAGS    += -I$(srctree)/crypto/ocf
-endif
+MV_DEFINE = -DMV_LINUX -DMV_CPU_$(ENDIAN) -DMV_$(CPU_ARCH)
 
-obj-$(CONFIG_MV_INCLUDE_CESA) += cesa_if.o
+CESA_DIR	:= drivers/crypto/mvebu_cesa
+
+obj-y += cesa_if.o
+
 obj-$(CONFIG_MV_CESA_TOOL) += cesa_dev.o
 obj-$(CONFIG_MV_CESA_TEST) += cesa_test.o
 obj-$(CONFIG_MV_CESA_OCF)  += cesa_ocf_drv.o
+
+obj-y += hal/mvCesa.o hal/mvCesaDebug.o hal/mvSHA256.o	\
+	 hal/mvMD5.o hal/mvSHA1.o hal/AES/mvAesAlg.o	\
+	 hal/AES/mvAesApi.o
+
+EXTRA_INCLUDE	=  -I$(CESA_DIR)
+EXTRA_INCLUDE	+= -I$(srctree)/arch/arm/mach-mvebu/include/mach
+EXTRA_INCLUDE	+= -I$(srctree)/arch/arm/mach-mvebu/linux_oss
+EXTRA_INCLUDE	+= -I$(CESA_DIR)/hal
+ifeq ($(CONFIG_MV_CESA_OCF),y)
+EXTRA_INCLUDE	+= -I$(srctree)/crypto/ocf
+endif
+
+ccflags-y	+= $(EXTRA_INCLUDE) $(MV_DEFINE)
