@@ -66,16 +66,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvOs.h"
 #include "mvDebug.h"
 
+#ifdef CONFIG_OF
+#include "cesa_if.h"
+#include "mvMD5.h"
+#include "mvSHA1.h"
+#include "mvSHA256.h"
+#include "mvCesaRegs.h"
+#include "mvCesa.h"
+#include "AES/mvAes.h"
+#else
 #include "cesa/mvMD5.h"
 #include "cesa/mvSHA1.h"
 #include "cesa/mvSHA256.h"
 #include "cesa/mvCesaRegs.h"
 #include "cesa/mvCesa.h"
 #include "cesa/AES/mvAes.h"
-#ifdef CONFIG_OF
-#include "cesa_if.h"
-#endif
-
+#endif /* CONFIG_OF */
 
 #define MV_CESA_VERSION		3
 

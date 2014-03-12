@@ -78,8 +78,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif
 
-#include "cesa/mvCesa.h"
-#include "cesa/mvCesaRegs.h"
+#include "mvCesa.h"
+#include "mvCesaRegs.h"
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>

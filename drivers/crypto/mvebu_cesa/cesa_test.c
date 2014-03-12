@@ -133,9 +133,9 @@ do {					\
 #include "ctrlEnv/sys/mvCpuIf.h"
 #include "cntmr/mvCntmr.h"
 #include "cesa_if.h"
-#include "cesa/mvMD5.h"
-#include "cesa/mvSHA1.h"
-#include "cesa/mvSHA256.h"
+#include "mvMD5.h"
+#include "mvSHA1.h"
+#include "mvSHA256.h"
 
 #if defined(CONFIG_MV646xx)
 #include "marvell_pic.h"
