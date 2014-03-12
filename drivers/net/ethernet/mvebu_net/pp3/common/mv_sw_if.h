@@ -62,66 +62,70 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *******************************************************************************/
 
-#ifndef __mvHwIf_h__
-#define __mvHwIf_h__
+#ifndef __mvSwIf_h__
+#define __mvSwIf_h__
 
 #include <linux/kernel.h>
 #include <linux/io.h>
-
-struct pp3_unit_info {
-	u32 base_addr; /* unit base address = silicon addr + unit offset */
-	u32 ins_offs;  /* unit instance offset - for multiple units */
-};
-
-/*
-	access_addr - absolute address: Silicon base + unit base + table base + entry offset
-	words_num   - number of words (word = 32 bits) to read
-	data_ptr    - pointer to an array containing the read data
- */
-static inline void mv_pp3_hw_read(u32 access_addr, int words_num, u32 *data_ptr)
-{
-	int i;
-
-	for (i = 0; i < words_num; i++)
-		data_ptr[i] = readl(access_addr + 4*i);
-}
-
-/*
-	access_addr - absolute address: Silicon base + unit base + table base + entry offset
-	words_num   - number of words (word = 32 bits) to write
-	data_ptr    - pointer to an array containing the write data
- */
-static inline void mv_pp3_hw_write(u32 access_addr, int words_num, u32 *data_ptr)
-{
-	int i;
-
-	for (i = 0; i < words_num; i++)
-		writel(data_ptr[i], access_addr + 4*i);
-}
-
-/*
-	access_addr - absolute address: Silicon base + unit base + register offset
-	return register value
- */
-static inline u32 mv_pp3_hw_reg_read(u32 access_addr)
-{
-	return readl(access_addr);
-}
-
-/*
-	access_addr - absolute address: Silicon base + unit base + register offset
-	write data to register
- */
-static inline void mv_pp3_hw_reg_write(u32 access_addr, u32 data)
-{
-#ifdef PP3_DEBUG
-	pr_info("\nwrite reg 0x%x, data 0x%x", access_addr, data);
-#endif
-	writel(data, access_addr);
-}
+#include <linux/errno.h>
+#include <linux/slab.h>
+#include <linux/module.h>
+#include <linux/netdevice.h>
+#include <linux/platform_device.h>
 
 
-u32 mv_hw_silicon_base_addr_get(void);
+#define	MV_MAC_ADDR_SIZE	(6)
+#define MV_MAC_STR_SIZE		(20)
 
+/******************************************************
+ * interrupt control --                               *
+ ******************************************************/
+#define MV_TRYLOCK(lock, flags)                               \
+	(in_interrupt() ? spin_trylock((lock)) :              \
+		spin_trylock_irqsave((lock), (flags)))
 
-#endif /* __mvHwIf_h__ */
+#define MV_LOCK(lock, flags)					\
+do {								\
+	if (in_interrupt())					\
+		spin_lock((lock));				\
+	else							\
+		spin_lock_irqsave((lock), (flags));		\
+} while (0)
+
+#define MV_UNLOCK(lock, flags)					\
+do {								\
+	if (in_interrupt())					\
+		spin_unlock((lock));				\
+	else							\
+		spin_unlock_irqrestore((lock), (flags));	\
+} while (0)
+
+#define MV_LIGHT_LOCK(flags)					\
+do {								\
+	if (!in_interrupt())					\
+		local_irq_save(flags);				\
+} while (0)
+
+#define MV_LIGHT_UNLOCK(flags)					\
+do {								\
+	if (!in_interrupt())					\
+		local_irq_restore(flags);			\
+} while (0)
+
+/******************************************************
+ * align memory allocateion                           *
+ ******************************************************/
+/* Macro for testing aligment. Positive if number is NOT aligned   */
+#define MV_IS_NOT_ALIGN(number, align)      ((number) & ((align) - 1))
+
+/* Macro for alignment up. For example, MV_ALIGN_UP(0x0330, 0x20) = 0x0340   */
+#define MV_ALIGN_UP(number, align)                             \
+(((number) & ((align) - 1)) ? (((number) + (align)) & ~((align)-1)) : (number))
+
+/* Macro for alignment down. For example, MV_ALIGN_UP(0x0330, 0x20) = 0x0320 */
+#define MV_ALIGN_DOWN(number, align) ((number) & ~((align)-1))
+
+/* Sets the field located at the specified in data.     */
+#define U32_SET_FIELD(data, mask, val)		((data) = (((data) & ~(mask)) | (val)))
+
+#endif /* __mvSwIf_h__ */
