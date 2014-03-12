@@ -34,6 +34,13 @@
 			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
 		};
 
+		/* Security Accelerator SRAM (CESA) */
+		cesa-sram {
+			compatible = "marvell,cesa-sram";
+			reg = <MBUS_ID(0x09, 0x01) 0 0x10000   /*chan0*/
+			       MBUS_ID(0x09, 0x05) 0 0x10000>; /*chan1*/
+		};
+
 		internal-regs {
 			L2: l2-cache {
 				compatible = "marvell,aurora-system-cache";
@@ -175,6 +182,29 @@
 					0x184d0 0x4>;
 				status = "okay";
 			};
+
+			crypto@9D000 {
+				compatible = "marvell,armada-cesa";
+				reg = <0x9D000 0x1000	/* cesa base reg chan 0 */
+				       0x90000 0x1000	/* tdma base reg chan 0 */
+				       0x9F000 0x1000	/* cesa base reg chan 1 */
+				       0x92000 0x1000>;	/* tdma base reg chan 1 */
+				clocks = <&gateclk 23>;
+				cesa,ctrlModel = /bits/ 16 <0x7846>;
+				cesa,ctrlRev = /bits/ 8 <2>;
+				cesa,sramOffset = /bits/ 16 <0>;
+				status = "disabled";
+
+				crypto10 {
+					/* channel 0 */
+					interrupts = <48>;
+				};
+				crypto11 {
+					/* channel 1 */
+					interrupts = <49>;
+				};
+			};
+
 		};
 	};
 
