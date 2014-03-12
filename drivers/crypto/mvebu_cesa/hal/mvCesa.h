@@ -78,7 +78,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif
 
+#ifndef CONFIG_OF
 #include "ctrlEnv/mvCtrlEnvSpec.h"
+#endif
 #include "mvSysCesaConfig.h"
 #include "mvCesaRegs.h"
 
