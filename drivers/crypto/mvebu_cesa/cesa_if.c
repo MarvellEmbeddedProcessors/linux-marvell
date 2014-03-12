@@ -410,3 +410,96 @@ MV_VOID mvCesaIfDebugMbuf(const char *str, MV_CESA_MBUF *pMbuf, int offset, int 
 {
 	return mvCesaDebugMbuf(str, pMbuf, offset, size);
 }
+
+void mv_bin_to_hex(const MV_U8 *bin, char *hexStr, int size)
+{
+	int i;
+
+	for (i = 0; i < size; i++)
+		mvOsSPrintf(&hexStr[i * 2], "%02x", bin[i]);
+
+	hexStr[i * 2] = '\0';
+}
+
+/*******************************************************************************
+* mv_hex_to_bin - Convert hex to binary
+*
+* DESCRIPTION:
+*		This function Convert hex to binary.
+*
+* INPUT:
+*       pHexStr - hex buffer pointer.
+*       size    - Size to convert.
+*
+* OUTPUT:
+*       pBin - Binary buffer pointer.
+*
+* RETURN:
+*       None.
+*
+*******************************************************************************/
+MV_VOID mv_hex_to_bin(const char *pHexStr, MV_U8 *pBin, int size)
+{
+	int j, i;
+	char tmp[3];
+	MV_U8 byte;
+
+	for (j = 0, i = 0; j < size; j++, i += 2) {
+		tmp[0] = pHexStr[i];
+		tmp[1] = pHexStr[i + 1];
+		tmp[2] = '\0';
+		byte = (MV_U8) (strtol(tmp, NULL, 16) & 0xFF);
+		pBin[j] = byte;
+	}
+}
+
+/* Dump memory in specific format:
+ * address: X1X1X1X1 X2X2X2X2 ... X8X8X8X8
+ */
+void mv_debug_mem_dump(void *addr, int size, int access)
+{
+	int i, j;
+	MV_U32 memAddr = (MV_U32) addr;
+
+	if (access == 0)
+		access = 1;
+
+	if ((access != 4) && (access != 2) && (access != 1)) {
+		mvOsPrintf("%d wrong access size. Access must be 1 or 2 or 4\n", access);
+		return;
+	}
+	memAddr = MV_ALIGN_DOWN((unsigned int)addr, 4);
+	size = MV_ALIGN_UP(size, 4);
+	addr = (void *)MV_ALIGN_DOWN((unsigned int)addr, access);
+	while (size > 0) {
+		mvOsPrintf("%08x: ", memAddr);
+		i = 0;
+		/* 32 bytes in the line */
+		while (i < 32) {
+			if (memAddr >= (MV_U32) addr) {
+				switch (access) {
+				case 1:
+					mvOsPrintf("%02x ", MV_MEMIO8_READ(memAddr));
+					break;
+
+				case 2:
+					mvOsPrintf("%04x ", MV_MEMIO16_READ(memAddr));
+					break;
+
+				case 4:
+					mvOsPrintf("%08x ", MV_MEMIO32_READ(memAddr));
+					break;
+				}
+			} else {
+				for (j = 0; j < (access * 2 + 1); j++)
+					mvOsPrintf(" ");
+			}
+			i += access;
+			memAddr += access;
+			size -= access;
+			if (size <= 0)
+				break;
+		}
+		mvOsPrintf("\n");
+	}
+}

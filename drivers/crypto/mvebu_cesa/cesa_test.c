@@ -1434,7 +1434,7 @@ static MV_U32 getRate(MV_U32 *remainder)
 static char *extractMbuf(MV_CESA_MBUF *pMbuf, int offset, int size, char *hexStr)
 {
 	mvCesaCopyFromMbuf((MV_U8 *)cesaBinBuffer, pMbuf, offset, size);
-	mvBinToHex((const MV_U8 *)cesaBinBuffer, hexStr, size);
+	mv_bin_to_hex((const MV_U8 *)cesaBinBuffer, hexStr, size);
 
 	return hexStr;
 }
@@ -1461,9 +1461,9 @@ static MV_BOOL cesaCheckMbuf(MV_CESA_MBUF *pMbuf, const char *hexString, int off
 		return MV_TRUE;
 	}
 /*
-    mvDebugMemDump(cesaBinBuffer, size, 1);
+    mv_debug_mem_dump(cesaBinBuffer, size, 1);
 */
-	mvHexToBin(hexString, (MV_U8 *)cesaExpBinBuffer, size);
+	mv_hex_to_bin(hexString, (MV_U8 *)cesaExpBinBuffer, size);
 
 	/* Compare buffers */
 	while (checkSize > checkedSize) {
@@ -1471,8 +1471,8 @@ static MV_BOOL cesaCheckMbuf(MV_CESA_MBUF *pMbuf, const char *hexString, int off
 		if (memcmp(cesaExpBinBuffer, &cesaBinBuffer[checkedSize], size) != 0) {
 			mvOsPrintf("CheckMbuf failed: checkSize=%d, size=%d, checkedSize=%d\n",
 				   checkSize, size, checkedSize);
-			mvDebugMemDump(&cesaBinBuffer[checkedSize], size, 1);
-			mvDebugMemDump(cesaExpBinBuffer, size, 1);
+			mv_debug_mem_dump(&cesaBinBuffer[checkedSize], size, 1);
+			mv_debug_mem_dump(cesaExpBinBuffer, size, 1);
 
 			isFailed = MV_TRUE;
 			break;
@@ -1488,7 +1488,7 @@ static MV_STATUS cesaSetMbuf(MV_CESA_MBUF *pMbuf, const char *hexString, int off
 	MV_STATUS status = MV_OK;
 	int copySize, size = strlen(hexString) / 2;
 
-	mvHexToBin(hexString, (MV_U8 *)cesaBinBuffer, size);
+	mv_hex_to_bin(hexString, (MV_U8 *)cesaBinBuffer, size);
 
 	copySize = 0;
 	while (reqSize > copySize) {
@@ -1531,7 +1531,7 @@ void cesaTestPrintReq(int req, int offset, int size)
 	MV_CESA_MBUF *pMbuf;
 
 	mvOsPrintf("cesaTestPrintReq: req=%d, offset=%d, size=%d\n", req, offset, size);
-	mvDebugMemDump(cesaCmdRing, 128, 4);
+	mv_debug_mem_dump(cesaCmdRing, 128, 4);
 
 	pMbuf = cesaCmdRing[req].pSrc;
 	mvCesaIfDebugMbuf("src", pMbuf, offset, size);
@@ -1894,19 +1894,19 @@ MV_STATUS testCmd(int sid, int iter, MV_CESA_COMMAND *pCmd,
 		if (pTestSession->macAlgorithm == MV_CESA_MAC_MD5) {
 			mvMD5(pCmd->pSrc->pFrags[0].bufVirtPtr, pCmd->macLength, pDigest);
 			mvOsPrintf("SW HASH_MD5: reqSize=%d, macLength=%d\n", cesaReqSize, pCmd->macLength);
-			mvDebugMemDump(pDigest, MV_CESA_MD5_DIGEST_SIZE, 1);
+			mv_debug_mem_dump(pDigest, MV_CESA_MD5_DIGEST_SIZE, 1);
 			return MV_OK;
 		}
 		if (pTestSession->macAlgorithm == MV_CESA_MAC_SHA1) {
 			mvSHA1(pCmd->pSrc->pFrags[0].bufVirtPtr, pCmd->macLength, pDigest);
 			mvOsPrintf("SW HASH_SHA1: reqSize=%d, macLength=%d\n", cesaReqSize, pCmd->macLength);
-			mvDebugMemDump(pDigest, MV_CESA_SHA1_DIGEST_SIZE, 1);
+			mv_debug_mem_dump(pDigest, MV_CESA_SHA1_DIGEST_SIZE, 1);
 			return MV_OK;
 		}
 		if (pTestSession->macAlgorithm == MV_CESA_MAC_SHA2) {
 			mvSHA256(pCmd->pSrc->pFrags[0].bufVirtPtr, pCmd->macLength, pDigest);
 			mvOsPrintf("SW HASH_SHA2: reqSize=%d, macLength=%d\n", cesaReqSize, pCmd->macLength);
-			mvDebugMemDump(pDigest, MV_CESA_SHA2_DIGEST_SIZE, 1);
+			mv_debug_mem_dump(pDigest, MV_CESA_SHA2_DIGEST_SIZE, 1);
 			return MV_OK;
 		}
 	}
