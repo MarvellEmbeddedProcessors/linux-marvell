@@ -21,6 +21,7 @@
 #include <linux/mv_pp3.h>
 #include <linux/dma-mapping.h>
 #include "common/mv_hw_if.h"
+#include "common/mv_sw_if.h"
 #include "common/mv_pp3_config.h"
 #include "hmac/mv_hmac.h"
 #include "hmac/mv_hmac_bm.h"

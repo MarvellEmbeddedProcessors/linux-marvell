@@ -67,6 +67,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/io.h>
 #include <linux/slab.h>
 #include "common/mv_hw_if.h"
+#include "common/mv_sw_if.h"
 #include "hmac/mv_hmac.h"
 
 #ifdef PP3_DEBUG

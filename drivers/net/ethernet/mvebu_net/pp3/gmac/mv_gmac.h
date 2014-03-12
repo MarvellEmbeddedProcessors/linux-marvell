@@ -118,42 +118,42 @@ void pp3_gmac_unit_base(int index, u32 base);
 u32  pp3_gmac_reg_read(int port, u32 reg);
 void pp3_gmac_reg_write(int port, u32 reg, u32 data);
 
-static INLINE u32 mv_fpga_gop_base_addr_get(void)
+static inline u32 mv_fpga_gop_base_addr_get(void)
 {
 	return 0xa0000000;
 }
 
 
 /***************************************************************************/
-/*                          Inline functions                               */
+/*                          inline functions                               */
 /***************************************************************************/
-static INLINE void pp3_gmac_isr_summary_mask(void)
+static inline void pp3_gmac_isr_summary_mask(void)
 {
 	mv_pp3_hw_reg_write(mv_fpga_gop_base_addr_get() + ISR_SUM_MASK_REG, 0);
 }
 
-static INLINE void pp3_gmac_isr_summary_unmask(void)
+static inline void pp3_gmac_isr_summary_unmask(void)
 {
 	mv_pp3_hw_reg_write(mv_fpga_gop_base_addr_get() + ISR_SUM_MASK_REG,
 			ISR_SUM_PORT0_MASK | ISR_SUM_PORT1_MASK | 0x20 /* magic bit */);
 }
 
-static INLINE u32 pp3_gmac_isr_summary_cause_get(void)
+static inline u32 pp3_gmac_isr_summary_cause_get(void)
 {
 	return mv_pp3_hw_reg_read(mv_fpga_gop_base_addr_get() + ISR_SUM_CAUSE_REG);
 }
 
-static INLINE u32 pp3_gmac_port_isr_cause_get(int port)
+static inline u32 pp3_gmac_port_isr_cause_get(int port)
 {
 	return pp3_gmac_reg_read(port, GMAC_PORT_ISR_CAUSE_REG);
 }
 
-static INLINE void pp3_gmac_port_isr_mask(int port)
+static inline void pp3_gmac_port_isr_mask(int port)
 {
 	pp3_gmac_reg_write(port, GMAC_PORT_ISR_MASK_REG, 0);
 }
 
-static INLINE void pp3_gmac_port_isr_unmask(int port)
+static inline void pp3_gmac_port_isr_unmask(int port)
 {
 	pp3_gmac_reg_write(port, GMAC_PORT_ISR_MASK_REG, GMAC_PORT_LINK_CHANGE_MASK);
 }
