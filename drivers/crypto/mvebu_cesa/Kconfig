@@ -15,10 +15,8 @@ config  MV_CESA_TOOL_ARMADA
 config MV_CESA_CHANNELS
 	int "Total CESA HW channels supported"
 	depends on MV_CESA
-	range 1 2 if ARCH_ARMADA_XP
-	range 1 1 if ARCH_ARMADA370
-	default "2" if ARCH_ARMADA_XP
-	default "1" if ARCH_ARMADA370
+	range 1 2
+	default "2"
 	---help---
 	Select the number of CESA channels to be used for crypto operations acceleration.
 
@@ -56,8 +54,7 @@ endchoice
 choice
 	prompt "CESA Features"
 	depends on MV_CESA
-	default MV_CESA_CHAIN_MODE if (ARCH_ARMADA370 || ARMADA_XP_REV_Z1)
-	default MV_CESA_INT_COALESCING_SUPPORT if (ARMADA_XP_REV_A0 || ARMADA_XP_REV_B0)
+	default MV_CESA_INT_COALESCING_SUPPORT
 
 config MV_CESA_CHAIN_MODE
 	bool "Support CESA chain-mode"
@@ -67,7 +64,7 @@ config MV_CESA_CHAIN_MODE
 
 config MV_CESA_INT_COALESCING_SUPPORT
 	bool "Support Interrupt Coalescing"
-	depends on MV_CESA && (ARMADA_XP_REV_A0 || ARMADA_XP_REV_B0)
+	depends on MV_CESA
 	---help---
 	Choosing this option will enable CESA interrupt coalescing support.
 
