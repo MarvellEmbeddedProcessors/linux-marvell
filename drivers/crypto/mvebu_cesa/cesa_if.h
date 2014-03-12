@@ -78,14 +78,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern "C" {
 #endif
 
-#include "ctrlEnv/mvCtrlEnvSpec.h"
-#include "mvSysCesaConfig.h"
 #include "cesa/mvCesa.h"
 #include "cesa/mvCesaRegs.h"
 
 
 	MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA_HAL_DATA *halData);
-	MV_STATUS mvCesaIfTdmaWinInit(MV_U8 chan, MV_UNIT_WIN_INFO *addrWinMap);
 	MV_STATUS mvCesaIfFinish(void);
 	MV_STATUS mvCesaIfSessionOpen(MV_CESA_OPEN_SESSION *pSession, short *pSid);
 	MV_STATUS mvCesaIfSessionClose(short sid);

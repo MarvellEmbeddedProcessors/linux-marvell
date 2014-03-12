@@ -64,7 +64,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mvCommon.h"
 #include "mvOs.h"
+#ifndef CONFIG_OF
 #include "ctrlEnv/mvCtrlEnvSpec.h"
+#endif
 #include "mvSysCesaConfig.h"
 #include "mvCesaRegs.h"
 #include "mvCesa.h"
