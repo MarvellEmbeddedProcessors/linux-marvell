@@ -57,6 +57,14 @@
 #include <linux/of_address.h>
 #include <linux/debugfs.h>
 
+/* #define MBUS_DEBUG */
+
+#ifdef MBUS_DEBUG
+#define dprintk(a...) printk(a)
+#else
+#define dprintk(a...)
+#endif
+
 /*
  * DDR target is the same on all platforms.
  */
@@ -289,6 +297,13 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
 		writel(0, addr + WIN_REMAP_HI_OFF);
 	}
 
+	dprintk("== %s: decoding window ==\n", __func__);
+	dprintk("base_phys: 0x%x, base_low 0x%x, ctrl 0x%x, remap_addr 0x%x\n",
+	    base, base & WIN_BASE_LOW, ctrl, remap_addr);
+
+	dprintk("base_addr: %p, ctrl_addr: %p\n",
+	    addr + WIN_BASE_OFF, addr + WIN_CTRL_OFF);
+
 	return 0;
 }
 
@@ -491,6 +506,8 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
 		u32 base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
 		u32 size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
 
+		dprintk("%s: base 0x%x, size 0x%x\n", __func__, base, size);
+
 		/*
 		 * We only take care of entries for which the chip
 		 * select is enabled, and that don't have high base
@@ -508,6 +525,9 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
 				w->mbus_attr |= ATTR_HW_COHERENCY;
 			w->base = base & DDR_BASE_CS_LOW_MASK;
 			w->size = (size | ~DDR_SIZE_MASK) + 1;
+
+			dprintk("%s win%d, w->base %x, w->size %x\n",
+			    __func__, i, w->base, w->size);
 		}
 	}
 	mvebu_mbus_dram_info.num_cs = cs;
