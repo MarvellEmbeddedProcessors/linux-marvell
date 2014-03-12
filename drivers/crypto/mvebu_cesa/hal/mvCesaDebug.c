@@ -76,6 +76,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cesa_if.h"
 #endif
 
+
+#define MV_CESA_VERSION		3
+
 static const char *mvCesaDebugStateStr(MV_CESA_STATE state)
 {
 	switch (state) {
@@ -205,6 +208,7 @@ void mvCesaDebugMbuf(const char *str, MV_CESA_MBUF *pMbuf, int offset, int size)
 void mvCesaDebugRegs(void)
 {
 	MV_U8 chan = 0;
+	MV_U8 i = 0;
 
 	mvOsPrintf("\t CESA Registers:\n");
 
@@ -257,7 +261,20 @@ void mvCesaDebugRegs(void)
 			MV_CESA_TDMA_ERROR_CAUSE_REG(chan), MV_REG_READ(MV_CESA_TDMA_ERROR_CAUSE_REG(chan)));
 
 		mvOsPrintf("MV_CESA_TDMA_ERROR_MASK_REG         : 0x%X = 0x%08x\n",
-			MV_CESA_TDMA_ERROR_MASK_REG(chan), MV_REG_READ(MV_CESA_TDMA_ERROR_CAUSE_REG(chan)));
+			MV_CESA_TDMA_ERROR_MASK_REG(chan),
+			MV_REG_READ(MV_CESA_TDMA_ERROR_MASK_REG(chan)));
+
+		mvOsPrintf("\n=========== decoding windows ===========\n");
+		for (i = 0; i < MV_CESA_TDMA_ADDR_DEC_WIN; i++) {
+			mvOsPrintf("%s\t: 0x%X = 0x%08x\n",
+			    "MV_CESA_TDMA_BASE_ADDR_REG",
+			    MV_CESA_TDMA_BASE_ADDR_REG(chan, i),
+			    MV_REG_READ(MV_CESA_TDMA_BASE_ADDR_REG(chan, i)));
+			mvOsPrintf("%s\t: 0x%X = 0x%08x\n",
+			    "MV_CESA_TDMA_WIN_CTRL_REG",
+			    MV_CESA_TDMA_WIN_CTRL_REG(chan, i),
+			    MV_REG_READ(MV_CESA_TDMA_WIN_CTRL_REG(chan, i)));
+		}
 
 #endif
 	}
