@@ -47,12 +47,12 @@ disclaimer.
 
 #include "mvDebug.h"
 
-#include "cesa/mvMD5.h"
-#include "cesa/mvSHA1.h"
+#include "mvMD5.h"
+#include "mvSHA1.h"
 
-#include "cesa/mvCesaRegs.h"
-#include "cesa/AES/mvAes.h"
-#include "cesa/mvLru.h"
+#include "mvCesaRegs.h"
+#include "AES/mvAes.h"
+#include "mvLru.h"
 
 #ifndef CONFIG_OF
 #error cesa_ocf driver supports only DT configuration
