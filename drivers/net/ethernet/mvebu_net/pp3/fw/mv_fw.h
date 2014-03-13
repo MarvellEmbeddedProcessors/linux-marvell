@@ -66,9 +66,38 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mvfw_h__
 #define __mvfw_h__
 
-int mv_pp3_fw_download(char *path);
 
-int mv_fw_write(char *data, int size);
+#define MV_PP3_FW_MEM_SIZE (128*1024)
+#define MV_PP3_PROFILE_MEM_SIZE (64*1024)
+#define MV_PP3_CFG_MEM_SIZE (32*1024)
+
+
+enum pp3_mem_type {
+	PP3_IMEM = 0,
+	PP3_CFG_MEM = 1,
+	PP3_PROFILE_MEM = 2,
+	PP3_SRAM_MEM = 3,
+	PP3_SPAD = 4
+};
+
+
+int mv_pp3_imem_download(char *path);
+int mv_pp3_imem_dump(char *path);
+
+int mv_pp3_profile_download(char *path);
+int mv_pp3_profile_dump(char *path);
+
+int mv_pp3_cfg_download(char *path);
+int mv_pp3_cfg_dump(char *path);
+
+int mv_pp3_ppn_run(char *params);
+
+
+int mv_pp3_fw_read_file(char *path, char *buf, int size);
+int mv_pp3_fw_write_file(char *path, char *buf, int size);
+
+int mv_fw_mem_write(char *data, int size, enum pp3_mem_type target_mem);
+int mv_fw_mem_read(char *data, int size, enum pp3_mem_type source_mem);
 
 /* SYSFS*/
 int mv_pp3_fw_sysfs_init(struct kobject *fw_kobj);
