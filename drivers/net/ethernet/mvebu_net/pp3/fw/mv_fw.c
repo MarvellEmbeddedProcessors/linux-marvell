@@ -73,57 +73,243 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mv_fw.h"
 
-#define MV_PP3_FW_IMAGE_SIZE (128*1024)
 
-int mv_pp3_fw_download(char *path)
+int mv_pp3_fw_read_file(char *path, char *buf, int image_size)
 {
 	int fd;
-	char *buf = NULL;
-	int size = 0;
 	int tmp = 0;
+	int size = 0;
 	mm_segment_t old_fs = get_fs();
-
-	pr_info("DOWNLOAD PATH: %s\n", path);
-
-	buf = kzalloc(MV_PP3_FW_IMAGE_SIZE, GFP_KERNEL);
-	if (!buf) {
-		pr_err("FW Image Allocation Failed in <%s>\n", __func__);
-		return -ENOMEM;
-	}
-	pr_info("ALLOCATED: %d\n", MV_PP3_FW_IMAGE_SIZE);
 
 	set_fs(KERNEL_DS);
 
 	fd = sys_open(path, O_RDONLY, 0);
 	if (fd >= 0) {
 		while ((tmp =
-			sys_read(fd, &buf[size],
-				 MV_PP3_FW_IMAGE_SIZE - size)) > 0) {
+			sys_read(fd, &buf[size], image_size - size)) > 0) {
 			size += tmp;
-			pr_info("Read %d bytes\n", tmp);
 		}
 		sys_close(fd);
-		mv_fw_write(buf, size);
 	} else {
 		pr_err("Failed to open file %s\n", path);
+		return -EIO;
 	}
-	kfree(buf);
+
 	set_fs(old_fs);
 
-	pr_info("FW DOWNLOADED\n");
+	pr_info("Read %d bytes\n", size);
+
+	return size;
+}
+
+
+int mv_pp3_fw_write_file(char *path, char *buf, int buf_size)
+{
+	int fd;
+	int tmp = 0;
+	int size = 0;
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+
+	fd = sys_open(path, (O_CREAT | O_WRONLY), 0);
+	if (fd >= 0) {
+		while ((size < buf_size) && (tmp =
+			sys_write(fd, &buf[size], buf_size - size)) > 0) {
+			size += tmp;
+		}
+		sys_close(fd);
+	} else {
+		pr_err("Failed to open file %s\n", path);
+		return -EIO;
+	}
+
+	set_fs(old_fs);
+
+	pr_info("Written: %d bytes\n", size);
+
+	return size;
+}
+
+int mv_pp3_profile_download(char *path)
+{
+	char *buf = NULL;
+	int size = 0;
+
+	pr_info("DOWNLOAD PATH: %s\n", path);
+
+	buf = kzalloc(MV_PP3_PROFILE_MEM_SIZE, GFP_KERNEL);
+	if (!buf) {
+		pr_err("FW Image Allocation Failed in <%s>\n", __func__);
+		return -ENOMEM;
+	}
+	pr_info("ALLOCATED: %d\n", MV_PP3_PROFILE_MEM_SIZE);
+
+	size = mv_pp3_fw_read_file(path, buf, MV_PP3_PROFILE_MEM_SIZE);
+	if (size > 0)
+		mv_fw_mem_write(buf, size, PP3_PROFILE_MEM);
+
+	kfree(buf);
 
 	return 0;
 }
 
-int mv_fw_write(char *data, int size)
+int mv_pp3_profile_dump(char *path)
+{
+	char *buf = NULL;
+	int size = 0;
+
+	pr_info("DUMP PATH: %s\n", path);
+
+	buf = kzalloc(MV_PP3_PROFILE_MEM_SIZE, GFP_KERNEL);
+	if (!buf) {
+		pr_err("FW Image Buffer Allocation Failed in <%s>\n", __func__);
+		return -ENOMEM;
+	}
+	pr_info("ALLOCATED: %d\n", MV_PP3_PROFILE_MEM_SIZE);
+
+	size = mv_fw_mem_read(buf, MV_PP3_PROFILE_MEM_SIZE, PP3_PROFILE_MEM);
+	if (size > 0)
+		size = mv_pp3_fw_write_file(path, buf, MV_PP3_PROFILE_MEM_SIZE);
+
+	kfree(buf);
+
+	return 0;
+}
+
+int mv_pp3_cfg_dump(char *path)
+{
+	char *buf = NULL;
+	int size = 0;
+
+	pr_info("DUMP PATH: %s\n", path);
+
+	buf = kzalloc(MV_PP3_CFG_MEM_SIZE, GFP_KERNEL);
+	if (!buf) {
+		pr_err("FW Image Buffer Allocation Failed in <%s>\n", __func__);
+		return -ENOMEM;
+	}
+	pr_info("ALLOCATED: %d\n", MV_PP3_CFG_MEM_SIZE);
+
+	size = mv_fw_mem_read(buf, MV_PP3_CFG_MEM_SIZE, PP3_CFG_MEM);
+	if (size > 0)
+		size = mv_pp3_fw_write_file(path, buf, MV_PP3_CFG_MEM_SIZE);
+
+	kfree(buf);
+
+	return 0;
+}
+
+int mv_pp3_cfg_download(char *path)
+{
+	char *buf = NULL;
+	int size = 0;
+
+	pr_info("DOWNLOAD PATH: %s\n", path);
+
+	buf = kzalloc(MV_PP3_CFG_MEM_SIZE, GFP_KERNEL);
+	if (!buf) {
+		pr_err("FW Image Allocation Failed in <%s>\n", __func__);
+		return -ENOMEM;
+	}
+	pr_info("ALLOCATED: %d\n", MV_PP3_CFG_MEM_SIZE);
+
+	size = mv_pp3_fw_read_file(path, buf, MV_PP3_CFG_MEM_SIZE);
+	if (size > 0)
+		mv_fw_mem_write(buf, size, PP3_CFG_MEM);
+
+	kfree(buf);
+
+	return 0;
+}
+
+
+int mv_pp3_ppn_run(char *path)
+{
+
+	return 0;
+}
+
+
+
+int mv_pp3_imem_download(char *path)
+{
+	char *buf = NULL;
+	int size = 0;
+
+	pr_info("DOWNLOAD PATH: %s\n", path);
+
+	buf = kzalloc(MV_PP3_FW_MEM_SIZE, GFP_KERNEL);
+	if (!buf) {
+		pr_err("FW Image Allocation Failed in <%s>\n", __func__);
+		return -ENOMEM;
+	}
+	pr_info("ALLOCATED: %d\n", MV_PP3_FW_MEM_SIZE);
+
+	size = mv_pp3_fw_read_file(path, buf, MV_PP3_FW_MEM_SIZE);
+	if (size > 0)
+		mv_fw_mem_write(buf, size, PP3_IMEM);
+
+	kfree(buf);
+
+	return 0;
+}
+
+
+int mv_pp3_imem_dump(char *path)
+{
+	char *buf = NULL;
+	int size = 0;
+
+	pr_info("DUMP PATH: %s\n", path);
+
+	buf = kzalloc(MV_PP3_FW_MEM_SIZE, GFP_KERNEL);
+	if (!buf) {
+		pr_err("FW Image Buffer Allocation Failed in <%s>\n", __func__);
+		return -ENOMEM;
+	}
+	pr_info("ALLOCATED: %d\n", MV_PP3_FW_MEM_SIZE);
+
+	size = mv_fw_mem_read(buf, MV_PP3_FW_MEM_SIZE, PP3_IMEM);
+	if (size > 0)
+		size = mv_pp3_fw_write_file(path, buf, MV_PP3_FW_MEM_SIZE);
+
+	kfree(buf);
+
+	return 0;
+}
+
+
+
+int mv_fw_mem_write(char *data, int size, enum pp3_mem_type mem_type)
 {
 	int i;
 
 	/*TODO: probably verify checksum, version etc. */
-	pr_info("size: %d [showing 0..63]\n", size);
+	pr_info("Writing .... Type: %d size: %d [showing 0..63]\n",
+		mem_type, size);
 
 	for (i = 0; i < ((size < 64) ? size : 64); i++)
-		pr_cont("%02X", data[i]);
+		pr_cont("%02X ", data[i]);
 
+	pr_info("Download SUCCESSFULL: Type: %d size: %d [showing 0..63]\n",
+		mem_type, size);
 	return 0;
+}
+
+
+int mv_fw_mem_read(char *data, int size, enum pp3_mem_type mem_type)
+{
+	int i;
+
+	/*TODO: probably verify checksum, version etc. */
+	pr_info("Reading .... Type: %d size: %d [generating ...]\n",
+		mem_type, size);
+
+	for (i = 0; i < size; i++)
+		data[i] = (char)i;
+
+	pr_info("Read SUCCESSFULL: Type: %d size: %d [showing 0..63]\n",
+		mem_type, size);
+	return size;
 }

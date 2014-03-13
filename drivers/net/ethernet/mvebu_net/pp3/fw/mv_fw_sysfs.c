@@ -71,7 +71,20 @@ static ssize_t mv_fw_help(char *b)
 	int o = 0;
 
 	o += scnprintf(b + o, PAGE_SIZE - o,
-		       "echo [path]         > fw_dnld     - Download FW\n");
+		       "echo [path]         > imem_dnld     - Download FW from file\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		       "echo [path]         > imem_dump     - Save FW to file\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		       "echo [path]         > profile_dnld  - Download profile from file\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		       "echo [path]         > profile_dump  - Save profile to file\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		       "echo [path]         > cfg_dnld      - Download Config RAM from file\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		       "echo [path]         > cfg_dump      - Save Config RAM to file\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		       "echo 'run'          > ppn_run       - Run PPN\n");
+
 
 	return o;
 }
@@ -105,8 +118,20 @@ static ssize_t mv_fw_store(struct device *dev,
 	err = 0;
 	sscanf(buf, "%s", str);
 
-	if (!strcmp(name, "fw_dnld")) {
-		mv_pp3_fw_download(str);
+	if (!strcmp(name, "imem_dnld")) {
+		mv_pp3_imem_download(str);
+	} else if (!strcmp(name, "imem_dump")) {
+		mv_pp3_imem_dump(str);
+	} else if (!strcmp(name, "profile_dnld")) {
+		mv_pp3_profile_download(str);
+	} else if (!strcmp(name, "profile_dump")) {
+		mv_pp3_profile_dump(str);
+	} else if (!strcmp(name, "ppn_run")) {
+		mv_pp3_ppn_run(str);
+	} else if (!strcmp(name, "cfg_dnld")) {
+		mv_pp3_cfg_download(str);
+	} else if (!strcmp(name, "cfg_dump")) {
+		mv_pp3_cfg_dump(str);
 	} else {
 		err = 1;
 		pr_err("%s: illegal operation <%s>\n", __func__,
@@ -117,11 +142,25 @@ static ssize_t mv_fw_store(struct device *dev,
 }
 
 static DEVICE_ATTR(help, S_IRUSR, mv_fw_show, NULL);
-static DEVICE_ATTR(fw_dnld, S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(imem_dnld, S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(imem_dump, S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(cfg_dnld, S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(cfg_dump, S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(profile_dump, S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(profile_dnld, S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(ppn_run, S_IWUSR, NULL, mv_fw_store);
+
 
 static struct attribute *mv_fw_attrs[] = {
 	&dev_attr_help.attr,
-	&dev_attr_fw_dnld.attr,
+	&dev_attr_imem_dnld.attr,
+	&dev_attr_imem_dump.attr,
+	&dev_attr_profile_dnld.attr,
+	&dev_attr_profile_dump.attr,
+	&dev_attr_ppn_run.attr,
+	&dev_attr_cfg_dnld.attr,
+	&dev_attr_cfg_dump.attr,
+
 	NULL
 };
 
