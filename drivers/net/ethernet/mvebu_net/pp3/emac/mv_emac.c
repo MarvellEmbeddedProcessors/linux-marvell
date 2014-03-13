@@ -116,13 +116,13 @@ void mv_pp3_emac_init(int port)
 {
 	/* attach to QM */
 	/* TODO config the correct values of qm_q and qm_port */
+	/* TODO: hard code from dan DDD*/
 	mv_pp3_emac_qm_mapping(port, port, port);
-
-	/* TODO */
-	/*mv_pp3_emac_rx_cfh_reorder_mode(int port, int lock_id);*/
-	/*mv_pp3_emac_rx_cfh_deq_mode(port, mode)*/
+	mv_pp3_emac_fw_data(port);
 
 	/* use hw defaults */
+	/*mv_pp3_emac_rx_cfh_reorder_mode(int port, int lock_id);*/
+	/*mv_pp3_emac_rx_cfh_deq_mode(port, mode)*/
 	/*mv_pp3_emac_mh_en(port, 1);*/
 	/*mv_pp3_emac_rx_desc_rsvd(port, 2);*/
 	/* mv_pp3_emac_tx_min_pkt_len(int port, 60)*/
@@ -139,6 +139,21 @@ void mv_pp3_emac_debug(int port, int en)
 		pp3_emac[port].flags &= ~MV_PP3_EMAC_F_DEBUG;
 
 
+}
+
+/* set logical port and CFH mode, used by FW */
+void mv_pp3_emac_fw_data(int port)
+{
+	u32 data;
+
+	data = mv_pp3_emac_reg_read(port, MV_EMAC_ENQ_DESC_W1_REG);
+
+	data &= (MV_EMAC_ENQ_DESC_W1_FW_CFH_MODE_MASK | MV_EMAC_ENQ_DESC_W1_FW_LOGIC_PORT_MASK);
+
+	data |= (port << MV_EMAC_ENQ_DESC_W1_FW_LOGIC_PORT_OFFS) |
+		(2 << MV_EMAC_ENQ_DESC_W1_FW_CFH_MODE_OFFS);
+
+	mv_pp3_emac_reg_write(port, MV_EMAC_ENQ_DESC_W1_REG, data);
 }
 
 /* set QM Enq queu and Deq port */
