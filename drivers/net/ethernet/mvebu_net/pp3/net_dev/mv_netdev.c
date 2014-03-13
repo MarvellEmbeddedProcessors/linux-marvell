@@ -43,6 +43,8 @@ struct pp3_cpu **pp3_cpus;
 static int pp3_ports_num;
 static int pp3_hw_initialized;
 static struct  platform_device *pp3_sysfs;
+struct platform_device *shared_pdev;
+
 
 /* functions */
 static int mv_pp3_poll(struct napi_struct *napi, int budget);
@@ -303,13 +305,11 @@ static struct pp3_pool *pp3_pool_alloc(int pool, int capacity)
 
 	size = sizeof(unsigned int) * capacity;
 
-/*
-	ppool->virt_base = dma_alloc_coherent(NULL, size, &ppool->phys_base, GFP_KERNEL);
+	ppool->virt_base = dma_alloc_coherent(&shared_pdev->dev, size, (dma_addr_t *)&ppool->phys_base, GFP_KERNEL);
 
 	if (!ppool->virt_base)
 		goto oom;
 
-*/
 	return ppool;
 
 oom:
@@ -888,7 +888,7 @@ static int mv_pp3_hw_shared_start(void)
 	/* TODO: Channel create */
 
 	/*cpu_ctrl->chan_id = mv_pp3_chan_create(MV_PP3_CHAN_SIZE, 0, pp3_chan_callback);*/
-
+	/*lock*/
 	return 0;
 oom:
 	for_each_possible_cpu(cpu) {
@@ -911,6 +911,8 @@ static int mv_pp3_sw_shared_probe(struct platform_device *pdev)
 	unsigned int silicon_base = mv_hw_silicon_base_addr_get();
 
 	struct mv_pp3_plat_data *plat_data = (struct mv_pp3_plat_data *)pdev->dev.platform_data;
+
+	shared_pdev = pdev;
 
 	pp3_ports_num = plat_data->max_port;
 
@@ -955,6 +957,11 @@ oom:
 /*---------------------------------------------------------------------------*/
 static int mv_pp3_netif_init(struct pp3_dev_priv *dev_priv)
 {
+	/*
+		TODO for all emac close rx
+		mv_pp3_emac_mh_en(emac, 0)
+	*/
+
 	if (!pp3_hw_initialized) {
 		mv_pp3_hw_shared_start();
 		pp3_hw_initialized = 1;
