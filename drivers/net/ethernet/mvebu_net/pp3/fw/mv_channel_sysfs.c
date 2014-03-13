@@ -61,84 +61,90 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *******************************************************************************/
+#include <linux/module.h>
+#include <linux/netdevice.h>
+#include "mv_channel_if.h"
 
-#ifndef __mvChnlIf_h__
-#define __mvChnlIf_h__
+static ssize_t mv_channel_help(char *b)
+{
+	int o = 0;
 
-#define MV_PP3_MAX_CHAN_NUM 16
+	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "echo [c]         > chan_show    - Show message channel status\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "parameters: [c] channel number\n");
 
-/*
-	event - HMAC Rx event
-	 * 0 - QM queue - Timeout or new items added to the queue
-	 *     BM queue - allocate completed
- */
-enum mv_pp3_hmac_rx_event {
-	MV_PP3_RX_CFH = 0,
-	MV_PP3_QU_FULL
+	return o;
+}
+
+static ssize_t mv_channel_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int             off = 0;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	off = mv_channel_help(buf);
+
+	return off;
+}
+
+static ssize_t mv_channel_store(struct device *dev,
+				struct device_attribute *attr, const char *buf, size_t len)
+{
+	const char      *name = attr->attr.name;
+	int             err;
+	unsigned int    c;
+	unsigned long   flags;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	/* Read first 3 parameters */
+	err = c = 0;
+	sscanf(buf, "%x", &c);
+
+	if (!strcmp(name, "chan_show"))
+		mv_pp3_channel_show(c);
+	else {
+		err = 1;
+		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
+	}
+
+	return err ? -EINVAL : len;
+}
+
+static DEVICE_ATTR(help, S_IRUSR, mv_channel_show, NULL);
+static DEVICE_ATTR(chan_show, S_IWUSR, NULL, mv_channel_store);
+
+
+static struct attribute *mv_attrs[] = {
+	&dev_attr_help.attr,
+	&dev_attr_chan_show.attr,
+	NULL
 };
 
-/* Channel flags definition */
-#define MV_PP3_F_CHANNEL_CREATED	(0x1)
-#define MV_PP3_F_CPU_SHARED_CHANNEL	(0x2)
-
-
-/* Message flags definition */
-#define MV_PP3_F_CFH_MSG_ACK		(0x1)
-
-/* Receive message callback prototype
-Inputs:
-	chan -  unique channel id as returned by "mv_pp3_chan_add" function
-	msg - pointer to received message
-	size - size of message
-*/
-typedef void (*mv_pp3_chan_rcv_func)(int chan, void *msg, int size);
-
-
-/* channel configuration parameters */
-struct mv_pp3_channel {
-	u8			id;		/* channel number */
-	u8			frame;		/* HMAC frame number */
-	u8			hmac_rxq_num;	/* HMAC queue number in frame */
-	u8			hmac_txq_num;	/* HMAC queue number in frame */
-	u16			size;		/* max number of messages in queue */
-	u8			bm_pool_id;	/* used for messages that Host send to Firmware */
-	u8			buf_headroom;	/* headroom defined for BM pool buffer */
-	u32			flags;
-	u8			cpu_num;		/* cpu number for non shared channel */
-	int			*ready_to_send;		/* list of CFH sizes waiting for send */
-	u16			ready_to_send_ind;	/* CFH index - ready_to_send */
-	u16			free_ind;		/* free index in ready for send */
-	mv_pp3_chan_rcv_func	rcv_func;
+static struct attribute_group mv_chan_group = {
+	.name = "messenger",
+	.attrs = mv_attrs,
 };
 
-/* Init messenger facility - call ones */
-int mv_pp3_messenger_init(void);
+int mv_pp3_chan_sysfs_init(struct kobject *pp3_kobj)
+{
+	int err;
 
-/* Create communication channel (bi-directional)
-Inputs:
-	size - number of CFHs with maximum CFH size (128 byte)
-	flags - channel flags
-	rcv_cb - callback function to be called when message from Firmware is received on this channel.
-Return:
-	positive - unique channel ID,
-	negative - failure
-*/
-int mv_pp3_chan_create(int size, int flags, mv_pp3_chan_rcv_func rcv_cb);
-int mv_pp3_def_chan_create(int *size);
+	err = sysfs_create_group(pp3_kobj, &mv_chan_group);
+	if (err) {
+		pr_err("sysfs group failed %d\n", err);
+		return err;
+	}
 
-/* Prepare message CFH and trigger it sending to firmware.
-Inputs:
-	chan - unique channel id
-	msg  - pointer to message to send
-	size - size of message (in bytes)
-	flags - message flags
-Return:
-	0		- Message is accepted and sent to firmware.
-	Other	- Failure: Queue is full, etc
-*/
-int mv_pp3_msg_send(int chan, void *msg, int size, int flags);
-/* sysfs related */
-void mv_pp3_channel_show(int ch_num);
-int mv_pp3_chan_sysfs_init(struct kobject *pp3_kobj);
+	return err;
+}
 
-#endif /* __mvChnlIf_h__ */
+int mv_pp3_chan_sysfs_exit(struct kobject *hmac_kobj)
+{
+	sysfs_remove_group(hmac_kobj, &mv_chan_group);
+	return 0;
+}
