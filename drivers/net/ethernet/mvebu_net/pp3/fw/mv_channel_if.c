@@ -380,3 +380,18 @@ void mv_pp3_chan_isr(struct mv_pp3_channel *chan)
 
 	return;
 }
+
+void mv_pp3_channel_show(int ch_num)
+{
+	struct mv_pp3_channel *ch_ptr = &mv_pp3_chan_ctrl[ch_num];
+
+	if (ch_ptr->rcv_func == NULL)
+		pr_info("\nChannel %d:: no callback function connected", ch_num);
+	else
+		pr_info("\nChannel %d::", ch_num);
+	pr_info("\tFrame %d, HMAC RXQ %d, HMAC TXQ %d", ch_ptr->frame, ch_ptr->hmac_rxq_num, ch_ptr->hmac_txq_num);
+	pr_info("\tBM pool %d, headroom %d", ch_ptr->bm_pool_id, ch_ptr->buf_headroom);
+	pr_info("\n");
+
+	return;
+}
