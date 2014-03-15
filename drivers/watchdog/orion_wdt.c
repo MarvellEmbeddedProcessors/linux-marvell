@@ -59,6 +59,7 @@ struct orion_watchdog_data {
 	int rstout_enable_bit;
 	int (*clock_init)(struct platform_device *,
 			  struct orion_watchdog *);
+	int (*enabled)(struct orion_watchdog *);
 	int (*start)(struct watchdog_device *);
 	int (*stop)(struct watchdog_device *);
 };
@@ -231,7 +232,7 @@ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
 	return dev->data->stop(wdt_dev);
 }
 
-static int orion_wdt_enabled(struct orion_watchdog *dev)
+static int orion_enabled(struct orion_watchdog *dev)
 {
 	bool enabled, running;
 
@@ -239,6 +240,13 @@ static int orion_wdt_enabled(struct orion_watchdog *dev)
 	running = readl(dev->reg + TIMER_CTRL) & dev->data->wdt_enable_bit;
 
 	return enabled && running;
+}
+
+static int orion_wdt_enabled(struct watchdog_device *wdt_dev)
+{
+	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+
+	return dev->data->enabled(dev);
 }
 
 static unsigned int orion_wdt_get_timeleft(struct watchdog_device *wdt_dev)
@@ -302,6 +310,7 @@ static const struct orion_watchdog_data orion_data = {
 	.wdt_enable_bit = BIT(4),
 	.wdt_counter_offset = 0x24,
 	.clock_init = orion_wdt_clock_init,
+	.enabled = orion_enabled,
 	.start = orion_start,
 	.stop = orion_stop,
 };
@@ -311,6 +320,7 @@ static const struct orion_watchdog_data armada370_data = {
 	.wdt_enable_bit = BIT(8),
 	.wdt_counter_offset = 0x34,
 	.clock_init = armada370_wdt_clock_init,
+	.enabled = orion_enabled,
 	.start = armada370_start,
 	.stop = armada370_stop,
 };
@@ -320,6 +330,7 @@ static const struct orion_watchdog_data armadaxp_data = {
 	.wdt_enable_bit = BIT(8),
 	.wdt_counter_offset = 0x34,
 	.clock_init = armadaxp_wdt_clock_init,
+	.enabled = orion_enabled,
 	.start = armada370_start,
 	.stop = armada370_stop,
 };
@@ -426,7 +437,7 @@ static int orion_wdt_probe(struct platform_device *pdev)
 	 * removed and re-insterted, or if the bootloader explicitly
 	 * set a running watchdog before booting the kernel.
 	 */
-	if (!orion_wdt_enabled(dev))
+	if (!orion_wdt_enabled(&dev->wdt))
 		orion_wdt_stop(&dev->wdt);
 
 	/* Request the IRQ only after the watchdog is disabled */
