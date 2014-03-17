@@ -122,6 +122,7 @@ static inline void mv_pp3_hw_reg_write(u32 access_addr, u32 data)
 
 
 u32 mv_hw_silicon_base_addr_get(void);
-
+u32 mv_cmn_sram_base_addr_get(void);
+u32 mv_gop_base_addr_get(void);
 
 #endif /* __mvHwIf_h__ */
