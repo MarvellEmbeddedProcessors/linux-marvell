@@ -53,11 +53,27 @@ static int mv_pp3_hw_shared_start(void);
 
 /*---------------------------------------------------------------------------*/
 static u32 mv_vbase_address;
+static u32 mv_cmn_sram_vbase_address;
+#ifdef MV_FPGA
+static u32 mv_gop_vbase_address;
+#endif
 
 u32 mv_hw_silicon_base_addr_get(void)
 {
 	return mv_vbase_address;
 }
+
+u32 mv_cmn_sram_base_addr_get(void)
+{
+	return mv_cmn_sram_vbase_address;
+}
+
+#ifdef MV_FPGA
+u32 mv_gop_base_addr_get(void)
+{
+	return mv_gop_vbase_address;
+}
+#endif
 
 static int pp3_sysfs_init(void)
 {
@@ -1010,13 +1026,6 @@ static int mv_pp3_pci_probe(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	/* Override memory size to 1GB */
-	/* Disable BARs1 & 2 for FPGA platform - As they are irrelevant. */
-	/*pci_resource_start(pdev, 1) = 0x0;
-	pci_resource_end(pdev, 1) = 0x0;
-	pci_resource_start(pdev, 2) = 0x0;
-	pci_resource_end(pdev, 2) = 0x0;*/
-
 	if (pci_request_regions(pdev, "mv_pp3_pci")) {
 		pr_err("Cannot obtain PCI resources, aborting\n");
 		return -ENODEV;
@@ -1030,8 +1039,19 @@ static int mv_pp3_pci_probe(struct pci_dev *pdev,
 	mv_vbase_address = (u32)pci_iomap(pdev, 0, 16*1024*1024);
 	if (!mv_vbase_address)
 		pr_err("Cannot map device registers, aborting\n");
+	pr_info("\nRegister VIRTUAL base is 0x%0x.\n", mv_vbase_address);
 
-	pr_info("\nSYSTEM VIRTUAL base is 0x%0x.\n", mv_vbase_address);
+	pci_resource_start(pdev, 1) += 0x6000000;
+	mv_cmn_sram_vbase_address = (u32)pci_iomap(pdev, 1, 512*1024);
+	if (!mv_cmn_sram_vbase_address)
+		pr_err("Cannot map device NSS SRAM, aborting\n");
+	pr_info("SRAM VIRTUAL base is 0x%0x.\n", mv_cmn_sram_vbase_address);
+
+	mv_gop_vbase_address = (u32)pci_iomap(pdev, 2, 64*1024);
+	if (!mv_gop_vbase_address)
+		pr_err("Cannot map device GOP, aborting\n");
+	pr_info("GOP VIRTUAL base is 0x%0x.\n", mv_gop_vbase_address);
+
 	return 0;
 }
 
