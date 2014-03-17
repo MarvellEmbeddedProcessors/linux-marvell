@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/mbus.h>
 #include <linux/clk.h>
+#include <linux/pci.h>
 #include <asm/smp_plat.h>
 #include <asm/cacheflush.h>
 #include "armada-370-xp.h"
@@ -404,3 +405,13 @@ static int __init coherency_late_init(void)
 }
 
 postcore_initcall(coherency_late_init);
+
+static int __init coherency_pci_notify_init(void)
+{
+	if (coherency_available())
+		bus_register_notifier(&pci_bus_type,
+				       &mvebu_hwcc_platform_nb);
+	return 0;
+}
+
+arch_initcall(coherency_pci_notify_init);
