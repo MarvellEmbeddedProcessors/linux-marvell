@@ -33,6 +33,7 @@ disclaimer.
 #include <linux/netdevice.h>
 
 #include "mv_netdev.h"
+#include "common/mv_hw_if.h"
 
 static ssize_t pp3_dev_help(char *b)
 {
@@ -43,6 +44,8 @@ static ssize_t pp3_dev_help(char *b)
 	o += sprintf(b+o, "echo [cpu]                  > cpuStatus        - print cpu status\n");
 	o += sprintf(b+o, "echo [netif] [cpu] [q]      > rxqStatus        - print rxq status\n");
 	o += sprintf(b+o, "echo [netif] [cpu] [q]      > txqStatus        - print rxq status\n");
+	o += sprintf(b+o, "echo [addr] [val] [c]       > reg_write        - write value to absolute address\n");
+	o += sprintf(b+o, "echo [addr] [c]             > reg_read         - read number of words from absolute address\n");
 
 	o += sprintf(b+o, "\nAll inputs in decimal\n");
 
@@ -105,12 +108,57 @@ static ssize_t pp3_dev_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
+static ssize_t pp3_hex_dev_store(struct device *dev,
+				   struct device_attribute *attr, const char *buf, size_t len)
+{
+	const char      *name = attr->attr.name;
+	int             err;
+	unsigned int    a, b, c;
+	unsigned long   flags;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	/* Read port and value */
+	err = a = b = c = 0;
+	sscanf(buf, "%x %x %x", &a, &b, &c);
+
+	local_irq_save(flags);
+
+	if (!strcmp(name, "reg_write")) {
+		u32 arr[16], i;
+
+		for (i = 0; i < c; i++)
+			arr[i] = b;
+		mv_pp3_hw_write(a, c, arr);
+
+	} else if (!strcmp(name, "reg_read")) {
+		u32 arr[16], i;
+
+		mv_pp3_hw_read(a, b, arr);
+		for (i = 0; i < b; i++)
+			pr_info("0x%x = 0x%x\n", a+i*4, arr[i]);
+	} else {
+		err = 1;
+		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
+	}
+
+	local_irq_restore(flags);
+
+	if (err)
+		pr_err("%s: error %d\n", __func__, err);
+
+	return err ? -EINVAL : len;
+}
+
 static DEVICE_ATTR(ifStatus,		S_IWUSR, NULL, pp3_dev_store);
 static DEVICE_ATTR(groupStatus,		S_IWUSR, NULL, pp3_dev_store);
 static DEVICE_ATTR(poolStatus,		S_IWUSR, NULL, pp3_dev_store);
 static DEVICE_ATTR(cpuStatus,		S_IWUSR, NULL, pp3_dev_store);
 static DEVICE_ATTR(rxqStatus,		S_IWUSR, NULL, pp3_dev_store);
 static DEVICE_ATTR(txqStatus,		S_IWUSR, NULL, pp3_dev_store);
+static DEVICE_ATTR(reg_write,		S_IWUSR, NULL, pp3_hex_dev_store);
+static DEVICE_ATTR(reg_read,		S_IWUSR, NULL, pp3_hex_dev_store);
 static DEVICE_ATTR(help,		S_IRUSR, pp3_dev_show, NULL);
 
 static struct attribute *pp3_dev_attrs[] = {
@@ -121,6 +169,8 @@ static struct attribute *pp3_dev_attrs[] = {
 	&dev_attr_cpuStatus.attr,
 	&dev_attr_rxqStatus.attr,
 	&dev_attr_txqStatus.attr,
+	&dev_attr_reg_write.attr,
+	&dev_attr_reg_read.attr,
 	NULL
 };
 
