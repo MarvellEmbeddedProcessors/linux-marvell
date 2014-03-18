@@ -585,14 +585,15 @@ static inline struct neta_tx_desc *mv_eth_tx_desc_get(struct tx_queue *txq_ctrl,
 	return mvNetaTxqNextDescGet(txq_ctrl->q);
 }
 
-static inline void mv_eth_tx_desc_flush(struct neta_tx_desc *tx_desc)
+static inline void mv_eth_tx_desc_flush(struct eth_port *pp, struct neta_tx_desc *tx_desc)
 {
 #if defined(MV_CPU_BE)
 	mvNetaTxqDescSwap(tx_desc);
 #endif /* MV_CPU_BE */
 
-	mvOsCacheLineFlush(NULL, tx_desc);
+	mvOsCacheLineFlush(pp->dev->dev.parent, tx_desc);
 }
+
 
 static inline void *mv_eth_extra_pool_get(struct eth_port *pp)
 {
@@ -796,7 +797,7 @@ int         mv_eth_ctrl_pool_size_set(int pool, int pkt_size);
 int         mv_eth_ctrl_set_poll_rx_weight(int port, u32 weight);
 int         mv_eth_shared_set(int port, int txp, int txq, int value);
 void        mv_eth_tx_desc_print(struct neta_tx_desc *desc);
-void        mv_eth_pkt_print(struct eth_pbuf *pkt);
+void        mv_eth_pkt_print(struct eth_port *pp, struct eth_pbuf *pkt);
 void        mv_eth_rx_desc_print(struct neta_rx_desc *desc);
 void        mv_eth_skb_print(struct sk_buff *skb);
 void        mv_eth_link_status_print(int port);
