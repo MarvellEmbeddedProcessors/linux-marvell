@@ -97,9 +97,6 @@ void handle_group_affinity(int port);
 void set_rxq_affinity(struct eth_port *pp, MV_U32 rxqAffinity, int group);
 static inline int mv_eth_tx_policy(struct eth_port *pp, struct sk_buff *skb);
 
-/* temporary global to store parent device pointer */
-static struct device *global_dev;
-
 /* uncomment if you want to debug the SKB recycle feature */
 /* #define ETH_SKB_DEBUG */
 
@@ -171,7 +168,7 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
 static void mv_eth_netdev_init_features(struct net_device *dev);
 
 static MV_STATUS mv_eth_pool_create(int pool, int capacity);
-static int mv_eth_pool_add(int pool, int buf_num);
+static int mv_eth_pool_add(struct eth_port *pp, int pool, int buf_num);
 static int mv_eth_pool_free(int pool, int num);
 static int mv_eth_pool_destroy(int pool);
 
@@ -578,7 +575,7 @@ int mv_eth_ctrl_port_buf_num_set(int port, int long_num, int short_num)
 		if (pp->pool_long_num > long_num)
 			mv_eth_pool_free(pp->pool_long->pool, pp->pool_long_num - long_num);
 		else if (long_num > pp->pool_long_num)
-			mv_eth_pool_add(pp->pool_long->pool, long_num - pp->pool_long_num);
+			mv_eth_pool_add(pp, pp->pool_long->pool, long_num - pp->pool_long_num);
 	}
 	pp->pool_long_num = long_num;
 
@@ -588,7 +585,7 @@ int mv_eth_ctrl_port_buf_num_set(int port, int long_num, int short_num)
 		if (pp->pool_short_num > short_num)
 			mv_eth_pool_free(pp->pool_short->pool, pp->pool_short_num - short_num);
 		else if (short_num > pp->pool_short_num)
-			mv_eth_pool_add(pp->pool_short->pool, short_num - pp->pool_short_num);
+			mv_eth_pool_add(pp, pp->pool_short->pool, short_num - pp->pool_short_num);
 	}
 	pp->pool_short_num = short_num;
 #endif /* CONFIG_MV_ETH_BM_CPU */
@@ -1245,7 +1242,7 @@ void mv_eth_tx_desc_print(struct neta_tx_desc *desc)
 }
 EXPORT_SYMBOL(mv_eth_tx_desc_print);
 
-void mv_eth_pkt_print(struct eth_pbuf *pkt)
+void mv_eth_pkt_print(struct eth_port *pp, struct eth_pbuf *pkt)
 {
 	printk(KERN_ERR "pkt: len=%d off=%d pool=%d "
 	       "skb=%p pa=%lx buf=%p\n",
@@ -1253,7 +1250,7 @@ void mv_eth_pkt_print(struct eth_pbuf *pkt)
 	       pkt->osInfo, pkt->physAddr, pkt->pBuf);
 
 	mvDebugMemDump(pkt->pBuf + pkt->offset, 64, 1);
-	mvOsCacheInvalidate(global_dev->parent, pkt->pBuf + pkt->offset, 64);
+	mvOsCacheInvalidate(pp->dev->dev.parent, pkt->pBuf + pkt->offset, 64);
 }
 EXPORT_SYMBOL(mv_eth_pkt_print);
 
@@ -1366,7 +1363,7 @@ int mv_eth_skb_recycle(struct sk_buff *skb)
 #endif /* CONFIG_MV_ETH_DEBUG_CODE */
 
 		STAT_DBG(pool->stats.skb_recycled_ok++);
-		mvOsCacheInvalidate(global_dev->parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
+		mvOsCacheInvalidate(pp->dev->dev.parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
 
 		status = mv_eth_pool_put(pool, pkt);
 
@@ -1391,7 +1388,8 @@ EXPORT_SYMBOL(mv_eth_skb_recycle);
 
 #endif /* CONFIG_NET_SKB_RECYCLE */
 
-static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, struct eth_pbuf *pkt, gfp_t gfp_mask)
+static struct sk_buff *mv_eth_skb_alloc(struct eth_port *pp, struct bm_pool *pool,
+					struct eth_pbuf *pkt, gfp_t gfp_mask)
 {
 	struct sk_buff *skb;
 
@@ -1413,13 +1411,13 @@ static struct sk_buff *mv_eth_skb_alloc(struct bm_pool *pool, struct eth_pbuf *p
 #else
 	*((MV_U32 *) skb->head) = (MV_U32)pkt;
 #endif /* !CONFIG_MV_ETH_BE_WA */
-	mvOsCacheLineFlush(global_dev->parent, skb->head);
+	mvOsCacheLineFlush(pp->dev->dev.parent, skb->head);
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
 	pkt->osInfo = (void *)skb;
 	pkt->pBuf = skb->head;
 	pkt->bytes = 0;
-	pkt->physAddr = mvOsCacheInvalidate(global_dev->parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
+	pkt->physAddr = mvOsCacheInvalidate(pp->dev->dev.parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
 	pkt->offset = NET_SKB_PAD;
 	pkt->pool = pool->pool;
 
@@ -1500,7 +1498,7 @@ static inline void mv_eth_txq_hwf_clean(struct eth_port *pp, struct tx_queue *tx
 		tx_desc = (struct neta_tx_desc *)MV_NETA_QUEUE_DESC_PTR(&txq_ctrl->q->queueCtrl, i);
 		if (mvNetaTxqDescIsValid(tx_desc)) {
 			mvNetaTxqDescInv(tx_desc);
-			mv_eth_tx_desc_flush(tx_desc);
+			mv_eth_tx_desc_flush(pp, tx_desc);
 
 			pool = (tx_desc->command & NETA_TX_BM_POOL_ID_ALL_MASK) >> NETA_TX_BM_POOL_ID_OFFS;
 			mvBmPoolPut(pool, (MV_ULONG)tx_desc->bufPhysAddr);
@@ -1580,7 +1578,7 @@ inline u32 mv_eth_txq_done(struct eth_port *pp, struct tx_queue *txq_ctrl)
 }
 EXPORT_SYMBOL(mv_eth_txq_done);
 
-inline struct eth_pbuf *mv_eth_pool_get(struct bm_pool *pool)
+inline struct eth_pbuf *mv_eth_pool_get(struct eth_port *pp, struct bm_pool *pool)
 {
 	struct eth_pbuf *pkt = NULL;
 	struct sk_buff *skb;
@@ -1601,7 +1599,7 @@ inline struct eth_pbuf *mv_eth_pool_get(struct bm_pool *pool)
 	/* Try to allocate new pkt + skb */
 	pkt = mvOsMalloc(sizeof(struct eth_pbuf));
 	if (pkt) {
-		skb = mv_eth_skb_alloc(pool, pkt, GFP_ATOMIC);
+		skb = mv_eth_skb_alloc(pp, pool, pkt, GFP_ATOMIC);
 		if (!skb) {
 			mvOsFree(pkt);
 			pkt = NULL;
@@ -1615,14 +1613,14 @@ inline int mv_eth_refill(struct eth_port *pp, int rxq,
 				struct eth_pbuf *pkt, struct bm_pool *pool, struct neta_rx_desc *rx_desc)
 {
 	if (pkt == NULL) {
-		pkt = mv_eth_pool_get(pool);
+		pkt = mv_eth_pool_get(pp, pool);
 		if (pkt == NULL)
 			return 1;
 	} else {
 		struct sk_buff *skb;
 
 		/* No recycle -  alloc new skb */
-		skb = mv_eth_skb_alloc(pool, pkt, GFP_ATOMIC);
+		skb = mv_eth_skb_alloc(pp, pool, pkt, GFP_ATOMIC);
 		if (!skb) {
 			mvOsFree(pkt);
 			pool->missed++;
@@ -1732,6 +1730,7 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 #else
 		rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
 		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
+
 		prefetch(rx_desc);
 #endif /* CONFIG_MV_ETH_RX_DESC_PREFETCH */
 
@@ -2015,7 +2014,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 			tx_cmd |= NETA_TX_FLZ_DESC_MASK;
 
 		tx_desc->command = tx_cmd;
-		mv_eth_tx_desc_flush(tx_desc);
+		mv_eth_tx_desc_flush(pp, tx_desc);
 
 		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = ((MV_ULONG) skb | MV_ETH_SHADOW_SKB);
 		mv_eth_shadow_inc_put(txq_ctrl);
@@ -2028,7 +2027,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		mv_eth_shadow_inc_put(txq_ctrl);
 
 		tx_desc->command = tx_cmd;
-		mv_eth_tx_desc_flush(tx_desc);
+		mv_eth_tx_desc_flush(pp, tx_desc);
 
 		/* Continue with other skb fragments */
 		mv_eth_tx_frag_process(pp, skb, txq_ctrl, tx_spec.flags);
@@ -2127,7 +2126,8 @@ static inline int mv_eth_tso_validate(struct sk_buff *skb, struct net_device *de
 	return 0;
 }
 
-static inline int mv_eth_tso_build_hdr_desc(struct neta_tx_desc *tx_desc, struct eth_port *priv, struct sk_buff *skb,
+static inline int mv_eth_tso_build_hdr_desc(struct eth_port *pp, struct neta_tx_desc *tx_desc, struct eth_port *priv,
+					     struct sk_buff *skb,
 					     struct tx_queue *txq_ctrl, u16 *mh, int hdr_len, int size,
 					     MV_U32 tcp_seq, MV_U16 ip_id, int left_len)
 {
@@ -2181,12 +2181,12 @@ static inline int mv_eth_tso_build_hdr_desc(struct neta_tx_desc *tx_desc, struct
 	tx_desc->bufPhysAddr = mvOsCacheFlush(priv->dev->dev.parent, data, tx_desc->dataSize);
 	mv_eth_shadow_inc_put(txq_ctrl);
 
-	mv_eth_tx_desc_flush(tx_desc);
+	mv_eth_tx_desc_flush(pp, tx_desc);
 
 	return hdr_len;
 }
 
-static inline int mv_eth_tso_build_data_desc(struct neta_tx_desc *tx_desc, struct sk_buff *skb,
+static inline int mv_eth_tso_build_data_desc(struct eth_port *pp, struct neta_tx_desc *tx_desc, struct sk_buff *skb,
 					     struct tx_queue *txq_ctrl, char *frag_ptr,
 					     int frag_size, int data_left, int total_left)
 {
@@ -2195,7 +2195,7 @@ static inline int mv_eth_tso_build_data_desc(struct neta_tx_desc *tx_desc, struc
 	size = MV_MIN(frag_size, data_left);
 
 	tx_desc->dataSize = size;
-	tx_desc->bufPhysAddr = mvOsCacheFlush(global_dev->parent, frag_ptr, size);
+	tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, frag_ptr, size);
 	tx_desc->command = 0;
 	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = 0;
 
@@ -2209,7 +2209,7 @@ static inline int mv_eth_tso_build_data_desc(struct neta_tx_desc *tx_desc, struc
 		}
 	}
 	mv_eth_shadow_inc_put(txq_ctrl);
-	mv_eth_tx_desc_flush(tx_desc);
+	mv_eth_tx_desc_flush(pp, tx_desc);
 
 	return size;
 }
@@ -2295,7 +2295,7 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 		if (tx_spec->flags & MV_ETH_F_MH)
 			mh = &priv->tx_mh;
 		/* prepare packet headers: MAC + IP + TCP */
-		size = mv_eth_tso_build_hdr_desc(tx_desc, priv, skb, txq_ctrl, mh,
+		size = mv_eth_tso_build_hdr_desc(priv, tx_desc, priv, skb, txq_ctrl, mh,
 					hdr_len, data_left, tcp_seq, ip_id, total_len);
 		if (size == 0)
 			goto outNoTxDesc;
@@ -2315,7 +2315,7 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			totalDescNum++;
 			txq_ctrl->txq_count++;
 
-			size = mv_eth_tso_build_data_desc(tx_desc, skb, txq_ctrl,
+			size = mv_eth_tso_build_data_desc(priv, tx_desc, skb, txq_ctrl,
 							  frag_ptr, frag_size, data_left, total_len);
 			totalBytes += size;
 /*
@@ -2523,7 +2523,7 @@ static void mv_eth_tx_frag_process(struct eth_port *pp, struct sk_buff *skb, str
 			mv_eth_shadow_inc_put(txq_ctrl);
 		}
 
-		mv_eth_tx_desc_flush(tx_desc);
+		mv_eth_tx_desc_flush(pp, tx_desc);
 	}
 }
 
@@ -2672,7 +2672,7 @@ static int mv_eth_pool_destroy(int pool)
 }
 
 
-static int mv_eth_pool_add(int pool, int buf_num)
+static int mv_eth_pool_add(struct eth_port *pp, int pool, int buf_num)
 {
 	struct bm_pool *bm_pool;
 	struct sk_buff *skb;
@@ -2711,7 +2711,7 @@ static int mv_eth_pool_add(int pool, int buf_num)
 			break;
 		}
 
-		skb = mv_eth_skb_alloc(bm_pool, pkt, GFP_KERNEL);
+		skb = mv_eth_skb_alloc(pp, bm_pool, pkt, GFP_KERNEL);
 		if (!skb) {
 			kfree(pkt);
 			break;
@@ -3385,7 +3385,7 @@ static int mv_eth_resume_port_pools(struct eth_port *pp)
 
 	/* fill long pool */
 	if (pp->pool_long) {
-		num = mv_eth_pool_add(pp->pool_long->pool, pp->pool_long_num);
+		num = mv_eth_pool_add(pp, pp->pool_long->pool, pp->pool_long_num);
 
 		if (num != pp->pool_long_num) {
 			printk(KERN_ERR "%s FAILED long: pool=%d, pkt_size=%d, only %d of %d allocated\n",
@@ -3402,7 +3402,7 @@ static int mv_eth_resume_port_pools(struct eth_port *pp)
 	if (pp->pool_short) {
 		if (pp->pool_short->pool != pp->pool_long->pool) {
 				/* fill short pool */
-				num = mv_eth_pool_add(pp->pool_short->pool, pp->pool_short_num);
+				num = mv_eth_pool_add(pp, pp->pool_short->pool, pp->pool_short_num);
 				if (num != pp->pool_short_num) {
 					printk(KERN_ERR "%s FAILED short: pool=%d, pkt_size=%d - %d of %d buffers added\n",
 					   __func__, pp->pool_short->pool, pp->pool_short->pkt_size, num, pp->pool_short_num);
@@ -4221,7 +4221,6 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
 	SET_ETHTOOL_OPS(dev, &mv_eth_tool_ops);
 
 	SET_NETDEV_DEV(dev, &pdev->dev);
-	global_dev = &pdev->dev;
 
 	dev->priv_flags |= IFF_UNICAST_FLT;
 
@@ -4244,6 +4243,8 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
 			printk(KERN_CONT "\n");
 		}
 	}
+	platform_set_drvdata(pdev, pp->dev);
+
 	return dev;
 }
 
@@ -4663,7 +4664,7 @@ static int mv_eth_rxq_fill(struct eth_port *pp, int rxq, int num)
 	}
 
 	for (i = 0; i < num; i++) {
-		pkt = mv_eth_pool_get(bm_pool);
+		pkt = mv_eth_pool_get(pp, bm_pool);
 		if (pkt) {
 			rx_desc = (struct neta_rx_desc *)MV_NETA_QUEUE_DESC_PTR(&rx_ctrl->queueCtrl, i);
 			memset(rx_desc, 0, sizeof(struct neta_rx_desc));
@@ -4963,7 +4964,7 @@ int mv_eth_start_internals(struct eth_port *pp, int mtu)
 		pp->pool_long = new_pool;
 		pp->pool_long->port_map |= (1 << pp->port);
 
-		num = mv_eth_pool_add(pp->pool_long->pool, pp->pool_long_num);
+		num = mv_eth_pool_add(pp, pp->pool_long->pool, pp->pool_long_num);
 		if (num != pp->pool_long_num) {
 			printk(KERN_ERR "%s FAILED: mtu=%d, pool=%d, pkt_size=%d, only %d of %d allocated\n",
 			       __func__, mtu, pp->pool_long->pool, pp->pool_long->pkt_size, num, pp->pool_long_num);
@@ -4986,7 +4987,7 @@ int mv_eth_start_internals(struct eth_port *pp, int mtu)
 		pp->pool_short = &mv_eth_pool[short_pool];
 		pp->pool_short->port_map |= (1 << pp->port);
 		if (pp->pool_short->pool != pp->pool_long->pool) {
-			num = mv_eth_pool_add(pp->pool_short->pool, pp->pool_short_num);
+			num = mv_eth_pool_add(pp, pp->pool_short->pool, pp->pool_short_num);
 			if (num != pp->pool_short_num) {
 				printk(KERN_ERR "%s FAILED: pool=%d, pkt_size=%d - %d of %d buffers added\n",
 					   __func__, short_pool, pp->pool_short->pkt_size, num, pp->pool_short_num);

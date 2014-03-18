@@ -135,7 +135,7 @@ static inline MV_STATUS mv_eth_l2sec_tx(struct eth_pbuf *pkt, struct eth_port *p
 
 	tx_desc->dataSize    = pkt->bytes;
 	tx_desc->bufPhysAddr = pkt->physAddr;
-	mv_eth_tx_desc_flush(tx_desc);
+	mv_eth_tx_desc_flush(pp, tx_desc);
 	mvNetaTxqPendDescAdd(pp->port, pp->txp, 0, 1);
 
 	return MV_OK;
