@@ -74,6 +74,54 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mv_fw.h"
 
 
+
+
+int mv_pp3_fw_read_img_file(char *path, struct mem_image *img)
+{
+	/* Format is: u32 address chars, : u32 data*/
+	int fd;
+	int tmp = 0;
+	u32 addr = 0;
+	u32 value = 0;
+	char ch = 0;
+	int size = 0;
+	char buf[MV_FW_MAX_LINE_SIZE] = "\0";
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+
+	fd = sys_open(path, O_RDONLY, 0);
+	if (fd >= 0) {
+		while ((tmp = sys_read(fd, &ch, 1)) > 0) {
+			if (size >= MV_FW_MAX_LINE_SIZE || ch == '\n') {
+				sscanf(buf, "%X:%X", &addr, &value);
+				img->rows[img->size].address = addr;
+				img->rows[img->size].data = value;
+				img->size++;
+				pr_info("0x%08X->0x%08X", addr, value);
+				size = 0;
+			} else {
+				buf[size++] = ch;
+			}
+		}
+		if (size > 0)
+			sscanf(buf, "%X:%X", &(img->rows[size].address), &(img->rows[size].data));
+
+		sys_close(fd);
+
+	} else {
+		pr_err("Failed to open file %s\n", path);
+		return -EIO;
+	}
+
+	set_fs(old_fs);
+	pr_info("Rows Read %d\n", img->size);
+
+	return img->size;
+}
+
+
+
 int mv_pp3_fw_read_file(char *path, char *buf, int image_size)
 {
 	int fd;
@@ -133,23 +181,26 @@ int mv_pp3_fw_write_file(char *path, char *buf, int buf_size)
 
 int mv_pp3_profile_download(char *path)
 {
-	char *buf = NULL;
-	int size = 0;
+	struct mem_image mem;
+
+	memset(&mem, 0, sizeof(mem));
 
 	pr_info("DOWNLOAD PATH: %s\n", path);
 
-	buf = kzalloc(MV_PP3_PROFILE_MEM_SIZE, GFP_KERNEL);
-	if (!buf) {
+	mem.rows = kzalloc(MV_PP3_PROFILE_MEM_ROWS * sizeof(struct mem_rec), GFP_KERNEL);
+	mem.allocated = MV_PP3_PROFILE_MEM_ROWS;
+
+	if (!mem.rows) {
 		pr_err("FW Image Allocation Failed in <%s>\n", __func__);
 		return -ENOMEM;
 	}
-	pr_info("ALLOCATED: %d\n", MV_PP3_PROFILE_MEM_SIZE);
+	pr_info("ALLOCATED: %d Rows\n", mem.allocated);
 
-	size = mv_pp3_fw_read_file(path, buf, MV_PP3_PROFILE_MEM_SIZE);
-	if (size > 0)
-		mv_fw_mem_write(buf, size, PP3_PROFILE_MEM);
+	mv_pp3_fw_read_img_file(path, &mem);
+	if (mem.size > 0)
+		mv_fw_mem_img_write(&mem,  PP3_PROFILE_MEM);
 
-	kfree(buf);
+	kfree(mem.rows);
 
 	return 0;
 }
@@ -234,23 +285,26 @@ int mv_pp3_ppn_run(char *path)
 
 int mv_pp3_imem_download(char *path)
 {
-	char *buf = NULL;
-	int size = 0;
+	struct mem_image mem;
+
+	memset(&mem, 0, sizeof(mem));
 
 	pr_info("DOWNLOAD PATH: %s\n", path);
 
-	buf = kzalloc(MV_PP3_FW_MEM_SIZE, GFP_KERNEL);
-	if (!buf) {
+	mem.rows = kzalloc(MV_PP3_FW_MEM_ROWS * sizeof(struct mem_rec), GFP_KERNEL);
+	mem.allocated = MV_PP3_FW_MEM_ROWS;
+
+	if (!mem.rows) {
 		pr_err("FW Image Allocation Failed in <%s>\n", __func__);
 		return -ENOMEM;
 	}
-	pr_info("ALLOCATED: %d\n", MV_PP3_FW_MEM_SIZE);
+	pr_info("ALLOCATED: %d Rows\n", mem.allocated);
 
-	size = mv_pp3_fw_read_file(path, buf, MV_PP3_FW_MEM_SIZE);
-	if (size > 0)
-		mv_fw_mem_write(buf, size, PP3_IMEM);
+	mv_pp3_fw_read_img_file(path, &mem);
+	if (mem.size > 0)
+		mv_fw_mem_img_write(&mem,  PP3_IMEM);
 
-	kfree(buf);
+	kfree(mem.rows);
 
 	return 0;
 }
@@ -289,13 +343,31 @@ int mv_fw_mem_write(char *data, int size, enum pp3_mem_type mem_type)
 	pr_info("Writing .... Type: %d size: %d [showing 0..63]\n",
 		mem_type, size);
 
-	for (i = 0; i < ((size < 64) ? size : 64); i++)
+	for (i = 0; i < size; i++)
 		pr_cont("%02X ", data[i]);
 
 	pr_info("Download SUCCESSFULL: Type: %d size: %d [showing 0..63]\n",
 		mem_type, size);
 	return 0;
 }
+
+
+int mv_fw_mem_img_write(struct mem_image *img, enum pp3_mem_type mem_type)
+{
+	int i;
+
+	/*TODO: probably verify checksum, version etc. */
+	pr_info("Writing .... Type: %d size: %d [showing 0..63]\n",
+		mem_type, img->size);
+
+	for (i = 0; i < img->size; i++)
+		pr_info("%08X:%08X", img->rows[i].address, img->rows[i].data);
+
+	pr_info("Download SUCCESSFULL: Type: %d size: %d [showing 0..63]\n",
+		mem_type, img->size);
+	return 0;
+}
+
 
 
 int mv_fw_mem_read(char *data, int size, enum pp3_mem_type mem_type)

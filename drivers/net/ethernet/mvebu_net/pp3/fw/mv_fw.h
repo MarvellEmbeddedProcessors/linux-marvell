@@ -68,8 +68,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 #define MV_PP3_FW_MEM_SIZE (128*1024)
+#define MV_PP3_FW_MEM_ROWS (128*1024/4)
 #define MV_PP3_PROFILE_MEM_SIZE (64*1024)
+#define MV_PP3_PROFILE_MEM_ROWS (64*1024/4)
 #define MV_PP3_CFG_MEM_SIZE (32*1024)
+#define MV_PP3_CFG_MEM_ROWS (32*1024/4)
+
+#define MV_FW_MAX_LINE_SIZE (128)
 
 
 enum pp3_mem_type {
@@ -79,6 +84,18 @@ enum pp3_mem_type {
 	PP3_SRAM_MEM = 3,
 	PP3_SPAD = 4
 };
+
+struct mem_rec {
+	u32 address;
+	u32 data;
+};
+
+struct mem_image {
+	struct mem_rec *rows;
+	u32 size;
+	u32 allocated;
+};
+
 
 
 int mv_pp3_imem_download(char *path);
@@ -95,9 +112,12 @@ int mv_pp3_ppn_run(char *params);
 
 int mv_pp3_fw_read_file(char *path, char *buf, int size);
 int mv_pp3_fw_write_file(char *path, char *buf, int size);
+int mv_pp3_fw_read_img_file(char *path, struct mem_image *img);
 
 int mv_fw_mem_write(char *data, int size, enum pp3_mem_type target_mem);
 int mv_fw_mem_read(char *data, int size, enum pp3_mem_type source_mem);
+
+int mv_fw_mem_img_write(struct mem_image *img, enum pp3_mem_type mem_type);
 
 /* SYSFS*/
 int mv_pp3_fw_sysfs_init(struct kobject *fw_kobj);
