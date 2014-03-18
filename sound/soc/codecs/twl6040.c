@@ -557,7 +557,7 @@ static const struct soc_enum twl6040_power_mode_enum =
 static int twl6040_headset_power_get_enum(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 
 	ucontrol->value.enumerated.item[0] = priv->hs_power_mode;
@@ -568,7 +568,7 @@ static int twl6040_headset_power_get_enum(struct snd_kcontrol *kcontrol,
 static int twl6040_headset_power_put_enum(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 	int high_perf = ucontrol->value.enumerated.item[0];
 	int ret = 0;
@@ -585,7 +585,7 @@ static int twl6040_headset_power_put_enum(struct snd_kcontrol *kcontrol,
 static int twl6040_pll_get_enum(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 
 	ucontrol->value.enumerated.item[0] = priv->pll_power_mode;
@@ -596,7 +596,7 @@ static int twl6040_pll_get_enum(struct snd_kcontrol *kcontrol,
 static int twl6040_pll_put_enum(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 
 	priv->pll_power_mode = ucontrol->value.enumerated.item[0];
