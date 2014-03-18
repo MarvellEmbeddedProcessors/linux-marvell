@@ -78,7 +78,7 @@ static unsigned int lm4857_read(struct snd_soc_codec *codec,
 static int lm4857_get_mode(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct lm4857 *lm4857 = snd_soc_codec_get_drvdata(codec);
 
 	ucontrol->value.integer.value[0] = lm4857->mode;
@@ -89,7 +89,7 @@ static int lm4857_get_mode(struct snd_kcontrol *kcontrol,
 static int lm4857_set_mode(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
 	struct lm4857 *lm4857 = snd_soc_codec_get_drvdata(codec);
 	uint8_t value = ucontrol->value.integer.value[0];
 
