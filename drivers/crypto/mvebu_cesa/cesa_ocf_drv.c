@@ -319,7 +319,7 @@ cesa_ocf_process(device_t dev, struct cryptop *crp, int hint)
 
         dprintk("%s()\n", __func__);
 
-	for(chan = 0; chan < MV_CESA_CHANNELS; chan++)
+	for (chan = 0; chan < mv_cesa_channels; chan++)
 		free_resrc += cesaReqResources[chan];
 
 		/* In case request should be split, at least 2 slots

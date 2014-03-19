@@ -52,14 +52,18 @@ enum cesa_feature {
 };
 
 extern enum cesa_mode mv_cesa_mode;
-extern u32 mv_cesa_time_threshold, mv_cesa_threshold;
+extern u32 mv_cesa_time_threshold, mv_cesa_threshold, mv_cesa_channels;
 extern enum cesa_feature mv_cesa_feature;
 
 #define MV_CESA_REGS_BASE(chan)		(mv_cesa_base[chan])
 
 #define MV_CESA_TDMA_REGS_BASE(chan)	(mv_cesa_tdma_base[chan])
 
-#define MV_CESA_CHANNELS		(CONFIG_MV_CESA_CHANNELS)
+/*
+ * MV_CESA_CHANNELS have to be known at compilation time, since it is used
+ * for table size declaration. It is defined for max available CESA channels
+ */
+#define MV_CESA_CHANNELS	2
 
 /*
  * Use 2K of SRAM

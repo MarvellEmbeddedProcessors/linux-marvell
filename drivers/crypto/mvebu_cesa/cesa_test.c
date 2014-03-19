@@ -1958,7 +1958,7 @@ MV_STATUS testCmd(int sid, int iter, MV_CESA_COMMAND *pCmd,
 	/*mvCesaDebugStatsClear(); */
 
 #ifndef MV_NETBSD
-	for (chan = 0; chan < MV_CESA_CHANNELS; chan++)
+	for (chan = 0; chan < mv_cesa_channels; chan++)
 		MV_REG_WRITE(MV_CESA_ISR_CAUSE_REG(chan), 0);
 #endif
 
@@ -2347,7 +2347,7 @@ MV_STATUS testRun(int idx, int caseIdx, int iter, int reqSize, int checkMode)
 				cmd.ivFromUser = 1;
 			} else {
 				cmd.ivFromUser = 0;
-				for (chan = 0; chan < MV_CESA_CHANNELS; chan++)
+				for (chan = 0; chan < mv_cesa_channels; chan++)
 					mvCesaCryptoIvSet(chan, cesaTestCases[caseIdx].pCryptoIV, blockSize);
 			}
 			cesaReqSize = cmd.cryptoOffset + cmd.cryptoLength;
