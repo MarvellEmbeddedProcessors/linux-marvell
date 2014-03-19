@@ -1,0 +1,140 @@
+* Marvell Cryptographic Engines And Security Accelerator
+
+To support CESA in dts two separate nodes are required:
+	- one for CESA engine with compatible "marvell,armada-cesa"
+	- second one for internal CESA SRAM with compatible "marvell,cesa-sram"
+
+Note that Marvell chips have maximum 2 available CESA channels.
+
+======================================
+- CESA engine ("marvell,armada-cesa")
+======================================
+Required properties:
+
+- compatible : should be "marvell,armada-cesa"
+
+- reg : base physical address of the engine and length of memory mapped
+        region, followed by base physical address of tdma and length of memory
+	mapped region. For more then one CESA channels see the example bellow.
+
+- clocks : must contain an entry for each clock gate
+	- armada-38x: requires two entry for one channel ("crypto0", "crypto0z")
+	  for second channels see the example bellow
+	- armada-xp: requires one entry for whole engine
+	- armada-370: requires one entry for whole engine
+
+- clock-names : require the following entries:
+	- armada-38x: "crypto0" and "crypto0z" for channel0;
+		      "crypto1" and "crypto1z" for channel1
+	- armada-xp: permit one entry or lack of clock-names properties
+	- armada-370: permit one entry or lack of clock-names properties
+
+- cesa,channels : number of CESA channels
+	- armada-38x: has 2 available cesa channels
+	- armada-xp: has 2 available cesa channels
+	- armada-370: has 1 available cesa channel
+
+- cesa,mode : CESA can operate in one of the following mode 'ocf' or 'test'
+
+- cesa,feature : depends on chip, CESA can operate in one of the following mode:
+	- armada-38x: "chain", "int_coalescing" or "int_per_packet"(no optimization)
+	- armada-xp: "chain", "int_coalescing" or "int_per_packet"(no optimization)
+	- armada-370: "chain" or "int_per_packet"(no optimization)
+
+- cesa,threshold : valid only with "int_coalescing" feature
+	This field provides a way to minimize the number of interrupts to off
+	load the CPU. It defines the number of <AccAndTDMAInt_CM> indications
+	before asserting the <EopCoalInt> bit in the Cryptographic interrupt
+	Cause Register.
+
+- cesa,time_threshold : valid only with "int_coalescing" feature
+	This field provides a way to ensure maximum delay between
+	<AccAndTDMAInt_CM> assertion and assertion bit <EopCoalInt> in
+	Cryptographic Interrupt Cause Register (even if the number of
+	<AccAndTDMAInt_CM> indications did not reach the <EopCoalPacketTh> value).
+
+- cesa,ctrlModel : 16-bit device model ID:
+	- armada-38x: <0x6800>
+	- armada-xp: <0x7846>
+	- armada-370: <0x6710>
+
+- cesa,ctrlRev : 8-bit device revision ID
+
+- cesa,sramOffset : 16-bit SRAM offset
+
+- interrupts : interrupt number (defined per channel in child node - see
+	example bellow)
+
+Example:
+
+	crypto@9D000 {
+		compatible = "marvell,armada-cesa";
+		reg = <0x9D000 0x1000	/* cesa base reg chan 0 */
+		       0x90000 0x1000	/* tdma base reg chan 0 */
+		       0x9F000 0x1000	/* cesa base reg chan 1 */
+		       0x92000 0x1000>;	/* tdma base reg chan 1 */
+		clocks = <&gateclk 23>, <&gateclk 14>,
+		         <&gateclk 21>, <&gateclk 16>;
+		clock-names = "crypto0", "crypto0z",
+			      "crypto1", "crypto1z";
+		cesa,channels = <0x2>;
+		cesa,mode = "ocf";	/* ocf or test */
+		cesa,feature = "int_coalescing"; /* chain, int_coalescing
+					   or int_per_packet */
+
+		/* threshold and time_threshold relevant if
+		   int_coalescing in use */
+		cesa,threshold = <0x2>;
+		cesa,time_threshold = <0xfffff>;
+
+		cesa,ctrlModel = /bits/ 16 <0x6800>;
+		cesa,ctrlRev = /bits/ 8 <2>;
+		cesa,sramOffset = /bits/ 16 <0>;
+		status = "disabled";
+
+		crypto10 {
+			/* channel 0 */
+			interrupts = <0 19 0x4>;
+		};
+		crypto11 {
+			/* channel 1 */
+			interrupts = <0 20 0x4>;
+		};
+
+	};
+
+
+======================================
+- CESA SRAM ("marvell,cesa-sram")
+======================================
+
+Required properties in soc ranges:
+
+- ranges : entry in soc ranges for static decoding window configuration. For
+	more information read Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+
+
+Required properties in cesa-sram node:
+
+- compatible : should be "marvell,cesa-sram"
+- reg : target ID, attribute ID, with use of MBUS_ID macro, followed by base
+	physical address and size of the SRAM, for each channel. For more
+	information read Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+
+
+Example:
+
+	soc {
+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+			  MBUS_ID(0x09, 0x01) 0 0xf1100000 0x10000	/* CESA0: PHYS=0xf1100000
+									   size 64K */
+			  MBUS_ID(0x09, 0x05) 0 0xf1110000 0x10000>;	/* CESA1: PHYS=0xf1110000
+									   size 64K */
+
+		/* Security Accelerator SRAM (CESA) */
+		cesa-sram {
+			compatible = "marvell,cesa-sram";
+			reg = <MBUS_ID(0x09, 0x01) 0 0x10000   /*chan0*/
+			       MBUS_ID(0x09, 0x05) 0 0x10000>; /*chan1*/
+		};
+	};
