@@ -190,6 +190,7 @@
 				       0x9F000 0x1000	/* cesa base reg chan 1 */
 				       0x92000 0x1000>;	/* tdma base reg chan 1 */
 				clocks = <&gateclk 23>;
+				cesa,mode = "ocf";	/* ocf or test */
 				cesa,ctrlModel = /bits/ 16 <0x7846>;
 				cesa,ctrlRev = /bits/ 8 <2>;
 				cesa,sramOffset = /bits/ 16 <0>;

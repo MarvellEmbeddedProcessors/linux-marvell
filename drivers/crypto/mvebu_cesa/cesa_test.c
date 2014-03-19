@@ -2028,13 +2028,22 @@ cesa_test_probe(struct platform_device *pdev)
 	MV_U8 chan = 0;
 	MV_U32 mask;
 	const char* irqName[] = {"cesa_test:0", "cesa_test:1"};
-
-	dev_info(&pdev->dev, "%s\n", __func__);
+	const char *cesa_m;
 
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "CESA device node not available\n");
 		return -ENOENT;
 	}
+
+	/*
+	 * Check driver mode from dts
+	 */
+	cesa_m = of_get_property(pdev->dev.of_node, "cesa,mode", NULL);
+	if (strncmp(cesa_m, "test", 4) != 0) {
+		dprintk("%s: device operate in %s mode\n", __func__, cesa_m);
+		return -ENODEV;
+	}
+	mv_cesa_mode = CESA_TEST_M;
 
 	/* Not all platforms can gate the clock, so it is not
 	 * an error if the clock does not exists.
@@ -2241,6 +2250,8 @@ cesa_test_probe(struct platform_device *pdev)
 #ifdef CESA_DEBUGS
 	mvCesaDebugRegs();
 #endif
+	dev_info(&pdev->dev, "%s: CESA driver operate in %s(%d) mode\n",
+					       __func__, cesa_m, mv_cesa_mode);
 	return 0;
 
 #endif

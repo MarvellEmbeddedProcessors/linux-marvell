@@ -34,10 +34,6 @@ module_param(debug, int, 0);
 MODULE_PARM_DESC(debug,
 	   "Enable debug");
 
-#ifdef CONFIG_MV_CESA_TEST
-
-
-
 extern void cesaTest(int iter, int reqSize, int checkMode);
 extern void combiTest(int iter, int reqSize, int checkMode);
 extern void cesaOneTest(int testIdx, int caseIdx, int iter, int reqSize, int checkMode);
@@ -87,7 +83,6 @@ int run_cesa_test(CESA_TEST *cesa_test)
 	}
 	return 0;
 }
-#endif /* CONFIG_MV_CESA_TEST */
 
 extern void    		mvCesaDebugSAD(int mode);
 extern void    		mvCesaDebugSA(short sid, int mode);
@@ -102,7 +97,11 @@ extern void	   	    cesaTestPrintStatus(void);
 int run_cesa_debug(CESA_DEBUG *cesa_debug)
 {
 	int error = 0;
-	switch(cesa_debug->debug){
+
+	if (mv_cesa_mode == CESA_TEST_M) {
+		dprintk("%s:cesa mode %d\n", __func__, mv_cesa_mode);
+
+		switch (cesa_debug->debug) {
 		case(STATUS):
 			mvCesaDebugStatus();
 			break;
@@ -110,7 +109,8 @@ int run_cesa_debug(CESA_DEBUG *cesa_debug)
 			mvCesaDebugQueue(cesa_debug->mode);
 			break;
 		case(SA):
-			mvCesaDebugSA(cesa_debug->index, cesa_debug->mode);
+			mvCesaDebugSA(cesa_debug->index,
+			    cesa_debug->mode);
 			break;
 		case(SRAM):
 			mvCesaDebugSram(cesa_debug->mode);
@@ -118,24 +118,50 @@ int run_cesa_debug(CESA_DEBUG *cesa_debug)
 		case(SAD):
 			mvCesaDebugSAD(cesa_debug->mode);
 			break;
-
-#ifdef CONFIG_MV_CESA_TEST
 		case(TST_REQ):
-			cesaTestPrintReq(cesa_debug->index, 0, cesa_debug->size);
+			cesaTestPrintReq(cesa_debug->index, 0,
+			    cesa_debug->size);
 			break;
 		case(TST_SES):
 			cesaTestPrintSession(cesa_debug->index);
 			break;
-        case(TST_STATS):
-            cesaTestPrintStatus();
-            break;
-#endif /* CONFIG_MV_CESA_TEST */
-
+		case(TST_STATS):
+			cesaTestPrintStatus();
+			break;
 		default:
-			dprintk("%s(unknown debug 0x%x)\n", __FUNCTION__, cesa_debug->debug);
+			dprintk("%s(unknown debug 0x%x)\n",
+			    __func__, cesa_debug->debug);
 			error = EINVAL;
 			break;
+		}
+	}
 
+	else if (mv_cesa_mode == CESA_OCF_M) {
+		dprintk("%s:cesa mode %d\n", __func__, mv_cesa_mode);
+
+		switch (cesa_debug->debug) {
+		case(STATUS):
+			mvCesaDebugStatus();
+			break;
+		case(QUEUE):
+			mvCesaDebugQueue(cesa_debug->mode);
+			break;
+		case(SA):
+			mvCesaDebugSA(cesa_debug->index,
+			    cesa_debug->mode);
+			break;
+		case(SRAM):
+			mvCesaDebugSram(cesa_debug->mode);
+			break;
+		case(SAD):
+			mvCesaDebugSAD(cesa_debug->mode);
+			break;
+		default:
+			dprintk("%s(unknown debug 0x%x)\n",
+			    __func__, cesa_debug->debug);
+			error = EINVAL;
+			break;
+		}
 	}
 
 	return(-error);
@@ -154,35 +180,67 @@ cesadev_ioctl(
 	dprintk("%s: cmd=0x%x, CIOCDEBUG=0x%x, CIOCTEST=0x%x\n",
                 __FUNCTION__, cmd, CIOCDEBUG, CIOCTEST);
 
-	switch (cmd) {
-	case CIOCDEBUG:
-		if(copy_from_user(&cesa_debug, (void*)arg, sizeof(CESA_DEBUG)))
+	if (mv_cesa_mode == CESA_TEST_M) {
+		dprintk("%s:cesa mode %d\n", __func__, mv_cesa_mode);
+
+		switch (cmd) {
+		case CIOCDEBUG:
+			if (copy_from_user(&cesa_debug, (void *)arg,
+							   sizeof(CESA_DEBUG)))
 				error = -EFAULT;
-		dprintk("%s(CIOCDEBUG): debug %d index %d mode %d size %d\n",
-			__FUNCTION__, cesa_debug.debug, cesa_debug.index, cesa_debug.mode, cesa_debug.size);
-		error = run_cesa_debug(&cesa_debug);
-		break;
 
-#ifdef CONFIG_MV_CESA_TEST
-    case CIOCTEST:
-		{
-		CESA_TEST cesa_test;
+			dprintk("%s(CIOCDBG): dbg %d idx %d mode %d size %d\n",
+				__func__, cesa_debug.debug,
+				cesa_debug.index, cesa_debug.mode,
+				cesa_debug.size);
+			error = run_cesa_debug(&cesa_debug);
+			break;
+		case CIOCTEST:
+			{
+			CESA_TEST cesa_test;
 
-		if(copy_from_user(&cesa_test, (void*)arg, sizeof(CESA_TEST)))
-			error = -EFAULT;
-		dprintk("%s(CIOCTEST): test %d iter %d req_size %d checkmode %d sess_id %d data_id %d \n",
-			__FUNCTION__, cesa_test.test, cesa_test.iter, cesa_test.req_size, cesa_test.checkmode,
-			cesa_test.session_id, cesa_test.data_id );
-		error = run_cesa_test(&cesa_test);
+			if (copy_from_user(&cesa_test, (void *)arg,
+							    sizeof(CESA_TEST)))
+				error = -EFAULT;
+
+			dprintk("%s(CIOCTST): test %d iter %d req_size %d",
+			    __func__, cesa_test.test, cesa_test.iter,
+			    cesa_test.req_size);
+			dprintk(" checkmode %d sess_id %d data_id %d\n",
+				cesa_test.checkmode, cesa_test.session_id,
+				cesa_test.data_id);
+			error = run_cesa_test(&cesa_test);
+			}
+			break;
+		default:
+			dprintk("%s(unknown ioctl 0x%x)\n", __func__, cmd);
+			error = EINVAL;
+			break;
 		}
-		break;
-#endif /* CONFIG_MV_CESA_TEST */
-
-	default:
-		dprintk("%s (unknown ioctl 0x%x)\n", __FUNCTION__, cmd);
-		error = EINVAL;
-		break;
 	}
+
+	else if (mv_cesa_mode == CESA_OCF_M) {
+		dprintk("%s:cesa mode %d\n", __func__, mv_cesa_mode);
+
+		switch (cmd) {
+		case CIOCDEBUG:
+			if (copy_from_user(&cesa_debug, (void *)arg,
+							   sizeof(CESA_DEBUG)))
+				error = -EFAULT;
+
+			dprintk("%s(CIOCDBG): dbg %d idx %d mode %d size %d\n",
+				__func__, cesa_debug.debug,
+				cesa_debug.index, cesa_debug.mode,
+				cesa_debug.size);
+			error = run_cesa_debug(&cesa_debug);
+			break;
+		default:
+			dprintk("%s(unknown ioctl 0x%x)\n", __func__, cmd);
+			error = EINVAL;
+			break;
+		}
+	}
+
 	return(-error);
 }
 

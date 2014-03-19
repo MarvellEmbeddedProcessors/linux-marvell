@@ -28,11 +28,23 @@ disclaimer.
 *
 *******************************************************************************/
 
+#ifndef __mvSysCesaConfig_h__
+#define __mvSysCesaConfig_h__
+
 /*
 ** Base address for cesa registers.
 */
 
 extern MV_U32 mv_cesa_base[], mv_cesa_tdma_base[];
+
+/* This enumerator defines the Marvell CESA feature*/
+enum cesa_mode {
+	CESA_UNKNOWN_M = -1,
+	CESA_OCF_M,
+	CESA_TEST_M
+};
+
+extern enum cesa_mode mv_cesa_mode;
 
 #define MV_CESA_REGS_BASE(chan)		(mv_cesa_base[chan])
 
@@ -60,3 +72,5 @@ extern MV_U32 mv_cesa_base[], mv_cesa_tdma_base[];
  * Use 2K of SRAM
  */
 #define MV_CESA_MAX_BUF_SIZE	1600
+
+#endif /* __mvSysCesaConfig_h__ */
