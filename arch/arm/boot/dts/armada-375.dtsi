@@ -380,7 +380,7 @@
 						      <&gic  0 11 4>,
 						      <&mpic 5>,
 						      <&mpic 6>;
-				clocks = <&coreclk 0>;
+				clocks = <&coreclk 2>;
 			};
 
 			/*
