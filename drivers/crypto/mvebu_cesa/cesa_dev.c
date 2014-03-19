@@ -36,19 +36,8 @@ MODULE_PARM_DESC(debug,
 
 #ifdef CONFIG_MV_CESA_TEST
 
-static int buf_size = 20000;
-/*MODULE_PARM(buf_size, "i");*/
-module_param(buf_size,int,0644);
-MODULE_PARM_DESC(buf_size, "Size of each data buffer");
 
-static int buf_num = 1;
-/*MODULE_PARM(buf_num, "i");*/
-module_param(buf_num,int,0644);
 
-MODULE_PARM_DESC(buf_num, "Number of data buffers for each request");
-
-extern void cesaTestStart(int bufNum, int bufSize);
-extern void cesaTestStop(void);
 extern void cesaTest(int iter, int reqSize, int checkMode);
 extern void combiTest(int iter, int reqSize, int checkMode);
 extern void cesaOneTest(int testIdx, int caseIdx, int iter, int reqSize, int checkMode);
@@ -235,21 +224,12 @@ cesadev_init(void)
 {
 	int rc;
 
-#ifdef CONFIG_MV_CESA_TEST
-	if (mvCtrlPwrClckGet(CESA_UNIT_ID, 0) == MV_FALSE)
-		return 0;
-#endif
-
 #if defined(CONFIG_MV78200) || defined(CONFIG_MV632X)
 	if (MV_FALSE == mvSocUnitIsMappedToThisCpu(CESA))
 	{
 		dprintk("CESA is not mapped to this CPU\n");
 		return -ENODEV;
 	}
-#endif
-
-#ifdef CONFIG_MV_CESA_TEST
-    cesaTestStart(buf_num, buf_size);
 #endif
 
 	dprintk("%s(%p)\n", __FUNCTION__, cesadev_init);
@@ -264,9 +244,6 @@ cesadev_init(void)
 static void __exit
 cesadev_exit(void)
 {
-#ifdef CONFIG_MV_CESA_TEST
-	cesaTestStop();
-#endif
 	dprintk("%s()\n", __FUNCTION__);
 	misc_deregister(&cesadev);
 }
