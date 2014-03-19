@@ -262,8 +262,7 @@ extern "C" {
 #define MV_CESA_CAUSE_EOP_COAL_BIT			14
 #define MV_CESA_CAUSE_EOP_COAL_MASK			(1 << MV_CESA_CAUSE_EOP_COAL_BIT)
 
-#ifdef MV_CESA_INT_COALESCING_SUPPORT
-
+/* MV_CESA_INT_COALESCING_SUPPORT */
 /* Cryptographic Interrupt Coalescing Threshold Register */
 #define MV_CESA_INT_COAL_TH_REG(chan)			(MV_CESA_REGS_BASE(chan) + 0xE30)
 #define MV_CESA_EOP_PACKET_COAL_TH_OFFSET		0
@@ -274,7 +273,7 @@ extern "C" {
 #define MV_CESA_EOP_TIME_TH_OFFSET			0
 #define MV_CESA_EOP_TIME_TH_MASK			(0xffffff << MV_CESA_EOP_TIME_TH_OFFSET)
 
-#endif /* MV_CESA_INT_COALESCING_SUPPORT */
+/* !MV_CESA_INT_COALESCING_SUPPORT */
 
 #define MV_CESA_AUTH_DATA_IN_REG(chan)      		(MV_CESA_REGS_BASE(chan) + 0xd38)
 #define MV_CESA_AUTH_BIT_COUNT_LOW_REG(chan)      	(MV_CESA_REGS_BASE(chan) + 0xd20)

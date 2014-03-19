@@ -755,11 +755,11 @@ cesa_interrupt_handler(int irq, void *arg)
 
 	dprintk("%s()\n", __func__);
 
-#ifdef CONFIG_MV_CESA_INT_COALESCING_SUPPORT
-	mask = MV_CESA_CAUSE_EOP_COAL_MASK;
-#else
-	mask = MV_CESA_CAUSE_ACC_DMA_MASK;
-#endif
+	if (mv_cesa_feature == INT_COALESCING)
+		mask = MV_CESA_CAUSE_EOP_COAL_MASK;
+	else
+		mask = MV_CESA_CAUSE_ACC_DMA_MASK;
+
 	/* Read cause register */
 	cause = MV_REG_READ(MV_CESA_ISR_CAUSE_REG(chan));
 
@@ -1157,6 +1157,10 @@ cesa_ocf_probe(struct platform_device *pdev)
 	}
 	mv_cesa_mode = CESA_OCF_M;
 
+	err = mv_get_cesa_resources(pdev);
+	if (err != 0)
+		return err;
+
 	/* Not all platforms can gate the clock, so it is not
 	 * an error if the clock does not exists.
 	 */
@@ -1194,10 +1198,6 @@ cesa_ocf_probe(struct platform_device *pdev)
 	dprintk("%s,%d: cesa ocf device id is %d\n",
 					      __FILE__, __LINE__, cesa_ocf_id);
 
-	err = mv_get_cesa_resources(pdev);
-	if (err != 0)
-		return err;
-
 	if (MV_OK !=
 	    mvSysCesaInit(CESA_OCF_MAX_SES*5, CESA_Q_SIZE, NULL, pdev)) {
 		dev_err(&pdev->dev, "%s,%d: mvCesaInit Failed.\n",
@@ -1205,11 +1205,10 @@ cesa_ocf_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_MV_CESA_INT_COALESCING_SUPPORT
-	mask = MV_CESA_CAUSE_EOP_COAL_MASK;
-#else
-	mask = MV_CESA_CAUSE_ACC_DMA_MASK;
-#endif
+	if (mv_cesa_feature == INT_COALESCING)
+		mask = MV_CESA_CAUSE_EOP_COAL_MASK;
+	else
+		mask = MV_CESA_CAUSE_ACC_DMA_MASK;
 
 	/*
 	 * Preparation for each CESA chan
