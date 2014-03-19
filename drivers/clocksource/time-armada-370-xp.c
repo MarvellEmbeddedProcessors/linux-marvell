@@ -328,7 +328,8 @@ static void __init armada_375_timer_init(struct device_node *np)
 	struct clk *clk = of_clk_get(np, 0);
 
 	BUG_ON(IS_ERR(clk));
-	timer_clk = clk_get_rate(clk) / TIMER_DIVIDER;
+	/* Global timer source clock is the Punit clock (which is L2 clock divided by 2) */
+	timer_clk = clk_get_rate(clk) / 2 / TIMER_DIVIDER;
 	timer25Mhz = false;
 
 	armada_370_xp_timer_common_init(np);
