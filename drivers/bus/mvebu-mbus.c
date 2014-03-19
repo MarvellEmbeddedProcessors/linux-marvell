@@ -966,4 +966,55 @@ int __init mvebu_mbus_dt_init(bool is_coherent)
 	/* Setup statically declared windows in the DT */
 	return mbus_dt_setup(&mbus_state, np);
 }
+
+#ifdef MBUS_DEBUG
+void mbus_debug_window()
+{
+	void __iomem *win_addr = mbus_state.mbuswins_base;
+	int i, j;
+
+	pr_info("----------- mbus window -----------\n");
+
+	/* win 0-7 has 4reg: ctrl, base, remap_l,remap_h */
+	for (i = 0; i <= 7; i++) {
+
+		pr_info("WIN%d\n", i);
+		for (j = 0; j < 4; j++) {
+
+			pr_info("\twin(%d,%d): %p\t 0x%x\n", i, j,
+			    win_addr, readl(win_addr));
+
+			win_addr += 4;
+		}
+	}
+
+	pr_info("\nINTERREGS_WIN(%d): %p\t 0x%x\n", i++, win_addr,
+							      readl(win_addr));
+	win_addr += 4;
+	pr_info("\nSYNC_BARIER_WIN(%d): %p\t 0x%x\n\n", i++, win_addr,
+							      readl(win_addr));
+	win_addr += 4;
+
+	/* hole */
+	win_addr += 8;
+
+	/* win 8-19 has 2reg: ctrl, base */
+	for (i = 8; i <= 19; i++) {
+
+		pr_info("WIN%d\n", i);
+		for (j = 0; j < 2; j++) {
+
+			pr_info("\twin(%d,%d): %p\t 0x%x\n", i, j,
+			    win_addr, readl(win_addr));
+
+			win_addr += 4;
+		}
+	}
+
+	pr_info("\n");
+
+	/* TODO: sdramwins_base */
+
+}
+#endif /* MBUS_DEBUG */
 #endif
