@@ -96,7 +96,7 @@ static DEFINE_SPINLOCK(cesaIsrLock);
  */
 MV_U32 mv_cesa_base[MV_CESA_CHANNELS], mv_cesa_tdma_base[MV_CESA_CHANNELS];
 enum cesa_mode mv_cesa_mode = CESA_UNKNOWN_M;
-u32 mv_cesa_time_threshold, mv_cesa_threshold;
+u32 mv_cesa_time_threshold, mv_cesa_threshold, mv_cesa_channels;
 enum cesa_feature mv_cesa_feature = CESA_UNKNOWN;
 
 MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA_HAL_DATA *halData)
@@ -106,13 +106,12 @@ MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA
 	/* Init parameters */
 	reqId = 0;
 	resId = 0;
-	resQueueDepth = (MV_CESA_CHANNELS * queueDepth);
+	resQueueDepth = (mv_cesa_channels * queueDepth);
 
-#if (CONFIG_MV_CESA_CHANNELS == 1)
-	cesaPolicy = CESA_SINGLE_CHAN_POLICY;
-#else
-	cesaPolicy = CESA_DUAL_CHAN_BALANCED_POLICY;
-#endif
+	if (mv_cesa_channels == 1)
+		cesaPolicy = CESA_SINGLE_CHAN_POLICY;
+	else
+		cesaPolicy = CESA_DUAL_CHAN_BALANCED_POLICY;
 
 	/* Allocate reordered queue for completed results */
 	resQ = (MV_CESA_RESULT *)mvOsMalloc(resQueueDepth * sizeof(MV_CESA_RESULT));
@@ -134,7 +133,7 @@ MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA
 	spin_lock_init(&cesaIsrLock);
 
 	/* Per channel init */
-	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+	for (chan = 0; chan < mv_cesa_channels; chan++) {
 		spin_lock_init(&chanLock[chan]);
 		chanWeight[chan] = 0;
 		flowType[chan] = 0;
@@ -159,7 +158,7 @@ MV_STATUS mvCesaIfAction(MV_CESA_COMMAND *pCmd)
 	switch (cesaPolicy) {
 	case CESA_WEIGHTED_CHAN_POLICY:
 	case CESA_NULL_POLICY:
-		for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+		for (chan = 0; chan < mv_cesa_channels; chan++) {
 			if ((cesaReqResources[chan] > 0) && (chanWeight[chan] < min)) {
 				min = chanWeight[chan];
 				chanId = chan;
@@ -187,7 +186,7 @@ MV_STATUS mvCesaIfAction(MV_CESA_COMMAND *pCmd)
 		break;
 
 	case CESA_FLOW_ASSOC_CHAN_POLICY:
-		for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+		for (chan = 0; chan < mv_cesa_channels; chan++) {
 			if (flowType[chan] == pCmd->flowType) {
 				chanId = chan;
 				break;
@@ -252,7 +251,7 @@ MV_STATUS mvCesaIfReadyGet(MV_U8 chan, MV_CESA_RESULT *pResult)
 	MV_ULONG flags;
 
 	/* Validate channel index */
-	if (chan >= MV_CESA_CHANNELS) {
+	if (chan >= mv_cesa_channels) {
 		printk("%s: Error, bad channel index(%d)\n", __func__, chan);
 		return MV_ERROR;
 	}
@@ -367,12 +366,12 @@ MV_STATUS mvCesaIfPolicySet(MV_CESA_POLICY policy, MV_CESA_FLOW_TYPE flow)
 		}
 
 		/* Find next empty entry */
-		for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+		for (chan = 0; chan < mv_cesa_channels; chan++) {
 			if (flowType[chan] == CESA_NULL_FLOW_TYPE)
 				flowType[chan] = flow;
 		}
 
-		if (chan == MV_CESA_CHANNELS) {
+		if (chan == mv_cesa_channels) {
 			spin_unlock(&cesaIfLock);
 			mvOsPrintf("%s: Error, no empty entry is available\n", __func__);
 			return MV_ERROR;
@@ -601,6 +600,27 @@ mv_get_cesa_resources(struct platform_device *pdev)
 
 		chan++;
 	}
+
+	/* Get mv_cesa_channels */
+	ret = 0;
+	ret |= of_property_read_u32(pdev->dev.of_node, "cesa,channels",
+							    &mv_cesa_channels);
+
+	if (ret != 0) {
+		dev_err(&pdev->dev,
+		    "missing or bad \'cesa,channels\' parameter in dts\n");
+		dprintk("%s: mv_cesa_channels = %d", __func__,
+		    mv_cesa_channels);
+		return -ENOENT;
+	} else if (mv_cesa_channels != chan) {
+		dev_err(&pdev->dev,
+		    "cesa,channels declared in dts is not equal %s\n",
+		    "to nr of cesa childs defined in dts");
+		return -ENOENT;
+	} else
+		dev_info(&pdev->dev,
+		    "%s: Total CESA HW channels supported %d\n", __func__,
+		    mv_cesa_channels);
 
 	/*
 	 * Get interrupt mode and parameters

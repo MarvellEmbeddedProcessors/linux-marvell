@@ -218,7 +218,11 @@ void mvCesaDebugRegs(void)
 
 	mvOsPrintf("\t CESA Registers:\n");
 
+#ifdef CONFIG_OF
+	for (chan = 0; chan < mv_cesa_channels; chan++) {
+#else
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+#endif
 		mvOsPrintf("\n\nChannel %d:\n", chan);
 		mvOsPrintf("===========\n");
 		mvOsPrintf("MV_CESA_CMD_REG                     : 0x%X = 0x%08x\n",
@@ -300,7 +304,11 @@ void mvCesaDebugStatus(void)
 {
 	MV_U8 chan = 0;
 	mvOsPrintf("\n\t CESA Status\n\n");
+#ifdef CONFIG_OF
+	for (chan = 0; chan < mv_cesa_channels; chan++) {
+#else
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+#endif
 
 		mvOsPrintf("Channel %d: pReqQ=%p, qDepth=%d, reqSize=%d bytes, qRes=%d",
 			chan, pCesaReqFirst[chan], cesaQueueDepth[chan], (int)sizeof(MV_CESA_REQ), cesaReqResources[chan]);
@@ -346,7 +354,11 @@ void mvCesaDebugQueue(int mode)
 
 	mvOsPrintf("\n\t CESA Request Queue:\n\n");
 
+#ifdef CONFIG_OF
+	for (chan = 0; chan < mv_cesa_channels; chan++) {
+#else
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+#endif
 		mvOsPrintf("\n\nChannel %d:\n", chan);
 		mvOsPrintf("===========\n");
 
@@ -466,7 +478,11 @@ void mvCesaDebugSA(short sid, int mode)
 {
 	MV_U8 chan = 0;
 
+#ifdef CONFIG_OF
+	for (chan = 0; chan < mv_cesa_channels; chan++) {
+#else
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+#endif
 		mvOsPrintf("\n\nChannel %d:\n", chan);
 		mvOsPrintf("===========\n");
 
