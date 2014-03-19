@@ -87,10 +87,25 @@ SEM_ID cesaWaitSemId = NULL;
 
 #elif defined(MV_LINUX)
 #include <linux/interrupt.h>
+#include <linux/module.h>
 #include <linux/wait.h>
+
+static int buf_size = 20000;
+/*MODULE_PARM(buf_size, "i");*/
+module_param(buf_size, int, 0644);
+MODULE_PARM_DESC(buf_size, "Size of each data buffer");
+
+static int buf_num = 1;
+/*MODULE_PARM(buf_num, "i");*/
+module_param(buf_num, int, 0644);
+
+MODULE_PARM_DESC(buf_num, "Number of data buffers for each request");
+
 static wait_queue_head_t cesaTest_waitq;
 static spinlock_t cesaLock;
 static struct timeval tv;
+
+#define	DRIVER_NAME	"armada-cesa-test"
 
 #define CESA_TEST_LOCK(flags)       spin_lock_irqsave(&cesaLock, flags)
 #define CESA_TEST_UNLOCK(flags)     spin_unlock_irqrestore(&cesaLock, flags);
@@ -129,9 +144,6 @@ do {					\
 #include "mvDebug.h"
 
 #include "mvSysCesaConfig.h"
-#include "boardEnv/mvBoardEnvLib.h"
-#include "ctrlEnv/sys/mvCpuIf.h"
-#include "cntmr/mvCntmr.h"
 #include "cesa_if.h"
 #include "mvMD5.h"
 #include "mvSHA1.h"
@@ -2001,11 +2013,12 @@ MV_STATUS testCmd(int sid, int iter, MV_CESA_COMMAND *pCmd,
 	return MV_OK;
 }
 
-extern MV_STATUS mvSysCesaInit(int numOfSession, int queueDepth, void *osHandle);
-
-void cesaTestStart(int bufNum, int bufSize)
+static int
+cesa_test_probe(struct platform_device *pdev)
 {
-	int i, j, idx;
+	struct device_node *np;
+	struct clk *clk;
+	int i, j, idx, err, bufNum = buf_num, bufSize = buf_size, irq;
 	MV_CESA_MBUF *pMbufSrc, *pMbufDst;
 	MV_BUF_INFO *pFragsSrc, *pFragsDst;
 	char *pBuf;
@@ -2017,11 +2030,29 @@ void cesaTestStart(int bufNum, int bufSize)
 	MV_U32 mask;
 	const char* irqName[] = {"cesa_test:0", "cesa_test:1"};
 
+	dev_info(&pdev->dev, "%s\n", __func__);
+
+	if (!pdev->dev.of_node) {
+		dev_err(&pdev->dev, "CESA device node not available\n");
+		return -ENOENT;
+	}
+
+	/* Not all platforms can gate the clock, so it is not
+	 * an error if the clock does not exists.
+	 */
+	clk = clk_get(&pdev->dev, NULL);
+	if (!IS_ERR(clk))
+		clk_prepare_enable(clk);
+
+	err = mv_get_cesa_resources(pdev);
+	if (err != 0)
+		return err;
+
 	cesaCmdRing = mvOsMalloc(sizeof(MV_CESA_COMMAND) * CESA_TEST_REQ_SIZE);
 	if (cesaCmdRing == NULL) {
 		mvOsPrintf("testStart: Can't allocate %d bytes of memory\n",
 			   (int)(sizeof(MV_CESA_COMMAND) * CESA_TEST_REQ_SIZE));
-		return;
+		return -EINVAL;
 	}
 	memset(cesaCmdRing, 0, sizeof(MV_CESA_COMMAND) * CESA_TEST_REQ_SIZE);
 
@@ -2038,21 +2069,21 @@ void cesaTestStart(int bufNum, int bufSize)
 	cesaHexBuffer = mvOsMalloc(2 * bufNum * bufSize);
 	if (cesaHexBuffer == NULL) {
 		mvOsPrintf("testStart: Can't malloc %d bytes for cesaHexBuffer.\n", 2 * bufNum * bufSize);
-		return;
+		return -EINVAL;
 	}
 	memset(cesaHexBuffer, 0, (2 * bufNum * bufSize));
 
 	cesaBinBuffer = mvOsMalloc(bufNum * bufSize);
 	if (cesaBinBuffer == NULL) {
 		mvOsPrintf("testStart: Can't malloc %d bytes for cesaBinBuffer\n", bufNum * bufSize);
-		return;
+		return -EINVAL;
 	}
 	memset(cesaBinBuffer, 0, (bufNum * bufSize));
 
 	cesaExpBinBuffer = mvOsMalloc(bufNum * bufSize);
 	if (cesaExpBinBuffer == NULL) {
 		mvOsPrintf("testStart: Can't malloc %d bytes for cesaExpBinBuffer\n", bufNum * bufSize);
-		return;
+		return -EINVAL;
 	}
 	memset(cesaExpBinBuffer, 0, (bufNum * bufSize));
 
@@ -2067,7 +2098,7 @@ void cesaTestStart(int bufNum, int bufSize)
 	if ((pMbufSrc == NULL) || (pFragsSrc == NULL) || (pMbufDst == NULL) || (pFragsDst == NULL)) {
 		mvOsPrintf("testStart: Can't malloc Src and Dst pMbuf and pFrags structures.\n");
 		/* !!!! Dima cesaTestCleanup(); */
-		return;
+		return -EINVAL;
 	}
 
 	memset(pMbufSrc, 0, sizeof(MV_CESA_MBUF) * CESA_TEST_REQ_SIZE);
@@ -2085,7 +2116,7 @@ void cesaTestStart(int bufNum, int bufSize)
 					  &cesaReqBufs[i].bufPhysAddr, &cesaReqBufs[i].memHandle);
 		if (pBuf == NULL) {
 			mvOsPrintf("testStart: Can't malloc %d bytes for pBuf\n", bufSize * bufNum * 2);
-			return;
+			return -EINVAL;
 		}
 
 		memset(pBuf, 0, bufSize * bufNum * 2);
@@ -2093,7 +2124,7 @@ void cesaTestStart(int bufNum, int bufSize)
 		if (pBuf == NULL) {
 			mvOsPrintf("cesaTestStart: Can't allocate %d bytes for req_%d buffers\n",
 				   bufSize * bufNum * 2, i);
-			return;
+			return -EINVAL;
 		}
 
 		cesaReqBufs[i].bufVirtPtr = (MV_U8 *) pBuf;
@@ -2123,11 +2154,11 @@ void cesaTestStart(int bufNum, int bufSize)
 #ifndef MV_NETBSD
 	numOfSessions = CESA_DEF_SESSION_NUM;
 
-	status = mvSysCesaInit(numOfSessions, CESA_DEF_REQ_SIZE, NULL);
+	status = mvSysCesaInit(numOfSessions, CESA_DEF_REQ_SIZE, NULL, pdev);
 	if (status != MV_OK) {
 		mvOsPrintf("mvCesaInit is Failed: status = 0x%x\n", status);
 		/* !!!! Dima cesaTestCleanup(); */
-		return;
+		return -EINVAL;
 	}
 #endif /* !MV_NETBSD */
 
@@ -2152,7 +2183,14 @@ void cesaTestStart(int bufNum, int bufSize)
 	mask = MV_CESA_CAUSE_ACC_DMA_MASK;
 #endif
 
+#ifndef __KERNEL__
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+#else
+	/*
+	 * Preparation for each CESA chan
+	 */
+	for_each_child_of_node(pdev->dev.of_node, np) {
+#endif
 #ifndef MV_NETBSD
 		MV_REG_WRITE(MV_CESA_ISR_CAUSE_REG(chan), 0);
 		MV_REG_WRITE(MV_CESA_ISR_MASK_REG(chan), mask);
@@ -2178,15 +2216,33 @@ void cesaTestStart(int bufNum, int bufSize)
 #endif /* MV_VXWORKS */
 
 #if !defined(MV_NETBSD) && defined(__KERNEL__)
+		/*
+		 * Get IRQ from FDT and map it to the Linux IRQ nr
+		 */
+		irq = irq_of_parse_and_map(np, 0);
+		if (!irq) {
+			dev_err(&pdev->dev, "IRQ nr missing in device tree\n");
+			return -ENOENT;
+		}
+
+		dprintk("%s: cesa irq %d, chan %d\n", __func__,
+					      irq, chan);
 		chanId[chan] = chan;
 		spin_lock_init(&cesaChanLock[chan]);
-		if (request_irq(CESA_IRQ(chan), cesaTestReadyIsr, (IRQF_DISABLED), irqName[chan], &chanId[chan])) {
+		if (request_irq(irq, cesaTestReadyIsr, (IRQF_DISABLED),
+					       irqName[chan], &chanId[chan])) {
 			mvOsPrintf("cannot assign irq\n");
 			/* !!!! Dima cesaTestCleanup(); */
-			return;
+			return -EINVAL;
 		}
+		chan++;
 	}
 	spin_lock_init(&cesaLock);
+
+#ifdef CESA_DEBUGS
+	mvCesaDebugRegs();
+#endif
+	return 0;
 
 #endif
 }
@@ -2351,7 +2407,8 @@ MV_STATUS testRun(int idx, int caseIdx, int iter, int reqSize, int checkMode)
 	return MV_OK;
 }
 
-void cesaTestStop(void)
+static int
+cesa_test_remove(struct platform_device *pdev)
 {
 	MV_CESA_MBUF *pMbufSrc, *pMbufDst;
 	MV_BUF_INFO *pFragsSrc, *pFragsDst;
@@ -2376,7 +2433,7 @@ void cesaTestStop(void)
 	cesaDataHexStr3[0] = '\0';
 
 	/* Free CESA HAL resources */
-	mvCesaIfFinish();
+	return mvCesaIfFinish();
 }
 
 void desTest(int iter, int reqSize, int checkMode)
@@ -3053,3 +3110,35 @@ void cesaTestPrintStatus(void)
 	}
 #endif /* CESA_TEST_DEBUG */
 }
+
+static struct of_device_id mv_cesa_dt_ids[] = {
+	{ .compatible = "marvell,armada-cesa", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, mv_cesa_dt_ids);
+
+static struct platform_driver mv_cesa_driver = {
+	.driver = {
+		.name	= DRIVER_NAME,
+		.owner	= THIS_MODULE,
+		.of_match_table = of_match_ptr(mv_cesa_dt_ids),
+	},
+	.probe		= cesa_test_probe,
+	.remove		= cesa_test_remove,
+};
+
+static int __init cesa_test_init(void)
+{
+	return platform_driver_register(&mv_cesa_driver);
+}
+module_init(cesa_test_init);
+
+static void __exit cesa_test_exit(void)
+{
+	platform_driver_unregister(&mv_cesa_driver);
+}
+module_exit(cesa_test_exit);
+
+MODULE_LICENSE("Marvell/GPL");
+MODULE_AUTHOR("Ronen Shitrit");
+MODULE_DESCRIPTION("TEST module for Marvell CESA based SoC");
