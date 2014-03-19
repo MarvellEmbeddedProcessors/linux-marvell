@@ -32,7 +32,11 @@
 	soc {
 		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
-			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
+			  MBUS_ID(0x09, 0x01) 0 0 0xf1100000 0x10000	/* CESA0: PHYS=0xf1100000
+									   size 64K */
+			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;	/* CESA1: PHYS=0xf1110000
+									   size 64K */
 
 		devbus-bootcs {
 			status = "okay";
@@ -218,6 +222,10 @@
 					label = "Root";
 					reg = <0x00700000 0x3f900000>;
 				};
+			};
+
+			crypto@9D000 {
+				status = "okay";
 			};
 		};
 	};
