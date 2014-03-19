@@ -1783,7 +1783,8 @@ sub process {
 		    $rawline !~ /^.\s*\*\s*\@$Ident\s/ &&
 		    !($line =~ /^\+\s*$logFunctions\s*\(\s*(?:(KERN_\S+\s*|[^"]*))?"[X\t]*"\s*(?:|,|\)\s*;)\s*$/ ||
 		    $line =~ /^\+\s*"[^"]*"\s*(?:\s*|,|\)\s*;)\s*$/) &&
-		    $length > $max_line_length)
+		    $length > $max_line_length &&
+		    !($realfile =~ /sysfs/))
 		{
 			WARN("LONG_LINE",
 			     "line over $max_line_length characters\n" . $herecurr);
