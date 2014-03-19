@@ -191,6 +191,14 @@
 				       0x92000 0x1000>;	/* tdma base reg chan 1 */
 				clocks = <&gateclk 23>;
 				cesa,mode = "ocf";	/* ocf or test */
+				cesa,feature = "int_coalescing"; /* chain, int_coalescing
+							   or int_per_packet */
+
+				/* threshold and time_threshold relevant if
+				   int_coalescing in use */
+				cesa,threshold = <0x2>;
+				cesa,time_threshold = <0xfffff>;
+
 				cesa,ctrlModel = /bits/ 16 <0x7846>;
 				cesa,ctrlRev = /bits/ 8 <2>;
 				cesa,sramOffset = /bits/ 16 <0>;

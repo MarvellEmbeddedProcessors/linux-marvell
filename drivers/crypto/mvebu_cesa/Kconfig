@@ -20,52 +20,6 @@ config MV_CESA_CHANNELS
 	---help---
 	Select the number of CESA channels to be used for crypto operations acceleration.
 
-choice
-	prompt "CESA Features"
-	depends on MV_CESA
-	default MV_CESA_INT_COALESCING_SUPPORT
-
-config MV_CESA_CHAIN_MODE
-	bool "Support CESA chain-mode"
-	depends on MV_CESA
-	---help---
-	Choosing this option will enable CESA chain mode support.
-
-config MV_CESA_INT_COALESCING_SUPPORT
-	bool "Support Interrupt Coalescing"
-	depends on MV_CESA
-	---help---
-	Choosing this option will enable CESA interrupt coalescing support.
-
-config MV_CESA_INT_PER_PACKET
-	bool "Support interrupt per packet(no optimization)"
-	depends on MV_CESA
-	---help---
-	Choosing this option will enforce CESA to work in interrupt per packet mode.
-
-endchoice
-
-config	MV_CESA_INT_COAL_THRESHOLD
-	hex "Cryptographic Interrupt Coalescing Threshold"
-	depends on MV_CESA_INT_COALESCING_SUPPORT
-	range 0x0 0xff
-	default 0x2
-	---help---
-	This field provides a way to minimize the number of interrupts to off load
-	the CPU. It defines the number of <AccAndTDMAInt_CM> indications before
-	asserting the <EopCoalInt> bit in the Cryptographic interrupt Cause Register.
-
-config	MV_CESA_INT_COAL_TIME_THRESHOLD
-	hex "Cryptographic Interrupt Coalescing Time Threshold"
-	depends on MV_CESA_INT_COALESCING_SUPPORT
-	range 0x0 0xffffff
-	default 0xfffff
-	---help---
-	This field provides a way to ensure maximum delay between <AccAndTDMAInt_CM>
-	assertion and assertion bit <EopCoalInt> in Cryptographic Interrupt Cause
-	Register (even if the number of <AccAndTDMAInt_CM> indications did not
-	reach the <EopCoalPacketTh> value).
-
 config  MV_CESA_TOOL
 	depends on MV_CESA_TOOL_ARMADA
 	tristate

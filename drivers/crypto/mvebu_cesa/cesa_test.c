@@ -1681,11 +1681,10 @@ void cesaTestReadyIsr(void)
 	MV_CESA_RESULT result;
 	MV_U8 chan = *((MV_U8 *)dev_id);
 
-#ifdef CONFIG_MV_CESA_INT_COALESCING_SUPPORT
-	mask = MV_CESA_CAUSE_EOP_COAL_MASK;
-#else
-	mask = MV_CESA_CAUSE_ACC_DMA_MASK;
-#endif
+	if (mv_cesa_feature == INT_COALESCING)
+		mask = MV_CESA_CAUSE_EOP_COAL_MASK;
+	else
+		mask = MV_CESA_CAUSE_ACC_DMA_MASK;
 
 	spin_lock(&cesaLock);
 
@@ -2185,11 +2184,10 @@ cesa_test_probe(struct platform_device *pdev)
 	strcat((char *)cesaDataAndMd5digest3, cesaHmacMd5digestHex3);
 	strcat((char *)cesaDataAndSha1digest3, cesaHmacSha1digestHex3);
 
-#ifdef CONFIG_MV_CESA_INT_COALESCING_SUPPORT
-	mask = MV_CESA_CAUSE_EOP_COAL_MASK;
-#else
-	mask = MV_CESA_CAUSE_ACC_DMA_MASK;
-#endif
+	if (mv_cesa_feature == INT_COALESCING)
+		mask = MV_CESA_CAUSE_EOP_COAL_MASK;
+	else
+		mask = MV_CESA_CAUSE_ACC_DMA_MASK;
 
 #ifndef __KERNEL__
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
