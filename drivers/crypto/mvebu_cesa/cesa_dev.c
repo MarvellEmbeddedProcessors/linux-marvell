@@ -1,4 +1,4 @@
-#ifdef CONFIG_PLAT_ARMADA
+#ifdef CONFIG_ARCH_MVEBU
 #include <generated/autoconf.h>
 #else
 #include <linux/autoconf.h>
@@ -26,10 +26,7 @@
 #endif
 #include "mvOs.h"
 #include "mvCommon.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
-#include "ctrlEnv/mvUnitMap.h"
-#include "cesa/mvCesa.h"
-#include "mvSysCesaApi.h"
+#include "mvCesa.h"
 
 
 static int debug = 1;
@@ -238,8 +235,10 @@ cesadev_init(void)
 {
 	int rc;
 
+#ifdef CONFIG_MV_CESA_TEST
 	if (mvCtrlPwrClckGet(CESA_UNIT_ID, 0) == MV_FALSE)
 		return 0;
+#endif
 
 #if defined(CONFIG_MV78200) || defined(CONFIG_MV632X)
 	if (MV_FALSE == mvSocUnitIsMappedToThisCpu(CESA))
@@ -248,8 +247,6 @@ cesadev_init(void)
 		return -ENODEV;
 	}
 #endif
-	if(mvUnitMapIsMine(CESA) == MV_FALSE)
-		return -ENODEV;
 
 #ifdef CONFIG_MV_CESA_TEST
     cesaTestStart(buf_num, buf_size);
