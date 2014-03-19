@@ -254,7 +254,12 @@ MV_STATUS mvCesaHalInit(int numOfSession, int queueDepth, void *osHandle, MV_CES
 	cesaOsHandle = osHandle;
 	sha2CmdVal = 0;
 
+#ifdef CONFIG_OF
+	mvOsPrintf("mvCesaInit: channels=%d, session=%d, queue=%d\n",
+	    mv_cesa_channels, numOfSession, queueDepth);
+#else
 	mvOsPrintf("mvCesaInit: channels=%d, session=%d, queue=%d\n", MV_CESA_CHANNELS, numOfSession, queueDepth);
+#endif
 
 	/* Create initial Session database */
 	pCesaSAD = mvOsMalloc(sizeof(MV_CESA_SA *) * numOfSession);
@@ -271,7 +276,11 @@ MV_STATUS mvCesaHalInit(int numOfSession, int queueDepth, void *osHandle, MV_CES
 	ctrlRev = halData->ctrlRev;
 
 	/* Initiliaze per channel resources */
+#ifdef CONFIG_OF
+	for (chan = 0; chan < mv_cesa_channels; chan++) {
+#else
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+#endif
 
 		cesaSramVirtPtr[chan] = (MV_CESA_SRAM_MAP *) (halData->sramVirtBase[chan] + halData->sramOffset[chan]);
 
@@ -494,9 +503,13 @@ MV_STATUS mvCesaFinish(void)
 	MV_CESA_REQ *pReq;
 	MV_U8 chan;
 
-	mvOsPrintf("mvCesaFinish: \n");
+	mvOsPrintf("mvCesaFinish:\n");
 
+#ifdef CONFIG_OF
+	for (chan = 0; chan < mv_cesa_channels; chan++) {
+#else
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+#endif
 
 		cesaSramVirtPtr[chan] = NULL;
 
@@ -867,7 +880,11 @@ MV_STATUS mvCesaSessionClose(short sid)
 		return MV_NOT_FOUND;
 	}
 
+#ifdef CONFIG_OF
+	for (chan = 0; chan < mv_cesa_channels; chan++) {
+#else
 	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+#endif
 		if (cesaLastSid[chan] == sid)
 			cesaLastSid[chan] = -1;
 	}

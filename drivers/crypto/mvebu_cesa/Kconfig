@@ -12,14 +12,6 @@ config  MV_CESA_TOOL_ARMADA
 	select MV_CESA_TOOL
 	---help---
 
-config MV_CESA_CHANNELS
-	int "Total CESA HW channels supported"
-	depends on MV_CESA
-	range 1 2
-	default "2"
-	---help---
-	Select the number of CESA channels to be used for crypto operations acceleration.
-
 config  MV_CESA_TOOL
 	depends on MV_CESA_TOOL_ARMADA
 	tristate
