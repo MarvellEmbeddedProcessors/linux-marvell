@@ -180,6 +180,9 @@ ENDPROC(cpu_pj4b_do_idle)
 __v7_ca5mp_setup:
 __v7_ca9mp_setup:
 	mov	r10, #(1 << 0)			@ TLB ops broadcasting
+#ifdef CONFIG_CPU_L1_CACHE_PREF_ENABLE
+	orr	r10, r10, #(1 << 2)
+#endif
 	b	1f
 __v7_ca7mp_setup:
 __v7_ca15mp_setup:
