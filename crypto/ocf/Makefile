@@ -31,6 +31,8 @@ else
 endif
 
 EXTRA_CFLAGS += -I$(obj)/.
+ccflags-$(CONFIG_OF)	+= -I$(srctree)/drivers/crypto/mvebu_cesa
+ccflags-$(CONFIG_OF)	+= -I$(srctree)/arch/arm/mach-mvebu/include/mach
 
 obj-$(CONFIG_OCF_OCF)         += ocf.o
 obj-$(CONFIG_OCF_CRYPTODEV)   += cryptodev.o

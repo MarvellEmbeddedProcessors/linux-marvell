@@ -1136,6 +1136,7 @@ cesa_ocf_probe(struct platform_device *pdev)
 {
 	u8 chan = 0;
 	const char *irq_str[] = {"cesa0","cesa1"};
+	const char *cesa_m;
 	unsigned int mask;
 	struct device_node *np;
 	struct clk *clk;
@@ -1146,14 +1147,22 @@ cesa_ocf_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 
+	/*
+	 * Check driver mode from dts
+	 */
+	cesa_m = of_get_property(pdev->dev.of_node, "cesa,mode", NULL);
+	if (strncmp(cesa_m, "ocf", 3) != 0) {
+		dprintk("%s: device operate in %s mode\n", __func__, cesa_m);
+		return -ENODEV;
+	}
+	mv_cesa_mode = CESA_OCF_M;
+
 	/* Not all platforms can gate the clock, so it is not
 	 * an error if the clock does not exists.
 	 */
 	clk = clk_get(&pdev->dev, NULL);
 	if (!IS_ERR(clk))
 		clk_prepare_enable(clk);
-
-	dev_info(&pdev->dev, "%s\n", __func__);
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,30))
 	crypto_init();
@@ -1252,9 +1261,11 @@ cesa_ocf_probe(struct platform_device *pdev)
 	REGISTER(CRYPTO_SHA1_HMAC);
 #undef REGISTER
 
-#ifdef RT_DEBUG
+#ifdef CESA_DEBUGS
 	mvCesaDebugRegs();
 #endif
+	dev_info(&pdev->dev, "%s: CESA driver operate in %s(%d) mode\n",
+					       __func__, cesa_m, mv_cesa_mode);
 	return 0;
 }
 

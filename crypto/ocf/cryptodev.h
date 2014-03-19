@@ -61,6 +61,11 @@
 #ifndef _CRYPTO_CRYPTO_H_
 #define _CRYPTO_CRYPTO_H_
 
+#ifdef CONFIG_OF
+#include "mvTypes.h"
+#include "mvSysCesaConfig.h"
+#endif
+
 /* Some initial values */
 #define CRYPTO_DRIVERS_INITIAL	4
 #define CRYPTO_SW_SESSIONS	32

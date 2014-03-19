@@ -94,6 +94,7 @@ static DEFINE_SPINLOCK(cesaIsrLock);
  * Initialized in cesa_<mode>_probe, where <mode>: ocf or test
  */
 MV_U32 mv_cesa_base[MV_CESA_CHANNELS], mv_cesa_tdma_base[MV_CESA_CHANNELS];
+enum cesa_mode mv_cesa_mode = CESA_UNKNOWN_M;
 
 MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA_HAL_DATA *halData)
 {
