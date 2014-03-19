@@ -20,37 +20,6 @@ config MV_CESA_CHANNELS
 	---help---
 	Select the number of CESA channels to be used for crypto operations acceleration.
 
-
-choice
-        prompt "CESA Mode"
-        depends on MV_CESA
-        default MV_CESA_OCF_ARMADA
-
-config	MV_CESA_OCF_ARMADA
-	bool "Support for Marvell CESA OCF driver"
-	depends on OCF_OCF
-	select MV_CESA_OCF
-	---help---
-	Choosing this option will enable you to use the Marvell Cryptographic Engine and
-	Security Accelerator, under the OCF package.
-
-config  MV_CESA_TEST_ARMADA
-	bool "Support for Marvell CESA test driver"
-	depends on MV_CESA_TOOL_ARMADA
-	select MV_CESA_TEST
-	---help---
-	Choosing this option will enable you to use the Marvell Cryptographic Engine and
-	Security Accelerator, with the mv_cesa_tool in test mode.
-
-config  MV_CESA_L2FW_ARMADA
-	bool "Support for Marvell L2fw demo driver"
-	depends on MV_ETH_L2SEC
-	select MV_CESA_L2FW
-	---help---
-	Choosing this option will enable you to use the Marvell Cryptographic Engine and
-	Security Accelerator, with the l2fw demo.
-endchoice
-
 choice
 	prompt "CESA Features"
 	depends on MV_CESA
@@ -96,14 +65,6 @@ config	MV_CESA_INT_COAL_TIME_THRESHOLD
 	assertion and assertion bit <EopCoalInt> in Cryptographic Interrupt Cause
 	Register (even if the number of <AccAndTDMAInt_CM> indications did not
 	reach the <EopCoalPacketTh> value).
-
-config	MV_CESA_OCF
-	depends on MV_CESA_OCF_ARMADA
-	tristate
-
-config  MV_CESA_TEST
-	depends on MV_CESA_TEST_ARMADA
-	bool
 
 config  MV_CESA_TOOL
 	depends on MV_CESA_TOOL_ARMADA

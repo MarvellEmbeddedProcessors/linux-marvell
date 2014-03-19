@@ -847,8 +847,80 @@ crypto_dispatch(struct cryptop *crp)
 		wake_up_interruptible(&cryptoproc_wait);
 		CRYPTO_Q_UNLOCK();
 	}
-#else
 
+#elif CONFIG_OF
+	if (mv_cesa_mode == CESA_OCF_M) {
+		dprintk("%s:cesa mode %d\n", __func__, mv_cesa_mode);
+
+		CRYPTO_Q_UNLOCK();
+
+		/* warning: We are using the CRYPTO_F_BATCH to mark processing by HW,
+		   it should be disabled for software encryption */
+		if ((crp->crp_flags & CRYPTO_F_BATCH)) {
+			int hid = CRYPTO_SESID2HID(crp->crp_sid);
+			cap = crypto_checkdriver(hid);
+			/* Driver cannot disappear when there is an active session. */
+			KASSERT(cap != NULL, ("%s: Driver disappeared.", __func__));
+
+			result = crypto_invoke(cap, crp, 0);
+			if (result != 0) {
+				CRYPTO_Q_LOCK();
+				crypto_q_cnt--;
+				cryptostats.cs_drops++;
+				CRYPTO_Q_UNLOCK();
+			}
+		} else {
+			CRYPTO_Q_LOCK();
+			TAILQ_INSERT_TAIL(&crp_q, crp, crp_next);
+			result = 0;
+			wake_up_interruptible(&cryptoproc_wait);
+			CRYPTO_Q_UNLOCK();
+		}
+
+	} else {
+
+		/*
+		 * Caller marked the request to be processed immediately; dispatch
+		 * it directly to the driver unless the driver is currently blocked.
+		 */
+		if ((crp->crp_flags & CRYPTO_F_BATCH) == 0) {
+			int hid = CRYPTO_SESID2HID(crp->crp_sid);
+			cap = crypto_checkdriver(hid);
+			/* Driver cannot disappear when there is an active session. */
+			KASSERT(cap != NULL, ("%s: Driver disappeared.", __func__));
+			if (!cap->cc_qblocked) {
+				crypto_all_qblocked = 0;
+				crypto_drivers[hid].cc_unqblocked = 1;
+				CRYPTO_Q_UNLOCK();
+				result = crypto_invoke(cap, crp, 0);
+				CRYPTO_Q_LOCK();
+				if (result == ERESTART)
+					if (crypto_drivers[hid].cc_unqblocked)
+						crypto_drivers[hid].cc_qblocked = 1;
+				crypto_drivers[hid].cc_unqblocked = 0;
+			}
+		}
+		if (result == ERESTART) {
+			/*
+			 * The driver ran out of resources, mark the
+			 * driver ``blocked'' for cryptop's and put
+			 * the request back in the queue.  It would
+			 * best to put the request back where we got
+			 * it but that's hard so for now we put it
+			 * at the front.  This should be ok; putting
+			 * it at the end does not work.
+			 */
+			list_add(&crp->crp_next, &crp_q);
+			cryptostats.cs_blocks++;
+			result = 0;
+		} else if (result == -1) {
+			TAILQ_INSERT_TAIL(&crp_q, crp, crp_next);
+			result = 0;
+		}
+		wake_up_interruptible(&cryptoproc_wait);
+		CRYPTO_Q_UNLOCK();
+	}
+#else
 	/*
 	 * Caller marked the request to be processed immediately; dispatch
 	 * it directly to the driver unless the driver is currently blocked.
