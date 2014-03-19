@@ -2044,12 +2044,21 @@ cesa_test_probe(struct platform_device *pdev)
 	}
 	mv_cesa_mode = CESA_TEST_M;
 
-	/* Not all platforms can gate the clock, so it is not
-	 * an error if the clock does not exists.
+	j = of_property_count_strings(pdev->dev.of_node, "clock-names");
+	dprintk("%s: Gate %d clocks\n", __func__, (j > 0 ? j : 1));
+	/*
+	 * If property "clock-names" does not exist (j < 0), assume that there
+	 * is only one clock which needs gating (j > 0 ? j : 1)
 	 */
-	clk = clk_get(&pdev->dev, NULL);
-	if (!IS_ERR(clk))
-		clk_prepare_enable(clk);
+	for (i = 0; i < (j > 0 ? j : 1); i++) {
+
+		/* Not all platforms can gate the clock, so it is not
+		 * an error if the clock does not exists.
+		 */
+		clk = of_clk_get(pdev->dev.of_node, i);
+		if (!IS_ERR(clk))
+			clk_prepare_enable(clk);
+	}
 
 	err = mv_get_cesa_resources(pdev);
 	if (err != 0)

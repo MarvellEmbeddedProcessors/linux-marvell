@@ -1140,7 +1140,7 @@ cesa_ocf_probe(struct platform_device *pdev)
 	unsigned int mask;
 	struct device_node *np;
 	struct clk *clk;
-	int err;
+	int err, i, j;
 
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "CESA device node not available\n");
@@ -1161,12 +1161,21 @@ cesa_ocf_probe(struct platform_device *pdev)
 	if (err != 0)
 		return err;
 
-	/* Not all platforms can gate the clock, so it is not
-	 * an error if the clock does not exists.
+	j = of_property_count_strings(pdev->dev.of_node, "clock-names");
+	dprintk("%s: Gate %d clocks\n", __func__, (j > 0 ? j : 1));
+	/*
+	 * If property "clock-names" does not exist (j < 0), assume that there
+	 * is only one clock which needs gating (j > 0 ? j : 1)
 	 */
-	clk = clk_get(&pdev->dev, NULL);
-	if (!IS_ERR(clk))
-		clk_prepare_enable(clk);
+	for (i = 0; i < (j > 0 ? j : 1); i++) {
+
+		/* Not all platforms can gate the clock, so it is not
+		 * an error if the clock does not exists.
+		 */
+		clk = of_clk_get(pdev->dev.of_node, i);
+		if (!IS_ERR(clk))
+			clk_prepare_enable(clk);
+	}
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,30))
 	crypto_init();
