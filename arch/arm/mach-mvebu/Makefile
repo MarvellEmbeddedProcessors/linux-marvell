@@ -22,7 +22,9 @@ obj-$(CONFIG_MACH_ARMADA_375)	 += platsmp-375.o headsmp-375.o
 obj-$(CONFIG_MACH_ARMADA_380)	 += platsmp-380.o headsmp-380.o
 endif
 obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+obj-$(CONFIG_PROC_FS)            += dump_mv_regs.o
 obj-y	+= linux_oss/mvOs.o
+
 
 COMMON_DIR	:= $(srctree)/arch/arm/mach-mvebu/include/mach
 ccflags-y	+= -I$(COMMON_DIR) -DMV_CPU_$(ENDIAN)
