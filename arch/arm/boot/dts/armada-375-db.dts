@@ -68,8 +68,8 @@
 			};
 
 			serial@12000 {
-				clock-frequency = <200000000>;
 				status = "okay";
+				clocks = <&coreclk 0>;
 			};
 
 			spi0: spi@10600 {
