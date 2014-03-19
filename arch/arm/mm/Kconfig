@@ -862,6 +862,16 @@ config MIGHT_HAVE_CACHE_L2X0
 	  instead of this option, thus preventing the user from
 	  inadvertently configuring a broken kernel.
 
+config CPU_L1_CACHE_PREF_ENABLE
+	bool "Enable CPU L1 Cache Prefetch"
+	depends on CPU_V7
+	default y if CPU_V7 && ARCH_MVEBU
+	help
+	  Say Y here to enable L1 cache prefetch.
+	  If unsure, say N.
+	  L1 cache prefetch is performance feature,
+	  impact mainly cpu read operations.
+
 config CACHE_L2X0
 	bool "Enable the L2x0 outer cache controller" if MIGHT_HAVE_CACHE_L2X0
 	default MIGHT_HAVE_CACHE_L2X0
