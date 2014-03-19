@@ -31,7 +31,9 @@
 
 	soc {
 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
+			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000
+			  MBUS_ID(0x09, 0x01) 0 0xf1100000 0x10000>;	/* CESA0: PHYS=0xf1100000
+									   size 64K */
 
 		internal-regs {
 			serial@12000 {
@@ -129,6 +131,10 @@
 					label = "Root";
 					reg = <0x00700000 0x3f900000>;
 				};
+			};
+
+			crypto@9D000 {
+				status = "okay";
 			};
 		};
 
