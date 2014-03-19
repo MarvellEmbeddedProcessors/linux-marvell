@@ -340,9 +340,9 @@ typedef struct {
 	MV_U32 readyCount;
 	MV_U32 notReadyCount;
 	MV_U32 startCount;
-#ifdef MV_CESA_CHAIN_MODE
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
 	MV_U32 maxChainUsage;
-#endif			/* MV_CESA_CHAIN_MODE */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 } MV_CESA_STATS;
 
 /* External variables */
@@ -358,9 +358,9 @@ extern MV_CESA_REQ *pCesaReqProcess[MV_CESA_CHANNELS];
 extern int cesaQueueDepth[MV_CESA_CHANNELS];
 extern int cesaReqResources[MV_CESA_CHANNELS];
 
-#ifdef MV_CESA_CHAIN_MODE
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
 	extern MV_U32 cesaChainLength[MV_CESA_CHANNELS];
-#endif				/* MV_CESA_CHAIN_MODE */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 
 extern MV_CESA_SRAM_MAP *cesaSramVirtPtr[MV_CESA_CHANNELS];
 

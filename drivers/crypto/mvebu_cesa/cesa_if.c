@@ -90,11 +90,14 @@ static spinlock_t chanLock[MV_CESA_CHANNELS];
 static DEFINE_SPINLOCK(cesaIfLock);
 static DEFINE_SPINLOCK(cesaIsrLock);
 
+
 /*
  * Initialized in cesa_<mode>_probe, where <mode>: ocf or test
  */
 MV_U32 mv_cesa_base[MV_CESA_CHANNELS], mv_cesa_tdma_base[MV_CESA_CHANNELS];
 enum cesa_mode mv_cesa_mode = CESA_UNKNOWN_M;
+u32 mv_cesa_time_threshold, mv_cesa_threshold;
+enum cesa_feature mv_cesa_feature = CESA_UNKNOWN;
 
 MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA_HAL_DATA *halData)
 {
@@ -306,9 +309,8 @@ MV_STATUS mvCesaIfReadyGet(MV_U8 chan, MV_CESA_RESULT *pResult)
 		pResQ[pCurrResult->reqId] = pCurrResult;
 		spin_unlock(&cesaIsrLock);
 
-#ifdef CONFIG_MV_CESA_INT_PER_PACKET
-		break;
-#endif
+		if (mv_cesa_feature == INT_PER_PACKET)
+			break;
 	}
 
 out:
@@ -542,6 +544,8 @@ mv_get_cesa_resources(struct platform_device *pdev)
 	struct device_node *np;
 	struct resource *r;
 	MV_U8 chan = 0;
+	const char *cesa_f;
+	int ret;
 
 	/*
 	 * Preparation resources for all CESA chan
@@ -597,6 +601,49 @@ mv_get_cesa_resources(struct platform_device *pdev)
 
 		chan++;
 	}
+
+	/*
+	 * Get interrupt mode and parameters
+	 */
+	cesa_f = of_get_property(pdev->dev.of_node, "cesa,feature",
+									 NULL);
+	if (strncmp(cesa_f, "chain", 5) &&
+	    strncmp(cesa_f, "int_coalescing", 14) &&
+	    strncmp(cesa_f, "int_per_packet", 14)) {
+		dev_err(&pdev->dev,
+		    "%s: unknown cesa feature %s from dts cesa,feature\n"
+		    , __func__, cesa_f);
+		return -ENODEV;
+	}
+
+	if (strncmp(cesa_f, "chain", 5) == 0)
+		mv_cesa_feature = CHAIN;
+	else if (strncmp(cesa_f, "int_coalescing", 14) == 0)
+		mv_cesa_feature = INT_COALESCING;
+	else if (strncmp(cesa_f, "int_per_packet", 14) == 0)
+		mv_cesa_feature = INT_PER_PACKET;
+
+	dev_info(&pdev->dev, "%s: CESA feature: %s(%d)\n", __func__,
+						cesa_f, mv_cesa_feature);
+
+	/* Parse device tree and acquire threshold configuration */
+	ret = 0;
+	ret |= of_property_read_u32(pdev->dev.of_node, "cesa,time_threshold",
+						      &mv_cesa_time_threshold);
+	ret |= of_property_read_u32(pdev->dev.of_node, "cesa,threshold",
+							   &mv_cesa_threshold);
+
+	if ((ret != 0) &&
+		       (mv_cesa_feature == INT_COALESCING)) {
+		dev_err(&pdev->dev,
+		    "missing or bad threshold configuration in dts\n");
+		dprintk("%s threshold 0x%x, threshold_time 0x%x\n",
+		    __func__, mv_cesa_threshold, mv_cesa_time_threshold);
+		return -ENOENT;
+	} else if (mv_cesa_feature == INT_COALESCING)
+		dev_info(&pdev->dev,
+		    "%s threshold 0x%x, threshold_time 0x%x\n", __func__,
+		    mv_cesa_threshold, mv_cesa_time_threshold);
 
 	return 0;
 }

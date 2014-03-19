@@ -44,29 +44,22 @@ enum cesa_mode {
 	CESA_TEST_M
 };
 
+enum cesa_feature {
+	CESA_UNKNOWN = -1,
+	CHAIN = 0,
+	INT_COALESCING,
+	INT_PER_PACKET
+};
+
 extern enum cesa_mode mv_cesa_mode;
+extern u32 mv_cesa_time_threshold, mv_cesa_threshold;
+extern enum cesa_feature mv_cesa_feature;
 
 #define MV_CESA_REGS_BASE(chan)		(mv_cesa_base[chan])
 
 #define MV_CESA_TDMA_REGS_BASE(chan)	(mv_cesa_tdma_base[chan])
 
 #define MV_CESA_CHANNELS		(CONFIG_MV_CESA_CHANNELS)
-
-#ifdef CONFIG_MV_CESA_CHAIN_MODE
-	#define MV_CESA_CHAIN_MODE
-#endif
-
-#ifdef CONFIG_MV_CESA_INT_COALESCING_SUPPORT
-	#define MV_CESA_INT_COALESCING_SUPPORT
-	#define MV_CESA_INT_COAL_THRESHOLD		\
-				(CONFIG_MV_CESA_INT_COAL_THRESHOLD)
-	#define MV_CESA_INT_COAL_TIME_THRESHOLD		\
-				(CONFIG_MV_CESA_INT_COAL_TIME_THRESHOLD)
-#endif
-
-#ifdef CONFIG_MV_CESA_INT_PER_PACKET
-	#define MV_CESA_INT_PER_PACKET
-#endif
 
 /*
  * Use 2K of SRAM

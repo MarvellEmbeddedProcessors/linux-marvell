@@ -238,12 +238,22 @@ void mvCesaDebugRegs(void)
 
 		mvOsPrintf("MV_CESA_ISR_MASK_REG                : 0x%X = 0x%08x\n",
 			MV_CESA_ISR_MASK_REG(chan), MV_REG_READ(MV_CESA_ISR_MASK_REG(chan)));
-#ifdef MV_CESA_INT_COALESCING_SUPPORT
-		mvOsPrintf("MV_CESA_INT_COAL_TH_REG             : 0x%X = 0x%08x\n",
-			MV_CESA_INT_COAL_TH_REG(chan), MV_REG_READ(MV_CESA_INT_COAL_TH_REG(chan)));
-		mvOsPrintf("MV_CESA_INT_TIME_TH_REG             : 0x%X = 0x%08x\n",
-			MV_CESA_INT_TIME_TH_REG(chan), MV_REG_READ(MV_CESA_INT_TIME_TH_REG(chan)));
-#endif
+#if defined(MV_CESA_INT_COALESCING_SUPPORT) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+		if (mv_cesa_feature == INT_COALESCING) {
+#endif /* CONFIG_OF */
+			mvOsPrintf("%s\t: 0x%X = 0x%08x\n",
+			    "MV_CESA_INT_COAL_TH_REG",
+			    MV_CESA_INT_COAL_TH_REG(chan),
+			    MV_REG_READ(MV_CESA_INT_COAL_TH_REG(chan)));
+			mvOsPrintf("%s\t: 0x%X = 0x%08x\n",
+			    "MV_CESA_INT_TIME_TH_REG",
+			    MV_CESA_INT_TIME_TH_REG(chan),
+			    MV_REG_READ(MV_CESA_INT_TIME_TH_REG(chan)));
+#ifdef CONFIG_OF
+		}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF */
 #if (MV_CESA_VERSION >= 2)
 		mvOsPrintf("MV_CESA_TDMA_CTRL_REG               : 0x%X = 0x%08x\n",
 			MV_CESA_TDMA_CTRL_REG(chan), MV_REG_READ(MV_CESA_TDMA_CTRL_REG(chan)));
@@ -295,9 +305,16 @@ void mvCesaDebugStatus(void)
 		mvOsPrintf("Channel %d: pReqQ=%p, qDepth=%d, reqSize=%d bytes, qRes=%d",
 			chan, pCesaReqFirst[chan], cesaQueueDepth[chan], (int)sizeof(MV_CESA_REQ), cesaReqResources[chan]);
 
-#ifdef MV_CESA_CHAIN_MODE
-		mvOsPrintf(", chainLength=%u", cesaChainLength[chan]);
-#endif
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
+
+#ifdef CONFIG_OF
+		if (mv_cesa_feature == CHAIN) {
+#endif /* CONFIG_OF */
+			mvOsPrintf(", chainLength=%u", cesaChainLength[chan]);
+#ifdef CONFIG_OF
+		}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 
 		mvOsPrintf("\n");
 	}
@@ -503,9 +520,15 @@ void mvCesaDebugStats(void)
 	mvOsPrintf("Req=%u, maxReq=%u, frags=%u, start=%u\n",
 		   cesaStats.reqCount, cesaStats.maxReqCount, cesaStats.fragCount, cesaStats.startCount);
 
-#ifdef MV_CESA_CHAIN_MODE
-	mvOsPrintf("maxChainUsage=%u\n", cesaStats.maxChainUsage);
-#endif
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+	if (mv_cesa_feature == CHAIN) {
+#endif /* CONFIG_OF */
+		mvOsPrintf("maxChainUsage=%u\n", cesaStats.maxChainUsage);
+#ifdef CONFIG_OF
+	}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 
 	mvOsPrintf("\n");
 	mvOsPrintf("proc=%u, ready=%u, notReady=%u\n",

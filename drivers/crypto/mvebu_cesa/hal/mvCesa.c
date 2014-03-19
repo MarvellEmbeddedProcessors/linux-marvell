@@ -91,7 +91,7 @@ MV_CESA_REQ *pCesaReqFirst[MV_CESA_CHANNELS];
 MV_CESA_REQ *pCesaReqLast[MV_CESA_CHANNELS];
 MV_CESA_REQ *pCesaReqEmpty[MV_CESA_CHANNELS];
 MV_CESA_REQ *pCesaReqProcess[MV_CESA_CHANNELS];
-#ifdef MV_CESA_INT_COALESCING_SUPPORT
+#if defined(MV_CESA_INT_COALESCING_SUPPORT) || defined(CONFIG_OF)
 MV_CESA_REQ *pCesaReqStartNext[MV_CESA_CHANNELS];
 MV_CESA_REQ *pCesaReqProcessCurr[MV_CESA_CHANNELS];
 #endif
@@ -105,7 +105,7 @@ MV_U16 ctrlModel;
 MV_U8 ctrlRev;
 MV_U32 sha2CmdVal;
 
-#ifdef MV_CESA_CHAIN_MODE
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
 
 MV_U32 cesaChainLength[MV_CESA_CHANNELS];
 int chainReqNum[MV_CESA_CHANNELS];
@@ -114,7 +114,7 @@ MV_CESA_REQ *pNextActiveChain[MV_CESA_CHANNELS];
 MV_CESA_REQ *pEndCurrChain[MV_CESA_CHANNELS];
 MV_BOOL isFirstReq[MV_CESA_CHANNELS];
 
-#endif /* MV_CESA_CHAIN_MODE */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 
 static MV_CESA_HAL_DATA cesaHalData;
 
@@ -188,9 +188,14 @@ static INLINE void mvCesaReqProcessStart(MV_U8 chan, MV_CESA_REQ *pReq)
 
 #ifdef MV_CESA_CHAIN_MODE
 	pReq->state = MV_CESA_CHAIN;
+#elif CONFIG_OF
+	if (mv_cesa_feature == CHAIN)
+		pReq->state = MV_CESA_CHAIN;
+	else
+		pReq->state = MV_CESA_PROCESS;
 #else
 	pReq->state = MV_CESA_PROCESS;
-#endif
+#endif /* MV_CESA_CHAIN_MODE */
 
 	cesaStats.startCount++;
 	(pReq->use)++;
@@ -282,21 +287,33 @@ MV_STATUS mvCesaHalInit(int numOfSession, int queueDepth, void *osHandle, MV_CES
 		pCesaReqEmpty[chan] = pCesaReqFirst[chan];
 		pCesaReqLast[chan] = pCesaReqFirst[chan] + (queueDepth - 1);
 		pCesaReqProcess[chan] = pCesaReqEmpty[chan];
-#ifdef MV_CESA_INT_COALESCING_SUPPORT
-		pCesaReqStartNext[chan] = pCesaReqFirst[chan];
-		pCesaReqProcessCurr[chan] = NULL;
-#endif
+#if defined(MV_CESA_INT_COALESCING_SUPPORT) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+		if (mv_cesa_feature == INT_COALESCING) {
+#endif /* CONFIG_OF */
+			pCesaReqStartNext[chan] = pCesaReqFirst[chan];
+			pCesaReqProcessCurr[chan] = NULL;
+#ifdef CONFIG_OF
+		}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF */
 		cesaQueueDepth[chan] = queueDepth;
 		cesaReqResources[chan] = queueDepth;
 		cesaLastSid[chan] = -1;
-#ifdef MV_CESA_CHAIN_MODE
-		cesaChainLength[chan] = MAX_CESA_CHAIN_LENGTH;
-		chainReqNum[chan] = 0;
-		chainIndex[chan] = 0;
-		pNextActiveChain[chan] = NULL;
-		pEndCurrChain[chan] = NULL;
-		isFirstReq[chan] = MV_TRUE;
-#endif
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+		if (mv_cesa_feature == CHAIN) {
+#endif /* CONFIG_OF */
+			cesaChainLength[chan] = MAX_CESA_CHAIN_LENGTH;
+			chainReqNum[chan] = 0;
+			chainIndex[chan] = 0;
+			pNextActiveChain[chan] = NULL;
+			pEndCurrChain[chan] = NULL;
+			isFirstReq[chan] = MV_TRUE;
+#ifdef CONFIG_OF
+		}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 
 		/* pSramBase must be 8 byte aligned */
 		if (MV_IS_NOT_ALIGN((MV_ULONG) cesaSramVirtPtr[chan], 8)) {
@@ -375,9 +392,15 @@ MV_STATUS mvCesaHalInit(int numOfSession, int queueDepth, void *osHandle, MV_CES
 
 		configReg |= (MV_CESA_CFG_WAIT_DMA_MASK | MV_CESA_CFG_ACT_DMA_MASK);
 
-#ifdef MV_CESA_CHAIN_MODE
-		configReg |= MV_CESA_CFG_CHAIN_MODE_MASK;
-#endif
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+		if (mv_cesa_feature == CHAIN) {
+#endif /* CONFIG_OF */
+			configReg |= MV_CESA_CFG_CHAIN_MODE_MASK;
+#ifdef CONFIG_OF
+		}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 
 		/* Initialize TDMA engine */
 		MV_REG_WRITE(MV_CESA_TDMA_CTRL_REG(chan), MV_CESA_TDMA_CTRL_VALUE);
@@ -426,12 +449,21 @@ MV_STATUS mvCesaHalInit(int numOfSession, int queueDepth, void *osHandle, MV_CES
 			break;
 		}
 
-#ifdef MV_CESA_INT_COALESCING_SUPPORT
+#if defined(MV_CESA_INT_COALESCING_SUPPORT) || defined(CONFIG_OF)
 		configReg |= MV_CESA_CFG_CHAIN_MODE_MASK;
 		/* Enable interrupt coalescing */
+#ifdef CONFIG_OF
+		if (mv_cesa_feature == INT_COALESCING) {
+			MV_REG_WRITE(MV_CESA_INT_COAL_TH_REG(chan),
+			    mv_cesa_threshold);
+			MV_REG_WRITE(MV_CESA_INT_TIME_TH_REG(chan),
+			    mv_cesa_time_threshold);
+		}
+#else /* CONFIG_OF */
 		MV_REG_WRITE(MV_CESA_INT_COAL_TH_REG(chan), MV_CESA_INT_COAL_THRESHOLD);
 		MV_REG_WRITE(MV_CESA_INT_TIME_TH_REG(chan), MV_CESA_INT_COAL_TIME_THRESHOLD);
-#endif
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF */
 
 		/* Set CESA configuration registers */
 		MV_REG_WRITE(MV_CESA_CFG_REG(chan), configReg);
@@ -892,10 +924,10 @@ MV_STATUS mvCesaAction(MV_U8 chan, MV_CESA_COMMAND *pCmd)
 	MV_CESA_REQ *pReq = pCesaReqEmpty[chan];
 	int sid = pCmd->sessionId;
 	MV_CESA_SA *pSA = pCesaSAD[sid];
-#ifdef MV_CESA_CHAIN_MODE
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
 	MV_CESA_REQ *pFromReq;
 	MV_CESA_REQ *pToReq;
-#endif
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 	cesaStats.reqCount++;
 
 	/* Check that the request queue is not FULL */
@@ -942,9 +974,15 @@ MV_STATUS mvCesaAction(MV_U8 chan, MV_CESA_COMMAND *pCmd)
 		status = mvCesaReqProcess(chan, pReq);
 		if (status != MV_OK)
 			mvOsPrintf("CesaReady: ReqProcess error: pReq=%p, status=0x%x\n", pReq, status);
-#ifdef MV_CESA_CHAIN_MODE
-		pReq->frags.numFrag = 1;
-#endif
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+		if (mv_cesa_feature == CHAIN) {
+#endif /* CONFIG_OF */
+			pReq->frags.numFrag = 1;
+#ifdef CONFIG_OF
+		}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF */
 	} else {
 		MV_U8 frag = 0;
 
@@ -966,25 +1004,42 @@ MV_STATUS mvCesaAction(MV_U8 chan, MV_CESA_COMMAND *pCmd)
 			}
 			status = mvCesaFragReqProcess(chan, pReq, frag);
 			if (status == MV_OK) {
-#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT)
-				if (frag) {
-					pReq->dma[frag - 1].pDmaLast->phyNextDescPtr =
-					    MV_32BIT_LE(mvCesaVirtToPhys(&pReq->dmaDescBuf, pReq->dma[frag].pDmaFirst));
-					mvOsCacheFlush(NULL, pReq->dma[frag - 1].pDmaLast, sizeof(MV_DMA_DESC));
+#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT) || \
+							     defined(CONFIG_OF)
+#ifdef CONFIG_OF
+				if ((mv_cesa_feature == INT_COALESCING) ||
+						(mv_cesa_feature == CHAIN)) {
+#endif /* CONFIG_OF */
+					if (frag) {
+						pReq->dma[frag - 1].pDmaLast->phyNextDescPtr =
+						    MV_32BIT_LE(mvCesaVirtToPhys(&pReq->dmaDescBuf,
+							pReq->dma[frag].pDmaFirst));
+						mvOsCacheFlush(NULL, pReq->dma[frag - 1].pDmaLast,
+						    sizeof(MV_DMA_DESC));
+					}
+#ifdef CONFIG_OF
 				}
-#endif /* MV_CESA_CHAIN_MODE || MV_CESA_INT_COALESCING_SUPPORT */
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_CHAIN_MODE || MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF*/
 				frag++;
 			}
 		}
 		pReq->frags.numFrag = frag;
 
-#ifdef MV_CESA_CHAIN_MODE
-		if (chainReqNum[chan]) {
-			chainReqNum[chan] += pReq->frags.numFrag;
-			if (chainReqNum[chan] >= MAX_CESA_CHAIN_LENGTH)
-				chainReqNum[chan] = MAX_CESA_CHAIN_LENGTH;
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+		if (mv_cesa_feature == CHAIN) {
+#endif /* CONFIG_OF */
+			if (chainReqNum[chan]) {
+				chainReqNum[chan] += pReq->frags.numFrag;
+				if (chainReqNum[chan] >= MAX_CESA_CHAIN_LENGTH)
+					chainReqNum[chan] =
+					    MAX_CESA_CHAIN_LENGTH;
 		}
-#endif /* MV_CESA_CHAIN_MODE */
+#ifdef CONFIG_OF
+		}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_CHAIN_MODE || CONFIG_OF*/
 	}
 
 	pReq->state = MV_CESA_PENDING;
@@ -999,73 +1054,96 @@ MV_STATUS mvCesaAction(MV_U8 chan, MV_CESA_COMMAND *pCmd)
 
 	cesaLastSid[chan] = sid;
 
-#ifdef MV_CESA_CHAIN_MODE
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+	if (mv_cesa_feature == CHAIN) {
+#endif /* CONFIG_OF */
 
-	/* Are we within chain bounderies and follows the first request ? */
-	if ((chainReqNum[chan] > 0) && (chainReqNum[chan] < MAX_CESA_CHAIN_LENGTH)) {
-		if (chainIndex[chan]) {
-			pFromReq = MV_CESA_REQ_PREV_PTR(chan, pReq);
-			pToReq = pReq;
-			pReq->state = MV_CESA_CHAIN;
+		/* Are we within chain bounderies and follows the first request ? */
+		if ((chainReqNum[chan] > 0) && (chainReqNum[chan] < MAX_CESA_CHAIN_LENGTH)) {
+			if (chainIndex[chan]) {
+				pFromReq = MV_CESA_REQ_PREV_PTR(chan, pReq);
+				pToReq = pReq;
+				pReq->state = MV_CESA_CHAIN;
 
-			/* assume concatenating is possible */
-			pFromReq->dma[pFromReq->frags.numFrag - 1].pDmaLast->phyNextDescPtr =
-			    MV_32BIT_LE(mvCesaVirtToPhys(&pToReq->dmaDescBuf, pToReq->dma[0].pDmaFirst));
-			mvOsCacheFlush(NULL, pFromReq->dma[pFromReq->frags.numFrag - 1].pDmaLast, sizeof(MV_DMA_DESC));
+				/* assume concatenating is possible */
+				pFromReq->dma[pFromReq->frags.numFrag - 1].pDmaLast->phyNextDescPtr =
+				    MV_32BIT_LE(mvCesaVirtToPhys(&pToReq->dmaDescBuf, pToReq->dma[0].pDmaFirst));
+				mvOsCacheFlush(NULL, pFromReq->dma[pFromReq->frags.numFrag - 1].pDmaLast,
+				    sizeof(MV_DMA_DESC));
 
-			/* align active & next pointers */
-			if (pNextActiveChain[chan]->state != MV_CESA_PENDING)
-				pEndCurrChain[chan] = pNextActiveChain[chan] = MV_CESA_REQ_NEXT_PTR(chan, pReq);
-		} else {	/* we have only one chain, start new one */
-			chainReqNum[chan] = 0;
-			chainIndex[chan]++;
-			/* align active & next pointers  */
-			if (pNextActiveChain[chan]->state != MV_CESA_PENDING)
-				pEndCurrChain[chan] = pNextActiveChain[chan] = pReq;
+
+				/* align active & next pointers */
+				if (pNextActiveChain[chan]->state != MV_CESA_PENDING)
+					pEndCurrChain[chan] = pNextActiveChain[chan] =
+					    MV_CESA_REQ_NEXT_PTR(chan, pReq);
+			} else {	/* we have only one chain, start new one */
+				chainReqNum[chan] = 0;
+				chainIndex[chan]++;
+				/* align active & next pointers  */
+				if (pNextActiveChain[chan]->state != MV_CESA_PENDING)
+					pEndCurrChain[chan] = pNextActiveChain[chan] = pReq;
+			}
+		} else {
+			/* In case we concatenate full chain */
+			if (chainReqNum[chan] == MAX_CESA_CHAIN_LENGTH) {
+				chainIndex[chan]++;
+				if (pNextActiveChain[chan]->state != MV_CESA_PENDING)
+					pEndCurrChain[chan] = pNextActiveChain[chan] = pReq;
+				chainReqNum[chan] = 0;
+			}
+
+			pReq = pCesaReqProcess[chan];
+			if (pReq->state == MV_CESA_PENDING) {
+				pNextActiveChain[chan] = pReq;
+				pEndCurrChain[chan] = MV_CESA_REQ_NEXT_PTR(chan, pReq);
+				/* Start Process new request */
+				mvCesaReqProcessStart(chan, pReq);
+			}
 		}
-	} else {
-		/* In case we concatenate full chain */
-		if (chainReqNum[chan] == MAX_CESA_CHAIN_LENGTH) {
-			chainIndex[chan]++;
-			if (pNextActiveChain[chan]->state != MV_CESA_PENDING)
-				pEndCurrChain[chan] = pNextActiveChain[chan] = pReq;
-			chainReqNum[chan] = 0;
-		}
 
+		chainReqNum[chan]++;
+
+		if ((chainIndex[chan] < MAX_CESA_CHAIN_LENGTH) && (chainReqNum[chan] > cesaStats.maxChainUsage))
+			cesaStats.maxChainUsage = chainReqNum[chan];
+#ifdef CONFIG_OF
+	}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_CHAIN_MODE) || CONFIG_OF */
+
+#if defined(MV_CESA_INT_COALESCING_SUPPORT) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+	if (mv_cesa_feature == INT_COALESCING) {
+#endif /* CONFIG_OF */
+
+		/* Check if processing of previous packet was completed */
+		if (!(MV_REG_READ(MV_CESA_STATUS_REG(chan)) & MV_CESA_STATUS_ACTIVE_MASK)) {
+			if (pCesaReqStartNext[chan]->state == MV_CESA_PENDING) {
+				mvCesaReqProcessStart(chan, pCesaReqStartNext[chan]);
+				pCesaReqProcessCurr[chan] = pCesaReqStartNext[chan];
+				pCesaReqStartNext[chan] = MV_CESA_REQ_NEXT_PTR(chan, pCesaReqStartNext[chan]);
+			}
+		}
+#ifdef CONFIG_OF
+	}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF */
+
+#if defined(MV_CESA_INT_PER_PACKET) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+	if (mv_cesa_feature == INT_PER_PACKET) {
+#endif /* CONFIG_OF */
+
+		/* Check status of CESA channels and process requests if possible */
 		pReq = pCesaReqProcess[chan];
 		if (pReq->state == MV_CESA_PENDING) {
-			pNextActiveChain[chan] = pReq;
-			pEndCurrChain[chan] = MV_CESA_REQ_NEXT_PTR(chan, pReq);
 			/* Start Process new request */
 			mvCesaReqProcessStart(chan, pReq);
 		}
+#ifdef CONFIG_OF
 	}
-
-	chainReqNum[chan]++;
-
-	if ((chainIndex[chan] < MAX_CESA_CHAIN_LENGTH) && (chainReqNum[chan] > cesaStats.maxChainUsage))
-		cesaStats.maxChainUsage = chainReqNum[chan];
-
-#elif defined(MV_CESA_INT_COALESCING_SUPPORT)
-
-	/* Check if processing of previous packet was completed */
-	if (!(MV_REG_READ(MV_CESA_STATUS_REG(chan)) & MV_CESA_STATUS_ACTIVE_MASK)) {
-		if (pCesaReqStartNext[chan]->state == MV_CESA_PENDING) {
-			mvCesaReqProcessStart(chan, pCesaReqStartNext[chan]);
-			pCesaReqProcessCurr[chan] = pCesaReqStartNext[chan];
-			pCesaReqStartNext[chan] = MV_CESA_REQ_NEXT_PTR(chan, pCesaReqStartNext[chan]);
-		}
-	}
-
-#else /* MV_CESA_INT_PER_PACKET */
-
-	/* Check status of CESA channels and process requests if possible */
-	pReq = pCesaReqProcess[chan];
-	if (pReq->state == MV_CESA_PENDING) {
-		/* Start Process new request */
-		mvCesaReqProcessStart(chan, pReq);
-	}
-#endif /* MV_CESA_CHAIN_MODE */
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_INT_PER_PACKET || CONFIG_OF */
 
 	/* If request queue became FULL - return MV_NO_MORE */
 	if (cesaReqResources[chan] == 0)
@@ -1111,48 +1189,65 @@ MV_STATUS mvCesaReadyGet(MV_U8 chan, MV_CESA_RESULT *pResult)
 	MV_CESA_REQ *pReq;
 	MV_CESA_SA *pSA;
 
-#ifdef MV_CESA_CHAIN_MODE
-	if (isFirstReq[chan] == MV_TRUE) {
+#if defined(MV_CESA_CHAIN_MODE) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+	if (mv_cesa_feature == CHAIN) {
+#endif /* CONFIG_OF */
 
-		if (chainIndex[chan] == 0)
-			chainReqNum[chan] = 0;
+		if (isFirstReq[chan] == MV_TRUE) {
 
-		isFirstReq[chan] = MV_FALSE;
+			if (chainIndex[chan] == 0)
+				chainReqNum[chan] = 0;
 
-		if (pNextActiveChain[chan]->state == MV_CESA_PENDING) {
+			isFirstReq[chan] = MV_FALSE;
 
-			/* Start request Process */
-			mvCesaReqProcessStart(chan, pNextActiveChain[chan]);
-			pEndCurrChain[chan] = pNextActiveChain[chan];
-			if (chainIndex[chan] > 0)
-				chainIndex[chan]--;
-			/* Update pNextActiveChain to next chain head */
-			while (pNextActiveChain[chan]->state == MV_CESA_CHAIN)
-				pNextActiveChain[chan] = MV_CESA_REQ_NEXT_PTR(chan, pNextActiveChain[chan]);
+			if (pNextActiveChain[chan]->state == MV_CESA_PENDING) {
+
+				/* Start request Process */
+				mvCesaReqProcessStart(chan, pNextActiveChain[chan]);
+				pEndCurrChain[chan] = pNextActiveChain[chan];
+				if (chainIndex[chan] > 0)
+					chainIndex[chan]--;
+				/* Update pNextActiveChain to next chain head */
+				while (pNextActiveChain[chan]->state == MV_CESA_CHAIN)
+					pNextActiveChain[chan] = MV_CESA_REQ_NEXT_PTR(chan, pNextActiveChain[chan]);
+			}
+
 		}
 
+		/* Check if there are more processed requests - can we remove pEndCurrChain ??? */
+		if (pCesaReqProcess[chan] == pEndCurrChain[chan]) {
+
+			isFirstReq[chan] = MV_TRUE;
+			pEndCurrChain[chan] = pNextActiveChain[chan];
+			return MV_EMPTY;
+		}
+#ifdef CONFIG_OF
+	} else {
+		if (pCesaReqProcess[chan]->state != MV_CESA_PROCESS)
+			return MV_EMPTY;
 	}
-
-	/* Check if there are more processed requests - can we remove pEndCurrChain ??? */
-	if (pCesaReqProcess[chan] == pEndCurrChain[chan]) {
-
-		isFirstReq[chan] = MV_TRUE;
-		pEndCurrChain[chan] = pNextActiveChain[chan];
+#endif
 #else
 	if (pCesaReqProcess[chan]->state != MV_CESA_PROCESS) {
-#endif /* MV_CESA_CHAIN_MODE */
-
 		return MV_EMPTY;
 	}
+#endif /* MV_CESA_CHAIN_MODE */
 
-#ifdef MV_CESA_INT_COALESCING_SUPPORT
-	statusReg = MV_REG_READ(MV_CESA_STATUS_REG(chan));
-	if ((statusReg & MV_CESA_STATUS_ACTIVE_MASK) && 
-		(pCesaReqProcessCurr[chan] == pCesaReqProcess[chan])) {
-		cesaStats.notReadyCount++;
-		return MV_NOT_READY;
+#if defined(MV_CESA_INT_COALESCING_SUPPORT) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+	if (mv_cesa_feature == INT_COALESCING) {
+#endif /* CONFIG_OF */
+		statusReg = MV_REG_READ(MV_CESA_STATUS_REG(chan));
+		if ((statusReg & MV_CESA_STATUS_ACTIVE_MASK) &&
+			(pCesaReqProcessCurr[chan] == pCesaReqProcess[chan])) {
+			cesaStats.notReadyCount++;
+			return MV_NOT_READY;
+		}
+#ifdef CONFIG_OF
 	}
-#endif /* MV_CESA_INT_COALESCING_SUPPORT */
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF */
 
 	cesaStats.readyCount++;
 
@@ -1164,7 +1259,8 @@ MV_STATUS mvCesaReadyGet(MV_U8 chan, MV_CESA_RESULT *pResult)
 		MV_U8 *pNewDigest;
 		int frag;
 
-#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT)
+#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT) || \
+							     defined(CONFIG_OF)
 		pReq->frags.nextFrag = 1;
 		while (pReq->frags.nextFrag <= pReq->frags.numFrag) {
 #endif
@@ -1210,10 +1306,19 @@ MV_STATUS mvCesaReadyGet(MV_U8 chan, MV_CESA_RESULT *pResult)
 				}
 				readyStatus = MV_OK;
 			}
-#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT)
+#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT) || \
+							     defined(CONFIG_OF)
+#ifdef CONFIG_OF
+		if ((mv_cesa_feature == INT_COALESCING) ||
+					(mv_cesa_feature == CHAIN))
 			pReq->frags.nextFrag++;
+		else
+			break;
+#else /* CONFIG_OF */
+			pReq->frags.nextFrag++;
+#endif /* CONFIG_OF */
 		}
-#endif
+#endif /* MV_CESA_CHAIN_MODE || MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF */
 	} else {
 		mvCesaMbufCacheUnmap(pReq->pCmd->pDst, 0, pReq->pCmd->pDst->mbufSize);
 
@@ -1256,21 +1361,34 @@ MV_STATUS mvCesaReadyGet(MV_U8 chan, MV_CESA_RESULT *pResult)
 		}
 	}
 
-#ifdef MV_CESA_INT_PER_PACKET
+#if defined(MV_CESA_INT_PER_PACKET) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+	if (mv_cesa_feature == INT_PER_PACKET) {
+#endif /* CONFIG_OF */
 
-	if (pCesaReqProcess[chan]->state == MV_CESA_PENDING)
-		mvCesaReqProcessStart(chan, pCesaReqProcess[chan]);
-
-#elif defined(MV_CESA_INT_COALESCING_SUPPORT)
-	statusReg = MV_REG_READ(MV_CESA_STATUS_REG(chan));
-	if (!(statusReg & MV_CESA_STATUS_ACTIVE_MASK)) {
-		if (pCesaReqStartNext[chan]->state == MV_CESA_PENDING) {
-			mvCesaReqProcessStart(chan, pCesaReqStartNext[chan]);
-			pCesaReqProcessCurr[chan] = pCesaReqStartNext[chan];
-			pCesaReqStartNext[chan] = MV_CESA_REQ_NEXT_PTR(chan, pCesaReqStartNext[chan]);
-		}
+		if (pCesaReqProcess[chan]->state == MV_CESA_PENDING)
+			mvCesaReqProcessStart(chan, pCesaReqProcess[chan]);
+#ifdef CONFIG_OF
 	}
-#endif
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_INT_PER_PACKET || CONFIG_OF */
+
+#if defined(MV_CESA_INT_COALESCING_SUPPORT) || defined(CONFIG_OF)
+#ifdef CONFIG_OF
+	if (mv_cesa_feature == INT_COALESCING) {
+#endif /* CONFIG_OF */
+		statusReg = MV_REG_READ(MV_CESA_STATUS_REG(chan));
+		if (!(statusReg & MV_CESA_STATUS_ACTIVE_MASK)) {
+			if (pCesaReqStartNext[chan]->state == MV_CESA_PENDING) {
+				mvCesaReqProcessStart(chan, pCesaReqStartNext[chan]);
+				pCesaReqProcessCurr[chan] = pCesaReqStartNext[chan];
+				pCesaReqStartNext[chan] = MV_CESA_REQ_NEXT_PTR(chan, pCesaReqStartNext[chan]);
+			}
+		}
+#ifdef CONFIG_OF
+	}
+#endif /* CONFIG_OF */
+#endif /* MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF */
 	return readyStatus;
 }
 
