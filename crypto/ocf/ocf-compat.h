@@ -237,6 +237,7 @@ typedef irqreturn_t (*irq_handler_t)(int irq, void *arg, struct pt_regs *regs);
 /*
  * common debug for all
  */
+#undef dprintk
 #if 1
 #define dprintk(a...)	do { if (debug) printk(a); } while(0)
 #else

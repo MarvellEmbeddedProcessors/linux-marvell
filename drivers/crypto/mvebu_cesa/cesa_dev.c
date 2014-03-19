@@ -142,7 +142,7 @@ int run_cesa_debug(CESA_DEBUG *cesa_debug)
 }
 
 
-static int
+static long
 cesadev_ioctl(
 	struct file *filp,
 	unsigned int cmd,

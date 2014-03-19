@@ -1680,7 +1680,6 @@ void cesaTestReadyIsr(void)
 	MV_STATUS status;
 	MV_CESA_RESULT result;
 	MV_U8 chan = *((MV_U8 *)dev_id);
-	unsigned long flags;
 
 #ifdef CONFIG_MV_CESA_INT_COALESCING_SUPPORT
 	mask = MV_CESA_CAUSE_EOP_COAL_MASK;
