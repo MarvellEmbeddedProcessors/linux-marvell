@@ -73,6 +73,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/netdevice.h>
 #include <linux/platform_device.h>
 
+#define __ATTRIBUTE_PACKED__	__packed
+#define MV_MALLOC	kmalloc
 
 #define	MV_MAC_ADDR_SIZE	(6)
 #define MV_MAC_STR_SIZE		(20)
@@ -127,5 +129,19 @@ do {								\
 
 /* Sets the field located at the specified in data.     */
 #define U32_SET_FIELD(data, mask, val)		((data) = (((data) & ~(mask)) | (val)))
+
+/* QM/BM related */
+#define MV_MIN(a , b) (((a) < (b)) ? (a) : (b))
+#define MV_MAX(a , b) (((a) > (b)) ? (a) : (b))
+
+#define UNIT_OF__8_BYTES  8
+#define UNIT_OF_64_BYTES 64
+
+/* Error definitions*/
+/* Error Codes */
+
+#define OK                                  0
+#define ON                                  1
+#define OFF                                 0
 
 #endif /* __mvSwIf_h__ */
