@@ -68,6 +68,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/kernel.h>
 #include <linux/io.h>
 
+struct mv_word40 {
+	u32 lo;				/* byte[ 0- 7],bit[ 0-31] */
+	u8  hi;				/* byte[ 0- 7],bit[32-39] */
+	u8 _reserved_6[3];		/* byte[ 0- 7],bit[40-63] */
+};
+
+
 struct pp3_unit_info {
 	u32 base_addr; /* unit base address = silicon addr + unit offset */
 	u32 ins_offs;  /* unit instance offset - for multiple units */
