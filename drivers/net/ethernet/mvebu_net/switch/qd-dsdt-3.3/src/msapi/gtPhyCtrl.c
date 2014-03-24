@@ -98,7 +98,72 @@ GT_STATUS feSetAutoMode
 }
 
 /*
- * This routine set Auto-Negotiation Ad Register for Copper
+ * This routine get Auto-Negotiation Ad Register for Fast Ethernet Phy
+*/
+static
+GT_STATUS feGetAutoMode
+(
+    IN  GT_QD_DEV        *dev,
+    IN  GT_U8            hwPort,
+    IN  GT_PHY_INFO      *phyInfo,
+    OUT GT_PHY_AUTO_MODE *mode
+)
+{
+    GT_U16  u16Data;
+
+    GT_UNUSED_PARAM(phyInfo);
+
+    DBG_INFO(("feGetAutoMode Called.\n"));
+
+    if(hwReadPhyReg(dev,hwPort,QD_PHY_AUTONEGO_AD_REG,&u16Data) != GT_OK)
+    {
+        DBG_INFO(("Not able to read Phy Reg(port:%d,offset:%d).\n",hwPort,QD_PHY_AUTONEGO_AD_REG));
+           return GT_FAIL;
+    }
+
+    /* Pick out all auto mode related bits. */
+    u16Data &= QD_PHY_MODE_AUTO_AUTO;
+
+    switch(u16Data)
+    {
+        case QD_PHY_MODE_10_HALF:
+                *mode = SPEED_10_DUPLEX_HALF;
+                break;
+        case QD_PHY_MODE_10_FULL:
+                *mode = SPEED_10_DUPLEX_FULL;
+                break;
+        case QD_PHY_MODE_100_HALF:
+                *mode = SPEED_100_DUPLEX_HALF;
+                break;
+        case QD_PHY_MODE_100_FULL:
+                *mode = SPEED_100_DUPLEX_FULL;
+                break;
+        case QD_PHY_MODE_AUTO_HALF:
+                *mode = SPEED_AUTO_DUPLEX_HALF;
+                break;
+        case QD_PHY_MODE_AUTO_FULL:
+                *mode = SPEED_AUTO_DUPLEX_FULL;
+                break;
+        case QD_PHY_MODE_10_AUTO:
+                *mode = SPEED_10_DUPLEX_AUTO;
+                break;
+        case QD_PHY_MODE_100_AUTO:
+                *mode = SPEED_100_DUPLEX_AUTO;
+                break;
+        case QD_PHY_MODE_AUTO_AUTO:
+                *mode = SPEED_AUTO_DUPLEX_AUTO;
+                break;
+        default:
+                DBG_INFO(("Unknown Auto Mode (%d)\n", u16Data));
+                *mode = SPEED_AUTO_DUPLEX_AUTO;
+                break;
+    }
+
+    return GT_OK;
+}
+
+/*
+ * This routine set Auto-Negotiation Advertisement Register for Copper
 */
 static
 GT_STATUS gigCopperSetAutoMode
@@ -187,6 +252,90 @@ GT_STATUS gigCopperSetAutoMode
     {
         DBG_INFO(("Not able to read Phy Reg(port:%d,offset:%d).\n",hwPort,QD_PHY_AUTONEGO_AD_REG));
            return GT_FAIL;
+    }
+
+    return GT_OK;
+}
+
+/*
+ * This routine get Auto-Negotiation Ad Register for Copper
+*/
+static
+GT_STATUS gigCopperGetAutoMode
+(
+    IN GT_QD_DEV        *dev,
+    IN GT_U8            hwPort,
+    IN GT_PHY_INFO      *phyInfo,
+    IN GT_PHY_AUTO_MODE *mode
+)
+{
+    GT_U16 u16Data, u16Data1;
+    GT_U32 u32Data;
+
+    DBG_INFO(("gigCopperGetAutoMode Called.\n"));
+
+    if(hwReadPagedPhyReg(dev,hwPort,0,QD_PHY_AUTONEGO_AD_REG,phyInfo->anyPage,&u16Data) != GT_OK)
+    {
+        DBG_INFO(("Not able to read Phy Reg(port:%d,offset:%d).\n",hwPort,QD_PHY_AUTONEGO_AD_REG));
+           return GT_FAIL;
+    }
+
+    /* Pick out all auto mode related bits. */
+    u16Data &= QD_PHY_MODE_AUTO_AUTO;
+
+    if(hwReadPagedPhyReg(dev,hwPort,0,QD_PHY_AUTONEGO_1000AD_REG,phyInfo->anyPage,&u16Data1) != GT_OK)
+    {
+        DBG_INFO(("Not able to read Phy Reg(port:%d,offset:%d).\n",hwPort,QD_PHY_AUTONEGO_AD_REG));
+           return GT_FAIL;
+    }
+
+    /* Pick out all auto mode related bits. */
+    u16Data1 &= (QD_GIGPHY_1000T_FULL|QD_GIGPHY_1000T_HALF);
+
+    u32Data  = (u16Data&0xffff)|((u16Data1&0xffff)<<16);
+
+    switch(u32Data)
+    {
+        case QD_PHY_MODE_10_HALF:
+                *mode = SPEED_10_DUPLEX_HALF;
+                break;
+        case QD_PHY_MODE_10_FULL:
+                *mode = SPEED_10_DUPLEX_FULL;
+                break;
+        case QD_PHY_MODE_100_HALF:
+                *mode = SPEED_100_DUPLEX_HALF;
+                break;
+        case QD_PHY_MODE_100_FULL:
+                *mode = SPEED_100_DUPLEX_FULL;
+                break;
+        case (QD_GIGPHY_1000T_HALF<<16):
+                *mode = SPEED_1000_DUPLEX_HALF;
+                break;
+        case (QD_GIGPHY_1000T_FULL<<16):
+                *mode = SPEED_1000_DUPLEX_FULL;
+                break;
+        case QD_PHY_MODE_AUTO_HALF|(QD_GIGPHY_1000T_HALF<<16):
+                *mode = SPEED_AUTO_DUPLEX_HALF;
+                break;
+        case QD_PHY_MODE_AUTO_FULL|(QD_GIGPHY_1000T_FULL<<16):
+                *mode = SPEED_AUTO_DUPLEX_FULL;
+                break;
+        case QD_PHY_MODE_10_AUTO:
+                *mode = SPEED_10_DUPLEX_AUTO;
+                break;
+        case QD_PHY_MODE_100_AUTO:
+                *mode = SPEED_100_DUPLEX_AUTO;
+                break;
+        case ((QD_GIGPHY_1000T_FULL|QD_GIGPHY_1000T_HALF)<<16):
+                *mode = SPEED_1000_DUPLEX_AUTO;
+                break;
+        case QD_PHY_MODE_AUTO_AUTO|((QD_GIGPHY_1000T_FULL|QD_GIGPHY_1000T_HALF)<<16):
+                *mode = SPEED_AUTO_DUPLEX_AUTO;
+                break;
+        default:
+                *mode = SPEED_AUTO_DUPLEX_AUTO;
+                DBG_INFO(("Unknown Auto Mode (%08x)\n", u32Data));
+                break;
     }
 
     return GT_OK;
@@ -326,6 +475,57 @@ GT_STATUS phySetAutoMode
     return hwPhyReset(dev,hwPort,0xFF);
 }
 
+/*
+ * This routine gets Auto Mode
+*/
+static
+GT_STATUS phyGetAutoMode
+(
+    IN  GT_QD_DEV        *dev,
+    IN  GT_U8            hwPort,
+    IN  GT_PHY_INFO      *phyInfo,
+    OUT GT_PHY_AUTO_MODE *mode
+)
+{
+    GT_STATUS    status;
+    GT_BOOL      autoOn;
+    GT_U16       pageReg;
+
+    DBG_INFO(("phyGetAutoMode Called.\n"));
+
+    if (!(phyInfo->flag & GT_PHY_GIGABIT))
+    {
+        if((status=feGetAutoMode(dev,hwPort,phyInfo,mode)) != GT_OK)
+        {
+               return status;
+        }
+        return status;
+    }
+
+    if(driverPagedAccessStart(dev,hwPort,phyInfo->pageType,&autoOn,&pageReg) != GT_OK)
+    {
+        return GT_FAIL;
+    }
+
+    if(phyInfo->flag & GT_PHY_COPPER)
+    {
+        if((status=gigCopperGetAutoMode(dev,hwPort,phyInfo,mode)) != GT_OK)
+        {
+               return status;
+        }
+    }
+    else if(phyInfo->flag & GT_PHY_FIBER)
+    {
+        return GT_NOT_SUPPORTED;
+    }
+
+    if(driverPagedAccessStop(dev,hwPort,phyInfo->pageType,autoOn,pageReg) != GT_OK)
+    {
+        return GT_FAIL;
+    }
+
+    return status;
+}
 
 /*******************************************************************************
 * gprtPhyReset
@@ -524,6 +724,274 @@ GT_STATUS gprtSetPortLoopback
     return retVal;
 }
 
+/*******************************************************************************
+* gprtGetPortLoopback
+*
+* DESCRIPTION:
+* Get Internal Port Loopback state.
+* For 10/100 Fast Ethernet PHY, speed of Loopback is determined as follows:
+*   If Auto-Negotiation is enabled, this routine disables Auto-Negotiation and
+*   forces speed to be 10Mbps.
+*   If Auto-Negotiation is disabled, the forced speed is used.
+*   Disabling Loopback simply clears bit 14 of control register(0.14). Therefore,
+*   it is recommended to call gprtSetPortAutoMode for PHY configuration after
+*   Loopback test.
+* For 10/100/1000 Gigagbit Ethernet PHY, speed of Loopback is determined as follows:
+*   If Auto-Negotiation is enabled and Link is active, the current speed is used.
+*   If Auto-Negotiation is disabled, the forced speed is used.
+*   All other cases, default MAC Interface speed is used. Please refer to the data
+*   sheet for the information of the default MAC Interface speed.
+*
+*
+* INPUTS:
+*       port - The logical port number, unless SERDES device is accessed
+*              The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*       enable - If GT_TRUE,  loopback mode is enabled
+*       If GT_FALSE,  loopback mode is disabled
+*
+* RETURNS:
+*       GT_OK - on success
+*       GT_FAIL - on error
+*
+* COMMENTS:
+*       data sheet register 0.14 - Loop_back
+*
+*******************************************************************************/
+GT_STATUS gprtGetPortLoopback
+(
+    IN GT_QD_DEV *dev,
+    IN GT_LPORT  port,
+    OUT GT_BOOL  *enable
+)
+{
+    GT_STATUS      retVal;         /* Functions return value.      */
+    GT_U8          hwPort;         /* the physical port number     */
+    GT_U16         u16Data;
+    GT_PHY_INFO    phyInfo;
+
+    DBG_INFO(("gprtGetPortLoopback Called.\n"));
+
+    /* translate LPORT to hardware port */
+    hwPort = GT_LPORT_2_PHY(port);
+
+    gtSemTake(dev,dev->phyRegsSem,OS_WAIT_FOREVER);
+
+    /* check if the port is configurable */
+    if((phyInfo.phyId=GT_GET_PHY_ID(dev,hwPort)) == GT_INVALID_PHY)
+    {
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_NOT_SUPPORTED;
+    }
+
+    if(driverFindPhyInformation(dev,hwPort,&phyInfo) != GT_OK)
+    {
+        DBG_INFO(("Unknown PHY device.\n"));
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_FAIL;
+    }
+
+    /*get loopback state*/
+    retVal = hwGetPhyRegField(dev,hwPort,QD_PHY_CONTROL_REG,14,1,&u16Data);
+    if(retVal != GT_OK)
+    {
+        DBG_INFO(("Failed.\n"));
+    }
+    else
+    {
+        DBG_INFO(("OK.\n"));
+        BIT_2_BOOL(u16Data, *enable);
+    }
+
+    return retVal;
+}
+
+/*******************************************************************************
+* gprtSetPortLineLoopback
+*
+* DESCRIPTION:
+*        Enable/Disable Port Line Loopback.
+*
+* INPUTS:
+*        port   - The logical port number, unless SERDES device is accessed
+*                 The physical address, if SERDES device is accessed
+*        enable - If GT_TRUE, enable loopback mode
+*                 If GT_FALSE, disable loopback mode
+*
+* OUTPUTS:
+*        None.
+*
+* RETURNS:
+*        GT_OK - on success
+*        GT_FAIL - on error
+*
+* COMMENTS:
+*        data sheet register FE:28.4, GE:21_2.14  - Loop_back
+*
+*******************************************************************************/
+GT_STATUS gprtSetPortLineLoopback
+(
+    IN GT_QD_DEV *dev,
+    IN GT_LPORT  port,
+    IN GT_BOOL   enable
+)
+{
+    GT_STATUS      retVal;         /* Functions return value.      */
+    GT_U8          hwPort;         /* the physical port number     */
+    GT_U16         u16Data;
+    GT_PHY_INFO    phyInfo;
+    GT_U16         pageReg;
+
+    DBG_INFO(("gprtSetPortLineLoopback Called.\n"));
+
+    /* translate LPORT to hardware port */
+    hwPort = GT_LPORT_2_PHY(port);
+
+    gtSemTake(dev,dev->phyRegsSem,OS_WAIT_FOREVER);
+
+    /* check if the port is configurable */
+    if((phyInfo.phyId=GT_GET_PHY_ID(dev,hwPort)) == GT_INVALID_PHY)
+    {
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_NOT_SUPPORTED;
+    }
+
+    if(driverFindPhyInformation(dev,hwPort,&phyInfo) != GT_OK)
+    {
+        DBG_INFO(("Unknown PHY device.\n"));
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_FAIL;
+    }
+
+    BOOL_2_BIT(enable,u16Data);
+
+    /* GE Phy */
+    if ((phyInfo.flag & GT_PHY_GIGABIT))
+    {
+        if(driverPagedAccessStart(dev,hwPort,phyInfo.pageType,0,&pageReg) != GT_OK)
+        {
+            return GT_FAIL;
+        }
+        /* Write to GE PHY MAC specific control register.  */
+        retVal = hwSetPagedPhyRegField(dev,hwPort, 2, QD_PHY_GE_LINE_LOOPBACK_REG,14,1,phyInfo.anyPage, u16Data);
+
+        if(driverPagedAccessStop(dev,hwPort,phyInfo.pageType,0,pageReg) != GT_OK)
+        {
+            return GT_FAIL;
+        }
+    }
+    else /* FE Phy */
+    {
+        /* Write to FE PHY specific control register.  */
+        retVal = hwSetPhyRegField(dev,hwPort,QD_PHY_FE_LINE_LOOPBACK_REG,4,1,u16Data);
+    }
+
+    if(retVal != GT_OK)
+    {
+        DBG_INFO(("Failed.\n"));
+    }
+    else
+    {
+        DBG_INFO(("OK.\n"));
+    }
+    gtSemGive(dev,dev->phyRegsSem);
+    return retVal;
+}
+
+/*******************************************************************************
+* gprtGetPortLineLoopback
+*
+* DESCRIPTION:
+*       Get Port Line Loopback status.
+*
+*
+* INPUTS:
+*       port - The logical port number, unless SERDES device is accessed
+*              The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*       enable - If GT_TRUE, enable loopback mode
+*                If GT_FALSE, disable loopback mode* enable - If GT_TRUE, enable loopback mode
+*                If GT_FALSE, disable loopback mode
+*
+* RETURNS:
+*      GT_OK - on success
+*      GT_FAIL - on error
+*
+* COMMENTS:
+*      data sheet register FE:28.4, GE:21_2.14  - Loop_back
+*
+*******************************************************************************/
+GT_STATUS gprtGetPortLineLoopback
+(
+    IN GT_QD_DEV *dev,
+    IN GT_LPORT  port,
+    OUT GT_BOOL  *enable
+)
+{
+    GT_STATUS      retVal;         /* Functions return value.      */
+    GT_U8          hwPort;         /* the physical port number     */
+    GT_U16         u16Data;
+    GT_PHY_INFO    phyInfo;
+    GT_U16         pageReg;
+
+    DBG_INFO(("gprtGetPortLineLoopback Called.\n"));
+
+    /* translate LPORT to hardware port */
+    hwPort = GT_LPORT_2_PHY(port);
+
+    gtSemTake(dev,dev->phyRegsSem,OS_WAIT_FOREVER);
+
+    /* check if the port is configurable */
+    if((phyInfo.phyId=GT_GET_PHY_ID(dev,hwPort)) == GT_INVALID_PHY)
+    {
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_NOT_SUPPORTED;
+    }
+
+    if(driverFindPhyInformation(dev,hwPort,&phyInfo) != GT_OK)
+    {
+        DBG_INFO(("Unknown PHY device.\n"));
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_FAIL;
+    }
+
+     /* GE Phy */
+    if ((phyInfo.flag & GT_PHY_GIGABIT))
+    {
+        if(driverPagedAccessStart(dev,hwPort,phyInfo.pageType,0,&pageReg) != GT_OK)
+        {
+            return GT_FAIL;
+        }
+        /* Read to GE PHY MAC specific control register.  */
+        retVal = hwGetPagedPhyRegField(dev,hwPort, 2, QD_PHY_GE_LINE_LOOPBACK_REG,14,1,phyInfo.anyPage,&u16Data);
+
+        if(driverPagedAccessStop(dev,hwPort,phyInfo.pageType,0,pageReg) != GT_OK)
+        {
+            return GT_FAIL;
+        }
+    }
+    else /* FE Phy */
+    {
+        /* Read to FE PHY specific control register.  */
+        retVal = hwGetPhyRegField(dev,hwPort,QD_PHY_FE_LINE_LOOPBACK_REG,4,1,&u16Data);
+    }
+
+    if(retVal != GT_OK)
+    {
+        DBG_INFO(("Failed.\n"));
+    }
+    else
+    {
+        DBG_INFO(("OK.\n"));
+    }
+
+    BIT_2_BOOL(u16Data, *enable);
+
+    gtSemGive(dev,dev->phyRegsSem);
+    return retVal;
+}
 
 /*******************************************************************************
 * gprtSetPortSpeed
@@ -717,6 +1185,69 @@ GT_STATUS gprtPortAutoNegEnable
 }
 
 /*******************************************************************************
+* gprtGetPortAutoNegState
+*
+* DESCRIPTION:
+*         Read the auto negotiation state of specific logical port.
+*         This routine simply reads Auto Negotiation bit (bit 12) of Control
+*         Register.
+*
+* INPUTS:
+*         port    - The logical port number, unless SERDES device is accessed
+*                   The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*         state   - GT_TRUE for enable Auto-Negotiation,
+*                   GT_FALSE otherwise
+*
+* RETURNS:
+*         GT_OK   - on success
+*         GT_FAIL - on error
+*
+* COMMENTS:
+*         data sheet register 0.12 - Auto-Negotiation Enable
+*         data sheet register 4.8, 4.7, 4.6, 4.5 - Auto-Negotiation Advertisement
+*******************************************************************************/
+GT_STATUS gprtGetPortAutoNegState
+(
+    IN  GT_QD_DEV *dev,
+    IN  GT_LPORT  port,
+    OUT GT_BOOL   *state
+)
+{
+    GT_U8        hwPort;  /* the physical port number     */
+    GT_U16       u16Data;
+    GT_STATUS    retVal;
+
+    DBG_INFO(("gprtGetPortAutoNegState Called.\n"));
+
+    /* translate LPORT to hardware port */
+    hwPort = GT_LPORT_2_PHY(port);
+
+    gtSemTake(dev,dev->phyRegsSem,OS_WAIT_FOREVER);
+
+    /* check if the port is configurable */
+    if(!IS_CONFIGURABLE_PHY(dev,hwPort))
+    {
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_NOT_SUPPORTED;
+    }
+
+    /* read the auto negotiation state from bit 12 of PHY control register */
+    if((retVal=hwGetPhyRegField(dev,hwPort,QD_PHY_CONTROL_REG,12,1,&u16Data)) != GT_OK)
+    {
+        DBG_INFO(("Failed.\n"));
+        gtSemGive(dev,dev->phyRegsSem);
+        return retVal;
+    }
+
+    BIT_2_BOOL(u16Data, *state);
+
+    gtSemGive(dev,dev->phyRegsSem);
+    return retVal;
+}
+
+/*******************************************************************************
 * gprtPortPowerDown
 *
 * DESCRIPTION:
@@ -779,6 +1310,75 @@ IN GT_BOOL   state
         gtSemGive(dev,dev->phyRegsSem);
         return retVal;
     }
+
+    gtSemGive(dev,dev->phyRegsSem);
+    return GT_OK;
+}
+
+/*******************************************************************************
+* gprtGetPortPowerDown
+*
+* DESCRIPTION:
+*         Read Port state (power down/normal operation) on specific logical port.
+*
+* INPUTS:
+*         port    - The logical port number, unless SERDES device is accessed
+*                   The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*         state   - GT_TRUE: power down
+*                   GT_FALSE: normal operation
+*
+* RETURNS:
+*         GT_OK   - on success
+*         GT_FAIL - on error
+*
+* COMMENTS:
+*         data sheet register 0.11 - Power Down
+*
+*******************************************************************************/
+GT_STATUS gprtGetPortPowerDown
+(
+    IN  GT_QD_DEV *dev,
+    IN  GT_LPORT  port,
+    OUT GT_BOOL   *state
+)
+{
+    GT_STATUS    retVal;         /* Functions return value.      */
+    GT_U8        hwPort;         /* the physical port number     */
+    GT_U16       u16Data;
+
+#ifdef GT_USE_MAD
+
+#endif
+
+    DBG_INFO(("gprtGetPortPowerDown Called.\n"));
+
+    if(state == NULL)
+    {
+        DBG_INFO(("input pointer is NULL, return\n"));
+    }
+
+    /* translate LPORT to hardware port */
+    hwPort = GT_LPORT_2_PHY(port);
+
+    gtSemTake(dev,dev->phyRegsSem,OS_WAIT_FOREVER);
+
+    /* check if the port is configurable */
+    if(!IS_CONFIGURABLE_PHY(dev,hwPort))
+    {
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_NOT_SUPPORTED;
+    }
+
+    if((retVal=hwGetPhyRegField(dev,hwPort,QD_PHY_CONTROL_REG,11,1,&u16Data)) != GT_OK)
+    {
+        DBG_INFO(("Failed.\n"));
+        gtSemGive(dev,dev->phyRegsSem);
+        return retVal;
+    }
+
+    BIT_2_BOOL(u16Data, *state);
 
     gtSemGive(dev,dev->phyRegsSem);
     return GT_OK;
@@ -1031,6 +1631,85 @@ GT_STATUS gprtSetPortAutoMode
 
 }
 
+/*******************************************************************************
+* gprtGetPortAutoMode
+*
+* DESCRIPTION:
+*        This routine get Auto Mode of specific port.
+*        Supported mode is as follows:
+*        - Auto for both speed and duplex.
+*        - Auto for speed only and Full duplex.
+*        - Auto for speed only and Half duplex.
+*        - Auto for duplex only and speed 1000Mbps.
+*        - Auto for duplex only and speed 100Mbps.
+*        - Auto for duplex only and speed 10Mbps.
+*        - Speed 1000Mbps and Full duplex.
+*        - Speed 1000Mbps and Half duplex.
+*        - Speed 100Mbps and Full duplex.
+*        - Speed 100Mbps and Half duplex.
+*        - Speed 10Mbps and Full duplex.
+*        - Speed 10Mbps and Half duplex.
+*
+*
+* INPUTS:
+*        port -    The logical port number, unless SERDES device is accessed
+*                  The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*        mode -    Auto Mode to be written
+*
+* RETURNS:
+*        GT_OK   - on success
+*        GT_FAIL - on error
+*        GT_NOT_SUPPORTED - on device without copper
+*
+* COMMENTS:
+*         data sheet register 4.8, 4.7, 4.6, and 4.5 Autonegotiation Advertisement
+*         data sheet register 4.6, 4.5 Autonegotiation Advertisement for 1000BX
+*         data sheet register 9.9, 9.8 Autonegotiation Advertisement for 1000BT
+*******************************************************************************/
+
+GT_STATUS gprtGetPortAutoMode
+(
+    IN  GT_QD_DEV        *dev,
+    IN  GT_LPORT         port,
+    OUT GT_PHY_AUTO_MODE *mode
+)
+{
+    GT_STATUS       retVal; /* Functions return value.  */
+    GT_U8           hwPort; /* the physical port number */
+    GT_PHY_INFO     phyInfo;
+
+    DBG_INFO(("gprtGetPortAutoMode Called.\n"));
+
+    /* translate LPORT to hardware port */
+    hwPort = GT_LPORT_2_PHY(port);
+
+    retVal = GT_NOT_SUPPORTED;
+
+    gtSemTake(dev,dev->phyRegsSem,OS_WAIT_FOREVER);
+
+    /* check if the port is configurable */
+    if((phyInfo.phyId=GT_GET_PHY_ID(dev,hwPort)) == GT_INVALID_PHY)
+    {
+        DBG_INFO(("PHY device is not configurable.\n"));
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_NOT_SUPPORTED;
+    }
+
+    if(driverFindPhyInformation(dev,hwPort,&phyInfo) != GT_OK)
+    {
+        DBG_INFO(("Unknown PHY device.\n"));
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_FAIL;
+    }
+
+    retVal = phyGetAutoMode(dev,hwPort,&phyInfo,mode);
+
+    gtSemGive(dev,dev->phyRegsSem);
+    return retVal;
+
+}
 
 /*******************************************************************************
 * gprtSetPause
@@ -1136,6 +1815,74 @@ IN GT_PHY_PAUSE_MODE state
     return retVal;
 }
 
+/*******************************************************************************
+* gprtGetPause
+*
+* DESCRIPTION:
+*       This routine will get the pause bit in Autonegotiation Advertisement
+*       Register.
+*
+* INPUTS:
+*        port -  The logical port number, unless SERDES device is accessed
+*                The physical address, if SERDES device is accessed
+*
+*
+* OUTPUTS:
+*        state - GT_PHY_PAUSE_MODE enum value.
+*                GT_PHY_NO_PAUSE         - disable pause
+*                GT_PHY_PAUSE            - support pause
+*                GT_PHY_ASYMMETRIC_PAUSE - support asymmetric pause
+*                GT_PHY_BOTH_PAUSE       - support both pause and asymmetric pause
+*
+* RETURNS:
+*       GT_OK   - on success
+*       GT_FAIL - on error
+* COMMENTS:
+*       data sheet register 4.10 Autonegotiation Advertisement Register
+*******************************************************************************/
+GT_STATUS gprtGetPause
+(
+    IN GT_QD_DEV           *dev,
+    IN GT_LPORT            port,
+    OUT  GT_PHY_PAUSE_MODE *state
+)
+{
+    GT_U8          hwPort;  /* the physical port number */
+    GT_U16         u16Data;
+    GT_U16         regStart;
+    GT_STATUS      retVal = GT_OK;
+    GT_PHY_INFO    phyInfo;
+
+    DBG_INFO(("gprtGetPause Called.\n"));
+
+    /* translate LPORT to hardware port */
+    hwPort = GT_LPORT_2_PHY(port);
+
+    gtSemTake(dev,dev->phyRegsSem,OS_WAIT_FOREVER);
+
+    /* check if the port is configurable */
+    if((phyInfo.phyId=GT_GET_PHY_ID(dev,hwPort)) == GT_INVALID_PHY)
+    {
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_NOT_SUPPORTED;
+    }
+
+    regStart = 10;
+
+    /* Read Phy AutoNegotiation Advertisement Register.  */
+    if((retVal=hwGetPhyRegField(dev,hwPort,QD_PHY_AUTONEGO_AD_REG,(GT_U8)regStart,2,&u16Data)) != GT_OK)
+    {
+        DBG_INFO(("Not able to write Phy Reg(port:%d,offset:%d).\n",hwPort,QD_PHY_AUTONEGO_AD_REG));
+        gtSemGive(dev,dev->phyRegsSem);
+        return GT_FAIL;
+    }
+
+    gtSemGive(dev,dev->phyRegsSem);
+
+    *state = u16Data;
+
+    return retVal;
+}
 
 static
 GT_STATUS dteWorkAround_Phy100M
