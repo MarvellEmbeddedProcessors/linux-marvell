@@ -40,7 +40,13 @@ disclaimer.
 
 #include "msApi.h"
 #include "h/platform/gtMiiSmiIf.h"
+#include "h/driver/gtHwCntl.h"
 #include "mv_switch.h"
+#include "mv_phy.h"
+#include "mv_mux_netdev.h"
+
+/*void mv_eth_switch_interrupt_clear(void);
+void mv_eth_switch_interrupt_unmask(void);*/
 
 #define MV_SWITCH_DEF_INDEX     0
 #define MV_ETH_PORT_0           0
@@ -49,6 +55,9 @@ disclaimer.
 static u16	db_port_mask[MV_SWITCH_DB_NUM];
 static u16	db_link_mask[MV_SWITCH_DB_NUM];
 static void	*db_cookies[MV_SWITCH_DB_NUM];
+
+static struct sw_port_info_t	sw_port_tbl[MV_SWITCH_MAX_PORT_NUM];
+static struct sw_vlan_info_t	sw_vlan_tbl[MV_SWITCH_MAX_VLAN_NUM];
 
 /* uncomment for debug prints */
 /* #define SWITCH_DEBUG */
@@ -310,7 +319,20 @@ int mv_switch_group_cookie_set(int db, void *cookie)
 	return 0;
 }
 
+int mv_switch_mac_update(int db, unsigned char *old_mac, unsigned char *new_mac)
+{
+	int err;
 
+	/* remove old mac */
+	err = mv_switch_mac_addr_set(db, old_mac, 0);
+	if (err)
+		return err;
+
+	/* add new mac */
+	err = mv_switch_mac_addr_set(db, new_mac, 1);
+
+	return err;
+}
 int mv_switch_mac_addr_set(int db, unsigned char *mac_addr, unsigned char op)
 {
 	GT_ATU_ENTRY mac_entry;
@@ -437,7 +459,7 @@ int mv_switch_promisc_set(int db, u8 promisc_on)
 		if (MV_BIT_CHECK(ports_mask, i) && (i != qd_cpu_port)) {
 			if (mv_switch_vlan_in_vtu_set(MV_SWITCH_PORT_VLAN_ID(vlan_grp_id, i),
 						      MV_SWITCH_VLAN_TO_GROUP(vlan_grp_id),
-						      ports_mask) != 0) {
+							ports_mask) != 0) {
 				printk(KERN_ERR "mv_switch_vlan_in_vtu_set failed\n");
 				return -1;
 			}
@@ -1597,8 +1619,8 @@ int mv_switch_port_add(int switch_port, u16 grp_id)
 		return -1;
 	}
 
-	/* Add port to the VLAN */
-	if (mv_switch_port_based_vlan_set(port_map, 0) != 0)
+	/* Add port to the VLAN (CPU port is not part of VLAN) */
+	if (mv_switch_port_based_vlan_set((port_map & ~(1 << qd_cpu_port)), 0) != 0)
 		printk(KERN_ERR "mv_switch_port_based_vlan_set failed\n");
 
 	/* Add port to vtu (used in tx) */
@@ -1609,7 +1631,7 @@ int mv_switch_port_add(int switch_port, u16 grp_id)
 	for (p = 0; p < qd_dev->numOfPorts; p++) {
 		if (MV_BIT_CHECK(port_map, p) && (p != qd_cpu_port)) {
 			if (mv_switch_vlan_in_vtu_set(MV_SWITCH_PORT_VLAN_ID(vlan_grp_id, p),
-						      grp_id, port_map) != 0) {
+						      grp_id, port_map & ~(1 << qd_cpu_port)) != 0) {
 				printk(KERN_ERR "mv_switch_vlan_in_vtu_set failed\n");
 			}
 		}
@@ -1667,8 +1689,8 @@ int mv_switch_port_del(int switch_port)
 	if (gstpSetPortState(qd_dev, switch_port, GT_PORT_DISABLE) != GT_OK)
 		printk(KERN_ERR "gstpSetPortState failed on port #%d\n", switch_port);
 
-	/* Remove port from the VLAN */
-	if (mv_switch_port_based_vlan_set(port_map, 0) != 0)
+	/* Remove port from the VLAN (CPU port is not part of VLAN) */
+	if (mv_switch_port_based_vlan_set((port_map & ~(1 << qd_cpu_port)), 0) != 0)
 		printk(KERN_ERR "mv_gtw_set_port_based_vlan failed\n");
 
 	/* Remove port from vtu (used in tx) */
@@ -1691,6 +1713,3292 @@ int mv_switch_port_del(int switch_port)
 	enabled_ports_mask &= ~(1 << switch_port);
 
 	return 0;
+}
+
+/*******************************************************************************
+* mv_switch_port_discard_tag_set
+*
+* DESCRIPTION:
+*	The API allows or drops all tagged packets based on logical port.
+*
+* INPUTS:
+*	lport - logical port.
+*	mode  - discard tag mode.
+*		GT_TRUE = discard tagged packets per lport
+*		GT_FALSE = allow tagged packets per lport.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_discard_tag_set(unsigned int lport, GT_BOOL mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetDiscardTagged(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetDiscardTagged()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_discard_tag_get
+*
+* DESCRIPTION:
+*	This routine gets discard tagged bit for given lport.
+*
+* INPUTS:
+*	lport - logical port.
+*
+* OUTPUTS:
+*	mode  - discard tag mode.
+*		GT_TRUE = discard tagged packets per lport
+*		GT_FALSE = allow tagged packets per lport.
+*
+* RETURNS:
+*       On success -  TPM_RC_OK.
+*       On error different types are returned according to the case - see tpm_error_code_t.
+*******************************************************************************/
+int mv_switch_port_discard_tag_get(unsigned int lport, GT_BOOL *mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetDiscardTagged(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetDiscardTagged()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_discard_untag_set
+*
+* DESCRIPTION:
+*	The API allows or drops all untagged packets based on logical port.
+*
+* INPUTS:
+*	lport - logical port.
+*	mode  - discard untag mode.
+*		GT_TRUE = discard untagged packets per lport
+*		GT_FALSE = allow untagged packets per lport.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_discard_untag_set(unsigned int lport, GT_BOOL mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetDiscardUntagged(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetDiscardUntagged()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_discard_untag_get
+*
+* DESCRIPTION:
+*	This routine gets discard untagged bit for given lport.
+*
+* INPUTS:
+*	lport - logical port.
+*
+* OUTPUTS:
+*	mode  - discard untag mode.
+*		GT_TRUE = undiscard tagged packets per lport
+*		GT_FALSE = unallow tagged packets per lport.
+*
+* RETURNS:
+*       On success -  TPM_RC_OK.
+*       On error different types are returned according to the case - see tpm_error_code_t.
+*******************************************************************************/
+int mv_switch_port_discard_untag_get(unsigned int lport, GT_BOOL *mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetDiscardUntagged(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetDiscardUntagged()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_def_vid_set
+*
+* DESCRIPTION:
+*	The API sets port default vlan ID.
+*
+* INPUTS:
+*	lport - logical port.
+*	vid   - port default VLAN ID.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_def_vid_set(unsigned int lport, unsigned short vid)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gvlnSetPortVid(qd_dev, lport, vid);
+	SW_IF_ERROR_STR(rc, "failed to call gvlnSetPortVid()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_def_vid_get
+*
+* DESCRIPTION:
+*	The API gets port default vlan ID.
+*
+* INPUTS:
+*	lport - logical port.
+*
+* OUTPUTS:
+*	vid   - port default VLAN ID.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_def_vid_get(unsigned int lport, unsigned short *vid)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gvlnGetPortVid(qd_dev, lport, vid);
+	SW_IF_ERROR_STR(rc, "failed to call gvlnGetPortVid()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_def_pri_set
+*
+* DESCRIPTION:
+*	The API sets port default priority.
+*
+* INPUTS:
+*	lport - logical port.
+*	pri   - the port priority.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_def_pri_set(unsigned int lport, unsigned char pri)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gcosSetPortDefaultTc(qd_dev, lport, pri);
+	SW_IF_ERROR_STR(rc, "failed to call gcosSetPortDefaultTc()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_def_pri_get
+*
+* DESCRIPTION:
+*	The API gets port default priority.
+*
+* INPUTS:
+*	lport - logical port.
+*
+* OUTPUTS:
+*	pri   - the port priority.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_def_pri_get(unsigned int lport, unsigned char *pri)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gcosGetPortDefaultTc(qd_dev, lport, pri);
+	SW_IF_ERROR_STR(rc, "failed to call gcosGetPortDefaultTc()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_vtu_entry_find
+*
+* DESCRIPTION:
+*	The API find expected VTU entry in sw_vlan_tbl.
+*
+* INPUTS:
+*	vtu_entry - VTU entry, supply VID.
+*
+* OUTPUTS:
+*	found     - find expected entry or not.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_vtu_entry_find(GT_VTU_ENTRY *vtu_entry, GT_BOOL *found)
+{
+	SW_IF_NULL(vtu_entry);
+	SW_IF_NULL(found);
+
+	if (sw_vlan_tbl[vtu_entry->vid].port_bm) {/* if port members is not 0, this vid entry exist in HW andd SW */
+		memcpy(vtu_entry, &sw_vlan_tbl[vtu_entry->vid].vtu_entry, sizeof(GT_VTU_ENTRY));
+		*found = MV_TRUE;
+	} else {
+		*found = MV_FALSE;
+	}
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_vtu_entry_save
+*
+* DESCRIPTION:
+*	The API store expected VTU entry in sw_vlan_tbl.
+*
+* INPUTS:
+*	vtu_entry - VTU entry.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_vtu_entry_save(GT_VTU_ENTRY *vtu_entry)
+{
+	SW_IF_NULL(vtu_entry);
+
+	memcpy(&sw_vlan_tbl[vtu_entry->vid].vtu_entry, vtu_entry, sizeof(GT_VTU_ENTRY));
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_vid_add
+*
+* DESCRIPTION:
+*	The API adds a VID.
+*
+* INPUTS:
+*	lport     - logical switch port ID.
+*	vid       - VLAN ID.
+*	egr_mode  - egress mode.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_vid_add(unsigned int lport, unsigned short vid, unsigned char egr_mode)
+{
+	GT_VTU_ENTRY vtu_entry;
+	unsigned int found = GT_FALSE;
+	unsigned int port;
+	GT_STATUS rc = GT_OK;
+
+	memset(&vtu_entry, 0, sizeof(GT_VTU_ENTRY));
+
+	/* Find existed VTU entry in SW cache */
+	vtu_entry.vid = vid;
+	rc = mv_switch_vtu_entry_find(&vtu_entry, &found);
+	SW_IF_ERROR_STR(rc, "failed to call mv_switch_vtu_entry_find()\n");
+
+	/* Add new VTU entry in case VTU entry does not exist */
+	if (found == GT_FALSE) {
+		vtu_entry.DBNum				= 0;
+		vtu_entry.vid				= vid;
+		vtu_entry.vidPriOverride		= GT_FALSE;
+		vtu_entry.vidPriority			= 0;
+		vtu_entry.vidExInfo.useVIDFPri		= GT_FALSE;
+		vtu_entry.vidExInfo.vidFPri		= 0;
+		vtu_entry.vidExInfo.useVIDQPri		= GT_FALSE;
+		vtu_entry.vidExInfo.vidQPri		= 0;
+		vtu_entry.vidExInfo.vidNRateLimit	= GT_FALSE;
+
+	}
+
+	/* Update VTU entry */
+	for (port = 0; port < qd_dev->numOfPorts; port++) {
+		if (sw_vlan_tbl[vid].port_bm & (1 << port)) {
+			if (port == lport)
+				vtu_entry.vtuData.memberTagP[port] = egr_mode;/* update egress mode only */
+			else
+				vtu_entry.vtuData.memberTagP[port] = sw_vlan_tbl[vid].egr_mode[port];
+		} else if (port == lport) {
+			vtu_entry.vtuData.memberTagP[port] = egr_mode;
+		} else if ((sw_port_tbl[port].port_mode == GT_FALLBACK) || (qd_dev->cpuPortNum == port)) {
+			/* add cpu_port to VLAN if cpu_port is valid */
+			vtu_entry.vtuData.memberTagP[port] = MEMBER_EGRESS_UNMODIFIED;
+		} else {
+			vtu_entry.vtuData.memberTagP[port] = NOT_A_MEMBER;
+		}
+	}
+
+	/* Add/Update HW VTU entry */
+	rc = gvtuAddEntry(qd_dev, &vtu_entry);
+	SW_IF_ERROR_STR(rc, "failed to call gvtuAddEntry()\n");
+
+	/* Record HW VTU entry info to sw_vlan_tbl */
+	rc = mv_switch_vtu_entry_save(&vtu_entry);
+	SW_IF_ERROR_STR(rc, "failed to call mv_switch_vtu_entry_save()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_vid_add
+*
+* DESCRIPTION:
+*	The API adds a VID per lport.
+*
+* INPUTS:
+*	lport     - logical switch port ID.
+*	vid       - VLAN ID.
+*	egr_mode  - egress mode.
+*	belong    - whether this port blong to the VLAN actually
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_vid_add(unsigned int lport, unsigned short vid, unsigned char egr_mode, bool belong)
+{
+	GT_STATUS rc = GT_OK;
+	unsigned int  port_bm;
+	unsigned int port_idx;
+
+	/* Verify whether the port is already a member of this VID */
+	port_bm = (unsigned int)(1 << lport);
+	if (!(sw_vlan_tbl[vid].port_bm & port_bm) || (sw_vlan_tbl[vid].egr_mode[lport] != egr_mode)) {
+		rc = mv_switch_vid_add(lport, vid, egr_mode);
+		SW_IF_ERROR_STR(rc, "failed to call mv_switch_vid_add()\n");
+
+		/* add port to vid's member bit map and set port egress mode */
+		sw_vlan_tbl[vid].port_bm |= port_bm;
+		sw_vlan_tbl[vid].egr_mode[lport] = egr_mode;
+	}
+
+	/* add fallback port or CPU port to this VLAN in DB */
+	for (port_idx = 0; port_idx < qd_dev->numOfPorts; port_idx++) {
+		/* If a VLAN has been defined (there is a member in the VLAN) and
+		   the specified port is not a member */
+		if (!(sw_vlan_tbl[vid].port_bm & (1 << port_idx)) &&
+		     ((sw_port_tbl[port_idx].port_mode == GT_FALLBACK) ||
+		      (port_idx == qd_dev->cpuPortNum))) {
+			sw_vlan_tbl[vid].port_bm |= (1 << port_idx);
+			sw_vlan_tbl[vid].egr_mode[port_idx] = MEMBER_EGRESS_UNMODIFIED;
+		}
+	}
+
+	/* Add the specified port to the SW Port table */
+	if ((true == belong) && (sw_port_tbl[lport].vlan_blong[vid] == MV_SWITCH_PORT_NOT_BELONG))
+		sw_port_tbl[lport].vlan_blong[vid] = MV_SWITCH_PORT_BELONG;
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_vid_del
+*
+* DESCRIPTION:
+*	The API delete existed VID per lport.
+*
+* INPUTS:
+*	lport     - logical switch port ID.
+*	vid       - VLAN ID.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_vid_del(unsigned int lport, unsigned short vid)
+{
+	unsigned int port_bm;
+	GT_VTU_ENTRY vtu_entry;
+	unsigned int found = GT_TRUE;
+	unsigned int port_idx;
+	unsigned int is_vlan_member = 0;
+	GT_STATUS rc = GT_OK;
+
+	/* Do nothing if the port does not in this VLAN */
+	port_bm = (unsigned int)(1 << lport);
+	if (!(sw_vlan_tbl[vid].port_bm & port_bm)) {
+		pr_err("%s(%d) port(%d) is not in VLAN(%d)\n", __func__, __LINE__, lport, vid);
+		return MV_OK;
+	}
+
+	/* Find VTU entry in SW cache */
+	memset(&vtu_entry, 0, sizeof(GT_VTU_ENTRY));
+	vtu_entry.vid = vid;
+	rc = mv_switch_vtu_entry_find(&vtu_entry, &found);
+	SW_IF_ERROR_STR(rc, "failed to call mv_switch_vtu_entry_find()\n");
+
+	/* Step 1. Mark the lport as NOT_A_MEMBER. */
+	vtu_entry.vtuData.memberTagP[lport] = NOT_A_MEMBER;
+
+	/* 2. Search whether a secure port is a member of the VLAN */
+	for (port_idx = 0; port_idx < qd_dev->numOfPorts; port_idx++) {
+		if ((vtu_entry.vtuData.memberTagP[port_idx] != NOT_A_MEMBER) &&
+			((sw_port_tbl[port_idx].port_mode == GT_SECURE) ||
+			(sw_port_tbl[port_idx].vlan_blong[vid] == MV_SWITCH_PORT_BELONG))) {
+			is_vlan_member = 1;
+			break;
+	    }
+	}
+
+	/* Update the VTU entry */
+	if (is_vlan_member) {
+		/* Add HW VTU entry */
+		rc = gvtuAddEntry(qd_dev, &vtu_entry);
+		SW_IF_ERROR_STR(rc, "failed to call mv_switch_vtu_entry_find()\n");
+
+		/* Record HW VTU entry info to sw_vlan_tbl */
+		rc = mv_switch_vtu_entry_save(&vtu_entry);
+		SW_IF_ERROR_STR(rc, "failed to call mv_switch_vtu_entry_save()\n");
+
+		/* Delete port from VID DB */
+		sw_vlan_tbl[vid].port_bm &= ~port_bm;
+	} else {
+		/* Delete the VTU entry */
+		rc = gvtuDelEntry(qd_dev, &vtu_entry);
+		SW_IF_ERROR_STR(rc, "failed to call gvtuDelEntry()\n");
+
+		sw_vlan_tbl[vid].port_bm = 0;
+	}
+
+	if (sw_port_tbl[lport].vlan_blong[vid] == MV_SWITCH_PORT_BELONG) {
+		sw_port_tbl[lport].vlan_blong[vid] = MV_SWITCH_PORT_NOT_BELONG;
+		sw_vlan_tbl[vid].egr_mode[lport] = NOT_A_MEMBER;
+	}
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_vid_get
+*
+* DESCRIPTION:
+*	The API get VID information.
+*
+* INPUTS:
+*	vid       - VLAN ID.
+*
+* OUTPUTS:
+*	vtu_entry - VTU entry.
+*	found     - MV_TRUE, if the appropriate entry exists.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_vid_get(unsigned int vid, GT_VTU_ENTRY *vtu_entry, unsigned int *found)
+{
+	GT_STATUS rc = GT_OK;
+
+	memset(vtu_entry, 0, sizeof(GT_VTU_ENTRY));
+	vtu_entry->vid = vid;
+	rc = gvtuFindVidEntry(qd_dev, vtu_entry, found);
+	SW_IF_ERROR_STR(rc, "failed to call gvtuFindVidEntry()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_vid_egress_mode_set
+*
+* DESCRIPTION:
+*	The API sets the egress mode for a member port of a vlan.
+*
+* INPUTS:
+*	lport    - logical switch port ID.
+*       vid      - vlan id.
+*       egr_mode - egress mode.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*
+* COMMENTS:
+*       MEMBER_EGRESS_UNMODIFIED - 0
+*       NOT_A_MEMBER             - 1
+*       MEMBER_EGRESS_UNTAGGED   - 2
+*       MEMBER_EGRESS_TAGGED     - 3
+*
+*******************************************************************************/
+int mv_switch_port_vid_egress_mode_set(unsigned int lport, unsigned short vid, unsigned char egr_mode)
+{
+	GT_STATUS    rc = GT_OK;
+	GT_VTU_ENTRY vtu_entry;
+	GT_BOOL      found = GT_FALSE;
+
+	/* If the port is the member of vlan, set */
+	if (sw_vlan_tbl[vid].port_bm & (1 << lport)) {
+		sw_vlan_tbl[vid].egr_mode[lport] = egr_mode;
+
+		memset(&vtu_entry, 0, sizeof(GT_VTU_ENTRY));
+		vtu_entry.vid = vid;
+
+		rc = mv_switch_vtu_entry_find(&vtu_entry, &found);
+		if (rc != GT_OK && rc != GT_NO_SUCH) {
+			pr_err("%s(%d) rc(%d) failed to call mv_switch_vtu_entry_find()\n",
+			       __func__, __LINE__, rc);
+
+			return MV_FAIL;
+		}
+
+		vtu_entry.vtuData.memberTagP[lport] = egr_mode;
+
+		rc = gvtuAddEntry(qd_dev, &vtu_entry);
+		SW_IF_ERROR_STR(rc, "failed to call gvtuAddEntry()\n");
+
+		/* Record HW VT entry info to sw_vlan_tbl */
+		rc = mv_switch_vtu_entry_save(&vtu_entry);
+		SW_IF_ERROR_STR(rc, "failed to call mv_switch_vtu_entry_save()\n");
+	} else {
+		pr_err("%s(%d) port(%d) is not the member of vlan(%d)\n",
+		       __func__, __LINE__, lport, vid);
+		return MV_FAIL;
+	}
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_unknown_unicast_flood_set
+*
+* DESCRIPTION:
+*	This routine enable/disable unknown unicast frame egress on a specific port.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*	enable  - Enable unknown unicast flooding.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_unknown_unicast_flood_set(unsigned char lport, GT_BOOL enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetForwardUnknown(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetForwardUnknown()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_unknown_unicast_flood_get
+*
+* DESCRIPTION:
+*       This routine gets unknown unicast frame egress mode of a specific port.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*
+* OUTPUTS:
+*	enable  - Enable unknown unicast flooding.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_unknown_unicast_flood_get(unsigned char lport, GT_BOOL *enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetForwardUnknown(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetForwardUnknown()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_unknown_multicast_flood_set
+*
+* DESCRIPTION:
+*	This routine enable/disable unknown multicast frame egress on a specific port.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*	enable  - Enable unknown multicast flooding.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_unknown_multicast_flood_set(unsigned char lport, GT_BOOL enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetDefaultForward(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetDefaultForward()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_unknown_multicast_flood_get
+*
+* DESCRIPTION:
+*	This routine gets unknown multicast frame egress mode of a specific port.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*
+* OUTPUTS:
+*	enable  - Enable unknown multicast flooding.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_unknown_multicast_flood_get(unsigned char lport, GT_BOOL *enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetDefaultForward(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetDefaultForward()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_broadcast_flood_set
+*
+* DESCRIPTION:
+*	This routine decides whether the switch always floods the broadcast
+*	frames to all portsr or uses the multicast egress mode (per port).
+*
+* INPUTS:
+*	enable - enable broadcast flooding regardless the multicast egress mode.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_broadcast_flood_set(GT_BOOL enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gsysSetFloodBC(qd_dev, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gsysSetFloodBC()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_broadcast_flood_get
+*
+* DESCRIPTION:
+*	This routine gets the global mode of broadcast flood.
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	enable - always floods the broadcast regardless the multicast egress mode.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_broadcast_flood_get(GT_BOOL *enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gsysGetFloodBC(qd_dev, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gsysGetFloodBC()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_count3_get
+*
+* DESCRIPTION:
+*	This function gets all counter 3 of the given port
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*
+* OUTPUTS:
+*	count - all port counter 3.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*
+* COMMENTS:
+*	Clear on read.
+*******************************************************************************/
+int mv_switch_port_count3_get(unsigned int lport, GT_STATS_COUNTER_SET3 *count)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gstatsGetPortAllCounters3(qd_dev, lport, count);
+	SW_IF_ERROR_STR(rc, "failed to call gstatsGetPortAllCounters3()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_drop_count_get
+*
+* DESCRIPTION:
+*	This function gets the port InDiscards, InFiltered, and OutFiltered counters.
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*
+* OUTPUTS:
+*	count - all port dropped counter.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*
+* COMMENTS:
+*	Clear on read.
+*******************************************************************************/
+int mv_switch_port_drop_count_get(unsigned int lport, GT_PORT_STAT2 *count)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetPortCtr2(qd_dev, lport, count);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetPortCtr2()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_count_clear
+*
+* DESCRIPTION:
+*	This function clean all counters of the given port
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_count_clear(unsigned int lport)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gstatsFlushPort(qd_dev, lport);
+	SW_IF_ERROR_STR(rc, "failed to call gstatsFlushPort()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_count_clear
+*
+* DESCRIPTION:
+*	This function gets all counters of the given port
+*
+* INPUTS:
+*       None.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_count_clear(void)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gstatsFlushAll(qd_dev);
+	SW_IF_ERROR_STR(rc, "failed to call gstatsFlushAll()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_ingr_limit_mode_set
+*
+* DESCRIPTION:
+*	This routine sets the port's rate control ingress limit mode.
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*	mode  - rate control ingress limit mode.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*
+* COMMENTS:
+*	GT_LIMT_ALL = 0,        limit and count all frames
+*	GT_LIMIT_FLOOD,         limit and count Broadcast, Multicast and flooded unicast frames
+*	GT_LIMIT_BRDCST_MLTCST, limit and count Broadcast and Multicast frames
+*	GT_LIMIT_BRDCST         limit and count Broadcast frames
+*
+*******************************************************************************/
+int mv_switch_ingr_limit_mode_set(unsigned int lport, GT_RATE_LIMIT_MODE mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = grcSetLimitMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call grcSetLimitMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_ingr_limit_mode_get
+*
+* DESCRIPTION:
+*	This routine gets the port's rate control ingress limit mode.
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*
+* OUTPUTS:
+*	mode  - rate control ingress limit mode.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*
+* COMMENTS:
+*	GT_LIMT_ALL = 0,        limit and count all frames
+*	GT_LIMIT_FLOOD,         limit and count Broadcast, Multicast and flooded unicast frames
+*	GT_LIMIT_BRDCST_MLTCST, limit and count Broadcast and Multicast frames
+*	GT_LIMIT_BRDCST         limit and count Broadcast frames
+*
+*******************************************************************************/
+int mv_switch_ingr_limit_mode_get(unsigned int lport, GT_RATE_LIMIT_MODE *mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = grcGetLimitMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call grcSetLimitMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_ingr_police_rate_get
+*
+* DESCRIPTION:
+*	The API gets the ingress policing rate for given switch port.
+*
+* INPUTS:
+*	lport      - logical switch port ID.
+*
+* OUTPUTS:
+*	count_mode - policing rate count mode:
+*			GT_PIRL2_COUNT_FRAME = 0
+*			GT_PIRL2_COUNT_ALL_LAYER1
+*			GT_PIRL2_COUNT_ALL_LAYER2
+*			GT_PIRL2_COUNT_ALL_LAYER3
+*	cir        - committed infomation rate.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_ingr_police_rate_get(unsigned int		lport,
+				   GT_PIRL2_COUNT_MODE	*count_mode,
+				   unsigned int		*cir)
+{
+	GT_PIRL2_DATA	pirl_2_Data;
+	GT_U32		irl_unit;
+	GT_STATUS	rc = GT_OK;
+
+	/* IRL Unit 0 - bucket to be used (0 ~ 4) */
+	irl_unit =  0;
+	memset(&pirl_2_Data, 0, sizeof(GT_PIRL2_DATA));
+
+	rc = gpirl2ReadResource(qd_dev, lport, irl_unit, &pirl_2_Data);
+	SW_IF_ERROR_STR(rc, "failed to call gpirl2ReadResource()\n");
+
+	*count_mode	= pirl_2_Data.byteTobeCounted;
+	*cir		= pirl_2_Data.ingressRate;
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_egr_rate_limit_set
+*
+* DESCRIPTION:
+*	The API Configures the egress frame rate limit of logical port.
+* INPUTS:
+*	lport - logical switch port ID.
+*	mode  - egress rate limit mode.
+*       rate  - egress rate limit value.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*
+* COMMENTS:
+*	GT_ERATE_TYPE used kbRate - frame rate valid values are:
+*	7600,..., 9600,
+*	10000, 20000, 30000, 40000, ..., 100000,
+*	110000, 120000, 130000, ..., 1000000.
+*******************************************************************************/
+int mv_switch_egr_rate_limit_set(unsigned int lport, GT_PIRL_ELIMIT_MODE mode, unsigned int rate)
+{
+	GT_ERATE_TYPE	fRate;
+	GT_STATUS	rc = GT_OK;
+
+	fRate.fRate  = rate;
+	fRate.kbRate = rate;
+
+	rc = grcSetELimitMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call grcSetELimitMode()\n");
+
+
+	rc = grcSetEgressRate(qd_dev, lport, &fRate);
+	SW_IF_ERROR_STR(rc, "failed to call grcSetEgressRate()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_egr_rate_limit_get
+*
+* DESCRIPTION:
+*	The API return the egress frame rate limit of logical port
+* INPUTS:
+*	lport - logical switch port ID.
+*
+* OUTPUTS:
+*	mode  - egress rate limit mode.
+*       rate  - egress rate limit value.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*
+* COMMENTS:
+*	GT_ERATE_TYPE used kbRate - frame rate valid values are:
+*	7600,..., 9600,
+*	10000, 20000, 30000, 40000, ..., 100000,
+*	110000, 120000, 130000, ..., 1000000.
+*******************************************************************************/
+int mv_switch_egr_rate_limit_get(unsigned int lport, GT_PIRL_ELIMIT_MODE *mode, unsigned int *rate)
+{
+	GT_ERATE_TYPE	fRate;
+	GT_STATUS		rc = GT_OK;
+
+	rc = grcGetELimitMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call grcGetELimitMode()\n");
+
+	rc = grcGetEgressRate(qd_dev, lport, &fRate);
+	SW_IF_ERROR_STR(rc, "failed to call grcGetEgressRate()\n");
+
+	if (mode == GT_PIRL_ELIMIT_FRAME) {
+		/* frame based limit */
+		*rate = fRate.fRate;
+	} else {
+		/* rate based limit */
+		*rate = fRate.kbRate;
+	}
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_ingr_broadcast_rate_get
+*
+* DESCRIPTION:
+*	The API gets the ingress broacast rate for given switch port.
+*
+* INPUTS:
+*	lport      - logical switch port ID.
+*
+* OUTPUTS:
+*	count_mode - policing rate count mode:
+*			GT_PIRL2_COUNT_FRAME = 0
+*			GT_PIRL2_COUNT_ALL_LAYER1
+*			GT_PIRL2_COUNT_ALL_LAYER2
+*			GT_PIRL2_COUNT_ALL_LAYER3
+*	cir        - committed infomation rate.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_ingr_broadcast_rate_get(unsigned int		lport,
+				   GT_PIRL2_COUNT_MODE	*count_mode,
+				   unsigned int		*cir)
+{
+	GT_PIRL2_DATA	pirl_2_Data;
+	GT_U32		irl_unit;
+	GT_STATUS	rc = GT_OK;
+
+	/* IRL Unit 0 - bucket to be used (0 ~ 4) */
+	irl_unit =  MV_SWITCH_PIRL_RESOURCE_BROADCAST;
+	memset(&pirl_2_Data, 0, sizeof(GT_PIRL2_DATA));
+
+	rc = gpirl2ReadResource(qd_dev, lport, irl_unit, &pirl_2_Data);
+	SW_IF_ERROR_STR(rc, "failed to call gpirl2ReadResource()\n");
+
+	*count_mode	= pirl_2_Data.byteTobeCounted;
+	*cir		= pirl_2_Data.ingressRate;
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_ingr_multicast_rate_get
+*
+* DESCRIPTION:
+*	The API gets the ingress broacast rate for given switch port.
+*
+* INPUTS:
+*	lport      - logical switch port ID.
+*
+* OUTPUTS:
+*	count_mode - policing rate count mode:
+*			GT_PIRL2_COUNT_FRAME = 0
+*			GT_PIRL2_COUNT_ALL_LAYER1
+*			GT_PIRL2_COUNT_ALL_LAYER2
+*			GT_PIRL2_COUNT_ALL_LAYER3
+*	cir        - committed infomation rate.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_ingr_multicast_rate_get(unsigned int		lport,
+				   GT_PIRL2_COUNT_MODE	*count_mode,
+				   unsigned int		*cir)
+{
+	GT_PIRL2_DATA	pirl_2_Data;
+	GT_U32		irl_unit;
+	GT_STATUS	rc = GT_OK;
+
+	/* IRL Unit 0 - bucket to be used (0 ~ 4) */
+	irl_unit =  MV_SWITCH_PIRL_RESOURCE_MULTICAST;
+	memset(&pirl_2_Data, 0, sizeof(GT_PIRL2_DATA));
+
+	rc = gpirl2ReadResource(qd_dev, lport, irl_unit, &pirl_2_Data);
+	SW_IF_ERROR_STR(rc, "failed to call gpirl2ReadResource()\n");
+
+	*count_mode	= pirl_2_Data.byteTobeCounted;
+	*cir		= pirl_2_Data.ingressRate;
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_mirror_set
+*
+* DESCRIPTION:
+*	Set port mirror.
+*
+* INPUTS:
+*	sport  - Source port.
+*	mode   - mirror mode.
+*	enable - enable/disable mirror.
+*	dport  - Destination port.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_mirror_set(unsigned int sport, enum sw_mirror_mode_t mode, GT_BOOL enable, unsigned int dport)
+{
+	GT_STATUS rc = GT_OK;
+
+	if (mode == MV_SWITCH_MIRROR_INGRESS) {
+		if (enable == GT_TRUE) {
+			/* set ingress monitor source */
+			rc = gprtSetIngressMonitorSource(qd_dev, sport, GT_TRUE);
+			SW_IF_ERROR_STR(rc, "failed to call gprtSetIngressMonitorSource()\n");
+
+			/* set ingress monitor destination */
+			rc = gsysSetIngressMonitorDest(qd_dev, dport);
+			SW_IF_ERROR_STR(rc, "failed to call gsysSetIngressMonitorDest()\n");
+		} else {
+			/*disable ingress monitor source */
+			rc = gprtSetIngressMonitorSource(qd_dev, sport, GT_FALSE);
+			SW_IF_ERROR_STR(rc, "failed to call gprtSetIngressMonitorSource()\n");
+		}
+	} else if (mode == MV_SWITCH_MIRROR_EGRESS) {
+		if (enable == GT_TRUE) {
+			/* enable egress monitor source */
+			rc = gprtSetEgressMonitorSource(qd_dev, sport, GT_TRUE);
+			SW_IF_ERROR_STR(rc, "failed to call gprtSetEgressMonitorSource()\n");
+
+			/* set egress monitor destination */
+			rc = gsysSetEgressMonitorDest(qd_dev, dport);
+			SW_IF_ERROR_STR(rc, "failed to call gsysSetEgressMonitorDest()\n");
+		} else {
+			/* disable egress monitor source */
+			rc = gprtSetEgressMonitorSource(qd_dev, sport, GT_FALSE);
+			SW_IF_ERROR_STR(rc, "failed to call gprtSetEgressMonitorSource()\n");
+		}
+	} else if (mode ==  MV_SWITCH_MIRROR_BOTH) {
+		if (enable == GT_TRUE) {
+			/* enable egress monitor source */
+			rc = gprtSetIngressMonitorSource(qd_dev, sport, GT_TRUE);
+			SW_IF_ERROR_STR(rc, "failed to call gprtSetIngressMonitorSource()\n");
+
+			/* set ingress monitor destination */
+			rc = gsysSetIngressMonitorDest(qd_dev, dport);
+			SW_IF_ERROR_STR(rc, "failed to call gsysSetIngressMonitorDest()\n");
+
+			/* enable egress monitor source */
+			rc = gprtSetEgressMonitorSource(qd_dev, sport, GT_TRUE);
+			SW_IF_ERROR_STR(rc, "failed to call gprtSetEgressMonitorSource()\n");
+
+			/* set egress monitor destination */
+			rc = gsysSetEgressMonitorDest(qd_dev, dport);
+			SW_IF_ERROR_STR(rc, "failed to call gsysSetEgressMonitorDest()\n");
+		} else {
+			/*disable ingress monitor source */
+			rc = gprtSetIngressMonitorSource(qd_dev, sport, GT_FALSE);
+			SW_IF_ERROR_STR(rc, "failed to call gprtSetIngressMonitorSource()\n");
+
+			/* disable egress monitor source */
+			rc = gprtSetEgressMonitorSource(qd_dev, sport, GT_FALSE);
+			SW_IF_ERROR_STR(rc, "failed to call gprtSetEgressMonitorSource()\n");
+		}
+	} else {
+		pr_err("illegal port mirror dir(%d)\n", mode);
+		return MV_FAIL;
+	}
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_mirror_get
+*
+* DESCRIPTION:
+*	Get port mirror status.
+*
+* INPUTS:
+*	sport  - Source port.
+*	mode   - mirror mode.
+*
+* OUTPUTS:
+*	enable - enable/disable mirror.
+*	dport  - Destination port.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_mirror_get(unsigned int sport, enum sw_mirror_mode_t mode, GT_BOOL *enable, unsigned int *dport)
+{
+	GT_LPORT port;
+	GT_STATUS rc = GT_OK;
+
+	if (mode == MV_SWITCH_MIRROR_INGRESS) {
+		/* Get ingress monitor source status */
+		rc = gprtGetIngressMonitorSource(qd_dev, (GT_LPORT)sport, enable);
+		SW_IF_ERROR_STR(rc, "failed to call gprtGetIngressMonitorSource()\n");
+
+		/* Get ingress destination port */
+		rc = gsysGetIngressMonitorDest(qd_dev, &port);
+		SW_IF_ERROR_STR(rc, "failed to call gsysGetIngressMonitorDest()\n");
+		*dport = port;
+
+	} else if (mode == MV_SWITCH_MIRROR_EGRESS) {
+		/* Get egress monitor source status */
+		rc = gprtGetEgressMonitorSource(qd_dev, (GT_LPORT)sport, enable);
+		SW_IF_ERROR_STR(rc, "failed to call gprtGetEgressMonitorSource()\n");
+
+		/* Get egress destination port */
+		rc = gsysGetEgressMonitorDest(qd_dev, &port);
+		SW_IF_ERROR_STR(rc, "failed to call gsysGetEgressMonitorDest()\n");
+		*dport = port;
+
+	} else {
+		pr_err("illegal port mirror dir(%d)\n", mode);
+		return MV_FAIL;
+	}
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_age_time_set
+*
+* DESCRIPTION:
+*	This function sets the MAC address aging time.
+*
+* INPUTS:
+*	time - aging time value.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_age_time_set(unsigned int time)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gfdbSetAgingTimeout(qd_dev, time);
+	SW_IF_ERROR_STR(rc, "failed to call gfdbSetAgingTimeout()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_age_time_get
+*
+* DESCRIPTION:
+*	This function gets the MAC address aging time.
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	time - MAC aging time.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_age_time_get(unsigned int *time)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gfdbGetAgingTimeout(qd_dev, (GT_U32 *)time);
+	SW_IF_ERROR_STR(rc, "failed to call gfdbGetAgingTimeout()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mac_learn_disable_set
+*
+* DESCRIPTION:
+*	Enable/disable automatic learning of new source MAC addresses on port
+*	ingress direction.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*	enable - enable/disable MAC learning.
+*		GT_TRUE: disable MAC learning
+*		GT_FALSE: enable MAC learning
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mac_learn_disable_set(unsigned int lport, GT_BOOL enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetLearnDisable(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetLearnDisable()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mac_learn_disable_get
+*
+* DESCRIPTION:
+*	Get automatic learning status of new source MAC addresses on port ingress.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*
+* OUTPUTS:
+*	enable - enable/disable MAC learning.
+*		GT_TRUE: disable MAC learning
+*		GT_FALSE: enable MAC learning
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mac_learn_disable_get(unsigned int lport, GT_BOOL *enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetLearnDisable(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetLearnDisable()\n");
+
+	return MV_OK;
+}
+#ifdef CONFIG_ARCH_AVANTA_LP
+
+/*******************************************************************************
+* mv_switch_ingr_police_rate_set
+*
+* DESCRIPTION:
+*	The API configures the ingress policing rate for given switch port.
+*
+* INPUTS:
+*	lport      - logical switch port ID.
+*	count_mode - policing rate count mode:
+*			GT_PIRL2_COUNT_FRAME = 0
+*			GT_PIRL2_COUNT_ALL_LAYER1
+*			GT_PIRL2_COUNT_ALL_LAYER2
+*			GT_PIRL2_COUNT_ALL_LAYER3
+*	cir        - committed infomation rate.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_ingr_police_rate_set(unsigned int	lport,
+				   GT_PIRL2_COUNT_MODE	count_mode,
+				   unsigned int		cir)
+{
+	GT_U32		irlRes;
+	GT_PIRL2_DATA	pirl_2_Data;
+	GT_BOOL		pause_state;
+	GT_STATUS	rc = GT_OK;
+
+	memset(&pirl_2_Data, 0, sizeof(pirl_2_Data));
+
+	irlRes = 0;
+
+	/* configure cir, count_mode */
+	pirl_2_Data.ingressRate		= cir;
+	pirl_2_Data.customSetup.isValid	= GT_FALSE;
+	pirl_2_Data.accountQConf	= GT_FALSE;
+	pirl_2_Data.accountFiltered	= GT_TRUE;
+	pirl_2_Data.mgmtNrlEn		= GT_TRUE;
+	pirl_2_Data.saNrlEn		= GT_FALSE;
+	pirl_2_Data.daNrlEn		= GT_FALSE;
+	pirl_2_Data.samplingMode	= GT_FALSE;
+	pirl_2_Data.actionMode		= PIRL_ACTION_USE_LIMIT_ACTION;
+
+	/* decide which mode to adopt when deal with overload traffic.
+	*  If pause state is ON, select FC mode, otherwize select drop mode.
+	*/
+	rc = mv_phy_port_pause_state_get(lport, &pause_state);
+	SW_IF_ERROR_STR(rc, "failed to call mv_phy_port_pause_state_get()\n");
+	if (pause_state == GT_TRUE)
+		pirl_2_Data.ebsLimitAction = ESB_LIMIT_ACTION_FC;
+	else
+		pirl_2_Data.ebsLimitAction = ESB_LIMIT_ACTION_DROP;
+
+	pirl_2_Data.fcDeassertMode	= GT_PIRL_FC_DEASSERT_EMPTY;
+	pirl_2_Data.bktRateType		= BUCKET_TYPE_TRAFFIC_BASED;
+	pirl_2_Data.priORpt		= GT_TRUE;
+	pirl_2_Data.priMask		= 0;
+	pirl_2_Data.bktTypeMask		= 0x7fff;
+	pirl_2_Data.byteTobeCounted	= count_mode;
+
+	rc = gpirl2WriteResource(qd_dev, lport, irlRes, &pirl_2_Data);
+	SW_IF_ERROR_STR(rc, "failed to call gpirl2WriteResource()\n");
+
+	return MV_OK;
+}
+
+
+/*******************************************************************************
+* mv_switch_ingr_broadcast_rate_set
+*
+* DESCRIPTION:
+*	The API configures the ingress broadcast rate for given switch port.
+*
+* INPUTS:
+*	lport      - logical switch port ID.
+*	count_mode - policing rate count mode:
+*			GT_PIRL2_COUNT_FRAME = 0
+*			GT_PIRL2_COUNT_ALL_LAYER1
+*			GT_PIRL2_COUNT_ALL_LAYER2
+*			GT_PIRL2_COUNT_ALL_LAYER3
+*	cir        - committed infomation rate.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_ingr_broadcast_rate_set(unsigned int		lport,
+					GT_PIRL2_COUNT_MODE	count_mode,
+					unsigned int	cir)
+{
+	GT_U32		irlRes;
+	GT_PIRL2_DATA	pirl_2_Data;
+	GT_BOOL		pause_state;
+	GT_STATUS	rc = GT_OK;
+
+	memset(&pirl_2_Data, 0, sizeof(pirl_2_Data));
+
+	irlRes = MV_SWITCH_PIRL_RESOURCE_BROADCAST;
+
+	/* configure cir, count_mode */
+	pirl_2_Data.ingressRate		= cir;
+	pirl_2_Data.customSetup.isValid	= GT_FALSE;
+	pirl_2_Data.accountQConf	= GT_FALSE;
+	pirl_2_Data.accountFiltered	= GT_TRUE;
+	pirl_2_Data.mgmtNrlEn		= GT_TRUE;
+	pirl_2_Data.saNrlEn		= GT_FALSE;
+	pirl_2_Data.daNrlEn		= GT_FALSE;
+	pirl_2_Data.samplingMode	= GT_FALSE;
+	pirl_2_Data.actionMode		= PIRL_ACTION_USE_LIMIT_ACTION;
+
+	/* decide which mode to adopt when deal with overload traffic.
+	*  If pause state is ON, select FC mode, otherwize select drop mode.
+	*/
+	rc = mv_phy_port_pause_state_get(lport, &pause_state);
+	SW_IF_ERROR_STR(rc, "failed to call mv_phy_port_pause_state_get()\n");
+	if (pause_state == GT_TRUE)
+		pirl_2_Data.ebsLimitAction = ESB_LIMIT_ACTION_FC;
+	else
+		pirl_2_Data.ebsLimitAction = ESB_LIMIT_ACTION_DROP;
+
+	pirl_2_Data.fcDeassertMode	= GT_PIRL_FC_DEASSERT_EMPTY;
+	pirl_2_Data.bktRateType		= BUCKET_TYPE_TRAFFIC_BASED;
+	pirl_2_Data.priORpt		= GT_TRUE;
+	pirl_2_Data.priMask		= 0;
+	pirl_2_Data.bktTypeMask		= (1 << MV_SWITCH_PIRL_BKTTYPR_BROADCAST_BIT);
+	pirl_2_Data.byteTobeCounted	= count_mode;
+
+	rc = gpirl2WriteResource(qd_dev, lport, irlRes, &pirl_2_Data);
+	SW_IF_ERROR_STR(rc, "failed to call gpirl2WriteResource()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_ingr_multicast_rate_set
+*
+* DESCRIPTION:
+*	The API configures the ingress broadcast rate for given switch port.
+*
+* INPUTS:
+*	lport      - logical switch port ID.
+*	count_mode - policing rate count mode:
+*			GT_PIRL2_COUNT_FRAME = 0
+*			GT_PIRL2_COUNT_ALL_LAYER1
+*			GT_PIRL2_COUNT_ALL_LAYER2
+*			GT_PIRL2_COUNT_ALL_LAYER3
+*	cir        - committed infomation rate.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_ingr_multicast_rate_set(unsigned int		lport,
+				   GT_PIRL2_COUNT_MODE	count_mode,
+				   unsigned int cir)
+{
+	GT_U32		irlRes;
+	GT_PIRL2_DATA	pirl_2_Data;
+	GT_BOOL		pause_state;
+	GT_STATUS	rc = GT_OK;
+
+	memset(&pirl_2_Data, 0, sizeof(pirl_2_Data));
+
+	irlRes = MV_SWITCH_PIRL_RESOURCE_MULTICAST;
+
+	/* configure cir, count_mode */
+	pirl_2_Data.ingressRate		= cir;
+	pirl_2_Data.customSetup.isValid	= GT_FALSE;
+	pirl_2_Data.accountQConf	= GT_FALSE;
+	pirl_2_Data.accountFiltered	= GT_TRUE;
+	pirl_2_Data.mgmtNrlEn		= GT_TRUE;
+	pirl_2_Data.saNrlEn		= GT_FALSE;
+	pirl_2_Data.daNrlEn		= GT_FALSE;
+	pirl_2_Data.samplingMode	= GT_FALSE;
+	pirl_2_Data.actionMode		= PIRL_ACTION_USE_LIMIT_ACTION;
+
+	/* decide which mode to adopt when deal with overload traffic.
+	*  If pause state is ON, select FC mode, otherwize select drop mode.
+	*/
+	rc = mv_phy_port_pause_state_get(lport, &pause_state);
+	SW_IF_ERROR_STR(rc, "failed to call mv_phy_port_pause_state_get()\n");
+	if (pause_state == GT_TRUE)
+		pirl_2_Data.ebsLimitAction = ESB_LIMIT_ACTION_FC;
+	else
+		pirl_2_Data.ebsLimitAction = ESB_LIMIT_ACTION_DROP;
+
+	pirl_2_Data.fcDeassertMode	= GT_PIRL_FC_DEASSERT_EMPTY;
+	pirl_2_Data.bktRateType		= BUCKET_TYPE_TRAFFIC_BASED;
+	pirl_2_Data.priORpt		= GT_TRUE;
+	pirl_2_Data.priMask		= 0;
+	pirl_2_Data.bktTypeMask		= ((1 << MV_SWITCH_PIRL_BKTTYPR_MULTICAST_BIT)
+		| (1 << MV_SWITCH_PIRL_BKTTYPR_UNKNOWN_MULTICAST_BIT));
+	pirl_2_Data.byteTobeCounted	= count_mode;
+
+	rc = gpirl2WriteResource(qd_dev, lport, irlRes, &pirl_2_Data);
+	SW_IF_ERROR_STR(rc, "failed to call gpirl2WriteResource()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_queue_weight_set
+*
+* DESCRIPTION:
+*	The API configures the weight of a queues for all
+*	Ethernet UNI ports in the integrated switch.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*	queue  - switch queue, ranging from 0 to 3.
+*	weight - weight value per queue (1-8).
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_queue_weight_set(unsigned int lport, unsigned char queue, unsigned char weight)
+{
+	unsigned int len = 0;
+	unsigned int offset = 0;
+	unsigned int idx;
+	GT_QoS_WEIGHT l_weight;
+	GT_STATUS rc = GT_OK;
+
+	/* get weight information at first */
+	rc = gsysGetQoSWeight(qd_dev, &l_weight);
+	SW_IF_ERROR_STR(rc, "failed to call gsysGetQoSWeight()\n");
+
+	offset = MV_SWITCH_MAX_QUEUE_NUM*lport + queue;
+	if (offset >= MAX_QOS_WEIGHTS) {
+		pr_err("%s offset(%d) is out of range\n", __func__, offset);
+		return MV_FAIL;
+	}
+
+	/* Update queue weight */
+	if ((offset+1) <= l_weight.len) {
+		l_weight.queue[offset] = weight;
+		len = l_weight.len;
+	} else {
+		for (idx = l_weight.len; idx < (offset/MV_SWITCH_MAX_QUEUE_NUM+1)*MV_SWITCH_MAX_QUEUE_NUM; idx++) {
+			if (idx == offset)
+				l_weight.queue[idx] = weight;
+			else
+				l_weight.queue[idx] = MV_SWITCH_DEFAULT_WEIGHT;
+		}
+
+		len = (offset/MV_SWITCH_MAX_QUEUE_NUM+1)*MV_SWITCH_MAX_QUEUE_NUM;
+	}
+
+	l_weight.len = len;
+
+	rc = gsysSetQoSWeight(qd_dev, &l_weight);
+	SW_IF_ERROR_STR(rc, "failed to call gsysSetQoSWeight()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_queue_weight_get
+*
+* DESCRIPTION:
+*	The API configures the weight of a queues for all
+*	Ethernet UNI ports in the integrated switch.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*	queue  - switch queue, ranging from 0 to 3.
+*
+* OUTPUTS:
+*	weight - weight value per queue (1-8).
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_queue_weight_get(unsigned int lport, unsigned char queue, unsigned char *weight)
+{
+	GT_QoS_WEIGHT l_weight;
+	unsigned int offset;
+	GT_STATUS rc = GT_OK;
+
+	/* Get QoS queue information */
+	rc = gsysGetQoSWeight(qd_dev, &l_weight);
+	SW_IF_ERROR_STR(rc, "failed to call gsysSetQoSWeight()\n");
+
+	offset = MV_SWITCH_MAX_QUEUE_NUM*lport + queue;
+	if ((offset + 1) > l_weight.len)
+		*weight = 0;
+	else
+		*weight = l_weight.queue[offset];
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_learn2all_enable_set
+*
+* DESCRIPTION:
+*	Enable/disable learn to all devices
+*
+* INPUTS:
+*	enable - enable/disable learn to all devices.
+*		GT_TRUE: disable MAC learning
+*		GT_FALSE: enable MAC learning
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_learn2all_enable_set(GT_BOOL enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gsysSetLearn2All(qd_dev, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gsysSetLearn2All(%d)\n", enable);
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_learn2all_enable_get
+*
+* DESCRIPTION:
+*	returns if the learn2all bit status
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	enabled - learn2all enabled/disabled
+*		GT_TRUE: learn2all enabled
+*		GT_FALSE: learn2all disabled
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_learn2all_enable_get(GT_BOOL *enabled)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gsysGetLearn2All(qd_dev, enabled);
+	SW_IF_ERROR_STR(rc, "failed to call gsysSetLearn2All()\n");
+
+	return MV_OK;
+}
+#endif
+/*******************************************************************************
+* mv_switch_mac_limit_set
+*
+* DESCRIPTION:
+*	This function limits the number of MAC addresses per lport.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*	mac_num - maximum number of MAC addresses per port (0-255).
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*
+* COMMENTS:
+*	The following care is needed when enabling this feature:
+*		1) disable learning on the ports
+*		2) flush all non-static addresses in the ATU
+*		3) define the desired limit for the ports
+*		4) re-enable learing on the ports
+*******************************************************************************/
+int mv_switch_mac_limit_set(unsigned int lport, unsigned int mac_num)
+{
+	GT_STATUS rc = GT_OK;
+
+	/* define the desired limit for the ports */
+	rc = gfdbSetPortAtuLearnLimit(qd_dev, lport, mac_num);
+	SW_IF_ERROR_STR(rc, "failed to call gfdbSetPortAtuLearnLimit()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mac_limit_get
+*
+* DESCRIPTION
+*	Port's auto learning limit. When the limit is non-zero value, the number
+*	of MAC addresses that can be learned on this lport are limited to the value
+*	specified in this API. When the learn limit has been reached any frame
+*	that ingresses this lport with a source MAC address not already in the
+*	address database that is associated with this lport will be discarded.
+*	Normal auto-learning will resume on the lport as soon as the number of
+*	active unicast MAC addresses associated to this lport is less than the
+*	learn limit.
+*	CPU directed ATU Load, Purge, or Move will not have any effect on the
+*	learn limit.
+*	This feature is disabled when the limit is zero.
+*	The following care is needed when enabling this feature:
+*		1) dsable learning on the ports
+*		2) flush all non-static addresses in the ATU
+*		3) define the desired limit for the ports
+*		4) re-enable learing on the ports
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*
+* OUTPUTS:
+*	mac_num - maximum number of MAC addresses per port (0-255).
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mac_limit_get(unsigned int lport, unsigned int *mac_num)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gfdbGetPortAtuLearnLimit(qd_dev, lport, (GT_U32 *)mac_num);
+	SW_IF_ERROR_STR(rc, "failed to call gfdbGetPortAtuLearnLimit()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mac_addr_add
+*
+* DESCRIPTION:
+*	This function creates a MAC entry in the MAC address table for a
+*	specific lport in the integrated switch
+*
+* INPUTS:
+*	port_bm  - logical switch port bitmap, bit0: switch port 0, bit1: port 1.
+*	mac_addr - 6byte network order MAC source address.
+*	mode     - Static or dynamic mode.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mac_addr_add(unsigned int port_bm, unsigned char mac_addr[6], unsigned int mode)
+{
+	GT_ATU_ENTRY mac_entry;
+	unsigned int l_port_bm = 0;
+	GT_STATUS    rc = GT_OK;
+	enum sw_mac_addr_type_t type = MV_SWITCH_UNICAST_MAC_ADDR;
+
+	memset(&mac_entry, 0, sizeof(GT_ATU_ENTRY));
+
+	mac_entry.trunkMember			= GT_FALSE;
+	mac_entry.prio				= 0;
+	mac_entry.exPrio.useMacFPri		= 0;
+	mac_entry.exPrio.macFPri		= 0;
+	mac_entry.exPrio.macQPri		= 0;
+	mac_entry.DBNum				= 0;
+	l_port_bm				= port_bm;
+	memcpy(mac_entry.macAddr.arEther, mac_addr, GT_ETHERNET_HEADER_SIZE);
+
+	/* treat broadcast MAC address as multicast one */
+	if (((mac_addr[0] & 0x01) == 0x01) ||
+		((mac_addr[0] == 0x33) && (mac_addr[1] == 0x33))) {
+		type = MV_SWITCH_MULTICAST_MAC_ADDR;
+		l_port_bm |= (1 << qd_dev->cpuPortNum);
+	}
+	mac_entry.portVec = l_port_bm;
+
+	if (type == MV_SWITCH_UNICAST_MAC_ADDR) {
+		if (mode == MV_SWITCH_DYNAMIC_MAC_ADDR)
+			mac_entry.entryState.ucEntryState = GT_UC_DYNAMIC;
+		else
+			mac_entry.entryState.ucEntryState = GT_UC_STATIC;
+	} else {
+		mac_entry.entryState.mcEntryState = GT_MC_STATIC;
+	}
+
+	/* add ATU entry */
+	rc = gfdbAddMacEntry(qd_dev, &mac_entry);
+	SW_IF_ERROR_STR(rc, "failed to call gfdbAddMacEntry()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mac_addr_del
+*
+* DESCRIPTION:
+*	This function removes an existed MAC entry from the MAC address
+*	table in the integrated switch.
+*
+* INPUTS:
+*	lport    - logical switch port ID.
+*       mac_addr - MAC address.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mac_addr_del(unsigned int lport, unsigned char mac_addr[6])
+{
+	GT_ATU_ENTRY mac_entry;
+	GT_BOOL      found;
+	GT_BOOL      mc_addr = GT_FALSE;
+	GT_STATUS    rc = GT_OK;
+
+	/* try to find VTU entry */
+	memset(&mac_entry, 0, sizeof(GT_ATU_ENTRY));
+	memcpy(mac_entry.macAddr.arEther, mac_addr, GT_ETHERNET_HEADER_SIZE);
+	rc = gfdbFindAtuMacEntry(qd_dev, &mac_entry, &found);
+	SW_IF_ERROR_STR(rc, "failed to call gfdbFindAtuMacEntry()\n");
+
+	/* return ok in case no ATU entry is found */
+	if (GT_FALSE == found)
+		return MV_OK;
+
+	/* delete ATU entry */
+	rc = gfdbDelMacEntry(qd_dev, &mac_entry.macAddr);
+	SW_IF_ERROR_STR(rc, "failed to call gfdbDelMacEntry()\n");
+
+	/* treat broadcast MAC address as multicast one */
+	if (((mac_addr[0] & 0x01) == 0x01) ||
+	    ((mac_addr[0] == 0x33) && (mac_addr[1] == 0x33))) {
+		mc_addr = GT_TRUE;
+	}
+
+	/* add ATU again in case there still have other ports */
+	if (((mac_entry.portVec & ~(1 << lport)) && (mc_addr == GT_FALSE)) ||
+	    ((mac_entry.portVec & ~((1 << lport) | (1 << qd_dev->cpuPortNum))) && (mc_addr == GT_TRUE))) {
+		mac_entry.portVec &= ~(1 << lport);
+		rc = gfdbAddMacEntry(qd_dev, &mac_entry);
+		SW_IF_ERROR_STR(rc, "failed to call gfdbAddMacEntry()\n");
+	}
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_qos_mode_set()
+*
+* DESCRIPTION:
+*	Configures the scheduling mode per logical port.
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*	mode  - scheduler mode.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_qos_mode_set(unsigned int lport, GT_PORT_SCHED_MODE mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetPortSched(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetPortSched()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_qos_mode_get()
+*
+* DESCRIPTION:
+*	This API gets the scheduling mode per logical port.
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*
+* OUTPUTS:
+*	mode  - scheduler mode.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_qos_mode_get(unsigned int lport, GT_PORT_SCHED_MODE *mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetPortSched(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetPortSched()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mtu_set
+*
+* DESCRIPTION:
+*	Set switch MTU size.
+*
+* INPUTS:
+*	mtu - MTU size.
+*
+* OUTPUTS:
+*	None
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mtu_set(unsigned int mtu)
+{
+	unsigned int idx;
+	GT_JUMBO_MODE jumbo_mode;
+	GT_STATUS rc = GT_OK;
+
+	/* Set jumbo frames mode */
+	if (mtu < 1522) {
+		pr_err("MTU(%d) will be adjusted to jumbo mode(1522)\n", mtu);
+		jumbo_mode = GT_JUMBO_MODE_1522;
+	} else if (mtu == 1522) {
+		jumbo_mode = GT_JUMBO_MODE_1522;
+	} else if (mtu < 2048) {
+		pr_err("MTU(%d) will be adjusted to jumbo mode(2048)\n", mtu);
+		jumbo_mode = GT_JUMBO_MODE_2048;
+	} else if (mtu == 2048) {
+		jumbo_mode = GT_JUMBO_MODE_2048;
+	} else if (mtu != 10240) {
+		pr_err("MTU(%d) will be adjusted to jumbo mode(10240)\n", mtu);
+		jumbo_mode = GT_JUMBO_MODE_10240;
+	} else {
+		jumbo_mode = GT_JUMBO_MODE_10240;
+	}
+
+	for (idx = 0; idx < qd_dev->numOfPorts; idx++) {
+		/* Set switch MTU */
+		rc = gsysSetJumboMode(qd_dev, idx, jumbo_mode);
+		SW_IF_ERROR_STR(rc, "failed to call gsysSetJumboMode()\n");
+	}
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mtu_get
+*
+* DESCRIPTION:
+*	Get switch MTU size.
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	mtu - MTU size.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mtu_get(unsigned int *mtu)
+{
+	GT_JUMBO_MODE jumbo_mode;
+	GT_STATUS rc = GT_OK;
+
+	/* Get switch MTU */
+	rc = gsysGetJumboMode(qd_dev, MV_SWITCH_CPU_PORT_NUM, &jumbo_mode);
+	SW_IF_ERROR_STR(rc, "failed to call gsysGetJumboMode()\n");
+
+	/* Convert jumbo frames mode to MTU size */
+	if (jumbo_mode == GT_JUMBO_MODE_1522)
+		*mtu = 1522;
+	else if (jumbo_mode == GT_JUMBO_MODE_2048)
+		*mtu = 2048;
+	else
+		*mtu = 10240;
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_link_state_get
+*
+* DESCRIPTION:
+*	The API return realtime port link state of switch logical port.
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*
+* OUTPUTS:
+*	state  - realtime port link state.
+*			GT_TRUE: link up
+*			GT_FALSE: link down down
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_link_state_get(unsigned int lport, GT_BOOL *state)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetLinkState(qd_dev, lport, state);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetLinkState()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_duplex_state_get
+*
+* DESCRIPTION:
+*	The API return realtime port duplex status of given switch logical port.
+* INPUTS:
+*	lport - logical switch PHY port ID.
+*
+* OUTPUTS:
+*	state - duplex state.
+*		GT_FALSE:half deplex mode
+*		GT_TRUE:full deplex mode					.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_duplex_state_get(unsigned int lport, GT_BOOL *state)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetDuplex(qd_dev, lport, state);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetDuplex()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_speed_state_get
+*
+* DESCRIPTION:
+*	The API return realtime port speed mode of given switch logical port.
+* INPUTS:
+*	lport - logical switch PHY port ID.
+*
+* OUTPUTS:
+*	state - speed mode state
+*		0:10M
+*		1:100M
+*		2:1000M
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_speed_state_get(unsigned int lport, GT_PORT_SPEED_MODE *speed)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetSpeedMode(qd_dev, lport, speed);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetSpeedMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_secure_mode_set
+*
+* DESCRIPTION:
+*	Change a port mode in the SW data base and remove it from all VLANs
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_secure_mode_set(unsigned int lport)
+{
+	unsigned int port_bm;
+	unsigned short vlan_idx;
+	GT_STATUS rc = GT_OK;
+
+	sw_port_tbl[lport].port_mode = GT_SECURE;
+
+	port_bm = 1 << lport;
+
+	for (vlan_idx = 0; vlan_idx < MV_SWITCH_MAX_VLAN_NUM; vlan_idx++) {
+		if ((sw_vlan_tbl[vlan_idx].port_bm & port_bm) &&
+		    (sw_port_tbl[lport].vlan_blong[vlan_idx] == MV_SWITCH_PORT_NOT_BELONG)) {
+			rc = mv_switch_port_vid_del(lport, vlan_idx);
+			SW_IF_ERROR_STR(rc, "failed to call mv_switch_port_vid_del()\n");
+
+			sw_vlan_tbl[vlan_idx].egr_mode[lport] = NOT_A_MEMBER;
+		}
+	}
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_fallback_mode_set
+*
+* DESCRIPTION:
+*	Change a port mode in the SW data base and add it to all VLANs
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_fallback_mode_set(unsigned int lport)
+{
+	unsigned int port_bm;
+	unsigned short vlan_idx;
+	GT_STATUS rc = GT_OK;
+
+	sw_port_tbl[lport].port_mode = GT_FALLBACK;
+
+	port_bm = 1 << lport;
+
+	for (vlan_idx = 0; vlan_idx < MV_SWITCH_MAX_VLAN_NUM; vlan_idx++) {
+		/* If a VLAN has been defined (there is a member in the VLAN) and
+		   the specified port is not a member */
+		if (sw_vlan_tbl[vlan_idx].port_bm &&
+		     !(sw_vlan_tbl[vlan_idx].port_bm & port_bm)) {
+			/* Update VTU table */
+			rc = mv_switch_port_vid_add(lport, vlan_idx, MEMBER_EGRESS_UNMODIFIED, false);
+			SW_IF_ERROR_STR(rc, "failed to call mv_switch_port_vid_add()\n");
+
+			sw_vlan_tbl[vlan_idx].port_bm |= port_bm;
+			sw_vlan_tbl[vlan_idx].egr_mode[lport] = MEMBER_EGRESS_UNMODIFIED;
+		}
+	}
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_vlan_filter_set
+*
+* DESCRIPTION:
+*	The API sets the filtering mode of a certain lport.
+*	If the lport is in filtering mode, only the VIDs added by the
+*	tpm_sw_port_add_vid API will be allowed to ingress and egress the lport.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*       filter - set to 1 means the lport will drop all packets which are NOT in
+*		 the allowed VID list (built using API tpm_sw_port_add_vid).
+*		 set to 0 - means that the list of VIDs allowed
+*		 per lport has no significance (the list is not deleted).
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_vlan_filter_set(unsigned int lport, unsigned char filter)
+{
+	GT_DOT1Q_MODE mode;
+	GT_STATUS rc = GT_OK;
+
+	/* Move port to secure mode and removed from all VLANs */
+	if (filter) {
+		/* The port is already in the secure mode - do noting */
+		if (sw_port_tbl[lport].port_mode == GT_SECURE)
+			return MV_OK;
+
+		rc = mv_switch_port_secure_mode_set(lport);
+		SW_IF_ERROR_STR(rc, "failed to call mv_switch_port_secure_mode_set()\n");
+		mode = GT_SECURE;
+	} else {
+		/* Port should be moved to the fallback mode and added to all VLANs */
+		if (sw_port_tbl[lport].port_mode == GT_FALLBACK)
+			return MV_OK;
+
+		rc = mv_switch_port_fallback_mode_set(lport);
+		SW_IF_ERROR_STR(rc, "failed to call mv_switch_port_fallback_mode_set()\n");
+		mode = GT_FALLBACK;
+	}
+
+	rc = gvlnSetPortVlanDot1qMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gvlnSetPortVlanDot1qMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_vlan_filter_get
+*
+* DESCRIPTION:
+*	The API gets the filtering mode of a certain lport.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*
+* OUTPUTS:
+*       filter - set to 1 means the lport will drop all packets which are NOT in
+*		 the allowed VID list (built using API tpm_sw_port_add_vid).
+*		 set to 0 - means that the list of VIDs allowed
+*		 per lport has no significance (the list is not deleted).
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_vlan_filter_get(unsigned int lport, unsigned char *filter)
+{
+	GT_DOT1Q_MODE mode;
+	GT_STATUS rc = GT_OK;
+
+	rc = gvlnGetPortVlanDot1qMode(qd_dev, lport, &mode);
+	SW_IF_ERROR_STR(rc, "failed to call gvlnGetPortVlanDot1qMode()\n");
+
+	if (GT_SECURE == mode)
+		*filter = 1;
+	else
+		*filter = 0;
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_vlan_mode_set
+*
+* DESCRIPTION:
+*	The API sets the VLAN 802.1q mode of a certain lport.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*       mode   - VLAN 802.1q mode.
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_vlan_mode_set(unsigned int lport, GT_DOT1Q_MODE mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gvlnSetPortVlanDot1qMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gvlnSetPortVlanDot1qMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_vlan_mode_get
+*
+* DESCRIPTION:
+*	The API gets the VLAN 802.1q mode of a certain lport.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*
+* OUTPUTS:
+*       mode   - VLAN 802.1q mode.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_vlan_mode_get(unsigned int lport, GT_DOT1Q_MODE *mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gvlnGetPortVlanDot1qMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gvlnGetPortVlanDot1qMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_mac_filter_mode_set
+*
+* DESCRIPTION: The routine sets MAC filter mode
+*
+* INPUTS:
+*	lport   - switch port
+*	mode   - MAC filter mode
+*
+* OUTPUTS:
+*	None
+*
+* RETURNS:
+*	On success, the function returns MV_OK. On error different types are returned
+*	according to the case - see tpm_error_code_t.
+*
+* COMMENTS:
+*	None
+*******************************************************************************/
+int mv_switch_port_mac_filter_mode_set(unsigned int	lport,
+				    GT_SA_FILTERING	mode)
+
+{
+	int rc = MV_OK;
+
+	/* set filter mode */
+	rc = gprtSetSAFiltering(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "fail to set filter port(%d) mode(%d)\n", lport, mode);
+
+	return rc;
+}
+
+/*******************************************************************************
+* mv_switch_port_mac_filter_mode_get
+*
+* DESCRIPTION: The routine adds MAC address filter entry
+*
+* INPUTS:
+*	lport   - switch lport
+*
+* OUTPUTS:
+*	mode   - MAC filter mode
+*
+* RETURNS:
+*	On success, the function returns MV_OK. On error different types are returned
+*	according to the case - see tpm_error_code_t.
+*
+* COMMENTS:
+*	None
+*******************************************************************************/
+int mv_switch_port_mac_filter_mode_get(unsigned int	lport,
+				    GT_SA_FILTERING	*mode)
+{
+	int rc = MV_OK;
+
+	/* set filter mode */
+	rc = gprtGetSAFiltering(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "fail to get filtering mode of port(%d)\n", lport);
+
+	return rc;
+}
+
+/*******************************************************************************
+* mv_switch_port_mac_filter_entry_add
+*
+* DESCRIPTION: The routine adds MAC address filter entry
+*
+* INPUTS:
+*	lport    - switch lport
+*	mac     - MAC address
+*	vlan    - VLAN ID
+*	mode    - MAC filter mode
+*
+* OUTPUTS:
+*	None
+*
+* RETURNS:
+*	On success, the function returns MV_OK. On error different types are returned
+*	according to the case - see tpm_error_code_t.
+*
+* COMMENTS:
+*	None
+*******************************************************************************/
+int mv_switch_port_mac_filter_entry_add(unsigned int	lport,
+				     unsigned char		*mac,
+				     unsigned short		vlan,
+				     GT_SA_FILTERING		mode)
+{
+	int rc = MV_OK;
+	unsigned int port_bm;
+
+	if (GT_SA_DROP_ON_LOCK == mode)
+		port_bm = (1 << lport);
+	else if (GT_SA_DROP_ON_UNLOCK == mode || GT_SA_DROP_TO_CPU == mode)
+		port_bm = 0;
+	else
+		return MV_OK;
+
+	rc = mv_switch_mac_addr_add(port_bm, mac, MV_SWITCH_STATIC_MAC_ADDR);
+	SW_IF_ERROR_STR(rc, "fail to add filtering addr of port(%d)\n", lport);
+
+	return rc;
+}
+
+/*******************************************************************************
+* mv_switch_port_mac_filter_entry_del
+*
+* DESCRIPTION: The routine deletes MAC address filter entry
+*
+* INPUTS:
+*	lport    - switch port
+*	mac     - MAC address
+*	vlan    - VLAN ID
+*	mode    - MAC filter mode
+*
+* OUTPUTS:
+*	None
+*
+* RETURNS:
+*	On success, the function returns MV_OK. On error different types are returned
+*	according to the case - see tpm_error_code_t.
+*
+* COMMENTS:
+*	None
+*******************************************************************************/
+int mv_switch_port_mac_filter_entry_del(unsigned int	lport,
+				     unsigned char		*mac,
+				     unsigned short		vlan,
+				     GT_SA_FILTERING		mode)
+{
+	int rc = MV_OK;
+
+	rc = mv_switch_mac_addr_del(lport, mac);
+	SW_IF_ERROR_STR(rc, "fail to del filtering addr of port(%d)\n", lport);
+
+	return rc;
+}
+
+/*******************************************************************************
+* mv_switch_port_vlan_set
+*
+* DESCRIPTION:
+*	This routine sets the port VLAN group port membership list.
+*
+* INPUTS:
+*	lport    - logical switch port ID.
+*	mem_port - array of logical ports in the same vlan.
+*	mem_num  - number of members in memPorts array
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_vlan_set(unsigned int lport, GT_LPORT mem_port[], unsigned int mem_num)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gvlnSetPortVlanPorts(qd_dev, (GT_LPORT)lport, mem_port, (unsigned char)mem_num);
+	SW_IF_ERROR_STR(rc, "failed to call gvlnSetPortVlanPorts()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_vlan_get
+*
+* DESCRIPTION:
+*	This routine gets the port VLAN group port membership list.
+*
+* INPUTS:
+*	lport    - logical switch port ID.
+*
+* OUTPUTS:
+*	mem_port - array of logical ports in the same vlan.
+*	mem_num  - number of members in memPorts array
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_vlan_get(unsigned int lport, GT_LPORT mem_port[], unsigned int *mem_num)
+{
+	GT_U8 num;
+	GT_STATUS rc = GT_OK;
+
+	rc = gvlnGetPortVlanPorts(qd_dev, lport, mem_port, &num);
+	SW_IF_ERROR_STR(rc, "failed to call gvlnGetPortVlanPorts()\n");
+	*mem_num = num;
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mh_mode_set
+*
+* DESCRIPTION:
+*	This routine enables/disables ingress and egress header mode of switch port.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*	enable  - enable/disable marvell header.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mh_mode_set(unsigned char lport, GT_BOOL enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetHeaderMode(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetHeaderMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_mh_mode_get
+*
+* DESCRIPTION:
+*	This routine gets ingress and egress header mode of switch port.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*
+* OUTPUTS:
+*	enable  - enable/disable marvell header.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_mh_mode_get(unsigned char lport, GT_BOOL *enable)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetHeaderMode(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetHeaderMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_frame_mode_set
+*
+* DESCRIPTION:
+*	This routine sets the frame mode.
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*	mode  - frame mode.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_frame_mode_set(unsigned char lport, GT_FRAME_MODE mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetFrameMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetFrameMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_frame_mode_get
+*
+* DESCRIPTION:
+*	This routine gets the frame mode.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*
+* OUTPUTS:
+*	mode   - frame mode.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_frame_mode_get(unsigned char lport, GT_FRAME_MODE *mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetFrameMode(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetFrameMode()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_etype_set
+*
+* DESCRIPTION:
+*	This routine sets ethernet type.
+*
+* INPUTS:
+*	lport - logical switch port ID.
+*	etype - Ethernet type.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_etype_set(unsigned char lport, unsigned short etype)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtSetPortEType(qd_dev, lport, etype);
+	SW_IF_ERROR_STR(rc, "failed to call gprtSetPortEType()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_etype_get
+*
+* DESCRIPTION:
+*	This routine gets the frame mode.
+*
+* INPUTS:
+*	lport  - logical switch port ID.
+*
+* OUTPUTS:
+*	etype - Ethernet type.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_etype_get(unsigned char lport, unsigned short *etype)
+{
+	GT_ETYPE l_etype;
+	GT_STATUS rc = GT_OK;
+
+	rc = gprtGetPortEType(qd_dev, lport, &l_etype);
+	SW_IF_ERROR_STR(rc, "failed to call gprtGetPortEType()\n");
+	*etype = (unsigned short)l_etype;
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_preamble_set
+*
+* DESCRIPTION:
+*	This routine sets preamble of a switch port.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*	preamble - preamble length.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_preamble_set(unsigned char lport, unsigned short preamble)
+{
+	unsigned short data;
+	GT_STATUS rc = GT_OK;
+
+	rc = mv_switch_mii_write(qd_dev, 3, 26, preamble);
+	SW_IF_ERROR_STR(rc, "failed to call mv_switch_set_port_reg()\n");
+
+	mvOsDelay(10);
+
+	data = 0xb002 | (lport << 8);
+	rc = mv_switch_mii_write(qd_dev, 2, 26, data);
+	SW_IF_ERROR_STR(rc, "failed to call mv_switch_set_port_reg()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_preamble_get
+*
+* DESCRIPTION:
+*	This routine gets preamble of a switch port.
+*
+* INPUTS:
+*	lport   - logical switch port ID.
+*
+* OUTPUTS:
+*	preamble - preamble length.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_preamble_get(unsigned char lport, unsigned short *preamble)
+{
+	unsigned int data;
+	GT_STATUS rc = GT_OK;
+
+	data = 0xc002 | (lport << 8);
+	rc = mv_switch_mii_write(qd_dev, 2, 26, data);
+	SW_IF_ERROR_STR(rc, "failed to call mv_switch_mii_read()\n");
+
+	mvOsDelay(10);
+
+	rc = mv_switch_mii_read(qd_dev, 3, 26, &data);
+	SW_IF_ERROR_STR(rc, "failed to call mv_switch_mii_read()\n");
+
+	*preamble = data;
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_atu_next_entry_get
+*
+* DESCRIPTION:
+*	This function get next FDB entry.
+*
+* INPUTS:
+*	atu_entry - ATU entry
+*
+* OUTPUTS:
+*	atu_entry - ATU entry
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_atu_next_entry_get(GT_ATU_ENTRY *atu_entry)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gfdbGetAtuEntryNext(qd_dev, atu_entry);
+
+	if (rc == GT_OK)
+		return MV_OK;
+	else
+		return MV_FAIL;
+}
+
+/*******************************************************************************
+* mv_switch_vtu_flush
+*
+* DESCRIPTION:
+*	Flush VTU on the Switch
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_vtu_flush(void)
+{
+	unsigned int lport;
+	GT_STATUS rc = GT_OK;
+
+	rc = gvtuFlush(qd_dev);
+	SW_IF_ERROR_STR(rc, "failed to call gvtuFlush()\n");
+
+	memset(sw_vlan_tbl, 0, sizeof(sw_vlan_tbl));
+
+	for (lport = 0; lport < qd_dev->numOfPorts; lport++)
+		memset(&(sw_port_tbl[lport].vlan_blong), 0, sizeof(sw_port_tbl[lport].vlan_blong));
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_atu_flush
+*
+* DESCRIPTION:
+*	Flush ATU on the Switch
+*
+* INPUTS:
+*	flush_cmd - flush command
+*	db_num    - ATU DB Num, only 0 should be used, since there is only one ATU DB right now.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_atu_flush(GT_FLUSH_CMD flush_cmd, unsigned short db_num)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gfdbFlushInDB(qd_dev, flush_cmd, db_num);
+	SW_IF_ERROR_STR(rc, "failed to call gfdbFlushInDB()\n");
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_force_link_set
+*
+* DESCRIPTION:
+*       This routine will force given switch port to be linked.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*	enable - enable/disable port force link.
+*	value  - force link up or down
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_force_link_set(unsigned int lport, GT_BOOL enable, GT_BOOL value)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gpcsSetForcedLink(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetForcedLink()\n");
+
+	rc = gpcsSetLinkValue(qd_dev, lport, value);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetLinkValue()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_force_link_get
+*
+* DESCRIPTION:
+*       This routine gets the force link state of given switch port.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*
+* OUTPUTS:
+*	enable - enable/disable port force link.
+*	value  - force link up or down
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_force_link_get(unsigned int lport, GT_BOOL *enable, GT_BOOL *value)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gpcsGetForcedLink(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetForcedLink()\n");
+
+	rc = gpcsGetLinkValue(qd_dev, lport, value);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetLinkValue()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_force_fc_set
+*
+* DESCRIPTION:
+*	This routine will set forced flow control state and value.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*	enable - enable/disable forced flow control.
+*	value  - force flow control value, enable flow control or disable it.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_force_fc_set(unsigned int lport, GT_BOOL enable, GT_BOOL value)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gpcsSetForcedFC(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetForcedFC()\n");
+
+	rc = gpcsSetFCValue(qd_dev, lport, value);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetFCValue()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_force_fc_get
+*
+* DESCRIPTION:
+*	This routine will get forced flow control state and value.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*
+* OUTPUTS:
+*	enable - enable/disable forced flow control.
+*	value  - force flow control value, enable flow control or disable it.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_force_fc_get(unsigned int lport, GT_BOOL *enable, GT_BOOL *value)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gpcsGetForcedFC(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetForcedFC()\n");
+
+	rc = gpcsGetFCValue(qd_dev, lport, value);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetFCValue()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_force_speed_set
+*
+* DESCRIPTION:
+*       This routine will force given switch port to work at specific speed.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*	enable - enable/disable port force speed.
+*	mode   - speed mode.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_force_speed_set(unsigned int lport, GT_BOOL enable, unsigned int mode)
+{
+	GT_PORT_FORCED_SPEED_MODE l_mode;
+	GT_STATUS rc = GT_OK;
+
+	if (GT_FALSE == enable)
+		l_mode = PORT_DO_NOT_FORCE_SPEED;
+	else
+		l_mode = (GT_PORT_FORCED_SPEED_MODE)mode;
+
+	rc = gpcsSetForceSpeed(qd_dev, lport, l_mode);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetForceSpeed()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_force_speed_get
+*
+* DESCRIPTION:
+*       This routine gets the force speed state of given switch port.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*
+* OUTPUTS:
+*	enable - enable/disable port force speed.
+*	mode   - speed mode.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_force_speed_get(unsigned int lport, GT_BOOL *enable, unsigned int *mode)
+{
+	GT_PORT_FORCED_SPEED_MODE l_mode;
+	GT_STATUS rc = GT_OK;
+
+	rc = gpcsGetForceSpeed(qd_dev, lport, &l_mode);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetForceSpeed()\n");
+
+	if (PORT_DO_NOT_FORCE_SPEED == l_mode) {
+		*enable = GT_FALSE;
+		*mode   = PORT_FORCE_SPEED_1000_MBPS; /* do not have mean in case the force is disabled */
+	} else {
+		*enable = GT_TRUE;
+		*mode   = (unsigned int)l_mode;
+	}
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_force_duplex_set
+*
+* DESCRIPTION:
+*       This routine will force given switch port w/ duplex mode.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*	enable - enable/disable port force duplex.
+*	value  - half or full duplex mode
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_force_duplex_set(unsigned int lport, GT_BOOL enable, GT_BOOL value)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gpcsSetForcedDpx(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetForcedDpx()\n");
+
+	rc = gpcsSetDpxValue(qd_dev, lport, value);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetDpxValue()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_force_duplex_get
+*
+* DESCRIPTION:
+*       This routine gets the force duplex state of given switch port.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*
+* OUTPUTS:
+*	enable - enable/disable port force duplex.
+*	value  - half or full duplex mode
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_force_duplex_get(unsigned int lport, GT_BOOL *enable, GT_BOOL *value)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gpcsGetForcedDpx(qd_dev, lport, enable);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetForcedDpx()\n");
+
+	rc = gpcsGetDpxValue(qd_dev, lport, value);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetDpxValue()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_num_get
+*
+* DESCRIPTION:
+*	This routine will get total switch port number.
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+unsigned int mv_switch_port_num_get(void)
+{
+	return qd_dev->numOfPorts;
+}
+
+/*******************************************************************************
+* mv_switch_qd_dev_get
+*
+* DESCRIPTION:
+*	This routine gets QA dev.
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	QA dev.
+*******************************************************************************/
+GT_QD_DEV *mv_switch_qd_dev_get(void)
+{
+	return qd_dev;
+}
+
+/*******************************************************************************
+* mv_switch_vtu_shadow_dump
+*
+* DESCRIPTION:
+*	This routine dumps the VTU shadow.
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*
+*******************************************************************************/
+int mv_switch_vtu_shadow_dump(void)
+{
+	unsigned int vid;
+	unsigned int num = 0;
+	unsigned int port_idx;
+	GT_VTU_ENTRY *vtu_entry;
+	pr_err("switch VTU shadow\n\n");
+
+	for (vid = 0; vid < MV_SWITCH_MAX_VLAN_NUM; vid++) {
+		if (sw_vlan_tbl[vid].port_bm) {
+			vtu_entry = &sw_vlan_tbl[vid].vtu_entry;
+			pr_err("DBNum:%i, VID:%i port_bm:0x%02x,\n",
+				vtu_entry->DBNum, vtu_entry->vid, sw_vlan_tbl[vid].port_bm);
+			pr_err("Tag Mode: ");
+			for (port_idx = 0; port_idx < MV_SWITCH_MAX_PORT_NUM; port_idx++)
+				pr_err("port(%d):%d; ", port_idx, sw_vlan_tbl[vid].egr_mode[port_idx]);
+			pr_err("\n");
+
+			pr_err("vidPriOverride(%d), vidPriority(%d), sid(%d), vidPolicy(%d), useVIDFPri(%d), vidFPri(%d), useVIDQPri(%d), vidQPri(%d), vidNRateLimit(%d)\n",
+				vtu_entry->vidPriOverride,
+				vtu_entry->vidPriority,
+				vtu_entry->sid,
+				vtu_entry->vidPolicy,
+				vtu_entry->vidExInfo.useVIDFPri,
+				vtu_entry->vidExInfo.vidFPri,
+				vtu_entry->vidExInfo.useVIDQPri,
+				vtu_entry->vidExInfo.vidQPri,
+				vtu_entry->vidExInfo.vidNRateLimit);
+			num++;
+		}
+	}
+	pr_err("\nTag mode 0: egress unmodified, 1:port not in VLAN, 2:egress untagged, 3:egress tagged\n");
+	pr_err("Total switch VLAN number:%d\n", num);
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_vlan_tunnel_set
+*
+* DESCRIPTION:
+*	This routine set VLAN tunnel mode of switch port.
+*
+* INPUTS:
+*	lport  - switch port
+*       mode   - vlan tunnel mode, enable or disable
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*
+*******************************************************************************/
+int mv_switch_vlan_tunnel_set(unsigned int lport, GT_BOOL mode)
+{
+	GT_STATUS rc = GT_OK;
+
+	/* check qd_dev init or not */
+	if (qd_dev == NULL) {
+		rc = MV_ERROR;
+		SW_IF_ERROR_STR(rc, "qd_dev not initialized, call mv_switch_load() first\n");
+	}
+
+	rc = gprtSetVlanTunnel(qd_dev, lport, mode);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetForcedDpx()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_cpu_port_get
+*
+* DESCRIPTION:
+*	This routine get cpu port of swicth.
+*
+* INPUTS:
+*	None.
+*
+* OUTPUTS:
+*	cpu_port - swicth CPU port configured.
+*
+* RETURNS:
+*
+*******************************************************************************/
+int mv_switch_cpu_port_get(unsigned int *cpu_port)
+{
+	GT_STATUS rc = GT_OK;
+
+	if (cpu_port == NULL)
+		return MV_BAD_VALUE;
+
+	/* check qd_dev init or not */
+	if (qd_dev == NULL) {
+		rc = MV_ERROR;
+		SW_IF_ERROR_STR(rc, "qd_dev not initialized, call mv_switch_load() first\n");
+	}
+
+	*cpu_port = qd_dev->cpuPortNum;
+
+	return MV_OK;
 }
 
 static int mv_switch_probe(struct platform_device *pdev)
