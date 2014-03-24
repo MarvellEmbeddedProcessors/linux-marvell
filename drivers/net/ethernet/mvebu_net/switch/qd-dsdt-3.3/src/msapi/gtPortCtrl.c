@@ -4746,6 +4746,101 @@ GT_STATUS gprtGetARPtoCPU
 
 
 /*******************************************************************************
+* gsysSetLearn2All
+*
+* DESCRIPTION:
+*       enable the Learn to All devices in a Switch, this must be enabled for
+*       hardware learn limiting is enabled on any port on any device
+*
+* INPUTS:
+*        en - GT_TRUE if Learn2All is set. GT_FALSE, otherwise.
+*
+* OUTPUTS:
+*        None.
+*
+* RETURNS:
+*        GT_OK   - on success
+*        GT_FAIL - on error
+*        GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*        None.
+*
+*******************************************************************************/
+GT_STATUS gsysSetLearn2All
+(
+    IN GT_QD_DEV    *dev,
+    IN GT_BOOL        en
+)
+{
+    GT_STATUS       retVal;         /* Functions return value.      */
+    GT_U16            data;
+
+    DBG_INFO(("gsysSetLearn2All Called.\n"));
+
+    BOOL_2_BIT(en, data);
+
+    /* Set related bit */
+    retVal = hwSetGlobalRegField(dev,QD_REG_AGETIME_LA_CONTROL,3,1, data);
+
+    if (retVal != GT_OK)
+    {
+        DBG_INFO(("Failed.\n"));
+        return retVal;
+    }
+
+    DBG_INFO(("OK.\n"));
+    return GT_OK;
+}
+
+/*******************************************************************************
+* gsysGetLearn2All
+*
+* DESCRIPTION:
+*       returns the state of Learn to All devices in a Switch flag
+*
+* INPUTS:
+*        None.
+*
+* OUTPUTS:
+*        en - GT_TRUE if Learn2All is set. GT_FALSE, otherwise.
+*
+* RETURNS:
+*        GT_OK   - on success
+*        GT_FAIL - on error
+*        GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*        None.
+*
+*******************************************************************************/
+GT_STATUS gsysGetLearn2All
+(
+    IN GT_QD_DEV    *dev,
+    IN GT_BOOL       *en
+)
+{
+    GT_STATUS       retVal;         /* Functions return value.      */
+    GT_U16            data;
+
+    DBG_INFO(("gsysGetLearn2All Called.\n"));
+
+    /* Set related bit */
+    retVal = hwGetGlobalRegField(dev, QD_REG_AGETIME_LA_CONTROL, 3, 1, &data);
+
+    if (retVal != GT_OK)
+    {
+        DBG_INFO(("Failed.\n"));
+        return retVal;
+    }
+
+    BIT_2_BOOL(data, *en);
+
+    DBG_INFO(("OK.\n"));
+    return GT_OK;
+}
+
+/*******************************************************************************
 * gprtSetEgressFlood
 *
 * DESCRIPTION:

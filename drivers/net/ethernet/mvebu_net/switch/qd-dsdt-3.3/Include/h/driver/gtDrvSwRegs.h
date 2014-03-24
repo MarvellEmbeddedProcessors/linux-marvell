@@ -58,6 +58,7 @@
 #define QD_REG_MACADDR_23        0x2
 #define QD_REG_MACADDR_45        0x3
 #define QD_REG_GLOBAL_CONTROL        0x4
+#define QD_REG_AGETIME_LA_CONTROL    0xA
 #define QD_REG_GLOBAL_CONTROL2        0x1C    /* for Sapphire, Schooner family */
 #define QD_REG_CORETAG_TYPE        0x19        /* for Ruby family */
 #define QD_REG_IP_MAPPING_TABLE    0x19        /* for Amber family */
@@ -269,6 +270,9 @@
 #define QD_PHY_INT_POLARITY_CHANGED        0x2
 #define QD_PHY_INT_JABBER            0x1
 
+/*Line loopback register related definition*/
+#define QD_PHY_FE_LINE_LOOPBACK_REG    0x1c
+#define QD_PHY_GE_LINE_LOOPBACK_REG    0x15
 
 /* Bit definition for DEVICE Interrupt */
 #define QD_DEV_INT_WATCHDOG            0x8000
