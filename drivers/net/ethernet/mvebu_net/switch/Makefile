@@ -17,4 +17,12 @@ ccflags-y       += -I$(PLAT_PATH_I)/$(LSP_MUX_DIR)
 
 endif # CONFIG_ARCH_MVEBU
 
+ifeq ($(CONFIG_ARCH_AVANTA_LP),y)
+
+obj-$(CONFIG_MV_INCLUDE_SWITCH)	+= mv_switch.o mv_switch_sysfs.o mv_phy.o
+
+else
+
 obj-$(CONFIG_MV_INCLUDE_SWITCH)	+= mv_switch.o mv_switch_sysfs.o
+
+endif # CONFIG_ARCH_AVANTA_LP
