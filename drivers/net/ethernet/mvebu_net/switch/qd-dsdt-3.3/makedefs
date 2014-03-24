@@ -7,7 +7,7 @@ DSDT_OBJS = ./gtDrvConfig.o ./gtDrvEvents.o ./gtHwCntl.o             \
         gtPCSCtrl.o gtPhyCtrl.o gtPhyInt.o gtPortCtrl.o gtPortPav.o    \
         gtPortRateCtrl.o gtPortRmon.o gtPortStat.o gtPortStatus.o    \
         gtQosMap.o gtSysConfig.o gtSysCtrl.o gtSysStatus.o gtUtils.o \
-        gtVct.o gtVersion.o gtPIRL.o gtPIRL2.o        \
+        gtVct.o gtVersion.o gtPIRL.o gtPIRL2.o gtWeight.o       \
             gtCCPVT.o gtPolicy.o \
             gtPriTable.o gtWeight.o gtPTP.o gtPortLed.o gtMisc.o \
             gtTCAM.o \

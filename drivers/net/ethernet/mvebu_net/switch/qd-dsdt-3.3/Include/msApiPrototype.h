@@ -1838,6 +1838,109 @@ GT_STATUS gprtSetPortLoopback
     IN GT_BOOL         enable
 );
 
+/*******************************************************************************
+* gprtGetPortLoopback
+*
+* DESCRIPTION:
+* Get Internal Port Loopback state.
+* For 10/100 Fast Ethernet PHY, speed of Loopback is determined as follows:
+*   If Auto-Negotiation is enabled, this routine disables Auto-Negotiation and
+*   forces speed to be 10Mbps.
+*   If Auto-Negotiation is disabled, the forced speed is used.
+*   Disabling Loopback simply clears bit 14 of control register(0.14). Therefore,
+*   it is recommended to call gprtSetPortAutoMode for PHY configuration after
+*   Loopback test.
+* For 10/100/1000 Gigagbit Ethernet PHY, speed of Loopback is determined as follows:
+*   If Auto-Negotiation is enabled and Link is active, the current speed is used.
+*   If Auto-Negotiation is disabled, the forced speed is used.
+*   All other cases, default MAC Interface speed is used. Please refer to the data
+*   sheet for the information of the default MAC Interface speed.
+*
+*
+* INPUTS:
+*       port - The logical port number, unless SERDES device is accessed
+*              The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*       enable - If GT_TRUE,  loopback mode is enabled
+*       If GT_FALSE,  loopback mode is disabled
+*
+* RETURNS:
+*       GT_OK - on success
+*       GT_FAIL - on error
+*
+* COMMENTS:
+*       data sheet register 0.14 - Loop_back
+*
+*******************************************************************************/
+GT_STATUS gprtGetPortLoopback
+(
+    IN GT_QD_DEV *dev,
+    IN GT_LPORT  port,
+    OUT GT_BOOL  *enable
+);
+
+/*******************************************************************************
+* gprtSetPortLineLoopback
+*
+* DESCRIPTION:
+*        Enable/Disable Port Line Loopback.
+*
+* INPUTS:
+*        port   - The logical port number, unless SERDES device is accessed
+*                 The physical address, if SERDES device is accessed
+*        enable - If GT_TRUE, enable loopback mode
+*                 If GT_FALSE, disable loopback mode
+*
+* OUTPUTS:
+*        None.
+*
+* RETURNS:
+*        GT_OK - on success
+*        GT_FAIL - on error
+*
+* COMMENTS:
+*        data sheet register FE:28.4, GE:21_2.14  - Loop_back
+*
+*******************************************************************************/
+GT_STATUS gprtSetPortLineLoopback
+(
+    IN GT_QD_DEV *dev,
+    IN GT_LPORT  port,
+    IN GT_BOOL   enable
+);
+
+/*******************************************************************************
+* gprtGetPortLineLoopback
+*
+* DESCRIPTION:
+*       Get Port Line Loopback status.
+*
+*
+* INPUTS:
+*       port - The logical port number, unless SERDES device is accessed
+*              The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*       enable - If GT_TRUE, enable loopback mode
+*                If GT_FALSE, disable loopback mode* enable - If GT_TRUE, enable loopback mode
+*                If GT_FALSE, disable loopback mode
+*
+* RETURNS:
+*      GT_OK - on success
+*      GT_FAIL - on error
+*
+* COMMENTS:
+*      data sheet register FE:28.4, GE:21_2.14  - Loop_back
+*
+*******************************************************************************/
+GT_STATUS gprtGetPortLineLoopback
+(
+    IN GT_QD_DEV *dev,
+    IN GT_LPORT  port,
+    OUT GT_BOOL  *enable
+)
+;
 
 /*******************************************************************************
 * gprtSetPortSpeed
@@ -1910,6 +2013,36 @@ GT_STATUS gprtPortAutoNegEnable
     IN GT_BOOL         state
 );
 
+/*******************************************************************************
+* gprtGetPortAutoNegState
+*
+* DESCRIPTION:
+*         Read the auto negotiation state of specific logical port.
+*         This routine simply reads Auto Negotiation bit (bit 12) of Control
+*         Register.
+*
+* INPUTS:
+*         port    - The logical port number, unless SERDES device is accessed
+*                   The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*         state   - GT_TRUE for enable Auto-Negotiation,
+*                   GT_FALSE otherwise
+*
+* RETURNS:
+*         GT_OK   - on success
+*         GT_FAIL - on error
+*
+* COMMENTS:
+*         data sheet register 0.12 - Auto-Negotiation Enable
+*         data sheet register 4.8, 4.7, 4.6, 4.5 - Auto-Negotiation Advertisement
+*******************************************************************************/
+GT_STATUS gprtGetPortAutoNegState
+(
+    IN  GT_QD_DEV *dev,
+    IN  GT_LPORT  port,
+    OUT GT_BOOL   *state
+);
 
 /*******************************************************************************
 * gprtPortPowerDown
@@ -1943,6 +2076,34 @@ GT_STATUS gprtPortPowerDown
     IN GT_BOOL        state
 );
 
+/*******************************************************************************
+* gprtGetPortPowerDown
+*
+* DESCRIPTION:
+*         Read Port state (power down/normal operation) on specific logical port.
+*
+* INPUTS:
+*         port    - The logical port number, unless SERDES device is accessed
+*                   The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*         state   - GT_TRUE: power down
+*                   GT_FALSE: normal operation
+*
+* RETURNS:
+*         GT_OK   - on success
+*         GT_FAIL - on error
+*
+* COMMENTS:
+*         data sheet register 0.11 - Power Down
+*
+*******************************************************************************/
+GT_STATUS gprtGetPortPowerDown
+(
+    IN  GT_QD_DEV *dev,
+    IN  GT_LPORT  port,
+    OUT GT_BOOL   *state
+);
 
 /*******************************************************************************
 * gprtPortRestartAutoNeg
@@ -2049,6 +2210,50 @@ GT_STATUS gprtSetPortAutoMode
 );
 
 /*******************************************************************************
+* gprtGetPortAutoMode
+*
+* DESCRIPTION:
+*        This routine get Auto Mode of specific port.
+*        Supported mode is as follows:
+*        - Auto for both speed and duplex.
+*        - Auto for speed only and Full duplex.
+*        - Auto for speed only and Half duplex.
+*        - Auto for duplex only and speed 1000Mbps.
+*        - Auto for duplex only and speed 100Mbps.
+*        - Auto for duplex only and speed 10Mbps.
+*        - Speed 1000Mbps and Full duplex.
+*        - Speed 1000Mbps and Half duplex.
+*        - Speed 100Mbps and Full duplex.
+*        - Speed 100Mbps and Half duplex.
+*        - Speed 10Mbps and Full duplex.
+*        - Speed 10Mbps and Half duplex.
+*
+*
+* INPUTS:
+*        port -    The logical port number, unless SERDES device is accessed
+*                  The physical address, if SERDES device is accessed
+*
+* OUTPUTS:
+*        mode -    Auto Mode to be written
+*
+* RETURNS:
+*        GT_OK   - on success
+*        GT_FAIL - on error
+*        GT_NOT_SUPPORTED - on device without copper
+*
+* COMMENTS:
+*         data sheet register 4.8, 4.7, 4.6, and 4.5 Autonegotiation Advertisement
+*         data sheet register 4.6, 4.5 Autonegotiation Advertisement for 1000BX
+*         data sheet register 9.9, 9.8 Autonegotiation Advertisement for 1000BT
+*******************************************************************************/
+GT_STATUS gprtGetPortAutoMode
+(
+    IN  GT_QD_DEV        *dev,
+    IN  GT_LPORT         port,
+    OUT GT_PHY_AUTO_MODE *mode
+);
+
+/*******************************************************************************
 * gprtSetPause
 *
 * DESCRIPTION:
@@ -2078,6 +2283,38 @@ GT_STATUS gprtSetPause
     IN GT_QD_DEV    *dev,
     IN GT_LPORT     port,
     IN GT_PHY_PAUSE_MODE state
+);
+
+/*******************************************************************************
+* gprtGetPause
+*
+* DESCRIPTION:
+*       This routine will get the pause bit in Autonegotiation Advertisement
+*       Register.
+*
+* INPUTS:
+*        port -  The logical port number, unless SERDES device is accessed
+*                The physical address, if SERDES device is accessed
+*
+*
+* OUTPUTS:
+*        state - GT_PHY_PAUSE_MODE enum value.
+*                GT_PHY_NO_PAUSE         - disable pause
+*                GT_PHY_PAUSE            - support pause
+*                GT_PHY_ASYMMETRIC_PAUSE - support asymmetric pause
+*                GT_PHY_BOTH_PAUSE       - support both pause and asymmetric pause
+*
+* RETURNS:
+*       GT_OK   - on success
+*       GT_FAIL - on error
+* COMMENTS:
+*       data sheet register 4.10 Autonegotiation Advertisement Register
+*******************************************************************************/
+GT_STATUS gprtGetPause
+(
+    IN GT_QD_DEV           *dev,
+    IN GT_LPORT            port,
+    OUT  GT_PHY_PAUSE_MODE *state
 );
 
 /*******************************************************************************
@@ -9400,7 +9637,59 @@ GT_STATUS gsysGetRsvd2Cpu
     IN  GT_QD_DEV    *dev,
     OUT GT_BOOL      *en
 );
-
+/*******************************************************************************
+* gsysSetLearn2All
+*
+* DESCRIPTION:
+*	enable the Learn to All devices in a Switch, this must be enabled for
+*	hardware learn limiting is enabled on any port on any device
+*
+* INPUTS:
+*        en - GT_TRUE if Learn2All is set. GT_FALSE, otherwise.
+*
+* OUTPUTS:
+*        None.
+*
+* RETURNS:
+*        GT_OK   - on success
+*        GT_FAIL - on error
+*        GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*        None.
+*
+*******************************************************************************/
+GT_STATUS gsysSetLearn2All
+(
+    IN GT_QD_DEV    *dev,
+    IN GT_BOOL        en
+);
+/*******************************************************************************
+* gsysGetLearn2All
+*
+* DESCRIPTION:
+*	returns the state of Learn to All devices in a Switch flag
+*
+* INPUTS:
+*        None.
+*
+* OUTPUTS:
+*        en - GT_TRUE if Learn2All is set. GT_FALSE, otherwise.
+*
+* RETURNS:
+*        GT_OK   - on success
+*        GT_FAIL - on error
+*        GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*        None.
+*
+*******************************************************************************/
+GT_STATUS gsysGetLearn2All
+(
+    IN GT_QD_DEV    *dev,
+    IN GT_BOOL       *en
+);
 /*******************************************************************************
 * gsysSetMGMTPri
 *
