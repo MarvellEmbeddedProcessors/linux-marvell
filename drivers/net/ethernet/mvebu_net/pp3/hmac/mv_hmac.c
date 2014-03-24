@@ -424,14 +424,13 @@ void mv_pp3_hmac_global_regs_dump(void)
 
 static void mv_pp3_hmac_queue_show(struct mv_pp3_hmac_queue_ctrl *rxq)
 {
-	pr_info("\n-------------- HMAC RX queue (0x%p) -----------", rxq);
-	pr_info("\n *first = 0x%p", rxq->first);
-	pr_info("\n *next = 0x%p", rxq->next_proc);
-	pr_info("\n *end = 0x%p", rxq->end);
-	pr_info("\n occ_dg = %d", rxq->occ_dg);
-	pr_info("\n dummy_dg = %d", rxq->dummy_dg);
-	pr_info("\n size = %d", rxq->size);
-	pr_info("\n cfh_size = %d", rxq->cfh_size);
+	pr_info("*first = 0x%p", rxq->first);
+	pr_info("*next = 0x%p", rxq->next_proc);
+	pr_info("*end = 0x%p", rxq->end);
+	pr_info("occ_dg = %d", rxq->occ_dg);
+	pr_info("dummy_dg = %d", rxq->dummy_dg);
+	pr_info("size = %d", rxq->size);
+	pr_info("cfh_size = %d", rxq->cfh_size);
 	pr_info("\n");
 
 	return;
@@ -440,10 +439,12 @@ static void mv_pp3_hmac_queue_show(struct mv_pp3_hmac_queue_ctrl *rxq)
 
 void mv_pp3_hmac_rx_queue_show(int frame, int queue)
 {
+	pr_info("\n-------------- HMAC RX queue (0x%p) -----------", mv_hmac_rxq_handle[frame][queue]);
 	return mv_pp3_hmac_queue_show(mv_hmac_rxq_handle[frame][queue]);
 }
 
 void mv_pp3_hmac_tx_queue_show(int frame, int queue)
 {
+	pr_info("\n-------------- HMAC TX queue (0x%p) -----------", mv_hmac_txq_handle[frame][queue]);
 	return mv_pp3_hmac_queue_show(mv_hmac_txq_handle[frame][queue]);
 }
