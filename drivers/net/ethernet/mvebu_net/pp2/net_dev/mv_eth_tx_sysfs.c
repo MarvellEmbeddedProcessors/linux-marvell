@@ -53,7 +53,7 @@ static ssize_t mv_eth_help(char *buf)
 	off += sprintf(buf+off, "echo [p] [hex]                  > txFlags       - bits: 0-no_pad, 1-mh, 2-hw_cmd\n");
 	off += sprintf(buf+off, "echo [p] [hex]                  > txMH          - set 2 bytes of Marvell Header for transmit\n");
 	off += sprintf(buf+off, "echo [p] [txp] [txq] [cpu]      > txqDef        - set default <txp/txq> for packets sent to port <p> by <cpu>\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [v] [hwf]  > txqSize       - set descriptor Q size <v>, and HWF share <hwf> for <p/txp/txq>.\n");
+	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]        > txqSize       - set descriptor Q size <v>, and HWF share <hwf> for <p/txp/txq>.\n");
 #ifdef CONFIG_MV_ETH_PP2_1
 	off += sprintf(buf+off, "echo [p] [txp] [txq] [hwf] [swf] > txqLimit      - set HWF <hwf> and SWF <swf> share for <p/txp/txq>.\n");
 	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]         > txqChunk      - set <txp/txq> SWF request chunk size [v] for port <p>\n");
