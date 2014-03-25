@@ -38,7 +38,7 @@
 		};
 
 		pcie-controller {
-			compatible = "marvell,armada-370-pcie";
+			compatible = "marvell,armada-38x-pcie";
 			status = "disabled";
 			device_type = "pci";
 
