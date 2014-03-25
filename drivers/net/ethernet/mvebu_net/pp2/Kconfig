@@ -347,3 +347,69 @@ config MV_ETH_SWF_HWF_CORRUPTION_WA
 	when HWF and SWF traffic use buffers from the same BM pools.
 
 endmenu
+
+menu "SoC CPH support"
+
+config  MV_CPH
+        bool "Support for Marvell CPU Packet Handler Driver"
+        depends on MV_ETH_TX_SPECIAL
+        default n
+        ---help---
+        CPH is designed mainly for PON product (GPON/EPON),
+        which basically has two features:
+        1. Set special skb->protocol value based on user configure rules.
+        2. Forward SWF packets to special TCONT and GEM port (GPON), LLID (EPON).
+
+comment "CPH Driver Options"
+
+config  MV_CPH_IGMP_HANDLE
+        bool "Enable MV_CPH IGMP handling"
+	depends on MV_CPH
+        default n
+        ---help---
+        Enable CPH to handle IGMP as protocol packet,
+        and setspecial skb->protocol value based on
+        user configure rules. So it could be trapped
+        by RAW SOCKET.
+
+config  MV_CPH_MLD_HANDLE
+        bool "Enable MV_CPH MLD handling"
+	depends on MV_CPH
+        default n
+        ---help---
+        Enable CPH to handle MLD as protocol packet,
+        and set special skb->protocol value based
+        on user configure rules. So it could be
+        trapped by RAW SOCKET.
+
+config  MV_CPH_BC_HANDLE
+        bool "Enable MV_CPH broadcast handling"
+	depends on MV_CPH
+        default n
+        ---help---
+        Enable CPH to handle Broadcast as protocol
+        packet, and set special skb->protocol value
+        based on user configure rules.So it could be
+        trapped by RAW SOCKETl
+
+config  MV_CPH_UDP_SAMPLE_HANDLE
+        bool "Enable MV_CPH sample UDP handling"
+	depends on MV_CPH
+        default n
+        ---help---
+        Enable CPH to handle sample UDP as protocol
+        packet, and set special skb->protocol value
+        based on user configure rules. So it could be
+        trapped by RAW SOCKET.
+
+config  MV_CPH_FLOW_MAP_HANDLE
+        bool "Enable MV_CPH flow mapping handling"
+	depends on MV_CPH
+        default n
+        ---help---
+        Enable CPH to handle flow mapping, and forward
+        upstream SWF packets to special TCONT and
+        GEM port (GPON), LLID (EPON) based on user
+        configure rules.
+
+endmenu
