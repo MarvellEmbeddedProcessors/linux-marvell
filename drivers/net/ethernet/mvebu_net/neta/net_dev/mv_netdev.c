@@ -685,6 +685,12 @@ int mv_eth_ctrl_rxq_size_set(int port, int rxq, int value)
 	struct eth_port *pp = mv_eth_port_by_id(port);
 	struct rx_queue	*rxq_ctrl;
 
+	if (mvNetaPortCheck(port))
+		return -EINVAL;
+
+	if (mvNetaMaxCheck(rxq, CONFIG_MV_ETH_RXQ, "rxq"))
+		return -EINVAL;
+
 	if (pp == NULL) {
 		printk(KERN_INFO "port doens not exist (%d) in %s\n" , port, __func__);
 		return -EINVAL;
@@ -712,6 +718,12 @@ int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int value)
 {
 	struct tx_queue *txq_ctrl;
 	struct eth_port *pp = mv_eth_port_by_id(port);
+
+	if (mvNetaTxpCheck(port, txp))
+		return -EINVAL;
+
+	if (mvNetaMaxCheck(txq, CONFIG_MV_ETH_TXQ, "txq"))
+		return -EINVAL;
 
 	if (pp == NULL) {
 		printk(KERN_INFO "port doens not exist (%d) in %s\n" , port, __func__);
