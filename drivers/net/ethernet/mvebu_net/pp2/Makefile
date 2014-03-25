@@ -18,6 +18,7 @@ PP2_PLCR_DIR  = $(PP2_HAL_DIR)/plcr
 PP2_WOL_DIR   = $(PP2_HAL_DIR)/wol
 PP2_DPI_DIR   = $(PP2_HAL_DIR)/dpi
 PP2_COMMON_DIR= $(PP2_HAL_DIR)/common
+PP2_CPH_DIR   = $(PP2_HAL_DIR)/cph
 
 mv_pp2-objs +=	$(PP2_GMAC_DIR)/mvEthGmacApi.o
 mv_pp2-objs +=	$(PP2_GBE_DIR)/mvPp2Gbe.o $(PP2_GBE_DIR)/mvPp2GbeDebug.o
@@ -52,6 +53,18 @@ mv_pp2-objs += dpi/dpi_sysfs.o
 
 ifeq ($(CONFIG_MV_ETH_L2FW),y)
 mv_pp2-objs += l2fw/l2fw_sysfs.o l2fw/mv_eth_l2fw.o
+endif
+
+ifeq ($(CONFIG_MV_CPH),y)
+mv_pp2-objs += cph/mv_cph_api.o
+mv_pp2-objs += cph/mv_cph_app.o
+mv_pp2-objs += cph/mv_cph_db.o
+mv_pp2-objs += cph/mv_cph_dev.o
+mv_pp2-objs += cph/mv_cph_flow.o
+mv_pp2-objs += cph/mv_cph_infra.o
+mv_pp2-objs += cph/mv_cph_mod.o
+mv_pp2-objs += cph/mv_cph_netdev.o
+mv_pp2-objs += cph/mv_cph_sysfs.o
 endif
 
 ifeq ($(CONFIG_ARCH_MVEBU),y)
