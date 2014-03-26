@@ -623,11 +623,12 @@ static MV_U32 mvNfcColBits(MV_U32 pg_size);
 static MV_STATUS mvNfcDeviceFeatureSet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 addr, MV_U32 data0, MV_U32 data1);
 static MV_STATUS mvNfcDeviceFeatureGet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 addr, MV_U32 *data0, MV_U32 *data1);
 static MV_STATUS mvNfcDeviceModeSet(MV_NFC_CTRL *nfcCtrl, MV_NFC_ONFI_MODE mode);
+static MV_STATUS mvNfcReadParamPage(struct parameter_page_t *ppage);
 
 /**************/
 /* Local Data */
 /**************/
-
+struct parameter_page_t paramPage;
 
 /*******************************************************************************
 * mvNfcInit
@@ -666,7 +667,7 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	 */
 	halData->mvCtrlNandClkSetFunction(8); /* setNANDClock(8);  Go down to 125MHz */
 	nand_clock = 125000000;
-	DB(printf("mvNfcInit: set nand clock to %d\n", nand_clock));
+	DB(mvOsPrintf("mvNfcInit: set nand clock to %d\n", nand_clock));
 
 	/* Relax Timing configurations to avoid timing violations after flash reset */
 	MV_REG_WRITE(NFC_TIMING_0_REG, 0xFC3F3F7F);
@@ -737,6 +738,31 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 		ret = mvNfcDeviceModeSet(nfcCtrl, MV_NFC_ONFI_MODE_3);
 		if (ret != MV_OK)
 			return ret;
+		if (MV_OK == mvNfcReadParamPage(&paramPage)) {
+			DB(mvNfcPrintParamPage());
+			switch (paramPage.num_ECC_bits) {
+			case 1:
+				nfcInfo->eccMode = MV_NFC_ECC_HAMMING;
+				break;
+			case 4:
+				nfcInfo->eccMode = MV_NFC_ECC_BCH_2K;
+				break;
+			case 8:
+				nfcInfo->eccMode = MV_NFC_ECC_BCH_1K;
+				break;
+			case 24:
+			case 12:
+				nfcInfo->eccMode = MV_NFC_ECC_BCH_704B;
+				break;
+			case 16:
+				nfcInfo->eccMode = MV_NFC_ECC_BCH_512B;
+				break;
+			default:
+				nfcInfo->eccMode = MV_NFC_ECC_DISABLE;
+				break;
+			}
+		} else
+			mvOsPrintf("mvNfcReadParamPage (EC comand) return error\n");
 	}
 
 	/* Critical Initialization done. Raise NFC clock if needed */
@@ -745,7 +771,7 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 		halData->mvCtrlNandClkSetFunction(5); /* setNANDClock(5); */
 		nand_clock = 200000000;
 	}
-	DB(printf("mvNfcInit: set nand clock to %d\n", nand_clock));
+	DB(mvOsPrintf("mvNfcInit: set nand clock to %d\n", nand_clock));
 
 	/* Configure the command set based on page size */
 	if (flashDeviceInfo[i].pgSz < MV_NFC_2KB_PAGE)
@@ -756,7 +782,7 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	/* calculate Timing parameters */
 	ret = mvNfcTimingSet(nand_clock, &flashDeviceInfo[i]);
 	if (ret != MV_OK) {
-		DB(printf("mvNfcInit: mvNfcTimingSet failed for clock %d\n", nand_clock));
+		DB(mvOsPrintf("mvNfcInit: mvNfcTimingSet failed for clock %d\n", nand_clock));
 		return ret;
 	}
 
@@ -2917,4 +2943,198 @@ MV_NFC_ECC_MODE mvNfcEccModeSet(MV_NFC_CTRL *nfcCtrl, MV_NFC_ECC_MODE eccMode)
 MV_U32 mvNfcBadBlockPageNumber(MV_NFC_CTRL *nfcCtrl)
 {
 	return flashDeviceInfo[nfcCtrl->flashIdx].bb_page;
+}
+
+
+/*******************************************************************************/
+#ifdef MV_CPU_LE
+#define build_uint16(byte1, byte0)	((MV_U16) ((byte0 << 8) | byte1));
+#define build_uint32(byte3, byte2, byte1, byte0)	\
+		((MV_U32) ((byte0 << 24) | (byte1 << 16) | (byte2 << 8) | byte3));
+#endif
+/*******************************************************************************/
+#ifdef MV_CPU_BE
+#define build_uint16(byte1, byte0) ((MV_U16) ((byte1 << 8) | byte0));
+#define build_uint32(byte3, byte2, byte1, byte0)	\
+		((MV_U32) ((byte3 << 24) | (byte2 << 16) | (byte1 << 8) | byte0));
+#endif
+/*******************************************************************************
+* mvNfcReadParamPage
+*
+* DESCRIPTION:
+*	The READ PARAMETER PAGE (ECh) command is used to read the ONFI parameter
+*	page programmed into the target. This command is accepted by the target
+*	only when all die (LUNs) on the target are idle
+*
+* INPUT:
+*	nfcCtrl	- NFC control structure.
+*	buf	- buff (size 256).
+*
+* OUTPUT:
+*	data0	- First 4 bytes of the data.
+*	data1	- Bytes 4-7 of data.
+*
+* RETURN:
+*	MV_OK		- On success,
+*	MV_TIMEOUT	- Error accessing the underlying flahs device.
+*******************************************************************************/
+static MV_STATUS mvNfcReadParamPage(struct parameter_page_t *ppage)
+{
+	MV_U32 reg, i;
+	MV_U8 rbuf[NUM_OF_PPAGE_BYTES];
+	MV_U32 *pBuf = (MV_U32 *)rbuf;
+
+	MV_U32 errCode = MV_OK;
+	MV_U32 timeout = 10000;
+
+	/* Clear all old events on the status register */
+	reg = MV_REG_READ(NFC_STATUS_REG);
+	MV_REG_WRITE(NFC_STATUS_REG, reg);
+
+	/* Setting ND_RUN bit to start the new transaction */
+	reg = MV_REG_READ(NFC_CONTROL_REG);
+	reg |= NFC_CTRL_ND_RUN_MASK;
+	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+
+	/* Wait for Command WRITE request */
+	errCode = mvDfcWait4Complete(NFC_SR_WRCMDREQ_MASK, 1);
+	if (errCode != MV_OK)
+		return errCode;
+
+	/* Send Read Command */
+	reg = 0xEC;
+	reg |= (0x1 << NFC_CB0_ADDR_CYC_OFFS);
+	reg |= NFC_CB0_CMD_XTYPE_MULTIPLE;
+	reg |= NFC_CB0_CMD_TYPE_READ;
+	reg |= NFC_CB0_LEN_OVRD_MASK;
+
+	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
+	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0);
+	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0);
+	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 128);
+
+	/* Wait for READY */
+	errCode = mvDfcWait4Complete(NFC_SR_RDY0_MASK, 100);
+	if (errCode != MV_OK)
+		return errCode;
+	mvOsUDelay(100);
+
+	/*  Read the data 129 bytes */
+	for (i = 0; i < (NUM_OF_PPAGE_BYTES / 4); i++)
+		*pBuf++ = MV_REG_READ(NFC_DATA_BUFF_REG);
+
+	/* Wait for ND_RUN bit to get cleared. */
+	while (timeout > 0) {
+		reg = MV_REG_READ(NFC_CONTROL_REG);
+		if (!(reg & NFC_CTRL_ND_RUN_MASK))
+			break;
+		timeout--;
+	}
+	if (timeout == 0)
+		return MV_BAD_STATE;
+    /*
+     * Fill the parameter page data structure in the right way
+     */
+
+    /* Parameter page signature (ONFI) */
+	mvOsMemset(ppage, 0, sizeof(struct parameter_page_t));
+	mvOsMemcpy(ppage->signature, rbuf, 4);
+
+	/* check if the buffer contains a valid ONFI parameter page */
+	if (strcmp(ppage->signature, "ONFI"))
+		return MV_BAD_PARAM;
+
+	ppage->rev_num = build_uint16(rbuf[4], rbuf[5]);         /* Revision number */
+	ppage->feature = build_uint16(rbuf[6], rbuf[7]);         /* Features supported */
+	ppage->command = build_uint16(rbuf[8], rbuf[9]);         /* Optional commands supported */
+	mvOsMemcpy(ppage->manufacturer, &rbuf[32], 13);         /* Device manufacturer */
+	mvOsMemcpy(ppage->model, &rbuf[44], 21);                /* Device part number */
+	ppage->jedec_id = rbuf[64];                             /* Manufacturer ID (Micron = 2Ch) */
+	ppage->date_code = build_uint16(rbuf[65], rbuf[66]);     /* Date code */
+
+	/* Number of data bytes per page */
+	ppage->data_bytes_per_page = build_uint32(rbuf[80], rbuf[81], rbuf[82], rbuf[83]);
+
+	/* Number of spare bytes per page */
+	ppage->spare_bytes_per_page = build_uint16(rbuf[84], rbuf[85]);
+
+	/* Number of data bytes per partial page */
+	ppage->data_bytes_per_partial_page = build_uint32(rbuf[86], rbuf[87], rbuf[88], rbuf[89]);
+
+	/* Number of spare bytes per partial page */
+	ppage->spare_bytes_per_partial_page = build_uint16(rbuf[90], rbuf[91]);
+
+	/* Number of pages per block */
+	ppage->pages_per_block = build_uint32(rbuf[92], rbuf[93], rbuf[94], rbuf[95]);
+
+	/* Number of blocks per unit */
+	ppage->blocks_per_lun = build_uint32(rbuf[96], rbuf[97], rbuf[98], rbuf[99]);
+
+	ppage->luns_per_ce = rbuf[100];				/* Number of logical units (LUN) per chip enable */
+	ppage->num_addr_cycles = rbuf[101];			/*Number of address cycles */
+	ppage->bit_per_cell = rbuf[102];			/* Number of bits per cell (1 = SLC; >1= MLC) */
+	ppage->max_bad_blocks_per_lun = build_uint16(rbuf[103], rbuf[104]); /* Bad blocks maximum per unit */
+	ppage->block_endurance = build_uint16(rbuf[105], rbuf[106]);	/* Block endurance */
+	ppage->guarenteed_valid_blocks = rbuf[107];		/* Guaranteed valid blocks at beginning of target */
+
+	/* Block endurance for guaranteed valid blocks */
+	ppage->guarenteed_valid_blocks = build_uint16(rbuf[108], rbuf[109]);
+	ppage->num_programs_per_page = rbuf[110];		/* Number of programs per page */
+	ppage->partial_prog_attr = rbuf[111];			/* Partial programming attributes */
+	ppage->num_ECC_bits = rbuf[112];			/* Number of bits ECC bits */
+	ppage->num_interleaved_addr_bits = rbuf[113];		/* Number of interleaved address bits */
+	ppage->interleaved_op_attr = rbuf[114];			/* Interleaved operation attributes */
+
+	return errCode;
+}
+
+/*******************************************************************************
+* mvNfcPrintParamPage
+*
+* DESCRIPTION:
+*       Print the READ PARAMETER PAGE (ECh - the ONFI parameter )
+*
+* INPUT:
+*	struct parameter_page_t
+*
+* OUTPUT:
+*
+* RETURN:
+*******************************************************************************/
+void mvNfcPrintParamPage(void)
+{
+	struct parameter_page_t *ppage = &paramPage;
+
+	if (strcmp(ppage->signature, "ONFI") != 0)
+		return;
+
+	mvOsPrintf("ONFI structure\n");
+	mvOsPrintf("signature = %s\n", ppage->signature);
+	mvOsPrintf("Revision number = 0x%x, \tFeatures supported =0x%x\n", ppage->rev_num, ppage->feature);
+	mvOsPrintf("Optional commands supported=0x%x\n", ppage->command);
+	mvOsPrintf("manufacturer = %s\n", ppage->manufacturer);
+	mvOsPrintf("model = %s\n", ppage->model);
+	mvOsPrintf("data bytes per page= %d\n", ppage->data_bytes_per_page);
+
+	mvOsPrintf("spare bytes per page = %d\n", ppage->spare_bytes_per_page);
+
+	mvOsPrintf("data bytes per partial page = %d\n", ppage->data_bytes_per_partial_page);
+
+	mvOsPrintf("spare bytes per partial page = %d\n", ppage->spare_bytes_per_partial_page);
+	mvOsPrintf("pages per block = %d\n", ppage->pages_per_block);
+	mvOsPrintf("blocks per unit = %d\n", ppage->blocks_per_lun);
+	mvOsPrintf("Number of logical units (LUN) per chip enable = %d\n", ppage->luns_per_ce);
+	mvOsPrintf("Number of address cycles = %d\n", ppage->num_addr_cycles);
+	mvOsPrintf("Number of bits per cell (1 = SLC; >1= MLC)  = %d\n", ppage->bit_per_cell);
+	mvOsPrintf("Bad blocks maximum per unit= %d\n", ppage->max_bad_blocks_per_lun);
+	mvOsPrintf("block endurance = %d\n", ppage->block_endurance);
+	mvOsPrintf("Guaranteed valid blocks at beginning of target = %d\n", ppage->guarenteed_valid_blocks);
+
+	/* Block endurance for guaranteed valid blocks */
+	mvOsPrintf("Block endurance for guaranteed valid blocks  = %d\n", ppage->guarenteed_valid_blocks);
+	mvOsPrintf("Number of programs per page = %d\n", ppage->num_programs_per_page);
+	mvOsPrintf("Partial programming attributes = %d\n", ppage->partial_prog_attr);
+	mvOsPrintf("Number of bits ECC bits = %d\n", ppage->num_ECC_bits);
+	mvOsPrintf("Number of interleaved address bits = %d\n", ppage->num_interleaved_addr_bits);
+	mvOsPrintf("Interleaved operation attributes = %d\n", ppage->interleaved_op_attr);
 }
