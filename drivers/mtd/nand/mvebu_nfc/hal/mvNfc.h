@@ -190,6 +190,8 @@ extern "C" {
 /* Max number of buffers chunks for as single read / write operation */
 #define MV_NFC_RW_MAX_BUFF_NUM		16
 
+#define NUM_OF_PPAGE_BYTES		128
+
 /* ECC mode options.			*/
 typedef enum {
 	MV_NFC_ECC_HAMMING = 0,		/* 1 bit */
@@ -396,6 +398,35 @@ typedef struct {
 struct MV_NFC_HAL_DATA {
 	void (*mvCtrlNandClkSetFunction) (int);    /* Controller NAND clock div  */
 };
+/** Micron MT29F NAND driver (ONFI):  Parameter Page Data   */
+struct parameter_page_t {
+	char signature[5];			/* Parameter page signature (ONFI) */
+	MV_U16 rev_num;				/* Revision number */
+	MV_U16 feature;				/* Features supported */
+	MV_U16 command;				/* Optional commands supported */
+	char manufacturer[13];			/* Device manufacturer */
+	char model[21];				/* Device part number */
+	MV_U8 jedec_id;				/* Manufacturer ID (Micron = 2Ch) */
+	MV_U16 date_code;			/* Date code */
+	MV_U32 data_bytes_per_page;		/* Number of data bytes per page */
+	MV_U16 spare_bytes_per_page;		/* Number of spare bytes per page */
+	MV_U32 data_bytes_per_partial_page;	/* Number of data bytes per partial page */
+	MV_U16 spare_bytes_per_partial_page;	/* Number of spare bytes per partial page */
+	MV_U32 pages_per_block;			/* Number of pages per block */
+	MV_U32 blocks_per_lun;			/* Number of blocks per unit */
+	MV_U8 luns_per_ce;			/* Number of logical units (LUN) per chip enable */
+	MV_U8 num_addr_cycles;			/* Number of address cycles */
+	MV_U8 bit_per_cell;			/* Number of bits per cell (1 = SLC; >1= MLC) */
+	MV_U16 max_bad_blocks_per_lun;		/* Bad blocks maximum per unit */
+	MV_U16 block_endurance;			/* Block endurance */
+	MV_U8 guarenteed_valid_blocks;		/* Guaranteed valid blocks at beginning of target */
+	MV_U16 block_endurance_guarenteed_valid; /* Block endurance for guaranteed valid blocks */
+	MV_U8 num_programs_per_page;		/* Number of programs per page */
+	MV_U8 partial_prog_attr;		/* Partial programming attributes */
+	MV_U8 num_ECC_bits;			/* Number of bits ECC bits */
+	MV_U8 num_interleaved_addr_bits;	/* Number of interleaved address bits */
+	MV_U8 interleaved_op_attr;		/* Interleaved operation attributes */
+};
 
 
 /********************************/
@@ -422,6 +453,7 @@ MV_STATUS mvNfcUnitStateStore(MV_U32 *stateData, MV_U32 *len);
 MV_NFC_ECC_MODE mvNfcEccModeSet(MV_NFC_CTRL *nfcCtrl, MV_NFC_ECC_MODE eccMode);
 MV_U32    mvNfcBadBlockPageNumber(MV_NFC_CTRL *nfcCtrl);
 MV_STATUS mvNfcReset(void);
+void mvNfcPrintParamPage(void);
 
 #ifdef __cplusplus
 }
