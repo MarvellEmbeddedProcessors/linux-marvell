@@ -47,7 +47,7 @@
 #define XOR_INTR_MASK(chan)	(chan->mmr_base + 0x40)
 #define XOR_ERROR_CAUSE(chan)	(chan->mmr_base + 0x50)
 #define XOR_ERROR_ADDR(chan)	(chan->mmr_base + 0x60)
-#define XOR_INTR_MASK_VALUE	0x3F5
+#define XOR_INTR_MASK_VALUE	0x3F7
 
 #define WINDOW_BASE(w)		(0x250 + ((w) << 2))
 #define WINDOW_SIZE(w)		(0x270 + ((w) << 2))

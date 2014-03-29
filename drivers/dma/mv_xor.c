@@ -52,10 +52,14 @@ static void mv_xor_issue_pending(struct dma_chan *chan);
 static void mv_desc_init(struct mv_xor_desc_slot *desc, unsigned long flags)
 {
 	struct mv_xor_desc *hw_desc = desc->hw_desc;
+	u32 command = 0;
 
 	hw_desc->status = (1 << 31);
 	hw_desc->phy_next_desc = 0;
-	hw_desc->desc_command = (1 << 31);
+	if (flags & DMA_PREP_INTERRUPT)
+		command = (1 << 31);
+
+	hw_desc->desc_command = command;
 }
 
 static u32 mv_desc_get_dest_addr(struct mv_xor_desc_slot *desc)
@@ -172,7 +176,7 @@ static int mv_is_err_intr(u32 intr_cause)
 
 static void mv_xor_device_clear_eoc_cause(struct mv_xor_chan *chan)
 {
-	u32 val = ~(1 << (chan->idx * 16));
+	u32 val = ~(3 << (chan->idx * 16));
 	dev_dbg(mv_chan_to_devp(chan), "%s, val 0x%08x\n", __func__, val);
 	__raw_writel(val, XOR_INTR_CAUSE(chan));
 }
