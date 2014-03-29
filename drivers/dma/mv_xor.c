@@ -159,19 +159,6 @@ static void mv_xor_device_clear_err_status(struct mv_xor_chan *chan)
 	__raw_writel(val, XOR_INTR_CAUSE(chan));
 }
 
-static int mv_can_chain(struct mv_xor_desc_slot *desc)
-{
-	struct mv_xor_desc_slot *chain_old_tail = list_entry(
-		desc->chain_node.prev, struct mv_xor_desc_slot, chain_node);
-
-	if (chain_old_tail->type != desc->type)
-		return 0;
-	if (desc->type == DMA_MEMSET)
-		return 0;
-
-	return 1;
-}
-
 static void mv_set_mode(struct mv_xor_chan *chan,
 			       enum dma_transaction_type type)
 {
@@ -242,8 +229,6 @@ static void mv_xor_start_new_chain(struct mv_xor_chan *mv_chan,
 {
 	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d: sw_desc %p\n",
 		__func__, __LINE__, sw_desc);
-	if (sw_desc->type != mv_chan->current_type)
-		mv_set_mode(mv_chan, sw_desc->type);
 
 	/* set the hardware chain */
 	mv_chan_set_next_descriptor(mv_chan, sw_desc->async_tx.phys);
@@ -501,9 +486,6 @@ mv_xor_tx_submit(struct dma_async_tx_descriptor *tx)
 					    chain_node);
 		list_add_tail(&sw_desc->chain_node, &mv_chan->chain);
 
-		if (!mv_can_chain(grp_start))
-			goto submit_done;
-
 		dev_dbg(mv_chan_to_devp(mv_chan), "Append to last desc %x\n",
 			old_chain_tail->async_tx.phys);
 
@@ -629,7 +611,7 @@ mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
 
 	sw_desc = mv_xor_alloc_slot(mv_chan);
 	if (sw_desc) {
-		sw_desc->type = DMA_MEMCPY;
+		sw_desc->type = DMA_XOR;
 		sw_desc->async_tx.flags = flags;
 		mv_desc_init(sw_desc, flags);
 		mv_desc_set_byte_count(sw_desc, len);
@@ -1091,7 +1073,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 
 	mv_chan_unmask_interrupts(mv_chan);
 
-	mv_set_mode(mv_chan, DMA_MEMCPY);
+	mv_set_mode(mv_chan, DMA_XOR);
 
 	spin_lock_init(&mv_chan->lock);
 	INIT_LIST_HEAD(&mv_chan->chain);
