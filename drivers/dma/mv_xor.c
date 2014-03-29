@@ -224,12 +224,11 @@ static void mv_set_mode(struct mv_xor_chan *chan,
 
 static void mv_chan_activate(struct mv_xor_chan *chan)
 {
-	u32 activation;
-
 	dev_dbg(mv_chan_to_devp(chan), " activate chan.\n");
-	activation = __raw_readl(XOR_ACTIVATION(chan));
-	activation |= 0x1;
-	__raw_writel(activation, XOR_ACTIVATION(chan));
+
+	/* writel ensures all descriptors are flushed before
+	   activation*/
+	writel(0x1, XOR_ACTIVATION(chan));
 }
 
 static char mv_chan_is_busy(struct mv_xor_chan *chan)
@@ -446,7 +445,12 @@ static void __mv_xor_slot_cleanup(struct mv_xor_chan *mv_chan)
 static void
 mv_xor_slot_cleanup(struct mv_xor_chan *mv_chan)
 {
+	struct dma_chan *dma_chan;
+	dma_chan = &mv_chan->dmachan;
+
 	spin_lock_bh(&mv_chan->lock);
+	dma_sync_single_for_cpu(dma_chan->device->dev, (dma_addr_t) NULL,
+				(size_t) NULL, DMA_FROM_DEVICE);
 	__mv_xor_slot_cleanup(mv_chan);
 	spin_unlock_bh(&mv_chan->lock);
 }
