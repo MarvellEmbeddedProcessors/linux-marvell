@@ -34,6 +34,10 @@
 #include "dmaengine.h"
 #include "mv_xor.h"
 
+unsigned int dummy1[MV_XOR_MIN_BYTE_COUNT];
+unsigned int dummy2[MV_XOR_MIN_BYTE_COUNT];
+dma_addr_t dummy1_addr, dummy2_addr;
+
 static void mv_xor_issue_pending(struct dma_chan *chan);
 
 #define to_mv_xor_chan(chan)		\
@@ -653,6 +657,39 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
 }
 
 static struct dma_async_tx_descriptor *
+mv_xor_prep_dma_interrupt(struct dma_chan *chan, unsigned long flags)
+{
+	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+	struct mv_xor_desc_slot *sw_desc, *grp_start;
+	int slot_cnt;
+
+	dev_dbg(mv_chan_to_devp(mv_chan),
+		"%s flags: %ld\n",
+		__func__, flags);
+
+	spin_lock_bh(&mv_chan->lock);
+	slot_cnt = mv_chan_xor_slot_count(MV_XOR_MIN_BYTE_COUNT, 1);
+	sw_desc = mv_xor_alloc_slots(mv_chan, slot_cnt, 1);
+	if (sw_desc) {
+		sw_desc->type = DMA_XOR;
+		sw_desc->async_tx.flags = flags;
+		grp_start = sw_desc->group_head;
+		mv_desc_init(grp_start, DMA_PREP_INTERRUPT);
+		/* the byte count field is the same as in memcpy desc*/
+		mv_desc_set_byte_count(grp_start, MV_XOR_MIN_BYTE_COUNT);
+		mv_desc_set_dest_addr(sw_desc->group_head, dummy1_addr);
+		sw_desc->unmap_src_cnt = 0;
+		sw_desc->unmap_len = 0;
+		mv_desc_set_src_addr(grp_start, 1, dummy2_addr);
+	}
+	spin_unlock_bh(&mv_chan->lock);
+	dev_dbg(mv_chan_to_devp(mv_chan),
+		"%s sw_desc %p async_tx %p\n",
+		__func__, sw_desc, &sw_desc->async_tx);
+	return sw_desc ? &sw_desc->async_tx : NULL;
+}
+
+static struct dma_async_tx_descriptor *
 mv_xor_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
 		size_t len, unsigned long flags)
 {
@@ -763,7 +800,7 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 	}
 	spin_unlock_bh(&mv_chan->lock);
 	dev_dbg(mv_chan_to_devp(mv_chan),
-		"%s sw_desc %p async_tx %p \n",
+		"%s sw_desc %p async_tx %p\n",
 		__func__, sw_desc, &sw_desc->async_tx);
 	return sw_desc ? &sw_desc->async_tx : NULL;
 }
@@ -1155,6 +1192,8 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 		dma_dev->max_xor = 8;
 		dma_dev->device_prep_dma_xor = mv_xor_prep_dma_xor;
 	}
+	if (dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask))
+		dma_dev->device_prep_dma_interrupt = mv_xor_prep_dma_interrupt;
 
 	mv_chan->mmr_base = xordev->xor_base;
 	if (!mv_chan->mmr_base) {
@@ -1258,6 +1297,11 @@ static int mv_xor_probe(struct platform_device *pdev)
 	int i, ret;
 
 	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
+
+	dummy1_addr = dma_map_single(NULL, (void *)dummy1,
+				     MV_XOR_MIN_BYTE_COUNT, DMA_FROM_DEVICE);
+	dummy2_addr = dma_map_single(NULL, (void *)dummy2,
+				     MV_XOR_MIN_BYTE_COUNT, DMA_TO_DEVICE);
 
 	xordev = devm_kzalloc(&pdev->dev, sizeof(*xordev), GFP_KERNEL);
 	if (!xordev)
