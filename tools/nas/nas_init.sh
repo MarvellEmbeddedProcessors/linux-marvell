@@ -427,7 +427,7 @@ function mount_fs {
     elif [ "$1" == "xfs" ]; then
 	mount -t xfs $2 $3 -o noatime,nodirspread
     elif [ "$1" == "btrfs" ]; then
-	mount -t btrfs $2 $3 -o noatime
+	mount -t btrfs $2 $3 -o noatime,thread_pool=$CPU_COUNT
     else
 	do_error "unsupported filesystem $1\n"
     fi
