@@ -223,10 +223,6 @@ reg 5 --> reg 0
 #define TCAM_INVALID				1
 #define TCAM_INV_WORD				5
 
-#define TCAM_DATA_BYTE_OFFS(_offs_)		(((_offs_) - ((_offs_) % 2)) * 2 + ((_offs_) % 2))
-#define TCAM_DATA_MASK_OFFS(_offs_)		(((_offs_) * 2) - ((_offs_) % 2)  + 2)
-#define TCAM_MASK_OFFS(_offs_)			((_offs_) + 2)
-
 /************************* SRAM structure **********************/
 /* convert bit offset to byte offset */
 #define SRAM_BIT_TO_BYTE(_bit_)			HW_BYTE_OFFS((_bit_) / 8)
