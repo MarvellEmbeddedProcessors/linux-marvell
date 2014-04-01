@@ -292,12 +292,12 @@ static inline void mvOsCacheIoSync(void *handle)
 
 static inline void mvOsCacheLineFlush(void *handle, void *addr)
 {
-	dma_map_single(handle, addr, CPU_D_CACHE_LINE_SIZE, DMA_TO_DEVICE);
+	dma_sync_single_for_device(handle, virt_to_dma(handle, addr), CPU_D_CACHE_LINE_SIZE, DMA_TO_DEVICE);
 }
 
 static inline void mvOsCacheLineInv(void *handle, void *addr)
 {
-	dma_map_single(handle, addr, CPU_D_CACHE_LINE_SIZE, DMA_FROM_DEVICE);
+	dma_sync_single_for_device(handle, virt_to_dma(handle, addr), CPU_D_CACHE_LINE_SIZE, DMA_FROM_DEVICE);
 }
 
 /* Flush multiple cache lines using mvOsCacheLineFlush to improve performance.              */
