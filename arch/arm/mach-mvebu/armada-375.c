@@ -27,7 +27,6 @@
 #include <asm/mach/map.h>
 #include <asm/smp_scu.h>
 #include <asm/mach/time.h>
-#include <asm/signal.h>
 #include "armada-375.h"
 #include "common.h"
 #include "coherency.h"
@@ -112,26 +111,6 @@ armada_375_ioremap_caller(unsigned long phys_addr, size_t size,
 	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
 }
 
-/*
- * Early versions of Armada 375 SoC have a bug where the BootROM
- * leaves an external data abort pending. The kernel is hit by this
- * data abort as soon as it enters userspace, because it unmasks the
- * data aborts at this moment. We register a custom abort handler
- * below to ignore the first data abort to work around this problem.
- */
-static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
-					struct pt_regs *regs)
-{
-	static int ignore_first;
-
-	if (!ignore_first) {
-		ignore_first = 1;
-		return 0;
-	}
-
-	return 1;
-}
-
 static void __init armada_375_timer_and_clk_init(void)
 {
 	pr_notice("\n  LSP version: %s\n\n", LSP_VERSION);
@@ -144,8 +123,6 @@ static void __init armada_375_timer_and_clk_init(void)
 	pci_ioremap_set_mem_type(MT_MEMORY_SO);
 	coherency_init();
 	armada_375_l2_enable();
-	hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
-			"imprecise external abort");
 }
 
 static const char * const armada_375_dt_compat[] = {
