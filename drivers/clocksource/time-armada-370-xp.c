@@ -325,12 +325,11 @@ CLOCKSOURCE_OF_DECLARE(armada_370, "marvell,armada-370-timer",
 
 static void __init armada_375_timer_init(struct device_node *np)
 {
-	struct clk *clk = of_clk_get(np, 0);
+	struct clk *clk = of_clk_get_by_name(np, "fixed");
 
+	/* The 25Mhz fixed clock is mandatory, and must always be available */
 	BUG_ON(IS_ERR(clk));
-	/* Global timer source clock is the Punit clock (which is L2 clock divided by 2) */
-	timer_clk = clk_get_rate(clk) / 2 / TIMER_DIVIDER;
-	timer25Mhz = false;
+	timer_clk = clk_get_rate(clk);
 
 	armada_370_xp_timer_common_init(np);
 }
