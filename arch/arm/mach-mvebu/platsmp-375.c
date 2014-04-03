@@ -18,35 +18,8 @@
 #include <asm/smp_scu.h>
 #include "armada-375.h"
 #include "common.h"
-#ifdef CONFIG_A375_CPU1_ENABLE_WA
-#include <linux/mbus.h>
-#endif
 
 #include "pmsu.h"
-
-#ifdef CONFIG_A375_CPU1_ENABLE_WA
-#define CRYPT0_ENG_ID	41
-#define CRYPT0_ENG_ATTR	0x1
-#define SRAM_PHYS_BASE	0xFFFF0000
-
-extern void* a375_smp_cpu1_enable_code_end;
-extern void* a375_smp_cpu1_enable_code_start;
-
-void a375_smp_cpu1_enable_wa(void)
-{
-	u32 code_len;
-	void __iomem *sram_virt_base;
-
-	mvebu_mbus_add_window_by_id(CRYPT0_ENG_ID, CRYPT0_ENG_ATTR,
-				SRAM_PHYS_BASE, SZ_64K);
-	sram_virt_base = ioremap(SRAM_PHYS_BASE, SZ_64K);
-
-	code_len = 4 * (&a375_smp_cpu1_enable_code_end
-			- &a375_smp_cpu1_enable_code_start);
-
-	memcpy(sram_virt_base, &a375_smp_cpu1_enable_code_start, code_len);
-}
-#endif
 
 extern void a375_secondary_startup(void);
 
@@ -99,10 +72,6 @@ static void __init armada_375_smp_prepare_cpus(unsigned int max_cpus)
 
 	for (i = 0; i < max_cpus; i++)
 		set_cpu_present(i, true);
-
-#ifdef CONFIG_A375_CPU1_ENABLE_WA
-	a375_smp_cpu1_enable_wa();
-#endif
 }
 
 struct smp_operations armada_375_smp_ops __initdata = {

@@ -87,10 +87,6 @@ config MACH_ARMADA_XP
 	  Say 'Y' here if you want your kernel to support boards based
 	  on the Marvell Armada XP SoC with device tree.
 
-config A375_CPU1_ENABLE_WA
-	depends on SMP
-	bool "SMP CPU1 Enable WA"
-	default y
 
 config A375_Z1_USB3_LFPS_FREQ_WA
 	bool "Enable the LFPS frequency workaround for USB3"
