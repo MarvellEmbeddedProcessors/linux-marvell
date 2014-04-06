@@ -122,24 +122,28 @@ int mv_eth_tool_restore_settings(struct net_device *netdev)
 			err = mvEthPhyAdvertiseSet(phy_addr, priv->advertise_cfg);
 		/* Restart AN on PHY enables it */
 		if (!err) {
+			err = mvNetaFlowCtrlSet(priv->port, MV_ETH_FC_AN_SYM);
+			if (!err) {
+				err = mvEthPhyRestartAN(phy_addr, MV_ETH_TOOL_AN_TIMEOUT);
+				if (err == MV_TIMEOUT) {
+					MV_ETH_PORT_STATUS ps;
 
-			err = mvEthPhyRestartAN(phy_addr, MV_ETH_TOOL_AN_TIMEOUT);
-			if (err == MV_TIMEOUT) {
-				MV_ETH_PORT_STATUS ps;
+					mvNetaLinkStatus(priv->port, &ps);
 
-				mvNetaLinkStatus(priv->port, &ps);
-
-				if (!ps.linkup)
-					err = 0;
+					if (!ps.linkup)
+						err = 0;
+				}
 			}
 		}
 	} else if (priv->autoneg_cfg == AUTONEG_DISABLE) {
 		err = mvEthPhyDisableAN(phy_addr, phy_speed, phy_duplex);
 		if (!err)
+			err = mvNetaFlowCtrlSet(priv->port, MV_ETH_FC_ENABLE);
+		if (!err)
 			err = mvNetaSpeedDuplexSet(priv->port, mac_speed, mac_duplex);
-	} else {
+	} else
 		err = -EINVAL;
-	}
+
 	return err;
 }
 
