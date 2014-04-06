@@ -444,6 +444,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /************************** Interrupt Cause and Mask registers ******************/
 #define MV_PP2_ISR_RX_THRESHOLD_REG(port)	(MV_PP2_REG_BASE + 0x5200 + 4 * (port))
 
+#define MV_PP2_ISR_RX_THRESHOLD_OFFS	4
+#define MV_PP2_ISR_RX_THRESHOLD_MASK	0xFFFFF0
+
 #define MV_PP2_ISR_RXQ_GROUP_REG(port)		(MV_PP2_REG_BASE + 0x5400 + 4 * (port))
 
 #define MV_PP2_ISR_ENABLE_REG(port)		(MV_PP2_REG_BASE + 0x5420 + 4 * (port))

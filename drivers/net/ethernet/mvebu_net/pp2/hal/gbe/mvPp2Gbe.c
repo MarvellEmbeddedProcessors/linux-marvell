@@ -1340,8 +1340,13 @@ MV_STATUS mvPp2RxqTimeCoalSet(int port, int rxq, MV_U32 uSec)
 {
 	MV_U32 regVal;
 	int prxq = mvPp2LogicRxqToPhysRxq(port, rxq);
+	unsigned int tClkUsec;
 
-	regVal = uSec * (mvPp2HalData.tClk / 1000000);
+	tClkUsec = mvPp2HalData.tClk / 1000000;
+
+	/* Register contains interrupt time in units of 16 core clock sycles, */
+	/* therefore shift the result value on 4 bits */
+	regVal = (((uSec * tClkUsec) >> 4) << MV_PP2_ISR_RX_THRESHOLD_OFFS) & MV_PP2_ISR_RX_THRESHOLD_MASK;
 
 	mvPp2WrReg(MV_PP2_ISR_RX_THRESHOLD_REG(prxq), regVal);
 
@@ -1352,14 +1357,21 @@ unsigned int mvPp2RxqTimeCoalGet(int port, int rxq)
 {
 	MV_U32 regVal;
 	int prxq = mvPp2LogicRxqToPhysRxq(port, rxq);
-	unsigned int res, tClkUsec;
-
-	regVal = mvPp2RdReg(MV_PP2_ISR_RX_THRESHOLD_REG(prxq));
+	unsigned int res, tClkUsec, uSec;
 
 	tClkUsec = mvPp2HalData.tClk / 1000000;
-	res = regVal / tClkUsec;
+	regVal = mvPp2RdReg(MV_PP2_ISR_RX_THRESHOLD_REG(prxq));
 
-	return res;
+	/* Register contains interrupt time in units of 16 core clock sycles, */
+	/* therefore shift the result value on 4 bits */
+	res = (((regVal & MV_PP2_ISR_RX_THRESHOLD_MASK) >> MV_PP2_ISR_RX_THRESHOLD_OFFS) << 4);
+
+	if ((res % tClkUsec) != 0)
+		uSec = (res / tClkUsec) + 1;
+	else
+		uSec = res / tClkUsec;
+
+	return uSec;
 }
 
 /* unmask the current CPU's rx/tx interrupts                   *
