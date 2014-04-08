@@ -895,16 +895,28 @@ int mv_eth_ctrl_set_poll_rx_weight(int port, u32 weight)
 
 int mv_eth_ctrl_rxq_size_set(int port, int rxq, int value)
 {
-	struct eth_port *pp = mv_eth_port_by_id(port);
+	struct eth_port *pp;
 	struct rx_queue	*rxq_ctrl;
 
+	if (mvPp2PortCheck(port))
+		return -EINVAL;
+
+	if (mvPp2MaxCheck(rxq, CONFIG_MV_ETH_RXQ, "rxq"))
+		return -EINVAL;
+
+	if ((value <= 0) || (value > 0x3FFF) || (value % 16)) {
+		pr_err("Invalid RXQ size %d\n", value);
+		return -EINVAL;
+	}
+
+	pp = mv_eth_port_by_id(port);
 	if (pp == NULL) {
-		printk(KERN_INFO "port doens not exist (%d) in %s\n" , port, __func__);
+		pr_err("Port %d does not exist\n", port);
 		return -EINVAL;
 	}
 
 	if (pp->flags & MV_ETH_F_STARTED) {
-		printk(KERN_ERR "Port %d must be stopped before\n", port);
+		pr_err("Port %d must be stopped before\n", port);
 		return -EINVAL;
 	}
 
@@ -956,8 +968,15 @@ int mv_eth_ctrl_txq_limits_set(int port, int txp, int txq, int hwf_size, int swf
 {
 	int txq_size;
 	struct tx_queue *txq_ctrl;
-	struct eth_port *pp = mv_eth_port_by_id(port);
+	struct eth_port *pp;
 
+	if (mvPp2TxpCheck(port, txp))
+		return -EINVAL;
+
+	if (mvPp2MaxCheck(txq, CONFIG_MV_ETH_TXQ, "txq"))
+		return -EINVAL;
+
+	pp = mv_eth_port_by_id(port);
 	if (pp == NULL) {
 		printk(KERN_INFO "port does not exist (%d) in %s\n" , port, __func__);
 		return -EINVAL;
@@ -1004,31 +1023,40 @@ int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int txq_size)
 	int cpu, cpu_size;
 	struct tx_queue *txq_ctrl;
 	struct txq_cpu_ctrl *txq_cpu_ptr;
-	struct eth_port *pp = mv_eth_port_by_id(port);
+	struct eth_port *pp;
 
+	if (mvPp2TxpCheck(port, txp))
+		return -EINVAL;
+
+	if (mvPp2MaxCheck(txq, CONFIG_MV_ETH_TXQ, "txq"))
+		return -EINVAL;
+
+	if ((txq_size <= 0) || (txq_size > 0x3FFF) || (txq_size % 16)) {
+		pr_err("Invalid TXQ size %d\n", txq_size);
+		return -EINVAL;
+	}
+
+	pp = mv_eth_port_by_id(port);
 	if (pp == NULL) {
-		printk(KERN_INFO "port does not exist (%d) in %s\n" , port, __func__);
-		return -EINVAL;
-	}
-	if (pp->flags & MV_ETH_F_STARTED) {
-		printk(KERN_ERR "Port %d must be stopped before\n", port);
+		pr_err("Port %d does not exist\n", port);
 		return -EINVAL;
 	}
 
-	if (txq_size % 16 != 0) {
-		printk(KERN_ERR "invalid txq size, must be aligned to 16\n");
+	if (pp->flags & MV_ETH_F_STARTED) {
+		pr_err("Port %d must be stopped before\n", port);
 		return -EINVAL;
 	}
 
 	txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + txq];
 
 	if (!txq_ctrl) {
-		printk(KERN_INFO "queue is null %s\n", __func__);
+		pr_err("TXQ is not exist\n");
 		return -EINVAL;
 	}
 
 	if ((txq_ctrl->q) && (txq_size < txq_ctrl->hwf_size)) {
-		printk(KERN_INFO "Invalid txq size, must be greater than hwf size (%d)\n", txq_ctrl->hwf_size);
+		pr_err("Invalid TXQ size %d, must be greater than HWF size (%d)\n",
+			txq_size, txq_ctrl->hwf_size);
 		return -EINVAL;
 	}
 
