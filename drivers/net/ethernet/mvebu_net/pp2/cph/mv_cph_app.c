@@ -659,7 +659,6 @@ MV_STATUS cph_app_get_rule_by_dir_proto(
 
 	rc = cph_db_get_app_rule_by_dir_proto(dir, proto_type, parse_bm,
 		parse_key, mod_bm, mod_value, frwd_bm, frwd_value);
-	CHECK_API_RETURN_AND_LOG_ERROR(rc, "fail to call cph_db_get_app_rule_by_dir_proto");
 
 	return rc;
 }
