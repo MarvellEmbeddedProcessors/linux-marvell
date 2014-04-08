@@ -37,73 +37,74 @@ disclaimer.
 #include "mv_netdev.h"
 #include "mv_eth_sysfs.h"
 
-static ssize_t mv_eth_help(char *buf)
+static ssize_t mv_eth_help(char *b)
 {
-	int off = 0;
+	int o = 0; /* buffer offset */
+	int s = PAGE_SIZE; /* buffer size */
 
-	off += mvOsSPrintf(buf+off, "p, txp, txq, rxq, cpu, prio, gr, d, t, l, s - are dec numbers\n");
-	off += mvOsSPrintf(buf+off, "v, tos, mask                                - are hex numbers\n");
-	off += mvOsSPrintf(buf+off, "\n");
+	o += scnprintf(b+o, s-o, "p, txp, txq, rxq, cpu, prio, gr, d, t, l, s - are dec numbers\n");
+	o += scnprintf(b+o, s-o, "v, tos, mask                                - are hex numbers\n");
+	o += scnprintf(b+o, s-o, "\n");
 
-	off += sprintf(buf+off, "cat                ports           - show all ports info\n");
-	off += sprintf(buf+off, "echo p d           > stack         - show pools stack for port <p>. d=0-brief, d=1-full\n");
-	off += sprintf(buf+off, "echo p             > port          - show a port info\n");
-	off += sprintf(buf+off, "echo [if_name]     > netdev        - show <if_name> net_device status\n");
-	off += sprintf(buf+off, "echo p             > stats         - show a port statistics\n");
-	off += sprintf(buf+off, "echo p txp         > cntrs         - show a port counters\n");
-	off += sprintf(buf+off, "echo p             > tos           - show RX and TX TOS map for port <p>\n");
-	off += sprintf(buf+off, "echo p             > mac           - show MAC info for port <p>\n");
-	off += sprintf(buf+off, "echo p             > vprio         - show VLAN priority map for port <p>\n");
-	off += sprintf(buf+off, "echo p             > napi          - show port NAPI groups: CPUs and RXQs\n");
-	off += sprintf(buf+off, "echo p             > p_regs        - show port registers for <p>\n");
+	o += scnprintf(b+o, s-o, "cat                ports           - show all ports info\n");
+	o += scnprintf(b+o, s-o, "echo p d           > stack         - show pools stack for port <p>. d=0-brief, d=1-full\n");
+	o += scnprintf(b+o, s-o, "echo p             > port          - show a port info\n");
+	o += scnprintf(b+o, s-o, "echo [if_name]     > netdev        - show <if_name> net_device status\n");
+	o += scnprintf(b+o, s-o, "echo p             > stats         - show a port statistics\n");
+	o += scnprintf(b+o, s-o, "echo p txp         > cntrs         - show a port counters\n");
+	o += scnprintf(b+o, s-o, "echo p             > tos           - show RX and TX TOS map for port <p>\n");
+	o += scnprintf(b+o, s-o, "echo p             > mac           - show MAC info for port <p>\n");
+	o += scnprintf(b+o, s-o, "echo p             > vprio         - show VLAN priority map for port <p>\n");
+	o += scnprintf(b+o, s-o, "echo p             > napi          - show port NAPI groups: CPUs and RXQs\n");
+	o += scnprintf(b+o, s-o, "echo p             > p_regs        - show port registers for <p>\n");
 #ifdef MV_ETH_GMAC_NEW
-	off += sprintf(buf+off, "echo p             > gmac_regs     - show gmac registers for <p>\n");
+	o += scnprintf(b+o, s-o, "echo p             > gmac_regs     - show gmac registers for <p>\n");
 #endif /* MV_ETH_GMAC_NEW */
-	off += sprintf(buf+off, "echo p rxq         > rxq_regs      - show RXQ registers for <p/rxq>\n");
-	off += sprintf(buf+off, "echo p txp         > wrr_regs      - show WRR registers for <p/txp>\n");
-	off += sprintf(buf+off, "echo p txp         > txp_regs      - show TX registers for <p/txp>\n");
-	off += sprintf(buf+off, "echo p txp txq     > txq_regs      - show TXQ registers for <p/txp/txq>\n");
-	off += sprintf(buf+off, "echo p rxq d       > rxq           - show RXQ descriptors ring for <p/rxq>. d=0-brief, d=1-full\n");
-	off += sprintf(buf+off, "echo p txp txq d   > txq           - show TXQ descriptors ring for <p/txp/txq>. d=0-brief, d=1-full\n");
+	o += scnprintf(b+o, s-o, "echo p rxq         > rxq_regs      - show RXQ registers for <p/rxq>\n");
+	o += scnprintf(b+o, s-o, "echo p txp         > wrr_regs      - show WRR registers for <p/txp>\n");
+	o += scnprintf(b+o, s-o, "echo p txp         > txp_regs      - show TX registers for <p/txp>\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq     > txq_regs      - show TXQ registers for <p/txp/txq>\n");
+	o += scnprintf(b+o, s-o, "echo p rxq d       > rxq           - show RXQ descriptors ring for <p/rxq>. d=0-brief, d=1-full\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq d   > txq           - show TXQ descriptors ring for <p/txp/txq>. d=0-brief, d=1-full\n");
 #ifdef CONFIG_MV_ETH_PNC
-	off += sprintf(buf+off, "echo {0|1}         > pnc           - enable / disable PNC access\n");
+	o += scnprintf(b+o, s-o, "echo {0|1}         > pnc           - enable / disable PNC access\n");
 #endif /* CONFIG_MV_ETH_PNC */
-	off += sprintf(buf+off, "echo {0|1}         > skb           - enable / disable SKB recycle\n");
-	off += sprintf(buf+off, "echo p {0|1}       > mh_en         - enable Marvell Header\n");
-	off += sprintf(buf+off, "echo p {0|1}       > tx_nopad      - disable zero padding\n");
-	off += sprintf(buf+off, "echo p v           > mh_2B         - set 2 bytes of Marvell Header\n");
-	off += sprintf(buf+off, "echo p v           > tx_cmd        - set 4 bytes of TX descriptor offset 0xc\n");
-	off += sprintf(buf+off, "echo p v           > debug         - bit0:rx, bit1:tx, bit2:isr, bit3:poll, bit4:dump\n");
-	off += sprintf(buf+off, "echo p l s         > buf_num       - set number of long <l> and short <s> buffers allocated for port <p>\n");
-	off += sprintf(buf+off, "echo p rxq tos     > rxq_tos       - set <rxq> for incoming IP packets with <tos>\n");
-	off += sprintf(buf+off, "echo p gr mask     > cpu_group     - set <cpus mask>  for <port/napi group>.\n");
-	off += sprintf(buf+off, "echo p gr mask     > rxq_group     - set  <rxqs mask> for <port/napi group>.\n");
-	off += sprintf(buf+off, "echo p rxq prio    > rxq_vlan      - set <rxq> for incoming VLAN packets with <prio>\n");
-	off += sprintf(buf+off, "echo p rxq d       > rxq_size      - set number of descriptors <d> for <port/rxq>.\n");
-	off += sprintf(buf+off, "echo p rxq d       > rxq_pkts_coal - set RXQ interrupt coalesing. <d> - number of received packets\n");
-	off += sprintf(buf+off, "echo p rxq d       > rxq_time_coal - set RXQ interrupt coalesing. <d> - time in microseconds\n");
-	off += sprintf(buf+off, "echo p rxq t       > rxq_type      - set RXQ for different packet types. t=0-bpdu, 1-arp, 2-tcp, 3-udp\n");
-	off += sprintf(buf+off, "echo p             > rx_reset      - reset RX part of the port <p>\n");
-	off += sprintf(buf+off, "echo p txp         > txp_reset     - reset TX part of the port <p/txp>\n");
-	off += sprintf(buf+off, "echo p txp txq     > txq_clean     - clean TXQ <p/txp/txq> - free descriptors and buffers\n");
-	off += sprintf(buf+off, "echo p txq cpu tos > txq_tos       - set <txq> for outgoing IP packets with <tos> handeled by <cpu>\n");
-	off += sprintf(buf+off, "echo p txp txq cpu > txq_def       - set default <txp/txq> for packets sent to port <p> by <cpu>\n");
-	off += sprintf(buf+off, "echo p txp {0|1}   > ejp           - enable/disable EJP mode for <port/txp>\n");
-	off += sprintf(buf+off, "echo p txp d       > txp_rate      - set outgoing rate <d> in [kbps] for <port/txp>\n");
-	off += sprintf(buf+off, "echo p txp d       > txp_burst     - set maximum burst <d> in [Bytes] for <port/txp>\n");
-	off += sprintf(buf+off, "echo p txp txq d   > txq_rate      - set outgoing rate <d> in [kbps] for <port/txp/txq>\n");
-	off += sprintf(buf+off, "echo p txp txq d   > txq_burst     - set maximum burst <d> in [Bytes] for <port/txp/txq>\n");
-	off += sprintf(buf+off, "echo p txp txq d   > txq_wrr       - set outgoing WRR weight for <port/txp/txq>. <d=0> - fixed\n");
-	off += sprintf(buf+off, "echo p txp txq d   > txq_size      - set number of descriptors <d> for <port/txp/txq>.\n");
-	off += sprintf(buf+off, "echo p txp txq d   > txq_coal      - set TXP/TXQ interrupt coalesing. <d> - number of sent packets\n");
-	off += sprintf(buf+off, "echo d             > tx_done       - set threshold <d> to start tx_done operations\n");
-	off += sprintf(buf+off, "echo p d           > rx_weight     - set weight for the poll function; <d> - new weight, max val: 255\n");
-	off += sprintf(buf+off, "echo p cpu mask    > txq_mask      - set cpu <cpu> accessible txq bitmap <mask>.\n");
-	off += sprintf(buf+off, "echo p txp txq d   > txq_shared    - set/reset shared bit for <port/txp/txq>. <d> - 1/0 for set/reset.\n");
+	o += scnprintf(b+o, s-o, "echo {0|1}         > skb           - enable / disable SKB recycle\n");
+	o += scnprintf(b+o, s-o, "echo p {0|1}       > mh_en         - enable Marvell Header\n");
+	o += scnprintf(b+o, s-o, "echo p {0|1}       > tx_nopad      - disable zero padding\n");
+	o += scnprintf(b+o, s-o, "echo p v           > mh_2B         - set 2 bytes of Marvell Header\n");
+	o += scnprintf(b+o, s-o, "echo p v           > tx_cmd        - set 4 bytes of TX descriptor offset 0xc\n");
+	o += scnprintf(b+o, s-o, "echo p v           > debug         - bit0:rx, bit1:tx, bit2:isr, bit3:poll, bit4:dump\n");
+	o += scnprintf(b+o, s-o, "echo p l s         > buf_num       - set number of long <l> and short <s> buffers allocated for port <p>\n");
+	o += scnprintf(b+o, s-o, "echo p rxq tos     > rxq_tos       - set <rxq> for incoming IP packets with <tos>\n");
+	o += scnprintf(b+o, s-o, "echo p gr mask     > cpu_group     - set <cpus mask>  for <port/napi group>.\n");
+	o += scnprintf(b+o, s-o, "echo p gr mask     > rxq_group     - set  <rxqs mask> for <port/napi group>.\n");
+	o += scnprintf(b+o, s-o, "echo p rxq prio    > rxq_vlan      - set <rxq> for incoming VLAN packets with <prio>\n");
+	o += scnprintf(b+o, s-o, "echo p rxq d       > rxq_size      - set number of descriptors <d> for <port/rxq>.\n");
+	o += scnprintf(b+o, s-o, "echo p rxq d       > rxq_pkts_coal - set RXQ interrupt coalesing. <d> - number of received packets\n");
+	o += scnprintf(b+o, s-o, "echo p rxq d       > rxq_time_coal - set RXQ interrupt coalesing. <d> - time in microseconds\n");
+	o += scnprintf(b+o, s-o, "echo p rxq t       > rxq_type      - set RXQ for different packet types. t=0-bpdu, 1-arp, 2-tcp, 3-udp\n");
+	o += scnprintf(b+o, s-o, "echo p             > rx_reset      - reset RX part of the port <p>\n");
+	o += scnprintf(b+o, s-o, "echo p txp         > txp_reset     - reset TX part of the port <p/txp>\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq     > txq_clean     - clean TXQ <p/txp/txq> - free descriptors and buffers\n");
+	o += scnprintf(b+o, s-o, "echo p txq cpu tos > txq_tos       - set <txq> for outgoing IP packets with <tos> handeled by <cpu>\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq cpu > txq_def       - set default <txp/txq> for packets sent to port <p> by <cpu>\n");
+	o += scnprintf(b+o, s-o, "echo p txp {0|1}   > ejp           - enable/disable EJP mode for <port/txp>\n");
+	o += scnprintf(b+o, s-o, "echo p txp d       > txp_rate      - set outgoing rate <d> in [kbps] for <port/txp>\n");
+	o += scnprintf(b+o, s-o, "echo p txp d       > txp_burst     - set maximum burst <d> in [Bytes] for <port/txp>\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq d   > txq_rate      - set outgoing rate <d> in [kbps] for <port/txp/txq>\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq d   > txq_burst     - set maximum burst <d> in [Bytes] for <port/txp/txq>\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq d   > txq_wrr       - set outgoing WRR weight for <port/txp/txq>. <d=0> - fixed\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq d   > txq_size      - set number of descriptors <d> for <port/txp/txq>.\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq d   > txq_coal      - set TXP/TXQ interrupt coalesing. <d> - number of sent packets\n");
+	o += scnprintf(b+o, s-o, "echo d             > tx_done       - set threshold <d> to start tx_done operations\n");
+	o += scnprintf(b+o, s-o, "echo p d           > rx_weight     - set weight for the poll function; <d> - new weight, max val: 255\n");
+	o += scnprintf(b+o, s-o, "echo p cpu mask    > txq_mask      - set cpu <cpu> accessible txq bitmap <mask>.\n");
+	o += scnprintf(b+o, s-o, "echo p txp txq d   > txq_shared    - set/reset shared bit for <port/txp/txq>. <d> - 1/0 for set/reset.\n");
 #ifdef CONFIG_MV_ETH_PNC_WOL
-	off += sprintf(buf+off, "echo p wol         > wol_mode      - set port <p> pm mode. 0 wol, 1 suspend.\n");
+	o += scnprintf(b+o, s-o, "echo p wol         > wol_mode      - set port <p> pm mode. 0 wol, 1 suspend.\n");
 #endif
-	return off;
+	return o;
 }
 
 #ifdef CONFIG_MV_ETH_PNC
