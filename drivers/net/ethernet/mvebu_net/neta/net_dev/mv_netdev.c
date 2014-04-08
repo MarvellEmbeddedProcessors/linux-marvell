@@ -682,7 +682,7 @@ int mv_eth_ctrl_set_poll_rx_weight(int port, u32 weight)
 
 int mv_eth_ctrl_rxq_size_set(int port, int rxq, int value)
 {
-	struct eth_port *pp = mv_eth_port_by_id(port);
+	struct eth_port *pp;
 	struct rx_queue	*rxq_ctrl;
 
 	if (mvNetaPortCheck(port))
@@ -691,13 +691,19 @@ int mv_eth_ctrl_rxq_size_set(int port, int rxq, int value)
 	if (mvNetaMaxCheck(rxq, CONFIG_MV_ETH_RXQ, "rxq"))
 		return -EINVAL;
 
+	if ((value <= 0) || (value > 0x3FFF)) {
+		pr_err("RXQ size %d is out of range\n", value);
+		return -EINVAL;
+	}
+
+	pp = mv_eth_port_by_id(port);
 	if (pp == NULL) {
-		printk(KERN_INFO "port doens not exist (%d) in %s\n" , port, __func__);
+		pr_err("Port %d does not exist\n", port);
 		return -EINVAL;
 	}
 
 	if (pp->flags & MV_ETH_F_STARTED) {
-		printk(KERN_ERR "Port %d must be stopped before\n", port);
+		pr_err("Port %d must be stopped before\n", port);
 		return -EINVAL;
 	}
 	rxq_ctrl = &pp->rxq_ctrl[rxq];
@@ -717,7 +723,7 @@ int mv_eth_ctrl_rxq_size_set(int port, int rxq, int value)
 int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int value)
 {
 	struct tx_queue *txq_ctrl;
-	struct eth_port *pp = mv_eth_port_by_id(port);
+	struct eth_port *pp;
 
 	if (mvNetaTxpCheck(port, txp))
 		return -EINVAL;
@@ -725,13 +731,19 @@ int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int value)
 	if (mvNetaMaxCheck(txq, CONFIG_MV_ETH_TXQ, "txq"))
 		return -EINVAL;
 
+	if ((value <= 0) || (value > 0x3FFF)) {
+		pr_err("TXQ size %d is out of range\n", value);
+		return -EINVAL;
+	}
+
+	pp = mv_eth_port_by_id(port);
 	if (pp == NULL) {
-		printk(KERN_INFO "port doens not exist (%d) in %s\n" , port, __func__);
+		pr_err("Port %d does not exist\n", port);
 		return -EINVAL;
 	}
 
 	if (pp->flags & MV_ETH_F_STARTED) {
-		printk(KERN_ERR "Port %d must be stopped before\n", port);
+		pr_err("Port %d must be stopped before\n", port);
 		return -EINVAL;
 	}
 	txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + txq];
@@ -740,7 +752,7 @@ int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int value)
 		if ((mvNetaTxqNextIndexGet(pp->port, txq_ctrl->txp, txq_ctrl->txq) != 0) ||
 			(mvNetaTxqPendDescNumGet(pp->port, txq_ctrl->txp, txq_ctrl->txq) != 0) ||
 			(mvNetaTxqSentDescNumGet(pp->port, txq_ctrl->txp, txq_ctrl->txq) != 0)) {
-			printk(KERN_ERR "%s: port=%d, txp=%d, txq=%d must be in its initial state\n",
+			pr_err("%s: port=%d, txp=%d, txq=%d must be in its initial state\n",
 				__func__, port, txq_ctrl->txp, txq_ctrl->txq);
 			return -EINVAL;
 		}
