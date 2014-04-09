@@ -461,7 +461,11 @@
 					/* channel 1 */
 					interrupts = <0 20 0x4>;
 				};
+			};
 
+			pmu {
+				compatible = "arm,cortex-a9-pmu";
+				interrupts-extended = <&mpic 3>;
 			};
 		};
 	};
