@@ -134,8 +134,7 @@ static int mv_mux_mgr_probe(int gbe_port)
 	mv_mux_mgr_init(preset, vid, tag_mode, gbe_port);
 
 	if (tag_mode != MV_TAG_TYPE_NONE)
-		if (eth_ops && eth_ops->promisc_set)
-			eth_ops->promisc_set(gbe_port);
+		dev_set_promiscuity(mux_eth_shadow[gbe_port].root, 1);
 
 	if (switch_ops && switch_ops->interrupt_unmask)
 		switch_ops->interrupt_unmask();
