@@ -102,7 +102,6 @@ struct mv_mux_switch_ops {
 
 struct mv_mux_eth_ops {
 	int	(*set_tag_type)(int port, int tag_type);
-	void	(*promisc_set)(int port);
 };
 
 int mv_mux_update_link(void *cookie, int link_up);

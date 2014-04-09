@@ -3230,14 +3230,6 @@ int mv_eth_poll(struct napi_struct *napi, int budget)
 	return rx_done;
 }
 
-void mv_eth_port_promisc_set(int port)
-{
-	if (mv_eth_pnc_ctrl_en)
-		mvPrsMacPromiscousSet(port, 1);
-	else
-		printk(KERN_ERR "%s: PARSER and CLASSIFIER control is disabled\n", __func__);
-}
-
 void mv_eth_port_filtering_cleanup(int port)
 {
 	static bool is_first = true;
@@ -3509,7 +3501,6 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 		mv_eth_open(pp->dev);
 
 	mux_eth_ops.set_tag_type = mv_eth_tag_type_set;
-	mux_eth_ops.promisc_set = mv_eth_port_promisc_set;
 	mv_mux_eth_attach(pp->port, pp->dev, &mux_eth_ops);
 
 	pr_info("\n");
