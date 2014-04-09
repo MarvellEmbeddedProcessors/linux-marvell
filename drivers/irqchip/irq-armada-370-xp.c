@@ -36,6 +36,7 @@
 /* Interrupt Controller Registers Map */
 #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
 #define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
+#define ARMADA_370_XP_INT_CPU_SUBSYS_MASK_OFFS	(0x54)
 
 #define ARMADA_370_XP_INT_CONTROL		(0x00)
 #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
@@ -52,6 +53,7 @@
 #define ARMADA_370_XP_MAX_PER_CPU_IRQS		(28)
 
 #define ARMADA_370_XP_TIMER0_PER_CPU_IRQ	(5)
+#define ARMADA_370_XP_CPU_SUBSYS_PERF_CNT	(3)
 
 #define IPI_DOORBELL_START                      (0)
 #define IPI_DOORBELL_END                        (8)
@@ -299,6 +301,13 @@ static struct irq_chip armada_370_xp_irq_chip = {
 #endif
 };
 
+static void armada_370_xp_enable_pmu_irq(void *data)
+{
+	unsigned long cpuid = smp_processor_id();
+	writel(1 << cpuid, per_cpu_int_base +
+				ARMADA_370_XP_INT_CPU_SUBSYS_MASK_OFFS);
+}
+
 static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
 				      unsigned int virq, irq_hw_number_t hw)
 {
@@ -314,7 +323,21 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
 		writel(hw, main_int_base + ARMADA_370_XP_INT_SET_ENABLE_OFFS);
 	irq_set_status_flags(virq, IRQ_LEVEL);
 
-	if (hw == ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
+	/*
+	 * Setup CPU Subsystem Mask registers.
+	 * Enable only Performance Counter Overflow interrupts.
+	 */
+	if (hw == ARMADA_370_XP_CPU_SUBSYS_PERF_CNT)
+		on_each_cpu_mask(cpu_online_mask,
+			armada_370_xp_enable_pmu_irq, NULL, 1);
+
+	/*
+	 * Setup Timer0 and CPU Subsystem Summary as Per-CPU interrupts.
+	 * Although the CPU Subsystem Cause contains also global IRQs,
+	 * we will use only Performance Counter Overflow interrupts.
+	 */
+	if ((hw == ARMADA_370_XP_TIMER0_PER_CPU_IRQ) ||
+				(hw == ARMADA_370_XP_CPU_SUBSYS_PERF_CNT)) {
 		irq_set_percpu_devid(virq);
 		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
 					handle_percpu_devid_irq);
