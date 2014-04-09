@@ -6503,9 +6503,19 @@ int mv_eth_suspend(struct platform_device *pdev, pm_message_t state)
 		}
 
 		/* BUG WA - if port 0 clock is down, we can't interrupt by magic packet */
-		if ((port != 0) || (wol_ports_bmp == 0))
+		if ((port != 0) || (wol_ports_bmp == 0)) {
 			/* Set Port Power State to 0 */
+#ifdef CONFIG_ARCH_MVEBU
+			{
+				/* get the relevant clock from the clk lib */
+				struct clk *clk;
+				clk = devm_clk_get(&pdev->dev, NULL);
+				clk_disable(clk);
+			}
+#else
 			mvCtrlPwrClckSet(ETH_GIG_UNIT_ID, port, 0);
+#endif
+		}
 	} else {
 
 #ifdef CONFIG_MV_ETH_PNC_WOL
@@ -6535,7 +6545,16 @@ int mv_eth_resume(struct platform_device *pdev)
 
 	if (pp->wol_mode == 0) {
 		/* Set Port Power State to 1 */
+#ifdef CONFIG_ARCH_MVEBU
+		{
+			struct clk *clk;
+			clk = devm_clk_get(&pdev->dev, NULL);
+			clk_enable(clk);
+		}
+#else
 		mvCtrlPwrClckSet(ETH_GIG_UNIT_ID, port, 1);
+#endif
+
 		mdelay(10);
 		if (mv_eth_port_resume(port)) {
 			printk(KERN_ERR "%s: port #%d resume failed.\n", __func__, port);
