@@ -3329,7 +3329,6 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 	handle_group_affinity(port);
 
 	mux_eth_ops.set_tag_type = mv_eth_tag_type_set;
-	mux_eth_ops.promisc_set = mv_eth_port_promisc_set;
 	mv_mux_eth_attach(pp->port, pp->dev, &mux_eth_ops);
 
 #ifdef CONFIG_NETMAP
