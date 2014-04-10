@@ -179,6 +179,38 @@
 				clock-output-names = "nand";
 			};
 
+			mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				compatible = "marvell,orion-mdio";
+				reg = <0xC0054 0x4>;
+			};
+
+			/* Network controller */
+			pp2@f0000 {
+				compatible = "marvell,armada-375-pp2";
+				reg = <0xf0000 0xa000>, /* Packet Processor regs */
+				      <0xc0000 0x3060>, /* LMS regs */
+				      <0xc4000 0x100>,  /* eth0 regs */
+				      <0xc5000 0x100>;  /* eth1 regs */
+				clocks = <&gateclk 3>, <&gateclk 19>;
+				clock-names = "pp_clk", "gop_clk";
+				status = "disabled";
+
+				/* GbE MAC's */
+				eth0: ethernet@c4000 {
+					interrupts-extended = <&mpic 9>;
+					port-id = <0>;
+					status = "disabled";
+				};
+
+				eth1: ethernet@c5000 {
+					interrupts-extended = <&mpic 11>;
+					port-id = <1>;
+					status = "disabled";
+				};
+			};
+
 			gpio0: gpio@18100 {
 				compatible = "marvell,orion-gpio";
 				reg = <0x18100 0x40>;
