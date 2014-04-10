@@ -2291,7 +2291,7 @@ static inline int mv_eth_tso_build_hdr_desc(struct pp2_tx_desc *tx_desc, struct 
 	tx_desc->command = mvPp2TxqDescCsum(mac_hdr_len, skb->protocol, ((u8 *)tcph - (u8 *)iph) >> 2, IPPROTO_TCP);
 	tx_desc->command |= PP2_TX_F_DESC_MASK;
 
-	bufPhysAddr = mvOsCacheFlush(NULL, skb->data, tx_desc->dataSize);
+	bufPhysAddr = mvOsCacheFlush(NULL, data, tx_desc->dataSize);
 	tx_desc->pktOffset = bufPhysAddr & MV_ETH_TX_DESC_ALIGN;
 	tx_desc->bufPhysAddr = bufPhysAddr & (~MV_ETH_TX_DESC_ALIGN);
 
