@@ -37,6 +37,32 @@
 									   size 64K */
 
 		internal-regs {
+			pp2@f0000 {
+				status = "okay";
+
+				ethernet@c4000 {
+					status = "okay";
+					phy = <&phy0>;
+					phy-mode = "rgmii-id";
+				};
+
+				ethernet@c5000 {
+					status = "okay";
+					phy = <&phy3>;
+					phy-mode = "gmii";
+				};
+			};
+
+			mdio {
+				phy0: ethernet-phy@0 {
+					reg = <0>;
+				};
+
+				phy3: ethernet-phy@3 {
+					reg = <3>;
+				};
+			};
+
 			i2c0: i2c@11000 {
 				status = "okay";
 				clock-frequency = <100000>;
