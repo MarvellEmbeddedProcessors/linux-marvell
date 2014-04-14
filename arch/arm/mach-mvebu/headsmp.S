@@ -30,8 +30,10 @@
  */
 ENTRY(armada_xp_secondary_startup)
 
-	/* Add CPU to coherency fabric */
-	bl	ll_set_cpu_coherent
+	bl	ll_add_cpu_to_smp_group
+
+	bl	ll_enable_coherency
+
 	b	secondary_startup
 
 ENDPROC(armada_xp_secondary_startup)

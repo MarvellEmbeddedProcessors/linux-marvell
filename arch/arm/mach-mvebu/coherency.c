@@ -63,8 +63,9 @@ static struct of_device_id of_coherency_table[] = {
 	{ /* end of list */ },
 };
 
-/* Function defined in coherency_ll.S */
-int ll_set_cpu_coherent(void);
+/* Functions defined in coherency_ll.S */
+int ll_enable_coherency(void);
+void ll_add_cpu_to_smp_group(void);
 
 int set_cpu_coherent(void)
 {
@@ -74,7 +75,8 @@ int set_cpu_coherent(void)
 		return 1;
 	}
 
-	return ll_set_cpu_coherent();
+	ll_add_cpu_to_smp_group();
+	return ll_enable_coherency();
 }
 
 static inline void mvebu_hwcc_sync_io_barrier(void)
