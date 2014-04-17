@@ -482,6 +482,22 @@ static void __init build_mem_type_table(const struct machine_desc *mdesc)
 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
 #endif
 
+		/*
+		 * On Cortex-A9 systems, configured in !SMP, proc-v7.S
+		 * has not set the SMP bit and the TLB broadcast
+		 * bit. However, these are needed to use the shareable
+		 * attribute on page tables, which in turn is needed
+		 * for certain systems that provide hardware I/O
+		 * coherency.
+		 */
+		if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9 &&
+		    !is_smp() && (mdesc->flags & MACHINE_NEEDS_SHAREABLE_PAGES)) {
+			u32 reg;
+			asm("mrc p15, 0, %0, c1, c0, 1" : "=r" (reg));
+			reg |= (1 << 6) | (1 << 0);
+			asm("mcr p15, 0, %0, c1, c0, 1" : : "r" (reg));
+		}
+
 		if (is_smp() || (mdesc->flags & MACHINE_NEEDS_SHAREABLE_PAGES)) {
 			/*
 			 * Mark memory with the "shared" attribute
