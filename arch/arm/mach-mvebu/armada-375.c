@@ -137,4 +137,6 @@ DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
 	.init_time	= armada_375_timer_and_clk_init,
 	.restart	= mvebu_restart,
 	.dt_compat	= armada_375_dt_compat,
+	.flags          = (MACHINE_NEEDS_CPOLICY_WRITEALLOC |
+			   MACHINE_NEEDS_SHAREABLE_PAGES),
 MACHINE_END
