@@ -338,7 +338,7 @@ EXPORT_SYMBOL(get_mem_type);
 /*
  * Adjust the PMD section entries according to the CPU in use.
  */
-static void __init build_mem_type_table(void)
+static void __init build_mem_type_table(const struct machine_desc *mdesc)
 {
 	struct cachepolicy *cp;
 	unsigned int cr = get_cr();
@@ -361,7 +361,7 @@ static void __init build_mem_type_table(void)
 			cachepolicy = CPOLICY_WRITEBACK;
 		ecc_mask = 0;
 	}
-	if (is_smp())
+	if (is_smp() || (mdesc->flags & MACHINE_NEEDS_CPOLICY_WRITEALLOC))
 		cachepolicy = CPOLICY_WRITEALLOC;
 
 	/*
@@ -482,7 +482,7 @@ static void __init build_mem_type_table(void)
 		mem_types[MT_CACHECLEAN].prot_sect |= PMD_SECT_APX|PMD_SECT_AP_WRITE;
 #endif
 
-		if (is_smp()) {
+		if (is_smp() || (mdesc->flags & MACHINE_NEEDS_SHAREABLE_PAGES)) {
 			/*
 			 * Mark memory with the "shared" attribute
 			 * for SMP systems
@@ -1314,7 +1314,7 @@ void __init paging_init(struct machine_desc *mdesc)
 
 	memblock_set_current_limit(arm_lowmem_limit);
 
-	build_mem_type_table();
+	build_mem_type_table(mdesc);
 	prepare_page_table();
 	map_lowmem();
 	dma_contiguous_remap();
