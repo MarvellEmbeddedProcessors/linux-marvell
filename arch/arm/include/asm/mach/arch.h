@@ -20,6 +20,10 @@ struct smp_operations;
 #define smp_ops(ops) (struct smp_operations *)NULL
 #endif
 
+/* Possible flags in struct machine_desc */
+#define MACHINE_NEEDS_CPOLICY_WRITEALLOC BIT(0)
+#define MACHINE_NEEDS_SHAREABLE_PAGES    BIT(1)
+
 struct machine_desc {
 	unsigned int		nr;		/* architecture number	*/
 	const char		*name;		/* architecture name	*/
@@ -39,6 +43,7 @@ struct machine_desc {
 	unsigned char		reserve_lp0 :1;	/* never has lp0	*/
 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+	unsigned long           flags;
 	char			restart_mode;	/* default restart mode	*/
 	struct smp_operations	*smp;		/* SMP operations	*/
 	void			(*fixup)(struct tag *, char **,
