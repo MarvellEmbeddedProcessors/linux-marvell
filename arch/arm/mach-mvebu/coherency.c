@@ -202,16 +202,9 @@ static int coherency_type(void)
 
 		type = (int) match->data;
 
-		/* Armada 370/XP coherency works in both UP and SMP */
-		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP)
-			return type;
-
-		/* Armada 38x coherency works only on SMP */
-		else if (type == COHERENCY_FABRIC_TYPE_ARMADA_375 && is_smp())
-			return type;
-
-		/* Armada 38x coherency works only on SMP */
-		if (type == COHERENCY_FABRIC_TYPE_ARMADA_380 && is_smp())
+		if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP ||
+			type == COHERENCY_FABRIC_TYPE_ARMADA_375    ||
+			type == COHERENCY_FABRIC_TYPE_ARMADA_380)
 			return type;
 	}
 
