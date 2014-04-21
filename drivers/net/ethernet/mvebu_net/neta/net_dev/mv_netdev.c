@@ -3985,6 +3985,8 @@ oom:
 }
 
 #ifdef CONFIG_OF
+static int mv_eth_port_num_get(struct platform_device *pdev);
+
 static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 {
 	struct mv_neta_pdata *plat_data;
@@ -4073,6 +4075,7 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 		plat_data->is_rgmii = 0;
 	break;
 	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_RGMII_ID:
 		plat_data->is_sgmii = 0;
 		plat_data->is_rgmii = 1;
 	break;
@@ -4083,7 +4086,7 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 
 	/* Global Parameters */
 	plat_data->tclk = 166666667;    /*mvBoardTclkGet();*/
-	plat_data->max_port = MV_ETH_MAX_PORTS;
+	plat_data->max_port = mv_eth_port_num_get(pdev);
 
 	/* Per port parameters */
 	plat_data->cpu_mask  = 0x3;
@@ -4396,89 +4399,89 @@ void mv_eth_config_show(void)
 #   error "If GSO enabled - TX checksum offload must be enabled too"
 #endif
 
-	printk(KERN_ERR "  o %d Giga ports supported\n", CONFIG_MV_ETH_PORTS_NUM);
+	pr_info("  o %d Giga ports supported\n", mv_eth_ports_num);
 
 #ifdef CONFIG_MV_PON
-	printk(KERN_ERR "  o Giga PON port is #%d: - %d TCONTs supported\n", MV_PON_PORT_ID, MV_ETH_MAX_TCONT());
+	pr_info("  o Giga PON port is #%d: - %d TCONTs supported\n", MV_PON_PORT_ID, MV_ETH_MAX_TCONT());
 #endif
 
 #ifdef CONFIG_NET_SKB_RECYCLE
-	printk(KERN_ERR "  o SKB recycle supported (%s)\n", mv_ctrl_recycle ? "Enabled" : "Disabled");
+	pr_info("  o SKB recycle supported (%s)\n", mv_ctrl_recycle ? "Enabled" : "Disabled");
 #endif
 
 #ifdef CONFIG_MV_ETH_NETA
-	printk(KERN_ERR "  o NETA acceleration mode %d\n", mvNetaAccMode());
+	pr_info("  o NETA acceleration mode %d\n", mvNetaAccMode());
 #endif
 
 #ifdef CONFIG_MV_ETH_BM_CPU
-	printk(KERN_ERR "  o BM supported for CPU: %d BM pools\n", MV_ETH_BM_POOLS);
+	pr_info("  o BM supported for CPU: %d BM pools\n", MV_ETH_BM_POOLS);
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
 #ifdef CONFIG_MV_ETH_PNC
-	printk(KERN_ERR "  o PnC supported (%s)\n", mv_eth_pnc_ctrl_en ? "Enabled" : "Disabled");
+	pr_info("  o PnC supported (%s)\n", mv_eth_pnc_ctrl_en ? "Enabled" : "Disabled");
 #endif
 
 #ifdef CONFIG_MV_ETH_HWF
-	printk(KERN_ERR "  o HWF supported\n");
+	pr_info("  o HWF supported\n");
 #endif
 
 #ifdef CONFIG_MV_ETH_PMT
-	printk(KERN_ERR "  o PMT supported\n");
+	pr_info("  o PMT supported\n");
 #endif
 
-	printk(KERN_ERR "  o RX Queue support: %d Queues * %d Descriptors\n", CONFIG_MV_ETH_RXQ, CONFIG_MV_ETH_RXQ_DESC);
+	pr_info("  o RX Queue support: %d Queues * %d Descriptors\n", CONFIG_MV_ETH_RXQ, CONFIG_MV_ETH_RXQ_DESC);
 
-	printk(KERN_ERR "  o TX Queue support: %d Queues * %d Descriptors\n", CONFIG_MV_ETH_TXQ, CONFIG_MV_ETH_TXQ_DESC);
+	pr_info("  o TX Queue support: %d Queues * %d Descriptors\n", CONFIG_MV_ETH_TXQ, CONFIG_MV_ETH_TXQ_DESC);
 
 #if defined(CONFIG_MV_ETH_TSO)
-	printk(KERN_ERR "  o GSO supported\n");
+	pr_info("  o GSO supported\n");
 #endif /* CONFIG_MV_ETH_TSO */
 
 #if defined(CONFIG_MV_ETH_GRO)
-	printk(KERN_ERR "  o GRO supported\n");
+	pr_info("  o GRO supported\n");
 #endif /* CONFIG_MV_ETH_GRO */
 
 #if defined(CONFIG_MV_ETH_RX_CSUM_OFFLOAD)
-	printk(KERN_ERR "  o Receive checksum offload supported\n");
+	pr_info("  o Receive checksum offload supported\n");
 #endif
 #if defined(CONFIG_MV_ETH_TX_CSUM_OFFLOAD)
-	printk(KERN_ERR "  o Transmit checksum offload supported\n");
+	pr_info("  o Transmit checksum offload supported\n");
 #endif
 
 #if defined(CONFIG_MV_ETH_NFP)
-	printk(KERN_ERR "  o NFP is supported\n");
+	pr_info("  o NFP is supported\n");
 #endif /* CONFIG_MV_ETH_NFP */
 
 #if defined(CONFIG_MV_ETH_NFP_HOOKS)
-	printk(KERN_ERR "  o NFP Hooks are supported\n");
+	pr_info("  o NFP Hooks are supported\n");
 #endif /* CONFIG_MV_ETH_NFP_HOOKS */
 
 #if defined(CONFIG_MV_ETH_NFP_EXT)
-	printk(KERN_ERR "  o NFP External drivers supported: up to %d interfaces\n", NFP_EXT_NUM);
+	pr_info("  o NFP External drivers supported: up to %d interfaces\n", NFP_EXT_NUM);
 #endif /* CONFIG_MV_ETH_NFP_EXT */
 
 #ifdef CONFIG_MV_ETH_STAT_ERR
-	printk(KERN_ERR "  o Driver ERROR statistics enabled\n");
+	pr_info("  o Driver ERROR statistics enabled\n");
 #endif
 
 #ifdef CONFIG_MV_ETH_STAT_INF
-	printk(KERN_ERR "  o Driver INFO statistics enabled\n");
+	pr_info("  o Driver INFO statistics enabled\n");
 #endif
 
 #ifdef CONFIG_MV_ETH_STAT_DBG
-	printk(KERN_ERR "  o Driver DEBUG statistics enabled\n");
+	pr_info("  o Driver DEBUG statistics enabled\n");
 #endif
 
 #ifdef ETH_DEBUG
-	printk(KERN_ERR "  o Driver debug messages enabled\n");
+	pr_info("  o Driver debug messages enabled\n");
 #endif
 
 #if defined(CONFIG_MV_ETH_SWITCH)
-	printk(KERN_ERR "  o Switch support enabled\n");
+	pr_info("  o Switch support enabled\n");
 
 #endif /* CONFIG_MV_ETH_SWITCH */
 
-	printk(KERN_ERR "\n");
+	pr_info("\n");
 }
 
 /* Set network device features on initialization. Take into account default compile time configuration. */
@@ -6612,6 +6615,20 @@ static const struct of_device_id mvneta_match[] = {
 	{ }
 };
 MODULE_DEVICE_TABLE(of, mvneta_match);
+
+static int mv_eth_port_num_get(struct platform_device *pdev)
+{
+	int port_num = 0;
+	int tbl_id;
+	struct device_node *np = pdev->dev.of_node;
+
+	for (tbl_id = 0; tbl_id < (sizeof(mvneta_match) / sizeof(struct of_device_id)); tbl_id++) {
+		for_each_compatible_node(np, NULL, mvneta_match[tbl_id].compatible)
+			port_num++;
+	}
+
+	return port_num;
+}
 #endif /* CONFIG_OF */
 
 static struct platform_driver mv_eth_driver = {
