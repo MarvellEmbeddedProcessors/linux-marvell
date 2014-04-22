@@ -99,8 +99,8 @@ static ssize_t mv_mux_netdev_store(struct device *dev,
 
 	} else if (!strcmp(name, "mh_rx")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
-		mux_cfg.rx_tag_ptrn.mh = a;
-		mux_cfg.rx_tag_mask.mh = b;
+		mux_cfg.rx_tag_ptrn.mh = MV_16BIT_BE((MV_U16)a);
+		mux_cfg.rx_tag_mask.mh = MV_16BIT_BE((MV_U16)b);
 		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
 
 	} else if (!strcmp(name, "dsa_rx")) {
@@ -123,7 +123,7 @@ static ssize_t mv_mux_netdev_store(struct device *dev,
 
 	}  else if (!strcmp(name, "mh_tx")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
-		mux_cfg.tx_tag.mh = a;
+		mux_cfg.tx_tag.mh = MV_16BIT_BE((MV_U16)a);
 		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
 
 	}  else if (!strcmp(name, "dsa_tx")) {

@@ -1127,7 +1127,7 @@ int mv_eth_ctrl_tx_mh(int port, u16 mh)
 	if (!pp)
 		return -ENODEV;
 
-	pp->tx_spec.tx_mh = MV_16BIT_BE(mh);
+	pp->tx_spec.tx_mh = mh;
 
 	return 0;
 }
