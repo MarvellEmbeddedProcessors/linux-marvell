@@ -247,7 +247,7 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	} else if (!strcmp(name, "tx_cmd")) {
 		err = mv_eth_ctrl_tx_cmd(p, v);
 	} else if (!strcmp(name, "mh_2B")) {
-		err = mv_eth_ctrl_tx_mh(p, (u16)v);
+		err = mv_eth_ctrl_tx_mh(p, MV_16BIT_BE((u16)v));
 	} else if (!strcmp(name, "mh_en")) {
 		err = mv_eth_ctrl_flag(p, MV_ETH_F_MH, v);
 	} else if (!strcmp(name, "tx_nopad")) {

@@ -103,7 +103,7 @@ static ssize_t mv_eth_tx_hex_store(struct device *dev,
 		err = mv_eth_ctrl_tx_flag(p, MV_ETH_TX_F_MH, v & 0x2);
 		err = mv_eth_ctrl_tx_flag(p, MV_ETH_TX_F_HW_CMD, v & 0x4);
 	} else if (!strcmp(name, "txMH")) {
-		err = mv_eth_ctrl_tx_mh(p, (u16)v);
+		err = mv_eth_ctrl_tx_mh(p, MV_16BIT_BE((u16)v));
 	} else {
 		err = 1;
 		printk(KERN_ERR "%s: illegal operation <%s>\n", __func__, attr->attr.name);
