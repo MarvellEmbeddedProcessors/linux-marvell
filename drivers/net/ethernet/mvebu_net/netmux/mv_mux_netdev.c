@@ -567,6 +567,11 @@ struct net_device *mv_mux_netdev_alloc(char *name, int idx, MV_MUX_TAG *tag_cfg)
 			return NULL;
 		}
 
+		/*initialization for new net device*/
+		pmux_priv = MV_MUX_PRIV(mux_dev);
+		memset(pmux_priv, 0, sizeof(struct mux_netdev));
+		pmux_priv->port = -1;
+		pmux_priv->next = NULL;
 	} else
 		dev_put(mux_dev);
 
@@ -701,11 +706,16 @@ struct net_device *mv_mux_netdev_add(int port, struct net_device *mux_dev)
 		mux_eth_shadow[port].switch_dev = mux_dev;
 	} else {
 		pdev = MV_MUX_PRIV(switch_dev);
-		while (pdev->next != NULL) {
+		dev_temp = switch_dev;
+		while ((mux_dev != dev_temp) && (pdev->next != NULL)) {
 			dev_temp = pdev->next;
 			pdev = MV_MUX_PRIV(dev_temp);
 		}
-		pdev->next = mux_dev;
+		/*check whether mux_dev is already in the physical port*/
+		if (mux_dev == dev_temp)
+			netdev_info(mux_dev, "this mux interface is already in port %d\n", port);
+		else
+			pdev->next = mux_dev;
 	}
 
 	if (!mux_init_cnt)
@@ -766,7 +776,7 @@ int mv_mux_netdev_delete(struct net_device *mux_dev)
 {
 	struct net_device *pdev_curr, *pdev_prev = NULL;
 	struct mux_netdev *pdev_tmp_curr, *pdev_tmp_prev, *pdev;
-	struct net_device *root;
+	struct net_device *root = NULL;
 	int flgs, port;
 
 	if (mux_dev == NULL) {
@@ -776,7 +786,8 @@ int mv_mux_netdev_delete(struct net_device *mux_dev)
 	pdev = MV_MUX_PRIV(mux_dev);
 	port = pdev->port;
 
-	root = mux_eth_shadow[pdev->port].root;
+	if (port != -1)
+		root = mux_eth_shadow[pdev->port].root;
 
 	/*not attached to gbe port*/
 	if (root == NULL) {
