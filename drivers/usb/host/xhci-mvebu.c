@@ -90,26 +90,6 @@ int xhci_mvebu_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-#ifdef CONFIG_A375_Z1_USB3_LFPS_FREQ_WA
-/*
- * All defines below are used for a temporary workaround and therefore
- * are placed inside the code and not in an include file
- */
-#define USB3_CNTR_PULSE_WIDTH_OFFSET	(0x10454)
-#define REF_CLK_100NS_OFFSET		(24)
-#define REF_CLK_100NS_MASK		(0xFF)
-
-	/* Modify the LFPS timing to fix clock issues on ALP-Z1 */
-	if (of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,xhci-armada-375")) {
-		struct usb_hcd *hcd = dev_get_drvdata(&pdev->dev);
-		writel((readl(hcd->regs + USB3_CNTR_PULSE_WIDTH_OFFSET)
-				& ~(REF_CLK_100NS_MASK << REF_CLK_100NS_OFFSET))
-			| (0x10 << REF_CLK_100NS_OFFSET),
-			hcd->regs + USB3_CNTR_PULSE_WIDTH_OFFSET);
-	}
-#endif
-
 	return ret;
 }
 
