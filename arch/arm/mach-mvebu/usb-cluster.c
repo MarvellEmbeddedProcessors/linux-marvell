@@ -54,8 +54,8 @@ static int __init mvebu_usb_cluster_init(void)
 		if (ehci_node && of_device_is_available(ehci_node)
 			&& use_usb3) {
 			/*
-			 * We can't use usb2 and usb3 in the same time, so let's
-			 * disbale usb2 and complain about it to the user askinf
+			 * We can't use the first usb2 unit and usb3 in the same time, so let's
+			 * disbale usb2 and complain about it to the user asking
 			 * to fix the device tree.
 			 */
 
