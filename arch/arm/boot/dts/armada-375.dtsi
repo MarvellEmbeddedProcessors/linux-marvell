@@ -391,11 +391,11 @@
 			};
 
 			/*
-			 * On Armada 375, USB2 host controller and
+			 * On Armada 375, USB2 host controller #0 and
 			 * USB3 host controller are incompatible. That
 			 * means that in the dts of your board, you
-			 * can either select the USB2 controller:
-			 * marvell,orion-ehci or the USB3 controller:
+			 * can either select the first USB2 controller:
+			 * marvell,orion-ehci (@0x50000) or the USB3 controller:
 			 * marvell,xhci-armada-375, but not both. If
 			 * both controllers are selected, then the
 			 * kernel will select the USB3 by default.
@@ -405,6 +405,22 @@
 				reg = <0x50000 0x500>;
 				interrupts = <0 17 4>;
 				clocks = <&gateclk 18>;
+				status = "disabled";
+			};
+
+			usb@54000 {
+				compatible = "marvell,orion-ehci";
+				reg = <0x54000 0x500>;
+				interrupts = <0 18 4>;
+				clocks = <&gateclk 26>;
+				status = "disabled";
+			};
+
+			usb3@58000 {
+				compatible = "marvell,xhci-armada-375";
+				reg = <0x58000 0x4000>,<0x5b880 0x80>;
+				interrupts = <0 16 4>;
+				clocks = <&gateclk 16>;
 				status = "disabled";
 			};
 
@@ -517,24 +533,6 @@
 				status = "disabled";
 			};
 
-		};
-
-		/*
-		 * On Armada 375, USB2 host controller and USB3 host
-		 * controller are incompatible. That means that in the
-		 * dts of your board, you can either select the USB2
-		 * controller: marvell,orion-ehci or the USB3
-		 * controller: marvell,xhci-armada-375, but not
-		 * both. If both controllers are selected, then the
-		 * kernel will select the USB3 by default.
-		 */
-		usb3-controller {
-			compatible = "marvell,xhci-armada-375";
-			reg = <MBUS_ID(0x05, 0x00) 0 0x20000>,
-				<MBUS_ID(0xf0, 0x01) 0x5ff80 0x80>;
-			interrupts = <0 16 4>;
-			clocks = <&gateclk 16>;
-			status = "disabled";
 		};
 	};
 };
