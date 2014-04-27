@@ -88,15 +88,6 @@ config MACH_ARMADA_XP
 	  on the Marvell Armada XP SoC with device tree.
 
 
-config A375_Z1_USB3_LFPS_FREQ_WA
-	bool "Enable the LFPS frequency workaround for USB3"
-	default y
-	help
-
-	  This flag enables a workaround for USB3 in Armada 375. It fixes
-	  the USB3 LFPS timing to fix some clock issues in the integration
-	  of USB3. This WA is needed only for Z1 devices
-
 endmenu
 
 endif
