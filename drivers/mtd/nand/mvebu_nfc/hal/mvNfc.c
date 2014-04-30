@@ -152,6 +152,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DBGPRINT(x)	printk(x)
 #define DBGLVL		KERN_INFO
 
+
+
+#ifndef MV_NAND_REG_BIT_SET
+#define MV_NAND_REG_BIT_SET	MV_REG_BIT_SET
+#endif
+#ifndef MV_NAND_REG_BIT_RESET
+#define MV_NAND_REG_BIT_RESET	MV_REG_BIT_RESET
+#endif
+
+#ifndef MV_NAND_REG_WRITE
+#define MV_NAND_REG_WRITE	MV_REG_WRITE
+#endif
+
+#ifndef MV_NAND_REG_READ
+#define MV_NAND_REG_READ	MV_REG_READ
+#endif
+
+
 /***********/
 /* Typedef */
 /***********/
@@ -607,10 +625,10 @@ MV_VOID nfc_dbg_write(MV_U32 addr, MV_U32 val)
 		mvOsPrintf("NFC write 0x%08x = %08x\n", addr, val);
 }
 
-#undef MV_REG_READ
-#undef MV_REG_WRITE
-#define MV_REG_READ(x)		nfc_dbg_read(x)
-#define MV_REG_WRITE(x, y)	nfc_dbg_write(x, y)
+#undef MV_NAND_REG_READ
+#undef MV_NAND_REG_WRITE
+#define MV_NAND_REG_READ(x)		nfc_dbg_read(x)
+#define MV_NAND_REG_WRITE(x, y)		nfc_dbg_write(x, y)
 #endif
 
 /**************/
@@ -670,13 +688,13 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	DB(mvOsPrintf("mvNfcInit: set nand clock to %d\n", nand_clock));
 
 	/* Relax Timing configurations to avoid timing violations after flash reset */
-	MV_REG_WRITE(NFC_TIMING_0_REG, 0xFC3F3F7F);
-	MV_REG_WRITE(NFC_TIMING_1_REG, 0x00FF83FF);
+	MV_NAND_REG_WRITE(NFC_TIMING_0_REG, 0xFC3F3F7F);
+	MV_NAND_REG_WRITE(NFC_TIMING_1_REG, 0x00FF83FF);
 
 	/* make sure ECC is disabled at this point - will be enabled only when issuing certain commands */
-	MV_REG_BIT_RESET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
+	MV_NAND_REG_BIT_RESET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
 	if (nfcInfo->eccMode != MV_NFC_ECC_HAMMING)
-		MV_REG_BIT_RESET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
+		MV_NAND_REG_BIT_RESET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
 
 	if ((nfcInfo->eccMode == MV_NFC_ECC_BCH_1K) ||
 	    (nfcInfo->eccMode == MV_NFC_ECC_BCH_704B) || (nfcInfo->eccMode == MV_NFC_ECC_BCH_512B))
@@ -709,7 +727,7 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	ctrl_reg |= NFC_CTRL_ND_ARB_EN_MASK;
 
 	/* Write registers before device detection */
-	MV_REG_WRITE(NFC_CONTROL_REG, ctrl_reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, ctrl_reg);
 
 #ifdef MTD_NAND_NFC_INIT_RESET
 	/* reset the device */
@@ -787,7 +805,7 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	}
 
 	/* Configure the control register based on the device detected */
-	ctrl_reg = MV_REG_READ(NFC_CONTROL_REG);
+	ctrl_reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 
 	/* Configure DMA */
 	if (nfcInfo->ioMode == MV_NFC_PDMA_ACCESS)
@@ -851,7 +869,7 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	}
 
 	/* Write the updated control register */
-	MV_REG_WRITE(NFC_CONTROL_REG, ctrl_reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, ctrl_reg);
 
 #ifdef MV_INCLUDE_PDMA
 	/* DMA resource allocation */
@@ -1434,7 +1452,7 @@ MV_STATUS mvNfcCommandMultiple(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *descInfo,
 	/* Start the whole command chain through setting the ND_RUN */
 	/* Setting ND_RUN bit to start the new transaction - verify that controller in idle state */
 	while (timeout > 0) {
-		reg = MV_REG_READ(NFC_CONTROL_REG);
+		reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 		if (!(reg & NFC_CTRL_ND_RUN_MASK))
 			break;
 		timeout--;
@@ -1461,14 +1479,14 @@ MV_STATUS mvNfcCommandMultiple(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *descInfo,
 			if ((descInfo[i].cmd == MV_NFC_CMD_READ_ID) || (descInfo[i].cmd == MV_NFC_CMD_READ_STATUS) ||
 			    (descInfo[i].cmd == MV_NFC_CMD_ERASE) || (descInfo[i].cmd == MV_NFC_CMD_RESET)) {
 				/* disable ECC for these commands */
-				MV_REG_BIT_RESET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
+				MV_NAND_REG_BIT_RESET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
 				if (nfcCtrl->eccMode != MV_NFC_ECC_HAMMING)
-					MV_REG_BIT_RESET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
+					MV_NAND_REG_BIT_RESET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
 			} else {
 				/* enable ECC for all other commands */
-				MV_REG_BIT_SET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
+				MV_NAND_REG_BIT_SET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
 				if (nfcCtrl->eccMode != MV_NFC_ECC_HAMMING)
-					MV_REG_BIT_SET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
+					MV_NAND_REG_BIT_SET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
 			}
 		}
 
@@ -1623,13 +1641,13 @@ MV_STATUS mvNfcCommandMultiple(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *descInfo,
 		return MV_HW_ERROR;
 
 	/* Clear all old events on the status register */
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Start the whole command chain through setting the ND_RUN */
 	/* Setting ND_RUN bit to start the new transaction - verify that controller in idle state */
 	while (timeout > 0) {
-		reg = MV_REG_READ(NFC_CONTROL_REG);
+		reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 		if (!(reg & NFC_CTRL_ND_RUN_MASK))
 			break;
 		timeout--;
@@ -1638,7 +1656,7 @@ MV_STATUS mvNfcCommandMultiple(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *descInfo,
 		return MV_BAD_STATE;
 
 	reg |= NFC_CTRL_ND_RUN_MASK;
-	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, reg);
 
 	return MV_OK;
 }
@@ -1676,12 +1694,12 @@ MV_STATUS mvNfcCommandPio(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *cmd_desc, MV_B
 		return MV_FAIL;
 
 	/* Clear all old events on the status register */
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Setting ND_RUN bit to start the new transaction - verify that controller in idle state */
 	while (timeout > 0) {
-		reg = MV_REG_READ(NFC_CONTROL_REG);
+		reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 		if (!(reg & NFC_CTRL_ND_RUN_MASK))
 			break;
 		timeout--;
@@ -1691,7 +1709,7 @@ MV_STATUS mvNfcCommandPio(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *cmd_desc, MV_B
 		return MV_BAD_STATE;
 
 	reg |= NFC_CTRL_ND_RUN_MASK;
-	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, reg);
 
 	/* Wait for Command WRITE request */
 	mvDfcWait4Complete(NFC_SR_WRCMDREQ_MASK, 1);
@@ -1715,16 +1733,16 @@ MV_STATUS mvNfcCommandPio(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *cmd_desc, MV_B
 		case MV_NFC_CMD_WRITE_NAKED:
 		case MV_NFC_CMD_WRITE_LAST_NAKED:
 			if (nfcCtrl->eccMode != MV_NFC_ECC_DISABLE) {
-				MV_REG_BIT_SET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
+				MV_NAND_REG_BIT_SET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
 				if (nfcCtrl->eccMode != MV_NFC_ECC_HAMMING)
-					MV_REG_BIT_SET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
+					MV_NAND_REG_BIT_SET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
 			}
 			break;
 
 		default:
 			/* disable ECC for non-data commands */
-			MV_REG_BIT_RESET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
-			MV_REG_BIT_RESET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
+			MV_NAND_REG_BIT_RESET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
+			MV_NAND_REG_BIT_RESET(NFC_ECC_CONTROL_REG, NFC_ECC_BCH_EN_MASK);
 			break;
 		};
 	}
@@ -1739,10 +1757,10 @@ MV_STATUS mvNfcCommandPio(MV_NFC_CTRL *nfcCtrl, MV_NFC_MULTI_CMD *cmd_desc, MV_B
 		cmdb[0] |= NFC_CB0_NEXT_CMD_MASK;
 
 	/* issue command */
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb[0]);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb[1]);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb[2]);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb[3]);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb[0]);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb[1]);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb[2]);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb[3]);
 
 	return MV_OK;
 }
@@ -1771,7 +1789,7 @@ MV_U32 mvNfcStatusGet(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *value)
 {
 	MV_U32 reg, ret;
 
-	reg = MV_REG_READ(NFC_STATUS_REG);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
 	if (reg == 0)
 		return 0;
 
@@ -1819,7 +1837,7 @@ MV_U32 mvNfcStatusGet(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *value)
 	}
 
 	/* Clear out all reported events */
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	return ret;
 }
@@ -1868,13 +1886,13 @@ MV_STATUS mvNfcIntrSet(MV_NFC_CTRL *nfcCtrl, MV_U32 intMask, MV_BOOL enable)
 			msk |= NFC_SR_RDY0_MASK;
 	}
 
-	reg = MV_REG_READ(NFC_CONTROL_REG);
+	reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 	if (enable)
 		reg &= ~msk;
 	else
 		reg |= msk;
 
-	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, reg);
 
 	return MV_OK;
 }
@@ -1986,7 +2004,7 @@ MV_STATUS mvNfcReadWrite(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *virt
 		} else {	/* PIO mode */
 
 			for (i = 0; i < data_len; i += 4) {
-				*virtBufAddr = MV_LE32_TO_CPU(MV_REG_READ(NFC_DATA_BUFF_REG));
+				*virtBufAddr = MV_LE32_TO_CPU(MV_NAND_REG_READ(NFC_DATA_BUFF_REG));
 				virtBufAddr++;
 			}
 		}
@@ -2011,7 +2029,7 @@ MV_STATUS mvNfcReadWrite(MV_NFC_CTRL *nfcCtrl, MV_NFC_CMD_TYPE cmd, MV_U32 *virt
 		} else {	/* PIO mode */
 
 			for (i = 0; i < data_len; i += 4) {
-				MV_REG_WRITE(NFC_DATA_BUFF_REG, MV_CPU_TO_LE32(*virtBufAddr));
+				MV_NAND_REG_WRITE(NFC_DATA_BUFF_REG, MV_CPU_TO_LE32(*virtBufAddr));
 				virtBufAddr++;
 			}
 		}
@@ -2049,7 +2067,7 @@ MV_VOID mvNfcReadWritePio(MV_NFC_CTRL *nfcCtrl, MV_U32 *buff, MV_U32 data_len, M
 	switch (mode) {
 	case MV_NFC_PIO_READ:
 		for (i = 0; i < data_len; i += 4) {
-			*buff = MV_LE32_TO_CPU(MV_REG_READ(NFC_DATA_BUFF_REG));
+			*buff = MV_LE32_TO_CPU(MV_NAND_REG_READ(NFC_DATA_BUFF_REG));
 			buff++;
 			/* For BCH ECC check if RDDREQ bit is set every 32 bytes */
 			if (((nfcCtrl->eccMode == MV_NFC_ECC_BCH_2K) ||
@@ -2065,7 +2083,7 @@ MV_VOID mvNfcReadWritePio(MV_NFC_CTRL *nfcCtrl, MV_U32 *buff, MV_U32 data_len, M
 
 	case MV_NFC_PIO_WRITE:	/* Program a single page of 512B or 2KB */
 		for (i = 0; i < data_len; i += 4) {
-			MV_REG_WRITE(NFC_DATA_BUFF_REG, MV_CPU_TO_LE32(*buff));
+			MV_NAND_REG_WRITE(NFC_DATA_BUFF_REG, MV_CPU_TO_LE32(*buff));
 			buff++;
 		}
 		break;
@@ -2312,16 +2330,16 @@ MV_STATUS mvNfcUnitStateStore(MV_U32 *stateData, MV_U32 *len)
 	i = 0;
 
 	stateData[i++] = NFC_CONTROL_REG;
-	stateData[i++] = MV_REG_READ(NFC_CONTROL_REG);
+	stateData[i++] = MV_NAND_REG_READ(NFC_CONTROL_REG);
 
 	stateData[i++] = NFC_TIMING_0_REG;
-	stateData[i++] = MV_REG_READ(NFC_TIMING_0_REG);
+	stateData[i++] = MV_NAND_REG_READ(NFC_TIMING_0_REG);
 
 	stateData[i++] = NFC_TIMING_1_REG;
-	stateData[i++] = MV_REG_READ(NFC_TIMING_1_REG);
+	stateData[i++] = MV_NAND_REG_READ(NFC_TIMING_1_REG);
 
 	stateData[i++] = NFC_ECC_CONTROL_REG;
-	stateData[i++] = MV_REG_READ(NFC_ECC_CONTROL_REG);
+	stateData[i++] = MV_NAND_REG_READ(NFC_ECC_CONTROL_REG);
 	*len = i;
 
 	return MV_OK;
@@ -2349,9 +2367,9 @@ static MV_STATUS mvDfcWait4Complete(MV_U32 statMask, MV_U32 usec)
 	MV_U32 i, sts;
 
 	for (i = 0; i < usec; i++) {
-		sts = (MV_REG_READ(NFC_STATUS_REG) & statMask);
+		sts = (MV_NAND_REG_READ(NFC_STATUS_REG) & statMask);
 		if (sts) {
-			MV_REG_WRITE(NFC_STATUS_REG, sts);
+			MV_NAND_REG_WRITE(NFC_STATUS_REG, sts);
 			return MV_OK;
 		}
 		mvOsUDelay(1);
@@ -2387,21 +2405,21 @@ static MV_STATUS mvNfcDeviceFeatureSet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 ad
 	MV_U32 timeout = 10000;
 
 	/* Clear all old events on the status register */
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Setting ND_RUN bit to start the new transaction */
-	reg = MV_REG_READ(NFC_CONTROL_REG);
+	reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 	reg |= NFC_CTRL_ND_RUN_MASK;
-	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, reg);
 
 	/* Wait for Command WRITE request */
 	errCode = mvDfcWait4Complete(NFC_SR_WRCMDREQ_MASK, 1);
 	if (errCode != MV_OK)
 		goto Error_1;
 
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Send Naked Command Dispatch Command*/
 	reg = cmd;
@@ -2410,10 +2428,10 @@ static MV_STATUS mvNfcDeviceFeatureSet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 ad
 	reg |= NFC_CB0_CMD_TYPE_WRITE;
 	reg |= NFC_CB0_LEN_OVRD_MASK;
 
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, addr);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x8);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, addr);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x8);
 
 	/* Wait for Data READ request */
 	errCode = mvDfcWait4Complete(NFC_SR_WRDREQ_MASK, 10);
@@ -2422,8 +2440,8 @@ static MV_STATUS mvNfcDeviceFeatureSet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 ad
 
 	mvOsUDelay(100);
 
-	MV_REG_WRITE(NFC_DATA_BUFF_REG, data0);
-	MV_REG_WRITE(NFC_DATA_BUFF_REG, data1);
+	MV_NAND_REG_WRITE(NFC_DATA_BUFF_REG, data0);
+	MV_NAND_REG_WRITE(NFC_DATA_BUFF_REG, data1);
 
 	/* Wait for Data READ request */
 	errCode = mvDfcWait4Complete(NFC_SR_RDY0_MASK, 10);
@@ -2432,7 +2450,7 @@ static MV_STATUS mvNfcDeviceFeatureSet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 ad
 
 	/* Wait for ND_RUN bit to get cleared. */
 	while (timeout > 0) {
-		reg = MV_REG_READ(NFC_CONTROL_REG);
+		reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 		if (!(reg & NFC_CTRL_ND_RUN_MASK))
 			break;
 		timeout--;
@@ -2470,21 +2488,21 @@ static MV_STATUS mvNfcDeviceFeatureGet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 ad
 	MV_U32 timeout = 10000;
 
 	/* Clear all old events on the status register */
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Setting ND_RUN bit to start the new transaction */
-	reg = MV_REG_READ(NFC_CONTROL_REG);
+	reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 	reg |= NFC_CTRL_ND_RUN_MASK;
-	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, reg);
 
 	/* Wait for Command WRITE request */
 	errCode = mvDfcWait4Complete(NFC_SR_WRCMDREQ_MASK, 1);
 	if (errCode != MV_OK)
 		goto Error_2;
 
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Send Read Command */
 	reg = cmd;
@@ -2493,10 +2511,10 @@ static MV_STATUS mvNfcDeviceFeatureGet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 ad
 	reg |= NFC_CB0_CMD_TYPE_READ;
 	reg |= NFC_CB0_LEN_OVRD_MASK;
 
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, addr);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x8);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, addr);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x8);
 
 	/* Wait for READY */
 	errCode = mvDfcWait4Complete(NFC_SR_RDY0_MASK, 10);
@@ -2510,10 +2528,10 @@ static MV_STATUS mvNfcDeviceFeatureGet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 ad
 	reg |= NFC_CB0_CMD_TYPE_READ;
 	reg |= NFC_CB0_LEN_OVRD_MASK;
 
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x8);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x8);
 
 	/* Wait for Data READ request */
 	errCode = mvDfcWait4Complete(NFC_SR_RDDREQ_MASK, 100);
@@ -2521,12 +2539,12 @@ static MV_STATUS mvNfcDeviceFeatureGet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 ad
 		return errCode;
 
 	/*  Read the data + read 4 bogus bytes */
-	*data0 = MV_REG_READ(NFC_DATA_BUFF_REG);
-	*data1 = MV_REG_READ(NFC_DATA_BUFF_REG);
+	*data0 = MV_NAND_REG_READ(NFC_DATA_BUFF_REG);
+	*data1 = MV_NAND_REG_READ(NFC_DATA_BUFF_REG);
 
 	/* Wait for ND_RUN bit to get cleared. */
 	while (timeout > 0) {
-		reg = MV_REG_READ(NFC_CONTROL_REG);
+		reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 		if (!(reg & NFC_CTRL_ND_RUN_MASK))
 			break;
 		timeout--;
@@ -2585,13 +2603,13 @@ MV_STATUS mvNfcReset(void)
 	MV_U32 timeout = 10000;
 
 	/* Clear all old events on the status register */
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Setting ND_RUN bit to start the new transaction */
-	reg = MV_REG_READ(NFC_CONTROL_REG);
+	reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 	reg |= NFC_CTRL_ND_RUN_MASK;
-	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, reg);
 
 	/* Wait for Command WRITE request */
 	errCode = mvDfcWait4Complete(NFC_SR_WRCMDREQ_MASK, 1);
@@ -2599,9 +2617,9 @@ MV_STATUS mvNfcReset(void)
 		goto Error_3;
 
 	/* Send Command */
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x00A000FF);	/* DFC_NDCB0_RESET */
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x00A000FF);	/* DFC_NDCB0_RESET */
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
 
 	/* Wait for Command completion */
 	errCode = mvDfcWait4Complete(NFC_SR_RDY0_MASK, 1000);
@@ -2610,7 +2628,7 @@ MV_STATUS mvNfcReset(void)
 
 	/* Wait for ND_RUN bit to get cleared. */
 	while (timeout > 0) {
-		reg = MV_REG_READ(NFC_CONTROL_REG);
+		reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 		if (!(reg & NFC_CTRL_ND_RUN_MASK))
 			break;
 		timeout--;
@@ -2645,13 +2663,13 @@ static MV_STATUS mvNfcReadIdNative(MV_NFC_CHIP_SEL cs, MV_U16 *id)
 	MV_U32 errCode = MV_OK;
 
 	/* Clear all old events on the status register */
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Setting ND_RUN bit to start the new transaction */
-	reg = MV_REG_READ(NFC_CONTROL_REG);
+	reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 	reg |= NFC_CTRL_ND_RUN_MASK;
-	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, reg);
 
 	/* Wait for Command WRITE request */
 	errCode = mvDfcWait4Complete(NFC_SR_WRCMDREQ_MASK, 1);
@@ -2669,9 +2687,9 @@ static MV_STATUS mvNfcReadIdNative(MV_NFC_CHIP_SEL cs, MV_U16 *id)
 	if ((cs == MV_NFC_CS_2) || (cs == MV_NFC_CS_3))
 		cmdb2 |= NFC_CB2_CS_2_3_SELECT_MASK;
 
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb2);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0x0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, cmdb2);
 
 	/* Wait for Data READ request */
 	mvDfcWait4Complete(NFC_SR_RDDREQ_MASK, 10);
@@ -2679,12 +2697,12 @@ static MV_STATUS mvNfcReadIdNative(MV_NFC_CHIP_SEL cs, MV_U16 *id)
 		return errCode;
 
 	/*  Read the read ID bytes. + read 4 bogus bytes */
-	*id = (MV_U16) (MV_REG_READ(NFC_DATA_BUFF_REG) & 0xFFFF);
-	reg = MV_REG_READ(NFC_DATA_BUFF_REG);	/* dummy read to complete 8 bytes */
+	*id = (MV_U16) (MV_NAND_REG_READ(NFC_DATA_BUFF_REG) & 0xFFFF);
+	reg = MV_NAND_REG_READ(NFC_DATA_BUFF_REG);	/* dummy read to complete 8 bytes */
 
-	reg = MV_REG_READ(NFC_CONTROL_REG);
+	reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 	if (reg & NFC_CTRL_ND_RUN_MASK) {
-		MV_REG_WRITE(NFC_CONTROL_REG, (reg & ~NFC_CTRL_ND_RUN_MASK));
+		MV_NAND_REG_WRITE(NFC_CONTROL_REG, (reg & ~NFC_CTRL_ND_RUN_MASK));
 		return MV_BAD_STATE;
 	}
 
@@ -2804,7 +2822,7 @@ static MV_STATUS mvNfcTimingSet(MV_U32 tclk, MV_NFC_FLASH_INFO *flInfo)
 		((trp_nfc >> 3) << NFC_TMNG0_ETRP_OFFS) |
 		(trh_nfc << NFC_TMNG0_TRH_OFFS) |
 		((trp_nfc & 0x7) << NFC_TMNG0_TRP_OFFS));
-	MV_REG_WRITE(NFC_TIMING_0_REG, reg);
+	MV_NAND_REG_WRITE(NFC_TIMING_0_REG, reg);
 
 	/* Calculate the timing configurations for register1 */
 	tr_nfc = (ns_clk(flInfo->tR, clk2ns) - tch_nfc - 3);
@@ -2869,7 +2887,7 @@ static MV_STATUS mvNfcTimingSet(MV_U32 tclk, MV_NFC_FLASH_INFO *flInfo)
 #ifndef MTD_NAND_NFC_NEGLECT_RNB
 	reg |= (0x1 << NFC_TMNG1_WAIT_MODE_OFFS);
 #endif
-	MV_REG_WRITE(NFC_TIMING_1_REG, reg);
+	MV_NAND_REG_WRITE(NFC_TIMING_1_REG, reg);
 
 	return MV_OK;
 }
@@ -2988,13 +3006,13 @@ static MV_STATUS mvNfcReadParamPage(struct parameter_page_t *ppage)
 	MV_U32 timeout = 10000;
 
 	/* Clear all old events on the status register */
-	reg = MV_REG_READ(NFC_STATUS_REG);
-	MV_REG_WRITE(NFC_STATUS_REG, reg);
+	reg = MV_NAND_REG_READ(NFC_STATUS_REG);
+	MV_NAND_REG_WRITE(NFC_STATUS_REG, reg);
 
 	/* Setting ND_RUN bit to start the new transaction */
-	reg = MV_REG_READ(NFC_CONTROL_REG);
+	reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 	reg |= NFC_CTRL_ND_RUN_MASK;
-	MV_REG_WRITE(NFC_CONTROL_REG, reg);
+	MV_NAND_REG_WRITE(NFC_CONTROL_REG, reg);
 
 	/* Wait for Command WRITE request */
 	errCode = mvDfcWait4Complete(NFC_SR_WRCMDREQ_MASK, 1);
@@ -3008,10 +3026,10 @@ static MV_STATUS mvNfcReadParamPage(struct parameter_page_t *ppage)
 	reg |= NFC_CB0_CMD_TYPE_READ;
 	reg |= NFC_CB0_LEN_OVRD_MASK;
 
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0);
-	MV_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 128);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, reg);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 0);
+	MV_NAND_REG_WRITE(NFC_COMMAND_BUFF_0_REG, 128);
 
 	/* Wait for READY */
 	errCode = mvDfcWait4Complete(NFC_SR_RDY0_MASK, 100);
@@ -3021,11 +3039,11 @@ static MV_STATUS mvNfcReadParamPage(struct parameter_page_t *ppage)
 
 	/*  Read the data 129 bytes */
 	for (i = 0; i < (NUM_OF_PPAGE_BYTES / 4); i++)
-		*pBuf++ = MV_REG_READ(NFC_DATA_BUFF_REG);
+		*pBuf++ = MV_NAND_REG_READ(NFC_DATA_BUFF_REG);
 
 	/* Wait for ND_RUN bit to get cleared. */
 	while (timeout > 0) {
-		reg = MV_REG_READ(NFC_CONTROL_REG);
+		reg = MV_NAND_REG_READ(NFC_CONTROL_REG);
 		if (!(reg & NFC_CTRL_ND_RUN_MASK))
 			break;
 		timeout--;
