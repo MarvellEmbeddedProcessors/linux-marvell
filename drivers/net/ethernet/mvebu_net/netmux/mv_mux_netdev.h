@@ -28,6 +28,7 @@ disclaimer.
 #ifndef __mv_tag_netdev_h__
 #define __mv_tag_netdev_h__
 
+#include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -39,8 +40,13 @@ disclaimer.
 #include "mv802_3.h"
 
 #define MV_MUX_SKB_TAG_VAL		(0xabcd)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+#define MV_MUX_SKB_TAG_SET(skb)		(skb->iif = (MV_MUX_SKB_TAG_VAL))
+#define MV_MUX_SKB_IS_TAGGED(skb)	(skb->iif == (MV_MUX_SKB_TAG_VAL))
+#else
 #define MV_MUX_SKB_TAG_SET(skb)		(skb->skb_iif = (MV_MUX_SKB_TAG_VAL))
 #define MV_MUX_SKB_IS_TAGGED(skb)	(skb->skb_iif == (MV_MUX_SKB_TAG_VAL))
+#endif
 
 extern const struct ethtool_ops mv_mux_tool_ops;
 
