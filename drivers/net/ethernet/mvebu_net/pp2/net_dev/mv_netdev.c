@@ -68,7 +68,11 @@ void mv_pp2_cache_inv_wa_ctrl(int en)
 void mv_eth_iocc_l1_l2_cache_inv(unsigned char *v_start, int size)
 {
 	if (mv_pp2_swf_hwf_wa_en)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 		___dma_single_dev_to_cpu(v_start, size, DMA_FROM_DEVICE);
+#else
+		dma_cache_maint(v_start, size, DMA_FROM_DEVICE);
+#endif
 }
 #endif /* CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA */
 
@@ -1285,7 +1289,9 @@ static const struct net_device_ops mv_eth_netdev_ops = {
 	.ndo_change_mtu = mv_eth_change_mtu,
 	.ndo_tx_timeout = mv_eth_tx_timeout,
 	.ndo_select_queue = mv_eth_select_txq,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	.ndo_fix_features = mv_eth_netdev_fix_features,
+#endif
 };
 
 
@@ -2385,7 +2391,11 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev, struct mv_eth_tx_
 
 		/* Move to next segment */
 		frag_size = skb_frag_ptr->size;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 1, 10)
 		frag_ptr = page_address(skb_frag_ptr->page.p) + skb_frag_ptr->page_offset;
+#else
+		frag_ptr = page_address(skb_frag_ptr->page) + skb_frag_ptr->page_offset;
+#endif
 		frag++;
 	}
 	total_desc_num = 0;
@@ -2493,7 +2503,11 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev, struct mv_eth_tx_
 
 				/* Move to next segment */
 				frag_size = skb_frag_ptr->size;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 1, 10)
 				frag_ptr = page_address(skb_frag_ptr->page.p) + skb_frag_ptr->page_offset;
+#else
+				frag_ptr = page_address(skb_frag_ptr->page) + skb_frag_ptr->page_offset;
+#endif
 				frag++;
 			}
 		}
@@ -2659,8 +2673,13 @@ static void mv_eth_tx_frag_process(struct eth_port *pp, struct sk_buff *skb, str
 		/* NETA_TX_PKT_OFFSET_MASK = 0 */
 		tx_desc->dataSize = frag->size;
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 1, 10)
 		bufPhysAddr = mvOsCacheFlush(NULL, page_address(frag->page.p) + frag->page_offset,
 						      tx_desc->dataSize);
+#else
+		bufPhysAddr = mvOsCacheFlush(NULL, page_address(frag->page) + frag->page_offset,
+						      tx_desc->dataSize);
+#endif
 
 		tx_desc->pktOffset = bufPhysAddr & MV_ETH_TX_DESC_ALIGN;
 		tx_desc->bufPhysAddr = bufPhysAddr & (~MV_ETH_TX_DESC_ALIGN);
@@ -4155,12 +4174,20 @@ void mv_eth_config_show(void)
 /* Set network device features on initialization. Take into account default compile time configuration. */
 void mv_eth_netdev_init_features(struct net_device *dev)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	dev->features = NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_LLTX;
+#else
+	dev->features = NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_LLTX;
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	dev->hw_features = NETIF_F_GRO | NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_SG;
+#endif
 
 #ifdef CONFIG_MV_ETH_TSO
 	dev->features |= NETIF_F_TSO;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	dev->hw_features |= NETIF_F_TSO;
+#endif
 #endif
 }
 
@@ -4670,9 +4697,11 @@ int mv_eth_change_mtu_internals(struct net_device *dev, int mtu)
 
 mtu_out:
 	dev->mtu = mtu;
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
 	netdev_update_features(dev);
-
+#else
+	netdev_features_change(dev);
+#endif
 	return 0;
 }
 
@@ -5097,9 +5126,14 @@ void mv_eth_netdev_print(struct net_device *dev)
 		dev->ifindex, dev->mtu, RX_PKT_SIZE(dev->mtu),
 		(int)RX_BUF_SIZE(RX_PKT_SIZE(dev->mtu)), MV_MACQUAD(dev->dev_addr));
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	printk(KERN_ERR "features=0x%x, hw_features=0x%x, wanted_features=0x%x, vlan_features=0x%x\n",
 			(unsigned int)(dev->features), (unsigned int)(dev->hw_features),
 			(unsigned int)(dev->wanted_features), (unsigned int)(dev->vlan_features));
+#else
+	printk(KERN_ERR "features=0x%x, vlan_features=0x%x\n",
+		 (unsigned int)(dev->features), (unsigned int)(dev->vlan_features));
+#endif
 
 	printk(KERN_ERR "flags=0x%x, gflags=0x%x: running=%d, oper_up=%d\n",
 			(unsigned int)(dev->flags), (unsigned int)(dev->flags), netif_running(dev), netif_oper_up(dev));
