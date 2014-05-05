@@ -26,6 +26,8 @@ DISCLAIMED.  The GPL License provides additional details about this warranty
 disclaimer.
 *******************************************************************************/
 
+#include <linux/version.h>
+
 #ifdef CONFIG_MV_INCLUDE_XOR
 #include "xor/mvXor.h"
 #include "xor/mvXorRegs.h"
@@ -1204,7 +1206,9 @@ static const struct net_device_ops mv_l2fw_netdev_ops = {
 	.ndo_open = mv_eth_open,
 	.ndo_stop = mv_l2fw_stop,
 	.ndo_start_xmit = mv_l2fw_xmit,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 	.ndo_change_rx_flags = mv_eth_change_rx_flags,
+#endif
 	.ndo_set_mac_address = mv_eth_set_mac_addr,
 	.ndo_change_mtu = mv_eth_change_mtu,
 };

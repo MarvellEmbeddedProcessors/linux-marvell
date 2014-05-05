@@ -280,6 +280,7 @@ void mv_eth_rx_set_rx_mode(struct net_device *dev)
 	mvPrsMcastDelAll(phyPort);
 
 	if (dev->flags & IFF_MULTICAST) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 		if (!netdev_mc_empty(dev)) {
 			struct netdev_hw_addr *ha;
 
@@ -290,6 +291,19 @@ void mv_eth_rx_set_rx_mode(struct net_device *dev)
 				}
 			}
 		}
+#else
+		struct dev_mc_list *curr_addr = dev->mc_list;
+		int                i;
+		for (i = 0; i < dev->mc_count; i++, curr_addr = curr_addr->next) {
+			if (!curr_addr)
+				break;
+			if (mvPrsMacDaAccept(priv->port, curr_addr->dmi_addr, 1)) {
+				printk(KERN_ERR "%s: Mcast init failed - %d of %d\n",
+						dev->name, i, dev->mc_count);
+				break;
+			}
+		}
+#endif
 	}
 }
 

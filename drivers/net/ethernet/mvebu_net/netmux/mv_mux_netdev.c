@@ -63,6 +63,24 @@ static inline int mv_mux_rx_tag_remove(struct net_device *dev, struct sk_buff *s
 static inline int mv_mux_tx_skb_tag_add(struct net_device *dev, struct sk_buff *skb);
 static int mv_mux_netdev_delete_all(int port);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 33)
+void netif_stacked_transfer_operstate(const struct net_device *rootdev,
+										struct net_device *dev)
+{
+	if (rootdev->operstate == IF_OPER_DORMANT)
+		netif_dormant_on(dev);
+	else
+		netif_dormant_off(dev);
+
+	if (netif_carrier_ok(rootdev)) {
+		if (!netif_carrier_ok(dev))
+			netif_carrier_on(dev);
+	} else {
+		if (netif_carrier_ok(dev))
+			netif_carrier_off(dev);
+	}
+}
+#endif
 /*-----------------------------------------------------------------------------------------*/
 /*----------------------------     MANAGER      -------------------------------------------*/
 /*-----------------------------------------------------------------------------------------*/
@@ -600,8 +618,10 @@ static inline void mv_mux_init_features(struct net_device *mux_dev)
 	struct net_device *root = mux_eth_shadow[pmux_priv->port].root;
 
 	mux_dev->features = root->features;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	mux_dev->hw_features = root->hw_features & ~NETIF_F_RXCSUM;
 	mux_dev->wanted_features = root->wanted_features;
+#endif
 	mux_dev->vlan_features = root->vlan_features;
 }
 /*-----------------------------------------------------------------------------------------*/
@@ -610,26 +630,34 @@ static inline void mv_mux_init_features(struct net_device *mux_dev)
 /*-----------------------------------------------------------------------------------------*/
 static void mv_mux_transfer_features(struct net_device *root, struct net_device *mux_dev)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	mux_dev->features &= ~NETIF_F_RXCSUM;
 	mux_dev->features |=  (root->features & NETIF_F_RXCSUM);
+#endif
 
 	mux_dev->features &= ~NETIF_F_IP_CSUM;
 	mux_dev->features |=  (root->features & NETIF_F_IP_CSUM);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	mux_dev->hw_features &= ~NETIF_F_IP_CSUM;
 	mux_dev->hw_features |=  (root->features & NETIF_F_IP_CSUM);
+#endif
 
 	mux_dev->features &= ~NETIF_F_TSO;
 	mux_dev->features |=  (root->features & NETIF_F_TSO);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	mux_dev->hw_features &= ~NETIF_F_TSO;
 	mux_dev->hw_features |=  (root->features & NETIF_F_TSO);
+#endif
 
 	mux_dev->features &= ~NETIF_F_SG;
 	mux_dev->features |=  (root->features & NETIF_F_SG);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	mux_dev->hw_features &= ~NETIF_F_SG;
 	mux_dev->hw_features |=  (root->features & NETIF_F_SG);
+#endif
 }
 /*----------------------------------------------------------------------------------------*/
 /* Function attache mux device to root device,						  */
@@ -713,7 +741,11 @@ struct net_device *mv_mux_netdev_add(int port, struct net_device *mux_dev)
 		}
 		/*check whether mux_dev is already in the physical port*/
 		if (mux_dev == dev_temp)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 34)
+			printk(KERN_INFO "%s: this mux interface is already in port %d\n", mux_dev->name, port);
+#else
 			netdev_info(mux_dev, "this mux interface is already in port %d\n", port);
+#endif
 		else
 			pdev->next = mux_dev;
 	}

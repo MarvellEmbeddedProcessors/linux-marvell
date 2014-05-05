@@ -91,4 +91,8 @@ ifeq ($(NETMAP),y)
 ccflags-y       += -DCONFIG_NETMAP -I$(NETMAP_DIR) -I$(NETMAP_DIR)/../sys
 endif
 
+ifeq ($(CONFIG_NETMAP),y)
+ccflags-y       += -Inet/netmap
+endif
+
 obj-$(CONFIG_MV_ETH_PP2) += mv_pp2.o

@@ -688,7 +688,7 @@ int mv_eth_tool_get_stats_count(struct net_device *netdev)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 25)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)
 static int mv_eth_tool_get_rxfh_indir(struct net_device *netdev,
 					struct ethtool_rxfh_indir *indir)
 {
@@ -722,6 +722,7 @@ static int mv_eth_tool_set_rxfh_indir(struct net_device *netdev,
 	return -EOPNOTSUPP;
 #endif
 }
+#endif
 
 static int mv_eth_tool_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
 									u32 *rules)
@@ -734,6 +735,7 @@ static int mv_eth_tool_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *i
 	return 0;
 }
 
+#if ((LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0)) && (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 33)))
 /******************************************************************************
 * mv_eth_tool_set_rx_ntuple
 * Description:
@@ -788,7 +790,7 @@ static int mv_eth_tool_set_rx_ntuple(struct net_device *dev, struct ethtool_rx_n
 	return 1;
 #endif /* CONFIG_MV_ETH_PNC_L3_FLOW */
 }
-#endif /* #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 25) */
+#endif
 
 /******************************************************************************
 * mv_eth_tool_get_ethtool_stats
@@ -829,10 +831,12 @@ const struct ethtool_ops mv_eth_tool_ops = {
 	.get_stats_count			= mv_eth_tool_get_stats_count,
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 25)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)
 	.get_rxfh_indir				= mv_eth_tool_get_rxfh_indir,
 	.set_rxfh_indir				= mv_eth_tool_set_rxfh_indir,
+#endif
 	.get_rxnfc				= mv_eth_tool_get_rxnfc,
+#if ((LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0)) && (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 33)))
 	.set_rx_ntuple				= mv_eth_tool_set_rx_ntuple,
 #endif
 };

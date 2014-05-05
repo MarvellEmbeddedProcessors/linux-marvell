@@ -27,7 +27,7 @@ disclaimer.
 *******************************************************************************/
 #ifndef __mv_netdev_h__
 #define __mv_netdev_h__
-
+#include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -569,6 +569,7 @@ extern struct eth_port **mv_eth_ports;
 
 static inline void mv_eth_rx_csum(struct eth_port *pp, struct pp2_rx_desc *rx_desc, struct sk_buff *skb)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	if (pp->dev->features & NETIF_F_RXCSUM) {
 		if ((PP2_RX_L3_IS_IP4(rx_desc->status) && !PP2_RX_IP4_HDR_ERR(rx_desc->status)) ||
 			(PP2_RX_L3_IS_IP6(rx_desc->status))) {
@@ -581,7 +582,7 @@ static inline void mv_eth_rx_csum(struct eth_port *pp, struct pp2_rx_desc *rx_de
 			}
 		}
 	}
-
+#endif
 	skb->ip_summed = CHECKSUM_NONE;
 	STAT_DBG(pp->stats.rx_csum_sw++);
 }
@@ -1028,7 +1029,11 @@ void      mv_hwf_bm_dump(void);
 #endif /* CONFIG_MV_ETH_HWF && !CONFIG_MV_ETH_BM_CPU */
 
 #ifdef CONFIG_MV_ETH_SWF_HWF_CORRUPTION_WA
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 extern void ___dma_single_dev_to_cpu(const void *, size_t, enum dma_data_direction);
+#else
+extern void dma_cache_maint(const void *, size_t, int);
+#endif
 void mv_pp2_cache_inv_wa_ctrl(int en);
 #endif
 
