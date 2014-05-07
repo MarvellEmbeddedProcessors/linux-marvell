@@ -151,8 +151,11 @@ static int mv_mux_mgr_probe(int gbe_port)
 	/* config mux interfaces according to preset mode */
 	mv_mux_mgr_init(preset, vid, tag_mode, gbe_port);
 
-	if (tag_mode != MV_TAG_TYPE_NONE)
+	if (tag_mode != MV_TAG_TYPE_NONE) {
+		rtnl_lock();
 		dev_set_promiscuity(mux_eth_shadow[gbe_port].root, 1);
+		rtnl_unlock();
+	}
 
 	if (switch_ops && switch_ops->interrupt_unmask)
 		switch_ops->interrupt_unmask();
