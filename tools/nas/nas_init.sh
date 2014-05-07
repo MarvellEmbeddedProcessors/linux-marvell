@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 4.7"
+echo " * Version: 4.8"
 
 # LOG:
+# 4.8:
+#   1. setting tcp_limit_output_bytes on a38x.
 # 4.7:
 #   1. adding option none to -s parameters.
 # 4.6:
@@ -655,18 +657,21 @@ elif [ "$PLATFORM" == "a380" ]; then
 #    ethtool -C eth0 pkt-rate-low 20000 pkt-rate-high 3000000 rx-frames 100 \
 #	rx-usecs 1500 rx-usecs-high 1500 adaptive-rx on
 #    set +o verbose
+    echo 250000 > /proc/sys/net/ipv4/tcp_limit_output_bytes
 elif [ "$PLATFORM" == "a385" ]; then
     [ ! -e "$(which ethtool)" ] && do_error "missing ethtool in rootfs"
 #    set -o verbose
 #    ethtool -C eth0 pkt-rate-low 20000 pkt-rate-high 3000000 rx-frames 100 \
 #	rx-usecs 1500 rx-usecs-high 1500 adaptive-rx on
 #    set +o verbose
+    echo 250000 > /proc/sys/net/ipv4/tcp_limit_output_bytes
 elif [ "$PLATFORM" == "a388" ]; then
     [ ! -e "$(which ethtool)" ] && do_error "missing ethtool in rootfs"
 #    set -o verbose
 #    ethtool -C eth0 pkt-rate-low 20000 pkt-rate-high 3000000 rx-frames 100 \
 #	rx-usecs 1500 rx-usecs-high 1500 adaptive-rx on
 #    set +o verbose
+    echo 250000 > /proc/sys/net/ipv4/tcp_limit_output_bytes
 fi
 
 echo -ne "[Done]\n"
