@@ -1568,6 +1568,10 @@ int mv_switch_all_multicasts_del(int db_num)
 
 	while ((status = gfdbGetAtuEntryNext(qd_dev, &atu_entry)) == GT_OK) {
 
+		/* Delete only Mcast addresses */
+		if (!is_multicast_ether_addr(atu_entry.macAddr.arEther))
+			continue;
+
 		/* we don't want to delete the broadcast entry which is the last one */
 		if (memcmp(atu_entry.macAddr.arEther, &bc_mac, 6) == 0)
 			break;
@@ -5033,6 +5037,7 @@ static const struct mv_mux_switch_ops switch_ops =  {
 	.group_disable = mv_switch_group_disable,
 	.group_enable = mv_switch_group_enable,
 	.link_status_get = mv_switch_link_status_get,
+	.all_mcast_del = mv_switch_all_multicasts_del,
 	.mac_addr_set = mv_switch_mac_addr_set,
 	.group_cookie_set = mv_switch_group_cookie_set,
 	.tag_get = mv_switch_tag_get,
