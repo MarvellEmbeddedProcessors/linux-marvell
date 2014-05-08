@@ -294,7 +294,6 @@ static inline int mv_mux_get_tag_size(MV_TAG_TYPE type)
 /*-----------------------------------------------------------------------------------------*/
 
 int mv_mux_rx(struct sk_buff *skb, int port, struct napi_struct *napi)
-
 {
 	struct net_device *mux_dev;
 	int    len;
@@ -311,14 +310,13 @@ int mv_mux_rx(struct sk_buff *skb, int port, struct napi_struct *napi)
 	/* remove tag*/
 	len = mv_mux_rx_tag_remove(mux_dev, skb);
 	mux_dev->stats.rx_packets++;
-	mux_dev->stats.rx_bytes += skb->len - len;
-
+	mux_dev->stats.rx_bytes += skb->len;
 
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
 	if (mux_eth_shadow[port].flags & MV_MUX_F_DBG_RX) {
 		struct mux_netdev *pmux_priv = MV_MUX_PRIV(mux_dev);
-		pr_err("\n%s - %s: port=%d, cpu=%d\n",
-			mux_dev->name, __func__, pmux_priv->port, smp_processor_id());
+		pr_err("\n%s - %s: port=%d, cpu=%d, pkt_size=%d, shift=%d\n",
+			mux_dev->name, __func__, pmux_priv->port, smp_processor_id(), skb->len, len);
 		/* mv_eth_skb_print(skb); */
 		mvDebugMemDump(skb->data, 64, 1);
 	}
@@ -410,32 +408,62 @@ char *mv_mux_get_mac(struct net_device *mux_dev)
 }
 /*-----------------------------------------------------------------------------------------*/
 
-static void mv_mux_set_rx_mode(struct net_device *dev)
-{
-/*
-	printk(KERN_ERR "Invalid operation %s is virtual interface.\n", dev->name);
-*/
-}
-
-/*-----------------------------------------------------------------------------------------*/
-
-void mv_mux_change_rx_flags(struct net_device *mux_dev, int flags)
+static void mv_mux_set_rx_mode(struct net_device *mux_dev)
 {
 	struct mux_netdev *pmux_priv = MV_MUX_PRIV(mux_dev);
 
-	if (mv_mux_internal_switch(pmux_priv->port))
-		if (switch_ops && switch_ops->promisc_set)
-			switch_ops->promisc_set(pmux_priv->idx, (mux_dev->flags & IFF_PROMISC) ? 1 : 0);
-}
+	if (!mv_mux_internal_switch(pmux_priv->port) || (switch_ops == NULL))
+		return;
 
+	if (switch_ops->promisc_set)
+		if (switch_ops->promisc_set(pmux_priv->idx, (mux_dev->flags & IFF_PROMISC) ? 1 : 0))
+			pr_err("%s: Set promiscuous mode failed\n", mux_dev->name);
+
+	/* IFF_ALLMULTI is not supported by switch */
+
+	/* remove all mcast enries */
+	 if (switch_ops->all_mcast_del)
+		if (switch_ops->all_mcast_del(pmux_priv->idx))
+			pr_err("%s: Delete all Mcast failed\n", mux_dev->name);
+
+	if (mux_dev->flags & IFF_MULTICAST) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+		if (!netdev_mc_empty(mux_dev)) {
+			struct netdev_hw_addr *ha;
+
+			netdev_for_each_mc_addr(ha, mux_dev) {
+				if (switch_ops->mac_addr_set) {
+					if (switch_ops->mac_addr_set(pmux_priv->idx, ha->addr, 1)) {
+						pr_err("%s: Mcast init failed\n", mux_dev->name);
+						break;
+					}
+				}
+			}
+		}
+#else
+		struct dev_mc_list *curr_addr = mux_dev->mc_list;
+		int                i;
+		for (i = 0; i < mux_dev->mc_count; i++, curr_addr = curr_addr->next) {
+			if (!curr_addr)
+				break;
+			if (switch_ops->mac_addr_set) {
+				if (switch_ops->mac_addr_set(pmux_priv->idx, curr_addr->dmi_addr, 1)) {
+					pr_err("%s: Mcast init failed\n", mux_dev->name);
+					break;
+				}
+			}
+		}
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34) */
+	}
+}
 /*-----------------------------------------------------------------------------------------*/
+
 static int mv_mux_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	/*TODO compleate implementation*/
 	printk(KERN_ERR "Not supported yet.\n");
 	return 0;
 }
-
 /*-----------------------------------------------------------------------------------------*/
 
 static void mv_mux_switch_mtu_update(int mtu)
@@ -472,8 +500,8 @@ int mv_mux_close(struct net_device *dev)
 
 	return MV_OK;
 }
-
 /*-----------------------------------------------------------------------------------------*/
+
 int mv_mux_open(struct net_device *dev)
 {
 	struct mux_netdev *pmux_priv = MV_MUX_PRIV(dev);
@@ -505,7 +533,6 @@ int mv_mux_open(struct net_device *dev)
 	return MV_OK;
 
 }
-
 /*-----------------------------------------------------------------------------------------*/
 
 static int mv_mux_set_mac(struct net_device *mux_dev, void *addr)
@@ -536,7 +563,6 @@ static int mv_mux_set_mac(struct net_device *mux_dev, void *addr)
 
 	return 0;
 }
-
 /*-----------------------------------------------------------------------------------------*/
 
 int mv_mux_mtu_change(struct net_device *mux_dev, int mtu)
@@ -1150,7 +1176,6 @@ static inline struct net_device *mv_mux_rx_netdev_get(int port, struct sk_buff *
 	MV_U8 *data = skb->data;
 	int tag_type = mux_eth_shadow[port].tag_type;
 
-
 	/* skb->data point to MH */
 	switch (tag_type) {
 
@@ -1401,10 +1426,8 @@ static inline int mv_mux_tx_skb_tag_add(struct net_device *dev, struct sk_buff *
 
 void mv_mux_netdev_print(struct net_device *mux_dev)
 {
-
 	struct mux_netdev *pdev;
 	int tag_type;
-
 
 	if (!mux_dev) {
 		printk(KERN_ERR "%s:device in NULL.\n", __func__);
@@ -1504,7 +1527,6 @@ static const struct net_device_ops mv_mux_netdev_ops = {
 	.ndo_set_mac_address	= mv_mux_set_mac,
 	.ndo_do_ioctl		= mv_mux_ioctl,
 	.ndo_set_rx_mode	= mv_mux_set_rx_mode,
-	.ndo_change_rx_flags	= mv_mux_change_rx_flags,
 	.ndo_change_mtu		= mv_mux_mtu_change,
 };
 /*-----------------------------------------------------------------------------------------*/
