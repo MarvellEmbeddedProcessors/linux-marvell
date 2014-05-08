@@ -226,6 +226,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define ETH_PORT_ISR_SUM_INTERN_MASK		(1 << ETH_PORT_ISR_SUM_INTERN_BIT)
 /*-------------------------------------------------------------------------------*/
 
+/**** Port MIB Counters Control register ****/
+#define ETH_GMAC_MIB_CTRL_REG(p)		(ETH_REG_BASE(p) + 0x44)
+/*-------------------------------------------------------------------------------*/
+
+/**** Port MAC Control register #3 ****/
+#define ETH_GMAC_CTRL_3_REG(p)			(ETH_REG_BASE(p) + 0x48)
+/*-------------------------------------------------------------------------------*/
+
+/**** CCFC Port Speed Timer register ****/
+#define ETH_GMAC_SPEED_TIMER_REG(p)		(ETH_REG_BASE(p) + 0x58)
+/*-------------------------------------------------------------------------------*/
+
+/**** Port MAC Control register #4 ****/
+#define ETH_GMAC_CTRL_4_REG(p)			(ETH_REG_BASE(p) + 0x90)
+
+#define ETH_GMAC_MH_ENABLE_BIT			9
+#define ETH_GMAC_MH_ENABLE_MASK			(1 << ETH_GMAC_MH_ENABLE_BIT)
+/*-------------------------------------------------------------------------------*/
+
 /****************************************/
 /*        LMS Unit Registers       	*/
 /****************************************/
