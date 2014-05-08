@@ -99,6 +99,7 @@ struct mv_mux_switch_ops {
 	int	(*group_disable)(int db);
 	int	(*group_enable)(int db);
 	int	(*link_status_get)(int db);
+	int     (*all_mcast_del)(int db);
 	int	(*mac_addr_set)(int db, unsigned char *mac_addr, unsigned char op);
 	int	(*group_cookie_set)(int db, void *cookie);
 	bool	(*tag_get)(int db, MV_TAG_TYPE tag_mode, MV_SWITCH_PRESET_TYPE preset, int vid, MV_MUX_TAG *tag);
@@ -128,7 +129,7 @@ void mv_mux_eth_attach(int port, struct net_device *root, struct mv_mux_eth_ops 
 void mv_mux_switch_attach(int gbe_port, int preset, int vid, int tag, int switch_port);
 void mv_mux_eth_detach(int port);
 int mv_mux_switch_ops_set(const struct mv_mux_switch_ops *switch_ops_ptr);
-
+int mv_mux_netdev_find(unsigned int dev_idx);
 
 
 #endif /* __mv_tag_netdev_h__ */
