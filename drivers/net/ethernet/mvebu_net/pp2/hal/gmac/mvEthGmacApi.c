@@ -84,6 +84,20 @@ void mvGmacPortDisable(int port)
 	MV_REG_WRITE(ETH_GMAC_CTRL_0_REG(port), regVal);
 }
 
+void mvGmacPortMhSet(int port, int enable)
+{
+	MV_U32 regVal;
+
+	regVal = MV_REG_READ(ETH_GMAC_CTRL_4_REG(port));
+
+	if (enable)
+		regVal |= ETH_GMAC_MH_ENABLE_MASK;
+	else
+		regVal &= ~ETH_GMAC_MH_ENABLE_MASK;
+
+	MV_REG_WRITE(ETH_GMAC_CTRL_4_REG(port), regVal);
+}
+
 static void mvGmacPortRgmiiSet(int port, int enable)
 {
 	MV_U32  regVal;
@@ -647,6 +661,8 @@ void mvGmacPortRegs(int port)
 	mvGmacPrintReg(ETH_GMAC_CTRL_0_REG(port), "MV_GMAC_CTRL_0_REG");
 	mvGmacPrintReg(ETH_GMAC_CTRL_1_REG(port), "MV_GMAC_CTRL_1_REG");
 	mvGmacPrintReg(ETH_GMAC_CTRL_2_REG(port), "MV_GMAC_CTRL_2_REG");
+	mvGmacPrintReg(ETH_GMAC_CTRL_3_REG(port), "MV_GMAC_CTRL_3_REG");
+	mvGmacPrintReg(ETH_GMAC_CTRL_4_REG(port), "MV_GMAC_CTRL_4_REG");
 
 	mvGmacPrintReg(ETH_GMAC_AN_CTRL_REG(port), "MV_GMAC_AN_CTRL_REG");
 	mvGmacPrintReg(ETH_GMAC_STATUS_REG(port), "MV_GMAC_STATUS_REG");

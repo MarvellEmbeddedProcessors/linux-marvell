@@ -1313,6 +1313,14 @@ MV_STATUS mvPp2MhSet(int port, MV_TAG_TYPE mh)
 		return MV_BAD_PARAM;
 	}
 	mvPp2WrReg(MV_PP2_MH_REG(MV_PPV2_PORT_PHYS(port)), regVal);
+
+#ifdef CONFIG_MV_ETH_PP2_1
+	if (mh == MV_TAG_TYPE_MH)
+		mvGmacPortMhSet(port, 1);
+	else
+		mvGmacPortMhSet(port, 0);
+#endif /* CONFIG_MV_ETH_PP2_1 */
+
 	return MV_OK;
 }
 /*-------------------------------------------------------------------------------*/
