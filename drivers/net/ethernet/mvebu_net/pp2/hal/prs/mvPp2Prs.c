@@ -1054,12 +1054,11 @@ static int mvPp2PrsMacInit(void)
 	/* Non-promiscous mode for all ports - DROP unknown packets */
 	pe.index = PE_MAC_NON_PROMISCOUS;
 	mvPp2PrsSwTcamLuSet(&pe, PRS_LU_MAC);
-	/*	mvPp2PrsSwSramRiSetBit(&pe, RI_DROP_BIT); */
-	/*	mvPp2PrsSwSramLuDoneSet(&pe);*/
+	mvPp2PrsSwSramRiSetBit(&pe, RI_DROP_BIT);
+	/* mvPp2PrsSwSramLuDoneSet(&pe);*/
 
-	/*	mvPp2PrsSwSramFlowidGenSet(&pe);*/
-	mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_DSA);
-	mvPp2PrsSwSramShiftSet(&pe, 2 * MV_MAC_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
+	mvPp2PrsSwSramFlowidGenSet(&pe);
+	mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_FLOWS);
 
 	/* Update mvPrsShadowTbl */
 	mvPp2PrsShadowSet(pe.index, PRS_LU_MAC, "non-promisc");
@@ -1070,6 +1069,7 @@ static int mvPp2PrsMacInit(void)
 	/* place holders only - no ports */
 	mvPrsMacDropAllSet(0, 0);
 	mvPrsMacPromiscousSet(0, 0);
+	mvPrsMacAllMultiSet(0, 0);
 
 	return MV_OK;
 }
