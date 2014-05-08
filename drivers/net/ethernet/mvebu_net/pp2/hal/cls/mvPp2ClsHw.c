@@ -1176,6 +1176,8 @@ int mvPp2V1ClsHwFlowHitsDump()
 			if (cnt != 0) {
 				mvPp2ClsHwFlowRead(index, &fe);
 				mvPp2ClsSwFlowDump(&fe);
+				mvOsPrintf("HITS = %d\n", cnt);
+				mvOsPrintf("\n");
 			}
 		}
 	}
