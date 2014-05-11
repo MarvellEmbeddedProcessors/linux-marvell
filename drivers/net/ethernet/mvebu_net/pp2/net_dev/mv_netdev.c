@@ -49,6 +49,7 @@ disclaimer.
 #include "prs/mvPp2Prs.h"
 #include "prs/mvPp2PrsHw.h"
 #include "cls/mvPp2Classifier.h"
+#include "dpi/mvPp2DpiHw.h"
 
 #include "mv_mux_netdev.h"
 #include "mv_netdev.h"
@@ -3676,8 +3677,12 @@ static void mv_eth_sysfs_exit(void)
 #ifdef CONFIG_MV_ETH_L2FW
 	mv_pp2_l2fw_sysfs_exit(&pd->kobj);
 #endif
-	mv_pp2_wol_sysfs_exit(&pd->kobj);
+
+#ifdef CONFIG_MV_ETH_PP2_1
 	mv_pp2_dpi_sysfs_exit(&pd->kobj);
+#endif
+
+	mv_pp2_wol_sysfs_exit(&pd->kobj);
 	mv_pp2_pme_sysfs_exit(&pd->kobj);
 	mv_pp2_plcr_sysfs_exit(&pd->kobj);
 	mv_pp2_mc_sysfs_exit(&pd->kobj);
@@ -3719,7 +3724,11 @@ static int mv_eth_sysfs_init(void)
 	mv_pp2_pme_sysfs_init(&pd->kobj);
 	mv_pp2_dbg_sysfs_init(&pd->kobj);
 	mv_pp2_wol_sysfs_init(&pd->kobj);
+
+#ifdef CONFIG_MV_ETH_PP2_1
 	mv_pp2_dpi_sysfs_init(&pd->kobj);
+#endif
+
 #ifdef CONFIG_MV_ETH_L2FW
 	mv_pp2_l2fw_sysfs_init(&pd->kobj);
 #endif
@@ -3779,6 +3788,10 @@ static int	mv_eth_shared_probe(struct mv_pp2_pdata *plat_data)
 		if (mvPp2ClassifierDefInit())
 			printk(KERN_ERR "%s: Warning Classifier defauld init failed\n", __func__);
 	}
+
+#ifdef CONFIG_MV_ETH_PP2_1
+	mvPp2DpiInit();
+#endif
 
 	/* Initialize tasklet for handle link events */
 	tasklet_init(&link_tasklet, mv_eth_link_tasklet, 0);
