@@ -2396,10 +2396,10 @@ sub process {
 # 			$clean = 0;
 # 		}
 
-		if ($line =~ /\bLINUX_VERSION_CODE\b/) {
-			WARN("LINUX_VERSION_CODE",
-			     "LINUX_VERSION_CODE should be avoided, code should be for the version to which it is merged\n" . $herecurr);
-		}
+#		if ($line =~ /\bLINUX_VERSION_CODE\b/) {
+#			WARN("LINUX_VERSION_CODE",
+#			     "LINUX_VERSION_CODE should be avoided, code should be for the version to which it is merged\n" . $herecurr);
+#		}
 
 # check for uses of printk_ratelimit
 		if ($line =~ /\bprintk_ratelimit\s*\(/) {
