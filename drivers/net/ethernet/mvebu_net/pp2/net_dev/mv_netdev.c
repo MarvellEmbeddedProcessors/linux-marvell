@@ -5121,7 +5121,7 @@ void mv_eth_ext_pool_print(struct eth_port *pp)
  ***********************************************************************************/
 void mv_eth_netdev_print(struct net_device *dev)
 {
-	printk(KERN_ERR "%s net_device status: dev=%p\n\n", dev->name, dev);
+	printk(KERN_ERR "%s net_device status:\n\n", dev->name);
 	printk(KERN_ERR "ifIdx=%d, mtu=%u, pkt_size=%d, buf_size=%d, MAC=" MV_MACQUAD_FMT "\n",
 		dev->ifindex, dev->mtu, RX_PKT_SIZE(dev->mtu),
 		(int)RX_BUF_SIZE(RX_PKT_SIZE(dev->mtu)), MV_MACQUAD(dev->dev_addr));
@@ -5135,17 +5135,19 @@ void mv_eth_netdev_print(struct net_device *dev)
 		 (unsigned int)(dev->features), (unsigned int)(dev->vlan_features));
 #endif
 
-	printk(KERN_ERR "flags=0x%x, gflags=0x%x: running=%d, oper_up=%d\n",
-			(unsigned int)(dev->flags), (unsigned int)(dev->flags), netif_running(dev), netif_oper_up(dev));
+	pr_info("flags=0x%x, gflags=0x%x: running=%d, oper_up=%d\n",
+		(unsigned int)(dev->flags), (unsigned int)(dev->flags), netif_running(dev), netif_oper_up(dev));
+	pr_info("uc_promisc=%d, promiscuity=%d, allmulti=%d\n", dev->uc_promisc, dev->promiscuity, dev->allmulti);
 
 	if (mv_eth_netdev_find(dev->ifindex)) {
 		struct eth_port *pp = MV_ETH_PRIV(dev);
-
-		if (pp)
-			printk(KERN_ERR "pp=%p\n", pp);
-	} else
-		/* mux net device */
-		mv_mux_netdev_print(dev);
+		if (pp->tagged)
+			mv_mux_netdev_print_all(pp->port);
+	} else {
+		/* Check if this is mux netdevice */
+		if (mv_mux_netdev_find(dev->ifindex) != -1)
+			mv_mux_netdev_print(dev);
+	}
 }
 
 void mv_eth_status_print(void)
