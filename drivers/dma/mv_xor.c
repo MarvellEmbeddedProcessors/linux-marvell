@@ -259,6 +259,17 @@ static void mv_chan_slot_cleanup(struct mv_xor_chan *mv_chan)
 	u32 current_desc = mv_chan_get_current_desc(mv_chan);
 	int current_cleaned = 0;
 	struct mv_xor_desc *hw_desc;
+	struct dma_chan *dma_chan;
+
+	dma_chan = &mv_chan->dmachan;
+
+	/* IO sync must be after reading the current_desc to unsure all
+	 * descriptors are updated currectly in DRAM, and no XOR -> DRAM
+	 * transactions are buffered. This ensure all descriptors are synced
+	 * to the current_desc position
+	 */
+	dma_sync_single_for_cpu(dma_chan->device->dev, (dma_addr_t) NULL,
+				(size_t) NULL, DMA_FROM_DEVICE);
 
 	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d\n", __func__, __LINE__);
 	dev_dbg(mv_chan_to_devp(mv_chan), "current_desc %x\n", current_desc);
