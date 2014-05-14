@@ -90,7 +90,8 @@ void __init armada_380_l2_enable(void)
 	of_node_put(np);
 out:
 	if (coherency_available())
-		l2x0_of_init_coherent(0, ~0UL);
+		l2x0_of_init_coherent((1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT),
+				       ~(1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT));
 	else
 		l2x0_of_init(0, ~0UL);
 }
