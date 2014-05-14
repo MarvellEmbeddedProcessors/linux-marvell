@@ -74,11 +74,10 @@ void __init armada_380_l2_enable(void)
 	}
 
 	/* Configure the L2 PREFETCH and POWER registers */
-	val = 0x58800000;
+	val = 0x48800000;
 	/*
 	*  Support the following configuration:
 	*  Incr double linefill enable
-	*  Data prefetch enable
 	*  Double linefill enable
 	*  Double linefill on WRAP disable
 	*  NO prefetch drop enable
