@@ -525,10 +525,10 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.tCH = 10,		/* tCH, Enable signal hold time */
 	.tCS = 25,		/* tCS, Enable signal setup time */
 	.tWC = 35,		/* tWC, ND_nWE cycle duration */
-	.tWH = 15,		/* tWH, ND_nWE high duration */
+	.tWH = 17,		/* tWH, ND_nWE high duration */
 	.tWP = 20,		/* tWP, ND_nWE pulse time */
 	.tRC = 35,		/* tWC, ND_nRE cycle duration */
-	.tRH = 15,		/* tRH, ND_nRE high duration */
+	.tRH = 17,		/* tRH, ND_nRE high duration */
 	.tRP = 17,		/* tRP, ND_nRE pulse width */
 	.tR = 25241,		/* tR = data transfer from cell to register tR = tR+tRR+tWB+1 */
 	.tWHR = 60,		/* tWHR, ND_nWE high to ND_nRE low delay for status read */
@@ -539,33 +539,33 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.oobSz = 224,		/* Spare size */
 	.blkNum = 2048,		/* Number of blocks/sectors in the flash */
 	.id = 0x382C,		/* Device ID 0xDevice,Vendor */
-		.model = "Micron 8Gb 8bit",
+		.model = "Micron 8Gb 8bit ABABA",
 	.bb_page = 0,		/* Manufacturer Bad block marking page in block */
 	.flags = (NFC_CLOCK_UPSCALE_200M | NFC_FLAGS_ONFI_MODE_3_SET)
 	},
 	{			/* Micron 8Gb ABACA  */
 		/* timing Asynchronous mode 3 */
 	.tADL = 100,		/* tADL, Address to write data delay */
-	.tCH = 5,		/* tCH, Enable signal hold time */
+	.tCH = 10,		/* tCH, Enable signal hold time */
 	.tCS = 25,		/* tCS, Enable signal setup time */
-	.tWC = 30,		/* tWC, ND_nWE cycle duration */
-	.tWH = 15,		/* tWH, ND_nWE high duration */
+	.tWC = 35,		/* tWC, ND_nWE cycle duration, limited to 35 by the ARMADA-XP CPU */
+	.tWH = 17,		/* tWH, ND_nWE high duration */
 	.tWP = 15,		/* tWP, ND_nWE pulse time */
-	.tRC = 30,		/* tWC, ND_nRE cycle duration */
-	.tRH = 10,		/* tRH, ND_nRE high duration */
+	.tRC = 35,		/* tRC, ND_nRE cycle duration, limited to 35 by the ARMADA-XP CPU */
+	.tRH = 17,		/* tRH, ND_nRE high duration */
 	.tRP = 15,		/* tRP, ND_nRE pulse width */
 	.tR = 25241,		/* tR = data transfer from cell to register tR = tR+tRR+tWB+1 */
 	.tWHR = 60,		/* tWHR, ND_nWE high to ND_nRE low delay for status read */
 	.tAR = 10,		/* tAR, ND_ALE low to ND_nRE low delay */
 	.tRHW = 100,		/* tRHW, ND_nRE high to ND_nWE low delay */
-	.pgPrBlk = 128,		/* Pages per block - detected */
+	.pgPrBlk = 64,		/* Pages per block - detected */
 	.pgSz = 4096,		/* Page size */
 	.oobSz = 224,		/* Spare size */
-	.blkNum = 2048,		/* Number of blocks/sectors in the flash */
+	.blkNum = 4096,		/* Number of blocks/sectors in the flash */
 	.id = 0xd32C,		/* Device ID 0xDevice,Vendor */
-		.model = "Micron 8Gb 8bit",
-	.bb_page = 0,		/* Manufacturer Bad block marking page in block */
-	.flags = (NFC_CLOCK_UPSCALE_200M | NFC_FLAGS_ONFI_MODE_3_SET)
+		.model = "Micron 8Gb 8bit ABACA",
+	.bb_page = 0,		/* Man ufacturer Bad block marking page in block */
+	.flags = (NFC_CLOCK_UPSCALE_200M)
 	}
 
 };
