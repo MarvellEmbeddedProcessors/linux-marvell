@@ -65,7 +65,11 @@ static ssize_t mv_cls_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE,  "echo virt gpid  >hw_virt_gpid        - set virtual port number <virt> for GemPortId <gpid>.\n");
 	off += scnprintf(buf + off, PAGE_SIZE,  "echo a b c d    >hw_udf              - set UDF field <a> as: base <b>, offset <c> bits, size<d> bits.\n");
 
+#ifdef CONFIG_MV_ETH_PP2_1
+	off += scnprintf(buf + off, PAGE_SIZE,  "echo p q        >hw_over_rxq_low     - set oversize rx low queue <q> for ingress port <p>.\n");
+#else
 	off += scnprintf(buf + off, PAGE_SIZE,  "echo p q        >hw_over_rxq         - set oversize rxq <q> for ingress port <p>.\n");
+#endif
 #ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE,  "echo p from q   >hw_qh               - set rx high queue source <from> and queue <q> for ingress port <p>.\n");
 	off += scnprintf(buf + off, PAGE_SIZE,  "echo idx m      >hw_mtu              - set MTU value <m> for index <idx>.\n");
@@ -219,8 +223,13 @@ static ssize_t mv_prs_store_unsigned(struct device *dev,
 #else
 		mvPp2V0ClsHwMtuSet(a, b, c);
 #endif
+#ifdef CONFIG_MV_ETH_PP2_1
+	else if (!strcmp(name, "hw_over_rxq_low"))
+		mvPp2ClsHwOversizeRxqLowSet(a, b);
+#else
 	else if (!strcmp(name, "hw_over_rxq"))
 		mvPp2ClsHwOversizeRxqSet(a, b);
+#endif
 	/*PPv2.1 new feature MAS 3.5*/
 	else if (!strcmp(name, "hw_qh"))
 		mvPp2ClsHwRxQueueHighSet(a, b, c);
@@ -310,7 +319,11 @@ static DEVICE_ATTR(hw_uni_spid,			S_IWUSR, mv_cls_show, mv_prs_store_unsigned);
 static DEVICE_ATTR(hw_virt_gpid,		S_IWUSR, mv_cls_show, mv_prs_store_unsigned);
 static DEVICE_ATTR(hw_udf,			S_IWUSR, mv_cls_show, mv_prs_store_unsigned);
 static DEVICE_ATTR(hw_mtu,			S_IWUSR, mv_cls_show, mv_prs_store_unsigned);
+#ifdef CONFIG_MV_ETH_PP2_1
+static DEVICE_ATTR(hw_over_rxq_low,		S_IWUSR, mv_cls_show, mv_prs_store_unsigned);
+#else
 static DEVICE_ATTR(hw_over_rxq,			S_IWUSR, mv_cls_show, mv_prs_store_unsigned);
+#endif
 static DEVICE_ATTR(hw_qh,			S_IWUSR, mv_cls_show, mv_prs_store_unsigned); /*PPv2.1 new feature MAS 3.5*/
 static DEVICE_ATTR(hw_mh,			S_IWUSR, mv_cls_show, mv_prs_store_unsigned); /*PPv2.1 new feature MAS 3.18*/
 static DEVICE_ATTR(hw_sq_size,			S_IWUSR, mv_cls_show, mv_prs_store_unsigned); /*PPv2.1 new feature MAS 3.14*/
@@ -355,7 +368,11 @@ static struct attribute *cls_attrs[] = {
 	&dev_attr_hw_virt_gpid.attr,
 	&dev_attr_hw_udf.attr,
 	&dev_attr_hw_mtu.attr,/*PPv2.1 feature changed MAS 3.7*/
+#ifdef CONFIG_MV_ETH_PP2_1
+	&dev_attr_hw_over_rxq_low.attr,/*PPv2.1 feature changed MAS 3.7*/
+#else
 	&dev_attr_hw_over_rxq.attr,
+#endif
 	&dev_attr_hw_qh.attr,/*PPv2.1 new feature MAS 3.5*/
 	&dev_attr_hw_mh.attr,/*PPv2.1 new feature MAS 3.18*/
 	&dev_attr_hw_sq_size.attr,/*PPv2.1 new feature MAS 3.14*/
