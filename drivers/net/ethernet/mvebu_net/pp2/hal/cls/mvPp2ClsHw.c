@@ -214,32 +214,42 @@ int mvPp2ClsHwUdfSet(int udf_no, int offs_id, int offs_bits, int size_bits)
 
 	return MV_OK;
 }
+#ifdef CONFIG_MV_ETH_PP2_1
 /*-------------------------------------------------------------------------------*/
 /*
 PPv2.1 (feature MAS 3.7) feature update
-Note: this function overwrite q_high value that set by mvPp2ClsHwRxQueueHighSet
+Note: this function only set oversize rxq_low value, rxq_high will be set by mvPp2ClsHwRxQueueHighSet
+*/
+int mvPp2ClsHwOversizeRxqLowSet(int port, int rxq)
+{
+	POS_RANGE_VALIDATE(rxq, MV_PP2_CLS_OVERSIZE_RXQ_LOW_MAX);
+
+	/* set oversize rxq */
+	mvPp2WrReg(MV_PP2_CLS_OVERSIZE_RXQ_LOW_REG(port), rxq);
+
+	return MV_OK;
+}
+#else
+/*-------------------------------------------------------------------------------*/
+/*
+Note: this function set oversize rxq including rxq_high and rxq_low for PPv2
 */
 int mvPp2ClsHwOversizeRxqSet(int port, int rxq)
 {
 
-	POS_RANGE_VALIDATE(rxq, MV_PP2_CLS_OVERSIZE_RXQ_MAX);
-	/* set oversize rxq */
-#ifdef CONFIG_MV_ETH_PP2_1
-	mvPp2WrReg(MV_PP2_CLS_OVERSIZE_RXQ_LOW_REG(port), rxq);
+	unsigned int regVal;
 
-	mvPp2WrReg(MV_PP2_CLS_SWFWD_P2HQ_REG(port), (rxq >> MV_PP2_CLS_OVERSIZE_RXQ_LOW_BITS));
-#else
-	{
-		unsigned int regVal;
-		regVal = mvPp2RdReg(MV_PP2_CLS_OVERSIZE_RXQ_REG(port));
-		regVal &= ~MV_PP2_CLS_OVERSIZE_RX_MASK;
-		regVal |= (rxq << MV_PP2_CLS_OVERSIZE_RXQ_OFFS);
-		mvPp2WrReg(MV_PP2_CLS_OVERSIZE_RXQ_REG(port), regVal);
-	}
-#endif /*PPv2_1*/
+	POS_RANGE_VALIDATE(rxq, MV_PP2_CLS_OVERSIZE_RXQ_MAX);
+
+	/* set oversize rxq */
+	regVal = mvPp2RdReg(MV_PP2_CLS_OVERSIZE_RXQ_REG(port));
+	regVal &= ~MV_PP2_CLS_OVERSIZE_RX_MASK;
+	regVal |= (rxq << MV_PP2_CLS_OVERSIZE_RXQ_OFFS);
+	mvPp2WrReg(MV_PP2_CLS_OVERSIZE_RXQ_REG(port), regVal);
 
 	return MV_OK;
 }
+#endif
 /*-------------------------------------------------------------------------------*/
 /*PPv2.1 feature changed MAS 3.7*/
 int mvPp2V0ClsHwMtuSet(int port, int txp, int mtu)

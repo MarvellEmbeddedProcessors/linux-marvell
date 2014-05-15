@@ -420,7 +420,11 @@ int mvPp2ClsHwVirtPortSet(int virt_port, int gem_portid);
 int mvPp2ClsHwUdfSet(int udf_no, int offs_id, int offs_bits, int size_bits);
 int mvPp2V0ClsHwMtuSet(int port, int txp, int mtu);/*PPv2.1 feature changed MAS 3.7*/
 int mvPp2V1ClsHwMtuSet(int index, int mtu);/*PPv2.1 feature changed MAS 3.7*/
+#ifdef CONFIG_MV_ETH_PP2_1
+int mvPp2ClsHwOversizeRxqLowSet(int port, int rxq);/*PPv2.1 feature changed MAS 3.7*/
+#else
 int mvPp2ClsHwOversizeRxqSet(int port, int rxq);
+#endif
 int mvPp2ClsHwRxQueueHighSet(int port, int from, int queue);/*PPv2.1 new feature MAS 3.5*/
 int mvPp2ClsHwMhSet(int port, int virtEn, int uniEn, unsigned short mh);/*PPv2.1 new feature MAS 3.18*/
 int mvPp2ClsHwSeqInstrSizeSet(int index, int size);/*PPv2.1 new feature MAS 3.14*/

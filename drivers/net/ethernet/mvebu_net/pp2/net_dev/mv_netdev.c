@@ -3506,7 +3506,15 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 		mv_eth_tx_mtu_set(port, mtu);
 #endif /* CONFIG_MV_ETH_PP2_1 */
 
+#ifndef CONFIG_MV_ETH_PP2_1
 		mvPp2ClsHwOversizeRxqSet(MV_PPV2_PORT_PHYS(pp->port), pp->first_rxq);
+#else
+		mvPp2ClsHwOversizeRxqLowSet(MV_PPV2_PORT_PHYS(pp->port),
+			(pp->first_rxq) & MV_PP2_CLS_OVERSIZE_RXQ_LOW_MASK);
+		mvPp2ClsHwRxQueueHighSet(MV_PPV2_PORT_PHYS(pp->port),
+			1,
+			(pp->first_rxq) >> MV_PP2_CLS_OVERSIZE_RXQ_LOW_BITS);
+#endif
 
 		/* classifier port default config */
 		mvPp2ClsHwPortDefConfig(phys_port, 0, FLOWID_DEF(phys_port), pp->first_rxq);
