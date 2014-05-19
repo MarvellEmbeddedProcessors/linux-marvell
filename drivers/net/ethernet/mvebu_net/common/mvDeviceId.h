@@ -402,6 +402,9 @@ extern "C" {
 /* BobCat2  Family */
 #define MV_BOBCAT2_DEV_ID		0xFC00
 
+/* AlleyCat3  Family */
+#define MV_ALLEYCAT3_DEV_ID		0xFD00
+
 
 #ifdef __cplusplus
 }
