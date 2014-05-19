@@ -506,7 +506,7 @@ MV_STATUS mvBmRxqToQsetShortSet(int queue, int qset)
 				__func__, queue, mvBmQsets[oldQset].pool, qset, mvBmQsets[qset].pool);
 			return MV_FAIL;
 		}
-		mvBmQsets[qset].refCount--;
+		mvBmQsets[oldQset].refCount--;
 	}
 
 	mvPp2WrReg(MV_BM_PRIO_IDX_REG, queue);
@@ -554,7 +554,7 @@ MV_STATUS mvBmTxqToQsetLongSet(int queue, int qset)
 				__func__, queue, mvBmQsets[oldQset].pool, qset, mvBmQsets[qset].pool);
 			return MV_FAIL;
 		}
-		mvBmQsets[qset].refCount--;
+		mvBmQsets[oldQset].refCount--;
 	}
 
 	mvPp2WrReg(MV_BM_PRIO_IDX_REG, queue);
@@ -602,7 +602,7 @@ MV_STATUS mvBmTxqToQsetShortSet(int queue, int qset)
 				__func__, queue, mvBmQsets[oldQset].pool, qset, mvBmQsets[qset].pool);
 			return MV_FAIL;
 		}
-		mvBmQsets[qset].refCount--;
+		mvBmQsets[oldQset].refCount--;
 	}
 
 	mvPp2WrReg(MV_BM_PRIO_IDX_REG, queue);
