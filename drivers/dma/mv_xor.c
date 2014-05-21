@@ -30,6 +30,7 @@
 #include <linux/of_irq.h>
 #include <linux/irqdomain.h>
 #include <linux/platform_data/dma-mv_xor.h>
+#include <linux/crc32c.h>
 
 #include "dmaengine.h"
 #include "mv_xor.h"
@@ -58,6 +59,9 @@ static void mv_desc_init(struct mv_xor_desc_slot *desc, unsigned long flags)
 	hw_desc->phy_next_desc = 0;
 	if (flags & DMA_PREP_INTERRUPT)
 		command = (1 << 31);
+
+	if (desc->type == DMA_CRC32C)
+		command |= (1 << 30);	/* CRCLast */
 
 	hw_desc->desc_command = command;
 }
@@ -171,6 +175,9 @@ static void mv_set_mode(struct mv_xor_chan *chan,
 		break;
 	case DMA_MEMCPY:
 		op_mode = XOR_OPERATION_MODE_MEMCPY;
+		break;
+	case DMA_CRC32C:
+		op_mode = XOR_OPERATION_MODE_CRC32C;
 		break;
 	default:
 		dev_err(mv_chan_to_devp(chan),
@@ -367,6 +374,12 @@ static void __mv_xor_slot_cleanup(struct mv_xor_chan *mv_chan)
 			seen_current = 1;
 			if (busy)
 				break;
+		}
+
+		if (iter->type == DMA_CRC32C) {
+			struct mv_xor_desc *hw_desc = iter->hw_desc;
+			BUG_ON(!iter->crc32_result);
+			*iter->crc32_result = ~hw_desc->crc32_result;
 		}
 
 		cookie = mv_xor_run_tx_complete_actions(iter, mv_chan, cookie);
@@ -667,6 +680,45 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 	return sw_desc ? &sw_desc->async_tx : NULL;
 }
 
+static struct dma_async_tx_descriptor *
+mv_xor_prep_dma_crc32c(struct dma_chan *chan, dma_addr_t src,
+		size_t len, u32 *seed, unsigned long flags)
+{
+	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+	struct mv_xor_desc_slot *sw_desc;
+
+	dev_dbg(mv_chan_to_devp(mv_chan), "%s src: %x len: %u flags: %lx\n",
+		__func__, src, len, flags);
+
+	/* This HW only supports only ~0 seed
+	 * Check for data size limitations
+	 */
+	if (*seed != ~0 ||
+	    unlikely(len < MV_XOR_MIN_BYTE_COUNT) ||
+	    unlikely(len > XOR_MAX_BYTE_COUNT))
+		return NULL;
+
+	spin_lock_bh(&mv_chan->lock);
+
+	sw_desc = mv_xor_alloc_slot(mv_chan);
+	if (sw_desc) {
+		sw_desc->type = DMA_CRC32C;
+		sw_desc->async_tx.flags = flags;
+		mv_desc_init(sw_desc, flags);
+		mv_desc_set_byte_count(sw_desc, len);
+		mv_desc_set_src_addr(sw_desc, 0, src);
+		sw_desc->unmap_src_cnt = 1;
+		sw_desc->unmap_len = len;
+		sw_desc->crc32_result = seed;
+	}
+	spin_unlock_bh(&mv_chan->lock);
+
+	dev_dbg(mv_chan_to_devp(mv_chan), "%s sw_desc %p async_tx %p\n",
+		__func__, sw_desc, &sw_desc->async_tx);
+
+	return sw_desc ? &sw_desc->async_tx : NULL;
+}
+
 static void mv_xor_free_chan_resources(struct dma_chan *chan)
 {
 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
@@ -874,6 +926,70 @@ out:
 	return err;
 }
 
+#define MV_XOR_CRC32_TEST_SIZE	PAGE_SIZE
+
+static int mv_xor_crc32_self_test(struct mv_xor_chan *mv_chan)
+{
+	int i;
+	void *src;
+	u32 sum;
+	dma_addr_t src_dma;
+	struct dma_chan *dma_chan;
+	dma_cookie_t cookie;
+	struct dma_async_tx_descriptor *tx;
+	int err = 0;
+
+	src = kmalloc(MV_XOR_CRC32_TEST_SIZE, GFP_KERNEL);
+	if (!src)
+		return -ENOMEM;
+
+	/* Fill in src buffer */
+	for (i = 0; i < MV_XOR_CRC32_TEST_SIZE; i++)
+		((u8 *) src)[i] = (u8)i;
+
+	dma_chan = &mv_chan->dmachan;
+
+	if (mv_xor_alloc_chan_resources(dma_chan) < 1) {
+		err = -ENODEV;
+		goto out;
+	}
+
+	src_dma = dma_map_single(dma_chan->device->dev, src,
+				 MV_XOR_CRC32_TEST_SIZE, DMA_TO_DEVICE);
+
+	sum = ~0;
+	tx = mv_xor_prep_dma_crc32c(dma_chan, src_dma,
+				    MV_XOR_CRC32_TEST_SIZE, &sum, 0);
+
+	if (unlikely(tx == (struct dma_async_tx_descriptor *)1))
+		BUG();
+
+	BUG_ON(!tx);
+
+	cookie = mv_xor_tx_submit(tx);
+	msleep(20);
+
+	if (mv_xor_status(dma_chan, cookie, NULL) != DMA_SUCCESS) {
+		dev_err(dma_chan->device->dev,
+			"Self-test crc32 timed out, disabling\n");
+		err = -ENODEV;
+		goto free_resources;
+	}
+
+	if (crc32c(~(u32)0, src, MV_XOR_CRC32_TEST_SIZE) != sum) {
+		dev_err(dma_chan->device->dev,
+			"Self-test crc32c failed compare, disabling\n");
+		err = -ENODEV;
+		goto free_resources;
+	}
+
+free_resources:
+	mv_xor_free_chan_resources(dma_chan);
+out:
+	kfree(src);
+	return err;
+}
+
 #define MV_XOR_NUM_SRC_TEST 4 /* must be <= 15 */
 static int
 mv_xor_xor_self_test(struct mv_xor_chan *mv_chan)
@@ -1054,6 +1170,8 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 	}
 	if (dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask))
 		dma_dev->device_prep_dma_interrupt = mv_xor_prep_dma_interrupt;
+	if (dma_has_cap(DMA_CRC32C, dma_dev->cap_mask))
+		dma_dev->device_prep_dma_crc32c = mv_xor_prep_dma_crc32c;
 
 	mv_chan->mmr_base = xordev->xor_base;
 	if (!mv_chan->mmr_base) {
@@ -1073,7 +1191,18 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 
 	mv_chan_unmask_interrupts(mv_chan);
 
-	mv_set_mode(mv_chan, DMA_XOR);
+	if (dma_has_cap(DMA_CRC32C, dma_dev->cap_mask)) {
+		/* channel can support CRC or XOR mode only, not both */
+		if (dma_has_cap(DMA_XOR, dma_dev->cap_mask) ||
+		    dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask) ||
+		    dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask)) {
+			BUG();
+			ret = -EINVAL;
+			goto err_free_dma;
+		}
+		mv_set_mode(mv_chan, DMA_CRC32C);
+	} else
+		mv_set_mode(mv_chan, DMA_XOR);
 
 	spin_lock_init(&mv_chan->lock);
 	INIT_LIST_HEAD(&mv_chan->chain);
@@ -1098,10 +1227,18 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 			goto err_free_irq;
 	}
 
-	dev_info(&pdev->dev, "Marvell XOR: ( %s%s%s)\n",
+	if (dma_has_cap(DMA_CRC32C, dma_dev->cap_mask)) {
+		ret = mv_xor_crc32_self_test(mv_chan);
+		dev_dbg(&pdev->dev, "crc32 self test returned %d\n", ret);
+		if (ret)
+			goto err_free_irq;
+	}
+
+	dev_info(&pdev->dev, "Marvell XOR: ( %s%s%s%s)\n",
 		 dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "xor " : "",
 		 dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask) ? "cpy " : "",
-		 dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask) ? "intr " : "");
+		 dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask) ? "intr " : "",
+		 dma_has_cap(DMA_CRC32C, dma_dev->cap_mask) ? "crc32c " : "");
 
 	dma_async_device_register(dma_dev);
 	return mv_chan;
@@ -1215,6 +1352,8 @@ static int mv_xor_probe(struct platform_device *pdev)
 				dma_cap_set(DMA_XOR, cap_mask);
 			if (of_property_read_bool(np, "dmacap,interrupt"))
 				dma_cap_set(DMA_INTERRUPT, cap_mask);
+			if (of_property_read_bool(np, "dmacap,crc32c"))
+				dma_cap_set(DMA_CRC32C, cap_mask);
 
 			irq = irq_of_parse_and_map(np, 0);
 			if (!irq) {
