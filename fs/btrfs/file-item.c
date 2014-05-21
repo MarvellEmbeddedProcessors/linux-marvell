@@ -20,6 +20,8 @@
 #include <linux/slab.h>
 #include <linux/pagemap.h>
 #include <linux/highmem.h>
+#include <linux/dmaengine.h>
+#include <linux/async_tx.h>
 #include "ctree.h"
 #include "disk-io.h"
 #include "transaction.h"
@@ -413,19 +415,25 @@ fail:
 	return ret;
 }
 
+struct sum_offload {
+	u32				*sum;	/* ptr to sum	*/
+	struct dma_async_tx_descriptor	*tx;	/* tx desc	*/
+	char				*data;	/* bvec kmapped	*/
+};
+
 int btrfs_csum_one_bio(struct btrfs_root *root, struct inode *inode,
 		       struct bio *bio, u64 file_start, int contig)
 {
 	struct btrfs_ordered_sum *sums;
 	struct btrfs_sector_sum *sector_sum;
 	struct btrfs_ordered_extent *ordered;
-	char *data;
 	struct bio_vec *bvec = bio->bi_io_vec;
-	int bio_index = 0;
+	int bio_index = 0, bio_idx2;
 	unsigned long total_bytes = 0;
 	unsigned long this_sum_bytes = 0;
 	u64 offset;
 	u64 disk_bytenr;
+	struct sum_offload *sum_off;
 
 	WARN_ON(bio->bi_vcnt <= 0);
 	sums = kzalloc(btrfs_ordered_sum_size(root, bio->bi_size), GFP_NOFS);
@@ -446,6 +454,9 @@ int btrfs_csum_one_bio(struct btrfs_root *root, struct inode *inode,
 	BUG_ON(!ordered); /* Logic error */
 	sums->bytenr = ordered->start;
 
+	sum_off = kzalloc(bio->bi_vcnt * (sizeof(struct sum_offload)), GFP_KERNEL);
+	BUG_ON(!sum_off);
+
 	while (bio_index < bio->bi_vcnt) {
 		if (!contig)
 			offset = page_offset(bvec->bv_page) + bvec->bv_offset;
@@ -455,6 +466,17 @@ int btrfs_csum_one_bio(struct btrfs_root *root, struct inode *inode,
 			unsigned long bytes_left;
 			sums->len = this_sum_bytes;
 			this_sum_bytes = 0;
+			bio_idx2 = 0;
+
+			while (bio_idx2 < bio_index) {
+				if (sum_off[bio_idx2].tx) {
+					async_tx_quiesce(&sum_off[bio_idx2].tx);
+					kunmap_atomic(sum_off[bio_idx2].data);
+					btrfs_csum_final(*sum_off[bio_idx2].sum,
+							(char *)sum_off[bio_idx2].sum);
+				}
+				bio_idx2++;
+			}
 			btrfs_add_ordered_sum(inode, ordered, sums);
 			btrfs_put_ordered_extent(ordered);
 
@@ -470,14 +492,22 @@ int btrfs_csum_one_bio(struct btrfs_root *root, struct inode *inode,
 			sums->bytenr = ordered->start;
 		}
 
-		data = kmap_atomic(bvec->bv_page);
+		sum_off[bio_index].data = kmap_atomic(bvec->bv_page);
 		sector_sum->sum = ~(u32)0;
-		sector_sum->sum = btrfs_csum_data(data + bvec->bv_offset,
+		sum_off[bio_index].tx =
+			btrfs_csum_data_dma_offload(sum_off[bio_index].data + bvec->bv_offset,
+						&sector_sum->sum,
+						bvec->bv_len);
+
+		if (sum_off[bio_index].tx)
+			sum_off[bio_index].sum = &sector_sum->sum;
+		else {
+			sector_sum->sum = btrfs_csum_data(sum_off[bio_index].data + bvec->bv_offset,
 						  sector_sum->sum,
 						  bvec->bv_len);
-		kunmap_atomic(data);
-		btrfs_csum_final(sector_sum->sum,
-				 (char *)&sector_sum->sum);
+			kunmap_atomic(sum_off[bio_index].data);
+			btrfs_csum_final(sector_sum->sum, (char *)&sector_sum->sum);
+		}
 		sector_sum->bytenr = disk_bytenr;
 
 		sector_sum++;
@@ -488,6 +518,18 @@ int btrfs_csum_one_bio(struct btrfs_root *root, struct inode *inode,
 		offset += bvec->bv_len;
 		bvec++;
 	}
+
+	bio_idx2 = 0;
+	while (bio_idx2 < bio->bi_vcnt) {
+		if (sum_off[bio_idx2].tx) {
+			async_tx_quiesce(&sum_off[bio_idx2].tx);
+			kunmap_atomic(sum_off[bio_idx2].data);
+			btrfs_csum_final(*sum_off[bio_idx2].sum, (char *)sum_off[bio_idx2].sum);
+		}
+		bio_idx2++;
+	}
+
+	kfree(sum_off);
 	this_sum_bytes = 0;
 	btrfs_add_ordered_sum(inode, ordered, sums);
 	btrfs_put_ordered_extent(ordered);
