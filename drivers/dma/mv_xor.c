@@ -195,7 +195,7 @@ static void mv_set_mode(struct mv_xor_chan *chan,
 
 static void mv_chan_activate(struct mv_xor_chan *chan)
 {
-	dev_dbg(mv_chan_to_devp(chan), " activate chan.\n");
+	dev_dbg(mv_chan_to_devp(chan), "activate chan %d\n", chan->dmadev.dev_id);
 
 	/* writel ensures all descriptors are flushed before
 	   activation*/
@@ -234,8 +234,8 @@ static void mv_xor_free_slots(struct mv_xor_chan *mv_chan,
 static void mv_xor_start_new_chain(struct mv_xor_chan *mv_chan,
 				   struct mv_xor_desc_slot *sw_desc)
 {
-	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d: sw_desc %p\n",
-		__func__, __LINE__, sw_desc);
+	dev_dbg(mv_chan_to_devp(mv_chan), "%s %d: sw_desc %p phys %x\n",
+		__func__, __LINE__, sw_desc, sw_desc->async_tx.phys);
 
 	/* set the hardware chain */
 	mv_chan_set_next_descriptor(mv_chan, sw_desc->async_tx.phys);
@@ -384,8 +384,7 @@ static void __mv_xor_slot_cleanup(struct mv_xor_chan *mv_chan)
 
 		cookie = mv_xor_run_tx_complete_actions(iter, mv_chan, cookie);
 
-		if (mv_xor_clean_slot(iter, mv_chan))
-			break;
+		mv_xor_clean_slot(iter, mv_chan);
 	}
 
 	if ((busy == 0) && !list_empty(&mv_chan->chain)) {
@@ -520,7 +519,6 @@ mv_xor_tx_submit(struct dma_async_tx_descriptor *tx)
 	if (new_hw_chain)
 		mv_xor_start_new_chain(mv_chan, sw_desc);
 
-submit_done:
 	spin_unlock_bh(&mv_chan->lock);
 
 	return cookie;
