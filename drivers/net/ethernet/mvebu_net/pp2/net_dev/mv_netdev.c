@@ -3952,6 +3952,7 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac, struct platform_device *
 
 	dev->mtu = mtu;
 	memcpy(dev->dev_addr, mac, MV_MAC_ADDR_SIZE);
+	memcpy(dev->perm_addr, mac, MV_MAC_ADDR_SIZE);
 	dev->tx_queue_len = CONFIG_MV_ETH_TXQ_DESC;
 	dev->watchdog_timeo = 5 * HZ;
 

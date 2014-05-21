@@ -35,9 +35,15 @@ disclaimer.
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <linux/mii.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24)
+#include <asm/arch/system.h>
+#else
+#include <mach/system.h>
+#endif
 
 #include "mvOs.h"
 #include "mvDebug.h"
+#include "mvCommon.h"
 #include "mvEthPhy.h"
 #include "gmac/mvEthGmacApi.h"
 
@@ -49,6 +55,93 @@ disclaimer.
 #include "prs/mvPp2Prs.h"
 
 #define MV_ETH_TOOL_AN_TIMEOUT	5000
+
+struct mv_eth_tool_stats {
+	char stat_string[ETH_GSTRING_LEN];
+	int stat_offset;
+};
+
+#define MV_ETH_TOOL_STAT(m)	offsetof(struct eth_port, m)
+
+static const struct mv_eth_tool_stats mv_eth_tool_global_strings_stats[] = {
+#ifdef CONFIG_MV_ETH_STAT_ERR
+	{"rx_error", MV_ETH_TOOL_STAT(stats.rx_error)},
+	{"tx_timeout", MV_ETH_TOOL_STAT(stats.tx_timeout)},
+	{"ext_stack_empty", MV_ETH_TOOL_STAT(stats.ext_stack_empty)},
+	{"ext_stack_full", MV_ETH_TOOL_STAT(stats.ext_stack_full)},
+	{"state_err", MV_ETH_TOOL_STAT(stats.state_err)},
+#endif
+#ifdef CONFIG_MV_ETH_STAT_INF
+	{"tx_done", MV_ETH_TOOL_STAT(stats.tx_done)},
+	{"link", MV_ETH_TOOL_STAT(stats.link)},
+	{"netdev_stop", MV_ETH_TOOL_STAT(stats.netdev_stop)},
+	{"rx_buf_hdr", MV_ETH_TOOL_STAT(stats.rx_buf_hdr)},
+#ifdef CONFIG_MV_ETH_RX_SPECIAL
+	{"rx_special", MV_ETH_TOOL_STAT(stats.rx_special)},
+#endif
+#ifdef CONFIG_MV_ETH_TX_SPECIAL
+	{"tx_special", MV_ETH_TOOL_STAT(stats.tx_special)},
+#endif
+#endif
+#ifdef CONFIG_MV_ETH_STAT_DBG
+	{"rx_tagged", MV_ETH_TOOL_STAT(stats.rx_tagged)},
+	{"rx_netif", MV_ETH_TOOL_STAT(stats.rx_netif)},
+	{"rx_gro", MV_ETH_TOOL_STAT(stats.rx_gro)},
+	{"rx_gro_bytes", MV_ETH_TOOL_STAT(stats.rx_gro_bytes)},
+	{"rx_drop_sw", MV_ETH_TOOL_STAT(stats.rx_drop_sw)},
+	{"rx_csum_hw", MV_ETH_TOOL_STAT(stats.rx_csum_hw)},
+	{"rx_csum_sw", MV_ETH_TOOL_STAT(stats.rx_csum_sw)},
+	{"tx_csum_hw", MV_ETH_TOOL_STAT(stats.tx_csum_hw)},
+	{"tx_csum_sw", MV_ETH_TOOL_STAT(stats.tx_csum_sw)},
+	{"tx_skb_free", MV_ETH_TOOL_STAT(stats.tx_skb_free)},
+	{"tx_sg", MV_ETH_TOOL_STAT(stats.tx_sg)},
+	{"tx_tso", MV_ETH_TOOL_STAT(stats.tx_tso)},
+	{"tx_tso_no_resource", MV_ETH_TOOL_STAT(stats.tx_tso_no_resource)},
+	{"tx_tso_bytes", MV_ETH_TOOL_STAT(stats.tx_tso_bytes)},
+	{"ext_stack_put", MV_ETH_TOOL_STAT(stats.ext_stack_put)},
+	{"ext_stack_get", MV_ETH_TOOL_STAT(stats.ext_stack_get)},
+#endif
+	{"rate_current", MV_ETH_TOOL_STAT(rate_current)},
+};
+
+static const struct mv_eth_tool_stats mv_eth_tool_cpu_strings_stats[] = {
+#ifdef CONFIG_MV_ETH_STATS_DEBUG
+	{"irq", MV_ETH_TOOL_STAT(stats.irq)},
+	{"irq_err", MV_ETH_TOOL_STAT(stats.irq_err)},
+	{"poll", MV_ETH_TOOL_STAT(stats.poll)},
+	{"poll_exit", MV_ETH_TOOL_STAT(stats.poll_exit)},
+	{"tx_done_timer_event", MV_ETH_TOOL_STAT(stats.tx_done_timer_event)},
+	{"tx_done_timer_add", MV_ETH_TOOL_STAT(stats.tx_done_timer_add)},
+#endif /* CONFIG_MV_ETH_STATS_DEBUG */
+};
+
+static const struct mv_eth_tool_stats mv_eth_tool_rx_queue_strings_stats[] = {
+#ifdef CONFIG_MV_ETH_STAT_DBG
+	{"rxq", MV_ETH_TOOL_STAT(stats.rxq)},
+#endif /* CONFIG_MV_ETH_STAT_DBG */
+};
+
+static const struct mv_eth_tool_stats mv_eth_tool_tx_queue_strings_stats[] = {
+};
+
+#define MV_ETH_TOOL_CPU_STATS_LEN	\
+	(sizeof(mv_eth_tool_cpu_strings_stats) / sizeof(struct mv_eth_tool_stats))
+
+#define MV_ETH_TOOL_RX_QUEUE_STATS_LEN	\
+	(sizeof(mv_eth_tool_rx_queue_strings_stats) / sizeof(struct mv_eth_tool_stats))
+
+#define MV_ETH_TOOL_TX_QUEUE_STATS_LEN	\
+	(sizeof(mv_eth_tool_tx_queue_strings_stats) / sizeof(struct mv_eth_tool_stats))
+
+#define MV_ETH_TOOL_QUEUE_STATS_LEN	\
+	((MV_ETH_TOOL_RX_QUEUE_STATS_LEN * CONFIG_MV_ETH_RXQ) + \
+	(MV_ETH_TOOL_TX_QUEUE_STATS_LEN * CONFIG_MV_ETH_TXQ))
+
+#define MV_ETH_TOOL_GLOBAL_STATS_LEN	\
+	(sizeof(mv_eth_tool_global_strings_stats) / sizeof(struct mv_eth_tool_stats))
+
+#define MV_ETH_TOOL_STATS_LEN		\
+	(MV_ETH_TOOL_GLOBAL_STATS_LEN + MV_ETH_TOOL_CPU_STATS_LEN + MV_ETH_TOOL_QUEUE_STATS_LEN)
 
 /******************************************************************************
 * mv_eth_tool_get_settings
@@ -282,7 +375,7 @@ int mv_eth_tool_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 *******************************************************************************/
 int mv_eth_tool_get_regs_len(struct net_device *netdev)
 {
-#define MV_ETH_TOOL_REGS_LEN 32
+#define MV_ETH_TOOL_REGS_LEN 42
 
 	return (MV_ETH_TOOL_REGS_LEN * sizeof(uint32_t));
 }
@@ -305,12 +398,10 @@ void mv_eth_tool_get_drvinfo(struct net_device *netdev,
 			     struct ethtool_drvinfo *info)
 {
 	strcpy(info->driver, "mv_eth");
-	/*strcpy(info->version, LSP_VERSION);*/
+	strcpy(info->version, LSP_VERSION);
 	strcpy(info->fw_version, "N/A");
 	strcpy(info->bus_info, "Mbus");
-/*   TBD
 	info->n_stats = MV_ETH_TOOL_STATS_LEN;
-*/
 	info->testinfo_len = 0;
 	info->regdump_len = mv_eth_tool_get_regs_len(netdev);
 	info->eedump_len = 0;
@@ -333,10 +424,8 @@ void mv_eth_tool_get_drvinfo(struct net_device *netdev,
 void mv_eth_tool_get_regs(struct net_device *netdev,
 			  struct ethtool_regs *regs, void *p)
 {
-	struct eth_port	*priv = MV_ETH_PRIV(netdev);
-/*
-	uint32_t 	*regs_buff = p;
-*/
+	struct eth_port *priv = MV_ETH_PRIV(netdev);
+	uint32_t	*regs_buff = p;
 
 	if ((priv == NULL) || MV_PON_PORT(priv->port)) {
 		printk(KERN_ERR "%s is not supported on %s\n", __func__, netdev->name);
@@ -348,9 +437,23 @@ void mv_eth_tool_get_regs(struct net_device *netdev,
 	regs->version = priv->plat_data->ctrl_rev;
 
 	/* ETH port registers */
-	/* TODO read ETH registers into p - reference at NETA */
-
+	regs_buff[0]  = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_CTRL_0_REG(priv->port)));
+	regs_buff[1]  = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_CTRL_1_REG(priv->port)));
+	regs_buff[2]  = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_CTRL_2_REG(priv->port)));
+	regs_buff[3]  = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_AN_CTRL_REG(priv->port)));
+	regs_buff[4]  = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_STATUS_REG(priv->port)));
+	regs_buff[6]  = MV_32BIT_BE(MV_REG_READ(GMAC_PORT_FIFO_CFG_0_REG(priv->port)));
+	regs_buff[7]  = MV_32BIT_BE(MV_REG_READ(GMAC_PORT_FIFO_CFG_1_REG(priv->port)));
+	regs_buff[8]  = MV_32BIT_BE(MV_REG_READ(ETH_PORT_ISR_CAUSE_REG(priv->port)));
+	regs_buff[9]  = MV_32BIT_BE(MV_REG_READ(ETH_PORT_ISR_MASK_REG(priv->port)));
+	regs_buff[17] = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_MIB_CTRL_REG(priv->port)));
+	regs_buff[18] = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_CTRL_3_REG(priv->port)));
+	regs_buff[22] = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_SPEED_TIMER_REG(priv->port)));
+	regs_buff[36] = MV_32BIT_BE(MV_REG_READ(ETH_GMAC_CTRL_4_REG(priv->port)));
+	regs_buff[40] = MV_32BIT_BE(MV_REG_READ(ETH_PORT_ISR_SUM_CAUSE_REG(priv->port)));
+	regs_buff[41] = MV_32BIT_BE(MV_REG_READ(ETH_PORT_ISR_SUM_MASK_REG(priv->port)));
 }
+
 
 
 /******************************************************************************
@@ -711,9 +814,42 @@ int mv_eth_tool_set_pauseparam(struct net_device *netdev,
 void mv_eth_tool_get_strings(struct net_device *netdev,
 			     uint32_t stringset, uint8_t *data)
 {
-/*	printk("in %s \n",__FUNCTION__);*/
+	uint8_t *p = data;
+	int i, q;
+	char qnum[8][4] = {" Q0", " Q1", " Q2", " Q3", " Q4", " Q5", " Q6", " Q7"};
 
+	switch (stringset) {
+	case ETH_SS_TEST:
+		/*
+		memcpy(data, *mv_eth_tool_gstrings_test,
+		       MV_ETH_TOOL_TEST_LEN*ETH_GSTRING_LEN); */
+		break;
+	case ETH_SS_STATS:
+		for (i = 0; i < MV_ETH_TOOL_GLOBAL_STATS_LEN; i++) {
+			memcpy(p, mv_eth_tool_global_strings_stats[i].stat_string,
+			       ETH_GSTRING_LEN);
+			p += ETH_GSTRING_LEN;
+		}
+		for (q = 0; q < CONFIG_MV_ETH_RXQ; q++) {
+			for (i = 0; i < MV_ETH_TOOL_RX_QUEUE_STATS_LEN; i++) {
+				const char *str = mv_eth_tool_rx_queue_strings_stats[i].stat_string;
+				memcpy(p, str, ETH_GSTRING_LEN);
+				strcat(p, qnum[q]);
+				p += ETH_GSTRING_LEN;
+			}
+		}
+		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
+			for (i = 0; i < MV_ETH_TOOL_TX_QUEUE_STATS_LEN; i++) {
+				const char *str = mv_eth_tool_tx_queue_strings_stats[i].stat_string;
+				memcpy(p, str, ETH_GSTRING_LEN);
+				strcat(p, qnum[q]);
+				p += ETH_GSTRING_LEN;
+			}
+		}
+		break;
+	}
 }
+
 
 /******************************************************************************
 * mv_eth_tool_get_stats_count
@@ -760,7 +896,150 @@ static int mv_eth_tool_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *i
 void mv_eth_tool_get_ethtool_stats(struct net_device *netdev,
 				   struct ethtool_stats *stats, uint64_t *data)
 {
+	struct eth_port	*priv = MV_ETH_PRIV(netdev);
+	uint64_t	*pdest = data;
+	int		i, q;
+	int		cpu = smp_processor_id();
 
+	for (i = 0; i < MV_ETH_TOOL_GLOBAL_STATS_LEN; i++) {
+		char *p = (char *)priv +
+			mv_eth_tool_global_strings_stats[i].stat_offset;
+		pdest[i] =  *(uint32_t *)p;
+	}
+	pdest += MV_ETH_TOOL_GLOBAL_STATS_LEN;
+
+	for (i = 0; i < MV_ETH_TOOL_CPU_STATS_LEN; i++) {
+		char *p = (char *)priv +
+			mv_eth_tool_cpu_strings_stats[i].stat_offset;
+		pdest[i] =  *((uint32_t *)p + cpu);
+	}
+	pdest += MV_ETH_TOOL_CPU_STATS_LEN;
+
+	for (q = 0; q < CONFIG_MV_ETH_RXQ; q++) {
+		for (i = 0; i < MV_ETH_TOOL_RX_QUEUE_STATS_LEN; i++) {
+			char *p = (char *)priv +
+				mv_eth_tool_rx_queue_strings_stats[i].stat_offset;
+			pdest[i] =  *((uint32_t *)p + q);
+		}
+		pdest += MV_ETH_TOOL_RX_QUEUE_STATS_LEN;
+	}
+
+	for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
+		for (i = 0; i < MV_ETH_TOOL_TX_QUEUE_STATS_LEN; i++) {
+			char *p = (char *)priv +
+				mv_eth_tool_tx_queue_strings_stats[i].stat_offset;
+			pdest[i] =  *((uint32_t *)p + q);
+		}
+		pdest += MV_ETH_TOOL_TX_QUEUE_STATS_LEN;
+	}
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+/******************************************************************************
+* mv_eth_tool_set_phys_id
+* Description:
+*	ethtool set indicator state for physical identification
+* INPUT:
+*	netdev		Network device structure pointer
+*	state		indicator state for physical identification
+* OUTPUT
+*	None
+* RETURN:
+*	Set results
+*
+*******************************************************************************/
+static int mv_eth_tool_set_phys_id(struct net_device *netdev,
+			     enum ethtool_phys_id_state state)
+{
+	/* we can only set Blink Duty Cycle and Blink Duration for Blink1 and Blink0
+	we can not set LED blink stae
+	0 = Blink Duty Cycle_0: 25% ON, 75% OFF.
+	1 = Blink Duty Cycle_1: 50% ON, 50% OFF.
+	2 = Blink Duty Cycle_2: 50% ON, 50% OFF.
+	3 = Blink Duty Cycle_3: 75% ON, 25% OFF.
+
+	0 = 1 x Core Clock: (Core_clock_period*2200*1)*1,000,000
+	1 = 2 x Core Clock: (Core_clock_period*2200*2)*1,000,000
+	2 = 4 x Core Clock: (Core_clock_period*2200*4)*1,000,000
+	3 = 8 x Core Clock: (Core_clock_period*2200*8)*1,000,000
+	4 = 16 x Core Clock: (Core_clock_period*2200*16)*1,000,000
+	5 = 32 x Core Clock: (Core_clock_period*2200*32)*1,000,000
+	6 = 64 x Core Clock: (Core_clock_period*2200*64)*1,000,000
+	*/
+	switch (state) {
+	case ETHTOOL_ID_ACTIVE:
+		return 2;
+
+	case ETHTOOL_ID_ON:
+		break;
+
+	case ETHTOOL_ID_OFF:
+		return -EOPNOTSUPP;
+
+	case ETHTOOL_ID_INACTIVE:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+#else
+/******************************************************************************
+* mv_eth_tool_phys_id
+* Description:
+*	ethtool set indicator state for physical identification
+* INPUT:
+*	netdev		Network device structure pointer
+*	state		indicator state for physical identification
+* OUTPUT
+*	None
+* RETURN:
+*	Set results
+*
+*******************************************************************************/
+static int mv_eth_tool_phys_id(struct net_device *netdev,
+			     uint32_t data)
+{
+	/* we can only set Blink Duty Cycle and Blink Duration for Blink1 and Blink0
+	we can not set LED blink stae
+	0 = Blink Duty Cycle_0: 25% ON, 75% OFF.
+	1 = Blink Duty Cycle_1: 50% ON, 50% OFF.
+	2 = Blink Duty Cycle_2: 50% ON, 50% OFF.
+	3 = Blink Duty Cycle_3: 75% ON, 25% OFF.
+
+	0 = 1 x Core Clock: (Core_clock_period*2200*1)*1,000,000
+	1 = 2 x Core Clock: (Core_clock_period*2200*2)*1,000,000
+	2 = 4 x Core Clock: (Core_clock_period*2200*4)*1,000,000
+	3 = 8 x Core Clock: (Core_clock_period*2200*8)*1,000,000
+	4 = 16 x Core Clock: (Core_clock_period*2200*16)*1,000,000
+	5 = 32 x Core Clock: (Core_clock_period*2200*32)*1,000,000
+	6 = 64 x Core Clock: (Core_clock_period*2200*64)*1,000,000
+	*/
+	return -EOPNOTSUPP;
+}
+
+#endif
+
+/******************************************************************************
+* mv_eth_tool_get_sset_count
+* Description:
+*	ethtool get stringset count
+* INPUT:
+*	netdev		Network device structure pointer
+*	sset		stringset
+* OUTPUT
+*	None
+* RETURN:
+*	stringset length
+*
+*******************************************************************************/
+static int mv_eth_tool_get_sset_count(struct net_device *netdev, int sset)
+{
+	switch (sset) {
+	case ETH_SS_STATS:
+		return MV_ETH_TOOL_STATS_LEN;
+	default:
+		return -EOPNOTSUPP;
+	}
 }
 
 const struct ethtool_ops mv_eth_tool_ops = {
@@ -768,7 +1047,7 @@ const struct ethtool_ops mv_eth_tool_ops = {
 	.set_settings				= mv_eth_tool_set_settings,
 	.get_drvinfo				= mv_eth_tool_get_drvinfo,
 	.get_regs_len				= mv_eth_tool_get_regs_len,
-	.get_regs				= mv_eth_tool_get_regs,/*TODO: complete implementation */
+	.get_regs				= mv_eth_tool_get_regs,
 	.nway_reset				= mv_eth_tool_nway_reset,
 	.get_link				= mv_eth_tool_get_link,
 	.get_coalesce				= mv_eth_tool_get_coalesce,
@@ -777,7 +1056,7 @@ const struct ethtool_ops mv_eth_tool_ops = {
 	.set_ringparam 				= mv_eth_tool_set_ringparam,
 	.get_pauseparam				= mv_eth_tool_get_pauseparam,
 	.set_pauseparam				= mv_eth_tool_set_pauseparam,
-	.get_strings				= mv_eth_tool_get_strings,/*TODO: complete implementation */
+	.get_strings				= mv_eth_tool_get_strings,
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
 	.get_stats_count			= mv_eth_tool_get_stats_count,/*TODO: complete implementation */
 #endif
@@ -785,4 +1064,13 @@ const struct ethtool_ops mv_eth_tool_ops = {
 	/*.get_rxfh_indir			= mv_eth_tool_get_rxfh_indir,
 	.set_rxfh_indir				= mv_eth_tool_set_rxfh_indir, */
 	.get_rxnfc                  		= mv_eth_tool_get_rxnfc,/*TODO new implementation*/
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+	.set_phys_id				= mv_eth_tool_set_phys_id,
+#else
+	.phys_id				= mv_eth_tool_phys_id,
+#endif
+	.get_sset_count				= mv_eth_tool_get_sset_count,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+	.get_ts_info				= ethtool_op_get_ts_info,
+#endif
 };
