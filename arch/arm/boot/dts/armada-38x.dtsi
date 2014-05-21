@@ -403,6 +403,10 @@
 					dmacap,xor;
 					dmacap,interrupt;
 				};
+				xor01 {
+					interrupts = <0 23 0x4>;
+					dmacap,crc32c;
+				};
 			};
 
 			xor@60900 {
@@ -417,6 +421,10 @@
 					dmacap,memcpy;
 					dmacap,xor;
 					dmacap,interrupt;
+				};
+				xor11 {
+					interrupts = <0 66 0x4>;
+					dmacap,crc32c;
 				};
 			};
 
