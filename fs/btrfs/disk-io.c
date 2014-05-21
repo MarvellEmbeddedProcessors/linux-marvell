@@ -32,6 +32,9 @@
 #include <linux/ratelimit.h>
 #include <linux/uuid.h>
 #include <asm/unaligned.h>
+#include <linux/async_tx.h>
+#include <linux/dma-attrs.h>
+#include <linux/dma-mapping.h>
 #include "compat.h"
 #include "ctree.h"
 #include "disk-io.h"
@@ -251,6 +254,47 @@ void btrfs_csum_final(u32 crc, char *result)
 	put_unaligned_le32(~crc, result);
 }
 
+struct dma_async_tx_descriptor *
+btrfs_csum_data_dma_offload(const u8 *data, u32 *crc, unsigned int len)
+{
+	struct async_submit_ctl submit;
+	struct dma_chan *chan;
+	struct dma_device *device;
+	struct dma_async_tx_descriptor *tx;
+	dma_addr_t src;
+
+	/* perform basic sanity checks */
+	if (unlikely((unsigned long)data < PAGE_OFFSET)	||
+	    unlikely(high_memory <= ((void *)data)))
+		return NULL;
+
+	len = min(len, (unsigned int)(high_memory - (void *)data));
+
+	/* offload the crc calc for page size */
+	if (len != PAGE_SIZE)
+		return NULL;
+
+	init_async_submit(&submit, 0, NULL, NULL, NULL, NULL);
+
+	chan = async_tx_find_channel(&submit, DMA_CRC32C, NULL, 0, NULL, 0, 0);
+	if (!chan)
+		return NULL;
+
+	device = chan->device;
+	src = dma_map_single(device->dev, (void *)data, len, DMA_TO_DEVICE);
+
+	tx = device->device_prep_dma_crc32c(chan, src, len, crc,
+					    DMA_COMPL_SKIP_DEST_UNMAP | DMA_PREP_INTERRUPT);
+	if (unlikely(!tx)) {
+		/* HW is unable to handle this context */
+		dma_unmap_page(device->dev, src, len, DMA_TO_DEVICE);
+		return NULL;
+	}
+
+	async_tx_submit(chan, tx, &submit);
+
+	return tx;
+}
 /*
  * compute the csum for a btree block, and either verify it or write it
  * into the csum field of the block.
