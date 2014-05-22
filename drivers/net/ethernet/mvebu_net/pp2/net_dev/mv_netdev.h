@@ -150,7 +150,8 @@ struct txq_stats {
 #endif /* CONFIG_MV_ETH_STAT_ERR */
 #ifdef CONFIG_MV_ETH_STAT_DBG
 	u32 txq_tx;
-	u32 txq_txreq; /*request reserved tx descriptors*/
+	u32 txq_reserved_req;   /* Number of requests to reserve TX descriptors */
+	u32 txq_reserved_total; /* Accumulated number of reserved TX descriptors */
 	u32 txq_txdone;
 #endif /* CONFIG_MV_ETH_STAT_DBG */
 };
@@ -257,7 +258,7 @@ struct port_stats {
 #define TOS_TO_DSCP(tos)	((tos >> 2) & 0x3F)
 
 /* Used in PPv2.1 */
-#define MV_ETH_CPU_DESC_CHUNK	20
+#define MV_ETH_CPU_DESC_CHUNK	64
 
 /* Masks used for tx_spec->flags */
 #define MV_ETH_TX_F_NO_PAD	0x0001
@@ -674,15 +675,17 @@ static inline int mv_eth_reserved_desc_num_proc(struct eth_port *pp, int txp, in
 			return 1;
 		}
 
-
 		new_reserved = mvPp2TxqAllocReservedDesc(pp->port, txp, txq, req);
+
+		STAT_DBG(txq_cpu_ptr->stats.txq_reserved_total += new_reserved);
 		txq_cpu_ptr->reserved_num += new_reserved;
 
-		if (txq_cpu_ptr->reserved_num < num)
-			/* out of resources - drop packet*/
+		if (txq_cpu_ptr->reserved_num < num) {
+			STAT_ERR(txq_cpu_ptr->stats.txq_err++);
 			return 1;
+		}
 
-		STAT_DBG(txq_cpu_ptr->stats.txq_txreq++);
+		STAT_DBG(txq_cpu_ptr->stats.txq_reserved_req++);
 	}
 
 	return 0;

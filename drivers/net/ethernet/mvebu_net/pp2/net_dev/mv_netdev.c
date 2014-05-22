@@ -2014,6 +2014,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 	struct txq_cpu_ctrl *txq_cpu_ptr = NULL;
 	struct aggr_tx_queue *aggr_txq_ctrl = NULL;
 	struct pp2_tx_desc *tx_desc;
+	unsigned long flags = 0;
 
 	if (!test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags))) {
 		STAT_INFO(pp->stats.netdev_stop++);
@@ -2070,6 +2071,8 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		goto out;
 	}
 	txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
+
+	MV_ETH_LIGHT_LOCK(flags);
 
 #ifdef CONFIG_MV_ETH_TSO
 	/* GSO/TSO */
@@ -2214,8 +2217,10 @@ out:
 		if ((txq_cpu_ptr->txq_count == frags) && (frags > 0))
 			mv_eth_add_tx_done_timer(pp->cpu_config[smp_processor_id()]);
 	}
-
 #endif /* CONFIG_MV_ETH_TXDONE_ISR */
+
+	if (txq_ctrl)
+		MV_ETH_LIGHT_UNLOCK(flags);
 
 	return NETDEV_TX_OK;
 }
@@ -2259,8 +2264,11 @@ static inline int mv_eth_tso_build_hdr_desc(struct pp2_tx_desc *tx_desc, struct 
 	int mac_hdr_len = skb_network_offset(skb);
 
 	data = mv_eth_extra_pool_get(priv);
-	if (!data)
+	if (!data) {
+		pr_err("Can't allocate extra buffer for TSO\n");
 		return 0;
+	}
+	mv_eth_shadow_push(txq_ctrl, ((MV_ULONG)data | MV_ETH_SHADOW_EXT));
 
 	/* Reserve 2 bytes for IP header alignment */
 	mac = data + MV_ETH_MH_SIZE;
@@ -2301,8 +2309,6 @@ static inline int mv_eth_tso_build_hdr_desc(struct pp2_tx_desc *tx_desc, struct 
 	bufPhysAddr = mvOsCacheFlush(NULL, data, tx_desc->dataSize);
 	tx_desc->pktOffset = bufPhysAddr & MV_ETH_TX_DESC_ALIGN;
 	tx_desc->bufPhysAddr = bufPhysAddr & (~MV_ETH_TX_DESC_ALIGN);
-
-	mv_eth_shadow_push(txq_ctrl, ((MV_ULONG)data | MV_ETH_SHADOW_EXT));
 
 	mv_eth_tx_desc_flush(tx_desc);
 
@@ -2422,28 +2428,8 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev, struct mv_eth_tx_
 #else
 		if (mv_eth_phys_desc_num_check(txq_cpu_ptr, seg_desc_num)) {
 #endif
-#ifndef CONFIG_MV_ETH_TXDONE_ISR
-			/* Try TX done and check resource again */
-#ifdef CONFIG_MV_ETH_STAT_DIST
-			u32 tx_done = mv_eth_txq_done(priv, txq_ctrl);
-
-			if (tx_done < priv->dist_stats.tx_done_dist_size)
-				priv->dist_stats.tx_done_dist[tx_done]++;
-#else
-			mv_eth_txq_done(priv, txq_ctrl);
-#endif /* CONFIG_MV_ETH_STAT_DIST */
-#ifdef CONFIG_MV_ETH_PP2_1
-		if (mv_eth_reserved_desc_num_proc(priv, tx_spec->txp, tx_spec->txq, seg_desc_num)) {
-#else
-		if (mv_eth_phys_desc_num_check(txq_cpu_ptr, seg_desc_num)) {
-#endif
-				STAT_DBG(priv->stats.tx_tso_no_resource++);
-				return 0;
-			}
-#else
 			STAT_DBG(priv->stats.tx_tso_no_resource++);
 			return 0;
-#endif /* CONFIG_MV_ETH_TXDONE_ISR */
 		}
 
 		seg_desc_num = 0;
@@ -2512,6 +2498,11 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev, struct mv_eth_tx_
 				frag++;
 			}
 		}
+
+#ifdef CONFIG_MV_ETH_PP2_1
+		/* PPv2.1 - MAS 3.16, decrease number of reserved descriptors */
+		txq_cpu_ptr->reserved_num -= seg_desc_num;
+#endif
 
 		/* TCP segment is ready - transmit it */
 		wmb();
@@ -3052,6 +3043,7 @@ void mv_eth_link_tasklet(unsigned long data)
 	struct eth_port *pp;
 
 	regVal = mvGmacIsrSummaryCauseGet();
+
 	/* check only relevant interrupts - ports0 and 1 */
 	regVal &= (ETH_ISR_SUM_PORT0_MASK | ETH_ISR_SUM_PORT1_MASK);
 
@@ -5215,49 +5207,54 @@ void mv_eth_port_status_print(unsigned int port)
 	mv_eth_link_status_print(port);
 
 	pr_cont("\n");
-	printk(KERN_ERR "rxq_coal(pkts)[ q]      = ");
+	pr_info("rxq_coal(pkts)[ q]         = ");
 	for (q = 0; q < pp->rxq_num; q++)
 		printk(KERN_CONT "%4d ", mvPp2RxqPktsCoalGet(port, q));
 
-	printk(KERN_CONT "\n");
-	printk(KERN_ERR "rxq_coal(usec)[ q]      = ");
+	pr_cont("\n");
+	pr_info("rxq_coal(usec)[ q]         = ");
 	for (q = 0; q < pp->rxq_num; q++)
-		printk(KERN_CONT "%4d ", mvPp2RxqTimeCoalGet(port, q));
+		pr_cont("%4d ", mvPp2RxqTimeCoalGet(port, q));
 
-	printk(KERN_CONT "\n");
-	printk(KERN_ERR "rxq_desc(num)[ q]       = ");
+	pr_cont("\n");
+	pr_info("rxq_desc(num)[ q]          = ");
 	for (q = 0; q < pp->rxq_num; q++)
-		printk(KERN_CONT "%4d ", pp->rxq_ctrl[q].rxq_size);
+		pr_info("%4d ", pp->rxq_ctrl[q].rxq_size);
 
-	printk(KERN_CONT "\n");
+	pr_cont("\n");
 	for (txp = 0; txp < pp->txp_num; txp++) {
-		printk(KERN_ERR "txq_coal(pkts)[%2d.q]    = ", txp);
+		pr_info("txq_coal(pkts)[%2d.q]       = ", txp);
 		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++)
-			printk(KERN_CONT "%4d ", mvPp2TxDonePktsCoalGet(port, txp, q));
-		printk(KERN_CONT "\n");
+			pr_cont("%4d ", mvPp2TxDonePktsCoalGet(port, txp, q));
+		pr_cont("\n");
 
-		printk(KERN_ERR "txq_desc(num) [%2d.q]    = ", txp);
+		pr_info("txq_desc(num) [%2d.q]       = ", txp);
 		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
 			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + q];
-			printk(KERN_CONT "%4d ", txq_ctrl->txq_size);
+			pr_cont("%4d ", txq_ctrl->txq_size);
 		}
-		printk(KERN_CONT "\n");
+		pr_cont("\n");
 
-		printk(KERN_ERR "txq_hwf_desc(num) [%2d.q] = ", txp);
+		pr_info("txq_hwf_desc(num) [%2d.q]   = ", txp);
 		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
 			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + q];
-			printk(KERN_CONT "%4d ", txq_ctrl->hwf_size);
+			pr_cont("%4d ", txq_ctrl->hwf_size);
 		}
-		printk(KERN_CONT "\n");
+		pr_cont("\n");
 
-		printk(KERN_ERR "txq_swf_desc(num) [%2d.q] = ", txp);
+		pr_info("txq_swf_desc(num) [%2d.q]   = ", txp);
 		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
 			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + q];
-			printk(KERN_CONT "%4d ", txq_ctrl->txq_cpu[0].txq_size);
+			pr_cont("%4d ", txq_ctrl->txq_cpu[0].txq_size);
 		}
-		printk(KERN_CONT "\n");
+		pr_info("txq_rsvd_chunk(num) [%2d.q] = ", txp);
+		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
+			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + q];
+			pr_cont("%4d ", txq_ctrl->rsvd_chunk);
+		}
+		pr_cont("\n");
 	}
-	printk(KERN_ERR "\n");
+	pr_info("\n");
 
 #ifdef CONFIG_MV_ETH_TXDONE_ISR
 	printk(KERN_ERR "Do tx_done in NAPI context triggered by ISR\n");
@@ -5439,28 +5436,29 @@ void mv_eth_port_stats_print(unsigned int port)
 	}
 
 	pr_info("\n");
-	pr_info("TXP-TXQ:  count          send          done      reserved      chunk_alloc      no_resource\n\n");
+	pr_info("TXP-TXQ:  count  res_num      send          done     no_resource      res_req      res_total\n\n");
 
 	for (txp = 0; txp < pp->txp_num; txp++) {
 		for (queue = 0; queue < CONFIG_MV_ETH_TXQ; queue++)
 			for_each_possible_cpu(cpu) {
-				u32 txq_tx = 0, txq_txdone = 0, txq_txreq = 0, txq_err = 0;
+				u32 txq_tx = 0, txq_done = 0, txq_reserved_req = 0, txq_reserved_total = 0, txq_err = 0;
 
 				txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + queue];
 				txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
 #ifdef CONFIG_MV_ETH_STAT_DBG
 				txq_tx = txq_cpu_ptr->stats.txq_tx;
-				txq_txdone =  txq_cpu_ptr->stats.txq_txdone;
-				txq_txreq =  txq_cpu_ptr->stats.txq_txreq;
+				txq_done = txq_cpu_ptr->stats.txq_txdone;
+				txq_reserved_req = txq_cpu_ptr->stats.txq_reserved_req;
+				txq_reserved_total = txq_cpu_ptr->stats.txq_reserved_total;
 
 #endif /* CONFIG_MV_ETH_STAT_DBG */
 #ifdef CONFIG_MV_ETH_STAT_ERR
 				txq_err = txq_cpu_ptr->stats.txq_err;
 #endif /* CONFIG_MV_ETH_STAT_ERR */
 
-				printk(KERN_ERR "%d-%d-cpu#%d: %3d    %10u    %10u    %10u    %10u    %10u\n",
-				       txp, queue, cpu, txq_cpu_ptr->txq_count, txq_tx,
-				       txq_txdone,  txq_cpu_ptr->reserved_num, txq_txreq, txq_err);
+				pr_info("%d-%d-cpu#%d: %3d    %3d   %10u    %10u    %10u    %10u    %10u\n",
+				       txp, queue, cpu, txq_cpu_ptr->txq_count, txq_cpu_ptr->reserved_num,
+				       txq_tx, txq_done, txq_err, txq_reserved_req, txq_reserved_total);
 
 				memset(&txq_cpu_ptr->stats, 0, sizeof(txq_cpu_ptr->stats));
 			}
