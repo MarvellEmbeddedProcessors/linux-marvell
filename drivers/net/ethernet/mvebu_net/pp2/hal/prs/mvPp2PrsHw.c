@@ -507,6 +507,8 @@ int mvPp2PrsHwClearAll()
 		for (i = 0; i < MV_PP2_PRC_TCAM_WORDS; i++)
 			mvPp2WrReg(MV_PP2_PRS_TCAM_DATA_REG(i), 0);
 
+		mvPp2WrReg(MV_PP2_PRS_SRAM_IDX_REG, index);
+
 		for (i = 0; i < MV_PP2_PRC_SRAM_WORDS; i++)
 			mvPp2WrReg(MV_PP2_PRS_SRAM_DATA_REG(i), 0);
 	}
