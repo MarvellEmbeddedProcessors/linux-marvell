@@ -1,8 +1,11 @@
 #!/bin/bash
 
-echo " * Version: 4.8"
+echo " * Version: 4.9"
 
 # LOG:
+# 4.9:
+#   1. set fdisk alignment to better support SSDs and new 4K sectors HDDS.
+#   2. remove default HDD_NUM set to 4. (each RAID has it's own default)
 # 4.8:
 #   1. setting tcp_limit_output_bytes on a38x.
 # 4.7:
@@ -84,7 +87,7 @@ echo " * Version: 4.8"
 PREPARE_HDD="no"
 MKFS="no"
 TOPOLOGY="sd"
-HDD_NUM=4
+HDD_NUM=""
 PLATFORM=""
 FS="ext4"
 SYSDISKEXIST="no"
@@ -460,14 +463,14 @@ if [ "$PREPARE_HDD" == "yes" ]; then
 
     set -o verbose
 
-    FDISK_LINE="c\no\nn\np\n1\n4096\n+$PARTSIZE\nt\n83\nw\n"
+    FDISK_LINE="o\nn\np\n1\n\n+$PARTSIZE\nt\n83\nw\n"
     if [ "$JUMPPARTSIZE" -ne "0" ]; then
-	FDISK_LINE="c\no\nn\np\n1\n\n+${JUMPPARTSIZE}GB\nt\n83\nn\np\n2\n\n+$PARTSIZE\nt\n2\n83\nw\n"
+	FDISK_LINE="o\nn\np\n1\n\n+${JUMPPARTSIZE}GB\nt\n83\nn\np\n2\n\n+$PARTSIZE\nt\n2\n83\nw\n"
 	PARTNUM="2"
     fi
 
     for drive in `echo $DRIVES`; \
-		do echo -e "${FDISK_LINE}" | fdisk -u /dev/sd${drive}; done
+		do echo -e "${FDISK_LINE}" | fdisk -c -u /dev/sd${drive}; done
     sleep 3
     mdadm -S /dev/md*
     sleep 2
