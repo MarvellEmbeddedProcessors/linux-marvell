@@ -766,19 +766,13 @@ static enum dma_status mv_xor_status(struct dma_chan *chan,
 	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
 	enum dma_status ret;
 
-	/*
-	 * TODO:
-	 * Do we need this?
-	 * Or just at mv_xor_clean_completed_slots?
-	 */
-	spin_lock_bh(&mv_chan->lock);
 	ret = dma_cookie_status(chan, cookie, txstate);
 	if (ret == DMA_SUCCESS) {
+		spin_lock_bh(&mv_chan->lock);
 		mv_xor_clean_completed_slots(mv_chan);
 		spin_unlock_bh(&mv_chan->lock);
 		return ret;
 	}
-	spin_unlock_bh(&mv_chan->lock);
 	mv_xor_slot_cleanup(mv_chan);
 
 	return dma_cookie_status(chan, cookie, txstate);
