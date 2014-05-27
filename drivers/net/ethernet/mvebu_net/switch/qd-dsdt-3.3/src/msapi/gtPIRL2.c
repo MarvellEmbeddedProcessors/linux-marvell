@@ -16,6 +16,48 @@
 #include <gtHwCntl.h>
 #include <gtDrvSwRegs.h>
 
+/* special ingress rate limit para */
+static struct PIRL_PARA_TBL_T pirl2RateLimitParaTbl[] = {
+	/* BI----BRF-----CBS-------EBS--------------------*/
+	{0x000, 0x00, 0x000000, 0x000000},/*No rate limit*/
+	{0x186, 0x03, 0xD06470, 0xFFFFF0},/*PIRL_RATE_64K*/
+	{0x30D, 0x0D, 0x415370, 0xFFFFF0},/*PIRL_RATE_128K*/
+	{0x186, 0x0A, 0x712D70, 0xFFFFF0},/*PIRL_RATE_192K*/
+	{0x186, 0x0D, 0xA0C8F0, 0xFFFFF0},/*PIRL_RATE_256K*/
+	{0x138, 0x0D, 0x4191F0, 0xFFFFF0},/*PIRL_RATE_320K*/
+	{0x0C3, 0x0A, 0x712D70, 0xFFFFF0},/*PIRL_RATE_384K*/
+	{0x0C3, 0x0C, 0x595FB0, 0xFFFFF0},/*PIRL_RATE_448K*/
+	{0x0C3, 0x0D, 0x4191F0, 0xFFFFF0},/*PIRL_RATE_512K*/
+	{0x0C3, 0x0F, 0x29C430, 0xFFFFF0},/*PIRL_RATE_576K*/
+	{0x09C, 0x0D, 0x4191F0, 0xFFFFF0},/*PIRL_RATE_640K*/
+	{0x07C, 0x0C, 0x597EF0, 0xFFFFF0},/*PIRL_RATE_704K*/
+	{0x082, 0x0D, 0x71E8F0, 0xFFFFF0},/*PIRL_RATE_768K*/
+	{0x078, 0x0D, 0x4191F0, 0xFFFFF0},/*PIRL_RATE_832K*/
+	{0x084, 0x10, 0x1E69F0, 0xFFFFF0},/*PIRL_RATE_896K*/
+	{0x027, 0x05, 0xB896B0, 0xFFFFF0},/*PIRL_RATE_960K*/
+	{0x031, 0x07, 0xA28A28, 0xFFFFF0},/*PIRL_RATE_1M*/
+	{0x031, 0x0D, 0x451460, 0xFFFFF0},/*PIRL_RATE_2M*/
+	{0x021, 0x0D, 0x432C18, 0xFFFFF0},/*PIRL_RATE_3M*/
+	{0x01C, 0x0F, 0x2A6070, 0xFFFFF0},/*PIRL_RATE_4M*/
+	{0x065, 0x43, 0x029810, 0xFFFFF0},/*PIRL_RATE_5M*/
+	{0x037, 0x2C, 0x0186A0, 0xFFFFF0},/*PIRL_RATE_6M*/
+	{0x051, 0x4B, 0x0222E0, 0xFFFFF0},/*PIRL_RATE_7M*/
+	{0x035, 0x38, 0x0186A0, 0xFFFFF0},/*PIRL_RATE_8M*/
+	{0x03B, 0x46, 0x0186A0, 0xFFFFF0},/*PIRL_RATE_9M*/
+	{0x030, 0x40, 0x015F90, 0xFFFFF0},/*PIRL_RATE_10M*/
+	{0x033, 0x4B, 0x0186A0, 0xFFFFF0},/*PIRL_RATE_11M*/
+	{0x033, 0x51, 0x015F90, 0xFFFFF0},/*PIRL_RATE_12M*/
+	{0x02F, 0x51, 0x015F90, 0xFFFFF0},/*PIRL_RATE_13M*/
+	{0x02D, 0x54, 0x013880, 0xFFFFF0},/*PIRL_RATE_14M*/
+	{0x02A, 0x54, 0x013880, 0xFFFFF0},/*PIRL_RATE_15M*/
+	{0x030, 0x66, 0x015F90, 0xFFFFF0},/*PIRL_RATE_16M*/
+	{0x02F, 0x6A, 0x015F90, 0xFFFFF0},/*PIRL_RATE_17M*/
+	{0x02A, 0x64, 0x013880, 0xFFFFF0},/*PIRL_RATE_18M*/
+	{0x02D, 0x72, 0x013880, 0xFFFFF0},/*PIRL_RATE_19M*/
+	{0x02C, 0x75, 0x013880, 0xFFFFF0},/*PIRL_RATE_20M*/
+};
+
+
 /****************************************************************************/
 /* PIRL operation function declaration.                                    */
 /****************************************************************************/
@@ -1042,6 +1084,35 @@ static GT_STATUS pirl2DisableIRLResource
     return GT_OK;
 }
 
+/*find the greatest common divisor for two interger
+*used to calculate BRF and BI
+*/
+static GT_U32 pirl2GetGCD(IN GT_U32 data1,
+		IN GT_U32 data2)
+{
+	GT_U32 temp1, temp2, temp;
+
+	if (data1 == 0 || data2 == 0)
+		return 1;
+
+	temp1 = data1;
+	temp2 = data2;
+
+	if (temp1 < temp2) {
+		temp = temp1;
+		temp1 = temp2;
+		temp2 = temp;
+	}
+	temp = temp1 % temp2;
+	while (temp) {
+		temp1 = temp2;
+		temp2 = temp;
+		temp = temp1 % temp2;
+	}
+
+	return temp2;
+}
+
 /*
  * convert PIRL Data structure to PIRL Resource structure.
  * if PIRL Data is not valid, return GT_BAD_PARARM;
@@ -1055,6 +1126,9 @@ static GT_STATUS pirl2DataToResource
 {
     GT_U32 typeMask;
     GT_U32 data;
+	GT_U32 burst_allocation;
+	GT_U32 pirl2_cir;
+	GT_U32 pirl_gcd = 1;
 
     gtMemSet((void*)res,0,sizeof(GT_PIRL2_RESOURCE));
 
@@ -1137,55 +1211,57 @@ static GT_STATUS pirl2DataToResource
             return GT_BAD_PARAM;
         }
 
-        if(pirlData->ingressRate < 1000)    /* less than 1Mbps */
-        {
+		if (pirlData->ingressRate < 1000) { /* less than 1Mbps */
             /* it should be divided by 64 */
             if(pirlData->ingressRate % 64)
             {
                 DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
                 return GT_BAD_PARAM;
             }
-            res->bktRateFactor = pirlData->ingressRate/64;
-        }
-        else if(pirlData->ingressRate < 10000)    /* less than or equal to 10Mbps */
-        {
-            /* it should be divided by 1000 */
+			/* Less than 1Mbps, use special value */
+			res->bktIncrement = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].BI;
+			res->bktRateFactor = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].BRF;
+			res->cbsLimit = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].CBS;
+			res->ebsLimit = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].EBS;
+		} else if (pirlData->ingressRate <= 20000) {
+			/* greater or equal to 1Mbps, and less than or equal to 20Mbps, it should be divided by 1000 */
             if(pirlData->ingressRate % 1000)
             {
                 DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
                 return GT_BAD_PARAM;
             }
-            res->bktRateFactor = pirlData->ingressRate/128 + ((pirlData->ingressRate % 128)?1:0);
-        }
-        else if(pirlData->ingressRate < 100000)    /* less than or equal to 100Mbps */
-        {
-            /* it should be divided by 1000 */
+			res->bktIncrement = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].BI;
+			res->bktRateFactor = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].BRF;
+			res->cbsLimit = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].CBS;
+			res->ebsLimit = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].EBS;
+		} else {/* greater than 20Mbps */
+			if (pirlData->ingressRate < 100000) {
+				/* it should be divided by 1000, if less than 100Mbps*/
             if(pirlData->ingressRate % 1000)
             {
                 DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
                 return GT_BAD_PARAM;
             }
-            res->bktRateFactor = pirlData->ingressRate/1000;
-        }
-        else if(pirlData->ingressRate <= 200000)    /* less than or equal to 200Mbps */
-        {
-            /* it should be divided by 10000 */
+			} else {
+				/* it should be divided by 10000, if more or equal than 100Mbps */
             if(pirlData->ingressRate % 10000)
             {
                 DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
                 return GT_BAD_PARAM;
             }
-            res->bktRateFactor = pirlData->ingressRate/1000;
         }
-        else
-        {
-            DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
-            return GT_BAD_PARAM;
-        }
+			pirl2_cir = pirlData->ingressRate * 1000;
 
+			burst_allocation = pirl2_cir;
+
+			pirl_gcd = pirl2GetGCD(pirl2_cir, PIRL_ALPHA);
+			res->bktRateFactor = pirl2_cir / pirl_gcd;
+			/* Correct Rate Factor */
+			res->bktRateFactor = res->bktRateFactor * 5 / 6;
+			res->bktIncrement = PIRL_ALPHA / pirl_gcd;
         res->ebsLimit = RECOMMENDED_ESB_LIMIT(dev, pirlData->ingressRate);
         res->cbsLimit = RECOMMENDED_CBS_LIMIT(dev, pirlData->ingressRate);
-        res->bktIncrement = RECOMMENDED_BUCKET_INCREMENT(dev, pirlData->ingressRate);
+		}
     }
 
     switch(pirlData->bktRateType)

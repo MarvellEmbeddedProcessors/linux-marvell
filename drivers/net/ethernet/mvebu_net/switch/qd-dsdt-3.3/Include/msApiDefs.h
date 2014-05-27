@@ -4462,6 +4462,63 @@ struct _GT_QD_DEV
 #endif
 };
 
+/*
+ * typedef: struct PIRL_PARA_TBL_T
+ *
+ * Description: PIRL parameter table structure
+ *
+ * Fields:
+ *      BI     - bucket increment
+ *      BRF    - bucket rate factor
+ *      CBS    - Committed Burst Size
+ *      EBS    - Excess Burst Size
+ */
+struct PIRL_PARA_TBL_T {
+	GT_U32 BI;
+	GT_U32 BRF;
+	GT_U32 CBS;
+	GT_U32 EBS;
+};
+
+/*special rate which can not be calculated by formula*/
+enum PIRL_SPECIAL_RATE_ENUM_T {
+	PIRL_RATE_NO_LIMIT = 0,
+	PIRL_RATE_64K,
+	PIRL_RATE_128K,
+	PIRL_RATE_192K,
+	PIRL_RATE_256K,
+	PIRL_RATE_320K,
+	PIRL_RATE_384K,
+	PIRL_RATE_448K,
+	PIRL_RATE_512K,
+	PIRL_RATE_576K,
+	PIRL_RATE_640K,
+	PIRL_RATE_704K,
+	PIRL_RATE_768K,
+	PIRL_RATE_832K,
+	PIRL_RATE_896K,
+	PIRL_RATE_960K,
+	PIRL_RATE_1M,
+	PIRL_RATE_2M,
+	PIRL_RATE_3M,
+	PIRL_RATE_4M,
+	PIRL_RATE_5M,
+	PIRL_RATE_6M,
+	PIRL_RATE_7M,
+	PIRL_RATE_8M,
+	PIRL_RATE_9M,
+	PIRL_RATE_10M,
+	PIRL_RATE_11M,
+	PIRL_RATE_12M,
+	PIRL_RATE_13M,
+	PIRL_RATE_14M,
+	PIRL_RATE_15M,
+	PIRL_RATE_16M,
+	PIRL_RATE_17M,
+	PIRL_RATE_18M,
+	PIRL_RATE_19M,
+	PIRL_RATE_20M
+};
 
 
 
