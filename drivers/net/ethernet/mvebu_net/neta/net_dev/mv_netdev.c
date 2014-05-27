@@ -4146,6 +4146,9 @@ static int mv_eth_probe(struct platform_device *pdev)
 	/* init SMI register */
 	mvEthPhySmiAddrSet(ETH_SMI_REG(port));
 #endif
+
+	pr_info("port #%d: is_sgmii=%d, is_rgmii=%d, phy_addr=%d\n",
+		port, plat_data->is_sgmii, plat_data->is_rgmii, plat_data->phy_addr);
 	mvNetaPortPowerUp(port, plat_data->is_sgmii, plat_data->is_rgmii);
 
 	mv_eth_win_init(port);
@@ -4263,10 +4266,6 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
 	SET_ETHTOOL_OPS(dev, &mv_eth_tool_ops);
 
 	SET_NETDEV_DEV(dev, &pdev->dev);
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 1, 10)
-	dev->priv_flags |= IFF_UNICAST_FLT;
-#endif
 
 	if (pp->flags & MV_ETH_F_CONNECT_LINUX) {
 		mv_eth_netdev_init_features(dev);
@@ -5865,27 +5864,34 @@ void mv_eth_ext_pool_print(struct eth_port *pp)
  ***********************************************************************************/
 void mv_eth_netdev_print(struct net_device *dev)
 {
-	printk(KERN_ERR "%s net_device status: dev=%p\n\n", dev->name, dev);
-	printk(KERN_ERR "ifIdx=%d, mtu=%u, pkt_size=%d, buf_size=%d, MAC=" MV_MACQUAD_FMT "\n",
+	pr_info("%s net_device status:\n\n", dev->name);
+	pr_info("ifIdx=%d, mtu=%u, pkt_size=%d, buf_size=%d, MAC=" MV_MACQUAD_FMT "\n",
 	       dev->ifindex, dev->mtu, RX_PKT_SIZE(dev->mtu),
 		RX_BUF_SIZE(RX_PKT_SIZE(dev->mtu)), MV_MACQUAD(dev->dev_addr));
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
-	printk(KERN_ERR "features=0x%x, hw_features=0x%x, wanted_features=0x%x, vlan_features=0x%x\n",
+	pr_info("features=0x%x, hw_features=0x%x, wanted_features=0x%x, vlan_features=0x%x\n",
 			(unsigned int)(dev->features), (unsigned int)(dev->hw_features),
 			(unsigned int)(dev->wanted_features), (unsigned int)(dev->vlan_features));
 #else
-	printk(KERN_ERR "features=0x%x, vlan_features=0x%x\n",
+	pr_info("features=0x%x, vlan_features=0x%x\n",
 		 (unsigned int)(dev->features), (unsigned int)(dev->vlan_features));
 #endif
 
-	printk(KERN_ERR "flags=0x%x, gflags=0x%x: running=%d, oper_up=%d\n",
-			(unsigned int)(dev->flags), (unsigned int)(dev->gflags),
-			netif_running(dev), netif_oper_up(dev));
+	pr_info("flags=0x%x, gflags=0x%x, priv_flags=0x%x: running=%d, oper_up=%d\n",
+		(unsigned int)(dev->flags), (unsigned int)(dev->gflags), (unsigned int)(dev->priv_flags),
+		netif_running(dev), netif_oper_up(dev));
+	pr_info("uc_promisc=%d, promiscuity=%d, allmulti=%d\n", dev->uc_promisc, dev->promiscuity, dev->allmulti);
 
-	if (!mv_eth_netdev_find(dev->ifindex))
-		/* mux net device */
-		mv_mux_netdev_print(dev);
+	if (mv_eth_netdev_find(dev->ifindex)) {
+		struct eth_port *pp = MV_ETH_PRIV(dev);
+		if (pp->tagged)
+			mv_mux_netdev_print_all(pp->port);
+	} else {
+		/* Check if this is mux netdevice */
+		if (mv_mux_netdev_find(dev->ifindex) != -1)
+			mv_mux_netdev_print(dev);
+	}
 }
 
 void mv_eth_status_print(void)
