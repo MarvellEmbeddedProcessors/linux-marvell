@@ -1075,7 +1075,8 @@ extern "C" {
 /* Pearl features */
 
 /***************************************************************************/
-
+/*PIRL Alpha factor macro for internal switch*/
+#define PIRL_ALPHA 6250000
 
 /* Macros to utilize Device Group */
 
@@ -1101,15 +1102,15 @@ extern "C" {
 
 
 #define RECOMMENDED_ESB_LIMIT(dev, _bps)                    \
-        ((IS_IN_DEV_GROUP(dev,DEV_PIRL_RESOURCE))?16777200:0xFFFFFF)
+	((IS_IN_DEV_GROUP(dev, DEV_PIRL_RESOURCE)) ? 16777200 : 0xFFFFF0)
 
 #define RECOMMENDED_CBS_LIMIT(dev, _bps)                    \
-        ((IS_IN_DEV_GROUP(dev,DEV_PIRL_RESOURCE))?393216:0x200000)
+	((IS_IN_DEV_GROUP(dev, DEV_PIRL_RESOURCE)) ? 393216 : 5000000)
 
 #define RECOMMENDED_BUCKET_INCREMENT(dev, _bps)                \
         ((IS_IN_DEV_GROUP(dev,DEV_PIRL_RESOURCE))?174:        \
-        ((_bps) < 1000)?0x3d:                            \
-        ((_bps) < 10000)?0x1f:0x4)
+	((_bps) < 1000) ? 3125 :                            \
+	((_bps) < 10000) ? 25 : 5)
 
 #define FACTOR_FROM_BUCKET_INCREMENT(dev, _bInc, _f)        \
     {                                                        \
@@ -1120,11 +1121,17 @@ extern "C" {
         }                                                    \
         else                                                \
         {                                                    \
-            if((_bInc) == 0x3d) {(_f) = 64;}                \
-            else if((_bInc) == 0x1f) {(_f) = 128;}            \
-            else if((_bInc) == 0x4) {(_f) = 1000;}            \
-            else {(_f) = 0;}                                \
-        }                                                    \
+		if ((_bInc) == 3125)                        \
+			(_f) = 32;                          \
+		else if ((_bInc) == 25)                     \
+			(_f) = 4;                           \
+		else if ((_bInc) == 50)                     \
+			(_f) = 8;                           \
+		else if ((_bInc) == 5)                      \
+			(_f) = 8;                           \
+		else                                        \
+			(_f) = 0;                           \
+	}                                                   \
     }
 
 
