@@ -462,7 +462,7 @@ int cph_data_flow_tx(int port, struct net_device *dev, struct sk_buff *skb,
 
 	cph_db_get_param(CPH_DB_PARAM_FLOW_SUPPORT, &state);
 
-	if (state == TRUE)
+	if (state != TRUE)
 		return 0;
 
 	/* Decide whether need to handle Marvell header */
@@ -743,12 +743,14 @@ void cph_rx_func(int port, int rxq, struct net_device *dev,
 	if (mvPp2IsRxSpecial(rx_desc->parserInfo)) {
 		/* Receive application packets */
 		if (cph_app_packet_rx(port, dev, skb, rx_desc))
-			MV_CPH_PRINT(CPH_DEBUG_LEVEL, "Failed to receive application packet\n");
+			return;
+		MV_CPH_PRINT(CPH_DEBUG_LEVEL, "Failed to receive application packet\n");
 
 		/* Handle the broadcast packet in case it is enabled */
 #ifdef CONFIG_MV_CPH_BC_HANDLE
 		if (cph_app_rx_bc(port, dev, skb, rx_desc))
-			MV_CPH_PRINT(CPH_DEBUG_LEVEL, "BC packet failure\n");
+			return;
+		MV_CPH_PRINT(CPH_DEBUG_LEVEL, "BC packet failure\n");
 #endif
 		/* deliver to upper layer */
 		MV_CPH_PRINT(CPH_DEBUG_LEVEL, "Deliver to upper layer\n");
@@ -756,9 +758,10 @@ void cph_rx_func(int port, int rxq, struct net_device *dev,
 #ifdef CONFIG_MV_CPH_FLOW_MAP_HANDLE
 		if (cph_data_flow_rx(port, dev, skb, rx_desc))
 			MV_CPH_PRINT(CPH_DEBUG_LEVEL, "Flow mapping\n");
-
 #endif
 	}
+
+	return;
 }
 
 /******************************************************************************
