@@ -586,7 +586,7 @@ static int cph_app_packet_rx(int port, struct net_device *dev, struct sk_buff *s
 	/* Get CPH application rule */
 	rc = cph_app_get_rule(parse_bm, &parse_key, &mod_bm, &mod_value, &frwd_bm, &frwd_value);
 	if (rc != MV_OK) {
-		pr_err(KERN_DEBUG "Fail to call cph_app_get_rule, rc(%d)\n", rc);
+		MV_CPH_PRINT(CPH_DEBUG_LEVEL, "Fail to call cph_app_get_rule, rc(%d)\n", rc);
 		return 0;
 	}
 
