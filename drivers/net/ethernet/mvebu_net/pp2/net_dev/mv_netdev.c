@@ -5148,8 +5148,9 @@ void mv_eth_netdev_print(struct net_device *dev)
 		 (unsigned int)(dev->features), (unsigned int)(dev->vlan_features));
 #endif
 
-	pr_info("flags=0x%x, gflags=0x%x: running=%d, oper_up=%d\n",
-		(unsigned int)(dev->flags), (unsigned int)(dev->flags), netif_running(dev), netif_oper_up(dev));
+	pr_info("flags=0x%x, gflags=0x%x, priv_flags=0x%x: running=%d, oper_up=%d\n",
+		(unsigned int)(dev->flags), (unsigned int)(dev->gflags), (unsigned int)(dev->priv_flags),
+		netif_running(dev), netif_oper_up(dev));
 	pr_info("uc_promisc=%d, promiscuity=%d, allmulti=%d\n", dev->uc_promisc, dev->promiscuity, dev->allmulti);
 
 	if (mv_eth_netdev_find(dev->ifindex)) {
@@ -5190,8 +5191,8 @@ void mv_eth_port_status_print(unsigned int port)
 	if (!pp)
 		return;
 
-	printk(KERN_ERR "\n");
-	printk(KERN_ERR "port=%d, flags=0x%lx, rx_weight=%d\n", port, pp->flags, pp->weight);
+	pr_err("\n");
+	pr_err("port=%d, flags=0x%lx, rx_weight=%d\n", port, pp->flags, pp->weight);
 
 	pr_info("RX next descriptor prefetch  : %s\n",
 			pp->flags & MV_ETH_F_RX_DESC_PREFETCH ? "Enabled" : "Disabled");
@@ -5200,16 +5201,16 @@ void mv_eth_port_status_print(unsigned int port)
 			pp->flags & MV_ETH_F_RX_PKT_PREFETCH ? "Enabled" : "Disabled");
 
 	if (pp->flags & MV_ETH_F_CONNECT_LINUX)
-		printk(KERN_ERR "%s: ", pp->dev->name);
+		pr_info("%s: ", pp->dev->name);
 	else
-		printk(KERN_ERR "port %d: ", port);
+		pr_info("port %d: ", port);
 
 	mv_eth_link_status_print(port);
 
 	pr_cont("\n");
 	pr_info("rxq_coal(pkts)[ q]         = ");
 	for (q = 0; q < pp->rxq_num; q++)
-		printk(KERN_CONT "%4d ", mvPp2RxqPktsCoalGet(port, q));
+		pr_cont("%4d ", mvPp2RxqPktsCoalGet(port, q));
 
 	pr_cont("\n");
 	pr_info("rxq_coal(usec)[ q]         = ");
@@ -5219,7 +5220,7 @@ void mv_eth_port_status_print(unsigned int port)
 	pr_cont("\n");
 	pr_info("rxq_desc(num)[ q]          = ");
 	for (q = 0; q < pp->rxq_num; q++)
-		pr_info("%4d ", pp->rxq_ctrl[q].rxq_size);
+		pr_cont("%4d ", pp->rxq_ctrl[q].rxq_size);
 
 	pr_cont("\n");
 	for (txp = 0; txp < pp->txp_num; txp++) {
