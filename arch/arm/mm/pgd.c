@@ -88,7 +88,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 		init_pmd = pmd_offset(init_pud, 0);
 		init_pte = pte_offset_map(init_pmd, 0);
 		set_pte_ext(new_pte + 0, init_pte[0], 0);
+#ifndef CONFIG_MV_LARGE_PAGE_SUPPORT
 		set_pte_ext(new_pte + 1, init_pte[1], 0);
+#endif
 		pte_unmap(init_pte);
 		pte_unmap(new_pte);
 	}
