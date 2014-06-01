@@ -81,13 +81,8 @@
 				};
 			};
 
-			/*
-			 * 1GB Flash via NFC NAND controller
-			 * by defeault disabled, because NFC
-			 * shares same pins with SPI0 and
-			 * requires SLM-1358 jumper
-			 */
 			nfc: nand@d0000 {
+				status = "okay";
 				#address-cells = <1>;
 				#size-cells = <1>;
 				clock-frequency = <200000000>;
