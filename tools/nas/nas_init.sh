@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 4.9"
+echo " * Version: 5.0"
 
 # LOG:
+# 5.0:
+#   1. remove btrfs disabling use of strict allocate in smb.conf
 # 4.9:
 #   1. set fdisk alignment to better support SSDs and new 4K sectors HDDS.
 #   2. remove default HDD_NUM set to 4. (each RAID has it's own default)
@@ -722,13 +724,12 @@ if [ "$SAMBASTATUS" == "enabled" ]; then
 	echo ' max xmit = 131072'			>>  /etc/smb.conf
 	echo ' disable netbios = yes'			>>  /etc/smb.conf
 	echo ' csc policy = disable'			>>  /etc/smb.conf
+	echo ' strict allocate = yes'			>>  /etc/smb.conf
 	if [ "$FS" == "btrfs" ]; then
-	# crash identified with btrfs
-	    echo '# min receivefile size = 16k'	>>  /etc/smb.conf
-	    echo '# strict allocate = yes'		>>  /etc/smb.conf
+		# crash identified with btrfs
+		echo '# min receivefile size = 16k'	>>  /etc/smb.conf
 	else
-	    echo ' min receivefile size = 16k'	>>  /etc/smb.conf
-	    echo ' strict allocate = yes'		>>  /etc/smb.conf
+		echo ' min receivefile size = 16k'	>>  /etc/smb.conf
 	fi
 	echo ''						>>  /etc/smb.conf
 	echo '[public]'					>>  /etc/smb.conf
