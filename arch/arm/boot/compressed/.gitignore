@@ -8,6 +8,7 @@ piggy.lzma
 piggy.xzkern
 vmlinux
 vmlinux.lds
+vmlinux.lds.S
 
 # borrowed libfdt files
 fdt.c
