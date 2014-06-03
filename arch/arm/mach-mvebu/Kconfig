@@ -99,7 +99,6 @@ config MACH_ARMADA_XP
 	  Say 'Y' here if you want your kernel to support boards based
 	  on the Marvell Armada XP SoC with device tree.
 
-
 endmenu
 
 endif
