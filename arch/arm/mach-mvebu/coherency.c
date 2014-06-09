@@ -109,8 +109,8 @@ static void mvebu_hwcc_dma_sync(struct device *dev, dma_addr_t dma_handle,
 }
 
 static struct dma_map_ops mvebu_hwcc_dma_ops = {
-	.alloc			= arm_dma_alloc,
-	.free			= arm_dma_free,
+	.alloc			= arm_coherent_dma_alloc,
+	.free			= arm_coherent_dma_free,
 	.mmap			= arm_dma_mmap,
 	.map_page		= mvebu_hwcc_dma_map_page,
 	.unmap_page		= mvebu_hwcc_dma_unmap_page,
