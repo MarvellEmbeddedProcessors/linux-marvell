@@ -1,0 +1,216 @@
+diff -urN a/linux/net/ipsec/defconfig b/linux/net/ipsec/defconfig
+--- a/linux/net/ipsec/defconfig	2014-01-16 08:46:24.000000000 +0100
++++ b/linux/net/ipsec/defconfig	2014-05-19 13:04:42.914510127 +0200
+@@ -54,8 +54,8 @@
+ CONFIG_KLIPS_IPCOMP=y
+
+ # To enable userspace-switchable KLIPS debugging, say 'y'.
+-CONFIG_KLIPS_DEBUG=y
++CONFIG_KLIPS_DEBUG=n
+
+ # OCF HW offloading, requires kernel patch
+-# CONFIG_KLIPS_OCF is not set
++CONFIG_KLIPS_OCF=y
+
+diff -urN a/linux/net/ipsec/ipsec_ocf.c b/linux/net/ipsec/ipsec_ocf.c
+--- a/linux/net/ipsec/ipsec_ocf.c	2014-01-16 08:46:24.000000000 +0100
++++ b/linux/net/ipsec/ipsec_ocf.c	2014-05-19 13:20:43.695932102 +0200
+@@ -77,18 +77,30 @@
+ static struct tasklet_struct ipsec_ocf_task;
+ static struct sk_buff_head ipsec_ocf_skbq;
+
++#ifdef CONFIG_SMP
++static void ipsec_crypto_dispatch_wrapper(struct cryptop *crp)
++{
++	int err;
++
++	if ((err = crypto_dispatch(crp))) {
++			KLIPS_PRINT(debug_rcv, "crypto_dispatch failure %u\n", err);
++			crypto_freereq(crp);
++		}
++
++	return;
++}
++#endif
++
+ static void ipsec_ocf_skbq_process(unsigned long arg)
+ {
+	void (*func)(void *arg);
+	void *this;
+	struct sk_buff *skb;
+
+-	if ((skb = skb_dequeue(&ipsec_ocf_skbq)) != NULL) {
++	while ((skb = skb_dequeue(&ipsec_ocf_skbq)) != NULL) {
+		func = ((void **) (&skb->cb[0]))[0];
+		this = ((void **) (&skb->cb[0]))[1];
+		(*func)(this);
+-		/* make sure we run again */
+-		tasklet_schedule(&ipsec_ocf_task);
+	}
+ }
+
+@@ -103,7 +115,7 @@
+	((void **) (&(this)->skb->cb[0]))[0] = func; \
+	((void **) (&(this)->skb->cb[0]))[1] = this; \
+	skb_queue_tail(&ipsec_ocf_skbq, (this)->skb); \
+-	tasklet_schedule(&ipsec_ocf_task);
++	tasklet_hi_schedule(&ipsec_ocf_task);
+
+ #endif
+
+@@ -564,6 +576,7 @@
+	struct ipsec_sa *ipsp;
+	int req_count = 0;
+	int rc, err;
++	unsigned int cpu = 0;
+
+	KLIPS_PRINT(debug_rcv, "klips_debug:ipsec_ocf_rcv\n");
+
+@@ -772,7 +785,7 @@
+	crp->crp_olen = irs->skb->len;  /* Total output length */
+	crp->crp_flags =
+		CRYPTO_F_SKBUF |
+-		(ipsec_ocf_cbimm ? CRYPTO_F_BATCH : 0) |
++		(ipsec_ocf_cbimm ? CRYPTO_F_CBIMM : 0) |
+		(ipsec_ocf_batch ? CRYPTO_F_BATCH : 0) |
+		0;
+	crp->crp_buf = (caddr_t) irs->skb;
+@@ -780,17 +793,29 @@
+	crp->crp_sid = ipsp->ocf_cryptoid;
+	crp->crp_opaque = (caddr_t) irs;
+ rcv_migrate:
+-	if ((err = crypto_dispatch(crp))) {
+-		KLIPS_PRINT(debug_rcv, "crypto_dispatch rcv failure %u\n",
+-			    err);
+-		crypto_freereq(crp);
+-		return IPSEC_RCV_REALLYBAD;
++#ifdef CONFIG_SMP
++	for_each_online_cpu(cpu) {
++		if (cpu != smp_processor_id())
++			break;
+	}
+-	if (crp->crp_etype == EAGAIN) {
+-		/* Session has been migrated. Store the new session id and retry */
+-		ipsp->ocf_cryptoid = crp->crp_sid;
+-		goto rcv_migrate;
++
++	if (cpu < NR_CPUS)
++		smp_call_function_single(cpu, (void*)ipsec_crypto_dispatch_wrapper, (void*)crp, 0);
++	else {
++#endif
++		if ((err = crypto_dispatch(crp))){
++			KLIPS_PRINT(debug_rcv, "crypto_dispatch rcv failure %u\n", err);
++			crypto_freereq(crp);
++			return IPSEC_RCV_REALLYBAD;
++		}
++		if (crp->crp_etype == EAGAIN) {
++			/* Session has been migrated. Store the new session id and retry */
++			ipsp->ocf_cryptoid = crp->crp_sid;
++			goto rcv_migrate;
++		}
++#ifdef CONFIG_SMP
+	}
++#endif
+
+	return IPSEC_RCV_PENDING;
+ }
+@@ -1034,6 +1059,7 @@
+	struct ipsec_sa *ipsp;
+	int req_count, payload_size;
+	int err;
++	unsigned int cpu = 0;
+
+	KLIPS_PRINT(debug_tunnel & DB_TN_XMIT, "klips_debug:ipsec_ocf_xmit\n");
+
+@@ -1255,7 +1281,7 @@
+	crp->crp_olen = ixs->skb->len;  /* Total output length */
+	crp->crp_flags =
+		CRYPTO_F_SKBUF |
+-		(ipsec_ocf_cbimm ? CRYPTO_F_BATCH : 0) |
++		(ipsec_ocf_cbimm ? CRYPTO_F_CBIMM : 0) |
+		(ipsec_ocf_batch ? CRYPTO_F_BATCH : 0) |
+		0;
+	crp->crp_buf = (caddr_t) ixs->skb;
+@@ -1263,17 +1289,30 @@
+	crp->crp_sid = ipsp->ocf_cryptoid;
+	crp->crp_opaque = (caddr_t) ixs;
+ xmit_migrate:
+-	if ((err = crypto_dispatch(crp))) {
+-		KLIPS_PRINT(debug_tunnel & DB_TN_XMIT,
+-			    "crypto_dispatch xmit failure %u\n", err);
+-		crypto_freereq(crp);
+-		return IPSEC_XMIT_ERRMEMALLOC;
++#ifdef CONFIG_SMP
++	for_each_online_cpu(cpu) {
++		if (cpu != smp_processor_id())
++			break;
+	}
+-	if (crp->crp_etype == EAGAIN) {
+-		/* Session has been migrated. Store the new session id */
+-		ipsp->ocf_cryptoid = crp->crp_sid;
+-		goto xmit_migrate;
++
++	if (cpu < NR_CPUS)
++		smp_call_function_single(cpu, (void*)ipsec_crypto_dispatch_wrapper, (void*)crp, 0);
++	else {
++#endif
++		if ((err = crypto_dispatch(crp))){
++			KLIPS_PRINT(debug_tunnel&DB_TN_XMIT,
++				"crypto_dispatch xmit failure %u\n", err);
++			crypto_freereq(crp);
++			return IPSEC_XMIT_ERRMEMALLOC;
++		}
++		if (crp->crp_etype == EAGAIN) {
++			/* Session has been migrated. Store the new session id */
++			ipsp->ocf_cryptoid = crp->crp_sid;
++			goto xmit_migrate;
++		}
++#ifdef CONFIG_SMP
+	}
++#endif
+
+	return IPSEC_XMIT_PENDING;
+ }
+diff -urN a/Makefile.inc b/Makefile.inc
+--- a/Makefile.inc	2014-01-16 08:46:24.000000000 +0100
++++ b/Makefile.inc	2014-05-19 13:07:22.812442621 +0200
+@@ -391,7 +391,7 @@
+
+ # Do we have Openssl libraries available for BIGNUM support?
+ # Required of HAVE_OCF support
+-HAVE_OPENSSL?=false
++HAVE_OPENSSL?=true
+
+ # Userland (IKE) Open Cryptographic Framework support (hw crypto offload)
+ # For Kernel level OCF support, enable CONFIG_KLIPS_OCF on a kernel that
+@@ -399,7 +399,7 @@
+ # Only enable this when compiling for embedded systems with very limited CPU
+ # power, and only if there is actually some hardware accelerator present
+ # for which there is an OCF kernel driver available.
+-HAVE_OCF?=false
++HAVE_OCF?=true
+
+ ifeq ($(HAVE_OCF),true)
+ HAVE_OPENSSL=true
+diff -urN a/packaging/linus/config-all.h b/packaging/linus/config-all.h
+--- a/packaging/linus/config-all.h	2014-01-16 08:46:24.000000000 +0100
++++ b/packaging/linus/config-all.h	2014-05-19 13:04:42.916510206 +0200
+@@ -79,7 +79,8 @@
+ #  define CONFIG_KLIPS_OCF 1
+ # endif
+ #endif
+-#undef CONFIG_KLIPS_OCF
++//#undef CONFIG_KLIPS_OCF
++#define CONFIG_KLIPS_OCF 1
+
+ #ifndef CONFIG_KLIPS_ALG_AES_MAC
+ #define CONFIG_KLIPS_ALG_AES_MAC 1
+diff -urN a/packaging/makefiles/module.defs b/packaging/makefiles/module.defs
+--- a/packaging/makefiles/module.defs	2014-01-16 08:46:24.000000000 +0100
++++ b/packaging/makefiles/module.defs	2014-05-19 13:04:42.916510206 +0200
+@@ -37,5 +37,5 @@
+ CONFIG_KLIPS_IPCOMP=y
+
+ # To enable userspace-switchable KLIPS debugging, say 'y'.
+-CONFIG_KLIPS_DEBUG=y
++CONFIG_KLIPS_DEBUG=n
