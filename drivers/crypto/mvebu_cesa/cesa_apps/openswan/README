@@ -2,13 +2,16 @@ OpenSWAN
 =========
 In order to explore the CESA through the OpenSWAN, please follow the next steps:
 
-1. Download openswan-2.6.38 (http://www.openswan.org/), then untar+unzip it.
+1. Download openswan-2.6.41 (http://www.openswan.org/), then untar+unzip it.
 
 2. Apply the patch:
-	- 0001-marvell-patch-for-openswan-2.6.38.patch:
+	- mv_openswan_2_6_41.patch:
 		> Disable default DEBUG support.
 		> Enable OCF support.
 		> Set OCF flag CRYPTO_F_CBIMM to mark immediate callback handling.
+
+	- lk_3_10_support_openswan_2_6_41.patch:
+		> Add support for LKv3.10 (imported from libreswan 3.8)
 
 3. Compile:
 
