@@ -141,9 +141,9 @@ struct dma_map_ops arm_dma_ops = {
 };
 EXPORT_SYMBOL(arm_dma_ops);
 
-static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+void *arm_coherent_dma_alloc(struct device *dev, size_t size,
 	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs);
-static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
+void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
 				  dma_addr_t handle, struct dma_attrs *attrs);
 
 struct dma_map_ops arm_coherent_dma_ops = {
@@ -707,7 +707,7 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 			   __builtin_return_address(0));
 }
 
-static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+void *arm_coherent_dma_alloc(struct device *dev, size_t size,
 	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
 {
 	pgprot_t prot = __get_dma_pgprot(attrs, pgprot_kernel);
@@ -786,7 +786,7 @@ void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
 	__arm_dma_free(dev, size, cpu_addr, handle, attrs, false);
 }
 
-static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
+void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
 				  dma_addr_t handle, struct dma_attrs *attrs)
 {
 	__arm_dma_free(dev, size, cpu_addr, handle, attrs, true);
