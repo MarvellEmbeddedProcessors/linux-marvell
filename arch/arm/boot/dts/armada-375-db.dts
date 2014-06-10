@@ -63,7 +63,7 @@
 			};
 
 			sata@a0000 {
-				nr-ports = <1>;
+				nr-ports = <2>;
 				status = "okay";
 			};
 
