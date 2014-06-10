@@ -306,7 +306,7 @@
 			};
 
 			sata@a0000 {
-				compatible = "marvell,orion-sata";
+				compatible = "marvell,armada-370-sata";
 				reg = <0xa0000 0x5000>;
 				interrupts = <0 26 0x4>;
 				clocks = <&gateclk 14>, <&gateclk 20>;
