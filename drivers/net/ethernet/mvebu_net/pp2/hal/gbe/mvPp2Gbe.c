@@ -1691,7 +1691,7 @@ MV_STATUS mvPp2TxqFixPrioSet(int port, int txp, int txq)
 /*   Weight range [1..N] */
 MV_STATUS mvPp2TxqWrrPrioSet(int port, int txp, int txq, int weight)
 {
-	MV_U32 regVal, mtu;
+	MV_U32 regVal, mtu, mtu_aligned, weight_min;
 	int txPortNum;
 
 	if (mvPp2TxpCheck(port, txp))
@@ -1705,14 +1705,19 @@ MV_STATUS mvPp2TxqWrrPrioSet(int port, int txp, int txq, int weight)
 
 	/* Weight * 256 bytes * 8 bits must be larger then MTU [bits] */
 	mtu = mvPp2RdReg(MV_PP2_TXP_SCHED_MTU_REG);
-	/* MTU [bits] -> MTU [256 bytes] */
-	mtu = ((mtu / 8) / 256) + 1;
 
-	if ((weight < mtu) || (weight > MV_PP2_TXQ_WRR_WEIGHT_MAX)) {
+	/* WA for wrong Token bucket update: Set MTU value = 3*real MTU value, now get read MTU*/
+	mtu /= MV_AMPLIFY_FACTOR_MTU;
+	mtu /= MV_BIT_NUM_OF_BYTE; /* move to bytes */
+	mtu_aligned = MV_ALIGN_UP(mtu, MV_WRR_WEIGHT_UNIT);
+	weight_min = mtu_aligned / MV_WRR_WEIGHT_UNIT;
+
+	if ((weight < weight_min) || (weight > MV_PP2_TXQ_WRR_WEIGHT_MAX)) {
 		mvOsPrintf("%s Error: weight=%d is out of range %d...%d\n",
-				__func__, weight, mtu, MV_PP2_TXQ_WRR_WEIGHT_MAX);
+				__func__, weight, weight_min, MV_PP2_TXQ_WRR_WEIGHT_MAX);
 		return MV_FAIL;
 	}
+
 
 	regVal = mvPp2RdReg(MV_PP2_TXQ_SCHED_WRR_REG(txq));
 
@@ -1743,7 +1748,7 @@ MV_STATUS   mvPp2TxpMaxTxSizeSet(int port, int txp, int maxTxSize)
 		mtu = MV_PP2_TXP_MTU_MAX;
 
 	/* WA for wrong Token bucket update: Set MTU value = 3*real MTU value */
-	mtu = 3 * mtu;
+	mtu = MV_AMPLIFY_FACTOR_MTU * mtu;
 
 	txPortNum = mvPp2EgressPort(port, txp);
 
