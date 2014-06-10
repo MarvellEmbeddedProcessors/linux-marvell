@@ -77,6 +77,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "prs/mvPp2PrsHw.h"
 
 #define PP2_CPU_CODE_IS_RX_SPECIAL(cpu_code)		((cpu_code) & RI_CPU_CODE_RX_SPEC_VAL)
+#define MV_AMPLIFY_FACTOR_MTU				(3)
+#define MV_BIT_NUM_OF_BYTE				(8)
+#define MV_WRR_WEIGHT_UNIT				(256)
 
 static inline int mvPp2IsRxSpecial(MV_U16 parser_info)
 {
