@@ -53,6 +53,9 @@ disclaimer.
 
 #include "prs/mvPp2Prs.h"
 
+#include "wol/mvPp2Wol.h"
+
+
 #define MV_ETH_TOOL_AN_TIMEOUT	5000
 
 struct mv_eth_tool_stats {
@@ -379,6 +382,106 @@ int mv_eth_tool_get_regs_len(struct net_device *netdev)
 	return (MV_ETH_TOOL_REGS_LEN * sizeof(uint32_t));
 }
 
+/******************************************************************************
+* mv_eth_tool_get_wol
+* Description:
+*	ethtool get WOL information
+* INPUT:
+*	netdev		Network device structure pointer
+* OUTPUT
+*	wolinfo		WOL info
+* RETURN:
+*	0 on success
+*
+*******************************************************************************/
+void mv_eth_tool_get_wol(struct net_device *netdev,
+			 struct ethtool_wolinfo *wolinfo)
+{
+	struct eth_port	*priv = MV_ETH_PRIV(netdev);
+
+	if (priv == NULL) {
+		pr_err("%s is not supported on %s\n", __func__, netdev->name);
+		return;
+	}
+
+	wolinfo->supported = WAKE_ARP | WAKE_UCAST | WAKE_MAGIC;
+	wolinfo->wolopts = 0;
+
+	if (priv->wol & (MV_PP2_WOL_ARP_IP_MASK(0) | MV_PP2_WOL_ARP_IP_MASK(1)))
+		wolinfo->wolopts |= WAKE_ARP;
+
+	if (priv->wol & MV_PP2_WOL_UCAST_MASK)
+		wolinfo->wolopts |= WAKE_UCAST;
+	if (priv->wol & MV_PP2_WOL_MAGIC_PTRN_MASK)
+		wolinfo->wolopts |= WAKE_MAGIC;
+}
+
+/******************************************************************************
+* mv_eth_tool_set_wol
+* Description:
+*	ethtool set WOL
+* INPUT:
+*	netdev		Network device structure pointer
+*	wolinfo		WOL settings
+* OUTPUT
+*	None
+* RETURN:
+*	None
+*
+*******************************************************************************/
+int mv_eth_tool_set_wol(struct net_device *netdev,
+			 struct ethtool_wolinfo *wolinfo)
+{
+	int ret;
+	struct eth_port	*priv = MV_ETH_PRIV(netdev);
+
+	if (priv == NULL) {
+		pr_err("%s is not supported on %s\n", __func__, netdev->name);
+		return -EOPNOTSUPP;
+	}
+
+	if (wolinfo->wolopts & (WAKE_PHY | WAKE_MCAST | WAKE_BCAST | WAKE_MAGICSECURE))
+		return -EOPNOTSUPP;
+
+	/* these settings will always override what we currently have */
+	priv->wol = 0;
+	/* Clearn all settings before if have */
+	ret = mvPp2WolWakeup();
+	if (ret)
+		return ret;
+
+	if (wolinfo->wolopts & WAKE_UCAST) {
+		priv->wol |= MV_PP2_WOL_UCAST_MASK;
+		/* Enable WoL Ucast event */
+		ret = mvPp2WolUcastEventSet(WOL_EVENT_EN);
+		if (ret)
+			return ret;
+	}
+
+	if (wolinfo->wolopts & WAKE_ARP) {
+		/* Even port num use ARP0; Odd port num use ARP1 */
+		priv->wol |= MV_PP2_WOL_ARP_IP_MASK((priv->port) % MV_PP2_WOL_ARP_IP_NUM);
+		/* Set WoL ARP Address; TODO */
+		/* Enable WoL ARP event */
+		ret = mvPp2WolArpEventSet((priv->port) % MV_PP2_WOL_ARP_IP_NUM, WOL_EVENT_EN);
+		if (ret)
+			return ret;
+	}
+
+	if (wolinfo->wolopts & WAKE_MAGIC) {
+		priv->wol |= MV_PP2_WOL_MAGIC_PTRN_MASK;
+		/* Set Magic MAC, the MAC of the last port configured by ethtool will be the Magic MAC */
+		ret = mvPp2WolMagicDaSet(netdev->dev_addr);
+		if (ret)
+			return ret;
+		/* Enable WoL Magic event */
+		ret = mvPp2WolMagicEventSet(WOL_EVENT_EN);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
 
 /******************************************************************************
 * mv_eth_tool_get_drvinfo
@@ -1046,6 +1149,8 @@ const struct ethtool_ops mv_eth_tool_ops = {
 	.get_drvinfo				= mv_eth_tool_get_drvinfo,
 	.get_regs_len				= mv_eth_tool_get_regs_len,
 	.get_regs				= mv_eth_tool_get_regs,
+	.get_wol				= mv_eth_tool_get_wol,
+	.set_wol				= mv_eth_tool_set_wol,
 	.nway_reset				= mv_eth_tool_nway_reset,
 	.get_link				= mv_eth_tool_get_link,
 	.get_coalesce				= mv_eth_tool_get_coalesce,

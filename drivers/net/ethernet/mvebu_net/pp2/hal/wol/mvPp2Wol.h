@@ -142,6 +142,13 @@ extern "C" {
 #define MV_PP2_WOL_PTRN_MASK_BIT(i)         (1    << ((i) * 8))
 /*---------------------------------------------------------------------------------------------*/
 
+/*********************************** ENUMERATIONS *******************/
+
+enum wol_event_enable_t {
+	WOL_EVENT_DIS = 0,
+	WOL_EVENT_EN,
+};
+
 /* WoL APIs */
 void      mvPp2WolRegs(void);
 void      mvPp2WolStatus(void);
@@ -150,7 +157,7 @@ MV_STATUS mvPp2WolWakeup(void);
 int       mvPp2WolIsSleep(int *port);
 MV_STATUS mvPp2WolMagicDaSet(MV_U8 *mac_da);
 MV_STATUS mvPp2WolArpIpSet(int idx, MV_U32 ip);
-MV_STATUS mvPp2WolPtrnSet(int idx, int size, MV_U8 *data, MV_U8 *mask);
+MV_STATUS mvPp2WolPtrnSet(int idx, int off, int size, MV_U8 *data, MV_U8 *mask);
 MV_STATUS mvPp2WolArpEventSet(int idx, int enable);
 MV_STATUS mvPp2WolMcastEventSet(int enable);
 MV_STATUS mvPp2WolUcastEventSet(int enable);
