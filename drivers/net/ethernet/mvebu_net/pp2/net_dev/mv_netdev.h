@@ -221,6 +221,8 @@ struct port_stats {
 #define MV_ETH_F_RX_PKT_PREFETCH_BIT    2
 #define MV_ETH_F_CONNECT_LINUX_BIT      5 /* port is connected to Linux netdevice */
 #define MV_ETH_F_LINK_UP_BIT            6
+#define MV_ETH_F_SUSPEND_BIT            12
+#define MV_ETH_F_STARTED_OLD_BIT        13 /*STARTED_BIT value before suspend */
 #define MV_ETH_F_IFCAP_NETMAP_BIT       15
 
 #define MV_ETH_F_STARTED                (1 << MV_ETH_F_STARTED_BIT)
@@ -228,6 +230,8 @@ struct port_stats {
 #define MV_ETH_F_RX_PKT_PREFETCH        (1 << MV_ETH_F_RX_PKT_PREFETCH_BIT)
 #define MV_ETH_F_CONNECT_LINUX          (1 << MV_ETH_F_CONNECT_LINUX_BIT)
 #define MV_ETH_F_LINK_UP                (1 << MV_ETH_F_LINK_UP_BIT)
+#define MV_ETH_F_SUSPEND                (1 << MV_ETH_F_SUSPEND_BIT)
+#define MV_ETH_F_STARTED_OLD            (1 << MV_ETH_F_STARTED_OLD_BIT)
 #define MV_ETH_F_IFCAP_NETMAP           (1 << MV_ETH_F_IFCAP_NETMAP_BIT)
 
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
@@ -384,6 +388,7 @@ struct eth_port {
 	__u32			rate_current; /* unknown (0), low (1), normal (2), high (3) */
 	__u32			rate_sample_cfg;
 	__u32			rx_adaptive_coal_cfg;
+	__u32			wol;
 	/* Rate calculate */
 	unsigned long		rx_rate_pkts;
 	unsigned long		rx_timestamp;
@@ -404,6 +409,7 @@ struct eth_port {
 
 enum eth_pm_mode {
 	MV_ETH_PM_WOL = 0,
+	MV_ETH_PM_SUSPEND,
 	MV_ETH_PM_CLOCK,
 	MV_ETH_PM_DISABLE,
 	MV_ETH_PM_LAST

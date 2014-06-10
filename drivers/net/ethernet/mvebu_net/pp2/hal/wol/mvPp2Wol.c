@@ -169,15 +169,18 @@ MV_STATUS mvPp2WolArpIpSet(int idx, MV_U32 ip)
 	return MV_OK;
 }
 
-MV_STATUS mvPp2WolPtrnSet(int idx, int size, MV_U8 *data, MV_U8 *mask)
+MV_STATUS mvPp2WolPtrnSet(int idx, int off, int size, MV_U8 *data, MV_U8 *mask)
 {
 	MV_U32 regVal, regData, regMask;
-	int i, j, reg;
+	int i, j, reg, new_size;
+	MV_U8 *new_data;
+	MV_U8 *new_mask;
+	int aligned_size = 0;
 
 	if (mvPp2MaxCheck(idx, MV_PP2_WOL_PTRN_NUM, "PTRN index"))
 		return MV_BAD_PARAM;
 
-	if (mvPp2MaxCheck(size, MV_PP2_WOL_PTRN_BYTES, "PTRN size"))
+	if (mvPp2MaxCheck((off + size), MV_PP2_WOL_PTRN_BYTES, "PTRN size"))
 		return MV_BAD_PARAM;
 /*
 	mvOsPrintf("WoL set pattern #%d: size=%d\n", idx, size);
@@ -191,25 +194,54 @@ MV_STATUS mvPp2WolPtrnSet(int idx, int size, MV_U8 *data, MV_U8 *mask)
 	mvPp2WrReg(MV_PP2_WOL_PTRN_SIZE_REG, regVal);
 
 	mvPp2WrReg(MV_PP2_WOL_PTRN_IDX_REG, idx);
-	for (i = 0; i < size; i += 4) {
-		reg = i / 4;
+	if (off % 4) {
+		aligned_size = size + 4 - (off % 4);
+		new_data = kmalloc(sizeof(MV_U8) * aligned_size, GFP_KERNEL);
+		if (!new_data) {
+			mvOsPrintf("CPU memory allocation fail\n");
+			return MV_OUT_OF_CPU_MEM;
+		}
+
+		new_mask = kmalloc(sizeof(MV_U8) * aligned_size, GFP_KERNEL);
+		if (!new_mask) {
+			kfree(new_data);
+			mvOsPrintf("CPU memory allocation fail\n");
+			return MV_OUT_OF_CPU_MEM;
+		}
+
+		memset(new_data, 0, sizeof(MV_U8) * aligned_size);
+		memset(new_mask, 0, sizeof(MV_U8) * aligned_size);
+
+		memcpy(&new_data[off % 4], data, size);
+		memcpy(&new_mask[off % 4], mask, size);
+	} else {
+		new_data = data;
+		new_mask = mask;
+	}
+	new_size = size + (off % 4);
+	for (i = 0; i < new_size; i += 4) {
+		reg = (off + i) / 4;
 		regData = mvPp2RdReg(MV_PP2_WOL_PTRN_DATA_REG(reg));
 		regMask = mvPp2RdReg(MV_PP2_WOL_PTRN_MASK_REG(reg));
 		for (j = 0; j < 4; j++) {
 
-			if ((i + j) >= size)
+			if ((i + j) >= new_size)
 				break;
 
 			regData &= ~MV_PP2_WOL_PTRN_DATA_BYTE_MASK(3 - j);
-			regData |= MV_PP2_WOL_PTRN_DATA_BYTE(3 - j, data[i + j]);
+			regData |= MV_PP2_WOL_PTRN_DATA_BYTE(3 - j, new_data[i + j]);
 			/* mask on byte level */
-			if (mask[i + j] == 0)
+			if (new_mask[i + j] == 0)
 				regMask &= ~MV_PP2_WOL_PTRN_MASK_BIT(3 - j);
 			else
 				regMask |= MV_PP2_WOL_PTRN_MASK_BIT(3 - j);
 		}
 		mvPp2WrReg(MV_PP2_WOL_PTRN_DATA_REG(reg), regData);
 		mvPp2WrReg(MV_PP2_WOL_PTRN_MASK_REG(reg), regMask);
+	}
+	if (off % 4) {
+		kfree(new_data);
+		kfree(new_mask);
 	}
 	return MV_OK;
 }
@@ -256,8 +288,6 @@ MV_STATUS mvPp2WolUcastEventSet(int enable)
 
 	mvPp2WrReg(MV_PP2_WOL_WAKEUP_EN_REG, regVal);
 
-	mvOsPrintf("%s: enable=%d, regOffset=0x%x, regVal=0x%x\n",
-			__func__, enable, MV_PP2_WOL_WAKEUP_EN_REG, regVal);
 	return MV_OK;
 }
 

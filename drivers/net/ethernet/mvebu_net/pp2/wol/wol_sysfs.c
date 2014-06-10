@@ -53,8 +53,10 @@ static ssize_t wol_help(char *buf)
 	of += scnprintf(buf + of, PAGE_SIZE - of, "echo 1       > wakeup    - Force wakeup\n");
 	of += scnprintf(buf + of, PAGE_SIZE - of, "echo mac     > magic_mac - Set MAC [a:b:c:d:e:f] for magic pattern\n");
 	of += scnprintf(buf + of, PAGE_SIZE - of, "echo i ip    > arp_ip    - Set IP [a.b.c.d] for ARP IP[i] event\n");
-	of += scnprintf(buf + of, PAGE_SIZE - of, "echo i s str > ptrn      - Set pattern [i] with [str] of [s] bytes\n");
-	of += scnprintf(buf + of, PAGE_SIZE - of, "                           [str] in format: b0:b1::b3:::b6\n");
+	of += scnprintf(buf + of, PAGE_SIZE - of, "echo i o d m > ptrn      - Set pattern [i] with data [d] and mask [m] from  header offset [o]\n");
+	of += scnprintf(buf + of, PAGE_SIZE - of, "                           [o] header offset: 0-127\n");
+	of += scnprintf(buf + of, PAGE_SIZE - of, "                           [d] str, in format: b0:b1::b3:::b6\n");
+	of += scnprintf(buf + of, PAGE_SIZE - of, "                           [m] str, in format: ff:ff::ff:::ff\n");
 	of += scnprintf(buf + of, PAGE_SIZE - of, "echo [0|1]   > magic_en  - On/Off wakeup by magic packet\n");
 	of += scnprintf(buf + of, PAGE_SIZE - of, "echo [0|1]   > ucast_en  - On/Off wakeup by Unicast packet\n");
 	of += scnprintf(buf + of, PAGE_SIZE - of, "echo [0|1]   > mcast_en  - On/Off wakeup by Multicast packet\n");
@@ -186,10 +188,10 @@ static ssize_t wol_ip_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
-static int wol_ptrn_get(char *ptrnStr, MV_U8 *data, MV_U8 *mask, int max_size)
+static int wol_ptrn_get(char *ptrnStr, char *maskStr, MV_U8 *data, MV_U8 *mask, int max_size)
 {
 	int i, j, size;
-	char tmp[3];
+	char tmp[3], mask_tmp[3];
 
 	size = strlen(ptrnStr);
 	i = 0;
@@ -219,8 +221,11 @@ static int wol_ptrn_get(char *ptrnStr, MV_U8 *data, MV_U8 *mask, int max_size)
 		tmp[0] = ptrnStr[i];
 		tmp[1] = ptrnStr[i + 1];
 		tmp[2] = '\0';
+		mask_tmp[0] = maskStr[i];
+		mask_tmp[1] = maskStr[i + 1];
+		mask_tmp[2] = '\0';
 		data[j] = (MV_U8) (strtol(tmp, NULL, 16));
-		mask[j] = 0xff;
+		mask[j] = (MV_U8) (strtol(mask_tmp, NULL, 16));
 		i += 3;
 		j++;
 	}
@@ -232,8 +237,9 @@ static ssize_t wol_ptrn_store(struct device *dev,
 {
 	const char    *name = attr->attr.name;
 	unsigned int  err = 0;
-	int           size, i = 0;
+	int           size, i = 0, off = 0;
 	char          ptrnStr[MV_PP2_WOL_PTRN_BYTES*3];
+	char          maskStr[MV_PP2_WOL_PTRN_BYTES*3];
 	char          data[MV_PP2_WOL_PTRN_BYTES];
 	char          mask[MV_PP2_WOL_PTRN_BYTES];
 	unsigned long flags;
@@ -241,14 +247,14 @@ static ssize_t wol_ptrn_store(struct device *dev,
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	sscanf(buf, "%d %s", &i, ptrnStr);
+	sscanf(buf, "%d %d %s %s", &i, &off, ptrnStr, maskStr);
 
 	local_irq_save(flags);
 
 	if (!strcmp(name, "ptrn")) {
-		size = wol_ptrn_get(ptrnStr, data, mask, MV_PP2_WOL_PTRN_BYTES);
+		size = wol_ptrn_get(ptrnStr, maskStr, data, mask, MV_PP2_WOL_PTRN_BYTES);
 		if (size != -1)
-			err = mvPp2WolPtrnSet(i, size, data, mask);
+			err = mvPp2WolPtrnSet(i, off, size, data, mask);
 		else
 			err = 1;
 	} else
@@ -260,17 +266,6 @@ static ssize_t wol_ptrn_store(struct device *dev,
 		printk(KERN_ERR "%s: <%s>, error %d\n", __func__, attr->attr.name, err);
 
 	return err ? -EINVAL : len;
-}
-
-irqreturn_t mv_wol_isr(int irq, void *dev_id)
-{
-	MV_U32 regVal;
-
-	regVal = mvPp2RdReg(MV_PP2_WOL_INTR_CAUSE_REG);
-	pr_info("WoL interrupt: irq=%d, cause=0x%x\n", irq, regVal);
-	mvPp2WolWakeup();
-
-	return IRQ_HANDLED;
 }
 
 static DEVICE_ATTR(help,      S_IRUSR, wol_show, NULL);
