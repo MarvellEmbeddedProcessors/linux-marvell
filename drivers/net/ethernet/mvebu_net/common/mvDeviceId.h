@@ -402,9 +402,16 @@ extern "C" {
 /* BobCat2  Family */
 #define MV_BOBCAT2_DEV_ID		0xFC00
 
+ /* Lion2  Family */
+#define MV_LION2_DEV_ID		0x8000
+
 /* AlleyCat3  Family */
 #define MV_ALLEYCAT3_DEV_ID		0xF400
 
+ /* IDT Swicth  */
+#define PCI_VENDOR_ID_IDT_SWITCH	0x111D
+#define MV_IDT_SWITCH_DEV_ID_808E	0x808E
+#define MV_IDT_SWITCH_DEV_ID_802B	0x802B
 
 #ifdef __cplusplus
 }
