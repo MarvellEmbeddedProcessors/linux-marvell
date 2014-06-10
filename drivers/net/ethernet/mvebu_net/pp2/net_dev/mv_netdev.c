@@ -50,6 +50,8 @@ disclaimer.
 #include "prs/mvPp2PrsHw.h"
 #include "cls/mvPp2Classifier.h"
 #include "dpi/mvPp2DpiHw.h"
+#include "wol/mvPp2Wol.h"
+
 
 #include "mv_mux_netdev.h"
 #include "mv_netdev.h"
@@ -3045,6 +3047,19 @@ irqreturn_t mv_eth_link_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_CPU_IDLE
+/* wol_isr_register, guarantee the wol irq register once */
+static int wol_isr_register;
+
+irqreturn_t mv_wol_isr(int irq, void *dev_id)
+{
+	mvPp2WolWakeup();
+	machine_restart(NULL);
+
+	return IRQ_HANDLED;
+}
+#endif
+
 void mv_eth_link_tasklet(unsigned long data)
 {
 	int port;
@@ -3551,8 +3566,31 @@ int mv_eth_resume_network_interfaces(struct eth_port *pp)
 
 int mv_eth_port_resume(int port)
 {
-/* TBD */
-	return 0;
+	struct eth_port *pp;
+
+	pp = mv_eth_port_by_id(port);
+
+	if (pp == NULL) {
+		pr_err("%s: pp == NULL, port=%d\n", __func__, port);
+		return  MV_ERROR;
+	}
+
+	if (!(pp->flags & MV_ETH_F_SUSPEND)) {
+		pr_err("%s: port %d is not suspend.\n", __func__, port);
+		return MV_ERROR;
+	}
+	if (pp->pm_mode == MV_ETH_PM_WOL) {
+		mv_eth_start_internals(pp, pp->dev->mtu);
+		mvGmacPortIsrUnmask(port);
+		mvGmacPortSumIsrUnmask(port);
+	}
+
+	clear_bit(MV_ETH_F_SUSPEND_BIT, &(pp->flags));
+	set_bit(MV_ETH_F_STARTED_BIT, &(pp->flags));
+
+	pr_info("Exit suspend mode on port #%d\n", port);
+
+	return MV_OK;
 }
 
 void    mv_eth_hal_shared_init(struct mv_pp2_pdata *plat_data)
@@ -3660,18 +3698,55 @@ void mv_eth_win_init(void)
  ***********************************************************/
 int mv_eth_port_suspend(int port)
 {
-/* TBD */
-	return 0;
+	struct eth_port *pp;
+
+	pp = mv_eth_port_by_id(port);
+	if (!pp)
+		return MV_OK;
+
+	if (pp->flags & MV_ETH_F_SUSPEND) {
+		pr_err("%s: port %d is allready suspend.\n", __func__, port);
+		return MV_ERROR;
+	}
+
+	if (pp->flags & MV_ETH_F_STARTED) {
+		if (pp->pm_mode == MV_ETH_PM_WOL) {
+			/* Clean up and disable all interrupts */
+			mv_eth_stop_internals(pp);
+			mvGmacPortIsrMask(port);
+			mvGmacPortSumIsrMask(port);
+		}
+		clear_bit(MV_ETH_F_STARTED_BIT, &(pp->flags));
+	} else
+		clear_bit(MV_ETH_F_STARTED_OLD_BIT, &(pp->flags));
+
+	set_bit(MV_ETH_F_SUSPEND_BIT, &(pp->flags));
+
+	pr_info("Enter suspend mode on port #%d\n", port);
+	return MV_OK;
 }
 
 /***********************************************************
  * mv_eth_pm_mode_set --                                   *
  *   set pm_mode. (power menegment mod)			   *
  ***********************************************************/
-int	mv_eth_pm_mode_set(int port, int mode)
+int mv_eth_pm_mode_set(int port, int mode)
 {
-/* TBD */
-	return 0;
+	struct eth_port *pp = mv_eth_port_by_id(port);
+
+	if (pp == NULL) {
+		pr_err("%s: pp == NULL, port=%d\n", __func__, port);
+		return -EINVAL;
+	}
+
+	if (pp->flags & MV_ETH_F_SUSPEND) {
+		pr_err("Port %d must resumed before\n", port);
+		return -EINVAL;
+	}
+
+	pp->pm_mode = mode;
+
+	return MV_OK;
 }
 
 static void mv_eth_sysfs_exit(void)
@@ -3901,6 +3976,15 @@ static int mv_eth_probe(struct platform_device *pdev)
 	if (mv_eth_load_network_interfaces(pdev))
 		return -ENODEV;
 
+#ifdef CONFIG_CPU_IDLE
+	/* Register WoL interrupt */
+	if (!wol_isr_register) {
+		if (request_irq(IRQ_GLOBAL_NET_WAKE_UP, mv_wol_isr, (IRQF_DISABLED), "wol", NULL))
+			pr_err("cannot request irq %d for Wake-on-Lan\n", IRQ_GLOBAL_NET_WAKE_UP);
+		else
+			wol_isr_register++;
+	}
+#endif
 	/* used in mv_eth_all_ports_probe */
 	plats[port] = pdev;
 
@@ -4547,7 +4631,6 @@ int mv_eth_resume_internals(struct eth_port *pp, int mtu)
 {
 /* TBD */
 	return 0;
-
 }
 
 
@@ -5815,13 +5898,44 @@ int mv_eth_suspend_clock(int port)
 	return 0;
 }
 
+/* mv_eth_suspend_common - common port suspend, can be called anyplace */
+int mv_eth_suspend_common(int port)
+{
+	struct eth_port *pp;
+
+	pp = mv_eth_port_by_id(port);
+	if (!pp)
+		return MV_OK;
+
+	if (mv_eth_port_suspend(port)) {
+		pr_err("%s: port #%d suspend failed.\n", __func__, port);
+		return MV_ERROR;
+	}
+
+	/* PM mode: WoL Mode*/
+	if (pp->pm_mode == 0) {
+		/* Insert port to WoL mode */
+		if (mvPp2WolSleep(port)) {
+			pr_err("%s: port #%d suspend failed.\n", __func__, port);
+			return MV_ERROR;
+		}
+	}
+	/* PM mode: Suspend to RAM Mode, TODO list*/
+
+	return MV_OK;
+}
 
 int mv_eth_suspend(struct platform_device *pdev, pm_message_t state)
 {
-/* TBD */
-	return 0;
-}
+	int port = pdev->id;
 
+	if (mv_eth_suspend_common(port)) {
+		pr_err("%s: port #%d suspend failed.\n", __func__, port);
+		return MV_ERROR;
+	}
+
+	return MV_OK;
+}
 
 int mv_eth_resume_clock(int port)
 {
@@ -5832,9 +5946,22 @@ int mv_eth_resume_clock(int port)
 
 int mv_eth_resume(struct platform_device *pdev)
 {
-/* TBD */
-	return 0;
+	struct eth_port *pp;
+	int port = pdev->id;
 
+	pp = mv_eth_port_by_id(port);
+	if (!pp)
+		return MV_OK;
+
+	/* PM mode: WoL Mode*/
+	if (pp->pm_mode == 0) {
+		if (mv_eth_port_resume(port)) {
+			pr_err("%s: port #%d resume failed.\n", __func__, port);
+			return MV_ERROR;
+		}
+	}
+
+	return MV_OK;
 }
 
 #endif	/* CONFIG_CPU_IDLE */
@@ -5856,6 +5983,15 @@ static int mv_eth_remove(struct platform_device *pdev)
 
 static void mv_eth_shutdown(struct platform_device *pdev)
 {
+
+#ifdef CONFIG_CPU_IDLE
+	int port = pdev->id;
+		struct eth_port *pp = mv_eth_port_by_id(port);
+
+	if (pp->flags & MV_ETH_F_STARTED)
+		mv_eth_suspend_common(port);
+#endif
+
 	printk(KERN_INFO "Shutting Down Marvell Ethernet Driver\n");
 }
 
