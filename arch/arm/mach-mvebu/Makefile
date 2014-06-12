@@ -23,6 +23,7 @@ obj-$(CONFIG_MACH_ARMADA_380)	 += platsmp-380.o headsmp-380.o
 endif
 obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
 obj-$(CONFIG_PROC_FS)            += dump_mv_regs.o
+obj-$(CONFIG_MVEBU_SOFT_POWEROFF)      += soft-poweroff.o
 obj-y	+= linux_oss/mvOs.o
 
 
