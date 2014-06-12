@@ -21,6 +21,14 @@ config ARCH_MVEBU
 	select PCI_QUIRKS if PCI
 	select RESET_CONTROLLER
 
+config MVEBU_SOFT_POWEROFF
+	bool "Soft Power Off"
+	depends on ARCH_MVEBU
+	default y
+	help
+	   Say 'Y' here if you want your kernel to support soft power off with WFI.
+	   usage: 'echo 1 > /sys/devices/platform/mv_power_wol/soft_power_idle'
+
 if ARCH_MVEBU
 
 menu "Marvell SOC with device tree"

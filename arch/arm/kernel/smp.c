@@ -584,8 +584,18 @@ static void ipi_cpu_stop(unsigned int cpu)
 	local_fiq_disable();
 	local_irq_disable();
 
+
+	/*
+	 * If Soft power off is enabled, instead of relaxing the CPU upon IPI_CPU_STOP event,
+	 * the CPU will enter WFI state
+	 */
 	while (1)
+#ifdef CONFIG_MVEBU_SOFT_POWEROFF
+		wfi();
+#else
 		cpu_relax();
+#endif
+
 }
 
 /*
