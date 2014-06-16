@@ -272,6 +272,7 @@ int mv_mux_netdev_find(unsigned int dev_idx)
 	}
 	return -1;
 }
+EXPORT_SYMBOL(mv_mux_netdev_find);
 /*-----------------------------------------------------------------------------------------*/
 int mv_mux_update_link(void *cookie, int link_up)
 {

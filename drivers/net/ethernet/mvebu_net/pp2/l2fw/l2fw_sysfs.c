@@ -50,10 +50,12 @@ static ssize_t mv_l2fw_help(char *buf)
 	off += sprintf(buf+off, "\n");
 	off += sprintf(buf+off, "echo p [1|0]      > l2fw     - Enable/Disable L2FW for port <p>\n");
 	off += sprintf(buf+off, "echo rxp txp mode > bind     - Set <rxp-->txp>, mode: 0-as_is, 1-swap, 2-copy\n");
-	off += sprintf(buf+off, "echo rxp thresh   > xor      - Set XOR threshold for port <rxp>\n");
 	off += sprintf(buf+off, "echo rxp [1|0]    > lookup   - Enable/Disable L3 lookup for port <rxp>\n");
 	off += sprintf(buf+off, "echo 1            > flush    - Flush L2FW rules DB\n");
 	off += sprintf(buf+off, "echo sip dip txp  > add_ip   - Set L3 lookup rule, sip, dip in a.b.c.d format\n");
+#ifdef CONFIG_MV_L2FW_XOR
+	off += sprintf(buf+off, "echo rxp thresh   > xor      - Set XOR threshold for port <rxp>\n");
+#endif
 #ifdef CONFIG_MV_ETH_L2SEC
 	off += sprintf(buf+off, "echo p chan       > cesa     - Set cesa channel <chan> for port <p>.\n");
 #endif
@@ -170,7 +172,7 @@ static ssize_t mv_l2fw_store(struct device *dev,
 	local_irq_save(flags);
 	if (!strcmp(name, "lookup"))
 		mv_l2fw_lookupEn(a, b);
-#ifdef CONFIG_MV_INCLUDE_XOR
+#ifdef CONFIG_MV_L2FW_XOR
 	else if (!strcmp(name, "xor"))
 		mv_l2fw_xor(a, b);
 #endif
@@ -207,7 +209,7 @@ static DEVICE_ATTR(flush,		S_IWUSR, NULL,	mv_l2fw_hex_store);
 #ifdef CONFIG_MV_ETH_L2SEC
 static DEVICE_ATTR(cesa_chan,		S_IWUSR, NULL,  mv_l2fw_store);
 #endif
-#ifdef CONFIG_MV_INCLUDE_XOR
+#ifdef CONFIG_MV_L2FW_XOR
 static DEVICE_ATTR(xor,		S_IWUSR, mv_l2fw_show, mv_l2fw_store);
 #endif
 
@@ -216,7 +218,7 @@ static DEVICE_ATTR(xor,		S_IWUSR, mv_l2fw_show, mv_l2fw_store);
 static struct attribute *mv_l2fw_attrs[] = {
 	&dev_attr_l2fw.attr,
 	&dev_attr_bind.attr,
-#ifdef CONFIG_MV_INCLUDE_XOR
+#ifdef CONFIG_MV_L2FW_XOR
 	&dev_attr_xor.attr,
 #endif
 	&dev_attr_lookup.attr,
