@@ -283,6 +283,16 @@ config MV_ETH_L2FW
 	Three modes are supported: Send packet without change, Swap MAC DA<->SA,
 	Copy the whole packet and swap MAC
 
+config MV_ETH_L2FW_XOR
+        bool "L2 Forwarding XOR support"
+        depends on MV_ETH_L2FW && MV_INCLUDE_XOR
+        default n
+        ---help---
+        Enable using XOR engine to copy ingress packets during L2FW processing.
+	If enabled XOR engine will be used to copy packet when packet size is
+	larger than XOR threshold (default value is 2000 bytes).
+	XOR threshold can be changes using sysfs command.
+
 config MV_ETH_L2SEC
 	bool "L2 Forwarding IPSec support"
 	depends on MV_ETH_L2FW

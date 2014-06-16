@@ -28,11 +28,11 @@ disclaimer.
 
 #include <linux/version.h>
 
-#ifdef CONFIG_MV_INCLUDE_XOR
+#ifdef CONFIG_MV_ETH_L2FW_XOR
 #include "xor/mvXor.h"
 #include "xor/mvXorRegs.h"
 #include "mv_hal_if/mvSysXorApi.h"
-#endif
+#endif /* CONFIG_MV_ETH_L2FW_XOR */
 
 #include "mv_eth_l2fw.h"
 #include "mv_pp2/net_dev/mv_netdev.h"
@@ -52,7 +52,7 @@ static int eth_ports_l2fw_num;
 
 static MV_U32 l2fw_jhash_iv;
 
-#ifdef CONFIG_MV_INCLUDE_XOR
+#ifdef CONFIG_MV_ETH_L2FW_XOR
 static MV_XOR_DESC *eth_xor_desc;
 static MV_LONG      eth_xor_desc_phys_addr;
 #endif
@@ -511,10 +511,10 @@ inline struct sk_buff *eth_l2fw_copy_packet_withOutXor(struct sk_buff *skb, stru
 	return skb_new;
 }
 
-#ifdef CONFIG_MV_INCLUDE_XOR
+#ifdef CONFIG_MV_ETH_L2FW_XOR
 inline struct sk_buff *eth_l2fw_copy_packet_withXor(struct sk_buff *skb, struct pp2_rx_desc *rx_desc)
 {
-	struct sk_buff *skb_new;
+	struct sk_buff *skb_new = NULL;
 	MV_U8 *pSrc;
 	MV_U8 *pDst;
 	int poolId;
@@ -606,7 +606,7 @@ void mv_l2fw_xor(int rx_port, int threshold)
 	mvOsPrintf("setting port %d threshold to %d in %s\n", rx_port, threshold, __func__);
 	mv_eth_ports_l2fw[rx_port]->xorThreshold = threshold;
 }
-#endif /*CONFIG_MV_INCLUDE_XOR*/
+#endif /* CONFIG_MV_ETH_L2FW_XOR */
 
 void mv_l2fw_lookupEn(int rx_port, int enable)
 {
@@ -779,7 +779,7 @@ inline int mv_l2fw_txq_done(struct eth_port *pp, struct tx_queue *txq_ctrl)
 
 static int mv_l2fw_txq_done_force(struct eth_port *pp, struct tx_queue *txq_ctrl)
 {
-	int cpu, tx_done;
+	int cpu, tx_done = 0;
 	struct txq_cpu_ctrl *txq_cpu_ptr;
 
 	for_each_possible_cpu(cpu) {
@@ -901,7 +901,7 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 	struct eth_port_l2fw *ppl2fw = mv_eth_ports_l2fw[pp->port];
 	MV_IP_HEADER *pIph = NULL;
 	int ipOffset;
-	struct sk_buff *skb, *skb_new;
+	struct sk_buff *skb, *skb_new = NULL;
 	MV_U32 bufPhysAddr, bm;
 
 	rx_done = mvPp2RxqBusyDescNumGet(pp->port, rxq);
@@ -1013,26 +1013,28 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 				status = MV_ERROR;
 				break;
 			}
+#ifdef CONFIG_MV_ETH_L2FW_XOR
 			if (bytes >= ppl2fw->xorThreshold) {
-				printk(KERN_INFO "%s: xor is not supported\n", __func__);
 				skb_new = eth_l2fw_copy_packet_withXor(skb, rx_desc);
-			} else {
+				pr_error("%s: xor is not supported\n", __func__);
+			}
+#endif /* CONFIG_MV_ETH_L2FW_XOR */
+
+			if (skb_new == NULL)
 				skb_new = eth_l2fw_copy_packet_withOutXor(skb, rx_desc);
 
-				if (skb_new) {
-					bufPhysAddr = rx_desc->bufPhysAddr;
+			if (skb_new) {
+				bufPhysAddr = rx_desc->bufPhysAddr;
 
-					bm = mv_eth_bm_cookie_build(rx_desc);
-					status = mv_l2fw_tx(skb_new, new_pp, rx_desc);
+				bm = mv_eth_bm_cookie_build(rx_desc);
+				status = mv_l2fw_tx(skb_new, new_pp, rx_desc);
 
-					mv_eth_pool_refill(pool, bm, bufPhysAddr, (MV_ULONG)skb);
+				mv_eth_pool_refill(pool, bm, bufPhysAddr, (MV_ULONG)skb);
 
-					/* for refill function */
-					skb = skb_new;
-				} else
-
+				/* for refill function */
+				skb = skb_new;
+			} else
 				status = MV_ERROR;
-			}
 			break;
 #ifdef CONFIG_MV_ETH_L2SEC
 		case CMD_L2FW_CESA:
@@ -1102,7 +1104,7 @@ static int mv_l2fw_shared_init(void)
 	memset(mv_eth_ports_l2fw, 0, size);
 
 	bytes = sizeof(struct l2fw_rule *) * L2FW_HASH_SIZE;
-	l2fw_jhash_iv = mvOsRand();
+	get_random_bytes(&l2fw_jhash_iv, sizeof(l2fw_jhash_iv));
 	l2fw_hash = (struct l2fw_rule **)mvOsMalloc(bytes);
 
 	if (l2fw_hash == NULL) {
@@ -1118,8 +1120,8 @@ static int mv_l2fw_shared_init(void)
 	mv_l2sec_cesa_init();
 #endif
 
-#ifdef CONFIG_MV_INCLUDE_XOR
-	/*setXorDesc();*/
+#ifdef CONFIG_MV_ETH_L2FW_XOR
+	setXorDesc();
 #endif
 
 	return MV_OK;
