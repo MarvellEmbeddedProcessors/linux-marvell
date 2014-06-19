@@ -388,7 +388,7 @@ struct eth_port {
 	unsigned long		rx_rate_pkts;
 	unsigned long		rx_timestamp;
 #ifdef CONFIG_MV_ETH_RX_SPECIAL
-	void			(*rx_special_proc)(int port, int rxq, struct net_device *dev,
+	int			(*rx_special_proc)(int port, int rxq, struct net_device *dev,
 						struct sk_buff *skb, struct pp2_rx_desc *rx_desc);
 #endif /* CONFIG_MV_ETH_RX_SPECIAL */
 #ifdef CONFIG_MV_ETH_TX_SPECIAL
@@ -998,7 +998,7 @@ void        mv_eth_tx_special_check_func(int port, int (*func)(int port, struct 
 #endif /* CONFIG_MV_ETH_TX_SPECIAL */
 
 #ifdef CONFIG_MV_ETH_RX_SPECIAL
-void        mv_eth_rx_special_proc_func(int port, void (*func)(int port, int rxq, struct net_device *dev,
+void        mv_eth_rx_special_proc_func(int port, int (*func)(int port, int rxq, struct net_device *dev,
 							struct sk_buff *skb, struct pp2_rx_desc *rx_desc));
 #endif /* CONFIG_MV_ETH_RX_SPECIAL */
 
