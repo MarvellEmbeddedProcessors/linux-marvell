@@ -1265,7 +1265,7 @@ void mv_eth_tx_special_check_func(int port,
 
 #ifdef CONFIG_MV_ETH_RX_SPECIAL
 /* Register special transmit check function */
-void mv_eth_rx_special_proc_func(int port, void (*func)(int port, int rxq, struct net_device *dev,
+void mv_eth_rx_special_proc_func(int port, int (*func)(int port, int rxq, struct net_device *dev,
 							struct sk_buff *skb, struct pp2_rx_desc *rx_desc))
 {
 	struct eth_port *pp = mv_eth_port_by_id(port);
@@ -1949,13 +1949,14 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 		/* Special RX processing */
 		if (mvPp2IsRxSpecial(rx_desc->parserInfo)) {
 			if (pp->rx_special_proc) {
-				pp->rx_special_proc(pp->port, rxq, dev, skb, rx_desc);
-				STAT_INFO(pp->stats.rx_special++);
+				if (pp->rx_special_proc(pp->port, rxq, dev, skb, rx_desc)) {
+					STAT_INFO(pp->stats.rx_special++);
 
-				/* Refill processing */
-				mv_eth_refill(ppool, bm, 0);
-				mvOsCacheLineInv(NULL, rx_desc);
-				continue;
+					/* Refill processing */
+					mv_eth_refill(ppool, bm, 0);
+					mvOsCacheLineInv(NULL, rx_desc);
+					continue;
+				}
 			}
 		}
 #endif /* CONFIG_MV_ETH_RX_SPECIAL */

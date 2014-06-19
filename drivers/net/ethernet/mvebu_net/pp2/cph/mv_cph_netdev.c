@@ -727,9 +727,10 @@ int cph_app_packet_tx(int port, struct net_device *dev, struct sk_buff *skb,
 *       None.
 *
 * RETURNS:
-*       None.
+*       1: the packet will be handled and forwarded to linux stack in CPH
+*       0: the packet will not be forwarded to linux stack and mv_eth_rx() needs to continue to handle it
 *******************************************************************************/
-void cph_rx_func(int port, int rxq, struct net_device *dev,
+int cph_rx_func(int port, int rxq, struct net_device *dev,
 		struct sk_buff *skb, struct pp2_rx_desc *rx_desc)
 {
 	MV_CPH_CLEAN_PRINT(CPH_DEBUG_LEVEL, "\n");
@@ -743,25 +744,27 @@ void cph_rx_func(int port, int rxq, struct net_device *dev,
 	if (mvPp2IsRxSpecial(rx_desc->parserInfo)) {
 		/* Receive application packets */
 		if (cph_app_packet_rx(port, dev, skb, rx_desc))
-			return;
+			return 1;
 		MV_CPH_PRINT(CPH_DEBUG_LEVEL, "Failed to receive application packet\n");
 
 		/* Handle the broadcast packet in case it is enabled */
 #ifdef CONFIG_MV_CPH_BC_HANDLE
 		if (cph_app_rx_bc(port, dev, skb, rx_desc))
-			return;
+			return 1;
 		MV_CPH_PRINT(CPH_DEBUG_LEVEL, "BC packet failure\n");
 #endif
 		/* deliver to upper layer */
 		MV_CPH_PRINT(CPH_DEBUG_LEVEL, "Deliver to upper layer\n");
 	} else {/* Handle received data flow packets */
 #ifdef CONFIG_MV_CPH_FLOW_MAP_HANDLE
-		if (cph_data_flow_rx(port, dev, skb, rx_desc))
+		if (cph_data_flow_rx(port, dev, skb, rx_desc)) {
 			MV_CPH_PRINT(CPH_DEBUG_LEVEL, "Flow mapping\n");
+			return 0;
+		}
 #endif
 	}
 
-	return;
+	return 0;
 }
 
 /******************************************************************************
