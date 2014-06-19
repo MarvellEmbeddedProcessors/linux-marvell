@@ -83,7 +83,7 @@ static MV_BOOL netaSetSpecialMcastAddr(int port, MV_U8 lastByte, int queue);
 static MV_BOOL netaSetOtherMcastAddr(int port, MV_U8 crc8, int queue);
 #endif /* CONFIG_MV_ETH_LEGACY_PARSER */
 
-static void mvNetaPortSgmiiConfig(int port);
+static void mvNetaPortSgmiiConfig(int port, MV_BOOL isInband);
 static MV_U8 *mvNetaDescrMemoryAlloc(MV_NETA_PORT_CTRL * pPortCtrl, int descSize,
 				   MV_ULONG *pPhysAddr, MV_U32 *memHandle);
 static void mvNetaDescrMemoryFree(MV_NETA_PORT_CTRL *pPortCtrl, MV_BUF_INFO *pDescBuf);
@@ -529,17 +529,45 @@ MV_STATUS       mvEthGmacRgmiiSet(int port, int enable)
 	return MV_OK;
 }
 
-static void mvNetaPortSgmiiConfig(int port)
+static void mvNetaPortSgmiiConfig(int port, MV_BOOL isInband)
 {
 	MV_U32 regVal;
+
 
 	regVal = MV_REG_READ(NETA_GMAC_CTRL_2_REG(port));
 	regVal |= (NETA_GMAC_PSC_ENABLE_MASK);
 	MV_REG_WRITE(NETA_GMAC_CTRL_2_REG(port), regVal);
+
+	if (isInband) {
+
+		/* set Inband AN enable in MAC Control 2 */
+		regVal = MV_REG_READ(NETA_GMAC_CTRL_2_REG(port));
+		regVal |= NETA_GMAC_INBAND_AN_MODE_MASK;
+		MV_REG_WRITE(NETA_GMAC_CTRL_2_REG(port), regVal);
+
+		/* set portType to SGMII (encoding) in MAC Control 0 */
+		regVal = MV_REG_READ(NETA_GMAC_CTRL_0_REG(port));
+		regVal &= ~NETA_GMAC_PORT_TYPE_MASK;
+		regVal |= NETA_GMAC_PORT_TYPE_SGMII;
+		MV_REG_WRITE(NETA_GMAC_CTRL_0_REG(port), regVal);
+
+		/* in case of SGMII mode enable InBand AutoNeg */
+		regVal = MV_REG_READ(NETA_GMAC_AN_CTRL_REG(port));
+		regVal &= ~NETA_ENABLE_FLOW_CONTROL_AUTO_NEG_MASK;
+		regVal |= NETA_INBAND_AN_EN_MASK;
+		MV_REG_WRITE(NETA_GMAC_AN_CTRL_REG(port), regVal);
+
+		/* Enable 1MS clock generation for SGMII */
+		regVal = MV_REG_READ(NETA_GMAC_CLOCK_DIVIDER_REG(port));
+		regVal |= NETA_GMAC_1MS_CLOCK_ENABLE_BIT_MASK;
+		MV_REG_WRITE(NETA_GMAC_CLOCK_DIVIDER_REG(port), regVal);
+
+	}
+
 }
 
 
-void mvNetaPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii)
+void mvNetaPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii, MV_BOOL isInband)
 {
 	MV_U32 regVal;
 
@@ -547,7 +575,7 @@ void mvNetaPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii)
 	MV_REG_WRITE(ETH_UNIT_INTR_CAUSE_REG(port), 0);
 
 	if (isSgmii)
-		mvNetaPortSgmiiConfig(port);
+		mvNetaPortSgmiiConfig(port, isInband);
 
 	mvEthGmacRgmiiSet(port, isRgmii);
 
@@ -990,7 +1018,7 @@ MV_STATUS           mvNetaGmacLpiSet(int port, int mode)
 
 #else	/* Old GMAC functions */
 
-static void mvNetaPortSgmiiConfig(int port)
+static void mvNetaPortSgmiiConfig(int port, MV_BOOL isInband)
 {
 	MV_U32 regVal;
 
@@ -1000,7 +1028,7 @@ static void mvNetaPortSgmiiConfig(int port)
 	MV_REG_WRITE(ETH_PORT_SERIAL_CTRL_1_REG(port), regVal);
 }
 
-void mvNetaPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii)
+void mvNetaPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii,  MV_BOOL isInband)
 {
 	MV_U32 regVal;
 
@@ -1009,7 +1037,7 @@ void mvNetaPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii)
 
 
 	if (isSgmii)
-		mvNetaPortSgmiiConfig(port);
+		mvNetaPortSgmiiConfig(port, isInband);
 
 	/* Cancel Port Reset */
 	regVal = MV_REG_READ(ETH_PORT_SERIAL_CTRL_1_REG(port));

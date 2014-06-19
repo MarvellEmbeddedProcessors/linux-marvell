@@ -571,6 +571,9 @@ extern int port_vbase[MV_ETH_MAX_PORTS];
 
 #define NETA_GMAC_CTRL_2_REG(p)             (NETA_REG_BASE(p) + 0x2C08)
 
+#define NETA_GMAC_INBAND_AN_MODE_BIT		0
+#define NETA_GMAC_INBAND_AN_MODE_MASK		(1 << NETA_GMAC_INBAND_AN_MODE_BIT)
+
 #define NETA_GMAC_PSC_ENABLE_BIT            3
 #define NETA_GMAC_PSC_ENABLE_MASK           (1 << NETA_GMAC_PSC_ENABLE_BIT)
 
@@ -588,6 +591,9 @@ extern int port_vbase[MV_ETH_MAX_PORTS];
 
 #define NETA_FORCE_LINK_PASS_BIT                1
 #define NETA_FORCE_LINK_PASS_MASK               (1 << NETA_FORCE_LINK_PASS_BIT)
+
+#define NETA_INBAND_AN_EN_BIT					2
+#define NETA_INBAND_AN_EN_MASK					(1 << NETA_INBAND_AN_EN_BIT)
 
 #define NETA_SET_MII_SPEED_100_BIT              5
 #define NETA_SET_MII_SPEED_100_MASK             (1 << NETA_SET_MII_SPEED_100_BIT)
@@ -643,6 +649,13 @@ extern int port_vbase[MV_ETH_MAX_PORTS];
 
 #define NETA_TX_FLOW_CTRL_ACTIVE_BIT        7
 #define NETA_TX_FLOW_CTRL_ACTIVE_MASK       (1 << NETA_TX_FLOW_CTRL_ACTIVE_BIT)
+/*-------------------------------------------------------------------------------*/
+
+#define NETA_GMAC_CLOCK_DIVIDER_REG(p)		(NETA_REG_BASE(p) + 0x24f4)
+
+#define NETA_GMAC_1MS_CLOCK_ENABLE_BIT		31
+#define NETA_GMAC_1MS_CLOCK_ENABLE_BIT_MASK	(1 << NETA_GMAC_1MS_CLOCK_ENABLE_BIT)
+
 /*-------------------------------------------------------------------------------*/
 
 #define NETA_GMAC_SERIAL_REG(p)             (NETA_REG_BASE(p) + 0x2C14)

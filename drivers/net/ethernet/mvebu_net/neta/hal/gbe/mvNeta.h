@@ -760,7 +760,7 @@ int 		mvNetaPhyAddrGet(int port);
 void		mvNetaPhyAddrPollingDisable(int port);
 
 void 		mvNetaPortPowerDown(int port);
-void 		mvNetaPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii);
+void		mvNetaPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii, MV_BOOL isInband);
 
 /* Interrupt Coalesting functions */
 MV_STATUS mvNetaRxqTimeCoalSet(int port, int rxq, MV_U32 uSec);
