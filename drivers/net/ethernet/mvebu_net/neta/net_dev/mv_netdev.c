@@ -3570,7 +3570,7 @@ int mv_eth_port_resume(int port)
 		printk(KERN_ERR "%s: port %d is not suspend.\n", __func__, port);
 		return MV_ERROR;
 	}
-	mvNetaPortPowerUp(port, pp->plat_data->is_sgmii, pp->plat_data->is_rgmii);
+	mvNetaPortPowerUp(port, pp->plat_data->is_sgmii, pp->plat_data->is_rgmii, (pp->plat_data->phy_addr == -1));
 
 	mv_eth_win_init(port);
 
@@ -4149,7 +4149,7 @@ static int mv_eth_probe(struct platform_device *pdev)
 
 	pr_info("port #%d: is_sgmii=%d, is_rgmii=%d, phy_addr=%d\n",
 		port, plat_data->is_sgmii, plat_data->is_rgmii, plat_data->phy_addr);
-	mvNetaPortPowerUp(port, plat_data->is_sgmii, plat_data->is_rgmii);
+	mvNetaPortPowerUp(port, plat_data->is_sgmii, plat_data->is_rgmii, (plat_data->phy_addr == -1));
 
 	mv_eth_win_init(port);
 
