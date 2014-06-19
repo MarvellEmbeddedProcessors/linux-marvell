@@ -351,7 +351,7 @@ endmenu
 menu "SoC CPH support"
 
 config  MV_CPH
-        bool "Support for Marvell CPU Packet Handler Driver"
+        tristate "Support for Marvell CPU Packet Handler Driver"
         depends on MV_ETH_TX_SPECIAL
         default n
         ---help---
