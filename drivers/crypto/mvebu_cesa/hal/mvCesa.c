@@ -3074,6 +3074,16 @@ static MV_STATUS mvCesaParamCheck(MV_CESA_SA *pSA, MV_CESA_COMMAND *pCmd, MV_U8 
 			}
 		}
 	}
+/*
+	if (fixOffset != 0) {
+		mvOsPrintf("%s: fixOffset = %d\n", __func__, fixOffset);
+		mvOsPrintf("macOff=%d digestOff=%d cryptoOff=%d ivOff=%d cryptoLen=%d cryptoBlockSize=%d mbufSize=%d\n",
+			pCmd->macOffset, pCmd->digestOffset, pCmd->cryptoOffset, pCmd->ivOffset,
+			pCmd->cryptoLength, pSA->cryptoBlockSize, pCmd->pSrc->mbufSize);
+	}
+*/
+	*pFixOffset = fixOffset;
+
 	return MV_OK;
 }
 
