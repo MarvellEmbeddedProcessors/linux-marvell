@@ -269,6 +269,11 @@
 				reg = <0x22000 0x1000>;
 			};
 
+			pm {
+				compatible = "marvell,armada-380-pm";
+				reg = <0x1400 0x310>, <0x18000 0x200>;
+			};
+
 			sata@a8000 {
 				compatible = "marvell,ahci-sata";
 				reg = <0xa8000 0x2000>;
