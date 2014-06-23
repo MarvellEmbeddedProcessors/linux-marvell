@@ -83,6 +83,9 @@ struct mv_neta_pdata {
 	/* Whether a PHY is present, and if yes, at which address. */
 	int      phy_addr;
 
+	/* Maximum packet size for L4 checksum generation */
+	int      tx_csum_limit;
+
 	/* Use this MAC address if it is valid */
 	u8       mac_addr[6];
 
@@ -95,12 +98,12 @@ struct mv_neta_pdata {
 	int      duplex;
 
 	/* Port configuration: indicates if this port is LB, and if PCS block is active */
-	int	     lb_enable;
-	int	     is_sgmii;
-	int	     is_rgmii;
+	int     lb_enable;
+	int     is_sgmii;
+	int     is_rgmii;
 
 	/* port interrupt line number */
-	int		 irq;
+	int     irq;
 
 	/*
 	* How many RX/TX queues to use.
