@@ -348,3 +348,28 @@ static void __init armada_380_timer_init(struct device_node *np)
 }
 CLOCKSOURCE_OF_DECLARE(armada_380, "marvell,armada-380-timer",
 		       armada_380_timer_init);
+
+#ifdef CONFIG_PM
+void armada_380_timer_resume(void)
+{
+	u32 clr = 0, set = 0;
+	int res;
+
+	if (timer25Mhz)
+		set = TIMER0_25MHZ;
+	else
+		clr = TIMER0_25MHZ;
+	timer_ctrl_clrset(clr, set);
+	local_timer_ctrl_clrset(clr, set);
+
+	/*
+	* Setup free-running clocksource timer (interrupts
+	* disabled).
+	*/
+	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
+	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
+
+	timer_ctrl_clrset(0, TIMER0_EN | TIMER0_RELOAD_EN |
+			TIMER0_DIV(TIMER_DIVIDER_SHIFT));
+}
+#endif
