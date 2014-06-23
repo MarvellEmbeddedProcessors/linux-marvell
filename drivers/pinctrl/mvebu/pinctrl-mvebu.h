@@ -188,5 +188,7 @@ struct mvebu_pinctrl_soc_info {
 
 int mvebu_pinctrl_probe(struct platform_device *pdev);
 int mvebu_pinctrl_remove(struct platform_device *pdev);
+int mvebu_pinctrl_suspend(struct platform_device *pdev, pm_message_t state);
+int mvebu_pinctrl_resume(struct platform_device *pdev);
 
 #endif

@@ -436,6 +436,10 @@ static struct platform_driver armada_38x_pinctrl_driver = {
 	},
 	.probe = armada_38x_pinctrl_probe,
 	.remove = armada_38x_pinctrl_remove,
+#ifdef CONFIG_PM
+	.suspend = mvebu_pinctrl_suspend,
+	.resume = mvebu_pinctrl_resume,
+#endif
 };
 
 module_platform_driver(armada_38x_pinctrl_driver);

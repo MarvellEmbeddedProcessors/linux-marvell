@@ -30,6 +30,10 @@
 #define MPP_BITS	4
 #define MPP_MASK	0xf
 
+#define PINCTRL_REGS_SAVE_NUM	10
+
+static u32 pinctrl_save[PINCTRL_REGS_SAVE_NUM];
+
 struct mvebu_pinctrl_function {
 	const char *name;
 	const char **groups;
@@ -759,3 +763,33 @@ int mvebu_pinctrl_remove(struct platform_device *pdev)
 	pinctrl_unregister(pctl->pctldev);
 	return 0;
 }
+
+#ifdef CONFIG_PM
+int mvebu_pinctrl_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct mvebu_pinctrl *pctl = platform_get_drvdata(pdev);
+	int reg;
+
+	if (!pctl)
+		return -EINVAL;
+
+	for (reg = 0; reg < PINCTRL_REGS_SAVE_NUM; reg++)
+		pinctrl_save[reg] = readl_relaxed(pctl->base + reg * 0x4);
+
+	return 0;
+}
+
+int mvebu_pinctrl_resume(struct platform_device *pdev)
+{
+	struct mvebu_pinctrl *pctl = platform_get_drvdata(pdev);
+	int reg;
+
+	if (!pctl)
+		return -EINVAL;
+
+	for (reg = 0; reg < PINCTRL_REGS_SAVE_NUM; reg++)
+		writel_relaxed(pinctrl_save[reg], pctl->base + reg * 0x4);
+
+	return 0;
+}
+#endif
