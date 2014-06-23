@@ -39,6 +39,124 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
 	b	cpu_resume
 ENDPROC(armada_38x_cpu_resume)
 
+ENTRY(armada_38x_cpu_mem_resume)
+
+	/* Disable MMU that was enabled in bootROM */
+	mrc  p15, 0, r1, c1, c0, 0
+	bic  r1, #0x1
+	mcr  p15, 0, r1, c1, c0, 0
+
+	/* Unlock L2 from being used as SRAM */
+	ldr     r0, =0xd0008000
+	mov	r1, #0x0
+	str	r1,[r0, #0x900]		/* @Data lock */
+	str	r1,[r0, #0x904]		/* @Instruction lock */
+	str	r1,[r0, #0x100]		/* @Instruction lock */
+
+	/* Disable open MBUS window @ 0xF0000000 */
+	mov  r1, #0
+	ldr  r0, =0xD00200B0
+	str  r1, [r0]
+
+	/* Restore internal registers Base address @ 0xF1000000 */
+	ldr  r1, =0xf1000000
+	ldr  r0, =0xD0020080
+	str  r1, [r0]
+
+	/* Update SCU offset CP15 register */
+	ldr  r2, = 0xC000		/* SCU offset = 0xC000 */
+	add  r1, r1, r2			/* r1 = INTER_REG_BASE + SCU_OFFSET */
+	mcr  p15, 4, r1, c15, c0, 0 	/* Write SCU base register */
+
+	b	armada_38x_cpu_resume
+
+ENDPROC(armada_38x_cpu_mem_resume)
+
+#define GPIO_32_47_DATA_OUT_EN_CTRL_REG_ADDR	(0x144)	/* 0x18144 */
+#define GPIO_32_47_DATA_OUT_REG_ADDR		(0x140) /* 0x18140 */
+#define GPIO_CMD_VALUE				(0x8000)
+#define GPIO_PIN_MASK				(0xFFFF7FFF)
+#define SDRAM_DLB_EVICT_OFFS_REG		(0x30C)	/* 0x170C */
+#define SDRAM_OPERATION_REG			(0x18)	/* 0x1418 */
+#define SDRAM_CONFIG_REG			(0x00)	/* 0x1400 */
+
+ENTRY(enter_mem_suspend)
+	/* Save ARM registers */
+	stmfd	sp!, {r4-r12, lr}		@ save registers on stack
+	/*
+	* Issue a Data Synchronization Barrier instruction to ensure
+	* that all state saving has been completed.
+	*/
+	dsb
+
+	/* Flush the DLB and wait ~7 usec */
+	/* Clear bits 7:0 in 'DLB Eviction Control Register', 0x170C */
+	/* Flush the DLB and wait ~7 usec*/
+	ldr r2, =SDRAM_DLB_EVICT_OFFS_REG
+	orr	r2, r2, r0
+	ldr	r3, [r2]
+	bic     r3, #0x000000FF
+	str     r3, [r2]
+
+	/* Wait ~7 us */
+	ldr r2, = 6000  /* WC freq =  1.6 Ghz, 2 cycles per loop */
+1:	subs r2,r2,#1
+	bne 1b
+
+	/* Set DRAM in battery backup mode */
+	/* Clear bit 24 in 'SDRAM Configuration Register', 0x1400 */
+	ldr 	r2, =SDRAM_CONFIG_REG
+	orr	r2, r2, r0
+	ldr	r3, [r2]
+	bic     r3, #0x01000000
+	str     r3, [r2]
+
+	/* Prepare to go to self-refresh */
+	/* Involves writing 0x7 to 'SDRAM Operation Register', 0x1418 */
+	ldr	r2, =(SDRAM_OPERATION_REG)
+	orr	r2, r2, r0
+	ldr	r3, [r2]
+	ldr	r4, =0x00000007
+	orr	r3, r3, r4
+
+	/* Configure GPIOs 47 for communicating with PIC */
+	/* Prepare value for GPIO 47 */
+	ldr r4, =(GPIO_32_47_DATA_OUT_REG_ADDR)
+	orr r4, r4, r1
+	ldr r5, =(GPIO_PIN_MASK)
+	ldr r6, =(GPIO_CMD_VALUE)
+	ldr r7, [r4]
+	and r7, r7, r5
+	orr r7, r7, r6
+
+	/* Set GPIO 47 as out */
+	ldr r0, =(GPIO_32_47_DATA_OUT_EN_CTRL_REG_ADDR)
+	orr r0, r0, r1
+	ldr r6, [r0]
+	and r6, r6, r5
+	str r6, [r0]
+
+	/*
+	 * Put Dram into self refresh. From here on we can perform
+	 * 8 instructions to ensure execution from I-Cache
+	 */
+	.align 5
+	/* Enter self-refresh */
+	str	r3, [r2]
+
+	/* Wait 100 cycles for DDR to enter self refresh */
+	ldr r1, = 50
+1:	subs r1,r1,#1
+	bne 1b
+
+	/* Issue the cmd ack. This will turn of the board */
+	str r7, [r4]
+
+	/* trap the processor */
+	b .
+	/* Wait a while */
+ENDPROC(enter_mem_suspend)
+
 .global mvebu_boot_wa_start
 .global mvebu_boot_wa_end
 

@@ -39,7 +39,7 @@ static struct of_device_id of_scu_table[] = {
 
 #define SCU_CTRL		0x00
 
-static void armada_380_scu_enable(void)
+void armada_380_scu_enable(void)
 {
 	u32 scu_ctrl;
 
