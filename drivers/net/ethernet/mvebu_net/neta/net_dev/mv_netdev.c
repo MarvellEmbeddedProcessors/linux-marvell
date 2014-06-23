@@ -161,10 +161,8 @@ static int mv_eth_rxq_fill(struct eth_port *pp, int rxq, int num);
 static void mv_eth_config_show(void);
 static int  mv_eth_priv_init(struct eth_port *pp, int port);
 static void mv_eth_priv_cleanup(struct eth_port *pp);
-static int  mv_eth_config_get(struct platform_device *pdev, u8 *mac);
 static int  mv_eth_hal_init(struct eth_port *pp);
-struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
-					struct platform_device *pdev);
+struct net_device *mv_eth_netdev_init(struct platform_device *pdev);
 static void mv_eth_netdev_init_features(struct net_device *dev);
 
 static MV_STATUS mv_eth_pool_create(int pool, int capacity);
@@ -1055,11 +1053,13 @@ static netdev_features_t mv_eth_netdev_fix_features(struct net_device *dev, netd
 #endif
 {
 #ifdef CONFIG_MV_ETH_TX_CSUM_OFFLOAD
-	if (dev->mtu > MV_ETH_TX_CSUM_MAX_SIZE) {
+	struct eth_port *pp = MV_ETH_PRIV(dev);
+
+	if (dev->mtu > pp->plat_data->tx_csum_limit) {
 		if (features & (NETIF_F_IP_CSUM | NETIF_F_TSO)) {
 			features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
 			printk(KERN_ERR "%s: NETIF_F_IP_CSUM and NETIF_F_TSO not supported for mtu larger %d bytes\n",
-					dev->name, MV_ETH_TX_CSUM_MAX_SIZE);
+					dev->name, pp->plat_data->tx_csum_limit);
 		}
 	}
 #endif /* CONFIG_MV_ETH_TX_CSUM_OFFLOAD */
@@ -3273,19 +3273,18 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 {
 	u32 port;
 	struct eth_port *pp;
-	int mtu, err = 0;
+	int err = 0;
 	struct net_device *dev;
 	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
-	u8 mac[MV_MAC_ADDR_SIZE];
 
 	port = pdev->id;
+	if (plat_data->tx_csum_limit == 0)
+		plat_data->tx_csum_limit = MV_ETH_TX_CSUM_MAX_SIZE;
 
-	printk(KERN_ERR "  o Loading network interface(s) for port #%d: cpu_mask=0x%x, mtu=%d\n",
-			port, plat_data->cpu_mask, plat_data->mtu);
+	pr_info("  o Loading network interface(s) for port #%d: cpu_mask=0x%x, tx_csum_limit=%d\n",
+			port, plat_data->cpu_mask, plat_data->tx_csum_limit);
 
-	mac_src[port] = "platform";
-	mtu = mv_eth_config_get(pdev, mac);
-	dev = mv_eth_netdev_init(mtu, mac, pdev);
+	dev = mv_eth_netdev_init(pdev);
 
 	if (!dev) {
 		printk(KERN_ERR "%s: can't create netdevice\n", __func__);
@@ -3295,8 +3294,6 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 
 	pp = (struct eth_port *)netdev_priv(dev);
 
-	pp->plat_data = plat_data;
-	pp->cpu_mask = plat_data->cpu_mask;
 	mv_eth_ports[port] = pp;
 
 	/* set port's speed, duplex, fc */
@@ -3340,7 +3337,7 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 #endif /* CONFIG_MV_ETH_PMT */
 
 	pr_info("\t%s p=%d: mtu=%d, mac=" MV_MACQUAD_FMT " (%s)\n",
-		MV_PON_PORT(port) ? "pon" : "giga", port, mtu, MV_MACQUAD(mac), mac_src[port]);
+		MV_PON_PORT(port) ? "pon" : "giga", port, dev->mtu, MV_MACQUAD(dev->dev_addr), mac_src[port]);
 
 	handle_group_affinity(port);
 
@@ -4020,7 +4017,7 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 		return NULL;
 	}
 
-	plat_data = kmalloc(sizeof(struct mv_neta_pdata), GFP_KERNEL);
+	plat_data = kzalloc(sizeof(struct mv_neta_pdata), GFP_KERNEL);
 	if (plat_data == NULL) {
 		pr_err("could not allocate memory for plat_data\n");
 		return NULL;
@@ -4078,6 +4075,9 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 		pr_err("could not get MTU\n");
 		return NULL;
 	}
+	/* Get TX checksum offload limit */
+	if (of_property_read_u32(np, "tx_csum_limit", &plat_data->tx_csum_limit))
+		plat_data->tx_csum_limit = MV_ETH_TX_CSUM_MAX_SIZE;
 
 	/* Get port PHY mode */
 	phy_mode = of_get_phy_mode(np);
@@ -4131,6 +4131,14 @@ static int mv_eth_probe(struct platform_device *pdev)
 	pdev->dev.platform_data = plat_data;
 #else
 	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
+	struct resource *res;
+
+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	if (res == NULL) {
+		pr_err("could not get IRQ number\n");
+		return -ENODEV;
+	}
+	plat_data->irq = res->start;
 #endif /* CONFIG_OF */
 
 	if (plat_data == NULL)
@@ -4161,16 +4169,6 @@ static int mv_eth_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int mv_eth_config_get(struct platform_device *pdev, MV_U8 *mac_addr)
-{
-	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
-
-	if ((mac_addr) && (is_valid_ether_addr(plat_data->mac_addr)))
-		memcpy(mac_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
-
-	return plat_data->mtu;
-}
-
 /***********************************************************
  * mv_eth_tx_timeout --                                    *
  *   nothing to be done (?)                                *
@@ -4190,17 +4188,14 @@ static void mv_eth_tx_timeout(struct net_device *dev)
  * mv_eth_netdev_init -- Allocate and initialize net_device    *
  *                   structure                                 *
  ***************************************************************/
-struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
-				struct platform_device *pdev)
+struct net_device *mv_eth_netdev_init(struct platform_device *pdev)
 {
 	int cpu, i;
 	struct net_device *dev;
 	struct eth_port *pp;
 	struct cpu_ctrl	*cpuCtrl;
 	int port = pdev->id;
-#ifdef CONFIG_OF
 	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
-#endif
 
 	dev = alloc_etherdev_mq(sizeof(struct eth_port), CONFIG_MV_ETH_TXQ);
 	if (!dev)
@@ -4212,29 +4207,30 @@ struct net_device *mv_eth_netdev_init(int mtu, u8 *mac,
 
 	memset(pp, 0, sizeof(struct eth_port));
 	pp->dev = dev;
+	pp->plat_data = plat_data;
+	pp->cpu_mask = plat_data->cpu_mask;
 
-	dev->mtu = mtu;
-#ifdef CONFIG_OF
-	dev->irq = plat_data->irq;
+	dev->mtu = plat_data->mtu;
 
 	if (!is_valid_ether_addr(plat_data->mac_addr)) {
-		mv_eth_get_mac_addr(port, mac);
-		if (is_valid_ether_addr(mac)) {
-			memcpy(plat_data->mac_addr, mac, MV_MAC_ADDR_SIZE);
+		mv_eth_get_mac_addr(port, plat_data->mac_addr);
+		if (is_valid_ether_addr(plat_data->mac_addr)) {
 			memcpy(dev->dev_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
 			mac_src[port] = "hw config";
 		} else {
+#ifdef CONFIG_OF
 			eth_hw_addr_random(dev);
 			mac_src[port] = "random";
+#else
+			memset(dev->dev_addr, 0, MV_MAC_ADDR_SIZE);
+			mac_src[port] = "invalid";
+#endif /* CONFIG_OF */
 		}
 	} else {
 		memcpy(dev->dev_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
 		mac_src[port] = "platform";
 	}
-#else
-	dev->irq = NET_TH_RXTX_IRQ_NUM(port);
-	memcpy(dev->dev_addr, mac, MV_MAC_ADDR_SIZE);
-#endif /* CONFIG_OF */
+	dev->irq = plat_data->irq;
 
 	dev->tx_queue_len = CONFIG_MV_ETH_TXQ_DESC;
 	dev->watchdog_timeo = 5 * HZ;
@@ -6657,11 +6653,11 @@ static void mv_eth_shutdown(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_OF
-static const struct of_device_id mvneta_match[] = {
+static const struct of_device_id mv_neta_match[] = {
 	{ .compatible = "marvell,neta" },
 	{ }
 };
-MODULE_DEVICE_TABLE(of, mvneta_match);
+MODULE_DEVICE_TABLE(of, mv_neta_match);
 
 static int mv_eth_port_num_get(struct platform_device *pdev)
 {
@@ -6669,8 +6665,8 @@ static int mv_eth_port_num_get(struct platform_device *pdev)
 	int tbl_id;
 	struct device_node *np = pdev->dev.of_node;
 
-	for (tbl_id = 0; tbl_id < (sizeof(mvneta_match) / sizeof(struct of_device_id)); tbl_id++) {
-		for_each_compatible_node(np, NULL, mvneta_match[tbl_id].compatible)
+	for (tbl_id = 0; tbl_id < (sizeof(mv_neta_match) / sizeof(struct of_device_id)); tbl_id++) {
+		for_each_compatible_node(np, NULL, mv_neta_match[tbl_id].compatible)
 			port_num++;
 	}
 
@@ -6689,7 +6685,7 @@ static struct platform_driver mv_eth_driver = {
 	.driver = {
 		.name = MV_NETA_PORT_NAME,
 #ifdef CONFIG_OF
-		.of_match_table = mvneta_match,
+		.of_match_table = mv_neta_match,
 #endif /* CONFIG_OF */
 	},
 };
