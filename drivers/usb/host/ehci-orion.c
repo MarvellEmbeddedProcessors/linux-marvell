@@ -60,6 +60,9 @@ static const char hcd_name[] = "ehci-orion";
 
 static struct hc_driver __read_mostly ehci_orion_hc_driver;
 
+static u32 usb_save[(USB_IPG - USB_CAUSE) +
+		    (USB_PHY_TST_GRP_CTRL - USB_PHY_PWR_CTRL)];
+
 /*
  * Implement Orion USB controller specification guidelines
  */
@@ -308,6 +311,77 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int ehci_orion_drv_suspend(struct platform_device *pdev,
+				  pm_message_t state)
+{
+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+
+	int addr, i;
+
+	for (addr = USB_CAUSE, i = 0; addr <= USB_IPG; addr += 0x4, i++)
+		usb_save[i] = readl_relaxed(hcd->regs + addr);
+
+	for (addr = USB_PHY_PWR_CTRL; addr <= USB_PHY_TST_GRP_CTRL;
+	     addr += 0x4, i++)
+		usb_save[i] = readl_relaxed(hcd->regs + addr);
+
+	return 0;
+}
+
+#define MV_USB_CORE_CMD_RESET_BIT           1
+#define MV_USB_CORE_CMD_RESET_MASK          (1 << MV_USB_CORE_CMD_RESET_BIT)
+#define MV_USB_CORE_MODE_OFFSET                 0
+#define MV_USB_CORE_MODE_MASK                   (3 << MV_USB_CORE_MODE_OFFSET)
+#define MV_USB_CORE_MODE_HOST                   (3 << MV_USB_CORE_MODE_OFFSET)
+#define MV_USB_CORE_MODE_DEVICE                 (2 << MV_USB_CORE_MODE_OFFSET)
+#define MV_USB_CORE_CMD_RUN_BIT             0
+#define MV_USB_CORE_CMD_RUN_MASK            (1 << MV_USB_CORE_CMD_RUN_BIT)
+
+static int ehci_orion_drv_resume(struct platform_device *pdev)
+{
+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+	int addr, regVal, i;
+
+	for (addr = USB_CAUSE, i = 0; addr <= USB_IPG; addr += 0x4, i++)
+		writel_relaxed(usb_save[i], hcd->regs + addr);
+
+	for (addr = USB_PHY_PWR_CTRL; addr <= USB_PHY_TST_GRP_CTRL;
+	     addr += 0x4, i++)
+		writel_relaxed(usb_save[i], hcd->regs + addr);
+
+	/* Clear Interrupt Cause and Mask registers */
+	writel_relaxed(0, hcd->regs + 0x310);
+	writel_relaxed(0, hcd->regs + 0x314);
+
+	/* Reset controller */
+	regVal = readl_relaxed(hcd->regs + 0x140);
+	writel_relaxed(regVal | MV_USB_CORE_CMD_RESET_MASK, hcd->regs + 0x140);
+	while (readl_relaxed(hcd->regs + 0x140) & MV_USB_CORE_CMD_RESET_MASK)
+		;
+
+	/* Set Mode register (Stop and Reset USB Core before) */
+	/* Stop the controller */
+	regVal = readl_relaxed(hcd->regs + 0x140);
+	regVal &= ~MV_USB_CORE_CMD_RUN_MASK;
+	writel_relaxed(regVal, hcd->regs + 0x140);
+
+	/* Reset the controller to get default values */
+	regVal = readl_relaxed(hcd->regs + 0x140);
+	regVal |= MV_USB_CORE_CMD_RESET_MASK;
+	writel_relaxed(regVal, hcd->regs + 0x140);
+
+	/* Wait for the controller reset to complete */
+	do {
+		regVal = readl_relaxed(hcd->regs + 0x140);
+	} while (regVal & MV_USB_CORE_CMD_RESET_MASK);
+
+	/* Set USB_MODE register */
+	regVal = MV_USB_CORE_MODE_HOST;
+	writel_relaxed(regVal, hcd->regs + 0x1A8);
+
+	return 0;
+}
+
 static void ehci_orion_drv_shutdown(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
@@ -339,6 +413,10 @@ MODULE_DEVICE_TABLE(of, ehci_orion_dt_ids);
 static struct platform_driver ehci_orion_driver = {
 	.probe		= ehci_orion_drv_probe,
 	.remove		= ehci_orion_drv_remove,
+#ifdef CONFIG_PM
+	.suspend        = ehci_orion_drv_suspend,
+	.resume         = ehci_orion_drv_resume,
+#endif
 	.shutdown	= ehci_orion_drv_shutdown,
 	.driver = {
 		.name	= "orion-ehci",
