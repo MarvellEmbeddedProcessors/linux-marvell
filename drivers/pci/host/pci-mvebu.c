@@ -64,6 +64,11 @@
  * bridge.
  */
 #define MARVELL_EMULATED_PCI_PCI_BRIDGE_ID 0x7846
+#define MVEBU_MAX_PCIE_PORTS	0x4
+
+static u32 nports;
+static u32 mbus_pcie_save[MVEBU_MAX_PCIE_PORTS];
+struct mvebu_pcie_port *port_bak[MVEBU_MAX_PCIE_PORTS];
 
 /* PCI configuration space of a PCI-to-PCI bridge */
 struct mvebu_sw_pci_bridge {
@@ -217,7 +222,7 @@ static void __init mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
 	       port->base + PCIE_BAR_CTRL_OFF(1));
 }
 
-static void __init mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
 {
 	u16 cmd;
 	u32 mask;
@@ -932,9 +937,11 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
 		port->dn = child;
 		spin_lock_init(&port->conf_lock);
 		mvebu_sw_pci_bridge_init(port);
+		port_bak[i] = port;
 		i++;
 	}
 
+	nports = i;
 	pcie->nports = i;
 	mvebu_pcie_msi_enable(pcie);
 	mvebu_pcie_enable(pcie);
@@ -967,6 +974,26 @@ static int __init mvebu_pcie_init(void)
 }
 
 subsys_initcall(mvebu_pcie_init);
+
+#ifdef CONFIG_PM
+void mvebu_pcie_suspend(void)
+{
+	int i;
+
+	for (i = 0; i < nports; i++)
+		mbus_pcie_save[i] = (readl(port_bak[i]->base + PCIE_STAT_OFF));
+}
+
+void mvebu_pcie_resume(void)
+{
+	int i;
+
+	for (i = 0; i < nports; i++) {
+		writel_relaxed(mbus_pcie_save[i], port_bak[i]->base + PCIE_STAT_OFF);
+		mvebu_pcie_setup_hw(port_bak[i]);
+	}
+}
+#endif
 
 MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
 MODULE_DESCRIPTION("Marvell EBU PCIe driver");

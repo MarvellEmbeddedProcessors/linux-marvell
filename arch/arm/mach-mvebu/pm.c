@@ -40,6 +40,9 @@ extern void mvebu_mbus_resume(void);
 extern void armada_370_xp_mpic_suspend(void);
 extern void armada_370_xp_mpic_resume(void);
 extern int armada_38x_cpuidle_init(void);
+extern void mvebu_pcie_suspend(void);
+extern void mvebu_pcie_resume(void);
+
 /*
  * Store boot information used by bin header
  */
@@ -114,6 +117,7 @@ static int mvebu_pm_enter(suspend_state_t state)
 
 	armada_store_boot_info();
 
+	mvebu_pcie_suspend();
 	mvebu_mbus_suspend();
 	armada_370_xp_mpic_suspend();
 
@@ -125,6 +129,7 @@ static int mvebu_pm_enter(suspend_state_t state)
 	armada_370_xp_mpic_resume();
 	mvebu_mbus_resume();
 	armada_380_timer_resume();
+	mvebu_pcie_resume();
 
 	cpu_cluster_pm_exit();
 	cpu_pm_exit();
