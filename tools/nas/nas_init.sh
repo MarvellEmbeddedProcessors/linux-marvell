@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 5.0"
+echo " * Version: 5.1"
 
 # LOG:
+# 5.1:
+#   1. add mkfs.btrfs the -f flag
 # 5.0:
 #   1. remove btrfs disabling use of strict allocate in smb.conf
 # 4.9:
@@ -417,7 +419,7 @@ function create_fs {
 	    ;;
         xfs) mkfs.xfs -f $3
 	    ;;
-        btrfs) mkfs.btrfs $3
+        btrfs) mkfs.btrfs -f $3
 	    ;;
 	*) do_error "unsupported filesystem $1\n"
 	    ;;
