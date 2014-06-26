@@ -2154,7 +2154,7 @@ static inline int mv_eth_tso_validate(struct sk_buff *skb, struct net_device *de
 	return 0;
 }
 
-static inline int mv_eth_tso_build_hdr_desc(struct eth_port *pp, struct neta_tx_desc *tx_desc, struct eth_port *priv,
+static inline int mv_eth_tso_build_hdr_desc(struct eth_port *pp, struct neta_tx_desc *tx_desc,
 					     struct sk_buff *skb,
 					     struct tx_queue *txq_ctrl, u16 *mh, int hdr_len, int size,
 					     MV_U32 tcp_seq, MV_U16 ip_id, int left_len)
@@ -2164,7 +2164,7 @@ static inline int mv_eth_tso_build_hdr_desc(struct eth_port *pp, struct neta_tx_
 	MV_U8 *data, *mac;
 	int mac_hdr_len = skb_network_offset(skb);
 
-	data = mv_eth_extra_pool_get(priv);
+	data = mv_eth_extra_pool_get(pp);
 	if (!data)
 		return 0;
 
@@ -2206,7 +2206,7 @@ static inline int mv_eth_tso_build_hdr_desc(struct eth_port *pp, struct neta_tx_
 	tx_desc->command = mvNetaTxqDescCsum(mac_hdr_len, skb->protocol, ((u8 *)tcph - (u8 *)iph) >> 2, IPPROTO_TCP);
 	tx_desc->command |= NETA_TX_F_DESC_MASK;
 
-	tx_desc->bufPhysAddr = mvOsCacheFlush(priv->dev->dev.parent, data, tx_desc->dataSize);
+	tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, data, tx_desc->dataSize);
 	mv_eth_shadow_inc_put(txq_ctrl);
 
 	mv_eth_tx_desc_flush(pp, tx_desc);
@@ -2327,7 +2327,7 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 		if (tx_spec->flags & MV_ETH_F_MH)
 			mh = &priv->tx_mh;
 		/* prepare packet headers: MAC + IP + TCP */
-		size = mv_eth_tso_build_hdr_desc(priv, tx_desc, priv, skb, txq_ctrl, mh,
+		size = mv_eth_tso_build_hdr_desc(priv, tx_desc, skb, txq_ctrl, mh,
 					hdr_len, data_left, tcp_seq, ip_id, total_len);
 		if (size == 0)
 			goto outNoTxDesc;
