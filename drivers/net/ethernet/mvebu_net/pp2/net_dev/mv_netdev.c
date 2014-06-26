@@ -2998,6 +2998,7 @@ irqreturn_t mv_eth_isr(int irq, void *dev_id)
 	int cpu = smp_processor_id();
 	struct napi_group_ctrl *napi_group = pp->cpu_config[cpu]->napi_group;
 	struct napi_struct *napi = napi_group->napi;
+	u32 imr;
 
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
 	if (pp->dbg_flags & MV_ETH_F_DBG_ISR) {
@@ -3024,6 +3025,13 @@ irqreturn_t mv_eth_isr(int irq, void *dev_id)
 			__func__, irq, pp->port, cpu, napi_group->cpu_mask);
 #endif /* CONFIG_MV_ETH_DEBUG_CODE */
 	}
+
+	/*
+	 * Ensure mask register write is completed by issuing a read.
+	 * dsb() instruction cannot be used on registers since they are in
+	 * MBUS domain
+	 */
+	imr = mvPp2RdReg(MV_PP2_ISR_ENABLE_REG(pp->port));
 
 	return IRQ_HANDLED;
 }
