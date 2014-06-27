@@ -172,9 +172,10 @@ void mvGmacPortResetSet(int port, MV_BOOL setReset)
 
 	MV_REG_WRITE(ETH_GMAC_CTRL_2_REG(port), regVal);
 
-	if (setReset == MV_FALSE)
-		while (MV_REG_READ(ETH_GMAC_CTRL_2_REG(port) &
-		       ETH_GMAC_PORT_RESET_MASK));
+	if (setReset == MV_FALSE) {
+		while (MV_REG_READ(ETH_GMAC_CTRL_2_REG(port)) & ETH_GMAC_PORT_RESET_MASK)
+			;
+	}
 }
 
 void mvGmacPortPowerUp(int port, MV_BOOL isSgmii, MV_BOOL isRgmii)
