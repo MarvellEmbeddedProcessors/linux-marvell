@@ -723,13 +723,13 @@ static inline int mv_pp2_aggr_desc_num_check(struct aggr_tx_queue *aggr_txq_ctrl
 	return 0;
 }
 
-static inline void mv_pp2_tx_desc_flush(struct pp2_tx_desc *tx_desc)
+static inline void mv_pp2_tx_desc_flush(struct eth_port *pp, struct pp2_tx_desc *tx_desc)
 {
 #if defined(MV_CPU_BE)
 	mvPPv2TxqDescSwap(tx_desc);
 #endif /* MV_CPU_BE */
 
-	mvOsCacheLineFlush(NULL, tx_desc);
+	mvOsCacheLineFlush(pp->dev->dev.parent, tx_desc);
 }
 
 static inline void *mv_pp2_extra_pool_get(struct eth_port *pp)
@@ -954,7 +954,7 @@ int	    mv_pp2_ctrl_txq_size_set(int port, int txp, int txq, int txq_size);
 int         mv_pp2_ctrl_txq_limits_set(int port, int txp, int txq, int hwf_size, int swf_size);
 int         mv_pp2_ctrl_txq_chunk_set(int port, int txp, int txq, int chunk_size);
 int         mv_pp2_ctrl_rxq_size_set(int port, int rxq, int value);
-int	    mv_pp2_ctrl_pool_buf_num_set(int pool, int buf_num);
+int	    mv_pp2_ctrl_pool_buf_num_set(int port, int pool, int buf_num);
 int         mv_pp2_ctrl_pool_detach(int port, struct bm_pool *ppool);
 int         mv_pp2_ctrl_pool_size_set(int pool, int pkt_size);
 int	    mv_pp2_ctrl_long_pool_set(int port, int pool);
@@ -964,7 +964,7 @@ int	    mv_pp2_ctrl_hwf_short_pool_set(int port, int pool);
 int     mv_pp2_ctrl_set_poll_rx_weight(int port, u32 weight);
 int     mv_pp2_ctrl_pool_port_map_get(int pool);
 void        mv_pp2_tx_desc_print(struct pp2_tx_desc *desc);
-void        mv_pp2_pkt_print(struct eth_pbuf *pkt);
+void        mv_pp2_pkt_print(struct eth_port *pp, struct eth_pbuf *pkt);
 void        mv_pp2_rx_desc_print(struct pp2_rx_desc *desc);
 void        mv_pp2_skb_print(struct sk_buff *skb);
 void        mv_pp2_eth_link_status_print(int port);
@@ -1011,13 +1011,11 @@ void        mv_pp2_rx_special_proc_func(int port, int (*func)(int port, int rxq,
 
 int  mv_pp2_poll(struct napi_struct *napi, int budget);
 void mv_pp2_link_event(struct eth_port *pp, int print);
-
 int mv_pp2_rx_policy(u32 cause);
-int mv_pp2_refill(struct bm_pool *ppool, __u32 bm, int is_recycle);
+int mv_pp2_refill(struct eth_port *pp, struct bm_pool *ppool, __u32 bm, int is_recycle);
 u32 mv_pp2_txq_done(struct eth_port *pp, struct tx_queue *txq_ctrl);
 u32 mv_pp2_tx_done_gbe(struct eth_port *pp, u32 cause_tx_done, int *tx_todo);
 u32 mv_pp2_tx_done_pon(struct eth_port *pp, int *tx_todo);
-
 
 /*****************************************
  *            NAPI Group API             *

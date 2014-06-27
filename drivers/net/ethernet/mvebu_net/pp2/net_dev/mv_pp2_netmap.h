@@ -116,7 +116,7 @@ static int mv_pp2_netmap_reg(struct ifnet *ifp, int onoff)
 
 		MV_ETH_UNLOCK(&adapter->pool_long->lock, flags);
 		printk(KERN_ERR "NETMAP: free %d buffers from pool %d\n", i, adapter->pool_long->pool);
-		mv_pp2_pool_add(adapter->pool_long->pool, pool_buf_num[adapter->pool_long->pool]);
+		mv_pp2_pool_add(adapter, adapter->pool_long->pool, pool_buf_num[adapter->pool_long->pool]);
 
 		/* set port's short pool for Linux driver */
 		for (rxq = 0; rxq < CONFIG_MV_PP2_RXQ; rxq++)
@@ -199,7 +199,7 @@ mv_pp2_netmap_txsync(struct ifnet *ifp, u_int ring_nr, int do_lock)
 			tx_desc->dataSize = len;
 			tx_desc->pktOffset = slot->data_offs;
 			tx_desc->command = PP2_TX_L4_CSUM_NOT | PP2_TX_F_DESC_MASK | PP2_TX_L_DESC_MASK;
-			mv_pp2_tx_desc_flush(tx_desc);
+			mv_pp2_tx_desc_flush(adapter, tx_desc);
 			aggr_txq_ctrl->txq_count++;
 
 			if (slot->flags & NS_BUF_CHANGED)

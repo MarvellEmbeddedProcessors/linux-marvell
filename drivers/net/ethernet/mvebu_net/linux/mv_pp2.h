@@ -102,6 +102,12 @@ struct mv_pp2_pdata {
 	int      speed;
 	int      duplex;
 
+	int	     is_sgmii;
+	int	     is_rgmii;
+
+	/* port interrupt line number */
+	int		 irq;
+
 	/*
 	* How many RX/TX queues to use.
 	*/

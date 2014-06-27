@@ -722,7 +722,7 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 
 	tx_desc->bufCookie = (MV_U32)skb;
 	tx_desc->bufPhysAddr = mvOsCacheFlush(NULL, skb->head, tx_desc->dataSize);
-	mv_pp2_tx_desc_flush(tx_desc);
+	mv_pp2_tx_desc_flush(pp, tx_desc);
 
 	/* TODO - XOR ready check */
 
