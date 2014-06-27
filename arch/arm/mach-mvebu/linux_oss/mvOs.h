@@ -346,6 +346,17 @@ extern int reg_arry_index;
 	(MV_MEMIO32_READ((INTER_REGS_VIRT_BASE | (offset))))
 
 /* PPv2 specific reg read/write */
+#ifdef CONFIG_OF
+#define MV_PP2_CPU0_REG_READ(offset)             \
+	(MV_MEMIO_LE32_READ(offset))
+#define MV_PP2_CPU0_REG_WRITE(offset, val)    \
+	MV_MEMIO_LE32_WRITE((offset), (val))
+
+#define MV_PP2_CPU1_REG_READ(offset)             \
+	(MV_MEMIO_LE32_READ(offset))
+#define MV_PP2_CPU1_REG_WRITE(offset, val)    \
+	MV_MEMIO_LE32_WRITE((offset), (val))
+#else
 #define MV_PP2_CPU0_REG_READ(offset)             \
 	(MV_MEMIO_LE32_READ(PP2_CPU0_VIRT_BASE | (offset & 0xffff)))
 #define MV_PP2_CPU0_REG_WRITE(offset, val)    \
@@ -355,6 +366,7 @@ extern int reg_arry_index;
 	(MV_MEMIO_LE32_READ(PP2_CPU1_VIRT_BASE | (offset & 0xffff)))
 #define MV_PP2_CPU1_REG_WRITE(offset, val)    \
 	MV_MEMIO_LE32_WRITE((PP2_CPU1_VIRT_BASE | (offset & 0xffff)), (val))
+#endif
 
 #ifdef CONFIG_SMP
 #define MV_PP2_REG_READ(offset)	\
