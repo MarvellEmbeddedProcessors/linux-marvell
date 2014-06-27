@@ -26,7 +26,6 @@ DISCLAIMED.  The GPL License provides additional details about this warranty
 disclaimer.
 *******************************************************************************/
 
-#include "mvCommon.h"
 #include <linux/kernel.h>
 #include <linux/version.h>
 #include <linux/netdevice.h>
@@ -38,7 +37,7 @@ disclaimer.
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24)
 #include <asm/arch/system.h>
 #else
-#include <mach/system.h>
+#include <asm/system.h>
 #endif
 
 #include "mvOs.h"
@@ -398,7 +397,6 @@ void mv_eth_tool_get_drvinfo(struct net_device *netdev,
 			     struct ethtool_drvinfo *info)
 {
 	strcpy(info->driver, "mv_eth");
-	strcpy(info->version, LSP_VERSION);
 	strcpy(info->fw_version, "N/A");
 	strcpy(info->bus_info, "Mbus");
 	info->n_stats = MV_ETH_TOOL_STATS_LEN;
