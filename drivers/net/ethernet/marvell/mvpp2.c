@@ -777,6 +777,29 @@ struct mvpp2_rx_desc {
 	u32 reserved8;
 };
 
+/* Per-CPU Tx queue control */
+struct mvpp2_txq_pcpu {
+	/* Number of Tx DMA descriptors in the descriptor ring */
+	int size;
+
+	/* Number of currently used Tx DMA descriptor in the
+	 * descriptor ring
+	 */
+	int count;
+
+	/* Number of Tx DMA descriptors reserved for each CPU */
+	int reserved_num;
+
+	/* Array of transmitted skb */
+	struct sk_buff **tx_skb;
+
+	/* Index of last TX DMA descriptor that was inserted */
+	int txq_put_index;
+
+	/* Index of the TX DMA descriptor to be cleaned up */
+	int txq_get_index;
+};
+
 struct mvpp2_tx_queue {
 	/* Physical number of this Tx queue */
 	u8 id;
@@ -798,17 +821,11 @@ struct mvpp2_tx_queue {
 	 */
 	int count;
 
-	/* Number of Tx DMA descriptors reserved for each CPU */
-	int reserved_num;
+	/* Per-CPU control of physical Tx queues */
+	struct mvpp2_txq_pcpu __percpu *pcpu;
 
 	/* Array of transmitted skb */
 	struct sk_buff **tx_skb;
-
-	/* Index of last TX DMA descriptor that was inserted */
-	int txq_put_index;
-
-	/* Index of the TX DMA descriptor to be cleaned up */
-	int txq_get_index;
 
 	u32 done_pkts_coal;
 
@@ -823,6 +840,8 @@ struct mvpp2_tx_queue {
 
 	/* Index of the next Tx DMA descriptor to process */
 	int next_desc_to_proc;
+
+	struct mvpp2 *pp2;
 };
 
 struct mvpp2_rx_queue {
@@ -963,19 +982,20 @@ static u32 mvpp2_read(struct mvpp2 *pp2, u32 offset)
 	return readl(pp2->base + offset);
 }
 
-static void mvpp2_txq_inc_get(struct mvpp2_tx_queue *txq)
+static void mvpp2_txq_inc_get(struct mvpp2_txq_pcpu *txq_pcpu)
 {
-	txq->txq_get_index++;
-	if (txq->txq_get_index == txq->size)
-		txq->txq_get_index = 0;
+	txq_pcpu->txq_get_index++;
+	if (txq_pcpu->txq_get_index == txq_pcpu->size)
+		txq_pcpu->txq_get_index = 0;
 }
 
-static void mvpp2_txq_inc_put(struct mvpp2_tx_queue *txq, struct sk_buff *skb)
+static void mvpp2_txq_inc_put(struct mvpp2_txq_pcpu *txq_pcpu,
+			      struct sk_buff *skb)
 {
-	txq->tx_skb[txq->txq_put_index] = skb;
-	txq->txq_put_index++;
-	if (txq->txq_put_index == txq->size)
-		txq->txq_put_index = 0;
+	txq_pcpu->tx_skb[txq_pcpu->txq_put_index] = skb;
+	txq_pcpu->txq_put_index++;
+	if (txq_pcpu->txq_put_index == txq_pcpu->size)
+		txq_pcpu->txq_put_index = 0;
 }
 
 static inline void mvpp2_mib_counters_clear(struct mvpp2_port *pp)
@@ -4331,15 +4351,23 @@ static int mvpp2_txq_alloc_reserved_desc(struct mvpp2 *pp2,
  * to reqest chunk of reserved descriptors and check again.
  */
 static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2 *pp2,
-					    struct mvpp2_tx_queue *txq, int num)
+					    struct mvpp2_tx_queue *txq,
+					    struct mvpp2_txq_pcpu *txq_pcpu,
+					    int num)
 {
-	if (txq->reserved_num < num) {
-		int req, new_reserved, desc_count = 0;
+	struct mvpp2_txq_pcpu *txq_pcpu_aux;
+
+	if (txq_pcpu->reserved_num < num) {
+		int req, cpu, new_reserved, desc_count = 0;
 
 		/* Compute total of used descriptors */
-		desc_count = txq->count + txq->reserved_num;
+		for_each_present_cpu(cpu) {
+			txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu);
+			desc_count += txq_pcpu_aux->count;
+			desc_count += txq_pcpu_aux->reserved_num;
+		}
 
-		req = max(MVPP2_CPU_DESC_CHUNK, num - txq->reserved_num);
+		req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
 		desc_count += req;
 
 		if (desc_count > txq->swf_size)
@@ -4347,9 +4375,9 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2 *pp2,
 
 		new_reserved = mvpp2_txq_alloc_reserved_desc(pp2, txq, req);
 
-		txq->reserved_num += new_reserved;
+		txq_pcpu->reserved_num += new_reserved;
 
-		if (txq->reserved_num < num)
+		if (txq_pcpu->reserved_num < num)
 			return -ERANGE;
 	}
 
@@ -4400,17 +4428,27 @@ static u32 mvpp2_txq_desc_csum(int l3_offs, int l3_proto,
 
 /* Get number of sent descriptors and decrement counter.
  * The number of sent descriptors is returned.
+ * Per-CPU access
  */
 static int mvpp2_txq_sent_desc_proc(struct mvpp2_port *pp,
 				    struct mvpp2_tx_queue *txq)
 {
 	u32 reg_val;
 
-	/* reading status reg also cause to reset transmitted counter */
+	/* Reading status reg resets transmitted descriptor counter */
 	reg_val = mvpp2_read(pp->pp2, MVPP2_TXQ_SENT_REG(txq->id));
 
 	return (reg_val & MVPP2_TRANSMITTED_COUNT_MASK) >>
 		MVPP2_TRANSMITTED_COUNT_OFFSET;
+}
+
+static void mvpp2_txq_sent_counter_clear(void *arg)
+{
+	struct mvpp2_tx_queue *txq = arg;
+	struct mvpp2 *pp2 = txq->pp2;
+	int reg_val;
+
+	reg_val = mvpp2_read(pp2, MVPP2_TXQ_SENT_REG(txq->id));
 }
 
 /* Queues helepr methods */
@@ -4492,31 +4530,32 @@ static void mvpp2_rx_time_coal_set(struct mvpp2_port *pp,
 }
 
 /* Set threshold for TX_DONE pkts coalescing */
-static void mvpp2_tx_done_pkts_coal_set(struct mvpp2_port *pp,
-					struct mvpp2_tx_queue *txq, u32 pkts)
+static void mvpp2_tx_done_pkts_coal_set(void *arg)
 {
-	u32 val;
+	struct mvpp2_tx_queue *txq = arg;
+	struct mvpp2 *pp2 = txq->pp2;
+	u32 pkts = txq->done_pkts_coal;
+	u32 reg_val;
 
-	val = (pkts << MVPP2_TRANSMITTED_THRESH_OFFSET) &
+	reg_val = (pkts << MVPP2_TRANSMITTED_THRESH_OFFSET) &
 		   MVPP2_TRANSMITTED_THRESH_MASK;
-	mvpp2_write(pp->pp2, MVPP2_TXQ_NUM_REG, txq->id);
-	mvpp2_write(pp->pp2, MVPP2_TXQ_THRESH_REG, val);
-
-	txq->done_pkts_coal = pkts;
+	mvpp2_write(pp2, MVPP2_TXQ_NUM_REG, txq->id);
+	mvpp2_write(pp2, MVPP2_TXQ_THRESH_REG, reg_val);
 }
 
 /* Free Tx queue skbuffs */
 static void mvpp2_txq_bufs_free(struct mvpp2_port *pp,
-				 struct mvpp2_tx_queue *txq, int num)
+				struct mvpp2_tx_queue *txq,
+				struct mvpp2_txq_pcpu *txq_pcpu, int num)
 {
 	int i;
 
 	for (i = 0; i < num; i++) {
 		struct mvpp2_tx_desc *tx_desc = txq->descs +
-			txq->txq_get_index;
-		struct sk_buff *skb = txq->tx_skb[txq->txq_get_index];
+							txq_pcpu->txq_get_index;
+		struct sk_buff *skb = txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
 
-		mvpp2_txq_inc_get(txq);
+		mvpp2_txq_inc_get(txq_pcpu);
 
 		if (!skb)
 			continue;
@@ -4542,23 +4581,24 @@ static struct mvpp2_tx_queue *mvpp2_get_tx_queue(struct mvpp2_port *pp,
 }
 
 /* Handle end of transmission */
-static int mvpp2_txq_done(struct mvpp2_port *pp, struct mvpp2_tx_queue *txq)
+static void mvpp2_txq_done(struct mvpp2_port *pp, struct mvpp2_tx_queue *txq)
 {
 	struct netdev_queue *nq = netdev_get_tx_queue(pp->dev, txq->log_id);
+	struct mvpp2_txq_pcpu *txq_pcpu = this_cpu_ptr(txq->pcpu);
 	int tx_done;
 
 	tx_done = mvpp2_txq_sent_desc_proc(pp, txq);
-	if (tx_done == 0)
-		return tx_done;
-	mvpp2_txq_bufs_free(pp, txq, tx_done);
+	if (!tx_done)
+		return;
+	mvpp2_txq_bufs_free(pp, txq, txq_pcpu, tx_done);
 
-	txq->count -= tx_done;
+	txq_pcpu->count -= tx_done;
 
 	if (netif_tx_queue_stopped(nq))
-		if (txq->size - txq->count >= MAX_SKB_FRAGS + 1)
+		if (txq_pcpu->size - txq_pcpu->count >= MAX_SKB_FRAGS + 1)
 			netif_tx_wake_queue(nq);
 
-	return tx_done;
+	return;
 }
 
 /* Rx/Tx queue initialization/cleanup methods */
@@ -4693,9 +4733,10 @@ static int mvpp2_txq_init(struct mvpp2_port *pp, int txp,
 			  struct mvpp2_tx_queue *txq)
 {
 	u32 reg_val;
-	int desc;
+	int cpu, desc;
 	int desc_per_txq;
 	int tx_port_num;
+	struct mvpp2_txq_pcpu *txq_pcpu;
 
 	/* Allocate memory for Tx descriptors */
 	txq->descs = dma_alloc_coherent(pp->dev->dev.parent,
@@ -4749,14 +4790,26 @@ static int mvpp2_txq_init(struct mvpp2_port *pp, int txp,
 	mvpp2_write(pp->pp2, MVPP2_TXQ_SCHED_TOKEN_SIZE_REG(txq->log_id),
 		    reg_val);
 
-	txq->tx_skb = kmalloc(txq->size * sizeof(*txq->tx_skb), GFP_KERNEL);
-	if (!txq->tx_skb) {
-		dma_free_coherent(pp->dev->dev.parent,
-				  txq->size * MVPP2_DESC_ALIGNED_SIZE,
-				  txq->descs, txq->descs_phys);
-		return -ENOMEM;
+	for_each_present_cpu(cpu) {
+		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
+		txq_pcpu->tx_skb = kmalloc(txq_pcpu->size *
+					   sizeof(*txq_pcpu->tx_skb),
+					   GFP_KERNEL);
+		if (!txq_pcpu->tx_skb) {
+			dma_free_coherent(pp->dev->dev.parent,
+					  txq->size * MVPP2_DESC_ALIGNED_SIZE,
+					  txq->descs, txq->descs_phys);
+			return -ENOMEM;
+		}
+
+		txq_pcpu->count = 0;
+		txq_pcpu->reserved_num = 0;
+		txq_pcpu->txq_put_index = 0;
+		txq_pcpu->txq_get_index = 0;
 	}
-	mvpp2_tx_done_pkts_coal_set(pp, txq, txq->done_pkts_coal);
+
+	on_each_cpu(mvpp2_txq_sent_counter_clear, txq, 1);
+	on_each_cpu(mvpp2_tx_done_pkts_coal_set, txq, 1);
 
 	return 0;
 }
@@ -4765,7 +4818,13 @@ static int mvpp2_txq_init(struct mvpp2_port *pp, int txp,
 static void mvpp2_txq_deinit(struct mvpp2_port *pp,
 			     struct mvpp2_tx_queue *txq)
 {
-	kfree(txq->tx_skb);
+	struct mvpp2_txq_pcpu *txq_pcpu;
+	int cpu;
+
+	for_each_present_cpu(cpu) {
+		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
+		kfree(txq_pcpu->tx_skb);
+	}
 
 	if (txq->descs)
 		dma_free_coherent(pp->dev->dev.parent,
@@ -4790,7 +4849,8 @@ static void mvpp2_txq_deinit(struct mvpp2_port *pp,
 static void mvpp2_txp_clean(struct mvpp2_port *pp, int txp,
 			    struct mvpp2_tx_queue *txq)
 {
-	int delay, pending;
+	struct mvpp2_txq_pcpu *txq_pcpu;
+	int delay, pending, cpu;
 	u32 reg_val;
 
 	mvpp2_write(pp->pp2, MVPP2_TXQ_NUM_REG, txq->id);
@@ -4818,16 +4878,19 @@ static void mvpp2_txp_clean(struct mvpp2_port *pp, int txp,
 	reg_val &= ~MVPP2_TXQ_DRAIN_EN_MASK;
 	mvpp2_write(pp->pp2, MVPP2_TXQ_PREF_BUF_REG, reg_val);
 
-	/* Get the transmitted descriptors to clear the counter */
-	mvpp2_txq_sent_desc_proc(pp, txq);
+	on_each_cpu(mvpp2_txq_sent_counter_clear, txq, 1);
 
-	/* Release all packets */
-	mvpp2_txq_bufs_free(pp, txq, txq->count);
+	for_each_present_cpu(cpu) {
+		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 
-	/* Reset queue */
-	txq->count = 0;
-	txq->txq_put_index = 0;
-	txq->txq_get_index = 0;
+		/* Release all packets */
+		mvpp2_txq_bufs_free(pp, txq, txq_pcpu, txq_pcpu->count);
+
+		/* Reset queue */
+		txq_pcpu->count = 0;
+		txq_pcpu->txq_put_index = 0;
+		txq_pcpu->txq_get_index = 0;
+	}
 }
 
 /* Cleanup all Tx queues */
@@ -4906,6 +4969,7 @@ static void mvpp2_tx_done(struct mvpp2_port *pp, u32 cause)
 {
 	struct mvpp2_tx_queue *txq;
 	struct netdev_queue *nq;
+	struct mvpp2_txq_pcpu *txq_pcpu;
 
 	while (cause) {
 		txq = mvpp2_get_tx_queue(pp, cause);
@@ -4913,9 +4977,10 @@ static void mvpp2_tx_done(struct mvpp2_port *pp, u32 cause)
 			break;
 
 		nq = netdev_get_tx_queue(pp->dev, txq->log_id);
+		txq_pcpu = this_cpu_ptr(txq->pcpu);
 
 		__netif_tx_lock(nq, smp_processor_id());
-		if (txq->count)
+		if (txq_pcpu->count)
 			mvpp2_txq_done(pp, txq);
 		__netif_tx_unlock(nq);
 
@@ -5218,6 +5283,7 @@ static int mvpp2_tx_frag_process(struct mvpp2_port *pp, struct sk_buff *skb,
 				 struct mvpp2_tx_queue *aggr_txq,
 				 struct mvpp2_tx_queue *txq)
 {
+	struct mvpp2_txq_pcpu *txq_pcpu = this_cpu_ptr(txq->pcpu);
 	struct mvpp2_tx_desc *tx_desc;
 	int i;
 	dma_addr_t buf_phys_addr;
@@ -5240,15 +5306,14 @@ static int mvpp2_tx_frag_process(struct mvpp2_port *pp, struct sk_buff *skb,
 		tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_ALIGN;
 		tx_desc->buf_phys_addr = buf_phys_addr & (~MVPP2_TX_DESC_ALIGN);
 
-
 		if (i == (skb_shinfo(skb)->nr_frags - 1)) {
 			/* Last descriptor */
 			tx_desc->command = MVPP2_TXD_L_DESC;
-			mvpp2_txq_inc_put(txq, skb);
+			mvpp2_txq_inc_put(txq_pcpu, skb);
 		} else {
 			/* Descriptor in the middle: Not First, Not Last */
 			tx_desc->command = 0;
-			mvpp2_txq_inc_put(txq, NULL);
+			mvpp2_txq_inc_put(txq_pcpu, NULL);
 		}
 	}
 
@@ -5275,6 +5340,7 @@ static int mvpp2_tx(struct sk_buff *skb, struct net_device *dev)
 {
 	struct mvpp2_port *pp = netdev_priv(dev);
 	struct mvpp2_tx_queue *txq, *aggr_txq;
+	struct mvpp2_txq_pcpu *txq_pcpu;
 	struct mvpp2_tx_desc *tx_desc;
 	dma_addr_t buf_phys_addr;
 	int frags = 0;
@@ -5286,13 +5352,14 @@ static int mvpp2_tx(struct sk_buff *skb, struct net_device *dev)
 
 	txq_id = skb_get_queue_mapping(skb);
 	txq = pp->txqs[txq_id];
+	txq_pcpu = this_cpu_ptr(txq->pcpu);
 	aggr_txq = &pp->pp2->aggr_txqs[smp_processor_id()];
 
 	frags = skb_shinfo(skb)->nr_frags + 1;
 
 	/* Check number of available descriptors */
 	if (mvpp2_aggr_desc_num_check(pp->pp2, aggr_txq, frags) ||
-	    mvpp2_txq_reserved_desc_num_proc(pp->pp2, txq, frags)) {
+	    mvpp2_txq_reserved_desc_num_proc(pp->pp2, txq, txq_pcpu, frags)) {
 		frags = 0;
 		goto out;
 	}
@@ -5314,17 +5381,16 @@ static int mvpp2_tx(struct sk_buff *skb, struct net_device *dev)
 
 	tx_cmd = mvpp2_skb_tx_csum(pp, skb);
 
-
 	if (frags == 1) {
 		/* First and Last descriptor */
 		tx_cmd |= MVPP2_TXD_F_DESC | MVPP2_TXD_L_DESC;
 		tx_desc->command = tx_cmd;
-		mvpp2_txq_inc_put(txq, skb);
+		mvpp2_txq_inc_put(txq_pcpu, skb);
 	} else {
 		/* First but not Last */
 		tx_cmd |= MVPP2_TXD_F_DESC | MVPP2_TXD_PADDING_DISABLE;
 		tx_desc->command = tx_cmd;
-		mvpp2_txq_inc_put(txq, NULL);
+		mvpp2_txq_inc_put(txq_pcpu, NULL);
 
 		/* Continue with other skb fragments */
 		if (mvpp2_tx_frag_process(pp, skb, aggr_txq, txq)) {
@@ -5338,15 +5404,15 @@ static int mvpp2_tx(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 
-	txq->reserved_num -= frags;
-	txq->count += frags;
+	txq_pcpu->reserved_num -= frags;
+	txq_pcpu->count += frags;
 	aggr_txq->count += frags;
 
 	/* Enable transmit */
 	wmb();
 	mvpp2_aggr_txq_pend_desc_add(pp, frags);
 
-	if (txq->size - txq->count < MAX_SKB_FRAGS + 1) {
+	if (txq_pcpu->size - txq_pcpu->count < MAX_SKB_FRAGS + 1) {
 		struct netdev_queue *nq = netdev_get_tx_queue(dev, txq_id);
 		netif_tx_stop_queue(nq);
 	}
@@ -5770,8 +5836,7 @@ static int mvpp2_ethtool_set_coalesce(struct net_device *dev,
 			struct mvpp2_tx_queue *txq =
 					     pp->txqs[txp * txq_number + queue];
 			txq->done_pkts_coal = c->tx_max_coalesced_frames;
-			mvpp2_tx_done_pkts_coal_set(pp, txq,
-						    txq->done_pkts_coal);
+			on_each_cpu(mvpp2_tx_done_pkts_coal_set, txq, 1);
 		}
 	}
 
@@ -5872,7 +5937,8 @@ static int mvpp2_port_init(struct mvpp2_port *pp)
 {
 	struct device *dev = pp->dev->dev.parent;
 	struct mvpp2 *pp2 = pp->pp2;
-	int queue, txp;
+	struct mvpp2_txq_pcpu *txq_pcpu;
+	int queue, txp, cpu;
 
 	if (pp->first_rxq + rxq_number > MVPP2_RXQ_TOTAL_NUM)
 		return -EINVAL;
@@ -5896,14 +5962,26 @@ static int mvpp2_port_init(struct mvpp2_port *pp)
 			struct mvpp2_tx_queue *txq;
 
 			txq = devm_kzalloc(dev, sizeof(*txq), GFP_KERNEL);
+			if (!txq)
+				return -ENOMEM;
+
+			txq->pcpu = alloc_percpu(struct mvpp2_txq_pcpu);
+			if (!txq->pcpu)
+				return -ENOMEM;
+
 			txq->id = queue_phy_id;
 			txq->log_id = queue;
 			txq->txp = txp;
 			txq->size = pp->tx_ring_size;
 			txq->swf_size = txq->size - (num_present_cpus() *
-						     MVPP2_CPU_DESC_CHUNK);
+							  MVPP2_CPU_DESC_CHUNK);
 			txq->done_pkts_coal = MVPP2_TXDONE_COAL_PKTS_THRESH;
+			for_each_present_cpu(cpu) {
+				txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
+				txq_pcpu->size = txq->size;
+			}
 
+			txq->pp2 = pp2;
 			pp->txqs[txq_idx] = txq;
 		}
 	}
@@ -5918,6 +5996,8 @@ static int mvpp2_port_init(struct mvpp2_port *pp)
 		struct mvpp2_rx_queue *rxq;
 		/* Map physical RXQ to port's logical RXQ */
 		rxq = devm_kzalloc(dev, sizeof(*rxq), GFP_KERNEL);
+		if (!rxq)
+			return -ENOMEM;
 		/* Map this Rx queue to a physical queue */
 		rxq->id = pp->first_rxq + queue;
 		rxq->port = pp->id;
@@ -5966,7 +6046,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	int features;
 	int phy_mode;
 	int pp2_common_regs_num = 2;
-	int err;
+	int err, i;
 
 	dev = alloc_etherdev_mqs(sizeof(struct mvpp2_port), txq_number,
 				 rxq_number);
@@ -6068,7 +6148,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	err = register_netdev(dev);
 	if (err < 0) {
 		dev_err(&pdev->dev, "failed to register netdev\n");
-		goto err_free_stats;
+		goto err_free_txq_pcpu;
 	}
 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
 
@@ -6077,6 +6157,9 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	pp2->port_list[id] = pp;
 	return 0;
 
+err_free_txq_pcpu:
+	for (i = 0; i < txq_number; i++)
+		free_percpu(pp->txqs[i]->pcpu);
 err_free_stats:
 	free_percpu(pp->stats);
 err_free_irq:
@@ -6089,8 +6172,12 @@ err_free_netdev:
 /* Ports removal routine */
 static void mvpp2_port_remove(struct mvpp2_port *pp)
 {
+	int i;
+
 	unregister_netdev(pp->dev);
 	free_percpu(pp->stats);
+	for (i = 0; i < txq_number; i++)
+		free_percpu(pp->txqs[i]->pcpu);
 	irq_dispose_mapping(pp->dev->irq);
 	free_netdev(pp->dev);
 }
