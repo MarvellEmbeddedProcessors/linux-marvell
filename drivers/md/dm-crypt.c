@@ -26,6 +26,8 @@
 #include <linux/device-mapper.h>
 
 #if defined(CONFIG_OCF_DM_CRYPT)
+extern int cesaReqResources[];
+extern void DUMP_OCF_POOL(void);
 
 //#define DM_DEBUG
 #undef DM_DEBUG
@@ -125,14 +127,6 @@ struct crypt_config {
 #define MIN_BIO_PAGES  8
 
 static struct kmem_cache *_crypt_io_pool;
-wait_queue_head_t   dm_waitq;
-static volatile u32 wake = 0;
-static atomic_t blocked;
-extern int cesaReqResources;
-
-#if defined(CONFIG_OCF_DM_CRYPT)
-static DEFINE_SPINLOCK(dmcrypt_lock);
-#endif
 
 static void clone_init(struct crypt_io *, struct bio *);
 
@@ -337,11 +331,6 @@ struct ocf_wr_priv {
 static int dm_ocf_wr_cb(struct cryptop *crp)
 {
 	struct ocf_wr_priv *ocf_wr_priv;
-	if(atomic_read(&blocked) > 0) {
-		atomic_dec(&blocked);
-		wake = 1;
-		wake_up(&dm_waitq);
-	}
 
 	if(crp == NULL) {
 		printk("dm_ocf_wr_cb: crp is NULL!! \n");
@@ -363,11 +352,6 @@ static int dm_ocf_wr_cb(struct cryptop *crp)
 static int dm_ocf_rd_cb(struct cryptop *crp)
 {
 	struct crypt_io *io;
-	if(atomic_read(&blocked) > 0) {
-		atomic_dec(&blocked);
-		wake = 1;
-		wake_up(&dm_waitq);
-	}
 
 	if(crp == NULL) {
 		printk("dm_ocf_rd_cb: crp is NULL!! \n");
@@ -389,7 +373,6 @@ static inline int dm_ocf_process(struct crypt_config *cc, struct scatterlist *ou
 {
 	struct cryptop *crp;
 	struct cryptodesc *crda = NULL;
-	unsigned long flags;
 	volatile int tmp;
 
 	if(!iv) {
@@ -440,21 +423,8 @@ static inline int dm_ocf_process(struct crypt_config *cc, struct scatterlist *ou
 	}
 	crp->crp_sid = cc->ocf_cryptoid;
 
-	while (crypto_dispatch(crp) != 0) {
-		spin_lock_irqsave(&dmcrypt_lock, flags);
-		/* Make sure CESA queue was not turned empty */
-		if(cesaReqResources > 1) {
-			spin_unlock_irqrestore(&dmcrypt_lock, flags);
-			continue;
-		} else {
-			/* CESA queue is full, wait a bit */
-			wake = 0;
-			atomic_set(&blocked, 1);
-			spin_unlock_irqrestore(&dmcrypt_lock, flags);
-			while (wake == 0)
-				tmp++; /*dummy */
-		}
-	}
+	while ((tmp = crypto_dispatch(crp)) != 0)
+		yield();
 
 	return 0;
 }
@@ -1520,10 +1490,6 @@ static int __init dm_crypt_init(void)
 		DMERR("register failed %d", r);
 		goto bad2;
 	}
-
-	init_waitqueue_head(&dm_waitq);
-
-	atomic_set(&blocked, 0);
 
 #ifdef CONFIG_OCF_DM_CRYPT
 	printk("dm_crypt using the OCF package.\n");
