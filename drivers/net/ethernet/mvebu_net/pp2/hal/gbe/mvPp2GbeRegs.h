@@ -327,6 +327,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PP2_TXQ_PENDING_OFFSET		0
 #define MV_PP2_TXQ_PENDING_MASK			(0x3FFF << MV_PP2_TXQ_PENDING_OFFSET)
 
+#define MV_PP2_TXQ_RESERVED_OFFSET		16
+#define MV_PP2_TXQ_RESERVED_MASK		(0x3FFF << MV_PP2_TXQ_RESERVED_OFFSET)
+/*-------------------------------------------------------------------------------*/
+
 /*
    ppv2.1 field MV_PP2_TXQ_HWF_PENDING_OFFSET changed to MV_PP2_TXQ_RESERVED_DESC_OFFSET
    MAS 3.16
@@ -369,8 +373,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #define MV_PP2_TXQ_RSVD_CLR_REG			(MV_PP2_REG_BASE + 0x20b8)
 
-#define MV_PP2_TXQ_RSVD_CLR_OFFSET		16
-#define MV_PP2_TXQ_RSVD_CLR_MASK		(0xFF << MV_PP2_TXQ_RSVD_CLR_OFFSET)
+#define MV_PP2_TXQ_RSVD_CLR_Q_OFFSET		16
+#define MV_PP2_TXQ_RSVD_CLR_Q_MASK		(0xFF << MV_PP2_TXQ_RSVD_CLR_Q_OFFSET)
 /*-------------------------------------------------------------------------------*/
 
 /* Direct access - per TXQ, per CPU */
