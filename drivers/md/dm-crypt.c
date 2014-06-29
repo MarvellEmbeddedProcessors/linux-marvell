@@ -127,6 +127,8 @@ struct crypt_config {
 #define MIN_BIO_PAGES  8
 
 static struct kmem_cache *_crypt_io_pool;
+static atomic_t _crypt_blocked;
+static wait_queue_head_t _crypt_waitq;
 
 static void clone_init(struct crypt_io *, struct bio *);
 
@@ -346,6 +348,9 @@ static int dm_ocf_wr_cb(struct cryptop *crp)
 		wake_up(&ocf_wr_priv->dm_ocf_wr_queue);
 
 	crypto_freereq(crp);
+
+	atomic_set(&_crypt_blocked, 0);
+	wake_up(&_crypt_waitq);
 	return 0;
 }
 
@@ -365,6 +370,8 @@ static int dm_ocf_rd_cb(struct cryptop *crp)
 	if(io != NULL)
 		dec_pending(io, 0);
 
+	atomic_set(&_crypt_blocked, 0);
+	wake_up(&_crypt_waitq);
 	return 0;
 }
 
@@ -373,7 +380,6 @@ static inline int dm_ocf_process(struct crypt_config *cc, struct scatterlist *ou
 {
 	struct cryptop *crp;
 	struct cryptodesc *crda = NULL;
-	volatile int tmp;
 
 	if(!iv) {
 		printk("dm_ocf_process: only CBC mode is supported\n");
@@ -423,8 +429,10 @@ static inline int dm_ocf_process(struct crypt_config *cc, struct scatterlist *ou
 	}
 	crp->crp_sid = cc->ocf_cryptoid;
 
-	while ((tmp = crypto_dispatch(crp)) != 0)
-		yield();
+	while (crypto_dispatch(crp) != 0) {
+		atomic_set(&_crypt_blocked, 1);
+		wait_event(_crypt_waitq, atomic_read(&_crypt_blocked) == 0);
+	}
 
 	return 0;
 }
@@ -1490,6 +1498,9 @@ static int __init dm_crypt_init(void)
 		DMERR("register failed %d", r);
 		goto bad2;
 	}
+
+	atomic_set(&_crypt_blocked, 0);
+	init_waitqueue_head(&_crypt_waitq);
 
 #ifdef CONFIG_OCF_DM_CRYPT
 	printk("dm_crypt using the OCF package.\n");
