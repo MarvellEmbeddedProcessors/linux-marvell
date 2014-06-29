@@ -647,6 +647,8 @@ MV_PP2_PHYS_TXQ_CTRL *mvPp2TxqInit(int port, int txp, int txq, int descNum, int 
 
 	mvPp2DescRingReset(qCtrl);
 
+	mvPp2TxqFreeReservedDesc(port, txp, txq);
+
 	/* Set Tx descriptors queue starting address */
 	/* indirect access */
 	mvPp2WrReg(MV_PP2_TXQ_NUM_REG, ptxq);
@@ -659,13 +661,15 @@ MV_PP2_PHYS_TXQ_CTRL *mvPp2TxqInit(int port, int txp, int txq, int descNum, int 
 	/* Pending counter read - indirect access */
 	regVal = mvPp2RdReg(MV_PP2_TXQ_PENDING_REG);
 	if (regVal != 0) {
-		mvOsPrintf("port=%d, txp=%d txq=%d, ptxq=%d, pend=0x%08x - Pending packets\n",
-			port, txp, txq, ptxq, regVal);
+		mvOsPrintf("port=%d, txp=%d, txq=%d, ptxq=%d: pending=%u, reserved=%u\n",
+			port, txp, txq, ptxq,
+			((regVal & MV_PP2_TXQ_PENDING_MASK) >> MV_PP2_TXQ_PENDING_OFFSET),
+			((regVal & MV_PP2_TXQ_RESERVED_MASK) >> MV_PP2_TXQ_RESERVED_OFFSET));
 	}
 	/* Sent descriptors counter - direct access */
 	regVal = mvPp2RdReg(MV_PP2_TXQ_SENT_REG(ptxq));
 	if (regVal != 0) {
-		mvOsPrintf("port=%d, txp=%d txq=%d, ptxq=%d, sent=0x%08x - Sent packets\n",
+		mvOsPrintf("port=%d, txp=%d, txq=%d, ptxq=%d, sent=0x%08x - Sent packets\n",
 			port, txp, txq, ptxq, regVal);
 	}
 

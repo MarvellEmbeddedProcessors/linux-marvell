@@ -441,6 +441,16 @@ static INLINE int mvPp2TxqAllocReservedDesc(int port, int txp, int txq, int num)
 	return (regVal & MV_PP2_TXQ_RSVD_REQ_DESC_MASK) >> MV_PP2_TXQ_RSVD_RSLT_OFFSET;
 }
 
+/* Free all descriptors reserved */
+static INLINE void mvPp2TxqFreeReservedDesc(int port, int txp, int txq)
+{
+	MV_U32 regVal, ptxq;
+
+	ptxq = MV_PPV2_TXQ_PHYS(port, txp, txq);
+	regVal = (ptxq << MV_PP2_TXQ_RSVD_CLR_Q_OFFSET);
+	mvPp2WrReg(MV_PP2_TXQ_RSVD_CLR_REG, regVal);
+}
+
 /* Get number of TXQ descriptors waiting to be transmitted by HW */
 static INLINE int mvPp2TxqPendDescNumGet(int port, int txp, int txq)
 {
