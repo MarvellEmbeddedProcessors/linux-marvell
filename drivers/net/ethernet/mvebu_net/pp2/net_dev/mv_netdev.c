@@ -4305,7 +4305,8 @@ int mv_eth_txq_clean(int port, int txp, int txq)
 {
 	struct eth_port *pp;
 	struct tx_queue *txq_ctrl;
-	int msec, pending, tx_done;
+	struct txq_cpu_ctrl *txq_cpu_ptr;
+	int msec, pending, tx_done, cpu;
 
 	if (mvPp2TxpCheck(port, txp))
 		return -EINVAL;
@@ -4351,6 +4352,14 @@ int mv_eth_txq_clean(int port, int txp, int txq)
 		if (tx_done > 0)
 			mvOsPrintf(KERN_INFO "%s: port=%d, txp=%d txq=%d: Free %d untransmitted descriptors\n",
 				__func__, port, txp, txq, tx_done);
+
+		/* release all reserved descriptors */
+		mvPp2TxqFreeReservedDesc(port, txp, txq);
+
+		for_each_possible_cpu(cpu) {
+			txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
+			txq_cpu_ptr->reserved_num = 0;
+		}
 	}
 	return 0;
 }
