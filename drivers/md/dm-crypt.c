@@ -422,15 +422,15 @@ static inline int dm_ocf_process(struct crypt_config *cc, struct scatterlist *ou
 	}
 
 	/* according to the current implementation the in and the out are the same buffer for read, and different for write*/
-	if ((page_address(sg_page(out)) + out->offset) != (page_address(sg_page(in)) + in->offset)) {
-		memcpy((page_address(sg_page(out)) + out->offset) , (page_address(sg_page(in)) + in->offset) , len);
+	if (sg_virt(out) != sg_virt(in)) {
+		memcpy(sg_virt(out), sg_virt(in), len);
 		dmprintk("dm_ocf_process: copy buffers!! \n");
 	}
 
 	dmprintk("len: %d\n",len);
 	crp->crp_ilen = len; /* Total input length */
 	crp->crp_flags = CRYPTO_F_CBIMM | CRYPTO_F_BATCH;
-	crp->crp_buf = page_address(sg_page(out)) + out->offset;
+	crp->crp_buf = sg_virt(out);
 	crp->crp_opaque = priv;
 	if (write) {
        crp->crp_callback = dm_ocf_wr_cb;
@@ -672,7 +672,7 @@ static struct bio *crypt_alloc_buffer(struct crypt_io *io, unsigned int size)
 	struct crypt_config *cc = io->target->private;
 	struct bio *clone;
 	unsigned int nr_iovecs = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	gfp_t gfp_mask = GFP_NOIO | __GFP_HIGHMEM;
+	gfp_t gfp_mask = GFP_NOIO;
 	unsigned int i;
 	clone = bio_alloc_bioset(GFP_NOIO, nr_iovecs, cc->bs);
 	if (!clone)
@@ -734,14 +734,70 @@ static void crypt_free_buffer_pages(struct crypt_config *cc,
 static void dec_pending(struct crypt_io *io, int error)
 {
 	struct crypt_config *cc = (struct crypt_config *) io->target->private;
+	struct bio_vec *tovec, *fromvec;
+	struct bio *bio = io->base_bio;
+#ifdef CONFIG_HIGHMEM
+	struct bio *origbio;
+	unsigned long flags;
+	char *vfrom, *vto;
+	unsigned int i;
+#endif /* CONFIG_HIGHMEM */
+
 	if (error < 0)
 		io->error = error;
 
 	if (!atomic_dec_and_test(&io->pending))
 		return;
 
-	bio_endio(io->base_bio, io->error);
+#ifdef CONFIG_HIGHMEM
+	if (bio_flagged(bio, BIO_BOUNCED)) {
+		origbio = bio->bi_private;
 
+		/* We have bounced bio, so copy data back if it is necessary */
+		if (bio_data_dir(bio) == READ) {
+			__bio_for_each_segment(tovec, origbio, i, 0) {
+				fromvec = bio->bi_io_vec + i;
+
+				/* Page not bounced */
+				if (tovec->bv_page == fromvec->bv_page)
+					continue;
+
+				/*
+				 * Page bounced - we have to copy data.
+				 * We are using tovec->bv_offset and
+				 * tovec->bv_len as originals might
+				 * have been modified.
+				 */
+				vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
+				local_irq_save(flags);
+
+				vto = kmap_atomic(tovec->bv_page, KM_BOUNCE_READ);
+				memcpy(vto + tovec->bv_offset, vfrom, tovec->bv_len);
+				kunmap_atomic(vto, KM_BOUNCE_READ);
+
+				local_irq_restore(flags);
+			}
+		}
+
+		/* Free bounced pages */
+		__bio_for_each_segment(fromvec, bio, i, 0) {
+			tovec = origbio->bi_io_vec + i;
+
+			/* Page not bounced */
+			if (tovec->bv_page == fromvec->bv_page)
+				continue;
+
+			/* Page bounced: free it! */
+			mempool_free(fromvec->bv_page, cc->page_pool);
+		}
+
+		/* Release our bounced bio */
+		bio_put(bio);
+		bio = origbio;
+	}
+#endif /* CONFIG_HIGHMEM */
+
+	bio_endio(bio, io->error);
 	mempool_free(io, cc->io_pool);
 }
 
@@ -1248,7 +1304,76 @@ static int crypt_map(struct dm_target *ti, struct bio *bio,
 {
 	struct crypt_config *cc = ti->private;
 	struct crypt_io *io;
+#ifdef CONFIG_HIGHMEM
+	struct bio *newbio = NULL;
+	struct bio_vec *from, *to;
+	struct page *page;
+	char *vto, *vfrom;
+	unsigned int i;
+#endif /* CONFIG_HIGHMEM */
+
 	io = mempool_alloc(cc->io_pool, GFP_NOIO);
+
+	/*
+	 * Because OCF and CESA do not support high memory
+	 * we have to create bounce pages if request
+	 * with data in high memory arrives.
+	 */
+
+#ifdef CONFIG_HIGHMEM
+	/* Check if we have to bounce */
+	bio_for_each_segment(from, bio, i) {
+		page = from->bv_page;
+
+		if (!PageHighMem(page))
+			continue;
+
+		/* We have to bounce */
+		if (newbio == NULL) {
+			newbio = bio_alloc(GFP_NOIO, bio->bi_vcnt);
+			memset(newbio->bi_io_vec, 0, bio->bi_vcnt *
+							sizeof(struct bio_vec));
+		}
+
+		/* Allocate new vector */
+		to = newbio->bi_io_vec + i;
+		to->bv_page = mempool_alloc(cc->page_pool, GFP_NOIO);
+		to->bv_len = from->bv_len;
+		to->bv_offset = from->bv_offset;
+
+		/* Copy data if this is required */
+		if (bio_data_dir(bio) == WRITE) {
+			vto = page_address(to->bv_page) + to->bv_offset;
+			vfrom = kmap(from->bv_page) + from->bv_offset;
+			memcpy(vto, vfrom, to->bv_len);
+			kunmap(from->bv_page);
+		}
+	}
+
+	/* We have at least one page bounced */
+	if (newbio != NULL) {
+		__bio_for_each_segment(from, bio, i, 0) {
+			to = bio_iovec_idx(newbio, i);
+			if (!to->bv_page) {
+				to->bv_page = from->bv_page;
+				to->bv_len = from->bv_len;
+				to->bv_offset = from->bv_offset;
+			}
+		}
+
+		newbio->bi_bdev = bio->bi_bdev;
+		newbio->bi_sector = bio->bi_sector;
+		newbio->bi_rw = bio->bi_rw;
+		newbio->bi_vcnt = bio->bi_vcnt;
+		newbio->bi_idx = bio->bi_idx;
+		newbio->bi_size = bio->bi_size;
+
+		newbio->bi_flags |= (1 << BIO_BOUNCED);
+		newbio->bi_private = bio;
+		bio = newbio;
+	}
+#endif /* CONFIG_HIGHMEM */
+
 	io->target = ti;
 	io->base_bio = bio;
 	io->error = io->post_process = 0;
