@@ -126,9 +126,10 @@ struct crypt_config {
 #define MIN_POOL_PAGES 32
 #define MIN_BIO_PAGES  8
 
-static struct kmem_cache *_crypt_io_pool;
-static atomic_t _crypt_blocked;
+static unsigned int _crypt_requests;
+static DEFINE_SPINLOCK(_crypt_lock);
 static wait_queue_head_t _crypt_waitq;
+static struct kmem_cache *_crypt_io_pool;
 
 static void clone_init(struct crypt_io *, struct bio *);
 
@@ -333,6 +334,7 @@ struct ocf_wr_priv {
 static int dm_ocf_wr_cb(struct cryptop *crp)
 {
 	struct ocf_wr_priv *ocf_wr_priv;
+	unsigned long flags;
 
 	if(crp == NULL) {
 		printk("dm_ocf_wr_cb: crp is NULL!! \n");
@@ -349,7 +351,11 @@ static int dm_ocf_wr_cb(struct cryptop *crp)
 
 	crypto_freereq(crp);
 
-	atomic_set(&_crypt_blocked, 0);
+	spin_lock_irqsave(&_crypt_lock, flags);
+	if (_crypt_requests > 0)
+		_crypt_requests -= 1;
+	spin_unlock_irqrestore(&_crypt_lock, flags);
+
 	wake_up(&_crypt_waitq);
 	return 0;
 }
@@ -357,6 +363,7 @@ static int dm_ocf_wr_cb(struct cryptop *crp)
 static int dm_ocf_rd_cb(struct cryptop *crp)
 {
 	struct crypt_io *io;
+	unsigned long flags;
 
 	if(crp == NULL) {
 		printk("dm_ocf_rd_cb: crp is NULL!! \n");
@@ -370,7 +377,11 @@ static int dm_ocf_rd_cb(struct cryptop *crp)
 	if(io != NULL)
 		dec_pending(io, 0);
 
-	atomic_set(&_crypt_blocked, 0);
+	spin_lock_irqsave(&_crypt_lock, flags);
+	if (_crypt_requests > 0)
+		_crypt_requests -= 1;
+	spin_unlock_irqrestore(&_crypt_lock, flags);
+
 	wake_up(&_crypt_waitq);
 	return 0;
 }
@@ -380,6 +391,8 @@ static inline int dm_ocf_process(struct crypt_config *cc, struct scatterlist *ou
 {
 	struct cryptop *crp;
 	struct cryptodesc *crda = NULL;
+	unsigned long flags;
+	unsigned int cr;
 
 	if(!iv) {
 		printk("dm_ocf_process: only CBC mode is supported\n");
@@ -429,10 +442,21 @@ static inline int dm_ocf_process(struct crypt_config *cc, struct scatterlist *ou
 	}
 	crp->crp_sid = cc->ocf_cryptoid;
 
+	spin_lock_irqsave(&_crypt_lock, flags);
 	while (crypto_dispatch(crp) != 0) {
-		atomic_set(&_crypt_blocked, 1);
-		wait_event(_crypt_waitq, atomic_read(&_crypt_blocked) == 0);
+		if (_crypt_requests == 0) {
+			spin_unlock_irqrestore(&_crypt_lock, flags);
+			schedule();
+			spin_lock_irqsave(&_crypt_lock, flags);
+		} else {
+			cr = _crypt_requests;
+			spin_unlock_irqrestore(&_crypt_lock, flags);
+			wait_event(_crypt_waitq, _crypt_requests < cr);
+			spin_lock_irqsave(&_crypt_lock, flags);
+		}
 	}
+	_crypt_requests += 1;
+	spin_unlock_irqrestore(&_crypt_lock, flags);
 
 	return 0;
 }
@@ -1499,7 +1523,7 @@ static int __init dm_crypt_init(void)
 		goto bad2;
 	}
 
-	atomic_set(&_crypt_blocked, 0);
+	_crypt_requests = 0;
 	init_waitqueue_head(&_crypt_waitq);
 
 #ifdef CONFIG_OCF_DM_CRYPT
