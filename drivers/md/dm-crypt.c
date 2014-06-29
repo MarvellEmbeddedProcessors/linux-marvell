@@ -656,14 +656,6 @@ static int crypt_convert(struct crypt_config *cc,
 }
 #endif
 
- static void dm_crypt_bio_destructor(struct bio *bio)
- {
-	struct crypt_io *io = bio->bi_private;
-	struct crypt_config *cc = io->target->private;
-
-	bio_free(bio, cc->bs);
- }
-
 /*
  * Generate a new unfragmented bio with the given size
  * This should never violate the device limitations
@@ -773,9 +765,9 @@ static void dec_pending(struct crypt_io *io, int error)
 				vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
 				local_irq_save(flags);
 
-				vto = kmap_atomic(tovec->bv_page, KM_BOUNCE_READ);
+				vto = kmap_atomic(tovec->bv_page);
 				memcpy(vto + tovec->bv_offset, vfrom, tovec->bv_len);
-				kunmap_atomic(vto, KM_BOUNCE_READ);
+				kunmap_atomic(vto);
 
 				local_irq_restore(flags);
 			}
@@ -855,7 +847,6 @@ static void clone_init(struct crypt_io *io, struct bio *clone)
 	clone->bi_end_io  = crypt_endio;
 	clone->bi_bdev    = cc->dev->bdev;
 	clone->bi_rw      = io->base_bio->bi_rw;
-	clone->bi_destructor = dm_crypt_bio_destructor;
 }
 
 static void process_read(struct crypt_io *io)
@@ -1301,8 +1292,7 @@ static void crypt_dtr(struct dm_target *ti)
 	kfree(cc);
 }
 
-static int crypt_map(struct dm_target *ti, struct bio *bio,
-		     union map_info *map_context)
+static int crypt_map(struct dm_target *ti, struct bio *bio)
 {
 	struct crypt_config *cc = ti->private;
 	struct crypt_io *io;
@@ -1386,7 +1376,7 @@ static int crypt_map(struct dm_target *ti, struct bio *bio,
 }
 
 static void crypt_status(struct dm_target *ti, status_type_t type,
-			 char *result, unsigned maxlen)
+			 unsigned status_flags, char *result, unsigned maxlen)
 {
 	struct crypt_config *cc = ti->private;
 	unsigned i, sz = 0;
