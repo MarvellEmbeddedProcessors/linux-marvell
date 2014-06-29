@@ -479,12 +479,7 @@
 					interrupts = <0 22 0x4>;
 					dmacap,memcpy;
 					dmacap,xor;
-				};
-				xor01 {
-					interrupts = <0 23 0x4>;
-					dmacap,memcpy;
-					dmacap,xor;
-					dmacap,memset;
+					dmacap,interrupt;
 				};
 			};
 
@@ -499,12 +494,7 @@
 					interrupts = <0 65 0x4>;
 					dmacap,memcpy;
 					dmacap,xor;
-				};
-				xor11 {
-					interrupts = <0 66 0x4>;
-					dmacap,memcpy;
-					dmacap,xor;
-					dmacap,memset;
+					dmacap,interrupt;
 				};
 			};
 
