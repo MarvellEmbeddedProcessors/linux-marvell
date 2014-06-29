@@ -75,6 +75,13 @@
 			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
 		};
 
+		/* Security Accelerator SRAM (CESA) */
+		cesa-sram {
+			compatible = "marvell,cesa-sram";
+			reg = <MBUS_ID(0x09, 0x09) 0 0x10000	/*chan0*/
+			       MBUS_ID(0x09, 0x05) 0 0x10000>;	/*chan1*/
+		};
+
 		devbus-bootcs {
 			compatible = "marvell,mvebu-devbus";
 			reg = <MBUS_ID(0xf0, 0x01) 0x10400 0x8>;
@@ -477,6 +484,43 @@
 				interrupts = <0 84 0x4>;
 				clocks = <&gateclk 11>;
 				status = "disabled";
+			};
+
+			crypto@9D000 {
+				compatible = "marvell,armada-cesa";
+				reg = <0x9D000 0x1000	/* cesa base reg chan 0 */
+				       0x90000 0x1000	/* tdma base reg chan 0 */
+				       0x9F000 0x1000	/* cesa base reg chan 1 */
+				       0x92000 0x1000>;	/* tdma base reg chan 1 */
+
+				clocks = <&gateclk 30>, <&gateclk 28>,
+					 <&gateclk 31>, <&gateclk 29>;
+				clock-names = "crypto0", "crypto0z",
+					      "crypto1", "crypto1z";
+
+				cesa,channels = <0x2>;
+				cesa,mode = "ocf";	/* ocf or test */
+				cesa,feature = "int_coalescing"; /* chain, int_coalescing
+							   or int_per_packet */
+
+				/* threshold and time_threshold relevant if
+				   int_coalescing in use */
+				cesa,threshold = <0x2>;
+				cesa,time_threshold = <0xff>;
+
+				cesa,ctrlModel = /bits/ 16 <0x6720>;
+				cesa,ctrlRev = /bits/ 8 <2>;
+				cesa,sramOffset = /bits/ 16 <0>;
+				status = "disabled";
+
+				crypto10 {
+					/* channel 0 */
+					interrupts = <0 19 0x4>;
+				};
+				crypto11 {
+					/* channel 1 */
+					interrupts = <0 20 0x4>;
+				};
 			};
 		};
 
