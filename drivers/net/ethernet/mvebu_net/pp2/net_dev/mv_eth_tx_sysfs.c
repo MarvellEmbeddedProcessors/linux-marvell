@@ -45,21 +45,21 @@ static ssize_t mv_eth_help(char *buf)
 #ifdef CONFIG_MV_ETH_PP2_1
 	off += sprintf(buf+off, "echo [p] [txp] [txq]             > pTxqCounters  - show TXQ Counters for port <p/txp/txq> where <txq> range [0..7]\n");
 #endif
-	off += sprintf(buf+off, "echo [p] [txp] [txq]            > pTxqRegs      - show TXQ registers for port <p/txp/txq> where <txq> range [0..7]\n");
-	off += sprintf(buf+off, "echo [txq]                      > gTxqRegs      - show TXQ registers for global <txq> range [0..255]\n");
-	off += sprintf(buf+off, "echo [cpu]                      > aggrTxqRegs   - show Aggregation TXQ registers for <cpu> range [0..max]\n");
-	off += sprintf(buf+off, "echo [cpu] [v]                  > aggrTxqShow   - show aggregated TXQ descriptors ring for <cpu>.\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]        > txqShow       - show TXQ descriptors ring for <p/txp/txq>. v: 0-brief, 1-full\n");
-	off += sprintf(buf+off, "echo [p] [hex]                  > txFlags       - bits: 0-no_pad, 1-mh, 2-hw_cmd\n");
-	off += sprintf(buf+off, "echo [p] [hex]                  > txMH          - set 2 bytes of Marvell Header for transmit\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [cpu]      > txqDef        - set default <txp/txq> for packets sent to port <p> by <cpu>\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]        > txqSize       - set descriptor Q size <v>, and HWF share <hwf> for <p/txp/txq>.\n");
+	off += sprintf(buf+off, "echo [p] [txp] [txq]             > pTxqRegs      - show TXQ registers for port <p/txp/txq> where <txq> range [0..7]\n");
+	off += sprintf(buf+off, "echo [txq]                       > gTxqRegs      - show TXQ registers for global <txq> range [0..255]\n");
+	off += sprintf(buf+off, "echo [cpu]                       > aggrTxqRegs   - show Aggregation TXQ registers for <cpu> range [0..max]\n");
+	off += sprintf(buf+off, "echo [cpu] [v]                   > aggrTxqShow   - show aggregated TXQ descriptors ring for <cpu>.\n");
+	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]         > txqShow       - show TXQ descriptors ring for <p/txp/txq>. v: 0-brief, 1-full\n");
+	off += sprintf(buf+off, "echo [p] [hex]                   > txFlags       - set TX flags. bits: 0-no_pad, 1-mh, 2-hw_cmd\n");
+	off += sprintf(buf+off, "echo [p] [hex]                   > txMH          - set 2 bytes of Marvell Header for transmit\n");
+	off += sprintf(buf+off, "echo [p] [txp] [txq] [cpu]       > txqDef        - set default <txp/txq> for packets sent to port <p> by <cpu>\n");
+	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]         > txqSize       - set TXQ size <v> for <p/txp/txq>.\n");
 #ifdef CONFIG_MV_ETH_PP2_1
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [hwf] [swf] > txqLimit      - set HWF <hwf> and SWF <swf> share for <p/txp/txq>.\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]         > txqChunk      - set <txp/txq> SWF request chunk size [v] for port <p>\n");
+	off += sprintf(buf+off, "echo [p] [txp] [txq] [hwf] [swf] > txqLimit      - set HWF <hwf> and SWF <swf> limits for <p/txp/txq>.\n");
+	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]         > txqChunk      - set SWF request chunk [v] for <p/txp/txq>\n");
 
 #else
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [hwf]       > txqLimit       - set HWF share <hwf> for <p/txp/txq>.\n");
+	off += sprintf(buf+off, "echo [p] [txp] [txq] [hwf]       > txqLimit      - set HWF limit <hwf> for <p/txp/txq>.\n");
 #endif
 	return off;
 }
