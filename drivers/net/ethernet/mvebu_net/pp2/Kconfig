@@ -113,7 +113,7 @@ config MV_ETH_TXQ_DEF
 
 config MV_ETH_TXQ_HWF_DESC
 	int "Number of HWF Tx descriptors"
-	depends on MV_ETH_PP2
+	depends on (MV_ETH_PP2 && !MV_ETH_PP2_1)
 	default 16
         ---help---
 	The number of HWF dedicated Tx descriptors in each Tx queue.

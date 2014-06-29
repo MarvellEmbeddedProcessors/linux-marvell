@@ -945,6 +945,33 @@ int mv_eth_ctrl_rxq_size_set(int port, int rxq, int value)
 	return 0;
 }
 
+static void mv_pp2_txq_size_set(struct tx_queue *txq_ctrl, int txq_size)
+{
+	int cpu;
+	struct txq_cpu_ctrl *txq_cpu_ptr;
+
+	txq_ctrl->txq_size = txq_size;
+
+#ifdef CONFIG_MV_ETH_PP2_1
+	txq_ctrl->rsvd_chunk = MV_ETH_CPU_DESC_CHUNK;
+	txq_ctrl->hwf_size = txq_ctrl->txq_size - (nr_cpu_ids * txq_ctrl->rsvd_chunk);
+	txq_ctrl->swf_size = txq_ctrl->txq_size - 2 * (nr_cpu_ids * txq_ctrl->rsvd_chunk);
+
+	for_each_possible_cpu(cpu) {
+		txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
+
+		txq_cpu_ptr->txq_size = txq_ctrl->txq_size;
+	}
+#else
+	txq_ctrl->hwf_size = CONFIG_MV_ETH_TXQ_HWF_DESC;
+
+	for_each_possible_cpu(cpu) {
+		txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
+
+		txq_cpu_ptr->txq_size = (txq_ctrl->txq_size - txq_ctrl->hwf_size) / nr_cpu_ids;
+	}
+#endif /* CONFIG_MV_ETH_PP2_1 */
+}
 
 /* set <txp/txq> SWF request chunk size */
 int mv_eth_ctrl_txq_chunk_set(int port, int txp, int txq, int chunk_size)
@@ -952,19 +979,22 @@ int mv_eth_ctrl_txq_chunk_set(int port, int txp, int txq, int chunk_size)
 	struct tx_queue *txq_ctrl;
 	struct eth_port *pp = mv_eth_port_by_id(port);
 
-
 	if (pp == NULL) {
 		printk(KERN_INFO "port does not exist (%d) in %s\n" , port, __func__);
 		return -EINVAL;
 	}
 
 	txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + txq];
-
 	if (!txq_ctrl) {
 		printk(KERN_INFO "queue does not exist (%d) in %s\n" , port, __func__);
 		return -EINVAL;
 	}
-
+	/* chunk_size must be less than swf_size */
+	if (chunk_size > txq_ctrl->swf_size) {
+		pr_err("Chunk size %d must be less or equal than swf size %d\n",
+			chunk_size, txq_ctrl->swf_size);
+		return -EINVAL;
+	}
 	txq_ctrl->rsvd_chunk = chunk_size;
 
 	return MV_OK;
@@ -985,41 +1015,39 @@ int mv_eth_ctrl_txq_limits_set(int port, int txp, int txq, int hwf_size, int swf
 
 	pp = mv_eth_port_by_id(port);
 	if (pp == NULL) {
-		printk(KERN_INFO "port does not exist (%d) in %s\n" , port, __func__);
+		pr_err("port does not exist (%d) in %s\n" , port, __func__);
 		return -EINVAL;
 	}
 
 	txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + txq];
 
 	if (!txq_ctrl) {
-		printk(KERN_INFO "queue is null %s\n", __func__);
+		pr_err("queue is null %s\n", __func__);
 		return -EINVAL;
 	}
 
 	txq_size = txq_ctrl->txq_size;
 
-#ifdef CONFIG_MV_ETH_PP2_1
-	if (hwf_size < swf_size) {
-		printk(KERN_ERR "Invalid size params, swf size must be less than hwf size\n");
-		return -EINVAL;
-	}
-#endif
-
 	if (txq_size < hwf_size) {
-		printk(KERN_ERR "invalid hwf size, must be less or equal to txq size (%d)\n", txq_size);
+		pr_err("invalid hwf size, must be less or equal to txq size (%d)\n", txq_size);
 		return -EINVAL;
 	}
 
 	if (hwf_size % 16 != 0) {
-		printk(KERN_ERR "invalid hwf size, must be aligned to 16\n");
+		pr_err("invalid hwf size, must be aligned to 16\n");
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_MV_ETH_PP2_1
+	if (hwf_size < swf_size) {
+		pr_err("Invalid size params, swf size must be less than hwf size\n");
+		return -EINVAL;
+	}
+	txq_ctrl->swf_size = swf_size;
+#endif /* CONFIG_MV_ETH_PP2_1 */
+
 	txq_ctrl->hwf_size = hwf_size;
 
-#ifdef CONFIG_MV_ETH_PP2_1
-	txq_ctrl->swf_size = swf_size;
-#endif
 	mvPp2TxqHwfSizeSet(port, txp, txq, hwf_size);
 
 	return 0;
@@ -1027,9 +1055,7 @@ int mv_eth_ctrl_txq_limits_set(int port, int txp, int txq, int hwf_size, int swf
 
 int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int txq_size)
 {
-	int cpu, cpu_size;
 	struct tx_queue *txq_ctrl;
-	struct txq_cpu_ctrl *txq_cpu_ptr;
 	struct eth_port *pp;
 
 	if (mvPp2TxpCheck(port, txp))
@@ -1055,15 +1081,8 @@ int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int txq_size)
 	}
 
 	txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + txq];
-
 	if (!txq_ctrl) {
 		pr_err("TXQ is not exist\n");
-		return -EINVAL;
-	}
-
-	if ((txq_ctrl->q) && (txq_size < txq_ctrl->hwf_size)) {
-		pr_err("Invalid TXQ size %d, must be greater than HWF size (%d)\n",
-			txq_size, txq_ctrl->hwf_size);
 		return -EINVAL;
 	}
 
@@ -1076,24 +1095,8 @@ int mv_eth_ctrl_txq_size_set(int port, int txp, int txq, int txq_size)
 		mvPp2TxqReset(port, txp, txq);
 		mv_eth_txq_delete(pp, txq_ctrl);
 	}
+	mv_pp2_txq_size_set(txq_ctrl, txq_size);
 
-	txq_ctrl->txq_size = txq_size;
-
-	/* right now, all cpus have same size */
-	/* relevant only for ppv2.1 */
-	cpu_size = (txq_ctrl->txq_size - txq_ctrl->hwf_size) / CONFIG_NR_CPUS;
-
-#ifdef CONFIG_MV_ETH_PP2_1
-	for_each_possible_cpu(cpu) {
-		txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
-		txq_cpu_ptr->txq_size = txq_size;
-	}
-#else
-	for_each_possible_cpu(cpu) {
-		txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
-		txq_cpu_ptr->txq_size = cpu_size;
-	}
-#endif
 	/* New TXQ will be created during mv_eth_start_internals */
 	return 0;
 }
@@ -4113,9 +4116,8 @@ EXPORT_SYMBOL(mv_eth_netdev_find);
 
 int mv_eth_hal_init(struct eth_port *pp)
 {
-	int rxq, txp, txq, size, cpu;
+	int rxq, txp, txq, size;
 	struct tx_queue *txq_ctrl;
-	struct txq_cpu_ctrl *txq_cpu_ptr;
 	struct rx_queue *rxq_ctrl;
 
 	/* Init port */
@@ -4137,36 +4139,11 @@ int mv_eth_hal_init(struct eth_port *pp)
 		for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++) {
 			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + txq];
 
-			txq_ctrl->q = NULL;
 			txq_ctrl->txp = txp;
 			txq_ctrl->txq = txq;
-			txq_ctrl->txq_size = CONFIG_MV_ETH_TXQ_DESC;
-			txq_ctrl->hwf_size = CONFIG_MV_ETH_TXQ_HWF_DESC;
-
-#ifdef CONFIG_MV_ETH_PP2_1
-			txq_ctrl->rsvd_chunk = MV_ETH_CPU_DESC_CHUNK;
-			txq_ctrl->hwf_size =
-				txq_ctrl->txq_size - (nr_cpu_ids * txq_ctrl->rsvd_chunk);
-			txq_ctrl->swf_size =
-				txq_ctrl->hwf_size - (nr_cpu_ids * txq_ctrl->rsvd_chunk);
-#endif
-			for_each_possible_cpu(cpu) {
-				txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
-				txq_cpu_ptr->shadow_txq = NULL;
-#ifdef CONFIG_MV_ETH_PP2_1
-				/* In default, all CPUs and TXQs have same chunk size */
-				txq_cpu_ptr->txq_size = CONFIG_MV_ETH_TXQ_DESC;
-				txq_cpu_ptr->reserved_num = 0;
-#else
-				txq_cpu_ptr->txq_size =
-					(CONFIG_MV_ETH_TXQ_DESC - CONFIG_MV_ETH_TXQ_HWF_DESC) / nr_cpu_ids;
-#endif
-				txq_cpu_ptr->txq_count = 0;
-				txq_cpu_ptr->shadow_txq_put_i = 0;
-				txq_cpu_ptr->shadow_txq_get_i = 0;
-			}
-
 			txq_ctrl->txq_done_pkts_coal = mv_ctrl_txdone;
+
+			mv_pp2_txq_size_set(txq_ctrl, CONFIG_MV_ETH_TXQ_DESC);
 		}
 	}
 
@@ -5345,16 +5322,25 @@ void mv_eth_port_status_print(unsigned int port)
 		}
 		pr_cont("\n");
 
+#ifdef CONFIG_MV_ETH_PP2_1
 		pr_info("txq_swf_desc(num) [%2d.q]   = ", txp);
 		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
 			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + q];
-			pr_cont("%4d ", txq_ctrl->txq_cpu[0].txq_size);
+			pr_cont("%4d ", txq_ctrl->swf_size);
 		}
 		pr_info("txq_rsvd_chunk(num) [%2d.q] = ", txp);
 		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
 			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + q];
 			pr_cont("%4d ", txq_ctrl->rsvd_chunk);
 		}
+#else
+		pr_info("txq_swf_desc(num) [%2d.q]   = ", txp);
+		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
+			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + q];
+			pr_cont("%4d ", txq_ctrl->txq_cpu[0].txq_size);
+		}
+#endif /* CONFIG_MV_ETH_PP2_1 */
+
 		pr_cont("\n");
 	}
 	pr_info("\n");
