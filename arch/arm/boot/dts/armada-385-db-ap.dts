@@ -41,7 +41,13 @@
 			ethernet@30000 {
 				status = "okay";
 				phy = <&phy1>;
-				phy-mode = "rgmii";
+				phy-mode = "sgmii";
+			};
+
+			ethernet@34000 {
+				status = "okay";
+				phy = <&phy2>;
+				phy-mode = "sgmii";
 			};
 
 			i2c0: i2c@11000 {
@@ -61,6 +67,10 @@
 
 				phy1: ethernet-phy@1 {
 					reg = <1>;
+				};
+
+				phy2: ethernet-phy@2 {
+					reg = <2>;
 				};
 			};
 
