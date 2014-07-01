@@ -2170,7 +2170,7 @@ cesa_test_probe(struct platform_device *pdev)
 #ifndef MV_NETBSD
 	numOfSessions = CESA_DEF_SESSION_NUM;
 
-	status = mvSysCesaInit(numOfSessions, CESA_DEF_REQ_SIZE, NULL, pdev);
+	status = mvSysCesaInit(numOfSessions, CESA_DEF_REQ_SIZE, &pdev->dev, pdev);
 	if (status != MV_OK) {
 		mvOsPrintf("mvCesaInit is Failed: status = 0x%x\n", status);
 		/* !!!! Dima cesaTestCleanup(); */
