@@ -1208,7 +1208,7 @@ cesa_ocf_probe(struct platform_device *pdev)
 					      __FILE__, __LINE__, cesa_ocf_id);
 
 	if (MV_OK !=
-	    mvSysCesaInit(CESA_OCF_MAX_SES*5, CESA_Q_SIZE, NULL, pdev)) {
+	    mvSysCesaInit(CESA_OCF_MAX_SES*5, CESA_Q_SIZE, &pdev->dev, pdev)) {
 		dev_err(&pdev->dev, "%s,%d: mvCesaInit Failed.\n",
 							   __FILE__, __LINE__);
 		return -EINVAL;
