@@ -389,7 +389,7 @@ MV_STATUS mvCesaHalInit(int numOfSession, int queueDepth, void *osHandle, MV_CES
 						MV_32BIT_LE(mvCesaVirtToPhys(&pReq->dmaDescBuf, &pDmaDesc[i + 1]));
 				}
 				pDma->pDmaFirst[i].phyNextDescPtr = 0;
-				mvOsCacheFlush(NULL, &pDma->pDmaFirst[0], MV_CESA_MAX_DMA_DESC * sizeof(MV_DMA_DESC));
+				mvOsCacheFlush(cesaOsHandle, &pDma->pDmaFirst[0], MV_CESA_MAX_DMA_DESC * sizeof(MV_DMA_DESC));
 
 				pDmaDesc += MV_CESA_MAX_DMA_DESC;
 			}
@@ -607,8 +607,8 @@ MV_STATUS mvCesaCryptoIvSet(MV_U8 chan, MV_U8 *pIV, int ivSize)
 		ivSize -= size;
 	}
 /*
-    mvOsCacheFlush(NULL, cesaSramVirtPtr[chan]->cryptoIV, MV_CESA_MAX_IV_LENGTH);
-    mvOsCacheInvalidate(NULL, cesaSramVirtPtr[chan]->cryptoIV, MV_CESA_MAX_IV_LENGTH);
+    mvOsCacheFlush(cesaOsHandle, cesaSramVirtPtr[chan]->cryptoIV, MV_CESA_MAX_IV_LENGTH);
+    mvOsCacheInvalidate(cesaOsHandle, cesaSramVirtPtr[chan]->cryptoIV, MV_CESA_MAX_IV_LENGTH);
 */
 	return MV_OK;
 }
@@ -842,7 +842,7 @@ MV_STATUS mvCesaSessionOpen(MV_CESA_OPEN_SESSION *pSession, short *pSid)
 	}
 	pCesaSAD[sid]->config = config;
 
-	mvOsCacheFlush(NULL, pCesaSAD[sid]->pSramSA, sizeof(MV_CESA_SRAM_SA));
+	mvOsCacheFlush(cesaOsHandle, pCesaSAD[sid]->pSramSA, sizeof(MV_CESA_SRAM_SA));
 	if (pSid != NULL)
 		*pSid = sid;
 
@@ -1031,7 +1031,7 @@ MV_STATUS mvCesaAction(MV_U8 chan, MV_CESA_COMMAND *pCmd)
 						pReq->dma[frag - 1].pDmaLast->phyNextDescPtr =
 						    MV_32BIT_LE(mvCesaVirtToPhys(&pReq->dmaDescBuf,
 							pReq->dma[frag].pDmaFirst));
-						mvOsCacheFlush(NULL, pReq->dma[frag - 1].pDmaLast,
+						mvOsCacheFlush(cesaOsHandle, pReq->dma[frag - 1].pDmaLast,
 						    sizeof(MV_DMA_DESC));
 					}
 #ifdef CONFIG_OF
@@ -1086,7 +1086,7 @@ MV_STATUS mvCesaAction(MV_U8 chan, MV_CESA_COMMAND *pCmd)
 				/* assume concatenating is possible */
 				pFromReq->dma[pFromReq->frags.numFrag - 1].pDmaLast->phyNextDescPtr =
 				    MV_32BIT_LE(mvCesaVirtToPhys(&pToReq->dmaDescBuf, pToReq->dma[0].pDmaFirst));
-				mvOsCacheFlush(NULL, pFromReq->dma[pFromReq->frags.numFrag - 1].pDmaLast,
+				mvOsCacheFlush(cesaOsHandle, pFromReq->dma[pFromReq->frags.numFrag - 1].pDmaLast,
 				    sizeof(MV_DMA_DESC));
 
 
@@ -1697,11 +1697,11 @@ static MV_STATUS mvCesaMbufCacheUnmap(MV_CESA_MBUF *pMbuf, int offset, int size)
 	pBuf = pMbuf->pFrags[frag].bufVirtPtr + fragOffset;
 	while (MV_TRUE) {
 		if (size <= bufSize) {
-			mvOsCacheUnmap(NULL, mvOsIoVirtToPhy(NULL, pBuf), size);
+			mvOsCacheUnmap(cesaOsHandle, mvOsIoVirtToPhy(cesaOsHandle, pBuf), size);
 			return MV_OK;
 		}
 
-		mvOsCacheUnmap(NULL, mvOsIoVirtToPhy(NULL, pBuf), bufSize);
+		mvOsCacheUnmap(cesaOsHandle, mvOsIoVirtToPhy(cesaOsHandle, pBuf), bufSize);
 		size -= bufSize;
 		frag++;
 		if (frag >= pMbuf->numFrags)
@@ -1923,7 +1923,7 @@ static MV_STATUS mvCesaFragReqProcess(MV_U8 chan, MV_CESA_REQ *pReq, MV_U8 frag)
 	/* Next field of Last DMA descriptor must be NULL */
 	pDmaDesc[i - 1].phyNextDescPtr = 0;
 	pReq->dma[frag].pDmaLast = &pDmaDesc[i - 1];
-	mvOsCacheFlush(NULL, pReq->dma[frag].pDmaFirst, i * sizeof(MV_DMA_DESC));
+	mvOsCacheFlush(cesaOsHandle, pReq->dma[frag].pDmaFirst, i * sizeof(MV_DMA_DESC));
 
 	/*mvCesaDebugDescriptor(&cesaSramVirtPtr[chan]->desc[frag]); */
 
@@ -2016,7 +2016,7 @@ static MV_STATUS mvCesaReqProcess(MV_U8 chan, MV_CESA_REQ *pReq)
 	/* Next field of Last DMA descriptor must be NULL */
 	pDmaDesc[i - 1].phyNextDescPtr = 0;
 	pReq->dma[0].pDmaLast = &pDmaDesc[i - 1];
-	mvOsCacheFlush(NULL, pReq->dma[0].pDmaFirst, i * sizeof(MV_DMA_DESC));
+	mvOsCacheFlush(cesaOsHandle, pReq->dma[0].pDmaFirst, i * sizeof(MV_DMA_DESC));
 
 	return MV_OK;
 }
@@ -2096,7 +2096,7 @@ static void mvCesaSramDescrBuild(MV_U8 chan, MV_U32 config, int frag,
 	pDmaDesc->byteCnt = MV_32BIT_LE(sizeof(MV_CESA_DESC) | BIT31);
 
 	/* flush Source buffer */
-	mvOsCacheFlush(NULL, pCesaDesc, sizeof(MV_CESA_DESC));
+	mvOsCacheFlush(cesaOsHandle, pCesaDesc, sizeof(MV_CESA_DESC));
 }
 
 /*******************************************************************************
@@ -2126,7 +2126,7 @@ static INLINE void mvCesaSramSaUpdate(MV_U8 chan, short sid, MV_DMA_DESC *pDmaDe
 	pDmaDesc->phyDestAdd = MV_32BIT_LE(mvCesaSramVirtToPhys(chan, NULL, (MV_U8 *)&cesaSramVirtPtr[chan]->sramSA));
 
 	/* Source buffer is already flushed during OpenSession */
-	/*mvOsCacheFlush(NULL, &pSA->sramSA, sizeof(MV_CESA_SRAM_SA)); */
+	/*mvOsCacheFlush(cesaOsHandle, &pSA->sramSA, sizeof(MV_CESA_SRAM_SA)); */
 }
 
 /*******************************************************************************
@@ -2179,17 +2179,17 @@ static INLINE int mvCesaDmaCopyPrepare(MV_U8 chan, MV_CESA_MBUF *pMbuf, MV_U8 *p
 		bufSize = MV_MIN(bufSize, (copySize - size));
 		pDmaDesc[i].byteCnt = MV_32BIT_LE(bufSize | BIT31);
 		if (isToMbuf) {
-			pDmaDesc[i].phyDestAdd = MV_32BIT_LE(mvOsIoVirtToPhy(NULL, pBuf));
+			pDmaDesc[i].phyDestAdd = MV_32BIT_LE(mvOsIoVirtToPhy(cesaOsHandle, pBuf));
 			pDmaDesc[i].phySrcAdd = MV_32BIT_LE(mvCesaSramVirtToPhys(chan, NULL, (pSramBuf + size)));
 			/* invalidate the buffer */
 			if (skipFlush == MV_FALSE)
-				mvOsCacheInvalidate(NULL, pBuf, bufSize);
+				mvOsCacheInvalidate(cesaOsHandle, pBuf, bufSize);
 		} else {
-			pDmaDesc[i].phySrcAdd = MV_32BIT_LE(mvOsIoVirtToPhy(NULL, pBuf));
+			pDmaDesc[i].phySrcAdd = MV_32BIT_LE(mvOsIoVirtToPhy(cesaOsHandle, pBuf));
 			pDmaDesc[i].phyDestAdd = MV_32BIT_LE(mvCesaSramVirtToPhys(chan, NULL, (pSramBuf + size)));
 			/* flush the buffer */
 			if (skipFlush == MV_FALSE)
-				mvOsCacheFlush(NULL, pBuf, bufSize);
+				mvOsCacheFlush(cesaOsHandle, pBuf, bufSize);
 		}
 
 		/* Count number of used DMA descriptors */
@@ -2263,7 +2263,7 @@ static int mvCesaDmaCopyPrepare(MV_U8 chan, MV_CESA_MBUF *pMbuf, MV_U8 *pSramBuf
 			/*
 			 * Physicall address of this fragment
 			 */
-			bufPhys = MV_32BIT_LE(mvOsIoVirtToPhy(NULL, pBuf));
+			bufPhys = MV_32BIT_LE(mvOsIoVirtToPhy(cesaOsHandle, pBuf));
 
 			/*
 			 * Set up the descriptor
@@ -2274,19 +2274,19 @@ static int mvCesaDmaCopyPrepare(MV_U8 chan, MV_CESA_MBUF *pMbuf, MV_U8 *pSramBuf
 				pDmaDesc[i].phySrcAdd = MV_32BIT_LE(sramPhys);
 				/* invalidate the buffer */
 				if (skipFlush == MV_FALSE)
-					mvOsCacheInvalidate(NULL, pBuf, thisSize);
+					mvOsCacheInvalidate(cesaOsHandle, pBuf, thisSize);
 			} else {
 				pDmaDesc[i].phySrcAdd = bufPhys;
 				pDmaDesc[i].phyDestAdd = MV_32BIT_LE(sramPhys);
 				/* flush the buffer */
 				if (skipFlush == MV_FALSE)
-					mvOsCacheFlush(NULL, pBuf, thisSize);
+					mvOsCacheFlush(cesaOsHandle, pBuf, thisSize);
 			}
 
-			pDmaDesc[i].phyNextDescPtr = MV_32BIT_LE(mvOsIoVirtToPhy(NULL, (&pDmaDesc[i + 1])));
+			pDmaDesc[i].phyNextDescPtr = MV_32BIT_LE(mvOsIoVirtToPhy(cesaOsHandle, (&pDmaDesc[i + 1])));
 
 			/* flush the DMA desc */
-			mvOsCacheFlush(NULL, &pDmaDesc[i], sizeof(MV_DMA_DESC));
+			mvOsCacheFlush(cesaOsHandle, &pDmaDesc[i], sizeof(MV_DMA_DESC));
 
 			/* Update state */
 			bufSize -= thisSize;
@@ -2830,7 +2830,7 @@ static MV_STATUS mvCesaCtrModePrepare(MV_CESA_COMMAND *pCtrModeCmd, MV_CESA_COMM
 		return MV_OUT_OF_CPU_MEM;
 	}
 	memset(pBuf, 0, cryptoSize);
-	mvOsCacheFlush(NULL, pBuf, cryptoSize);
+	mvOsCacheFlush(cesaOsHandle, pBuf, cryptoSize);
 
 	pMbuf->pFrags[0].bufVirtPtr = pBuf;
 	pMbuf->mbufSize = cryptoSize;
