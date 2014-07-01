@@ -50,8 +50,23 @@ int mv_neta_wol_sysfs_exit(struct kobject *gbe_kobj);
 int mv_neta_pon_sysfs_init(struct kobject *gbe_kobj);
 int mv_neta_pon_sysfs_exit(struct kobject *gbe_kobj);
 #ifdef CONFIG_MV_ETH_L2FW
-int mv_neta_l2fw_sysfs_init(struct kobject *pp2_kobj);
-int mv_neta_l2fw_sysfs_exit(struct kobject *pp2_kobj);
+int mv_neta_l2fw_sysfs_init(struct kobject *neta_kobj);
+int mv_neta_l2fw_sysfs_exit(struct kobject *neta_kobj);
 #endif
+
+int mv_neta_rx_sysfs_init(struct kobject *gbe_kobj);
+int mv_neta_rx_sysfs_exit(struct kobject *gbe_kobj);
+
+int mv_neta_tx_sysfs_init(struct kobject *gbe_kobj);
+int mv_neta_tx_sysfs_exit(struct kobject *gbe_kobj);
+
+int mv_neta_tx_sched_sysfs_init(struct kobject *gbe_kobj);
+int mv_neta_tx_sched_sysfs_exit(struct kobject *gbe_kobj);
+
+int mv_neta_qos_sysfs_init(struct kobject *gbe_kobj);
+int mv_neta_qos_sysfs_exit(struct kobject *gbe_kobj);
+
+int mv_neta_rss_sysfs_init(struct kobject *gbe_kobj);
+int mv_neta_rss_sysfs_exit(struct kobject *gbe_kobj);
 
 #endif /* __mv_eth_sysfs_h__ */

@@ -45,7 +45,9 @@ ifeq ($(CONFIG_MV_ETH_HWF),y)
 mv_neta-objs += $(NETA_GBE_DIR)/mvHwf.o hwf/hwf_sysfs.o
 endif
 
-mv_neta-objs += net_dev/mv_netdev.o net_dev/mv_ethernet.o net_dev/mv_eth_sysfs.o net_dev/mv_eth_tool.o
+mv_neta-objs += net_dev/mv_netdev.o net_dev/mv_ethernet.o net_dev/mv_eth_tool.o
+mv_neta-objs += net_dev/mv_eth_sysfs.o net_dev/mv_eth_rx_sysfs.o net_dev/mv_eth_tx_sysfs.o
+mv_neta-objs += net_dev/mv_eth_tx_sched_sysfs.o net_dev/mv_eth_qos_sysfs.o net_dev/mv_eth_rss_sysfs.o
 
 ifeq ($(CONFIG_MV_ETH_L2FW),y)
 mv_neta-objs += l2fw/l2fw_sysfs.o l2fw/mv_eth_l2fw.o
