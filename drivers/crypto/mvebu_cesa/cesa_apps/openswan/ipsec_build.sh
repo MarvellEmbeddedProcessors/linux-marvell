@@ -3,7 +3,7 @@
 set -e
 
 # Optionaly download the sources from web
-#wget http://download.openswan.org/openswan/openswan-2.6.41.tar.gz
+wget --no-check-certificate http://download.openswan.org/openswan/openswan-2.6.41.tar.gz
 
 # Extract sources localy
 tar -zxvf openswan-2.6.41.tar.gz
