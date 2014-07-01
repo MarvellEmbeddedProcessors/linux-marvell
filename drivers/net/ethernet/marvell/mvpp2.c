@@ -779,6 +779,8 @@ struct mvpp2_rx_desc {
 
 /* Per-CPU Tx queue control */
 struct mvpp2_txq_pcpu {
+	int cpu;
+
 	/* Number of Tx DMA descriptors in the descriptor ring */
 	int size;
 
@@ -4118,8 +4120,8 @@ static void mvpp2_defaults_set(struct mvpp2_port *pp)
 		mvpp2_write(pp->pp2, MVPP2_RXQ_CONFIG_REG(queue), reg_val);
 	}
 
-	/* At default, mask all interrupts to all online cpus */
-	for_each_online_cpu(cpu)
+	/* At default, mask all interrupts to all present cpus */
+	for_each_present_cpu(cpu)
 		mvpp2_cpu_interrupts_disable(pp, cpu);
 }
 
@@ -4430,8 +4432,8 @@ static u32 mvpp2_txq_desc_csum(int l3_offs, int l3_proto,
  * The number of sent descriptors is returned.
  * Per-CPU access
  */
-static int mvpp2_txq_sent_desc_proc(struct mvpp2_port *pp,
-				    struct mvpp2_tx_queue *txq)
+static inline int mvpp2_txq_sent_desc_proc(struct mvpp2_port *pp,
+					   struct mvpp2_tx_queue *txq)
 {
 	u32 reg_val;
 
@@ -4566,26 +4568,29 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *pp,
 	}
 }
 
-static struct mvpp2_rx_queue *mvpp2_get_rx_queue(struct mvpp2_port *pp,
-						 u32 cause)
+static inline struct mvpp2_rx_queue *mvpp2_get_rx_queue(struct mvpp2_port *pp,
+							u32 cause)
 {
 	int queue = fls(cause) - 1;
 	return pp->rxqs[queue];
 }
 
-static struct mvpp2_tx_queue *mvpp2_get_tx_queue(struct mvpp2_port *pp,
-						 u32 cause)
+static inline struct mvpp2_tx_queue *mvpp2_get_tx_queue(struct mvpp2_port *pp,
+							u32 cause)
 {
 	int queue = fls(cause >> 16) - 1;
 	return pp->txqs[queue];
 }
 
 /* Handle end of transmission */
-static void mvpp2_txq_done(struct mvpp2_port *pp, struct mvpp2_tx_queue *txq)
+static void mvpp2_txq_done(struct mvpp2_port *pp, struct mvpp2_tx_queue *txq,
+			   struct mvpp2_txq_pcpu *txq_pcpu)
 {
 	struct netdev_queue *nq = netdev_get_tx_queue(pp->dev, txq->log_id);
-	struct mvpp2_txq_pcpu *txq_pcpu = this_cpu_ptr(txq->pcpu);
 	int tx_done;
+
+	if (txq_pcpu->cpu != smp_processor_id())
+		netdev_err(pp->dev, "wrong cpu on the end of Tx processing\n");
 
 	tx_done = mvpp2_txq_sent_desc_proc(pp, txq);
 	if (!tx_done)
@@ -4965,36 +4970,13 @@ err_cleanup:
 	return err;
 }
 
-static void mvpp2_tx_done(struct mvpp2_port *pp, u32 cause)
-{
-	struct mvpp2_tx_queue *txq;
-	struct netdev_queue *nq;
-	struct mvpp2_txq_pcpu *txq_pcpu;
-
-	while (cause) {
-		txq = mvpp2_get_tx_queue(pp, cause);
-		if (!txq)
-			break;
-
-		nq = netdev_get_tx_queue(pp->dev, txq->log_id);
-		txq_pcpu = this_cpu_ptr(txq->pcpu);
-
-		__netif_tx_lock(nq, smp_processor_id());
-		if (txq_pcpu->count)
-			mvpp2_txq_done(pp, txq);
-		__netif_tx_unlock(nq);
-
-		cause &= ~((1 << txq->log_id) << 16);
-	}
-}
-
 /* The callback for per-port interrupt */
-irqreturn_t mvpp2_isr(int irq, void *dev_id)
+static irqreturn_t mvpp2_isr(int irq, void *dev_id)
 {
 	struct mvpp2_port *pp = (struct mvpp2_port *)dev_id;
 	int cpu;
 
-	for_each_online_cpu(cpu)
+	for_each_present_cpu(cpu)
 		mvpp2_cpu_interrupts_disable(pp, cpu);
 
 	napi_schedule(&pp->napi);
@@ -5442,18 +5424,10 @@ static inline void mvpp2_cause_error(struct net_device *dev, int cause)
 		netdev_err(dev, "tx fifo underrun error\n");
 }
 
-static int mvpp2_poll(struct napi_struct *napi, int budget)
+static void mvpp2_handle_cpu(void *arg)
 {
-	u32 cause_rx_tx, cause_tx, cause_rx, cause_misc;
-	int rx_done = 0;
-	struct mvpp2_port *pp = netdev_priv(napi->dev);
-
-	if (!netif_running(pp->dev)) {
-		napi_complete(napi);
-		return rx_done;
-	}
-
-	cause_rx_tx = mvpp2_read(pp->pp2, MVPP2_ISR_RX_TX_CAUSE_REG(pp->id));
+	struct mvpp2_port *pp = arg;
+	u32 cause_rx_tx, cause_tx, cause_misc;
 
 	/* Rx/Tx cause register
 	 *
@@ -5465,7 +5439,7 @@ static int mvpp2_poll(struct napi_struct *napi, int budget)
 	 *
 	 * Each CPU has its own Rx/Tx cause register
 	 */
-	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	cause_rx_tx = mvpp2_read(pp->pp2, MVPP2_ISR_RX_TX_CAUSE_REG(pp->id));
 	cause_tx = cause_rx_tx & MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
 	cause_misc = cause_rx_tx & MVPP2_CAUSE_MISC_SUM_MASK;
 
@@ -5479,8 +5453,33 @@ static int mvpp2_poll(struct napi_struct *napi, int budget)
 	}
 
 	/* Release TX descriptors */
-	if (cause_tx)
-		mvpp2_tx_done(pp, cause_tx);
+	if (cause_tx) {
+		struct mvpp2_tx_queue *txq = mvpp2_get_tx_queue(pp, cause_tx);
+		struct mvpp2_txq_pcpu *txq_pcpu = this_cpu_ptr(txq->pcpu);
+
+		if (!txq)
+			return;
+
+		if (txq_pcpu->count)
+			mvpp2_txq_done(pp, txq, txq_pcpu);
+	}
+}
+
+static int mvpp2_poll(struct napi_struct *napi, int budget)
+{
+	u32 cause_rx_tx, cause_rx;
+	int rx_done = 0;
+	struct mvpp2_port *pp = netdev_priv(napi->dev);
+
+	if (!netif_running(pp->dev)) {
+		napi_complete(napi);
+		return rx_done;
+	}
+
+	on_each_cpu(mvpp2_handle_cpu, pp, 1);
+
+	cause_rx_tx = mvpp2_read(pp->pp2, MVPP2_ISR_RX_TX_CAUSE_REG(pp->id));
+	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 
 	/* Process RX packets */
 	cause_rx |= pp->pending_cause_rx;
@@ -5512,7 +5511,7 @@ static int mvpp2_poll(struct napi_struct *napi, int budget)
 
 		/* TODO: Check this wmb() */
 		wmb();
-		for_each_online_cpu(cpu)
+		for_each_present_cpu(cpu)
 			mvpp2_cpu_interrupts_enable(pp, cpu);
 	}
 	pp->pending_cause_rx = cause_rx;
@@ -5546,7 +5545,7 @@ static int mvpp2_start_dev(struct mvpp2_port *pp)
 
 	/* Unmask and enable interrupts on all CPUs */
 	on_each_cpu(mvpp2_interrupts_unmask, pp, 1);
-	for_each_online_cpu(cpu)
+	for_each_present_cpu(cpu)
 		mvpp2_cpu_interrupts_enable(pp, cpu);
 
 	mvpp2_port_enable(pp);
@@ -5573,7 +5572,7 @@ static void mvpp2_stop_dev(struct mvpp2_port *pp)
 	mdelay(10);
 
 	/* Disable and mask interrupts on all CPUs */
-	for_each_online_cpu(cpu)
+	for_each_present_cpu(cpu)
 		mvpp2_cpu_interrupts_disable(pp, cpu);
 	on_each_cpu(mvpp2_interrupts_mask, pp, 1);
 
@@ -5978,6 +5977,7 @@ static int mvpp2_port_init(struct mvpp2_port *pp)
 			txq->done_pkts_coal = MVPP2_TXDONE_COAL_PKTS_THRESH;
 			for_each_present_cpu(cpu) {
 				txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
+				txq_pcpu->cpu = cpu;
 				txq_pcpu->size = txq->size;
 			}
 
