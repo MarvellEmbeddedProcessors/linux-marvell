@@ -90,11 +90,20 @@
 					marvell,pins = "mpp44", "mpp45";
 					marvell,function = "gpio";
 				};
+
+				sata_sd_pins: sata-sd-pins {
+					marvell,pins = "mpp63", "mpp66";
+					marvell,function = "gpio";
+				};
 			};
 
 			sata@a0000 {
 				nr-ports = <2>;
 				status = "okay";
+				pinctrl-0 = <&sata_sd_pins>;
+				pinctrl-names = "default";
+				status = "okay";
+				sd-gpios = <&gpio1 31 0>, <&gpio2 2 0>;
 			};
 
 			serial@12000 {
