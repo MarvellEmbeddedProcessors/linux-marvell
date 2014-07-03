@@ -171,6 +171,24 @@
 				#clock-cells = <1>;
 			};
 
+
+			common-phy@18310 {
+				compatible = "marvell,armada-375-common-phy-configuration";
+				reg = <0x18310 0x34>;
+				status = "disabled";
+				phy-count = <4>;
+			};
+
+			ip-configuration@18400 {
+				compatible = "marvell,armada-375-ip-configuration";
+				reg = <0x18400 0x100>;
+			};
+
+			pm-override-configuration0@34308 {
+				compatible = "marvell,armada-375-serdes-pipe-configuration";
+				reg = <0x34308 0x4>, <0x36308 0x4>, <0x38308 0x4>, <0x3a308 0x4>;
+			};
+
 			coredivclk: corediv-clock@e8250 {
 				compatible = "marvell,armada-375-corediv-clock";
 				reg = <0xe8250 0xc>;
