@@ -175,27 +175,26 @@ MV_STATUS mvPp2WolPtrnSet(int idx, int off, int size, MV_U8 *data, MV_U8 *mask)
 	int i, j, reg, new_size;
 	MV_U8 *new_data;
 	MV_U8 *new_mask;
-	int aligned_size = 0;
+	int aligned_size = 0, mh_off = 0;
+
+	/* Take Marvell Header offset into consideration  */
+	mh_off = off + MV_ETH_MH_SIZE;
 
 	if (mvPp2MaxCheck(idx, MV_PP2_WOL_PTRN_NUM, "PTRN index"))
 		return MV_BAD_PARAM;
 
-	if (mvPp2MaxCheck((off + size), MV_PP2_WOL_PTRN_BYTES, "PTRN size"))
+	if (mvPp2MaxCheck((mh_off + size), MV_PP2_WOL_PTRN_BYTES, "PTRN size"))
 		return MV_BAD_PARAM;
-/*
-	mvOsPrintf("WoL set pattern #%d: size=%d\n", idx, size);
-	mvDebugMemDump(data, size, 1);
-	mvDebugMemDump(mask, size, 1);
-*/
+
 	regVal = mvPp2RdReg(MV_PP2_WOL_PTRN_SIZE_REG);
 	regVal &= ~MV_PP2_WOL_PTRN_SIZE_MAX_MASK(idx);
-	regVal |= MV_PP2_WOL_PTRN_SIZE_MASK(idx, size);
+	regVal |= MV_PP2_WOL_PTRN_SIZE_MASK(idx, size + mh_off);
 
 	mvPp2WrReg(MV_PP2_WOL_PTRN_SIZE_REG, regVal);
 
 	mvPp2WrReg(MV_PP2_WOL_PTRN_IDX_REG, idx);
-	if (off % 4) {
-		aligned_size = size + 4 - (off % 4);
+	if (mh_off % 4) {
+		aligned_size = size + 4 - (mh_off % 4);
 		new_data = kmalloc(sizeof(MV_U8) * aligned_size, GFP_KERNEL);
 		if (!new_data) {
 			mvOsPrintf("CPU memory allocation fail\n");
@@ -212,15 +211,15 @@ MV_STATUS mvPp2WolPtrnSet(int idx, int off, int size, MV_U8 *data, MV_U8 *mask)
 		memset(new_data, 0, sizeof(MV_U8) * aligned_size);
 		memset(new_mask, 0, sizeof(MV_U8) * aligned_size);
 
-		memcpy(&new_data[off % 4], data, size);
-		memcpy(&new_mask[off % 4], mask, size);
+		memcpy(&new_data[mh_off % 4], data, size);
+		memcpy(&new_mask[mh_off % 4], mask, size);
 	} else {
 		new_data = data;
 		new_mask = mask;
 	}
-	new_size = size + (off % 4);
+	new_size = size + (mh_off % 4);
 	for (i = 0; i < new_size; i += 4) {
-		reg = (off + i) / 4;
+		reg = (mh_off + i) / 4;
 		regData = mvPp2RdReg(MV_PP2_WOL_PTRN_DATA_REG(reg));
 		regMask = mvPp2RdReg(MV_PP2_WOL_PTRN_MASK_REG(reg));
 		for (j = 0; j < 4; j++) {
@@ -239,10 +238,11 @@ MV_STATUS mvPp2WolPtrnSet(int idx, int off, int size, MV_U8 *data, MV_U8 *mask)
 		mvPp2WrReg(MV_PP2_WOL_PTRN_DATA_REG(reg), regData);
 		mvPp2WrReg(MV_PP2_WOL_PTRN_MASK_REG(reg), regMask);
 	}
-	if (off % 4) {
+	if (mh_off % 4) {
 		kfree(new_data);
 		kfree(new_mask);
 	}
+
 	return MV_OK;
 }
 
