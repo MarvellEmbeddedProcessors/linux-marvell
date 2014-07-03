@@ -199,13 +199,13 @@
 
 				/* GbE MAC's */
 				eth0: ethernet@c4000 {
-					interrupts-extended = <&mpic 9>;
+					interrupts = <0 37 1>;
 					port-id = <0>;
 					status = "disabled";
 				};
 
 				eth1: ethernet@c5000 {
-					interrupts-extended = <&mpic 11>;
+					interrupts = <0 41 1>;
 					port-id = <1>;
 					status = "disabled";
 				};
