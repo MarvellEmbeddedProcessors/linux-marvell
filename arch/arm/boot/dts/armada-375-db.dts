@@ -159,6 +159,10 @@
 			crypto@9D000 {
 				status = "okay";
 			};
+
+			common-phy@18310 {
+				status = "okay";
+			};
 		};
 
 		pcie-controller {
