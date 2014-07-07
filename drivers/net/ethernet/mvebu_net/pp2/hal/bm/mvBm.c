@@ -689,7 +689,7 @@ MV_STATUS mvBmQsetBuffMaxSet(int qset, int maxGrntd, int maxShared)
 	}
 
 	/* Update BM pool shared buffers num */
-	mvBmPoolBuffNumSet(pool, pBmPool->maxShared + delta);
+	mvBmPoolBuffNumSet(pool, pBmPool->maxShared - delta);
 
 	pQset->maxShared = maxShared;
 	pQset->maxGrntd = maxGrntd;
