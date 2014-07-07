@@ -336,7 +336,7 @@ int mv_switch_mac_update(int db, unsigned char *old_mac, unsigned char *new_mac)
 int mv_switch_mac_addr_set(int db, unsigned char *mac_addr, unsigned char op)
 {
 	GT_ATU_ENTRY mac_entry;
-	unsigned int ports_mask = db_port_mask[db] | (1 << qd_cpu_port);
+	unsigned int ports_mask;
 
 	memset(&mac_entry, 0, sizeof(GT_ATU_ENTRY));
 
@@ -346,13 +346,16 @@ int mv_switch_mac_addr_set(int db, unsigned char *mac_addr, unsigned char op)
 	mac_entry.exPrio.macFPri = 0;
 	mac_entry.exPrio.macQPri = 0;
 	mac_entry.DBNum = db;
-	mac_entry.portVec = ports_mask;
 	memcpy(mac_entry.macAddr.arEther, mac_addr, 6);
 
-	if (is_multicast_ether_addr(mac_addr))
+	if (is_multicast_ether_addr(mac_addr)) {
+		ports_mask = db_port_mask[db] | (1 << qd_cpu_port);
 		mac_entry.entryState.mcEntryState = GT_MC_STATIC;
-	else
+	} else {
+		ports_mask = (1 << qd_cpu_port);
 		mac_entry.entryState.ucEntryState = GT_UC_NO_PRI_STATIC;
+	}
+	mac_entry.portVec = ports_mask;
 
 	if ((op == 0) || (mac_entry.portVec == 0)) {
 		if (gfdbDelAtuEntry(qd_dev, &mac_entry) != GT_OK) {
