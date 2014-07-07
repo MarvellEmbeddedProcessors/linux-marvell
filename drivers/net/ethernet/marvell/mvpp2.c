@@ -3802,7 +3802,7 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *pp,
 	}
 
 	/* Update BM driver with number of buffers added to pool */
-	bm_pool->buf_num -= i;
+	bm_pool->buf_num += i;
 	bm_pool->in_use_thresh = bm_pool->buf_num / 4;
 
 	netdev_dbg(pp->dev,
@@ -3914,6 +3914,40 @@ static int mvpp2_swf_bm_pool_init(struct mvpp2_port *pp)
 			mvpp2_rxq_short_pool_set(pp, rxq, pp->pool_short->id);
 	}
 
+	return 0;
+}
+
+static int mvpp2_bm_update_mtu(struct net_device *dev, int mtu)
+{
+	struct mvpp2_port *pp = netdev_priv(dev);
+	struct mvpp2_bm_pool *port_pool = pp->pool_long;
+	int num, pkts_num = port_pool->buf_num;
+	int pkt_size = MVPP2_RX_PKT_SIZE(mtu);
+
+	if (mtu == dev->mtu)
+		goto mtu_out;
+
+	/* Update BM pool with new buffer size */
+	num = mvpp2_bm_bufs_free(pp->pp2, port_pool, pkts_num);
+	if (num != pkts_num) {
+		WARN(1, "cannot free all buffers in pool %d\n", port_pool->id);
+		return -EIO;
+	}
+
+	port_pool->pkt_size = pkt_size;
+	num = mvpp2_bm_bufs_add(pp, port_pool, pkts_num);
+	if (num != pkts_num) {
+		WARN(1, "pool %d: %d of %d allocated\n",
+		     port_pool->id, num, pkts_num);
+		return -EIO;
+	}
+
+	mvpp2_bm_pool_bufsize_set(pp->pp2, port_pool,
+				  MVPP2_RX_BUF_SIZE(port_pool->pkt_size));
+
+mtu_out:
+	dev->mtu = mtu;
+	netdev_update_features(dev);
 	return 0;
 }
 
@@ -5592,7 +5626,23 @@ static void mvpp2_stop_dev(struct mvpp2_port *pp)
 /* Return positive if MTU is valid */
 static inline int mvpp2_check_mtu_valid(struct net_device *dev, int mtu)
 {
-	/* TODO */
+	if (mtu < 68) {
+		netdev_err(dev, "cannot change mtu to less than 68\n");
+		return -EINVAL;
+	}
+
+	/* 9676 == 9700 - 20 and rounding to 8 */
+	if (mtu > 9676) {
+		netdev_info(dev, "illegal MTU value %d, round to 9676\n", mtu);
+		mtu = 9676;
+	}
+
+	if (!IS_ALIGNED(MVPP2_RX_PKT_SIZE(mtu), 8)) {
+		netdev_info(dev, "illegal MTU value %d, round to %d\n", mtu,
+			    ALIGN(MVPP2_RX_PKT_SIZE(mtu), 8));
+		mtu = ALIGN(MVPP2_RX_PKT_SIZE(mtu), 8);
+	}
+
 	return mtu;
 }
 
@@ -5752,8 +5802,43 @@ static int mvpp2_set_mac_address(struct net_device *dev, void *p)
 
 static int mvpp2_change_mtu(struct net_device *dev, int mtu)
 {
-	/* TODO */
+	struct mvpp2_port *pp = netdev_priv(dev);
+	int err;
+
+	mtu = mvpp2_check_mtu_valid(dev, mtu);
+	if (mtu < 0) {
+		err = mtu;
+		goto error;
+	}
+
+	if (!netif_running(dev)) {
+		err = mvpp2_bm_update_mtu(dev, mtu);
+		if (err)
+			goto error;
+		pp->pkt_size =  MVPP2_RX_PKT_SIZE(mtu);
+		mvpp2_gmac_max_rx_size_set(pp);
+		return 0;
+	}
+
+	mvpp2_stop_dev(pp);
+
+	err = mvpp2_bm_update_mtu(dev, mtu);
+	if (err)
+		goto error;
+
+	pp->pkt_size =  MVPP2_RX_PKT_SIZE(mtu);
+
+	err = mvpp2_start_dev(pp);
+	if (err)
+		goto error;
+	mvpp2_egress_enable(pp, true);
+	mvpp2_ingress_enable(pp, true);
+
 	return 0;
+
+error:
+	netdev_err(dev, "fail to change MTU");
+	return err;
 }
 
 struct rtnl_link_stats64 *mvpp2_get_stats64(struct net_device *dev,
