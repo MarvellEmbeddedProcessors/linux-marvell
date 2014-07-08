@@ -133,13 +133,19 @@ static const struct mvebu_soc_descr __initconst armada_370_gating_descr[] = {
 
 #ifdef CONFIG_MACH_ARMADA_375
 static const struct mvebu_soc_descr __initconst armada_375_gating_descr[] = {
+	{ "tdmmc", NULL, 0 },
+	{ "xpon", NULL, 1 },
 	{ "mu", NULL, 2 },
 	{ "pp", NULL, 3 },
 	{ "ptp", NULL, 4 },
 	{ "pex0", NULL, 5 },
 	{ "pex1", NULL, 6 },
 	{ "audio", NULL, 8 },
+	{ "isi_slic", NULL, 9 },
+	{ "zsi_slic", NULL, 10 },
 	{ "nd_clk", "nand", 11 },
+	{ "switch", NULL, 12 },
+	{ "ssi_slic", NULL, 13 },
 	{ "sata0_link", "sata0_core", 14 },
 	{ "sata0_core", NULL, 15 },
 	{ "usb3", NULL, 16 },
@@ -152,6 +158,7 @@ static const struct mvebu_soc_descr __initconst armada_375_gating_descr[] = {
 	{ "xor1", NULL, 23 },
 	{ "copro", NULL, 24 },
 	{ "tdm", NULL, 25 },
+	{ "usb_p1", NULL, 26 },
 	{ "crypto0_enc", NULL, 28 },
 	{ "crypto0_core", NULL, 29 },
 	{ "crypto1_enc", NULL, 30 },
