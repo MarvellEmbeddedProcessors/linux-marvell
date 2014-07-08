@@ -3265,6 +3265,27 @@ static int mvpp2_prs_mac_da_accept(struct mvpp2 *pp2, int port,
 	return 0;
 }
 
+static int mvpp2_prs_update_mac_da(struct net_device *dev, const u8 *da)
+{
+	struct mvpp2_port *pp = netdev_priv(dev);
+	int err;
+
+	/* Remove old parser entry */
+	err = mvpp2_prs_mac_da_accept(pp->pp2, pp->id, dev->dev_addr, false);
+	if (err)
+		return err;
+
+	/* Add new parser entry */
+	err = mvpp2_prs_mac_da_accept(pp->pp2, pp->id, da, true);
+	if (err)
+		return err;
+
+	/* Set addr in the device */
+	memcpy(dev->dev_addr, da, ETH_ALEN);
+
+	return 0;
+}
+
 /* Delete all port's multicast simple (not range) entries */
 static void mvpp2_prs_mcast_del_all(struct mvpp2 *pp2, int port)
 {
@@ -5779,25 +5800,35 @@ static int mvpp2_set_mac_address(struct net_device *dev, void *p)
 	const struct sockaddr *addr = p;
 	int err;
 
-	if (!is_valid_ether_addr(addr->sa_data))
-		return -EADDRNOTAVAIL;
+	if (!is_valid_ether_addr(addr->sa_data)) {
+		err = -EADDRNOTAVAIL;
+		goto error;
+	}
 
-	if (netif_running(dev))
-		return -EBUSY;
+	if (!netif_running(dev)) {
+		err = mvpp2_prs_update_mac_da(dev, addr->sa_data);
+		if (err)
+			goto error;
+		return 0;
+	}
 
-	/* Remove old parser entry */
-	err = mvpp2_prs_mac_da_accept(pp->pp2, pp->id, dev->dev_addr, false);
+	mvpp2_stop_dev(pp);
+
+	err = mvpp2_prs_update_mac_da(dev, addr->sa_data);
 	if (err)
-		return err;
+		goto error;
 
-	/* Add new parser entry */
-	err = mvpp2_prs_mac_da_accept(pp->pp2, pp->id, addr->sa_data, true);
+	err = mvpp2_start_dev(pp);
 	if (err)
-		return err;
+		goto error;
+	mvpp2_egress_enable(pp, true);
+	mvpp2_ingress_enable(pp, true);
 
-	/* Set addr in the device */
-	memcpy(dev->dev_addr, addr->sa_data, ETH_ALEN);
 	return 0;
+
+error:
+	netdev_err(dev, "fail to change MAC address\n");
+	return err;
 }
 
 static int mvpp2_change_mtu(struct net_device *dev, int mtu)
