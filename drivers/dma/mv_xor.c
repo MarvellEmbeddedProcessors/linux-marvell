@@ -1295,10 +1295,21 @@ err_channel_add:
 	return ret;
 }
 
+static void mv_xor_shutdown(struct platform_device *pdev)
+{
+	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
+
+	if (!IS_ERR(xordev->clk)) {
+		clk_disable_unprepare(xordev->clk);
+		clk_put(xordev->clk);
+	}
+}
+
 static struct platform_driver mv_xor_driver = {
 	.probe		= mv_xor_probe,
 	.suspend        = mv_xor_suspend,
 	.resume         = mv_xor_resume,
+	.shutdown	= mv_xor_shutdown,
 	.driver		= {
 		.name	        = MV_XOR_NAME,
 		.of_match_table = of_match_ptr(mv_xor_dt_ids),
