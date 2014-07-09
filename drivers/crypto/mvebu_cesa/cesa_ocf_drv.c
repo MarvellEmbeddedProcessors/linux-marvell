@@ -1315,6 +1315,32 @@ cesa_ocf_remove(struct platform_device *pdev)
 	return 0;
 }
 
+void cesa_ocf_shutdown(struct platform_device *pdev)
+{
+	struct clk *clk;
+	int  i, j;
+
+	if (!pdev->dev.of_node) {
+		dev_err(&pdev->dev, "CESA device node not available\n");
+		return;
+	}
+
+	j = of_property_count_strings(pdev->dev.of_node, "clock-names");
+	dprintk("%s: Gate %d clocks\n", __func__, (j > 0 ? j : 1));
+	/*
+	 * If property "clock-names" does not exist (j < 0), assume that there
+	 * is only one clock which needs gating (j > 0 ? j : 1)
+	 */
+	for (i = 0; i < (j > 0 ? j : 1); i++) {
+		/* Not all platforms can gate the clock, so it is not
+		 * an error if the clock does not exists.
+		 */
+		clk = of_clk_get(pdev->dev.of_node, i);
+		if (!IS_ERR(clk))
+			clk_disable_unprepare(clk);
+	}
+}
+
 static struct of_device_id mv_cesa_dt_ids[] = {
 	{ .compatible = "marvell,armada-cesa", },
 	{},
@@ -1329,6 +1355,7 @@ static struct platform_driver mv_cesa_driver = {
 	},
 	.probe		= cesa_ocf_probe,
 	.remove		= cesa_ocf_remove,
+	.shutdown	= cesa_ocf_shutdown,
 };
 
 static int __init cesa_ocf_init(void)
