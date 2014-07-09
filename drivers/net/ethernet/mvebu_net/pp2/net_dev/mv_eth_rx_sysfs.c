@@ -37,7 +37,7 @@ disclaimer.
 #include "prs/mvPp2Prs.h"
 #include "mv_netdev.h"
 
-static ssize_t mv_eth_help(char *b)
+static ssize_t mv_pp2_help(char *b)
 {
 	int o = 0;
 
@@ -58,7 +58,7 @@ static ssize_t mv_eth_help(char *b)
 	return o;
 }
 
-static ssize_t mv_eth_show(struct device *dev,
+static ssize_t mv_pp2_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	const char      *name = attr->attr.name;
@@ -70,12 +70,12 @@ static ssize_t mv_eth_show(struct device *dev,
 	if (!strcmp(name, "rxDmaRegs"))
 		mvPp2RxDmaRegsPrint();
 	else
-		off = mv_eth_help(buf);
+		off = mv_pp2_help(buf);
 
 	return off;
 }
 
-static ssize_t mv_eth_port_store(struct device *dev,
+static ssize_t mv_pp2_port_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
@@ -101,14 +101,14 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	} else if (!strcmp(name, "rxFifoRegs")) {
 		mvPp2RxFifoRegs(p);
 	} else if (!strcmp(name, "rxWeight")) {
-		mv_eth_ctrl_set_poll_rx_weight(p, v);
+		mv_pp2_ctrl_set_poll_rx_weight(p, v);
 	} else if (!strcmp(name, "rxqSize")) {
-		mv_eth_ctrl_rxq_size_set(p, v, a);
+		mv_pp2_ctrl_rxq_size_set(p, v, a);
 	} else if (!strcmp(name, "rxqCounters")) {
 		mvPp2V1RxqDbgCntrs(p, v);
 	} else if (!strcmp(name, "prefetch")) {
-		err |= mv_eth_ctrl_flag(p, MV_ETH_F_RX_DESC_PREFETCH, v & 0x1);
-		err |= mv_eth_ctrl_flag(p, MV_ETH_F_RX_PKT_PREFETCH, v & 0x2);
+		err |= mv_pp2_ctrl_flag(p, MV_ETH_F_RX_DESC_PREFETCH, v & 0x1);
+		err |= mv_pp2_ctrl_flag(p, MV_ETH_F_RX_PKT_PREFETCH, v & 0x2);
 	} else {
 		err = 1;
 		printk(KERN_ERR "%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -122,7 +122,7 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
-static ssize_t mv_eth_rx_hex_store(struct device *dev,
+static ssize_t mv_pp2_rx_hex_store(struct device *dev,
 				struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
@@ -154,19 +154,19 @@ static ssize_t mv_eth_rx_hex_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
-static DEVICE_ATTR(help,        S_IRUSR, mv_eth_show, NULL);
-static DEVICE_ATTR(rxDmaRegs,  	S_IRUSR, mv_eth_show, NULL);
-static DEVICE_ATTR(rxqCounters, S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(rxqShow,     S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(gRxqRegs,    S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(pRxqRegs,    S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(rxFifoRegs,  S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(rxWeight,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(rxqSize,   	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(mhRxSpec,	S_IWUSR, NULL, mv_eth_rx_hex_store);
-static DEVICE_ATTR(prefetch,	S_IWUSR, NULL, mv_eth_port_store);
+static DEVICE_ATTR(help,        S_IRUSR, mv_pp2_show, NULL);
+static DEVICE_ATTR(rxDmaRegs,	S_IRUSR, mv_pp2_show, NULL);
+static DEVICE_ATTR(rxqCounters, S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(rxqShow,     S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(gRxqRegs,    S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(pRxqRegs,    S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(rxFifoRegs,  S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(rxWeight,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(rxqSize,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(mhRxSpec,	S_IWUSR, NULL, mv_pp2_rx_hex_store);
+static DEVICE_ATTR(prefetch,	S_IWUSR, NULL, mv_pp2_port_store);
 
-static struct attribute *mv_eth_attrs[] = {
+static struct attribute *mv_pp2_attrs[] = {
 	&dev_attr_help.attr,
 	&dev_attr_rxDmaRegs.attr,
 	&dev_attr_rxqShow.attr,
@@ -181,25 +181,25 @@ static struct attribute *mv_eth_attrs[] = {
 	NULL
 };
 
-static struct attribute_group mv_eth_rx_group = {
+static struct attribute_group mv_pp2_rx_group = {
 	.name = "rx",
-	.attrs = mv_eth_attrs,
+	.attrs = mv_pp2_attrs,
 };
 
 int mv_pp2_rx_sysfs_init(struct kobject *gbe_kobj)
 {
 	int err;
 
-	err = sysfs_create_group(gbe_kobj, &mv_eth_rx_group);
+	err = sysfs_create_group(gbe_kobj, &mv_pp2_rx_group);
 	if (err)
-		pr_err("sysfs group %s failed %d\n", mv_eth_rx_group.name, err);
+		pr_err("sysfs group %s failed %d\n", mv_pp2_rx_group.name, err);
 
 	return err;
 }
 
 int mv_pp2_rx_sysfs_exit(struct kobject *gbe_kobj)
 {
-	sysfs_remove_group(gbe_kobj, &mv_eth_rx_group);
+	sysfs_remove_group(gbe_kobj, &mv_pp2_rx_group);
 
 	return 0;
 }

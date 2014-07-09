@@ -30,6 +30,6 @@ disclaimer.
 
 #include <linux/ethtool.h>
 
-extern const struct ethtool_ops mv_eth_tool_ops;
+extern const struct ethtool_ops mv_pp2_eth_tool_ops;
 
 #endif

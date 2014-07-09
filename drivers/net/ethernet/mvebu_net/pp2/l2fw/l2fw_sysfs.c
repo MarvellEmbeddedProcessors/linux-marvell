@@ -34,7 +34,7 @@ disclaimer.
 
 #include "mvTypes.h"
 #include "mv_eth_l2fw.h"
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 #include "mv_eth_l2sec.h"
 #endif
 #include "linux/inet.h"
@@ -56,7 +56,7 @@ static ssize_t mv_l2fw_help(char *buf)
 #ifdef CONFIG_MV_L2FW_XOR
 	off += sprintf(buf+off, "echo rxp thresh   > xor      - Set XOR threshold for port <rxp>\n");
 #endif
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 	off += sprintf(buf+off, "echo p chan       > cesa     - Set cesa channel <chan> for port <p>.\n");
 #endif
 	return off;
@@ -182,7 +182,7 @@ static ssize_t mv_l2fw_store(struct device *dev,
 	else if (!strcmp(name, "bind"))
 		err = mv_l2fw_port(a, b, c);
 
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 	else if (!strcmp(name, "cesa_chan"))
 		err = mv_l2sec_set_cesa_chan(a, b);
 #endif
@@ -206,7 +206,7 @@ static DEVICE_ATTR(ports_dump,		S_IRUSR, mv_l2fw_show, NULL);
 static DEVICE_ATTR(stats,		S_IRUSR, mv_l2fw_show, NULL);
 static DEVICE_ATTR(flush,		S_IWUSR, NULL,	mv_l2fw_hex_store);
 
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 static DEVICE_ATTR(cesa_chan,		S_IWUSR, NULL,  mv_l2fw_store);
 #endif
 #ifdef CONFIG_MV_L2FW_XOR
@@ -228,7 +228,7 @@ static struct attribute *mv_l2fw_attrs[] = {
 	&dev_attr_ports_dump.attr,
 	&dev_attr_flush.attr,
 	&dev_attr_stats.attr,
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 	&dev_attr_cesa_chan.attr,
 #endif
 	NULL

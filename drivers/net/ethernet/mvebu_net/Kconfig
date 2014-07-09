@@ -13,6 +13,52 @@ config NET_VENDOR_MVEBU
 
 if NET_VENDOR_MVEBU
 
+menu "Marvell Network SKB Features"
+
+config  NET_SKB_HEADROOM
+	int "SKB headroom size"
+	default 64
+	---help---
+	Customize SKB headroom size. Must be power of 2.
+
+config NET_SKB_RECYCLE
+	bool "Skb recycle"
+	default y
+	---help---
+	Work-in-progress and experimental.
+
+	This option enables skb's to be returned via a callback at kfree to
+	the allocator to make a fastpath for very skb consuming network
+	applications.
+
+config NET_SKB_RECYCLE_DEF
+	depends on NET_SKB_RECYCLE
+	int "Default value for SKB recycle:  0 - disable, 1 - enable"
+	default 1
+	---help---
+
+endmenu
+
+menu "Marvell Network PON Support"
+
+config MV_INCLUDE_PON
+	bool "PON include"
+	default n
+	---help---
+	Whether PON is included.
+
+endmenu
+
+menu "Marvell Network Debug Control"
+
+config MV_ETH_DEBUG_CODE
+	bool "Add run-time debug code"
+	default n
+	---help---
+	Enable run-time enable/disable enter debug code blocks
+
+endmenu
+
 config MV_ETH_NETA
 	tristate "Marvell Armada 380 network interface support"
 	depends on MACH_ARMADA_380

@@ -584,7 +584,7 @@ MV_STATUS cph_flow_mod_packet(struct sk_buff *skb,  bool mh, struct CPH_FLOW_ENT
 *       On success, the function returns MV_OK.
 *       On error returns error code accordingly.
 *******************************************************************************/
-MV_STATUS cph_flow_mod_frwd(struct CPH_FLOW_ENTRY_T *flow, struct mv_eth_tx_spec *tx_spec_out);
+MV_STATUS cph_flow_mod_frwd(struct CPH_FLOW_ENTRY_T *flow, struct mv_pp2_tx_spec *tx_spec_out);
 
 /******************************************************************************
 * cph_flow_send_packet()
@@ -605,7 +605,7 @@ MV_STATUS cph_flow_mod_frwd(struct CPH_FLOW_ENTRY_T *flow, struct mv_eth_tx_spec
 *       On error returns 0.
 *******************************************************************************/
 MV_STATUS cph_flow_send_packet(struct net_device *dev_out,  struct eth_pbuf *pkt,
-	struct mv_eth_tx_spec *tx_spec_out);
+	struct mv_pp2_tx_spec *tx_spec_out);
 
 /******************************************************************************
 * cph_flow_db_get_rule()

@@ -591,7 +591,7 @@ MV_STATUS cph_app_mod_rx_packet(
 *******************************************************************************/
 MV_STATUS cph_app_mod_tx_packet(
 	struct sk_buff        *skb,
-	struct mv_eth_tx_spec *tx_spec_out,
+	struct mv_pp2_tx_spec *tx_spec_out,
 	enum CPH_APP_MOD_FIELD_E    mod_bm,
 	struct CPH_APP_MOD_T         *mod_value);
 
@@ -616,7 +616,7 @@ MV_STATUS cph_app_mod_tx_packet(
 *******************************************************************************/
 MV_STATUS cph_app_set_frwd(
 	struct sk_buff        *skb,
-	struct mv_eth_tx_spec *tx_spec_out,
+	struct mv_pp2_tx_spec *tx_spec_out,
 	enum CPH_APP_FRWD_FIELD_E   frwd_bm,
 	struct CPH_APP_FRWD_T        *frwd_value);
 

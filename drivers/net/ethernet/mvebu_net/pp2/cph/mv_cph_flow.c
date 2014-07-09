@@ -2449,7 +2449,7 @@ MV_STATUS cph_flow_mod_packet(struct sk_buff *skb,  bool mh, struct CPH_FLOW_ENT
 *       On success, the function returns MV_OK.
 *       On error returns error code accordingly.
 *******************************************************************************/
-MV_STATUS cph_flow_mod_frwd(struct CPH_FLOW_ENTRY_T *flow, struct mv_eth_tx_spec *tx_spec_out)
+MV_STATUS cph_flow_mod_frwd(struct CPH_FLOW_ENTRY_T *flow, struct mv_pp2_tx_spec *tx_spec_out)
 {
 	MV_STATUS rc = MV_OK;
 
@@ -2488,13 +2488,13 @@ MV_STATUS cph_flow_mod_frwd(struct CPH_FLOW_ENTRY_T *flow, struct mv_eth_tx_spec
 *       On error returns 0.
 *******************************************************************************/
 MV_STATUS cph_flow_send_packet(struct net_device *dev_out, struct eth_pbuf *pkt,
-	struct mv_eth_tx_spec *tx_spec_out)
+	struct mv_pp2_tx_spec *tx_spec_out)
 {
 #if 0
 	struct eth_port *pp = MV_ETH_PRIV(dev_out);
 	int frags = 0;
 	bool tx_spec_ready = false;
-	struct mv_eth_tx_spec tx_spec;
+	struct mv_pp2_tx_spec tx_spec;
 	u32 tx_cmd;
 	struct tx_queue *txq_ctrl = NULL;
 	struct pp2_tx_desc *tx_desc;
@@ -2518,7 +2518,7 @@ MV_STATUS cph_flow_send_packet(struct net_device *dev_out, struct eth_pbuf *pkt,
 		tx_spec.flags  = tx_spec_out->flags;
 	}
 
-	txq_ctrl = &pp->txq_ctrl[tx_spec.txp * CONFIG_MV_ETH_TXQ + tx_spec.txq];
+	txq_ctrl = &pp->txq_ctrl[tx_spec.txp * CONFIG_MV_PP2_TXQ + tx_spec.txq];
 	if (txq_ctrl == NULL) {
 		pr_err("%s: invalidate txp/txq (%d/%d)\n", __func__, tx_spec.txp, tx_spec.txq);
 		goto out;
@@ -2526,13 +2526,13 @@ MV_STATUS cph_flow_send_packet(struct net_device *dev_out, struct eth_pbuf *pkt,
 	spin_lock_irqsave(&txq_ctrl->queue_lock);
 
 #if 0
-#ifdef CONFIG_MV_ETH_TSO
+#ifdef CONFIG_MV_PP2_TSO
 	/* GSO/TSO */
 	if (skb_is_gso(skb)) {
-		frags = mv_eth_tx_tso(skb, dev_out, &tx_spec, txq_ctrl);
+		frags = mv_pp2_tx_tso(skb, dev_out, &tx_spec, txq_ctrl);
 		goto out;
 	}
-#endif /* CONFIG_MV_ETH_TSO */
+#endif /* CONFIG_MV_PP2_TSO */
 #endif
 
 	frags = 1;
@@ -2544,13 +2544,13 @@ MV_STATUS cph_flow_send_packet(struct net_device *dev_out, struct eth_pbuf *pkt,
 		else
 			mh = pp->tx_mh;
 
-		if (mv_eth_skb_mh_add(skb, mh)) {
+		if (mv_pp2_skb_mh_add(skb, mh)) {
 			frags = 0;
 			goto out;
 		}
 	}
 #endif
-	tx_desc = mv_eth_tx_desc_get(txq_ctrl, frags);
+	tx_desc = mv_pp2_tx_desc_get(txq_ctrl, frags);
 	if (tx_desc == NULL) {
 		frags = 0;
 		goto out;
@@ -2558,7 +2558,7 @@ MV_STATUS cph_flow_send_packet(struct net_device *dev_out, struct eth_pbuf *pkt,
 
 	tx_cmd = PP2_TX_L4_CSUM_NOT;
 
-#ifdef CONFIG_MV_PON
+#ifdef CONFIG_MV_PP2_PON
 	tx_desc->hw_cmd[0] = tx_spec.hw_cmd[0];
 #endif
 
@@ -2577,28 +2577,28 @@ MV_STATUS cph_flow_send_packet(struct net_device *dev_out, struct eth_pbuf *pkt,
 			tx_cmd |= PP2_TX_FLZ_DESC_MASK;
 
 		tx_desc->command = tx_cmd;
-		mv_eth_tx_desc_flush(tx_desc);
+		mv_pp2_tx_desc_flush(tx_desc);
 
 		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = ((MV_ULONG) skb | MV_ETH_SHADOW_SKB);
-		mv_eth_shadow_inc_put(txq_ctrl);
+		mv_pp2_shadow_inc_put(txq_ctrl);
 	}
 
 	txq_ctrl->txq_count += frags;
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_PP2_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_TX) {
 		pr_err("\n");
 		pr_err("%s - eth_tx_%lu: port=%d, txp=%d, txq=%d, skb=%p, head=%p, data=%p, size=%d\n",
 			dev_out->name, dev_out->stats.tx_packets, pp->port, tx_spec.txp, tx_spec.txq, skb,
 			skb->head, skb->data, skb->len);
-		mv_eth_tx_desc_print(tx_desc);
+		mv_pp2_tx_desc_print(tx_desc);
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_PP2_DEBUG_CODE */
 
-#ifdef CONFIG_MV_PON
-	if (MV_PON_PORT(pp->port))
+#ifdef CONFIG_MV_PP2_PON
+	if (MV_PP2_IS_PON_PORT(pp->port))
 		mvNetaPonTxqBytesAdd(pp->port, tx_spec.txp, tx_spec.txq, skb->len);
-#endif /* CONFIG_MV_PON */
+#endif /* CONFIG_MV_PP2_PON */
 
 	/* Enable transmit */
 	mvPp2AggrTxqPendDescAdd(pp->port, tx_spec.txp, tx_spec.txq, frags);
@@ -2614,18 +2614,18 @@ out:
 		dev_kfree_skb_any(skb);
 	}
 
-#ifndef CONFIG_MV_ETH_TXDONE_ISR
+#ifndef CONFIG_MV_PP2_TXDONE_ISR
 	if (txq_ctrl) {
-		if (txq_ctrl->txq_count >= mv_ctrl_txdone) {
-			u32 tx_done = mv_eth_txq_done(pp, txq_ctrl);
+		if (txq_ctrl->txq_count >= mv_ctrl_pp2_txdone) {
+			u32 tx_done = mv_pp2_txq_done(pp, txq_ctrl);
 			STAT_DIST((tx_done < pp->dist_stats.tx_done_dist_size) ?
 				pp->dist_stats.tx_done_dist[tx_done]++ : 0);
 		}
-		/* If after calling mv_eth_txq_done, txq_ctrl->txq_count equals frags, we need to set the timer */
+		/* If after calling mv_pp2_txq_done, txq_ctrl->txq_count equals frags, we need to set the timer */
 		if ((txq_ctrl->txq_count == frags) && (frags > 0))
-			mv_eth_add_tx_done_timer(pp);
+			mv_pp2_add_tx_done_timer(pp);
 	}
-#endif /* CONFIG_MV_ETH_TXDONE_ISR */
+#endif /* CONFIG_MV_PP2_TXDONE_ISR */
 
 	if (txq_ctrl)
 		spin_unlock_irqrestore(&txq_ctrl->queue_lock);

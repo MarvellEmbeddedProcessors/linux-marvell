@@ -36,7 +36,7 @@ disclaimer.
 #include "gbe/mvPp2Gbe.h"
 #include "mv_netdev.h"
 
-static ssize_t mv_eth_help(char *buf)
+static ssize_t mv_pp2_help(char *buf)
 {
 	int off = 0;
 
@@ -67,7 +67,7 @@ static ssize_t mv_eth_help(char *buf)
 	return off;
 }
 
-static ssize_t mv_eth_show(struct device *dev,
+static ssize_t mv_pp2_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	const char	*name = attr->attr.name;
@@ -82,12 +82,12 @@ static ssize_t mv_eth_show(struct device *dev,
 		mvBmQsetConfigDumpAll();
 
 	else
-		off = mv_eth_help(buf);
+		off = mv_pp2_help(buf);
 
 	return off;
 }
 
-static ssize_t mv_eth_port_store(struct device *dev,
+static ssize_t mv_pp2_port_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
@@ -109,19 +109,19 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	} else if (!strcmp(name, "poolDropCnt")) {
 		mvBmV1PoolDropCntDump(a);
 	} else if (!strcmp(name, "poolStatus")) {
-		mv_eth_pool_status_print(a);
+		mv_pp2_pool_status_print(a);
 	} else if (!strcmp(name, "poolSize")) {
-		err = mv_eth_ctrl_pool_size_set(a, b);
+		err = mv_pp2_ctrl_pool_size_set(a, b);
 	} else if (!strcmp(name, "poolBufNum")) {
-		err = mv_eth_ctrl_pool_buf_num_set(a, b);
+		err = mv_pp2_ctrl_pool_buf_num_set(a, b);
 	} else if (!strcmp(name, "longPool")) {
-		err = mv_eth_ctrl_long_pool_set(a, b);
+		err = mv_pp2_ctrl_long_pool_set(a, b);
 	} else if (!strcmp(name, "shortPool")) {
-		err = mv_eth_ctrl_short_pool_set(a, b);
+		err = mv_pp2_ctrl_short_pool_set(a, b);
 	} else if (!strcmp(name, "hwfLongPool")) {
-		err = mv_eth_ctrl_hwf_long_pool_set(a, b);
+		err = mv_pp2_ctrl_hwf_long_pool_set(a, b);
 	} else if (!strcmp(name, "hwfShortPool")) {
-		err = mv_eth_ctrl_hwf_short_pool_set(a, b);
+		err = mv_pp2_ctrl_hwf_short_pool_set(a, b);
 	} else if (!strcmp(name, "qsetCreate")) {
 		mvBmQsetCreate(a, b);
 	} else if (!strcmp(name, "qsetDelete")) {
@@ -151,29 +151,29 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
-static DEVICE_ATTR(help,		S_IRUSR, mv_eth_show, NULL);
-static DEVICE_ATTR(queueMappDump,	S_IRUSR, mv_eth_show, NULL);
-static DEVICE_ATTR(qsetConfigDump,	S_IRUSR, mv_eth_show, NULL);
-static DEVICE_ATTR(poolRegs,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(poolDropCnt,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(poolStatus,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(poolSize,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(poolBufNum,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(longPool,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(shortPool,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(hwfLongPool,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(hwfShortPool,	S_IWUSR, NULL, mv_eth_port_store);
+static DEVICE_ATTR(help,		S_IRUSR, mv_pp2_show, NULL);
+static DEVICE_ATTR(queueMappDump,	S_IRUSR, mv_pp2_show, NULL);
+static DEVICE_ATTR(qsetConfigDump,	S_IRUSR, mv_pp2_show, NULL);
+static DEVICE_ATTR(poolRegs,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(poolDropCnt,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(poolStatus,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(poolSize,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(poolBufNum,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(longPool,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(shortPool,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(hwfLongPool,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(hwfShortPool,	S_IWUSR, NULL, mv_pp2_port_store);
 
-static DEVICE_ATTR(qsetCreate,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(qsetDelete,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(rxqQsetLong,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(rxqQsetShort,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(txqQsetLong,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(txqQsetShort,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(qsetMaxSet,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(qsetShow,		S_IWUSR, NULL, mv_eth_port_store);
+static DEVICE_ATTR(qsetCreate,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(qsetDelete,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(rxqQsetLong,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(rxqQsetShort,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(txqQsetLong,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(txqQsetShort,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(qsetMaxSet,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(qsetShow,		S_IWUSR, NULL, mv_pp2_port_store);
 
-static struct attribute *mv_eth_attrs[] = {
+static struct attribute *mv_pp2_attrs[] = {
 	&dev_attr_help.attr,
 	&dev_attr_queueMappDump.attr,
 	&dev_attr_qsetConfigDump.attr,
@@ -197,16 +197,16 @@ static struct attribute *mv_eth_attrs[] = {
 	NULL
 };
 
-static struct attribute_group mv_eth_bm_group = {
+static struct attribute_group mv_pp2_bm_group = {
 	.name = "bm",
-	.attrs = mv_eth_attrs,
+	.attrs = mv_pp2_attrs,
 };
 
 int mv_pp2_bm_sysfs_init(struct kobject *pp2_kobj)
 {
 	int err;
 
-	err = sysfs_create_group(pp2_kobj, &mv_eth_bm_group);
+	err = sysfs_create_group(pp2_kobj, &mv_pp2_bm_group);
 	if (err)
 		printk(KERN_INFO "sysfs group failed %d\n", err);
 
@@ -215,7 +215,7 @@ int mv_pp2_bm_sysfs_init(struct kobject *pp2_kobj)
 
 int mv_pp2_bm_sysfs_exit(struct kobject *pp2_kobj)
 {
-	sysfs_remove_group(pp2_kobj, &mv_eth_bm_group);
+	sysfs_remove_group(pp2_kobj, &mv_pp2_bm_group);
 
 	return 0;
 }

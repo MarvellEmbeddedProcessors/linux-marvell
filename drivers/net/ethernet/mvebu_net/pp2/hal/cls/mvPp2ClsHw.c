@@ -259,8 +259,8 @@ int mvPp2V0ClsHwMtuSet(int port, int txp, int mtu)
 
 	POS_RANGE_VALIDATE(mtu, MV_PP2_CLS_MTU_MAX);
 
-	if (port == MV_PON_PORT_ID)  {/*pon*/
-		POS_RANGE_VALIDATE(txp, MV_ETH_MAX_TCONT - 1); /*txq num in pon*/
+	if (port == MV_PP2_PON_PORT_ID)  {/*pon*/
+		POS_RANGE_VALIDATE(txp, MV_PP2_MAX_TCONT - 1); /*txq num in pon*/
 		eport = txp; /* regs 0 - 15 for pon txq */
 	} else {
 		POS_RANGE_VALIDATE(port, ETH_PORTS_NUM - 1);
@@ -336,7 +336,7 @@ int mvPp2ClsHwMhSet(int port, int virtEn, int uniEn, unsigned short mh)
 	BIT_RANGE_VALIDATE(virtEn);
 	POS_RANGE_VALIDATE(mh, MV_PP2_CLS_PCTRL_MH_MASK);
 
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		regVal = uniDisable << MV_PP2_CLS_PCTRL_UNI_EN_OFFS;
 	else
 		regVal = (uniDisable << MV_PP2_CLS_PCTRL_UNI_EN_OFFS) |
@@ -1075,7 +1075,7 @@ int mvPp2ClsHwRegsDump()
 		mvPp2PrintReg(MV_PP2_CLS_PCTRL_REG(i), reg_name);
 	}
 #else
-	for (i = 0; i < (MV_ETH_MAX_TCONT + MV_PP2_MAX_PORTS - 1); i++) {
+	for (i = 0; i < (MV_PP2_MAX_TCONT + MV_PP2_MAX_PORTS - 1); i++) {
 		mvOsSPrintf(reg_name, "MV_PP2_CLS_MTU_%d_REG", i);
 		mvPp2PrintReg(MV_PP2_CLS_MTU_REG(i), reg_name);
 	}

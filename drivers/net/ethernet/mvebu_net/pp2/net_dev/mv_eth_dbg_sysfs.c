@@ -36,7 +36,7 @@ disclaimer.
 #include "mv_eth_sysfs.h"
 
 
-static ssize_t mv_eth_dbg_help(char *buf)
+static ssize_t mv_pp2_dbg_help(char *buf)
 {
 	int off = 0;
 
@@ -48,7 +48,7 @@ static ssize_t mv_eth_dbg_help(char *buf)
 	return off;
 }
 
-static ssize_t mv_eth_dbg_show(struct device *dev,
+static ssize_t mv_pp2_dbg_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	const char      *name = attr->attr.name;
@@ -58,18 +58,18 @@ static ssize_t mv_eth_dbg_show(struct device *dev,
 		return -EPERM;
 
 	if (!strcmp(name, "clean"))
-		mv_eth_all_ports_cleanup();
+		mv_pp2_all_ports_cleanup();
 	else if (!strcmp(name, "init")) {
-		if (mv_eth_all_ports_cleanup() == 0)
+		if (mv_pp2_all_ports_cleanup() == 0)
 			/* probe only if all ports are clean */
-			mv_eth_all_ports_probe();
+			mv_pp2_all_ports_probe();
 	} else
-		off = mv_eth_dbg_help(buf);
+		off = mv_pp2_dbg_help(buf);
 
 	return off;
 }
 
-static ssize_t mv_eth_dbg_reg_store(struct device *dev,
+static ssize_t mv_pp2_dbg_reg_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
@@ -105,14 +105,14 @@ static ssize_t mv_eth_dbg_reg_store(struct device *dev,
 }
 
 
-static DEVICE_ATTR(help,          S_IRUSR, mv_eth_dbg_show, NULL);
-static DEVICE_ATTR(clean,         S_IRUSR, mv_eth_dbg_show, NULL);
-static DEVICE_ATTR(init,          S_IRUSR, mv_eth_dbg_show, NULL);
-static DEVICE_ATTR(regRead,       S_IWUSR, NULL, mv_eth_dbg_reg_store);
-static DEVICE_ATTR(regWrite,      S_IWUSR, NULL, mv_eth_dbg_reg_store);
+static DEVICE_ATTR(help,          S_IRUSR, mv_pp2_dbg_show, NULL);
+static DEVICE_ATTR(clean,         S_IRUSR, mv_pp2_dbg_show, NULL);
+static DEVICE_ATTR(init,          S_IRUSR, mv_pp2_dbg_show, NULL);
+static DEVICE_ATTR(regRead,       S_IWUSR, NULL, mv_pp2_dbg_reg_store);
+static DEVICE_ATTR(regWrite,      S_IWUSR, NULL, mv_pp2_dbg_reg_store);
 
 
-static struct attribute *mv_eth_dbg_attrs[] = {
+static struct attribute *mv_pp2_dbg_attrs[] = {
 	&dev_attr_clean.attr,
 	&dev_attr_init.attr,
 	&dev_attr_help.attr,
@@ -122,25 +122,25 @@ static struct attribute *mv_eth_dbg_attrs[] = {
 };
 
 
-static struct attribute_group mv_eth_dbg_group = {
+static struct attribute_group mv_pp2_dbg_group = {
 	.name = "dbg",
-	.attrs = mv_eth_dbg_attrs,
+	.attrs = mv_pp2_dbg_attrs,
 };
 
 int mv_pp2_dbg_sysfs_init(struct kobject *pp2_kobj)
 {
 	int err;
 
-	err = sysfs_create_group(pp2_kobj, &mv_eth_dbg_group);
+	err = sysfs_create_group(pp2_kobj, &mv_pp2_dbg_group);
 	if (err)
-		pr_err("sysfs group i%s failed %d\n", mv_eth_dbg_group.name, err);
+		pr_err("sysfs group i%s failed %d\n", mv_pp2_dbg_group.name, err);
 
 	return err;
 }
 
 int mv_pp2_dbg_sysfs_exit(struct kobject *pp2_kobj)
 {
-	sysfs_remove_group(pp2_kobj, &mv_eth_dbg_group);
+	sysfs_remove_group(pp2_kobj, &mv_pp2_dbg_group);
 
 	return 0;
 }

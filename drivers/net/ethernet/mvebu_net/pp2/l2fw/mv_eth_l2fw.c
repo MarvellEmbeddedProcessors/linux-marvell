@@ -28,18 +28,18 @@ disclaimer.
 
 #include <linux/version.h>
 
-#ifdef CONFIG_MV_ETH_L2FW_XOR
+#ifdef CONFIG_MV_PP2_L2FW_XOR
 #include "xor/mvXor.h"
 #include "xor/mvXorRegs.h"
 #include "mv_hal_if/mvSysXorApi.h"
-#endif /* CONFIG_MV_ETH_L2FW_XOR */
+#endif /* CONFIG_MV_PP2_L2FW_XOR */
 
 #include "mv_eth_l2fw.h"
-#include "mv_pp2/net_dev/mv_netdev.h"
+#include "../net_dev/mv_netdev.h"
 #include "gbe/mvPp2Gbe.h"
 #include "mvDebug.h"
 
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 #include "mv_eth_l2sec.h"
 #endif
 
@@ -47,12 +47,12 @@ static int numHashEntries;
 static int shared;
 
 static struct l2fw_rule **l2fw_hash;
-static struct eth_port_l2fw **mv_eth_ports_l2fw;
+static struct eth_port_l2fw **mv_pp2_ports_l2fw;
 static int eth_ports_l2fw_num;
 
 static MV_U32 l2fw_jhash_iv;
 
-#ifdef CONFIG_MV_ETH_L2FW_XOR
+#ifdef CONFIG_MV_PP2_L2FW_XOR
 static MV_XOR_DESC *eth_xor_desc;
 static MV_LONG      eth_xor_desc_phys_addr;
 #endif
@@ -64,7 +64,7 @@ static int mv_l2fw_port_init(int port);
 static void mv_l2fw_port_free(int port);
 
 static const struct net_device_ops mv_l2fw_netdev_ops;
-static const struct net_device_ops *mv_eth_netdev_ops_ptr;
+static const struct net_device_ops *mv_pp2_netdev_ops_ptr;
 
 static struct l2fw_rule *l2fw_lookup(MV_U32 srcIP, MV_U32 dstIP)
 {
@@ -77,7 +77,7 @@ static struct l2fw_rule *l2fw_lookup(MV_U32 srcIP, MV_U32 dstIP)
 
 	while (rule) {
 		if ((rule->srcIP == srcIP) && (rule->dstIP == dstIP)) {
-#ifdef CONFIG_MV_ETH_L2FW_DEBUG
+#ifdef CONFIG_MV_PP2_L2FW_DEBUG
 			printk(KERN_INFO "rule is not NULL in %s\n", __func__);
 #endif
 			return rule;
@@ -86,7 +86,7 @@ static struct l2fw_rule *l2fw_lookup(MV_U32 srcIP, MV_U32 dstIP)
 		rule = rule->next;
 	}
 
-#ifdef CONFIG_MV_ETH_L2FW_DEBUG
+#ifdef CONFIG_MV_PP2_L2FW_DEBUG
 	printk(KERN_INFO "rule is NULL in %s\n", __func__);
 #endif
 
@@ -146,11 +146,11 @@ void mv_l2fw_ports_dump(void)
 	mvOsPrintf("\nPrinting L2fw ports Database:\n");
 	mvOsPrintf("*******************************\n");
 
-	if (!mv_eth_ports_l2fw)
+	if (!mv_pp2_ports_l2fw)
 		return;
 
 	for (rx_port = 0; rx_port < eth_ports_l2fw_num; rx_port++) {
-		ppl2fw = mv_eth_ports_l2fw[rx_port];
+		ppl2fw = mv_pp2_ports_l2fw[rx_port];
 		if (ppl2fw)
 			mvOsPrintf("rx_port=%d cmd = %d tx_port=%d lookup=%d xor_threshold = %d\n",
 					rx_port, ppl2fw->cmd, ppl2fw->txPort, ppl2fw->lookupEn, ppl2fw->xorThreshold);
@@ -174,7 +174,7 @@ int mv_l2fw_add(MV_U32 srcIP, MV_U32 dstIP, int port)
 	srcIPchr = (MV_U8 *)&(srcIP);
 	dstIPchr = (MV_U8 *)&(dstIP);
 
-#ifdef CONFIG_MV_ETH_L2FW_DEBUG
+#ifdef CONFIG_MV_PP2_L2FW_DEBUG
 	mvOsPrintf("srcIP=%x dstIP=%x in %s\n", srcIP, dstIP, __func__);
 	mvOsPrintf("srcIp = %u.%u.%u.%u in %s\n", MV_IPQUAD(srcIPchr), __func__);
 	mvOsPrintf("dstIp = %u.%u.%u.%u in %s\n", MV_IPQUAD(dstIPchr), __func__);
@@ -192,7 +192,7 @@ int mv_l2fw_add(MV_U32 srcIP, MV_U32 dstIP, int port)
 		mvOsPrintf("%s: OOM\n", __func__);
 		return MV_FAIL;
 	}
-#ifdef CONFIG_MV_ETH_L2FW_DEBUG
+#ifdef CONFIG_MV_PP2_L2FW_DEBUG
 	mvOsPrintf("adding a rule to l2fw hash in %s\n", __func__);
 #endif
 	rule->srcIP = srcIP;
@@ -205,7 +205,7 @@ int mv_l2fw_add(MV_U32 srcIP, MV_U32 dstIP, int port)
 	return MV_OK;
 }
 
-static int mv_eth_poll_l2fw(struct napi_struct *napi, int budget)
+static int mv_pp2_poll_l2fw(struct napi_struct *napi, int budget)
 {
 	int rx_done = 0;
 	MV_U32 causeRxTx;
@@ -238,7 +238,7 @@ static int mv_eth_poll_l2fw(struct napi_struct *napi, int budget)
 	napi_group = pp->cpu_config[smp_processor_id()]->napi_group;
 	causeRxTx |= napi_group->cause_rx_tx;
 
-#ifdef CONFIG_MV_ETH_TXDONE_ISR
+#ifdef CONFIG_MV_PP2_TXDONE_ISR
 
 	/* TODO check this mode */
 
@@ -247,14 +247,14 @@ static int mv_eth_poll_l2fw(struct napi_struct *napi, int budget)
 
 		/* TX_DONE process */
 		cause_tx_done = mvPp2GbeIsrCauseTxDoneOffset(pp->port, causeRxTx);
-		if (MV_PON_PORT(pp->port)) {
-			mv_eth_tx_done_pon(pp, &tx_todo);
-			printk(KERN_ERR "enter to mv_eth_tx_done_pon\n", __func__);
+		if (MV_PP2_IS_PON_PORT(pp->port)) {
+			mv_pp2_tx_done_pon(pp, &tx_todo);
+			mvOsPrintf("enter to mv_pp2_tx_done_pon\n");
 		} else
-			mv_eth_tx_done_gbe(pp, cause_tx_done, &tx_todo);
+			mv_pp2_tx_done_gbe(pp, cause_tx_done, &tx_todo);
 	}
-#endif /* CONFIG_MV_ETH_TXDONE_ISR */
-	if (MV_PON_PORT(pp->port))
+#endif /* CONFIG_MV_PP2_TXDONE_ISR */
+	if (MV_PP2_IS_PON_PORT(pp->port))
 		causeRxTx &= ~MV_PP2_PON_CAUSE_TXP_OCCUP_DESC_ALL_MASK;
 	else
 		causeRxTx &= ~MV_PP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
@@ -262,7 +262,7 @@ static int mv_eth_poll_l2fw(struct napi_struct *napi, int budget)
 	while ((causeRxTx != 0) && (budget > 0)) {
 		int count, rx_queue;
 
-		rx_queue = mv_eth_rx_policy(causeRxTx);
+		rx_queue = mv_pp2_rx_policy(causeRxTx);
 		if (rx_queue == -1)
 			break;
 
@@ -275,12 +275,12 @@ static int mv_eth_poll_l2fw(struct napi_struct *napi, int budget)
 
 	STAT_DIST((rx_done < pp->dist_stats.rx_dist_size) ? pp->dist_stats.rx_dist[rx_done]++ : 0);
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_PP2_DEBUG_CODE
 	if (pp->dbg_flags & MV_ETH_F_DBG_POLL) {
 		printk(KERN_ERR "%s  EXIT: port=%d, cpu=%d, budget=%d, rx_done=%d\n",
 			__func__, pp->port, cpu, budget, rx_done);
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_PP2_DEBUG_CODE */
 
 	if (budget > 0) {
 		unsigned long flags;
@@ -316,9 +316,9 @@ static int mv_l2fw_update_napi(struct eth_port *pp, bool l2fw)
 		netif_napi_del(napi_group->napi);
 
 		if (l2fw)
-			netif_napi_add(pp->dev, napi_group->napi, mv_eth_poll_l2fw, pp->weight);
+			netif_napi_add(pp->dev, napi_group->napi, mv_pp2_poll_l2fw, pp->weight);
 		else
-			netif_napi_add(pp->dev, napi_group->napi, mv_eth_poll, pp->weight);
+			netif_napi_add(pp->dev, napi_group->napi, mv_pp2_poll, pp->weight);
 /*
 		if (test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags)))
 			napi_enable(napi_group->napi);
@@ -331,18 +331,18 @@ static int mv_l2fw_check(int port, bool l2fw)
 {
 	if (!l2fw) {
 		/* user try to exit form l2fw */
-		if (!mv_eth_ports_l2fw) {
+		if (!mv_pp2_ports_l2fw) {
 			mvOsPrintf("port #%d l2fw already disabled\n", port);
 			return MV_ERROR;
 		}
 
-		if (!mv_eth_ports_l2fw[port]) {
+		if (!mv_pp2_ports_l2fw[port]) {
 			mvOsPrintf("port #%d l2fw already disabled\n", port);
 			return MV_ERROR;
 		}
 
 	/* user try to enter into l2fw */
-	} else if (mv_eth_ports_l2fw && mv_eth_ports_l2fw[port]) {
+	} else if (mv_pp2_ports_l2fw && mv_pp2_ports_l2fw[port]) {
 			mvOsPrintf("port #%d l2fw already enabled\n", port);
 			return MV_ERROR;
 	}
@@ -352,7 +352,7 @@ static int mv_l2fw_check(int port, bool l2fw)
 
 int mv_l2fw_set(int port, bool l2fw)
 {
-	struct eth_port *pp = mv_eth_port_by_id(port);
+	struct eth_port *pp = mv_pp2_port_by_id(port);
 	int status = MV_OK;
 
 	if (mv_l2fw_check(port, l2fw))
@@ -371,9 +371,9 @@ int mv_l2fw_set(int port, bool l2fw)
 	/* for multiBuffer validation */
 	/*mvGmacMaxRxSizeSet(port, 9000);*/
 
-	if (!mv_eth_netdev_ops_ptr) {
+	if (!mv_pp2_netdev_ops_ptr) {
 		/* enter only once - save eth ops */
-		mv_eth_netdev_ops_ptr = pp->dev->netdev_ops;
+		mv_pp2_netdev_ops_ptr = pp->dev->netdev_ops;
 		/* set maximum number of ports */
 		eth_ports_l2fw_num = pp->plat_data->max_port;
 	}
@@ -386,7 +386,7 @@ int mv_l2fw_set(int port, bool l2fw)
 		pp->dev->netdev_ops  = &mv_l2fw_netdev_ops;
 
 	} else {
-		pp->dev->netdev_ops = mv_eth_netdev_ops_ptr;
+		pp->dev->netdev_ops = mv_pp2_netdev_ops_ptr;
 		mv_l2fw_port_free(port);
 	}
 
@@ -397,7 +397,7 @@ int mv_l2fw_port(int rx_port, int tx_port, int cmd)
 {
 	struct eth_port_l2fw *ppl2fw;
 
-	if (!mv_eth_ports_l2fw) {
+	if (!mv_pp2_ports_l2fw) {
 		mvOsPrintf("%s: ports are not in l2fw mode\n", __func__);
 		return MV_ERROR;
 	}
@@ -407,12 +407,12 @@ int mv_l2fw_port(int rx_port, int tx_port, int cmd)
 	if (mvPp2MaxCheck(tx_port, eth_ports_l2fw_num, "tx_port"))
 		return MV_ERROR;
 
-	if (!mv_eth_ports_l2fw[rx_port]) {
+	if (!mv_pp2_ports_l2fw[rx_port]) {
 		mvOsPrintf("%s: port #%d is not in l2fw mode\n", __func__, rx_port);
 		return MV_ERROR;
 	}
 
-	if (!mv_eth_ports_l2fw[tx_port]) {
+	if (!mv_pp2_ports_l2fw[tx_port]) {
 		mvOsPrintf("%s: port #%d is not in l2fw mode\n", __func__, tx_port);
 		return MV_ERROR;
 	}
@@ -422,7 +422,7 @@ int mv_l2fw_port(int rx_port, int tx_port, int cmd)
 		return MV_ERROR;
 	}
 
-	ppl2fw = mv_eth_ports_l2fw[rx_port];
+	ppl2fw = mv_pp2_ports_l2fw[rx_port];
 	ppl2fw->cmd = cmd;
 	ppl2fw->txPort = tx_port;
 
@@ -494,7 +494,7 @@ inline struct sk_buff *eth_l2fw_copy_packet_withOutXor(struct sk_buff *skb, stru
 
 	poolId = mvPp2RxBmPoolId(rx_desc);
 
-	skb_new = (struct sk_buff *)mv_eth_pool_get(poolId);
+	skb_new = (struct sk_buff *)mv_pp2_pool_get(poolId);
 
 	if (!skb_new) {
 		mvOsPrintf("skb == NULL in %s\n", __func__);
@@ -511,7 +511,7 @@ inline struct sk_buff *eth_l2fw_copy_packet_withOutXor(struct sk_buff *skb, stru
 	return skb_new;
 }
 
-#ifdef CONFIG_MV_ETH_L2FW_XOR
+#ifdef CONFIG_MV_PP2_L2FW_XOR
 inline struct sk_buff *eth_l2fw_copy_packet_withXor(struct sk_buff *skb, struct pp2_rx_desc *rx_desc)
 {
 	struct sk_buff *skb_new = NULL;
@@ -523,7 +523,7 @@ inline struct sk_buff *eth_l2fw_copy_packet_withXor(struct sk_buff *skb, struct 
 
 	poolId = mvPp2RxBmPoolId(rx_desc);
 
-	skb_new = (struct sk_buff *)mv_eth_pool_get(poolId);
+	skb_new = (struct sk_buff *)mv_pp2_pool_get(poolId);
 
 	if (!skb_new) {
 		mvOsPrintf("skb == NULL in %s\n", __func__);
@@ -604,9 +604,9 @@ void mv_l2fw_xor(int rx_port, int threshold)
 		return;
 
 	mvOsPrintf("setting port %d threshold to %d in %s\n", rx_port, threshold, __func__);
-	mv_eth_ports_l2fw[rx_port]->xorThreshold = threshold;
+	mv_pp2_ports_l2fw[rx_port]->xorThreshold = threshold;
 }
-#endif /* CONFIG_MV_ETH_L2FW_XOR */
+#endif /* CONFIG_MV_PP2_L2FW_XOR */
 
 void mv_l2fw_lookupEn(int rx_port, int enable)
 {
@@ -614,24 +614,24 @@ void mv_l2fw_lookupEn(int rx_port, int enable)
 		return;
 
 	mvOsPrintf("setting port %d lookup mode to %s\n", rx_port, (enable == 1) ? "enable" : "disable");
-	mv_eth_ports_l2fw[rx_port]->lookupEn = enable;
+	mv_pp2_ports_l2fw[rx_port]->lookupEn = enable;
 }
 
 void mv_l2fw_stats(void)
 {
 	int i;
 
-	if (!mv_eth_ports_l2fw)
+	if (!mv_pp2_ports_l2fw)
 		return;
 
 	for (i = 0; i < eth_ports_l2fw_num; i++) {
-		if (mv_eth_ports_l2fw[i]) {
-			mvOsPrintf("number of errors in port[%d]=%d\n", i, mv_eth_ports_l2fw[i]->statErr);
-			mvOsPrintf("number of drops  in port[%d]=%d\n", i, mv_eth_ports_l2fw[i]->statDrop);
+		if (mv_pp2_ports_l2fw[i]) {
+			mvOsPrintf("number of errors in port[%d]=%d\n", i, mv_pp2_ports_l2fw[i]->statErr);
+			mvOsPrintf("number of drops  in port[%d]=%d\n", i, mv_pp2_ports_l2fw[i]->statDrop);
 		}
 	}
 
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 	mv_l2sec_stats();
 #endif
 
@@ -641,7 +641,7 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 {
 	struct pp2_tx_desc *tx_desc;
 	u32 tx_cmd = 0;
-	struct mv_eth_tx_spec *tx_spec_ptr = NULL;
+	struct mv_pp2_tx_spec *tx_spec_ptr = NULL;
 	struct tx_queue *txq_ctrl;
 	struct aggr_tx_queue *aggr_txq_ctrl = NULL;
 	struct txq_cpu_ctrl *txq_cpu_ptr;
@@ -651,17 +651,17 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 	tx_spec_ptr->txq = pp->cpu_config[cpu]->txq;
 	aggr_txq_ctrl = &aggr_txqs[cpu];
 
-	txq_ctrl = &pp->txq_ctrl[tx_spec_ptr->txp * CONFIG_MV_ETH_TXQ + tx_spec_ptr->txq];
+	txq_ctrl = &pp->txq_ctrl[tx_spec_ptr->txp * CONFIG_MV_PP2_TXQ + tx_spec_ptr->txq];
 	txq_cpu_ptr = &(txq_ctrl->txq_cpu[cpu]);
 
 #ifdef CONFIG_MV_ETH_PP2_1
-	if (mv_eth_reserved_desc_num_proc(pp, tx_spec_ptr->txp, tx_spec_ptr->txq, frags) ||
-		mv_eth_aggr_desc_num_check(aggr_txq_ctrl, frags)) {
+	if (mv_pp2_reserved_desc_num_proc(pp, tx_spec_ptr->txp, tx_spec_ptr->txq, frags) ||
+		mv_pp2_aggr_desc_num_check(aggr_txq_ctrl, frags)) {
 		frags = 0;
 		goto out;
 	}
 #else
-	if (mv_eth_aggr_desc_num_check(aggr_txq_ctrl, frags))
+	if (mv_pp2_aggr_desc_num_check(aggr_txq_ctrl, frags))
 		goto out;
 #endif /*CONFIG_MV_ETH_PP2_1*/
 
@@ -698,7 +698,7 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 
 	tx_desc->physTxq = MV_PPV2_TXQ_PHYS(pp->port, tx_spec_ptr->txp, tx_spec_ptr->txq);
 
-	txq_ctrl = &pp->txq_ctrl[tx_spec_ptr->txp * CONFIG_MV_ETH_TXQ + tx_spec_ptr->txq];
+	txq_ctrl = &pp->txq_ctrl[tx_spec_ptr->txp * CONFIG_MV_PP2_TXQ + tx_spec_ptr->txq];
 
 	if (txq_ctrl == NULL) {
 		printk(KERN_ERR "%s: invalidate txp/txq (%d/%d)\n",
@@ -709,10 +709,10 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 
 	txq_cpu_ptr = &txq_ctrl->txq_cpu[cpu];
 
-	if (txq_cpu_ptr->txq_count >= mv_ctrl_txdone)
+	if (txq_cpu_ptr->txq_count >= mv_ctrl_pp2_txdone)
 		mv_l2fw_txq_done(pp, txq_ctrl);
 
-	if (MV_PON_PORT(pp->port)) {
+	if (MV_PP2_IS_PON_PORT(pp->port)) {
 		tx_desc->dataSize  = rx_desc->dataSize;
 		tx_desc->pktOffset = skb_headroom(skb);
 	} else {
@@ -722,7 +722,7 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 
 	tx_desc->bufCookie = (MV_U32)skb;
 	tx_desc->bufPhysAddr = mvOsCacheFlush(NULL, skb->head, tx_desc->dataSize);
-	mv_eth_tx_desc_flush(tx_desc);
+	mv_pp2_tx_desc_flush(tx_desc);
 
 	/* TODO - XOR ready check */
 
@@ -732,17 +732,17 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 	txq_cpu_ptr->txq_count++;
 	aggr_txq_ctrl->txq_count++;
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_PP2_DEBUG_CODE
 	if (pp->dbg_flags & MV_ETH_F_DBG_TX) {
 		printk(KERN_ERR "\n");
 		printk(KERN_ERR "%s - eth_l2fw_tx_%lu: cpu=%d, in_intr=0x%lx, port=%d, txp=%d, txq=%d\n",
 			pp->dev->name, pp->dev->stats.tx_packets, smp_processor_id(), in_interrupt(),
 			pp->port, tx_spec_ptr->txp, tx_spec_ptr->txq);
 
-		mv_eth_tx_desc_print(tx_desc);
+		mv_pp2_tx_desc_print(tx_desc);
 		mvDebugMemDump(skb->data, 64, 1);
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_PP2_DEBUG_CODE */
 
 	/* Enable transmit */
 	wmb();
@@ -755,10 +755,10 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 	pp->dev->stats.tx_bytes += rx_desc->dataSize - MV_ETH_MH_SIZE;
 
 out:
-#ifndef CONFIG_MV_ETH_TXDONE_ISR
-	if (txq_cpu_ptr->txq_count >= mv_ctrl_txdone)
+#ifndef CONFIG_MV_PP2_TXDONE_ISR
+	if (txq_cpu_ptr->txq_count >= mv_ctrl_pp2_txdone)
 		mv_l2fw_txq_done(pp, txq_ctrl);
-#endif /* CONFIG_MV_ETH_STAT_DIST */
+#endif /* CONFIG_MV_PP2_STAT_DIST */
 
 	return NETDEV_TX_OK;
 }
@@ -799,14 +799,14 @@ static int mv_l2fw_txq_clean(int port, int txp, int txq)
 	if (mvPp2TxpCheck(port, txp))
 		return -EINVAL;
 
-	pp = mv_eth_port_by_id(port);
+	pp = mv_pp2_port_by_id(port);
 	if ((pp == NULL) || (pp->txq_ctrl == NULL))
 		return -ENODEV;
 
-	if (mvPp2MaxCheck(txq, CONFIG_MV_ETH_TXQ, "txq"))
+	if (mvPp2MaxCheck(txq, CONFIG_MV_PP2_TXQ, "txq"))
 		return -EINVAL;
 
-	txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_ETH_TXQ + txq];
+	txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_PP2_TXQ + txq];
 	if (txq_ctrl->q) {
 		/* Enable TXQ drain */
 		mvPp2TxqDrainSet(port, txp, txq, MV_TRUE);
@@ -851,7 +851,7 @@ static int mv_l2fw_txp_clean(int port, int txp)
 	if (mvPp2TxpCheck(port, txp))
 		return -EINVAL;
 
-	pp = mv_eth_port_by_id(port);
+	pp = mv_pp2_port_by_id(port);
 	if ((pp == NULL) || (pp->txq_ctrl == NULL))
 		return -ENODEV;
 
@@ -864,7 +864,7 @@ static int mv_l2fw_txp_clean(int port, int txp)
 	mvPp2TxPortFifoFlush(port, MV_TRUE);
 
 	/* free the skb's in the hal tx ring */
-	for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
+	for (txq = 0; txq < CONFIG_MV_PP2_TXQ; txq++)
 		mv_l2fw_txq_clean(port, txp, txq);
 
 	mvPp2TxPortFifoFlush(port, MV_FALSE);
@@ -881,11 +881,11 @@ inline void mv_l2fw_pool_refill(struct eth_port *pp,
 				     struct bm_pool *pool, struct pp2_rx_desc *rx_desc)
 {
 	if ((rx_desc->status & PP2_RX_BUF_HDR_MASK) == MV_FALSE) {
-		__u32 bm = mv_eth_bm_cookie_build(rx_desc);
-		mv_eth_pool_refill(pool, bm, rx_desc->bufPhysAddr, rx_desc->bufCookie);
+		__u32 bm = mv_pp2_bm_cookie_build(rx_desc);
+		mv_pp2_pool_refill(pool, bm, rx_desc->bufPhysAddr, rx_desc->bufCookie);
 	} else
 		/* multiBuffer mode */
-		mv_eth_buff_hdr_rx(pp, rx_desc);
+		mv_pp2_buff_hdr_rx(pp, rx_desc);
 }
 
 inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
@@ -898,7 +898,7 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 	struct pp2_rx_desc *rx_desc;
 	struct bm_pool *pool;
 	MV_STATUS status = MV_OK;
-	struct eth_port_l2fw *ppl2fw = mv_eth_ports_l2fw[pp->port];
+	struct eth_port_l2fw *ppl2fw = mv_pp2_ports_l2fw[pp->port];
 	MV_IP_HEADER *pIph = NULL;
 	int ipOffset;
 	struct sk_buff *skb, *skb_new = NULL;
@@ -918,13 +918,13 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 
 	/* Fairness NAPI loop */
 	while (rx_done < rx_todo) {
-#ifdef CONFIG_MV_ETH_RX_DESC_PREFETCH
-		rx_desc = mv_eth_rx_prefetch(pp, rx_ctrl, rx_done, rx_todo);
+#ifdef CONFIG_MV_PP2_RX_DESC_PREFETCH
+		rx_desc = mv_pp2_rx_prefetch(pp, rx_ctrl, rx_done, rx_todo);
 #else
 		rx_desc = mvPp2RxqNextDescGet(rx_ctrl);
 		mvOsCacheLineInv(NULL, rx_desc);
 		prefetch(rx_desc);
-#endif /* CONFIG_MV_ETH_RX_DESC_PREFETCH */
+#endif /* CONFIG_MV_PP2_RX_DESC_PREFETCH */
 
 		if (!rx_desc)
 			printk(KERN_INFO "rx_desc is NULL in %s\n", __func__);
@@ -934,16 +934,16 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 
 		rx_status = rx_desc->status;
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_PP2_DEBUG_CODE
 		/* check if buffer header is in used */
 		if (pp->dbg_flags & MV_ETH_F_DBG_BUFF_HDR)
 			if (rx_status & PP2_RX_BUF_HDR_MASK)
-				mv_eth_buff_hdr_rx_dump(pp, rx_desc);
+				mv_pp2_buff_hdr_rx_dump(pp, rx_desc);
 
 		/* print RX descriptor */
 		if (pp->dbg_flags & MV_ETH_F_DBG_RX)
-			mv_eth_rx_desc_print(rx_desc);
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+			mv_pp2_rx_desc_print(rx_desc);
+#endif /* CONFIG_MV_PP2_DEBUG_CODE */
 
 		skb = (struct sk_buff *)rx_desc->bufCookie;
 
@@ -953,7 +953,7 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 		}
 
 		poolId = mvPp2RxBmPoolId(rx_desc);
-		pool = &mv_eth_pool[poolId];
+		pool = &mv_pp2_pool[poolId];
 
 		if (rx_status & PP2_RX_ES_MASK) {
 			printk(KERN_ERR "giga #%d: bad rx status 0x%08x\n", pp->port, rx_status);
@@ -969,7 +969,7 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 			printk(KERN_INFO "pIph==NULL in %s\n", __func__);
 			continue;
 		}
-#ifdef CONFIG_MV_ETH_L2FW_DEBUG
+#ifdef CONFIG_MV_PP2_L2FW_DEBUG
 		if (pp->dbg_flags & MV_ETH_F_DBG_RX) {
 
 			mvDebugMemDump(skb->data, 64, 1);
@@ -988,10 +988,10 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 		if (ppl2fw->lookupEn) {
 			rule = l2fw_lookup(pIph->srcIP, pIph->dstIP);
 
-			new_pp = rule ? mv_eth_ports[rule->port] : mv_eth_ports[ppl2fw->txPort];
+			new_pp = rule ? mv_pp2_ports[rule->port] : mv_pp2_ports[ppl2fw->txPort];
 
 		} else
-			new_pp  = mv_eth_ports[ppl2fw->txPort];
+			new_pp  = mv_pp2_ports[ppl2fw->txPort];
 
 		bytes = rx_desc->dataSize - MV_ETH_MH_SIZE;
 
@@ -1013,12 +1013,12 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 				status = MV_ERROR;
 				break;
 			}
-#ifdef CONFIG_MV_ETH_L2FW_XOR
+#ifdef CONFIG_MV_PP2_L2FW_XOR
 			if (bytes >= ppl2fw->xorThreshold) {
 				skb_new = eth_l2fw_copy_packet_withXor(skb, rx_desc);
 				pr_error("%s: xor is not supported\n", __func__);
 			}
-#endif /* CONFIG_MV_ETH_L2FW_XOR */
+#endif /* CONFIG_MV_PP2_L2FW_XOR */
 
 			if (skb_new == NULL)
 				skb_new = eth_l2fw_copy_packet_withOutXor(skb, rx_desc);
@@ -1026,17 +1026,17 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 			if (skb_new) {
 				bufPhysAddr = rx_desc->bufPhysAddr;
 
-				bm = mv_eth_bm_cookie_build(rx_desc);
+				bm = mv_pp2_bm_cookie_build(rx_desc);
 				status = mv_l2fw_tx(skb_new, new_pp, rx_desc);
 
-				mv_eth_pool_refill(pool, bm, bufPhysAddr, (MV_ULONG)skb);
+				mv_pp2_pool_refill(pool, bm, bufPhysAddr, (MV_ULONG)skb);
 
 				/* for refill function */
 				skb = skb_new;
 			} else
 				status = MV_ERROR;
 			break;
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 		case CMD_L2FW_CESA:
 			if (rx_status & PP2_RX_BUF_HDR_MASK) {
 				printk(KERN_INFO "%s: not support cesa with multibuffer packets.\n", __func__);
@@ -1078,15 +1078,15 @@ inline int mv_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 
 static void mv_l2fw_shared_cleanup(void)
 {
-	if (mv_eth_ports_l2fw)
-		mvOsFree(mv_eth_ports_l2fw);
+	if (mv_pp2_ports_l2fw)
+		mvOsFree(mv_pp2_ports_l2fw);
 
 	if (l2fw_hash) {
 		mv_l2fw_flush();
 		mvOsFree(l2fw_hash);
 	}
 
-	mv_eth_ports_l2fw = NULL;
+	mv_pp2_ports_l2fw = NULL;
 	l2fw_hash = NULL;
 }
 
@@ -1096,12 +1096,12 @@ static int mv_l2fw_shared_init(void)
 	int size, bytes;
 
 	size = eth_ports_l2fw_num * sizeof(struct eth_port_l2fw *);
-	mv_eth_ports_l2fw = mvOsMalloc(size);
+	mv_pp2_ports_l2fw = mvOsMalloc(size);
 
-	if (!mv_eth_ports_l2fw)
+	if (!mv_pp2_ports_l2fw)
 		goto oom;
 
-	memset(mv_eth_ports_l2fw, 0, size);
+	memset(mv_pp2_ports_l2fw, 0, size);
 
 	bytes = sizeof(struct l2fw_rule *) * L2FW_HASH_SIZE;
 	get_random_bytes(&l2fw_jhash_iv, sizeof(l2fw_jhash_iv));
@@ -1116,11 +1116,11 @@ static int mv_l2fw_shared_init(void)
 
 	mvOsPrintf("L2FW hash init %d entries, %d bytes\n", L2FW_HASH_SIZE, bytes);
 
-#ifdef CONFIG_MV_ETH_L2SEC
+#ifdef CONFIG_MV_PP2_L2SEC
 	mv_l2sec_cesa_init();
 #endif
 
-#ifdef CONFIG_MV_ETH_L2FW_XOR
+#ifdef CONFIG_MV_PP2_L2FW_XOR
 	setXorDesc();
 #endif
 
@@ -1143,16 +1143,16 @@ static int mv_l2fw_port_init(int port)
 			return status;
 	}
 
-	mv_eth_ports_l2fw[port] = mvOsMalloc(sizeof(struct eth_port_l2fw));
-	if (!mv_eth_ports_l2fw[port])
+	mv_pp2_ports_l2fw[port] = mvOsMalloc(sizeof(struct eth_port_l2fw));
+	if (!mv_pp2_ports_l2fw[port])
 		goto oom;
 
-	mv_eth_ports_l2fw[port]->cmd    = CMD_L2FW_AS_IS;
-	mv_eth_ports_l2fw[port]->txPort = port;
-	mv_eth_ports_l2fw[port]->lookupEn = 0;
-	mv_eth_ports_l2fw[port]->xorThreshold = XOR_THRESHOLD_DEF;
-	mv_eth_ports_l2fw[port]->statErr = 0;
-	mv_eth_ports_l2fw[port]->statDrop = 0;
+	mv_pp2_ports_l2fw[port]->cmd    = CMD_L2FW_AS_IS;
+	mv_pp2_ports_l2fw[port]->txPort = port;
+	mv_pp2_ports_l2fw[port]->lookupEn = 0;
+	mv_pp2_ports_l2fw[port]->xorThreshold = XOR_THRESHOLD_DEF;
+	mv_pp2_ports_l2fw[port]->statErr = 0;
+	mv_pp2_ports_l2fw[port]->statDrop = 0;
 
 	shared++;
 
@@ -1168,18 +1168,18 @@ oom:
 
 static void mv_l2fw_port_free(int port)
 {
-	if (!mv_eth_ports_l2fw) {
+	if (!mv_pp2_ports_l2fw) {
 		mvOsPrintf("in %s: l2fw database is NULL\n", __func__);
 		return;
 	}
 
-	if (!mv_eth_ports_l2fw[port]) {
+	if (!mv_pp2_ports_l2fw[port]) {
 		mvOsPrintf("in %s: l2fw port #%d database is NULL\n", __func__, port);
 		return;
 	}
 
-	mvOsFree(mv_eth_ports_l2fw[port]);
-	mv_eth_ports_l2fw[port] = NULL;
+	mvOsFree(mv_pp2_ports_l2fw[port]);
+	mv_pp2_ports_l2fw[port] = NULL;
 
 	shared--;
 
@@ -1196,7 +1196,7 @@ int mv_l2fw_stop(struct net_device *dev)
 		if (mv_l2fw_txp_clean(pp->port, txp))
 			return MV_ERROR;
 
-	return mv_eth_stop(dev);
+	return mv_pp2_eth_stop(dev);
 }
 
 static netdev_tx_t mv_l2fw_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -1205,10 +1205,10 @@ static netdev_tx_t mv_l2fw_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 static const struct net_device_ops mv_l2fw_netdev_ops = {
-	.ndo_open = mv_eth_open,
+	.ndo_open = mv_pp2_eth_open,
 	.ndo_stop = mv_l2fw_stop,
 	.ndo_start_xmit = mv_l2fw_xmit,
-	.ndo_set_rx_mode = mv_eth_rx_set_rx_mode,
-	.ndo_set_mac_address = mv_eth_set_mac_addr,
-	.ndo_change_mtu = mv_eth_change_mtu,
+	.ndo_set_rx_mode = mv_pp2_rx_set_rx_mode,
+	.ndo_set_mac_address = mv_pp2_eth_set_mac_addr,
+	.ndo_change_mtu = mv_pp2_eth_change_mtu,
 };

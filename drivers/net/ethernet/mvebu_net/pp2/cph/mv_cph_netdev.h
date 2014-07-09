@@ -91,7 +91,7 @@ extern "C" {
 
 #include <mvCommon.h>
 #include <mvOs.h>
-#include <mv_pp2/net_dev/mv_netdev.h>
+#include <../net_dev/mv_netdev.h>
 
 
 #define MV_CPH_MAS_UDP_SRC_PORT          8
@@ -102,7 +102,7 @@ extern "C" {
 #ifdef CONFIG_MV_CPH_UDP_SAMPLE_HANDLE
 struct mv_udp_port_tx_spec {
 	__be16    udp_port;
-	struct mv_eth_tx_spec tx_spec;
+	struct mv_pp2_tx_spec tx_spec;
 };
 
 struct mv_port_tx_spec {

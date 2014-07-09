@@ -112,7 +112,7 @@ void        mvPp2PlcrHwRegs(void)
 	}
 #endif
 	mvOsPrintf("\nPer RXQ: Non zero early drop thresholds\n");
-	for (i = 0; i < MV_ETH_RXQ_TOTAL_NUM; i++) {
+	for (i = 0; i < MV_PP2_RXQ_TOTAL_NUM; i++) {
 		mvPp2WrReg(MV_PP2_PLCR_EDROP_RXQ_REG, i);
 		regVal = mvPp2RdReg(MV_PP2_PLCR_EDROP_RXQ_TR_REG);
 		if (regVal != 0)

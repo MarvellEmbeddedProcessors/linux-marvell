@@ -118,7 +118,7 @@ int mvPp2TxpCheck(int port, int txp)
 	if (mvPp2PortCheck(port))
 		return 1;
 
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		txpMax = mvPp2HalData.maxTcont;
 
 	return mvPp2MaxCheck(txp, txpMax, "txp");
@@ -131,9 +131,14 @@ int mvPp2CpuCheck(int cpu)
 
 int mvPp2EgressPort(int port, int txp)
 {
-	if (!MV_PON_PORT(port))
-		return (MV_ETH_MAX_TCONT + port + txp);
-	return txp;
+	int egress_port;
+
+	if (!MV_PP2_IS_PON_PORT(port))
+		egress_port = MV_PP2_MAX_TCONT + port + txp;
+	else
+		egress_port = txp;
+
+	return egress_port;
 }
 /*-------------------------------------------------------------------------------*/
 MV_STATUS mvPp2HalInit(MV_PP2_HAL_DATA *halData)
@@ -181,7 +186,7 @@ MV_STATUS mvPp2HalInit(MV_PP2_HAL_DATA *halData)
 	mvPp2RxFifoInit(mvPp2HalData.maxPort);
 
 	/* Init all interrupt rxqs groups - each port has 0 rxqs */
-	for (i = 0; i <= MV_PON_PORT_ID; i++)
+	for (i = 0; i <= MV_PP2_PON_PORT_ID; i++)
 		mvPp2GbeIsrRxqGroup(i, 0);
 
 	MV_REG_WRITE(ETH_MNG_EXTENDED_GLOBAL_CTRL_REG, 0x27);
@@ -232,7 +237,7 @@ MV_STATUS mvPp2DefaultsSet(int port)
 	int txp, queue, txPortNum, i;
 	MV_PP2_PORT_CTRL *pPortCtrl = mvPp2PortHndlGet(port);
 
-	if (!MV_PON_PORT(port))
+	if (!MV_PP2_IS_PON_PORT(port))
 		mvGmacDefaultsSet(port);
 
 	/* avoid unused variable compilation warninig */
@@ -246,7 +251,7 @@ MV_STATUS mvPp2DefaultsSet(int port)
 
 		mvPp2WrReg(MV_PP2_TXP_SCHED_CMD_1_REG, 0);
 		/* Close bandwidth for all queues */
-		for (queue = 0; queue < MV_ETH_MAX_TXQ; queue++)
+		for (queue = 0; queue < MV_PP2_MAX_TXQ; queue++)
 			mvPp2WrReg(MV_PP2_TXQ_SCHED_TOKEN_CNTR_REG(MV_PPV2_TXQ_PHYS(port, txp, queue)), 0);
 
 		/* Set refill period to 1 usec, refill tokens and bucket size to maximum */
@@ -290,13 +295,13 @@ MV_STATUS mvPp2PhysRxqMapAdd(int prxq, int port, int lrxq)
 		mvOsPrintf("Bad port number: %d\n", port);
 		return MV_BAD_PARAM;
 	}
-	if (lrxq < 0 || lrxq > MV_ETH_MAX_RXQ) {
+	if (lrxq < 0 || lrxq > MV_PP2_MAX_RXQ) {
 		mvOsPrintf("Bad logical RXQ number: %d\n", lrxq);
 		return MV_BAD_PARAM;
 	}
 	if (mvPp2PhysRxqs == NULL)
 		return MV_ERROR;
-	if (prxq < 0 || prxq >= MV_ETH_RXQ_TOTAL_NUM)
+	if (prxq < 0 || prxq >= MV_PP2_RXQ_TOTAL_NUM)
 		return MV_BAD_PARAM;
 	if (mvPp2PhysRxqs[prxq].port != MV_PP2_RXQ_FREE || mvPp2PhysRxqs[prxq].logicRxq != MV_PP2_RXQ_FREE)
 		return MV_BAD_PARAM;
@@ -305,9 +310,9 @@ MV_STATUS mvPp2PhysRxqMapAdd(int prxq, int port, int lrxq)
 	/* map prxq <- (port, lrxq) */
 	if (pCtrl == NULL || pCtrl->pRxQueue == NULL)
 		return MV_BAD_PARAM;
-	if (lrxq < 0 || lrxq >= MV_ETH_MAX_RXQ)
+	if (lrxq < 0 || lrxq >= MV_PP2_MAX_RXQ)
 		return MV_BAD_PARAM;
-	if (pCtrl->rxqNum >= MV_ETH_MAX_RXQ)
+	if (pCtrl->rxqNum >= MV_PP2_MAX_RXQ)
 		return MV_FAIL;
 
 	pCtrl->pRxQueue[lrxq] = &mvPp2PhysRxqs[prxq];
@@ -327,7 +332,7 @@ MV_STATUS mvPp2PhysRxqMapDel(int prxq)
 
 	if (mvPp2PhysRxqs == NULL)
 		return MV_ERROR;
-	if (prxq < 0 || prxq >= MV_ETH_RXQ_TOTAL_NUM)
+	if (prxq < 0 || prxq >= MV_PP2_RXQ_TOTAL_NUM)
 		return MV_BAD_PARAM;
 
 	port = mvPp2PhysRxqs[prxq].port;
@@ -352,7 +357,7 @@ MV_STATUS mvPp2PortLogicRxqMapDel(int port, int lrxq)
 		mvOsPrintf("Bad port number: %d\n", port);
 		return MV_BAD_PARAM;
 	}
-	if (lrxq < 0 || lrxq > MV_ETH_MAX_RXQ) {
+	if (lrxq < 0 || lrxq > MV_PP2_MAX_RXQ) {
 		mvOsPrintf("Bad logical RXQ number: %d\n", lrxq);
 		return MV_BAD_PARAM;
 	}
@@ -512,18 +517,18 @@ MV_STATUS mvPp2PhysRxqsAlloc(MV_VOID)
 {
 	int i, bytes;
 
-	bytes = MV_ETH_RXQ_TOTAL_NUM * sizeof(MV_PP2_PHYS_RXQ_CTRL);
+	bytes = MV_PP2_RXQ_TOTAL_NUM * sizeof(MV_PP2_PHYS_RXQ_CTRL);
 	mvPp2PhysRxqs = mvOsMalloc(bytes);
 
 	if (!mvPp2PhysRxqs) {
 		mvOsPrintf("mvPp2 Can't allocate %d Bytes for %d RXQs controls\n",
-			   bytes, MV_ETH_RXQ_TOTAL_NUM);
+			   bytes, MV_PP2_RXQ_TOTAL_NUM);
 		return MV_OUT_OF_CPU_MEM;
 	}
 
 	memset(mvPp2PhysRxqs, 0, bytes);
 
-	for (i = 0; i < MV_ETH_RXQ_TOTAL_NUM; i++) {
+	for (i = 0; i < MV_PP2_RXQ_TOTAL_NUM; i++) {
 		mvPp2PhysRxqs[i].port = MV_PP2_RXQ_FREE;
 		mvPp2PhysRxqs[i].logicRxq = MV_PP2_RXQ_FREE;
 		mvPp2PhysRxqs[i].rxq = i;
@@ -546,7 +551,7 @@ MV_STATUS mvPp2PortRxqsInit(int port, int firstRxq, int numRxqs)
 	int i;
 	MV_PP2_PORT_CTRL *pCtrl = mvPp2PortCtrl[port];
 
-	if (firstRxq < 0 || firstRxq + numRxqs > MV_ETH_RXQ_TOTAL_NUM) {
+	if (firstRxq < 0 || firstRxq + numRxqs > MV_PP2_RXQ_TOTAL_NUM) {
 		mvOsPrintf("%s: Bad RXQ parameters. first RXQ = %d,  num of RXQS = %d\n", __func__, firstRxq, numRxqs);
 		return MV_BAD_PARAM;
 	}
@@ -560,11 +565,11 @@ MV_STATUS mvPp2PortRxqsInit(int port, int firstRxq, int numRxqs)
 
 	/* Allocate logical RXQs */
 	if (!pCtrl->pRxQueue)
-		pCtrl->pRxQueue = mvOsMalloc(MV_ETH_MAX_RXQ * sizeof(MV_PP2_PHYS_RXQ_CTRL *));
+		pCtrl->pRxQueue = mvOsMalloc(MV_PP2_MAX_RXQ * sizeof(MV_PP2_PHYS_RXQ_CTRL *));
 	if (!pCtrl->pRxQueue)
 		return MV_OUT_OF_CPU_MEM;
 
-	mvOsMemset(pCtrl->pRxQueue, 0, (MV_ETH_MAX_RXQ * sizeof(MV_PP2_PHYS_RXQ_CTRL *)));
+	mvOsMemset(pCtrl->pRxQueue, 0, (MV_PP2_MAX_RXQ * sizeof(MV_PP2_PHYS_RXQ_CTRL *)));
 
 	/* Associate requested RXQs with port */
 	for (i = firstRxq; i < firstRxq + numRxqs; i++)
@@ -677,11 +682,11 @@ MV_PP2_PHYS_TXQ_CTRL *mvPp2TxqInit(int port, int txp, int txq, int descNum, int 
 	/* TCONTS for PON port must be continious from 0 to mvPp2HalData.maxTcont */
 	/* GBE ports assumed to be continious from 0 to (mvPp2HalData.maxPort - 1) */
 	descPerTxq = 16;
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		desc = ptxq * descPerTxq;
 	else
-		desc = (mvPp2HalData.maxTcont * MV_ETH_MAX_TXQ * descPerTxq) +
-			(port * MV_ETH_MAX_TXQ * descPerTxq) + (txq * descPerTxq);
+		desc = (mvPp2HalData.maxTcont * MV_PP2_MAX_TXQ * descPerTxq) +
+			(port * MV_PP2_MAX_TXQ * descPerTxq) + (txq * descPerTxq);
 
 	mvPp2WrReg(MV_PP2_TXQ_PREF_BUF_REG, MV_PP2_PREF_BUF_PTR(desc) | MV_PP2_PREF_BUF_SIZE_16 |
 				MV_PP2_PREF_BUF_THRESH(descPerTxq/2));
@@ -762,7 +767,7 @@ MV_STATUS mvPp2PortTxqsInit(int port)
 	for (txp = 0; txp < pCtrl->txpNum; txp++) {
 		for (txq = 0; txq < pCtrl->txqNum; txq++) {
 			ptxq = MV_PPV2_TXQ_PHYS(port, txp, txq);
-			pCtrl->pTxQueue[txp * CONFIG_MV_ETH_TXQ + txq] = &mvPp2PhysTxqs[ptxq];
+			pCtrl->pTxQueue[txp * CONFIG_MV_PP2_TXQ + txq] = &mvPp2PhysTxqs[ptxq];
 		}
 	}
 
@@ -976,11 +981,11 @@ void *mvPp2PortInit(int port, int firstRxq, int numRxqs, void *osHandle)
 
 	/* associate TXQs to this port */
 #ifdef CONFIG_MV_INCLUDE_PON
-	pCtrl->txpNum = MV_PON_PORT(port) ? mvPp2HalData.maxTcont : 1;
+	pCtrl->txpNum = MV_PP2_IS_PON_PORT(port) ? mvPp2HalData.maxTcont : 1;
 #else
 	pCtrl->txpNum = 1;
 #endif
-	pCtrl->txqNum = CONFIG_MV_ETH_TXQ;
+	pCtrl->txqNum = CONFIG_MV_PP2_TXQ;
 	status = mvPp2PortTxqsInit(port);
 	if (status != MV_OK)
 		return NULL;
@@ -1055,7 +1060,7 @@ MV_STATUS mvPp2PortEgressEnable(int port, MV_BOOL en)
 
 MV_STATUS mvPp2PortEnable(int port, MV_BOOL en)
 {
-	if (!MV_PON_PORT(port)) {
+	if (!MV_PP2_IS_PON_PORT(port)) {
 		/* Enable port */
 		if (en)
 			mvGmacPortEnable(port);
@@ -1391,7 +1396,7 @@ unsigned int mvPp2RxqTimeCoalGet(int port, int rxq)
  *  - isTxDoneIsr: if 0 then Tx Done interruptare not unmasked */
 MV_STATUS mvPp2GbeIsrRxTxUnmask(int port, MV_U16 rxq_mask, int isTxDoneIsr)
 {
-	if (MV_PON_PORT(port)) {
+	if (MV_PP2_IS_PON_PORT(port)) {
 		mvPp2WrReg(MV_PP2_ISR_PON_RX_TX_MASK_REG,
 			(MV_PP2_PON_CAUSE_MISC_SUM_MASK |
 			((isTxDoneIsr) ? MV_PP2_PON_CAUSE_TXP_OCCUP_DESC_ALL_MASK : 0) |
@@ -1409,7 +1414,7 @@ MV_STATUS mvPp2GbeIsrRxTxUnmask(int port, MV_U16 rxq_mask, int isTxDoneIsr)
 /* mask the current CPU's rx/tx interrupts */
 MV_STATUS mvPp2GbeIsrRxTxMask(int port)
 {
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		mvPp2WrReg(MV_PP2_ISR_PON_RX_TX_MASK_REG, 0);
 	else
 		mvPp2WrReg(MV_PP2_ISR_RX_TX_MASK_REG(MV_PPV2_PORT_PHYS(port)), 0);
@@ -1419,9 +1424,9 @@ MV_STATUS mvPp2GbeIsrRxTxMask(int port)
 
 MV_STATUS mvPp2GbeIsrRxqGroup(int port, int rxqNum)
 {
-	if ((rxqNum % 4 != 0) || (rxqNum > MV_ETH_MAX_RXQ)) {
+	if ((rxqNum % 4 != 0) || (rxqNum > MV_PP2_MAX_RXQ)) {
 		mvOsPrintf("%s: bad number of rxqs - %d.  Must be multiple of 4 and less than %d\n",
-			__func__, rxqNum, MV_ETH_MAX_RXQ);
+			__func__, rxqNum, MV_PP2_MAX_RXQ);
 		return MV_BAD_PARAM;
 	}
 
@@ -1600,7 +1605,7 @@ MV_STATUS   mvPp2TxqRateSet(int port, int txp, int txq, int rate)
 	if (mvPp2TxpCheck(port, txp))
 		return MV_BAD_PARAM;
 
-	if (txq >= MV_ETH_MAX_TXQ)
+	if (txq >= MV_PP2_MAX_TXQ)
 		return MV_BAD_PARAM;
 
 	status = mvPp2RateCalc(rate, accuracy, &period, &tokens);
@@ -1644,7 +1649,7 @@ MV_STATUS mvPp2TxqBurstSet(int port, int txp, int txq, int burst)
 	if (mvPp2TxpCheck(port, txp))
 		return MV_BAD_PARAM;
 
-	if (txq >= MV_ETH_MAX_TXQ)
+	if (txq >= MV_PP2_MAX_TXQ)
 		return MV_BAD_PARAM;
 
 	txPortNum = mvPp2EgressPort(port, txp);
@@ -1678,7 +1683,7 @@ MV_STATUS mvPp2TxqFixPrioSet(int port, int txp, int txq)
 	if (mvPp2TxpCheck(port, txp))
 		return MV_BAD_PARAM;
 
-	if (txq >= MV_ETH_MAX_TXQ)
+	if (txq >= MV_PP2_MAX_TXQ)
 		return MV_BAD_PARAM;
 
 	txPortNum = mvPp2EgressPort(port, txp);
@@ -1701,7 +1706,7 @@ MV_STATUS mvPp2TxqWrrPrioSet(int port, int txp, int txq, int weight)
 	if (mvPp2TxpCheck(port, txp))
 		return MV_BAD_PARAM;
 
-	if (txq >= MV_ETH_MAX_TXQ)
+	if (txq >= MV_PP2_MAX_TXQ)
 		return MV_BAD_PARAM;
 
 	txPortNum = mvPp2EgressPort(port, txp);
@@ -1773,7 +1778,7 @@ MV_STATUS   mvPp2TxpMaxTxSizeSet(int port, int txp, int maxTxSize)
 		regVal |= size;
 		mvPp2WrReg(MV_PP2_TXP_SCHED_TOKEN_SIZE_REG, regVal);
 	}
-	for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++) {
+	for (txq = 0; txq < CONFIG_MV_PP2_TXQ; txq++) {
 		regVal = mvPp2RdReg(MV_PP2_TXQ_SCHED_TOKEN_SIZE_REG(txq));
 		size = regVal & MV_PP2_TXQ_TOKEN_SIZE_MAX;
 		if (size < mtu) {
@@ -1827,7 +1832,7 @@ MV_STATUS mvPp2TxpEnable(int port, int txp)
 	/* Enable all initialized TXs. */
 	qMap = 0;
 	for (txq = 0; txq < pPortCtrl->txqNum; txq++) {
-		if (pPortCtrl->pTxQueue[txp * CONFIG_MV_ETH_TXQ + txq] != NULL)
+		if (pPortCtrl->pTxQueue[txp * CONFIG_MV_PP2_TXQ + txq] != NULL)
 			qMap |= (1 << txq);
 	}
 	/* Indirect access to register */
@@ -1906,7 +1911,7 @@ MV_STATUS mvPp2TxPortFifoFlush(int port, MV_BOOL en)
 	MV_U32 regVal;
 
 	/* valid only for ethernet ports (not for xPON) */
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		return MV_NOT_SUPPORTED;
 
 	regVal = mvPp2RdReg(MV_PP2_TX_PORT_FLUSH_REG);
@@ -1936,7 +1941,7 @@ MV_STATUS mvPp2TxPortFifoFlush(int port, MV_BOOL en)
 
 /* Function for swithcing SWF to HWF */
 /* txq is physical (global) txq in range 0..MV_PP2_TXQ_TOTAL_NUM */
-/* txq is physical (global) rxq in range 0..MV_ETH_RXQ_TOTAL_NUM */
+/* txq is physical (global) rxq in range 0..MV_PP2_RXQ_TOTAL_NUM */
 
 MV_STATUS mvPp2FwdSwitchCtrl(MV_U32 flowId, int txq, int rxq, int msec)
 {
@@ -1947,7 +1952,7 @@ MV_STATUS mvPp2FwdSwitchCtrl(MV_U32 flowId, int txq, int rxq, int msec)
 	if (mvPp2MaxCheck(txq, MV_PP2_TXQ_TOTAL_NUM, "global txq"))
 		return MV_BAD_PARAM;
 
-	if (mvPp2MaxCheck(rxq, MV_ETH_RXQ_TOTAL_NUM, "global rxq"))
+	if (mvPp2MaxCheck(rxq, MV_PP2_RXQ_TOTAL_NUM, "global rxq"))
 		return MV_BAD_PARAM;
 
 	timeout = MV_PP2_FWD_SWITCH_TIMEOUT_MAX * 1024;
