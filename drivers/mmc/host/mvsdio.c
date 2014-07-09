@@ -858,6 +858,15 @@ static int mvsd_resume(struct platform_device *dev)
 #define mvsd_resume	NULL
 #endif
 
+void mvsd_shutdown(struct platform_device *pdev)
+{
+	struct mmc_host *mmc = platform_get_drvdata(pdev);
+	struct mvsd_host *host = mmc_priv(mmc);
+
+	if (!IS_ERR(host->clk))
+		clk_disable_unprepare(host->clk);
+}
+
 static const struct of_device_id mvsdio_dt_ids[] = {
 	{ .compatible = "marvell,orion-sdio" },
 	{ /* sentinel */ }
@@ -868,6 +877,7 @@ static struct platform_driver mvsd_driver = {
 	.remove		= __exit_p(mvsd_remove),
 	.suspend	= mvsd_suspend,
 	.resume		= mvsd_resume,
+	.shutdown	= mvsd_shutdown,
 	.driver		= {
 		.name	= DRIVER_NAME,
 		.of_match_table = mvsdio_dt_ids,
