@@ -71,6 +71,7 @@ void __init set_secondary_cpus_clock(void)
 		if (cpu != thiscpu) {
 			cpu_clk = of_clk_get(np, 0);
 			clk_set_rate(cpu_clk, rate);
+			clk_prepare_enable(cpu_clk);
 		}
 	}
 }
