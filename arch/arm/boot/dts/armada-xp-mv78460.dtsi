@@ -37,6 +37,7 @@
 			reg = <0>;
 			clocks = <&cpuclk 0>;
 			resets = <&cpurst 0>;
+			clock-latency = <1000000>;
 		};
 
 		cpu@1 {
@@ -45,6 +46,7 @@
 			reg = <1>;
 			clocks = <&cpuclk 1>;
 			resets = <&cpurst 1>;
+			clock-latency = <1000000>;
 		};
 
 		cpu@2 {
@@ -53,6 +55,7 @@
 			reg = <2>;
 			clocks = <&cpuclk 2>;
 			resets = <&cpurst 2>;
+			clock-latency = <1000000>;
 		};
 
 		cpu@3 {
@@ -61,6 +64,7 @@
 			reg = <3>;
 			clocks = <&cpuclk 3>;
 			resets = <&cpurst 3>;
+			clock-latency = <1000000>;
 		};
 	};
 

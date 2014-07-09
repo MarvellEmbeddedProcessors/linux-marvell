@@ -34,6 +34,7 @@
 			reg = <0>;
 			clocks = <&cpuclk 0>;
 			resets = <&cpurst 0>;
+			clock-latency = <1000000>;
 		};
 
 		cpu@1 {
@@ -42,6 +43,7 @@
 			reg = <1>;
 			clocks = <&cpuclk 1>;
 			resets = <&cpurst 1>;
+			clock-latency = <1000000>;
 		};
 	};
 
