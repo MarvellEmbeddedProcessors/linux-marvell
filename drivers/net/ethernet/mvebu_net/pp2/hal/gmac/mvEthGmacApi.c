@@ -213,7 +213,7 @@ MV_STATUS mvGmacLinkStatus(int port, MV_ETH_PORT_STATUS *pStatus)
 {
 	MV_U32 regVal;
 
-	if (MV_PON_PORT(port)) {
+	if (MV_PP2_IS_PON_PORT(port)) {
 		pStatus->linkup = MV_TRUE;
 		pStatus->speed = MV_ETH_SPEED_1000;
 		pStatus->duplex = MV_ETH_DUPLEX_FULL;
@@ -303,7 +303,7 @@ MV_STATUS mvGmacMaxRxSizeSet(int port, int maxRxSize)
 {
 	MV_U32		regVal;
 
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		return MV_ERROR;
 
 	regVal =  MV_REG_READ(ETH_GMAC_CTRL_0_REG(port));
@@ -649,7 +649,7 @@ void mvGmacPortRegs(int port)
 	if (mvPp2PortCheck(port))
 		return;
 
-	if (MV_PON_PORT(port)) {
+	if (MV_PP2_IS_PON_PORT(port)) {
 		mvOsPrintf("Not supported for PON port\n");
 		return;
 	}
@@ -738,7 +738,7 @@ void mvGmacMibCountersClear(int port)
 {
 	int i;
 
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		return;
 
 	/* Perform dummy reads from MIB counters */
@@ -765,7 +765,7 @@ void mvGmacMibCountersShow(int port)
 	if (mvPp2PortCheck(port))
 		return;
 
-	if (MV_PON_PORT(port)) {
+	if (MV_PP2_IS_PON_PORT(port)) {
 		mvOsPrintf("%s: not supported for PON port\n", __func__);
 		return;
 	}

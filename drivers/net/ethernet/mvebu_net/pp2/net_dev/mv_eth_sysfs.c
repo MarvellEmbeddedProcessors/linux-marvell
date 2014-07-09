@@ -39,7 +39,7 @@ disclaimer.
 #include "mv_eth_sysfs.h"
 
 
-static ssize_t mv_eth_help(char *buf)
+static ssize_t mv_pp2_help(char *buf)
 {
 	int off = 0;
 
@@ -51,7 +51,7 @@ static ssize_t mv_eth_help(char *buf)
 	off += sprintf(buf+off, "cd                 pme         - move to PME sysfs directory\n");
 	off += sprintf(buf+off, "cd                 qos         - move to QoS sysfs directory\n\n");
 
-#ifdef CONFIG_MV_ETH_HWF
+#ifdef CONFIG_MV_PP2_HWF
 	off += sprintf(buf+off, "cd                 qos         - move to QoS sysfs directory\n\n");
 #endif
 	off += sprintf(buf+off, "cat                addrDec     - show address decode registers\n");
@@ -66,7 +66,7 @@ static ssize_t mv_eth_help(char *buf)
 	off += sprintf(buf+off, "echo [0|1]       > pnc         - enable / disable Parser and Classifier access\n");
 	off += sprintf(buf+off, "echo [0|1]       > skb         - enable / disable skb recycle\n");
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_PP2_DEBUG_CODE
 	off += sprintf(buf+off, "echo [p] [hex]   > debug       - b0:rx, b1:tx, b2:isr, b3:poll, b4:dump, b5:b_hdr\n");
 #endif
 #ifdef CONFIG_CPU_IDLE
@@ -76,7 +76,7 @@ static ssize_t mv_eth_help(char *buf)
 	return off;
 }
 
-static ssize_t mv_eth_show(struct device *dev,
+static ssize_t mv_pp2_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	const char      *name = attr->attr.name;
@@ -89,12 +89,12 @@ static ssize_t mv_eth_show(struct device *dev,
 		/*mvPp2AddressDecodeRegsPrint();*/
 		mvPp2AddrDecodeRegs();
 	else
-		off = mv_eth_help(buf);
+		off = mv_pp2_help(buf);
 
 	return off;
 }
 
-static ssize_t mv_eth_port_store(struct device *dev,
+static ssize_t mv_pp2_port_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
@@ -112,11 +112,11 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	local_irq_save(flags);
 
 	if (!strcmp(name, "port")) {
-		mv_eth_status_print();
-		mv_eth_port_status_print(p);
+		mv_pp2_status_print();
+		mv_pp2_eth_port_status_print(p);
 		mvPp2PortStatus(p);
 	} else if (!strcmp(name, "cntrs")) {
-		if (!MV_PON_PORT(p))
+		if (!MV_PP2_IS_PON_PORT(p))
 			mvGmacMibCountersShow(p);
 		else
 			printk(KERN_ERR "sysfs command %s is not supported for xPON port %d\n",
@@ -133,11 +133,13 @@ static ssize_t mv_eth_port_store(struct device *dev,
 		mvPp2V0DropCntrs(p);
 #endif
 	} else if (!strcmp(name, "stats")) {
-		mv_eth_port_stats_print(p);
+		mv_pp2_port_stats_print(p);
+	} else if (!strcmp(name, "mac")) {
+		mv_pp2_mac_show(p);
 	} else if (!strcmp(name, "pnc")) {
-		mv_eth_ctrl_pnc(p);
+		mv_pp2_ctrl_pnc(p);
 	} else if (!strcmp(name, "skb")) {
-		mv_eth_ctrl_recycle(p);
+		mv_pp2_eth_ctrl_recycle(p);
 	} else {
 		err = 1;
 		printk(KERN_ERR "%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -151,7 +153,7 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
-static ssize_t mv_eth_2_hex_store(struct device *dev,
+static ssize_t mv_pp2_2_hex_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
@@ -169,24 +171,24 @@ static ssize_t mv_eth_2_hex_store(struct device *dev,
 	local_irq_save(flags);
 
 	if (!strcmp(name, "debug")) {
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
-		err = mv_eth_ctrl_dbg_flag(p, MV_ETH_F_DBG_RX,   v & 0x1);
-		err = mv_eth_ctrl_dbg_flag(p, MV_ETH_F_DBG_TX,   v & 0x2);
-		err = mv_eth_ctrl_dbg_flag(p, MV_ETH_F_DBG_ISR,  v & 0x4);
-		err = mv_eth_ctrl_dbg_flag(p, MV_ETH_F_DBG_POLL, v & 0x8);
-		err = mv_eth_ctrl_dbg_flag(p, MV_ETH_F_DBG_DUMP, v & 0x10);
-		err = mv_eth_ctrl_dbg_flag(p, MV_ETH_F_DBG_BUFF_HDR, v & 0x20);
+#ifdef CONFIG_MV_PP2_DEBUG_CODE
+		err = mv_pp2_ctrl_dbg_flag(p, MV_ETH_F_DBG_RX,   v & 0x1);
+		err = mv_pp2_ctrl_dbg_flag(p, MV_ETH_F_DBG_TX,   v & 0x2);
+		err = mv_pp2_ctrl_dbg_flag(p, MV_ETH_F_DBG_ISR,  v & 0x4);
+		err = mv_pp2_ctrl_dbg_flag(p, MV_ETH_F_DBG_POLL, v & 0x8);
+		err = mv_pp2_ctrl_dbg_flag(p, MV_ETH_F_DBG_DUMP, v & 0x10);
+		err = mv_pp2_ctrl_dbg_flag(p, MV_ETH_F_DBG_BUFF_HDR, v & 0x20);
 #endif
 	} else if (!strcmp(name, "pm_mode")) {
 #ifdef CONFIG_CPU_IDLE
-		err = mv_eth_pm_mode_set(p, v);
+		err = mv_pp2_pm_mode_set(p, v);
 #endif
 	}
 
 	return err ? -EINVAL : len;
 }
 
-static ssize_t mv_eth_netdev_store(struct device *dev,
+static ssize_t mv_pp2_netdev_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char *name = attr->attr.name;
@@ -204,7 +206,7 @@ static ssize_t mv_eth_netdev_store(struct device *dev,
 		err = 1;
 	} else {
 		if (!strcmp(name, "netdev"))
-			mv_eth_netdev_print(netdev);
+			mv_pp2_eth_netdev_print(netdev);
 		else {
 			err = 1;
 			printk(KERN_ERR "%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -217,7 +219,7 @@ static ssize_t mv_eth_netdev_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
-static ssize_t mv_eth_reg_store(struct device *dev,
+static ssize_t mv_pp2_reg_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
@@ -252,32 +254,33 @@ static ssize_t mv_eth_reg_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
-static DEVICE_ATTR(addrDec,	S_IRUSR, mv_eth_show, NULL);
-static DEVICE_ATTR(help,	S_IRUSR, mv_eth_show, NULL);
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
-static DEVICE_ATTR(debug,	S_IWUSR, NULL, mv_eth_2_hex_store);
+static DEVICE_ATTR(addrDec,	S_IRUSR, mv_pp2_show, NULL);
+static DEVICE_ATTR(help,	S_IRUSR, mv_pp2_show, NULL);
+#ifdef CONFIG_MV_PP2_DEBUG_CODE
+static DEVICE_ATTR(debug,	S_IWUSR, NULL, mv_pp2_2_hex_store);
 #endif
-static DEVICE_ATTR(isrRegs,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(gmacRegs,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(dropCntrs,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(stats,       S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(pnc,		S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(skb,         S_IWUSR, NULL, mv_eth_port_store);
+static DEVICE_ATTR(isrRegs,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(gmacRegs,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(dropCntrs,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(stats,       S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(mac,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(pnc,		S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(skb,         S_IWUSR, NULL, mv_pp2_port_store);
 
-static DEVICE_ATTR(port,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(cntrs,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(netdev,	S_IWUSR, NULL, mv_eth_netdev_store);
+static DEVICE_ATTR(port,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(cntrs,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(netdev,	S_IWUSR, NULL, mv_pp2_netdev_store);
 
-static DEVICE_ATTR(regRead,       S_IWUSR, NULL, mv_eth_reg_store);
-static DEVICE_ATTR(regWrite,      S_IWUSR, NULL, mv_eth_reg_store);
+static DEVICE_ATTR(regRead,       S_IWUSR, NULL, mv_pp2_reg_store);
+static DEVICE_ATTR(regWrite,      S_IWUSR, NULL, mv_pp2_reg_store);
 #ifdef CONFIG_CPU_IDLE
-static DEVICE_ATTR(pm_mode,	S_IWUSR, NULL, mv_eth_2_hex_store);
+static DEVICE_ATTR(pm_mode,	S_IWUSR, NULL, mv_pp2_2_hex_store);
 #endif
 
-static struct attribute *mv_eth_attrs[] = {
+static struct attribute *mv_pp2_attrs[] = {
 	&dev_attr_addrDec.attr,
 	&dev_attr_help.attr,
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_PP2_DEBUG_CODE
 	&dev_attr_debug.attr,
 #endif
 	&dev_attr_port.attr,
@@ -297,8 +300,8 @@ static struct attribute *mv_eth_attrs[] = {
 	NULL
 };
 
-static struct attribute_group mv_eth_group = {
-	.attrs = mv_eth_attrs,
+static struct attribute_group mv_pp2_group = {
+	.attrs = mv_pp2_attrs,
 };
 
 static struct kobject *gbe_kobj;
@@ -313,7 +316,7 @@ int mv_pp2_gbe_sysfs_init(struct kobject *pp2_kobj)
 		return -ENOMEM;
 	}
 
-	err = sysfs_create_group(gbe_kobj, &mv_eth_group);
+	err = sysfs_create_group(gbe_kobj, &mv_pp2_group);
 	if (err) {
 		printk(KERN_INFO "sysfs group failed %d\n", err);
 		return err;
@@ -326,7 +329,7 @@ int mv_pp2_gbe_sysfs_init(struct kobject *pp2_kobj)
 	mv_pp2_qos_sysfs_init(gbe_kobj);
 	mv_pp2_pon_sysfs_init(gbe_kobj);
 	mv_pp2_gbe_pme_sysfs_init(gbe_kobj);
-#ifdef CONFIG_MV_ETH_HWF
+#ifdef CONFIG_MV_PP2_HWF
 	mv_pp2_gbe_hwf_sysfs_init(gbe_kobj);
 #endif
 	return err;
@@ -341,10 +344,10 @@ int mv_pp2_gbe_sysfs_exit(struct kobject *pp2_kobj)
 	mv_pp2_tx_sysfs_exit(gbe_kobj);
 	mv_pp2_rx_sysfs_exit(gbe_kobj);
 	mv_pp2_bm_sysfs_exit(gbe_kobj);
-#ifdef CONFIG_MV_ETH_HWF
+#ifdef CONFIG_MV_PP2_HWF
 	mv_pp2_gbe_hwf_sysfs_exit(gbe_kobj);
 #endif
-	sysfs_remove_group(pp2_kobj, &mv_eth_group);
+	sysfs_remove_group(pp2_kobj, &mv_pp2_group);
 
 	return 0;
 }

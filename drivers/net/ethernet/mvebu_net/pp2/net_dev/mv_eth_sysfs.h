@@ -86,10 +86,10 @@ int mv_pp2_pon_sysfs_exit(struct kobject *pp2_kobj);
 int mv_pp2_gbe_pme_sysfs_init(struct kobject *gbe_kobj);
 int mv_pp2_gbe_pme_sysfs_exit(struct kobject *gbe_kobj);
 
-#ifdef CONFIG_MV_ETH_HWF
+#ifdef CONFIG_MV_PP2_HWF
 int mv_pp2_gbe_hwf_sysfs_init(struct kobject *gbe_kobj);
 int mv_pp2_gbe_hwf_sysfs_exit(struct kobject *gbe_kobj);
-#endif /* CONFIG_MV_ETH_HWF */
+#endif /* CONFIG_MV_PP2_HWF */
 
 int mv_pp2_dbg_sysfs_init(struct kobject *pp2_kobj);
 int mv_pp2_dbg_sysfs_exit(struct kobject *pp2_kobj);
@@ -100,7 +100,7 @@ int mv_pp2_wol_sysfs_exit(struct kobject *pp2_kobj);
 int mv_pp2_dpi_sysfs_init(struct kobject *pp2_kobj);
 int mv_pp2_dpi_sysfs_exit(struct kobject *pp2_kobj);
 
-#ifdef CONFIG_MV_ETH_L2FW
+#ifdef CONFIG_MV_PP2_L2FW
 int mv_pp2_l2fw_sysfs_init(struct kobject *pp2_kobj);
 int mv_pp2_l2fw_sysfs_exit(struct kobject *pp2_kobj);
 #endif

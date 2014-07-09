@@ -86,8 +86,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <net/ipv6.h>
 #include <linux/icmpv6.h>
 
-#include <ctrlEnv/mvCtrlEnvLib.h>
-
 #include "mvDebug.h"
 #include "mv_cph_header.h"
 
@@ -134,13 +132,13 @@ void cph_rec_skb(int port, struct sk_buff *skb)
 	struct eth_port *pp = NULL;
 
 	rx_status = netif_receive_skb(skb);
-	pp        = mv_eth_port_by_id(port);
+	pp        = mv_pp2_port_by_id(port);
 	if (rx_status)
 		STAT_DBG(pp->stats.rx_drop_sw++);
 }
 
 #ifdef CONFIG_MV_CPH_UDP_SAMPLE_HANDLE
-static inline void cph_copy_tx_spec(struct mv_eth_tx_spec *tx_spec,
+static inline void cph_copy_tx_spec(struct mv_pp2_tx_spec *tx_spec,
 					uint8_t txp, uint8_t txq,
 					uint16_t flags, uint32_t hw_cmd)
 {
@@ -153,7 +151,7 @@ static inline void cph_copy_tx_spec(struct mv_eth_tx_spec *tx_spec,
 int cph_udp_spec_print(int port)
 {
 	int i;
-	struct eth_port *pp = mv_eth_port_by_id(port);
+	struct eth_port *pp = mv_pp2_port_by_id(port);
 	struct mv_udp_port_tx_spec *udp_spec;
 
 	if (!pp)
@@ -230,7 +228,7 @@ MV_STATUS  cph_udp_int_spec_set(struct mv_udp_port_tx_spec *udp_spec, uint16_t u
 MV_STATUS  cph_udp_src_spec_set(int tx_port, uint16_t udp_src_port, uint8_t txp,
 	uint8_t txq, uint16_t flags, uint32_t hw_cmd)
 {
-	struct eth_port *pp = mv_eth_port_by_id(tx_port);
+	struct eth_port *pp = mv_pp2_port_by_id(tx_port);
 	struct mv_udp_port_tx_spec *udp_src_spec = udp_port_spec_cfg[tx_port].udp_src;
 	MV_STATUS mv_status;
 
@@ -252,7 +250,7 @@ EXPORT_SYMBOL(cph_udp_src_spec_set);
 MV_STATUS  cph_udp_dest_spec_set(int tx_port, uint16_t udp_dest_port, uint8_t txp,
 	uint8_t txq, uint16_t flags, uint32_t hw_cmd)
 {
-	struct eth_port *pp = mv_eth_port_by_id(tx_port);
+	struct eth_port *pp = mv_pp2_port_by_id(tx_port);
 	struct mv_udp_port_tx_spec *udp_dst_spec = udp_port_spec_cfg[tx_port].udp_dst;
 	MV_STATUS mv_status;
 
@@ -297,7 +295,7 @@ void cph_udp_table_init(void)
 }
 
 int cph_udp_port_tx(int port, struct net_device *dev, struct sk_buff *skb,
-		struct mv_eth_tx_spec *tx_spec_out)
+		struct mv_pp2_tx_spec *tx_spec_out)
 {
 	struct iphdr  *iphdrp   = NULL;
 	struct udphdr *udphdrp  = NULL;
@@ -330,7 +328,7 @@ int cph_udp_port_tx(int port, struct net_device *dev, struct sk_buff *skb,
 					if ((udphdrp->source == udp_port_spec_cfg[port].udp_src[i].udp_port) &&
 					(udp_port_spec_cfg[port].udp_src[i].tx_spec.txq != MV_ETH_TXQ_INVALID)) {
 						memcpy(tx_spec_out, &(udp_port_spec_cfg[port].udp_src[i].tx_spec),
-							sizeof(struct mv_eth_tx_spec));
+							sizeof(struct mv_pp2_tx_spec));
 						MV_CPH_PRINT(CPH_DEBUG_LEVEL, "found udp_src 0x(%04x)\n",
 							ntohs(udphdrp->source));
 						return 1;
@@ -341,7 +339,7 @@ int cph_udp_port_tx(int port, struct net_device *dev, struct sk_buff *skb,
 					if ((udphdrp->dest == udp_port_spec_cfg[port].udp_dst[i].udp_port) &&
 					(udp_port_spec_cfg[port].udp_src[i].tx_spec.txq != MV_ETH_TXQ_INVALID)) {
 						memcpy(tx_spec_out, &(udp_port_spec_cfg[port].udp_dst[i].tx_spec),
-							sizeof(struct mv_eth_tx_spec));
+							sizeof(struct mv_pp2_tx_spec));
 						MV_CPH_PRINT(CPH_DEBUG_LEVEL, "found udp_dst 0x(%04x)\n",
 							ntohs(udphdrp->dest));
 						return 1;
@@ -449,7 +447,7 @@ static int cph_data_flow_rx(int port, struct net_device *dev, struct sk_buff *sk
 *       On error returns 0.
 *******************************************************************************/
 int cph_data_flow_tx(int port, struct net_device *dev, struct sk_buff *skb,
-			bool mh, struct mv_eth_tx_spec *tx_spec_out)
+			bool mh, struct mv_pp2_tx_spec *tx_spec_out)
 {
 	struct CPH_FLOW_ENTRY_T flow_rule;
 	int            offset = 0;
@@ -630,7 +628,7 @@ static int cph_app_packet_rx(int port, struct net_device *dev, struct sk_buff *s
 *       On error returns 0.
 *******************************************************************************/
 int cph_app_packet_tx(int port, struct net_device *dev, struct sk_buff *skb,
-			struct mv_eth_tx_spec *tx_spec_out)
+			struct mv_pp2_tx_spec *tx_spec_out)
 {
 	enum CPH_DIR_E             dir;
 	unsigned short                proto_type = 0;
@@ -728,7 +726,7 @@ int cph_app_packet_tx(int port, struct net_device *dev, struct sk_buff *skb,
 *
 * RETURNS:
 *       1: the packet will be handled and forwarded to linux stack in CPH
-*       0: the packet will not be forwarded to linux stack and mv_eth_rx() needs to continue to handle it
+*       0: the packet will not be forwarded to linux stack and mv_pp2_rx() needs to continue to handle it
 *******************************************************************************/
 int cph_rx_func(int port, int rxq, struct net_device *dev,
 		struct sk_buff *skb, struct pp2_rx_desc *rx_desc)
@@ -787,7 +785,7 @@ int cph_rx_func(int port, int rxq, struct net_device *dev,
 *       None.
 *******************************************************************************/
 int cph_tx_func(int port, struct net_device *dev, struct sk_buff *skb,
-		struct mv_eth_tx_spec *tx_spec_out)
+		struct mv_pp2_tx_spec *tx_spec_out)
 {
 	/* Transmit application packets */
 	if (cph_app_packet_tx(port, dev, skb, tx_spec_out))
@@ -828,8 +826,8 @@ int cph_netdev_init(void)
 {
 	unsigned int idx;
 
-	/* Retrieve Eth port number, as in mv_eth_init_module */
-	gs_mv_eth_port_num = mvCtrlEthMaxPortGet();
+	/* Retrieve Eth port number, TODO list */
+	gs_mv_eth_port_num = MV_ETH_MAX_PORTS;
 
 	if (gs_mv_eth_port_num > MV_ETH_MAX_PORTS)
 		gs_mv_eth_port_num = MV_ETH_MAX_PORTS;
@@ -848,16 +846,16 @@ int cph_netdev_init(void)
 #endif
 
 	/* Register special receive check function */
-#ifdef CONFIG_MV_ETH_RX_SPECIAL
+#ifdef CONFIG_MV_PP2_RX_SPECIAL
 	for (idx = 0; idx < gs_mv_eth_port_num; idx++)
-		mv_eth_rx_special_proc_func(idx, cph_rx_func);
-#endif /* CONFIG_MV_ETH_RX_SPECIAL */
+		mv_pp2_rx_special_proc_func(idx, cph_rx_func);
+#endif /* CONFIG_MV_PP2_RX_SPECIAL */
 
 	/* Register special transmit check function */
-#ifdef CONFIG_MV_ETH_TX_SPECIAL
+#ifdef CONFIG_MV_PP2_TX_SPECIAL
 	for (idx = 0; idx < gs_mv_eth_port_num; idx++)
-		mv_eth_tx_special_check_func(idx, cph_tx_func);
-#endif /* CONFIG_MV_ETH_TX_SPECIAL */
+		mv_pp2_tx_special_check_func(idx, cph_tx_func);
+#endif /* CONFIG_MV_PP2_TX_SPECIAL */
 
 	/* enable all T-CONT by default, whill remove it once callback implmented*/
 	for (idx = 0; idx < MV_TCONT_LLID_NUM; idx++)

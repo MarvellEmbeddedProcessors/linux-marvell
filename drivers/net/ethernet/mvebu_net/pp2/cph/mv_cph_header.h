@@ -82,7 +82,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* Include Files
 ------------------------------------------------------------------------------*/
 #include <mvCommon.h>
-#include <mv_pp2/net_dev/mv_netdev.h>
+#include <../net_dev/mv_netdev.h>
 
 #include "mv_cph_infra.h"
 #include "mv_cph_app.h"

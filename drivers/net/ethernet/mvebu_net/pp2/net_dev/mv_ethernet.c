@@ -43,17 +43,15 @@ disclaimer.
 
 #include "mv_netdev.h"
 
-extern unsigned int mv_eth_pnc_ctrl_en;
-
-static int mv_eth_set_mac_addr_internals(struct net_device *dev, void *addr);
+static int mv_pp2_set_mac_addr_internals(struct net_device *dev, void *addr);
 
 /***********************************************************
- * mv_eth_start --                                         *
+ * mv_pp2_start --                                         *
  *   start a network device. connect and enable interrupts *
  *   set hw defaults. fill rx buffers. restart phy link    *
  *   auto neg. set device link flags. report status.       *
  ***********************************************************/
-int mv_eth_start(struct net_device *dev)
+int mv_pp2_start(struct net_device *dev)
 {
 	struct eth_port *priv = MV_ETH_PRIV(dev);
 	int group;
@@ -65,19 +63,19 @@ int mv_eth_start(struct net_device *dev)
 	netif_tx_stop_all_queues(dev);
 
 	/* fill rx buffers, start rx/tx activity, set coalescing */
-	if (mv_eth_start_internals(priv, dev->mtu) != 0) {
+	if (mv_pp2_start_internals(priv, dev->mtu) != 0) {
 		printk(KERN_ERR "%s: start internals failed\n", dev->name);
 		goto error;
 	}
 	/* enable polling on the port, must be used after netif_poll_disable */
 	if (priv->flags & MV_ETH_F_CONNECT_LINUX) {
-		for (group = 0; group < MV_ETH_MAX_RXQ; group++)
+		for (group = 0; group < MV_PP2_MAX_RXQ; group++)
 			if (priv->napi_group[group] && priv->napi_group[group]->napi)
 				napi_enable(priv->napi_group[group]->napi);
 	}
 	if (priv->flags & MV_ETH_F_LINK_UP) {
 
-		if (mv_eth_ctrl_is_tx_enabled(priv)) {
+		if (mv_pp2_ctrl_is_tx_enabled(priv)) {
 			netif_carrier_on(dev);
 			netif_tx_wake_all_queues(dev);
 		}
@@ -86,16 +84,16 @@ int mv_eth_start(struct net_device *dev)
 
 	if (priv->flags & MV_ETH_F_CONNECT_LINUX) {
 		/* connect to port interrupt line */
-		if (request_irq(dev->irq, mv_eth_isr, (IRQF_DISABLED), dev->name, priv)) {
+		if (request_irq(dev->irq, mv_pp2_isr, (IRQF_DISABLED), dev->name, priv)) {
 			printk(KERN_ERR "cannot request irq %d for %s port %d\n", dev->irq, dev->name, priv->port);
-			for (group = 0; group < MV_ETH_MAX_RXQ; group++)
+			for (group = 0; group < MV_PP2_MAX_RXQ; group++)
 				if (priv->napi_group[group] && priv->napi_group[group]->napi)
 					napi_disable(priv->napi_group[group]->napi);
 			goto error;
 		}
 
 		/* unmask interrupts */
-		on_each_cpu(mv_eth_interrupts_unmask, (void *)priv, 1);
+		on_each_cpu(mv_pp2_interrupts_unmask, (void *)priv, 1);
 
 		/* Enable interrupts for all CPUs */
 		mvPp2GbeCpuInterruptsEnable(priv->port, priv->cpuMask);
@@ -107,10 +105,10 @@ int mv_eth_start(struct net_device *dev)
 	}
 
 	/* Enable GMAC */
-	if (!MV_PON_PORT(priv->port))
+	if (!MV_PP2_IS_PON_PORT(priv->port))
 		mvGmacPortEnable(priv->port);
 
-	mv_eth_link_event(priv, 1);
+	mv_pp2_link_event(priv, 1);
 
 	return 0;
 
@@ -120,11 +118,11 @@ error:
 }
 
 /***********************************************************
- * mv_eth_stop --                                          *
+ * mv_pp2_eth_stop --                                          *
  *   stop interface with linux core. stop port activity.   *
  *   free skb's from rings.                                *
  ***********************************************************/
-int mv_eth_stop(struct net_device *dev)
+int mv_pp2_eth_stop(struct net_device *dev)
 {
 	struct eth_port *priv = MV_ETH_PRIV(dev);
 	struct cpu_ctrl *cpuCtrl;
@@ -138,10 +136,10 @@ int mv_eth_stop(struct net_device *dev)
 	/* Disable interrupts for all CPUs */
 	mvPp2GbeCpuInterruptsDisable(priv->port, priv->cpuMask);
 
-	on_each_cpu(mv_eth_interrupts_mask, priv, 1);
+	on_each_cpu(mv_pp2_interrupts_mask, priv, 1);
 
 	/* make sure that the port finished its Rx polling */
-	for (group = 0; group < MV_ETH_MAX_RXQ; group++)
+	for (group = 0; group < MV_PP2_MAX_RXQ; group++)
 		if (priv->napi_group[group] && priv->napi_group[group]->napi)
 			napi_disable(priv->napi_group[group]->napi);
 
@@ -150,7 +148,7 @@ int mv_eth_stop(struct net_device *dev)
 	netif_tx_stop_all_queues(dev);
 
 	/* stop tx/rx activity, mask all interrupts, relese skb in rings,*/
-	mv_eth_stop_internals(priv);
+	mv_pp2_stop_internals(priv);
 	for_each_possible_cpu(cpu) {
 		cpuCtrl = priv->cpu_config[cpu];
 		del_timer(&cpuCtrl->tx_done_timer);
@@ -161,7 +159,7 @@ int mv_eth_stop(struct net_device *dev)
 
 	mvPp2PortEgressEnable(priv->port, MV_FALSE);
 
-	if (!MV_PON_PORT(priv->port))
+	if (!MV_PP2_IS_PON_PORT(priv->port))
 		mvGmacPortDisable(priv->port);
 
 	printk(KERN_NOTICE "%s: stopped\n", dev->name);
@@ -170,16 +168,16 @@ int mv_eth_stop(struct net_device *dev)
 }
 
 
-int mv_eth_change_mtu(struct net_device *dev, int mtu)
+int mv_pp2_eth_change_mtu(struct net_device *dev, int mtu)
 {
 	int old_mtu = dev->mtu;
 
-	mtu = mv_eth_check_mtu_valid(dev, mtu);
+	mtu = mv_pp2_eth_check_mtu_valid(dev, mtu);
 	if (mtu < 0)
 		return -EINVAL;
 
 	if (!netif_running(dev)) {
-		if (mv_eth_change_mtu_internals(dev, mtu) == -1)
+		if (mv_pp2_eth_change_mtu_internals(dev, mtu) == -1)
 			goto error;
 
 		printk(KERN_NOTICE "%s: change mtu %d (packet-size %d) to %d (packet-size %d)\n",
@@ -188,7 +186,7 @@ int mv_eth_change_mtu(struct net_device *dev, int mtu)
 		return 0;
 	}
 
-	if (mv_eth_check_mtu_internals(dev, mtu))
+	if (mv_pp2_check_mtu_internals(dev, mtu))
 		goto error;
 
 	if (dev->netdev_ops->ndo_stop(dev)) {
@@ -196,7 +194,7 @@ int mv_eth_change_mtu(struct net_device *dev, int mtu)
 		goto error;
 	}
 
-	if (mv_eth_change_mtu_internals(dev, mtu) == -1) {
+	if (mv_pp2_eth_change_mtu_internals(dev, mtu) == -1) {
 		printk(KERN_ERR "%s change mtu internals failed\n", dev->name);
 		goto error;
 	}
@@ -220,18 +218,18 @@ error:
  *   stop port activity. set new addr in device and hw.    *
  *   restart port activity.                                *
  ***********************************************************/
-static int mv_eth_set_mac_addr_internals(struct net_device *dev, void *addr)
+static int mv_pp2_set_mac_addr_internals(struct net_device *dev, void *addr)
 {
 	u8              *mac = &(((u8 *)addr)[2]);  /* skip on first 2B (ether HW addr type) */
 	int             i;
 
 	struct eth_port *priv = MV_ETH_PRIV(dev);
 
-	if (!mv_eth_pnc_ctrl_en) {
+	if (!mv_pp2_pnc_ctrl_en) {
 		printk(KERN_ERR "%s Error: PARSER and CLASSIFIER control is disabled\n", __func__);
 
 		/* linux stop the port */
-		mv_eth_open(dev);
+		mv_pp2_eth_open(dev);
 		return -1;
 	}
 
@@ -247,7 +245,7 @@ static int mv_eth_set_mac_addr_internals(struct net_device *dev, void *addr)
 
 #ifdef CONFIG_MV_INCLUDE_PON
 	/* Update PON module */
-	if (MV_PON_PORT(priv->port))
+	if (MV_PP2_IS_PON_PORT(priv->port))
 		mv_pon_set_mac_addr(addr);
 #endif
 
@@ -256,12 +254,12 @@ static int mv_eth_set_mac_addr_internals(struct net_device *dev, void *addr)
 	return 0;
 }
 
-void mv_eth_rx_set_rx_mode(struct net_device *dev)
+void mv_pp2_rx_set_rx_mode(struct net_device *dev)
 {
 	struct eth_port     *priv = MV_ETH_PRIV(dev);
 	int                 phyPort = MV_PPV2_PORT_PHYS(priv->port);
 
-	if (!mv_eth_pnc_ctrl_en) {
+	if (!mv_pp2_pnc_ctrl_en) {
 		pr_err("%s Error: PARSER and CLASSIFIER control is disabled\n", __func__);
 		return;
 	}
@@ -308,10 +306,10 @@ void mv_eth_rx_set_rx_mode(struct net_device *dev)
 }
 
 
-int     mv_eth_set_mac_addr(struct net_device *dev, void *addr)
+int     mv_pp2_eth_set_mac_addr(struct net_device *dev, void *addr)
 {
 	if (!netif_running(dev)) {
-		if (mv_eth_set_mac_addr_internals(dev, addr) == -1)
+		if (mv_pp2_set_mac_addr_internals(dev, addr) == -1)
 			goto error;
 		return 0;
 	}
@@ -321,7 +319,7 @@ int     mv_eth_set_mac_addr(struct net_device *dev, void *addr)
 		goto error;
 	}
 
-	if (mv_eth_set_mac_addr_internals(dev, addr) == -1)
+	if (mv_pp2_set_mac_addr_internals(dev, addr) == -1)
 		goto error;
 
 	if (dev->netdev_ops->ndo_open(dev)) {
@@ -338,17 +336,17 @@ error:
 
 
 /************************************************************
- * mv_eth_open -- Restore MAC address and call to   *
- *                mv_eth_start                               *
+ * mv_pp2_eth_open -- Restore MAC address and call to   *
+ *                    mv_pp2_start                      *
  ************************************************************/
-int mv_eth_open(struct net_device *dev)
+int mv_pp2_eth_open(struct net_device *dev)
 {
 
 	struct	eth_port *priv = MV_ETH_PRIV(dev);
 	int	phyPort = MV_PPV2_PORT_PHYS(priv->port);
 	static  u8 mac_bcast[MV_MAC_ADDR_SIZE] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
-	if (mv_eth_pnc_ctrl_en) {
+	if (mv_pp2_pnc_ctrl_en) {
 
 		if (mvPrsMacDaAccept(phyPort, mac_bcast, 1 /*add*/)) {
 			printk(KERN_ERR "%s:mvPrsMacDaAccept\n", dev->name);
@@ -367,7 +365,7 @@ int mv_eth_open(struct net_device *dev)
 				return -1;
 		}
 	}
-	if (mv_eth_start(dev)) {
+	if (mv_pp2_start(dev)) {
 		printk(KERN_ERR "%s: start interface failed\n", dev->name);
 		return -1;
 	}

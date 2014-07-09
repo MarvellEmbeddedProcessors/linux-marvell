@@ -352,10 +352,10 @@ static MV_STATUS mv_eth_nfp_tx(struct eth_pbuf *pkt, MV_NFP_RESULT *res)
 
 	if (!test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags))) {
 		STAT_INFO(pp->stats.netdev_stop++);
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		if (pp->flags & MV_ETH_F_DBG_TX)
 			printk(KERN_ERR "%s: STARTED_BIT = 0 , packet is dropped.\n", __func__);
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 		return MV_DROPPED;
 	}
 
@@ -455,14 +455,14 @@ static MV_STATUS mv_eth_nfp_tx(struct eth_pbuf *pkt, MV_NFP_RESULT *res)
 	/* FIXME: PON only? --BK */
 	tx_desc->hw_cmd = pp->hw_cmd;
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_TX) {
 		printk(KERN_ERR "%s - nfp_tx_%lu: port=%d, txp=%d, txq=%d\n",
 		       dev->name, dev->stats.tx_packets, pp->port, res->txp, res->txq);
 		mv_eth_tx_desc_print(tx_desc);
 		mv_eth_pkt_print(pkt);
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 	mv_eth_tx_desc_flush(tx_desc);
 
@@ -510,12 +510,12 @@ MV_STATUS mv_eth_nfp(struct eth_port *pp, int rxq, struct neta_rx_desc *rx_desc,
 	MV_NFP_RESULT   res;
 	bool            tx_external = false;
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_RX) {
 		mv_eth_rx_desc_print(rx_desc);
 		mv_eth_pkt_print(pkt);
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 	status = nfp_core_p->nfp_rx(pp->port, rx_desc, pkt, &res);
 	tx_external = (res.flags & MV_NFP_RES_NETDEV_EXT);
@@ -718,12 +718,12 @@ static int mv_eth_nfp_ext_tx(struct eth_port *pp, struct eth_pbuf *pkt, MV_NFP_R
 		mv_eth_skb_check(skb);
 #endif /* ETH_SKB_DEBUG */
 
-#ifdef CONFIG_NET_SKB_RECYCLE
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
 		if (mv_eth_is_recycle()) {
 			skb->skb_recycle = mv_eth_skb_recycle;
 			skb->hw_cookie = (__u32)pkt;
 		}
-#endif /* CONFIG_NET_SKB_RECYCLE */
+#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 	}
 	return dev->netdev_ops->ndo_start_xmit(skb, dev);
 }

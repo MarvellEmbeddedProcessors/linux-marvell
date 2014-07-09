@@ -117,7 +117,7 @@ static ssize_t mv_eth_3_hex_store(struct device *dev,
 	if (!strcmp(name, "cpuGroup")) {
 		err = mv_eth_napi_set_cpu_affinity(p, i, v);
 	} else if (!strcmp(name, "rxqGroup")) {
-		err = mv_eth_napi_set_rxq_affinity(p, i, v);
+		err = mv_pp2_eth_napi_set_rxq_affinity(p, i, v);
 	} else {
 		err = 1;
 		printk(KERN_ERR "%s: illegal operation <%s>\n", __func__, attr->attr.name);
