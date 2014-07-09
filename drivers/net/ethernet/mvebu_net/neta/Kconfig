@@ -493,7 +493,8 @@ endmenu
 
 menu "Control and Statistics"
 
-config  MV_ETH_DEBUG_CODE
+config  MV_NETA_DEBUG_CODE
+	depends on MV_ETH_DEBUG_CODE
 	bool "Add run-time debug code"
 	default n
 	---help---
@@ -538,27 +539,22 @@ endmenu
 
 menu "Advanced Features"
 
-config  NET_SKB_HEADROOM
-        int "SKB headroom size"
-        default 64
-        ---help---
-          Customize SKB headroom size. Must be power of 2.
+config MV_NETA_SKB_RECYCLE
+	depends on NET_SKB_RECYCLE
+	bool "NETA Skb recycle"
+	default y
+	---help---
+	Work-in-progress and experimental.
 
-config NET_SKB_RECYCLE
-        bool "Skb recycle"
-        default y
-        ---help---
-          Work-in-progress and experimental.
+	This option enables skb's to be returned via a callback at kfree to
+	the allocator to make a fastpath for very skb consuming network
+	applications.
 
-          This option enables skb's to be returned via a callback at kfree to
-          the allocator to make a fastpath for very skb consuming network
-          applications.
-
-config NET_SKB_RECYCLE_DEF
-        depends on NET_SKB_RECYCLE
-        int "Default value for SKB recycle:  0 - disable, 1 - enable"
-        default 1
-        ---help---
+config MV_NETA_SKB_RECYCLE_DEF
+	depends on MV_NETA_SKB_RECYCLE
+	int "Default value for SKB recycle:  0 - disable, 1 - enable"
+	default 1
+	---help---
 
 config  MV_ETH_TX_DONE_TIMER_PERIOD
         int "Periodical Tx Done timer period"

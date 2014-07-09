@@ -51,14 +51,14 @@ static int mv_pp2_netmap_reg(struct ifnet *ifp, int onoff)
 		return -EINVAL;
 
 	if (!(ifp->flags & IFF_UP)) {
-		/* mv_eth_open has not been called yet, so resources
+		/* mv_pp2_eth_open has not been called yet, so resources
 		 * are not allocated */
 		printk(KERN_ERR "Interface is down!");
 		return -EINVAL;
 	}
 
 	/* stop current interface */
-	if (mv_eth_stop(ifp)) {
+	if (mv_pp2_eth_stop(ifp)) {
 		printk(KERN_ERR "%s: stop interface failed\n", ifp->name);
 		return -EINVAL;
 	}
@@ -66,13 +66,13 @@ static int mv_pp2_netmap_reg(struct ifnet *ifp, int onoff)
 	if (onoff) { /* enable netmap mode */
 		u32 port_map;
 
-		mv_eth_rx_reset(adapter->port);
+		mv_pp2_rx_reset(adapter->port);
 		ifp->if_capenable |= IFCAP_NETMAP;
 		na->if_transmit = (void *)ifp->netdev_ops;
 		ifp->netdev_ops = &na->nm_ndo;
 
 		/* check that long pool is not shared with other ports */
-		port_map =  mv_eth_ctrl_pool_port_map_get(adapter->pool_long->pool);
+		port_map =  mv_pp2_ctrl_pool_port_map_get(adapter->pool_long->pool);
 		if (port_map != (1 << adapter->port)) {
 			printk(KERN_ERR "%s: BM pool %d not initialized or shared with other ports.\n",
 			__func__, adapter->pool_long->pool);
@@ -81,10 +81,10 @@ static int mv_pp2_netmap_reg(struct ifnet *ifp, int onoff)
 
 		/* Keep old number of long pool buffers */
 		pool_buf_num[adapter->pool_long->pool] = adapter->pool_long->buf_num;
-		mv_eth_pool_free(adapter->pool_long->pool, adapter->pool_long->buf_num);
+		mv_pp2_pool_free(adapter->pool_long->pool, adapter->pool_long->buf_num);
 
 		/* set same pool number for short and long packets */
-		for (rxq = 0; rxq < CONFIG_MV_ETH_RXQ; rxq++)
+		for (rxq = 0; rxq < CONFIG_MV_PP2_RXQ; rxq++)
 			mvPp2RxqBmShortPoolSet(adapter->port, rxq, adapter->pool_long->pool);
 
 		/* update short pool in software */
@@ -99,11 +99,11 @@ static int mv_pp2_netmap_reg(struct ifnet *ifp, int onoff)
 
 		ifp->if_capenable &= ~IFCAP_NETMAP;
 		ifp->netdev_ops = (void *)na->if_transmit;
-		mv_eth_rx_reset(adapter->port);
+		mv_pp2_rx_reset(adapter->port);
 
 		/* TODO: handle SMP - each CPU must call this loop */
 		/*
-		for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
+		for (txq = 0; txq < CONFIG_MV_PP2_TXQ; txq++)
 			mvPp2TxqSentDescProc(adapter->port, 0, txq);
 		*/
 
@@ -116,10 +116,10 @@ static int mv_pp2_netmap_reg(struct ifnet *ifp, int onoff)
 
 		MV_ETH_UNLOCK(&adapter->pool_long->lock, flags);
 		printk(KERN_ERR "NETMAP: free %d buffers from pool %d\n", i, adapter->pool_long->pool);
-		mv_eth_pool_add(adapter->pool_long->pool, pool_buf_num[adapter->pool_long->pool]);
+		mv_pp2_pool_add(adapter->pool_long->pool, pool_buf_num[adapter->pool_long->pool]);
 
 		/* set port's short pool for Linux driver */
-		for (rxq = 0; rxq < CONFIG_MV_ETH_RXQ; rxq++)
+		for (rxq = 0; rxq < CONFIG_MV_PP2_RXQ; rxq++)
 			mvPp2RxqBmShortPoolSet(adapter->port, rxq, adapter->pool_short->pool);
 
 		/* update short pool in software */
@@ -128,7 +128,7 @@ static int mv_pp2_netmap_reg(struct ifnet *ifp, int onoff)
 		clear_bit(MV_ETH_F_IFCAP_NETMAP_BIT, &(adapter->flags));
 	}
 
-	if (mv_eth_start(ifp)) {
+	if (mv_pp2_start(ifp)) {
 		printk(KERN_ERR "%s: start interface failed\n", ifp->name);
 		return -EINVAL;
 	}
@@ -187,7 +187,7 @@ mv_pp2_netmap_txsync(struct ifnet *ifp, u_int ring_nr, int do_lock)
 			slot->flags &= ~NS_REPORT;
 
 			/* check aggregated TXQ resource */
-			if (mv_eth_aggr_desc_num_check(aggr_txq_ctrl, 1)) {
+			if (mv_pp2_aggr_desc_num_check(aggr_txq_ctrl, 1)) {
 				if (do_lock)
 					mtx_unlock(&kring->q_lock);
 				return netmap_ring_reinit(kring);
@@ -199,7 +199,7 @@ mv_pp2_netmap_txsync(struct ifnet *ifp, u_int ring_nr, int do_lock)
 			tx_desc->dataSize = len;
 			tx_desc->pktOffset = slot->data_offs;
 			tx_desc->command = PP2_TX_L4_CSUM_NOT | PP2_TX_F_DESC_MASK | PP2_TX_L_DESC_MASK;
-			mv_eth_tx_desc_flush(tx_desc);
+			mv_pp2_tx_desc_flush(tx_desc);
 			aggr_txq_ctrl->txq_count++;
 
 			if (slot->flags & NS_BUF_CHANGED)
@@ -437,7 +437,7 @@ static int pp2_netmap_txq_init_buffers(struct SOFTC_T *adapter, int txp, int txq
 	if (!(adapter->flags & MV_ETH_F_IFCAP_NETMAP))
 		return 0;
 
-	q = txp * CONFIG_MV_ETH_TXQ + txq;
+	q = txp * CONFIG_MV_PP2_TXQ + txq;
 
 	/* initialize the tx ring */
 	slot = netmap_reset(na, NR_TX, q, 0);
@@ -465,8 +465,8 @@ mv_pp2_netmap_attach(struct SOFTC_T *adapter)
 	na.nm_register = mv_pp2_netmap_reg;
 	na.nm_txsync = mv_pp2_netmap_txsync;
 	na.nm_rxsync = mv_pp2_netmap_rxsync;
-	na.num_tx_rings = CONFIG_MV_ETH_TXQ;
-	netmap_attach(&na, CONFIG_MV_ETH_RXQ);
+	na.num_tx_rings = CONFIG_MV_PP2_TXQ;
+	netmap_attach(&na, CONFIG_MV_PP2_RXQ);
 }
 /* end of file */
 

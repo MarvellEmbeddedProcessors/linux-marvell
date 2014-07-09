@@ -113,8 +113,8 @@ int mv_eth_ctrl_pnc(int en)
 }
 #endif /* CONFIG_MV_ETH_PNC */
 
-#ifdef CONFIG_NET_SKB_RECYCLE
-int mv_ctrl_recycle = CONFIG_NET_SKB_RECYCLE_DEF;
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
+int mv_ctrl_recycle = CONFIG_MV_NETA_SKB_RECYCLE_DEF;
 EXPORT_SYMBOL(mv_ctrl_recycle);
 
 int mv_eth_ctrl_recycle(int en)
@@ -128,7 +128,7 @@ int mv_eth_ctrl_recycle(int en)
 	printk(KERN_ERR "SKB recycle is not supported\n");
 	return 1;
 }
-#endif /* CONFIG_NET_SKB_RECYCLE */
+#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 extern u8 mvMacAddr[CONFIG_MV_ETH_PORTS_NUM][MV_MAC_ADDR_SIZE];
 extern u16 mvMtu[CONFIG_MV_ETH_PORTS_NUM];
@@ -1148,7 +1148,7 @@ static void mv_eth_rx_error(struct eth_port *pp, struct neta_rx_desc *rx_desc)
 	if (pp->dev)
 		pp->dev->stats.rx_errors++;
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if ((pp->flags & MV_ETH_F_DBG_RX) == 0)
 		return;
 
@@ -1180,7 +1180,7 @@ static void mv_eth_rx_error(struct eth_port *pp, struct neta_rx_desc *rx_desc)
 		break;
 	}
 	mv_eth_rx_desc_print(rx_desc);
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 }
 
 void mv_eth_skb_print(struct sk_buff *skb)
@@ -1194,9 +1194,9 @@ void mv_eth_skb_print(struct sk_buff *skb)
 	       atomic_read(&skb->users), atomic_read(&skb_shinfo(skb)->dataref),
 	       skb_shinfo(skb)->nr_frags, skb_shinfo(skb)->gso_size, skb_shinfo(skb)->gso_segs);
 	printk(KERN_ERR "\t proto=%d, ip_summed=%d, priority=%d\n", ntohs(skb->protocol), skb->ip_summed, skb->priority);
-#ifdef CONFIG_NET_SKB_RECYCLE
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
 	printk(KERN_ERR "\t skb_recycle=%p, hw_cookie=0x%x\n", skb->skb_recycle, skb->hw_cookie);
-#endif /* CONFIG_NET_SKB_RECYCLE */
+#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 }
 
 void mv_eth_rx_desc_print(struct neta_rx_desc *desc)
@@ -1333,7 +1333,7 @@ static inline int mv_eth_tx_policy(struct eth_port *pp, struct sk_buff *skb)
 	return txq;
 }
 
-#ifdef CONFIG_NET_SKB_RECYCLE
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
 int mv_eth_skb_recycle(struct sk_buff *skb)
 {
 	struct eth_pbuf *pkt = (struct eth_pbuf *)(skb->hw_cookie & ~BIT(0));
@@ -1381,14 +1381,14 @@ int mv_eth_skb_recycle(struct sk_buff *skb)
 		atomic_set(&skb->users, 1);
 
 	if (skb_recycle_check(skb, pool->pkt_size)) {
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		/* Sanity check */
 		if (SKB_TRUESIZE(skb->end - skb->head) != skb->truesize) {
 			printk(KERN_ERR "%s: skb=%p, Wrong SKB_TRUESIZE(end - head)=%d\n",
 				__func__, skb, SKB_TRUESIZE(skb->end - skb->head));
 			mv_eth_skb_print(skb);
 		}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 		STAT_DBG(pool->stats.skb_recycled_ok++);
 		mvOsCacheInvalidate(pp->dev->dev.parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
@@ -1414,7 +1414,7 @@ err:
 }
 EXPORT_SYMBOL(mv_eth_skb_recycle);
 
-#endif /* CONFIG_NET_SKB_RECYCLE */
+#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 static struct sk_buff *mv_eth_skb_alloc(struct eth_port *pp, struct bm_pool *pool,
 					struct eth_pbuf *pkt, gfp_t gfp_mask)
@@ -1769,12 +1769,12 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 		mvNetaRxqDescSwap(rx_desc);
 #endif /* MV_CPU_BE */
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		if (pp->flags & MV_ETH_F_DBG_RX) {
 			printk(KERN_ERR "\n%s: port=%d, cpu=%d\n", __func__, pp->port, smp_processor_id());
 			mv_eth_rx_desc_print(rx_desc);
 		}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 		rx_status = rx_desc->status;
 		pkt = (struct eth_pbuf *)rx_desc->bufCookie;
@@ -1820,12 +1820,12 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 	}
 #endif /* !CONFIG_MV_ETH_PNC */
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		if (pp->flags & MV_ETH_F_DBG_RX) {
 			printk(KERN_ERR "pkt=%p, pBuf=%p, ksize=%d\n", pkt, pkt->pBuf, ksize(pkt->pBuf));
 			mvDebugMemDump(pkt->pBuf + pkt->offset, 64, 1);
 		}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 #if defined(CONFIG_MV_ETH_PNC) && defined(CONFIG_MV_ETH_RX_SPECIAL)
 		/* Special RX processing */
@@ -1874,13 +1874,13 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 		mv_eth_skb_check(skb);
 #endif /* ETH_SKB_DEBUG */
 
-#ifdef CONFIG_NET_SKB_RECYCLE
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
 		if (mv_eth_is_recycle()) {
 			skb->skb_recycle = mv_eth_skb_recycle;
 			skb->hw_cookie = (__u32)pkt;
 			pkt = NULL;
 		}
-#endif /* CONFIG_NET_SKB_RECYCLE */
+#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 		mv_eth_rx_csum(pp, rx_desc, skb);
 
@@ -1942,10 +1942,10 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 	if (!test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags))) {
 		STAT_INFO(pp->stats.netdev_stop++);
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		if (pp->flags & MV_ETH_F_DBG_TX)
 			printk(KERN_ERR "%s: STARTED_BIT = 0, packet is dropped.\n", __func__);
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 		goto out;
 	}
 
@@ -1972,11 +1972,11 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/* In case this port is tagged, check if SKB is tagged - i.e. SKB's source is MUX interface */
 	if (pp->tagged && (!MV_MUX_SKB_IS_TAGGED(skb))) {
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		if (pp->flags & MV_ETH_F_DBG_TX)
 			pr_err("%s: port %d is tagged, skb not from MUX interface - packet is dropped.\n",
 				__func__, pp->port);
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 		goto out;
 	}
@@ -2068,7 +2068,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 */
 	txq_ctrl->txq_count += frags;
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_TX) {
 		printk(KERN_ERR "\n");
 		printk(KERN_ERR "%s - eth_tx_%lu: cpu=%d, in_intr=0x%lx, port=%d, txp=%d, txq=%d\n",
@@ -2079,7 +2079,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		/*mv_eth_skb_print(skb);*/
 		mvDebugMemDump(skb->data, 64, 1);
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 #ifdef CONFIG_MV_PON
 	if (MV_PON_PORT(pp->port))
@@ -2866,13 +2866,13 @@ irqreturn_t mv_eth_isr(int irq, void *dev_id)
 	int cpu = smp_processor_id();
 	struct napi_struct *napi = pp->cpu_config[cpu]->napi;
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_ISR) {
 		printk(KERN_ERR "%s: port=%d, cpu=%d, mask=0x%x, cause=0x%x\n",
 			__func__, pp->port, cpu,
 			MV_REG_READ(NETA_INTR_NEW_MASK_REG(pp->port)), MV_REG_READ(NETA_INTR_NEW_CAUSE_REG(pp->port)));
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 	STAT_INFO(pp->stats.irq[cpu]++);
 
@@ -2887,10 +2887,10 @@ irqreturn_t mv_eth_isr(int irq, void *dev_id)
 		__napi_schedule(napi);
 	} else {
 		STAT_INFO(pp->stats.irq_err[cpu]++);
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		pr_warning("%s: IRQ=%d, port=%d, cpu=%d - NAPI already scheduled\n",
 			__func__, irq, pp->port, cpu);
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 	}
 	return IRQ_HANDLED;
 }
@@ -2975,21 +2975,21 @@ int mv_eth_poll(struct napi_struct *napi, int budget)
 	struct eth_port *pp = MV_ETH_PRIV(napi->dev);
 	struct cpu_ctrl *cpuCtrl = pp->cpu_config[smp_processor_id()];
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_POLL) {
 		printk(KERN_ERR "%s ENTER: port=%d, cpu=%d, mask=0x%x, cause=0x%x\n",
 			__func__, pp->port, smp_processor_id(),
 			MV_REG_READ(NETA_INTR_NEW_MASK_REG(pp->port)), MV_REG_READ(NETA_INTR_NEW_CAUSE_REG(pp->port)));
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 	if (!test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags))) {
 		STAT_INFO(pp->stats.netdev_stop++);
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		if (pp->flags & MV_ETH_F_DBG_RX)
 			printk(KERN_ERR "%s: STARTED_BIT = 0, poll completed.\n", __func__);
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 		napi_complete(napi);
 		STAT_INFO(pp->stats.poll_exit[smp_processor_id()]++);
@@ -3055,12 +3055,12 @@ int mv_eth_poll(struct napi_struct *napi, int budget)
 
 	STAT_DIST((rx_done < pp->dist_stats.rx_dist_size) ? pp->dist_stats.rx_dist[rx_done]++ : 0);
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_POLL) {
 		printk(KERN_ERR "%s  EXIT: port=%d, cpu=%d, budget=%d, rx_done=%d\n",
 			__func__, pp->port, smp_processor_id(), budget, rx_done);
 	}
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 	if (budget > 0) {
 		unsigned long flags;
@@ -4418,7 +4418,7 @@ void mv_eth_config_show(void)
 	pr_info("  o Giga PON port is #%d: - %d TCONTs supported\n", MV_PON_PORT_ID, MV_ETH_MAX_TCONT());
 #endif
 
-#ifdef CONFIG_NET_SKB_RECYCLE
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
 	pr_info("  o SKB recycle supported (%s)\n", mv_ctrl_recycle ? "Enabled" : "Disabled");
 #endif
 
@@ -5422,10 +5422,10 @@ static void mv_eth_tx_done_timer_callback(unsigned long data)
 	if (!test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags))) {
 		STAT_INFO(pp->stats.netdev_stop++);
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		if (pp->flags & MV_ETH_F_DBG_TX)
 			printk(KERN_ERR "%s: port #%d is stopped, STARTED_BIT = 0, exit timer.\n", __func__, pp->port);
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 		return;
 	}
@@ -5894,9 +5894,9 @@ void mv_eth_status_print(void)
 {
 	printk(KERN_ERR "totals: ports=%d\n", mv_eth_ports_num);
 
-#ifdef CONFIG_NET_SKB_RECYCLE
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
 	printk(KERN_ERR "SKB recycle = %s\n", mv_ctrl_recycle ? "Enabled" : "Disabled");
-#endif /* CONFIG_NET_SKB_RECYCLE */
+#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 #ifdef CONFIG_MV_ETH_PNC
 	printk(KERN_ERR "PnC control = %s\n", mv_eth_pnc_ctrl_en ? "Enabled" : "Disabled");
@@ -6502,10 +6502,10 @@ void pon_link_status_notify_func(MV_BOOL link_state)
 
 	if ((pon_port->flags & MV_ETH_F_STARTED) == 0) {
 		/* Ignore link event if port is down - link status will be updated on start */
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 		pr_info("PON port: Link event (%s) when port is down\n",
 			link_state ? "Up" : "Down");
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 		return;
 	}
 	mv_eth_link_event(pon_port, 1);

@@ -40,7 +40,7 @@ mv_pp2-objs += net_dev/mv_eth_rx_sysfs.o net_dev/mv_eth_tx_sysfs.o net_dev/mv_et
 mv_pp2-objs += net_dev/mv_eth_pme_sysfs.o net_dev/mv_eth_pon_sysfs.o
 mv_pp2-objs += net_dev/mv_eth_bm_sysfs.o net_dev/mv_eth_qos_sysfs.o net_dev/mv_eth_dbg_sysfs.o
 
-ifeq ($(CONFIG_MV_ETH_HWF),y)
+ifeq ($(CONFIG_MV_PP2_HWF),y)
 mv_pp2-objs += net_dev/mv_eth_hwf_sysfs.o
 endif
 
@@ -51,7 +51,7 @@ mv_pp2-objs += plcr/plcr_sysfs.o
 mv_pp2-objs += wol/wol_sysfs.o
 mv_pp2-objs += dpi/dpi_sysfs.o
 
-ifeq ($(CONFIG_MV_ETH_L2FW),y)
+ifeq ($(CONFIG_MV_PP2_L2FW),y)
 mv_pp2-objs += l2fw/l2fw_sysfs.o l2fw/mv_eth_l2fw.o
 endif
 

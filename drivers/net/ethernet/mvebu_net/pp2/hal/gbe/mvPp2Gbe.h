@@ -211,41 +211,41 @@ static INLINE int mvPp2LogicRxqToPhysRxq(int port, int rxq)
 
 
 /************************** TXQ: Physical - Logical Mapping ******************************/
-#ifdef MV_PON_EXIST
+#ifdef MV_PP2_PON_EXIST
 
 #define MV_PON_LOGIC_PORT_GET()			(mvPp2HalData.maxPort - 1)
-#define MV_PON_PORT(p)				((p) == MV_PON_LOGIC_PORT_GET())
-#define MV_PON_PHYS_PORT_GET()			MV_PON_PORT_ID
-#define MV_PON_PHYS_PORT(p)			((p) == MV_PON_PORT_ID)
-#define MV_PP2_TOTAL_TXP_NUM			(MV_ETH_MAX_TCONT + MV_ETH_MAX_PORTS - 1)
-#define MV_PP2_TOTAL_PON_TXQ_NUM		(MV_ETH_MAX_TCONT * MV_ETH_MAX_TXQ)
+#define MV_PP2_IS_PON_PORT(p)			((p) == MV_PON_LOGIC_PORT_GET())
+#define MV_PON_PHYS_PORT_GET()			MV_PP2_PON_PORT_ID
+#define MV_PON_PHYS_PORT(p)			((p) == MV_PP2_PON_PORT_ID)
+#define MV_PP2_TOTAL_TXP_NUM			(MV_PP2_MAX_TCONT + MV_ETH_MAX_PORTS - 1)
+#define MV_PP2_TOTAL_PON_TXQ_NUM		(MV_PP2_MAX_TCONT * MV_PP2_MAX_TXQ)
 
-#define MV_PPV2_PORT_PHYS(port)			((MV_PON_PORT(port)) ? MV_PON_PHYS_PORT_GET() : (port))
-#define MV_PPV2_TXP_PHYS(port, txp)		((MV_PON_PORT(port)) ? txp : (MV_ETH_MAX_TCONT + port))
-#define MV_PPV2_TXQ_PHYS(port, txp, txq)	((MV_PON_PORT(port)) ? txp * MV_ETH_MAX_TXQ + txq :\
-											MV_PP2_TOTAL_PON_TXQ_NUM + port * MV_ETH_MAX_TXQ + txq)
+#define MV_PPV2_PORT_PHYS(port)			((MV_PP2_IS_PON_PORT(port)) ? MV_PON_PHYS_PORT_GET() : (port))
+#define MV_PPV2_TXP_PHYS(port, txp)		((MV_PP2_IS_PON_PORT(port)) ? txp : (MV_PP2_MAX_TCONT + port))
+#define MV_PPV2_TXQ_PHYS(port, txp, txq)	((MV_PP2_IS_PON_PORT(port)) ? txp * MV_PP2_MAX_TXQ + txq :\
+							MV_PP2_TOTAL_PON_TXQ_NUM + port * MV_PP2_MAX_TXQ + txq)
 
 #define MV_PPV2_TXQ_LOGICAL_PORT(physTxq)	((physTxq < MV_PP2_TOTAL_PON_TXQ_NUM) ? MV_PON_LOGIC_PORT_ID_GET() :\
-							(physTxq - MV_PP2_TOTAL_PON_TXQ_NUM) / MV_ETH_MAX_TXQ)
+							(physTxq - MV_PP2_TOTAL_PON_TXQ_NUM) / MV_PP2_MAX_TXQ)
 
-#define MV_PPV2_TXQ_LOGICAL_TXP(physTxq)	((physTxq < MV_PP2_TOTAL_PON_TXQ_NUM) ? (physTxq / MV_ETH_MAX_TXQ) : 0)
+#define MV_PPV2_TXQ_LOGICAL_TXP(physTxq)	((physTxq < MV_PP2_TOTAL_PON_TXQ_NUM) ? (physTxq / MV_PP2_MAX_TXQ) : 0)
 
 #else /* Without PON */
 
-#define MV_PON_PORT(p)				MV_FALSE
+#define MV_PP2_IS_PON_PORT(p)				MV_FALSE
 #define MV_PON_PHYS_PORT(p)			MV_FALSE
 #define MV_PP2_TOTAL_TXP_NUM			(MV_ETH_MAX_PORTS)
 
 #define MV_PPV2_PORT_PHYS(port)                 (port)
 #define MV_PPV2_TXP_PHYS(port, txp)		(port)
-#define MV_PPV2_TXQ_PHYS(port, txp, txq)	(port * MV_ETH_MAX_TXQ + txq)
-#define MV_PPV2_TXQ_LOGICAL_PORT(physTxq)	(physTxq / MV_ETH_MAX_TXQ)
+#define MV_PPV2_TXQ_PHYS(port, txp, txq)	(port * MV_PP2_MAX_TXQ + txq)
+#define MV_PPV2_TXQ_LOGICAL_PORT(physTxq)	(physTxq / MV_PP2_MAX_TXQ)
 #define MV_PPV2_TXQ_LOGICAL_TXP(physTxq)	0
 
-#endif /* MV_PON_EXIST */
+#endif /* MV_PP2_PON_EXIST */
 
-#define MV_PPV2_TXQ_LOGICAL_TXQ(physTxq)	(physTxq % MV_ETH_MAX_TXQ)
-#define MV_PP2_TXQ_TOTAL_NUM			(MV_PP2_TOTAL_TXP_NUM * MV_ETH_MAX_TXQ)
+#define MV_PPV2_TXQ_LOGICAL_TXQ(physTxq)	(physTxq % MV_PP2_MAX_TXQ)
+#define MV_PP2_TXQ_TOTAL_NUM			(MV_PP2_TOTAL_TXP_NUM * MV_PP2_MAX_TXQ)
 
 /************************** Data Path functions ******************************/
 /* Set TXQ descriptors fields relevant for CSUM calculation */
@@ -558,7 +558,7 @@ static INLINE MV_U32 mvPp2GbeIsrCauseRxTxGet(int port)
 {
 	MV_U32 val;
 
-	if (MV_PON_PORT(port)) {
+	if (MV_PP2_IS_PON_PORT(port)) {
 		val = mvPp2RdReg(MV_PP2_ISR_PON_RX_TX_CAUSE_REG);
 		val &= (MV_PP2_PON_CAUSE_RXQ_OCCUP_DESC_ALL_MASK |
 			MV_PP2_PON_CAUSE_TXP_OCCUP_DESC_ALL_MASK | MV_PP2_PON_CAUSE_MISC_SUM_MASK);
@@ -573,7 +573,7 @@ static INLINE MV_U32 mvPp2GbeIsrCauseRxTxGet(int port)
 
 static INLINE MV_BOOL mvPp2GbeIsrCauseTxDoneIsSet(int port, MV_U32 causeRxTx)
 {
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		return (causeRxTx & MV_PP2_PON_CAUSE_TXP_OCCUP_DESC_ALL_MASK);
 
 	return (causeRxTx & MV_PP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK);
@@ -581,7 +581,7 @@ static INLINE MV_BOOL mvPp2GbeIsrCauseTxDoneIsSet(int port, MV_U32 causeRxTx)
 
 static INLINE MV_U32 mvPp2GbeIsrCauseTxDoneOffset(int port, MV_U32 causeRxTx)
 {
-	if (MV_PON_PORT(port))
+	if (MV_PP2_IS_PON_PORT(port))
 		return (causeRxTx & MV_PP2_PON_CAUSE_TXP_OCCUP_DESC_ALL_MASK);
 
 	return (causeRxTx & MV_PP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK);

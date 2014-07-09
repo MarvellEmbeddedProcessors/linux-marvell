@@ -1140,7 +1140,7 @@ MV_STATUS cph_app_mod_rx_packet(
 *******************************************************************************/
 MV_STATUS cph_app_mod_tx_packet(
 	struct sk_buff        *skb,
-	struct mv_eth_tx_spec *tx_spec_out,
+	struct mv_pp2_tx_spec *tx_spec_out,
 	enum CPH_APP_MOD_FIELD_E    mod_bm,
 	struct CPH_APP_MOD_T         *mod_value)
 {
@@ -1178,7 +1178,7 @@ MV_STATUS cph_app_mod_tx_packet(
 *******************************************************************************/
 MV_STATUS cph_app_set_frwd(
 	struct sk_buff        *skb,
-	struct mv_eth_tx_spec *tx_spec_out,
+	struct mv_pp2_tx_spec *tx_spec_out,
 	enum CPH_APP_FRWD_FIELD_E   frwd_bm,
 	struct CPH_APP_FRWD_T        *frwd_value)
 {
@@ -1252,7 +1252,7 @@ int cph_app_rx_bc(int port, struct net_device *dev, struct sk_buff *skb, struct 
 		}
 
 		/* Forward packet */
-		if (netif_running(mv_eth_ports[peer_port]->dev)) {
+		if (netif_running(mv_pp2_ports[peer_port]->dev)) {
 			/* Copy a new SKB */
 			skb_old->tail += rx_desc->dataSize;
 			skb_old->len   = rx_desc->dataSize;
@@ -1261,7 +1261,7 @@ int cph_app_rx_bc(int port, struct net_device *dev, struct sk_buff *skb, struct 
 				skb_new = skb_old;
 				goto out;
 			}
-			mv_eth_ports[peer_port]->dev->netdev_ops->ndo_start_xmit(skb_old, mv_eth_ports[peer_port]->dev);
+			mv_pp2_ports[peer_port]->dev->netdev_ops->ndo_start_xmit(skb_old, mv_pp2_ports[peer_port]->dev);
 		}
 	}
 out:

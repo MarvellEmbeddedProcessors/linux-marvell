@@ -65,6 +65,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __mv_net_config_h__
 #define __mv_net_config_h__
 
+#define MV_ETH_MAX_PORTS                4
+
 #if defined(CONFIG_MV_ETH_PP2) || defined(CONFIG_MV_ETH_PP2_MODULE)
 
 #define INTER_REGS_PHYS_BASE		0xF1000000
@@ -79,17 +81,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MIB_COUNTERS_REG_BASE           (MV_ETH_BASE_ADDR + 0x1000)
 #define GOP_MNG_REG_BASE                (MV_ETH_BASE_ADDR + 0x3000)
 #define GOP_REG_BASE(port)		(MV_ETH_BASE_ADDR + 0x4000 + ((port) / 2) * 0x3000 + ((port) % 2) * 0x1000)
-#define MV_PON_REGS_OFFSET                      (MV_ETH_BASE_ADDR + 0x8000)
+#define MV_PON_REGS_OFFSET              (MV_ETH_BASE_ADDR + 0x8000)
 
-#define MV_PON_PORT_ID                  7
-#define MV_ETH_MAX_PORTS                4
-#define MV_ETH_MAX_RXQ                  16      /* Maximum number of RXQs can be mapped to each port */
-#define MV_ETH_MAX_TXQ                  8
-#define MV_ETH_RXQ_TOTAL_NUM            32      /* Total number of RXQs for usage by all ports */
-#define MV_ETH_MAX_TCONT                16      /* Maximum number of TCONTs supported by PON port */
-#define MV_ETH_TX_CSUM_MAX_SIZE         9800
+#define MV_PP2_PON_EXIST
+#define MV_PP2_PON_PORT_ID              7
+#define MV_PP2_MAX_RXQ                  16      /* Maximum number of RXQs can be mapped to each port */
+#define MV_PP2_MAX_TXQ                  8
+#define MV_PP2_RXQ_TOTAL_NUM            32      /* Total number of RXQs for usage by all ports */
+#define MV_PP2_MAX_TCONT                16      /* Maximum number of TCONTs supported by PON port */
+#define MV_PP2_TX_CSUM_MAX_SIZE         9800
 
 #define IRQ_GLOBAL_GOP			82 /* Group of Ports (GOP) */
+#define IRQ_GLOBAL_NET_WAKE_UP		112 /* WOL interrupt */
 #endif /* PP2 */
 
 #if defined(CONFIG_MV_ETH_NETA) || defined(CONFIG_MV_ETH_NETA_MODULE)
@@ -97,7 +100,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PON_PORT(p)			MV_FALSE
 #define MV_ETH_MAX_TCONT		1
 
-#define MV_ETH_MAX_PORTS		4	/* Armada 370-XP has 4 GMAC ports */
 #define MV_ETH_MAX_RXQ			8
 #define MV_ETH_MAX_TXQ			8
 #define MV_ETH_TX_CSUM_MAX_SIZE		9800

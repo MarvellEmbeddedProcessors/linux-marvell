@@ -88,14 +88,14 @@ extern int mv_ctrl_txdone;
 #define RX_BUF_SIZE(pkt_size)   ((pkt_size) + NET_SKB_PAD)
 
 
-#ifdef CONFIG_NET_SKB_RECYCLE
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
 extern int mv_ctrl_recycle;
 
 #define mv_eth_is_recycle()     (mv_ctrl_recycle)
 int mv_eth_skb_recycle(struct sk_buff *skb);
 #else
 #define mv_eth_is_recycle()     0
-#endif /* CONFIG_NET_SKB_RECYCLE */
+#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 /******************************************************
  * interrupt control --                               *
@@ -672,10 +672,10 @@ static inline void mv_eth_pkt_free(struct eth_pbuf *pkt)
 {
 	struct sk_buff *skb = (struct sk_buff *)pkt->osInfo;
 
-#ifdef CONFIG_NET_SKB_RECYCLE
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
 	skb->skb_recycle = NULL;
 	skb->hw_cookie = 0;
-#endif /* CONFIG_NET_SKB_RECYCLE */
+#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 	dev_kfree_skb_any(skb);
 	mvOsFree(pkt);

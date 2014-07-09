@@ -36,7 +36,7 @@ disclaimer.
 #include "gbe/mvPp2Gbe.h"
 #include "mv_netdev.h"
 
-static ssize_t mv_eth_help(char *buf)
+static ssize_t mv_pp2_help(char *buf)
 {
 	int off = 0;
 
@@ -49,7 +49,7 @@ static ssize_t mv_eth_help(char *buf)
 	return off;
 }
 
-static ssize_t mv_eth_show(struct device *dev,
+static ssize_t mv_pp2_show(struct device *dev,
 				  struct device_attribute *attr, char *buf)
 {
 	int             off = 0;
@@ -57,12 +57,12 @@ static ssize_t mv_eth_show(struct device *dev,
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	off = mv_eth_help(buf);
+	off = mv_pp2_help(buf);
 
 	return off;
 }
 
-static ssize_t mv_eth_port_store(struct device *dev,
+static ssize_t mv_pp2_port_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
 {
 	const char      *name = attr->attr.name;
@@ -80,13 +80,13 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	local_irq_save(flags);
 
 	if (!strcmp(name, "dsaTag")) {
-		err = mv_eth_ctrl_tx_cmd_dsa(p, v);
+		err = mv_pp2_ctrl_tx_cmd_dsa(p, v);
 	} else if (!strcmp(name, "pktColor")) {
-		err = mv_eth_ctrl_tx_cmd_color(p, v);
+		err = mv_pp2_ctrl_tx_cmd_color(p, v);
 	} else if (!strcmp(name, "gemPortId")) {
-		err = mv_eth_ctrl_tx_cmd_gem_id(p, v);
+		err = mv_pp2_ctrl_tx_cmd_gem_id(p, v);
 	} else if (!strcmp(name, "ponFec")) {
-		err = mv_eth_ctrl_tx_cmd_pon_fec(p, v);
+		err = mv_pp2_ctrl_tx_cmd_pon_fec(p, v);
 	} else if (!strcmp(name, "gemOem")) {
 		err = mv_eth_ctrl_tx_cmd_gem_oem(p, v);
 	} else {
@@ -102,14 +102,14 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	return err ? -EINVAL : len;
 }
 
-static DEVICE_ATTR(help,        S_IRUSR, mv_eth_show, NULL);
-static DEVICE_ATTR(dsaTag,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(pktColor,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(gemPortId,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(ponFec,	S_IWUSR, NULL, mv_eth_port_store);
-static DEVICE_ATTR(gemOem,	S_IWUSR, NULL, mv_eth_port_store);
+static DEVICE_ATTR(help,        S_IRUSR, mv_pp2_show, NULL);
+static DEVICE_ATTR(dsaTag,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(pktColor,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(gemPortId,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(ponFec,	S_IWUSR, NULL, mv_pp2_port_store);
+static DEVICE_ATTR(gemOem,	S_IWUSR, NULL, mv_pp2_port_store);
 
-static struct attribute *mv_eth_attrs[] = {
+static struct attribute *mv_pp2_attrs[] = {
 	&dev_attr_help.attr,
 	&dev_attr_dsaTag.attr,
 	&dev_attr_pktColor.attr,
@@ -119,24 +119,24 @@ static struct attribute *mv_eth_attrs[] = {
 	NULL
 };
 
-static struct attribute_group mv_eth_pon_group = {
+static struct attribute_group mv_pp2_pon_group = {
 	.name = "pon",
-	.attrs = mv_eth_attrs,
+	.attrs = mv_pp2_attrs,
 };
 
 int mv_pp2_pon_sysfs_init(struct kobject *gbe_kobj)
 {
 	int err;
 
-	err = sysfs_create_group(gbe_kobj, &mv_eth_pon_group);
+	err = sysfs_create_group(gbe_kobj, &mv_pp2_pon_group);
 	if (err)
-		pr_err("sysfs group %s failed %d\n", mv_eth_pon_group.name, err);
+		pr_err("sysfs group %s failed %d\n", mv_pp2_pon_group.name, err);
 
 	return err;
 }
 
 int mv_pp2_pon_sysfs_exit(struct kobject *gbe_kobj)
 {
-	sysfs_remove_group(gbe_kobj, &mv_eth_pon_group);
+	sysfs_remove_group(gbe_kobj, &mv_pp2_pon_group);
 	return 0;
 }

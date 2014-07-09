@@ -58,34 +58,34 @@ disclaimer.
 
 #define MV_ETH_TOOL_AN_TIMEOUT	5000
 
-struct mv_eth_tool_stats {
+struct mv_pp2_tool_stats {
 	char stat_string[ETH_GSTRING_LEN];
 	int stat_offset;
 };
 
 #define MV_ETH_TOOL_STAT(m)	offsetof(struct eth_port, m)
 
-static const struct mv_eth_tool_stats mv_eth_tool_global_strings_stats[] = {
-#ifdef CONFIG_MV_ETH_STAT_ERR
+static const struct mv_pp2_tool_stats mv_pp2_tool_global_strings_stats[] = {
+#ifdef CONFIG_MV_PP2_STAT_ERR
 	{"rx_error", MV_ETH_TOOL_STAT(stats.rx_error)},
 	{"tx_timeout", MV_ETH_TOOL_STAT(stats.tx_timeout)},
 	{"ext_stack_empty", MV_ETH_TOOL_STAT(stats.ext_stack_empty)},
 	{"ext_stack_full", MV_ETH_TOOL_STAT(stats.ext_stack_full)},
 	{"state_err", MV_ETH_TOOL_STAT(stats.state_err)},
 #endif
-#ifdef CONFIG_MV_ETH_STAT_INF
+#ifdef CONFIG_MV_PP2_STAT_INF
 	{"tx_done", MV_ETH_TOOL_STAT(stats.tx_done)},
 	{"link", MV_ETH_TOOL_STAT(stats.link)},
 	{"netdev_stop", MV_ETH_TOOL_STAT(stats.netdev_stop)},
 	{"rx_buf_hdr", MV_ETH_TOOL_STAT(stats.rx_buf_hdr)},
-#ifdef CONFIG_MV_ETH_RX_SPECIAL
+#ifdef CONFIG_MV_PP2_RX_SPECIAL
 	{"rx_special", MV_ETH_TOOL_STAT(stats.rx_special)},
 #endif
-#ifdef CONFIG_MV_ETH_TX_SPECIAL
+#ifdef CONFIG_MV_PP2_TX_SPECIAL
 	{"tx_special", MV_ETH_TOOL_STAT(stats.tx_special)},
 #endif
 #endif
-#ifdef CONFIG_MV_ETH_STAT_DBG
+#ifdef CONFIG_MV_PP2_STAT_DBG
 	{"rx_tagged", MV_ETH_TOOL_STAT(stats.rx_tagged)},
 	{"rx_netif", MV_ETH_TOOL_STAT(stats.rx_netif)},
 	{"rx_gro", MV_ETH_TOOL_STAT(stats.rx_gro)},
@@ -106,7 +106,7 @@ static const struct mv_eth_tool_stats mv_eth_tool_global_strings_stats[] = {
 	{"rate_current", MV_ETH_TOOL_STAT(rate_current)},
 };
 
-static const struct mv_eth_tool_stats mv_eth_tool_cpu_strings_stats[] = {
+static const struct mv_pp2_tool_stats mv_pp2_tool_cpu_strings_stats[] = {
 #ifdef CONFIG_MV_ETH_STATS_DEBUG
 	{"irq", MV_ETH_TOOL_STAT(stats.irq)},
 	{"irq_err", MV_ETH_TOOL_STAT(stats.irq_err)},
@@ -117,36 +117,36 @@ static const struct mv_eth_tool_stats mv_eth_tool_cpu_strings_stats[] = {
 #endif /* CONFIG_MV_ETH_STATS_DEBUG */
 };
 
-static const struct mv_eth_tool_stats mv_eth_tool_rx_queue_strings_stats[] = {
-#ifdef CONFIG_MV_ETH_STAT_DBG
+static const struct mv_pp2_tool_stats mv_pp2_tool_rx_queue_strings_stats[] = {
+#ifdef CONFIG_MV_PP2_STAT_DBG
 	{"rxq", MV_ETH_TOOL_STAT(stats.rxq)},
-#endif /* CONFIG_MV_ETH_STAT_DBG */
+#endif /* CONFIG_MV_PP2_STAT_DBG */
 };
 
-static const struct mv_eth_tool_stats mv_eth_tool_tx_queue_strings_stats[] = {
+static const struct mv_pp2_tool_stats mv_pp2_tool_tx_queue_strings_stats[] = {
 };
 
 #define MV_ETH_TOOL_CPU_STATS_LEN	\
-	(sizeof(mv_eth_tool_cpu_strings_stats) / sizeof(struct mv_eth_tool_stats))
+	(sizeof(mv_pp2_tool_cpu_strings_stats) / sizeof(struct mv_pp2_tool_stats))
 
 #define MV_ETH_TOOL_RX_QUEUE_STATS_LEN	\
-	(sizeof(mv_eth_tool_rx_queue_strings_stats) / sizeof(struct mv_eth_tool_stats))
+	(sizeof(mv_pp2_tool_rx_queue_strings_stats) / sizeof(struct mv_pp2_tool_stats))
 
 #define MV_ETH_TOOL_TX_QUEUE_STATS_LEN	\
-	(sizeof(mv_eth_tool_tx_queue_strings_stats) / sizeof(struct mv_eth_tool_stats))
+	(sizeof(mv_pp2_tool_tx_queue_strings_stats) / sizeof(struct mv_pp2_tool_stats))
 
 #define MV_ETH_TOOL_QUEUE_STATS_LEN	\
-	((MV_ETH_TOOL_RX_QUEUE_STATS_LEN * CONFIG_MV_ETH_RXQ) + \
-	(MV_ETH_TOOL_TX_QUEUE_STATS_LEN * CONFIG_MV_ETH_TXQ))
+	((MV_ETH_TOOL_RX_QUEUE_STATS_LEN * CONFIG_MV_PP2_RXQ) + \
+	(MV_ETH_TOOL_TX_QUEUE_STATS_LEN * CONFIG_MV_PP2_TXQ))
 
 #define MV_ETH_TOOL_GLOBAL_STATS_LEN	\
-	(sizeof(mv_eth_tool_global_strings_stats) / sizeof(struct mv_eth_tool_stats))
+	(sizeof(mv_pp2_tool_global_strings_stats) / sizeof(struct mv_pp2_tool_stats))
 
 #define MV_ETH_TOOL_STATS_LEN		\
 	(MV_ETH_TOOL_GLOBAL_STATS_LEN + MV_ETH_TOOL_CPU_STATS_LEN + MV_ETH_TOOL_QUEUE_STATS_LEN)
 
 /******************************************************************************
-* mv_eth_tool_get_settings
+* mv_pp2_eth_tool_get_settings
 * Description:
 *	ethtool get standard port settings
 * INPUT:
@@ -157,7 +157,7 @@ static const struct mv_eth_tool_stats mv_eth_tool_tx_queue_strings_stats[] = {
 *	0 for success
 *
 *******************************************************************************/
-int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
+int mv_pp2_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 {
 	struct eth_port 	*priv = MV_ETH_PRIV(netdev);
 	u16			lp_ad, stat1000;
@@ -166,7 +166,7 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 	MV_ETH_PORT_DUPLEX 	duplex;
 	MV_ETH_PORT_STATUS      status;
 
-	if ((priv == NULL) || (MV_PON_PORT(priv->port))) {
+	if ((priv == NULL) || (MV_PP2_IS_PON_PORT(priv->port))) {
 		printk(KERN_ERR "%s is not supported on %s\n", __func__, netdev->name);
 		return -EOPNOTSUPP;
 	}
@@ -238,7 +238,7 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 
 
 /******************************************************************************
-* mv_eth_tool_restore_settings
+* mv_pp2_eth_tool_restore_settings
 * Description:
 *	restore saved speed/dublex/an settings
 * INPUT:
@@ -249,7 +249,7 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 *	0 for success
 *
 *******************************************************************************/
-int mv_eth_tool_restore_settings(struct net_device *netdev)
+int mv_pp2_eth_tool_restore_settings(struct net_device *netdev)
 {
 	struct eth_port 	*priv = MV_ETH_PRIV(netdev);
 	int			phy_speed, phy_duplex;
@@ -321,7 +321,7 @@ int mv_eth_tool_restore_settings(struct net_device *netdev)
 
 
 /******************************************************************************
-* mv_eth_tool_set_settings
+* mv_pp2_eth_tool_set_settings
 * Description:
 *	ethtool set standard port settings
 * INPUT:
@@ -333,12 +333,12 @@ int mv_eth_tool_restore_settings(struct net_device *netdev)
 *	0 for success
 *
 *******************************************************************************/
-int mv_eth_tool_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+int mv_pp2_eth_tool_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct eth_port *priv = MV_ETH_PRIV(dev);
 	int _speed, _duplex, _autoneg, _advertise, err;
 
-	if ((priv == NULL) || (MV_PON_PORT(priv->port))) {
+	if ((priv == NULL) || (MV_PP2_IS_PON_PORT(priv->port))) {
 		printk(KERN_ERR "%s is not supported on %s\n", __func__, dev->name);
 		return -EOPNOTSUPP;
 	}
@@ -352,7 +352,7 @@ int mv_eth_tool_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	priv->speed_cfg = cmd->speed;
 	priv->autoneg_cfg = cmd->autoneg;
 	priv->advertise_cfg = cmd->advertising;
-	err = mv_eth_tool_restore_settings(dev);
+	err = mv_pp2_eth_tool_restore_settings(dev);
 
 	if (err) {
 		priv->duplex_cfg = _duplex;
@@ -364,7 +364,7 @@ int mv_eth_tool_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 }
 
 /******************************************************************************
-* mv_eth_tool_get_regs_len
+* mv_pp2_eth_tool_get_regs_len
 * Description:
 *	ethtool get registers array length
 * INPUT:
@@ -375,7 +375,7 @@ int mv_eth_tool_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 *	registers array length
 *
 *******************************************************************************/
-int mv_eth_tool_get_regs_len(struct net_device *netdev)
+int mv_pp2_eth_tool_get_regs_len(struct net_device *netdev)
 {
 #define MV_ETH_TOOL_REGS_LEN 42
 
@@ -383,7 +383,7 @@ int mv_eth_tool_get_regs_len(struct net_device *netdev)
 }
 
 /******************************************************************************
-* mv_eth_tool_get_wol
+* mv_pp2_eth_tool_get_wol
 * Description:
 *	ethtool get WOL information
 * INPUT:
@@ -394,7 +394,7 @@ int mv_eth_tool_get_regs_len(struct net_device *netdev)
 *	0 on success
 *
 *******************************************************************************/
-void mv_eth_tool_get_wol(struct net_device *netdev,
+void mv_pp2_eth_tool_get_wol(struct net_device *netdev,
 			 struct ethtool_wolinfo *wolinfo)
 {
 	struct eth_port	*priv = MV_ETH_PRIV(netdev);
@@ -417,7 +417,7 @@ void mv_eth_tool_get_wol(struct net_device *netdev,
 }
 
 /******************************************************************************
-* mv_eth_tool_set_wol
+* mv_pp2_eth_tool_set_wol
 * Description:
 *	ethtool set WOL
 * INPUT:
@@ -429,7 +429,7 @@ void mv_eth_tool_get_wol(struct net_device *netdev,
 *	None
 *
 *******************************************************************************/
-int mv_eth_tool_set_wol(struct net_device *netdev,
+int mv_pp2_eth_tool_set_wol(struct net_device *netdev,
 			 struct ethtool_wolinfo *wolinfo)
 {
 	int ret;
@@ -484,7 +484,7 @@ int mv_eth_tool_set_wol(struct net_device *netdev,
 }
 
 /******************************************************************************
-* mv_eth_tool_get_drvinfo
+* mv_pp2_eth_tool_get_drvinfo
 * Description:
 *	ethtool get driver information
 * INPUT:
@@ -496,7 +496,7 @@ int mv_eth_tool_set_wol(struct net_device *netdev,
 *	None
 *
 *******************************************************************************/
-void mv_eth_tool_get_drvinfo(struct net_device *netdev,
+void mv_pp2_eth_tool_get_drvinfo(struct net_device *netdev,
 			     struct ethtool_drvinfo *info)
 {
 	strcpy(info->driver, "mv_eth");
@@ -504,13 +504,13 @@ void mv_eth_tool_get_drvinfo(struct net_device *netdev,
 	strcpy(info->bus_info, "Mbus");
 	info->n_stats = MV_ETH_TOOL_STATS_LEN;
 	info->testinfo_len = 0;
-	info->regdump_len = mv_eth_tool_get_regs_len(netdev);
+	info->regdump_len = mv_pp2_eth_tool_get_regs_len(netdev);
 	info->eedump_len = 0;
 }
 
 
 /******************************************************************************
-* mv_eth_tool_get_regs
+* mv_pp2_eth_tool_get_regs
 * Description:
 *	ethtool get registers array
 * INPUT:
@@ -522,13 +522,13 @@ void mv_eth_tool_get_drvinfo(struct net_device *netdev,
 *	None
 *
 *******************************************************************************/
-void mv_eth_tool_get_regs(struct net_device *netdev,
+void mv_pp2_eth_tool_get_regs(struct net_device *netdev,
 			  struct ethtool_regs *regs, void *p)
 {
 	struct eth_port *priv = MV_ETH_PRIV(netdev);
 	uint32_t	*regs_buff = p;
 
-	if ((priv == NULL) || MV_PON_PORT(priv->port)) {
+	if ((priv == NULL) || MV_PP2_IS_PON_PORT(priv->port)) {
 		printk(KERN_ERR "%s is not supported on %s\n", __func__, netdev->name);
 		return;
 	}
@@ -558,7 +558,7 @@ void mv_eth_tool_get_regs(struct net_device *netdev,
 
 
 /******************************************************************************
-* mv_eth_tool_nway_reset
+* mv_pp2_eth_tool_nway_reset
 * Description:
 *	ethtool restart auto negotiation
 * INPUT:
@@ -569,12 +569,12 @@ void mv_eth_tool_get_regs(struct net_device *netdev,
 *	0 on success
 *
 *******************************************************************************/
-int mv_eth_tool_nway_reset(struct net_device *netdev)
+int mv_pp2_eth_tool_nway_reset(struct net_device *netdev)
 {
 	struct eth_port *priv = MV_ETH_PRIV(netdev);
 	MV_U32	        phy_addr;
 
-	if ((priv == NULL) || (MV_PON_PORT(priv->port))) {
+	if ((priv == NULL) || (MV_PP2_IS_PON_PORT(priv->port))) {
 		printk(KERN_ERR "interface %s is not supported\n", netdev->name);
 		return -EOPNOTSUPP;
 	}
@@ -588,7 +588,7 @@ int mv_eth_tool_nway_reset(struct net_device *netdev)
 
 
 /******************************************************************************
-* mv_eth_tool_get_link
+* mv_pp2_eth_tool_get_link
 * Description:
 *	ethtool get link status
 * INPUT:
@@ -599,7 +599,7 @@ int mv_eth_tool_nway_reset(struct net_device *netdev)
 *	0 if link is down, 1 if link is up
 *
 *******************************************************************************/
-u32 mv_eth_tool_get_link(struct net_device *netdev)
+u32 mv_pp2_eth_tool_get_link(struct net_device *netdev)
 {
 	struct eth_port     *pp = MV_ETH_PRIV(netdev);
 
@@ -609,7 +609,7 @@ u32 mv_eth_tool_get_link(struct net_device *netdev)
 	}
 
 #ifdef CONFIG_MV_INCLUDE_PON
-	if (MV_PON_PORT(pp->port))
+	if (MV_PP2_IS_PON_PORT(pp->port))
 		return mv_pon_link_status(NULL);
 #endif /* CONFIG_MV_PON */
 
@@ -618,7 +618,7 @@ u32 mv_eth_tool_get_link(struct net_device *netdev)
 
 
 /******************************************************************************
-* mv_eth_tool_get_coalesce
+* mv_pp2_eth_tool_get_coalesce
 * Description:
 *	ethtool get RX/TX coalesce parameters
 * INPUT:
@@ -629,7 +629,7 @@ u32 mv_eth_tool_get_link(struct net_device *netdev)
 *	0 on success
 *
 *******************************************************************************/
-int mv_eth_tool_get_coalesce(struct net_device *netdev,
+int mv_pp2_eth_tool_get_coalesce(struct net_device *netdev,
 			     struct ethtool_coalesce *cmd)
 {
 	struct eth_port *pp = MV_ETH_PRIV(netdev);
@@ -637,7 +637,7 @@ int mv_eth_tool_get_coalesce(struct net_device *netdev,
 	   notice that if you use ethtool to set coal, then all queues have the same value */
 	cmd->rx_coalesce_usecs = pp->rx_time_coal_cfg;
 	cmd->rx_max_coalesced_frames = pp->rx_pkts_coal_cfg;
-#ifdef CONFIG_MV_ETH_TXDONE_ISR
+#ifdef CONFIG_MV_PP2_TXDONE_ISR
 	cmd->tx_max_coalesced_frames = pp->tx_pkts_coal_cfg;
 #endif
 
@@ -655,7 +655,7 @@ int mv_eth_tool_get_coalesce(struct net_device *netdev,
 }
 
 /******************************************************************************
-* mv_eth_tool_set_coalesce
+* mv_pp2_eth_tool_set_coalesce
 * Description:
 *	ethtool set RX/TX coalesce parameters
 * INPUT:
@@ -667,7 +667,7 @@ int mv_eth_tool_get_coalesce(struct net_device *netdev,
 *	0 on success
 *
 *******************************************************************************/
-int mv_eth_tool_set_coalesce(struct net_device *netdev,
+int mv_pp2_eth_tool_set_coalesce(struct net_device *netdev,
 			     struct ethtool_coalesce *cmd)
 {
 	struct eth_port *pp = MV_ETH_PRIV(netdev);
@@ -676,26 +676,26 @@ int mv_eth_tool_set_coalesce(struct net_device *netdev,
 	/* can't set rx coalesce with both 0 pkts and 0 usecs,  tx coalesce supports only pkts */
 	if (!cmd->rx_coalesce_usecs && !cmd->rx_max_coalesced_frames)
 		return -EPERM;
-#ifdef CONFIG_MV_ETH_TXDONE_ISR
+#ifdef CONFIG_MV_PP2_TXDONE_ISR
 	if (!cmd->tx_max_coalesced_frames)
 		return -EPERM;
 #endif
 
 	if (!cmd->use_adaptive_rx_coalesce)
-		for (rxq = 0; rxq < CONFIG_MV_ETH_RXQ; rxq++) {
-			mv_eth_rx_ptks_coal_set(pp->port, rxq, cmd->rx_max_coalesced_frames);
-			mv_eth_rx_time_coal_set(pp->port, rxq, cmd->rx_coalesce_usecs);
+		for (rxq = 0; rxq < CONFIG_MV_PP2_RXQ; rxq++) {
+			mv_pp2_rx_ptks_coal_set(pp->port, rxq, cmd->rx_max_coalesced_frames);
+			mv_pp2_rx_time_coal_set(pp->port, rxq, cmd->rx_coalesce_usecs);
 		}
 
 	pp->rx_time_coal_cfg = cmd->rx_coalesce_usecs;
 	pp->rx_pkts_coal_cfg = cmd->rx_max_coalesced_frames;
-#ifdef CONFIG_MV_ETH_TXDONE_ISR
+#ifdef CONFIG_MV_PP2_TXDONE_ISR
 	{
 		int txp, txq;
 
 		for (txp = 0; txp < pp->txp_num; txp++)
-			for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++)
-				mv_eth_tx_done_ptks_coal_set(pp->port, txp, txq, cmd->tx_max_coalesced_frames);
+			for (txq = 0; txq < CONFIG_MV_PP2_TXQ; txq++)
+				mv_pp2_tx_done_ptks_coal_set(pp->port, txp, txq, cmd->tx_max_coalesced_frames);
 	}
 #endif
 	pp->tx_pkts_coal_cfg = cmd->tx_max_coalesced_frames;
@@ -723,7 +723,7 @@ int mv_eth_tool_set_coalesce(struct net_device *netdev,
 
 
 /******************************************************************************
-* mv_eth_tool_get_ringparam
+* mv_pp2_eth_tool_get_ringparam
 * Description:
 *	ethtool get ring parameters
 * INPUT:
@@ -734,7 +734,7 @@ int mv_eth_tool_set_coalesce(struct net_device *netdev,
 *	None
 *
 *******************************************************************************/
-void mv_eth_tool_get_ringparam(struct net_device *netdev,
+void mv_pp2_eth_tool_get_ringparam(struct net_device *netdev,
 				struct ethtool_ringparam *ring)
 {
 	struct eth_port *priv = MV_ETH_PRIV(netdev);
@@ -745,7 +745,7 @@ void mv_eth_tool_get_ringparam(struct net_device *netdev,
 }
 
 /******************************************************************************
-* mv_eth_tool_set_ringparam
+* mv_pp2_eth_tool_set_ringparam
 * Description:
 *	ethtool set ring parameters
 * INPUT:
@@ -756,7 +756,7 @@ void mv_eth_tool_get_ringparam(struct net_device *netdev,
 *	None
 *
 *******************************************************************************/
-int mv_eth_tool_set_ringparam(struct net_device *netdev,
+int mv_pp2_eth_tool_set_ringparam(struct net_device *netdev,
 				 struct ethtool_ringparam *ring)
 {
 	struct eth_port *priv = MV_ETH_PRIV(netdev);
@@ -775,11 +775,11 @@ int mv_eth_tool_set_ringparam(struct net_device *netdev,
 		netdev_running = 1;
 
 	if (netdev_running)
-		mv_eth_stop(netdev);
+		mv_pp2_eth_stop(netdev);
 
 	if (rxq_size != priv->rxq_ctrl[0].rxq_size)
 		for (rxq = 0; rxq < priv->rxq_num; rxq++)
-			mv_eth_ctrl_rxq_size_set(priv->port, rxq, rxq_size);
+			mv_pp2_ctrl_rxq_size_set(priv->port, rxq, rxq_size);
 
 #ifdef CONFIG_MV_ETH_PP2_1
 	hwf_size = txq_size - (nr_cpu_ids * priv->txq_ctrl[0].rsvd_chunk);
@@ -791,20 +791,20 @@ int mv_eth_tool_set_ringparam(struct net_device *netdev,
 
 	if (txq_size != priv->txq_ctrl[0].txq_size)
 		for (txp = 0; txp < priv->txp_num; txp++)
-			for (txq = 0; txq < CONFIG_MV_ETH_TXQ; txq++) {
-				mv_eth_ctrl_txq_size_set(priv->port, txp, txq, txq_size);
+			for (txq = 0; txq < CONFIG_MV_PP2_TXQ; txq++) {
+				mv_pp2_ctrl_txq_size_set(priv->port, txp, txq, txq_size);
 				/* swf_size is ignored if ppv2.0 */
-				mv_eth_ctrl_txq_limits_set(priv->port, txp, txq, hwf_size, swf_size);
+				mv_pp2_ctrl_txq_limits_set(priv->port, txp, txq, hwf_size, swf_size);
 			}
 
 	if (netdev_running)
-		mv_eth_open(netdev);
+		mv_pp2_eth_open(netdev);
 
 	return 0;
 }
 
 /******************************************************************************
-* mv_eth_tool_get_pauseparam
+* mv_pp2_eth_tool_get_pauseparam
 * Description:
 *	ethtool get pause parameters
 * INPUT:
@@ -815,7 +815,7 @@ int mv_eth_tool_set_ringparam(struct net_device *netdev,
 *	None
 *
 *******************************************************************************/
-void mv_eth_tool_get_pauseparam(struct net_device *netdev,
+void mv_pp2_eth_tool_get_pauseparam(struct net_device *netdev,
 				struct ethtool_pauseparam *pause)
 {
 	struct eth_port      *priv = MV_ETH_PRIV(netdev);
@@ -823,7 +823,7 @@ void mv_eth_tool_get_pauseparam(struct net_device *netdev,
 	MV_ETH_PORT_STATUS   portStatus;
 	MV_ETH_PORT_FC       flowCtrl;
 
-	if ((priv == NULL) || (MV_PON_PORT(priv->port))) {
+	if ((priv == NULL) || (MV_PP2_IS_PON_PORT(priv->port))) {
 		printk(KERN_ERR "%s is not supported on %s\n", __func__, netdev->name);
 		return;
 	}
@@ -850,7 +850,7 @@ void mv_eth_tool_get_pauseparam(struct net_device *netdev,
 
 
 /******************************************************************************
-* mv_eth_tool_set_pauseparam
+* mv_pp2_eth_tool_set_pauseparam
 * Description:
 *	ethtool configure pause parameters
 * INPUT:
@@ -862,7 +862,7 @@ void mv_eth_tool_get_pauseparam(struct net_device *netdev,
 *	0 on success
 *
 *******************************************************************************/
-int mv_eth_tool_set_pauseparam(struct net_device *netdev,
+int mv_pp2_eth_tool_set_pauseparam(struct net_device *netdev,
 				struct ethtool_pauseparam *pause)
 {
 	struct eth_port *priv = MV_ETH_PRIV(netdev);
@@ -870,7 +870,7 @@ int mv_eth_tool_set_pauseparam(struct net_device *netdev,
 	MV_U32			phy_addr;
 	MV_STATUS		status = MV_FAIL;
 
-	if ((priv == NULL) || (MV_PON_PORT(priv->port))) {
+	if ((priv == NULL) || (MV_PP2_IS_PON_PORT(priv->port))) {
 		printk(KERN_ERR "%s is not supported on %s\n", __func__, netdev->name);
 		return -EOPNOTSUPP;
 	}
@@ -900,7 +900,7 @@ int mv_eth_tool_set_pauseparam(struct net_device *netdev,
 }
 
 /******************************************************************************
-* mv_eth_tool_get_strings
+* mv_pp2_eth_tool_get_strings
 * Description:
 *	ethtool get strings (used for statistics and self-test descriptions)
 * INPUT:
@@ -912,7 +912,7 @@ int mv_eth_tool_set_pauseparam(struct net_device *netdev,
 *	None
 *
 *******************************************************************************/
-void mv_eth_tool_get_strings(struct net_device *netdev,
+void mv_pp2_eth_tool_get_strings(struct net_device *netdev,
 			     uint32_t stringset, uint8_t *data)
 {
 	uint8_t *p = data;
@@ -922,26 +922,26 @@ void mv_eth_tool_get_strings(struct net_device *netdev,
 	switch (stringset) {
 	case ETH_SS_TEST:
 		/*
-		memcpy(data, *mv_eth_tool_gstrings_test,
+		memcpy(data, *mv_pp2_tool_gstrings_test,
 		       MV_ETH_TOOL_TEST_LEN*ETH_GSTRING_LEN); */
 		break;
 	case ETH_SS_STATS:
 		for (i = 0; i < MV_ETH_TOOL_GLOBAL_STATS_LEN; i++) {
-			memcpy(p, mv_eth_tool_global_strings_stats[i].stat_string,
+			memcpy(p, mv_pp2_tool_global_strings_stats[i].stat_string,
 			       ETH_GSTRING_LEN);
 			p += ETH_GSTRING_LEN;
 		}
-		for (q = 0; q < CONFIG_MV_ETH_RXQ; q++) {
+		for (q = 0; q < CONFIG_MV_PP2_RXQ; q++) {
 			for (i = 0; i < MV_ETH_TOOL_RX_QUEUE_STATS_LEN; i++) {
-				const char *str = mv_eth_tool_rx_queue_strings_stats[i].stat_string;
+				const char *str = mv_pp2_tool_rx_queue_strings_stats[i].stat_string;
 				memcpy(p, str, ETH_GSTRING_LEN);
 				strcat(p, qnum[q]);
 				p += ETH_GSTRING_LEN;
 			}
 		}
-		for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
+		for (q = 0; q < CONFIG_MV_PP2_TXQ; q++) {
 			for (i = 0; i < MV_ETH_TOOL_TX_QUEUE_STATS_LEN; i++) {
-				const char *str = mv_eth_tool_tx_queue_strings_stats[i].stat_string;
+				const char *str = mv_pp2_tool_tx_queue_strings_stats[i].stat_string;
 				memcpy(p, str, ETH_GSTRING_LEN);
 				strcat(p, qnum[q]);
 				p += ETH_GSTRING_LEN;
@@ -953,7 +953,7 @@ void mv_eth_tool_get_strings(struct net_device *netdev,
 
 
 /******************************************************************************
-* mv_eth_tool_get_stats_count
+* mv_pp2_eth_tool_get_stats_count
 * Description:
 *	ethtool get statistics count (number of stat. array entries)
 * INPUT:
@@ -964,13 +964,12 @@ void mv_eth_tool_get_strings(struct net_device *netdev,
 *	statistics count
 *
 *******************************************************************************/
-int mv_eth_tool_get_stats_count(struct net_device *netdev)
+int mv_pp2_eth_tool_get_stats_count(struct net_device *netdev)
 {
-/*	printk("in %s \n",__FUNCTION__);*/
 	return 0;
 }
 
-static int mv_eth_tool_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
+static int mv_pp2_eth_tool_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
 									 u32 *rules)
 {
 	if (info->cmd == ETHTOOL_GRXRINGS) {
@@ -982,7 +981,7 @@ static int mv_eth_tool_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *i
 }
 
 /******************************************************************************
-* mv_eth_tool_get_ethtool_stats
+* mv_pp2_eth_tool_get_ethtool_stats
 * Description:
 *	ethtool get statistics
 * INPUT:
@@ -994,7 +993,7 @@ static int mv_eth_tool_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *i
 *	None
 *
 *******************************************************************************/
-void mv_eth_tool_get_ethtool_stats(struct net_device *netdev,
+void mv_pp2_eth_tool_get_ethtool_stats(struct net_device *netdev,
 				   struct ethtool_stats *stats, uint64_t *data)
 {
 	struct eth_port	*priv = MV_ETH_PRIV(netdev);
@@ -1004,31 +1003,31 @@ void mv_eth_tool_get_ethtool_stats(struct net_device *netdev,
 
 	for (i = 0; i < MV_ETH_TOOL_GLOBAL_STATS_LEN; i++) {
 		char *p = (char *)priv +
-			mv_eth_tool_global_strings_stats[i].stat_offset;
+			mv_pp2_tool_global_strings_stats[i].stat_offset;
 		pdest[i] =  *(uint32_t *)p;
 	}
 	pdest += MV_ETH_TOOL_GLOBAL_STATS_LEN;
 
 	for (i = 0; i < MV_ETH_TOOL_CPU_STATS_LEN; i++) {
 		char *p = (char *)priv +
-			mv_eth_tool_cpu_strings_stats[i].stat_offset;
+			mv_pp2_tool_cpu_strings_stats[i].stat_offset;
 		pdest[i] =  *((uint32_t *)p + cpu);
 	}
 	pdest += MV_ETH_TOOL_CPU_STATS_LEN;
 
-	for (q = 0; q < CONFIG_MV_ETH_RXQ; q++) {
+	for (q = 0; q < CONFIG_MV_PP2_RXQ; q++) {
 		for (i = 0; i < MV_ETH_TOOL_RX_QUEUE_STATS_LEN; i++) {
 			char *p = (char *)priv +
-				mv_eth_tool_rx_queue_strings_stats[i].stat_offset;
+				mv_pp2_tool_rx_queue_strings_stats[i].stat_offset;
 			pdest[i] =  *((uint32_t *)p + q);
 		}
 		pdest += MV_ETH_TOOL_RX_QUEUE_STATS_LEN;
 	}
 
-	for (q = 0; q < CONFIG_MV_ETH_TXQ; q++) {
+	for (q = 0; q < CONFIG_MV_PP2_TXQ; q++) {
 		for (i = 0; i < MV_ETH_TOOL_TX_QUEUE_STATS_LEN; i++) {
 			char *p = (char *)priv +
-				mv_eth_tool_tx_queue_strings_stats[i].stat_offset;
+				mv_pp2_tool_tx_queue_strings_stats[i].stat_offset;
 			pdest[i] =  *((uint32_t *)p + q);
 		}
 		pdest += MV_ETH_TOOL_TX_QUEUE_STATS_LEN;
@@ -1037,7 +1036,7 @@ void mv_eth_tool_get_ethtool_stats(struct net_device *netdev,
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
 /******************************************************************************
-* mv_eth_tool_set_phys_id
+* mv_pp2_eth_tool_set_phys_id
 * Description:
 *	ethtool set indicator state for physical identification
 * INPUT:
@@ -1049,7 +1048,7 @@ void mv_eth_tool_get_ethtool_stats(struct net_device *netdev,
 *	Set results
 *
 *******************************************************************************/
-static int mv_eth_tool_set_phys_id(struct net_device *netdev,
+static int mv_pp2_eth_tool_set_phys_id(struct net_device *netdev,
 			     enum ethtool_phys_id_state state)
 {
 	/* we can only set Blink Duty Cycle and Blink Duration for Blink1 and Blink0
@@ -1085,7 +1084,7 @@ static int mv_eth_tool_set_phys_id(struct net_device *netdev,
 }
 #else
 /******************************************************************************
-* mv_eth_tool_phys_id
+* mv_pp2_eth_tool_phys_id
 * Description:
 *	ethtool set indicator state for physical identification
 * INPUT:
@@ -1097,7 +1096,7 @@ static int mv_eth_tool_set_phys_id(struct net_device *netdev,
 *	Set results
 *
 *******************************************************************************/
-static int mv_eth_tool_phys_id(struct net_device *netdev,
+static int mv_pp2_eth_tool_phys_id(struct net_device *netdev,
 			     uint32_t data)
 {
 	/* we can only set Blink Duty Cycle and Blink Duration for Blink1 and Blink0
@@ -1121,7 +1120,7 @@ static int mv_eth_tool_phys_id(struct net_device *netdev,
 #endif
 
 /******************************************************************************
-* mv_eth_tool_get_sset_count
+* mv_pp2_eth_tool_get_sset_count
 * Description:
 *	ethtool get stringset count
 * INPUT:
@@ -1133,7 +1132,7 @@ static int mv_eth_tool_phys_id(struct net_device *netdev,
 *	stringset length
 *
 *******************************************************************************/
-static int mv_eth_tool_get_sset_count(struct net_device *netdev, int sset)
+static int mv_pp2_eth_tool_get_sset_count(struct net_device *netdev, int sset)
 {
 	switch (sset) {
 	case ETH_SS_STATS:
@@ -1143,36 +1142,36 @@ static int mv_eth_tool_get_sset_count(struct net_device *netdev, int sset)
 	}
 }
 
-const struct ethtool_ops mv_eth_tool_ops = {
-	.get_settings				= mv_eth_tool_get_settings,
-	.set_settings				= mv_eth_tool_set_settings,
-	.get_drvinfo				= mv_eth_tool_get_drvinfo,
-	.get_regs_len				= mv_eth_tool_get_regs_len,
-	.get_regs				= mv_eth_tool_get_regs,
-	.get_wol				= mv_eth_tool_get_wol,
-	.set_wol				= mv_eth_tool_set_wol,
-	.nway_reset				= mv_eth_tool_nway_reset,
-	.get_link				= mv_eth_tool_get_link,
-	.get_coalesce				= mv_eth_tool_get_coalesce,
-	.set_coalesce				= mv_eth_tool_set_coalesce,
-	.get_ringparam  			= mv_eth_tool_get_ringparam,
-	.set_ringparam 				= mv_eth_tool_set_ringparam,
-	.get_pauseparam				= mv_eth_tool_get_pauseparam,
-	.set_pauseparam				= mv_eth_tool_set_pauseparam,
-	.get_strings				= mv_eth_tool_get_strings,
+const struct ethtool_ops mv_pp2_eth_tool_ops = {
+	.get_settings				= mv_pp2_eth_tool_get_settings,
+	.set_settings				= mv_pp2_eth_tool_set_settings,
+	.get_drvinfo				= mv_pp2_eth_tool_get_drvinfo,
+	.get_regs_len				= mv_pp2_eth_tool_get_regs_len,
+	.get_regs				= mv_pp2_eth_tool_get_regs,
+	.get_wol				= mv_pp2_eth_tool_get_wol,
+	.set_wol				= mv_pp2_eth_tool_set_wol,
+	.nway_reset				= mv_pp2_eth_tool_nway_reset,
+	.get_link				= mv_pp2_eth_tool_get_link,
+	.get_coalesce				= mv_pp2_eth_tool_get_coalesce,
+	.set_coalesce				= mv_pp2_eth_tool_set_coalesce,
+	.get_ringparam				= mv_pp2_eth_tool_get_ringparam,
+	.set_ringparam				= mv_pp2_eth_tool_set_ringparam,
+	.get_pauseparam				= mv_pp2_eth_tool_get_pauseparam,
+	.set_pauseparam				= mv_pp2_eth_tool_set_pauseparam,
+	.get_strings				= mv_pp2_eth_tool_get_strings,
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
-	.get_stats_count			= mv_eth_tool_get_stats_count,/*TODO: complete implementation */
+	.get_stats_count			= mv_pp2_eth_tool_get_stats_count,/*TODO: complete implementation */
 #endif
-	.get_ethtool_stats			= mv_eth_tool_get_ethtool_stats,/*TODO: complete implementation */
-	/*.get_rxfh_indir			= mv_eth_tool_get_rxfh_indir,
-	.set_rxfh_indir				= mv_eth_tool_set_rxfh_indir, */
-	.get_rxnfc                  		= mv_eth_tool_get_rxnfc,/*TODO new implementation*/
+	.get_ethtool_stats			= mv_pp2_eth_tool_get_ethtool_stats,/*TODO: complete implementation */
+	/*.get_rxfh_indir			= mv_pp2_eth_tool_get_rxfh_indir,
+	.set_rxfh_indir				= mv_pp2_eth_tool_set_rxfh_indir, */
+	.get_rxnfc				= mv_pp2_eth_tool_get_rxnfc,/*TODO new implementation*/
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
-	.set_phys_id				= mv_eth_tool_set_phys_id,
+	.set_phys_id				= mv_pp2_eth_tool_set_phys_id,
 #else
-	.phys_id				= mv_eth_tool_phys_id,
+	.phys_id				= mv_pp2_eth_tool_phys_id,
 #endif
-	.get_sset_count				= mv_eth_tool_get_sset_count,
+	.get_sset_count				= mv_pp2_eth_tool_get_sset_count,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
 	.get_ts_info				= ethtool_op_get_ts_info,
 #endif

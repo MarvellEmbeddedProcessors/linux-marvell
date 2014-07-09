@@ -79,11 +79,11 @@ extern "C" {
 # include "pnc/mvPnc.h"
 #endif /* CONFIG_MV_ETH_PNC */
 
-#ifdef CONFIG_MV_ETH_DEBUG_CODE
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
 # define mvNetaDebugPrintf      mvOsPrintf
 #else
 # define mvNetaDebugPrintf(msg, ...)
-#endif /* CONFIG_MV_ETH_DEBUG_CODE */
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 #ifndef MV_ETH_MAX_TCONT
 # define MV_ETH_MAX_TCONT 1
