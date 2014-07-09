@@ -1432,6 +1432,16 @@ static int mv_xor_remove(struct platform_device *pdev)
 	return 0;
 }
 
+void mv_xor_shutdown(struct platform_device *pdev)
+{
+	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
+
+	if (!IS_ERR(xordev->clk)) {
+		clk_disable_unprepare(xordev->clk);
+		clk_put(xordev->clk);
+	}
+}
+
 #ifdef CONFIG_OF
 static struct of_device_id mv_xor_dt_ids[] = {
        { .compatible = "marvell,orion-xor", },
@@ -1443,6 +1453,7 @@ MODULE_DEVICE_TABLE(of, mv_xor_dt_ids);
 static struct platform_driver mv_xor_driver = {
 	.probe		= mv_xor_probe,
 	.remove		= mv_xor_remove,
+	.shutdown		= mv_xor_shutdown,
 	.driver		= {
 		.owner	        = THIS_MODULE,
 		.name	        = MV_XOR_NAME,
