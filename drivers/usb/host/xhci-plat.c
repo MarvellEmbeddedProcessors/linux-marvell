@@ -282,8 +282,9 @@ static int xhci_plat_remove(struct platform_device *pdev)
 }
 
 static struct platform_driver usb_xhci_driver = {
-	.probe	= xhci_plat_probe,
-	.remove	= xhci_plat_remove,
+	.probe		= xhci_plat_probe,
+	.remove		= xhci_plat_remove,
+	.shutdown	= xhci_plat_remove,
 	.driver	= {
 		.name = "xhci-hcd",
 		.of_match_table = of_match_ptr(usb_xhci_of_match),
