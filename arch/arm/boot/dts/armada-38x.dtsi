@@ -127,6 +127,11 @@
 				#reset-cells = <1>;
 			};
 
+			mpcore-soc-ctrl@20d20 {
+				compatible = "marvell,armada-380-mpcore-soc-ctrl";
+				reg = <0x20d20 0x6c>;
+			};
+
 			mdio {
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -261,7 +266,7 @@
 
 			pmsu@22000 {
 				compatible = "marvell,armada-380-pmsu";
-				reg = <0x22100 0x200>;
+				reg = <0x22000 0x1000>;
 			};
 
 			sata@a8000 {
