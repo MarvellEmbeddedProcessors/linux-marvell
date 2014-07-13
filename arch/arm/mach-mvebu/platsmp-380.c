@@ -29,7 +29,7 @@ static struct notifier_block armada_380_secondary_cpu_notifier;
 
 static int __cpuinit armada_380_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
-	mvebu_pmsu_set_boot_addr(cpu, a380_secondary_startup);
+	mvebu_pmsu_set_cpu_boot_addr(cpu, a380_secondary_startup);
 	mvebu_boot_cpu(cpu);
 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
 	return 0;

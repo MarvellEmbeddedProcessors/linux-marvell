@@ -20,7 +20,7 @@
 void mvebu_restart(char mode, const char *cmd);
 
 void armada_xp_cpu_die(unsigned int cpu);
-
+void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
 int mvebu_boot_cpu(int cpu);
 
 #endif

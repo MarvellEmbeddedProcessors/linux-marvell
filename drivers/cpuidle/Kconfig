@@ -39,4 +39,10 @@ config CPU_IDLE_CALXEDA
 	help
 	  Select this to enable cpuidle on Calxeda processors.
 
+config ARM_MVEBU_V7_CPUIDLE
+	bool "CPU Idle Driver for mvebu v7 family processors"
+	depends on ARCH_MVEBU
+	help
+	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
+
 endif
