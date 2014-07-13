@@ -277,8 +277,9 @@ static const struct acpi_device_id usb_xhci_acpi_match[] = {
 MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
 
 static struct platform_driver usb_xhci_driver = {
-	.probe	= xhci_plat_probe,
-	.remove	= xhci_plat_remove,
+	.probe		= xhci_plat_probe,
+	.remove		= xhci_plat_remove,
+	.shutdown	= xhci_plat_remove,
 	.driver	= {
 		.name = "xhci-hcd",
 		.pm = DEV_PM_OPS,
