@@ -11,6 +11,11 @@
 #ifndef __MACH_MVEBU_PMSU_H
 #define __MACH_MVEBU_PMSU_H
 
-int mvebu_pmsu_set_boot_addr(unsigned int cpu_id, void *phys_addr);
+int armada_xp_boot_cpu(unsigned int cpu_id, void *phys_addr);
+int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
+				unsigned int crypto_eng_attribute,
+				phys_addr_t resume_addr_reg);
+
+void mvebu_v7_pmsu_idle_exit(void);
 
 #endif	/* __MACH_370_XP_PMSU_H */

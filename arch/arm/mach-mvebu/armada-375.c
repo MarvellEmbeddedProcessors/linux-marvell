@@ -31,6 +31,8 @@
 #include "common.h"
 #include "coherency.h"
 
+extern void __iomem *scu_base;
+
 static struct of_device_id of_scu_table[] = {
 	{ .compatible = "arm,cortex-a9-scu" },
 	{ },
@@ -40,7 +42,6 @@ static struct of_device_id of_scu_table[] = {
 
 static void __init armada_375_scu_enable(void)
 {
-	void __iomem *scu_base;
 	u32 scu_ctrl;
 
 	struct device_node *np = of_find_matching_node(NULL, of_scu_table);
