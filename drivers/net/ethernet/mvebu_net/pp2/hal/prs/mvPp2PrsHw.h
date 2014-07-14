@@ -319,7 +319,7 @@ reg 5 --> reg 0
 #define RI_CPU_CODE_OFFS           			4 /* bits 4 - 6 */
 #define RI_CPU_CODE_BITS				3
 #define RI_CPU_CODE_MASK				(((1 << RI_CPU_CODE_BITS) - 1) << RI_CPU_CODE_OFFS)
-#define RI_CPU_CODE_RX_SPEC_VAL				1
+#define RI_CPU_CODE_RX_SPEC_VAL				3 /* bit 0 for IGMP, bit 1 for OMCI/eOAM */
 #define RI_CPU_CODE_RX_SPEC				(RI_CPU_CODE_RX_SPEC_VAL << RI_CPU_CODE_OFFS)
 
 /* bits 7 - 8 */
