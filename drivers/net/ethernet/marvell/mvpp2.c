@@ -258,6 +258,8 @@
 /* LMS registers */
 #define MVPP2_SRC_ADDR_MIDDLE			0x24
 #define MVPP2_SRC_ADDR_HIGH			0x28
+#define MVPP2_PHY_AN_CFG0_REG			0x34
+#define     MVPP2_PHY_AN_STOP_SMI0_MASK		BIT(7)
 #define MVPP2_MIB_COUNTERS_BASE(port)		(0x1000 + ((port) >> 1) * \
 						0x400 + (port) * 0x400)
 #define     MVPP2_MIB_LATE_COLLISION		0x7c
@@ -272,7 +274,7 @@
 #define      MVPP2_GMAC_MAX_RX_SIZE_MASK	0x7ffc
 #define      MVPP2_GMAC_MIB_CNTR_EN_MASK	BIT(15)
 #define MVPP2_GMAC_CTRL_1_REG			0x4
-#define      MVPP2_GMAC_PERIODIC_XON_EN_MASK	BIT(0)
+#define      MVPP2_GMAC_PERIODIC_XON_EN_MASK	BIT(1)
 #define      MVPP2_GMAC_GMII_LB_EN_MASK		BIT(5)
 #define      MVPP2_GMAC_PCS_LB_EN_BIT		6
 #define      MVPP2_GMAC_PCS_LB_EN_MASK		BIT(6)
@@ -288,6 +290,7 @@
 #define      MVPP2_GMAC_CONFIG_MII_SPEED	BIT(5)
 #define      MVPP2_GMAC_CONFIG_GMII_SPEED	BIT(6)
 #define      MVPP2_GMAC_AN_SPEED_EN		BIT(7)
+#define      MVPP2_GMAC_FC_ADV_EN		BIT(9)
 #define      MVPP2_GMAC_CONFIG_FULL_DUPLEX	BIT(12)
 #define      MVPP2_GMAC_AN_DUPLEX_EN		BIT(13)
 #define MVPP2_GMAC_PORT_FIFO_CFG_1_REG		0x1c
@@ -4011,16 +4014,30 @@ static void mvpp2_interrupts_unmask(void *arg)
 
 static void mvpp2_port_mii_set(struct mvpp2_port *pp)
 {
-	u32 reg, val = 0;
+	u32 val;
 
-	if (pp->phy_interface == PHY_INTERFACE_MODE_SGMII)
-		val = MVPP2_GMAC_PCS_ENABLE_MASK |
-		      MVPP2_GMAC_INBAND_AN_MASK;
-	else if (pp->phy_interface == PHY_INTERFACE_MODE_RGMII)
-		val = MVPP2_GMAC_PORT_RGMII_MASK;
+	val = readl(pp->base + MVPP2_GMAC_CTRL_2_REG);
 
-	reg = readl(pp->base + MVPP2_GMAC_CTRL_2_REG);
-	writel(reg | val, pp->base + MVPP2_GMAC_CTRL_2_REG);
+	switch (pp->phy_interface) {
+	case PHY_INTERFACE_MODE_SGMII:
+		val |= MVPP2_GMAC_INBAND_AN_MASK;
+		break;
+	case PHY_INTERFACE_MODE_RGMII:
+		val |= MVPP2_GMAC_PORT_RGMII_MASK;
+	default:
+		val &= ~MVPP2_GMAC_PCS_ENABLE_MASK;
+	}
+
+	writel(val, pp->base + MVPP2_GMAC_CTRL_2_REG);
+}
+
+static void mvpp2_port_fc_adv_enable(struct mvpp2_port *pp)
+{
+	u32 val;
+
+	val = readl(pp->base + MVPP2_GMAC_AUTONEG_CONFIG);
+	val |= MVPP2_GMAC_FC_ADV_EN;
+	writel(val, pp->base + MVPP2_GMAC_AUTONEG_CONFIG);
 }
 
 static void mvpp2_port_enable(struct mvpp2_port *pp)
@@ -6044,6 +6061,7 @@ static void mvpp2_port_power_up(struct mvpp2_port *pp)
 {
 	mvpp2_port_mii_set(pp);
 	mvpp2_port_periodic_xon_set(pp, false);
+	mvpp2_port_fc_adv_enable(pp);
 	mvpp2_port_reset_set(pp, false);
 }
 
@@ -6351,6 +6369,7 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *pp2)
 {
 	const struct mbus_dram_target_info *dram_target_info;
 	int err, i;
+	u32 val;
 
 	/* Checks for hardware constraints */
 	if (rxq_number % 4 || (rxq_number > MVPP2_MAX_RXQ) ||
@@ -6363,6 +6382,11 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *pp2)
 	dram_target_info = mv_mbus_dram_info();
 	if (dram_target_info)
 		mvpp2_conf_mbus_windows(dram_target_info, pp2);
+
+	/* Disable HW PHY polling */
+	val = readl(pp2->lms_base + MVPP2_PHY_AN_CFG0_REG);
+	val |= MVPP2_PHY_AN_STOP_SMI0_MASK;
+	writel(val, pp2->lms_base + MVPP2_PHY_AN_CFG0_REG);
 
 	/* Allocate and initialize aggregated TXQs */
 	pp2->aggr_txqs = devm_kzalloc(&pdev->dev, num_present_cpus() *
