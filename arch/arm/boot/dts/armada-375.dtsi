@@ -204,7 +204,7 @@
 				reg = <0xC0054 0x4>;
 			};
 
-			/* Network controller */
+			/* Network controller. The mainline node is not used in hal driver, reserved just for reference in future enable */
 			pp2@f0000 {
 				compatible = "marvell,armada-375-pp2";
 				reg = <0xf0000 0xa000>, /* Packet Processor regs */
@@ -216,13 +216,13 @@
 				status = "disabled";
 
 				/* GbE MAC's */
-				eth0: ethernet@c4000 {
+				ethernet@c4000 {
 					interrupts = <0 37 1>;
 					port-id = <0>;
 					status = "disabled";
 				};
 
-				eth1: ethernet@c5000 {
+				ethernet@c5000 {
 					interrupts = <0 41 1>;
 					port-id = <1>;
 					status = "disabled";
@@ -262,6 +262,42 @@
 				interrupt-controller;
 				#interrupt-cells = <2>;
 				interrupts = <0 62 0x4>;
+			};
+
+			/* Packet Processor */
+			ppv2@f0000 {
+				compatible = "marvell,packet_processor_v2";
+				reg = <0xf0000 0xa000>;
+				clocks = <&gateclk 3>;
+			};
+
+			/* ETH LMS regs */
+			eth_lms@c0000 {
+				compatible = "marvell,eth_lms";
+				reg = <0xc0000 0x3060>;
+			};
+
+			/* GbE MAC's */
+			eth0: ethernet@c4000 {
+				compatible = "marvell,pp2";
+				reg = <0xc4000 0x100>;
+				interrupts = <0 37 1>;
+				clocks = <&gateclk 19>;
+				mac-address = [ 00 50 43 02 02 00 ];
+				eth,port-num    = <0>;
+				eth,port-mtu    = <1500>;
+				status = "disabled";
+			};
+
+			eth1: ethernet@c5000 {
+				compatible = "marvell,pp2";
+				reg = <0xc5000 0x100>;
+				interrupts = <0 41 1>;
+				clocks = <&gateclk 19>;
+				mac-address = [ 00 50 43 02 02 01 ];
+				eth,port-num    = <1>;
+				eth,port-mtu    = <1500>;
+				status = "disabled";
 			};
 
 			i2c0: i2c@11000 {

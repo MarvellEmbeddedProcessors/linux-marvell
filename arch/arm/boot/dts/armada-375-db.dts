@@ -37,7 +37,8 @@
 									   size 64K */
 
 		internal-regs {
-			pp2@f0000 {
+			/* The mainline node is not used in hal driver, reserved just for reference in future enable  */
+			/*pp2@f0000 {
 				status = "okay";
 
 				ethernet@c4000 {
@@ -51,6 +52,18 @@
 					phy = <&phy3>;
 					phy-mode = "gmii";
 				};
+			};*/
+
+			ethernet@c4000 {
+				status = "okay";
+				phy = <&phy0>;
+				phy-mode = "mii";
+			};
+
+			ethernet@c5000 {
+				status = "okay";
+				phy = <&phy3>;
+				phy-mode = "mii";
 			};
 
 			mdio {
