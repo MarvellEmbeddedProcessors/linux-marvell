@@ -1211,57 +1211,75 @@ static GT_STATUS pirl2DataToResource
             return GT_BAD_PARAM;
         }
 
-		if (pirlData->ingressRate < 1000) { /* less than 1Mbps */
-            /* it should be divided by 64 */
-            if(pirlData->ingressRate % 64)
-            {
-                DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
-                return GT_BAD_PARAM;
-            }
-			/* Less than 1Mbps, use special value */
-			res->bktIncrement = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].BI;
-			res->bktRateFactor = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].BRF;
-			res->cbsLimit = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].CBS;
-			res->ebsLimit = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].EBS;
-		} else if (pirlData->ingressRate <= 20000) {
-			/* greater or equal to 1Mbps, and less than or equal to 20Mbps, it should be divided by 1000 */
-            if(pirlData->ingressRate % 1000)
-            {
-                DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
-                return GT_BAD_PARAM;
-            }
-			res->bktIncrement = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].BI;
-			res->bktRateFactor = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].BRF;
-			res->cbsLimit = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].CBS;
-			res->ebsLimit = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].EBS;
-		} else {/* greater than 20Mbps */
-			if (pirlData->ingressRate < 100000) {
-				/* it should be divided by 1000, if less than 100Mbps*/
-            if(pirlData->ingressRate % 1000)
-            {
-                DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
-                return GT_BAD_PARAM;
-            }
-			} else {
-				/* it should be divided by 10000, if more or equal than 100Mbps */
-            if(pirlData->ingressRate % 10000)
-            {
-                DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n",pirlData->ingressRate));
-                return GT_BAD_PARAM;
-            }
-        }
-			pirl2_cir = pirlData->ingressRate * 1000;
-
-			burst_allocation = pirl2_cir;
-
-			pirl_gcd = pirl2GetGCD(pirl2_cir, PIRL_ALPHA);
-			res->bktRateFactor = pirl2_cir / pirl_gcd;
-			/* Correct Rate Factor */
-			res->bktRateFactor = res->bktRateFactor * 5 / 6;
-			res->bktIncrement = PIRL_ALPHA / pirl_gcd;
-        res->ebsLimit = RECOMMENDED_ESB_LIMIT(dev, pirlData->ingressRate);
-        res->cbsLimit = RECOMMENDED_CBS_LIMIT(dev, pirlData->ingressRate);
+	if (pirlData->ingressRate < 1000) { /* less than 1Mbps */
+		/* it should be divided by 64 */
+		if (pirlData->ingressRate % 64) {
+			DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n", pirlData->ingressRate));
+			return GT_BAD_PARAM;
 		}
+		/* Less than 1Mbps, use special value */
+		res->bktIncrement = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].BI;
+		res->bktRateFactor = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].BRF;
+		res->cbsLimit = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].CBS;
+		res->ebsLimit = pirl2RateLimitParaTbl[pirlData->ingressRate / 64].EBS;
+	} else if (pirlData->ingressRate <= 20000) {
+		/* greater or equal to 1Mbps, and less than or equal to 20Mbps, it should be divided by 1000 */
+		if (pirlData->ingressRate % 1000) {
+			DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n", pirlData->ingressRate));
+			return GT_BAD_PARAM;
+		}
+		res->bktIncrement = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].BI;
+		res->bktRateFactor = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].BRF;
+		res->cbsLimit = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].CBS;
+		res->ebsLimit = pirl2RateLimitParaTbl[PIRL_RATE_960K + pirlData->ingressRate / 1000].EBS;
+	} else {/* greater than 20Mbps */
+		if (pirlData->ingressRate < 100000) {
+			/* it should be divided by 1000, if less than 100Mbps*/
+			if (pirlData->ingressRate % 1000) {
+				DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n", pirlData->ingressRate));
+				return GT_BAD_PARAM;
+			}
+		} else {
+			/* it should be divided by 10000, if more or equal than 100Mbps */
+			if (pirlData->ingressRate % 10000) {
+				DBG_INFO(("GT_BAD_PARAM ingressRate(%i)\n", pirlData->ingressRate));
+				return GT_BAD_PARAM;
+			}
+		}
+
+		pirl2_cir = pirlData->ingressRate * 1000;
+
+		burst_allocation = pirl2_cir;
+
+		pirl_gcd = pirl2GetGCD(pirl2_cir, PIRL_ALPHA);
+		res->bktRateFactor = pirl2_cir / pirl_gcd;
+		/* Correct Rate Factor because the actuall rate  will be 5/4 of the setting rate,
+		so we should decrease the configuration rate to 4/5,
+		if we use res->bktRateFactor = res->bktRateFactor * 4 / 5, then bktRateFactor might be a decimal,
+		it will cause inaccurate,
+		so here I amplify bktRateFactor by 4 and amplify bktIncrement by 5.
+		And if we want to hold random size packets, we can plus 1 more to bktRateFactor, here I do not do it.
+		Since in all cases, res->bktRateFactor * 4 will not be larger than 2^16,
+		res->bktIncrement *5 will not be larger than 2^12,  so it's safe*/
+		res->bktRateFactor = res->bktRateFactor * 4;
+		res->bktIncrement = (PIRL_ALPHA / pirl_gcd) * 5;
+
+		res->ebsLimit = RECOMMENDED_ESB_LIMIT(dev, pirlData->ingressRate);
+		/* cbs = ebs - ba*bi/8, and we should avoid the counting number > ULONG_MAX*/
+		if ((burst_allocation / 8) >
+			(((~0UL) - RECOMMENDED_CBS_LIMIT(dev, pirlData->ingressRate)) / res->bktIncrement))
+			res->cbsLimit = RECOMMENDED_CBS_LIMIT(dev, pirlData->ingressRate);
+		else if (res->ebsLimit > (res->bktIncrement * (burst_allocation/8)
+					+ RECOMMENDED_CBS_LIMIT(dev, pirlData->ingressRate)))
+			res->cbsLimit = res->ebsLimit - res->bktIncrement * (burst_allocation/8);
+		else
+			res->cbsLimit = RECOMMENDED_CBS_LIMIT(dev, pirlData->ingressRate);
+
+		DBG_INFO(("ingressRate %u pirl_gcd %u bktIncrement from 0x%x increased to 0x%x ",
+			pirlData->ingressRate, pirl_gcd, res->bktIncrement / 5, res->bktIncrement));
+		DBG_INFO(("bktRateFactor from 0x%x increased to 0x%x cbsLimit 0x%x\r\n",
+			res->bktRateFactor / 4,	res->bktRateFactor, res->cbsLimit));
+	}
     }
 
     switch(pirlData->bktRateType)
