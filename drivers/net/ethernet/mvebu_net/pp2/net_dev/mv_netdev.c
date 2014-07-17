@@ -3051,7 +3051,7 @@ irqreturn_t mv_pp2_link_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 /* wol_isr_register, guarantee the wol irq register once */
 static int wol_isr_register;
 
@@ -3980,7 +3980,7 @@ static int mv_pp2_eth_probe(struct platform_device *pdev)
 	if (mv_pp2_load_network_interfaces(pdev))
 		return -ENODEV;
 
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 	/* Register WoL interrupt */
 	if (!wol_isr_register) {
 		if (request_irq(IRQ_GLOBAL_NET_WAKE_UP, mv_wol_isr, (IRQF_DISABLED), "wol", NULL))
@@ -5877,8 +5877,7 @@ MV_STATUS mv_pon_disable(void)
 
 /* Support for platform driver */
 
-#ifdef CONFIG_CPU_IDLE
-
+#ifdef CONFIG_PM
 
 int mv_pp2_suspend_clock(int port)
 {
@@ -5952,7 +5951,7 @@ int mv_pp2_eth_resume(struct platform_device *pdev)
 	return MV_OK;
 }
 
-#endif	/* CONFIG_CPU_IDLE */
+#endif	/*  CONFIG_PM */
 
 static int mv_pp2_eth_remove(struct platform_device *pdev)
 {
@@ -5972,7 +5971,7 @@ static int mv_pp2_eth_remove(struct platform_device *pdev)
 static void mv_pp2_eth_shutdown(struct platform_device *pdev)
 {
 
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 	int port = pdev->id;
 		struct eth_port *pp = mv_pp2_port_by_id(port);
 
@@ -5987,10 +5986,10 @@ static struct platform_driver mv_pp2_eth_driver = {
 	.probe = mv_pp2_eth_probe,
 	.remove = mv_pp2_eth_remove,
 	.shutdown = mv_pp2_eth_shutdown,
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 	.suspend = mv_pp2_eth_suspend,
 	.resume = mv_pp2_eth_resume,
-#endif /* CONFIG_CPU_IDLE */
+#endif /*  CONFIG_PM */
 	.driver = {
 		.name = MV_PP2_PORT_NAME,
 	},

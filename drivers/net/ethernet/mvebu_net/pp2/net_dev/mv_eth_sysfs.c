@@ -69,7 +69,7 @@ static ssize_t mv_pp2_help(char *buf)
 #ifdef CONFIG_MV_PP2_DEBUG_CODE
 	off += sprintf(buf+off, "echo [p] [hex]   > debug       - b0:rx, b1:tx, b2:isr, b3:poll, b4:dump, b5:b_hdr\n");
 #endif
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 	off += sprintf(buf+off, "echo [p] [hex]   > pm_mode     - set port <p> pm mode. 0 wol, 1 suspend.\n");
 #endif
 
@@ -180,7 +180,7 @@ static ssize_t mv_pp2_2_hex_store(struct device *dev,
 		err = mv_pp2_ctrl_dbg_flag(p, MV_ETH_F_DBG_BUFF_HDR, v & 0x20);
 #endif
 	} else if (!strcmp(name, "pm_mode")) {
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 		err = mv_pp2_pm_mode_set(p, v);
 #endif
 	}
@@ -273,7 +273,7 @@ static DEVICE_ATTR(netdev,	S_IWUSR, NULL, mv_pp2_netdev_store);
 
 static DEVICE_ATTR(regRead,       S_IWUSR, NULL, mv_pp2_reg_store);
 static DEVICE_ATTR(regWrite,      S_IWUSR, NULL, mv_pp2_reg_store);
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 static DEVICE_ATTR(pm_mode,	S_IWUSR, NULL, mv_pp2_2_hex_store);
 #endif
 
@@ -294,7 +294,7 @@ static struct attribute *mv_pp2_attrs[] = {
 	&dev_attr_skb.attr,
 	&dev_attr_regRead.attr,
 	&dev_attr_regWrite.attr,
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 	&dev_attr_pm_mode.attr,
 #endif
 	NULL
