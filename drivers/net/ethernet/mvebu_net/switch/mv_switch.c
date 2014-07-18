@@ -3106,6 +3106,7 @@ int mv_switch_mac_learn_disable_get(unsigned int lport, GT_BOOL *enable)
 *			GT_PIRL2_COUNT_ALL_LAYER2
 *			GT_PIRL2_COUNT_ALL_LAYER3
 *	cir        - committed infomation rate.
+*	bktTypeMask - ingress packet type mask
 *
 * OUTPUTS:
 *	None.
@@ -3116,7 +3117,8 @@ int mv_switch_mac_learn_disable_get(unsigned int lport, GT_BOOL *enable)
 *******************************************************************************/
 int mv_switch_ingr_police_rate_set(unsigned int	lport,
 				   GT_PIRL2_COUNT_MODE	count_mode,
-				   unsigned int		cir)
+				   unsigned int		cir,
+				   GT_U32		bktTypeMask)
 {
 	GT_U32		irlRes;
 	GT_PIRL2_DATA	pirl_2_Data;
@@ -3152,7 +3154,7 @@ int mv_switch_ingr_police_rate_set(unsigned int	lport,
 	pirl_2_Data.bktRateType		= BUCKET_TYPE_TRAFFIC_BASED;
 	pirl_2_Data.priORpt		= GT_TRUE;
 	pirl_2_Data.priMask		= 0;
-	pirl_2_Data.bktTypeMask		= 0x7fff;
+	pirl_2_Data.bktTypeMask		= bktTypeMask;
 	pirl_2_Data.byteTobeCounted	= count_mode;
 
 	rc = gpirl2WriteResource(qd_dev, lport, irlRes, &pirl_2_Data);
@@ -3160,7 +3162,6 @@ int mv_switch_ingr_police_rate_set(unsigned int	lport,
 
 	return MV_OK;
 }
-
 
 /*******************************************************************************
 * mv_switch_ingr_broadcast_rate_set

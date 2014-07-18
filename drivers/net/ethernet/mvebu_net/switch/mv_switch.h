@@ -186,7 +186,8 @@ int mv_switch_ingr_limit_mode_set(unsigned int lport, GT_RATE_LIMIT_MODE mode);
 int mv_switch_ingr_limit_mode_get(unsigned int lport, GT_RATE_LIMIT_MODE *mode);
 int mv_switch_ingr_police_rate_set(unsigned int	lport,
 					GT_PIRL2_COUNT_MODE	count_mode,
-					unsigned int		cir);
+					unsigned int		cir,
+					GT_U32		bktTypeMask);
 int mv_switch_ingr_police_rate_get(unsigned int		lport,
 				   GT_PIRL2_COUNT_MODE	*count_mode,
 				   unsigned int		*cir);
