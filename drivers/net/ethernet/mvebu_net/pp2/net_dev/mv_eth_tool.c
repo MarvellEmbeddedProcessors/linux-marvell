@@ -1138,6 +1138,83 @@ static int mv_pp2_eth_tool_get_sset_count(struct net_device *netdev, int sset)
 	}
 }
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 39)
+/******************************************************************************
+* mv_eth_tool_set_tx_csum
+* Description:
+*	ethtool enable/disable TX checksum offloading
+* INPUT:
+*	netdev		Network device structure pointer
+*	data		Command data
+* OUTPUT
+*	None
+* RETURN:
+*	0 on success
+*
+*******************************************************************************/
+int mv_eth_tool_set_tx_csum(struct net_device *netdev, uint32_t data)
+{
+	if (data && (MV_MAX_PKT_SIZE(netdev->mtu) > MV_PP2_TX_CSUM_MAX_SIZE)) {
+		pr_err("%s: NETIF_F_IP_CSUM and NETIF_F_TSO not supported for mtu larger %d bytes\n",
+			netdev->name, MV_PP2_TX_CSUM_MAX_SIZE);
+		return -EINVAL;
+	}
+
+	ethtool_op_set_tx_csum(netdev, data);
+	return 0;
+}
+
+/******************************************************************************
+* mv_eth_tool_set_sg
+* Description:
+*	ethtool enable/disable scatter-gathering
+* INPUT:
+*	netdev		Network device structure pointer
+*	data		Command data
+* OUTPUT
+*	None
+* RETURN:
+*	0 on success
+*
+*******************************************************************************/
+int mv_eth_tool_set_sg(struct net_device *netdev, uint32_t data)
+{
+	if (data && (MV_MAX_PKT_SIZE(netdev->mtu) > MV_PP2_TX_CSUM_MAX_SIZE)) {
+		pr_err("%s: NETIF_F_IP_CSUM and NETIF_F_TSO not supported for mtu larger %d bytes\n",
+			netdev->name, MV_PP2_TX_CSUM_MAX_SIZE);
+		return -EINVAL;
+	}
+
+	ethtool_op_set_sg(netdev, data);
+	return 0;
+}
+
+/******************************************************************************
+* mv_eth_tool_set_tso
+* Description:
+*	ethtool enable/disable TCP segmentation offloading
+* INPUT:
+*	netdev		Network device structure pointer
+*	data		Command data
+* OUTPUT
+*	None
+* RETURN:
+*	0 on success
+*
+*******************************************************************************/
+int mv_eth_tool_set_tso(struct net_device *netdev, uint32_t data)
+{
+	if (data && (MV_MAX_PKT_SIZE(netdev->mtu) > MV_PP2_TX_CSUM_MAX_SIZE)) {
+		pr_err("%s: NETIF_F_IP_CSUM and NETIF_F_TSO not supported for mtu larger %d bytes\n",
+			netdev->name, MV_PP2_TX_CSUM_MAX_SIZE);
+		return -EINVAL;
+	}
+
+	ethtool_op_set_tso(netdev, data);
+	return 0;
+}
+#endif
+
 const struct ethtool_ops mv_pp2_eth_tool_ops = {
 	.get_settings				= mv_pp2_eth_tool_get_settings,
 	.set_settings				= mv_pp2_eth_tool_set_settings,
@@ -1171,4 +1248,14 @@ const struct ethtool_ops mv_pp2_eth_tool_ops = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
 	.get_ts_info				= ethtool_op_get_ts_info,
 #endif
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 39)
+	.get_rx_csum				= ethtool_op_get_rx_csum,
+	.get_tx_csum				= ethtool_op_get_tx_csum,
+	.set_tx_csum				= mv_eth_tool_set_tx_csum,
+	.get_sg					= ethtool_op_get_sg,
+	.set_sg					= mv_eth_tool_set_sg,
+	.get_tso				= ethtool_op_get_tso,
+	.set_tso				= mv_eth_tool_set_tso,
+#endif
+
 };

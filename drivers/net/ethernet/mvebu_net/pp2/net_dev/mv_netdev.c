@@ -4282,13 +4282,26 @@ static void mv_pp2_tx_timeout(struct net_device *dev)
 static u32 mv_pp2_netdev_fix_features_internal(struct net_device *dev, u32 features)
 {
 	if (MV_MAX_PKT_SIZE(dev->mtu) > MV_PP2_TX_CSUM_MAX_SIZE) {
-		if (features & (NETIF_F_IP_CSUM | NETIF_F_TSO)) {
-			features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
-			pr_info("%s: NETIF_F_IP_CSUM and NETIF_F_TSO aren't supported when packet size > %d bytes\n",
+		if (features & (NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_TSO)) {
+			features &= ~(NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_TSO);
+			pr_info("%s: NETIF_F_IP_CSUM, NETIF_F_SG and NETIF_F_TSO not supported when mtu > %d bytes\n",
 				dev->name, MV_PP2_TX_CSUM_MAX_SIZE);
 		}
 	}
 	return features;
+}
+
+static void mv_pp2_netdev_update_features(struct net_device *dev, int mtu)
+{
+	if ((MV_MAX_PKT_SIZE(mtu) > MV_PP2_TX_CSUM_MAX_SIZE)) {
+		if (dev->features & (NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_TSO)) {
+			dev->features &= ~(NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_TSO);
+			pr_err("%s: NETIF_F_IP_CSUM, NETIF_F_SG and NETIF_F_TSO not supported for mtu > %d bytes\n",
+				dev->name, MV_PP2_TX_CSUM_MAX_SIZE);
+		}
+	} else {
+			dev->features |= (NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_TSO);
+	}
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 25)
@@ -4585,24 +4598,29 @@ void mv_pp2_config_show(void)
 }
 
 /* Set network device features on initialization. Take into account default compile time configuration. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 void mv_pp2_netdev_init_features(struct net_device *dev)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	dev->features = NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_LLTX;
-#else
-	dev->features = NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_LLTX;
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	dev->hw_features = NETIF_F_GRO | NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_SG;
-#endif
-
 #ifdef CONFIG_MV_PP2_TSO
 	dev->features |= NETIF_F_TSO;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	dev->hw_features |= NETIF_F_TSO;
 #endif
+}
+#else
+void mv_pp2_netdev_init_features(struct net_device *dev)
+{
+	if ((MV_MAX_PKT_SIZE(dev->mtu) <= MV_PP2_TX_CSUM_MAX_SIZE))
+		dev->features = NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_LLTX;
+	else
+		dev->features = NETIF_F_LLTX;
+#ifdef CONFIG_MV_PP2_TSO
+	if ((MV_MAX_PKT_SIZE(dev->mtu) <= MV_PP2_TX_CSUM_MAX_SIZE))
+		dev->features |= NETIF_F_TSO;
 #endif
 }
+#endif
 
 static int mv_pp2_rxq_fill(struct eth_port *pp, int rxq, int num)
 {
@@ -5088,8 +5106,10 @@ mtu_out:
 	dev->mtu = mtu;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
 	netdev_update_features(dev);
-#else
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
 	netdev_features_change(dev);
+#else
+	mv_pp2_netdev_update_features(dev, mtu);
 #endif
 	return 0;
 }
