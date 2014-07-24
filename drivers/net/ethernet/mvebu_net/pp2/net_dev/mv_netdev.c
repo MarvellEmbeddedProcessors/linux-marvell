@@ -148,6 +148,8 @@ static int mv_pp2_initialized;
 
 static struct tasklet_struct link_tasklet;
 
+static int wol_ports_bmp;
+
 /*
  * Local functions
  */
@@ -3781,6 +3783,13 @@ int	mv_pp2_pm_mode_set(int port, int mode)
 
 	pp->pm_mode = mode;
 
+	/* Set wol_ports_bmp, because WoL HW is shared by all ports,
+	   so for WoL mode (mode == 0), only one port is set in bit map */
+	if (mode)
+		wol_ports_bmp &= ~(1 << port);
+	else
+		wol_ports_bmp = (1 << port);
+
 	return MV_OK;
 }
 
@@ -6128,7 +6137,8 @@ int mv_pp2_suspend_common(int port)
 	}
 
 	/* PM mode: WoL Mode*/
-	if (pp->pm_mode == 0) {
+	if (pp->pm_mode == 0 &&
+	    wol_ports_bmp & (1 << port)) {
 		/* Insert port to WoL mode */
 		if (mvPp2WolSleep(port)) {
 			pr_err("%s: port #%d suspend failed.\n", __func__, port);
