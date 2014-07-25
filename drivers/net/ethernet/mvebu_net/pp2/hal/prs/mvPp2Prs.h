@@ -233,6 +233,8 @@ int mvPp2PrsEtypeDsaModeSet(int port, int extand);
 int mvPp2PrsEtypeDsaSet(unsigned int eType);
 int mvPrsEthTypeSet(int portMap, unsigned short ethertype, unsigned int ri, unsigned int riMask, MV_BOOL finish);
 int mvPrsEthTypeDel(int portMap, unsigned short eth_type);
+int mvPrsVlanExist(unsigned short tpid, int ai);
+int mvPrsDoubleVlanExist(unsigned short tpid1, unsigned short tpid2);
 int mvPp2PrsTripleVlan(unsigned short tpid1, unsigned short tpid2, unsigned short tpid3, unsigned int portBmp, int add);
 int mvPp2PrsDoubleVlan(unsigned short tpid1, unsigned short tpid2, unsigned int portBmp, int add);
 int mvPp2PrsSingleVlan(unsigned short tpid, unsigned int portBmp, int add);
