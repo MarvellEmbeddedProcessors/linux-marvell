@@ -1445,6 +1445,14 @@ static MV_PP2_PRS_ENTRY *mvPrsVlanFind(unsigned short tpid, int ai)
 	return NULL;
 }
 
+int mvPrsVlanExist(unsigned short tpid, int ai)
+{
+	if (NULL == mvPrsVlanFind(tpid, ai))
+		return 0;
+	else
+		return 1;
+}
+
 static MV_PP2_PRS_ENTRY *mvPrsDoubleVlanFind(unsigned short tpid1, unsigned short tpid2)
 {
 	MV_PP2_PRS_ENTRY *pe;
@@ -1487,6 +1495,14 @@ static MV_PP2_PRS_ENTRY *mvPrsDoubleVlanFind(unsigned short tpid1, unsigned shor
 	}
 	mvPp2PrsSwFree(pe);
 	return NULL;
+}
+
+int mvPrsDoubleVlanExist(unsigned short tpid1, unsigned short tpid2)
+{
+	if (NULL == mvPrsDoubleVlanFind(tpid1, tpid2))
+		return 0;
+	else
+		return 1;
 }
 
 /* return last double vlan entry */
