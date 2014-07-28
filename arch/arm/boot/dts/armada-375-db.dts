@@ -119,7 +119,7 @@
 				 * here, and select NAND as the enabled device
 				 * by default.
 				 */
-				status = "disabled";
+				status = "okay";
 
 				spi-flash@0 {
 					#address-cells = <1>;
@@ -133,7 +133,7 @@
 			nand: nand@d0000 {
 				pinctrl-0 = <&nand_pins>;
 				pinctrl-names = "default";
-				status = "disabled";
+				status = "okay";
 				num-cs = <1>;
 				marvell,nand-keep-config;
 				marvell,nand-enable-arbiter;
