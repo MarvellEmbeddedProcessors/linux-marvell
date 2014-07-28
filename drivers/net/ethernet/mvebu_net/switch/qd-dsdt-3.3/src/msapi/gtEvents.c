@@ -96,6 +96,70 @@ GT_STATUS eventSetActive
     return GT_OK;
 }
 
+/*******************************************************************************
+* eventgetActive
+*
+* DESCRIPTION:
+*       This routine gets the enable/disable status of the receive of an hardware driven event.
+*
+* OUTPUTS:
+*       eventType - the event type. any combination of the folowing:
+*           GT_STATS_DONE, GT_VTU_PROB, GT_VTU_DONE, GT_ATU_FULL(or GT_ATU_PROB),
+*           GT_ATU_DONE, GT_PHY_INTERRUPT, GT_EE_INTERRUPT, GT_DEVICE_INT,
+*            and GT_AVB_INTERRUPT
+*
+* INPUTS:
+*       None.
+*
+* RETURNS:
+*       GT_OK   - on success
+*       GT_FAIL - on error
+*
+* COMMENTS:
+*       Each switch device has its own set of event Types. Please refer to the
+*        device datasheet for the list of event types that the device supports.
+*
+*******************************************************************************/
+GT_STATUS eventGetActive(IN GT_QD_DEV * dev, IN GT_U32 * eventType)
+{
+	GT_STATUS   retVal;
+	GT_U16      data;
+	GT_U16      intMask;
+	GT_U8       len;
+
+	DBG_INFO(("eventGetActive Called.\n"));
+
+	len = 9;
+
+	if ((IS_IN_DEV_GROUP(dev, DEV_EXTERNAL_PHY_ONLY)) ||
+		(IS_IN_DEV_GROUP(dev, DEV_DEV_PHY_INTERRUPT))) {
+		intMask = GT_NO_INTERNAL_PHY_INT_MASK;
+	} else {
+		intMask = GT_INT_MASK;
+	}
+
+	if (!IS_IN_DEV_GROUP(dev, DEV_AVB_INTERRUPT)) {
+		intMask &= ~GT_AVB_INT;
+		len = 8;
+	}
+
+	if (!IS_IN_DEV_GROUP(dev, DEV_DEVICE_INTERRUPT)) {
+		intMask &= ~GT_DEVICE_INT;
+		len = 7;
+	}
+
+	/* Get the IntEn bit.               */
+	retVal = hwGetGlobalRegField(dev, QD_REG_GLOBAL_CONTROL, 0, len, &data);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed.\n"));
+		return retVal;
+	}
+
+	*eventType = data;
+
+	DBG_INFO(("OK.\n"));
+	return GT_OK;
+}
 
 /*******************************************************************************
 * eventGetIntStatus

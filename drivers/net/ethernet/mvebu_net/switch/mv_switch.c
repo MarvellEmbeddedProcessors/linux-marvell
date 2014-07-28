@@ -98,6 +98,7 @@ static spinlock_t switch_lock;
 
 static unsigned int mv_switch_link_detection_init(struct mv_switch_pdata *plat_data);
 
+
 #ifdef CONFIG_AVANTA_LP
 static GT_BOOL mv_switch_mii_read(GT_QD_DEV *dev, unsigned int phy, unsigned int reg, unsigned int *data)
 {
@@ -622,8 +623,29 @@ void mv_switch_link_timer_function(unsigned long data)
 
 static irqreturn_t mv_switch_isr(int irq, void *dev_id)
 {
-	mv_switch_interrupt_mask();
+	GT_DEV_INT_STATUS devIntStatus;
+	MV_U32 port_mask = 0;
+	GT_U16 swIntStatus;
+	int status;
 
+	/* Check switch interrupt cause */
+	status = eventGetIntStatus(qd_dev, &swIntStatus);
+	if (status != GT_OK) {
+		pr_err("eventGetIntStatus failed: %d\n", status);
+		return IRQ_HANDLED;
+	}
+
+	/* Leave AVB Interrupt to PTP */
+	if (swIntStatus & GT_AVB_INT)
+		return IRQ_NONE;
+
+	if (geventGetDevIntStatus(qd_dev, &devIntStatus) != GT_OK)
+		pr_err("geventGetDevIntStatus failed\n");
+
+	if (devIntStatus.devIntCause & GT_DEV_INT_PHY)
+		port_mask = devIntStatus.phyInt & 0xFF;
+
+	mv_switch_interrupt_mask();
 	tasklet_schedule(&link_tasklet);
 
 	return IRQ_HANDLED;
@@ -1210,7 +1232,8 @@ static unsigned int mv_switch_link_detection_init(struct mv_switch_pdata *plat_d
 			tasklet_init(&link_tasklet, mv_switch_tasklet, 0);
 
 			/* Interrupt supported */
-			if (request_irq(switch_irq, mv_switch_isr, (IRQF_DISABLED | IRQF_SAMPLE_RANDOM), "switch", NULL))
+			if (request_irq(switch_irq, mv_switch_isr, IRQF_DISABLED | IRQF_SHARED,
+							"switch", plat_data))
 				printk(KERN_ERR "failed to assign irq%d\n", switch_irq);
 
 			/* interrupt unmasking will be done by GW manager */
@@ -1522,6 +1545,44 @@ void mv_switch_status_print(void)
 		       mv_str_egress_mode(egress_mode), mv_str_frame_mode(frame_mode), mv_str_header_mode(header_mode));
 	}
 }
+
+#ifdef CONFIG_MV_SW_PTP
+int mv_switch_ptp_reg_read(int port, int reg, MV_U16 *value)
+{
+	GT_STATUS status;
+	GT_U32 val;
+
+	if (qd_dev == NULL) {
+		pr_err("Switch is not initialized\n");
+		return 1;
+	}
+
+	status = gptpGetReg(qd_dev, port, reg, &val);
+	if (status != GT_OK) {
+		pr_err("Failed reading PTP register.\n");
+		return status;
+	}
+	*value = (MV_U16)val;
+	return 0;
+}
+
+int mv_switch_ptp_reg_write(int port, int reg, MV_U16 value)
+{
+	GT_STATUS status;
+
+	if (qd_dev == NULL) {
+		pr_err("Switch is not initialized\n");
+		return 1;
+	}
+
+	status = gptpSetReg(qd_dev, port, reg, (MV_U32)value);
+	if (status != GT_OK) {
+		pr_err("Failed reading PTP register.\n");
+		return status;
+	}
+	return 0;
+}
+#endif
 
 int mv_switch_reg_read(int port, int reg, int type, MV_U16 *value)
 {
