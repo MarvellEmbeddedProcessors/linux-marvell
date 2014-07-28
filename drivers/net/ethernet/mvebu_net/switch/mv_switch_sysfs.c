@@ -36,6 +36,7 @@ disclaimer.
 #include "mv802_3.h"
 #include "mv_switch.h"
 
+
 static ssize_t mv_switch_help(char *buf)
 {
 	int off = 0;
@@ -47,6 +48,10 @@ static ssize_t mv_switch_help(char *buf)
 	off += sprintf(buf+off, "echo p            > port_del        - unmap switch port from a network device\n");
 	off += sprintf(buf+off, "echo p r t   > reg_r                - read switch register.  t: 1-phy, 2-port, 3-global, 4-global2, 5-smi\n");
 	off += sprintf(buf+off, "echo p r t v > reg_w                - write switch register. t: 1-phy, 2-port, 3-global, 4-global2, 5-smi\n");
+#ifdef CONFIG_MV_SW_PTP
+	off += sprintf(buf+off, "echo p r t   > ptp_reg_r            - read ptp register.  p: 15-PTP Global, 14-TAI Global, t: not used\n");
+	off += sprintf(buf+off, "echo p r t v > ptp_reg_w            - write ptp register. p: 15-PTP Global, 14-TAI Global, t: not used\n");
+#endif
 	return off;
 }
 
@@ -89,6 +94,13 @@ static ssize_t mv_switch_store(struct device *dev, struct device_attribute *attr
 	} else if (!strcmp(name, "reg_w")) {
 		val = (MV_U16)v;
 		err = mv_switch_reg_write(port, reg, type, v);
+#ifdef CONFIG_MV_SW_PTP
+	} else if (!strcmp(name, "ptp_reg_r")) {
+		err = mv_switch_ptp_reg_read(port, reg, &val);
+	} else if (!strcmp(name, "ptp_reg_w")) {
+		val = (MV_U16)v;
+		err = mv_switch_ptp_reg_write(port, reg, val);
+#endif
 	}
 	printk(KERN_ERR "switch register access: type=%d, port=%d, reg=%d", type, port, reg);
 
@@ -130,6 +142,10 @@ static ssize_t mv_switch_netdev_store(struct device *dev, struct device_attribut
 
 static DEVICE_ATTR(reg_r,       S_IWUSR, mv_switch_show, mv_switch_store);
 static DEVICE_ATTR(reg_w,       S_IWUSR, mv_switch_show, mv_switch_store);
+#ifdef CONFIG_MV_SW_PTP
+static DEVICE_ATTR(ptp_reg_r,   S_IWUSR, mv_switch_show, mv_switch_store);
+static DEVICE_ATTR(ptp_reg_w,   S_IWUSR, mv_switch_show, mv_switch_store);
+#endif
 static DEVICE_ATTR(status,      S_IRUSR, mv_switch_show, mv_switch_store);
 static DEVICE_ATTR(stats,       S_IRUSR, mv_switch_show, mv_switch_store);
 static DEVICE_ATTR(help,        S_IRUSR, mv_switch_show, mv_switch_store);
@@ -139,6 +155,10 @@ static DEVICE_ATTR(port_del,    S_IWUSR, mv_switch_show, mv_switch_netdev_store)
 static struct attribute *mv_switch_attrs[] = {
 	&dev_attr_reg_r.attr,
 	&dev_attr_reg_w.attr,
+#ifdef CONFIG_MV_SW_PTP
+	&dev_attr_ptp_reg_r.attr,
+	&dev_attr_ptp_reg_w.attr,
+#endif
 	&dev_attr_status.attr,
 	&dev_attr_stats.attr,
 	&dev_attr_help.attr,

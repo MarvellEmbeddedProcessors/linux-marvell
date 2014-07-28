@@ -135,6 +135,11 @@ int mv_switch_promisc_set(int db, u8 promisc_on);
 int     mv_switch_reg_read(int port, int reg, int type, MV_U16 *value);
 int     mv_switch_reg_write(int port, int reg, int type, MV_U16 value);
 
+#ifdef CONFIG_MV_SW_PTP
+int     mv_switch_ptp_reg_read(int port, int reg, MV_U16 *value);
+int     mv_switch_ptp_reg_write(int port, int reg, MV_U16 value);
+#endif
+
 void    mv_switch_stats_print(void);
 void    mv_switch_status_print(void);
 

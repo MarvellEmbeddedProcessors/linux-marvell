@@ -3669,6 +3669,188 @@ GT_STATUS gtaiSetTimeDec
     return GT_OK;
 }
 
+/*******************************************************************************
+* gtaiSetTrigGenAmt
+*
+* DESCRIPTION:
+*         This routine sets the TrigGenAmt
+*
+* INPUTS:
+*        amount    - Trigger Generation Time Amount (U32)
+*
+* OUTPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiSetTrigGenAmt(IN GT_QD_DEV * dev, IN GT_U32 amount)
+{
+	GT_STATUS           retVal;
+	GT_PTP_OPERATION    op;
+	GT_PTP_OP_DATA      opData;
+
+	DBG_INFO(("gtaiSetTrigGenAmt Called.\n"));
+
+    /* check if device supports this feature */
+#ifndef CONFIG_AVB_FPGA
+	if (!IS_IN_DEV_GROUP(dev, DEV_TAI)) {
+		DBG_INFO(("GT_NOT_SUPPORTED\n"));
+		return GT_NOT_SUPPORTED;
+	}
+#endif
+
+	opData.ptpBlock = 0x0;    /* PTP register space */
+	opData.ptpPort = 0xE;    /* TAI register */
+	op = PTP_WRITE_DATA;
+	opData.ptpAddr = 2;
+	opData.ptpData = GT_PTP_L16_TIME(amount);
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed writing PTPEType.\n"));
+		return GT_FAIL;
+	}
+
+	opData.ptpAddr = 3;
+	opData.ptpData = GT_PTP_H16_TIME(amount);
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed writing PTPEType.\n"));
+		return GT_FAIL;
+	}
+
+	DBG_INFO(("OK.\n"));
+	return GT_OK;
+}
+
+
+/*******************************************************************************
+* gtaiGetTrigGenAmt
+*
+* DESCRIPTION:
+*         This routine gets the TrigGenAmt
+*
+* OUTPUTS:
+*        amount    - Trigger Generation Time Amount (U32)
+*
+* INPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiGetTrigGenAmt(IN GT_QD_DEV * dev,	IN GT_U32 * amount)
+{
+	GT_STATUS           retVal;
+	GT_PTP_OPERATION    op;
+	GT_PTP_OP_DATA      opData;
+	GT_U32              data[2];
+
+	DBG_INFO(("gtaiGetTrigGenAmt Called.\n"));
+
+	/* check if device supports this feature */
+#ifndef CONFIG_AVB_FPGA
+	if (!IS_IN_DEV_GROUP(dev, DEV_TAI)) {
+		DBG_INFO(("GT_NOT_SUPPORTED\n"));
+		return GT_NOT_SUPPORTED;
+	}
+#endif
+
+	opData.ptpBlock = 0x0;    /* PTP register space */
+	opData.ptpPort = 0xE;    /* TAI register */
+	op = PTP_READ_DATA;
+	opData.ptpAddr = 2;
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed reading PTPEType.\n"));
+		return GT_FAIL;
+	}
+	data[0] = opData.ptpData;
+
+	opData.ptpAddr = 3;
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed reading PTPEType.\n"));
+		return GT_FAIL;
+	}
+	data[1] = opData.ptpData;
+
+	*amount = GT_PTP_BUILD_TIME(data[1], data[0]);
+
+	DBG_INFO(("OK.\n"));
+	return GT_OK;
+}
+
+/*******************************************************************************
+* gtaiTrigGenRequest
+*
+* DESCRIPTION:
+*         This routine requests TrigGen
+*
+* OUTPUTS:
+*         None.
+*
+* INPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiTrigGenRequest(IN GT_QD_DEV * dev)
+{
+	GT_STATUS           retVal;
+	GT_PTP_OPERATION    op;
+	GT_PTP_OP_DATA      opData;
+
+	DBG_INFO(("gtaiTrigGenRequest Called.\n"));
+
+	/* check if device supports this feature */
+#ifndef CONFIG_AVB_FPGA
+	if (!IS_IN_DEV_GROUP(dev, DEV_TAI)) {
+		DBG_INFO(("GT_NOT_SUPPORTED\n"));
+		return GT_NOT_SUPPORTED;
+	}
+#endif
+
+	opData.ptpBlock = 0x0;    /* PTP register space */
+	opData.ptpPort = 0xE;    /* TAI register */
+	op = PTP_READ_DATA;
+	opData.ptpAddr = 0;
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed reading PTPEType.\n"));
+		return GT_FAIL;
+	}
+
+	opData.ptpData |= 1;
+	op = PTP_WRITE_DATA;
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed reading PTPEType.\n"));
+		return GT_FAIL;
+	}
+
+	DBG_INFO(("OK.\n"));
+	return GT_OK;
+}
 
 /****************************************************************************/
 /* Internal functions.                                                  */
