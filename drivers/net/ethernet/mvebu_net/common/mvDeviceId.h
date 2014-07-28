@@ -399,6 +399,10 @@ extern "C" {
 #define MV_6810_DEV_ID		0x6810
 #define MV_6820_DEV_ID		0x6820
 
+/* Armada 39x Family */
+#define MV_88F69XX		0x6900
+#define MV_6920_DEV_ID		0x6920
+
 /* BobCat2  Family */
 #define MV_BOBCAT2_DEV_ID		0xFC00
 
