@@ -1500,6 +1500,36 @@ GT_STATUS eventSetActive
 );
 
 /*******************************************************************************
+* eventgetActive
+*
+* DESCRIPTION:
+*       This routine gets the enable/disable status of the receive of an hardware driven event.
+*
+* OUTPUTS:
+*       eventType - the event type. any combination of the folowing:
+*           GT_STATS_DONE, GT_VTU_PROB, GT_VTU_DONE, GT_ATU_FULL(or GT_ATU_PROB),
+*           GT_ATU_DONE, GT_PHY_INTERRUPT, GT_EE_INTERRUPT, GT_DEVICE_INT,
+*            and GT_AVB_INTERRUPT
+*
+* INPUTS:
+*       None.
+*
+* RETURNS:
+*       GT_OK   - on success
+*       GT_FAIL - on error
+*
+* COMMENTS:
+*       Each switch device has its own set of event Types. Please refer to the
+*        device datasheet for the list of event types that the device supports.
+*
+*******************************************************************************/
+GT_STATUS eventGetActive
+(
+	IN GT_QD_DEV * dev,
+	IN GT_U32    * eventType
+);
+
+/*******************************************************************************
 * eventGetIntStatus
 *
 * DESCRIPTION:
@@ -19755,6 +19785,86 @@ GT_STATUS gtaiSetTimeDec
     IN  GT_U32        amount
 );
 
+
+/*******************************************************************************
+* gtaiSetTrigGenAmt
+*
+* DESCRIPTION:
+*         This routine sets the TrigGenAmt
+*
+* INPUTS:
+*        amount    - Trigger Generation Time Amount (U32)
+*
+* OUTPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiSetTrigGenAmt
+(
+	IN  GT_QD_DEV     * dev,
+	IN  GT_U32          amount
+);
+
+/*******************************************************************************
+* gtaiGetTrigGenAmt
+*
+* DESCRIPTION:
+*         This routine gets the TrigGenAmt
+*
+* OUTPUTS:
+*        amount    - Trigger Generation Time Amount (U32)
+*
+* INPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiGetTrigGenAmt
+(
+	IN  GT_QD_DEV     * dev,
+	IN  GT_U32        * amount
+);
+
+/*******************************************************************************
+ * * gtaiTrigGenRequest
+ * *
+ * * DESCRIPTION:
+ * *         This routine requests TrigGen
+ * *
+ * * OUTPUTS:
+ * *         None.
+ * *
+ * * INPUTS:
+ * *         None.
+ * *
+ * * RETURNS:
+ * *         GT_OK      - on success
+ * *         GT_FAIL    - on error
+ * *         GT_NOT_SUPPORTED - if current device does not support this feature.
+ * *
+ * * COMMENTS:
+ * *         None
+ * *
+ * *******************************************************************************/
+GT_STATUS gtaiTrigGenRequest
+(
+	IN  GT_QD_DEV     * dev
+);
 
 /*******************************************************************************
 * gavbGetPriority
