@@ -373,6 +373,19 @@ static inline MV_U32 mv_jhash_3words(MV_U32 a, MV_U32 b, MV_U32 c, MV_U32 initva
 
 #define MV_ARRAY_SIZE(a)                    ((sizeof(a)) / (sizeof(a[0])))
 
+#define MV_IF_NULL_RET_STR(ptr, rc, format, ...) { \
+	if (ptr == NULL) {\
+		pr_err("(error) %s(%d) (rc=%d): "format, __func__, __LINE__, rc, ##__VA_ARGS__);\
+		return rc;\
+	} \
+}
+#define MV_IF_NULL_STR(ptr, format, ...) { \
+	if (ptr == NULL) {\
+		pr_err("(error) %s(%d): "format, __func__, __LINE__, ##__VA_ARGS__);\
+		return;\
+	} \
+}
+
 #ifndef MV_ASMLANGUAGE
 /* mvCommon API list */
 
