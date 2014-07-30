@@ -2865,6 +2865,7 @@ irqreturn_t mv_eth_isr(int irq, void *dev_id)
 	struct eth_port *pp = (struct eth_port *)dev_id;
 	int cpu = smp_processor_id();
 	struct napi_struct *napi = pp->cpu_config[cpu]->napi;
+	u32 regVal;
 
 #ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_ISR) {
@@ -2892,6 +2893,17 @@ irqreturn_t mv_eth_isr(int irq, void *dev_id)
 			__func__, irq, pp->port, cpu);
 #endif /* CONFIG_MV_NETA_DEBUG_CODE */
 	}
+
+	/*
+	* Ensure mask register write is completed by issuing a read.
+	* dsb() instruction cannot be used on registers since they are in
+	* MBUS domain
+	* Need for Aramada38x. Dosn't need for AXP and A370
+	*/
+	if ((pp->plat_data->ctrl_model == MV_6810_DEV_ID) ||
+	    (pp->plat_data->ctrl_model == MV_6820_DEV_ID))
+		regVal = MV_REG_READ(NETA_INTR_NEW_MASK_REG(pp->port));
+
 	return IRQ_HANDLED;
 }
 
