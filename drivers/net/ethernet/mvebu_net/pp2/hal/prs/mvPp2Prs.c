@@ -2405,8 +2405,8 @@ static int mvPp2PrsIpv6Pppoe(void)
 	/* there is no support in extension yet */
 	mvPp2PrsSwSramRiUpdate(pe, RI_L3_IP6, RI_L3_PROTO_MASK);
 
-	/* Skip eth_type + 4 bytes of IPV6 header */
-	mvPp2PrsSwSramShiftSet(pe, MV_ETH_TYPE_LEN + 4, SRAM_OP_SEL_SHIFT_ADD);
+	/* Skip DIP of IPV6 header */
+	mvPp2PrsSwSramShiftSet(pe, MV_ETH_TYPE_LEN + 8 + MV_MAX_L3_ADDR_SIZE, SRAM_OP_SEL_SHIFT_ADD);
 
 	/* set L3 offset */
 	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_L3, MV_ETH_TYPE_LEN, SRAM_OP_SEL_OFFSET_ADD);
