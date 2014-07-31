@@ -423,7 +423,7 @@ struct eth_port {
 	MV_U32              rx_indir_table[256];
 	struct cpu_ctrl	    *cpu_config[CONFIG_NR_CPUS];
 	MV_U32              sgmii_serdes;
-	int	                wol_mode;
+	int	                pm_mode;
 };
 
 struct eth_netdev {
