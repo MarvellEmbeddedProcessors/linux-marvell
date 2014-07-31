@@ -68,9 +68,8 @@ static ssize_t mv_eth_help(char *b)
 	o += scnprintf(b+o, s-o, "echo {0|1}         > skb           - enable / disable SKB recycle\n");
 	o += scnprintf(b+o, s-o, "echo p v           > debug         - bit0:rx, bit1:tx, bit2:isr, bit3:poll, bit4:dump\n");
 	o += scnprintf(b+o, s-o, "echo p l s         > buf_num       - set number of long <l> and short <s> buffers allocated for port <p>\n");
-#ifdef CONFIG_MV_ETH_PNC_WOL
-	o += scnprintf(b+o, s-o, "echo p wol         > wol_mode      - set port <p> pm mode. 0 wol, 1 suspend.\n");
-#endif
+	o += scnprintf(b+o, s-o, "echo p wol         > pm_mode       - set port <p> pm mode. 1 wol, 0 suspend.\n");
+
 	return o;
 }
 
@@ -177,10 +176,8 @@ static ssize_t mv_eth_port_store(struct device *dev,
 	} else if (!strcmp(name, "pnc")) {
 		mv_eth_ctrl_pnc(p);
 #endif /* CONFIG_MV_ETH_PNC */
-#ifdef CONFIG_MV_ETH_PNC_WOL
-	} else if (!strcmp(name, "wol_mode")) {
+	} else if (!strcmp(name, "pm_mode")) {
 		err = mv_eth_wol_mode_set(p, v);
-#endif /* CONFIG_MV_ETH_PNC_WOL */
 	} else {
 		err = 1;
 		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -271,9 +268,7 @@ static DEVICE_ATTR(gmac_regs,   S_IWUSR, mv_eth_show, mv_eth_port_store);
 #ifdef CONFIG_MV_ETH_PNC
 static DEVICE_ATTR(pnc,         S_IWUSR, NULL, mv_eth_port_store);
 #endif /* CONFIG_MV_ETH_PNC */
-#ifdef CONFIG_MV_ETH_PNC_WOL
-static DEVICE_ATTR(wol_mode,	S_IWUSR, mv_eth_show, mv_eth_port_store);
-#endif /* CONFIG_MV_ETH_PNC_WOL */
+static DEVICE_ATTR(pm_mode,	S_IWUSR, mv_eth_show, mv_eth_port_store);
 static DEVICE_ATTR(netdev,       S_IWUSR, NULL, mv_eth_netdev_store);
 
 static struct attribute *mv_eth_attrs[] = {
@@ -294,9 +289,7 @@ static struct attribute *mv_eth_attrs[] = {
 #ifdef CONFIG_MV_ETH_PNC
     &dev_attr_pnc.attr,
 #endif /* CONFIG_MV_ETH_PNC */
-#ifdef CONFIG_MV_ETH_PNC_WOL
-	&dev_attr_wol_mode.attr,
-#endif
+	&dev_attr_pm_mode.attr,
 	NULL
 };
 
