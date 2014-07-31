@@ -3370,6 +3370,7 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 int mv_eth_resume_network_interfaces(struct eth_port *pp)
 {
 	int cpu;
+	int err = 0;
 
 	if (!MV_PON_PORT(pp->port)) {
 		int phyAddr;
@@ -3393,6 +3394,30 @@ int mv_eth_resume_network_interfaces(struct eth_port *pp)
 		/* set queue mask per cpu */
 		mvNetaRxqCpuMaskSet(pp->port, pp->cpu_config[cpu]->cpuRxqMask, cpu);
 		mvNetaTxqCpuMaskSet(pp->port, pp->cpu_config[cpu]->cpuTxqMask, cpu);
+	}
+
+	/* set port's speed, duplex, fc */
+	if (!MV_PON_PORT(pp->port)) {
+		/* force link, speed and duplex if necessary (e.g. Switch is connected) based on board information */
+		switch (pp->plat_data->speed) {
+		case SPEED_10:
+			err = mv_eth_port_link_speed_fc(pp->port, MV_ETH_SPEED_10, 1);
+			break;
+		case SPEED_100:
+			err = mv_eth_port_link_speed_fc(pp->port, MV_ETH_SPEED_100, 1);
+			break;
+		case SPEED_1000:
+			err = mv_eth_port_link_speed_fc(pp->port, MV_ETH_SPEED_1000, 1);
+			break;
+		case 0:
+			err = mv_eth_port_link_speed_fc(pp->port, MV_ETH_SPEED_AN, 0);
+			break;
+		default:
+			/* do nothing */
+			break;
+		}
+		if (err)
+			return err;
 	}
 
 	return MV_OK;
@@ -3860,10 +3885,14 @@ int	mv_eth_wol_mode_set(int port, int mode)
 		printk(KERN_ERR "Port %d must resumed before\n", port);
 		return -EINVAL;
 	}
-	pp->wol_mode = mode;
+	pp->pm_mode = mode;
 
 	if (mode)
+#ifdef CONFIG_MV_ETH_PNC_WOL
 		wol_ports_bmp |= (1 << port);
+#else
+		;
+#endif
 	else
 		wol_ports_bmp &= ~(1 << port);
 
@@ -5699,7 +5728,7 @@ static int mv_eth_priv_init(struct eth_port *pp, int port)
 	pp->port = port;
 	pp->txp_num = 1;
 	pp->txp = 0;
-	pp->wol_mode = 0;
+	pp->pm_mode = 0;
 	for_each_possible_cpu(cpu) {
 		cpuCtrl = pp->cpu_config[cpu];
 		cpuCtrl->txq = CONFIG_MV_ETH_TXQ_DEF;
@@ -5945,7 +5974,7 @@ void mv_eth_port_status_print(unsigned int port)
 	else
 		printk(KERN_CONT "Disabled\n");
 #endif /* CONFIG_MV_ETH_NFP */
-	if (pp->wol_mode == 1)
+	if (pp->pm_mode == 1)
 		printk(KERN_CONT "pm - wol\n");
 	else
 		printk(KERN_CONT "pm - suspend\n");
@@ -6541,7 +6570,7 @@ MV_BOOL mv_pon_link_status(void)
 
 /* Support for platform driver */
 
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 
 int mv_eth_suspend(struct platform_device *pdev, pm_message_t state)
 {
@@ -6554,7 +6583,7 @@ int mv_eth_suspend(struct platform_device *pdev, pm_message_t state)
 	if (!pp)
 		return 0;
 
-	if (pp->wol_mode == 0) {
+	if (pp->pm_mode == 0) {
 		if (mv_eth_port_suspend(port)) {
 			printk(KERN_ERR "%s: port #%d suspend failed.\n", __func__, port);
 			return MV_ERROR;
@@ -6601,7 +6630,7 @@ int mv_eth_resume(struct platform_device *pdev)
 	if (!pp)
 		return 0;
 
-	if (pp->wol_mode == 0) {
+	if (pp->pm_mode == 0) {
 		/* Set Port Power State to 1 */
 #ifdef CONFIG_ARCH_MVEBU
 		{
@@ -6629,7 +6658,7 @@ int mv_eth_resume(struct platform_device *pdev)
 }
 
 
-#endif	/*CONFIG_CPU_IDLE*/
+#endif	/*CONFIG_PM*/
 
 static int mv_eth_shared_remove(void)
 {
@@ -6690,10 +6719,10 @@ static struct platform_driver mv_eth_driver = {
 	.probe = mv_eth_probe,
 	.remove = mv_eth_remove,
 	.shutdown = mv_eth_shutdown,
-#ifdef CONFIG_CPU_IDLE
+#ifdef CONFIG_PM
 	.suspend = mv_eth_suspend,
 	.resume = mv_eth_resume,
-#endif /* CONFIG_CPU_IDLE */
+#endif /* CONFIG_PM */
 	.driver = {
 		.name = MV_NETA_PORT_NAME,
 #ifdef CONFIG_OF
