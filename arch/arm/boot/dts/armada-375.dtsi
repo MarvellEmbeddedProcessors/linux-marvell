@@ -421,9 +421,9 @@
 				reg = <0x18200 0x100>;
 			};
 
-			thermal@18300 {
+			thermal@e8078 {
 				compatible = "marvell,armada375-thermal";
-				reg = <0xe8078 0x4>, <0xe8070 0x8>;
+				reg = <0xe8078 0x4>, <0xe807c 0x8>;
 				status = "okay";
 			};
 
