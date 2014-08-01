@@ -108,8 +108,8 @@ struct mvebu_mbus_state;
 
 struct mvebu_mbus_soc_data {
 	unsigned int num_wins;
-	unsigned int num_remappable_wins;
 	unsigned int (*win_cfg_offset)(const int win);
+	unsigned int (*win_remap_offset)(const int win);
 	void (*setup_cpu_target)(struct mvebu_mbus_state *s);
 	int (*show_cpu_target)(struct mvebu_mbus_state *s,
 			       struct seq_file *seq, void *v);
@@ -135,6 +135,15 @@ const struct mbus_dram_target_info *mv_mbus_dram_info(void)
 	return &mvebu_mbus_dram_info;
 }
 EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
+
+/* Checks whether the given window has remap capability */
+static bool mvebu_mbus_window_is_remappable(struct mvebu_mbus_state *mbus,
+					    const int win)
+{
+	unsigned int offset = mbus->soc->win_remap_offset(win);
+
+	return offset != MVEBU_MBUS_NO_REMAP;
+}
 
 /*
  * Functions to manipulate the address decoding windows
@@ -167,9 +176,12 @@ static void mvebu_mbus_read_window(struct mvebu_mbus_state *mbus,
 		*attr = (ctrlreg & WIN_CTRL_ATTR_MASK) >> WIN_CTRL_ATTR_SHIFT;
 
 	if (remap) {
-		if (win < mbus->soc->num_remappable_wins) {
-			u32 remap_low = readl(addr + WIN_REMAP_LO_OFF);
-			u32 remap_hi  = readl(addr + WIN_REMAP_HI_OFF);
+		if (mvebu_mbus_window_is_remappable(mbus, win)) {
+			u32 remap_low, remap_hi;
+			addr = mbus->mbuswins_base +
+					mbus->soc->win_remap_offset(win);
+			remap_low = readl(addr + WIN_REMAP_LO_OFF);
+			remap_hi  = readl(addr + WIN_REMAP_HI_OFF);
 			*remap = ((u64)remap_hi << 32) | remap_low;
 		} else
 			*remap = 0;
@@ -182,10 +194,11 @@ static void mvebu_mbus_disable_window(struct mvebu_mbus_state *mbus,
 	void __iomem *addr;
 
 	addr = mbus->mbuswins_base + mbus->soc->win_cfg_offset(win);
-
 	writel(0, addr + WIN_BASE_OFF);
 	writel(0, addr + WIN_CTRL_OFF);
-	if (win < mbus->soc->num_remappable_wins) {
+
+	if (mvebu_mbus_window_is_remappable(mbus, win)) {
+		addr = mbus->mbuswins_base + mbus->soc->win_remap_offset(win);
 		writel(0, addr + WIN_REMAP_LO_OFF);
 		writel(0, addr + WIN_REMAP_HI_OFF);
 	}
@@ -282,6 +295,8 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
 {
 	void __iomem *addr = mbus->mbuswins_base +
 		mbus->soc->win_cfg_offset(win);
+	void __iomem *addr_rmp = mbus->mbuswins_base +
+		mbus->soc->win_remap_offset(win);
 	u32 ctrl, remap_addr;
 
 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
@@ -291,13 +306,14 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
 
 	writel(base & WIN_BASE_LOW, addr + WIN_BASE_OFF);
 	writel(ctrl, addr + WIN_CTRL_OFF);
-	if (win < mbus->soc->num_remappable_wins) {
+
+	if (mvebu_mbus_window_is_remappable(mbus, win)) {
 		if (remap == MVEBU_MBUS_NO_REMAP)
 			remap_addr = base;
 		else
 			remap_addr = remap;
-		writel(remap_addr & WIN_REMAP_LOW, addr + WIN_REMAP_LO_OFF);
-		writel(0, addr + WIN_REMAP_HI_OFF);
+		writel(remap_addr & WIN_REMAP_LOW, addr_rmp + WIN_REMAP_LO_OFF);
+		writel(0, addr_rmp + WIN_REMAP_HI_OFF);
 	}
 
 	dprintk("== %s: decoding window ==\n", __func__);
@@ -318,19 +334,27 @@ static int mvebu_mbus_alloc_window(struct mvebu_mbus_state *mbus,
 	int win;
 
 	if (remap == MVEBU_MBUS_NO_REMAP) {
-		for (win = mbus->soc->num_remappable_wins;
-		     win < mbus->soc->num_wins; win++)
+		for (win = 0; win < mbus->soc->num_wins; win++) {
+			if (mvebu_mbus_window_is_remappable(mbus, win))
+				continue;
+
 			if (mvebu_mbus_window_is_free(mbus, win))
 				return mvebu_mbus_setup_window(mbus, win, base,
 							       size, remap,
 							       target, attr);
+		}
 	}
 
+	for (win = 0; win < mbus->soc->num_wins; win++) {
+		/* Skip window if need remap but is not supported */
+		if ((remap != MVEBU_MBUS_NO_REMAP) &&
+		    (!mvebu_mbus_window_is_remappable(mbus, win)))
+			continue;
 
-	for (win = 0; win < mbus->soc->num_wins; win++)
 		if (mvebu_mbus_window_is_free(mbus, win))
 			return mvebu_mbus_setup_window(mbus, win, base, size,
 						       remap, target, attr);
+	}
 
 	return -ENOMEM;
 }
@@ -438,7 +462,7 @@ static int mvebu_devs_debug_show(struct seq_file *seq, void *v)
 			   win, (unsigned long long)wbase,
 			   (unsigned long long)(wbase + wsize), wtarget, wattr);
 
-		if (win < mbus->soc->num_remappable_wins) {
+		if (mvebu_mbus_window_is_remappable(mbus, win)) {
 			seq_printf(seq, " (remap %016llx)\n",
 				   (unsigned long long)wremap);
 		} else
@@ -464,12 +488,46 @@ static const struct file_operations mvebu_devs_debug_fops = {
  * SoC-specific functions and definitions
  */
 
-static unsigned int orion_mbus_win_offset(int win)
+static unsigned int generic_mbus_win_cfg_offset(int win)
 {
 	return win << 4;
 }
 
-static unsigned int armada_370_xp_mbus_win_offset(int win)
+static unsigned int generic_mbus_win_remap_2_offset(int win)
+{
+	if (win < 2)
+		return generic_mbus_win_cfg_offset(win);
+	else
+		return MVEBU_MBUS_NO_REMAP;
+}
+
+static unsigned int generic_mbus_win_remap_4_offset(int win)
+{
+	if (win < 4)
+		return generic_mbus_win_cfg_offset(win);
+	else
+		return MVEBU_MBUS_NO_REMAP;
+}
+
+static unsigned int generic_mbus_win_remap_8_offset(int win)
+{
+	if (win < 8)
+		return generic_mbus_win_cfg_offset(win);
+	else
+		return MVEBU_MBUS_NO_REMAP;
+}
+
+static unsigned int armada_xp_mbus_win_remap_offset(int win)
+{
+	if (win < 8)
+		return win << 4;
+	else if (win == 13)
+		return 0xF0 - WIN_REMAP_LO_OFF;
+	else
+		return MVEBU_MBUS_NO_REMAP;
+}
+
+static unsigned int armada_370_xp_mbus_win_cfg_offset(int win)
 {
 	/* The register layout is a bit annoying and the below code
 	 * tries to cope with it.
@@ -489,7 +547,7 @@ static unsigned int armada_370_xp_mbus_win_offset(int win)
 		return 0x90 + ((win - 8) << 3);
 }
 
-static unsigned int mv78xx0_mbus_win_offset(int win)
+static unsigned int mv78xx0_mbus_win_cfg_offset(int win)
 {
 	if (win < 8)
 		return win << 4;
@@ -566,26 +624,34 @@ mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
 	mvebu_mbus_dram_info.num_cs = cs;
 }
 
-static const struct mvebu_mbus_soc_data armada_370_xp_mbus_data = {
+static const struct mvebu_mbus_soc_data armada_370_mbus_data = {
 	.num_wins            = 20,
-	.num_remappable_wins = 8,
-	.win_cfg_offset      = armada_370_xp_mbus_win_offset,
+	.win_cfg_offset      = armada_370_xp_mbus_win_cfg_offset,
+	.win_remap_offset    = generic_mbus_win_remap_8_offset,
+	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
+	.show_cpu_target     = mvebu_sdram_debug_show_orion,
+};
+
+static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
+	.num_wins            = 20,
+	.win_cfg_offset      = armada_370_xp_mbus_win_cfg_offset,
+	.win_remap_offset    = armada_xp_mbus_win_remap_offset,
 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
 };
 
 static const struct mvebu_mbus_soc_data kirkwood_mbus_data = {
 	.num_wins            = 8,
-	.num_remappable_wins = 4,
-	.win_cfg_offset      = orion_mbus_win_offset,
+	.win_cfg_offset      = generic_mbus_win_cfg_offset,
+	.win_remap_offset    = generic_mbus_win_remap_4_offset,
 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
 };
 
 static const struct mvebu_mbus_soc_data dove_mbus_data = {
 	.num_wins            = 8,
-	.num_remappable_wins = 4,
-	.win_cfg_offset      = orion_mbus_win_offset,
+	.win_cfg_offset      = generic_mbus_win_cfg_offset,
+	.win_remap_offset    = generic_mbus_win_remap_4_offset,
 	.setup_cpu_target    = mvebu_mbus_dove_setup_cpu_target,
 	.show_cpu_target     = mvebu_sdram_debug_show_dove,
 };
@@ -596,24 +662,24 @@ static const struct mvebu_mbus_soc_data dove_mbus_data = {
  */
 static const struct mvebu_mbus_soc_data orion5x_4win_mbus_data = {
 	.num_wins            = 8,
-	.num_remappable_wins = 4,
-	.win_cfg_offset      = orion_mbus_win_offset,
+	.win_cfg_offset      = generic_mbus_win_cfg_offset,
+	.win_remap_offset    = generic_mbus_win_remap_4_offset,
 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
 };
 
 static const struct mvebu_mbus_soc_data orion5x_2win_mbus_data = {
 	.num_wins            = 8,
-	.num_remappable_wins = 2,
-	.win_cfg_offset      = orion_mbus_win_offset,
+	.win_cfg_offset      = generic_mbus_win_cfg_offset,
+	.win_remap_offset    = generic_mbus_win_remap_2_offset,
 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
 };
 
 static const struct mvebu_mbus_soc_data mv78xx0_mbus_data = {
 	.num_wins            = 14,
-	.num_remappable_wins = 8,
-	.win_cfg_offset      = mv78xx0_mbus_win_offset,
+	.win_cfg_offset      = mv78xx0_mbus_win_cfg_offset,
+	.win_remap_offset    = generic_mbus_win_remap_8_offset,
 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
 };
@@ -626,13 +692,13 @@ static const struct mvebu_mbus_soc_data mv78xx0_mbus_data = {
  */
 static const struct of_device_id of_mvebu_mbus_ids[] = {
 	{ .compatible = "marvell,armada370-mbus",
-	  .data = &armada_370_xp_mbus_data, },
+	  .data = &armada_370_mbus_data, },
 	{ .compatible = "marvell,armada375-mbus",
-	  .data = &armada_370_xp_mbus_data, },
+	  .data = &armada_xp_mbus_data, },
 	{ .compatible = "marvell,armada380-mbus",
-	  .data = &armada_370_xp_mbus_data, },
+	  .data = &armada_xp_mbus_data, },
 	{ .compatible = "marvell,armadaxp-mbus",
-	  .data = &armada_370_xp_mbus_data, },
+	  .data = &armada_xp_mbus_data, },
 	{ .compatible = "marvell,kirkwood-mbus",
 	  .data = &kirkwood_mbus_data, },
 	{ .compatible = "marvell,dove-mbus",
