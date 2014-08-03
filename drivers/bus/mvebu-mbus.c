@@ -101,6 +101,9 @@
 
 #define DOVE_DDR_BASE_CS_OFF(n) ((n) << 4)
 
+#define WIN_REGS_SAVE_NUM	64
+
+static u32 mbus_save[WIN_REGS_SAVE_NUM];
 struct mvebu_mbus_state;
 
 struct mvebu_mbus_soc_data {
@@ -1017,4 +1020,21 @@ void mbus_debug_window()
 
 }
 #endif /* MBUS_DEBUG */
+#ifdef CONFIG_PM
+void mvebu_mbus_suspend(void)
+{
+	int reg;
+
+	for (reg = 0; reg < WIN_REGS_SAVE_NUM; reg++)
+		mbus_save[reg] = readl_relaxed(mbus_state.mbuswins_base + reg * 0x4);
+}
+
+void mvebu_mbus_resume(void)
+{
+	int reg;
+
+	for (reg = 0; reg < WIN_REGS_SAVE_NUM; reg++)
+		writel_relaxed(mbus_save[reg], mbus_state.mbuswins_base + reg * 0x4);
+}
+#endif
 #endif
