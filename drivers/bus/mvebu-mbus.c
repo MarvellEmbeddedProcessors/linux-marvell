@@ -702,6 +702,17 @@ void mvebu_mbus_get_pcie_io_aperture(struct resource *res)
 	*res = mbus_state.pcie_io_aperture;
 }
 
+void mvebu_mbus_get_sdram_window(int win, u32 *base, u32 *size)
+{
+	struct mvebu_mbus_state *mbus = &mbus_state;
+
+	if (!mbus->sdramwins_base)
+		return;
+
+	*base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(win));
+	*size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(win));
+}
+
 static __init int mvebu_mbus_debugfs_init(void)
 {
 	struct mvebu_mbus_state *s = &mbus_state;
