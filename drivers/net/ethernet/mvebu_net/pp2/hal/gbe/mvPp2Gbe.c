@@ -195,6 +195,9 @@ MV_STATUS mvPp2HalInit(MV_PP2_HAL_DATA *halData)
 	if (mvPp2HalData.iocc)
 		mvPp2WrReg(MV_PP2_TX_SNOOP_REG, 0x1);
 
+	/* Set TX FIFO Threshold to maximum */
+	MV_REG_WRITE(MV_PP2_TX_FIFO_THRESH_REG, MV_PP2_TX_CSUM_MAX_SIZE);
+
 	return MV_OK;
 }
 
