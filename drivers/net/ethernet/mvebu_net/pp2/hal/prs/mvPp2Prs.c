@@ -2952,6 +2952,9 @@ static int mvPp2PrsIp6Proto(unsigned short proto, unsigned int ri, unsigned int 
 			mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_EXT_AI_BIT), (1 << IPV6_EXT_AI_BIT));
 		}
 
+		/* update UDF2 */
+		mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_IPV6_PROTO, 0, SRAM_OP_SEL_SHIFT_ADD);
+
 		/* Next LU */
 		mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP6);
 
@@ -3086,6 +3089,9 @@ static int mvPp2PrsIp6ProtoAh(unsigned short proto, unsigned int ri, unsigned in
 	/* Set AI bit */
 	mvPp2PrsSwTcamAiUpdate(pe, (1 << IPV6_EXT_AH_AI_BIT), (1 << IPV6_EXT_AH_AI_BIT));
 
+	/* update UDF2 */
+	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_IPV6_PROTO, 0, SRAM_OP_SEL_SHIFT_ADD);
+
 	/* Next LU */
 	mvPp2PrsSwSramNextLuSet(pe, PRS_LU_IP6);
 
@@ -3157,6 +3163,9 @@ static int mvPp2PrsIp6AhLen(unsigned char ah_len, MV_BOOL l4_off_set)
 
 	/* All ports */
 	mvPp2PrsSwTcamPortMapSet(pe, PORT_MASK);
+
+	/* update UDF2 */
+	mvPp2PrsSwSramOffsetSet(pe, SRAM_OFFSET_TYPE_IPV6_PROTO, 0, SRAM_OP_SEL_SHIFT_ADD);
 
 	/* Write HW */
 	mvPp2PrsHwWrite(pe);
