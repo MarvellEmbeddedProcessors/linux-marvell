@@ -254,6 +254,7 @@ reg 5 --> reg 0
 #define SRAM_OFFSET_TYPE_MASK  				((1 << SRAM_OFFSET_TYPE_BITS) - 1)
 #define SRAM_OFFSET_TYPE_PKT				0
 #define SRAM_OFFSET_TYPE_L3				1
+#define SRAM_OFFSET_TYPE_IPV6_PROTO		2
 #define SRAM_OFFSET_TYPE_L4				4
 
 #define SRAM_OP_SEL_OFFS  				85
