@@ -166,11 +166,6 @@ static int  mv_pp2_hal_init(struct eth_port *pp);
 struct net_device *mv_pp2_netdev_init(int mtu, u8 *mac, struct platform_device *pdev);
 static int mv_pp2_netdev_connect(struct eth_port *pp);
 static void mv_pp2_netdev_init_features(struct net_device *dev);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 25)
-static u32 mv_pp2_netdev_fix_features(struct net_device *dev, u32 features);
-#else
-static netdev_features_t mv_pp2_netdev_fix_features(struct net_device *dev, netdev_features_t features);
-#endif
 static struct sk_buff *mv_pp2_skb_alloc(struct eth_port *pp, struct bm_pool *pool,
 					phys_addr_t *phys_addr, gfp_t gfp_mask);
 static MV_STATUS mv_pp2_pool_create(int pool, int capacity);
@@ -621,7 +616,7 @@ int mv_pp2_ctrl_pool_size_set(int pool, int total_size)
 	pkts_num = ppool->buf_num;
 	mv_pp2_pool_free(pool, pkts_num);
 	ppool->pkt_size = pkt_size;
-	mv_pp2_pool_add(pp, pool, pkts_num);
+	mv_pp2_pool_add(NULL, pool, pkts_num);
 	mvBmPoolBufSizeSet(pool, buf_size);
 	MV_ETH_UNLOCK(&ppool->lock, flags);
 
@@ -1308,21 +1303,6 @@ static inline u16 mv_pp2_select_txq(struct net_device *dev, struct sk_buff *skb)
 	struct eth_port *pp = MV_ETH_PRIV(dev);
 	return mv_pp2_tx_policy(pp, skb);
 }
-
-static const struct net_device_ops mv_pp2_netdev_ops = {
-	.ndo_open = mv_pp2_eth_open,
-	.ndo_stop = mv_pp2_eth_stop,
-	.ndo_start_xmit = mv_pp2_tx,
-	.ndo_set_rx_mode = mv_pp2_rx_set_rx_mode,
-	.ndo_set_mac_address = mv_pp2_eth_set_mac_addr,
-	.ndo_change_mtu = mv_pp2_eth_change_mtu,
-	.ndo_tx_timeout = mv_pp2_tx_timeout,
-	.ndo_select_queue = mv_pp2_select_txq,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
-	.ndo_fix_features = mv_pp2_netdev_fix_features,
-#endif
-};
-
 
 void mv_pp2_eth_link_status_print(int port)
 {
@@ -4244,6 +4224,45 @@ static void mv_pp2_tx_timeout(struct net_device *dev)
 	printk(KERN_INFO "%s: tx timeout\n", dev->name);
 }
 
+static u32 mv_pp2_netdev_fix_features_internal(struct net_device *dev, u32 features)
+{
+	if (MV_MAX_PKT_SIZE(dev->mtu) > MV_PP2_TX_CSUM_MAX_SIZE) {
+		if (features & (NETIF_F_IP_CSUM | NETIF_F_TSO)) {
+			features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
+			pr_info("%s: NETIF_F_IP_CSUM and NETIF_F_TSO aren't supported when packet size > %d bytes\n",
+				dev->name, MV_PP2_TX_CSUM_MAX_SIZE);
+		}
+	}
+	return features;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 25)
+static u32 mv_pp2_netdev_fix_features(struct net_device *dev, u32 features)
+{
+	return mv_pp2_netdev_fix_features_internal(dev, features);
+}
+#else
+static netdev_features_t mv_pp2_netdev_fix_features(struct net_device *dev, netdev_features_t features)
+{
+	return (netdev_features_t)mv_pp2_netdev_fix_features_internal(dev, (u32)features);
+}
+#endif /* LINUX_VERSION_CODE < 3.4.25 */
+
+
+static const struct net_device_ops mv_pp2_netdev_ops = {
+	.ndo_open = mv_pp2_eth_open,
+	.ndo_stop = mv_pp2_eth_stop,
+	.ndo_start_xmit = mv_pp2_tx,
+	.ndo_set_rx_mode = mv_pp2_rx_set_rx_mode,
+	.ndo_set_mac_address = mv_pp2_eth_set_mac_addr,
+	.ndo_change_mtu = mv_pp2_eth_change_mtu,
+	.ndo_tx_timeout = mv_pp2_tx_timeout,
+	.ndo_select_queue = mv_pp2_select_txq,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
+	.ndo_fix_features = mv_pp2_netdev_fix_features,
+#endif
+};
+
 /***************************************************************
  * mv_eth_netdev_init -- Allocate and initialize net_device    *
  *                   structure                                 *
@@ -4513,32 +4532,6 @@ void mv_pp2_netdev_init_features(struct net_device *dev)
 #endif
 #endif
 }
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 25)
-static u32 mv_pp2_netdev_fix_features(struct net_device *dev, u32 features)
-{
-	if (dev->mtu > MV_PP2_TX_CSUM_MAX_SIZE)
-		if (features & (NETIF_F_IP_CSUM | NETIF_F_TSO)) {
-			features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
-			printk(KERN_ERR "%s: NETIF_F_IP_CSUM and NETIF_F_TSO not supported for mtu larger %d bytes\n",
-				dev->name, MV_PP2_TX_CSUM_MAX_SIZE);
-		}
-
-	return features;
-}
-#else
-static netdev_features_t mv_pp2_netdev_fix_features(struct net_device *dev, netdev_features_t features)
-{
-	if (dev->mtu > MV_PP2_TX_CSUM_MAX_SIZE)
-		if (features & (NETIF_F_IP_CSUM | NETIF_F_TSO)) {
-			features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
-			printk(KERN_ERR "%s: NETIF_F_IP_CSUM and NETIF_F_TSO not supported for mtu larger %d bytes\n",
-				dev->name, MV_PP2_TX_CSUM_MAX_SIZE);
-		}
-
-	return features;
-}
-#endif
 
 static int mv_pp2_rxq_fill(struct eth_port *pp, int rxq, int num)
 {
@@ -4910,19 +4903,13 @@ error:
 int mv_pp2_eth_check_mtu_valid(struct net_device *dev, int mtu)
 {
 	if (mtu < 68) {
-		printk(KERN_INFO "MTU must be at least 68, change mtu failed\n");
+		pr_info("MTU must be at least 68, change mtu failed\n");
 		return -EINVAL;
 	}
 	if (mtu > 9676 /* 9700 - 20 and rounding to 8 */) {
-		printk(KERN_ERR "%s: Illegal MTU value %d, ", dev->name, mtu);
+		pr_info("%s: Illegal MTU value %d, ", dev->name, mtu);
 		mtu = 9676;
-		printk(KERN_CONT " rounding MTU to: %d \n", mtu);
-	}
-
-	if (MV_IS_NOT_ALIGN(RX_PKT_SIZE(mtu), 8)) {
-		printk(KERN_ERR "%s: Illegal MTU value %d, ", dev->name, mtu);
-		mtu = MV_ALIGN_UP(RX_PKT_SIZE(mtu), 8);
-		printk(KERN_CONT " rounding MTU to: %d \n", mtu);
+		pr_info(" rounding MTU to: %d\n", mtu);
 	}
 	return mtu;
 }
@@ -5348,8 +5335,6 @@ static void mv_pp2_priv_cleanup(struct eth_port *pp)
 	mv_pp2_ports[port] = NULL;
 }
 
-
-
 /***********************************************************************************
  ***  print RX bm_pool status
  ***********************************************************************************/
@@ -5452,17 +5437,16 @@ void mv_pp2_ext_pool_print(struct eth_port *pp)
  ***********************************************************************************/
 void mv_pp2_eth_netdev_print(struct net_device *dev)
 {
-	printk(KERN_ERR "%s net_device status:\n\n", dev->name);
-	printk(KERN_ERR "ifIdx=%d, mtu=%u, pkt_size=%d, buf_size=%d, MAC=" MV_MACQUAD_FMT "\n",
-		dev->ifindex, dev->mtu, RX_PKT_SIZE(dev->mtu),
-		(int)RX_BUF_SIZE(RX_PKT_SIZE(dev->mtu)), MV_MACQUAD(dev->dev_addr));
+	pr_info("%s net_device status:\n\n", dev->name);
+	pr_info("ifIdx=%d, mtu=%u, MAC=" MV_MACQUAD_FMT "\n",
+		dev->ifindex, dev->mtu,	MV_MACQUAD(dev->dev_addr));
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39)
-	printk(KERN_ERR "features=0x%x, hw_features=0x%x, wanted_features=0x%x, vlan_features=0x%x\n",
+	pr_info("features=0x%x, hw_features=0x%x, wanted_features=0x%x, vlan_features=0x%x\n",
 			(unsigned int)(dev->features), (unsigned int)(dev->hw_features),
 			(unsigned int)(dev->wanted_features), (unsigned int)(dev->vlan_features));
 #else
-	printk(KERN_ERR "features=0x%x, vlan_features=0x%x\n",
+	pr_info("features=0x%x, vlan_features=0x%x\n",
 		 (unsigned int)(dev->features), (unsigned int)(dev->vlan_features));
 #endif
 
