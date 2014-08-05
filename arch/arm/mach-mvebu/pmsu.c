@@ -419,7 +419,7 @@ static __init int armada_370_cpuidle_init(void)
 	return 0;
 }
 
-static __init int armada_38x_cpuidle_init(void)
+int armada_38x_cpuidle_init(void)
 {
 	struct device_node *np;
 	void __iomem *mpsoc_base;
