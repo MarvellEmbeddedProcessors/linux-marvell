@@ -30,6 +30,7 @@ disclaimer.
 #include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/if_vlan.h>
 #include <linux/skbuff.h>
 #include <linux/mv_pp2.h>
 #include <net/ip.h>
@@ -82,8 +83,11 @@ extern unsigned int mv_pp2_pnc_ctrl_en;
  ****************************************************************************/
 #define MV_ETH_SKB_SHINFO_SIZE		SKB_DATA_ALIGN(sizeof(struct skb_shared_info))
 
+/* MTU + EtherType + Double VLAN + MAC_SA + MAC_DA + Marvell header */
+#define MV_MAX_PKT_SIZE(mtu)		((mtu) + MV_ETH_MH_SIZE + 2 * VLAN_HLEN + ETH_HLEN)
+
 #define RX_PKT_SIZE(mtu) \
-		MV_ALIGN_UP((mtu) + 2 + 4 + ETH_HLEN + 4, CPU_D_CACHE_LINE_SIZE)
+		MV_ALIGN_UP(MV_MAX_PKT_SIZE(mtu) + ETH_FCS_LEN, CPU_D_CACHE_LINE_SIZE)
 
 #define RX_BUF_SIZE(pkt_size)		((pkt_size) + NET_SKB_PAD)
 #define RX_TOTAL_SIZE(buf_size)		((buf_size) + MV_ETH_SKB_SHINFO_SIZE)

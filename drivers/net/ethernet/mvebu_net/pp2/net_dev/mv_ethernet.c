@@ -180,9 +180,9 @@ int mv_pp2_eth_change_mtu(struct net_device *dev, int mtu)
 		if (mv_pp2_eth_change_mtu_internals(dev, mtu) == -1)
 			goto error;
 
-		printk(KERN_NOTICE "%s: change mtu %d (packet-size %d) to %d (packet-size %d)\n",
-				dev->name, old_mtu, RX_PKT_SIZE(old_mtu),
-				dev->mtu, RX_PKT_SIZE(dev->mtu));
+		pr_info("%s: change mtu %d (max-pkt-size %d) to %d (max-pkt-size %d)\n",
+				dev->name, old_mtu, MV_MAX_PKT_SIZE(old_mtu),
+				dev->mtu, MV_MAX_PKT_SIZE(dev->mtu));
 		return 0;
 	}
 
@@ -190,26 +190,26 @@ int mv_pp2_eth_change_mtu(struct net_device *dev, int mtu)
 		goto error;
 
 	if (dev->netdev_ops->ndo_stop(dev)) {
-		printk(KERN_ERR "%s: stop interface failed\n", dev->name);
+		pr_err("%s: stop interface failed\n", dev->name);
 		goto error;
 	}
 
 	if (mv_pp2_eth_change_mtu_internals(dev, mtu) == -1) {
-		printk(KERN_ERR "%s change mtu internals failed\n", dev->name);
+		pr_err("%s change mtu internals failed\n", dev->name);
 		goto error;
 	}
 
 	if (dev->netdev_ops->ndo_open(dev)) {
-		printk(KERN_ERR "%s: start interface failed\n", dev->name);
+		pr_err("%s: start interface failed\n", dev->name);
 		goto error;
 	}
-	printk(KERN_NOTICE "%s: change mtu %d (packet-size %d) to %d (packet-size %d)\n",
-				dev->name, old_mtu, RX_PKT_SIZE(old_mtu), dev->mtu,
-				RX_PKT_SIZE(dev->mtu));
+	pr_info("%s: change mtu %d (max-pkt-size %d) to %d (max-pkt-size %d)\n",
+				dev->name, old_mtu, MV_MAX_PKT_SIZE(old_mtu), dev->mtu,
+				MV_MAX_PKT_SIZE(dev->mtu));
 	return 0;
 
 error:
-	printk(KERN_ERR "%s: change mtu failed\n", dev->name);
+	pr_err("%s: change mtu failed\n", dev->name);
 	return -1;
 }
 
