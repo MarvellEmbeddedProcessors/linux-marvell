@@ -1763,7 +1763,6 @@ static int orion_nfc_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int orion_nfc_suspend(struct platform_device *pdev, pm_message_t state)
 {
-#if 0 /* Code dropped because standby WoL does not power off the device */
 	struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
 	struct orion_nfc_info *info = (struct orion_nfc_info *)((struct nand_chip *)mtd->priv)->priv;
 
@@ -1771,6 +1770,7 @@ static int orion_nfc_suspend(struct platform_device *pdev, pm_message_t state)
 		dev_err(&pdev->dev, "driver busy, state = %d\n", info->state);
 		return -EAGAIN;
 	}
+
 #ifdef CONFIG_MV_INCLUDE_PDMA
 	/* Store PDMA registers.	*/
 	info->pdmaDataLen = 128;
@@ -1783,30 +1783,30 @@ static int orion_nfc_suspend(struct platform_device *pdev, pm_message_t state)
 #if 0
 	clk_disable(info->clk);
 #endif
-#endif
+
 	return 0;
 }
 
 static int orion_nfc_resume(struct platform_device *pdev)
 {
-#if 0  /* Code dropped because standby WoL does not power off the device */
 	struct mtd_info *mtd = (struct mtd_info *)platform_get_drvdata(pdev);
 	struct orion_nfc_info *info = (struct orion_nfc_info *)((struct nand_chip *)mtd->priv)->priv;
 	MV_U32	i;
 #if 0
 	clk_enable(info->clk);
 #endif
+#ifdef CONFIG_MV_INCLUDE_PDMA
 	/* restore PDMA registers */
 	for (i = 0; i < info->pdmaDataLen; i += 2)
 		MV_REG_WRITE(info->pdmaUnitData[i], info->pdmaUnitData[i+1]);
-
+#endif
 	/* Clear all NAND interrupts */
 	MV_REG_WRITE(NFC_STATUS_REG, MV_REG_READ(NFC_STATUS_REG));
 
 	/* restore NAND registers */
 	for (i = 0; i < info->nfcDataLen; i += 2)
 		MV_REG_WRITE(info->nfcUnitData[i], info->nfcUnitData[i+1]);
-#endif
+
 	return 0;
 }
 #else
