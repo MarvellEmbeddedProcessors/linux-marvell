@@ -39,7 +39,7 @@ extern void mvebu_mbus_suspend(void);
 extern void mvebu_mbus_resume(void);
 extern void armada_370_xp_mpic_suspend(void);
 extern void armada_370_xp_mpic_resume(void);
-
+extern int armada_38x_cpuidle_init(void);
 /*
  * Store boot information used by bin header
  */
@@ -128,6 +128,8 @@ static int mvebu_pm_enter(suspend_state_t state)
 
 	cpu_cluster_pm_exit();
 	cpu_pm_exit();
+
+	armada_38x_cpuidle_init();
 
 	return 0;
 }
