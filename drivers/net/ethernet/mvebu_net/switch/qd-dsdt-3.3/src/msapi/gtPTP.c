@@ -1426,7 +1426,6 @@ GT_STATUS gptpGetPTPGlobalTime
 
 }
 
-
 /*******************************************************************************
 * gptpGetTimeStamped
 *
@@ -3670,6 +3669,144 @@ GT_STATUS gtaiSetTimeDec
 }
 
 /*******************************************************************************
+* gtaiSetTimeIncDecAmt
+*
+* DESCRIPTION:
+*         This routine sets time decrement or increment amount.
+*        The amount specifies the number of units of PTP Global Time that need to be
+*        decremented or increased. This is used for adjusting the PTP Global Time counter value by
+*        a certain amount.
+*
+* INPUTS:
+*        amount    - time decrement amount (0 ~ 0x7FF)
+*        dec       - 0: increase, 1: descrease
+* OUTPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiSetTimeIncDecAmt(IN GT_QD_DEV * dev, IN GT_BOOL dec, IN GT_U32 amount)
+{
+	GT_STATUS           retVal;
+	GT_PTP_OPERATION    op;
+	GT_PTP_OP_DATA      opData;
+
+	DBG_INFO(("gtaiSetTimeIncDecAmt Called.\n"));
+
+#ifndef CONFIG_AVB_FPGA
+	/* check if device supports this feature */
+	if (!IS_IN_DEV_GROUP(dev, DEV_TAI)) {
+		DBG_INFO(("GT_NOT_SUPPORTED\n"));
+		return GT_NOT_SUPPORTED;
+	}
+#endif
+
+	/* set TimeIncAmt */
+	opData.ptpBlock = 0x0;    /* PTP register space */
+
+	opData.ptpPort = 0xE;    /* TAI register */
+	op = PTP_READ_DATA;
+
+	opData.ptpAddr = 5;
+
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed reading TAI register.\n"));
+		return GT_FAIL;
+	}
+
+	opData.ptpData &= 0xF000;
+	opData.ptpData |= amount;
+	opData.ptpData |= (dec & 0x1) << 11;    /* decrement */
+
+	op = PTP_WRITE_DATA;
+
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed writing TAI register.\n"));
+		return GT_FAIL;
+	}
+
+	DBG_INFO(("OK.\n"));
+	return GT_OK;
+}
+
+/*******************************************************************************
+* gtaiIncDecTimeEnable
+*
+* DESCRIPTION:
+*         This routine enables time decrement or increment by the specifed time decrement amount.
+*        The amount specifies the number of units of PTP Global Time that need to be
+*        decremented. This is used for adjusting the PTP Global Time counter value by
+*        a certain amount.
+*        Decrement occurs just once.
+*
+* INPUTS:
+*         None.
+* OUTPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiIncDecTimeEnable(IN GT_QD_DEV * dev)
+{
+	GT_STATUS           retVal;
+	GT_PTP_OPERATION    op;
+	GT_PTP_OP_DATA      opData;
+
+	DBG_INFO(("gtaiIncDecTimeEnable Called.\n"));
+
+#ifndef CONFIG_AVB_FPGA
+	/* check if device supports this feature */
+	if (!IS_IN_DEV_GROUP(dev, DEV_TAI)) {
+		DBG_INFO(("GT_NOT_SUPPORTED\n"));
+		return GT_NOT_SUPPORTED;
+	}
+#endif
+
+    /* set TimeIncEn */
+	opData.ptpBlock = 0x0;    /* PTP register space */
+
+	opData.ptpPort = 0xE;    /* TAI register */
+	op = PTP_READ_DATA;
+
+	opData.ptpAddr = 0;
+
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed reading TAI register.\n"));
+		return GT_FAIL;
+	}
+
+	opData.ptpData |= 0x8;
+
+	op = PTP_WRITE_DATA;
+
+	retVal = ptpOperationPerform(dev, op, &opData);
+	if (retVal != GT_OK) {
+		DBG_INFO(("Failed writing TAI register.\n"));
+		return GT_FAIL;
+	}
+
+	DBG_INFO(("OK.\n"));
+	return GT_OK;
+}
+
+/*******************************************************************************
 * gtaiSetTrigGenAmt
 *
 * DESCRIPTION:
@@ -3713,7 +3850,7 @@ GT_STATUS gtaiSetTrigGenAmt(IN GT_QD_DEV * dev, IN GT_U32 amount)
 	opData.ptpData = GT_PTP_L16_TIME(amount);
 	retVal = ptpOperationPerform(dev, op, &opData);
 	if (retVal != GT_OK) {
-		DBG_INFO(("Failed writing PTPEType.\n"));
+		DBG_INFO(("Failed writing TrigGenAmt.\n"));
 		return GT_FAIL;
 	}
 
@@ -3721,7 +3858,7 @@ GT_STATUS gtaiSetTrigGenAmt(IN GT_QD_DEV * dev, IN GT_U32 amount)
 	opData.ptpData = GT_PTP_H16_TIME(amount);
 	retVal = ptpOperationPerform(dev, op, &opData);
 	if (retVal != GT_OK) {
-		DBG_INFO(("Failed writing PTPEType.\n"));
+		DBG_INFO(("Failed writing TrigGenAmt.\n"));
 		return GT_FAIL;
 	}
 
@@ -3814,7 +3951,7 @@ GT_STATUS gtaiGetTrigGenAmt(IN GT_QD_DEV * dev,	IN GT_U32 * amount)
 *         None
 *
 *******************************************************************************/
-GT_STATUS gtaiTrigGenRequest(IN GT_QD_DEV * dev)
+GT_STATUS gtaiTrigGenRequest(IN GT_QD_DEV * dev, IN GT_BOOL enable)
 {
 	GT_STATUS           retVal;
 	GT_PTP_OPERATION    op;
@@ -3840,7 +3977,8 @@ GT_STATUS gtaiTrigGenRequest(IN GT_QD_DEV * dev)
 		return GT_FAIL;
 	}
 
-	opData.ptpData |= 1;
+	opData.ptpData &= ~0x1;
+	opData.ptpData |= enable & 0x1;
 	op = PTP_WRITE_DATA;
 	retVal = ptpOperationPerform(dev, op, &opData);
 	if (retVal != GT_OK) {
