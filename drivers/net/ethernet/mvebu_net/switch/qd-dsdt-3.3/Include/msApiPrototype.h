@@ -19785,6 +19785,65 @@ GT_STATUS gtaiSetTimeDec
     IN  GT_U32        amount
 );
 
+/*******************************************************************************
+* gtaiSetTimeIncDecAmt
+*
+* DESCRIPTION:
+*         This routine sets time decrement or increment amount.
+*        The amount specifies the number of units of PTP Global Time that need to be
+*        decremented or increased. This is used for adjusting the PTP Global Time counter value by
+*        a certain amount.
+*
+* INPUTS:
+*        amount    - time decrement amount (0 ~ 0x7FF)
+*        dec       - 0: increase, 1: descrease
+* OUTPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiSetTimeIncDecAmt
+(
+	IN  GT_QD_DEV     * dev,
+	IN  GT_BOOL         dec,
+	IN  GT_U32          amount
+);
+
+/*******************************************************************************
+* gtaiIncDecTimeEnable
+*
+* DESCRIPTION:
+*         This routine enables time decrement or increment by the specifed time decrement amount.
+*        The amount specifies the number of units of PTP Global Time that need to be
+*        decremented. This is used for adjusting the PTP Global Time counter value by
+*        a certain amount.
+*        Decrement occurs just once.
+*
+* INPUTS:
+*         None.
+* OUTPUTS:
+*         None.
+*
+* RETURNS:
+*         GT_OK      - on success
+*         GT_FAIL    - on error
+*         GT_NOT_SUPPORTED - if current device does not support this feature.
+*
+* COMMENTS:
+*         None
+*
+*******************************************************************************/
+GT_STATUS gtaiIncDecTimeEnable
+(
+	IN  GT_QD_DEV     * dev
+);
 
 /*******************************************************************************
 * gtaiSetTrigGenAmt
@@ -19850,7 +19909,7 @@ GT_STATUS gtaiGetTrigGenAmt
  * *         None.
  * *
  * * INPUTS:
- * *         None.
+ * *         enable: enable or disable.
  * *
  * * RETURNS:
  * *         GT_OK      - on success
@@ -19863,7 +19922,8 @@ GT_STATUS gtaiGetTrigGenAmt
  * *******************************************************************************/
 GT_STATUS gtaiTrigGenRequest
 (
-	IN  GT_QD_DEV     * dev
+	IN  GT_QD_DEV     * dev,
+	IN  GT_BOOL         enable
 );
 
 /*******************************************************************************
