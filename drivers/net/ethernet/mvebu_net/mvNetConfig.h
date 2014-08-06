@@ -81,7 +81,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PP2_MAX_TXQ                  8
 #define MV_PP2_RXQ_TOTAL_NUM            32      /* Total number of RXQs for usage by all ports */
 #define MV_PP2_MAX_TCONT                16      /* Maximum number of TCONTs supported by PON port */
-#define MV_PP2_TX_CSUM_MAX_SIZE         9800
+#define MV_PP2_TX_CSUM_MAX_SIZE         1790
 
 #define IRQ_GLOBAL_GOP			82 /* Group of Ports (GOP) */
 #define IRQ_GLOBAL_NET_WAKE_UP		112 /* WOL interrupt */
@@ -100,6 +100,7 @@ extern int pp2_port_vbase[MV_ETH_MAX_PORTS];
 #define MV_ETH_BASE_ADDR                (0xC0000)
 #define GOP_REG_BASE(port)		(MV_ETH_BASE_ADDR + 0x4000 + ((port) / 2) * 0x3000 + ((port) % 2) * 0x1000)
 #endif
+
 #define LMS_REG_BASE                    (MV_ETH_BASE_ADDR)
 #define MIB_COUNTERS_REG_BASE           (MV_ETH_BASE_ADDR + 0x1000)
 #define GOP_MNG_REG_BASE                (MV_ETH_BASE_ADDR + 0x3000)
