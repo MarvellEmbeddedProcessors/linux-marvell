@@ -1427,59 +1427,6 @@ xfs_file_llseek(
 	}
 }
 
-STATIC ssize_t
-xfs_file_splice_from_socket(
-       struct file     *file,
-       struct socket   *sock,
-       loff_t __user   *ppos,
-       size_t count)
-{
-       struct inode            *inode = file->f_mapping->host;
-       struct xfs_inode        *ip = XFS_I(inode);
-       ssize_t                 ret;
-       xfs_fsize_t             isize, new_size;
-
-       XFS_STATS_INC(xs_write_calls);
-       if (XFS_FORCED_SHUTDOWN(ip->i_mount))
-               return -EIO;
-
-       xfs_ilock(ip, XFS_IOLOCK_EXCL);
-
-       new_size = *ppos + count;
-
-       xfs_ilock(ip, XFS_ILOCK_EXCL);
-       if (new_size > ip->i_size)
-               ip->i_new_size = new_size;
-       xfs_iunlock(ip, XFS_ILOCK_EXCL);
-//     xfs_rw_enter_trace(XFS_SPLICE_WRITE_ENTER, ip,
-//                        pipe, count, *ppos, ioflags);
-       ret = generic_splice_from_socket(file, sock, ppos, count);
-
-       if (ret > 0)
-               XFS_STATS_ADD(xs_write_bytes, ret);
-
-       isize = i_size_read(inode);
-       if (unlikely(ret < 0 && ret != -EFAULT && *ppos > isize))
-               *ppos = isize;
-
-       if (*ppos > ip->i_size) {
-               xfs_ilock(ip, XFS_ILOCK_EXCL);
-               if (*ppos > ip->i_size)
-                       ip->i_size = *ppos;
-               xfs_iunlock(ip, XFS_ILOCK_EXCL);
-       }
-
-       if (ip->i_new_size) {
-               xfs_ilock(ip, XFS_ILOCK_EXCL);
-               ip->i_new_size = 0;
-               if (ip->i_d.di_size > ip->i_size)
-                       ip->i_d.di_size = ip->i_size;
-               xfs_iunlock(ip, XFS_ILOCK_EXCL);
-       }
-       xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-       return ret;
-}
-
 const struct file_operations xfs_file_operations = {
 	.llseek		= xfs_file_llseek,
 	.read		= do_sync_read,
@@ -1488,7 +1435,6 @@ const struct file_operations xfs_file_operations = {
 	.aio_write	= xfs_file_aio_write,
 	.splice_read	= xfs_file_splice_read,
 	.splice_write	= xfs_file_splice_write,
-	.splice_from_socket = xfs_file_splice_from_socket,
 	.unlocked_ioctl	= xfs_file_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= xfs_file_compat_ioctl,
