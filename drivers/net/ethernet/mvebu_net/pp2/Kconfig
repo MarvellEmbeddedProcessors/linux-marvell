@@ -116,7 +116,7 @@ config MV_PP2_RXQ_DEF
 config MV_PP2_TXQ_DESC
 	int "Number of Tx descriptors"
 	depends on MV_ETH_PP2
-	default 532
+	default 1024
         ---help---
 	The number of Tx descriptors in each Tx queue.
 
@@ -124,6 +124,16 @@ config MV_PP2_TXQ_DEF
         int "Default TXQ to send local generated packets"
         default 0
         ---help---
+
+config MV_PP2_TXQ_CPU_CHUNK
+	int "Number of TX descriptors allocated per CPU"
+	depends on MV_ETH_PP2_1
+	default 64
+        ---help---
+	The number of TXQ descriptors each CPU will allocate each time when
+	no enough allocated descriptors to transmit the current packet.
+	The total number of TXQ descriptors (MV_PP2_TXQ_DESC) must be at least
+	3 * nr_cpu_ids * MV_PP2_TXQ_CPU_CHUNK
 
 config MV_PP2_TXQ_HWF_DESC
 	int "Number of HWF Tx descriptors"
