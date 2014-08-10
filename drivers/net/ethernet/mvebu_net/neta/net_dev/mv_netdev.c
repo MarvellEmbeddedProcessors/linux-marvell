@@ -4111,6 +4111,11 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 		return NULL;
 	}
 
+	/* FDT does not support the '-1' convention of the inband fake phy address */
+	/* In case of FDT, use '999' phy address to represent inband mode */
+	if (plat_data->phy_addr == 999)
+		plat_data->phy_addr = -1;
+
 	/* Get port MTU */
 	if (of_property_read_u32(np, "eth,port-mtu", &plat_data->mtu)) {
 		pr_err("could not get MTU\n");
