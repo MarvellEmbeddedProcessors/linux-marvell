@@ -266,9 +266,6 @@ struct port_stats {
 
 #define TOS_TO_DSCP(tos)	((tos >> 2) & 0x3F)
 
-/* Used in PPv2.1 */
-#define MV_ETH_CPU_DESC_CHUNK	64
-
 /* Masks used for tx_spec->flags */
 #define MV_ETH_TX_F_NO_PAD	0x0001
 #define MV_ETH_TX_F_MH		0x0002

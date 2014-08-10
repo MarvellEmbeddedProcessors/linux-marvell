@@ -962,6 +962,32 @@ int mv_pp2_ctrl_rxq_size_set(int port, int rxq, int value)
 	return 0;
 }
 
+static int mv_pp2_txq_size_validate(struct tx_queue *txq_ctrl, int txq_size)
+{
+	int txq_min_size, txq_max_size = MV_PP2_TXQ_DESC_SIZE_MASK;
+
+#ifdef CONFIG_MV_ETH_PP2_1
+	txq_min_size = 3 * (nr_cpu_ids * txq_ctrl->rsvd_chunk);
+#else
+	/* At least 16 descriptors per CPU */
+	txq_min_size = txq_ctrl->hwf_size + 16 * nr_cpu_ids;
+#endif /* CONFIG_MV_ETH_PP2_1 */
+
+	if ((txq_size < txq_min_size) || (txq_size > txq_max_size)) {
+		pr_err("Invalid TXQ size %d. Valid range: %d .. %d\n",
+			txq_size, txq_min_size, txq_max_size);
+		return -EINVAL;
+	}
+	/* txq_size must be aligned to 16 bytes */
+	if (txq_size % (1 << MV_PP2_TXQ_DESC_SIZE_OFFSET)) {
+		pr_warn("txq_size %d is not aligned %d, rounded to %d\n",
+			txq_size, 1 << MV_PP2_TXQ_DESC_SIZE_OFFSET,
+			txq_size & MV_PP2_TXQ_DESC_SIZE_MASK);
+		txq_size = txq_size & MV_PP2_TXQ_DESC_SIZE_MASK;
+	}
+	return txq_size;
+}
+
 static void mv_pp2_txq_size_set(struct tx_queue *txq_ctrl, int txq_size)
 {
 	int cpu;
@@ -970,7 +996,6 @@ static void mv_pp2_txq_size_set(struct tx_queue *txq_ctrl, int txq_size)
 	txq_ctrl->txq_size = txq_size;
 
 #ifdef CONFIG_MV_ETH_PP2_1
-	txq_ctrl->rsvd_chunk = MV_ETH_CPU_DESC_CHUNK;
 	txq_ctrl->hwf_size = txq_ctrl->txq_size - (nr_cpu_ids * txq_ctrl->rsvd_chunk);
 	txq_ctrl->swf_size = txq_ctrl->txq_size - 2 * (nr_cpu_ids * txq_ctrl->rsvd_chunk);
 
@@ -996,7 +1021,6 @@ int mv_pp2_ctrl_txq_chunk_set(int port, int txp, int txq, int chunk_size)
 	struct tx_queue *txq_ctrl;
 	struct eth_port *pp = mv_pp2_port_by_id(port);
 
-
 	if (pp == NULL) {
 		printk(KERN_INFO "port does not exist (%d) in %s\n" , port, __func__);
 		return -EINVAL;
@@ -1008,7 +1032,7 @@ int mv_pp2_ctrl_txq_chunk_set(int port, int txp, int txq, int chunk_size)
 		return -EINVAL;
 	}
 	/* chunk_size must be less than swf_size */
-	if (chunk_size > txq_ctrl->swf_size) {
+	if (chunk_size > (txq_ctrl->swf_size)) {
 		pr_err("Chunk size %d must be less or equal than swf size %d\n",
 			chunk_size, txq_ctrl->swf_size);
 		return -EINVAL;
@@ -1082,11 +1106,6 @@ int mv_pp2_ctrl_txq_size_set(int port, int txp, int txq, int txq_size)
 	if (mvPp2MaxCheck(txq, CONFIG_MV_PP2_TXQ, "txq"))
 		return -EINVAL;
 
-	if ((txq_size <= 0) || (txq_size > 0x3FFF) || (txq_size % 16)) {
-		pr_err("Invalid TXQ size %d\n", txq_size);
-		return -EINVAL;
-	}
-
 	pp = mv_pp2_port_by_id(port);
 	if (pp == NULL) {
 		pr_err("Port %d does not exist\n", port);
@@ -1103,6 +1122,10 @@ int mv_pp2_ctrl_txq_size_set(int port, int txp, int txq, int txq_size)
 		pr_err("TXQ is not exist\n");
 		return -EINVAL;
 	}
+
+	txq_size = mv_pp2_txq_size_validate(txq_ctrl, txq_size);
+	if (txq_size < 0)
+		return -EINVAL;
 
 	if ((txq_ctrl->q) && (txq_ctrl->txq_size != txq_size)) {
 		/* Clean and Reset of txq is required when TXQ ring size is changed */
@@ -4374,7 +4397,6 @@ EXPORT_SYMBOL(mv_pp2_eth_netdev_find);
 int mv_pp2_hal_init(struct eth_port *pp)
 {
 	int rxq, txp, txq, size;
-	struct tx_queue *txq_ctrl;
 	struct rx_queue *rxq_ctrl;
 
 	/* Init port */
@@ -4394,6 +4416,9 @@ int mv_pp2_hal_init(struct eth_port *pp)
 	/* Create TX descriptor rings */
 	for (txp = 0; txp < pp->txp_num; txp++) {
 		for (txq = 0; txq < CONFIG_MV_PP2_TXQ; txq++) {
+			struct tx_queue *txq_ctrl;
+			int txq_size;
+
 			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_PP2_TXQ + txq];
 
 			txq_ctrl->txp = txp;
@@ -4401,7 +4426,16 @@ int mv_pp2_hal_init(struct eth_port *pp)
 
 			txq_ctrl->txq_done_pkts_coal = mv_ctrl_pp2_txdone;
 
-			mv_pp2_txq_size_set(txq_ctrl, CONFIG_MV_PP2_TXQ_DESC);
+#ifdef CONFIG_MV_ETH_PP2_1
+			txq_ctrl->rsvd_chunk = CONFIG_MV_PP2_TXQ_CPU_CHUNK;
+#else
+			txq_ctrl->hwf_size = CONFIG_MV_PP2_TXQ_HWF_DESC;
+#endif
+			txq_size = mv_pp2_txq_size_validate(txq_ctrl, CONFIG_MV_PP2_TXQ_DESC);
+			if (txq_size < 0)
+				return -ENODEV;
+
+			mv_pp2_txq_size_set(txq_ctrl, txq_size);
 		}
 	}
 
@@ -5549,7 +5583,7 @@ void mv_pp2_eth_port_status_print(unsigned int port)
 		pr_info("txq_swf_desc(num) [%2d.q]   = ", txp);
 		for (q = 0; q < CONFIG_MV_PP2_TXQ; q++) {
 			txq_ctrl = &pp->txq_ctrl[txp * CONFIG_MV_PP2_TXQ + q];
-			pr_cont("%4d ", txq_ctrl->txq_cpu[0].txq_size);
+			pr_cont("%4d ", txq_ctrl->swf_size);
 		}
 		pr_info("txq_rsvd_chunk(num) [%2d.q] = ", txp);
 		for (q = 0; q < CONFIG_MV_PP2_TXQ; q++) {
