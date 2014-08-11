@@ -86,85 +86,92 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mv_cph_header.h"
 
-static ssize_t cph_spec_proc_help(char *buf)
+static ssize_t cph_spec_proc_help(char *b)
 {
-	int off = 0;
-	off += sprintf(buf+off, "cat  help                                 - show this help\n");
-	off += sprintf(buf+off, "cat  help_add                             - show additional help for parameters\n");
-	off += sprintf(buf+off, "cat  show_app_db                          - show all information in application rule data base\n");
-	off += sprintf(buf+off, "cat  show_parse_name                      - show sysfs parsing rule data base\n");
-	off += sprintf(buf+off, "cat  show_mod_name                        - show sysfs modification rule data base\n");
-	off += sprintf(buf+off, "cat  show_frwd_name                       - show sysfs modification rule data base\n");
+	int o = 0; /* buffer offset */
+	int s = PAGE_SIZE; /* buffer size */
+
+	o += scnprintf(b+o, s-o, "cat  help                                 - show this help\n");
+	o += scnprintf(b+o, s-o, "cat  help_add                             - show additional help for parameters\n");
+	o += scnprintf(b+o, s-o, "cat  show_app_db                          - show all information in application rule data base\n");
+	o += scnprintf(b+o, s-o, "cat  show_parse_name                      - show sysfs parsing rule data base\n");
+	o += scnprintf(b+o, s-o, "cat  show_mod_name                        - show sysfs modification rule data base\n");
+	o += scnprintf(b+o, s-o, "cat  show_frwd_name                       - show sysfs modification rule data base\n");
 #ifdef CONFIG_MV_CPH_UDP_SAMPLE_HANDLE
-	off += sprintf(buf+off, "cat  udp_ports                            - show special udp source and destination port configuration\n");
+	o += scnprintf(b+o, s-o, "cat  udp_ports                            - show special udp source and destination port configuration\n");
 #endif
 #ifdef CONFIG_MV_CPH_FLOW_MAP_HANDLE
-	off += sprintf(buf+off, "cat  show_flow_rule                       - show flow mapping rules\n");
-	off += sprintf(buf+off, "cat  clear_flow_rule                      - clear all flow mapping rules\n");
-	off += sprintf(buf+off, "cat  del_dscp_map                         - delete DSCP to P-bits mapping rules\n");
+	o += scnprintf(b+o, s-o, "cat  show_flow_rule                       - show flow mapping rules\n");
+	o += scnprintf(b+o, s-o, "cat  clear_flow_rule                      - clear all flow mapping rules\n");
+	o += scnprintf(b+o, s-o, "cat  del_dscp_map                         - delete DSCP to P-bits mapping rules\n");
 #endif
-	off += sprintf(buf+off, "echo profile_id active_port               > set_complex     - Set TPM complex profile ID and active GMAC port, 0:GMAC0, 1:GMAC1, 2:PON MAC\n");
-	off += sprintf(buf+off, "echo feature state                        > set_flag        - Set the support of CPH feature: refer to below additional info, state 0:disable, 1:enable\n");
-	off += sprintf(buf+off, "echo tcont state                          > set_tcont       - Set T-CONT state in CPH, T-CONT 0~7, state, 1:enable, 0:disable\n");
-	off += sprintf(buf+off, "echo hex                                  > trace_level     - Set cph trace level bitmap. 0x01:debug, 0x02:info, 0x04:warn, 0x08:error\n");
-	off += sprintf(buf+off, "echo name bm(hex) dir rx(hex) mh(hex) ety(hex) esty ipv4ty nh1 nh2 icmpty > add_parse   - add parsing field, dir 0:U/S, 1:D/S, 2:Not care\n");
-	off += sprintf(buf+off, "echo name                                 > del_parse       - delete parsing field\n");
-	off += sprintf(buf+off, "echo name bm(hex) proto_type(hex) state   > add_mod         - add modification field, state 0:diable, 1:enable\n");
-	off += sprintf(buf+off, "echo name                                 > del_mod         - delete modification field\n");
-	off += sprintf(buf+off, "echo name bm(hex) trg_port trg_queue gem  > add_frwd        - add forwarding field\n");
-	off += sprintf(buf+off, "echo name                                 > del_frwd        - delete forwarding field\n");
-	off += sprintf(buf+off, "echo parse_name mod_name frwd_name        > add_app_rule    - add application rule\n");
-	off += sprintf(buf+off, "echo parse_name                           > del_app_rule    - delete application rule\n");
-	off += sprintf(buf+off, "echo parse_name mod_name frwd_name        > update_app_rule - update application rule\n");
-	off += sprintf(buf+off, "echo parse_name                           > get_app_rule    - get application rule\n");
+	o += scnprintf(b+o, s-o, "echo p dir en                             > set_port_func   - enable or disable cph function on physical port\n");
+	o += scnprintf(b+o, s-o, "echo p                                    > get_port_func   - show cph function enabled status on physical port\n");
+	o += scnprintf(b+o, s-o, "	p(dec): physical port | dir(dec): 0:Rx, 1:Tx, 2:both of dir | en(dec): 0:disable, 1:enable\n");
+	o += scnprintf(b+o, s-o, "echo profile_id active_port               > set_complex     - Set TPM complex profile ID and active GMAC port, 0:GMAC0, 1:GMAC1, 2:PON MAC\n");
+	o += scnprintf(b+o, s-o, "echo feature state                        > set_flag        - Set the support of CPH feature: refer to below additional info, state 0:disable, 1:enable\n");
+	o += scnprintf(b+o, s-o, "echo tcont state                          > set_tcont       - Set T-CONT state in CPH, T-CONT 0~7, state, 1:enable, 0:disable\n");
+	o += scnprintf(b+o, s-o, "echo hex                                  > trace_level     - Set cph trace level bitmap. 0x01:debug, 0x02:info, 0x04:warn, 0x08:error\n");
+	o += scnprintf(b+o, s-o, "echo name bm(hex) dir rx(hex) mh(hex) ety(hex) esty ipv4ty nh1 nh2 icmpty > add_parse   - add parsing field, dir 0:U/S, 1:D/S, 2:Not care\n");
+	o += scnprintf(b+o, s-o, "echo name                                 > del_parse       - delete parsing field\n");
+	o += scnprintf(b+o, s-o, "echo name bm(hex) proto_type(hex) state   > add_mod         - add modification field, state 0:diable, 1:enable\n");
+	o += scnprintf(b+o, s-o, "echo name                                 > del_mod         - delete modification field\n");
+	o += scnprintf(b+o, s-o, "echo name bm(hex) trg_port trg_queue gem  > add_frwd        - add forwarding field\n");
+	o += scnprintf(b+o, s-o, "echo name                                 > del_frwd        - delete forwarding field\n");
+	o += scnprintf(b+o, s-o, "echo parse_name mod_name frwd_name        > add_app_rule    - add application rule\n");
+	o += scnprintf(b+o, s-o, "echo parse_name                           > del_app_rule    - delete application rule\n");
+	o += scnprintf(b+o, s-o, "echo parse_name mod_name frwd_name        > update_app_rule - update application rule\n");
+	o += scnprintf(b+o, s-o, "echo parse_name                           > get_app_rule    - get application rule\n");
 #ifdef CONFIG_MV_CPH_UDP_SAMPLE_HANDLE
-	off += sprintf(buf+off, "echo p udp_src(dec) txp txq flags hw_cmd  > udp_src         - set udp source port special Tx behavior\n");
-	off += sprintf(buf+off, "echo p udp_dst(dec) txp txq flags hw_cmd  > udp_dst         - set udp destination port special Tx behavior\n");
+	o += scnprintf(b+o, s-o, "echo p udp_src(dec) txp txq flags hw_cmd  > udp_src         - set udp source port special Tx behavior\n");
+	o += scnprintf(b+o, s-o, "echo p udp_dst(dec) txp txq flags hw_cmd  > udp_dst         - set udp destination port special Tx behavior\n");
 #endif
 #ifdef CONFIG_MV_CPH_FLOW_MAP_HANDLE
-	off += sprintf(buf+off, "---------------------------------------------------------------------------------------------------------------------------------------\n");
-	off += sprintf(buf+off, "                         |Parse outer    |Parse inner             |Mod outer      |Mod Inner      |Forward\n");
-	off += sprintf(buf+off, "echo dir default parse_bm mh ety  tpid vid pbits  tpid vid pbits  op_type  tpid vid pbits  tpid vid pbits  port queue hwf_queue gem > add_flow_rule - Add flow rule\n");
-	off += sprintf(buf+off, "echo dir default parse_bm mh ety  tpid vid pbits  tpid vid pbits  > del_flow_rule   - delete flow mapping rule\n");
-	off += sprintf(buf+off, "echo dir default parse_bm mh ety  tpid vid pbits  tpid vid pbits  > get_flow_rule   - get flow mapping rule\n");
-	off += sprintf(buf+off, "echo pbits0 pbits1 ... pbits62 pbits63                    > set_dscp_map    - set DSCP to P-bits mapping rules\n");
+	o += scnprintf(b+o, s-o, "---------------------------------------------------------------------------------------------------------------------------------------\n");
+	o += scnprintf(b+o, s-o, "                         |Parse outer    |Parse inner             |Mod outer      |Mod Inner      |Forward\n");
+	o += scnprintf(b+o, s-o, "echo dir default parse_bm mh ety  tpid vid pbits  tpid vid pbits  op_type  tpid vid pbits  tpid vid pbits  port queue hwf_queue gem > add_flow_rule - Add flow rule\n");
+	o += scnprintf(b+o, s-o, "echo dir default parse_bm mh ety  tpid vid pbits  tpid vid pbits  > del_flow_rule   - delete flow mapping rule\n");
+	o += scnprintf(b+o, s-o, "echo dir default parse_bm mh ety  tpid vid pbits  tpid vid pbits  > get_flow_rule   - get flow mapping rule\n");
+	o += scnprintf(b+o, s-o, "echo pbits0 pbits1 ... pbits62 pbits63                    > set_dscp_map    - set DSCP to P-bits mapping rules\n");
 #endif
-	return off;
+	return o;
 }
 
-static ssize_t cph_spec_proc_help_add(char *buf)
+static ssize_t cph_spec_proc_help_add(char *b)
 {
-	int off = 0;
-	off += sprintf(buf+off, "CPH additional help for parameters\n");
-	off += sprintf(buf+off, "---------------------------------------------------------------------------------------------------------------------------------------\n");
-	off += sprintf(buf+off, "[Generic Parameters]\n");
-	off += sprintf(buf+off, "feature:\n");
-	off += sprintf(buf+off, "   0:Generic application, 1:IGMP/MLD support, 2:Broadcast support, 3:Data flow mapping support, 4: UDP port mapping support\n");
-	off += sprintf(buf+off, "[App Parameters]\n");
-	off += sprintf(buf+off, "parse bm:\n");
-	off += sprintf(buf+off, "   0x01:PARSE_FIELD_DIR              0x02:PARSE_FIELD_MH               0x04:PARSE_FIELD_ETH_TYPE         0x08:PARSE_FIELD_ETH_SUBTYPE\n");
-	off += sprintf(buf+off, "   0x10:PARSE_FIELD_IPV4_TYPE        0x20:PARSE_FIELD_IPV6_NH1         0x40:PARSE_FIELD_IPV6_NH2         0x80:PARSE_FIELD_ICMPV6_TYPE\n");
-	off += sprintf(buf+off, "dir: 0: U/S, 1:D/S, 2: Not care\n");
-	off += sprintf(buf+off, "rx: 0: RX, 1:TX\n");
-	off += sprintf(buf+off, "mod bm:\n");
-	off += sprintf(buf+off, "   0x01:RX_MOD_ADD_GMAC              0x02:RX_MOD_REPLACE_PROTO_TYPE    0x04:RX_MOD_STRIP_MH              0x08:TX_MOD_ADD_MH_BY_DRIVER\n");
-	off += sprintf(buf+off, "   0x10:CPH_APP_TX_MOD_NO_PAD        0x20:MOD_SET_STATE\n");
-	off += sprintf(buf+off, "frwd bm:\n");
-	off += sprintf(buf+off, "   0x01:FRWD_SET_TRG_PORT            0x02:FRWD_SET_TRG_QUEUE           0x04:FRWD_SET_GEM_PORT\n");
-	off += sprintf(buf+off, "[Flow Parameters]\n");
-	off += sprintf(buf+off, "dir: 0: U/S, 1:D/S, 2: Not care\n");
-	off += sprintf(buf+off, "default: 0: not default, 1:default\n");
-	off += sprintf(buf+off, "bm:\n");
-	off += sprintf(buf+off, "   0x01:PARSE_MH                     0x02:PARSE_EXT_VLAN               0x04:PARSE_TWO_VLAN               0x08:PARSE_ETH_TYPE\n");
-	off += sprintf(buf+off, "mh(hex), ety(hex), tpid(hex), vid(dec), pbits(dec)\n");
-	off += sprintf(buf+off, "op_type:\n");
-	off += sprintf(buf+off, "   00:ASIS                           01:DISCARD                        02:ADD                            03:ADD_COPY_DSCP\n");
-	off += sprintf(buf+off, "   04:ADD_COPY_OUTER_PBIT            05:ADD_COPY_INNER_PBIT            06:ADD_2_TAGS                     07:ADD_2_TAGS_COPY_DSCP\n");
-	off += sprintf(buf+off, "   08:ADD_2_TAGS_COPY_PBIT           09:REM                            10:REM_2_TAGS                     11:REPLACE\n");
-	off += sprintf(buf+off, "   12:REPLACE_VID                    13:REPLACE_PBIT                   14:REPLACE_INNER_ADD_OUTER        15:REPLACE_INNER_ADD_OUTER_COPY_PBIT\n");
-	off += sprintf(buf+off, "   16:REPLACE_INNER_REM_OUTER        17:REPLACE_2TAGS                  18:REPLACE_2TAGS_VID              19:SWAP\n");
+	int o = 0; /* buffer offset */
+	int s = PAGE_SIZE; /* buffer size */
 
-	return off;
+	o += scnprintf(b+o, s-o, "CPH additional help for parameters\n");
+	o += scnprintf(b+o, s-o, "---------------------------------------------------------------------------------------------------------------------------------------\n");
+	o += scnprintf(b+o, s-o, "[Generic Parameters]\n");
+	o += scnprintf(b+o, s-o, "feature:\n");
+	o += scnprintf(b+o, s-o, "   0:Generic application, 1:IGMP/MLD support, 2:Broadcast support, 3:Data flow mapping support, 4: UDP port mapping support\n");
+	o += scnprintf(b+o, s-o, "[App Parameters]\n");
+	o += scnprintf(b+o, s-o, "parse bm:\n");
+	o += scnprintf(b+o, s-o, "   0x01:PARSE_FIELD_DIR              0x02:PARSE_FIELD_MH               0x04:PARSE_FIELD_ETH_TYPE         0x08:PARSE_FIELD_ETH_SUBTYPE\n");
+	o += scnprintf(b+o, s-o, "   0x10:PARSE_FIELD_IPV4_TYPE        0x20:PARSE_FIELD_IPV6_NH1         0x40:PARSE_FIELD_IPV6_NH2         0x80:PARSE_FIELD_ICMPV6_TYPE\n");
+	o += scnprintf(b+o, s-o, "dir: 0: U/S, 1:D/S, 2: Not care\n");
+	o += scnprintf(b+o, s-o, "rx: 0: RX, 1:TX\n");
+	o += scnprintf(b+o, s-o, "mod bm:\n");
+	o += scnprintf(b+o, s-o, "   0x01:RX_MOD_ADD_GMAC              0x02:RX_MOD_REPLACE_PROTO_TYPE    0x04:RX_MOD_STRIP_MH              0x08:TX_MOD_ADD_MH_BY_DRIVER\n");
+	o += scnprintf(b+o, s-o, "   0x10:CPH_APP_TX_MOD_NO_PAD        0x20:MOD_SET_STATE\n");
+	o += scnprintf(b+o, s-o, "frwd bm:\n");
+	o += scnprintf(b+o, s-o, "   0x01:FRWD_SET_TRG_PORT            0x02:FRWD_SET_TRG_QUEUE           0x04:FRWD_SET_GEM_PORT\n");
+	o += scnprintf(b+o, s-o, "[Flow Parameters]\n");
+	o += scnprintf(b+o, s-o, "dir: 0: U/S, 1:D/S, 2: Not care\n");
+	o += scnprintf(b+o, s-o, "default: 0: not default, 1:default\n");
+	o += scnprintf(b+o, s-o, "bm:\n");
+	o += scnprintf(b+o, s-o, "   0x01:PARSE_MH                     0x02:PARSE_EXT_VLAN               0x04:PARSE_TWO_VLAN               0x08:PARSE_ETH_TYPE\n");
+	o += scnprintf(b+o, s-o, "mh(hex), ety(hex), tpid(hex), vid(dec), pbits(dec)\n");
+	o += scnprintf(b+o, s-o, "op_type:\n");
+	o += scnprintf(b+o, s-o, "   00:ASIS                           01:DISCARD                        02:ADD                            03:ADD_COPY_DSCP\n");
+	o += scnprintf(b+o, s-o, "   04:ADD_COPY_OUTER_PBIT            05:ADD_COPY_INNER_PBIT            06:ADD_2_TAGS                     07:ADD_2_TAGS_COPY_DSCP\n");
+	o += scnprintf(b+o, s-o, "   08:ADD_2_TAGS_COPY_PBIT           09:REM                            10:REM_2_TAGS                     11:REPLACE\n");
+	o += scnprintf(b+o, s-o, "   12:REPLACE_VID                    13:REPLACE_PBIT                   14:REPLACE_INNER_ADD_OUTER        15:REPLACE_INNER_ADD_OUTER_COPY_PBIT\n");
+	o += scnprintf(b+o, s-o, "   16:REPLACE_INNER_REM_OUTER        17:REPLACE_2TAGS                  18:REPLACE_2TAGS_VID              19:SWAP\n");
+
+	return o;
 }
 
 
@@ -981,6 +988,75 @@ static ssize_t cph_spec_proc_dscp_store(struct device *dev,
 }
 #endif
 
+static ssize_t cph_port_func_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t len)
+{
+	const char *name  = attr->attr.name;
+	unsigned int      v1    = 0;
+	unsigned int      v2    = 0;
+	unsigned int      v3    = 0;
+	unsigned long       flags = 0;
+	MV_STATUS   rc    =  MV_OK;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	/* Read input */
+	sscanf(buf, "%d %d %d", &v1, &v2, &v3);
+
+	raw_local_irq_save(flags);
+
+	if (!strcmp(name, "set_port_func")) {
+		rc = cph_set_port_func(v1, v2, v3);
+		if (rc == MV_OK)
+			pr_err("Succeed to set cph port<%d> func\n", v1);
+		else
+			pr_err("Fail to set cph port port<%d> func\n", v1);
+	} else
+		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
+
+	raw_local_irq_restore(flags);
+
+	return len;
+}
+
+static ssize_t cph_port_func_get(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t len)
+{
+	const char *name        = attr->attr.name;
+	unsigned int v1         = 0;
+	unsigned long flags     = 0;
+	bool rx_enable, tx_enable;
+	MV_STATUS   rc    =  MV_OK;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	/* Read input */
+	sscanf(buf, "%d", &v1);
+
+	raw_local_irq_save(flags);
+
+	if (!strcmp(name, "get_port_func")) {
+		rc = cph_get_port_func(v1, &rx_enable, &tx_enable);
+		if (rc != MV_OK)
+			pr_err("input port<%d> is error!\n", v1);
+		else {
+			pr_err("port port<%d> cph func rx <%s>, tx<%s>.\n", v1,
+								rx_enable ? "enabled" : "disbaled",
+								tx_enable ? "enabled" : "disbaled");
+		}
+	} else
+		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
+
+	raw_local_irq_restore(flags);
+
+	return len;
+}
+
+
 static DEVICE_ATTR(help,            S_IRUSR, cph_spec_proc_show, NULL);
 static DEVICE_ATTR(help_add,        S_IRUSR, cph_spec_proc_show, NULL);
 static DEVICE_ATTR(show_app_db,     S_IRUSR, cph_spec_proc_show, NULL);
@@ -995,6 +1071,8 @@ static DEVICE_ATTR(show_flow_rule,  S_IRUSR, cph_spec_proc_show, NULL);
 static DEVICE_ATTR(clear_flow_rule, S_IRUSR, cph_spec_proc_show, NULL);
 static DEVICE_ATTR(del_dscp_map,    S_IRUSR, cph_spec_proc_show, NULL);
 #endif
+static DEVICE_ATTR(set_port_func,   S_IWUSR, cph_spec_proc_show, cph_port_func_store);
+static DEVICE_ATTR(get_port_func,   S_IWUSR, cph_spec_proc_show, cph_port_func_get);
 static DEVICE_ATTR(set_complex,     S_IWUSR, cph_spec_proc_show, cph_spec_proc_2_store);
 static DEVICE_ATTR(set_flag,        S_IWUSR, cph_spec_proc_show, cph_spec_proc_2_store);
 static DEVICE_ATTR(add_parse,       S_IWUSR, cph_spec_proc_show, cph_spec_proc_name_store);
@@ -1036,6 +1114,8 @@ static struct attribute *cph_spec_proc_attrs[] = {
 	&dev_attr_clear_flow_rule.attr,
 	&dev_attr_del_dscp_map.attr,
 #endif
+	&dev_attr_set_port_func.attr,
+	&dev_attr_get_port_func.attr,
 	&dev_attr_set_complex.attr,
 	&dev_attr_set_flag.attr,
 	&dev_attr_add_parse.attr,

@@ -853,8 +853,7 @@ int cph_netdev_init(void)
 
 	/* Register special transmit check function */
 #ifdef CONFIG_MV_PP2_TX_SPECIAL
-	for (idx = 0; idx < gs_mv_eth_port_num; idx++)
-		mv_pp2_tx_special_check_func(idx, cph_tx_func);
+	mv_pp2_tx_special_check_func(MV_PON_LOGIC_PORT_GET(), cph_tx_func);
 #endif /* CONFIG_MV_PP2_TX_SPECIAL */
 
 	/* enable all T-CONT by default, whill remove it once callback implmented*/

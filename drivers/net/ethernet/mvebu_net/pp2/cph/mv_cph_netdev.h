@@ -152,6 +152,51 @@ void cph_rec_skb(int port, struct sk_buff *skb);
 *******************************************************************************/
 int cph_netdev_init(void);
 
+/******************************************************************************
+* cph_rx_func()
+* _____________________________________________________________________________
+*
+* DESCRIPTION: CPH function to handle the received special packets
+*              from network driver
+*
+* INPUTS:
+*       port    - Gmac port the packet from
+*       rxq     - CPU received queue
+*       dev     - Net device
+*       skb     - Marvell packet information
+*       rx_desc - RX descriptor
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*       1: the packet will be handled and forwarded to linux stack in CPH
+*       0: the packet will not be forwarded to linux stack and mv_pp2_rx() needs to continue to handle it
+*******************************************************************************/
+int cph_rx_func(int port, int rxq, struct net_device *dev,
+		struct sk_buff *skb, struct pp2_rx_desc *rx_desc);
+
+/******************************************************************************
+* cph_tx_func()
+* _____________________________________________________________________________
+*
+* DESCRIPTION: CPH function to handle tranmitting special packets
+*              to network driver
+*
+* INPUTS:
+*       port        - Gmac port the packet from
+*       dev         - Net device
+*       skb         - SKB buffer to receive packet
+*       tx_spec_out - TX descriptor
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*       None.
+*******************************************************************************/
+int cph_tx_func(int port, struct net_device *dev, struct sk_buff *skb,
+		struct mv_pp2_tx_spec *tx_spec_out);
 
 #ifdef __cplusplus
 }
