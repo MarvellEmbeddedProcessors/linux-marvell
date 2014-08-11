@@ -404,6 +404,51 @@ bool cph_get_tcont_state(unsigned int tcont);
 *******************************************************************************/
 int cph_set_tcont_state(unsigned int tcont, bool state);
 
+/******************************************************************************
+* Function Definition
+******************************************************************************/
+/******************************************************************************
+* cph_set_port_func()
+* _____________________________________________________________________________
+*
+* DESCRIPTION: Set CPH port Rx/Tx func
+*
+* INPUTS:
+*       port          - physical port ID
+*       dir            - Rx(0)  Tx(1)
+*       enable      - disable(0)  enable(1)
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*       On success, the function returns MV_OK.
+*       On error returns error code accordingly.
+*******************************************************************************/
+MV_STATUS cph_set_port_func(int port, enum CPH_RX_TX_E dir, bool enable);
+
+/******************************************************************************
+* Function Definition
+******************************************************************************/
+/******************************************************************************
+* cph_get_port_func()
+* _____________________________________________________________________________
+*
+* DESCRIPTION: Set CPH port Rx/Tx func
+*
+* INPUTS:
+*       port              - physical port ID
+*
+* OUTPUTS:
+*       rx_enable      - disable(0)  enable(1)
+*       tx_enable      - disable(0)  enable(1)
+*
+* RETURNS:
+*       On success, the function returns MV_OK.
+*       On error returns error code accordingly.
+*******************************************************************************/
+MV_STATUS cph_get_port_func(int port, bool *rx_enable, bool *tx_enable);
+
 #ifdef __cplusplus
 }
 #endif

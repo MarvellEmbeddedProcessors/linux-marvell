@@ -539,3 +539,98 @@ int cph_set_tcont_state(unsigned int tcont, bool state)
 	return cph_db_set_tcont_state(tcont, state);
 }
 EXPORT_SYMBOL(cph_set_tcont_state);
+
+/******************************************************************************
+* Function Definition
+******************************************************************************/
+/******************************************************************************
+* cph_set_port_func()
+* _____________________________________________________________________________
+*
+* DESCRIPTION: Set CPH port Rx/Tx func
+*
+* INPUTS:
+*       port          - physical port ID
+*       dir            - Rx(0)  Tx(1)
+*       enable      - disable(0)  enable(1)
+*
+* OUTPUTS:
+*       None.
+*
+* RETURNS:
+*       On success, the function returns MV_OK.
+*       On error returns error code accordingly.
+*******************************************************************************/
+MV_STATUS cph_set_port_func(int port, enum CPH_RX_TX_E dir, bool enable)
+{
+	MV_STATUS rc = MV_OK;
+
+	if (CPH_DIR_RX == dir) {
+		if (enable)
+			mv_pp2_rx_special_proc_func(port, cph_rx_func);
+		else
+			mv_pp2_rx_special_proc_func(port, NULL);
+	} else if (CPH_DIR_TX == dir) {
+		if (enable)
+			mv_pp2_tx_special_check_func(port, cph_tx_func);
+		else
+			mv_pp2_tx_special_check_func(port, NULL);
+	} else {
+		if (enable) {
+			mv_pp2_rx_special_proc_func(port, cph_rx_func);
+			mv_pp2_tx_special_check_func(port, cph_tx_func);
+		} else {
+			mv_pp2_rx_special_proc_func(port, NULL);
+			mv_pp2_tx_special_check_func(port, NULL);
+		}
+	}
+
+	CHECK_API_RETURN_AND_LOG_ERROR(rc, "Fail to call cph_set_port_func");
+
+	return rc;
+}
+EXPORT_SYMBOL(cph_set_port_func);
+
+/******************************************************************************
+* Function Definition
+******************************************************************************/
+/******************************************************************************
+* cph_get_port_func()
+* _____________________________________________________________________________
+*
+* DESCRIPTION: Set CPH port Rx/Tx func
+*
+* INPUTS:
+*       port              - physical port ID
+*
+* OUTPUTS:
+*       rx_enable      - disable(0)  enable(1)
+*       tx_enable      - disable(0)  enable(1)
+*
+* RETURNS:
+*       On success, the function returns MV_OK.
+*       On error returns error code accordingly.
+*******************************************************************************/
+MV_STATUS cph_get_port_func(int port, bool *rx_enable, bool *tx_enable)
+{
+	MV_STATUS rc = MV_OK;
+	struct eth_port *pp = mv_pp2_port_by_id(port);
+
+	if (!pp)
+		return MV_BAD_PARAM;
+
+	if (pp->rx_special_proc)
+		*rx_enable = true;
+	else
+		*rx_enable = false;
+
+	if (pp->tx_special_check)
+		*tx_enable = true;
+	else
+		*tx_enable = false;
+
+	CHECK_API_RETURN_AND_LOG_ERROR(rc, "Fail to call cph_get_port_func");
+
+	return rc;
+}
+EXPORT_SYMBOL(cph_get_port_func);
