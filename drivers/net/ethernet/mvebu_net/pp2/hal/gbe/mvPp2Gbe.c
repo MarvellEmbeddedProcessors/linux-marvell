@@ -1808,6 +1808,11 @@ MV_STATUS mvPp2TxpDisable(int port, int txp)
 		mvPp2WrReg(MV_PP2_TXP_SCHED_Q_CMD_REG, (regData << MV_PP2_TXP_SCHED_DISQ_OFFSET));
 
 	/* Wait for all Tx activity to terminate. */
+	/* for PON, do not wait for TXQ, since for Functional Erratum FE-8309479, PON TXQ could only be flushed
+	    for Ethernet port, not PON port, so TXQ will never be stopped */
+	if (MV_PP2_IS_PON_PORT(port))
+		return MV_OK;
+
 	mDelay = 0;
 	do {
 		if (mDelay >= TX_DISABLE_TIMEOUT_MSEC) {
