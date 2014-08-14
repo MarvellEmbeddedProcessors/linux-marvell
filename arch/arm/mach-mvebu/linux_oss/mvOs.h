@@ -126,6 +126,7 @@ extern void mv_early_printk(char *fmt, ...);
 
 #include "mvTypes.h"
 #include "mvCommon.h"
+#include "../coherency.h"
 
 #ifdef MV_NDEBUG
 #define mvOsAssert(cond)
@@ -155,10 +156,10 @@ extern void mv_early_printk(char *fmt, ...);
 #define mvOsIoVirtToPhys(pDev, pVirtAddr)       virt_to_dma((pDev), (pVirtAddr))
 
 #define mvOsCacheFlush(pDev, p, size)                              \
-	dma_map_single((pDev), (p), (size), DMA_TO_DEVICE)
+	(COHERENCY_FABRIC_HARD_MODE() ? virt_to_phys((p)) : dma_map_single((pDev), (p), (size), DMA_TO_DEVICE))
 
 #define mvOsCacheInvalidate(pDev, p, size)                          \
-	dma_map_single((pDev), (p), (size), DMA_FROM_DEVICE)
+	(COHERENCY_FABRIC_HARD_MODE() ? virt_to_phys((p)) : dma_map_single((pDev), (p), (size), DMA_FROM_DEVICE))
 
 #define mvOsCacheUnmap(pDev, phys, size)                          \
 	dma_unmap_single((pDev), (dma_addr_t)(phys), (size), DMA_FROM_DEVICE)
@@ -286,18 +287,21 @@ static INLINE MV_U64 mvOsDivMod64(MV_U64 divided, MV_U64 divisor, MV_U64 *modulu
 
 static inline void mvOsCacheIoSync(void *handle)
 {
-	dma_sync_single_for_cpu(handle, (dma_addr_t) NULL,
-				CPU_D_CACHE_LINE_SIZE, DMA_FROM_DEVICE);
+	if (likely(COHERENCY_FABRIC_HARD_MODE()))
+		dma_sync_single_for_cpu(handle, (dma_addr_t) NULL,
+					CPU_D_CACHE_LINE_SIZE, DMA_FROM_DEVICE);
 }
 
 static inline void mvOsCacheLineFlush(void *handle, void *addr)
 {
-	dma_sync_single_for_device(handle, virt_to_dma(handle, addr), CPU_D_CACHE_LINE_SIZE, DMA_TO_DEVICE);
+	if (unlikely(!COHERENCY_FABRIC_HARD_MODE()))
+		dma_sync_single_for_device(handle, virt_to_dma(handle, addr), CPU_D_CACHE_LINE_SIZE, DMA_TO_DEVICE);
 }
 
 static inline void mvOsCacheLineInv(void *handle, void *addr)
 {
-	dma_sync_single_for_device(handle, virt_to_dma(handle, addr), CPU_D_CACHE_LINE_SIZE, DMA_FROM_DEVICE);
+	if (unlikely(!COHERENCY_FABRIC_HARD_MODE()))
+		dma_sync_single_for_device(handle, virt_to_dma(handle, addr), CPU_D_CACHE_LINE_SIZE, DMA_FROM_DEVICE);
 }
 
 /* Flush multiple cache lines using mvOsCacheLineFlush to improve performance.              */
