@@ -33,6 +33,7 @@
 unsigned long coherency_phys_base;
 void __iomem *coherency_base;
 static void __iomem *coherency_cpu_base;
+bool coherency_hard_mode;
 
 /* Coherency fabric registers */
 #define COHERENCY_FABRIC_CFG_OFFSET		   0x4
@@ -223,6 +224,11 @@ int __init coherency_init(void)
 {
 	int type = coherency_type();
 	struct device_node *np;
+
+	if (type != COHERENCY_FABRIC_TYPE_NONE)
+		coherency_hard_mode = true;
+	else
+		coherency_hard_mode = false;
 
 	np = of_find_matching_node(NULL, of_coherency_table);
 

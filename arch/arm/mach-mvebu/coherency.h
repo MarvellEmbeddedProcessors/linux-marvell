@@ -16,6 +16,9 @@
 
 
 extern unsigned long coherency_phys_base;
+extern bool coherency_hard_mode;
+
+#define COHERENCY_FABRIC_HARD_MODE() coherency_hard_mode
 int set_cpu_coherent(void);
 
 int coherency_init(void);
