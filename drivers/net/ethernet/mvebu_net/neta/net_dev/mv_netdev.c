@@ -4117,7 +4117,7 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 		return NULL;
 	}
 	/* Get TX checksum offload limit */
-	if (of_property_read_u32(np, "tx_csum_limit", &plat_data->tx_csum_limit))
+	if (of_property_read_u32(np, "tx-csum-limit", &plat_data->tx_csum_limit))
 		plat_data->tx_csum_limit = MV_ETH_TX_CSUM_MAX_SIZE;
 
 	/* Get port PHY mode */
