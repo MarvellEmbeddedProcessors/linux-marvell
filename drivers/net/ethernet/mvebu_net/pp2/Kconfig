@@ -12,10 +12,7 @@ config MV_PP2_HWF
 	bool "Enable PPv2 Harware Forwarding"
 	default y
 	---help---
-	HWF are not shared between PP2 and NETA
-	PP2 and NETA can enable or disable HWF depdently
-	The default status is enable
-	Please note other options depend on it
+	Enable Hardware:
 	Configuration is changable in Run-Time
 
 config MV_ETH_PP2_CLS2
@@ -85,28 +82,19 @@ config MV_PP2_RXQ
 	default 8
 	---help---
 	Multiple RX queue support.
-	PP2 module exvlusive.
-	Neta module has its own macro.
-	Note the option depends on it.
 
 config  MV_PP2_TXQ
-	int "Number of TX queues"
-	default 1
+	int "Number of TX queues per port"
+	default 8
 	---help---
 	Multiple TX queue support.
-	PP2 module exvlusive.
-	Neta module has its own macro.
-	Note the option depends on it.
 
 config MV_PP2_RXQ_DESC
 	int "Number of Rx descriptors"
 	depends on MV_ETH_PP2
-	default 128
+	default 256
 	---help---
 	The number of Rx descriptors in each Rx queue.
-	PP2 driver excludsive, NETA driver has its own option.
-	It depends on definetion of MV_ETH_PP2.
-	Please note other options depend on it.
 
 config MV_PP2_RXQ_DEF
         int "Default RXQ to recieve packets"
@@ -170,8 +158,6 @@ config  MV_PP2_TSO
 	default y
 	---help---
 	Marvell network driver compiled with TSO (TCP Segmentation Offload) support.
-	The default status is enable
-	Please note other options depend on it
 	Configuration is changable in Run-Time
 
 endmenu
@@ -179,14 +165,13 @@ endmenu
 menu "PP2 Control and Statistics"
 
 config  MV_PP2_DEBUG_CODE
-	depends on MV_ETH_DEBUG_CODE
 	bool "Add run-time debug code"
 	default n
 	---help---
-	Enable run-time enable/disable enter debug code blocks.
-	PP2 driver excluded.
-	NETA driver have their own HWF option.
-	Please note other options depend on it.
+	Enable debug code blocks in key places of PP2 driver.
+	By default the debug code do nothing but can be activated in run-time
+	by sysfs command under directory: "/sys/devices/platform/neta"
+	"echo [p] [hex]   > debug  - b0:rx, b1:tx, b2:isr, b3:poll, b4:dump, b5:b_hdr"
 
 config  MV_PP2_STAT_ERR
         bool "Collect error statistics"
@@ -194,8 +179,6 @@ config  MV_PP2_STAT_ERR
 	---help---
 	Marvell network interface driver collect minimal number of statistics.
 	Only for error conditions. Can be displayed using mv_eth_tool.
-	PP2 driver excluded.
-	Please note other options depend on it.
 
 config  MV_PP2_STAT_INF
         bool "Collect event statistics"
@@ -239,6 +222,7 @@ config MV_PP2_SKB_RECYCLE_DEF
 	int "Default value for SKB recycle:  0 - disable, 1 - enable"
 	default 1
 	---help---
+	Default value for skb recycle capability.
 
 config MV_PP2_TX_DONE_TIMER_PERIOD
         int "Periodical Tx Done timer period"
@@ -285,37 +269,43 @@ config MV_PP2_RX_DESC_PREFETCH
 	bool "Enable RX descriptor prefetch"
 	default n
 	---help---
-	Use pld instruction to prefetch one RX descriptor ahead
-	The default status is disable
-	Please note other options depend on it
-	Configuration is changable in Run-Time
+	Default value for RX descriptor prefetch.
+	When enabled PP2 driver uses "pld" instruction to prefetch one RX descriptor ahead.
+	This feature can be enabled/disabled in run-time by sysfs command under directory:
+	"/sys/devices/platform/neta/rx".
+	"echo [p] [m] > prefetch    - set RX prefetch mode for port [p]"
+	where [m]: 0-disable, 1-descriptor, 2-packet header, 3-both
 
 config MV_PP2_RX_PKT_PREFETCH
 	bool "Enable RX packet prefetch"
 	default n
 	---help---
-	Use pld instruction to prefetch first two cache lines of received packet data
-	The default status is disable
-	Please note other options depend on it
-	Configuration is changable in Run-Time
+	Default value for first two cache lines of received packet prefetch.
+	When enabled PP2 driver uses "pld" instruction to prefetch first two cache lines
+	of received packet data.
+	This feature can be enabled/disabled in run-time by sysfs command under directory:
+	"/sys/devices/platform/neta/rx".
+	"echo [p] [m] > prefetch    - set RX prefetch mode for port [p]"
+	where [m]: 0-disable, 1-descriptor, 2-packet header, 3-both
 
 config MV_PP2_RX_SPECIAL
-	bool "Enable special RX processing"
+	bool "Support special RX processing"
 	default n
 	---help---
-	Enable special RX processing for packets with RI_RX_SEPCIAL PNC result info bit set
-	The default status is disable
-	Please note other options depend on it
-	Configuration is changable in Run-Time
+	Add source code for special RX processing of packets marked by parser.
+	To enable this feature two additional configurations must be done.
+	1. Parser must be configured to mark packets which need special processing.
+	2. Callback function for special RX processing must be registered (per port).
+	If unsure, say N.
 
 config MV_PP2_TX_SPECIAL
-	bool "Enable special TX processing"
+	bool "Support special TX processing"
 	default n
 	---help---
-	Enable special TX processing for packets with signal header (SH)
-	The default status is disable
-	Please note other options depend on it
-	Configuration is changable in Run-Time
+	Add source code for special TX processing of packets per egress port.
+	To enable this feature callback function for special TX processing
+	must be registered (per port).
+	If unsure, say N.
 
 config MV_PP2_L2FW
 	bool "L2 Forwarding support"
@@ -324,7 +314,6 @@ config MV_PP2_L2FW
 	Enable L2 Forwarding support for received packets.
 	Three modes are supported: Send packet without change, Swap MAC DA<->SA,
 	Copy the whole packet and swap MAC
-	The default status is disable
 
 config MV_PP2_L2FW_XOR
         bool "L2 Forwarding XOR support"
@@ -342,9 +331,6 @@ config MV_PP2_L2SEC
 	default n
 	---help---
 	Handle encrypted packets with CESA.
-	PP2 driver excluded.
-	NETA driver have their own HWF option.
-	Please note other options depend on it.
 
 config MV_PP2_L2FW_DEBUG
 	depends on (MV_PP2_L2FW && MV_PP2_DEBUG_CODE)
@@ -352,9 +338,6 @@ config MV_PP2_L2FW_DEBUG
 	default n
 	---help---
 	Enable L2FW run-time enable/disable enter debug code blocks
-	PP2 driver excluded.
-	NETA driver have their own HWF option.
-	Please note other options depend on it.
 
 config MV_PP2_RX_POLL_WEIGHT
 	int "poll weight for the RX poll() function"
@@ -385,29 +368,20 @@ config MV_PP2_PON
 	depends on MV_ETH_PP2 && MV_INCLUDE_PON
 	---help---
 	Choose this option to support PON port in Marvell network driver.
-	PP2 driver excluded.
-	NETA driver have their own HWF option.
-	Please note other options depend on it.
 
 config MV_PP2_PON_TXP_DEF
 	int "Default T-CONT to send local generated packets"
 	depends on MV_PP2_PON
 	default 0
 	---help---
-	Define T-CONT to send local generated packets
-	PP2 module exvlusive.
-	Neta module has its own macro.
-	Note the option depends on it.
+	Define default T-CONT to send local generated packets
 
 config MV_PP2_PON_TXQ_DEF
 	int "Default TXQ to send local generated packets"
 	depends on MV_PP2_PON
 	default 0
 	---help---
-	Define TXQ to send local generated packets
-	PP2 module exvlusive.
-	Neta module has its own macro.
-	Note the option depends on it.
+	Define default TXQ to send local generated packets
 
 endmenu
 
@@ -465,7 +439,7 @@ config  MV_CPH_BC_HANDLE
         Enable CPH to handle Broadcast as protocol
         packet, and set special skb->protocol value
         based on user configure rules.So it could be
-        trapped by RAW SOCKETl
+        trapped by RAW SOCKET
 
 config  MV_CPH_UDP_SAMPLE_HANDLE
         bool "Enable MV_CPH sample UDP handling"

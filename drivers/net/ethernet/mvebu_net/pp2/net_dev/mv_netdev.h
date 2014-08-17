@@ -1032,10 +1032,10 @@ struct pp2_rx_desc *mv_pp2_rx_prefetch(struct eth_port *pp,
 
 void		*mv_pp2_bm_pool_create(int pool, int capacity, MV_ULONG *physAddr);
 
-#if defined(CONFIG_MV_PP2_HWF) && !defined(CONFIG_MV_ETH_BM_CPU)
+#if defined(CONFIG_MV_PP2_HWF)
 MV_STATUS mv_pp2_hwf_bm_create(int port, int mtuPktSize);
 void      mv_hwf_bm_dump(void);
-#endif /* CONFIG_MV_PP2_HWF && !CONFIG_MV_ETH_BM_CPU */
+#endif /* CONFIG_MV_PP2_HWF */
 
 #ifdef CONFIG_MV_PP2_SWF_HWF_CORRUPTION_WA
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
