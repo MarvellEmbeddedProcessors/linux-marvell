@@ -4536,7 +4536,7 @@ void mv_pp2_config_show(void)
 	pr_info("  o Driver DEBUG statistics enabled\n");
 #endif
 
-#ifdef ETH_DEBUG
+#ifdef CONFIG_MV_ETH_DEBUG_CODE
 	pr_info("  o Driver debug messages enabled\n");
 #endif
 
