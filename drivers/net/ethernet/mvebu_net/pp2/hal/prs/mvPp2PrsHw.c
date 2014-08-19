@@ -571,7 +571,7 @@ int mvPp2PrsSwDump(MV_PP2_PRS_ENTRY *pe)
 	mvOsPrintf("SH=%d ", shift);
 
 	mvPp2PrsSwSramOffsetGet(pe, &type, &offset, &op);
-	if (offset != 0)
+	if (offset != 0 || ((op >> SRAM_OP_SEL_SHIFT_BITS) != 0))
 		mvOsPrintf("UDFT=%u UDFO=%d ", type, offset);
 
 	mvOsPrintf("op=%u ", op);
