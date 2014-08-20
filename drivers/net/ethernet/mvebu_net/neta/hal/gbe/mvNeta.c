@@ -2217,6 +2217,9 @@ void mvNetaRxReset(int port)
 	MV_REG_WRITE(NETA_PORT_RX_RESET_REG(port), NETA_PORT_RX_DMA_RESET_MASK);
 	for (rxq = 0; rxq < pPortCtrl->rxqNum ; rxq++) {
 		pRxqCtrl = mvNetaRxqHndlGet(port, rxq);
+		/* Check queue is initialized or not, if not init, skip reset */
+		if (NULL == pRxqCtrl->queueCtrl.pFirst)
+			continue;
 		mvNetaDescRingReset(&pRxqCtrl->queueCtrl);
 		mvOsCacheFlush(pPortCtrl->osHandle, pRxqCtrl->queueCtrl.pFirst,
 		((pRxqCtrl->queueCtrl.lastDesc + 1) * NETA_DESC_ALIGNED_SIZE));
@@ -2234,6 +2237,9 @@ void mvNetaTxpReset(int port, int txp)
 	MV_REG_WRITE(NETA_PORT_TX_RESET_REG(port, txp), NETA_PORT_TX_DMA_RESET_MASK);
 	for (txq = 0; txq < pPortCtrl->txqNum; txq++) {
 		pTxqCtrl = mvNetaTxqHndlGet(port, txp, txq);
+		/* Check queue is initialized or not, if not init, skip reset */
+		if (NULL == pTxqCtrl->queueCtrl.pFirst)
+			continue;
 		mvNetaDescRingReset(&pTxqCtrl->queueCtrl);
 		mvOsCacheFlush(pPortCtrl->osHandle, pTxqCtrl->queueCtrl.pFirst,
 		((pTxqCtrl->queueCtrl.lastDesc + 1) * NETA_DESC_ALIGNED_SIZE));
@@ -2295,6 +2301,10 @@ void mvNetaRxqAddrSet(int port, int queue, int descrNum)
 	MV_NETA_PORT_CTRL *pPortCtrl = mvNetaPortCtrl[port];
 	MV_NETA_RXQ_CTRL *pRxqCtrl = &pPortCtrl->pRxQueue[queue];
 	MV_NETA_QUEUE_CTRL *pQueueCtrl = &pRxqCtrl->queueCtrl;
+
+	/* Check queue is initialized or not, if not init, return */
+	if (NULL == pQueueCtrl->pFirst)
+		return;
 
 	/* Set Rx descriptors queue starting address */
 	MV_REG_WRITE(NETA_RXQ_BASE_ADDR_REG(pPortCtrl->portNo, queue),
@@ -2365,6 +2375,10 @@ void mvNetaTxqAddrSet(int port, int txp, int queue, int descrNum)
 
 	pTxqCtrl = mvNetaTxqHndlGet(port, txp, queue);
 	pQueueCtrl = &pTxqCtrl->queueCtrl;
+
+	/* Check queue is initialized or not, if not init, return */
+	if (NULL == pQueueCtrl->pFirst)
+		return;
 
 	/* Set Tx descriptors queue starting address */
 	MV_REG_WRITE(NETA_TXQ_BASE_ADDR_REG(port, txp, queue), netaDescVirtToPhys(pQueueCtrl, (MV_U8 *)pQueueCtrl->pFirst));
