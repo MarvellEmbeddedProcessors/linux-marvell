@@ -2299,21 +2299,16 @@ static inline int mv_pp2_tso_validate(struct sk_buff *skb, struct net_device *de
 	return 0;
 }
 
-static inline int mv_pp2_tso_build_hdr_desc(struct pp2_tx_desc *tx_desc, struct eth_port *priv, struct sk_buff *skb,
-					     struct txq_cpu_ctrl *txq_ctrl, u16 *mh, int hdr_len, int size,
-					     MV_U32 tcp_seq, MV_U16 ip_id, int left_len)
+static inline int mv_pp2_tso_build_hdr_desc(struct pp2_tx_desc *tx_desc, MV_U8 *data, struct eth_port *priv,
+					struct sk_buff *skb, struct txq_cpu_ctrl *txq_ctrl, u16 *mh,
+					int hdr_len, int size, MV_U32 tcp_seq, MV_U16 ip_id, int left_len)
 {
 	struct iphdr *iph;
 	struct tcphdr *tcph;
-	MV_U8 *data, *mac;
+	MV_U8 *mac;
 	MV_U32 bufPhysAddr;
 	int mac_hdr_len = skb_network_offset(skb);
 
-	data = mv_pp2_extra_pool_get(priv);
-	if (!data) {
-		pr_err("Can't allocate extra buffer for TSO\n");
-		return 0;
-	}
 	mv_pp2_shadow_push(txq_ctrl, ((MV_ULONG)data | MV_ETH_SHADOW_EXT));
 
 	/* Reserve 2 bytes for IP header alignment */
@@ -2375,7 +2370,6 @@ static inline int mv_pp2_tso_build_data_desc(struct eth_port *pp, struct pp2_tx_
 	tx_desc->pktOffset = bufPhysAddr & MV_ETH_TX_DESC_ALIGN;
 	tx_desc->bufPhysAddr = bufPhysAddr & (~MV_ETH_TX_DESC_ALIGN);
 
-
 	tx_desc->command = 0;
 
 	if (size == data_left) {
@@ -2402,7 +2396,7 @@ static int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev, struct mv_
 {
 	int ptxq, frag = 0;
 	int total_len, hdr_len, size, frag_size, data_left;
-	int total_desc_num, seg_desc_num, total_bytes = 0;
+	int total_desc_num, total_bytes = 0, max_desc_num = 0;
 	char *frag_ptr;
 	struct pp2_tx_desc *tx_desc;
 	struct txq_cpu_ctrl *txq_cpu_ptr = NULL;
@@ -2411,13 +2405,32 @@ static int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev, struct mv_
 	skb_frag_t *skb_frag_ptr;
 	const struct tcphdr *th = tcp_hdr(skb);
 	struct eth_port *priv = MV_ETH_PRIV(dev);
+	int i;
 
 	STAT_DBG(priv->stats.tx_tso++);
 
 	if (mv_pp2_tso_validate(skb, dev))
 		return 0;
 
+	/* Calculate expected number of TX descriptors */
+	max_desc_num = skb_shinfo(skb)->gso_segs * 2 + skb_shinfo(skb)->nr_frags;
+
+	if (mv_pp2_aggr_desc_num_check(aggr_txq_ctrl, max_desc_num)) {
+		STAT_DBG(priv->stats.tx_tso_no_resource++);
+		return 0;
+	}
+
 	txq_cpu_ptr = &txq_ctrl->txq_cpu[smp_processor_id()];
+
+	/* Check if there are enough descriptors in physical TXQ */
+#ifdef CONFIG_MV_ETH_PP2_1
+	if (mv_pp2_reserved_desc_num_proc(priv, tx_spec->txp, tx_spec->txq, max_desc_num)) {
+#else
+	if (mv_pp2_phys_desc_num_check(txq_cpu_ptr, max_desc_num)) {
+#endif
+		STAT_DBG(priv->stats.tx_tso_no_resource++);
+		return 0;
+	}
 
 	total_len = skb->len;
 	hdr_len = (skb_transport_offset(skb) + tcp_hdrlen(skb));
@@ -2456,68 +2469,55 @@ static int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev, struct mv_
 
 	/* Each iteration - create new TCP segment */
 	while (total_len > 0) {
+		MV_U8 *data;
+
 		data_left = MV_MIN(skb_shinfo(skb)->gso_size, total_len);
 
-		/* Calculate maximum number of descriptors needed for the current TCP segment			  *
-		 * At worst case we'll transmit all remaining frags including skb->data (one descriptor per frag) *
-		 * We also need one descriptor for packet header						  */
-		seg_desc_num = skb_shinfo(skb)->nr_frags - frag + 2;
-
-		if (mv_pp2_aggr_desc_num_check(aggr_txq_ctrl, seg_desc_num)) {
-			STAT_DBG(priv->stats.tx_tso_no_resource++);
-			return 0;
+		/* Sanity check */
+		if (total_desc_num >= max_desc_num) {
+			pr_err("%s: Used TX descriptors number %d is larger than allocated %d\n",
+				__func__, total_desc_num, max_desc_num);
+			goto outNoTxDesc;
 		}
 
-		/* Check if there are enough descriptors in physical TXQ */
-#ifdef CONFIG_MV_ETH_PP2_1
-		if (mv_pp2_reserved_desc_num_proc(priv, tx_spec->txp, tx_spec->txq, seg_desc_num)) {
-#else
-		if (mv_pp2_phys_desc_num_check(txq_cpu_ptr, seg_desc_num)) {
-#endif
-			STAT_DBG(priv->stats.tx_tso_no_resource++);
-			return 0;
+		data = mv_pp2_extra_pool_get(priv);
+		if (!data) {
+			pr_err("Can't allocate extra buffer for TSO\n");
+			goto outNoTxDesc;
 		}
-
-		seg_desc_num = 0;
 
 		tx_desc = mvPp2AggrTxqNextDescGet(aggr_txq_ctrl->q);
+		total_desc_num++;
+
 		tx_desc->physTxq = ptxq;
 
-		seg_desc_num++;
-		total_desc_num++;
 		total_len -= data_left;
-
-		aggr_txq_ctrl->txq_count++;
-		txq_cpu_ptr->txq_count++;
 
 		if (tx_spec->flags & MV_ETH_TX_F_MH)
 			mh = &tx_spec->tx_mh;
 
 		/* prepare packet headers: MAC + IP + TCP */
-		size = mv_pp2_tso_build_hdr_desc(tx_desc, priv, skb, txq_cpu_ptr, mh,
+		size = mv_pp2_tso_build_hdr_desc(tx_desc, data, priv, skb, txq_cpu_ptr, mh,
 					hdr_len, data_left, tcp_seq, ip_id, total_len);
-		if (size == 0) {
-			aggr_txq_ctrl->txq_count--;
-			txq_cpu_ptr->txq_count--;
-			mv_pp2_shadow_dec_put(txq_cpu_ptr);
-			mvPp2AggrTxqPrevDescGet(aggr_txq_ctrl->q);
 
-			STAT_DBG(priv->stats.tx_tso_no_resource++);
-			return 0;
-		}
 		total_bytes += size;
 
 		/* Update packet's IP ID */
 		ip_id++;
 
 		while (data_left > 0) {
+
+			/* Sanity check */
+			if (total_desc_num >= max_desc_num) {
+				pr_err("%s: Used TX descriptors number %d is larger than allocated %d\n",
+					__func__, total_desc_num, max_desc_num);
+				goto outNoTxDesc;
+			}
+
 			tx_desc = mvPp2AggrTxqNextDescGet(aggr_txq_ctrl->q);
 			tx_desc->physTxq = ptxq;
 
-			seg_desc_num++;
 			total_desc_num++;
-			aggr_txq_ctrl->txq_count++;
-			txq_cpu_ptr->txq_count++;
 
 			size = mv_pp2_tso_build_data_desc(priv, tx_desc, skb, txq_cpu_ptr,
 							  frag_ptr, frag_size, data_left, total_len);
@@ -2544,23 +2544,43 @@ static int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev, struct mv_
 				frag++;
 			}
 		}
-
-#ifdef CONFIG_MV_ETH_PP2_1
-		/* PPv2.1 - MAS 3.16, decrease number of reserved descriptors */
-		txq_cpu_ptr->reserved_num -= seg_desc_num;
-#endif
-
-		/* TCP segment is ready - transmit it */
-		wmb();
-		mvPp2AggrTxqPendDescAdd(seg_desc_num);
-
-		STAT_DBG(aggr_txq_ctrl->stats.txq_tx += seg_desc_num);
-		STAT_DBG(txq_cpu_ptr->stats.txq_tx += seg_desc_num);
 	}
 
+	/* TCP segment is ready - transmit it */
+	wmb();
+	mvPp2AggrTxqPendDescAdd(total_desc_num);
+
+#ifdef CONFIG_MV_ETH_PP2_1
+	/* PPv2.1 - MAS 3.16, decrease number of reserved descriptors */
+	txq_cpu_ptr->reserved_num -= total_desc_num;
+#endif
+
+	aggr_txq_ctrl->txq_count += total_desc_num;
+	txq_cpu_ptr->txq_count += total_desc_num;
+
 	STAT_DBG(priv->stats.tx_tso_bytes += total_bytes);
+	STAT_DBG(aggr_txq_ctrl->stats.txq_tx += total_desc_num);
+	STAT_DBG(txq_cpu_ptr->stats.txq_tx += total_desc_num);
 
 	return total_desc_num;
+
+outNoTxDesc:
+	/* No enough memory for packet header - rollback */
+	pr_err("%s: No TX descriptors - rollback %d, txq_count=%d, nr_frags=%d, skb=%p, len=%d, gso_segs=%d\n",
+			__func__, total_desc_num, aggr_txq_ctrl->txq_count, skb_shinfo(skb)->nr_frags,
+			skb, skb->len, skb_shinfo(skb)->gso_segs);
+	STAT_DBG(priv->stats.tx_tso_no_resource++);
+
+	for (i = 0; i < total_desc_num; i++) {
+		u32 shadow;
+
+		mv_pp2_shadow_dec_put(txq_cpu_ptr);
+		shadow = txq_cpu_ptr->shadow_txq[txq_cpu_ptr->shadow_txq_put_i];
+		mv_pp2_txq_buf_free(priv, shadow);
+		mvPp2AggrTxqPrevDescGet(aggr_txq_ctrl->q);
+	}
+
+	return 0;
 }
 
 #endif /* CONFIG_MV_PP2_TSO */

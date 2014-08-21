@@ -668,7 +668,7 @@ static inline int mv_pp2_reserved_desc_num_proc(struct eth_port *pp, int txp, in
 		/* new chunk is necessary */
 
 		for_each_possible_cpu(cpu) {
-			/* compute tolat txq used descriptors */
+			/* compute total txq used descriptors */
 			txq_cpu_p = &txq_ctrl->txq_cpu[cpu];
 			txq_count += txq_cpu_p->txq_count;
 			txq_count += txq_cpu_p->reserved_num;
