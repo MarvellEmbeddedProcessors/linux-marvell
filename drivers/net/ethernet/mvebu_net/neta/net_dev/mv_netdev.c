@@ -307,7 +307,7 @@ void set_cpu_affinity(struct eth_port *pp, MV_U32 cpuAffinity, int group)
 		return;
 
 	/* First, read affinity of the target group, in case it contains CPUs */
-	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
 		cpuCtrl = pp->cpu_config[cpu];
 		if (!(MV_BIT_CHECK(pp->cpu_mask, cpu)))
 			continue;
@@ -316,7 +316,7 @@ void set_cpu_affinity(struct eth_port *pp, MV_U32 cpuAffinity, int group)
 			break;
 		}
 	}
-	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
 		if (cpuAffinity & 1) {
 			cpuCtrl = pp->cpu_config[cpu];
 			cpuCtrl->napi = pp->napiGroup[group];
@@ -334,7 +334,7 @@ int group_has_cpus(struct eth_port *pp, int group)
 	int cpu;
 	struct cpu_ctrl	*cpuCtrl;
 
-	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
 		if (!(MV_BIT_CHECK(pp->cpu_mask, cpu)))
 			continue;
 
@@ -368,7 +368,7 @@ void set_rxq_affinity(struct eth_port *pp, MV_U32 rxqAffinity, int group)
 		return;
 	}
 
-	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
 		if (!(MV_BIT_CHECK(pp->cpu_mask, cpu)))
 			continue;
 		tmpRxqAffinity = rxqAffinity;
@@ -888,9 +888,9 @@ int mv_eth_ctrl_txq_cpu_def(int port, int txp, int txq, int cpu)
 	struct cpu_ctrl	*cpuCtrl;
 	struct eth_port *pp = mv_eth_port_by_id(port);
 
-	if ((cpu >= CONFIG_NR_CPUS) || (cpu < 0)) {
+	if ((cpu >= nr_cpu_ids) || (cpu < 0)) {
 		printk(KERN_ERR "cpu #%d is out of range: from 0 to %d\n",
-			cpu, CONFIG_NR_CPUS - 1);
+			cpu, nr_cpu_ids - 1);
 		return -EINVAL;
 	}
 
@@ -938,9 +938,9 @@ int	mv_eth_cpu_txq_mask_set(int port, int cpu, int txqMask)
 		return -EINVAL;
 	}
 
-	if ((cpu >= CONFIG_NR_CPUS) || (cpu < 0)) {
+	if ((cpu >= nr_cpu_ids) || (cpu < 0)) {
 		printk(KERN_ERR "cpu #%d is out of range: from 0 to %d\n",
-			cpu, CONFIG_NR_CPUS - 1);
+			cpu, nr_cpu_ids - 1);
 		return -EINVAL;
 	}
 	if (pp == NULL) {
@@ -3390,7 +3390,7 @@ int mv_eth_resume_network_interfaces(struct eth_port *pp)
 		mv_eth_port_promisc_set(pp->port);
 	}
 
-	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
 		/* set queue mask per cpu */
 		mvNetaRxqCpuMaskSet(pp->port, pp->cpu_config[cpu]->cpuRxqMask, cpu);
 		mvNetaTxqCpuMaskSet(pp->port, pp->cpu_config[cpu]->cpuTxqMask, cpu);
@@ -4293,7 +4293,7 @@ struct net_device *mv_eth_netdev_init(struct platform_device *pdev)
 		memset(pp->napiGroup[i], 0, sizeof(struct napi_struct));
 	}
 
-	for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
 		cpuCtrl = pp->cpu_config[cpu];
 		cpuCtrl->napiCpuGroup = 0;
 		cpuCtrl->napi         = NULL;
@@ -4683,7 +4683,7 @@ void mv_eth_napi_group_show(int port)
 	}
 	for (group = 0; group < CONFIG_MV_ETH_NAPI_GROUPS; group++) {
 		printk(KERN_INFO "group=%d:\n", group);
-		for (cpu = 0; cpu < CONFIG_NR_CPUS; cpu++) {
+		for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
 			cpuCtrl = pp->cpu_config[cpu];
 			if (!(MV_BIT_CHECK(pp->cpu_mask, cpu)))
 				continue;
@@ -5670,9 +5670,9 @@ int mv_eth_txq_tos_map_set(int port, int txq, int cpu, unsigned int tos)
 	if ((pp == NULL) || (pp->txq_ctrl == NULL))
 		return -ENODEV;
 
-	if ((cpu >= CONFIG_NR_CPUS) || (cpu < 0)) {
+	if ((cpu >= nr_cpu_ids) || (cpu < 0)) {
 		printk(KERN_ERR "cpu #%d is out of range: from 0 to %d\n",
-			cpu, CONFIG_NR_CPUS - 1);
+			cpu, nr_cpu_ids - 1);
 		return -EINVAL;
 	}
 
@@ -5725,7 +5725,7 @@ static int mv_eth_priv_init(struct eth_port *pp, int port)
 	u8	*ext_buf;
 
 	/* Default field per cpu initialization */
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+	for (i = 0; i < nr_cpu_ids; i++) {
 		pp->cpu_config[i] = kmalloc(sizeof(struct cpu_ctrl), GFP_KERNEL);
 		memset(pp->cpu_config[i], 0, sizeof(struct cpu_ctrl));
 	}
