@@ -1148,9 +1148,9 @@ int mv_pp2_ctrl_txq_cpu_def(int port, int txp, int txq, int cpu)
 {
 	struct eth_port *pp = mv_pp2_port_by_id(port);
 
-	if ((cpu >= CONFIG_NR_CPUS) || (cpu < 0)) {
+	if ((cpu >= nr_cpu_ids) || (cpu < 0)) {
 		printk(KERN_ERR "cpu #%d is out of range: from 0 to %d\n",
-			cpu, CONFIG_NR_CPUS - 1);
+			cpu, nr_cpu_ids - 1);
 		return -EINVAL;
 	}
 
@@ -3552,7 +3552,7 @@ static int mv_pp2_load_network_interfaces(struct platform_device *pdev)
 	if (pp->flags & MV_ETH_F_CONNECT_LINUX) {
 		if (mv_pp2_port_napi_group_create(pp->port, 0))
 			return -EIO;
-		if (mv_pp2_napi_set_cpu_affinity(pp->port, 0, (1 << CONFIG_NR_CPUS) - 1) ||
+		if (mv_pp2_napi_set_cpu_affinity(pp->port, 0, (1 << nr_cpu_ids) - 1) ||
 				mv_pp2_eth_napi_set_rxq_affinity(pp->port, 0, (1 << MV_PP2_MAX_RXQ) - 1))
 			return -EIO;
 	}
@@ -3889,7 +3889,7 @@ static int	mv_pp2_shared_probe(struct mv_pp2_pdata *plat_data)
 	memset(mv_pp2_ports, 0, size);
 
 	/* Allocate aggregated TXQs control */
-	size = CONFIG_NR_CPUS * sizeof(struct aggr_tx_queue);
+	size = nr_cpu_ids * sizeof(struct aggr_tx_queue);
 	aggr_txqs = mvOsMalloc(size);
 	if (!aggr_txqs)
 		goto oom;
@@ -5218,7 +5218,7 @@ static int mv_pp2_priv_init(struct eth_port *pp, int port)
 	u8	*ext_buf;
 
 	/* Default field per cpu initialization */
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+	for (i = 0; i < nr_cpu_ids; i++) {
 		pp->cpu_config[i] = kmalloc(sizeof(struct cpu_ctrl), GFP_KERNEL);
 		memset(pp->cpu_config[i], 0, sizeof(struct cpu_ctrl));
 	}
@@ -5348,7 +5348,7 @@ static void mv_pp2_priv_cleanup(struct eth_port *pp)
 
 	mvPp2PortDestroy(pp->port);
 
-	for (i = 0; i < CONFIG_NR_CPUS; i++)
+	for (i = 0; i < nr_cpu_ids; i++)
 		kfree(pp->cpu_config[i]);
 
 	/* delete pool of external buffers for TSO, fragmentation, etc */
