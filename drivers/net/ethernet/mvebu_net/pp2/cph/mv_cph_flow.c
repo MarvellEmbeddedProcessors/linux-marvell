@@ -2457,7 +2457,7 @@ MV_STATUS cph_flow_mod_frwd(struct CPH_FLOW_ENTRY_T *flow, struct mv_pp2_tx_spec
 	tx_spec_out->txq     = flow->pkt_frwd.trg_queue;
 	if ((FALSE == cph_db_get_tcont_state(tx_spec_out->txp)) ||
 	    (flow->op_type == CPH_VLAN_OP_DISCARD))
-		tx_spec_out->txq = MV_INVALID_QUEUE_NUM;
+		tx_spec_out->txq = MV_ETH_TXQ_INVALID;
 	tx_spec_out->hw_cmd[0]  = ((flow->pkt_frwd.gem_port << 8)|0x0010);
 	tx_spec_out->tx_func = NULL;
 	tx_spec_out->flags   = MV_ETH_TX_F_MH;
