@@ -2081,6 +2081,11 @@ static int mv_pp2_tx(struct sk_buff *skb, struct net_device *dev)
 			} else {
 				/* Check validity of tx_spec txp/txq must be CPU owned */
 				tx_spec_ptr = &tx_spec;
+
+				/* in routine cph_flow_mod_frwd,  if this packet should be discard,
+					txq will be assigned to value MV_ETH_TXQ_INVALID */
+				if (tx_spec_ptr->txq == MV_ETH_TXQ_INVALID)
+					goto out;
 			}
 		}
 	}

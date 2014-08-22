@@ -209,7 +209,6 @@ enum MV_APP_PORT_TYPE_E {
 #define MV_QUEUE_MIN  0
 #define MV_QUEUE_MAX  7
 #define MV_QUEUE_NUM  (MV_QUEUE_MAX-MV_QUEUE_MIN+1)
-#define MV_INVALID_QUEUE_NUM  (0xFF) /* Invalid queue number  */
 
 enum MV_QUEUE_E {
 	MV_QUEUE_0 = 0,
