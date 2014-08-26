@@ -129,7 +129,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /*---------------------------------------------------------------------------*/
 
-MV_STATUS   mvPncInit(MV_U8 *pncVirtBase);
+MV_STATUS   mvPncInit(MV_U8 *pncVirtBase, MV_U32 pncTcamSize);
 
 #ifdef CONFIG_MV_ETH_PNC
 /*
@@ -197,7 +197,7 @@ enum {
 
 #ifdef CONFIG_MV_ETH_PNC_WOL
 	TE_WOL,
-	TE_WOL_EOF = CONFIG_MV_PNC_TCAM_LINES - 1,
+	/*TE_WOL_EOF is always the last line of the TCAM table, it is dynamic, redefined it to macro */
 #endif /* CONFIG_MV_ETH_PNC_WOL */
 };
 

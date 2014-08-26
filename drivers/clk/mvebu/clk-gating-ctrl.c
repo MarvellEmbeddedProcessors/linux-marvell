@@ -191,6 +191,7 @@ static const struct mvebu_soc_descr __initconst armada_380_gating_descr[] = {
 	{ "crypto0", NULL, 23 },
 	{ "tdm", NULL, 25 },
 	{ "xor1", NULL, 28 },
+	{ "pnc", NULL, 29 },
 	{ "sata1", NULL, 30 },
 	{ }
 };

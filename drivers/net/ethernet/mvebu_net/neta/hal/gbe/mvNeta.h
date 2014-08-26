@@ -306,6 +306,7 @@ typedef struct {
 #endif /* CONFIG_MV_ETH_BM */
 
 #ifdef CONFIG_MV_ETH_PNC
+	MV_U32 pncTcamSize;
 	MV_ULONG pncPhysBase;
 	MV_U8 *pncVirtBase;
 #endif /* CONFIG_MV_ETH_PNC */
@@ -368,6 +369,17 @@ typedef struct {
 
 extern MV_NETA_PORT_CTRL **mvNetaPortCtrl;
 extern MV_NETA_HAL_DATA mvNetaHalData;
+extern unsigned int neta_cap_bitmap;
+/* NETA dynamic capabilities bitmap define */
+#define MV_ETH_CAP_PNC		(0x00000001)
+#define MV_ETH_CAP_BM		(0x00000002)
+#define MV_ETH_CAP_HWF		(0x00000004)
+#define MV_ETH_CAP_PME		(0x00000008)
+/* NETA dynamic capabilities macro */
+#define MV_NETA_BM_CAP()	(MV_ETH_CAP_BM & neta_cap_bitmap)
+#define MV_NETA_PNC_CAP()	(MV_ETH_CAP_PNC & neta_cap_bitmap)
+#define MV_NETA_HWF_CAP()	(MV_ETH_CAP_HWF & neta_cap_bitmap)
+#define MV_NETA_PMT_CAP()	(MV_ETH_CAP_PME & neta_cap_bitmap)
 
 /* Get Giga port handler */
 static INLINE MV_NETA_PORT_CTRL *mvNetaPortHndlGet(int port)
@@ -740,7 +752,7 @@ void		mvNetaSetOtherMcastTable(int portNo, int queue);
 void		mvNetaSetUcastTable(int port, int queue);
 void		mvNetaSetSpecialMcastTable(int portNo, int queue);
 
-#ifdef CONFIG_MV_ETH_LEGACY_PARSER
+/************************ Legacy parse function start *******************************/
 MV_STATUS	mvNetaRxUnicastPromiscSet(int port, MV_BOOL isPromisc);
 
 MV_STATUS	mvNetaMcastAddrSet(int port, MV_U8 *pAddr, int queue);
@@ -756,7 +768,7 @@ MV_STATUS	mvNetaTcpRxq(int port, int rxq);
 MV_STATUS	mvNetaUdpRxq(int port, int rxq);
 MV_STATUS	mvNetaArpRxq(int port, int rxq);
 MV_STATUS	mvNetaBpduRxq(int port, int rxq);
-#endif /* CONFIG_MV_ETH_LEGACY_PARSER */
+/************************ Legacy parse function end *******************************/
 
 void 		mvNetaPhyAddrSet(int port, int phyAddr);
 int 		mvNetaPhyAddrGet(int port);

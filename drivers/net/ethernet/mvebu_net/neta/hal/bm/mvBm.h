@@ -114,22 +114,22 @@ static INLINE MV_ULONG mvBmPoolGet(int poolId)
 }
 
 /* prototypes */
-MV_STATUS mvBmInit(MV_U8 *virtBase);
-void      mvBmRegsInit(void);
-void      mvBmConfigSet(MV_U32 mask);
-void      mvBmConfigClear(MV_U32 mask);
-MV_STATUS mvBmControl(MV_COMMAND cmd);
-MV_STATE  mvBmStateGet(void);
-void      mvBmPoolTargetSet(int pool, MV_U8 targetId, MV_U8 attr);
-void      mvBmPoolEnable(int pool);
-void      mvBmPoolDisable(int pool);
-MV_BOOL   mvBmPoolIsEnabled(int pool);
-MV_STATUS mvBmPoolInit(int pool, void *virtPoolBase, MV_ULONG physPoolBase, int capacity);
-MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num, int add);
-MV_STATUS mvBmPoolBufSizeSet(int pool, int buf_size);
-void      mvBmRegs(void);
-void      mvBmStatus(void);
-void      mvBmPoolDump(int pool, int mode);
-void      mvBmPoolPrint(int pool);
+MV_STATUS mvNetaBmInit(MV_U8 *virtBase);
+void      mvNetaBmRegsInit(void);
+void      mvNetaBmConfigSet(MV_U32 mask);
+void      mvNetaBmConfigClear(MV_U32 mask);
+MV_STATUS mvNetaBmControl(MV_COMMAND cmd);
+MV_STATE  mvNetaBmStateGet(void);
+void      mvNetaBmPoolTargetSet(int pool, MV_U8 targetId, MV_U8 attr);
+void      mvNetaBmPoolEnable(int pool);
+void      mvNetaBmPoolDisable(int pool);
+MV_BOOL   mvNetaBmPoolIsEnabled(int pool);
+MV_STATUS mvNetaBmPoolInit(int pool, void *virtPoolBase, MV_ULONG physPoolBase, int capacity);
+MV_STATUS mvNetaBmPoolBufNumUpdate(int pool, int buf_num, int add);
+MV_STATUS mvNetaBmPoolBufferSizeSet(int pool, int buf_size);
+void      mvNetaBmRegs(void);
+void      mvNetaBmStatus(void);
+void      mvNetaBmPoolDump(int pool, int mode);
+void      mvNetaBmPoolPrint(int pool);
 
 #endif /* __mvBm_h__ */

@@ -70,6 +70,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvOs.h"
 
 #ifdef CONFIG_ARCH_MVEBU
+#include "mvebu-soc-id.h"
 #include "mvNetConfig.h"
 #else
 #include "mvSysEthConfig.h"
@@ -81,19 +82,18 @@ MV_U8 *mvBmVirtBase = 0;
 static MV_BM_POOL	mvBmPools[MV_BM_POOLS];
 
 /* Initialize Hardware Buffer management unit */
-MV_STATUS mvBmInit(MV_U8 *virtBase)
+MV_STATUS mvNetaBmInit(MV_U8 *virtBase)
 {
-
 	mvBmVirtBase = virtBase;
 
-	mvBmRegsInit();
+	mvNetaBmRegsInit();
 
 	memset(mvBmPools, 0, sizeof(mvBmPools));
 
 	return MV_OK;
 }
 
-void mvBmRegsInit(void)
+void mvNetaBmRegsInit(void)
 {
 	MV_U32 regVal;
 
@@ -114,7 +114,7 @@ void mvBmRegsInit(void)
 	return;
 }
 
-MV_STATUS mvBmControl(MV_COMMAND cmd)
+MV_STATUS mvNetaBmControl(MV_COMMAND cmd)
 {
 	MV_U32 regVal = 0;
 
@@ -139,7 +139,7 @@ MV_STATUS mvBmControl(MV_COMMAND cmd)
 	return MV_OK;
 }
 
-MV_STATE mvBmStateGet(void)
+MV_STATE mvNetaBmStateGet(void)
 {
 	MV_U32 regVal;
 	MV_STATE state;
@@ -166,7 +166,7 @@ MV_STATE mvBmStateGet(void)
 	return state;
 }
 
-void      mvBmConfigSet(MV_U32 mask)
+void mvNetaBmConfigSet(MV_U32 mask)
 {
 	MV_U32	regVal;
 
@@ -175,7 +175,7 @@ void      mvBmConfigSet(MV_U32 mask)
 	MV_REG_WRITE(MV_BM_CONFIG_REG, regVal);
 }
 
-void      mvBmConfigClear(MV_U32 mask)
+void mvNetaBmConfigClear(MV_U32 mask)
 {
 	MV_U32	regVal;
 
@@ -184,7 +184,7 @@ void      mvBmConfigClear(MV_U32 mask)
 	MV_REG_WRITE(MV_BM_CONFIG_REG, regVal);
 }
 
-void mvBmPoolTargetSet(int pool, MV_U8 targetId, MV_U8 attr)
+void mvNetaBmPoolTargetSet(int pool, MV_U8 targetId, MV_U8 attr)
 {
 	MV_U32 regVal;
 
@@ -204,7 +204,7 @@ void mvBmPoolTargetSet(int pool, MV_U8 targetId, MV_U8 attr)
 	MV_REG_WRITE(MV_BM_XBAR_POOL_REG(pool), regVal);
 }
 
-void mvBmPoolEnable(int pool)
+void mvNetaBmPoolEnable(int pool)
 {
 	MV_U32 regVal;
 
@@ -222,7 +222,7 @@ void mvBmPoolEnable(int pool)
 
 }
 
-void mvBmPoolDisable(int pool)
+void mvNetaBmPoolDisable(int pool)
 {
 	MV_U32 regVal;
 
@@ -236,7 +236,7 @@ void mvBmPoolDisable(int pool)
 	MV_REG_WRITE(MV_BM_POOL_BASE_REG(pool), regVal);
 }
 
-MV_BOOL mvBmPoolIsEnabled(int pool)
+MV_BOOL mvNetaBmPoolIsEnabled(int pool)
 {
 	MV_U32 regVal;
 
@@ -250,7 +250,7 @@ MV_BOOL mvBmPoolIsEnabled(int pool)
 }
 
 /* Configure BM specific pool of "capacity" size. */
-MV_STATUS mvBmPoolInit(int pool, void *virtPoolBase, MV_ULONG physPoolBase, int capacity)
+MV_STATUS mvNetaBmPoolInit(int pool, void *virtPoolBase, MV_ULONG physPoolBase, int capacity)
 {
 	MV_BM_POOL	*pBmPool;
 
@@ -303,7 +303,7 @@ MV_STATUS mvBmPoolInit(int pool, void *virtPoolBase, MV_ULONG physPoolBase, int 
 	return MV_OK;
 }
 
-MV_STATUS mvBmPoolBufSizeSet(int pool, int buf_size)
+MV_STATUS mvNetaBmPoolBufferSizeSet(int pool, int buf_size)
 {
 	MV_BM_POOL *pBmPool;
 
@@ -319,7 +319,7 @@ MV_STATUS mvBmPoolBufSizeSet(int pool, int buf_size)
 	return MV_OK;
 }
 
-MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num, int add)
+MV_STATUS mvNetaBmPoolBufNumUpdate(int pool, int buf_num, int add)
 {
 	MV_BM_POOL *pBmPool;
 
@@ -343,7 +343,7 @@ MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num, int add)
 	return MV_OK;
 }
 
-void mvBmPoolPrint(int pool)
+void mvNetaBmPoolPrint(int pool)
 {
 	MV_BM_POOL *pBmPool;
 
@@ -364,17 +364,17 @@ void mvBmPoolPrint(int pool)
 						pBmPool->pVirt, (unsigned)pBmPool->physAddr);
 }
 
-void mvBmStatus(void)
+void mvNetaBmStatus(void)
 {
 	int i;
 
 	mvOsPrintf("BM Pools status\n");
 	mvOsPrintf("pool:    capacity    bufSize    bufNum      virtPtr       physAddr\n");
 	for (i = 0; i < MV_BM_POOLS; i++)
-		mvBmPoolPrint(i);
+		mvNetaBmPoolPrint(i);
 }
 
-void mvBmPoolDump(int pool, int mode)
+void mvNetaBmPoolDump(int pool, int mode)
 {
 	MV_U32     regVal;
 	MV_ULONG   *pBufAddr;
@@ -427,7 +427,7 @@ void mvBmPoolDump(int pool, int mode)
 	}
 }
 
-void mvBmRegs(void)
+void mvNetaBmRegs(void)
 {
 	int pool;
 

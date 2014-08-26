@@ -65,7 +65,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvOs.h"
 #include "mvCommon.h"
 #include "mv802_3.h"
+#ifndef CONFIG_OF
 #include "ctrlEnv/mvCtrlEnvLib.h"
+#endif
 
 #include "gbe/mvNetaRegs.h"
 #include "gbe/mvEthRegs.h"

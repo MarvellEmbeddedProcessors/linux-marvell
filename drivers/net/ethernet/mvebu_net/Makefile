@@ -22,6 +22,7 @@ INCLUDE_DIRS	+= -I$(srctree)/arch/arm/mach-mvebu/linux_oss
 INCLUDE_DIRS	+= -I$(PLAT_DIR)/switch
 INCLUDE_DIRS	+= -I$(PLAT_DIR)/netmux
 INCLUDE_DIRS	+= -I$(PLAT_DIR)/phy
+INCLUDE_DIRS	+= -I$(srctree)/arch/arm/mach-mvebu
 export INCLUDE_DIRS
 
 ccflags-y	+= $(INCLUDE_DIRS)

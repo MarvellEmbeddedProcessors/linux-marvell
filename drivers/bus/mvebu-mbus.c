@@ -779,6 +779,38 @@ void mvebu_mbus_get_sdram_window(int win, u32 *base, u32 *size)
 	*size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(win));
 }
 
+int mvebu_mbus_get_addr_win_info(phys_addr_t phyaddr, u8 *trg_id, u8 *attr)
+{
+	const struct mbus_dram_target_info *dram;
+	int i;
+
+	if (NULL == trg_id || NULL == attr) {
+		pr_err("%s: Invalid parameter\n", __func__);
+		return -EINVAL;
+	}
+	/* Get dram info */
+	dram = mv_mbus_dram_info();
+	if (!dram) {
+		pr_err("%s: No DRAM information\n", __func__);
+		return -ENODEV;
+	}
+	/* Check addr in the range or not */
+	for (i = 0; i < dram->num_cs; i++) {
+		const struct mbus_dram_window *cs = dram->cs + i;
+		if (cs->base <= phyaddr && phyaddr <= (cs->base + cs->size)) {
+			*trg_id = dram->mbus_dram_target_id;
+			*attr = cs->mbus_attr;
+			break;
+		}
+	}
+	if (i == dram->num_cs) {
+		pr_err("%s: Invalid dram address 0x%x\n", __func__, phyaddr);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static __init int mvebu_mbus_debugfs_init(void)
 {
 	struct mvebu_mbus_state *s = &mbus_state;
@@ -1045,6 +1077,52 @@ int __init mvebu_mbus_dt_init(bool is_coherent)
 
 	/* Setup statically declared windows in the DT */
 	return mbus_dt_setup(&mbus_state, np);
+}
+
+int mvebu_mbus_win_addr_get(u8 target_id, u8 attribute, u32 *phy_base, u32 *size)
+{
+	int addr_cells, c_addr_cells, c_size_cells;
+	int i, ret, cell_count;
+	const __be32 *r, *ranges_start, *ranges_end;
+	struct device_node *np;
+
+	np = of_find_matching_node(NULL, of_mvebu_mbus_ids);
+	if (!np) {
+		pr_err("could not find a matching SoC family\n");
+		return -ENODEV;
+	}
+
+	ret = mbus_parse_ranges(np, &addr_cells, &c_addr_cells,
+				&c_size_cells, &cell_count,
+				&ranges_start, &ranges_end);
+	if (ret < 0)
+		return ret;
+
+	*phy_base = 0;
+	*size = 0;
+	for (i = 0, r = ranges_start; r < ranges_end; r += cell_count, i++) {
+		u32 windowid;
+		u8 target, attr;
+
+		/*
+		 * An entry with a non-zero custom field do not
+		 * correspond to a static window, so skip it.
+		 */
+		windowid = of_read_number(r, 1);
+		if (CUSTOM(windowid))
+			continue;
+
+		target = TARGET(windowid);
+		attr = ATTR(windowid);
+		if (target_id != target || attr != attribute)
+			continue;
+
+		*phy_base = of_read_number(r + c_addr_cells, addr_cells);
+		*size = of_read_number(r + c_addr_cells + addr_cells,
+				      c_size_cells);
+		break;
+	}
+	return 0;
 }
 
 #ifdef MBUS_DEBUG
