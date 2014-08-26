@@ -116,6 +116,10 @@ struct mv_neta_pdata {
 	*/
 	int      rx_queue_size;
 	int      tx_queue_size;
+	/* PNC TCAM size*/
+#ifdef CONFIG_MV_ETH_PNC
+	unsigned int pnc_tcam_size;
+#endif
 };
 
 

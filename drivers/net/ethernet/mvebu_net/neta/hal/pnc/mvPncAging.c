@@ -106,14 +106,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PNC_AGING_LOG_VALID_BIT         31
 #define PNC_AGING_LOG_VALID_MASK        (1 << PNC_AGING_LOG_VALID_BIT)
 
-extern char tcam_text[CONFIG_MV_PNC_TCAM_LINES][TCAM_TEXT];
-extern MV_U8 *mvPncVirtBase;
-
 void    mvPncAgingCntrWrite(int tid, MV_U32 w32)
 {
 	MV_U32  va;
 
-	WARN_ON_OOR(tid >= CONFIG_MV_PNC_TCAM_LINES);
+	WARN_ON_OOR(tid >= MV_PNC_TCAM_SIZE());
 
 	va = (MV_U32)mvPncVirtBase;
 	va |= PNC_AGING_ACCESS_MASK;
@@ -131,7 +128,7 @@ MV_U32  mvPncAgingCntrRead(int tid)
 {
 	MV_U32  va, w32;
 
-	ERR_ON_OOR(tid >= CONFIG_MV_PNC_TCAM_LINES);
+	ERR_ON_OOR(tid >= MV_PNC_TCAM_SIZE());
 
 	va = (MV_U32)mvPncVirtBase;
 	va |= PNC_AGING_ACCESS_MASK;
@@ -216,7 +213,7 @@ void    mvPncAgingDump(int all)
 	MV_U32  cntrVal;
 
 	mvOsPrintf("TCAM entries Aging counters: %s\n", all ? "ALL" : "Non ZERO");
-	for (tid = 0; tid < CONFIG_MV_PNC_TCAM_LINES; tid++) {
+	for (tid = 0; tid < MV_PNC_TCAM_SIZE(); tid++) {
 		cntrVal = mvPncAgingCntrRead(tid);
 
 		if (all || (cntrVal & PNC_AGING_CNTR_MASK))
@@ -227,8 +224,8 @@ void    mvPncAgingDump(int all)
 		mvOsPrintf("group #%d: %10u\n", gr, mvPncAgingGroupCntrRead(gr));
 }
 
-static MV_U32  mvPncScannerLog[CONFIG_MV_PNC_TCAM_LINES];
-static MV_U32  mvPncAgingCntrs[CONFIG_MV_PNC_TCAM_LINES];
+static MV_U32  mvPncScannerLog[MV_PNC_TCAM_LINES];
+static MV_U32  mvPncAgingCntrs[MV_PNC_TCAM_LINES];
 
 void    mvPncAgingScannerDump(void)
 {
@@ -239,7 +236,7 @@ void    mvPncAgingScannerDump(void)
 	for (gr = 0; gr < MV_PNC_AGING_MAX_GROUP; gr++) {
 		i = 0;
 		mvOsPrintf("LU group #%d:\n", gr);
-		while (i < CONFIG_MV_PNC_TCAM_LINES) {
+		while (i < MV_PNC_TCAM_SIZE()) {
 			w32 = mvPncAgingLogEntryRead(gr, 0);
 			if ((w32 & PNC_AGING_LOG_VALID_MASK) == 0)
 				break;
@@ -262,7 +259,7 @@ void    mvPncAgingScannerDump(void)
 	for (gr = 0; gr < MV_PNC_AGING_MAX_GROUP; gr++) {
 		i = 0;
 		mvOsPrintf("MU group #%d:\n", gr);
-		while (i < CONFIG_MV_PNC_TCAM_LINES) {
+		while (i < MV_PNC_TCAM_SIZE()) {
 			w32 = mvPncAgingLogEntryRead(gr, 1);
 			/*mvOsDelay(1);*/
 			if ((w32 & PNC_AGING_LOG_VALID_MASK) == 0)
@@ -309,7 +306,7 @@ void    mvPncAgingReset(void)
 {
 	int tid, gr;
 
-	for (tid = 0; tid < CONFIG_MV_PNC_TCAM_LINES; tid++)
+	for (tid = 0; tid < MV_PNC_TCAM_SIZE(); tid++)
 		mvPncAgingCntrClear(tid);
 
 	for (gr = 0; gr < MV_PNC_AGING_MAX_GROUP; gr++)

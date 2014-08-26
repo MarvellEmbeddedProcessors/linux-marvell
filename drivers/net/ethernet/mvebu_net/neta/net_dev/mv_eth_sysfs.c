@@ -63,7 +63,8 @@ static ssize_t mv_eth_help(char *b)
 	o += scnprintf(b+o, s-o, "echo p             > gmac_regs     - show gmac registers for <p>\n");
 #endif /* MV_ETH_GMAC_NEW */
 #ifdef CONFIG_MV_ETH_PNC
-	o += scnprintf(b+o, s-o, "echo {0|1}         > pnc           - enable / disable PNC access\n");
+	if (MV_NETA_PNC_CAP())
+		o += scnprintf(b+o, s-o, "echo {0|1}         > pnc           - enable / disable PNC access\n");
 #endif /* CONFIG_MV_ETH_PNC */
 	o += scnprintf(b+o, s-o, "echo {0|1}         > skb           - enable / disable SKB recycle\n");
 	o += scnprintf(b+o, s-o, "echo p v           > debug         - bit0:rx, bit1:tx, bit2:isr, bit3:poll, bit4:dump\n");

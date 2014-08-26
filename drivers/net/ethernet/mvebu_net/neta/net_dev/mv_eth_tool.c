@@ -55,7 +55,6 @@ disclaimer.
 
 #define MV_ETH_TOOL_AN_TIMEOUT	5000
 
-
 static int isSwitch(struct eth_port *priv)
 {
 	return priv->tagged;
@@ -689,21 +688,78 @@ int mv_eth_tool_get_stats_count(struct net_device *netdev)
 }
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+
+static u32 mv_eth_tool_get_rxfh_indir_size(struct net_device *netdev)
+{
+#if defined(MV_ETH_PNC_LB) && defined(CONFIG_MV_ETH_PNC)
+	struct eth_port *priv = MV_ETH_PRIV(netdev);
+	return ARRAY_SIZE(priv->rx_indir_table);
+#else
+	return 0;
+#endif
+}
+
+static int mv_eth_tool_get_rxfh_indir(struct net_device *netdev,
+					u32 *indir)
+{
+#if defined(MV_ETH_PNC_LB) && defined(CONFIG_MV_ETH_PNC)
+	struct eth_port *priv = MV_ETH_PRIV(netdev);
+	size_t copy_size = ARRAY_SIZE(priv->rx_indir_table);
+
+	if (!MV_NETA_PNC_CAP())
+		return -EOPNOTSUPP;
+
+	memcpy(indir, priv->rx_indir_table,
+	       copy_size * sizeof(u32));
+	return 0;
+#else
+	return -EOPNOTSUPP;
+#endif
+}
+
+
+static int mv_eth_tool_set_rxfh_indir(struct net_device *netdev,
+				   const u32 *indir)
+{
+#if defined(MV_ETH_PNC_LB) && defined(CONFIG_MV_ETH_PNC)
+	int i;
+	struct eth_port *priv = MV_ETH_PRIV(netdev);
+	if (MV_NETA_PNC_CAP()) {
+		for (i = 0; i < ARRAY_SIZE(priv->rx_indir_table); i++) {
+			priv->rx_indir_table[i] = indir[i];
+			mvPncLbRxqSet(i, priv->rx_indir_table[i]);
+		}
+		return 0;
+	} else {
+		return -EOPNOTSUPP;
+	}
+#else
+	return -EOPNOTSUPP;
+#endif
+}
+
+#else /* KERNEL_VERSION(3, 3, 0) */
+
 static int mv_eth_tool_get_rxfh_indir(struct net_device *netdev,
 					struct ethtool_rxfh_indir *indir)
 {
 #if defined(MV_ETH_PNC_LB) && defined(CONFIG_MV_ETH_PNC)
-	struct eth_port 	*priv = MV_ETH_PRIV(netdev);
-	size_t copy_size =
-		min_t(size_t, indir->size, ARRAY_SIZE(priv->rx_indir_table));
+		struct eth_port *priv = MV_ETH_PRIV(netdev);
+		size_t copy_size =
+			min_t(size_t, indir->size, ARRAY_SIZE(priv->rx_indir_table));
 
-	indir->size = ARRAY_SIZE(priv->rx_indir_table);
+		if (!MV_NETA_PNC_CAP())
+			return -EOPNOTSUPP;
 
-	memcpy(indir->ring_index, priv->rx_indir_table,
-	       copy_size * sizeof(indir->ring_index[0]));
-	return 0;
+		indir->size = ARRAY_SIZE(priv->rx_indir_table);
+
+		memcpy(indir->ring_index, priv->rx_indir_table,
+		       copy_size * sizeof(indir->ring_index[0]));
+		return 0;
 #else
-	return -EOPNOTSUPP;
+		return -EOPNOTSUPP;
 #endif
 }
 
@@ -713,16 +769,21 @@ static int mv_eth_tool_set_rxfh_indir(struct net_device *netdev,
 #if defined(MV_ETH_PNC_LB) && defined(CONFIG_MV_ETH_PNC)
 	int i;
 	struct eth_port 	*priv = MV_ETH_PRIV(netdev);
-	for (i = 0; i < indir->size; i++) {
-		priv->rx_indir_table[i] = indir->ring_index[i];
-		mvPncLbRxqSet(i, priv->rx_indir_table[i]);
+	if (MV_NETA_PNC_CAP()) {
+		for (i = 0; i < indir->size; i++) {
+			priv->rx_indir_table[i] = indir->ring_index[i];
+			mvPncLbRxqSet(i, priv->rx_indir_table[i]);
+		}
+		return 0;
+	} else {
+		return -EOPNOTSUPP;
 	}
-	return 0;
 #else
 	return -EOPNOTSUPP;
 #endif
 }
-#endif
+#endif /* KERNEL_VERSION(3, 3, 0) */
+#endif /* KERNEL_VERSION(2, 6, 35) */
 
 static int mv_eth_tool_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
 									u32 *rules)
@@ -829,6 +890,10 @@ const struct ethtool_ops mv_eth_tool_ops = {
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 32)
 	.get_stats_count			= mv_eth_tool_get_stats_count,
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+	.get_rxfh_indir_size			= mv_eth_tool_get_rxfh_indir_size,
 #endif
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)

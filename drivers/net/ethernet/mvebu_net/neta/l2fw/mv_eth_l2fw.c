@@ -650,8 +650,12 @@ static inline MV_STATUS mv_eth_l2fw_tx(struct sk_buff *skb, struct eth_port *pp,
 	pool_id = NETA_RX_GET_BPID(rx_desc);
 
 #ifdef CONFIG_MV_ETH_BM_CPU
-	tx_cmd |= NETA_TX_BM_ENABLE_MASK | NETA_TX_BM_POOL_ID_MASK(pool_id);
-	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) NULL;
+	if (MV_NETA_BM_CAP()) {
+		tx_cmd |= NETA_TX_BM_ENABLE_MASK | NETA_TX_BM_POOL_ID_MASK(pool_id);
+		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) NULL;
+	} else {
+		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) skb;
+	}
 #else
 	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) skb;
 #endif /* CONFIG_MV_ETH_BM_CPU */
@@ -753,7 +757,14 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 		pData = skb->head + NET_SKB_PAD;
 
 #ifdef CONFIG_MV_ETH_PNC
-		ipOffset = NETA_RX_GET_IPHDR_OFFSET(rx_desc);
+		if (MV_NETA_PNC_CAP()) {
+			ipOffset = NETA_RX_GET_IPHDR_OFFSET(rx_desc);
+		} else {
+			if ((rx_desc->status & ETH_RX_VLAN_TAGGED_FRAME_MASK))
+				ipOffset = MV_ETH_MH_SIZE + sizeof(MV_802_3_HEADER) + MV_VLAN_HLEN;
+			else
+				ipOffset = MV_ETH_MH_SIZE + sizeof(MV_802_3_HEADER);
+		}
 #else
 		if ((rx_desc->status & ETH_RX_VLAN_TAGGED_FRAME_MASK))
 			ipOffset = MV_ETH_MH_SIZE + sizeof(MV_802_3_HEADER) + MV_VLAN_HLEN;

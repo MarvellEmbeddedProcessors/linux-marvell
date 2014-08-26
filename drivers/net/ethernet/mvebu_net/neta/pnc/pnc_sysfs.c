@@ -31,10 +31,13 @@ disclaimer.
 #include <linux/capability.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/version.h>
 
 #include "mvOs.h"
 #include "mvCommon.h"
+#ifndef CONFIG_ARCH_MVEBU
 #include "ctrlEnv/mvCtrlEnvLib.h"
+#endif
 
 #include "gbe/mvNeta.h"
 
@@ -42,7 +45,7 @@ disclaimer.
 #include "pnc/mvTcam.h"
 
 #ifdef CONFIG_MV_ETH_PNC_L3_FLOW
-extern int __devinit rxq_map_sysfs_init(struct kobject *kobj);
+#include "pnc_sysfs.h"
 #endif /* CONFIG_MV_ETH_PNC_L3_FLOW */
 
 static struct tcam_entry te;

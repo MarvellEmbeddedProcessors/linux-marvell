@@ -76,12 +76,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 MV_NETA_PORT_CTRL **mvNetaPortCtrl = NULL;
 MV_NETA_HAL_DATA mvNetaHalData;
 
+/* Bitmap of NETA dymamic capabilities, such as PnC, BM, HWF and PME
+	 * Pnc - 0x01
+	 * BM  - 0x02
+	 * HWF - 0x04
+	 * PME - 0x08
+*/
+unsigned int neta_cap_bitmap = 0x0;
+
 /* Function prototypes */
-#ifdef CONFIG_MV_ETH_LEGACY_PARSER
+/* Legacy parse function start */
 static MV_BOOL netaSetUcastAddr(int port, MV_U8 lastNibble, int queue);
 static MV_BOOL netaSetSpecialMcastAddr(int port, MV_U8 lastByte, int queue);
 static MV_BOOL netaSetOtherMcastAddr(int port, MV_U8 crc8, int queue);
-#endif /* CONFIG_MV_ETH_LEGACY_PARSER */
+/* Legacy parse function end */
 
 static void mvNetaPortSgmiiConfig(int port, MV_BOOL isInband);
 static MV_U8 *mvNetaDescrMemoryAlloc(MV_NETA_PORT_CTRL * pPortCtrl, int descSize,
@@ -253,15 +261,14 @@ int mvNetaAccMode(void)
 {
 	int mode;
 
-#if defined(CONFIG_MV_ETH_BM) && defined(CONFIG_MV_ETH_PNC)
-	mode = NETA_ACC_MODE_MASK(NETA_ACC_MODE_EXT_PNC_BMU);
-#elif defined(CONFIG_MV_ETH_BM)
-	mode = NETA_ACC_MODE_MASK(NETA_ACC_MODE_EXT_BMU);
-#elif defined(CONFIG_MV_ETH_PNC)
-	mode = NETA_ACC_MODE_MASK(NETA_ACC_MODE_EXT_PNC);
-#else
-	mode = NETA_ACC_MODE_MASK(NETA_ACC_MODE_EXT);
-#endif
+	if (MV_NETA_BM_CAP() && MV_NETA_PNC_CAP())
+		mode = NETA_ACC_MODE_MASK(NETA_ACC_MODE_EXT_PNC_BMU);
+	else if (MV_NETA_BM_CAP())
+		mode = NETA_ACC_MODE_MASK(NETA_ACC_MODE_EXT_BMU);
+	else if (MV_NETA_PNC_CAP())
+		mode = NETA_ACC_MODE_MASK(NETA_ACC_MODE_EXT_PNC);
+	else
+		mode = NETA_ACC_MODE_MASK(NETA_ACC_MODE_EXT);
 
 	return mode;
 }
@@ -357,7 +364,8 @@ MV_STATUS mvNetaDefaultsSet(int port)
 
 #ifdef CONFIG_MV_ETH_BM
 	/* Set address of Buffer Management Unit */
-	MV_REG_WRITE(NETA_BM_ADDR_REG(port), mvNetaHalData.bmPhysBase);
+	if (MV_NETA_BM_CAP())
+		MV_REG_WRITE(NETA_BM_ADDR_REG(port), mvNetaHalData.bmPhysBase);
 #endif /* CONFIG_MV_ETH_BM */
 
 	/* Update value of portCfg register accordingly with all RxQueue types */
@@ -460,11 +468,13 @@ MV_STATUS mvNetaHalInit(MV_NETA_HAL_DATA *halData)
 		mvNetaPortCtrl[port] = NULL;
 
 #ifdef CONFIG_MV_ETH_BM
-	mvBmInit(mvNetaHalData.bmVirtBase);
+	if (MV_NETA_BM_CAP())
+		mvNetaBmInit(mvNetaHalData.bmVirtBase);
 #endif /* CONFIG_MV_ETH_BM */
 
 #ifdef CONFIG_MV_ETH_PNC
-	mvPncInit(mvNetaHalData.pncVirtBase);
+	if (MV_NETA_PNC_CAP())
+		mvPncInit(mvNetaHalData.pncVirtBase, mvNetaHalData.pncTcamSize);
 #endif /* CONFIG_MV_ETH_PNC */
 
 	return MV_OK;
@@ -1466,7 +1476,155 @@ MV_STATUS mvNetaLinkStatus(int port, MV_ETH_PORT_STATUS *pStatus)
 /*                      MAC Filtering functions                               */
 /******************************************************************************/
 
-#ifdef CONFIG_MV_ETH_LEGACY_PARSER
+/************************ Legacy parse function start *******************************/
+/*******************************************************************************
+* netaSetUcastAddr - This function Set the port unicast address table
+*
+* DESCRIPTION:
+*       This function locates the proper entry in the Unicast table for the
+*       specified MAC nibble and sets its properties according to function
+*       parameters.
+*
+* INPUT:
+*       int     portNo		- Port number.
+*       MV_U8   lastNibble	- Unicast MAC Address last nibble.
+*       int     queue		- Rx queue number for this MAC address.
+*			value "-1" means remove address.
+*
+* OUTPUT:
+*       This function add/removes MAC addresses from the port unicast address
+*       table.
+*
+* RETURN:
+*       MV_TRUE is output succeeded.
+*       MV_FALSE if option parameter is invalid.
+*
+*******************************************************************************/
+static MV_BOOL netaSetUcastAddr(int portNo, MV_U8 lastNibble, int queue)
+{
+	unsigned int unicastReg;
+	unsigned int tblOffset;
+	unsigned int regOffset;
+
+	/* Locate the Unicast table entry */
+	lastNibble = (0xf & lastNibble);
+	tblOffset = (lastNibble / 4) * 4;	/* Register offset from unicast table base */
+	regOffset = lastNibble % 4;	/* Entry offset within the above register */
+
+	unicastReg = MV_REG_READ((ETH_DA_FILTER_UCAST_BASE(portNo) + tblOffset));
+
+	if (queue == -1) {
+		/* Clear accepts frame bit at specified unicast DA table entry */
+		unicastReg &= ~(0xFF << (8 * regOffset));
+	} else {
+		unicastReg &= ~(0xFF << (8 * regOffset));
+		unicastReg |= ((0x01 | (queue << 1)) << (8 * regOffset));
+	}
+	MV_REG_WRITE((ETH_DA_FILTER_UCAST_BASE(portNo) + tblOffset), unicastReg);
+
+	return MV_TRUE;
+}
+
+/*******************************************************************************
+* netaSetSpecialMcastAddr - Special Multicast address settings.
+*
+* DESCRIPTION:
+*       This routine controls the MV device special MAC multicast support.
+*       The Special Multicast Table for MAC addresses supports MAC of the form
+*       0x01-00-5E-00-00-XX (where XX is between 0x00 and 0xFF).
+*       The MAC DA[7:0] bits are used as a pointer to the Special Multicast
+*       Table entries in the DA-Filter table.
+*       This function set the Special Multicast Table appropriate entry
+*       according to the argument given.
+*
+* INPUT:
+*       int     port      Port number.
+*       unsigned char   mcByte      Multicast addr last byte (MAC DA[7:0] bits).
+*       int          queue      Rx queue number for this MAC address.
+*       int             option      0 = Add, 1 = remove address.
+*
+* OUTPUT:
+*       See description.
+*
+* RETURN:
+*       MV_TRUE is output succeeded.
+*       MV_FALSE if option parameter is invalid.
+*
+*******************************************************************************/
+static MV_BOOL netaSetSpecialMcastAddr(int port, MV_U8 lastByte, int queue)
+{
+	unsigned int smcTableReg;
+	unsigned int tblOffset;
+	unsigned int regOffset;
+
+	/* Locate the SMC table entry */
+	tblOffset = (lastByte / 4);	/* Register offset from SMC table base    */
+	regOffset = lastByte % 4;	/* Entry offset within the above register */
+
+	smcTableReg = MV_REG_READ((ETH_DA_FILTER_SPEC_MCAST_BASE(port) + tblOffset * 4));
+
+	if (queue == -1) {
+		/* Clear accepts frame bit at specified Special DA table entry */
+		smcTableReg &= ~(0xFF << (8 * regOffset));
+	} else {
+		smcTableReg &= ~(0xFF << (8 * regOffset));
+		smcTableReg |= ((0x01 | (queue << 1)) << (8 * regOffset));
+	}
+	MV_REG_WRITE((ETH_DA_FILTER_SPEC_MCAST_BASE(port) + tblOffset * 4), smcTableReg);
+
+	return MV_TRUE;
+}
+
+/*******************************************************************************
+* netaSetOtherMcastAddr - Multicast address settings.
+*
+* DESCRIPTION:
+*       This routine controls the MV device Other MAC multicast support.
+*       The Other Multicast Table is used for multicast of another type.
+*       A CRC-8bit is used as an index to the Other Multicast Table entries
+*       in the DA-Filter table.
+*       The function gets the CRC-8bit value from the calling routine and
+*       set the Other Multicast Table appropriate entry according to the
+*       CRC-8 argument given.
+*
+* INPUT:
+*       int     port        Port number.
+*       MV_U8   crc8        A CRC-8bit (Polynomial: x^8+x^2+x^1+1).
+*       int     queue       Rx queue number for this MAC address.
+*
+* OUTPUT:
+*       See description.
+*
+* RETURN:
+*       MV_TRUE is output succeeded.
+*       MV_FALSE if option parameter is invalid.
+*
+*******************************************************************************/
+static MV_BOOL netaSetOtherMcastAddr(int port, MV_U8 crc8, int queue)
+{
+	unsigned int omcTableReg;
+	unsigned int tblOffset;
+	unsigned int regOffset;
+
+	/* Locate the OMC table entry */
+	tblOffset = (crc8 / 4) * 4;	/* Register offset from OMC table base    */
+	regOffset = crc8 % 4;	/* Entry offset within the above register */
+
+	omcTableReg = MV_REG_READ((ETH_DA_FILTER_OTH_MCAST_BASE(port) + tblOffset));
+
+	if (queue == -1) {
+		/* Clear accepts frame bit at specified Other DA table entry */
+		omcTableReg &= ~(0xFF << (8 * regOffset));
+	} else {
+		omcTableReg &= ~(0xFF << (8 * regOffset));
+		omcTableReg |= ((0x01 | (queue << 1)) << (8 * regOffset));
+	}
+
+	MV_REG_WRITE((ETH_DA_FILTER_OTH_MCAST_BASE(port) + tblOffset), omcTableReg);
+
+	return MV_TRUE;
+}
+
 /*******************************************************************************
 * mvNetaRxUnicastPromiscSet - Configure Fitering mode of Ethernet port
 *
@@ -1743,7 +1901,7 @@ MV_STATUS mvNetaMcastAddrSet(int port, MV_U8 *pAddr, int queue)
 	}
 	return MV_OK;
 }
-#endif /* CONFIG_MV_ETH_LEGACY_PARSER */
+/************************ Legacy parse function end *******************************/
 
 /*******************************************************************************
 * mvNetaSetUcastTable - Unicast address settings.
@@ -1829,155 +1987,7 @@ MV_VOID mvNetaSetOtherMcastTable(int portNo, int queue)
 		MV_REG_WRITE((ETH_DA_FILTER_OTH_MCAST_BASE(portNo) + offset), regValue);
 }
 
-#ifdef CONFIG_MV_ETH_LEGACY_PARSER
-/*******************************************************************************
-* netaSetUcastAddr - This function Set the port unicast address table
-*
-* DESCRIPTION:
-*       This function locates the proper entry in the Unicast table for the
-*       specified MAC nibble and sets its properties according to function
-*       parameters.
-*
-* INPUT:
-*       int     portNo		- Port number.
-*       MV_U8   lastNibble	- Unicast MAC Address last nibble.
-*       int     queue		- Rx queue number for this MAC address.
-*                           		value "-1" means remove address.
-*
-* OUTPUT:
-*       This function add/removes MAC addresses from the port unicast address
-*       table.
-*
-* RETURN:
-*       MV_TRUE is output succeeded.
-*       MV_FALSE if option parameter is invalid.
-*
-*******************************************************************************/
-static MV_BOOL netaSetUcastAddr(int portNo, MV_U8 lastNibble, int queue)
-{
-	unsigned int unicastReg;
-	unsigned int tblOffset;
-	unsigned int regOffset;
-
-	/* Locate the Unicast table entry */
-	lastNibble = (0xf & lastNibble);
-	tblOffset = (lastNibble / 4) * 4;	/* Register offset from unicast table base */
-	regOffset = lastNibble % 4;	/* Entry offset within the above register */
-
-	unicastReg = MV_REG_READ((ETH_DA_FILTER_UCAST_BASE(portNo) + tblOffset));
-
-	if (queue == -1) {
-		/* Clear accepts frame bit at specified unicast DA table entry */
-		unicastReg &= ~(0xFF << (8 * regOffset));
-	} else {
-		unicastReg &= ~(0xFF << (8 * regOffset));
-		unicastReg |= ((0x01 | (queue << 1)) << (8 * regOffset));
-	}
-	MV_REG_WRITE((ETH_DA_FILTER_UCAST_BASE(portNo) + tblOffset), unicastReg);
-
-	return MV_TRUE;
-}
-
-/*******************************************************************************
-* netaSetSpecialMcastAddr - Special Multicast address settings.
-*
-* DESCRIPTION:
-*       This routine controls the MV device special MAC multicast support.
-*       The Special Multicast Table for MAC addresses supports MAC of the form
-*       0x01-00-5E-00-00-XX (where XX is between 0x00 and 0xFF).
-*       The MAC DA[7:0] bits are used as a pointer to the Special Multicast
-*       Table entries in the DA-Filter table.
-*       This function set the Special Multicast Table appropriate entry
-*       according to the argument given.
-*
-* INPUT:
-*       int     port      Port number.
-*       unsigned char   mcByte      Multicast addr last byte (MAC DA[7:0] bits).
-*       int          queue      Rx queue number for this MAC address.
-*       int             option      0 = Add, 1 = remove address.
-*
-* OUTPUT:
-*       See description.
-*
-* RETURN:
-*       MV_TRUE is output succeeded.
-*       MV_FALSE if option parameter is invalid.
-*
-*******************************************************************************/
-static MV_BOOL netaSetSpecialMcastAddr(int port, MV_U8 lastByte, int queue)
-{
-	unsigned int smcTableReg;
-	unsigned int tblOffset;
-	unsigned int regOffset;
-
-	/* Locate the SMC table entry */
-	tblOffset = (lastByte / 4);	/* Register offset from SMC table base    */
-	regOffset = lastByte % 4;	/* Entry offset within the above register */
-
-	smcTableReg = MV_REG_READ((ETH_DA_FILTER_SPEC_MCAST_BASE(port) + tblOffset * 4));
-
-	if (queue == -1) {
-		/* Clear accepts frame bit at specified Special DA table entry */
-		smcTableReg &= ~(0xFF << (8 * regOffset));
-	} else {
-		smcTableReg &= ~(0xFF << (8 * regOffset));
-		smcTableReg |= ((0x01 | (queue << 1)) << (8 * regOffset));
-	}
-	MV_REG_WRITE((ETH_DA_FILTER_SPEC_MCAST_BASE(port) + tblOffset * 4), smcTableReg);
-
-	return MV_TRUE;
-}
-
-/*******************************************************************************
-* netaSetOtherMcastAddr - Multicast address settings.
-*
-* DESCRIPTION:
-*       This routine controls the MV device Other MAC multicast support.
-*       The Other Multicast Table is used for multicast of another type.
-*       A CRC-8bit is used as an index to the Other Multicast Table entries
-*       in the DA-Filter table.
-*       The function gets the CRC-8bit value from the calling routine and
-*       set the Other Multicast Table appropriate entry according to the
-*       CRC-8 argument given.
-*
-* INPUT:
-*       int     port        Port number.
-*       MV_U8   crc8        A CRC-8bit (Polynomial: x^8+x^2+x^1+1).
-*       int     queue       Rx queue number for this MAC address.
-*
-* OUTPUT:
-*       See description.
-*
-* RETURN:
-*       MV_TRUE is output succeeded.
-*       MV_FALSE if option parameter is invalid.
-*
-*******************************************************************************/
-static MV_BOOL netaSetOtherMcastAddr(int port, MV_U8 crc8, int queue)
-{
-	unsigned int omcTableReg;
-	unsigned int tblOffset;
-	unsigned int regOffset;
-
-	/* Locate the OMC table entry */
-	tblOffset = (crc8 / 4) * 4;	/* Register offset from OMC table base    */
-	regOffset = crc8 % 4;	/* Entry offset within the above register */
-
-	omcTableReg = MV_REG_READ((ETH_DA_FILTER_OTH_MCAST_BASE(port) + tblOffset));
-
-	if (queue == -1) {
-		/* Clear accepts frame bit at specified Other DA table entry */
-		omcTableReg &= ~(0xFF << (8 * regOffset));
-	} else {
-		omcTableReg &= ~(0xFF << (8 * regOffset));
-		omcTableReg |= ((0x01 | (queue << 1)) << (8 * regOffset));
-	}
-
-	MV_REG_WRITE((ETH_DA_FILTER_OTH_MCAST_BASE(port) + tblOffset), omcTableReg);
-
-	return MV_TRUE;
-}
-
+/************************ Legacy parse function start *******************************/
 /*******************************************************************************
 * mvNetaTosToRxqSet - Map packets with special TOS value to special RX queue
 *
@@ -2086,7 +2096,7 @@ int     mvNetaVprioToRxqGet(int port, int vprio)
 
 	return rxq;
 }
-#endif /* CONFIG_MV_ETH_LEGACY_PARSER */
+/************************ Legacy parse function end *******************************/
 
 /******************************************************************************/
 /*                         PHY Control Functions                              */
@@ -3245,7 +3255,7 @@ MV_STATUS mvNetaTxqBurstSet(int port, int txp, int txq, int burst)
 	return MV_OK;
 }
 
-#ifdef CONFIG_MV_ETH_LEGACY_PARSER
+/************************ Legacy parse function start *******************************/
 /******************************************************************************/
 /*                        RX Dispatching configuration routines               */
 /******************************************************************************/
@@ -3333,8 +3343,7 @@ MV_STATUS mvNetaBpduRxq(int port, int rxq)
 
 	return MV_OK;
 }
-#endif /* CONFIG_MV_ETH_LEGACY_PARSER */
-
+/************************ Legacy parse function end *******************************/
 
 /******************************************************************************/
 /*                      MIB Counters functions                                */

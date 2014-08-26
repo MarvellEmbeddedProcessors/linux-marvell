@@ -117,6 +117,10 @@ extern int pp2_port_vbase[MV_ETH_MAX_PORTS];
 #define MV_ETH_MAX_TXQ			8
 #define MV_ETH_TX_CSUM_MAX_SIZE		9800
 #define MV_PNC_TCAM_LINES		1024    /* TCAM num of entries */
+#define MV_BM_WIN_ID		12
+#define MV_PNC_WIN_ID		11
+#define MV_BM_WIN_ATTR		0x4
+#define MV_PNC_WIN_ATTR		0x4
 
 /* New GMAC module is used */
 #define MV_ETH_GMAC_NEW
@@ -124,6 +128,8 @@ extern int pp2_port_vbase[MV_ETH_MAX_PORTS];
 #define MV_ETH_WRR_NEW
 /* IPv6 parsing support for Legacy parser */
 #define MV_ETH_LEGACY_PARSER_IPV6
+#define MV_ETH_PNC_NEW
+#define MV_ETH_PNC_LB
 
 #endif /* CONFIG_MV_ETH_NETA */
 

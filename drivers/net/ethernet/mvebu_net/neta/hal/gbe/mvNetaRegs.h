@@ -71,9 +71,11 @@ extern "C" {
 #endif /* __cplusplus */
 
 #ifdef CONFIG_ARCH_MVEBU
+#include "mvebu-soc-id.h"
 #include "mvNetConfig.h"
 #else
 #include "mvSysEthConfig.h"
+#include "ctrlEnv/mvCtrlEnvLib.h"
 #endif
 
 #ifdef CONFIG_OF
