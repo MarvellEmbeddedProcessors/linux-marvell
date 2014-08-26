@@ -34,6 +34,15 @@
 		pcie-mem-aperture = <0xe0000000 0x8000000>;
 		pcie-io-aperture  = <0xe8000000 0x100000>;
 
+		ranges = <
+			  MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000	/* CESA0: PHYS=0xf1100000
+									   size 64K */
+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000	/* CESA1: PHYS=0xf1110000 */
+			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000	/* BM: PHYS=0xf1200000 size 1M */
+			  MBUS_ID(0x0b, 0x04) 0 0xf1300000 0x100000>;	/* PNC: PHYS=0xf1300000 size 1M */
+
 		bootrom {
 			compatible = "marvell,bootrom";
 			reg = <MBUS_ID(0x01, 0x1d) 0 0x200000>;
@@ -137,6 +146,17 @@
 				#size-cells = <0>;
 				compatible = "marvell,orion-mdio";
 				reg = <0x72004 0x4>;
+			};
+
+			/* PnC and BM */
+			bm_pnc@c0000 {
+				compatible = "marvell,neta_bm_pnc";
+				reg = <0xc8000 0xAC 0xb8000 0x48>;
+				clocks = <&gateclk 13>, <&gateclk 29>;
+				/*neta_cap_bm, bitmap of NETA dynamic capabilities, such as PNC, BM, HWF and PME
+				  PNC--0x1, BM--0x2, HWF--0x4, PME--0x8*/
+				neta_cap_bm = <0x3>;
+				pnc_tcam_size = <1024>;
 			};
 
 			eth0: ethernet@70000 {

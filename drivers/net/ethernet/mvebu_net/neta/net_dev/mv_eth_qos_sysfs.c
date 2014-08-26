@@ -32,6 +32,7 @@ disclaimer.
 #include <linux/platform_device.h>
 #include <linux/netdevice.h>
 
+#include "gbe/mvNeta.h"
 #include "mv_eth_sysfs.h"
 #include "mv_netdev.h"
 
@@ -68,43 +69,44 @@ static ssize_t mv_eth_show(struct device *dev,
 	return off;
 }
 
-#ifdef CONFIG_MV_ETH_PNC
-int run_rxq_type(int port, int q, int t)
+int pnc_run_rxq_type(int port, int q, int t)
 {
 	void *port_hndl = mvNetaPortHndlGet(port);
 
 	if (port_hndl == NULL)
 		return 1;
+#ifdef CONFIG_MV_ETH_PNC
+	if (MV_NETA_PNC_CAP()) {
+		if (!mv_eth_pnc_ctrl_en) {
+			pr_err("%s: PNC control is not supported\n", __func__);
+			return 1;
+		}
 
-	if (!mv_eth_pnc_ctrl_en) {
-		pr_err("%s: PNC control is not supported\n", __func__);
-		return 1;
+		switch (t) {
+		case 1:
+			pnc_etype_arp(q);
+			break;
+		case 2:
+			pnc_ip4_tcp(q);
+			break;
+		case 3:
+			pnc_ip4_udp(q);
+			break;
+		default:
+			pr_err("unsupported packet type: value=%d\n", t);
+			return 1;
+		}
 	}
-
-	switch (t) {
-	case 1:
-		pnc_etype_arp(q);
-		break;
-	case 2:
-		pnc_ip4_tcp(q);
-		break;
-	case 3:
-		pnc_ip4_udp(q);
-		break;
-	default:
-		pr_err("unsupported packet type: value=%d\n", t);
-		return 1;
-	}
+#endif /* CONFIG_MV_ETH_PNC */
 	return 0;
 }
-#else
-int run_rxq_type(int port, int q, int t)
+
+int neta_run_rxq_type(int port, int q, int t)
 {
 	void *port_hndl = mvNetaPortHndlGet(port);
 
 	if (port_hndl == NULL)
 		return 1;
-
 	switch (t) {
 	case 0:
 		mvNetaBpduRxq(port, q);
@@ -122,9 +124,9 @@ int run_rxq_type(int port, int q, int t)
 		pr_err("unknown packet type: value=%d\n", t);
 		return 1;
 	}
+
 	return 0;
 }
-#endif /* CONFIG_MV_ETH_PNC */
 
 static ssize_t mv_eth_port_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
@@ -176,9 +178,12 @@ static ssize_t mv_eth_3_store(struct device *dev,
 
 	local_irq_save(flags);
 
-	if (!strcmp(name, "rxq_type"))
-		err = run_rxq_type(p, i, v);
-	else {
+	if (!strcmp(name, "rxq_type")) {
+		if (MV_NETA_PNC_CAP())
+			err = pnc_run_rxq_type(p, i, v);
+		else
+			err = neta_run_rxq_type(p, i, v);
+	} else {
 		err = 1;
 		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
 	}

@@ -67,6 +67,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /************************** NETA PNC Registers ******************************/
 
+#ifdef CONFIG_OF
+extern int pnc_reg_vbase;
+#define MV_PNC_REG_BASE			(pnc_reg_vbase)
+#endif
+extern unsigned int tcam_line_num;
+#define MV_PNC_TCAM_SIZE() (tcam_line_num)
+#ifdef CONFIG_MV_ETH_PNC_WOL
+#define TE_WOL_EOF (tcam_line_num - 1)
+#endif
+/*-------------------------------------------------------------------------------*/
+
 #define MV_PNC_LOOP_CTRL_REG 				(MV_PNC_REG_BASE + 0x00)
 
 #define MV_PNC_TCAM_CTRL_REG 				(MV_PNC_REG_BASE + 0x04)
@@ -318,6 +329,12 @@ struct tcam_entry {
 	struct sram_entry sram;
 	struct tcam_ctrl ctrl;
 }  __attribute__((packed));
+
+#ifdef CONFIG_MV_ETH_PNC
+/* PnC Global variale */
+extern char tcam_text[MV_PNC_TCAM_LINES][TCAM_TEXT];
+extern MV_U8 *mvPncVirtBase;
+#endif
 
 /*
  * TCAM Low Level API

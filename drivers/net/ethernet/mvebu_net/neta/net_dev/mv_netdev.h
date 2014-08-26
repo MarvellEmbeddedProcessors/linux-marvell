@@ -498,8 +498,8 @@ struct bm_pool {
 
 #ifdef CONFIG_MV_ETH_BM_CPU
 #define MV_ETH_BM_POOLS	        MV_BM_POOLS
-#define mv_eth_pool_bm(p)       (p->bm_pool)
-#define mv_eth_txq_bm(q)        (q->bm_only)
+#define mv_eth_pool_bm(p)       (MV_NETA_BM_CAP() ? (p->bm_pool) : 0)
+#define mv_eth_txq_bm(q)        (MV_NETA_BM_CAP() ? (q->bm_only) : 0)
 #else
 #define MV_ETH_BM_POOLS		CONFIG_MV_ETH_PORTS_NUM
 #define mv_eth_pool_bm(p)       0
@@ -879,7 +879,7 @@ struct neta_rx_desc *mv_eth_rx_prefetch(struct eth_port *pp,
 void	*mv_eth_bm_pool_create(int pool, int capacity, MV_ULONG *physAddr);
 #endif /* CONFIG_MV_ETH_BM */
 
-#if defined(CONFIG_MV_ETH_HWF) && !defined(CONFIG_MV_ETH_BM_CPU)
+#ifdef CONFIG_MV_ETH_HWF
 MV_STATUS mv_eth_hwf_bm_create(int port, int mtuPktSize);
 void      mv_hwf_bm_dump(void);
 #endif /* CONFIG_MV_ETH_HWF && !CONFIG_MV_ETH_BM_CPU */

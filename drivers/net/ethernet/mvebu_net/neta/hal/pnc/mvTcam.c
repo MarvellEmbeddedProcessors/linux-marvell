@@ -64,11 +64,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "mvOs.h"
 #include "mvCommon.h"
-#include "ctrlEnv/mvCtrlEnvLib.h"
 
+#include "gbe/mvNetaRegs.h"
 #include "mvPnc.h"
 #include "mvTcam.h"
-#include "gbe/mvNetaRegs.h"
 
 #define DWORD_LEN       32
 
@@ -86,15 +85,18 @@ static int tcam_ctl_flags;
 /*
  * Keep short text per entry
  */
-char tcam_text[CONFIG_MV_PNC_TCAM_LINES][TCAM_TEXT];
+char tcam_text[MV_PNC_TCAM_LINES][TCAM_TEXT];
 
 MV_U8 *mvPncVirtBase = NULL;
 
-MV_STATUS mvPncInit(MV_U8 *pncVirtBase)
+unsigned int tcam_line_num;
+
+MV_STATUS mvPncInit(MV_U8 *pncVirtBase, MV_U32 pncTcamSize)
 {
 	mvPncVirtBase = pncVirtBase;
+	tcam_line_num = pncTcamSize;
 
-	mvOsPrintf("mvPncVirtBase = 0x%p\n", pncVirtBase);
+	mvOsPrintf("mvPncVirtBase = 0x%p, pncTcamSize = %d\n", pncVirtBase, pncTcamSize);
 	return MV_OK;
 }
 
@@ -642,7 +644,7 @@ void tcam_hw_inv(int tid)
 {
 	MV_U32 va;
 
-	WARN_ON_OOR(tid >= CONFIG_MV_PNC_TCAM_LINES);
+	WARN_ON_OOR(tid >= MV_PNC_TCAM_SIZE());
 	va = (MV_U32) mvPncVirtBase;
 	va |= PNC_TCAM_ACCESS_MASK;
 	va |= (tid << TCAM_LINE_INDEX_OFFS);
@@ -655,7 +657,7 @@ void tcam_hw_inv(int tid)
 void tcam_hw_inv_all(void)
 {
 	MV_U32 va;
-	int tid = CONFIG_MV_PNC_TCAM_LINES;
+	int tid = MV_PNC_TCAM_SIZE();
 
 	while (tid--) {
 		va = (MV_U32) mvPncVirtBase;
@@ -677,7 +679,7 @@ int tcam_hw_write(struct tcam_entry *te, int tid)
 	MV_U32 i, va, w32;
 
 	TCAM_DBG("%s: tid=0x%x\n", __func__, tid);
-	ERR_ON_OOR(tid >= CONFIG_MV_PNC_TCAM_LINES);
+	ERR_ON_OOR(tid >= MV_PNC_TCAM_SIZE());
 
 	/* sram */
 	for (i = 0; i < SRAM_LEN; i++) {
@@ -753,7 +755,7 @@ int tcam_hw_read(struct tcam_entry *te, int tid)
 	MV_U32 i, va, w32;
 
 	TCAM_DBG("%s: tid=0x%x\n", __func__, tid);
-	ERR_ON_OOR(tid >= CONFIG_MV_PNC_TCAM_LINES);
+	ERR_ON_OOR(tid >= MV_PNC_TCAM_SIZE());
 
 	te->ctrl.index = tid;
 
@@ -868,7 +870,7 @@ int tcam_hw_dump(int all)
 	struct tcam_entry te;
 	char buff[1024];
 
-	for (i = 0; i < CONFIG_MV_PNC_TCAM_LINES; i++) {
+	for (i = 0; i < MV_PNC_TCAM_SIZE(); i++) {
 		tcam_sw_clear(&te);
 		tcam_hw_read(&te, i);
 		if (!all && (te.ctrl.flags & TCAM_F_INV))
@@ -892,14 +894,16 @@ int tcam_hw_init(void)
 	MV_U32	regVal;
 	struct tcam_entry te;
 
-#if (CONFIG_MV_PNC_TCAM_LINES > MV_PNC_TCAM_LINES)
-#error "CONFIG_MV_PNC_TCAM_LINES must be less or equal than MV_PNC_TCAM_LINES"
-#endif
+	/* Check TCAM size */
+	if (MV_PNC_TCAM_SIZE() > MV_PNC_TCAM_LINES) {
+		mvOsPrintf("MV_PNC_TCAM_SIZE()-%d must be less or equal than MV_PNC_TCAM_LINES\n", MV_PNC_TCAM_SIZE());
+		return -1;
+	}
 
-	/* Power on TCAM arrays accordingly with CONFIG_MV_PNC_TCAM_LINES */
+	/* Power on TCAM arrays accordingly with MV_PNC_TCAM_SIZE() */
 	regVal = MV_REG_READ(MV_PNC_TCAM_CTRL_REG);
 	for (i = 0; i < (MV_PNC_TCAM_LINES / MV_PNC_TCAM_ARRAY_SIZE); i++) {
-		if ((i * MV_PNC_TCAM_ARRAY_SIZE) < CONFIG_MV_PNC_TCAM_LINES)
+		if ((i * MV_PNC_TCAM_ARRAY_SIZE) < MV_PNC_TCAM_SIZE())
 			regVal |= MV_PNC_TCAM_POWER_UP(i); /* Power ON */
 		else
 			regVal &= ~MV_PNC_TCAM_POWER_UP(i); /* Power OFF */
@@ -912,7 +916,7 @@ int tcam_hw_init(void)
 	/* Perform full write */
 	tcam_ctl_flags = TCAM_F_WRITE;
 
-	for (i = 0; i < CONFIG_MV_PNC_TCAM_LINES; i++) {
+	for (i = 0; i < MV_PNC_TCAM_SIZE(); i++) {
 		sram_sw_set_flowid(&te, i, FLOW_CTRL_MASK);
 		tcam_sw_text(&te, "empty");
 		tcam_hw_write(&te, i);

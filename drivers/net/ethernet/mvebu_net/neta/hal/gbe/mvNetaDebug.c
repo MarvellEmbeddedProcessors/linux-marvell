@@ -422,7 +422,16 @@ void mvNetaPortStatus(int port)
 			mvOsPrintf("link down\n");
 	}
 #ifndef CONFIG_MV_ETH_PNC
-	{
+	MV_U32	regValue = MV_REG_READ(ETH_PORT_CONFIG_REG(port));
+
+	mvOsPrintf("default queue: rx=%d, arp=%d, bpdu=%d, tcp=%d, udp=%d\n",
+	   (regValue & ETH_DEF_RX_QUEUE_ALL_MASK) >> ETH_DEF_RX_QUEUE_OFFSET,
+	   (regValue & ETH_DEF_RX_ARP_QUEUE_ALL_MASK) >> ETH_DEF_RX_ARP_QUEUE_OFFSET,
+	   (regValue & ETH_DEF_RX_BPDU_QUEUE_ALL_MASK) >> ETH_DEF_RX_BPDU_QUEUE_OFFSET,
+	   (regValue & ETH_DEF_RX_TCP_QUEUE_ALL_MASK) >> ETH_DEF_RX_TCP_QUEUE_OFFSET,
+	   (regValue & ETH_DEF_RX_UDP_QUEUE_ALL_MASK) >> ETH_DEF_RX_UDP_QUEUE_OFFSET);
+#else /* CONFIG_MV_ETH_PNC */
+	if (!MV_NETA_PNC_CAP()) {
 		MV_U32	regValue = MV_REG_READ(ETH_PORT_CONFIG_REG(port));
 
 		mvOsPrintf("default queue: rx=%d, arp=%d, bpdu=%d, tcp=%d, udp=%d\n",

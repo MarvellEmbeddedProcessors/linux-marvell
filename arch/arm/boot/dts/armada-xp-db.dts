@@ -35,8 +35,10 @@
 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
 			  MBUS_ID(0x09, 0x01) 0 0 0xf1100000 0x10000	/* CESA0: PHYS=0xf1100000
 									   size 64K */
-			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000>;	/* CESA1: PHYS=0xf1110000
+			  MBUS_ID(0x09, 0x05) 0 0 0xf1110000 0x10000	/* CESA1: PHYS=0xf1110000
 									   size 64K */
+			  MBUS_ID(0x0c, 0x04) 0 0 0xf1200000 0x100000>;	/* PNC_BM: PHYS=0xf1200000
+									   size 1M, (PnC 512KB, BM 512KB) */
 
 		devbus-bootcs {
 			status = "okay";

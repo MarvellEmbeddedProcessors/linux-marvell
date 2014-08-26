@@ -121,8 +121,12 @@ static inline MV_STATUS mv_eth_l2sec_tx(struct eth_pbuf *pkt, struct eth_port *p
 	txq_ctrl->txq_count++;
 
 #ifdef CONFIG_MV_ETH_BM_CPU
-	tx_cmd |= NETA_TX_BM_ENABLE_MASK | NETA_TX_BM_POOL_ID_MASK(pkt->pool);
-	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) NULL;
+	if (MV_NETA_BM_CAP()) {
+		tx_cmd |= NETA_TX_BM_ENABLE_MASK | NETA_TX_BM_POOL_ID_MASK(pkt->pool);
+		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) NULL;
+	} else {
+		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) pkt;
+	}
 #else
 	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) pkt;
 #endif /* CONFIG_MV_ETH_BM_CPU */

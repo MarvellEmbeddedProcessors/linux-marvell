@@ -61,9 +61,9 @@ static ssize_t bm_show(struct device *dev,
 	if (!strcmp(name, "help"))
 		return bm_help(buf);
 	else if (!strcmp(name, "regs"))
-		mvBmRegs();
+		mvNetaBmRegs();
 	else if (!strcmp(name, "stat"))
-		mvBmStatus();
+		mvNetaBmStatus();
 	else if (!strcmp(name, "config"))
 		mv_eth_bm_config_print();
 	else {
@@ -87,7 +87,7 @@ static ssize_t bm_store(struct device *dev,
 	local_irq_save(flags);
 
 	if (!strcmp(name, "dump")) {
-		mvBmPoolDump(pool, val);
+		mvNetaBmPoolDump(pool, val);
 	} else if (!strcmp(name, "size")) {
 		err = mv_eth_ctrl_pool_size_set(pool, val);
 	} else {

@@ -114,6 +114,17 @@
 				reg = <0x18200 0x500>;
 			};
 
+			/* PnC and BM */
+			bm_pnc@c0000 {
+				compatible = "marvell,neta_bm_pnc";
+				reg = <0xc0000 0xAC 0xc8000 0x48>;
+				clocks = <&gateclk 13>;
+				/*neta_cap_bm, bitmap of NETA dynamic capabilities, such as PNC, BM, HWF and PME
+				  PNC--0x1, BM--0x2, HWF--0x4, PME--0x8*/
+				neta_cap_bm = <0x3>;
+				pnc_tcam_size = <1024>;
+			};
+
 			eth2: ethernet@30000 {
 				compatible = "marvell,neta";
 				reg = <0x30000 0x4000>;

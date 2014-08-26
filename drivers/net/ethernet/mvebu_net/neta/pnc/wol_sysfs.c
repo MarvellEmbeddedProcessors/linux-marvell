@@ -34,7 +34,9 @@ disclaimer.
 
 #include "mvOs.h"
 #include "mvCommon.h"
+#ifndef CONFIG_ARCH_MVEBU
 #include "ctrlEnv/mvCtrlEnvLib.h"
+#endif
 
 #include "gbe/mvNeta.h"
 #include "pnc/mvPnc.h"

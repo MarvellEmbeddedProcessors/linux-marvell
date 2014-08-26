@@ -65,7 +65,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "mvOs.h"
 #include "mvCommon.h"
 #include "mv802_3.h"
+#ifndef CONFIG_OF
 #include "ctrlEnv/mvCtrlEnvLib.h"
+#endif
 
 #include "gbe/mvNeta.h"
 
@@ -289,7 +291,7 @@ int mv_pnc_wol_rule_set(int port, char *data, char *mask, int size)
 			break;
 
 		/* Set free TCAM entry */
-		for (; tid < TE_WOL_EOF; tid++) {
+		for (; tid < (MV_PNC_TCAM_SIZE() - 1); tid++) {
 
 			te = pnc_tcam_entry_get(tid);
 			if (te != NULL) {
@@ -381,7 +383,7 @@ int mv_pnc_wol_rule_del_all(int port)
 		}
 	}
 	/* Set free TCAM entry */
-	for (i = TE_WOL; i < TE_WOL_EOF; i++)
+	for (i = TE_WOL; i < (MV_PNC_TCAM_SIZE() - 1); i++)
 		pnc_te_del(i);
 
 	return 0;

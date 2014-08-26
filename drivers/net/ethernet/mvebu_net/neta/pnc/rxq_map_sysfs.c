@@ -31,10 +31,13 @@ disclaimer.
 #include <linux/capability.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/version.h>
 
 #include "mvOs.h"
 #include "mvCommon.h"
+#ifndef CONFIG_OF
 #include "ctrlEnv/mvCtrlEnvLib.h"
+#endif
 
 #include "gbe/mvNeta.h"
 #include "pnc/mvPnc.h"
@@ -173,7 +176,7 @@ static struct attribute_group rxq_map_group = {
 	.attrs = rxq_map_attrs,
 };
 
-int __devinit rxq_map_sysfs_init(struct kobject *kobj)
+int rxq_map_sysfs_init(struct kobject *kobj)
 {
 	int err;
 

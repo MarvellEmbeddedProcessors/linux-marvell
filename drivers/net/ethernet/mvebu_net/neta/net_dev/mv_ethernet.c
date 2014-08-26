@@ -198,29 +198,42 @@ static int mv_eth_set_mac_addr_internals(struct net_device *dev, void *addr)
 	int             i;
 
 #ifdef CONFIG_MV_ETH_PNC
-	if (mv_eth_pnc_ctrl_en) {
-		if (pnc_mac_me(priv->port, mac, CONFIG_MV_ETH_RXQ_DEF)) {
-			printk(KERN_ERR "%s: ethSetMacAddr failed\n", dev->name);
+	if (MV_NETA_PNC_CAP()) {
+		if (mv_eth_pnc_ctrl_en) {
+			if (pnc_mac_me(priv->port, mac, CONFIG_MV_ETH_RXQ_DEF)) {
+				pr_err("%s: ethSetMacAddr failed\n", dev->name);
+				return -1;
+			}
+		} else {
+			pr_err("%s: PNC control is disabled\n", __func__);
 			return -1;
 		}
 	} else {
-		printk(KERN_ERR "%s: PNC control is disabled\n", __func__);
-		return -1;
+		/* remove previous address table entry */
+		if (mvNetaMacAddrSet(priv->port, dev->dev_addr, -1) != MV_OK) {
+			pr_err("%s: ethSetMacAddr failed\n", dev->name);
+			return -1;
+		}
+
+		/* set new addr in hw */
+		if (mvNetaMacAddrSet(priv->port, mac, CONFIG_MV_ETH_RXQ_DEF) != MV_OK) {
+			pr_err("%s: ethSetMacAddr failed\n", dev->name);
+			return -1;
+		}
 	}
 #else
 	/* remove previous address table entry */
 	if (mvNetaMacAddrSet(priv->port, dev->dev_addr, -1) != MV_OK) {
-		printk(KERN_ERR "%s: ethSetMacAddr failed\n", dev->name);
+		pr_err("%s: ethSetMacAddr failed\n", dev->name);
 		return -1;
 	}
 
 	/* set new addr in hw */
 	if (mvNetaMacAddrSet(priv->port, mac, CONFIG_MV_ETH_RXQ_DEF) != MV_OK) {
-		printk(KERN_ERR "%s: ethSetMacAddr failed\n", dev->name);
+		pr_err("%s: ethSetMacAddr failed\n", dev->name);
 		return -1;
 	}
-#endif /* CONFIG_MV_ETH_PNC */
-
+#endif
 	/* set addr in the device */
 	for (i = 0; i < 6; i++)
 		dev->dev_addr[i] = mac[i];
@@ -231,7 +244,7 @@ static int mv_eth_set_mac_addr_internals(struct net_device *dev, void *addr)
 }
 
 #ifdef CONFIG_MV_ETH_PNC
-void mv_eth_set_multicast_list(struct net_device *dev)
+void mv_eth_set_multicast_list_pnc(struct net_device *dev)
 {
 	struct eth_port     *priv = MV_ETH_PRIV(dev);
 	int                 rxq = CONFIG_MV_ETH_RXQ_DEF;
@@ -290,8 +303,9 @@ void mv_eth_set_multicast_list(struct net_device *dev)
 		}
 	}
 }
-#else /* !CONFIG_MV_ETH_PNC - legacy parser */
-void mv_eth_set_multicast_list(struct net_device *dev)
+#endif
+
+void mv_eth_set_multicast_list_legacy(struct net_device *dev)
 {
 	struct eth_port    *priv = MV_ETH_PRIV(dev);
 	int                queue = CONFIG_MV_ETH_RXQ_DEF;
@@ -340,8 +354,18 @@ void mv_eth_set_multicast_list(struct net_device *dev)
 		}
 	}
 }
-#endif /* CONFIG_MV_ETH_PNC */
 
+void mv_eth_set_multicast_list(struct net_device *dev)
+{
+#ifdef CONFIG_MV_ETH_PNC
+	if (MV_NETA_PNC_CAP())
+		mv_eth_set_multicast_list_pnc(dev);
+	else
+		mv_eth_set_multicast_list_legacy(dev);
+#else
+	mv_eth_set_multicast_list_legacy(dev);
+#endif /* CONFIG_MV_ETH_PNC */
+}
 
 int     mv_eth_set_mac_addr(struct net_device *dev, void *addr)
 {
@@ -382,22 +406,29 @@ int mv_eth_open(struct net_device *dev)
 	int         queue = CONFIG_MV_ETH_RXQ_DEF;
 
 #ifdef CONFIG_MV_ETH_PNC
-	if (mv_eth_pnc_ctrl_en) {
-		if (pnc_mac_me(priv->port, dev->dev_addr, queue)) {
-			printk(KERN_ERR "%s: ethSetMacAddr failed\n", dev->name);
+	if (MV_NETA_PNC_CAP()) {
+		if (mv_eth_pnc_ctrl_en) {
+			if (pnc_mac_me(priv->port, dev->dev_addr, queue)) {
+				pr_err("%s: ethSetMacAddr failed\n", dev->name);
+				return -1;
+			}
+		} else
+			pr_err("%s: PNC control is disabled\n", __func__);
+	} else {/* Legacy parser */
+		if (mvNetaMacAddrSet(priv->port, dev->dev_addr, queue) != MV_OK) {
+			pr_err("%s: ethSetMacAddr failed\n", dev->name);
 			return -1;
 		}
-	} else
-		printk(KERN_ERR "%s: PNC control is disabled\n", __func__);
+	}
 #else /* Legacy parser */
 	if (mvNetaMacAddrSet(priv->port, dev->dev_addr, queue) != MV_OK) {
-		printk(KERN_ERR "%s: ethSetMacAddr failed\n", dev->name);
+		pr_err("%s: ethSetMacAddr failed\n", dev->name);
 		return -1;
 	}
 #endif /* CONFIG_MV_ETH_PNC */
 
 	if (mv_eth_start(dev)) {
-		printk(KERN_ERR "%s: start interface failed\n", dev->name);
+		pr_err("%s: start interface failed\n", dev->name);
 		return -1;
 	}
 	return 0;

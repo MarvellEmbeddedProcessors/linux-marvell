@@ -8,11 +8,9 @@ config MV_ETH_PORTS_NUM
 menu "BM configuration"
 
 config MV_ETH_BM
-	depends on MV_ETH_NETA && (ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP || ARCH_ARMADA38X)
+	depends on MV_ETH_NETA && (ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP || ARCH_ARMADA38X || ARCH_MVEBU)
 	bool "Buffer Management support (BM)"
-	default y if ARCH_FEROCEON_KW2
-	default n if ARCH_ARMADA_XP
-	default n if ARCH_ARMADA38X
+	default y
         ---help---
 	Enable/Disable hardware buffer management support for NETA driver.
 	if 'y' - BM support is enabled for Hardware Forwarding
@@ -224,24 +222,15 @@ config  MV_ETH_BM_PORT_3_SHORT_BUF_NUM
 
 endmenu
 
-config MV_ETH_LEGACY_PARSER
-	depends on !MV_ETH_PNC
-	bool "Use legacy parser for incoming traffic"
+menuconfig MV_ETH_PNC
+	depends on MV_ETH_NETA && (ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP || ARCH_MVEBU)
+	bool "PnC support"
 	default y
 	---help---
-
-menuconfig MV_ETH_PNC
-        depends on MV_ETH_NETA && (ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP)
-        bool "PnC support"
-	default y
-        ---help---
-
-config MV_PNC_TCAM_LINES
-        depends on MV_ETH_PNC
-        int "Number of TCAM lines supported by PNC"
-        default 512  if ARCH_FEROCEON_KW2
-	default 1024 if ARCH_ARMADA_XP
-        ---help---
+	PnC module is used for parse of incoming traffic.
+	If PnC is involved, incoming traffic is parsed by PnC, legacy mode is bypass.
+	On LK-3.10 legacy and pnc co-exist, user can select it in FDT.
+	On other LK version, it depends on corresponding SoC and config file.
 
 config MV_ETH_PNC_MCAST_NUM
         depends on MV_ETH_PNC
