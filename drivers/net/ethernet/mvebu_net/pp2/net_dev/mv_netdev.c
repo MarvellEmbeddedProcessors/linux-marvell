@@ -2254,7 +2254,7 @@ out:
 #endif /* CONFIG_MV_PP2_STAT_DIST */
 		}
 		/* If after calling mv_pp2_txq_done, txq_ctrl->txq_count equals frags, we need to set the timer */
-		if ((txq_cpu_ptr->txq_count == frags) && (frags > 0))
+		if ((txq_cpu_ptr->txq_count > 0)  && (txq_cpu_ptr->txq_count <= frags) && (frags > 0))
 			mv_pp2_add_tx_done_timer(pp->cpu_config[smp_processor_id()]);
 	}
 #endif /* CONFIG_MV_PP2_TXDONE_ISR */
