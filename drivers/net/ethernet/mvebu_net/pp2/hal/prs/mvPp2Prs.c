@@ -1142,6 +1142,9 @@ static int mvPp2PrsDsaTagEtherTypeSet(int port, int add, int tagged, int extend)
 			/* Clear all AI bits for next iteration */
 			mvPp2PrsSwSramAiUpdate(&pe, 0, SRAM_AI_MASK);
 
+			/* mark vlan single RI */
+			mvPp2PrsSwSramRiUpdate(&pe, RI_VLAN_SINGLE, RI_VLAN_MASK);
+
 			mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_VLAN);
 		} else {
 			/* Set result info bits - No valns ! */
@@ -1214,6 +1217,9 @@ static int mvPp2PrsDsaTagSet(int port, int add, int tagged, int extend)
 
 			/* Clear all AI bits for next iteration */
 			mvPp2PrsSwSramAiUpdate(&pe, 0, SRAM_AI_MASK);
+
+			/* mark vlan single RI */
+			mvPp2PrsSwSramRiUpdate(&pe, RI_VLAN_SINGLE, RI_VLAN_MASK);
 
 			mvPp2PrsSwSramNextLuSet(&pe, PRS_LU_VLAN);
 		} else {
