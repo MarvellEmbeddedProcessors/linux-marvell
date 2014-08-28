@@ -363,6 +363,7 @@ int cph_udp_port_tx(int port, struct net_device *dev, struct sk_buff *skb,
 
 
 #ifdef CONFIG_MV_CPH_FLOW_MAP_HANDLE
+
 /******************************************************************************
 * cph_data_flow_rx()
 * _____________________________________________________________________________
@@ -426,6 +427,7 @@ static int cph_data_flow_rx(int port, struct net_device *dev, struct sk_buff *sk
 
 	return 0;
 }
+#endif
 
 /******************************************************************************
 * cph_data_flow_tx()
@@ -533,7 +535,6 @@ int cph_data_flow_tx(int port, struct net_device *dev, struct sk_buff *skb,
 	}
 	return 1;
 }
-#endif
 
 /******************************************************************************
 * cph_app_packet_rx()
