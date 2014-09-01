@@ -114,6 +114,14 @@ struct sw_vlan_info_t {
 	unsigned char	egr_mode[MV_SWITCH_MAX_PORT_NUM];	/* egress mode of each port         */
 	GT_VTU_ENTRY	vtu_entry;				/* Add this member to record HW VT info to SW table */
 };
+
+enum sw_port_state_t {
+	MV_SWITCH_PORT_DISABLE = 0,
+	MV_SWITCH_BLOCKING,
+	MV_SWITCH_LEARNING,
+	MV_SWITCH_FORWARDING
+};
+
 /*TPM end*/
 #endif
 /*unsigned int	mv_switch_link_detection_init(struct mv_switch_pdata *plat_data);*/
@@ -254,6 +262,10 @@ unsigned int mv_switch_port_num_get(void);
 GT_QD_DEV *mv_switch_qd_dev_get(void);
 int mv_switch_vtu_shadow_dump(void);
 int mv_switch_vlan_tunnel_set(unsigned int lport, GT_BOOL mode);
+int mv_switch_port_force_link_set(unsigned int lport, GT_BOOL enable, GT_BOOL value);
+int mv_switch_port_force_link_get(unsigned int lport, GT_BOOL *enable, GT_BOOL *value);
+int mv_switch_port_state_set(unsigned int lport, enum sw_port_state_t state);
+int mv_switch_port_state_get(unsigned int lport, enum sw_port_state_t *state);
 int mv_switch_cpu_port_get(unsigned int *cpu_port);
 /*TPM end*/
 #endif

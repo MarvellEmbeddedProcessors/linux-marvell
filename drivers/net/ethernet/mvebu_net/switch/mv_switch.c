@@ -5254,6 +5254,59 @@ int mv_switch_vlan_tunnel_set(unsigned int lport, GT_BOOL mode)
 }
 
 /*******************************************************************************
+* mv_switch_port_state_get
+*
+* DESCRIPTION:
+*       This routine gets the forwarding state of given switch port.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*
+* OUTPUTS:
+*	state  -switch port forwarding state
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_state_get(unsigned int lport, enum sw_port_state_t *state)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gstpGetPortState(qd_dev, lport, state);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsGetForcedLink()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_state_set
+*
+* DESCRIPTION:
+*	This routine will set forwarding state.
+*
+* INPUTS:
+*	lport  - logical switch PHY port ID.
+*	state  -switch port forwarding state
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_state_set(unsigned int lport, enum sw_port_state_t state)
+{
+	GT_STATUS rc = GT_OK;
+
+	rc = gstpSetPortState(qd_dev, lport, state);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetForcedFC()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
 * mv_switch_cpu_port_get
 *
 * DESCRIPTION:
