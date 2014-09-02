@@ -1693,8 +1693,10 @@ inline u32 mv_pp2_txq_done(struct eth_port *pp, struct tx_queue *txq_ctrl)
 			txq_ctrl->txq_count, pp->port, txq_ctrl->txp, txq_ctrl->txq, tx_done);
 */
 	/* packet sent by outer tx function */
-	if (txq_cpu_ptr->txq_count < tx_done)
+	if (txq_cpu_ptr->txq_count < tx_done) {
+		pr_warn("%s: txq_count = %d < tx_done = %d\n", __func__, txq_cpu_ptr->txq_count, tx_done);
 		return tx_done;
+	}
 
 	mv_pp2_txq_bufs_free(pp, txq_cpu_ptr, tx_done);
 
@@ -5224,7 +5226,6 @@ static int mv_pp2_priv_init(struct eth_port *pp, int port)
 	static int first_rx_q[MV_ETH_MAX_PORTS];
 	int cpu, i;
 	struct cpu_ctrl	*cpuCtrl;
-	u8	*ext_buf;
 
 	/* Default field per cpu initialization */
 	for (i = 0; i < nr_cpu_ids; i++) {
@@ -5289,28 +5290,27 @@ static int mv_pp2_priv_init(struct eth_port *pp, int port)
 		cpuCtrl->tx_done_timer.data = (unsigned long)cpuCtrl;
 		init_timer(&cpuCtrl->tx_done_timer);
 		clear_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags));
+
+		/* Init pool of external buffers for TSO, fragmentation, etc */
+		cpuCtrl->ext_buf_size = CONFIG_MV_PP2_EXTRA_BUF_SIZE;
+		cpuCtrl->ext_buf_stack = mvStackCreate(CONFIG_MV_PP2_EXTRA_BUF_NUM);
+		if (cpuCtrl->ext_buf_stack == NULL) {
+			pr_err("%s: Error: failed create  ext_buf_stack for port #%d\n", __func__, port);
+			return -ENOMEM;
+		}
+
+		for (i = 0; i < CONFIG_MV_PP2_EXTRA_BUF_NUM; i++) {
+			u8 *ext_buf = mvOsMalloc(CONFIG_MV_PP2_EXTRA_BUF_SIZE);
+			if (ext_buf == NULL) {
+				pr_warn("\to %s Warning: %d of %d extra buffers allocated\n",
+					__func__, i, CONFIG_MV_PP2_EXTRA_BUF_NUM);
+				break;
+			}
+			mvStackPush(cpuCtrl->ext_buf_stack, (MV_U32)ext_buf);
+		}
 	}
 
 	pp->weight = CONFIG_MV_PP2_RX_POLL_WEIGHT;
-
-	/* Init pool of external buffers for TSO, fragmentation, etc */
-	spin_lock_init(&pp->extLock);
-	pp->extBufSize = CONFIG_MV_PP2_EXTRA_BUF_SIZE;
-	pp->extArrStack = mvStackCreate(CONFIG_MV_PP2_EXTRA_BUF_NUM);
-	if (pp->extArrStack == NULL) {
-		pr_err("\to %s: Error: failed create  extArrStack for port #%d\n", __func__, port);
-		return -ENOMEM;
-	}
-
-	for (i = 0; i < CONFIG_MV_PP2_EXTRA_BUF_NUM; i++) {
-		ext_buf = mvOsMalloc(CONFIG_MV_PP2_EXTRA_BUF_SIZE);
-		if (ext_buf == NULL) {
-			pr_warn("\to %s Warning: %d of %d extra buffers allocated\n",
-				__func__, i, CONFIG_MV_PP2_EXTRA_BUF_NUM);
-			break;
-		}
-		mvStackPush(pp->extArrStack, (MV_U32)ext_buf);
-	}
 
 #ifdef CONFIG_MV_PP2_STAT_DIST
 	pp->dist_stats.rx_dist = mvOsMalloc(sizeof(u32) * (pp->rxq_num * CONFIG_MV_PP2_RXQ_DESC + 1));
@@ -5342,10 +5342,11 @@ mv_pp2_hal_init
 */
 static void mv_pp2_priv_cleanup(struct eth_port *pp)
 {
-	int i, port;
+	int cpu, port;
 
 	if (!pp)
 		return;
+
 	port = pp->port;
 
 	mvOsFree(pp->rxq_ctrl);
@@ -5357,12 +5358,14 @@ static void mv_pp2_priv_cleanup(struct eth_port *pp)
 
 	mvPp2PortDestroy(pp->port);
 
-	for (i = 0; i < nr_cpu_ids; i++)
-		kfree(pp->cpu_config[i]);
+	for_each_possible_cpu(cpu) {
+		/* delete pool of external buffers for TSO, fragmentation, etc */
+		if (mvStackDelete(pp->cpu_config[cpu]->ext_buf_stack))
+			pr_err("Error: failed delete ext_buf_stack for port #%d\n", port);
 
-	/* delete pool of external buffers for TSO, fragmentation, etc */
-	if (mvStackDelete(pp->extArrStack))
-		printk(KERN_ERR "Error: failed delete extArrStack for port #%d\n", port);
+		kfree(pp->cpu_config[cpu]);
+	}
+
 
 #ifdef CONFIG_MV_PP2_STAT_DIST
 	mvOsFree(pp->dist_stats.rx_dist);
@@ -5469,10 +5472,11 @@ void mv_pp2_pool_status_print(int pool)
 /***********************************************************************************
  ***  print ext pool status
  ***********************************************************************************/
-void mv_pp2_ext_pool_print(struct eth_port *pp)
+void mv_pp2_ext_pool_print(struct cpu_ctrl *cpu_ctrl)
 {
-	printk(KERN_ERR "\nExt Pool Stack: bufSize = %u bytes\n", pp->extBufSize);
-	mvStackStatus(pp->extArrStack, 0);
+	pr_info("\nExt Pool Stack: cpu = %d, bufSize = %u bytes\n",
+		cpu_ctrl->cpu, cpu_ctrl->ext_buf_size);
+	mvStackStatus(cpu_ctrl->ext_buf_stack, 0);
 }
 
 /***********************************************************************************
@@ -5680,52 +5684,59 @@ void mv_pp2_port_stats_print(unsigned int port)
 
 #ifdef CONFIG_MV_PP2_STAT_ERR
 	pr_info("Errors:\n");
-	pr_info("rx_error..................%10u\n", stat->rx_error);
-	pr_info("tx_timeout................%10u\n", stat->tx_timeout);
-	pr_info("ext_stack_empty...........%10u\n", stat->ext_stack_empty);
-	pr_info("ext_stack_full............%10u\n", stat->ext_stack_full);
-	pr_info("state_err.................%10u\n", stat->state_err);
+	pr_info("rx_error................. %10u\n", stat->rx_error);
+	pr_info("tx_timeout............... %10u\n", stat->tx_timeout);
+	pr_info("state_err................ %10u\n", stat->state_err);
+	pr_info("\n");
+
+	pr_info("ext_stack_empty[cpu]    = ");
+	for_each_possible_cpu(cpu)
+		pr_cont("%10u ", stat->ext_stack_empty[cpu]);
+
+	pr_info("ext_stack_full[cpu]     = ");
+	for_each_possible_cpu(cpu)
+		pr_cont("%10u ", stat->ext_stack_full[cpu]);
 #endif /* CONFIG_MV_PP2_STAT_ERR */
 
 #ifdef CONFIG_MV_PP2_STAT_INF
 	pr_info("\nEvents:\n");
 
-	pr_info("irq[cpu]            = ");
+	pr_info("irq[cpu]                = ");
 	for_each_possible_cpu(cpu)
-		printk(KERN_CONT "%8d ", stat->irq[cpu]);
+		pr_cont("%10u ", stat->irq[cpu]);
 
-	pr_info("irq_none[cpu]       = ");
+	pr_info("irq_none[cpu]           = ");
 	for_each_possible_cpu(cpu)
-		printk(KERN_CONT "%8d ", stat->irq_err[cpu]);
+		pr_cont("%10u ", stat->irq_err[cpu]);
 
-	pr_info("poll[cpu]           = ");
+	pr_info("poll[cpu]               = ");
 	for_each_possible_cpu(cpu)
-		printk(KERN_CONT "%8d ", stat->poll[cpu]);
+		pr_cont("%10u ", stat->poll[cpu]);
 
-	pr_info("poll_exit[cpu]      = ");
+	pr_info("poll_exit[cpu]          = ");
 	for_each_possible_cpu(cpu)
-		printk(KERN_CONT "%8d ", stat->poll_exit[cpu]);
+		pr_cont("%10u ", stat->poll_exit[cpu]);
 
-	pr_info("tx_timer_event[cpu] = ");
+	pr_info("tx_timer_event[cpu]     = ");
 	for_each_possible_cpu(cpu)
-		printk(KERN_CONT "%8d ", stat->tx_done_timer_event[cpu]);
+		pr_cont("%10u ", stat->tx_done_timer_event[cpu]);
 
-	pr_info("tx_timer_add[cpu]   = ");
+	pr_info("tx_timer_add[cpu]       = ");
 	for_each_possible_cpu(cpu)
-		printk(KERN_CONT "%8d ", stat->tx_done_timer_add[cpu]);
+		pr_cont("%10u ", stat->tx_done_timer_add[cpu]);
 
 	pr_info("\n");
-	pr_info("tx_done_event.............%10u\n", stat->tx_done);
-	pr_info("link......................%10u\n", stat->link);
-	pr_info("netdev_stop...............%10u\n", stat->netdev_stop);
-	pr_info("rx_buf_hdr................%10u\n", stat->rx_buf_hdr);
+	pr_info("tx_done_event............ %10u\n", stat->tx_done);
+	pr_info("link..................... %10u\n", stat->link);
+	pr_info("netdev_stop.............. %10u\n", stat->netdev_stop);
+	pr_info("rx_buf_hdr............... %10u\n", stat->rx_buf_hdr);
 
 #ifdef CONFIG_MV_PP2_RX_SPECIAL
-	pr_info("rx_special................%10u\n", stat->rx_special);
+	pr_info("rx_special............... %10u\n", stat->rx_special);
 #endif /* CONFIG_MV_PP2_RX_SPECIAL */
 
 #ifdef CONFIG_MV_PP2_TX_SPECIAL
-	pr_info("tx_special................%10u\n", stat->tx_special);
+	pr_info("tx_special............... %10u\n", stat->tx_special);
 #endif /* CONFIG_MV_PP2_TX_SPECIAL */
 #endif /* CONFIG_MV_PP2_STAT_INF */
 
@@ -5734,31 +5745,37 @@ void mv_pp2_port_stats_print(unsigned int port)
 		__u32 total_rx_ok = 0;
 
 		pr_info("\nDebug statistics:\n");
-		printk(KERN_ERR "\n");
-		printk(KERN_ERR "rx_gro....................%10u\n", stat->rx_gro);
-		printk(KERN_ERR "rx_gro_bytes .............%10u\n", stat->rx_gro_bytes);
+		pr_info("\n");
 
-		printk(KERN_ERR "tx_tso....................%10u\n", stat->tx_tso);
-		printk(KERN_ERR "tx_tso_bytes .............%10u\n", stat->tx_tso_bytes);
-		printk(KERN_ERR "tx_tso_no_resource........%10u\n", stat->tx_tso_no_resource);
+		pr_info("ext_stack_get[cpu]      = ");
+		for_each_possible_cpu(cpu)
+			pr_cont("%10u ", stat->ext_stack_get[cpu]);
 
-		printk(KERN_ERR "rx_netif..................%10u\n", stat->rx_netif);
-		printk(KERN_ERR "rx_drop_sw................%10u\n", stat->rx_drop_sw);
-		printk(KERN_ERR "rx_csum_hw................%10u\n", stat->rx_csum_hw);
-		printk(KERN_ERR "rx_csum_sw................%10u\n", stat->rx_csum_sw);
+		pr_info("ext_stack_put[cpu]      = ");
+		for_each_possible_cpu(cpu)
+			pr_cont("%10u ", stat->ext_stack_put[cpu]);
 
+		pr_info("\n");
+		pr_info("rx_gro................... %10u\n", stat->rx_gro);
+		pr_info("rx_gro_bytes ............ %10u\n", stat->rx_gro_bytes);
 
-		printk(KERN_ERR "tx_skb_free...............%10u\n", stat->tx_skb_free);
-		printk(KERN_ERR "tx_sg.....................%10u\n", stat->tx_sg);
-		printk(KERN_ERR "tx_csum_hw................%10u\n", stat->tx_csum_hw);
-		printk(KERN_ERR "tx_csum_sw................%10u\n", stat->tx_csum_sw);
+		pr_info("rx_netif................. %10u\n", stat->rx_netif);
+		pr_info("rx_drop_sw............... %10u\n", stat->rx_drop_sw);
+		pr_info("rx_csum_hw............... %10u\n", stat->rx_csum_hw);
+		pr_info("rx_csum_sw............... %10u\n", stat->rx_csum_sw);
 
-		printk(KERN_ERR "ext_stack_get.............%10u\n", stat->ext_stack_get);
-		printk(KERN_ERR "ext_stack_put ............%10u\n", stat->ext_stack_put);
+		pr_info("tx_tso................... %10u\n", stat->tx_tso);
+		pr_info("tx_tso_bytes ............ %10u\n", stat->tx_tso_bytes);
+		pr_info("tx_tso_no_resource....... %10u\n", stat->tx_tso_no_resource);
 
-		printk(KERN_ERR "\n");
+		pr_info("tx_skb_free.............. %10u\n", stat->tx_skb_free);
+		pr_info("tx_sg.................... %10u\n", stat->tx_sg);
+		pr_info("tx_csum_hw............... %10u\n", stat->tx_csum_hw);
+		pr_info("tx_csum_sw............... %10u\n", stat->tx_csum_sw);
 
-		printk(KERN_ERR "RXQ:       rx_ok\n\n");
+		pr_info("\n");
+
+		pr_info("RXQ:       rx_ok\n\n");
 		for (queue = 0; queue < pp->rxq_num; queue++) {
 			u32 rxq_ok = 0;
 
@@ -5767,7 +5784,7 @@ void mv_pp2_port_stats_print(unsigned int port)
 			pr_info("%3d:  %10u\n",	queue, rxq_ok);
 			total_rx_ok += rxq_ok;
 		}
-		printk(KERN_ERR "SUM:  %10u\n", total_rx_ok);
+		pr_info("SUM:  %10u\n", total_rx_ok);
 	}
 #endif /* CONFIG_MV_PP2_STAT_DBG */
 
@@ -5820,8 +5837,6 @@ void mv_pp2_port_stats_print(unsigned int port)
 	}
 	memset(stat, 0, sizeof(struct port_stats));
 
-	mv_pp2_ext_pool_print(pp);
-
 	/* RX pool statistics */
 	if (pp->pool_short)
 		mv_pp2_pool_status_print(pp->pool_short->pool);
@@ -5864,9 +5879,14 @@ void mv_pp2_port_stats_print(unsigned int port)
 			}
 		}
 #endif /* CONFIG_MV_PP2_TSO */
+		memset(dist_stats, 0, struct dist_stats);
 	}
 #endif /* CONFIG_MV_PP2_STAT_DIST */
+
+	for_each_possible_cpu(cpu)
+		mv_pp2_ext_pool_print(pp->cpu_config[cpu]);
 }
+
 /* mv_pp2_tx_cleanup - reset and delete all tx queues */
 static void mv_pp2_tx_cleanup(struct eth_port *pp)
 {
