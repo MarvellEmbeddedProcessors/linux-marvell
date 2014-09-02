@@ -166,8 +166,8 @@ struct port_stats {
 #ifdef CONFIG_MV_PP2_STAT_ERR
 	u32 rx_error;
 	u32 tx_timeout;
-	u32 ext_stack_empty;
-	u32 ext_stack_full;
+	u32 ext_stack_empty[CONFIG_NR_CPUS];
+	u32 ext_stack_full[CONFIG_NR_CPUS];
 	u32 state_err;
 #endif /* CONFIG_MV_PP2_STAT_ERR */
 
@@ -209,8 +209,8 @@ struct port_stats {
 	u32 tx_tso;
 	u32 tx_tso_no_resource;
 	u32 tx_tso_bytes;
-	u32 ext_stack_put;
-	u32 ext_stack_get;
+	u32 ext_stack_put[CONFIG_NR_CPUS];
+	u32 ext_stack_get[CONFIG_NR_CPUS];
 #endif /* CONFIG_MV_PP2_STAT_DBG */
 };
 
@@ -344,6 +344,8 @@ struct cpu_ctrl {
 	int			cpu;
 	struct timer_list	tx_done_timer;
 	unsigned long		flags;
+	MV_STACK		*ext_buf_stack;
+	int			ext_buf_size;
 };
 
 struct eth_port {
@@ -369,9 +371,6 @@ struct eth_port {
 	struct port_stats	stats;
 	struct dist_stats	dist_stats;
 	int			weight;
-	MV_STACK		*extArrStack;
-	int			extBufSize;
-	spinlock_t		extLock;
 	MV_U8			txq_dscp_map[64];
 	/* Ethtool parameters */
 	__u16			speed_cfg;
@@ -735,33 +734,30 @@ static inline void mv_pp2_tx_desc_flush(struct eth_port *pp, struct pp2_tx_desc 
 
 static inline void *mv_pp2_extra_pool_get(struct eth_port *pp)
 {
+	int cpu = smp_processor_id();
 	void *ext_buf;
 
-	spin_lock(&pp->extLock);
-	if (mvStackIndex(pp->extArrStack) == 0) {
-		STAT_ERR(pp->stats.ext_stack_empty++);
+	if (mvStackIndex(pp->cpu_config[cpu]->ext_buf_stack) == 0) {
+		STAT_ERR(pp->stats.ext_stack_empty[cpu]++);
 		ext_buf = mvOsMalloc(CONFIG_MV_PP2_EXTRA_BUF_SIZE);
 	} else {
-		STAT_DBG(pp->stats.ext_stack_get++);
-		ext_buf = (void *)mvStackPop(pp->extArrStack);
+		STAT_DBG(pp->stats.ext_stack_get[cpu]++);
+		ext_buf = (void *)mvStackPop(pp->cpu_config[cpu]->ext_buf_stack);
 	}
-	spin_unlock(&pp->extLock);
-
 	return ext_buf;
 }
 
 static inline int mv_pp2_extra_pool_put(struct eth_port *pp, void *ext_buf)
 {
-	spin_lock(&pp->extLock);
-	if (mvStackIsFull(pp->extArrStack)) {
-		STAT_ERR(pp->stats.ext_stack_full++);
-		spin_unlock(&pp->extLock);
+	int cpu = smp_processor_id();
+
+	if (mvStackIsFull(pp->cpu_config[cpu]->ext_buf_stack)) {
+		STAT_ERR(pp->stats.ext_stack_full[cpu]++);
 		mvOsFree(ext_buf);
 		return 1;
 	}
-	mvStackPush(pp->extArrStack, (MV_U32)ext_buf);
-	STAT_DBG(pp->stats.ext_stack_put++);
-	spin_unlock(&pp->extLock);
+	mvStackPush(pp->cpu_config[cpu]->ext_buf_stack, (MV_U32)ext_buf);
+	STAT_DBG(pp->stats.ext_stack_put[cpu]++);
 	return 0;
 }
 

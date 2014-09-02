@@ -69,8 +69,6 @@ static const struct mv_pp2_tool_stats mv_pp2_tool_global_strings_stats[] = {
 #ifdef CONFIG_MV_PP2_STAT_ERR
 	{"rx_error", MV_ETH_TOOL_STAT(stats.rx_error)},
 	{"tx_timeout", MV_ETH_TOOL_STAT(stats.tx_timeout)},
-	{"ext_stack_empty", MV_ETH_TOOL_STAT(stats.ext_stack_empty)},
-	{"ext_stack_full", MV_ETH_TOOL_STAT(stats.ext_stack_full)},
 	{"state_err", MV_ETH_TOOL_STAT(stats.state_err)},
 #endif
 #ifdef CONFIG_MV_PP2_STAT_INF
@@ -100,8 +98,6 @@ static const struct mv_pp2_tool_stats mv_pp2_tool_global_strings_stats[] = {
 	{"tx_tso", MV_ETH_TOOL_STAT(stats.tx_tso)},
 	{"tx_tso_no_resource", MV_ETH_TOOL_STAT(stats.tx_tso_no_resource)},
 	{"tx_tso_bytes", MV_ETH_TOOL_STAT(stats.tx_tso_bytes)},
-	{"ext_stack_put", MV_ETH_TOOL_STAT(stats.ext_stack_put)},
-	{"ext_stack_get", MV_ETH_TOOL_STAT(stats.ext_stack_get)},
 #endif
 	{"rate_current", MV_ETH_TOOL_STAT(rate_current)},
 };
