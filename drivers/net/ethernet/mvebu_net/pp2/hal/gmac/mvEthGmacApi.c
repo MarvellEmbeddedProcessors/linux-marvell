@@ -632,6 +632,19 @@ int mvGmacPhyAddrGet(int port)
 	return ((regData & ETH_PHY_ADDR_MASK(port)) >> ETH_PHY_ADDR_OFFS(port));
 }
 
+void mvGmacPhyPollEnable(int enable)
+{
+	unsigned int regData;
+
+	regData = MV_REG_READ(ETH_PHY_AN_CFG0_REG);
+	if (enable)
+		regData &= ~ETH_PHY_AN_CFG0_STOP_AN_SMI0_MASK;
+	else
+		regData |= ETH_PHY_AN_CFG0_STOP_AN_SMI0_MASK;
+
+	MV_REG_WRITE(ETH_PHY_AN_CFG0_REG, regData);
+}
+
 void mvGmacPrintReg(unsigned int reg_addr, char *reg_name)
 {
 	mvOsPrintf("  %-32s: 0x%x = 0x%08x\n", reg_name, reg_addr, MV_REG_READ(reg_addr));
@@ -643,6 +656,11 @@ void mvGmacLmsRegs(void)
 
 	mvGmacPrintReg(ETH_PHY_ADDR_REG, "MV_GOP_LMS_PHY_ADDR_REG");
 	mvGmacPrintReg(ETH_PHY_AN_CFG0_REG, "MV_GOP_LMS_PHY_AN_CFG0_REG");
+
+	mvGmacPrintReg(ETH_PHY_AN_CFG0_REG, "MV_GOP_LMS_PHY_AN_CFG0_REG");
+	mvGmacPrintReg(ETH_PHY_AN_CFG0_REG, "MV_GOP_LMS_PHY_AN_CFG0_REG");
+	mvGmacPrintReg(ETH_ISR_SUM_CAUSE_REG, "ETH_ISR_SUM_CAUSE_REG");
+	mvGmacPrintReg(ETH_ISR_SUM_MASK_REG, "ETH_ISR_SUM_MASK_REG");
 }
 
 void mvGmacPortRegs(int port)
