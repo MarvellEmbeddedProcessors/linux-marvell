@@ -99,7 +99,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define NFC_PG_CNT_MASK			(0xFF << NFC_PG_CNT_OFFS)
 
 /* NAND special features bitmask definition.	*/
-#define NFC_FLAGS_NONE			0x0
+#define NFC_FLAGS_NONE				0x0
 #define NFC_FLAGS_ONFI_MODE_3_SET	0x1
 #define NFC_CLOCK_UPSCALE_200M		0x2
 
@@ -539,7 +539,7 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.oobSz = 224,		/* Spare size */
 	.blkNum = 2048,		/* Number of blocks/sectors in the flash */
 	.id = 0x382C,		/* Device ID 0xDevice,Vendor */
-		.model = "Micron 8Gb 8bit ABABA",
+	.model = "Micron 8Gb 8bit ABABA",
 	.bb_page = 0,		/* Manufacturer Bad block marking page in block */
 	.flags = (NFC_CLOCK_UPSCALE_200M | NFC_FLAGS_ONFI_MODE_3_SET)
 	},
@@ -563,11 +563,34 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.oobSz = 224,		/* Spare size */
 	.blkNum = 4096,		/* Number of blocks/sectors in the flash */
 	.id = 0xd32C,		/* Device ID 0xDevice,Vendor */
-		.model = "Micron 8Gb 8bit ABACA",
-	.bb_page = 0,		/* Man ufacturer Bad block marking page in block */
+	.model = "Micron 8Gb 8bit ABACA",
+	.bb_page = 0,		/* Manufacturer Bad block marking page in block */
 	.flags = (NFC_CLOCK_UPSCALE_200M)
+	},
+	{	/* Micron 2Gb ABAFA  */
+		/* 3.3v parametrs */
+	.tADL = 70,		/* tADL, Address to write data delay */
+	.tCH = 5,		/* tCH, Enable signal hold time */
+	.tCS = 15,		/* tCS, Enable signal setup time */
+	.tWC = 20,		/* tWC, ND_nWE cycle duration, limited to 35 by the ARMADA-XP CPU */
+	.tWH = 7,		/* tWH, ND_nWE high duration */
+	.tWP = 10,		/* tWP, ND_nWE pulse time */
+	.tRC = 21,		/* tRC, ND_nRE cycle duration, limited to 35 by the ARMADA-XP CPU */
+	.tRH = 7,		/* tRH, ND_nRE high duration */
+	.tRP = 10,		/* tRP, ND_nRE pulse width */
+	.tR = 25121,	/* tR = data transfer from cell to register tR = tR+tRR+tWB+1 */
+	.tWHR = 60,		/* tWHR, ND_nWE high to ND_nRE low delay for status read */
+	.tAR = 10,		/* tAR, ND_ALE low to ND_nRE low delay */
+	.tRHW = 100,		/* tRHW, ND_nRE high to ND_nWE low delay */
+	.pgPrBlk = 64,		/* Pages per block - detected */
+	.pgSz = 2048,		/* Page size */
+	.oobSz = 224,		/* Spare size */
+	.blkNum = 2048,		/* Number of blocks/sectors in the flash */
+	.id = 0xDA2C,		/* Device ID 0xDevice,Vendor */
+	.model = "Micron 2Gb 8bit ABAFA",
+	.bb_page = 0,		/* Manufacturer Bad block marking page in block */
+	.flags = NFC_CLOCK_UPSCALE_200M
 	}
-
 };
 
 /* Defined Command set */
