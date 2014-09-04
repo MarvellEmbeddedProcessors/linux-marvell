@@ -139,6 +139,9 @@ extern unsigned int switch_enabled_ports;
 struct bm_pool mv_eth_pool[MV_ETH_BM_POOLS];
 struct eth_port **mv_eth_ports;
 
+/* Global device used for global cache operation */
+static struct device *neta_global_dev;
+
 int mv_ctrl_txdone = CONFIG_MV_ETH_TXDONE_COAL_PKTS;
 EXPORT_SYMBOL(mv_ctrl_txdone);
 
@@ -1390,7 +1393,7 @@ int mv_eth_skb_recycle(struct sk_buff *skb)
 #endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 		STAT_DBG(pool->stats.skb_recycled_ok++);
-		mvOsCacheInvalidate(pp->dev->dev.parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
+		mvOsCacheInvalidate(neta_global_dev->parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
 
 		/* Restore recycle data */
 #if !defined(CONFIG_MV_ETH_BE_WA)
@@ -4184,6 +4187,7 @@ static int mv_eth_probe(struct platform_device *pdev)
 
 	port = pdev->id;
 	if (!mv_eth_initialized) {
+		neta_global_dev = &pdev->dev;
 		if (mv_eth_shared_probe(plat_data))
 			return -ENODEV;
 	}
