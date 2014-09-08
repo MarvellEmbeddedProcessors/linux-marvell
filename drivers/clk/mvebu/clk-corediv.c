@@ -135,14 +135,9 @@ static unsigned long clk_corediv_recalc_rate(struct clk_hw *hwclk,
 static long clk_corediv_round_rate(struct clk_hw *hwclk, unsigned long rate,
 			       unsigned long *parent_rate)
 {
-	/* Valid ratio are 1:4, 1:5, 1:6 and 1:8 */
 	u32 div;
 
-	div = *parent_rate / rate;
-	if (div < 4)
-		div = 4;
-	else if (div > 6)
-		div = 8;
+	div = DIV_ROUND_UP(*parent_rate, rate);
 
 	return *parent_rate / div;
 }
