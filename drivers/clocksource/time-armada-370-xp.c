@@ -49,6 +49,8 @@
 #include <asm/sched_clock.h>
 #include <asm/localtimer.h>
 #include <linux/percpu.h>
+#include <linux/syscore_ops.h>
+
 /*
  * Timer block registers.
  */
@@ -230,6 +232,28 @@ static struct local_timer_ops armada_370_xp_local_timer_ops __cpuinitdata = {
 	.stop	=  armada_370_xp_timer_stop,
 };
 
+static u32 timer0_ctrl_reg, timer0_local_ctrl_reg;
+
+static int armada_370_xp_timer_suspend(void)
+{
+	timer0_ctrl_reg = readl(timer_base + TIMER_CTRL_OFF);
+	timer0_local_ctrl_reg = readl(local_base + TIMER_CTRL_OFF);
+	return 0;
+}
+
+static void armada_370_xp_timer_resume(void)
+{
+	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
+	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
+	writel(timer0_ctrl_reg, timer_base + TIMER_CTRL_OFF);
+	writel(timer0_local_ctrl_reg, local_base + TIMER_CTRL_OFF);
+}
+
+struct syscore_ops armada_370_xp_timer_syscore_ops = {
+	.suspend	= armada_370_xp_timer_suspend,
+	.resume		= armada_370_xp_timer_resume,
+};
+
 static void __init armada_370_xp_timer_common_init(struct device_node *np)
 {
 	u32 clr = 0, set = 0;
@@ -295,6 +319,8 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
 		local_timer_register(&armada_370_xp_local_timer_ops);
 #endif
 	}
+
+	register_syscore_ops(&armada_370_xp_timer_syscore_ops);
 }
 
 static void __init armada_xp_timer_init(struct device_node *np)
