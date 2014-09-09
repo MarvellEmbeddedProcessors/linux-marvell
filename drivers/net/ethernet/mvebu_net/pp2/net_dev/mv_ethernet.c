@@ -151,8 +151,13 @@ int mv_pp2_eth_stop(struct net_device *dev)
 	mv_pp2_stop_internals(priv);
 	for_each_possible_cpu(cpu) {
 		cpuCtrl = priv->cpu_config[cpu];
+#if defined(CONFIG_MV_PP2_TXDONE_IN_HRTIMER)
+		hrtimer_cancel(&cpuCtrl->tx_done_timer);
+		clear_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags));
+#elif defined(CONFIG_MV_PP2_TXDONE_IN_TIMER)
 		del_timer(&cpuCtrl->tx_done_timer);
 		clear_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags));
+#endif
 	}
 	if (dev->irq != 0)
 		free_irq(dev->irq, priv);

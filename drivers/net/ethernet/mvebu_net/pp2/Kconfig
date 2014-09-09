@@ -224,26 +224,60 @@ config MV_PP2_SKB_RECYCLE_DEF
 	---help---
 	Default value for skb recycle capability.
 
-config MV_PP2_TX_DONE_TIMER_PERIOD
+config MV_PP2_TXDONE_PROCESS_METHOD
+	bool "TX_DONE event process method"
+	default y
+	help
+	  It's used for choosing TX_DONE event process method
+	  MV_PP2_TXDONE_ISR means processing TX_DONE event in interrupt mode
+	  MV_PP2_TXDONE_IN_TIMER means using regular timer to process TX_DONE event in polling mode
+	  MV_PP2_TXDONE_IN_HRTIMER means using high-resolution timer to process TX_DONE event in polling mode
+
+choice
+	prompt "TX_DONE event process method"
+	depends on MV_PP2_TXDONE_PROCESS_METHOD
+	default MV_PP2_TXDONE_IN_HRTIMER
+
+	config  MV_PP2_TXDONE_ISR
+		bool "Use interrupt to process TX_DONE event"
+		---help---
+		When chosen TX_DONE event will be process in interrupt mode
+		When unchosen TX_DONE event will be processed in polling mode
+
+	config MV_PP2_TXDONE_IN_TIMER
+		bool "Use regular timer to process TX_DONE event"
+		---help---
+		When chosen TX_DONE event will be process by regular timer in polling mode.
+
+	config MV_PP2_TXDONE_IN_HRTIMER
+		depends on HIGH_RES_TIMERS
+		bool "Use high resolution timer to process TX_DONE event"
+		---help---
+		When chosen TX_DONE event will be process by high resolution timer in polling mode.
+		High resolution timer can support higher precision in ns level.
+		If high resolution timer is enabled, TX processing
+		can free SKB memory much faster.
+
+endchoice
+
+config MV_PP2_TX_DONE_HIGH_RES_TIMER_PERIOD
+	depends on MV_PP2_TXDONE_IN_HRTIMER
+        int "Periodical Tx Done high resolution timer period"
+        default 1000
+        range 10 10000
+        ---help---
+        Periodical high resolution timer period for Tx Done operation in [usec]
+        Its precision is much higher than regular timer whose higest precision is 10 msec
+        Tx done high resolution timer's higest precison is 10 usec
+        Must be larger than or equal to 10 and be smaller than or equal to 10000.
+
+config  MV_PP2_TX_DONE_TIMER_PERIOD
+	depends on MV_PP2_TXDONE_IN_TIMER
         int "Periodical Tx Done timer period"
         default 10
         ---help---
           Periodical timer period for Tx Done operation in [msec].
 
-config MV_PP2_CLEANUP_TIMER_PERIOD
-        int "Periodical Cleanup timer period"
-        default 10
-        ---help---
-          Periodical timer period for cleanup operation in [msec].
-
-config MV_PP2_TXDONE_ISR
-	bool "Use interrupt to process TX_DONE event"
-	default n
-	---help---
-	When chosen TX_DONE event will be process in interrupt mode
-	When unchosen TX_DONE event will be processed in polling mode
-	The default status is disable
-	Please note other options depend on it
 
 config MV_PP2_TXDONE_COAL_PKTS
 	int "Threshold for TX_DONE event trigger"
