@@ -68,6 +68,11 @@ disclaimer.
 #include <linux/phy.h>
 #endif /* CONFIG_OF */
 
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+#include <linux/hrtimer.h>
+#include <linux/ktime.h>
+#endif
+
 #ifdef CONFIG_OF
 /* Virtual address for PP2, ETH module and GMACs when FDT used */
 int pp2_vbase, eth_vbase, pp2_port_vbase[MV_ETH_MAX_PORTS];
@@ -150,6 +155,10 @@ static struct tasklet_struct link_tasklet;
 
 static int wol_ports_bmp;
 
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+static unsigned int mv_pp2_tx_done_hrtimer_period_us = CONFIG_MV_PP2_TX_DONE_HIGH_RES_TIMER_PERIOD;
+#endif
+
 /*
  * Local functions
  */
@@ -186,6 +195,24 @@ void mv_pp2_ctrl_pnc(int en)
 {
 	mv_pp2_pnc_ctrl_en = en;
 }
+
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+unsigned int mv_pp2_tx_done_hrtimer_period_get(void)
+{
+	return mv_pp2_tx_done_hrtimer_period_us;
+}
+
+int mv_pp2_tx_done_hrtimer_period_set(unsigned int period)
+{
+	if ((period < MV_PP2_HRTIMER_PERIOD_MIN) || (period > MV_PP2_HRTIMER_PERIOD_MAX)) {
+		pr_info("period should be in [%lu, %lu]\n", MV_PP2_HRTIMER_PERIOD_MIN, MV_PP2_HRTIMER_PERIOD_MAX);
+		return -EINVAL;
+	}
+
+	mv_pp2_tx_done_hrtimer_period_us = period;
+	return 0;
+}
+#endif
 
 /*****************************************
  *          Adaptive coalescing          *
@@ -5114,6 +5141,22 @@ mtu_out:
 	return 0;
 }
 
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+/***********************************************************
+ * mv_pp2_tx_done_hr_timer_callback --			   *
+ *   callback for tx_done hrtimer                          *
+ ***********************************************************/
+enum hrtimer_restart mv_pp2_tx_done_hr_timer_callback(struct hrtimer *timer)
+{
+	struct cpu_ctrl *cpuCtrl = container_of(timer, struct cpu_ctrl, tx_done_timer);
+
+	tasklet_schedule(&cpuCtrl->tx_done_tasklet);
+
+	return HRTIMER_NORESTART;
+}
+#endif
+
+#ifndef CONFIG_MV_PP2_TXDONE_ISR
 /***********************************************************
  * mv_pp2_tx_done_timer_callback --			   *
  *   N msec periodic callback for tx_done                  *
@@ -5154,6 +5197,7 @@ static void mv_pp2_tx_done_timer_callback(unsigned long data)
 	if (tx_todo > 0)
 		mv_pp2_add_tx_done_timer(cpuCtrl);
 }
+#endif
 
 void mv_pp2_mac_show(int port)
 {
@@ -5331,10 +5375,21 @@ static int mv_pp2_priv_init(struct eth_port *pp, int port)
 
 	for_each_possible_cpu(cpu) {
 		cpuCtrl = pp->cpu_config[cpu];
+
+#if defined(CONFIG_MV_PP2_TXDONE_IN_HRTIMER)
+		memset(&cpuCtrl->tx_done_timer, 0, sizeof(struct hrtimer));
+		hrtimer_init(&cpuCtrl->tx_done_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
+		cpuCtrl->tx_done_timer.function = mv_pp2_tx_done_hr_timer_callback;
+
+		/* initialize tasklet for tx countevent notification */
+		tasklet_init(&cpuCtrl->tx_done_tasklet, mv_pp2_tx_done_timer_callback,
+			     (unsigned long) cpuCtrl);
+#elif defined(CONFIG_MV_PP2_TXDONE_IN_TIMER)
 		memset(&cpuCtrl->tx_done_timer, 0, sizeof(struct timer_list));
 		cpuCtrl->tx_done_timer.function = mv_pp2_tx_done_timer_callback;
 		cpuCtrl->tx_done_timer.data = (unsigned long)cpuCtrl;
 		init_timer(&cpuCtrl->tx_done_timer);
+#endif
 		clear_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags));
 
 		/* Init pool of external buffers for TSO, fragmentation, etc */
@@ -5661,7 +5716,7 @@ void mv_pp2_eth_port_status_print(unsigned int port)
 	}
 	pr_info("\n");
 
-#ifdef CONFIG_MV_PP2_TXDONE_ISR
+#if defined(CONFIG_MV_PP2_TXDONE_ISR)
 	printk(KERN_ERR "Do tx_done in NAPI context triggered by ISR\n");
 	for (txp = 0; txp < pp->txp_num; txp++) {
 		printk(KERN_ERR "txcoal(pkts)[%2d.q] = ", txp);
@@ -5670,9 +5725,14 @@ void mv_pp2_eth_port_status_print(unsigned int port)
 		printk(KERN_CONT "\n");
 	}
 	printk(KERN_ERR "\n");
-#else
-	pr_err("Do tx_done in TX or Timer context: tx_done_threshold=%d\n", mv_ctrl_pp2_txdone);
+#elif defined(CONFIG_MV_PP2_TXDONE_IN_HRTIMER)
+	pr_err("Do tx_done in TX or high-resolution Timer's tasklet: tx_done_threshold=%d timer_interval=%d usec\n",
+	mv_ctrl_pp2_txdone, mv_pp2_tx_done_hrtimer_period_get());
+#elif defined(CONFIG_MV_PP2_TXDONE_IN_TIMER)
+	pr_err("Do tx_done in TX or regular Timer context: tx_done_threshold=%d timer_interval=%d msec\n",
+	mv_ctrl_pp2_txdone, CONFIG_MV_PP2_TX_DONE_TIMER_PERIOD);
 #endif /* CONFIG_MV_PP2_TXDONE_ISR */
+	pr_err("\n");
 
 	printk(KERN_ERR "txp=%d, zero_pad=%s, mh_en=%s (0x%04x), hw_cmd: 0x%08x 0x%08x 0x%08x\n",
 		pp->tx_spec.txp, (pp->tx_spec.flags & MV_ETH_TX_F_NO_PAD) ? "Disabled" : "Enabled",

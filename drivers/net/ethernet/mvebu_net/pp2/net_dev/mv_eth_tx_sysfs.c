@@ -37,31 +37,37 @@ disclaimer.
 #include "mv_netdev.h"
 
 
-static ssize_t mv_pp2_help(char *buf)
+static ssize_t mv_pp2_help(char *b)
 {
-	int off = 0;
+	int o = 0; /* buffer offset */
+	int s = PAGE_SIZE; /* buffer size */
 
-	off += sprintf(buf+off, "cat                              txRegs          - show global TX registers\n");
+	o += scnprintf(b+o, s-o, "cat                              txRegs          - show global TX registers\n");
 #ifdef CONFIG_MV_ETH_PP2_1
-	off += sprintf(buf+off, "echo [p] [txp] [txq]             > pTxqCounters  - show TXQ Counters for port <p/txp/txq> where <txq> range [0..7]\n");
+	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq]             > pTxqCounters  - show TXQ Counters for port <p/txp/txq> where <txq> range [0..7]\n");
 #endif
-	off += sprintf(buf+off, "echo [p] [txp] [txq]             > pTxqRegs      - show TXQ registers for port <p/txp/txq> where <txq> range [0..7]\n");
-	off += sprintf(buf+off, "echo [txq]                       > gTxqRegs      - show TXQ registers for global <txq> range [0..255]\n");
-	off += sprintf(buf+off, "echo [cpu]                       > aggrTxqRegs   - show Aggregation TXQ registers for <cpu> range [0..max]\n");
-	off += sprintf(buf+off, "echo [cpu] [v]                   > aggrTxqShow   - show aggregated TXQ descriptors ring for <cpu>.\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]         > txqShow       - show TXQ descriptors ring for <p/txp/txq>. v: 0-brief, 1-full\n");
-	off += sprintf(buf+off, "echo [p] [hex]                   > txFlags       - set TX flags. bits: 0-no_pad, 1-mh, 2-hw_cmd\n");
-	off += sprintf(buf+off, "echo [p] [hex]                   > txMH          - set 2 bytes of Marvell Header for transmit\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [cpu]       > txqDef        - set default <txp/txq> for packets sent to port <p> by <cpu>\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]         > txqSize       - set TXQ size <v> for <p/txp/txq>.\n");
+	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq]             > pTxqRegs      - show TXQ registers for port <p/txp/txq> where <txq> range [0..7]\n");
+	o += scnprintf(b+o, s-o, "echo [txq]                       > gTxqRegs      - show TXQ registers for global <txq> range [0..255]\n");
+	o += scnprintf(b+o, s-o, "echo [cpu]                       > aggrTxqRegs   - show Aggregation TXQ registers for <cpu> range [0..max]\n");
+	o += scnprintf(b+o, s-o, "echo [cpu] [v]                   > aggrTxqShow   - show aggregated TXQ descriptors ring for <cpu>.\n");
+	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [v]         > txqShow       - show TXQ descriptors ring for <p/txp/txq>. v: 0-brief, 1-full\n");
+	o += scnprintf(b+o, s-o, "echo [p] [hex]                   > txFlags       - set TX flags. bits: 0-no_pad, 1-mh, 2-hw_cmd\n");
+	o += scnprintf(b+o, s-o, "echo [p] [hex]                   > txMH          - set 2 bytes of Marvell Header for transmit\n");
+	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [cpu]       > txqDef        - set default <txp/txq> for packets sent to port <p> by <cpu>\n");
+	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [v]         > txqSize       - set TXQ size <v> for <p/txp/txq>.\n");
 #ifdef CONFIG_MV_ETH_PP2_1
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [hwf] [swf] > txqLimit      - set HWF <hwf> and SWF <swf> limits for <p/txp/txq>.\n");
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [v]         > txqChunk      - set SWF request chunk [v] for <p/txp/txq>\n");
+	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [hwf] [swf] > txqLimit      - set HWF <hwf> and SWF <swf> limits for <p/txp/txq>.\n");
+	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [v]         > txqChunk      - set SWF request chunk [v] for <p/txp/txq>\n");
 
 #else
-	off += sprintf(buf+off, "echo [p] [txp] [txq] [hwf]       > txqLimit      - set HWF limit <hwf> for <p/txp/txq>.\n");
+	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [hwf]       > txqLimit      - set HWF limit <hwf> for <p/txp/txq>.\n");
 #endif
-	return off;
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+	o += scnprintf(b+o, s-o, "echo [period]                    > txPeriod      - set Tx Done high resolution timer period\n");
+	o += scnprintf(b+o, s-o, "				     [period]: period range is [%lu, %lu], unit usec\n",
+		MV_PP2_HRTIMER_PERIOD_MIN, MV_PP2_HRTIMER_PERIOD_MAX);
+#endif
+	return o;
 }
 
 static ssize_t mv_pp2_show(struct device *dev,
@@ -154,6 +160,10 @@ static ssize_t mv_pp2_txq_store(struct device *dev,
 		mv_pp2_ctrl_txq_limits_set(p, v, a, b, c);
 	} else if (!strcmp(name, "txqChunk")) {
 		mv_pp2_ctrl_txq_chunk_set(p, v, a, b);
+	} else if (!strcmp(name, "txPeriod")) {
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+		mv_pp2_tx_done_hrtimer_period_set(p);
+#endif
 	} else {
 		err = 1;
 		printk(KERN_ERR "%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -179,6 +189,9 @@ static DEVICE_ATTR(txqDef,       S_IWUSR, NULL, mv_pp2_txq_store);
 static DEVICE_ATTR(txqSize,      S_IWUSR, NULL, mv_pp2_txq_store);
 static DEVICE_ATTR(txqLimit,     S_IWUSR, NULL, mv_pp2_txq_store);
 static DEVICE_ATTR(txqChunk,     S_IWUSR, NULL, mv_pp2_txq_store);
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+static DEVICE_ATTR(txPeriod,     S_IWUSR, NULL, mv_pp2_txq_store);
+#endif
 static DEVICE_ATTR(txFlags,      S_IWUSR, NULL, mv_pp2_tx_hex_store);
 static DEVICE_ATTR(txMH,         S_IWUSR, NULL, mv_pp2_tx_hex_store);
 
@@ -195,6 +208,9 @@ static struct attribute *mv_pp2_tx_attrs[] = {
 	&dev_attr_txqSize.attr,
 	&dev_attr_txqLimit.attr,
 	&dev_attr_txqChunk.attr,
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+	&dev_attr_txPeriod.attr,
+#endif
 	&dev_attr_txFlags.attr,
 	&dev_attr_txMH.attr,
 	NULL
