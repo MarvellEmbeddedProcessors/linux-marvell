@@ -34,6 +34,7 @@ disclaimer.
 #include <linux/skbuff.h>
 #include <linux/mv_pp2.h>
 #include <net/ip.h>
+#include <linux/interrupt.h>
 
 #include "mvCommon.h"
 #include "mvOs.h"
@@ -77,6 +78,7 @@ disclaimer.
 
 extern int mv_ctrl_pp2_txdone;
 extern unsigned int mv_pp2_pnc_ctrl_en;
+
 
 /****************************************************************************
  * Rx buffer size: MTU + 2(Marvell Header) + 4(VLAN) + 14(MAC hdr) + 4(CRC) *
@@ -342,7 +344,12 @@ struct cpu_ctrl {
 	struct napi_group_ctrl	*napi_group;
 	int			txq;
 	int			cpu;
-	struct timer_list	tx_done_timer;
+#if defined(CONFIG_MV_PP2_TXDONE_IN_HRTIMER)
+	struct hrtimer		tx_done_timer;
+	struct tasklet_struct	tx_done_tasklet;
+#elif defined(CONFIG_MV_PP2_TXDONE_IN_TIMER)
+	struct timer_list       tx_done_timer;
+#endif
 	unsigned long		flags;
 	MV_STACK		*ext_buf_stack;
 	int			ext_buf_size;
@@ -521,6 +528,13 @@ struct bm_pool {
 #define MV_ETH_BM_COOKIE_QSET_OFFS		16
 /* bits[24-31] - Cpu    */
 #define MV_ETH_BM_COOKIE_CPU_OFFS		24
+
+#ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
+#define MV_PP2_HRTIMER_PERIOD_MIN	(10UL)
+#define MV_PP2_HRTIMER_PERIOD_MAX	(10000UL)
+unsigned int mv_pp2_tx_done_hrtimer_period_get(void);
+int mv_pp2_tx_done_hrtimer_period_set(unsigned int period);
+#endif
 
 static inline int mv_pp2_bm_cookie_grntd_get(__u32 cookie)
 {
@@ -761,15 +775,28 @@ static inline int mv_pp2_extra_pool_put(struct eth_port *pp, void *ext_buf)
 	return 0;
 }
 
+#if defined(CONFIG_MV_PP2_TXDONE_IN_HRTIMER)
+static inline void mv_pp2_add_tx_done_timer(struct cpu_ctrl *cpuCtrl)
+{
+	ktime_t interval;
+	unsigned long delay_in_ns = mv_pp2_tx_done_hrtimer_period_get()*1000; /*the func return value is in us unit*/
+
+	if (test_and_set_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags)) == 0) {
+		STAT_INFO(cpuCtrl->pp->stats.tx_done_timer_add[smp_processor_id()]++);
+		interval = ktime_set(0, delay_in_ns);
+		hrtimer_start(&cpuCtrl->tx_done_timer, interval, HRTIMER_MODE_REL_PINNED);
+	}
+}
+#elif defined(CONFIG_MV_PP2_TXDONE_IN_TIMER)
 static inline void mv_pp2_add_tx_done_timer(struct cpu_ctrl *cpuCtrl)
 {
 	if (test_and_set_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags)) == 0) {
-
 		cpuCtrl->tx_done_timer.expires = jiffies + ((HZ * CONFIG_MV_PP2_TX_DONE_TIMER_PERIOD) / 1000); /* ms */
 		STAT_INFO(cpuCtrl->pp->stats.tx_done_timer_add[smp_processor_id()]++);
 		add_timer_on(&cpuCtrl->tx_done_timer, smp_processor_id());
 	}
 }
+#endif
 
 static inline void mv_pp2_shadow_inc_get(struct txq_cpu_ctrl *txq_cpu)
 {
