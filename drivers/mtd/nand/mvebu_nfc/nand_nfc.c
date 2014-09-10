@@ -1358,7 +1358,8 @@ static int orion_nfc_init_buff(struct orion_nfc_info *info)
 	struct platform_device *pdev = info->pdev;
 
 	if (info->use_dma == 0) {
-		info->data_buff = kmalloc(MAX_BUFF_SIZE, GFP_KERNEL);
+		info->data_buff = devm_kzalloc(&pdev->dev, MAX_BUFF_SIZE,
+					       GFP_KERNEL);
 		if (info->data_buff == NULL)
 			return -ENOMEM;
 		return 0;
@@ -1534,19 +1535,20 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	MV_U32 mv_nand_offset;
 
 	/* Allocate all data: mtd_info -> nand_chip -> orion_nfc_info */
-	mtd = kzalloc(sizeof(struct mtd_info),	GFP_KERNEL);
+	mtd = devm_kzalloc(&pdev->dev, sizeof(struct mtd_info), GFP_KERNEL);
 	if (!mtd) {
 		dev_err(&pdev->dev, "failed to allocate memory for mtd_info\n");
 		return -ENOMEM;
 	}
 
-	info = kzalloc(sizeof(struct orion_nfc_info), GFP_KERNEL);
+	info = devm_kzalloc(&pdev->dev, sizeof(struct orion_nfc_info),
+			    GFP_KERNEL);
 	if (!info) {
 		dev_err(&pdev->dev, "failed to allocate memory for orion_nfc_info\n");
 		return -ENOMEM;
 	}
 
-	nand = kzalloc(sizeof(struct nand_chip), GFP_KERNEL);
+	nand = devm_kzalloc(&pdev->dev, sizeof(struct nand_chip), GFP_KERNEL);
 	if (!nand) {
 		dev_err(&pdev->dev, "failed to allocate memory for nand_chip\n");
 		return -ENOMEM;
@@ -1559,14 +1561,14 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	}
 	ret = clk_prepare_enable(nand_clk);
 	if (ret < 0)
-		return ret;
+		goto fail_put_nand_clk;
 
 	if (of_device_is_compatible(np, "marvell,armada-375-nand")) {
 		info->aux_clk = devm_clk_get(&pdev->dev, "gateclk");
 		if (IS_ERR(info->aux_clk)) {
 			dev_err(&pdev->dev, "failed to get auxiliary clock\n");
 			ret = PTR_ERR(info->aux_clk);
-			goto fail_put_clk;
+			goto fail_put_nand_clk;
 		}
 		ret = clk_prepare_enable(info->aux_clk);
 		if (ret < 0)
@@ -1591,22 +1593,25 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	/* Determine the NAND Flash Controller mode for later usage */
 	info->nfc_mode = of_get_property(np, "nfc,nfc-mode", NULL);
 	if (!info->nfc_mode || (strncmp(info->nfc_mode, "normal", 6) &&
-	    strncmp(info->nfc_mode, "ganged", 6)))
+	    strncmp(info->nfc_mode, "ganged", 6))) {
 		ret = -EINVAL;
+		goto fail_put_clk;
+	}
 
 	if (ret != 0) {
 		dev_err(&pdev->dev,
 		    "missing or bad NAND configuration from device tree\n");
-		return -ENOENT;
+		ret = -ENOENT;
+		goto fail_put_clk;
 	}
 
 	/* Get IRQ from FDT and map it to the Linux IRQ number */
 	irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-
-	if (irq == NO_IRQ) {
+	if (irq == 0) {
 		dev_err(&pdev->dev,
 		    "IRQ number missing in device tree or can't be mapped\n");
-		return -ENOENT;
+		ret = -ENOENT;
+		goto fail_put_clk;
 	}
 	/* Save acquired IRQ mapping */
 	info->irq = irq;
@@ -1618,7 +1623,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	if (r == NULL) {
 		dev_err(&pdev->dev, "no IO memory resource defined\n");
 		ret = -ENODEV;
-		goto fail_put_clk;
+		goto fail_dispose_irq;
 	}
 
 	r = devm_request_mem_region(&pdev->dev, r->start, r->end - r->start + 1,
@@ -1626,7 +1631,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	if (r == NULL) {
 		dev_err(&pdev->dev, "failed to request memory resource\n");
 		ret = -EBUSY;
-		goto fail_put_clk;
+		goto fail_dispose_irq;
 	}
 
 	info->mmio_base = devm_ioremap(&pdev->dev, r->start,
@@ -1634,7 +1639,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	if (info->mmio_base == NULL) {
 		dev_err(&pdev->dev, "ioremap() failed\n");
 		ret = -ENODEV;
-		goto fail_put_clk;
+		goto fail_dispose_irq;
 	}
 
 	info->mmio_phys_base = r->start;
@@ -1642,7 +1647,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 #ifdef CONFIG_MV_INCLUDE_PDMA
 	if (mvPdmaHalInit(MV_PDMA_MAX_CHANNELS_NUM) != MV_OK) {
 		dev_err(&pdev->dev, "mvPdmaHalInit() failed.\n");
-		goto fail_put_clk;
+		goto fail_dispose_irq;
 	}
 #endif
 	/* Initialize NFC HAL */
@@ -1667,7 +1672,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	if (status != MV_OK) {
 		dev_err(&pdev->dev, "mvNfcInit() failed. Returned %d\n",
 				status);
-		goto fail_put_clk;
+		goto fail_dispose_irq;
 	}
 
 	mvNfcSelectChip(&info->nfcCtrl, MV_NFC_CS_0);
@@ -1678,7 +1683,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 
 	ret = orion_nfc_init_buff(info);
 	if (ret)
-		goto fail_put_clk;
+		goto fail_dispose_irq;
 
 	/* Clear all old events on the status register */
 	MV_REG_WRITE(NFC_STATUS_REG, MV_REG_READ(NFC_STATUS_REG));
@@ -1734,18 +1739,16 @@ static int orion_nfc_probe(struct platform_device *pdev)
 fail_free_irq:
 	free_irq(irq, info);
 fail_free_buf:
-	if (info->use_dma) {
+	if (info->use_dma)
 		dma_free_coherent(&pdev->dev, info->data_buff_size,
 			info->data_buff, info->data_buff_phys);
-	} else
-		kfree(info->data_buff);
+fail_dispose_irq:
+	irq_dispose_mapping(info->irq);
 fail_put_clk:
 	if (of_device_is_compatible(np, "marvell,armada-375-nand"))
 		clk_disable_unprepare(info->aux_clk);
+fail_put_nand_clk:
 	clk_disable_unprepare(nand_clk);
-	kfree(mtd);
-	kfree(nand);
-	kfree(info);
 	return ret;
 }
 
@@ -1763,16 +1766,15 @@ static int orion_nfc_remove(struct platform_device *pdev)
 
 	/*del_mtd_device(mtd);*/
 	free_irq(info->irq, info);
-	if (info->use_dma) {
+	irq_dispose_mapping(info->irq);
+
+	if (info->use_dma)
 		dma_free_writecombine(&pdev->dev, info->data_buff_size,
 				info->data_buff, info->data_buff_phys);
-	} else
-		kfree(info->data_buff);
 
-	if (mtd) {
+	if (mtd)
 		mtd_device_unregister(mtd);
-		kfree(mtd);
-	}
+
 	return 0;
 }
 
