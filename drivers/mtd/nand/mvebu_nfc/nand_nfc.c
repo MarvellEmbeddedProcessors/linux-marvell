@@ -85,7 +85,7 @@ char *cmd_text[] = {
 
 MV_U32 pg_sz[NFC_PAGE_SIZE_MAX_CNT] = {512, 2048, 4096, 8192, 16384};
 MV_U32 mv_nand_base;
-struct clk *nand_clk;
+struct clk *ecc_clk;
 
 /* error code and state */
 enum {
@@ -1503,7 +1503,7 @@ static void mvCtrlNandClkSet(int nClock)
 	 * on 2GHz frequency and divider used in HAL */
 	rate = ARMADA_MAIN_PLL_FREQ / nClock;
 
-	clk_set_rate(nand_clk, rate);
+	clk_set_rate(ecc_clk, rate);
 }
 
 static MV_STATUS mvSysNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl)
@@ -1554,12 +1554,12 @@ static int orion_nfc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	nand_clk = devm_clk_get(&pdev->dev, "ecc_clk");
-	if (IS_ERR(nand_clk)) {
+	ecc_clk = devm_clk_get(&pdev->dev, "ecc_clk");
+	if (IS_ERR(ecc_clk)) {
 		dev_err(&pdev->dev, "failed to get nand clock\n");
-		return PTR_ERR(nand_clk);
+		return PTR_ERR(ecc_clk);
 	}
-	ret = clk_prepare_enable(nand_clk);
+	ret = clk_prepare_enable(ecc_clk);
 	if (ret < 0)
 		goto fail_put_nand_clk;
 
@@ -1748,7 +1748,7 @@ fail_put_clk:
 	if (of_device_is_compatible(np, "marvell,armada-375-nand"))
 		clk_disable_unprepare(info->aux_clk);
 fail_put_nand_clk:
-	clk_disable_unprepare(nand_clk);
+	clk_disable_unprepare(ecc_clk);
 	return ret;
 }
 
@@ -1760,7 +1760,7 @@ static int orion_nfc_remove(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, NULL);
 
-	clk_disable_unprepare(nand_clk);
+	clk_disable_unprepare(ecc_clk);
 	if (of_device_is_compatible(np, "marvell,armada-375-nand"))
 		clk_disable_unprepare(info->aux_clk);
 
