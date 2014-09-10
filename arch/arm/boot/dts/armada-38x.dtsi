@@ -310,6 +310,7 @@
 				reg-shift = <2>;
 				interrupts = <0 12 4>;
 				reg-io-width = <1>;
+				clocks = <&coreclk 0>;
 				status = "disabled";
 			};
 
@@ -319,6 +320,7 @@
 				reg-shift = <2>;
 				interrupts = <0 13 4>;
 				reg-io-width = <1>;
+				clocks = <&coreclk 0>;
 				status = "disabled";
 			};
 
