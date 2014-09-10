@@ -555,12 +555,13 @@
 			};
 
 			nand: nand@d0000 {
-				compatible = "marvell,armada-nand";
+				compatible = "marvell,armada-375-nand";
 				reg = <0xd0000 0x54>;
 				#address-cells = <1>;
 				#size-cells = <1>;
 				interrupts = <0 84 0x4>;
-				clocks = <&gateclk 11>;
+				clocks = <&coredivclk 0>, <&gateclk 11>;
+				clock-names = "ecc_clk", "gateclk";
 				status = "disabled";
 			};
 

@@ -280,6 +280,7 @@
 				reg = <0xd0000 0x400>;
 				status = "disabled";
 				clocks = <&coredivclk 0>;
+				clock-names = "ecc_clk";
 			};
 		};
 	};
