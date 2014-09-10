@@ -130,7 +130,6 @@
 			nfc: nand-flash@d0000 {
 				#address-cells = <1>;
 				#size-cells = <1>;
-				clock-frequency = <200000000>;
 				status = "okay";
 
 				nfc,nfc-mode  = "normal";       /* normal or ganged */

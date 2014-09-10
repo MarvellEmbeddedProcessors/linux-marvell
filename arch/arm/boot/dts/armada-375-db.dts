@@ -145,7 +145,6 @@
 			nand: nand@d0000 {
 				pinctrl-0 = <&nand_pins>;
 				pinctrl-names = "default";
-				clock-frequency = <200000000>;
 				status = "okay";
 
 				nfc,nfc-mode  = "normal";	/* normal or ganged */

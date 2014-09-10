@@ -357,6 +357,7 @@
 				interrupts = <0 84 0x4>;
 				reg = <0xd0000 0x400>;
 				clocks = <&coredivclk 0>;
+				clock-names = "ecc_clk";
 				status = "disabled";
 			};
 

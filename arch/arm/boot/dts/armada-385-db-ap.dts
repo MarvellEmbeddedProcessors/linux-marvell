@@ -98,7 +98,6 @@
 				status = "okay";
 				#address-cells = <1>;
 				#size-cells = <1>;
-				clock-frequency = <200000000>;
 
 				nfc,nfc-mode  = "normal";	/* normal or ganged */
 				nfc,nfc-dma   = <0>;		/* 0 for no, 1 for dma */

@@ -115,6 +115,8 @@ struct orion_nfc_info {
 
 	unsigned int		irq;
 
+	struct clk		*aux_clk;
+
 	unsigned int		buf_start;
 	unsigned int		buf_count;
 
@@ -131,7 +133,6 @@ struct orion_nfc_info {
 	unsigned int		use_dma;	/* use DMA ? */
 
 	/* flash information */
-	unsigned int		tclk;		/* Clock supplied to NFC	*/
 	unsigned int		nfc_width;	/* Width of NFC 16/8 bits	*/
 	const char		*nfc_mode;	/* NAND mode - normal or ganged	*/
 	unsigned int		num_cs;		/* Number of NAND devices	*/
@@ -1551,7 +1552,7 @@ static int orion_nfc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	nand_clk = devm_clk_get(&pdev->dev, NULL);
+	nand_clk = devm_clk_get(&pdev->dev, "ecc_clk");
 	if (IS_ERR(nand_clk)) {
 		dev_err(&pdev->dev, "failed to get nand clock\n");
 		return PTR_ERR(nand_clk);
@@ -1559,6 +1560,18 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	ret = clk_prepare_enable(nand_clk);
 	if (ret < 0)
 		return ret;
+
+	if (of_device_is_compatible(np, "marvell,armada-375-nand")) {
+		info->aux_clk = devm_clk_get(&pdev->dev, "gateclk");
+		if (IS_ERR(info->aux_clk)) {
+			dev_err(&pdev->dev, "failed to get auxiliary clock\n");
+			ret = PTR_ERR(info->aux_clk);
+			goto fail_put_clk;
+		}
+		ret = clk_prepare_enable(info->aux_clk);
+		if (ret < 0)
+			goto fail_put_clk;
+	}
 
 	/* Hookup pointers */
 	info->pdev = pdev;
@@ -1569,7 +1582,6 @@ static int orion_nfc_probe(struct platform_device *pdev)
 
 	/* Parse DT tree and acquire all necessary data */
 	ret = 0;
-	ret |= of_property_read_u32(np, "clock-frequency", &info->tclk);
 	ret |= of_property_read_u32(np, "nfc,nfc-dma", &info->use_dma);
 	ret |= of_property_read_u32(np, "nfc,nfc-width", &info->nfc_width);
 	ret |= of_property_read_u32(np, "nfc,ecc-type", &info->ecc_type);
@@ -1643,7 +1655,6 @@ static int orion_nfc_probe(struct platform_device *pdev)
 	else
 		nfcInfo.ifMode = MV_NFC_IF_2X8;
 	nfcInfo.autoStatusRead = MV_FALSE;
-	nfcInfo.tclk = info->tclk;
 	nfcInfo.readyBypass = MV_FALSE;
 	nfcInfo.osHandle = NULL;
 	nfcInfo.regsPhysAddr = mv_nand_base - mv_nand_offset;
@@ -1729,6 +1740,8 @@ fail_free_buf:
 	} else
 		kfree(info->data_buff);
 fail_put_clk:
+	if (of_device_is_compatible(np, "marvell,armada-375-nand"))
+		clk_disable_unprepare(info->aux_clk);
 	clk_disable_unprepare(nand_clk);
 	kfree(mtd);
 	kfree(nand);
@@ -1740,10 +1753,13 @@ static int orion_nfc_remove(struct platform_device *pdev)
 {
 	struct mtd_info *mtd = platform_get_drvdata(pdev);
 	struct orion_nfc_info *info = (struct orion_nfc_info *)((struct nand_chip *)mtd->priv)->priv;
+	struct device_node *np = pdev->dev.of_node;
 
 	platform_set_drvdata(pdev, NULL);
 
 	clk_disable_unprepare(nand_clk);
+	if (of_device_is_compatible(np, "marvell,armada-375-nand"))
+		clk_disable_unprepare(info->aux_clk);
 
 	/*del_mtd_device(mtd);*/
 	free_irq(info->irq, info);
@@ -1816,6 +1832,7 @@ static int orion_nfc_resume(struct platform_device *pdev)
 
 static struct of_device_id mv_nfc_dt_ids[] = {
 	{ .compatible = "marvell,armada-nand", },
+	{ .compatible = "marvell,armada-375-nand", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mv_nfc_dt_ids);
