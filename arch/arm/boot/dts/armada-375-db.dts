@@ -121,7 +121,6 @@
 
 			serial@12000 {
 				status = "okay";
-				clocks = <&coreclk 0>;
 			};
 
 			spi0: spi@10600 {
