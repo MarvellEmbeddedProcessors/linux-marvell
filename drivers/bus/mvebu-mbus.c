@@ -117,6 +117,8 @@ struct mvebu_mbus_soc_data {
 	unsigned int (*win_remap_offset)(const int win);
 	bool has_mbus_bridge;
 	void (*setup_cpu_target)(struct mvebu_mbus_state *s);
+	int (*save_cpu_target)(struct mvebu_mbus_state *s,
+			       u32 *store_addr);
 	int (*show_cpu_target)(struct mvebu_mbus_state *s,
 			       struct seq_file *seq, void *v);
 };
@@ -135,6 +137,7 @@ struct mvebu_mbus_state {
 	void __iomem *mbuswins_base;
 	void __iomem *sdramwins_base;
 	void __iomem *mbusbridge_base;
+	phys_addr_t sdramwins_phys_base;
 	struct dentry *debugfs_root;
 	struct dentry *debugfs_sdram;
 	struct dentry *debugfs_devs;
@@ -616,6 +619,28 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
 	mvebu_mbus_dram_info.num_cs = cs;
 }
 
+static int
+mvebu_mbus_default_save_cpu_target(struct mvebu_mbus_state *mbus,
+				   u32 *store_addr)
+{
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		u32 base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
+		u32 size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
+
+		writel(mbus->sdramwins_phys_base + DDR_BASE_CS_OFF(i),
+		       store_addr++);
+		writel(base, store_addr++);
+		writel(mbus->sdramwins_phys_base + DDR_SIZE_CS_OFF(i),
+		       store_addr++);
+		writel(size, store_addr++);
+	}
+
+	/* We've written 16 words to the store address */
+	return 16;
+}
+
 static void __init
 mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
 {
@@ -646,10 +671,17 @@ mvebu_mbus_dove_setup_cpu_target(struct mvebu_mbus_state *mbus)
 	mvebu_mbus_dram_info.num_cs = cs;
 }
 
+int mvebu_mbus_save_cpu_target(u32 *store_addr)
+{
+	return mbus_state.soc->save_cpu_target(&mbus_state, store_addr);
+}
+
+
 static const struct mvebu_mbus_soc_data armada_370_mbus_data = {
 	.num_wins            = 20,
 	.win_cfg_offset      = armada_370_xp_mbus_win_cfg_offset,
 	.win_remap_offset    = generic_mbus_win_remap_8_offset,
+	.save_cpu_target     = mvebu_mbus_default_save_cpu_target,
 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
 };
@@ -659,6 +691,7 @@ static const struct mvebu_mbus_soc_data armada_xp_mbus_data = {
 	.has_mbus_bridge     = true,
 	.win_cfg_offset      = armada_370_xp_mbus_win_cfg_offset,
 	.win_remap_offset    = armada_xp_mbus_win_remap_offset,
+	.save_cpu_target     = mvebu_mbus_default_save_cpu_target,
 	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
 	.show_cpu_target     = mvebu_sdram_debug_show_orion,
 };
@@ -926,6 +959,8 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
 		iounmap(mbus_state.mbuswins_base);
 		return -ENOMEM;
 	}
+
+	mbus->sdramwins_phys_base = sdramwins_phys_base;
 
 	if (mbusbridge_phys_base) {
 		mbus->mbusbridge_base = ioremap(mbusbridge_phys_base,
