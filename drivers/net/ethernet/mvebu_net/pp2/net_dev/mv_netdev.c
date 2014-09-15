@@ -3192,7 +3192,13 @@ void mv_pp2_link_event(struct eth_port *pp, int print)
 		mvPp2PortIngressEnable(pp->port, MV_TRUE);
 	} else {
 		/* Link Down event */
-		mvPp2PortIngressEnable(pp->port, MV_FALSE);
+		/*
+		 * Do not allow disabling PON port since need to filter
+		 * some OAM packet from broadcast LLID even the port is down.
+		 */
+		if (!(MV_PP2_IS_PON_PORT(pp->port)))
+			mvPp2PortIngressEnable(pp->port, MV_FALSE);
+
 		if (dev) {
 			netif_carrier_off(dev);
 			netif_tx_stop_all_queues(dev);
