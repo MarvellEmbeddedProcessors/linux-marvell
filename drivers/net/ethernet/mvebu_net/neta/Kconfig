@@ -8,11 +8,16 @@ config MV_ETH_PORTS_NUM
 menu "BM configuration"
 
 config MV_ETH_BM
-	depends on MV_ETH_NETA && (ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP)
+	depends on MV_ETH_NETA && (ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP || ARCH_ARMADA38X)
 	bool "Buffer Management support (BM)"
 	default y if ARCH_FEROCEON_KW2
 	default n if ARCH_ARMADA_XP
+	default n if ARCH_ARMADA38X
         ---help---
+	Enable/Disable hardware buffer management support for NETA driver.
+	if 'y' - BM support is enabled for Hardware Forwarding
+	To enable BM support for Software forwarding MV_ETH_BM_CPU should
+	be set to 'y' too.
 
 config MV_ETH_BM_CPU
 	depends on MV_ETH_BM
