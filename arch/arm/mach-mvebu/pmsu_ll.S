@@ -34,8 +34,27 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
 	mrc	15, 0, r0, cr0, cr0, 5	@ get the CPU ID
 	and	r0, r0, #15
 	add	r1, r1, r0
-	mov	r0, #0x0
-	strb	r0, [r1]		@ switch SCU power state to Normal mode
+	mov	r2, #0x0
+	strb	r2, [r1]		@ switch SCU power state to Normal mode
+
+	/*
+	 * PCIe deadlock WA for Armada 38x cpuidle:
+	 * The saved data is copied back to the DRAM according to the saved pointer
+	 */
+	mov	r2, #0x10000
+	mul	r1, r0, r2
+	ldr	r0, =0xF1100000
+	add	r0, r0, r1		@ add CPU offset
+	ldr	r1, [r0], #4		@ get address
+	ldr	r2, [r0], #4		@ get pointer address
+	str	r2, [r1]		@ update pointer
+	ldr	r3, [r0],#4		@ ptr size
+	lsr	r3, r3 , #0x2
+1:
+	ldr	r1, [r0], #4
+	str	r1, [r2], #4
+	subs	r3, r3, #0x1
+	bne	1b
 	b	cpu_resume
 ENDPROC(armada_38x_cpu_resume)
 
