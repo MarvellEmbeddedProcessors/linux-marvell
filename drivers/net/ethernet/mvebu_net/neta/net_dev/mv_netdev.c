@@ -2652,7 +2652,9 @@ static int mv_eth_pool_free(int pool, int num)
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
 	ppool->buf_num -= num;
-
+#ifdef CONFIG_MV_ETH_BM
+	mvBmPoolBufNumUpdate(pool, num, 0);
+#endif
 	/* Free buffers from the pool stack too */
 	if (free_all)
 		num = mvStackIndex(ppool->stack);
@@ -2770,7 +2772,9 @@ static int mv_eth_pool_add(struct eth_port *pp, int pool, int buf_num)
 #endif /* CONFIG_MV_ETH_BM_CPU */
 	}
 	bm_pool->buf_num += i;
-
+#ifdef CONFIG_MV_ETH_BM
+	mvBmPoolBufNumUpdate(pool, i, 1);
+#endif
 	printk(KERN_ERR "pool #%d: pkt_size=%d, buf_size=%d - %d of %d buffers added\n",
 	       pool, bm_pool->pkt_size, RX_BUF_SIZE(bm_pool->pkt_size), i, buf_num);
 
