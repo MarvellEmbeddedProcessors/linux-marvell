@@ -13,11 +13,13 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/of_address.h>
+#include <linux/of_fdt.h>
 #include <linux/of_platform.h>
 #include <linux/clocksource.h>
 #include <linux/io.h>
 #include <linux/clk/mvebu.h>
 #include <linux/dma-mapping.h>
+#include <linux/memblock.h>
 #include <linux/mbus.h>
 #include <linux/irqchip.h>
 #include <asm/hardware/cache-l2x0.h>
@@ -132,12 +134,63 @@ static const char * const armada_380_dt_compat[] = {
 	NULL,
 };
 
+/*
+ * When returning from suspend, the platform goes through the
+ * bootloader, which executes its DDR3 training code. This code has
+ * the unfortunate idea of using the first 10 KB of each DRAM bank to
+ * exercise the RAM and calculate the optimal timings. Therefore, this
+ * area of RAM is overwritten, and shouldn't be used by the kernel if
+ * suspend/resume is supported.
+ */
+
+#ifdef CONFIG_SUSPEND
+#define MVEBU_DDR_TRAINING_AREA_SZ (10 * SZ_1K)
+static int __init mvebu_scan_mem(unsigned long node, const char *uname,
+				 int depth, void *data)
+{
+	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
+	const __be32 *reg, *endp;
+	int l;
+
+	if (type == NULL || strcmp(type, "memory"))
+		return 0;
+
+	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &l);
+	if (reg == NULL)
+		reg = of_get_flat_dt_prop(node, "reg", &l);
+	if (reg == NULL)
+		return 0;
+
+	endp = reg + (l / sizeof(__be32));
+	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
+		u64 base, size;
+
+		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
+		size = dt_mem_next_cell(dt_root_size_cells, &reg);
+
+		memblock_reserve(base, MVEBU_DDR_TRAINING_AREA_SZ);
+	}
+
+	return 0;
+}
+
+static void __init mvebu_memblock_reserve(void)
+{
+	of_scan_flat_dt(mvebu_scan_mem, NULL);
+}
+#else
+static void __init mvebu_memblock_reserve(void) {}
+#endif
+
+
+
 DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 380/385/388 (Device Tree)")
 	.smp		= smp_ops(armada_380_smp_ops),
 	.map_io		= debug_ll_io_init,
 	.init_irq	= irqchip_init,
 	.init_time	= armada_380_timer_and_clk_init,
 	.restart	= mvebu_restart,
+	.reserve        = mvebu_memblock_reserve,
 	.dt_compat	= armada_380_dt_compat,
 	.flags          = (MACHINE_NEEDS_CPOLICY_WRITEALLOC |
 			   MACHINE_NEEDS_SHAREABLE_PAGES),
