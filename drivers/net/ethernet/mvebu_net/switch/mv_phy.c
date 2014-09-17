@@ -370,8 +370,20 @@ int mv_phy_port_egr_loopback_set(unsigned int lport, GT_BOOL enable)
 	GT_STATUS rc = GT_OK;
 	GT_BOOL link_forced;
 
+	/*clear the PHY detect bit before enable loopback to preven the port from getting locked up due the PPU bug*/
+	if (enable == GT_TRUE) {
+		rc = gprtSetPHYDetect(mv_switch_qd_dev_get(), lport, GT_FALSE);
+		SW_IF_ERROR_STR(rc, "failed to call gprtSetPHYDetect()\n");
+	}
+
 	rc = gprtSetPortLoopback(mv_switch_qd_dev_get(), lport, enable);
 	SW_IF_ERROR_STR(rc, "failed to call gprtSetPortLoopback()\n");
+
+	/*restore the PHY detect bit after disable loopback*/
+	if (enable == GT_FALSE) {
+		rc = gprtSetPHYDetect(mv_switch_qd_dev_get(), lport, GT_TRUE);
+		SW_IF_ERROR_STR(rc, "failed to call gprtSetPHYDetect()\n");
+	}
 
 	/* Get port force link statue */
 	rc = gpcsGetForcedLink(mv_switch_qd_dev_get(), lport, &link_forced);
