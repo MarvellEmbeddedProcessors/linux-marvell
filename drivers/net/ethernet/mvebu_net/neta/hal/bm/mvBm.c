@@ -319,7 +319,7 @@ MV_STATUS mvBmPoolBufSizeSet(int pool, int buf_size)
 	return MV_OK;
 }
 
-MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num)
+MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num, int add)
 {
 	MV_BM_POOL *pBmPool;
 
@@ -331,10 +331,15 @@ MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num)
 
 	pBmPool = &mvBmPools[pool];
 	if (pBmPool->bufSize == 0) {
-		mvOsPrintf("bmPoolId = %d has unknown buf_size  \n", pool);
+		mvOsPrintf("bmPoolId = %d has unknown buf_size\n", pool);
 		return MV_BAD_PARAM;
 	}
-	pBmPool->bufNum += buf_num;
+
+	if (add)
+		pBmPool->bufNum += buf_num;
+	else
+		pBmPool->bufNum -= buf_num;
+
 	return MV_OK;
 }
 

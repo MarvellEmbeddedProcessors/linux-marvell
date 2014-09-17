@@ -125,7 +125,7 @@ void      mvBmPoolEnable(int pool);
 void      mvBmPoolDisable(int pool);
 MV_BOOL   mvBmPoolIsEnabled(int pool);
 MV_STATUS mvBmPoolInit(int pool, void *virtPoolBase, MV_ULONG physPoolBase, int capacity);
-MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num);
+MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num, int add);
 MV_STATUS mvBmPoolBufSizeSet(int pool, int buf_size);
 void      mvBmRegs(void);
 void      mvBmStatus(void);
