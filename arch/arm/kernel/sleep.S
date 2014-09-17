@@ -98,6 +98,7 @@ THUMB(	mov	sp, r2			)
 THUMB(	bx	r3			)
 ENDPROC(cpu_resume)
 
+	.globl	sleep_save_sp
 sleep_save_sp:
 	.rept	CONFIG_NR_CPUS
 	.long	0				@ preserve stack phys ptr here

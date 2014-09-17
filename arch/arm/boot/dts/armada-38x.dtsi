@@ -472,7 +472,7 @@
 
 				cesa,ctrlModel = /bits/ 16 <0x6800>;
 				cesa,ctrlRev = /bits/ 8 <2>;
-				cesa,sramOffset = /bits/ 16 <0>;
+				cesa,sramOffset = /bits/ 16 <0x40>;
 				status = "disabled";
 
 				crypto10 {

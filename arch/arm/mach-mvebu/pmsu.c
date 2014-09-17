@@ -97,6 +97,7 @@ static phys_addr_t pmsu_mp_phys_base;
 static void __iomem *pmsu_mp_base;
 
 static void *mvebu_cpu_resume;
+static void __iomem *sram_wa_virt_base[2];
 
 static struct of_device_id of_pmsu_table[] = {
 	{ .compatible = "marvell,armada-370-pmsu", },
@@ -113,7 +114,7 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
 
 extern unsigned char mvebu_boot_wa_start;
 extern unsigned char mvebu_boot_wa_end;
-
+extern long sleep_save_sp[CONFIG_NR_CPUS];
 /*
  * This function sets up the boot address workaround needed for SMP
  * boot on Armada 375 Z1 and cpuidle on Armada 370. It unmaps the
@@ -151,6 +152,27 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
 	iounmap(sram_virt_base);
 
 	return 0;
+}
+
+/*
+ * Due to a known ARM architecture bug which is related to the PCIe bus,
+ * the L2 cache cannot be cleaned during the cpuidle suspend flow under active PCIe traffic.
+ * Therefore we copy the cpuidle saved data to the CESA SRAM instead of cleaning it to the DRAM
+ * and copy it to the DRAM when we return from the idle state
+ */
+int armada_38x_cpuidle_wa(void)
+{
+	u32 *tmp;
+	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
+
+	tmp = sram_wa_virt_base[hw_cpu];
+	*tmp = virt_to_phys(&sleep_save_sp[hw_cpu]);	/* Save address */
+	tmp++;
+	*tmp = sleep_save_sp[hw_cpu];			/* Save pointer address */
+	tmp++;
+	*tmp = 0x2C;					/* Save size */
+	tmp++;
+	memcpy(tmp, sleep_save_sp[hw_cpu] + 0xC0000000, 0x2C); /* Copy from virtual address (mmu enabled) */
 }
 
 static int __init mvebu_v7_pmsu_init(void)
@@ -310,6 +332,8 @@ static int armada_38x_do_cpu_suspend(unsigned long deepidle)
 {
 	unsigned long flags = 0;
 
+	armada_38x_cpuidle_wa();
+
 	if (deepidle)
 		flags |= PMSU_PREPARE_DEEP_IDLE;
 
@@ -455,6 +479,16 @@ int armada_38x_cpuidle_init(void)
 
 	mvebu_cpu_resume = armada_38x_cpu_resume;
 	mvebu_v7_cpuidle_device.dev.platform_data = &armada_38x_cpuidle;
+
+	/* PCIe deadlock WA for Armada 38x cpuidle */
+	/* CESA SRAM remap */
+	sram_wa_virt_base[0] = ioremap(0xf1100000, SZ_64);
+	sram_wa_virt_base[1] = ioremap(0xf1110000, SZ_64);
+
+	/* Disable the L2 cache clean function as it is being used in the cpu_suspend
+	 * Flow and violates the PCIe deadlock WA.
+	 * We cannot disable this function in the L2 cache driver as it will break SMP boot */
+	outer_cache.clean_range = NULL;
 
 	return 0;
 }
