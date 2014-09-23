@@ -12,7 +12,6 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
-#define ARM_BE8(code...)
 
 /*
  * This is the entry point through which CPUs exiting cpuidle deep
