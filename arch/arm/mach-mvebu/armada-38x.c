@@ -47,12 +47,12 @@ void armada_380_scu_enable(void)
 	if (np) {
 		scu_base = of_iomap(np, 0);
 
-		scu_ctrl = __raw_readl(scu_base + SCU_CTRL);
+		scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
 		/* already enabled? */
 		if (!(scu_ctrl & 1)) {
 			/* Enable SCU Speculative linefills to L2 */
 			scu_ctrl |= (1 << 3);
-			__raw_writel(scu_ctrl, scu_base + SCU_CTRL);
+			writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
 		}
 		scu_enable(scu_base);
 	}
