@@ -52,7 +52,7 @@ static void mv_memcpy_set_mode(struct mv_memcpy_chan *chan,
 			       enum dma_transaction_type type)
 {
 	u32 op_mode;
-	u32 config = __raw_readl(MEMCPY_CONFIG(chan));
+	u32 config = readl_relaxed(MEMCPY_CONFIG(chan));
 
 	switch (type) {
 	case DMA_MEMCPY:
@@ -65,13 +65,13 @@ static void mv_memcpy_set_mode(struct mv_memcpy_chan *chan,
 
 	config &= ~0x7;
 	config |= op_mode;
-	__raw_writel(config, MEMCPY_CONFIG(chan));
+	writel_relaxed(config, MEMCPY_CONFIG(chan));
 }
 
 static void mv_memcpy_set_next_desc(struct mv_memcpy_chan *chan,
 				    u32 next_desc_addr)
 {
-	__raw_writel(next_desc_addr, MEMCPY_NEXT_DESC(chan));
+	writel_relaxed(next_desc_addr, MEMCPY_NEXT_DESC(chan));
 }
 
 #define to_mv_memcpy_chans(chan)		\
@@ -79,12 +79,12 @@ static void mv_memcpy_set_next_desc(struct mv_memcpy_chan *chan,
 
 static void mv_memcpy_chan_activate(struct mv_memcpy_chan *chan)
 {
-	__raw_writel(1, MEMCPY_ACTIVATION(chan));
+	writel_relaxed(1, MEMCPY_ACTIVATION(chan));
 }
 
 static char mv_memcpy_chan_is_busy(struct mv_memcpy_chan *chan)
 {
-	u32 state = __raw_readl(MEMCPY_ACTIVATION(chan));
+	u32 state = readl_relaxed(MEMCPY_ACTIVATION(chan));
 
 	state = (state >> 4) & 0x3;
 	return (state == 1) ? 1 : 0;
