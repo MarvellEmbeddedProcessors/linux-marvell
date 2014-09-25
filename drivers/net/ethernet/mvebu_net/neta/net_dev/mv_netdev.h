@@ -33,6 +33,7 @@ disclaimer.
 #include <linux/skbuff.h>
 #include <linux/mv_neta.h>
 #include <net/ip.h>
+#include <linux/interrupt.h>
 
 #include "mvCommon.h"
 #include "mvOs.h"
@@ -109,7 +110,7 @@ int mv_eth_skb_recycle(struct sk_buff *skb);
 /******************************************************
  * interrupt control --                               *
  ******************************************************/
-#ifdef CONFIG_MV_ETH_TXDONE_ISR
+#ifdef CONFIG_MV_NETA_TXDONE_ISR
 #define MV_ETH_TXDONE_INTR_MASK       (((1 << CONFIG_MV_ETH_TXQ) - 1) << NETA_CAUSE_TXQ_SENT_DESC_OFFS)
 #else
 #define MV_ETH_TXDONE_INTR_MASK       0
@@ -365,7 +366,12 @@ struct cpu_ctrl {
 	int			napiCpuGroup;
 	int             	txq;
 	int                     cpu;
-	struct timer_list   	tx_done_timer;
+#if defined(CONFIG_MV_NETA_TXDONE_IN_HRTIMER)
+	struct hrtimer		tx_done_timer;
+	struct tasklet_struct	tx_done_tasklet;
+#elif defined(CONFIG_MV_NETA_TXDONE_IN_TIMER)
+	struct timer_list	tx_done_timer;
+#endif
 	struct timer_list   	cleanup_timer;
 	unsigned long       	flags;
 
@@ -499,6 +505,13 @@ struct bm_pool {
 #define mv_eth_pool_bm(p)       0
 #define mv_eth_txq_bm(q)        0
 #endif /* CONFIG_MV_ETH_BM_CPU */
+
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+#define MV_ETH_HRTIMER_PERIOD_MIN	(10UL)
+#define MV_ETH_HRTIMER_PERIOD_MAX	(10000UL)
+unsigned int mv_eth_tx_done_hrtimer_period_get(void);
+int mv_eth_tx_done_hrtimer_period_set(unsigned int period);
+#endif
 
 #ifdef CONFIG_MV_ETH_BM
 MV_STATUS mv_eth_bm_config_get(void);
@@ -638,20 +651,34 @@ static inline int mv_eth_extra_pool_put(struct eth_port *pp, void *ext_buf)
 static inline void mv_eth_add_cleanup_timer(struct cpu_ctrl *cpuCtrl)
 {
 	if (test_and_set_bit(MV_ETH_F_CLEANUP_TIMER_BIT, &(cpuCtrl->flags)) == 0) {
-		cpuCtrl->cleanup_timer.expires = jiffies + ((HZ * CONFIG_MV_ETH_CLEANUP_TIMER_PERIOD) / 1000); /* ms */
+		cpuCtrl->cleanup_timer.expires = jiffies + ((HZ * 10) / 1000); /* ms */
 		add_timer_on(&cpuCtrl->cleanup_timer, smp_processor_id());
 	}
 }
 
+#if defined(CONFIG_MV_NETA_TXDONE_IN_HRTIMER)
+static inline void mv_eth_add_tx_done_timer(struct cpu_ctrl *cpuCtrl)
+{
+	ktime_t interval;
+	unsigned long delay_in_ns = mv_eth_tx_done_hrtimer_period_get() * 1000; /*the func return value is in us unit*/
+
+	if (test_and_set_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags)) == 0) {
+		STAT_INFO(cpuCtrl->pp->stats.tx_done_timer_add[smp_processor_id()]++);
+		interval = ktime_set(0, delay_in_ns);
+		hrtimer_start(&cpuCtrl->tx_done_timer, interval, HRTIMER_MODE_REL_PINNED);
+	}
+}
+#elif defined(CONFIG_MV_NETA_TXDONE_IN_TIMER)
 static inline void mv_eth_add_tx_done_timer(struct cpu_ctrl *cpuCtrl)
 {
 	if (test_and_set_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags)) == 0) {
 
-		cpuCtrl->tx_done_timer.expires = jiffies + ((HZ * CONFIG_MV_ETH_TX_DONE_TIMER_PERIOD) / 1000); /* ms */
+		cpuCtrl->tx_done_timer.expires = jiffies + ((HZ * CONFIG_MV_NETA_TX_DONE_TIMER_PERIOD) / 1000); /* ms */
 		STAT_INFO(cpuCtrl->pp->stats.tx_done_timer_add[smp_processor_id()]++);
 		add_timer_on(&cpuCtrl->tx_done_timer, smp_processor_id());
 	}
 }
+#endif
 
 static inline void mv_eth_shadow_inc_get(struct tx_queue *txq)
 {

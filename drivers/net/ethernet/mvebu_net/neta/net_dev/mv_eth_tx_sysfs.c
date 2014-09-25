@@ -60,6 +60,11 @@ static ssize_t mv_eth_help(char *b)
 	o += scnprintf(b+o, s-o, "echo p {0|1}       > tx_nopad      - disable zero padding on transmit\n");
 	o += scnprintf(b+o, s-o, "echo p v           > tx_mh_2B      - set 2 bytes of Marvell Header for transmit\n");
 	o += scnprintf(b+o, s-o, "echo p v           > tx_cmd        - set 4 bytes of TX descriptor offset 0xc\n");
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+	o += scnprintf(b+o, s-o, "echo period        > tx_period     - set Tx Done high resolution timer period\n");
+	o += scnprintf(b+o, s-o, "					period: period range is [%u, %u], unit usec\n",
+								MV_ETH_HRTIMER_PERIOD_MIN, MV_ETH_HRTIMER_PERIOD_MAX);
+#endif
 
 	return o;
 }
@@ -135,6 +140,10 @@ static ssize_t mv_eth_3_store(struct device *dev,
 		err = mv_eth_txp_reset(p, i);
 	} else if (!strcmp(name, "tx_done")) {
 		mv_eth_ctrl_txdone(p);
+	} else if (!strcmp(name, "tx_period")) {
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+		err = mv_eth_tx_done_hrtimer_period_set(p);
+#endif
 	} else {
 		err = 1;
 		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -233,6 +242,9 @@ static DEVICE_ATTR(txq_size,       S_IWUSR, NULL, mv_eth_4_store);
 static DEVICE_ATTR(txq_coal,       S_IWUSR, NULL, mv_eth_4_store);
 static DEVICE_ATTR(mh_en,          S_IWUSR, NULL, mv_eth_port_store);
 static DEVICE_ATTR(tx_done,        S_IWUSR, NULL, mv_eth_3_store);
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+static DEVICE_ATTR(tx_period,      S_IWUSR, NULL, mv_eth_3_store);
+#endif
 static DEVICE_ATTR(txq_mask,       S_IWUSR, NULL, mv_eth_3_hex_store);
 static DEVICE_ATTR(txq_shared,     S_IWUSR, NULL, mv_eth_4_store);
 static DEVICE_ATTR(tx_nopad,       S_IWUSR, NULL, mv_eth_port_store);
@@ -251,6 +263,9 @@ static struct attribute *mv_eth_tx_attrs[] = {
 	&dev_attr_txq_coal.attr,
 	&dev_attr_mh_en.attr,
 	&dev_attr_tx_done.attr,
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+	&dev_attr_tx_period.attr,
+#endif
 	&dev_attr_txq_mask.attr,
 	&dev_attr_txq_shared.attr,
 	&dev_attr_tx_nopad.attr,
