@@ -1282,19 +1282,22 @@ int mv_switch_get_free_buffers_num(void)
 }
 
 #define QD_FMT "%10lu %10lu %10lu %10lu %10lu %10lu %10lu\n"
-#define QD_CNT(c, f) (GT_U32)(c[0]->f), (GT_U32)(c[1]->f), (GT_U32)(c[2]->f), (GT_U32)(c[3]->f),\
-			(GT_U32)(c[4]->f), (GT_U32)(c[5]->f), (GT_U32)(c[6]->f)
+#define QD_CNT_CORRECT(c, f, p) (GT_U32)(c[p]->f - history_counters[p].f)
+#define QD_STAT_FMT "%10u %10u %10u %10u %10u %10u %10u\n"
+#define QD_STAT_CORRECT(c, f, p) (GT_U16)(c[p]->f - history_stats[p].f)
 
 #define QD_MAX 7
 void mv_switch_stats_print(void)
 {
+	static GT_STATS_COUNTER_SET3 history_counters[QD_MAX] = {0};
+	static GT_PORT_STAT2 history_stats[QD_MAX] = {0};
 	GT_STATS_COUNTER_SET3 * counters[QD_MAX];
 	GT_PORT_STAT2 * port_stats[QD_MAX];
 
 	int p;
 
 	if (qd_dev == NULL) {
-		printk(KERN_ERR "Switch is not initialized\n");
+		pr_err("Switch is not initialized\n");
 		return;
 	}
 
@@ -1305,63 +1308,207 @@ void mv_switch_stats_print(void)
 		mvOsMemset(port_stats[p], 0, sizeof(GT_PORT_STAT2));
 	}
 
-	printk(KERN_ERR "Total free buffers:      %u\n\n", mv_switch_get_free_buffers_num());
+	pr_err("Total free buffers:      %u\n\n", mv_switch_get_free_buffers_num());
 
 	for (p = 0; p < QD_MAX; p++) {
 		if (gstatsGetPortAllCounters3(qd_dev, p, counters[p]) != GT_OK)
-			printk(KERN_ERR "gstatsGetPortAllCounters3 for port #%d - FAILED\n", p);
+			pr_err("gstatsGetPortAllCounters3 for port #%d - FAILED\n", p);
 
 		if (gprtGetPortCtr2(qd_dev, p, port_stats[p]) != GT_OK)
-			printk(KERN_ERR "gprtGetPortCtr2 for port #%d - FAILED\n", p);
+			pr_err("gprtGetPortCtr2 for port #%d - FAILED\n", p);
 	}
 
-	printk(KERN_ERR "PortNum         " QD_FMT, (GT_U32) 0, (GT_U32) 1, (GT_U32) 2, (GT_U32) 3, (GT_U32) 4, (GT_U32) 5,
+	pr_err("PortNum         " QD_FMT, (GT_U32) 0, (GT_U32) 1, (GT_U32) 2, (GT_U32) 3, (GT_U32) 4, (GT_U32) 5,
 	       (GT_U32) 6);
-	printk(KERN_ERR "-----------------------------------------------------------------------------------------------\n");
-	printk(KERN_ERR "InGoodOctetsLo  " QD_FMT, QD_CNT(counters, InGoodOctetsLo));
-	printk(KERN_ERR "InGoodOctetsHi  " QD_FMT, QD_CNT(counters, InGoodOctetsHi));
-	printk(KERN_ERR "InBadOctets     " QD_FMT, QD_CNT(counters, InBadOctets));
-	printk(KERN_ERR "InUnicasts      " QD_FMT, QD_CNT(counters, InUnicasts));
-	printk(KERN_ERR "InBroadcasts    " QD_FMT, QD_CNT(counters, InBroadcasts));
-	printk(KERN_ERR "InMulticasts    " QD_FMT, QD_CNT(counters, InMulticasts));
-	printk(KERN_ERR "inDiscardLo     " QD_FMT, QD_CNT(port_stats, inDiscardLo));
-	printk(KERN_ERR "inDiscardHi     " QD_FMT, QD_CNT(port_stats, inDiscardHi));
-	printk(KERN_ERR "InFiltered      " QD_FMT, QD_CNT(port_stats, inFiltered));
+	pr_err("-----------------------------------------------------------------------------------------------\n");
+	pr_err("InGoodOctetsLo  " QD_FMT,
+		QD_CNT_CORRECT(counters, InGoodOctetsLo, 0), QD_CNT_CORRECT(counters, InGoodOctetsLo, 1),
+		QD_CNT_CORRECT(counters, InGoodOctetsLo, 2), QD_CNT_CORRECT(counters, InGoodOctetsLo, 3),
+		QD_CNT_CORRECT(counters, InGoodOctetsLo, 4), QD_CNT_CORRECT(counters, InGoodOctetsLo, 5),
+		QD_CNT_CORRECT(counters, InGoodOctetsLo, 6));
+	pr_err("InGoodOctetsHi  " QD_FMT,
+		QD_CNT_CORRECT(counters, InGoodOctetsHi, 0), QD_CNT_CORRECT(counters, InGoodOctetsHi, 1),
+		QD_CNT_CORRECT(counters, InGoodOctetsHi, 2), QD_CNT_CORRECT(counters, InGoodOctetsHi, 3),
+		QD_CNT_CORRECT(counters, InGoodOctetsHi, 4), QD_CNT_CORRECT(counters, InGoodOctetsHi, 5),
+		QD_CNT_CORRECT(counters, InGoodOctetsHi, 6));
+	pr_err("InBadOctets     " QD_FMT,
+		QD_CNT_CORRECT(counters, InBadOctets, 0), QD_CNT_CORRECT(counters, InBadOctets, 1),
+		QD_CNT_CORRECT(counters, InBadOctets, 2), QD_CNT_CORRECT(counters, InBadOctets, 3),
+		QD_CNT_CORRECT(counters, InBadOctets, 4), QD_CNT_CORRECT(counters, InBadOctets, 5),
+		QD_CNT_CORRECT(counters, InBadOctets, 6));
+	pr_err("InUnicasts      " QD_FMT,
+		QD_CNT_CORRECT(counters, InUnicasts, 0), QD_CNT_CORRECT(counters, InUnicasts, 1),
+		QD_CNT_CORRECT(counters, InUnicasts, 2), QD_CNT_CORRECT(counters, InUnicasts, 3),
+		QD_CNT_CORRECT(counters, InUnicasts, 4), QD_CNT_CORRECT(counters, InUnicasts, 5),
+		QD_CNT_CORRECT(counters, InUnicasts, 6));
+	pr_err("InBroadcasts    " QD_FMT,
+		QD_CNT_CORRECT(counters, InBroadcasts, 0), QD_CNT_CORRECT(counters, InBroadcasts, 1),
+		QD_CNT_CORRECT(counters, InBroadcasts, 2), QD_CNT_CORRECT(counters, InBroadcasts, 3),
+		QD_CNT_CORRECT(counters, InBroadcasts, 4), QD_CNT_CORRECT(counters, InBroadcasts, 5),
+		QD_CNT_CORRECT(counters, InBroadcasts, 6));
+	pr_err("InMulticasts    " QD_FMT,
+		QD_CNT_CORRECT(counters, InMulticasts, 0), QD_CNT_CORRECT(counters, InMulticasts, 1),
+		QD_CNT_CORRECT(counters, InMulticasts, 2), QD_CNT_CORRECT(counters, InMulticasts, 3),
+		QD_CNT_CORRECT(counters, InMulticasts, 4), QD_CNT_CORRECT(counters, InMulticasts, 5),
+		QD_CNT_CORRECT(counters, InMulticasts, 6));
+	pr_err("inDiscardLo     " QD_FMT,
+		QD_STAT_CORRECT(port_stats, inDiscardLo, 0), QD_STAT_CORRECT(port_stats, inDiscardLo, 1),
+		QD_STAT_CORRECT(port_stats, inDiscardLo, 2), QD_STAT_CORRECT(port_stats, inDiscardLo, 3),
+		QD_STAT_CORRECT(port_stats, inDiscardLo, 4), QD_STAT_CORRECT(port_stats, inDiscardLo, 5),
+		QD_STAT_CORRECT(port_stats, inDiscardLo, 6));
+	pr_err("inDiscardHi     " QD_FMT,
+		QD_STAT_CORRECT(port_stats, inDiscardHi, 0), QD_STAT_CORRECT(port_stats, inDiscardHi, 1),
+		QD_STAT_CORRECT(port_stats, inDiscardHi, 2), QD_STAT_CORRECT(port_stats, inDiscardHi, 3),
+		QD_STAT_CORRECT(port_stats, inDiscardHi, 4), QD_STAT_CORRECT(port_stats, inDiscardHi, 5),
+		QD_STAT_CORRECT(port_stats, inDiscardHi, 6));
+	pr_err("inFiltered      " QD_FMT,
+		QD_STAT_CORRECT(port_stats, inFiltered, 0), QD_STAT_CORRECT(port_stats, inFiltered, 1),
+		QD_STAT_CORRECT(port_stats, inFiltered, 2), QD_STAT_CORRECT(port_stats, inFiltered, 3),
+		QD_STAT_CORRECT(port_stats, inFiltered, 4), QD_STAT_CORRECT(port_stats, inFiltered, 5),
+		QD_STAT_CORRECT(port_stats, inFiltered, 6));
+	pr_err("OutOctetsLo     " QD_FMT,
+		QD_CNT_CORRECT(counters, OutOctetsLo, 0), QD_CNT_CORRECT(counters, OutOctetsLo, 1),
+		QD_CNT_CORRECT(counters, OutOctetsLo, 2), QD_CNT_CORRECT(counters, OutOctetsLo, 3),
+		QD_CNT_CORRECT(counters, OutOctetsLo, 4), QD_CNT_CORRECT(counters, OutOctetsLo, 5),
+		QD_CNT_CORRECT(counters, OutOctetsLo, 6));
+	pr_err("OutOctetsHi     " QD_FMT,
+		QD_CNT_CORRECT(counters, OutOctetsHi, 0), QD_CNT_CORRECT(counters, OutOctetsHi, 1),
+		QD_CNT_CORRECT(counters, OutOctetsHi, 2), QD_CNT_CORRECT(counters, OutOctetsHi, 3),
+		QD_CNT_CORRECT(counters, OutOctetsHi, 4), QD_CNT_CORRECT(counters, OutOctetsHi, 5),
+		QD_CNT_CORRECT(counters, OutOctetsHi, 6));
+	pr_err("OutUnicasts     " QD_FMT,
+		QD_CNT_CORRECT(counters, OutUnicasts, 0), QD_CNT_CORRECT(counters, OutUnicasts, 1),
+		QD_CNT_CORRECT(counters, OutUnicasts, 2), QD_CNT_CORRECT(counters, OutUnicasts, 3),
+		QD_CNT_CORRECT(counters, OutUnicasts, 4), QD_CNT_CORRECT(counters, OutUnicasts, 5),
+		QD_CNT_CORRECT(counters, OutUnicasts, 6));
+	pr_err("OutMulticasts   " QD_FMT,
+		QD_CNT_CORRECT(counters, OutMulticasts, 0), QD_CNT_CORRECT(counters, OutMulticasts, 1),
+		QD_CNT_CORRECT(counters, OutMulticasts, 2), QD_CNT_CORRECT(counters, OutMulticasts, 3),
+		QD_CNT_CORRECT(counters, OutMulticasts, 4), QD_CNT_CORRECT(counters, OutMulticasts, 5),
+		QD_CNT_CORRECT(counters, OutMulticasts, 6));
+	pr_err("OutBroadcasts   " QD_FMT,
+		QD_CNT_CORRECT(counters, OutBroadcasts, 0), QD_CNT_CORRECT(counters, OutBroadcasts, 1),
+		QD_CNT_CORRECT(counters, OutBroadcasts, 2), QD_CNT_CORRECT(counters, OutBroadcasts, 3),
+		QD_CNT_CORRECT(counters, OutBroadcasts, 4), QD_CNT_CORRECT(counters, OutBroadcasts, 5),
+		QD_CNT_CORRECT(counters, OutBroadcasts, 6));
+	pr_err("outFiltered     " QD_FMT,
+		QD_STAT_CORRECT(port_stats, outFiltered, 0), QD_STAT_CORRECT(port_stats, outFiltered, 1),
+		QD_STAT_CORRECT(port_stats, outFiltered, 2), QD_STAT_CORRECT(port_stats, outFiltered, 3),
+		QD_STAT_CORRECT(port_stats, outFiltered, 4), QD_STAT_CORRECT(port_stats, outFiltered, 5),
+		QD_STAT_CORRECT(port_stats, outFiltered, 6));
 
-	printk(KERN_ERR "OutOctetsLo     " QD_FMT, QD_CNT(counters, OutOctetsLo));
-	printk(KERN_ERR "OutOctetsHi     " QD_FMT, QD_CNT(counters, OutOctetsHi));
-	printk(KERN_ERR "OutUnicasts     " QD_FMT, QD_CNT(counters, OutUnicasts));
-	printk(KERN_ERR "OutMulticasts   " QD_FMT, QD_CNT(counters, OutMulticasts));
-	printk(KERN_ERR "OutBroadcasts   " QD_FMT, QD_CNT(counters, OutBroadcasts));
-	printk(KERN_ERR "OutFiltered     " QD_FMT, QD_CNT(port_stats, outFiltered));
+	pr_err("OutPause        " QD_FMT,
+		QD_CNT_CORRECT(counters, OutPause, 0), QD_CNT_CORRECT(counters, OutPause, 1),
+		QD_CNT_CORRECT(counters, OutPause, 2), QD_CNT_CORRECT(counters, OutPause, 3),
+		QD_CNT_CORRECT(counters, OutPause, 4), QD_CNT_CORRECT(counters, OutPause, 5),
+		QD_CNT_CORRECT(counters, OutPause, 6));
+	pr_err("InPause         " QD_FMT,
+		QD_CNT_CORRECT(counters, InPause, 0), QD_CNT_CORRECT(counters, InPause, 1),
+		QD_CNT_CORRECT(counters, InPause, 2), QD_CNT_CORRECT(counters, InPause, 3),
+		QD_CNT_CORRECT(counters, InPause, 4), QD_CNT_CORRECT(counters, InPause, 5),
+		QD_CNT_CORRECT(counters, InPause, 6));
 
-	printk(KERN_ERR "OutPause        " QD_FMT, QD_CNT(counters, OutPause));
-	printk(KERN_ERR "InPause         " QD_FMT, QD_CNT(counters, InPause));
+	pr_err("Octets64        " QD_FMT,
+		QD_CNT_CORRECT(counters, Octets64, 0), QD_CNT_CORRECT(counters, Octets64, 1),
+		QD_CNT_CORRECT(counters, Octets64, 2), QD_CNT_CORRECT(counters, Octets64, 3),
+		QD_CNT_CORRECT(counters, Octets64, 4), QD_CNT_CORRECT(counters, Octets64, 5),
+		QD_CNT_CORRECT(counters, Octets64, 6));
+	pr_err("Octets127       " QD_FMT,
+		QD_CNT_CORRECT(counters, Octets127, 0), QD_CNT_CORRECT(counters, Octets127, 1),
+		QD_CNT_CORRECT(counters, Octets127, 2), QD_CNT_CORRECT(counters, Octets127, 3),
+		QD_CNT_CORRECT(counters, Octets127, 4), QD_CNT_CORRECT(counters, Octets127, 5),
+		QD_CNT_CORRECT(counters, Octets127, 6));
+	pr_err("Octets255       " QD_FMT,
+		QD_CNT_CORRECT(counters, Octets255, 0), QD_CNT_CORRECT(counters, Octets255, 1),
+		QD_CNT_CORRECT(counters, Octets255, 2), QD_CNT_CORRECT(counters, Octets255, 3),
+		QD_CNT_CORRECT(counters, Octets255, 4), QD_CNT_CORRECT(counters, Octets255, 5),
+		QD_CNT_CORRECT(counters, Octets255, 6));
+	pr_err("Octets511       " QD_FMT,
+		QD_CNT_CORRECT(counters, Octets511, 0), QD_CNT_CORRECT(counters, Octets511, 1),
+		QD_CNT_CORRECT(counters, Octets511, 2), QD_CNT_CORRECT(counters, Octets511, 3),
+		QD_CNT_CORRECT(counters, Octets511, 4), QD_CNT_CORRECT(counters, Octets511, 5),
+		QD_CNT_CORRECT(counters, Octets511, 6));
+	pr_err("Octets1023      " QD_FMT,
+		QD_CNT_CORRECT(counters, Octets1023, 0), QD_CNT_CORRECT(counters, Octets1023, 1),
+		QD_CNT_CORRECT(counters, Octets1023, 2), QD_CNT_CORRECT(counters, Octets1023, 3),
+		QD_CNT_CORRECT(counters, Octets1023, 4), QD_CNT_CORRECT(counters, Octets1023, 5),
+		QD_CNT_CORRECT(counters, Octets1023, 6));
+	pr_err("OctetsMax       " QD_FMT,
+		QD_CNT_CORRECT(counters, OctetsMax, 0), QD_CNT_CORRECT(counters, OctetsMax, 1),
+		QD_CNT_CORRECT(counters, OctetsMax, 2), QD_CNT_CORRECT(counters, OctetsMax, 3),
+		QD_CNT_CORRECT(counters, OctetsMax, 4), QD_CNT_CORRECT(counters, OctetsMax, 5),
+		QD_CNT_CORRECT(counters, OctetsMax, 6));
+	pr_err("Excessive       " QD_FMT,
+		QD_CNT_CORRECT(counters, Excessive, 0), QD_CNT_CORRECT(counters, Excessive, 1),
+		QD_CNT_CORRECT(counters, Excessive, 2), QD_CNT_CORRECT(counters, Excessive, 3),
+		QD_CNT_CORRECT(counters, Excessive, 4), QD_CNT_CORRECT(counters, Excessive, 5),
+		QD_CNT_CORRECT(counters, Excessive, 6));
+	pr_err("Single          " QD_FMT,
+		QD_CNT_CORRECT(counters, Single, 0), QD_CNT_CORRECT(counters, Single, 1),
+		QD_CNT_CORRECT(counters, Single, 2), QD_CNT_CORRECT(counters, Single, 3),
+		QD_CNT_CORRECT(counters, Single, 4), QD_CNT_CORRECT(counters, Single, 5),
+		QD_CNT_CORRECT(counters, Single, 6));
+	pr_err("Multiple        " QD_FMT,
+		QD_CNT_CORRECT(counters, Multiple, 0), QD_CNT_CORRECT(counters, Multiple, 1),
+		QD_CNT_CORRECT(counters, Multiple, 2), QD_CNT_CORRECT(counters, Multiple, 3),
+		QD_CNT_CORRECT(counters, Multiple, 4), QD_CNT_CORRECT(counters, Multiple, 5),
+		QD_CNT_CORRECT(counters, Multiple, 6));
+	pr_err("Undersize       " QD_FMT,
+		QD_CNT_CORRECT(counters, Undersize, 0), QD_CNT_CORRECT(counters, Undersize, 1),
+		QD_CNT_CORRECT(counters, Undersize, 2), QD_CNT_CORRECT(counters, Undersize, 3),
+		QD_CNT_CORRECT(counters, Undersize, 4), QD_CNT_CORRECT(counters, Undersize, 5),
+		QD_CNT_CORRECT(counters, Undersize, 6));
+	pr_err("Fragments       " QD_FMT,
+		QD_CNT_CORRECT(counters, Fragments, 0), QD_CNT_CORRECT(counters, Fragments, 1),
+		QD_CNT_CORRECT(counters, Fragments, 2), QD_CNT_CORRECT(counters, Fragments, 3),
+		QD_CNT_CORRECT(counters, Fragments, 4), QD_CNT_CORRECT(counters, Fragments, 5),
+		QD_CNT_CORRECT(counters, Fragments, 6));
+	pr_err("Oversize        " QD_FMT,
+		QD_CNT_CORRECT(counters, Oversize, 0), QD_CNT_CORRECT(counters, Oversize, 1),
+		QD_CNT_CORRECT(counters, Oversize, 2), QD_CNT_CORRECT(counters, Oversize, 3),
+		QD_CNT_CORRECT(counters, Oversize, 4), QD_CNT_CORRECT(counters, Oversize, 5),
+		QD_CNT_CORRECT(counters, Oversize, 6));
+	pr_err("Jabber          " QD_FMT,
+		QD_CNT_CORRECT(counters, Jabber, 0), QD_CNT_CORRECT(counters, Jabber, 1),
+		QD_CNT_CORRECT(counters, Jabber, 2), QD_CNT_CORRECT(counters, Jabber, 3),
+		QD_CNT_CORRECT(counters, Jabber, 4), QD_CNT_CORRECT(counters, Jabber, 5),
+		QD_CNT_CORRECT(counters, Jabber, 6));
+	pr_err("InMACRcvErr     " QD_FMT,
+		QD_CNT_CORRECT(counters, InMACRcvErr, 0), QD_CNT_CORRECT(counters, InMACRcvErr, 1),
+		QD_CNT_CORRECT(counters, InMACRcvErr, 2), QD_CNT_CORRECT(counters, InMACRcvErr, 3),
+		QD_CNT_CORRECT(counters, InMACRcvErr, 4), QD_CNT_CORRECT(counters, InMACRcvErr, 5),
+		QD_CNT_CORRECT(counters, InMACRcvErr, 6));
+	pr_err("InFCSErr        " QD_FMT,
+		QD_CNT_CORRECT(counters, InFCSErr, 0), QD_CNT_CORRECT(counters, InFCSErr, 1),
+		QD_CNT_CORRECT(counters, InFCSErr, 2), QD_CNT_CORRECT(counters, InFCSErr, 3),
+		QD_CNT_CORRECT(counters, InFCSErr, 4), QD_CNT_CORRECT(counters, InFCSErr, 5),
+		QD_CNT_CORRECT(counters, InFCSErr, 6));
+	pr_err("Collisions      " QD_FMT,
+		QD_CNT_CORRECT(counters, Collisions, 0), QD_CNT_CORRECT(counters, Collisions, 1),
+		QD_CNT_CORRECT(counters, Collisions, 2), QD_CNT_CORRECT(counters, Collisions, 3),
+		QD_CNT_CORRECT(counters, Collisions, 4), QD_CNT_CORRECT(counters, Collisions, 5),
+		QD_CNT_CORRECT(counters, Collisions, 6));
+	pr_err("Late            " QD_FMT,
+		QD_CNT_CORRECT(counters, Late, 0), QD_CNT_CORRECT(counters, Late, 1),
+		QD_CNT_CORRECT(counters, Late, 2), QD_CNT_CORRECT(counters, Late, 3),
+		QD_CNT_CORRECT(counters, Late, 4), QD_CNT_CORRECT(counters, Late, 5),
+		QD_CNT_CORRECT(counters, Late, 6));
+	pr_err("OutFCSErr       " QD_FMT,
+		QD_CNT_CORRECT(counters, OutFCSErr, 0), QD_CNT_CORRECT(counters, OutFCSErr, 1),
+		QD_CNT_CORRECT(counters, OutFCSErr, 2), QD_CNT_CORRECT(counters, OutFCSErr, 3),
+		QD_CNT_CORRECT(counters, OutFCSErr, 4), QD_CNT_CORRECT(counters, OutFCSErr, 5),
+		QD_CNT_CORRECT(counters, OutFCSErr, 6));
+	pr_err("Deferred        " QD_FMT,
+		QD_CNT_CORRECT(counters, Deferred, 0), QD_CNT_CORRECT(counters, Deferred, 1),
+		QD_CNT_CORRECT(counters, Deferred, 2), QD_CNT_CORRECT(counters, Deferred, 3),
+		QD_CNT_CORRECT(counters, Deferred, 4), QD_CNT_CORRECT(counters, Deferred, 5),
+		QD_CNT_CORRECT(counters, Deferred, 6));
 
-	printk(KERN_ERR "Octets64        " QD_FMT, QD_CNT(counters, Octets64));
-	printk(KERN_ERR "Octets127       " QD_FMT, QD_CNT(counters, Octets127));
-	printk(KERN_ERR "Octets255       " QD_FMT, QD_CNT(counters, Octets255));
-	printk(KERN_ERR "Octets511       " QD_FMT, QD_CNT(counters, Octets511));
-	printk(KERN_ERR "Octets1023      " QD_FMT, QD_CNT(counters, Octets1023));
-	printk(KERN_ERR "OctetsMax       " QD_FMT, QD_CNT(counters, OctetsMax));
-
-	printk(KERN_ERR "Excessive       " QD_FMT, QD_CNT(counters, Excessive));
-	printk(KERN_ERR "Single          " QD_FMT, QD_CNT(counters, Single));
-	printk(KERN_ERR "Multiple        " QD_FMT, QD_CNT(counters, InPause));
-	printk(KERN_ERR "Undersize       " QD_FMT, QD_CNT(counters, Undersize));
-	printk(KERN_ERR "Fragments       " QD_FMT, QD_CNT(counters, Fragments));
-	printk(KERN_ERR "Oversize        " QD_FMT, QD_CNT(counters, Oversize));
-	printk(KERN_ERR "Jabber          " QD_FMT, QD_CNT(counters, Jabber));
-	printk(KERN_ERR "InMACRcvErr     " QD_FMT, QD_CNT(counters, InMACRcvErr));
-	printk(KERN_ERR "InFCSErr        " QD_FMT, QD_CNT(counters, InFCSErr));
-	printk(KERN_ERR "Collisions      " QD_FMT, QD_CNT(counters, Collisions));
-	printk(KERN_ERR "Late            " QD_FMT, QD_CNT(counters, Late));
-	printk(KERN_ERR "OutFCSErr       " QD_FMT, QD_CNT(counters, OutFCSErr));
-	printk(KERN_ERR "Deferred        " QD_FMT, QD_CNT(counters, Deferred));
-
-	gstatsFlushAll(qd_dev);
+	/*gstatsFlushAll(qd_dev);*/	/*remove this line for FlushAll operation may cause StatusBusy bit stuck*/
 
 	for (p = 0; p < QD_MAX; p++) {
+		memmove(&history_counters[p], counters[p], sizeof(GT_STATS_COUNTER_SET3));
+		memmove(&history_stats[p], port_stats[p], sizeof(GT_PORT_STAT2));
 		mvOsFree(counters[p]);
 		mvOsFree(port_stats[p]);
 	}
