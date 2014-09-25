@@ -63,6 +63,11 @@ disclaimer.
 #include <linux/phy.h>
 #endif /* CONFIG_OF */
 
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+#include <linux/hrtimer.h>
+#include <linux/ktime.h>
+#endif
+
 #ifdef CONFIG_ARCH_MVEBU
 #include "mvNetConfig.h"
 #else
@@ -152,6 +157,10 @@ static int mv_eth_ports_num = 0;
 
 static int mv_eth_initialized = 0;
 
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+static unsigned int mv_eth_tx_done_hrtimer_period_us = CONFIG_MV_NETA_TX_DONE_HIGH_RES_TIMER_PERIOD;
+#endif
+
 /*
  * Local functions
  */
@@ -189,6 +198,23 @@ __setup("mv_port2_config=", mv_eth_cmdline_port2_config);
 int mv_eth_cmdline_port3_config(char *s);
 __setup("mv_port3_config=", mv_eth_cmdline_port3_config);
 
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+unsigned int mv_eth_tx_done_hrtimer_period_get(void)
+{
+	return mv_eth_tx_done_hrtimer_period_us;
+}
+
+int mv_eth_tx_done_hrtimer_period_set(unsigned int period)
+{
+	if ((period < MV_ETH_HRTIMER_PERIOD_MIN) || (period > MV_ETH_HRTIMER_PERIOD_MAX)) {
+		pr_info("period should be in [%u, %u]\n", MV_ETH_HRTIMER_PERIOD_MIN, MV_ETH_HRTIMER_PERIOD_MAX);
+		return -EINVAL;
+	}
+
+	mv_eth_tx_done_hrtimer_period_us = period;
+	return 0;
+}
+#endif
 
 int mv_eth_cmdline_port0_config(char *s)
 {
@@ -2089,7 +2115,7 @@ out:
 		dev_kfree_skb_any(skb);
 	}
 
-#ifndef CONFIG_MV_ETH_TXDONE_ISR
+#ifndef CONFIG_MV_NETA_TXDONE_ISR
 	if (txq_ctrl) {
 		if (txq_ctrl->txq_count >= mv_ctrl_txdone) {
 			u32 tx_done = mv_eth_txq_done(pp, txq_ctrl);
@@ -2098,13 +2124,13 @@ out:
 
 		}
 		/* If after calling mv_eth_txq_done, txq_ctrl->txq_count equals frags, we need to set the timer */
-		if ((txq_ctrl->txq_count == frags) && (frags > 0)) {
+		if ((txq_ctrl->txq_count > 0)  && (txq_ctrl->txq_count <= frags) && (frags > 0)) {
 			struct cpu_ctrl *cpuCtrl = pp->cpu_config[smp_processor_id()];
 
 			mv_eth_add_tx_done_timer(cpuCtrl);
 		}
 	}
-#endif /* CONFIG_MV_ETH_TXDONE_ISR */
+#endif /* CONFIG_MV_NETA_TXDONE_ISR */
 
 	if (txq_ctrl)
 		mv_eth_unlock(txq_ctrl, flags);
@@ -3023,7 +3049,7 @@ int mv_eth_poll(struct napi_struct *napi, int budget)
 	}
 	causeRxTx |= cpuCtrl->causeRxTx;
 
-#ifdef CONFIG_MV_ETH_TXDONE_ISR
+#ifdef CONFIG_MV_NETA_TXDONE_ISR
 	if (causeRxTx & MV_ETH_TXDONE_INTR_MASK) {
 		int tx_todo = 0;
 		/* TX_DONE process */
@@ -3035,7 +3061,7 @@ int mv_eth_poll(struct napi_struct *napi, int budget)
 
 		causeRxTx &= ~MV_ETH_TXDONE_INTR_MASK;
 	}
-#endif /* CONFIG_MV_ETH_TXDONE_ISR */
+#endif /* CONFIG_MV_NETA_TXDONE_ISR */
 
 #if (CONFIG_MV_ETH_RXQ > 1)
 	while ((causeRxTx != 0) && (budget > 0)) {
@@ -5443,6 +5469,22 @@ int mv_eth_change_mtu_internals(struct net_device *dev, int mtu)
 	return 0;
 }
 
+#ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
+/***********************************************************
+ * mv_eth_tx_done_hr_timer_callback --			   *
+ *   callback for tx_done hrtimer                          *
+ ***********************************************************/
+enum hrtimer_restart mv_eth_tx_done_hr_timer_callback(struct hrtimer *timer)
+{
+	struct cpu_ctrl *cpuCtrl = container_of(timer, struct cpu_ctrl, tx_done_timer);
+
+	tasklet_schedule(&cpuCtrl->tx_done_tasklet);
+
+	return HRTIMER_NORESTART;
+}
+#endif
+
+#ifndef CONFIG_MV_NETA_TXDONE_ISR
 /***********************************************************
  * mv_eth_tx_done_timer_callback --			   *
  *   N msec periodic callback for tx_done                  *
@@ -5484,6 +5526,7 @@ static void mv_eth_tx_done_timer_callback(unsigned long data)
 	if (tx_todo > 0)
 		mv_eth_add_tx_done_timer(cpuCtrl);
 }
+#endif
 
 /***********************************************************
  * mv_eth_cleanup_timer_callback --			   *
@@ -5491,17 +5534,21 @@ static void mv_eth_tx_done_timer_callback(unsigned long data)
  ***********************************************************/
 static void mv_eth_cleanup_timer_callback(unsigned long data)
 {
-	struct cpu_ctrl *cpuCtrl;
-	struct net_device *dev = (struct net_device *)data;
-	struct eth_port *pp = MV_ETH_PRIV(dev);
+	struct cpu_ctrl *cpuCtrl = (struct cpu_ctrl *)data;
+	struct eth_port *pp = cpuCtrl->pp;
+	struct net_device *dev = pp->dev;
 
 	STAT_INFO(pp->stats.cleanup_timer++);
 
-	cpuCtrl = pp->cpu_config[smp_processor_id()];
 	clear_bit(MV_ETH_F_CLEANUP_TIMER_BIT, &(cpuCtrl->flags));
 
 	if (!test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags)))
 		return;
+
+	if (cpuCtrl->cpu != smp_processor_id()) {
+		pr_warn("%s: Called on other CPU - %d != %d\n", __func__, cpuCtrl->cpu, smp_processor_id());
+		cpuCtrl = pp->cpu_config[smp_processor_id()];
+	}
 
 	/* FIXME: check bm_pool->missed and pp->rxq_ctrl[rxq].missed counters and allocate */
 	/* re-add timer if necessary (check bm_pool->missed and pp->rxq_ctrl[rxq].missed   */
@@ -5774,15 +5821,23 @@ static int mv_eth_priv_init(struct eth_port *pp, int port)
 
 	for_each_possible_cpu(cpu) {
 		cpuCtrl = pp->cpu_config[cpu];
+#if defined(CONFIG_MV_NETA_TXDONE_IN_HRTIMER)
+		memset(&cpuCtrl->tx_done_timer, 0, sizeof(struct hrtimer));
+		hrtimer_init(&cpuCtrl->tx_done_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
+		cpuCtrl->tx_done_timer.function = mv_eth_tx_done_hr_timer_callback;
+		tasklet_init(&cpuCtrl->tx_done_tasklet, mv_eth_tx_done_timer_callback,
+			     (unsigned long) cpuCtrl);
+#elif defined(CONFIG_MV_NETA_TXDONE_IN_TIMER)
 		memset(&cpuCtrl->tx_done_timer, 0, sizeof(struct timer_list));
 		cpuCtrl->tx_done_timer.function = mv_eth_tx_done_timer_callback;
 		cpuCtrl->tx_done_timer.data = (unsigned long)cpuCtrl;
 		init_timer(&cpuCtrl->tx_done_timer);
-		clear_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags));
+#endif
 		memset(&cpuCtrl->cleanup_timer, 0, sizeof(struct timer_list));
 		cpuCtrl->cleanup_timer.function = mv_eth_cleanup_timer_callback;
 		cpuCtrl->cleanup_timer.data = (unsigned long)cpuCtrl;
 		init_timer(&cpuCtrl->cleanup_timer);
+		clear_bit(MV_ETH_F_TX_DONE_TIMER_BIT, &(cpuCtrl->flags));
 		clear_bit(MV_ETH_F_CLEANUP_TIMER_BIT, &(cpuCtrl->flags));
 	}
 
@@ -6014,7 +6069,7 @@ void mv_eth_port_status_print(unsigned int port)
 	}
 	printk(KERN_ERR "\n");
 
-#ifdef CONFIG_MV_ETH_TXDONE_ISR
+#if defined(CONFIG_MV_NETA_TXDONE_ISR)
 	printk(KERN_ERR "Do tx_done in NAPI context triggered by ISR\n");
 	for (txp = 0; txp < pp->txp_num; txp++) {
 		printk(KERN_ERR "txcoal(pkts)[%2d.q] = ", txp);
@@ -6022,26 +6077,49 @@ void mv_eth_port_status_print(unsigned int port)
 			printk(KERN_CONT "%3d ", mvNetaTxDonePktsCoalGet(port, txp, q));
 		printk(KERN_CONT "\n");
 	}
-	printk(KERN_ERR "\n");
-#else
-	printk(KERN_ERR "Do tx_done in TX or Timer context: tx_done_threshold=%d\n", mv_ctrl_txdone);
-#endif /* CONFIG_MV_ETH_TXDONE_ISR */
+	pr_err("\n");
+#elif defined(CONFIG_MV_NETA_TXDONE_IN_HRTIMER)
+	pr_err("Do tx_done in TX or high-resolution Timer's tasklet: tx_done_threshold=%d timer_interval=%d usec\n",
+		mv_ctrl_txdone, mv_eth_tx_done_hrtimer_period_get());
+#elif defined(CONFIG_MV_NETA_TXDONE_IN_TIMER)
+	pr_err("Do tx_done in TX or regular Timer context: tx_done_threshold=%d timer_interval=%d msec\n",
+		mv_ctrl_txdone, CONFIG_MV_NETA_TX_DONE_TIMER_PERIOD);
+#endif /* CONFIG_MV_NETA_TXDONE_ISR */
 
 	printk(KERN_ERR "txp=%d, zero_pad=%s, mh_en=%s (0x%04x), tx_cmd=0x%08x\n",
 	       pp->txp, (pp->flags & MV_ETH_F_NO_PAD) ? "Disabled" : "Enabled",
 	       (pp->flags & MV_ETH_F_MH) ? "Enabled" : "Disabled", pp->tx_mh, pp->hw_cmd);
 
 	printk(KERN_CONT "\n");
-	printk(KERN_CONT "CPU:  txq  causeRxTx   napi txqMask txqOwner flags  timer\n");
+#ifdef CONFIG_MV_NETA_TXDONE_ISR
+	pr_cont("CPU:  txq  causeRxTx   napi txqMask txqOwner flags\n");
+#else
+	pr_cont("CPU:  txq  causeRxTx   napi txqMask txqOwner flags  timer\n");
+#endif
 	{
 		int cpu;
 		for_each_possible_cpu(cpu) {
 			cpuCtrl = pp->cpu_config[cpu];
 			if (cpuCtrl != NULL)
-				printk(KERN_ERR "  %d:   %d   0x%08x   %d    0x%02x    0x%02x    0x%02x    %d\n",
-					cpu, cpuCtrl->txq, cpuCtrl->causeRxTx, test_bit(NAPI_STATE_SCHED, &cpuCtrl->napi->state),
+#if defined(CONFIG_MV_NETA_TXDONE_ISR)
+				pr_err("  %d:   %d   0x%08x   %d    0x%02x    0x%02x    0x%02x\n",
+					cpu, cpuCtrl->txq, cpuCtrl->causeRxTx,
+					test_bit(NAPI_STATE_SCHED, &cpuCtrl->napi->state),
+					cpuCtrl->cpuTxqMask, cpuCtrl->cpuTxqOwner,
+					(unsigned)cpuCtrl->flags);
+#elif defined(CONFIG_MV_NETA_TXDONE_IN_HRTIMER)
+				pr_err("  %d:   %d   0x%08x   %d    0x%02x    0x%02x    0x%02x    %d\n",
+					cpu, cpuCtrl->txq, cpuCtrl->causeRxTx,
+					test_bit(NAPI_STATE_SCHED, &cpuCtrl->napi->state),
+					cpuCtrl->cpuTxqMask, cpuCtrl->cpuTxqOwner,
+					(unsigned)cpuCtrl->flags, !(hrtimer_active(&cpuCtrl->tx_done_timer)));
+#elif defined(CONFIG_MV_NETA_TXDONE_IN_TIMER)
+				pr_err("  %d:   %d   0x%08x   %d    0x%02x    0x%02x    0x%02x    %d\n",
+					cpu, cpuCtrl->txq, cpuCtrl->causeRxTx,
+					test_bit(NAPI_STATE_SCHED, &cpuCtrl->napi->state),
 					cpuCtrl->cpuTxqMask, cpuCtrl->cpuTxqOwner,
 					(unsigned)cpuCtrl->flags, timer_pending(&cpuCtrl->tx_done_timer));
+#endif
 		}
 	}
 

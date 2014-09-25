@@ -261,7 +261,7 @@ static int mv_eth_poll_l2fw(struct napi_struct *napi, int budget)
 	}
 
 	causeRxTx |= pp->cpu_config[smp_processor_id()]->causeRxTx;
-#ifdef CONFIG_MV_ETH_TXDONE_ISR
+#ifdef CONFIG_MV_NETA_TXDONE_ISR
 	if (causeRxTx & MV_ETH_TXDONE_INTR_MASK) {
 		/* TX_DONE process */
 
@@ -270,7 +270,7 @@ static int mv_eth_poll_l2fw(struct napi_struct *napi, int budget)
 
 		causeRxTx &= ~MV_ETH_TXDONE_INTR_MASK;
 	}
-#endif /* CONFIG_MV_ETH_TXDONE_ISR */
+#endif /* CONFIG_MV_NETA_TXDONE_ISR */
 
 #if (CONFIG_MV_ETH_RXQ > 1)
 	while ((causeRxTx != 0) && (budget > 0)) {
