@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 5.1"
+echo " * Version: 5.2"
 
 # LOG:
+# 5.2:
+#   1. fix -j option when not using the -p option.
 # 5.1:
 #   1. add mkfs.btrfs the -f flag
 # 5.0:
@@ -192,7 +194,7 @@ while getopts "l:ps:mzun:f:t:h:j:" flag; do
 	    echo "           -h <num>: number of HDDs to use"
 	    echo "           -l <num>: number of links to use"
 	    echo "           -u adding this flag will disable SAMBA support"
-		echo "			 -j <num>: offset in disk for the new partition to be created (in GB)"
+	    echo "           -j <num>: offset in disk for the new partition to be created (in GB)"
 	    exit 1
 	    ;;
     esac
@@ -455,6 +457,10 @@ function mount_fs {
 
 [ ! -e "$(which mdadm)" ] && do_error "missing mdadm in rootfs (aptitude install mdadm)"
 
+if [ "$JUMPPARTSIZE" -ne "0" ]; then
+	PARTNUM="2"
+fi
+
 if [ "$PREPARE_HDD" == "yes" ]; then
     echo -ne " * Preparing disks partitions: "
     [ ! -e "$(which fdisk)" ] && do_error "missing fdisk in rootfs"
@@ -470,7 +476,6 @@ if [ "$PREPARE_HDD" == "yes" ]; then
     FDISK_LINE="o\nn\np\n1\n\n+$PARTSIZE\nt\n83\nw\n"
     if [ "$JUMPPARTSIZE" -ne "0" ]; then
 	FDISK_LINE="o\nn\np\n1\n\n+${JUMPPARTSIZE}GB\nt\n83\nn\np\n2\n\n+$PARTSIZE\nt\n2\n83\nw\n"
-	PARTNUM="2"
     fi
 
     for drive in `echo $DRIVES`; \
