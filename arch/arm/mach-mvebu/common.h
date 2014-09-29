@@ -15,7 +15,7 @@
 #ifndef __ARCH_MVEBU_COMMON_H
 #define __ARCH_MVEBU_COMMON_H
 
-#define LSP_VERSION    "linux-3.10.39-2014_T3.0.eng_drop_v1"
+#define LSP_VERSION    "linux-3.10.39-2014_T3.0.eng_drop_v2"
 
 void mvebu_restart(char mode, const char *cmd);
 
