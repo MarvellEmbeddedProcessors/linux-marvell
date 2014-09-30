@@ -204,18 +204,17 @@
 				reg = <0xC0054 0x4>;
 			};
 
-			/* Network controller. The mainline node is not used in hal driver, reserved just for reference in future enable */
+/* Network controller. The mainline node is not used in hal driver, reserved just for reference in future enable
 			pp2@f0000 {
 				compatible = "marvell,armada-375-pp2";
-				reg = <0xf0000 0xa000>, /* Packet Processor regs */
-				      <0xc0000 0x3060>, /* LMS regs */
-				      <0xc4000 0x100>,  /* eth0 regs */
-				      <0xc5000 0x100>;  /* eth1 regs */
+				reg = <0xf0000 0xa000>,
+				      <0xc0000 0x3060>,
+				      <0xc4000 0x100>,
+				      <0xc5000 0x100>;
 				clocks = <&gateclk 3>, <&gateclk 19>;
 				clock-names = "pp_clk", "gop_clk";
 				status = "disabled";
 
-				/* GbE MAC's */
 				ethernet@c4000 {
 					interrupts = <0 37 1>;
 					port-id = <0>;
@@ -228,7 +227,7 @@
 					status = "disabled";
 				};
 			};
-
+*/
 			gpio0: gpio@18100 {
 				compatible = "marvell,orion-gpio";
 				reg = <0x18100 0x40>;
