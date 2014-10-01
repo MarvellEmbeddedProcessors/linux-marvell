@@ -397,7 +397,9 @@ extern "C" {
 /* Armada 38x Family */
 #define MV_88F68XX		0x6800
 #define MV_6810_DEV_ID		0x6810
+#define MV_6811_DEV_ID		0x6811
 #define MV_6820_DEV_ID		0x6820
+#define MV_6828_DEV_ID		0x6828
 
 #define MV_88F68XX_69XX_Z1_ID		0x0
 #define MV_88F68XX_69XX_Z1_NAME		"Z1"
