@@ -72,6 +72,7 @@
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
 #include <linux/libata.h>
+#include <linux/dmaengine.h>
 
 #define DRV_NAME	"sata_mv"
 #define DRV_VERSION	"1.28"
@@ -2800,6 +2801,9 @@ static void mv_process_crpb_entries(struct ata_port *ap, struct mv_port_priv *pp
 	/* Get the hardware queue position index */
 	in_index = (readl(port_mmio + EDMA_RSP_Q_IN_PTR)
 			>> EDMA_RSP_Q_PTR_SHIFT) & MV_MAX_Q_DEPTH_MASK;
+
+	dma_sync_single_for_cpu(ap->dev , (dma_addr_t) NULL,
+			(size_t) NULL, DMA_FROM_DEVICE);
 
 	/* Process new responses from since the last time we looked */
 	while (in_index != pp->resp_idx) {
