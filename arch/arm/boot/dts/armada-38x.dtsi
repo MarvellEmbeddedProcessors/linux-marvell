@@ -42,8 +42,8 @@
 		/* Security Accelerator SRAM (CESA) */
 		cesa-sram {
 			compatible = "marvell,cesa-sram";
-			reg = <MBUS_ID(0x09, 0x01) 0 0x10000   /*chan0*/
-			       MBUS_ID(0x09, 0x05) 0 0x10000>; /*chan1*/
+			reg = <MBUS_ID(0x09, 0x19) 0 0x10000   /*chan0*/
+			       MBUS_ID(0x09, 0x15) 0 0x10000>; /*chan1*/
 		};
 
 		devbus-bootcs {
