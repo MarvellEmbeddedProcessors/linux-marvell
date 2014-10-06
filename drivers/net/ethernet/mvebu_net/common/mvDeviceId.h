@@ -413,7 +413,6 @@ extern "C" {
 
 /* Armada 39x Family */
 #define MV_88F69XX		0x6900
-#define MV_6910_DEV_ID		0x6910
 #define MV_6920_DEV_ID		0x6920
 #define MV_6928_DEV_ID		0x6928
 
