@@ -401,14 +401,22 @@ extern "C" {
 #define MV_6820_DEV_ID		0x6820
 #define MV_6828_DEV_ID		0x6828
 
-#define MV_88F68XX_69XX_Z1_ID		0x0
-#define MV_88F68XX_69XX_Z1_NAME		"Z1"
-#define MV_88F68XX_69XX_A0_ID		0x1
-#define MV_88F68XX_69XX_A0_NAME		"A0"
+/* A38x revisions */
+#define MV_88F68XX_Z1_ID		0x0
+#define MV_88F68XX_Z1_NAME		"Z1"
+#define MV_88F68XX_A0_ID		0x4
+#define MV_88F68XX_A0_NAME		"A0"
+
+/* A39x revisions */
+#define MV_88F69XX_Z1_ID		0x2
+#define MV_88F69XX_Z1_NAME		"Z1"
 
 #define MV_88F68XX_69XX_ID_ARRAY { \
-	MV_88F68XX_69XX_Z1_NAME,\
-	MV_88F68XX_69XX_A0_NAME,\
+	MV_88F68XX_Z1_NAME,\
+	NULL,\
+	MV_88F69XX_Z1_NAME,\
+	NULL,\
+	MV_88F68XX_A0_NAME,\
 };
 
 /* Armada 39x Family */
