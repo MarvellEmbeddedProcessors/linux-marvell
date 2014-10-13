@@ -13,9 +13,11 @@
 
 #include <linux/linkage.h>
 #include <linux/init.h>
+#include <asm/assembler.h>
 
 	__CPUINIT
 ENTRY(a380_secondary_startup)
+ARM_BE8(setend be)
 	bl      v7_invalidate_l1
 	b	secondary_startup
 ENDPROC(a380_secondary_startup)
