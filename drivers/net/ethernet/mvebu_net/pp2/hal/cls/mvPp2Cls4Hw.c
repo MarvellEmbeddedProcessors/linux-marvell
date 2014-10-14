@@ -312,7 +312,7 @@ int mvPp2ClsC4SwDump(MV_PP2_CLS_C4_ENTRY *C4)
 
 /*-------------------------------------------------------------------------------*/
 /* PPv2.1 MASS 3.20 new feature */
-static int mvPp2V1ClsC4HwCntDump(int rule, int set, unsigned int *cnt)
+int mvPp2V1ClsC4HwCntDump(int rule, int set, unsigned int *cnt)
 {
 	unsigned int regVal;
 
