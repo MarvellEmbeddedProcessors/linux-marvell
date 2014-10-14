@@ -222,6 +222,7 @@ void mvPp2ClsC4HwClearAll(void);
 int mvPp2ClsC4RegsDump(void);
 int mvPp2V1ClsC4HwHitsDump(void);
 int mvPp2ClsC4HwDumpAll(void);
+int mvPp2V1ClsC4HwCntDump(int rule, int set, unsigned int *cnt);
 
 
 /*-------------------------------------------------------------------------------*/
