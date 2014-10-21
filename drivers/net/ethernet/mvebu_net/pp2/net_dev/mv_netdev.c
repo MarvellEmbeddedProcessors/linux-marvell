@@ -172,7 +172,7 @@ static int  mv_pp2_priv_init(struct eth_port *pp, int port);
 static void mv_pp2_priv_cleanup(struct eth_port *pp);
 static int  mv_pp2_config_get(struct platform_device *pdev, u8 *mac);
 static int  mv_pp2_hal_init(struct eth_port *pp);
-struct net_device *mv_pp2_netdev_init(int mtu, u8 *mac, struct platform_device *pdev);
+struct net_device *mv_pp2_netdev_init(struct platform_device *pdev);
 static int mv_pp2_netdev_connect(struct eth_port *pp);
 static void mv_pp2_netdev_init_features(struct net_device *dev);
 static struct sk_buff *mv_pp2_skb_alloc(struct eth_port *pp, struct bm_pool *pool,
@@ -3529,7 +3529,7 @@ static int mv_pp2_load_network_interfaces(struct platform_device *pdev)
 
 	mtu = mv_pp2_config_get(pdev, mac);
 
-	dev = mv_pp2_netdev_init(mtu, mac, pdev);
+	dev = mv_pp2_netdev_init(pdev);
 
 	if (dev == NULL) {
 		pr_err("\to %s: can't create netdevice\n", __func__);
@@ -4362,13 +4362,13 @@ static const struct net_device_ops mv_pp2_netdev_ops = {
  * mv_eth_netdev_init -- Allocate and initialize net_device    *
  *                   structure                                 *
  ***************************************************************/
-struct net_device *mv_pp2_netdev_init(int mtu, u8 *mac, struct platform_device *pdev)
+struct net_device *mv_pp2_netdev_init(struct platform_device *pdev)
 {
 	struct net_device *dev;
 	struct eth_port *dev_priv;
-#ifdef CONFIG_OF
+
 	struct mv_pp2_pdata *plat_data = (struct mv_pp2_pdata *)pdev->dev.platform_data;
-#else
+#ifndef CONFIG_OF
 	struct resource *res;
 #endif
 
@@ -4388,24 +4388,28 @@ struct net_device *mv_pp2_netdev_init(int mtu, u8 *mac, struct platform_device *
 	memset(dev_priv, 0, sizeof(struct eth_port));
 
 	dev_priv->dev = dev;
+	dev_priv->port = pdev->id;
 
 #ifdef CONFIG_OF
 	dev->irq = plat_data->irq;
-
-	if (!is_valid_ether_addr(plat_data->mac_addr))
-		eth_hw_addr_random(dev);
-	else {
-		memcpy(dev->dev_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
-		memcpy(dev->perm_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
-	}
 #else
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	BUG_ON(!res);
 	dev->irq = res->start;
-	memcpy(dev->dev_addr, mac, MV_MAC_ADDR_SIZE);
-	memcpy(dev->perm_addr, mac, MV_MAC_ADDR_SIZE);
 #endif
-	dev->mtu = mtu;
+
+	if (!is_valid_ether_addr(plat_data->mac_addr))
+#ifdef CONFIG_OF
+		eth_hw_addr_random(dev);
+#else
+		memset(dev->dev_addr, 0, MV_MAC_ADDR_SIZE);
+#endif
+	else {
+		memcpy(dev->dev_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
+		memcpy(dev->perm_addr, plat_data->mac_addr, MV_MAC_ADDR_SIZE);
+	}
+
+	dev->mtu = plat_data->mtu;
 	dev->tx_queue_len = CONFIG_MV_PP2_TXQ_DESC;
 	dev->watchdog_timeo = 5 * HZ;
 
