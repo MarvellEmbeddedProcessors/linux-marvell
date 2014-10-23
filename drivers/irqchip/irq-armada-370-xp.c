@@ -56,6 +56,8 @@
 #define ARMADA_370_XP_CPU_SUBSYS_PERF_CNT	(3)
 
 #define ARMADA_370_XP_MAX_HW_IRQS		(115)
+#define ARMADA_370_XP_GBE0_PER_CPU_IRQ		(8)
+#define ARMADA_370_XP_GBE3_PER_CPU_IRQ		(15)
 
 #define IPI_DOORBELL_START                      (0)
 #define IPI_DOORBELL_END                        (8)
@@ -69,6 +71,7 @@
 static DEFINE_RAW_SPINLOCK(irq_controller_lock);
 #endif
 
+static void __iomem *cpus_int_base;
 static void __iomem *per_cpu_int_base;
 static void __iomem *main_int_base;
 static u32 mpic_save[ARMADA_370_XP_MAX_HW_IRQS];
@@ -90,12 +93,25 @@ static void armada_370_xp_irq_mask(struct irq_data *d)
 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
 
 #ifdef CONFIG_SMP
+	int cpu;
+
 	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
 #else
 	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
 #endif
 		writel(hwirq, main_int_base +
 				ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS);
+#ifdef CONFIG_SMP
+	/* In case of Network Per CPU IRQ and SMP - Mask all CPUs */
+	else if ((hwirq >= ARMADA_370_XP_GBE0_PER_CPU_IRQ) &&
+		 (hwirq <= ARMADA_370_XP_GBE3_PER_CPU_IRQ) &&
+		 (nr_cpu_ids > 1)) {
+		for_each_possible_cpu(cpu) {
+			if (cpumask_test_cpu(cpu, d->affinity))
+				writel(hwirq, cpus_int_base + 0x100 * cpu + ARMADA_370_XP_INT_SET_MASK_OFFS);
+		}
+	}
+#endif
 	else
 		writel(hwirq, per_cpu_int_base +
 				ARMADA_370_XP_INT_SET_MASK_OFFS);
@@ -106,12 +122,25 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
 
 #ifdef CONFIG_SMP
+	int cpu;
+
 	if (hwirq > ARMADA_370_XP_MAX_PER_CPU_IRQS)
 #else
 	if (hwirq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
 #endif
 		writel(hwirq, main_int_base +
 				ARMADA_370_XP_INT_SET_ENABLE_OFFS);
+#ifdef CONFIG_SMP
+	/* In case of Network Per CPU IRQ and SMP - Set correct affinity to the IRQ */
+	else if ((hwirq >= ARMADA_370_XP_GBE0_PER_CPU_IRQ) &&
+		 (hwirq <= ARMADA_370_XP_GBE3_PER_CPU_IRQ) &&
+		 (nr_cpu_ids > 1)) {
+		for_each_possible_cpu(cpu) {
+			if (cpumask_test_cpu(cpu, d->affinity))
+				writel(hwirq, cpus_int_base + 0x100 * cpu + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+		}
+	}
+#endif
 	else
 		writel(hwirq, per_cpu_int_base +
 				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
@@ -275,8 +304,10 @@ static int armada_xp_set_affinity(struct irq_data *d,
 	 * Forbid mutlicore interrupt affinity
 	 * This is required since the MPIC HW doesn't limit
 	 * several CPUs from acknowledging the same interrupt.
+	 * Note: Allow GBE interrupt set affinity.
 	 */
-	if (count > 1)
+	if (count > 1 && (hwirq < ARMADA_370_XP_GBE0_PER_CPU_IRQ ||
+			  hwirq > ARMADA_370_XP_GBE3_PER_CPU_IRQ))
 		return -EINVAL;
 
 	for_each_cpu(cpu, cpu_online_mask)
@@ -544,7 +575,7 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
 static int __init armada_370_xp_mpic_of_init(struct device_node *node,
 					     struct device_node *parent)
 {
-	struct resource main_int_res, per_cpu_int_res;
+	struct resource main_int_res, per_cpu_int_res, cpus_int_res;
 	int parent_irq;
 	u32 control;
 
@@ -565,6 +596,16 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
 	per_cpu_int_base = ioremap(per_cpu_int_res.start,
 				   resource_size(&per_cpu_int_res));
 	BUG_ON(!per_cpu_int_base);
+
+	if (nr_cpu_ids > 1) {
+		BUG_ON(of_address_to_resource(node, 2, &cpus_int_res));
+		BUG_ON(!request_mem_region(cpus_int_res.start,
+					   resource_size(&cpus_int_res),
+					   node->full_name));
+		cpus_int_base = ioremap(cpus_int_res.start,
+					resource_size(&cpus_int_res));
+		BUG_ON(!cpus_int_base);
+	}
 
 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
 
