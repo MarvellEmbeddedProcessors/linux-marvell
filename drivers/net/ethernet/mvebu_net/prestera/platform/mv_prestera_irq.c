@@ -244,6 +244,7 @@ int prestera_int_connect(struct pp_dev		*ppdev,
 	unsigned int		status, intVec = ppdev->irq_data.intVec;
 	struct intData		*irq_data = &ppdev->irq_data;
 	struct tasklet_struct	*tasklet;
+	unsigned long       flags;
 
 	tasklet = kmalloc(sizeof(struct tasklet_struct), GFP_KERNEL);
 	if (NULL == tasklet) {
@@ -278,12 +279,12 @@ int prestera_int_connect(struct pp_dev		*ppdev,
 
 	printk(KERN_DEBUG "%s: connected Prestera IRQ - %d\n", __func__, intVec);
 	disable_irq_nosync(intVec);
-	local_irq_disable();
+	local_irq_save(flags);
 	if (assinged_irq_nr < PRESTERA_MAX_INTERRUPTS) {
 		assigned_irq[assinged_irq_nr++] = ppdev;
-		local_irq_enable();
+		local_irq_restore(flags);
 	} else {
-		local_irq_enable();
+		local_irq_restore(flags);
 		printk(KERN_DEBUG "%s: too many irqs assigned\n", __func__);
 	}
 
