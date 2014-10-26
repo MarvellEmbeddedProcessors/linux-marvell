@@ -543,6 +543,29 @@ MV_NFC_FLASH_INFO flashDeviceInfo[] = {
 	.bb_page = 0,		/* Manufacturer Bad block marking page in block */
 	.flags = (NFC_CLOCK_UPSCALE_200M | NFC_FLAGS_ONFI_MODE_3_SET)
 	},
+	{			/* Micron 256MB */
+	.tADL = 100,		/* tADL, Address to write data delay */
+	.tCH = 5,		/* tCH, Enable signal hold time */
+	.tCS = 25,		/* tCS, Enable signal setup time */
+	.tWC = 30,		/* tWC, ND_nWE cycle duration */
+	.tWH = 15,		/* tWH, ND_nWE high duration */
+	.tWP = 15,		/* tWP, ND_nWE pulse time */
+	.tRC = 30,		/* tWC, ND_nRE cycle duration */
+	.tRH = 10,		/* tRH, ND_nRE high duration */
+	.tRP = 15,		/* tRP, ND_nRE pulse width */
+	.tR = 25241,		/* tR = data transfer from cell to register tR = tR+tRR+tWB+1 */
+	.tWHR = 60,		/* tWHR, ND_nWE high to ND_nRE low delay for status read */
+	.tAR = 10,		/* tAR, ND_ALE low to ND_nRE low delay */
+	.tRHW = 100,		/* tRHW, ND_nRE high to ND_nWE low delay */
+	.pgPrBlk = 64,		/* Pages per block - detected */
+	.pgSz = 2048,		/* Page size */
+	.oobSz = 224,		/* Spare size */
+	.blkNum = 2048,		/* Number of blocks/sectors in the flash */
+	.id = 0xda2C,		/* Device ID 0xDevice,Vendor */
+	.model = "Micron 256MB",
+	.bb_page = 0,		/* Manufacturer Bad block marking page in block */
+	.flags = (NFC_CLOCK_UPSCALE_200M | NFC_FLAGS_ONFI_MODE_3_SET)
+	},
 	{			/* Micron 8Gb ABACA  */
 		/* timing Asynchronous mode 3 */
 	.tADL = 100,		/* tADL, Address to write data delay */
