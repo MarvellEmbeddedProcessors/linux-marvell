@@ -217,7 +217,10 @@ static int mvebu_rtc_set_time(struct device *dev, struct rtc_time *tm)
 
 	if (rtc_tm_to_time(tm, &time) == 0) {
 		spin_lock_irq(&rtc->lock);
-		RTC_WRITE_REG(time, RTC_TIME_REG_OFFS);
+		/* WA for failing time set attempts. The HW ERRATA information should be added here */
+		RTC_WRITE_REG(0, RTC_STATUS_REG_OFFS);
+		mdelay(100);
+		/* End of SW WA */
 		RTC_WRITE_REG(time, RTC_TIME_REG_OFFS);
 		spin_unlock_irq(&rtc->lock);
 	}
