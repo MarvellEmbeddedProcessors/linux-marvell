@@ -73,12 +73,12 @@ static bool rtc_init_state(mvebu_rtc_t *rtc)
 	/* Update RTC-MBUS bridge timing parameters */
 	writel(0xFD4D4CFA, rtc->regbase_soc);
 
-	/* Setup nominal register access timing */
-	RTC_WRITE_REG(RTC_NOMINAL_TIMING, RTC_CLOCK_CORR_REG_OFFS);
-
 	/* Make sure we are not in any test mode */
 	RTC_WRITE_REG(0, RTC_TEST_CONFIG_REG_OFFS);
 	msleep_interruptible(500);
+
+	/* Setup nominal register access timing */
+	RTC_WRITE_REG(RTC_NOMINAL_TIMING, RTC_CLOCK_CORR_REG_OFFS);
 
 	/* Turn off Int1 sources & clear the Alarm count */
 	RTC_WRITE_REG(0, RTC_IRQ_1_CONFIG_REG_OFFS);
@@ -104,8 +104,6 @@ static bool rtc_init_state(mvebu_rtc_t *rtc)
 			(0 == alrm1) && (0xC0 == int1) &&
 			(0 == alrm2) && (0xC0 == int2) &&
 			(0 == tstcfg)) {
-			/* Setup the loosest register access timing possible */
-			RTC_WRITE_REG(~RTC_SZ_TIMING_RESERVED1_MASK, RTC_CLOCK_CORR_REG_OFFS);
 			return true;
 		} else {
 			return false;
