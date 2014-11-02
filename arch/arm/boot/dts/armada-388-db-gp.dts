@@ -99,10 +99,6 @@
 				};
 			};
 
-			usb3@f8000 {
-				status = "disabled";
-			};
-
 			crypto@9D000 {
 				status = "okay";
 			};
