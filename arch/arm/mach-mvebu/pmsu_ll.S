@@ -86,7 +86,16 @@ ENTRY(armada_38x_cpu_mem_resume)
 	add  r1, r1, r2			/* r1 = INTER_REG_BASE + SCU_OFFSET */
 	mcr  p15, 4, r1, c15, c0, 0 	/* Write SCU base register */
 
-	b	armada_38x_cpu_resume
+	bl	v7_invalidate_l1
+	mrc     p15, 4, r1, c15, c0	@ get SCU base address
+	orr	r1, r1, #0x8		@ SCU CPU Power Status Register
+	mrc	15, 0, r0, cr0, cr0, 5	@ get the CPU ID
+	and	r0, r0, #15
+	add	r1, r1, r0
+	mov	r2, #0x0
+	strb	r2, [r1]		@ switch SCU power state to Normal mode
+
+	b	cpu_resume
 
 ENDPROC(armada_38x_cpu_mem_resume)
 
