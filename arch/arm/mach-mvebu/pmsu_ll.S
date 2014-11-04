@@ -101,8 +101,9 @@ ENDPROC(armada_38x_cpu_mem_resume)
 
 #define GPIO_32_47_DATA_OUT_EN_CTRL_REG_ADDR	(0x144)	/* 0x18144 */
 #define GPIO_32_47_DATA_OUT_REG_ADDR		(0x140) /* 0x18140 */
-#define GPIO_CMD_VALUE				(0x8000)
-#define GPIO_PIN_MASK				(0xFFFF7FFF)
+#define GPIO_CMD_VALUE				(0x2)
+#define GPIO_ACK_VALUE				(0xE)
+#define GPIO_PIN_MASK				(0xFFFFFFFE)
 #define SDRAM_DLB_EVICT_OFFS_REG		(0x30C)	/* 0x170C */
 #define SDRAM_OPERATION_REG			(0x18)	/* 0x1418 */
 #define SDRAM_CONFIG_REG			(0x00)	/* 0x1400 */
@@ -146,8 +147,8 @@ ENTRY(enter_mem_suspend)
 	ldr	r4, =0x00000007
 	orr	r3, r3, r4
 
-	/* Configure GPIOs 47 for communicating with PIC */
-	/* Prepare value for GPIO 47 */
+	/* Configure GPIOs 33-35 for communicating with PIC */
+	/* Prepare command value for GPIOs 33-35 */
 	ldr r4, =(GPIO_32_47_DATA_OUT_REG_ADDR)
 	orr r4, r4, r1
 	ldr r5, =(GPIO_PIN_MASK)
@@ -156,12 +157,26 @@ ENTRY(enter_mem_suspend)
 	and r7, r7, r5
 	orr r7, r7, r6
 
-	/* Set GPIO 47 as out */
+	/* Set GPIO 33-35 as out */
 	ldr r0, =(GPIO_32_47_DATA_OUT_EN_CTRL_REG_ADDR)
 	orr r0, r0, r1
 	ldr r6, [r0]
 	and r6, r6, r5
 	str r6, [r0]
+
+	/* Issue the cmd */
+	str r7, [r4]
+
+	/* Prepare the cmd ack */
+	ldr r6, =(GPIO_ACK_VALUE)
+	orr r7, r7, r6
+
+	/*
+	 * Wait between cmd (0x1) and cmd ack (0x7)
+	 */
+	ldr r1, =1000000000
+1:	subs r1,r1,#1
+	bne 1b
 
 	/*
 	 * Put Dram into self refresh. From here on we can perform
