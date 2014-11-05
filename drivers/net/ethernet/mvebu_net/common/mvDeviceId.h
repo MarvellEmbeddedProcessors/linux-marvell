@@ -427,11 +427,33 @@ extern "C" {
 /* BobCat2  Family */
 #define MV_BOBCAT2_DEV_ID		0xFC00
 
+/* BobCat2  Revisions */
+#define MV_BOBCAT2_A0_ID		0x0
+#define MV_BOBCAT2_A0_NAME		"A0"
+#define MV_BOBCAT2_B0_ID		0x1
+#define MV_BOBCAT2_B0_NAME		"B0"
+
+#define MV_BOBCAT2_ID_ARRAY { \
+	MV_BOBCAT2_A0_NAME,\
+	MV_BOBCAT2_B0_NAME,\
+}
+
  /* Lion2  Family */
 #define MV_LION2_DEV_ID		0x8000
 
 /* AlleyCat3  Family */
 #define MV_ALLEYCAT3_DEV_ID		0xF400
+
+/* AlleyCat3  Revisions */
+#define MV_ALLEYCAT3_A0_ID		0x0
+#define MV_ALLEYCAT3_A0_NAME	"A0"
+#define MV_ALLEYCAT3_A1_ID		0x1
+#define MV_ALLEYCAT3_A1_NAME	"A1"
+
+#define MV_ALLEYCAT3_ID_ARRAY { \
+	MV_ALLEYCAT3_A0_NAME,\
+	MV_ALLEYCAT3_A1_NAME,\
+}
 
  /* IDT Swicth  */
 #define PCI_VENDOR_ID_IDT_SWITCH	0x111D
