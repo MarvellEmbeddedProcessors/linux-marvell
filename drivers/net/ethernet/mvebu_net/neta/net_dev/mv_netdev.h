@@ -89,6 +89,15 @@ extern int mv_ctrl_txdone;
 
 
 #ifdef CONFIG_MV_NETA_SKB_RECYCLE
+/* IPv6 TCP will consume the most cb[] with 44 bytes, so the last 4 bytes is safe to use */
+#define MV_NETA_SKB_RECYCLE_MAGIC(skb)                       ((unsigned int)skb)
+#define MV_NETA_SKB_RECYCLE_CB(skb)                          (*((unsigned int *)(&(skb->cb[44]))))
+#define MV_NETA_SKB_RECYCLE_MAGIC_GET(skb)                   (MV_NETA_SKB_RECYCLE_CB(skb) & 0xfffffffc)
+#define MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, magic_bpid)  (MV_NETA_SKB_RECYCLE_CB(skb) = magic_bpid)
+#define MV_NETA_SKB_RECYCLE_MAGIC_IS_OK(skb)                 ((MV_NETA_SKB_RECYCLE_MAGIC(skb) ==           \
+								MV_NETA_SKB_RECYCLE_MAGIC_GET(skb)) ? 1 : 0)
+#define MV_NETA_SKB_RECYCLE_BPID_GET(skb)                    (MV_NETA_SKB_RECYCLE_CB(skb) & 0x3)
+
 extern int mv_ctrl_recycle;
 
 #define mv_eth_is_recycle()     (mv_ctrl_recycle)
@@ -681,7 +690,7 @@ static inline void mv_eth_pkt_free(struct eth_pbuf *pkt)
 	mvOsFree(pkt);
 }
 
-static inline int mv_eth_pool_put(struct bm_pool *pool, struct eth_pbuf *pkt)
+static inline int mv_eth_pool_put(struct bm_pool *pool, struct sk_buff *skb)
 {
 	unsigned long flags = 0;
 
@@ -690,30 +699,31 @@ static inline int mv_eth_pool_put(struct bm_pool *pool, struct eth_pbuf *pkt)
 		STAT_ERR(pool->stats.stack_full++);
 		MV_ETH_UNLOCK(&pool->lock, flags);
 
-		/* free pkt+skb */
-		mv_eth_pkt_free(pkt);
+		/* free skb */
+		dev_kfree_skb_any(skb);
 		return 1;
 	}
-	mvStackPush(pool->stack, (MV_U32) pkt);
+	mvStackPush(pool->stack, (MV_U32)skb);
 	STAT_DBG(pool->stats.stack_put++);
 	MV_ETH_UNLOCK(&pool->lock, flags);
 	return 0;
 }
 
-
 /* Pass pkt to BM Pool or RXQ ring */
 static inline void mv_eth_rxq_refill(struct eth_port *pp, int rxq,
-				     struct eth_pbuf *pkt, struct bm_pool *pool, struct neta_rx_desc *rx_desc)
+				     struct bm_pool *pool, struct sk_buff *skb, struct neta_rx_desc *rx_desc)
 {
+	phys_addr_t pa = virt_to_phys(skb->head);
+
 	if (mv_eth_pool_bm(pool)) {
 		/* Refill BM pool */
 		STAT_DBG(pool->stats.bm_put++);
-		mvBmPoolPut(pkt->pool, (MV_ULONG) pkt->physAddr);
+		mvBmPoolPut(pool->pool, (MV_ULONG)pa);
 		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 	} else {
 		/* Refill Rx descriptor */
 		STAT_DBG(pp->stats.rxq_fill[rxq]++);
-		mvNetaRxDescFill(rx_desc, pkt->physAddr, (MV_U32)pkt);
+		mvNetaRxDescFill(rx_desc, (MV_U32)pa, (MV_U32)skb);
 		mvOsCacheLineFlush(pp->dev->dev.parent, rx_desc);
 	}
 }
@@ -829,7 +839,7 @@ void mv_eth_link_event(struct eth_port *pp, int print);
 
 int mv_eth_rx_policy(u32 cause);
 int mv_eth_refill(struct eth_port *pp, int rxq,
-				struct eth_pbuf *pkt, struct bm_pool *pool, struct neta_rx_desc *rx_desc);
+				struct bm_pool *pool, struct neta_rx_desc *rx_desc);
 u32 mv_eth_txq_done(struct eth_port *pp, struct tx_queue *txq_ctrl);
 u32 mv_eth_tx_done_gbe(struct eth_port *pp, u32 cause_tx_done, int *tx_todo);
 u32 mv_eth_tx_done_pon(struct eth_port *pp, int *tx_todo);
@@ -851,14 +861,5 @@ void      mv_hwf_bm_dump(void);
 #ifdef CONFIG_MV_ETH_L2FW
 int         mv_l2fw_init(void);
 #endif
-
-#ifdef CONFIG_MV_ETH_NFP
-int         mv_eth_nfp_ctrl(struct net_device *dev, int en);
-int         mv_eth_nfp_ext_ctrl(struct net_device *dev, int en);
-int         mv_eth_nfp_ext_add(struct net_device *dev, int port);
-int         mv_eth_nfp_ext_del(struct net_device *dev);
-MV_STATUS   mv_eth_nfp(struct eth_port *pp, int rxq, struct neta_rx_desc *rx_desc,
-					struct eth_pbuf *pkt, struct bm_pool *pool);
-#endif /* CONFIG_MV_ETH_NFP */
 
 #endif /* __mv_netdev_h__ */
