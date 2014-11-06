@@ -76,6 +76,7 @@ extern int bm_reg_vbase;
 #endif
 
 #define MV_BM_POOLS                 4
+#define MV_BM_POOLS_MASK            (MV_BM_POOLS - 1)
 #define MV_BM_POOL_CAP_MAX          (16*1024 - MV_BM_POOL_PTR_ALIGN/4)
 #define MV_BM_POOL_CAP_MIN          128
 #define MV_BM_POOL_PTR_ALIGN        128

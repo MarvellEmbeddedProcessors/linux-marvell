@@ -535,13 +535,13 @@ menu "Advanced Features"
 
 config MV_NETA_SKB_RECYCLE
 	depends on NET_SKB_RECYCLE
-	bool "NETA Skb recycle"
+	bool "NETA Skb recycle only for forwarding cases"
 	default y
 	---help---
 	Work-in-progress and experimental.
 
-	This option enables skb's to be returned via a callback at kfree to
-	the allocator to make a fastpath for very skb consuming network
+	This option enables skb's to be recycled when packet tx done, which
+	makes a fastpath for routine and bridge skb consuming network
 	applications.
 
 config MV_NETA_SKB_RECYCLE_DEF
