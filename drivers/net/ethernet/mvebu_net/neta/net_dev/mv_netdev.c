@@ -6128,7 +6128,6 @@ void mv_eth_port_stats_print(unsigned int port)
 		printk(KERN_CONT "%8d ", stat->tx_done_timer_add[cpu]);
 
 	pr_info("\n");
-	printk(KERN_ERR "tx_fragmentation..............%10u\n", stat->tx_fragment);
 	printk(KERN_ERR "tx_done_event.................%10u\n", stat->tx_done);
 	printk(KERN_ERR "cleanup_timer_event...........%10u\n", stat->cleanup_timer);
 	printk(KERN_ERR "link..........................%10u\n", stat->link);

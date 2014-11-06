@@ -209,7 +209,6 @@ struct port_stats {
 	u32 poll_exit[CONFIG_NR_CPUS];
 	u32 tx_done_timer_event[CONFIG_NR_CPUS];
 	u32 tx_done_timer_add[CONFIG_NR_CPUS];
-	u32 tx_fragment;
 	u32 tx_done;
 	u32 cleanup_timer;
 	u32 link;
