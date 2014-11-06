@@ -55,7 +55,7 @@ disclaimer.
 
 static int numHashEntries;
 
-struct eth_pbuf *mv_eth_pool_get(struct bm_pool *pool);
+struct sk_buff *mv_eth_pool_get(struct bm_pool *pool);
 
 static int mv_eth_ports_l2fw_num;
 
@@ -70,8 +70,8 @@ static MV_LONG      eth_xor_desc_phys_addr;
 
 struct eth_port_l2fw **mv_eth_ports_l2fw;
 static inline int       mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq);
-static inline MV_STATUS mv_eth_l2fw_tx(struct eth_pbuf *pkt, struct eth_port *pp,
-					   int withXor, struct neta_rx_desc *rx_desc);
+static inline MV_STATUS mv_eth_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, int withXor,
+									   struct neta_rx_desc *rx_desc);
 
 
 static L2FW_RULE *l2fw_lookup(MV_U32 srcIP, MV_U32 dstIP)
@@ -378,12 +378,12 @@ void mv_eth_set_l2fw(struct eth_port_l2fw *ppl2fw, int cmd, int rx_port, int tx_
 
 }
 
-static inline struct eth_pbuf *l2fw_swap_mac(struct eth_pbuf *pRxPktInfo)
+inline unsigned char *l2fw_swap_mac(unsigned char *buff)
 {
 	MV_U16 *pSrc;
 	int i;
 	MV_U16 swap;
-	pSrc = (MV_U16 *)(pRxPktInfo->pBuf + pRxPktInfo->offset + MV_ETH_MH_SIZE);
+	pSrc = (MV_U16 *)(buff + MV_ETH_MH_SIZE);
 
 	for (i = 0; i < 3; i++) {
 		swap = pSrc[i];
@@ -391,20 +391,19 @@ static inline struct eth_pbuf *l2fw_swap_mac(struct eth_pbuf *pRxPktInfo)
 		pSrc[i+3] = swap;
 		}
 
-	return  pRxPktInfo;
+	return  buff;
 }
 
-static inline void l2fw_copy_mac(struct eth_pbuf *pRxPktInfo,
-					 struct eth_pbuf *pTxPktInfo)
-	{
+inline void l2fw_copy_mac(unsigned char *rx_buff, unsigned char *tx_buff)
+{
 	/* copy 30 bytes (start after MH header) */
 	/* 12 for SA + DA */
 	/* 18 for the rest */
 	MV_U16 *pSrc;
 	MV_U16 *pDst;
 	int i;
-	pSrc = (MV_U16 *)(pRxPktInfo->pBuf + pRxPktInfo->offset + MV_ETH_MH_SIZE);
-	pDst = (MV_U16 *)(pTxPktInfo->pBuf + pTxPktInfo->offset + MV_ETH_MH_SIZE);
+	pSrc = (MV_U16 *)(rx_buff);
+	pDst = (MV_U16 *)(tx_buff);
 
 	/* swap mac SA and DA */
 	for (i = 0; i < 3; i++) {
@@ -413,73 +412,80 @@ static inline void l2fw_copy_mac(struct eth_pbuf *pRxPktInfo,
 		}
 	for (i = 6; i < 15; i++)
 		pDst[i] = pSrc[i];
-	}
+}
 
-static inline void l2fw_copy_and_swap_mac(struct eth_pbuf *pRxPktInfo, struct eth_pbuf *pTxPktInfo)
+inline void l2fw_copy_and_swap_mac(unsigned char *rx_buff, unsigned char *tx_buff)
 {
 	MV_U16 *pSrc;
 	MV_U16 *pDst;
 	int i;
 
-	pSrc = (MV_U16 *)(pRxPktInfo->pBuf +  pRxPktInfo->offset + MV_ETH_MH_SIZE);
-	pDst = (MV_U16 *)(pTxPktInfo->pBuf +  pTxPktInfo->offset + MV_ETH_MH_SIZE);
+	pSrc = (MV_U16 *)(rx_buff);
+	pDst = (MV_U16 *)(tx_buff);
 	for (i = 0; i < 3; i++) {
 		pDst[i]   = pSrc[i+3];
 		pDst[i+3] = pSrc[i];
-		}
+	}
 }
 
 static inline
-struct eth_pbuf *eth_l2fw_copy_packet_withoutXor(struct eth_pbuf *pRxPktInfo)
+struct sk_buff *eth_l2fw_copy_packet_withoutXor(struct sk_buff *skb, struct neta_rx_desc *rx_desc)
 {
 	MV_U8 *pSrc;
 	MV_U8 *pDst;
 	struct bm_pool *pool;
-	struct eth_pbuf *pTxPktInfo;
+	struct sk_buff *skb_new;
+	int bytes = rx_desc->dataSize - MV_ETH_MH_SIZE;
+	int pool_id = NETA_RX_GET_BPID(rx_desc);
 
-	mvOsCacheInvalidate(NULL, pRxPktInfo->pBuf + pRxPktInfo->offset,
-						pRxPktInfo->bytes);
+	mvOsCacheInvalidate(NULL, skb->data, bytes);
 
-	pool = &mv_eth_pool[pRxPktInfo->pool];
-	pTxPktInfo = mv_eth_pool_get(pool);
-	if (pTxPktInfo == NULL) {
-		mvOsPrintf("pTxPktInfo == NULL in %s\n", __func__);
+	pool = &mv_eth_pool[pool_id];
+	skb_new = mv_eth_pool_get(pool);
+	if (!skb_new) {
+		mvOsPrintf("skb == NULL in %s\n", __func__);
 		return NULL;
-		}
-	pSrc = pRxPktInfo->pBuf +  pRxPktInfo->offset + MV_ETH_MH_SIZE;
-	pDst = pTxPktInfo->pBuf +  pTxPktInfo->offset + MV_ETH_MH_SIZE;
+	}
+	pSrc = skb->data + MV_ETH_MH_SIZE;
+	pDst = skb_new->data + MV_ETH_MH_SIZE;
 
-	memcpy(pDst+12, pSrc+12, pRxPktInfo->bytes-12);
-	l2fw_copy_and_swap_mac(pRxPktInfo, pTxPktInfo);
-	pTxPktInfo->bytes = pRxPktInfo->bytes;
-	mvOsCacheFlush(NULL, pTxPktInfo->pBuf + pTxPktInfo->offset, pTxPktInfo->bytes);
+	memcpy(pDst+12, pSrc+12, bytes - 12);
+	l2fw_copy_and_swap_mac(pSrc, pDst);
+	mvOsCacheFlush(NULL, skb->data, bytes);
 
-	return pTxPktInfo;
+	return skb_new;
 }
 
 #ifdef CONFIG_MV_INCLUDE_XOR
 static inline
-struct eth_pbuf *eth_l2fw_copy_packet_withXor(struct eth_pbuf *pRxPktInfo)
+struct sk_buff *eth_l2fw_copy_packet_withXor(struct sk_buff *skb, struct neta_rx_desc *rx_desc)
 {
+	struct sk_buff *skb_new = NULL;
 	struct bm_pool *pool;
-	struct eth_pbuf *pTxPktInfo;
+	unsigned int bufPhysAddr;
+	MV_U8 *pSrc;
+	MV_U8 *pDst;
+	int pool_id = NETA_RX_GET_BPID(rx_desc);
+	int  bytes = rx_desc->dataSize - MV_ETH_MH_SIZE;
 
-	pool = &mv_eth_pool[pRxPktInfo->pool];
-	pTxPktInfo = mv_eth_pool_get(pool);
-	if (pTxPktInfo == NULL) {
-		mvOsPrintf("pTxPktInfo == NULL in %s\n", __func__);
+	pool = &mv_eth_pool[pool_id];
+	skb_new = mv_eth_pool_get(pool);
+	if (!skb_new) {
+		mvOsPrintf("skb == NULL in %s\n", __func__);
 		return NULL;
-		}
+	}
 
 	/* sync between giga and XOR to avoid errors (like checksum errors in TX)
 	   when working with IOCC */
 
 	mvOsCacheIoSync(NULL);
 
-	eth_xor_desc->srcAdd0    = pRxPktInfo->physAddr + pRxPktInfo->offset + MV_ETH_MH_SIZE + 30;
-	eth_xor_desc->phyDestAdd = pTxPktInfo->physAddr + pTxPktInfo->offset + MV_ETH_MH_SIZE + 30;
+	bufPhysAddr =  virt_to_phys(skb->data);
+	eth_xor_desc->srcAdd0    = bufPhysAddr + skb_headroom(skb) + MV_ETH_MH_SIZE + 30;
+	bufPhysAddr =  virt_to_phys(skb_new->data);
+	eth_xor_desc->phyDestAdd = bufPhysAddr + skb_headroom(skb_new) + MV_ETH_MH_SIZE + 30;
 
-	eth_xor_desc->byteCnt    = pRxPktInfo->bytes - 30;
+	eth_xor_desc->byteCnt    = bytes - 30;
 
 	eth_xor_desc->phyNextDescPtr = 0;
 	eth_xor_desc->status         = BIT31;
@@ -490,13 +496,13 @@ struct eth_pbuf *eth_l2fw_copy_packet_withXor(struct eth_pbuf *pRxPktInfo)
 
 	MV_REG_WRITE(XOR_ACTIVATION_REG(1, XOR_CHAN(0)), XEXACTR_XESTART_MASK);
 
-	mvOsCacheLineInv(NULL, pRxPktInfo->pBuf + pRxPktInfo->offset);
-	l2fw_copy_mac(pRxPktInfo, pTxPktInfo);
-	mvOsCacheLineFlush(NULL, pTxPktInfo->pBuf + pTxPktInfo->offset);
+	mvOsCacheLineInv(NULL, skb->data);
+	pSrc = skb->data + MV_ETH_MH_SIZE;
+	pDst = skb_new->data + MV_ETH_MH_SIZE;
+	l2fw_copy_mac(pSrc, pDst);
+	mvOsCacheLineFlush(NULL, skb->data);
 
-	/* Update TxPktInfo */
-	pTxPktInfo->bytes = pRxPktInfo->bytes;
-	return pTxPktInfo;
+	return skb_new;
 }
 
 void setXorDesc(void)
@@ -603,13 +609,14 @@ void l2fw_stats(void)
 #endif
 }
 
-static inline MV_STATUS mv_eth_l2fw_tx(struct eth_pbuf *pkt, struct eth_port *pp, int withXor,
+static inline MV_STATUS mv_eth_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, int withXor,
 									   struct neta_rx_desc *rx_desc)
 {
 	struct neta_tx_desc *tx_desc;
 	u32 tx_cmd = 0;
 	struct tx_queue *txq_ctrl;
 	unsigned long flags = 0;
+	int pool_id;
 
 	/* assigning different txq for each rx port , to avoid waiting on the
 	same txq lock when traffic on several rx ports are destined to the same
@@ -639,11 +646,14 @@ static inline MV_STATUS mv_eth_l2fw_tx(struct eth_pbuf *pkt, struct eth_port *pp
 	}
 	txq_ctrl->txq_count++;
 
+	/* Get pool_id */
+	pool_id = NETA_RX_GET_BPID(rx_desc);
+
 #ifdef CONFIG_MV_ETH_BM_CPU
-	tx_cmd |= NETA_TX_BM_ENABLE_MASK | NETA_TX_BM_POOL_ID_MASK(pkt->pool);
+	tx_cmd |= NETA_TX_BM_ENABLE_MASK | NETA_TX_BM_POOL_ID_MASK(pool_id);
 	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) NULL;
 #else
-	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) pkt;
+	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = (u32) skb;
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
 	mv_eth_shadow_inc_put(txq_ctrl);
@@ -651,10 +661,10 @@ static inline MV_STATUS mv_eth_l2fw_tx(struct eth_pbuf *pkt, struct eth_port *pp
 	tx_desc->command = tx_cmd | NETA_TX_L4_CSUM_NOT |
 		NETA_TX_FLZ_DESC_MASK | NETA_TX_F_DESC_MASK
 		| NETA_TX_L_DESC_MASK |
-		NETA_TX_PKT_OFFSET_MASK(pkt->offset + MV_ETH_MH_SIZE);
+		NETA_TX_PKT_OFFSET_MASK(NET_SKB_PAD + MV_ETH_MH_SIZE);
 
-	tx_desc->dataSize    = pkt->bytes;
-	tx_desc->bufPhysAddr = pkt->physAddr;
+	tx_desc->dataSize    = rx_desc->dataSize - MV_ETH_MH_SIZE;
+	tx_desc->bufPhysAddr = virt_to_phys(skb->head);
 
 	mv_eth_tx_desc_flush(pp, tx_desc);
 
@@ -687,14 +697,14 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 	int rx_done, rx_filled;
 	struct neta_rx_desc *rx_desc;
 	u32 rx_status = MV_OK;
-	struct eth_pbuf *pkt;
-	struct eth_pbuf *newpkt = NULL;
+	struct sk_buff *skb, *skb_new = NULL;
 	struct bm_pool *pool;
 	MV_STATUS status = MV_OK;
 	struct eth_port_l2fw *ppl2fw = mv_eth_ports_l2fw[pp->port];
 	MV_IP_HEADER *pIph = NULL;
 	MV_U8 *pData;
 	int	ipOffset;
+	int pool_id, bytes;
 
 	rx_done = mvNetaRxqBusyDescNumGet(pp->port, rxq);
 	mvOsCacheIoSync(NULL);
@@ -718,13 +728,14 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 		rx_done++;
 		rx_filled++;
 
-		pkt = (struct eth_pbuf *)rx_desc->bufCookie;
-		if (!pkt) {
-			printk(KERN_INFO "pkt is NULL in ; rx_done=%d %s\n", rx_done, __func__);
+		skb = (struct sk_buff *)rx_desc->bufCookie;
+		if (!skb) {
+			pr_err("%s: skb is NULL, rx_done=%d\n", __func__, rx_done);
 			return rx_done;
 		}
 
-		pool = &mv_eth_pool[pkt->pool];
+		pool_id = NETA_RX_GET_BPID(rx_desc);
+		pool = &mv_eth_pool[pool_id];
 		rx_status = rx_desc->status;
 		if (((rx_status & NETA_RX_FL_DESC_MASK) != NETA_RX_FL_DESC_MASK) ||
 			(rx_status & NETA_RX_ES_MASK)) {
@@ -733,13 +744,13 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 			if (pp->dev)
 				pp->dev->stats.rx_errors++;
 
-			mv_eth_rxq_refill(pp, rxq, pkt, pool, rx_desc);
+			mv_eth_rxq_refill(pp, rxq, pool, skb, rx_desc);
 			continue;
 		}
 
-		pkt->bytes = rx_desc->dataSize - (MV_ETH_CRC_SIZE + MV_ETH_MH_SIZE);
+		bytes = rx_desc->dataSize - (MV_ETH_CRC_SIZE + MV_ETH_MH_SIZE);
 
-		pData = pkt->pBuf + pkt->offset;
+		pData = skb->head + NET_SKB_PAD;
 
 #ifdef CONFIG_MV_ETH_PNC
 		ipOffset = NETA_RX_GET_IPHDR_OFFSET(rx_desc);
@@ -783,32 +794,29 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 
 		switch (ppl2fw->cmd) {
 		case CMD_L2FW_AS_IS:
-			status = mv_eth_l2fw_tx(pkt, new_pp, 0, rx_desc);
+			status = mv_eth_l2fw_tx(skb, new_pp, 0, rx_desc);
 			break;
 
 		case CMD_L2FW_SWAP_MAC:
-			mvOsCacheLineInv(NULL, pkt->pBuf + pkt->offset);
-			l2fw_swap_mac(pkt);
-			mvOsCacheLineFlush(NULL, pkt->pBuf+pkt->offset);
-			status = mv_eth_l2fw_tx(pkt, new_pp, 0, rx_desc);
+			mvOsCacheLineInv(NULL, skb->head + NET_SKB_PAD);
+			l2fw_swap_mac(skb->data);
+			mvOsCacheLineFlush(NULL, skb->head + NET_SKB_PAD);
+			status = mv_eth_l2fw_tx(skb, new_pp, 0, rx_desc);
 			break;
 
 		case CMD_L2FW_COPY_SWAP:
 #ifdef CONFIG_MV_INCLUDE_XOR
-			if (pkt->bytes >= ppl2fw->xorThreshold) {
-				newpkt = eth_l2fw_copy_packet_withXor(pkt);
-				if (newpkt)
-					status = mv_eth_l2fw_tx(newpkt, new_pp, 1, rx_desc);
-				else
-					status = MV_ERROR;
+			if (bytes >= ppl2fw->xorThreshold) {
+				skb_new = eth_l2fw_copy_packet_withXor(skb, rx_desc);
+				pr_err("%s: xor is not supported\n", __func__);
 			} else
 #endif /* CONFIG_MV_INCLUDE_XOR */
 			{
-					newpkt = eth_l2fw_copy_packet_withoutXor(pkt);
-					if (newpkt)
-						status = mv_eth_l2fw_tx(newpkt, new_pp, 0, rx_desc);
-					else
-						status = MV_ERROR;
+				skb_new = eth_l2fw_copy_packet_withoutXor(skb, rx_desc);
+				if (skb_new)
+					status = mv_eth_l2fw_tx(skb, new_pp, 0, rx_desc);
+				else
+					status = MV_ERROR;
 			}
 			break;
 #ifdef CONFIG_MV_ETH_L2SEC
@@ -819,7 +827,7 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 		default:
 			pr_err("WARNING:in %s invalid mode %d for rx port %d\n",
 				__func__, ppl2fw->cmd, pp->port);
-			mv_eth_rxq_refill(pp, rxq, pkt, pool, rx_desc);
+			mv_eth_rxq_refill(pp, rxq, pool, skb, rx_desc);
 		} /*of switch*/
 
 		if (status == MV_OK) {
@@ -827,28 +835,28 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 				/* BM - no refill */
 				mvOsCacheLineInv(NULL, rx_desc);
 			} else {
-				if (mv_eth_refill(pp, rxq, NULL, pool, rx_desc)) {
+				if (mv_eth_refill(pp, rxq, pool, rx_desc)) {
 					printk(KERN_ERR "%s: Linux processing - Can't refill\n", __func__);
 					pp->rxq_ctrl[rxq].missed++;
 				}
 			}
 			/* we do not need the pkt , we do not do anything with it*/
 			if  (ppl2fw->cmd == CMD_L2FW_COPY_SWAP)
-				mv_eth_pool_put(pool, pkt);
+				mv_eth_pool_put(pool, skb);
 
 			continue;
 
 		} else if (status == MV_DROPPED) {
 			ppl2fw->statDrop++;
-			mv_eth_rxq_refill(pp, rxq, pkt, pool, rx_desc);
+			mv_eth_rxq_refill(pp, rxq, pool, skb, rx_desc);
 			if (ppl2fw->cmd == CMD_L2FW_COPY_SWAP)
-				mv_eth_pool_put(pool, newpkt);
+				mv_eth_pool_put(pool, skb_new);
 
 			continue;
 
 		} else if (status == MV_ERROR) {
 			ppl2fw->statErr++;
-			mv_eth_rxq_refill(pp, rxq, pkt, pool, rx_desc);
+			mv_eth_rxq_refill(pp, rxq, pool, skb, rx_desc);
 		}
 
 

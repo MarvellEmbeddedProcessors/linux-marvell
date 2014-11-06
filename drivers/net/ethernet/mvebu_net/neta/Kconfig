@@ -669,46 +669,6 @@ config MV_ETH_EXTRA_BUF_NUM
 	Number of extra buffers allocated for each port
 endmenu
 
-menu "Network Fast Processing (NFP) support"
-
-config  MV_ETH_NFP
-	depends on MV_ETH_NETA
-        bool "NFP support"
-	default n
-        ---help---
-        Choosing this option will enable Network Fast Processing support.
-	Kernel image will be able to use NFP modules.
-	NFP provided as different package and must be compiled separately.
-	NFP support include two modules:
-	NFP core functionality and NFP dynamic learning.
-
-config MV_ETH_NFP_HOOKS
-        bool "NFP IP stack Hooks"
-	depends on MV_ETH_NFP
-	default y
-        ---help---
-        Choosing this option will enable NFP Dynamic Learning.
-	Marvell specific code was added to few files
-	in Linux Network Stack. Without this configration option only
-	static NFP configuration is enabled.
-
-config MV_ETH_NFP_EXT
-	bool "Support NFP for External (non GBE) network interfaces"
-	depends on MV_ETH_NFP
-	default n
-	---help---
-	Enable NFP support for External (non GBE) network interfaces.
-	It doesn't require special changes in external network drivers,
-	but NFP can be used only for NAPI capable drivers.
-	Leave default if unsure.
-
-config MV_ETH_NFP_EXT_NUM
-	depends on MV_ETH_NFP_EXT
-	int "Maximum number of External (non-Gbe) interfaces"
-	default 1
-	range 1 4
-endmenu
-
 menuconfig MV_ETH_NAPI
         bool "NAPI configuration"
         default y
