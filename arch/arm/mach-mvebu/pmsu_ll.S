@@ -58,6 +58,7 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
 ENDPROC(armada_38x_cpu_resume)
 
 ENTRY(armada_38x_cpu_mem_resume)
+	ARM_BE8(setend	be)
 
 	/* Disable MMU that was enabled in bootROM */
 	mrc  p15, 0, r1, c1, c0, 0
@@ -78,6 +79,7 @@ ENTRY(armada_38x_cpu_mem_resume)
 
 	/* Restore internal registers Base address @ 0xF1000000 */
 	ldr  r1, =0xf1000000
+ARM_BE8(rev	r1, r1)
 	ldr  r0, =0xD0020080
 	str  r1, [r0]
 
@@ -123,7 +125,9 @@ ENTRY(enter_mem_suspend)
 	ldr r2, =SDRAM_DLB_EVICT_OFFS_REG
 	orr	r2, r2, r0
 	ldr	r3, [r2]
+ARM_BE8(rev	r3, r3)
 	bic     r3, #0x000000FF
+ARM_BE8(rev	r3, r3)
 	str     r3, [r2]
 
 	/* Wait ~7 us */
@@ -136,7 +140,9 @@ ENTRY(enter_mem_suspend)
 	ldr 	r2, =SDRAM_CONFIG_REG
 	orr	r2, r2, r0
 	ldr	r3, [r2]
+ARM_BE8(rev	r3, r3)
 	bic     r3, #0x01000000
+ARM_BE8(rev	r3, r3)
 	str     r3, [r2]
 
 	/* Prepare to go to self-refresh */
@@ -144,8 +150,10 @@ ENTRY(enter_mem_suspend)
 	ldr	r2, =(SDRAM_OPERATION_REG)
 	orr	r2, r2, r0
 	ldr	r3, [r2]
+ARM_BE8(rev	r3, r3)
 	ldr	r4, =0x00000007
 	orr	r3, r3, r4
+ARM_BE8(rev	r3, r3)
 
 	/* Configure GPIOs 33-35 for communicating with PIC */
 	/* Prepare command value for GPIOs 33-35 */
@@ -154,14 +162,18 @@ ENTRY(enter_mem_suspend)
 	ldr r5, =(GPIO_PIN_MASK)
 	ldr r6, =(GPIO_CMD_VALUE)
 	ldr r7, [r4]
+ARM_BE8(rev r7, r7)
 	and r7, r7, r5
 	orr r7, r7, r6
+ARM_BE8(rev r7, r7)
 
 	/* Set GPIO 33-35 as out */
 	ldr r0, =(GPIO_32_47_DATA_OUT_EN_CTRL_REG_ADDR)
 	orr r0, r0, r1
 	ldr r6, [r0]
+ARM_BE8(rev r6, r6)
 	and r6, r6, r5
+ARM_BE8(rev r6, r6)
 	str r6, [r0]
 
 	/* Issue the cmd */
@@ -169,7 +181,9 @@ ENTRY(enter_mem_suspend)
 
 	/* Prepare the cmd ack */
 	ldr r6, =(GPIO_ACK_VALUE)
+ARM_BE8(rev r7, r7)
 	orr r7, r7, r6
+ARM_BE8(rev r7, r7)
 
 	/*
 	 * Wait between cmd (0x1) and cmd ack (0x7)
