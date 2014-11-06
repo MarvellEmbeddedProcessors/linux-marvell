@@ -133,6 +133,9 @@ typedef struct {
 #define NETA_RX_GET_IPHDR_HDRLEN(rxd)       (((rxd)->status & NETA_RX_IP_HLEN_MASK) >> NETA_RX_IP_HLEN_OFFS)
 #define NETA_RX_SET_IPHDR_HDRLEN(rxd, hlen) ((rxd)->status |= ((hlen) << NETA_RX_IP_HLEN_OFFS) & NETA_RX_IP_HLEN_MASK)
 
+#define NETA_RX_GET_BPID(rxd)       (((rxd)->status & NETA_RX_BM_POOL_ALL_MASK) >> NETA_RX_BM_POOL_ID_OFFS)
+
+
 #ifdef CONFIG_MV_ETH_PNC
 
 #define NETA_RX_IS_PPPOE(rxd)          ((rxd)->pncInfo & NETA_PNC_PPPOE)
