@@ -66,7 +66,7 @@ static ssize_t mv_eth_help(char *b)
 	if (MV_NETA_PNC_CAP())
 		o += scnprintf(b+o, s-o, "echo {0|1}         > pnc           - enable / disable PNC access\n");
 #endif /* CONFIG_MV_ETH_PNC */
-	o += scnprintf(b+o, s-o, "echo {0|1}         > skb           - enable / disable SKB recycle\n");
+	o += scnprintf(b+o, s-o, "echo {0|1}         > skb           - enable / disable SKB recycle, only for SWF\n");
 	o += scnprintf(b+o, s-o, "echo p v           > debug         - bit0:rx, bit1:tx, bit2:isr, bit3:poll, bit4:dump\n");
 	o += scnprintf(b+o, s-o, "echo p l s         > buf_num       - set number of long <l> and short <s> buffers allocated for port <p>\n");
 	o += scnprintf(b+o, s-o, "echo p wol         > pm_mode       - set port <p> pm mode. 1 wol, 0 suspend.\n");
@@ -152,7 +152,7 @@ static ssize_t mv_eth_port_store(struct device *dev,
 		err = mv_eth_ctrl_flag(p, MV_ETH_F_DBG_POLL, v & 0x8);
 		err = mv_eth_ctrl_flag(p, MV_ETH_F_DBG_DUMP, v & 0x10);
 	} else if (!strcmp(name, "skb")) {
-		mv_eth_ctrl_recycle(p);
+		mv_eth_ctrl_swf_recycle(p);
 	} else if (!strcmp(name, "port")) {
 		mv_eth_status_print();
 		mvNetaPortStatus(p);

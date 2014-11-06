@@ -88,23 +88,25 @@ extern int mv_ctrl_txdone;
 
 #define RX_BUF_SIZE(pkt_size)   ((pkt_size) + NET_SKB_PAD)
 
-
 #ifdef CONFIG_MV_NETA_SKB_RECYCLE
-/* IPv6 TCP will consume the most cb[] with 44 bytes, so the last 4 bytes is safe to use */
+/* SKB recycle magic, indicate the skb can be recycled, here it is the address of skb */
 #define MV_NETA_SKB_RECYCLE_MAGIC(skb)                       ((unsigned int)skb)
-#define MV_NETA_SKB_RECYCLE_CB(skb)                          (*((unsigned int *)(&(skb->cb[44]))))
-#define MV_NETA_SKB_RECYCLE_MAGIC_GET(skb)                   (MV_NETA_SKB_RECYCLE_CB(skb) & 0xfffffffc)
+/* Cb to store magic and bpid, IPv6 TCP will consume the most cb[] with 44 bytes, so the last 4 bytes is safe to use */
+#define MV_NETA_SKB_RECYCLE_CB(skb)                          (*((unsigned int *)(&(skb->cb[sizeof(skb->cb) - 4]))))
+/* Get recycle magic */
+#define MV_NETA_SKB_RECYCLE_MAGIC_GET(skb)                   (MV_NETA_SKB_RECYCLE_CB(skb) & (~MV_BM_POOLS_MASK))
+/* Set recycle magic and bpid */
 #define MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, magic_bpid)  (MV_NETA_SKB_RECYCLE_CB(skb) = magic_bpid)
-#define MV_NETA_SKB_RECYCLE_MAGIC_IS_OK(skb)                 ((MV_NETA_SKB_RECYCLE_MAGIC(skb) ==           \
-								MV_NETA_SKB_RECYCLE_MAGIC_GET(skb)) ? 1 : 0)
-#define MV_NETA_SKB_RECYCLE_BPID_GET(skb)                    (MV_NETA_SKB_RECYCLE_CB(skb) & 0x3)
+/* Recycle magic check */
+#define MV_NETA_SKB_RECYCLE_MAGIC_IS_OK(skb)                 (MV_NETA_SKB_RECYCLE_MAGIC(skb) ==           \
+								MV_NETA_SKB_RECYCLE_MAGIC_GET(skb))
+/* Get bpid */
+#define MV_NETA_SKB_RECYCLE_BPID_GET(skb)                    (MV_NETA_SKB_RECYCLE_CB(skb) & MV_BM_POOLS_MASK)
 
-extern int mv_ctrl_recycle;
-
-#define mv_eth_is_recycle()     (mv_ctrl_recycle)
-int mv_eth_skb_recycle(struct sk_buff *skb);
+extern int mv_ctrl_swf_recycle;
+#define mv_eth_is_swf_recycle()             (mv_ctrl_swf_recycle)
 #else
-#define mv_eth_is_recycle()     0
+#define mv_eth_is_swf_recycle() 0
 #endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 /******************************************************
@@ -478,7 +480,6 @@ struct pool_stats {
 	u32 skb_alloc_ok;
 	u32 skb_recycled_ok;
 	u32 skb_recycled_err;
-	u32 skb_hw_cookie_err;
 #endif /* CONFIG_MV_ETH_STAT_DBG */
 };
 
@@ -493,6 +494,8 @@ struct bm_pool {
 	spinlock_t  lock;
 	u32         port_map;
 	int         missed;		/* FIXME: move to stats */
+	atomic_t    in_use;
+	int         in_use_thresh;
 	struct pool_stats  stats;
 };
 
@@ -707,11 +710,6 @@ static inline void mv_eth_pkt_free(struct eth_pbuf *pkt)
 {
 	struct sk_buff *skb = (struct sk_buff *)pkt->osInfo;
 
-#ifdef CONFIG_MV_NETA_SKB_RECYCLE
-	skb->skb_recycle = NULL;
-	skb->hw_cookie = 0;
-#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
-
 	dev_kfree_skb_any(skb);
 	mvOsFree(pkt);
 }
@@ -817,7 +815,7 @@ void        mv_eth_pool_status_print(int pool);
 void        mv_eth_set_noqueue(struct net_device *dev, int enable);
 
 void        mv_eth_ctrl_hwf(int en);
-int         mv_eth_ctrl_recycle(int en);
+int         mv_eth_ctrl_swf_recycle(int en);
 void        mv_eth_ctrl_txdone(int num);
 int         mv_eth_ctrl_tx_mh(int port, u16 mh);
 int         mv_eth_ctrl_tx_cmd(int port, u32 cmd);

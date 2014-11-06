@@ -125,20 +125,22 @@ int mv_eth_ctrl_pnc(int en)
 #endif /* CONFIG_MV_ETH_PNC */
 
 #ifdef CONFIG_MV_NETA_SKB_RECYCLE
-int mv_ctrl_recycle = CONFIG_MV_NETA_SKB_RECYCLE_DEF;
-EXPORT_SYMBOL(mv_ctrl_recycle);
+int mv_ctrl_swf_recycle = CONFIG_MV_NETA_SKB_RECYCLE_DEF;
+EXPORT_SYMBOL(mv_ctrl_swf_recycle);
 
-int mv_eth_ctrl_recycle(int en)
+int mv_eth_ctrl_swf_recycle(int en)
 {
-	mv_ctrl_recycle = en;
+	mv_ctrl_swf_recycle = en;
 	return 0;
 }
 #else
-int mv_eth_ctrl_recycle(int en)
+
+int mv_eth_ctrl_swf_recycle(int en)
 {
-	printk(KERN_ERR "SKB recycle is not supported\n");
+	pr_info("SWF SKB recycle is not supported\n");
 	return 1;
 }
+
 #endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 extern u8 mvMacAddr[CONFIG_MV_ETH_PORTS_NUM][MV_MAC_ADDR_SIZE];
@@ -1252,9 +1254,6 @@ void mv_eth_skb_print(struct sk_buff *skb)
 	       atomic_read(&skb->users), atomic_read(&skb_shinfo(skb)->dataref),
 	       skb_shinfo(skb)->nr_frags, skb_shinfo(skb)->gso_size, skb_shinfo(skb)->gso_segs);
 	printk(KERN_ERR "\t proto=%d, ip_summed=%d, priority=%d\n", ntohs(skb->protocol), skb->ip_summed, skb->priority);
-#ifdef CONFIG_MV_NETA_SKB_RECYCLE
-	printk(KERN_ERR "\t skb_recycle=%p, hw_cookie=0x%x\n", skb->skb_recycle, skb->hw_cookie);
-#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 }
 
 void mv_eth_rx_desc_print(struct neta_rx_desc *desc)
@@ -1393,96 +1392,6 @@ static inline int mv_eth_tx_policy(struct eth_port *pp, struct sk_buff *skb)
 	return txq;
 }
 
-#ifdef CONFIG_MV_NETA_SKB_RECYCLE
-int mv_eth_skb_recycle(struct sk_buff *skb)
-{
-	struct bm_pool  *pool;
-	int             status = 0;
-	int             pool_id;
-
-	pool_id = MV_NETA_SKB_RECYCLE_BPID_GET(skb);
-	pool = &mv_eth_pool[pool_id];
-
-	if (skb->hw_cookie & BIT(0)) {
-		/* hw_cookie is not valid for recycle */
-		STAT_DBG(pool->stats.skb_hw_cookie_err++);
-		goto err;
-	}
-
-#if defined(CONFIG_MV_ETH_BM_CPU)
-	if (MV_NETA_BM_CAP()) {
-		/* Check that first 4 bytes of the buffer contain hw_cookie */
-		if (*((MV_U32 *) skb->head) != (MV_U32)skb) {
-			/*
-			pr_err("%s: Wrong skb->head=%p (0x%x) != hw_cookie=%p\n",
-				__func__, skb->head, *((MV_U32 *) skb->head), pkt);
-			*/
-			STAT_DBG(pool->stats.skb_hw_cookie_err++);
-			goto err;
-		}
-	}
-#endif /* CONFIG_MV_ETH_BM_CPU */
-	/* Check that cond 4 bytes of the buffer recycle magic */
-	if (!MV_NETA_SKB_RECYCLE_MAGIC_IS_OK(skb)) {
-		/*
-		pr_err("%s: Wrong skb->head=%p (0x%x) != hw_cookie=%p\n",
-			__func__, skb->head, *((MV_U32 *) skb->head), pkt);
-		*/
-		STAT_DBG(pool->stats.skb_hw_cookie_err++);
-		goto err;
-	}
-
-	/*
-	WA for Linux network stack issue that prevent skb recycle.
-	If dev_kfree_skb_any called from interrupt context or interrupts disabled context
-	skb->users will be zero when skb_recycle callback function is called.
-	In such case skb_recycle_check function returns error because skb->users != 1.
-	*/
-	if (atomic_read(&skb->users) == 0)
-		atomic_set(&skb->users, 1);
-
-	if (skb_recycle_check(skb, pool->pkt_size)) {
-#ifdef CONFIG_MV_NETA_DEBUG_CODE
-		/* Sanity check */
-		if (SKB_TRUESIZE(skb->end - skb->head) != skb->truesize) {
-			printk(KERN_ERR "%s: skb=%p, Wrong SKB_TRUESIZE(end - head)=%d\n",
-				__func__, skb, SKB_TRUESIZE(skb->end - skb->head));
-			mv_eth_skb_print(skb);
-		}
-#endif /* CONFIG_MV_NETA_DEBUG_CODE */
-
-		STAT_DBG(pool->stats.skb_recycled_ok++);
-		mvOsCacheInvalidate(neta_global_dev->parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
-
-		/* Restore recycle data */
-#if !defined(CONFIG_MV_ETH_BE_WA)
-		MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, MV_32BIT_LE(MV_NETA_SKB_RECYCLE_MAGIC(skb) | pool_id));
-#else
-		MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, (MV_NETA_SKB_RECYCLE_MAGIC(skb) | pool_id))
-#endif /* !CONFIG_MV_ETH_BE_WA */
-
-		status = mv_eth_pool_put(pool, skb);
-
-#ifdef ETH_SKB_DEBUG
-		if (status == 0)
-			mv_eth_skb_save(skb, "recycle");
-#endif /* ETH_SKB_DEBUG */
-
-		return 0;
-	}
-	STAT_DBG(pool->stats.skb_recycled_err++);
-
-	/* printk(KERN_ERR "mv_eth_skb_recycle failed: pool=%d, pkt=%p, skb=%p\n", pkt->pool, pkt, skb); */
-err:
-	skb->hw_cookie = 0;
-	skb->skb_recycle = NULL;
-
-	return 1;
-}
-EXPORT_SYMBOL(mv_eth_skb_recycle);
-
-#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
-
 static struct sk_buff *mv_eth_skb_alloc(struct eth_port *pp, struct bm_pool *pool,
 					phys_addr_t *phys_addr, gfp_t gfp_mask)
 {
@@ -1499,27 +1408,14 @@ static struct sk_buff *mv_eth_skb_alloc(struct eth_port *pp, struct bm_pool *poo
 	mv_eth_skb_save(skb, "alloc");
 #endif /* ETH_SKB_DEBUG */
 
-#if defined(CONFIG_MV_ETH_BM_CPU) || defined(CONFIG_MV_NETA_SKB_RECYCLE)
-	if (MV_NETA_BM_CAP()) {
-		/* Save skb as first 4 bytes in the buffer, then skb can be get through rx_desc->bufCookie */
+#ifdef CONFIG_MV_ETH_BM_CPU
+	/* Save skb as first 4 bytes in the buffer, then skb can be get through rx_desc->bufCookie */
 #if !defined(CONFIG_MV_ETH_BE_WA)
 		*((MV_U32 *) skb->head) = MV_32BIT_LE((MV_U32)skb);
 #else
 		*((MV_U32 *) skb->head) = (MV_U32)skb;
 #endif /* !CONFIG_MV_ETH_BE_WA */
-
-#if defined(CONFIG_MV_NETA_SKB_RECYCLE)
-	/* Save skb recycle magic(bit 31~2) and pool(bit 1~0) id */
-#if !defined(CONFIG_MV_ETH_BE_WA)
-	MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, MV_32BIT_LE(MV_NETA_SKB_RECYCLE_MAGIC(skb) | pool->pool));
-#else
-	MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, (MV_NETA_SKB_RECYCLE_MAGIC(skb) | pool->pool));
-#endif /* !CONFIG_MV_ETH_BE_WA */
-
-#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
-
-		mvOsCacheLineFlush(pp->dev->dev.parent, skb->head);
-	}
+	mvOsCacheLineFlush(pp->dev->dev.parent, skb->head);
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
 	if (phys_addr)
@@ -1528,6 +1424,16 @@ static struct sk_buff *mv_eth_skb_alloc(struct eth_port *pp, struct bm_pool *poo
 	return skb;
 }
 
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
+static inline struct bm_pool *mv_eth_skb_recycle_get_pool(struct sk_buff *skb)
+{
+	if (mv_eth_is_swf_recycle() && MV_NETA_SKB_RECYCLE_MAGIC_IS_OK(skb))
+		return &mv_eth_pool[MV_NETA_SKB_RECYCLE_BPID_GET(skb)];
+	else
+		return NULL;
+}
+#endif
+
 static inline void mv_eth_txq_buf_free(struct eth_port *pp, u32 shadow)
 {
 	if (!shadow)
@@ -1535,8 +1441,26 @@ static inline void mv_eth_txq_buf_free(struct eth_port *pp, u32 shadow)
 
 	if (shadow & MV_ETH_SHADOW_SKB) {
 		shadow &= ~MV_ETH_SHADOW_SKB;
+#ifndef CONFIG_MV_ETH_BM_CPU
+		struct sk_buff *skb = (struct sk_buff *)shadow;
+		struct bm_pool *pool = mv_eth_skb_recycle_get_pool(skb);
+		/* check recycle enable flag and magic number */
+		if (pool && skb_recycle_check(skb, pool->pkt_size)) {
+			/* push skb to stack */
+			if (mv_eth_pool_put(pool, skb))
+				STAT_DBG(pp->stats.tx_skb_free++);
+			else
+				STAT_DBG(pool->stats.skb_recycled_ok++);
+		} else {
+			dev_kfree_skb_any(skb);
+			STAT_DBG(pp->stats.tx_skb_free++);
+			if (pool)
+				STAT_DBG(pool->stats.skb_recycled_err++);
+		}
+#else
 		dev_kfree_skb_any((struct sk_buff *)shadow);
 		STAT_DBG(pp->stats.tx_skb_free++);
+#endif /* CONFIG_MV_ETH_BM_CPU */
 	} else if (shadow & MV_ETH_SHADOW_EXT) {
 		shadow &= ~MV_ETH_SHADOW_EXT;
 		mv_eth_extra_pool_put(pp, (void *)shadow);
@@ -1701,17 +1625,23 @@ inline struct sk_buff *mv_eth_pool_get(struct eth_port *pp, struct bm_pool *pool
 inline int mv_eth_refill(struct eth_port *pp, int rxq,
 				struct bm_pool *pool, struct neta_rx_desc *rx_desc)
 {
-
 	struct sk_buff *skb = NULL;
 	phys_addr_t phys_addr;
+	int pool_in_use = atomic_read(&pool->in_use);
 
-#if defined(CONFIG_MV_NETA_SKB_RECYCLE)
-	if (mv_eth_is_recycle()) {
+	if (pool_in_use <= 0)
+		return 0;
+
+	if (mv_eth_is_swf_recycle()) {
+		if (mv_eth_pool_bm(pool) && (pool_in_use < pool->in_use_thresh)) {
+			mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
+			return 0;
+		}
 		skb = mv_eth_pool_get(pp, pool);
 		if (!skb)
 			return 1;
 	}
-#endif
+
 	/* No recycle -  alloc new skb */
 	if (!skb) {
 		skb = mv_eth_skb_alloc(pp, pool, &phys_addr, GFP_ATOMIC);
@@ -1723,6 +1653,7 @@ inline int mv_eth_refill(struct eth_port *pp, int rxq,
 	}
 
 	mv_eth_rxq_refill(pp, rxq, pool, skb, rx_desc);
+	atomic_dec(&pool->in_use);
 
 	return 0;
 }
@@ -1837,14 +1768,14 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 
 #ifdef CONFIG_MV_NETA_DEBUG_CODE
 		if (pp->flags & MV_ETH_F_DBG_RX) {
-			printk(KERN_ERR "\n%s: port=%d, cpu=%d\n", __func__, pp->port, smp_processor_id());
+			pr_info("\n%s: port=%d, cpu=%d\n", __func__, pp->port, smp_processor_id());
 			mv_eth_rx_desc_print(rx_desc);
 		}
 #endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
 		rx_status = rx_desc->status;
 		skb = (struct sk_buff *)rx_desc->bufCookie;
-#if !defined(CONFIG_MV_ETH_BM_CPU) && defined(CONFIG_MV_NETA_SKB_RECYCLE)
+#if !defined(CONFIG_MV_ETH_BM_CPU) && (defined(CONFIG_MV_NETA_SKB_RECYCLE))
 		pool_id = MV_NETA_SKB_RECYCLE_BPID_GET(skb);
 #else
 		pool_id = NETA_RX_GET_BPID(rx_desc);
@@ -1870,6 +1801,7 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 
 		dev = pp->dev;
 
+		atomic_inc(&pool->in_use);
 		STAT_DBG(pp->stats.rxq[rxq]++);
 		dev->stats.rx_packets++;
 
@@ -1898,6 +1830,10 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 		}
 #endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
+	/* Set skb recycle magic(bit 31~2) and pool(bit 1~0) id  if recycle is enabled */
+	if (mv_eth_is_swf_recycle())
+		MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, (MV_NETA_SKB_RECYCLE_MAGIC(skb) | pool->pool));
+
 #if defined(CONFIG_MV_ETH_PNC) && defined(CONFIG_MV_ETH_RX_SPECIAL)
 		/* Special RX processing */
 		if (MV_NETA_PNC_CAP() && (rx_desc->pncInfo & NETA_PNC_RX_SPECIAL)) {
@@ -1923,13 +1859,6 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 #ifdef ETH_SKB_DEBUG
 		mv_eth_skb_check(skb);
 #endif /* ETH_SKB_DEBUG */
-
-#ifdef CONFIG_MV_NETA_SKB_RECYCLE
-	if (mv_eth_is_recycle()) {
-		skb->skb_recycle = mv_eth_skb_recycle;
-		skb->hw_cookie = 0;
-	}
-#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 		mv_eth_rx_csum(pp, rx_desc, skb);
 
@@ -1982,7 +1911,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 	int frags = 0;
 	bool tx_spec_ready = false;
 	struct mv_eth_tx_spec tx_spec;
-	u32 tx_cmd;
+	u32 tx_cmd, skb_len = 0;
 
 	struct tx_queue *txq_ctrl = NULL;
 	struct neta_tx_desc *tx_desc;
@@ -2081,10 +2010,33 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 
 	tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, skb->data, tx_desc->dataSize);
 
+	/* Record skb len in case skb is reset when recycle */
+	skb_len = skb->len;
+
 	if (frags == 1) {
 		/*
 		 * First and Last descriptor
 		 */
+#if defined(CONFIG_MV_ETH_BM_CPU) && defined(CONFIG_MV_NETA_SKB_RECYCLE)
+		struct bm_pool *pool = mv_eth_skb_recycle_get_pool(skb);
+		if (pool && (atomic_read(&pool->in_use) > 0) && skb_recycle_check(skb, pool->pkt_size)) {
+			/* HW release buffer after tx finished */
+			tx_cmd |= NETA_TX_BM_ENABLE_MASK |
+				  NETA_TX_BM_POOL_ID_MASK(pool->pool) |
+				  NETA_TX_PKT_OFFSET_MASK(NET_SKB_PAD + MV_ETH_MH_SIZE);
+			txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = NULL;
+			tx_desc->bufPhysAddr = virt_to_phys(skb->head);
+			atomic_dec(&pool->in_use);
+			STAT_DBG(pool->stats.skb_recycled_ok++);
+		} else {
+			txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = ((MV_ULONG) skb | MV_ETH_SHADOW_SKB);
+			if (pool && (atomic_read(&pool->in_use) > 0))
+				STAT_DBG(pool->stats.skb_recycled_err++);
+		}
+#else
+		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = ((MV_ULONG) skb | MV_ETH_SHADOW_SKB);
+#endif /* CONFIG_MV_ETH_BM_CPU && CONFIG_MV_NETA_SKB_RECYCLE */
+
 		if (tx_spec.flags & MV_ETH_F_NO_PAD)
 			tx_cmd |= NETA_TX_F_DESC_MASK | NETA_TX_L_DESC_MASK;
 		else
@@ -2093,7 +2045,6 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		tx_desc->command = tx_cmd;
 		mv_eth_tx_desc_flush(pp, tx_desc);
 
-		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = ((MV_ULONG) skb | MV_ETH_SHADOW_SKB);
 		mv_eth_shadow_inc_put(txq_ctrl);
 	} else {
 
@@ -2123,7 +2074,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		printk(KERN_ERR "%s - eth_tx_%lu: cpu=%d, in_intr=0x%lx, port=%d, txp=%d, txq=%d\n",
 		       dev->name, dev->stats.tx_packets, smp_processor_id(),
 			in_interrupt(), pp->port, tx_spec.txp, tx_spec.txq);
-		printk(KERN_ERR "\t skb=%p, head=%p, data=%p, size=%d\n", skb, skb->head, skb->data, skb->len);
+		pr_info("\t skb=%p, head=%p, data=%p, size=%d\n", skb, skb->head, skb->data, skb_len);
 		mv_eth_tx_desc_print(tx_desc);
 		/*mv_eth_skb_print(skb);*/
 		mvDebugMemDump(skb->data, 64, 1);
@@ -2132,7 +2083,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 
 #ifdef CONFIG_MV_PON
 	if (MV_PON_PORT(pp->port))
-		mvNetaPonTxqBytesAdd(pp->port, tx_spec.txp, tx_spec.txq, skb->len);
+		mvNetaPonTxqBytesAdd(pp->port, tx_spec.txp, tx_spec.txq, skb_len);
 #endif /* CONFIG_MV_PON */
 
 	/* Enable transmit */
@@ -2688,10 +2639,6 @@ static int mv_eth_pool_free(int pool, int num)
 #endif /* !CONFIG_MV_ETH_BE_WA */
 
 			if (skb) {
-#ifdef CONFIG_MV_NETA_SKB_RECYCLE
-				skb->skb_recycle = NULL;
-				skb->hw_cookie = 0;
-#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 				dev_kfree_skb_any(skb);
 #ifdef ETH_SKB_DEBUG
 				mv_eth_skb_check(skb);
@@ -2726,11 +2673,7 @@ static int mv_eth_pool_free(int pool, int num)
 		}
 		skb = (struct sk_buff *)mvStackPop(ppool->stack);
 		if (skb) {
-#ifdef CONFIG_MV_NETA_SKB_RECYCLE
-				skb->skb_recycle = NULL;
-				skb->hw_cookie = 0;
-#endif /* CONFIG_MV_NETA_SKB_RECYCLE */
-				dev_kfree_skb_any(skb);
+			dev_kfree_skb_any(skb);
 
 #ifdef ETH_SKB_DEBUG
 			mv_eth_skb_check(skb);
@@ -2833,6 +2776,7 @@ static int mv_eth_pool_add(struct eth_port *pp, int pool, int buf_num)
 #endif /* CONFIG_MV_ETH_BM_CPU */
 	}
 	bm_pool->buf_num += i;
+	bm_pool->in_use_thresh = bm_pool->buf_num / 4;
 #ifdef CONFIG_MV_ETH_BM
 	mvNetaBmPoolBufNumUpdate(pool, i, 1);
 #endif
@@ -2925,6 +2869,7 @@ static MV_STATUS mv_eth_pool_create(int pool, int capacity)
 	bm_pool->capacity = capacity;
 	bm_pool->pkt_size = 0;
 	bm_pool->buf_num = 0;
+	atomic_set(&bm_pool->in_use, 0);
 	spin_lock_init(&bm_pool->lock);
 
 	return MV_OK;
@@ -4957,7 +4902,7 @@ void mv_eth_config_show(void)
 #endif
 
 #ifdef CONFIG_MV_NETA_SKB_RECYCLE
-	pr_info("  o SKB recycle supported (%s)\n", mv_ctrl_recycle ? "Enabled" : "Disabled");
+	pr_info("  o SKB recycle supported for SWF (%s)\n", mv_ctrl_swf_recycle ? "Enabled" : "Disabled");
 #endif
 
 #ifdef CONFIG_MV_ETH_NETA
@@ -6527,9 +6472,9 @@ void mv_eth_pool_status_print(int pool)
 	printk(KERN_ERR "\nRX Pool #%d: pkt_size=%d, BM-HW support - %s\n",
 	       pool, bm_pool->pkt_size, mv_eth_pool_bm(bm_pool) ? "Yes" : "No");
 
-	printk(KERN_ERR "bm_pool=%p, stack=%p, capacity=%d, buf_num=%d, port_map=0x%x missed=%d\n",
-	       bm_pool->bm_pool, bm_pool->stack, bm_pool->capacity, bm_pool->buf_num,
-		   bm_pool->port_map, bm_pool->missed);
+	pr_info("bm_pool=%p, stack=%p, capacity=%d, buf_num=%d, port_map=0x%x missed=%d, in_use=%u, in_use_thresh=%u\n",
+		bm_pool->bm_pool, bm_pool->stack, bm_pool->capacity, bm_pool->buf_num,
+		bm_pool->port_map, bm_pool->missed, bm_pool->in_use, bm_pool->in_use_thresh);
 
 #ifdef CONFIG_MV_ETH_STAT_ERR
 	printk(KERN_ERR "Errors: skb_alloc_oom=%u, stack_empty=%u, stack_full=%u\n",
@@ -6540,8 +6485,8 @@ void mv_eth_pool_status_print(int pool)
 	pr_info("     skb_alloc_ok=%u, bm_put=%u, stack_put=%u, stack_get=%u\n",
 	       bm_pool->stats.skb_alloc_ok, bm_pool->stats.bm_put, bm_pool->stats.stack_put, bm_pool->stats.stack_get);
 
-	pr_info("     skb_recycled_ok=%u, skb_recycled_err=%u, skb_hw_cookie_err=%u\n",
-	       bm_pool->stats.skb_recycled_ok, bm_pool->stats.skb_recycled_err, bm_pool->stats.skb_hw_cookie_err);
+	pr_info("     skb_recycled_ok=%u, skb_recycled_err=%u\n",
+	       bm_pool->stats.skb_recycled_ok, bm_pool->stats.skb_recycled_err);
 #endif /* CONFIG_MV_ETH_STAT_DBG */
 
 	if (bm_pool->stack)
@@ -6597,15 +6542,15 @@ void mv_eth_netdev_print(struct net_device *dev)
 
 void mv_eth_status_print(void)
 {
-	printk(KERN_ERR "totals: ports=%d\n", mv_eth_ports_num);
+	pr_info("totals: ports=%d\n", mv_eth_ports_num);
 
 #ifdef CONFIG_MV_NETA_SKB_RECYCLE
-	printk(KERN_ERR "SKB recycle = %s\n", mv_ctrl_recycle ? "Enabled" : "Disabled");
+	pr_info("SKB recycle = %s\n", mv_ctrl_swf_recycle ? "Enabled" : "Disabled");
 #endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 #ifdef CONFIG_MV_ETH_PNC
 	if (MV_NETA_PNC_CAP())
-		pr_err("PnC control = %s\n", mv_eth_pnc_ctrl_en ? "Enabled" : "Disabled");
+		pr_info("PnC control = %s\n", mv_eth_pnc_ctrl_en ? "Enabled" : "Disabled");
 #endif /* CONFIG_MV_ETH_PNC */
 }
 
