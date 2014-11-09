@@ -248,6 +248,9 @@ static inline MV_U32 mv_jhash_3words(MV_U32 a, MV_U32 b, MV_U32 c, MV_U32 initva
 #define _250MHz     250000000
 #define _266MHz     266666667
 #define _300MHz     300000000
+#define _800MHz     800000000
+#define _1GHz       1000000000UL
+#define _2GHz       2000000000UL
 
 /* Supported clocks */
 #define MV_BOARD_TCLK_100MHZ	100000000

@@ -1495,15 +1495,17 @@ static void orion_nfc_init_nand(struct nand_chip *nand, struct orion_nfc_info *i
 	nand->chip_delay	= 25;
 }
 
-static void mvCtrlNandClkSet(int nClock)
+static int mvCtrlNandClkSet(int nfc_clk_freq)
 {
-	unsigned long rate;
+	/* NAND clock is derived from ecc_clk according to equation
+	 * nfc_clk_freq = ecc_clk / 2
+	 */
+	clk_set_rate(ecc_clk, nfc_clk_freq * 2);
 
-	/* Calculate target ECC clock rate basing
-	 * on 2GHz frequency and divider used in HAL */
-	rate = ARMADA_MAIN_PLL_FREQ / nClock;
+	/* Return calculated nand clock frequency */
+	nfc_clk_freq = clk_get_rate(ecc_clk) / 2;
 
-	clk_set_rate(ecc_clk, rate);
+	return nfc_clk_freq;
 }
 
 static MV_STATUS mvSysNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl)
