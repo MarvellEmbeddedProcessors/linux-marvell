@@ -134,6 +134,44 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define NFC_CMD_BUFF_ADDR		(NFC_COMMAND_BUFF_0_REG_4PDMA)
 #define NFC_DATA_BUFF_ADDR		(NFC_DATA_BUFF_REG_4PDMA)
 
+
+#define TIMING_MAX_tADL		0x1f
+#define TIMING_DEF_SEL_CNTR	0x1
+#define TIMING_MAX_RD_CNT_DEL	0x0
+#define TIMING_MAX_tCH		0x7
+#define TIMING_MAX_tCS		0x7
+#define TIMING_MAX_tWH		0x7
+#define TIMING_MAX_tWP		0x7
+#define TIMING_MAX_etRP		0x1
+#define TIMING_MAX_tRH		0x7
+#define TIMING_MAX_tRP		0x7
+
+#define MV_NDTR0CS0_REG		((TIMING_MAX_tADL << 27) | \
+				 (TIMING_DEF_SEL_CNTR << 26) | \
+				 (TIMING_MAX_RD_CNT_DEL << 22) | \
+				 (TIMING_MAX_tCH << 19) | \
+				 (TIMING_MAX_tCS << 16) | \
+				 (TIMING_MAX_tWH << 11) | \
+				 (TIMING_MAX_tWP << 8) | \
+				 (TIMING_MAX_etRP << 6) | \
+				 (TIMING_MAX_tRH << 3) | \
+				 (TIMING_MAX_tRP))
+
+#define TIMING_tR		0xff
+#define TIMING_WAIT_MODE	0x1	/* Work with RnB signal (1) or ignore it (0) */
+#define TIMING_PRESCALE		0x0	/* no prescalling */
+#define TIMING_MAX_tRHW		0x0
+#define TIMING_MAX_tWHR		0xf
+#define TIMING_MAX_tAR		0xf
+
+#define MV_NDTR1CS0_REG		((TIMING_tR << 16) | \
+				 (TIMING_WAIT_MODE << 15) | \
+				 (TIMING_PRESCALE << 14) | \
+				 (TIMING_MAX_tRHW << 8) | \
+				 (TIMING_MAX_tWHR << 4) | \
+				 (TIMING_MAX_tAR))
+
+
 /**********/
 /* Macros */
 /**********/
@@ -682,7 +720,7 @@ MV_VOID nfc_dbg_write(MV_U32 addr, MV_U32 val)
 /**************/
 static MV_STATUS mvDfcWait4Complete(MV_U32 statMask, MV_U32 usec);
 static MV_STATUS mvNfcReadIdNative(MV_NFC_CHIP_SEL cs, MV_U16 *id);
-static MV_STATUS mvNfcTimingSet(MV_U32 tclk, MV_NFC_FLASH_INFO *flInfo);
+static MV_STATUS mvNfcTimingSet(MV_U32 nand_clock, MV_NFC_FLASH_INFO *flInfo);
 static MV_U32 mvNfcColBits(MV_U32 pg_size);
 static MV_STATUS mvNfcDeviceFeatureSet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 addr, MV_U32 data0, MV_U32 data1);
 static MV_STATUS mvNfcDeviceFeatureGet(MV_NFC_CTRL *nfcCtrl, MV_U8 cmd, MV_U8 addr, MV_U32 *data0, MV_U32 *data1);
@@ -729,13 +767,16 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	 ECC engine clock = (2Ghz / divider)
 	 NFC clock = ECC clock / 2
 	 */
-	halData->mvCtrlNandClkSetFunction(8); /* setNANDClock(8);  Go down to 125MHz */
-	nand_clock = 125000000;
+	nand_clock = halData->mvCtrlNandClkSetFunction(_100MHz); /* Go down to 100MHz */
+	if (nand_clock != _100MHz)
+		mvOsPrintf("%s: Warning: set freq to %dHz instead of %dHz\n",
+						__func__, nand_clock, _100MHz);
+
 	DB(mvOsPrintf("mvNfcInit: set nand clock to %d\n", nand_clock));
 
 	/* Relax Timing configurations to avoid timing violations after flash reset */
-	MV_NAND_REG_WRITE(NFC_TIMING_0_REG, 0xFC3F3F7F);
-	MV_NAND_REG_WRITE(NFC_TIMING_1_REG, 0x00FF83FF);
+	MV_NAND_REG_WRITE(NFC_TIMING_0_REG, MV_NDTR0CS0_REG);
+	MV_NAND_REG_WRITE(NFC_TIMING_1_REG, MV_NDTR1CS0_REG);
 
 	/* make sure ECC is disabled at this point - will be enabled only when issuing certain commands */
 	MV_NAND_REG_BIT_RESET(NFC_CONTROL_REG, NFC_CTRL_ECC_EN_MASK);
@@ -831,10 +872,12 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 
 	/* Critical Initialization done. Raise NFC clock if needed */
 	if (flashDeviceInfo[i].flags & NFC_CLOCK_UPSCALE_200M) {
-
-		halData->mvCtrlNandClkSetFunction(5); /* setNANDClock(5); */
-		nand_clock = 200000000;
+		nand_clock = halData->mvCtrlNandClkSetFunction(_200MHz); /* raise NFC clk to 200MHz */
+		if (nand_clock != _200MHz)
+			mvOsPrintf("%s: Warning: set freq to %dHz instead of %dHz\n",
+							__func__, nand_clock, _200MHz);
 	}
+
 	DB(mvOsPrintf("mvNfcInit: set nand clock to %d\n", nand_clock));
 
 	/* Configure the command set based on page size */
@@ -2756,23 +2799,23 @@ static MV_STATUS mvNfcReadIdNative(MV_NFC_CHIP_SEL cs, MV_U16 *id)
 }
 
 /*******************************************************************************
-* mvNfcTimingSet
-*
-* DESCRIPTION:
-*       Set all flash timing parameters for optimized operation
-*
-* INPUT:
-*	tclk: Tclk frequency,
-	flInfo: timing information
-*
-* OUTPUT:
-*	None.
-*
-* RETURN:
-*       MV_OK		- On success,
-*	MV_FAIL		- On failure
-*******************************************************************************/
-static MV_STATUS mvNfcTimingSet(MV_U32 tclk, MV_NFC_FLASH_INFO *flInfo)
+ * mvNfcTimingSet
+ *
+ * DESCRIPTION:
+ *	Set all flash timing parameters for optimized operation
+ *
+ * INPUT:
+ *	nand_clock - nand clock frequency,
+ *	flInfo - timing information
+ *
+ * OUTPUT:
+ *	None.
+ *
+ * RETURN:
+ *	MV_OK		-On success,
+ *	MV_FAIL		-On failure
+ *******************************************************************************/
+static MV_STATUS mvNfcTimingSet(MV_U32 nand_clock, MV_NFC_FLASH_INFO *flInfo)
 {
 	MV_U32 reg, i;
 	MV_U32 clk2ns;
@@ -2782,22 +2825,7 @@ static MV_STATUS mvNfcTimingSet(MV_U32 tclk, MV_NFC_FLASH_INFO *flInfo)
 	MV_U32 tr_pre_nfc = 0;
 /*	MV_U32 ret = MV_OK; */
 
-	switch (tclk) {
-	case 125000000:
-		clk2ns = 8;
-		break;
-	case 166666667:
-		clk2ns = 6;
-		break;
-	case 200000000:
-		clk2ns = 5;
-		break;
-	case 250000000:
-		clk2ns = 4;
-		break;
-	default:
-		return MV_FAIL;
-	};
+	clk2ns = DIV_ROUND_UP(_1GHz, nand_clock);
 
 	/* Calculate legal read timing */
 	trc = ns_clk(flInfo->tRC, clk2ns);

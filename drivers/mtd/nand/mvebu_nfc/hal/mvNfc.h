@@ -396,7 +396,7 @@ typedef struct {
 } MV_NFC_CMD;
 
 struct MV_NFC_HAL_DATA {
-	void (*mvCtrlNandClkSetFunction) (int);    /* Controller NAND clock div  */
+	int (*mvCtrlNandClkSetFunction) (int);    /* Controller NAND clock div  */
 };
 /** Micron MT29F NAND driver (ONFI):  Parameter Page Data   */
 struct parameter_page_t {
