@@ -101,11 +101,16 @@
 
 			/*
 			 * 1GB Flash via NFC NAND controller
-			 * by defeault disabled, because NFC
-			 * shares same pins with SPI0 and
-			 * requires SLM-1358 jumper
+			 * should be disabled when the board boots
+			 * from SPI flash, since NFC shares the same
+			 * pins with SPI0 and requires SLM-1358 jumper.
+			 * However the u-boot DTB parser will
+			 * handle this situation and disable/remove
+			 * unnessesary devices according to board
+			 * boot-up configuration.
 			 */
 			nfc: nand@d0000 {
+				status = "okay";
 				#address-cells = <1>;
 				#size-cells = <1>;
 
