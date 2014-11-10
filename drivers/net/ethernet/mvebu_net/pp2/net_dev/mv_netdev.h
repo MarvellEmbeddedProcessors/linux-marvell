@@ -953,6 +953,7 @@ void        mv_pp2_status_print(void);
 void        mv_pp2_eth_port_status_print(unsigned int port);
 void        mv_pp2_port_stats_print(unsigned int port);
 void        mv_pp2_pool_status_print(int pool);
+void        mv_pp2_pool_stats_print(int pool);
 
 void        mv_pp2_set_noqueue(struct net_device *dev, int enable);
 void	    mv_pp2_ctrl_pnc(int en);
