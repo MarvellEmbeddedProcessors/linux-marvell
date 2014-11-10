@@ -91,7 +91,7 @@ void mv_pp2_iocc_l1_l2_cache_inv(unsigned char *v_start, int size)
 {
 	if (mv_pp2_swf_hwf_wa_en)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3, 4, 99)
-		dma_map_single(NULL, v_start, size DMA_FROM_DEVICE);
+		dma_map_single(NULL, v_start, size, DMA_FROM_DEVICE);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 		___dma_single_dev_to_cpu(v_start, size, DMA_FROM_DEVICE);
 #else
