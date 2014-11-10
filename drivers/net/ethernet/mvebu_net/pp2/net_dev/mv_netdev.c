@@ -90,7 +90,9 @@ void mv_pp2_cache_inv_wa_ctrl(int en)
 void mv_pp2_iocc_l1_l2_cache_inv(unsigned char *v_start, int size)
 {
 	if (mv_pp2_swf_hwf_wa_en)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 4, 99)
+		dma_map_single(NULL, v_start, size DMA_FROM_DEVICE);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
 		___dma_single_dev_to_cpu(v_start, size, DMA_FROM_DEVICE);
 #else
 		dma_cache_maint(v_start, size, DMA_FROM_DEVICE);
@@ -434,6 +436,37 @@ int mv_pp2_eth_napi_set_rxq_affinity(int port, int group, int rxq_mask)
 	return 0;
 }
 
+const char *mv_pp2_pool_type_str(enum mv_pp2_bm_type type)
+{
+	const char *type_str;
+
+	switch (type) {
+	case MV_ETH_BM_FREE:
+		type_str = "FREE     ";
+		break;
+	case MV_ETH_BM_SWF_LONG:
+		type_str = "SWF Long ";
+		break;
+	case MV_ETH_BM_SWF_SHORT:
+		type_str = "SWF Short";
+		break;
+	case MV_ETH_BM_HWF_LONG:
+		type_str = "HWF Long ";
+		break;
+	case MV_ETH_BM_HWF_SHORT:
+		type_str = "HWF Short";
+		break;
+	case MV_ETH_BM_MIXED_LONG:
+		type_str = "MIX Long ";
+		break;
+	case MV_ETH_BM_MIXED_SHORT:
+		type_str = "MIX Short";
+		break;
+	default:
+		type_str = "Unknown  ";
+	}
+	return type_str;
+}
 /**********************************************************/
 
 struct eth_port *mv_pp2_port_by_id(unsigned int port)
@@ -624,7 +657,6 @@ int mv_pp2_ctrl_pool_size_set(int pool, int total_size)
 		buf_size = RX_BUF_SIZE(pkt_size);
 	}
 
-
 	for (port = 0; port < mv_pp2_ports_num; port++) {
 		if (!((1 << port) & ppool->port_map))
 			continue;
@@ -634,22 +666,22 @@ int mv_pp2_ctrl_pool_size_set(int pool, int total_size)
 			continue;
 
 		/* If this pool is used as long pool, then it is expected that MTU will be smaller than buffer size */
-		if (MV_ETH_BM_POOL_IS_LONG(ppool->type) && (RX_PKT_SIZE(pp->dev->mtu) > pkt_size))
-			pr_warn("%s: port %d MTU (%d) is larger than requested packet size (%d) [total size = %d]\n",
-				__func__, port, RX_PKT_SIZE(pp->dev->mtu), pkt_size, total_size);
+		if (MV_ETH_BM_POOL_IS_LONG(ppool->type) && (RX_PKT_SIZE(pp->dev->mtu) > pkt_size)) {
+			pr_warn("port #%d: Failed. %s pool (%d) size (%d bytes) is too small for MTU=%d, pkt_size=%d\n",
+				port, mv_pp2_pool_type_str(ppool->type), pool,
+				total_size, pp->dev->mtu, RX_PKT_SIZE(pp->dev->mtu));
+			return -EINVAL;
+		}
 	}
 
 	MV_ETH_LOCK(&ppool->lock, flags);
 	pkts_num = ppool->buf_num;
 	mv_pp2_pool_free(pool, pkts_num);
+
 	ppool->pkt_size = pkt_size;
 	mv_pp2_pool_add(NULL, pool, pkts_num);
 	mvBmPoolBufSizeSet(pool, buf_size);
 	MV_ETH_UNLOCK(&ppool->lock, flags);
-
-	pr_info("%s: BM pool %d:\n", __func__, pool);
-	pr_info("       packet size = %d, buffer size = %d, total bytes per buffer = %d, true buffer size = %d\n",
-		pkt_size, buf_size, total_size, (int)RX_TRUE_SIZE(total_size));
 
 	return 0;
 }
@@ -2826,8 +2858,8 @@ static int mv_pp2_pool_free(int pool, int num)
 		}
 		i++;
 	}
-	pr_info("bm pool #%d: pkt_size=%4d, buf_size=%4d, total buf_size=%4d - %d of %d buffers free\n",
-			pool, ppool->pkt_size, buf_size, total_size, i, num);
+	mv_pp2_pool_status_print(pool);
+	pr_info(" - %d of %d buffers free\n", i, num);
 
 	ppool->buf_num -= num;
 
@@ -2926,10 +2958,8 @@ static int mv_pp2_pool_add(struct eth_port *pp, int pool, int buf_num)
 	/* Update BM driver with number of buffers added to pool */
 	mvBmPoolBufNumUpdate(pool, i, 1);
 
-	pr_info("%s %s pool #%d: pkt_size=%4d, buf_size=%4d, total_size=%4d - %d of %d buffers added\n",
-		MV_ETH_BM_POOL_IS_HWF(bm_pool->type) ? "HWF" : "SWF",
-		MV_ETH_BM_POOL_IS_SHORT(bm_pool->type) ? "short" : " long",
-		pool, bm_pool->pkt_size, buf_size, total_size, i, buf_num);
+	mv_pp2_pool_status_print(pool);
+	pr_info(" - %d of %d buffers added\n", i, buf_num);
 
 	return i;
 }
@@ -3074,7 +3104,8 @@ static struct bm_pool *mv_pp2_pool_use(struct eth_port *pp, int pool, enum mv_pp
 			return NULL;
 		}
 
-	}
+	} else
+		mv_pp2_pool_status_print(new_pool->pool);
 
 	if (MV_ETH_BM_POOL_IS_HWF(new_pool->type))
 		mvPp2BmPoolBufSizeSet(new_pool->pool, RX_HWF_BUF_SIZE(new_pool->pkt_size));
@@ -5511,9 +5542,18 @@ void mv_pp2_napi_groups_print(int port)
  ***********************************************************************************/
 void mv_pp2_pool_status_print(int pool)
 {
-	const char *type;
-	struct bm_pool *bm_pool = &mv_pp2_pool[pool];
+	struct bm_pool *bm_pool;
 	int buf_size, total_size, true_size;
+
+	if ((pool < 0) || (pool >= MV_ETH_BM_POOLS)) {
+		pr_err("%s: Invalid pool number (%d)\n", __func__, pool);
+		return;
+	}
+	bm_pool = &mv_pp2_pool[pool];
+	if (bm_pool == NULL) {
+		pr_err("%s: BM pool %d is not initialized\n", __func__, pool);
+		return;
+	}
 
 	if (MV_ETH_BM_POOL_IS_HWF(bm_pool->type)) {
 		buf_size = RX_HWF_BUF_SIZE(bm_pool->pkt_size);
@@ -5524,56 +5564,46 @@ void mv_pp2_pool_status_print(int pool)
 	}
 	true_size = RX_TRUE_SIZE(total_size);
 
-	switch (bm_pool->type) {
-	case MV_ETH_BM_FREE:
-		type = "MV_ETH_BM_FREE";
-		break;
-	case MV_ETH_BM_SWF_LONG:
-		type = "MV_ETH_BM_SWF_LONG";
-		break;
-	case MV_ETH_BM_SWF_SHORT:
-		type = "MV_ETH_BM_SWF_SHORT";
-		break;
-	case MV_ETH_BM_HWF_LONG:
-		type = "MV_ETH_BM_HWF_LONG";
-		break;
-	case MV_ETH_BM_HWF_SHORT:
-		type = "MV_ETH_BM_HWF_SHORT";
-		break;
-	case MV_ETH_BM_MIXED_LONG:
-		type = "MV_ETH_BM_MIXED_LONG";
-		break;
-	case MV_ETH_BM_MIXED_SHORT:
-		type = "MV_ETH_BM_MIXED_SHORT";
-		break;
-	default:
-		type = "Unknown";
-	}
-
-	pr_info("\nBM Pool #%d: pool type = %s, buffers num = %d\n", pool, type, bm_pool->buf_num);
-	pr_info("     packet size = %d, buffer size = %d, total size = %d, true size = %d\n",
-		bm_pool->pkt_size, buf_size, total_size, true_size);
-	pr_info("     capacity=%d, buf_num=%d, port_map=0x%x, in_use=%u, in_use_thresh=%u\n",
+	pr_info("\n%9s pool #%d: pkt_size=%4d, buf_size=%4d, total_size=%4d, allocated_size=%4d\n",
+		mv_pp2_pool_type_str(bm_pool->type), pool,
+		bm_pool->pkt_size, buf_size, total_size, (int)RX_TRUE_SIZE(total_size));
+	pr_info("\tcapacity=%d, buf_num=%d, port_map=0x%x, in_use=%u, in_use_thresh=%u\n",
 		bm_pool->capacity, bm_pool->buf_num, bm_pool->port_map,
 		mv_pp2_bm_in_use_read(bm_pool), bm_pool->in_use_thresh);
+}
+
+void mv_pp2_pool_stats_print(int pool)
+{
+	struct bm_pool *bm_pool;
+
+	if ((pool < 0) || (pool >= MV_ETH_BM_POOLS)) {
+		pr_err("%s: Invalid pool number (%d)\n", __func__, pool);
+		return;
+	}
+	bm_pool = &mv_pp2_pool[pool];
+	if (bm_pool == NULL) {
+		pr_err("%s: BM pool %d is not initialized\n", __func__, pool);
+		return;
+	}
 
 #ifdef CONFIG_MV_PP2_STAT_ERR
-	pr_cont("     skb_alloc_oom=%u", bm_pool->stats.skb_alloc_oom);
+	pr_info("skb_alloc_oom    = %u", bm_pool->stats.skb_alloc_oom);
 #endif /* #ifdef CONFIG_MV_PP2_STAT_ERR */
 
 #ifdef CONFIG_MV_PP2_STAT_DBG
-	pr_cont(", skb_alloc_ok=%u, bm_put=%u\n",
-	       bm_pool->stats.skb_alloc_ok, bm_pool->stats.bm_put);
+	pr_info("skb_alloc_ok     = %u\n",	bm_pool->stats.skb_alloc_ok);
 
-	pr_info("     no_recycle=%u, skb_recycled_ok=%u, skb_recycled_err=%u, bm_cookie_err=%u\n",
-		bm_pool->stats.no_recycle, bm_pool->stats.skb_recycled_ok,
-		bm_pool->stats.skb_recycled_err, bm_pool->stats.bm_cookie_err);
+	pr_info("bm_put           = %u\n", bm_pool->stats.bm_put);
+#ifdef CONFIG_MV_PP2_SKB_RECYCLE
+	pr_info("no_recycle       = %u\n", bm_pool->stats.no_recycle);
+	pr_info("skb_recycled_ok  = %u\n", bm_pool->stats.bm_put);
+	pr_info("skb_recycled_err = %u\n", bm_pool->stats.skb_recycled_err);
+	pr_info("bm_cookie_err    = %u\n", bm_pool->stats.bm_cookie_err);
+#endif /* CONFIG_MV_PP2_SKB_RECYCLE */
 #endif /* CONFIG_MV_PP2_STAT_DBG */
 
 	memset(&bm_pool->stats, 0, sizeof(bm_pool->stats));
 }
-
-
 /***********************************************************************************
  ***  print ext pool status
  ***********************************************************************************/
@@ -5759,7 +5789,7 @@ void mv_pp2_eth_port_status_print(unsigned int port)
 
 	printk(KERN_CONT "\n");
 
-	mv_pp2_napi_groups_print(port);
+	/* mv_pp2_napi_groups_print(port); */
 
 	/* Print status of all mux_dev for this port */
 	if (pp->tagged) {
@@ -5767,6 +5797,19 @@ void mv_pp2_eth_port_status_print(unsigned int port)
 		mv_mux_netdev_print_all(port);
 	} else
 		printk(KERN_CONT "UNTAGGED PORT\n");
+
+	pr_info("\nBM pools used by port #%d:\n", port);
+	if (pp->pool_short)
+		mv_pp2_pool_status_print(pp->pool_short->pool);
+
+	if (pp->pool_long)
+		mv_pp2_pool_status_print(pp->pool_long->pool);
+
+	if (pp->hwf_pool_short)
+		mv_pp2_pool_status_print(pp->hwf_pool_short->pool);
+
+	if (pp->hwf_pool_short)
+		mv_pp2_pool_status_print(pp->hwf_pool_long->pool);
 }
 
 
@@ -5948,11 +5991,21 @@ void mv_pp2_port_stats_print(unsigned int port)
 	memset(stat, 0, sizeof(struct port_stats));
 
 	/* RX pool statistics */
-	if (pp->pool_short)
+	if (pp->pool_short) {
 		mv_pp2_pool_status_print(pp->pool_short->pool);
+		mv_pp2_pool_stats_print(pp->pool_short->pool);
+	}
 
-	if (pp->pool_long)
+	if (pp->pool_long) {
 		mv_pp2_pool_status_print(pp->pool_long->pool);
+		mv_pp2_pool_stats_print(pp->pool_long->pool);
+	}
+
+	if (pp->hwf_pool_short)
+		mv_pp2_pool_status_print(pp->hwf_pool_short->pool);
+
+	if (pp->hwf_pool_long)
+		mv_pp2_pool_status_print(pp->hwf_pool_long->pool);
 
 #ifdef CONFIG_MV_PP2_STAT_DIST
 	{

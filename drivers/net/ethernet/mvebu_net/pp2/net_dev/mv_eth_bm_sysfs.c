@@ -59,7 +59,7 @@ static ssize_t mv_pp2_help(char *buf)
 	off += sprintf(buf+off, "echo [pool]                  > poolStatus      - print BM pool status\n");
 	off += sprintf(buf+off, "echo [pool] [size]           > poolSize        - set packet size to BM pool\n");
 	off += sprintf(buf+off, "echo [port] [pool] [buf_num] > poolBufNum      - set buffers num for BM pool\n");
-	off += sprintf(buf+off, "                                                 [port] - any port use this pool");
+	off += sprintf(buf+off, "                                                 [port] - any port use this pool\n");
 	off += sprintf(buf+off, "echo [port] [pool]           > longPool        - set port's long BM pool\n");
 	off += sprintf(buf+off, "echo [port] [pool]           > shortPool       - set port's short BM pool\n");
 	off += sprintf(buf+off, "echo [port] [pool]           > hwfLongPool     - set port's HWF long BM pool\n");
@@ -111,6 +111,7 @@ static ssize_t mv_pp2_port_store(struct device *dev,
 		mvBmV1PoolDropCntDump(a);
 	} else if (!strcmp(name, "poolStatus")) {
 		mv_pp2_pool_status_print(a);
+		mv_pp2_pool_stats_print(a);
 	} else if (!strcmp(name, "poolSize")) {
 		err = mv_pp2_ctrl_pool_size_set(a, b);
 	} else if (!strcmp(name, "poolBufNum")) {
