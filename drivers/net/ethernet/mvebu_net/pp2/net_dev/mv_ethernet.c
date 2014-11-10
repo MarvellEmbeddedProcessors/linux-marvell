@@ -93,7 +93,7 @@ int mv_pp2_start(struct net_device *dev)
 		}
 
 		/* unmask interrupts */
-		on_each_cpu(mv_pp2_interrupts_unmask, (void *)priv, 1);
+		on_each_cpu((smp_call_func_t)mv_pp2_interrupts_unmask, (void *)priv, 1);
 
 		/* Enable interrupts for all CPUs */
 		mvPp2GbeCpuInterruptsEnable(priv->port, priv->cpuMask);
@@ -101,7 +101,7 @@ int mv_pp2_start(struct net_device *dev)
 		/* Unmask Port link interrupt */
 		mvGmacPortIsrUnmask(priv->port);
 
-		printk(KERN_NOTICE "%s: started\n", dev->name);
+		pr_info("\n%s: started\n", dev->name);
 	}
 
 	/* Enable GMAC */
@@ -136,7 +136,7 @@ int mv_pp2_eth_stop(struct net_device *dev)
 	/* Disable interrupts for all CPUs */
 	mvPp2GbeCpuInterruptsDisable(priv->port, priv->cpuMask);
 
-	on_each_cpu(mv_pp2_interrupts_mask, priv, 1);
+	on_each_cpu((smp_call_func_t)mv_pp2_interrupts_mask, priv, 1);
 
 	/* make sure that the port finished its Rx polling */
 	for (group = 0; group < MV_PP2_MAX_RXQ; group++)
