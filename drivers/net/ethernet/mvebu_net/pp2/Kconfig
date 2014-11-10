@@ -423,11 +423,17 @@ menu "PP2 ERRATA / WA"
 
 config MV_PP2_SWF_HWF_CORRUPTION_WA
         bool "Prevent data corruption in IOCC mode"
-        depends on (AURORA_IO_CACHE_COHERENCY && MV_PP2_HWF)
+        depends on MV_PP2_HWF
         default y
         ---help---
 	Enable this feature to avoid data corruption in IOCC mode
 	when HWF and SWF traffic use buffers from the same BM pools.
+        In addition workaround should be activated using sysfs command:
+	"echo en > pp2/gbe/c_inv   - on/off L1 and L2 cache invalidation"
+	After activation each buffer that refilled to BM pool in mixed mode
+	(used for HWF and SWF) will be invalidated by the driver.
+	Warning: this WA can't be activated when there are any kind
+	of PCIe activities.
 
 endmenu
 
