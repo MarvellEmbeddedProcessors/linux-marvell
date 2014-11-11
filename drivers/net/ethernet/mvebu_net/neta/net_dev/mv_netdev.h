@@ -507,8 +507,8 @@ struct bm_pool {
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
 #ifdef CONFIG_MV_NETA_TXDONE_IN_HRTIMER
-#define MV_ETH_HRTIMER_PERIOD_MIN	(10UL)
-#define MV_ETH_HRTIMER_PERIOD_MAX	(10000UL)
+#define MV_ETH_HRTIMER_PERIOD_MIN	(10)
+#define MV_ETH_HRTIMER_PERIOD_MAX	(10000)
 unsigned int mv_eth_tx_done_hrtimer_period_get(void);
 int mv_eth_tx_done_hrtimer_period_set(unsigned int period);
 #endif
