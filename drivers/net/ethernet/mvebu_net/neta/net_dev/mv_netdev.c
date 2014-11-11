@@ -290,9 +290,10 @@ static void mv_eth_adaptive_rx_update(struct eth_port *pp)
 		} else if (rate > pp->pkt_rate_high_cfg) {
 			if (pp->rate_current != 3) {
 				pp->rate_current = 3;
-				for (i = 0; i < CONFIG_MV_ETH_RXQ; i++)
+				for (i = 0; i < CONFIG_MV_ETH_RXQ; i++) {
 					mv_eth_rx_time_coal_set(pp->port, i, pp->rx_time_high_coal_cfg);
 					mv_eth_rx_pkts_coal_set(pp->port, i, pp->rx_pkts_high_coal_cfg);
+				}
 			}
 		} else {
 			if (pp->rate_current != 2) {
@@ -303,7 +304,6 @@ static void mv_eth_adaptive_rx_update(struct eth_port *pp)
 				}
 			}
 		}
-
 		pp->rx_rate_pkts = 0;
 		pp->rx_timestamp = jiffies;
 	}
