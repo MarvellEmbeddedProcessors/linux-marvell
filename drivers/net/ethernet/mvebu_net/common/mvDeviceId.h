@@ -445,12 +445,15 @@ extern "C" {
 #define MV_ALLEYCAT3_DEV_ID		0xF400
 
 /* AlleyCat3  Revisions */
-#define MV_ALLEYCAT3_A0_ID		0x0
+#define MV_ALLEYCAT3_A0_ID		0x3
 #define MV_ALLEYCAT3_A0_NAME	"A0"
-#define MV_ALLEYCAT3_A1_ID		0x1
+#define MV_ALLEYCAT3_A1_ID		0x4
 #define MV_ALLEYCAT3_A1_NAME	"A1"
 
 #define MV_ALLEYCAT3_ID_ARRAY { \
+	NULL,\
+	NULL,\
+	NULL,\
 	MV_ALLEYCAT3_A0_NAME,\
 	MV_ALLEYCAT3_A1_NAME,\
 }
