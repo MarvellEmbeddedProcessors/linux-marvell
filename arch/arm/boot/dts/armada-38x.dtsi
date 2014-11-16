@@ -344,6 +344,7 @@
 				cell-index = <0>;
 				interrupts = <0 1 0x4>;
 				clocks = <&coreclk 0>;
+				num-cs = <4>;
 				status = "disabled";
 			};
 
@@ -355,6 +356,7 @@
 				cell-index = <1>;
 				interrupts = <0 63 0x4>;
 				clocks = <&coreclk 0>;
+				num-cs = <4>;
 				status = "disabled";
 			};
 
