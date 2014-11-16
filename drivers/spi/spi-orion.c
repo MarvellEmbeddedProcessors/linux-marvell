@@ -8,7 +8,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
@@ -23,7 +22,9 @@
 
 #define DRIVER_NAME			"orion_spi"
 
-#define ORION_NUM_CHIPSELECTS		1 /* only one slave is supported*/
+#define ORION_NUM_CHIPSELECTS		4
+#define ORION_CHIPSELECTS_OFFS		2
+#define ORION_CHIPSELECTS_MASK		(0x3 << ORION_CHIPSELECTS_OFFS)
 #define ORION_SPI_WAIT_RDY_MAX_LOOP	2000 /* in usec */
 
 #define ORION_SPI_IF_CTRL_REG		0x00
@@ -32,11 +33,11 @@
 #define ORION_SPI_DATA_IN_REG		0x0c
 #define ORION_SPI_INT_CAUSE_REG		0x10
 
-#define ORION_SPI_MODE_CPOL		(1 << 11)
-#define ORION_SPI_MODE_CPHA		(1 << 12)
+#define ORION_SPI_MODE_CPOL			(1 << 11)
+#define ORION_SPI_MODE_CPHA			(1 << 12)
 #define ORION_SPI_IF_8_16_BIT_MODE	(1 << 5)
 #define ORION_SPI_CLK_PRESCALE_MASK	0x1F
-#define ORION_SPI_MODE_MASK		(ORION_SPI_MODE_CPOL | \
+#define ORION_SPI_MODE_MASK			(ORION_SPI_MODE_CPOL | \
 					 ORION_SPI_MODE_CPHA)
 
 struct orion_spi {
@@ -44,7 +45,8 @@ struct orion_spi {
 	void __iomem		*base;
 	unsigned int		max_speed;
 	unsigned int		min_speed;
-	struct clk              *clk;
+	struct clk			*clk;
+	struct spi_device	*cur_spi;
 };
 
 static inline void __iomem *spi_reg(struct orion_spi *orion_spi, u32 reg)
@@ -174,10 +176,11 @@ orion_spi_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
 
 static void orion_spi_set_cs(struct orion_spi *orion_spi, int enable)
 {
+	orion_spi_clrbits(orion_spi, ORION_SPI_IF_CTRL_REG,
+					  0x1 | ORION_CHIPSELECTS_MASK);
 	if (enable)
-		orion_spi_setbits(orion_spi, ORION_SPI_IF_CTRL_REG, 0x1);
-	else
-		orion_spi_clrbits(orion_spi, ORION_SPI_IF_CTRL_REG, 0x1);
+		orion_spi_setbits(orion_spi, ORION_SPI_IF_CTRL_REG,
+			0x1 | (orion_spi->cur_spi->chip_select << ORION_CHIPSELECTS_OFFS));
 }
 
 static inline int orion_spi_wait_till_ready(struct orion_spi *orion_spi)
@@ -308,6 +311,8 @@ static int orion_spi_transfer_one_message(struct spi_master *master,
 	if (status < 0)
 		goto msg_done;
 
+	orion_spi->cur_spi = spi;
+
 	list_for_each_entry(t, &m->transfers, transfer_list) {
 		/* make sure buffer length is even when working in 16
 		 * bit mode*/
@@ -403,6 +408,10 @@ static int orion_spi_probe(struct platform_device *pdev)
 	struct resource *r;
 	unsigned long tclk_hz;
 	int status = 0;
+	const u32 *iprop;
+	int size;
+	u32 ret;
+	unsigned int num_cs;
 
 	master = spi_alloc_master(&pdev->dev, sizeof *spi);
 	if (master == NULL) {
@@ -413,18 +422,20 @@ static int orion_spi_probe(struct platform_device *pdev)
 	if (pdev->id != -1)
 		master->bus_num = pdev->id;
 	if (pdev->dev.of_node) {
-		u32 cell_index;
-		if (!of_property_read_u32(pdev->dev.of_node, "cell-index",
-					  &cell_index))
-			master->bus_num = cell_index;
+		iprop = of_get_property(pdev->dev.of_node, "cell-index",
+					&size);
+		if (iprop && size == sizeof(*iprop))
+			master->bus_num = *iprop;
+
+		ret = of_property_read_u32(pdev->dev.of_node, "num-cs", &num_cs);
+		if (ret < 0)
+			num_cs = ORION_NUM_CHIPSELECTS;
 	}
 
-	/* we support only mode 0, and no options */
 	master->mode_bits = SPI_CPHA | SPI_CPOL;
-
 	master->setup = orion_spi_setup;
 	master->transfer_one_message = orion_spi_transfer_one_message;
-	master->num_chipselect = ORION_NUM_CHIPSELECTS;
+	master->num_chipselect = num_cs;
 
 	dev_set_drvdata(&pdev->dev, master);
 
@@ -454,7 +465,7 @@ static int orion_spi_probe(struct platform_device *pdev)
 		status = -EBUSY;
 		goto out_rel_clk;
 	}
-	spi->base = ioremap(r->start, SZ_1K);
+	spi->base = ioremap(r->start, SZ_128);
 
 	if (orion_spi_reset(spi) < 0)
 		goto out_rel_mem;
