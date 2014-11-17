@@ -98,6 +98,17 @@ config OMAP_INTERCONNECT
 	help
 	  Driver to enable OMAP interconnect error handling driver.
 
+config MVEBU_DEBUG_MBUS
+	bool "Mvebu MBUS Windows"
+	default n
+	depends on MVEBU_MBUS
+	help
+	  Print MBus Windows configuration on Marvell
+	  EBU SoCs.
+	  (e.g. Armada 370/XP)
+
+	  Useful for debugging.
+
 config OMAP_OCP2SCP
 	tristate "OMAP OCP2SCP DRIVER"
 	depends on ARCH_OMAP2PLUS
