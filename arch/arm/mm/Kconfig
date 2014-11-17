@@ -891,6 +891,16 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
 	  Say Y here to use the Feroceon L2 cache in writethrough mode.
 	  Unless you specifically require this, say N for writeback mode.
 
+config CPU_L1_CACHE_PREF_ENABLE
+	bool "Enable CPU L1 Cache Prefetch"
+	depends on CPU_V7
+	default y if CPU_V7 && ARCH_MVEBU
+	help
+	  Say Y here to enable L1 cache prefetch.
+	  If unsure, say N.
+	  L1 cache prefetch is performance feature,
+	  impact mainly cpu read operations.
+
 config MIGHT_HAVE_CACHE_L2X0
 	bool
 	help
