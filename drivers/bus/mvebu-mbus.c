@@ -199,6 +199,48 @@ static bool mvebu_mbus_window_is_remappable(struct mvebu_mbus_state *mbus,
  * Functions to manipulate the address decoding windows
  */
 
+#ifdef CONFIG_MVEBU_DEBUG_MBUS
+void mbus_debug_window(void)
+{
+	void __iomem *win_addr = mbus_state.mbuswins_base;
+	int i, j;
+
+	pr_info("----------- mbus window -----------\n");
+
+	/* win 0-7 has 4reg: ctrl, base, remap_l,remap_h */
+	for (i = 0; i <= 7; i++) {
+		pr_info("WIN%d\n", i);
+		for (j = 0; j < 4; j++) {
+			pr_info("\twin(%d,%d): %p\t 0x%x\n",
+				i, j, win_addr, readl(win_addr));
+			win_addr += 4;
+		}
+	}
+
+	pr_info("\nINTERREGS_WIN(%d): %p\t 0x%x\n",
+		i++, win_addr, readl(win_addr));
+	win_addr += 4;
+	pr_info("\nSYNC_BARIER_WIN(%d): %p\t 0x%x\n\n",
+		i++, win_addr, readl(win_addr));
+	win_addr += 4;
+
+	/* hole */
+	win_addr += 8;
+
+	/* win 8-19 has 2reg: ctrl, base */
+	for (i = 8; i <= 19; i++) {
+		pr_info("WIN%d\n", i);
+			for (j = 0; j < 2; j++) {
+				pr_info("\twin(%d,%d): %p\t 0x%x\n",
+					i, j, win_addr, readl(win_addr));
+				win_addr += 4;
+			}
+	}
+
+	pr_info("\n");
+}
+#endif /* CONFIG_MVEBU_DEBUG_MBUS */
+
 static void mvebu_mbus_read_window(struct mvebu_mbus_state *mbus,
 				   int win, int *enabled, u64 *base,
 				   u32 *size, u8 *target, u8 *attr,
@@ -1266,6 +1308,11 @@ static int __init mbus_dt_setup(struct mvebu_mbus_state *mbus,
 		if (ret < 0)
 			return ret;
 	}
+
+#ifdef CONFIG_MVEBU_DEBUG_MBUS
+	mbus_debug_window();
+#endif /* CONFIG_MVEBU_DEBUG_MBUS */
+
 	return 0;
 }
 
