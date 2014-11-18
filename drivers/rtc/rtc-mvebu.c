@@ -201,10 +201,20 @@ static irqreturn_t mvebu_rtc_irq_handler(int irq, void *rtc_ptr)
 static int mvebu_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	mvebu_rtc_t *rtc = dev_get_drvdata(dev);
-	unsigned long time;
+	unsigned long time, time_check;
 
 	spin_lock_irq(&rtc->lock);
-	rtc_time_to_tm((time = RTC_READ_REG(RTC_TIME_REG_OFFS)), tm);
+
+	time = RTC_READ_REG(RTC_TIME_REG_OFFS);
+
+	/* WA for failing time read attempts. The HW ERRATA information should be added here */
+	/* if detected more than one second between two time reads, read once again */
+	time_check = RTC_READ_REG(RTC_TIME_REG_OFFS);
+	if ((time_check - time) > 1)
+		time_check = RTC_READ_REG(RTC_TIME_REG_OFFS);
+	/* End of WA */
+
+	rtc_time_to_tm(time_check, tm);
 	spin_unlock_irq(&rtc->lock);
 
 	return 0;
