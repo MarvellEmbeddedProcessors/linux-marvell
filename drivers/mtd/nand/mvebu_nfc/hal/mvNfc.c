@@ -769,8 +769,8 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	 */
 	nand_clock = halData->mvCtrlNandClkSetFunction(_100MHz); /* Go down to 100MHz */
 	if (nand_clock != _100MHz)
-		mvOsPrintf("%s: Warning: set freq to %dHz instead of %dHz\n",
-						__func__, nand_clock, _100MHz);
+		DB(mvOsPrintf("%s: Warning: set NFC Clock frequency to %dHz instead of %dHz\n",
+						__func__, nand_clock, _100MHz));
 
 	DB(mvOsPrintf("mvNfcInit: set nand clock to %d\n", nand_clock));
 
@@ -874,8 +874,8 @@ MV_STATUS mvNfcInit(MV_NFC_INFO *nfcInfo, MV_NFC_CTRL *nfcCtrl, struct MV_NFC_HA
 	if (flashDeviceInfo[i].flags & NFC_CLOCK_UPSCALE_200M) {
 		nand_clock = halData->mvCtrlNandClkSetFunction(_200MHz); /* raise NFC clk to 200MHz */
 		if (nand_clock != _200MHz)
-			mvOsPrintf("%s: Warning: set freq to %dHz instead of %dHz\n",
-							__func__, nand_clock, _200MHz);
+			DB(mvOsPrintf("%s: Warning: set NFC Clock frequency to %dHz instead of %dHz\n",
+							__func__, nand_clock, _200MHz));
 	}
 
 	DB(mvOsPrintf("mvNfcInit: set nand clock to %d\n", nand_clock));
