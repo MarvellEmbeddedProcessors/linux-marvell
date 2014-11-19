@@ -358,6 +358,9 @@ static int mvebu_rtc_probe(struct platform_device *pdev)
 		ret = -ENOENT;
 		goto errExit1;
 	}
+
+	/* No need to re-init the RTC as it was already initialized by the boot loader at start of battery life */
+#if 0
 	/* Init the state of the RTC, failure indicates there is probably no battery */
 
 	{
@@ -372,7 +375,7 @@ static int mvebu_rtc_probe(struct platform_device *pdev)
 			goto errExit3;
 		}
 	}
-
+#endif
 	spin_lock_init(&rtc->lock);
 
 	/* register shared periodic/carry/alarm irq */
