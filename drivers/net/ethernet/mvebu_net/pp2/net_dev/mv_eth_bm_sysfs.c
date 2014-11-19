@@ -40,7 +40,6 @@ static ssize_t mv_pp2_help(char *buf)
 {
 	int off = 0;
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += sprintf(buf+off, "cat                            queueMappDump   - print BM all rxq/txq to qSet mapp\n");
 	off += sprintf(buf+off, "cat                            qsetConfigDump  - print BM all qSets configuration\n");
 	off += sprintf(buf+off, "echo [qset] [pool]           > qsetCreate      - create qset and attach it to BM [pool]\n");
@@ -53,7 +52,6 @@ static ssize_t mv_pp2_help(char *buf)
 	off += sprintf(buf+off, "echo [qset]                  > qsetShow        - show info for Qset [qset]\n");
 
 	off += sprintf(buf+off, "echo [pool]                  > poolDropCnt     - print BM pool drop counters\n");
-#endif
 
 	off += sprintf(buf+off, "echo [pool]                  > poolRegs        - print BM pool registers\n");
 	off += sprintf(buf+off, "echo [pool]                  > poolStatus      - print BM pool status\n");

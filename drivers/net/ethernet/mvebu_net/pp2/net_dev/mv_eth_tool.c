@@ -777,11 +777,7 @@ int mv_pp2_eth_tool_set_ringparam(struct net_device *netdev,
 		for (rxq = 0; rxq < priv->rxq_num; rxq++)
 			mv_pp2_ctrl_rxq_size_set(priv->port, rxq, rxq_size);
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	hwf_size = txq_size - (nr_cpu_ids * priv->txq_ctrl[0].rsvd_chunk);
-#else
-	hwf_size = txq_size/2;
-#endif
 	/* relevant only for ppv2.1 */
 	swf_size = hwf_size - (nr_cpu_ids * priv->txq_ctrl[0].rsvd_chunk);
 

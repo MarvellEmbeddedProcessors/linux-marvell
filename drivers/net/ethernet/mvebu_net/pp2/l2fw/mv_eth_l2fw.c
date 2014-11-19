@@ -654,16 +654,11 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 	txq_ctrl = &pp->txq_ctrl[tx_spec_ptr->txp * CONFIG_MV_PP2_TXQ + tx_spec_ptr->txq];
 	txq_cpu_ptr = &(txq_ctrl->txq_cpu[cpu]);
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	if (mv_pp2_reserved_desc_num_proc(pp, tx_spec_ptr->txp, tx_spec_ptr->txq, frags) ||
 		mv_pp2_aggr_desc_num_check(aggr_txq_ctrl, frags)) {
 		frags = 0;
 		goto out;
 	}
-#else
-	if (mv_pp2_aggr_desc_num_check(aggr_txq_ctrl, frags))
-		goto out;
-#endif /*CONFIG_MV_ETH_PP2_1*/
 
 	/* Get next descriptor for tx, single buffer, so FIRST & LAST */
 	tx_desc = mvPp2AggrTxqNextDescGet(aggr_txq_ctrl->q);
@@ -690,11 +685,9 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 
 	tx_desc->command = tx_cmd;
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	qset = (rx_desc->bmQset & PP2_RX_BUFF_QSET_NUM_MASK) >> PP2_RX_BUFF_QSET_NUM_OFFS;
 	grntd = (rx_desc->bmQset & PP2_RX_BUFF_TYPE_MASK) >> PP2_RX_BUFF_TYPE_OFFS;
 	tx_desc->hwCmd[1] = (qset << PP2_TX_MOD_QSET_OFFS) | (grntd << PP2_TX_MOD_GRNTD_BIT);
-#endif
 
 	tx_desc->physTxq = MV_PPV2_TXQ_PHYS(pp->port, tx_spec_ptr->txp, tx_spec_ptr->txq);
 
@@ -726,9 +719,7 @@ inline int mv_l2fw_tx(struct sk_buff *skb, struct eth_port *pp, struct pp2_rx_de
 
 	/* TODO - XOR ready check */
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	txq_cpu_ptr->reserved_num--;
-#endif
 	txq_cpu_ptr->txq_count++;
 	aggr_txq_ctrl->txq_count++;
 

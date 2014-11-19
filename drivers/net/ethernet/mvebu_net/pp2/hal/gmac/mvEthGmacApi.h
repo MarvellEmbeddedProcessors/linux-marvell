@@ -139,16 +139,12 @@ static INLINE MV_VOID mvGmacPortIsrUnmask(int port)
 
 static INLINE MV_VOID mvGmacPortSumIsrMask(int port)
 {
-#ifdef CONFIG_MV_ETH_PP2_1
 	MV_REG_WRITE(ETH_PORT_ISR_SUM_MASK_REG(port), 0);
-#endif
 }
 
 static INLINE MV_VOID mvGmacPortSumIsrUnmask(int port)
 {
-#ifdef CONFIG_MV_ETH_PP2_1
 	MV_REG_WRITE(ETH_PORT_ISR_SUM_MASK_REG(port), ETH_PORT_ISR_SUM_INTERN_MASK);
-#endif
 }
 
 

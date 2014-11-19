@@ -120,7 +120,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PP2_POOL_BUF_SIZE_MASK		(0xFFFE)
 /*-------------------------------------------------------------------------------*/
 
-#ifdef CONFIG_MV_ETH_PP2_1 /* PPv2.1 - A0 */
 
 #define MV_PP2_RX_STATUS			(MV_PP2_REG_BASE + 0x174)
 
@@ -166,43 +165,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PP2_HWF_TXQ_DISABLE_BIT              31
 #define MV_PP2_HWF_TXQ_DISABLE_MASK             (0x1 << MV_PP2_HWF_TXQ_DISABLE_BIT)
 /*-------------------------------------------------------------------------------*/
-
-#else /* PPv2 - Z1 */
-
-#define MV_PP2_V0_RXQ_SNOOP_REG(rxq)		(MV_PP2_REG_BASE + 0x800 + 4 * (rxq))
-
-#define MV_PP2_V0_SNOOP_PKT_SIZE_OFFS		5
-#define MV_PP2_V0_SNOOP_PKT_SIZE_MASK		(0x1FF << MV_PP2_V0_SNOOP_PKT_SIZE_OFFS)
-
-#define MV_PP2_V0_SNOOP_BUF_HDR_OFFS		14
-#define MV_PP2_V0_SNOOP_BUF_HDR_MASK		(0x1 << MV_PP2_V0_SNOOP_BUF_HDR_OFFS)
-
-#define MV_PP2_V0_L2_DEPOSIT_PKT_SIZE_OFFS	21
-#define MV_PP2_V0_L2_DEPOSIT_PKT_SIZE_MASK	(0xF << MV_PP2_V0_L2_DEPOSIT_PKT_SIZE_OFFS)
-
-#define MV_PP2_V0_L2_DEPOSIT_BUF_HDR_OFFS	25
-#define MV_PP2_V0_L2_DEPOSIT_BUF_HDR_MASK	(0x1 << MV_PP2_V0_L2_DEPOSIT_BUF_HDR_OFFS)
-/*-------------------------------------------------------------------------------*/
-
-#define MV_PP2_V0_RXQ_CONFIG_REG(rxq)		(MV_PP2_REG_BASE + 0xc00 + 4 * (rxq))
-
-#define MV_PP2_V0_RXQ_POOL_SHORT_OFFS		0
-#define MV_PP2_V0_RXQ_POOL_SHORT_MASK		(0x7 << MV_PP2_V0_RXQ_POOL_SHORT_OFFS)
-#define MV_PP2_V0_RXQ_POOL_LONG_OFFS		8
-#define MV_PP2_V0_RXQ_POOL_LONG_MASK		(0x7 << MV_PP2_V0_RXQ_POOL_LONG_OFFS)
-#define MV_PP2_V0_RXQ_PACKET_OFFSET_OFFS	17
-#define MV_PP2_V0_RXQ_PACKET_OFFSET_MASK	(0xFF << MV_PP2_V0_RXQ_PACKET_OFFSET_OFFS)
-/*-------------------------------------------------------------------------------*/
-
-#define MV_PP2_V0_PORT_HWF_CONFIG_REG(port)	(MV_PP2_REG_BASE + 0x120 + 4 * (port))
-
-#define MV_PP2_V0_PORT_HWF_POOL_SHORT_OFFS	0
-#define MV_PP2_V0_PORT_HWF_POOL_SHORT_MASK	(0x7 << MV_PP2_V0_PORT_HWF_POOL_SHORT_OFFS)
-#define MV_PP2_V0_PORT_HWF_POOL_LONG_OFFS	8
-#define MV_PP2_V0_PORT_HWF_POOL_LONG_MASK	(0x7 << MV_PP2_V0_PORT_HWF_POOL_LONG_OFFS)
-/*-------------------------------------------------------------------------------*/
-
-#endif /* PPv2 - Z1 / PPv2.1 - A0 */
 
 #define MV_PP2_RX_GEMPID_SRC_OFFS		8
 #define MV_PP2_RX_GEMPID_SRC_MASK		(0x7 << MV_PP2_RX_GEMPID_SRC_OFFS)
