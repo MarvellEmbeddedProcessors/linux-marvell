@@ -93,7 +93,6 @@ MV_STATUS mvBmInit()
 
 	memset(mvBmPools, 0, sizeof(mvBmPools));
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	/* Enable BM priority */
 	mvPp2WrReg(MV_BM_PRIO_CTRL_REG, 1);
 
@@ -109,7 +108,6 @@ MV_STATUS mvBmInit()
 		mvBmTxqToQsetLong[i] = -1;
 		mvBmTxqToQsetShort[i] = -1;
 	}
-#endif
 
 	return MV_OK;
 }
@@ -195,7 +193,6 @@ MV_STATUS mvBmPoolInit(int pool, MV_U32 *virtPoolBase, MV_ULONG physPoolBase, in
 
 	mvBmPoolControl(pool, MV_STOP);
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	/* Init Qsets list for this pool */
 	pBmPool->qsets = mvListCreate();
 	if (pBmPool->qsets == NULL) {
@@ -220,7 +217,6 @@ MV_STATUS mvBmPoolInit(int pool, MV_U32 *virtPoolBase, MV_ULONG physPoolBase, in
 	/* Init default priority counters for this pool */
 	mvBmPoolBuffNumSet(pool, 0);
 	mvBmPoolBuffCountersSet(pool, 0, 0);
-#endif
 
 	/* Set poolBase address */
 	mvPp2WrReg(MV_BM_POOL_BASE_REG(pool), physPoolBase);
@@ -264,7 +260,6 @@ MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num, int add)
 	else
 		pBmPool->bufNum -= buf_num;
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	/* Update max buffers of default Qset, MC Qset and pool shared */
 	if (add) {
 		mvBmQsetBuffMaxSet(pBmPool->defQset->id,
@@ -279,7 +274,6 @@ MV_STATUS mvBmPoolBufNumUpdate(int pool, int buf_num, int add)
 			pBmPool->mcQset->maxGrntd, pBmPool->mcQset->maxShared - buf_num);
 		mvBmPoolBuffNumSet(pool, pBmPool->maxShared - buf_num);
 	}
-#endif
 
 	return MV_OK;
 }

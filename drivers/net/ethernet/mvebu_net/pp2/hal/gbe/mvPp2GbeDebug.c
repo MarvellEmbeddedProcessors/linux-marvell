@@ -81,13 +81,8 @@ MV_VOID mvPp2RxDmaRegsPrint(void)
 
 	mvOsPrintf("\nRXQs [0..%d] registers\n", MV_PP2_RXQ_TOTAL_NUM);
 	for (i = 0; i < MV_PP2_RXQ_TOTAL_NUM; i++) {
-#ifdef CONFIG_MV_ETH_PP2_1
 		mvPp2PrintReg(MV_PP2_RX_STATUS, "MV_PP2_RX_STATUS");
 		mvPp2PrintReg2(MV_PP2_RXQ_CONFIG_REG(i), "MV_PP2_RXQ_CONFIG_REG", i);
-#else
-		mvPp2PrintReg2(MV_PP2_V0_RXQ_SNOOP_REG(i), "MV_PP2_RXQ_SNOOP_REG", i);
-		mvPp2PrintReg2(MV_PP2_V0_RXQ_CONFIG_REG(i), "MV_PP2_RXQ_CONFIG_REG", i);
-#endif
 	}
 	mvOsPrintf("\nBM pools [0..%d] registers\n", MV_BM_POOLS);
 	for (i = 0; i < MV_BM_POOLS; i++)
@@ -95,9 +90,6 @@ MV_VOID mvPp2RxDmaRegsPrint(void)
 
 	mvOsPrintf("\nIngress ports [0..%d] registers\n", MV_PP2_MAX_PORTS);
 	for (i = 0; i < MV_PP2_MAX_PORTS; i++) {
-#ifndef CONFIG_MV_ETH_PP2_1
-		mvPp2PrintReg2(MV_PP2_V0_PORT_HWF_CONFIG_REG(i), "MV_PP2_PORT_HWF_CONFIG_REG", i);
-#endif
 		mvPp2PrintReg2(MV_PP2_RX_CTRL_REG(i), "MV_PP2_RX_CTRL_REG", i);
 	}
 	mvOsPrintf("\n");
@@ -283,15 +275,7 @@ void mvPp2PhysRxqRegs(int rxq)
 	mvPp2PrintReg(MV_PP2_RXQ_STATUS_REG(rxq), "MV_PP2_RXQ_STATUS_REG");
 	mvPp2PrintReg(MV_PP2_RXQ_THRESH_REG, "MV_PP2_RXQ_THRESH_REG");
 	mvPp2PrintReg(MV_PP2_RXQ_INDEX_REG, "MV_PP2_RXQ_INDEX_REG");
-#ifdef CONFIG_MV_ETH_PP2_1
 	mvPp2PrintReg(MV_PP2_RXQ_CONFIG_REG(rxq), "MV_PP2_RXQ_CONFIG_REG");
-#else
-	mvPp2PrintReg(MV_PP2_V0_RXQ_CONFIG_REG(rxq), "MV_PP2_RXQ_CONFIG_REG");
-	mvPp2PrintReg(MV_PP2_V0_RXQ_SNOOP_REG(rxq), "MV_PP2_RXQ_SNOOP_REG");
-	mvPp2PrintReg(MV_PP2_V0_RX_EARLY_DROP_REG(rxq), "MV_PP2_V0_RX_EARLY_DROP_REG");
-	mvPp2PrintReg(MV_PP2_V0_RX_DESC_DROP_REG(rxq), "MV_PP2_V0_RX_DESC_DROP_REG");
-#endif
-
 }
 
 void mvPp2PortRxqRegs(int port, int rxq)

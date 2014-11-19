@@ -43,9 +43,7 @@ static ssize_t mv_cls3_help(char *buf)
 	int off = 0;
 	off += scnprintf(buf + off, PAGE_SIZE, "cat             hw_dump        - Dump all occupied entries from HW.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "cat             hw_ext_dump    - Dump all occupied extension table entries from HW.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "cat             hw_ms_dump     - Dump all miss table entires from HW.\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE, "cat             sw_dump        - Dump SW entry.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "cat             sc_res_dump    - Dump all valid scan results from HW.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "cat             sc_regs        - Dump scan registers.\n");
@@ -53,9 +51,7 @@ static ssize_t mv_cls3_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE, "cat             cnt_read_all   - Dump all hit counters for all changed indices and miss entries\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "echo lkp_type   > hw_ms_add    - Write entry from SW into HW miss table <lkp_type>\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE, "echo depth      > hw_query_add - Get query for HEK in the SW entry and Write entry into HW hash entry.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "                                 free entry search depth <depth>.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo idx        > hw_read      - Read entry from HW <idx> into SW entry.\n");
@@ -78,16 +74,10 @@ static ssize_t mv_cls3_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd ql      > act_sw_ql    - Set Queue Low command <cmd> and value <ql> to action table SW entry.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd q       > act_sw_queue - Set full Queue command <cmd> and value <q> to action table SW entry.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd         > act_sw_fwd   - Set Forwarding command <cmd> to action table SW entry.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd id bnk  > act_sw_pol   - Set PolicerID command <cmd> bank <bnk> and number <id> to action table SW entry.\n");
-#else
-	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd id      > act_sw_pol   - Set PolicerID command <cmd> and number <id> to action table SW entry.\n");
-#endif
 
 	off += scnprintf(buf + off, PAGE_SIZE, "echo en          > act_sw_flowid- Set FlowID enable/disable <1/0> to action table SW entry.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "echo idx         > act_sw_mtu   - Set MTU index to action table SW entry\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE, "echo d i cs      > act_sw_mdf   - Set modification parameters to action table SW entry data pointer <d>\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "                                  instruction offset <i>, <cs> enable L4 checksum generation\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo id cnt      > act_sw_dup   - Set packet duplication parameters <id, cnt> to action SW entry.\n");
@@ -97,9 +87,7 @@ static ssize_t mv_cls3_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE, "\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo idx         > cnt_read     - Show hit counter for action table entry <idx>.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "echo lkp_type    > cnt_ms_read  - Show hit counter for action table miss entry <lkp_type>.\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE, "echo 1           > cnt_clr_all  - Clear hit counters for all action table entries.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo t           > cnt_clr_lkp  - Clear hit counters for all action table entries with lookup type <t>.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "\n");
@@ -201,11 +189,7 @@ static ssize_t mv_cls3_store(struct device *dev,
 	else if (!strcmp(name, "act_sw_fwd"))
 		mvPp2ClsC3ForwardSet(&c3, a);
 	else if (!strcmp(name, "act_sw_pol"))
-#ifdef CONFIG_MV_ETH_PP2_1
 		mvPp2ClsC3PolicerSet(&c3, a, b, c);
-#else
-		mvPp2ClsC3PolicerSet(&c3, a, b);
-#endif
 	else if (!strcmp(name, "act_sw_flowid"))
 		mvPp2ClsC3FlowIdEn(&c3, a);
 	else if (!strcmp(name, "act_sw_mdf"))

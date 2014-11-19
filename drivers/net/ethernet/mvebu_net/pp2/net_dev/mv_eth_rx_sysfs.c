@@ -45,9 +45,7 @@ static ssize_t mv_pp2_help(char *b)
 	o += sprintf(b+o, "echo [p]             > rxFifoRegs  - show RX FIFO registers for port <p>\n");
 	o += sprintf(b+o, "echo [p] v           > rxWeight    - set weight for poll function, <v> - weight [0..255]\n");
 	o += sprintf(b+o, "echo [rxq]           > gRxqRegs    - show RXQ registers for global <rxq>\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	o += sprintf(b+o, "echo [p] [rxq]       > rxqCounters - show RXQ counters for <p/rxq>.\n");
-#endif
 	o += sprintf(b+o, "echo [p] [rxq]       > pRxqRegs    - show RXQ registers for global <rxq>\n");
 	o += sprintf(b+o, "echo [p] [rxq] [0|1] > rxqShow     - show RXQ descriptors ring for <p/rxq>\n");
 	o += sprintf(b+o, "echo [p] [rxq] [v]   > rxqSize     - set number of descriptors <v> for <port/rxq>.\n");

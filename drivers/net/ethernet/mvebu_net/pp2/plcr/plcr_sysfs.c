@@ -55,9 +55,7 @@ static ssize_t plcr_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE - off, "echo 0|1      > rate      - Enable <1> or Disable <0> addition of tokens to token buckets\n");
 	off += scnprintf(buf + off, PAGE_SIZE - off, "echo bytes    > min_pkt   - Set minimal packet length\n");
 	off += scnprintf(buf + off, PAGE_SIZE - off, "echo 0|1      > edrop     - Enable <1> or Disable <0> early packets drop\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE - off, "echo mode     > mode      - Set policer mode of operation 0-bank01 1-bank10 2-parallal\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE - off, "echo p 0|1    > enable    - Enable <1> or Disable <0> policer <p>\n");
 	off += scnprintf(buf + off, PAGE_SIZE - off, "echo p 0|1    > color     - Set color mode for policer <p>: 0-blind, 1-aware\n");
 	off += scnprintf(buf + off, PAGE_SIZE - off, "echo p u t    > config    - Set token units <u> and update type <t> for policer <p>\n");

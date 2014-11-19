@@ -109,11 +109,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PP2_CLS2_HIT_CTR_REG				(MV_PP2_REG_BASE + 0x1B50)
 #define MV_PP2_CLS2_HIT_CTR_OFF				0
 
-#ifdef CONFIG_MV_ETH_PP2_1
 #define MV_PP2_CLS2_HIT_CTR_BITS			32
-#else
-#define MV_PP2_CLS2_HIT_CTR_BITS			24
-#endif
 #define MV_PP2_CLS2_HIT_CTR_MASK			((1  << MV_PP2_CLS2_HIT_CTR_BITS) - 1)
 /*-------------------------------------------------------------------------------*/
 
@@ -278,11 +274,7 @@ int	mvPp2ClsC2QueueLowSet(MV_PP2_CLS_C2_ENTRY *c2, int cmd, int queue, int from)
 int	mvPp2ClsC2QueueSet(MV_PP2_CLS_C2_ENTRY *c2, int cmd, int queue, int from);
 int	mvPp2ClsC2ForwardSet(MV_PP2_CLS_C2_ENTRY *c2, int cmd);
 
-#ifdef CONFIG_MV_ETH_PP2_1
 int	mvPp2ClsC2PolicerSet(MV_PP2_CLS_C2_ENTRY *c2, int cmd, int policerId, int bank);
-#else
-int	mvPp2ClsC2PolicerSet(MV_PP2_CLS_C2_ENTRY *c2, int cmd, int policerId);
-#endif
 
 int     mvPp2ClsC2FlowIdEn(MV_PP2_CLS_C2_ENTRY *c2, int flowid_en);
 int	mvPp2ClsC2ModSet(MV_PP2_CLS_C2_ENTRY *c2, int data_ptr, int instr_offs, int l4_csum);

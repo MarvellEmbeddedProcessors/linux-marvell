@@ -46,9 +46,7 @@ static ssize_t mv_cls_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE, "cat               sw_dump               - Dump software entry.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "cat               hw_regs               - Dump hardware registers.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "cat               hw_dump               - Dump all hardware entries.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "cat               hw_hits               - Dump non zeroed hit counters and the associated HW entries\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE, "\n");
 
 	off += scnprintf(buf + off, PAGE_SIZE, "echo p s r      > hw_port_rules         - Set physical port number <p> for rules set <s>.\n");
@@ -81,18 +79,11 @@ static ssize_t mv_cls_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE, "                                          table software entry.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd q      > act_sw_ql             - Set queue low command <cmd> and value <q> to action\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "                                          table software entry.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd        > act_sw_fwd            - Set Forwarding command <cmd> to action table software entry\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd q      > act_sw_queue          - Set full queue command <cmd> and value <q> to action\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "                                          table software entry.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd id bnk > act_sw_pol            - Set PolicerId command <cmd> bank <bnk> and numver <id> to action\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "                                          table software entry.\n");
-#else
-	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd id     > act_sw_pol            - Set PolicerId command <cmd> and numver <id> to action\n");
-	off += scnprintf(buf + off, PAGE_SIZE, "                                          table software entry.\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE, "\n");
 
 	return off;
@@ -181,11 +172,7 @@ static ssize_t mv_cls_store(struct device *dev,
 	else if (!strcmp(name, "act_sw_queue"))
 		mvPp2ClsC4QueueSet(&C4, a, b);
 	else if (!strcmp(name, "act_sw_pol"))
-#ifdef CONFIG_MV_ETH_PP2_1
 		mvPp2ClsC4PolicerSet(&C4, a, b, c);
-#else
-		mvPp2ClsC4PolicerSet(&C4, a, b);
-#endif
 	else {
 		err = 1;
 		printk(KERN_ERR "%s: illegal operation <%s>\n", __func__, attr->attr.name);

@@ -269,14 +269,9 @@ MV_STATUS mvPp2DefaultsSet(int port)
 	if (mvPp2HalData.iocc) {
 		for (i = 0; i < pPortCtrl->rxqNum; i++) {
 			queue = mvPp2LogicRxqToPhysRxq(port, i);
-#ifdef CONFIG_MV_ETH_PP2_1
 			regVal = mvPp2RdReg(MV_PP2_RXQ_CONFIG_REG(queue));
 			regVal |= MV_PP2_SNOOP_PKT_SIZE_MASK | MV_PP2_SNOOP_BUF_HDR_MASK;
 			mvPp2WrReg(MV_PP2_RXQ_CONFIG_REG(queue), regVal);
-#else
-			regVal = MV_PP2_V0_SNOOP_PKT_SIZE_MASK | MV_PP2_V0_SNOOP_BUF_HDR_MASK;
-			mvPp2WrReg(MV_PP2_V0_RXQ_SNOOP_REG(queue), regVal);
-#endif
 		}
 	}
 
@@ -1086,7 +1081,6 @@ MV_STATUS mvPp2BmPoolBufSizeSet(int pool, int bufsize)
 	return MV_OK;
 }
 
-#ifdef CONFIG_MV_ETH_PP2_1
 
 /*******************************************************************************
 * mvPp2PortIngressEnable
@@ -1220,81 +1214,6 @@ MV_STATUS mvPp2TxqBmLongPoolSet(int port, int txp, int txq, int longPool)
 	return MV_OK;
 }
 
-#else
-
-MV_STATUS mvPp2PortIngressEnable(int port, MV_BOOL en)
-{
-	if (en)
-		mvPrsMacDropAllSet(port, 0);
-	else
-		mvPrsMacDropAllSet(port, 1);
-
-	return MV_OK;
-}
-
-MV_STATUS mvPp2RxqOffsetSet(int port, int rxq, int offset)
-{
-	MV_U32 regVal;
-	int prxq = mvPp2LogicRxqToPhysRxq(port, rxq);
-
-	if (offset % 32 != 0) {
-		mvOsPrintf("%s: offset must be in units of 32\n", __func__);
-		return MV_BAD_PARAM;
-	}
-
-	/* convert offset from bytes to units of 32 bytes */
-	offset = offset >> 5;
-
-	regVal = mvPp2RdReg(MV_PP2_V0_RXQ_CONFIG_REG(prxq));
-
-	regVal &= ~MV_PP2_V0_RXQ_PACKET_OFFSET_MASK;
-	regVal |= ((offset << MV_PP2_V0_RXQ_PACKET_OFFSET_OFFS) & MV_PP2_V0_RXQ_PACKET_OFFSET_MASK);
-
-	mvPp2WrReg(MV_PP2_V0_RXQ_CONFIG_REG(prxq), regVal);
-
-	return MV_OK;
-}
-
-MV_STATUS mvPp2RxqBmLongPoolSet(int port, int rxq, int longPool)
-{
-	MV_U32 regVal = 0;
-	int prxq = mvPp2LogicRxqToPhysRxq(port, rxq);
-
-	regVal = mvPp2RdReg(MV_PP2_V0_RXQ_CONFIG_REG(prxq));
-	regVal &= ~MV_PP2_V0_RXQ_POOL_LONG_MASK;
-	regVal |= ((longPool << MV_PP2_V0_RXQ_POOL_LONG_OFFS) & MV_PP2_V0_RXQ_POOL_LONG_MASK);
-
-	mvPp2WrReg(MV_PP2_V0_RXQ_CONFIG_REG(prxq), regVal);
-
-	return MV_OK;
-}
-
-MV_STATUS mvPp2RxqBmShortPoolSet(int port, int rxq, int shortPool)
-{
-	MV_U32 regVal = 0;
-	int prxq = mvPp2LogicRxqToPhysRxq(port, rxq);
-
-	regVal = mvPp2RdReg(MV_PP2_V0_RXQ_CONFIG_REG(prxq));
-	regVal &= ~MV_PP2_V0_RXQ_POOL_SHORT_MASK;
-	regVal |= ((shortPool << MV_PP2_V0_RXQ_POOL_SHORT_OFFS) & MV_PP2_V0_RXQ_POOL_SHORT_MASK);
-
-	mvPp2WrReg(MV_PP2_V0_RXQ_CONFIG_REG(prxq), regVal);
-
-	return MV_OK;
-}
-
-MV_STATUS mvPp2PortHwfBmPoolSet(int port, int shortPool, int longPool)
-{
-	MV_U32 regVal = 0;
-
-	regVal |= ((shortPool << MV_PP2_V0_PORT_HWF_POOL_SHORT_OFFS) & MV_PP2_V0_PORT_HWF_POOL_SHORT_MASK);
-	regVal |= ((longPool << MV_PP2_V0_PORT_HWF_POOL_LONG_OFFS) & MV_PP2_V0_PORT_HWF_POOL_LONG_MASK);
-
-	mvPp2WrReg(MV_PP2_V0_PORT_HWF_CONFIG_REG(MV_PPV2_PORT_PHYS(port)), regVal);
-
-	return MV_OK;
-}
-#endif /* CONFIG_MV_ETH_PP2_1 */
 
 /*-------------------------------------------------------------------------------*/
 
@@ -1326,12 +1245,10 @@ MV_STATUS mvPp2MhSet(int port, MV_TAG_TYPE mh)
 	}
 	mvPp2WrReg(MV_PP2_MH_REG(MV_PPV2_PORT_PHYS(port)), regVal);
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	if (mh == MV_TAG_TYPE_MH)
 		mvGmacPortMhSet(port, 1);
 	else
 		mvGmacPortMhSet(port, 0);
-#endif /* CONFIG_MV_ETH_PP2_1 */
 
 	return MV_OK;
 }
@@ -1850,7 +1767,6 @@ MV_STATUS mvPp2TxpEnable(int port, int txp)
 	return MV_OK;
 }
 
-#ifdef CONFIG_MV_ETH_PP2_1
 /* Functions implemented only for PPv2.1 version (A0 and later) */
 MV_STATUS mvPp2RxqEnable(int port, int rxq, MV_BOOL en)
 {
@@ -1934,18 +1850,6 @@ MV_STATUS mvPp2TxPortFifoFlush(int port, MV_BOOL en)
 	return MV_OK;
 }
 
-#else /* Stabs for Z1 */
-
-MV_STATUS mvPp2TxqDrainSet(int port, int txp, int txq, MV_BOOL en)
-{
-	return MV_OK;
-}
-
-MV_STATUS mvPp2TxPortFifoFlush(int port, MV_BOOL en)
-{
-	return MV_OK;
-}
-#endif /* CONFIG_MV_ETH_PP2_1 */
 
 /* Function for swithcing SWF to HWF */
 /* txq is physical (global) txq in range 0..MV_PP2_TXQ_TOTAL_NUM */
