@@ -27,9 +27,7 @@ export INCLUDE_DIRS
 
 ccflags-y	+= $(INCLUDE_DIRS)
 
-obj-y	+= common/mvCommon.o common/mvStack.o common/mvDebug.o
-
-obj-$(CONFIG_MV_ETH_PP2_1)		+= common/mvList.o
+obj-y	+= common/mvCommon.o common/mvStack.o common/mvDebug.o common/mvList.o
 
 obj-$(CONFIG_MV_ETH_INCLUDE_PHY)	+= phy/mvEthPhy.o phy/phy_sysfs.o
 

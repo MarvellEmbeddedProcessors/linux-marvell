@@ -91,20 +91,14 @@ static ssize_t mv_cls_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd q from    > act_sw_queue           - set full queue command <cmd> and value <q> to action\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "                                              table software entry.  <from> -source for Queue command.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd           > act_sw_hwf             - set Forwarding command <cmd> to action table SW entry.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd id bank   > act_sw_pol             - set PolicerID command <cmd> bank and number <id> to action table SW entry.\n");
-#else
-	off += scnprintf(buf + off, PAGE_SIZE, "echo cmd id        > act_sw_pol             - set PolicerID command <cmd> and number <id> to action table SW entry.\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE, "echo en            > act_sw_flowid          - set FlowID enable/disable <1/0> to action table SW entry.\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo d i cs        > act_sw_mdf             - set modification parameters to action table SW entry\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "                                              data pointer <d>, instruction pointrt <i>,\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "                                              <cs> enable L4 checksum generation.\n");
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE, "echo idx           > act_sw_mtu             - set MTU index to action table SW entry\n");
 	off += scnprintf(buf + off, PAGE_SIZE, "echo miss id       > act_sw_sq              - set miss bit and instruction ID to action table SW entry\n");
-#endif
 
 /*TODO ppv2.1: ADD sysfs command for mvPp2ClsC2SeqSet */
 	off += scnprintf(buf + off, PAGE_SIZE, "echo id cnt        > act_sw_dup             - set packet duplication parameters <id,cnt> to action table SW entry.\n");
@@ -207,11 +201,7 @@ static ssize_t mv_cls_store(struct device *dev,
 	else if (!strcmp(name, "act_sw_hwf"))
 		mvPp2ClsC2ForwardSet(&act_entry, a);
 	else if (!strcmp(name, "act_sw_pol"))
-#ifdef CONFIG_MV_ETH_PP2_1
 		mvPp2ClsC2PolicerSet(&act_entry, a, b, c);
-#else
-		mvPp2ClsC2PolicerSet(&act_entry, a, b);
-#endif
 	else if (!strcmp(name, "act_sw_mdf"))
 		mvPp2ClsC2ModSet(&act_entry, a, b, c);
 	else if (!strcmp(name, "act_sw_mtu"))/*PPv2.1 new feature MAS 3.7*/

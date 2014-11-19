@@ -79,11 +79,7 @@ void        mvPp2PlcrHwRegs(void)
 
 	mvOsPrintf("\n[PLCR registers: %d policers]\n", MV_PP2_PLCR_NUM);
 
-#ifdef CONFIG_MV_ETH_PP2_1
 	mvPp2PrintReg(MV_PP2_PLCR_MODE_REG,	"MV_PP2_PLCR_MODE_REG");
-#else
-	mvPp2PrintReg(MV_PP2_PLCR_ENABLE_REG,	"MV_PP2_PLCR_ENABLE_REG");
-#endif
 	mvPp2PrintReg(MV_PP2_PLCR_BASE_PERIOD_REG,	"MV_PP2_PLCR_BASE_PERIOD_REG");
 	mvPp2PrintReg(MV_PP2_PLCR_MIN_PKT_LEN_REG,	"MV_PP2_PLCR_MIN_PKT_LEN_REG");
 	mvPp2PrintReg(MV_PP2_PLCR_EDROP_EN_REG,		"MV_PP2_PLCR_EDROP_EN_REG");
@@ -99,18 +95,10 @@ void        mvPp2PlcrHwRegs(void)
 	}
 
 	mvOsPrintf("\nEarly Drop Thresholds for SW and HW forwarding\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	for (i = 0; i < MV_PP2_V1_PLCR_EDROP_THRESH_NUM; i++) {
 		mvPp2PrintReg2(MV_PP2_V1_PLCR_EDROP_CPU_TR_REG(i),   "MV_PP2_V1_PLCR_EDROP_CPU_TR_REG", i);
 		mvPp2PrintReg2(MV_PP2_V1_PLCR_EDROP_HWF_TR_REG(i),   "MV_PP2_V1_PLCR_EDROP_HWF_TR_REG", i);
 	}
-#else
-
-	for (i = 0; i < MV_PP2_V0_PLCR_EDROP_THRESH_NUM; i++) {
-		mvPp2PrintReg2(MV_PP2_V0_PLCR_EDROP_CPU_TR_REG(i),   "MV_PP2_V0_PLCR_EDROP_CPU_TR_REG", i);
-		mvPp2PrintReg2(MV_PP2_V0_PLCR_EDROP_HWF_TR_REG(i),   "MV_PP2_V0_PLCR_EDROP_HWF_TR_REG", i);
-	}
-#endif
 	mvOsPrintf("\nPer RXQ: Non zero early drop thresholds\n");
 	for (i = 0; i < MV_PP2_RXQ_TOTAL_NUM; i++) {
 		mvPp2WrReg(MV_PP2_PLCR_EDROP_RXQ_REG, i);
@@ -153,20 +141,14 @@ static void        mvPp2PlcrHwDump(int plcr)
 	mvPp2WrReg(MV_PP2_PLCR_TABLE_INDEX_REG, plcr);
 	mvOsPrintf("%3d:  ", plcr);
 
-#ifndef CONFIG_MV_ETH_PP2_1
-	enable = mvPp2RdReg(MV_PP2_PLCR_ENABLE_REG);
-	mvOsPrintf("%4s", MV_BIT_CHECK(enable, plcr) ? "Yes" : "No");
-#endif
 
 	regVal = mvPp2RdReg(MV_PP2_PLCR_TOKEN_CFG_REG);
 	units = regVal & MV_PP2_PLCR_TOKEN_UNIT_MASK;
 	color = regVal & MV_PP2_PLCR_COLOR_MODE_MASK;
 	type = (regVal & MV_PP2_PLCR_TOKEN_TYPE_ALL_MASK) >> MV_PP2_PLCR_TOKEN_TYPE_OFFS;
 	tokens =  (regVal & MV_PP2_PLCR_TOKEN_VALUE_ALL_MASK) >> MV_PP2_PLCR_TOKEN_VALUE_OFFS;
-#ifdef CONFIG_MV_ETH_PP2_1
 	enable = regVal & MV_PP2_PLCR_ENABLE_MASK;
 	mvOsPrintf("%4s", enable ? "Yes" : "No");
-#endif
 	mvOsPrintf("   %-5s  %2d   %5d", units ? "pkts" : "bytes", type, tokens);
 	mvOsPrintf("  %-5s", color ? "aware" : "blind");
 

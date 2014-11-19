@@ -47,9 +47,7 @@ static ssize_t mv_prs_low_help(char *buf)
 	off += scnprintf(buf + off, PAGE_SIZE - off, "cat          sw_dump       - dump parser SW entry.\n");
 	off += scnprintf(buf + off, PAGE_SIZE - off, "cat          hw_dump       - dump all valid HW entries\n");
 	off += scnprintf(buf + off, PAGE_SIZE - off, "cat          hw_regs       - dump parser registers.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	off += scnprintf(buf + off, PAGE_SIZE - off, "cat          hw_hits       - dump non zeroed hit counters and the associated HW entries\n");
-#endif
 	off += scnprintf(buf + off, PAGE_SIZE - off, "\n");
 
 	off += scnprintf(buf + off, PAGE_SIZE - off, "echo id      > hw_write    - write parser SW entry into HW place <id>.\n");

@@ -248,11 +248,7 @@ int mvPp2ClsC4PrioSet(MV_PP2_CLS_C4_ENTRY *C4, int cmd, int prio);
 int mvPp2ClsC4DscpSet(MV_PP2_CLS_C4_ENTRY *C4, int cmd, int dscp);
 int mvPp2ClsC4GpidSet(MV_PP2_CLS_C4_ENTRY *C4, int cmd, int gpid);
 int mvPp2ClsC4ForwardSet(MV_PP2_CLS_C4_ENTRY *c4, int cmd);
-#ifdef CONFIG_MV_ETH_PP2_1
 int mvPp2ClsC4PolicerSet(MV_PP2_CLS_C4_ENTRY *c2, int cmd, int policerId, int bank);
-#else
-int mvPp2ClsC4PolicerSet(MV_PP2_CLS_C4_ENTRY *c2, int cmd, int policerId);
-#endif
 int mvPp2ClsC4QueueHighSet(MV_PP2_CLS_C4_ENTRY *C4, int cmd, int queue);
 int mvPp2ClsC4QueueLowSet(MV_PP2_CLS_C4_ENTRY *C4, int cmd, int queue);
 int mvPp2ClsC4QueueSet(MV_PP2_CLS_C4_ENTRY *C4, int cmd, int queue);

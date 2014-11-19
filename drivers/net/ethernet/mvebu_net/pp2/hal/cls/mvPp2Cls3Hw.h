@@ -84,13 +84,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*
   PPv2.1 (feature MAS 3.16) LKP_TYPE size and offset changed
 */
-#ifdef CONFIG_MV_ETH_PP2_1
 #define KEY_CTRL_LKP_TYPE			4
 #define KEY_CTRL_LKP_TYPE_BITS			6
-#else
-#define KEY_CTRL_LKP_TYPE			8
-#define KEY_CTRL_LKP_TYPE_BITS			4
-#endif
 
 #define KEY_CTRL_LKP_TYPE_MAX			((1 << KEY_CTRL_LKP_TYPE_BITS) - 1)
 #define KEY_CTRL_LKP_TYPE_MASK			(((1 << KEY_CTRL_LKP_TYPE_BITS) - 1) << KEY_CTRL_LKP_TYPE)
@@ -244,11 +239,7 @@ SCAN STATUS
   PPv2.1 (feature MAS 3.16) LKP_TYPE size and offset changed
 */
 
-#ifdef CONFIG_MV_ETH_PP2_1
 #define MV_PP2_CLS3_SC_PROP_LKP_TYPE_BITS	6
-#else
-#define MV_PP2_CLS3_SC_PROP_LKP_TYPE_BITS	4
-#endif
 
 #define MV_PP2_CLS3_SC_PROP_LKP_TYPE_MAX	((1 << MV_PP2_CLS3_SC_PROP_LKP_TYPE_BITS) - 1)
 #define MV_PP2_CLS3_SC_PROP_LKP_TYPE_MASK	((MV_PP2_CLS3_SC_PROP_LKP_TYPE_MAX) << MV_PP2_CLS3_SC_PROP_LKP_TYPE)
@@ -335,7 +326,6 @@ SCAN STATUS
 /*		Classifier C3 offsets in hash table		    		 */
 /*-------------------------------------------------------------------------------*/
 /* PPv2.1 (feature MAS 3.16) LKP_TYPE size and offset changed */
-#ifdef CONFIG_MV_ETH_PP2_1
 
 #define KEY_OCCUPIED				116
 #define KEY_FORMAT				115
@@ -346,20 +336,6 @@ SCAN STATUS
 
 #define KEY_PRT_ID_TYPE(ext_mode)		((ext_mode == 1) ? (97) : (105))
 #define KEY_PRT_ID_TYPE_MASK(ext_mode)		((KEY_CTRL_PRT_ID_TYPE_MAX) << (KEY_PRT_ID_TYPE(ext_mode) % 32))
-
-#else
-
-#define KEY_OCCUPIED				114
-#define KEY_FORMAT				113
-#define KEY_PTR_EXT				105
-
-#define KEY_PRT_ID(ext_mode)			((ext_mode == 1) ? (97) : (105))
-#define KEY_PRT_ID_MASK(ext_mode)		(((1 << KEY_CTRL_PRT_ID_BITS) - 1) << (KEY_PRT_ID(ext_mode) % 32))
-
-#define KEY_PRT_ID_TYPE(ext_mode)		((ext_mode == 1) ? (95) : (103))
-#define KEY_PRT_ID_TYPE_MASK(ext_mode)		((KEY_CTRL_PRT_ID_TYPE_MAX) << (KEY_PRT_ID_TYPE(ext_mode) % 32))
-
-#endif /* CONFIG_MV_ETH_PP2_1 */
 
 #define KEY_LKP_TYPE(ext_mode)			((ext_mode == 1) ? (91) : (99))
 #define KEY_LKP_TYPE_MASK(ext_mode)		(((1 << KEY_CTRL_LKP_TYPE_BITS) - 1) << (KEY_LKP_TYPE(ext_mode) % 32))
@@ -477,11 +453,7 @@ int mvPp2ClsC3QueueHighSet(MV_PP2_CLS_C3_ENTRY *c3, int cmd, int q);
 int mvPp2ClsC3QueueLowSet(MV_PP2_CLS_C3_ENTRY *c3, int cmd, int q);
 int mvPp2ClsC3QueueSet(MV_PP2_CLS_C3_ENTRY *c3, int cmd, int queue);
 int mvPp2ClsC3ForwardSet(MV_PP2_CLS_C3_ENTRY *c3, int cmd);
-#ifdef CONFIG_MV_ETH_PP2_1
 int mvPp2ClsC3PolicerSet(MV_PP2_CLS_C3_ENTRY *c3, int cmd, int policerId, int bank);
-#else
-int mvPp2ClsC3PolicerSet(MV_PP2_CLS_C3_ENTRY *c3, int cmd, int policerId);
-#endif
 int mvPp2ClsC3FlowIdEn(MV_PP2_CLS_C3_ENTRY *c3, int flowid_en);
 
 /* PPv2.1 (feature MAS 3.7) mtu - new field at action table */

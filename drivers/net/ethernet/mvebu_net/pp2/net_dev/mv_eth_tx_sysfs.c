@@ -43,9 +43,7 @@ static ssize_t mv_pp2_help(char *b)
 	int s = PAGE_SIZE; /* buffer size */
 
 	o += scnprintf(b+o, s-o, "cat                              txRegs          - show global TX registers\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq]             > pTxqCounters  - show TXQ Counters for port <p/txp/txq> where <txq> range [0..7]\n");
-#endif
 	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq]             > pTxqRegs      - show TXQ registers for port <p/txp/txq> where <txq> range [0..7]\n");
 	o += scnprintf(b+o, s-o, "echo [txq]                       > gTxqRegs      - show TXQ registers for global <txq> range [0..255]\n");
 	o += scnprintf(b+o, s-o, "echo [cpu]                       > aggrTxqRegs   - show Aggregation TXQ registers for <cpu> range [0..max]\n");
@@ -55,13 +53,8 @@ static ssize_t mv_pp2_help(char *b)
 	o += scnprintf(b+o, s-o, "echo [p] [hex]                   > txMH          - set 2 bytes of Marvell Header for transmit\n");
 	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [cpu]       > txqDef        - set default <txp/txq> for packets sent to port <p> by <cpu>\n");
 	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [v]         > txqSize       - set TXQ size <v> for <p/txp/txq>.\n");
-#ifdef CONFIG_MV_ETH_PP2_1
 	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [hwf] [swf] > txqLimit      - set HWF <hwf> and SWF <swf> limits for <p/txp/txq>.\n");
 	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [v]         > txqChunk      - set SWF request chunk [v] for <p/txp/txq>\n");
-
-#else
-	o += scnprintf(b+o, s-o, "echo [p] [txp] [txq] [hwf]       > txqLimit      - set HWF limit <hwf> for <p/txp/txq>.\n");
-#endif
 #ifdef CONFIG_MV_PP2_TXDONE_IN_HRTIMER
 	o += scnprintf(b+o, s-o, "echo [period]                    > txPeriod      - set Tx Done high resolution timer period\n");
 	o += scnprintf(b+o, s-o, "				     [period]: period range is [%lu, %lu], unit usec\n",

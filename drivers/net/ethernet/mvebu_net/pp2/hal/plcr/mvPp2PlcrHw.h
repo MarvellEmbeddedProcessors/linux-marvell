@@ -70,11 +70,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 
-#ifdef CONFIG_MV_ETH_PP2_1
 #define MV_PP2_PLCR_NUM		48
-#else
-#define MV_PP2_PLCR_NUM		16
-#endif
 
 /*********************************** RX Policer Registers *******************/
 /* exist only in ppv2.0 */

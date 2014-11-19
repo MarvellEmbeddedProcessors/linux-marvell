@@ -127,11 +127,7 @@ static ssize_t mv_pp2_port_store(struct device *dev,
 		mvGmacLmsRegs();
 		mvGmacPortRegs(p);
 	} else if (!strcmp(name, "dropCntrs")) {
-#ifdef CONFIG_MV_ETH_PP2_1
 		mvPp2V1DropCntrs(p);
-#else
-		mvPp2V0DropCntrs(p);
-#endif
 	} else if (!strcmp(name, "stats")) {
 		mv_pp2_port_stats_print(p);
 	} else if (!strcmp(name, "mac")) {

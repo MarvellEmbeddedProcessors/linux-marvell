@@ -141,16 +141,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define MV_PP2_CLS_GEM_VIRT_INDEX_BITS		(7)
 #define MV_PP2_CLS_GEM_VIRT_INDEX_MAX		(((1 << MV_PP2_CLS_GEM_VIRT_INDEX_BITS) - 1) << 0)
 /*-------------------------------------------------------------------------------*/
-#ifdef CONFIG_MV_ETH_PP2_1
 /* indirect rd/wr via index GEM_VIRT_INDEX */
 #define MV_PP2_CLS_GEM_VIRT_REGS_NUM		128
 #define MV_PP2_CLS_GEM_VIRT_REG			(MV_PP2_REG_BASE + 0x1A04)
-#else
-/* direct rd/wr */
-#define MV_PP2_CLS_GEM_VIRT_REGS_NUM		64
-#define MV_PP2_CLS_GEM_VIRT_BASE_REG		(MV_PP2_REG_BASE + 0x1A00)
-#define MV_PP2_CLS_GEM_VIRT_REG(index)		(MV_PP2_CLS_GEM_VIRT_BASE_REG + ((index) * 4))
-#endif
 
 #define MV_PP2_CLS_GEM_VIRT_BITS		12
 #define MV_PP2_CLS_GEM_VIRT_MAX			((1 << MV_PP2_CLS_GEM_VIRT_BITS) - 1)
@@ -420,11 +413,7 @@ int mvPp2ClsHwVirtPortSet(int virt_port, int gem_portid);
 int mvPp2ClsHwUdfSet(int udf_no, int offs_id, int offs_bits, int size_bits);
 int mvPp2V0ClsHwMtuSet(int port, int txp, int mtu);/*PPv2.1 feature changed MAS 3.7*/
 int mvPp2V1ClsHwMtuSet(int index, int mtu);/*PPv2.1 feature changed MAS 3.7*/
-#ifdef CONFIG_MV_ETH_PP2_1
 int mvPp2ClsHwOversizeRxqLowSet(int port, int rxq);/*PPv2.1 feature changed MAS 3.7*/
-#else
-int mvPp2ClsHwOversizeRxqSet(int port, int rxq);
-#endif
 int mvPp2ClsHwRxQueueHighSet(int port, int from, int queue);/*PPv2.1 new feature MAS 3.5*/
 int mvPp2ClsHwMhSet(int port, int virtEn, int uniEn, unsigned short mh);/*PPv2.1 new feature MAS 3.18*/
 int mvPp2ClsHwSeqInstrSizeSet(int index, int size);/*PPv2.1 new feature MAS 3.14*/
