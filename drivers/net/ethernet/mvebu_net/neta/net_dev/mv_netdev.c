@@ -5372,19 +5372,13 @@ error:
 int mv_eth_check_mtu_valid(struct net_device *dev, int mtu)
 {
 	if (mtu < 68) {
-		printk(KERN_INFO "MTU must be at least 68, change mtu failed\n");
+		pr_err("MTU must be at least 68, change mtu failed\n");
 		return -EINVAL;
 	}
 	if (mtu > 9676 /* 9700 - 20 and rounding to 8 */) {
-		printk(KERN_ERR "%s: Illegal MTU value %d, ", dev->name, mtu);
+		pr_err("%s: Illegal MTU value %d, ", dev->name, mtu);
 		mtu = 9676;
-		printk(KERN_CONT " rounding MTU to: %d \n", mtu);
-	}
-
-	if (MV_IS_NOT_ALIGN(RX_PKT_SIZE(mtu), 8)) {
-		printk(KERN_ERR "%s: Illegal MTU value %d, ", dev->name, mtu);
-		mtu = MV_ALIGN_UP(RX_PKT_SIZE(mtu), 8);
-		printk(KERN_CONT " rounding MTU to: %d \n", mtu);
+		pr_cont(" rounding MTU to: %d\n", mtu);
 	}
 	return mtu;
 }
