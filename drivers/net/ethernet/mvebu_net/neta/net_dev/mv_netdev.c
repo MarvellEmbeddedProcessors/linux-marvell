@@ -83,6 +83,10 @@ disclaimer.
 #ifdef CONFIG_OF
 int port_vbase[MV_ETH_MAX_PORTS];
 int bm_reg_vbase, pnc_reg_vbase;
+static u32 pnc_phyaddr_base;
+static u32 pnc_win_size;
+static u32 bm_phyaddr_base;
+static u32 bm_win_size;
 #endif /* CONFIG_OF */
 
 static struct mv_mux_eth_ops mux_eth_ops;
@@ -3926,6 +3930,42 @@ int mv_eth_win_set(int port, u32 base, u32 size, u8 trg_id, u8 win_attr, u32 *en
 	return MV_OK;
 }
 
+int mv_eth_pnc_win_get(u32 *phyaddr_base, u32 *win_size)
+{
+	static bool first_time = true;
+	int ret = 0;
+
+	/* get addr from fdt only once, since during eth resume (S2RAM feature), it might crash system */
+	if (first_time) {
+		ret = mvebu_mbus_win_addr_get(MV_PNC_WIN_ID, MV_PNC_WIN_ATTR, phyaddr_base, win_size);
+		pnc_phyaddr_base = *phyaddr_base;
+		pnc_win_size = *win_size;
+		first_time = false;
+	} else {
+		*phyaddr_base = pnc_phyaddr_base;
+		*win_size = pnc_win_size;
+	}
+	return ret;
+}
+
+int mv_eth_bm_win_get(u32 *phyaddr_base, u32 *win_size)
+{
+	static bool first_time = true;
+	int ret = 0;
+
+	/* get addr from fdt only once, since during eth resume (S2RAM feature), it might crash system */
+	if (first_time) {
+		ret = mvebu_mbus_win_addr_get(MV_BM_WIN_ID, MV_BM_WIN_ATTR, phyaddr_base, win_size);
+		bm_phyaddr_base = *phyaddr_base;
+		bm_win_size = *win_size;
+		first_time = false;
+	} else {
+		*phyaddr_base = bm_phyaddr_base;
+		*win_size = bm_win_size;
+	}
+	return ret;
+}
+
 void	mv_eth_win_init(int port)
 {
 	const struct mbus_dram_target_info *dram;
@@ -3969,7 +4009,7 @@ void	mv_eth_win_init(int port)
 
 	/* set BM and PnC window */
 	if (MV_NETA_BM_CAP()) {
-		ret = mvebu_mbus_win_addr_get(MV_BM_WIN_ID, MV_BM_WIN_ATTR, &phyaddr_base, &win_size);
+		ret = mv_eth_bm_win_get(&phyaddr_base, &win_size);
 		if (ret) {
 			pr_err("%s: BM window addr info get fail\n", __func__);
 			return;
@@ -3988,7 +4028,7 @@ void	mv_eth_win_init(int port)
 			|| (dev == MV78260_DEV_ID)
 			|| (dev == MV78460_DEV_ID)) {
 			if (!MV_NETA_BM_CAP()) {
-				ret = mvebu_mbus_win_addr_get(MV_BM_WIN_ID, MV_BM_WIN_ATTR, &phyaddr_base, &win_size);
+				ret = mv_eth_bm_win_get(&phyaddr_base, &win_size);
 				if (ret) {
 					pr_err("%s: BM window addr info get fail\n", __func__);
 					return;
@@ -4001,7 +4041,7 @@ void	mv_eth_win_init(int port)
 				}
 			}
 		} else {
-			ret = mvebu_mbus_win_addr_get(MV_PNC_WIN_ID, MV_PNC_WIN_ATTR, &phyaddr_base, &win_size);
+			ret = mv_eth_pnc_win_get(&phyaddr_base, &win_size);
 			if (ret) {
 				pr_err("%s: PNC window addr info get fail\n", __func__);
 				return;
