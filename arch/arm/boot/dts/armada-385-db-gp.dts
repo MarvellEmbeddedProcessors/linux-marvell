@@ -72,10 +72,6 @@
 				status = "okay";
 			};
 
-			sata@e0000 {
-				status = "okay";
-			};
-
 			sdhci@d8000 {
 				broken-cd;
 				wp-inverted;
