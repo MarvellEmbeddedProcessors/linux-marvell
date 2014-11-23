@@ -83,7 +83,7 @@ extern int cesaReqResources[MV_CESA_CHANNELS];
 
 /* general defines */
 #define CESA_OCF_MAX_SES 	128
-#define CESA_Q_SIZE	 	64
+#define CESA_Q_SIZE		256
 #define CESA_RESULT_Q_SIZE	(CESA_Q_SIZE * MV_CESA_CHANNELS * 2)
 #define CESA_OCF_POOL_SIZE	(CESA_Q_SIZE * MV_CESA_CHANNELS * 2)
 
