@@ -525,7 +525,7 @@ int mvPp2ClsC3HwQueryAdd(MV_PP2_CLS_C3_ENTRY *c3, int max_search_depth, MV_PP2_C
 		/* Get Free Extension Index */
 		ext_index = mvPp2ClsC3ShadowExtFreeGet();
 
-		if (ext_index == MV_PP2_CLS_C3_HASH_TBL_SIZE) {
+		if (ext_index == MV_PP2_CLS_C3_EXT_TBL_SIZE) {
 			mvOsPrintf("%s:Error - Extension table is full.\n", __func__);
 			return MV_CLS3_ERR;
 		}
