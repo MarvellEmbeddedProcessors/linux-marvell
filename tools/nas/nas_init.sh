@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 5.2"
+echo " * Version: 5.3"
 
 # LOG:
+# 5.3:
+#   1. enable adaptive coalecing for a338 & a375.
 # 5.2:
 #   1. fix -j option when not using the -p option.
 # 5.1:
@@ -659,9 +661,12 @@ elif [ "$PLATFORM" == "a370" ]; then
 elif [ "$PLATFORM" == "a375" ]; then
     [ ! -e "$(which ethtool)" ] && do_error "missing ethtool in rootfs"
     set -o verbose
-    ethtool -C eth0 pkt-rate-low 20000 pkt-rate-high 3000000 rx-frames 32 \
-        rx-usecs 1150 rx-usecs-high 1150 rx-usecs-low 100 rx-frames-low 32 \
-	rx-frames-high 32 adaptive-rx on
+    for i in 0 1 ; do
+	ethtool -C  eth$i pkt-rate-low 20000 pkt-rate-high 3000000	\
+		    rx-usecs-low  60       rx-frames-low  32		\
+		    rx-usecs      80       rx-frames      32		\
+		    rx-usecs-high 1150     rx-frames-high 32  	adaptive-rx on
+    done
     set +o verbose
 elif [ "$PLATFORM" == "a380" ]; then
     [ ! -e "$(which ethtool)" ] && do_error "missing ethtool in rootfs"
@@ -679,10 +684,14 @@ elif [ "$PLATFORM" == "a385" ]; then
     echo 250000 > /proc/sys/net/ipv4/tcp_limit_output_bytes
 elif [ "$PLATFORM" == "a388" ]; then
     [ ! -e "$(which ethtool)" ] && do_error "missing ethtool in rootfs"
-#    set -o verbose
-#    ethtool -C eth0 pkt-rate-low 20000 pkt-rate-high 3000000 rx-frames 100 \
-#	rx-usecs 1500 rx-usecs-high 1500 adaptive-rx on
-#    set +o verbose
+    set -o verbose
+    for i in 0 1 ; do
+	ethtool -C  eth$i pkt-rate-low 20000 pkt-rate-high 3000000	\
+		    rx-usecs-low  60       rx-frames-low  32		\
+		    rx-usecs      80       rx-frames      32		\
+		    rx-usecs-high 1150     rx-frames-high 32  	adaptive-rx on
+    done
+    set +o verbose
     echo 250000 > /proc/sys/net/ipv4/tcp_limit_output_bytes
 fi
 
