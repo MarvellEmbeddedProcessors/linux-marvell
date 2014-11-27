@@ -3456,6 +3456,15 @@ EXPORT_SYMBOL(__skb_warn_lro_forwarding);
 void kfree_skb_partial(struct sk_buff *skb, bool head_stolen)
 {
 	if (head_stolen) {
+#ifdef CONFIG_NET_SKB_RECYCLE
+		/* Workaround for the cases when recycle callback was not called */
+		if (skb->skb_recycle) {
+			/* Sign that skb is not available for recycle */
+			skb->hw_cookie |= BIT(0);
+			skb->skb_recycle(skb);
+		}
+#endif /* CONFIG_NET_SKB_RECYCLE */
+
 		skb_release_head_state(skb);
 		kmem_cache_free(skbuff_head_cache, skb);
 	} else {
