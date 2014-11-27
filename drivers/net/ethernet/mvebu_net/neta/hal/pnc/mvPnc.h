@@ -220,6 +220,11 @@ enum {
 #endif /* CONFIG_MV_ETH_PNC_WOL */
 };
 
+struct gbe_pnc_port_mapping {
+	int gbe_port;
+	int pnc_port;
+};
+
 /*
  * Pre-defined FlowId assigment
  */
@@ -260,6 +265,7 @@ int pnc_default_init(void);
 int pnc_te_del(unsigned int tid);
 
 struct tcam_entry *pnc_tcam_entry_get(int tid);
+int pnc_gbe_port_map_init(unsigned int ctrl_model, unsigned int ctrl_rev);
 
 int          pnc_eth_port_map(int eth_port);
 int          pnc_port_map(int pnc_port);

@@ -100,87 +100,99 @@ static int rxq_ip4_tcp = CONFIG_MV_ETH_RXQ_DEF;
 static int rxq_ip4_udp = CONFIG_MV_ETH_RXQ_DEF;
 static int rxq_arp 		= CONFIG_MV_ETH_RXQ_DEF;
 
+/* xlate gbe port number to port value in pnc entry */
+struct gbe_pnc_port_mapping gbe_pnc_map[PORT_BITS];
+struct gbe_pnc_port_mapping gbe_pnc_map_kw2[] = {
+		{.gbe_port = 0, .pnc_port = 2},
+		{.gbe_port = 1, .pnc_port = 4},
+		{.gbe_port = 2, .pnc_port = 0},
+};
+struct gbe_pnc_port_mapping gbe_pnc_map_axp[] = {
+		{.gbe_port = 0, .pnc_port = 0},
+		{.gbe_port = 1, .pnc_port = 4},
+		{.gbe_port = 2, .pnc_port = 2},
+		{.gbe_port = 3, .pnc_port = 3},
+		{.gbe_port = 0, .pnc_port = 1},
+};
+struct gbe_pnc_port_mapping gbe_pnc_map_38x[] = {
+		{.gbe_port = 0, .pnc_port = 0},
+		{.gbe_port = 1, .pnc_port = 2},
+		{.gbe_port = 2, .pnc_port = 4},
+};
+
+
+#ifdef CONFIG_OF
+int pnc_gbe_port_map_init(unsigned int ctrl_model, unsigned int ctrl_rev)
+{
+
+	memset(&gbe_pnc_map, 0xff, sizeof(gbe_pnc_map));
+
+	if (ctrl_model == MV78230_DEV_ID
+		|| ctrl_model == MV78260_DEV_ID
+		|| ctrl_model == MV78460_DEV_ID) {
+		/* Armada XP ID */
+		memcpy(&gbe_pnc_map, &gbe_pnc_map_axp, sizeof(gbe_pnc_map_axp));
+	} else if (ctrl_model == MV88F6510_DEV_ID
+		|| ctrl_model == MV88F6530_DEV_ID
+		|| ctrl_model == MV88F6601_DEV_ID
+		|| ctrl_model == MV88F6560_DEV_ID) {
+		/* Armada KW2 ID */
+		memcpy(&gbe_pnc_map, &gbe_pnc_map_kw2, sizeof(gbe_pnc_map_kw2));
+	} else if (ctrl_model == MV88F6810_DEV_ID
+		|| ctrl_model == MV88F6811_DEV_ID
+		|| ctrl_model == MV88F6820_DEV_ID
+		|| ctrl_model == MV88F6828_DEV_ID) {
+		/* Armada A38x ID */
+		memcpy(&gbe_pnc_map, &gbe_pnc_map_38x, sizeof(gbe_pnc_map_38x));
+	} else {
+		mvOsPrintf("%s: ctrl_model=%x is not supported\n", __func__, ctrl_model);
+		return -1;
+	}
+	return 0;
+}
+#else
+int pnc_gbe_port_map_init(unsigned int ctrl_model, unsigned int ctrl_rev)
+{
+	memset(&gbe_pnc_map, 0xff, sizeof(gbe_pnc_map));
 
 #ifdef CONFIG_ARCH_FEROCEON_KW2
+	/* Armada KW2 ID */
+	memcpy(&gbe_pnc_map, &gbe_pnc_map_kw2, sizeof(gbe_pnc_map_kw2));
+#elif defined(CONFIG_ARCH_ARMADA38X)
+	/* Armada A38x ID */
+	memcpy(&gbe_pnc_map, &gbe_pnc_map_38x, sizeof(gbe_pnc_map_38x));
+#else
+	/* Armada XP ID */
+	memcpy(&gbe_pnc_map, &gbe_pnc_map_axp, sizeof(gbe_pnc_map_axp));
+#endif
+
+	return 0;
+}
+#endif
+
 int pnc_port_map(int pnc_port)
 {
-	switch (pnc_port) {
-	case 2:
-		return 0;
+	int loop;
 
-	case 4:
-		return 1;
+	for (loop = 0; loop < PORT_BITS; loop++)
+		if (gbe_pnc_map[loop].pnc_port == pnc_port)
+			return gbe_pnc_map[loop].gbe_port;
 
-	case 0:
-		return 2;
-
-	default:
-		mvOsPrintf("%s: pnc_port=%d is out of range\n", __func__, pnc_port);
-		return -1;
-	}
+	mvOsPrintf("%s: pnc_port=%d is out of range\n", __func__, pnc_port);
+	return -1;
 }
 
 int pnc_eth_port_map(int eth_port)
 {
-	switch (eth_port) {
-	case 0:
-		return 2;
+	int loop;
 
-	case 1:
-		return 4;
+	for (loop = 0; loop < PORT_BITS; loop++)
+		if (gbe_pnc_map[loop].gbe_port == eth_port)
+			return gbe_pnc_map[loop].pnc_port;
 
-	case 2:
-		return 0;
-
-	default:
-		mvOsPrintf("%s: eth_port=%d is out of range\n", __func__, eth_port);
-		return -1;
-	}
+	mvOsPrintf("%s: eth_port=%d is out of range\n", __func__, eth_port);
+	return -1;
 }
-#else /* CONFIG_ARCH_ARMADA_XP */
-int pnc_port_map(int pnc_port)
-{
-	switch (pnc_port) {
-	case 0:
-	case 1:
-		return 0;
-
-	case 4:
-		return 1;
-
-	case 2:
-		return 2;
-
-	case 3:
-		return 3;
-
-	default:
-		mvOsPrintf("%s: pnc_port=%d is out of range\n", __func__, pnc_port);
-		return -1;
-	}
-}
-
-int pnc_eth_port_map(int eth_port)
-{
-	switch (eth_port) {
-	case 0:
-		return 0;
-
-	case 1:
-		return 4;
-
-	case 2:
-		return 2;
-
-	case 3:
-		return 3;
-
-	default:
-		mvOsPrintf("%s: eth_port=%d is out of range\n", __func__, eth_port);
-		return -1;
-	}
-}
-#endif /* MV_ETH_PNC_NEW */
 
 int pnc_te_del(unsigned int tid)
 {

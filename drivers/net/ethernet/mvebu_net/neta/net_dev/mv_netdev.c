@@ -3800,9 +3800,8 @@ void    mv_eth_hal_shared_init(struct mv_neta_pdata *plat_data)
 	halData.ctrlRev = plat_data->ctrl_rev;
 
 #ifdef CONFIG_ARCH_MVEBU
-	/* Get SoC ID */
-	if (mvebu_get_soc_id(&dev, &rev))
-		return;
+	dev = plat_data->ctrl_model;
+	rev = plat_data->ctrl_rev;
 
 	if (MV_NETA_BM_CAP()) {
 		ret = mvebu_mbus_win_addr_get(MV_BM_WIN_ID, MV_BM_WIN_ATTR, &bm_phy_base, &bm_size);
@@ -4305,6 +4304,12 @@ static int	mv_eth_shared_probe(struct mv_neta_pdata *plat_data)
 
 #ifdef CONFIG_MV_ETH_PNC
 	if (MV_NETA_PNC_CAP()) {
+		/* init gbe pnc port mapping */
+		if (pnc_gbe_port_map_init(plat_data->ctrl_model, plat_data->ctrl_rev)) {
+			pr_err("%s: PNC GBE port mapping init failed\n", __func__);
+			goto oom;
+		}
+
 		if (mv_eth_pnc_ctrl_en) {
 			if (pnc_default_init())
 				pr_err("%s: Warning PNC init failed\n", __func__);
@@ -4494,6 +4499,7 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 	struct clk *clk;
 	phy_interface_t phy_mode;
 	const char *mac_addr = NULL;
+	u32 ctrl_model, ctrl_rev;
 
 	/* Get port number */
 	if (of_property_read_u32(np, "eth,port-num", &pdev->id)) {
@@ -4603,6 +4609,14 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 	plat_data->cpu_mask  = (1 << nr_cpu_ids) - 1;
 	plat_data->duplex = DUPLEX_FULL;
 	plat_data->speed = MV_ETH_SPEED_AN;
+
+	/* Get SoC ID */
+	if (mvebu_get_soc_id(&ctrl_model, &ctrl_rev)) {
+		mvOsPrintf("%s: get soc_id failed\n", __func__);
+		return NULL;
+	}
+	plat_data->ctrl_model = ctrl_model;
+	plat_data->ctrl_rev = ctrl_rev;
 
 	pdev->dev.platform_data = plat_data;
 
