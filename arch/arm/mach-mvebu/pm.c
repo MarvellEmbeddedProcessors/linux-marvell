@@ -34,7 +34,6 @@ static struct of_device_id of_pm_table[] = {
 extern void armada_380_scu_enable(void);
 extern void armada_38x_cpu_mem_resume(void);
 extern void armada_380_resume(void);
-extern void armada_380_timer_resume(void);
 extern void mvebu_mbus_suspend(void);
 extern void mvebu_mbus_resume(void);
 extern int armada_38x_cpuidle_init(void);
@@ -125,7 +124,7 @@ static int mvebu_pm_enter(suspend_state_t state)
 	armada_380_scu_enable();
 
 	mvebu_mbus_resume();
-	armada_380_timer_resume();
+
 	mvebu_pcie_resume();
 
 	cpu_cluster_pm_exit();
