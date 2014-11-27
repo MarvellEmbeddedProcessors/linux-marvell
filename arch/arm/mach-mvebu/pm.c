@@ -37,8 +37,6 @@ extern void armada_380_resume(void);
 extern void armada_380_timer_resume(void);
 extern void mvebu_mbus_suspend(void);
 extern void mvebu_mbus_resume(void);
-extern void armada_370_xp_mpic_suspend(void);
-extern void armada_370_xp_mpic_resume(void);
 extern int armada_38x_cpuidle_init(void);
 extern void mvebu_pcie_suspend(void);
 extern void mvebu_pcie_resume(void);
@@ -119,14 +117,13 @@ static int mvebu_pm_enter(suspend_state_t state)
 
 	mvebu_pcie_suspend();
 	mvebu_mbus_suspend();
-	armada_370_xp_mpic_suspend();
 
 	cpu_suspend(0, mvebu_powerdown);
 
 	pr_info("Restoring Armada 38x\n");
 
 	armada_380_scu_enable();
-	armada_370_xp_mpic_resume();
+
 	mvebu_mbus_resume();
 	armada_380_timer_resume();
 	mvebu_pcie_resume();
