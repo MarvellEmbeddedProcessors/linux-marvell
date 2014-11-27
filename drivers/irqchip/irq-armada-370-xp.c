@@ -55,7 +55,6 @@
 #define ARMADA_370_XP_TIMER0_PER_CPU_IRQ	(5)
 #define ARMADA_370_XP_CPU_SUBSYS_PERF_CNT	(3)
 
-#define ARMADA_370_XP_MAX_HW_IRQS		(115)
 #define ARMADA_370_XP_GBE0_PER_CPU_IRQ		(8)
 #define ARMADA_370_XP_GBE3_PER_CPU_IRQ		(15)
 
@@ -74,7 +73,6 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
 static void __iomem *cpus_int_base;
 static void __iomem *per_cpu_int_base;
 static void __iomem *main_int_base;
-static u32 mpic_save[ARMADA_370_XP_MAX_HW_IRQS];
 static struct irq_domain *armada_370_xp_mpic_domain;
 #ifdef CONFIG_PCI_MSI
 static struct irq_domain *armada_370_xp_msi_domain;
@@ -643,21 +641,3 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
 }
 
 IRQCHIP_DECLARE(armada_370_xp_mpic, "marvell,mpic", armada_370_xp_mpic_of_init);
-
-#ifdef CONFIG_PM
-void armada_370_xp_mpic_suspend(void)
-{
-	int hwirq;
-
-	for (hwirq = 0; hwirq < ARMADA_370_XP_MAX_HW_IRQS; hwirq++)
-		mpic_save[hwirq] = readl_relaxed(main_int_base + ARMADA_370_XP_INT_SOURCE_CTL(hwirq));
-}
-
-void armada_370_xp_mpic_resume(void)
-{
-	int hwirq;
-
-	for (hwirq = 0; hwirq < ARMADA_370_XP_MAX_HW_IRQS; hwirq++)
-		writel_relaxed(mpic_save[hwirq], main_int_base + ARMADA_370_XP_INT_SOURCE_CTL(hwirq));
-}
-#endif
