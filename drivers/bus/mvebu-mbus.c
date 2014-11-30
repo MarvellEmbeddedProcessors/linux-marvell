@@ -101,9 +101,6 @@
 
 #define DOVE_DDR_BASE_CS_OFF(n) ((n) << 4)
 
-#define WIN_REGS_SAVE_NUM	64
-
-static u32 mbus_save[WIN_REGS_SAVE_NUM];
 struct mvebu_mbus_state;
 
 struct mvebu_mbus_soc_data {
@@ -768,17 +765,6 @@ void mvebu_mbus_get_pcie_io_aperture(struct resource *res)
 	*res = mbus_state.pcie_io_aperture;
 }
 
-void mvebu_mbus_get_sdram_window(int win, u32 *base, u32 *size)
-{
-	struct mvebu_mbus_state *mbus = &mbus_state;
-
-	if (!mbus->sdramwins_base)
-		return;
-
-	*base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(win));
-	*size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(win));
-}
-
 int mvebu_mbus_get_addr_win_info(phys_addr_t phyaddr, u8 *trg_id, u8 *attr)
 {
 	const struct mbus_dram_target_info *dram;
@@ -1175,21 +1161,4 @@ void mbus_debug_window()
 
 }
 #endif /* MBUS_DEBUG */
-#ifdef CONFIG_PM
-void mvebu_mbus_suspend(void)
-{
-	int reg;
-
-	for (reg = 0; reg < WIN_REGS_SAVE_NUM; reg++)
-		mbus_save[reg] = readl_relaxed(mbus_state.mbuswins_base + reg * 0x4);
-}
-
-void mvebu_mbus_resume(void)
-{
-	int reg;
-
-	for (reg = 0; reg < WIN_REGS_SAVE_NUM; reg++)
-		writel_relaxed(mbus_save[reg], mbus_state.mbuswins_base + reg * 0x4);
-}
-#endif
 #endif

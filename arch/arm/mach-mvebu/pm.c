@@ -34,8 +34,6 @@ static struct of_device_id of_pm_table[] = {
 extern void armada_380_scu_enable(void);
 extern void armada_38x_cpu_mem_resume(void);
 extern void armada_380_resume(void);
-extern void mvebu_mbus_suspend(void);
-extern void mvebu_mbus_resume(void);
 extern int armada_38x_cpuidle_init(void);
 extern void mvebu_pcie_suspend(void);
 extern void mvebu_pcie_resume(void);
@@ -53,7 +51,6 @@ extern void mvebu_pcie_resume(void);
 #define SDRAM_WIN_CTRL_REG(x)	(0x20184 + (0x8*x))
 #define MAX_CS_COUNT		4
 
-extern void mvebu_mbus_get_sdram_window(int win, u32 *base, u32 *size);
 void armada_store_boot_info(void)
 {
 	int *store_addr = (int *)BOOT_INFO_ADDR;
@@ -76,7 +73,7 @@ void armada_store_boot_info(void)
 
 	/* Save AXI windows data */
 	for (win = 0; win < 4; win++) {
-		mvebu_mbus_get_sdram_window(win, &base, &size);
+/*		mvebu_mbus_get_sdram_window(win, &base, &size); */
 
 		writel(BOOTROM_INTER_REGS_PHYS_BASE + SDRAM_WIN_BASE_REG(win), store_addr++);
 		writel(base, store_addr++);
@@ -115,15 +112,12 @@ static int mvebu_pm_enter(suspend_state_t state)
 	armada_store_boot_info();
 
 	mvebu_pcie_suspend();
-	mvebu_mbus_suspend();
 
 	cpu_suspend(0, mvebu_powerdown);
 
 	pr_info("Restoring Armada 38x\n");
 
 	armada_380_scu_enable();
-
-	mvebu_mbus_resume();
 
 	mvebu_pcie_resume();
 
