@@ -31,12 +31,6 @@ config NET_SKB_RECYCLE
 	the allocator to make a fastpath for very skb consuming network
 	applications.
 
-config NET_SKB_RECYCLE_DEF
-	depends on NET_SKB_RECYCLE
-	int "Default value for SKB recycle:  0 - disable, 1 - enable"
-	default 1
-	---help---
-
 endmenu
 
 menu "Marvell Network PON Support"
