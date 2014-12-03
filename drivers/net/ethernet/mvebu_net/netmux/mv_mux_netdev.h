@@ -47,6 +47,9 @@ disclaimer.
 #define MV_MUX_SKB_TAG_SET(skb)		(skb->skb_iif = (MV_MUX_SKB_TAG_VAL))
 #define MV_MUX_SKB_IS_TAGGED(skb)	(skb->skb_iif == (MV_MUX_SKB_TAG_VAL))
 #endif
+/*MV_MUX_UNKNOWN_GROUP is usedfor sysfs creating mux device.*/
+/*e.g. when switch is in HGU mode, then mux device is created in -1 group*/
+#define MV_MUX_UNKNOWN_GROUP		(-1)
 
 extern const struct ethtool_ops mv_mux_tool_ops;
 
