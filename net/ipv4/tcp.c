@@ -1648,23 +1648,8 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	do {
 		u32 offset;
 
-		if (flags & MSG_NOCATCHSIG) {
-			if (signal_pending(current)) {
-				if (sigismember(&current->pending.signal, SIGQUIT) ||
-				    sigismember(&current->pending.signal, SIGABRT) ||
-				    sigismember(&current->pending.signal, SIGKILL) ||
-				    sigismember(&current->pending.signal, SIGTERM) ||
-				    sigismember(&current->pending.signal, SIGSTOP)) {
-
-					if (copied)
-						break;
-					copied = timeo ? sock_intr_errno(timeo) : -EAGAIN;
-					break;
-				}
-			}
-		}
 		/* Are we at urgent data? Stop if we have read anything or have SIGURG pending. */
-		else if (tp->urg_data && tp->urg_seq == *seq) {
+		if (tp->urg_data && tp->urg_seq == *seq) {
 			if (copied)
 				break;
 			if (signal_pending(current)) {

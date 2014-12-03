@@ -19,6 +19,7 @@
  */
 #include <linux/fs.h>
 #include <linux/file.h>
+#include <linux/fsnotify.h>
 #include <linux/pagemap.h>
 #include <linux/splice.h>
 #include <linux/memcontrol.h>
@@ -35,10 +36,6 @@
 #include <linux/net.h>
 #include <net/sock.h>
 #include "internal.h"
-
-struct common_mempool;
-static struct common_mempool/*struct gen_pool*/ * rcv_pool = NULL;
-static struct common_mempool/*struct gen_pool*/ * kvec_pool = NULL;
 
 /*
  * Attempt to steal a page from a pipe buffer. This should perhaps go into
@@ -1417,413 +1414,162 @@ static long do_splice(struct file *in, loff_t __user *off_in,
 	return -EINVAL;
 }
 
-/****************************** POOL MANAGER *************************************/
-/* Forward declarations */
-typedef struct common_mempool common_mempool_t;
-void* common_mempool_alloc(common_mempool_t* pool);
-void common_mempool_free(common_mempool_t* pool, void* mem);
-common_mempool_t* common_mempool_get(void* mem);
-common_mempool_t*  common_mempool_create(uint32_t number_of_entries, uint32_t entry_size);
-void  common_mempool_destroy(common_mempool_t* pool);
-int32_t common_mempool_get_number_of_free_entries(common_mempool_t* pool);
-int32_t common_mempool_get_number_of_entries(common_mempool_t* pool);
-int32_t common_mempool_get_entry_size(common_mempool_t* pool);
-
-/* Implementation */
-#define COMMON_MPOOL_HDR_FLAGS_ALLOCATED 0x00000001
-#define COMMON_MPOOL_HDR_MAGIC           0xa5a5a508
-#define COMMON_MPOOL_FTR_MAGIC           0xa5a5a509
-#define COMMON_MPOOL_ALIGN4(size) ((size)+4) & 0xFFFFFFFC;
-#define COMMON_MPOOL_CHECK_ALIGNED4(ptr) ((((uint32_t)(ptr)) & 0x00000003) == 0)
-#define MAX_PAGES_PER_RECVFILE		64
-
-typedef struct common_mpool_hdr
-{
-  struct common_mpool_hdr* next;
-  common_mempool_t*        pool;
-  uint32_t flags;
-  uint32_t magic;
-} common_mpool_hdr_t;
-
-typedef struct
-{
-	uint32_t magic;
-	common_mempool_t* pool;
-} common_mpool_ftr_t;
-
-struct common_mempool
-{
-	common_mpool_hdr_t*  head;
-	common_mpool_hdr_t*  tail;
-	uint32_t		number_of_free_entries;
-	spinlock_t		lock;
-	uint32_t                 data_size; /* size of data section in pool entry */
-	uint32_t                 pool_entry_size; /* size of pool entry */
-	/* parameters passed on init */
-	uint32_t                 number_of_entries;
-	uint32_t                 entry_size;
-	uint8_t*                 mem;
-};
-
-bool common_mempool_check_internal(common_mempool_t * pool,
-					void * ptr,
-					common_mpool_hdr_t * hdr,
-					common_mpool_ftr_t * ftr)
-{
-	if (!ptr) {
-		printk(KERN_ERR "illegal ptr NULL");
-		return false;
-	}
-
-	if (!COMMON_MPOOL_CHECK_ALIGNED4(ptr)) {
-		printk(KERN_ERR "ptr not aligned %p",ptr);
-		return false;
-	}
-
-	if (hdr->magic != COMMON_MPOOL_HDR_MAGIC) {
-		printk(KERN_ERR "illegal hdr magic %x for ptr %p",hdr->magic,ptr);
-		return false;
-	}
-
-	if (ftr->magic != COMMON_MPOOL_FTR_MAGIC) {
-		printk(KERN_ERR "illegal ftr magic %x for ptr %p",ftr->magic,ptr);
-		return false;
-	}
-
-	if (hdr->pool != pool || ftr->pool != pool) {
-		printk(KERN_ERR "inconsistent size hdr->pool: %p ftr->pool: %p for ptr %p",hdr->pool,ftr->pool,ptr);
-		return false;
-	}
-
-	if (!(hdr->flags & COMMON_MPOOL_HDR_FLAGS_ALLOCATED)) {
-		printk(KERN_ERR "ptr %p was not allocated",ptr);
-		return false;
-	}
-	return true;
-}
-
-void* common_mempool_alloc(common_mempool_t* pool)
-{
-	common_mpool_hdr_t* hdr;
-
-	if (!pool || !pool->head || pool->number_of_free_entries == 0) {
-		return NULL;
-	}
-	spin_lock_bh(&pool->lock);
-	hdr = pool->head;
-	pool->head = pool->head->next;
-
-	if (!pool->head) {
-		pool->tail = NULL;
-	}
-
-	hdr->flags = COMMON_MPOOL_HDR_FLAGS_ALLOCATED;
-	pool->number_of_free_entries--;
-	spin_unlock_bh(&pool->lock);
-	return ((uint8_t*)hdr+sizeof(common_mpool_hdr_t));
-}
-
-void common_mempool_free(common_mempool_t* pool, void* ptr)
-{
-	common_mpool_hdr_t* hdr;
-	common_mpool_ftr_t* ftr;
-
-	if (!pool || !ptr) {
-		return;
-	}
-	if (!COMMON_MPOOL_CHECK_ALIGNED4(ptr)) {
-		printk(KERN_ERR "ptr not aligned %p",ptr);
-		return;
-	}
-	spin_lock_bh(&pool->lock);
-	hdr = (common_mpool_hdr_t*)((uint8_t*)ptr-sizeof(common_mpool_hdr_t));
-	ftr = (common_mpool_ftr_t*)((uint8_t*)ptr+pool->data_size);
-
-	if (!common_mempool_check_internal(pool,ptr,hdr,ftr)) {
-		printk(KERN_ERR "invalid ptr %p",ptr);
-		spin_unlock_bh(&pool->lock);
-		return;
-	}
-
-	hdr->flags ^= COMMON_MPOOL_HDR_FLAGS_ALLOCATED;
-	hdr->next = NULL;
-
-	if (!pool->head) {
-		pool->head = pool->tail = hdr;
-	} else {
-		pool->tail->next = hdr;
-		pool->tail = hdr;
-	}
-
-	pool->number_of_free_entries++;
-	spin_unlock_bh(&pool->lock);
-}
-
-common_mempool_t*  common_mempool_create(uint32_t number_of_entries,
-						uint32_t entry_size)
-{
-	uint32_t i;
-	uint32_t aligned_entry_size;
-	uint32_t pool_entry_size;
-	common_mpool_hdr_t* hdr;
-	common_mpool_hdr_t* next_hdr;
-	common_mpool_ftr_t* ftr;
-	common_mempool_t* pool;
-
-	aligned_entry_size = COMMON_MPOOL_ALIGN4(entry_size);
-	pool_entry_size = COMMON_MPOOL_ALIGN4(sizeof(common_mpool_hdr_t) +
-					aligned_entry_size +
-					sizeof(common_mpool_ftr_t));
-
-	pool = kmalloc((sizeof(common_mempool_t) + pool_entry_size*number_of_entries), GFP_ATOMIC);
-
-	if (!pool) {
-		return NULL;
-	}
-
-	pool->entry_size = entry_size;
-	pool->number_of_entries = number_of_entries;
-	pool->data_size  = aligned_entry_size;
-	pool->pool_entry_size = pool_entry_size;
-	pool->number_of_free_entries = number_of_entries;
-	pool->mem = (uint8_t*)(pool+1);
-	pool->head = (common_mpool_hdr_t*)pool->mem;
-	spin_lock_init(&pool->lock);
-
-	for (i=0;i<number_of_entries;i++) {
-		hdr = (common_mpool_hdr_t*)&pool->mem[pool_entry_size*i];
-		ftr = (common_mpool_ftr_t*)((uint8_t*)hdr+sizeof(common_mpool_hdr_t)+aligned_entry_size);
-		hdr->magic = COMMON_MPOOL_HDR_MAGIC;
-		hdr->pool = pool;
-		hdr->flags = 0;
-		ftr->magic = COMMON_MPOOL_FTR_MAGIC;
-		ftr->pool = pool;
-
-		if (i < (number_of_entries-1)) {
-			next_hdr = (common_mpool_hdr_t*)&pool->mem[pool_entry_size*(i+1)];
-		} else {
-			pool->tail = hdr;
-			next_hdr = NULL;
-		}
-
-		hdr->next = next_hdr;
-	}
-	return pool;
-}
-
-void  common_mempool_destroy(common_mempool_t* pool)
-{
-	if (!pool) {
-		return;
-	}
-
-	kfree(pool);
-}
-
-int32_t common_mempool_get_number_of_free_entries(common_mempool_t* pool)
-{
-	if (!pool) {
-		return -1;
-	}
-
-	return (int32_t)pool->number_of_free_entries;
-}
-
-int32_t common_mempool_get_number_of_entries(common_mempool_t* pool)
-{
-	if (!pool) {
-		return -1;
-	}
-	return (int32_t)pool->number_of_entries;
-}
-
-int32_t common_mempool_get_entry_size(common_mempool_t* pool)
-{
-	if (!pool) {
-		return -1;
-	}
-	return (int32_t)pool->entry_size;
-}
-
-common_mempool_t* common_mempool_get(void* ptr)
-{
-	common_mpool_hdr_t* hdr;
-	common_mpool_ftr_t* ftr;
-
-	if (!ptr) {
-		return NULL;
-	}
-	if (!COMMON_MPOOL_CHECK_ALIGNED4(ptr)) {
-		return NULL;
-	}
-	hdr = (common_mpool_hdr_t*)((uint8_t*)ptr-sizeof(common_mpool_hdr_t));
-	ftr = (common_mpool_ftr_t*)((uint8_t*)ptr + hdr->pool->data_size);
-
-	if (hdr->magic != COMMON_MPOOL_HDR_MAGIC) {
-		printk(KERN_ERR "illegal hdr magic %x for ptr %p",hdr->magic,ptr);
-		return NULL;
-	}
-	if (ftr->magic != COMMON_MPOOL_FTR_MAGIC) {
-		printk(KERN_ERR "illegal ftr magic %x for ptr %p",ftr->magic,ptr);
-		return NULL;
-	}
-	if (hdr->pool != ftr->pool || !hdr->pool) {
-		printk(KERN_ERR "inconsistent size hdr->pool: %p ftr->pool: %p for ptr %p",hdr->pool,ftr->pool,ptr);
-		return false;
-	}
-	return hdr->pool;
-}
-/****************************** POOL MANAGER *************************************/
-
 ssize_t generic_splice_from_socket(struct file *file, struct socket *sock,
-				     loff_t __user *ppos, size_t count)
+				   loff_t __user *ppos, size_t count_req)
 {
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
-	loff_t pos;
-	int count_tmp;
-	int err = 0;
-	int i = 0;
-	int nr_pages = 0;
-	int page_cnt_est= count/PAGE_SIZE + 1;
-	struct recvfile_ctl_blk *rv_cb = NULL;
-	struct kvec *iov = NULL;
-	struct msghdr msg;
-	long rcvtimeo;
-	int ret;
+	loff_t pos, pos_tmp;
+	int ret, i = 0, nr_pages;
+	struct recvfile_ctl_blk *rv_cb;
+	struct kvec *iov;
+	struct msghdr msg = { 0 };
+	bool append = true;
+	int remaining, krecvmsg_sz;
+	size_t written = 0, verified_sz,
+		pg_cache_sz, pg_cache_end_sz;
 
-	if (copy_from_user(&pos, ppos, sizeof(loff_t)))
-		return -EFAULT;
-
-	if (count > MAX_PAGES_PER_RECVFILE * PAGE_SIZE) {
-		printk("%s: count(%u) exceeds maxinum\n", __func__, count);
-		return -EINVAL;
+	if (copy_from_user(&pos, ppos, sizeof(loff_t))) {
+		ret = -EFAULT;
+		goto err;
 	}
-	mutex_lock(&inode->i_mutex);
 
-	/*
-	 * TODO: Convert to sb_{start/end}_write et. al.
-	 *
-	 * vfs_check_frozen(inode->i_sb, SB_FREEZE_WRITE);
-	 */
-	sb_start_pagefault(inode->i_sb);
+	ret = rw_verify_area(WRITE, file, &file->f_pos, count_req);
+	if (ret < 0)
+		goto err;
 
-	/* We can write back this queue in page reclaim */
+	verified_sz = ret;
+
+	nr_pages = (((pos & ~PAGE_CACHE_MASK) + count_req + ~PAGE_CACHE_MASK) >> PAGE_CACHE_SHIFT);
+	rv_cb = kzalloc(nr_pages * sizeof(struct recvfile_ctl_blk), GFP_KERNEL);
+	if (unlikely(!rv_cb)) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	iov = kzalloc(nr_pages * sizeof(struct kvec), GFP_KERNEL);
+	if (unlikely(!iov)) {
+		kfree(rv_cb);
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	sb_start_intwrite(inode->i_sb);
+
+	/* We can write back this queue in page reclaim. */
 	current->backing_dev_info = mapping->backing_dev_info;
 
-	err = generic_write_checks(file, &pos, &count, S_ISBLK(inode->i_mode));
-	if (err != 0 || count == 0)
-		goto done;
+	mutex_lock(&inode->i_mutex);
 
-	file_remove_suid(file);
-	file_update_time(file);
-
-	if (unlikely(!rcv_pool || !kvec_pool))
-		goto done;
-
-	rv_cb = (struct recvfile_ctl_blk *)common_mempool_alloc(rcv_pool);
-	iov = (struct kvec *)common_mempool_alloc(kvec_pool);
-
-	if (!rv_cb || !iov) {
-		printk(KERN_ERR "Failed to get pool mem for %d pages (rv_cb %p iov %p)\n", page_cnt_est, rv_cb, iov);
-		goto done;
-	}
-
-	count_tmp = count;
-	do {
-		unsigned long bytes;	/* Bytes to write to page */
-		unsigned long offset;	/* Offset into pagecache page */
-		struct page *pageP;
-		void *fsdata;
-
-		offset = (pos & (PAGE_CACHE_SIZE - 1));
-		bytes = PAGE_CACHE_SIZE - offset;
-		if (bytes > count_tmp)
-			bytes = count_tmp;
-		ret = mapping->a_ops->write_begin(file, mapping, pos, bytes,
-						  AOP_FLAG_UNINTERRUPTIBLE,
-						  &pageP, &fsdata);
-
-		if (unlikely(ret)) {
-			err = ret;
-			goto cleanup;
-		}
-
-		rv_cb[nr_pages].rv_page = pageP;
-		rv_cb[nr_pages].rv_pos = pos;
-		rv_cb[nr_pages].rv_count = bytes;
-		rv_cb[nr_pages].rv_fsdata = fsdata;
-		iov[nr_pages].iov_base = kmap(pageP) + offset;
-		iov[nr_pages].iov_len = bytes;
-		nr_pages++;
-		count_tmp -= bytes;
-		pos += bytes;
-	} while (count_tmp);
-
-	/* IOV is ready, receive the date from socket now */
-	msg.msg_name = NULL;
-	msg.msg_namelen = 0;
-	msg.msg_iov = (struct iovec *)&iov[0];
-	msg.msg_iovlen = nr_pages ;
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-	msg.msg_flags = MSG_KERNSPACE;
-	rcvtimeo = sock->sk->sk_rcvtimeo;
-	sock->sk->sk_rcvtimeo = 8 * HZ;
-
-	ret = kernel_recvmsg(sock, &msg, &iov[0], nr_pages, count,
-			     MSG_WAITALL | MSG_NOCATCHSIG);
-
-	sock->sk->sk_rcvtimeo = rcvtimeo;
-	if(ret != count)
-		err = -EPIPE;
-	else
-		err = 0;
-
-	if (unlikely(err < 0)) {
+	ret = generic_write_checks(file, &pos, &verified_sz, S_ISBLK(inode->i_mode));
+	if (ret < 0) {
+		pr_info("%s: generic_write_checks err, ret=%d:\n", __func__, ret);
 		goto cleanup;
 	}
 
-	for(i=0,count=0;i < nr_pages;i++) {
-		kunmap(rv_cb[i].rv_page);
-		ret = mapping->a_ops->write_end(file, mapping,
-						rv_cb[i].rv_pos,
-						rv_cb[i].rv_count,
-						rv_cb[i].rv_count,
-						rv_cb[i].rv_page,
-						rv_cb[i].rv_fsdata);
-		if (unlikely(ret < 0))
-			printk("%s: write_end fail,ret = %d\n", __func__, ret);
-		count += rv_cb[i].rv_count;
+	ret = file_remove_suid(file);
+	if (ret) {
+		pr_info("%s: file_remove_suid err, ret=%d:\n", __func__, ret);
+		goto cleanup;
 	}
-	balance_dirty_pages_ratelimited(mapping);
-	if (copy_to_user(ppos, &pos, sizeof(loff_t)))
-		err = -EFAULT;
-done:
-	sb_end_pagefault(inode->i_sb);
-	current->backing_dev_info = NULL;
-	common_mempool_free(rcv_pool, (void*)rv_cb);
-	common_mempool_free(kvec_pool, (void*)iov);
 
-	mutex_unlock(&inode->i_mutex);
-	return err ? err : count;
+	ret = file_update_time(file);
+	if (ret) {
+		pr_info("%s: file_update_time err, ret=%d:\n", __func__, ret);
+		goto cleanup;
+	}
+
+	pg_cache_sz = 0;
+	remaining = verified_sz;
+	pos_tmp = pos;
+	for (i = 0; i < nr_pages; i++) {
+		pgoff_t offset = pos_tmp & (PAGE_CACHE_SIZE - 1);
+		unsigned len = min_t(unsigned int, PAGE_CACHE_SIZE - offset, remaining);
+		struct page *page;
+		void *fsdata;
+
+		ret = pagecache_write_begin(file, mapping, pos_tmp, len,
+					    AOP_FLAG_UNINTERRUPTIBLE,
+					    &page, &fsdata);
+
+		if (unlikely(ret)) {
+			pr_info("pagecache_write_begin err. ret %d:\n", ret);
+			break;
+		}
+
+		rv_cb[i].rv_page = page;
+		rv_cb[i].rv_pos = pos_tmp;
+		rv_cb[i].rv_count = len;
+		rv_cb[i].rv_fsdata = fsdata;
+		iov[i].iov_base = kmap(page) + offset;
+		iov[i].iov_len = len;
+		remaining -= len;
+		pos_tmp += len;
+		pg_cache_sz += len;
+
+		if (i_size_read(inode) < pos_tmp)
+			i_size_write(inode, pos_tmp);
+	}
+
+	nr_pages = i;
+
+	/* failed to get page cache */
+	if (unlikely(pg_cache_sz == 0))
+		goto cleanup;
+
+	if (pos + pg_cache_sz < i_size_read(inode))
+		append = false;
+
+	/* IOV is ready, receive the data from socket now */
+	krecvmsg_sz = kernel_recvmsg(sock, &msg, iov, nr_pages, pg_cache_sz, MSG_WAITALL);
+
+	/* socket data is ready, write page cache */
+	for (i = 0, pg_cache_end_sz = 0; i < nr_pages; i++) {
+		unsigned to_copy = min_t(unsigned int, rv_cb[i].rv_count, pg_cache_sz - pg_cache_end_sz);
+
+		kunmap(rv_cb[i].rv_page);
+		ret = pagecache_write_end(file, mapping,
+					  rv_cb[i].rv_pos,
+					  rv_cb[i].rv_count,
+					  to_copy,
+					  rv_cb[i].rv_page,
+					  rv_cb[i].rv_fsdata);
+		if (unlikely(ret < 0)) {
+			pr_info("%s: pagecache_write_end fail,ret = %d\n", __func__, ret);
+			break;
+		}
+		BUG_ON(ret != rv_cb[i].rv_count);
+		pg_cache_end_sz += ret;
+	}
+
+	/* update the actual bytes written */
+	if (likely(krecvmsg_sz > 0))
+		/* use the least byte size */
+		written = min_t(size_t, pg_cache_end_sz, krecvmsg_sz);
+
+	if (likely(written > 0)) {
+		balance_dirty_pages_ratelimited(mapping);
+		pos += written;
+		fsnotify_modify(file);
+
+		if (unlikely((count_req != written) && append))
+			truncate_setsize(inode, pos);
+
+		if (copy_to_user(ppos, &pos, sizeof(loff_t))) {
+			written = 0;
+			ret = -EFAULT;
+		}
+	}
 cleanup:
-	for(i = 0; i < nr_pages; i++) {
-		kunmap(rv_cb[i].rv_page);
-		ret = mapping->a_ops->write_end(file, mapping,
-						rv_cb[i].rv_pos,
-						rv_cb[i].rv_count,
-						0,
-						rv_cb[i].rv_page,
-						rv_cb[i].rv_fsdata);
-	}
-	sb_end_pagefault(inode->i_sb);
-	current->backing_dev_info = NULL;
-	common_mempool_free(rcv_pool, (void*)rv_cb);
-	common_mempool_free(kvec_pool, (void*)iov);
-
 	mutex_unlock(&inode->i_mutex);
-	return err ? err : count;
+	sb_end_intwrite(inode->i_sb);
+	current->backing_dev_info = NULL;
+
+	kfree(iov);
+	kfree(rv_cb);
+
+err:
+	return written ? written : ret;
 }
 
 /*
@@ -2527,22 +2273,3 @@ SYSCALL_DEFINE4(tee, int, fdin, int, fdout, size_t, len, unsigned int, flags)
 	return error;
 }
 
-static int __init init_splice_pools(void)
-{
-	unsigned int rcv_pool_size= sizeof(struct recvfile_ctl_blk) * MAX_PAGES_PER_RECVFILE;
-	unsigned int kve_pool_size= sizeof(struct kvec) * MAX_PAGES_PER_RECVFILE;
-
-	rcv_pool =  common_mempool_create((8 * num_possible_cpus()), rcv_pool_size);
-	kvec_pool = common_mempool_create((8 * num_possible_cpus()), kve_pool_size);
-	if (!rcv_pool || !kvec_pool)
-	{
-		return -ENOMEM;
-	}
-/*
-	printk(KERN_ERR "%s rcv %p (sz:%d) kvec %p (sz:%d) per %d core\n",
-		__FUNCTION__, rcv_pool, rcv_pool_size, kvec_pool, kve_pool_size, num_possible_cpus());
-*/
-	return 0;
-}
-
-fs_initcall(init_splice_pools);
