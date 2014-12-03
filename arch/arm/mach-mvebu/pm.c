@@ -32,6 +32,8 @@
 #define SDRAM_DLB_EVICTION_OFFS            0x30c
 #define  SDRAM_DLB_EVICTION_THRESHOLD_MASK 0xff
 
+extern void armada_38x_cpu_mem_resume(void);
+
 static void (*mvebu_board_pm_enter)(void __iomem *sdram_reg, u32 srcmd);
 static void __iomem *sdram_ctrl;
 
@@ -111,7 +113,9 @@ static void mvebu_pm_store_bootinfo(void)
 	phys_addr_t resume_pc;
 
 	store_addr = phys_to_virt(BOOT_INFO_ADDR);
-	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
+	/* TBD - Fix support for Armada XP */
+	/* resume_pc = virt_to_phys(armada_370_xp_cpu_resume); */
+	resume_pc = virt_to_phys(armada_38x_cpu_mem_resume);
 
 	/*
 	 * The bootloader expects the first two words to be a magic
@@ -138,8 +142,12 @@ static void mvebu_pm_store_bootinfo(void)
 	 * Set the internal register base address to the value
 	 * expected by Linux, as read from the Device Tree.
 	 */
-	writel(MBUS_INTERNAL_REG_ADDRESS, store_addr++);
+	/* TBD - Fix support for Armada XP */
+	/* Skip this part for now for Armada 38x - will be done in Linux resume function */
+#if 0
+	writel(MBUS_INTERNAL_REG_ADDRESS, store_addr++); */
 	writel(mvebu_internal_reg_base(), store_addr++);
+#endif
 
 	/*
 	 * Ask the mvebu-mbus driver to store the SDRAM window
@@ -159,6 +167,10 @@ static int mvebu_pm_enter(suspend_state_t state)
 	cpu_pm_enter();
 
 	mvebu_pm_store_bootinfo();
+
+	outer_flush_all();
+	outer_disable();
+
 	cpu_suspend(0, mvebu_pm_powerdown);
 
 	outer_resume();
@@ -182,7 +194,8 @@ int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
 	struct device_node *np;
 	struct resource res;
 
-	if (!of_machine_is_compatible("marvell,armadaxp"))
+	if (!of_machine_is_compatible("marvell,armadaxp") &&
+		!of_machine_is_compatible("marvell,armada38x"))
 		return -ENODEV;
 
 	np = of_find_compatible_node(NULL, NULL,

@@ -266,7 +266,7 @@
 
 			mbusc: mbus-controller@20000 {
 				compatible = "marvell,mbus-controller";
-				reg = <0x20000 0x100>, <0x20180 0x20>;
+				reg = <0x20000 0x100>, <0x20180 0x20>, <0x20250 0x8>;
 			};
 
 			mpic: interrupt-controller@20000 {
@@ -289,9 +289,9 @@
 				reg = <0x22000 0x1000>;
 			};
 
-			pm {
-				compatible = "marvell,armada-380-pm";
-				reg = <0x1400 0x310>, <0x18000 0x200>;
+			sdramc@1400 {
+				compatible = "marvell,armada-xp-sdram-controller";
+				reg = <0x1400 0x500>;
 			};
 
 			rtc@a3800 {
