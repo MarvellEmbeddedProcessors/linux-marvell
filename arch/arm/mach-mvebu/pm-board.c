@@ -22,7 +22,8 @@
 
 #define ARMADA_XP_GP_PIC_NR_GPIOS 3
 
-static void __iomem *gpio_ctrl;
+static void __iomem *gpio_ctrl[ARMADA_XP_GP_PIC_NR_GPIOS];
+static void __iomem *gpio_ctrl_addr[ARMADA_XP_GP_PIC_NR_GPIOS];
 static int pic_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
 static int pic_raw_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
 static int pic_gpios_num;
@@ -33,16 +34,21 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
 	int i;
 
 	/* Put 001 as value on the GPIOs */
-	reg = readl(gpio_ctrl);
-	for (i = 0; i < pic_gpios_num; i++)
+	for (i = 0; i < pic_gpios_num; i++) {
+		reg = readl(gpio_ctrl[i]);
 		reg &= ~BIT(pic_raw_gpios[i]);
-	reg |= BIT(pic_raw_gpios[0]);
-	writel(reg, gpio_ctrl);
+		if (i == 0)
+			reg |= BIT(pic_raw_gpios[0]);
+		writel(reg, gpio_ctrl[i]);
+	}
 
 	/* Prepare writing 111 to the GPIOs */
-	ackcmd = readl(gpio_ctrl);
-	for (i = 0; i < pic_gpios_num; i++)
-		ackcmd |= BIT(pic_raw_gpios[i]);
+	/* This code assumes that the ack bits (#1 and possibly #2) belong to the same GPIO group */
+	ackcmd = readl(gpio_ctrl[pic_gpios_num-1]);
+	for (i = 0; i < pic_gpios_num; i++) {
+		if (gpio_ctrl[i] == gpio_ctrl[pic_gpios_num-1])
+			ackcmd |= BIT(pic_raw_gpios[i]);
+	}
 
 	/*
 	 * Wait a while, the PIC needs quite a bit of time between the
@@ -71,7 +77,7 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
 		/* Trap the processor */
 		"b .\n\t"
 		: : [srcmd] "r" (srcmd), [sdram_reg] "r" (sdram_reg),
-		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
+		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl[pic_gpios_num-1]) : "r1");
 }
 
 static int mvebu_armada_xp_gp_pm_init(void)
@@ -81,7 +87,7 @@ static int mvebu_armada_xp_gp_pm_init(void)
 	int ret = 0, i;
 
 	if (!of_machine_is_compatible("marvell,axp-gp") &&
-		!of_machine_is_compatible("marvell,a388-db-gp"))
+		!of_machine_is_compatible("marvell,a388-db-gp"));
 		return -ENODEV;
 
 	np = of_find_node_by_name(NULL, "pm_pic");
@@ -131,11 +137,18 @@ static int mvebu_armada_xp_gp_pm_init(void)
 
 		gpio_ctrl_np = args.np;
 		pic_raw_gpios[i] = args.args[0];
-	}
+		gpio_ctrl_addr[i] = of_get_address(gpio_ctrl_np, 0, NULL, NULL);
 
-	gpio_ctrl = of_iomap(gpio_ctrl_np, 0);
-	if (!gpio_ctrl)
-		return -ENOMEM;
+		if ((i == 0) || (i > 0 && gpio_ctrl_addr[i] != gpio_ctrl_addr[i-1]))
+			gpio_ctrl[i] = of_iomap(gpio_ctrl_np, 0);
+		else
+			gpio_ctrl[i] = gpio_ctrl[i-1];
+
+		if (!gpio_ctrl[i]) {
+			ret = -ENOMEM;
+			goto out;
+		}
+	}
 
 	mvebu_pm_init(mvebu_armada_xp_gp_pm_enter);
 
