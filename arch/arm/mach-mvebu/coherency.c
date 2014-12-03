@@ -29,7 +29,8 @@
 #include <asm/cacheflush.h>
 #include "armada-370-xp.h"
 
-
+extern void armada_380_scu_enable(void);
+static int coherency_type(void);
 unsigned long coherency_phys_base;
 void __iomem *coherency_base;
 static void __iomem *coherency_cpu_base;
@@ -70,14 +71,20 @@ void ll_add_cpu_to_smp_group(void);
 
 int set_cpu_coherent(void)
 {
-	if (!coherency_base) {
-		pr_warn("Can't make current CPU cache coherent.\n");
-		pr_warn("Coherency fabric is not initialized\n");
-		return 1;
-	}
+	int type = coherency_type();
 
-	ll_add_cpu_to_smp_group();
-	return ll_enable_coherency();
+	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP) {
+		if (!coherency_base) {
+			pr_warn("Can't make current CPU cache coherent.\n");
+			pr_warn("Coherency fabric is not initialized\n");
+			return 1;
+		}
+		ll_add_cpu_to_smp_group();
+		return ll_enable_coherency();
+	} else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380)
+		armada_380_scu_enable();
+
+	return 0;
 }
 
 static inline void mvebu_hwcc_sync_io_barrier(void)
