@@ -488,8 +488,10 @@ int armada_38x_cpuidle_init(void)
 	/* Disable the L2 cache clean function as it is being used in the cpu_suspend
 	 * Flow and violates the PCIe deadlock WA.
 	 * We cannot disable this function in the L2 cache driver as it will break SMP boot */
+	/* TBD - Disable cpuidle outer cache WA as it affects Suspend to RAM */
+#if 0
 	outer_cache.clean_range = NULL;
-
+#endif
 	return 0;
 }
 
