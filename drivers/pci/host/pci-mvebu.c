@@ -805,6 +805,28 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
 	return -ENOENT;
 }
 
+static int mvebu_pcie_suspend(struct platform_device *pdev, pm_message_t message)
+{
+	int i;
+
+	for (i = 0; i < nports; i++)
+		mbus_pcie_save[i] = (readl(port_bak[i]->base + PCIE_STAT_OFF));
+
+	return 0;
+}
+
+static int mvebu_pcie_resume(struct platform_device *pdev)
+{
+	int i;
+
+	for (i = 0; i < nports; i++) {
+		writel_relaxed(mbus_pcie_save[i], port_bak[i]->base + PCIE_STAT_OFF);
+		mvebu_pcie_setup_hw(port_bak[i]);
+	}
+
+	return 0;
+}
+
 static int __init mvebu_pcie_probe(struct platform_device *pdev)
 {
 	struct mvebu_pcie *pcie;
@@ -959,6 +981,10 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
 MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
 
 static struct platform_driver mvebu_pcie_driver = {
+#ifdef CONFIG_PM
+	.suspend        = mvebu_pcie_suspend,
+	.resume         = mvebu_pcie_resume,
+#endif
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "mvebu-pcie",
@@ -974,26 +1000,6 @@ static int __init mvebu_pcie_init(void)
 }
 
 subsys_initcall(mvebu_pcie_init);
-
-#ifdef CONFIG_PM
-void mvebu_pcie_suspend(void)
-{
-	int i;
-
-	for (i = 0; i < nports; i++)
-		mbus_pcie_save[i] = (readl(port_bak[i]->base + PCIE_STAT_OFF));
-}
-
-void mvebu_pcie_resume(void)
-{
-	int i;
-
-	for (i = 0; i < nports; i++) {
-		writel_relaxed(mbus_pcie_save[i], port_bak[i]->base + PCIE_STAT_OFF);
-		mvebu_pcie_setup_hw(port_bak[i]);
-	}
-}
-#endif
 
 MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
 MODULE_DESCRIPTION("Marvell EBU PCIe driver");
