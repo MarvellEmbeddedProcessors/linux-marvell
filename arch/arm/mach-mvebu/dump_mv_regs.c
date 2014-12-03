@@ -139,6 +139,9 @@ static int proc_dump_cp15_read(struct seq_file *m, void *p)
 	asm volatile ("mrc p15, 0, %0, c10, c2, 1" : "=r" (value));
 	seq_printf(m, "Memory Attribute NMRR: 0x%08x\n", value);
 
+	asm volatile ("mrc p15, 0, %0, c15, c0, 0" : "=r" (value));
+	seq_printf(m, "Power Control Register: 0x%08x\n", value);
+
 	return 0;
 }
 
