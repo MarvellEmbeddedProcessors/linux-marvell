@@ -25,6 +25,7 @@
 static void __iomem *gpio_ctrl;
 static int pic_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
 static int pic_raw_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
+static int pic_gpios_num;
 
 static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
 {
@@ -33,14 +34,14 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
 
 	/* Put 001 as value on the GPIOs */
 	reg = readl(gpio_ctrl);
-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
+	for (i = 0; i < pic_gpios_num; i++)
 		reg &= ~BIT(pic_raw_gpios[i]);
 	reg |= BIT(pic_raw_gpios[0]);
 	writel(reg, gpio_ctrl);
 
 	/* Prepare writing 111 to the GPIOs */
 	ackcmd = readl(gpio_ctrl);
-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
+	for (i = 0; i < pic_gpios_num; i++)
 		ackcmd |= BIT(pic_raw_gpios[i]);
 
 	/*
@@ -86,7 +87,11 @@ static int mvebu_armada_xp_gp_pm_init(void)
 	if (!np)
 		return -ENODEV;
 
-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++) {
+	pic_gpios_num = of_gpio_named_count(np, "ctrl-gpios");
+	if (pic_gpios_num < 1)
+		return -ENODEV;
+
+	for (i = 0; i < pic_gpios_num; i++) {
 		char *name;
 		struct of_phandle_args args;
 
