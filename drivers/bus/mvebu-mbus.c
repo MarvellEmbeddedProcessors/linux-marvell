@@ -104,7 +104,9 @@
 
 /* Relative to mbusbridge_base */
 #define MBUS_BRIDGE_CTRL_OFF	0x0
+#define  MBUS_BRIDGE_SIZE_MASK  0xffff0000
 #define MBUS_BRIDGE_BASE_OFF	0x4
+#define  MBUS_BRIDGE_BASE_MASK  0xffff0000
 
 /* Maximum number of windows, for all known platforms */
 #define MBUS_WINS_MAX		20
@@ -585,36 +587,84 @@ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
 {
 	int i;
 	int cs;
+	struct mvebu_mbus_state *s = &mbus_state;
+	u32 mbus_bridge_base = 0, mbus_bridge_size = 0;
+	u64 mbus_bridge_end = 0;
+
+	if (s->mbusbridge_base) {
+		mbus_bridge_base =
+			(readl(s->mbusbridge_base + MBUS_BRIDGE_BASE_OFF) &
+			 MBUS_BRIDGE_BASE_MASK);
+		mbus_bridge_size =
+			(readl(s->mbusbridge_base + MBUS_BRIDGE_CTRL_OFF) |
+			 ~MBUS_BRIDGE_SIZE_MASK) + 1;
+		mbus_bridge_end = (u64)mbus_bridge_base + mbus_bridge_size;
+	}
 
 	mvebu_mbus_dram_info.mbus_dram_target_id = TARGET_DDR;
 
 	for (i = 0, cs = 0; i < 4; i++) {
-		u32 base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
-		u32 size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
+		u64 base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
+		u64 size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
+		u64 end;
+		struct mbus_dram_window *w;
 
-		dprintk("%s: base 0x%x, size 0x%x\n", __func__, base, size);
+		/* Ignore entries that are not enabled */
+		if (!(size & DDR_SIZE_ENABLED))
+			continue;
 
 		/*
-		 * We only take care of entries for which the chip
-		 * select is enabled, and that don't have high base
-		 * address bits set (devices can only access the first
-		 * 32 bits of the memory).
+		 * Ignore entries whose base address is above 2^32,
+		 * since devices cannot DMA to such high addresses
 		 */
-		if ((size & DDR_SIZE_ENABLED) &&
-		    !(base & DDR_BASE_CS_HIGH_MASK)) {
-			struct mbus_dram_window *w;
+		if (base & DDR_BASE_CS_HIGH_MASK)
+			continue;
 
-			w = &mvebu_mbus_dram_info.cs[cs++];
-			w->cs_index = i;
-			w->mbus_attr = 0xf & ~(1 << i);
-			if (mbus->hw_io_coherency)
-				w->mbus_attr |= ATTR_HW_COHERENCY;
-			w->base = base & DDR_BASE_CS_LOW_MASK;
-			w->size = (size | ~DDR_SIZE_MASK) + 1;
+		base = base & DDR_BASE_CS_LOW_MASK;
+		size = (size | ~DDR_SIZE_MASK) + 1;
+		end = base + size;
 
-			dprintk("%s win%d, w->base %x, w->size %x\n",
-			    __func__, i, w->base, w->size);
+		/*
+		 * Adjust base/size of the current CS to make sure it
+		 * doesn't overlap with the MBus bridge window. This
+		 * is particularly important for devices that do DMA
+		 * from DRAM to a SRAM mapped in a MBus window, such
+		 * as the CESA cryptographic engine.
+		 */
+
+		if (s->mbusbridge_base) {
+			/*
+			 * The CS is fully enclosed inside the MBus bridge
+			 * area, so ignore it.
+			 */
+			if (base >= mbus_bridge_base && end <= mbus_bridge_end)
+				continue;
+
+			/*
+			 * Beginning of CS overlaps with end of MBus, raise CS
+			 * base address, and shrink its size.
+			 */
+			if (base >= mbus_bridge_base && end > mbus_bridge_end) {
+				pr_info(" ==> 1\n");
+				size -= mbus_bridge_end - base;
+				base = mbus_bridge_end;
+			}
+
+			/*
+			 * End of CS overlaps with beginning of MBus, shrink
+			 * CS size.
+			 */
+			if (base < mbus_bridge_base && end > mbus_bridge_base)
+				size -= end - mbus_bridge_base;
 		}
+
+		w = &mvebu_mbus_dram_info.cs[cs++];
+		w->cs_index = i;
+		w->mbus_attr = 0xf & ~(1 << i);
+		if (mbus->hw_io_coherency)
+			w->mbus_attr |= ATTR_HW_COHERENCY;
+		w->base = base;
+		w->size = size;
 	}
 	mvebu_mbus_dram_info.num_cs = cs;
 }
