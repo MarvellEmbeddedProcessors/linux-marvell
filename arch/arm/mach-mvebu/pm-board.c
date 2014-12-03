@@ -87,7 +87,8 @@ static int mvebu_armada_xp_gp_pm_init(void)
 	int ret = 0, i;
 
 	if (!of_machine_is_compatible("marvell,axp-gp") &&
-		!of_machine_is_compatible("marvell,a388-db-gp"));
+		!of_machine_is_compatible("marvell,a388-db-gp") &&
+		!of_machine_is_compatible("marvell,a385-db-ap"))
 		return -ENODEV;
 
 	np = of_find_node_by_name(NULL, "pm_pic");

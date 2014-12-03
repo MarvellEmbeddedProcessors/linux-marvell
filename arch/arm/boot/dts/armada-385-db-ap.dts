@@ -12,6 +12,7 @@
  */
 
 /dts-v1/;
+#include <dt-bindings/gpio/gpio.h>
 #include "armada-385-388.dtsi"
 
 / {
@@ -123,6 +124,20 @@
 
 			crypto@9D000 {
 				status = "okay";
+			};
+
+			pm_pic {
+				pinctrl-0 = <&pic_pins>;
+				pinctrl-names = "default";
+				ctrl-gpios = <&gpio0 21 GPIO_ACTIVE_LOW>,
+					     <&gpio1 15 GPIO_ACTIVE_LOW>;
+			};
+
+			pinctrl {
+				pic_pins: pic-pins-0 {
+					marvell,pins = "mpp21", "mpp47";
+					marvell,function = "gpio";
+				};
 			};
 		};
 
