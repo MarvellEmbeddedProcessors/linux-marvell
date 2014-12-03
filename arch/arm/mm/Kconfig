@@ -862,6 +862,22 @@ config MIGHT_HAVE_CACHE_L2X0
 	  instead of this option, thus preventing the user from
 	  inadvertently configuring a broken kernel.
 
+config CPU_DYNAMIC_CLOCK_GATING_ENABLE
+	bool "Enable CPU Dynamic Clock Gating - Power optimization"
+	depends on CPU_V7
+	default y if CPU_V7 && ARCH_MVEBU
+	help
+	  Say Y here to enable CPU Dynamic Clock Gating.
+	  If unsure, say N.
+	  When dynamic clock gating is enabled, the clock of the system control block is cut
+	  in the following cases:
+	  - there are no system control coprocessor instructions being executed
+	  - there are no system control coprocessor instructions present in the pipeline
+	  - performance events are not enabled
+	  When dynamic clock gating is enabled, the clock of the data engine is cut when there is no
+	  data engine instruction in the data engine and no data engine instruction in the pipeline.
+	  CPU Dynamic Clock Gating is performance feature,
+
 config CPU_L1_CACHE_PREF_ENABLE
 	bool "Enable CPU L1 Cache Prefetch"
 	depends on CPU_V7
