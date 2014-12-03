@@ -95,47 +95,47 @@ static ssize_t mv_mux_netdev_store(struct device *dev,
 
 	} else if (!strcmp(name, "mux_vid")) {
 		mv_mux_vlan_set(&mux_cfg, a);
-		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
 	} else if (!strcmp(name, "mh_rx")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
 		mux_cfg.rx_tag_ptrn.mh = MV_16BIT_BE((MV_U16)a);
 		mux_cfg.rx_tag_mask.mh = MV_16BIT_BE((MV_U16)b);
-		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
 	} else if (!strcmp(name, "dsa_rx")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
 		mux_cfg.rx_tag_ptrn.dsa = a;
 		mux_cfg.rx_tag_mask.dsa = b;
-		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
 	} else if (!strcmp(name, "edsa_rx")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
 		mux_cfg.rx_tag_ptrn.edsa[0] = a;
 		mux_cfg.rx_tag_ptrn.edsa[1] = b;
-		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
 	} else if (!strcmp(name, "edsa_rx_mask")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
 		mux_cfg.rx_tag_mask.edsa[0] = a;
 		mux_cfg.rx_tag_mask.edsa[1] = b;
-		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
 	}  else if (!strcmp(name, "mh_tx")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
 		mux_cfg.tx_tag.mh = MV_16BIT_BE((MV_U16)a);
-		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
 	}  else if (!strcmp(name, "dsa_tx")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
 		mux_cfg.tx_tag.dsa = a;
-		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
 	} else if (!strcmp(name, "edsa_tx")) {
 		mv_mux_cfg_get(mux_dev, &mux_cfg);
 		mux_cfg.tx_tag.edsa[0] = a;
 		mux_cfg.tx_tag.edsa[1] = b;
-		err = mv_mux_netdev_alloc(dev_name, -1, &mux_cfg) ? 0 : 1;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
 	} else if (!strcmp(name, "add")) {
 		err =  mv_mux_netdev_add(a, mux_dev) ? 0 : 1;

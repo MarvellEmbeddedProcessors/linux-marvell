@@ -956,7 +956,9 @@ static int mux_device_event(struct notifier_block *unused, unsigned long event, 
 			pdev_priv = MV_MUX_PRIV(mux_dev);
 			if (mv_mux_internal_switch(port)) {
 				/* In case of internal switch, link is determined by switch */
-				if (switch_ops && switch_ops->link_status_get) {
+				/*In HGU mode, mux may be created by sysfs cmd and then pdev_priv->idx will be -1*/
+				if (switch_ops && switch_ops->link_status_get
+					&& (pdev_priv->idx != MV_MUX_UNKNOWN_GROUP)) {
 					int link_up = switch_ops->link_status_get(pdev_priv->idx);
 					mv_mux_update_link(mux_dev, link_up);
 				}
