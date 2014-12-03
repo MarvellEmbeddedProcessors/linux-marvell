@@ -73,18 +73,6 @@ ENTRY(armada_38x_cpu_mem_resume)
 	bic  r1, #0x1
 	mcr  p15, 0, r1, c1, c0, 0
 
-	/* Unlock L2 from being used as SRAM */
-	ldr     r0, =0xd0008000
-	mov	r1, #0x0
-	str	r1,[r0, #0x900]		/* @Data lock */
-	str	r1,[r0, #0x904]		/* @Instruction lock */
-	str	r1,[r0, #0x100]		/* @Instruction lock */
-
-	/* Disable open MBUS window @ 0xF0000000 */
-	mov  r1, #0
-	ldr  r0, =0xD00200B0
-	str  r1, [r0]
-
 	/* Restore internal registers Base address @ 0xF1000000 */
 	ldr  r1, =0xf1000000
 ARM_BE8(rev	r1, r1)
