@@ -1,0 +1,164 @@
+/*
+ * Device Tree file for Marvell Armada 38x boards: Modular file to be updated by U-Boot board-setup
+ * (DB-88F6820)
+ *
+ *  Copyright (C) 2013 Marvell
+ *
+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ *
+ * This file is licensed under the terms of the GNU General Public
+ * License version 2.  This program is licensed "as is" without any
+ * warranty of any kind, whether express or implied.
+ */
+
+/dts-v1/;
+#include <dt-bindings/gpio/gpio.h>
+#include "armada-385-388.dtsi"
+
+/ {
+	model = "Marvell Armada 38x Modular Device Tree";
+	compatible = "marvell,a385-db", "marvell,armada385", "marvell,armada38x";
+
+	chosen {
+		bootargs = "console=ttyS0,115200 earlyprintk";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x10000000>; /* 256 MB */
+	};
+
+	soc {
+
+		internal-regs {
+			ethernet@70000 {
+				phy = <&phy0>;
+				phy-mode = "rgmii";	/* RGMII for DB-BP, DB-GP, & DB-381 */
+			};
+
+			ethernet@30000 {
+				phy = <&phy1>;
+				phy-mode = "rgmii";	/* RGMII for DB-BP, DB-GP, & DB-381 */
+			};
+
+			ethernet@34000 {
+				phy = <&phy2>;
+				phy-mode = "sgmii";	/* SGMII for DB-AP */
+			};
+
+			i2c0: i2c@11000 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			i2c1: i2c@11100 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			mdio {
+				phy0: ethernet-phy@0 {
+					reg = <0>;	/* PHY address = 0x0 for DB-BP, DB-GP, & DB-381 */
+				};
+
+				phy1: ethernet-phy@1 {
+					reg = <1>;	/* PHY address = 0x1 for DB-BP, DB-GP, & DB-381 */
+				};
+
+				phy2: ethernet-phy@2 {
+					reg = <4>;	/* PHY address = 0x4 for DB-AP */
+				};
+			};
+
+			sdhci@d8000 {
+				broken-cd;
+				wp-inverted;
+				bus-width = <8>;
+				no-1-8-v;
+			};
+
+			spi0: spi@10600 {
+				spi-flash@0 {
+					#address-cells = <1>;
+					#size-cells = <1>;
+					compatible = "w25q32";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <108000000>;
+				};
+			};
+
+			/*
+			 * 1GB Flash via NFC NAND controller
+			 * should be disabled when the board boots
+			 * from SPI flash, since NFC shares the same
+			 * pins with SPI0 and requires SLM-1358 jumper.
+			 * However the u-boot DTB parser will
+			 * handle this situation and disable/remove
+			 * unnessesary devices according to board
+			 * boot-up configuration.
+			 */
+			nfc: nand@d0000 {
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				nfc,nfc-mode  = "normal";	/* normal or ganged */
+				nfc,nfc-dma   = <0>;		/* 0 for no, 1 for dma */
+				nfc,nfc-width = <8>;
+				nfc,ecc-type  = <1>;		/* 4 bit */
+				nfc,num-cs    = <1>;
+
+				mtd0@00000000 {
+					label = "U-Boot";
+					reg = <0x00000000 0x00600000>;
+					read-only;
+				};
+
+				mtd1@00080000 {
+					label = "uImage";
+					reg = <0x00600000 0x00400000>;
+					read-only;
+				};
+
+				mtd2@00140000 {
+					label = "Root";
+					reg = <0x00a00000 0x3f600000>;
+				};
+			};
+
+			usb@50000 {
+				status = "disabled";
+			};
+
+			usb3@f0000 {
+				status = "disabled";
+			};
+
+			usb3@f8000 {
+				status = "disabled";
+			};
+
+			crypto@9D000 {
+				status = "okay";
+			};
+
+			pm_pic {
+				pinctrl-0 = <&pic_pins>;
+				pinctrl-names = "default";
+				ctrl-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>,	/* mpp33: default for DB-GP */
+					     <&gpio1 2 GPIO_ACTIVE_LOW>,	/* mpp34: default for DB-GP */
+					     <&gpio1 3 GPIO_ACTIVE_LOW>;	/* mpp35: default for DB-GP */
+			};
+
+			pinctrl {
+				pic_pins: pic-pins-0 {
+					marvell,pins = "mpp33", "mpp34", "mpp35";	/* default for DB-GP */
+					marvell,function = "gpio";
+				};
+			};
+		};
+
+		pcie-controller {
+			status = "okay";
+		};
+	};
+};
