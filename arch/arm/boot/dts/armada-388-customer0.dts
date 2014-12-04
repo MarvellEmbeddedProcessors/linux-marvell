@@ -1,8 +1,8 @@
 /*
- * Device Tree file for Marvell Armada 385 Reference Design board
- * (RD-88F6820-AP)
+ * Device Tree file for Marvell Armada 388 Development General Purpose board
+ * (DB-88F6828-GP)
  *
- *  Copyright (C) 2013 Marvell
+ *  Copyright (C) 2014 Marvell
  *
  * Nadav Haklai <nadavh@marvell.com>
  *
@@ -12,11 +12,12 @@
  */
 
 /dts-v1/;
+#include <dt-bindings/gpio/gpio.h>
 #include "armada-385-388.dtsi"
 
 / {
-	model = "Marvell Armada 385 Reference Design";
-	compatible = "marvell,a385-rd", "marvell,armada385", "marvell,armada38x";
+	model = "Marvell Armada 388 Development General Purpose";
+	compatible = "marvell,a388-db-gp", "marvell,armada388", "marvell,armada38x";
 
 	chosen {
 		bootargs = "console=ttyS0,115200 earlyprintk";
@@ -28,7 +29,6 @@
 	};
 
 	soc {
-
 		internal-regs {
 			ethernet@70000 {
 				status = "okay";
@@ -94,12 +94,23 @@
 				};
 			};
 
-			usb3@f8000 {
-				status = "disabled";
-			};
-
 			crypto@9D000 {
 				status = "okay";
+			};
+
+			pm_pic {
+				pinctrl-0 = <&pic_pins>;
+				pinctrl-names = "default";
+				ctrl-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>,
+					     <&gpio1 2 GPIO_ACTIVE_LOW>,
+					     <&gpio1 3 GPIO_ACTIVE_LOW>;
+			};
+
+			pinctrl {
+				pic_pins: pic-pins-0 {
+					marvell,pins = "mpp33", "mpp34", "mpp35";
+					marvell,function = "gpio";
+				};
 			};
 		};
 
@@ -115,7 +126,7 @@
 			};
 			pcie@2,0 {
 				/* Port 1, Lane 0 */
-				status = "okay";
+				status = "disabled";
 			};
 		};
 	};
