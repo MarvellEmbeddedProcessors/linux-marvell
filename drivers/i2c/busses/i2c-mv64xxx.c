@@ -656,6 +656,13 @@ mv64xxx_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	if (rc < 0)
 		ret = rc;
 
+	/* Sleep for >=5ms after sending the STOP condition which starts the
+	 * internal write cycle. This is needed while working with some EEPROMs
+	 * which max Twr = 5ms (Write Cycle Time).
+	 */
+	if (!(msgs->flags & I2C_M_RD))
+		usleep_range(5000, 5500);
+
 	drv_data->num_msgs = 0;
 	drv_data->msgs = NULL;
 
