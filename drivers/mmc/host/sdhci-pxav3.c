@@ -257,7 +257,8 @@ static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
 	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
 		| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
 		| SDHCI_QUIRK_32BIT_ADMA_SIZE
-		| SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+		| SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN
+		| SDHCI_QUIRK_MISSING_CAPS,
 	.ops = &pxav3_sdhci_ops,
 };
 
@@ -363,7 +364,22 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 		mmc_of_parse(host->mmc);
 		sdhci_get_of_property(pdev);
 		pdata = pxav3_get_mmc_pdata(dev);
+		host->caps = sdhci_readl(host, SDHCI_CAPABILITIES);
+		host->caps1 = sdhci_readl(host, SDHCI_CAPABILITIES_1);
 
+		/* Modify capabilities of Armada 38x SDHCI controller according
+		 * to erratum ERR-7878951:
+		 */
+		if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
+			if (of_get_property(np, "no-1-8-v", NULL)) {
+				host->caps &= ~SDHCI_CAN_VDD_180;
+				host->mmc->caps &= ~MMC_CAP_1_8V_DDR;
+			} else
+				host->caps &= ~SDHCI_CAN_VDD_330;
+
+			host->caps1 &= ~(SDHCI_SUPPORT_SDR104 |
+					 SDHCI_USE_SDR50_TUNING);
+		}
 	} else if (pdata) {
 		/* on-chip device */
 		if (pdata->flags & PXA_FLAG_CARD_PERMANENT)
