@@ -66,6 +66,11 @@
 #define SDHCI_WINDOW_BASE(i)	(0x84 + ((i) << 3))
 #define SDHCI_MAX_WIN_NUM	8
 
+/* Fields below belong to SDIO3 Configuration Register (third register region)
+ */
+#define SDIO3_CONF_CLK_INV	BIT(0)
+#define SDIO3_CONF_SD_FB_CLK	BIT(2)
+
 static int mv_conf_mbus_windows(struct platform_device *pdev,
 				const struct mbus_dram_target_info *dram)
 {
@@ -186,7 +191,10 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
 
 static int pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_pxa *pxa = pltfm_host->priv;
 	u16 ctrl_2;
+	u8 reg_val;
 
 	/*
 	 * Set V18_EN -- UHS modes do not work without this.
@@ -212,6 +220,22 @@ static int pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
 	case MMC_TIMING_UHS_DDR50:
 		ctrl_2 |= SDHCI_CTRL_UHS_DDR50 | SDHCI_CTRL_VDD_180;
 		break;
+	}
+
+	/* Update SDIO3 Configuration register according to
+	 * erratum 'FE-2946959'.
+	 */
+	if (of_device_is_compatible(pxa->np, "marvell,armada-380-sdhci")) {
+		reg_val = readb(pxa->sdio3_conf_reg);
+		if (uhs == MMC_TIMING_UHS_SDR50 ||
+		    uhs == MMC_TIMING_UHS_DDR50) {
+			reg_val &= ~SDIO3_CONF_CLK_INV;
+			reg_val |= SDIO3_CONF_SD_FB_CLK;
+		} else {
+			reg_val |= SDIO3_CONF_CLK_INV;
+			reg_val &= ~SDIO3_CONF_SD_FB_CLK;
+		}
+		writeb(reg_val, pxa->sdio3_conf_reg);
 	}
 
 	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
@@ -282,6 +306,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct sdhci_host *host = NULL;
 	struct sdhci_pxa *pxa = NULL;
+	struct resource *res;
 	const struct of_device_id *match;
 	const struct sdhci_pltfm_data *sdhci_pltfm_data;
 
@@ -306,6 +331,13 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 	}
 
 	if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+		pxa->sdio3_conf_reg = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(pxa->sdio3_conf_reg))
+			return PTR_ERR(pxa->sdio3_conf_reg);
+
+		pxa->np = np;
+
 		ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
 		if (ret < 0)
 			goto err_clk_get;
