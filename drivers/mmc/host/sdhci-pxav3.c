@@ -191,6 +191,8 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
 
 static int pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
 {
+	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+	struct device_node *np = pdev->dev.of_node;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_pxa *pxa = pltfm_host->priv;
 	u16 ctrl_2;
@@ -225,7 +227,7 @@ static int pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
 	/* Update SDIO3 Configuration register according to
 	 * erratum 'FE-2946959'.
 	 */
-	if (of_device_is_compatible(pxa->np, "marvell,armada-380-sdhci")) {
+	if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
 		reg_val = readb(pxa->sdio3_conf_reg);
 		if (uhs == MMC_TIMING_UHS_SDR50 ||
 		    uhs == MMC_TIMING_UHS_DDR50) {
@@ -334,10 +336,10 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 	if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
 		pxa->sdio3_conf_reg = devm_ioremap_resource(&pdev->dev, res);
-		if (IS_ERR(pxa->sdio3_conf_reg))
-			return PTR_ERR(pxa->sdio3_conf_reg);
-
-		pxa->np = np;
+		if (IS_ERR(pxa->sdio3_conf_reg)) {
+			ret = PTR_ERR(pxa->sdio3_conf_reg);
+			goto err_clk_get;
+		}
 
 		ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
 		if (ret < 0)
