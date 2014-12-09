@@ -125,7 +125,7 @@
 				};
 			};
 
-			usb@50000 {
+			usb@58000 {
 				status = "disabled";
 			};
 
