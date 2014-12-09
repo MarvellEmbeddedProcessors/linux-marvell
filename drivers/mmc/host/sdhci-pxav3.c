@@ -71,28 +71,14 @@
 #define SDIO3_CONF_CLK_INV	BIT(0)
 #define SDIO3_CONF_SD_FB_CLK	BIT(2)
 
-static int mv_conf_mbus_windows(struct platform_device *pdev,
+static int mv_conf_mbus_windows(struct device *dev, void __iomem *regs,
 				const struct mbus_dram_target_info *dram)
 {
 	int i;
-	void __iomem *regs;
-	struct resource *res;
 
 	if (!dram) {
-		dev_err(&pdev->dev, "no mbus dram info\n");
+		dev_err(dev, "no mbus dram info\n");
 		return -EINVAL;
-	}
-
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (!res) {
-		dev_err(&pdev->dev, "cannot get mbus registers\n");
-		return -EINVAL;
-	}
-
-	regs = ioremap(res->start, resource_size(res));
-	if (!regs) {
-		dev_err(&pdev->dev, "cannot map mbus registers\n");
-		return -ENOMEM;
 	}
 
 	for (i = 0; i < SDHCI_MAX_WIN_NUM; i++) {
@@ -111,8 +97,6 @@ static int mv_conf_mbus_windows(struct platform_device *pdev,
 		/* Write base address to base register */
 		writel(cs->base, regs + SDHCI_WINDOW_BASE(i));
 	}
-
-	iounmap(regs);
 
 	return 0;
 }
@@ -334,6 +318,13 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 	}
 
 	if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+		pxa->mbus_win_regs = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(pxa->mbus_win_regs)) {
+			ret = PTR_ERR(pxa->mbus_win_regs);
+			goto err_clk_get;
+		}
+
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
 		pxa->sdio3_conf_reg = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(pxa->sdio3_conf_reg)) {
@@ -341,7 +332,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 			goto err_clk_get;
 		}
 
-		ret = mv_conf_mbus_windows(pdev, mv_mbus_dram_info());
+		ret = mv_conf_mbus_windows(&pdev->dev, pxa->mbus_win_regs,
+					   mv_mbus_dram_info());
 		if (ret < 0)
 			goto err_clk_get;
 	}
@@ -489,6 +481,13 @@ static int sdhci_pxav3_resume(struct device *dev)
 {
 	int ret;
 	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_pxa *pxa = pltfm_host->priv;
+	struct device_node *np = dev->of_node;
+
+	if (of_device_is_compatible(np, "marvell,armada-380-sdhci"))
+		ret = mv_conf_mbus_windows(dev, pxa->mbus_win_regs,
+					   mv_mbus_dram_info());
 
 	pm_runtime_get_sync(dev);
 	ret = sdhci_resume_host(host);

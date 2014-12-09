@@ -60,5 +60,6 @@ struct sdhci_pxa {
 	u8	clk_enable;
 	u8	power_mode;
 	void	__iomem *sdio3_conf_reg;
+	void	__iomem *mbus_win_regs;
 };
 #endif /* _PXA_SDHCI_H_ */
