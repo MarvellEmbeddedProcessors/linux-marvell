@@ -402,7 +402,7 @@
 				clocks = <&coreclk 2>;
 			};
 
-			usb@50000 {
+			usb@58000 {
 				compatible = "marvell,orion-ehci";
 				reg = <0x58000 0x500>;
 				interrupts = <0 18 4>;
