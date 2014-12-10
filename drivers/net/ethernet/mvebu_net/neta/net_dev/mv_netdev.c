@@ -1486,7 +1486,7 @@ static struct sk_buff *mv_eth_skb_alloc(struct eth_port *pp, struct bm_pool *poo
 {
 	struct sk_buff *skb;
 
-	skb = __dev_alloc_skb(pool->pkt_size, gfp_mask);
+	skb = __dev_alloc_skb(pool->pkt_size, GFP_DMA | gfp_mask);
 	if (!skb) {
 		STAT_ERR(pool->stats.skb_alloc_oom++);
 		return NULL;
@@ -2970,8 +2970,11 @@ irqreturn_t mv_eth_isr(int irq, void *dev_id)
 	* Need for Aramada38x. Dosn't need for AXP and A370
 	*/
 	if ((pp->plat_data->ctrl_model == MV_6810_DEV_ID) ||
-	    (pp->plat_data->ctrl_model == MV_6820_DEV_ID))
+	    (pp->plat_data->ctrl_model == MV_6811_DEV_ID) ||
+	    (pp->plat_data->ctrl_model == MV_6820_DEV_ID) ||
+	    (pp->plat_data->ctrl_model == MV_6828_DEV_ID)) {
 		regVal = MV_REG_READ(NETA_INTR_NEW_MASK_REG(pp->port));
+	}
 
 	return IRQ_HANDLED;
 }
@@ -4282,6 +4285,9 @@ static int	mv_eth_shared_probe(struct mv_neta_pdata *plat_data)
 #endif
 
 	mv_eth_sysfs_init();
+
+	pr_info("SoC: model = 0x%x, revision = 0x%x\n",
+		plat_data->ctrl_model, plat_data->ctrl_rev);
 
 	/* init MAC Unit */
 	mv_eth_hal_shared_init(plat_data);
@@ -6756,7 +6762,6 @@ void mv_eth_port_status_print(unsigned int port)
 /***********************************************************************************
  ***  print port statistics
  ***********************************************************************************/
-
 void mv_eth_port_stats_print(unsigned int port)
 {
 	struct eth_port *pp = mv_eth_port_by_id(port);
