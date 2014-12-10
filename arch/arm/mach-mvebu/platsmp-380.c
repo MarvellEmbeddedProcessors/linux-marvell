@@ -79,12 +79,23 @@ static void __init armada_380_smp_prepare_cpus(unsigned int max_cpus)
 	register_cpu_notifier(&armada_380_secondary_cpu_notifier);
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+static void armada_38x_cpu_die(unsigned int cpu)
+{
+	/*
+	 * CPU hotplug is implemented by putting offline CPUs into the
+	 * deep idle sleep state.
+	 */
+	armada_38x_do_cpu_suspend(true);
+}
+#endif
+
 struct smp_operations armada_380_smp_ops __initdata = {
 	.smp_init_cpus		= armada_380_smp_init_cpus,
 	.smp_prepare_cpus	= armada_380_smp_prepare_cpus,
 	.smp_boot_secondary	= armada_380_boot_secondary,
 #ifdef CONFIG_HOTPLUG_CPU
-	.cpu_die		= armada_xp_cpu_die,
+	.cpu_die		= armada_38x_cpu_die,
 #endif
 };
 
