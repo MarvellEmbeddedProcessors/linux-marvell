@@ -531,9 +531,23 @@ static int armada_thermal_exit(struct platform_device *pdev)
 	return 0;
 }
 
+static int armada_thermal_resume(struct platform_device *pdev)
+{
+	struct thermal_zone_device *thermal =
+		platform_get_drvdata(pdev);
+	struct armada_thermal_priv *priv = thermal->devdata;
+
+	priv->data->init_sensor(pdev, priv);
+
+	return 0;
+}
+
 static struct platform_driver armada_thermal_driver = {
 	.probe = armada_thermal_probe,
 	.remove = armada_thermal_exit,
+#ifdef CONFIG_PM
+	.resume = armada_thermal_resume,
+#endif
 	.driver = {
 		.name = "armada_thermal",
 		.of_match_table = armada_thermal_id_table,
