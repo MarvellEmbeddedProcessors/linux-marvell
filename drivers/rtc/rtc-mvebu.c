@@ -434,6 +434,16 @@ static int __exit mvebu_rtc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int mvebu_rtc_resume(struct platform_device *pdev)
+{
+	mvebu_rtc_t *rtc = platform_get_drvdata(pdev);
+
+	/* Update RTC-MBUS bridge timing parameters */
+	writel(0xFD4D4CFA, rtc->regbase_soc);
+
+	return 0;
+}
+
 #ifdef CONFIG_OF
 static struct of_device_id rtc_mvebu_of_match_table[] = {
 	{ .compatible = "marvell,mvebu-rtc", },
@@ -444,6 +454,9 @@ static struct of_device_id rtc_mvebu_of_match_table[] = {
 static struct platform_driver mvebu_rtc_driver = {
 	.probe      = mvebu_rtc_probe,
 	.remove     = __exit_p(mvebu_rtc_remove),
+#ifdef CONFIG_PM
+	.resume = mvebu_rtc_resume,
+#endif
 	.driver     = {
 		.name   = "mvebu-rtc",
 		.owner  = THIS_MODULE,
