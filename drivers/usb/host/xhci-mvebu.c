@@ -19,6 +19,10 @@
 #define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
 #define USB3_WIN_BASE(w)	(0x4 + ((w) * 8))
 
+struct xhci_mvebu_priv {
+	void __iomem *base;
+	struct clk *clk;
+};
 
 static void mv_usb3_conf_mbus_windows(void __iomem *base,
 				      const struct mbus_dram_target_info *dram)
@@ -46,45 +50,42 @@ static void mv_usb3_conf_mbus_windows(void __iomem *base,
 int xhci_mvebu_probe(struct platform_device *pdev)
 {
 	struct resource	*res;
+	struct xhci_mvebu_priv *priv;
 	void __iomem	*base;
 	const struct mbus_dram_target_info *dram;
 	int ret;
 	struct clk *clk;
 
+	priv = devm_kzalloc(&pdev->dev, sizeof(struct xhci_mvebu_priv),
+			    GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res)
 		return -ENODEV;
 
-	/*
-	 * We don't use devm_ioremap() because this mapping should
-	 * only exists for the duration of this probe function.
-	 */
-	base = ioremap(res->start, resource_size(res));
+	base = devm_ioremap_resource(&pdev->dev, res);
 	if (!base)
-		return -ENODEV;
+		return -ENOMEM;
 
 	clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(clk)) {
-		iounmap(base);
 		return PTR_ERR(clk);
 	}
 
 	ret = clk_prepare_enable(clk);
 	if (ret < 0) {
-		iounmap(base);
 		return ret;
 	}
 
 	dram = mv_mbus_dram_info();
 	mv_usb3_conf_mbus_windows(base, dram);
 
-	/*
-	 * This memory area was only needed to configure the MBus
-	 * windows, and is therefore no longer useful.
-	 */
-	iounmap(base);
+	priv->base = base;
+	priv->clk = clk;
 
-	ret = common_xhci_plat_probe(pdev, clk);
+	ret = common_xhci_plat_probe(pdev, priv);
 	if (ret < 0) {
 		clk_disable_unprepare(clk);
 		return ret;
@@ -97,10 +98,23 @@ int xhci_mvebu_remove(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-	struct clk *clk = xhci->priv;
+	struct xhci_mvebu_priv *priv = (struct xhci_mvebu_priv *)xhci->priv;
+	struct clk *clk = priv->clk;
 
 	common_xhci_plat_remove(pdev);
 	clk_disable_unprepare(clk);
 
 	return 0;
+}
+
+void xhci_mvebu_resume(struct device *dev)
+{
+	const struct mbus_dram_target_info *dram;
+	struct usb_hcd *hcd = dev_get_drvdata(dev);
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+	struct xhci_mvebu_priv *priv = (struct xhci_mvebu_priv *)xhci->priv;
+	void __iomem *base = priv->base;
+
+	dram = mv_mbus_dram_info();
+	mv_usb3_conf_mbus_windows(base, dram);
 }

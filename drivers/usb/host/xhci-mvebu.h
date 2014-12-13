@@ -14,8 +14,10 @@
 #ifdef CONFIG_USB_XHCI_MVEBU
 int xhci_mvebu_probe(struct platform_device *pdev);
 int xhci_mvebu_remove(struct platform_device *pdev);
+void xhci_mvebu_resume(struct device *dev);
 #else
 #define xhci_mvebu_probe NULL
 #define xhci_mvebu_remove NULL
+#define xhci_mvebu_resume NULL
 #endif
 #endif /* __LINUX_XHCI_MVEBU_H */
