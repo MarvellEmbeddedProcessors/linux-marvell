@@ -214,6 +214,7 @@ static int default_xhci_plat_remove(struct platform_device *pdev)
 struct xhci_plat_ops {
 	int (*probe)(struct platform_device *);
 	int (*remove)(struct platform_device *);
+	void (*resume)(struct device *);
 };
 
 static struct xhci_plat_ops xhci_plat_default = {
@@ -225,6 +226,7 @@ static struct xhci_plat_ops xhci_plat_default = {
 struct xhci_plat_ops xhci_plat_mvebu = {
 	.probe =  xhci_mvebu_probe,
 	.remove =  xhci_mvebu_remove,
+	.resume =  xhci_mvebu_resume,
 };
 
 static const struct of_device_id usb_xhci_of_match[] = {
@@ -292,8 +294,23 @@ static int xhci_plat_suspend(struct device *dev)
 
 static int xhci_plat_resume(struct device *dev)
 {
+	const struct xhci_plat_ops *plat_of = &xhci_plat_default;
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+
+	if (dev->of_node) {
+		const struct of_device_id *match =
+			of_match_device(usb_xhci_of_match, dev);
+		if (!match)
+			return -ENODEV;
+		plat_of = match->data;
+	}
+
+	if (!plat_of)
+		return -ENODEV;
+
+	if (plat_of->resume)
+		plat_of->resume(dev);
 
 	return xhci_resume(xhci, 0);
 }
