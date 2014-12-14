@@ -20,8 +20,8 @@
 #define USB3_WIN_BASE(w)	(0x4 + ((w) * 8))
 
 
-static void __init mv_usb3_conf_mbus_windows(void __iomem *base,
-			const struct mbus_dram_target_info *dram)
+static void mv_usb3_conf_mbus_windows(void __iomem *base,
+				      const struct mbus_dram_target_info *dram)
 {
 	int win;
 
