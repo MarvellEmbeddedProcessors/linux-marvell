@@ -964,16 +964,18 @@ int mv_eth_ctrl_txq_cpu_def(int port, int txp, int txq, int cpu)
 		return -EINVAL;
 	}
 
-	/* Decrement CPU ownership for old txq */
-	mv_eth_ctrl_txq_cpu_own(port, pp->txp, cpuCtrl->txq, 0, cpu);
+	if (test_bit(MV_ETH_F_STARTED_BIT, &(pp->flags))) {
+		/* Decrement CPU ownership for old txq */
+		mv_eth_ctrl_txq_cpu_own(port, pp->txp, cpuCtrl->txq, 0, cpu);
 
-	if (txq != -1) {
-		if (mvNetaMaxCheck(txq, CONFIG_MV_ETH_TXQ, "txq"))
-			return -EINVAL;
+		if (txq != -1) {
+			if (mvNetaMaxCheck(txq, CONFIG_MV_ETH_TXQ, "txq"))
+				return -EINVAL;
 
-		/* Increment CPU ownership for new txq */
-		if (mv_eth_ctrl_txq_cpu_own(port, txp, txq, 1, cpu))
-			return -EINVAL;
+			/* Increment CPU ownership for new txq */
+			if (mv_eth_ctrl_txq_cpu_own(port, txp, txq, 1, cpu))
+				return -EINVAL;
+		}
 	}
 	pp->txp = txp;
 	cpuCtrl->txq = txq;
