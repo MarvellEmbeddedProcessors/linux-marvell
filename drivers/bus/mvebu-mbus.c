@@ -1237,7 +1237,7 @@ static int __init mbus_dt_setup_win(struct mvebu_mbus_state *mbus,
 	return 0;
 }
 
-static int __init
+static int
 mbus_parse_ranges(struct device_node *node,
 		  int *addr_cells, int *c_addr_cells, int *c_size_cells,
 		  int *cell_count, const __be32 **ranges_start,
