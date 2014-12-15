@@ -1449,6 +1449,39 @@ void mv_xor_shutdown(struct platform_device *pdev)
 	}
 }
 
+static int mv_xor_suspend(struct platform_device *dev, pm_message_t state)
+{
+	struct mv_xor_device *xordev = platform_get_drvdata(dev);
+	int i;
+
+	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
+		if (xordev->channels[i]) {
+			struct mv_xor_chan *mv_chan = xordev->channels[i];
+
+			mv_chan->suspend_regs.config = readl_relaxed(XOR_CONFIG(mv_chan));
+			mv_chan->suspend_regs.int_mask = readl_relaxed(XOR_INTR_MASK(mv_chan));
+		}
+	}
+	return 0;
+}
+
+static int mv_xor_resume(struct platform_device *dev)
+{
+	struct mv_xor_device *xordev = platform_get_drvdata(dev);
+	int i;
+
+	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
+		if (xordev->channels[i]) {
+			struct mv_xor_chan *mv_chan = xordev->channels[i];
+
+			writel_relaxed(mv_chan->suspend_regs.config, XOR_CONFIG(mv_chan));
+			writel_relaxed(mv_chan->suspend_regs.int_mask, XOR_INTR_MASK(mv_chan));
+		}
+	}
+
+	return 0;
+}
+
 #ifdef CONFIG_OF
 static struct of_device_id mv_xor_dt_ids[] = {
        { .compatible = "marvell,orion-xor", },
@@ -1460,7 +1493,9 @@ MODULE_DEVICE_TABLE(of, mv_xor_dt_ids);
 static struct platform_driver mv_xor_driver = {
 	.probe		= mv_xor_probe,
 	.remove		= mv_xor_remove,
-	.shutdown		= mv_xor_shutdown,
+	.shutdown	= mv_xor_shutdown,
+	.suspend	= mv_xor_suspend,
+	.resume		= mv_xor_resume,
 	.driver		= {
 		.owner	        = THIS_MODULE,
 		.name	        = MV_XOR_NAME,
