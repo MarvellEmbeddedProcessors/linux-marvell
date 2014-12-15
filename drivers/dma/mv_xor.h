@@ -65,6 +65,13 @@ struct mv_xor_device {
 	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
 };
 
+
+/* Stores certain registers during suspend to RAM */
+struct mv_xor_suspend_regs {
+	int config;
+	int int_mask;
+};
+
 /**
  * struct mv_xor_chan - internal representation of a XOR channel
  * @pending: allows batching of hardware operations
@@ -87,6 +94,7 @@ struct mv_xor_chan {
 	unsigned int		idx;
 	int                     irq;
 	enum dma_transaction_type	current_type;
+	struct mv_xor_suspend_regs	suspend_regs;
 	struct list_head	chain;
 	struct list_head	completed_slots;
 	dma_addr_t		dma_desc_pool;
