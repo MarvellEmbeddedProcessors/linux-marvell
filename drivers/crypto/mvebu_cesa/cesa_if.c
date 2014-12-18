@@ -99,6 +99,14 @@ enum cesa_mode mv_cesa_mode = CESA_UNKNOWN_M;
 u32 mv_cesa_time_threshold, mv_cesa_threshold, mv_cesa_channels;
 enum cesa_feature mv_cesa_feature = CESA_UNKNOWN;
 
+struct cesa_s2r_reg {
+	uint32_t desc_offset;
+	uint32_t config_reg;
+	uint32_t int_coal_th;
+	uint32_t int_time_th;
+	uint32_t tdma_ctrl;
+};
+
 MV_STATUS mvCesaIfInit(int numOfSession, int queueDepth, void *osHandle, MV_CESA_HAL_DATA *halData)
 {
 	MV_U8 chan = 0;
@@ -682,6 +690,15 @@ MV_STATUS mvSysCesaInit(int numOfSession, int queueDepth, void *osHandle,
 	struct device_node *np, *np_sram;
 	struct resource res;
 	int err, ret;
+#ifdef CONFIG_PM
+	struct cesa_s2r_reg (*s2r_reg)[MV_CESA_CHANNELS];
+
+	s2r_reg = devm_kzalloc(&pdev->dev, MV_CESA_CHANNELS * sizeof(struct cesa_s2r_reg), GFP_KERNEL);
+	if (!s2r_reg)
+		return -ENOMEM;
+
+	platform_set_drvdata(pdev, s2r_reg);
+#endif
 
 	np_sram = of_find_compatible_node(NULL, NULL, "marvell,cesa-sram");
 	if (!np_sram) {
@@ -763,3 +780,46 @@ MV_STATUS mvSysCesaInit(int numOfSession, int queueDepth, void *osHandle,
 
 	return status;
 }
+
+#ifdef CONFIG_PM
+int cesa_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct cesa_s2r_reg (*s2r_reg)[MV_CESA_CHANNELS] = platform_get_drvdata(pdev);
+	uint8_t chan;
+
+	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+		s2r_reg[chan]->desc_offset = MV_REG_READ(MV_CESA_CHAN_DESC_OFFSET_REG(chan));
+		s2r_reg[chan]->config_reg = MV_REG_READ(MV_CESA_CFG_REG(chan));
+		s2r_reg[chan]->int_coal_th = MV_REG_READ(MV_CESA_INT_COAL_TH_REG(chan));
+		s2r_reg[chan]->int_time_th = MV_REG_READ(MV_CESA_INT_TIME_TH_REG(chan));
+		s2r_reg[chan]->tdma_ctrl = MV_REG_READ(MV_CESA_TDMA_CTRL_REG(chan));
+	}
+
+	return 0;
+}
+
+int cesa_resume(struct platform_device *pdev)
+{
+	struct cesa_s2r_reg (*s2r_reg)[MV_CESA_CHANNELS] = platform_get_drvdata(pdev);
+	const struct mbus_dram_target_info *dram;
+	uint8_t chan;
+
+	dram = mv_mbus_dram_info();
+
+	for (chan = 0; chan < MV_CESA_CHANNELS; chan++) {
+		mv_cesa_conf_mbus_windows(dram, chan);
+
+		MV_REG_WRITE(MV_CESA_CHAN_DESC_OFFSET_REG(chan), s2r_reg[chan]->desc_offset);
+		MV_REG_WRITE(MV_CESA_CFG_REG(chan), s2r_reg[chan]->config_reg);
+		MV_REG_WRITE(MV_CESA_INT_COAL_TH_REG(chan), s2r_reg[chan]->int_coal_th);
+		MV_REG_WRITE(MV_CESA_INT_TIME_TH_REG(chan), s2r_reg[chan]->int_time_th);
+		MV_REG_WRITE(MV_CESA_TDMA_CTRL_REG(chan), s2r_reg[chan]->tdma_ctrl);
+
+		/* clear and unmask Int */
+		MV_REG_WRITE(MV_CESA_ISR_CAUSE_REG(chan), 0);
+		MV_REG_WRITE(MV_CESA_ISR_MASK_REG(chan), MV_CESA_CAUSE_EOP_COAL_MASK);
+	}
+
+	return 0;
+}
+#endif

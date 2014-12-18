@@ -3142,6 +3142,10 @@ static struct platform_driver mv_cesa_driver = {
 	},
 	.probe		= cesa_test_probe,
 	.remove		= cesa_test_remove,
+#ifdef CONFIG_PM
+	.resume		= cesa_resume,
+	.suspend	= cesa_suspend,
+#endif
 };
 
 static int __init cesa_test_init(void)
