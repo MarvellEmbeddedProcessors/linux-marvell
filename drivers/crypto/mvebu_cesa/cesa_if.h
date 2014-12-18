@@ -87,6 +87,11 @@ extern "C" {
 #include <linux/mbus.h>
 #include <linux/clk.h>
 
+#ifdef CONFIG_PM
+int cesa_suspend(struct platform_device *pdev, pm_message_t state);
+int cesa_resume(struct platform_device *pdev);
+#endif
+
 /* #define CESA_DEBUGS */
 #ifdef CESA_DEBUGS
 #define dprintk(a...) printk(a)

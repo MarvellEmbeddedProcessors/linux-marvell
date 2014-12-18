@@ -1356,6 +1356,10 @@ static struct platform_driver mv_cesa_driver = {
 	.probe		= cesa_ocf_probe,
 	.remove		= cesa_ocf_remove,
 	.shutdown	= cesa_ocf_shutdown,
+#ifdef CONFIG_PM
+	.resume		= cesa_resume,
+	.suspend	= cesa_suspend,
+#endif
 };
 
 static int __init cesa_ocf_init(void)
