@@ -139,6 +139,12 @@ int common_xhci_plat_probe(struct platform_device *pdev,
 		goto release_mem_region;
 	}
 
+	/*
+	 * Make the host wait until internal buffer is available before issuing
+	 * data request from device - MARVELL proprietary XHCI MAC register
+	 */
+	set_bit(7, hcd->regs + 0x380c);
+
 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (ret)
 		goto unmap_registers;
