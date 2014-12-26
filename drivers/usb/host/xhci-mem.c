@@ -995,6 +995,32 @@ fail:
 	return 0;
 }
 
+void mrvl_refresh_ring_seg(struct xhci_segment *seg, unsigned int cycle_state)
+{
+	union xhci_trb *current_trb = seg->trbs;
+	do {
+		if (cycle_state != 0)
+			current_trb->link.control &= ~TRB_CYCLE;
+		else
+			current_trb->link.control |= TRB_CYCLE;
+		if (TRB_TYPE_LINK_LE32(current_trb->link.control))
+			break;
+	} while (current_trb++);
+}
+
+void mrvl_refresh_ring(struct xhci_ring *ring, unsigned int cycle_state)
+{
+	struct xhci_segment *current_seg = ring->first_seg;
+
+	while (current_seg != ring->last_seg) {
+		mrvl_refresh_ring_seg(current_seg, cycle_state);
+		current_seg = current_seg->next;
+	};
+
+	mrvl_refresh_ring_seg(current_seg, cycle_state);
+	xhci_initialize_ring_info(ring, cycle_state);
+}
+
 void xhci_copy_ep0_dequeue_into_input_ctx(struct xhci_hcd *xhci,
 		struct usb_device *udev)
 {
@@ -1012,9 +1038,17 @@ void xhci_copy_ep0_dequeue_into_input_ctx(struct xhci_hcd *xhci,
 	 * configured device has reset, so all control transfers should have
 	 * been completed or cancelled before the reset.
 	 */
+#define MRVL_XHCI_RELEASE_3_0		1
+#if defined(MRVL_XHCI_RELEASE_3_0) && MRVL_XHCI_RELEASE_3_0
+	/*walk around for address dev fail*/
+	mrvl_refresh_ring(ep_ring, 1);
+	ep0_ctx->deq = cpu_to_le64(ep_ring->first_seg->dma |
+			ep_ring->cycle_state);
+#else
 	ep0_ctx->deq = cpu_to_le64(xhci_trb_virt_to_dma(ep_ring->enq_seg,
 							ep_ring->enqueue)
 				   | ep_ring->cycle_state);
+#endif
 }
 
 /*
