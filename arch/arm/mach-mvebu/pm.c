@@ -33,6 +33,7 @@
 #define  SDRAM_DLB_EVICTION_THRESHOLD_MASK 0xff
 
 extern void armada_38x_cpu_mem_resume(void);
+extern int mvebu_pcie_resume(void);
 
 static void (*mvebu_board_pm_enter)(void __iomem *sdram_reg, u32 srcmd);
 static void __iomem *sdram_ctrl;
@@ -178,6 +179,9 @@ static int mvebu_pm_enter(suspend_state_t state)
 	mvebu_v7_pmsu_idle_exit();
 
 	set_cpu_coherent();
+
+	/* Eraly resume of PCIe to avoid PCIe resume failures - TBD */
+	mvebu_pcie_resume();
 
 	cpu_pm_exit();
 
