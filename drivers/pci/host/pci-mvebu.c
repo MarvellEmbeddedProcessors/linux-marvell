@@ -815,7 +815,7 @@ static int mvebu_pcie_suspend(struct platform_device *pdev, pm_message_t message
 	return 0;
 }
 
-static int mvebu_pcie_resume(struct platform_device *pdev)
+int mvebu_pcie_resume(void)
 {
 	int i;
 
@@ -983,7 +983,8 @@ MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
 static struct platform_driver mvebu_pcie_driver = {
 #ifdef CONFIG_PM
 	.suspend        = mvebu_pcie_suspend,
-	.resume         = mvebu_pcie_resume,
+	/* Move PCIe resume to ealier stage in the resume sequence to avoid resume failures - TBD */
+	/* .resume         = mvebu_pcie_resume, */
 #endif
 	.driver = {
 		.owner = THIS_MODULE,
