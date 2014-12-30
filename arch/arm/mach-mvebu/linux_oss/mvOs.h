@@ -309,7 +309,8 @@ static inline void mvOsCacheLineInv(void *handle, void *addr)
 /* the beginning of the cache line automatically and the size will be adjusted accordingly. */
 static inline void mvOsCacheMultiLineFlush(void *handle, void *addr, int size)
 {
-	dma_map_single(handle, addr, size, DMA_TO_DEVICE);
+	if (unlikely(!COHERENCY_FABRIC_HARD_MODE()))
+		dma_map_single(handle, addr, size, DMA_TO_DEVICE);
 }
 
 /* Invalidate multiple cache lines using mvOsCacheLineInv to improve performance.           */
@@ -320,7 +321,8 @@ static inline void mvOsCacheMultiLineFlush(void *handle, void *addr, int size)
 /* DO NOT USE this function unless you are certain of this!                                 */
 static inline void mvOsCacheMultiLineInv(void *handle, void *addr, int size)
 {
-	dma_map_single(handle, addr, size, DMA_FROM_DEVICE);
+	if (unlikely(!COHERENCY_FABRIC_HARD_MODE()))
+		dma_map_single(handle, addr, size, DMA_FROM_DEVICE);
 }
 
 /* Flush and invalidate multiple cache lines using mvOsCacheLineFlushInv to improve performance. */
@@ -328,7 +330,8 @@ static inline void mvOsCacheMultiLineInv(void *handle, void *addr, int size)
 /* the beginning of the cache line automatically and the size will be adjusted accordingly.      */
 static inline void mvOsCacheMultiLineFlushInv(void *handle, void *addr, int size)
 {
-	dma_map_single(handle, addr, size, DMA_BIDIRECTIONAL);
+	if (unlikely(!COHERENCY_FABRIC_HARD_MODE()))
+		dma_map_single(handle, addr, size, DMA_BIDIRECTIONAL);
 }
 
 /* register manipulations  */
