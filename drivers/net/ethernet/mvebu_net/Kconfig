@@ -52,29 +52,6 @@ config MV_ETH_DEBUG_CODE
 	Enable run-time enable/disable enter debug code blocks
 
 endmenu
-
-config MV_ETH_NETA
-	tristate "Marvell Armada 380 network interface support"
-	depends on MACH_ARMADA_380
-	---help---
-	  This driver supports the network interface units in the
-	  Marvell ARMADA 38x SoC family.
-
-if MV_ETH_NETA
-source drivers/net/ethernet/mvebu_net/neta/Kconfig
-endif
-
-config MV_ETH_PP2
-	tristate "Marvell Armada 375 network interface support"
-	depends on MACH_ARMADA_375
-	---help---
-	  This driver supports the network interface units in the
-	  Marvell ARMADA 375 SoC family.
-
-if MV_ETH_PP2
-source drivers/net/ethernet/mvebu_net/pp2/Kconfig
-endif
-
 config MV_ETH_INCLUDE_PHY
 	bool "Choose to compile Ethernet PHY support"
 	depends on MV_ETH_NETA || MV_ETH_PP2

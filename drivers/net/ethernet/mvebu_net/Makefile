@@ -27,12 +27,19 @@ export INCLUDE_DIRS
 
 ccflags-y	+= $(INCLUDE_DIRS)
 
+ifneq ($(CONFIG_MV_ETH_PP2)$(CONFIG_MV_ETH_NETA),)
 obj-y	+= common/mvCommon.o common/mvStack.o common/mvDebug.o common/mvList.o
+endif
 
 obj-$(CONFIG_MV_ETH_INCLUDE_PHY)	+= phy/mvEthPhy.o phy/phy_sysfs.o
 
-obj-$(CONFIG_MV_ETH_INCLUDE_NETMUX)	+= netmux/
+ifeq ($(CONFIG_MV_ETH_INCLUDE_NETMUX),y)
+obj-y	+= netmux/
+endif
 
-obj-$(CONFIG_MV_ETH_NETA) += neta/
-obj-$(CONFIG_MV_ETH_PP2) += pp2/
-
+ifeq ($(CONFIG_MV_ETH_NETA),y)
+obj-y += neta/
+endif
+ifeq ($(CONFIG_MV_ETH_PP2),y)
+obj-y += pp2/
+endif
