@@ -1,3 +1,14 @@
+config MV_ETH_NETA
+	tristate "Marvell NETA network interface support"
+	depends on ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP || ARCH_ARMADA370 || ARCH_ARMADA38X || ARCH_MSYS || MACH_ARMADA_380
+	default y
+	---help---
+	  This driver supports the network interface
+	  units in the following Marvell MSYS SoC family
+	  1. ARMADA-370.
+	  2. ARMADA-XP.
+	  3. ARMADA-38x.
+
 config MV_ETH_PORTS_NUM
 	int "Number of Marvell GbE ports"
 	depends on MV_ETH_NETA
@@ -6,6 +17,7 @@ config MV_ETH_PORTS_NUM
 	Number of Marvell GbE ports supported by NETA driver
 
 menu "BM configuration"
+	depends on MV_ETH_NETA
 
 config MV_ETH_BM
 	depends on MV_ETH_NETA && (ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP || ARCH_ARMADA38X || ARCH_MVEBU)
@@ -330,6 +342,7 @@ config MV_ETH_PMT_CMD_PER_FLOW
 	MV_ETH_PMT_SIZE >= (MV_ETH_PMT_FLOWS * (MV_ETH_PMT_CMD_PER_FLOW + 1))
 
 menu "Network Interface configuration"
+	depends on MV_ETH_NETA
 
 config  MV_ETH_0_MTU
 	int "Giga port #0 MTU value"
@@ -390,6 +403,7 @@ config  MV_ETH_3_MACADDR
 endmenu
 
 menu "Rx/Tx Queue configuration"
+	depends on MV_ETH_NETA
 
 config  MV_ETH_RXQ
         int "Number of RX queues"
@@ -430,6 +444,7 @@ config MV_ETH_TXQ_DEF
 endmenu
 
 menu "IP/TCP/UDP Offloading"
+	depends on MV_ETH_NETA
 
 config  MV_ETH_TX_CSUM_OFFLOAD
         bool "L3/L4 TX checksum offload support for Marvell network interface"
@@ -486,6 +501,7 @@ config  MV_ETH_TSO_DEF
 endmenu
 
 menu "Control and Statistics"
+	depends on MV_ETH_NETA
 
 config  MV_NETA_DEBUG_CODE
 	depends on MV_ETH_DEBUG_CODE
@@ -532,6 +548,7 @@ config  MV_LINUX_COUNTERS_DISABLE
 endmenu
 
 menu "Advanced Features"
+	depends on MV_ETH_NETA
 
 config MV_NETA_SKB_RECYCLE
 	depends on NET_SKB_RECYCLE
@@ -694,6 +711,7 @@ config MV_ETH_EXTRA_BUF_NUM
 endmenu
 
 menuconfig MV_ETH_NAPI
+	depends on MV_ETH_NETA
         bool "NAPI configuration"
         default y
 	---help---
@@ -783,6 +801,7 @@ config MV_ETH_GROUP3_RXQ
 endmenu
 
 menu "PON support for Network driver"
+	depends on MV_ETH_NETA
 
 config MV_PON
         bool "PON support"
@@ -805,6 +824,7 @@ config MV_PON_TXQ_DEF
 endmenu
 
 menu "ERRATA / WA"
+	depends on MV_ETH_NETA
 
 config MV_ETH_ERRATA_SMI_ACCESS
         bool "use SMI port 1 instead of SMI port 0"

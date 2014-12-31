@@ -1,6 +1,20 @@
+config MV_ETH_PP2
+	tristate "Marvell PP2 network interface driver"
+	depends on MACH_ARMADA_375 || ARCH_AVANTA_LP
+	default y
+	select MV_ETH_PP2_CLS2
+	select MV_ETH_PP2_CLS3
+	select MV_ETH_PP2_CLS4
+	select MV_ETH_PP2_CLS_MC
+	---help---
+	  This driver supports the network interface
+	  units in the following Marvell Soc families:
+	  1. ARMADA-375.
+	  2. AVANTA-LP.
 
 config MV_PP2_HWF
 	bool "Enable PPv2 Harware Forwarding"
+	depends on MV_ETH_PP2
 	default y
 	---help---
 	Enable Hardware:
@@ -8,25 +22,30 @@ config MV_PP2_HWF
 
 config MV_ETH_PP2_CLS2
 	bool
+	depends on MV_ETH_PP2
 	default y
 	---help---
 
 config MV_ETH_PP2_CLS3
 	bool
+	depends on MV_ETH_PP2
 	default y
 	---help---
 
 config MV_ETH_PP2_CLS4
 	bool
+	depends on MV_ETH_PP2
 	default y
 	---help---
 
 config MV_ETH_PP2_CLS_MC
 	bool
+	depends on MV_ETH_PP2
 	default y
 	---help---
 
 menu "PP2 BM configuration"
+	depends on MV_ETH_PP2
 
 choice
 	prompt "PP2 BM pool assignment mode"
@@ -67,6 +86,7 @@ config MV_PP2_BM_SHORT_BUF_NUM
 endmenu
 
 menu "PP2 Rx/Tx Queue configuration"
+	depends on MV_ETH_PP2
 
 config MV_PP2_RXQ
 	int "Number of RX queues per port"
@@ -82,7 +102,6 @@ config  MV_PP2_TXQ
 
 config MV_PP2_RXQ_DESC
 	int "Number of Rx descriptors"
-	depends on MV_ETH_PP2
 	default 256
 	---help---
 	The number of Rx descriptors in each Rx queue.
@@ -94,7 +113,6 @@ config MV_PP2_RXQ_DEF
 
 config MV_PP2_TXQ_DESC
 	int "Number of Tx descriptors"
-	depends on MV_ETH_PP2
 	default 1024
         ---help---
 	The number of Tx descriptors in each Tx queue.
@@ -115,26 +133,26 @@ config MV_PP2_TXQ_CPU_CHUNK
 
 config MV_PP2_AGGR_TXQ_SIZE
 	int "Number of aggregated Tx descriptors"
-	depends on MV_ETH_PP2
 	default 256
         ---help---
 	The number of Tx descriptors in each aggregated Tx queue.
 
 config MV_PP2_TEMP_TXQ_SIZE
 	int "Number of temporary Txq descriptors (for switching between HWF and SWF)"
-	depends on (MV_ETH_PP2 && MV_PP2_HWF)
+	depends on MV_PP2_HWF
 	default 512
         ---help---
 
 config MV_PP2_TEMP_TXQ_HWF_SIZE
 	int "Number of temporary Txq HWF descriptors (for switching between HWF and SWF)"
-	depends on (MV_ETH_PP2 && MV_PP2_HWF)
+	depends on MV_PP2_HWF
 	default 256
         ---help---
 
 endmenu
 
 menu "PP2 IP/TCP/UDP Offloading"
+	depends on MV_ETH_PP2
 
 config  MV_PP2_TSO
 	bool "TSO Support for Marvell network interface"
@@ -146,6 +164,7 @@ config  MV_PP2_TSO
 endmenu
 
 menu "PP2 Control and Statistics"
+	depends on MV_ETH_PP2
 
 config  MV_PP2_DEBUG_CODE
 	bool "Add run-time debug code"
@@ -187,7 +206,8 @@ config  MV_PP2_STAT_DIST
 
 endmenu
 
-menu "Advanced Features"
+menu "PP2 Advanced Features"
+	depends on MV_ETH_PP2
 
 config MV_PP2_SKB_RECYCLE
 	depends on NET_SKB_RECYCLE
@@ -260,7 +280,6 @@ config  MV_PP2_TX_DONE_TIMER_PERIOD
         default 10
         ---help---
           Periodical timer period for Tx Done operation in [msec].
-
 
 config MV_PP2_TXDONE_COAL_PKTS
 	int "Threshold for TX_DONE event trigger"
@@ -378,11 +397,12 @@ config MV_PP2_EXTRA_BUF_NUM
 	Number of extra buffers allocated for each port
 endmenu
 
-menu "PON support for Network driver"
+menu "PP2 PON support"
+	depends on MV_ETH_PP2
 
 config MV_PP2_PON
 	bool "PP2 PON support"
-	depends on MV_ETH_PP2 && MV_INCLUDE_PON
+	depends on MV_INCLUDE_PON
 	---help---
 	Choose this option to support PON port in Marvell network driver.
 
@@ -403,6 +423,7 @@ config MV_PP2_PON_TXQ_DEF
 endmenu
 
 menu "PP2 ERRATA / WA"
+	depends on MV_ETH_PP2
 
 config MV_PP2_SWF_HWF_CORRUPTION_WA
         bool "Prevent data corruption in IOCC mode"
@@ -420,7 +441,8 @@ config MV_PP2_SWF_HWF_CORRUPTION_WA
 
 endmenu
 
-menu "SoC CPH support"
+menu "PP2 CPH support"
+	depends on MV_ETH_PP2
 
 config  MV_CPH
         tristate "Support for Marvell CPU Packet Handler Driver"
