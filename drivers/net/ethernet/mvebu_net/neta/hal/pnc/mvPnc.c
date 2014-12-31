@@ -948,7 +948,8 @@ void pnc_ip4_tcp(int rxq)
 	sram_sw_set_rinfo(te, (RI_L3_IP4_FRAG | RI_L4_TCP), (RI_L3_IP4_FRAG | RI_L4_TCP));
 	sram_sw_set_rxq(te, rxq_ip4_tcp, 0);
 	sram_sw_set_ainfo(te, 0, AI_DONE_MASK);
-	pnc_ip4_flow_next_lookup_set(te);
+	sram_sw_set_lookup_done(te, 1);
+	sram_sw_set_flowid(te, FLOWID_EOF_LU_L4, FLOWID_CTRL_LOW_HALF_MASK);
 	tcam_sw_text(te, "ipv4_tcp_fr");
 
 	tcam_hw_write(te, TE_IP4_TCP_FRAG);
@@ -987,7 +988,8 @@ void pnc_ip4_udp(int rxq)
 	sram_sw_set_rinfo(te, (RI_L3_IP4_FRAG | RI_L4_UDP), (RI_L3_IP4_FRAG | RI_L4_UDP));
 	sram_sw_set_rxq(te, rxq_ip4_udp, 0);
 	sram_sw_set_ainfo(te, 0, AI_DONE_MASK);
-	pnc_ip4_flow_next_lookup_set(te);
+	sram_sw_set_lookup_done(te, 1);
+	sram_sw_set_flowid(te, FLOWID_EOF_LU_L4, FLOWID_CTRL_LOW_HALF_MASK);
 	tcam_sw_text(te, "ipv4_udp_fr");
 
 	tcam_hw_write(te, TE_IP4_UDP_FRAG);

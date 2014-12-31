@@ -365,9 +365,10 @@ void    mvPncAgingCounterClear(int tid, int gr);
 #ifdef MV_ETH_PNC_LB
 void    mvPncLbDump(void);
 int     mvPncLbRxqSet(int hash, int rxq);
-int		mvPncLbModeIp4(int mode);
-int		mvPncLbModeIp6(int mode);
-int		mvPncLbModeL4(int mode);
+int	mvPncLbFirstFragL4(int en);
+int	mvPncLbModeIp4(int mode);
+int	mvPncLbModeIp6(int mode);
+int	mvPncLbModeL4(int mode);
 #endif /* MV_ETH_PNC_LB */
 
 #endif /* CONFIG_MV_ETH_PNC */
