@@ -78,9 +78,10 @@ static ssize_t tcam_help(char *buf)
 	off += mvOsSPrintf(buf+off, " hw_hits         - start recording for port <a>\n");
 
 #ifdef MV_ETH_PNC_LB
+	off += mvOsSPrintf(buf+off, " lb_frag_l4      - enable/disable 4-tuple LB mode for first fragment\n");
 	off += mvOsSPrintf(buf+off, " lb_ip4          - set LB mode <a> for ipv4 traffic: 0-disable, 1-2tuple\n");
 	off += mvOsSPrintf(buf+off, " lb_ip6          - set LB mode <a> for ipv6 traffic: 0-disable, 1-2tuple\n");
-	off += mvOsSPrintf(buf+off, " lb_l4           - set LB mode <a> for TCP/UDP traffic: : 0-disable, 1-2tuple, 2-4tuple\n");
+	off += mvOsSPrintf(buf+off, " lb_l4           - set LB mode <a> for TCP/UDP traffic: 0-disable, 1-2tuple, 2-4tuple\n");
 #endif /* MV_ETH_PNC_LB */
 
 #ifdef MV_ETH_PNC_AGING
@@ -185,6 +186,8 @@ static ssize_t tcam_store(struct device *dev,
 	else if (!strcmp(name, "hw_hits"))
 		tcam_hw_record(a);
 #ifdef MV_ETH_PNC_LB
+	else if (!strcmp(name, "lb_frag_l4"))
+		mvPncLbFirstFragL4(a);
 	else if (!strcmp(name, "lb_ip4"))
 		mvPncLbModeIp4(a);
 	else if (!strcmp(name, "lb_ip6"))
@@ -297,6 +300,7 @@ static DEVICE_ATTR(lb_rxq,      S_IWUSR, tcam_show, tcam_store);
 static DEVICE_ATTR(lb_ip4,      S_IWUSR, tcam_show, tcam_store);
 static DEVICE_ATTR(lb_ip6,      S_IWUSR, tcam_show, tcam_store);
 static DEVICE_ATTR(lb_l4,       S_IWUSR, tcam_show, tcam_store);
+static DEVICE_ATTR(lb_frag_l4,     S_IWUSR, tcam_show, tcam_store);
 #endif /* MV_ETH_PNC_LB */
 
 static DEVICE_ATTR(sw_dump,     S_IRUSR, tcam_show, tcam_store);
@@ -351,6 +355,7 @@ static struct attribute *pnc_attrs[] = {
 	&dev_attr_lb_ip4.attr,
 	&dev_attr_lb_ip6.attr,
 	&dev_attr_lb_l4.attr,
+	&dev_attr_lb_frag_l4.attr,
 #endif /* MV_ETH_PNC_LB */
 
     &dev_attr_sw_dump.attr,
