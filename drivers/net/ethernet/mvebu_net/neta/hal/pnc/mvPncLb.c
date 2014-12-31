@@ -35,6 +35,11 @@ disclaimer.
 #include "mvTcam.h"
 
 #ifdef MV_ETH_PNC_LB
+int pnc_lb_first_frag_l4;
+int mvPncLbFirstFragL4(int en)
+{
+	pnc_lb_first_frag_l4 = en;
+}
 
 void    mvPncLbDump(void)
 {
@@ -78,7 +83,7 @@ int    mvPncLbRxqSet(int hash, int rxq)
 	return 0;
 }
 
-int		mvPncLbModeIp4(int mode)
+int	mvPncLbModeIp4(int mode)
 {
 	int lb;
 	struct tcam_entry te;
@@ -98,6 +103,14 @@ int		mvPncLbModeIp4(int mode)
 	tcam_hw_read(&te, TE_IP4_EOF);
 	sram_sw_set_load_balance(&te, lb);
 	tcam_hw_write(&te, TE_IP4_EOF);
+
+	tcam_hw_read(&te, TE_IP4_TCP_FRAG);
+	sram_sw_set_load_balance(&te, lb);
+	tcam_hw_write(&te, TE_IP4_TCP_FRAG);
+
+	tcam_hw_read(&te, TE_IP4_UDP_FRAG);
+	sram_sw_set_load_balance(&te, lb);
+	tcam_hw_write(&te, TE_IP4_UDP_FRAG);
 
 	return 0;
 }
@@ -153,6 +166,16 @@ int	mvPncLbModeL4(int mode)
 	tcam_hw_read(&te, TE_L4_EOF);
 	sram_sw_set_load_balance(&te, lb);
 	tcam_hw_write(&te, TE_L4_EOF);
+
+	if (pnc_lb_first_frag_l4) {
+		tcam_hw_read(&te, TE_IP4_TCP_FRAG);
+		sram_sw_set_load_balance(&te, lb);
+		tcam_hw_write(&te, TE_IP4_TCP_FRAG);
+
+		tcam_hw_read(&te, TE_IP4_UDP_FRAG);
+		sram_sw_set_load_balance(&te, lb);
+		tcam_hw_write(&te, TE_IP4_UDP_FRAG);
+	}
 	return 0;
 #endif /* CONFIG_MV_ETH_PNC_L3_FLOW */
 }
