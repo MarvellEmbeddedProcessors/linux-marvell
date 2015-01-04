@@ -79,11 +79,11 @@ struct mv_xor_suspend_regs {
  * @mmr_base: memory mapped register base
  * @idx: the index of the xor channel
  * @chain: device chain view of the descriptors
+ * @free_slots: free slots usable by the channel
+ * @allocated_slots: slots allocated by the driver
  * @completed_slots: slots completed by HW but still need to be acked
  * @device: parent device
  * @common: common dmaengine channel object members
- * @last_used: place holder for allocation to continue from where it left off
- * @all_slots: complete domain of slots usable by the channel
  * @slots_allocated: records the actual size of the descriptor slot pool
  * @irq_tasklet: bottom half where mv_xor_slot_cleanup runs
  */
@@ -96,14 +96,14 @@ struct mv_xor_chan {
 	enum dma_transaction_type	current_type;
 	struct mv_xor_suspend_regs	suspend_regs;
 	struct list_head	chain;
+	struct list_head	free_slots;
+	struct list_head	allocated_slots;
 	struct list_head	completed_slots;
 	dma_addr_t		dma_desc_pool;
 	void			*dma_desc_pool_virt;
 	size_t                  pool_size;
 	struct dma_device	dmadev;
 	struct dma_chan		dmachan;
-	struct mv_xor_desc_slot	*last_used;
-	struct list_head	all_slots;
 	int			slots_allocated;
 	struct tasklet_struct	irq_tasklet;
 #ifdef USE_TIMER
@@ -114,9 +114,7 @@ struct mv_xor_chan {
 
 /**
  * struct mv_xor_desc_slot - software descriptor
- * @slot_node: node on the mv_xor_chan.all_slots list
- * @chain_node: node on the mv_xor_chan.chain list
- * @completed_node: node on the mv_xor_chan.completed_slots list
+ * @node: node on the mv_xor_chan lists
  * @hw_desc: virtual address of the hardware descriptor chain
  * @phys: hardware address of the hardware descriptor chain
  * @slot_used: slot in use or not
@@ -128,12 +126,9 @@ struct mv_xor_chan {
  * @crc32_result: result crc calculation
  */
 struct mv_xor_desc_slot {
-	struct list_head	slot_node;
-	struct list_head	chain_node;
-	struct list_head	completed_node;
+	struct list_head	node;
 	enum dma_transaction_type	type;
 	void			*hw_desc;
-	u16			slot_used;
 	u16			idx;
 	u16			unmap_src_cnt;
 	u32			value;
