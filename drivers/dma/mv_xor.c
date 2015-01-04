@@ -57,12 +57,8 @@ static void mv_desc_init(struct mv_xor_desc_slot *desc, unsigned long flags)
 
 	hw_desc->status = (1 << 31);
 	hw_desc->phy_next_desc = 0;
-
-	/* Workaround for XOR data interity errors */
-#if 0
 	if (flags & DMA_PREP_INTERRUPT)
 		command = (1 << 31);
-#endif
 
 	if (desc->type == DMA_CRC32C)
 		command |= (1 << 30);	/* CRCLast */
