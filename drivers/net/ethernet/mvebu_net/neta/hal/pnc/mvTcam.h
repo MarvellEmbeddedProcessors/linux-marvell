@@ -278,6 +278,9 @@ extern unsigned int tcam_line_num;
 #define SHIFT_IP4_HLEN			126 /* IPv4 dynamic shift index */
 #define SHIFT_IP6_HLEN			127 /* IPv6 dynamic shift index */
 
+#define SHIFT_IP6_FIRST_PHASE	24 /* IPv6 first phase shift, to where DIP starts */
+#define SHIFT_IP6_SECOND_PHASE	16 /* IPv6 second phase shift, to L4 offset */
+
 /*
  * TCAM misc/control
  */

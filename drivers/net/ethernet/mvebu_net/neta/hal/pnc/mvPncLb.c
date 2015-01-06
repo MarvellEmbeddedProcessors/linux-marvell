@@ -39,6 +39,7 @@ int pnc_lb_first_frag_l4;
 int mvPncLbFirstFragL4(int en)
 {
 	pnc_lb_first_frag_l4 = en;
+	return 0;
 }
 
 void    mvPncLbDump(void)
@@ -82,11 +83,17 @@ int    mvPncLbRxqSet(int hash, int rxq)
 
 	return 0;
 }
+void		mvPncLbModeSet(int pnc_entry_num, int lb)
+{
+	struct tcam_entry te;
 
+	tcam_hw_read(&te, pnc_entry_num);
+	sram_sw_set_load_balance(&te, lb);
+	tcam_hw_write(&te, pnc_entry_num);
+}
 int	mvPncLbModeIp4(int mode)
 {
 	int lb;
-	struct tcam_entry te;
 
 	switch (mode) {
 	case 0:
@@ -100,17 +107,11 @@ int	mvPncLbModeIp4(int mode)
 		mvOsPrintf("%s: %d - unexpected mode value\n", __func__, mode);
 		return 1;
 	}
-	tcam_hw_read(&te, TE_IP4_EOF);
-	sram_sw_set_load_balance(&te, lb);
-	tcam_hw_write(&te, TE_IP4_EOF);
-
-	tcam_hw_read(&te, TE_IP4_TCP_FRAG);
-	sram_sw_set_load_balance(&te, lb);
-	tcam_hw_write(&te, TE_IP4_TCP_FRAG);
-
-	tcam_hw_read(&te, TE_IP4_UDP_FRAG);
-	sram_sw_set_load_balance(&te, lb);
-	tcam_hw_write(&te, TE_IP4_UDP_FRAG);
+	mvPncLbModeSet(TE_IP4_TCP, lb);
+	mvPncLbModeSet(TE_IP4_UDP, lb);
+	mvPncLbModeSet(TE_IP4_TCP_FRAG, lb);
+	mvPncLbModeSet(TE_IP4_UDP_FRAG, lb);
+	mvPncLbModeSet(TE_IP4_EOF, lb);
 
 	return 0;
 }
@@ -118,7 +119,6 @@ int	mvPncLbModeIp4(int mode)
 int	mvPncLbModeIp6(int mode)
 {
 	int lb;
-	struct tcam_entry te;
 
 	switch (mode) {
 	case 0:
@@ -132,9 +132,11 @@ int	mvPncLbModeIp6(int mode)
 		mvOsPrintf("%s: %d - unexpected mode value\n", __func__, mode);
 		return 1;
 	}
-	tcam_hw_read(&te, TE_IP6_EOF);
-	sram_sw_set_load_balance(&te, lb);
-	tcam_hw_write(&te, TE_IP6_EOF);
+	mvPncLbModeSet(TE_IP6_TCP, lb);
+	mvPncLbModeSet(TE_IP6_UDP, lb);
+	mvPncLbModeSet(TE_IP6_UNKNOWN_L4, lb);
+	mvPncLbModeSet(TE_IP6_2ND_PHASE_TCP_UDP, lb);
+	mvPncLbModeSet(TE_IP6_2ND_PHASE_UNKNOWN_L4, lb);
 
 	return 0;
 }
@@ -142,7 +144,6 @@ int	mvPncLbModeIp6(int mode)
 int	mvPncLbModeL4(int mode)
 {
 	int lb;
-	struct tcam_entry te;
 
 	switch (mode) {
 	case 0:
@@ -163,18 +164,17 @@ int	mvPncLbModeL4(int mode)
 	mvOsPrintf("%s: Not supported\n", __func__);
 	return 1;
 #else
-	tcam_hw_read(&te, TE_L4_EOF);
-	sram_sw_set_load_balance(&te, lb);
-	tcam_hw_write(&te, TE_L4_EOF);
+	/* IP4 */
+	mvPncLbModeSet(TE_IP4_TCP, lb);
+	mvPncLbModeSet(TE_IP4_UDP, lb);
+	/* IP6 */
+	mvPncLbModeSet(TE_IP6_TCP, lb);
+	mvPncLbModeSet(TE_IP6_UDP, lb);
+	mvPncLbModeSet(TE_IP6_2ND_PHASE_TCP_UDP, lb);
 
 	if (pnc_lb_first_frag_l4) {
-		tcam_hw_read(&te, TE_IP4_TCP_FRAG);
-		sram_sw_set_load_balance(&te, lb);
-		tcam_hw_write(&te, TE_IP4_TCP_FRAG);
-
-		tcam_hw_read(&te, TE_IP4_UDP_FRAG);
-		sram_sw_set_load_balance(&te, lb);
-		tcam_hw_write(&te, TE_IP4_UDP_FRAG);
+		mvPncLbModeSet(TE_IP4_TCP_FRAG, lb);
+		mvPncLbModeSet(TE_IP4_UDP_FRAG, lb);
 	}
 	return 0;
 #endif /* CONFIG_MV_ETH_PNC_L3_FLOW */
