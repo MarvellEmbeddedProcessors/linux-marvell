@@ -1620,7 +1620,7 @@ static struct sk_buff *mv_pp2_skb_alloc(struct eth_port *pp, struct bm_pool *poo
 	else
 		dev = pp->dev->dev.parent;
 
-	skb = __dev_alloc_skb(pool->pkt_size, gfp_mask);
+	skb = __dev_alloc_skb(pool->pkt_size, GFP_DMA | gfp_mask);
 	if (!skb) {
 		STAT_ERR(pool->stats.skb_alloc_oom++);
 		return NULL;
