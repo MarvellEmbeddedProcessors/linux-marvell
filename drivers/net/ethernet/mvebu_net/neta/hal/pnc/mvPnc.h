@@ -119,6 +119,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define AI_DONE_BIT         0
 #define AI_DONE_MASK        (1 << AI_DONE_BIT)
 
+#define AI_IP6_L4_TCP_UDP_BIT         1
+#define AI_IP6_L4_TCP_UDP_MASK        (1 << AI_IP6_L4_TCP_UDP_BIT)
+
+#define AI_IP6_L4_NOTHING_BIT         2
+#define AI_IP6_L4_NOTHING_MASK        (1 << AI_IP6_L4_NOTHING_BIT)
+
 /* PnC result info */
 #define NETA_PNC_VLAN       (RI_VLAN  >> 9)
 #define NETA_PNC_DA_MC      (RI_DA_MC >> 9)
@@ -182,7 +188,9 @@ enum {
 	/* IP6 Lookup */
 	TE_IP6_TCP,
 	TE_IP6_UDP,
-	TE_IP6_EOF,
+	TE_IP6_UNKNOWN_L4,
+	TE_IP6_2ND_PHASE_TCP_UDP,
+	TE_IP6_2ND_PHASE_UNKNOWN_L4,
 
 #ifdef CONFIG_MV_ETH_PNC_L3_FLOW
 	/* Session Lookup for IPv4 and IPv6 */
