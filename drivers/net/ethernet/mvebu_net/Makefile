@@ -43,3 +43,6 @@ endif
 ifeq ($(CONFIG_MV_ETH_PP2),y)
 obj-y += pp2/
 endif
+ifeq ($(CONFIG_MV_PP3),y)
+obj-y += pp3/
+endif
