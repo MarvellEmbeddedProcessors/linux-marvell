@@ -46,10 +46,15 @@
 #define SDCLK_DELAY_SHIFT	9
 #define SDCLK_DELAY_MASK	0x1f
 
-#define SD_CFG_FIFO_PARAM       0x100
+#define SD_EXTRA_PARAM_REG	0x100
 #define SDCFG_GEN_PAD_CLK_ON	(1<<6)
 #define SDCFG_GEN_PAD_CLK_CNT_MASK	0xFF
 #define SDCFG_GEN_PAD_CLK_CNT_SHIFT	24
+
+#define SD_FIFO_PARAM_REG	0x104
+#define SD_USE_DAT3		BIT(7)
+#define SD_OVRRD_CLK_OEN	BIT(11)
+#define SD_FORCE_CLK_ON		BIT(12)
 
 #define SD_SPI_MODE          0x108
 #define SD_CE_ATA_1          0x10C
@@ -105,6 +110,8 @@ static void pxav3_set_private_registers(struct sdhci_host *host, u8 mask)
 {
 	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
 	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+	struct device_node *np = pdev->dev.of_node;
+	u32 reg_val;
 
 	if (mask == SDHCI_RESET_ALL) {
 		/*
@@ -119,6 +126,21 @@ static void pxav3_set_private_registers(struct sdhci_host *host, u8 mask)
 				<< SDCLK_DELAY_SHIFT;
 			tmp |= SDCLK_SEL;
 			writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+		}
+
+		if (of_device_is_compatible(np, "marvell,armada-380-sdhci") &&
+		    host->quirks2 & SDHCI_QUIRK2_KEEP_INT_CLK_ON) {
+			reg_val = sdhci_readl(host, SD_FIFO_PARAM_REG);
+			reg_val |= SD_USE_DAT3 | SD_OVRRD_CLK_OEN |
+				   SD_FORCE_CLK_ON;
+			sdhci_writel(host, reg_val, SD_FIFO_PARAM_REG);
+
+			/* For HW detection purpose keep internal clk switched
+			 * on after controller reset.
+			 */
+			reg_val = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
+			reg_val |= SDHCI_CLOCK_INT_EN;
+			sdhci_writel(host, reg_val, SDHCI_CLOCK_CONTROL);
 		}
 	}
 }
@@ -147,9 +169,9 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
 		writew(tmp, host->ioaddr + SD_CE_ATA_2);
 
 		/* start sending the 74 clocks */
-		tmp = readw(host->ioaddr + SD_CFG_FIFO_PARAM);
+		tmp = readw(host->ioaddr + SD_EXTRA_PARAM_REG);
 		tmp |= SDCFG_GEN_PAD_CLK_ON;
-		writew(tmp, host->ioaddr + SD_CFG_FIFO_PARAM);
+		writew(tmp, host->ioaddr + SD_EXTRA_PARAM_REG);
 
 		/* slowest speed is about 100KHz or 10usec per clock */
 		udelay(740);
@@ -373,6 +395,14 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 
 			host->caps1 &= ~(SDHCI_SUPPORT_SDR104 |
 					 SDHCI_USE_SDR50_TUNING);
+
+			/* The interface clock enable is also used as control
+			 * for the A38x SDIO IP, so it can't be powered down
+			 * when using HW-based card detection.
+			 */
+			if (of_property_read_bool(np, "dat3-cd") &&
+			    !of_property_read_bool(np, "broken-cd"))
+				host->quirks2 |= SDHCI_QUIRK2_KEEP_INT_CLK_ON;
 		}
 	} else if (pdata) {
 		/* on-chip device */
