@@ -1132,7 +1132,10 @@ static void sdhci_set_clock(struct sdhci_host *host, unsigned int clock)
 			return;
 	}
 
-	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
+	/* Some controllers need to keep internal clk always enabled */
+	if (host->quirks2 & SDHCI_QUIRK2_KEEP_INT_CLK_ON)
+		clk = SDHCI_CLOCK_INT_EN;
+	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
 
 	if (clock == 0)
 		goto out;
