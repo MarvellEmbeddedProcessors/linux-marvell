@@ -48,12 +48,15 @@ static ssize_t mv_mux_help(char *b)
 	o += sprintf(b+o, "echo name wL wH    > edsa_tx      - Set virt interface EDSA TX tag\n");
 	o += sprintf(b+o, "echo name wL wH    > edsa_rx      - Set virt interface EDSA RX tag\n");
 	o += sprintf(b+o, "echo name wL wH    > edsa_rx_mask - Set virt interface EDSA RX mask tag\n");
+	o += sprintf(b+o, "echo name en       > leave_tag    - Don't remove tag on RX and don't add tag on TX\n");
+	o += sprintf(b+o, "echo name proto    > proto_type   - Set 16 bits protocol value to work with raw socket.\n");
 
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
 	o += sprintf(b+o, "echo p hex         > debug        - bit0:rx, bit1:tx\n");
 #endif
 	o += sprintf(b+o, "\n");
-	o += sprintf(b+o, "params: name-interface name,  mh-2 bytes value(hex), dsa,edsa,vid-4 bytes value(hex)\n");
+	o += sprintf(b+o, "params: name - interface name, please follow example: eth0m0 (device mux0 on port eth0)\n");
+	o += sprintf(b+o, "params: mh-2 bytes value(hex), dsa,edsa,vid-4 bytes value(hex)\n");
 
 	return o;
 }
@@ -137,6 +140,16 @@ static ssize_t mv_mux_netdev_store(struct device *dev,
 		mux_cfg.tx_tag.edsa[1] = b;
 		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
 
+	} else if (!strcmp(name, "leave_tag")) {
+		mv_mux_cfg_get(mux_dev, &mux_cfg);
+		mux_cfg.leave_tag = a;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
+
+	} else if (!strcmp(name, "proto_type")) {
+		mv_mux_cfg_get(mux_dev, &mux_cfg);
+		mux_cfg.proto_type = a;
+		err = mv_mux_netdev_alloc(dev_name, MV_MUX_UNKNOWN_GROUP, &mux_cfg) ? 0 : 1;
+
 	} else if (!strcmp(name, "add")) {
 		err =  mv_mux_netdev_add(a, mux_dev) ? 0 : 1;
 
@@ -199,6 +212,8 @@ static DEVICE_ATTR(edsa_rx_mask, S_IWUSR, mv_mux_show, mv_mux_netdev_store);
 static DEVICE_ATTR(mh_tx,        S_IWUSR, mv_mux_show, mv_mux_netdev_store);
 static DEVICE_ATTR(dsa_tx,       S_IWUSR, mv_mux_show, mv_mux_netdev_store);
 static DEVICE_ATTR(edsa_tx,      S_IWUSR, mv_mux_show, mv_mux_netdev_store);
+static DEVICE_ATTR(leave_tag,    S_IWUSR, mv_mux_show, mv_mux_netdev_store);
+static DEVICE_ATTR(proto_type,   S_IWUSR, mv_mux_show, mv_mux_netdev_store);
 static DEVICE_ATTR(tag_type,     S_IWUSR, mv_mux_show, mv_mux_store);
 static DEVICE_ATTR(dump,         S_IWUSR, mv_mux_show, mv_mux_store);
 static DEVICE_ATTR(debug,        S_IWUSR, mv_mux_show, mv_mux_store);
@@ -218,6 +233,8 @@ static struct attribute *mv_mux_attrs[] = {
 	&dev_attr_mh_tx.attr,
 	&dev_attr_dsa_tx.attr,
 	&dev_attr_edsa_tx.attr,
+	&dev_attr_leave_tag.attr,
+	&dev_attr_proto_type.attr,
 	&dev_attr_tag_type.attr,
 	&dev_attr_dump.attr,
 	&dev_attr_help.attr,

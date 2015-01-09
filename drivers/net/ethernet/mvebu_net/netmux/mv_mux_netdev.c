@@ -293,11 +293,255 @@ static inline int mv_mux_get_tag_size(MV_TAG_TYPE type)
 	return size_arr[type];
 }
 /*-----------------------------------------------------------------------------------------*/
+/* Restore VLAN with DSA, including EDSA */
+static inline int mv_mux_dsa2vlan(struct net_device *mux_dev, struct sk_buff *skb, bool is_edsa)
+{
+	u8 *dsa_header;
+	int source_device;
+	int source_port;
+	int len;
+	struct mux_netdev *pdev = MV_MUX_PRIV(mux_dev);
+
+	/* The ethertype field is part of the DSA header. */
+	dsa_header = skb->data + (2 * MV_MAC_ADDR_SIZE) + MV_ETH_MH_SIZE;
+#ifdef CONFIG_MV_ETH_DEBUG_CODE
+	if (mux_eth_shadow[pdev->port].flags & MV_MUX_F_DBG_RX) {
+		pr_info("dsa_header WL = 0x%.8x", ntohl(*((u32 *)dsa_header)));
+		if (is_edsa)
+			pr_info(" WH = 0x%.8x\n", ntohl(*(((u32 *)dsa_header) + 1)));
+		else
+			pr_info("\n");
+	}
+#endif
+
+	/* Check that frame type is either TO_CPU or FORWARD. */
+	if (MV_DSA_HDR_TAG_CMD_GET(dsa_header) != MV_DSA_HDR_TAG_CMD_TO_CPU &&
+		MV_DSA_HDR_TAG_CMD_GET(dsa_header) != MV_DSA_HDR_TAG_CMD_FORWARD) {
+		pr_err("Invalid (E)DSA type\n");
+		return -1;
+	}
+
+	/* Determine source device and port. */
+	source_device = MV_DSA_HDR_SRC_DEV_GET(dsa_header);
+	source_port = MV_DSA_HDR_SRC_PORT_GET(dsa_header);
+	if (is_edsa) {
+		/* WH bit 10 */
+		if (MV_EDSA_HDR_SRC_PORT_BIT5_GET(dsa_header))
+			source_port |= 0x20;
+	}
+
+#ifdef CONFIG_MV_ETH_DEBUG_CODE
+	if (mux_eth_shadow[pdev->port].flags & MV_MUX_F_DBG_RX)
+		pr_info("source_device = 0x%x, source_port=0x%x", source_device, source_port);
+#endif
+
+	/* Convert the DSA header to an 802.1q header if the 'tagged'
+	 * bit in the DSA header is set.  If the 'tagged' bit is clear,
+	 * delete the DSA header entirely.
+	*/
+	if (MV_DSA_HDR_TAGGED(dsa_header)) {
+		u8 new_header[4];
+		u16 tpid = ETH_P_8021Q;
+
+		/*
+		 * Insert 802.1q ethertype and copy the VLAN-related
+		 * fields, but clear the bit that will hold CFI (since
+		 * DSA uses that bit location for another purpose).
+		*/
+		new_header[0] = (tpid >> 8) & 0xff;
+		new_header[1] = tpid & 0xff;
+		new_header[2] = dsa_header[2] & ~0x10;
+		new_header[3] = dsa_header[3];
+
+		/*
+		 * Move CFI bit from its place in the DSA header to
+		 * its 802.1q-designated place.
+		 */
+		if (is_edsa) {
+			if (dsa_header[8] & 0x40)
+				new_header[2] |= 0x10;
+		} else {
+			if (dsa_header[1] & 0x01)
+				new_header[2] |= 0x10;
+		}
+
+		/*
+		 * Update packet checksum if skb is CHECKSUM_COMPLETE.
+		*/
+		if (skb->ip_summed == CHECKSUM_COMPLETE) {
+			__wsum c = skb->csum;
+			c = csum_add(c, csum_partial(new_header + 2, 2, 0));
+			c = csum_sub(c, csum_partial(dsa_header + 2, 2, 0));
+			skb->csum = c;
+		}
+
+		memcpy(dsa_header, new_header, MV_ETH_DSA_SIZE);
+		len = 0;
+		if (is_edsa) {
+			/* memmove the extend 4 bytes in EDSA */
+			memmove(skb->data + 4, skb->data, (2 * MV_MAC_ADDR_SIZE) + MV_ETH_MH_SIZE + 4);
+			__skb_pull(skb, 4);
+			len = 4;
+		}
+
+		/* MH exist in packet anycase - Skip it */
+		__skb_pull(skb, MV_ETH_MH_SIZE);
+		len += MV_ETH_MH_SIZE;
+	} else {
+		/* remove tag*/
+		len = mv_mux_rx_tag_remove(mux_dev, skb);
+	}
+
+	return len;
+}
+
+/* Build DSA with VLAN, the second parameter dsa is used to get trg port and trg dev id */
+static inline int mv_mux_vlan2dsa(struct sk_buff *skb, u32 dsa)
+{
+	u8 *dsa_header;
+	/* target devcie ID and port from tx DSA, TODO - what is the better way to get trg_dev and trg_port? */
+	u8 trg_dev = (dsa >> MV_DSA_HDR_TRG_DEV_WORD_OFF) & MV_DSA_HDR_TRG_DEV_MASK;
+	u8 trg_port = (dsa >> MV_DSA_HDR_TRG_PORT_WORD_OFF) & MV_DSA_HDR_TRG_PORT_MASK;
+
+	/*
+	 * Convert the outermost 802.1q tag to a DSA tag for tagged
+	 * packets, or insert a DSA tag between the addresses and
+	 * the ethertype field for untagged packets.
+	 */
+	if (skb->protocol == htons(ETH_P_8021Q)) {
+		if (skb_cow_head(skb, 0) < 0)
+			return -1;
+
+		/*
+		 * Construct tagged FROM_CPU DSA tag from 802.1q tag.
+		 */
+		dsa_header = skb->data + 2 * MV_MAC_ADDR_SIZE;
+		dsa_header[0] = 0x60 | trg_dev;
+		dsa_header[1] = trg_port << 3;
+
+		/*
+		 * Move CFI field from byte 2 to byte 1.
+		 */
+		if (dsa_header[2] & 0x10) {
+			dsa_header[1] |= 0x01;
+			dsa_header[2] &= ~0x10;
+		}
+	} else {
+		if (skb_cow_head(skb, MV_ETH_DSA_SIZE) < 0)
+			return -1;
+		skb_push(skb, MV_ETH_DSA_SIZE);
+
+		memmove(skb->data, skb->data + MV_ETH_DSA_SIZE, 2 * MV_MAC_ADDR_SIZE);
+
+		/*
+		 * Construct untagged FROM_CPU DSA tag.
+		 */
+		dsa_header = skb->data + (2 * MV_MAC_ADDR_SIZE);
+		dsa_header[0] = 0x40;
+		dsa_header[1] = trg_port << 3;
+		dsa_header[2] = 0x00;
+		dsa_header[3] = 0x00;
+	}
+
+#ifdef CONFIG_MV_ETH_DEBUG_CODE
+	pr_info("trg_dev = 0x%x, trg_port = 0x%x, dsa header = 0x%.8x\n",
+		trg_dev, trg_port, ntohl(*(u32 *)dsa_header));
+#endif
+
+	return 0;
+}
+
+static inline int mv_mux_vlan2edsa(struct sk_buff *skb, unsigned int edsaL, unsigned int edsaH)
+{
+	u8 *dsa_header;
+	/* target devcie ID and port from tx EDSA, TODO - what is the better way to get trg_dev and trg_port? */
+	u8 trg_dev = (edsaL >> MV_DSA_HDR_TRG_DEV_WORD_OFF) & MV_DSA_HDR_TRG_DEV_MASK;
+	u8 trg_port = (edsaL >> MV_DSA_HDR_TRG_PORT_WORD_OFF) & MV_DSA_HDR_TRG_PORT_MASK;
+
+	/*
+	 * Convert the outermost 802.1q tag to a DSA tag for tagged
+	 * packets, or insert a DSA tag between the addresses and
+	 * the ethertype field for untagged packets.
+	 */
+	if (skb->protocol == htons(ETH_P_8021Q)) {
+		if (skb_cow_head(skb, 0) < 0)
+			return -1;
+
+		/* add extra 4 bytes; edsa: 8 bytes, vlan: 4 bytes */
+		skb_push(skb, MV_ETH_DSA_SIZE);
+
+		/* Data move */
+		memmove(skb->data, skb->data + MV_ETH_DSA_SIZE, 2 * MV_MAC_ADDR_SIZE + MV_ETH_DSA_SIZE);
+
+		/*
+		 * Construct tagged FROM_CPU DSA tag from 802.1q tag.
+		 */
+		dsa_header = skb->data + 2 * MV_MAC_ADDR_SIZE;
+		dsa_header[0] = 0x60 | trg_dev;
+		dsa_header[1] = trg_port << 3;
+
+		/*
+		 * Move CFI field from byte 2 to byte 4.
+		 */
+		if (dsa_header[2] & 0x10) {
+			dsa_header[4] |= 0x40;
+			dsa_header[2] &= ~0x10;
+		}
+
+		/* Set extend bit */
+		dsa_header[2] |= 0x10;
+		dsa_header[4] &= 0x7f;
+		/* Set trg port bit[5] in WH bit 10 */
+		if (edsaH & 0x400)
+			dsa_header[6] |= 0x04;
+	} else {
+		if (skb_cow_head(skb, MV_ETH_EDSA_SIZE) < 0)
+			return -1;
+
+		/* Add 8 bytes of EDSA size */
+		skb_push(skb, MV_ETH_EDSA_SIZE);
+
+		/* Data move */
+		memmove(skb->data, skb->data + MV_ETH_EDSA_SIZE, 2 * MV_MAC_ADDR_SIZE);
+
+		/*
+		 * Construct untagged FROM_CPU DSA tag.
+		 */
+		dsa_header = skb->data + 2 * MV_MAC_ADDR_SIZE;
+		dsa_header[0] = 0x40 | trg_dev;
+		dsa_header[1] = trg_port << 3;
+		dsa_header[2] = 0x00;
+		dsa_header[3] = 0x00;
+
+		/* Set extend */
+		dsa_header[2] |= 0x10;
+		/* Clear WH bit 31 and 30*/
+		dsa_header[4] = 0x00;
+		/* Clear other fields */
+		dsa_header[5] = 0x00;
+		dsa_header[6] = 0x00;
+		dsa_header[7] = 0x00;
+		/* Set trg port bit[5] in WH bit 10 */
+		if (edsaH & 0x400)
+			dsa_header[6] |= 0x04;
+	}
+
+#ifdef CONFIG_MV_ETH_DEBUG_CODE
+	/*pr_info("trg_dev = 0x%x, trg_port = 0x%x, EDSA header WL=0x%.8x, WH=0x%.8x\n",
+		trg_dev, trg_port, ntohl(*(u32 *)dsa_header), ntohl(*(((u32 *)dsa_header) + 1)));*/
+#endif
+
+	return MV_OK;
+}
+
+/*-----------------------------------------------------------------------------------------*/
 
 int mv_mux_rx(struct sk_buff *skb, int port, struct napi_struct *napi)
 {
 	struct net_device *mux_dev;
 	int    len;
+	struct mux_netdev *pdev;
+	bool is_edsa = false;
 
 	mux_dev = mv_mux_rx_netdev_get(port, skb);
 
@@ -308,16 +552,37 @@ int mv_mux_rx(struct sk_buff *skb, int port, struct napi_struct *napi)
 	if (!(mux_dev->flags & IFF_UP))
 		goto out1;
 
-	/* remove tag*/
-	len = mv_mux_rx_tag_remove(mux_dev, skb);
+	pdev = MV_MUX_PRIV(mux_dev);
+
+	if (pdev->leave_tag == false) {
+		/* restore VLAN from DSA */
+		if (mux_eth_shadow[pdev->port].tag_type == MV_TAG_TYPE_DSA ||
+		    mux_eth_shadow[pdev->port].tag_type == MV_TAG_TYPE_EDSA) {
+			if (mux_eth_shadow[pdev->port].tag_type == MV_TAG_TYPE_EDSA)
+				is_edsa = true;
+			len = mv_mux_dsa2vlan(mux_dev, skb, is_edsa);
+			/* Not valid DSA mode */
+			if (len < 0) {
+				pr_err("Invalid (E)DSA mode\n");
+				goto out1;
+			}
+		} else {
+			/* remove tag */
+			len = mv_mux_rx_tag_remove(mux_dev, skb);
+		}
+	} else {
+		/* Transparent to packet, however, MH exist in packet anycase - Skip it */
+		__skb_pull(skb, MV_ETH_MH_SIZE);
+		len = MV_ETH_MH_SIZE;
+	}
 	mux_dev->stats.rx_packets++;
 	mux_dev->stats.rx_bytes += skb->len;
 
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
 	if (mux_eth_shadow[port].flags & MV_MUX_F_DBG_RX) {
 		struct mux_netdev *pmux_priv = MV_MUX_PRIV(mux_dev);
-		pr_err("\n%s - %s: port=%d, cpu=%d, pkt_size=%d, shift=%d\n",
-			mux_dev->name, __func__, pmux_priv->port, smp_processor_id(), skb->len, len);
+		pr_err("\n%s - %s: port=%d, cpu=%d, pkt_size=%d, shift=%d, leave_tag=%d\n",
+			mux_dev->name, __func__, pmux_priv->port, smp_processor_id(), skb->len, len, pdev->leave_tag);
 		/* mv_eth_skb_print(skb); */
 		mvDebugMemDump(skb->data, 64, 1);
 	}
@@ -329,6 +594,11 @@ int mv_mux_rx(struct sk_buff *skb, int port, struct napi_struct *napi)
 #endif
 */
 	skb->protocol = eth_type_trans(skb, mux_dev);
+
+	/* Replace protocol with ansparent proto for raw socket with app */
+	if (pdev->leave_tag == true &&
+	    (mux_eth_shadow[port].tag_type == MV_TAG_TYPE_DSA || mux_eth_shadow[port].tag_type == MV_TAG_TYPE_EDSA))
+		skb->protocol = htons(pdev->proto_type);
 
 	if (mux_dev->features & NETIF_F_GRO) {
 		/*
@@ -368,9 +638,9 @@ static int mv_mux_xmit(struct sk_buff *skb, struct net_device *dev)
 
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
 	if (mux_eth_shadow[pmux_priv->port].flags & MV_MUX_F_DBG_TX) {
-		pr_err("\n%s - %s_%lu: port=%d, cpu=%d, in_intr=0x%lx\n",
+		pr_err("\n%s - %s_%lu: port=%d, cpu=%d, in_intr=0x%lx, leave_tag=%d\n",
 			dev->name, __func__, dev->stats.tx_packets, pmux_priv->port,
-			smp_processor_id(), in_interrupt());
+			smp_processor_id(), in_interrupt(), pmux_priv->leave_tag);
 		/* mv_eth_skb_print(skb); */
 		mvDebugMemDump(skb->data, 64, 1);
 	}
@@ -634,6 +904,8 @@ struct net_device *mv_mux_netdev_alloc(char *name, int idx, MV_MUX_TAG *tag_cfg)
 		pmux_priv->tx_tag = tag_cfg->tx_tag;
 		pmux_priv->rx_tag_ptrn = tag_cfg->rx_tag_ptrn;
 		pmux_priv->rx_tag_mask = tag_cfg->rx_tag_mask;
+		pmux_priv->leave_tag = tag_cfg->leave_tag;
+		pmux_priv->proto_type = tag_cfg->proto_type;
 	}
 	pmux_priv->idx = idx;
 	return mux_dev;
@@ -1077,6 +1349,8 @@ void mv_mux_cfg_get(struct net_device *mux_dev, MV_MUX_TAG *mux_cfg)
 		mux_cfg->tx_tag = pmux_priv->tx_tag;
 		mux_cfg->rx_tag_ptrn = pmux_priv->rx_tag_ptrn;
 		mux_cfg->rx_tag_mask = pmux_priv->rx_tag_mask;
+		mux_cfg->leave_tag = pmux_priv->leave_tag;
+		mux_cfg->proto_type = pmux_priv->proto_type;
 	} else
 		memset(mux_cfg, 0, sizeof(MV_MUX_TAG));
 }
@@ -1163,7 +1437,8 @@ static inline struct net_device *mv_mux_edsa_netdev_get(int port, MV_TAG *tag)
 		dev = pdev->next;
 	}
 #ifdef CONFIG_MV_ETH_DEBUG_CODE
-	printk(KERN_ERR "%s:Error TAG=0x%08x match no interfaces\n", __func__, tag->vlan);
+	if (mux_eth_shadow[port].flags & MV_MUX_F_DBG_RX)
+		pr_err("%s:Error TAG=0x%08x, 0x%08x match no interfaces\n", __func__, tag->edsa[0], tag->edsa[1]);
 #endif
 
 	return NULL;
@@ -1183,23 +1458,23 @@ static inline struct net_device *mv_mux_rx_netdev_get(int port, struct sk_buff *
 	switch (tag_type) {
 
 	case MV_TAG_TYPE_MH:
-		tag.mh = *(MV_U16 *)data;
+		tag.mh = ntohs(*(MV_U16 *)data);
 		dev = mv_mux_mh_netdev_get(port, &tag);
 		break;
 
 	case MV_TAG_TYPE_VLAN:
-		tag.vlan = *(MV_U32 *)(data + MV_ETH_MH_SIZE + (2 * MV_MAC_ADDR_SIZE));
+		tag.vlan = ntohl(*(MV_U32 *)(data + MV_ETH_MH_SIZE + (2 * MV_MAC_ADDR_SIZE)));
 		dev = mv_mux_vlan_netdev_get(port, &tag);
 		break;
 
 	case MV_TAG_TYPE_DSA:
-		tag.dsa = *(MV_U32 *)(data + MV_ETH_MH_SIZE + (2 * MV_MAC_ADDR_SIZE));
+		tag.dsa = ntohl(*(MV_U32 *)(data + MV_ETH_MH_SIZE + (2 * MV_MAC_ADDR_SIZE)));
 		dev = mv_mux_dsa_netdev_get(port, &tag);
 		break;
 
 	case MV_TAG_TYPE_EDSA:
-		tag.edsa[0] = *(MV_U32 *)(data + MV_ETH_MH_SIZE + (2 * MV_MAC_ADDR_SIZE));
-		tag.edsa[1] = *(MV_U32 *)(data + MV_ETH_MH_SIZE + (2 * MV_MAC_ADDR_SIZE) + 4);
+		tag.edsa[0] = ntohl(*(MV_U32 *)(data + MV_ETH_MH_SIZE + (2 * MV_MAC_ADDR_SIZE)));
+		tag.edsa[1] = ntohl(*(MV_U32 *)(data + MV_ETH_MH_SIZE + (2 * MV_MAC_ADDR_SIZE) + 4));
 		dev = mv_mux_edsa_netdev_get(port, &tag);
 		break;
 
@@ -1352,7 +1627,7 @@ static inline int mv_mux_tx_skb_vlan_add(struct net_device *dev, struct sk_buff 
 {
 	struct mux_netdev *pdev = MV_MUX_PRIV(dev);
 
-	return mv_mux_skb_vlan_add(skb, pdev->tx_tag.vlan);
+	return mv_mux_skb_vlan_add(skb, htonl(pdev->tx_tag.vlan));
 }
 
 
@@ -1360,8 +1635,12 @@ static inline int mv_mux_tx_skb_vlan_add(struct net_device *dev, struct sk_buff 
 
 static inline int mv_mux_tx_skb_dsa_add(struct net_device *dev, struct sk_buff *skb)
 {
-	/* both DSA and VLAN are 4 bytes tags, placed in the same offset in the packet */
-	return mv_mux_tx_skb_vlan_add(dev, skb);
+	struct mux_netdev *pdev = MV_MUX_PRIV(dev);
+	/* build DSA tag with VLAN info */
+	if (!pdev->leave_tag)
+		return mv_mux_vlan2dsa(skb, pdev->tx_tag.dsa);
+	else
+		return MV_OK;
 }
 
 /*-----------------------------------------------------------------------------------------*/
@@ -1390,8 +1669,11 @@ static inline int mv_mux_skb_edsa_add(struct sk_buff *skb, unsigned int edsaL, u
 static inline int mv_mux_tx_skb_edsa_add(struct net_device *dev, struct sk_buff *skb)
 {
 	struct mux_netdev *pdev = MV_MUX_PRIV(dev);
-
-	return mv_mux_skb_edsa_add(skb, pdev->tx_tag.edsa[0], pdev->tx_tag.edsa[1]);
+	/* build EDSA tag with VLAN info */
+	if (!pdev->leave_tag)
+		return mv_mux_vlan2edsa(skb, pdev->tx_tag.edsa[0], pdev->tx_tag.edsa[1]);
+	else
+		return MV_OK;
 }
 
 /*-----------------------------------------------------------------------------------------*/
@@ -1401,6 +1683,10 @@ static inline int mv_mux_tx_skb_tag_add(struct net_device *dev, struct sk_buff *
 	struct mux_netdev *pdev = MV_MUX_PRIV(dev);
 	int tag_type = mux_eth_shadow[pdev->port].tag_type;
 	int err = 0;
+
+	/* If transparent, leave_tag is true, return */
+	if (pdev->leave_tag == true)
+		return err;
 
 	switch (tag_type) {
 
@@ -1433,51 +1719,52 @@ void mv_mux_netdev_print(struct net_device *mux_dev)
 	int tag_type;
 
 	if (!mux_dev) {
-		printk(KERN_ERR "%s:device in NULL.\n", __func__);
+		pr_err("%s:device in NULL.\n", __func__);
 		return;
 	}
 
 	if (mv_mux_netdev_find(mux_dev->ifindex) != -1) {
-		printk(KERN_ERR "%s: %s is not mux device.\n", __func__, mux_dev->name);
+		pr_err("%s: %s is not mux device.\n", __func__, mux_dev->name);
 		return;
 	}
 
 	pdev = MV_MUX_PRIV(mux_dev);
 
 	if (!pdev || (pdev->port == -1)) {
-		printk(KERN_ERR "%s: device must be conncted to physical port\n", __func__);
+		pr_err("%s: device must be conncted to physical port\n", __func__);
 		return;
 	}
 	tag_type = mux_eth_shadow[pdev->port].tag_type;
 	switch (tag_type) {
 
 	case MV_TAG_TYPE_VLAN:
-		printk(KERN_ERR "%s: port=%d, pdev=%p, tx_vlan=0x%08x, rx_vlan=0x%08x, rx_mask=0x%08x\n",
+		pr_info("%s: port=%d, pdev=%p, tx_vlan=0x%08x, rx_vlan=0x%08x, rx_mask=0x%08x",
 			mux_dev->name, pdev->port, pdev, pdev->tx_tag.vlan,
 			pdev->rx_tag_ptrn.vlan, pdev->rx_tag_mask.vlan);
 		break;
 
 	case MV_TAG_TYPE_DSA:
-		printk(KERN_ERR "%s: port=%d, pdev=%p: tx_dsa=0x%08x, rx_dsa=0x%08x, rx_mask=0x%08x\n",
+		pr_info("%s: port=%d, pdev=%p: tx_dsa=0x%08x, rx_dsa=0x%08x, rx_mask=0x%08x",
 			mux_dev->name, pdev->port, pdev, pdev->tx_tag.dsa,
 			pdev->rx_tag_ptrn.dsa, pdev->rx_tag_mask.dsa);
 		break;
 
 	case MV_TAG_TYPE_MH:
-		printk(KERN_ERR "%s: port=%d, pdev=%p: tx_mh=0x%04x, rx_mh=0x%04x, rx_mask=0x%04x\n",
+		pr_info("%s: port=%d, pdev=%p: tx_mh=0x%04x, rx_mh=0x%04x, rx_mask=0x%04x",
 			mux_dev->name, pdev->port, pdev, pdev->tx_tag.mh, pdev->rx_tag_ptrn.mh, pdev->rx_tag_mask.mh);
 		break;
 
 	case MV_TAG_TYPE_EDSA:
-		printk(KERN_ERR "%s: port=%d, pdev=%p: tx_edsa=0x%08x %08x, rx_edsa=0x%08x %08x, rx_mask=0x%08x %08x\n",
+		pr_info("%s: port=%d, pdev=%p: tx_edsa=0x%08x %08x, rx_edsa=0x%08x %08x, rx_mask=0x%08x %08x",
 			mux_dev->name, pdev->port, pdev, pdev->tx_tag.edsa[1], pdev->tx_tag.edsa[0],
 			pdev->rx_tag_ptrn.edsa[1], pdev->rx_tag_ptrn.edsa[0],
 			pdev->rx_tag_mask.edsa[1], pdev->rx_tag_mask.edsa[0]);
 		break;
 
 	default:
-		printk(KERN_ERR "%s: Error, Unknown tag type\n", __func__);
+		pr_info("%s: Error, Unknown tag type\n", __func__);
 	}
+	pr_info(", leave_tag=%d\n", pdev->leave_tag);
 }
 EXPORT_SYMBOL(mv_mux_netdev_print);
 

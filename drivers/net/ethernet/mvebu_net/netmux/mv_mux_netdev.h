@@ -51,12 +51,37 @@ disclaimer.
 /*e.g. when switch is in HGU mode, then mux device is created in -1 group*/
 #define MV_MUX_UNKNOWN_GROUP		(-1)
 
+/* Mux tag related definition */
+/* DSA/EDSA, the unit is Byte */
+#define MV_DSA_HDR_TAG_CMD_OFF (6)
+#define MV_DSA_HDR_TAG_CMD_TO_CPU (0x0)
+#define MV_DSA_HDR_TAG_CMD_FORWARD (0x3)
+#define MV_DSA_HDR_TAG_CMD_MASK (0x3)
+#define MV_DSA_HDR_TAG_CMD_GET(hdr) ((hdr[0] >> MV_DSA_HDR_TAG_CMD_OFF) & MV_DSA_HDR_TAG_CMD_MASK)
+
+#define MV_DSA_HDR_SRC_DEV_MASK (0x1f)
+#define MV_DSA_HDR_SRC_DEV_GET(hdr) (hdr[0] & MV_DSA_HDR_SRC_DEV_MASK)
+
+#define MV_DSA_HDR_SRC_PORT_OFF (3)
+#define MV_DSA_HDR_SRC_PORT_MASK (0x1f)
+#define MV_DSA_HDR_SRC_PORT_GET(hdr) ((hdr[1] >> MV_DSA_HDR_SRC_PORT_OFF) & MV_DSA_HDR_SRC_PORT_MASK)
+#define MV_EDSA_HDR_SRC_PORT_BIT5_GET(hdr) (hdr[6] & 0x4)
+
+#define MV_DSA_HDR_TRG_DEV_WORD_OFF (24)
+#define MV_DSA_HDR_TRG_DEV_MASK (0x1f)
+#define MV_DSA_HDR_TRG_PORT_WORD_OFF (19)
+#define MV_DSA_HDR_TRG_PORT_MASK (0x1f)
+
+#define MV_DSA_HDR_TAGGED_MASK (0x20)
+#define MV_DSA_HDR_TAGGED(hdr) (hdr[0] & MV_DSA_HDR_TAGGED_MASK)
+
 extern const struct ethtool_ops mv_mux_tool_ops;
 
 struct mux_netdev {
 	int	idx;
 	int	port;
 	bool    leave_tag;
+	MV_U16  proto_type;
 	MV_TAG  tx_tag;
 	MV_TAG  rx_tag_ptrn;
 	MV_TAG  rx_tag_mask;

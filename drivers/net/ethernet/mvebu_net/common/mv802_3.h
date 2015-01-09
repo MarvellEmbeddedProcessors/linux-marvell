@@ -98,6 +98,8 @@ typedef struct mv_mux_tag {
 	MV_TAG tx_tag;
 	MV_TAG rx_tag_ptrn;
 	MV_TAG rx_tag_mask;
+	MV_BOOL leave_tag;
+	MV_U16 proto_type;
 } MV_MUX_TAG;
 
 typedef enum {

@@ -265,8 +265,7 @@ static int mv_pp2_tag_type_set(int port, int type)
 {
 	struct eth_port *pp = mv_pp2_port_by_id(port);
 
-	if ((type == MV_TAG_TYPE_MH) || (type == MV_TAG_TYPE_DSA) || (type == MV_TAG_TYPE_EDSA))
-		mvPp2MhSet(port, type);
+	mvPp2MhSet(port, type);
 
 	pp->tagged = (type == MV_TAG_TYPE_NONE) ? MV_FALSE : MV_TRUE;
 
