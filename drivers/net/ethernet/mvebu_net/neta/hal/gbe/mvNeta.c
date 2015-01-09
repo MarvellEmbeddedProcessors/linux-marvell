@@ -2552,6 +2552,7 @@ MV_STATUS mvNetaMhSet(int port, MV_NETA_MH_MODE mh)
 
 	case MV_NETA_DSA_EXT:
 		regVal |= ETH_DSA_EXT_MASK;
+		break;
 
 	default:
 		mvOsPrintf("port=%d: Unexpected MH = %d value\n", port, mh);
