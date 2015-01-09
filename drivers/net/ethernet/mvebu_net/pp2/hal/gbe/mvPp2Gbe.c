@@ -1226,6 +1226,7 @@ MV_STATUS mvPp2MhSet(int port, MV_TAG_TYPE mh)
 	regVal &= ~(MV_PP2_DSA_EN_MASK | MV_PP2_MH_EN_MASK);
 	switch (mh) {
 	case MV_TAG_TYPE_NONE:
+	case MV_TAG_TYPE_VLAN:
 		break;
 
 	case MV_TAG_TYPE_MH:
@@ -1233,11 +1234,12 @@ MV_STATUS mvPp2MhSet(int port, MV_TAG_TYPE mh)
 		break;
 
 	case MV_TAG_TYPE_DSA:
-		regVal |= MV_PP2_DSA_EN_MASK;
+		regVal |= MV_PP2_DSA_NON_EXTENDED;
 		break;
 
 	case MV_TAG_TYPE_EDSA:
 		regVal |= MV_PP2_DSA_EXTENDED;
+		break;
 
 	default:
 		mvOsPrintf("port=%d: Unexpected MH = %d value\n", port, mh);
