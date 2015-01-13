@@ -102,13 +102,15 @@ extern void ll_enable_coherency(void);
 
 extern void armada_370_xp_cpu_resume(void);
 extern void armada_38x_cpu_resume(void);
-
+extern struct clk *get_cpu_clk(int cpu);
 void __iomem *scu_base;
 
 static phys_addr_t pmsu_mp_phys_base;
 static void __iomem *pmsu_mp_base;
 
 static void *mvebu_cpu_resume;
+static int (*mvebu_pmsu_dfs_request_ptr)(int cpu);
+
 static void __iomem *sram_wa_virt_base[2];
 
 static struct of_device_id of_pmsu_table[] = {
@@ -561,6 +563,12 @@ static void mvebu_pmsu_dfs_request_local(void *data)
 
 	local_irq_save(flags);
 
+	/* Clear any previous DFS DONE event & Mask the DFS done interrupt */
+	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
+	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE;
+	reg |= PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
+	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
+
 	/* Prepare to enter idle */
 	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
 	reg |= PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT |
@@ -584,24 +592,19 @@ static void mvebu_pmsu_dfs_request_local(void *data)
 	reg &= ~PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT;
 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
 
+	/* Restore the DFS mask to its original state */
+	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
+	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
+	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
+
 	local_irq_restore(flags);
 }
 
-int mvebu_pmsu_dfs_request(int cpu)
+int armada_xp_pmsu_dfs_request(int cpu)
 {
 	unsigned long timeout;
 	int hwcpu = cpu_logical_map(cpu);
 	u32 reg;
-
-	/* Clear any previous DFS DONE event */
-	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE;
-	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-
-	/* Mask the DFS done interrupt, since we are going to poll */
-	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-	reg |= PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
-	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
 
 	/* Trigger the DFS on the appropriate CPU */
 	smp_call_function_single(cpu, mvebu_pmsu_dfs_request_local,
@@ -619,22 +622,82 @@ int mvebu_pmsu_dfs_request(int cpu)
 	if (time_after(jiffies, timeout))
 		return -ETIME;
 
-	/* Restore the DFS mask to its original state */
-	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
-	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-
 	return 0;
 }
 
-static int __init armada_xp_pmsu_cpufreq_init(void)
+int armada_380_pmsu_dfs_request(int cpu)
+{
+	/* Trigger the DFS on the appropriate CPU */
+	on_each_cpu(mvebu_pmsu_dfs_request_local,
+				 NULL, false);
+	return 0;
+}
+
+int mvebu_pmsu_dfs_request(int cpu)
+{
+	return mvebu_pmsu_dfs_request_ptr(cpu);
+}
+#if 0
+struct cpufreq_dt_platform_data armada_xp_cpufreq_dt_pd = {
+	.independent_clocks = true,
+};
+
+struct cpufreq_dt_platform_data armada_380_cpufreq_dt_pd = {
+	.independent_clocks = false,
+};
+#endif
+static int mvebu_v7_pmsu_register_cpufreq(int cpu)
+{
+	struct device *cpu_dev;
+	struct clk *clk;
+	int ret;
+
+	/*
+	* registers the operating points
+	* supported (which are the nominal CPU frequency and half of
+	* it), and registers the clock notifier that will take care
+	* of doing the PMSU part of a frequency transition.
+	*/
+
+	cpu_dev = get_cpu_device(cpu);
+	if (!cpu_dev) {
+		pr_err("Cannot get CPU %d\n", cpu);
+		return 0;
+	}
+
+	clk = clk_get(cpu_dev, 0);
+	if (!clk) {
+		pr_err("Cannot get clock for CPU %d\n", cpu);
+		return -ENODEV;
+	}
+
+	/*
+	 * In case of a failure of dev_pm_opp_add(), we don't
+	 * bother with cleaning up the registered OPP (there's
+	 * no function to do so), and simply cancel the
+	 * registration of the cpufreq device.
+	 */
+		ret = opp_add(cpu_dev, clk_get_rate(clk), 0);
+	if (ret) {
+		clk_put(clk);
+		return ret;
+	}
+
+		ret = opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
+	if (ret) {
+		clk_put(clk);
+		return ret;
+	}
+
+	return 0;
+
+}
+
+static int __init mvebu_v7_pmsu_cpufreq_init(void)
 {
 	struct device_node *np;
 	struct resource res;
 	int ret, cpu;
-
-	if (!of_machine_is_compatible("marvell,armadaxp"))
-		return 0;
 
 	/*
 	 * In order to have proper cpufreq handling, we need to ensure
@@ -657,50 +720,25 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
 
 	of_node_put(np);
 
-	/*
-	 * For each CPU, this loop registers the operating points
-	 * supported (which are the nominal CPU frequency and half of
-	 * it), and registers the clock notifier that will take care
-	 * of doing the PMSU part of a frequency transition.
-	 */
+	/* register cpu clock for each cpu */
 	for_each_possible_cpu(cpu) {
-		struct device *cpu_dev;
-		struct clk *clk;
-		int ret;
-
-		cpu_dev = get_cpu_device(cpu);
-		if (!cpu_dev) {
-			pr_err("Cannot get CPU %d\n", cpu);
-			continue;
-		}
-
-		clk = clk_get(cpu_dev, 0);
-		if (!clk) {
-			pr_err("Cannot get clock for CPU %d\n", cpu);
-			return -ENODEV;
-		}
-
-		/*
-		 * In case of a failure of dev_pm_opp_add(), we don't
-		 * bother with cleaning up the registered OPP (there's
-		 * no function to do so), and simply cancel the
-		 * registration of the cpufreq device.
-		 */
-		ret = opp_add(cpu_dev, clk_get_rate(clk), 0);
-		if (ret) {
-			clk_put(clk);
+		ret = mvebu_v7_pmsu_register_cpufreq(cpu);
+		if (ret)
 			return ret;
-		}
-
-		ret = opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
-		if (ret) {
-			clk_put(clk);
-			return ret;
-		}
 	}
-
-	platform_device_register_simple("cpufreq-generic", -1, NULL, 0);
+#if 0
+	if (of_machine_is_compatible("marvell,armada38x")) {
+		mvebu_pmsu_dfs_request_ptr = armada_380_pmsu_dfs_request;
+		platform_device_register_data(NULL, "cpufreq-dt", -1,
+					&armada_380_cpufreq_dt_pd, sizeof(armada_380_cpufreq_dt_pd));
+	} else if (of_machine_is_compatible("marvell,armadaxp")) {
+		mvebu_pmsu_dfs_request_ptr = armada_xp_pmsu_dfs_request;
+		platform_device_register_data(NULL, "cpufreq-dt", -1,
+					&armada_xp_cpufreq_dt_pd, sizeof(armada_xp_cpufreq_dt_pd));
+	} else
+		return 0;
+#endif
 	return 0;
 }
 
-device_initcall(armada_xp_pmsu_cpufreq_init);
+device_initcall(mvebu_v7_pmsu_cpufreq_init);
