@@ -14,6 +14,7 @@
 
 #include <linux/init.h>
 #include <linux/io.h>
+#include <linux/clk.h>
 #include <linux/of.h>
 #include <linux/smp.h>
 #include <linux/cpu.h>
@@ -23,6 +24,34 @@
 #include "common.h"
 
 #include "pmsu.h"
+
+static struct clk *__init get_cpu_clk(int cpu)
+{
+	struct clk *cpu_clk;
+	struct device_node *np = of_get_cpu_node(cpu, NULL);
+
+	if (WARN(!np, "missing cpu node\n"))
+		return NULL;
+
+	cpu_clk = of_clk_get(np, 0);
+
+	if (WARN_ON(IS_ERR(cpu_clk)))
+		return NULL;
+
+	return cpu_clk;
+}
+
+static void __init set_secondary_cpus_clock(void)
+{
+	int thiscpu;
+	struct clk *cpu_clk;
+
+	thiscpu = smp_processor_id();
+	cpu_clk = get_cpu_clk(thiscpu);
+	if (!cpu_clk)
+		return;
+	clk_prepare_enable(cpu_clk);
+}
 
 extern void a380_secondary_startup(void);
 static struct notifier_block armada_380_secondary_cpu_notifier;
@@ -77,6 +106,8 @@ static void __init armada_380_smp_prepare_cpus(unsigned int max_cpus)
 	 * cannot be enabled from another CPU.
 	 */
 	register_cpu_notifier(&armada_380_secondary_cpu_notifier);
+
+	set_secondary_cpus_clock();
 }
 
 /*
