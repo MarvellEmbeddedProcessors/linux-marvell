@@ -58,6 +58,7 @@
 
 #define SD_SPI_MODE          0x108
 #define SD_CE_ATA_1          0x10C
+#define SDCE_MMC_CARD		BIT(28)
 
 #define SD_CE_ATA_2          0x10E
 #define SDCE_MISC_INT		(1<<2)
@@ -142,6 +143,22 @@ static void pxav3_set_private_registers(struct sdhci_host *host, u8 mask)
 			reg_val |= SDHCI_CLOCK_INT_EN;
 			sdhci_writel(host, reg_val, SDHCI_CLOCK_CONTROL);
 		}
+	}
+}
+
+static void pxav3_init_card(struct sdhci_host *host, struct mmc_card *card)
+{
+	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+	struct device_node *np = pdev->dev.of_node;
+	u32 reg_val;
+
+	if (of_device_is_compatible(np, "marvell,armada-380-sdhci")) {
+		reg_val = sdhci_readl(host, SD_CE_ATA_1);
+		if (mmc_card_mmc(card))
+			reg_val |= SDCE_MMC_CARD;
+		else
+			reg_val &= ~SDCE_MMC_CARD;
+		sdhci_writel(host, reg_val, SD_CE_ATA_1);
 	}
 }
 
@@ -259,6 +276,7 @@ static const struct sdhci_ops pxav3_sdhci_ops = {
 	.set_uhs_signaling = pxav3_set_uhs_signaling,
 	.platform_send_init_74_clocks = pxav3_gen_init_74_clocks,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+	.init_card = pxav3_init_card,
 };
 
 static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
