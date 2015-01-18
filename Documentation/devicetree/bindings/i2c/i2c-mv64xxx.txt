@@ -20,6 +20,9 @@ Optional properties :
 
  - clock-frequency : Desired I2C bus clock frequency in Hz. If not set the
 default frequency is 100kHz
+ - timeout-ms      : timeout value in miliseconds. If not set the default
+                     timeout is 1000ms
+
 
  - resets          : phandle to the parent reset controller. Mandatory
                      whenever you're using the "allwinner,sun6i-a31-i2c"
@@ -31,6 +34,7 @@ Examples:
 		compatible = "marvell,mv64xxx-i2c";
 		reg = <0x11000 0x20>;
 		interrupts = <29>;
+		timeout-ms = <1000>;
 		clock-frequency = <100000>;
 	};
 
@@ -40,5 +44,6 @@ For the Armada XP:
 		compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
 		reg = <0x11000 0x100>;
 		interrupts = <29>;
+		timeout-ms = <1000>;
 		clock-frequency = <100000>;
 	};
