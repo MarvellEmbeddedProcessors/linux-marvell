@@ -807,7 +807,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
 #else
 	const struct of_device_id *device;
 	struct device_node *np = dev->of_node;
-	u32 bus_freq, tclk;
+	u32 bus_freq, tclk, timeout;
 	int rc = 0;
 
 	if (IS_ERR(drv_data->clk)) {
@@ -839,10 +839,10 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
 		reset_control_deassert(drv_data->rstc);
 	}
 
-	/* Its not yet defined how timeouts will be specified in device tree.
-	 * So hard code the value to 1 second.
-	 */
-	drv_data->adapter.timeout = HZ;
+	if (of_property_read_u32(np, "timeout-ms", &timeout))
+		timeout = 1000; /* 1000ms by default */
+	drv_data->adapter.timeout = msecs_to_jiffies(timeout);
+
 
 	device = of_match_device(mv64xxx_i2c_of_match_table, dev);
 	if (!device)
