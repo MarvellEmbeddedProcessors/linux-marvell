@@ -71,4 +71,11 @@ config MV_ETH_INCLUDE_NETMUX
 	Use Marvell propriotary NETMUX driver for Virtual Networking interfaces support.
 	The driver located uner directory mvebu_net/netmux
 
+config MV_ETH_INCLUDE_NET_COMPLEX
+	bool "Choose to compile Marvell Net Complex support"
+	depends on MV_PP3
+	default y
+	---help---
+	Use Marvell propriotary netcomplex driver for A390.
+	The driver located uner directory mvebu_net/a390_nc.
 endif # NET_VENDOR_MVEBU
