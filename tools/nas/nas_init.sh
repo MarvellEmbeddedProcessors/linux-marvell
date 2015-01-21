@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 5.3"
+echo " * Version: 5.4"
 
 # LOG:
+# 5.4:
+#   1. added support for encrypted RAID arrays (crypt_rd0|crypt_rd1|crypt_rd5|crypt_rd6).
 # 5.3:
 #   1. enable adaptive coalecing for a338 & a375.
 # 5.2:
@@ -163,7 +165,7 @@ while getopts "l:ps:mzun:f:t:h:j:" flag; do
 	    ;;
 	t)	TOPOLOGY=$OPTARG
 	    case "$OPTARG" in
-		sd|rd0|rd1|rd5|rd6|crypt_sd) ;;
+		sd|rd0|rd1|rd5|rd6|crypt_sd|crypt_rd0|crypt_rd1|crypt_rd5|crypt_rd6) ;;
 		*)	do_error "-t: wrong option" ;;
 	    esac
 	    ;;
@@ -217,6 +219,10 @@ case "$TOPOLOGY" in
     rd5)	echo -ne "RAID5\n" ;;
     rd6)	echo -ne "RAID6\n" ;;
     crypt_sd) 	echo -ne "Encrypted single drive\n" ;;
+    crypt_rd0)	echo -ne "Encrypted RAID0\n" ;;
+    crypt_rd1)	echo -ne "Encrypted RAID1\n" ;;
+    crypt_rd5)	echo -ne "Encrypted RAID5\n" ;;
+    crypt_rd6)	echo -ne "Encrypted RAID6\n" ;;
     *)	do_error "Invalid drive topology" ;;
 esac
 
@@ -229,6 +235,11 @@ echo -ne "    Disk mount:    $SYSDISKEXIST\n"
 echo -ne "    * Option above will used for the system configuration\n"
 echo -ne "      if you like to change them, please pass different parameters to the nas_init.sh\n"
 echo -ne "******************************************\n"
+
+
+if [[ $TOPOLOGY == "crypt"* ]]; then
+    [ ! -e "$(which cryptsetup)" ] && do_error "cryptsetup in not installed, can't use encrypted drives"
+fi
 
 if [ "$SAMBASTATUS" == "enabled" ]; then
 
@@ -269,14 +280,14 @@ fi
 echo -ne "[Done]\n"
 
 # examine disk topology
-if [ "$TOPOLOGY" == "sd" -o "$TOPOLOGY" == "crypt_sd" ]; then
+if [[ $TOPOLOGY == *"sd" ]]; then
     if [ "$SYSDISKEXIST" == "yes" ]; then
 	DRIVES="b"
     else
 	DRIVES="a"
     fi
     PARTSIZE="55GB"
-elif [ "$TOPOLOGY" == "rd0" ]; then
+elif [[ $TOPOLOGY == *"rd0" ]]; then
     if [ "$HDD_NUM" == "5" ]; then
 	if [ "$SYSDISKEXIST" == "yes" ]; then
 	    DRIVES="b c d e f"
@@ -308,7 +319,7 @@ elif [ "$TOPOLOGY" == "rd0" ]; then
 	PARTSIZE="50GB"
     fi
     LEVEL=0
-elif [ "$TOPOLOGY" == "rd1" ]; then
+elif [[ $TOPOLOGY == *"rd1" ]]; then
     if [ "$SYSDISKEXIST" == "yes" ]; then
 	DRIVES="b c"
     else
@@ -317,7 +328,7 @@ elif [ "$TOPOLOGY" == "rd1" ]; then
     PARTSIZE="55GB"
     HDD_NUM=2
     LEVEL=1
-elif [ "$TOPOLOGY" == "rd5" ]; then
+elif [[ $TOPOLOGY == *"rd5" ]]; then
     if [ "$HDD_NUM" == "8" ]; then
 	if [ "$SYSDISKEXIST" == "yes" ]; then
 	    DRIVES="b c d e f g h i"
@@ -349,7 +360,7 @@ elif [ "$TOPOLOGY" == "rd5" ]; then
 	HDD_NUM=4
     fi
     LEVEL=5
-elif [ "$TOPOLOGY" == "rd6" ]; then
+elif [[ $TOPOLOGY == *"rd6" ]]; then
     if [ "$HDD_NUM" == "8" ]; then
 	if [ "$SYSDISKEXIST" == "yes" ]; then
 	    DRIVES="b c d e f g h i"
@@ -398,16 +409,16 @@ function create_fs {
     case "$1" in
 	ext4)
 	    case "$2" in
-		sd) STRIPE=0
+		*sd) STRIPE=0
 		    ;;
-		rd1) STRIPE=$STRIDE
+		*rd1) STRIPE=$STRIDE
 		    ;;
-		rd0) STRIPE=$((STRIDE * HDD_NUM))
+		*rd0) STRIPE=$((STRIDE * HDD_NUM))
 	            ;;
-		rd5) HDD_NUM=$((HDD_NUM - 1))
+		*rd5) HDD_NUM=$((HDD_NUM - 1))
 		    STRIPE=$((STRIDE * HDD_NUM))
 		    ;;
-		rd6) HDD_NUM=$(($HDD_NUM - 2))
+		*rd6) HDD_NUM=$(($HDD_NUM - 2))
 		    STRIPE=$((STRIDE * HDD_NUM))
 		    ;;
 		*) do_error "unsupported topology $2\n"
@@ -497,44 +508,40 @@ mdadm -S /dev/md*
 sleep 2
 echo -ne "[Done]\n"
 
-if [ "$TOPOLOGY" == "sd" ]; then
+if [[ $TOPOLOGY == *"sd" ]]; then
     PARTITIONS="/dev/sd${DRIVES}${PARTNUM}"
     echo -ne " * Starting single disk:       "
     set -o verbose
 
     echo -e 1024 > /sys/block/sd${DRIVES}/queue/read_ahead_kb
 
+
     if [ "$MKFS" == "yes" ]; then
 	for partition in `echo $DRIVES`; do mdadm --zero-superblock /dev/sd${partition}${PARTNUM}; done
 	sleep 2
+
+	if [[ $TOPOLOGY == "crypt"* ]]; then
+	    echo -ne "Encrypted: "
+            # create encryption key
+	    dd if=/dev/urandom of=key bs=$KEY_SIZE count=1
+	    cryptsetup -c $ALGORITHIM -d key -s $KEY_SIZE create $CRYPTO_NAME $PARTITIONS
+	    PARTITIONS="/dev/mapper/$CRYPTO_NAME"
+	fi
+
 	create_fs $FS $TOPOLOGY $PARTITIONS
+
+    elif [[ $TOPOLOGY == "crypt"* ]]; then
+	echo -ne "Encrypted: "
+	cryptsetup -c $ALGORITHIM -d key -s $KEY_SIZE create $CRYPTO_NAME $PARTITIONS
+	PARTITIONS="/dev/mapper/$CRYPTO_NAME"
     fi
 
     mount_fs $FS $PARTITIONS $MNT_DIR
 
     set +o verbose
     echo -ne "[Done]\n"
-elif [ "$TOPOLOGY" == "crypt_sd" ]; then
-    PARTITIONS="/dev/sd${DRIVES}${PARTNUM}"
-    CRYPTO_PARTITIONS="/dev/mapper/$CRYPTO_NAME"
-    echo -ne " * Starting encrypted single disk:       "
-    set -o verbose
-
-    echo -e 1024 > /sys/block/sd${DRIVES}/queue/read_ahead_kb
-
-    # create encryption key
-    dd if=/dev/urandom of=key bs=$KEY_SIZE count=1
-    cryptsetup -c $ALGORITHIM -d key -s $KEY_SIZE create $CRYPTO_NAME $PARTITIONS
-
-    if [ "$MKFS" == "yes" ]; then
-	create_fs $FS "sd" $CRYPTO_PARTITIONS
-    fi
-
-    mount_fs $FS $CRYPTO_PARTITIONS $MNT_DIR
-
-    set +o verbose
-    echo -ne "[Done]\n"
 else # RAID TOPOLOGY
+    TARGET_DRIVE="/dev/md0"
     [ ! -e "$(which mdadm)" ] && do_error "missing mdadm in rootfs (aptitude install mdadm)"
 
     echo -ne " * Starting $TOPOLOGY build:       "
@@ -548,14 +555,22 @@ else # RAID TOPOLOGY
 	for partition in `echo $DRIVES`; do mdadm --zero-superblock /dev/sd${partition}${PARTNUM}; done
 	sleep 2
 
-	echo "y" | mdadm --create -c 128 /dev/md0 --level=$LEVEL -n $HDD_NUM --force $PARTITIONS
+	echo "y" | mdadm --create -c 128 $TARGET_DRIVE --level=$LEVEL -n $HDD_NUM --force $PARTITIONS
 	sleep 2
 
 	if [ `cat /proc/mdstat  |grep md0 |wc -l` == 0 ]; then
 	    do_error "Unable to create RAID device"
 	fi
 
-	create_fs $FS $TOPOLOGY /dev/md0 $HDD_NUM
+	if [[ $TOPOLOGY == "crypt"* ]]; then
+	    echo -ne "Encrypted: "
+	    # create encryption key
+	    dd if=/dev/urandom of=key bs=$KEY_SIZE count=1
+	    cryptsetup -c $ALGORITHIM -d key -s $KEY_SIZE create $CRYPTO_NAME $TARGET_DRIVE
+	    TARGET_DRIVE="/dev/mapper/$CRYPTO_NAME"
+	fi
+
+	create_fs $FS $TOPOLOGY $TARGET_DRIVE $HDD_NUM
 
     else
 	# need to reassemble the raid
@@ -564,11 +579,19 @@ else # RAID TOPOLOGY
 	if [ `cat /proc/mdstat  |grep md0 |wc -l` == 0 ]; then
 	    do_error "Unable to assemble RAID device"
 	fi
+
+	if [[ $TOPOLOGY == "crypt"* ]]; then
+	    echo -ne "Encrypted: "
+	    [ ! -e "key" ] && do_error "no key file available, please locate or use -m to create a new key"
+	    cryptsetup -c $ALGORITHIM -d key -s $KEY_SIZE create $CRYPTO_NAME /dev/md0
+	    TARGET_DRIVE="/dev/mapper/$CRYPTO_NAME"
+	fi
+
     fi
 
-    mount_fs $FS /dev/md0 $MNT_DIR
+    mount_fs $FS $TARGET_DRIVE $MNT_DIR
 
-    if [ "$TOPOLOGY" != "rd1" ]; then
+    if [[ $TOPOLOGY != *"rd1" ]]; then
        # no stripe_cache_size support in rd1
 	if [ "$LARGE_PAGE" == "65536" ]; then
             echo 256 > /sys/block/md0/md/stripe_cache_size
