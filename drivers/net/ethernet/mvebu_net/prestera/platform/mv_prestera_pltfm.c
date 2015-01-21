@@ -109,7 +109,7 @@ static struct presteraPciDev presteraPciDevs[] = {
 
 static const char prestera_drv_name[] = "mvPP";
 static void __iomem *inter_regs;
-static int gBoardId = -1;
+static int gDevId = -1;
 
 /*******************************************************************************
 ********************************************************************************
@@ -122,13 +122,13 @@ static int gBoardId = -1;
 *******************************************************************************/
 
 /*******************************************************************************
-*	mvInternalBoardIdSet
+*	mvInternalDeviceIdSet
 *
 *
 *******************************************************************************/
-void mvInternalBoardIdSet(unsigned int boardId)
+void mvInternalDevIdSet(unsigned int devId)
 {
-	gBoardId = boardId;
+	gDevId = devId;
 }
 
 /*******************************************************************************
@@ -138,14 +138,10 @@ void mvInternalBoardIdSet(unsigned int boardId)
 *******************************************************************************/
 unsigned int mvDevIdGet(void)
 {
-	if ((gBoardId >= BC2_CUSTOMER_BOARD_ID_BASE) && (gBoardId < BC2_MARVELL_MAX_BOARD_ID))
-		return MV_BOBCAT2_DEV_ID;
-	else if ((gBoardId >= AC3_CUSTOMER_BOARD_ID_BASE) && (gBoardId < AC3_MARVELL_MAX_BOARD_ID))
-		return MV_ALLEYCAT3_DEV_ID;
-	else {
-		dprintk("%s: No Internal device detected\n", __func__);
-		return gBoardId;
-	}
+	if (gDevId == -1)
+		BUG();
+
+	return gDevId;
 }
 
 /*******************************************************************************
@@ -233,13 +229,11 @@ static void prestera_dma_switch_init(void)
 *
 *
 *******************************************************************************/
-static int prestera_Internal_dev_probe(unsigned int boardId)
+static int prestera_Internal_dev_probe(unsigned int devId)
 {
 	int err;
-	unsigned short devId;
 
-	mvInternalBoardIdSet(boardId);
-	devId = mvDevIdGet();
+	mvInternalDevIdSet(devId);
 
 	switch (devId) {
 

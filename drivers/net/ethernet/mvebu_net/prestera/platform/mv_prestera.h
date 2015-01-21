@@ -134,34 +134,6 @@
 #define BAR_1	(1)
 #define BAR_2	(2)
 
-/* Bobcat2 Customer Boards */
-#define BC2_CUSTOMER_BOARD_ID_BASE      0x0
-#define BC2_CUSTOMER_BOARD_ID0          (BC2_CUSTOMER_BOARD_ID_BASE + 0)
-#define BC2_CUSTOMER_BOARD_ID1          (BC2_CUSTOMER_BOARD_ID_BASE + 1)
-#define BC2_CUSTOMER_MAX_BOARD_ID       (BC2_CUSTOMER_BOARD_ID_BASE + 2)
-#define BC2_CUSTOMER_BOARD_NUM          (BC2_CUSTOMER_MAX_BOARD_ID - BC2_CUSTOMER_BOARD_ID_BASE)
-
-/* Bobcat2 Marvell boards */
-#define BC2_MARVELL_BOARD_ID_BASE       0x10
-#define DB_DX_BC2_ID                            (BC2_MARVELL_BOARD_ID_BASE + 0)
-#define RD_DX_BC2_ID                            (BC2_MARVELL_BOARD_ID_BASE + 1)
-#define RD_MTL_BC2                                      (BC2_MARVELL_BOARD_ID_BASE + 2)
-#define BC2_MARVELL_MAX_BOARD_ID        (BC2_MARVELL_BOARD_ID_BASE + 3)
-#define BC2_MARVELL_BOARD_NUM           (BC2_MARVELL_MAX_BOARD_ID - BC2_MARVELL_BOARD_ID_BASE)
-
-/* AlleyCat3 Customer Boards */
-#define AC3_CUSTOMER_BOARD_ID_BASE      0x20
-#define AC3_CUSTOMER_BOARD_ID0          (AC3_CUSTOMER_BOARD_ID_BASE + 0)
-#define AC3_CUSTOMER_BOARD_ID1          (AC3_CUSTOMER_BOARD_ID_BASE + 1)
-#define AC3_CUSTOMER_MAX_BOARD_ID       (AC3_CUSTOMER_BOARD_ID_BASE + 2)
-#define AC3_CUSTOMER_BOARD_NUM          (AC3_CUSTOMER_MAX_BOARD_ID - AC3_CUSTOMER_BOARD_ID_BASE)
-
-/* AlleyCat3 Marvell boards */
-#define AC3_MARVELL_BOARD_ID_BASE       0x30
-#define DB_AC3_ID                                       (AC3_MARVELL_BOARD_ID_BASE + 0)
-#define AC3_MARVELL_MAX_BOARD_ID        (AC3_MARVELL_BOARD_ID_BASE + 1)
-#define AC3_MARVELL_BOARD_NUM           (AC3_MARVELL_MAX_BOARD_ID - AC3_MARVELL_BOARD_ID_BASE)
-
 #define PRV_MAX_PP_DEVICES	10
 
 /* Switch registers & reg values */
