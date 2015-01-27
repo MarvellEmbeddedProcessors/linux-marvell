@@ -174,6 +174,8 @@ static int mvebu_pm_enter(suspend_state_t state)
 
 	cpu_suspend(0, mvebu_pm_powerdown);
 
+	/* Disable the L2 Cache after it was being used by the bootROM */
+	outer_disable();
 	outer_resume();
 
 	mvebu_v7_pmsu_idle_exit();
