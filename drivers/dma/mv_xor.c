@@ -1421,6 +1421,14 @@ static int mv_xor_resume(struct platform_device *dev)
 {
 	struct mv_xor_device *xordev = platform_get_drvdata(dev);
 	int i;
+	const struct mbus_dram_target_info *dram;
+
+	/*
+	 * (Re-)program MBUS remapping windows on resume.
+	 */
+	dram = mv_mbus_dram_info();
+	if (dram)
+		mv_xor_conf_mbus_windows(xordev, dram);
 
 	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
 		if (xordev->channels[i]) {
