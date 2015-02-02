@@ -86,6 +86,16 @@
 					compatible = "w25q32";
 					reg = <0>; /* Chip select 0 */
 					spi-max-frequency = <108000000>;
+					mtd0@00000000 {
+						label = "U-Boot";
+						reg = <0x00000000 0x00400000>;
+						read-only;
+					};
+
+					mtd1@00400000 {
+						label = "Root";
+						reg = <0x00400000 0x00c00000>;
+					};
 				};
 			};
 
@@ -106,13 +116,13 @@
 					read-only;
 				};
 
-				mtd1@00080000 {
+				mtd1@00600000 {
 					label = "uImage";
 					reg = <0x00600000 0x00400000>;
 					read-only;
 				};
 
-				mtd2@00140000 {
+				mtd2@00a00000 {
 					label = "Root";
 					reg = <0x00a00000 0x3f600000>;
 				};
