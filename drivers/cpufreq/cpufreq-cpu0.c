@@ -34,11 +34,6 @@ static struct regulator *cpu_reg;
 static struct cpufreq_frequency_table *freq_table;
 static struct thermal_cooling_device *cdev;
 
-static unsigned int cpu0_get_speed(unsigned int cpu)
-{
-	return clk_get_rate(cpu_clk) / 1000;
-}
-
 static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
 {
 	struct dev_pm_opp *opp;
@@ -104,6 +99,7 @@ static int cpu0_set_target(struct cpufreq_policy *policy, unsigned int index)
 
 static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
 {
+	policy->clk = cpu_clk;
 	return cpufreq_generic_init(policy, freq_table, transition_latency);
 }
 
@@ -111,7 +107,7 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
 	.flags = CPUFREQ_STICKY,
 	.verify = cpufreq_generic_frequency_table_verify,
 	.target_index = cpu0_set_target,
-	.get = cpu0_get_speed,
+	.get = cpufreq_generic_get,
 	.init = cpu0_cpufreq_init,
 	.exit = cpufreq_generic_exit,
 	.name = "generic_cpu0",
