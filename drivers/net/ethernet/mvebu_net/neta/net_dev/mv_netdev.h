@@ -107,6 +107,8 @@ extern int mv_ctrl_swf_recycle;
 #define mv_eth_is_swf_recycle()             (mv_ctrl_swf_recycle)
 #else
 #define mv_eth_is_swf_recycle() 0
+#define MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, magic_bpid)	{; }
+#define MV_NETA_SKB_RECYCLE_MAGIC(skb)				0
 #endif /* CONFIG_MV_NETA_SKB_RECYCLE */
 
 /******************************************************
