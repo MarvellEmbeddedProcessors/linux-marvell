@@ -1109,7 +1109,7 @@ int bspTwsiWaitNotBusy(void)
 *
 *******************************************************************************/
 int bspTwsiMasterReadTrans(unsigned char	devId,
-				 unsigned char	*pData,
+				 mv_kmod_uintptr_t pData,
 				 unsigned char	len,
 				 int	stop)
 {
@@ -1139,7 +1139,7 @@ int bspTwsiMasterReadTrans(unsigned char	devId,
 *
 *******************************************************************************/
 int bspTwsiMasterWriteTrans(unsigned char	devId,
-				  unsigned char	*pData,
+				  mv_kmod_uintptr_t pData,
 				  unsigned char	len,
 				  int	stop)
 {
