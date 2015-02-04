@@ -1,19 +1,19 @@
-Device Tree bindings for the Armada 370 DB audio
-================================================
+Device Tree bindings for the Armada 370/385 DB audio
+====================================================
 
 These Device Tree bindings are used to describe the audio complex
-found on the Armada 370 DB platform.
+found on the Armada 370 DB and Armada 385 DB platforms.
 
 Mandatory properties:
 
- * compatible: must be "marvell,a370db-audio"
+ * compatible: must be "marvell,a370db-audio" or "marvell,a385db-audio"
 
  * marvell,audio-controller: a phandle that points to the audio
-   controller of the Armada 370 SoC.
+   controller of the Armada 370/385 SoC.
 
  * marvell,audio-codec: a set of three phandles that points to:
 
-    1/ the analog audio codec connected to the Armada 370 SoC
+    1/ the analog audio codec connected to the Armada 370/A385 SoC
     2/ the S/PDIF transceiver
     3/ the S/PDIF receiver
 
