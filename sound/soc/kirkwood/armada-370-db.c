@@ -55,7 +55,7 @@ static const struct snd_soc_dapm_route a370db_route[] = {
 	{ "Out Jack",	NULL,	"HPL" },
 	{ "Out Jack",	NULL,	"HPR" },
 	{ "AIN1L",	NULL,	"In Jack" },
-	{ "AIN1L",	NULL,	"In Jack" },
+	{ "AIN1R",	NULL,	"In Jack" },
 };
 
 static struct snd_soc_dai_link a370db_dai[] = {
