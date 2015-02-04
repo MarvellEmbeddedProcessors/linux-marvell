@@ -740,8 +740,10 @@ static int prestera_pci_probe(struct pci_dev *pdev, const struct pci_device_id *
 {
 	int err;
 	static int pexSwitchConfigure;
-	void __iomem * const *iomap;
 	struct pci_decoding_window *prestera_sysmap_bar;
+#ifdef CONFIG_MV_INCLUDE_SERVICECPU
+	void __iomem * const *iomap;
+#endif
 
 	switch (pdev->device) {
 
