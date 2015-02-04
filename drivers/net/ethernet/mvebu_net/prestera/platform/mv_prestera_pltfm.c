@@ -138,9 +138,6 @@ void mvInternalDevIdSet(unsigned int devId)
 *******************************************************************************/
 unsigned int mvDevIdGet(void)
 {
-	if (gDevId == -1)
-		BUG();
-
 	return gDevId;
 }
 
