@@ -37,6 +37,9 @@ static int a370db_hw_params(struct snd_pcm_substream *substream,
 	case 96000:
 		freq = 24576000;
 		break;
+	case 192000:
+		freq = 49152000;
+		break;
 	}
 
 	return snd_soc_dai_set_sysclk(codec_dai, 0, freq, SND_SOC_CLOCK_IN);
@@ -84,7 +87,7 @@ static struct snd_soc_dai_link a370db_dai[] = {
 };
 
 static struct snd_soc_card a370db = {
-	.name = "a370db",
+	.name = "a370db/385db",
 	.owner = THIS_MODULE,
 	.dai_link = a370db_dai,
 	.num_links = ARRAY_SIZE(a370db_dai),
@@ -128,20 +131,21 @@ static int a370db_probe(struct platform_device *pdev)
 
 static const struct of_device_id a370db_dt_ids[] = {
 	{ .compatible = "marvell,a370db-audio" },
+	{ .compatible = "marvell,a385db-audio" },
 	{ },
 };
 
-static struct platform_driver a370db_driver = {
+static struct platform_driver a370_a385_db_driver = {
 	.driver		= {
-		.name	= "a370db-audio",
+		.name	= "a370_a385-db-audio",
 		.of_match_table = of_match_ptr(a370db_dt_ids),
 	},
 	.probe		= a370db_probe,
 };
 
-module_platform_driver(a370db_driver);
+module_platform_driver(a370_a385_db_driver);
 
 MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
-MODULE_DESCRIPTION("ALSA SoC a370db audio client");
+MODULE_DESCRIPTION("ALSA SoC a370_a385-db audio client");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:a370db-audio");
