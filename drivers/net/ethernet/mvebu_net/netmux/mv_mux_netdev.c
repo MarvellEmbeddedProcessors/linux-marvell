@@ -687,14 +687,15 @@ static void mv_mux_set_rx_mode(struct net_device *mux_dev)
 		return;
 
 	if (switch_ops->promisc_set)
-		if (switch_ops->promisc_set(pmux_priv->idx, (mux_dev->flags & IFF_PROMISC) ? 1 : 0))
+		if (switch_ops->promisc_set(MV_MUX_GROUP_IDX_2_DB(pmux_priv->idx),
+			(mux_dev->flags & IFF_PROMISC) ? 1 : 0))
 			pr_err("%s: Set promiscuous mode failed\n", mux_dev->name);
 
 	/* IFF_ALLMULTI is not supported by switch */
 
 	/* remove all mcast enries */
 	 if (switch_ops->all_mcast_del)
-		if (switch_ops->all_mcast_del(pmux_priv->idx))
+		if (switch_ops->all_mcast_del(MV_MUX_GROUP_IDX_2_DB(pmux_priv->idx)))
 			pr_err("%s: Delete all Mcast failed\n", mux_dev->name);
 
 	if (mux_dev->flags & IFF_MULTICAST) {
@@ -704,7 +705,8 @@ static void mv_mux_set_rx_mode(struct net_device *mux_dev)
 
 			netdev_for_each_mc_addr(ha, mux_dev) {
 				if (switch_ops->mac_addr_set) {
-					if (switch_ops->mac_addr_set(pmux_priv->idx, ha->addr, 1)) {
+					if (switch_ops->mac_addr_set(MV_MUX_GROUP_IDX_2_DB(pmux_priv->idx),
+						ha->addr, 1)) {
 						pr_err("%s: Mcast init failed\n", mux_dev->name);
 						break;
 					}
@@ -718,7 +720,8 @@ static void mv_mux_set_rx_mode(struct net_device *mux_dev)
 			if (!curr_addr)
 				break;
 			if (switch_ops->mac_addr_set) {
-				if (switch_ops->mac_addr_set(pmux_priv->idx, curr_addr->dmi_addr, 1)) {
+				if (switch_ops->mac_addr_set(MV_MUX_GROUP_IDX_2_DB(pmux_priv->idx),
+					curr_addr->dmi_addr, 1)) {
 					pr_err("%s: Mcast init failed\n", mux_dev->name);
 					break;
 				}
@@ -765,7 +768,7 @@ int mv_mux_close(struct net_device *dev)
 
 	if (mv_mux_internal_switch(pmux_priv->port))
 		if (switch_ops && switch_ops->group_disable)
-			switch_ops->group_disable(pmux_priv->idx);
+			switch_ops->group_disable(MV_MUX_GROUP_IDX_2_DB(pmux_priv->idx));
 
 	printk(KERN_NOTICE "%s: stopped\n", dev->name);
 
@@ -797,7 +800,7 @@ int mv_mux_open(struct net_device *dev)
 
 	if (mv_mux_internal_switch(pmux_priv->port))
 		if (switch_ops && switch_ops->group_enable)
-			switch_ops->group_enable(pmux_priv->idx);
+			switch_ops->group_enable(MV_MUX_GROUP_IDX_2_DB(pmux_priv->idx));
 
 	printk(KERN_NOTICE "%s: started\n", dev->name);
 
@@ -820,11 +823,11 @@ static int mv_mux_set_mac(struct net_device *mux_dev, void *addr)
 		if (switch_ops && switch_ops->mac_addr_set) {
 
 			/* delete old mac */
-			if (switch_ops->mac_addr_set(pmux_priv->idx, mux_dev->dev_addr, 0))
+			if (switch_ops->mac_addr_set(MV_MUX_GROUP_IDX_2_DB(pmux_priv->idx), mux_dev->dev_addr, 0))
 				return MV_ERROR;
 
 			/* set new mac */
-			if (switch_ops->mac_addr_set(pmux_priv->idx, mac, 1))
+			if (switch_ops->mac_addr_set(MV_MUX_GROUP_IDX_2_DB(pmux_priv->idx), mac, 1))
 				return MV_ERROR;
 		}
 
@@ -1231,7 +1234,8 @@ static int mux_device_event(struct notifier_block *unused, unsigned long event, 
 				/*In HGU mode, mux may be created by sysfs cmd and then pdev_priv->idx will be -1*/
 				if (switch_ops && switch_ops->link_status_get
 					&& (pdev_priv->idx != MV_MUX_UNKNOWN_GROUP)) {
-					int link_up = switch_ops->link_status_get(pdev_priv->idx);
+					int link_up;
+					link_up = switch_ops->link_status_get(MV_MUX_GROUP_IDX_2_DB(pdev_priv->idx));
 					mv_mux_update_link(mux_dev, link_up);
 				}
 			} else {
