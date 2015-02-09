@@ -50,6 +50,7 @@ disclaimer.
 /*MV_MUX_UNKNOWN_GROUP is usedfor sysfs creating mux device.*/
 /*e.g. when switch is in HGU mode, then mux device is created in -1 group*/
 #define MV_MUX_UNKNOWN_GROUP		(-1)
+#define MV_MUX_GROUP_IDX_2_DB(idx)	((idx) == MV_MUX_UNKNOWN_GROUP ? 0 : idx)
 
 /* Mux tag related definition */
 /* DSA/EDSA, the unit is Byte */
