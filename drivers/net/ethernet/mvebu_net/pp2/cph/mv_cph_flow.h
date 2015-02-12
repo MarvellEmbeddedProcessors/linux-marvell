@@ -389,7 +389,7 @@ int cph_flow_del_dscp_map(void);
 * RETURNS:
 *       The shift of SKB data.
 *******************************************************************************/
-INLINE int cph_flow_add_vlan(bool mh, unsigned char *p_data, unsigned short tpid,
+int cph_flow_add_vlan(bool mh, unsigned char *p_data, unsigned short tpid,
 	unsigned short vid, unsigned char pbits);
 
 /******************************************************************************
@@ -408,7 +408,7 @@ INLINE int cph_flow_add_vlan(bool mh, unsigned char *p_data, unsigned short tpid
 * RETURNS:
 *       The shift of SKB data.
 *******************************************************************************/
-INLINE int cph_flow_del_vlan(bool mh, unsigned char *p_data);
+int cph_flow_del_vlan(bool mh, unsigned char *p_data);
 
 /******************************************************************************
 * cph_flow_replace_vlan()
@@ -429,7 +429,7 @@ INLINE int cph_flow_del_vlan(bool mh, unsigned char *p_data);
 * RETURNS:
 *       The shift of SKB data.
 *******************************************************************************/
-INLINE int cph_flow_replace_vlan(bool mh, unsigned char *p_data, unsigned short tpid,
+int cph_flow_replace_vlan(bool mh, unsigned char *p_data, unsigned short tpid,
 	unsigned short vid, unsigned char pbits);
 
 /******************************************************************************
@@ -448,7 +448,7 @@ INLINE int cph_flow_replace_vlan(bool mh, unsigned char *p_data, unsigned short 
 * RETURNS:
 *       The shift of SKB data.
 *******************************************************************************/
-INLINE int cph_flow_swap_vlan(bool mh, unsigned char *p_data);
+int cph_flow_swap_vlan(bool mh, unsigned char *p_data);
 
 /******************************************************************************
 * cph_flow_strip_vlan()
@@ -466,7 +466,7 @@ INLINE int cph_flow_swap_vlan(bool mh, unsigned char *p_data);
 * RETURNS:
 *       The shift of SKB data.
 *******************************************************************************/
-INLINE int cph_flow_strip_vlan(bool mh, unsigned char *p_data);
+int cph_flow_strip_vlan(bool mh, unsigned char *p_data);
 
 /******************************************************************************
 * cph_flow_compare_rules()
