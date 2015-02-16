@@ -1,1 +1,34 @@
 
+config MV_INCLUDE_PRESTERA
+	bool "Prestera Switch Support"
+	depends on ARCH_MVEBU
+#	select MV_INCLUDE_PRESTERA_PCI if MACH_ARMADA_XP_AMC
+	default y
+	help
+	Add Prestera mvPP char device driver support,
+	used by user space to configure and interact with
+	Prestera Packet Procesors, supporting switches connected
+	via PCIe to AMC/AXP and MSYS.
+	This option should be enabled when using CPSS.
+
+
+config MV_INCLUDE_PRESTERA_PCI
+	bool "Prestera Switch Support for PCI endpoint"
+	depends on MV_INCLUDE_PRESTERA
+	default y
+	help
+	this option increase virtual memory
+	allocation in case of ARMADA XP AMC
+	board for CPSS devices connected to
+	PCI switch
+
+config MV_INCLUDE_PRESTERA_KERNELEXT
+	tristate "Prestera mvKernelExt"
+	depends on MV_INCLUDE_PRESTERA
+	default y
+	help
+	Add Prestera mvKernelExt char device driver support,
+	used by user space to configure and interact with
+	Prestera Packet Processors, supporting switches connected
+	via PCIe to AMC/AXP and MSYS.
+	This option should be enabled when using CPSS.

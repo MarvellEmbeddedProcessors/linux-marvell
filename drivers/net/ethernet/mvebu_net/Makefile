@@ -49,3 +49,9 @@ endif
 ifeq ($(CONFIG_MV_PP3),y)
 obj-y += pp3/
 endif
+ifeq ($(CONFIG_MV_INCLUDE_PRESTERA),y)
+obj-y += prestera/
+endif
+ifeq ($(CONFIG_MV_INCLUDE_PRESTERA_PCI),y)
+obj-y += prestera/pci/
+endif
