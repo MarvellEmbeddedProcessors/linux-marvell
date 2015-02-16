@@ -950,8 +950,11 @@ static int mvKernelExt_init(void)
         return result;
     }
 
+/* code for kernel 2.6 shouldn't be relevant for 3.10 */
+#ifndef CONFIG_OF
     /* create proc entry */
     create_proc_read_entry("mvKernelExt", 0, NULL, mvKernelExt_read_proc_mem, NULL);
+#endif
 
     mvKernelExt_initialized = 1;
 

@@ -72,6 +72,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *       $Revision: 6$
 *******************************************************************************/
 
+#ifdef CONFIG_OF
+#include <linux/proc_fs.h>
+#endif
+
 #define MV_SEM_STAT
 typedef struct {
     int                 flags;
@@ -176,6 +180,60 @@ static int mvKernelExtSem_read_proc_mem(
     return len;
 }
 
+#ifdef CONFIG_OF
+static int proc_status_show(struct seq_file *m, void *v) {
+    int k;
+
+    seq_printf(m, "id type count owner");
+#ifdef MV_SEM_STAT
+    seq_printf(m, " tcount gcount wcount");
+#endif
+    seq_printf(m, " name\n");
+    for (k = 1; k < mv_num_semaphores; k++)
+    {
+        mvSemaphoreSTC *sem;
+        struct mv_task *p;
+
+        if (!mvSemaphores[k].flags)
+            continue;
+        sem = mvSemaphores + k;
+
+        seq_printf(m, "%d %c %d %d",
+                k,
+                (sem->flags & MV_SEMAPTHORE_F_MTX) ? 'M' :
+                    (sem->flags & MV_SEMAPTHORE_F_COUNT) ? 'C' :
+                    (sem->flags & MV_SEMAPTHORE_F_BINARY) ? 'B' : '?',
+                sem->count,
+                sem->owner?(sem->owner->pid):0);
+#ifdef MV_SEM_STAT
+        seq_printf(m," %d %d %d", sem->tcount, sem->gcount, sem->wcount);
+#endif
+        if (sem->name[0])
+            seq_printf(m, " %s", sem->name);
+	seq_putc(m, '\n');
+
+        for (p = sem->waitqueue.first; p; p = p->wait_next)
+            seq_printf(m,  "  q=%d\n", p->task->pid);
+
+    }
+
+    return 0;
+
+}
+
+static int proc_status_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_status_show, PDE_DATA(inode));
+}
+
+static const struct file_operations mv_kext_sem_read_proc_operations = {
+	.open		= proc_status_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+#endif
+
 /*******************************************************************************
 * mvKernelExt_SemInit
 *
@@ -213,8 +271,13 @@ static int mvKernelExt_SemInit(void)
 
     memset(mvSemaphores, 0, mv_num_semaphores * sizeof(mvSemaphoreSTC));
 
+#ifdef CONFIG_OF
+	if (!proc_create("mvKernelExtSem", S_IRUGO, NULL, &mv_kext_sem_read_proc_operations))
+		return -ENOMEM;
+#else
     /* create proc entry */
     create_proc_read_entry("mvKernelExtSem", 0, NULL, mvKernelExtSem_read_proc_mem, NULL);
+#endif
 
     return 1;
 }

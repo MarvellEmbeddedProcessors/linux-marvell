@@ -10,6 +10,10 @@
 *       $Revision: $
 1*******************************************************************************/
 
+#ifdef CONFIG_OF
+#include <linux/proc_fs.h>
+#endif
+
 
 /************* Defines ********************************************************/
 
@@ -121,6 +125,62 @@ static int mvKernelExtMsgQ_read_proc_mem(
 
     return len;
 }
+#ifdef CONFIG_OF
+static int proc_status_show_msq(struct seq_file *m, void *v) {
+
+    int len;
+    int k;
+
+    seq_printf(m, "id msgs waitRx waitTx");
+#ifdef MV_MSGQ_STAT
+    /*
+    len += sprintf(page+len," tcount gcount wcount");
+    */
+#endif
+    seq_printf(m, " name\n");
+    for (k = 1; k < mv_num_queues; k++)
+    {
+        mvMsgQSTC *q;
+        struct mv_task *p;
+
+        if (!mvMsgQs[k].flags)
+            continue;
+        q = mvMsgQs + k;
+
+        seq_printf(m, "%d %d %d %d",
+                k, q->messages, q->waitRx, q->waitTx);
+#ifdef MV_MSGQ_STAT
+        /*
+        len += sprintf(page+len," %d %d %d", sem->tcount, sem->gcount, sem->wcount);
+        */
+#endif
+        if (q->name[0])
+            seq_printf(m, " %s", q->name);
+	seq_putc(m, '\n');
+
+        for (p = q->rxWaitQueue.first; p; p = p->wait_next)
+            seq_printf(m, "  rq=%d\n", p->task->pid);
+        for (p = q->txWaitQueue.first; p; p = p->wait_next)
+            seq_printf(m, "  tq=%d\n", p->task->pid);
+
+    }
+
+    return 0;
+
+}
+
+static int proc_status_open_msq(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_status_show_msq, PDE_DATA(inode));
+}
+
+static const struct file_operations mv_kext_msq_read_proc_operations = {
+	.open		= proc_status_open_msq,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+#endif
 
 /*******************************************************************************
 * mvKernelExt_MsgQInit
@@ -157,7 +217,12 @@ static int mvKernelExt_MsgQInit(void)
     memset(mvMsgQs, 0, mv_num_queues * sizeof(mvMsgQSTC));
 
     /* create proc entry */
+#ifdef CONFIG_OF
+	if (!proc_create("mvKernelExtMsgQ", S_IRUGO, NULL, &mv_kext_msq_read_proc_operations))
+		return -ENOMEM;
+#else
     create_proc_read_entry("mvKernelExtMsgQ", 0, NULL, mvKernelExtMsgQ_read_proc_mem, NULL);
+#endif
 
     return 1;
 }
