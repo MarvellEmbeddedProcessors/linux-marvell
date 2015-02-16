@@ -72,6 +72,15 @@
 #ifndef __MV_PRESTERA_PCI_H
 #define __MV_PRESTERA_PCI_H
 
+/* PCI Devices definition */
+#define MARVELL_VEN_ID			(0x11AB)
+#define MV_BOBCAT2_DEV_ID		(0xFC00)
+#define MV_LION2_DEV_ID			(0x8000)
+#define MV_ALLEYCAT3_DEV_ID		(0xF400)
+#define PCI_VENDOR_ID_IDT_SWITCH	(0x111D)
+#define MV_IDT_SWITCH_DEV_ID_808E	(0x808E)
+#define MV_IDT_SWITCH_DEV_ID_802B	(0x802B)
+
 /* General definition */
 #define ENABLE		(1)
 #define DISABLE		(0)
