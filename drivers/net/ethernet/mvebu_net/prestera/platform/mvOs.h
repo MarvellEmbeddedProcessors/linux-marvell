@@ -86,6 +86,12 @@ disclaimer.
 #error "CPU endianess isn't defined!\n"
 #endif
 
+#define INTER_REGS_VIRT_BASE 0
+
+/*XXX: looks like error - should be 0x72000 - check
+ * neta + documentation for AC3 0x00072004 and bits e.g.
+ * ETH_PHY_SMI_BUSY_BIT
+ */
 #define MV_ETH_BASE_ADDR			(0x70000)
 #define MV_ETH_REGS_OFFSET(port)		(MV_ETH_BASE_ADDR + (port) * 0x4000)
 #define MV_ETH_REGS_BASE(p)			MV_ETH_REGS_OFFSET(p)
