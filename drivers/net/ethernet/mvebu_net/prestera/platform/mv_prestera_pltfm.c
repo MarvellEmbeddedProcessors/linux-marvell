@@ -144,6 +144,7 @@ unsigned int mvDevIdGet(void)
 	return gDevId;
 }
 
+#ifndef CONFIG_OF
 /*******************************************************************************
 *	ppdev_conf_set_pltfm
 *
@@ -259,6 +260,7 @@ static int prestera_Internal_dev_probe(unsigned int devId)
 
 	return 0;
 }
+#endif
 
 /*******************************************************************************
 ********************************************************************************
@@ -466,8 +468,10 @@ static int prestera_pci_dev_probe(void)
 static int prestera_pltfm_probe(struct platform_device *pdev)
 {
 	int err;
+#ifndef CONFIG_OF
 	unsigned int *pdata;
 	unsigned int boardId;
+#endif
 
 	/*
 	**  PCI Devices  Configuration Section
@@ -478,6 +482,7 @@ static int prestera_pltfm_probe(struct platform_device *pdev)
 	if (0 != err)
 		return err;
 
+#ifndef CONFIG_OF
 	/*
 	**  Internal Device Configuration Section
 	**  =======================
@@ -493,6 +498,7 @@ static int prestera_pltfm_probe(struct platform_device *pdev)
 		if (0 != err)
 			return err;
 	}
+#endif
 
 	return 0;
 }
