@@ -57,6 +57,7 @@
 #include <linux/of_address.h>
 #include <linux/debugfs.h>
 #include <linux/syscore_ops.h>
+#include <linux/log2.h>
 
 /* #define MBUS_DEBUG */
 
@@ -326,6 +327,17 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
 		mbus->soc->win_remap_offset(win);
 	u32 ctrl, remap_addr;
 
+	if (!is_power_of_2(size)) {
+		WARN(true, "Invalid MBus window size: 0x%zx\n", size);
+		return -EINVAL;
+	}
+
+	if ((base & (phys_addr_t)(size - 1)) != 0) {
+		WARN(true, "Invalid MBus base/size: %pa len 0x%zx\n", &base,
+		     size);
+		return -EINVAL;
+	}
+
 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
 		(attr << WIN_CTRL_ATTR_SHIFT)    |
 		(target << WIN_CTRL_TGT_SHIFT)   |
@@ -488,6 +500,10 @@ static int mvebu_devs_debug_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "[%02d] %016llx - %016llx : %04x:%04x",
 			   win, (unsigned long long)wbase,
 			   (unsigned long long)(wbase + wsize), wtarget, wattr);
+
+		if (!is_power_of_2(wsize) ||
+		    ((wbase & (u64)(wsize - 1)) != 0))
+			seq_puts(seq, " (Invalid base/size!!)");
 
 		if (mvebu_mbus_window_is_remappable(mbus, win)) {
 			seq_printf(seq, " (remap %016llx)\n",
