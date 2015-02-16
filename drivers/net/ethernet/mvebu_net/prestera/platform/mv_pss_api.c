@@ -586,8 +586,9 @@ int bspPciFindDev(unsigned short	vendorId,
 	for_each_pci_dev(dev) {
 		if ((vendorId == 0xffff || dev->vendor == vendorId) &&
 		    (devId == 0xffff || dev->device == devId) &&
-		    /* skip the virtual bridge : 11ab8888 */
-		    (!((vendorId == MARVELL_VEN_ID) && (dev->device == 0x8888))) && (count++ == instance)) {
+		    /* skip the virtual bridge : 11ab8888 and class 0x06 */
+		    (!((vendorId == MARVELL_VEN_ID) && ((dev->device == 0x8888)))) &&
+		    ((dev->class & 0x00ff0000) != 0x00060000) && (count++ == instance)) {
 			*busNo = dev->bus->number;
 			*devSel = PCI_SLOT(dev->devfn);
 			*funcNo = PCI_FUNC(dev->devfn);
