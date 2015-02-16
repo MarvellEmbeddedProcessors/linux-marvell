@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 5.4"
+echo " * Version: 5.5"
 
 # LOG:
+# 5.5:
+#   1. added support for fat32.
 # 5.4:
 #   1. added support for encrypted RAID arrays (crypt_rd0|crypt_rd1|crypt_rd5|crypt_rd6).
 # 5.3:
@@ -145,7 +147,7 @@ while getopts "l:ps:mzun:f:t:h:j:" flag; do
 	f)
 	    FS=$OPTARG
 	    case "$OPTARG" in
-		ext4|btrfs|xfs)	echo "Filesystem: ${OPTARG}" ;;
+		ext4|btrfs|xfs|fat32)	echo "Filesystem: ${OPTARG}" ;;
 		*)   do_error "-f: wrong option" ;;
 	    esac
 	    ;;
@@ -403,6 +405,8 @@ function create_fs {
 	    && do_error "missing mkfs.xfs in rootfs (aptitude install xfsprogs)" ;;
 	btrfs)	[ ! -e "$(which mkfs.btrfs)" ] \
 	    && do_error "missing mkfs.btrfs in rootfs (aptitude install btrfs-tools)" ;;
+	fat32) [ ! -e "$(which mkfs.vfat)" ] \
+	    && do_error "missing mkfs.vfat in rootfs" ;;
 	*) do_error "no valid filesystem specified" ;;
     esac
 
@@ -436,6 +440,8 @@ function create_fs {
 	    ;;
         btrfs) mkfs.btrfs -f $3
 	    ;;
+	fat32) mkfs.vfat $3 -s 128 -S 512 -F 32
+	    ;;
 	*) do_error "unsupported filesystem $1\n"
 	    ;;
     esac
@@ -452,6 +458,8 @@ function mount_fs {
 	mount -t xfs $2 $3 -o noatime,nodirspread
     elif [ "$1" == "btrfs" ]; then
 	mount -t btrfs $2 $3 -o noatime,thread_pool=$CPU_COUNT
+    elif [ "$1" == "fat32" ]; then
+	mount -t vfat  $2 $3 -o rw,noatime,umask=0000
     else
 	do_error "unsupported filesystem $1\n"
     fi
@@ -764,11 +772,11 @@ if [ "$SAMBASTATUS" == "enabled" ]; then
 	echo ' disable netbios = yes'			>>  /etc/smb.conf
 	echo ' csc policy = disable'			>>  /etc/smb.conf
 	echo ' strict allocate = yes'			>>  /etc/smb.conf
-	if [ "$FS" == "btrfs" ]; then
-		# crash identified with btrfs
-		echo '# min receivefile size = 16k'	>>  /etc/smb.conf
-	else
+	if [ "$FS" == "ext4" ]; then
+		# only ext4 supports splice
 		echo ' min receivefile size = 16k'	>>  /etc/smb.conf
+	else
+		echo '# min receivefile size = 16k'	>>  /etc/smb.conf
 	fi
 	echo ''						>>  /etc/smb.conf
 	echo '[public]'					>>  /etc/smb.conf
