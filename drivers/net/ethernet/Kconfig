@@ -89,6 +89,7 @@ source "drivers/net/ethernet/marvell/Kconfig"
 source "drivers/net/ethernet/mvebu_net/Kconfig"
 source "drivers/net/ethernet/mvebu_net/neta/Kconfig"
 source "drivers/net/ethernet/mvebu_net/pp2/Kconfig"
+source "drivers/net/ethernet/mvebu_net/prestera/Kconfig"
 
 source "drivers/net/ethernet/mellanox/Kconfig"
 source "drivers/net/ethernet/micrel/Kconfig"
