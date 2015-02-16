@@ -74,6 +74,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <linux/sched.h>
 #include <linux/version.h>
+#ifdef CONFIG_OF
+#include <linux/slab.h>
+#include <linux/sched/rt.h>
+#endif
 
 /* task locking data */
 static struct task_struct*  mv_tasklock_owner = NULL;
