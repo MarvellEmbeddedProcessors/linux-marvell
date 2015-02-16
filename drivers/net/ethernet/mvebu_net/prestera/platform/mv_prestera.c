@@ -1264,6 +1264,40 @@ struct dumpregs_stc {
 	unsigned start;
 	unsigned end;
 };
+
+#ifdef CONFIG_OF
+static int dumpregs(struct seq_file *m, struct mem_region *mem, struct dumpregs_stc *r)
+{
+	void *basePtr = (void *)mem->base;
+	if (basePtr == NULL)
+		basePtr = ioremap_nocache(mem->phys, PAGE_SIZE);
+	for (; r->nm; r++) {
+		int i, n;
+		uintptr_t address;
+		uint32_t  value;
+
+		address = (uintptr_t)basePtr + (uintptr_t)r->start;
+		for (i = r->start, n = 0; i <= r->end; i += 4) {
+			value = dbgread_u32((void *)address);
+			if (n == 0)
+				seq_printf(m, "\t%s(0x%04x):", r->nm, i);
+			seq_printf(m, " %08x", le32_to_cpu(value));
+			n++;
+			if (n == 4) {
+				n = 0;
+				if (i+4 <= r->end)
+					seq_putc(m, '\n');
+			}
+			address += 4;
+		}
+		seq_putc(m, '\n');
+	}
+
+	if (mem->base == 0)
+		iounmap(basePtr);
+	return 0;
+}
+#else
 static int dumpregs(char *page, int len, struct mem_region *mem, struct dumpregs_stc *r)
 {
 	void *basePtr = (void *)mem->base;
@@ -1295,6 +1329,7 @@ static int dumpregs(char *page, int len, struct mem_region *mem, struct dumpregs
 		iounmap(basePtr);
 	return len;
 }
+#endif
 
 static struct dumpregs_stc ppConf[] = {
 	{ "\toff",  0,   0x10 },
@@ -1322,6 +1357,7 @@ static struct dumpregs_stc ppRegs[] = {
 	{ NULL, 0, 0 }
 };
 
+#ifndef CONFIG_OF
 int prestera_read_proc_mem(char		*page,
 			   char		**start,
 			   off_t	offset,
@@ -1366,6 +1402,7 @@ int prestera_read_proc_mem(char		*page,
 
 	return len;
 }
+#endif
 
 static const struct file_operations prestera_fops = {
 	.llseek			= prestera_lseek,
@@ -1667,6 +1704,55 @@ int ppdev_conf_set(struct pci_dev *pdev, struct pp_dev *ppdev)
 
 	return 0;
 }
+#ifdef CONFIG_OF
+static int proc_status_show(struct seq_file *m, void *v)
+{
+	int		i;
+	struct pp_dev	*ppdev;
+
+	seq_printf(m, "%s major # %d\n", prestera_dev_name, prestera_major);
+	seq_printf(m, "short_bh_count %d\n", prestera_int_bh_cnt_get());
+	seq_printf(m, "rx_DSR %d\n", prestera_smi_eth_port_rx_dsr_cnt());
+	seq_printf(m, "tx_DSR %d\n", prestera_smi_eth_port_tx_dsr_cnt());
+
+	seq_printf(m, "DMA area: 0x%lx(virt), base: 0x%lx(phys), len: 0x%x\n",
+			(unsigned long)dma_area, dma_base, dma_len);
+
+	for (i = 0; i < founddevs; i++) {
+		ppdev = ppdevs[i];
+
+		seq_printf(m, "Device %d\n", i);
+		seq_printf(m, "\tPCI %02x:%02x.%x  vendor:dev=%04x:%04x\n",
+				(unsigned)ppdev->busNo, (unsigned)ppdev->devSel, (unsigned)ppdev->funcNo,
+				ppdev->vendorId, ppdev->devId);
+
+		seq_printf(m, "\tconfig 0x%lx(user virt), phys: 0x%lx, len: 0x%lx\n",
+				ppdev->config.mmapbase, ppdev->config.phys, ppdev->config.size);
+
+		dumpregs(m, &(ppdev->config), ppConf);
+
+		seq_printf(m, "\tppregs 0x%lx(user virt), phys: 0x%lx, len: 0x%lx\n",
+				ppdev->ppregs.mmapbase, ppdev->ppregs.phys, ppdev->ppregs.size);
+
+		dumpregs(m, &(ppdev->ppregs), ppRegs);
+	}
+
+	return 0;
+}
+
+static int proc_status_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_status_show, PDE_DATA(inode));
+}
+
+static const struct file_operations prestera_read_proc_operations = {
+	.open		= proc_status_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+#endif
 
 /************************************************************************
  *
@@ -1725,7 +1811,12 @@ int prestera_init(void)
 #endif
 
 	/* create /proc entry */
+#ifdef CONFIG_OF
+	if (!proc_create(prestera_dev_name, S_IRUGO, NULL, &prestera_read_proc_operations))
+		return -ENOMEM;
+#else
 	create_proc_read_entry(prestera_dev_name, 0, NULL, prestera_read_proc_mem, NULL);
+#endif
 
 	/* initialize the device main semaphore */
 	sema_init(&prestera_dev->sem, 1);
