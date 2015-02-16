@@ -486,7 +486,7 @@
 			};
 
 			xor@60800 {
-				compatible = "marvell,orion-xor";
+				compatible = "marvell,a38x-xor";
 				reg = <0x60800 0x100
 				       0x60a00 0x100>;
 				clocks = <&gateclk 22>;
@@ -497,15 +497,17 @@
 					dmacap,memcpy;
 					dmacap,xor;
 					dmacap,interrupt;
+					dmacap,pq;
 				};
 				xor01 {
 					interrupts = <0 23 0x4>;
 					dmacap,crc32c;
+					dmacap,interrupt;
 				};
 			};
 
 			xor@60900 {
-				compatible = "marvell,orion-xor";
+				compatible = "marvell,a38x-xor";
 				reg = <0x60900 0x100
 				       0x60b00 0x100>;
 				clocks = <&gateclk 28>;
@@ -516,10 +518,12 @@
 					dmacap,memcpy;
 					dmacap,xor;
 					dmacap,interrupt;
+					dmacap,pq;
 				};
 				xor11 {
 					interrupts = <0 66 0x4>;
 					dmacap,crc32c;
+					dmacap,interrupt;
 				};
 			};
 
