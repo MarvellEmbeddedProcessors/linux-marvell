@@ -23,6 +23,10 @@
 #include <linux/spinlock.h>
 #include <linux/io.h>
 
+#ifdef CONFIG_OF
+#include <linux/slab.h>
+#endif
+
 #include "mv_prestera.h"
 #include "mv_prestera_pp_driver_glob.h"
 
