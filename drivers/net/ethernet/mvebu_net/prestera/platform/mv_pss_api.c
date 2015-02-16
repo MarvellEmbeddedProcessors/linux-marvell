@@ -87,6 +87,9 @@
 #define  SMI_READ_DATA_MSB_REGISTER	(0x06)
 #define  SMI_READ_DATA_LSB_REGISTER	(0x07)
 
+
+#define MARVELL_VEN_ID			(0x11AB)
+
 static inline void smiWaitForStatus(unsigned long devSlvId)
 {
 #ifdef SMI_WAIT_FOR_STATUS_DONE

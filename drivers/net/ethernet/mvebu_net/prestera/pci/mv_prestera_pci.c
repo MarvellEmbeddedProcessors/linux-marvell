@@ -77,8 +77,16 @@
 #include <pci/pci.h>
 #include "mv_prestera_pci.h"
 #include "mv_sysmap_pci.h"
+
+#ifdef CONFIG_OF
+#include "mach/mvCommon.h"
+#else
 #include "common/mvCommon.h"
+#endif
+
+#ifdef CONFIG_MV_INCLUDE_SERVICECPU
 #include "mv_servicecpu/servicecpu.h"
+#endif
 #ifdef CONFIG_MV_INCLUDE_DRAGONITE_XCAT
 #include "mv_drivers_lsp/mv_dragonite/dragonite_xcat.h"
 #endif
