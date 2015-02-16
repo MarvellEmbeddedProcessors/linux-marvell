@@ -73,6 +73,10 @@
 #include "mv_prestera_pci.h"
 #include "mv_pss_api.h"
 
+#ifdef CONFIG_OF
+#include <linux/of.h>
+#endif
+
 #undef MV_PP_DBG
 
 #ifdef MV_PP_DBG
@@ -514,10 +518,19 @@ static int prestera_pltfm_cleanup(struct platform_device *pdev)
 	return 0;
 }
 
+static struct of_device_id mv_prestera_dt_ids[] = {
+	{ .compatible = "marvell,armada-prestera", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, mv_prestera_dt_ids);
+
 static struct platform_driver prestera_driver = {
 	.driver = {
 		.name	= DRIVER_NAME,
 		.owner	= THIS_MODULE,
+#ifdef CONFIG_OF
+		.of_match_table = of_match_ptr(mv_prestera_dt_ids),
+#endif
 	},
 	.probe		= prestera_pltfm_probe,
 	.remove		= prestera_pltfm_cleanup,
