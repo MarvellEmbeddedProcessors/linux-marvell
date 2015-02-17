@@ -45,6 +45,11 @@ enum mv_xor_mode {
 	XOR_MODE_IN_DESC,
 };
 
+/* engine coefficients  */
+static u8 mv_xor_raid6_coefs[8] = {
+	0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
+};
+
 static void mv_xor_issue_pending(struct dma_chan *chan);
 
 #define to_mv_xor_chan(chan)		\
@@ -88,6 +93,9 @@ static void mv_desc_set_mode(struct mv_xor_desc_slot *desc)
 	case DMA_MEMCPY:
 		hw_desc->desc_command |= XOR_DESC_OPERATION_MEMCPY;
 		break;
+	case DMA_PQ:
+		hw_desc->desc_command |= XOR_DESC_OPERATION_PQ;
+		break;
 	default:
 		BUG();
 		return;
@@ -98,6 +106,12 @@ static u32 mv_desc_get_dest_addr(struct mv_xor_desc_slot *desc)
 {
 	struct mv_xor_desc *hw_desc = desc->hw_desc;
 	return hw_desc->phy_dest_addr;
+}
+
+static u32 mv_desc_get_q_dest_addr(struct mv_xor_desc_slot *desc)
+{
+	struct mv_xor_desc *hw_desc = desc->hw_desc;
+	return hw_desc->phy_q_dest_addr;
 }
 
 static u32 mv_desc_get_src_addr(struct mv_xor_desc_slot *desc,
@@ -127,6 +141,17 @@ static void mv_desc_set_dest_addr(struct mv_xor_desc_slot *desc,
 {
 	struct mv_xor_desc *hw_desc = desc->hw_desc;
 	hw_desc->phy_dest_addr = addr;
+	if (desc->type == DMA_PQ)
+		hw_desc->desc_command |= (1 << 8);
+}
+
+static void mv_desc_set_q_dest_addr(struct mv_xor_desc_slot *desc,
+				  dma_addr_t addr)
+{
+	struct mv_xor_desc *hw_desc = desc->hw_desc;
+	hw_desc->phy_q_dest_addr = addr;
+	if (desc->type == DMA_PQ)
+		hw_desc->desc_command |= (1 << 9);
 }
 
 static void mv_desc_set_src_addr(struct mv_xor_desc_slot *desc,
@@ -134,8 +159,14 @@ static void mv_desc_set_src_addr(struct mv_xor_desc_slot *desc,
 {
 	struct mv_xor_desc *hw_desc = desc->hw_desc;
 	hw_desc->phy_src_addr[mv_phy_src_idx(index)] = addr;
-	if (desc->type == DMA_XOR)
+	if ((desc->type == DMA_XOR) || (desc->type == DMA_PQ))
 		hw_desc->desc_command |= (1 << index);
+}
+
+static int mv_desc_is_src_used(struct mv_xor_desc_slot *desc, int index)
+{
+	struct mv_xor_desc *hw_desc = desc->hw_desc;
+	return hw_desc->desc_command & (1 << index) ? 1 : 0;
 }
 
 static u32 mv_chan_get_current_desc(struct mv_xor_chan *chan)
@@ -329,6 +360,29 @@ static void mv_xor_unmap_desc(struct mv_xor_desc_slot *desc,
 					/* unmap dest address once */
 					if (src == dest)
 						continue;
+
+					mv_xor_unmap(dev, src, len, DMA_TO_DEVICE, flags, 0);
+				}
+			}
+			break;
+		case DMA_PQ:
+			if (!(flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
+				if (!(flags & DMA_PREP_PQ_DISABLE_P)) {
+					dest = mv_desc_get_dest_addr(unmap);
+					mv_xor_unmap(dev, dest, len, DMA_BIDIRECTIONAL, flags, 1);
+				}
+				if (!(flags & DMA_PREP_PQ_DISABLE_Q)) {
+					q_dest = mv_desc_get_q_dest_addr(unmap);
+					mv_xor_unmap(dev, q_dest, len, DMA_BIDIRECTIONAL, flags, 1);
+				}
+			}
+
+			if (!(flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
+				int src_i;
+				for (src_i = 0; src_i < 8; src_i++) {
+					if (!mv_desc_is_src_used(unmap, src_i))
+						continue;
+					src = mv_desc_get_src_addr(unmap, src_i);
 
 					mv_xor_unmap(dev, src, len, DMA_TO_DEVICE, flags, 0);
 				}
@@ -770,6 +824,65 @@ mv_xor_prep_dma_crc32c(struct dma_chan *chan, dma_addr_t src,
 	dev_dbg(mv_chan_to_devp(mv_chan), "%s sw_desc %p async_tx %p\n",
 		__func__, sw_desc, &sw_desc->async_tx);
 
+	return sw_desc ? &sw_desc->async_tx : NULL;
+}
+
+static struct dma_async_tx_descriptor *
+mv_xor_prep_dma_pq(struct dma_chan *chan, dma_addr_t *dst, dma_addr_t *src,
+		unsigned int src_cnt, const unsigned char *scf,
+		size_t len, unsigned long flags)
+{
+	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+	struct mv_xor_desc_slot *sw_desc;
+	int src_i = 0;
+	int i = 0;
+
+	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+		return NULL;
+
+	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
+
+	dev_dbg(mv_chan_to_devp(mv_chan),
+		"%s src_cnt: %d len: %u flags: %ld\n",
+		__func__, src_cnt, len, flags);
+
+	/* since the coefs on Marvell engine are hardcoded, do not support mult
+	 * and sum product requests
+	 */
+	if ((flags & DMA_PREP_PQ_MULT) || (flags & DMA_PREP_PQ_SUM_PRODUCT))
+		return NULL;
+
+	sw_desc = mv_xor_alloc_slot(mv_chan);
+	if (sw_desc) {
+		sw_desc->type = DMA_PQ;
+		sw_desc->async_tx.flags = flags;
+		mv_desc_init(sw_desc, flags);
+		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+			mv_desc_set_mode(sw_desc);
+		mv_desc_set_byte_count(sw_desc, len);
+		if (!(flags & DMA_PREP_PQ_DISABLE_P))
+			mv_desc_set_dest_addr(sw_desc, dst[0]);
+		if (!(flags & DMA_PREP_PQ_DISABLE_Q))
+			mv_desc_set_q_dest_addr(sw_desc, dst[1]);
+		sw_desc->unmap_src_cnt = src_cnt;
+		sw_desc->unmap_len = len;
+		while (src_cnt) {
+			if (scf[src_i] == mv_xor_raid6_coefs[i]) {
+				/* coefs are hardcoded, assign the src to the
+				 * right place
+				 */
+				mv_desc_set_src_addr(sw_desc, i, src[src_i]);
+				src_i++;
+				i++;
+				src_cnt--;
+			} else
+				i++;
+		}
+	}
+
+	dev_dbg(mv_chan_to_devp(mv_chan),
+		"%s sw_desc %p async_tx %p\n",
+		__func__, sw_desc, &sw_desc->async_tx);
 	return sw_desc ? &sw_desc->async_tx : NULL;
 }
 
@@ -1225,6 +1338,10 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 		dma_dev->device_prep_dma_interrupt = mv_xor_prep_dma_interrupt;
 	if (dma_has_cap(DMA_CRC32C, dma_dev->cap_mask))
 		dma_dev->device_prep_dma_crc32c = mv_xor_prep_dma_crc32c;
+	if (dma_has_cap(DMA_PQ, dma_dev->cap_mask)) {
+		dma_set_maxpq(dma_dev, 8, 0);
+		dma_dev->device_prep_dma_pq = mv_xor_prep_dma_pq;
+	}
 
 	mv_chan->mmr_base = xordev->xor_base;
 	if (!mv_chan->mmr_base) {
@@ -1292,12 +1409,13 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 			goto err_free_irq;
 	}
 
-	dev_info(&pdev->dev, "Marvell XOR (%s): ( %s%s%s%s)\n",
+	dev_info(&pdev->dev, "Marvell XOR (%s): ( %s%s%s%s%s)\n",
 		 mv_chan->op_in_desc ? "Descriptor Mode" : "Registers Mode",
 		 dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "xor " : "",
 		 dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask) ? "cpy " : "",
 		 dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask) ? "intr " : "",
-		 dma_has_cap(DMA_CRC32C, dma_dev->cap_mask) ? "crc32c " : "");
+		 dma_has_cap(DMA_CRC32C, dma_dev->cap_mask) ? "crc32c " : "",
+		 dma_has_cap(DMA_PQ, dma_dev->cap_mask) ? "pq " : "");
 
 	dma_async_device_register(dma_dev);
 	return mv_chan;
@@ -1426,6 +1544,8 @@ static int mv_xor_probe(struct platform_device *pdev)
 				dma_cap_set(DMA_INTERRUPT, cap_mask);
 			if (of_property_read_bool(np, "dmacap,crc32c"))
 				dma_cap_set(DMA_CRC32C, cap_mask);
+			if (of_property_read_bool(np, "dmacap,pq"))
+				dma_cap_set(DMA_PQ, cap_mask);
 
 			irq = irq_of_parse_and_map(np, 0);
 			if (!irq) {
