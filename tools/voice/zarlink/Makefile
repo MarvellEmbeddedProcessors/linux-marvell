@@ -19,6 +19,10 @@ AR := $(CROSS_COMPILE)ar
 
 #CFLAGS += -I$(KSRC)/tools/voice/
 
+ifeq ($(CONFIG_ARCH_MVEBU),y)
+CFLAGS += -I$(KSRC)/drivers/telephony/mvebu_phone/mv_phone/
+endif
+
 ifeq ($(CONFIG_ZARLINK_SLIC_SUPPORT),y)
 TARGETS += vpapi_lib.o
 LIBS := libvpapi.a

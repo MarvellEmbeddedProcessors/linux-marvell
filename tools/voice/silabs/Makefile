@@ -19,6 +19,10 @@ AR := $(CROSS_COMPILE)ar
 
 #CFLAGS += -I$(KSRC)/tools/voice/
 
+ifeq ($(CONFIG_ARCH_MVEBU),y)
+CFLAGS += -I$(KSRC)/drivers/telephony/mvebu_phone/mv_phone/
+endif
+
 ifeq ($(CONFIG_PLAT_ARMADA),y)
 CFLAGS += -I$(KSRC)/arch/arm/plat-armada/mv_drivers_lsp/mv_phone/
 else
