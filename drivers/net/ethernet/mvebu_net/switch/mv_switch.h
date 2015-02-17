@@ -124,6 +124,7 @@ enum sw_port_state_t {
 
 /*TPM end*/
 #endif
+
 /*unsigned int	mv_switch_link_detection_init(struct mv_switch_pdata *plat_data);*/
 void mv_switch_interrupt_mask(void);
 void mv_switch_interrupt_unmask(void);
@@ -148,8 +149,15 @@ int     mv_switch_ptp_reg_read(int port, int reg, MV_U16 *value);
 int     mv_switch_ptp_reg_write(int port, int reg, MV_U16 value);
 #endif
 
+char *mv_str_speed_state(int port);
+char *mv_str_duplex_state(int port);
+char *mv_str_link_state(int port);
+void	mv_switch_atu_print(void);
 void    mv_switch_stats_print(void);
 void    mv_switch_status_print(void);
+
+size_t mv_switch_get_peer_count(void);
+size_t mv_switch_get_peer_mac_addresses(uint8_t mac_addresses[][6], size_t count, int port);
 
 int     mv_switch_all_multicasts_del(int db_num);
 
@@ -266,6 +274,8 @@ int mv_switch_port_force_link_set(unsigned int lport, GT_BOOL enable, GT_BOOL va
 int mv_switch_port_force_link_get(unsigned int lport, GT_BOOL *enable, GT_BOOL *value);
 int mv_switch_port_state_set(unsigned int lport, enum sw_port_state_t state);
 int mv_switch_port_state_get(unsigned int lport, enum sw_port_state_t *state);
+int mv_switch_port_rgmii_timing_delay_set(unsigned int lport, GT_BOOL rxmode, GT_BOOL txmode);
+int mv_switch_port_rgmii_timing_delay_get(unsigned int lport, GT_BOOL *rxmode, GT_BOOL *txmode);
 int mv_switch_cpu_port_get(unsigned int *cpu_port);
 /*TPM end*/
 #endif

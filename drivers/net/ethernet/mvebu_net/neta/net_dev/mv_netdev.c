@@ -4561,7 +4561,12 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 	/* Per port parameters */
 	plat_data->cpu_mask  = (1 << nr_cpu_ids) - 1;
 	plat_data->duplex = DUPLEX_FULL;
-	plat_data->speed = MV_ETH_SPEED_AN;
+
+	/*if eth port is connect to switch, then we should force its speed to 1gps and force it linked up*/
+	if (plat_data->phy_addr == -1)
+		plat_data->speed = SPEED_1000;
+	else
+		plat_data->speed = 0;
 
 	/* Get SoC ID */
 	if (mvebu_get_soc_id(&ctrl_model, &ctrl_rev)) {

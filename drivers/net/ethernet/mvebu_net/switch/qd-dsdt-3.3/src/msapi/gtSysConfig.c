@@ -762,6 +762,8 @@ GT_STATUS qdLoadDriver
                 break;
         case GT_88E6172:
                 dev->numOfPorts = 7;
+		dev->maxPorts = 7;
+		dev->maxPhyNum = 5;
                 dev->validPortVec = (1 << dev->numOfPorts) - 1;
                 dev->validPhyVec = 0x1F;
                 dev->validSerdesVec = 0x8000;

@@ -33,6 +33,15 @@ config NET_SKB_RECYCLE
 
 endmenu
 
+menu "Marvell DSOHO SDT Features"
+config MV_INCLUDE_SWITCH
+	bool "Marvell Armada 38X network switch support"
+	default n
+	---help---
+	  This driver supports the network switch units in the
+	  Marvell ARMADA 38x SoC family.
+endmenu
+
 menu "Marvell Network PON Support"
 
 config MV_INCLUDE_PON
