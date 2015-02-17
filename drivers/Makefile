@@ -131,6 +131,7 @@ obj-$(CONFIG_VHOST_RING)	+= vhost/
 obj-$(CONFIG_VLYNQ)		+= vlynq/
 obj-$(CONFIG_STAGING)		+= staging/
 obj-y				+= platform/
+obj-$(CONFIG_PHONE)		+= telephony/
 #common clk code
 obj-y				+= clk/
 
