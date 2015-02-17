@@ -1,0 +1,108 @@
++------------------------------------------------------+
+| How to compile Lantiq DFEV drivers and mv_voice_tool |
++------------------------------------------------------+
+
+1. Unpack configure and build LSP using avanta_lp_defconfig.
+   Make sure that the following options are configured as shown below:
+
+	CONFIG_LANTIQ_DFEV_SLIC_SUPPORT=y
+	CONFIG_MV_IPC_FREERTOS_DRIVER=y
+	CONFIG_MV_INCLUDE_DRAGONITE=y
+	CONFIG_MV_TDM_PCM_CLK_8MHZ=y
+
+2. Build Lantiq lib_ifxos:
+
+	$ cd <path-to-slic-drivers>/dfev/lib_ifxos
+	$ ./configure								\
+		--host=arm-marvell-linux-gnueabi				\
+		--enable-linux-26						\
+		--enable-kernelbuild=<path-to-lsp>				\
+		--enable-kernelincl=<path-to-lsp>/include			\
+		--with-kernel-module
+	$ make
+	$ ls -l src/drv_ifxos.ko
+
+3. Build Lantiq drv_tapi:
+
+	$ cd <path-to-slic-drivers>/dfev/drv_tapi
+	$ ./configure								\
+		--host=arm-marvell-linux-gnueabi				\
+		--enable-linux-26						\
+		--with-kernel-build=<path-to-lsp>				\
+		--with-kernel-incl=<path-to-lsp>/include			\
+		--with-kernel-module						\
+		--with-ifxos-incl=<path-to-lib_ifxos>/src/include	\
+		--enable-module							\
+		--enable-tapi4							\
+		--enable-cont-measurement					\
+		--enable-dtmf							\
+		--enable-hsm							\
+		--enable-metering						\
+		--enable-nlt							\
+		--enable-pcm							\
+		--enable-phone-detection					\
+		--enable-voice
+	$ make
+	$ ls -l src/drv_tapi.ko
+
+4. Build Lantiq drv_sdd:
+
+	$ cd <path-to-slic-drivers>/dfev/drv_sdd
+	$ ./configure								\
+		--host=arm-marvell-linux-gnueabi				\
+		--enable-linux-26						\
+		--with-kernel-build=<path-to-lsp>				\
+		--with-kernel-incl=<path-to-lsp>/include			\
+		--with-ifxos-incl=<path-to-lib_ifxos>/src/include	\
+		--with-tapi-incl=<path-to-drv_tapi>/include
+	$ make
+	$ ls -l src/drv_sdd.ko
+
+5. Build DFEV driver:
+
+	$ cd <path-to-slic-drivers>/dfev/drv_dfev
+	$ make -C <path-to-lsp> M=$PWD						\
+		ARCH=arm CROSS_COMPILE=arm-marvell-linux-gnueabi-		\
+		DRV_SDD=<path-to-drv_sdd>				\
+		LIB_IFXOS=<path-to-lib_ifxos>
+	$ ls -l drv_dfev.ko
+
+6. Build VMMC interface:
+
+	$ cd <path-to-slic-drivers>/dfev/vmmc_if
+	$ make -C <path-to-lsp> M=$PWD						\
+		ARCH=arm CROSS_COMPILE=arm-marvell-linux-gnueabi-		\
+		DRV_SDD=<path-to-drv_sdd>				\
+		LIB_IFXOS=<path-to-lib_ifxos>
+	$ ls -l vmmc_if.ko
+
+7. Build mv_voice_tool for Lantiq SLIC:
+
+	$ cd mv_voice_tool
+	$ make ARCH=arm CROSS_COMPILE=arm-marvell-linux-gnueabi-		\
+		EXTRA_CFLAGS="-I<path-to-lib_ifxos>/src/include		\
+			-I<path-to-drv_tapi>/include			\
+			-I<path-to-drv_sdd>/include			\
+			-I<path-to-lsp>/arch/arm/plat-armada/mv_drivers_lsp/mv_phone"
+	$ ls -l mv_voice_tool
+
++---------------------------------------------+
+| How to run Lantiq drivers and mv_voice_tool |
++---------------------------------------------+
+
+1. Copy all modules and mv_voice_tool to the target and run it in AMP mode.
+
+2. Load drivers:
+	# insmod drv_ifxos.ko && insmod drv_tapi.ko && insmod drv_sdd.ko && insmod vmmc_if.ko
+
+3. Run mv_voice_tool (on Host CPU):
+	# ./mv_voice_tool
+
++------------+
+| Known Bugs |
++------------+
+
+1. The demo uses IRQ instead of FIQ to handle SDD firmware calls
+   due to problems with FIQ interrupts on Avanta-LP. As result
+   SDD real-time timing requirements cannot be achieved and silent
+   "clicking" sound might be heard on the line.

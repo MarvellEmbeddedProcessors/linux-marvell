@@ -1,0 +1,31 @@
++-------------------------------------------------------------------------+
+| How to compile Silabs mv_voice_tool with Silabs external module package |
++-------------------------------------------------------------------------+
+
+1. Unpack, configure and build LSP. Make sure that the following
+   options are set:
+
+	CONFIG_SILABS_SLIC_SUPPORT=y
+	CONFIG_SILABS_SLIC_EXTERNAL_DRIVER=y
+	CONFIG_MV_TDM_PCM_CLK_8MHZ=y
+	CONFIG_MV_TDM_USE_DCO=y
+
+2. Build Silabs Drivers (shipped separately).
+
+3. Build mv_voice_tool for Silabs SLICs
+	$ cd <path-to-lsp>/tools/voice/silabs
+	$ make ARCH=arm CROSS_COMPILE=arm-marvell-linux-gnueabi-		\
+		SILABS_SLIC=<path-to-silabs-slic>
+	$ ls -l mv_voice_tool-*
+
++---------------------------------------------+
+| How to run Silabs drivers and mv_voice_tool |
++---------------------------------------------+
+
+1. Copy all modules and mv_voice_tool utilities to the target.
+
+2. Load Silabs drivers (replace si3226x with proper SLIC type):
+	# insmod silabs-si3226x.ko
+
+3. Run mv_voice_tool (replace si3226x with proper SLIC type):
+	# ./mv_voice_tool-si3226x

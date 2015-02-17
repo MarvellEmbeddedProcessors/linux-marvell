@@ -1,0 +1,59 @@
++-------------------------------------------------+
+| How to compile Lantiq drivers and mv_voice_tool |
++-------------------------------------------------+
+
+1. Unpack configure and build LSP. Make sure that the following
+   options are set:
+
+	CONFIG_LANTIQ_SLIC_SUPPORT=y
+	CONFIG_LANTIQ_SLIC_DUSLIC_XT=y
+	CONFIG_MV_TDM_PCM_CLK_8MHZ=y
+
+2. Build Lantiq lib_ifxos-1.5.17:
+
+	$ cd lib_ifxos-1.5.17
+	$ ./configure --host=arm-marvell-linux-gnueabi --enable-linux-26 --enable-kernelbuild=<path-to-lsp> --enable-kernelincl=<path-to-lsp>/include	--with-kernel-module
+	$ make
+	$ ls -l src/drv_ifxos.ko
+
+3. Build Lantiq drv_tapi-4.10.1.4:
+	$ cd drv_tapi-4.10.1.4
+	$ ./configure --host=arm-marvell-linux-gnueabi	--enable-linux-26 --with-kernel-incl=<path-to-lsp>/include --with-kernel-build=<path-to-lsp> --with-kernel-module --with-ifxos-incl=<path-to-lib_ifxos-1.5.17>/src/include --enable-module --enable-tapi4 --enable-cont-measurement --enable-dtmf --enable-hsm	--enable-metering --enable-nlt	--enable-pcm --enable-phone-detection --enable-voice
+	$ make
+	$ ls -l src/drv_tapi.ko
+
+4. Build Lantiq drv_dxt-1.5.3.4:
+	$ cd drv_dxt-1.5.3.4
+	$ ./configure --host=arm-marvell-linux-gnueabi	--enable-linux-26 --with-kernel-incl=<path-to-lsp>/include --with-kernel-build=<path-to-lsp> --with-ifxos-incl=<path-to-lib_ifxos-1.5.17>/src/include --with-tapi-incl=<path-to-drv_tapi-4.10.1.4>/include --enable-cap-measurement --enable-cont-measurement	--enable-lt --enable-proc --enable-tone-generator
+	$ make
+	$ ls -l src/drv_dxt.ko
+
+5. Build mv_voice_tool for Lantiq SLIC (please note that if you have libtapi.a
+   binary, the EXTRA_CFLAGS parameter is not necessary):
+	$ cd <path-to-lsp>/tools/voice/lantiq/kernel
+	$ make ARCH=arm CROSS_COMPILE=arm-marvell-linux-gnueabi-		\
+		EXTRA_CFLAGS="-I<path-to-lib_ifxos-1.5.17>/src/include		\
+		-I<path-to-drv_tapi-4.10.1.4>/include				\
+		-I<path-to-drv_dxt-1.5.3.4>/include"
+	$ ls -l mv_voice_tool
+
++---------------------------------------------+
+| How to run Lantiq drivers and mv_voice_tool |
++---------------------------------------------+
+
+1. Copy all modules and mv_voice_tool to the target.
+
+2. Make device node under /dev(should be changed if conflicts with existed device):
+	# mknod /dev/tapi c 253 0
+
+3. Load Lantiq drivers:
+	# insmod drv_ifxos.ko && insmod drv_tapi.ko && insmod drv_dxt.ko
+
+4. Run mv_voice_tool:
+	# ./mv_voice_tool
+
++------------+
+| Known Bugs |
++------------+
+
+1. The Channel Balancing test fails if 4-byte sample is selected.
