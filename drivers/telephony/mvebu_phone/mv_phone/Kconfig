@@ -1,0 +1,6 @@
+menu "SoC Telephony support"
+	depends on MV_INCLUDE_TDM
+
+	comment "See under:  Staging drivers -> Telephony support -> Marvell Telephony Options"
+
+endmenu
