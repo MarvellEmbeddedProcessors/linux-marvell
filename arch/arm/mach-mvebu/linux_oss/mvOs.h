@@ -103,6 +103,7 @@ extern void mv_early_printk(char *fmt, ...);
 #define MV_ASM              (__asm__ __volatile__)
 #define INLINE              inline
 #define _INIT               __init
+#define MV_TRC_REC(...)
 #define mvOsPrintf          printk
 #define mvOsEarlyPrintf	    mv_early_printk
 #define mvOsOutput          printk
