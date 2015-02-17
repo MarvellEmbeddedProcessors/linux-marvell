@@ -560,7 +560,7 @@ static irqreturn_t tdm_if_isr(int irq, void* dev_id)
 {
 	MV_TDM_INT_INFO tdm_int_info;
 	unsigned int int_type;
-	int ret;
+	int ret = 0;
 
 	TRC_REC("->%s\n", __func__);
 
