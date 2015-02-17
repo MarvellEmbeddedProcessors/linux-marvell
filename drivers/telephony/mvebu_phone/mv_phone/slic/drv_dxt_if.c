@@ -73,7 +73,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 static int drv_dxt_spi_cs;
 static int drv_dxt_irq;
-static int drv_dxt_irq_dev;
+static void *drv_dxt_irq_dev;
 static irq_handler_t drv_dxt_irq_handler;
 
 void

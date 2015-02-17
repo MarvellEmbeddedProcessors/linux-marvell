@@ -78,7 +78,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 static ssize_t spi_read(struct file *file, char __user *buf, size_t size, loff_t *ppos);
 static ssize_t spi_write(struct file *file, const char __user *buf, size_t size, loff_t *ppos);
 static unsigned int spi_poll(struct file *pFile, poll_table *pPollTable);
-static int spi_ioctl(struct file *pFile, unsigned int cmd, unsigned long arg);
+static long spi_ioctl(struct file *pFile, unsigned int cmd, unsigned long arg);
 static int spi_open(struct inode *pInode, struct file *pFile);
 static int spi_release(struct inode *pInode, struct file *pFile);
 
@@ -121,7 +121,7 @@ static unsigned int spi_poll(struct file *pFile, poll_table *pPollTable)
 	return 0;
 }
 
-static int spi_ioctl(struct file *pFile, unsigned int cmd, unsigned long arg)
+static long spi_ioctl(struct file *pFile, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
 
