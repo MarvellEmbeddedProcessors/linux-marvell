@@ -21,6 +21,10 @@ ifeq ($(CONFIG_MV_TDM_USE_DCO),y)
  CFLAGS += -DMV_TDM_USE_DCO
 endif
 
+ifeq ($(CONFIG_ARCH_MVEBU),y)
+CFLAGS += -I$(KSRC)/drivers/telephony/mvebu_phone/mv_phone/
+endif
+
 CC := $(CROSS_COMPILE)gcc
 LD := $(CROSS_COMPILE)ld
 AR := $(CROSS_COMPILE)ar
