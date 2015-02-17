@@ -1,0 +1,31 @@
++---------------------------------------------------------------------------+
+| How to compile Zarlink mv_voice_tool with Zarlink external module package |
++---------------------------------------------------------------------------+
+
+1. Unpack, configure and build LSP. Make sure that the following
+   options are set:
+
+	CONFIG_ZARLINK_SLIC_SUPPORT=y
+	CONFIG_ZARLINK_SLIC_EXTERNAL_DRIVER=y
+	CONFIG_MV_TDM_PCM_CLK_8MHZ=y
+	CONFIG_MV_TDM_USE_INTERNAL_PCLK_SOURCE=y
+
+2. Build Zarlink Drivers (shipped separately).
+
+3. Build mv_voice_tool for Zarlink SLICs
+	$ cd <path-to-lsp>/tools/voice/zarlink/kernel
+	$ make ARCH=arm CROSS_COMPILE=arm-marvell-linux-gnueabi-		\
+		ZARLINK_VPAPI=<path-to-zarlink-vpapi>
+	$ ls -l mv_voice_tool-*
+
++----------------------------------------------+
+| How to run Zarlink drivers and mv_voice_tool |
++----------------------------------------------+
+
+1. Copy all modules and mv_voice_tool utilities to the target.
+
+2. Load Zarlink drivers (replace ve880 with proper SLIC type):
+	# insmod zarlink-ve880.ko
+
+3. Run mv_voice_tool (replace ve880 with proper SLIC type):
+	# ./mv_voice_tool-ve880
