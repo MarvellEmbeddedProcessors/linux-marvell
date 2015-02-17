@@ -288,6 +288,18 @@
 						       "mpp51", "mpp52", "mpp53";
 					marvell,function = "audio";
 				};
+
+				tdm_pins: tdm_pins {
+					marvell,pins = "mpp48", "mpp49", "mpp50",
+						       "mpp51", "mpp52", "mpp53";
+					marvell,function = "tdm2c";
+				};
+
+				spi1_pins: spi1_pins {
+					marvell,pins = "mpp55", "mpp56", "mpp57",
+						       "mpp58", "mpp59";
+					marvell,function = "spi1";
+				};
 			};
 
 			pmsu@22000 {
@@ -319,6 +331,16 @@
 				reg = <0xe0000 0x2000>;
 				interrupts = <0 28 0x4>;
 				clocks = <&gateclk 30>;
+				status = "disabled";
+			};
+
+			tdm@b0000 {
+				compatible = "marvell,armada-380-tdm";
+				reg = <0xb0000 0x5000>, <0x18400 0xc>, <0x18730 0x4>;
+				reg-names = "tdm_regs", "pll_regs", "dco_div";
+				interrupts = <0 27 0x4>;
+				clocks = <&gateclk 25>;
+				clock-names = "gateclk";
 				status = "disabled";
 			};
 
