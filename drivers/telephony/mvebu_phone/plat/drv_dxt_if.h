@@ -65,6 +65,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef __PLAT_DRV_DXT_IF_H
 #define __PLAT_DRV_DXT_IF_H
 
+#ifdef CONFIG_OF
+#include "mvSysTdmConfig.h"
+#endif
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
