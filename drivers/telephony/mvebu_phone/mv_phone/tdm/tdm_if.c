@@ -71,8 +71,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <plat/drv_dxt_if.h>
 #include <plat/zarlink_if.h>
 #include <plat/silabs_if.h>
+#ifndef CONFIG_OF
 #include "gpp/mvGppRegs.h"
 #include "ctrlEnv/mvCtrlEnvLib.h"
+#endif
 
 #define TDM_STOP_MAX_POLLING_TIME 20 /* ms */
 
@@ -92,6 +94,7 @@ static inline void tdm_if_pcm_rx_process(void);
 static inline void tdm_if_pcm_tx_process(void);
 #endif
 /* TDM proc-fs statistics */
+#ifndef CONFIG_OF
 static int proc_tdm_init_read(char *buffer, char **buffer_location, off_t offset,
                             int buffer_length, int *zero, void *ptr);
 static int proc_rx_miss_read(char *buffer, char **buffer_location, off_t offset,
@@ -106,6 +109,7 @@ static int proc_tx_under_read(char *buffer, char **buffer_location, off_t offset
 static int proc_dump_ext_stats(char *buffer, char **buffer_location, off_t offset,
 				int buffer_length, int *zero, void *ptr);
 #endif
+#endif /* !CONFIG_OF */
 
 /* TDM SW Reset */
 static void tdm2c_if_stop_channels(unsigned long args);
@@ -140,6 +144,53 @@ static unsigned int pcm_start_stop_state;
 static unsigned int is_pcm_stopping;
 static unsigned int mv_tdm_unit_type;
 
+#ifdef CONFIG_OF
+static int proc_tdm_status_show(struct seq_file *m, void *v)
+{
+#ifdef CONFIG_MV_TDM_EXT_STATS
+	MV_TDM_EXTENDED_STATS tdm_ext_stats;
+#endif
+
+	seq_printf(m, "tdm_init:	%u\n", tdm_init);
+	seq_printf(m, "rx_miss:		%u\n", rx_miss);
+	seq_printf(m, "tx_miss:		%u\n", tx_miss);
+	seq_printf(m, "rx_over:		%u\n", rx_over);
+	seq_printf(m, "tx_under:	%u\n", tx_under);
+
+#ifdef CONFIG_MV_TDM_EXT_STATS
+	mvTdmExtStatsGet(&tdm_ext_stats);
+
+	seq_printf(m, "\nTDM Extended Statistics:\n");
+	seq_printf(m, "intRxCount	= %u\n", tdm_ext_stats.intRxCount);
+	seq_printf(m, "intTxCount	= %u\n", tdm_ext_stats.intTxCount);
+	seq_printf(m, "intRx0Count	= %u\n", tdm_ext_stats.intRx0Count);
+	seq_printf(m, "intTx0Count	= %u\n", tdm_ext_stats.intTx0Count);
+	seq_printf(m, "intRx1Count	= %u\n", tdm_ext_stats.intRx1Count);
+	seq_printf(m, "intTx1Count	= %u\n", tdm_ext_stats.intTx1Count);
+	seq_printf(m, "intRx0Miss	= %u\n", tdm_ext_stats.intRx0Miss);
+	seq_printf(m, "intTx0Miss	= %u\n", tdm_ext_stats.intTx0Miss);
+	seq_printf(m, "intRx1Miss	= %u\n", tdm_ext_stats.intRx1Miss);
+	seq_printf(m, "intTx1Miss	= %u\n", tdm_ext_stats.intTx1Miss);
+	seq_printf(m, "pcmRestartCount	= %u\n", tdm_ext_stats.pcmRestartCount);
+	seq_printf(m, "pcm_stop_fail	= %u\n", pcm_stop_fail);
+#endif
+
+	return 0;
+}
+
+static int proc_tdm_status_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_tdm_status_show, PDE_DATA(inode));
+}
+
+static const struct file_operations proc_tdm_operations = {
+	.open		= proc_tdm_status_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+#else
 static int proc_tdm_init_read(char *buffer, char **buffer_location, off_t offset,
                             int buffer_length, int *zero, void *ptr)
 {
@@ -169,6 +220,7 @@ static int proc_tx_under_read(char *buffer, char **buffer_location, off_t offset
 {
 	return sprintf(buffer, "%u\n", tx_under);
 }
+#endif /* CONFIG_OF */
 
 static void tdm_if_unit_type_set(unsigned int tdm_unit)
 {
@@ -190,6 +242,7 @@ static unsigned int tdm_if_unit_type_get(void)
 	return mv_tdm_unit_type;
 }
 
+#ifndef CONFIG_OF
 #ifdef CONFIG_MV_TDM_EXT_STATS
 static int proc_dump_ext_stats(char *buffer, char **buffer_location, off_t offset,
 				int buffer_length, int *zero, void *ptr)
@@ -220,6 +273,7 @@ static int proc_dump_ext_stats(char *buffer, char **buffer_location, off_t offse
 	return (int)(str - buffer);
 }
 #endif
+#endif /* !CONFIG_OF */
 
 MV_STATUS tdm_if_init(tal_params_t *tal_params)
 {
@@ -232,12 +286,14 @@ MV_STATUS tdm_if_init(tal_params_t *tal_params)
 
 	printk(KERN_INFO "Loading Marvell Telephony Driver\n");
 
+#ifndef CONFIG_OF
 	/* Check if any SLIC module exists */
 	if (mvCtrlSocUnitInfoNumGet(TDM_UNIT_ID) == 0) {
 		mvCtrlPwrClckSet(TDM_UNIT_ID, 0, MV_FALSE);
 		printk(KERN_WARNING "%s: Warning, no SLIC module is connected\n", __func__);
 		return MV_OK;
 	}
+#endif
 
 	if (tal_params == NULL) {
 		printk(KERN_ERR "%s: bad parameters\n", __func__);
@@ -314,6 +370,10 @@ MV_STATUS tdm_if_init(tal_params_t *tal_params)
 	/* Create TDM procFS statistics */
 	tdm_stats = proc_mkdir("tdm", NULL);
 	if (tdm_stats != NULL) {
+#ifdef CONFIG_OF
+		if (!proc_create("tdm_stats", S_IRUGO, tdm_stats, &proc_tdm_operations))
+			return -ENOMEM;
+#else
 		create_proc_read_entry("tdm_init", 0, tdm_stats, proc_tdm_init_read, NULL);
 		create_proc_read_entry("rx_miss", 0, tdm_stats, proc_rx_miss_read, NULL);
 		create_proc_read_entry("tx_miss", 0, tdm_stats, proc_tx_miss_read, NULL);
@@ -322,6 +382,7 @@ MV_STATUS tdm_if_init(tal_params_t *tal_params)
 #ifdef CONFIG_MV_TDM_EXT_STATS
 		create_proc_read_entry("tdm_extended_stats", 0, tdm_stats, proc_dump_ext_stats, NULL);
 #endif
+#endif /* CONFIG_OF */
 	}
 
 	TRC_REC("Marvell Telephony Driver Loaded Successfully\n");
@@ -382,6 +443,9 @@ void tdm_if_exit(void)
 			mvCommUnitRelease();
 #endif
 		/* Remove proc directory & entries */
+#ifdef CONFIG_OF
+		remove_proc_entry("tdm_stats", tdm_stats);
+#else
 		remove_proc_entry("tdm_init", tdm_stats);
 		remove_proc_entry("rx_miss", tdm_stats);
 		remove_proc_entry("tx_miss", tdm_stats);
@@ -390,6 +454,7 @@ void tdm_if_exit(void)
 #ifdef CONFIG_MV_TDM_EXT_STATS
 		remove_proc_entry("tdm_extended_stats", tdm_stats);
 #endif
+#endif /* CONFIG_OF */
 		remove_proc_entry("tdm", NULL);
 
 		tdm_init = 0;

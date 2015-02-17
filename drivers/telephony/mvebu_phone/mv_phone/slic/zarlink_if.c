@@ -67,8 +67,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/interrupt.h>
 #include <plat/zarlink_if.h>
 
+#ifndef CONFIG_OF
 #include "boardEnv/mvBoardEnvLib.h"
 #include "spi/mvSpi.h"
+#endif
 #include "voiceband/mvSysTdmSpi.h"
 
 static handler zsi_handler;
