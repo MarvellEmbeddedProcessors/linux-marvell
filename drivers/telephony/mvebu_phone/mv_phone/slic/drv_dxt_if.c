@@ -66,7 +66,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/module.h>
 #include <linux/interrupt.h>
 #include <plat/drv_dxt_if.h>
+#ifndef CONFIG_OF
 #include "spi/mvSpi.h"
+#endif
 #include "voiceband/mvSysTdmSpi.h"
 
 static int drv_dxt_spi_cs;

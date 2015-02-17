@@ -70,7 +70,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/sched.h>
 #include <linux/wait.h>
 
+#ifndef CONFIG_OF
 #include "spi/mvSpi.h"
+#endif
 #include "tal.h"
 #include "../tdm/tdm_if.h"
 #include "tal_dev.h"

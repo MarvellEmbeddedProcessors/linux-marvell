@@ -66,8 +66,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include "spi_dev.h"
+#ifndef CONFIG_OF
 #include "boardEnv/mvBoardEnvLib.h"
 #include "spi/mvSpi.h"
+#endif
 #include "voiceband/mvSysTdmSpi.h"
 
 /* Defines */
