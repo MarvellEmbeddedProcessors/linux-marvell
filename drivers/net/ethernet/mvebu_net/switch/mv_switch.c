@@ -30,10 +30,16 @@ disclaimer.
 #include <linux/interrupt.h>
 #include <linux/mv_switch.h>
 #include <linux/module.h>
+#include <linux/of.h>
+#include <linux/kthread.h>
+#include <linux/workqueue.h>
 
 #include "mvOs.h"
-#include "mvSysHwConfig.h"
+#ifdef CONFIG_OF
+#include "phy/mvEthPhy.h"
+#else
 #include "eth-phy/mvEthPhy.h"
+#endif
 #ifdef MV_INCLUDE_ETH_COMPLEX
 #include "ctrlEnv/mvCtrlEthCompLib.h"
 #endif /* MV_INCLUDE_ETH_COMPLEX */
@@ -75,12 +81,13 @@ static u32 switch_dbg = 0xffff;
 #define SWITCH_DBG(FLG, X)
 #endif /* SWITCH_DEBUG */
 
-static GT_QD_DEV qddev, *qd_dev = NULL;
+GT_QD_DEV qddev, *qd_dev = NULL;
 static GT_SYS_CONFIG qd_cfg;
 
 static int qd_cpu_port = -1;
 static int enabled_ports_mask;
 static int switch_ports_mask;
+static int switch_link_ports_mask;
 static MV_TAG_TYPE tag_mode;
 static MV_SWITCH_PRESET_TYPE preset;
 static int default_vid;
@@ -91,13 +98,13 @@ static const struct mv_mux_switch_ops switch_ops;
 
 static struct tasklet_struct link_tasklet;
 static int switch_irq = -1;
-int switch_link_poll = 0;
+int switch_link_poll;	/* polling mode */
 static struct timer_list switch_link_timer;
+static struct task_struct *switch_link_detect_thrd;
 
 static spinlock_t switch_lock;
 
 static unsigned int mv_switch_link_detection_init(struct mv_switch_pdata *plat_data);
-
 
 #ifdef CONFIG_AVANTA_LP
 static GT_BOOL mv_switch_mii_read(GT_QD_DEV *dev, unsigned int phy, unsigned int reg, unsigned int *data)
@@ -621,6 +628,30 @@ void mv_switch_link_timer_function(unsigned long data)
 	}
 }
 
+static int mv_switch_link_detect_thread(void *data)
+{
+	int timeout;
+	wait_queue_head_t timeout_wq;
+
+	pr_info("switch link detect thread starts up\n");
+
+	init_waitqueue_head(&timeout_wq);
+
+	set_cpus_allowed_ptr(current, &cpumask_of_cpu(1));
+
+	while (switch_link_poll) {
+		mv_switch_link_update_event(switch_link_ports_mask, 0);
+		sleep_on_timeout(&timeout_wq, HZ);
+
+		if (kthread_should_stop()) {
+			pr_err("receive stop event!\n");
+			break;
+		}
+	}
+
+	return 0;
+}
+
 static irqreturn_t mv_switch_isr(int irq, void *dev_id)
 {
 	GT_DEV_INT_STATUS devIntStatus;
@@ -697,6 +728,44 @@ int mv_switch_jumbo_mode_set(int max_size)
 	return 0;
 }
 
+static GT_SEM mv_switch_sem_create(GT_SEM_BEGIN_STATE state)
+{
+	struct semaphore *sem;
+
+	sem = mvOsMalloc(sizeof(struct semaphore));
+
+	if (GT_SEM_EMPTY == state)
+		sema_init(sem, 0);
+	else
+		sema_init(sem, 1);
+
+	return (GT_SEM)sem;
+}
+
+static GT_STATUS mv_switch_sem_delete(GT_SEM smid)
+{
+	mvOsFree((struct semaphore *)smid);
+
+	return GT_OK;
+}
+
+static GT_STATUS mv_switch_sem_wait(GT_SEM smid, GT_U32 timeOut)
+{
+	if (!timeOut)
+		down((struct semaphore *)(smid));
+	else
+		return down_timeout((struct semaphore *)(smid), timeOut);
+
+	return GT_OK;
+}
+
+static GT_STATUS mv_switch_sem_give(GT_SEM smid)
+{
+	up((struct semaphore *)(smid));
+
+	return GT_OK;
+}
+
 int mv_switch_load(struct mv_switch_pdata *plat_data)
 {
 	int p;
@@ -727,6 +796,10 @@ int mv_switch_load(struct mv_switch_pdata *plat_data)
 	} else if (plat_data->smi_scan_mode == 2) {
 		qd_cfg.mode.scanMode = SMI_MULTI_ADDR_MODE;
 		qd_cfg.mode.baseAddr = plat_data->phy_addr;
+		qd_cfg.BSPFunctions.semCreate = mv_switch_sem_create;
+		qd_cfg.BSPFunctions.semDelete = mv_switch_sem_delete;
+		qd_cfg.BSPFunctions.semTake = mv_switch_sem_wait;
+		qd_cfg.BSPFunctions.semGive = mv_switch_sem_give;
 	}
 
 	/* load switch sw package */
@@ -756,6 +829,16 @@ int mv_switch_load(struct mv_switch_pdata *plat_data)
 		if (MV_BIT_CHECK(plat_data->forced_link_port_mask, p)) {
 			/* Switch port connected to GMAC - force link UP - 1000 Full with FC */
 			printk(KERN_ERR "    o Setting Switch Port #%d connected to GMAC port for 1000 Full with FC\n", p);
+#ifdef CONFIG_OF
+			if (gpcsSetRGMIITimingDelay(qd_dev,
+							p,
+							plat_data->rgmii_rx_timing_delay,
+							plat_data->rgmii_tx_timing_delay) != GT_OK) {
+				pr_err("set rgmii timeing delay - Failed\n");
+				return -1;
+			}
+#endif
+
 			if (gpcsSetForceSpeed(qd_dev, p, PORT_FORCE_SPEED_1000_MBPS) != GT_OK) {
 				printk(KERN_ERR "Force speed 1000mbps - Failed\n");
 				return -1;
@@ -871,7 +954,13 @@ int mv_switch_unload(unsigned int switch_ports_mask)
 
 	switch_irq = -1;
 	switch_link_poll = 0;
-	del_timer(&switch_link_timer);
+	if ((switch_irq == -1) && (qd_dev->accessMode == SMI_MULTI_ADDR_MODE)) {
+		if (switch_link_detect_thrd) {
+			kthread_stop(switch_link_detect_thrd);
+			switch_link_detect_thrd = NULL;
+		}
+	} else
+		del_timer(&switch_link_timer);
 
 	return 0;
 }
@@ -919,6 +1008,8 @@ int mv_switch_init(struct mv_switch_pdata *plat_data)
 		return -1;
 	}
 
+	switch_ports_mask = plat_data->connected_port_mask;
+
 	/* set priorities rules */
 	for (p = 0; p < qd_dev->numOfPorts; p++) {
 		if (MV_BIT_CHECK(plat_data->connected_port_mask, p)) {
@@ -943,7 +1034,7 @@ int mv_switch_init(struct mv_switch_pdata *plat_data)
 	if (gfdbFlush(qd_dev, GT_FLUSH_ALL) != GT_OK)
 		printk(KERN_ERR "gfdbFlush failed\n");
 
-	mv_switch_link_detection_init(plat_data);
+	switch_link_ports_mask = mv_switch_link_detection_init(plat_data);
 
 	/* Enable Jumbo support by default */
 	mv_switch_jumbo_mode_set(9180);
@@ -1217,16 +1308,20 @@ static unsigned int mv_switch_link_detection_init(struct mv_switch_pdata *plat_d
 	if (!link_init_done) {
 		/* we want to use a timer for polling link status if no interrupt is available for all or some of the PHYs */
 		if (switch_irq == -1) {
-			/* Use timer for polling */
 			switch_link_poll = 1;
-			init_timer(&switch_link_timer);
-			switch_link_timer.function = mv_switch_link_timer_function;
-
-			if (switch_irq == -1)
-				switch_link_timer.data = connected_phys_mask;
-
-			switch_link_timer.expires = jiffies + (HZ);	/* 1 second */
-			add_timer(&switch_link_timer);
+			if (qd_dev->accessMode == SMI_MULTI_ADDR_MODE) {
+				/* Use thread for polling, thread can call semphore*/
+				pr_err("switch access mode is smi_multi_addr, there are semphore preventation!\n");
+				pr_err("So please note that switch APIs can not be called in interrupts!\n");
+				pr_err("Switch link detection will be implemented by thread later but not timer!\n");
+			} else {
+				/* Use timer for polling */
+				init_timer(&switch_link_timer);
+				switch_link_timer.function = mv_switch_link_timer_function;
+				switch_link_timer.data = connected_phys_mask & (~plat_data->forced_link_port_mask);
+				switch_link_timer.expires = jiffies + (HZ);	/* 1 second */
+				add_timer(&switch_link_timer);
+			}
 		} else {
 			/* create tasklet for interrupt handling */
 			tasklet_init(&link_tasklet, mv_switch_tasklet, 0);
@@ -1505,7 +1600,6 @@ void mv_switch_stats_print(void)
 		QD_CNT_CORRECT(counters, Deferred, 6));
 
 	/*gstatsFlushAll(qd_dev);*/	/*remove this line for FlushAll operation may cause StatusBusy bit stuck*/
-
 	for (p = 0; p < QD_MAX; p++) {
 		memmove(&history_counters[p], counters[p], sizeof(GT_STATS_COUNTER_SET3));
 		memmove(&history_stats[p], port_stats[p], sizeof(GT_PORT_STAT2));
@@ -1530,7 +1624,7 @@ static char *mv_str_port_state(GT_PORT_STP_STATE state)
 	}
 }
 
-static char *mv_str_speed_state(int port)
+char *mv_str_speed_state(int port)
 {
 	GT_PORT_SPEED_MODE speed;
 	char *speed_str;
@@ -1553,7 +1647,7 @@ static char *mv_str_speed_state(int port)
 	return speed_str;
 }
 
-static char *mv_str_duplex_state(int port)
+char *mv_str_duplex_state(int port)
 {
 	GT_BOOL duplex;
 
@@ -1568,7 +1662,7 @@ static char *mv_str_duplex_state(int port)
 		return (duplex) ? "Full" : "Half";
 }
 
-static char *mv_str_link_state(int port)
+char *mv_str_link_state(int port)
 {
 	GT_BOOL link;
 
@@ -1650,6 +1744,36 @@ static char *mv_str_header_mode(GT_BOOL mode)
 		return "True";
 	default:
 		return "Invalid";
+	}
+}
+
+/* paul.chen for ATU table : David Wang */
+void mv_switch_atu_print(void)
+{
+	GT_STATUS status;
+	GT_ATU_ENTRY atu_entry;
+
+	if (qd_dev == NULL) {
+		pr_err("Switch is not initialized\n");
+		return;
+	}
+	memset(&atu_entry, 0, sizeof(atu_entry));
+
+	pr_err("Printing Switch ATU Table:\n");
+	if (gfdbGetAtuEntryFirst(qd_dev, &atu_entry) != GT_OK)
+		return;
+	pr_err("ATU Entry: db = %d, MAC = %02X:%02X:%02X:%02X:%02X:%02X, port vector = 0x%x\n",
+				atu_entry.DBNum, atu_entry.macAddr.arEther[0],
+				atu_entry.macAddr.arEther[1], atu_entry.macAddr.arEther[2],
+				atu_entry.macAddr.arEther[3], atu_entry.macAddr.arEther[4],
+				atu_entry.macAddr.arEther[5], atu_entry.portVec);
+
+	while ((status = gfdbGetAtuEntryNext(qd_dev, &atu_entry)) == GT_OK) {
+		pr_err("ATU Entry: db = %d, MAC = %02X:%02X:%02X:%02X:%02X:%02X, port vector = 0x%x\n",
+				atu_entry.DBNum, atu_entry.macAddr.arEther[0],
+				atu_entry.macAddr.arEther[1], atu_entry.macAddr.arEther[2],
+				atu_entry.macAddr.arEther[3], atu_entry.macAddr.arEther[4],
+				atu_entry.macAddr.arEther[5], atu_entry.portVec);
 	}
 }
 
@@ -1813,6 +1937,36 @@ int mv_switch_reg_write(int port, int reg, int type, MV_U16 value)
 		return 2;
 	}
 	return 0;
+}
+
+size_t mv_switch_get_peer_count(void)
+{
+	GT_U32  count = 0;
+
+	MV_IF_NULL_RET_STR(qd_dev, MV_FAIL, "switch dev qd_dev has not been init!\n");
+
+	if (gfdbGetAtuAllCount(qd_dev, &count) != GT_OK)
+		return 0;
+	return count;
+}
+
+size_t mv_switch_get_peer_mac_addresses(uint8_t mac_addresses[][6], size_t count, int port)
+{
+	GT_ATU_ENTRY mac_entry;
+	size_t  i = 0;
+
+	MV_IF_NULL_RET_STR(qd_dev, MV_FAIL, "switch dev qd_dev has not been init!\n");
+
+	memset(&mac_entry, 0, sizeof(mac_entry));
+	if (gfdbGetAtuEntryFirst(qd_dev, &mac_entry) != GT_OK)
+		return 0;
+	do {
+		if (mac_entry.portVec & (1 << port)) {
+			memcpy(mac_addresses[i], mac_entry.macAddr.arEther, 6);
+			++i;
+		}
+	} while (i <= count && gfdbGetAtuEntryNext(qd_dev, &mac_entry) == GT_OK);
+	return i;
 }
 
 int mv_switch_all_multicasts_del(int db_num)
@@ -5454,6 +5608,66 @@ int mv_switch_port_state_set(unsigned int lport, enum sw_port_state_t state)
 }
 
 /*******************************************************************************
+* mv_switch_port_rgmii_timing_delay_set
+*
+* DESCRIPTION:
+*	This routine will set RGMII receive/transmit Timing Control.
+*
+* INPUTS:
+*        lport       - logical switch PHY port ID, valid on port 5 and port 6 only.
+*        rxmode   - GT_FALSE for default setup, GT_TRUE for adding delay to rxclk
+*        txmode   - GT_FALSE for default setup, GT_TRUE for adding delay to txclk
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_rgmii_timing_delay_set(unsigned int lport, GT_BOOL rxmode, GT_BOOL txmode)
+{
+	GT_STATUS rc = GT_OK;
+
+	MV_IF_NULL_RET_STR(qd_dev, MV_FAIL, "switch dev qd_dev has not been init!\n");
+
+	rc = gpcsSetRGMIITimingDelay(qd_dev, lport, rxmode, txmode);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetForcedFC()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
+* mv_switch_port_rgmii_timing_delay_set
+*
+* DESCRIPTION:
+*	This routine will set RGMII receive/transmit Timing Control.
+*
+* INPUTS:
+*        lport       - logical switch PHY port ID, valid on port 5 and port 6 only.
+*        rxmode   - GT_FALSE for default setup, GT_TRUE for adding delay to rxclk
+*        txmode   - GT_FALSE for default setup, GT_TRUE for adding delay to txclk
+*
+* OUTPUTS:
+*	None.
+*
+* RETURNS:
+*	On success return MV_OK.
+*	On error different types are returned according to the case.
+*******************************************************************************/
+int mv_switch_port_rgmii_timing_delay_get(unsigned int lport, GT_BOOL *rxmode, GT_BOOL *txmode)
+{
+	GT_STATUS rc = GT_OK;
+
+	MV_IF_NULL_RET_STR(qd_dev, MV_FAIL, "switch dev qd_dev has not been init!\n");
+
+	rc = gpcsGetRGMIITimingDelay(qd_dev, lport, rxmode, txmode);
+	SW_IF_ERROR_STR(rc, "failed to call gpcsSetForcedFC()\n");
+
+	return MV_OK;
+}
+
+/*******************************************************************************
 * mv_switch_cpu_port_get
 *
 * DESCRIPTION:
@@ -5486,9 +5700,91 @@ int mv_switch_cpu_port_get(unsigned int *cpu_port)
 	return MV_OK;
 }
 
+#ifdef CONFIG_OF
+char *mv_switch_str;
+
+static int mv_switch_cmdline_config(char *s)
+{
+	mv_switch_str = s;
+	return 1;
+}
+__setup("switch_config=", mv_switch_cmdline_config);
+
+static void mv_switch_parse_cmd_line(char *str, MV_SWITCH_PRESET_TYPE *preset, MV_TAG_TYPE *tag_mode)
+{
+	int len, curr = 0;
+
+	/* default values */
+	*preset = MV_PRESET_TRANSPARENT;
+	*tag_mode = MV_TAG_TYPE_NONE;
+
+	if (!str || !strcmp(str, "none"))
+		return;
+
+	len = strlen(str);
+
+	/* Parse tag mode */
+	if ((len >= 2) && (((str[curr] == 'm') && (str[curr + 1] == 'h')) ||
+		((str[curr] == 'M') && (str[curr + 1] == 'H')))) {
+			*tag_mode = MV_TAG_TYPE_MH;
+			curr += 2;
+	} else if ((len >= 3) && (((str[curr] == 'd') && (str[curr + 1] == 's') && (str[curr + 2] == 'a'))
+			|| ((str[curr] == 'D') && (str[curr + 1] == 'S') && (str[curr + 2] == 'A')))) {
+		*tag_mode = MV_TAG_TYPE_DSA;
+		curr += 3;
+	} else
+		return;
+
+	if (str[curr++] != ',')
+		return;
+
+	/* Parse preset mode */
+	if (!strcmp(str + curr, "per_port"))
+		*preset = MV_PRESET_PER_PORT_VLAN;
+	else if (!strcmp(str + curr, "single"))
+		*preset = MV_PRESET_SINGLE_VLAN;
+}
+
+#endif
 static int mv_switch_probe(struct platform_device *pdev)
 {
+
+#ifdef CONFIG_OF
+	struct mv_switch_pdata *plat_data = kzalloc(sizeof(struct mv_switch_pdata), GFP_KERNEL);
+	platform_set_drvdata(pdev, plat_data);
+	struct device_node *np = pdev->dev.of_node;
+	int ret;
+
+	ret = 0;
+	ret |= of_property_read_u32(np, "index", &plat_data->index);
+	ret |= of_property_read_u32(np, "phy_addr", &plat_data->phy_addr);
+	ret |= of_property_read_u32(np, "gbe_port", &plat_data->gbe_port);
+	ret |= of_property_read_u32(np, "cpuPort", &plat_data->switch_cpu_port);
+	ret |= of_property_read_u32(np, "vid", &plat_data->vid);
+	ret |= of_property_read_u32(np, "port_mask", &plat_data->port_mask);
+	ret |= of_property_read_u32(np, "connected_port_mask", &plat_data->connected_port_mask);
+	ret |= of_property_read_u32(np, "forced_link_port_mask", &plat_data->forced_link_port_mask);
+	ret |= of_property_read_u32(np, "mtu", &plat_data->mtu);
+	ret |= of_property_read_u32(np, "smi_scan_mode", &plat_data->smi_scan_mode);
+	ret |= of_property_read_u32(np, "qsgmii_module", &plat_data->qsgmii_module);
+	ret |= of_property_read_u32(np, "gephy_on_port", &plat_data->gephy_on_port);
+	ret |= of_property_read_u32(np, "rgmiia_on_port", &plat_data->rgmiia_on_port);
+	ret |= of_property_read_u32(np, "switch_irq", &plat_data->switch_irq);
+	ret |= of_property_read_u32(np, "is_speed_2000", &plat_data->is_speed_2000);
+	ret |= of_property_read_u32(np, "rgmii_rx_timing_delay", &plat_data->rgmii_rx_timing_delay);
+	ret |= of_property_read_u32(np, "rgmii_tx_timing_delay", &plat_data->rgmii_tx_timing_delay);
+
+	SW_IF_ERROR_STR(ret, "read switch fdt file failed\n");
+
+	mv_switch_parse_cmd_line(mv_switch_str, &plat_data->preset, &plat_data->tag_mode);
+
+/* paul.chen known issue on interrupt the link detect need to fix. */
+
+#else
 	struct mv_switch_pdata *plat_data = (struct mv_switch_pdata *)pdev->dev.platform_data;
+#endif /* CONFIG_OF */
+
+
 	/* load switch driver, force link on cpu port */
 	mv_switch_load(plat_data);
 
@@ -5526,6 +5822,14 @@ static const struct mv_mux_switch_ops switch_ops =  {
 	.interrupt_unmask = mv_switch_interrupt_unmask,
 };
 
+#ifdef CONFIG_OF
+static const struct of_device_id mv_switch_match[] = {
+	{ .compatible = "marvell,mv_switch" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, pp2_match);
+#endif
+
 static struct platform_driver mv_switch_driver = {
 	.probe = mv_switch_probe,
 	.remove = mv_switch_remove,
@@ -5535,8 +5839,34 @@ static struct platform_driver mv_switch_driver = {
 #endif /* CONFIG_CPU_IDLE */
 	.driver = {
 		.name = MV_SWITCH_SOHO_NAME,
+#ifdef CONFIG_OF
+		.of_match_table = mv_switch_match,
+#endif
 	},
 };
+
+static __init int mv_switch_start_link_detect_thread(void)
+{
+	struct task_struct *thrd;
+	struct sched_param param;
+
+	/* Start link status polling Thread if switch is external and need smi multi addr access*/
+	if ((switch_irq == -1) && (qd_dev->accessMode == SMI_MULTI_ADDR_MODE)) {
+
+		thrd = kthread_run(mv_switch_link_detect_thread, NULL, "link detect");
+		if (IS_ERR(thrd))
+			pr_err("failed to start config thread\n");
+		/* Set scheduler and priority */
+		param.sched_priority = 99;
+		sched_setscheduler(thrd, SCHED_FIFO, &param);
+		pr_info("create config thread (pid=%d)\n", thrd->pid);
+		switch_link_detect_thrd = thrd;
+	}
+
+	return 0;
+}
+
+late_initcall(mv_switch_start_link_detect_thread);
 
 static int __init mv_switch_init_module(void)
 {
