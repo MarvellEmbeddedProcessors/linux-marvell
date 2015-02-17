@@ -197,12 +197,20 @@ MV_STATUS mvTdmHalInit(MV_TDM_PARAMS *tdmParams, MV_TDM_HAL_DATA *halData)
 
 	if (tdmBandMode == MV_NARROW_BAND) {
 		pcmCtrlReg = (CONFIG_PCM_CRTL | (((MV_U8)pcmFormat - 1) << PCM_SAMPLE_SIZE_OFFS));
+#ifdef CONFIG_OF
+		if (use_pclk_external)
+			pcmCtrlReg |= MASTER_PCLK_EXTERNAL;
+#endif
 		MV_REG_WRITE(PCM_CTRL_REG, pcmCtrlReg);	/* PCM configuration */
 		MV_REG_WRITE(CH_DELAY_CTRL_REG(0), chDelay[0]);	/* CH0 delay control register */
 		MV_REG_WRITE(CH_DELAY_CTRL_REG(1), chDelay[1]);	/* CH1 delay control register */
 	} else {		/* MV_WIDE_BAND */
 
 		pcmCtrlReg = (CONFIG_WB_PCM_CRTL | (((MV_U8)pcmFormat - 1) << PCM_SAMPLE_SIZE_OFFS));
+#ifdef CONFIG_OF
+		if (use_pclk_external)
+			pcmCtrlReg |= MASTER_PCLK_EXTERNAL;
+#endif
 		MV_REG_WRITE(PCM_CTRL_REG, pcmCtrlReg);	/* PCM configuration - WB support */
 		MV_REG_WRITE(CH_DELAY_CTRL_REG(0), chDelay[0]);	/* CH0 delay control register */
 		MV_REG_WRITE(CH_DELAY_CTRL_REG(1), chDelay[1]);	/* CH1 delay control register */
