@@ -65,13 +65,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef _TDM_IF_H_
 #define _TDM_IF_H_
 
+#ifndef CONFIG_OF
 #include "mvSysTdmApi.h"
+#endif
 #include "voiceband/tdm/mvTdm.h"
 #include "voiceband/commUnit/mvCommUnit.h"
+#ifndef CONFIG_OF
 #include "ctrlEnv/mvCtrlEnvSpec.h"
 #include "ctrlEnv/mvCtrlEnvRegs.h"
 #include "ctrlEnv/mvCtrlEnvLib.h"
 #include "boardEnv/mvBoardEnvLib.h"
+#endif
 
 /* Structures */
 typedef struct {
