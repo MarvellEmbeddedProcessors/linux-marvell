@@ -3,11 +3,15 @@
 #
 #
 
+ifneq ($(CONFIG_ARCH_MVEBU),y)
 ifneq ($(MACHINE),)
 include $(srctree)/$(MACHINE)/config/mvRules.mk
 endif
 
 VB_SRC_PATH = ../../mv_hal/voiceband
+else
+VB_SRC_PATH = ../voiceband
+endif
 LSP_TAL_PATH = tal
 LSP_SPI_PATH = spi
 LSP_SLIC_PATH = slic
@@ -19,8 +23,10 @@ obj-$(CONFIG_MV_INCLUDE_TDM) += mv_phone.o
 # TAL
 PHONE_OBJS = $(LSP_TAL_PATH)/tal.o $(LSP_TAL_PATH)/tal_dev.o
 
+ifneq ($(CONFIG_ARCH_MVEBU),y)
 # TDM HAL
 PHONE_OBJS += ../../../../../$(MACHINE)/mv_hal_if/mvSysTdm.o
+endif
 
 # SPI and SLIC, always compile SPI and all SLIC in none DFEV mode
 ifneq ($(MV_LANTIQ_DFEV_SUPPORT),y)
@@ -30,9 +36,20 @@ ifneq ($(MV_LANTIQ_DFEV_SUPPORT),y)
 	PHONE_OBJS += $(LSP_SLIC_PATH)/zarlink_if.o
 endif
 
+ifeq ($(CONFIG_ARCH_MVEBU),y)
+	PHONE_OBJS += ../mv_phone_dev.o
+	PHONE_OBJS += ../mv_phone_spi.o
+
+	ccflags-y += $(MVEBU_PHONE_FLAGS)
+	ccflags-y += $(INCLUDE_DIRS)
+endif
+
 # TDM2C support
 ifeq ($(CONFIG_MV_TDM2C_SUPPORT),y)
-	PHONE_OBJS += $(VB_SRC_PATH)/tdm/mvTdm.o $(VB_SRC_PATH)/tdm/mvTdmAddrDec.o
+ifneq ($(CONFIG_ARCH_MVEBU),y)
+	PHONE_OBJS += $(VB_SRC_PATH)/tdm/mvTdmAddrDec.o
+endif
+	PHONE_OBJS += $(VB_SRC_PATH)/tdm/mvTdm.o
 	PHONE_OBJS += $(LSP_TDM_PATH)/tdm_if.o
 endif
 
