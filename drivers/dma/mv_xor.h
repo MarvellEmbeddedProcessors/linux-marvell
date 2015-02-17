@@ -41,6 +41,7 @@
 #define XOR_DESC_OPERATION_XOR            (0 << 24)
 #define XOR_DESC_OPERATION_CRC32C         (1 << 24)
 #define XOR_DESC_OPERATION_MEMCPY         (2 << 24)
+#define XOR_DESC_OPERATION_PQ             (5 << 24)
 
 #define XOR_CURR_DESC(chan)	(chan->mmr_base + 0x210 + (chan->idx * 4))
 #define XOR_NEXT_DESC(chan)	(chan->mmr_base + 0x200 + (chan->idx * 4))
@@ -170,7 +171,7 @@ struct mv_xor_desc {
 	u32 byte_count;		/* size of src/dst blocks in bytes */
 	u32 phy_dest_addr;	/* destination block address */
 	u32 phy_src_addr[8];	/* source block addresses */
-	u32 reserved0;
+	u32 phy_q_dest_addr;
 	u32 reserved1;
 };
 #define mv_phy_src_idx(src_idx) (src_idx)
@@ -184,7 +185,7 @@ struct mv_xor_desc {
 	u32 byte_count;		/* size of src/dst blocks in bytes */
 	u32 phy_src_addr[8];	/* source block addresses */
 	u32 reserved1;
-	u32 reserved0;
+	u32 phy_q_dest_addr;
 };
 #define mv_phy_src_idx(src_idx) (src_idx ^ 1)
 #endif
