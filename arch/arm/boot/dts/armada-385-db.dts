@@ -70,6 +70,12 @@
 				status = "okay";
 			};
 
+			tdm@b0000 {
+				pinctrl-0 = <&tdm_pins>;
+				pinctrl-names = "default";
+				pclk-freq-mhz = <8>;
+			};
+
 			sdhci@d8000 {
 				broken-cd;
 				wp-inverted;
@@ -91,6 +97,19 @@
 					compatible = "w25q32";
 					reg = <0>; /* Chip select 0 */
 					spi-max-frequency = <108000000>;
+				};
+			};
+
+			spi1: spi@10680 {
+				pinctrl-0 = <&spi1_pins>;
+				pinctrl-names = "default";
+
+				slic@0 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "mv_slic";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <10000000>;
 				};
 			};
 
