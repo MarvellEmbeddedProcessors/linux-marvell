@@ -440,7 +440,7 @@ static int orion_spi_probe(struct platform_device *pdev)
 	spi = spi_master_get_devdata(master);
 	spi->master = master;
 
-	spi->clk = clk_get(&pdev->dev, NULL);
+	spi->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(spi->clk)) {
 		status = PTR_ERR(spi->clk);
 		goto out;
@@ -471,7 +471,6 @@ static int orion_spi_probe(struct platform_device *pdev)
 
 out_rel_clk:
 	clk_disable_unprepare(spi->clk);
-	clk_put(spi->clk);
 out:
 	spi_master_put(master);
 	return status;
@@ -487,7 +486,6 @@ static int orion_spi_remove(struct platform_device *pdev)
 	spi = spi_master_get_devdata(master);
 
 	clk_disable_unprepare(spi->clk);
-	clk_put(spi->clk);
 
 	spi_unregister_master(master);
 
