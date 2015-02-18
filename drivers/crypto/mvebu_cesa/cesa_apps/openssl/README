@@ -1,20 +1,34 @@
 OpenSSL
 ===========
- In order to explore the CESA unit through the OpenSSL, you have to use the
- OpenSSL OCF cryptodev engine.
- By default the cryptodev engine will use the CESA
- accelerator.
+In order to explore the CESA unit through the OpenSSL, you have to use the
+OpenSSL OCF cryptodev engine.
+By default the cryptodev engine will use the CESA
+accelerator.
 
- o In case missing, create a crypto device: mknod /dev/crypto c 10 70
- o Download latest openssl source package from http://www.openssl.org, then untar+unzip it.
- o In case missing, copy from kernel crypto/ocf/cryptodev.h to file-system path: /usr/include/crypto .
- o Run: ./config -DHAVE_CRYPTODEV no-shared
- o and compile ...('make' and 'make install')
+o In case missing, create a crypto device: mknod /dev/crypto c 10 70
+o Download latest openssl source package from http://www.openssl.org, then untar+unzip it.
+o copy from kernel crypto/ocf/cryptodev.h to openSSL build file-system path: /usr/include/crypto .
+o If using Marvell Cross complier, set the following flags according to your file location (OpenSSL sources and Marvell toolchain location)
+        export INSTALLDIR=/home/<home_dir>/work/openSSL/openssl-1.0.2
+        export PATH=$INSTALLDIR/bin:$PATH
+        export TARGETMACH=arm-none-linux-gnueabi
+        export BUILDMACH=i686-pc-linux-gnu
+        export CROSS=/opt/armv7-marvell-linux-gnueabi-hard-4.6.4_i686_20140402/bin/arm-marvell-linux-gnueabi
+        export CC=${CROSS}-gc
+        export CC=${CROSS}-gcc
+        export LD=${CROSS}-ld
+        export AS=${CROSS}-as
+        export AR=${CROSS}-ar
+        ./Configure -DHAVE_CRYPTODEV no-shared --openssldir=/home/<home_dir>/work/openSSL/openssl-1.0.2/final os/compiler:arm-none-linux-gnueabi-
+        make RANLIB=${CROSS}ranlib
+        sudo -E make install
+o If using ARM native comiler, run: ./config -DHAVE_CRYPTODEV no-shared
+o and compile ...('make' and 'make install')
 
- you can run a speed test to make sure everything is working:
-	openssl speed -evp des3 -elapsed
- Modify /dev/crypto to /dev/crypto_tmp so that the speed test will use
- now software encryption.
- Run again:
+you can run a speed test to make sure everything is working:
+                openssl speed -evp des3 -elapsed
+Modify /dev/crypto to /dev/crypto_tmp so that the speed test will use
+now software encryption.
+Run again:
         openssl speed -evp des3 -elapsed
- Compare results.
+Compare results.
