@@ -80,6 +80,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 int tdm_base;
 int use_pclk_external;
+int mv_phone_enabled;
 struct mv_phone_dev *priv;
 
 /* Initialize the TDM subsystem. */
@@ -154,6 +155,9 @@ u32 mvCtrlTdmUnitIrqGet(void)
 MV_TDM_UNIT_TYPE mvCtrlTdmUnitTypeGet(void)
 {
 	MV_TDM_UNIT_TYPE tdm_type = MV_TDM_UNIT_NONE;
+
+	if (!mv_phone_enabled)
+		return tdm_type;
 
 	if (of_device_is_compatible(priv->np, "marvell,armada-380-tdm"))
 		tdm_type = MV_TDM_UNIT_TDM2C;
@@ -369,6 +373,8 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		if (err < 0)
 			goto err_clk;
 	}
+
+	mv_phone_enabled = 1;
 
 	return 0;
 
