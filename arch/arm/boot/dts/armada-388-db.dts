@@ -78,6 +78,7 @@
 					compatible = "w25q32", "jedec,spi-nor";
 					reg = <0>; /* Chip select 0 */
 					spi-max-frequency = <108000000>;
+					spi-cpha;
 				};
 			};
 
