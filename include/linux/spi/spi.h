@@ -233,6 +233,8 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
  *	suported. If set, the SPI core will reject any transfer with an
  *	unsupported bits_per_word. If not set, this value is simply ignored,
  *	and it's up to the individual driver to perform any validation.
+ * @min_speed_hz: Lowest supported transfer speed
+ * @max_speed_hz: Highest supported transfer speed
  * @flags: other constraints relevant to this driver
  * @bus_lock_spinlock: spinlock for SPI bus locking
  * @bus_lock_mutex: mutex for SPI bus locking
@@ -308,6 +310,10 @@ struct spi_master {
 
 	/* bitmask of supported bits_per_word for transfers */
 	u32			bits_per_word_mask;
+
+	/* limits on transfer speed */
+	u32			min_speed_hz;
+	u32			max_speed_hz;
 
 	/* other constraints relevant to this driver */
 	u16			flags;
