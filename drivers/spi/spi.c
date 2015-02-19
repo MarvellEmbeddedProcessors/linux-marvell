@@ -868,6 +868,8 @@ static void of_register_spi_devices(struct spi_master *master)
 			spi->mode |= SPI_CS_HIGH;
 		if (of_find_property(nc, "spi-3wire", NULL))
 			spi->mode |= SPI_3WIRE;
+		if (of_find_property(nc, "spi-1byte-cs", NULL))
+			spi->mode |= SPI_1BYTE_CS;
 
 		/* Device speed */
 		prop = of_get_property(nc, "spi-max-frequency", &len);
@@ -1332,13 +1334,14 @@ int spi_setup(struct spi_device *spi)
 	if (spi->master->setup)
 		status = spi->master->setup(spi);
 
-	dev_dbg(&spi->dev, "setup mode %d, %s%s%s%s"
+	dev_dbg(&spi->dev, "setup mode %d, %s%s%s%s%s"
 				"%u bits/w, %u Hz max --> %d\n",
 			(int) (spi->mode & (SPI_CPOL | SPI_CPHA)),
 			(spi->mode & SPI_CS_HIGH) ? "cs_high, " : "",
 			(spi->mode & SPI_LSB_FIRST) ? "lsb, " : "",
 			(spi->mode & SPI_3WIRE) ? "3wire, " : "",
 			(spi->mode & SPI_LOOP) ? "loopback, " : "",
+			(spi->mode & SPI_1BYTE_CS) ? "single_cs_byte, " : "",
 			spi->bits_per_word, spi->max_speed_hz,
 			status);
 
