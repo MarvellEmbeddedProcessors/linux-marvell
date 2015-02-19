@@ -252,8 +252,15 @@ orion_spi_write_read_8bit(struct spi_device *spi,
 {
 	void __iomem *tx_reg, *rx_reg, *int_reg;
 	struct orion_spi *orion_spi;
+	bool cs_single_byte;
+
+	cs_single_byte = spi->mode & SPI_1BYTE_CS;
 
 	orion_spi = spi_master_get_devdata(spi->master);
+
+	if (cs_single_byte)
+		orion_spi_set_cs(orion_spi, 1);
+
 	tx_reg = spi_reg(orion_spi, ORION_SPI_DATA_OUT_REG);
 	rx_reg = spi_reg(orion_spi, ORION_SPI_DATA_IN_REG);
 	int_reg = spi_reg(orion_spi, ORION_SPI_INT_CAUSE_REG);
@@ -267,12 +274,23 @@ orion_spi_write_read_8bit(struct spi_device *spi,
 		writel(0, tx_reg);
 
 	if (orion_spi_wait_till_ready(orion_spi) < 0) {
+		if (cs_single_byte) {
+			orion_spi_set_cs(orion_spi, 0);
+			/* Satisfy some SLIC devices requirements */
+			udelay(4);
+		}
 		dev_err(&spi->dev, "TXS timed out\n");
 		return -1;
 	}
 
 	if (rx_buf && *rx_buf)
 		*(*rx_buf)++ = readl(rx_reg);
+
+	if (cs_single_byte) {
+		orion_spi_set_cs(orion_spi, 0);
+		/* Satisfy some SLIC devices requirements */
+		udelay(4);
+	}
 
 	return 1;
 }
@@ -350,6 +368,7 @@ static int orion_spi_transfer_one_message(struct spi_master *master,
 	struct orion_spi *orion_spi = spi_master_get_devdata(master);
 	struct spi_device *spi = m->spi;
 	struct spi_transfer *t = NULL;
+	bool cs_single_byte;
 	int par_override = 0;
 	int status = 0;
 	int cs_active = 0;
@@ -361,6 +380,8 @@ static int orion_spi_transfer_one_message(struct spi_master *master,
 		goto msg_done;
 
 	orion_spi->cur_spi = spi;
+
+	cs_single_byte = spi->mode & SPI_1BYTE_CS;
 
 	list_for_each_entry(t, &m->transfers, transfer_list) {
 		/* make sure buffer length is even when working in 16
@@ -383,7 +404,7 @@ static int orion_spi_transfer_one_message(struct spi_master *master,
 				par_override = 0;
 		}
 
-		if (!cs_active) {
+		if (!cs_active && !cs_single_byte) {
 			orion_spi_set_cs(orion_spi, 1);
 			cs_active = 1;
 		}
@@ -394,14 +415,14 @@ static int orion_spi_transfer_one_message(struct spi_master *master,
 		if (t->delay_usecs)
 			udelay(t->delay_usecs);
 
-		if (t->cs_change) {
+		if (t->cs_change && !cs_single_byte) {
 			orion_spi_set_cs(orion_spi, 0);
 			cs_active = 0;
 		}
 	}
 
 msg_done:
-	if (cs_active)
+	if (cs_active && !cs_single_byte)
 		orion_spi_set_cs(orion_spi, 0);
 
 	m->status = status;
@@ -470,7 +491,7 @@ static int orion_spi_probe(struct platform_device *pdev)
 			num_cs = ORION_NUM_CHIPSELECTS;
 	}
 
-	master->mode_bits = SPI_CPHA | SPI_CPOL;
+	master->mode_bits = SPI_CPHA | SPI_CPOL | SPI_1BYTE_CS;
 	master->transfer_one_message = orion_spi_transfer_one_message;
 	master->num_chipselect = num_cs;
 
