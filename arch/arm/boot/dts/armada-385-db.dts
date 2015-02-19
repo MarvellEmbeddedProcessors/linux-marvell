@@ -110,7 +110,10 @@
 					#size-cells = <0>;
 					compatible = "mv_slic";
 					reg = <0>; /* Chip select 0 */
-					spi-max-frequency = <10000000>;
+					spi-max-frequency = <3000000>;
+					spi-1byte-cs;
+					spi-cpol;
+					spi-cpha;
 				};
 			};
 
