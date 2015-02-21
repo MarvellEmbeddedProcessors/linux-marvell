@@ -277,8 +277,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*********************************/
 
 #define TDM_MBUS_MAX_WIN	4
+#ifdef CONFIG_OF
+#define TDM_WIN_CTRL_REG(win)	(0x4030 + (win<<4))
+#define TDM_WIN_BASE_REG(win)	(0x4034 + (win<<4))
+#else
 #define TDM_WIN_CTRL_REG(win)	((MV_TDM_REGS_BASE + 0x4030) + (win<<4))
 #define TDM_WIN_BASE_REG(win)	((MV_TDM_REGS_BASE + 0x4034) + (win<<4))
+#endif
 
 /* TDM_WIN_CTRL_REG bits */
 #define TDM_WIN_ENABLE_OFFS	0
