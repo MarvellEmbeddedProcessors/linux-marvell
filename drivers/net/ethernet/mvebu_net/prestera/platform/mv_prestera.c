@@ -1014,7 +1014,7 @@ struct vm_operations_struct prestera_vm_ops = {
  */
 static int prestera_do_mmap(struct vm_area_struct *vma,
 		unsigned long phys,
-		unsigned long pageSize)
+		unsigned long pageSize, bool no_cache)
 {
 	int             rc;
 
@@ -1025,7 +1025,9 @@ static int prestera_do_mmap(struct vm_area_struct *vma,
 	vma->vm_flags |= VM_IO;
 
 	/* disable caching on mapped memory */
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	if (no_cache)
+		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
 	vma->vm_private_data = prestera_dev;
 
 	vma->vm_pgoff = phys >> PAGE_SHIFT;
@@ -1126,7 +1128,7 @@ static int prestera_mmap_dyn(struct file *file, struct vm_area_struct *vma)
 		return -ENXIO;
 	}
 
-	return prestera_do_mmap(vma, phys, pageSize);
+	return prestera_do_mmap(vma, phys, pageSize, true);
 }
 
 /************************************************************************
@@ -1167,8 +1169,8 @@ static int prestera_mmap(struct file *file, struct vm_area_struct *vma)
 	case MMAP_INFO_TYPE_DMA_E:
 			phys = dma_base;
 			pageSize = dma_len;
+			return prestera_do_mmap(vma, phys, pageSize, false);
 
-			break;
 	case MMAP_INFO_TYPE_PP_CONF_E:
 			phys = ppdev->config.phys;
 			pageSize = ppdev->config.mmapsize;
@@ -1193,7 +1195,7 @@ static int prestera_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EFAULT;
 	}
 
-	return prestera_do_mmap(vma, phys, pageSize);
+	return prestera_do_mmap(vma, phys, pageSize, true);
 }
 
 /************************************************************************
