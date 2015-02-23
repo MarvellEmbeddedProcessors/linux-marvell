@@ -183,6 +183,8 @@ struct dma_interleaved_template {
  *  operation it continues the calculation with new sources
  * @DMA_PREP_FENCE - tell the driver that subsequent operations depend
  *  on the result of this operation
+ * @DMA_PREP_PQ_MULT - tell the driver that this is a mult request
+ * @DMA_PREP_PQ_SUM_PRODUCT - tell the driver that this is a sum product request
  */
 enum dma_ctrl_flags {
 	DMA_PREP_INTERRUPT = (1 << 0),
@@ -195,6 +197,8 @@ enum dma_ctrl_flags {
 	DMA_PREP_PQ_DISABLE_Q = (1 << 7),
 	DMA_PREP_CONTINUE = (1 << 8),
 	DMA_PREP_FENCE = (1 << 9),
+	DMA_PREP_PQ_MULT = (1 << 10),
+	DMA_PREP_PQ_SUM_PRODUCT = (1 << 11),
 };
 
 /**
