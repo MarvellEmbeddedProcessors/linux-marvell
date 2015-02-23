@@ -1333,6 +1333,9 @@ static int dumpregs(char *page, int len, struct mem_region *mem, struct dumpregs
 
 static struct dumpregs_stc ppConf[] = {
 	{ "\toff",  0,   0x10 },
+	{ "\toff",  0,   0x10 },
+	{ "\toff",  0x41804, 0x41804 },
+	{ "\toff",  0x41808, 0x41808 },
 #if 0
 	/* No idea what are these registers,
 	 * not found in Lion2, Bobcat2 specs
