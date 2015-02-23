@@ -188,6 +188,11 @@ void mv_mux_shadow_print(int gbe_port)
 	struct mv_mux_eth_port shadow;
 	static const char * const tags[] = {"None", "mh", "dsa", "edas", "vlan"};
 
+	if (gbe_port >= MV_ETH_MAX_PORTS) {
+		pr_err("gbe port %d is out of range (0..%d)\n", gbe_port, MV_ETH_MAX_PORTS-1);
+		return;
+	}
+
 	if (mux_eth_shadow[gbe_port].root == NULL)
 		printk(KERN_ERR "gbe port %d is not attached.\n", gbe_port);
 
@@ -1070,6 +1075,10 @@ int mv_mux_tag_type_set(int port, int type)
 	unsigned int flgs;
 	struct net_device *root;
 
+	if (port >= MV_ETH_MAX_PORTS) {
+		pr_err("gbe port %d is out of range (0..%d)\n", port, MV_ETH_MAX_PORTS-1);
+		return;
+	}
 
 	if ((type < MV_TAG_TYPE_NONE) || (type >= MV_TAG_TYPE_LAST)) {
 		printk(KERN_INFO "%s: Invalid tag type %d\n", __func__, type);
