@@ -261,13 +261,14 @@ int prestera_int_connect(struct pp_dev		*ppdev,
 
 	tasklet_init(tasklet, prestera_bh, (unsigned long)irq_data);
 
-	if ((ppdev->devId == MV_BOBCAT2_DEV_ID || ppdev->devId == MV_ALLEYCAT3_DEV_ID) &&
+	if (((ppdev->devId & ~MV_DEV_FLAVOUR_MASK) == MV_BOBCAT2_DEV_ID ||
+		 (ppdev->devId & ~MV_DEV_FLAVOUR_MASK) == MV_ALLEYCAT3_DEV_ID) &&
 								   ppdev->on_pci_bus == 1)
 		status = request_irq(intVec, prestera_tl_isr_pci, IRQF_SHARED,
-						      "mvPP", (void *)ppdev);
+							  "mvPP", (void *)ppdev);
 	else
 		status = request_irq(intVec, prestera_tl_isr, IRQF_DISABLED,
-						      "mvPP", (void *)ppdev);
+							  "mvPP", (void *)ppdev);
 
 	if (status) {
 		panic("Can not assign IRQ %d to PresteraDev\n", intVec);
@@ -287,7 +288,8 @@ int prestera_int_connect(struct pp_dev		*ppdev,
 	}
 
 	/* Enable interrupt after registering handler */
-	if (ppdev->devId == MV_BOBCAT2_DEV_ID || ppdev->devId == MV_ALLEYCAT3_DEV_ID)
+	if (((ppdev->devId & ~MV_DEV_FLAVOUR_MASK) == MV_BOBCAT2_DEV_ID ||
+		(ppdev->devId & ~MV_DEV_FLAVOUR_MASK) == MV_ALLEYCAT3_DEV_ID) && ppdev->on_pci_bus == 1)
 		mv_ac3_bc2_enable_switch_irq(ppdev->config.base, true);
 
 	return 0;
@@ -333,7 +335,8 @@ int prestera_int_cleanup(void)
 		/* Do not disable pcie shared irqs - they can be used by
 		 * other devices connected via the same pcie such as dragonite)
 		 */
-		if ((ppdev->devId == MV_BOBCAT2_DEV_ID || ppdev->devId == MV_ALLEYCAT3_DEV_ID) &&
+		if (((ppdev->devId & ~MV_DEV_FLAVOUR_MASK) == MV_BOBCAT2_DEV_ID ||
+			 (ppdev->devId & ~MV_DEV_FLAVOUR_MASK) == MV_ALLEYCAT3_DEV_ID) &&
 									  ppdev->on_pci_bus == 1)
 			mv_ac3_bc2_enable_switch_irq(ppdev->config.base, false);
 		else

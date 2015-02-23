@@ -237,7 +237,8 @@ static int prestera_Internal_dev_probe(unsigned int devId)
 
 	mvInternalDevIdSet(devId);
 
-	switch (devId) {
+	/* The device flavor is ignored for AC3/BC2 */
+	switch (devId & ~MV_DEV_FLAVOUR_MASK) {
 
 	case MV_BOBCAT2_DEV_ID:
 	case MV_ALLEYCAT3_DEV_ID:
@@ -371,8 +372,14 @@ static int prestera_pci_dev_config(struct pci_dev *pdev)
 	int err;
 	void __iomem * const *iomap = NULL;
 	void __iomem *switch_reg = NULL;
+	unsigned short tmpDevId = pdev->device;
 
-	switch (pdev->device) {
+	/* Make sure all AC3/BC2 device flavours are handled in the same way */
+	if (((pdev->device & ~MV_DEV_FLAVOUR_MASK) == MV_BOBCAT2_DEV_ID) ||
+		((pdev->device & ~MV_DEV_FLAVOUR_MASK) == MV_ALLEYCAT3_DEV_ID))
+		tmpDevId &= ~MV_DEV_FLAVOUR_MASK;
+
+	switch (tmpDevId) {
 
 	case MV_IDT_SWITCH_DEV_ID_808E:
 	case MV_IDT_SWITCH_DEV_ID_802B:
@@ -427,11 +434,10 @@ static int prestera_pci_dev_config(struct pci_dev *pdev)
 *******************************************************************************/
 static int prestera_pci_dev_probe(void)
 {
-	int err;
 	unsigned long type = 0;
 	unsigned long instance = 0;
 	unsigned long busNo, devSel, funcNo;
-	unsigned long devId, vendorId;
+	unsigned short devId, vendorId, flavour;
 
 	/*
 	**  PCI Configuration Section
@@ -439,23 +445,31 @@ static int prestera_pci_dev_probe(void)
 	*/
 	prestera_global_init();
 
-	while (presteraPciDevs[type].deviceNum != (-1))	{
+	for (type = 0; presteraPciDevs[type].deviceNum != (-1); type++)	{
+
 		devId = presteraPciDevs[type].deviceId;
 		vendorId = presteraPciDevs[type].vendorId;
 
-		err = bspPciFindDev(vendorId, devId, instance, &busNo, &devSel, &funcNo);
-		if (err != 0) {
-			/* no more devices */
-			instance = 0;
-			type++;
-			continue;
-		}
-		dprintk(KERN_INFO "vendorId 0x%lx, devId 0x%lx, instance 0x%lx\n", vendorId, devId, instance);
-		dprintk(KERN_INFO "busNo 0x%lx, devSel 0x%lx, funcNo 0x%lx\n", busNo, devSel, funcNo);
-		instance++;
+		for (flavour = 0; flavour < MV_DEV_FLAVOUR_MASK; flavour++) {
 
-		prestera_pci_dev_config(pci_get_bus_and_slot(busNo, PCI_DEVFN(devSel, funcNo)));
-	}
+			instance = 0;
+			while (bspPciFindDev(vendorId, devId + flavour, instance, &busNo, &devSel, &funcNo) == 0) {
+				dprintk(KERN_INFO "vendorId 0x%x, devId 0x%x, instance 0x%lx\n",
+						vendorId, devId + flavour, instance);
+				dprintk(KERN_INFO "busNo 0x%lx, devSel 0x%lx, funcNo 0x%lx\n",
+						busNo, devSel, funcNo);
+				instance++;
+
+				prestera_pci_dev_config(pci_get_bus_and_slot(busNo, PCI_DEVFN(devSel, funcNo)));
+			}
+
+			/* devices that support flavours */
+			if ((devId != MV_BOBCAT2_DEV_ID) &&
+				(devId != MV_ALLEYCAT3_DEV_ID))
+				break;
+		} /* device flavours */
+
+	} /* table entries */
 
 	return 0;
 }

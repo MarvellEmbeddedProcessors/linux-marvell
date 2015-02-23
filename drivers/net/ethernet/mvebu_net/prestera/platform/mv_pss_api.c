@@ -631,23 +631,26 @@ int bspPciGetIntVec(enum bspPciInt_PCI_INT pciInt, void **intVec)
 	/* Support MSYS with Internal PP */
 	if ((devnum == 1) &&  (mvDevIdGet() != (-1))) {
 		*intVec = (void *)(unsigned long)(IRQ_AURORA_SW_CORE0);
-		printk(KERN_INFO "%s int vector 0x%x, internal Int 0x%x\n", __func__, (int)*intVec, pciInt);
+		pr_info("%s (single) int vector 0x%x, internal Int 0x%x\n",
+			   __func__, (int)*intVec, pciInt);
 		rc = MV_OK;
 	} else {
 		/* Support MSYS in B2B Internal PP */
-	/* iterate to the instance of pp_core_number */
-	if (bspPciFindDev(MARVELL_VEN_ID, 0xffff, pciInt, &b, &d, &f) == MV_OK) {
-		dev = find_bdf(b, d, f);
-		if (dev != NULL) {
-			*intVec = (void *)(unsigned long)(dev->irq);
-			printk(KERN_INFO "%s int vector 0x%x, pci Int 0x%x\n", __func__, (int)*intVec, pciInt);
-			pci_dev_put(dev);
+		/* iterate to the instance of pp_core_number */
+		if (bspPciFindDev(MARVELL_VEN_ID, 0xffff, pciInt, &b, &d, &f) == MV_OK) {
+			dev = find_bdf(b, d, f);
+			if (dev != NULL) {
+				*intVec = (void *)(unsigned long)(dev->irq);
+				pr_info("%s int vector 0x%x, pci Int 0x%x\n",
+					   __func__, (int)*intVec, pciInt);
+				pci_dev_put(dev);
+				rc = MV_OK;
+			}
+		} else if (mvDevIdGet() != (-1)) {
+			*intVec = (void *)(unsigned long)(IRQ_AURORA_SW_CORE0);
+			pr_info("%s int vector 0x%x, internal Int 0x%x\n",
+				   __func__, (int)*intVec, pciInt);
 			rc = MV_OK;
-		}
-	} else if (mvDevIdGet() != (-1)) {
-		*intVec = (void *)(unsigned long)(IRQ_AURORA_SW_CORE0);
-		printk(KERN_INFO "%s int vector 0x%x, internal Int 0x%x\n", __func__, (int)*intVec, pciInt);
-		rc = MV_OK;
 		}
 	}
 

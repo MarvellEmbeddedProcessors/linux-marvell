@@ -192,6 +192,11 @@ static int32_t get_quirks(unsigned short devId)
 {
 	uint32_t index = 0;
 
+	/* Make sure all AC3/BC2 device flavours are handled in the same way */
+	if (((devId & ~MV_DEV_FLAVOUR_MASK) == MV_BOBCAT2_DEV_ID) ||
+		((devId & ~MV_DEV_FLAVOUR_MASK) == MV_ALLEYCAT3_DEV_ID))
+		devId &= ~MV_DEV_FLAVOUR_MASK;
+
 	while (quirks[index].pciId != (-1)) {
 		if (devId == quirks[index].pciId)
 			return index;
@@ -1607,15 +1612,23 @@ static void prestera_cleanup(void)
 
 static uint32_t get_instance(unsigned short vendorId, unsigned short devId)
 {
-	static uint32_t bobcat2_instance;
+	static uint32_t bobcat2_instance[MV_DEV_FLAVOUR_MASK] = {0};
 	static uint32_t lion2_instance;
-	static uint32_t ac3_instance;
+	static uint32_t ac3_instance[MV_DEV_FLAVOUR_MASK] = {0};
 	uint32_t instance = 0;
+	unsigned short flavour;
+
+	/* Make sure all AC3/BC2 device flavours are handled in the same way */
+	if (((devId & ~MV_DEV_FLAVOUR_MASK) == MV_BOBCAT2_DEV_ID) ||
+		((devId & ~MV_DEV_FLAVOUR_MASK) == MV_ALLEYCAT3_DEV_ID)) {
+		flavour = devId & MV_DEV_FLAVOUR_MASK;
+		devId &= ~MV_DEV_FLAVOUR_MASK;
+	}
 
 	switch (devId) {
 	case MV_BOBCAT2_DEV_ID: {
-		instance = bobcat2_instance;
-		bobcat2_instance++;
+		instance = bobcat2_instance[flavour];
+		bobcat2_instance[flavour]++;
 		break;
 		}
 	case MV_LION2_DEV_ID:{
@@ -1624,8 +1637,8 @@ static uint32_t get_instance(unsigned short vendorId, unsigned short devId)
 		break;
 		}
 	case MV_ALLEYCAT3_DEV_ID:{
-		instance = ac3_instance;
-		ac3_instance++;
+		instance = ac3_instance[flavour];
+		ac3_instance[flavour]++;
 		break;
 		}
 	default:
