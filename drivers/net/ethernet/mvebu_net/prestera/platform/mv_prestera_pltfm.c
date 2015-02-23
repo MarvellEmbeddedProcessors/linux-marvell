@@ -243,12 +243,12 @@ static int prestera_Internal_dev_probe(unsigned int devId)
 	case MV_BOBCAT2_DEV_ID:
 	case MV_ALLEYCAT3_DEV_ID:
 
-		err = ppdev_conf_set_pltfm();
-		if (0 != err)
-			return err;
-
 		err = prestera_init();
 		if (err)
+			return err;
+
+		err = ppdev_conf_set_pltfm();
+		if (0 != err)
 			return err;
 
 		prestera_dma_switch_init();
@@ -407,11 +407,11 @@ static int prestera_pci_dev_config(struct pci_dev *pdev)
 		dprintk("%s: unsupported device\n", __func__);
 	}
 
-	err = mv_ppdev_conf_set_pci(pdev);
+	err = prestera_init();
 	if (err)
 		return err;
 
-	err = prestera_init();
+	err = mv_ppdev_conf_set_pci(pdev);
 	if (err)
 		return err;
 
@@ -443,7 +443,6 @@ static int prestera_pci_dev_probe(void)
 	**  PCI Configuration Section
 	**  ===============
 	*/
-	prestera_global_init();
 
 	for (type = 0; presteraPciDevs[type].deviceNum != (-1); type++)	{
 

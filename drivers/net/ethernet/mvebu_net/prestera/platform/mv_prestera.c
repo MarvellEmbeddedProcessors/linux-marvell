@@ -145,8 +145,6 @@ static uintptr_t		pci_conf_vma_start = CPSS_CPU_VIRT_ADDR;
 static uintptr_t		pci_conf_vma_end = CPSS_CPU_VIRT_ADDR;
 static uintptr_t		dma_base_vma_start = CPSS_DMA_VIRT_ADDR;
 static uintptr_t		dma_base_vma_end = CPSS_DMA_VIRT_ADDR + 2 * _1M;
-static struct pp_dev		*ppdevs[PRV_MAX_PP_DEVICES];
-static int			founddevs;
 static unsigned int		dma_len;
 unsigned long			dma_base;
 static void			*dma_area;
@@ -154,8 +152,7 @@ static void			*dma_tmp_virt;
 static dma_addr_t		dma_tmp_phys;
 /* info for mmap */
 static struct Mmap_Info_stc mmapInfoArr[PP_MAPPINGS_MAX];
-static int                  mmapInfoArrSize ;
-#define M mmapInfoArr[mmapInfoArrSize]
+#define M mmapInfoArr[prestera_dev->mmapInfoArrSize]
 
 #ifdef EXT_ARCH_64_CPU
 int bspAdv64Malloc32bit; /* in bssBspApis.c */
@@ -168,19 +165,7 @@ int bspAdv64Malloc32bit; /* in bssBspApis.c */
  */
 unsigned int get_founddev(void)
 {
-	return founddevs;
-}
-
-/************************************************************************
- *
- * prestera_global_init: init global parameters
- *
- */
-int prestera_global_init(void)
-{
-	mmapInfoArrSize = 0;
-	founddevs = 0;
-	return 0;
+	return prestera_dev->founddevs;
 }
 
 /************************************************************************
@@ -222,8 +207,8 @@ static mv_phys_addr_t prestera_mapped_virt2phys(unsigned long address)
 		struct pp_dev   *dev;
 		int             i;
 
-		for (i = 0; i < founddevs; i++) {
-			dev = ppdevs[i];
+		for (i = 0; i < prestera_dev->founddevs; i++) {
+			dev = prestera_dev->ppdevs[i];
 			if (address >= dev->ppregs.mmapbase && address < dev->ppregs.mmapbase + dev->ppregs.mmapsize) {
 				address -= dev->ppregs.mmapbase;
 				return dev->ppregs.phys + address;
@@ -376,8 +361,8 @@ static int find_pp_device(uint32_t busNo, uint32_t devSel, uint32_t funcNo)
 {
 	int             i;
 	struct pp_dev   *pp;
-	for (i = 0; i < founddevs; i++) {
-		pp = ppdevs[i];
+	for (i = 0; i < prestera_dev->founddevs; i++) {
+		pp = prestera_dev->ppdevs[i];
 		if (pp->busNo != busNo ||
 				pp->devSel != devSel ||
 				pp->funcNo != funcNo)
@@ -405,7 +390,7 @@ static void ppdev_set_vma(struct pp_dev *dev, int devIdx, unsigned long regsSize
 	M.addr   = dev->ppregs.mmapbase;
 	M.length = dev->ppregs.mmapsize;
 	M.offset = 0;
-	mmapInfoArrSize++;
+	prestera_dev->mmapInfoArrSize++;
 
 	dev->config.mmapbase = pci_conf_vma_end;
 	dev->config.mmapsize = dev->config.size;
@@ -415,7 +400,7 @@ static void ppdev_set_vma(struct pp_dev *dev, int devIdx, unsigned long regsSize
 	M.addr   = dev->config.mmapbase;
 	M.length = dev->config.mmapsize;
 	M.offset = dev->config.mmapoffset;
-	mmapInfoArrSize++;
+	prestera_dev->mmapInfoArrSize++;
 
 	if (dev->dfx.phys != 0) {
 		dev->dfx.mmapbase = pci_dfx_vma_end;
@@ -426,7 +411,7 @@ static void ppdev_set_vma(struct pp_dev *dev, int devIdx, unsigned long regsSize
 		M.addr   = dev->dfx.mmapbase;
 		M.length = dev->dfx.mmapsize;
 		M.offset = 0;
-		mmapInfoArrSize++;
+		prestera_dev->mmapInfoArrSize++;
 	}
 }
 
@@ -443,9 +428,9 @@ static int presteraPpDriver_ioctl(unsigned int cmd, unsigned long arg)
 			printk(KERN_ERR "IOCTL: FAULT\n");
 			return -EFAULT;
 		}
-		if (io.id >= founddevs)
+		if (io.id >= prestera_dev->founddevs)
 			return -EFAULT;
-		dev = ppdevs[io.id];
+		dev = prestera_dev->ppdevs[io.id];
 		if (dev->ppdriver)
 			return dev->ppdriver(dev->ppdriverData, &io);
 		return -EFAULT;
@@ -463,7 +448,7 @@ static int presteraPpDriver_ioctl(unsigned int cmd, unsigned long arg)
 			/* device not found */
 			return -EFAULT;
 		}
-		dev = ppdevs[i];
+		dev = prestera_dev->ppdevs[i];
 
 		if (dev->ppdriver != NULL) {
 			if ((int)info.type != dev->ppdriverType) {
@@ -637,14 +622,14 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 		}
 
 		/* Find ppdevs associated with requested irq nr */
-		for (i = 0; i < founddevs; i++) {
-			if (ppdevs[i]->irq_data.intVec == vector_cookie.vector)
+		for (i = 0; i < prestera_dev->founddevs; i++) {
+			if (prestera_dev->ppdevs[i]->irq_data.intVec == vector_cookie.vector)
 				break;
 		}
-		if (i == founddevs)
+		if (i == prestera_dev->founddevs)
 			return -ENODEV;
 
-		if (prestera_int_connect(ppdevs[i], 0, &intData)) {
+		if (prestera_int_connect(prestera_dev->ppdevs[i], 0, &intData)) {
 			printk(KERN_ERR "prestera_int_connect failed\n");
 			return -EFAULT;
 		}
@@ -692,14 +677,14 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 			return -EFAULT;
 		}
 
-		for (i = 0; i < founddevs; i++) {
-			dev = ppdevs[i];
+		for (i = 0; i < prestera_dev->founddevs; i++) {
+			dev = prestera_dev->ppdevs[i];
 			if ((gtDev.vendorId == dev->vendorId) &&
 				(gtDev.devId == dev->devId) &&
 				(gtDev.instance == dev->instance))
 				break;
 		}
-		if (i == founddevs)
+		if (i == prestera_dev->founddevs)
 			return -ENODEV;
 
 		/* Found */
@@ -734,7 +719,7 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 			/* not found */
 			return -ENODEV;
 		}
-		dev = ppdevs[i];
+		dev = prestera_dev->ppdevs[i];
 		/* configure virtual addresses if not configured yet */
 		ppdev_set_vma(dev, i, mapping.regsSize);
 
@@ -761,14 +746,14 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 			return -EFAULT;
 		}
 
-		for (i = 0; i < founddevs; i++) {
-			dev = ppdevs[i];
+		for (i = 0; i < prestera_dev->founddevs; i++) {
+			dev = prestera_dev->ppdevs[i];
 			if ((pciConfReg.busNo == dev->busNo) &&
 				(pciConfReg.devSel == dev->devSel) &&
 				(pciConfReg.funcNo == dev->funcNo))
 				break;
 		}
-		if (i == founddevs)
+		if (i == prestera_dev->founddevs)
 			return -ENODEV;
 
 		if (dev->on_pci_bus) {
@@ -788,15 +773,15 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 			return -EFAULT;
 		}
 
-		for (i = 0; i < founddevs; i++) {
-			dev = ppdevs[i];
+		for (i = 0; i < prestera_dev->founddevs; i++) {
+			dev = prestera_dev->ppdevs[i];
 			if ((pciConfReg.busNo == dev->busNo) &&
 				(pciConfReg.devSel == dev->devSel) &&
 				(pciConfReg.funcNo == dev->funcNo))
 				break;
 		}
 
-		if (i == founddevs)
+		if (i == prestera_dev->founddevs)
 			return -ENODEV;
 
 		pciConfReg.data = 0;
@@ -959,7 +944,7 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 			printk(KERN_ERR "copy_from_user failed\n");
 			return -EFAULT;
 		}
-		if (mInfo.index < 0 || mInfo.index >= mmapInfoArrSize) {
+		if (mInfo.index < 0 || mInfo.index >= prestera_dev->mmapInfoArrSize) {
 			/* out of range */
 			return -EFAULT;
 		}
@@ -1091,7 +1076,7 @@ static int prestera_mmap_dyn(struct file *file, struct vm_area_struct *vma)
 				busNo, devSel, funcNo);
 		return -ENXIO;
 	}
-	ppdev = ppdevs[i];
+	ppdev = prestera_dev->ppdevs[i];
 
 	pageSize = vma->vm_end - vma->vm_start;
 
@@ -1158,15 +1143,15 @@ static int prestera_mmap(struct file *file, struct vm_area_struct *vma)
 
 #define D mmapInfoArr[i]
 	/* search for mapping */
-	for (i = 0; i < mmapInfoArrSize; i++) {
+	for (i = 0; i < prestera_dev->mmapInfoArrSize; i++) {
 		if (vma->vm_start == D.addr + D.offset)
 			break;
 	}
-	if (i == mmapInfoArrSize) {
+	if (i == prestera_dev->mmapInfoArrSize) {
 		printk(KERN_ERR "unknown range (0%0x)\n", (int)vma->vm_start);
 		return 1;
 	}
-	ppdev = ppdevs[D.index];
+	ppdev = prestera_dev->ppdevs[D.index];
 
 	pageSize = vma->vm_end - vma->vm_start;
 
@@ -1389,8 +1374,8 @@ int prestera_read_proc_mem(char		*page,
 	len += sprintf(page + len, "DMA area: 0x%lx(virt), base: 0x%lx(phys), len: 0x%x\n",
 			(unsigned long)dma_area, dma_base, dma_len);
 
-	for (i = 0; i < founddevs; i++) {
-		ppdev = ppdevs[i];
+	for (i = 0; i < prestera_dev->founddevs; i++) {
+		ppdev = prestera_dev->ppdevs[i];
 
 		len += sprintf(page + len, "Device %d\n", i);
 		len += sprintf(page+len, "\tPCI %02x:%02x.%x  vendor:dev=%04x:%04x\n",
@@ -1561,7 +1546,7 @@ static int prestera_dma_init(void)
 	dma_base_vma_end = dma_base_vma_start + dma_len;
 	M.length = dma_len;
 	M.offset = 0;
-	mmapInfoArrSize++;
+	prestera_dev->mmapInfoArrSize++;
 
 	return 0;
 }
@@ -1579,15 +1564,15 @@ static void prestera_cleanup(void)
 
 	prestera_int_cleanup();
 
-	for (i = 0; i < founddevs; i++) {
-		ppdev = ppdevs[i];
+	for (i = 0; i < prestera_dev->founddevs; i++) {
+		ppdev = prestera_dev->ppdevs[i];
 #ifdef PRESTERA_PP_DRIVER
 		if (ppdev->ppdriver) /* destroy driver */
 			ppdev->ppdriver(ppdev->ppdriverData, NULL);
 #endif /* PRESTERA_PP_DRIVER */
 		kfree(ppdev);
 	}
-	founddevs = 0;
+	prestera_dev->founddevs = 0;
 
 	if (dma_tmp_virt) {
 		dma_free_coherent(NULL, PAGE_SIZE, dma_tmp_virt, dma_tmp_phys);
@@ -1715,8 +1700,8 @@ int ppdev_conf_set(struct pci_dev *pdev, struct pp_dev *ppdev)
 			ppdev->config.phys, ppdev->config.mmapoffset);
 
 	/* Add device to ppdevs */
-	ppdevs[founddevs++] = ppdev;
-	dprintk("num of devices %d\n", founddevs);
+	prestera_dev->ppdevs[prestera_dev->founddevs++] = ppdev;
+	dprintk("num of devices %d\n", prestera_dev->founddevs);
 
 	prestera_ppdev = quirks[quirksInstance].pciId;
 
@@ -1736,8 +1721,8 @@ static int proc_status_show(struct seq_file *m, void *v)
 	seq_printf(m, "DMA area: 0x%lx(virt), base: 0x%lx(phys), len: 0x%x\n",
 			(unsigned long)dma_area, dma_base, dma_len);
 
-	for (i = 0; i < founddevs; i++) {
-		ppdev = ppdevs[i];
+	for (i = 0; i < prestera_dev->founddevs; i++) {
+		ppdev = prestera_dev->ppdevs[i];
 
 		seq_printf(m, "Device %d\n", i);
 		seq_printf(m, "\tPCI %02x:%02x.%x  vendor:dev=%04x:%04x\n",
@@ -1821,6 +1806,7 @@ int prestera_init(void)
 		rc = -ENOMEM;
 		goto fail;
 	}
+	memset(prestera_dev, 0, sizeof(*prestera_dev));
 
 #ifdef PRESTERA_SYSCALLS
 	rc = prestera_syscall_init();
