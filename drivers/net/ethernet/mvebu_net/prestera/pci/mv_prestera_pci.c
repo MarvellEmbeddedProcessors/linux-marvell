@@ -172,7 +172,10 @@ static struct pci_decoding_window bc2_pci_sysmap[] = {
 
 static struct pci_decoding_window *get_pci_sysmap(struct pci_dev *pdev)
 {
-	switch (pdev->device) {
+	/* For future extensions - pay attention that only MSB of device id
+	   is tested since AC3/BC2 devices use LSB for coding device flavour
+	 */
+	switch (pdev->device & ~MV_DEV_FLAVOUR_MASK) {
 
 	case MV_BOBCAT2_DEV_ID:
 		return bc2_pci_sysmap;
@@ -741,11 +744,17 @@ static int prestera_pci_probe(struct pci_dev *pdev, const struct pci_device_id *
 	int err;
 	static int pexSwitchConfigure;
 	struct pci_decoding_window *prestera_sysmap_bar;
+	unsigned short tmpDevId = pdev->device;
 #ifdef CONFIG_MV_INCLUDE_SERVICECPU
 	void __iomem * const *iomap;
 #endif
 
-	switch (pdev->device) {
+	/* Make sure all AC3/BC2 device flavours are handled in the same way */
+	if (((pdev->device & ~MV_DEV_FLAVOUR_MASK) == MV_BOBCAT2_DEV_ID) ||
+		((pdev->device & ~MV_DEV_FLAVOUR_MASK) == MV_ALLEYCAT3_DEV_ID))
+		tmpDevId &= ~MV_DEV_FLAVOUR_MASK;
+
+	switch (tmpDevId) {
 
 	case MV_IDT_SWITCH_DEV_ID_808E:
 	case MV_IDT_SWITCH_DEV_ID_802B:
@@ -782,7 +791,7 @@ static int prestera_pci_probe(struct pci_dev *pdev, const struct pci_device_id *
 		if (err)
 			return err;
 #ifdef CONFIG_MV_INCLUDE_DRAGONITE_XCAT
-		if (pdev->device == MV_ALLEYCAT3_DEV_ID)
+		if (tmpDevId == MV_ALLEYCAT3_DEV_ID)
 			err = mv_msys_dragonite_init(pdev, prestera_sysmap_bar);
 			if (err)
 				return err;
@@ -835,9 +844,9 @@ static DEFINE_PCI_DEVICE_TABLE(prestera_pci_tbl) = {
 	/* Marvell */
 	{ PCI_DEVICE(PCI_VENDOR_ID_IDT_SWITCH, MV_IDT_SWITCH_DEV_ID_808E)},
 	{ PCI_DEVICE(PCI_VENDOR_ID_IDT_SWITCH, MV_IDT_SWITCH_DEV_ID_802B)},
-	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL, MV_BOBCAT2_DEV_ID)},
+	MV_PCI_DEVICE_FLAVOUR_TABLE_ENTRIES(MV_BOBCAT2_DEV_ID),
 	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL, MV_LION2_DEV_ID)},
-	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL, MV_ALLEYCAT3_DEV_ID)},
+	MV_PCI_DEVICE_FLAVOUR_TABLE_ENTRIES(MV_ALLEYCAT3_DEV_ID),
 	{}
 };
 
