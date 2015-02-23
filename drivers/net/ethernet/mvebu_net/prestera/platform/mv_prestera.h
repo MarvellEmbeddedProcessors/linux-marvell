@@ -153,6 +153,9 @@ struct intData {
 struct prestera_device {
 	struct semaphore	sem;		/* Mutual exclusion semaphore */
 	loff_t			size;		/* prestera mem size */
+	unsigned int		founddevs;
+	struct pp_dev		*ppdevs[PRV_MAX_PP_DEVICES];
+	int			mmapInfoArrSize;
 };
 
 struct mem_region {
@@ -217,7 +220,6 @@ struct prvPciDeviceQuirks {
 };
 
 int prestera_init(void);
-int prestera_global_init(void);
 int ppdev_conf_set(struct pci_dev *pdev, struct pp_dev *ppdev);
 unsigned int mvDevIdGet(void);
 unsigned int get_founddev(void);
