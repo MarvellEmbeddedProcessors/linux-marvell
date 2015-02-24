@@ -275,6 +275,80 @@ static void mv_xor_start_new_chain(struct mv_xor_chan *mv_chan,
 	mv_xor_issue_pending(&mv_chan->dmachan);
 }
 
+static inline void mv_xor_unmap(struct device *dev, dma_addr_t addr, size_t len,
+			      int direction, enum dma_ctrl_flags flags, bool dest)
+{
+	if ((dest && (flags & DMA_COMPL_DEST_UNMAP_SINGLE)) ||
+	    (!dest && (flags & DMA_COMPL_SRC_UNMAP_SINGLE)))
+		dma_unmap_single(dev, addr, len, direction);
+	else
+		dma_unmap_page(dev, addr, len, direction);
+}
+
+static void mv_xor_unmap_desc(struct mv_xor_desc_slot *desc,
+			      struct mv_xor_chan *mv_chan)
+{
+	if (desc->unmap_len) {
+		struct mv_xor_desc_slot *unmap = desc;
+		struct device *dev = mv_chan_to_devp(mv_chan);
+		u32 len = unmap->unmap_len;
+		enum dma_ctrl_flags flags = unmap->async_tx.flags;
+		dma_addr_t src;
+		dma_addr_t dest; /* and p_dest */
+		dma_addr_t q_dest;
+		enum dma_data_direction dir;
+		u32 src_cnt = unmap->unmap_src_cnt;
+
+		switch (desc->type) {
+		case DMA_MEMCPY:
+			if (!(flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
+				dest = mv_desc_get_dest_addr(unmap);
+				mv_xor_unmap(dev, dest, len, DMA_FROM_DEVICE, flags, 1);
+			}
+
+			if (!(flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
+				src = mv_desc_get_src_addr(unmap, 0);
+				mv_xor_unmap(dev, src, len, DMA_TO_DEVICE, flags, 0);
+			}
+			break;
+		case DMA_XOR:
+			dest = mv_desc_get_dest_addr(unmap);
+			if (!(flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
+				if (src_cnt > 1) /* is xor ? */
+					dir = DMA_BIDIRECTIONAL;
+				else
+					dir = DMA_FROM_DEVICE;
+
+				mv_xor_unmap(dev, dest, len, dir, flags, 1);
+			}
+
+			if (!(flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
+				while (src_cnt--) {
+					src = mv_desc_get_src_addr(unmap, src_cnt);
+
+					/* unmap dest address once */
+					if (src == dest)
+						continue;
+
+					mv_xor_unmap(dev, src, len, DMA_TO_DEVICE, flags, 0);
+				}
+			}
+			break;
+		case DMA_CRC32C:
+			if (!(flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
+				src = mv_desc_get_src_addr(unmap, 0);
+				mv_xor_unmap(dev, src, len, DMA_TO_DEVICE, flags, 0);
+			}
+			break;
+		default:
+			dev_err(mv_chan_to_devp(mv_chan),
+				"wrong operation type %d\n",
+				desc->type);
+			BUG();
+		}
+	}
+}
+
 static dma_cookie_t
 mv_xor_run_tx_complete_actions(struct mv_xor_desc_slot *desc,
 	struct mv_xor_chan *mv_chan, dma_cookie_t cookie)
@@ -291,41 +365,8 @@ mv_xor_run_tx_complete_actions(struct mv_xor_desc_slot *desc,
 			desc->async_tx.callback(
 				desc->async_tx.callback_param);
 
-		/* unmap dma addresses
-		 * (unmap_single vs unmap_page?)
-		 */
-		if (desc->unmap_len) {
-			struct mv_xor_desc_slot *unmap = desc;
-			struct device *dev = mv_chan_to_devp(mv_chan);
-			u32 len = unmap->unmap_len;
-			enum dma_ctrl_flags flags = desc->async_tx.flags;
-			u32 src_cnt;
-			dma_addr_t addr;
-			dma_addr_t dest;
-
-			src_cnt = unmap->unmap_src_cnt;
-			dest = mv_desc_get_dest_addr(unmap);
-			if (!(flags & DMA_COMPL_SKIP_DEST_UNMAP)) {
-				enum dma_data_direction dir;
-
-				if (src_cnt > 1) /* is xor ? */
-					dir = DMA_BIDIRECTIONAL;
-				else
-					dir = DMA_FROM_DEVICE;
-				dma_unmap_page(dev, dest, len, dir);
-			}
-
-			if (!(flags & DMA_COMPL_SKIP_SRC_UNMAP)) {
-				while (src_cnt--) {
-					addr = mv_desc_get_src_addr(unmap,
-								    src_cnt);
-					if (addr == dest)
-						continue;
-					dma_unmap_page(dev, addr, len,
-						       DMA_TO_DEVICE);
-				}
-			}
-		}
+		/* unmap the descriptor */
+		mv_xor_unmap_desc(desc, mv_chan);
 	}
 
 	/* run dependent operations */
