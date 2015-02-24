@@ -562,6 +562,10 @@
 				compatible = "arm,cortex-a9-pmu";
 				interrupts-extended = <&mpic 3>;
 			};
+			prestera {
+				compatible = "marvell,armada-prestera";
+				status = "disabled";
+			};
 		};
 	};
 
