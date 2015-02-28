@@ -35,6 +35,7 @@ disclaimer.
 #ifndef CONFIG_OF
 #include "mvSysHwConfig.h"
 #include "eth-phy/mvEthPhy.h"
+#include "mv_mux/mv_mux_netdev.h"
 #ifdef MV_INCLUDE_ETH_COMPLEX
 #include "ctrlEnv/mvCtrlEthCompLib.h"
 #endif /* MV_INCLUDE_ETH_COMPLEX */
@@ -44,9 +45,6 @@ disclaimer.
 #include "msApi.h"
 #include "mv_switch.h"
 #include "mv_phy.h"
-#ifndef CONFIG_OF
-#include "mv_mux/mv_mux_netdev.h"
-#endif
 
 /*******************************************************************************
 * mv_phy_port_power_state_set

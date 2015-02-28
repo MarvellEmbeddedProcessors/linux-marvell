@@ -86,6 +86,6 @@ DSDT_OBJS		= $(QD_DIR)/src/driver/gtDrvConfig.o $(QD_DIR)/src/driver/gtDrvEvents
 				  $(QD_DIR)/src/msapi/gtPCSCtrl.o $(QD_DIR)/src/msapi/gtWeight.o	\
 				  $(QD_DIR)/src/msapi/gtBrgStu.o
 
-obj-$(CONFIG_MV_INCLUDE_SWITCH) += $(DSDT_OBJS)
-obj-$(CONFIG_MV_INCLUDE_SWITCH)	+= switch/mv_switch.o switch/mv_switch_sysfs.o switch/mv_phy.o
+obj-y += $(DSDT_OBJS)
+obj-y += switch/
 endif
