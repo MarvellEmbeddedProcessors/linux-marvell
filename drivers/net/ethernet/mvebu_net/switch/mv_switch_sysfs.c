@@ -204,27 +204,12 @@ int mv_switch_sysfs_init(void)
 {
 	int err;
 	struct device *pd;
-	int i;
-
-	pd = bus_find_device_by_name(&platform_bus_type, NULL, "neta");
-	if (!pd) {
-		platform_device_register_simple("neta", -1, NULL, 0);
-		pd = bus_find_device_by_name(&platform_bus_type, NULL, "neta");
-	}
-
-	if (!pd) {
-		pr_err("%s: cannot find neta device\n", __func__);
-		pd = &platform_bus;
-	}
 
 	pd = &platform_bus;
 	err = sysfs_create_group(&pd->kobj, &mv_switch_group);
-	if (err) {
-		pr_info("sysfs group failed %d\n", err);
-		goto out;
-	}
+	if (err)
+		pr_err("Init sysfs group %s failed %d\n", mv_switch_group.name, err);
 
-out:
 	return err;
 }
 

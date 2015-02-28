@@ -579,4 +579,26 @@
 			clock-frequency = <2000000000>;
 		};
 	};
+
+	switch {
+			compatible = "marvell,mv_switch";
+			status = "disabled";
+			index = <0x0>;
+			phy_addr = <0x2>;
+			gbe_port = <0x0>;
+			cpuPort = <0x6>;
+			vid = <0>;
+			port_mask = <0x7f>;
+			connected_port_mask = <0x7f>;
+			forced_link_port_mask = <0x60>;
+			mtu = <1500>;
+			smi_scan_mode = <0x2>;
+			qsgmii_module = <0>;
+			gephy_on_port = <0x1f>;
+			rgmiia_on_port = <0x60>;
+			switch_irq = <0xffffffff>;
+			is_speed_2000 = <0>;
+			rgmii_rx_timing_delay = <1>;
+			rgmii_tx_timing_delay = <1>;
+		};
 };
