@@ -1,0 +1,66 @@
+* Switch binding description
+
+The device tree allows to describe the layout of a switch in a system through the "switch" node.
+
+
+Main node required properties:
+
+- compatible: should be "marvell,mv_switch"
+- status: switch status, should be "disabled" or "okay"
+- index: switch index, generally it's zero since systeem has only 1 switch generally
+- phy_addr: the SMI PHY address to access switch
+- gbe_port: the SOC GBE port which switch uplink port is connected to
+- cpuPort: the switch port which is connect to SOC CPU
+- vid: switch default DB number
+- port_mask: switch port mask, if bitn is 1, then the NO. n switch port is valid in physical
+- connected_port_mask: which switch ports are being used
+- forced_link_port_mask: which switch ports are forced link up
+- mtu: switch MTU
+- smi_scan_mode: switch SMI scan mode, encoded as follows:
+	0 = SMI auto scan mode, scan 0 or 0x10 base address to find the QD
+	1 = SMI muanal mode, use QD located at manually defined base addr
+	2 = SMI multi address mode, use QD at base addr and use indirect access
+- qsgmii_module: 0 or 1, whether there is qsgmii module in switch, 0 is no, 1 is yes
+- gephy_on_port: the switch GE PHY ports bitmask
+- rgmiia_on_port: the switch RGMII ports bitmask, generally these ports are uplink ports
+- switch_irq: if the switch use IRQ mode to report events, then switch_irq is valid and it is
+	the switch IRQ number in system; if PHY polling unit is enabled and IRQ is disabled,
+	the switch_irq should be 0xffffffff(-1)
+- is_speed_2000: if the value is not zero, then the switch CPU port works in 2 Gbps mode
+- rgmii_rx_timing_delay: RGMII receive timing control
+	0 = default, there is no delay
+	1 = add delay to RXCLK for IND inputs when port is in RGMII mode
+- rgmii_tx_timing_delay: RGMII transmit timing control
+	0 = default, there is no delay
+	1 = add delay to GTXCLK for OUTD outputs when port is in RGMII mode
+
+Example:
+
+	In A38x mamba board,  the switch is in external mode, its SMI scan mode is multi address mode,
+	and switch SMI address is 2, PHY polling unit is enabled and IRQ is disabled;
+	There are 7 ports in the switch, port 5 is connected to GBE port 1 while port 6 is connected
+	to the GBE port 0, switch port 6 is the CPU port, switch port 5 and 6 works in RGMII mode
+	and should add delay to RXCLK for IND inputs and GTXCLK for OUTD outputs.
+	Switch MTU is 1500 and switch does not works in 2G mode;
+
+	switch {
+			compatible = "marvell,mv_switch";
+			status = "okay";
+			index = <0x0>;
+			phy_addr = <0x2>;
+			gbe_port = <0x0>;
+			cpuPort = <0x6>;
+			vid = <0>;
+			port_mask = <0x7f>;
+			connected_port_mask = <0x7f>;
+			forced_link_port_mask = <0x60>;
+			mtu = <1500>;
+			smi_scan_mode = <0x2>;
+			qsgmii_module = <0>;
+			gephy_on_port = <0x1f>;
+			rgmiia_on_port = <0x60>;
+			switch_irq = <0xffffffff>;
+			is_speed_2000 = <0>;
+			rgmii_rx_timing_delay = <1>;
+			rgmii_tx_timing_delay = <1>;
+		};

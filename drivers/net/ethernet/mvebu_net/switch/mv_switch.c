@@ -5850,6 +5850,11 @@ static __init int mv_switch_start_link_detect_thread(void)
 	struct task_struct *thrd;
 	struct sched_param param;
 
+	if (qd_dev == NULL) {
+		pr_err("%s: qd_dev not initialized, call mv_switch_load() first\n", __func__);
+		return 0;
+	}
+
 	/* Start link status polling Thread if switch is external and need smi multi addr access*/
 	if ((switch_irq == -1) && (qd_dev->accessMode == SMI_MULTI_ADDR_MODE)) {
 
