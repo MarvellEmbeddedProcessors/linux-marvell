@@ -1629,14 +1629,17 @@ inline int mv_eth_refill(struct eth_port *pp, int rxq,
 	phys_addr_t phys_addr;
 	int pool_in_use = atomic_read(&pool->in_use);
 
+	/* if BM is enabled, always invalidate the cache line of rx_desc, no matter of refill fail or success */
+	if (mv_eth_pool_bm(pool))
+		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
+
 	if (pool_in_use <= 0)
 		return 0;
 
 	if (mv_eth_is_swf_recycle()) {
-		if (mv_eth_pool_bm(pool) && (pool_in_use < pool->in_use_thresh)) {
-			mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
+		if (mv_eth_pool_bm(pool) && (pool_in_use < pool->in_use_thresh))
 			return 0;
-		}
+
 		skb = mv_eth_pool_get(pp, pool);
 		if (!skb)
 			return 1;
@@ -1645,11 +1648,8 @@ inline int mv_eth_refill(struct eth_port *pp, int rxq,
 	/* No recycle -  alloc new skb */
 	if (!skb) {
 		skb = mv_eth_skb_alloc(pp, pool, &phys_addr, GFP_ATOMIC);
-		if (!skb) {
-			pool->missed++;
-			mv_eth_add_cleanup_timer(pp->cpu_config[smp_processor_id()]);
+		if (!skb)
 			return 1;
-		}
 	}
 
 	mv_eth_rxq_refill(pp, rxq, pool, skb, rx_desc);
@@ -1889,13 +1889,35 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 		}
 
 		/* Refill processing: */
-		err = mv_eth_refill(pp, rxq, pool, rx_desc);
-		if (err) {
-			printk(KERN_ERR "Linux processing - Can't refill\n");
-			pp->rxq_ctrl[rxq].missed++;
-			mv_eth_add_cleanup_timer(pp->cpu_config[smp_processor_id()]);
-			rx_filled--;
+		if (mv_eth_pool_bm(pool)) {/* case: BM_CPU enabled */
+			err = mv_eth_refill(pp, rxq, pool, rx_desc);
+			if (err) {
+				pr_warn("Linux processing - Can't refill, try to allocate again in cleanup timer\n");
+				atomic_inc(&pool->missed);
+				/* add cleanup timer */
+				mv_eth_add_cleanup_timer(pp->cpu_config[smp_processor_id()]);
+			}
+		} else {/* case: BM_CPU disabled */
+			if (!atomic_read(&pp->rxq_ctrl[rxq].refill_stop)) {
+				err = mv_eth_refill(pp, rxq, pool, rx_desc);
+				if (err) {
+					pr_warn("Linux processing - Can't refill, allocate again in cleanup timer\n");
+					atomic_inc(&pp->rxq_ctrl[rxq].missed);
+					/* record the first rx desc refilled failure */
+					pp->rxq_ctrl[rxq].missed_desc = rx_desc;
+					/* set refill stop flag */
+					atomic_set(&pp->rxq_ctrl[rxq].refill_stop, 1);
+					rx_filled--;
+					/* add cleanup timer */
+					mv_eth_add_cleanup_timer(pp->cpu_config[smp_processor_id()]);
+				}
+			} else {
+				/* Continue to statistics missed */
+				atomic_inc(&pp->rxq_ctrl[rxq].missed);
+				rx_filled--;
+			}
 		}
+
 	}
 
 	/* Update RxQ management counters */
@@ -2871,6 +2893,7 @@ static MV_STATUS mv_eth_pool_create(int pool, int capacity)
 	bm_pool->buf_num = 0;
 	atomic_set(&bm_pool->in_use, 0);
 	spin_lock_init(&bm_pool->lock);
+	atomic_set(&bm_pool->missed, 0);
 
 	return MV_OK;
 }
@@ -4850,6 +4873,8 @@ int mv_eth_hal_init(struct eth_port *pp)
 		rxq_ctrl->rxq_size = CONFIG_MV_ETH_RXQ_DESC;
 		rxq_ctrl->rxq_pkts_coal = CONFIG_MV_ETH_RX_COAL_PKTS;
 		rxq_ctrl->rxq_time_coal = CONFIG_MV_ETH_RX_COAL_USEC;
+		atomic_set(&rxq_ctrl->missed, 0);
+		atomic_set(&rxq_ctrl->refill_stop, 0);
 	}
 
 	if (pp->flags & MV_ETH_F_MH)
@@ -6037,7 +6062,11 @@ static void mv_eth_cleanup_timer_callback(unsigned long data)
 {
 	struct cpu_ctrl *cpuCtrl = (struct cpu_ctrl *)data;
 	struct eth_port *pp = cpuCtrl->pp;
-	struct net_device *dev = pp->dev;
+	struct sk_buff *skb;
+	struct bm_pool *pool;
+	struct neta_rx_desc *rx_desc;
+	phys_addr_t pa;
+	int index, refill_ok;
 
 	STAT_INFO(pp->stats.cleanup_timer++);
 
@@ -6053,6 +6082,60 @@ static void mv_eth_cleanup_timer_callback(unsigned long data)
 
 	/* FIXME: check bm_pool->missed and pp->rxq_ctrl[rxq].missed counters and allocate */
 	/* re-add timer if necessary (check bm_pool->missed and pp->rxq_ctrl[rxq].missed   */
+
+	if (MV_NETA_BM_CAP()) {/* BM enabled, allocate skb with pool->missed, and put into BM pool */
+		for (index = 0; index < MV_ETH_BM_POOLS; index++) {
+			pool = &mv_eth_pool[index];
+			if (!mv_eth_pool_bm(pool))
+				continue;
+			while (atomic_read(&pool->missed)) {
+				skb  = mv_eth_skb_alloc(pp, pool, &pa, GFP_ATOMIC);
+				if (!skb) {
+					/* quit and add timer again */
+					mv_eth_add_cleanup_timer(pp->cpu_config[smp_processor_id()]);
+					break;
+				}
+				mv_eth_rxq_refill(pp, index, pool, skb, NULL);
+				STAT_INFO(pp->stats.cleanup_timer_skb++);
+				atomic_dec(&pool->missed);
+			}
+			if (atomic_read(&pool->missed))
+				break;
+		}
+	} else {/* BM disabled, alloc new skb with rxq_ctrl.missed, attach it with rsdesc and valid the desc again */
+		for (index = 0; index < CONFIG_MV_ETH_RXQ; index++) {
+			if (!atomic_read(&pp->rxq_ctrl[index].missed))
+				continue;
+			rx_desc = pp->rxq_ctrl[index].missed_desc;
+			refill_ok = 0;
+			/* Allocate memory, refill */
+			while (atomic_read(&pp->rxq_ctrl[index].missed)) {
+				pool = pp->pool_long;
+				skb = mv_eth_skb_alloc(pp, pool, &pa, GFP_ATOMIC);
+				if (!skb) {
+					/* quit and add timer again */
+					pp->rxq_ctrl[index].missed_desc = rx_desc;
+					mv_eth_add_cleanup_timer(pp->cpu_config[smp_processor_id()]);
+					break;
+				}
+				mv_eth_rxq_refill(pp, index, pool, skb, rx_desc);
+				STAT_INFO(pp->stats.cleanup_timer_skb++);
+				atomic_dec(&pp->rxq_ctrl[index].missed);
+				/* Update rx desc to next one */
+				rx_desc = mvNetaRxqNextDescPtr(pp->rxq_ctrl[index].q, rx_desc);
+				refill_ok++;
+			}
+			/* Update refill stop flag */
+			if (!atomic_read(&pp->rxq_ctrl[index].missed))
+				atomic_set(&pp->rxq_ctrl[index].refill_stop, 0);
+
+			/* Update RxQ management counters */
+			if (refill_ok) {
+				mv_neta_wmb();
+				mvNetaRxqDescNumUpdate(pp->port, index, 0, refill_ok);
+			}
+		}
+	}
 }
 
 void mv_eth_mac_show(int port)
@@ -6475,9 +6558,10 @@ void mv_eth_pool_status_print(int pool)
 	printk(KERN_ERR "\nRX Pool #%d: pkt_size=%d, BM-HW support - %s\n",
 	       pool, bm_pool->pkt_size, mv_eth_pool_bm(bm_pool) ? "Yes" : "No");
 
-	pr_info("bm_pool=%p, stack=%p, capacity=%d, buf_num=%d, port_map=0x%x missed=%d, in_use=%u, in_use_thresh=%u\n",
+	pr_info("bm_pool=%p, stack=%p, capacity=%d, buf_num=%d, port_map=0x%x missed=%d, in_use=%d, in_use_thresh=%u\n",
 		bm_pool->bm_pool, bm_pool->stack, bm_pool->capacity, bm_pool->buf_num,
-		bm_pool->port_map, bm_pool->missed, bm_pool->in_use, bm_pool->in_use_thresh);
+		bm_pool->port_map, atomic_read(&bm_pool->missed),
+		atomic_read(&bm_pool->in_use), bm_pool->in_use_thresh);
 
 #ifdef CONFIG_MV_ETH_STAT_ERR
 	printk(KERN_ERR "Errors: skb_alloc_oom=%u, stack_empty=%u, stack_full=%u\n",
@@ -6771,6 +6855,7 @@ void mv_eth_port_stats_print(unsigned int port)
 	pr_info("\n");
 	printk(KERN_ERR "tx_done_event.................%10u\n", stat->tx_done);
 	printk(KERN_ERR "cleanup_timer_event...........%10u\n", stat->cleanup_timer);
+	pr_info("skb from cleanup timer........%10u\n", stat->cleanup_timer_skb);
 	printk(KERN_ERR "link..........................%10u\n", stat->link);
 	printk(KERN_ERR "netdev_stop...................%10u\n", stat->netdev_stop);
 #ifdef CONFIG_MV_ETH_RX_SPECIAL
@@ -6792,9 +6877,9 @@ void mv_eth_port_stats_print(unsigned int port)
 		rxq_fill = stat->rxq_fill[queue];
 #endif /* CONFIG_MV_ETH_STAT_DBG */
 
-		printk(KERN_ERR "%3d:  %10u    %10u          %d\n",
+		pr_info("%3d:  %10u    %10u          %d\n",
 			queue, rxq_ok, rxq_fill,
-			pp->rxq_ctrl[queue].missed);
+			atomic_read(&pp->rxq_ctrl[queue].missed));
 		total_rx_ok += rxq_ok;
 		total_rx_fill_ok += rxq_fill;
 	}
