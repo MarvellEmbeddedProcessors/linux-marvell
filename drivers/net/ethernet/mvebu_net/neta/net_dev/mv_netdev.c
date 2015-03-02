@@ -5430,9 +5430,8 @@ int mv_eth_rx_reset(int port)
 #ifndef CONFIG_MV_ETH_BM_CPU
 	{
 		for (rxq = 0; rxq < CONFIG_MV_ETH_RXQ; rxq++) {
-			struct eth_pbuf *pkt;
+			struct sk_buff *skb;
 			struct neta_rx_desc *rx_desc;
-			struct bm_pool *pool;
 			int i, rx_done;
 			MV_NETA_RXQ_CTRL *rx_ctrl = pp->rxq_ctrl[rxq].q;
 
@@ -5449,16 +5448,15 @@ int mv_eth_rx_reset(int port)
 				mvNetaRxqDescSwap(rx_desc);
 #endif /* MV_CPU_BE */
 
-				pkt = (struct eth_pbuf *)rx_desc->bufCookie;
-				pool = &mv_eth_pool[pkt->pool];
-				mv_eth_pool_put(pool, pkt);
+				skb = (struct sk_buff *)rx_desc->bufCookie;
+				mv_eth_pool_put(pp->pool_long, skb);
 			}
 		}
 	}
 #else
 	if (!MV_NETA_BM_CAP()) {
 		for (rxq = 0; rxq < CONFIG_MV_ETH_RXQ; rxq++) {
-			struct eth_pbuf *pkt;
+			struct sk_buff *skb;
 			struct neta_rx_desc *rx_desc;
 			struct bm_pool *pool;
 			int i, rx_done;
@@ -5477,9 +5475,12 @@ int mv_eth_rx_reset(int port)
 				mvNetaRxqDescSwap(rx_desc);
 #endif /* MV_CPU_BE */
 
-				pkt = (struct eth_pbuf *)rx_desc->bufCookie;
-				pool = &mv_eth_pool[pkt->pool];
-				mv_eth_pool_put(pool, pkt);
+				skb = (struct sk_buff *)rx_desc->bufCookie;
+				if (pp->pool_short && (skb->data_len <= pp->pool_short->pkt_size))
+					pool = pp->pool_short;
+				else
+					pool = pp->pool_long;
+				mv_eth_pool_put(pool, skb);
 			}
 		}
 	}
