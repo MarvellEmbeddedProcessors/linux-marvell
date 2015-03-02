@@ -346,6 +346,9 @@ typedef struct {
 #define MV_NETA_QUEUE_PREV_DESC(pQueueCtrl, descIdx)  \
     (((descIdx) > 0) ? ((descIdx) - 1) : (pQueueCtrl)->lastDesc)
 
+#define MV_NETA_RX_LAST_DESC_PTR(pQueueCtrl)  \
+	(((NETA_RX_DESC *)pQueueCtrl.pFirst) + pQueueCtrl.lastDesc)
+
 typedef struct {
 	MV_NETA_QUEUE_CTRL queueCtrl;
 
@@ -620,6 +623,19 @@ static INLINE NETA_RX_DESC *mvNetaRxqNextDescGet(MV_NETA_RXQ_CTRL *pRxq)
 	pRxDesc = ((NETA_RX_DESC *)pRxq->queueCtrl.pFirst) + rxDesc;
 
 	return pRxDesc;
+}
+
+/* Get the next desc pointer following current desc */
+static INLINE NETA_RX_DESC *mvNetaRxqNextDescPtr(MV_NETA_RXQ_CTRL *pRxq, NETA_RX_DESC *pRxDesc)
+{
+	NETA_RX_DESC *pNextDesc;
+
+	if (pRxDesc == MV_NETA_RX_LAST_DESC_PTR(pRxq->queueCtrl))
+		pNextDesc = (NETA_RX_DESC *)pRxq->queueCtrl.pFirst;
+	else
+		pNextDesc = ++pRxDesc;
+
+	return pNextDesc;
 }
 
 static INLINE NETA_RX_DESC *mvNetaRxqDescGet(MV_NETA_RXQ_CTRL *pRxq)

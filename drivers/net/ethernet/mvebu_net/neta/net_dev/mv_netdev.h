@@ -216,6 +216,7 @@ struct port_stats {
 	u32 tx_done_timer_add[CONFIG_NR_CPUS];
 	u32 tx_done;
 	u32 cleanup_timer;
+	u32 cleanup_timer_skb;
 	u32 link;
 	u32 netdev_stop;
 
@@ -345,7 +346,9 @@ struct tx_queue {
 struct rx_queue {
 	MV_NETA_RXQ_CTRL    *q;
 	int                 rxq_size;
-	int                 missed;
+	atomic_t            missed;
+	NETA_RX_DESC        *missed_desc;
+	atomic_t            refill_stop;
 	MV_U32	            rxq_pkts_coal;
 	MV_U32	            rxq_time_coal;
 };
@@ -495,7 +498,7 @@ struct bm_pool {
 	MV_STACK    *stack;
 	spinlock_t  lock;
 	u32         port_map;
-	int         missed;		/* FIXME: move to stats */
+	atomic_t    missed;		/* FIXME: move to stats */
 	atomic_t    in_use;
 	int         in_use_thresh;
 	struct pool_stats  stats;
@@ -745,7 +748,6 @@ static inline void mv_eth_rxq_refill(struct eth_port *pp, int rxq,
 		/* Refill BM pool */
 		STAT_DBG(pool->stats.bm_put++);
 		mvBmPoolPut(pool->pool, (MV_ULONG)pa);
-		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 	} else {
 		/* Refill Rx descriptor */
 		STAT_DBG(pp->stats.rxq_fill[rxq]++);
