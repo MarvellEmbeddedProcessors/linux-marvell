@@ -400,6 +400,8 @@ extern "C" {
 #define MV_6811_DEV_ID		0x6811
 #define MV_6820_DEV_ID		0x6820
 #define MV_6828_DEV_ID		0x6828
+#define MV_6W22_DEV_ID		0x6823 /* 6W22=A383 */
+#define MV_6W23_DEV_ID		0x6824 /* 6W23=A384 */
 
 /* A38x revisions */
 #define MV_88F68XX_Z1_ID		0x0
