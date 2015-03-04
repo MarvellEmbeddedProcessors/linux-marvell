@@ -42,7 +42,19 @@ diff -ruN a/linux/include/openswan/ipsec_kern24.h b/linux/include/openswan/ipsec
 +	 })
 +
  #endif /* _IPSEC_KERN24_H */
- 
+
+diff --git a/linux/include/openswan/ipsec_param2.h b/linux/include/openswan/ipsec_param2.h
+--- a/linux/include/openswan/ipsec_param2.h
++++ b/linux/include/openswan/ipsec_param2.h
+@@ -23,7 +23,7 @@
+ #define netdev_priv(dev) (dev->priv)
+ #endif
+
+-#define KLIPS_IP_SELECT_IDENT(iph, skb) __ip_select_ident(iph, skb_dst(skb), 0)
++#define KLIPS_IP_SELECT_IDENT(iph, skb) __ip_select_ident(iph, 0)
+
+ #if !defined(HAVE_CURRENT_UID)
+ #define current_uid() (current->uid)
 diff -ruN a/linux/include/openswan/ipsec_proto.h b/linux/include/openswan/ipsec_proto.h
 --- a/linux/include/openswan/ipsec_proto.h	2014-02-21 21:46:57.000000000 +0100
 +++ b/linux/include/openswan/ipsec_proto.h	2014-05-29 17:59:19.517771129 +0200
