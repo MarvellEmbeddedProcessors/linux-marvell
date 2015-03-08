@@ -223,6 +223,10 @@ int prestera_init(struct device *dev);
 int ppdev_conf_set(struct pp_dev *ppdev);
 unsigned int mvDevIdGet(void);
 unsigned int get_founddev(void);
+#ifdef CONFIG_MV_INCLUDE_PRESTERA_KERNELEXT
+void mvKernelExt_cleanup(void);
+int mvKernelExt_init(void);
+#endif
 extern unsigned long		dma_base;
 
 static inline uint32_t read_u32(uintptr_t addr)

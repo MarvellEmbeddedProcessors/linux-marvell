@@ -871,7 +871,7 @@ static int mvKernelExt_read_proc_mem(
 * COMMENTS:
 *
 *******************************************************************************/
-static void mvKernelExt_cleanup(void)
+void mvKernelExt_cleanup(void)
 {
     printk("mvKernelExt Says: Bye world from kernel\n");
 
@@ -907,7 +907,7 @@ static void mvKernelExt_cleanup(void)
 * COMMENTS:
 *
 *******************************************************************************/
-static int mvKernelExt_init(void)
+int mvKernelExt_init(void)
 {
     int         result = 0;
 
@@ -962,7 +962,3 @@ static int mvKernelExt_init(void)
 
     return 0;
 }
-
-
-module_init(mvKernelExt_init);
-module_exit(mvKernelExt_cleanup);
