@@ -115,6 +115,38 @@ static const char prestera_drv_name[] = "mvPP";
 static void __iomem *inter_regs;
 static int gDevId = -1;
 
+static void mv_dma_switch_init(void *switch_reg, struct pci_dev *pdev)
+{
+	uint32_t attr, t_id;
+	dprintk("%s\n", __func__);
+
+	/* Switch attr and target id is different for PCI */
+	if (pdev) {
+		attr = PP_PCI_BA_ATTR;
+		t_id = PP_PCI_UDID_DATTR;
+	} else {
+		attr = PP_BA_ATTR;
+		t_id = PP_UDID_DATTR;
+	}
+
+	/* open internal switch window for DMA */
+	writel(dma_base | attr,	switch_reg + PP_WIN_BA(0));
+	writel(t_id,		switch_reg + PP_UDID);
+	writel(PP_WIN_SIZE_VAL,	switch_reg + PP_WIN_SR(0));
+	writel(PP_WIN_CTRL_AP,	switch_reg + PP_WIN_CTRL(0));
+
+	dprintk("read pp: 0x%x\n", readl(switch_reg + PP_WIN_BA(0)));
+	dprintk("read pp: 0x%x\n", readl(switch_reg + PP_UDID));
+	dprintk("read pp: 0x%x\n", readl(switch_reg + PP_WIN_SR(0)));
+	dprintk("read pp: 0x%x\n", readl(switch_reg + PP_WIN_CTRL(0)));
+
+	/* Debug dma reg - according to old code in
+	* arch/arm/mach-armadaxp/pss/hwServices.c
+	*/
+	writel(0xaaba,	switch_reg + 0x2684);
+	dprintk("%s read pp: 0x%x\n", __func__, readl(switch_reg + 0x2684));
+}
+
 /*******************************************************************************
 ********************************************************************************
 ********************************************************************************
@@ -204,29 +236,6 @@ static int ppdev_conf_set_pltfm(void)
 }
 
 /*******************************************************************************
-*	prestera_dma_switch_init
-*
-*
-*******************************************************************************/
-static void prestera_dma_switch_init(void)
-{
-	/* open internal switch window for DMA */
-	writel(dma_base | PP_BA_ATTR,	SWITCH_REGS_VIRT_BASE | PP_WIN_BA(0));
-	writel(PP_UDID_DATTR,		SWITCH_REGS_VIRT_BASE | PP_UDID);
-	writel(PP_WIN_SIZE_VAL,		SWITCH_REGS_VIRT_BASE | PP_WIN_SR(0));
-	writel(PP_WIN_CTRL_AP,		SWITCH_REGS_VIRT_BASE | PP_WIN_CTRL(0));
-
-	dprintk("%s read pp: 0x%x\n", __func__,
-		readl(SWITCH_REGS_VIRT_BASE | PP_WIN_BA(0)));
-	dprintk("%s read pp: 0x%x\n", __func__,
-		readl(SWITCH_REGS_VIRT_BASE | PP_UDID));
-	dprintk("%s read pp: 0x%x\n", __func__,
-		readl(SWITCH_REGS_VIRT_BASE | PP_WIN_SR(0)));
-	dprintk("%s read pp: 0x%x\n", __func__,
-		readl(SWITCH_REGS_VIRT_BASE | PP_WIN_CTRL(0)));
-}
-
-/*******************************************************************************
 *	prestera_Internal_dev_probe
 *
 *
@@ -251,7 +260,7 @@ static int prestera_Internal_dev_probe(struct platform_device *pdev, unsigned in
 		if (0 != err)
 			return err;
 
-		prestera_dma_switch_init();
+		mv_dma_switch_init(SWITCH_REGS_VIRT_BASE, NULL);
 		break;
 
 	default:
@@ -337,32 +346,6 @@ static int mv_ppdev_conf_set_pci(struct pci_dev *pdev)
 }
 
 /*******************************************************************************
-*	mv_pci_dma_switch_init
-*
-*
-*******************************************************************************/
-static void mv_pci_dma_switch_init(unsigned long switch_reg, struct pci_dev *pdev)
-{
-	dprintk("%s\n", __func__);
-
-	writel(dma_base | PP_PCI_BA_ATTR, switch_reg | PP_WIN_BA(0));
-	writel(PP_PCI_UDID_DATTR,	switch_reg | PP_UDID);
-	writel(PP_WIN_SIZE_VAL,		switch_reg | PP_WIN_SR(0));
-	writel(PP_WIN_CTRL_AP,		switch_reg | PP_WIN_CTRL(0));
-
-	dprintk("read pp: 0x%x\n", readl(switch_reg | PP_WIN_BA(0)));
-	dprintk("read pp: 0x%x\n", readl(switch_reg | PP_UDID));
-	dprintk("read pp: 0x%x\n", readl(switch_reg | PP_WIN_SR(0)));
-	dprintk("read pp: 0x%x\n", readl(switch_reg | PP_WIN_CTRL(0)));
-
-	/* Debug dma reg - according to old code in
-	* arch/arm/mach-armadaxp/pss/hwServices.c
-	*/
-	writel(0xaaba,	switch_reg | 0x2684);
-	dprintk("%s read pp: 0x%x\n", __func__, readl(switch_reg | 0x2684));
-}
-
-/*******************************************************************************
 *	prestera_pci_dev_config
 *
 *
@@ -417,7 +400,7 @@ static int prestera_pci_dev_config(struct pci_dev *pdev)
 
 	/* MV_BOBCAT2_DEV_ID /  MV_ALLEYCAT3_DEV_ID */
 	if (pdev->device  != MV_LION2_DEV_ID) {
-		mv_pci_dma_switch_init((unsigned long)switch_reg, pdev);
+		mv_dma_switch_init(switch_reg, pdev);
 		dprintk("DFX(0x%x) test %x and should be ..357\n", iomap[MV_PCI_BAR_2] + DFX_JTAG_DEVID_STAT,
 			readl(iomap[MV_PCI_BAR_2] + DFX_JTAG_DEVID_STAT));
 	}
