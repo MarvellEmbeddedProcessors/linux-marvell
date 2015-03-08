@@ -151,8 +151,8 @@ struct intData {
 };
 
 struct prestera_device {
-	struct semaphore sem;		/* Mutual exclusion semaphore */
-	loff_t size;			/* prestera mem size */
+	struct semaphore	sem;		/* Mutual exclusion semaphore */
+	loff_t			size;		/* prestera mem size */
 };
 
 struct mem_region {
