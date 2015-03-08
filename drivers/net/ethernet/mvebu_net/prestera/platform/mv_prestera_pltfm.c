@@ -231,7 +231,7 @@ static void prestera_dma_switch_init(void)
 *
 *
 *******************************************************************************/
-static int prestera_Internal_dev_probe(unsigned int devId)
+static int prestera_Internal_dev_probe(struct platform_device *pdev, unsigned int devId)
 {
 	int err;
 
@@ -243,7 +243,7 @@ static int prestera_Internal_dev_probe(unsigned int devId)
 	case MV_BOBCAT2_DEV_ID:
 	case MV_ALLEYCAT3_DEV_ID:
 
-		err = prestera_init();
+		err = prestera_init(&pdev->dev);
 		if (err)
 			return err;
 
@@ -407,7 +407,7 @@ static int prestera_pci_dev_config(struct pci_dev *pdev)
 		dprintk("%s: unsupported device\n", __func__);
 	}
 
-	err = prestera_init();
+	err = prestera_init(&pdev->dev);
 	if (err)
 		return err;
 
@@ -508,7 +508,7 @@ static int prestera_pltfm_probe(struct platform_device *pdev)
 	} else {
 		boardId = *pdata;
 		printk(KERN_INFO "Internal device 0x%x detected\n", boardId);
-		err = prestera_Internal_dev_probe(boardId);
+		err = prestera_Internal_dev_probe(pdev, boardId);
 		if (0 != err)
 			return err;
 	}
