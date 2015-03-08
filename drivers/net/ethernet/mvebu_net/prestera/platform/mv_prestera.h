@@ -219,7 +219,7 @@ struct prvPciDeviceQuirks {
 	unsigned int	interruptMap[8];
 };
 
-int prestera_init(void);
+int prestera_init(struct device *dev);
 int ppdev_conf_set(struct pci_dev *pdev, struct pp_dev *ppdev);
 unsigned int mvDevIdGet(void);
 unsigned int get_founddev(void);

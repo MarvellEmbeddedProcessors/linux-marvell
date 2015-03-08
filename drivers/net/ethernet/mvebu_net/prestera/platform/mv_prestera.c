@@ -1517,10 +1517,10 @@ static int prestera_syscall_restore(void)
 
 
 
-static int prestera_dma_init(void)
+static int prestera_dma_init(struct device *dev)
 {
 	dma_len  = _2M;
-	dma_area = dma_alloc_coherent(NULL, dma_len, (dma_addr_t *)&dma_base,
+	dma_area = dma_alloc_coherent(dev, dma_len, (dma_addr_t *)&dma_base,
 				      GFP_DMA | GFP_KERNEL);
 
 	if (!dma_area) {
@@ -1532,7 +1532,7 @@ static int prestera_dma_init(void)
 			dma_area, dma_base, dma_len);
 
 	/* allocate temp area for bspDma operations */
-	dma_tmp_virt = dma_alloc_coherent(NULL, PAGE_SIZE, &dma_tmp_phys,
+	dma_tmp_virt = dma_alloc_coherent(dev, PAGE_SIZE, &dma_tmp_phys,
 					  GFP_DMA | GFP_KERNEL);
 
 	if (!dma_tmp_virt) {
@@ -1554,7 +1554,7 @@ static int prestera_dma_init(void)
  *
  * prestera_cleanup:
  */
-static void prestera_cleanup(void)
+static void prestera_cleanup(struct device *dev)
 {
 	int		i;
 	struct pp_dev	*ppdev;
@@ -1572,12 +1572,12 @@ static void prestera_cleanup(void)
 	prestera_dev->founddevs = 0;
 
 	if (dma_tmp_virt) {
-		dma_free_coherent(NULL, PAGE_SIZE, dma_tmp_virt, dma_tmp_phys);
+		dma_free_coherent(dev, PAGE_SIZE, dma_tmp_virt, dma_tmp_phys);
 		dma_tmp_virt = NULL;
 	}
 
 	if (dma_area) {
-		dma_free_coherent(NULL, dma_len, (dma_addr_t *)&dma_base,
+		dma_free_coherent(dev, dma_len, (dma_addr_t *)&dma_base,
 				  GFP_DMA | GFP_KERNEL);
 		dma_area = NULL;
 	}
@@ -1758,7 +1758,7 @@ static const struct file_operations prestera_read_proc_operations = {
  *
  * prestera_init:
  */
-int prestera_init(void)
+int prestera_init(struct device *dev)
 {
 	int rc = 0;
 
@@ -1828,7 +1828,7 @@ int prestera_init(void)
 	if (0 != rc)
 		goto fail;
 
-	rc = prestera_dma_init();
+	rc = prestera_dma_init(dev);
 	if (0 != rc)
 		goto fail;
 
@@ -1837,7 +1837,7 @@ int prestera_init(void)
 	return 0;
 
 fail:
-	prestera_cleanup();
+	prestera_cleanup(dev);
 
 	printk(KERN_ERR "%s driver init failed, rc=%d\n", prestera_dev_name, rc);
 
