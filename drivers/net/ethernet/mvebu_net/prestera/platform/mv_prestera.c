@@ -131,7 +131,6 @@ struct prvPciDeviceQuirks quirks[] = {
 
 /* local variables and variables */
 static int			dev_open_nr;
-static int			dev_init_done;
 static struct prestera_device	*prestera_dev;
 static int			prestera_major = PRESTERA_MAJOR;
 static struct cdev		prestera_cdev;
@@ -1198,7 +1197,7 @@ static int prestera_open(struct inode *inode, struct file *filp)
 		return -ERESTARTSYS;
 
 
-	if (!dev_init_done) {
+	if (!prestera_dev) {
 		up(&prestera_dev->sem);
 		return -EIO;
 	}
@@ -1560,8 +1559,6 @@ static void prestera_cleanup(void)
 	int		i;
 	struct pp_dev	*ppdev;
 
-	dev_init_done = 0;
-
 	prestera_int_cleanup();
 
 	for (i = 0; i < prestera_dev->founddevs; i++) {
@@ -1768,7 +1765,7 @@ int prestera_init(void)
 	dprintk("%s\n", __func__);
 
 	/* If already initialized skip it */
-	if (dev_init_done == 1) {
+	if (prestera_dev) {
 		dprintk("%s: already initialized\n", __func__);
 		return 0;
 	}
@@ -1834,8 +1831,6 @@ int prestera_init(void)
 	rc = prestera_dma_init();
 	if (0 != rc)
 		goto fail;
-
-	dev_init_done = 1;
 
 	printk(KERN_INFO "%s driver initialized\n", prestera_dev_name);
 
