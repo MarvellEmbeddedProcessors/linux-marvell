@@ -1634,7 +1634,7 @@ static uint32_t get_instance(unsigned short vendorId, unsigned short devId)
  * it will be enough for CPSS to remove instance variable and assign founddevs
  * to ppdev->instance - will be check during multi-switch configuration tests
  */
-int ppdev_conf_set(struct pci_dev *pdev, struct pp_dev *ppdev)
+int ppdev_conf_set(struct pp_dev *ppdev)
 {
 	uint32_t instance;
 	int32_t quirksInstance;

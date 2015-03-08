@@ -220,7 +220,7 @@ struct prvPciDeviceQuirks {
 };
 
 int prestera_init(struct device *dev);
-int ppdev_conf_set(struct pci_dev *pdev, struct pp_dev *ppdev);
+int ppdev_conf_set(struct pp_dev *ppdev);
 unsigned int mvDevIdGet(void);
 unsigned int get_founddev(void);
 extern unsigned long		dma_base;

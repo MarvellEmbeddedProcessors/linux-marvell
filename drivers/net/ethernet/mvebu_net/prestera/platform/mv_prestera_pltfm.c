@@ -196,7 +196,7 @@ static int ppdev_conf_set_pltfm(void)
 	ppdev->config.phys = start;
 	ppdev->config.base = (uintptr_t)(INTER_REGS_VIRT_BASE);
 
-	err = ppdev_conf_set(NULL, ppdev);
+	err = ppdev_conf_set(ppdev);
 	if (err)
 		return err;
 
@@ -329,7 +329,7 @@ static int mv_ppdev_conf_set_pci(struct pci_dev *pdev)
 	ppdev->config.phys = start;
 	ppdev->config.base = (unsigned long)iomap[MV_PCI_BAR_INTER_REGS];
 
-	err = ppdev_conf_set(pdev, ppdev);
+	err = ppdev_conf_set(ppdev);
 	if (err)
 		return err;
 
