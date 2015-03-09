@@ -4334,6 +4334,8 @@ static int mv_eth_neta_cap_verify(unsigned int neta_cap_bm)
 	case MV88F6811_DEV_ID:
 	case MV88F6820_DEV_ID:
 	case MV88F6828_DEV_ID:
+	case MV88F6W22_DEV_ID:
+	case MV88F6W23_DEV_ID:
 		if (((rev == MV88F68xx_Z1_REV) && (neta_cap_bm == MV_ETH_CAP_BM || neta_cap_bm == 0)) ||
 		    ((rev == MV88F68xx_A0_REV) && (neta_cap_bm == (MV_ETH_CAP_PNC | MV_ETH_CAP_BM) ||
 						neta_cap_bm == MV_ETH_CAP_PNC ||
