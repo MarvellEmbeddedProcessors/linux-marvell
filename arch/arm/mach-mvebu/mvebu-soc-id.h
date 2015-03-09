@@ -38,6 +38,9 @@
 #define MV88F6811_DEV_ID	0x6811
 #define MV88F6820_DEV_ID	0x6820
 #define MV88F6828_DEV_ID	0x6828
+#define MV88F6W22_DEV_ID	0x6823 /* 6W22=A383 */
+#define MV88F6W23_DEV_ID	0x6824 /* 6W23=A384 */
+
 
 /* Armada A38x Revision */
 #define MV88F68xx_Z1_REV	0x0
