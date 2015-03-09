@@ -138,10 +138,7 @@ int pnc_gbe_port_map_init(unsigned int ctrl_model, unsigned int ctrl_rev)
 		|| ctrl_model == MV88F6560_DEV_ID) {
 		/* Armada KW2 ID */
 		memcpy(&gbe_pnc_map, &gbe_pnc_map_kw2, sizeof(gbe_pnc_map_kw2));
-	} else if (ctrl_model == MV88F6810_DEV_ID
-		|| ctrl_model == MV88F6811_DEV_ID
-		|| ctrl_model == MV88F6820_DEV_ID
-		|| ctrl_model == MV88F6828_DEV_ID) {
+	} else if ((ctrl_model & ~0xFF) == MV_88F68XX) {
 		/* Armada A38x ID */
 		memcpy(&gbe_pnc_map, &gbe_pnc_map_38x, sizeof(gbe_pnc_map_38x));
 	} else {

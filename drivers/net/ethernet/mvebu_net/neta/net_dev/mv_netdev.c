@@ -2916,12 +2916,8 @@ irqreturn_t mv_eth_isr(int irq, void *dev_id)
 	* MBUS domain
 	* Need for Aramada38x. Dosn't need for AXP and A370
 	*/
-	if ((pp->plat_data->ctrl_model == MV_6810_DEV_ID) ||
-	    (pp->plat_data->ctrl_model == MV_6811_DEV_ID) ||
-	    (pp->plat_data->ctrl_model == MV_6820_DEV_ID) ||
-	    (pp->plat_data->ctrl_model == MV_6828_DEV_ID)) {
+	if ((pp->plat_data->ctrl_model & ~0xFF) == MV_88F68XX)
 		regVal = MV_REG_READ(NETA_INTR_NEW_MASK_REG(pp->port));
-	}
 
 	return IRQ_HANDLED;
 }
