@@ -500,9 +500,9 @@ static int prestera_pltfm_probe(struct platform_device *pdev)
 	/* if initialization proceeded successfully and the KernelExt is
 	 * enabled - initialize it
 	 */
-	if (IS_ENABLED(CONFIG_MV_INCLUDE_PRESTERA_KERNELEXT))
+#ifdef CONFIG_MV_INCLUDE_PRESTERA_KERNELEXT
 		mvKernelExt_init();
-
+#endif
 	return 0;
 }
 
@@ -513,9 +513,9 @@ static int prestera_pltfm_probe(struct platform_device *pdev)
 *******************************************************************************/
 static int prestera_pltfm_cleanup(struct platform_device *pdev)
 {
-	if (IS_ENABLED(CONFIG_MV_INCLUDE_PRESTERA_KERNELEXT))
+#ifdef CONFIG_MV_INCLUDE_PRESTERA_KERNELEXT
 		mvKernelExt_cleanup();
-
+#endif
 	/* ppdev is freed during char-dev clean-up (prestera_cleanup) so no need
 	 * to do it here
 	 */
