@@ -630,7 +630,7 @@ int mv_eth_ctrl_port_buf_num_set(int port, int long_num, int short_num)
 
 #ifdef CONFIG_MV_ETH_BM_CPU
 	if (MV_NETA_BM_CAP()) {
-		if (pp->pool_short != NULL) {
+		if ((pp->pool_short != NULL) && (pp->pool_short != pp->pool_long)) {
 			/* Update number of buffers in existing pool (allocate or free) */
 			if (pp->pool_short_num > short_num)
 				mv_eth_pool_free(pp->pool_short->pool, pp->pool_short_num - short_num);
@@ -6943,20 +6943,20 @@ void mv_eth_port_stats_print(unsigned int port)
 			memset(&txq_ctrl->stats, 0, sizeof(txq_ctrl->stats));
 		}
 	}
-	printk(KERN_ERR "\n\n");
+	pr_info("\n");
 
 	memset(stat, 0, sizeof(struct port_stats));
 
 	/* RX pool statistics */
 #ifdef CONFIG_MV_ETH_BM_CPU
-	if (MV_NETA_BM_CAP() && pp->pool_short)
+	if (MV_NETA_BM_CAP() && pp->pool_short && (pp->pool_short != pp->pool_long))
 		mv_eth_pool_status_print(pp->pool_short->pool);
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
 	if (pp->pool_long)
 		mv_eth_pool_status_print(pp->pool_long->pool);
 
-		mv_eth_ext_pool_print(pp);
+	mv_eth_ext_pool_print(pp);
 
 #ifdef CONFIG_MV_ETH_STAT_DIST
 	{
