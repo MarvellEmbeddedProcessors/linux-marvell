@@ -835,7 +835,7 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 			printk(KERN_ERR "copy_from_user failed\n");
 			return -EFAULT;
 		}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 69) || defined(CONFIG_ARCH_MSYS)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 69) || defined(CONFIG_ARCH_MSYS) || defined(CONFIG_MACH_ARMADA_XP_AMC)
 		pci_map_single(NULL, (void *)range.address, range.length, PCI_DMA_TODEVICE);
 #else
 		consistent_sync((void *)range.address, range.length, PCI_DMA_TODEVICE);
@@ -848,7 +848,7 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 			printk(KERN_ERR "copy_from_user failed\n");
 			return -EFAULT;
 		}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 69) || defined(CONFIG_ARCH_MSYS)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 69) || defined(CONFIG_ARCH_MSYS) || defined(CONFIG_MACH_ARMADA_XP_AMC)
 		pci_map_single(NULL, (void *)range.address, range.length, PCI_DMA_FROMDEVICE);
 #else
 		consistent_sync((void *)range.address, range.length, PCI_DMA_FROMDEVICE);
