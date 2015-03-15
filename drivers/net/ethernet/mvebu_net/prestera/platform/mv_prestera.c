@@ -583,7 +583,7 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 	}
 
 #ifdef MV_DEBUG
-	if (cmd != PRESTERA_IOC_WAIT)
+	if (cmd != PRESTERA_IOC_WAIT && cmd != PRESTERA_IOC_INTENABLE)
 		ioctl_cmd_pr(cmd);
 #endif
 
@@ -645,9 +645,6 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 		break;
 
 	case PRESTERA_IOC_INTENABLE:
-		/* clear the mask reg on device 0x10 */
-		if (arg > 64)
-			send_sig_info(SIGSTOP, (struct siginfo *)1, current);
 		enable_irq(arg);
 		break;
 
@@ -658,9 +655,6 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 	case PRESTERA_IOC_WAIT:
 		/* cookie */
 		intData = (struct intData *)arg;
-
-		/* enable the interrupt vector */
-		enable_irq(intData->intVec);
 
 		if (down_interruptible(&intData->sem)) {
 			/* to avoid unbalanced irq warning when suspended by gdb */
