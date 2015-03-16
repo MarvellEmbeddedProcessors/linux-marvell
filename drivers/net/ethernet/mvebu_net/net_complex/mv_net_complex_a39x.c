@@ -451,6 +451,44 @@ static void mv_net_complex_mac_to_xaui(u32 port, enum mvNetComplexPhase phase)
 	}
 }
 
+int mv_net_complex_dynamic_init(u32 net_comp_config)
+{
+	u32 i;
+
+	/* Reset the GOP unit */
+	mv_net_complex_gop_reset(0);
+	/* Active the GOP 4 ports */
+	for (i = 0; i < 4; i++)
+		mv_net_complex_active_port(i, 1);
+
+	if ((net_comp_config & 0x1) == 1)
+		mv_net_complex_rxaui_enable(0, 1);
+	else
+		mv_net_complex_rxaui_enable(0, 0);
+
+	/* Set Bus Width to HB mode = 1 */
+	mv_net_complex_bus_width_select(1);
+	/* Select SGMII mode */
+	mv_net_complex_gbe_mode_select(0);
+	/* Configure the sample stages */
+	mv_net_complex_sample_stages_timing(0);
+
+	/* Configure the ComPhy Selector */
+	mv_net_complex_com_phy_selector_config(net_comp_config);
+
+	/* un reset */
+	for (i = 0; i < 4; i++)
+		mv_net_complex_port_rf_reset(i, 1);
+
+
+	/* Enable the GOP internal clock logic */
+	mv_net_complex_gop_clock_logic_set(1);
+	/* De-assert GOP unit reset */
+	mv_net_complex_gop_reset(1);
+
+	return 0;
+}
+
 int mv_net_complex_init(u32 net_comp_config, enum mvNetComplexPhase phase)
 {
 	u32 reg;
@@ -507,15 +545,11 @@ int mv_net_complex_init(u32 net_comp_config, enum mvNetComplexPhase phase)
 		/* Enable the NSS (PPv3) instead of the NetA (PPv1) */
 		mv_net_complex_nss_select(1);
 
-	else if (phase == MV_NETC_SECOND_PHASE) {
+	if (phase == MV_NETC_SECOND_PHASE) {
 		/* Enable the GOP internal clock logic */
 		mv_net_complex_gop_clock_logic_set(1);
 		/* De-assert GOP unit reset */
 		mv_net_complex_gop_reset(1);
-
-		/* WA for A390 Z1 - when NSS wake up from reset
-		registers default values are wrong */
-		mv_net_restore_regs_defaults();
 	}
 
 	return 0;
@@ -580,10 +614,11 @@ static int mv_net_complex_plat_data_get(struct platform_device *pdev)
 	return 0;
 }
 
+u32 net_complex = 0x421;
+
 static int mv_net_complex_probe(struct platform_device *pdev)
 {
 	int ret;
-	u32 net_complex;
 
 	ret = mv_net_complex_plat_data_get(pdev);
 	if (ret) {
@@ -592,12 +627,30 @@ static int mv_net_complex_probe(struct platform_device *pdev)
 	}
 
 	/* TODO -- Static initialize net complex temp, after fdt ready, fix it */
-	net_complex = 0x421;
+	pr_info("\nRun with net_complex = 0x%x\n", net_complex);
 	mv_net_complex_init(net_complex, 0);
 	mv_net_complex_init(net_complex, 1);
 
+	/* WA for A390 Z1 - when NSS wake up from reset
+	registers default values are wrong */
+	mv_net_restore_regs_defaults();
+
 	return 0;
 }
+
+static int mv_nss_cmdline_config(char *s)
+{
+	int f;
+
+	if (s) {
+		f = sscanf(s, "0x%x", &net_complex);
+		pr_info("\nnetcomplex 0x%x %s\n", net_complex, s);
+	}
+
+	return 1;
+}
+__setup("netcomplex=", mv_nss_cmdline_config);
+
 
 static int mv_net_complex_remove(struct platform_device *pdev)
 {

@@ -212,6 +212,7 @@ enum mvNetComplexPhase {
 #define COMMON_PHYS_SELECTOR_LANE_OFFSET(lane)		(4 * lane)
 #define COMMON_PHYS_SELECTOR_LANE_MASK(lane)		(0xF << COMMON_PHYS_SELECTOR_LANE_OFFSET(lane))
 
+int mv_net_complex_dynamic_init(u32 net_comp_config);
 int mv_net_complex_init(u32 net_comp_config, enum mvNetComplexPhase phase);
 void mv_net_complex_nss_select(u32 val);
 
