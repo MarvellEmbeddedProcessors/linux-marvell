@@ -1592,7 +1592,7 @@ static uint32_t get_instance(unsigned short vendorId, unsigned short devId)
 	static uint32_t lion2_instance;
 	static uint32_t ac3_instance[MV_DEV_FLAVOUR_MASK] = {0};
 	uint32_t instance = 0;
-	unsigned short flavour;
+	unsigned short flavour = 0;
 
 	/* Make sure all AC3/BC2 device flavours are handled in the same way */
 	if (((devId & ~MV_DEV_FLAVOUR_MASK) == MV_BOBCAT2_DEV_ID) ||
