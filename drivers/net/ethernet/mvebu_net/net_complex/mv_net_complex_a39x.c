@@ -455,8 +455,6 @@ int mv_net_complex_dynamic_init(u32 net_comp_config)
 {
 	u32 i;
 
-	/* Reset the GOP unit */
-	mv_net_complex_gop_reset(0);
 	/* Active the GOP 4 ports */
 	for (i = 0; i < 4; i++)
 		mv_net_complex_active_port(i, 1);
