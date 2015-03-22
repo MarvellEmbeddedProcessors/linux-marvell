@@ -609,4 +609,17 @@
 			rgmii_rx_timing_delay = <1>;
 			rgmii_tx_timing_delay = <1>;
 		};
+
+	sound {
+                marvell,audio-controller = <&audio_controller>;
+		status = "disabled";
+        };
+
+        spdif_out: spdif-out {
+                compatible = "linux,spdif-dit";
+        };
+
+        spdif_in: spdif-in {
+                compatible = "linux,spdif-dir";
+        };
 };
