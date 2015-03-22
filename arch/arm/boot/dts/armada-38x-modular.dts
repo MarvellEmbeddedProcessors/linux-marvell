@@ -49,6 +49,10 @@
 			i2c0: i2c@11000 {
 				status = "okay";
 				clock-frequency = <100000>;
+				audio_codec: audio-codec@4a {
+					compatible = "cirrus,cs42l51";
+					reg = <0x4a>;
+				};
 			};
 
 			i2c1: i2c@11100 {
@@ -165,10 +169,20 @@
 					marvell,function = "gpio";
 				};
 			};
+
+			audio-controller@e8000 {
+				pinctrl-0 = <&i2s_pins>;
+				pinctrl-names = "default";
+			};
 		};
 
 		pcie-controller {
 			status = "okay";
 		};
 	};
+
+        sound {
+                compatible = "marvell,a385db-audio";
+                marvell,audio-codec = <&audio_codec &spdif_out &spdif_in>;
+        };
 };
