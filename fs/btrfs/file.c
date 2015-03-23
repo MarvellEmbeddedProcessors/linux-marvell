@@ -32,6 +32,7 @@
 #include <linux/compat.h>
 #include <linux/slab.h>
 #include <linux/btrfs.h>
+#include <net/sock.h>
 #include "ctree.h"
 #include "disk-io.h"
 #include "transaction.h"
@@ -2444,11 +2445,208 @@ out:
 	return offset;
 }
 
+static ssize_t btrfs_splice_from_socket(struct file *file, struct socket *sock,
+					loff_t __user *ppos, size_t count)
+{
+	struct inode *inode = file_inode(file);
+	struct btrfs_root *root = BTRFS_I(inode)->root;
+	struct page **pages = NULL;
+	struct kvec *iov = NULL;
+	struct msghdr msg = { 0 };
+	size_t offset, offset_tmp, remaining;
+	size_t num_pages, dirty_pages;
+	size_t copied = 0;
+	u64 start_pos;
+	int ret = 0;
+	loff_t pos;
+	int i;
+	bool sync = (file->f_flags & O_DSYNC) || IS_SYNC(file->f_mapping->host);
+
+	if (ppos && copy_from_user(&pos, ppos, sizeof(pos)))
+		return -EFAULT;
+
+	ret = rw_verify_area(WRITE, file, &pos, count);
+	if (ret < 0)
+		return ret;
+
+	/* limit the splice to 128K */
+	count = min_t(size_t, ret, SZ_128K);
+
+	mutex_lock(&inode->i_mutex);
+
+	current->backing_dev_info = inode->i_mapping->backing_dev_info;
+	ret = generic_write_checks(file, &pos, &count, S_ISBLK(inode->i_mode));
+	if (ret) {
+		mutex_unlock(&inode->i_mutex);
+		goto out;
+	}
+
+	if (count == 0) {
+		mutex_unlock(&inode->i_mutex);
+		goto out;
+	}
+
+	ret = file_remove_suid(file);
+	if (ret) {
+		mutex_unlock(&inode->i_mutex);
+		goto out;
+	}
+
+	/*
+	 * If BTRFS flips readonly due to some impossible error
+	 * (fs_info->fs_state now has BTRFS_SUPER_FLAG_ERROR),
+	 * although we have opened a file as writable, we have
+	 * to stop this write operation to ensure FS consistency.
+	 */
+	if (test_bit(BTRFS_FS_STATE_ERROR, &root->fs_info->fs_state)) {
+		ret = -EROFS;
+		mutex_unlock(&inode->i_mutex);
+		goto out;
+	}
+
+	/*
+	 * We reserve space for updating the inode when we reserve space for the
+	 * extent we are going to write, so we will enospc out there.  We don't
+	 * need to start yet another transaction to update the inode as we will
+	 * update the inode when we finish writing whatever data we write.
+	 */
+	update_time_for_write(inode);
+
+	start_pos = round_down(pos, root->sectorsize);
+	if (start_pos > i_size_read(inode)) {
+		ret = btrfs_cont_expand(inode, i_size_read(inode), start_pos);
+		if (ret) {
+			mutex_unlock(&inode->i_mutex);
+			goto out;
+		}
+	}
+
+	if (sync)
+		atomic_inc(&BTRFS_I(inode)->sync_writers);
+
+	offset = pos & (PAGE_CACHE_SIZE - 1);
+	num_pages = (offset + count + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+
+	ret = btrfs_delalloc_reserve_space(inode,
+					   num_pages << PAGE_CACHE_SHIFT);
+	if (ret)
+		goto out_free;
+
+	pages = kmalloc(num_pages * sizeof(*pages), GFP_NOFS);
+	if (!pages) {
+		ret = -ENOMEM;
+		goto out_free;
+	}
+
+	iov = kmalloc(num_pages * sizeof(*iov), GFP_NOFS);
+	if (!iov) {
+		ret = -ENOMEM;
+		goto out_free;
+	}
+
+	/*
+	 * This is going to setup the pages array with the number of
+	 * pages we want, so we don't really need to worry about the
+	 * contents of pages from loop to loop
+	 */
+	ret = prepare_pages(root, file, pages, num_pages,
+			    pos, 0, count, false);
+	if (ret) {
+		btrfs_delalloc_release_space(inode,
+					     num_pages << PAGE_CACHE_SHIFT);
+		goto out_free;
+	}
+
+	remaining = count;
+	offset_tmp = offset;
+	for (i = 0; i < num_pages; i++) {
+		unsigned int bytes = min_t(unsigned int,
+					   PAGE_CACHE_SIZE - offset_tmp, remaining);
+
+		iov[i].iov_base = kmap(pages[i]) + offset_tmp;
+		iov[i].iov_len = bytes;
+		offset_tmp = 0;
+		remaining -= bytes;
+	}
+
+	/* receive the data from socket now */
+	copied = kernel_recvmsg(sock, &msg, iov, num_pages, count, MSG_WAITALL);
+
+	for (i = 0; i < num_pages; i++)
+		kunmap(pages[i]);
+
+	if (copied <= 0) {
+		ret = copied;
+		dirty_pages = copied = 0;
+	} else
+		dirty_pages = (copied + offset + PAGE_CACHE_SIZE - 1) >>
+			PAGE_CACHE_SHIFT;
+
+	/*
+	 * If we had a short copy we need to release the excess delaloc
+	 * bytes we reserved.  We need to increment outstanding_extents
+	 * because btrfs_delalloc_release_space will decrement it, but
+	 * we still have an outstanding extent for the chunk we actually
+	 * managed to copy.
+	 */
+	if (num_pages > dirty_pages) {
+		if (copied > 0) {
+			spin_lock(&BTRFS_I(inode)->lock);
+			BTRFS_I(inode)->outstanding_extents++;
+			spin_unlock(&BTRFS_I(inode)->lock);
+		}
+		btrfs_delalloc_release_space(inode,
+			     (num_pages - dirty_pages) << PAGE_CACHE_SHIFT);
+	}
+
+	if (copied > 0) {
+		ret = btrfs_dirty_pages(root, inode, pages,
+				dirty_pages, pos, copied,
+				NULL);
+		if (ret) {
+			btrfs_delalloc_release_space(inode,
+				     dirty_pages << PAGE_CACHE_SHIFT);
+			btrfs_drop_pages(pages, num_pages);
+			goto out_free;
+		}
+	}
+
+	btrfs_drop_pages(pages, num_pages);
+
+	cond_resched();
+
+	balance_dirty_pages_ratelimited(inode->i_mapping);
+	if (dirty_pages < (root->leafsize >> PAGE_CACHE_SHIFT) + 1)
+		btrfs_btree_balance_dirty(root);
+
+out_free:
+	kfree(iov);
+	kfree(pages);
+
+	mutex_unlock(&inode->i_mutex);
+
+	BTRFS_I(inode)->last_trans = root->fs_info->generation + 1;
+	BTRFS_I(inode)->last_sub_trans = root->log_transid;
+	if (copied > 0 || ret == -EIOCBQUEUED)
+		ret = generic_write_sync(file, pos, copied);
+
+	if (sync)
+		atomic_dec(&BTRFS_I(inode)->sync_writers);
+
+	pos += copied;
+	if (ppos && copy_to_user(ppos, &pos, sizeof(*ppos)))
+		ret = -EFAULT;
+out:
+	current->backing_dev_info = NULL;
+	return ret ? ret : copied;
+}
+
 const struct file_operations btrfs_file_operations = {
 	.llseek		= btrfs_file_llseek,
 	.read		= do_sync_read,
 	.write		= do_sync_write,
 	.aio_read       = generic_file_aio_read,
+	.splice_from_socket	= btrfs_splice_from_socket,
 	.splice_read	= generic_file_splice_read,
 	.aio_write	= btrfs_file_aio_write,
 	.mmap		= btrfs_file_mmap,
