@@ -283,8 +283,7 @@ btrfs_csum_data_dma_offload(const u8 *data, u32 *crc, unsigned int len)
 	device = chan->device;
 	src = dma_map_single(device->dev, (void *)data, len, DMA_TO_DEVICE);
 
-	tx = device->device_prep_dma_crc32c(chan, src, len, crc,
-					    DMA_COMPL_SKIP_DEST_UNMAP | DMA_PREP_INTERRUPT);
+	tx = device->device_prep_dma_crc32c(chan, src, len, crc, 0);
 	if (unlikely(!tx)) {
 		/* HW is unable to handle this context */
 		dma_unmap_page(device->dev, src, len, DMA_TO_DEVICE);
