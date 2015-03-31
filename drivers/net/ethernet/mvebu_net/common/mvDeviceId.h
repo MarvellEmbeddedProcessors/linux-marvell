@@ -447,6 +447,7 @@ extern "C" {
 
 /* AlleyCat3  Family */
 #define MV_ALLEYCAT3_DEV_ID		0xF400
+#define MV_ALLEYCAT3_MAX_DEV_ID		0xF4FF
 
 /* AlleyCat3  Revisions */
 #define MV_ALLEYCAT3_A0_ID		0x3
