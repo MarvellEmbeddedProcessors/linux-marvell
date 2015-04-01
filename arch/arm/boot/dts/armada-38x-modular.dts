@@ -101,6 +101,22 @@
 				};
 			};
 
+			spi1: spi@10680 {
+				pinctrl-0 = <&spi1_pins>;
+				pinctrl-names = "default";
+
+				slic@0 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "mv_slic";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <3000000>;
+					spi-1byte-cs;
+					spi-cpol;
+					spi-cpha;
+				};
+			};
+
 			/*
 			 * 1GB Flash via NFC NAND controller
 			 * should be disabled when the board boots
@@ -168,6 +184,12 @@
 					marvell,pins = "mpp33", "mpp34", "mpp35";	/* default for DB-GP */
 					marvell,function = "gpio";
 				};
+			};
+
+			tdm@b0000 {
+				pinctrl-0 = <&tdm_pins>;
+				pinctrl-names = "default";
+				pclk-freq-mhz = <8>;
 			};
 
 			audio-controller@e8000 {
