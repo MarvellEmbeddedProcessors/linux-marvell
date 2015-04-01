@@ -13,6 +13,7 @@
 
 #include <linux/platform_device.h>
 #include <linux/module.h>
+#include <linux/usb/phy.h>
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/dma-mapping.h>
@@ -160,6 +161,18 @@ int common_xhci_plat_probe(struct platform_device *pdev,
 		goto dealloc_usb2_hcd;
 	}
 
+	hcd->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+	if (IS_ERR(hcd->phy)) {
+		ret = PTR_ERR(hcd->phy);
+		if (ret == -EPROBE_DEFER)
+			goto put_usb3_hcd;
+		hcd->phy = NULL;
+	} else {
+		ret = usb_phy_init(hcd->phy);
+		if (ret)
+			goto put_usb3_hcd;
+	}
+
 	/*
 	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
 	 * is called by usb_add_hcd().
@@ -168,9 +181,12 @@ int common_xhci_plat_probe(struct platform_device *pdev,
 
 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
 	if (ret)
-		goto put_usb3_hcd;
+		goto disable_usb_phy;
 
 	return 0;
+
+disable_usb_phy:
+	usb_phy_shutdown(hcd->phy);
 
 put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
@@ -196,6 +212,8 @@ int common_xhci_plat_remove(struct platform_device *dev)
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 
 	usb_remove_hcd(xhci->shared_hcd);
+	if (hcd->phy)
+		usb_phy_shutdown(hcd->phy);
 	usb_put_hcd(xhci->shared_hcd);
 
 	usb_remove_hcd(hcd);
