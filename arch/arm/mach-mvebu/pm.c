@@ -222,7 +222,7 @@ static int __init mvebu_pm_init(void)
 
 	if (!of_machine_is_compatible("marvell,armadaxp") &&
 			!of_machine_is_compatible("marvell,armada370") &&
-			!of_machine_is_compatible("marvell,armada380") &&
+			!of_machine_is_compatible("marvell,armada38x") &&
 			!of_machine_is_compatible("marvell,armada390"))
 		return -ENODEV;
 
