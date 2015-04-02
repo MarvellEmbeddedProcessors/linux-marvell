@@ -181,7 +181,6 @@ MV_STATUS mvTdmHalInit(MV_TDM_PARAMS *tdmParams, MV_TDM_HAL_DATA *halData)
 
 	/* Config TDM */
 	MV_REG_BIT_RESET(TDM_SPI_MUX_REG, BIT0);	/* enable TDM/SPI interface */
-	MV_REG_BIT_SET(TDM_MISC_REG, BIT0);		/* sw reset to TDM for 5181L-A1 & up */
 	MV_REG_WRITE(INT_RESET_SELECT_REG, CLEAR_ON_ZERO);	/* int cause is not clear on read */
 	MV_REG_WRITE(INT_EVENT_MASK_REG, 0x3ffff);	/* all interrupt bits latched in status */
 	MV_REG_WRITE(INT_STATUS_MASK_REG, 0);	/* disable interrupts */
@@ -307,6 +306,9 @@ MV_VOID mvTdmRelease(MV_VOID)
 	/* Release HW channel resources */
 	for (ch = 0; ch < MV_TDM2C_TOTAL_CHANNELS; ch++)
 		mvTdmChRemove(ch);
+
+	/* Disable TDM/SPI interface */
+	MV_REG_BIT_SET(TDM_SPI_MUX_REG, BIT0);
 
 	MV_TRC_REC("<-%s\n", __func__);
 }
@@ -1081,17 +1083,16 @@ MV_VOID mvTdmPcmIfReset(MV_VOID)
 {
 	MV_TRC_REC("->%s\n", __func__);
 
-	MV_REG_BIT_RESET(PCM_CTRL_REG, BIT0);
+	/* SW PCM reset assert */
+	MV_REG_BIT_RESET(TDM_MISC_REG, BIT0);
 
-	/* Wait a bit - might be fine tuned */
-	mvOsDelay(5);
+	mvOsDelay(10);
 
-	MV_REG_BIT_SET(TDM_SPI_MUX_REG, BIT0);	/* Disable TDM/SPI interface */
-
-	MV_REG_WRITE(TDM_MISC_REG, 0);		/* SW PCM reset */
+	/* SW PCM reset de-assert */
+	MV_REG_BIT_SET(TDM_MISC_REG, BIT0);
 
 	/* Wait a bit more - might be fine tuned */
-	mvOsDelay(100);
+	mvOsDelay(50);
 
 	MV_TRC_REC("<-%s\n", __func__);
 }
