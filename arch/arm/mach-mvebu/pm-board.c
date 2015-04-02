@@ -155,7 +155,9 @@ out:
 
 int __init mvebu_armada_xp_gp_pm_register(void)
 {
-	if (of_machine_is_compatible("marvell,axp-gp"))
+	if (of_machine_is_compatible("marvell,axp-gp") ||
+	    of_machine_is_compatible("marvell,a388-db-gp") ||
+	    of_machine_is_compatible("marvell,a385-db-ap"))
 		mvebu_pm_register_init(mvebu_armada_xp_gp_pm_init);
 	return 0;
 }
