@@ -11,4 +11,14 @@ config MV_TDM2C_SUPPORT
 	The TDM bus may be used for transferring
 	voice samples through analog phone interface.
 
+config MV_TDM_EXT_STATS
+	bool "Enable legacy TDM extended statistics"
+	depends on MACH_ARMADA_380
+	default y
+	---help---
+	Choosing this option will export
+	extended statistics to procfs.
+	This is relevant only for the
+	legacy TDM unit.
+
 endmenu

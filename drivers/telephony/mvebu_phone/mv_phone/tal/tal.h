@@ -22,6 +22,7 @@ disclaimer.
 #define _TAL_H_
 
 #include "mvOs.h"
+#include "voiceband/tdm/mvTdm.h"
 
 /* Defines */
 #define TAL_MAX_PHONE_LINES	32
@@ -53,7 +54,7 @@ typedef struct {
 	unsigned int tx_miss;
 	unsigned int rx_over;
 	unsigned int tx_under;
-#ifdef MV_TDM_EXT_STATS
+#ifdef CONFIG_MV_TDM_EXT_STATS
 	MV_TDM_EXTENDED_STATS tdm_ext_stats;
 #endif
 } tal_stats_t;
