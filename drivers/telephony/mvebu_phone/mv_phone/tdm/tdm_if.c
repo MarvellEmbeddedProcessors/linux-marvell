@@ -339,18 +339,18 @@ MV_STATUS tdm_if_init(tal_params_t *tal_params)
 	/* Assign TDM parameters */
 	memcpy(&tdm_params, tal_params, sizeof(MV_TDM_PARAMS));
 
-	/* Soft reset to PCM I/F */
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-	if (MV_TDM_UNIT_TDM2C == tdm_if_unit_type_get())
-		mvTdmPcmIfReset();
-#endif
-
 	/* TDM init */
 	if (mvSysTdmInit(&tdm_params) != MV_OK) {
 			printk(KERN_ERR "%s: Error, TDM initialization failed !!!\n", __func__);
 			return MV_ERROR;
 	}
 	tdm_init = 1;
+
+	/* Soft reset to PCM I/F */
+#ifdef CONFIG_MV_TDM2C_SUPPORT
+	if (MV_TDM_UNIT_TDM2C == tdm_if_unit_type_get())
+		mvTdmPcmIfReset();
+#endif
 
 	/* Register TDM interrupt */
 #ifdef CONFIG_MV_PHONE_USE_FIQ_PROCESSING
