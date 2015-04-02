@@ -121,6 +121,10 @@ extern int tdm_base, use_pclk_external;
 #define TRC_REC(...)
 #define TRC_OUTPUT(...)
 
+#ifdef CONFIG_MV_TDM_EXT_STATS
+	#define MV_TDM_EXT_STATS
+#endif
+
 struct mv_phone_dev {
 	void __iomem *tdm_base;
 	void __iomem *pll_base;
