@@ -455,6 +455,11 @@ int main(void)
 					return 1;
 				}
 
+				if (ioctl(tdm_fd, TDM_DEV_TDM_TEST_MODE_ENABLE)) {
+					printf("%s Error, unable to configure TDM\n", TOOL_PREFIX);
+					return 1;
+				}
+
 				if(silabs_open_device()) {
 					printf("%s Error, could not open vpapi device\n", TOOL_PREFIX);
 					return 1;
