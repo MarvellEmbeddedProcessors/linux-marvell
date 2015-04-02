@@ -19,5 +19,6 @@
 ENTRY(a375_secondary_startup)
 ARM_BE8(setend be)
 	bl      v7_invalidate_l1
+	bl	armada_38x_scu_power_up
 	b	secondary_startup
 ENDPROC(a375_secondary_startup)
