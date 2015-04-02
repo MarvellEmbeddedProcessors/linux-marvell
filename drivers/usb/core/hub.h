@@ -110,6 +110,7 @@ extern int hub_port_debounce(struct usb_hub *hub, int port1,
 		bool must_be_connected);
 extern int usb_clear_port_feature(struct usb_device *hdev,
 		int port1, int feature);
+extern void root_hub_recovery(struct usb_hub *hub);
 
 static inline int hub_port_debounce_be_connected(struct usb_hub *hub,
 		int port1)

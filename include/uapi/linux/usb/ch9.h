@@ -931,7 +931,7 @@ enum usb_device_state {
 	USB_STATE_ADDRESS,
 	USB_STATE_CONFIGURED,			/* most functions */
 
-	USB_STATE_SUSPENDED
+	USB_STATE_SUSPENDED,
 
 	/* NOTE:  there are actually four different SUSPENDED
 	 * states, returning to POWERED, DEFAULT, ADDRESS, or
@@ -939,6 +939,7 @@ enum usb_device_state {
 	 * At this level there's no difference between L1 and L2
 	 * suspend states.  (L2 being original USB 1.1 suspend.)
 	 */
+	USB_STATE_RH_RST,
 };
 
 enum usb3_link_state {

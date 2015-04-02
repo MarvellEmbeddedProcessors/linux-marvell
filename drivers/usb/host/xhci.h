@@ -1707,6 +1707,8 @@ void xhci_urb_free_priv(struct xhci_hcd *xhci, struct urb_priv *urb_priv);
 void xhci_free_command(struct xhci_hcd *xhci,
 		struct xhci_command *command);
 
+extern void xhci_kick_kxhcd(struct xhci_hcd *xhci);
+
 #ifdef CONFIG_PCI
 /* xHCI PCI glue */
 int xhci_register_pci(void);
@@ -1861,5 +1863,8 @@ struct xhci_ep_ctx *xhci_get_ep_ctx(struct xhci_hcd *xhci, struct xhci_container
 
 /* xHCI quirks */
 bool xhci_compliance_mode_recovery_timer_quirk_check(void);
+
+/* HCRST debug */
+#define XHCI_MV_HCRST_DEBUG		1
 
 #endif /* __LINUX_XHCI_HCD_H */

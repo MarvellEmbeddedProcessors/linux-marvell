@@ -951,6 +951,12 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 
 	ret = xhci_halt(xhci);
 
+#if defined(XHCI_MV_HCRST_DEBUG) && (XHCI_MV_HCRST_DEBUG == 1)
+	xhci_dbg(xhci, "Calling usb_hc_pre_reset()\n");
+	usb_hc_pre_reset(xhci_to_hcd(xhci)->primary_hcd);
+
+#endif
+
 	spin_lock_irqsave(&xhci->lock, flags);
 	if (ret < 0) {
 		/* This is bad; the host is not responding to commands and it's
@@ -1000,9 +1006,21 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 		}
 	}
 	spin_unlock_irqrestore(&xhci->lock, flags);
+#if defined(XHCI_MV_HCRST_DEBUG) && (XHCI_MV_HCRST_DEBUG == 1)
+	xhci_kick_kxhcd(xhci);
+#else
 	xhci_dbg(xhci, "Calling usb_hc_died()\n");
 	usb_hc_died(xhci_to_hcd(xhci)->primary_hcd);
 	xhci_dbg(xhci, "xHCI host controller is dead.\n");
+#endif
+
+#ifdef CONFIG_USB_XHCI_HCD_DEBUGGING
+	/* Tell the event ring poll function not to reschedule */
+	xhci->zombie = 1;
+	del_timer_sync(&xhci->event_ring_timer);
+#endif
+
+
 }
 
 
