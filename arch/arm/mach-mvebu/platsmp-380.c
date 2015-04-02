@@ -79,6 +79,19 @@ static void __init armada_380_smp_prepare_cpus(unsigned int max_cpus)
 	register_cpu_notifier(&armada_380_secondary_cpu_notifier);
 }
 
+/*
+ * When a CPU is brought back online, either through CPU hotplug, or
+ * because of the boot of a kexec'ed kernel, the PMSU configuration
+ * for this CPU might be in the deep idle state, preventing this CPU
+ * from receiving interrupts. Here, we therefore take out the current
+ * CPU from this state, which was entered by armada_38x_cpu_die()
+ * below.
+ */
+static void armada_38x_secondary_init(unsigned int cpu)
+{
+	mvebu_v7_pmsu_idle_exit();
+}
+
 #ifdef CONFIG_HOTPLUG_CPU
 static void armada_38x_cpu_die(unsigned int cpu)
 {
@@ -88,14 +101,27 @@ static void armada_38x_cpu_die(unsigned int cpu)
 	 */
 	armada_38x_do_cpu_suspend(true);
 }
+
+/*
+ * We need a dummy function, so that platform_can_cpu_hotplug() knows
+ * we support CPU hotplug. However, the function does not need to do
+ * anything, because CPUs going offline can enter the deep idle state
+ * by themselves, without any help from a still alive CPU.
+ */
+static int armada_38x_cpu_kill(unsigned int cpu)
+{
+	return 1;
+}
 #endif
 
 struct smp_operations armada_380_smp_ops __initdata = {
 	.smp_init_cpus		= armada_380_smp_init_cpus,
 	.smp_prepare_cpus	= armada_380_smp_prepare_cpus,
 	.smp_boot_secondary	= armada_380_boot_secondary,
+	.smp_secondary_init     = armada_38x_secondary_init,
 #ifdef CONFIG_HOTPLUG_CPU
 	.cpu_die		= armada_38x_cpu_die,
+	.cpu_kill               = armada_38x_cpu_kill,
 #endif
 };
 
