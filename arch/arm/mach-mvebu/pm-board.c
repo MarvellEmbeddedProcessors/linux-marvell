@@ -86,11 +86,6 @@ static int __init mvebu_armada_xp_gp_pm_init(void)
 	struct device_node *gpio_ctrl_np;
 	int ret = 0, i;
 
-	if (!of_machine_is_compatible("marvell,axp-gp") &&
-		!of_machine_is_compatible("marvell,a388-db-gp") &&
-		!of_machine_is_compatible("marvell,a385-db-ap"))
-		return -ENODEV;
-
 	np = of_find_node_by_name(NULL, "pm_pic");
 	if (!np)
 		return -ENODEV;
@@ -151,11 +146,17 @@ static int __init mvebu_armada_xp_gp_pm_init(void)
 		}
 	}
 
-	mvebu_pm_init(mvebu_armada_xp_gp_pm_enter);
+	mvebu_pm_suspend_init(mvebu_armada_xp_gp_pm_enter);
 
 out:
 	of_node_put(np);
 	return ret;
 }
 
-late_initcall(mvebu_armada_xp_gp_pm_init);
+int __init mvebu_armada_xp_gp_pm_register(void)
+{
+	if (of_machine_is_compatible("marvell,axp-gp"))
+		mvebu_pm_register_init(mvebu_armada_xp_gp_pm_init);
+	return 0;
+}
+arch_initcall(mvebu_armada_xp_gp_pm_register);

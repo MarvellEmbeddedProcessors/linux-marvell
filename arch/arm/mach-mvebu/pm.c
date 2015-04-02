@@ -37,6 +37,8 @@ extern int mvebu_pcie_resume(void);
 
 static void (*mvebu_board_pm_enter)(void __iomem *sdram_reg, u32 srcmd);
 static void __iomem *sdram_ctrl;
+static bool is_suspend_mem_available;
+static int (*mvebu_board_pm_init)(void);
 
 static int mvebu_pm_powerdown(unsigned long data)
 {
@@ -160,11 +162,8 @@ static void mvebu_pm_store_bootinfo(void)
 	writel(BOOT_MAGIC_LIST_END, store_addr);
 }
 
-static int mvebu_pm_enter(suspend_state_t state)
+static void mvebu_enter_suspend(void)
 {
-	if (state != PM_SUSPEND_MEM)
-		return -EINVAL;
-
 	cpu_pm_enter();
 
 	mvebu_pm_store_bootinfo();
@@ -186,16 +185,57 @@ static int mvebu_pm_enter(suspend_state_t state)
 	mvebu_pcie_resume();
 
 	cpu_pm_exit();
+}
 
+static int mvebu_pm_enter(suspend_state_t state)
+{
+	switch (state) {
+	case PM_SUSPEND_STANDBY:
+		cpu_do_idle();
+		break;
+	case PM_SUSPEND_MEM:
+		mvebu_enter_suspend();
+	default:
+		return -EINVAL;
+	}
 	return 0;
+}
+
+static int mvebu_pm_valid(suspend_state_t state)
+{
+	return ((state == PM_SUSPEND_STANDBY) ||
+		(is_suspend_mem_available && (state == PM_SUSPEND_MEM)));
 }
 
 static const struct platform_suspend_ops mvebu_pm_ops = {
 	.enter = mvebu_pm_enter,
-	.valid = suspend_valid_only_mem,
+	.valid = mvebu_pm_valid,
 };
 
-int __init mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
+void __init mvebu_pm_register_init(int (*board_pm_init)(void))
+{
+	mvebu_board_pm_init = board_pm_init;
+}
+
+static int __init mvebu_pm_init(void)
+{
+
+	if (!of_machine_is_compatible("marvell,armadaxp") &&
+			!of_machine_is_compatible("marvell,armada370") &&
+			!of_machine_is_compatible("marvell,armada380") &&
+			!of_machine_is_compatible("marvell,armada390"))
+		return -ENODEV;
+
+	if (mvebu_board_pm_init)
+		if (mvebu_board_pm_init())
+			pr_warn("Registering suspend init for this board failed\n");
+	suspend_set_ops(&mvebu_pm_ops);
+
+	return 0;
+}
+
+int __init mvebu_pm_suspend_init(void (*board_pm_enter)(void __iomem *sdram_reg,
+								u32 srcmd))
 {
 	struct device_node *np;
 	struct resource res;
@@ -231,7 +271,9 @@ int __init mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 src
 
 	mvebu_board_pm_enter = board_pm_enter;
 
-	suspend_set_ops(&mvebu_pm_ops);
+	is_suspend_mem_available = true;
 
 	return 0;
 }
+
+late_initcall(mvebu_pm_init);

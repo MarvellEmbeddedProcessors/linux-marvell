@@ -23,6 +23,7 @@ void armada_xp_cpu_die(unsigned int cpu);
 void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr);
 int mvebu_boot_cpu(int cpu);
 
-int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd));
-
+int mvebu_pm_suspend_init(void (*board_pm_enter)(void __iomem *sdram_reg,
+							u32 srcmd));
+void mvebu_pm_register_init(int (*board_pm_init)(void));
 #endif
