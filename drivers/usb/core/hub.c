@@ -1228,6 +1228,11 @@ static int hub_pre_reset(struct usb_interface *intf)
 	return 0;
 }
 
+void root_hub_recovery(struct usb_hub *hub)
+{
+	hub_activate(hub, HUB_POST_RESET);
+}
+
 /* caller has locked the hub device */
 static int hub_post_reset(struct usb_interface *intf)
 {
@@ -1871,8 +1876,12 @@ void usb_set_device_state(struct usb_device *udev,
 	int wakeup = -1;
 
 	spin_lock_irqsave(&device_state_lock, flags);
-	if (udev->state == USB_STATE_NOTATTACHED)
-		;	/* do nothing */
+	if (udev->state == USB_STATE_NOTATTACHED) {
+		if (udev->parent)
+			;	/* do nothing */
+		else if (new_state == USB_STATE_RH_RST)
+			udev->state = new_state;
+	}
 	else if (new_state != USB_STATE_NOTATTACHED) {
 
 		/* root hub wakeup capabilities are managed out-of-band
@@ -4656,6 +4665,24 @@ static void hub_events(void)
 		usb_lock_device(hdev);
 		if (unlikely(hub->disconnected))
 			goto loop_disconnected;
+
+		/* If we need to reset HC, we have to mark
+		 * root hub to USB_STATE_RH_RST.
+		 */
+		if (!(hub->hdev->parent) && (hdev->state == USB_STATE_RH_RST)) {
+
+				struct usb_hcd *hcd = bus_to_hcd(hdev->bus);
+				hub_quiesce(hub, HUB_DISCONNECT);
+				set_bit(HCD_FLAG_RH_CLEANED, &hcd->flags);
+
+				dev_dbg(hub_dev, "roothub HCRST processed -- 0x%x hcd @0x%x 0x%x\n",
+						 hdev->parent,
+						 hcd,
+						 hcd->flags);
+
+				hdev->state = USB_STATE_CONFIGURED;
+			goto loop;
+		}
 
 		/* If the hub has died, clean up after it */
 		if (hdev->state == USB_STATE_NOTATTACHED) {
