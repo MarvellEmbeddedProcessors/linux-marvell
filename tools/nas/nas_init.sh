@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 5.5"
+echo " * Version: 5.6"
 
 # LOG:
+# 5.6:
+#   1. enable splice on btrfs.
 # 5.5:
 #   1. added support for fat32.
 # 5.4:
@@ -772,8 +774,7 @@ if [ "$SAMBASTATUS" == "enabled" ]; then
 	echo ' disable netbios = yes'			>>  /etc/smb.conf
 	echo ' csc policy = disable'			>>  /etc/smb.conf
 	echo ' strict allocate = yes'			>>  /etc/smb.conf
-	if [ "$FS" == "ext4" ]; then
-		# only ext4 supports splice
+	if [ "$FS" == "ext4" ] || [ "$FS" == "btrfs" ]; then
 		echo ' min receivefile size = 16k'	>>  /etc/smb.conf
 	else
 		echo '# min receivefile size = 16k'	>>  /etc/smb.conf
