@@ -1514,7 +1514,17 @@ static int prestera_syscall_restore(void)
 static int prestera_dma_init(struct device *dev)
 {
 	dma_len  = _2M;
-	dma_area = dma_alloc_coherent(dev, dma_len, (dma_addr_t *)&dma_base,
+	struct device *local_device = NULL;
+
+/* - LK3.10: (A38x) during dma_alloc_coherent, arch specific dma ops are called.
+ *   Pass device pointers, so dma allocation will be done by mvebu_hwcc_dma_ops.
+ * - LK3.4 and below: Pass NULL pointers, so dma allocation will be done with
+ *   the default arm_dma_ops are used */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+	local_device = dev;
+#endif
+
+	dma_area = dma_alloc_coherent(local_device, dma_len, (dma_addr_t *)&dma_base,
 				      GFP_DMA | GFP_KERNEL);
 
 	if (!dma_area) {
@@ -1526,7 +1536,7 @@ static int prestera_dma_init(struct device *dev)
 			dma_area, dma_base, dma_len);
 
 	/* allocate temp area for bspDma operations */
-	dma_tmp_virt = dma_alloc_coherent(dev, PAGE_SIZE, &dma_tmp_phys,
+	dma_tmp_virt = dma_alloc_coherent(local_device, PAGE_SIZE, &dma_tmp_phys,
 					  GFP_DMA | GFP_KERNEL);
 
 	if (!dma_tmp_virt) {
@@ -1552,6 +1562,15 @@ static void prestera_cleanup(struct device *dev)
 {
 	int		i;
 	struct pp_dev	*ppdev;
+	struct device *local_device = NULL;
+
+/* - LK3.10: (A38x) during dma_alloc_coherent, arch specific dma ops are called.
+ *   Pass device pointers, so dma allocation will be done by mvebu_hwcc_dma_ops.
+ * - LK3.4 and below: Pass NULL pointers, so dma allocation will be done with
+ *   the default arm_dma_ops are used */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+	local_device = dev;
+#endif
 
 	prestera_int_cleanup();
 
@@ -1566,12 +1585,12 @@ static void prestera_cleanup(struct device *dev)
 	prestera_dev->founddevs = 0;
 
 	if (dma_tmp_virt) {
-		dma_free_coherent(dev, PAGE_SIZE, dma_tmp_virt, dma_tmp_phys);
+		dma_free_coherent(local_device, PAGE_SIZE, dma_tmp_virt, dma_tmp_phys);
 		dma_tmp_virt = NULL;
 	}
 
 	if (dma_area) {
-		dma_free_coherent(dev, dma_len, (dma_addr_t *)&dma_base,
+		dma_free_coherent(local_device, dma_len, (dma_addr_t *)&dma_base,
 				  GFP_DMA | GFP_KERNEL);
 		dma_area = NULL;
 	}
