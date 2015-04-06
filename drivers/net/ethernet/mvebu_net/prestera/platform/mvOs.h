@@ -86,7 +86,9 @@ disclaimer.
 #error "CPU endianess isn't defined!\n"
 #endif
 
+#ifndef INTER_REGS_VIRT_BASE
 #define INTER_REGS_VIRT_BASE 0
+#endif
 
 /*XXX: looks like error - should be 0x72000 - check
  * neta + documentation for AC3 0x00072004 and bits e.g.
