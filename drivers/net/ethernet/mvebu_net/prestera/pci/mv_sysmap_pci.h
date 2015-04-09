@@ -82,13 +82,13 @@
 
 /* BAR 2 sizes */
 #define DFX_SIZE			_1M
-#define SCPU_SIZE			_512K
+#define SCPU_SIZE			_2M
 #define ITCM_SIZE			_64K
 #define DTCM_SIZE			_64K
 
 /* BAR 2 bases */
 #define DFX_BASE			0x0
-#define SCPU_BASE			(DFX_BASE + DFX_SIZE)
+#define SCPU_BASE			(DFX_BASE + DFX_SIZE + _1M)/* keep aligned to the window size */
 #define ITCM_BASE			(SCPU_BASE + SCPU_SIZE)
 #define DTCM_BASE			(ITCM_BASE + ITCM_SIZE)
 
