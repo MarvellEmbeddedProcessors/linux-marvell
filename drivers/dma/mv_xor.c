@@ -1481,9 +1481,9 @@ static int mv_xor_probe(struct platform_device *pdev)
 
 	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
 
-	dummy1_addr = dma_map_single(NULL, (void *)dummy1,
+	dummy1_addr = dma_map_single(&pdev->dev, (void *)dummy1,
 				     MV_XOR_MIN_BYTE_COUNT, DMA_FROM_DEVICE);
-	dummy2_addr = dma_map_single(NULL, (void *)dummy2,
+	dummy2_addr = dma_map_single(&pdev->dev, (void *)dummy2,
 				     MV_XOR_MIN_BYTE_COUNT, DMA_TO_DEVICE);
 
 	xordev = devm_kzalloc(&pdev->dev, sizeof(*xordev), GFP_KERNEL);
