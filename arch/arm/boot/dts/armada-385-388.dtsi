@@ -21,17 +21,24 @@
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
+		clock-ranges;
 		cpu@0 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a9";
 			reg = <0>;
 			resets = <&cpurst 0>;
+			clocks = <&cpuclk 0>;
+			clock-latency = <1000000>;
+			clock-names = "cpu0";
 		};
 		cpu@1 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a9";
 			reg = <1>;
 			resets = <&cpurst 1>;
+			clocks = <&cpuclk 0>;
+			clock-latency = <1000000>;
+			clock-names = "cpu1";
 		};
 	};
 

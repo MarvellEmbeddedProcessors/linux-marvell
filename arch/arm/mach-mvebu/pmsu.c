@@ -21,6 +21,7 @@
 #include <linux/clk.h>
 #include <linux/cpu_pm.h>
 #include <linux/cpu.h>
+#include <linux/cpufreq-dt.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -102,7 +103,7 @@ extern void ll_enable_coherency(void);
 
 extern void armada_370_xp_cpu_resume(void);
 extern void armada_38x_cpu_resume(void);
-extern struct clk *get_cpu_clk(int cpu);
+
 void __iomem *scu_base;
 
 static phys_addr_t pmsu_mp_phys_base;
@@ -637,7 +638,7 @@ int mvebu_pmsu_dfs_request(int cpu)
 {
 	return mvebu_pmsu_dfs_request_ptr(cpu);
 }
-#if 0
+
 struct cpufreq_dt_platform_data armada_xp_cpufreq_dt_pd = {
 	.independent_clocks = true,
 };
@@ -645,12 +646,13 @@ struct cpufreq_dt_platform_data armada_xp_cpufreq_dt_pd = {
 struct cpufreq_dt_platform_data armada_380_cpufreq_dt_pd = {
 	.independent_clocks = false,
 };
-#endif
+
 static int mvebu_v7_pmsu_register_cpufreq(int cpu)
 {
 	struct device *cpu_dev;
 	struct clk *clk;
 	int ret;
+	struct device_node *np;
 
 	/*
 	* registers the operating points
@@ -659,11 +661,22 @@ static int mvebu_v7_pmsu_register_cpufreq(int cpu)
 	* of doing the PMSU part of a frequency transition.
 	*/
 
+	for_each_child_of_node(of_find_node_by_path("/cpus"), np)
+		if (of_get_property(np, "clock-names", NULL))
+			break;
+
+	if (!np) {
+		pr_err("failed to find cpufreq node\n");
+		return -ENOENT;
+	}
+
 	cpu_dev = get_cpu_device(cpu);
 	if (!cpu_dev) {
 		pr_err("Cannot get CPU %d\n", cpu);
 		return 0;
 	}
+
+	cpu_dev->of_node = np;
 
 	clk = clk_get(cpu_dev, 0);
 	if (!clk) {
@@ -726,7 +739,7 @@ static int __init mvebu_v7_pmsu_cpufreq_init(void)
 		if (ret)
 			return ret;
 	}
-#if 0
+
 	if (of_machine_is_compatible("marvell,armada38x")) {
 		mvebu_pmsu_dfs_request_ptr = armada_380_pmsu_dfs_request;
 		platform_device_register_data(NULL, "cpufreq-dt", -1,
@@ -735,9 +748,10 @@ static int __init mvebu_v7_pmsu_cpufreq_init(void)
 		mvebu_pmsu_dfs_request_ptr = armada_xp_pmsu_dfs_request;
 		platform_device_register_data(NULL, "cpufreq-dt", -1,
 					&armada_xp_cpufreq_dt_pd, sizeof(armada_xp_cpufreq_dt_pd));
+
 	} else
 		return 0;
-#endif
+
 	return 0;
 }
 

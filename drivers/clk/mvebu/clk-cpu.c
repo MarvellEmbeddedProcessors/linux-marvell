@@ -291,7 +291,7 @@ void __init of_cpu_clk_setup(struct device_node *node)
 		pr_warn("%s: pmu-dfs base register not set, dynamic frequency scaling not available\n",
 			__func__);
 
-	if (of_machine_is_compatible("marvell,armada380")) {
+	if (of_machine_is_compatible("marvell,armada38x")) {
 		if (dfx_server_base == NULL) {
 			pr_err("%s: DFX server base register not set\n",
 			__func__);
