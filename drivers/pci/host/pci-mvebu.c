@@ -933,6 +933,11 @@ int mvebu_pcie_resume(void)
 	return 0;
 }
 
+static const struct dev_pm_ops mvebu_pcie_pm_ops = {
+	.suspend_noirq        = mvebu_pcie_suspend,
+	.resume_noirq         = mvebu_pcie_resume,
+};
+
 static int __init mvebu_pcie_probe(struct platform_device *pdev)
 {
 	struct mvebu_pcie *pcie;
@@ -1086,14 +1091,13 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
 MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
 
 static struct platform_driver mvebu_pcie_driver = {
-#ifdef CONFIG_PM
-	.suspend        = mvebu_pcie_suspend,
-	/* Move PCIe resume to ealier stage in the resume sequence to avoid resume failures - TBD */
-	/* .resume         = mvebu_pcie_resume, */
-#endif
+
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "mvebu-pcie",
+#ifdef CONFIG_PM
+		.pm = &mvebu_pcie_pm_ops,
+#endif
 		.of_match_table =
 		   of_match_ptr(mvebu_pcie_of_match_table),
 	},
