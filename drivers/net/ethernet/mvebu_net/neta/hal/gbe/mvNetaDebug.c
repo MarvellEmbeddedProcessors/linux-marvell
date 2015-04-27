@@ -490,7 +490,7 @@ void mvNetaRxqShow(int port, int rxq, int mode)
 				   i, pRxDesc, pRxDesc->status,
 				   pRxDesc->dataSize, (MV_U32) pRxDesc->bufPhysAddr, (MV_U32) pRxDesc->bufCookie);
 
-			mvOsCacheLineInv(NULL, pRxDesc);
+			mvOsCacheLineInv(pPortCtrl->osHandle, pRxDesc);
 		}
 	}
 }
@@ -541,7 +541,7 @@ void mvNetaTxqShow(int port, int txp, int txq, int mode)
 				   i, pTxDesc, pTxDesc->command, pTxDesc->dataSize,
 				   (MV_U32) pTxDesc->bufPhysAddr, pTxDesc->hw_cmd);
 
-			mvOsCacheLineInv(NULL, pTxDesc);
+			mvOsCacheLineInv(pPortCtrl->osHandle, pTxDesc);
 		}
 	}
 }
