@@ -656,6 +656,9 @@ static int prestera_ioctl(struct inode *inode, struct file *filp, unsigned int c
 		/* cookie */
 		intData = (struct intData *)arg;
 
+		/* enable the interrupt vector */
+		enable_irq(intData->intVec);
+
 		if (down_interruptible(&intData->sem)) {
 			/* to avoid unbalanced irq warning when suspended by gdb */
 			disable_irq(intData->intVec);
