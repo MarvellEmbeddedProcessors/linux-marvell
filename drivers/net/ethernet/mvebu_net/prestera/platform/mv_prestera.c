@@ -1316,11 +1316,15 @@ static int dumpregs(char *page, int len, struct mem_region *mem, struct dumpregs
 }
 #endif
 
+static struct dumpregs_stc ppConf_pci[] = {
+	{ "\toff",  0x41804, 0x41804 },
+	{ "\toff",  0x41808, 0x41808 },
+	{ NULL, 0, 0 }
+};
+
 static struct dumpregs_stc ppConf[] = {
 	{ "\toff",  0,   0x10 },
 	{ "\toff",  0,   0x10 },
-	{ "\toff",  0x41804, 0x41804 },
-	{ "\toff",  0x41808, 0x41808 },
 #if 0
 	/* No idea what are these registers,
 	 * not found in Lion2, Bobcat2 specs
@@ -1380,12 +1384,14 @@ int prestera_read_proc_mem(char		*page,
 
 		len = dumpregs(page, len, &(ppdev->config), ppConf);
 
+		if (ppdev->on_pci_bus)
+			len = dumpregs(page, len, &(ppdev->config), ppConf_pci);
+
 		len += sprintf(page + len, "\tppregs 0x%lx(user virt), phys: 0x%lx, len: 0x%lx\n",
 				ppdev->ppregs.mmapbase, ppdev->ppregs.phys, ppdev->ppregs.size);
 
 		len = dumpregs(page, len, &(ppdev->ppregs), ppRegs);
 	}
-
 	*eof = 1;
 
 	return len;
@@ -1743,6 +1749,9 @@ static int proc_status_show(struct seq_file *m, void *v)
 				ppdev->config.mmapbase, ppdev->config.phys, ppdev->config.size);
 
 		dumpregs(m, &(ppdev->config), ppConf);
+
+		if (ppdev->on_pci_bus)
+			dumpregs(m, &(ppdev->config), ppConf_pci);
 
 		seq_printf(m, "\tppregs 0x%lx(user virt), phys: 0x%lx, len: 0x%lx\n",
 				ppdev->ppregs.mmapbase, ppdev->ppregs.phys, ppdev->ppregs.size);
