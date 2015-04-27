@@ -88,6 +88,7 @@
 #include "mv_servicecpu/servicecpu.h"
 #endif
 #ifdef CONFIG_MV_INCLUDE_DRAGONITE_XCAT
+#include <linux/miscdevice.h>
 #include "mv_drivers_lsp/mv_dragonite/dragonite_xcat.h"
 #endif
 
