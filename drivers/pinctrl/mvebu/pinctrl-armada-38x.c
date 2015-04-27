@@ -385,6 +385,10 @@ static struct of_device_id armada_38x_pinctrl_of_match[] = {
 		.data       = (void *) V_88F6820,
 	},
 	{
+		.compatible = "marvell,mv88f6824-pinctrl",
+		.data       = (void *) V_88F6828,
+	},
+	{
 		.compatible = "marvell,mv88f6828-pinctrl",
 		.data       = (void *) V_88F6828,
 	},
