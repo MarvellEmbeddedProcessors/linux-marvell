@@ -722,7 +722,7 @@ int __init mv_msys_dragonite_init(struct pci_dev *pdev, struct pci_decoding_wind
 	dragonite_pci_data->host2poe_irq_reg = (void *)(switch_reg + DRAGONITE_HOST2POE_IRQ_REG);
 
 	mv_dragonite_dev->name		= "dragonite_xcat";
-	mv_dragonite_dev->id		= -1;
+	mv_dragonite_dev->id		= 1;
 	mv_dragonite_dev->dev.platform_data = dragonite_pci_data;
 	mv_dragonite_dev->num_resources	= 4;
 	mv_dragonite_dev->resource	= dragonite_resources;
