@@ -47,11 +47,21 @@
 			};
 
 			i2c0: i2c@11000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&i2c0_pins>;
 				status = "okay";
 				clock-frequency = <100000>;
 				audio_codec: audio-codec@4a {
 					compatible = "cirrus,cs42l51";
 					reg = <0x4a>;
+				};
+
+				expander1: pca9555@21 {
+					compatible = "nxp,pca9555";
+					pinctrl-names = "default";
+					gpio-controller;
+					#gpio-cells = <2>;
+					reg = <0x21>;
 				};
 			};
 
@@ -201,6 +211,16 @@
 					marvell,pins = "mpp33", "mpp34", "mpp35";	/* default for DB-GP */
 					marvell,function = "gpio";
 				};
+
+				i2c0_pins: i2c-pins-0 {
+					marvell,pins = "mpp2", "mpp3";
+					marvell,function = "i2c0";
+				};
+
+				xhci0_vbus_pins: xhci0-vbus-pins {
+					marvell,pins = "mpp44";
+					marvell,function = "gpio";
+				};
 			};
 
 			tdm@b0000 {
@@ -218,6 +238,44 @@
 		pcie-controller {
 			status = "okay";
 		};
+	};
+
+	/* usb3 vbus controlled via gpio expander1 */
+	usb3_phy_exp1: usb3-phy-exp1 {
+		status = "disabled";
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&reg_usb3_vbus_exp1>;
+	};
+
+	reg_usb3_vbus_exp1: usb3-vbus-exp1 {
+		status = "disabled";
+		compatible = "regulator-fixed";
+		regulator-name = "usb3-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&expander1 15 GPIO_ACTIVE_HIGH>;
+	};
+
+	/* usb3 vbus controlled via gpio pin */
+	usb3_phy_gpio: usb3-phy-gpio {
+		status = "disabled";
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&reg_usb3_vbus_gpio>;
+	};
+
+	reg_usb3_vbus_gpio: usb3-vbus-gpio {
+		status = "disabled";
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&xhci0_vbus_pins>;
+		regulator-name = "xhci0-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
 	};
 
         sound {
