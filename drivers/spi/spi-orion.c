@@ -51,6 +51,7 @@ struct orion_spi_dev {
 	enum orion_spi_type	typ;
 	unsigned int		min_divisor;
 	unsigned int		max_divisor;
+	unsigned int		max_frequency;
 	u32			prescale_mask;
 };
 
@@ -443,13 +444,15 @@ static const struct orion_spi_dev orion_spi_dev_data = {
 	.typ = ORION_SPI,
 	.min_divisor = 4,
 	.max_divisor = 30,
+	.max_frequency = 0,
 	.prescale_mask = ORION_SPI_CLK_PRESCALE_MASK,
 };
 
 static const struct orion_spi_dev armada_spi_dev_data = {
 	.typ = ARMADA_SPI,
-	.min_divisor = 1,
+	.min_divisor = 4,
 	.max_divisor = 1920,
+	.max_frequency = 50000000,
 	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
 };
 
@@ -515,6 +518,8 @@ static int orion_spi_probe(struct platform_device *pdev)
 	tclk_hz = clk_get_rate(spi->clk);
 	master->max_speed_hz = DIV_ROUND_UP(tclk_hz, devdata->min_divisor);
 	master->min_speed_hz = DIV_ROUND_UP(tclk_hz, devdata->max_divisor);
+	if ((devdata->max_frequency != 0) && (master->max_speed_hz > devdata->max_frequency))
+		master->max_speed_hz = devdata->max_frequency;
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	spi->base = devm_ioremap_resource(&pdev->dev, r);
