@@ -2818,7 +2818,7 @@ void	*mv_eth_bm_pool_create(int pool, int capacity, MV_ULONG *pPhysAddr)
 		void				*pVirt;
 		MV_STATUS			status;
 
-		pVirt = mvOsIoUncachedMalloc(NULL, sizeof(MV_U32) * capacity, &physAddr, NULL);
+		pVirt = mvOsIoUncachedMalloc(neta_global_dev->parent, sizeof(MV_U32) * capacity, &physAddr, NULL);
 		if (pVirt == NULL) {
 			mvOsPrintf("%s: Can't allocate %d bytes for Long pool #%d\n",
 					__func__, MV_BM_POOL_CAP_MAX * sizeof(MV_U32), pool);
