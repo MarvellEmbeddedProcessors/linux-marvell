@@ -1845,7 +1845,7 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 				err = mv_eth_refill(pp, rxq, pool, rx_desc);
 				if (err) {
 					pr_err("Linux processing - Can't refill\n");
-					pp->rxq_ctrl[rxq].missed++;
+					atomic_inc(&pp->rxq_ctrl[rxq].missed);
 					rx_filled--;
 				}
 				continue;
