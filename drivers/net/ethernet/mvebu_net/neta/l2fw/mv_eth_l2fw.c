@@ -428,8 +428,8 @@ inline void l2fw_copy_and_swap_mac(unsigned char *rx_buff, unsigned char *tx_buf
 	}
 }
 
-static inline
-struct sk_buff *eth_l2fw_copy_packet_withoutXor(struct sk_buff *skb, struct neta_rx_desc *rx_desc)
+static inline struct sk_buff *eth_l2fw_copy_packet_withoutXor(struct eth_port *pp, struct sk_buff *skb,
+								struct neta_rx_desc *rx_desc)
 {
 	MV_U8 *pSrc;
 	MV_U8 *pDst;
@@ -438,7 +438,7 @@ struct sk_buff *eth_l2fw_copy_packet_withoutXor(struct sk_buff *skb, struct neta
 	int bytes = rx_desc->dataSize - MV_ETH_MH_SIZE;
 	int pool_id = NETA_RX_GET_BPID(rx_desc);
 
-	mvOsCacheInvalidate(NULL, skb->data, bytes);
+	mvOsCacheInvalidate(pp->dev->dev.parent, skb->data, bytes);
 
 	pool = &mv_eth_pool[pool_id];
 	skb_new = mv_eth_pool_get(pool);
@@ -457,8 +457,8 @@ struct sk_buff *eth_l2fw_copy_packet_withoutXor(struct sk_buff *skb, struct neta
 }
 
 #ifdef CONFIG_MV_INCLUDE_XOR
-static inline
-struct sk_buff *eth_l2fw_copy_packet_withXor(struct sk_buff *skb, struct neta_rx_desc *rx_desc)
+static inline struct sk_buff *eth_l2fw_copy_packet_withXor(struct eth_port *pp, struct sk_buff *skb,
+							struct neta_rx_desc *rx_desc)
 {
 	struct sk_buff *skb_new = NULL;
 	struct bm_pool *pool;
@@ -478,7 +478,7 @@ struct sk_buff *eth_l2fw_copy_packet_withXor(struct sk_buff *skb, struct neta_rx
 	/* sync between giga and XOR to avoid errors (like checksum errors in TX)
 	   when working with IOCC */
 
-	mvOsCacheIoSync(NULL);
+	mvOsCacheIoSync(pp->dev->dev.parent);
 
 	bufPhysAddr =  virt_to_phys(skb->data);
 	eth_xor_desc->srcAdd0    = bufPhysAddr + skb_headroom(skb) + MV_ETH_MH_SIZE + 30;
@@ -491,16 +491,16 @@ struct sk_buff *eth_l2fw_copy_packet_withXor(struct sk_buff *skb, struct neta_rx
 	eth_xor_desc->status         = BIT31;
 	/* we had changed only the first part of eth_xor_desc, so flush only one
 	 line of cache */
-	mvOsCacheLineFlush(NULL, eth_xor_desc);
+	mvOsCacheLineFlush(pp->dev->dev.parent, eth_xor_desc);
 	MV_REG_WRITE(XOR_NEXT_DESC_PTR_REG(1, XOR_CHAN(0)), eth_xor_desc_phys_addr);
 
 	MV_REG_WRITE(XOR_ACTIVATION_REG(1, XOR_CHAN(0)), XEXACTR_XESTART_MASK);
 
-	mvOsCacheLineInv(NULL, skb->data);
+	mvOsCacheLineInv(pp->dev->dev.parent, skb->data);
 	pSrc = skb->data + MV_ETH_MH_SIZE;
 	pDst = skb_new->data + MV_ETH_MH_SIZE;
 	l2fw_copy_mac(pSrc, pDst);
-	mvOsCacheLineFlush(NULL, skb->data);
+	mvOsCacheLineFlush(pp->dev->dev.parent, skb->data);
 
 	return skb_new;
 }
@@ -711,7 +711,7 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 	int pool_id, bytes;
 
 	rx_done = mvNetaRxqBusyDescNumGet(pp->port, rxq);
-	mvOsCacheIoSync(NULL);
+	mvOsCacheIoSync(pp->dev->dev.parent);
 	if (rx_todo > rx_done)
 		rx_todo = rx_done;
 	rx_done = 0;
@@ -725,7 +725,7 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 			printk(KERN_INFO "rx_desc is NULL in %s\n", __func__);
 #else
 		rx_desc = mvNetaRxqNextDescGet(rx_ctrl);
-		mvOsCacheLineInv(NULL, rx_desc);
+		mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 		prefetch(rx_desc);
 #endif /* CONFIG_MV_ETH_RX_DESC_PREFETCH */
 
@@ -760,13 +760,13 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 		if (MV_NETA_PNC_CAP()) {
 			ipOffset = NETA_RX_GET_IPHDR_OFFSET(rx_desc);
 		} else {
-			if ((rx_desc->status & ETH_RX_VLAN_TAGGED_FRAME_MASK))
+			if (NETA_RX_IS_VLAN(rx_desc))
 				ipOffset = MV_ETH_MH_SIZE + sizeof(MV_802_3_HEADER) + MV_VLAN_HLEN;
 			else
 				ipOffset = MV_ETH_MH_SIZE + sizeof(MV_802_3_HEADER);
 		}
 #else
-		if ((rx_desc->status & ETH_RX_VLAN_TAGGED_FRAME_MASK))
+		if (NETA_RX_IS_VLAN(rx_desc))
 			ipOffset = MV_ETH_MH_SIZE + sizeof(MV_802_3_HEADER) + MV_VLAN_HLEN;
 		else
 			ipOffset = MV_ETH_MH_SIZE + sizeof(MV_802_3_HEADER);
@@ -809,21 +809,21 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 			break;
 
 		case CMD_L2FW_SWAP_MAC:
-			mvOsCacheLineInv(NULL, skb->head + NET_SKB_PAD);
+			mvOsCacheLineInv(pp->dev->dev.parent, skb->head + NET_SKB_PAD);
 			l2fw_swap_mac(skb->data);
-			mvOsCacheLineFlush(NULL, skb->head + NET_SKB_PAD);
+			mvOsCacheLineFlush(pp->dev->dev.parent, skb->head + NET_SKB_PAD);
 			status = mv_eth_l2fw_tx(skb, new_pp, 0, rx_desc);
 			break;
 
 		case CMD_L2FW_COPY_SWAP:
 #ifdef CONFIG_MV_INCLUDE_XOR
 			if (bytes >= ppl2fw->xorThreshold) {
-				skb_new = eth_l2fw_copy_packet_withXor(skb, rx_desc);
+				skb_new = eth_l2fw_copy_packet_withXor(pp, skb, rx_desc);
 				pr_err("%s: xor is not supported\n", __func__);
 			} else
 #endif /* CONFIG_MV_INCLUDE_XOR */
 			{
-				skb_new = eth_l2fw_copy_packet_withoutXor(skb, rx_desc);
+				skb_new = eth_l2fw_copy_packet_withoutXor(pp, skb, rx_desc);
 				if (skb_new)
 					status = mv_eth_l2fw_tx(skb, new_pp, 0, rx_desc);
 				else
@@ -844,11 +844,11 @@ static inline int mv_eth_l2fw_rx(struct eth_port *pp, int rx_todo, int rxq)
 		if (status == MV_OK) {
 			if (mv_eth_pool_bm(pool)) {
 				/* BM - no refill */
-				mvOsCacheLineInv(NULL, rx_desc);
+				mvOsCacheLineInv(pp->dev->dev.parent, rx_desc);
 			} else {
 				if (mv_eth_refill(pp, rxq, pool, rx_desc)) {
 					printk(KERN_ERR "%s: Linux processing - Can't refill\n", __func__);
-					pp->rxq_ctrl[rxq].missed++;
+					atomic_inc(&pp->rxq_ctrl[rxq].missed);
 				}
 			}
 			/* we do not need the pkt , we do not do anything with it*/
