@@ -921,6 +921,7 @@ int mvebu_mbus_get_addr_win_info(phys_addr_t phyaddr, u8 *trg_id, u8 *attr)
 
 	return 0;
 }
+EXPORT_SYMBOL(mvebu_mbus_get_addr_win_info);
 
 static __init int mvebu_mbus_debugfs_init(void)
 {
@@ -1325,6 +1326,7 @@ int mvebu_mbus_win_addr_get(u8 target_id, u8 attribute, u32 *phy_base, u32 *size
 	}
 	return 0;
 }
+EXPORT_SYMBOL(mvebu_mbus_win_addr_get);
 
 #ifdef MBUS_DEBUG
 void mbus_debug_window()
