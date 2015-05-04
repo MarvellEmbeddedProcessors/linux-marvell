@@ -144,6 +144,10 @@
 			};
 
 			pinctrl {
+				xhci0_vbus_pins: xhci0-vbus-pins {
+					marvell,pins = "mpp44";
+					marvell,function = "gpio";
+				};
 				pic_pins: pic-pins-0 {
 					marvell,pins = "mpp21", "mpp47";
 					marvell,function = "gpio";
@@ -170,5 +174,22 @@
 				status = "okay";
 			};
 		};
+	};
+
+	usb3_phy: usb3_phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&reg_xhci0_vbus>;
+	};
+
+	reg_xhci0_vbus: xhci0-vbus {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&xhci0_vbus_pins>;
+		regulator-name = "xhci0-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
 	};
 };
