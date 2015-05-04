@@ -47,6 +47,14 @@ static void mv_usb3_conf_mbus_windows(void __iomem *base,
 	}
 }
 
+static void xhci_mvebu_quirks(struct platform_device *pdev)
+{
+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+
+	xhci->quirks |= XHCI_RESET_ON_RESUME;
+}
+
 int xhci_mvebu_probe(struct platform_device *pdev)
 {
 	struct resource	*res;
@@ -90,6 +98,7 @@ int xhci_mvebu_probe(struct platform_device *pdev)
 		clk_disable_unprepare(clk);
 		return ret;
 	}
+	xhci_mvebu_quirks(pdev);
 
 	return ret;
 }
