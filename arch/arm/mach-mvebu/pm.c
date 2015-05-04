@@ -18,6 +18,7 @@
 #include <linux/mbus.h>
 #include <linux/of_address.h>
 #include <linux/suspend.h>
+#include <linux/regulator/machine.h>
 #include <asm/cacheflush.h>
 #include <asm/outercache.h>
 #include <asm/suspend.h>
@@ -203,9 +204,19 @@ static int mvebu_pm_valid(suspend_state_t state)
 		(is_suspend_mem_available && (state == PM_SUSPEND_MEM)));
 }
 
+static void mvebu_suspend_finish(void)
+{
+	int ret;
+
+	ret = regulator_suspend_finish();
+	if (ret)
+		pr_warn("Failed to resume regulators from suspend (%d)\n", ret);
+}
+
 static const struct platform_suspend_ops mvebu_pm_ops = {
 	.enter = mvebu_pm_enter,
 	.valid = mvebu_pm_valid,
+	.finish = mvebu_suspend_finish,
 };
 
 void __init mvebu_pm_register_init(int (*board_pm_init)(void))
