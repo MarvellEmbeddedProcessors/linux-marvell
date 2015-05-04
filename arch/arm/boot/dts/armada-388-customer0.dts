@@ -13,6 +13,7 @@
 
 /dts-v1/;
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
 #include "armada-385-388.dtsi"
 
 / {
@@ -43,8 +44,18 @@
 			};
 
 			i2c0: i2c@11000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&i2c0_pins>;
 				status = "okay";
 				clock-frequency = <100000>;
+
+				expander1: pca9555@21 {
+					compatible = "nxp,pca9555";
+					pinctrl-names = "default";
+					gpio-controller;
+					#gpio-cells = <2>;
+					reg = <0x21>;
+				};
 			};
 
 			i2c1: i2c@11100 {
@@ -121,6 +132,11 @@
 					marvell,pins = "mpp33", "mpp34", "mpp35";
 					marvell,function = "gpio";
 				};
+
+				i2c0_pins: i2c-pins-0 {
+					marvell,pins = "mpp2", "mpp3";
+					marvell,function = "i2c0";
+				};
 			};
 		};
 
@@ -139,5 +155,20 @@
 				status = "disabled";
 			};
 		};
+	};
+
+	usb3_phy: usb3_phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&reg_usb3_vbus>;
+	};
+
+	reg_usb3_vbus: usb3-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb3-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&expander1 15 GPIO_ACTIVE_HIGH>;
 	};
 };
