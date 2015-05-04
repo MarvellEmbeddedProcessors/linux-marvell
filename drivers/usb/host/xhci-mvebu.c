@@ -13,6 +13,7 @@
 #include <linux/platform_device.h>
 
 #include "xhci-mvebu.h"
+#include "xhci.h"
 
 #define USB3_MAX_WINDOWS	4
 #define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
@@ -41,6 +42,14 @@ static void xhci_mvebu_mbus_config(void __iomem *base,
 	}
 }
 
+static void xhci_mvebu_quirks(struct platform_device *pdev)
+{
+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+
+	xhci->quirks |= XHCI_RESET_ON_RESUME;
+}
+
 int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
 {
 	struct resource	*res;
@@ -67,6 +76,8 @@ int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
 	 * windows, and is therefore no longer useful.
 	 */
 	iounmap(base);
+
+	xhci_mvebu_quirks(pdev);
 
 	return 0;
 }
