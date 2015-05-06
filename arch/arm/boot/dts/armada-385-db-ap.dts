@@ -76,6 +76,11 @@
 					reg = <0>; /* Chip select 0 */
 					spi-max-frequency = <54000000>;
 				};
+				ethernet: enc28j60@0 {
+					compatible = "microchip,enc28j60";
+					spi-max-frequency = <20000000>;
+					reg = <1>;
+				};
 			};
 
 			i2c0: i2c@11000 {
