@@ -1,6 +1,3 @@
-#ifndef __INCusbh
-#define __INCusbh
-
 #include <linux/pm.h>
 #include <linux/acpi.h>
 
@@ -197,5 +194,4 @@ extern acpi_handle usb_get_hub_port_acpi_handle(struct usb_device *hdev,
 #else
 static inline int usb_acpi_register(void) { return 0; };
 static inline void usb_acpi_unregister(void) { };
-#endif
 #endif
