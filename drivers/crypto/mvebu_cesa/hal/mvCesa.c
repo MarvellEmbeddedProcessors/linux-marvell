@@ -1026,26 +1026,14 @@ MV_STATUS mvCesaAction(MV_U8 chan, MV_CESA_COMMAND *pCmd)
 				return MV_OUT_OF_CPU_MEM;
 			}
 			status = mvCesaFragReqProcess(chan, pReq, frag);
-			if (status == MV_OK) {
-#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT) || \
-							     defined(CONFIG_OF)
-#ifdef CONFIG_OF
-				if ((mv_cesa_feature == INT_COALESCING) ||
-						(mv_cesa_feature == CHAIN)) {
-#endif /* CONFIG_OF */
-					if (frag) {
-						pReq->dma[frag - 1].pDmaLast->phyNextDescPtr =
-						    MV_32BIT_LE(mvCesaVirtToPhys(&pReq->dmaDescBuf,
-							pReq->dma[frag].pDmaFirst));
-						mvOsCacheFlush(cesaOsHandle, pReq->dma[frag - 1].pDmaLast,
-						    sizeof(MV_DMA_DESC));
-					}
-#ifdef CONFIG_OF
-				}
-#endif /* CONFIG_OF */
-#endif /* MV_CESA_CHAIN_MODE || MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF*/
-				frag++;
+			if (status == MV_OK && frag) {
+				pReq->dma[frag - 1].pDmaLast->phyNextDescPtr =
+					MV_32BIT_LE(mvCesaVirtToPhys(&pReq->dmaDescBuf,
+						    pReq->dma[frag].pDmaFirst));
+				mvOsCacheFlush(cesaOsHandle, pReq->dma[frag - 1].pDmaLast,
+					       sizeof(MV_DMA_DESC));
 			}
+			frag++;
 		}
 		pReq->frags.numFrag = frag;
 
@@ -1282,12 +1270,8 @@ MV_STATUS mvCesaReadyGet(MV_U8 chan, MV_CESA_RESULT *pResult)
 		MV_U8 *pNewDigest;
 		int frag;
 
-#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT) || \
-							     defined(CONFIG_OF)
 		pReq->frags.nextFrag = 1;
 		while (pReq->frags.nextFrag <= pReq->frags.numFrag) {
-#endif
-
 			frag = (pReq->frags.nextFrag - 1);
 
 			/* Restore DMA descriptor list */
@@ -1329,19 +1313,8 @@ MV_STATUS mvCesaReadyGet(MV_U8 chan, MV_CESA_RESULT *pResult)
 				}
 				readyStatus = MV_OK;
 			}
-#if defined(MV_CESA_CHAIN_MODE) || defined(MV_CESA_INT_COALESCING_SUPPORT) || \
-							     defined(CONFIG_OF)
-#ifdef CONFIG_OF
-		if ((mv_cesa_feature == INT_COALESCING) ||
-					(mv_cesa_feature == CHAIN))
 			pReq->frags.nextFrag++;
-		else
-			break;
-#else /* CONFIG_OF */
-			pReq->frags.nextFrag++;
-#endif /* CONFIG_OF */
 		}
-#endif /* MV_CESA_CHAIN_MODE || MV_CESA_INT_COALESCING_SUPPORT || CONFIG_OF */
 	} else {
 		mvCesaMbufCacheUnmap(pReq->pCmd->pDst, 0, pReq->pCmd->pDst->mbufSize);
 
