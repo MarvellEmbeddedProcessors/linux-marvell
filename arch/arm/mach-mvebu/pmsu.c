@@ -712,6 +712,12 @@ static int __init mvebu_v7_pmsu_cpufreq_init(void)
 	struct resource res;
 	int ret, cpu;
 
+	/* Temporarly disable cpufreq for single CPU boot mode */
+	if (num_online_cpus() == 1) {
+		pr_warn(FW_WARN "cpufreq is disabled for single CPU mode\n");
+		return 0;
+	}
+
 	/*
 	 * In order to have proper cpufreq handling, we need to ensure
 	 * that the Device Tree description of the CPU clock includes
