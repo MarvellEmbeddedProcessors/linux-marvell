@@ -382,6 +382,12 @@ void mvebu_v7_pmsu_idle_exit(void)
 	/* cancel ask HW to power down the L2 Cache if possible */
 	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
 	reg &= ~PMSU_CONTROL_AND_CONFIG_L2_PWDDN;
+	/*
+	 * When exiting from idle state such as cpuidle or hotplug,
+	 * Enable PMU wait for the CPU to enter WFI when doing DFS
+	 * by setting CPUx Frequency ID to 1
+	 */
+	reg |= (1 << 4);
 	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
 
 	/* cancel Enable wakeup events and mask interrupts */
@@ -391,6 +397,20 @@ void mvebu_v7_pmsu_idle_exit(void)
 	reg &= ~PMSU_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT;
 	reg &= ~(PMSU_STATUS_AND_MASK_IRQ_MASK | PMSU_STATUS_AND_MASK_FIQ_MASK);
 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
+}
+
+void mvebu_v7_pmsu_disable_dfs_cpu(int hw_cpu)
+{
+	u32 reg;
+	if (pmsu_mp_base == NULL)
+		return;
+	/*
+	 * Disable PMU wait for the CPU to enter WFI when doing DFS
+	 * by setting CPUx Frequency ID to 0
+	 */
+	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
+	reg &= ~(0xf << 4);
+	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
 }
 
 static int mvebu_v7_cpu_pm_notify(struct notifier_block *self,
@@ -628,9 +648,19 @@ int armada_xp_pmsu_dfs_request(int cpu)
 
 int armada_380_pmsu_dfs_request(int cpu)
 {
+
+	/*
+	 * Protect CPU DFS from changing the number of online cpus number during
+	 * frequency transition by temporarily disable cpu hotplug
+	 */
+	cpu_hotplug_disable();
+
 	/* Trigger the DFS on the appropriate CPU */
 	on_each_cpu(mvebu_pmsu_dfs_request_local,
 				 NULL, false);
+
+	cpu_hotplug_enable();
+
 	return 0;
 }
 
@@ -712,12 +742,6 @@ static int __init mvebu_v7_pmsu_cpufreq_init(void)
 	struct resource res;
 	int ret, cpu;
 
-	/* Temporarly disable cpufreq for single CPU boot mode */
-	if (num_online_cpus() == 1) {
-		pr_warn(FW_WARN "cpufreq is disabled for single CPU mode\n");
-		return 0;
-	}
-
 	/*
 	 * In order to have proper cpufreq handling, we need to ensure
 	 * that the Device Tree description of the CPU clock includes
@@ -747,6 +771,8 @@ static int __init mvebu_v7_pmsu_cpufreq_init(void)
 	}
 
 	if (of_machine_is_compatible("marvell,armada38x")) {
+		if (num_online_cpus() == 1)
+			mvebu_v7_pmsu_disable_dfs_cpu(1);
 		mvebu_pmsu_dfs_request_ptr = armada_380_pmsu_dfs_request;
 		platform_device_register_data(NULL, "cpufreq-dt", -1,
 					&armada_380_cpufreq_dt_pd, sizeof(armada_380_cpufreq_dt_pd));

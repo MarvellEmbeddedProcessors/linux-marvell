@@ -173,6 +173,9 @@ static void mvebu_enter_suspend(void)
 
 	cpu_suspend(0, mvebu_pm_powerdown);
 
+	/* Remove CPU1 from the PMU frequnecy domain until it becomes online */
+	mvebu_v7_pmsu_disable_dfs_cpu(1);
+
 	/* Disable the L2 Cache after it was being used by the bootROM */
 	outer_disable();
 	outer_resume();
