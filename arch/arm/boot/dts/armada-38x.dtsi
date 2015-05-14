@@ -553,7 +553,7 @@
 				/* threshold and time_threshold relevant if
 				   int_coalescing in use */
 				cesa,threshold = <0x2>;
-				cesa,time_threshold = <0xff>;
+				cesa,time_threshold = <0xfffff>;
 
 				cesa,ctrlModel = /bits/ 16 <0x6800>;
 				cesa,ctrlRev = /bits/ 8 <2>;
