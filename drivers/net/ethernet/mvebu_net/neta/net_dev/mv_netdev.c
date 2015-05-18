@@ -2237,7 +2237,7 @@ static inline int mv_eth_tso_build_hdr_desc(struct eth_port *pp, struct neta_tx_
 }
 
 static inline int mv_eth_tso_build_data_desc(struct eth_port *pp, struct neta_tx_desc *tx_desc, struct sk_buff *skb,
-					     struct tx_queue *txq_ctrl, char *frag_ptr,
+					     struct tx_queue *txq_ctrl, struct page *frag_page, int page_offset,
 					     int frag_size, int data_left, int total_left)
 {
 	int size;
@@ -2245,7 +2245,7 @@ static inline int mv_eth_tso_build_data_desc(struct eth_port *pp, struct neta_tx
 	size = MV_MIN(frag_size, data_left);
 
 	tx_desc->dataSize = size;
-	tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, frag_ptr, size);
+	tx_desc->bufPhysAddr = mvOsCachePageFlush(pp->dev->dev.parent, frag_page, page_offset, size);
 	tx_desc->command = 0;
 	txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = 0;
 
@@ -2273,11 +2273,12 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 {
 	int frag = 0;
 	int total_len, hdr_len, size, frag_size, data_left;
-	char *frag_ptr;
 	int totalDescNum, totalBytes = 0;
 	struct neta_tx_desc *tx_desc;
 	MV_U16 ip_id;
 	MV_U32 tcp_seq = 0;
+	struct page *frag_page = NULL;
+	MV_U32 frag_offset = 0;
 	skb_frag_t *skb_frag_ptr;
 	const struct tcphdr *th = tcp_hdr(skb);
 	struct eth_port *priv = MV_ETH_PRIV(dev);
@@ -2312,7 +2313,8 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	tcp_seq = ntohl(th->seq);
 
 	frag_size = skb_headlen(skb);
-	frag_ptr = skb->data;
+	frag_page = virt_to_page(skb->data);
+	frag_offset = offset_in_page(skb->data);
 
 	if (frag_size < hdr_len) {
 		printk(KERN_ERR "***** ERROR: frag_size=%d, hdr_len=%d\n", frag_size, hdr_len);
@@ -2320,16 +2322,17 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	}
 
 	frag_size -= hdr_len;
-	frag_ptr += hdr_len;
+	frag_offset += hdr_len;
 	if (frag_size == 0) {
 		skb_frag_ptr = &skb_shinfo(skb)->frags[frag];
 
 		/* Move to next segment */
 		frag_size = skb_frag_ptr->size;
+		frag_offset = skb_frag_ptr->page_offset;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3, 1, 10)
-		frag_ptr = page_address(skb_frag_ptr->page.p) + skb_frag_ptr->page_offset;
+		frag_page = skb_frag_ptr->page.p;
 #else
-		frag_ptr = page_address(skb_frag_ptr->page) + skb_frag_ptr->page_offset;
+		frag_page = skb_frag_ptr->page;
 #endif
 		frag++;
 	}
@@ -2370,7 +2373,7 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			txq_ctrl->txq_count++;
 
 			size = mv_eth_tso_build_data_desc(priv, tx_desc, skb, txq_ctrl,
-							  frag_ptr, frag_size, data_left, total_len);
+							  frag_page, frag_offset, frag_size, data_left, total_len);
 			totalBytes += size;
 /*
 			printk(KERN_ERR "Data desc: tx_desc=%p, skb=%p, size=%d, frag_size=%d, data_left=%d\n",
@@ -2380,17 +2383,18 @@ int mv_eth_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			tcp_seq += size;
 
 			frag_size -= size;
-			frag_ptr += size;
+			frag_offset += size;
 
 			if ((frag_size == 0) && (frag < skb_shinfo(skb)->nr_frags)) {
 				skb_frag_ptr = &skb_shinfo(skb)->frags[frag];
 
 				/* Move to next segment */
 				frag_size = skb_frag_ptr->size;
+				frag_offset = skb_frag_ptr->page_offset;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3, 1, 10)
-				frag_ptr = page_address(skb_frag_ptr->page.p) + skb_frag_ptr->page_offset;
+				frag_page = skb_frag_ptr->page.p;
 #else
-				frag_ptr = page_address(skb_frag_ptr->page) + skb_frag_ptr->page_offset;
+				frag_page = skb_frag_ptr->page;
 #endif
 				frag++;
 			}
@@ -2563,11 +2567,9 @@ static void mv_eth_tx_frag_process(struct eth_port *pp, struct sk_buff *skb, str
 		tx_desc->dataSize = frag->size;
 		tx_desc->bufPhysAddr =
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3, 1, 10)
-			mvOsCacheFlush(pp->dev->dev.parent, page_address(frag->page.p) + frag->page_offset,
-			tx_desc->dataSize);
+			mvOsCachePageFlush(pp->dev->dev.parent, frag->page.p, frag->page_offset, tx_desc->dataSize);
 #else
-			mvOsCacheFlush(pp->dev->dev.parent, page_address(frag->page) + frag->page_offset,
-			tx_desc->dataSize);
+			mvOsCachePageFlush(pp->dev->dev.parent, frag->page, frag->page_offset, tx_desc->dataSize);
 #endif
 		if (i == (skb_shinfo(skb)->nr_frags - 1)) {
 			/* Last descriptor */

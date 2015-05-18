@@ -165,6 +165,14 @@ extern void mv_early_printk(char *fmt, ...);
 #define mvOsCacheUnmap(pDev, phys, size)                          \
 	dma_unmap_single((pDev), (dma_addr_t)(phys), (size), DMA_FROM_DEVICE)
 
+#define mvOsCachePageFlush(pDev, page, offset, size)              \
+	(COHERENCY_FABRIC_HARD_MODE() ? (pfn_to_dma((pDev), page_to_pfn(page)) + (offset)) :             \
+	dma_map_page((pDev), (page), (offset), (size), DMA_TO_DEVICE))
+
+#define mvOsCachePageInvalidate(pDev, page, offset, size)         \
+	(COHERENCY_FABRIC_HARD_MODE() ? (pfn_to_dma((pDev), page_to_pfn(page)) + (offset)) :             \
+	dma_map_page((pDev), (page), (offset), (size), DMA_FROM_DEVICE))
+
 #define CPU_PHY_MEM(x)              ((MV_U32)x)
 #define CPU_MEMIO_CACHED_ADDR(x)    ((void *)x)
 #define CPU_MEMIO_UNCACHED_ADDR(x)  ((void *)x)
