@@ -130,7 +130,7 @@ int mv_eth_tool_restore_settings(struct net_device *netdev)
 					mvNetaLinkStatus(priv->port, &ps);
 
 					if (!ps.linkup)
-						err = 0;
+						err = -EINVAL;
 				}
 			}
 		}
@@ -234,6 +234,8 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 			cmd->lp_advertising |= ADVERTISED_1000baseT_Half;
 		if (stat1000 & LPA_1000FULL)
 			cmd->lp_advertising |= ADVERTISED_1000baseT_Full;
+
+		cmd->advertising = cmd->lp_advertising;
 	} else
 		cmd->autoneg = AUTONEG_DISABLE;
 
@@ -280,6 +282,7 @@ int mv_eth_tool_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 		priv->speed_cfg = _speed;
 		priv->autoneg_cfg = _autoneg;
 		priv->advertise_cfg = _advertise;
+		err = mv_eth_tool_restore_settings(dev);
 	}
 	return err;
 }
