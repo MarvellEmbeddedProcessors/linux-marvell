@@ -341,6 +341,7 @@
 				reg = <0x34000 0x4000>;
 				interrupts = <14>;
 				clocks = <&gateclk 1>;
+				tx-csum-limit = <9800>;
 				status = "disabled";
 				mac-address = [ 00 50 43 02 02 03 ];
 				eth,port-num    = <3>;

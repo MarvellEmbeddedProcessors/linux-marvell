@@ -3355,8 +3355,11 @@ static int mv_eth_load_network_interfaces(struct platform_device *pdev)
 	struct mv_neta_pdata *plat_data = (struct mv_neta_pdata *)pdev->dev.platform_data;
 
 	port = pdev->id;
-	if (plat_data->tx_csum_limit == 0)
-		plat_data->tx_csum_limit = MV_ETH_TX_CSUM_MAX_SIZE;
+	if (plat_data->tx_csum_limit < MV_ETH_TX_CSUM_MIN_SIZE || plat_data->tx_csum_limit > MV_ETH_TX_CSUM_MAX_SIZE) {
+		pr_info("WARN: Invalid FIFO size %d on port-%d, minimal size 2K will be used as default\n",
+											plat_data->tx_csum_limit, port);
+		plat_data->tx_csum_limit = MV_ETH_TX_CSUM_MIN_SIZE;
+	}
 
 	pr_info("  o Loading network interface(s) for port #%d: cpu_mask=0x%x, tx_csum_limit=%d\n",
 			port, plat_data->cpu_mask, plat_data->tx_csum_limit);
@@ -4547,8 +4550,10 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 		return NULL;
 	}
 	/* Get TX checksum offload limit */
-	if (of_property_read_u32(np, "tx-csum-limit", &plat_data->tx_csum_limit))
-		plat_data->tx_csum_limit = MV_ETH_TX_CSUM_MAX_SIZE;
+	if (of_property_read_u32(np, "tx-csum-limit", &plat_data->tx_csum_limit)) {
+		pr_err("Could not get FIFO size, tx-csum-limit\n");
+		return NULL;
+	}
 
 	/* Initialize PnC and BM module */
 	if (mv_eth_pnc_bm_init(plat_data)) {

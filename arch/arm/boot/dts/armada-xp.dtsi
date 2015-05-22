@@ -130,11 +130,21 @@
 				pnc_tcam_size = <1024>;
 			};
 
+			/* Overwrite FIFO size */
+			eth0: ethernet@70000 {
+				tx-csum-limit = <9800>;
+			};
+
+			eth1: ethernet@74000 {
+				tx-csum-limit = <9800>;
+			};
+
 			eth2: ethernet@30000 {
 				compatible = "marvell,neta";
 				reg = <0x30000 0x4000>;
 				interrupts = <12>;
 				clocks = <&gateclk 2>;
+				tx-csum-limit = <9800>;
 				status = "disabled";
 				mac-address = [ 00 50 43 02 02 02 ];
 				eth,port-num    = <2>;
