@@ -848,7 +848,7 @@ crypto_dispatch(struct cryptop *crp)
 		CRYPTO_Q_UNLOCK();
 	}
 
-#elif defined(CONFIG_OF) && (defined(CONFIG_MV_CESA_OCF) || defined(CONFIG_MV_CESA_OCF_KW2))
+#elif defined(CONFIG_OF) && defined(CONFIG_MV_INCLUDE_CESA)
 	if (mv_cesa_mode == CESA_OCF_M) {
 		dprintk("%s:cesa mode %d\n", __func__, mv_cesa_mode);
 
