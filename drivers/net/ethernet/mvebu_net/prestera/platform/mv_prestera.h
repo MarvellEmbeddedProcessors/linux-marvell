@@ -195,8 +195,8 @@ struct pp_dev {
 	unsigned long		funcNo;
 	struct mem_region	config;		/* Configuration space */
 	struct mem_region	ppregs;		/* PP registers space */
-	struct intData		irq_data;
 	struct mem_region	dfx;        /* DFX space */
+	struct intData		irq_data;
 
 #ifdef PRESTERA_PP_DRIVER
 	PP_DRIVER_FUNC ppdriver;
