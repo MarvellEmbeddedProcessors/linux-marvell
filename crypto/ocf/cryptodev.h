@@ -61,7 +61,7 @@
 #ifndef _CRYPTO_CRYPTO_H_
 #define _CRYPTO_CRYPTO_H_
 
-#ifdef CONFIG_OF
+#if defined(CONFIG_OF) && defined(CONFIG_MV_INCLUDE_CESA)
 #include "../../arch/arm/mach-mvebu/include/mach/mvTypes.h"
 #include "../../drivers/crypto/mvebu_cesa/mvSysCesaConfig.h"
 #endif
