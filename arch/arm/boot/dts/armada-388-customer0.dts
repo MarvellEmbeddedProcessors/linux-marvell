@@ -82,7 +82,8 @@
 			};
 
 			sdhci@d8000 {
-				broken-cd;
+				dat3-cd;
+				cd-inverted;
 				wp-inverted;
 				bus-width = <8>;
 				status = "okay";
