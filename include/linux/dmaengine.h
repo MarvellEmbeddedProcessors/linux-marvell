@@ -186,6 +186,9 @@ struct dma_interleaved_template {
  *  on the result of this operation
  * @DMA_CTRL_REUSE: client can reuse the descriptor and submit again till
  *  cleared or freed
+ * @DMA_PREP_PQ_MULT - tell the driver that this is a mult
+ *						request
+ * @DMA_PREP_PQ_SUM_PRODUCT - tell the driver that this is a sum product request
  */
 enum dma_ctrl_flags {
 	DMA_PREP_INTERRUPT = (1 << 0),
@@ -195,6 +198,8 @@ enum dma_ctrl_flags {
 	DMA_PREP_CONTINUE = (1 << 4),
 	DMA_PREP_FENCE = (1 << 5),
 	DMA_CTRL_REUSE = (1 << 6),
+	DMA_PREP_PQ_MULT = (1 << 10),
+	DMA_PREP_PQ_SUM_PRODUCT = (1 << 11),
 };
 
 /**
