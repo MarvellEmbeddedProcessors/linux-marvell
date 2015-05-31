@@ -122,7 +122,7 @@ static void __init armada_380_mbus_optimization(void)
 
 		/* Fabric Units Priority Control Register -
 		Prioritize CPUs requests */
-		__raw_writel(0xA, mbus_units_base + 0x4);
+		__raw_writel(0x3000A, mbus_units_base + 0x4);
 
 		/* MBUS Units Prefetch Control Register -
 		Pre-fetch enable for all IO masters */
