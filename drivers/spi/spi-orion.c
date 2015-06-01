@@ -127,7 +127,7 @@ static int orion_spi_baudrate_set(struct spi_device *spi, unsigned int speed)
 
 	tclk_hz = clk_get_rate(orion_spi->clk);
 
-	if (devdata->typ == ARMADA_SPI) {
+	if (devdata->typ == ARMADA_SPI || devdata->typ == ARMADA_380_SPI) {
 		unsigned int clk, spr, sppr, sppr2, err;
 		unsigned int best_spr, best_sppr, best_err;
 
