@@ -1996,6 +1996,16 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 	}
 	mv_eth_lock(txq_ctrl, flags);
 
+#ifdef CONFIG_MV_NETA_DEBUG_CODE
+	if (pp->flags & MV_ETH_F_DBG_TX) {
+		pr_info("\n%s - eth_tx_%lu: cpu=%d, in_intr=0x%lx, port=%d, txp=%d, txq=%d\n",
+		       dev->name, dev->stats.tx_packets, smp_processor_id(),
+			in_interrupt(), pp->port, tx_spec.txp, tx_spec.txq);
+		mv_eth_skb_print(skb);
+		mvDebugMemDump(skb->data, 64, 1);
+	}
+#endif /* CONFIG_MV_NETA_DEBUG_CODE */
+
 #ifdef CONFIG_MV_ETH_TSO
 	/* GSO/TSO */
 	if (skb_is_gso(skb)) {
@@ -2019,44 +2029,48 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		goto out;
 	}
 
-	/* Don't use BM for Linux packets: NETA_TX_BM_ENABLE_MASK = 0 */
-	/* NETA_TX_PKT_OFFSET_MASK = 0 - for all descriptors */
 	tx_cmd = mv_eth_skb_tx_csum(pp, skb);
 
 #ifdef CONFIG_MV_PON
 	tx_desc->hw_cmd = tx_spec.hw_cmd;
 #endif
 
-	/* FIXME: beware of nonlinear --BK */
 	tx_desc->dataSize = skb_headlen(skb);
-
-	tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, skb->data, tx_desc->dataSize);
 
 	/* Record skb len in case skb is reset when recycle */
 	skb_len = skb->len;
 
 	if (frags == 1) {
-		/*
-		 * First and Last descriptor
-		 */
+		/* First and Last descriptor */
 #if defined(CONFIG_MV_ETH_BM_CPU) && defined(CONFIG_MV_NETA_SKB_RECYCLE)
 		struct bm_pool *pool = mv_eth_skb_recycle_get_pool(skb);
-		if (pool && (atomic_read(&pool->in_use) > 0) && skb_recycle_check(skb, pool->pkt_size)) {
-			/* HW release buffer after tx finished */
-			tx_cmd |= NETA_TX_BM_ENABLE_MASK |
+		int headroom = skb_headroom(skb);
+
+		if (pool && (headroom < NETA_TX_PKT_OFFSET_MAX) &&
+			(atomic_read(&pool->in_use) > 0) && skb_recycle_check(skb, pool->pkt_size)) {
+			/* SKB can be recycled - Use BM to release buffer after tx finished */
+			/* skb_recycle_check() will reset skb */
+			/* fields as skb->len, skb->data and others become invalid */
+			tx_cmd |= (NETA_TX_BM_ENABLE_MASK |
 				  NETA_TX_BM_POOL_ID_MASK(pool->pool) |
-				  NETA_TX_PKT_OFFSET_MASK(NET_SKB_PAD + MV_ETH_MH_SIZE);
-			txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = NULL;
-			tx_desc->bufPhysAddr = virt_to_phys(skb->head);
+				  NETA_TX_PKT_OFFSET_MASK(headroom));
+			txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = 0;
+			tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, skb->head,
+								headroom + tx_desc->dataSize);
+
 			atomic_dec(&pool->in_use);
 			STAT_DBG(pool->stats.skb_recycled_ok++);
 		} else {
+			/* SKB can't be recycled - Don't use BM to release buffer */
+			tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, skb->data, tx_desc->dataSize);
 			txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = ((MV_ULONG) skb | MV_ETH_SHADOW_SKB);
 			if (pool && (atomic_read(&pool->in_use) > 0))
 				STAT_DBG(pool->stats.skb_recycled_err++);
 		}
 #else
+		/* SKB recycle or BM is not supported - Don't use BM to release buffer */
 		txq_ctrl->shadow_txq[txq_ctrl->shadow_txq_put_i] = ((MV_ULONG) skb | MV_ETH_SHADOW_SKB);
+		tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, skb->data, tx_desc->dataSize);
 #endif /* CONFIG_MV_ETH_BM_CPU && CONFIG_MV_NETA_SKB_RECYCLE */
 
 		if (tx_spec.flags & MV_ETH_F_NO_PAD)
@@ -2069,6 +2083,9 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 
 		mv_eth_shadow_inc_put(txq_ctrl);
 	} else {
+
+		/* For Scatter-Gather buffers - Don't use BM to release buffer */
+		tx_desc->bufPhysAddr = mvOsCacheFlush(pp->dev->dev.parent, skb->data, tx_desc->dataSize);
 
 		/* First but not Last */
 		tx_cmd |= NETA_TX_F_DESC_MASK;
@@ -2092,14 +2109,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 
 #ifdef CONFIG_MV_NETA_DEBUG_CODE
 	if (pp->flags & MV_ETH_F_DBG_TX) {
-		printk(KERN_ERR "\n");
-		printk(KERN_ERR "%s - eth_tx_%lu: cpu=%d, in_intr=0x%lx, port=%d, txp=%d, txq=%d\n",
-		       dev->name, dev->stats.tx_packets, smp_processor_id(),
-			in_interrupt(), pp->port, tx_spec.txp, tx_spec.txq);
-		pr_info("\t skb=%p, head=%p, data=%p, size=%d\n", skb, skb->head, skb->data, skb_len);
 		mv_eth_tx_desc_print(tx_desc);
-		/*mv_eth_skb_print(skb);*/
-		mvDebugMemDump(skb->data, 64, 1);
 	}
 #endif /* CONFIG_MV_NETA_DEBUG_CODE */
 
@@ -2117,7 +2127,7 @@ static int mv_eth_tx(struct sk_buff *skb, struct net_device *dev)
 out:
 	if (frags > 0) {
 		dev->stats.tx_packets++;
-		dev->stats.tx_bytes += skb->len;
+		dev->stats.tx_bytes += skb_len;
 	} else {
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
