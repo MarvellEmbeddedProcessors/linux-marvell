@@ -214,6 +214,8 @@ struct mv_udc {
 				active:1,
 				stopped:1;      /* stop bit is setted */
 
+
+	int vbus_pin;
 	struct work_struct	vbus_work;
 	struct workqueue_struct *qwork;
 
