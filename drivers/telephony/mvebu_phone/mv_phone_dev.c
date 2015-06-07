@@ -394,13 +394,26 @@ static int mvebu_phone_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM_SLEEP
 static int mvebu_phone_suspend(struct device *dev)
 {
+	int i;
+
+	for (i = 0; i < TDM_CTRL_REGS_NUM; i++)
+		priv->tdm_ctrl_regs[i] = readl(priv->tdm_base + i);
+
+	for (i = 0; i < TDM_SPI_REGS_NUM; i++)
+		priv->tdm_spi_regs[i] = readl(priv->tdm_base +
+					      TDM_SPI_REGS_OFFSET + i);
+
+	priv->tdm_spi_mux_reg = MV_REG_READ(TDM_SPI_MUX_REG);
+	priv->tdm_mbus_config_reg = MV_REG_READ(TDM_MBUS_CONFIG_REG);
+	priv->tdm_misc_reg = MV_REG_READ(TDM_MISC_REG);
+
 	return 0;
 }
 
 static int mvebu_phone_resume(struct device *dev)
 {
 	struct platform_device *pdev = priv->parent;
-	int err;
+	int err, i;
 
 	err = mv_conf_mbus_windows(dev, priv->tdm_base,
 				   mv_mbus_dram_info());
@@ -414,7 +427,16 @@ static int mvebu_phone_resume(struct device *dev)
 			return err;
 	}
 
-	mvSysTdmInit(priv->tdm_params);
+	for (i = 0; i < TDM_CTRL_REGS_NUM; i++)
+		writel(priv->tdm_ctrl_regs[i], priv->tdm_base + i);
+
+	for (i = 0; i < TDM_SPI_REGS_NUM; i++)
+		writel(priv->tdm_spi_regs[i], priv->tdm_base +
+					      TDM_SPI_REGS_OFFSET + i);
+
+	MV_REG_WRITE(TDM_SPI_MUX_REG, priv->tdm_spi_mux_reg);
+	MV_REG_WRITE(TDM_MBUS_CONFIG_REG, priv->tdm_mbus_config_reg);
+	MV_REG_WRITE(TDM_MISC_REG, priv->tdm_misc_reg);
 
 	return 0;
 }
