@@ -125,6 +125,11 @@ extern int tdm_base, use_pclk_external;
 	#define MV_TDM_EXT_STATS
 #endif
 
+/* TDM control/SPI registers used for suspend/resume */
+#define TDM_CTRL_REGS_NUM			36
+#define TDM_SPI_REGS_OFFSET			0x3100
+#define TDM_SPI_REGS_NUM			16
+
 struct mv_phone_dev {
 	void __iomem *tdm_base;
 	void __iomem *pll_base;
@@ -135,6 +140,13 @@ struct mv_phone_dev {
 	struct clk *clk;
 	u32 pclk_freq_mhz;
 	int irq;
+
+	/* Used to preserve TDM registers across suspend/resume */
+	u32 tdm_ctrl_regs[TDM_CTRL_REGS_NUM];
+	u32 tdm_spi_regs[TDM_SPI_REGS_NUM];
+	u32 tdm_spi_mux_reg;
+	u32 tdm_mbus_config_reg;
+	u32 tdm_misc_reg;
 };
 
 /* This enumerator defines the Marvell Units ID */
