@@ -227,6 +227,12 @@ config USB_MV_U3D
 	  MARVELL PXA2128 Processor series include a super speed USB3.0 device
 	  controller, which support super speed USB peripheral.
 
+config USB_MVEBU_U3D
+	tristate "Marvell Armada 38X/3700/8K USB 3.0 controller"
+	help
+	  MARVELL Armada 38X/3700/8K Processors series include a super speed
+	  USB3.0 device controller, which support super speed USB peripheral.
+
 #
 # Controllers available in both integrated and discrete versions
 #
