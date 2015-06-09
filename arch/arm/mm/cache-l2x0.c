@@ -1271,9 +1271,9 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
 };
 
 /*
- * This is a variant of the of_l2c310_data with .sync set to
- * NULL. Outer sync operations are not needed when the system is I/O
- * coherent, and potentially harmful in certain situations (PCIe/PL310
+ * This is a variant of the of_l2c310_data with .sync and .flush_range set to
+ * NULL. Outer sync and flush range operations are not needed when the system
+ * is I/O coherent, and potentially harmful in certain situations (PCIe/PL310
  * deadlock on Armada 375/38x due to hardware I/O coherency). The
  * other operations are kept because they are infrequent (therefore do
  * not cause the deadlock in practice) and needed for secondary CPU
@@ -1292,7 +1292,6 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
 	.outer_cache = {
 		.inv_range   = l2c210_inv_range,
 		.clean_range = l2c210_clean_range,
-		.flush_range = l2c210_flush_range,
 		.flush_all   = l2c210_flush_all,
 		.disable     = l2c310_disable,
 		.resume      = l2c310_resume,
