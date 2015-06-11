@@ -112,7 +112,6 @@ static void msg_cleanup(void);
 
 static int msg_thread_exits(struct fsg_common *common)
 {
-	msg_cleanup();
 	return 0;
 }
 
