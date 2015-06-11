@@ -544,5 +544,26 @@ static inline unsigned int lfps_signal(struct mvc2 *cp, unsigned int n)
 	return cp->reg->lfps_signal + ((n - 1) << 2);
 }
 
+/*
+ * struct mvc2_glue - glue structure to combine 2.0/3.0 udc together
+ * @u20: 2.0 driver udc
+ * @u30: 3.0 driver udc
+ * @usb2_connect: whether usb2.0 is in connection
+ * @connect_num: how many usb3 has been tried
+ */
+struct mvc2_glue {
+	struct usb_udc  *u20;
+	struct usb_udc  *u30;
+
+	int usb2_connect;
+	unsigned int status;
+};
+
+extern struct mvc2_glue glue;
+extern bool usb3_disconnect;
+
+int mvc2_checkvbus(struct mvc2 *cp);
+void mvc2_handle_setup(struct mvc2 *cp);
+int mv_udc_register_status_notify(struct notifier_block *nb);
 
 #endif

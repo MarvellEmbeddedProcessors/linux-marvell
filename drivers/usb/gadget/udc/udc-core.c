@@ -29,26 +29,6 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb.h>
 
-/**
- * struct usb_udc - describes one usb device controller
- * @driver - the gadget driver pointer. For use by the class code
- * @dev - the child device to the actual controller
- * @gadget - the gadget. For use by the class code
- * @list - for use by the udc class driver
- * @vbus - for udcs who care about vbus status, this value is real vbus status;
- * for udcs who do not care about vbus status, this value is always true
- *
- * This represents the internal data structure which is used by the UDC-class
- * to hold information about udc driver and gadget together.
- */
-struct usb_udc {
-	struct usb_gadget_driver	*driver;
-	struct usb_gadget		*gadget;
-	struct device			dev;
-	struct list_head		list;
-	bool				vbus;
-};
-
 static struct class *udc_class;
 static LIST_HEAD(udc_list);
 static DEFINE_MUTEX(udc_lock);
@@ -555,11 +535,10 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
 		return -EINVAL;
 
 	mutex_lock(&udc_lock);
-	list_for_each_entry(udc, &udc_list, list) {
-		/* For now we take the first one */
-		if (!udc->driver)
-			goto found;
-	}
+
+	udc = udc_detect(&udc_list, driver);
+	if (udc)
+		goto found;
 
 	pr_debug("couldn't find an available UDC\n");
 	mutex_unlock(&udc_lock);

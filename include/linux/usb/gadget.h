@@ -1260,4 +1260,24 @@ extern void usb_ep_autoconfig_release(struct usb_ep *);
 
 extern void usb_ep_autoconfig_reset(struct usb_gadget *);
 
+/**
+ * struct usb_udc - describes one usb device controller
+ * @driver - the gadget driver pointer. For use by the class code
+ * @dev - the child device to the actual controller
+ * @gadget - the gadget. For use by the class code
+ * @list - for use by the udc class driver
+ *
+ * This represents the internal data structure which is used by the UDC-class
+ * to hold information about udc driver and gadget together.
+ */
+struct usb_udc {
+	struct usb_gadget_driver	*driver;
+	struct usb_gadget		*gadget;
+	struct device			dev;
+	struct list_head		list;
+	bool				vbus;
+};
+
+extern struct usb_udc *udc_detect(struct list_head *udc_list, struct usb_gadget_driver *driver);
+
 #endif /* __LINUX_USB_GADGET_H */

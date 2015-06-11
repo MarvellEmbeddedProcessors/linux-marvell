@@ -2014,6 +2014,32 @@ static void irq_process_error(struct mv_udc *udc)
 	udc->errors++;
 }
 
+static ATOMIC_NOTIFIER_HEAD(mv_udc_status_list);
+
+int mv_udc_register_status_notify(struct notifier_block *nb)
+{
+	int ret = 0;
+
+	ret = atomic_notifier_chain_register(&mv_udc_status_list, nb);
+	if (ret)
+		return ret;
+
+	return 0;
+
+}
+EXPORT_SYMBOL(mv_udc_register_status_notify);
+
+int mv_udc_unregister_status_notify(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&mv_udc_status_list, nb);
+}
+EXPORT_SYMBOL(mv_udc_unregister_status_notify);
+
+static void status_change(struct mv_udc *udc, int event)
+{
+	atomic_notifier_call_chain(&mv_udc_status_list, event, NULL);
+}
+
 static irqreturn_t mv_udc_irq(int irq, void *dev)
 {
 	struct mv_udc *udc = (struct mv_udc *)dev;
@@ -2041,8 +2067,10 @@ static irqreturn_t mv_udc_irq(int irq, void *dev)
 	if (status & USBSTS_ERR)
 		irq_process_error(udc);
 
-	if (status & USBSTS_RESET)
+	if (status & USBSTS_RESET) {
 		irq_process_reset(udc);
+		status_change(udc, 1);
+	}
 
 	if (status & USBSTS_PORT_CHANGE)
 		irq_process_port_change(udc);
@@ -2050,8 +2078,10 @@ static irqreturn_t mv_udc_irq(int irq, void *dev)
 	if (status & USBSTS_INT)
 		irq_process_tr_complete(udc);
 
-	if (status & USBSTS_SUSPEND)
+	if (status & USBSTS_SUSPEND) {
 		irq_process_suspend(udc);
+		status_change(udc, 1);
+	}
 
 	spin_unlock(&udc->lock);
 
