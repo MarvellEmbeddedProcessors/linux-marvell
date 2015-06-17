@@ -791,6 +791,8 @@ int         mv_eth_rx_reset(int port);
 int         mv_eth_txp_reset(int port, int txp);
 int         mv_eth_txq_clean(int port, int txp, int txq);
 
+int         mv_eth_pool_add(struct eth_port *pp, int pool, int buf_num);
+int         mv_eth_pool_free(int pool, int num);
 MV_STATUS   mv_eth_rx_pkts_coal_set(int port, int rxq, MV_U32 value);
 MV_STATUS   mv_eth_rx_time_coal_set(int port, int rxq, MV_U32 value);
 MV_STATUS   mv_eth_tx_done_pkts_coal_set(int port, int txp, int txq, MV_U32 value);

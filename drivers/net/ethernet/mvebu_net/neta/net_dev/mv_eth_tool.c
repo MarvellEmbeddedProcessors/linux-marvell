@@ -708,8 +708,13 @@ static u32 mv_eth_tool_get_rxfh_indir_size(struct net_device *netdev)
 #endif
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)
+static int mv_eth_tool_get_rxfh_indir(struct net_device *netdev,
+					u32 *indir, u8 *key)
+#else
 static int mv_eth_tool_get_rxfh_indir(struct net_device *netdev,
 					u32 *indir)
+#endif
 {
 #if defined(MV_ETH_PNC_LB) && defined(CONFIG_MV_ETH_PNC)
 	struct eth_port *priv = MV_ETH_PRIV(netdev);
@@ -726,9 +731,13 @@ static int mv_eth_tool_get_rxfh_indir(struct net_device *netdev,
 #endif
 }
 
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)
+static int mv_eth_tool_set_rxfh_indir(struct net_device *netdev,
+				   const u32 *indir, const u8 *key)
+#else
 static int mv_eth_tool_set_rxfh_indir(struct net_device *netdev,
 				   const u32 *indir)
+#endif
 {
 #if defined(MV_ETH_PNC_LB) && defined(CONFIG_MV_ETH_PNC)
 	int i;
@@ -903,9 +912,14 @@ const struct ethtool_ops mv_eth_tool_ops = {
 	.get_rxfh_indir_size			= mv_eth_tool_get_rxfh_indir_size,
 #endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)
+#if ((LINUX_VERSION_CODE < KERNEL_VERSION(3, 18, 0)) && (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 35)))
 	.get_rxfh_indir				= mv_eth_tool_get_rxfh_indir,
 	.set_rxfh_indir				= mv_eth_tool_set_rxfh_indir,
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0)
+	.get_rxfh				= mv_eth_tool_get_rxfh_indir,
+	.set_rxfh				= mv_eth_tool_set_rxfh_indir,
 #endif
 	.get_rxnfc				= mv_eth_tool_get_rxnfc,
 #if ((LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0)) && (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 33)))

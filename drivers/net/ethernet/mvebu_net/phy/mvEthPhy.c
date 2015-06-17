@@ -342,7 +342,6 @@ MV_STATUS mvEthPhyRestartAN(MV_U32 phyAddr, int timeout)
 	return MV_TIMEOUT;
 }
 
-
 /*******************************************************************************
 * mvEthPhyDisableAN - Disable Phy Auto-Negotiation and set forced Speed and Duplex
 *

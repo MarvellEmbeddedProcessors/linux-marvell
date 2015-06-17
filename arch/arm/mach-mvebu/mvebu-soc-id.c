@@ -59,7 +59,7 @@ int mvebu_get_soc_id(u32 *dev, u32 *rev)
 	} else
 		return -1;
 }
-
+EXPORT_SYMBOL(mvebu_get_soc_id);
 static int __init mvebu_soc_id_init(void)
 {
 	struct device_node *np;

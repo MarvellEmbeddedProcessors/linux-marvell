@@ -1,6 +1,6 @@
 config MV_ETH_NETA
 	tristate "Marvell NETA network interface support"
-	depends on ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP || ARCH_ARMADA370 || ARCH_ARMADA38X || ARCH_MSYS || MACH_ARMADA_380
+	depends on ARCH_FEROCEON_KW2 || ARCH_ARMADA_XP || ARCH_ARMADA370 || ARCH_ARMADA38X || ARCH_MSYS || MACH_ARMADA_380 || MACH_ARMADA_38X
 	default y
 	---help---
 	  This driver supports the network interface

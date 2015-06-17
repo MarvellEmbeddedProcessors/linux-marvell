@@ -186,8 +186,6 @@ struct net_device *mv_eth_netdev_init(struct platform_device *pdev);
 static void mv_eth_netdev_init_features(struct net_device *dev);
 
 static MV_STATUS mv_eth_pool_create(int pool, int capacity);
-static int mv_eth_pool_add(struct eth_port *pp, int pool, int buf_num);
-static int mv_eth_pool_free(int pool, int num);
 static int mv_eth_pool_destroy(int pool);
 
 #ifdef CONFIG_MV_ETH_TSO
@@ -2637,7 +2635,7 @@ static int mv_eth_port_pools_free(int port)
 }
 
 /* Free "num" buffers from the pool */
-static int mv_eth_pool_free(int pool, int num)
+int mv_eth_pool_free(int pool, int num)
 {
 	struct sk_buff *skb;
 	int i = 0;
@@ -2754,7 +2752,7 @@ static int mv_eth_pool_destroy(int pool)
 }
 
 
-static int mv_eth_pool_add(struct eth_port *pp, int pool, int buf_num)
+int mv_eth_pool_add(struct eth_port *pp, int pool, int buf_num)
 {
 	struct bm_pool *bm_pool;
 	struct sk_buff *skb;
@@ -4984,9 +4982,7 @@ void mv_eth_config_show(void)
 	pr_info("  o SKB recycle supported for SWF (%s)\n", mv_ctrl_swf_recycle ? "Enabled" : "Disabled");
 #endif
 
-#ifdef CONFIG_MV_ETH_NETA
 	pr_info("  o NETA acceleration mode %d\n", mvNetaAccMode());
-#endif
 
 #ifdef CONFIG_MV_ETH_BM_CPU
 	if (MV_NETA_BM_CAP())

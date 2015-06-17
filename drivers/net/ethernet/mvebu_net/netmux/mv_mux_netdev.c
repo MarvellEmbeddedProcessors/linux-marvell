@@ -877,7 +877,11 @@ struct net_device *mv_mux_netdev_alloc(char *name, int idx, MV_MUX_TAG *tag_cfg)
 
 	if (!mux_dev) {
 		/* new net device */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)
+		mux_dev = alloc_netdev(sizeof(struct mux_netdev), name, NET_NAME_UNKNOWN, ether_setup);
+#else
 		mux_dev = alloc_netdev(sizeof(struct mux_netdev), name, ether_setup);
+#endif
 		if (!mux_dev) {
 			printk(KERN_ERR "%s: out of memory, net device allocation failed.\n", __func__);
 			return NULL;
@@ -1077,7 +1081,7 @@ int mv_mux_tag_type_set(int port, int type)
 
 	if (port >= MV_ETH_MAX_PORTS) {
 		pr_err("gbe port %d is out of range (0..%d)\n", port, MV_ETH_MAX_PORTS-1);
-		return;
+		return MV_ERROR;
 	}
 
 	if ((type < MV_TAG_TYPE_NONE) || (type >= MV_TAG_TYPE_LAST)) {
@@ -1263,7 +1267,11 @@ static int mux_device_event(struct notifier_block *unused, unsigned long event, 
 		while (mux_dev != NULL) {
 			pdev_priv = MV_MUX_PRIV(mux_dev);
 			/* May be called without an actual change */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+			if (ether_addr_equal(mux_dev->dev_addr, dev->dev_addr)) {
+#else
 			if (!compare_ether_addr(mux_dev->dev_addr, dev->dev_addr)) {
+#endif
 				mux_dev = pdev_priv->next;
 				continue;
 			}

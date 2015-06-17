@@ -35,6 +35,7 @@ unsigned long coherency_phys_base;
 void __iomem *coherency_base;
 static void __iomem *coherency_cpu_base;
 bool coherency_hard_mode;
+EXPORT_SYMBOL(coherency_hard_mode);
 
 /* Coherency fabric registers */
 #define COHERENCY_FABRIC_CFG_OFFSET		   0x4

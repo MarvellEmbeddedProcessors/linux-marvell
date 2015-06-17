@@ -110,6 +110,7 @@ void *mvOsIoCachedMalloc(void *osHandle, MV_U32 size, MV_ULONG *pPhyAddr,
 	*pPhyAddr = (MV_ULONG)(dma_addr & 0xFFFFFFFF);
 	return p;
 }
+EXPORT_SYMBOL(mvOsIoCachedMalloc);
 void *mvOsIoUncachedMalloc(void *osHandle, MV_U32 size, MV_ULONG *pPhyAddr,
 			    MV_U32 *memHandle)
 {
@@ -118,7 +119,7 @@ void *mvOsIoUncachedMalloc(void *osHandle, MV_U32 size, MV_ULONG *pPhyAddr,
 	*pPhyAddr = (MV_ULONG)(dma_addr & 0xFFFFFFFF);
 	return ptr;
 }
-
+EXPORT_SYMBOL(mvOsIoUncachedMalloc);
 void mvOsIoUncachedFree(void *osHandle, MV_U32 size, MV_ULONG phyAddr, void *pVirtAddr,
 			 MV_U32 memHandle)
 {
@@ -130,7 +131,7 @@ void mvOsIoCachedFree(void *osHandle, MV_U32 size, MV_ULONG phyAddr, void *pVirt
 {
 	return kfree(pVirtAddr);
 }
-
+EXPORT_SYMBOL(mvOsIoCachedFree);
 int mvOsRand(void)
 {
 	int rand;

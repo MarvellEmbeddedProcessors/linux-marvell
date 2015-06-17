@@ -52,9 +52,8 @@ ifeq ($(CONFIG_MV_ETH_INCLUDE_NETMUX),y)
 obj-y	+= netmux/
 endif
 
-ifeq ($(CONFIG_MV_ETH_NETA),y)
-obj-y += neta/
-endif
+obj-$(CONFIG_MV_ETH_NETA) += neta/
+
 ifeq ($(CONFIG_MV_ETH_PP2),y)
 obj-y += pp2/
 endif
@@ -88,4 +87,8 @@ DSDT_OBJS		= $(QD_DIR)/src/driver/gtDrvConfig.o $(QD_DIR)/src/driver/gtDrvEvents
 
 obj-y += $(DSDT_OBJS)
 obj-y += switch/
+endif
+
+ifneq ($(CONFIG_MV_ETH_NETA),)
+obj-y += mv_exports.o
 endif
