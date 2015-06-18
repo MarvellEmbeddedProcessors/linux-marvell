@@ -4593,7 +4593,6 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 	}
 
 	/* Global Parameters */
-	plat_data->tclk = 166666667;    /*mvBoardTclkGet();*/
 	plat_data->max_port = mv_eth_port_num_get(pdev);
 
 	/* Per port parameters */
@@ -4618,6 +4617,7 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 
 	clk = devm_clk_get(&pdev->dev, 0);
 	clk_prepare_enable(clk);
+	plat_data->tclk = clk_get_rate(clk);
 
 	return plat_data;
 }
