@@ -249,13 +249,17 @@
 
 	reg_usb3_vbus_exp1: usb3-vbus-exp1 {
 		status = "disabled";
-		compatible = "regulator-fixed";
+		compatible = "mv,vbus-regulator";
 		regulator-name = "usb3-vbus";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
 		enable-active-high;
 		regulator-always-on;
+		regulator-boot-on;
 		gpio = <&expander1 15 GPIO_ACTIVE_HIGH>;
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
 	};
 
 	/* usb3 vbus controlled via gpio pin */
@@ -267,7 +271,7 @@
 
 	reg_usb3_vbus_gpio: usb3-vbus-gpio {
 		status = "disabled";
-		compatible = "regulator-fixed";
+		compatible = "mv,vbus-regulator";
 		pinctrl-names = "default";
 		pinctrl-0 = <&xhci0_vbus_pins>;
 		regulator-name = "xhci0-vbus";
@@ -276,6 +280,9 @@
 		enable-active-high;
 		regulator-always-on;
 		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
 	};
 
         sound {
