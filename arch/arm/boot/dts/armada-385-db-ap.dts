@@ -173,7 +173,7 @@
 	};
 
 	reg_xhci0_vbus: xhci0-vbus {
-		compatible = "regulator-fixed";
+		compatible = "mv,vbus-regulator";
 		pinctrl-names = "default";
 		pinctrl-0 = <&xhci0_vbus_pins>;
 		regulator-name = "xhci0-vbus";
@@ -182,5 +182,8 @@
 		enable-active-high;
 		regulator-always-on;
 		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
 	};
 };
