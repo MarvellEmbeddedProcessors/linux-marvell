@@ -207,6 +207,17 @@ static int mvebu_pm_valid(suspend_state_t state)
 		(is_suspend_mem_available && (state == PM_SUSPEND_MEM)));
 }
 
+static int mvebu_suspend_prepare(void)
+{
+	int ret;
+
+	ret = regulator_suspend_prepare(PM_SUSPEND_MEM);
+	if (ret)
+		pr_err("Failed to prepare regulators for PM_SUSPEND_MEM (%d)\n", ret);
+
+	return ret;
+}
+
 static void mvebu_suspend_finish(void)
 {
 	int ret;
@@ -219,6 +230,7 @@ static void mvebu_suspend_finish(void)
 static const struct platform_suspend_ops mvebu_pm_ops = {
 	.enter = mvebu_pm_enter,
 	.valid = mvebu_pm_valid,
+	.prepare = mvebu_suspend_prepare,
 	.finish = mvebu_suspend_finish,
 };
 
