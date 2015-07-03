@@ -216,6 +216,9 @@ static int mvebu_enter_suspend(void)
 
 	cpu_suspend(0, mvebu_pm_powerdown);
 
+	/* Remove CPU1 from the PMU frequency domain until it becomes online */
+	mvebu_v7_pmsu_disable_dfs_cpu(1);
+
 	outer_resume();
 
 	mvebu_v7_pmsu_idle_exit();
