@@ -1,10 +1,13 @@
 Device Tree Clock bindings for cpu clock of Marvell EBU platforms
 
 Required properties:
-- compatible : shall be one of the following:
+- compatible : shall be the following:
 	"marvell,armada-xp-cpu-clock" - cpu clocks for Armada XP
+	"marvell,armada-38x-cpu-clock", "marvell,armada-xp-cpu-clock" - cpu
+	clocks for Armada 38x
 - reg : Address and length of the clock complex register set, followed
-        by address and length of the PMU DFS registers
+	by address and length of the PMU DFS registers, for Armada 38x
+	a third register set must be addeed: DFX server.
 - #clock-cells : should be set to 1.
 - clocks : shall be the input parent clock phandle for the clock.
 
@@ -19,4 +22,24 @@ cpu@0 {
 	compatible = "marvell,sheeva-v7";
 	reg = <0>;
 	clocks = <&cpuclk 0>;
+};
+
+or for Armada38x
+
+cpuclk: clock-complex@18700 {
+	compatible = "marvell,armada-380-cpu-clock",
+	"marvell,armada-xp-cpu-clock";
+	reg = <0x18700 0xA0>, <0x1c054 0x40>,
+	<0xe4260 0x8>;
+	clocks = <&coreclk 1>;
+	#clock-cells = <1>;
+};
+
+cpu@0 {
+	device_type = "cpu";
+	compatible = "arm,cortex-a9";
+	reg = <0>;
+	clocks = <&cpuclk 0>;
+	clock-latency = <1000000>;
+	clock-names = "cpu0";
 };
