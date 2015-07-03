@@ -352,6 +352,13 @@ void mvebu_v7_pmsu_idle_exit(void)
 	/* cancel ask HW to power down the L2 Cache if possible */
 	reg = readl(pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
 	reg &= ~PMSU_CTL_CFG_L2_PWDDN;
+
+	/*
+	 * When exiting from idle state such as cpuidle or hotplug,
+	 * Enable PMU wait for the CPU to enter WFI when doing DFS
+	 * by setting CPUx Frequency ID to 1
+	 */
+	reg |= 1 << PMSU_CTL_CFG_CPU0_FRQ_ID_SFT;
 	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
 
 	/* cancel Enable wakeup events and mask interrupts */
@@ -609,6 +616,38 @@ int armada_xp_pmsu_dfs_request(int cpu)
 	return 0;
 }
 
+void mvebu_v7_pmsu_disable_dfs_cpu(int hw_cpu)
+{
+	u32 reg;
+
+	if (pmsu_mp_base == NULL)
+		return;
+	/*
+	 * Disable PMU wait for the CPU to enter WFI when doing DFS
+	 * by setting CPUx Frequency ID to 0
+	 */
+	reg = readl(pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
+	reg &= ~(PMSU_CTL_CFG_CPU0_FRQ_ID_MSK << PMSU_CTL_CFG_CPU0_FRQ_ID_SFT);
+	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
+}
+
+int armada_38x_pmsu_dfs_request(int cpu)
+{
+	/*
+	 * Protect CPU DFS from changing the number of online cpus number during
+	 * frequency transition by temporarily disable cpu hotplug
+	 */
+	cpu_hotplug_disable();
+
+	/* Trigger the DFS on all the CPUs */
+	on_each_cpu(mvebu_pmsu_dfs_request_local,
+		    NULL, false);
+
+	cpu_hotplug_enable();
+
+	return 0;
+}
+
 int mvebu_pmsu_dfs_request(int cpu)
 {
 	return mvebu_pmsu_dfs_request_ptr(cpu);
@@ -618,15 +657,19 @@ struct cpufreq_dt_platform_data armada_xp_cpufreq_dt_pd = {
 	.independent_clocks = true,
 };
 
+struct cpufreq_dt_platform_data armada_38x_cpufreq_dt_pd = {
+	.independent_clocks = false,
+};
+
 static int __init mvebu_pmsu_cpufreq_init(void)
 {
 	struct device_node *np;
 	struct resource res;
 	int ret, cpu;
 
-	if (!of_machine_is_compatible("marvell,armadaxp"))
+	if (!of_machine_is_compatible("marvell,armadaxp") &&
+	    !of_machine_is_compatible("marvell,armada380"))
 		return 0;
-
 	/*
 	 * In order to have proper cpufreq handling, we need to ensure
 	 * that the Device Tree description of the CPU clock includes
@@ -671,6 +714,8 @@ static int __init mvebu_pmsu_cpufreq_init(void)
 			return PTR_ERR(clk);
 		}
 
+		clk_prepare_enable(clk);
+
 		/*
 		 * In case of a failure of dev_pm_opp_add(), we don't
 		 * bother with cleaning up the registered OPP (there's
@@ -689,10 +734,20 @@ static int __init mvebu_pmsu_cpufreq_init(void)
 			return ret;
 		}
 	}
-	mvebu_pmsu_dfs_request_ptr = armada_xp_pmsu_dfs_request;
-	platform_device_register_data(NULL, "cpufreq-dt", -1,
-				      &armada_xp_cpufreq_dt_pd,
-				      sizeof(armada_xp_cpufreq_dt_pd));
+	if (of_machine_is_compatible("marvell,armada380")) {
+		if (num_online_cpus() == 1)
+			mvebu_v7_pmsu_disable_dfs_cpu(1);
+
+		mvebu_pmsu_dfs_request_ptr = armada_38x_pmsu_dfs_request;
+		platform_device_register_data(NULL, "cpufreq-dt", -1,
+					      &armada_38x_cpufreq_dt_pd,
+					      sizeof(armada_38x_cpufreq_dt_pd));
+	} else if (of_machine_is_compatible("marvell,armadaxp")) {
+		mvebu_pmsu_dfs_request_ptr = armada_xp_pmsu_dfs_request;
+		platform_device_register_data(NULL, "cpufreq-dt", -1,
+					      &armada_xp_cpufreq_dt_pd,
+					      sizeof(armada_xp_cpufreq_dt_pd));
+	}
 	return 0;
 }
 
