@@ -105,6 +105,7 @@ static phys_addr_t pmsu_mp_phys_base;
 static void __iomem *pmsu_mp_base;
 
 static void *mvebu_cpu_resume;
+static int (*mvebu_pmsu_dfs_request_ptr)(int cpu);
 
 static const struct of_device_id of_pmsu_table[] = {
 	{ .compatible = "marvell,armada-370-pmsu", },
@@ -545,6 +546,14 @@ static void mvebu_pmsu_dfs_request_local(void *data)
 
 	local_irq_save(flags);
 
+	/* Clear any previous DFS DONE event */
+	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_MSK(cpu));
+	reg &= ~PMSU_EVENT_STATUS_MSK_DFS_DONE;
+
+	/* Mask the DFS done interrupt, since we are going to poll */
+	reg |= PMSU_EVENT_STATUS_MSK_DFS_DONE_MASK;
+	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_MSK(cpu));
+
 	/* Prepare to enter idle */
 	reg = readl(pmsu_mp_base + PMSU_STATUS_MSK(cpu));
 	reg |= PMSU_STATUS_MSK_CPU_IDLE_WAIT |
@@ -568,24 +577,19 @@ static void mvebu_pmsu_dfs_request_local(void *data)
 	reg &= ~PMSU_STATUS_MSK_CPU_IDLE_WAIT;
 	writel(reg, pmsu_mp_base + PMSU_STATUS_MSK(cpu));
 
+	/* Restore the DFS mask to its original state */
+	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_MSK(cpu));
+	reg &= ~PMSU_EVENT_STATUS_MSK_DFS_DONE_MASK;
+	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_MSK(cpu));
+
 	local_irq_restore(flags);
 }
 
-int mvebu_pmsu_dfs_request(int cpu)
+int armada_xp_pmsu_dfs_request(int cpu)
 {
 	unsigned long timeout;
 	int hwcpu = cpu_logical_map(cpu);
 	u32 reg;
-
-	/* Clear any previous DFS DONE event */
-	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE;
-	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-
-	/* Mask the DFS done interrupt, since we are going to poll */
-	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-	reg |= PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
-	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
 
 	/* Trigger the DFS on the appropriate CPU */
 	smp_call_function_single(cpu, mvebu_pmsu_dfs_request_local,
@@ -602,20 +606,19 @@ int mvebu_pmsu_dfs_request(int cpu)
 
 	if (time_after(jiffies, timeout))
 		return -ETIME;
-
-	/* Restore the DFS mask to its original state */
-	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
-	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(hwcpu));
-
 	return 0;
 }
 
-struct cpufreq_dt_platform_data cpufreq_dt_pd = {
+int mvebu_pmsu_dfs_request(int cpu)
+{
+	return mvebu_pmsu_dfs_request_ptr(cpu);
+}
+
+struct cpufreq_dt_platform_data armada_xp_cpufreq_dt_pd = {
 	.independent_clocks = true,
 };
 
-static int __init armada_xp_pmsu_cpufreq_init(void)
+static int __init mvebu_pmsu_cpufreq_init(void)
 {
 	struct device_node *np;
 	struct resource res;
@@ -686,10 +689,11 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
 			return ret;
 		}
 	}
-
+	mvebu_pmsu_dfs_request_ptr = armada_xp_pmsu_dfs_request;
 	platform_device_register_data(NULL, "cpufreq-dt", -1,
-				      &cpufreq_dt_pd, sizeof(cpufreq_dt_pd));
+				      &armada_xp_cpufreq_dt_pd,
+				      sizeof(armada_xp_cpufreq_dt_pd));
 	return 0;
 }
 
-device_initcall(armada_xp_pmsu_cpufreq_init);
+device_initcall(mvebu_pmsu_cpufreq_init);
