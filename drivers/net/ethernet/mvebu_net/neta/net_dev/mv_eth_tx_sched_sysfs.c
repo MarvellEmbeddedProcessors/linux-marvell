@@ -80,6 +80,12 @@ static ssize_t mv_eth_3_store(struct device *dev,
 	err = p = i = v = 0;
 	sscanf(buf, "%d %d %d", &p, &i, &v);
 
+	/*check whether the port is valid*/
+	if (mv_eth_port_by_id(p) == NULL) {
+		pr_err("%s: port %d is invalid\n", __func__, p);
+		return -EINVAL;
+	}
+
 	local_irq_save(flags);
 
 	if (!strcmp(name, "txp_rate")) {
@@ -114,6 +120,12 @@ static ssize_t mv_eth_4_store(struct device *dev,
 
 	err = p = txp = txq = v = 0;
 	sscanf(buf, "%d %d %d %d", &p, &txp, &txq, &v);
+
+	/*check whether the port is valid*/
+	if (mv_eth_port_by_id(p) == NULL) {
+		pr_err("%s: port %d is invalid\n", __func__, p);
+		return -EINVAL;
+	}
 
 	local_irq_save(flags);
 
