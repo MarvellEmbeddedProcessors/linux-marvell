@@ -5395,7 +5395,8 @@ int mv_eth_txp_reset(int port, int txp)
 			int mode, rx_port;
 
 			mode = mv_eth_ctrl_txq_mode_get(pp->port, txp, queue, &rx_port);
-			if (mode == MV_ETH_TXQ_CPU) {
+			/* The queue state is free does not mean the queue was not ever used */
+			if (mode != MV_ETH_TXQ_HWF) {
 				/* Free all buffers in TXQ */
 				mv_eth_txq_done_force(pp, txq_ctrl);
 				/* reset txq */
@@ -5403,12 +5404,9 @@ int mv_eth_txp_reset(int port, int txp)
 				txq_ctrl->shadow_txq_get_i = 0;
 			}
 #ifdef CONFIG_MV_ETH_HWF
-			else if (mode == MV_ETH_TXQ_HWF && MV_NETA_HWF_CAP())
+			else if (MV_NETA_HWF_CAP())
 				mv_eth_txq_hwf_clean(pp, txq_ctrl, rx_port);
 #endif /* CONFIG_MV_ETH_HWF */
-			else
-				printk(KERN_ERR "%s: port=%d, txp=%d, txq=%d is not in use\n",
-					__func__, pp->port, txp, queue);
 		}
 	}
 	mvNetaTxpReset(port, txp);
