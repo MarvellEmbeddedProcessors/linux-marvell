@@ -210,12 +210,16 @@ int mv_eth_tool_get_settings(struct net_device *netdev, struct ethtool_cmd *cmd)
 	cmd->port = PORT_MII;
 	cmd->phy_address = phy_addr;
 	cmd->transceiver = XCVR_INTERNAL;
+
 	/* check if speed and duplex are AN */
 	mvNetaSpeedDuplexGet(priv->port, &speed, &duplex);
 	if (speed == MV_ETH_SPEED_AN && duplex == MV_ETH_DUPLEX_AN) {
+		MV_U16 advertise;
+
 		cmd->lp_advertising = cmd->advertising = 0;
 		cmd->autoneg = AUTONEG_ENABLE;
-		mvEthPhyAdvertiseGet(phy_addr, (MV_U16 *)&(cmd->advertising));
+		mvEthPhyAdvertiseGet(phy_addr, &advertise);
+		cmd->advertising = advertise;
 
 		mvEthPhyRegRead(phy_addr, MII_LPA, &lp_ad);
 		if (lp_ad & LPA_LPACK)
