@@ -53,7 +53,11 @@ head-y		:= arch/arm64/kernel/head.o
 ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
 TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%03x000\n", int(512 * rand())}')
 else
+ifeq ($(CONFIG_ARCH_MVEBU_PD), y)
+TEXT_OFFSET := 0x00180000
+else
 TEXT_OFFSET := 0x00080000
+endif
 endif
 
 # KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - 3)) - (1 << 61)
