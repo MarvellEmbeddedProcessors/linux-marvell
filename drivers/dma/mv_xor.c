@@ -99,7 +99,7 @@ static void mv_desc_set_src_addr(struct mv_xor_desc_slot *desc,
 
 static u32 mv_chan_get_current_desc(struct mv_xor_chan *chan)
 {
-	return readl_relaxed(XOR_CURR_DESC(chan));
+	return readl(XOR_CURR_DESC(chan));
 }
 
 static void mv_chan_set_next_descriptor(struct mv_xor_chan *chan,
@@ -165,7 +165,7 @@ static void mv_chan_activate(struct mv_xor_chan *chan)
 
 static char mv_chan_is_busy(struct mv_xor_chan *chan)
 {
-	u32 state = readl_relaxed(XOR_ACTIVATION(chan));
+	u32 state = readl(XOR_ACTIVATION(chan));
 
 	state = (state >> 4) & 0x3;
 
