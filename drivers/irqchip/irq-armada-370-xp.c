@@ -290,7 +290,7 @@ static int armada_xp_set_affinity(struct irq_data *d,
 {
 	unsigned long reg;
 	unsigned long new_mask = 0;
-	unsigned long online_mask = 0;
+	unsigned long present_mask = 0;
 	unsigned long count = 0;
 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
 	int cpu;
@@ -310,13 +310,13 @@ static int armada_xp_set_affinity(struct irq_data *d,
 			  hwirq > ARMADA_370_XP_GBE3_PER_CPU_IRQ))
 		return -EINVAL;
 
-	for_each_cpu(cpu, cpu_online_mask)
-		online_mask |= 1 << cpu_logical_map(cpu);
+	for_each_cpu(cpu, cpu_present_mask)
+		present_mask |= 1 << cpu_logical_map(cpu);
 
 	raw_spin_lock(&irq_controller_lock);
 
 	reg = readl(main_int_base + ARMADA_370_XP_INT_SOURCE_CTL(hwirq));
-	reg = (reg & (~online_mask)) | new_mask;
+	reg = (reg & (~present_mask)) | new_mask;
 	writel(reg, main_int_base + ARMADA_370_XP_INT_SOURCE_CTL(hwirq));
 
 	raw_spin_unlock(&irq_controller_lock);
