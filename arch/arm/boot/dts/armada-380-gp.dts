@@ -177,6 +177,8 @@
 
 			sdhci@d8000 {
 				no-1-8-v;
+				dat3-cd;
+				cd-inverted;
 				wp-inverted;
 				bus-width = <8>;
 				status = "okay";

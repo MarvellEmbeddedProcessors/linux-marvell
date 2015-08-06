@@ -229,7 +229,8 @@
 				 * 'dat3-cd;'
 				 * 'cd-inverted;'
 				 */
-				broken-cd;
+				dat3-cd;
+				cd-inverted;
 				wp-inverted;
 				bus-width = <8>;
 				status = "okay";
