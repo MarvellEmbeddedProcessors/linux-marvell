@@ -1418,6 +1418,9 @@ static struct sk_buff *mv_eth_skb_alloc(struct eth_port *pp, struct bm_pool *poo
 	mvOsCacheLineFlush(pp->dev->dev.parent, skb->head);
 #endif /* CONFIG_MV_ETH_BM_CPU */
 
+	/* Save skb magic(bit 31~2) and pool(bit 1~0) id */
+	MV_NETA_SKB_MAGIC_BPID_SET(skb, (MV_NETA_SKB_MAGIC(skb) | pool->pool));
+
 	if (phys_addr)
 		*phys_addr = mvOsCacheInvalidate(pp->dev->dev.parent, skb->head, RX_BUF_SIZE(pool->pkt_size));
 
@@ -1428,7 +1431,7 @@ static struct sk_buff *mv_eth_skb_alloc(struct eth_port *pp, struct bm_pool *poo
 static inline struct bm_pool *mv_eth_skb_recycle_get_pool(struct sk_buff *skb)
 {
 	if (mv_eth_is_swf_recycle() && MV_NETA_SKB_RECYCLE_MAGIC_IS_OK(skb))
-		return &mv_eth_pool[MV_NETA_SKB_RECYCLE_BPID_GET(skb)];
+		return &mv_eth_pool[MV_NETA_SKB_BPID_GET(skb)];
 	else
 		return NULL;
 }
@@ -1775,11 +1778,8 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 
 		rx_status = rx_desc->status;
 		skb = (struct sk_buff *)rx_desc->bufCookie;
-#if !defined(CONFIG_MV_ETH_BM_CPU) && (defined(CONFIG_MV_NETA_SKB_RECYCLE))
-		pool_id = MV_NETA_SKB_RECYCLE_BPID_GET(skb);
-#else
-		pool_id = NETA_RX_GET_BPID(rx_desc);
-#endif
+		/* rx desc pool id field valid only when BM works */
+		pool_id = (MV_NETA_BM_CAP()) ? (NETA_RX_GET_BPID(rx_desc)) : (MV_NETA_SKB_BPID_GET(skb));
 		pool = &mv_eth_pool[pool_id];
 
 		if (((rx_status & NETA_RX_FL_DESC_MASK) != NETA_RX_FL_DESC_MASK) ||
@@ -1832,7 +1832,7 @@ static inline int mv_eth_rx(struct eth_port *pp, int rx_todo, int rxq, struct na
 
 	/* Set skb recycle magic(bit 31~2) and pool(bit 1~0) id  if recycle is enabled */
 	if (mv_eth_is_swf_recycle())
-		MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, (MV_NETA_SKB_RECYCLE_MAGIC(skb) | pool->pool));
+		MV_NETA_SKB_MAGIC_BPID_SET(skb, (MV_NETA_SKB_MAGIC(skb) | pool->pool));
 
 #if defined(CONFIG_MV_ETH_PNC) && defined(CONFIG_MV_ETH_RX_SPECIAL)
 		/* Special RX processing */
@@ -4652,7 +4652,7 @@ static int mv_eth_probe(struct platform_device *pdev)
 	neta_cap_bitmap |= MV_ETH_CAP_PNC;
 #endif
 
-#ifdef CONFIG_MV_ETH_BM
+#ifdef CONFIG_MV_ETH_BM_CPU
 	neta_cap_bitmap |= MV_ETH_CAP_BM;
 #endif
 

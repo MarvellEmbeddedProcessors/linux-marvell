@@ -88,20 +88,20 @@ extern int mv_ctrl_txdone;
 
 #define RX_BUF_SIZE(pkt_size)   ((pkt_size) + NET_SKB_PAD)
 
-#ifdef CONFIG_MV_NETA_SKB_RECYCLE
-/* SKB recycle magic, indicate the skb can be recycled, here it is the address of skb */
-#define MV_NETA_SKB_RECYCLE_MAGIC(skb)                       ((unsigned int)skb)
+/* SKB magic, mainly used for skb recycle, here it is the address of skb */
+#define MV_NETA_SKB_MAGIC(skb)                       ((unsigned int)skb)
 /* Cb to store magic and bpid, IPv6 TCP will consume the most cb[] with 44 bytes, so the last 4 bytes is safe to use */
-#define MV_NETA_SKB_RECYCLE_CB(skb)                          (*((unsigned int *)(&(skb->cb[sizeof(skb->cb) - 4]))))
-/* Get recycle magic */
-#define MV_NETA_SKB_RECYCLE_MAGIC_GET(skb)                   (MV_NETA_SKB_RECYCLE_CB(skb) & (~MV_BM_POOLS_MASK))
-/* Set recycle magic and bpid */
-#define MV_NETA_SKB_RECYCLE_MAGIC_BPID_SET(skb, magic_bpid)  (MV_NETA_SKB_RECYCLE_CB(skb) = magic_bpid)
-/* Recycle magic check */
-#define MV_NETA_SKB_RECYCLE_MAGIC_IS_OK(skb)                 (MV_NETA_SKB_RECYCLE_MAGIC(skb) ==           \
-								MV_NETA_SKB_RECYCLE_MAGIC_GET(skb))
+#define MV_NETA_SKB_CB(skb)                          (*((unsigned int *)(&(skb->cb[sizeof(skb->cb) - 4]))))
+/* Set magic and bpid */
+#define MV_NETA_SKB_MAGIC_BPID_SET(skb, magic_bpid)  (MV_NETA_SKB_CB(skb) = magic_bpid)
 /* Get bpid */
-#define MV_NETA_SKB_RECYCLE_BPID_GET(skb)                    (MV_NETA_SKB_RECYCLE_CB(skb) & MV_BM_POOLS_MASK)
+#define MV_NETA_SKB_BPID_GET(skb)                    (MV_NETA_SKB_CB(skb) & MV_BM_POOLS_MASK)
+
+#ifdef CONFIG_MV_NETA_SKB_RECYCLE
+/* Get recycle magic */
+#define MV_NETA_SKB_RECYCLE_MAGIC_GET(skb)           (MV_NETA_SKB_CB(skb) & (~MV_BM_POOLS_MASK))
+/* Recycle magic check */
+#define MV_NETA_SKB_RECYCLE_MAGIC_IS_OK(skb)         (MV_NETA_SKB_MAGIC(skb) == MV_NETA_SKB_RECYCLE_MAGIC_GET(skb))
 
 extern int mv_ctrl_swf_recycle;
 #define mv_eth_is_swf_recycle()             (mv_ctrl_swf_recycle)
