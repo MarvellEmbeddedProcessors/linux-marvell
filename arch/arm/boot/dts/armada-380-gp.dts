@@ -176,9 +176,6 @@
 			};
 
 			sdhci@d8000 {
-				pinctrl-names = "default";
-				pinctrl-0 = <&sdhci_pins>;
-				cd-gpios = <&expander0 5 GPIO_ACTIVE_LOW>;
 				no-1-8-v;
 				wp-inverted;
 				bus-width = <8>;
