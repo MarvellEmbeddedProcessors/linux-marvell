@@ -203,7 +203,10 @@
 				pinctrl-names = "default";
 				ctrl-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>,	/* mpp33: default for DB-GP */
 					     <&gpio1 2 GPIO_ACTIVE_LOW>,	/* mpp34: default for DB-GP */
-					     <&gpio1 3 GPIO_ACTIVE_LOW>;	/* mpp35: default for DB-GP */
+					     <&gpio1 3 GPIO_ACTIVE_LOW>,	/* mpp35: default for DB-GP */
+					     <&gpio0 21 GPIO_ACTIVE_LOW>,       /* mpp21: default for DB-AP */
+				             <&gpio0 47 GPIO_ACTIVE_LOW>;       /* mpp47: default for DB-AP */
+
 			};
 
 			pinctrl {
