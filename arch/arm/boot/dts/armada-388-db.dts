@@ -89,6 +89,12 @@
 					compatible = "cirrus,cs42l51";
 					reg = <0x4a>;
 				};
+
+				eeprom@54 {
+					compatible = "atmel,24c64";
+					pagesize = <32>;
+					reg = <0x54>;
+				};
 			};
 
 			i2c@11100 {
