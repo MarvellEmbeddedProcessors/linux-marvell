@@ -288,6 +288,14 @@ static struct sdhci_pltfm_data sdhci_pxav3_pdata = {
 	.ops = &pxav3_sdhci_ops,
 };
 
+static struct sdhci_pltfm_data sdhci_armada_380_pdata = {
+	.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK
+		| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
+		| SDHCI_QUIRK_32BIT_ADMA_SIZE
+		| SDHCI_QUIRK_MISSING_CAPS,
+	.ops = &pxav3_sdhci_ops,
+};
+
 #ifdef CONFIG_OF
 static const struct of_device_id sdhci_pxav3_of_match[] = {
 	{
@@ -296,7 +304,7 @@ static const struct of_device_id sdhci_pxav3_of_match[] = {
 	},
 	{
 		.compatible = "marvell,armada-380-sdhci",
-		.data = &sdhci_pxav3_pdata,
+		.data = &sdhci_armada_380_pdata,
 	},
 	{},
 };
