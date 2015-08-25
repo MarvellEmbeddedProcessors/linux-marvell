@@ -336,8 +336,15 @@ orion_spi_write_read_8bit(struct spi_device *spi,
 {
 	void __iomem *tx_reg, *rx_reg, *int_reg;
 	struct orion_spi *orion_spi;
+	bool cs_single_byte;
+
+	cs_single_byte = spi->mode & SPI_1BYTE_CS;
 
 	orion_spi = spi_master_get_devdata(spi->master);
+
+	if (cs_single_byte)
+		orion_spi_set_cs(spi, 1);
+
 	tx_reg = spi_reg(orion_spi, ORION_SPI_DATA_OUT_REG);
 	rx_reg = spi_reg(orion_spi, ORION_SPI_DATA_IN_REG);
 	int_reg = spi_reg(orion_spi, ORION_SPI_INT_CAUSE_REG);
@@ -351,12 +358,23 @@ orion_spi_write_read_8bit(struct spi_device *spi,
 		writel(0, tx_reg);
 
 	if (orion_spi_wait_till_ready(orion_spi) < 0) {
+		if (cs_single_byte) {
+			orion_spi_set_cs(spi, 0);
+			/* Satisfy some SLIC devices requirements */
+			udelay(4);
+		}
 		dev_err(&spi->dev, "TXS timed out\n");
 		return -1;
 	}
 
 	if (rx_buf && *rx_buf)
 		*(*rx_buf)++ = readl(rx_reg);
+
+	if (cs_single_byte) {
+		orion_spi_set_cs(spi, 0);
+		/* Satisfy some SLIC devices requirements */
+		udelay(4);
+	}
 
 	return 1;
 }
@@ -547,7 +565,7 @@ static int orion_spi_probe(struct platform_device *pdev)
 	}
 
 	/* we support only mode 0, and no options */
-	master->mode_bits = SPI_CPHA | SPI_CPOL;
+	master->mode_bits = SPI_CPHA | SPI_CPOL | SPI_1BYTE_CS;
 	master->set_cs = orion_spi_set_cs;
 	master->transfer_one = orion_spi_transfer_one;
 	master->num_chipselect = ORION_NUM_CHIPSELECTS;
