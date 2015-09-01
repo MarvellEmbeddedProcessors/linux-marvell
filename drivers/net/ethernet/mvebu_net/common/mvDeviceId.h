@@ -446,8 +446,8 @@ extern "C" {
 #define MV_BOBK_DEV_ID		0xBC00
 
 /* BobK deivces matrix */
-#define MV_BOBK_CETUS_98DX4235_DEV_ID		0xBC00
-#define MV_BOBK_CAELUM_98DX4203_DEV_ID		0xBE00
+#define MV_BOBK_CETUS_98DX4235_DEV_ID		0xBE00
+#define MV_BOBK_CAELUM_98DX4203_DEV_ID		0xBC00
 
 /* BobK  Revisions */
 #define MV_BOBK_A0_ID		0x0
