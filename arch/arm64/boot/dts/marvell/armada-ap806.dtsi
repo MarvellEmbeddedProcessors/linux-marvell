@@ -226,9 +226,9 @@
 				dma-coherent;
 			};
 
-			thermal@7f008c {
+			thermal@6f808c {
 				compatible = "marvell,armada-ap806-thermal";
-				reg = <0x7f008C 0x4>, <0x7f0084 0x4>;
+				reg = <0x6f808C 0x4>, <0x6f8084 0x4>;
 				status = "okay";
 			};
 		};
