@@ -302,7 +302,7 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.temp_mask = 0x3ff,
 	.coef_b = 153400,
 	.coef_m = 425,
-	.coef_div = 1000,
+	.coef_div = 1,
 	.inverted = true,
 	.ops = &armada_ap806_ops,
 };
