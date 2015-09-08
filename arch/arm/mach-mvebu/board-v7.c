@@ -114,8 +114,43 @@ static void __init mvebu_memblock_reserve(void)
 static void __init mvebu_memblock_reserve(void) {}
 #endif
 
+void __init mvebu_l2_optimizations(void)
+{
+	void __iomem *l2x0_base;
+	struct device_node *np;
+	unsigned int val;
+
+	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+	if (!np)
+		return;
+
+	l2x0_base = of_iomap(np, 0);
+	if (!l2x0_base) {
+		of_node_put(np);
+		return;
+	}
+
+	/* Configure the L2 PREFETCH and POWER registers */
+	val = 0x58800000;
+	/*
+	*  Support the following configuration:
+	*  Incr double linefill enable
+	*  Data prefetch enable
+	*  Double linefill enable
+	*  Double linefill on WRAP disable
+	*  NO prefetch drop enable
+	 */
+	writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
+	val = L310_DYNAMIC_CLK_GATING_EN;
+	writel_relaxed(val, l2x0_base + L310_POWER_CTRL);
+
+	iounmap(l2x0_base);
+	of_node_put(np);
+}
+
 static void __init mvebu_init_irq(void)
 {
+	mvebu_l2_optimizations();
 	irqchip_init();
 	mvebu_scu_enable();
 	coherency_init();
