@@ -34,6 +34,7 @@
 #include "coherency.h"
 #include "mvebu-soc-id.h"
 
+#define SCU_CTRL		0x00
 static void __iomem *scu_base;
 
 /*
@@ -42,10 +43,19 @@ static void __iomem *scu_base;
  */
 static void __init mvebu_scu_enable(void)
 {
+	u32 scu_ctrl;
 	struct device_node *np =
 		of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
 	if (np) {
 		scu_base = of_iomap(np, 0);
+
+		scu_ctrl = readl_relaxed(scu_base + SCU_CTRL);
+		/* already enabled? */
+		if (!(scu_ctrl & 1)) {
+			/* Enable SCU Speculative linefills to L2 */
+			scu_ctrl |= (1 << 3);
+			writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+		}
 		scu_enable(scu_base);
 		of_node_put(np);
 	}
