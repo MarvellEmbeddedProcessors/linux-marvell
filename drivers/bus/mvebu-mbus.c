@@ -120,6 +120,7 @@ struct mvebu_mbus_soc_data {
 			       u32 *store_addr);
 	int (*show_cpu_target)(struct mvebu_mbus_state *s,
 			       struct seq_file *seq, void *v);
+	void (*mbus_optimizations)(struct mvebu_mbus_state *s);
 };
 
 /*
@@ -136,6 +137,7 @@ struct mvebu_mbus_state {
 	void __iomem *mbuswins_base;
 	void __iomem *sdramwins_base;
 	void __iomem *mbusbridge_base;
+	void __iomem *mbusopt_base;
 	phys_addr_t sdramwins_phys_base;
 	struct dentry *debugfs_root;
 	struct dentry *debugfs_sdram;
@@ -801,6 +803,45 @@ int mvebu_mbus_save_cpu_target(u32 *store_addr)
 	return mbus_state.soc->save_cpu_target(&mbus_state, store_addr);
 }
 
+static void armada_380_mbus_optimizations(struct mvebu_mbus_state *mbus)
+{
+	/*
+	 * MBUS Units Priority Control Register -
+	 * Prioritize XOR, PCIe and GbEs (ID=4,6,3,7,8) DRAM access
+	 * GbE is High and others are Med
+	 */
+	__raw_writel(0x19180, mbus->mbusopt_base);
+
+	/*
+	 * Fabric Units Priority Control Register -
+	 * Prioritize CPUs requests
+	 */
+	__raw_writel(0x3000A, mbus->mbusopt_base + 0x4);
+
+	/*
+	 * MBUS Units Prefetch Control Register -
+	 * Pre-fetch enable for all IO masters
+	 */
+	__raw_writel(0xFFFF, mbus->mbusopt_base + 0x8);
+
+	/*
+	 * Fabric Units Prefetch Control Register -
+	 * Enable the CPUs Instruction and Data prefetch
+	 */
+	__raw_writel(0x303, mbus->mbusopt_base + 0xC);
+}
+
+static const struct mvebu_mbus_soc_data armada_380_mbus_data = {
+	.num_wins            = 20,
+	.has_mbus_bridge     = true,
+	.win_cfg_offset      = armada_370_xp_mbus_win_cfg_offset,
+	.win_remap_offset    = armada_xp_mbus_win_remap_offset,
+	.setup_cpu_target    = mvebu_mbus_default_setup_cpu_target,
+	.show_cpu_target     = mvebu_sdram_debug_show_orion,
+	.save_cpu_target     = mvebu_mbus_default_save_cpu_target,
+	.mbus_optimizations  = armada_380_mbus_optimizations,
+};
+
 static const struct mvebu_mbus_soc_data armada_370_mbus_data = {
 	.num_wins            = 20,
 	.has_mbus_bridge     = true,
@@ -876,7 +917,7 @@ static const struct of_device_id of_mvebu_mbus_ids[] = {
 	{ .compatible = "marvell,armada375-mbus",
 	  .data = &armada_xp_mbus_data, },
 	{ .compatible = "marvell,armada380-mbus",
-	  .data = &armada_xp_mbus_data, },
+	  .data = &armada_380_mbus_data, },
 	{ .compatible = "marvell,armadaxp-mbus",
 	  .data = &armada_xp_mbus_data, },
 	{ .compatible = "marvell,kirkwood-mbus",
@@ -1049,6 +1090,8 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
 					 size_t sdramwins_size,
 					 phys_addr_t mbusbridge_phys_base,
 					 size_t mbusbridge_size,
+					 phys_addr_t mbusopt_phys_base,
+					 size_t mbusopt_size,
 					 bool is_coherent)
 {
 	int win;
@@ -1075,6 +1118,11 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
 		}
 	} else
 		mbus->mbusbridge_base = NULL;
+
+	if (mbusopt_phys_base) {
+		mbus->mbusopt_base = ioremap(mbusopt_phys_base, sdramwins_size);
+		mbus->soc->mbus_optimizations(mbus);
+	}
 
 	for (win = 0; win < mbus->soc->num_wins; win++)
 		mvebu_mbus_disable_window(mbus, win);
@@ -1113,7 +1161,7 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
 			mbuswins_phys_base,
 			mbuswins_size,
 			sdramwins_phys_base,
-			sdramwins_size, 0, 0, false);
+			sdramwins_size, 0, 0, 0, 0, false);
 }
 
 #ifdef CONFIG_OF
@@ -1254,7 +1302,8 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
 
 int __init mvebu_mbus_dt_init(bool is_coherent)
 {
-	struct resource mbuswins_res, sdramwins_res, mbusbridge_res;
+	struct resource mbuswins_res, sdramwins_res, mbusbridge_res,
+	       mbusopt_res;
 	struct device_node *np, *controller;
 	const struct of_device_id *of_id;
 	const __be32 *prop;
@@ -1297,10 +1346,16 @@ int __init mvebu_mbus_dt_init(bool is_coherent)
 	 * compatibility.
 	 */
 	memset(&mbusbridge_res, 0, sizeof(mbusbridge_res));
+	memset(&mbusopt_res, 0, sizeof(mbusopt_res));
 
 	if (mbus_state.soc->has_mbus_bridge) {
 		if (of_address_to_resource(controller, 2, &mbusbridge_res))
 			pr_warn(FW_WARN "deprecated mbus-mvebu Device Tree, suspend/resume will not work\n");
+	}
+
+	if (mbus_state.soc->mbus_optimizations) {
+		if (of_address_to_resource(controller, 3, &mbusopt_res))
+			pr_warn(FW_WARN "deprecated mbus-mvebu Device Tree, MBUS performance is not optimized\n");
 	}
 
 	mbus_state.hw_io_coherency = is_coherent;
@@ -1316,6 +1371,8 @@ int __init mvebu_mbus_dt_init(bool is_coherent)
 				     resource_size(&sdramwins_res),
 				     mbusbridge_res.start,
 				     resource_size(&mbusbridge_res),
+				     mbusopt_res.start,
+				     resource_size(&mbusopt_res),
 				     is_coherent);
 	if (ret)
 		return ret;

@@ -48,12 +48,14 @@ Required properties:
 - compatible:	Should be set to "marvell,mbus-controller".
 
 - reg:          Device's register space.
-		Two or three entries are expected (see the examples below):
+		Two to four entries are expected (see the examples below):
 		the first one controls the devices decoding window,
 		the second one controls the SDRAM decoding window and
 		the third controls the MBus bridge (only with the
 		marvell,armada370-mbus and marvell,armadaxp-mbus
 		compatible strings)
+		the optional forth entry controls the MBus optimization registers
+		(currently only with marvell,armada380-mbus)
 
 Example:
 
