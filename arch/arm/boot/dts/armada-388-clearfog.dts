@@ -1,0 +1,145 @@
+/*
+* Device Tree file for SolidRun's ClearFog-a1 board
+*
+* Rabeeh Khoury <rabeeh@solid-run.com
+*
+* This file is licensed under the terms of the GNU General Public
+* License version 2.  This program is licensed "as is" without any
+* warranty of any kind, whether express or implied.
+*/
+
+/dts-v1/;
+#include <dt-bindings/gpio/gpio.h>
+#include "armada-385-388.dtsi"
+
+/ {
+	model = "SolidRun ClearFog a1 board";
+	compatible = "marvell,a388-db-gp", "marvell,armada388", "marvell,armada38x";
+
+	chosen {
+		bootargs = "console=ttyS0,115200 earlyprintk";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x10000000>; /* 256 MB */
+	};
+
+	soc {
+		internal-regs {
+			ethernet@70000 {
+				status = "okay";
+				phy = <&phy0>;
+				phy-mode = "rgmii";
+			};
+
+			ethernet@30000 {
+				status = "okay";
+				phy = <&phy1>;
+				phy-mode = "sgmii";
+			};
+
+			ethernet@34000 {
+				status = "okay";
+				phy = <&phy2>;
+				phy-mode = "sgmii";
+			};
+
+			i2c0: i2c@11000 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			i2c1: i2c@11100 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			mdio {
+				phy0: ethernet-phy@0 {
+					reg = <0>;
+				};
+				phy1: ethernet-phy@1 {
+					reg = <999>;
+				};
+				phy2: ethernet-phy@2 {
+					reg = <999>;
+				};
+			};
+
+			sata@a8000 {
+				status = "okay";
+			};
+
+			sata@e0000 {
+				status = "okay";
+			};
+
+			tdm@b0000 {
+				pinctrl-0 = <&tdm_pins>;
+				pinctrl-names = "default";
+				pclk-freq-mhz = <8>;
+			};
+
+			sdhci@d8000 {
+				broken-cd;
+				wp-inverted;
+				bus-width = <4>;
+				status = "okay";
+				no-1-8-v;
+			};
+
+			serial@12000 {
+				status = "okay";
+			};
+
+			serial@12100 {
+				status = "okay";
+			};
+
+			spi1: spi@10680 {
+				pinctrl-0 = <&spi1_pins>;
+				pinctrl-names = "default";
+				status = "okay";
+
+				spi-flash@0 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "w25q32";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <3000000>;
+				};
+				slic@0 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "mv_slic";
+					reg = <1>; /* Chip select 1 */
+					spi-max-frequency = <3000000>;
+					spi-1byte-cs;
+					spi-cpol;
+					spi-cpha;
+				};
+			};
+
+			crypto@9D000 {
+				status = "okay";
+			};
+		};
+
+		pcie-controller {
+			status = "okay";
+			/*
+				* The two PCIe units are accessible through
+				* standard PCIe slots on the board.
+				*/
+			pcie@2,0 {
+				/* Port 1, Lane 0 */
+				status = "okay";
+			};
+			pcie@3,0 {
+				/* Port 2, Lane 0 */
+				status = "okay";
+			};
+		};
+	};
+};
