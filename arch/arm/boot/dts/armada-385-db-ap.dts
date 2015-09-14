@@ -167,12 +167,12 @@
 		};
 	};
 
-	usb3_phy: usb3_phy {
+	usb3_phy_gpio: usb3-phy-gpio {
 		compatible = "usb-nop-xceiv";
-		vcc-supply = <&reg_xhci0_vbus>;
+		vcc-supply = <&reg_usb3_vbus_gpio>;
 	};
 
-	reg_xhci0_vbus: xhci0-vbus {
+	reg_usb3_vbus_gpio: usb3-vbus-gpio {
 		compatible = "mv,vbus-regulator";
 		pinctrl-names = "default";
 		pinctrl-0 = <&xhci0_vbus_pins>;
