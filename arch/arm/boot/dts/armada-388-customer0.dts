@@ -158,12 +158,12 @@
 		};
 	};
 
-	usb3_phy: usb3_phy {
+	usb3_phy_exp1: usb3-phy-exp1 {
 		compatible = "usb-nop-xceiv";
-		vcc-supply = <&reg_usb3_vbus>;
+		vcc-supply = <&reg_usb3_vbus_exp1>;
 	};
 
-	reg_usb3_vbus: usb3-vbus {
+	reg_usb3_vbus_exp1: usb3-vbus-exp1 {
 		compatible = "mv,vbus-regulator";
 		regulator-name = "usb3-vbus";
 		regulator-min-microvolt = <5000000>;
