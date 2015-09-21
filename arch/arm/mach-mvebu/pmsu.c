@@ -82,6 +82,15 @@
 #define PMSU_POWERDOWN_DELAY_MASK		0xFFFE
 #define PMSU_DFLT_ARMADA38X_DELAY	        0x64
 
+/* CIB Control and Configuration */
+#define CIB_CONTROL_AND_CONFIG_ACCK_EN_OFFSET		9
+#define CIB_CONTROL_AND_CONFIG_ACCK_EN_MASK		0x1
+#define CIB_CONTROL_AND_CONFIG_ACCK_EN_DISABLE		0x1
+#define CIB_CONTROL_AND_CONFIG_ACCK_ENABLE		0x0
+#define CIB_CONTROL_AND_CONFIG_EMPTY_STAT_OFFSET	13
+#define CIB_CONTROL_AND_CONFIG_EMPTY_STATUS_MASK	0x1
+#define CIB_CONTROL_AND_CONFIG_NOT_EMPTY		0x0
+
 /* CA9 MPcore SoC Control registers */
 
 #define MPCORE_RESET_CTL		    0x64
@@ -103,6 +112,7 @@ extern void armada_38x_cpu_resume(void);
 
 static phys_addr_t pmsu_mp_phys_base;
 static void __iomem *pmsu_mp_base;
+static void __iomem *cib_control;
 
 static void *mvebu_cpu_resume;
 static int (*mvebu_pmsu_dfs_request_ptr)(int cpu);
@@ -199,6 +209,14 @@ static int __init mvebu_v7_pmsu_init(void)
 	if (!pmsu_mp_base) {
 		pr_err("unable to map registers\n");
 		release_mem_region(res.start, resource_size(&res));
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	cib_control = of_iomap(np, 1);
+	if (!cib_control) {
+		pr_err("unable to map registers\n");
+		iounmap(pmsu_mp_base);
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -573,7 +591,21 @@ static void mvebu_pmsu_dfs_request_local(void *data)
 	reg |= PMSU_CTL_CFG_DFS_REQ;
 	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(cpu));
 
+	/* before enter wfi need to empty the CIB */
+	reg = readl(cib_control);
+	reg |= (CIB_CONTROL_AND_CONFIG_ACCK_EN_DISABLE <<
+			CIB_CONTROL_AND_CONFIG_ACCK_EN_OFFSET);
+
+	writel(reg, cib_control);
+
+	/* wait until CIB is empty */
+	while (((readl(cib_control) >> CIB_CONTROL_AND_CONFIG_EMPTY_STAT_OFFSET)
+			& CIB_CONTROL_AND_CONFIG_EMPTY_STATUS_MASK) ==
+			CIB_CONTROL_AND_CONFIG_NOT_EMPTY)
+		;
+
 	/* The fact of entering idle will trigger the DFS transition */
+	isb();
 	wfi();
 
 	/*

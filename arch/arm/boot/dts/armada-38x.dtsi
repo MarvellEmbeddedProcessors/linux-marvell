@@ -447,7 +447,7 @@
 
 			pmsu@22000 {
 				compatible = "marvell,armada-380-pmsu";
-				reg = <0x22000 0x1000>;
+				reg = <0x22000 0x1000>, <0x20280 0x4>;
 			};
 
 			eth0: ethernet@70000 {
