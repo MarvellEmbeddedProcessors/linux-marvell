@@ -82,7 +82,8 @@ static int __init mvebu_armada_pm_init(void)
 	struct device_node *gpio_ctrl_np;
 	int ret = 0, i;
 
-	if (!of_machine_is_compatible("marvell,axp-gp"))
+	if (!of_machine_is_compatible("marvell,axp-gp") &&
+	    !of_machine_is_compatible("marvell,a388-gp"))
 		return -ENODEV;
 
 	np = of_find_node_by_name(NULL, "pm_pic");

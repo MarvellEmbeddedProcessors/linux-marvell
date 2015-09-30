@@ -31,9 +31,11 @@
 #include <linux/mbus.h>
 #include <linux/pci.h>
 #include <asm/smp_plat.h>
+#include <asm/smp_scu.h>
 #include <asm/cacheflush.h>
 #include <asm/mach/map.h>
 #include <asm/dma-mapping.h>
+#include "common.h"
 #include "coherency.h"
 #include "mvebu-soc-id.h"
 
@@ -260,6 +262,8 @@ int set_cpu_coherent(void)
 		armada_xp_clear_shared_l2();
 		ll_add_cpu_to_smp_group();
 		return ll_enable_coherency();
+	} else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380) {
+		scu_enable(mvebu_get_scu_base());
 	}
 
 	return 0;

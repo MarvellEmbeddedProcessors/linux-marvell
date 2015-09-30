@@ -194,6 +194,7 @@ DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
 	.l2c_aux_mask	= ~0,
 	.init_irq       = mvebu_init_irq,
 	.restart	= mvebu_restart,
+	.reserve        = mvebu_memblock_reserve,
 	.dt_compat	= armada_38x_dt_compat,
 MACHINE_END
 
