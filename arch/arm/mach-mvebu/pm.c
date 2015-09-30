@@ -149,6 +149,45 @@ static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
 	writel(BOOT_MAGIC_LIST_END, store_addr);
 }
 
+static void mvebu_pm_store_armada38x_bootinfo(u32 *store_addr)
+{
+	phys_addr_t resume_pc;
+	extern unsigned char armada_38x_mem_resume_data;
+	void *armada_38x_mem_resume_datap =
+		&armada_38x_mem_resume_data;
+
+	/*
+	 * Provide the internal register address to the resume code in
+	 * assembly. The value must be given in the native endianness
+	 * of the system, hence the usage of the raw variant.
+	 */
+	__raw_writel(mvebu_internal_reg_base(),
+		     armada_38x_mem_resume_datap);
+
+	resume_pc = virt_to_phys(armada_38x_mem_resume);
+
+	/*
+	 * The bootloader expects the first two words to be a magic
+	 * value (BOOT_MAGIC_WORD), followed by the address of the
+	 * resume code to jump to. Then, it expects a sequence of
+	 * (address, value) pairs, which can be used to restore the
+	 * value of certain registers. This sequence must end with the
+	 * BOOT_MAGIC_LIST_END magic value.
+	 */
+
+	writel(BOOT_MAGIC_WORD, store_addr++);
+	writel(resume_pc, store_addr++);
+
+	/*
+	 * We don't restore much registers here compared to Armada XP,
+	 * because we're getting out of the bootloader with MMU
+	 * enabled, so we have to disable it first in
+	 * armada_38x_mem_resume before being able to restore things.
+	 */
+
+	writel(BOOT_MAGIC_LIST_END, store_addr);
+}
+
 static int mvebu_pm_store_bootinfo(void)
 {
 	u32 *store_addr;
@@ -157,6 +196,8 @@ static int mvebu_pm_store_bootinfo(void)
 
 	if (of_machine_is_compatible("marvell,armadaxp"))
 		mvebu_pm_store_armadaxp_bootinfo(store_addr);
+	else if (of_machine_is_compatible("marvell,armada380"))
+		mvebu_pm_store_armada38x_bootinfo(store_addr);
 	else
 		return -ENODEV;
 

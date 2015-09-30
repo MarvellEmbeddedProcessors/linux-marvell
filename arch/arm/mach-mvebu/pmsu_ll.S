@@ -51,6 +51,49 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
 	b	cpu_resume
 ENDPROC(armada_38x_cpu_resume)
 
+.global armada_38x_mem_resume_data
+
+#define MBUS_INTERNAL_REG_ADDRESS 0xd0020080
+
+ENTRY(armada_38x_mem_resume)
+ARM_BE8(setend	be )			@ go BE8 if entered LE
+	/* MMU disable, left enabled by the bootloader */
+	mrc	p15, 0, r1, c1, c0, 0
+	bic	r1, #1
+	mcr	p15, 0, r1, c1, c0, 0
+
+	bl      v7_invalidate_l1
+
+	/*
+	 * Load the internal register base address, we keep the value
+	 * unmodified in r1 throughout this function.
+	 */
+	adr	r1, armada_38x_mem_resume_data
+	ldr	r1, [r1]
+
+	/* Restore internal register address */
+	mov	r2, r1
+ARM_BE8(rev	r2, r2)
+	ldr	r3, =MBUS_INTERNAL_REG_ADDRESS
+	str	r2, [r3]
+
+	/* Update SCU offset CP15 register */
+	add	r2, r1, #0xC000
+	mcr  	p15, 4, r2, c15, c0, 0
+
+	/*
+	 * Disable L2 cache, left enabled by the bootloader,
+	 * it will be re-enabled later by the resume logic
+	 */
+	add	r2, r1, #0x8100
+	ldr  	r3, =0x0
+	str  	r3, [r2]
+
+	b 	cpu_resume
+armada_38x_mem_resume_data:
+	.long	.
+ENDPROC(armada_38x_mem_resume)
+
 .global mvebu_boot_wa_start
 .global mvebu_boot_wa_end
 
