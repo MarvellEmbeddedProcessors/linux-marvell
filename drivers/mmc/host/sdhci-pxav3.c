@@ -46,10 +46,14 @@
 #define SDCLK_DELAY_SHIFT	9
 #define SDCLK_DELAY_MASK	0x1f
 
-#define SD_CFG_FIFO_PARAM       0x100
+#define SD_EXTRA_PARAM_REG	0x100
 #define SDCFG_GEN_PAD_CLK_ON	(1<<6)
 #define SDCFG_GEN_PAD_CLK_CNT_MASK	0xFF
 #define SDCFG_GEN_PAD_CLK_CNT_SHIFT	24
+#define SD_FIFO_PARAM_REG	0x104
+#define SD_USE_DAT3		BIT(7)
+#define SD_OVRRD_CLK_OEN	BIT(11)
+#define SD_FORCE_CLK_ON		BIT(12)
 
 #define SD_SPI_MODE          0x108
 #define SD_CE_ATA_1          0x10C
@@ -64,6 +68,7 @@ struct sdhci_pxa {
 	u8	power_mode;
 	void __iomem *sdio3_conf_reg;
 	void __iomem *mbus_win_regs;
+	bool dat3_cd_enabled;
 };
 
 /*
@@ -160,13 +165,36 @@ static int armada_38x_quirks(struct platform_device *pdev,
 	}
 	host->caps1 &= ~(SDHCI_SUPPORT_SDR104 | SDHCI_USE_SDR50_TUNING);
 
+	if (of_property_read_bool(np, "dat3-cd") &&
+	    !of_property_read_bool(np, "broken-cd"))
+		pxa->dat3_cd_enabled = true;
+
 	return 0;
+}
+
+static void pxav3_set_clock(struct sdhci_host *host, unsigned int clock)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_pxa *pxa = pltfm_host->priv;
+
+	sdhci_set_clock(host, clock);
+
+	/*
+	 * The interface clock enable is also used as control
+	 * for the A38x SDIO IP, so it can't be powered down
+	 * when using HW-based card detection.
+	 */
+	if (clock == 0 && pxa->dat3_cd_enabled)
+		sdhci_writew(host, SDHCI_CLOCK_INT_EN, SDHCI_CLOCK_CONTROL);
 }
 
 static void pxav3_reset(struct sdhci_host *host, u8 mask)
 {
 	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
 	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_pxa *pxa = pltfm_host->priv;
+	u32 reg_val;
 
 	sdhci_reset(host, mask);
 
@@ -183,6 +211,21 @@ static void pxav3_reset(struct sdhci_host *host, u8 mask)
 				<< SDCLK_DELAY_SHIFT;
 			tmp |= SDCLK_SEL;
 			writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+		}
+
+		if (pxa->dat3_cd_enabled) {
+			reg_val = sdhci_readl(host, SD_FIFO_PARAM_REG);
+			reg_val |= SD_USE_DAT3 | SD_OVRRD_CLK_OEN |
+				   SD_FORCE_CLK_ON;
+			sdhci_writel(host, reg_val, SD_FIFO_PARAM_REG);
+
+			/*
+			 * For HW detection based on DAT3 pin keep internal
+			 * clk switched on after controller reset.
+			 */
+			reg_val = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
+			reg_val |= SDHCI_CLOCK_INT_EN;
+			sdhci_writel(host, reg_val, SDHCI_CLOCK_CONTROL);
 		}
 	}
 }
@@ -211,9 +254,9 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
 		writew(tmp, host->ioaddr + SD_CE_ATA_2);
 
 		/* start sending the 74 clocks */
-		tmp = readw(host->ioaddr + SD_CFG_FIFO_PARAM);
+		tmp = readw(host->ioaddr + SD_EXTRA_PARAM_REG);
 		tmp |= SDCFG_GEN_PAD_CLK_ON;
-		writew(tmp, host->ioaddr + SD_CFG_FIFO_PARAM);
+		writew(tmp, host->ioaddr + SD_EXTRA_PARAM_REG);
 
 		/* slowest speed is about 100KHz or 10usec per clock */
 		udelay(740);
@@ -298,7 +341,7 @@ static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
 }
 
 static const struct sdhci_ops pxav3_sdhci_ops = {
-	.set_clock = sdhci_set_clock,
+	.set_clock = pxav3_set_clock,
 	.platform_send_init_74_clocks = pxav3_gen_init_74_clocks,
 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
 	.set_bus_width = sdhci_set_bus_width,
@@ -407,6 +450,7 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 		sdhci_get_of_property(pdev);
 		pdata = pxav3_get_mmc_pdata(dev);
 		pdev->dev.platform_data = pdata;
+
 	} else if (pdata) {
 		/* on-chip device */
 		if (pdata->flags & PXA_FLAG_CARD_PERMANENT)
@@ -438,12 +482,15 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 		}
 	}
 
-	pm_runtime_get_noresume(&pdev->dev);
-	pm_runtime_set_active(&pdev->dev);
-	pm_runtime_set_autosuspend_delay(&pdev->dev, PXAV3_RPM_DELAY_MS);
-	pm_runtime_use_autosuspend(&pdev->dev);
-	pm_runtime_enable(&pdev->dev);
-	pm_suspend_ignore_children(&pdev->dev, 1);
+	if (!pxa->dat3_cd_enabled) {
+		pm_runtime_get_noresume(&pdev->dev);
+		pm_runtime_set_active(&pdev->dev);
+		pm_runtime_set_autosuspend_delay(&pdev->dev,
+						 PXAV3_RPM_DELAY_MS);
+		pm_runtime_use_autosuspend(&pdev->dev);
+		pm_runtime_enable(&pdev->dev);
+		pm_suspend_ignore_children(&pdev->dev, 1);
+	}
 
 	ret = sdhci_add_host(host);
 	if (ret) {
@@ -456,13 +503,16 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 	if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
 		device_init_wakeup(&pdev->dev, 1);
 
-	pm_runtime_put_autosuspend(&pdev->dev);
+	if (!pxa->dat3_cd_enabled)
+		pm_runtime_put_autosuspend(&pdev->dev);
 
 	return 0;
 
 err_add_host:
-	pm_runtime_disable(&pdev->dev);
-	pm_runtime_put_noidle(&pdev->dev);
+	if (!pxa->dat3_cd_enabled) {
+		pm_runtime_disable(&pdev->dev);
+		pm_runtime_put_noidle(&pdev->dev);
+	}
 err_of_parse:
 err_cd_req:
 err_mbus_win:
@@ -479,9 +529,11 @@ static int sdhci_pxav3_remove(struct platform_device *pdev)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_pxa *pxa = pltfm_host->priv;
 
-	pm_runtime_get_sync(&pdev->dev);
-	pm_runtime_disable(&pdev->dev);
-	pm_runtime_put_noidle(&pdev->dev);
+	if (!pxa->dat3_cd_enabled) {
+		pm_runtime_get_sync(&pdev->dev);
+		pm_runtime_disable(&pdev->dev);
+		pm_runtime_put_noidle(&pdev->dev);
+	}
 
 	sdhci_remove_host(host, 1);
 
@@ -498,9 +550,16 @@ static int sdhci_pxav3_suspend(struct device *dev)
 {
 	int ret;
 	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_pxa *pxa = pltfm_host->priv;
 
-	pm_runtime_get_sync(dev);
+	if (!pxa->dat3_cd_enabled)
+		pm_runtime_get_sync(dev);
+
 	ret = sdhci_suspend_host(host);
+	if (pxa->dat3_cd_enabled)
+		return ret;
+
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_put_autosuspend(dev);
 
@@ -518,8 +577,13 @@ static int sdhci_pxav3_resume(struct device *dev)
 		ret = mv_conf_mbus_windows(dev, pxa->mbus_win_regs,
 					   mv_mbus_dram_info());
 
-	pm_runtime_get_sync(dev);
+	if (!pxa->dat3_cd_enabled)
+		pm_runtime_get_sync(dev);
+
 	ret = sdhci_resume_host(host);
+	if (pxa->dat3_cd_enabled)
+		return ret;
+
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_put_autosuspend(dev);
 

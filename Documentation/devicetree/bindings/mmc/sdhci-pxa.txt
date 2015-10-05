@@ -23,6 +23,11 @@ Required properties:
 
 Optional properties:
 - mrvl,clk-delay-cycles: Specify a number of cycles to delay for tuning.
+- dat3-cd: use DAT3 pin as hardware card detect - option available for
+  "marvell,armada-380-sdhci" only. The detection is supposed to work with
+  active high polarity, which implies usage of "cd-inverted" property.
+  Note that according to the specifications DAT3-based card detection can be
+  used with SD cards only. MMC standard doesn't support this feature.
 
 Example:
 
