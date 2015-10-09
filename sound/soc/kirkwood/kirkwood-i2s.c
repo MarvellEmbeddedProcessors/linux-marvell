@@ -679,6 +679,9 @@ static int kirkwood_i2s_dev_probe(struct platform_device *pdev)
 
 	if (of_device_is_compatible(np, "marvell,armada-380-audio")) {
 		err = armada_38x_i2s_init_quirk(pdev, priv, soc_dai);
+		/* Set initial pll frequency */
+		if (priv->pll_config)
+			armada_38x_set_pll(priv->pll_config, 44100);
 		if (err < 0)
 			return err;
 	}
