@@ -79,6 +79,7 @@
 				pinctrl-0 = <&tdm_pins>;
 				pinctrl-names = "default";
 				pclk-freq-mhz = <8>;
+				status = "okay";
 			};
 
 			sdhci@d8000 {
