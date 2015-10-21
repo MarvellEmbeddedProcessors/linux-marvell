@@ -81,7 +81,7 @@ disclaimer.
 #endif
 
 #ifdef CONFIG_OF
-int port_vbase[MV_ETH_MAX_PORTS];
+int port_vbase[MV_ETH_MAX_PORTS] = {0};
 int bm_reg_vbase, pnc_reg_vbase;
 static u32 pnc_phyaddr_base;
 static u32 pnc_win_size;
@@ -4511,12 +4511,46 @@ static struct mv_neta_pdata *mv_plat_data_get(struct platform_device *pdev)
 	}
 
 	/* build virtual port base address */
-	base_addr = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-	if (!base_addr) {
-		pr_err("could not map neta registers\n");
-		return NULL;
+	if (!port_vbase[pdev->id]) {
+		base_addr = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+		if (!base_addr) {
+			pr_err("could not map neta registers\n");
+			return NULL;
+		}
+		port_vbase[pdev->id] = (int)base_addr;
 	}
-	port_vbase[pdev->id] = (int)base_addr;
+
+	/* Only NETA_MBUS_RETRY_REG at Port 0 and Port 2 are used, port 0&1 share
+	  * port 0's NETA_MBUS_RETRY_REG, port 2&3 share port 2's NETA_MBUS_RETRY_REG.
+	  * If port 0 is disabled and port 1 is enabled and if we do not remap IO address for port0,
+	  * then when port 1 tries to access NETA_MBUS_RETRY_REG(1) which is really NETA_MBUS_RETRY_REG(0),
+	  * there will be an invalid memory access because there is no valid port 0's IO memory space,
+	  * so we have to map the IO memory for port 0 even if port 0 is disabled when port 1 is enabled
+	*/
+	if ((pdev->id % 2) == 1) {
+		struct device_node *eth_previous;
+		u32 port_num_previous = 0;
+
+		/* find the previous port which shares NETA_MBUS_RETRY_REG */
+		for_each_node_by_name(eth_previous, "ethernet") {
+			if (0 != of_property_read_u32(eth_previous, "eth,port-num", &port_num_previous)) {
+				pr_err("%s read eth,port-num failed!!!\n", __func__);
+				return NULL;
+			}
+
+			if (port_num_previous == (pdev->id - 1))
+				break;
+		}
+
+		/* if no previous sharing port is found, then return */
+		if (port_num_previous != (pdev->id - 1)) {
+			pr_err("%s eth%d is not found!!!\n", __func__, pdev->id - 1);
+			return NULL;
+		}
+
+		if (!port_vbase[port_num_previous])
+			port_vbase[port_num_previous] = (int)of_iomap(eth_previous, 0);
+	}
 
 	/* get IRQ number */
 	if (pdev->dev.of_node) {
