@@ -675,6 +675,18 @@ config SPI_DW_MMIO
 	tristate "Memory-mapped io interface driver for DW SPI core"
 	depends on SPI_DESIGNWARE
 
+config SPI_ARMADA_3700
+	tristate "Armada_3700 SPI controller driver"
+	help
+	  This selects a driver for Armada_3700 SPI controller.
+
+	  If you say 'Yes' to this option, it selects a driver for
+	  Armada_3700 SPI controller.
+	  The SPI driver supports legacy mode and non-legacy mode.
+	  In non-legacy mode, SPI controller works with 4x32-bytes
+	  FIFO. The main use case of this controller is to use SPI
+	  flash as the boot device.
+
 #
 # There are lots of SPI device types, with sensors and memory
 # being probably the most widely used ones.
