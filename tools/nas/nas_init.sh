@@ -1,8 +1,10 @@
 #!/bin/bash
 
-echo " * Version: 5.6"
+echo " * Version: 5.7"
 
 # LOG:
+# 5.7:
+#   1. add bond config transmit hash policy of layer2+3
 # 5.6:
 #   1. enable splice on btrfs.
 # 5.5:
@@ -629,6 +631,7 @@ if [ "$LINK_NUM" == "2" ]; then
     ifconfig eth1 0.0.0.0 down
 
     ifconfig bond0 192.168.0.5 netmask 255.255.255.0 down
+    echo layer2+3    > /sys/class/net/bond0/bonding/xmit_hash_policy
     echo balance-xor > /sys/class/net/bond0/bonding/mode
     ifconfig bond0 up
     ifenslave bond0 eth0 eth1
@@ -644,6 +647,7 @@ elif [ "$LINK_NUM" == "4" ]; then
     ifconfig eth3 0.0.0.0 down
 
     ifconfig bond0 192.168.0.5 netmask 255.255.255.0 down
+    echo layer2+3    > /sys/class/net/bond0/bonding/xmit_hash_policy
     echo balance-xor > /sys/class/net/bond0/bonding/mode
     ifconfig bond0 up
     ifenslave bond0 eth0 eth1 eth2 eth3
