@@ -2417,8 +2417,6 @@ extern ssize_t generic_file_splice_write(struct pipe_inode_info *,
 		struct file *, loff_t *, size_t, unsigned int);
 extern ssize_t generic_splice_sendpage(struct pipe_inode_info *pipe,
 		struct file *out, loff_t *, size_t len, unsigned int flags);
-extern ssize_t generic_splice_from_socket(struct file *file, struct socket *sock,
-				     loff_t __user *ppos, size_t count);
 
 extern void
 file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping);
