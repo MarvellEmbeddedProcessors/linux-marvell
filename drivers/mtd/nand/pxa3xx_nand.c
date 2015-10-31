@@ -1674,6 +1674,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
 
 static int alloc_nand_resource(struct platform_device *pdev)
 {
+	struct device_node *np = pdev->dev.of_node;
 	struct pxa3xx_nand_platform_data *pdata;
 	struct pxa3xx_nand_info *info;
 	struct pxa3xx_nand_host *host;
@@ -1702,6 +1703,8 @@ static int alloc_nand_resource(struct platform_device *pdev)
 		host->info_data = info;
 		mtd->priv = host;
 		mtd->dev.parent = &pdev->dev;
+		/* FIXME: all chips use the same device tree partitions */
+		nand_set_flash_node(chip, np);
 
 		chip->ecc.read_page	= pxa3xx_nand_read_page_hwecc;
 		chip->ecc.write_page	= pxa3xx_nand_write_page_hwecc;
@@ -1863,7 +1866,6 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
 static int pxa3xx_nand_probe(struct platform_device *pdev)
 {
 	struct pxa3xx_nand_platform_data *pdata;
-	struct mtd_part_parser_data ppdata = {};
 	struct pxa3xx_nand_info *info;
 	int ret, cs, probe_success, dma_available;
 
@@ -1910,10 +1912,8 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
 			continue;
 		}
 
-		ppdata.of_node = pdev->dev.of_node;
-		ret = mtd_device_parse_register(mtd, NULL,
-						&ppdata, pdata->parts[cs],
-						pdata->nr_parts[cs]);
+		ret = mtd_device_register(mtd, pdata->parts[cs],
+					  pdata->nr_parts[cs]);
 		if (!ret)
 			probe_success = 1;
 	}
