@@ -40,6 +40,8 @@
 #define A375_READOUT_INVERT		BIT(15)
 #define A375_HW_RESETn			BIT(8)
 #define A380_HW_RESET			BIT(8)
+#define A380_CONTROL_MSB_OFFSET		4
+#define A380_TSEN_TC_TRIM_MASK		0x7
 
 #define AP806_START	BIT(0)
 #define AP806_RESET	BIT(1)
@@ -148,14 +150,21 @@ static void armada375_init_sensor(struct platform_device *pdev,
 static void armada380_init_sensor(struct platform_device *pdev,
 				  struct armada_thermal_priv *priv)
 {
-	unsigned long reg = readl_relaxed(priv->control);
+	unsigned long reg = readl_relaxed(priv->control +
+					  A380_CONTROL_MSB_OFFSET);
 
 	/* Reset hardware once */
 	if (!(reg & A380_HW_RESET)) {
 		reg |= A380_HW_RESET;
-		writel(reg, priv->control);
+		writel(reg, priv->control + A380_CONTROL_MSB_OFFSET);
 		mdelay(10);
 	}
+
+	/* set Tsen Tc Trim value */
+	reg = readl_relaxed(priv->control);
+	reg &= ~A380_TSEN_TC_TRIM_MASK;
+	reg |= 0x3;
+	writel(reg, priv->control);
 }
 
 static void armada_ap806_init_sensor(struct platform_device *pdev,
