@@ -23,8 +23,11 @@
 #include <linux/platform_device.h>
 #include <linux/of_device.h>
 #include <linux/thermal.h>
+#include <linux/interrupt.h>
 
 #define THERMAL_VALID_MASK		0x1
+#define MCELSIUS(temp)			((temp) * 1000)
+#define CELSIUS(temp)			((temp) / 1000)
 
 /* Thermal Manager Control and Status Register */
 #define PMU_TDC0_SW_RST_MASK		(0x1 << 1)
@@ -52,13 +55,22 @@
 #define AP806_TSEN_OUTPUT_MSB		512
 #define AP806_TSEN_OUTPUT_COMP		1024
 
+/* Statically defined overheat threshold Celsius */
+#define A380_THRESH_DEFAULT_TEMP	100
+#define A380_THRESH_DEFAULT_HYST	2
+#define A380_THRESH_OFFSET		16
+#define A380_THRESH_HYST_MASK		0x3
+#define A380_THRESH_HYST_OFFSET		26
+
 struct armada_thermal_data;
 
 /* Marvell EBU Thermal Sensor Dev Structure */
 struct armada_thermal_priv {
 	void __iomem *sensor;
 	void __iomem *control;
+	void __iomem *dfx;
 	struct armada_thermal_data *data;
+	struct platform_device *pdev;
 };
 
 struct armada_thermal_data {
@@ -82,6 +94,69 @@ struct armada_thermal_data {
 
 	struct thermal_zone_device_ops *ops;
 };
+
+inline unsigned int armada380_thresh_val_calc(unsigned int celsius_temp,
+					      struct armada_thermal_data *data)
+{
+	int thresh_val;
+
+	thresh_val = ((MCELSIUS(celsius_temp) * data->coef_div) +
+		      data->coef_b) / data->coef_m;
+
+	return thresh_val & data->temp_mask;
+}
+
+inline unsigned int armada380_thresh_celsius_calc(int thresh_val,
+				     int hyst, struct armada_thermal_data *data)
+{
+	unsigned int mcelsius_temp;
+
+	mcelsius_temp = (((data->coef_m * (thresh_val + hyst)) -
+			  data->coef_b) / data->coef_div);
+
+	return CELSIUS(mcelsius_temp);
+}
+
+static void armada380_temp_set_threshold(struct platform_device *pdev,
+					 struct armada_thermal_priv *priv)
+{
+	int temp, reg, hyst;
+	unsigned int thresh;
+	struct armada_thermal_data *data = priv->data;
+	struct device_node *np = pdev->dev.of_node;
+
+	/* get threshold value from DT */
+	if (of_property_read_u32(np, "threshold", &thresh)) {
+		thresh = A380_THRESH_DEFAULT_TEMP;
+		dev_warn(&pdev->dev, "no threshold in DT, using default\n");
+	}
+
+	/* get hysteresis value from DT */
+	if (of_property_read_u32(np, "hysteresis", &hyst)) {
+		hyst = A380_THRESH_DEFAULT_HYST;
+		dev_warn(&pdev->dev, "no hysteresis in DT, using default\n");
+	}
+
+	temp = armada380_thresh_val_calc(thresh, data);
+	reg = readl_relaxed(priv->control + A380_CONTROL_MSB_OFFSET);
+
+	/* Set Threshold */
+	reg &= ~(data->temp_mask << A380_THRESH_OFFSET);
+	reg |= (temp << A380_THRESH_OFFSET);
+
+	/* Set Hysteresis */
+	reg &= ~(A380_THRESH_HYST_MASK << A380_THRESH_HYST_OFFSET);
+	reg |= (hyst << A380_THRESH_HYST_OFFSET);
+
+	writel(reg, priv->control + A380_CONTROL_MSB_OFFSET);
+
+	/* hysteresis calculation is 2^(2+n) */
+	hyst = 1 << (hyst + 2);
+
+	dev_info(&pdev->dev, "Overheat threshold between %d..%d\n",
+		armada380_thresh_celsius_calc(temp, -hyst, data),
+		armada380_thresh_celsius_calc(temp, hyst, data));
+}
 
 static void armadaxp_init_sensor(struct platform_device *pdev,
 				 struct armada_thermal_priv *priv)
@@ -165,6 +240,22 @@ static void armada380_init_sensor(struct platform_device *pdev,
 	reg &= ~A380_TSEN_TC_TRIM_MASK;
 	reg |= 0x3;
 	writel(reg, priv->control);
+
+	/* Set thresholds */
+	armada380_temp_set_threshold(pdev, priv);
+
+	/* Clear on Read DFX temperature irqs cause */
+	reg = readl_relaxed(priv->dfx + 0x10);
+
+	/* Unmask DFX Temperature overheat and cooldown irqs */
+	reg = readl_relaxed(priv->dfx + 0x14);
+	reg |= (0x3 << 1);
+	writel(reg, priv->dfx + 0x14);
+
+	/* Unmask DFX Server irq */
+	reg = readl_relaxed(priv->dfx + 0x4);
+	reg |= (0x3 << 1);
+	writel(reg, priv->dfx + 0x4);
 }
 
 static void armada_ap806_init_sensor(struct platform_device *pdev,
@@ -255,6 +346,31 @@ static struct thermal_zone_device_ops armada_ap806_ops = {
 	.get_temp = armada_ap806_get_temp,
 };
 
+static irqreturn_t a38x_temp_irq_handler(int irq, void *data)
+{
+	struct armada_thermal_priv *priv = (struct armada_thermal_priv *)data;
+	struct device *dev = &priv->pdev->dev;
+	u32 reg;
+
+	/* Mask Temp irq */
+	reg = readl_relaxed(priv->dfx + 0x14);
+	reg &= ~(0x3 << 1);
+	writel(reg, priv->dfx + 0x14);
+
+	/* Clear Temp irq cause */
+	reg = readl_relaxed(priv->dfx + 0x10);
+
+	if (reg & (0x3 << 1))
+		dev_warn(dev, "Overheat critical %s threshold temperature reached\n",
+			 (reg & (1 << 1)) ? "high" : "low");
+
+	/* UnMask Temp irq */
+	reg = readl_relaxed(priv->dfx + 0x14);
+	reg |= (0x3 << 1);
+	writel(reg, priv->dfx + 0x14);
+
+	return IRQ_HANDLED;
+}
 
 static const struct armada_thermal_data armadaxp_data = {
 	.init_sensor = armadaxp_init_sensor,
@@ -350,6 +466,7 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	const struct of_device_id *match;
 	struct armada_thermal_priv *priv;
 	struct resource *res;
+	int irq;
 
 	match = of_match_device(armada_thermal_id_table, &pdev->dev);
 	if (!match)
@@ -369,6 +486,11 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->control))
 		return PTR_ERR(priv->control);
 
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+	priv->dfx = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(priv->dfx))
+		return PTR_ERR(priv->dfx);
+
 	priv->data = (struct armada_thermal_data *)match->data;
 	priv->data->init_sensor(pdev, priv);
 
@@ -378,6 +500,20 @@ static int armada_thermal_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev,
 			"Failed to register thermal zone device\n");
 		return PTR_ERR(thermal);
+	}
+
+	priv->pdev = pdev;
+
+	/* Register overheat interrupt */
+	irq = platform_get_irq(pdev, 0);
+
+	if (irq < 0) {
+		dev_warn(&pdev->dev, "no irq\n");
+		return irq;
+	}
+	if (devm_request_irq(&pdev->dev, irq, a38x_temp_irq_handler,
+				0, pdev->name, priv) < 0) {
+		dev_warn(&pdev->dev, "Interrupt not available.\n");
 	}
 
 	platform_set_drvdata(pdev, thermal);
@@ -407,5 +543,5 @@ static struct platform_driver armada_thermal_driver = {
 module_platform_driver(armada_thermal_driver);
 
 MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
-MODULE_DESCRIPTION("Armada 370/XP thermal driver");
+MODULE_DESCRIPTION("Armada 370/380/XP thermal driver");
 MODULE_LICENSE("GPL v2");
