@@ -10,16 +10,31 @@ Required properties:
 		marvell,armada-ap806-thermal
 
 - reg:		Device's register space.
-		Two entries are expected, see the examples below.
+		Two or three entries are expected, see the examples below.
 		The first one is required for the sensor register;
 		the second one is required for the control register
 		to be used for sensor initialization (a.k.a. calibration).
+		The third entry is dedicated to the DFX interrupt for
+		Armada 38x.
+
+- interrupts:	Should contain interrupt for thermal system
+
+- threshold:	Temperature threshold in Celsius, the threshold +/- calculated
+		hysteresis (formula below) define the upper and lower watermark
+		which when crossing, an interrupt will be asserted.
+
+- hysteresis:	Valid values are 0..3, following is upper/lower watermark calculation:
+		high/low watermark = threshold +/- 0.4761 * 2^(hysteresis + 2).
+		Following are the corresponding degrees corresponding to
+		hysteresis value: 0=>1.9, 1=>3.8,  2=>7.6, 3=>15.2
 
 Example:
 
-	thermal@d0018300 {
-		compatible = "marvell,armada370-thermal";
-                reg = <0xd0018300 0x4
-		       0xd0018304 0x4>;
+	thermal@e4078 {
+		compatible = "marvell,armada380-thermal";
+		reg = <0xe4078 0x4>, <0xe4074 0x4>, <0xe4100 0x20>;
+		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
+		threshold = <100>;
+		hysteresis = <2>;
 		status = "okay";
 	};
