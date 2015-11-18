@@ -59,6 +59,8 @@
 #define RTC_SZ_INTERRUPT2_INT2FE_MASK	0x2
 #define RTC_SZ_INTERRUPT2_RESERVED1_MASK	0xFFFFFFC0
 
+#define SAMPLE_NR 100
+
 typedef struct mvebu_rtc_s {
 	struct rtc_device *rtc_dev;
 	void __iomem      *regbase_rtc;
@@ -198,24 +200,64 @@ static irqreturn_t mvebu_rtc_irq_handler(int irq, void *rtc_ptr)
 	return irq_status;
 }
 
+struct str_time_2_freq {
+	unsigned long nTime;
+	uint8_t nFreq;
+} __packed;
+
 static int mvebu_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
+	/* Functional Errata Ref #: FE-3124064 - WA for failing time read attempts.
+	 * Description:
+	 *      The device supports CPU write and read access to the RTC Time register.
+	 *	However, due to this erratum, Write to RTC TIME register may fail.
+	 *	Read from RTC TIME register may fail.
+	 * Workaround:
+	 *	Before writing to RTC TIME register, issue a dummy write of 0x0 twice to
+	 *	RTC Status register.
+	 *	Configure maximum value (0x3FF) in write clock period in RTC Mbus Bridge
+	 *	Timing Control register.
+	 *	Before writing to RTC TIME register, issue a dummy write of 0x0 twice to
+	 *	RTC Status register.
+	 *      RTC TIME register should be read 100 times, then find the result
+	 *	that appear most frequently, use this result as the correct value.
+	 */
 	mvebu_rtc_t *rtc = dev_get_drvdata(dev);
-	unsigned long time, time_check;
+	unsigned long nTimeArray[SAMPLE_NR], i, j, nTime;
+	unsigned long nMax = 0, indexMax = SAMPLE_NR - 1;
+	struct str_time_2_freq sTimeToFreq[SAMPLE_NR];
 
+	if (rtc == NULL) {
+		dev_err(dev, "Can't get driver data of RTC device\n");
+		return 0;
+	}
 	spin_lock_irq(&rtc->lock);
 
-	time = RTC_READ_REG(RTC_TIME_REG_OFFS);
-
-	/* WA for failing time read attempts. The HW ERRATA information should be added here */
-	/* if detected more than one second between two time reads, read once again */
-	time_check = RTC_READ_REG(RTC_TIME_REG_OFFS);
-	if ((time_check - time) > 1)
-		time_check = RTC_READ_REG(RTC_TIME_REG_OFFS);
-	/* End of WA */
-
-	rtc_time_to_tm(time_check, tm);
+	for (i = 0; i < SAMPLE_NR; i++) {
+		sTimeToFreq[i].nFreq = 0;
+		nTimeArray[i] = RTC_READ_REG(RTC_TIME_REG_OFFS);
+	}
 	spin_unlock_irq(&rtc->lock);
+	for (i = 0; i < SAMPLE_NR; i++) {
+		nTime = nTimeArray[i];
+		/* if nTime appears in sTimeToFreq array so add the counter of nTime value,
+		   if didn't appear yet in counters array then allocate new member of
+		   sTimeToFreq array with counter = 1 */
+		for (j = 0; j < SAMPLE_NR; j++) {
+			if (sTimeToFreq[j].nFreq == 0 || sTimeToFreq[j].nTime == nTime)
+				break;
+		}
+		if (sTimeToFreq[j].nFreq == 0)
+			sTimeToFreq[j].nTime = nTime;
+		sTimeToFreq[j].nFreq++;
+		/*find the most common result*/
+		if (nMax < sTimeToFreq[j].nFreq) {
+			indexMax = j;
+			nMax = sTimeToFreq[j].nFreq;
+		}
+	}
+
+	rtc_time_to_tm(sTimeToFreq[indexMax].nTime, tm);
 
 	return 0;
 }
