@@ -235,7 +235,7 @@ static void armada380_init_sensor(struct platform_device *pdev,
 		mdelay(10);
 	}
 
-	/* set Tsen Tc Trim value */
+	/* set Tsen Tc Trim to correct default value (errata #132698) */
 	reg = readl_relaxed(priv->control);
 	reg &= ~A380_TSEN_TC_TRIM_MASK;
 	reg |= 0x3;
