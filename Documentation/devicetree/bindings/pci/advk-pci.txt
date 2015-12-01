@@ -1,0 +1,73 @@
+* Aardvark PCIe interface for Marvell Armada-3700
+
+Mandatory properties:
+
+- compatible:
+    marvell,armada-3700-pcie
+- Status:
+	Disabled in dtsi and enable only if needed in dts
+- device_type, set to "pci"
+- #address-cells, set to <3>
+- #size-cells, set to <2>
+- #interrupt-cells, set to <3>
+- bus-range: PCI bus numbers covered
+- ranges: ranges describing the IO registers to control the PCIe
+  interfaces, and ranges describing the Memory windows needed to access
+  the memory and I/O regions of each PCIe interface.
+
+For: pcie@1,0
+- device_type, set to pci
+- assigned-addresses, assigns the PCIe registers offset
+- reg set to <0x0800 0 0 0 0>
+- #address-cells, set to <3>
+- #size-cells, set to <2>
+- #interrupt-cells set to <1>
+- interrupt-map-mask set to <0 0 0 7>
+- interrupt-map this is used for INTX:
+	<0 0 0 1 &advk_ic 1>,
+	<0 0 0 2 &advk_ic 2>,
+	<0 0 0 3 &advk_ic 3>,
+	<0 0 0 4 &advk_ic 4>
+- marvell,pcie-port set to <0>
+- marvell,pcie-lane set to <0>
+
+For the PCIe Interrupt Controller:
+- #address-cells set to <0>
+- #interrupt-cells set to <1>
+
+Example:
+
+	pcie-controller {
+		compatible = "marvell,armada-3700-pcie";
+		status = "disabled";
+		device_type = "pci";
+
+		#address-cells = <3>;
+		#size-cells = <2>;
+		dma-coherent;
+
+
+		bus-range = <0x00 0xff>;
+
+		ranges = <0x82000000 0 0x00080000   0 0xD0070000 0 0x20000
+			  0x82000000 0 0xe8000000   0 0xe8000000 0 0x1000000 /* Port 0 MEM */
+			  0x81000000 0 0xe9000000   0 0xe9000000 0 0x10000 /* Port 0 IO*/>;
+
+		pcie@1,0 {
+			device_type = "pci";
+			assigned-addresses = <0x82000800 0 0x00080000 0 0x20000>;
+			reg = <0x0800 0 0 0 0>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+			#interrupt-cells = <1>;
+			ranges = <0x82000000 0 0 0x82000000 0 0xe8000000 1 0
+				  0x81000000 0 0 0x81000000 0 0xe9000000 1 0>;
+			interrupt-map-mask = <0 0 0 7>;
+			interrupt-map =	<0 0 0 1 &advk_ic 1>,
+					<0 0 0 2 &advk_ic 2>,
+					<0 0 0 3 &advk_ic 3>,
+					<0 0 0 4 &advk_ic 4>;
+			marvell,pcie-port = <0>;
+			marvell,pcie-lane = <0>;
+		};
+	};

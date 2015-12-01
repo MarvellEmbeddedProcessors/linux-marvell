@@ -16,6 +16,17 @@ config PCI_MVEBU
 	depends on ARCH_MVEBU || ARCH_DOVE
 	depends on OF
 
+config PCI_ADVK_ARM64
+	bool "Aardvark PCIe controller for arm64 CPU"
+	depends on ARCH_MVEBU && ARM64
+	depends on OF
+	select MVEBU_ADVK_IRQ
+	help
+	 Add support for Aardvark 64bit PCIe Host Controoler.
+	 This controller is part of the South Bridge of
+	 Armada3700 (LP) SOC supporting single RC mode.
+	 EP mode is not yet supported in Software.
+
 config IGNORE_ASYNC_ABORT
 	bool "Ignore asynchronous abort from configuration access"
 	depends on ARCH_MVEBU
