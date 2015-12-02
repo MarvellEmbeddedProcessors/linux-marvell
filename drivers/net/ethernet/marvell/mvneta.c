@@ -1067,15 +1067,28 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
 		       MVNETA_GMAC_AN_SPEED_EN |
 		       MVNETA_GMAC_AN_DUPLEX_EN;
 		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
+
 		val = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
 		val |= MVNETA_GMAC_1MS_CLOCK_ENABLE;
 		mvreg_write(pp, MVNETA_GMAC_CLOCK_DIVIDER, val);
+
+		val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+		val |= MVNETA_GMAC2_INBAND_AN_ENABLE;
+		mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
 	} else {
 		val = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
 		val &= ~(MVNETA_GMAC_INBAND_AN_ENABLE |
 		       MVNETA_GMAC_AN_SPEED_EN |
 		       MVNETA_GMAC_AN_DUPLEX_EN);
 		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
+
+		val = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
+		val &= ~MVNETA_GMAC_1MS_CLOCK_ENABLE;
+		mvreg_write(pp, MVNETA_GMAC_CLOCK_DIVIDER, val);
+
+		val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+		val &= ~MVNETA_GMAC2_INBAND_AN_ENABLE;
+		mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
 	}
 
 	mvneta_set_ucast_table(pp, -1);
@@ -3229,9 +3242,6 @@ static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
 	default:
 		return -EINVAL;
 	}
-
-	if (pp->use_inband_status)
-		ctrl |= MVNETA_GMAC2_INBAND_AN_ENABLE;
 
 	/* Cancel Port Reset */
 	ctrl &= ~MVNETA_GMAC2_PORT_RESET;
