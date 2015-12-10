@@ -42,6 +42,12 @@
 
 #define RTC_NOMINAL_TIMING 0x0
 
+#define RTC_BRIDGE_TIMING_CTRL_REG_OFFS 0x0
+#define RTC_WRCLK_PERIOD_OFFS		0
+#define RTC_WRCLK_PERIOD_MASK		(0x3FF << RTC_WRCLK_PERIOD_OFFS)
+#define RTC_READ_OUTPUT_DELAY_OFFS	26
+#define RTC_READ_OUTPUT_DELAY_MASK	(0x1F << RTC_READ_OUTPUT_DELAY_OFFS)
+
 #define RTC_STATUS_REG_OFFS		0x0
 #define RTC_IRQ_1_CONFIG_REG_OFFS	0x4
 #define RTC_IRQ_2_CONFIG_REG_OFFS	0x8
@@ -70,10 +76,53 @@ typedef struct mvebu_rtc_s {
 	uint32_t           periodic_freq;
 } mvebu_rtc_t;
 
+struct str_value_2_freq {
+	unsigned long nValue;
+	uint8_t nFreq;
+} __packed;
+
+static unsigned long read_rtc_register_WA(mvebu_rtc_t *rtc, uint8_t rtc_reg)
+{
+	unsigned long nValueArray[SAMPLE_NR], i, j, nValue;
+	unsigned long nMax = 0, indexMax = SAMPLE_NR - 1;
+	struct str_value_2_freq sValueToFreq[SAMPLE_NR];
+
+	for (i = 0; i < SAMPLE_NR; i++) {
+		sValueToFreq[i].nFreq = 0;
+		nValueArray[i] = RTC_READ_REG(rtc_reg);
+	}
+	for (i = 0; i < SAMPLE_NR; i++) {
+		nValue = nValueArray[i];
+		/* if nValue appears in sValueToFreq array so add the counter of nValue value,
+		   if didn't appear yet in counters array then allocate new member of
+		   sValueToFreq array with counter = 1 */
+		for (j = 0; j < SAMPLE_NR; j++) {
+			if (sValueToFreq[j].nFreq == 0 || sValueToFreq[j].nValue == nValue)
+				break;
+		}
+		if (sValueToFreq[j].nFreq == 0)
+			sValueToFreq[j].nValue = nValue;
+		sValueToFreq[j].nFreq++;
+		/*find the most common result*/
+		if (nMax < sValueToFreq[j].nFreq) {
+			indexMax = j;
+			nMax = sValueToFreq[j].nFreq;
+		}
+	}
+	return sValueToFreq[indexMax].nValue;
+}
+
 static bool rtc_init_state(mvebu_rtc_t *rtc)
 {
+	uint32_t reg;
+
 	/* Update RTC-MBUS bridge timing parameters */
-	writel(0xFD4D4CFA, rtc->regbase_soc);
+	reg = readl(rtc->regbase_soc + RTC_BRIDGE_TIMING_CTRL_REG_OFFS);
+	reg &= ~RTC_WRCLK_PERIOD_MASK;
+	reg |= 0x3FF << RTC_WRCLK_PERIOD_OFFS; /*Maximum value*/
+	reg &= ~RTC_READ_OUTPUT_DELAY_MASK;
+	reg |= 0x1F << RTC_READ_OUTPUT_DELAY_OFFS; /*Maximum value*/
+	writel(reg, rtc->regbase_soc + RTC_BRIDGE_TIMING_CTRL_REG_OFFS);
 
 	/* Make sure we are not in any test mode */
 	RTC_WRITE_REG(0, RTC_TEST_CONFIG_REG_OFFS);
@@ -95,12 +144,12 @@ static bool rtc_init_state(mvebu_rtc_t *rtc)
 	{
 		uint32_t stat, alrm1, alrm2, int1, int2, tstcfg;
 
-		stat   = RTC_READ_REG(RTC_STATUS_REG_OFFS) & 0xFF;
-		alrm1  = RTC_READ_REG(RTC_ALARM_1_REG_OFFS);
-		int1   = RTC_READ_REG(RTC_IRQ_1_CONFIG_REG_OFFS) & 0xFF;
-		alrm2  = RTC_READ_REG(RTC_ALARM_2_REG_OFFS);
-		int2   = RTC_READ_REG(RTC_IRQ_2_CONFIG_REG_OFFS) & 0xFF;
-		tstcfg = RTC_READ_REG(RTC_TEST_CONFIG_REG_OFFS) & 0xFF;
+		stat   = read_rtc_register_WA(rtc, RTC_STATUS_REG_OFFS) & 0xFF;
+		alrm1  = read_rtc_register_WA(rtc, RTC_ALARM_1_REG_OFFS);
+		int1   = read_rtc_register_WA(rtc, RTC_IRQ_1_CONFIG_REG_OFFS) & 0xFF;
+		alrm2  = read_rtc_register_WA(rtc, RTC_ALARM_2_REG_OFFS);
+		int2   = read_rtc_register_WA(rtc, RTC_IRQ_2_CONFIG_REG_OFFS) & 0xFF;
+		tstcfg = read_rtc_register_WA(rtc, RTC_TEST_CONFIG_REG_OFFS) & 0xFF;
 
 		if ((0xFC == stat)  &&
 			(0 == alrm1) && (0xC0 == int1) &&
@@ -146,7 +195,7 @@ static int rtc_setup_alarm(mvebu_rtc_t *rtc, struct rtc_time *alrm)
 	int ret;
 
 	do {
-		now = RTC_READ_REG(RTC_TIME_REG_OFFS);
+		now = read_rtc_register_WA(rtc, RTC_TIME_REG_OFFS);
 		rtc_time_to_tm(now, &now_tm);
 		rtc_next_alarm_time(&alarm_tm, &now_tm, alrm);
 		ret = rtc_tm_to_time(&alarm_tm, &time);
@@ -156,7 +205,7 @@ static int rtc_setup_alarm(mvebu_rtc_t *rtc, struct rtc_time *alrm)
 		else
 			RTC_WRITE_REG(time, RTC_ALARM_1_REG_OFFS);
 
-	} while (now != RTC_READ_REG(RTC_TIME_REG_OFFS));
+	} while (now != read_rtc_register_WA(rtc, RTC_TIME_REG_OFFS));
 
 	return ret;
 }
@@ -170,7 +219,7 @@ static irqreturn_t mvebu_rtc_irq_handler(int irq, void *rtc_ptr)
 	val = readl(rtc->regbase_soc + 0x8);
 	writel(0, rtc->regbase_soc + 0x8);
 
-	rtc_status_reg = RTC_READ_REG(RTC_STATUS_REG_OFFS);
+	rtc_status_reg = read_rtc_register_WA(rtc, RTC_STATUS_REG_OFFS);
 
 	/* Has Alarm 1 triggered? */
 	/* TBD - properly check IRQ status */
@@ -200,64 +249,19 @@ static irqreturn_t mvebu_rtc_irq_handler(int irq, void *rtc_ptr)
 	return irq_status;
 }
 
-struct str_time_2_freq {
-	unsigned long nTime;
-	uint8_t nFreq;
-} __packed;
-
 static int mvebu_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
-	/* Functional Errata Ref #: FE-3124064 - WA for failing time read attempts.
-	 * Description:
-	 *      The device supports CPU write and read access to the RTC Time register.
-	 *	However, due to this erratum, Write to RTC TIME register may fail.
-	 *	Read from RTC TIME register may fail.
-	 * Workaround:
-	 *	Before writing to RTC TIME register, issue a dummy write of 0x0 twice to
-	 *	RTC Status register.
-	 *	Configure maximum value (0x3FF) in write clock period in RTC Mbus Bridge
-	 *	Timing Control register.
-	 *	Before writing to RTC TIME register, issue a dummy write of 0x0 twice to
-	 *	RTC Status register.
-	 *      RTC TIME register should be read 100 times, then find the result
-	 *	that appear most frequently, use this result as the correct value.
-	 */
 	mvebu_rtc_t *rtc = dev_get_drvdata(dev);
-	unsigned long nTimeArray[SAMPLE_NR], i, j, nTime;
-	unsigned long nMax = 0, indexMax = SAMPLE_NR - 1;
-	struct str_time_2_freq sTimeToFreq[SAMPLE_NR];
+	unsigned long time;
 
 	if (rtc == NULL) {
 		dev_err(dev, "Can't get driver data of RTC device\n");
 		return 0;
 	}
 	spin_lock_irq(&rtc->lock);
-
-	for (i = 0; i < SAMPLE_NR; i++) {
-		sTimeToFreq[i].nFreq = 0;
-		nTimeArray[i] = RTC_READ_REG(RTC_TIME_REG_OFFS);
-	}
+	time = read_rtc_register_WA(rtc, RTC_TIME_REG_OFFS);
 	spin_unlock_irq(&rtc->lock);
-	for (i = 0; i < SAMPLE_NR; i++) {
-		nTime = nTimeArray[i];
-		/* if nTime appears in sTimeToFreq array so add the counter of nTime value,
-		   if didn't appear yet in counters array then allocate new member of
-		   sTimeToFreq array with counter = 1 */
-		for (j = 0; j < SAMPLE_NR; j++) {
-			if (sTimeToFreq[j].nFreq == 0 || sTimeToFreq[j].nTime == nTime)
-				break;
-		}
-		if (sTimeToFreq[j].nFreq == 0)
-			sTimeToFreq[j].nTime = nTime;
-		sTimeToFreq[j].nFreq++;
-		/*find the most common result*/
-		if (nMax < sTimeToFreq[j].nFreq) {
-			indexMax = j;
-			nMax = sTimeToFreq[j].nFreq;
-		}
-	}
-
-	rtc_time_to_tm(sTimeToFreq[indexMax].nTime, tm);
+	rtc_time_to_tm(time, tm);
 
 	return 0;
 }
@@ -291,8 +295,8 @@ static int mvebu_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 	spin_lock_irq(&rtc->lock);
 
-	rtc_time_to_tm((time = RTC_READ_REG(RTC_ALARM_1_REG_OFFS)), &alrm->time);
-	alrm->enabled = (RTC_READ_REG(RTC_IRQ_1_CONFIG_REG_OFFS) & RTC_SZ_INTERRUPT1_INT1AE_MASK) ? 1 : 0;
+	rtc_time_to_tm((time = read_rtc_register_WA(rtc, RTC_ALARM_1_REG_OFFS)), &alrm->time);
+	alrm->enabled = (read_rtc_register_WA(rtc, RTC_IRQ_1_CONFIG_REG_OFFS) & RTC_SZ_INTERRUPT1_INT1AE_MASK) ? 1 : 0;
 
 	spin_unlock_irq(&rtc->lock);
 
@@ -483,9 +487,15 @@ static int __exit mvebu_rtc_remove(struct platform_device *pdev)
 static int mvebu_rtc_resume(struct platform_device *pdev)
 {
 	mvebu_rtc_t *rtc = platform_get_drvdata(pdev);
+	uint32_t reg;
 
 	/* Update RTC-MBUS bridge timing parameters */
-	writel(0xFD4D4CFA, rtc->regbase_soc);
+	reg = readl(rtc->regbase_soc + RTC_BRIDGE_TIMING_CTRL_REG_OFFS);
+	reg &= ~RTC_WRCLK_PERIOD_MASK;
+	reg |= 0x3FF << RTC_WRCLK_PERIOD_OFFS; /*Maximum value*/
+	reg &= ~RTC_READ_OUTPUT_DELAY_MASK;
+	reg |= 0x1F << RTC_READ_OUTPUT_DELAY_OFFS; /*Maximum value*/
+	writel(reg, rtc->regbase_soc + RTC_BRIDGE_TIMING_CTRL_REG_OFFS);
 
 	return 0;
 }
