@@ -48,6 +48,16 @@ config MMC_SDHCI
 
 	  If unsure, say N.
 
+config MMC_XENON_SDHCI
+	bool "Marvell XENON SD Host Controller"
+	depends on MMC_SDHCI
+	default n
+	help
+	  This selects the Marvell Xenon Host Controller.
+	  Marvell Xenon host controller supports
+	  JEDEC eMMC 5.1, SDIO spec 3.0,
+	  and SD host controller spec 3.0
+
 config MMC_SDHCI_IO_ACCESSORS
 	bool
 	depends on MMC_SDHCI

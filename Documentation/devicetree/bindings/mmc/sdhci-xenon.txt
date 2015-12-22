@@ -1,0 +1,69 @@
+* Marvell sdhci-xenon controller
+
+This file documents differences between the core properties in mmc.txt
+and the properties used by the sdhci-xenon drivers.
+
+Required properties:
+- compatible: Should be "marvell,xenon-sdhci".
+- reg:
+  one register area for the SDHCI registers.
+- interrupts-extended: interrupt number and attributes
+- clocks: array of clocks required for SDHCI.
+- eMMC Speed Mode:
+  If the SDHC slot in use is implemented to connect an eMMC
+  card, three  speed modes in below should be explicitly set.
+  - mmc-ddr-1_8v: whether support eMMC DDR mode by 1.8 voltage.
+  - mmc-hs200-1_8v: whether support eMMC high speed 200 mode by 1.8 voltage.
+  - mmc-hs400-1_8v: whether support eMMC high speed 400 mode by 1.8 voltage.
+  Besides, since Xenon cannot support 1.2v, three speed modes in below should not be set.
+  - mmc-ddr-1_2v: whether support eMMC DDR mode by 1.2 voltage.
+  - mmc-hs200-1_2v:  whether support eMMC high speed 200 mode by 1.2 voltage.
+  - mmc-hs400-1_2v: whether support eMMC high speed 400 mode by 1.2 voltage.
+  If the SDHC slot is for SD/SDIO, eMMC speed mode should not be set.
+- Slot Index
+  Xenon can support multiple slots in a single IP. Each SDHC
+  slot has its own setting bits.
+  The specific slot index in Xenon IP should be provided.
+  - xenon,slotno = <slot_index>;
+- bus-width: max bus width in unit of bit, normally should be 1 bit, 4 bits or 8 bits
+- tuning-count: tuning shift.
+
+Optional properties:
+- re-tuning counter
+  Tuning counter is only necessary in the speed modes which require re-tuning, such as H200, SDR104 and SDR50.
+  In Linux driver, the re-tuning interval will be 2 ^ (Tuning Counter - 1) seconds.
+  Xenon SDHC usually doesn't provide re-tuning counter in capability register 3 bit[11:8], thus need set it in driver.
+  This property provides the re-tuning counter.
+  - xenon,tuning-count = <count>;
+  The valid range of Tuning Counter on Xenon SDHC is [1, 0xE].
+  0xF is the default value of Capabilities Register 3 bit[11:8] on Xenon SDHC, which indicates that the Tuning
+  Counter should be achieved through another source.
+  The selection of Tuning Counter value depends on the board timing and environment.
+  More quickly the board timing varies with environment change, more frequently SDHC should execute re-tuning.
+  The term board timing also includes the timing characteristic of eMMC/SD/SDIO card.
+  If have no idea what value should set, just remove this property in DT file.
+  If this property is not set, default re-tuning counter will be set to 0x9 in driver.
+- xenon,emmc: whether only used for eMMC mode(does not support SD)
+  If the SDHC_SYS_CFG_INFO register (Offset 0x0104) can clearly indicate that the current slot only supports eMMC, this property is optional.
+  However, if the SDHC_SYS_CFG_INFO register shows that the current slot can also support SD/SDIO besides of eMMC, this property is mandatory.
+  It informs driver that the current slot is used for eMMC.
+  If this property is not set, current slot will be used for SD/SDIO.
+- non-removable: whether card is non-removable.
+- auto-cmd12: whether cmd12 is sent automatically.
+Example:
+
+sdhci0: sdhci@D8000 {
+	compatible = "marvell,xenon-sdhci";
+	reg = <0xD8000 0x300>;
+	interrupts-extended = <&gic GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+	mmc-ddr-1_8v;
+	mmc-hs200-1_8v;
+	mmc-hs400-1_8v;
+	xenon,slotno = <0>;
+	xenon,emmc;
+	non-removable;
+	bus-width = <8>;
+	auto-cmd12;
+	tuning-count = <6>;
+	status = "disabled";
+};
