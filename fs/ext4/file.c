@@ -26,6 +26,12 @@
 #include <linux/quotaops.h>
 #include <linux/pagevec.h>
 #include <linux/uio.h>
+#ifdef CONFIG_SPLICE_FROM_SOCKET
+#include <linux/backing-dev.h>
+#include <linux/fsnotify.h>
+#include <linux/swap.h>
+#include <net/sock.h>
+#endif
 #include "ext4.h"
 #include "ext4_jbd2.h"
 #include "xattr.h"
@@ -417,6 +423,249 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 	return dquot_file_open(inode, filp);
 }
 
+#ifdef CONFIG_SPLICE_FROM_SOCKET
+ssize_t ext4_splice_from_socket(struct file *file, struct socket *sock,
+				loff_t __user *ppos, size_t count_req)
+{
+	struct address_space *mapping = file->f_mapping;
+	const struct address_space_operations *a_ops = mapping->a_ops;
+	struct inode *inode = mapping->host;
+	int err = 0, remaining;
+	struct kvec iov;
+	struct msghdr msg = { 0 };
+	size_t written = 0, verified_sz;
+	struct kiocb iocb;
+	struct iov_iter iter;
+
+	init_sync_kiocb(&iocb, file);
+
+	if (unlikely(iocb.ki_flags & IOCB_DIRECT))
+		return -EINVAL;
+
+	if (copy_from_user(&iocb.ki_pos, ppos, sizeof(loff_t)))
+		return -EFAULT;
+
+	/* minimal init of iter, used by write_check only */
+	iov_iter_init(&iter, WRITE, NULL, 0, count_req);
+
+	file_start_write(file);
+
+	mutex_lock(&inode->i_mutex);
+	verified_sz = generic_write_checks(&iocb, &iter);
+	if (verified_sz <= 0) {
+		pr_debug("%s: generic_write_checks err, verified_sz %zd\n",
+			 __func__, verified_sz);
+		err = verified_sz;
+		goto cleanup;
+	}
+
+	/*
+	 * If we have encountered a bitmap-format file, the size limit
+	 * is smaller than s_maxbytes, which is for extent-mapped files.
+	 */
+	if (!(ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))) {
+		struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+
+		if (iocb.ki_pos >= sbi->s_bitmap_maxbytes) {
+			err = -EFBIG;
+			goto cleanup;
+		}
+		iov_iter_truncate(&iter, sbi->s_bitmap_maxbytes - iocb.ki_pos);
+	}
+
+	/* We can write back this queue in page reclaim */
+	current->backing_dev_info = inode_to_bdi(inode);
+
+	err = file_remove_privs(file);
+	if (err) {
+		pr_debug("%s: file_remove_privs, err %d\n", __func__, err);
+		goto cleanup;
+	}
+
+	err = file_update_time(file);
+	if (err) {
+		pr_debug("%s: file_update_time, err %d\n", __func__, err);
+		goto cleanup;
+	}
+
+	remaining = iter.count;
+
+	while (remaining > 0) {
+		unsigned long offset;	/* Offset into pagecache page */
+		unsigned long bytes;	/* Bytes to write to page */
+		int copied;		/* Bytes copied from net */
+		struct page *page;
+		void *fsdata;
+		long rcvtimeo;
+		char *paddr;
+
+		offset = (iocb.ki_pos & (PAGE_CACHE_SIZE - 1));
+		bytes = min_t(unsigned long, PAGE_CACHE_SIZE - offset,
+			      remaining);
+
+		err = a_ops->write_begin(file, mapping, iocb.ki_pos,
+					 bytes, AOP_FLAG_UNINTERRUPTIBLE,
+					 &page, &fsdata);
+		if (unlikely(err)) {
+			pr_debug("%s: write_begin err %d\n", __func__, err);
+			break;
+		}
+
+		if (mapping_writably_mapped(mapping))
+			flush_dcache_page(page);
+
+		/* save page address for partial recvmsg case */
+		paddr = kmap(page) + offset;
+		iov.iov_base = paddr;
+		iov.iov_len = bytes;
+
+		rcvtimeo = sock->sk->sk_rcvtimeo;
+		sock->sk->sk_rcvtimeo = 5 * HZ;
+
+		/* IOV is ready, receive the data from socket now */
+		copied = kernel_recvmsg(sock, &msg, &iov, 1,
+					bytes, MSG_WAITALL);
+
+		sock->sk->sk_rcvtimeo = rcvtimeo;
+
+		/* kernel_recvmsg returned an error or no data */
+		if (unlikely(copied <= 0)) {
+			kunmap(page);
+
+			/* update error and quit */
+			err = copied;
+
+			pr_debug("%s: kernel_recvmsg err %d\n", __func__, err);
+
+			/* release pagecache */
+			a_ops->write_end(file, mapping, iocb.ki_pos,
+					 bytes, 0, page, fsdata);
+			break;
+		}
+
+		if (unlikely(copied != bytes)) {
+			char *kaddr;
+			char *buff;
+
+			/* recvmsg failed to write the requested bytes, this
+			 * can happen from NEED_RESCHED signal or socket
+			 * timeout. Partial writes are not allowed so we write
+			 * the recvmsg portion and finish splice, this will
+			 * force the caller to redo the remaining.
+			 */
+
+			pr_debug("%s: partial bytes %ld copied %d\n",
+				 __func__, bytes, copied);
+
+			/* alloc buffer for recvmsg data */
+			buff = kmalloc(copied, GFP_KERNEL);
+			if (unlikely(!buff)) {
+				err = -ENOMEM;
+				break;
+			}
+			/* copy recvmsg bytes to buffer */
+			memcpy(buff, paddr, copied);
+
+			/* and free the partial page */
+			kunmap(page);
+			err = a_ops->write_end(file, mapping, iocb.ki_pos,
+					       bytes, 0, page, fsdata);
+			if (unlikely(err < 0)) {
+				kfree(buff);
+				pr_debug("%s: write_end partial, err %d\n",
+					 __func__, err);
+				break;
+			}
+
+			/* allocate a new page with recvmsg size */
+			err = a_ops->write_begin(file, mapping, iocb.ki_pos, copied,
+						 AOP_FLAG_UNINTERRUPTIBLE,
+						 &page, &fsdata);
+			if (unlikely(err)) {
+				kfree(buff);
+				pr_debug("%s: write_begin partial, err %d\n",
+					 __func__, err);
+				break;
+			}
+
+			if (mapping_writably_mapped(mapping))
+				flush_dcache_page(page);
+
+			/* copy the buffer to new page */
+			kaddr = kmap_atomic(page) + offset;
+			memcpy(kaddr, buff, copied);
+
+			kfree(buff);
+			kunmap_atomic(kaddr);
+
+			/* and write it */
+			mark_page_accessed(page);
+			err = a_ops->write_end(file, mapping, iocb.ki_pos,
+					       copied, copied, page, fsdata);
+			if (unlikely(err < 0)) {
+				pr_debug("%s: write_end partial, err %d\n",
+					 __func__, err);
+				break;
+			}
+
+			/* update written counters */
+			iocb.ki_pos += copied;
+			written += copied;
+
+			WARN_ON(copied != err);
+
+			break;
+		}
+
+		kunmap(page);
+
+		/* page written w/o recvmsg error */
+		mark_page_accessed(page);
+		err = a_ops->write_end(file, mapping, iocb.ki_pos, bytes,
+				       copied, page, fsdata);
+
+		if (unlikely(err < 0)) {
+			pr_debug("%s: write_end, err %d\n", __func__, err);
+			break;
+		}
+
+		/* write success, update counters */
+		remaining -= copied;
+		iocb.ki_pos += copied;
+		written += copied;
+
+		if (WARN_ON(copied != err))
+			break;
+	}
+
+	if (written > 0)
+		balance_dirty_pages_ratelimited(mapping);
+
+cleanup:
+	current->backing_dev_info = NULL;
+
+	mutex_unlock(&inode->i_mutex);
+
+	if (written > 0) {
+		err = generic_write_sync(file, iocb.ki_pos - written, written);
+		if (err < 0) {
+			written = 0;
+			goto done;
+		}
+		fsnotify_modify(file);
+
+		if (copy_to_user(ppos, &iocb.ki_pos, sizeof(loff_t))) {
+			written = 0;
+			err = -EFAULT;
+		}
+	}
+done:
+	file_end_write(file);
+
+	return written ? written : err;
+}
+#endif
+
 /*
  * Here we use ext4_map_blocks() to get a block mapping for a extent-based
  * file rather than ext4_ext_walk_space() because we can introduce
@@ -736,6 +985,9 @@ const struct file_operations ext4_file_operations = {
 	.fsync		= ext4_sync_file,
 	.splice_read	= generic_file_splice_read,
 	.splice_write	= iter_file_splice_write,
+#ifdef CONFIG_SPLICE_FROM_SOCKET
+	.splice_from_socket = ext4_splice_from_socket,
+#endif
 	.fallocate	= ext4_fallocate,
 };
 
