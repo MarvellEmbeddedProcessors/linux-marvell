@@ -619,7 +619,7 @@ cat << EOF > $SMBCONF
 	local master = no
 	dns proxy = no
 	ldap ssl = no
-	create mask = 0666
+	create mask = 0777
 	directory mask = 0777
 	show add printer wizard = no
 	printcap name = /dev/null
