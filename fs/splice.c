@@ -32,6 +32,9 @@
 #include <linux/gfp.h>
 #include <linux/socket.h>
 #include <linux/compat.h>
+#ifdef CONFIG_SPLICE_FROM_SOCKET
+#include <linux/net.h>
+#endif
 #include "internal.h"
 
 /*
@@ -1694,10 +1697,54 @@ SYSCALL_DEFINE6(splice, int, fd_in, loff_t __user *, off_in,
 	struct fd in, out;
 	long error;
 
+#ifdef CONFIG_SPLICE_FROM_SOCKET
+	struct socket *sock = NULL;
+	ssize_t ret;
+#endif
 	if (unlikely(!len))
 		return 0;
 
 	error = -EBADF;
+
+#ifdef CONFIG_SPLICE_FROM_SOCKET
+	/* check if fd_in is a socket */
+	sock = sockfd_lookup(fd_in, (int *)&error);
+	if (sock) {
+		if (!sock->sk)
+			goto nosock;
+		out = fdget(fd_out);
+		if (out.file) {
+			if (!(out.file->f_mode & FMODE_WRITE)) {
+				error = -EBADF;
+				goto done;
+			}
+			if (!(out.file->f_mode & FMODE_CAN_WRITE)) {
+				error = -EINVAL;
+				goto done;
+			}
+
+			ret = rw_verify_area(WRITE, out.file, off_out, len);
+			if (ret < 0) {
+				error = ret;
+				goto done;
+			}
+
+			len = ret;
+			if (!out.file->f_op->splice_from_socket)
+				goto done;
+			error = out.file->f_op->splice_from_socket(out.file,
+								   sock,
+								   off_out,
+								   len);
+		}
+done:
+		fdput(out);
+nosock:
+		fput(sock->file);
+		return error;
+	}
+#endif
+
 	in = fdget(fd_in);
 	if (in.file) {
 		if (in.file->f_mode & FMODE_READ) {
