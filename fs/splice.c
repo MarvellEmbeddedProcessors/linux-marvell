@@ -1699,6 +1699,7 @@ SYSCALL_DEFINE6(splice, int, fd_in, loff_t __user *, off_in,
 #ifdef CONFIG_SPLICE_FROM_SOCKET
 	struct socket *sock = NULL;
 	ssize_t ret;
+	loff_t offset;
 #endif
 	if (unlikely(!len))
 		return 0;
@@ -1722,7 +1723,12 @@ SYSCALL_DEFINE6(splice, int, fd_in, loff_t __user *, off_in,
 				goto done;
 			}
 
-			ret = rw_verify_area(WRITE, out.file, off_out, len);
+			if (copy_from_user(&offset, off_out, sizeof(loff_t))) {
+				error = -EFAULT;
+				goto done;
+			}
+
+			ret = rw_verify_area(WRITE, out.file, &offset, len);
 			if (ret < 0) {
 				error = ret;
 				goto done;
