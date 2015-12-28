@@ -281,4 +281,15 @@ endif # NETWORK_FILESYSTEMS
 source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
 
+config SPLICE_FROM_SOCKET
+	bool "Splice from socket to file descriptor"
+	depends on NET
+	default y
+
+	---help---
+	splice_from_socket to file descriptor can improve splice syscall
+	performance by ~10%.
+	If filesystem does not support this fop api, default
+	file descriptor to file descriptor splice is used.
+
 endmenu
