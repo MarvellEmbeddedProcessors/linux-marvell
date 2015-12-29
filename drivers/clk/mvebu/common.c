@@ -201,34 +201,43 @@ struct clk_gating_ctrl {
 
 #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
 
-static struct clk_gating_ctrl *ctrl;
+#define MAX_CLK_GATE_DOMAINS	(4)
+static struct clk_gating_ctrl *ctrl[MAX_CLK_GATE_DOMAINS];
+static int ctrl_cnt;
 
 static struct clk *clk_gating_get_src(
 	struct of_phandle_args *clkspec, void *data)
 {
+	struct clk_gating_ctrl *ctrlp = data;
 	int n;
 
 	if (clkspec->args_count < 1)
 		return ERR_PTR(-EINVAL);
 
-	for (n = 0; n < ctrl->num_gates; n++) {
+	for (n = 0; n < ctrlp->num_gates; n++) {
 		struct clk_gate *gate =
-			to_clk_gate(__clk_get_hw(ctrl->gates[n]));
+			to_clk_gate(__clk_get_hw(ctrlp->gates[n]));
 		if (clkspec->args[0] == gate->bit_idx)
-			return ctrl->gates[n];
+			return ctrlp->gates[n];
 	}
 	return ERR_PTR(-ENODEV);
 }
 
 static int mvebu_clk_gating_suspend(void)
 {
-	ctrl->saved_reg = readl(ctrl->base);
+	int i;
+
+	for (i = 0; i < ctrl_cnt; i++)
+		ctrl[i]->saved_reg = readl(ctrl[i]->base);
 	return 0;
 }
 
 static void mvebu_clk_gating_resume(void)
 {
-	writel(ctrl->saved_reg, ctrl->base);
+	int i;
+
+	for (i = 0; i < ctrl_cnt; i++)
+		writel(ctrl[i]->saved_reg, ctrl[i]->base);
 }
 
 static struct syscore_ops clk_gate_syscore_ops = {
@@ -243,9 +252,10 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
 	void __iomem *base;
 	const char *default_parent = NULL;
 	int n;
+	struct clk_gating_ctrl *ctrlp;
 
-	if (ctrl) {
-		pr_err("mvebu-clk-gating: cannot instantiate more than one gatable clock device\n");
+	if (ctrl_cnt >= MAX_CLK_GATE_DOMAINS) {
+		pr_err("mvebu-clk-gating: too many gatable clock devices.\n");
 		return;
 	}
 
@@ -259,41 +269,45 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
 		clk_put(clk);
 	}
 
-	ctrl = kzalloc(sizeof(*ctrl), GFP_KERNEL);
-	if (WARN_ON(!ctrl))
+	ctrlp = kzalloc(sizeof(*ctrlp), GFP_KERNEL);
+	if (WARN_ON(!ctrlp))
 		goto ctrl_out;
 
+	ctrl[ctrl_cnt] = ctrlp;
 	/* lock must already be initialized */
-	ctrl->lock = &ctrl_gating_lock;
+	ctrlp->lock = &ctrl_gating_lock;
 
-	ctrl->base = base;
+	ctrlp->base = base;
 
 	/* Count, allocate, and register clock gates */
 	for (n = 0; desc[n].name;)
 		n++;
 
-	ctrl->num_gates = n;
-	ctrl->gates = kzalloc(ctrl->num_gates * sizeof(struct clk *),
+	ctrlp->num_gates = n;
+	ctrlp->gates = kcalloc(ctrlp->num_gates, sizeof(struct clk *),
 			      GFP_KERNEL);
-	if (WARN_ON(!ctrl->gates))
+	if (WARN_ON(!ctrlp->gates))
 		goto gates_out;
 
-	for (n = 0; n < ctrl->num_gates; n++) {
+	for (n = 0; n < ctrlp->num_gates; n++) {
 		const char *parent =
 			(desc[n].parent) ? desc[n].parent : default_parent;
-		ctrl->gates[n] = clk_register_gate(NULL, desc[n].name, parent,
+		ctrlp->gates[n] = clk_register_gate(NULL, desc[n].name, parent,
 					desc[n].flags, base, desc[n].bit_idx,
-					0, ctrl->lock);
-		WARN_ON(IS_ERR(ctrl->gates[n]));
+					0, ctrlp->lock);
+		WARN_ON(IS_ERR(ctrlp->gates[n]));
 	}
 
-	of_clk_add_provider(np, clk_gating_get_src, ctrl);
+	of_clk_add_provider(np, clk_gating_get_src, ctrlp);
 
-	register_syscore_ops(&clk_gate_syscore_ops);
+	/* Register ops only for first device. */
+	if (ctrl_cnt == 0)
+		register_syscore_ops(&clk_gate_syscore_ops);
 
+	ctrl_cnt++;
 	return;
 gates_out:
-	kfree(ctrl);
+	kfree(ctrlp);
 ctrl_out:
 	iounmap(base);
 }
