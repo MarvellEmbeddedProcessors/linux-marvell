@@ -954,9 +954,9 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 	 * a DMA_INTERRUPT operation as a minimum-sized XOR operation.
 	 * Hence, we only need to map the buffers at initialization-time.
 	 */
-	mv_chan->dummy_src_addr = dma_map_single(dma_dev->dev,
+	mv_chan->dummy_src_addr = dma_map_single(&pdev->dev,
 		mv_chan->dummy_src, MV_XOR_MIN_BYTE_COUNT, DMA_FROM_DEVICE);
-	mv_chan->dummy_dst_addr = dma_map_single(dma_dev->dev,
+	mv_chan->dummy_dst_addr = dma_map_single(&pdev->dev,
 		mv_chan->dummy_dst, MV_XOR_MIN_BYTE_COUNT, DMA_TO_DEVICE);
 
 	/* allocate coherent memory for hardware descriptors
