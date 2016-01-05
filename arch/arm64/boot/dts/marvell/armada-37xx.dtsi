@@ -130,6 +130,18 @@
 				};
 			};
 
+			sdhci0: sdhci@d8000 {
+				compatible = "marvell,xenon-sdhci";
+				reg = <0xd8000 0x300>;
+				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+				mmc-ddr-1_8v;
+				mmc-hs200-1_8v;
+				mmc-hs400-1_8v;
+				xenon,slotno = <0>;
+				auto-cmd12;
+				status = "disabled";
+			};
+
 			sata@e0000 {
 				compatible = "marvell,armada-3700-ahci";
 				reg = <0xe0000 0x2000>;
