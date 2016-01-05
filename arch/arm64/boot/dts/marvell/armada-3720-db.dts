@@ -76,6 +76,14 @@
 				status = "okay";
 			};
 
+			sdhci0: sdhci@d8000 {
+				xenon,emmc;
+				non-removable;
+				bus-width = <8>;
+				tuning-count = <6>;
+				status = "okay";
+			};
+
 			/* CON3 */
 			sata@e0000 {
 			       status = "okay";
