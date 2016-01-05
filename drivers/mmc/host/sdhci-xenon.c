@@ -200,6 +200,18 @@ struct sdhci_xenon_priv {
 	unsigned int	quirks; /* Xenon private quirks */
 };
 
+struct card_cntx {
+	/* When initializing card, Xenon has to adjust
+	 * sampling fixed delay.
+	 * However, at that time, card structure is not
+	 * linked to mmc_host.
+	 * Thus a card pointer is added here providing
+	 * the delay adjustment function with the card structure
+	 * of the card during initialization
+	 */
+	struct mmc_card *delay_adjust_card;
+};
+
 /*
  * Xenon Specific Initialization Operations
  */
@@ -649,6 +661,7 @@ static int sdhci_xenon_delay_adj(struct sdhci_host *host, struct mmc_ios *ios)
 	struct mmc_card *card = NULL;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv;
+	struct card_cntx *cntx;
 
 	if (!host->clock)
 		return 0;
@@ -680,6 +693,8 @@ static int sdhci_xenon_delay_adj(struct sdhci_host *host, struct mmc_ios *ios)
 	priv->bus_width = ios->bus_width;
 	priv->timing = ios->timing;
 
+	cntx = (struct card_cntx *)mmc->slot.handler_priv;
+	card = cntx->delay_adjust_card;
 	if (unlikely(card == NULL))
 		return -EIO;
 
@@ -711,6 +726,52 @@ static int sdhci_xenon_delay_adj(struct sdhci_host *host, struct mmc_ios *ios)
 		       mmc_hostname(mmc));
 
 	return ret;
+}
+
+/* After determining the slot is used for SDIO, some addtional
+ * task is required. It will save the pointer to current card,
+ * and do other utilities such as enable or disable auto cmd12
+ * according to card type, and whether indicate current slot as SDIO slot.
+ */
+static void sdhci_xenon_init_card(struct sdhci_host *host,
+				  struct mmc_card *card)
+{
+	u32 reg;
+	u8 slot_idx;
+	struct card_cntx *cntx;
+	struct mmc_host *mmc = host->mmc;
+
+	cntx = (struct card_cntx *)mmc->slot.handler_priv;
+	cntx->delay_adjust_card = card;
+
+	slot_idx = mmc->slotno;
+
+	if (!mmc_card_sdio(card)) {
+		/* Re-enable the Auto-CMD12 cap flag. */
+		host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+		host->flags |= SDHCI_AUTO_CMD12;
+
+		/* Clear SDHC system config information register[31:24] */
+		reg = sdhci_readl(host, SDHC_SYS_CFG_INFO);
+		reg &= ~(1 << (slot_idx + SLOT_TYPE_SDIO_SHIFT));
+		sdhci_writel(host, reg, SDHC_SYS_CFG_INFO);
+	} else {
+		/* Delete the Auto-CMD12 cap flag.
+		 * Otherwise, when sending multi-block CMD53,
+		 * driver will set transfer mode register to enable Auto CMD12.
+		 * However, SDIO device cannot recognize CMD12.
+		 * Thus SDHC will be time out for waiting for CMD12 response.
+		 */
+		host->quirks &= ~SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+		host->flags &= ~SDHCI_AUTO_CMD12;
+
+		/* Set SDHC system configuration information register[31:24]
+		 * to inform that the current slot is for SDIO.
+		 */
+		reg = sdhci_readl(host, SDHC_SYS_CFG_INFO);
+		reg |= (1 << (slot_idx + SLOT_TYPE_SDIO_SHIFT));
+		sdhci_writel(host, reg, SDHC_SYS_CFG_INFO);
+	}
 }
 
 /* Enable/Disable the Auto Clock Gating function */
@@ -923,6 +984,7 @@ static struct sdhci_ops sdhci_xenon_ops = {
 	.voltage_switch		= sdhci_xenon_voltage_switch,
 	.voltage_switch_pre	= sdhci_xenon_voltage_switch_pre,
 	.delay_adj		= sdhci_xenon_delay_adj,
+	.init_card		= sdhci_xenon_init_card,
 };
 
 static struct sdhci_pltfm_data sdhci_xenon_pdata = {
@@ -1062,6 +1124,12 @@ static int sdhci_xenon_slot_probe(struct sdhci_host *host)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv =
 				 (struct sdhci_xenon_priv *)pltfm_host->private;
+	struct card_cntx *cntx;
+
+	cntx = devm_kzalloc(mmc_dev(mmc), sizeof(*cntx), GFP_KERNEL);
+	if (!cntx)
+		return -ENOMEM;
+	mmc->slot.handler_priv = cntx;
 
 	/* Enable slot */
 	sdhci_xenon_set_slot(host, slotno, true);
