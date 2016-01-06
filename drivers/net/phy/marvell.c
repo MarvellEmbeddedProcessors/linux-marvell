@@ -1202,7 +1202,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1112,
@@ -1221,7 +1220,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1111,
@@ -1240,7 +1238,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1118,
@@ -1259,7 +1256,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = {.owner = THIS_MODULE,},
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1121R,
@@ -1278,7 +1274,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1318S,
@@ -1299,7 +1294,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1145,
@@ -1318,7 +1312,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1149R,
@@ -1337,7 +1330,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1240,
@@ -1356,7 +1348,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1116R,
@@ -1375,7 +1366,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1510,
@@ -1391,7 +1381,6 @@ static struct phy_driver marvell_drivers[] = {
 		.did_interrupt = &m88e1121_did_interrupt,
 		.resume = &genphy_resume,
 		.suspend = &genphy_suspend,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E1540,
@@ -1413,7 +1402,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 	{
 		.phy_id = MARVELL_PHY_ID_88E3016,
@@ -1434,7 +1422,6 @@ static struct phy_driver marvell_drivers[] = {
 		.get_sset_count = marvell_get_sset_count,
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
-		.driver = { .owner = THIS_MODULE },
 	},
 };
 

@@ -227,8 +227,6 @@ static struct phy_driver dp83867_driver[] = {
 		.read_status	= genphy_read_status,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
-
-		.driver		= {.owner = THIS_MODULE,}
 	},
 };
 module_phy_driver(dp83867_driver);
