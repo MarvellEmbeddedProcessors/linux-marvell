@@ -908,8 +908,7 @@ static int ravb_phy_init(struct net_device *ndev)
 	/* 10BASE is not supported */
 	phydev->supported &= ~PHY_10BT_FEATURES;
 
-	netdev_info(ndev, "attached PHY %d (IRQ %d) to driver %s\n",
-		    phydev->addr, phydev->irq, phydev_name(phydev));
+	phy_attached_info(phydev);
 
 	priv->phydev = phydev;
 
