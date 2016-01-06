@@ -17,6 +17,7 @@ struct mdio_device {
 	struct device dev;
 
 	struct mii_bus *bus;
+	int (*bus_match)(struct device *dev, struct device_driver *drv);
 	/* Bus address of the MDIO device (0-31) */
 	int addr;
 	int flags;
