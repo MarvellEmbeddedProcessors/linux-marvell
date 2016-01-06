@@ -4015,7 +4015,7 @@ static int mvneta_probe(struct platform_device *pdev)
 
 		mvneta_fixed_link_update(pp, phy);
 
-		put_device(&phy->dev);
+		put_device(&phy->mdio.dev);
 	}
 	/* Initialize cleanup */
 	init_timer(&pp->cleanup_timer);
