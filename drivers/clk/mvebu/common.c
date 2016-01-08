@@ -199,8 +199,6 @@ struct clk_gating_ctrl {
 	u32 saved_reg;
 };
 
-#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
-
 #define MAX_CLK_GATE_DOMAINS	(4)
 static struct clk_gating_ctrl *ctrl[MAX_CLK_GATE_DOMAINS];
 static int ctrl_cnt;
