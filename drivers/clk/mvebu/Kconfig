@@ -31,6 +31,10 @@ config ARMADA_XP_CLK
 	select MVEBU_CLK_CPU
 	select MVEBU_CLK_COREDIV
 
+config ARMADA_3700_CLK
+	bool
+	select MVEBU_CLK_COMMON
+
 config DOVE_CLK
 	bool
 	select MVEBU_CLK_COMMON

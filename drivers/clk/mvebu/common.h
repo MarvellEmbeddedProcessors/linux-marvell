@@ -42,6 +42,7 @@ struct clk_gating_soc_desc {
 	const char *parent;
 	int bit_idx;
 	unsigned long flags;
+	u8 clk_gate_flags;
 };
 
 void __init mvebu_coreclk_setup(struct device_node *np,

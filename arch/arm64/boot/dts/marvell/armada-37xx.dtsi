@@ -118,6 +118,18 @@
 				status = "disabled";
 			};
 
+			ngateclk: north-bridge-gate-clk@13014 {
+				compatible = "marvell,armada-3700-north-bridge-gating-clock";
+				reg = <0x13014 0x4>;
+				#clock-cells = <1>;
+			};
+
+			sgateclk: south-bridge-gate-clk@18014 {
+				compatible = "marvell,armada-3700-south-bridge-gating-clock";
+				reg = <0x18014 0x4>;
+				#clock-cells = <1>;
+			};
+
 			usb3@58000 {
 				compatible = "generic-xhci";
 				reg = <0x58000 0x4000>;
