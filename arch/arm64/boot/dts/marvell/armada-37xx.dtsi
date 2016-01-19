@@ -180,6 +180,7 @@
 				compatible = "marvell,armada-3700-ahci";
 				reg = <0xe0000 0x2000>;
 				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&ngateclk 3>;
 				status = "disabled";
 			};
 
