@@ -5,6 +5,7 @@ obj-$(CONFIG_ARMADA_370_CLK)	+= armada-370.o
 obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
 obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
 obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
+obj-$(CONFIG_ARMADA_3700_CLK)	+= armada-3700.o
 obj-$(CONFIG_ARMADA_AP806_CORE_CLK) += ap806-core.o
 obj-$(CONFIG_ARMADA_AP806_RING_CLK) += ap806-ring.o
 obj-$(CONFIG_ARMADA_CP110_CLK)  += cp110.o

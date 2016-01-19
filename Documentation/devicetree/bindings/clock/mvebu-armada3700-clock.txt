@@ -1,0 +1,40 @@
+* Clock bindings for Marvell MVEBU Armada3700 SoCs
+
+Marvell Armada 3700 allow some peripheral clocks to be gated to save power.The clock
+consumer should specify the desired clock by having the clock ID in its
+"clocks" phandle cell. The clock ID is directly mapped to the corresponding clock
+gating control bit in HW to ease manual clock lookup in datasheet.
+
+Required properties:
+- compatible : shall be one of the following:
+	"marvell,armada-3700-north-bridge-gating-clock" - gate clock control for Armada 3700 north bridge
+	"marvell,armada-3700-south-bridge-gating-clock" - gate clock control for Armada 3700 south bridge
+- reg : shall be the register address of the Clock Gating Control register
+- #clock-cells : from common clock binding; shall be set to 1
+
+Optional properties:
+- clocks : default parent clock phandle and clock specifier.
+	(for gate clock control, it's optional to define the parent clock,
+	for the clock consumer, it defines the gate clock phandle and clock ID)
+
+Example:
+
+ngateclk: north-bridge-gate-clk@13014 {
+	compatible = "marvell,armada-3700-north-bridge-gating-clock";
+	reg = <0x13014 0x4>;
+	#clock-cells = <1>;
+};
+
+sgateclk: south-bridge-gate-clk@18014 {
+	compatible = "marvell,armada-3700-south-bridge-gating-clock";
+	reg = <0x18014 0x4>;
+	#clock-cells = <1>;
+};
+
+sata0: sata@e0000 {
+	compatible = "marvell,armada-3700-ahci";
+	reg = <0xe0000 0x2000>;
+	interrupts = <0 27 4>;
+	clocks = <&ngateclk 3>;
+	status = "disabled";
+};

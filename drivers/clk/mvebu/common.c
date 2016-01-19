@@ -294,7 +294,7 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
 			(desc[n].parent) ? desc[n].parent : default_parent;
 		ctrlp->gates[n] = clk_register_gate(NULL, desc[n].name, parent,
 					desc[n].flags, base, desc[n].bit_idx,
-					0, ctrlp->lock);
+					desc[n].clk_gate_flags, ctrlp->lock);
 		WARN_ON(IS_ERR(ctrlp->gates[n]));
 	}
 
