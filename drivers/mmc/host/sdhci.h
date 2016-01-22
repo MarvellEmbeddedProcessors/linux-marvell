@@ -162,6 +162,8 @@
 #define   SDHCI_CTRL_UHS_SDR104		0x0003
 #define   SDHCI_CTRL_UHS_DDR50		0x0004
 #define   SDHCI_CTRL_HS400		0x0005 /* Non-standard */
+#define   SDHCI_CTRL_HS200_ONLY		0x0005 /* Non-standard */
+#define   SDHCI_CTRL_HS400_ONLY		0x0006 /* Non-standard */
 #define  SDHCI_CTRL_VDD_180		0x0008
 #define  SDHCI_CTRL_DRV_TYPE_MASK	0x0030
 #define   SDHCI_CTRL_DRV_TYPE_B		0x0000
@@ -422,6 +424,8 @@ struct sdhci_host {
  * SD clock frequency or enabling back the internal clock.
  */
 #define SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST	(1<<16)
+/* Some host controller separates HS200 and HS400 definitions */
+#define SDHCI_QUIRK2_TIMING_HS200_HS400			(1<<17)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */

@@ -1461,6 +1461,19 @@ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
 		ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
 	else if (timing == MMC_TIMING_MMC_HS400)
 		ctrl_2 |= SDHCI_CTRL_HS400; /* Non-standard */
+
+	/* Some host controller separates HS200 and HS400 definitions,
+	 * and may have different defitition with the non-standard one
+	 * defined in original SDHCI.
+	 */
+	if (host->quirks2 & SDHCI_QUIRK2_TIMING_HS200_HS400) {
+		ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+		if (timing == MMC_TIMING_MMC_HS200)
+			ctrl_2 |= SDHCI_CTRL_HS200_ONLY;
+		else if (timing == MMC_TIMING_MMC_HS400)
+			ctrl_2 |= SDHCI_CTRL_HS400_ONLY;
+	}
+
 	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
 }
 EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);
