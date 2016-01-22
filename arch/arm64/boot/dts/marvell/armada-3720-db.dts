@@ -76,6 +76,12 @@
 				status = "okay";
 			};
 
+			sdhci1: sdhci@d0000 {
+				broken-cd;
+				bus-width = <4>;
+				status = "okay";
+			};
+
 			sdhci0: sdhci@d8000 {
 				xenon,emmc;
 				non-removable;
