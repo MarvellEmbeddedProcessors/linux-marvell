@@ -130,6 +130,15 @@
 				};
 			};
 
+			sdhci1: sdhci@d0000 {
+				compatible = "marvell,xenon-sdhci";
+				reg = <0xd0000 0x300>;
+				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+				xenon,slotno = <0>;
+				auto-cmd12;
+				status = "disabled";
+			};
+
 			sdhci0: sdhci@d8000 {
 				compatible = "marvell,xenon-sdhci";
 				reg = <0xd8000 0x300>;
