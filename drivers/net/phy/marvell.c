@@ -133,6 +133,10 @@
 #define MII_88E3016_DISABLE_SCRAMBLER	0x0200
 #define MII_88E3016_AUTO_MDIX_CROSSOVER	0x0030
 
+#define MII_88E1510_PHY_INTERNAL_REG_1	16
+#define MII_88E1510_PHY_INTERNAL_REG_2	17
+#define MII_88E1510_PHY_GENERAL_CTRL_1	20
+
 MODULE_DESCRIPTION("Marvell PHY driver");
 MODULE_AUTHOR("Andy Fleming");
 MODULE_LICENSE("GPL");
@@ -614,6 +618,111 @@ static int m88e1111_config_init(struct phy_device *phydev)
 		return err;
 
 	return phy_write(phydev, MII_BMCR, BMCR_RESET);
+}
+
+static int m88e1510_phy_writebits(struct phy_device *phydev,
+				  u8 reg_num, u16 offset, u16 len, u16 data)
+{
+	int err;
+	int reg;
+	u16 mask;
+
+	if ((len + offset) >= 16)
+		mask = 0 - (1 << offset);
+	else
+		mask = (1 << (len + offset)) - (1 << offset);
+
+	reg = phy_read(phydev, reg_num);
+	if (reg < 0)
+		return reg;
+
+	reg &= ~mask;
+	reg |= data << offset;
+
+	err = phy_write(phydev, reg_num, (u16)reg);
+
+	return err;
+}
+
+/* For Marvell 88E1510/88E1518/88E1512/88E1514, need to fix the Errata in
+ * SGMII mode, which is described in Marvell Release Notes Errata Section 3.1.
+ * Besides of that, the 88E151X serial PHY should be initialized as legacy
+ * Marvell 88E1111 PHY.
+ */
+static int m88e1510_config_init(struct phy_device *phydev)
+{
+	int err;
+
+	/* As per Marvell Release Notes - Alaska 88E1510/88E1518/88E1512
+	 * /88E1514 Rev A0, Errata Section 3.1
+	 */
+	if (phydev->interface == PHY_INTERFACE_MODE_SGMII) {
+		err = phy_write(phydev, MII_MARVELL_PHY_PAGE, 0x00ff);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_88E1510_PHY_INTERNAL_REG_2, 0x214B);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_88E1510_PHY_INTERNAL_REG_1, 0x2144);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_88E1510_PHY_INTERNAL_REG_2, 0x0C28);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_88E1510_PHY_INTERNAL_REG_1, 0x2146);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_88E1510_PHY_INTERNAL_REG_2, 0xB233);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_88E1510_PHY_INTERNAL_REG_1, 0x214D);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_88E1510_PHY_INTERNAL_REG_2, 0xCC0C);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_88E1510_PHY_INTERNAL_REG_1, 0x2159);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_MARVELL_PHY_PAGE, 0x0);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_MARVELL_PHY_PAGE, 18);
+		if (err < 0)
+			return err;
+
+		/* Write HWCFG_MODE = SGMII to Copper */
+		err = m88e1510_phy_writebits(phydev,
+					     MII_88E1510_PHY_GENERAL_CTRL_1,
+					     0, 3, 1);
+		if (err < 0)
+			return err;
+
+		/* Phy reset */
+		err = m88e1510_phy_writebits(phydev,
+					     MII_88E1510_PHY_GENERAL_CTRL_1,
+					     15, 1, 1);
+		if (err < 0)
+			return err;
+
+		err = phy_write(phydev, MII_MARVELL_PHY_PAGE, 0x0);
+		if (err < 0)
+			return err;
+
+		usleep_range(100, 200);
+	}
+
+	return m88e1111_config_init(phydev);
 }
 
 static int m88e1118_config_aneg(struct phy_device *phydev)
@@ -1150,6 +1259,7 @@ static struct phy_driver marvell_drivers[] = {
 		.name = "Marvell 88E1510",
 		.features = PHY_GBIT_FEATURES,
 		.flags = PHY_HAS_INTERRUPT,
+		.config_init = &m88e1510_config_init,
 		.config_aneg = &m88e1510_config_aneg,
 		.read_status = &marvell_read_status,
 		.ack_interrupt = &marvell_ack_interrupt,
