@@ -571,7 +571,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	port->line       = 0; /* single port: force line number to  0 */
 
 	port->irq        = irq->start;
-	port->irqflags   = 0;
+	port->irqflags   = IRQF_SHARED;
 	port->mapbase    = reg->start;
 
 	port->membase = devm_ioremap_resource(&pdev->dev, reg);
