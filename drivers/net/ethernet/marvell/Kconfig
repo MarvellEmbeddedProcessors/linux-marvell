@@ -72,6 +72,15 @@ config MVPP2
 	  This driver supports the network interface units in the
 	  Marvell ARMADA 375 SoC.
 
+config MVPP2X
+        tristate "Marvell Armada 375/70xx/80xx network interface support"
+       depends on ARCH_MVEBU
+        select MVMDIO
+        select MVXMDIO
+        ---help---
+          This driver supports the network interface units in the
+          Marvell ARMADA 375/70xx/80xx SoC series
+
 config PXA168_ETH
 	tristate "Marvell pxa168 ethernet support"
 	depends on HAS_IOMEM && HAS_DMA
