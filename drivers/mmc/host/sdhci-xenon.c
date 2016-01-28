@@ -992,6 +992,7 @@ static struct sdhci_pltfm_data sdhci_xenon_pdata = {
 	.quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
 		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 |
 		  SDHCI_QUIRK_NO_SIMULT_VDD_AND_POWER,
+	.quirks2 = SDHCI_QUIRK2_TIMING_HS200_HS400,
 	/* Add SOC specific quirks in the above .quirks, .quirks2
 	 * fields.
 	 */
