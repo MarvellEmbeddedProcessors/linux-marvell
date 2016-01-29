@@ -134,6 +134,7 @@
 				compatible = "generic-xhci";
 				reg = <0x58000 0x4000>;
 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&sgateclk 17>;
 				status = "disabled";
 			};
 
