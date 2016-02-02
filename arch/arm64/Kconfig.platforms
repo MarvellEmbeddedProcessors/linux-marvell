@@ -1,5 +1,11 @@
 menu "Platform selection"
 
+config ARCH_MVEBU
+	bool "Marvell EBU SoC Family"
+	help
+	  This enables support for Marvell EBU familly such as the
+	  Armada 3700 SoC Family.
+
 config ARCH_BCM_IPROC
 	bool "Broadcom iProc SoC Family"
 	help
