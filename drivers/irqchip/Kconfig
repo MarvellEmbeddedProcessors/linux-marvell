@@ -49,7 +49,6 @@ config ARM_VIC_NR
 
 config ARMADA_370_XP_IRQ
 	bool
-	default y if ARCH_MVEBU
 	select GENERIC_IRQ_CHIP
 
 config ATMEL_AIC_IRQ
