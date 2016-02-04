@@ -151,6 +151,16 @@ config AHCI_MVEBU
 
 	  If unsure, say N.
 
+config CP110_SATA_ADDR_WA
+	bool "Enable WA for CP110 port addresses"
+	depends on AHCI_MVEBU
+	default n
+	help
+	  This option adds a WA for the bad
+	  addresses of CP-110 port registers.
+	  Use this option when using the
+	  CP-110-A0 AHCI ports.
+
 config AHCI_SUNXI
 	tristate "Allwinner sunxi AHCI SATA support"
 	depends on ARCH_SUNXI

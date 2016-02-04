@@ -122,6 +122,11 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 		ahci_mvebu_regret_option(hpriv);
 	}
 
+#ifdef CONFIG_CP110_SATA_ADDR_WA
+	of_property_read_u32(pdev->dev.of_node, "port_base", &hpriv->port_base);
+	of_property_read_u32(pdev->dev.of_node, "port_offset", &hpriv->port_offset);
+#endif
+
 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
 				     &ahci_platform_sht);
 	if (rc)
