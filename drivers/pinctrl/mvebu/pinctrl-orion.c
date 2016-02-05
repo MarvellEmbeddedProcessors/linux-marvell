@@ -29,6 +29,10 @@
 
 #include "pinctrl-mvebu.h"
 
+#define MVEBU_MPPS_PER_REG	8
+#define MVEBU_MPP_BITS		4
+#define MVEBU_MPP_MASK		0xf
+
 static void __iomem *mpp_base;
 static void __iomem *high_mpp_base;
 
