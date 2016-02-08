@@ -2,9 +2,14 @@ menu "Platform selection"
 
 config ARCH_MVEBU
 	bool "Marvell EBU SoC Family"
+	select ARM_GIC_ODMI
+	select ARMADA_AP806_CORE_CLK
+	select ARMADA_AP806_RING_CLK
 	help
-	  This enables support for Marvell EBU familly such as the
-	  Armada 3700 SoC Family.
+	  This enables support for Marvell EBU familly, including:
+	   - Armada 3700 SoC Family
+	   - Armada 7K SoC Family
+	   - Armada 8K SoC Family
 
 config ARCH_BCM_IPROC
 	bool "Broadcom iProc SoC Family"
