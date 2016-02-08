@@ -42,3 +42,6 @@ config KIRKWOOD_CLK
 config ORION_CLK
 	bool
 	select MVEBU_CLK_COMMON
+
+config ARMADA_AP806_CORE_CLK
+	bool

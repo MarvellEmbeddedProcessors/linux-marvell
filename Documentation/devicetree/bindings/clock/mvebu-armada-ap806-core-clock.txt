@@ -1,0 +1,33 @@
+* Clock bindings for Marvell MVEBU AP806 Core clocks
+
+The Marvell MVEBU Armada 7K/8K SoCs contain a block called AP806,
+hosting the CPU and other core components of the CPU. This Device Tree
+binding allows to describe the core clocks of the AP806, whose
+frequencies are determined by reading the Sample-At-Reset (SAR)
+register.
+
+Clock consumers must specify the desired clock by having the clock ID
+in its "clocks" phandle cell.
+
+The following is a list of provided IDs and clock names for the core
+Armada AP806 clocks:
+
+ 0 = DDR
+ 1 = Ring
+ 2 = CPU
+
+Required properties:
+- compatible: must be be one of the following:
+	"marvell,armada-ap806-core-clock"
+- reg: must be the register address of the Sample-At-Reset (SAR) register
+- #clock-cells: from common clock binding; shall be set to 1
+- clock-output-names: name of the output clocks
+
+Example:
+
+	coreclk: clk@0x6F8204 {
+		compatible = "marvell,armada-ap806-core-clock";
+		reg = <0x6F8204 0x04>;
+		#clock-cells = <1>;
+		clock-output-names = "ddr", "ring", "cpu";
+	};
