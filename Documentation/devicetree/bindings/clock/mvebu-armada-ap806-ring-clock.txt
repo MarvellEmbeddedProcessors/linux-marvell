@@ -1,0 +1,32 @@
+* Clock bindings for Marvell MVEBU AP806 Ring clocks
+
+The Marvell MVEBU Armada 7K/8K SoCs contain a block called AP806,
+hosting the CPU and other core components of the CPU. This Device Tree
+binding allows to describe the ring clocks of the AP806, which are
+derived from the Ring Core clock, after a dividing factor.
+
+The following is a list of provided IDs and clock names on Armada
+AP806 RING dividers:
+
+ 0 = Ring 0
+ 1 = Ring 2
+ 2 = Ring 3
+ 3 = Ring 4
+ 4 = Ring 5
+
+Required properties:
+- compatible: must be one of the following:
+	"marvell,armada-ap806-ring-clock"
+- reg: must be the register holding the divider values for ring clocks
+- #clock-cells : from common clock binding; shall be set to 1
+- clock-output-names: name of the output clocks
+
+Example:
+
+	ringclk: clk@0x6F8250 {
+		compatible = "marvell,armada-ap806-ring-clock";
+		reg = <0x6F8250 0x04>;
+		#clock-cells = <1>;
+		clock-output-names = "ring-0", "ring-2", "ring-3", "ring-4", "ring-5";
+		clocks = <&coreclk 1>;
+	};
