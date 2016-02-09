@@ -86,20 +86,25 @@ EBU Armada family
     Product Brief:   http://www.marvell.com/embedded-processors/armada-300/assets/Marvell_ARMADA_370_SoC.pdf
     Hardware Spec:   http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA370-datasheet.pdf
     Functional Spec: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA370-FunctionalSpec-datasheet.pdf
+    Core:            Marvell PJ4B, ARMv7 compatible
 
   Armada 375 Flavors:
 	88F6720
     Product Brief: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA_375_SoC-01_product_brief.pdf
+    Core:          ARM Cortex-A9
 
   Armada 380/385 Flavors:
 	88F6810
 	88F6820
 	88F6828
+    Functional spec: https://marvellcorp.wufoo.com/forms/marvell-armada-38x-functional-specifications/
+    Core:          ARM Cortex-A9
 
   Armada 390/398 Flavors:
 	88F6920
 	88F6928
     Product infos: http://www.marvell.com/embedded-processors/armada-39x/
+    Core:          ARM Cortex-A9
 
   Armada XP Flavors:
         MV78230
@@ -112,8 +117,7 @@ EBU Armada family
       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78230_OS.PDF
       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78260_OS.PDF
       http://www.marvell.com/embedded-processors/armada-xp/assets/HW_MV78460_OS.PDF
-
-  Core: Sheeva ARMv7 compatible
+    Core: Marvell PJ4B-MP, ARMv7 compatible
 
   Linux kernel mach directory: arch/arm/mach-mvebu
   Linux kernel plat directory: none
