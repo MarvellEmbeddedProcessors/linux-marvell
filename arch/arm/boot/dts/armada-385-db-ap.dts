@@ -177,6 +177,10 @@
 				nand-on-flash-bbt;
 			};
 
+			usb@58000 {
+				status = "okay";
+			};
+
 			usb3@f0000 {
 				status = "okay";
 				usb-phy = <&usb3_phy>;
