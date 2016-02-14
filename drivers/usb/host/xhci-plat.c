@@ -84,6 +84,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	struct clk              *clk;
 	int			ret;
 	int			irq;
+	int			i;
 
 	if (usb_disabled())
 		return -ENODEV;
@@ -123,36 +124,38 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	hcd->rsrc_start = res->start;
 	hcd->rsrc_len = resource_size(res);
 
-	/*
-	 * Not all platforms have a clk so it is not an error if the
-	 * clock does not exists.
-	 */
-	clk = devm_clk_get(&pdev->dev, NULL);
-	if (!IS_ERR(clk)) {
-		ret = clk_prepare_enable(clk);
-		if (ret)
-			goto put_hcd;
-	}
-
 	if (of_device_is_compatible(pdev->dev.of_node,
 				    "marvell,armada-375-xhci") ||
 	    of_device_is_compatible(pdev->dev.of_node,
 				    "marvell,armada-380-xhci")) {
 		ret = xhci_mvebu_mbus_init_quirk(pdev);
 		if (ret)
-			goto disable_clk;
+			goto put_hcd;
 	}
 
 	device_wakeup_enable(hcd->self.controller);
 
 	xhci = hcd_to_xhci(hcd);
-	xhci->clk = clk;
 	xhci->main_hcd = hcd;
 	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
 			dev_name(&pdev->dev), hcd);
 	if (!xhci->shared_hcd) {
 		ret = -ENOMEM;
-		goto disable_clk;
+		goto put_hcd;
+	}
+
+	/*
+	 * Not all platforms have a clk so it is not an error if the
+	 * clock does not exists.
+	 */
+	for (i = 0; i < MAX_XHCI_CLOCKS; i++) {
+		clk = of_clk_get(pdev->dev.of_node, i);
+		if (!IS_ERR(clk)) {
+			ret = clk_prepare_enable(clk);
+			if (ret)
+				goto disable_clk;
+			xhci->clk[i] = clk;
+		}
 	}
 
 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
@@ -195,8 +198,10 @@ put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
 
 disable_clk:
-	if (!IS_ERR(clk))
-		clk_disable_unprepare(clk);
+	for (i = 0; i < MAX_XHCI_CLOCKS; i++) {
+		if (!IS_ERR(xhci->clk[i]))
+			clk_disable_unprepare(xhci->clk[i]);
+	}
 
 put_hcd:
 	usb_put_hcd(hcd);
@@ -208,7 +213,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 {
 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-	struct clk *clk = xhci->clk;
+	int i;
 
 	usb_remove_hcd(xhci->shared_hcd);
 	usb_phy_shutdown(hcd->usb_phy);
@@ -216,8 +221,11 @@ static int xhci_plat_remove(struct platform_device *dev)
 	usb_remove_hcd(hcd);
 	usb_put_hcd(xhci->shared_hcd);
 
-	if (!IS_ERR(clk))
-		clk_disable_unprepare(clk);
+	for (i = 0; i < MAX_XHCI_CLOCKS; i++) {
+		if (!IS_ERR(xhci->clk[i]))
+			clk_disable_unprepare(xhci->clk[i]);
+	}
+
 	usb_put_hcd(hcd);
 
 	return 0;
