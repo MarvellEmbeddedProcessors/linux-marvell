@@ -553,6 +553,7 @@ struct sdhci_ops {
 					 struct mmc_card *card,
 					 unsigned int max_dtr, int host_drv,
 					 int card_drv, int *drv_type);
+	void	(*voltage_switch_pre)(struct sdhci_host *host);
 	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
 };
 

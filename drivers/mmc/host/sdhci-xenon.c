@@ -42,6 +42,16 @@
 
 #define SDHC_SYS_EXT_OP_CTRL			0x010c
 
+#define SDHC_SLOT_eMMC_CTRL			0x0130
+#define  ENABLE_DATA_STROBE			(1 << 24)
+#define  SET_EMMC_RSTN				(1 << 16)
+#define  DISABLE_RD_DATA_CRC			(1 << 14)
+#define  DISABLE_CRC_STAT_TOKEN			(1 << 13)
+#define  eMMC_VCCQ_MASK				0x3
+#define   eMMC_VCCQ_1_8V			0x1
+#define   eMMC_VCCQ_1_2V			0x2
+#define	  eMMC_VCCQ_3_3V			0x3
+
 #define SDHC_SLOT_RETUNING_REQ_CTRL		0x0144
 #define  RETUNING_COMPATIBLE			0x1
 
@@ -185,6 +195,85 @@ static void sdhci_xenon_reset(struct sdhci_host *host, u8 mask)
 	sdhci_xenon_reset_exit(host, host->mmc->slotno, mask);
 }
 
+static void sdhci_xenon_voltage_switch(struct sdhci_host *host)
+{
+	u32 reg;
+	unsigned char voltage;
+	unsigned char voltage_code;
+
+	voltage = host->mmc->ios.signal_voltage;
+
+	if (voltage == MMC_SIGNAL_VOLTAGE_330) {
+		voltage_code = eMMC_VCCQ_3_3V;
+	} else if (voltage == MMC_SIGNAL_VOLTAGE_180) {
+		voltage_code = eMMC_VCCQ_1_8V;
+	} else {
+		pr_err("%s: Xenon unsupported signal voltage\n",
+		       mmc_hostname(host->mmc));
+		return;
+	}
+
+	/* This host is for eMMC, XENON self-defined
+	 * eMMC slot control register should be accessed
+	 * instead of Host Control 2
+	 */
+	reg = sdhci_readl(host, SDHC_SLOT_eMMC_CTRL);
+	reg &= ~eMMC_VCCQ_MASK;
+	reg |= voltage_code;
+	sdhci_writel(host, reg, SDHC_SLOT_eMMC_CTRL);
+
+	/* There is no standard to determine this waiting period */
+	usleep_range(1000, 2000);
+
+	/* Check whether io voltage switch is done */
+	reg = sdhci_readl(host, SDHC_SLOT_eMMC_CTRL);
+	reg &= eMMC_VCCQ_MASK;
+	/*
+	 * This bit is set only when regulator feedbacks the voltage switch
+	 * result. However, in actaul implementation, regulator might not
+	 * provide this feedback. Thus we shall not rely on this bit status
+	 * to determine if switch is failed. If the bit is not set, just
+	 * throws a warning, error level message is not need.
+	 */
+	if (reg != voltage_code)
+		pr_warn("%s: Xenon failed to switch signal voltage\n",
+			mmc_hostname(host->mmc));
+}
+
+static void sdhci_xenon_voltage_switch_pre(struct sdhci_host *host)
+{
+	u32 reg;
+	int timeout;
+
+	/*
+	 * Before SD/SDIO set signal voltage, SD bus clock should be disabled.
+	 * However, sdhci_set_clock will also disable the internal clock.
+	 * For some host SD controller, if internal clock is disabled,
+	 * the 3.3V/1.8V bit can not be updated.
+	 * Thus here manually enable internal clock.
+	 * After switch completes, it is unnessary to disable internal clock,
+	 * since keeping internal clock active follows SD spec.
+	 */
+	reg = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+	if (!(reg & SDHCI_CLOCK_INT_EN)) {
+		reg |= SDHCI_CLOCK_INT_EN;
+		sdhci_writew(host, reg, SDHCI_CLOCK_CONTROL);
+
+		/* Wait max 20 ms */
+		timeout = 20;
+		while (!((reg = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
+				& SDHCI_CLOCK_INT_STABLE)) {
+			if (timeout == 0) {
+				pr_err("%s: Internal clock never stabilised.\n",
+				       mmc_hostname(host->mmc));
+				break;
+			}
+			timeout--;
+			mdelay(1);
+		}
+	}
+}
+
 static const struct of_device_id sdhci_xenon_dt_ids[] = {
 	{ .compatible = "marvell,xenon-sdhci",},
 	{}
@@ -208,6 +297,8 @@ static struct sdhci_ops sdhci_xenon_ops = {
 	.set_uhs_signaling	= sdhci_set_uhs_signaling,
 	.platform_init		= sdhci_xenon_platform_init,
 	.get_max_clock		= sdhci_xenon_get_max_clock,
+	.voltage_switch		= sdhci_xenon_voltage_switch,
+	.voltage_switch_pre	= sdhci_xenon_voltage_switch_pre,
 };
 
 static struct sdhci_pltfm_data sdhci_xenon_pdata = {
