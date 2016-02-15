@@ -376,6 +376,9 @@ struct mvneta_port {
 	spinlock_t lock;
 	bool is_stopped;
 
+	u32 cause_rx_tx;
+	struct napi_struct napi;
+
 	/* Core clock */
 	struct clk *clk;
 	u8 mcast_count[256];
@@ -395,6 +398,12 @@ struct mvneta_port {
 	u64 ethtool_stats[ARRAY_SIZE(mvneta_statistics)];
 
 	u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
+
+	/* Flags for special SoC configurations */
+	bool neta_armada3700;
+#ifdef CONFIG_64BIT
+	u64 data_high;
+#endif
 };
 
 /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
@@ -1111,27 +1120,33 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
 	/* Set CPU queue access map. CPUs are assigned to the RX and
 	 * TX queues modulo their number. If there is only one TX
 	 * queue then it is assigned to the CPU associated to the
-	 * default RX queue.
+	 * default RX queue. Without per-CPU processing enable all
+	 * CPUs' access to all TX and RX queues.
 	 */
 	for_each_present_cpu(cpu) {
 		int rxq_map = 0, txq_map = 0;
 		int rxq, txq;
 
-		for (rxq = 0; rxq < rxq_number; rxq++)
-			if ((rxq % max_cpu) == cpu)
-				rxq_map |= MVNETA_CPU_RXQ_ACCESS(rxq);
+		if (!pp->neta_armada3700) {
+			for (rxq = 0; rxq < rxq_number; rxq++)
+				if ((rxq % max_cpu) == cpu)
+					rxq_map |= MVNETA_CPU_RXQ_ACCESS(rxq);
 
-		for (txq = 0; txq < txq_number; txq++)
-			if ((txq % max_cpu) == cpu)
-				txq_map |= MVNETA_CPU_TXQ_ACCESS(txq);
+			for (txq = 0; txq < txq_number; txq++)
+				if ((txq % max_cpu) == cpu)
+					txq_map |= MVNETA_CPU_TXQ_ACCESS(txq);
 
-		/* With only one TX queue we configure a special case
-		 * which will allow to get all the irq on a single
-		 * CPU
-		 */
-		if (txq_number == 1)
-			txq_map = (cpu == pp->rxq_def) ?
-				MVNETA_CPU_TXQ_ACCESS(1) : 0;
+			/* With only one TX queue we configure a special case
+			 * which will allow to get all the irq on a single
+			 * CPU.
+			 */
+			if (txq_number == 1)
+				txq_map = (cpu == pp->rxq_def) ?
+					MVNETA_CPU_TXQ_ACCESS(1) : 0;
+		} else {
+			txq_map = MVNETA_CPU_TXQ_ACCESS_ALL_MASK;
+			rxq_map = MVNETA_CPU_RXQ_ACCESS_ALL_MASK;
+		}
 
 		mvreg_write(pp, MVNETA_CPU_MAP(cpu), rxq_map | txq_map);
 	}
@@ -1307,7 +1322,14 @@ static void mvneta_rx_time_coal_set(struct mvneta_port *pp,
 	u32 val;
 	unsigned long clk_rate;
 
-	clk_rate = clk_get_rate(pp->clk);
+	if (pp->neta_armada3700)
+		/* Since lack of full clock tree support, Tclk rate
+		 * has to be temporarily hardcoded to 200MHz in order to
+		 * enable RX coalescing.
+		 */
+		clk_rate = 200000000;
+	else
+		clk_rate = clk_get_rate(pp->clk);
 	val = (clk_rate / 1000000) * value;
 
 	mvreg_write(pp, MVNETA_RXQ_TIME_COAL_REG(rxq->id), val);
@@ -1548,6 +1570,11 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
 	if (!data)
 		return -ENOMEM;
 
+#ifdef CONFIG_64BIT
+	if (unlikely(pp->data_high != ((u64)data & 0xffffffff00000000)))
+		return -ENOMEM;
+#endif
+
 	phys_addr = dma_map_single(pp->dev->dev.parent, data,
 				   MVNETA_RX_BUF_SIZE(pp->pkt_size),
 				   DMA_FROM_DEVICE);
@@ -1556,7 +1583,7 @@ static int mvneta_rx_refill(struct mvneta_port *pp,
 		return -ENOMEM;
 	}
 
-	mvneta_rx_desc_fill(rx_desc, phys_addr, (u32)data);
+	mvneta_rx_desc_fill(rx_desc, phys_addr, (uintptr_t)data);
 	return 0;
 }
 
@@ -1600,8 +1627,15 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 	rx_done = mvneta_rxq_busy_desc_num_get(pp, rxq);
 	for (i = 0; i < rxq->size; i++) {
 		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
-		void *data = (void *)rx_desc->buf_cookie;
-
+		void *data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
+#ifdef CONFIG_64BIT
+		/* In Neta HW only 32 bits data is supported, so in order to
+		 * obtain whole 64 bits address from RX descriptor, we store the
+		 * upper 32 bits when allocating buffer, and put it back
+		 * when using buffer cookie for accessing packet in memory.
+		 */
+		data = (u8 *)(pp->data_high | (u64)data);
+#endif
 		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
 		mvneta_frag_free(pp, data);
@@ -1613,9 +1647,9 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 
 /* Main rx processing */
 static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
-		     struct mvneta_rx_queue *rxq)
+		     struct mvneta_rx_queue *rxq,
+		     struct napi_struct *napi)
 {
-	struct mvneta_pcpu_port *port = this_cpu_ptr(pp->ports);
 	struct net_device *dev = pp->dev;
 	int rx_done;
 	u32 rcvd_pkts = 0;
@@ -1641,7 +1675,16 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 		rx_done++;
 		rx_status = rx_desc->status;
 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
-		data = (unsigned char *)rx_desc->buf_cookie;
+#ifdef CONFIG_64BIT
+		/* In Neta HW only 32 bits data is supported, so in order to
+		 * obtain whole 64 bits address from RX descriptor, we store the
+		 * upper 32 bits when allocating buffer, and put it back
+		 * when using buffer cookie for accessing packet in memory.
+		 */
+		data = (u8 *)(pp->data_high | (u64)rx_desc->buf_cookie);
+#else
+		data = (u8 *)rx_desc->buf_cookie;
+#endif
 		phys_addr = rx_desc->buf_phys_addr;
 
 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
@@ -1670,7 +1713,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 
 			skb->protocol = eth_type_trans(skb, dev);
 			mvneta_rx_csum(pp, rx_status, skb);
-			napi_gro_receive(&port->napi, skb);
+			napi_gro_receive(napi, skb);
 
 			rcvd_pkts++;
 			rcvd_bytes += rx_bytes;
@@ -1709,7 +1752,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 
 		mvneta_rx_csum(pp, rx_status, skb);
 
-		napi_gro_receive(&port->napi, skb);
+		napi_gro_receive(napi, skb);
 	}
 
 	if (rcvd_pkts) {
@@ -2220,6 +2263,17 @@ static void mvneta_set_rx_mode(struct net_device *dev)
 /* Interrupt handling - the callback for request_irq() */
 static irqreturn_t mvneta_isr(int irq, void *dev_id)
 {
+	struct mvneta_port *pp = (struct mvneta_port *)dev_id;
+
+	mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
+	napi_schedule(&pp->napi);
+
+	return IRQ_HANDLED;
+}
+
+/* Interrupt handling - the callback for request_percpu_irq() */
+static irqreturn_t mvneta_percpu_isr(int irq, void *dev_id)
+{
 	struct mvneta_pcpu_port *port = (struct mvneta_pcpu_port *)dev_id;
 
 	disable_percpu_irq(port->pp->dev->irq);
@@ -2261,12 +2315,13 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
 {
 	int rx_done = 0;
 	u32 cause_rx_tx;
+	unsigned long flags;
 	int rx_queue;
 	struct mvneta_port *pp = netdev_priv(napi->dev);
 	struct mvneta_pcpu_port *port = this_cpu_ptr(pp->ports);
 
 	if (!netif_running(pp->dev)) {
-		napi_complete(&port->napi);
+		napi_complete(napi);
 		return rx_done;
 	}
 
@@ -2295,22 +2350,36 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
 	 */
 	rx_queue = fls(((cause_rx_tx >> 8) & 0xff));
 
-	cause_rx_tx |= port->cause_rx_tx;
+	cause_rx_tx |= pp->neta_armada3700 ? pp->cause_rx_tx : port->cause_rx_tx;
 
 	if (rx_queue) {
 		rx_queue = rx_queue - 1;
-		rx_done = mvneta_rx(pp, budget, &pp->rxqs[rx_queue]);
+		rx_done = mvneta_rx(pp, budget, &pp->rxqs[rx_queue], napi);
 	}
 
 	budget -= rx_done;
 
 	if (budget > 0) {
 		cause_rx_tx = 0;
-		napi_complete(&port->napi);
-		enable_percpu_irq(pp->dev->irq, 0);
+		napi_complete(napi);
+
+		if (pp->neta_armada3700) {
+			local_irq_save(flags);
+			mvreg_write(pp, MVNETA_INTR_NEW_MASK,
+				    MVNETA_RX_INTR_MASK(rxq_number) |
+				    MVNETA_TX_INTR_MASK(txq_number) |
+				    MVNETA_MISCINTR_INTR_MASK);
+			local_irq_restore(flags);
+		} else {
+			enable_percpu_irq(pp->dev->irq, 0);
+		}
 	}
 
-	port->cause_rx_tx = cause_rx_tx;
+	if (pp->neta_armada3700)
+		pp->cause_rx_tx = cause_rx_tx;
+	else
+		port->cause_rx_tx = cause_rx_tx;
+
 	return rx_done;
 }
 
@@ -2535,6 +2604,22 @@ static void mvneta_cleanup_rxqs(struct mvneta_port *pp)
 static int mvneta_setup_rxqs(struct mvneta_port *pp)
 {
 	int queue;
+#ifdef CONFIG_64BIT
+	void *data_tmp;
+
+	/* In Neta HW only 32 bits data is supported, so in order to
+	 * obtain whole 64 bits address from RX descriptor, we store the
+	 * upper 32 bits when allocating buffer, and put it back
+	 * when using buffer cookie for accessing packet in memory.
+	 * Frags should be allocated from single 'memory' region, hence
+	 * common upper address half should be sufficient.
+	 */
+	data_tmp = mvneta_frag_alloc(pp);
+	if (data_tmp) {
+		pp->data_high = (u64)data_tmp & 0xffffffff00000000;
+		mvneta_frag_free(pp, data_tmp);
+	}
+#endif
 
 	for (queue = 0; queue < rxq_number; queue++) {
 		int err = mvneta_rxq_init(pp, &pp->rxqs[queue]);
@@ -2570,6 +2655,7 @@ static int mvneta_setup_txqs(struct mvneta_port *pp)
 
 static void mvneta_start_dev(struct mvneta_port *pp)
 {
+	struct mvneta_pcpu_port *port;
 	int cpu;
 
 	mvneta_max_rx_size_set(pp, pp->pkt_size);
@@ -2578,11 +2664,14 @@ static void mvneta_start_dev(struct mvneta_port *pp)
 	/* start the Rx/Tx activity */
 	mvneta_port_enable(pp);
 
-	/* Enable polling on the port */
-	for_each_online_cpu(cpu) {
-		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
-
-		napi_enable(&port->napi);
+	if (!pp->neta_armada3700) {
+		/* Enable polling on the port */
+		for_each_online_cpu(cpu) {
+			port = per_cpu_ptr(pp->ports, cpu);
+			napi_enable(&port->napi);
+		}
+	} else {
+		napi_enable(&pp->napi);
 	}
 
 	/* Unmask interrupts. It has to be done from each CPU */
@@ -2599,14 +2688,18 @@ static void mvneta_start_dev(struct mvneta_port *pp)
 
 static void mvneta_stop_dev(struct mvneta_port *pp)
 {
+	struct mvneta_pcpu_port *port;
 	unsigned int cpu;
 
 	phy_stop(pp->phy_dev);
 
-	for_each_online_cpu(cpu) {
-		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
-
-		napi_disable(&port->napi);
+	if (!pp->neta_armada3700) {
+		for_each_online_cpu(cpu) {
+			port = per_cpu_ptr(pp->ports, cpu);
+			napi_disable(&port->napi);
+		}
+	} else {
+		napi_disable(&pp->napi);
 	}
 
 	netif_carrier_off(pp->dev);
@@ -3026,23 +3119,29 @@ static int mvneta_open(struct net_device *dev)
 		goto err_cleanup_rxqs;
 
 	/* Connect to port interrupt line */
-	ret = request_percpu_irq(pp->dev->irq, mvneta_isr,
-				 MVNETA_DRIVER_NAME, pp->ports);
+	if (pp->neta_armada3700)
+		ret = request_irq(pp->dev->irq, mvneta_isr, 0,
+				  MVNETA_DRIVER_NAME, pp);
+	else
+		ret = request_percpu_irq(pp->dev->irq, mvneta_percpu_isr,
+					 MVNETA_DRIVER_NAME, pp->ports);
 	if (ret) {
 		netdev_err(pp->dev, "cannot request irq %d\n", pp->dev->irq);
 		goto err_cleanup_txqs;
 	}
 
-	/* Enable per-CPU interrupt on all the CPU to handle our RX
-	 * queue interrupts
-	 */
-	on_each_cpu(mvneta_percpu_enable, pp, true);
+	if (!pp->neta_armada3700) {
+		/* Enable per-CPU interrupt on all the CPU to handle our RX
+		 * queue interrupts
+		 */
+		on_each_cpu(mvneta_percpu_enable, pp, true);
 
-	pp->is_stopped = false;
-	/* Register a CPU notifier to handle the case where our CPU
-	 * might be taken offline.
-	 */
-	register_cpu_notifier(&pp->cpu_notifier);
+		pp->is_stopped = false;
+		/* Register a CPU notifier to handle the case where our CPU
+		 * might be taken offline.
+		 */
+		register_cpu_notifier(&pp->cpu_notifier);
+	}
 
 	/* In default link is down */
 	netif_carrier_off(pp->dev);
@@ -3058,7 +3157,10 @@ static int mvneta_open(struct net_device *dev)
 	return 0;
 
 err_free_irq:
-	free_percpu_irq(pp->dev->irq, pp->ports);
+	if (pp->neta_armada3700)
+		free_irq(pp->dev->irq, pp);
+	else
+		free_percpu_irq(pp->dev->irq, pp->ports);
 err_cleanup_txqs:
 	mvneta_cleanup_txqs(pp);
 err_cleanup_rxqs:
@@ -3071,20 +3173,27 @@ static int mvneta_stop(struct net_device *dev)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
 
-	/* Inform that we are stopping so we don't want to setup the
-	 * driver for new CPUs in the notifiers
-	 */
-	spin_lock(&pp->lock);
-	pp->is_stopped = true;
-	mvneta_stop_dev(pp);
-	mvneta_mdio_remove(pp);
-	unregister_cpu_notifier(&pp->cpu_notifier);
-	/* Now that the notifier are unregistered, we can release le
-	 * lock
-	 */
-	spin_unlock(&pp->lock);
-	on_each_cpu(mvneta_percpu_disable, pp, true);
-	free_percpu_irq(dev->irq, pp->ports);
+	if (!pp->neta_armada3700) {
+		/* Inform that we are stopping so we don't want to setup the
+		 * driver for new CPUs in the notifiers
+		 */
+		spin_lock(&pp->lock);
+		pp->is_stopped = true;
+		mvneta_stop_dev(pp);
+		mvneta_mdio_remove(pp);
+		unregister_cpu_notifier(&pp->cpu_notifier);
+		/* Now that the notifier are unregistered, we can release le
+		 * lock
+		 */
+		spin_unlock(&pp->lock);
+		on_each_cpu(mvneta_percpu_disable, pp, true);
+		free_percpu_irq(dev->irq, pp->ports);
+	} else {
+		mvneta_stop_dev(pp);
+		mvneta_mdio_remove(pp);
+		free_irq(dev->irq, pp);
+	}
+
 	mvneta_cleanup_rxqs(pp);
 	mvneta_cleanup_txqs(pp);
 
@@ -3375,6 +3484,11 @@ static int mvneta_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 				   const u8 *key, const u8 hfunc)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
+
+	/* Armada 3700 SoC doesn't support RSS features */
+	if (pp->neta_armada3700)
+		return -EOPNOTSUPP;
+
 	/* We require at least one supported parameter to be changed
 	 * and no change in any of the unsupported parameters
 	 */
@@ -3394,6 +3508,10 @@ static int mvneta_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 				   u8 *hfunc)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
+
+	/* Armada 3700 SoC doesn't support RSS features */
+	if (pp->neta_armada3700)
+		return -EOPNOTSUPP;
 
 	if (hfunc)
 		*hfunc = ETH_RSS_HASH_TOP;
@@ -3496,16 +3614,29 @@ static void mvneta_conf_mbus_windows(struct mvneta_port *pp,
 	win_enable = 0x3f;
 	win_protect = 0;
 
-	for (i = 0; i < dram->num_cs; i++) {
-		const struct mbus_dram_window *cs = dram->cs + i;
-		mvreg_write(pp, MVNETA_WIN_BASE(i), (cs->base & 0xffff0000) |
-			    (cs->mbus_attr << 8) | dram->mbus_dram_target_id);
+	if (dram) {
+		for (i = 0; i < dram->num_cs; i++) {
+			const struct mbus_dram_window *cs = dram->cs + i;
 
-		mvreg_write(pp, MVNETA_WIN_SIZE(i),
-			    (cs->size - 1) & 0xffff0000);
+			mvreg_write(pp, MVNETA_WIN_BASE(i),
+				    (cs->base & 0xffff0000) |
+				    (cs->mbus_attr << 8) |
+				    dram->mbus_dram_target_id);
 
-		win_enable &= ~(1 << i);
-		win_protect |= 3 << (2 * i);
+			mvreg_write(pp, MVNETA_WIN_SIZE(i),
+				    (cs->size - 1) & 0xffff0000);
+
+			win_enable &= ~(1 << i);
+			win_protect |= 3 << (2 * i);
+		}
+	} else {
+		/* For Armada3700 open default 4GB Mbus window, leaving
+		 * arbitration of target/attribute to a different layer
+		 * of configuration.
+		 */
+		mvreg_write(pp, MVNETA_WIN_SIZE(0), 0xffff0000);
+		win_enable &= ~BIT(0);
+		win_protect = 3;
 	}
 
 	mvreg_write(pp, MVNETA_BASE_ADDR_ENABLE, win_enable);
@@ -3627,6 +3758,10 @@ static int mvneta_probe(struct platform_device *pdev)
 
 	pp->indir[0] = rxq_def;
 
+	/* Get special SoC configurations */
+	if (of_device_is_compatible(dn, "marvell,armada3700-neta"))
+		pp->neta_armada3700 = true;
+
 	pp->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(pp->clk)) {
 		err = PTR_ERR(pp->clk);
@@ -3704,14 +3839,27 @@ static int mvneta_probe(struct platform_device *pdev)
 	}
 
 	dram_target_info = mv_mbus_dram_info();
-	if (dram_target_info)
+	/* Armada3700 requires setting default configuration of Mbus
+	 * windows, however without using filled mbus_dram_target_info
+	 * structure.
+	 */
+	if (dram_target_info || pp->neta_armada3700)
 		mvneta_conf_mbus_windows(pp, dram_target_info);
 
-	for_each_present_cpu(cpu) {
-		struct mvneta_pcpu_port *port = per_cpu_ptr(pp->ports, cpu);
+	/* Armada3700 network controller does not support per-cpu
+	 * operation, so only single NAPI should be initialized.
+	 */
+	if (pp->neta_armada3700) {
+		netif_napi_add(dev, &pp->napi, mvneta_poll, NAPI_POLL_WEIGHT);
+	} else {
+		for_each_present_cpu(cpu) {
+			struct mvneta_pcpu_port *port =
+						    per_cpu_ptr(pp->ports, cpu);
 
-		netif_napi_add(dev, &port->napi, mvneta_poll, NAPI_POLL_WEIGHT);
-		port->pp = pp;
+			netif_napi_add(dev, &port->napi, mvneta_poll,
+				       NAPI_POLL_WEIGHT);
+			port->pp = pp;
+		}
 	}
 
 	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
@@ -3776,6 +3924,7 @@ static int mvneta_remove(struct platform_device *pdev)
 static const struct of_device_id mvneta_match[] = {
 	{ .compatible = "marvell,armada-370-neta" },
 	{ .compatible = "marvell,armada-xp-neta" },
+	{ .compatible = "marvell,armada3700-neta" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, mvneta_match);
