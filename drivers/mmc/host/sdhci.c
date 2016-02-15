@@ -1777,6 +1777,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 	if (host->version < SDHCI_SPEC_300)
 		return 0;
 
+	/* Some controller need to do more before switching */
+	if (host->ops->voltage_switch_pre)
+		host->ops->voltage_switch_pre(host);
+
 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 
 	switch (ios->signal_voltage) {
@@ -1796,6 +1800,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 		}
 		/* Wait for 5ms */
 		usleep_range(5000, 5500);
+
+		/* Some controller need to do more when switching */
+		if (host->ops->voltage_switch)
+			host->ops->voltage_switch(host);
 
 		/* 3.3V regulator output should be stable within 5 ms */
 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
