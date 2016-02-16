@@ -80,5 +80,24 @@
 		};
 	};
 
+	ap806 {
+		config-space {
+			xor0@400000 {
+				compatible = "marvell,mv-xor-v2-z1";
+			};
+
+			xor1@420000 {
+				compatible = "marvell,mv-xor-v2-z1";
+			};
+
+			xor2@440000 {
+				compatible = "marvell,mv-xor-v2-z1";
+			};
+
+			xor3@460000 {
+				compatible = "marvell,mv-xor-v2-z1";
+			};
+		};
+	};
 };
 
