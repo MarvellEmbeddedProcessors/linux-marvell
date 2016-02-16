@@ -92,6 +92,27 @@
 				status = "okay";
 			};
 
+			eth0: ethernet@30000 {
+				phy-mode = "rgmii-id";
+				phy = <&phy0>;
+				status = "okay";
+			};
+
+			mdio@32004 {
+				phy0: ethernet-phy@0 {
+					reg = <0>;
+				};
+				phy1: ethernet-phy@1 {
+					reg = <1>;
+				};
+			};
+
+			eth1: ethernet@40000 {
+				phy-mode = "sgmii";
+				phy = <&phy1>;
+				status = "okay";
+			};
+
 			/* CON31 */
 			usb3@58000 {
 				status = "okay";
