@@ -69,7 +69,45 @@
 			spi@700680 {
 				status = "okay";
 			};
+			mdio@12a200 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				phy2: ethernet-phy@2 {
+					reg = <0>;
+				};
+				phy3: ethernet-phy@3 {
+					reg = <1>;
+				};
+			};
+			gop {
+				emac0: mac0 {
+					phy-mode = "sgmii"; /* lane-2 */
+					status = "okay";
+				};
+				emac2: mac2 {
+					phy-mode = "rgmii"; /* rgmii-0 */
+					phy = <&phy2>;
+					status = "okay";
+				};
+				emac3: mac3 {
+					phy-mode = "rgmii"; /* rgmii-1 */
+					phy = <&phy3>;
+					status = "okay";
+				};
+			};
+			ppv22@000000 {
+				eth0: eth0@010000 {
+					status = "okay";
+				};
+				eth1: eth1@020000 {
+					status = "okay";
+				};
+				eth2: eth2@030000 {
+					status = "okay";
+				};
+			};
 		};
+
 		pcie@0x640000 {
 			status = "okay";
 		};
