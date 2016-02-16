@@ -146,3 +146,66 @@ mdio@15b000 {
 	compatible = "marvell,xmdio";
 	reg = <0x12a600 0x10>;
 };
+
+aliases {
+	ethernet0 = &emac0;
+	ethernet1 = &emac2;
+	ethernet2 = &emac3;
+};
+
+gop {
+	emac0: mac0 {
+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 01];
+		port-id = <0>; /* gop_port_id */
+	};
+	emac2: mac2 {
+		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 02];
+		port-id = <2>; /* gop_port_id */
+	};
+	emac3: mac3 {
+		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 03];
+		port-id = <3>; /* gop_port_id */
+	};
+};
+
+ppv22@000000 {
+	compatible = "marvell,mv-pp22";
+	reg = <0x000000 0x80000>, /* Packet Processor regs */
+	      <0x120000 0x9000>, /* SERDES regs */
+	      <0x129000 0x0600>, /* XMIB regs */
+	      <0x12a000 0x200>,  /* LED regs */
+	      <0x12a200 0x200>,  /* SMI regs */
+	      <0x12a400 0x200>,  /* TAI regs */
+	      <0x12a600 0x200>,  /* XSMI regs */
+	      <0x12b000 0x1000>,  /* MG Internal regs */
+	      <0x130000 0x6000>, /* MSPG regs */
+	      <0x130400 0x200>,  /* MSPG - XPCS regs */
+	      <0x130e00 0x100>,  /* MSPG - GMAC regs */
+	      <0x130f00 0x100>,  /* MSPG - XLG MAC regs */
+	      <0x441000 0x1000>;  /* RFU-1 Regs */
+	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs", "gmac", "xlg", "rfu1";
+	clocks = <&gateclk 3>, <&gateclk 18>, <&gateclk 9>, <&gateclk 6>, <&gateclk 5>;
+	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
+	status = "okay";
+	eth0: eth0@010000 {
+		interrupts = <GIC_SPI 05 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		port-id = <0>; /* pp2_port_id */
+		emac-data = <&emac0>;
+		status = "disabled";
+	};
+	eth1: eth1@020000 {
+		interrupts = <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		port-id = <1>; /* pp2_port_id */
+		emac-data = <&emac2>;
+		status = "disabled";
+	};
+	eth2: eth2@030000 {
+		interrupts = <GIC_SPI 07 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		port-id = <2>; /* pp2_port_id */
+		emac-data = <&emac3>;
+		status = "disabled";
+	};
+};

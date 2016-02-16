@@ -1,0 +1,112 @@
+* Marvell PPv2x Ethernet Controller (PPv2x)
+
+ppv22 required properties:
+=========================
+- compatible: should be "marvell,mv-pp22"
+- reg: addresses and length of the register sets for the device.
+  Must contain the following register sets:
+	- Packet Processor v22  registers
+	- cpn110 GOP/GMAC  registers
+  In addition, at least one port register set is required.
+- reg-names: names of used registers, must be "pp", "serdes", "xmib",
+	     "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs",
+	     "gmac", "xlg", "rfu1"
+- clocks: a pointer to the reference clocks for this device, consequently:
+	- ppv22 clock
+	- GOP clocks
+- clock-names: names of used clocks, must be "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk".
+
+The ethernet ports are represented by subnodes. At least one port is required.
+
+ppv22 port required properties:
+==============================
+- interrupts: RX/TX interrupt for the port
+- port-id: Should be '0' or '1' or '2' for ethernet ports, it references the ppv2 port-id.
+- emac-data: A phandle to an emac node, defining the mac (a.k.a. GOP) properties of the node.
+	     The emac nodes are under the gop section.
+
+gop section:
+===========
+The gop section is separated from the ppv22 node.
+In current version it has no properties of its own, and only serves as a container for the emac nodes.
+
+Following the properties of the emac node, which are referenced by the ppv22 port.
+
+emac required properties:
+========================
+- interrupts: Link change interrupt for the mac.
+- port-id: Should be '0', '2', or '3' for ethernet macs, references the mac-id (GOP port-id).
+- phy-mode: See ethernet.txt file in the same directory
+
+emac optional properties:
+========================
+- phy: A phandle to a phy node defining the PHY address (as the reg property, a single integer).
+- mac-address: mac-address of the emac.
+
+Example:
+
+gop {
+	emac0: mac0 {
+		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 01];
+		port-id = <0>; /* gop_port_id */
+                phy-mode = "sgmii"; /* lane-2 */
+                status = "okay";
+        };
+	emac2: mac2 {
+		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 02];
+		port-id = <2>; /* gop_port_id */
+                phy-mode = "rgmii"; /* rgmii-0 */
+                phy = <&phy2>;
+                status = "okay";
+	};
+	emac3: mac3 {
+		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 03];
+		port-id = <3>; /* gop_port_id */
+                phy-mode = "rgmii"; /* rgmii-1 */
+                phy = <&phy3>;
+                status = "okay";
+	};
+};
+
+
+ppv22@000000 {
+	compatible = "marvell,mv-pp22";
+	reg = <0x000000 0x80000>, /* Packet Processor regs */
+	      <0x120000 0x9000>, /* SERDES regs */
+	      <0x129000 0x0600>, /* XMIB regs */
+	      <0x12a000 0x200>,  /* LED regs */
+	      <0x12a200 0x200>,  /* SMI regs */
+	      <0x12a400 0x200>,  /* TAI regs */
+	      <0x12a600 0x200>,  /* XSMI regs */
+	      <0x12b000 0x1000>,  /* MG Internal regs */
+	      <0x130000 0x6000>, /* MSPG regs */
+	      <0x130400 0x200>,  /* MSPG - XPCS regs */
+	      <0x130e00 0x100>,  /* MSPG - GMAC regs */
+	      <0x130f00 0x100>,  /* MSPG - XLG MAC regs */
+	      <0x441000 0x1000>;  /* RFU-1 Regs */
+	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs", "gmac", "xlg", "rfu1";
+	clocks = <&gateclk 3>, <&gateclk 18>, <&gateclk 9>, <&gateclk 6>, <&gateclk 5>;
+	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
+	status = "okay";
+	eth0: eth0@010000 {
+		interrupts = <GIC_SPI 05 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		port-id = <0>; /* pp2_port_id */
+		emac-data = <&emac0>;
+		status = "disabled";
+	};
+	eth1: eth1@020000 {
+		interrupts = <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		port-id = <1>; /* pp2_port_id */
+		emac-data = <&emac2>;
+		status = "disabled";
+	};
+	eth2: eth2@030000 {
+		interrupts = <GIC_SPI 07 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		port-id = <2>; /* pp2_port_id */
+		emac-data = <&emac3>;
+		status = "disabled";
+	};
+};
