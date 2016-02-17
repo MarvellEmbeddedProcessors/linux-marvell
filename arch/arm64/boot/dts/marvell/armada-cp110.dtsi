@@ -132,3 +132,17 @@ cpxor1@6c0000 {
 	msi-parent = <&gic_v2m0>;
 	clocks = <&gateclk 7>;
 };
+
+mdio@12a200 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "marvell,orion-mdio";
+	reg = <0x12a200 0x10>;
+};
+
+mdio@15b000 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "marvell,xmdio";
+	reg = <0x12a600 0x10>;
+};
