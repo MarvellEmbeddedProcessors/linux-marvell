@@ -33,13 +33,13 @@
 			ethernet@70000 {
 				status = "okay";
 				phy = <&phy0>;
-				phy-mode = "rgmii";
+				phy-mode = "rgmii-id";
 			};
 
 			ethernet@30000 {
 				status = "okay";
 				phy = <&phy1>;
-				phy-mode = "rgmii";
+				phy-mode = "rgmii-id";
 			};
 
 			i2c0: i2c@11000 {
@@ -52,7 +52,7 @@
 				clock-frequency = <100000>;
 			};
 
-			mdio {
+			mdio@72004 {
 				phy0: ethernet-phy@0 {
 					reg = <0>;
 				};
@@ -82,8 +82,8 @@
 
 				spi-flash@0 {
 					#address-cells = <1>;
-					#size-cells = <1>;
-					compatible = "w25q32";
+					#size-cells = <0>;
+					compatible = "w25q32", "jedec,spi-nor";
 					reg = <0>; /* Chip select 0 */
 					spi-max-frequency = <108000000>;
 				};
@@ -99,30 +99,28 @@
 			 * unnessesary devices according to board
 			 * boot-up configuration.
 			 */
-			nfc: nand@d0000 {
+			flash@d0000 {
 				status = "okay";
-				#address-cells = <1>;
-				#size-cells = <1>;
+				num-cs = <1>;
+				marvell,nand-keep-config;
+				marvell,nand-enable-arbiter;
+				nand-on-flash-bbt;
+				nand-ecc-strength = <4>;
+				nand-ecc-step-size = <512>;
 
-				nfc,nfc-mode  = "normal";	/* normal or ganged */
-				nfc,nfc-dma   = <0>;		/* 0 for no, 1 for dma */
-				nfc,nfc-width = <8>;
-				nfc,ecc-type  = <1>;		/* 4 bit */
-				nfc,num-cs    = <1>;
-
-				mtd0@00000000 {
+				partition@0 {
 					label = "U-Boot";
 					reg = <0x00000000 0x00600000>;
 					read-only;
 				};
 
-				mtd1@00080000 {
+				partition@600000 {
 					label = "uImage";
 					reg = <0x00600000 0x00400000>;
 					read-only;
 				};
 
-				mtd2@00140000 {
+				partition@a000000 {
 					label = "Root";
 					reg = <0x00a00000 0x3f600000>;
 				};
