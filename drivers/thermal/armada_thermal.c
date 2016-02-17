@@ -41,6 +41,15 @@
 #define A375_HW_RESETn			BIT(8)
 #define A380_HW_RESET			BIT(8)
 
+#define AP806_START	BIT(0)
+#define AP806_RESET	BIT(1)
+#define AP806_ENABLE	BIT(2)
+
+/* For AP806 TSEN output format is signed as a 2s complement number
+	ranging from-512 to +511*/
+#define AP806_TSEN_OUTPUT_MSB		512
+#define AP806_TSEN_OUTPUT_COMP		1024
+
 struct armada_thermal_data;
 
 /* Marvell EBU Thermal Sensor Dev Structure */
@@ -68,6 +77,8 @@ struct armada_thermal_data {
 	unsigned int temp_shift;
 	unsigned int temp_mask;
 	unsigned int is_valid_shift;
+
+	struct thermal_zone_device_ops *ops;
 };
 
 static void armadaxp_init_sensor(struct platform_device *pdev,
@@ -147,6 +158,18 @@ static void armada380_init_sensor(struct platform_device *pdev,
 	}
 }
 
+static void armada_ap806_init_sensor(struct platform_device *pdev,
+				  struct armada_thermal_priv *priv)
+{
+	unsigned long reg = readl_relaxed(priv->control);
+
+	reg &= ~AP806_RESET;
+	reg |= AP806_START;
+	reg |= AP806_ENABLE;
+	writel(reg, priv->control);
+	mdelay(10);
+}
+
 static bool armada_is_valid(struct armada_thermal_priv *priv)
 {
 	unsigned long reg = readl_relaxed(priv->sensor);
@@ -183,9 +206,46 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
 	return 0;
 }
 
-static struct thermal_zone_device_ops ops = {
+static int armada_ap806_get_temp(struct thermal_zone_device *thermal, int *temp)
+{
+	struct armada_thermal_priv *priv = thermal->devdata;
+	unsigned long reg;
+	unsigned long m, b, div;
+
+	/* Valid check */
+	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
+		dev_err(&thermal->device,
+			"Temperature sensor reading not valid\n");
+		return -EIO;
+	}
+
+	reg = readl_relaxed(priv->sensor);
+	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
+
+	/* TSEN output format is signed as a 2s complement number
+	    ranging from-512 to +511. when MSB is set, need to
+	    calculate the complement number */
+	if (reg >= AP806_TSEN_OUTPUT_MSB)
+		reg = reg - AP806_TSEN_OUTPUT_COMP;
+
+	/* Get formula coeficients */
+	b = priv->data->coef_b;
+	m = priv->data->coef_m;
+	div = priv->data->coef_div;
+
+	*temp = ((m * reg) + b) / div;
+
+	return 0;
+}
+
+static struct thermal_zone_device_ops armada_ops = {
 	.get_temp = armada_get_temp,
 };
+
+static struct thermal_zone_device_ops armada_ap806_ops = {
+	.get_temp = armada_ap806_get_temp,
+};
+
 
 static const struct armada_thermal_data armadaxp_data = {
 	.init_sensor = armadaxp_init_sensor,
@@ -194,6 +254,7 @@ static const struct armada_thermal_data armadaxp_data = {
 	.coef_b = 3153000000UL,
 	.coef_m = 10000000UL,
 	.coef_div = 13825,
+	.ops = &armada_ops,
 };
 
 static const struct armada_thermal_data armada370_data = {
@@ -205,6 +266,7 @@ static const struct armada_thermal_data armada370_data = {
 	.coef_b = 3153000000UL,
 	.coef_m = 10000000UL,
 	.coef_div = 13825,
+	.ops = &armada_ops,
 };
 
 static const struct armada_thermal_data armada375_data = {
@@ -216,6 +278,7 @@ static const struct armada_thermal_data armada375_data = {
 	.coef_b = 3171900000UL,
 	.coef_m = 10000000UL,
 	.coef_div = 13616,
+	.ops = &armada_ops,
 };
 
 static const struct armada_thermal_data armada380_data = {
@@ -228,7 +291,22 @@ static const struct armada_thermal_data armada380_data = {
 	.coef_m = 2000096UL,
 	.coef_div = 4201,
 	.inverted = true,
+	.ops = &armada_ops,
 };
+
+static const struct armada_thermal_data armada_ap806_data = {
+	.is_valid = armada_is_valid,
+	.init_sensor = armada_ap806_init_sensor,
+	.is_valid_shift = 16,
+	.temp_shift = 0,
+	.temp_mask = 0x3ff,
+	.coef_b = 153400,
+	.coef_m = 425,
+	.coef_div = 1000,
+	.inverted = true,
+	.ops = &armada_ap806_ops,
+};
+
 
 static const struct of_device_id armada_thermal_id_table[] = {
 	{
@@ -246,6 +324,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
 	{
 		.compatible = "marvell,armada380-thermal",
 		.data       = &armada380_data,
+	},
+	{
+		.compatible = "marvell,armada-ap806-thermal",
+		.data       = &armada_ap806_data,
 	},
 	{
 		/* sentinel */
@@ -282,7 +364,7 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	priv->data->init_sensor(pdev, priv);
 
 	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
-					       priv, &ops, NULL, 0, 0);
+					       priv, priv->data->ops, NULL, 0, 0);
 	if (IS_ERR(thermal)) {
 		dev_err(&pdev->dev,
 			"Failed to register thermal zone device\n");
