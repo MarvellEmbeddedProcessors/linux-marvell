@@ -73,6 +73,10 @@
 #define PMSU_EVENT_STATUS_AND_MASK_DFS_DONE        BIT(1)
 #define PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK   BIT(17)
 
+#define PMSU_EVENT_STATUS_MSK(cpu)     ((cpu * 0x100) + 0x120)
+#define PMSU_EVENT_STATUS_MSK_DFS_DONE        BIT(1)
+#define PMSU_EVENT_STATUS_MSK_DFS_DONE_MASK   BIT(17)
+
 #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu) ((cpu * 0x100) + 0x124)
 
 /* PMSU fabric registers */
@@ -84,6 +88,15 @@
 #define PMSU_POWERDOWN_DELAY_PMU		BIT(1)
 #define PMSU_POWERDOWN_DELAY_MASK		0xFFFE
 #define PMSU_DFLT_ARMADA38X_DELAY	        0x64
+
+/* CIB Control and Configuration */
+#define CIB_CONTROL_AND_CONFIG_ACCK_EN_OFFSET		9
+#define CIB_CONTROL_AND_CONFIG_ACCK_EN_MASK		0x1
+#define CIB_CONTROL_AND_CONFIG_ACCK_EN_DISABLE		0x1
+#define CIB_CONTROL_AND_CONFIG_ACCK_ENABLE		0x0
+#define CIB_CONTROL_AND_CONFIG_EMPTY_STATUS_OFFSET	13
+#define CIB_CONTROL_AND_CONFIG_EMPTY_STATUS_MASK	0x1
+#define CIB_CONTROL_AND_CONFIG_NOT_EMPTY		0x0
 
 /* CA9 MPcore SoC Control registers */
 
@@ -98,6 +111,14 @@
 #define ARMADA_370_CRYPT0_ENG_TARGET   0x9
 #define ARMADA_370_CRYPT0_ENG_ATTR     0x1
 
+/* PMSU DFS Core Sync in SMP */
+#define PMSU_DFS_DELAY						1
+#define PMSU_DFS_NO_SYNC					0
+#define PMSU_DFS_SYNC						1
+#define PMSU_DFS_SYNC_TIMEOUT				2
+#define PMSU_DFS_SLAVE_TIMEOUT_THRESHOLD	20
+#define PMSU_DFS_MASTER_TIMEOUT_THRESHOLD	4
+
 extern void ll_disable_coherency(void);
 extern void ll_enable_coherency(void);
 
@@ -108,6 +129,12 @@ void __iomem *scu_base;
 
 static phys_addr_t pmsu_mp_phys_base;
 static void __iomem *pmsu_mp_base;
+static void __iomem *cib_control;
+
+static spinlock_t pmsu_dfs_slave_lock;
+static spinlock_t pmsu_dfs_master_lock;
+static spinlock_t pmsu_dfs_sync_lock;
+static struct cpumask cpu_dfs_mask;
 
 static void *mvebu_cpu_resume;
 static int (*mvebu_pmsu_dfs_request_ptr)(int cpu);
@@ -227,6 +254,14 @@ static int __init mvebu_v7_pmsu_init(void)
 	if (!pmsu_mp_base) {
 		pr_err("unable to map registers\n");
 		release_mem_region(res.start, resource_size(&res));
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	cib_control = of_iomap(np, 1);
+	if (!cib_control) {
+		pr_err("unable to map registers\n");
+		iounmap(pmsu_mp_base);
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -578,46 +613,178 @@ early_initcall(mvebu_v7_pmsu_init);
 
 static void mvebu_pmsu_dfs_request_local(void *data)
 {
+	u32 cpu;
 	u32 reg;
-	u32 cpu = smp_processor_id();
+	u32 slave_timestamp;
+	u32 slave_sync_flag;
+	u32 master_timestamp;
+	u32 master_sync_flag;
 	unsigned long flags;
 
 	local_irq_save(flags);
+	cpu = smp_processor_id();
+
+	if ((num_online_cpus() != 1) && spin_trylock(&pmsu_dfs_slave_lock)) {
+
+		/* Start SW sync point in SMP mode */
+		/* =============================== */
+
+		/* Set CPU mask under spinlock */
+		spin_lock(&pmsu_dfs_sync_lock);
+		cpumask_set_cpu(cpu, &cpu_dfs_mask);
+		spin_unlock(&pmsu_dfs_sync_lock);
+
+		/* Wait for master core to disable CIB */
+		slave_sync_flag = PMSU_DFS_NO_SYNC;
+		slave_timestamp = PMSU_DFS_SLAVE_TIMEOUT_THRESHOLD;
+		do {
+			mdelay(PMSU_DFS_DELAY);
+			reg = readl(cib_control) >> CIB_CONTROL_AND_CONFIG_ACCK_EN_OFFSET
+									  & CIB_CONTROL_AND_CONFIG_ACCK_EN_MASK;
+			slave_timestamp--;
+			if (slave_timestamp == 0) {
+				slave_sync_flag = PMSU_DFS_SYNC_TIMEOUT;
+				break;
+			}
+		} while (reg == CIB_CONTROL_AND_CONFIG_ACCK_ENABLE);
+
+		/* Slave core timeout */
+		if (slave_sync_flag == PMSU_DFS_SYNC_TIMEOUT) {
+			spin_lock(&pmsu_dfs_sync_lock);
+			/* Validate CPU mask
+			*  In case CPU mask not set for both cores (meaning master has not started execution)
+			*  Clear CPU mask, unlock slave spinlock, restore interrupt, and exit
+			*  In case CPU mask set for both cores, master has started execution therefore continue
+			*  slave execution
+			*/
+			if (!cpumask_equal(cpu_online_mask, &cpu_dfs_mask))
+				cpumask_clear_cpu(cpu, &cpu_dfs_mask);
+			else
+				slave_sync_flag = PMSU_DFS_SYNC;
+			spin_unlock(&pmsu_dfs_sync_lock);
+
+			if (slave_sync_flag != PMSU_DFS_SYNC) {
+				spin_unlock(&pmsu_dfs_slave_lock);
+				local_irq_restore(flags);
+				return;
+			}
+		}
+
+		/* Release slave spinlock
+		*  Take Master spinlock - wait for master to finish execution
+		*  Release master spinlock - once taken release for next DFS interval
+		*/
+		spin_unlock(&pmsu_dfs_slave_lock);
+		spin_lock(&pmsu_dfs_master_lock);
+		spin_unlock(&pmsu_dfs_master_lock);
+
+	} else {
+		if (num_online_cpus() != 1) {
+
+			/* Allocate master spinlock - block slave execution until CIB is disabled and empty */
+			spin_lock(&pmsu_dfs_master_lock);
+
+			/* Set CPU mask under spinlock */
+			spin_lock(&pmsu_dfs_sync_lock);
+			cpumask_set_cpu(cpu, &cpu_dfs_mask);
+			spin_unlock(&pmsu_dfs_sync_lock);
+
+			/* Wait for slave core to set CPU mask */
+			master_sync_flag = PMSU_DFS_NO_SYNC;
+			master_timestamp = PMSU_DFS_MASTER_TIMEOUT_THRESHOLD;
+			do {
+				mdelay(PMSU_DFS_DELAY);
+				master_timestamp--;
+				if (master_timestamp == 0) {
+					master_sync_flag = PMSU_DFS_SYNC_TIMEOUT;
+					break;
+				}
+			} while (!cpumask_equal(cpu_online_mask, &cpu_dfs_mask));
+
+			/* Master core timeout */
+			if (master_sync_flag == PMSU_DFS_SYNC_TIMEOUT) {
+				/* Master core started execution at the time slave core has timeout
+				*  master core will timeout and exit
+				*/
+				spin_lock(&pmsu_dfs_sync_lock);
+				if (!cpumask_equal(cpu_online_mask, &cpu_dfs_mask))
+					cpumask_clear_cpu(cpu, &cpu_dfs_mask);
+				spin_unlock(&pmsu_dfs_sync_lock);
+				/* Release master spinlock, restore interrupts, and exit */
+				spin_unlock(&pmsu_dfs_master_lock);
+				local_irq_restore(flags);
+				return;
+			}
+
+		} else {
+			/* Single core
+			*  Allocate slave spinlock, incase already allocated it will fail
+			*  If not allocated then allocate it, once allocated release it for next interval
+			*/
+			spin_trylock(&pmsu_dfs_slave_lock);
+			spin_unlock(&pmsu_dfs_slave_lock);
+		}
+
+		/* Disable CIB Ack */
+		reg = readl(cib_control);
+		reg |= (CIB_CONTROL_AND_CONFIG_ACCK_EN_DISABLE <<
+				CIB_CONTROL_AND_CONFIG_ACCK_EN_OFFSET);
+		writel(reg, cib_control);
+
+		/* Wait until CIB is empty */
+		while
+			(((readl(cib_control) >> CIB_CONTROL_AND_CONFIG_EMPTY_STATUS_OFFSET) &
+				CIB_CONTROL_AND_CONFIG_EMPTY_STATUS_MASK) == CIB_CONTROL_AND_CONFIG_NOT_EMPTY);
+
+		/* Release master spinlock - blocking slave execution */
+		if (num_online_cpus() != 1)
+			spin_unlock(&pmsu_dfs_master_lock);
+	}
+
+	/* Reached SW sync point in SMP mode */
+	/* ================================= */
 
 	/* Clear any previous DFS DONE event & Mask the DFS done interrupt */
-	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
+	reg  = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
 	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE;
 	reg |= PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
 	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
 
 	/* Prepare to enter idle */
-	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
+	reg  = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
 	reg |= PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT |
-	       PMSU_STATUS_AND_MASK_IRQ_MASK     |
-	       PMSU_STATUS_AND_MASK_FIQ_MASK;
+		   PMSU_STATUS_AND_MASK_IRQ_MASK      |
+		   PMSU_STATUS_AND_MASK_FIQ_MASK;
 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
 
 	/* Request the DFS transition */
-	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
+	reg  = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
 	reg |= PMSU_CONTROL_AND_CONFIG_DFS_REQ;
 	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(cpu));
 
-	/* The fact of entering idle will trigger the DFS transition */
+	isb();
 	wfi();
+
+	if (num_online_cpus() != 1) {
+		spin_lock(&pmsu_dfs_sync_lock);
+		cpumask_clear(&cpu_dfs_mask);
+		spin_unlock(&pmsu_dfs_sync_lock);
+	}
 
 	/*
 	 * We're back from idle, the DFS transition has completed,
 	 * clear the idle wait indication.
 	 */
-	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
+	reg  = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
 	reg &= ~PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT;
 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(cpu));
 
 	/* Restore the DFS mask to its original state */
-	reg = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
+	reg  = readl(pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
 	reg &= ~PMSU_EVENT_STATUS_AND_MASK_DFS_DONE_MASK;
 	writel(reg, pmsu_mp_base + PMSU_EVENT_STATUS_AND_MASK(cpu));
 
+	/* Set cpu ID to default */
 	local_irq_restore(flags);
 }
 
@@ -648,7 +815,6 @@ int armada_xp_pmsu_dfs_request(int cpu)
 
 int armada_380_pmsu_dfs_request(int cpu)
 {
-
 	/*
 	 * Protect CPU DFS from changing the number of online cpus number during
 	 * frequency transition by temporarily disable cpu hotplug
@@ -656,13 +822,13 @@ int armada_380_pmsu_dfs_request(int cpu)
 	cpu_hotplug_disable();
 
 	/* Trigger the DFS on the appropriate CPU */
-	on_each_cpu(mvebu_pmsu_dfs_request_local,
-				 NULL, false);
+	on_each_cpu(mvebu_pmsu_dfs_request_local, NULL, false);
 
 	cpu_hotplug_enable();
 
 	return 0;
 }
+
 
 int mvebu_pmsu_dfs_request(int cpu)
 {
@@ -733,7 +899,6 @@ static int mvebu_v7_pmsu_register_cpufreq(int cpu)
 	}
 
 	return 0;
-
 }
 
 static int __init mvebu_v7_pmsu_cpufreq_init(void)
@@ -741,6 +906,12 @@ static int __init mvebu_v7_pmsu_cpufreq_init(void)
 	struct device_node *np;
 	struct resource res;
 	int ret, cpu;
+
+	/* init DFS spin lock */
+	spin_lock_init(&pmsu_dfs_slave_lock);
+	spin_lock_init(&pmsu_dfs_master_lock);
+	spin_lock_init(&pmsu_dfs_sync_lock);
+	cpumask_clear(&cpu_dfs_mask);
 
 	/*
 	 * In order to have proper cpufreq handling, we need to ensure
@@ -771,12 +942,15 @@ static int __init mvebu_v7_pmsu_cpufreq_init(void)
 	}
 
 	if (of_machine_is_compatible("marvell,armada38x")) {
+
 		if (num_online_cpus() == 1)
 			mvebu_v7_pmsu_disable_dfs_cpu(1);
+
 		mvebu_pmsu_dfs_request_ptr = armada_380_pmsu_dfs_request;
 		platform_device_register_data(NULL, "cpufreq-dt", -1,
 					&armada_380_cpufreq_dt_pd, sizeof(armada_380_cpufreq_dt_pd));
 	} else if (of_machine_is_compatible("marvell,armadaxp")) {
+
 		mvebu_pmsu_dfs_request_ptr = armada_xp_pmsu_dfs_request;
 		platform_device_register_data(NULL, "cpufreq-dt", -1,
 					&armada_xp_cpufreq_dt_pd, sizeof(armada_xp_cpufreq_dt_pd));
