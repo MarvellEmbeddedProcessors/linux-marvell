@@ -116,6 +116,17 @@
 				};
 			};
 
+			pic: interrupt-controller@3f0100 {
+				compatible = "marvell,pic";
+				reg = <0x3f0100 0x10>;
+				irq-mask = <0x7001f>;
+				#interrupt-cells = <1>;
+				#size-cells = <1>;
+				interrupt-controller;
+				interrupt-parent = <&gic>;
+				interrupts = <GIC_PPI 12 IRQ_TYPE_LEVEL_HIGH>;
+			};
+
 			timer {
 				compatible = "arm,armv8-timer";
 				interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>,
