@@ -1,0 +1,152 @@
+/*
+ * Device Tree file for Marvell Armada 382 Development Board Purpose board
+ * (DB-88F6821-BP)
+ *
+ *  Copyright (C) 2014 Marvell
+ *
+ * Nadav Haklai <nadavh@marvell.com>
+ *
+ * This file is licensed under the terms of the GNU General Public
+ * License version 2.  This program is licensed "as is" without any
+ * warranty of any kind, whether express or implied.
+ */
+
+/dts-v1/;
+#include "armada-380.dtsi"
+
+/ {
+	model = "Marvell Armada 382 Development Board";
+	compatible = "marvell,a382-db", "marvell,armada382", "marvell,armada38x";
+
+	chosen {
+		bootargs = "console=ttyS0,115200 earlyprintk";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x10000000>; /* 256 MB */
+	};
+
+	soc {
+
+		internal-regs {
+			ethernet@70000 {
+				status = "okay";
+				phy = <&phy0>;
+				phy-mode = "rgmii";
+			};
+
+			ethernet@30000 {
+				status = "okay";
+				phy = <&phy1>;
+				phy-mode = "rgmii";
+			};
+
+			i2c0: i2c@11000 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			i2c1: i2c@11100 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			mdio {
+				phy0: ethernet-phy@0 {
+					reg = <0>;
+				};
+
+				phy1: ethernet-phy@1 {
+					reg = <1>;
+				};
+			};
+
+			sata@a8000 {
+				status = "okay";
+			};
+
+			sdhci@d8000 {
+				broken-cd;
+				wp-inverted;
+				bus-width = <8>;
+				status = "okay";
+			};
+
+			serial@12000 {
+				status = "okay";
+			};
+
+			spi0: spi@10600 {
+				status = "okay";
+
+				spi-flash@0 {
+					#address-cells = <1>;
+					#size-cells = <1>;
+					compatible = "w25q32";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <108000000>;
+				};
+			};
+
+			/*
+			 * 1GB Flash via NFC NAND controller
+			 * should be disabled when the board boots
+			 * from SPI flash, since NFC shares the same
+			 * pins with SPI0 and requires SLM-1358 jumper.
+			 * However the u-boot DTB parser will
+			 * handle this situation and disable/remove
+			 * unnessesary devices according to board
+			 * boot-up configuration.
+			 */
+			nfc: nand@d0000 {
+				status = "okay";
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				nfc,nfc-mode  = "normal";	/* normal or ganged */
+				nfc,nfc-dma   = <0>;		/* 0 for no, 1 for dma */
+				nfc,nfc-width = <8>;
+				nfc,ecc-type  = <1>;		/* 4 bit */
+				nfc,num-cs    = <1>;
+
+				mtd0@00000000 {
+					label = "U-Boot";
+					reg = <0x00000000 0x00600000>;
+					read-only;
+				};
+
+				mtd1@00080000 {
+					label = "uImage";
+					reg = <0x00600000 0x00400000>;
+					read-only;
+				};
+
+				mtd2@00140000 {
+					label = "Root";
+					reg = <0x00a00000 0x3f600000>;
+				};
+			};
+
+			crypto@9D000 {
+				status = "okay";
+			};
+		};
+
+		pcie-controller {
+			status = "okay";
+			/*
+			 * The two PCIe units are accessible through
+			 * standard PCIe slots on the board.
+			 */
+			pcie@1,0 {
+				/* Port 0, Lane 0 */
+				status = "okay";
+			};
+			pcie@2,0 {
+				/* Port 1, Lane 0 */
+				status = "okay";
+			};
+		};
+	};
+};
