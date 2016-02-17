@@ -3,6 +3,7 @@ menu "Platform selection"
 config ARCH_MVEBU
 	bool "Marvell EBU SoC Family"
 	select ARM_GIC_ODMI
+	select MVEBU_PIC
 	select ARMADA_AP806_CORE_CLK
 	select ARMADA_AP806_RING_CLK
 	help
