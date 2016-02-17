@@ -7,6 +7,7 @@ Required properties:
 		marvell,armada375-thermal
 		marvell,armada380-thermal
 		marvell,armadaxp-thermal
+		marvell,armada-ap806-thermal
 
 - reg:		Device's register space.
 		Two entries are expected, see the examples below.
