@@ -1,0 +1,29 @@
+Marvell PIC Interrupt Controller
+-----------------------------------------------------
+The Marvell PIC interrupt controller is a simple per-cpu
+interrupt aggregator. It receives per-cpu interrupts from
+several sources and aggregates them to a single interrupt
+line on the primary interrupt controller.
+
+Required properties:
+- compatible: Should be "marvell,pic"
+- interrupt-controller: Identifies the node as an interrupt controller.
+- interrupt-parent : Indicates the node of the parent interrupt controller.
+- #interrupt-cells: Number of cells to define interrupts. Should be 1. The cell is the IRQ number.
+- #size-cells: The size of the interrupt cell. Should be 1.
+- reg: Should contain PIC registers location and length.
+- interrupts: Identifies the IRQ nunmber of the parent IRQ controller to which the PIC is connected to.
+- irq-mask: Indicates the valid interrupts supported by this instance of PIC.
+
+Example:
+
+	pic: interrupt-controller@3f0100 {
+		compatible = "marvell,pic";
+		reg = <0x3f0100 0x10>;
+		irq-mask = <0x7001f>;  /* interrupts 0,1,2,3,4,16,17,18 */
+		#interrupt-cells = <1>;
+		#size-cells = <1>;
+		interrupt-controller;
+		interrupt-parent = <&gic>;
+		interrupts = <GIC_PPI 12 IRQ_TYPE_LEVEL_HIGH>;
+	};
