@@ -1,0 +1,35 @@
+* Marvell xMDIO Ethernet Controller interface
+
+The Ethernet controllers of the Marvel Armada-39x, Armada-7k
+and Armada-8k have an identical unit that provides
+an interface with the xMDIO bus. This driver handles this xMDIO
+interface.
+
+Required properties:
+- compatible: "marvell,xmdio"
+- reg: address and length of the xSMI register
+
+The child nodes of the xMDIO driver are the individual PHY devices
+connected to this xMDIO bus. They must have a "reg" property given the
+PHY address on the xMDIO bus.
+
+Example at the SoC level:
+
+mdio {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "marvell,xmdio";
+	reg = <0x12A600 0x20>;
+};
+
+And at the board level:
+
+mdio {
+	phy0: ethernet-phy@0 {
+		reg = <0>;
+	};
+
+	phy1: ethernet-phy@1 {
+		reg = <1>;
+	};
+}

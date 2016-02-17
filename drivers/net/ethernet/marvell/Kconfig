@@ -40,6 +40,17 @@ config MVMDIO
 
 	  This driver is used by the MV643XX_ETH and MVNETA drivers.
 
+config MVXMDIO
+	tristate "Marvell xMDIO interface support"
+	depends on HAS_IOMEM
+	select PHYLIB
+	---help---
+	  This driver supports the xMDIO interface found in the network
+	  interface units of the Marvell EBU SoCs (Armada39x, Armada8k,
+	  and Armada7k).
+
+	  This driver should be used by PPv2.2 netwrork driver.
+
 config MVNETA
 	tristate "Marvell Armada 370/38x/XP network interface support"
 	depends on PLAT_ORION
