@@ -225,6 +225,12 @@
 				msi-parent = <&gic_v2m0>;
 				dma-coherent;
 			};
+
+			thermal@7f008c {
+				compatible = "marvell,armada-ap806-thermal";
+				reg = <0x7f008C 0x4>, <0x7f0084 0x4>;
+				status = "okay";
+			};
 		};
 	};
 
