@@ -242,6 +242,12 @@
 				reg = <0x6f808C 0x4>, <0x6f8084 0x4>;
 				status = "okay";
 			};
+
+			pmu {
+				compatible = "arm,armv8-pmuv3";
+				interrupt-parent = <&pic>;
+				interrupts = <17>;
+			};
 		};
 	};
 
