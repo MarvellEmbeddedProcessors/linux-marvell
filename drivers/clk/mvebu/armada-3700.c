@@ -27,6 +27,8 @@
  */
 static const struct clk_gating_soc_desc armada_3700_north_bridge_gating_desc[] __initconst = {
 	{ "sata-host", NULL, 3, 0, CLK_GATE_SET_TO_DISABLE },
+	{ "twsi2", NULL, 16, 0, CLK_GATE_SET_TO_DISABLE },
+	{ "twsi1", NULL, 17, 0, CLK_GATE_SET_TO_DISABLE },
 	{ }
 };
 
