@@ -4,8 +4,10 @@ config ARCH_MVEBU
 	bool "Marvell EBU SoC Family"
 	select ARM_GIC_ODMI
 	select MVEBU_PIC
+	select MVEBU_CLK_COMMON
 	select ARMADA_AP806_CORE_CLK
 	select ARMADA_AP806_RING_CLK
+	select ARMADA_CP110_CLK
 	help
 	  This enables support for Marvell EBU familly, including:
 	   - Armada 3700 SoC Family

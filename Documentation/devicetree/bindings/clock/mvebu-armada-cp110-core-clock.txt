@@ -1,0 +1,32 @@
+* Clock bindings for Marvell MVEBU CP110 Core clocks
+
+The Marvell MVEBU Armada 7K/8K SoCs contain a block called CP110,
+hosting slow and high speed peripherals. This Device Tree
+binding allows to describe the core clocks of the CP110, whose
+frequencies are fixed except for the NAND clock.
+
+Clock consumers must specify the desired clock by having the clock ID
+in its "clocks" phandle cell.
+
+The following is a list of provided IDs and clock names for the core
+Armada AP806 clocks:
+
+ 0 = APLL - The PLL clock. Root of the clock tree
+ 1 = PPv2 - The Packet processor clock
+ 2 = EIP  - The encryption engine clock
+ 3 = Core - The clock of all other consumers (except NAND)
+ 4 = Nand - The clock of the NAND interface.
+
+Required properties:
+- compatible: must be be one of the following:
+	"marvell,armada-cp110-clock"
+- reg: must be the register address of the NAND clock control register
+- #clock-cells: from common clock binding; shall be set to 1
+
+Example:
+
+	cp110_clk: clk@0x6F8204 {
+		compatible = "marvell,armada-cp110-clock";
+		reg = <0x440700 0x4>;
+		#clock-cells = <1>;
+	};

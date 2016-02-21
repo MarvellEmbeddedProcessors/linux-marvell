@@ -1,11 +1,37 @@
 * Gated Clock bindings for Marvell EBU SoCs
 
-Marvell Armada 370/375/380/385/39x/XP, Dove and Kirkwood allow some
+Marvell Armada 370/375/380/385/39x/XP, Dove, Kirkwood, and CP-110 allow some
 peripheral clocks to be gated to save some power. The clock consumer
 should specify the desired clock by having the clock ID in its
 "clocks" phandle cell. The clock ID is directly mapped to the
 corresponding clock gating control bit in HW to ease manual clock
 lookup in datasheet.
+
+The following is a list of provided IDs for Armada CPN110 component:
+ID	Clock		Peripheral
+-----------------------------------
+0	Audio		AC97 Cntrl
+1	communit	TDM Comm-Unit
+2	nand		Nand Flash Ctrl
+3	pp		Packet Processor
+4	sd		SD/eMMC
+5	mg		MG
+5	mg_core		MG Core
+7	xor1		XOR Engine 1
+8	xor0		XOR Engine 0
+9	gop		Ethernet GOP
+11	pcie_x1_0	PCIe x1, unit 0
+12	pcie_x1_1	PCIe x1, unit 1
+13	pcie_x4		PCIe x4
+14	pcie_core	PCIe Core
+15	sata0		Sata
+16	satausbcore	Sata/USB Core
+18	sd-mmc		SD/MMC unit
+22	usb3h0		USB3 Host #0
+23	USB3h1		USB3 Host #1
+24	USB3d		USB3 device
+25	eip150		EIP-150
+26	eip197		EIP-197
 
 The following is a list of provided IDs for Armada 370:
 ID	Clock	Peripheral
@@ -162,6 +188,7 @@ ID	Clock	Peripheral
 
 Required properties:
 - compatible : shall be one of the following:
+	"marvell,armada-cp110-gating-clock" - for A8K CP110 component clock gating.
 	"marvell,armada-370-gating-clock" - for Armada 370 SoC clock gating
 	"marvell,armada-375-gating-clock" - for Armada 375 SoC clock gating
 	"marvell,armada-380-gating-clock" - for Armada 380/385 SoC clock gating
