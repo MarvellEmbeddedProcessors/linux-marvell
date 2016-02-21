@@ -55,4 +55,11 @@
 
 	chosen { };
 
+	cpn-110-master {
+		config-space {
+			sata: sata@540000 {
+				status = "okay";
+			};
+		};
+	};
 };
