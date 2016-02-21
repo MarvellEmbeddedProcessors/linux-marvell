@@ -39,3 +39,21 @@ sata: sata@540000 {
 	port_base = <0x10000>;
 	port_offset = <0x10000>;
 };
+
+usb3h0: usb3@500000 {
+	compatible = "generic-xhci";
+	reg = <0x500000 0x4000>;
+	dma-coherent;
+	interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk 22>, <&gateclk 16>;
+	status = "disabled";
+};
+
+usb3h1: usb3@510000 {
+	compatible = "generic-xhci";
+	reg = <0x510000 0x4000>;
+	dma-coherent;
+	interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk 23>, <&gateclk 16>;
+	status = "disabled";
+};
