@@ -70,5 +70,8 @@
 				status = "okay";
 			};
 		};
+		pcie@0x640000 {
+			status = "okay";
+		};
 	};
 };
