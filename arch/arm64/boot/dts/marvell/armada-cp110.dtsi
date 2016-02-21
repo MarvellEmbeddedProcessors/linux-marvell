@@ -17,3 +17,15 @@
  * Generic Device Tree describing Marvell Armada CP-110 device
  */
 
+cp110_clk: clk@0x440700 {
+	compatible = "marvell,armada-cp110-clock";
+	reg = <0x440700 0x4>;
+	#clock-cells = <1>;
+};
+
+gateclk: clock-gating-control@440220 {
+	compatible = "marvell,armada-cp110-gating-clock";
+	reg = <0x440220 0x4>;
+	clocks = <&cp110_clk 3>;
+	#clock-cells = <1>;
+};
