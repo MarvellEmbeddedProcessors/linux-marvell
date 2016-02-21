@@ -66,6 +66,9 @@
 			usb3h1: usb3@510000 {
 				status = "okay";
 			};
+			spi@700680 {
+				status = "okay";
+			};
 		};
 	};
 };

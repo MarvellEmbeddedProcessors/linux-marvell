@@ -57,3 +57,23 @@ usb3h1: usb3@510000 {
 	clocks = <&gateclk 23>, <&gateclk 16>;
 	status = "disabled";
 };
+
+spi@700600 {
+	compatible = "marvell,armada-380-spi";
+	reg = <0x700600 0x50>;
+	#address-cells = <0x1>;
+	#size-cells = <0x0>;
+	cell-index = <0x0>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
+spi@700680 {
+	compatible = "marvell,armada-380-spi";
+	reg = <0x700680 0x50>;
+	#address-cells = <0x1>;
+	#size-cells = <0x0>;
+	cell-index = <0x0>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};

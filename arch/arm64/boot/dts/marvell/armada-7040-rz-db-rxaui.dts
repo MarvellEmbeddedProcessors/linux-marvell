@@ -60,6 +60,9 @@
 			sata: sata@540000 {
 				status = "okay";
 			};
+			spi@700680 {
+				status = "okay";
+			};
 		};
 	};
 };
