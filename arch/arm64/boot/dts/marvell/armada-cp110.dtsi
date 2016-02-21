@@ -29,3 +29,13 @@ gateclk: clock-gating-control@440220 {
 	clocks = <&cp110_clk 3>;
 	#clock-cells = <1>;
 };
+
+sata: sata@540000 {
+	compatible = "marvell,armada-3700-ahci";
+	reg = <0x540000 0x30000>;
+	interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk 15>, <&gateclk 16>;
+	status = "disabled";
+	port_base = <0x10000>;
+	port_offset = <0x10000>;
+};
