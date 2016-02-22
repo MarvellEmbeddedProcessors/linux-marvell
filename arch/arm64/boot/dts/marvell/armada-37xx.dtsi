@@ -45,6 +45,7 @@
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/gpio/gpio.h>
 
 / {
 	model = "Marvell Armada 37xx SoC";
@@ -57,6 +58,8 @@
 		ethernet0 = &eth0;
 		ethernet1 = &eth1;
 		serial0 = &uart0;
+		gpio0 = &gpio_nb;
+		gpio1 = &gpio_sb;
 	};
 
 	cpus {
@@ -204,6 +207,21 @@
 				mac-address = [00 50 43 01 02 33];
 				clocks = <&sgateclk 4>;
 				status = "disabled";
+			};
+			gpio_nb: gpio@13800 {
+				compatible = "marvell,armada3700-gpio";
+				reg = <0x13800 0x30>;
+				ngpios = <36>;
+				gpio-controller;
+				#gpio-cells = <2>;
+			};
+
+			gpio_sb: gpio@18800 {
+				compatible = "marvell,armada3700-gpio";
+				reg = <0x18800 0x30>;
+				ngpios = <30>;
+				gpio-controller;
+				#gpio-cells = <2>;
 			};
 
 			usb3@58000 {
