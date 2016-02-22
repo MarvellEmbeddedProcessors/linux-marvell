@@ -219,7 +219,11 @@ ENTRY(vectors)
 	ventry	el1_sync			// Synchronous EL1h
 	ventry	el1_irq				// IRQ EL1h
 	ventry	el1_fiq_invalid			// FIQ EL1h
+#ifdef CONFIG_IGNORE_ASYNC_ABORT
+	ventry	el1_ignore
+#else
 	ventry	el1_error_invalid		// Error EL1h
+#endif
 
 	ventry	el0_sync			// Synchronous 64-bit EL0
 	ventry	el0_irq				// IRQ 64-bit EL0
@@ -291,6 +295,12 @@ ENDPROC(el1_fiq_invalid)
 el1_error_invalid:
 	inv_entry 1, BAD_ERROR
 ENDPROC(el1_error_invalid)
+
+#ifdef CONFIG_IGNORE_ASYNC_ABORT
+el1_ignore:
+	eret
+ENDPROC(el1_ignore)
+#endif
 
 /*
  * EL1 mode handlers.
