@@ -1,0 +1,84 @@
+Armada7040-RZ development board setup:
+--------------------------------------
+
+The Armada7040-RZ Development Board (DB) is a configurable board designed to test several
+combinations of SoC configurations. Linux supports a defined set of those configurations
+via different device tree files.
+
+This document describes the board modifications required to set up each configuration and the
+interfaces supported (or disabled in each one).
+
+Board Setup
+------------
+
+## Set UP 1: Router ###
+
+  SERDES site
+   - module: SLM1524
+   - Module DIP switch:
+	- SW1 = ON
+	- SW2 = OFF
+	- SW3 = NA
+	- SW4 = OFF
+	- SW5 = ON
+	- SW6 - NA
+	- SW7 - NA
+	- SW8 - OFF
+
+## Set UP 4: NAND ###
+
+  SERDES site
+   - module: SLM1521
+   - Module DIP switch:
+	- SW1 = OFF
+	- SW2 = ON
+	- SW3 = NA
+	- SW4 = OFF
+	- SW5 = ON
+	- SW6 - NA
+	- SW7 - NA
+	- SW8 - OFF
+
+## Set UP 6: RXAUI ###
+
+  SERDES site
+   - module: SLM1522
+   - No module DIP switch
+
+The tables below summarizes the interface configuration of each setup
+
+SERDES PHY configuration
+------------------------
+
+Setup  #	|	1	|	4	| 	6	|
+Name   #	|     Router 	|     NAND	|     RXAUI	|
+-----------------------------------------------------------------
+SERDES:	lane0	| sgmii2	| pex_x4_l0	|  sata1	|
+	lane1	| usb3h0	| usb3h0	|  sata0	|
+	lane2	| sgmii0	| kr		|  sgmii0	|
+	lane3	| sata1		| sata1		|  sgmii2	|
+	lane4	| usb3h1	| usb3h1	|  rxauil0	|
+	lane5	| pex_x1_1	| pex_x1_1	|  rxauil1	|
+-----------------------------------------------------------------
+
+
+Multi-purpose pin configurations
+--------------------------------
+
+Setup  #	|	1	|       4	| 	6	|
+Name   #	|     Router 	|     NAND	|     RXAUI	|
+-----------------------------------------------------------------
+
+MPPs: 	CP-SPI0	| N/C		| N/C		|  N/C		|
+	CP-SPI1	| [13-16]	| N/C		|  [13-16]	|
+	NAND	| N/C		| [13,17-27]	|  N/C		|
+	RGMII0	| N/C		| [0-12]	|  N/C		|
+	RGMII1	| N/C		| [44-55]	|  N/C		|
+	CP-UART0| [29-30]	| [29-30]	|  [29-30]	|
+	CP-UART1| [40-41]	| [40-41]	|  [40-41]	|
+	SD	| [56-62]	| [56-62]	|  [56-62]	|
+	TDM	| [0-11]	| N/C		|  N/C		|
+	TWSI	| [37-38]	| [37-38]	|  [37-38]	|
+	SATA0	| [36]		| N/C		|  [36]		|
+	SATA1	| [28]		| [28]		|  [28]		|
+-----------------------------------------------------------------

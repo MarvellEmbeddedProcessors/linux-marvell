@@ -1,0 +1,31 @@
+User Guide
+----------
+
+Build instructions for ARMv8:
+-----------------------------
+$ export CROSS_COMPILE=<path/to/cross/compiler/>
+	(Path to compiler gcc executable, without the gcc suffix. e.g. CROSS_COMPILE=/my_compilers/gcc-5.2/bin/aarch64-marvell-linux-gnu-)
+$ export ARCH=arm64
+$ make mvebu_v8_lsp_defconfig
+$ make - for build kernel image and device tree images.
+- Linux image is under: 'arch/arm64/boot/Image'.
+- Device tree images are under: 'arch/arm64/boot/dts/marvell':
+	- armada-7040-rz-db-router.dtb - for the 8040RZ default configuration
+	- armada-3700-db.dtb - for the A3700 default configuration
+
+Build instructions for ARMv7:
+-----------------------------
+$ export CROSS_COMPILE=<path/to/cross/compiler/>
+	(Path to compiler gcc executable, without the gcc suffix. e.g. CROSS_COMPILE=/my_compilers/gcc-5.2/bin/aarch64-marvell-linux-gnu-)
+$ export ARCH=arm
+$ make mvebu_v7_lsp_defconfig
+$ make - for build kernel image and device tree images.
+$ mak zImage - for build kernel image
+- Linux image is under: 'arch/arm/boot/zImage'.
+- Device tree images are under: 'arch/arm/boot/dts':
+	- armada-398-db.dtb - for the A398 dvelopment board configuration
+
+Board options:
+--------------
+   List of board options of development board.
+   doc/mvebu/<soc_name>/<board_name>-setup.txt
