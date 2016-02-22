@@ -66,6 +66,9 @@
 			usb3h1: usb3@510000 {
 				status = "okay";
 			};
+			nand@720000 {
+				status = "okay";
+			};
 		};
 		pcie@0x600000 {
 			status = "okay";

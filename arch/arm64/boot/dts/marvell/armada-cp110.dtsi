@@ -99,3 +99,18 @@ i2c2: i2c@701100 {
 	clocks = <&cp110_clk 3>;
 	status = "disabled";
 };
+
+nand@720000 {
+	compatible = "marvell,armada370-nand";
+	reg = <0x720000 0x54>;
+	#address-cells = <1>;
+	#size-cells = <1>;
+	num-cs = <1>;
+	marvell,nand-enable-arbiter;
+	nand-on-flash-bbt;
+	interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk 2>;
+	nand-ecc-strength = <4>;
+	nand-ecc-step-size = <512>;
+	status = "disabled";
+};
