@@ -291,7 +291,7 @@ config GPIO_MPC8XXX
 
 config GPIO_MVEBU
 	def_bool y
-	depends on PLAT_ORION
+	depends on PLAT_ORION || ARCH_MVEBU
 	depends on OF
 	select GENERIC_IRQ_CHIP
 
