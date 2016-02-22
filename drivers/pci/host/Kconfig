@@ -16,6 +16,15 @@ config PCI_MVEBU
 	depends on ARCH_MVEBU || ARCH_DOVE
 	depends on OF
 
+config IGNORE_ASYNC_ABORT
+	bool "Ignore asynchronous abort from configuration access"
+	depends on ARCH_MVEBU
+	help
+	 Ignore asynchronous abort caused during configuration
+	 access to ports with no endpoint connected.
+	 Warning: This will mask all Serror aborts
+	 regardless of their cause
+
 config PCIE_DW
 	bool
 
