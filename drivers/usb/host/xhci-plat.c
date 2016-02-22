@@ -124,39 +124,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	hcd->rsrc_start = res->start;
 	hcd->rsrc_len = resource_size(res);
 
-	/*
-	 * Not all platforms have a clk so it is not an error if the
-	 * clock does not exists.
-	 */
-	clk = devm_clk_get(&pdev->dev, NULL);
-	if (!IS_ERR(clk)) {
-		ret = clk_prepare_enable(clk);
-		if (ret)
-			goto put_hcd;
-	} else if (PTR_ERR(clk) == -EPROBE_DEFER) {
-		ret = -EPROBE_DEFER;
-		goto put_hcd;
-	}
-
-	if (of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-375-xhci") ||
-	    of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-380-xhci")) {
-		ret = xhci_mvebu_mbus_init_quirk(pdev);
-		if (ret)
-			goto put_hcd;
-	}
-
-	device_wakeup_enable(hcd->self.controller);
-
 	xhci = hcd_to_xhci(hcd);
-	xhci->main_hcd = hcd;
-	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
-			dev_name(&pdev->dev), hcd);
-	if (!xhci->shared_hcd) {
-		ret = -ENOMEM;
-		goto put_hcd;
-	}
 
 	/*
 	 * Not all platforms have a clk so it is not an error if the
@@ -170,6 +138,25 @@ static int xhci_plat_probe(struct platform_device *pdev)
 				goto disable_clk;
 			xhci->clk[i] = clk;
 		}
+	}
+
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-375-xhci") ||
+	    of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-380-xhci")) {
+		ret = xhci_mvebu_mbus_init_quirk(pdev);
+		if (ret)
+			goto disable_clk;
+	}
+
+	device_wakeup_enable(hcd->self.controller);
+
+	xhci->main_hcd = hcd;
+	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+			dev_name(&pdev->dev), hcd);
+	if (!xhci->shared_hcd) {
+		ret = -ENOMEM;
+		goto disable_clk;
 	}
 
 	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
