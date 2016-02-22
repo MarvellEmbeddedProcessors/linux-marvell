@@ -905,7 +905,7 @@ static int a3700_spi_transfer_one_message(struct spi_master *master,
 
 	list_for_each_entry(xfer, &mesg->transfers, transfer_list) {
 
-		dev_err(&spi->dev, "<xfer> rx_buf %p, tx_buf %p, len %d, BPW %d\n",
+		dev_dbg(&spi->dev, "<xfer> rx_buf %p, tx_buf %p, len %d, BPW %d\n",
 			xfer->rx_buf, xfer->tx_buf, xfer->len,
 			xfer->bits_per_word);
 
