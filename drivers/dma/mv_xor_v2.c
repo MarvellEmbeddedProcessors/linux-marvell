@@ -12,6 +12,7 @@
  * General Public License for more details.
  */
 
+#include <linux/clk.h>
 #include <linux/dma-mapping.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -149,6 +150,7 @@ struct mv_xor_v2_device {
 	spinlock_t cookie_lock;
 	void __iomem *dma_base;
 	void __iomem *glob_base;
+	struct clk *clk;
 	struct tasklet_struct irq_tasklet;
 	struct list_head free_sw_desc;
 	struct dma_device dmadev;
@@ -735,6 +737,7 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	struct dma_device *dma_dev;
 	struct mv_xor_v2_sw_desc *sw_desc;
 	struct msi_desc *msi_desc;
+	struct device *dev = &pdev->dev;
 
 	dev_notice(&pdev->dev, "Marvell Version 2 XOR driver\n");
 
@@ -753,6 +756,16 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 		return PTR_ERR(xor_dev->glob_base);
 
 	platform_set_drvdata(pdev, xor_dev);
+
+	xor_dev->clk = devm_clk_get(dev, NULL);
+	if (!IS_ERR(xor_dev->clk)) {
+		ret = clk_prepare_enable(xor_dev->clk);
+		if (ret) {
+			dev_err(dev, "Failed to enable XOR clock.\n");
+			devm_clk_put(dev, xor_dev->clk);
+			return ret;
+		}
+	}
 
 	ret = platform_msi_domain_alloc_irqs(&pdev->dev, 1,
 					     mv_xor_v2_set_msi_msg);
