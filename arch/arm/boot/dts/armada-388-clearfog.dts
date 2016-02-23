@@ -55,9 +55,12 @@
 				clock-frequency = <100000>;
 			};
 
-			mdio {
+			mdio: mdio {
 				phy0: ethernet-phy@0 {
 					reg = <0>;
+				};
+				phy1: ethernet-phy@1 {
+					reg = <4>;
 				};
 				phy1: ethernet-phy@1 {
 					reg = <999>;
@@ -126,6 +129,20 @@
 				status = "okay";
 			};
 		};
+
+	mv_qd_switch {
+		compatible = "marvell,mv_qd_switch";
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		interrupts = <10>;
+		mii-bus = <&mdio>;
+		phy_addr = <&phy1>;	/* MDIO address of switch 0 in tree */
+		smi_scan_mode = <2>;	/* multi mode */
+		cpu_port = <6>;
+		forced_link_port_mask = <0x60>;
+		connected_port_mask = <0x6f>;
+	};
 
 		pcie-controller {
 			status = "okay";
