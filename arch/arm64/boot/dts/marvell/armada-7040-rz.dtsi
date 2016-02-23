@@ -52,4 +52,15 @@
 	model = "Marvell Armada 7040 RZ";
 	compatible = "marvell,armada7040", "marvell,armada-ap806-quad",
 	             "marvell,armada-ap806";
+
+	cpn-110-master {
+		config-space {
+			cpxor0@6a0000 {
+				compatible = "marvell,mv-xor-v2-z1";
+			};
+			cpxor1@6c0000 {
+				compatible = "marvell,mv-xor-v2-z1";
+			};
+		};
+	};
 };
