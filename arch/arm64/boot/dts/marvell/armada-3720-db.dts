@@ -127,6 +127,10 @@
 				status = "okay";
 			};
 
+			interrupt-controller@74840 {
+				status = "okay";
+			};
+
 			sdhci1: sdhci@d0000 {
 				broken-cd;
 				wp-inverted;
@@ -166,6 +170,14 @@
 					  3300000 0x0>;
 
 				enable-active-high;
+			};
+		};
+
+		pcie-controller {
+			status = "okay";
+
+			pcie@1,0 {
+				status = "okay";
 			};
 		};
 	};
