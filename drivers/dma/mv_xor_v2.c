@@ -375,20 +375,31 @@ mv_xor_v2_prep_sw_desc(struct mv_xor_v2_device *xor_dev)
 	/* Lock the channel */
 	spin_lock_bh(&xor_dev->sw_ll_lock);
 
-	/* get a free SW descriptor from the SW DESQ */
-	sw_desc = list_first_entry(&xor_dev->free_sw_desc,
-				   struct mv_xor_v2_sw_desc, free_list);
-	list_del(&sw_desc->free_list);
+	if (!list_empty(&xor_dev->free_sw_desc)) {
+		/* get a free SW descriptor from the SW DESQ */
+		sw_desc = list_first_entry(&xor_dev->free_sw_desc,
+					   struct mv_xor_v2_sw_desc, free_list);
+		list_del(&sw_desc->free_list);
+
+		/* Release the channel */
+		spin_unlock_bh(&xor_dev->sw_ll_lock);
+
+		/* set the async tx descriptor */
+		dma_async_tx_descriptor_init(&sw_desc->async_tx, &xor_dev->dmachan);
+		sw_desc->async_tx.tx_submit = mv_xor_v2_tx_submit;
+		async_tx_ack(&sw_desc->async_tx);
+
+		return sw_desc;
+	}
 
 	/* Release the channel */
 	spin_unlock_bh(&xor_dev->sw_ll_lock);
 
-	/* set the async tx descriptor */
-	dma_async_tx_descriptor_init(&sw_desc->async_tx, &xor_dev->dmachan);
-	sw_desc->async_tx.tx_submit = mv_xor_v2_tx_submit;
-	async_tx_ack(&sw_desc->async_tx);
+	/* schedule tasklet to free some descriptors */
+	tasklet_schedule(&xor_dev->irq_tasklet);
 
-	return sw_desc;
+	/* no free descriptors */
+	return NULL;
 }
 
 /*
@@ -409,6 +420,10 @@ mv_xor_v2_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src
 		__func__, len, &src, &dest, flags);
 
 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
+
+	/* did we get a valid descriptor? */
+	if (!sw_desc)
+		return NULL;
 
 	sw_desc->async_tx.flags = flags;
 
@@ -474,6 +489,10 @@ mv_xor_v2_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 
 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
 
+	/* did we get a valid descriptor? */
+	if (!sw_desc)
+		return NULL;
+
 	sw_desc->async_tx.flags = flags;
 
 	/* set the HW descriptor */
@@ -525,6 +544,10 @@ mv_xor_v2_prep_dma_interrupt(struct dma_chan *chan, unsigned long flags)
 	xor_dev = container_of(chan, struct mv_xor_v2_device, dmachan);
 
 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
+
+	/* did we get a valid descriptor? */
+	if (!sw_desc)
+		return NULL;
 
 	/* set the HW descriptor */
 	hw_descriptor = &sw_desc->hw_desc;
