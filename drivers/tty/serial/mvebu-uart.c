@@ -89,6 +89,7 @@
 #define MVEBU_NR_UARTS		1
 
 #define MVEBU_UART_TYPE		"mvebu-uart"
+#define DRIVER_NAME		"mvebu-serial"
 
 static struct uart_port mvebu_uart_ports[MVEBU_NR_UARTS];
 
@@ -286,7 +287,7 @@ static int mvebu_uart_startup(struct uart_port *port)
 	udelay(1);
 	writel(CTRL_RX_INT, port->membase + UART_CTRL);
 
-	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, "serial",
+	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, DRIVER_NAME,
 			  port);
 	if (ret) {
 		dev_err(port->dev, "failed to request irq\n");
@@ -535,7 +536,7 @@ console_initcall(mvebu_uart_console_init);
 
 static struct uart_driver mvebu_uart_driver = {
 	.owner			= THIS_MODULE,
-	.driver_name		= "serial",
+	.driver_name		= DRIVER_NAME,
 	.dev_name		= "ttyMV",
 	.nr			= MVEBU_NR_UARTS,
 #ifdef CONFIG_SERIAL_MVEBU_CONSOLE
