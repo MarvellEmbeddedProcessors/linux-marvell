@@ -1,0 +1,34 @@
+Marvell Distributed Switch Architecture Device Tree Bindings
+------------------------------------------------------------
+
+Required properties:
+- compatible		: Should be "marvell,mv_qd_switch"
+- #address-cells	: Must be 2, first cell is the address on the MDIO bus
+			  and second cell is the address in the switch tree.
+			  Second cell is used only when cascading/chaining.
+- #size-cells		: Must be 0
+- mii-bus		: Should be a phandle to a valid MDIO bus device node
+- phy_addr		: Should be a phandle to a valid PHY device node accessed by MDIO
+- cpu_port		: Should be Switch port number connected to CPU
+- connected_port_mask	: Include all switch connected ports
+- forced_link_port_mask	: Include switch ports with force link up configuration
+
+Optionnal properties:
+- interrupts		: property with a value describing the switch
+			  interrupt number (not supported by the driver)
+
+
+	mv_qd_switch {
+		compatible = "marvell,mv_qd_switch";
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		interrupts = <10>;
+		mii-bus = <&mdio>;
+		phy_addr = <&phy0>;	/* MDIO address of switch 0 in tree */
+		smi_scan_mode = <0>;	/* scan smi mode */
+		cpu_port = <6>;
+		forced_link_port_mask = <0x60>;
+		connected_port_mask = <0x7f>;
+	};
+};
