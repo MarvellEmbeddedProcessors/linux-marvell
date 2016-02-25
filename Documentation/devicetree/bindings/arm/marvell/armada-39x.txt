@@ -17,4 +17,4 @@ compatible: must contain "marvell,armada398"
 
 Example:
 
-compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada390";
+compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada395", "marvell,armada390";
