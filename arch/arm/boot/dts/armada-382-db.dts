@@ -12,11 +12,11 @@
  */
 
 /dts-v1/;
-#include "armada-380.dtsi"
+#include "armada-385.dtsi"
 
 / {
 	model = "Marvell Armada 382 Development Board";
-	compatible = "marvell,a382-db", "marvell,armada382", "marvell,armada38x";
+	compatible = "marvell,a382-db", "marvell,armada385", "marvell,armada380";
 
 	chosen {
 		bootargs = "console=ttyS0,115200 earlyprintk";
@@ -28,6 +28,10 @@
 	};
 
 	soc {
+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
+			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000>;
 
 		internal-regs {
 			ethernet@70000 {
@@ -71,6 +75,7 @@
 				wp-inverted;
 				bus-width = <8>;
 				status = "okay";
+				no-1-8-v;
 			};
 
 			serial@12000 {
@@ -127,6 +132,10 @@
 			};
 
 			crypto@9D000 {
+				status = "okay";
+			};
+
+			usb3@f8000 {
 				status = "okay";
 			};
 		};
