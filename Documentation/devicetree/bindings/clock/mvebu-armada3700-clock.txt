@@ -1,11 +1,33 @@
 * Clock bindings for Marvell MVEBU Armada3700 SoCs
 
-Marvell Armada 3700 allow some peripheral clocks to be gated to save power.The clock
+Armada3700 SoCs usually allow to determine core clock frequencies by
+reading the CPU registers. The core clock consumer should
+specify the desired clock by having the clock ID in its "clocks" phandle cell.
+
+Also, Marvell Armada3700 allow some peripheral clocks to be gated to save power.The clock
 consumer should specify the desired clock by having the clock ID in its
 "clocks" phandle cell. The clock ID is directly mapped to the corresponding clock
 gating control bit in HW to ease manual clock lookup in datasheet.
 
-Required properties:
+In most of the time, the core clock modules have the corresponding gating
+control bit, the kernel driver will take the core clock as the parent of
+the gating clock, thus, the consumer only need to specify the gating clock ID.
+
+Core Clock Required properties:
+- compatible : shall be one of the following:
+	"marvell,armada-3700-core-clock" - For Armada 3700 SoC core clocks
+- reg : shall be the register address of the clock related register
+- #clock-cells : from common clock binding; shall be set to 1
+
+Example:
+
+core_clk: core-clocks@13000 {
+	compatible = "marvell,armada-3700-core-clock";
+	reg = <0x13000 0x6000>;
+	#clock-cells = <1>;
+};
+
+Gated Clock Required properties:
 - compatible : shall be one of the following:
 	"marvell,armada-3700-north-bridge-gating-clock" - gate clock control for Armada 3700 north bridge
 	"marvell,armada-3700-south-bridge-gating-clock" - gate clock control for Armada 3700 south bridge
