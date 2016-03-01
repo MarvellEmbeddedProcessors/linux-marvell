@@ -144,10 +144,20 @@
 				#clock-cells = <1>;
 			};
 
+			npinctrl: north-bridge-pinctrl@13830 {
+				compatible = "marvell,armada-3700-nb-pinctrl";
+				reg = <0x13830 0x4>;
+			};
+
 			sgateclk: south-bridge-gate-clk@18014 {
 				compatible = "marvell,armada-3700-south-bridge-gating-clock";
 				reg = <0x18014 0x4>;
 				#clock-cells = <1>;
+			};
+
+			spinctrl: south-bridge-pinctrl@18830 {
+				compatible = "marvell,armada-3700-sb-pinctrl";
+				reg = <0x18830 0x4>;
 			};
 
 			eth0: ethernet@30000 {

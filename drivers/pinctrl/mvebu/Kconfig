@@ -1,9 +1,13 @@
-if PLAT_ORION
-
 config PINCTRL_MVEBU
 	bool
 	select PINMUX
 	select PINCONF
+
+config PINCTRL_ARMADA_3700
+	bool
+	select PINCTRL_MVEBU
+
+if PLAT_ORION
 
 config PINCTRL_DOVE
 	bool
