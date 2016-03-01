@@ -152,6 +152,11 @@
 					marvell,pins = "mpp15", "mpp18";
 					marvell,function = "spi";
 				};
+
+				mmc_pins: mmc-pins {
+					marvell,pins = "mpp2";
+					marvell,function = "mmc";
+				};
 			};
 
 			sgateclk: south-bridge-gate-clk@18014 {
@@ -163,6 +168,11 @@
 			spinctrl: south-bridge-pinctrl@18830 {
 				compatible = "marvell,armada-3700-sb-pinctrl";
 				reg = <0x18830 0x4>;
+
+				sdio_pins: sdio-pins {
+					marvell,pins = "mpp2";
+					marvell,function = "sdio";
+				};
 			};
 
 			eth0: ethernet@30000 {
