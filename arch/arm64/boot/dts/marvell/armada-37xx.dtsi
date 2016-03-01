@@ -147,6 +147,11 @@
 			npinctrl: north-bridge-pinctrl@13830 {
 				compatible = "marvell,armada-3700-nb-pinctrl";
 				reg = <0x13830 0x4>;
+
+				spi0_pins: spi-pins-0 {
+					marvell,pins = "mpp15", "mpp18";
+					marvell,function = "spi";
+				};
 			};
 
 			sgateclk: south-bridge-gate-clk@18014 {
