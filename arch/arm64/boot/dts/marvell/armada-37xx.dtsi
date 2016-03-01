@@ -138,6 +138,12 @@
 				status = "disabled";
 			};
 
+			core_clk: core-clocks@13000 {
+				compatible = "marvell,armada-3700-core-clock";
+				reg = <0x13000 0x6000>;
+				#clock-cells = <1>;
+			};
+
 			ngateclk: north-bridge-gate-clk@13014 {
 				compatible = "marvell,armada-3700-north-bridge-gating-clock";
 				reg = <0x13014 0x4>;
