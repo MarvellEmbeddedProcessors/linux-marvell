@@ -127,6 +127,9 @@
 				broken-cd;
 				bus-width = <4>;
 				status = "okay";
+
+				pinctrl-names = "default";
+				pinctrl-0 = <&sdio_pins>;
 			};
 
 			sdhci0: sdhci@d8000 {
@@ -135,6 +138,9 @@
 				bus-width = <8>;
 				tuning-count = <6>;
 				status = "okay";
+
+				pinctrl-names = "default";
+				pinctrl-0 = <&mmc_pins>;
 			};
 
 			/* CON3 */
