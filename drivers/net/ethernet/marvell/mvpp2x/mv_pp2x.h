@@ -34,6 +34,9 @@
 
 #define PFX			MVPP2_DRIVER_NAME ": "
 
+#define IRQ_NAME_SIZE (36)
+
+
 #if defined(CONFIG_MV_PP2_FPGA) || defined(CONFIG_MV_PP2_PALLADIUM)
 #define CONFIG_MV_PP2_POLLING
 #endif
@@ -74,8 +77,6 @@
 #endif
 
 #define MV_ETH_SKB_SHINFO_SIZE	SKB_DATA_ALIGN(sizeof(struct skb_shared_info))
-
-#define CONFIG_MV_PP2_POLLING
 
 /* START - Taken from mvPp2Commn.h, need to order TODO */
 /*--------------------------------------------------------------------*/
@@ -149,7 +150,7 @@
 	pr_info("%s(%d): "#var"=0x%lx\n", __FILENAME__, __LINE__,\
 		(unsigned long)var)
 #define MVPP2_PRINT_VAR_NAME(var, name) \
-	pr_crit("%s(%d): %s=0x%lx\n", __FILENAME__, __LINE__, name, var)
+	pr_info("%s(%d): %s=0x%lx\n", __FILENAME__, __LINE__, name, var)
 #else
 #define MVPP2_PRINT_LINE()
 #define MVPP2_PRINT_2LINE()
@@ -170,12 +171,12 @@
 #define MVPP2_MAX_SHARED	1
 
 /* Coalescing */
-#define MVPP2_TXDONE_COAL_PKTS		32
+#define MVPP2_TXDONE_COAL_PKTS		64
 #define MVPP2_TXDONE_HRTIMER_PERIOD_NS	1000000UL
-#define MVPP2_TXDONE_COAL_USEC		500
+#define MVPP2_TXDONE_COAL_USEC		0 /* No tx_time_coalescing */
 
 #define MVPP2_RX_COAL_PKTS		32
-#define MVPP2_RX_COAL_USEC		100
+#define MVPP2_RX_COAL_USEC		64
 
 /* BM constants */
 #define MVPP2_BM_POOLS_NUM		16
@@ -198,6 +199,12 @@
 #define RX_TOTAL_SIZE(buf_size)		((buf_size) + MV_ETH_SKB_SHINFO_SIZE)
 #define RX_TRUE_SIZE(total_size)	roundup_pow_of_two(total_size)
 extern  u32 debug_param;
+
+
+/* Convert cpu_id to sw_thread_id */
+#define QV_THR_2_CPU(sw_thread_id)	(sw_thread_id - first_addr_space)
+#define QV_CPU_2_THR(cpu_id)		(first_addr_space + cpu_id)
+
 
 enum mvppv2_version {
 	PPV21 = 21,
@@ -245,6 +252,7 @@ struct mv_mac_data {
 	struct phy_device	*phy_dev;
 	struct device_node	*phy_node;
 	int			link_irq;
+	char			irq_name[IRQ_NAME_SIZE];
 	bool			force_link;
 	unsigned int		autoneg;
 	unsigned int		link;
@@ -544,6 +552,7 @@ struct mv_pp2x_port_pcpu {
 
 struct queue_vector {
 	unsigned int irq;
+	char irq_name[IRQ_NAME_SIZE];
 	struct napi_struct napi;
 	enum mv_pp2x_queue_vector_type qv_type;
 	u16 sw_thread_id; /* address_space index used to

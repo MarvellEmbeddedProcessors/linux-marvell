@@ -26,6 +26,7 @@
 #include <linux/mbus.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/cpumask.h>
 #include <linux/kallsyms.h>
 #include <linux/of.h>
@@ -64,7 +65,7 @@
 
 /* Declaractions */
 u8 mv_pp2x_num_cos_queues = 4;
-static u8 mv_pp2x_queue_mode = MVPP2_QDIST_MULTI_MODE;
+static u8 mv_pp2x_queue_mode = MVPP2_QDIST_SINGLE_MODE;
 static u8 rss_mode;
 static u8 default_cpu;
 static u8 cos_classifer;
@@ -85,7 +86,7 @@ u32 debug_param;
 #ifdef CONFIG_MV_PP2_PALLADIUM
 #define MV_PP2_FPGA_PERODIC_TIME 2
 #else
-#define MV_PP2_FPGA_PERODIC_TIME 10
+#define MV_PP2_FPGA_PERODIC_TIME 100
 #endif
 #endif
 #ifdef CONFIG_MV_PP2_FPGA
@@ -1235,11 +1236,14 @@ void mv_pp2x_cleanup_irqs(struct mv_pp2x_port *port)
 {
 	int qvec;
 
-	/* YuvalC TODO: Check, according to free_irq(),
-	 *	it is safe to free a non-requested irq
-	 */
-	for (qvec = 0; qvec < port->num_qvector; qvec++)
+	/* Rx/TX irq's */
+	for (qvec = 0; qvec < port->num_qvector; qvec++) {
+		irq_set_affinity_hint(port->q_vector[qvec].irq, NULL);
 		free_irq(port->q_vector[qvec].irq, &port->q_vector[qvec]);
+	}
+
+	/* Link irq */
+	free_irq(port->mac_data.link_irq, port);
 }
 
 /* The callback for per-q_vector interrupt */
@@ -1275,25 +1279,32 @@ static irqreturn_t mv_pp2_link_change_isr(int irq, void *data)
 
 int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 {
-	int qvec, err;
-	char temp_buf[32];
+	int qvec_id, cpu, err;
+	struct queue_vector *qvec;
 
 	/* Rx/TX irq's */
-	for (qvec = 0; qvec < port->num_qvector; qvec++) {
-		sprintf(temp_buf, "%s.q_vec[%d]", dev->name, qvec);
-		err = request_irq(port->q_vector[qvec].irq, mv_pp2x_isr, 0,
-				  temp_buf, &port->q_vector[qvec]);
+	for (qvec_id = 0; qvec_id < port->num_qvector; qvec_id++) {
+		qvec = &port->q_vector[qvec_id];
+		err = request_irq(qvec->irq, mv_pp2x_isr, 0,
+				  qvec->irq_name, qvec);
+		pr_debug("%s interrupt request\n", qvec->irq_name);
+		if (qvec->qv_type == MVPP2_PRIVATE) {
+			cpu = QV_THR_2_CPU(qvec->sw_thread_id);
+			irq_set_affinity_hint(qvec->irq, cpumask_of(cpu));
+			irq_set_status_flags(qvec->irq, IRQ_NO_BALANCING);
+		}
 		if (err) {
 			netdev_err(dev, "cannot request IRQ %d\n",
-				   port->q_vector[qvec].irq);
+				   qvec->irq);
 			goto err_cleanup;
 		}
 	}
 	/* Link irq */
 	if (port->mac_data.link_irq != MVPP2_NO_LINK_IRQ) {
-		sprintf(temp_buf, "%s link_change", dev->name);
+		pr_debug("%s interrupt request\n", port->mac_data.irq_name);
 		err = request_irq(port->mac_data.link_irq,
-				  mv_pp2_link_change_isr, 0, temp_buf, dev);
+				  mv_pp2_link_change_isr, 0,
+				  port->mac_data.irq_name, port);
 		if (err) {
 			netdev_err(dev, "cannot request IRQ %d\n",
 				   port->mac_data.link_irq);
@@ -2216,7 +2227,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	u16 txq_id;
 	u32 tx_cmd;
 
-	txq_id = skb_get_queue_mapping(skb);
+	txq_id = 0/*skb_get_queue_mapping(skb)*/;
 	txq = port->txqs[txq_id];
 	txq_pcpu = this_cpu_ptr(txq->pcpu);
 	aggr_txq = &port->priv->aggr_txqs[smp_processor_id()];
@@ -2552,13 +2563,15 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 
 	tasklet_init(&port->link_change_tasklet, mv_pp2_link_change_tasklet,
 		(unsigned long)(port->dev));
-	/* Unmask link_event */
-	if (!FPGA && port->priv->pp2_version == PPV22)
-		mv_gop110_port_events_unmask(gop, mac);
 
 	mv_pp2x_egress_enable(port);
 	mv_pp2x_ingress_enable(port);
 	MVPP2_PRINT_VAR(mac->phy_mode);
+	/* Unmask link_event */
+#if !defined(CONFIG_MV_PP2_POLLING)
+	if (port->priv->pp2_version == PPV22)
+		mv_gop110_port_events_unmask(gop, mac);
+#endif
 }
 
 /* Set hw internals when stopping port */
@@ -2587,6 +2600,7 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 		mv_gop110_port_events_mask(gop, mac);
 		mv_gop110_port_disable(gop, mac);
 		port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
+		tasklet_kill(&port->link_change_tasklet);
 	}
 
 
@@ -3220,22 +3234,23 @@ static void mv_pp21_port_queue_vectors_init(struct mv_pp2x_port *port)
 	port->num_qvector = 1;
 }
 
-static void mv_pp22_port_queue_vectors_init(struct mv_pp2x_port *port)
+static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 {
 	int cpu;
 	struct queue_vector *q_vec = &port->q_vector[0];
+	struct net_device  *net_dev = port->dev;
 
 	/* Each cpu has zero private rx_queues */
 	for (cpu = 0; cpu < num_active_cpus(); cpu++) {
 		q_vec[cpu].parent = port;
 		q_vec[cpu].qv_type = MVPP2_PRIVATE;
-		q_vec[cpu].sw_thread_id = first_addr_space+cpu;
+		q_vec[cpu].sw_thread_id = QV_CPU_2_THR(cpu);
 		q_vec[cpu].sw_thread_mask = (1<<q_vec[cpu].sw_thread_id);
 		q_vec[cpu].pending_cause_rx = 0;
 #if !defined(CONFIG_MV_PP2_POLLING)
 		q_vec[cpu].irq = port->of_irqs[first_addr_space+cpu];
 #endif
-		netif_napi_add(port->dev, &q_vec[cpu].napi, mv_pp22_poll,
+		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
 		if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
 			q_vec[cpu].num_rx_queues = mv_pp2x_num_cos_queues;
@@ -3256,7 +3271,7 @@ static void mv_pp22_port_queue_vectors_init(struct mv_pp2x_port *port)
 #if !defined(CONFIG_MV_PP2_POLLING)
 		q_vec[cpu].irq = port->of_irqs[first_addr_space+cpu];
 #endif
-		netif_napi_add(port->dev, &q_vec[cpu].napi, mv_pp22_poll,
+		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
 		q_vec[cpu].first_rx_queue = 0;
 		q_vec[cpu].num_rx_queues = port->num_rx_queues;
@@ -3264,6 +3279,36 @@ static void mv_pp22_port_queue_vectors_init(struct mv_pp2x_port *port)
 		port->num_qvector++;
 	}
 }
+
+
+static void mv_pp22_port_irq_names_update(struct mv_pp2x_port *port)
+{
+	int i, cpu;
+	struct queue_vector *q_vec = &port->q_vector[0];
+	char str_common[32];
+	struct net_device  *net_dev = port->dev;
+	struct device *parent_dev;
+
+	parent_dev = net_dev->dev.parent;
+
+	snprintf(str_common, sizeof(str_common), "%s.%s",
+		dev_name(parent_dev), net_dev->name);
+
+	for (i = 0; i < port->num_qvector; i++) {
+		if (q_vec[i].qv_type == MVPP2_PRIVATE) {
+			cpu = QV_THR_2_CPU(q_vec[i].sw_thread_id);
+			snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s%d",
+				str_common, "cpu", cpu);
+		} else {
+			snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s",
+				str_common, "rx_shared");
+		}
+	}
+
+	snprintf(port->mac_data.irq_name, IRQ_NAME_SIZE, "%s.%s", str_common,
+		"link");
+}
+
 
 static void mv_pp21x_port_isr_rx_group_cfg(struct mv_pp2x_port *port)
 {
@@ -3278,15 +3323,12 @@ static void mv_pp22_port_isr_rx_group_cfg(struct mv_pp2x_port *port)
 	struct mv_pp2x_hw *hw = &(port->priv->hw);
 
 	for (i = 0; i < port->num_qvector; i++) {
-		MVPP2_PRINT_LINE();
 		if (port->q_vector[i].num_rx_queues != 0) {
-			MVPP2_PRINT_LINE();
 			mv_pp22_isr_rx_group_write(hw, port->id,
 				port->q_vector[i].sw_thread_id,
 				port->q_vector[i].first_rx_queue,
 				port->q_vector[i].num_rx_queues);
 		}
-
 	}
 }
 
@@ -3670,6 +3712,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		dev_err(&pdev->dev, "failed to register netdev\n");
 		goto err_free_port_pcpu;
 	}
+	mv_pp22_port_irq_names_update(port);
+
 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
 
 	priv->port_list[priv->num_ports] = port;
@@ -4086,9 +4130,9 @@ static struct mv_pp2x_platform_data pp22_pdata = {
 	.interrupt_tx_done = true,
 #endif
 	.multi_hw_instance = true,
-	.mv_pp2x_port_queue_vectors_init = mv_pp22_port_queue_vectors_init,
+	.mv_pp2x_port_queue_vectors_init = mv_pp22_queue_vectors_init,
 	.mv_pp2x_port_isr_rx_group_cfg = mv_pp22_port_isr_rx_group_cfg,
-	.num_port_irq = 1,
+	.num_port_irq = 5,
 	.hw.desc_queue_addr_shift = MVPP22_DESC_ADDR_SHIFT,
 	.skb_base_addr = 0,
 #ifdef CONFIG_64BIT
@@ -4149,7 +4193,6 @@ static void mv_pp2x_init_rxfhindir(struct mv_pp2x *pp2)
 
 void mv_pp2x_pp2_basic_print(struct platform_device *pdev, struct mv_pp2x *priv)
 {
-
 	DBG_MSG("%s\n", __func__);
 
 	DBG_MSG("num_present_cpus(%d) num_act_cpus(%d) num_online_cpus(%d)\n",
@@ -4204,6 +4247,8 @@ void mv_pp2x_pp2_port_print(struct mv_pp2x_port *port)
 	DBG_MSG("\t ifname(%s)\n", port->dev->name);
 	DBG_MSG("\t first_rxq(%d)\n", port->first_rxq);
 	DBG_MSG("\t num_irqs(%d)\n", port->num_irqs);
+	for (i = 0; i < port->num_irqs; i++)
+		DBG_MSG("\t\t irq%d(%d)\n", i, port->of_irqs[i]);
 	DBG_MSG("\t pkt_size(%d)\n", port->pkt_size);
 	DBG_MSG("\t flags(%lx)\n", port->flags);
 	DBG_MSG("\t tx_ring_size(%d)\n", port->tx_ring_size);
@@ -4219,8 +4264,8 @@ void mv_pp2x_pp2_port_print(struct mv_pp2x_port *port)
 	for (i = 0; i < port->num_qvector; i++) {
 		DBG_MSG("\t qvector_index(%d)\n", i);
 #if !defined(CONFIG_MV_PP2_POLLING)
-		DBG_MSG("\t\t irq(%d)\n",
-			port->q_vector[i].irq);
+		DBG_MSG("\t\t irq(%d) irq_name:%s\n",
+			port->q_vector[i].irq, port->q_vector[i].irq_name);
 #endif
 		DBG_MSG("\t\t qv_type(%d)\n",
 			port->q_vector[i].qv_type);
@@ -4243,7 +4288,8 @@ void mv_pp2x_pp2_port_print(struct mv_pp2x_port *port)
 		port->mac_data.force_link, port->mac_data.autoneg,
 		port->mac_data.duplex, port->mac_data.speed);
 #if !defined(CONFIG_MV_PP2_POLLING)
-	DBG_MSG("\t GOP link_irq(%d)\n", port->mac_data.link_irq);
+	DBG_MSG("\t GOP link_irq(%d) irq_name:%s\n", port->mac_data.link_irq,
+		port->mac_data.irq_name);
 #endif
 	DBG_MSG("\t GOP phy_dev(%p) phy_node(%p)\n", port->mac_data.phy_dev,
 		port->mac_data.phy_node);
@@ -4251,7 +4297,7 @@ void mv_pp2x_pp2_port_print(struct mv_pp2x_port *port)
 }
 EXPORT_SYMBOL(mv_pp2x_pp2_port_print);
 
-static void mv_pp2x_pp2_ports_print(struct mv_pp2x *priv)
+void mv_pp2x_pp2_ports_print(struct mv_pp2x *priv)
 {
 	int i;
 	struct mv_pp2x_port *port;
@@ -4597,8 +4643,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	/*Init PP2 Configuration */
 	mv_pp2x_init_config(&priv->pp2_cfg, cell_index);
-	mv_pp2x_pp2_basic_print(pdev, priv);
-
 
 	/* Init PP22 rxfhindir table evenly in probe */
 	mv_pp2x_init_rxfhindir(priv);
@@ -4625,7 +4669,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	mv_gop110_netc_init(&priv->hw.gop, net_comp_config,
 				MV_NETC_SECOND_PHASE);
 
-	mv_pp2x_pp2_ports_print(priv);
 #if defined(CONFIG_MV_PP2_POLLING)
 	init_timer(&cpu_poll_timer);
 	cpu_poll_timer.function = mv_pp22_cpu_timer_callback;
@@ -4820,16 +4863,8 @@ static int __init mpp2_module_init(void)
 	}
 #endif
 
-	/*pr_crit("mv_pp2x_device list_empty=%d line=%d\n",
-	 *	list_empty(&mv_pp2x_device.dev.devres_head), __LINE__);
-	*/
 
 	mv_pp2x_device.dev.dma_mask = &(mv_pp2x_device.dev.coherent_dma_mask);
-
-	/*pr_crit("mv_pp2x_device list_empty=%d line=%d\n",
-	 *	list_empty(&mv_pp2x_device.dev.devres_head), __LINE__);
-	 */
-
 	mv_pp2x_num_cos_queues = 4;
 
 #endif
