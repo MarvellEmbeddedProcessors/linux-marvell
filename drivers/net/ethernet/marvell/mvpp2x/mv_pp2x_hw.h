@@ -37,7 +37,7 @@ static inline void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
 		pr_emerg_once("Received mv_pp2x_write(%d) from CPU1 !!\n",
 			offset);
 #endif
-	pr_info("mv_pp2x_write(%p)\n", hw->cpu_base[smp_processor_id()] +
+	pr_debug("mv_pp2x_write(%p)\n", hw->cpu_base[smp_processor_id()] +
 		offset);
 	writel(data, hw->cpu_base[smp_processor_id()] + offset);
 }
@@ -49,7 +49,7 @@ static inline u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 		pr_emerg_once("Received mv_pp2x_read(%d) from CPU1 !!\n",
 			offset);
 #endif
-	pr_info("mv_pp2x_read(%p)\n", hw->cpu_base[smp_processor_id()] +
+	pr_debug("mv_pp2x_read(%p)\n", hw->cpu_base[smp_processor_id()] +
 		offset);
 
 	return readl(hw->cpu_base[smp_processor_id()] + offset);
