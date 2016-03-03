@@ -182,7 +182,7 @@ struct mv_pp2x_pool_attributes mv_pp2x_pools[] = {
 	}
 };
 
-#if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
+#if defined(CONFIG_MV_PP2_FPGA) || defined(CONFIG_MV_PP2_PALLADIUM)
 void *mv_pp2x_vfpga_address_get(void)
 {
 	return mv_pp2_vfpga_address;
@@ -688,9 +688,13 @@ static void mv_pp2x_defaults_set(struct mv_pp2x_port *port)
 	for (lrxq = 0; lrxq < port->num_rx_queues; lrxq++) {
 		queue = port->rxqs[lrxq]->id;
 		val = mv_pp2x_read(hw, MVPP2_RXQ_CONFIG_REG(queue));
-
-		val &= ~MVPP2_SNOOP_PKT_SIZE_MASK;
-		val &= ~MVPP2_SNOOP_BUF_HDR_MASK;
+		if (is_device_dma_coherent(port->dev->dev.parent)) {
+			val |= MVPP2_SNOOP_PKT_SIZE_MASK;
+			val |= MVPP2_SNOOP_BUF_HDR_MASK;
+		} else {
+			val &= ~MVPP2_SNOOP_PKT_SIZE_MASK;
+			val &= ~MVPP2_SNOOP_BUF_HDR_MASK;
+		}
 		mv_pp2x_write(hw, MVPP2_RXQ_CONFIG_REG(queue), val);
 	}
 
@@ -2068,7 +2072,9 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 			skb = mv_pp22_rxdesc_cookie_get(rx_desc);
 			buf_phys_addr = mv_pp22_rxdesc_phys_addr_get(rx_desc);
 		}
-
+		if (!is_device_dma_coherent(dev->dev.parent))
+			dma_sync_single_for_cpu(dev->dev.parent, buf_phys_addr,
+					rx_desc->data_size, DMA_FROM_DEVICE);
 #ifdef CONFIG_64BIT
 		skb = (struct sk_buff *)((uintptr_t)skb |
 			port->priv->pp2xdata->skb_base_addr);
@@ -2496,6 +2502,8 @@ static int mvcpn110_mac_hw_init(struct mv_pp2x_port *port)
 	struct mv_mac_data *mac = &port->mac_data;
 	int gop_port = mac->gop_index;
 
+	if (mac->flags & MV_EMAC_F_INIT)
+		return 0;
 
 	/* configure port PHY address */
 	mv_gop110_smi_phy_addr_cfg(gop, gop_port, mac->phy_addr);
@@ -2851,7 +2859,6 @@ int mv_pp2x_open(struct net_device *dev)
 	/* Unmask interrupts on all CPUs */
 	on_each_cpu(mv_pp2x_interrupts_unmask, port, 1);
 
-
 	/* Unmask shared interrupts */
 	mv_pp2x_shared_thread_interrupts_unmask(port);
 #endif
@@ -2859,12 +2866,18 @@ int mv_pp2x_open(struct net_device *dev)
 #if defined(CONFIG_MV_PP2_POLLING)
 	if (cpu_poll_timer_ref_cnt == 0) {
 		cpu_poll_timer.expires  =
-		jiffies + msecs_to_jiffies(MV_PP2_FPGA_PERODIC_TIME*1000);
+		jiffies + msecs_to_jiffies(MV_PP2_FPGA_PERODIC_TIME*100);
 		add_timer(&cpu_poll_timer);
 		cpu_poll_timer_ref_cnt++;
 	}
 #endif
 #if !defined(CONFIG_MV_PP2_FPGA) && !defined(CONFIG_MV_PP2_PALLADIUM)
+	/* Port is init in uboot */
+#if !defined(OLD_UBOOT)
+	if (port->mac_data.phy_mode == PHY_INTERFACE_MODE_RGMII)
+		port->mac_data.flags |= MV_EMAC_F_INIT;
+#endif
+
 	if (port->priv->pp2_version == PPV22)
 		mvcpn110_mac_hw_init(port);
 #endif
@@ -4002,23 +4015,62 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 
 #if !defined(CONFIG_MV_PP2_FPGA)
 	/*AXI Bridge Configuration */
+
+	/* BM always non-cache  */
 	mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
-		MVPP22_AXI_ATTR_SNOOP_CNTRL_BIT);
+		MVPP22_AXI_ATTR_NON_CACHE);
 	mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
-		MVPP22_AXI_ATTR_SNOOP_CNTRL_BIT);
-	mv_pp2x_write(hw, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG,
-		MVPP22_AXI_ATTR_SNOOP_CNTRL_BIT);
-	mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_WR_ATTR_REG,
-		MVPP22_AXI_ATTR_SNOOP_CNTRL_BIT);
-	mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_RD_ATTR_REG,
-		MVPP22_AXI_ATTR_SNOOP_CNTRL_BIT);
-	mv_pp2x_write(hw, MVPP22_AXI_RXQ_DESCR_WR_ATTR_REG,
-		MVPP22_AXI_ATTR_SNOOP_CNTRL_BIT);
-	mv_pp2x_write(hw, MVPP22_AXI_RX_DATA_WR_ATTR_REG,
-		MVPP22_AXI_ATTR_SNOOP_CNTRL_BIT);
-	mv_pp2x_write(hw, MVPP22_AXI_TX_DATA_RD_ATTR_REG,
-		MVPP22_AXI_ATTR_SNOOP_CNTRL_BIT);
-	MVPP2_PRINT_LINE();
+		MVPP22_AXI_ATTR_NON_CACHE);
+
+	if (is_device_dma_coherent(&pdev->dev)) {
+		/* Descriptors */
+		mv_pp2x_write(hw, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_HW_COH_READ);
+		mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_HW_COH_WRITE);
+		mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_HW_COH_READ);
+		mv_pp2x_write(hw, MVPP22_AXI_RXQ_DESCR_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_HW_COH_WRITE);
+
+		/* Buffer Data */
+		mv_pp2x_write(hw, MVPP22_AXI_TX_DATA_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_HW_COH_READ);
+		mv_pp2x_write(hw, MVPP22_AXI_RX_DATA_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_HW_COH_WRITE);
+	} else {
+		/* Descriptors */
+		mv_pp2x_write(hw, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_NON_CACHE);
+		mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_NON_CACHE);
+		mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_NON_CACHE);
+		mv_pp2x_write(hw, MVPP22_AXI_RXQ_DESCR_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_NON_CACHE);
+
+		/* Buffer Data */
+		mv_pp2x_write(hw, MVPP22_AXI_RX_DATA_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_SW_COH_WRITE);
+		mv_pp2x_write(hw, MVPP22_AXI_TX_DATA_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_SW_COH_READ);
+	}
+
+	val = MVPP22_AXI_CODE_CACHE_NON_CACHE << MVPP22_AXI_CODE_CACHE_OFFS;
+	val |= MVPP22_AXI_CODE_DOMAIN_SYSTEM << MVPP22_AXI_CODE_DOMAIN_OFFS;
+	mv_pp2x_write(hw, MVPP22_AXI_RD_NORMAL_CODE_REG, val);
+	mv_pp2x_write(hw, MVPP22_AXI_WR_NORMAL_CODE_REG, val);
+
+	val = MVPP22_AXI_CODE_CACHE_RD_CACHE << MVPP22_AXI_CODE_CACHE_OFFS;
+	val |= MVPP22_AXI_CODE_DOMAIN_OUTER_DOM << MVPP22_AXI_CODE_DOMAIN_OFFS;
+
+	mv_pp2x_write(hw, MVPP22_AXI_RD_SNOOP_CODE_REG, val);
+
+	val = MVPP22_AXI_CODE_CACHE_WR_CACHE << MVPP22_AXI_CODE_CACHE_OFFS;
+	val |= MVPP22_AXI_CODE_DOMAIN_OUTER_DOM << MVPP22_AXI_CODE_DOMAIN_OFFS;
+
+	mv_pp2x_write(hw, MVPP22_AXI_WR_SNOOP_CODE_REG, val);
+
 #endif
 
 	/* Disable HW PHY polling */
@@ -4057,11 +4109,11 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	mv_pp2x_rx_fifo_init(hw);
 
 
-
-	/* Allow cache snoop when transmiting packets */
-	mv_pp2x_write(hw, MVPP2_TX_SNOOP_REG, 0x1);
-	MVPP2_PRINT_LINE();
-
+	/* Set cache snoop when transmiting packets */
+	if (is_device_dma_coherent(&pdev->dev))
+		mv_pp2x_write(hw, MVPP2_TX_SNOOP_REG, 0x1);
+	else
+		mv_pp2x_write(hw, MVPP2_TX_SNOOP_REG, 0x0);
 
 	/* Buffer Manager initialization */
 	err = mv_pp2x_bm_init(pdev, priv);
@@ -4208,7 +4260,6 @@ void mv_pp2x_pp2_basic_print(struct platform_device *pdev, struct mv_pp2x *priv)
 
 	DBG_MSG("Device dma_coherent(%d)\n", pdev->dev.archdata.dma_coherent);
 
-
 	DBG_MSG("pp2_ver(%d)\n", priv->pp2_version);
 	DBG_MSG("queue_mode(%d)\n", priv->pp2_cfg.queue_mode);
 	DBG_MSG("first_bm_pool(%d) jumbo_pool(%d)\n",
@@ -4235,7 +4286,6 @@ void mv_pp2x_pp2_basic_print(struct platform_device *pdev, struct mv_pp2x *priv)
 		DBG_MSG("gop_addr: rfu1(%p)\n",
 			priv->hw.gop.gop_110.rfu1_base);
 	}
-
 }
 EXPORT_SYMBOL(mv_pp2x_pp2_basic_print);
 
@@ -4576,7 +4626,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 #ifdef CONFIG_MV_PP2_FPGA
 	pdev->dev.archdata.dma_coherent = 0;
 #else
-	pdev->dev.archdata.dma_coherent = 0; /*PKAK not coherent*/
+	pdev->dev.archdata.dma_coherent = 0; /* SW_COHERENT */
 #endif
 
 #ifdef CONFIG_64BIT
@@ -4943,10 +4993,7 @@ static void mv_pp22_cpu_timer_callback(unsigned long data)
 	}
 
 
-	if (debug_param)
-		timeout = debug_param;
-	else
-		timeout = MV_PP2_FPGA_PERODIC_TIME;
+	timeout = MV_PP2_FPGA_PERODIC_TIME;
 #ifdef CONFIG_MV_PP2_PALLADIUM
 	timeout = timeout*1000;
 #endif

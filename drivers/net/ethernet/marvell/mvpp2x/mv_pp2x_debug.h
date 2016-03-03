@@ -107,6 +107,8 @@ int mv_pp22_wrap_rss_mode_set(struct mv_pp2x_port *port, int rss_mode);
 int mv_pp22_wrap_rss_dflt_cpu_set(struct mv_pp2x_port *port, int default_cpu);
 int mv_pp2x_port_bind_cpu_set(struct mv_pp2x_port *port, u8 bind_cpu);
 int mv_pp2x_debug_param_set(u32 param);
+int mv_pp2x_debug_param_get(void);
+
 
 void mv_pp2x_bm_queue_map_dump_all(struct mv_pp2x_hw *hw);
 

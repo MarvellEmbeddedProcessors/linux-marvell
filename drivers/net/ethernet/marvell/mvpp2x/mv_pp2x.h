@@ -747,7 +747,7 @@ struct mv_pp2x_pool_attributes {
 
 extern struct mv_pp2x_pool_attributes mv_pp2x_pools[];
 
-#if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
+#if defined(CONFIG_MV_PP2_FPGA) || defined(CONFIG_MV_PP2_PALLADIUM)
 void *mv_pp2x_vfpga_address_get(void);
 #endif
 
