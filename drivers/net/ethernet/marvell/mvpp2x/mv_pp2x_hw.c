@@ -75,7 +75,7 @@ void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
 		pr_debug("NEW REG: mv_pp2x_write(%p)\n", reg_ptr);
 		last_used[next_write] = reg_ptr;
 		next_write++;
-		next_write = next_write%MVPP2_REG_BUF_SIZE;
+		next_write = next_write % MVPP2_REG_BUF_SIZE;
 	} else {
 		/*pr_info("mv_pp2x_write(%d)=%d , caller %pS\n",
 		*	offset, data, __builtin_return_address(0));
@@ -552,10 +552,12 @@ static void mv_pp2x_prs_shadow_ri_set(struct mv_pp2x_hw *hw, int index,
 /* Update lookup field in tcam sw entry */
 void mv_pp2x_prs_tcam_lu_set(struct mv_pp2x_prs_entry *pe, unsigned int lu)
 {
-	int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_LU_BYTE);
+	unsigned int offset = MVPP2_PRS_TCAM_LU_BYTE;
+	unsigned int enable_off =
+		MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_LU_BYTE);
 
-	pe->tcam.byte[MVPP2_PRS_TCAM_LU_BYTE] = lu;
-	pe->tcam.byte[enable_off] = MVPP2_PRS_LU_MASK;
+	pe->tcam.byte[HW_BYTE_OFFS(offset)] = lu;
+	pe->tcam.byte[HW_BYTE_OFFS(enable_off)] = MVPP2_PRS_LU_MASK;
 }
 EXPORT_SYMBOL(mv_pp2x_prs_tcam_lu_set);
 
@@ -563,7 +565,8 @@ EXPORT_SYMBOL(mv_pp2x_prs_tcam_lu_set);
 void mv_pp2x_prs_tcam_port_set(struct mv_pp2x_prs_entry *pe,
 			       unsigned int port, bool add)
 {
-	int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
+	int enable_off =
+		HW_BYTE_OFFS(MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE));
 
 	if (add)
 		pe->tcam.byte[enable_off] &= ~(1 << port);
@@ -577,9 +580,10 @@ void mv_pp2x_prs_tcam_port_map_set(struct mv_pp2x_prs_entry *pe,
 				   unsigned int ports)
 {
 	unsigned char port_mask = MVPP2_PRS_PORT_MASK;
-	int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
+	int enable_off =
+		HW_BYTE_OFFS(MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE));
 
-	pe->tcam.byte[MVPP2_PRS_TCAM_PORT_BYTE] = 0;
+	pe->tcam.byte[HW_BYTE_OFFS(MVPP2_PRS_TCAM_PORT_BYTE)] = 0;
 	pe->tcam.byte[enable_off] &= ~port_mask;
 	pe->tcam.byte[enable_off] |= ~ports & MVPP2_PRS_PORT_MASK;
 }
@@ -588,7 +592,8 @@ EXPORT_SYMBOL(mv_pp2x_prs_tcam_port_map_set);
 /* Obtain port map from tcam sw entry */
 static unsigned int mv_pp2x_prs_tcam_port_map_get(struct mv_pp2x_prs_entry *pe)
 {
-	int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
+	int enable_off =
+		HW_BYTE_OFFS(MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE));
 
 	return ~(pe->tcam.byte[enable_off]) & MVPP2_PRS_PORT_MASK;
 }
@@ -625,8 +630,8 @@ static void mv_pp2x_prs_tcam_data_dword_set(struct mv_pp2x_prs_entry *pe,
 
 	for (index = 0; index < 4; index++) {
 		offset = (offs * 4) + index;
-		byte = ((unsigned char *) &word)[index];
-		byteMask = ((unsigned char *) &enable)[index];
+		byte = ((unsigned char *) &word)[HW_BYTE_OFFS(index)];
+		byteMask = ((unsigned char *) &enable)[HW_BYTE_OFFS(index)];
 		mv_pp2x_prs_tcam_data_byte_set(pe, offset, byte, byteMask);
 	}
 }
@@ -676,12 +681,12 @@ void mv_pp2x_prs_tcam_ai_update(struct mv_pp2x_prs_entry *pe,
 			continue;
 
 		if (bits & BIT(i))
-			pe->tcam.byte[ai_idx] |= 1 << i;
+			pe->tcam.byte[HW_BYTE_OFFS(ai_idx)] |= 1 << i;
 		else
-			pe->tcam.byte[ai_idx] &= ~(1 << i);
+			pe->tcam.byte[HW_BYTE_OFFS(ai_idx)] &= ~(1 << i);
 	}
 
-	pe->tcam.byte[MVPP2_PRS_TCAM_EN_OFFS(ai_idx)] |= enable;
+	pe->tcam.byte[HW_BYTE_OFFS(MVPP2_PRS_TCAM_EN_OFFS(ai_idx))] |= enable;
 }
 EXPORT_SYMBOL(mv_pp2x_prs_tcam_ai_update);
 
@@ -690,7 +695,7 @@ EXPORT_SYMBOL(mv_pp2x_prs_tcam_ai_update);
 /* Get ai bits from tcam sw entry */
 static int mv_pp2x_prs_tcam_ai_get(struct mv_pp2x_prs_entry *pe)
 {
-	return pe->tcam.byte[MVPP2_PRS_TCAM_AI_BYTE];
+	return pe->tcam.byte[HW_BYTE_OFFS(MVPP2_PRS_TCAM_AI_BYTE)];
 }
 #endif
 
@@ -706,14 +711,14 @@ static void mv_pp2x_prs_match_etype(struct mv_pp2x_prs_entry *pe, int offset,
 static void mv_pp2x_prs_sram_bits_set(struct mv_pp2x_prs_entry *pe, int bit_num,
 				      int val)
 {
-	pe->sram.byte[MVPP2_BIT_TO_BYTE(bit_num)] |= (val << (bit_num % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(bit_num)] |= (val << (bit_num % 8));
 }
 
 /* Clear bits in sram sw entry */
 static void mv_pp2x_prs_sram_bits_clear(struct mv_pp2x_prs_entry *pe,
 					int bit_num, int val)
 {
-	pe->sram.byte[MVPP2_BIT_TO_BYTE(bit_num)] &= ~(val << (bit_num % 8));
+	pe->sram.byte[SRAM_BIT_TO_BYTE(bit_num)] &= ~(val << (bit_num % 8));
 }
 
 /* Update ri bits in sram sw entry */
@@ -774,7 +779,7 @@ EXPORT_SYMBOL(mv_pp2x_prs_sram_ai_update);
 static int mv_pp2x_prs_sram_ai_get(struct mv_pp2x_prs_entry *pe)
 {
 	u8 bits;
-	int ai_off = MVPP2_BIT_TO_BYTE(MVPP2_PRS_SRAM_AI_OFFS);
+	int ai_off = SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_AI_OFFS);
 	int ai_en_off = ai_off + 1;
 	int ai_shift = MVPP2_PRS_SRAM_AI_OFFS % 8;
 
@@ -815,7 +820,7 @@ static void mv_pp2x_prs_sram_shift_set(struct mv_pp2x_prs_entry *pe, int shift,
 	}
 
 	/* Set value */
-	pe->sram.byte[MVPP2_BIT_TO_BYTE(MVPP2_PRS_SRAM_SHIFT_OFFS)] =
+	pe->sram.byte[SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_SHIFT_OFFS)] =
 						   (unsigned char)shift;
 
 	/* Reset and set operation */
@@ -846,11 +851,11 @@ static void mv_pp2x_prs_sram_offset_set(struct mv_pp2x_prs_entry *pe,
 	mv_pp2x_prs_sram_bits_clear(pe, MVPP2_PRS_SRAM_UDF_OFFS,
 				    MVPP2_PRS_SRAM_UDF_MASK);
 	mv_pp2x_prs_sram_bits_set(pe, MVPP2_PRS_SRAM_UDF_OFFS, offset);
-	pe->sram.byte[MVPP2_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS +
+	pe->sram.byte[SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS +
 					MVPP2_PRS_SRAM_UDF_BITS)] &=
 					~(MVPP2_PRS_SRAM_UDF_MASK >>
 					(8 - (MVPP2_PRS_SRAM_UDF_OFFS % 8)));
-	pe->sram.byte[MVPP2_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS +
+	pe->sram.byte[SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS +
 					MVPP2_PRS_SRAM_UDF_BITS)] |=
 					(offset >> (8 -
 					(MVPP2_PRS_SRAM_UDF_OFFS % 8)));
@@ -865,13 +870,13 @@ static void mv_pp2x_prs_sram_offset_set(struct mv_pp2x_prs_entry *pe,
 				    MVPP2_PRS_SRAM_OP_SEL_UDF_MASK);
 	mv_pp2x_prs_sram_bits_set(pe, MVPP2_PRS_SRAM_OP_SEL_UDF_OFFS, op);
 
-	pe->sram.byte[MVPP2_BIT_TO_BYTE(MVPP2_PRS_SRAM_OP_SEL_UDF_OFFS +
+	pe->sram.byte[SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_OP_SEL_UDF_OFFS +
 					MVPP2_PRS_SRAM_OP_SEL_UDF_BITS)] &=
 					~(MVPP2_PRS_SRAM_OP_SEL_UDF_MASK >>
 					(8 -
 					(MVPP2_PRS_SRAM_OP_SEL_UDF_OFFS % 8)));
 
-	pe->sram.byte[MVPP2_BIT_TO_BYTE(MVPP2_PRS_SRAM_OP_SEL_UDF_OFFS +
+	pe->sram.byte[SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_OP_SEL_UDF_OFFS +
 					MVPP2_PRS_SRAM_OP_SEL_UDF_BITS)] |=
 					(op >> (8 -
 					(MVPP2_PRS_SRAM_OP_SEL_UDF_OFFS % 8)));
@@ -2883,7 +2888,6 @@ int mv_pp2x_prs_flow_set(struct mv_pp2x_port *port)
 
 	MVPP2_PRINT_LINE();
 
-
 	index = MVPP2_PRS_FL_NON_IP_UNTAG_INDEX;
 	ret = mv_pp2x_prs_flow_id_gen(port,
 			mv_pp2x_prs_flow_id_array[index].flow_id,
@@ -3552,7 +3556,6 @@ void mv_pp2x_rx_csum(struct mv_pp2x_port *port, u32 status,
 	skb->ip_summed = CHECKSUM_NONE;
 }
 
-
 /* Set the number of packets that will be received before Rx interrupt
  * will be generated by HW.
  */
@@ -3606,7 +3609,6 @@ void mv_pp2x_tx_done_time_coal_set(struct mv_pp2x_port *port, u32 usec)
 		      MVPP22_ISR_TX_THRESHOLD_REG(port->id), val);
 }
 
-
 /* Change maximum receive size of the port */
 void mv_pp21_gmac_max_rx_size_set(struct mv_pp2x_port *port)
 {
@@ -3621,14 +3623,12 @@ void mv_pp21_gmac_max_rx_size_set(struct mv_pp2x_port *port)
 #endif
 }
 
-
 /* Set max sizes for Tx queues */
 void mv_pp2x_txp_max_tx_size_set(struct mv_pp2x_port *port)
 {
 	u32	val, size, mtu;
 	int	txq, tx_port_num;
 	struct mv_pp2x_hw *hw = &port->priv->hw;
-
 
 	mtu = port->pkt_size * 8;
 	if (mtu > MVPP2_TXP_MTU_MAX)
@@ -3672,7 +3672,6 @@ void mv_pp2x_txp_max_tx_size_set(struct mv_pp2x_port *port)
 		}
 	}
 }
-
 
 /* Set Tx descriptors fields relevant for CSUM calculation */
 u32 mv_pp2x_txq_desc_csum(int l3_offs, int l3_proto,
@@ -3967,7 +3966,6 @@ void mv_pp21_rxq_short_pool_set(struct mv_pp2x_hw *hw,
 	mv_pp2x_write(hw, MVPP2_RXQ_CONFIG_REG(prxq), val);
 }
 
-
 /* Attach long pool to rxq */
 void mv_pp22_rxq_long_pool_set(struct mv_pp2x_hw *hw,
 			       int prxq, int long_pool)
@@ -4044,7 +4042,7 @@ void mv_pp2x_egress_enable(struct mv_pp2x_port *port)
 	mv_pp2x_write(hw, MVPP2_TXP_SCHED_PORT_INDEX_REG, tx_port_num);
 	mv_pp2x_write(hw, MVPP2_TXP_SCHED_Q_CMD_REG, qmap);
 
-	DBG_MSG("tx_port_num=%d qmap=0x%x\n", tx_port_num, qmap);
+	pr_debug("tx_port_num=%d qmap=0x%x\n", tx_port_num, qmap);
 }
 
 /* Disable transmit via physical egress queue
@@ -4185,7 +4183,7 @@ int mv_pp2x_prs_sw_sram_shift_set(struct mv_pp2x_prs_entry *pe,
 
 	/* Set sign */
 	if (shift < 0) {
-		pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
+		pe->sram.byte[SRAM_BIT_TO_BYTE(
 			MVPP2_PRS_SRAM_SHIFT_SIGN_BIT)] |=
 			(1 << (MVPP2_PRS_SRAM_SHIFT_SIGN_BIT % 8));
 		shift = 0 - shift;
@@ -4226,10 +4224,10 @@ int mv_pp2x_prs_sw_sram_shift_get(struct mv_pp2x_prs_entry *pe, int *shift)
 	if (mv_pp2x_ptr_validate(shift) == MV_ERROR)
 		return MV_ERROR;
 
-	sign = pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
+	sign = pe->sram.byte[SRAM_BIT_TO_BYTE(
 		MVPP2_PRS_SRAM_SHIFT_SIGN_BIT)] &
 		(1 << (MVPP2_PRS_SRAM_SHIFT_SIGN_BIT % 8));
-	*shift = ((int)(pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
+	*shift = ((int)(pe->sram.byte[SRAM_BIT_TO_BYTE(
 		MVPP2_PRS_SRAM_SHIFT_OFFS)])) &
 		MVPP2_PRS_SRAM_SHIFT_MASK;
 
@@ -4341,37 +4339,37 @@ int mv_pp2x_prs_sw_sram_offset_get(struct mv_pp2x_prs_entry *pe,
 	if (mv_pp2x_ptr_validate(type) == MV_ERROR)
 		return MV_ERROR;
 
-	*type = pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
+	*type = pe->sram.byte[SRAM_BIT_TO_BYTE(
 		MVPP2_PRS_SRAM_UDF_TYPE_OFFS)] >>
 		(MVPP2_PRS_SRAM_UDF_TYPE_OFFS % 8);
 	*type &= MVPP2_PRS_SRAM_UDF_TYPE_MASK;
 
-	*offset = (pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
+	*offset = (pe->sram.byte[SRAM_BIT_TO_BYTE(
 		MVPP2_PRS_SRAM_UDF_OFFS)] >>
 		(MVPP2_PRS_SRAM_UDF_OFFS % 8)) & 0x7f;
-	*offset |= (pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
-		MVPP2_PRS_SRAM_UDF_OFFS + MVPP2_PRS_SRAM_UDF_OFFS)] <<
-		(8 - (MVPP2_PRS_SRAM_UDF_OFFS % 8))) & 0x80;
+	*offset |= (pe->sram.byte[
+		    SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS) +
+		    SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS)] <<
+		    (8 - (MVPP2_PRS_SRAM_UDF_OFFS % 8))) & 0x80;
 
-	*op = (pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
+	*op = (pe->sram.byte[SRAM_BIT_TO_BYTE(
 		MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS)] >>
 		(MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS % 8)) & 0x7;
-	*op |= (pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
-		MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS +
-		MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS)] <<
+	*op |= (pe->sram.byte[HW_BYTE_OFFS(
+		SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS) +
+		SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS))] <<
 		(8 - (MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS % 8))) & 0x18;
 
 	/* if signed bit is tes */
-	sign = pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
+	sign = pe->sram.byte[SRAM_BIT_TO_BYTE(
 		MVPP2_PRS_SRAM_UDF_SIGN_BIT)] &
 		(1 << (MVPP2_PRS_SRAM_UDF_SIGN_BIT % 8));
 	if (sign != 0)
-		*offset = 1-(*offset);
+		*offset = 1 - (*offset);
 
 	return MV_OK;
 }
 EXPORT_SYMBOL(mv_pp2x_prs_sw_sram_offset_get);
-
 
 int mv_pp2x_prs_sw_sram_next_lu_get(struct mv_pp2x_prs_entry *pe,
 				    unsigned int *lu)
@@ -4382,7 +4380,7 @@ int mv_pp2x_prs_sw_sram_next_lu_get(struct mv_pp2x_prs_entry *pe,
 	if (mv_pp2x_ptr_validate(lu) == MV_ERROR)
 		return MV_ERROR;
 
-	*lu = pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(
+	*lu = pe->sram.byte[SRAM_BIT_TO_BYTE(
 		MVPP2_PRS_SRAM_NEXT_LU_OFFS)];
 	*lu = ((*lu) >> MVPP2_PRS_SRAM_NEXT_LU_OFFS % 8);
 	*lu &= MVPP2_PRS_SRAM_NEXT_LU_MASK;
@@ -4395,7 +4393,7 @@ int mv_pp2x_prs_sram_bit_get(struct mv_pp2x_prs_entry *pe, int bitNum,
 	if (mv_pp2x_ptr_validate(pe) == MV_ERROR)
 		return MV_ERROR;
 
-	*bit = pe->sram.byte[MVPP2_PRS_SRAM_BIT_TO_BYTE(bitNum)]  &
+	*bit = pe->sram.byte[SRAM_BIT_TO_BYTE(bitNum)]  &
 		(1 << (bitNum % 8));
 	*bit = (*bit) >> (bitNum % 8);
 	return MV_OK;
@@ -4756,7 +4754,6 @@ int mv_pp2x_cls_sw_flow_hek_get(struct mv_pp2x_cls_flow_entry *fe,
 	*num_of_fields = (fe->data[1] & MVPP2_FLOW_FIELDS_NUM_MASK) >>
 			MVPP2_FLOW_FIELDS_NUM;
 
-
 	for (index = 0; index < (*num_of_fields); index++)
 		field_ids[index] = ((fe->data[2] &
 			MVPP2_FLOW_FIELD_MASK(index)) >>
@@ -5084,7 +5081,6 @@ int mv_pp2x_cls_hw_regs_dump(struct mv_pp2x_hw *hw)
 			  "MVPP2_CLS_FLOW_TBL1_REG");
 	mv_pp2x_print_reg(hw, MVPP2_CLS_FLOW_TBL2_REG,
 			  "MVPP2_CLS_FLOW_TBL2_REG");
-
 
 	mv_pp2x_print_reg(hw, MVPP2_CLS_PORT_SPID_REG,
 			  "MVPP2_CLS_PORT_SPID_REG");
@@ -5619,8 +5615,6 @@ int mv_pp2x_cls_c2_hit_cntr_dump(struct mv_pp2x_hw *hw)
 		if (cnt != 0)
 			DBG_MSG("INDEX: 0x%8.8X	VAL: 0x%8.8X\n", i, cnt);
 	}
-
-
 	return MV_OK;
 }
 EXPORT_SYMBOL(mv_pp2x_cls_c2_hit_cntr_dump);
@@ -6339,7 +6333,7 @@ static void mv_pp2x_cls_c2_qos_tbl_fill(struct mv_pp2x_port *port,
 	for (pri = 0; pri < line_num; pri++) {
 		/* cos_value equal to dscp/8 or pbit value */
 		cos_value = ((tbl_sel == MVPP2_QOS_TBL_SEL_PRI) ?
-			pri : (pri/8));
+			pri : (pri / 8));
 		/* each nibble of pri_map stands for a cos-value,
 		 * nibble value is the queue
 		 */
