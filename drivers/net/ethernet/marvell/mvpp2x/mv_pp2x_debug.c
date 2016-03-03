@@ -1427,6 +1427,12 @@ int mv_pp2x_debug_param_set(u32 param)
 }
 EXPORT_SYMBOL(mv_pp2x_debug_param_set);
 
+int mv_pp2x_debug_param_get(void)
+{
+	return debug_param;
+}
+EXPORT_SYMBOL(mv_pp2x_debug_param_get);
+
 
 static int mv_pp2x_prs_hw_tcam_cnt_dump(struct mv_pp2x_hw *hw,
 					int tid, unsigned int *cnt)
