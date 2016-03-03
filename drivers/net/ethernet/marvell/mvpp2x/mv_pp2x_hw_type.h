@@ -1198,8 +1198,6 @@
 #define MVPP2_RX_MAX_PKT_SIZE(total_size) \
 	((total_size) - NET_SKB_PAD - MVPP2_SKB_SHINFO_SIZE)
 
-#define MVPP2_BIT_TO_BYTE(bit)		((bit) / 8)
-
 /* IPv6 max L3 address size */
 #define MVPP2_MAX_L3_ADDR_SIZE		16
 
@@ -1420,7 +1418,6 @@ enum mv_pp2x_tag_type {
 #define MVPP2_PRS_SINGLE_VLAN_AI		0
 #define MVPP2_PRS_DBL_VLAN_AI_BIT		BIT(7)
 
-#define MVPP2_PRS_SRAM_BIT_TO_BYTE(_bit_)	HW_BYTE_OFFS((_bit_) / 8)
 #define MVPP2_PRS_SRAM_SHIFT_MASK		((1 << \
 					MVPP2_PRS_SRAM_SHIFT_BITS) - 1)
 

@@ -110,13 +110,15 @@
  * LE example: HW_BYTE_OFFS(1) = 1
  * BE example: HW_BYTE_OFFS(1) = 2
  */
-#define SRAM_BIT_TO_BYTE(_bit_) HW_BYTE_OFFS((_bit_) / 8)
 
 #if defined(__LITTLE_ENDIAN)
 #define HW_BYTE_OFFS(_offs_) (_offs_)
 #else
 #define HW_BYTE_OFFS(_offs_) ((3 - ((_offs_) % 4)) + (((_offs_) / 4) * 4))
 #endif
+
+#define SRAM_BIT_TO_BYTE(_bit_) HW_BYTE_OFFS((_bit_) / 8)
+
 
 #define TCAM_DATA_BYTE_OFFS_LE(_offs_)		(((_offs_) - \
 	((_offs_) % 2)) * 2 + ((_offs_) % 2))
