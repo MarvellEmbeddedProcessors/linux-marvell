@@ -155,17 +155,17 @@ aliases {
 
 gop {
 	emac0: mac0 {
-		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
 		mac-address = [00 00 00 00 00 01];
 		port-id = <0>; /* gop_port_id */
 	};
 	emac2: mac2 {
-		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
 		mac-address = [00 00 00 00 00 02];
 		port-id = <2>; /* gop_port_id */
 	};
 	emac3: mac3 {
-		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
 		mac-address = [00 00 00 00 00 03];
 		port-id = <3>; /* gop_port_id */
 	};
@@ -191,19 +191,31 @@ ppv22@000000 {
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 	status = "okay";
 	eth0: eth0@010000 {
-		interrupts = <GIC_SPI 05 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
 		port-id = <0>; /* pp2_port_id */
 		emac-data = <&emac0>;
 		status = "disabled";
 	};
 	eth1: eth1@020000 {
-		interrupts = <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
 		port-id = <1>; /* pp2_port_id */
 		emac-data = <&emac2>;
 		status = "disabled";
 	};
 	eth2: eth2@030000 {
-		interrupts = <GIC_SPI 07 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
 		port-id = <2>; /* pp2_port_id */
 		emac-data = <&emac3>;
 		status = "disabled";
