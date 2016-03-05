@@ -1289,6 +1289,9 @@ int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 	/* Rx/TX irq's */
 	for (qvec_id = 0; qvec_id < port->num_qvector; qvec_id++) {
 		qvec = &port->q_vector[qvec_id];
+		if (qvec->qv_type == MVPP2_PRIVATE &&
+		    port->priv->pp2xdata->interrupt_tx_done == false)
+			continue;
 		err = request_irq(qvec->irq, mv_pp2x_isr, 0,
 				  qvec->irq_name, qvec);
 		pr_debug("%s interrupt request\n", qvec->irq_name);
@@ -3247,6 +3250,17 @@ static void mv_pp21_port_queue_vectors_init(struct mv_pp2x_port *port)
 	port->num_qvector = 1;
 }
 
+static int mv_pp2_num_cpu_irqs(struct mv_pp2x_port *port)
+{
+	int cpu_avail_irq;
+
+	cpu_avail_irq = port->num_irqs -
+		((mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) ? 1 : 0);
+	if (cpu_avail_irq < 0)
+		return 0;
+	return min((num_active_cpus()), ((unsigned int)cpu_avail_irq));
+}
+
 static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 {
 	int cpu;
@@ -3261,7 +3275,8 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 		q_vec[cpu].sw_thread_mask = (1<<q_vec[cpu].sw_thread_id);
 		q_vec[cpu].pending_cause_rx = 0;
 #if !defined(CONFIG_MV_PP2_POLLING)
-		q_vec[cpu].irq = port->of_irqs[first_addr_space+cpu];
+		if (port->priv->pp2xdata->interrupt_tx_done == true)
+			q_vec[cpu].irq = port->of_irqs[first_addr_space+cpu];
 #endif
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
@@ -3278,11 +3293,17 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 	if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
 		q_vec[cpu].parent = port;
 		q_vec[cpu].qv_type = MVPP2_SHARED;
-		q_vec[cpu].sw_thread_id = first_addr_space+cpu;
+		if (port->priv->pp2xdata->interrupt_tx_done == true)
+			q_vec[cpu].sw_thread_id = first_addr_space+cpu;
+		else
+			q_vec[cpu].sw_thread_id = first_addr_space;
 		q_vec[cpu].sw_thread_mask = (1<<q_vec[cpu].sw_thread_id);
 		q_vec[cpu].pending_cause_rx = 0;
 #if !defined(CONFIG_MV_PP2_POLLING)
-		q_vec[cpu].irq = port->of_irqs[first_addr_space+cpu];
+		if (port->priv->pp2xdata->interrupt_tx_done == true)
+			q_vec[cpu].irq = port->of_irqs[first_addr_space+cpu];
+		else
+			q_vec[cpu].irq = port->of_irqs[first_addr_space];
 #endif
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
@@ -3308,6 +3329,8 @@ static void mv_pp22_port_irq_names_update(struct mv_pp2x_port *port)
 		dev_name(parent_dev), net_dev->name);
 
 	for (i = 0; i < port->num_qvector; i++) {
+		if (!q_vec[i].irq)
+			continue;
 		if (q_vec[i].qv_type == MVPP2_PRIVATE) {
 			cpu = QV_THR_2_CPU(q_vec[i].sw_thread_id);
 			snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s%d",
@@ -3634,7 +3657,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			sizeof(u32), GFP_KERNEL);
 	port->of_irqs = port_irqs;
 	port->num_irqs = 0;
-
+	if (port_num_irq > PPV2_MAX_NUM_IRQ)
+		port_num_irq = PPV2_MAX_NUM_IRQ;
 	for (i = 0; i < port_num_irq; i++) {
 		port_irqs[i] = irq_of_parse_and_map(port_node, i);
 		if (port_irqs[i] == 0) {
@@ -3686,6 +3710,12 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 
 	port->tx_ring_size = tx_queue_size;
 	port->rx_ring_size = rx_queue_size;
+
+	if (mv_pp2_num_cpu_irqs(port) < num_active_cpus() &&
+	    port->priv->pp2xdata->interrupt_tx_done == true) {
+		port->priv->pp2xdata->interrupt_tx_done = false;
+		pr_info("mvpp2x: interrupt_tx_done override to false\n");
+	}
 
 	err = mv_pp2x_port_init(port);
 	if (err < 0) {
@@ -4179,7 +4209,7 @@ static struct mv_pp2x_platform_data pp22_pdata = {
 #ifdef CONFIG_MV_PP2_POLLING
 	.interrupt_tx_done = false,
 #else
-	.interrupt_tx_done = true,
+	.interrupt_tx_done = false, /*temp. value*/
 #endif
 	.multi_hw_instance = true,
 	.mv_pp2x_port_queue_vectors_init = mv_pp22_queue_vectors_init,
