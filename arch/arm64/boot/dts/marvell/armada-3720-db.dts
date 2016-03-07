@@ -84,6 +84,14 @@
 				};
 			};
 
+			i2c0: i2c@11000 {
+				status = "okay";
+			};
+
+			i2c1: i2c@11080 {
+				status = "okay";
+			};
+
 			/*
 			* Exported on the micro USB connector CON32
 			* through an FTDI
