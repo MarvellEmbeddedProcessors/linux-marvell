@@ -3,6 +3,7 @@ menu "Platform selection"
 config ARCH_MVEBU
 	bool "Marvell EBU SoC Family"
 	select ARM_GIC_ODMI
+	select ARM_GIC_V2M
 	select MVEBU_PIC
 	select MVEBU_CLK_COMMON
 	select ARMADA_3700_CLK
