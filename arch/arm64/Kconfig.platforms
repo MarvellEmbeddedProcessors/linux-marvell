@@ -35,6 +35,15 @@ config ARCH_BCM2835
 	  This enables support for the Broadcom BCM2837 SoC.
 	  This SoC is used in the Raspberry Pi 3 device.
 
+config ARCH_MVEBU_PD
+	bool "Marvell EBU SoC Emulation"
+	select ARCH_MVEBU
+	help
+	  This enables emulation support for Marvell EBU family, including:
+	   - Armada 3700 SoC Family
+	   - Armada 7K SoC Family
+	   - Armada 8K SoC Family
+
 config ARCH_BCM_IPROC
 	bool "Broadcom iProc SoC Family"
 	select COMMON_CLK_IPROC
