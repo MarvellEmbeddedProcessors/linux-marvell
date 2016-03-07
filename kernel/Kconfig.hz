@@ -4,6 +4,7 @@
 
 choice
 	prompt "Timer frequency"
+	default HZ_20 if (CONFIG_ARCH_MVEBU_PD)
 	default HZ_250
 	help
 	 Allows the configuration of the timer frequency. It is customary
@@ -15,6 +16,14 @@ choice
 	 environment leading to NR_CPUS * HZ number of timer interrupts
 	 per second.
 
+	config HZ_20
+		bool "20 HZ"
+	help
+	  200 Hz is only used for emulation platforms where a very slow
+	  clock is required in order to adapt to the emulation platform
+	  clocks configuration.
+	  A higher clock ratio will cause the system to spend 100% of
+	  it's time handling timer interrupts.
 
 	config HZ_100
 		bool "100 HZ"
@@ -49,6 +58,7 @@ endchoice
 
 config HZ
 	int
+	default 20 if HZ_20
 	default 100 if HZ_100
 	default 250 if HZ_250
 	default 300 if HZ_300
