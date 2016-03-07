@@ -1,0 +1,75 @@
+/****************************************************************************
+* This program is free software: you can redistribute it and/or modify it
+* under the terms of the GNU General Public License as published by the Free
+* Software Foundation, either version 2 of the License, or any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+* ***************************************************************************
+*/
+
+/*
+ * Device Tree file for Marvell Armada 7040 Emulation platform
+ */
+
+#include "armada-7040-rz.dtsi"
+
+/ {
+	model = "Marvell Armada-7040 Palladium";
+	compatible = "marvell,armada7040-pd";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	/* This usually gets edited by the bootloader so the value
+	 * Doesn't bare much meaning
+	 */
+	memory@00000000 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x10000000>;
+	};
+
+	chosen { };
+
+	/* Override UART frequency for palladium env */
+	ap806 {
+		config-space {
+			serial@512000 {
+				clock-frequency = <384000>;
+				clocks = <>;
+				status = "okay";
+			};
+
+			spi@510600 {
+				status = "okay";
+
+				spi-flash@0 {
+					#address-cells = <1>;
+					#size-cells = <1>;
+					compatible = "w25q128";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <108000000>;
+
+					partition@0 {
+						label = "U-Boot";
+						reg = <0 0x400000>;
+					};
+					partition@400000 {
+						label = "Filesystem";
+						reg = <0x400000 0xc00000>;
+					};
+				};
+			};
+
+			i2c@511000 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+		};
+	};
+};
