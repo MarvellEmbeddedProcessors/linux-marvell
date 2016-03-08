@@ -121,7 +121,7 @@ cpxor0@6a0000 {
 	      <0x6b0000 0x1000>;
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
-	clocks = <&gateclk 8>;
+	clocks = <&gateclk 14>, <&gateclk 8>;
 };
 
 cpxor1@6c0000 {
@@ -130,7 +130,7 @@ cpxor1@6c0000 {
 	      <0x6d0000 0x1000>;
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
-	clocks = <&gateclk 7>;
+	clocks = <&gateclk 14>, <&gateclk 7>;
 };
 
 mdio@12a200 {
