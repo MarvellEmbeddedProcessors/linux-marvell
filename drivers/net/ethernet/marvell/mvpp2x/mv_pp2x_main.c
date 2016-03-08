@@ -2021,6 +2021,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	int rx_received, rx_filled, i;
 	u32 rcvd_pkts = 0;
 	u32 rcvd_bytes = 0;
+	u16 coherence_size;
 
 #ifdef DEV_NETMAP
 		if (port->flags & MVPP2_F_IFCAP_NETMAP) {
@@ -2075,9 +2076,15 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 			skb = mv_pp22_rxdesc_cookie_get(rx_desc);
 			buf_phys_addr = mv_pp22_rxdesc_phys_addr_get(rx_desc);
 		}
+
+		if (pool == 1)
+			coherence_size = MVPP2_BM_LONG_PKT_SIZE;
+		else
+			coherence_size = MVPP2_BM_SHORT_PKT_SIZE;
+
 		if (!is_device_dma_coherent(dev->dev.parent))
 			dma_sync_single_for_cpu(dev->dev.parent, buf_phys_addr,
-				MVPP2_BM_LONG_PKT_SIZE, DMA_FROM_DEVICE);
+				coherence_size, DMA_FROM_DEVICE);
 #ifdef CONFIG_64BIT
 		skb = (struct sk_buff *)((uintptr_t)skb |
 			port->priv->pp2xdata->skb_base_addr);
@@ -3743,9 +3750,13 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 				mv_pp2x_tx_proc_cb, (unsigned long)dev);
 		}
 	}
-	features = NETIF_F_SG | NETIF_F_IP_CSUM;
+	features = NETIF_F_SG ;
+#if defined(__BIG_ENDIAN)
 	dev->features = features | NETIF_F_RXCSUM;
-	dev->hw_features |= features | NETIF_F_RXCSUM | NETIF_F_GRO;
+#else
+	dev->features = features | NETIF_F_RXCSUM | NETIF_F_IP_CSUM;
+#endif
+	dev->hw_features |= features | NETIF_F_RXCSUM | NETIF_F_GRO | NETIF_F_IP_CSUM;
 	/* Only when multi queue mode, rxhash is supported */
 	if (mv_pp2x_queue_mode)
 		dev->hw_features |= NETIF_F_RXHASH;
