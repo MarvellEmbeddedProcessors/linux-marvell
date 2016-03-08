@@ -2077,7 +2077,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		}
 		if (!is_device_dma_coherent(dev->dev.parent))
 			dma_sync_single_for_cpu(dev->dev.parent, buf_phys_addr,
-					rx_desc->data_size, DMA_FROM_DEVICE);
+				MVPP2_BM_LONG_PKT_SIZE, DMA_FROM_DEVICE);
 #ifdef CONFIG_64BIT
 		skb = (struct sk_buff *)((uintptr_t)skb |
 			port->priv->pp2xdata->skb_base_addr);
