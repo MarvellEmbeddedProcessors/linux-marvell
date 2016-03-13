@@ -125,9 +125,9 @@ static void mvebu_hwcc_dma_sync(struct device *dev, dma_addr_t dma_handle,
 		mvebu_hwcc_sync_io_barrier();
 }
 
-static const struct dma_map_ops mvebu_hwcc_dma_ops = {
-	.alloc			= arm_dma_alloc,
-	.free			= arm_dma_free,
+static struct dma_map_ops mvebu_hwcc_dma_ops = {
+	.alloc			= arm_coherent_dma_alloc,
+	.free			= arm_coherent_dma_free,
 	.mmap			= arm_dma_mmap,
 	.map_page		= mvebu_hwcc_dma_map_page,
 	.unmap_page		= mvebu_hwcc_dma_unmap_page,
@@ -138,7 +138,7 @@ static const struct dma_map_ops mvebu_hwcc_dma_ops = {
 	.sync_single_for_device	= mvebu_hwcc_dma_sync,
 	.sync_sg_for_cpu	= arm_dma_sync_sg_for_cpu,
 	.sync_sg_for_device	= arm_dma_sync_sg_for_device,
-	.set_dma_mask	= arm_dma_set_mask,
+	.set_dma_mask		= arm_dma_set_mask,
 };
 
 static int mvebu_hwcc_notifier(struct notifier_block *nb,
