@@ -239,6 +239,16 @@ config ARM_PXA2xx_CPUFREQ
 
 	  If in doubt, say N.
 
+config ARM_ARMADA3700_CPUFREQ
+	tristate "Armada3700 CPUFreq support"
+	depends on ARCH_MVEBU
+	default y
+	help
+	  This adds the CPUFreq driver support for Marvell
+	  Armada3700 SOCs.
+	  Armada3700 PMU supports 4 frequency and VDD levels,
+	  which will be preset and loaded later.
+
 config ACPI_CPPC_CPUFREQ
 	tristate "CPUFreq driver based on the ACPI CPPC spec"
 	depends on ACPI_PROCESSOR
