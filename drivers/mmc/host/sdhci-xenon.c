@@ -138,6 +138,7 @@
 #define EMMC_PHY_DLL_CONTROL			(EMMC_PHY_REG_BASE + 0x14)
 #define  DLL_ENABLE				(1 << 31)
 #define  DLL_REFCLK_SEL				(1 << 30)
+#define  DLL_UPDATE				(1 << 23)
 #define  DLL_PHSEL1_SHIFT			24
 #define  DLL_PHSEL0_SHIFT			16
 #define  DLL_PHASE_MASK				0x3f
@@ -145,7 +146,6 @@
 #define  DLL_DELAY_TEST_LOWER_SHIFT		8
 #define  DLL_DELAY_TEST_LOWER_MASK		0xff
 #define  DLL_FAST_LOCK				(1 << 5)
-#define  DLL_GAIN2X				(1 << 3)
 #define  DLL_BYPASS_EN				(1 << 0)
 
 #define EMMC_LOGIC_TIMING_ADJUST		(EMMC_PHY_REG_BASE + 0x18)
@@ -458,7 +458,7 @@ static void sdhci_xenon_set_strobe_delay(struct sdhci_host *host)
 
 	/* Enable DLL */
 	reg = sdhci_readl(host, EMMC_PHY_DLL_CONTROL);
-	reg |= (DLL_ENABLE | DLL_GAIN2X | DLL_FAST_LOCK);
+	reg |= (DLL_ENABLE | DLL_FAST_LOCK);
 
 	/* Set phase as 90 degree */
 	reg &= ~((DLL_PHASE_MASK << DLL_PHSEL0_SHIFT) |
@@ -466,8 +466,10 @@ static void sdhci_xenon_set_strobe_delay(struct sdhci_host *host)
 	reg |= ((DLL_PHASE_90_DEGREE << DLL_PHSEL0_SHIFT) |
 			(DLL_PHASE_90_DEGREE << DLL_PHSEL1_SHIFT));
 
-	reg |= DLL_REFCLK_SEL;
 	reg &= ~DLL_BYPASS_EN;
+	reg |= DLL_UPDATE;
+	if (host->clock > 500000000)
+		reg &= ~DLL_REFCLK_SEL;
 	sdhci_writel(host, reg, EMMC_PHY_DLL_CONTROL);
 
 	/* Set data strobe pull down */
