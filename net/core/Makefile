@@ -26,4 +26,4 @@ obj-$(CONFIG_CGROUP_NET_CLASSID) += netclassid_cgroup.o
 obj-$(CONFIG_LWTUNNEL) += lwtunnel.o
 obj-$(CONFIG_DST_CACHE) += dst_cache.o
 obj-$(CONFIG_MV_GNSS_SUPPORT) += gnss/
-
+obj-$(CONFIG_HWBM) += hwbm.o
