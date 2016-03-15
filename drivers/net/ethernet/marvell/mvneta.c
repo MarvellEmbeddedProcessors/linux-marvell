@@ -2752,6 +2752,20 @@ static int mvneta_check_mtu_valid(struct net_device *dev, int mtu)
 	return mtu;
 }
 
+static void mvneta_percpu_enable(void *arg)
+{
+	struct mvneta_port *pp = arg;
+
+	enable_percpu_irq(pp->dev->irq, IRQ_TYPE_NONE);
+}
+
+static void mvneta_percpu_disable(void *arg)
+{
+	struct mvneta_port *pp = arg;
+
+	disable_percpu_irq(pp->dev->irq);
+}
+
 /* Change the device mtu */
 static int mvneta_change_mtu(struct net_device *dev, int mtu)
 {
@@ -2773,6 +2787,7 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
 	 * reallocation of the queues
 	 */
 	mvneta_stop_dev(pp);
+	on_each_cpu(mvneta_percpu_disable, pp, true);
 
 	mvneta_cleanup_txqs(pp);
 	mvneta_cleanup_rxqs(pp);
@@ -2793,6 +2808,7 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
 		return ret;
 	}
 
+	on_each_cpu(mvneta_percpu_enable, pp, true);
 	mvneta_start_dev(pp);
 	mvneta_port_up(pp);
 
@@ -2944,20 +2960,6 @@ static void mvneta_mdio_remove(struct mvneta_port *pp)
 {
 	phy_disconnect(pp->phy_dev);
 	pp->phy_dev = NULL;
-}
-
-static void mvneta_percpu_enable(void *arg)
-{
-	struct mvneta_port *pp = arg;
-
-	enable_percpu_irq(pp->dev->irq, IRQ_TYPE_NONE);
-}
-
-static void mvneta_percpu_disable(void *arg)
-{
-	struct mvneta_port *pp = arg;
-
-	disable_percpu_irq(pp->dev->irq);
 }
 
 /* Electing a CPU must be done in an atomic way: it should be done
