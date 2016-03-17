@@ -1,7 +1,7 @@
-Armada7040-RZ development board setup:
+Armada7040 development board setup:
 --------------------------------------
 
-The Armada7040-RZ Development Board (DB) is a configurable board designed to test several
+The Armada7040 Development Board (DB) is a configurable board designed to test several
 combinations of SoC configurations. Linux supports a defined set of those configurations
 via different device tree files.
 
