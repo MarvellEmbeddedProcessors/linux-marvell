@@ -18,6 +18,20 @@
 	model = "Marvell Armada 382 Development Board";
 	compatible = "marvell,a382-db", "marvell,armada382", "marvell,armada38x";
 
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a9";
+			reg = <1>;
+			resets = <&cpurst 1>;
+			clocks = <&cpuclk 0>;
+			clock-latency = <1000000>;
+			clock-names = "cpu1";
+		};
+	};
+
 	chosen {
 		bootargs = "console=ttyS0,115200 earlyprintk";
 	};
