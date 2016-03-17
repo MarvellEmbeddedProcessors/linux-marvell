@@ -10,7 +10,7 @@ $ make mvebu_v8_lsp_defconfig
 $ make - for build kernel image and device tree images.
 - Linux image is under: 'arch/arm64/boot/Image'.
 - Device tree images are under: 'arch/arm64/boot/dts/marvell':
-	- armada-7040-rz-db-router.dtb - for the 8040RZ default configuration
+	- armada-7040-db-router.dtb - for the 7040 default configuration
 	- armada-3700-db.dtb - for the A3700 default configuration
 
 Build instructions for ARMv7:
