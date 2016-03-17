@@ -49,7 +49,7 @@
 / {
 	model = "Marvell Armada 7040 DB board";
 	compatible = "marvell,armada7040-db", "marvell,armada7040",
-	             "marvell,armada-ap806-quad", "marvell,armada-ap806";
+			"marvell,armada-ap806-quad", "marvell,armada-ap806";
 
 	memory@00000000 {
 		device_type = "memory";
@@ -58,34 +58,54 @@
 
 	ap806 {
 		config-space {
-			spi@510600 {
+			serial@512000 {
 				status = "okay";
-
-				spi-flash@0 {
-					#address-cells = <1>;
-					#size-cells = <1>;
-					compatible = "n25q128a13";
-					reg = <0>; /* Chip select 0 */
-					spi-max-frequency = <10000000>;
-
-					partition@0 {
-						label = "U-Boot";
-						reg = <0 0x200000>;
-					};
-					partition@400000 {
-						label = "Filesystem";
-						reg = <0x200000 0xce0000>;
-					};
-				};
 			};
-
 			i2c@511000 {
 				status = "okay";
 				clock-frequency = <100000>;
 			};
+		};
+	};
 
-			serial@512000 {
-				status = "okay";
+	cpn-110-master {
+		config-space {
+			spi@700680 {
+				spi-flash@0 {
+					#address-cells = <0x1>;
+					#size-cells = <0x1>;
+					compatible = "jedec,spi-nor";
+					reg = <0x0>;
+					spi-max-frequency = <20000000>;
+
+					partition@0 {
+						label = "U-Boot";
+						reg = <0x0 0x200000>;
+					};
+
+					partition@400000 {
+						label = "Filesystem";
+						reg = <0x200000 0xe00000>;
+					};
+				};
+			};
+
+			nand@720000 {
+				nand-ecc-strength = <4>;
+				nand-ecc-step-size = <512>;
+				status = "disabled";
+				partition@0 {
+					label = "U-Boot";
+					reg = <0 0x200000>;
+				};
+				partition@200000 {
+					label = "Linux";
+					reg = <0x200000 0xd00000>;
+				};
+				partition@1000000 {
+					label = "Filesystem";
+					reg = <0x1000000 0x3f000000>;
+				};
 			};
 		};
 	};
