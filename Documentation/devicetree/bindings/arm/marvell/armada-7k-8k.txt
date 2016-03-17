@@ -20,5 +20,5 @@ the following root node property:
 
 Example:
 
-compatible = "marvell,armada7040-db", "marvell,armada7040",
+compatible = "marvell,armada7040-db-router", "marvell,armada7040-db", "marvell,armada7040",
              "marvell,ap806-quad", "marvell,ap806";
