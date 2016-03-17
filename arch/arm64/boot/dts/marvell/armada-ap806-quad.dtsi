@@ -79,6 +79,12 @@
 			enable-method = "psci";
 		};
 	};
-
+	ap806 {
+		config-space {
+			sdhci@d8000 {
+				status = "okay";
+			};
+		};
+	};
 };
 
