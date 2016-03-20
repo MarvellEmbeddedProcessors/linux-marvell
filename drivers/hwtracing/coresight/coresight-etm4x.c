@@ -2706,6 +2706,11 @@ static struct amba_id etm4_ids[] = {
 		.mask	= 0x000fffff,
 		.data	= "ETM 4.0",
 	},
+	{       /* ETM 4.0 - CA-72 ID */
+		.id	= 0x000bb95a,
+		.mask	= 0x000fffff,
+		.data	= "ETM 4.0",
+	},
 	{ 0, 0},
 };
 
