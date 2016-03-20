@@ -82,6 +82,40 @@
 
 	ap806 {
 		config-space {
+			/* For SPI, I2C, and Serial units override the clock */
+			spi0: spi@510600 {
+				clocks = <&ringclk 2>;
+			};
+
+			i2c0: i2c@511000 {
+				clocks = <&ringclk 2>;
+			};
+
+			serial@512000 {
+				clocks = <&ringclk 2>;
+			};
+
+			serial@512100 {
+				clocks = <&ringclk 2>;
+
+			};
+			/* Add clock node for AP-806-Z SoC
+			** The Z1 revision use different driver than A0 revision
+			*/
+			coreclk: clk@0x6F8204 {
+				compatible = "marvell,armada-ap806-core-clock";
+				reg = <0x6F8204 0x04>;
+				#clock-cells = <1>;
+				clock-output-names = "ddr", "ring", "cpu";
+			};
+
+			ringclk: clk@0x6F8250 {
+				compatible = "marvell,armada-ap806-ring-clock";
+				reg = <0x6F8250 0x04>;
+				#clock-cells = <1>;
+				clock-output-names = "ring-0", "ring-2", "ring-3", "ring-4", "ring-5";
+				clocks = <&coreclk 1>;
+			};
 			xor0@400000 {
 				compatible = "marvell,mv-xor-v2-z1";
 			};
