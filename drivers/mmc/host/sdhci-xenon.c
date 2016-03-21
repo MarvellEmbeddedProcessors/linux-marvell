@@ -546,22 +546,42 @@ static int sdhci_xenon_fix_delay_adj(struct sdhci_host *host,
 	unsigned int delay;
 	unsigned int min_delay, max_delay;
 	u32 reg;
+	struct sdhci_pltfm_host *pltfm_host =
+				    (struct sdhci_pltfm_host *)sdhci_priv(host);
+	struct sdhci_xenon_priv *priv =
+				 (struct sdhci_xenon_priv *)pltfm_host->private;
 	/* Pairs to set the delay edge.
 	 * First column is the inversion sequence.
 	 * Second column indicates delay 90 degree or not.
+	 * Different type of boards may have different preferred delay edge setting,
+	 * it is even different between eMMC and SD modes.
+	 * According to the test result, below two edge pair sequences are defined
+	 * for mmc and SD modes.
 	 */
-	bool delay_edge_pair[][2] = {
+	bool mmc_delay_edge_pair[][2] = {
 			{ true,		false},
 			{ true,		true},
 			{ false,	false},
 			{ false,	true }
 	};
+	bool sd_delay_edge_pair[][2] = {
+			{ false,	false},
+			{ false,	true},
+			{ true,		false},
+			{ true,		true }
+	};
+	bool (*delay_edge_pair_p)[2];
 
-	nr_pair = sizeof(delay_edge_pair) / ARRAY_SIZE(delay_edge_pair);
+	nr_pair = sizeof(mmc_delay_edge_pair) / ARRAY_SIZE(mmc_delay_edge_pair);
+
+	if (priv->quirks & SDHCI_QUIRK_XENON_EMMC_SLOT)
+		delay_edge_pair_p = mmc_delay_edge_pair;
+	else
+		delay_edge_pair_p = sd_delay_edge_pair;
 
 	for (idx = 0; idx < nr_pair; idx++) {
-		invert = delay_edge_pair[idx][0];
-		phase = delay_edge_pair[idx][1];
+		invert = delay_edge_pair_p[idx][0];
+		phase = delay_edge_pair_p[idx][1];
 
 		/* Increase delay value to get min fix delay */
 		for (min_delay = 0; min_delay <= TUNING_PROG_FIXED_DELAY_MASK;
