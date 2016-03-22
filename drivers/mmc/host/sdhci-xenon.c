@@ -197,10 +197,7 @@ struct sdhci_xenon_priv {
 	unsigned char	timing;
 	unsigned char	tuning_count;
 	unsigned int	clock;
-	unsigned int	quirks; /* Xenon private quirks */
-};
 
-struct card_cntx {
 	/* When initializing card, Xenon has to adjust
 	 * sampling fixed delay.
 	 * However, at that time, card structure is not
@@ -210,6 +207,8 @@ struct card_cntx {
 	 * of the card during initialization
 	 */
 	struct mmc_card *delay_adjust_card;
+
+	unsigned int	quirks; /* Xenon private quirks */
 };
 
 /*
@@ -683,7 +682,6 @@ static int sdhci_xenon_delay_adj(struct sdhci_host *host, struct mmc_ios *ios)
 	struct mmc_card *card = NULL;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv;
-	struct card_cntx *cntx;
 
 	if (!host->clock)
 		return 0;
@@ -715,8 +713,7 @@ static int sdhci_xenon_delay_adj(struct sdhci_host *host, struct mmc_ios *ios)
 	priv->bus_width = ios->bus_width;
 	priv->timing = ios->timing;
 
-	cntx = (struct card_cntx *)mmc->slot.handler_priv;
-	card = cntx->delay_adjust_card;
+	card = priv->delay_adjust_card;
 	if (unlikely(card == NULL))
 		return -EIO;
 
@@ -760,11 +757,10 @@ static void sdhci_xenon_init_card(struct sdhci_host *host,
 {
 	u32 reg;
 	u8 slot_idx;
-	struct card_cntx *cntx;
 	struct mmc_host *mmc = host->mmc;
+	struct sdhci_xenon_priv *priv = sdhci_priv(host);
 
-	cntx = (struct card_cntx *)mmc->slot.handler_priv;
-	cntx->delay_adjust_card = card;
+	priv->delay_adjust_card = card;
 
 	slot_idx = mmc->slotno;
 
@@ -1147,12 +1143,6 @@ static int sdhci_xenon_slot_probe(struct sdhci_host *host)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv =
 				 (struct sdhci_xenon_priv *)pltfm_host->private;
-	struct card_cntx *cntx;
-
-	cntx = devm_kzalloc(mmc_dev(mmc), sizeof(*cntx), GFP_KERNEL);
-	if (!cntx)
-		return -ENOMEM;
-	mmc->slot.handler_priv = cntx;
 
 	/* Enable slot */
 	sdhci_xenon_set_slot(host, slotno, true);
