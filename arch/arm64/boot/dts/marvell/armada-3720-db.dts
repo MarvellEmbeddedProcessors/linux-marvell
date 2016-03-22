@@ -125,6 +125,7 @@
 
 			sdhci1: sdhci@d0000 {
 				broken-cd;
+				wp-inverted;
 				bus-width = <4>;
 				status = "okay";
 
