@@ -1166,9 +1166,13 @@ static int advk_pcie_probe(struct platform_device *pdev)
 				continue;
 			}
 
+			/* apply reset by setting GPIO */
+			gpio_set_value(port->reset_gpio,
+				       (port->reset_active_low) ? 0 : 1);
+			msleep(reset_udelay/1000);
+			/* release reset by setting GPIO */
 			gpio_set_value(port->reset_gpio,
 				       (port->reset_active_low) ? 1 : 0);
-			msleep(reset_udelay/1000);
 		}
 
 		port->clk = of_clk_get_by_name(child, NULL);
