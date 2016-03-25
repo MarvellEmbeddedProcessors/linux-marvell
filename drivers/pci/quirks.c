@@ -28,6 +28,57 @@
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
 #include "pci.h"
 
+#define _8M	0x00800000
+#define _64M	0x04000000
+#define MV_PCI_BAR_1	2
+#define MV_PCI_BAR_2	4
+
+/* On some Marvell switches, announced BAR size are incorrect and too big to
+ * fit to the pcie aperture (e.g. BAR2 on some of those systems reports 2GB).
+ * Therefore ignore those BARs and assign resources only for correct BARs.
+ * The BAR0 is always correct and allows to reconfigure corrupted BAR1 and/or
+ * BAR2 size
+ */
+static void quirk_ignore_msys_bar(struct pci_dev *dev)
+{
+	int bar2_size;
+
+	switch (dev->device) {
+	case PCI_DEVICE_ID_MARVELL_BOBCAT2:
+		bar2_size = _64M;
+		break;
+	case PCI_DEVICE_ID_MARVELL_ALLEYCAT3:
+		bar2_size = _8M;
+		break;
+	default:
+		return;
+	}
+
+	/* Don't try to assign any of the broken BARs. */
+	if (resource_size(&dev->resource[MV_PCI_BAR_2]) != bar2_size) {
+		dev_info(&dev->dev, "BAR %d size: %pR is corrupted - skipping\n",
+			 MV_PCI_BAR_2, &dev->resource[MV_PCI_BAR_2]);
+
+		dev->resource[MV_PCI_BAR_2].start = 0;
+		dev->resource[MV_PCI_BAR_2].end = 0;
+		dev->resource[MV_PCI_BAR_2].flags = 0;
+	}
+
+	if (resource_size(&dev->resource[MV_PCI_BAR_1]) != _64M) {
+		dev_info(&dev->dev, "BAR %d size: %pR is corrupted - skipping\n",
+			 MV_PCI_BAR_1, &dev->resource[MV_PCI_BAR_1]);
+
+		dev->resource[MV_PCI_BAR_2].start = 0;
+		dev->resource[MV_PCI_BAR_2].end = 0;
+		dev->resource[MV_PCI_BAR_1].flags = 0;
+	}
+}
+
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_DEVICE_ID_MARVELL_ALLEYCAT3,
+			 quirk_ignore_msys_bar);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_MARVELL, PCI_DEVICE_ID_MARVELL_BOBCAT2,
+			 quirk_ignore_msys_bar);
+
 /*
  * Decoding should be disabled for a PCI device during BAR sizing to avoid
  * conflict. But doing so may cause problems on host bridge and perhaps other
