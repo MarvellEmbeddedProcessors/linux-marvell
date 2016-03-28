@@ -1,0 +1,18 @@
+Marvell EIP197 Security Packet Engine with Classifiers
+
+Required properties:
+- compatible: should be one of the following string
+	      "marvell,eip197"
+- reg: base physical address of the engine and length of memory mapped region.
+- interrupts: interrupt number
+- clocks: One ore more clock gating clocks to be used to enable EIP197 unit in the SoC.
+
+Examples:
+
+eip197: eip197@800000 {
+	compatible = "marvell,eip197";
+	reg = <0x800000 0x200000>;
+	interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk 26>;
+	status = "disabled";
+};
