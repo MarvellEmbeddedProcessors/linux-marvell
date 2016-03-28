@@ -221,3 +221,10 @@ ppv22@000000 {
 		status = "disabled";
 	};
 };
+eip197: eip197@800000 {
+	compatible = "marvell,eip197";
+	reg = <0x800000 0x200000>;
+	interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk 26>;
+	status = "disabled";
+};
