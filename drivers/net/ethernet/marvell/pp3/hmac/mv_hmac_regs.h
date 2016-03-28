@@ -1,0 +1,313 @@
+/*******************************************************************************
+Copyright (C) Marvell International Ltd. and its affiliates
+
+This software file (the "File") is owned and distributed by Marvell
+International Ltd. and/or its affiliates ("Marvell") under the following
+alternative licensing terms.  Once you have made an election to distribute the
+File under one of the following license alternatives, please (i) delete this
+introductory statement regarding license alternatives, (ii) delete the two
+license alternatives that you have not elected to use and (iii) preserve the
+Marvell copyright notice above.
+
+
+********************************************************************************
+Marvell GPL License Option
+
+If you received this File from Marvell, you may opt to use, redistribute and/or
+modify this File in accordance with the terms and conditions of the General
+Public License Version 2, June 1991 (the "GPL License"), a copy of which is
+available along with the File in the license.txt file or by writing to the Free
+Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 or
+on the worldwide web at http://www.gnu.org/licenses/gpl.txt.
+
+THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE IMPLIED
+WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE ARE EXPRESSLY
+DISCLAIMED.  The GPL License provides additional details about this warranty
+disclaimer.
+*******************************************************************************/
+
+#ifndef __mv_hmac_regs_h__
+#define __mv_hmac_regs_h__
+
+/* includes */
+
+/* unit offset */
+#define MV_PP3_HMAC_FR_INST_OFFSET	0x010000
+
+/************************** HMAC GLOBAL regs *********************************************************/
+
+/* Hmac_eco */
+#define MV_HMAC_ECO_REG								0xF0000
+#define MV_HMAC_ECO_GENERAL_PURPOSE_ECO_OFFS		0
+
+/* Hmac_rec_qm_port_number */
+#define MV_HMAC_RX_QM_PORT_NUMBER_REG								0xF0008
+#define MV_HMAC_RX_QM_PORT_NUMBER_RQ_QM_HMAC_PORT_NUM_OFFS		0
+#define MV_HMAC_RX_QM_PORT_NUMBER_RQ_QM_HMAC_PORT_NUM_MASK    \
+		(0x00000fff << MV_HMAC_RX_QM_PORT_NUMBER_RQ_QM_HMAC_PORT_NUM_OFFS)
+
+
+/* Hmac_vmid_frame_%m */
+#define MV_HMAC_VMID_FRAME_REG(m)							(0xF0010 + 4*m)
+#define MV_HMAC_VMID_FRAME_CONTEXT_ID_OFFS		0
+#define MV_HMAC_VMID_FRAME_CONTEXT_ID_MASK    \
+		(0x0000003f << MV_HMAC_VMID_FRAME_CONTEXT_ID_OFFS)
+
+#define MV_HMAC_VMID_FRAME_AXI_PROT_PRIVILEGE_OFFS		16
+#define MV_HMAC_VMID_FRAME_AXI_PROT_PRIVILEGE_MASK    \
+		(0x00000001 << MV_HMAC_VMID_FRAME_AXI_PROT_PRIVILEGE_OFFS)
+
+#define MV_HMAC_VMID_FRAME_AW_QOS_OFFS		20
+#define MV_HMAC_VMID_FRAME_AW_QOS_MASK    \
+		(0x00000003 << MV_HMAC_VMID_FRAME_AW_QOS_OFFS)
+
+#define MV_HMAC_VMID_FRAME_AR_QOS_OFFS		24
+#define MV_HMAC_VMID_FRAME_AR_QOS_MASK    \
+		(0x00000003 << MV_HMAC_VMID_FRAME_AR_QOS_OFFS)
+
+
+/* Hmac_event_addr_low_%m */
+#define MV_HMAC_EVENT_ADDR_LOW_REG(m)							(0xF0050 + 8*m)
+#define MV_HMAC_EVENT_ADDR_LOW_EVENT_ADDRESS_LOW_OFFS		0
+#define MV_HMAC_EVENT_ADDR_LOW_EVENT_ADDRESS_LOW_MASK    \
+		(0x00ffffff << MV_HMAC_EVENT_ADDR_LOW_EVENT_ADDRESS_LOW_OFFS)
+
+
+/* Hmac_event_addr_high_%m */
+#define MV_HMAC_EVENT_ADDR_HIGH_REG(m)							(0xF0054 + 8*m)
+#define MV_HMAC_EVENT_ADDR_HIGH_EVENT_ADDRESS_HIGH_OFFS		0
+#define MV_HMAC_EVENT_ADDR_HIGH_EVENT_ADDRESS_HIGH_MASK    \
+		(0x000000ff << MV_HMAC_EVENT_ADDR_HIGH_EVENT_ADDRESS_HIGH_OFFS)
+
+
+/* HMAC AXI Interrupt Cause */
+#define MV_HMAC_AXI_INT_CAUSE								(0xF0200)
+#define MV_HMAC_AXI_INT_MASK								(0xF0204)
+#define MV_HMAC_AXI_INT_SYNDROME							(0xF0208)
+#define MV_HMAC_MISC_INT_CAUSE								(0xF0210)
+#define MV_HMAC_MISC_INT_MASK								(0xF0214)
+#define MV_HMAC_MISC_INT_SYNDROME							(0xF0218)
+
+#define MV_HMAC_EVENT_AXI_ATTRIBUTES_REG						(0xF0150)
+#define MV_HMAC_EVENT_AXI_ATTRIBUTES_EVENT_AW_DOMAIN_OFFS		0
+#define MV_HMAC_EVENT_AXI_ATTRIBUTES_EVENT_AW_DOMAIN_MASK    \
+		(0x00000003 << MV_HMAC_EVENT_AXI_ATTRIBUTES_EVENT_AW_DOMAIN_OFFS)
+
+#define MV_HMAC_EVENT_AXI_ATTRIBUTES_EVENT_AW_CACHE_OFFS		2
+#define MV_HMAC_EVENT_AXI_ATTRIBUTES_EVENT_AW_CACHE_MASK    \
+		(0x0000000f << MV_HMAC_EVENT_AXI_ATTRIBUTES_EVENT_AW_CACHE_OFFS)
+
+/* HMAC Event Mask %m */
+#define MV_HMAC_EVENT_MASK_REG(m)							(0xF0160 + 4*m)
+#define MV_HMAC_EVENT_MASK_GROUP_DIS_MASK_OFFS					16
+#define MV_HMAC_EVENT_MASK_GROUP_DIS_MASK					\
+	(0xFF << MV_HMAC_EVENT_MASK_GROUP_DIS_MASK_OFFS)
+#define MV_HMAC_EVENT_MASK_GROUP_EN_MASK_OFFS					0
+#define MV_HMAC_EVENT_MASK_GROUP_EN_MASK					\
+	(0xFF << MV_HMAC_EVENT_MASK_GROUP_EN_MASK_OFFS)
+
+/* Hmac Axi Read Port Fifo Fill Debug */
+#define MV_HMAC_AXI_READ_PORT_FIFO_FILL_DEBUG_REG					(0xF0228)
+
+/* Hmac Axi Write Port Fifo Fill Debug */
+#define MV_HMAC_AXI_WRITE_PORT_FIFO_FILL_DEBUG_REG					(0xF022c)
+
+/* Hmac Ppc Debug Mode */
+#define MV_HMAC_PPC_DEBUG_MODE_REG							(0xF0230)
+#define MV_HMAC_PPC_DEBUG_MODE_HMAC_PPC_DBG_MODE_OFFS		0
+#define MV_HMAC_PPC_DEBUG_MODE_HMAC_PPC_DBG_MODE_MASK    \
+		(0x00000001 << MV_HMAC_PPC_DEBUG_MODE_HMAC_PPC_DBG_MODE_OFFS)
+
+/* HMAC Busy */
+#define MV_HMAC_BUSY_REG								(0xF0234)
+#define MV_HMAC_BUSY_HMAC_BUSY_OFFS				0
+#define MV_HMAC_BUSY_HMAC_BUSY_MASK				\
+		(0x00000001 << MV_HMAC_BUSY_HMAC_BUSY_OFFS)
+#define MV_HMAC_BUSY_HMAC_PENDING_DATA_IN_QM_OFFS		1
+#define MV_HMAC_BUSY_HMAC_PENDING_DATA_IN_QM_MASK		\
+	(0x1 << MV_HMAC_BUSY_HMAC_PENDING_DATA_IN_QM_OFFS)
+#define MV_HMAC_BUSY_HMAC_DEBUG_BUSY_OFFS			2
+#define MV_HMAC_BUSY_HMAC_DEBUG_BUSY_MASK			\
+	(0xF << MV_HMAC_BUSY_HMAC_DEBUG_BUSY_OFFS)
+
+/* HMAC_OUTSTANDING_LIMIT Register */
+#define MV_HMAC_OUTSTANDING_LIMIT_REG							(0xF0238)
+#define MV_HMAC_OUTSTANDING_LIMIT_OUTSTANDING_LIMIT_1_OFFS		10
+#define MV_HMAC_OUTSTANDING_LIMIT_OUTSTANDING_LIMIT_1_MASK		\
+	(0xF << MV_HMAC_OUTSTANDING_LIMIT_OUTSTANDING_LIMIT_1_OFFS)
+#define MV_HMAC_OUTSTANDING_LIMIT_OUTSTANDING_LIMIT_0_OFFS		2
+#define MV_HMAC_OUTSTANDING_LIMIT_OUTSTANDING_LIMIT_0_MASK		\
+	(0xF << MV_HMAC_OUTSTANDING_LIMIT_OUTSTANDING_LIMIT_0_OFFS)
+
+
+/* HMAC_REC_Q_TIMEOUT_0 Register */
+#define MV_HMAC_RX_Q_TIMEOUT_REG(m)							(0xF0240 + 4*m)
+#define MV_HMAC_RX_Q_TIMEOUT_RQ_TIMEOUT_0_OFFS					5
+#define MV_HMAC_RX_Q_TIMEOUT_RQ_TIMEOUT_0_MASK					\
+	(0x7FF << MV_HMAC_RX_Q_TIMEOUT_RQ_TIMEOUT_0_OFFS)
+#define MV_HMAC_RX_Q_TIMEOUT_RQ_TIMEOUT_1_OFFS					21
+#define MV_HMAC_RX_Q_TIMEOUT_RQ_TIMEOUT_1_MASK					\
+	(0x7FF << MV_HMAC_RX_Q_TIMEOUT_RQ_TIMEOUT_1_OFFS)
+
+/* HMAC_SEND_Q_TIMEOUT_0 Register */
+#define MV_HMAC_SEND_Q_TIMEOUT_REG(m)							(0xF0280 + 4*m)
+#define MV_HMAC_SEND_Q_TIMEOUT_SQ_TIMEOUT_1_OFFS					21
+#define MV_HMAC_SEND_Q_TIMEOUT_SQ_TIMEOUT_1_MASK					\
+	(0x7FF << MV_HMAC_SEND_Q_TIMEOUT_SQ_TIMEOUT_1_OFFS)
+#define MV_HMAC_SEND_Q_TIMEOUT_SQ_TIMEOUT_0_OFFS					5
+#define MV_HMAC_SEND_Q_TIMEOUT_SQ_TIMEOUT_0_MASK					\
+	(0x7FF << MV_HMAC_SEND_Q_TIMEOUT_SQ_TIMEOUT_0_OFFS)
+
+/* Hmac_axi_prot_secure_%m */
+#define MV_HMAC_AXI_PROT_SECURE_REG(m)							(0xF0300 + 4*m)
+#define MV_HMAC_AXI_PROT_SECURE_AXI_PROT_SECURE_OFFS		0
+#define MV_HMAC_AXI_PROT_SECURE_AXI_PROT_SECURE_MASK    \
+		(0x00000001 << MV_HMAC_AXI_PROT_SECURE_AXI_PROT_SECURE_OFFS)
+
+/* HMAC_RECEIVE_QUEUES_BUSY_0 Register */
+#define MV_HMAC_RECEIVE_QUEUES_BUSY_REG(m)						(0xF0340 + 4*m)
+#define MV_HMAC_RECEIVE_QUEUES_BUSY_RQS_BUSY_OFFS			0
+#define MV_HMAC_RECEIVE_QUEUES_BUSY_RQS_BUSY_MASK			\
+	(0xFFFF << MV_HMAC_RECEIVE_QUEUES_BUSY_RQS_BUSY_OFFS)
+
+/************************** HMAC FRAME regs *********************************************************/
+
+/* Hmac_%m_rec_q_%n_control */
+#define MV_HMAC_RX_Q_CTRL_REG(n)							(0x108000 + 0x100*n)
+#define MV_HMAC_RX_Q_CTRL_RCV_Q_EN_OFFS		0
+#define MV_HMAC_RX_Q_CTRL_RCV_Q_EN_MASK    \
+		(0x00000001 << MV_HMAC_RX_Q_CTRL_RCV_Q_EN_OFFS)
+
+#define MV_HMAC_RX_Q_CTRL_RCV_Q_FLUSH_OFFS		1
+#define MV_HMAC_RX_Q_CTRL_RCV_Q_FLUSH_MASK    \
+		(0x00000001 << MV_HMAC_RX_Q_CTRL_RCV_Q_FLUSH_OFFS)
+
+#define MV_HMAC_RX_Q_CTRL_Q_DLB_EN_OFFS		8
+#define MV_HMAC_RX_Q_CTRL_Q_DLB_EN_MASK    \
+		(0x00000001 << MV_HMAC_RX_Q_CTRL_Q_DLB_EN_OFFS)
+
+#define MV_HMAC_RX_Q_CTRL_RCV_Q_TIMER_SEL_OFFS		12
+#define MV_HMAC_RX_Q_CTRL_RCV_Q_TIMER_SEL_MASK    \
+		(0x00000001 << MV_HMAC_RX_Q_CTRL_RCV_Q_TIMER_SEL_OFFS)
+
+/* Hmac_%m_rec_q_%n_status */
+#define MV_HMAC_RX_Q_STATUS_REG(n)							(0x10800c + 0x100*n)
+#define MV_HMAC_RX_Q_STATUS_RQ_BUSY_OFFS		0
+#define MV_HMAC_RX_Q_STATUS_RQ_BUSY_MASK    \
+		(0x00000001 << MV_HMAC_RX_Q_STATUS_RQ_BUSY_OFFS)
+
+#define MV_HMAC_RX_Q_STATUS_RQ_REMAINDER_NEMPTY_OFFS		1
+#define MV_HMAC_RX_Q_STATUS_RQ_REMAINDER_NEMPTY_MASK    \
+		(0x00000001 << MV_HMAC_RX_Q_STATUS_RQ_REMAINDER_NEMPTY_OFFS)
+
+#define MV_HMAC_RX_Q_STATUS_BM_ALLOCATE_BUSY_OFFS		2
+#define MV_HMAC_RX_Q_STATUS_BM_ALLOCATE_BUSY_MASK    \
+		(0x00000001 << MV_HMAC_RX_Q_STATUS_BM_ALLOCATE_BUSY_OFFS)
+
+/* Hmac_%m_send_q_%n_control */
+#define MV_HMAC_SEND_Q_CTRL_REG(n)							(0x108040 + 0x100*n)
+#define MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS						0
+#define MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_CTRL_SEND_Q_EN_OFFS)
+
+#define MV_HMAC_SEND_Q_CTRL_SEND_Q_FLUSH_OFFS						1
+#define MV_HMAC_SEND_Q_CTRL_SEND_Q_FLUSH_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_CTRL_SEND_Q_FLUSH_OFFS)
+
+#define MV_HMAC_SEND_Q_CTRL_Q_MODE_OFFS							4
+#define MV_HMAC_SEND_Q_CTRL_Q_MODE_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_CTRL_Q_MODE_OFFS)
+
+#define MV_HMAC_SEND_Q_CTRL_BM_PE_FORMAT_OFFS						8
+#define MV_HMAC_SEND_Q_CTRL_BM_PE_FORMAT_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_CTRL_BM_PE_FORMAT_OFFS)
+
+#define MV_HMAC_SEND_Q_CTRL_SEND_Q_TIMER_SEL_OFFS					12
+#define MV_HMAC_SEND_Q_CTRL_SEND_Q_TIMER_SEL_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_CTRL_SEND_Q_TIMER_SEL_OFFS)
+
+#define MV_HMAC_SEND_Q_CTRL_SQ_LIMIT_SELECTION_OFFS					13
+#define MV_HMAC_SEND_Q_CTRL_SQ_LIMIT_SELECTION_MASK					\
+	(0x1 << MV_HMAC_SEND_Q_CONTROL_SQ_LIMIT_SELECTION_OFFS)
+
+/* Hmac_%m_send_q_%n_q_num_bpid */
+#define MV_HMAC_SEND_Q_NUM_BPID_REG(n)							(0x108048 + 0x100*n)
+#define MV_HMAC_SEND_Q_NUM_BPID_QNUM_OFFS		0
+#define MV_HMAC_SEND_Q_NUM_BPID_QNUM_MASK    \
+		(0x00000fff << MV_HMAC_SEND_Q_NUM_BPID_QNUM_OFFS)
+
+#define MV_HMAC_SEND_Q_NUM_BPID_BPID_OFFS		0
+#define MV_HMAC_SEND_Q_NUM_BPID_BPID_MASK    \
+		(0x000000ff << MV_HMAC_SEND_Q_NUM_BPID_BPID_OFFS)
+
+#define MV_HMAC_SEND_Q_NUM_BPID_BM_ALLOC_COUNT_OFFS		8
+#define MV_HMAC_SEND_Q_NUM_BPID_BM_ALLOC_COUNT_MASK    \
+		(0x00000007 << MV_HMAC_SEND_Q_NUM_BPID_BM_ALLOC_COUNT_OFFS)
+
+
+/* Hmac_%m_send_q_%n_status */
+#define MV_HMAC_SEND_Q_STATUS_REG(n)							(0x10804c + 0x100*n)
+#define MV_HMAC_SEND_Q_STATUS_SQ_BUSY_OFFS		0
+#define MV_HMAC_SEND_Q_STATUS_SQ_BUSY_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_STATUS_SQ_BUSY_OFFS)
+
+#define MV_HMAC_SEND_Q_STATUS_SQ_PENDING_AXI_READ_OFFS		1
+#define MV_HMAC_SEND_Q_STATUS_SQ_PENDING_AXI_READ_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_STATUS_SQ_PENDING_AXI_READ_OFFS)
+
+#define MV_HMAC_SEND_Q_STATUS_SQ_REMAINDER_NEMPTY_OFFS		2
+#define MV_HMAC_SEND_Q_STATUS_SQ_REMAINDER_NEMPTY_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_STATUS_SQ_REMAINDER_NEMPTY_OFFS)
+
+#define MV_HMAC_SEND_Q_STATUS_SQ_QM_BP_OFF_OFFS		3
+#define MV_HMAC_SEND_Q_STATUS_SQ_QM_BP_OFF_MASK    \
+		(0x00000001 << MV_HMAC_SEND_Q_STATUS_SQ_QM_BP_OFF_OFFS)
+
+/* HMAC Frame unit tables offsets */
+#define MV_PP3_HMAC_RQ_ADDR_LOW(n)		(0x100000 + 0x100*n)
+#define MV_PP3_HMAC_RQ_ADDR_HIGH(n)		(0x100004 + 0x100*n)
+#define MV_PP3_HMAC_RQ_SIZE(n)			(0x100008 + 0x100*n)
+#define MV_PP3_HMAC_RQ_OCC_STATUS(n)		(0x10000C + 0x100*n)
+#define MV_PP3_HMAC_RQ_AXI_ATTR(n)		(0x100010 + 0x100*n)
+#define MV_PP3_HMAC_RQ_EVENT_GROUP(n)		(0x100014 + 0x100*n)
+#define MV_PP3_HMAC_RQ_INT_THRESH(n)		(0x100018 + 0x100*n)
+
+#define MV_PP3_HMAC_RQ_INT_THRESH_OFFS		0
+#define MV_PP3_HMAC_RQ_INT_THRESH_MASK		(0xFFFF)
+
+#define MV_PP3_HMAC_RQ_BACK_PRES0(n)		(0x10001c + 0x100*n)
+#define MV_PP3_HMAC_RQ_BACK_PRES1(n)		(0x100020 + 0x100*n)
+
+#define MV_PP3_HMAC_RQ_BP_XOFF_THRESH_OFFS	0
+#define MV_PP3_HMAC_RQ_BP_XON_THRESH_OFFS	16
+#define MV_PP3_HMAC_RQ_BP_THRESH_MASK		(0xFFFF)
+
+#define MV_PP3_HMAC_SQ_ADDR_LOW(n)		(0x100040 + 0x100*n)
+#define MV_PP3_HMAC_SQ_ADDR_HIGH(n)		(0x100044 + 0x100*n)
+#define MV_PP3_HMAC_SQ_SIZE(n)			(0x100048 + 0x100*n)
+#define MV_PP3_HMAC_SQ_OCC_STATUS(n)		(0x10004C + 0x100*n)
+#define MV_PP3_HMAC_SQ_AXI_ATTR(n)		(0x100050 + 0x100*n)
+#define MV_PP3_HMAC_SQ_EVENT_GROUP(n)		(0x100054 + 0x100*n)
+#define MV_PP3_HMAC_SQ_SW_QNUM_TDEST(n)		(0x100058 + 0x100*n)
+
+#define MV_PP3_HMAC_OCC_COUNTER_MASK		(0xFFFF)
+
+#define MV_PP3_HMAC_RQ_EVENT0_GROUP_OFFS	0
+#define MV_PP3_HMAC_RQ_EVENT0_GROUP_MASK	(0x7)
+#define MV_PP3_HMAC_RQ_EVENT0_DIS_OFFS		3
+#define MV_PP3_HMAC_RQ_EVENT0_DIS_MASK		(1 << MV_PP3_HMAC_RQ_EVENT0_DIS_OFFS)
+
+#define MV_PP3_HMAC_RQ_EVENT1_GROUP_OFFS	4
+#define MV_PP3_HMAC_RQ_EVENT1_GROUP_MASK	(0x7)
+#define MV_PP3_HMAC_RQ_EVENT1_DIS_OFFS		7
+#define MV_PP3_HMAC_RQ_EVENT1_DIS_MASK		(1 << MV_PP3_HMAC_RQ_EVENT1_DIS_OFFS)
+
+#define MV_PP3_HMAC_SQ_EVENT_GROUP_OFFS		0
+#define MV_PP3_HMAC_SQ_EVENT_GROUP_MASK		(0x7)
+#define MV_PP3_HMAC_SQ_EVENT_DIS_OFFS		3
+#define MV_PP3_HMAC_SQ_EVENT_DIS_MASK		(1 << MV_PP3_HMAC_SQ_EVENT_DIS_OFFS)
+
+#define MV_PP3_HMAC_Q_SIZE_MASK			(0xFFFF)
+/**/
+
+#endif /* __mv_hmac_regs_h__ */
