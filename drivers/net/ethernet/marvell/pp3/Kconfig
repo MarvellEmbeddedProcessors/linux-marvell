@@ -1,0 +1,232 @@
+config MVPP3
+	tristate "Marvell Armada 390 network interface support"
+	depends on MACH_ARMADA_38X
+	select MVMDIO
+	select MV_GNSS_SUPPORT
+	select MVEBU_ODMI
+	---help---
+		Add support for PP3 driver.
+		This driver supports the network
+		interface units in the Marvell
+		ARMADA 39x SoC.
+
+config MV_GNSS_SUPPORT
+	bool "Generic NSS network interfaces support"
+	depends on MVPP3
+	default n
+	---help---
+	When defined add support for generic
+	NSS capabilities.
+	When not defined only standard network
+	inferfaces are supported.
+
+config MV_PP3_TM_SUPPORT
+	bool "Traffic Management (TM) configuration support"
+	depends on MVPP3
+	default y
+	---help---
+	When defined add support for run-time configuration of Traffic Management
+	hardware capabilities.
+	When not defined hardware default values will be used.
+	If unsure, say N.
+
+menu "BM configuration"
+	depends on MVPP3
+
+config MV_PP3_BM_LINUX_POOL_CAPACITY
+	int "capacity of Linux (TxDone) BM pool"
+	default 16384
+	---help---
+	Number of buffers can be returned to pool after transmit.
+	BM Linux pools are created for each CPU for all interfaces.
+	All BM Linux pools are empty after initialization.
+	Hardware will push buffers to these pools when transmit is completed.
+	Software will pop buffers from these pools and return these buffers to Linux.
+
+config MV_PP3_BM_RX_POOL_CAPACITY
+	int "capacity of Receive BM pools"
+	default 32768
+	---help---
+	Maximal number of buffers can pushed to BM long or short pool.
+	Buffers are allocated for BM pools during initialization.
+	Capacity of BM pools must be bigger then number of buffers that allocated for long or short pools.
+
+config MV_PP3_BM_SHORT_BUF_SIZE
+	int "buffers size for BM short pool"
+	default 0
+	---help---
+	Default size of buffers allocated for short pools.
+	Buffers size should be long enough to contain the predefined headroom
+	and linux shared info.
+	This value is relevant for all ports.
+
+endmenu
+
+menu "Rx/Tx Queue configuration"
+	depends on MVPP3
+
+config  MV_PP3_RXQ_NUM
+	int "Number of RX VQs for NIC devices"
+        default 2
+        ---help---
+	Number of virtual RXQs for each NIC network interface
+
+config  MV_PP3_GNSS_RXQ_NUM
+	int "Number of RX VQs for NSS devices"
+        default 2
+        ---help---
+	Number of virtual RXQs for each NSS network interface
+
+config MV_PP3_RXQ_SIZE
+	int "Number of CFHs [128 bytes] allocated for each RXQ"
+	default 1024
+        ---help---
+	Default number of CFHs [128 bytes] in each RXQ.
+	This value is relevant for all RXQs.
+
+config  MV_PP3_TXQ_NUM
+	int "Number of TX VQs for NIC devices"
+        default 2
+        ---help---
+	Number of virtual TXQs for each NIC network interface
+
+config  MV_PP3_GNSS_TXQ_NUM
+	int "Number of TX VQs for NSS devices"
+        default 2
+        ---help---
+	Number of virtual TXQs for each NSS network interface
+
+config MV_PP3_TXQ_SIZE
+	int "Number of CFHs [128 bytes] allocated for each TXQ"
+	default 2048
+        ---help---
+	Default number of CFHs [128 bytes] in each TXQ.
+	This value is relevant for all TXQs.
+
+endmenu
+
+menu "Control and Statistics"
+	depends on MVPP3
+
+config  MV_PP3_DEBUG_CODE
+	bool "Add run-time debug code"
+	default y
+	---help---
+	When defined special debug code is compiled in kernel image.
+	Some debug messages can be enabled/disabled using special sysfs command.
+	Used for Debug mode and can cause performance decrease.
+	Minory increase kernal image size.
+
+config  MV_PP3_STAT_ERR
+	bool "Collect error statistics"
+	default y
+	---help---
+	Marvell network interface driver collect minimal number of statistics.
+	Provide information only about error events. Doesn't effect performance.
+	Can be displayed using sysfs commands.
+
+config  MV_PP3_STAT_INF
+	bool "Collect event statistics"
+	default y
+	---help---
+	Marvell network interface driver collect event statistics.
+	Provide more information about driver functionality and almost doesn't
+	effect performance. Can be displayed using sysfs command.
+
+config  MV_PP3_STAT_DBG
+	bool "Collect debug statistics"
+	default y
+	---help---
+	Marvell network interface driver collect a lot of statistics.
+	Provide information about each event occurs in the driver.
+	Used for Debug mode and can cause performance decrease.
+	Can be displayed using sysfs command.
+
+endmenu
+
+menu "Advanced Features"
+	depends on MVPP3
+
+config MV_PP3_SKB_RECYCLE
+	depends on NET_SKB_RECYCLE
+	bool "PP3 SKB recycle only for forwarding cases"
+	default y
+	---help---
+	Work-in-progress and experimental.
+
+	This option enables skb's to be recycled after packet transmitted,
+	which makes a fastpath for routine and bridge skb consuming network
+	applications. It only applies to nic interfaces.
+
+config MV_PP3_SKB_RECYCLE_DEF
+	depends on MV_PP3_SKB_RECYCLE
+	int "Default value for SKB recycle:  0 - disable, 1 - enable"
+	default 0
+	---help---
+	SKB recycle can be enabled or disabled in run-time by sysfs command:
+	"echo [0|1] > dev/nic_skb" - set SKB recycle in NIC mode, 0 - disable, 1 - enable
+
+config  MV_PP3_RX_COAL_PKTS
+        int "Threshold [number of packets] for RX interrupt"
+        default 32
+        ---help---
+        Number of packets will be received before RX interrupt will be generated by HW.
+
+config  MV_PP3_RX_COAL_USEC
+        int "Threshold [usec] for RX interrupt"
+        default 100
+        ---help---
+        Time delay in usec before RX interrupt will be generated by HW if number of
+	received packets larger than 0 but smaller than MV_PP3_RX_COAL_PKTS
+
+config  MV_PP3_TXDONE_COAL_PKTS
+        int "Threshold for TX_DONE event trigger"
+        default 16
+        ---help---
+	Number of packets will be sent before TX_DONE event will be triggered.
+
+config MV_PP3_TXDONE_IN_HRTIMER
+        depends on HIGH_RES_TIMERS
+        bool "Use high resolution timer to process TX_DONE event"
+        ---help---
+        When chosen TX_DONE event will be process by high resolution timer in polling mode.
+        High resolution timer can support higher precision in ns level.
+        If high resolution timer is enabled, TX processing
+	 can free SKB memory much faster.
+
+config  MV_PP3_GRO
+        bool "GRO Support for Marvell network interface"
+	default y
+        ---help---
+	Marvell network driver compiled with GRO (Generic Receive Offload) support.
+
+config  MV_PP3_SG
+        bool "Scatter-Gather Support for Marvell network interface"
+        default n
+        ---help---
+        Marvell network driver compiled with SG (Scatter-Gather Offload) support.
+
+config  MV_PP3_TSO
+	depends on MV_PP3_SG
+        bool "TSO Support for Marvell network interface"
+	default n
+        ---help---
+	Marvell PP3 network driver compiled with TSO support
+	(TSO -- TCP Segmentation Offloading)
+	L4 checksum offload must be enabled
+
+config  MV_PP3_PPC_NUM
+        int "Number of active packet processors clusters"
+        default 2
+        ---help---
+	Number of active packet processors clusters in the system.
+
+config  MV_PP3_PTP_SERVICE
+	bool "PTP service"
+	default y
+	select UIO
+	---help---
+	PTP uio mapping and packet-timestamp in Marvell network driver
+
+endmenu
+
