@@ -11,3 +11,4 @@ obj-$(CONFIG_PXA168_ETH) += pxa168_eth.o
 obj-$(CONFIG_SKGE) += skge.o
 obj-$(CONFIG_SKY2) += sky2.o
 obj-$(CONFIG_MVPP2X) += mvpp2x/
+obj-$(CONFIG_MVNET_COMPLEX) += net_complex/mv_net_complex_a39x.o

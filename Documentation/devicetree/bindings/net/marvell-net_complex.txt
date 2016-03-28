@@ -1,0 +1,18 @@
+* Marvell NSS Complex
+
+Required properties:
+
+- compatible: should be "marvell,armada-390-nss_complex"
+- reg: include target and attribute for CPU window
+       and addresses and length of the register sets for the device.
+
+Example:
+
+nss_complex {
+        compatible = "marvell,armada-390-nss_complex";
+        status = "disabled";
+        reg = <MBUS_ID(0xf0, 0x01) 0x18200 0x100>,     /* netcomplex_misc */
+              <MBUS_ID(0xf0, 0x01) 0x18300 0x200>,     /* netcomplex_phy */
+              <MBUS_ID(0xf0, 0x01) 0x18a00 0x1000>,    /* netcomplex_base */
+              <MBUS_ID(0xf0, 0x01) 0x0 0x100000>;      /* AXI bus */
+};
