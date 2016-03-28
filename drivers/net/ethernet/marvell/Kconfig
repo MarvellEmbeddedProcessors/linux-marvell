@@ -160,4 +160,12 @@ config SKY2_DEBUG
 
 	  If unsure, say N.
 
+config MVNET_COMPLEX
+	bool "Choose to compile Marvell Net Complex support"
+	depends on ARCH_MVEBU
+	default y
+	---help---
+	Use Marvell propriotary netcomplex driver for A390.
+	The driver located uner directory mvebu_net/a390_nc.
+
 endif # NET_VENDOR_MARVELL
