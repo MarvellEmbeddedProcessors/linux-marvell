@@ -80,17 +80,17 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 	of_property_read_string_index(np, "clock-output-names",
 				      0, &name);
 	ap806_clks[0] = clk_register_fixed_rate(NULL, name, NULL,
-						0, cpuclk_freq);
+						CLK_IS_ROOT, cpuclk_freq);
 
 	of_property_read_string_index(np, "clock-output-names",
 				      1, &name);
-	ap806_clks[1] = clk_register_fixed_rate(NULL, name, NULL, 0,
+	ap806_clks[1] = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT,
 						cpuclk_freq);
 
 	/* Fixed clock is always 1200 Mhz */
 	of_property_read_string_index(np, "clock-output-names",
 				      2, &fixedclk_name);
-	ap806_clks[2] = clk_register_fixed_rate(NULL, fixedclk_name, NULL, 0,
+	ap806_clks[2] = clk_register_fixed_rate(NULL, fixedclk_name, NULL, CLK_IS_ROOT,
 						1200 * 1000 * 1000);
 
 	/* MSS Clock is fixed clock divided by 6 */
