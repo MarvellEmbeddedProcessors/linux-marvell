@@ -45,7 +45,6 @@
 			#size-cells = <2>;
 			#interrupt-cells = <1>;
 			device_type = "pci";
-			/* msi-parent = <&gic_v2m1>; */
 			dma-coherent;
 
 			bus-range = <0 0xff>;
@@ -67,7 +66,6 @@
 			#size-cells = <2>;
 			#interrupt-cells = <1>;
 			device_type = "pci";
-			/* msi-parent = <&gic_v2m1>; */
 			dma-coherent;
 
 			bus-range = <0 0xff>;
@@ -90,7 +88,6 @@
 			#size-cells = <2>;
 			#interrupt-cells = <1>;
 			device_type = "pci";
-			/* msi-parent = <&gic_v2m2>; */
 			dma-coherent;
 
 			bus-range = <0 0xff>;
