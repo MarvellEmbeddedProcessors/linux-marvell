@@ -249,9 +249,9 @@
 				};
 			};
 
-			funnel@809000 {
+			funnel@810000 {
 				compatible = "arm,coresight-funnel", "arm,primecell";
-				reg = <0x809000 0x1000>;
+				reg = <0x810000 0x1000>;
 				clocks = <&syscon 3>;
 				clock-names = "apb_pclk";
 
