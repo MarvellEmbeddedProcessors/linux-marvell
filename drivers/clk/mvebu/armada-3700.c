@@ -305,6 +305,7 @@ CLK_OF_DECLARE(armada_3700_north_bridge_clk_gating,
 static const struct clk_gating_soc_desc armada_3700_south_bridge_gating_desc[] __initconst = {
 	{ "gbe1-gate", "gbe1-core", 4, 0, CLK_GATE_SET_TO_DISABLE },
 	{ "gbe0-gate", "gbe0-core", 5, 0, CLK_GATE_SET_TO_DISABLE },
+	{ "pcie", NULL, 14, 0, CLK_GATE_SET_TO_DISABLE },
 	{ "usb32-ss-sys-gate", "usb32-ss-sys", 17, 0, CLK_GATE_SET_TO_DISABLE },
 	{ }
 };
