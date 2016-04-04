@@ -204,3 +204,7 @@ config MVEBU_ODMI
 
 config MVEBU_PIC
 	bool
+
+config MVEBU_ADVK_IRQ
+	bool
+	select GENERIC_IRQ_CHIP
