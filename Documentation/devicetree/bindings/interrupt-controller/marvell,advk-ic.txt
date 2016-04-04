@@ -1,0 +1,28 @@
+Marvell Armada 3700 PCIe auxiliary IRQ controller
+--------------------------------------------------
+
+Required properties:
+
+- compatible	       : The value here should contain "marvell,advk-ic".
+
+- interrupt-controller : Identifies the node as an interrupt controller.
+
+- #interrupt-cells     : The number of cells to define the interrupts.
+                         Should be 1. The cell is the IRQ number.
+
+- interrupts           : Controller's parent interrupt.
+
+- reg		       : List of register definitions, one for each
+                         configuration region.
+
+Example:
+
+	advk_ic: interrupt-controller@74840 {
+		compatible = "marvell,advk-ic";
+		reg = <0x74840 0x10
+		       0x8b000 0x8>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+		status = "okay";
+	};
