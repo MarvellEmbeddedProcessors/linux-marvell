@@ -199,6 +199,26 @@ void mv_gop110_serdes_init(struct gop_hw *gop, int lane,
 void mv_gop110_serdes_reset(struct gop_hw *gop, int lane, bool analog_reset,
 			    bool core_reset, bool digital_reset);
 
+/* MPCS Functions */
+
+static inline u32 mv_gop110_mpcs_global_read(struct gop_hw *gop, u32 offset)
+{
+	return mv_gop_gen_read(gop->gop_110.mspg_base, offset);
+}
+
+static inline void mv_gop110_mpcs_global_write(struct gop_hw *gop, u32 offset,
+					       u32 data)
+{
+	mv_gop_gen_write(gop->gop_110.mspg_base, offset, data);
+}
+
+static inline void mv_gop110_mpcs_global_print(struct gop_hw *gop,
+					       char *reg_name, u32 reg)
+{
+	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg,
+		mv_gop110_mpcs_global_read(gop, reg));
+}
+
 /* XPCS Functions */
 
 static inline u32 mv_gop110_xpcs_global_read(struct gop_hw *gop, u32 offset)
@@ -243,6 +263,7 @@ void mv_gop110_xpcs_gl_regs_dump(struct gop_hw *gop);
 void mv_gop110_xpcs_lane_regs_dump(struct gop_hw *gop, int lane);
 int mv_gop110_xpcs_reset(struct gop_hw *gop, enum mv_reset reset);
 int mv_gop110_xpcs_mode(struct gop_hw *gop, int num_of_lanes);
+int mv_gop110_mpcs_mode(struct gop_hw *gop);
 
 /* XLG MAC Functions */
 static inline u32 mv_gop110_xlg_mac_read(struct gop_hw *gop, int mac_num,
