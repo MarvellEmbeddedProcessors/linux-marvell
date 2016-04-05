@@ -949,8 +949,21 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		mv_gop110_serdes_reset(gop, 0, false, false, false);
 		mv_gop110_serdes_reset(gop, 1, false, false, false);
 	break;
-	/* Stefan: need to check KR case */
 	case PHY_INTERFACE_MODE_KR:
+
+		num_of_act_lanes = 2;
+		mac_num = 0;
+		/* configure PCS */
+		mv_gop110_xpcs_mode(gop, num_of_act_lanes);
+		mv_gop110_mpcs_mode(gop);
+		/* configure MAC */
+		mv_gop110_xlg_mac_mode_cfg(gop, mac_num, num_of_act_lanes);
+
+		/* pcs unreset */
+		mv_gop110_xpcs_reset(gop, UNRESET);
+
+		/* mac unreset */
+		mv_gop110_xlg_mac_reset(gop, mac_num, UNRESET);
 	break;
 	default:
 		pr_err("%s: Requested port mode (%d) not supported",
@@ -1766,14 +1779,13 @@ int mv_gop110_xlg_mac_mode_cfg(struct gop_hw *gop, int mac_num,
 	u32 reg_addr;
 	u32 val;
 
-	/* Set TX FIFO thresholds */
-	reg_addr = MV_XLG_PORT_FIFOS_THRS_CFG_REG;
+	/* configure 10G MAC mode */
+	reg_addr = MV_XLG_PORT_MAC_CTRL0_REG;
 	val = mv_gop110_xlg_mac_read(gop, mac_num, reg_addr);
-	U32_SET_FIELD(val, MV_XLG_MAC_PORT_FIFOS_THRS_CFG_TXRDTHR_MASK,
-		      (6 << MV_XLG_MAC_PORT_FIFOS_THRS_CFG_TXRDTHR_OFFS));
+	U32_SET_FIELD(val, MV_XLG_MAC_CTRL0_RXFCEN_MASK,
+		      (1 << MV_XLG_MAC_CTRL0_RXFCEN_OFFS));
 	mv_gop110_xlg_mac_write(gop, mac_num, reg_addr, val);
 
-	/* configure 10G MAC mode */
 	reg_addr = MV_XLG_PORT_MAC_CTRL3_REG;
 	val = mv_gop110_xlg_mac_read(gop, mac_num, reg_addr);
 	U32_SET_FIELD(val, MV_XLG_MAC_CTRL3_MACMODESELECT_MASK,
@@ -1784,12 +1796,17 @@ int mv_gop110_xlg_mac_mode_cfg(struct gop_hw *gop, int mac_num,
 
 	/* read - modify - write */
 	val = mv_gop110_xlg_mac_read(gop, mac_num, reg_addr);
-	U32_SET_FIELD(val, 0x1F10, 0x310);
+	U32_SET_FIELD(val, MV_XLG_MAC_CTRL4_MAC_MODE_DMA_1G_MASK, 0 <<
+					MV_XLG_MAC_CTRL4_MAC_MODE_DMA_1G_OFFS);
+	U32_SET_FIELD(val, MV_XLG_MAC_CTRL4_FORWARD_PFC_EN_MASK, 1 <<
+					MV_XLG_MAC_CTRL4_FORWARD_PFC_EN_OFFS);
+	U32_SET_FIELD(val, MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN_MASK, 1 <<
+					MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN_OFFS);
 	mv_gop110_xlg_mac_write(gop, mac_num, reg_addr, val);
 
 	/* Jumbo frame support - 0x1400*2= 0x2800 bytes */
 	val = mv_gop110_xlg_mac_read(gop, mac_num, MV_XLG_PORT_MAC_CTRL1_REG);
-	U32_SET_FIELD(val, 0x1FFF, 0x1400);
+	U32_SET_FIELD(val, MV_XLG_MAC_CTRL1_FRAMESIZELIMIT_MASK, 0x1400);
 	mv_gop110_xlg_mac_write(gop, mac_num, MV_XLG_PORT_MAC_CTRL1_REG, val);
 
 	/* mask all port interrupts */
@@ -2263,6 +2280,36 @@ int mv_gop110_xpcs_mode(struct gop_hw *gop, int num_of_lanes)
 	return 0;
 }
 
+int mv_gop110_mpcs_mode(struct gop_hw *gop)
+{
+	u32 reg_addr;
+	u32 val;
+
+	/* configure PCS40G COMMON CONTROL */
+	reg_addr = PCS40G_COMMON_CONTROL;
+	val = mv_gop110_mpcs_global_read(gop, reg_addr);
+	U32_SET_FIELD(val, FORWARD_ERROR_CORRECTION_MASK,
+		      0 << FORWARD_ERROR_CORRECTION_OFFSET);
+
+	mv_gop110_mpcs_global_write(gop, reg_addr, val);
+
+	/* configure PCS CLOCK RESET */
+	reg_addr = PCS_CLOCK_RESET;
+	val = mv_gop110_mpcs_global_read(gop, reg_addr);
+	U32_SET_FIELD(val, CLK_DIVISION_RATIO_MASK, 1 << CLK_DIVISION_RATIO_OFFSET);
+
+	mv_gop110_mpcs_global_write(gop, reg_addr, val);
+
+	U32_SET_FIELD(val, CLK_DIV_PHASE_SET_MASK, 0 << CLK_DIV_PHASE_SET_OFFSET);
+	U32_SET_FIELD(val, MAC_CLK_RESET_MASK, 1 << MAC_CLK_RESET_OFFSET);
+	U32_SET_FIELD(val, RX_SD_CLK_RESET_MASK, 1 << RX_SD_CLK_RESET_OFFSET);
+	U32_SET_FIELD(val, TX_SD_CLK_RESET_MASK, 1 << TX_SD_CLK_RESET_OFFSET);
+
+	mv_gop110_mpcs_global_write(gop, reg_addr, val);
+
+	return 0;
+}
+
 u64 mv_gop110_mib_read64(struct gop_hw *gop, int port, unsigned int offset)
 {
 	u64 val, val2;
@@ -2283,7 +2330,7 @@ static void mv_gop110_mib_print(struct gop_hw *gop, int port, u32 offset,
 	u64 val;
 
 	val = mv_gop110_mib_read64(gop, port, offset);
-	pr_info("  %-32s: 0x%02x = 0x%08llx\n", mib_name, offset, val);
+	pr_info("  %-32s: 0x%02x = %lld\n", mib_name, offset, val);
 }
 
 void mv_gop110_mib_counters_show(struct gop_hw *gop, int port)
