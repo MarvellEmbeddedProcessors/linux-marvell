@@ -69,8 +69,8 @@ static u8 mv_pp2x_queue_mode = MVPP2_QDIST_SINGLE_MODE;
 static u8 rss_mode;
 static u8 default_cpu;
 static u8 cos_classifer;
-static u32 pri_map;
-static u8 default_cos;
+static u32 pri_map = 0x3210; /* As default, cos0--rxq0, cos1--rxq1, cos2--rxq2, cos3--rxq3 */
+static u8 default_cos = 3; /* As default, non-IP packet has the highest CoS value */
 static bool jumbo_pool;
 static u16 rx_queue_size = MVPP2_MAX_RXD;
 static u16 tx_queue_size = MVPP2_MAX_TXD;
