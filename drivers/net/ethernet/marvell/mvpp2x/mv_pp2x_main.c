@@ -196,10 +196,10 @@ static void mv_pp2x_txq_inc_get(struct mv_pp2x_txq_pcpu *txq_pcpu)
 		txq_pcpu->txq_get_index = 0;
 }
 
-static void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
-			      struct mv_pp2x_txq_pcpu *txq_pcpu,
-			      struct sk_buff *skb,
-			      struct mv_pp2x_tx_desc *tx_desc)
+void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
+			 struct mv_pp2x_txq_pcpu *txq_pcpu,
+			 struct sk_buff *skb,
+			 struct mv_pp2x_tx_desc *tx_desc)
 {
 	txq_pcpu->tx_skb[txq_pcpu->txq_put_index] = skb;
 	if (skb)
@@ -705,7 +705,7 @@ static void mv_pp2x_defaults_set(struct mv_pp2x_port *port)
 /* Check if there are enough reserved descriptors for transmission.
  * If not, request chunk of reserved descriptors and check again.
  */
-static int mv_pp2x_txq_reserved_desc_num_proc(
+int mv_pp2x_txq_reserved_desc_num_proc(
 					struct mv_pp2x *priv,
 					struct mv_pp2x_tx_queue *txq,
 					struct mv_pp2x_txq_pcpu *txq_pcpu,
@@ -2387,6 +2387,9 @@ static inline int mv_pp2x_cause_rx_handle(struct mv_pp2x_port *port,
 	if (budget > 0) {
 		cause_rx = 0;
 		napi_complete(napi);
+#ifdef DEV_NETMAP
+	if (!(port->flags & MVPP2_F_IFCAP_NETMAP))
+#endif
 		mv_pp2x_qvector_interrupt_enable(q_vec);
 	}
 	q_vec->pending_cause_rx = cause_rx;
@@ -2908,7 +2911,7 @@ err_cleanup_rxqs:
 	return err;
 }
 
-static int mv_pp2x_stop(struct net_device *dev)
+int mv_pp2x_stop(struct net_device *dev)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_pp2x_port_pcpu *port_pcpu;

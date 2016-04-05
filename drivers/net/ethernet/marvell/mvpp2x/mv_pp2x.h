@@ -757,6 +757,11 @@ void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv,
 int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 			struct mv_pp2x_bm_pool *bm_pool, int buf_num);
 int mv_pp2x_open(struct net_device *dev);
+int mv_pp2x_stop(struct net_device *dev);
+void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
+			 struct mv_pp2x_txq_pcpu *txq_pcpu,
+			 struct sk_buff *skb,
+			 struct mv_pp2x_tx_desc *tx_desc);
 int mv_pp2x_check_ringparam_valid(struct net_device *dev,
 				  struct ethtool_ringparam *ring);
 void mv_pp2x_start_dev(struct mv_pp2x_port *port);
@@ -776,5 +781,10 @@ int mv_pp2x_cos_default_value_set(struct mv_pp2x_port *port, int cos_value);
 int mv_pp2x_cos_default_value_get(struct mv_pp2x_port *port);
 int mv_pp22_rss_mode_set(struct mv_pp2x_port *port, int rss_mode);
 int mv_pp22_rss_default_cpu_set(struct mv_pp2x_port *port, int default_cpu);
+int mv_pp2x_txq_reserved_desc_num_proc(struct mv_pp2x *priv,
+				       struct mv_pp2x_tx_queue *txq,
+				       struct mv_pp2x_txq_pcpu *txq_pcpu,
+				       int num);
+
 #endif /*_MVPP2_H_*/
 
