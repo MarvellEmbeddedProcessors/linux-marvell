@@ -1745,9 +1745,13 @@ struct mv_pp2x_prs_flow_id {
  * These value assure that for SWF the total number
  * of bytes allocated for each buffer will be 512
  */
-#define MVPP2_BM_SHORT_PKT_SIZE		MVPP2_RX_MAX_PKT_SIZE(512)
-#define MVPP2_BM_LONG_PKT_SIZE		MVPP2_RX_MAX_PKT_SIZE(2048)
-#define MVPP2_BM_JUMBO_PKT_SIZE		9600 /*FIXME: What is max. size ? */
+#define MVPP2_BM_SHORT_PKT_SIZE	MVPP2_RX_MAX_PKT_SIZE(MVPP2_BM_SHORT_FRAME_SIZE)
+#define MVPP2_BM_LONG_PKT_SIZE	MVPP2_RX_MAX_PKT_SIZE(MVPP2_BM_LONG_FRAME_SIZE)
+#define MVPP2_BM_JUMBO_PKT_SIZE	MVPP2_RX_MAX_PKT_SIZE(MVPP2_BM_JUMBO_FRAME_SIZE)
+
+#define MVPP2_BM_SHORT_FRAME_SIZE		1024
+#define MVPP2_BM_LONG_FRAME_SIZE		2048
+#define MVPP2_BM_JUMBO_FRAME_SIZE		8192 /*FIXME: What is max. size ? */
 
 enum mv_pp2x_bm_pool_log_num {
 	MVPP2_BM_SWF_SHORT_POOL,
