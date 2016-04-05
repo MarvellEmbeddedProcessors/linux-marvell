@@ -632,13 +632,13 @@ static void mv_pp2x_prs_tcam_data_dword_set(struct mv_pp2x_prs_entry *pe,
 					    unsigned int enable)
 {
 	int index, offset;
-	unsigned char byte, byteMask;
+	unsigned char byte, byte_mask;
 
 	for (index = 0; index < 4; index++) {
 		offset = (offs * 4) + index;
-		byte = ((unsigned char *) &word)[HW_BYTE_OFFS(index)];
-		byteMask = ((unsigned char *) &enable)[HW_BYTE_OFFS(index)];
-		mv_pp2x_prs_tcam_data_byte_set(pe, offset, byte, byteMask);
+		byte = ((unsigned char *)&word)[HW_BYTE_OFFS(index)];
+		byte_mask = ((unsigned char *)&enable)[HW_BYTE_OFFS(index)];
+		mv_pp2x_prs_tcam_data_byte_set(pe, offset, byte, byte_mask);
 	}
 }
 
@@ -654,8 +654,8 @@ static void mv_pp2x_prs_tcam_data_dword_get(struct mv_pp2x_prs_entry *pe,
 	for (index = 0; index < 4; index++) {
 		offset = (offs * 4) + index;
 		mv_pp2x_prs_tcam_data_byte_get(pe, offset,  &byte, &mask);
-		((unsigned char *) word)[index] = byte;
-		((unsigned char *) enable)[index] = mask;
+		((unsigned char *)word)[HW_BYTE_OFFS(index)] = byte;
+		((unsigned char *)enable)[HW_BYTE_OFFS(index)] = mask;
 	}
 }
 
@@ -664,10 +664,9 @@ static void mv_pp2x_prs_tcam_data_dword_get(struct mv_pp2x_prs_entry *pe,
 static bool mv_pp2x_prs_tcam_data_cmp(struct mv_pp2x_prs_entry *pe, int offs,
 				      u16 data)
 {
-	int off = TCAM_DATA_BYTE(offs);
 	u16 tcam_data;
 
-	tcam_data = (8 << pe->tcam.byte[off + 1]) | pe->tcam.byte[off];
+	tcam_data = (pe->tcam.byte[TCAM_DATA_BYTE(offs + 1)] << 8) | pe->tcam.byte[TCAM_DATA_BYTE(offs)];
 	if (tcam_data != data)
 		return false;
 	return true;
@@ -2570,8 +2569,7 @@ mv_pp2x_prs_mac_da_range_find(struct mv_pp2x_hw *hw, int pmap, const u8 *da,
 		mv_pp2x_prs_hw_read(hw, pe);
 		entry_pmap = mv_pp2x_prs_tcam_port_map_get(pe);
 
-		if (mv_pp2x_prs_mac_range_equals(pe, da, mask) &&
-		    entry_pmap == pmap)
+		if (mv_pp2x_prs_mac_range_equals(pe, da, mask))
 			return pe;
 	}
 	kfree(pe);
@@ -3692,7 +3690,7 @@ u32 mv_pp2x_txq_desc_csum(int l3_offs, int l3_proto,
 	command |= (ip_hdr_len << MVPP2_TXD_IP_HLEN_SHIFT);
 	command |= MVPP2_TXD_IP_CSUM_DISABLE;
 
-	if (l3_proto == swab16(ETH_P_IP)) {
+	if (l3_proto == ETH_P_IP) {
 		command &= ~MVPP2_TXD_IP_CSUM_DISABLE;	/* enable IPv4 csum */
 		command &= ~MVPP2_TXD_L3_IP6;		/* enable IPv4 */
 	} else {
