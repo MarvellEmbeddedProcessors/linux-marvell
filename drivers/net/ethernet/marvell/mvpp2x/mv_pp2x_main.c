@@ -2021,7 +2021,6 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	int rx_received, rx_filled, i;
 	u32 rcvd_pkts = 0;
 	u32 rcvd_bytes = 0;
-	u16 coherence_size;
 
 #ifdef DEV_NETMAP
 		if (port->flags & MVPP2_F_IFCAP_NETMAP) {
@@ -2059,8 +2058,6 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		rx_status = rx_desc->status;
 		rx_bytes = rx_desc->data_size - MVPP2_MH_SIZE;
 
-
-
 		pool = MVPP2_RX_DESC_POOL(rx_desc);
 		bm_pool = &port->priv->bm_pools[pool];
 		/* Check if buffer header is used */
@@ -2077,22 +2074,18 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 			buf_phys_addr = mv_pp22_rxdesc_phys_addr_get(rx_desc);
 		}
 
-		if (pool == 1)
-			coherence_size = MVPP2_BM_LONG_PKT_SIZE;
-		else
-			coherence_size = MVPP2_BM_SHORT_PKT_SIZE;
-
-		if (!is_device_dma_coherent(dev->dev.parent))
-			dma_sync_single_for_cpu(dev->dev.parent, buf_phys_addr,
-				coherence_size, DMA_FROM_DEVICE);
 #ifdef CONFIG_64BIT
 		skb = (struct sk_buff *)((uintptr_t)skb |
 			port->priv->pp2xdata->skb_base_addr);
 #endif
+
 #ifdef MVPP2_VERBOSE
 		mv_pp2x_skb_dump(skb, rx_desc->data_size, 4);
 #endif
 
+		dma_sync_single_for_cpu(dev->dev.parent, buf_phys_addr,
+					MVPP2_RX_BUF_SIZE(rx_desc->data_size),
+					DMA_FROM_DEVICE);
 
 		/* In case of an error, release the requested buffer pointer
 		 * to the Buffer Manager. This request process is controlled
@@ -2107,7 +2100,6 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 				skb);
 			continue;
 		}
-
 
 		rcvd_pkts++;
 		rcvd_bytes += rx_bytes;
