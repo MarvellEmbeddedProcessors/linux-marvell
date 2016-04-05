@@ -1126,7 +1126,9 @@ static void mv_pp2x_txq_clean(struct mv_pp2x_port *port,
 	struct mv_pp2x_txq_pcpu *txq_pcpu;
 	int delay, pending, cpu;
 	u32 val;
+	bool egress_en = false;
 	struct mv_pp2x_hw *hw = &port->priv->hw;
+	int tx_port_num = mv_pp2x_egress_port(port);
 
 	mv_pp2x_write(hw, MVPP2_TXQ_NUM_REG, txq->id);
 	val = mv_pp2x_read(hw, MVPP2_TXQ_PREF_BUF_REG);
@@ -1136,6 +1138,16 @@ static void mv_pp2x_txq_clean(struct mv_pp2x_port *port,
 	/* The napi queue has been stopped so wait for all packets
 	 * to be transmitted.
 	 */
+
+	/* Enable egress queue in order to allow releasing all packets*/
+	mv_pp2x_write(hw, MVPP2_TXP_SCHED_PORT_INDEX_REG, tx_port_num);
+	val = mv_pp2x_read(hw, MVPP2_TXP_SCHED_Q_CMD_REG);
+	if (!(val & (1 << txq->log_id))) {
+		val |= 1 << txq->log_id;
+		mv_pp2x_write(hw, MVPP2_TXP_SCHED_Q_CMD_REG, val);
+		egress_en = true;
+	}
+
 	delay = 0;
 	do {
 		if (delay >= MVPP2_TX_PENDING_TIMEOUT_MSEC) {
@@ -1149,6 +1161,17 @@ static void mv_pp2x_txq_clean(struct mv_pp2x_port *port,
 
 		pending = mv_pp2x_txq_pend_desc_num_get(port, txq);
 	} while (pending);
+
+	/* Disable egress queue */
+	if (egress_en) {
+		mv_pp2x_write(hw, MVPP2_TXP_SCHED_PORT_INDEX_REG, tx_port_num);
+		val = (mv_pp2x_read(hw, MVPP2_TXP_SCHED_Q_CMD_REG)) &
+			    MVPP2_TXP_SCHED_ENQ_MASK;
+		val |= 1 << txq->log_id;
+		mv_pp2x_write(hw, MVPP2_TXP_SCHED_Q_CMD_REG,
+			      (val << MVPP2_TXP_SCHED_DISQ_OFFSET));
+		egress_en = false;
+	}
 
 	val &= ~MVPP2_TXQ_DRAIN_EN_MASK;
 	mv_pp2x_write(hw, MVPP2_TXQ_PREF_BUF_REG, val);
