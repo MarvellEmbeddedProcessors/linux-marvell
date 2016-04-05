@@ -3157,7 +3157,7 @@ int mv_pp2x_of_irq_count(struct device_node *dev)
 static int mv_pp2x_netdev_set_features(struct net_device *dev,
 	netdev_features_t features)
 {
-	u32 changed = dev->features ^ features;
+	netdev_features_t changed = dev->features ^ features;
 	struct mv_pp2x_port *port = netdev_priv(dev);
 
 	/* dev->features is not changed */
@@ -3774,13 +3774,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 				mv_pp2x_tx_proc_cb, (unsigned long)dev);
 		}
 	}
-	features = NETIF_F_SG ;
-#if defined(__BIG_ENDIAN)
-	dev->features = features | NETIF_F_RXCSUM;
-#else
-	dev->features = features | NETIF_F_RXCSUM | NETIF_F_IP_CSUM;
-#endif
-	dev->hw_features |= features | NETIF_F_RXCSUM | NETIF_F_GRO | NETIF_F_IP_CSUM;
+	features = NETIF_F_SG;
+	dev->features = features | NETIF_F_RXCSUM | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+	dev->hw_features |= features | NETIF_F_RXCSUM | NETIF_F_GRO | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
 	/* Only when multi queue mode, rxhash is supported */
 	if (mv_pp2x_queue_mode)
 		dev->hw_features |= NETIF_F_RXHASH;
@@ -3796,11 +3792,13 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 
 	priv->port_list[priv->num_ports] = port;
 	priv->num_ports++;
-	return 0;
-	dev_err(&pdev->dev, "%s failed for port_id(%d)\n", __func__, id);
+
 #ifdef DEV_NETMAP
 	mv_pp2x_netmap_attach(port);
 #endif /* DEV_NETMAP */
+
+	return 0;
+	dev_err(&pdev->dev, "%s failed for port_id(%d)\n", __func__, id);
 
 err_free_port_pcpu:
 	free_percpu(port->pcpu);
