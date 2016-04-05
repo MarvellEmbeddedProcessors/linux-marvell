@@ -462,6 +462,60 @@ static int mv_pp2x_ethtool_get_rxnfc(struct net_device *dev,
 	return 0;
 }
 
+static int mv_pp2x_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
+				    u8 *hfunc)
+{
+	size_t copy_size;
+	struct mv_pp2x_port *port = netdev_priv(dev);
+
+	/* Single mode doesn't support RSS features */
+	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+		return -EOPNOTSUPP;
+
+	if (hfunc)
+		*hfunc = ETH_RSS_HASH_TOP;
+
+	if (!indir)
+		return 0;
+
+	copy_size = ARRAY_SIZE(port->priv->rx_indir_table);
+	memcpy(indir, port->priv->rx_indir_table, copy_size * sizeof(u32));
+
+	return 0;
+}
+
+static int mv_pp2x_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
+				    const u8 *key, const u8 hfunc)
+{
+	int i, err;
+	struct mv_pp2x_port *port = netdev_priv(dev);
+
+	/* Single mode doesn't support RSS features */
+	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+		return -EOPNOTSUPP;
+
+	/* We require at least one supported parameter to be changed
+	 * and no change in any of the unsupported parameters
+	 */
+	if (key ||
+	    (hfunc != ETH_RSS_HASH_NO_CHANGE && hfunc != ETH_RSS_HASH_TOP))
+		return -EOPNOTSUPP;
+
+	if (!indir)
+		return 0;
+
+	for (i = 0; i < ARRAY_SIZE(port->priv->rx_indir_table); i++)
+		port->priv->rx_indir_table[i] = indir[i];
+
+	err =  mv_pp22_rss_rxfh_indir_set(port);
+	if (err) {
+		netdev_err(dev, "fail to change rxfh indir table");
+		return err;
+	}
+
+	return 0;
+}
+
 static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_link		= ethtool_op_get_link,
 	.get_settings		= mv_pp2x_ethtool_get_settings,
@@ -471,9 +525,10 @@ static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_drvinfo		= mv_pp2x_ethtool_get_drvinfo,
 	.get_ringparam		= mv_pp2x_ethtool_get_ringparam,
 	.set_ringparam		= mv_pp2x_ethtool_set_ringparam,
-	/* For rxfh relevant command, only support LK-3.18 */
 	.get_rxfh_indir_size	= mv_pp2x_ethtool_get_rxfh_indir_size,
 	.get_rxnfc		= mv_pp2x_ethtool_get_rxnfc,
+	.get_rxfh		= mv_pp2x_ethtool_get_rxfh,
+	.set_rxfh		= mv_pp2x_ethtool_set_rxfh,
 };
 
 void mv_pp2x_set_ethtool_ops(struct net_device *netdev)
