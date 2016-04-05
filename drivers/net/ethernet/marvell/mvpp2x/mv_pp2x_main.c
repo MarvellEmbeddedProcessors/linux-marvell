@@ -720,22 +720,28 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 	 * count and check again.
 	 */
 
-	desc_count = 0;
-	/* Compute total of used descriptors */
-	for_each_online_cpu(cpu) {
-		struct mv_pp2x_txq_pcpu *txq_pcpu_aux;
+	/* Entire txq_size is used for SWF . Must be changed when HWF is implemented.
+	 * There will always be at least one CHUNK available
+	 */
 
-		txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu);
-		desc_count += txq_pcpu_aux->count;
-		desc_count += txq_pcpu_aux->reserved_num;
+	req = MVPP2_CPU_DESC_CHUNK;
+
+	if ((num - txq_pcpu->reserved_num) > req) {
+		req = num - txq_pcpu->reserved_num;
+		desc_count = 0;
+		/* Compute total of used descriptors */
+		for_each_online_cpu(cpu) {
+			struct mv_pp2x_txq_pcpu *txq_pcpu_aux;
+
+			txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu);
+			desc_count += txq_pcpu_aux->count;
+			desc_count += txq_pcpu_aux->reserved_num;
+		}
+		desc_count += req;
+
+		if (desc_count > txq->size)
+			return -ENOMEM;
 	}
-
-	req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
-	desc_count += req;
-
-	if (desc_count >
-	   (txq->size - (num_active_cpus() * MVPP2_CPU_DESC_CHUNK)))
-		return -ENOMEM;
 
 	txq_pcpu->reserved_num += mv_pp2x_txq_alloc_reserved_desc(priv, txq,
 								  req);
