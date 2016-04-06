@@ -1,0 +1,181 @@
+What:		/sys/bus/coresight/devices/<memory_map>.axim/enable_source
+Date:		April 2016
+KernelVersion:  4.4
+Contact:        Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) Enable/disable tracing on this specific trace entity.
+		Enabling a source implies the source has been configured
+		properly and a sink has been identified for it.  The path
+		of Coresight components linking the source to the sink is
+		configured and managed automatically by the Coresight framework.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/mon_enable
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) Enable The AXI monitor only. Doesn't enable monitor
+		as a trace source. This is useful for using the monitor
+		for debug only
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/nr_chan
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(R) Indicates the number of comparator channels.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/nr_prof_regs
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(R) Indicates the number of profiling counters
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/version
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(R) Indicates the AXI monitor version.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/reset
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(W) Resets the AXIM to it's initial state
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/curr_chan
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) Controlls and Indicates the channel for configuration
+		under "channel" sub directory.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/counters
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(R) Prints the counters of all channels.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/addr_end
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) End address of the comparator.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/addr_start
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) Start address of the comparator.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/cache
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) The AxCache[0:3] attribute of the transaction.
+		AxCache[0]: Allocate
+		AxCache[1]: Other allocate
+		AxCache[2]: Modifiable
+		AxCache[3]: Bufferable
+		Refer to AMBA AXI protocol spec for more details.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/cache_mask
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) cache field mask.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/counter
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) The channel's event counter
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/domain
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) The AxDomain[0:1] attribute of the transaction
+		AxDomain = 0x0 - Non shareable
+		AxDomain = 0x1 - Inner shareable
+		AxDomain = 0x2 - Outer shareable
+		AxDomain = 0x0 - System
+		Refer to AMBA AXI protocol spec for more details.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/domain_mask
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) domain field mask.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/enables
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) Enables and disables the channel
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/event_mode
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) Controls when events are created
+		0 = events are created on every channel match
+		1 = events are created when counter = event_thresh
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/event_thresh
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) if event_mode = 1, controls after how many matches an
+		event is created.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/id
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) The AxID[0:15] attribute of the transaction
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/id_mask
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) id field mask.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/prot
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) The AxProt[0:1] attribute of the transaction
+		AxCache[0]: 1 = privileged
+		AxCache[1]: 1 = non secure
+		Refer to AMBA AXI protocol spec for more details.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/prot_mask
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) prot field mask.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/qos
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) The AxQos[0:1] attribute of the transaction
+		Refer to AMBA AXI protocol spec for more details.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/qos_mask
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) qos field mask.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/user
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) The AxUser[0:15] attribute of the transaction
+		Refer to AMBA AXI protocol spec for more details.
+
+What:		/sys/bus/coresight/devices/<memory_map>.axi/channel/user_mask
+Date:		April 2016
+KernelVersion:	4.4
+Contact:	Yehuda Yitschak <yehuday@marvell.com>
+Description:	(RW) user field mask.
+
