@@ -2574,8 +2574,22 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 #endif /* DEV_NETMAP */
 	if (FPGA || port->priv->pp2_version == PPV21)
 		mv_pp21_gmac_max_rx_size_set(port);
-	else
-		mv_gop110_gmac_max_rx_size_set(gop, mac_num, port->pkt_size);
+	else {
+		switch (mac->phy_mode) {
+		case PHY_INTERFACE_MODE_RGMII:
+		case PHY_INTERFACE_MODE_SGMII:
+		case PHY_INTERFACE_MODE_QSGMII:
+			mv_gop110_gmac_max_rx_size_set(gop, mac_num, port->pkt_size);
+		break;
+		case PHY_INTERFACE_MODE_XAUI:
+		case PHY_INTERFACE_MODE_RXAUI:
+		case PHY_INTERFACE_MODE_KR:
+			mv_gop110_xlg_mac_max_rx_size_set(gop, mac_num, port->pkt_size);
+		break;
+		default:
+		break;
+		}
+	}
 	mv_pp2x_txp_max_tx_size_set(port);
 
 	mv_pp2x_port_napi_enable(port);
