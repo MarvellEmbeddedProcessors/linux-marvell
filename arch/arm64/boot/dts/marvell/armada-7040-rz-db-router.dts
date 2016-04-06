@@ -85,8 +85,7 @@
 					status = "okay";
 				};
 				emac2: mac2 {
-					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&phy2>;
+					phy-mode = "sgmii"; /* lane-0 */
 					status = "okay";
 				};
 				emac3: mac3 {
