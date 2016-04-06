@@ -1318,8 +1318,7 @@ int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 	/* Rx/TX irq's */
 	for (qvec_id = 0; qvec_id < port->num_qvector; qvec_id++) {
 		qvec = &port->q_vector[qvec_id];
-		if (qvec->qv_type == MVPP2_PRIVATE &&
-		    port->priv->pp2xdata->interrupt_tx_done == false)
+		if (!qvec->irq)
 			continue;
 		err = request_irq(qvec->irq, mv_pp2x_isr, 0,
 				  qvec->irq_name, qvec);
@@ -1996,7 +1995,7 @@ static u32 mv_pp2x_skb_tx_csum(struct mv_pp2x_port *port, struct sk_buff *skb)
 		}
 
 		return mv_pp2x_txq_desc_csum(skb_network_offset(skb),
-				skb->protocol, ip_hdr_len, l4_proto);
+				ntohs(skb->protocol), ip_hdr_len, l4_proto);
 	}
 
 	return MVPP2_TXD_L4_CSUM_NOT | MVPP2_TXD_IP_CSUM_DISABLE;
@@ -2849,12 +2848,6 @@ int mv_pp2x_open(struct net_device *dev)
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	int err;
 
-
-	err = mv_pp2x_open_cls(dev);
-	if (err)
-		return err;
-
-
 	/* Allocate the Rx/Tx queues */
 	err = mv_pp2x_setup_rxqs(port);
 	if (err) {
@@ -2908,7 +2901,9 @@ int mv_pp2x_open(struct net_device *dev)
 #if !defined(CONFIG_MV_PP2_FPGA) && !defined(CONFIG_MV_PP2_PALLADIUM)
 	/* Port is init in uboot */
 #if !defined(OLD_UBOOT)
-	if (port->mac_data.phy_mode == PHY_INTERFACE_MODE_RGMII)
+	if (port->mac_data.phy_mode == PHY_INTERFACE_MODE_RGMII ||
+	    port->mac_data.phy_mode == PHY_INTERFACE_MODE_KR ||
+	    port->mac_data.phy_mode == PHY_INTERFACE_MODE_SGMII)
 		port->mac_data.flags |= MV_EMAC_F_INIT;
 #endif
 
@@ -2922,9 +2917,15 @@ int mv_pp2x_open(struct net_device *dev)
 	netif_tx_start_all_queues(port->dev);
 
 #endif
+	/* Before rxq and port init, all ingress packets should be blocked in classifier */
+	err = mv_pp2x_open_cls(dev);
+	if (err)
+		goto err_free_all;
+
 	MVPP2_PRINT_2LINE();
 	return 0;
 
+err_free_all:
 #if !defined(CONFIG_MV_PP2_FPGA) && !defined(CONFIG_MV_PP2_PALLADIUM)
 err_free_irq:
 	mv_pp2x_cleanup_irqs(port);
@@ -3295,19 +3296,21 @@ static int mv_pp2_num_cpu_irqs(struct mv_pp2x_port *port)
 static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 {
 	int cpu;
+	int sw_thread_index = first_addr_space, irq_index = first_addr_space;
 	struct queue_vector *q_vec = &port->q_vector[0];
 	struct net_device  *net_dev = port->dev;
 
-	/* Each cpu has zero private rx_queues */
+	/* Each cpu has queue_vector for private tx_done counters and/or private rx_queues */
 	for (cpu = 0; cpu < num_active_cpus(); cpu++) {
 		q_vec[cpu].parent = port;
 		q_vec[cpu].qv_type = MVPP2_PRIVATE;
-		q_vec[cpu].sw_thread_id = QV_CPU_2_THR(cpu);
+		q_vec[cpu].sw_thread_id = sw_thread_index++;
 		q_vec[cpu].sw_thread_mask = (1<<q_vec[cpu].sw_thread_id);
 		q_vec[cpu].pending_cause_rx = 0;
 #if !defined(CONFIG_MV_PP2_POLLING)
-		if (port->priv->pp2xdata->interrupt_tx_done == true)
-			q_vec[cpu].irq = port->of_irqs[first_addr_space+cpu];
+		if (port->priv->pp2xdata->interrupt_tx_done == true ||
+		    mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
+			q_vec[cpu].irq = port->of_irqs[irq_index++];
 #endif
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
@@ -3324,17 +3327,11 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 	if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
 		q_vec[cpu].parent = port;
 		q_vec[cpu].qv_type = MVPP2_SHARED;
-		if (port->priv->pp2xdata->interrupt_tx_done == true)
-			q_vec[cpu].sw_thread_id = first_addr_space+cpu;
-		else
-			q_vec[cpu].sw_thread_id = first_addr_space;
+		q_vec[cpu].sw_thread_id = irq_index;
 		q_vec[cpu].sw_thread_mask = (1<<q_vec[cpu].sw_thread_id);
 		q_vec[cpu].pending_cause_rx = 0;
 #if !defined(CONFIG_MV_PP2_POLLING)
-		if (port->priv->pp2xdata->interrupt_tx_done == true)
-			q_vec[cpu].irq = port->of_irqs[first_addr_space+cpu];
-		else
-			q_vec[cpu].irq = port->of_irqs[first_addr_space];
+		q_vec[cpu].irq = port->of_irqs[irq_index];
 #endif
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
@@ -4168,9 +4165,7 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 		i++;
 	}
 
-	/* Rx Fifo Init */
-	mv_pp2x_rx_fifo_init(hw);
-
+	/* Rx Fifo Init is done only in uboot */
 
 	/* Set cache snoop when transmiting packets */
 	if (is_device_dma_coherent(&pdev->dev))
@@ -4727,6 +4722,9 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	}
 	priv->cpu_map = cpu_map;
 
+	/*Init PP2 Configuration */
+	mv_pp2x_init_config(&priv->pp2_cfg, cell_index);
+
 	/* Initialize network controller */
 	err = mv_pp2x_init(pdev, priv);
 	if (err < 0) {
@@ -4753,9 +4751,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		err = -ENOMEM;
 		goto err_clk;
 	}
-
-	/*Init PP2 Configuration */
-	mv_pp2x_init_config(&priv->pp2_cfg, cell_index);
 
 	/* Init PP22 rxfhindir table evenly in probe */
 	mv_pp2x_init_rxfhindir(priv);

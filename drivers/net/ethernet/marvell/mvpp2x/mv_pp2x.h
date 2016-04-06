@@ -207,7 +207,7 @@ extern  u32 debug_param;
 #define QV_THR_2_CPU(sw_thread_id)	(sw_thread_id - first_addr_space)
 #define QV_CPU_2_THR(cpu_id)		(first_addr_space + cpu_id)
 
-#define PPV2_MAX_NUM_IRQ		3
+#define PPV2_MAX_NUM_IRQ		4
 
 enum mvppv2_version {
 	PPV21 = 21,
