@@ -123,6 +123,10 @@
 				status = "okay";
 			};
 
+			usb@5e000 {
+				status = "okay";
+			};
+
 			sdhci1: sdhci@d0000 {
 				broken-cd;
 				wp-inverted;
