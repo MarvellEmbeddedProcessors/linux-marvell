@@ -19,6 +19,7 @@ its hardware characteristcs.
 		- "arm,coresight-etm3x", "arm,primecell";
 		- "arm,coresight-etm4x", "arm,primecell";
 		- "qcom,coresight-replicator1x", "arm,primecell";
+		- "marvell,coresight-axim", "arm,primecell";
 
 	* reg: physical base address and length of the register
 	  set(s) of the component.
