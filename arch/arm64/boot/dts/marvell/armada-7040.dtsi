@@ -63,5 +63,8 @@
 		pcie@0x640000 {
 			msi-parent = <&gic_v2m0>;
 		};
+		ppv22@000000 {
+			dma-coherent;
+		};
 	};
 };
