@@ -32,6 +32,7 @@
 
 #define PIC_MAX_IRQS		32
 #define PIC_MAX_IRQ_MASK	((1UL << PIC_MAX_IRQS) - 1)
+#define PIC_INT_EN_POL		(0)
 
 struct pic_data {
 	struct resource res;	/* PIC register resource */
@@ -39,6 +40,9 @@ struct pic_data {
 	u32 parent_irq;		/* Parent PPI in GIC domain */
 	u32 nr_irqs;		/* The number interrupts in this PIC */
 	u32 irq_mask;		/* The specific interrupts on this PIC */
+	u32 int_en_pol;		/* Interrupt mask bit polarity - 0 means that writing
+				 * 0 to the int-mask reg enables the interrupt.
+				 */
 	struct irq_domain *domain;
 };
 
@@ -62,7 +66,11 @@ static void mvebu_pic_mask_irq(struct irq_data *d)
 	u32 reg;
 
 	reg =  readl(pic->base + PIC_MASK);
-	reg &= ~(1 << d->hwirq);
+	if (pic->int_en_pol)
+		reg &= ~(1 << d->hwirq);
+	else
+		/* 1 enables the interrupt */
+		reg |= (1 << d->hwirq);
 	writel(reg, pic->base + PIC_MASK);
 }
 
@@ -72,7 +80,11 @@ static void mvebu_pic_unmask_irq(struct irq_data *d)
 	u32 reg;
 
 	reg =  readl(pic->base + PIC_MASK);
-	reg |= (1 << d->hwirq);
+	if (pic->int_en_pol)
+		/* 1 enables the interrupt */
+		reg |= (1 << d->hwirq);
+	else
+		reg &= ~(1 << d->hwirq);
 	writel(reg, pic->base + PIC_MASK);
 }
 
@@ -174,6 +186,11 @@ static int __init mvebu_pic_of_init(struct device_node *node, struct device_node
 		pic->irq_mask = PIC_MAX_IRQ_MASK;
 	}
 	pic->nr_irqs = get_count_order(pic->irq_mask);
+
+	if (of_property_read_u32(node, "int-en-pol", &pic->int_en_pol)) {
+		pr_warn("Missing interrupt enable polarity. Assuming %d\n", PIC_INT_EN_POL);
+		pic->int_en_pol = PIC_INT_EN_POL;
+	}
 
 	pic->domain = irq_domain_add_linear(node, pic->nr_irqs, &mvebu_pic_domain_ops, pic);
 	if (!pic->domain) {
