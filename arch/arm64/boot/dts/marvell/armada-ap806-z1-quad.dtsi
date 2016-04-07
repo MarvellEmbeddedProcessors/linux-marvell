@@ -82,6 +82,12 @@
 
 	ap806 {
 		config-space {
+			pic: interrupt-controller@3f0100 {
+				/* Override A0 pic settings to match Z1 spec. */
+				int-en-pol = <1>;
+				interrupts = <GIC_PPI 12 IRQ_TYPE_LEVEL_HIGH>;
+			};
+
 			/* For SPI, I2C, and Serial units override the clock */
 			spi0: spi@510600 {
 				clocks = <&ringclk 2>;
