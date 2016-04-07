@@ -14,6 +14,8 @@ Required properties:
 - reg: Should contain PIC registers location and length.
 - interrupts: Identifies the IRQ nunmber of the parent IRQ controller to which the PIC is connected to.
 - irq-mask: Indicates the valid interrupts supported by this instance of PIC.
+- int-en-pol: Interrupt mask polarity - 0 means that writing 0 to the pic int-mask reg enables the interrupt.
+		Please refer to the functional spec to figure the right polarity for a specific SoC.
 
 Example:
 
@@ -21,6 +23,7 @@ Example:
 		compatible = "marvell,pic";
 		reg = <0x3f0100 0x10>;
 		irq-mask = <0x7001f>;  /* interrupts 0,1,2,3,4,16,17,18 */
+		int-en-pol = <0>; /* 0 unmasks / enables the interrupt. */
 		#interrupt-cells = <1>;
 		#size-cells = <1>;
 		interrupt-controller;
