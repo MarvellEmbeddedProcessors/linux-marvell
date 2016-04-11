@@ -309,8 +309,9 @@ static void mv_gop110_gmac_sgmii2_5_cfg(struct gop_hw *gop, int mac_num)
 	val |= MV_GMAC_PORT_CTRL0_PORTTYPE_MASK;
 	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL0_REG, val);
 
-	/* configure AN 0x9268 */
-	an = MV_GMAC_PORT_AUTO_NEG_CFG_AN_BYPASS_EN_MASK |
+	/* configure AN 0x926C */
+	an = MV_GMAC_PORT_AUTO_NEG_CFG_EN_PCS_AN_MASK |
+		MV_GMAC_PORT_AUTO_NEG_CFG_AN_BYPASS_EN_MASK |
 		MV_GMAC_PORT_AUTO_NEG_CFG_SET_MII_SPEED_MASK  |
 		MV_GMAC_PORT_AUTO_NEG_CFG_SET_GMII_SPEED_MASK     |
 		MV_GMAC_PORT_AUTO_NEG_CFG_ADV_PAUSE_MASK    |
@@ -595,6 +596,7 @@ int mv_gop110_gmac_speed_duplex_set(struct gop_hw *gop, int mac_num,
 		reg_val |= MV_GMAC_PORT_AUTO_NEG_CFG_EN_AN_SPEED_MASK;
 		/* the other bits don't matter in this case */
 		break;
+	case MV_PORT_SPEED_2500:
 	case MV_PORT_SPEED_1000:
 		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_AN_SPEED_MASK;
 		reg_val |= MV_GMAC_PORT_AUTO_NEG_CFG_SET_GMII_SPEED_MASK;
@@ -1295,7 +1297,7 @@ int mv_gop110_status_show(struct gop_hw *gop, struct mv_mac_data *mac)
 	if ((mac->phy_mode == PHY_INTERFACE_MODE_SGMII) &&
 	    (mac->speed == 2500) &&
 	    (port_status.speed == MV_PORT_SPEED_1000))
-		port_status.speed = MV_PORT_SPEED_2000;
+		port_status.speed = MV_PORT_SPEED_2500;
 
 	switch (port_status.speed) {
 	case MV_PORT_SPEED_AN:
@@ -1310,7 +1312,7 @@ int mv_gop110_status_show(struct gop_hw *gop, struct mv_mac_data *mac)
 	case MV_PORT_SPEED_1000:
 		pr_info("Port speed              : 1G");
 	break;
-	case MV_PORT_SPEED_2000:
+	case MV_PORT_SPEED_2500:
 		pr_info("Port speed              : 2.5G");
 	break;
 	case MV_PORT_SPEED_10000:
@@ -1430,7 +1432,7 @@ int mv_gop110_fl_cfg(struct gop_hw *gop, struct mv_mac_data *mac)
 		/* disable AN */
 		if (mac->speed == 2500)
 			mv_gop110_speed_duplex_set(gop, mac,
-						   MV_PORT_SPEED_2000,
+						   MV_PORT_SPEED_2500,
 						   MV_PORT_DUPLEX_FULL);
 		else
 			mv_gop110_speed_duplex_set(gop, mac,
@@ -1801,7 +1803,7 @@ int mv_gop110_xlg_mac_mode_cfg(struct gop_hw *gop, int mac_num,
 	U32_SET_FIELD(val, MV_XLG_MAC_CTRL4_FORWARD_PFC_EN_MASK, 1 <<
 					MV_XLG_MAC_CTRL4_FORWARD_PFC_EN_OFFS);
 	U32_SET_FIELD(val, MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN_MASK, 1 <<
-					MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN_OFFS);
+				MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN_OFFS);
 	mv_gop110_xlg_mac_write(gop, mac_num, reg_addr, val);
 
 	/* Jumbo frame support - 0x1400*2= 0x2800 bytes */
@@ -2296,11 +2298,13 @@ int mv_gop110_mpcs_mode(struct gop_hw *gop)
 	/* configure PCS CLOCK RESET */
 	reg_addr = PCS_CLOCK_RESET;
 	val = mv_gop110_mpcs_global_read(gop, reg_addr);
-	U32_SET_FIELD(val, CLK_DIVISION_RATIO_MASK, 1 << CLK_DIVISION_RATIO_OFFSET);
+	U32_SET_FIELD(val, CLK_DIVISION_RATIO_MASK,
+			1 << CLK_DIVISION_RATIO_OFFSET);
 
 	mv_gop110_mpcs_global_write(gop, reg_addr, val);
 
-	U32_SET_FIELD(val, CLK_DIV_PHASE_SET_MASK, 0 << CLK_DIV_PHASE_SET_OFFSET);
+	U32_SET_FIELD(val, CLK_DIV_PHASE_SET_MASK,
+			0 << CLK_DIV_PHASE_SET_OFFSET);
 	U32_SET_FIELD(val, MAC_CLK_RESET_MASK, 1 << MAC_CLK_RESET_OFFSET);
 	U32_SET_FIELD(val, RX_SD_CLK_RESET_MASK, 1 << RX_SD_CLK_RESET_OFFSET);
 	U32_SET_FIELD(val, TX_SD_CLK_RESET_MASK, 1 << TX_SD_CLK_RESET_OFFSET);
