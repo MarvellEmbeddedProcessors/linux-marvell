@@ -4694,11 +4694,9 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		pr_crit("mvpp2: cannot set dma_mask\n");
 		goto err_clk;
 	}
-	/*Set dma_coherency to 0 */
+	/*Disable dma_coherency in FPGA*/
 #ifdef CONFIG_MV_PP2_FPGA
 	pdev->dev.archdata.dma_coherent = 0;
-#else
-	pdev->dev.archdata.dma_coherent = 0; /* SW_COHERENT */
 #endif
 
 #ifdef CONFIG_64BIT
