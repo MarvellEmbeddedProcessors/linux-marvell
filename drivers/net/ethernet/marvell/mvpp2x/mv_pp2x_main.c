@@ -2541,10 +2541,6 @@ static int mvcpn110_mac_hw_init(struct mv_pp2x_port *port)
 	/* configure port PHY address */
 	mv_gop110_smi_phy_addr_cfg(gop, gop_port, mac->phy_addr);
 
-	/* enable MAC PTP unit */
-	/*mv_pp3_ptp_enable(emac, true);*/
-	/*mv_pp3_ptp_tai_tod_uio_init(shared_pdev);*/
-
 	mv_gop110_port_init(gop, mac);
 
 	if (mac->force_link)
