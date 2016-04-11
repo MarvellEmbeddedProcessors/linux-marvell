@@ -880,7 +880,7 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
-		mv_gop110_gmac_reset(gop, mac_num, RESET);
+		/* As workaround do not reset mac before MAC configuration */
 		/* configure PCS */
 		mv_gop110_gpcs_mode_cfg(gop, mac_num, false);
 
