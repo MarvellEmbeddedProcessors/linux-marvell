@@ -185,7 +185,7 @@ static const struct of_device_id armada38x_rtc_of_match_table[] = {
 		.data		= &armada38x_data,
 	},
 	{
-		.compatible	= "marvell,armada-70x0-rtc",
+		.compatible	= "marvell,armada8k-rtc",
 		.data		= &armada70x0_data,
 	},
 	{
@@ -363,7 +363,7 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
 
 	rtc->data = (struct armada38x_rtc_data *)match->data;
 	rtc->irq = platform_get_irq(pdev, 0);
-	if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada-70x0-rtc")) {
+	if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada8k-rtc")) {
 		rtc->irq = -1;
 		armada38x_rtc_ops.set_alarm = NULL;
 		armada38x_rtc_ops.alarm_irq_enable = NULL;
