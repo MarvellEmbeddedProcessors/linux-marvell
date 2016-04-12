@@ -7,11 +7,15 @@ Required properties:
 - interrupts: interrupt number
 - clocks: One ore more clock gating clocks to be used to enable EIP197 unit in the SoC.
 
+Optional properties:
+- dma-coherent: Present if dma operations are coherent
+
 Examples:
 
 eip197: eip197@800000 {
 	compatible = "marvell,eip197";
 	reg = <0x800000 0x200000>;
+	dma-coherent;
 	interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&gateclk 26>;
 	status = "disabled";
