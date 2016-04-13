@@ -45,7 +45,7 @@ static void axim_enable_channel(struct axim_drvdata *axim, int chan_nr)
 	int order, offset;
 	u32 reload;
 
-	/* Find the MSB different betweem both addresses */
+	/* Find the MSB different between both addresses */
 	order = ilog2(chan->addr_end ^ chan->addr_start);
 	if (order < 0)
 		addr_mask = 0;
@@ -54,15 +54,19 @@ static void axim_enable_channel(struct axim_drvdata *axim, int chan_nr)
 
 	offset = max(0, order - 31);
 
-	/* First define the power of 2 aligned window */
+	/* First define the power of 2 aligned window
+	 * This is a coarse window for address comparison
+	 */
 	writel(chan->addr_start & U32_MAX, axim->base + AXI_MON_CH_REF_ADDR_L(chan_nr));
 	writel(chan->addr_start >> 32, axim->base + AXI_MON_CH_REF_ADDR_H(chan_nr));
 	writel(addr_mask & U32_MAX, axim->base + AXI_MON_CH_USE_ADDR_L(chan_nr));
 	writel(addr_mask >> 32, axim->base + AXI_MON_CH_USE_ADDR_H(chan_nr));
 
-	/* now set specific addresses in the 32 comperator
-	 * the comperator can also be used for user field but we use it
-	 * statically for address field to enable fine grain address match
+	/* now set precise addresses in the 32 bit comperator
+	 * the comperator can also be used for user field but we
+	 * always use it for address field to enable fine grain
+	 * address match. The comperator can select which 32 bits
+	 * of address to capture so we update the offset accordingly
 	 */
 	if (addr_mask) {
 		writel(chan->addr_start & U32_MAX, axim->base + AXI_MON_CH_COMP_MIN(chan_nr));
