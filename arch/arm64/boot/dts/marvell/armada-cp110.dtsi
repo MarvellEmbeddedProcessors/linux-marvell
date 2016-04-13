@@ -30,6 +30,46 @@ gateclk: clock-gating-control@440220 {
 	#clock-cells = <1>;
 };
 
+serial@702000 {
+	compatible = "snps,dw-apb-uart";
+	reg = <0x702000 0x100>;
+	reg-shift = <2>;
+	interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+	reg-io-width = <1>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
+serial@702100 {
+	compatible = "snps,dw-apb-uart";
+	reg = <0x702100 0x100>;
+	reg-shift = <2>;
+	interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+	reg-io-width = <1>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
+serial@702200 {
+	compatible = "snps,dw-apb-uart";
+	reg = <0x702200 0x100>;
+	reg-shift = <2>;
+	interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+	reg-io-width = <1>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
+serial@702300 {
+	compatible = "snps,dw-apb-uart";
+	reg = <0x702300 0x100>;
+	reg-shift = <2>;
+	interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+	reg-io-width = <1>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
 sata: sata@540000 {
 	compatible = "marvell,armada-3700-ahci";
 	reg = <0x540000 0x30000>;

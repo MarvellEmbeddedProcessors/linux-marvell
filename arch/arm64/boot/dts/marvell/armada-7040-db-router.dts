@@ -57,6 +57,18 @@
 
 	cpn-110-master {
 		config-space {
+			serial@702000 {
+				status = "disabled";
+			};
+			serial@702100 {
+				status = "disabled";
+			};
+			serial@702200 {
+				status = "disabled";
+			};
+			serial@702300 {
+				status = "disabled";
+			};
 			sata: sata@540000 {
 				status = "okay";
 			};
@@ -69,6 +81,7 @@
 			spi@700680 {
 				status = "okay";
 			};
+
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
