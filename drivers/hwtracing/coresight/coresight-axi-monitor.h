@@ -97,6 +97,7 @@
 #define AXI_MON_REV_2			(0x01)
 
 #define AXI_MON_MAX_CHANNELS		(12)
+#define AXI_MON_MAX_BUS_WIDTH		(48)
 
 
 /* Address comparator access types */
@@ -174,6 +175,7 @@ struct axim_drvdata {
 	u8				nr_prof_reg;
 	u8				major;
 	u8				minor;
+	u32				bus_width;
 	struct axim_chan_data		channel[AXI_MON_MAX_CHANNELS];
 };
 

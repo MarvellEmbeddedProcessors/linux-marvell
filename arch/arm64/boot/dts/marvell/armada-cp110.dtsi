@@ -152,6 +152,7 @@ axim-cp-rd@3c5000 {
 	reg = <0x3c5000 0x1000>;
 	clocks = <&syscon 3>;
 	clock-names = "apb_pclk";
+	bus-width = <40>;
 };
 
 axim-cp-wr@3c6000 {
@@ -159,6 +160,7 @@ axim-cp-wr@3c6000 {
 	reg = <0x3c6000 0x1000>;
 	clocks = <&syscon 3>;
 	clock-names = "apb_pclk";
+	bus-width = <40>;
 };
 
 axim-ppv2-rd@3c0000 {
@@ -166,6 +168,7 @@ axim-ppv2-rd@3c0000 {
 	reg = <0x3c0000 0x1000>;
 	clocks = <&syscon 3>;
 	clock-names = "apb_pclk";
+	bus-width = <40>;
 };
 
 axim-ppv2-wr@3c1000 {
@@ -173,6 +176,7 @@ axim-ppv2-wr@3c1000 {
 	reg = <0x3c1000 0x1000>;
 	clocks = <&syscon 3>;
 	clock-names = "apb_pclk";
+	bus-width = <40>;
 };
 
 axim-hb1-rd@3c8000 {
@@ -180,6 +184,7 @@ axim-hb1-rd@3c8000 {
 	reg = <0x3c8000 0x1000>;
 	clocks = <&syscon 3>;
 	clock-names = "apb_pclk";
+	bus-width = <40>;
 };
 
 axim-hb1-wr@3c9000 {
@@ -187,6 +192,7 @@ axim-hb1-wr@3c9000 {
 	reg = <0x3c9000 0x1000>;
 	clocks = <&syscon 3>;
 	clock-names = "apb_pclk";
+	bus-width = <40>;
 };
 
 aliases {
