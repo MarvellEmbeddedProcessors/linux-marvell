@@ -157,6 +157,7 @@
 				reg = <0x840000 0x1000>;
 				clocks = <&syscon 3>;
 				clock-names = "apb_pclk";
+				bus-width = <40>;
 			};
 
 			axim-ddr-wr@841000 {
@@ -164,6 +165,7 @@
 				reg = <0x841000 0x1000>;
 				clocks = <&syscon 3>;
 				clock-names = "apb_pclk";
+				bus-width = <40>;
 			};
 
 			axim-ihb-rd@848000 {
@@ -171,6 +173,7 @@
 				reg = <0x848000 0x1000>;
 				clocks = <&syscon 3>;
 				clock-names = "apb_pclk";
+				bus-width = <40>;
 			};
 
 			axim-ihb-rd@849000 {
@@ -178,6 +181,7 @@
 				reg = <0x849000 0x1000>;
 				clocks = <&syscon 3>;
 				clock-names = "apb_pclk";
+				bus-width = <40>;
 			};
 
 			odmi: odmi@300000 {

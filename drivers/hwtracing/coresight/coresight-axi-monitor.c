@@ -17,6 +17,7 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/io.h>
+#include <linux/of.h>
 #include <linux/err.h>
 #include <linux/coresight.h>
 #include <linux/amba/bus.h>
@@ -41,7 +42,7 @@ static void axim_enable_channel(struct axim_drvdata *axim, int chan_nr)
 {
 	struct axim_chan_data *chan = &axim->channel[chan_nr];
 	u32 reg;
-	u64 addr_mask;
+	u64 addr_mask, bus_mask;
 	int order, offset;
 	u32 reload;
 
@@ -52,7 +53,14 @@ static void axim_enable_channel(struct axim_drvdata *axim, int chan_nr)
 	else
 		addr_mask = ~((1 << (order + 1)) - 1);
 
-	offset = max(0, order - 31);
+	/* Limit the address mask and comperator offset to bus width */
+	if (axim->bus_width < 32)
+		bus_mask = (1 << axim->bus_width) - 1;
+	else
+		bus_mask = (0x100000000ULL << (axim->bus_width - 32)) - 1;
+	addr_mask &= bus_mask;
+
+	offset = clamp(order - 31, 0, (int)axim->bus_width - 32);
 
 	/* First define the power of 2 aligned window
 	 * This is a coarse window for address comparison
@@ -245,6 +253,16 @@ static ssize_t version_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(version);
 
+static ssize_t bus_width_show(struct device *dev,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	struct axim_drvdata *axim = dev_get_drvdata(dev->parent);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", axim->bus_width);
+}
+static DEVICE_ATTR_RO(bus_width);
+
 static ssize_t curr_chan_show(struct device *dev,
 		       struct device_attribute *attr,
 		       char *buf)
@@ -367,6 +385,7 @@ static struct attribute *coresight_axim_attrs[] = {
 	&dev_attr_nr_chan.attr,
 	&dev_attr_nr_prof_reg.attr,
 	&dev_attr_version.attr,
+	&dev_attr_bus_width.attr,
 	&dev_attr_curr_chan.attr,
 	&dev_attr_reset.attr,
 	&dev_attr_counters.attr,
@@ -542,6 +561,7 @@ static int axim_probe(struct amba_device *adev, const struct amba_id *id)
 	struct resource *res = &adev->res;
 	struct coresight_desc *desc;
 	struct device_node *np = adev->dev.of_node;
+	int ret;
 
 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
 	if (!desc)
@@ -567,6 +587,13 @@ static int axim_probe(struct amba_device *adev, const struct amba_id *id)
 		return PTR_ERR(base);
 
 	axim->base = base;
+
+	ret = of_property_read_u32(np, "bus-width", &axim->bus_width);
+	if ((ret) || (axim->bus_width > AXI_MON_MAX_BUS_WIDTH)) {
+		dev_warn(dev, "Bad or missing bus-width property. assuming %d bit width\n",
+				AXI_MON_MAX_BUS_WIDTH);
+		axim->bus_width = AXI_MON_MAX_BUS_WIDTH;
+	}
 
 	if (axim_check_version(axim))
 		return -EINVAL;
