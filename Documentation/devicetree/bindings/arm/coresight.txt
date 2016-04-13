@@ -59,6 +59,9 @@ its hardware characteristcs.
 	* arm,buffer-size: size of contiguous buffer space for TMC ETR
 	 (embedded trace router)
 
+* Optional property for AXIM:
+
+	* bus-width: size of bus monitored by AXI monitor
 
 Example:
 
