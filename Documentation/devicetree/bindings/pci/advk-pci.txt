@@ -11,6 +11,7 @@ Mandatory properties:
 - #size-cells, set to <2>
 - #interrupt-cells, set to <3>
 - bus-range: PCI bus numbers covered
+- msi-parent: parent MSI interrupt controller
 - ranges: ranges describing the IO registers to control the PCIe
   interfaces, and ranges describing the Memory windows needed to access
   the memory and I/O regions of each PCIe interface.
@@ -46,6 +47,7 @@ Example:
 		#size-cells = <2>;
 		dma-coherent;
 
+		msi-parent = <&advk_ic>;
 
 		bus-range = <0x00 0xff>;
 
