@@ -21,14 +21,21 @@
 #include <linux/irqdomain.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/msi.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
+#include <linux/of_pci.h>
 
 /* Registers relative to 'core_base' */
 #define ADVK_PCIE_CORE_ISR0_STATUS_REG			0x0
 #define ADVK_PCIE_CORE_ISR0_MASK_REG			0x4
 #define ADVK_PCIE_CORE_ISR1_STATUS_REG			0x8
 #define ADVK_PCIE_CORE_ISR1_MASK_REG			0xc
+#define ADVK_PCIE_CORE_MSI_ADDR_LOW_REG			0x10
+#define ADVK_PCIE_CORE_MSI_ADDR_HIGH_REG		0x14
+#define ADVK_PCIE_CORE_MSI_STATUS_REG			0x18
+#define ADVK_PCIE_CORE_MSI_MASK_REG			0x1c
+#define ADVK_PCIE_CORE_MSI_PAYLOAD_REG			0x5c
 
 /* PCIE_CORE_ISR0 fields and helper macros */
 #define     ADVK_PCIE_INTR_FLR_INT			(1 << 26)
@@ -152,11 +159,164 @@
 #define ADVK_PCIE_IRQ_MASK_ENABLE_INTS		(ADVK_PCIE_IRQ_CORE_INT)
 
 #define ADVK_LEGACY_IRQ_NUM			4
+#define ADVK_MSI_IRQ_NUM			32
 
 static void __iomem *core_base;
 static void __iomem *main_irq_base;
 static struct irq_domain *armada_3700_advk_domain;
 static int parent_irq;
+#ifdef CONFIG_PCI_MSI
+static struct irq_domain *armada_3700_advk_msi_domain;
+static DECLARE_BITMAP(msi_irq_in_use, ADVK_MSI_IRQ_NUM);
+static DEFINE_MUTEX(msi_used_lock);
+static phys_addr_t msi_msg_base;
+
+static int armada_3700_advk_alloc_msi(void)
+{
+	int hwirq;
+
+	mutex_lock(&msi_used_lock);
+	hwirq = find_first_zero_bit(msi_irq_in_use, ADVK_MSI_IRQ_NUM);
+	if (hwirq >= ADVK_MSI_IRQ_NUM)
+		hwirq = -ENOSPC;
+	else
+		set_bit(hwirq, msi_irq_in_use);
+	mutex_unlock(&msi_used_lock);
+
+	return hwirq;
+}
+
+static void armada_3700_advk_free_msi(int hwirq)
+{
+	mutex_lock(&msi_used_lock);
+	if (!test_bit(hwirq, msi_irq_in_use))
+		pr_err("trying to free unused MSI#%d\n", hwirq);
+	else
+		clear_bit(hwirq, msi_irq_in_use);
+	mutex_unlock(&msi_used_lock);
+}
+
+static int armada_3700_advk_setup_msi_irq(struct msi_controller *chip,
+					  struct pci_dev *pdev,
+					  struct msi_desc *desc)
+{
+	struct msi_msg msg;
+	int virq, hwirq;
+
+	/* We support MSI, but not MSI-X */
+	if (desc->msi_attrib.is_msix)
+		return -EINVAL;
+
+	hwirq = armada_3700_advk_alloc_msi();
+	if (hwirq < 0)
+		return hwirq;
+
+	virq = irq_create_mapping(armada_3700_advk_msi_domain, hwirq);
+	if (!virq) {
+		armada_3700_advk_free_msi(hwirq);
+		return -EINVAL;
+	}
+
+	irq_set_msi_desc(virq, desc);
+
+	msg.address_lo = lower_32_bits(msi_msg_base);
+	msg.address_hi = upper_32_bits(msi_msg_base);
+	msg.data = virq;
+
+	pci_write_msi_msg(virq, &msg);
+
+	return 0;
+}
+
+static void armada_3700_advk_teardown_msi_irq(struct msi_controller *chip,
+					   unsigned int irq)
+{
+	struct irq_data *d = irq_get_irq_data(irq);
+	unsigned long hwirq = d->hwirq;
+
+	irq_dispose_mapping(irq);
+	armada_3700_advk_free_msi(hwirq);
+}
+
+static struct irq_chip armada_3700_advk_msi_irq_chip = {
+	.name = "advk_msi",
+	.irq_enable = pci_msi_unmask_irq,
+	.irq_disable = pci_msi_mask_irq,
+	.irq_mask = pci_msi_mask_irq,
+	.irq_unmask = pci_msi_unmask_irq,
+};
+
+static int armada_3700_advk_msi_map(struct irq_domain *domain,
+				    unsigned int virq, irq_hw_number_t hw)
+{
+	irq_set_chip_and_handler(virq, &armada_3700_advk_msi_irq_chip,
+				 handle_simple_irq);
+
+	return 0;
+}
+
+static const struct irq_domain_ops armada_3700_advk_msi_irq_ops = {
+	.map = armada_3700_advk_msi_map,
+};
+
+static int armada_3700_advk_msi_init(struct device_node *node)
+{
+	struct msi_controller *msi_chip;
+	void *msi_msg_base_virt;
+	int ret;
+
+	msi_chip = kzalloc(sizeof(*msi_chip), GFP_KERNEL);
+	if (!msi_chip)
+		return -ENOMEM;
+
+	msi_chip->setup_irq = armada_3700_advk_setup_msi_irq;
+	msi_chip->teardown_irq = armada_3700_advk_teardown_msi_irq;
+	msi_chip->of_node = node;
+
+	msi_msg_base_virt = kzalloc(sizeof(u16), GFP_KERNEL);
+	if (!msi_msg_base_virt) {
+		ret = -ENOMEM;
+		goto err_base;
+	}
+
+	msi_msg_base = virt_to_phys(msi_msg_base_virt);
+
+	writel(lower_32_bits(msi_msg_base),
+	       core_base + ADVK_PCIE_CORE_MSI_ADDR_LOW_REG);
+	writel(upper_32_bits(msi_msg_base),
+	       core_base + ADVK_PCIE_CORE_MSI_ADDR_HIGH_REG);
+
+	armada_3700_advk_msi_domain =
+		irq_domain_add_linear(NULL, ADVK_MSI_IRQ_NUM,
+				      &armada_3700_advk_msi_irq_ops,
+				      NULL);
+	if (!armada_3700_advk_msi_domain) {
+		ret = -ENOMEM;
+		goto err_domain;
+	}
+
+	ret = of_pci_msi_chip_add(msi_chip);
+	if (ret < 0)
+		goto err_chip_add;
+
+	return 0;
+
+err_chip_add:
+	irq_domain_remove(armada_3700_advk_msi_domain);
+err_domain:
+	kfree(msi_msg_base_virt);
+err_base:
+	kfree(msi_chip);
+
+	return ret;
+}
+#else
+static inline int armada_3700_advk_msi_init(struct device_node *node,
+					 phys_addr_t main_int_phys_base)
+{
+	return 0;
+}
+#endif
 
 static void armada_3700_advk_irq_mask(struct irq_data *d)
 {
@@ -203,6 +363,31 @@ static const struct irq_domain_ops armada_3700_advk_irq_ops = {
 	.xlate = irq_domain_xlate_onecell,
 };
 
+static void armada_3700_advk_msi_handler(void)
+{
+	u32 msi_val, msi_mask, msi_status, msi_idx;
+	u16 msi_data;
+
+	msi_mask = readl(core_base + ADVK_PCIE_CORE_MSI_MASK_REG);
+	msi_val = readl(core_base + ADVK_PCIE_CORE_MSI_STATUS_REG);
+	msi_status = msi_val & ~msi_mask;
+
+	for (msi_idx = 0; msi_idx < ADVK_MSI_IRQ_NUM; msi_idx++) {
+		if (!(BIT(msi_idx) & msi_status))
+			continue;
+
+		writel(BIT(msi_idx),
+		       core_base + ADVK_PCIE_CORE_MSI_STATUS_REG);
+
+		msi_data = readl(core_base +
+				 ADVK_PCIE_CORE_MSI_PAYLOAD_REG) & 0xFF;
+		generic_handle_irq(msi_data);
+	}
+
+	writel(ADVK_PCIE_INTR_MSI_INT_PENDING,
+	       core_base + ADVK_PCIE_CORE_ISR0_STATUS_REG);
+}
+
 static void armada_3700_advk_isr0_handler(void)
 {
 	u32 val, mask, status;
@@ -216,6 +401,10 @@ static void armada_3700_advk_isr0_handler(void)
 		writel(val, core_base + ADVK_PCIE_CORE_ISR0_STATUS_REG);
 		return;
 	}
+
+	/* Process MSI interrupts */
+	if (status & ADVK_PCIE_INTR_MSI_INT_PENDING)
+		armada_3700_advk_msi_handler();
 
 	/* Process legacy interrupts */
 	do {
@@ -270,10 +459,18 @@ static void armada_3700_advk_init_hw(void)
 
 	/* Disable All ISR0/1 Sources */
 	mask = ADVK_PCIE_INTR_ISR0_ALL;
+#ifdef CONFIG_PCI_MSI
+	mask &= ~ADVK_PCIE_INTR_MSI_INT_PENDING;
+#endif
 	writel(mask, core_base + ADVK_PCIE_CORE_ISR0_MASK_REG);
 
 	mask = ADVK_PCIE_INTR_ISR1_ALL;
 	writel(mask, core_base + ADVK_PCIE_CORE_ISR1_MASK_REG);
+
+#ifdef CONFIG_PCI_MSI
+	/* Unmask all MSI's */
+	writel(0, core_base + ADVK_PCIE_CORE_MSI_MASK_REG);
+#endif
 
 	/* Enable summary interrupt for GIC SPI source */
 	mask = ADVK_PCIE_IRQ_MASK_ALL & (~ADVK_PCIE_IRQ_MASK_ENABLE_INTS);
@@ -302,6 +499,8 @@ static int __init armada_3700_advk_of_init(struct device_node *node,
 		ret = -ENOMEM;
 		goto err_domain;
 	}
+
+	armada_3700_advk_msi_init(node);
 
 	armada_3700_advk_init_hw();
 
