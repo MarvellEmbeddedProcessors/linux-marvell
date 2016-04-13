@@ -424,6 +424,9 @@ static void advk_pcie_setup_hw(struct advk_pcie_port *port)
 	/* Disable strict ordering */
 	state = advk_readl(port, PCIE_CORE_CTRL_REG_ADDR(PCIE_CORE_CTRL2_REG));
 	state &= ~STRICT_ORDER_ENABLE;
+#ifdef CONFIG_PCI_MSI
+	state |= MSI_ENABLE;
+#endif
 	advk_writel(port, state, PCIE_CORE_CTRL_REG_ADDR(PCIE_CORE_CTRL2_REG));
 
 	/* Start link training */
@@ -1105,6 +1108,22 @@ static void __iomem *advk_pcie_map_registers(struct platform_device *pdev,
 	return devm_ioremap_resource(&pdev->dev, &regs);
 }
 
+#ifdef CONFIG_PCI_MSI
+static struct msi_controller *advk_pcie_msi_init(struct device_node *np)
+{
+	struct device_node *msi_node;
+	struct msi_controller *msi;
+
+	msi_node = of_parse_phandle(np, "msi-parent", 0);
+	if (!msi_node)
+		return NULL;
+
+	msi = of_pci_find_msi_chip_by_node(msi_node);
+
+	return msi;
+}
+#endif
+
 static int advk_pcie_probe(struct platform_device *pdev)
 {
 	struct advk_pcie *pcie;
@@ -1230,6 +1249,10 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	bus = pci_create_root_bus(&pdev->dev, 0, &advk_pcie_ops, pcie, &res);
 	if (!bus)
 		return -ENOMEM;
+
+#ifdef CONFIG_PCI_MSI
+	bus->msi = advk_pcie_msi_init(np);
+#endif
 
 	pci_scan_child_bus(bus);
 	pci_assign_unassigned_bus_resources(bus);
