@@ -69,8 +69,7 @@
 	((smmu)->base +							\
 		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
 			? 0x400 : 0))
-
-#ifdef CONFIG_64BIT
+#ifdef CONFIG_MMIO_64BIT
 #define smmu_writeq	writeq_relaxed
 #else
 #define smmu_writeq(reg64, addr)				\
