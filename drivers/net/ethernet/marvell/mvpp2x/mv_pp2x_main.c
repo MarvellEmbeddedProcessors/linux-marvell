@@ -3417,6 +3417,8 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 	port->mac_data.link_irq = irq_of_parse_and_map(emac_node, 0);
 #endif
 
+	phy_mode = of_get_phy_mode(emac_node);
+
 	if (of_phy_is_fixed_link(emac_node)) {
 		port->mac_data.force_link = true;
 		port->mac_data.link = true;
@@ -3429,11 +3431,8 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 	} else {
 		port->mac_data.force_link = false;
 
-		phy_mode = of_get_phy_mode(emac_node);
-
 		pr_debug("gop_mac(%d), phy_mode(%d) (%s)\n", id,  phy_mode,
 			phy_modes(phy_mode));
-
 
 		switch (phy_mode) {
 		case PHY_INTERFACE_MODE_SGMII:
@@ -3465,8 +3464,8 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 			pr_err("%s: incorrect phy-mode\n", __func__);
 			return -1;
 		}
-		port->mac_data.phy_mode = phy_mode;
 	}
+	port->mac_data.phy_mode = phy_mode;
 	pr_debug("gop_mac(%d), phy_speed(%d)\n", id,  port->mac_data.speed);
 
 
