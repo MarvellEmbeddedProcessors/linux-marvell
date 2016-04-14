@@ -21,10 +21,10 @@ $ export CROSS_COMPILE=<path/to/cross/compiler/>
 $ export ARCH=arm
 $ make mvebu_v7_lsp_defconfig
 $ make - for build kernel image and device tree images.
-$ mak zImage - for build kernel image
+$ make zImage - for build kernel image
 - Linux image is under: 'arch/arm/boot/zImage'.
 - Device tree images are under: 'arch/arm/boot/dts':
-	- armada-398-db.dtb - for the A398 dvelopment board configuration
+	- armada-398-db.dtb - for the A398 development board configuration
 
 Board options:
 --------------
