@@ -41,6 +41,9 @@ config ARMADA_3700_CLK
 	bool
 	select MVEBU_CLK_COMMON
 
+config ARMADA_CP110_SYSCON
+	bool
+
 config DOVE_CLK
 	bool
 	select MVEBU_CLK_COMMON
