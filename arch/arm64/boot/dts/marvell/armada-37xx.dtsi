@@ -301,6 +301,7 @@
 				compatible = "arm,gic-v3";
 				#interrupt-cells = <3>;
 				interrupt-controller;
+				interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
 				reg = <0x1d00000 0x10000>, /* GICD */
 				      <0x1d40000 0x40000>; /* GICR */
 			};
