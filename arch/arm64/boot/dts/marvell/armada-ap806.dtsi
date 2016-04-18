@@ -297,6 +297,11 @@
 				interrupt-parent = <&pic>;
 				interrupts = <17>;
 			};
+
+			ccu-spmu {
+				compatible = "marvell,mvebu-ccu-pmu";
+				reg = <0xF000 0x1000>;
+			};
 		};
 	};
 

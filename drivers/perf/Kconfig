@@ -12,4 +12,11 @@ config ARM_PMU
 	  Say y if you want to use CPU performance monitors on ARM-based
 	  systems.
 
+config MVEBU_SPMU
+	depends on ARCH_MVEBU
+	bool "Armada-8K SPMU Support"
+	default y
+	help
+	  Enable system PMU for armada-8k SoCs.
+
 endmenu

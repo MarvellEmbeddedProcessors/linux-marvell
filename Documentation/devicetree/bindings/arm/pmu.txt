@@ -24,6 +24,7 @@ Required properties:
 	"qcom,scorpion-pmu"
 	"qcom,scorpion-mp-pmu"
 	"qcom,krait-pmu"
+	"marvell,mvebu-ccu-pmu"
 - interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
                interrupt (PPI) then 1 interrupt should be specified.
 
@@ -44,6 +45,9 @@ Optional properties:
 
 - qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
                      events.
+
+- Relevant for marvell,mvebu-ccu-pmu
+	- reg: Base address of SPMU registers base address.
 
 Example:
 
