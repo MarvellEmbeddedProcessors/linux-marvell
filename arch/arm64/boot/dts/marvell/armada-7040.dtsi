@@ -53,10 +53,25 @@
 	compatible = "marvell,armada7040", "marvell,armada-ap806-quad",
 	             "marvell,armada-ap806";
 
+	ap806 {
+		config-space {
+			smmu: iommu@5000000 {
+				mmu-masters = <&usb3h0 0x483>,
+					      <&usb3h1 0x484>;
+			};
+		};
+	};
+
 	cpn-110-master {
 		config-space {
 			ppv22@000000 {
 				dma-coherent;
+			};
+			usb3h0: usb3@500000 {
+				#stream-id-cells = <1>;
+			};
+			usb3h1: usb3@510000 {
+				#stream-id-cells = <1>;
 			};
 		};
 		pcie@0x600000 {
