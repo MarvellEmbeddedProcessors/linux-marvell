@@ -99,9 +99,6 @@ config ARM64
 config 64BIT
 	def_bool y
 
-config MMIO_64BIT
-	def_bool n
-
 config ARCH_PHYS_ADDR_T_64BIT
 	def_bool y
 
@@ -499,6 +496,12 @@ config CPU_BIG_ENDIAN
        bool "Build big-endian kernel"
        help
          Say Y if you plan on running a kernel in big-endian mode.
+
+config MMIO_64BIT
+       bool "64BIT MMIO Access"
+       default y
+       help
+         Say Y if you your platform supports 64bit MMIO access.
 
 config SCHED_MC
 	bool "Multi-core scheduler support"
