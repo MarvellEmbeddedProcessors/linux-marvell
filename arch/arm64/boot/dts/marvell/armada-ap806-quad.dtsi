@@ -82,9 +82,6 @@
 
 	ap806 {
 		config-space {
-			sdhci@d8000 {
-				status = "okay";
-			};
 			etm0@c40000 {
 				compatible = "arm,coresight-etm4x", "arm,primecell";
 				reg = <0xc40000 0x1000>;
