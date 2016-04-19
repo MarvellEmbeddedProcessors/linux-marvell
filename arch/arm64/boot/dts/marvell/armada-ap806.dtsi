@@ -239,7 +239,7 @@
 
 			};
 			/* The SDIO should not be enabled in Z1 DSTI/DST */
-			sdhci@d8000 {
+			sdhci@6e0000 {
 				compatible = "marvell,xenon-sdhci";
 				reg = <0x6E0000 0x300>;
 				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
