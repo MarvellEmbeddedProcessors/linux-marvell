@@ -54,6 +54,11 @@
 	             "marvell,armada-ap806";
 
 	cpn-110-master {
+		config-space {
+			ppv22@000000 {
+				dma-coherent;
+			};
+		};
 		pcie@0x600000 {
 			msi-parent = <&gic_v2m0>;
 		};
@@ -62,9 +67,6 @@
 		};
 		pcie@0x640000 {
 			msi-parent = <&gic_v2m0>;
-		};
-		ppv22@000000 {
-			dma-coherent;
 		};
 	};
 };
