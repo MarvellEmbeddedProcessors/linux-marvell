@@ -455,9 +455,12 @@ extern "C" {
 /* BobK  Revisions */
 #define MV_BOBK_A0_ID		0x0
 #define MV_BOBK_A0_NAME		"A0"
+#define MV_BOBK_A1_ID		0x1
+#define MV_BOBK_A1_NAME		"A1"
 
 #define MV_BOBK_ID_ARRAY { \
 	 MV_BOBK_A0_NAME,\
+	 MV_BOBK_A1_NAME,\
 }
 
  /* Lion2  Family */
