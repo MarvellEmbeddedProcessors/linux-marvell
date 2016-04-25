@@ -305,6 +305,7 @@
 			ccu-spmu {
 				compatible = "marvell,mvebu-ccu-pmu";
 				reg = <0xF000 0x1000>;
+				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
 			};
 		};
 	};
