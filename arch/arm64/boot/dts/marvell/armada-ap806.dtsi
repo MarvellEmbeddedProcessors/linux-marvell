@@ -242,6 +242,14 @@
 					<GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
+			sd_mmc_reg0: regulator@0 {
+				compatible = "regulator-gpio";
+				regulator-name = "sd-mmc-gpio-supply";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+			};
+
 			serial@512000 {
 				compatible = "snps,dw-apb-uart";
 				reg = <0x512000 0x100>;
