@@ -45,6 +45,7 @@
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/gpio/gpio.h>
 
 /dts-v1/;
 
@@ -53,6 +54,10 @@
 	compatible = "marvell,armada-ap806";
 	#address-cells = <2>;
 	#size-cells = <2>;
+
+	aliases {
+		gpio0 = &gpio0;
+	};
 
 	psci {
 		compatible = "arm,psci-0.2";
@@ -221,6 +226,20 @@
 			pinctrl@6F4000 {
 				compatible = "marvell,ap806-pinctrl";
 				reg = <0x6F4000 0x10>;
+			};
+
+			gpio0: gpio@6F5040 {
+				compatible = "marvell,orion-gpio";
+				reg = <0x6F5040 0x40>;
+				ngpios = <20>;
+				gpio-controller;
+				#gpio-cells = <2>;
+				interrupt-controller;
+				#interrupt-cells = <2>;
+				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			serial@512000 {
