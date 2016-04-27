@@ -218,6 +218,11 @@
 				status = "disabled";
 			};
 
+			pinctrl@6F4000 {
+				compatible = "marvell,ap806-pinctrl";
+				reg = <0x6F4000 0x10>;
+			};
+
 			serial@512000 {
 				compatible = "snps,dw-apb-uart";
 				reg = <0x512000 0x100>;
