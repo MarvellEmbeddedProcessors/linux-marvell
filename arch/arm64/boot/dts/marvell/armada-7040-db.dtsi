@@ -58,6 +58,14 @@
 
 	ap806 {
 		config-space {
+			sd_mmc_reg0: regulator@0 {
+				gpios = <&gpio0 19 GPIO_ACTIVE_HIGH>;
+				gpios-states = <0>;
+				states = <1800000 0x1
+					3300000 0x0>;
+				enable-active-high;
+				status = "disabled";
+			};
 			sdhci@6e0000 {
 				bus-width = <4>;
 				non-removable; /* For now, need to configure the GPIO for card detect */
