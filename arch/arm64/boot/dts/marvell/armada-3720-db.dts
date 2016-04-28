@@ -177,6 +177,11 @@
 			status = "okay";
 
 			pcie@1,0 {
+				reset-gpios = <&gpio_sb 3 GPIO_ACTIVE_LOW>;
+
+				pinctrl-names = "default";
+				pinctrl-0 = <&pcie_pins>;
+
 				status = "okay";
 			};
 		};
