@@ -1,0 +1,35 @@
+* Marvell Armada AP-806 SoC pinctrl driver for MPP
+
+Please refer to marvell,mvebu-pinctrl.txt in this directory for the common binding
+part and usage.
+
+Required properties:
+- compatible: "marvell,ap806-pinctrl"
+- reg: register specifier of MPP registers
+
+Available MPP pins/groups and functions:
+Note: Brackets (x) are not part of the MPP name for the Marvell function and are
+      included only to provide a more detailed description this document.
+
+name    pins    functions
+================================================================================
+mpp0	0	gpio, sdio(clk), spi0(clk)
+mpp1	1	gpio, sdio(cmd), spi0(miso)
+mpp2	2	gpio, sdio(d0), spi0(mosi)
+mpp3	3	gpio, sdio(d1), spi0(cs0n)
+mpp4	4	gpio, sdio(d2), i2c0(sda)
+mpp5	5	gpio, sdio(d3), i2c0(sdk)
+mpp6	6	gpio, sdio(ds)
+mpp7	7	gpio, sdio(d4), uart1(rxd)
+mpp8	8	gpio, sdio(d5), uart1(txd)
+mpp9	9	gpio, sdio(d6), spi0(cs1n)
+mpp10	10	gpio, sdio(d7)
+mpp11	11	gpio, uart0(txd)
+mpp12	12	gpio, sdio(pw_off), sdio(hw_rst)
+mpp13	13	gpio
+mpp14	14	gpio
+mpp15	15	gpio
+mpp16	16	gpio
+mpp17	17	gpio
+mpp18	18	gpio
+mpp19	19	gpio, uart0(rxd), sdio(pw_off)
