@@ -187,6 +187,11 @@
 					marvell,pins = "mpp24", "mpp25", "mpp26", "mpp27", "mpp28", "mpp29";
 					marvell,function = "sdio";
 				};
+
+				pcie_pins: pcie_pins {
+					marvell,pins = "mpp3";
+					marvell,function = "gpio";
+				};
 			};
 
 			cpufreq@14000 {
