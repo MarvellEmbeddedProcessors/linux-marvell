@@ -588,7 +588,7 @@ static int advk_pcie_hw_wr_conf(struct advk_pcie_port *port,
 				 struct pci_bus *bus,
 				 u32 devfn, int where, int size, u32 val)
 {
-	u32 reg_val;
+	u32 reg_val, is_done;
 	void __iomem *baseaddr;
 	u32 data_strobe = 0x0;
 	int i;
@@ -675,7 +675,8 @@ static int advk_pcie_hw_wr_conf(struct advk_pcie_port *port,
 
 	for (i = 0; i < PIO_TIMEOUT_NUM; i++) {
 		reg_val = advk_readl(port, PCIE_PIO_REG_ADDR(PIO_START));
-		if (!reg_val)
+		is_done = advk_readl(port, PCIE_PIO_REG_ADDR(PIO_ISR));
+		if ((!reg_val) && is_done)
 			break;
 	}
 	if (i == PIO_TIMEOUT_NUM) {
