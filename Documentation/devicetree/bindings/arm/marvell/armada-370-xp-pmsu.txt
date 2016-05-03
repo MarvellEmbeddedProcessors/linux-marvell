@@ -1,12 +1,13 @@
 Power Management Service Unit(PMSU)
 -----------------------------------
-Available on Marvell SOCs: Armada 370, Armada 38x and Armada XP
+Available on Marvell SOCs: Armada 370, Armada 38x, Armada XP and Msys family
 
 Required properties:
 
 - compatible: should be one of:
   - "marvell,armada-370-pmsu" for Armada 370 or Armada XP
   - "marvell,armada-380-pmsu" for Armada 38x
+  - "marvell,msys-pmsu" for Msys family
   - "marvell,armada-370-xp-pmsu" was used for Armada 370/XP but is now
     deprecated and will be removed
 
