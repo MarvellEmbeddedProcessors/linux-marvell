@@ -68,7 +68,10 @@ struct mvebu_spmu {
 	spinlock_t config_lock;
 
 	DECLARE_BITMAP(used_mask, SPMU_NUM_PERF_COUNTERS + 1);
-	struct perf_event *event[SPMU_NUM_PERF_COUNTERS];
+	struct {
+		struct perf_event *event;
+		uint32_t correction;
+	} ev_info[SPMU_NUM_PERF_COUNTERS];
 
 	cpumask_t cpu;
 	struct notifier_block cpu_nb;
@@ -250,15 +253,21 @@ static int mvebu_spmu_cache_event(u64 config)
 
 static inline uint32_t mvebu_spmu_read_counter(struct mvebu_spmu *spmu, int idx)
 {
-	return readl(spmu->base + SPMU_EVCNTR(idx));
+	u32 v;
+
+	v = readl(spmu->base + SPMU_EVCNTR(idx));
+	v -= spmu->ev_info[idx].correction;
+	return v;
 }
 
 static inline void mvebu_spmu_write_counter(struct perf_event *event, int idx, uint32_t v)
 {
+	uint32_t new_v;
 	struct mvebu_spmu *spmu = pmu_to_spmu(event->pmu);
 
-	v = (v + 1) >> 1;
-	writel(v, spmu->base + SPMU_EVCNTR(idx));
+	new_v = (v + 1) >> 1;
+	spmu->ev_info[idx].correction = (new_v << 1) - v;
+	writel(new_v, spmu->base + SPMU_EVCNTR(idx));
 }
 
 static void mvebu_perf_event_update(struct perf_event *event,
@@ -423,7 +432,7 @@ static int mvebu_spmu_add(struct perf_event *event, int flags)
 		__set_bit(idx, spmu->used_mask);
 		hwc->idx = idx;
 	}
-	spmu->event[idx] = event;
+	spmu->ev_info[idx].event = event;
 
 	/* Set the event type. */
 	reg = readl(spmu->base + SPMU_EVTYPER(idx));
@@ -472,7 +481,7 @@ irqreturn_t mvebu_spmu_irq_handler(int irq, void *dev_id)
 		if (((1 << i) & reg) == 0)
 			continue;
 
-		event = spmu->event[i];
+		event = spmu->ev_info[i].event;
 		hwc = &event->hw;
 
 		mvebu_perf_event_update(event, hwc, i);
