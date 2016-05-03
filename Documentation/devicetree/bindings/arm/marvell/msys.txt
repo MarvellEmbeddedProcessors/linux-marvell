@@ -1,0 +1,28 @@
+Marvell Msys Platforms Device Tree Bindings
+---------------------------------------------------------------
+
+Boards with a SoC of the Marvell Msys families
+shall have the following property:
+
+Required root node property:
+
+compatible: must contain "marvell,armada-370-xp"
+
+In addition, boards using the Marvell Msys SoC shall have the
+following property:
+
+Required root node property:
+
+compatible: must contain "marvell,msys"
+
+In addition, boards using the Marvell Msys AlleyCat3 SoC shall have the
+following property:
+
+Required root node property:
+
+compatible: must contain "marvell,msys-ac3"
+
+Example:
+
+compatible = "marvell,msys-ac3-db", "marvell,msys-ac3",
+		     "marvell,msys", "marvell,armada-370-xp";

@@ -121,4 +121,14 @@ config MACH_KIRKWOOD
 	  Say 'Y' here if you want your kernel to support boards based
 	  on the Marvell Kirkwood device tree.
 
+config MACH_MSYS
+	bool "Marvell Msys boards"
+	select MSYS_CLK
+	select CPU_PJ4B
+	select MACH_MVEBU_V7
+	select PINCTRL_MSYS
+	help
+	  Say 'Y' here if you want your kernel to support boards based
+	  on the Marvell Msys SoC family with device tree.
+
 endif
