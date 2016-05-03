@@ -3863,6 +3863,16 @@ static const u16 pci_quirk_intel_pch_acs_ids[] = {
 	0x8c90, 0x8c92, 0x8c94, 0x8c96, 0x8c98, 0x8c9a, 0x8c9c, 0x8c9e,
 };
 
+/*
+ * Some of Marvell's PCIe ports do not support ACS capability
+ * but also do not enable peer-to-peer transactions so allow them
+ * to safely use the ACS quirk
+ */
+static const u16 pci_quirk_marvell_acs_ids[] = {
+	/* Marvell CP-110 south bridge */
+	0x0110,
+};
+
 static bool pci_quirk_intel_pch_acs_match(struct pci_dev *dev)
 {
 	int i;
@@ -3889,6 +3899,21 @@ static int pci_quirk_intel_pch_acs(struct pci_dev *dev, u16 acs_flags)
 		return -ENOTTY;
 
 	return acs_flags & ~flags ? 0 : 1;
+}
+
+static int pci_quirk_marvell_acs(struct pci_dev *dev, u16 acs_flags)
+{
+	int i;
+
+	/* Filter out a few obvious non-matches first */
+	if (!pci_is_pcie(dev) || pci_pcie_type(dev) != PCI_EXP_TYPE_ROOT_PORT)
+		return false;
+
+	for (i = 0; i < ARRAY_SIZE(pci_quirk_marvell_acs_ids); i++)
+		if (pci_quirk_marvell_acs_ids[i] == dev->device)
+			return true;
+
+	return false;
 }
 
 static int pci_quirk_mf_endpoint_acs(struct pci_dev *dev, u16 acs_flags)
@@ -3981,6 +4006,8 @@ static const struct pci_dev_acs_enabled {
 	{ PCI_VENDOR_ID_INTEL, PCI_ANY_ID, pci_quirk_intel_pch_acs },
 	{ 0x19a2, 0x710, pci_quirk_mf_endpoint_acs }, /* Emulex BE3-R */
 	{ 0x10df, 0x720, pci_quirk_mf_endpoint_acs }, /* Emulex Skyhawk-R */
+	/* Marvell PCIe root port */
+	{ PCI_VENDOR_ID_MARVELL, PCI_ANY_ID, pci_quirk_marvell_acs },
 	{ 0 }
 };
 
