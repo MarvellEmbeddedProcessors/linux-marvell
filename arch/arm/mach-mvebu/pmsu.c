@@ -113,6 +113,7 @@ extern void armada_38x_cpu_resume(void);
 static phys_addr_t pmsu_mp_phys_base;
 static void __iomem *pmsu_mp_base;
 static void __iomem *cib_control;
+static void __iomem *pmsu_msys_ba_redirect_reg;
 
 static void *mvebu_cpu_resume;
 static int (*mvebu_pmsu_dfs_request_ptr)(int cpu);
@@ -121,11 +122,17 @@ static const struct of_device_id of_pmsu_table[] = {
 	{ .compatible = "marvell,armada-370-pmsu", },
 	{ .compatible = "marvell,armada-370-xp-pmsu", },
 	{ .compatible = "marvell,armada-380-pmsu", },
+	{ .compatible = "marvell,msys-pmsu", },
 	{ /* end of list */ },
 };
 
 void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
 {
+	if (pmsu_msys_ba_redirect_reg) {
+		writel(virt_to_phys(boot_addr), pmsu_msys_ba_redirect_reg);
+		return;
+	}
+
 	writel(virt_to_phys(boot_addr), pmsu_mp_base +
 		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
 }
@@ -171,6 +178,35 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
 
 	return 0;
 }
+
+/* Msys SoCs address of boot address redirect register is different than in
+ * other mvebu machines. Its offset is out of common pmsu address range.
+ */
+static int msys_ba_redirect_quirk(struct device_node *np)
+{
+	struct resource res;
+
+	if (of_address_to_resource(np, 1, &res)) {
+		pr_err("unable to get resource\n");
+		return -ENOENT;
+	}
+
+	if (!request_mem_region(res.start, resource_size(&res),
+				np->full_name)) {
+		pr_err("unable to request region\n");
+		return -EBUSY;
+	}
+
+	pmsu_msys_ba_redirect_reg = ioremap(res.start, resource_size(&res));
+	if (!pmsu_mp_base) {
+		pr_err("unable to map register\n");
+		release_mem_region(res.start, resource_size(&res));
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
 
 static int __init mvebu_v7_pmsu_init(void)
 {
@@ -219,6 +255,12 @@ static int __init mvebu_v7_pmsu_init(void)
 		iounmap(pmsu_mp_base);
 		ret = -ENOMEM;
 		goto out;
+	}
+
+	if (of_device_is_compatible(np, "marvell,msys-pmsu")) {
+		ret = msys_ba_redirect_quirk(np);
+		if (ret)
+			iounmap(pmsu_mp_base);
 	}
 
  out:
@@ -530,7 +572,18 @@ static int __init mvebu_v7_cpu_pm_init(void)
 		return 0;
 	of_node_put(np);
 
-	if (of_machine_is_compatible("marvell,armadaxp"))
+	/*
+	 * Currently the CPU idle support for Armada 38x is broken, as
+	 * the CPU hotplug uses some of the CPU idle functions it is
+	 * broken too, so let's disable it
+	 */
+	if (of_machine_is_compatible("marvell,armada380")) {
+		cpu_hotplug_disable();
+		pr_warn("CPU hotplug support is currently broken on Armada 38x: disabling\n");
+	}
+
+	if (of_machine_is_compatible("marvell,armadaxp") ||
+	    of_machine_is_compatible("marvell,msys"))
 		ret = armada_xp_cpuidle_init();
 	else if (of_machine_is_compatible("marvell,armada370"))
 		ret = armada_370_cpuidle_init();
