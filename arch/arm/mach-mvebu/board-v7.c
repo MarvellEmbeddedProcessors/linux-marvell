@@ -157,6 +157,16 @@ static void __init mvebu_init_irq(void)
 	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
 }
 
+static void __init msys_irqchip_init(void)
+{
+	/* Because the switch interrupt driver (marvell,swic) uses register from
+	* the switch region space, the decoding window for switch must be
+	* initialized, before calling interrupt drivers.
+	*/
+	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+	mvebu_init_irq();
+}
+
 static void __init i2c_quirk(void)
 {
 	struct device_node *np;
@@ -255,4 +265,26 @@ DT_MACHINE_START(ARMADA_39X_DT, "Marvell Armada 39x (Device Tree)")
 	.init_irq       = mvebu_init_irq,
 	.restart	= mvebu_restart,
 	.dt_compat	= armada_39x_dt_compat,
+MACHINE_END
+
+static const char * const msys_dt_compat[] __initconst = {
+	"marvell,msys",
+	NULL,
+};
+
+
+DT_MACHINE_START(MSYS_DT, "Marvell SYS (Device Tree)")
+	.l2c_aux_val	= 0,
+	.l2c_aux_mask	= ~0,
+/*
+ * The following field (.smp) is still needed to ensure backward
+ * compatibility with old Device Trees that were not specifying the
+ * cpus enable-method property.
+ */
+	.smp		= smp_ops(armada_xp_smp_ops),
+	.init_machine	= mvebu_dt_init,
+	.init_irq       = msys_irqchip_init,
+	.restart	= mvebu_restart,
+	.reserve        = mvebu_memblock_reserve,
+	.dt_compat	= msys_dt_compat,
 MACHINE_END
