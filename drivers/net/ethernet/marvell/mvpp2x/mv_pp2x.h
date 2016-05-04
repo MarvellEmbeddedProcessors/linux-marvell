@@ -390,6 +390,7 @@ struct cpn110_gop_hw {
 	struct mv_mac_unit_desc xlg_mac;
 	struct mv_mac_unit_desc serdes;
 	struct mv_mac_unit_desc xmib;
+	struct mv_mac_unit_desc tai;
 	struct mv_mac_unit_desc ptp;
 	void __iomem *smi_base;
 	void __iomem *xsmi_base;
@@ -538,6 +539,8 @@ struct queue_vector {
 	struct mv_pp2x_port *parent;
 };
 
+struct mv_pp2x_ptp_desc; /* per-port private PTP descriptor */
+
 struct mv_pp2x_port {
 	u8 id;
 
@@ -589,6 +592,8 @@ struct mv_pp2x_port {
 	 * mv_pp2_isr(int irq, void *dev_id=q_vector)
 	 */
 	struct queue_vector q_vector[MVPP2_MAX_CPUS + MVPP2_MAX_SHARED];
+
+	struct mv_pp2x_ptp_desc *ptp_desc;
 };
 
 struct pp2x_hw_params {
