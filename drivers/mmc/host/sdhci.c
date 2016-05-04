@@ -1929,6 +1929,11 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	unsigned int tuning_count = 0;
 	bool hs400_tuning;
 
+	/* Some host controller does not support tuning in DDR50 mode */
+	if ((host->timing == MMC_TIMING_UHS_DDR50) &&
+	    (host->quirks2 & SDHCI_QUIRK2_BROKEN_DDR50_TUNING))
+		return 0;
+
 	sdhci_runtime_pm_get(host);
 	spin_lock_irqsave(&host->lock, flags);
 
