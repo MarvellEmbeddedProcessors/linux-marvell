@@ -426,7 +426,8 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST	(1<<16)
 /* Some host controller separates HS200 and HS400 definitions */
 #define SDHCI_QUIRK2_TIMING_HS200_HS400			(1<<17)
-
+/* Some host controller does not support tuning in DDR50 mode */
+#define SDHCI_QUIRK2_BROKEN_DDR50_TUNING		(1<<18)
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
 
