@@ -55,6 +55,21 @@
 
 	chosen { };
 
+	ap806 {
+		config-space {
+			sdhci@6e0000 {
+				status = "okay";
+			};
+			serial@512000 {
+				status = "okay";
+			};
+			i2c@511000 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+		};
+	};
+
 	cpn-110-master {
 		config-space {
 			serial@702000 {
@@ -80,6 +95,12 @@
 			};
 			spi@700680 {
 				status = "okay";
+			};
+			i2c1: i2c@701000 {
+				status = "disabled";
+			};
+			i2c2: i2c@701100 {
+				status = "disabled";
 			};
 
 			mdio@12a200 {
