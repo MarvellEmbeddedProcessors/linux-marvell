@@ -41,54 +41,108 @@
  */
 
 /*
- * Device Tree file for the Armada 8040 SoC, made of an AP806 Quad and
- * two CP110.
+ * Device Tree file for Marvell Armada 8040 RZ development board
+ * This board file supports the router configuration of the board
  */
 
-#include "armada-ap806-quad.dtsi"
-#include "armada-cp110-master.dtsi"
-#include "armada-cp110-slave.dtsi"
+#include "armada-8040-db.dtsi"
 
 / {
-	model = "Marvell Armada 8040";
-	compatible = "marvell,armada8040", "marvell,armada-ap806-quad",
-	             "marvell,armada-ap806";
+	model = "Marvell Armada-8040 development board router setup";
+	compatible = "marvell,armada8040-db-router";
+	#address-cells = <2>;
+	#size-cells = <2>;
 
-	ap806 {
-		config-space {
-			smmu: iommu@5000000 {
-				mmu-masters = <&usb3h0 0x483>,
-					      <&usb3h1 0x484>;
-			};
-		};
-	};
+	chosen { };
 
 	cpn-110-master {
 		config-space {
-			ppv22@000000 {
-				dma-coherent;
+			sata@540000 {
+				status = "okay";
 			};
 			usb3h0: usb3@500000 {
-				#stream-id-cells = <1>;
+				status = "okay";
 			};
 			usb3h1: usb3@510000 {
-				#stream-id-cells = <1>;
+				status = "okay";
+			};
+			mdio@12a200 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				phy2: ethernet-phy@2 {
+					reg = <0>;
+				};
+				phy3: ethernet-phy@3 {
+					reg = <1>;
+				};
+			};
+			gop {
+				emac0: mac0 {
+					phy-mode = "kr"; /* lane-2 */
+					status = "okay";
+				};
+				emac2: mac2 {
+					phy-mode = "rgmii"; /* lane-0 */
+					phy = <&phy2>;
+					status = "okay";
+				};
+				emac3: mac3 {
+					phy-mode = "rgmii"; /* rgmii-1 */
+					phy = <&phy3>;
+					status = "okay";
+				};
+			};
+			ppv22@000000 {
+				eth0: eth0@010000 {
+					status = "okay";
+				};
+				eth1: eth1@020000 {
+					status = "okay";
+				};
+				eth2: eth2@030000 {
+					status = "okay";
+				};
+			};
+			eip197@800000 {
+				status = "okay";
 			};
 		};
-		pcie@0x600000 {
-			msi-parent = <&gic_v2m0>;
-		};
-		pcie@0x620000 {
-			msi-parent = <&gic_v2m0>;
-		};
+
 		pcie@0x640000 {
-			msi-parent = <&gic_v2m0>;
+			status = "okay";
 		};
 	};
 	cpn-110-slave {
 		config-space {
+			sata@540000 {
+				status = "okay";
+			};
+			gop {
+				emac0_1: mac0 {
+					phy-mode = "kr"; /* lane-2 */
+					status = "okay";
+				};
+				emac2_1: mac2 {
+					phy-mode = "rgmii"; /* lane-0 */
+					phy = <&phy2>;
+					status = "disabled";
+				};
+				emac3_1: mac3 {
+					phy-mode = "rgmii"; /* rgmii-1 */
+					phy = <&phy3>;
+					status = "disabled";
+				};
+			};
 			ppv22@000000 {
-				dma-coherent;
+				eth0_1: eth0@010000 {
+					status = "okay";
+				};
+				eth1_1: eth1@020000 {
+					status = "disabled";
+				};
+				eth2_1: eth2@030000 {
+					status = "disabled";
+				};
 			};
 		};
 	};

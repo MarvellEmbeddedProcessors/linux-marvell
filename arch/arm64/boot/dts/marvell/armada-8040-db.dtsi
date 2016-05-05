@@ -41,55 +41,31 @@
  */
 
 /*
- * Device Tree file for the Armada 8040 SoC, made of an AP806 Quad and
- * two CP110.
+ * Device Tree file for Marvell Armada 8040 Development board platform
  */
 
-#include "armada-ap806-quad.dtsi"
-#include "armada-cp110-master.dtsi"
-#include "armada-cp110-slave.dtsi"
+#include "armada-8040.dtsi"
 
 / {
-	model = "Marvell Armada 8040";
-	compatible = "marvell,armada8040", "marvell,armada-ap806-quad",
-	             "marvell,armada-ap806";
+	model = "Marvell Armada 8040 development board";
+	compatible = "marvell,armada8040-db", "marvell,armada8040",
+			"marvell,armada-ap806-quad", "marvell,armada-ap806";
+
+	memory@00000000 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x80000000>;
+	};
 
 	ap806 {
 		config-space {
-			smmu: iommu@5000000 {
-				mmu-masters = <&usb3h0 0x483>,
-					      <&usb3h1 0x484>;
+			serial@512000 {
+				status = "okay";
+			};
+			i2c@511000 {
+				status = "okay";
+				clock-frequency = <100000>;
 			};
 		};
 	};
 
-	cpn-110-master {
-		config-space {
-			ppv22@000000 {
-				dma-coherent;
-			};
-			usb3h0: usb3@500000 {
-				#stream-id-cells = <1>;
-			};
-			usb3h1: usb3@510000 {
-				#stream-id-cells = <1>;
-			};
-		};
-		pcie@0x600000 {
-			msi-parent = <&gic_v2m0>;
-		};
-		pcie@0x620000 {
-			msi-parent = <&gic_v2m0>;
-		};
-		pcie@0x640000 {
-			msi-parent = <&gic_v2m0>;
-		};
-	};
-	cpn-110-slave {
-		config-space {
-			ppv22@000000 {
-				dma-coherent;
-			};
-		};
-	};
 };

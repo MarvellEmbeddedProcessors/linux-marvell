@@ -6,6 +6,7 @@ the following root node property:
 
  - compatible, with one of the following values:
 
+SoC:
    - "marvell,armada7020", "marvell,ap806-dual", "marvell,ap806"
       when the SoC being used is the Armada 7020
 
@@ -17,6 +18,14 @@ the following root node property:
 
    - "marvell,armada8040", "marvell,ap806-quad", "marvell,ap806"
       when the SoC being used is the Armada 8040
+
+Boards:
+   - "marvell,armada7040-db-router", "marvell,armada7040-db"
+      when the board being used is the Armada 7040 Development board
+
+   - "marvell,armada8040-db-router", "marvell,armada8040-db"
+      when the board being used is the Armada 8040 Development board
+
 
 Example:
 
