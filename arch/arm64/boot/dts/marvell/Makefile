@@ -13,6 +13,8 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-rz-db-nand.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-rz-db-rxaui.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-rz-pd.dtb
 
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db-router.dtb
+
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
 clean-files	:= *.dtb

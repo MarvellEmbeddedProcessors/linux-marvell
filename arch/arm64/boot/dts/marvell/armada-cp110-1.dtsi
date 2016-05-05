@@ -1,0 +1,279 @@
+/****************************************************************************
+* This program is free software: you can redistribute it and/or modify it
+* under the terms of the GNU General Public License as published by the Free
+* Software Foundation, either version 2 of the License, or any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+* ***************************************************************************
+*/
+
+/*
+ * Generic Device Tree describing Marvell Armada CP-110 device
+ */
+
+cp110_clk_1: clk@0x440700 {
+	compatible = "marvell,armada-cp110-clock";
+	reg = <0x440700 0x4>;
+	#clock-cells = <1>;
+};
+
+gateclk_1: clock-gating-control@440220 {
+	compatible = "marvell,armada-cp110-gating-clock";
+	reg = <0x440220 0x4>;
+	clocks = <&cp110_clk_1 3>;
+	#clock-cells = <1>;
+};
+
+sata@540000 {
+	compatible = "marvell,armada-3700-ahci";
+	reg = <0x540000 0x30000>;
+	interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk_1 15>, <&gateclk_1 16>;
+	status = "disabled";
+	port_base = <0x10000>;
+	port_offset = <0x10000>;
+};
+
+usb3h0_1: usb3@500000 {
+	compatible = "generic-xhci";
+	reg = <0x500000 0x4000>;
+	dma-coherent;
+	interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk_1 22>, <&gateclk_1 16>;
+	status = "disabled";
+};
+
+usb3h1_1: usb3@510000 {
+	compatible = "generic-xhci";
+	reg = <0x510000 0x4000>;
+	dma-coherent;
+	interrupts = <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk_1 23>, <&gateclk_1 16>;
+	status = "disabled";
+};
+
+spi@700600 {
+	compatible = "marvell,armada-380-spi";
+	reg = <0x700600 0x50>;
+	#address-cells = <0x1>;
+	#size-cells = <0x0>;
+	cell-index = <0x0>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
+spi@700680 {
+	compatible = "marvell,armada-380-spi";
+	reg = <0x700680 0x50>;
+	#address-cells = <0x1>;
+	#size-cells = <0x0>;
+	cell-index = <0x0>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
+i2c@701000 {
+	compatible = "marvell,mv64xxx-i2c";
+	reg = <0x701000 0x20>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	interrupts = <GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH>;
+	timeout-ms = <1000>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
+i2c@701100 {
+	compatible = "marvell,mv64xxx-i2c";
+	reg = <0x701100 0x20>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	interrupts = <GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH>;
+	timeout-ms = <1000>;
+	clocks = <&cp110_clk 3>;
+	status = "disabled";
+};
+
+nand@720000 {
+	compatible = "marvell,armada370-nand";
+	reg = <0x720000 0x54>;
+	#address-cells = <1>;
+	#size-cells = <1>;
+	num-cs = <1>;
+	marvell,nand-enable-arbiter;
+	nand-on-flash-bbt;
+	interrupts = <GIC_SPI 307 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk_1 2>;
+	nand-ecc-strength = <4>;
+	nand-ecc-step-size = <512>;
+	status = "disabled";
+};
+
+cpxor0@6a0000 {
+	compatible = "marvell,mv-xor-v2";
+	reg = <0x6a0000 0x1000>,
+	      <0x6b0000 0x1000>;
+	dma-coherent;
+	msi-parent = <&gic_v2m0>;
+	clocks = <&gateclk_1 14>, <&gateclk_1 8>;
+};
+
+cpxor1@6c0000 {
+	compatible = "marvell,mv-xor-v2";
+	reg = <0x6c0000 0x1000>,
+	      <0x6d0000 0x1000>;
+	dma-coherent;
+	msi-parent = <&gic_v2m0>;
+	clocks = <&gateclk_1 14>, <&gateclk_1 7>;
+};
+
+mdio@12a200 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "marvell,orion-mdio";
+	reg = <0x12a200 0x10>;
+};
+
+mdio@15b000 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "marvell,xmdio";
+	reg = <0x12a600 0x10>;
+};
+
+axim-cp-rd@3c5000 {
+	compatible = "marvell,coresight-axim", "arm,primecell";
+	reg = <0x3c5000 0x1000>;
+	clocks = <&syscon 3>;
+	clock-names = "apb_pclk";
+	bus-width = <40>;
+};
+
+axim-cp-wr@3c6000 {
+	compatible = "marvell,coresight-axim", "arm,primecell";
+	reg = <0x3c6000 0x1000>;
+	clocks = <&syscon 3>;
+	clock-names = "apb_pclk";
+	bus-width = <40>;
+};
+
+axim-ppv2-rd@3c0000 {
+	compatible = "marvell,coresight-axim", "arm,primecell";
+	reg = <0x3c0000 0x1000>;
+	clocks = <&syscon 3>;
+	clock-names = "apb_pclk";
+	bus-width = <40>;
+};
+
+axim-ppv2-wr@3c1000 {
+	compatible = "marvell,coresight-axim", "arm,primecell";
+	reg = <0x3c1000 0x1000>;
+	clocks = <&syscon 3>;
+	clock-names = "apb_pclk";
+	bus-width = <40>;
+};
+
+axim-hb1-rd@3c8000 {
+	compatible = "marvell,coresight-axim", "arm,primecell";
+	reg = <0x3c8000 0x1000>;
+	clocks = <&syscon 3>;
+	clock-names = "apb_pclk";
+	bus-width = <40>;
+};
+
+axim-hb1-wr@3c9000 {
+	compatible = "marvell,coresight-axim", "arm,primecell";
+	reg = <0x3c9000 0x1000>;
+	clocks = <&syscon 3>;
+	clock-names = "apb_pclk";
+	bus-width = <40>;
+};
+
+aliases {
+	ethernet0_1 = &emac0_1;
+	ethernet1_1 = &emac2_1;
+	ethernet2_1 = &emac3_1;
+};
+
+gop {
+	emac0_1: mac0 {
+		interrupts = <GIC_SPI 292 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 04];
+		port-id = <0>; /* gop_port_id */
+	};
+	emac2_1: mac2 {
+		interrupts = <GIC_SPI 291 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 05];
+		port-id = <2>; /* gop_port_id */
+	};
+	emac3_1: mac3 {
+		interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [00 00 00 00 00 06];
+		port-id = <3>; /* gop_port_id */
+	};
+};
+
+ppv22@000000 {
+	compatible = "marvell,mv-pp22";
+	reg = <0x000000 0x80000>, /* Packet Processor regs */
+	      <0x120000 0x9000>, /* SERDES regs */
+	      <0x129000 0x0600>, /* XMIB regs */
+	      <0x12a000 0x200>,  /* LED regs */
+	      <0x12a200 0x200>,  /* SMI regs */
+	      <0x12a400 0x200>,  /* TAI regs */
+	      <0x12a600 0x200>,  /* XSMI regs */
+	      <0x12b000 0x1000>,  /* MG Internal regs */
+	      <0x130000 0x6000>, /* MSPG regs */
+	      <0x130400 0x200>,  /* MSPG - XPCS regs */
+	      <0x130e00 0x100>,  /* MSPG - GMAC regs */
+	      <0x130f00 0x100>,  /* MSPG - XLG MAC regs */
+	      <0x441000 0x1000>;  /* RFU-1 Regs */
+	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs", "gmac", "xlg", "rfu1";
+	clocks = <&gateclk_1 3>, <&gateclk_1 18>, <&gateclk_1 9>, <&gateclk_1 6>, <&gateclk_1 5>;
+	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
+	status = "okay";
+	eth0_1: eth0@010000 {
+		interrupts = <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <GIC_SPI 265 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <GIC_SPI 269 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <GIC_SPI 273 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <GIC_SPI 277 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
+		port-id = <0>; /* pp2_port_id */
+		emac-data = <&emac0_1>;
+		status = "disabled";
+	};
+	eth1_1: eth1@020000 {
+		interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <GIC_SPI 270 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <GIC_SPI 274 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
+		port-id = <1>; /* pp2_port_id */
+		emac-data = <&emac2_1>;
+		status = "disabled";
+	};
+	eth2_1: eth2@030000 {
+		interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <GIC_SPI 271 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <GIC_SPI 275 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
+		port-id = <2>; /* pp2_port_id */
+		emac-data = <&emac3_1>;
+		status = "disabled";
+	};
+};
+eip197@800000 {
+	compatible = "marvell,eip197";
+	reg = <0x800000 0x200000>;
+	dma-coherent;
+	interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&gateclk_1 26>;
+	status = "disabled";
+};
