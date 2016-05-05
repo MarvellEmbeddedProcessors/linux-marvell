@@ -64,7 +64,7 @@
 				status = "okay";
 			};
 			i2c@511000 {
-				status = "okay";
+				status = "disabled";
 				clock-frequency = <100000>;
 			};
 		};
@@ -97,7 +97,8 @@
 				status = "okay";
 			};
 			i2c1: i2c@701000 {
-				status = "disabled";
+				status = "okay";
+				clock-frequency = <100000>;
 			};
 			i2c2: i2c@701100 {
 				status = "disabled";
