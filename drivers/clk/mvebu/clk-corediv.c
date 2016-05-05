@@ -71,6 +71,11 @@ static const struct clk_corediv_desc mvebu_corediv_desc[] = {
 	{ .mask = 0x3f, .offset = 8, .fieldbit = 1 }, /* NAND clock */
 };
 
+static const struct clk_corediv_desc mvebu_msys_corediv_desc[] __initconst = {
+	/* NAND clock */
+	{ .mask = 0xf, .offset = 6, .fieldbit = 27},
+};
+
 #define to_corediv_clk(p) container_of(p, struct clk_corediv, hw)
 
 static int clk_corediv_is_enabled(struct clk_hw *hwclk)
@@ -227,6 +232,18 @@ static const struct clk_corediv_soc_desc armada375_corediv_soc = {
 	.ratio_offset = 0x4,
 };
 
+static const struct clk_corediv_soc_desc msys_corediv_soc = {
+	.descs = mvebu_msys_corediv_desc,
+	.ndescs = ARRAY_SIZE(mvebu_msys_corediv_desc),
+	.ops = {
+		.recalc_rate = clk_corediv_recalc_rate,
+		.round_rate = clk_corediv_round_rate,
+		.set_rate = clk_corediv_set_rate,
+	},
+	.ratio_reload = BIT(10),
+	.ratio_offset = 0x8,
+};
+
 static void __init
 mvebu_corediv_clk_init(struct device_node *node,
 		       const struct clk_corediv_soc_desc *soc_desc)
@@ -308,3 +325,10 @@ static void __init armada380_corediv_clk_init(struct device_node *node)
 }
 CLK_OF_DECLARE(armada380_corediv_clk, "marvell,armada-380-corediv-clock",
 	       armada380_corediv_clk_init);
+
+static void __init mvebu_corediv_clk_msys_init(struct device_node *node)
+{
+	return mvebu_corediv_clk_init(node, &msys_corediv_soc);
+}
+CLK_OF_DECLARE(mvebu_corediv_msys_clk, "marvell,msys-corediv-clock",
+		  mvebu_corediv_clk_msys_init);
