@@ -212,14 +212,6 @@
 				reg = <0x18000 0x38>;
 			};
 
-			coredivclk: corediv-clock@18740 {
-				compatible = "marvell,armada-370-corediv-clock";
-				reg = <0x18740 0xc>;
-				#clock-cells = <1>;
-				clocks = <&mainpll>;
-				clock-output-names = "nand";
-			};
-
 			mbusc: mbus-controller@20000 {
 				compatible = "marvell,mbus-controller";
 				reg = <0x20000 0x100>, <0x20180 0x20>,
