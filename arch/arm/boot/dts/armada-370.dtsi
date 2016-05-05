@@ -237,6 +237,14 @@
 				reg = <0x18330 0x4>;
 			};
 
+			coredivclk: corediv-clock@18740 {
+				compatible = "marvell,armada-370-corediv-clock";
+				reg = <0x18740 0xc>;
+				#clock-cells = <1>;
+				clocks = <&mainpll>;
+				clock-output-names = "nand";
+			};
+
 			interrupt-controller@20a00 {
 				reg = <0x20a00 0x1d0>, <0x21870 0x58>;
 			};
