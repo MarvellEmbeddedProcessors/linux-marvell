@@ -1,12 +1,13 @@
 * Core Divider Clock bindings for Marvell MVEBU SoCs
 
-The following is a list of provided IDs and clock names on Armada 370/XP:
+The following is a list of provided IDs and clock names on Armada 370/XP & Msys:
  0 = nand (NAND clock)
 
 Required properties:
 - compatible : must be "marvell,armada-370-corediv-clock",
 		       "marvell,armada-375-corediv-clock",
 		       "marvell,armada-380-corediv-clock",
+		       "marvell,msys-corediv-clock",
 
 - reg : must be the register address of Core Divider control register
 - #clock-cells : from common clock binding; shall be set to 1
