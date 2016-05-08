@@ -45,6 +45,7 @@
  */
 
 #include "armada-39x.dtsi"
+#include <dt-bindings/mvebu_nss/nss39x.h>
 
 / {
 	compatible = "marvell,armada390";
@@ -58,6 +59,87 @@
 					marvell,pins = "mpp4", "mpp5";
 					marvell,function = "smi";
 				};
+				rgmii_pins: rgmii_pins {
+					marvell,pins = "mpp21", "mpp27", "mpp28",
+							"mpp29", "mpp30", "mpp31",
+							"mpp32", "mpp37", "mpp38",
+							"mpp39", "mpp40", "mpp41";
+					marvell,function = "ge";
+				};
+			};
+			mdio {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				compatible = "marvell,pp3-mdio";
+				smi_reg = <0x5000000>;
+			};
+		};
+
+		gop {
+			status = "disabled";
+			mg_base: mg_base {
+				gop-base = <0xf7000000>;
+				gop-size = <0x400000>;
+				mg-target-id = <0xb>;
+				mg-attr = <4>;
+				mg-remap-base = <0>;
+			};
+
+			emac0: mac0 {
+				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+				mac-address = [ 00 00 00 00 00 00 ];
+			};
+
+			emac1: mac1 {
+				interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+				mac-address = [ 00 00 00 00 00 00 ];
+			};
+
+			emac2: mac2 {
+				interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+				mac-address = [ 00 00 00 00 00 00 ];
+			};
+			emac3: mac3 {
+				interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+				mac-address = [ 00 00 00 00 00 00 ];
+			};
+		};
+
+		pp3_platform {
+			compatible = "marvell,armada-390-pp3";
+			status = "disabled";
+			reg = <MBUS_ID(0xf0, 0x01) 0x70000 0x1000>,    /* A2M Master 0 */
+			      <MBUS_ID(0xf0, 0x01) 0x30000 0x1000>,    /* A2M Master 1 */
+			      <MBUS_ID(0xf0, 0x01) 0x18a00 0x1000>,    /* AMB registers */
+			      <MBUS_ID(NSS_TARGET_ID, NSS_REGS_ATTR)  0 NSS_REGS_SIZE>, /* NSS IP registers */
+			      <MBUS_ID(NSS_TARGET_ID, NSS_SPACE_ATTR) 0 NSS_SPACE_SIZE>; /* NSS IP space */
+			clock-frequency = <250000000>;
+			gop_access = <&mg_base>;
+			msi-parent = <&odmi>;
+
+			nic@0 {
+				status = "disabled";
+				id = <0>;
+			};
+
+			nic@1 {
+				status = "disabled";
+				id = <1>;
+			};
+
+			nic@2 {
+				status = "disabled";
+				id = <2>;
+			};
+
+			nic@3 {
+				status = "disabled";
+				id = <3>;
+			};
+
+			nss@0 {
+				status = "disabled";
+				id = <0>;
 			};
 		};
 	};
