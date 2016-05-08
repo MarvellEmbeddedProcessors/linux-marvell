@@ -545,10 +545,9 @@ static int sdhci_xenon_fix_delay_adj(struct sdhci_host *host,
 	unsigned int delay;
 	unsigned int min_delay, max_delay;
 	u32 reg;
-	struct sdhci_pltfm_host *pltfm_host =
-				    (struct sdhci_pltfm_host *)sdhci_priv(host);
-	struct sdhci_xenon_priv *priv =
-				 (struct sdhci_xenon_priv *)pltfm_host->private;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+
 	/* Pairs to set the delay edge.
 	 * First column is the inversion sequence.
 	 * Second column indicates delay 90 degree or not.
@@ -681,12 +680,11 @@ static int sdhci_xenon_delay_adj(struct sdhci_host *host, struct mmc_ios *ios)
 	struct mmc_host *mmc = host->mmc;
 	struct mmc_card *card = NULL;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_xenon_priv *priv;
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 
 	if (!host->clock)
 		return 0;
 
-	priv = (struct sdhci_xenon_priv *)pltfm_host->private;
 	if (ios->timing != priv->timing)
 		sdhci_xenon_phy_reset(host, ios->timing);
 
@@ -758,7 +756,8 @@ static void sdhci_xenon_init_card(struct sdhci_host *host,
 	u32 reg;
 	u8 slot_idx;
 	struct mmc_host *mmc = host->mmc;
-	struct sdhci_xenon_priv *priv = sdhci_priv(host);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 
 	priv->delay_adjust_card = card;
 
@@ -1021,10 +1020,8 @@ static int sdhci_xenon_probe_dt(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct sdhci_host *host = platform_get_drvdata(pdev);
-	struct sdhci_pltfm_host *pltfm_host =
-				    (struct sdhci_pltfm_host *)sdhci_priv(host);
-	struct sdhci_xenon_priv *priv =
-				 (struct sdhci_xenon_priv *)pltfm_host->private;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	struct mmc_host *mmc = host->mmc;
 	int err;
 	u32 slotno;
@@ -1068,10 +1065,8 @@ static bool sdhci_xenon_slot_type_emmc(struct sdhci_host *host,
 	u32 reg;
 	unsigned int emmc_slot;
 	unsigned int sd_slot;
-	struct sdhci_pltfm_host *pltfm_host =
-				    (struct sdhci_pltfm_host *)sdhci_priv(host);
-	struct sdhci_xenon_priv *priv =
-				 (struct sdhci_xenon_priv *)pltfm_host->private;
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 
 	if (priv->quirks & SDHCI_QUIRK_XENON_EMMC_SLOT)
 		return true;
@@ -1129,11 +1124,10 @@ static void sdhci_xenon_set_tuning_mode(struct sdhci_host *host)
 static void sdhci_xenon_add_host_fixup(struct sdhci_host *host)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_xenon_priv *priv;
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 
 	sdhci_xenon_set_tuning_mode(host);
 
-	priv = (struct sdhci_xenon_priv *)pltfm_host->private;
 	sdhci_xenon_set_tuning_count(host, priv->tuning_count);
 }
 
@@ -1142,8 +1136,7 @@ static int sdhci_xenon_slot_probe(struct sdhci_host *host)
 	struct mmc_host *mmc = host->mmc;
 	u8 slotno = mmc->slotno;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_xenon_priv *priv =
-				 (struct sdhci_xenon_priv *)pltfm_host->private;
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 
 	/* Enable slot */
 	sdhci_xenon_set_slot(host, slotno, true);
