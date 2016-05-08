@@ -1,0 +1,128 @@
+* Marvell Armada 390 Ethernet Controller (PP3)
+
+Required properties:
+
+- compatible: should be "marvell,armada-390-pp3"
+- reg: describing the MBus windows have the following layout:
+
+        MBUS_ID(w, a) o z
+  where:
+   - w is the 'target ID' value for the MBus window
+   - a the 'attribute' value for the MBus window
+   - o the address offset inside the window
+   - s the size of window
+
+  Must contain the following register sets:
+	- AMB controller registers
+	- A2M Masters 0 and 1 area
+	- NSS configuration registers
+	- NSS area
+- clocks-frequency: define clock frequency NSS unit run with
+- interrupts: base of ODMI interrupts used for RX
+- gop_access: define access to GOP registers parameters
+- ptp-event-pin: GPIO pin number used as ptp-event input
+
+The network interfaces are represented by subnodes.
+
+Required properties:
+
+- id: interafce ID
+- emac-data: pointer to relevant emac node (see below)
+
+Example:
+
+pp3_platform {
+	compatible = "marvell,armada-390-pp3";
+	status = "disabled";
+	reg = <MBUS_ID(0xf0, 0x01) 0x70000 0x1000>,    /* A2M Master 0 */
+	      <MBUS_ID(0xf0, 0x01) 0x30000 0x1000>,    /* A2M Master 1 */
+	      <MBUS_ID(0xf0, 0x01) 0x18a00 0x1000>,    /* AMB registers */
+	      <MBUS_ID(0x0c, 0x04) 0       0x800000>,  /* NSS IP registers */
+	      <MBUS_ID(0x0c, 0x05) 0       0x8000000>; /* NSS IP space */
+	clocks-frequency = <250000000>;
+	interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;  /* ODMI IRQs */
+	gop_access = <&mg_base>;
+	ptp-event-pin = <10>;
+
+	nic@0 {
+		status = "disabled";
+		id = <0>;
+		emac-data = <&emac0>;
+	};
+
+	nic@1 {
+		status = "disabled";
+		id = <1>;
+		emac-data = <&emac1>;
+	};
+
+	nic@2 {
+		status = "disabled";
+		id = <2>;
+		emac-data = <&emac2>;
+	};
+
+	nic@3 {
+		status = "disabled";
+		id = <3>;
+		emac-data = <&emac3>;
+	};
+
+	nss@0 {
+		status = "disabled";
+		id = <0>;
+	};
+};
+
+GOP node describe Group of Ports block and access data, include MAC data.
+
+Required properties:
+- mg_base - define remap window information
+            The mvebu-mbus DT binding currently doesn't allow
+            describing static windows with the remap capability, so we
+            need this information to use the mvebu-mbus API to dynamically create the
+            required window. This should be changed once mvebu-mbus is
+            extended to cover such a case.
+- emac0,1,2,3 - MAC data:
+  - interrupts: mac link change interrupt line
+  - mac-address: plase folder for mac address updated by u-boot
+  - phy-mode: one from the following modes: "sgmii", "sgmii2_5", "rgmii", "rxaui", "xaui" or "qsgmii"
+  - phy-id: phy address
+  - force-link: must be set to "yes" explicitly, if no AN run.
+
+gop {
+	status = "disabled";
+	mg_base: mg_base {
+		gop-base = <0xf8000000>;
+		gop-size = <0x400000>;
+		mg-target-id = <0xb>;
+		mg-attr = <4>;
+		mg-remap-base = <0>;
+	};
+
+	emac0: mac0 {
+		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [ 00 00 00 00 00 00 ];
+	};
+
+	emac1: mac1 {
+		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [ 00 00 00 00 00 00 ];
+	};
+
+	emac2: mac2 {
+		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [ 00 00 00 00 00 00 ];
+	};
+	emac3: mac3 {
+		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		mac-address = [ 00 00 00 00 00 00 ];
+		phy-mode = "sgmii";
+		phy-id = <0>;
+		switch-data = <&switch>; /* Optional */
+	};
+};
+
+For supported boards information see:
+Documentation/devicetree/bindings/net/marvell-pp3-a395-db_gp.txt
+Documentation/devicetree/bindings/net/marvell-pp3-a390-db.txt

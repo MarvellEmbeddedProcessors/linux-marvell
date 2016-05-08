@@ -1,0 +1,38 @@
+* Marvell MDIO Ethernet Controller interface
+
+The Ethernet controllers of the Marvel A390 have an identical unit that provides
+an interface with the MDIO bus. This driver handles this MDIO
+interface.
+
+Required properties:
+- compatible: "marvell,pp3-mdio"
+- smi_reg: address offset of the SMI GOP register
+
+Optional properties:
+- interrupts: interrupt line number for the SMI error/done interrupt
+- clocks: Phandle to the clock control device and gate bit
+
+The child nodes of the MDIO driver are the individual PHY devices
+connected to this MDIO bus. They must have a "reg" property given the
+PHY address on the MDIO bus.
+
+Example at the SoC level:
+
+mdio {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	compatible = "marvell,pp3-mdio";
+	smi_reg = <0x5000000>;
+};
+
+And at the board level:
+
+mdio {
+	phy0: ethernet-phy@0 {
+		reg = <0>;
+	};
+
+	phy1: ethernet-phy@1 {
+		reg = <5>;
+	};
+}
