@@ -119,7 +119,7 @@ spi@700680 {
 };
 
 i2c1: i2c@701000 {
-	compatible = "marvell,mv64xxx-i2c";
+	compatible = "marvell,mv78230-i2c";
 	reg = <0x701000 0x20>;
 	#address-cells = <1>;
 	#size-cells = <0>;
@@ -130,7 +130,7 @@ i2c1: i2c@701000 {
 };
 
 i2c2: i2c@701100 {
-	compatible = "marvell,mv64xxx-i2c";
+	compatible = "marvell,mv78230-i2c";
 	reg = <0x701100 0x20>;
 	#address-cells = <1>;
 	#size-cells = <0>;
