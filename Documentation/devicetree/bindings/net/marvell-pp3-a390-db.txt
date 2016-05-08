@@ -1,0 +1,80 @@
+* Marvell Armada 390 DB Board
+
+Must contain the following nodes:
+	- nss_complex, see marvell-net_complex.txt
+	- gop, to describe init port configuration mode and phy
+	- pp3_platform, to describe active interfaces configuration
+
+General properties are described in marvell-pp3-platform.txt
+
+Example:
+
+nss_complex {
+	status = "okay";
+};
+
+gop {
+	emac0: mac0 {
+		phy-mode = "rxaui";
+		phy-id = <0>;
+	};
+OR
+	emac0: mac0 {
+		phy-mode = "sgmii";
+		phy-id = <0>;
+		phy-speed = <1000>; /* or 2500 for SGMII 2.5 */
+	};
+
+	emac1: mac1 {
+		phy-mode = "sgmii";
+		phy-id = <5>;
+	};
+OR
+	emac1: mac1 {
+		phy-mode = "qsgmii";
+		phy-id = <5>;
+	};
+OR
+	emac1: mac1 {
+		phy-mode = "rgmii";
+		phy-id = <1>;
+	};
+
+	emac2: mac2 {
+		phy-mode = "sgmii";
+		phy-id = <4>;
+	};
+
+	emac3: mac3 {
+		phy-mode = "sgmii";
+		phy-id = <6>;
+	};
+};
+
+pp3_platform {
+	status = "okay";
+
+	nic@0 {
+		status = "okay";
+		emac-data = <&emac0>;
+	};
+
+	nic@1 {
+		status = "okay";
+		emac-data = <&emac1>;
+	};
+
+	nic@2 {
+		status = "okay";
+		emac-data = <&emac2>;
+	};
+
+	nic@3 {
+		status = "okay";
+		emac-data = <&emac3>;
+	};
+
+	nss@0 {
+		status = "okay";
+	};
+};
