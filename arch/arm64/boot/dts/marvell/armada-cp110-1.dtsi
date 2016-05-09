@@ -23,18 +23,19 @@ cp110_clk_1: clk@0x440700 {
 	#clock-cells = <1>;
 };
 
+/* Need to debug freeze when the gateclk_1 is enabled
 gateclk_1: clock-gating-control@440220 {
 	compatible = "marvell,armada-cp110-gating-clock";
 	reg = <0x440220 0x4>;
 	clocks = <&cp110_clk_1 3>;
 	#clock-cells = <1>;
 };
-
+*/
 sata@540000 {
 	compatible = "marvell,armada-3700-ahci";
 	reg = <0x540000 0x30000>;
 	interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 15>, <&gateclk_1 16>;
+	clocks = <&gateclk 15>, <&gateclk 16>;
 	status = "disabled";
 	port_base = <0x10000>;
 	port_offset = <0x10000>;
@@ -45,7 +46,7 @@ usb3h0_1: usb3@500000 {
 	reg = <0x500000 0x4000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 22>, <&gateclk_1 16>;
+	clocks = <&gateclk 22>, <&gateclk 16>;
 	status = "disabled";
 };
 
@@ -54,7 +55,7 @@ usb3h1_1: usb3@510000 {
 	reg = <0x510000 0x4000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 23>, <&gateclk_1 16>;
+	clocks = <&gateclk 23>, <&gateclk 16>;
 	status = "disabled";
 };
 
@@ -109,7 +110,7 @@ nand@720000 {
 	marvell,nand-enable-arbiter;
 	nand-on-flash-bbt;
 	interrupts = <GIC_SPI 307 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 2>;
+	clocks = <&gateclk 2>;
 	nand-ecc-strength = <4>;
 	nand-ecc-step-size = <512>;
 	status = "disabled";
@@ -121,7 +122,7 @@ cpxor0@6a0000 {
 	      <0x6b0000 0x1000>;
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
-	clocks = <&gateclk_1 14>, <&gateclk_1 8>;
+	clocks = <&gateclk 14>, <&gateclk 8>;
 };
 
 cpxor1@6c0000 {
@@ -130,7 +131,7 @@ cpxor1@6c0000 {
 	      <0x6d0000 0x1000>;
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
-	clocks = <&gateclk_1 14>, <&gateclk_1 7>;
+	clocks = <&gateclk 14>, <&gateclk 7>;
 };
 
 mdio@12a200 {
@@ -235,7 +236,7 @@ ppv22@000000 {
 	      <0x130f00 0x100>,  /* MSPG - XLG MAC regs */
 	      <0x441000 0x1000>;  /* RFU-1 Regs */
 	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs", "gmac", "xlg", "rfu1";
-	clocks = <&gateclk_1 3>, <&gateclk_1 18>, <&gateclk_1 9>, <&gateclk_1 6>, <&gateclk_1 5>;
+	clocks = <&gateclk 3>, <&gateclk 18>, <&gateclk 9>, <&gateclk 6>, <&gateclk 5>;
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 	status = "okay";
 	eth0_1: eth0@010000 {
@@ -274,6 +275,6 @@ eip197@800000 {
 	reg = <0x800000 0x200000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 26>;
+	clocks = <&gateclk 26>;
 	status = "disabled";
 };
