@@ -54,7 +54,7 @@
 			interrupt-map = <0 0 0 0 &gic 0 GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
 			num-lanes = <1>;
-			clocks = <&gateclk_1 14>, <&gateclk_1 13>;
+			clocks = <&gateclk 14>, <&gateclk 13>;
 			status = "disabled";
 		};
 
@@ -76,7 +76,7 @@
 			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
 
 			num-lanes = <1>;
-			clocks = <&gateclk_1 14>, <&gateclk_1 11>;
+			clocks = <&gateclk 14>, <&gateclk 11>;
 			status = "disabled";
 		};
 
@@ -98,7 +98,7 @@
 			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
 
 			num-lanes = <1>;
-			clocks = <&gateclk_1 14>, <&gateclk_1 12>;
+			clocks = <&gateclk 14>, <&gateclk 12>;
 			status = "disabled";
 		};
 	};
