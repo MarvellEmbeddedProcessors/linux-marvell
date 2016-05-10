@@ -30,6 +30,11 @@ gateclk: clock-gating-control@440220 {
 	#clock-cells = <1>;
 };
 
+pinctrl@440000 {
+	compatible = "marvell,a70x0-pinctrl";
+	reg = <0x440000 0x10>;
+};
+
 serial@702000 {
 	compatible = "snps,dw-apb-uart";
 	reg = <0x702000 0x100>;
