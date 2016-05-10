@@ -11,6 +11,10 @@ config PINCTRL_ARMADA_AP806
 	bool
 	select PINCTRL_MVEBU
 
+config PINCTRL_ARMADA_CP110
+	bool
+	select PINCTRL_MVEBU
+
 if PLAT_ORION
 
 config PINCTRL_DOVE
