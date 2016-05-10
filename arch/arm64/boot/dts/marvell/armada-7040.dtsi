@@ -52,6 +52,10 @@
 	model = "Marvell Armada 7040";
 	compatible = "marvell,armada7040", "marvell,armada-ap806-quad",
 	             "marvell,armada-ap806";
+	aliases {
+		gpio1 = &gpio1;
+		gpio2 = &gpio2;
+	};
 
 	ap806 {
 		config-space {
@@ -64,6 +68,10 @@
 
 	cpn-110-master {
 		config-space {
+			gpio1: gpio@440100 {
+			};
+			gpio2: gpio@440140 {
+			};
 			ppv22@000000 {
 				dma-coherent;
 			};
