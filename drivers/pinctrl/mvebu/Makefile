@@ -10,3 +10,4 @@ obj-$(CONFIG_PINCTRL_ARMADA_3700) += pinctrl-armada-3700.o
 obj-$(CONFIG_PCIE_ARMADA_8K) += pinctrl-armada-ap806.o
 obj-$(CONFIG_PCIE_ARMADA_8K) += pinctrl-armada-cp110.o
 obj-$(CONFIG_PINCTRL_ORION)  += pinctrl-orion.o
+obj-$(CONFIG_PINCTRL_MSYS)  += pinctrl-msys.o

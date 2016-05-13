@@ -1,0 +1,53 @@
+* Marvell Msys SoC pinctrl driver for mpp
+
+Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
+part and usage.
+
+Required properties:
+- compatible: "marvell,ac3-pinctrl", "marvell,bc2-pinctrl",
+              "marvell,bobk-pinctrl"
+- reg: register specifier of MPP registers
+
+This driver supports all Msys variants, i.e. AlleyCat3, BobCat2, and BobK.
+
+Available mpp pins/groups and functions:
+Note: brackets (x) are not part of the mpp name for marvell,function and given
+only for more detailed description in this document.
+
+* Marvell Msys (all variants)
+
+name          pins     functions
+================================================================================
+mpp0          0        gpo, spi(mosi), dev(ad8)
+mpp1          1        gpio, spi(miso), dev(ad9)
+mpp2          2        gpo, spi(sck), dev(ad10)
+mpp3          3        gpio, spi(cs0), dev(ad11)
+mpp4          4        gpio, spi(cs1), mstsmi(mdc), dev(cs0), nf
+mpp5          5        gpio, pex(rstout), sdio(cmd), dev(bootcsn)
+mpp6          6        gpo, sdio(clk), dev(ad2)
+mpp7          7        gpio, sdio(d0), dev(ale0)
+mpp8          8        gpio, sdio(d1), dev(ale1)
+mpp9          9        gpio, sdio(d2), dev(readyn)
+mpp10         10       gpio, sdio(d3), dev(ad12)
+mpp11         11       gpio, uart1(rxd), uart0(cts), dev(ad13)
+mpp12         12       gpo, uart1(txd), uart0(rts), dev(ad14)
+mpp13         13       gpio, pp(intout), i2c1(sck), dev(ad15)
+mpp14         14       gpio, i2c0(sck)
+mpp15         15       gpio, i2c0(sda)
+mpp16         16       gpio, dev(oen), nf(ren)
+mpp17         17       gpio, dev(clkout)
+mpp18         18       gpio, i2c1(sda), uart1,(txd)
+mpp19         19       gpio, uart1(rxd), nf(rbn)
+mpp20         20       gpio, dev(wen0), nf(wen)
+mpp21         21       gpio, dev(ad0), nf(io0)
+mpp22         22       gpio, dev(ad1), nf(io1)
+mpp23         23       gpio, dev(ad2), nf(io2)
+mpp24         24       gpio, dev(ad3), nf(io3)
+mpp25         25       gpio, dev(ad4), nf(io4)
+mpp26         26       gpio, dev(ad5), nf(io5)
+mpp27         27       gpio, dev(ad6), nf(io6)
+mpp28         28       gpio, dev(ad7), nf(io7)
+mpp29         29       gpio, dev(a0), nf(cle)
+mpp30         30       gpio, dev(a1), nf(ale)
+mpp31         31       gpio, slvsmi(mdc), mstsmi(mdc), dev(wen1)
+mpp32         32       gpio, slvsmi(mdio), mstsmi(mdio), dev(cs1)
