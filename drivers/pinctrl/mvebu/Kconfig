@@ -46,6 +46,10 @@ config PINCTRL_ARMADA_XP
 	bool
 	select PINCTRL_MVEBU
 
+config PINCTRL_MSYS
+	bool
+	select PINCTRL_MVEBU
+
 config PINCTRL_ORION
 	bool
 	select PINCTRL_MVEBU
