@@ -56,6 +56,52 @@
 
 	ap806 {
 		config-space {
+			/* Temp: disable all Coresight nodes */
+			etm0@c40000 {
+				status = "disabled";
+			};
+			etm1@d40000 {
+				status = "disabled";
+			};
+			etm2@e40000 {
+				status = "disabled";
+			};
+			etm3@f40000 {
+				status = "disabled";
+			};
+			etf0@809000 {
+				status = "disabled";
+			};
+			etf1@80a000 {
+				status = "disabled";
+			};
+			etf2@80b000 {
+				status = "disabled";
+			};
+			etf3@80c000 {
+				status = "disabled";
+			};
+			funnel@810000 {
+				status = "disabled";
+			};
+			etf5@811000 {
+				status = "disabled";
+			};
+			etr@812000 {
+				status = "disabled";
+			};
+			axim-ddr-rd@840000 {
+				status = "disabled";
+			};
+			axim-ddr-wr@841000 {
+				status = "disabled";
+			};
+			axim-ihb-rd@848000 {
+				status = "disabled";
+			};
+			axim-ihb-rd@849000 {
+				status = "disabled";
+			};
 			smmu: iommu@5000000 {
 				mmu-masters = <&usb3h0 0x483>,
 					      <&usb3h1 0x484>;
@@ -65,6 +111,25 @@
 
 	cpn-110-master {
 		config-space {
+			/* Temp: disable all Coresight nodes */
+			axim-cp-rd@3c5000 {
+				status = "disabled";
+			};
+			axim-cp-wr@3c6000 {
+				status = "disabled";
+			};
+			axim-ppv2-rd@3c0000 {
+				status = "disabled";
+			};
+			axim-ppv2-wr@3c1000 {
+				status = "disabled";
+			};
+			axim-hb1-rd@3c8000 {
+				status = "disabled";
+			};
+			axim-hb1-wr@3c9000 {
+				status = "disabled";
+			};
 			ppv22@000000 {
 				dma-coherent;
 			};
@@ -87,6 +152,25 @@
 	};
 	cpn-110-slave {
 		config-space {
+			/* Temp: disable all Coresight nodes */
+			axim-cp-rd@3c5000 {
+				status = "disabled";
+			};
+			axim-cp-wr@3c6000 {
+				status = "disabled";
+			};
+			axim-ppv2-rd@3c0000 {
+				status = "disabled";
+			};
+			axim-ppv2-wr@3c1000 {
+				status = "disabled";
+			};
+			axim-hb1-rd@3c8000 {
+				status = "disabled";
+			};
+			axim-hb1-wr@3c9000 {
+				status = "disabled";
+			};
 			ppv22@000000 {
 				dma-coherent;
 			};
