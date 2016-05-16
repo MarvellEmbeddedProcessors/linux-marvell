@@ -39,6 +39,7 @@ gpio@440100 {
 	compatible = "marvell,orion-gpio";
 	reg = <0x440100 0x40>;
 	ngpios = <32>;
+	gpiobase = <20>;
 	gpio-controller;
 	#gpio-cells = <2>;
 	interrupt-controller;
@@ -53,6 +54,7 @@ gpio@440140 {
 	compatible = "marvell,orion-gpio";
 	reg = <0x440140 0x40>;
 	ngpios = <31>;
+	gpiobase = <52>;
 	gpio-controller;
 	#gpio-cells = <2>;
 	interrupt-controller;
