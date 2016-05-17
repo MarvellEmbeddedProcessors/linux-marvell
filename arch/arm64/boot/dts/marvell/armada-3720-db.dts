@@ -132,14 +132,14 @@
 			};
 
 			sdhci1: sdhci@d0000 {
-				broken-cd;
 				wp-inverted;
 				bus-width = <4>;
+				cd-gpios = <&gpio_sb 2 GPIO_ACTIVE_LOW>;
 				vqmmc-supply = <&vcc_sd_reg1>;
 				status = "okay";
 
 				pinctrl-names = "default";
-				pinctrl-0 = <&sdio_pins>;
+				pinctrl-0 = <&sdio_pins &cd_pins>;
 			};
 
 			sdhci0: sdhci@d8000 {
