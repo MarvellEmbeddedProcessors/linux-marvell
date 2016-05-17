@@ -75,6 +75,23 @@
 
 	cpn-110-master {
 		config-space {
+			i2c1: i2c@701000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&i2c0_pins>;
+				expander0: pca9555@21 {
+					compatible = "nxp,pca9555";
+					pinctrl-names = "default";
+					gpio-controller;
+					#gpio-cells = <2>;
+					reg = <0x21>;
+				};
+			};
+			usb3h0: usb3@500000 {
+				usb-phy = <&usb3h0_phy>;
+			};
+			usb3h1: usb3@510000 {
+				usb-phy = <&usb3h1_phy>;
+			};
 			spi@700680 {
 				spi-flash@0 {
 					#address-cells = <0x1>;
@@ -113,5 +130,31 @@
 				};
 			};
 		};
+	};
+	usb3h0_phy: usb3-h0-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&exp_usb3h0_vbus>;
+	};
+	usb3h1_phy: usb3-h1-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&exp_usb3h1_vbus>;
+	};
+	exp_usb3h0_vbus: usb3-0-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb3-0-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
+	};
+	exp_usb3h1_vbus: usb3-1-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb3-1-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
 	};
 };
