@@ -192,6 +192,11 @@
 					marvell,pins = "mpp3";
 					marvell,function = "gpio";
 				};
+
+				cd_pins: cd-pins {
+					marvell,pins = "mpp2";
+					marvell,function = "gpio";
+				};
 			};
 
 			cpufreq@14000 {
