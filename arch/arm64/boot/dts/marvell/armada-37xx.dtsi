@@ -295,6 +295,14 @@
 				clocks = <&sgateclk 4>;
 				status = "disabled";
 			};
+
+			tbg: tbg@13200 {
+				compatible = "marvell,armada-3700-tbg-clock";
+				reg = <0x13200 0x100>;
+				clocks = <&xtalclk>;
+				#clock-cells = <1>;
+			};
+
 			gpio_nb: gpio@13800 {
 				compatible = "marvell,armada3700-gpio",
 				"syscon", "simple-mfd";
