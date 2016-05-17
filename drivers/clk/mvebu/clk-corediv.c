@@ -12,6 +12,7 @@
 
 #include <linux/kernel.h>
 #include <linux/clk-provider.h>
+#include <linux/clk.h>
 #include <linux/of_address.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -251,6 +252,7 @@ mvebu_corediv_clk_init(struct device_node *node,
 	struct clk_init_data init;
 	struct clk_corediv *corediv;
 	struct clk **clks;
+	struct clk *clk;
 	void __iomem *base;
 	const char *parent_name;
 	const char *clk_name;
@@ -260,7 +262,15 @@ mvebu_corediv_clk_init(struct device_node *node,
 	if (WARN_ON(!base))
 		return;
 
-	parent_name = of_clk_get_parent_name(node, 0);
+	/* Msys SoC's do not use fixed PLL as parent clock */
+	if (of_device_is_compatible(node, "marvell,msys-corediv-clock")) {
+		clk = of_clk_get(node, 0);
+		if (IS_ERR(clk))
+			goto err_unmap;
+		parent_name = __clk_get_name(clk);
+		clk_put(clk);
+	} else
+		parent_name = of_clk_get_parent_name(node, 0);
 
 	clk_data.clk_num = soc_desc->ndescs;
 
