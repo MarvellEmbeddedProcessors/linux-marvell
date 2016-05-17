@@ -68,6 +68,12 @@
 
 	cpn-110-master {
 		config-space {
+			pinctrl@440000 {
+				i2c0_pins: i2c-pins-0 {
+					marvell,pins = "mpp37", "mpp38";
+					marvell,function = "i2c0";
+				};
+			};
 			gpio1: gpio@440100 {
 			};
 			gpio2: gpio@440140 {
