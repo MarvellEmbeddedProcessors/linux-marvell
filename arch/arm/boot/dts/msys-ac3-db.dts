@@ -1,0 +1,98 @@
+/*
+ * Device Tree file for Marvell AlleyCat3 development board
+ * (DB-XC3-24G4XG)
+ *
+ * Copyright (C) 2015 Marvell
+ *
+ * This file is licensed under the terms of the GNU General Public
+ * License version 2.  This program is licensed "as is" without any
+ * warranty of any kind, whether express or implied.
+ */
+
+/dts-v1/;
+#include "msys-ac3.dtsi"
+
+/ {
+	model = "Marvell AlleyCat3 Development Board DB-XC3-24G4XG";
+	compatible = "marvell,msys", "marvell,msys-ac3",
+		     "marvell,msys-ac3-db", "marvell,armada-370-xp";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory {
+		/*
+		 * 1GB of plug-in RAM modules by default. The amount
+		 * of memory available can be changed by the
+		 * bootloader according the size of the module
+		 * actually plugged.
+		 */
+		device_type = "memory";
+		reg = <0x00000000 0x00000000 0x00000000 0x40000000>;
+	};
+
+	soc {
+		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
+			  MBUS_ID(0x03, 0x00) 0 0 0xf8000000 0x4000000	/* switch */
+			  MBUS_ID(0x08, 0x00) 0 0 0xfc000000 0x100000>;	/* dfx */
+
+		internal-regs {
+			serial@12000 {
+				status = "okay";
+			};
+
+			serial@12100 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&uart1_pins>;
+				status = "okay";
+			};
+			ethernet@70000 {
+				status = "okay";
+				compatible = "marvell,armada-xp-neta";
+				phy-mode = "sgmii";
+				fixed-link {
+					speed = <100>;
+					full-duplex;
+				};
+			};
+			eth1:ethernet@74000 {
+				status = "okay";
+				compatible = "marvell,armada-xp-neta";
+				phy-mode = "sgmii";
+				fixed-link {
+					speed = <100>;
+					full-duplex;
+				};
+			};
+			spi0: spi@10600 {
+				status = "okay";
+
+				spi-flash@0 {
+					#address-cells = <1>;
+					#size-cells = <1>;
+					compatible = "jedec,spi-nor";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <108000000>;
+				};
+			};
+
+			usb@50000 {
+				status = "okay";
+			};
+
+			i2c0: i2c@11000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&i2c0_pins>;
+				eeprom@50 {
+					compatible = "atmel,24c64";
+					pagesize = <32>;
+					reg = <0x50>;
+					marvell,board_id_reg = <0x7>;
+				};
+			};
+		};
+	};
+};
