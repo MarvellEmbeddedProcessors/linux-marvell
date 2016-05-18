@@ -68,14 +68,9 @@
 	ADVK_PCIE_INTR_INTA_ASSERT |		\
 	ADVK_PCIE_INTR_INTB_ASSERT |		\
 	ADVK_PCIE_INTR_INTC_ASSERT |		\
-	ADVK_PCIE_INTR_INTD_ASSERT |		\
-	ADVK_PCIE_INTR_INTA_DEASSERT |		\
-	ADVK_PCIE_INTR_INTB_DEASSERT |		\
-	ADVK_PCIE_INTR_INTC_DEASSERT |		\
-	ADVK_PCIE_INTR_INTD_DEASSERT)
+	ADVK_PCIE_INTR_INTD_ASSERT)
 
 #define ADVK_PCIE_INTR_INTX_ASSERT(val)			(1 << (15 + (val)))
-#define ADVK_PCIE_INTR_INTX_DEASSERT(val)		(1 << (19 + (val)))
 
 #define ADVK_PCIE_INTR_ISR0_ALL (		\
 	ADVK_PCIE_INTR_FLR_INT |		\
@@ -323,8 +318,7 @@ static void armada_3700_advk_irq_mask(struct irq_data *d)
 	u32 mask;
 
 	mask = readl(core_base + ADVK_PCIE_CORE_ISR0_MASK_REG);
-	mask |= ADVK_PCIE_INTR_INTX_ASSERT(hwirq) |
-		ADVK_PCIE_INTR_INTX_DEASSERT(hwirq);
+	mask |= ADVK_PCIE_INTR_INTX_ASSERT(hwirq);
 	writel(mask, core_base + ADVK_PCIE_CORE_ISR0_MASK_REG);
 }
 
@@ -334,8 +328,7 @@ static void armada_3700_advk_irq_unmask(struct irq_data *d)
 	u32 mask;
 
 	mask = readl(core_base + ADVK_PCIE_CORE_ISR0_MASK_REG);
-	mask = ~(ADVK_PCIE_INTR_INTX_ASSERT(hwirq) |
-		 ADVK_PCIE_INTR_INTX_DEASSERT(hwirq));
+	mask = ~(ADVK_PCIE_INTR_INTX_ASSERT(hwirq));
 	writel(mask, core_base + ADVK_PCIE_CORE_ISR0_MASK_REG);
 }
 
@@ -406,24 +399,14 @@ static void armada_3700_advk_isr0_handler(void)
 		armada_3700_advk_msi_handler();
 
 	/* Process legacy interrupts */
-	do {
-		for (i = 1; i <= ADVK_LEGACY_IRQ_NUM; i++) {
-			if (!(status & ADVK_PCIE_INTR_INTX_ASSERT(i)))
-				continue;
+	for (i = 1; i <= ADVK_LEGACY_IRQ_NUM; i++) {
+		if (!(status & ADVK_PCIE_INTR_INTX_ASSERT(i)))
+			continue;
 
-			do {
-				writel(ADVK_PCIE_INTR_INTX_ASSERT(i),
-				       core_base + ADVK_PCIE_CORE_ISR0_STATUS_REG);
-				generic_handle_irq(irq_find_mapping(armada_3700_advk_domain, i));
-				status = readl(core_base + ADVK_PCIE_CORE_ISR0_STATUS_REG);
-			} while (!(status & ADVK_PCIE_INTR_INTX_DEASSERT(i)));
-
-			writel(ADVK_PCIE_INTR_INTX_DEASSERT(i),
-			       core_base + ADVK_PCIE_CORE_ISR0_STATUS_REG);
-		}
-
-		status = readl(core_base + ADVK_PCIE_CORE_ISR0_STATUS_REG);
-	} while (status & ADVK_PCIE_CORE_ISR0_INTX_MASK);
+		writel(ADVK_PCIE_INTR_INTX_ASSERT(i),
+		       core_base + ADVK_PCIE_CORE_ISR0_STATUS_REG);
+		generic_handle_irq(irq_find_mapping(armada_3700_advk_domain, i));
+	}
 }
 
 static void armada_3700_advk_handle_cascade_irq(struct irq_desc *desc)
