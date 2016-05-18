@@ -1698,9 +1698,10 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 
 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
 		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-		err_drop_frame:
-			dev->stats.rx_errors++;
 			mvneta_rx_error(pp, rx_desc);
+
+err_drop_frame:
+			dev->stats.rx_errors++;
 			/* leave the descriptor untouched */
 			continue;
 		}
