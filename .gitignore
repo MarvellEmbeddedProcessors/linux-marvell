@@ -68,6 +68,10 @@ Module.symvers
 !.mailmap
 
 #
+# GIT Submodules
+#
+firmware/pp3_gnss/*
+#
 # Generated include files
 #
 include/config
