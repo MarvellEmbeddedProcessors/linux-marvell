@@ -311,8 +311,7 @@ err_base:
 	return ret;
 }
 #else
-static inline int armada_3700_advk_msi_init(struct device_node *node,
-					 phys_addr_t main_int_phys_base)
+static inline int armada_3700_advk_msi_init(struct device_node *node)
 {
 	return 0;
 }
