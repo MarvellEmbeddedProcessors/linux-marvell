@@ -685,7 +685,7 @@ static int sdhci_xenon_delay_adj(struct sdhci_host *host, struct mmc_ios *ios)
 	if (!host->clock)
 		return 0;
 
-	if (ios->timing != priv->timing)
+	if ((ios->timing != priv->timing) || (host->clock != priv->clock))
 		sdhci_xenon_phy_reset(host, ios->timing);
 
 	/* Legacy mode is a special case.
