@@ -21,9 +21,9 @@ Required properties:
   (example: 1 interrupt per 8 pins on Armada XP, which means 4
   interrupts per bank of 32 GPIOs).
 
-- interrupt-controller: identifies the node as an interrupt controller
+- interrupt-controller: Identifies the node as an interrupt controller
 
-- #interrupt-cells: specifies the number of cells needed to encode an
+- #interrupt-cells: Specifies the number of cells needed to encode an
   interrupt source. Should be two.
   The first cell is the GPIO number.
   The second cell is used to specify flags:
@@ -33,12 +33,20 @@ Required properties:
       4 = active high level-sensitive.
       8 = active low level-sensitive.
 
-- gpio-controller: marks the device node as a gpio controller
+- gpio-controller: Marks the device node as a GPIO controller
 
-- ngpios: number of GPIOs this controller has
+- ngpios: Number of GPIOs this controller has
 
 - #gpio-cells: Should be two. The first cell is the pin number. The
   second cell is reserved for flags, unused at the moment.
+
+Optional:
+- gpiobase: The base of the GPIO bank, if not defined the base calculated by
+  multiplying the bank ID number by MVEBU_MAX_GPIO_PER_BANK (32)
+  This option used in Armada-8k SoC, because the GPIOs count is different between banks
+  In Armada-70x0: AP-806 has 20 GPIOs and CP-110 has 63 GPIOs that split into 2 banks,
+  The base of CP0 bank0 should be 20 (after AP-806 pins) the base of CP0 bank1 should be
+  52 (after AP-806, and CP0 bank0 pins)
 
 Example:
 
