@@ -34,6 +34,9 @@
 #define SOC_ID_MASK	    0xFFFF0000
 #define SOC_REV_MASK	    0xFF
 
+#define MSYS_DEV_ID_MASK	0xFF00
+#define MSYS_REV_MASK		0xF
+
 static u32 soc_dev_id;
 static u32 soc_rev;
 static bool is_id_valid;
@@ -44,6 +47,12 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
 	{ .compatible = "marvell,kirkwood-pcie" },
 	{},
 };
+
+static const struct of_device_id mvebu_msys_of_match_table[] = {
+	{ .compatible = "marvell,msys-soc-id", },
+	{},
+};
+
 
 int mvebu_get_soc_id(u32 *dev, u32 *rev)
 {
@@ -131,12 +140,44 @@ clk_err:
 	return ret;
 }
 
+static int __init get_soc_id_by_dfx(void)
+{
+	struct device_node *np;
+	int ret = 0;
+	void __iomem *reg_base;
+
+	np = of_find_matching_node(NULL, mvebu_msys_of_match_table);
+	if (!np)
+		return ret;
+
+	reg_base = of_iomap(np, 0);
+	if (reg_base == NULL) {
+		pr_err("cannot map registers\n");
+		ret = -ENOMEM;
+		return ret;
+	}
+
+	/* SoC ID */
+	soc_dev_id = (readl(reg_base) >> 12) & MSYS_DEV_ID_MASK;
+	/* SoC revision */
+	soc_rev = (readl(reg_base) >> 28) & MSYS_REV_MASK;
+
+	is_id_valid = true;
+
+	pr_info("MVEBU SoC ID=0x%X, Rev=0x%X\n", soc_dev_id, soc_rev);
+
+	iounmap(reg_base);
+
+	return ret;
+}
+
 static int __init mvebu_soc_id_init(void)
 {
 
 	/*
 	 * First try to get the ID and the revision by the system
-	 * register and use PCI registers only if it is not possible
+	 * register, then try to read it from PCI registers,
+	 * use DFX registers only if the previous methods are not possible
 	 */
 	if (!mvebu_system_controller_get_soc_id(&soc_dev_id, &soc_rev)) {
 		is_id_valid = true;
@@ -144,7 +185,10 @@ static int __init mvebu_soc_id_init(void)
 		return 0;
 	}
 
-	return get_soc_id_by_pci();
+	if (!get_soc_id_by_pci())
+		return 0;
+
+	return get_soc_id_by_dfx();
 }
 early_initcall(mvebu_soc_id_init);
 
