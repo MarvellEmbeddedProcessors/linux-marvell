@@ -68,6 +68,11 @@
 				clocks = <&coreclk 3>;
 				clock-output-names = "nand";
 			};
+
+			soc-id@f8244 {
+				compatible = "marvell,msys-soc-id";
+				reg = <0xf8244 0x4>;
+			};
 		};
 
 		ireg: internal-regs {
