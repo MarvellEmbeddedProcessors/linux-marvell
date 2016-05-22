@@ -3134,10 +3134,10 @@ static int mvneta_open(struct net_device *dev)
 	/* Connect to port interrupt line */
 	if (pp->neta_armada3700)
 		ret = request_irq(pp->dev->irq, mvneta_isr, 0,
-				  MVNETA_DRIVER_NAME, pp);
+				  dev->name, pp);
 	else
 		ret = request_percpu_irq(pp->dev->irq, mvneta_percpu_isr,
-					 MVNETA_DRIVER_NAME, pp->ports);
+					 dev->name, pp->ports);
 	if (ret) {
 		netdev_err(pp->dev, "cannot request irq %d\n", pp->dev->irq);
 		goto err_cleanup_txqs;
