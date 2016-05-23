@@ -100,6 +100,16 @@
 			reg = <MBUS_ID(0x01, 0x1d) 0 0x200000>;
 		};
 
+		nss_complex {
+			compatible = "marvell,armada-390-nss_complex";
+			status = "disabled";
+			reg = <MBUS_ID(0xf0, 0x01) 0x18200 0x100>,     /* netcomplex_misc */
+			      <MBUS_ID(0xf0, 0x01) 0x18300 0x200>,     /* netcomplex_phy */
+			      <MBUS_ID(0xf0, 0x01) 0x18a00 0x1000>,    /* netcomplex_base */
+			      <MBUS_ID(0xf0, 0x01) 0xE4000 0x500>,     /* DFX server */
+			      <MBUS_ID(0xf0, 0x01) 0x0 0x100000>;      /* AXI bus */
+		};
+
 		internal-regs {
 			compatible = "simple-bus";
 			#address-cells = <1>;
