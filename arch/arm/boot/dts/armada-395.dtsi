@@ -54,6 +54,10 @@
 			pinctrl@18000 {
 				compatible = "marvell,mv88f6925-pinctrl";
 				reg = <0x18000 0x20>;
+				smi_nss_pins: smi_nss_pins {
+					marvell,pins = "mpp4", "mpp5";
+					marvell,function = "smi";
+				};
 			};
 
 			rtc@a3800 {
