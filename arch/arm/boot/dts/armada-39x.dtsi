@@ -132,6 +132,16 @@
 				reg = <0xc000 0x100>;
 			};
 
+			thermal@e8078 {
+				compatible = "marvell,armada380-thermal";
+				reg = <0xe4078 0x4>, <0xe4070 0x8>,
+				      <0xe4100 0x20>;
+				interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
+				threshold = <100>;
+				hysteresis = <2>;
+				status = "okay";
+			};
+
 			timer@c600 {
 				compatible = "arm,cortex-a9-twd-timer";
 				reg = <0xc600 0x20>;
