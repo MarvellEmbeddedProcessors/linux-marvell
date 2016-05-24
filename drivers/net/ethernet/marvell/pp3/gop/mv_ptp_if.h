@@ -37,6 +37,8 @@ bool mv_pp3_tai_clock_stable_status_get(void);
 u16 mv_pp3_tai_clock_in_cntr_get(u32 *accumulated);
 int mv_pp3_ptp_event_led_sysfs(unsigned led_gpio);
 
+ssize_t mv_pp3_tai_clock_status_get_sysfs(char *buf);
+
 int mv_pp3_ptp_enable(int port, bool state);
 void mv_pp3_ptp_reset(int port);
 void mv_pp3_ptp_reset_all_ptp_ports(void);
@@ -45,7 +47,7 @@ int mv_pp3_tai_tod_op(enum mv_pp3_tai_ptp_op op, struct mv_pp3_tai_tod *ts,
 			int synced_op);
 int mv_pp3_tai_tod_op_read_captured(struct mv_pp3_tai_tod *ts, u32 *status);
 
-void mv_pp3_tai_clock_from_external_sync(u32 start, u32 sec, int d_sec);
+void mv_pp3_tai_clock_from_external_sync(int start, u32 sec, int d_sec);
 
 void mv_pp3_ptp_reg_dump(int port);
 void mv_pp3_tai_tod_dump_util(struct mv_pp3_tai_tod *ts);
