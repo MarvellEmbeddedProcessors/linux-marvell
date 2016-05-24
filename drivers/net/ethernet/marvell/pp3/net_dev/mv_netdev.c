@@ -3078,7 +3078,7 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 	ptp_ts_offs = mv_pp3_is_pkt_ptp_tx(dev_priv, skb, &tx_ts_queue);
 	if (ptp_ts_offs > 0) {
 		/* Send filler or/and raise Queue priority if needed */
-		mv_pp3_send_filler_pkt_cfh(dev_priv, skb->data, cpu, &tx_vq, &tx_swq);
+		mv_pp3_send_filler_pkt_cfh(skb, dev);
 	}
 #endif
 
