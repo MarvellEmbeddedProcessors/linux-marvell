@@ -182,6 +182,7 @@
 
 /* BM constants */
 #define MVPP2_BM_POOLS_NUM		16
+#define MVPP2_BM_POOLS_MAX_ALLOC_NUM	4 /* Max num of allowed BM pools allocations*/
 #define MVPP2_BM_POOL_SIZE_MAX		(16 * 1024 - \
 					MVPP2_BM_POOL_PTR_ALIGN / 4)
 #define MVPP2_BM_POOL_PTR_ALIGN		128
@@ -752,10 +753,16 @@ extern struct mv_pp2x_pool_attributes mv_pp2x_pools[];
 void *mv_pp2x_vfpga_address_get(void);
 #endif
 
-void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv,
-			  struct mv_pp2x_bm_pool *bm_pool, int buf_num);
+void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
+			  int buf_num, bool is_skb);
 int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 			struct mv_pp2x_bm_pool *bm_pool, int buf_num);
+int mv_pp2x_bm_pool_add(struct device *dev, struct mv_pp2x *priv,
+			u32 *pool_num, u32 pkt_size);
+int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
+			   struct mv_pp2x_bm_pool *bm_pool, bool is_skb);
+int mv_pp2x_swf_bm_pool_assign(struct mv_pp2x_port *port, u32 rxq,
+			       u32 long_id, u32 short_id);
 int mv_pp2x_open(struct net_device *dev);
 int mv_pp2x_stop(struct net_device *dev);
 void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
