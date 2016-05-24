@@ -221,14 +221,14 @@ static inline u8 mv_pp2x_first_pool_get(struct mv_pp2x *priv)
 	return priv->pp2_cfg.first_bm_pool;
 }
 
-static inline u8 mv_pp2x_num_pools_get(struct mv_pp2x *priv)
+static inline u8 mv_pp2x_kernel_num_pools_get(struct mv_pp2x *priv)
 {
 	return((priv->pp2_cfg.jumbo_pool == true) ? 3 : 2);
 }
 
 static inline u8 mv_pp2x_last_pool_get(struct mv_pp2x *priv)
 {
-	return(mv_pp2x_first_pool_get(priv) + mv_pp2x_num_pools_get(priv));
+	return(mv_pp2x_first_pool_get(priv) + priv->num_pools);
 }
 
 static inline int mv_pp2x_pool_pkt_size_get(
@@ -253,7 +253,7 @@ static inline const char *
 /* Buffer Manager configuration routines */
 
 /* Create pool */
-static int mv_pp2x_bm_pool_create(struct platform_device *pdev,
+static int mv_pp2x_bm_pool_create(struct device *dev,
 					 struct mv_pp2x_hw *hw,
 					 struct mv_pp2x_bm_pool *bm_pool,
 					 int size)
@@ -268,7 +268,7 @@ static int mv_pp2x_bm_pool_create(struct platform_device *pdev,
 
 	/*YuvalC: Two pointers per buffer, existing bug fixed. */
 	size_bytes = 2 * sizeof(uintptr_t) * size;
-	bm_pool->virt_addr = dma_alloc_coherent(&pdev->dev, size_bytes,
+	bm_pool->virt_addr = dma_alloc_coherent(dev, size_bytes,
 						&bm_pool->phys_addr,
 						GFP_KERNEL);
 	if (!bm_pool->virt_addr)
@@ -276,9 +276,9 @@ static int mv_pp2x_bm_pool_create(struct platform_device *pdev,
 
 	if (!IS_ALIGNED((uintptr_t)bm_pool->virt_addr,
 			MVPP2_BM_POOL_PTR_ALIGN)) {
-		dma_free_coherent(&pdev->dev, size_bytes, bm_pool->virt_addr,
+		dma_free_coherent(dev, size_bytes, bm_pool->virt_addr,
 				  bm_pool->phys_addr);
-		dev_err(&pdev->dev, "BM pool %d is not %d bytes aligned\n",
+		dev_err(dev, "BM pool %d is not %d bytes aligned\n",
 			bm_pool->id, MVPP2_BM_POOL_PTR_ALIGN);
 		return -ENOMEM;
 	}
@@ -296,7 +296,7 @@ static int mv_pp2x_bm_pool_create(struct platform_device *pdev,
 }
 
 void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
-				int buf_num)
+				int buf_num, bool is_skb)
 {
 	int i;
 
@@ -313,13 +313,15 @@ void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
 		vaddr = mv_pp2x_bm_virt_addr_get(&priv->hw, bm_pool->id);
 		if (!vaddr)
 			break;
+		if (is_skb) {
 #ifdef CONFIG_64BIT
-		dev_kfree_skb_any(
-			(struct sk_buff *)(priv->pp2xdata->skb_base_addr |
-			(uintptr_t)vaddr));
+			dev_kfree_skb_any(
+				(struct sk_buff *)(priv->pp2xdata->skb_base_addr |
+				(uintptr_t)vaddr));
 #else
-		dev_kfree_skb_any(vaddr);
+			dev_kfree_skb_any(vaddr);
 #endif
+		}
 	}
 
 	/* Update BM driver with number of buffers removed from pool */
@@ -328,14 +330,13 @@ void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
 
 
 /* Cleanup pool */
-static int mv_pp2x_bm_pool_destroy(struct platform_device *pdev,
-					  struct mv_pp2x *priv,
-					  struct mv_pp2x_bm_pool *bm_pool)
+int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
+			   struct mv_pp2x_bm_pool *bm_pool, bool is_skb)
 {
 	u32 val;
 	int size_bytes;
 
-	mv_pp2x_bm_bufs_free(priv, bm_pool, bm_pool->buf_num);
+	mv_pp2x_bm_bufs_free(priv, bm_pool, bm_pool->buf_num, is_skb);
 	if (bm_pool->buf_num) {
 		WARN(1, "cannot free all buffers in pool %d, buf_num left %d\n",
 		     bm_pool->id,
@@ -348,9 +349,60 @@ static int mv_pp2x_bm_pool_destroy(struct platform_device *pdev,
 	mv_pp2x_write(&priv->hw, MVPP2_BM_POOL_CTRL_REG(bm_pool->id), val);
 
 	size_bytes = 2 * sizeof(uintptr_t) * bm_pool->size;
-	dma_free_coherent(&pdev->dev, size_bytes, bm_pool->virt_addr,
+	dma_free_coherent(dev, size_bytes, bm_pool->virt_addr,
 			  bm_pool->phys_addr);
 	mv_pp2x_bm_pool_bufsize_set(&priv->hw, bm_pool, 0);
+	priv->num_pools--;
+	return 0;
+}
+
+int mv_pp2x_bm_pool_add(struct device *dev, struct mv_pp2x *priv, u32 *pool_num,
+	u32 pkt_size)
+{
+	int err, size, enabled;
+	u8 first_pool = mv_pp2x_first_pool_get(priv);
+	u32 pool = priv->num_pools;
+	struct mv_pp2x_bm_pool *bm_pool;
+	struct mv_pp2x_hw *hw = &priv->hw;
+
+	if ((priv->num_pools + 1) >= MVPP2_BM_POOLS_MAX_ALLOC_NUM) {
+		DBG_MSG("Unable to add pool. Max BM pool alloc reached %d\n",
+			priv->num_pools + 1);
+		return -ENOMEM;
+	}
+
+	/* Check if pool is already active. Ignore request */
+	enabled = mv_pp2x_read(hw, MVPP2_BM_POOL_CTRL_REG(pool)) &
+		MVPP2_BM_STATE_MASK;
+
+	if (enabled) {
+		DBG_MSG("%s pool %d already enabled. Ignoring request\n",
+			__func__, pool);
+		return 0;
+	}
+
+	/* Mask BM interrupts */
+	mv_pp2x_write(&priv->hw, MVPP2_BM_INTR_MASK_REG(first_pool +
+		      pool), 0);
+	/* Clear BM cause register */
+	mv_pp2x_write(&priv->hw, MVPP2_BM_INTR_CAUSE_REG(first_pool +
+		      pool), 0);
+
+	/* Create all pools with maximum size */
+	size = MVPP2_BM_POOL_SIZE_MAX;
+	bm_pool = &priv->bm_pools[pool];
+	bm_pool->log_id = pool;
+	bm_pool->id = first_pool + pool;
+	mv_pp2x_pools[pool].pkt_size = pkt_size;
+		err = mv_pp2x_bm_pool_create(dev, hw, bm_pool, size);
+		if (err)
+			return err;
+
+	*pool_num = pool;
+	priv->num_pools++;
+	DBG_MSG("log_id %d, id %d, pool_num %d, num_pools %d\n",
+		bm_pool->log_id, bm_pool->id, *pool_num, priv->num_pools);
+
 	return 0;
 }
 
@@ -368,7 +420,7 @@ static int mv_pp2x_bm_pools_init(struct platform_device *pdev,
 		bm_pool = &priv->bm_pools[i];
 		bm_pool->log_id = i;
 		bm_pool->id = first_pool + i;
-		err = mv_pp2x_bm_pool_create(pdev, hw, bm_pool, size);
+		err = mv_pp2x_bm_pool_create(&pdev->dev, hw, bm_pool, size);
 		if (err)
 			goto err_unroll_pools;
 	}
@@ -378,7 +430,8 @@ static int mv_pp2x_bm_pools_init(struct platform_device *pdev,
 err_unroll_pools:
 	dev_err(&pdev->dev, "failed to create BM pool %d, size %d\n", i, size);
 	for (i = i - 1; i >= 0; i--)
-		mv_pp2x_bm_pool_destroy(pdev, priv, &priv->bm_pools[i]);
+		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, &priv->bm_pools[i],
+					true);
 		return err;
 }
 
@@ -386,7 +439,7 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 {
 	int i, err;
 	u8 first_pool = mv_pp2x_first_pool_get(priv);
-	u8 num_pools = mv_pp2x_num_pools_get(priv);
+	u8 num_pools = mv_pp2x_kernel_num_pools_get(priv);
 
 	for (i = first_pool; i < (first_pool + num_pools); i++) {
 		/* Mask BM all interrupts */
@@ -396,7 +449,7 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	}
 
 	/* Allocate and initialize BM pools */
-	priv->bm_pools = devm_kcalloc(&pdev->dev, num_pools,
+	priv->bm_pools = devm_kcalloc(&pdev->dev, MVPP2_BM_POOLS_NUM,
 				      sizeof(struct mv_pp2x_bm_pool),
 				      GFP_KERNEL);
 	if (!priv->bm_pools)
@@ -542,7 +595,7 @@ static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_use_internal(
 			return NULL;
 		}
 	} else if (add_num < 0) {
-		mv_pp2x_bm_bufs_free(port->priv, pool, -add_num);
+		mv_pp2x_bm_bufs_free(port->priv, pool, -add_num, true);
 	}
 
 	return pool;
@@ -560,6 +613,22 @@ static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_stop_use(
 			enum mv_pp2x_bm_pool_log_num log_pool)
 {
 	return mv_pp2x_bm_pool_use_internal(port, log_pool, false);
+}
+
+
+int mv_pp2x_swf_bm_pool_assign(struct mv_pp2x_port *port, u32 rxq,
+			       u32 long_id, u32 short_id)
+{
+	struct mv_pp2x_hw *hw = &(port->priv->hw);
+
+	if (rxq >= port->num_rx_queues)
+		return -ENOMEM;
+
+	port->priv->pp2xdata->mv_pp2x_rxq_long_pool_set(hw,
+		port->rxqs[rxq]->id, long_id);
+	port->priv->pp2xdata->mv_pp2x_rxq_short_pool_set(hw,
+		port->rxqs[rxq]->id, short_id);
+	return 0;
 }
 
 /* Initialize pools for swf */
@@ -4806,7 +4875,7 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 	for (i = 0; i < priv->num_pools; i++) {
 		struct mv_pp2x_bm_pool *bm_pool = &priv->bm_pools[i];
 
-		mv_pp2x_bm_pool_destroy(pdev, priv, bm_pool);
+		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, bm_pool, true);
 	}
 
 	for_each_online_cpu(i) {
