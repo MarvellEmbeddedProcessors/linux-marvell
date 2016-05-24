@@ -283,7 +283,7 @@ static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,
 /* Release buffer to BM */
 static inline void mv_pp2x_bm_pool_put(struct mv_pp2x_hw *hw, u32 pool,
 					      dma_addr_t buf_phys_addr,
-					      struct sk_buff *buf_virt_addr)
+					      u8 *buf_virt_addr)
 {
 
 	mv_pp2x_relaxed_write(hw, MVPP2_BM_VIRT_RLS_REG,
@@ -309,7 +309,7 @@ static inline void mv_pp2x_bm_pool_mc_put(struct mv_pp2x_port *port, int pool,
 	mv_pp2x_bm_pool_put(&(port->priv->hw), pool,
 			    (dma_addr_t)(buf_phys_addr |
 			    MVPP2_BM_PHY_RLS_MC_BUFF_MASK),
-			    (struct sk_buff *)(u64)(buf_virt_addr));
+			    (u8 *)(u64)(buf_virt_addr));
 }
 
 static inline void mv_pp2x_port_interrupts_enable(struct mv_pp2x_port *port)
@@ -407,10 +407,10 @@ static inline void mv_pp2x_txq_sent_counter_clear(void *arg)
 	}
 }
 
-static inline struct sk_buff *mv_pp21_rxdesc_cookie_get(
+static inline u8 *mv_pp21_rxdesc_cookie_get(
 		struct mv_pp2x_rx_desc *rx_desc)
 {
-	return((struct sk_buff *)((uintptr_t)rx_desc->u.pp21.buf_cookie));
+	return((u8 *)((uintptr_t)rx_desc->u.pp21.buf_cookie));
 }
 
 static inline dma_addr_t mv_pp21_rxdesc_phys_addr_get(
@@ -420,10 +420,10 @@ static inline dma_addr_t mv_pp21_rxdesc_phys_addr_get(
 }
 
 /*YuvalC: Below functions are intended to support both aarch64 & aarch32 */
-static inline struct sk_buff *mv_pp22_rxdesc_cookie_get(
+static inline u8 *mv_pp22_rxdesc_cookie_get(
 		struct mv_pp2x_rx_desc *rx_desc)
 {
-	return((struct sk_buff *)((uintptr_t)
+	return((u8 *)((uintptr_t)
 		(rx_desc->u.pp22.buf_cookie_bm_qset_cls_info &
 		DMA_BIT_MASK(40))));
 }
@@ -563,7 +563,7 @@ void mv_pp2x_bm_pool_bufsize_set(struct mv_pp2x_hw *hw,
 					 struct mv_pp2x_bm_pool *bm_pool,
 					 int buf_size);
 void mv_pp2x_pool_refill(struct mv_pp2x *priv, u32 pool,
-			    dma_addr_t phys_addr, struct sk_buff *cookie);
+			    dma_addr_t phys_addr, u8 *cookie);
 
 void mv_pp21_rxq_long_pool_set(struct mv_pp2x_hw *hw,
 				     int prxq, int long_pool);
