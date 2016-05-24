@@ -2392,6 +2392,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	u32 tx_cmd;
 
 	txq_id = 0/*skb_get_queue_mapping(skb)*/;
+	nq = netdev_get_tx_queue(dev, txq_id);
 	txq = port->txqs[txq_id];
 	txq_pcpu = this_cpu_ptr(txq->pcpu);
 	aggr_txq = &port->priv->aggr_txqs[smp_processor_id()];
@@ -2470,14 +2471,12 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	txq_pcpu->reserved_num -= frags;
 	txq_pcpu->count += frags;
 	aggr_txq->count += frags;
+	aggr_txq->xmit_bulk += frags;
 
 	/* Enable transmit */
-	mv_pp2x_aggr_txq_pend_desc_add(port, frags);
-
-	if (txq_pcpu->size - txq_pcpu->count < MAX_SKB_FRAGS + 1) {
-		MVPP2_PRINT_LINE();
-		nq = netdev_get_tx_queue(dev, txq_id);
-		netif_tx_stop_queue(nq);
+	if (!skb->xmit_more || netif_xmit_stopped(nq)) {
+		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
+		aggr_txq->xmit_bulk = 0;
 	}
 out:
 	if (frags > 0) {
