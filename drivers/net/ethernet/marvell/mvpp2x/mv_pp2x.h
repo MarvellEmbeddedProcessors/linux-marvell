@@ -144,15 +144,15 @@
 
 #ifdef MVPP2_VERBOSE
 #define MVPP2_PRINT_2LINE() \
-	pr_info("Passed: %s(%d)\n", __FILENAME__, __LINE__)
+	pr_info("Passed: %s(%d)\n", __func__, __LINE__)
 #define MVPP2_PRINT_LINE() \
-	pr_info("Passed: %s(%d)\n", __FILENAME__, __LINE__)
+	pr_info("Passed: %s(%d)\n", __func__, __LINE__)
 
 #define MVPP2_PRINT_VAR(var) \
-	pr_info("%s(%d): "#var"=0x%lx\n", __FILENAME__, __LINE__,\
+	pr_info("%s(%d): "#var"=0x%lx\n", __func__, __LINE__,\
 		(unsigned long)var)
 #define MVPP2_PRINT_VAR_NAME(var, name) \
-	pr_info("%s(%d): %s=0x%lx\n", __FILENAME__, __LINE__, name, var)
+	pr_info("%s(%d): %s=0x%lx\n", __func__, __LINE__, name, var)
 #else
 #define MVPP2_PRINT_LINE()
 #define MVPP2_PRINT_2LINE()
