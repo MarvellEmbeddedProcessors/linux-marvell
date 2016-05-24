@@ -43,29 +43,40 @@ static ssize_t mv_gop_help(char *b)
 {
 	int o = 0;
 
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "cd                     ptp         - go to PTP and TAI units configuration sub directory\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p]             > status      - show GOP port configuration\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p]             > regs        - show GOP port registers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [lane]          > xpcs_regs   - show XPCS lane registers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [lane]          > serdes_regs - show Serdes lane registers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p]             > mib_cntrs   - show port MIB counters\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p]             > clear_cntrs - clear port MIB counters\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [u] [v]         > reg_write   - write register: address [u], value [v]\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [u]             > reg_read    - read register: address [u]\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [u] [s:e] [v]   > reg_modify  - read, modify, write gop register\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"cd                     ptp         - go to PTP and TAI units configuration sub directory\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [p]             > status      - show GOP port configuration\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [p]             > regs        - show GOP port registers\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [lane]          > xpcs_regs   - show XPCS lane registers\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [lane]          > serdes_regs - show Serdes lane registers\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [p]             > mib_cntrs   - show port MIB counters\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [p]             > clear_cntrs - clear port MIB counters\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [u] [v]         > reg_write   - write register: address [u], value [v]\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [u]             > reg_read    - read register: address [u]\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [u] [s:e] [v]   > reg_modify  - read, modify, write gop register\n");
 #ifdef CONFIG_ARCH_MVEBU
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p] [mode]      > port_mode   - change mode of lanes 6,5 connected to port [p]\n");
+	o += scnprintf(b + o, PAGE_SIZE - o,
+		"echo [p] [mode]      > port_mode   - change mode of lanes 6,5 connected to port [p]\n");
 #endif
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "parameters:\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [p]	- mac number\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "parameters:\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "      [p]	- mac number\n");
 #ifdef CONFIG_ARCH_MVEBU
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [mode]	- rxaui:    switch to RXAUI\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "		- sgmii:    switch to SGMII\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "		- sgmii2_5: switch to SGMII 2.5\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "      [mode]	- rxaui:    switch to RXAUI\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "		- sgmii:    switch to SGMII\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "		- sgmii2_5: switch to SGMII 2.5\n");
 #endif
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "\n");
 
 	return o;
 }
@@ -73,42 +84,43 @@ static ssize_t mv_gop_help(char *b)
 static ssize_t mv_gop_ptp_help(char *b)
 {
 	int o = 0;
-	/* NOTE: the sysfs-show limited with PAGE_SIZE. Current help-size is about 1.28kB */
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "cat              tai_regs  - show TAI unit registers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "cat              tai_tod   - show TAI time capture values\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p]       > ptp_regs  - show PTP unit registers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p] [0/1] > ptp_en    - enable(1) / disable(0) PTP unit\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [p]       > ptp_reset - reset given port PTP unit\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     [p] - mac (port) number\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "----\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [h] [l] [n] > tai_tod_load_value  - set TAI TOD with DECimal\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "         [h] hig16bit sec, [l] low32bit sec, [n] - nanosec\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
+	/* NOTE: the sysfs-show limited with PAGE_SIZE. Current help-size is about 1.3kB */
+	o += scnprintf(b + o, PAGE_SIZE - o, "\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "cat              tai_regs  - show TAI unit registers\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "cat              tai_tod   - show TAI time capture values\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "cat              tai_clock - show TAI clock status\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "echo [p]       > ptp_regs  - show PTP unit registers\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "echo [p] [0/1] > ptp_en    - enable(1) / disable(0) PTP unit\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "echo [p]       > ptp_reset - reset given port PTP unit\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     [p] - mac (port) number\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "----\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "echo [h] [l] [n] > tai_tod_load_value  - set TAI TOD with DECimal\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "         [h] hig16bit sec, [l] low32bit sec, [n] - nanosec\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "\n");
 
-	o += scnprintf(b+o, PAGE_SIZE-o, "--- TAI TOD operationS (HEX parameters)---\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [o] [h] [l] [n] > tai_op\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "         [h] high sec, [l] low sec, [n] nanosec (HEX)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     [o] OPeration (HEX all parameters)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "   ToD time:      [h]=0 must be present\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     1c -increment[l+n], 1c0 -graceful inc[l+n]\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     dc -decrement[l+n], 1d0 -graceful dec[l+n]\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "   FREQ:\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     F1c / Fdc - inc/dec by value [h]\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "   SYNC ToD time from/to linux or Sys/kernel:\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     41 - from linux, 21 - to linux\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     45 - from Sys/kernel, 47,46 -print ToD and System time\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "   Tai-Clock cfg:\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     CE1 - Clock External Increment [h] seconds\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     CED - Clock External Decrement [h] seconds\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     CEA - Clock External Absolute set [h] seconds\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     CEC - Clock External Check stability & counter\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     C1  - Clock Internal (free-running)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     C0  - Clock Off\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     CEB11 - Blink led on gpio=11\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "   DEBUG:\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "     deb h l n  - DEBug-op with up to 3 parameters\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "--- TAI TOD operationS (HEX parameters)---\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "echo [o] [h] [l] [n] > tai_op\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "         [h] high sec, [l] low sec, [n] nanosec (HEX)\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     [o] OPeration (HEX all parameters)\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "   ToD time:      [h]=0 must be present\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     1c -increment[l+n], 1c0 -graceful inc[l+n]\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     dc -decrement[l+n], 1d0 -graceful dec[l+n]\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "   FREQ:\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     F1c / Fdc - inc/dec by value [h]\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "   SYNC ToD time from/to linux or Sys/kernel:\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     41 - from linux, 21 - to linux\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     45 - from Sys/kernel, 47,46 -print ToD and System time\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "   Tai-Clock cfg:\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     CE1 - Clock External Increment [h] seconds\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     CED - Clock External Decrement [h] seconds\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     CEA - Clock External Absolute set [h] seconds\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     CEC - Clock External Check stability & counter\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     C1  - Clock Internal (free-running)\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     C0  - Clock Off\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     CEB11 - Blink led on gpio=11\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "   DEBUG:\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "     deb h l n  - DEBug-op with up to 3 parameters\n");
+	o += scnprintf(b + o, PAGE_SIZE - o, "\n");
 
 	return o;
 }
@@ -147,6 +159,8 @@ static ssize_t mv_gop_ptp_show(struct device *dev,
 		mv_pp3_tai_reg_dump();
 	else if (!strcmp(name, "tai_tod"))
 		mv_pp3_tai_tod_dump();
+	else if (!strcmp(name, "tai_clock"))
+		off = mv_pp3_tai_clock_status_get_sysfs(buf);
 	else {
 		off = 1;
 		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -339,6 +353,7 @@ static struct attribute *mv_gop_attrs[] = {
 
 static DEVICE_ATTR(help_ptp,		S_IRUSR, mv_gop_ptp_show, NULL);
 static DEVICE_ATTR(tai_regs,		S_IRUSR, mv_gop_ptp_show, NULL);
+static DEVICE_ATTR(tai_clock,		S_IRUSR, mv_gop_ptp_show, NULL);
 static DEVICE_ATTR(tai_tod,		S_IRUSR, mv_gop_ptp_show, NULL);
 static DEVICE_ATTR(tai_tod_load_value,	S_IWUSR, NULL, mv_gop_3_hex_store);
 static DEVICE_ATTR(tai_op,		S_IWUSR, NULL, mv_gop_3_hex_store);
@@ -349,6 +364,7 @@ static DEVICE_ATTR(ptp_reset,		S_IWUSR, NULL, mv_gop_3_hex_store);
 static struct attribute *mv_gop_ptp_attrs[] = {
 	&dev_attr_help_ptp.attr,
 	&dev_attr_tai_regs.attr,
+	&dev_attr_tai_clock.attr,
 	&dev_attr_tai_tod.attr,
 	&dev_attr_tai_tod_load_value.attr,
 	&dev_attr_tai_op.attr,

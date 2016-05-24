@@ -73,9 +73,13 @@ struct mv_ptp_event {
 
 	enum mv_ptp_event_clock_state state;
 	int state_cntr;
+	int clock_restart_req;
+	int sync_check_polling_limit;
+
 	bool gps_up_already_printed;
 	struct work_struct work_q;
 	struct timer_list timer;
+	int gps_watchdog_expired;
 
 	u32 sec;   /* Absolute set seconds to TAI/ToD */
 	int d_sec; /* Relative Inc/Dec delta to TAI/ToD */
@@ -132,6 +136,25 @@ static inline void ptp_event_led_blink(struct mv_ptp_event *ev, int req)
 }
 
 /***************************************************************************/
+/* ptp_is_sync_bad: checks sync between input GPS-1PPS and TAI-output 1PPS
+ *         retuns 0 if sync is ok,
+ *         retuns 1 if sync is bad and re-sync procedure to be initiated
+ * The detection is done on nano-sec difference between IRQ and TAI-counter
+ * so it should be called as soon as possible - best is in IRQ, but
+ * MV_TAI_GET_CAPTURE has latency more than 1.5uS
+ */
+static inline int ptp_is_sync_bad(void)
+{
+	struct mv_pp3_tai_tod ts;
+	/* ~999985000..999999999 - is under HW-sync
+	 * Range 0..500000000 is "ready for HW sync"
+	 */
+	mv_pp3_tai_tod_op(MV_TAI_GET_CAPTURE, &ts, 0);
+	 /* for precise IRQ context: 500000000 < nsec < 999985000 */
+	return (ts.nsec > 500015000) && (ts.nsec < 999985000);
+}
+
+/***************************************************************************/
 static irqreturn_t ptp_gpio_isr(int irq, void *data)
 {
 	struct mv_ptp_event *ev = data;
@@ -144,9 +167,7 @@ static irqreturn_t ptp_gpio_isr(int irq, void *data)
 		mod_timer(&ev->timer, MSEC_1PPS_D(-MSEC_BEFORE_1PPS));
 		break;
 	case PTP_CLK_GPS_UP:
-		/* Restart GPS-Up watchdog  */
-		mod_timer(&ev->timer, MSEC_1PPS_D(30));
-		ptp_event_led_blink(ev, -1); /*toggle*/
+		schedule_work(&ev->work_q);
 		break;
 	case PTP_CLK_GPS_DOWN:
 		/* GPS Up-and-Down timer */
@@ -204,7 +225,13 @@ static void ptp_tai_tod_set_synchronous(u32 sec, int d_sec)
 
 	if (!sec && !d_sec)
 		sec = 1;
-	clock_restart = (d_sec <= 0) || (d_sec > 2);
+
+	if (mv_ptp_event.clock_restart_req) {
+		mv_ptp_event.clock_restart_req = 0;
+		clock_restart = 1;
+	} else {
+		clock_restart = (d_sec <= 0) || (d_sec > 2);
+	}
 
 	if (sec && !d_sec) {
 		/* Absolute set required */
@@ -231,6 +258,7 @@ static void ptp_event_work_cb(struct work_struct *work)
 	enum mv_ptp_event_clock_state curr = ev->state;
 	struct mv_pp3_tai_tod ts;
 	u16 in_cntr_1pps;
+	int sync_bad;
 
 	switch (curr) {
 	case PTP_CLK_SYNC_START_TIMER:
@@ -280,6 +308,24 @@ static void ptp_event_work_cb(struct work_struct *work)
 		}
 		break;
 	case PTP_CLK_GPS_UP:
+		if (!ev->gps_watchdog_expired) {
+			/* per-second Heart-bit service:
+			 * sync-check, GPS-Up watchdog, led
+			 */
+			if (!ev->sync_check_polling_limit) {
+				sync_bad = 0;
+			} else {
+				sync_bad = ptp_is_sync_bad();
+				if (ev->sync_check_polling_limit > 0)
+					ev->sync_check_polling_limit--;
+			}
+			if (!sync_bad) {
+				mod_timer(&ev->timer, MSEC_1PPS_D(30));
+				ptp_event_led_blink(ev, -1); /*toggle*/
+				break;
+			}
+		}
+		ev->gps_watchdog_expired = 0;
 		ev->state = PTP_CLK_GPS_DOWN;
 		/* clock is free-running but stable */
 		pr_info("GPS 1PPS is Down\n");
@@ -323,7 +369,11 @@ static void ptp_event_timer_cb(unsigned long data)
 		break;
 
 	case PTP_CLK_SYNC_START_TIMER:
+		schedule_work(&ev->work_q);
+		break;
+
 	case PTP_CLK_GPS_UP:
+		ev->gps_watchdog_expired = 1;
 		schedule_work(&ev->work_q);
 		break;
 
@@ -382,11 +432,12 @@ static void ptp_event_monitor_stop(void) /* == deinit */
 		ev->gpio_irq_engaged = false;
 		ev->state = PTP_CLK_FREE_RUN;
 		ev->gps_up_already_printed = false;
+		ev->clock_restart_req = 1;
 	}
 }
 
 
-void mv_pp3_tai_clock_from_external_sync(u32 start, u32 sec, int d_sec)
+void mv_pp3_tai_clock_from_external_sync(int start, u32 sec, int d_sec)
 {
 	struct mv_ptp_event *ev = &mv_ptp_event;
 
@@ -396,6 +447,7 @@ void mv_pp3_tai_clock_from_external_sync(u32 start, u32 sec, int d_sec)
 		return;
 	}
 	if (start) {
+		ptp_event_monitor_start();
 		/* if both sec/d_sec == 0 - sync without set ToD requested
 		 * if both sec/d_sec == 1 - sync with keep current ToD
 		 */
@@ -403,8 +455,19 @@ void mv_pp3_tai_clock_from_external_sync(u32 start, u32 sec, int d_sec)
 			d_sec = 0;
 		ev->sec = sec;
 		ev->d_sec = d_sec;
-		ptp_event_monitor_start();
-		ev->state = PTP_CLK_SYNC_START;
+
+		if (start == 1) {
+			ev->state = PTP_CLK_SYNC_START; /* Starts at once */
+			ev->sync_check_polling_limit = 0;
+		} else {
+			/* Extended sync with stabilization delay
+			 * MV_PTP_GPS_DOWN2UP_PULSES and unlimited polling
+			 */
+			ev->state = PTP_CLK_GPS_DOWN;
+			ev->sync_check_polling_limit = -1;
+		}
+		ev->state_cntr = 0;
+
 		ptp_event_ptp_gpioirq(0, 1);
 	} else {
 		ptp_event_monitor_stop();
@@ -454,9 +517,40 @@ void mv_pp3_tai_clock_external_init2(bool from_external)
 		return;
 
 	if (from_external)
-		mv_pp3_tai_clock_from_external_sync(1, 1, 1);
+		mv_pp3_tai_clock_from_external_sync(2, 1, 1);
 }
 
+
+ssize_t mv_pp3_tai_clock_status_get_sysfs(char *buf)
+{
+	static const char * const status_str[] = {
+		"0:off",
+		"1:internal",
+		"2:sync_ok",
+		"3:sync_ok_checkpoll",
+		"4:sync_fail",
+	};
+	enum mv_ptp_event_clock_state ext_state = mv_ptp_event.state;
+	int sz, idx;
+	u32 clock_in_cntr;
+
+	if (!mv_pp3_tai_clock_enable_get()) {
+		idx = 0;
+	} else if (ext_state == PTP_CLK_FREE_RUN) {
+		idx = 1;
+	} else if (ext_state == PTP_CLK_GPS_UP) {
+		if (!mv_ptp_event.sync_check_polling_limit)
+			idx = 2;
+		else
+			idx = 3;
+	} else {
+		idx = 4;
+	}
+	mv_pp3_tai_clock_in_cntr_get(&clock_in_cntr);
+	sz  = scnprintf(buf, PAGE_SIZE, "%s, 1pps-in-cntr=%u\n",
+			status_str[idx], clock_in_cntr);
+	return sz;
+}
 
 /******************************************************************************
 * PTP-Event is a physical pulse obtained over MV_PTP_EVENT_MPP_DTB_STRING pin.

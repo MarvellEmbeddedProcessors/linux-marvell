@@ -53,6 +53,8 @@ static u32 ptp_tai_clock_in_cntr;
 static bool ptp_tai_clock_enabled;
 static bool ptp_tai_clock_external_cfg;
 
+static DEFINE_MUTEX(ptp_op_mutex);
+static DEFINE_MUTEX(ptp_clock_in_cntr_mutex);
 
 /************************************************************************/
 /*********    HW-level utilities     ************************************/
@@ -97,11 +99,21 @@ u16 mv_pp3_tai_clock_in_cntr_get(u32 *accumulated)
 	/* The HW 1PPS-in-Counter is reset upon reading
 	 * If some contexts are using this the "accumulated" is prefered
 	 */
-	u32 regv = mv_pp3_ptp_reg_read(MV_TAI_INCOMING_CLOCKIN_CNTING_CFG_LOW_REG);
+	u32 regv;
+	int mutex_req;
+
+	mutex_req = !in_interrupt();
+	if (mutex_req)
+		mutex_lock(&ptp_clock_in_cntr_mutex);
+
+	regv = mv_pp3_ptp_reg_read(MV_TAI_INCOMING_CLOCKIN_CNTING_CFG_LOW_REG);
 	regv &= MV_TAI_INCOMING_CLOCKIN_CNTING_CFG_LOW_CLOCK_CNTR_BITS_0_15_MASK;
 	ptp_tai_clock_in_cntr += regv;
 	if (accumulated)
 		*accumulated = ptp_tai_clock_in_cntr;
+
+	if (mutex_req)
+		mutex_unlock(&ptp_clock_in_cntr_mutex);
 	return (u16)regv;
 }
 
@@ -304,7 +316,7 @@ int mv_pp3_tai_tod_op(enum mv_pp3_tai_ptp_op op, struct mv_pp3_tai_tod *ts,
 			int synced_op)
 {
 	u32 ctrl, ctrl_new, status;
-	int rc = 0;
+	int rc = 0, mutex_req;
 	bool keep_last_op = (bool)synced_op;
 	u32 trigger_bit = synced_op ? 0 : 1;
 
@@ -321,7 +333,9 @@ int mv_pp3_tai_tod_op(enum mv_pp3_tai_ptp_op op, struct mv_pp3_tai_tod *ts,
 		}
 	}
 
-	/* mutex_lock - if needed, place here*/
+	mutex_req = !in_interrupt();
+	if (mutex_req)
+		mutex_lock(&ptp_op_mutex);
 
 	if (unlikely(op == MV_TAI_NOP)) {
 		ctrl = mv_pp3_ptp_reg_read(MV_TAI_TIME_CNTR_FUNC_CFG_0_REG);
@@ -357,6 +371,7 @@ exit:
 	if ((!keep_last_op) && (ctrl_new != ctrl)) /* restore original */
 		mv_pp3_ptp_reg_write(MV_TAI_TIME_CNTR_FUNC_CFG_0_REG, ctrl);
 
-	/* mutex_unlock - if needed, place here*/
+	if (mutex_req)
+		mutex_unlock(&ptp_op_mutex);
 	return rc;
 }
