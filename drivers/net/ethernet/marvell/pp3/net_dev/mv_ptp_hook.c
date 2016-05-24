@@ -55,7 +55,10 @@ Marvell copyright notice above.
 #define PTP_TS_CS_CORRECTION_SIZE	2
 
 /* FEATURES */
+/*#define PTP_FILLER_EMPTY*/
+#ifndef PTP_FILLER_EMPTY
 #define PTP_FILLER_CONTROL
+#endif
 #define PTP_IGNORE_TIMESTAMPING_FLAG_FOR_DEBUG
 #define PTP_TS_TRAFFIC_CORRECTION
 
@@ -138,7 +141,7 @@ void mv_ptp_hook_extra_op(u32 val1, u32 val2, u32 val3)
 		}
 		rc = 0;
 	}
-	pr_info("echo deb f .. > [F]iller enable = %d (1:without, 2/3:with TS, 0xFn:ADDRs save)\n",
+	pr_info("echo deb f .. > [F]iller = %d ([1/2/3]:8k/16k/64, 0xff0:MAC/IP+TStamp)\n",
 		pp3_ptp_filler_enable);
 #endif
 	PTP_DELAY_TRACE_CFG_DBG(val1, val2, val3, &rc);
@@ -271,9 +274,24 @@ static inline void mv_pp3_rx_traffic_handle(int emac_num, int pkt_len,
 #define mv_pp3_rx_traffic_handle(IDX, LEN, DATA, RX_DONE)
 #endif/*PTP_TS_TRAFFIC_CORRECTION*/
 
-static inline int mv_pp3_send_filler_pkt_cfh(struct pp3_dev_priv *dev_priv, u8 *pkt_data,
-				int cpu, struct pp3_vq  **p_tx_vq, struct pp3_swq **p_tx_swq)
+/* Pre-prototype */
+static inline void mv_pp3_mdata_build_on_cfh(u16 port_src, u16 port_dst, u8 cos, struct mv_cfh_common *cfh);
+static inline u8 mv_pp3_cos_get(struct sk_buff *skb);
+static inline u32 mv_pp3_skb_tx_csum(struct sk_buff *skb, struct pp3_vport *cpu_vp);
+
+static inline void mv_pp3_send_filler_pkt_cfh(struct sk_buff *skb, struct net_device *dev)
 {
+#ifdef PTP_FILLER_EMPTY
+	/* No filler required. Used only for extra ptp configurations */
+	int cpu = smp_processor_id();
+	int vq = 0;
+	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
+	struct pp3_vport *cpu_vp = dev_priv->cpu_vp[cpu];
+	struct pp3_vq *tx_vq = cpu_vp->tx_vqs[vq];
+	struct pp3_swq *tx_swq = tx_swq = tx_vq->swq;
+
+	ptp_raise_tx_q_priority(dev_priv, cpu_vp, &tx_vq, &tx_swq);
+#else
 	/* Use filler with MAX possible len "built into" the CFH = 64bytes
 	 * but with MaxMax FIFO = 16k-2
 	 * It could have "any contents" but let's use UDP/PTP_319 DELAY_REQUEST
@@ -282,127 +300,131 @@ static inline int mv_pp3_send_filler_pkt_cfh(struct pp3_dev_priv *dev_priv, u8 *
 	 * could save valid MAC and IPv4 addresses from given PTP packet
 	 * For debug only we could save-and-use real MACs and IPs from the packet
 	 */
-	#define DBG_FILLER_REPLACEABLE_SIZE	((12 + 2)/*l2sz*/ + 20/*IPv4sz*/)
-	static u8 pkt_l2[62] = { 0x00, 0x00,  /* marvell header */
-	/*02*/ 0x3c, 0xff, 0xff, 0xff, 0xff, 0xff, 0x3c, 0xff, 0xff, 0xff, 0xff, 0xff, /*MAC dst/src*/
-	/*14*/ 0x08, 0x00, 0x45, 0x00,	0x00, 0x30/*IPlen*/,
+	#define DBG_FILLER_REPLACEABLE_SIZE	(MV_MH_SIZE + (12 + 2)/*l2sz*/ + 20/*IPv4sz*/)
+	static u8 filler_l2[MV_PP3_CFH_PAYLOAD_MAX_SIZE] = {
+	/*00*/ 0x00, 0x00,  /* marvell header */
+	/*02*/ 0x40, 0xde, 0xad, 0xbe, 0xef, 0xef, 0x40, 0xde, 0xad, 0xbe, 0xef, 0xef, /*MAC dst/src*/
+	/*14*/ 0x08, 0x00, 0x45, 0x00, 0x00, 0x2e/*IPlen=46*/,
 	/*20*/ 0xb6, 0x3e, 0x40, 0x00, 0x40, 0x11/*UDP*/, 0x2f, 0xc6,
-	/*28*/ 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0,	0xc0, 0xc0, /* IPv4 addr src/dst: 192.192.192.192 */
-	/*36  =  (MV_MH_SIZE + 34:DBG_FILLER_REPLACEABLE_SIZE) */
-	/*36*/ 0x01, 0x3f, 0x01, 0x3f, 0x00, 0x1c, 0xbf, 0x3b, /* UDP Port=319/319, Lenght(2), CS(2) */
+	/*28*/ 0xc0, 0xc0, 0xc0, 0xc0, 0xc0, 0xc0,	0xc0, 0xc0, /* IPv4 addr src/dst: 193.193.193.193 */
+	/*36  = DBG_FILLER_REPLACEABLE_SIZE */
+	/*36*/ 0x01, 0x3f, 0x01, 0x3f, 0x00, 0x1a, 0xbf, 0x3b, /* UDP Port=319/319, length=26, CS(2) */
 	/*     0x_F -- PTP but Non-Standard MsgId */
 	/*44*/ 0x0f, 0x02, 0x00, 0x12, 0x04, 0x00, /* TimeStamp may be placed below this ...*/
 	/*50*/ 0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xff, 0xff
 	/*62*/
 	};
-	static u16 ptp_fp_len = 0x4000 - 2; /* 16k-2 */
-
-	/* cpu = smp_processor_id() */
-	/* p_tx_vq/p_tx_swq updated if raising priority */
-	/* tx_swq = tx_vq->swq */
-	struct pp3_swq *tx_swq = *p_tx_swq;
-	struct pp3_vport *cpu_vp = dev_priv->cpu_vp[cpu];
 
 	struct mv_cfh_common *cfh;
-	unsigned char *cfh_pdata;
-	int cfh_len_dg, pkt_len, rc = 0;
+	int cpu = smp_processor_id();
+	int global_cpu_vp, vq = 0;
+	unsigned int l3_l4_info;
+	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
+	struct pp3_vport *cpu_vp = dev_priv->cpu_vp[cpu];
+	struct pp3_vq *tx_vq = NULL;
+	struct pp3_swq *tx_swq = NULL;
+	int pkt_len, rd_offs, cfh_dg_size, cfh_size;
+	int cfh_pkt_len;
+	u8 *cfh_pkt_data;
+	u8 cos;
 
 #ifdef PTP_FILLER_CONTROL
 	if (!pp3_ptp_filler_enable)
-		goto exit;
+		return;
 #endif
+	/* get priority from mdata */
+	cos = mv_pp3_cos_get(skb);
 
-	cfh_len_dg = 96 / MV_PP3_CFH_DG_SIZE;
+	/* get vqueue mapped to priority */
+	vq = mv_pp3_egress_cos_to_vq_get(cpu_vp, cos);
 
-	/* get cfh */
-	cfh = (struct mv_cfh_common *)mv_pp3_hmac_txq_next_cfh(tx_swq->frame_num,
-								tx_swq->swq, cfh_len_dg);
-	if (!cfh) {
-		STAT_ERR(tx_swq->stats.pkts_errors++);
-		rc = -1;
-		goto exit;
-	}
-	cfh->plen_order = MV_CFH_PKT_LEN_SET(ptp_fp_len) | MV_CFH_REORDER_SET(REORD_NEW) |
-		MV_CFH_LAST_BIT_SET;
+	/* virtual queue equal software queue */
+	tx_vq = cpu_vp->tx_vqs[vq];
+	tx_swq = tx_vq->swq;
 
-	cfh->ctrl = MV_CFH_LEN_SET(cfh_len_dg * MV_PP3_CFH_DG_SIZE) |
-		MV_CFH_MODE_SET(HMAC_CFH) | MV_CFH_PP_MODE_SET(PP_TX_PACKET);
-
-	cfh->vm_bp = 0; /*Pool=0 but not MV_CFH_BPID_SET(1) */
-	cfh->marker_l = 0;
-	cfh->phys_l = 0;
-	cfh->l3_l4_info = 0;
-
-	cfh->tag1 = ptp_MV_CFH_HWQ_SET(*p_tx_vq, false) |
-			MV_CFH_ADD_CRC_BIT_SET | MV_CFH_L2_PAD_BIT_SET;
+	pkt_len = MV_PP3_CFH_PAYLOAD_MAX_SIZE - 2; /* 2 for TimeStamp CheckSum correction */
+	cfh_pkt_len = 0x2000; /* fake 8kB instead of (pkt_len + MV_PP3_CFH_MDATA_SIZE) */
 
 #ifdef PTP_FILLER_CONTROL
+	if ((pp3_ptp_filler_enable & 0x0f) == 2)
+		cfh_pkt_len = 0x4000; /* fake 16kB */
+	if ((pp3_ptp_filler_enable & 0x0f) == 3)
+		cfh_pkt_len = pkt_len + MV_PP3_CFH_MDATA_SIZE;
+#endif
+	rd_offs = 0;
+	cfh_dg_size = MV_PP3_CFH_DG_MAX_NUM;
+	cfh_size = cfh_dg_size * MV_PP3_CFH_DG_SIZE;
+
+	/* get cfh*/
+	cfh = (struct mv_cfh_common *)mv_pp3_hmac_txq_next_cfh(
+		tx_swq->frame_num, tx_swq->swq, cfh_dg_size);
+	if (!cfh)
+		goto end;
+
+	prefetchw(cfh);
+
+	/* write meta data to CFH */
+	global_cpu_vp = MV_PP3_CPU_VPORT_ID(cpu_vp->port.cpu.cpu_num);
+	mv_pp3_mdata_build_on_cfh(global_cpu_vp, cpu_vp->dest_vp, cos, cfh);
+
+	/* Copy filler-packet to CFH */
+	cfh_pkt_data = (u8 *)cfh + MV_PP3_CFH_PKT_SIZE;
+	memcpy(cfh_pkt_data, filler_l2, pkt_len);
+#ifdef PTP_FILLER_CONTROL
 	if (pp3_ptp_filler_enable & 0xf0) {
-		/* Construct special DEBUG filler-buffer "pkt_l2" (IPv4 only)
-		 * for HW-TS checking and measurement
-		 */
-		u8 tmp[4], *pf;
+		/* DEBUG: Send filler to the real MAC/IP destination same as original PTP */
+		memcpy(cfh_pkt_data, skb->data, DBG_FILLER_REPLACEABLE_SIZE);
+		/* get back the filler's IPlen */
+		cfh_pkt_data[19] = filler_l2[19];
+	}
+#endif
+	cfh->plen_order = MV_CFH_PKT_LEN_SET(cfh_pkt_len) |
+				MV_CFH_REORDER_SET(REORD_NEW) | MV_CFH_LAST_BIT_SET;
 
-		pf = pkt_l2 + MV_MH_SIZE;
-		/* Save MAC/IP addresses of original PTP into filler-buffer "pkt_l2" */
-		memcpy(pf, pkt_data + MV_MH_SIZE, DBG_FILLER_REPLACEABLE_SIZE);
+	cfh->ctrl = MV_CFH_RD_SET(rd_offs + MV_PP3_CFH_PAYLOAD_MAX_SIZE) |
+			MV_CFH_LEN_SET(cfh_size) | MV_CFH_MDATA_BIT_SET |
+			MV_CFH_MODE_SET(HMAC_CFH) | MV_CFH_PP_MODE_SET(PP_TX_PACKET_NSS);
 
-		if (pp3_ptp_filler_enable & 0x20) {
-			/* Set MAC-dst Broadcast */
-			/*pf = pkt_l2 + MV_MH_SIZE; already done*/
-			memset(pf, 0xff, 6);
-		}
-		if (pp3_ptp_filler_enable & 0x40) {
-			/* Swap IPv4 src/dst */
-			pf = pkt_l2 + MV_MH_SIZE + 26;
-			memcpy(tmp, pf, 4);
-			memcpy(pf, pf + 4, 4);
-			memcpy(pf + 4, tmp, 4);
-		}
-		if (pp3_ptp_filler_enable & 0x80) {
-			/* Set real 62 lenght instead filler's huge size */
-			ptp_fp_len = sizeof(pkt_l2);
-		}
-		pp3_ptp_filler_enable &= ~0xf0;
+	/* Use for filler the same l3_l4_info as in original PTP packet */
+	l3_l4_info = mv_pp3_skb_tx_csum(skb, cpu_vp);
+	if (l3_l4_info) {
+		/* QC bit set at cfh word1 only if l3 or l4 checksum are calc by HW*/
+		cfh->l3_l4_info = l3_l4_info;
+		cfh->ctrl |= MV_CFH_QC_BIT_SET;
 	}
 
-	if (pp3_ptp_filler_enable > 1) {
+	/* CFH store packet data, pdata point to start point of payload data in cfh */
+	cfh->vm_bp = 0;
+	cfh->marker_l = 0;
+	cfh->phys_l = 0;
+	cfh->ctrl &= ~MV_CFH_RD_MASK;
+	cfh->tag1 = MV_CFH_ADD_CRC_BIT_SET | MV_CFH_L2_PAD_BIT_SET;
+	cfh->tag2 = 0;
+#ifdef PTP_FILLER_CONTROL
+	if (pp3_ptp_filler_enable & 0xf00) {
+		/* With TimeStamp */
 		/* filler with TS and CS/CUE avoids latency ~5uSec */
 		/*  TSE, QS, TS_off, CS_off, CUE, PACT, PF, WC, DE, ETS */
 		/*   1,  0,    50,    60,    1(!), 4/6,  0,  0,  0,   0 */
 		cfh->tag1 |= MV_CFH_PTP_TSE_SET;
 		cfh->tag2 = MV_CFH_PTP_TS_OFF_SET(50 - MV_MH_SIZE); /*TS_off*/
-		/* CUE: UDP-CS-Enable and CS_off (2bytes used) if needed *
-		cfh->tag2 |= MV_CFH_PTP_CUE_SET(1) | MV_CFH_PTP_CS_OFF_SET(60 - MV_MH_SIZE);
-		*/
-		if (pp3_ptp_filler_enable > 2)
-			cfh->tag2 |= MV_CFH_PTP_PACT_SET(6); /*PACT=AddTime2packet+Capture*/
-		else
-			cfh->tag2 |= MV_CFH_PTP_PACT_SET(4); /*PACT=AddTime2packet*/
-	} else {
-		cfh->tag2 = 0;
+		cfh->tag2 |= MV_CFH_PTP_PACT_SET(4); /*PACT=AddTime2packet*/
+		/*   tag2 |= MV_CFH_PTP_PACT_SET(6) if need AddTime2packet+Capture*/
 	}
-#else
-	cfh->tag2 = 0;
 #endif
 
-	/* copy packet to CFH */
-	pkt_len = sizeof(pkt_l2) - 2;  /* not including MV_MH_SIZE */
-	cfh_pdata = (unsigned char *)cfh + MV_PP3_CFH_HDR_SIZE;
-	memcpy(cfh_pdata, pkt_l2, sizeof(pkt_l2));
-
-	/* transmit CFH */
 	wmb();
-	mv_pp3_hmac_txq_send(tx_swq->frame_num, tx_swq->swq, cfh_len_dg);
+	/* transmit CFH */
+	mv_pp3_hmac_txq_send(tx_swq->frame_num, tx_swq->swq, cfh_dg_size);
 
 	DEV_PRIV_STATS(dev_priv, cpu)->tx_pkt_dev++;
-	DEV_PRIV_STATS(dev_priv, cpu)->tx_bytes_dev += pkt_len;
-
+	DEV_PRIV_STATS(dev_priv, cpu)->tx_bytes_dev += (pkt_len - MV_MH_SIZE);
 	STAT_DBG(tx_swq->stats.pkts++);
-	STAT_DBG(cpu_vp->port.cpu.stats.tx_bytes += pkt_len);
-exit:
-	ptp_raise_tx_q_priority(dev_priv, cpu_vp, p_tx_vq, p_tx_swq);
-	return rc;
+	STAT_DBG(cpu_vp->port.cpu.stats.tx_bytes += (pkt_len - MV_MH_SIZE));
+
+end:
+	ptp_raise_tx_q_priority(dev_priv, cpu_vp, &tx_vq, &tx_swq);
+#endif /*PTP_FILLER_EMPTY*/
 }
 
 static inline void mv_pp3_is_pkt_ptp_rx_proc(struct pp3_dev_priv *dev_priv,
