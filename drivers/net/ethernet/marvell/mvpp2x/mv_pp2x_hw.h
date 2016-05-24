@@ -55,6 +55,12 @@ static inline u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 	return readl(hw->cpu_base[smp_processor_id()] + offset);
 }
 #endif
+
+void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 data);
+u32 mv_pp2x_relaxed_read(struct mv_pp2x_hw *hw, u32 offset);
+
+
+
 static inline void mv_pp22_thread_write(struct mv_pp2x_hw *hw, u32 sw_thread,
 					     u32 offset, u32 data)
 {
@@ -65,6 +71,20 @@ static inline u32 mv_pp22_thread_read(struct mv_pp2x_hw *hw, u32 sw_thread,
 					    u32 offset)
 {
 	return readl(hw->base + sw_thread*MVPP2_ADDR_SPACE_SIZE + offset);
+}
+
+static inline void mv_pp22_thread_relaxed_write(struct mv_pp2x_hw *hw,
+						u32 sw_thread,
+						u32 offset, u32 data)
+{
+	writel_relaxed(data, hw->base + sw_thread*MVPP2_ADDR_SPACE_SIZE + offset);
+}
+
+static inline u32 mv_pp22_thread_relaxed_read(struct mv_pp2x_hw *hw,
+					      u32 sw_thread,
+					      u32 offset)
+{
+	return readl_relaxed(hw->base + sw_thread*MVPP2_ADDR_SPACE_SIZE + offset);
 }
 
 static inline void mv_pp21_isr_rx_group_write(struct mv_pp2x_hw *hw, int port,
@@ -105,7 +125,7 @@ static inline int mv_pp2x_txq_phys(int port, int txq)
 /* Get number of Rx descriptors occupied by received packets */
 static inline int mv_pp2x_rxq_received(struct mv_pp2x_port *port, int rxq_id)
 {
-	u32 val = mv_pp2x_read(&port->priv->hw, MVPP2_RXQ_STATUS_REG(rxq_id));
+	u32 val = mv_pp2x_relaxed_read(&port->priv->hw, MVPP2_RXQ_STATUS_REG(rxq_id));
 
 	return val & MVPP2_RXQ_OCCUPIED_MASK;
 }
@@ -266,25 +286,9 @@ static inline void mv_pp2x_bm_pool_put(struct mv_pp2x_hw *hw, u32 pool,
 					      struct sk_buff *buf_virt_addr)
 {
 
-/*TODO: Validate this is  correct CONFIG_XXX for (sk_buff *),
- * it is a kmem_cache address (YuvalC).
- */
-#ifdef CONFIG_64BIT /*CONFIG_PHYS_ADDR_T_64BIT*/
-	u32 val = 0;
-
-	val = (upper_32_bits((uintptr_t)buf_virt_addr) &
-		MVPP22_ADDR_HIGH_MASK) << MVPP22_BM_VIRT_HIGH_RLS_OFFST;
-#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-	val |= (upper_32_bits(buf_phys_addr) &
-		MVPP22_ADDR_HIGH_MASK) << MVPP22_BM_PHY_HIGH_RLS_OFFSET;
-
-#endif
-	mv_pp2x_write(hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG, val);
-#endif
-
-	mv_pp2x_write(hw, MVPP2_BM_VIRT_RLS_REG,
-		      lower_32_bits((uintptr_t)buf_virt_addr));
-	mv_pp2x_write(hw, MVPP2_BM_PHY_RLS_REG(pool),
+	mv_pp2x_relaxed_write(hw, MVPP2_BM_VIRT_RLS_REG,
+			      lower_32_bits((uintptr_t)buf_virt_addr));
+	mv_pp2x_relaxed_write(hw, MVPP2_BM_PHY_RLS_REG(pool),
 		      lower_32_bits(buf_phys_addr));
 
 }
@@ -354,20 +358,23 @@ static inline void mv_pp2x_qvector_interrupt_disable(struct queue_vector *q_vec)
 }
 
 static inline int mv_pp2x_txq_sent_desc_proc(struct mv_pp2x_port *port,
-						  struct mv_pp2x_tx_queue *txq)
+					     int sw_thread,
+					     u8 txq_id)
 {
 	u32 val;
 
 	/* Reading status reg resets transmitted descriptor counter */
 	if (port->priv->pp2_version == PPV21) {
-		val = mv_pp2x_read(&(port->priv->hw),
-				   MVPP21_TXQ_SENT_REG(txq->id));
+		val = mv_pp22_thread_relaxed_read(&port->priv->hw,
+							sw_thread,
+							MVPP21_TXQ_SENT_REG(txq_id));
 		return (val & MVPP21_TRANSMITTED_COUNT_MASK) >>
 			MVPP21_TRANSMITTED_COUNT_OFFSET;
 		}
 	else {
-		val = mv_pp2x_read(&(port->priv->hw),
-				   MVPP22_TXQ_SENT_REG(txq->id));
+		val = mv_pp22_thread_relaxed_read(&port->priv->hw,
+						  sw_thread,
+						  MVPP22_TXQ_SENT_REG(txq_id));
 		return (val & MVPP22_TRANSMITTED_COUNT_MASK) >>
 			MVPP22_TRANSMITTED_COUNT_OFFSET;
 		}
@@ -426,7 +433,7 @@ static inline dma_addr_t mv_pp22_rxdesc_phys_addr_get(
 {
 	return((dma_addr_t)
 		(rx_desc->u.pp22.buf_phys_addr_key_hash &
-		DMA_BIT_MASK(40)));
+		DMA_BIT_MASK(32)));
 }
 
 static inline struct sk_buff *mv_pp21_txdesc_cookie_get(
