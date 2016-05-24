@@ -364,6 +364,8 @@ struct mvneta_pcpu_port {
 	u32			cause_rx_tx;
 };
 
+#define MVNETA_PORT_F_CLEANUP_TIMER_BIT  0
+
 struct mvneta_port {
 	struct mvneta_pcpu_port __percpu	*ports;
 	struct mvneta_pcpu_stats __percpu	*stats;
@@ -411,6 +413,10 @@ struct mvneta_port {
 	u64 data_high;
 #endif
 	u16 rx_offset_correction;
+
+	/* Timer to refill missed buffers */
+	struct timer_list   cleanup_timer;
+	unsigned long flags;
 };
 
 /* The mvneta_tx_desc and mvneta_rx_desc structures describe the
@@ -549,7 +555,9 @@ struct mvneta_rx_queue {
 	int size;
 
 	/* counter of times when mvneta_refill() failed */
-	int missed;
+	atomic_t missed;
+	atomic_t refill_stop;
+	struct mvneta_rx_desc *missed_desc;
 
 	u32 pkts_coal;
 	u32 time_coal;
@@ -738,6 +746,20 @@ static void mvneta_rxq_desc_num_update(struct mvneta_port *pp,
 		}
 		mvreg_write(pp, MVNETA_RXQ_STATUS_UPDATE_REG(rxq->id), val);
 	}
+}
+
+/* Return pointer to the following rx desc */
+static inline struct mvneta_rx_desc *
+mvneta_rxq_next_desc_ptr(struct mvneta_rx_queue *rxq, struct mvneta_rx_desc *rx_desc)
+{
+	struct mvneta_rx_desc *next_desc;
+
+	if (rx_desc == (rxq->descs + rxq->last_desc))
+		next_desc = rxq->descs;
+	else
+		next_desc = ++rx_desc;
+
+	return next_desc;
 }
 
 /* Get pointer to next RX descriptor to be processed by SW */
@@ -1570,7 +1592,6 @@ static void mvneta_frag_free(const struct mvneta_port *pp, void *data)
 /* Refill processing */
 static int mvneta_rx_refill(struct mvneta_port *pp,
 			    struct mvneta_rx_desc *rx_desc)
-
 {
 	dma_addr_t phys_addr;
 	void *data;
@@ -1629,6 +1650,69 @@ static u32 mvneta_skb_tx_csum(struct mvneta_port *pp, struct sk_buff *skb)
 	return MVNETA_TX_L4_CSUM_NOT;
 }
 
+/* Add cleanup timer to refill missed buffer */
+static inline void mvneta_add_cleanup_timer(struct mvneta_port *pp)
+{
+	if (test_and_set_bit(MVNETA_PORT_F_CLEANUP_TIMER_BIT, &pp->flags) == 0) {
+		pp->cleanup_timer.expires = jiffies + ((HZ * 10) / 1000); /* ms */
+		add_timer_on(&pp->cleanup_timer, smp_processor_id());
+	}
+}
+
+/***********************************************************
+ * mvneta_cleanup_timer_callback --			   *
+ *   N msec periodic callback for error cleanup            *
+ ***********************************************************/
+static void mvneta_cleanup_timer_callback(unsigned long data)
+{
+	struct mvneta_port *pp = (struct mvneta_port *)data;
+	struct mvneta_rx_desc *rx_desc;
+	int refill_num, queue, err;
+
+	clear_bit(MVNETA_PORT_F_CLEANUP_TIMER_BIT, &pp->flags);
+
+	if (!netif_running(pp->dev))
+		return;
+
+	/* alloc new skb with rxq_ctrl.missed, attach it with rxq_desc and valid the desc again */
+	for (queue = 0; queue < rxq_number; queue++) {
+		struct mvneta_rx_queue *rxq = &pp->rxqs[queue];
+
+		if (!atomic_read(&rxq->missed))
+			continue;
+
+		rx_desc = rxq->missed_desc;
+		refill_num = 0;
+
+		/* Allocate memory, refill */
+		while (atomic_read(&rxq->missed)) {
+			err = mvneta_rx_refill(pp, rx_desc);
+			if (err) {
+				/* update missed_desc and restart timer */
+				rxq->missed_desc = rx_desc;
+				mvneta_add_cleanup_timer(pp);
+				break;
+			}
+			atomic_dec(&rxq->missed);
+			/* Get pointer to next rx desc */
+			rx_desc = mvneta_rxq_next_desc_ptr(rxq, rx_desc);
+			refill_num++;
+		}
+
+		/* Update RxQ management counters */
+		if (refill_num) {
+			mvneta_rxq_desc_num_update(pp, rxq, 0, refill_num);
+
+			/* Update refill stop flag */
+			if (!atomic_read(&rxq->missed))
+				atomic_set(&rxq->refill_stop, 0);
+
+			pr_debug("%s: %d buffers refilled to rxq #%d - missed = %d\n",
+				 __func__, refill_num, rxq->id, atomic_read(&rxq->missed));
+		}
+	}
+}
+
 /* Drop packets received by the RXQ and free buffers */
 static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 				 struct mvneta_rx_queue *rxq)
@@ -1662,7 +1746,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 		     struct napi_struct *napi)
 {
 	struct net_device *dev = pp->dev;
-	int rx_done;
+	int rx_done, rx_filled;
 	u32 rcvd_pkts = 0;
 	u32 rcvd_bytes = 0;
 
@@ -1673,6 +1757,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 		rx_todo = rx_done;
 
 	rx_done = 0;
+	rx_filled = 0;
 
 	/* Fairness NAPI loop */
 	while (rx_done < rx_todo) {
@@ -1705,6 +1790,7 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 err_drop_frame:
 			dev->stats.rx_errors++;
 			/* leave the descriptor untouched */
+			rx_filled++;
 			continue;
 		}
 
@@ -1737,6 +1823,7 @@ err_drop_frame:
 			rcvd_bytes += rx_bytes;
 
 			/* leave the descriptor and buffer untouched */
+			rx_filled++;
 			continue;
 		}
 
@@ -1751,11 +1838,27 @@ err_drop_frame:
 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
 
 		/* Refill processing */
-		err = mvneta_rx_refill(pp, rx_desc);
-		if (err) {
-			netdev_warn(dev, "rxq #%d - Can't allocate RX buffer. Refill stopped\n", rxq->id);
-			rxq->missed++;
-			goto err_drop_frame;
+		if (!atomic_read(&rxq->refill_stop)) {
+			err = mvneta_rx_refill(pp, rx_desc);
+			if (err) {
+				netdev_err(dev, "Linux processing - Can't refill\n");
+				/* set refill stop flag */
+				atomic_set(&rxq->refill_stop, 1);
+
+				atomic_inc(&rxq->missed);
+
+				/* record the first rx desc refilled failure */
+				rxq->missed_desc = rx_desc;
+
+				/* add cleanup timer */
+				mvneta_add_cleanup_timer(pp);
+			} else {
+				/* successful refill */
+				rx_filled++;
+			}
+		} else {
+			/* refill already stopped - only update missed counter */
+			atomic_inc(&rxq->missed);
 		}
 
 		rcvd_pkts++;
@@ -1782,7 +1885,7 @@ err_drop_frame:
 	}
 
 	/* Update rxq management counters */
-	mvneta_rxq_desc_num_update(pp, rxq, rx_done, rx_done);
+	mvneta_rxq_desc_num_update(pp, rxq, rx_done, rx_filled);
 
 	return rx_done;
 }
@@ -3611,6 +3714,8 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
 		rxq->size = pp->rx_ring_size;
 		rxq->pkts_coal = MVNETA_RX_COAL_PKTS;
 		rxq->time_coal = MVNETA_RX_COAL_USEC;
+		atomic_set(&rxq->missed, 0);
+		atomic_set(&rxq->refill_stop, 0);
 	}
 
 	return 0;
@@ -3915,6 +4020,10 @@ static int mvneta_probe(struct platform_device *pdev)
 
 		put_device(&phy->dev);
 	}
+	/* Initialize cleanup */
+	init_timer(&pp->cleanup_timer);
+	pp->cleanup_timer.function = mvneta_cleanup_timer_callback;
+	pp->cleanup_timer.data = (unsigned long)pp;
 
 	return 0;
 
