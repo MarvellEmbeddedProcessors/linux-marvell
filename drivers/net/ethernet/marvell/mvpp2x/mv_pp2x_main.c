@@ -4411,6 +4411,8 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		struct mv_pp2x *priv,	u32 *cell_index, int *port_count)
 {
 	struct mv_pp2x_hw *hw = &priv->hw;
+	static int auto_cell_index;
+	static bool cell_index_dts_flag;
 	const struct of_device_id *match;
 #if !defined(CONFIG_MV_PP2_FPGA) && !defined(CONFIG_MV_PP2_PALLADIUM)
 	struct device_node *dn = pdev->dev.of_node;
@@ -4431,8 +4433,16 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 	priv->pp2xdata = (struct mv_pp2x_platform_data *) match->data;
 
 #if !defined(CONFIG_MV_PP2_FPGA) && !defined(CONFIG_MV_PP2_PALLADIUM)
-	if (of_property_read_u32(dn, "cell-index", cell_index))
-		*cell_index = 0;
+	if (of_property_read_u32(dn, "cell-index", cell_index)) {
+		*cell_index = auto_cell_index;
+		auto_cell_index++;
+	}
+
+	else
+		cell_index_dts_flag = true;
+
+	if (auto_cell_index && cell_index_dts_flag)
+		return -ENXIO;
 
 	MVPP2_PRINT_VAR(*cell_index);
 
@@ -4608,6 +4618,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 	/* Get system's tclk rate */
 	hw->tclk = clk_get_rate(hw->pp_clk);
 	MVPP2_PRINT_VAR(hw->tclk);
+
 #else
 	hw->tclk = 25000000;
 #endif
