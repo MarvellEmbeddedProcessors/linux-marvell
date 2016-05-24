@@ -495,12 +495,15 @@
 #define MVPP2_CLS2_ACT_QOS_ATTR_PRI_OFF		0
 #define MVPP2_CLS2_ACT_QOS_ATTR_PRI_BITS	3
 #define MVPP2_CLS2_ACT_QOS_ATTR_PRI_MASK	0x00000007
+#define MVPP2_CLS2_ACT_QOS_ATTR_PRI_MAX		((1 << MVPP2_CLS2_ACT_QOS_ATTR_PRI_BITS) - 1)
 #define MVPP2_CLS2_ACT_QOS_ATTR_DSCP_OFF	3
 #define MVPP2_CLS2_ACT_QOS_ATTR_DSCP_BITS	6
 #define MVPP2_CLS2_ACT_QOS_ATTR_DSCP_MASK	0x000001f8
+#define MVPP2_CLS2_ACT_QOS_ATTR_DSCP_MAX	((1 << MVPP2_CLS2_ACT_QOS_ATTR_DSCP_BITS) - 1)
 #define MVPP2_CLS2_ACT_QOS_ATTR_GEM_OFF		9
 #define MVPP2_CLS2_ACT_QOS_ATTR_GEM_BITS	12
 #define MVPP2_CLS2_ACT_QOS_ATTR_GEM_MASK	0x001ffe00
+#define MVPP2_CLS2_ACT_QOS_ATTR_GEM_MAX		((1 << MVPP2_CLS2_ACT_QOS_ATTR_GEM_BITS) - 1)
 #define MVPP2_CLS2_ACT_QOS_ATTR_QL_OFF		21
 #define MVPP2_CLS2_ACT_QOS_ATTR_QL_BITS		3
 #define MVPP2_CLS2_ACT_QOS_ATTR_QL_MASK		0x00e00000
@@ -511,9 +514,11 @@
 #define MVPP2_CLS2_ACT_HWF_ATTR_DPTR_OFF	1
 #define MVPP2_CLS2_ACT_HWF_ATTR_DPTR_BITS	15
 #define MVPP2_CLS2_ACT_HWF_ATTR_DPTR_MASK	0x0000fffe
+#define MVPP2_CLS2_ACT_HWF_ATTR_DPTR_MAX	((1 << MVPP2_CLS2_ACT_HWF_ATTR_DPTR_BITS) - 1)
 #define MVPP2_CLS2_ACT_HWF_ATTR_IPTR_OFF	16
 #define MVPP2_CLS2_ACT_HWF_ATTR_IPTR_BITS	8
 #define MVPP2_CLS2_ACT_HWF_ATTR_IPTR_MASK	0x00ff0000
+#define MVPP2_CLS2_ACT_HWF_ATTR_IPTR_MAX	((1 << MVPP2_CLS2_ACT_HWF_ATTR_IPTR_BITS) - 1)
 #define MVPP2_CLS2_ACT_HWF_ATTR_L4CHK_OFF	24
 #define MVPP2_CLS2_ACT_HWF_ATTR_L4CHK_BITS	1
 #define MVPP2_CLS2_ACT_HWF_ATTR_L4CHK_MASK	0x01000000
@@ -2296,6 +2301,11 @@ enum mv_pp22_rss_access_sel {
 	MVPP22_RSS_ACCESS_TBL,
 };
 
+enum mv_pp2_rss_hash_select {
+	MVPP2_RSS_HASH_0_4,
+	MVPP2_RSS_HASH_5_9,
+};
+
 /* Structure dexcribe RXQ and corresponding rss table */
 struct mv_pp22_rss_tbl_ptr {
 	u8 rxq_idx;
@@ -2318,6 +2328,411 @@ union mv_pp22_rss_access_entry {
 struct mv_pp22_rss_entry {
 	enum mv_pp22_rss_access_sel sel;
 	union mv_pp22_rss_access_entry u;
+};
+
+/* C3 or other module definetions */
+#define MVPP2_CLS_C3_HASH_TBL_SIZE			(4096)
+#define MVPP2_CLS_C3_MISS_TBL_SIZE			(64)
+#define MVPP2_CLS_C3_EXT_HEK_WORDS			(9)
+#define MVPP2_CLS_C3_SRAM_WORDS				(5)
+#define MVPP2_CLS_C3_EXT_TBL_SIZE			(256)
+#define MVPP2_CLS_C3_HEK_WORDS				(3)
+#define MVPP2_CLS_C3_HEK_BYTES				12 /* size in bytes */
+#define MVPP2_CLS_C3_BANK_SIZE				(512)
+#define MVPP2_CLS_C3_MAX_SEARCH_DEPTH			(16)
+
+/* Classifier C3 offsets in hash table */
+#define KEY_OCCUPIED				(116)
+#define KEY_FORMAT				(115)
+#define KEY_PTR_EXT				(107)
+
+#define KEY_PRT_ID(ext_mode)			((ext_mode == 1) ? (99) : (107))
+#define KEY_PRT_ID_MASK(ext_mode)		(((1 << KEY_CTRL_PRT_ID_BITS) - 1) << (KEY_PRT_ID(ext_mode) % 32))
+
+#define KEY_PRT_ID_TYPE(ext_mode)		((ext_mode == 1) ? (97) : (105))
+#define KEY_PRT_ID_TYPE_MASK(ext_mode)		((KEY_CTRL_PRT_ID_TYPE_MAX) << (KEY_PRT_ID_TYPE(ext_mode) % 32))
+
+#define KEY_LKP_TYPE(ext_mode)			((ext_mode == 1) ? (91) : (99))
+#define KEY_LKP_TYPE_MASK(ext_mode)		(((1 << KEY_CTRL_LKP_TYPE_BITS) - 1) << (KEY_LKP_TYPE(ext_mode) % 32))
+
+#define KEY_L4_INFO(ext_mode)			((ext_mode == 1) ? (88) : (96))
+#define KEY_L4_INFO_MASK(ext_mode)		(((1 << KEY_CTRL_L4_BITS) - 1) << (KEY_L4_INFO(ext_mode) % 32))
+
+#define KEY_CTRL_LKP_TYPE			4
+#define KEY_CTRL_LKP_TYPE_BITS			6
+
+#define KEY_CTRL_LKP_TYPE_MAX			((1 << KEY_CTRL_LKP_TYPE_BITS) - 1)
+#define KEY_CTRL_LKP_TYPE_MASK			(((1 << KEY_CTRL_LKP_TYPE_BITS) - 1) << KEY_CTRL_LKP_TYPE)
+
+#define KEY_CTRL_PRT_ID_TYPE			12
+#define KEY_CTRL_PRT_ID_TYPE_BITS		2
+#define KEY_CTRL_PRT_ID_TYPE_MAX		((1 << KEY_CTRL_PRT_ID_TYPE_BITS) - 1)
+#define KEY_CTRL_PRT_ID_TYPE_MASK		((KEY_CTRL_PRT_ID_TYPE_MAX) << KEY_CTRL_PRT_ID_TYPE)
+
+#define KEY_CTRL_PRT_ID				16
+#define KEY_CTRL_PRT_ID_BITS			8
+#define KEY_CTRL_PRT_ID_MAX			((1 << KEY_CTRL_PRT_ID_BITS) - 1)
+#define KEY_CTRL_PRT_ID_MASK			(((1 << KEY_CTRL_PRT_ID_BITS) - 1) << KEY_CTRL_PRT_ID)
+
+#define KEY_CTRL_HEK_SIZE			24
+#define KEY_CTRL_HEK_SIZE_BITS			6
+#define KEY_CTRL_HEK_SIZE_MAX			36
+#define KEY_CTRL_HEK_SIZE_MASK			(((1 << KEY_CTRL_HEK_SIZE_BITS) - 1) << KEY_CTRL_HEK_SIZE)
+
+struct mv_pp2x_cls_c3_hash_pair {
+	u16 pair_num;
+	u16 old_idx[MVPP2_CLS_C3_MAX_SEARCH_DEPTH];
+	u16 new_idx[MVPP2_CLS_C3_MAX_SEARCH_DEPTH];
+};
+
+struct mv_pp2x_cls_c3_entry {
+	u32 index;
+	u32 ext_index;
+
+	struct {
+		union {
+			u32 words[MVPP2_CLS_C3_EXT_HEK_WORDS];
+			u8 bytes[MVPP2_CLS_C3_EXT_HEK_WORDS * 4];
+		} hek;
+		u32 key_ctrl;/*0x1C10*/
+	} key;
+	union {
+		u32 words[MVPP2_CLS_C3_SRAM_WORDS];
+		struct {
+			u32 actions;/*0x1D40*/
+			u32 qos_attr;/*0x1D44*/
+			u32 hwf_attr;/*0x1D48*/
+			u32 dup_attr;/*0x1D4C*/
+			u32 seq_l_attr;/*0x1D50*/
+			u32 seq_h_attr;/*0x1D54*/
+		} regs;
+	} sram;
+};
+
+struct mv_pp2x_cls_c3_shadow_hash_entry {
+	/* valid if size > 0 */
+	/* size include the extension*/
+	int ext_ptr;
+	int size;
+};
+
+/* Classifier C4 Top Registers */
+#define MVPP2_CLS4_PHY_TO_RL_REG(port)			(0x1E00 + ((port)*4))
+#define MVPP2_CLS4_PHY_TO_RL_GRP			0
+#define MVPP2_CLS4_PHY_TO_RL_GRP_BITS			3
+#define MVPP2_CLS4_PHY_TO_RL_GRP_MASK			(((1 << MVPP2_CLS4_PHY_TO_RL_GRP_BITS) - 1) << \
+							 MVPP2_CLS4_PHY_TO_RL_GRP)
+#define MVPP2_CLS4_PHY_TO_RL_RULE_NUM			4
+#define MVPP2_CLS4_PHY_TO_RL_RULE_NUM_BITS		4
+#define MVPP2_CLS4_PHY_TO_RL_RULE_NUM_MASK		(((1 << MVPP2_CLS4_PHY_TO_RL_RULE_NUM_BITS) - 1) << \
+							 MVPP2_CLS4_PHY_TO_RL_RULE_NUM)
+
+#define MVPP2_CLS4_UNI_TO_RL_REG(uni)			(0x1E20 + ((uni)*4))
+#define MVPP2_CLS4_UNI_TO_RL_GRP			0
+#define MVPP2_CLS4_UNI_TO_RL_RULE_NUM			4
+
+#define MVPP2_CLS4_RL_INDEX_REG				(0x1E40)
+#define MVPP2_CLS4_RL_INDEX_RULE			0
+#define MVPP2_CLS4_RL_INDEX_GRP				3
+
+#define MVPP2_CLS4_FATTR1_REG				(0x1E50)
+#define MVPP2_CLS4_FATTR2_REG				(0x1E54)
+#define MVPP2_CLS4_FATTR_REG_NUM			2
+
+#define MVPP2_CLS4_FATTR_ID(field)			(((field) * 9) % 27)
+#define MVPP2_CLS4_FATTR_ID_BITS			6
+#define MVPP2_CLS4_FATTR_ID_MAX				((1 << MVPP2_CLS4_FATTR_ID_BITS) - 1)
+#define MVPP2_CLS4_FATTR_ID_MASK(field)			(MVPP2_CLS4_FATTR_ID_MAX << MVPP2_CLS4_FATTR_ID(field))
+#define MVPP2_CLS4_FATTR_ID_VAL(field, reg_val)		((reg_val & MVPP2_CLS4_FATTR_ID_MASK(field)) >> \
+							 MVPP2_CLS4_FATTR_ID(field))
+
+#define MVPP2_CLS4_FATTR_OPCODE_BITS			3
+#define MVPP2_CLS4_FATTR_OPCODE(field)			((((field) * 9) % 27) + MVPP2_CLS4_FATTR_ID_BITS)
+#define MVPP2_CLS4_FATTR_OPCODE_MAX			((1 << MVPP2_CLS4_FATTR_OPCODE_BITS) - 1)
+#define MVPP2_CLS4_FATTR_OPCODE_MASK(field)		(MVPP2_CLS4_FATTR_OPCODE_MAX << MVPP2_CLS4_FATTR_OPCODE(field))
+#define MVPP2_CLS4_FATTR_OPCODE_VAL(field, reg_val)	((reg_val & MVPP2_CLS4_FATTR_OPCODE_MASK(field)) >> \
+							 MVPP2_CLS4_FATTR_OPCODE(field))
+
+#define MVPP2_CLS4_FDATA1_REG				(0x1E58)
+#define MVPP2_CLS4_FDATA2_REG				(0x1E5C)
+#define MVPP2_CLS4_FDATA3_REG				(0x1E60)
+#define MVPP2_CLS4_FDATA4_REG				(0x1E64)
+#define MVPP2_CLS4_FDATA5_REG				(0x1E68)
+#define MVPP2_CLS4_FDATA6_REG				(0x1E6C)
+#define MVPP2_CLS4_FDATA7_REG				(0x1E70)
+#define MVPP2_CLS4_FDATA8_REG				(0x1E74)
+#define MVPP2_CLS4_FDATA_REG(reg_num)			(0x1E58 + (4*(reg_num)))
+#define MVPP2_CLS4_FDATA_REGS_NUM			8
+
+#define MVPP2_CLS4_FDATA7_L3INFO			16
+#define MVPP2_CLS4_FDATA7_L3INFO_BITS			4
+#define MVPP2_CLS4_L3INFO_MAX				((1 << MVPP2_CLS4_FDATA7_L3INFO_BITS) - 1)
+#define MVPP2_CLS4_L3INFO_MASK				(MVPP2_CLS4_L3INFO_MAX << MVPP2_CLS4_FDATA7_L3INFO)
+#define MVPP2_CLS4_L3INFO_VAL(reg_val)			(((reg_val) & MVPP2_CLS4_L3INFO_MASK) >> \
+							 MVPP2_CLS4_FDATA7_L3INFO)
+
+#define MVPP2_CLS4_FDATA7_L4INFO			20
+#define MVPP2_CLS4_FDATA7_L4INFO_BITS			4
+#define MVPP2_CLS4_L4INFO_MAX				((1 << MVPP2_CLS4_FDATA7_L4INFO_BITS) - 1)
+#define MVPP2_CLS4_L4INFO_MASK				(MVPP2_CLS4_L4INFO_MAX << MVPP2_CLS4_FDATA7_L4INFO)
+#define MVPP2_CLS4_L4INFO_VAL(reg_val)			(((reg_val) & MVPP2_CLS4_L4INFO_MASK) >> \
+							 MVPP2_CLS4_FDATA7_L4INFO)
+
+#define MVPP2_CLS4_FDATA7_MACME				24
+#define MVPP2_CLS4_FDATA7_MACME_BITS			2
+#define MVPP2_CLS4_MACME_MAX				((1 << MVPP2_CLS4_FDATA7_MACME_BITS) - 1)
+#define MVPP2_CLS4_MACME_MASK				(MVPP2_CLS4_MACME_MAX << MVPP2_CLS4_FDATA7_MACME)
+#define MVPP2_CLS4_MACME_VAL(reg_val)			(((reg_val) & MVPP2_CLS4_MACME_MASK) >> MVPP2_CLS4_FDATA7_MACME)
+
+#define MVPP2_CLS4_FDATA7_PPPOE				26
+#define MVPP2_CLS4_FDATA7_PPPOE_BITS			2
+#define MVPP2_CLS4_PPPOE_MAX				((1 << MVPP2_CLS4_FDATA7_PPPOE_BITS) - 1)
+#define MVPP2_CLS4_PPPOE_MASK				(MVPP2_CLS4_PPPOE_MAX << MVPP2_CLS4_FDATA7_PPPOE)
+#define MVPP2_CLS4_PPPOE_VAL(reg_val)			(((reg_val) & MVPP2_CLS4_PPPOE_MASK) >> MVPP2_CLS4_FDATA7_PPPOE)
+
+#define MVPP2_CLS4_FDATA7_VLAN				28
+#define MVPP2_CLS4_FDATA7_VLAN_BITS			3
+#define MVPP2_CLS4_VLAN_MAX				((1 << MVPP2_CLS4_FDATA7_VLAN_BITS) - 1)
+#define MVPP2_CLS4_VLAN_MASK				(MVPP2_CLS4_VLAN_MAX << MVPP2_CLS4_FDATA7_VLAN)
+#define MVPP2_CLS4_VLAN_VAL(reg_val)			(((reg_val) & MVPP2_CLS4_VLAN_MASK) >> MVPP2_CLS4_FDATA7_VLAN)
+
+#define MVPP2_CLS4_ACT_REG				(0x1E80)
+#define MVPP2_CLS4_ACT_QOS_ATTR_REG			(0x1E84)
+#define MVPP2_CLS4_ACT_DUP_ATTR_REG			(0x1E88)
+#define MVPP2_CNT_IDX_RULE(rule, set)			((rule) << 3 | (set))
+#define MVPP2_CLS_C4_TBL_HIT_REG			(0x7708)
+
+/* Classifier C4 constants */
+#define MVPP2_CLS_C4_GRP_SIZE				(8)
+#define MVPP2_CLS_C4_GRPS_NUM				(8)
+#define MVPP2_CLS_C4_TBL_WORDS				(10)
+#define MVPP2_CLS_C4_TBL_DATA_WORDS			(8)
+#define MVPP2_CLS_C4_SRAM_WORDS				(3)
+#define MVPP2_CLS_C4_FIELDS_NUM				(6)
+
+/* C4 entry structure */
+struct mv_pp2x_cls_c4_entry {
+	u32 ruleIndex;
+	u32 setIndex;
+	union {
+		u32	words[MVPP2_CLS_C4_TBL_WORDS];
+		struct {
+			u32 attr[MVPP2_CLS4_FATTR_REG_NUM];
+			u32 fdataArr[MVPP2_CLS_C4_TBL_DATA_WORDS];
+		} regs;
+	} rules;
+	union {
+		u32 words[MVPP2_CLS_C4_SRAM_WORDS];
+		struct {
+			u32 actions;/* 0x1E80 */
+			u32 qos_attr;/* 0x1E84*/
+			u32 dup_attr;/* 0x1E88 */
+		} regs;
+	} sram;
+};
+
+/************** TX Packet Modification Registers *******************/
+#define MVPP2_PME_TBL_IDX_REG			(0x8400)
+#define MVPP2_PME_TBL_INSTR_REG			(0x8480)
+/*--------------------------------------------------------------------------*/
+#define MVPP2_PME_TBL_DATA1_REG			(0x8500)
+#define MVPP2_PME_TBL_DATA2_REG			(0x8580)
+#define MVPP2_PME_TBL_DATA_BITS			16
+#define MVPP2_PME_TBL_DATA_OFFS(idx)		((idx == 0) ? MVPP2_PME_TBL_DATA_BITS : 0)
+#define MVPP2_PME_TBL_DATA_MASK(idx)		(((1 << MVPP2_PME_TBL_DATA_BITS) - 1) << MVPP2_PME_TBL_DATA_OFFS(idx))
+/*--------------------------------------------------------------------------*/
+#define MVPP2_PME_TBL_STATUS_REG		(0x8600)
+#define MVPP2_PME_TCONT_THRESH_REG		(0x8604)
+#define MVPP2_PME_MTU_REG			(0x8608)
+
+#define MVPP2_PME_MAX_VLAN_ETH_TYPES		4
+#define MVPP2_PME_VLAN_ETH_TYPE_REG(i)		(0x8610 + ((i) << 2))
+/*--------------------------------------------------------------------------*/
+#define MVPP2_PME_DEF_VLAN_CFG_REG			(0x8620)
+/*--------------------------------------------------------------------------*/
+#define MVPP2_PME_MAX_DSA_ETH_TYPES		2
+#define MVPP2_PME_DEF_DSA_CFG_REG(i)		(0x8624 + ((i) << 2))
+/*--------------------------------------------------------------------------*/
+#define MVPP2_PME_DEF_DSA_SRC_DEV_REG		(0x8630)
+#define MVPP2_PME_DSA_SRC_DEV_OFFS		1
+#define MVPP2_PME_DSA_SRC_DEV_BITS		4
+#define MVPP2_PME_DSA_SRC_DEV_ALL_MASK		(((1 << MVPP2_PME_DSA_SRC_DEV_BITS) - 1) << MVPP2_PME_DSA_SRC_DEV_OFFS)
+#define MVPP2_PME_DSA_SRC_DEV_MASK(dev)	((dev) << MVPP2_PME_DSA_SRC_DEV_OFFS)
+/*--------------------------------------------------------------------------*/
+#define MVPP2_PME_TTL_ZERO_FRWD_REG		(0x8640)
+#define MVPP2_PME_TTL_ZERO_FRWD_BIT		0
+#define MVPP2_PME_TTL_ZERO_FRWD_MASK		(1 << MVPP2_PME_TTL_ZERO_FRWD_BIT)
+/*--------------------------------------------------------------------------*/
+#define MVPP2_PME_PPPOE_ETYPE_REG		(0x8650)
+#define MVPP2_PME_PPPOE_DATA_REG		(0x8654)
+
+#define MVPP2_PME_PPPOE_CODE_OFFS		0
+#define MVPP2_PME_PPPOE_CODE_BITS		8
+#define MVPP2_PME_PPPOE_CODE_ALL_MASK		(((1 << MVPP2_PME_PPPOE_CODE_BITS) - 1) << MVPP2_PME_PPPOE_CODE_OFFS)
+#define MVPP2_PME_PPPOE_CODE_MASK(code)		(((code) << MVPP2_PME_PPPOE_CODE_OFFS) & MVPP2_PME_PPPOE_CODE_ALL_MASK)
+
+#define MVPP2_PME_PPPOE_TYPE_OFFS		8
+#define MVPP2_PME_PPPOE_TYPE_BITS		4
+#define MVPP2_PME_PPPOE_TYPE_ALL_MASK		(((1 << MVPP2_PME_PPPOE_TYPE_BITS) - 1) << MVPP2_PME_PPPOE_TYPE_OFFS)
+#define MVPP2_PME_PPPOE_TYPE_MASK(type)	(((type) << MVPP2_PME_PPPOE_TYPE_OFFS) & MVPP2_PME_PPPOE_TYPE_ALL_MASK)
+
+#define MVPP2_PME_PPPOE_VER_OFFS		12
+#define MVPP2_PME_PPPOE_VER_BITS		4
+#define MVPP2_PME_PPPOE_VER_ALL_MASK		(((1 << MVPP2_PME_PPPOE_VER_BITS) - 1) << MVPP2_PME_PPPOE_VER_OFFS)
+#define MVPP2_PME_PPPOE_VER_MASK(ver)		(((ver) << MVPP2_PME_PPPOE_VER_OFFS) & MVPP2_PME_PPPOE_VER_ALL_MASK)
+
+#define MVPP2_PME_PPPOE_LEN_REG			(0x8658)
+#define MVPP2_PME_PPPOE_PROTO_REG		(0x865c)
+
+#define MVPP2_PME_PPPOE_PROTO_OFFS(i)		((i == 0) ? 0 : 16)
+#define MVPP2_PME_PPPOE_PROTO_BITS		(16)
+#define MVPP2_PME_PPPOE_PROTO_ALL_MASK(i)	(((1 << MVPP2_PME_PPPOE_PROTO_BITS) - 1) << \
+						 MVPP2_PME_PPPOE_PROTO_OFFS(i))
+#define MVPP2_PME_PPPOE_PROTO_MASK(i, p)	(((p) << MVPP2_PME_PPPOE_PROTO_OFFS(i)) & \
+						 MVPP2_PME_PPPOE_PROTO_ALL_MASK(i))
+
+#define MVPP2_PME_CONFIG_REG			(0x8660)
+
+#define MVPP2_PME_MAX_HDR_SIZE_OFFS		0
+#define MVPP2_PME_MAX_HDR_SIZE_BITS		8
+#define MVPP2_PME_MAX_HDR_SIZE_ALL_MASK		(((1 << MVPP2_PME_MAX_HDR_SIZE_BITS) - 1) << \
+						 MVPP2_PME_MAX_HDR_SIZE_OFFS)
+#define MVPP2_PME_MAX_HDR_SIZE_MASK(size)	(((size) << MVPP2_PME_MAX_HDR_SIZE_OFFS) & \
+						 MVPP2_PME_MAX_HDR_SIZE_ALL_MASK)
+
+#define MVPP2_PME_MAX_INSTR_NUM_OFFS		16
+#define MVPP2_PME_MAX_INSTR_NUM_BITS		8
+#define MVPP2_PME_MAX_INSTR_NUM_ALL_MASK	(((1 << MVPP2_PME_MAX_INSTR_NUM_BITS) - 1) << \
+						 MVPP2_PME_MAX_INSTR_NUM_OFFS)
+#define MVPP2_PME_MAX_INSTR_NUM_MASK(num)	(((num) << MVPP2_PME_MAX_INSTR_NUM_OFFS) & \
+						 MVPP2_PME_MAX_INSTR_NUM_ALL_MASK)
+
+#define MVPP2_PME_DROP_ON_ERR_BIT		24
+#define MVPP2_PME_DROP_ON_ERR_MASK		(1 << MVPP2_PME_DROP_ON_ERR_BIT)
+/*--------------------------------------------------------------------------*/
+
+#define MVPP2_PME_STATUS_1_REG			(0x8664)
+#define MVPP2_PME_STATUS_2_REG(txp)		(0x8700 + 4 * (txp))
+#define MVPP2_PME_STATUS_3_REG(txp)		(0x8780 + 4 * (txp))
+
+/* PME insructions table (MV_PP2_PME_TBL_INSTR_REG) fields definition */
+#define MVPP2_PME_DATA_OFFS			0
+#define MVPP2_PME_DATA_BITS			16
+#define MVPP2_PME_DATA_MASK			(((1 << MVPP2_PME_DATA_BITS) - 1) << MVPP2_PME_DATA_OFFS)
+
+#define MVPP2_PME_CTRL_OFFS			16
+#define MVPP2_PME_CTRL_BITS			16
+#define MVPP2_PME_CTRL_MASK			(((1 << MVPP2_PME_CTRL_BITS) - 1) << MVPP2_PME_CTRL_OFFS)
+
+#define MVPP2_PME_CMD_OFFS			16
+#define MVPP2_PME_CMD_BITS			5
+#define MVPP2_PME_CMD_ALL_MASK			(((1 << MVPP2_PME_CMD_BITS) - 1) << MVPP2_PME_CMD_OFFS)
+#define MVPP2_PME_CMD_MASK(cmd)			((cmd) << MVPP2_PME_CMD_OFFS)
+
+#define MVPP2_PME_IP4_CSUM_BIT			21
+#define MVPP2_PME_IP4_CSUM_MASK			(1 << MVPP2_PME_IP4_CSUM_BIT)
+
+#define MVPP2_PME_L4_CSUM_BIT			22
+#define MVPP2_PME_L4_CSUM_MASK			(1 << MVPP2_PME_L4_CSUM_BIT)
+
+#define MVPP2_PME_LAST_BIT			23
+#define MVPP2_PME_LAST_MASK			(1 << MVPP2_PME_LAST_BIT)
+
+#define MVPP2_PME_CMD_TYPE_OFFS			24
+#define MVPP2_PME_CMD_TYPE_BITS			3
+#define MVPP2_PME_CMD_TYPE_ALL_MASK		(((1 << MVPP2_PME_CMD_TYPE_BITS) - 1) << MVPP2_PME_CMD_TYPE_OFFS)
+#define MVPP2_PME_CMD_TYPE_MASK(type)		((type) << MVPP2_PME_CMD_TYPE_OFFS)
+
+#define MVPP2_TOTAL_TXP_NUM			(16 + 3 - 1)
+
+/* PME data1 and data2 fields MVPP2_PME_TBL_DATA1_REG and MVPP2_PME_TBL_DATA2_REG */
+#define MVPP2_PME_TBL_DATA_BITS		16
+#define MVPP2_PME_TBL_DATA_OFFS(idx)	((idx == 0) ? MVPP2_PME_TBL_DATA_BITS : 0)
+#define MVPP2_PME_TBL_DATA_MASK(idx)	(((1 << MVPP2_PME_TBL_DATA_BITS) - 1) << MVPP2_PME_TBL_DATA_OFFS(idx))
+
+/* TX packet modification constants */
+#define MVPP2_PME_INSTR_SIZE	2600
+#define MVPP2_PME_DATA1_SIZE   (46 * 1024 / 2) /* 46KBytes = 23K data of 2 bytes */
+#define MVPP2_PME_DATA2_SIZE   (4 * 1024 / 2) /* 4KBytes = 2K data of 2 bytes */
+
+enum mv_pp2x_pme_instr {
+	MVPP2_PME_CMD_NONE = 0,
+	MVPP2_PME_CMD_ADD_2B,
+	MVPP2_PME_CMD_CFG_VLAN,
+	MVPP2_PME_CMD_ADD_VLAN,
+	MVPP2_PME_CMD_CFG_DSA_1,
+	MVPP2_PME_CMD_CFG_DSA_2,
+	MVPP2_PME_CMD_ADD_DSA,
+	MVPP2_PME_CMD_DEL_BYTES,
+	MVPP2_PME_CMD_REPLACE_2B,
+	MVPP2_PME_CMD_REPLACE_LSB,
+	MVPP2_PME_CMD_REPLACE_MSB,
+	MVPP2_PME_CMD_REPLACE_VLAN,
+	MVPP2_PME_CMD_DEC_LSB,
+	MVPP2_PME_CMD_DEC_MSB,
+	MVPP2_PME_CMD_ADD_CALC_LEN,
+	MVPP2_PME_CMD_REPLACE_LEN,
+	MVPP2_PME_CMD_IPV4_CSUM,
+	MVPP2_PME_CMD_L4_CSUM,
+	MVPP2_PME_CMD_SKIP,
+	MVPP2_PME_CMD_JUMP,
+	MVPP2_PME_CMD_JUMP_SKIP,
+	MVPP2_PME_CMD_JUMP_SUB,
+	MVPP2_PME_CMD_PPPOE,
+	MVPP2_PME_CMD_STORE,
+	MVPP2_PME_CMD_ADD_IP4_CSUM,
+	MVPP2_PME_CMD_PPPOE_2,
+	MVPP2_PME_CMD_REPLACE_MID,
+	MVPP2_PME_CMD_ADD_MULT,
+	MVPP2_PME_CMD_REPLACE_MULT,
+	MVPP2_PME_CMD_REPLACE_REM_2B,
+	MVPP2_PME_CMD_ADD_IP6_HDR,
+	MVPP2_PME_CMD_DROP_PKT = 0x1f,
+	MVPP2_TMP_CMD_LAST
+};
+/* PME entry structure */
+struct mv_pp2x_pme_entry {
+	int     index;
+	u32	word;
+};
+
+/* MC */
+/*-------------------------------------------------------------------------------*/
+#define MVPP2_MC_INDEX_REG			(0x160)
+#define MVPP2_MC_INDEX_MAX			((1 << MVPP2_CLS2_ACT_DUP_ATTR_DUPID_BITS) - 1)
+/*------------------------------------------------------------------------------*/
+#define MVPP2_MC_DATA1_REG			(0x164)
+#define	MVPP2_MC_DATA1_DPTR			1
+#define	MVPP2_MC_DATA1_IPTR			16
+/*------------------------------------------------------------------------------*/
+#define MVPP2_MC_DATA2_REG			(0x168)
+#define MVPP2_MC_DATA2_GEM_ID			0
+#define MVPP2_MC_DATA2_PRI			12
+#define MVPP2_MC_DATA2_DSCP			15
+#define MVPP2_MC_DATA2_GEM_ID_EN		(1 << 21)
+#define MVPP2_MC_DATA2_PRI_EN			(1 << 22)
+#define MVPP2_MC_DATA2_DSCP_EN			(1 << 23)
+/*------------------------------------------------------------------------------*/
+#define MVPP2_MC_DATA3_REG			(0x16C)
+#define MVPP2_MC_DATA3_QUEUE			0
+#define MVPP2_MC_DATA3_HWF_EN			(1 << 8)
+#define MVPP2_MC_DATA3_NEXT			16
+#define MVPP2_MC_DATA3_NEXT_MASK		(MVPP2_MC_INDEX_MAX << MVPP2_MC_DATA3_NEXT)
+
+#define MVPP2_MC_TBL_SIZE			256
+#define MVPP2_MC_WORDS				3
+
+/* MC entry structure */
+struct mv_pp2x_mc_entry {
+	u32 index;
+	union {
+		u32 words[MVPP2_MC_WORDS];
+		struct {
+			u32 data1;/* 0x164 */
+			u32 data2;/* 0x168 */
+			u32 data3;/* 0x16c */
+		} regs;
+	} sram;
 };
 
 #endif /*_MVPP2_HW_TYPE_H_*/
