@@ -54,6 +54,29 @@ err:
 	return -1;
 }
 /*---------------------------------------------------------------------------*/
+/* return max size of SWQ in packets and bytes */
+static int mv_pp3_vq_max_size_get(int vport, int vq, int *pkts, int *bytes)
+{
+	struct net_device *dev = mv_pp3_vport_dev_get(vport);
+	u16 size_pkts;
+
+	MV_PP3_NULL_PTR(dev, err);
+	MV_PP3_NULL_PTR(pkts, err);
+	MV_PP3_NULL_PTR(bytes, err);
+
+	/*SWQ size int packets*/
+	mv_pp3_dev_ingress_vq_size_get(dev, vq, &size_pkts);
+
+	*pkts = size_pkts;
+
+	/*SWQ size int bytes*/
+	*bytes =  size_pkts * dev->mtu;
+	return 0;
+err:
+	pr_err("%s: function failed\n", __func__);
+	return -1;
+}
+/*---------------------------------------------------------------------------*/
 static int mv_pp3_vq_reset_flag_set(int vport, int vq, int cpu, int reset)
 {
 	struct net_device *dev = mv_pp3_vport_dev_get(vport);
@@ -170,34 +193,6 @@ static int mv_pp3_ingress_vq_stats_update_after_dev_reset(int vport, int vq, int
 	pr_info("vp#%d vq#%d, cpu#%d: Sync statistics DB after reset\n", vport, vq, cpu);
 	return 0;
 }
-
-/*---------------------------------------------------------------------------*/
-/* update counters base after reset */
-
-
-static int mv_pp3_ingress_vq_stats_collect(int vport, int vq, int cpu)
-{
-	struct mv_pp3_vq_collect_stats *collect_stats = mv_pp3_stats_collect_get(vport, vq, cpu);
-	struct pp3_swq_stats *swq_stats = mv_pp3_ingress_vq_stats(vport, vq, cpu);
-
-	collect_stats->swq_ext_stats_curr.pkts = swq_stats->pkts;
-	collect_stats->swq_ext_stats_curr.bytes = swq_stats->bytes;
-	collect_stats->swq_ext_stats_curr.pkts_drop = swq_stats->pkts_drop;
-	collect_stats->swq_ext_stats_curr.pkts_errors = swq_stats->pkts_errors;
-
-	if (mv_pp3_ingress_hwq_stats(vport, vq, cpu, &collect_stats->fw_ext_stats_curr) < 0) {
-		pr_err("%s: failed to collect fw vport %d vq %d statistics\n", __func__, vport, vq);
-		return -1;
-	}
-	if (mv_pp3_vq_reset_flag_get(vport, vq, cpu)) {
-		if (mv_pp3_ingress_vq_stats_update_after_dev_reset(vport, vq, cpu) < 0) {
-			pr_err("%s: function failed\n", __func__);
-			return -1;
-		}
-		mv_pp3_vq_reset_flag_set(vport, vq, cpu, false);
-	}
-	return 0;
-}
 /*---------------------------------------------------------------------------*/
 static int mv_pp3_ingress_vq_stats_update(int vport, int vq, int cpu)
 {
@@ -232,6 +227,34 @@ static int mv_pp3_ingress_vq_stats_update(int vport, int vq, int cpu)
 	MV_UNLOCK(stats_lock, flags);
 	return 0;
 }
+
+/*---------------------------------------------------------------------------*/
+static int mv_pp3_ingress_vq_stats_collect_and_update(int vport, int vq, int cpu)
+{
+	struct mv_pp3_vq_collect_stats *collect_stats = mv_pp3_stats_collect_get(vport, vq, cpu);
+	struct pp3_swq_stats *swq_stats = mv_pp3_ingress_vq_stats(vport, vq, cpu);
+	int rc;
+
+	collect_stats->swq_ext_stats_curr.pkts = swq_stats->pkts;
+	collect_stats->swq_ext_stats_curr.bytes = swq_stats->bytes;
+	collect_stats->swq_ext_stats_curr.pkts_drop = swq_stats->pkts_drop;
+	collect_stats->swq_ext_stats_curr.pkts_errors = swq_stats->pkts_errors;
+
+	if (mv_pp3_ingress_hwq_stats(vport, vq, cpu, &collect_stats->fw_ext_stats_curr) < 0) {
+		pr_err("%s: failed to collect fw vport %d vq %d statistics\n", __func__, vport, vq);
+		return -1;
+	}
+	if (mv_pp3_vq_reset_flag_get(vport, vq, cpu)) {
+		if (mv_pp3_ingress_vq_stats_update_after_dev_reset(vport, vq, cpu) < 0) {
+			pr_err("%s: function failed\n", __func__);
+			return -1;
+		}
+		rc = mv_pp3_vq_reset_flag_set(vport, vq, cpu, false);
+	} else
+		rc = mv_pp3_ingress_vq_stats_update(vport, vq, cpu);
+
+	return rc;
+}
 /*---------------------------------------------------------------------------*/
 static void mv_pp3_stats_callback(unsigned long data)
 {
@@ -249,11 +272,9 @@ static void mv_pp3_stats_callback(unsigned long data)
 			continue;
 		vq_num = mv_pp3_dev_rxvq_num_get(dev, cpu);
 
-		for (vq = 0; vq < vq_num; vq++) {
-			mv_pp3_ingress_vq_stats_collect(vport, vq, cpu);
-			mv_pp3_ingress_vq_stats_update(vport, vq, cpu);
+		for (vq = 0; vq < vq_num; vq++)
+			mv_pp3_ingress_vq_stats_collect_and_update(vport, vq, cpu);
 
-		}
 	}
 	mv_pp3_timer_complete(stats_timer);
 
@@ -522,7 +543,6 @@ int mv_pp3_gnss_ingress_vport_ext_stats_clean(int vport)
 	if (!dev)
 		goto err;
 
-
 	if (vport > MV_NSS_EXT_PORT_MAX) {
 		pr_err("%s: Invalid virtual port %d\n", __func__, vport);
 		return -1;
@@ -561,14 +581,13 @@ err:
 EXPORT_SYMBOL(mv_pp3_gnss_ingress_vport_ext_stats_clean);
 
 /*---------------------------------------------------------------------------*/
-
 int mv_pp3_gnss_ingress_vport_ext_stats_get(int vport, bool clean, int size,
 						struct mv_nss_vq_advance_stats res_stats[])
 {
 	struct net_device *dev = mv_pp3_vport_dev_get(vport);
 	struct mv_pp3_stats_ext_vp *vp_priv;
 	struct mv_pp3_vq_update_stats *ext_stats;
-	int cpu, i, vq_num, rc = 0;
+	int cpu, i, vq_num, swq_max_pkt, swq_max_bytes, rc;
 	unsigned long flags = 0;
 	uint64_t temp64;
 
@@ -593,6 +612,8 @@ int mv_pp3_gnss_ingress_vport_ext_stats_get(int vport, bool clean, int size,
 	/* clear input */
 	memset(res_stats, 0, sizeof(struct mv_nss_vq_advance_stats) * size);
 
+	swq_max_pkt = swq_max_bytes = rc = 0;
+
 	MV_LOCK(vp_priv->stats_lock, flags);
 
 	for_each_possible_cpu(cpu) {
@@ -609,7 +630,19 @@ int mv_pp3_gnss_ingress_vport_ext_stats_get(int vport, bool clean, int size,
 			return -1;
 		}
 		for (i = 0; i < size; i++) {
+
 			ext_stats = mv_pp3_update_stats_get(vport, i, cpu);
+
+			mv_pp3_vq_max_size_get(vport, i, &swq_max_pkt, &swq_max_bytes);
+
+			/* WA - fix packets fill level */
+			if (ext_stats->pkts_fill_lvl > swq_max_pkt)
+				ext_stats->pkts_fill_lvl = swq_max_pkt;
+
+			/* WA - fix bytes fill level */
+			if (res_stats[i].bytes_fill_lvl > swq_max_bytes)
+				res_stats[i].bytes_fill_lvl = swq_max_bytes;
+
 			/* time elapsed in msec */
 			res_stats[i].time_elapsed = vp_priv->time_elapsed / 1000;
 
