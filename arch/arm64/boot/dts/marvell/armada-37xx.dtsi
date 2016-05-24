@@ -157,12 +157,18 @@
 				reg = <0x13830 0x4>;
 
 				spi0_pins: spi-pins-0 {
-					marvell,pins = "mpp15", "mpp18";
+					marvell,pins = "mpp36";
 					marvell,function = "spi";
 				};
 
+				spi_quad_pins: spi-quad-pins {
+					marvell,pins = "mpp15", "mpp16";
+					marvell,function = "spi-quad";
+				};
+
 				mmc_pins: mmc-pins {
-					marvell,pins = "mpp2";
+					marvell,pins = "mpp27", "mpp28", "mpp29", "mpp30",
+							"mpp31", "mpp32", "mpp33", "mpp34", "mpp35";
 					marvell,function = "mmc";
 				};
 			};
@@ -178,7 +184,7 @@
 				reg = <0x18830 0x4>;
 
 				sdio_pins: sdio-pins {
-					marvell,pins = "mpp2";
+					marvell,pins = "mpp24", "mpp25", "mpp26", "mpp27", "mpp28", "mpp29";
 					marvell,function = "sdio";
 				};
 			};
