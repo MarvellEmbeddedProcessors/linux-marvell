@@ -466,7 +466,7 @@ static void mv_pp3_chan_rx_event(struct mv_pp3_channel *chan)
 			/* get msg from HMAC RX queue */
 			cfh_ptr = (struct host_msg *)
 				mv_pp3_hmac_rxq_next_cfh(chan->frame, chan->hmac_sw_rxq, &cfh_size);
-			if ((cfh_size == 0) || (cfh_size > MV_PP3_CFH_MAX_SIZE) || (cfh_size > proc_dg)) {
+			if ((cfh_size == 0) || (cfh_size > MV_PP3_CFH_MAX_SIZE)) {
 				chan->ch_stat.msg_rx_err++;
 				pr_err("%s: error CFH with wrong size %d received on channel %d (%d). Frame %d, queue %d.",
 					__func__, cfh_size, chan->id, dg_num, chan->frame, chan->hmac_sw_rxq);
