@@ -89,6 +89,16 @@ void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
 }
 EXPORT_SYMBOL(mv_pp2x_write);
 
+
+void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
+{
+	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+
+	writel_relaxed(data, reg_ptr);
+}
+EXPORT_SYMBOL(mv_pp2x_relaxed_write);
+
+
 u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 {
 #if defined(MVPP2_DEBUG) && !defined(CONFIG_MV_PP2_PALLADIUM)
@@ -124,6 +134,18 @@ u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 	return val;
 }
 EXPORT_SYMBOL(mv_pp2x_read);
+
+
+u32 mv_pp2x_relaxed_read(struct mv_pp2x_hw *hw, u32 offset)
+{
+	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+	u32 val;
+
+	val = readl_relaxed(reg_ptr);
+	return val;
+}
+EXPORT_SYMBOL(mv_pp2x_relaxed_read);
+
 
 /* Parser configuration routines */
 
@@ -3763,7 +3785,7 @@ int mv_pp2x_aggr_desc_num_check(struct mv_pp2x *priv,
 	if ((aggr_txq->count + num) > aggr_txq->size) {
 		/* Update number of occupied aggregated Tx descriptors */
 		int cpu = smp_processor_id();
-		u32 val = mv_pp2x_read(&priv->hw,
+		u32 val = mv_pp2x_relaxed_read(&priv->hw,
 				MVPP2_AGGR_TXQ_STATUS_REG(cpu));
 
 		aggr_txq->count = val & MVPP2_AGGR_TXQ_PENDING_MASK;
@@ -3782,9 +3804,9 @@ int mv_pp2x_txq_alloc_reserved_desc(struct mv_pp2x *priv,
 	u32 val;
 
 	val = (txq->id << MVPP2_TXQ_RSVD_REQ_Q_OFFSET) | num;
-	mv_pp2x_write(&priv->hw, MVPP2_TXQ_RSVD_REQ_REG, val);
+	mv_pp2x_relaxed_write(&priv->hw, MVPP2_TXQ_RSVD_REQ_REG, val);
 
-	val = mv_pp2x_read(&priv->hw, MVPP2_TXQ_RSVD_RSLT_REG);
+	val = mv_pp2x_relaxed_read(&priv->hw, MVPP2_TXQ_RSVD_RSLT_REG);
 
 	return val & MVPP2_TXQ_RSVD_RSLT_MASK;
 }

@@ -800,7 +800,9 @@ static void mv_pp2x_txq_done(struct mv_pp2x_port *port,
 	if (txq_pcpu->cpu != smp_processor_id())
 		netdev_err(port->dev, "wrong cpu on the end of Tx processing\n");
 
-	tx_done = mv_pp2x_txq_sent_desc_proc(port, txq);
+	tx_done = mv_pp2x_txq_sent_desc_proc(port,
+					     QV_CPU_2_THR(txq_pcpu->cpu),
+					     txq->id);
 	if (!tx_done)
 		return;
 
@@ -2157,7 +2159,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	}
 
 	/* Update Rx queue management counters */
-	wmb();
+
 	mv_pp2x_rxq_status_update(port, rxq->id, rx_todo, rx_filled);
 
 	return rx_todo;
@@ -2344,7 +2346,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	aggr_txq->count += frags;
 
 	/* Enable transmit */
-	wmb();
 	mv_pp2x_aggr_txq_pend_desc_add(port, frags);
 
 	if (txq_pcpu->size - txq_pcpu->count < MAX_SKB_FRAGS + 1) {
@@ -2477,7 +2478,7 @@ static int mv_pp22_poll(struct napi_struct *napi, int budget)
 	 */
 
 	/*The read is in the q_vector's sw_thread_id  address_space */
-	cause_rx_tx = mv_pp22_thread_read(hw, q_vec->sw_thread_id,
+	cause_rx_tx = mv_pp22_thread_relaxed_read(hw, q_vec->sw_thread_id,
 			MVPP2_ISR_RX_TX_CAUSE_REG(port->id));
 	pr_debug("%s port_id(%d), q_vec(%d), cpuId(%d), sw_thread_id(%d), isr_tx_rx(0x%x)\n",
 		__func__, port->id, (int)(q_vec - port->q_vector),
@@ -4059,6 +4060,8 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	if (dram_target_info)
 		mv_pp2x_conf_mbus_windows(dram_target_info, hw);
 
+	mv_pp2x_write(hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG, 0x0);
+
 #if !defined(CONFIG_MV_PP2_FPGA)
 	/*AXI Bridge Configuration */
 
@@ -4231,11 +4234,7 @@ static struct mv_pp2x_platform_data pp22_pdata = {
 	.num_port_irq = 5,
 	.hw.desc_queue_addr_shift = MVPP22_DESC_ADDR_SHIFT,
 	.skb_base_addr = 0,
-#ifdef CONFIG_64BIT
-	.skb_base_mask = DMA_BIT_MASK(40),
-#else
 	.skb_base_mask = DMA_BIT_MASK(32),
-#endif
 };
 
 
