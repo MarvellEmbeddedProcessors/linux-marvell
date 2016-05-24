@@ -2247,6 +2247,7 @@ struct mv_pp2x_bm_pool {
 	int buf_size;
 	/* Packet size */
 	int pkt_size;
+	int frag_size;
 
 	/* BPPE virtual base address */
 	void *virt_addr;
@@ -2262,6 +2263,9 @@ struct mv_pp2x_bm_pool {
 	/* Stats info */
 #ifdef MVPP2_DEBUG
 	struct mv_pp2x_bm_pool_stats stats;
+#endif
+#ifdef CONFIG_64BIT
+	u64 data_high;
 #endif
 };
 

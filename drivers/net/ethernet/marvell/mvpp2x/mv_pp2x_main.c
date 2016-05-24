@@ -251,6 +251,53 @@ static inline const char *
 }
 
 /* Buffer Manager configuration routines */
+static void *mv_pp2x_frag_alloc(const struct mv_pp2x_bm_pool *pool)
+{
+	if (likely(pool->frag_size <= PAGE_SIZE))
+		return netdev_alloc_frag(pool->frag_size);
+	else
+		return kmalloc(pool->frag_size, GFP_ATOMIC);
+}
+
+static void mv_pp2x_frag_free(const struct mv_pp2x_bm_pool *pool, void *data)
+{
+	if (likely(pool->frag_size <= PAGE_SIZE))
+		skb_free_frag(data);
+	else
+		kfree(data);
+}
+
+static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
+			   struct mv_pp2x_bm_pool *bm_pool,
+			   u32 pool, int is_recycle)
+{
+	dma_addr_t phys_addr;
+	void *data;
+
+	if (is_recycle &&
+	    (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
+		return 0;
+
+	data = mv_pp2x_frag_alloc(bm_pool);
+	if (!data)
+		return -ENOMEM;
+#ifdef CONFIG_64BIT
+	if (unlikely(bm_pool->data_high != ((u64)data & 0xffffffff00000000)))
+		return -ENOMEM;
+#endif
+
+	phys_addr = dma_map_single(port->dev->dev.parent, data,
+				   MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
+				   DMA_FROM_DEVICE);
+	if (unlikely(dma_mapping_error(port->dev->dev.parent, phys_addr))) {
+		mv_pp2x_frag_free(bm_pool, data);
+		return -ENOMEM;
+	}
+
+	mv_pp2x_pool_refill(port->priv, pool, phys_addr, (u8 *)data);
+	atomic_dec(&bm_pool->in_use);
+	return 0;
+}
 
 /* Create pool */
 static int mv_pp2x_bm_pool_create(struct device *dev,
@@ -287,10 +334,23 @@ static int mv_pp2x_bm_pool_create(struct device *dev,
 
 	bm_pool->size = size;
 	bm_pool->pkt_size = mv_pp2x_pool_pkt_size_get(bm_pool->log_id);
+	bm_pool->frag_size = SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(bm_pool->pkt_size)) +
+				MVPP2_SKB_SHINFO_SIZE;
 	bm_pool->buf_num = 0;
 	mv_pp2x_bm_pool_bufsize_set(hw, bm_pool,
 				    MVPP2_RX_BUF_SIZE(bm_pool->pkt_size));
 	atomic_set(&bm_pool->in_use, 0);
+#ifdef CONFIG_64BIT
+{
+	void *data_tmp;
+
+	data_tmp = mv_pp2x_frag_alloc(bm_pool);
+	if (data_tmp) {
+		bm_pool->data_high = (u64)data_tmp & 0xffffffff00000000;
+		mv_pp2x_frag_free(bm_pool, data_tmp);
+	}
+}
+#endif
 
 	return 0;
 }
@@ -461,50 +521,11 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	return 0;
 }
 
-/* Allocate skb for BM pool */
-static struct sk_buff *mv_pp2x_skb_alloc(struct mv_pp2x_port *port,
-					      struct mv_pp2x_bm_pool *bm_pool,
-					      dma_addr_t *buf_phys_addr,
-					      gfp_t gfp_mask)
-{
-	struct sk_buff *skb;
-	dma_addr_t phys_addr;
-
-	gfp_mask |= GFP_DMA;
-	skb = __dev_alloc_skb(bm_pool->pkt_size, gfp_mask);
-	if (!skb) {
-		pr_crit_once("%s skb alloc failed\n", __func__);
-		STAT_DBG(bm_pool->stats.skb_alloc_oom++);
-		return NULL;
-	}
-	STAT_DBG(bm_pool->stats.skb_alloc_ok++);
-	phys_addr = dma_map_single(port->dev->dev.parent, skb->head,
-				   MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
-				   DMA_FROM_DEVICE);
-	pr_debug_once("dev_ptr:%p, dev_name:%s, sizeof(dma_addr_t):%ld",
-		      port->dev->dev.parent, port->dev->dev.parent->init_name,
-		      sizeof(dma_addr_t));
-	pr_debug_once("sizeof(long):%ld, phys_addr:%llx, size:%d\n",
-		      sizeof(long),
-		      phys_addr, MVPP2_RX_BUF_SIZE(bm_pool->pkt_size));
-
-	if (unlikely(dma_mapping_error(port->dev->dev.parent, phys_addr))) {
-		MVPP2_PRINT_2LINE();
-		dev_kfree_skb_any(skb);
-		return NULL;
-	}
-	*buf_phys_addr = phys_addr;
-
-	return skb;
-}
-
 /* Allocate buffers for the pool */
 int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 			       struct mv_pp2x_bm_pool *bm_pool, int buf_num)
 {
-	struct sk_buff *skb;
 	int i, buf_size, total_size;
-	dma_addr_t phys_addr;
 
 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
 	total_size = MVPP2_RX_TOTAL_SIZE(buf_size);
@@ -519,13 +540,8 @@ int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 
 	MVPP2_PRINT_VAR(buf_num);
 
-	for (i = 0; i < buf_num; i++) {
-		skb = mv_pp2x_skb_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
-		if (!skb)
-			break;
-		mv_pp2x_pool_refill(port->priv, (u32)bm_pool->id,
-				    phys_addr, skb);
-	}
+	for (i = 0; i < buf_num; i++)
+		mv_pp2x_rx_refill_new(port, bm_pool, (u32)bm_pool->id, 0);
 
 	/* Update BM driver with number of buffers added to pool */
 	bm_pool->buf_num += i;
@@ -1001,7 +1017,7 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 					struct mv_pp2x_rx_queue *rxq)
 {
 	int rx_received, i;
-	struct sk_buff *buf_cookie;
+	u8 *buf_cookie;
 	dma_addr_t buf_phys_addr;
 
 	rx_received = mv_pp2x_rxq_received(port, rxq->id);
@@ -2017,7 +2033,7 @@ int mv_pp22_rss_default_cpu_set(struct mv_pp2x_port *port, int default_cpu)
 }
 
 /* Main RX/TX processing routines */
-
+#if 0
 
 /* Reuse skb if possible, or allocate a new skb and add it to BM pool */
 static int mv_pp2x_rx_refill(struct mv_pp2x_port *port,
@@ -2040,6 +2056,8 @@ static int mv_pp2x_rx_refill(struct mv_pp2x_port *port,
 	atomic_dec(&bm_pool->in_use);
 	return 0;
 }
+}
+#endif
 
 /* Handle tx checksum */
 static u32 mv_pp2x_skb_tx_csum(struct mv_pp2x_port *port, struct sk_buff *skb)
@@ -2145,6 +2163,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		u32 rx_status, pool;
 		int rx_bytes, err;
 		dma_addr_t buf_phys_addr;
+		unsigned char *data;
 
 #if defined(__BIG_ENDIAN)
 		if (port->priv->pp2_version == PPV21)
@@ -2166,16 +2185,15 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		}
 
 		if (port->priv->pp2_version == PPV21) {
-			skb = mv_pp21_rxdesc_cookie_get(rx_desc);
+			data = mv_pp21_rxdesc_cookie_get(rx_desc);
 			buf_phys_addr = mv_pp21_rxdesc_phys_addr_get(rx_desc);
 		} else {
-			skb = mv_pp22_rxdesc_cookie_get(rx_desc);
+			data = mv_pp22_rxdesc_cookie_get(rx_desc);
 			buf_phys_addr = mv_pp22_rxdesc_phys_addr_get(rx_desc);
 		}
 
 #ifdef CONFIG_64BIT
-		skb = (struct sk_buff *)((uintptr_t)skb |
-			port->priv->pp2xdata->skb_base_addr);
+		data = (unsigned char *)((uintptr_t)data | bm_pool->data_high);
 #endif
 
 #ifdef MVPP2_VERBOSE
@@ -2193,29 +2211,49 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		 */
 		if (rx_status & MVPP2_RXD_ERR_SUMMARY) {
 			pr_err("MVPP2_RXD_ERR_SUMMARY\n");
+err_drop_frame:
 			dev->stats.rx_errors++;
 			mv_pp2x_rx_error(port, rx_desc);
 			mv_pp2x_pool_refill(port->priv, pool, buf_phys_addr,
-				skb);
+				data);
 			continue;
 		}
 
+		atomic_inc(&bm_pool->in_use);
+		err = mv_pp2x_rx_refill_new(port, bm_pool, pool, 0);
+		if (err) {
+			netdev_err(port->dev, "failed to refill BM pools\n");
+			rx_filled--;
+		}
+
+		skb = build_skb(data, bm_pool->frag_size > PAGE_SIZE ? 0 : bm_pool->frag_size);
+		/* After refill old buffer has to be unmapped regardless
+		 * the skb is successfully built or not.
+		 */
+		dma_unmap_single(dev->dev.parent, buf_phys_addr,
+				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size), DMA_FROM_DEVICE);
+
+		if (!skb) {
+			pr_err("skb build failed\n");
+			goto err_drop_frame;
+		}
+
+#ifdef MVPP2_VERBOSE
+		mv_pp2x_skb_dump(skb, rx_desc->data_size, 4);
+#endif
+#if 0
+		dma_sync_single_for_cpu(dev->dev.parent, buf_phys_addr,
+					MVPP2_RX_BUF_SIZE(rx_desc->data_size),
+					DMA_FROM_DEVICE);
+#endif
 		rcvd_pkts++;
 		rcvd_bytes += rx_bytes;
-		atomic_inc(&bm_pool->in_use);
-
-		skb_reserve(skb, MVPP2_MH_SIZE);
+		skb_reserve(skb, MVPP2_MH_SIZE+NET_SKB_PAD);
 		skb_put(skb, rx_bytes);
 		skb->protocol = eth_type_trans(skb, dev);
 		mv_pp2x_rx_csum(port, rx_status, skb);
 
 		napi_gro_receive(napi, skb);
-
-		err = mv_pp2x_rx_refill(port, bm_pool, pool, 0);
-		if (err) {
-			netdev_err(port->dev, "failed to refill BM pools\n");
-			rx_filled--;
-		}
 	}
 
 	if (rcvd_pkts) {
