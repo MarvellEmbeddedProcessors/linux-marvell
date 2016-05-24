@@ -67,14 +67,17 @@ static ssize_t pp3_dev_store(struct device *dev, struct device_attribute *attr,
 	const char      *name = attr->attr.name;
 	int             err;
 	int             vport;
-	unsigned long   flags, num;
+	unsigned long   flags;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
 	/* Read port and value */
 	err = 0;
-	num = sscanf(buf, "%d %d", &vport);
+
+	err = kstrtoint(buf, 0, &vport);
+	if (err)
+		goto err;
 
 	local_irq_save(flags);
 
@@ -93,6 +96,7 @@ static ssize_t pp3_dev_store(struct device *dev, struct device_attribute *attr,
 	}
 	local_irq_restore(flags);
 
+err:
 	if (err)
 		pr_err("%s: error %d\n", __func__, err);
 
