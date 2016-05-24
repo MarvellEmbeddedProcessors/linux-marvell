@@ -420,6 +420,9 @@ int mv_pp3_ingress_cos_to_vq_set(struct pp3_vport *vport, int cos, int vq)
 	if (pp3_fw_cos_to_vq_set(vport->vport, vq, MV_PP3_PPC_TO_HMAC, cos) < 0)
 		goto err;
 
+	/* Update cos_to_vq array - used for RX */
+	vport->rx_cos_to_vq[cos] = vq;
+
 	return 0;
 
 err:
@@ -430,9 +433,28 @@ err:
 
 int mv_pp3_ingress_cos_to_vq_get(struct pp3_vport *vport, int cos, int *vq)
 {
+
+	if (!vport) {
+		pr_err("%s: Error - VP is not initialized\n", __func__);
+		goto err;
+	}
+
+	if (!vq) {
+		pr_err("%s: Error - VQ is not initialized\n", __func__);
+		goto err;
+	}
+
+	if (mv_pp3_max_check(cos, MV_PP3_PRIO_NUM, "cos"))
+		goto err;
+
+
 	/* TBD - send message to FW to get cos to vq mapping */
-	*vq = 0;
+	*vq = vport->rx_cos_to_vq[cos];
+
 	return 0;
+err:
+	pr_err("%s: function failed\n", __func__);
+	return -1;
 }
 /*---------------------------------------------------------------------------*/
 
