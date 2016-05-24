@@ -207,20 +207,20 @@ static int mv_pp3_ingress_vq_stats_update(int vport, int vq, int cpu)
 	/* pkts calculation */
 	ext_stats->pkts_sum = collect_stats->swq_ext_stats_curr.pkts - collect_stats->swq_ext_stats_base.pkts;
 
-	temp64 = (((uint64_t)collect_stats->fw_ext_stats_curr.hwq_pkt_high << 31)
+	temp64 = (((uint64_t)collect_stats->fw_ext_stats_curr.hwq_pkt_high << 32)
 			| (uint64_t)collect_stats->fw_ext_stats_curr.hwq_pkt_low);
 
-	ext_stats->pkts_fill_lvl = (unsigned int)(temp64 & 0xFFFFFFFF) - collect_stats->swq_ext_stats_curr.pkts;
+	ext_stats->pkts_fill_lvl = (unsigned int)((temp64 - collect_stats->swq_ext_stats_curr.pkts) & 0xFFFFFFFF);
 
 	ext_stats->pkts_fill_lvl_sum += ext_stats->pkts_fill_lvl;
 	ext_stats->pkts_fill_lvl_max = MV_MAX(ext_stats->pkts_fill_lvl_max, ext_stats->pkts_fill_lvl);
 
 	ext_stats->bytes_sum = collect_stats->swq_ext_stats_curr.bytes - collect_stats->swq_ext_stats_base.bytes;
 
-	temp64 = (((uint64_t)collect_stats->fw_ext_stats_curr.hwq_oct_high << 31)
+	temp64 = (((uint64_t)collect_stats->fw_ext_stats_curr.hwq_oct_high << 32)
 			| (uint64_t)collect_stats->fw_ext_stats_curr.hwq_oct_low);
 
-	ext_stats->bytes_fill_lvl = (unsigned int)(temp64 & 0xFFFFFFFF) - collect_stats->swq_ext_stats_curr.bytes;
+	ext_stats->bytes_fill_lvl = (unsigned int)((temp64 - collect_stats->swq_ext_stats_curr.bytes) & 0xFFFFFFFF);
 
 	ext_stats->bytes_fill_lvl_sum += ext_stats->bytes_fill_lvl;
 	ext_stats->bytes_fill_lvl_max = MV_MAX(ext_stats->bytes_fill_lvl_max, ext_stats->bytes_fill_lvl);
@@ -467,11 +467,11 @@ int mv_pp3_gnss_ingress_vport_stats_get(int vport, bool clean, int size, struct 
 
 		for (vq = 0; vq < size; vq++) {
 			if (mv_pp3_vq_reset_flag_get(vport, vq, cpu)) {
-					if (mv_pp3_ingress_vq_stats_update_after_dev_reset(vport, vq, cpu) < 0) {
-						pr_err("%s: function failed\n", __func__);
-						return -1;
-					}
-					mv_pp3_vq_reset_flag_set(vport, vq, cpu, false);
+				if (mv_pp3_ingress_vq_stats_update_after_dev_reset(vport, vq, cpu) < 0) {
+					pr_err("%s: function failed\n", __func__);
+					return -1;
+				}
+				mv_pp3_vq_reset_flag_set(vport, vq, cpu, false);
 			}
 			if (mv_pp3_ingress_hwq_stats(vport, vq, cpu, &hwq_stats) < 0) {
 				pr_err("%s: failed to read fw vport %d vq %d statistics\n", __func__, vport, vq);
@@ -479,25 +479,25 @@ int mv_pp3_gnss_ingress_vport_stats_get(int vport, bool clean, int size, struct 
 			}
 			hwq_stats_base  = mv_pp3_stats_hwq_base_get(vport, vq, cpu);
 			/* calc packets */
-			temp64_base = (((uint64_t)hwq_stats_base->hwq_pkt_high << 31) |
+			temp64_base = (((uint64_t)hwq_stats_base->hwq_pkt_high << 32) |
 							(uint64_t)hwq_stats_base->hwq_pkt_low);
-			temp64 = (((uint64_t)hwq_stats.hwq_pkt_high << 31) |
+			temp64 = (((uint64_t)hwq_stats.hwq_pkt_high << 32) |
 							(uint64_t)hwq_stats.hwq_pkt_low);
-			res_stats[vq].pkts += (unsigned int)((temp64 - temp64_base) & 0xFFFFFFFF);
+			res_stats[vq].pkts += (temp64 - temp64_base);
 
 			/* octets packets */
-			temp64_base = (((uint64_t)hwq_stats_base->hwq_oct_high << 31) |
+			temp64_base = (((uint64_t)hwq_stats_base->hwq_oct_high << 32) |
 							(uint64_t)hwq_stats_base->hwq_oct_low);
-			temp64 = (((uint64_t)hwq_stats.hwq_oct_high << 31) |
+			temp64 = (((uint64_t)hwq_stats.hwq_oct_high << 32) |
 							(uint64_t)hwq_stats.hwq_oct_low);
-			res_stats[vq].octets += (unsigned int)((temp64 - temp64_base) & 0xFFFFFFFF);
+			res_stats[vq].octets += (temp64 - temp64_base);
 
 			/* drops packets */
-			temp64_base = (((uint64_t)hwq_stats_base->hwq_pkt_drop_high << 31) |
+			temp64_base = (((uint64_t)hwq_stats_base->hwq_pkt_drop_high << 32) |
 							(uint64_t)hwq_stats_base->hwq_pkt_drop_low);
-			temp64 = (((uint64_t)hwq_stats.hwq_pkt_drop_high << 31) |
+			temp64 = (((uint64_t)hwq_stats.hwq_pkt_drop_high << 32) |
 								(uint64_t)hwq_stats.hwq_pkt_drop_low);
-			res_stats[vq].drops += (unsigned int)((temp64 - temp64_base) & 0xFFFFFFFF);
+			res_stats[vq].drops += (temp64 - temp64_base);
 
 			/* errors packets - not supported, FW and SW do not count errors */
 		}
