@@ -81,7 +81,7 @@ int mv_pp3_dev_ingress_cos_show(struct net_device *netdev)
 	pr_cont("cos:  ");
 	for (cos = 0; cos < MV_PP3_PRIO_NUM; cos++)
 		pr_cont("%2d  ", cos);
-
+	pr_cont("\n");
 	pr_cont("vq :  ");
 	for (cos = 0; cos < MV_PP3_PRIO_NUM; cos++)
 		pr_cont("%2d  ", vqs[cos]);

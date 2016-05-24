@@ -128,6 +128,7 @@ struct pp3_vport {
 	int			rx_vqs_num;             /* Number of ingress virtual queues */
 	struct pp3_vq		*rx_vqs[MV_PP3_VQ_NUM]; /* Array of ingress virtual queues */
 	int			tx_cos_to_vq[MV_PP3_PRIO_NUM]; /* Mapping of CoS value to egress VQ */
+	int			rx_cos_to_vq[MV_PP3_PRIO_NUM]; /* Mapping of CoS value to egress VQ */
 	union {
 		struct pp3_cpu_port  cpu;
 		struct pp3_emac      emac;
