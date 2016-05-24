@@ -362,6 +362,9 @@ struct mv_pp2x_aggr_tx_queue {
 
 	/* Index of the next Tx DMA descriptor to process */
 	int next_desc_to_proc;
+
+	/* Used to statistic the desc number to xmit in bulk */
+	u32 xmit_bulk;
 };
 
 struct mv_pp2x_rx_queue {
