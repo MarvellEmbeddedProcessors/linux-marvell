@@ -9,45 +9,80 @@ Required properties:
 
 Available mpp pins/groups and functions:
 Note: brackets (x) are not part of the mpp name for marvell,function and given
-only for more detailed description in this document.
+only for more detailed description in this document. Customer should make sure
+that there are no mpps configuration conflicts.
 
 North bridge: "marvell,armada-3700-nb-pinctrl"
 name          pins     functions
 ================================================================================
-mpp0          0        jtag, gpio
-mpp1          1        sdio, gpio
-mpp2          2        mmc, gpio
-mpp3          3        pwm0, gpio
-mpp4          4        pwm1, gpio
-mpp5          5        pwm2, gpio
-mpp6          6        pwm3, gpio
-mpp7          7        pmic1, gpio
-mpp8          8        pmic0, gpio
-mpp9          9        i2c2, gpio
-mpp10         10       i2c1, gpio
-mpp11         11       fcs0, gpio
-mpp12         12       fcs1, gpio
-mpp13         13       fcs2, gpio
-mpp14         14       fcs3, gpio
-mpp15         15       spi, gpio
-mpp16         16       1wire, gpio
-mpp17         17       uart1, gpio
-mpp18         18       spi(quad), gpio
-mpp19         19       spi(cs), uart2
-mpp20         20       led(led0), pulllow
-mpp21         21       led(led1), pulllow
-mpp22         22       led(led2), pulllow
-mpp23         23       led(led3), pulllow
+mpp0          0        i2c1(sck), gpio
+mpp1          1        i2c1(sda), gpio
+mpp2          2        i2c2(sck), gpio
+mpp3          3        i2c2(sda), gpio
+mpp4          4        1wire, gpio
+mpp5          5        gpio
+mpp6          6        pmic0(slp-out), gpio
+mpp7          7        pmic1(slp-out), gpio
+mpp8          8        sdio, gpio
+mpp9          9        sdio, gpio, uart2(rts)
+mpp10         10       sdio, gpio, uart2(cts)
+mpp11         11       pwm0, gpio, led0-od
+mpp12         12       pwm1, gpio, led1-od
+mpp13         13       pwm2, gpio, led2-od
+mpp14         14       pwm3, gpio, led3-od
+mpp15         15       spi-quad, gpio
+mpp16         16       spi-quad, gpio
+mpp17         17       spi-cs1, gpio
+mpp18         18       spi-cs2, gpio, uart2(tx)
+mpp19         19       spi-cs3, gpio, uart2(rx)
+mpp20         20       jtag, gpio
+mpp21         21       jtag, gpio
+mpp22         22       jtag, gpio
+mpp23         23       jtag, gpio
+mpp24         24       jtag, gpio
+mpp25         25       uart1, gpio
+mpp26         26       uart1, gpio
+mpp27         27       mmc, gpio
+mpp28         28       mmc, gpio
+mpp29         29       mmc, gpio
+mpp30         30       mmc, gpio
+mpp31         31       mmc, gpio
+mpp32         32       mmc, gpio
+mpp33         33       mmc, gpio
+mpp34         34       mmc, gpio
+mpp35         35       mmc, gpio
+mpp36         36       spi
 
 South bridge: "marvell,armada-3700-sb-pinctrl"
 name          pins     functions
 ================================================================================
-mpp0          0        usb32, gpio
-mpp1          1        usb2, gpio
-mpp2          2        sdio, gpio
-mpp3          3        mii, gpio
-mpp4          4        pcie1, gpio
-mpp5          5        ptp, gpio
-mpp6          6        ptp(clk), mii(txerr)
-mpp7          7        ptp(trig), mii(carriersense)
-mpp8          8        collision, mii(txerr)
+mpp0          0        usb32(drvvbus0), gpio
+mpp1          1        usb32(drvvbus1), gpio
+mpp2          2        gpio
+mpp3          3        pcie1(resetn), gpio
+mpp4          4        pcie1(clkreq), gpio
+mpp5          5        gpio
+mpp6          6        rgmii/mii/smi, gpio
+mpp7          7        rgmii/mii/smi, gpio
+mpp8          8        rgmii/mii/smi, gpio
+mpp9          9        rgmii/mii/smi, gpio
+mpp10         10       rgmii/mii/smi, gpio
+mpp11         11       rgmii/mii/smi, gpio
+mpp12         12       rgmii/mii/smi, gpio
+mpp13         13       rgmii/mii/smi, gpio
+mpp14         14       rgmii/mii/smi, gpio
+mpp15         15       rgmii/mii/smi, gpio
+mpp16         16       rgmii/mii/smi, gpio
+mpp17         17       rgmii/mii/smi, gpio
+mpp18         18       rgmii/mii/smi, gpio
+mpp19         19       rgmii/mii/smi, gpio
+mpp20         20       ptp/mii, gpio
+mpp21         21       ptp(clk-req), gpio, mii(tx-err)
+mpp22         22       ptp(trig-gen), gpio, mii(carrier-sense)
+mpp23         23       rgmii/mii/smi, gpio, mii(tx-err)
+mpp24         24       sdio(sd0-d2), gpio
+mpp25         25       sdio(sd0-d3), gpio
+mpp26         26       sdio(sd0-d1), gpio
+mpp27         27       sdio(sd0-d0), gpio
+mpp28         28       sdio(sd0-cmd), gpio
+mpp29         29       sdio(sd0-clk), gpio
