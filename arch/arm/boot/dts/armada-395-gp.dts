@@ -113,7 +113,7 @@
 			};
 
 			flash@d0000 {
-				status = "disabled";
+				status = "okay";
 				pinctrl-0 = <&nand_pins>;
 				pinctrl-names = "default";
 				num-cs = <1>;
