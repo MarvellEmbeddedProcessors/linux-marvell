@@ -473,8 +473,8 @@ void mvPp2TxqShow(struct mv_pp2x *priv, int port, int txq, int mode)
 		txq_pcpu = per_cpu_ptr(pp_txq->pcpu, cpu);
 		DBG_MSG("\n[PPv2 TxQ %d cpu=%d show:\n", txq, cpu);
 
-		DBG_MSG("cpu=%d, size=%d, count=%d reserved_num=%d\n",
-			txq_pcpu->cpu, txq_pcpu->size, txq_pcpu->count,
+		DBG_MSG("cpu=%d, size=%d, reserved_num=%d\n",
+			txq_pcpu->cpu, txq_pcpu->size,
 			txq_pcpu->reserved_num);
 		DBG_MSG("txq_put_index=%d, txq_get_index=%d\n",
 			txq_pcpu->txq_put_index, txq_pcpu->txq_get_index);

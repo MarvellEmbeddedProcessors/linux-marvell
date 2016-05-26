@@ -189,6 +189,22 @@ void *mv_pp2x_vfpga_address_get(void)
 }
 #endif
 
+static inline int mv_pp2x_txq_count(struct mv_pp2x_txq_pcpu *txq_pcpu)
+{
+
+	int index_diff = txq_pcpu->txq_put_index - txq_pcpu->txq_get_index;
+
+	return(index_diff % txq_pcpu->size);
+}
+
+static inline int mv_pp2x_txq_free_count(struct mv_pp2x_txq_pcpu *txq_pcpu)
+{
+
+	int index_diff = txq_pcpu->txq_get_index - txq_pcpu->txq_put_index;
+
+	return(index_diff % txq_pcpu->size);
+}
+
 static void mv_pp2x_txq_inc_get(struct mv_pp2x_txq_pcpu *txq_pcpu)
 {
 	txq_pcpu->txq_get_index++;
@@ -816,11 +832,13 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 		desc_count = 0;
 		/* Compute total of used descriptors */
 		for_each_online_cpu(cpu) {
+			int txq_count;
 			struct mv_pp2x_txq_pcpu *txq_pcpu_aux;
 
 			txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu);
-			desc_count += txq_pcpu_aux->count;
-			desc_count += txq_pcpu_aux->reserved_num;
+			txq_count = mv_pp2x_txq_count(txq_pcpu_aux);
+			desc_count += txq_count;
+
 		}
 		desc_count += req;
 
@@ -844,9 +862,8 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 
 /* Free Tx queue skbuffs */
 static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
-				       struct mv_pp2x_tx_queue *txq,
-				       struct mv_pp2x_txq_pcpu *txq_pcpu,
-				       int num)
+				  struct mv_pp2x_txq_pcpu *txq_pcpu,
+				  int num)
 {
 	int i;
 
@@ -882,40 +899,42 @@ static void mv_pp2x_txq_done(struct mv_pp2x_port *port,
 	}
 #endif /* DEV_NETMAP */
 
-	if (txq_pcpu->cpu != smp_processor_id())
-		netdev_err(port->dev, "wrong cpu on the end of Tx processing\n");
-
 	tx_done = mv_pp2x_txq_sent_desc_proc(port,
 					     QV_CPU_2_THR(txq_pcpu->cpu),
 					     txq->id);
 	if (!tx_done)
 		return;
 
-	mv_pp2x_txq_bufs_free(port, txq, txq_pcpu, tx_done);
+	mv_pp2x_txq_bufs_free(port, txq_pcpu, tx_done);
 
-	txq_pcpu->count -= tx_done;
-
-	if (netif_tx_queue_stopped(nq))
-		if (txq_pcpu->size - txq_pcpu->count >= MAX_SKB_FRAGS + 1)
+		if (netif_tx_queue_stopped(nq))
+		if (mv_pp2x_txq_free_count(txq_pcpu) >= (MAX_SKB_FRAGS + 2))
 			netif_tx_wake_queue(nq);
 }
 
-static unsigned int mv_pp2x_tx_done(struct mv_pp2x_port *port, u32 cause)
+static unsigned int mv_pp2x_tx_done(struct mv_pp2x_port *port, u32 cause,
+					    int cpu)
 {
 	struct mv_pp2x_tx_queue *txq;
 	struct mv_pp2x_txq_pcpu *txq_pcpu;
 	unsigned int tx_todo = 0;
 
 	while (cause) {
+		int txq_count;
+
 		txq = mv_pp2x_get_tx_queue(port, cause);
 		if (!txq)
 			break;
 
-		txq_pcpu = this_cpu_ptr(txq->pcpu);
+		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
+		txq_count = mv_pp2x_txq_count(txq_pcpu);
 
-		if (txq_pcpu->count) {
+		if (txq_count) {
 			mv_pp2x_txq_done(port, txq, txq_pcpu);
-			tx_todo += txq_pcpu->count;
+			/*Recalc after tx_done*/
+			txq_count = mv_pp2x_txq_count(txq_pcpu);
+
+			tx_todo += txq_count;
 		}
 
 		cause &= ~(1 << txq->log_id);
@@ -1264,13 +1283,15 @@ static void mv_pp2x_txq_clean(struct mv_pp2x_port *port,
 	mv_pp2x_write(hw, MVPP2_TXQ_PREF_BUF_REG, val);
 
 	for_each_online_cpu(cpu) {
+		int txq_count;
+
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 
 		/* Release all packets */
-		mv_pp2x_txq_bufs_free(port, txq, txq_pcpu, txq_pcpu->count);
+		txq_count = mv_pp2x_txq_count(txq_pcpu);
+		mv_pp2x_txq_bufs_free(port, txq_pcpu, txq_count);
 
 		/* Reset queue */
-		txq_pcpu->count = 0;
 		txq_pcpu->txq_put_index = 0;
 		txq_pcpu->txq_get_index = 0;
 	}
@@ -1413,7 +1434,8 @@ int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 		if (qvec->qv_type == MVPP2_PRIVATE) {
 			cpu = QV_THR_2_CPU(qvec->sw_thread_id);
 			irq_set_affinity_hint(qvec->irq, cpumask_of(cpu));
-			irq_set_status_flags(qvec->irq, IRQ_NO_BALANCING);
+			if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_MULTI_MODE)
+				irq_set_status_flags(qvec->irq, IRQ_NO_BALANCING);
 		}
 		if (err) {
 			netdev_err(dev, "cannot request IRQ %d\n",
@@ -1585,7 +1607,7 @@ static void mv_pp2x_tx_proc_cb(unsigned long data)
 
 	/* Process all the Tx queues */
 	cause = (1 << mv_pp2x_txq_number) - 1;
-	tx_todo = mv_pp2x_tx_done(port, cause);
+	tx_todo = mv_pp2x_tx_done(port, cause, smp_processor_id());
 
 	/* Set the timer in case not all the packets were processed */
 	if (tx_todo)
@@ -2056,7 +2078,6 @@ static int mv_pp2x_rx_refill(struct mv_pp2x_port *port,
 	atomic_dec(&bm_pool->in_use);
 	return 0;
 }
-}
 #endif
 
 /* Handle tx checksum */
@@ -2360,18 +2381,20 @@ error:
 	return -ENOMEM;
 }
 
-
-
 static inline void mv_pp2x_tx_done_post_proc(struct mv_pp2x_tx_queue *txq,
 	struct mv_pp2x_txq_pcpu *txq_pcpu, struct mv_pp2x_port *port, int frags)
 {
+	int txq_count = mv_pp2x_txq_count(txq_pcpu);
 
 	/* Finalize TX processing */
-	if (txq_pcpu->count >= txq->pkts_coal)
+	if (txq_count >= txq->pkts_coal)
 		mv_pp2x_txq_done(port, txq, txq_pcpu);
 
+	/* Recalc after tx_done */
+	txq_count = mv_pp2x_txq_count(txq_pcpu);
+
 	/* Set the timer in case not all frags were processed */
-	if (txq_pcpu->count <= frags && txq_pcpu->count > 0) {
+	if (txq_count <= frags && txq_count > 0) {
 		struct mv_pp2x_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
 
 		mv_pp2x_timer_set(port_pcpu);
@@ -2470,9 +2493,15 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 	txq_pcpu->reserved_num -= frags;
-	txq_pcpu->count += frags;
 	aggr_txq->count += frags;
 	aggr_txq->xmit_bulk += frags;
+
+	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
+
+	if (mv_pp2x_txq_free_count(txq_pcpu) < (MAX_SKB_FRAGS + 2)) {
+		MVPP2_PRINT_LINE();
+		netif_tx_stop_queue(nq);
+	}
 
 	/* Enable transmit */
 	if (!skb->xmit_more || netif_xmit_stopped(nq)) {
@@ -2606,7 +2635,7 @@ static int mv_pp21_poll(struct napi_struct *napi, int budget)
 static int mv_pp22_poll(struct napi_struct *napi, int budget)
 {
 	u32 cause_rx_tx, cause_rx, cause_tx;
-	int rx_done = 0;
+	int rx_done = 0, txq_cpu;
 	struct mv_pp2x_port *port = netdev_priv(napi->dev);
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	struct queue_vector *q_vec = container_of(napi,
@@ -2629,8 +2658,11 @@ static int mv_pp22_poll(struct napi_struct *napi, int budget)
 	/* Release TX descriptors */
 	cause_tx = (cause_rx_tx & MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK) >>
 			MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET;
-	if (cause_tx)
-		mv_pp2x_tx_done(port, cause_tx);
+	if (cause_tx) {
+		txq_cpu = QV_THR_2_CPU(q_vec->sw_thread_id);
+		mv_pp2x_tx_done(port, cause_tx, txq_cpu);
+	}
+
 
 	/* Process RX packets */
 	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
@@ -4365,7 +4397,7 @@ static struct mv_pp2x_platform_data pp22_pdata = {
 #ifdef CONFIG_MV_PP2_POLLING
 	.interrupt_tx_done = false,
 #else
-	.interrupt_tx_done = false, /*temp. value*/
+	.interrupt_tx_done = true, /*temp. value*/
 #endif
 	.multi_hw_instance = true,
 	.mv_pp2x_port_queue_vectors_init = mv_pp22_queue_vectors_init,
