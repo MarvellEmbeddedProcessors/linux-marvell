@@ -1193,6 +1193,9 @@
 /* Maximum number of supported ports */
 #define MVPP2_MAX_PORTS			4
 
+/* Maximum number of supported cells */
+#define MVPP2_MAX_CELLS			4
+
 /* Maximum number of TXQs used by single port */
 #define MVPP2_MAX_TXQ			8
 
