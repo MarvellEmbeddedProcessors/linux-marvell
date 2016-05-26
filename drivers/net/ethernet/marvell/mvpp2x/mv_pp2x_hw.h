@@ -163,7 +163,9 @@ mv_pp2x_rxq_next_desc_get(struct mv_pp2x_rx_queue *rxq)
 	int rx_desc = rxq->next_desc_to_proc;
 
 	rxq->next_desc_to_proc = MVPP2_QUEUE_NEXT_DESC(rxq, rx_desc);
-	prefetch(rxq->first_desc + rxq->next_desc_to_proc);
+	/* For uneven descriptors, fetch next two descriptors (2*32B) */
+	if (rx_desc & 0x1)
+		prefetch(rxq->first_desc + rxq->next_desc_to_proc);
 	return (rxq->first_desc + rx_desc);
 }
 
