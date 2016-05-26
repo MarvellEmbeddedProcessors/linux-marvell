@@ -62,9 +62,6 @@
 				phy1: ethernet-phy@1 {
 					reg = <4>;
 				};
-				phy1: ethernet-phy@1 {
-					reg = <999>;
-				};
 				phy2: ethernet-phy@2 {
 					reg = <999>;
 				};
