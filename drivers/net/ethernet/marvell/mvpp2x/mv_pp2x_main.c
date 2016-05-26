@@ -2202,7 +2202,8 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 #ifdef MVPP2_VERBOSE
 		mv_pp2x_skb_dump(skb, rx_desc->data_size, 4);
 #endif
-
+		/* Prefetch 128B packet_header */
+		prefetch(data + NET_SKB_PAD);
 		dma_sync_single_for_cpu(dev->dev.parent, buf_phys_addr,
 					MVPP2_RX_BUF_SIZE(rx_desc->data_size),
 					DMA_FROM_DEVICE);
