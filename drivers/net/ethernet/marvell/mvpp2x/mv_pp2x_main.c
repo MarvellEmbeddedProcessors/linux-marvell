@@ -2515,7 +2515,6 @@ static inline void mv_pp2x_cause_misc_handle(struct mv_pp2x_port *port,
 	}
 }
 
-
 static inline int mv_pp2x_cause_rx_handle(struct mv_pp2x_port *port,
 		struct queue_vector *q_vec, struct napi_struct *napi,
 		int budget, u32 cause_rx)
@@ -2539,12 +2538,26 @@ static inline int mv_pp2x_cause_rx_handle(struct mv_pp2x_port *port,
 			cause_rx &= ~(1 << rxq->log_id);
 		}
 	}
+
+#ifdef DEV_NETMAP
+	if ((port->flags & MVPP2_F_IFCAP_NETMAP)) {
+		u32 state;
+
+		state = mv_pp2x_qvector_interrupt_state_get(q_vec);
+		if (state)
+			mv_pp2x_qvector_interrupt_disable(q_vec);
+		cause_rx = 0;
+		napi_complete(napi);
+		if (state)
+			mv_pp2x_qvector_interrupt_enable(q_vec);
+		q_vec->pending_cause_rx = cause_rx;
+		return rx_done;
+	}
+#endif
+
 	if (budget > 0) {
 		cause_rx = 0;
 		napi_complete(napi);
-#ifdef DEV_NETMAP
-	if (!(port->flags & MVPP2_F_IFCAP_NETMAP))
-#endif
 		mv_pp2x_qvector_interrupt_enable(q_vec);
 	}
 	q_vec->pending_cause_rx = cause_rx;

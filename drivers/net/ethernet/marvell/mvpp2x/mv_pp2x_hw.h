@@ -359,6 +359,17 @@ static inline void mv_pp2x_qvector_interrupt_disable(struct queue_vector *q_vec)
 
 }
 
+static inline u32 mv_pp2x_qvector_interrupt_state_get(struct queue_vector
+						       *q_vec)
+{
+	struct mv_pp2x_port *port = q_vec->parent;
+	u32 state;
+
+	state = mv_pp2x_read(&port->priv->hw, MVPP2_ISR_ENABLE_REG(port->id));
+	state &= MVPP2_ISR_ENABLE_INTERRUPT(q_vec->sw_thread_mask);
+	return state;
+}
+
 static inline int mv_pp2x_txq_sent_desc_proc(struct mv_pp2x_port *port,
 					     int sw_thread,
 					     u8 txq_id)
