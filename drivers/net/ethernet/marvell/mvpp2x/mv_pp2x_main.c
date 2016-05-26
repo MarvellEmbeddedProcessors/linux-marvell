@@ -2140,7 +2140,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	u32 rcvd_bytes = 0;
 	u32 refill_array[MVPP2_BM_POOLS_NUM] = {0};
 	u8  first_bm_pool = port->priv->pp2_cfg.first_bm_pool;
-	u8  num_pool = mv_pp2x_initial_num_pools_get(port->priv);
+	u8  num_pool = mv_pp2x_kernel_num_pools_get(port->priv);
 
 #ifdef DEV_NETMAP
 		if (port->flags & MVPP2_F_IFCAP_NETMAP) {
