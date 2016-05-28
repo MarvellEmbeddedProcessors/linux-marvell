@@ -1796,7 +1796,7 @@ err_drop_frame:
 
 		if (rx_bytes <= rx_copybreak) {
 			/* better copy a small frame and not unmap the DMA region */
-			skb = netdev_alloc_skb_ip_align(dev, rx_bytes);
+			skb = napi_alloc_skb(napi, rx_bytes);
 			if (unlikely(!skb)) {
 				netdev_warn(dev, "rxq #%d - Can't allocate skb. rx_bytes = %d bytes\n",
 					    rxq->id, rx_bytes);
