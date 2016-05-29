@@ -2948,7 +2948,7 @@ int mv_pp2x_open_cls(struct net_device *dev)
 	err = mv_pp2x_prs_mac_da_accept(hw, port->id,
 				      dev->dev_addr, true);
 	if (err) {
-		netdev_err(dev, "mv_pp2x_prs_mac_da_accept MC failed\n");
+		netdev_err(dev, "mv_pp2x_prs_mac_da_accept M2M failed\n");
 		return err;
 	}
 	err = mv_pp2x_prs_tag_mode_set(hw, port->id, MVPP2_TAG_TYPE_MH);
@@ -3161,24 +3161,53 @@ int mv_pp2x_stop(struct net_device *dev)
 	return 0;
 }
 
+/* register unicast and multicast addresses */
 static void mv_pp2x_set_rx_mode(struct net_device *dev)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
-	struct mv_pp2x_hw *hw = &(port->priv->hw);
 	struct netdev_hw_addr *ha;
+	struct mv_pp2x_hw *hw = &(port->priv->hw);
 	int id = port->id;
-	bool allmulti = dev->flags & IFF_ALLMULTI;
+	int err;
 
-	mv_pp2x_prs_mac_promisc_set(hw, id, dev->flags & IFF_PROMISC);
-	mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_ALL, allmulti);
-	mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_IP6, allmulti);
-
-	/* Remove all port->id's mcast enries */
-	mv_pp2x_prs_mcast_del_all(hw, id);
-
-	if (allmulti && !netdev_mc_empty(dev)) {
-		netdev_for_each_mc_addr(ha, dev)
-			mv_pp2x_prs_mac_da_accept(hw, id, ha->addr, true);
+	if (dev->flags & IFF_PROMISC) {
+		/* Accept all: Multicast + Unicast */
+		mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_ALL, true);
+		mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_IP6, true);
+		/* Remove all port->id's mcast enries */
+		mv_pp2x_prs_mcast_del_all(hw, id);
+		/* Enter promisc mode */
+		mv_pp2x_prs_mac_promisc_set(hw, id, true);
+	} else {
+		if (dev->flags & IFF_ALLMULTI) {
+			/* Accept all multicast */
+			mv_pp2x_prs_mac_multi_set(hw, id,
+						  MVPP2_PE_MAC_MC_ALL, true);
+			mv_pp2x_prs_mac_multi_set(hw, id,
+						  MVPP2_PE_MAC_MC_IP6, true);
+			/* Remove all port->id's mcast enries */
+			mv_pp2x_prs_mcast_del_all(hw, id);
+		} else {
+			/* Accept only initialized multicast */
+			if (!netdev_mc_empty(dev)) {
+				netdev_for_each_mc_addr(ha, dev) {
+					err = mv_pp2x_prs_mac_da_accept(hw,
+							id, ha->addr, true);
+					if (err)
+						netdev_err(dev,
+						"MAC[%2x:%2x:%2x:%2x:%2x:%2x] add failed\n",
+						ha->addr[0], ha->addr[1],
+						ha->addr[2], ha->addr[3],
+						ha->addr[4], ha->addr[5]);
+				}
+			}
+			mv_pp2x_prs_mac_multi_set(hw, id,
+						  MVPP2_PE_MAC_MC_ALL, false);
+			mv_pp2x_prs_mac_multi_set(hw, id,
+						  MVPP2_PE_MAC_MC_IP6, false);
+		}
+		/* Leave promisc mode */
+		mv_pp2x_prs_mac_promisc_set(hw, id, false);
 	}
 }
 
