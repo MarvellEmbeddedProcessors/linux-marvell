@@ -583,7 +583,8 @@ static int txq_number = 8;
 
 static int rxq_def;
 
-static int rx_copybreak __read_mostly = 256;
+/* Default value is 0 - no copybreak */
+static int rx_copybreak __read_mostly;
 
 #define MVNETA_DRIVER_NAME "mvneta"
 #define MVNETA_DRIVER_VERSION "1.0"
