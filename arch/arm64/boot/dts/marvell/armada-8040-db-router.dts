@@ -84,7 +84,7 @@
 				emac2: mac2 {
 					phy-mode = "rgmii"; /* lane-0 */
 					phy = <&phy2>;
-					status = "okay";
+					status = "disabled";
 				};
 				emac3: mac3 {
 					phy-mode = "rgmii"; /* rgmii-1 */
@@ -97,7 +97,7 @@
 					status = "okay";
 				};
 				eth1: eth1@020000 {
-					status = "okay";
+					status = "disabled";
 				};
 				eth2: eth2@030000 {
 					status = "okay";
@@ -130,7 +130,7 @@
 				emac3_1: mac3 {
 					phy-mode = "rgmii"; /* rgmii-1 */
 					phy = <&phy3>;
-					status = "disabled";
+					status = "okay";
 				};
 			};
 			ppv22@000000 {
@@ -141,7 +141,7 @@
 					status = "disabled";
 				};
 				eth2_1: eth2@030000 {
-					status = "disabled";
+					status = "okay";
 				};
 			};
 		};
