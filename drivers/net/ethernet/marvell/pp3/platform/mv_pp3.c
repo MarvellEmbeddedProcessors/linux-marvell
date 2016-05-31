@@ -48,6 +48,7 @@
 #include "net_dev/mv_dev_sysfs.h"
 #include "common/mv_sw_if.h"
 #include "a390_gic_odmi_if.h"
+#include "gnss/mv_pp3_gnss_api.h"
 
 #define MV_PP3_SHARED_NAME        "mv_pp3_shared"
 
@@ -884,7 +885,6 @@ static int mv_pp3_shared_probe(struct platform_device *pdev)
 	mv_pp3_netdev_global_init(pp3_device);
 
 	/* Create netdevice interfaces if needed */
-
 	for_each_child_of_node(np, child) {
 		if (!of_device_is_available(child))
 			continue;
@@ -900,6 +900,9 @@ static int mv_pp3_shared_probe(struct platform_device *pdev)
 			mv_pp3_netdev_show(dev);
 		}
 	}
+	if (mv_pp3_gnss_dev_create(MV_NSS_EXT_PORT_MAX, false, NULL))
+		return -ENODEV;
+
 	if (pp3_sysfs_init(pp3_device) < 0)
 		pr_err("NSS init - sysfs initialization failed\n");
 
