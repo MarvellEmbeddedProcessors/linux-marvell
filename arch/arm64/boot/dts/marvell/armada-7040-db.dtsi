@@ -99,15 +99,17 @@
 					compatible = "jedec,spi-nor";
 					reg = <0x0>;
 					spi-max-frequency = <20000000>;
-
 					partition@0 {
-						label = "U-Boot";
+						label = "boot";
 						reg = <0x0 0x200000>;
 					};
-
-					partition@400000 {
+					partition@200000 {
 						label = "Filesystem";
-						reg = <0x200000 0xe00000>;
+						reg = <0x200000 0xd00000>;
+					};
+					partition@d00000 {
+						label = "boot_2nd";
+						reg = <0xd00000 0x100000>;
 					};
 				};
 			};
