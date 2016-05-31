@@ -93,7 +93,11 @@ int mv_pp3_gnss_dev_create(unsigned short vport, bool state, unsigned char *mac)
 	struct pp3_dev_priv *dev_priv;
 	int msec;
 
-	sprintf(name, "nss%d", vport);
+	/* Special name nss0 for network interface used for default gateway */
+	if (vport == MV_NSS_EXT_PORT_MAX)
+		sprintf(name, "nss%d", 0);
+	else
+		sprintf(name, "nss%d", vport);
 
 	/* check MAC validation */
 	if (mac && !is_valid_ether_addr(mac))
