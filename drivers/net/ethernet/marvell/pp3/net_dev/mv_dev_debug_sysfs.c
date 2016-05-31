@@ -123,7 +123,6 @@ static ssize_t pp3_dev_debug_store(struct device *dev,
 	unsigned long   flags;
 	char		if_name[10];
 	struct net_device *netdev;
-	struct	pp3_dev_priv *dev_priv;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -133,17 +132,30 @@ static ssize_t pp3_dev_debug_store(struct device *dev,
 
 	fields = sscanf(buf, "%s %d %d %d %d", if_name, &a, &b, &c, &d);
 
+	/* Create external network interface (without EMAC connectivity) */
+	if (!strcmp(name, "create")) {
+		if (fields == 3) {
+			local_irq_save(flags);
+			if (mv_pp3_netdev_init(if_name, a, b))
+				err = 0;
+
+			local_irq_restore(flags);
+		}
+		return err ? -EINVAL : len;
+	}
+
+	netdev = dev_get_by_name(&init_net, if_name);
+	if (!mv_pp3_dev_is_valid(netdev)) {
+		pr_err("%s in not pp3 device\n", if_name);
+		if (netdev)
+			dev_put(netdev);
+		return -EINVAL;
+	}
+
 	local_irq_save(flags);
 
 	if (!strcmp(name, "debug")) {
 		if (fields == 2) {
-			netdev = dev_get_by_name(&init_net, if_name);
-			if (!netdev) {
-				pr_err("%s: illegal interface <%s>\n", __func__, if_name);
-				return -EINVAL;
-			}
-
-			dev_priv = MV_PP3_PRIV(netdev);
 			pp3_dbg_dev_flags(netdev, MV_PP3_F_DBG_RX, a & 0x1);
 			pp3_dbg_dev_flags(netdev, MV_PP3_F_DBG_TX, a & 0x2);
 			pp3_dbg_dev_flags(netdev, MV_PP3_F_DBG_ISR, a & 0x4);
@@ -154,11 +166,6 @@ static ssize_t pp3_dev_debug_store(struct device *dev,
 		}
 	} else if (!strcmp(name, "mac_show")) {
 		if (fields == 1) {
-			netdev = dev_get_by_name(&init_net, if_name);
-			if (!netdev) {
-				pr_err("%s: illegal interface <%s>\n", __func__, if_name);
-				return -EINVAL;
-			}
 			pp3_dbg_dev_mac_show(netdev);
 			dev_put(netdev);
 			err = 0;
@@ -167,11 +174,6 @@ static ssize_t pp3_dev_debug_store(struct device *dev,
 		if (fields == 5) {
 			struct mv_nss_meter meter;
 
-			netdev = dev_get_by_name(&init_net, if_name);
-			if (!netdev) {
-				pr_err("%s: illegal interface <%s>\n", __func__, if_name);
-				return -EINVAL;
-			}
 			meter.cir = a;
 			meter.eir = b;
 			meter.cbs = c;
@@ -179,11 +181,6 @@ static ssize_t pp3_dev_debug_store(struct device *dev,
 			meter.enable = true;
 			err = mv_pp3_dev_egress_vport_shaper_set(netdev, &meter);
 			dev_put(netdev);
-		}
-	} else if (!strcmp(name, "create")) {
-		if (fields == 3) {
-			if (mv_pp3_netdev_init(if_name, a, b) != NULL)
-				err = 0;
 		}
 	} else {
 		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);

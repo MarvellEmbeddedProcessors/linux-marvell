@@ -103,6 +103,9 @@ int mv_pp3_dev_rx_cpus_set(struct net_device *dev, int cpus_mask);
 int mv_pp3_dev_cpu_inuse(struct net_device *dev, int cpu);
 void mv_pp3_dev_rx_pause(struct net_device *dev, int cos);
 void mv_pp3_dev_rx_resume(struct net_device *dev, int cos);
+bool mv_pp3_dev_is_valid(struct net_device *dev);
+struct pp3_dev_priv *mv_pp3_dev_priv_exist_get(struct net_device *dev);
+struct pp3_dev_priv *mv_pp3_dev_priv_ready_get(struct net_device *dev);
 
 #ifdef CONFIG_MV_PP3_SKB_RECYCLE
 int mv_pp3_ctrl_nic_skb_recycle(int en);

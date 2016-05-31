@@ -120,8 +120,6 @@ int mv_pp3_ctrl_internal_debug_set(int en)
 static int pp3_ports_num;
 static struct pp3_dev_priv **pp3_netdev;
 static int pp3_netdev_next;
-/* sysfs related */
-static struct platform_device *pp3_sysfs;
 
 /* ISR related */
 static bool mv_pp3_run_hmac_interrupts;
@@ -217,12 +215,49 @@ struct net_device *mv_pp3_vport_dev_get(int vport)
 {
 	int i;
 
-	for (i = 0; i < pp3_netdev_next; i++)
-
+	for (i = 0; i < pp3_netdev_next; i++) {
 		if (pp3_netdev[i] && pp3_netdev[i]->vport &&
-			(pp3_netdev[i]->vport->vport == vport))
-				return pp3_netdev[i]->dev;
+		    (pp3_netdev[i]->vport->vport == vport))
+			return pp3_netdev[i]->dev;
+	}
 	return NULL;
+}
+
+bool mv_pp3_dev_is_valid(struct net_device *dev)
+{
+	int i;
+
+	if (!dev)
+		return false;
+
+	for (i = 0; i < pp3_netdev_next; i++) {
+		if (pp3_netdev[i] == MV_PP3_PRIV(dev))
+			return true;
+	}
+	return false;
+}
+
+struct pp3_dev_priv *mv_pp3_dev_priv_exist_get(struct net_device *dev)
+{
+	if (mv_pp3_dev_is_valid(dev))
+		return MV_PP3_PRIV(dev);
+
+	pr_err("%s in not pp3 device\n", dev->name);
+	return NULL;
+}
+
+struct pp3_dev_priv *mv_pp3_dev_priv_ready_get(struct net_device *dev)
+{
+	struct pp3_dev_priv *dev_priv = mv_pp3_dev_priv_exist_get(dev);
+
+	if (!dev_priv)
+		return NULL;
+
+	if (!(dev_priv->flags & MV_PP3_F_INIT)) {
+		pr_err("%s in not initialized yet\n", dev->name);
+		return NULL;
+	}
+	return dev_priv;
 }
 
 static inline struct pp3_dev_priv *mv_pp3_emac_dev_priv_get(int emac_num)
