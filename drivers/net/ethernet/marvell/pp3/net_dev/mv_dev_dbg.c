@@ -72,16 +72,10 @@ void pp3_dbg_ingress_vqs_show(struct net_device *dev)
 	struct mv_nss_drop drop;
 	struct mv_nss_sched sched;
 
-	if (!dev) {
-		pr_info("%s: Error - Input pointer is NULL\n", __func__);
+	dev_priv = mv_pp3_dev_priv_ready_get(dev);
+	if (!dev_priv)
 		return;
-	}
 
-	dev_priv = MV_PP3_PRIV(dev);
-	if (!(dev_priv->flags & MV_PP3_F_INIT)) {
-		pr_err("Error - Can't show ingress virtual queues map, %s is not initialized\n", dev->name);
-		return;
-	}
 	if (mv_pp3_dev_ingress_vqs_num_get(dev, &vqs_num)) {
 		pr_err("%s: Error - Can't get number of ingress virtual queues\n", dev->name);
 		return;
@@ -116,16 +110,9 @@ void pp3_dbg_ingress_vqs_print(struct net_device *dev)
 	struct	pp3_dev_priv *dev_priv;
 	struct pp3_vq *vq_priv;
 
-	if (!dev) {
-		pr_info("%s: Error - Input pointer is NULL\n", __func__);
+	dev_priv = mv_pp3_dev_priv_ready_get(dev);
+	if (!dev_priv)
 		return;
-	}
-
-	dev_priv = MV_PP3_PRIV(dev);
-	if (!(dev_priv->flags & MV_PP3_F_INIT)) {
-		pr_err("Error - Can't show ingress virtual queues map, %s is not initialized\n", dev->name);
-		return;
-	}
 
 	pr_cont("\n");
 
@@ -190,16 +177,10 @@ void pp3_dbg_egress_vqs_show(struct net_device *dev)
 	struct mv_nss_sched sched;
 	struct mv_nss_drop drop;
 
-	if (!dev) {
-		pr_info("%s: Error - Input pointer is NULL\n", __func__);
+	dev_priv = mv_pp3_dev_priv_ready_get(dev);
+	if (!dev_priv)
 		return;
-	}
 
-	dev_priv = MV_PP3_PRIV(dev);
-	if (!(dev_priv->flags & MV_PP3_F_INIT)) {
-		pr_err("Error - Can't show egress virtual queues configuration, %s in not initialized\n", dev->name);
-		return;
-	}
 	if (mv_pp3_dev_egress_vqs_num_get(dev, &vqs_num)) {
 		pr_err("%s: Error - Can't get number of egress virtual queues\n", dev->name);
 		return;
@@ -241,16 +222,10 @@ void pp3_dbg_egress_vqs_print(struct net_device *dev)
 	struct pp3_vport *vp, *emac_vp = NULL;
 	struct pp3_vq *vq_priv;
 
-	if (!dev) {
-		pr_info("%s: Error - Input pointer is NULL\n", __func__);
+	dev_priv = mv_pp3_dev_priv_ready_get(dev);
+	if (!dev_priv)
 		return;
-	}
 
-	dev_priv = MV_PP3_PRIV(dev);
-	if (!(dev_priv->flags & MV_PP3_F_INIT)) {
-		pr_err("Error - Can't show egress virtual queues map, %s is not initialized\n", dev->name);
-		return;
-	}
 	if (mv_pp3_dev_egress_vqs_num_get(dev, &vqs_num)) {
 		pr_err("%s: Error - Can't get number of ingress virtual queues\n", dev->name);
 		return;
@@ -321,10 +296,11 @@ static void pp3_dbg_dev_emacs_resources_line_dump(struct pp3_vport *emac_vp)
 {
 	int i;
 
-	pr_info("\nemac%d:  TX%-35s", emac_vp->vport, "");
+	pr_info("\n");
+	pr_info("emac%d:  TX%-35s", emac_vp->vport, "");
 
+	/* emac not initialized */
 	if (!(emac_vp->port.emac.flags & BIT(MV_PP3_EMAC_F_INIT_BIT)))
-		/* emac not initialized */
 		return;
 
 	for (i = 0; i < emac_vp->tx_vqs_num; i++) {
@@ -333,7 +309,6 @@ static void pp3_dbg_dev_emacs_resources_line_dump(struct pp3_vport *emac_vp)
 
 		pr_cont("%-3d ", emac_vp->tx_vqs[i]->hwq);
 	}
-
 	pr_info("        RX%-35s", "");
 
 	for (i = 0; i < emac_vp->rx_vqs_num; i++) {
@@ -341,7 +316,6 @@ static void pp3_dbg_dev_emacs_resources_line_dump(struct pp3_vport *emac_vp)
 			continue;
 
 		pr_cont("%-3d ", emac_vp->rx_vqs[i]->hwq);
-
 	}
 }
 
@@ -385,7 +359,8 @@ static void pp3_dbg_dev_channel_resources_dump(void)
 		chan_ctrl = mv_pp3_chan_get(i);
 
 		mv_pp3_cfg_hmac_tx_anode_get(chan_ctrl->hmac_hw_txq, &node);
-		pr_info("\nchan%d:  TX   ", i);
+		pr_info("\n");
+		pr_info("chan%d:  TX   ", i);
 		pr_cont("%-4s %-5s %-6d %-6s %-6d %-32d %-28d %2d (ppc0)   %-4s", "NA", "NA", chan_ctrl->frame, "NA",
 				chan_ctrl->hmac_sw_txq, chan_ctrl->hmac_hw_txq, node,
 				mv_pp3_cfg_hmac_pnode_get(PP3_PPC0_DP), "NA");
@@ -418,21 +393,35 @@ static void pp3_dbg_dev_bm_resources_dump(void)
 {
 	struct pp3_cpu *cpu_ctrl;
 	int cpu;
+	bool first;
 
-	pr_info("\nbm_put: TX   ");
+	pr_info("\n");
+
+	first = true;
 	for_each_possible_cpu(cpu) {
+		if (first) {
+			pr_info("bm_put: TX   ");
+			first = false;
+		} else {
+			pr_info("%-13s", "");
+		}
 
 		cpu_ctrl = pp3_cpus[cpu];
 		pr_cont("%-4d %-5s %-6d %-6s %-6d", cpu, "NA", cpu_ctrl->bm_frame, "NA", cpu_ctrl->bm_swq);
-		pr_info("%-13s", "");
 	}
-	pr_info("\nbm_get: RX   ");
+	pr_info("\n");
+	first = true;
 	for_each_possible_cpu(cpu) {
 		struct pp3_cpu *cpu_ctrl;
 
 		cpu_ctrl = pp3_cpus[cpu];
+		if (first) {
+			pr_info("bm_get: RX   ");
+			first = false;
+		} else {
+			pr_info("%-13s", "");
+		}
 		pr_cont("%-4d %-5s %-6d %-6s %-6d", cpu, "NA", cpu_ctrl->bm_frame, "NA", cpu_ctrl->bm_swq);
-		pr_info("%-13s", "");
 	}
 	pr_cont("\n");
 }
@@ -441,12 +430,14 @@ static void pp3_dbg_dev_bm_resources_dump(void)
 static void pp3_dbg_dev_rx_resources_line_dump(struct pp3_dev_priv *dev_priv)
 {
 	int cpu, q, node;
+	bool first;
 	struct pp3_vport *cpu_vp;
 	char queues[64];
 	char anodes[64];
 	char tmp[16];
 
-	pr_info("\n        RX   ");
+	pr_info("\n");
+	first = true;
 	for_each_possible_cpu(cpu) {
 		memset(queues, 0, sizeof(queues));
 		memset(anodes, 0, sizeof(anodes));
@@ -455,6 +446,12 @@ static void pp3_dbg_dev_rx_resources_line_dump(struct pp3_dev_priv *dev_priv)
 		if (!cpu_vp || !cpumask_test_cpu(cpu, &dev_priv->rx_cpus))
 			continue;
 
+		if (first) {
+			pr_info("        RX   ");
+			first = false;
+		} else {
+			pr_info("%-13s", "");
+		}
 		pr_cont("%-4d %-5d %-6d", cpu, cpu_vp->port.cpu.irq_num, cpu_vp->rx_vqs[0]->swq->frame_num);
 		pr_cont(" %-6d", cpu_vp->rx_vqs[0]->swq->queue.rx.irq_group);
 
@@ -491,7 +488,6 @@ static void pp3_dbg_dev_rx_resources_line_dump(struct pp3_dev_priv *dev_priv)
 			}
 			pr_cont("%-32s %-28s ", queues, anodes);
 		}
-		pr_info("%-13s", "");
 	}
 }
 /*---------------------------------------------------------------------------*/
@@ -501,11 +497,13 @@ static void pp3_dbg_dev_tx_resources_line_dump(struct pp3_dev_priv *dev_priv)
 	int cpu, q, node;
 	struct pp3_vport *cpu_vp;
 	struct pp3_pool *ppool;
+	bool first;
 	char queues[64];
 	char anodes[64];
 	char tmp[16];
 
-	pr_info("\n%-5s:  TX   ", dev_priv->dev->name);
+	pr_info("\n");
+	first = true;
 	for_each_possible_cpu(cpu) {
 		memset(queues, 0, sizeof(queues));
 		memset(anodes, 0, sizeof(anodes));
@@ -514,6 +512,12 @@ static void pp3_dbg_dev_tx_resources_line_dump(struct pp3_dev_priv *dev_priv)
 		if (!cpu_vp)
 			continue;
 
+		if (first) {
+			pr_info("%-5s:  TX   ", dev_priv->dev->name);
+			first = false;
+		} else {
+			pr_info("%-13s", "");
+		}
 		pr_cont("%-4d %-5s %-6d %-6s", cpu, "NA", cpu_vp->tx_vqs[0]->swq->frame_num, "NA");
 
 		pr_cont("%2d:%-2d ", cpu_vp->tx_vqs[0]->swq->swq, cpu_vp->tx_vqs[cpu_vp->tx_vqs_num-1]->swq->swq);
@@ -549,7 +553,6 @@ static void pp3_dbg_dev_tx_resources_line_dump(struct pp3_dev_priv *dev_priv)
 			}
 			pr_cont("%-32s %-28s ", queues, anodes);
 		}
-		pr_info("%-13s", "");
 	}
 }
 
@@ -568,11 +571,13 @@ void pp3_dbg_dev_resources_dump(void)
 		return;
 	}
 
-	pr_info("\n------Linux----------");
+	pr_info("\n");
+	pr_info("------Linux----------");
 	pr_cont("   ------HMAC--------");
 	pr_cont("   -------------------QM--------------------------------------------------");
 	pr_cont("   -----BM------");
-	pr_info("\nName    Dir  CPU  IRQ");
+	pr_info("\n");
+	pr_info("Name    Dir  CPU  IRQ");
 	pr_cont("   Frame  ISR   SWQs");
 	pr_cont("    HWQs                             A node                        P node ");
 	pr_cont("    BM Pool");
@@ -585,7 +590,6 @@ void pp3_dbg_dev_resources_dump(void)
 		pp3_dbg_dev_tx_resources_line_dump(dev_priv);
 		pp3_dbg_dev_rx_resources_line_dump(dev_priv);
 	}
-	pr_info("\n");
 	pr_info("-----------------------------------------------------------------------------------------------");
 	pr_cont("-------------------------------------\n");
 	pp3_dbg_dev_channel_resources_dump();
@@ -595,6 +599,8 @@ void pp3_dbg_dev_resources_dump(void)
 	pr_info("-----------------------------------------------------------------------------------------------");
 	pr_cont("-------------------------------------\n");
 	pp3_dbg_dev_bm_resources_dump();
+	pr_info("-----------------------------------------------------------------------------------------------");
+	pr_cont("-------------------------------------\n");
 }
 
 /*---------------------------------------------------------------------------*/
@@ -987,6 +993,7 @@ static void pp3_dbg_dev_timers_stats_dump(struct net_device *dev)
 	int cpu;
 	struct pp3_vport *cpu_vp;
 	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
+
 	/* print CPU statistics */
 	pr_cont("\n%-24s", "timers stats:");
 
@@ -1063,7 +1070,10 @@ void pp3_dbg_dev_pools_stats_dump(struct net_device *dev)
 /* Print all Host software collected statistics relevant for network interface */
 void pp3_dbg_dev_stats_dump(struct net_device *dev)
 {
-	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
+	struct pp3_dev_priv *dev_priv = mv_pp3_dev_priv_ready_get(dev);
+
+	if (!dev_priv)
+		return;
 
 	/*Print timers statistics */
 	pp3_dbg_dev_timers_stats_dump(dev);
@@ -1073,10 +1083,6 @@ void pp3_dbg_dev_stats_dump(struct net_device *dev)
 
 	pr_cont("\n");
 
-	if (!(dev_priv->flags & MV_PP3_F_INIT)) {
-		pr_err("Error: Can't show statistics, %s in not initialized\n", dev->name);
-		return;
-	}
 	/* print BM pool statistics */
 	pp3_dbg_dev_rx_pools_stats_dump(dev_priv);
 	pp3_dbg_dev_lnx_pools_stats_dump(dev_priv);
@@ -1089,7 +1095,10 @@ void pp3_dbg_dev_stats_dump(struct net_device *dev)
 /* Print all Host software queues collected statistics relevant for network interface */
 void pp3_dbg_dev_queues_stats_dump(struct net_device *dev)
 {
-	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
+	struct pp3_dev_priv *dev_priv = mv_pp3_dev_priv_ready_get(dev);
+
+	if (!dev_priv)
+		return;
 
 	pr_cont("\n");
 
@@ -1101,9 +1110,12 @@ void pp3_dbg_dev_queues_stats_dump(struct net_device *dev)
 
 void pp3_dbg_dev_status_print(struct net_device *dev)
 {
-	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
+	struct pp3_dev_priv *dev_priv = mv_pp3_dev_priv_ready_get(dev);
 	int cpu;
 	char cpus_str[16];
+
+	if (!dev_priv)
+		return;
 
 	scnprintf(cpus_str, sizeof(cpus_str), "%*pb", cpumask_pr_args(&dev_priv->rx_cpus));
 
@@ -1111,7 +1123,7 @@ void pp3_dbg_dev_status_print(struct net_device *dev)
 	pr_info("Interface %s:\n", dev->name);
 
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
-	pr_info("Flags                       : 0x%x\n", dev_priv->flags);
+	pr_info("Flags                       : 0x%x\n", (unsigned)dev_priv->flags);
 	pr_info("GNSS ops                    : %p\n", dev_priv->cpu_shared->gnss_ops);
 #endif
 #ifdef CONFIG_MV_PP3_SKB_RECYCLE
@@ -1162,12 +1174,10 @@ void pp3_dbg_dev_status_print(struct net_device *dev)
 
 void pp3_dbg_dev_pools_status_print(struct net_device *dev)
 {
-	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
+	struct pp3_dev_priv *dev_priv = mv_pp3_dev_priv_ready_get(dev);
 
-	if (!dev_priv || !(dev_priv->flags & MV_PP3_F_INIT)) {
-		pr_err("%s in not initialized yet\n", dev->name);
+	if (!dev_priv)
 		return;
-	}
 
 	if (dev_priv->cpu_shared->long_pool)
 		pp3_dbg_pool_status_print(dev_priv->cpu_shared->long_pool->pool);
