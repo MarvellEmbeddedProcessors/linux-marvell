@@ -54,7 +54,7 @@
 				compatible = "marvell,armada-xp-neta";
 				phy-mode = "sgmii";
 				fixed-link {
-					speed = <100>;
+					speed = <1000>;
 					full-duplex;
 				};
 			};
@@ -63,7 +63,7 @@
 				compatible = "marvell,armada-xp-neta";
 				phy-mode = "sgmii";
 				fixed-link {
-					speed = <100>;
+					speed = <1000>;
 					full-duplex;
 				};
 			};
