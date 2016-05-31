@@ -733,7 +733,7 @@ void mv_pp3_ppc_run_all(void)
 	for (ppc = 0; ppc < active_ppc_num; ppc++)
 		mv_pp3_ppc_run(ppc);
 
-	mdelay(1);
+	mdelay(10);
 	for (ppc = 0; ppc < active_ppc_num; ppc++) {
 		ppc_ppn_mask[ppc] = mv_pp3_hw_reg_read(apb_base_addr + MV_DP_PPC_BASE(ppc) + MV_PPC_WAIT_FOR_DEQ_REG);
 		pr_info("Start PPC #%d with 0x%x active PPNs mask\n", ppc, ppc_ppn_mask[ppc]);
