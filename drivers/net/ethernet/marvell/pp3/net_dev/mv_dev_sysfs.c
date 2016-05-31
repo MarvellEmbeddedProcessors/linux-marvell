@@ -77,10 +77,6 @@ static ssize_t pp3_dev_show(struct device *dev,
 		off = pp3_dev_help(buf);
 	else if (!strcmp(name, "sys_conf"))
 		pp3_dbg_dev_resources_dump();
-/*
-	else if (!strcmp(name, "cpu_status"))
-		pp3_dbg_cpu_status_print();
-*/
 	else {
 		err = 1;
 		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
@@ -98,7 +94,6 @@ static ssize_t pp3_dev_store(struct device *dev,
 	unsigned long   flags;
 	char		if_name[10];
 	struct net_device *netdev;
-	struct	pp3_dev_priv *dev_priv;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -108,15 +103,13 @@ static ssize_t pp3_dev_store(struct device *dev,
 
 	sscanf(buf, "%s %d %d", if_name, &b, &c);
 
-
 	netdev = dev_get_by_name(&init_net, if_name);
-
-	if (!netdev) {
-		pr_err("%s: illegal interface <%s>\n", __func__, if_name);
+	if (!mv_pp3_dev_is_valid(netdev)) {
+		pr_err("%s in not pp3 device\n", if_name);
+		if (netdev)
+			dev_put(netdev);
 		return -EINVAL;
 	}
-
-	dev_priv = MV_PP3_PRIV(netdev);
 
 	local_irq_save(flags);
 

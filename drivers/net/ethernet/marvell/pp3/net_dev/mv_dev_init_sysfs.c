@@ -88,8 +88,11 @@ static ssize_t pp3_dev_init_netdev_store(struct device *dev,
 
 	if (strcmp(if_name, "nss")) {
 		netdev = dev_get_by_name(&init_net, if_name);
-		if (!netdev) {
-			pr_err("%s: illegal interface <%s>\n", __func__, if_name);
+		if (!mv_pp3_dev_is_valid(netdev)) {
+			pr_err("%s in not pp3 device\n", if_name);
+			if (netdev)
+				dev_put(netdev);
+
 			return -EINVAL;
 		}
 	}
