@@ -96,6 +96,21 @@
 				clock-frequency = <100000>;
 			};
 
+			i2c@11100 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			i2c@11200 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			i2c@11300 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
 			serial@12000 {
 				pinctrl-0 = <&uart0_pins>;
 				pinctrl-names = "default";
