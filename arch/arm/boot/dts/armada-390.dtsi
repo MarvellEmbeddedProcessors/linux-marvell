@@ -66,6 +66,14 @@
 							"mpp39", "mpp40", "mpp41";
 					marvell,function = "ge";
 				};
+				ptp_event_pin_gpio: ptp_event_pin_gpio {
+					marvell,pins = "mpp10";
+					marvell,function = "gpio";
+				};
+				ptp_event_pin_ptp: ptp_event_pin_ptp {
+					marvell,pins = "mpp10";
+					marvell,function = "ptp";
+				};
 			};
 			mdio {
 				#address-cells = <1>;
@@ -114,6 +122,7 @@
 			      <MBUS_ID(NSS_TARGET_ID, NSS_REGS_ATTR)  0 NSS_REGS_SIZE>, /* NSS IP registers */
 			      <MBUS_ID(NSS_TARGET_ID, NSS_SPACE_ATTR) 0 NSS_SPACE_SIZE>; /* NSS IP space */
 			clock-frequency = <250000000>;
+			ptp-event-pin = <10>;
 			gop_access = <&mg_base>;
 			msi-parent = <&odmi>;
 
@@ -141,6 +150,14 @@
 				status = "disabled";
 				id = <0>;
 			};
+		};
+
+		pp3_ptp_event: ptp-event {
+			compatible = "marvell,ptp-event";
+			status = "okay";
+			pinctrl-0 = <&ptp_event_pin_gpio>;
+			pinctrl-1 = <&ptp_event_pin_ptp>;
+			pinctrl-names = "gpio", "ptp";
 		};
 	};
 };
