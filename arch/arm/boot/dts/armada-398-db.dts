@@ -133,6 +133,15 @@
 				};
 			};
 
+			sdhci@d8000 {
+				clock-frequency = <200000000>;
+				broken-cd;
+				wp-inverted;
+				bus-width = <8>;
+				status = "okay";
+				no-1-8-v;
+			};
+
 			usb@58000 {
 				status = "okay";
 			};
