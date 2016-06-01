@@ -1,0 +1,71 @@
+* Marvell Armada 39x SoC ptp-event pinctrl driver
+
+Capability to alternate PTP-pin functions gpio/ptp in run-time.
+
+For general understanding pin-control please refer pinctrl.txt.
+
+For gpio refer gpio/gpio.txt.
+Pay attention, gpio request toggles the pin-function to gpio.
+
+The same pin-number is used for gpio and for pin-control.
+Refer
+ pin-control is {mpp10}  here
+ gpio number is <10>  in net/marvell-pp3-platform.txt:"ptp-event-pin"
+
+Required properties:
+- compatible: "marvell,ptp-event",
+- "marvell,mv88f6920-pinctrl"
+  Based on the pinctrl-armada-38x.c::armada_38x_mpp_modes[] variants
+     V_88F6810_PLUS and V_88F6920_PLUS
+- internal-regs: register specifier of MPP registers
+
+Available mpp pins/groups and functions:
+
+name          pins     function-names        Values (for reference)
+====================================================================
+mpp10         10       "gpio", "ptp"         gpio=0, ptp=0x7(0111b)
+
+Other pins related to PTP used with default values without pinctrl:
+mpp8          8        "gpio", "ptp"         gpio=0, ptp=0x7(0111b)
+mpp9          9        "gpio", "ptp"         gpio=0, ptp=0x7(0111b)
+mpp11         11       "gpio", "ptp"         gpio=0, ptp=0x7(0111b)
+
+
+DTS/DTSI configuration EXAMPLE (2 parts)
+========================================
+1). Configuration-SETs for ptp-event pin control:
+internal-regs {
+	pinctrl {
+		compatible = "marvell,mv88f6920-pinctrl";
+		........................................
+		ptp_event_pin_gpio: ptp_event_pin_gpio {
+			marvell,pins = "mpp10";
+			marvell,function = "gpio";
+		};
+		ptp_event_pin_ptp: ptp_event_pin_ptp {
+			marvell,pins = "mpp10";
+			marvell,function = "ptp";
+		};
+	};
+
+
+2). Device for SET alternation:
+	ptp_event: ptp-event {
+		compatible = "marvell,ptp-event";
+		status = "okay";
+		pinctrl-0 = <&ptp_event_pin_gpio>;
+		pinctrl-1 = <&ptp_event_pin_ptp>;
+		pinctrl-names = "gpio", "ptp";
+	};
+
+
+EXAMPLE of init and usage in C-sorce
+====================================
+  Init:
+	pinctrl = devm_pinctrl_get(&pdev->dev);
+	pin_gpio_state = pinctrl_lookup_state(pinctrl, "gpio");
+	pin_ptp_state  = pinctrl_lookup_state(pinctrl, "ptp");
+  Usage - select the state according to required logic:
+	pinctrl_select_state(pinctrl, pin_gpio_state);
+          or
+	pinctrl_select_state(pinctrl, pin_ptp_state);
