@@ -67,7 +67,7 @@ static int read_show_cmd(char *buf, const struct kernel_param *kp)
 	if (p) {
 		sprintf(buf, "region=%d region_offs=%x size=%lx",
 			p->dedicated_mg_region, p->dedicated_mg_region_offs,
-			p->uio_info.mem[0].size);
+			(unsigned long)p->uio_info.mem[0].size);
 		pr_debug("%s device is used with parameters: %s\n", kp->name, buf);
 	}
 	return strlen(buf);
