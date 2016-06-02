@@ -353,7 +353,7 @@ static inline bool early_page_uninitialised(unsigned long pfn)
 
 static inline bool early_page_nid_uninitialised(unsigned long pfn, int nid)
 {
-	return false;
+	return true;
 }
 
 static inline bool update_defer_init(pg_data_t *pgdat,
