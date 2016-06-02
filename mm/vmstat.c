@@ -923,6 +923,7 @@ static char * const migratetype_names[MIGRATE_TYPES] = {
 	"Unmovable",
 	"Movable",
 	"Reclaimable",
+	"Reserve",
 #ifdef CONFIG_CMA
 	"CMA",
 #endif
