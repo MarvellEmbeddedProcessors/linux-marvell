@@ -2365,10 +2365,8 @@ static inline bool should_fail_alloc_page(gfp_t gfp_mask, unsigned int order)
 #endif /* CONFIG_FAIL_PAGE_ALLOC */
 
 /*
- * Return true if free base pages are above 'mark'. For high-order checks it
- * will return true of the order-0 watermark is reached and there is at least
- * one free page of a suitable size. Checking now avoids taking the zone lock
- * to check in the allocation paths if no pages are free.
+ * Return true if free pages are above 'mark'. This takes into account the order
+ * of the allocation.
  */
 static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 			unsigned long mark, int classzone_idx, int alloc_flags,
@@ -2376,7 +2374,7 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 {
 	long min = mark;
 	int o;
-	const int alloc_harder = (alloc_flags & ALLOC_HARDER);
+	long free_cma = 0;
 
 	/* free_pages may go negative - that's OK */
 	free_pages -= (1 << order) - 1;
@@ -2389,7 +2387,7 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 	 * the high-atomic reserves. This will over-estimate the size of the
 	 * atomic reserve but it avoids a search.
 	 */
-	if (likely(!alloc_harder))
+	if (likely(!(alloc_flags & ALLOC_HARDER)))
 		free_pages -= z->nr_reserved_highatomic;
 	else
 		min -= min / 4;
@@ -2397,45 +2395,22 @@ static bool __zone_watermark_ok(struct zone *z, unsigned int order,
 #ifdef CONFIG_CMA
 	/* If allocation can't use CMA areas don't use free CMA pages */
 	if (!(alloc_flags & ALLOC_CMA))
-		free_pages -= zone_page_state(z, NR_FREE_CMA_PAGES);
+		free_cma = zone_page_state(z, NR_FREE_CMA_PAGES);
 #endif
 
-	/*
-	 * Check watermarks for an order-0 allocation request. If these
-	 * are not met, then a high-order request also cannot go ahead
-	 * even if a suitable page happened to be free.
-	 */
-	if (free_pages <= min + z->lowmem_reserve[classzone_idx])
+	if (free_pages - free_cma <= min + z->lowmem_reserve[classzone_idx])
 		return false;
+	for (o = 0; o < order; o++) {
+		/* At the next order, this order's pages become unavailable */
+		free_pages -= z->free_area[o].nr_free << o;
 
-	/* If this is an order-0 request then the watermark is fine */
-	if (!order)
-		return true;
+		/* Require fewer higher order pages to be free */
+		min >>= 1;
 
-	/* For a high-order request, check at least one suitable page is free */
-	for (o = order; o < MAX_ORDER; o++) {
-		struct free_area *area = &z->free_area[o];
-		int mt;
-
-		if (!area->nr_free)
-			continue;
-
-		if (alloc_harder)
-			return true;
-
-		for (mt = 0; mt < MIGRATE_PCPTYPES; mt++) {
-			if (!list_empty(&area->free_list[mt]))
-				return true;
-		}
-
-#ifdef CONFIG_CMA
-		if ((alloc_flags & ALLOC_CMA) &&
-		    !list_empty(&area->free_list[MIGRATE_CMA])) {
-			return true;
-		}
-#endif
+		if (free_pages <= min)
+			return false;
 	}
-	return false;
+	return true;
 }
 
 bool zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
