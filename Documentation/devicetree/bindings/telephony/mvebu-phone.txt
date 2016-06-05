@@ -1,0 +1,78 @@
+* mvebu (Armada 38x/XP/80x0) TDM telephony controller
+
+Required properties:
+
+- compatible:
+  "marvell,armada-380-tdm" for Armada 38x platforms
+  "marvell,armada-xp-tdm" for Armada AXP platforms
+  "marvell,armada-a8k-tdm" for Armada 80x0 platforms
+
+- reg: physical base address of the controller and length of memory mapped
+  region (named "tdm_regs").
+  With "marvell,armada-380-tdm" two other regions are required:
+  first of those is dedicated for Audio PLL Configuration registers
+  (named "pll_regs") and the second one ("dco_div") - for register
+  where DCO post-divider for PLL output is set.
+
+- interrupts - TDM controller interrupt
+
+- clocks: phandle for internal gate clock
+
+- clock-names: name associated to the clocks: "gateclk"
+
+Optional properties:
+
+- pclk-freq-mhz: internal pclk frequency. If not set, the driver uses
+  default value of 8 MHz
+
+- use-pclk-external: chooses SLIC as an external pclk source
+
+Example:
+
+tdm@b0000 {
+	compatible = "marvell,armada-380-tdm";
+	reg = <0xb0000 0x5000>, <0x18400 0xc>, <0x18730 0x4>;
+	reg-names = "tdm_regs", "pll_regs", "dco_div";
+	interrupts = <0 27 0x4>;
+	clocks = <&gateclk 25>;
+	clock-names = "gateclk";
+	pclk-freq-mhz = <8>;
+};
+
+In case an external SLIC is used, there is a need of instantiating it as
+a slave SPI device under one of SPI busses (please refer to:
+Documentation/devicetree/bindings/spi/spi-bus.txt)
+
+Required properties:
+
+- compatible: "mv_slic" for Armada 38x platforms
+
+- reg: SLIC slave spi device interface chip select number
+
+- spi-max-frequency: SLIC slave spi device interface max clock
+  frequency
+
+Zarlink/Silabs SLIC devices require also following properties:
+
+- spi-1byte-cs - switch CS every single byte transferred
+
+- spi-cpol - active-low clk
+
+- spi-cpha - accept data on clk trailing edge
+
+spi1: spi@10680 {
+	pinctrl-0 = <&spi1_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	slic@0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "mv_slic";
+		reg = <0>; /* Chip select 0 */
+		spi-max-frequency = <3000000>;
+		spi-1byte-cs;
+		spi-cpol;
+		spi-cpha;
+	};
+};
