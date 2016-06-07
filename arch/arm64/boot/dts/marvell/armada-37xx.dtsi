@@ -111,7 +111,6 @@
 				cell-index = <0>;
 				clock-frequency = <160000>;
 				max-frequency = <40000>;
-				fifo-mode;
 				interrupts = <0 0 4>;
 				status = "disabled";
 			};
