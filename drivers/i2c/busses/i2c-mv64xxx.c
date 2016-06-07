@@ -434,10 +434,10 @@ static void
 mv64xxx_i2c_read_offload_rx_data(struct mv64xxx_i2c_data *drv_data,
 				 struct i2c_msg *msg)
 {
-	u32 buf[2];
+	u8 buf[2];
 
-	buf[0] = readl(drv_data->reg_base + MV64XXX_I2C_REG_RX_DATA_LO);
-	buf[1] = readl(drv_data->reg_base + MV64XXX_I2C_REG_RX_DATA_HI);
+	buf[0] = readb(drv_data->reg_base + MV64XXX_I2C_REG_RX_DATA_LO);
+	buf[1] = readb(drv_data->reg_base + MV64XXX_I2C_REG_RX_DATA_HI);
 
 	memcpy(msg->buf, buf, msg->len);
 }
@@ -592,12 +592,12 @@ static void
 mv64xxx_i2c_prepare_tx(struct mv64xxx_i2c_data *drv_data)
 {
 	struct i2c_msg *msg = drv_data->msgs;
-	u32 buf[2];
+	u8 buf[2];
 
 	memcpy(buf, msg->buf, msg->len);
 
-	writel(buf[0], drv_data->reg_base + MV64XXX_I2C_REG_TX_DATA_LO);
-	writel(buf[1], drv_data->reg_base + MV64XXX_I2C_REG_TX_DATA_HI);
+	writeb(buf[0], drv_data->reg_base + MV64XXX_I2C_REG_TX_DATA_LO);
+	writeb(buf[1], drv_data->reg_base + MV64XXX_I2C_REG_TX_DATA_HI);
 }
 
 static int
