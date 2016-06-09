@@ -58,7 +58,11 @@
 
 	soc {
 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+				/* nss window, 16M */
+			  MBUS_ID(NSS_TARGET_ID, NSS_REGS_ATTR)  0 0xf5000000 NSS_REGS_SIZE
+				/* mac_nic window, (nss internal window) 128M */
+			  MBUS_ID(NSS_TARGET_ID, NSS_SPACE_ATTR) 0 0xD0000000 NSS_SPACE_SIZE>;
 
 		internal-regs {
 			spi@10680 {
@@ -116,6 +120,12 @@
 				clock-frequency = <100000>;
 			};
 
+			mdio {
+				phy2: ethernet-phy@2 {
+					reg = <0>;
+				};
+			};
+
 			serial@12000 {
 				status = "okay";
 			};
@@ -129,6 +139,47 @@
 			status = "okay";
 			pinctrl-0 = <&smi_nss_pins>;
 			pinctrl-names="default";
+		};
+
+		gop {
+			emac0: mac0 {
+				phy-mode = "sgmii";
+				phy-speed = <2500>;
+				force-link = "yes";
+			};
+
+			emac2: mac2 {
+				phy = <&phy2>;
+				phy-mode = "sgmii";
+				phy-speed = <1000>;
+				force-link = "no";
+			};
+		};
+
+		pp3_platform {
+			status = "okay";
+
+			nic@0 {
+				status = "okay";
+				emac-data = <&emac0>;
+			};
+
+			nic@1 {
+				status = "disabled";
+			};
+
+			nic@2 {
+				status = "okay";
+				emac-data = <&emac2>;
+			};
+
+			nic@3 {
+				status = "disabled";
+			};
+
+			nss@0 {
+				status = "okay";
+			};
 		};
 
 		pcie-controller {
