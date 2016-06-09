@@ -62,7 +62,11 @@
 
 	soc {
 		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
+				/* nss window, 16M */
+			  MBUS_ID(NSS_TARGET_ID, NSS_REGS_ATTR)  0 0xf5000000 NSS_REGS_SIZE
+				/* mac_nic window, (nss internal window) 128M */
+			  MBUS_ID(NSS_TARGET_ID, NSS_SPACE_ATTR) 0 0xD0000000 NSS_SPACE_SIZE>;
 
 		internal-regs {
 			spi@10680 {
@@ -109,6 +113,20 @@
 			i2c@11300 {
 				status = "okay";
 				clock-frequency = <100000>;
+			};
+
+			mdio {
+				phy1: ethernet-phy@1 {
+					reg = <1>;
+				};
+
+				phy2: ethernet-phy@2 {
+					reg = <2>;
+				};
+
+				phy3: ethernet-phy@3 {
+					reg = <0>;
+				};
 			};
 
 			serial@12000 {
@@ -170,6 +188,55 @@
 			status = "okay";
 			pinctrl-0 = <&smi_nss_pins>;
 			pinctrl-names="default";
+		};
+
+		gop {
+			emac0: mac0 {
+				phy-mode = "rxaui";
+			};
+
+			emac1: mac1 {
+				phy = <&phy1>;
+				phy-mode = "sgmii";
+			};
+
+			emac2: mac2 {
+				phy = <&phy2>;
+				phy-mode = "sgmii";
+			};
+
+			emac3: mac3 {
+				phy = <&phy3>;
+				phy-mode = "sgmii";
+			};
+		};
+
+		pp3_platform {
+			status = "okay";
+
+			nic@0 {
+				status = "okay";
+				emac-data = <&emac0>;
+			};
+
+			nic@1 {
+				status = "okay";
+				emac-data = <&emac1>;
+			};
+
+			nic@2 {
+				status = "okay";
+				emac-data = <&emac2>;
+			};
+
+			nic@3 {
+				status = "okay";
+				emac-data = <&emac3>;
+			};
+
+			nss@0 {
+				status = "okay";
+			};
 		};
 
 		pcie-controller {

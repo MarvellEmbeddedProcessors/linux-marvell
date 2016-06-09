@@ -170,11 +170,7 @@
 				status = "okay";
 			};
 		};
-		nss_complex {
-			status = "okay";
-			pinctrl-0 = <&smi_nss_pins>;
-			pinctrl-names="default";
-		};
+
 		nss_complex {
 			status = "okay";
 			pinctrl-0 = <&smi_nss_pins>;
