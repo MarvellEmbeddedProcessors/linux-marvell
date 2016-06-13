@@ -550,7 +550,7 @@
 #define IW_SCAN_CAPA_TIME		0x40
 
 /* Max number of char in custom event - use multiple of them if needed */
-#define IW_CUSTOM_MAX		256	/* In bytes */
+#define IW_CUSTOM_MAX		1024	/* In bytes */
 
 /* Generic information element */
 #define IW_GENERIC_IE_MAX	1024
