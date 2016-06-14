@@ -34,8 +34,10 @@
 #include <linux/irq.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
+#include <linux/of.h>
 #include <linux/platform_data/mv_usb.h>
 #include <asm/unaligned.h>
+#include <linux/mbus.h>
 
 #include "mv_udc.h"
 
@@ -72,6 +74,33 @@ static const struct usb_endpoint_descriptor mv_ep0_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_CONTROL,
 	.wMaxPacketSize =	EP0_MAX_PKT_SIZE,
 };
+
+#define UDC_MAX_WINDOWS	4
+#define UDC_WIN_CTRL(w)	(0x220 + ((w) * 8))
+#define UDC_WIN_BASE(w)	(0x224 + ((w) * 8))
+
+static void mv_udc_conf_mbus_windows(void __iomem *base,
+				      const struct mbus_dram_target_info *dram)
+{
+	int win;
+
+	/* Clear all existing windows */
+	for (win = 0; win < UDC_MAX_WINDOWS; win++) {
+		writel(0, base + UDC_WIN_CTRL(win));
+		writel(0, base + UDC_WIN_BASE(win));
+	}
+
+	/* Program each DRAM CS in a separate window */
+	for (win = 0; win < dram->num_cs; win++) {
+		const struct mbus_dram_window *cs = dram->cs + win;
+
+		writel(((cs->size - 1) & 0xffff0000) | (cs->mbus_attr << 8) |
+		       (dram->mbus_dram_target_id << 4) | 1,
+		       base + UDC_WIN_CTRL(win));
+
+		writel((cs->base & 0xffff0000), base + UDC_WIN_BASE(win));
+	}
+}
 
 static void ep0_reset(struct mv_udc *udc)
 {
@@ -975,6 +1004,7 @@ static struct usb_ep_ops mv_ep_ops = {
 static void udc_clock_enable(struct mv_udc *udc)
 {
 	clk_prepare_enable(udc->clk);
+	clk_put(udc->clk);
 }
 
 static void udc_clock_disable(struct mv_udc *udc)
@@ -1076,13 +1106,13 @@ static int udc_reset(struct mv_udc *udc)
 
 static int mv_udc_enable_internal(struct mv_udc *udc)
 {
-	int retval;
-
 	if (udc->active)
 		return 0;
-
 	dev_dbg(&udc->dev->dev, "enable udc\n");
 	udc_clock_enable(udc);
+
+	/* no need for phyregs in our platform usb device support */
+#if 0
 	if (udc->pdata->phy_init) {
 		retval = udc->pdata->phy_init(udc->phy_regs);
 		if (retval) {
@@ -1092,6 +1122,7 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
 			return retval;
 		}
 	}
+#endif
 	udc->active = 1;
 
 	return 0;
@@ -2105,11 +2136,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 	int retval = 0;
 	struct resource *r;
 	size_t size;
-
-	if (pdata == NULL) {
-		dev_err(&pdev->dev, "missing platform_data\n");
-		return -ENODEV;
-	}
+	const struct mbus_dram_target_info *dram;
 
 	udc = devm_kzalloc(&pdev->dev, sizeof(*udc), GFP_KERNEL);
 	if (udc == NULL) {
@@ -2117,13 +2144,16 @@ static int mv_udc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	if (pdata)
+		udc->pdata = pdev->dev.platform_data;
+
 	udc->done = &release_done;
-	udc->pdata = pdev->dev.platform_data;
+
 	spin_lock_init(&udc->lock);
 
 	udc->dev = pdev;
 
-	if (pdata->mode == MV_USB_MODE_OTG) {
+	if (pdata && pdata->mode == MV_USB_MODE_OTG) {
 		udc->transceiver = devm_usb_get_phy(&pdev->dev,
 					USB_PHY_TYPE_USB2);
 		if (IS_ERR(udc->transceiver)) {
@@ -2142,7 +2172,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 	if (IS_ERR(udc->clk))
 		return PTR_ERR(udc->clk);
 
-	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
+	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
 	if (r == NULL) {
 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
 		return -ENODEV;
@@ -2155,6 +2185,13 @@ static int mv_udc_probe(struct platform_device *pdev)
 		return -EBUSY;
 	}
 
+
+	/* setup decoding windows */
+	dram = mv_mbus_dram_info();
+	mv_udc_conf_mbus_windows(udc->cap_regs, dram);
+
+	/* no need for phyregs in our platform usb device support */
+#if 0
 	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
 	if (r == NULL) {
 		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
@@ -2166,6 +2203,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
 		return -EBUSY;
 	}
+#endif
 
 	/* we will acces controller register, so enable the clk */
 	retval = mv_udc_enable_internal(udc);
@@ -2266,7 +2304,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 	/* VBUS detect: we can disable/enable clock on demand.*/
 	if (udc->transceiver)
 		udc->clock_gating = 1;
-	else if (pdata->vbus) {
+	else if (pdata && pdata->vbus) {
 		udc->clock_gating = 1;
 		retval = devm_request_threaded_irq(&pdev->dev,
 				pdata->vbus->irq, NULL,
@@ -2403,6 +2441,12 @@ static void mv_udc_shutdown(struct platform_device *pdev)
 	mv_udc_disable(udc);
 }
 
+static const struct of_device_id mv_udc_dt_match[] = {
+	{ .compatible = "marvell,mv-udc" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, mv_udc_dt_match);
+
 static struct platform_driver udc_driver = {
 	.probe		= mv_udc_probe,
 	.remove		= mv_udc_remove,
@@ -2410,6 +2454,7 @@ static struct platform_driver udc_driver = {
 	.driver		= {
 		.owner	= THIS_MODULE,
 		.name	= "mv-udc",
+		.of_match_table = of_match_ptr(mv_udc_dt_match),
 #ifdef CONFIG_PM
 		.pm	= &mv_udc_pm_ops,
 #endif

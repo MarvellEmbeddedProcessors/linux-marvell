@@ -1,0 +1,15 @@
+Marvell mv_udc gadget
+
+Required properties:
+  - compatible : should be "marvell,mv_udc".
+  - reg : address and length of the register set for the device.
+  - interrupts : one interrupt should be described here.
+  - clocks : clock number to enable.
+
+Example:
+	udc@58100 {
+		  compatible = "marvell,mv-udc";
+		  reg = <0x58100 0x2000>;
+		  interrupts = <0 18 0x4>;
+		  clocks = <&gateclk 18>;
+	};
