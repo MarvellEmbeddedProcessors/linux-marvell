@@ -2967,7 +2967,7 @@ static ssize_t btrfs_splice_from_socket(struct file *file, struct socket *sock,
 	mutex_lock(&inode->i_mutex);
 	err = generic_write_checks(&iocb, &iter);
 	if (err <= 0) {
-		pr_debug("%s: generic_write_checks err, write_bytes %d\n",
+		pr_debug("%s: generic_write_checks err, write_bytes %zu\n",
 			 __func__, write_bytes);
 		mutex_unlock(&inode->i_mutex);
 		goto out;
@@ -2983,7 +2983,7 @@ static ssize_t btrfs_splice_from_socket(struct file *file, struct socket *sock,
 	current->backing_dev_info = inode_to_bdi(inode);
 	err = file_remove_privs(file);
 	if (err) {
-		pr_debug("%s: file_remove_privs, err %d\n", __func__, err);
+		pr_debug("%s: file_remove_privs, err %zu\n", __func__, err);
 		mutex_unlock(&inode->i_mutex);
 		goto out;
 	}
