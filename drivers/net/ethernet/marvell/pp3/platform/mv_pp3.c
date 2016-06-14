@@ -997,6 +997,7 @@ int mv_pp3_fdt_mac_address_get(struct device_node *np, unsigned char *mac_addr)
 static int mv_pp3_shared_remove(struct platform_device *pdev)
 {
 	/* free all shared resources */
+	pp3_sysfs_exit(pp3_device);
 	pr_err("%s:: called", __func__);
 	return 0;
 }
