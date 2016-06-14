@@ -649,7 +649,7 @@ static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 	if (IS_ERR(mpp_base))
 		return PTR_ERR(mpp_base);
 
-	soc->variant = (unsigned) match->data & 0xff;
+	soc->variant = (u64)match->data & 0xff;
 	soc->controls = armada_cp110_mpp_controls;
 	soc->ncontrols = ARRAY_SIZE(armada_cp110_mpp_controls);
 	soc->gpioranges = armada_cp110_mpp_gpio_ranges;
