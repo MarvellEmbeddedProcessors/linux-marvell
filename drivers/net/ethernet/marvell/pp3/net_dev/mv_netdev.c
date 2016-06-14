@@ -359,9 +359,7 @@ void mv_pp3_config_show(void)
 
 	pr_info("  o %d PPCs num supported\n", mv_pp3_fw_ppc_num_get());
 
-#ifdef CONFIG_ARCH_MVEBU
-	pr_info("  o Cache coherency mode: %s\n", coherency_available() ? "HW" : "SW");
-#endif
+	pr_info("  o Cache coherency mode: %s\n", coherency_hard_mode ? "HW" : "SW");
 
 #ifdef CONFIG_MV_PP3_STAT_ERR
 	pr_info("  o ERROR statistics enabled\n");
@@ -1566,6 +1564,7 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 	mv_pp3_os_cache_io_sync(dev->dev.parent);
 
 	cpu = cpu_vp->port.cpu.cpu_ctrl->cpu;
+
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
 	if (dev_priv->flags & MV_PP3_F_DBG_RX) {
 		if (occ_dg)
@@ -1573,7 +1572,7 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 				dev->name, DEV_PRIV_STATS(dev_priv, cpu)->rx_pkt_dev,
 				rx_swq->frame_num, rx_swq->swq, cpu, budget, occ_dg);
 	}
-#endif
+#endif /* CONFIG_MV_PP3_DEBUG_CODE */
 
 	while ((occ_dg > 0) && (rx_pkt_done < budget)) {
 

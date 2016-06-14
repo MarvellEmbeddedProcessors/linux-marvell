@@ -49,6 +49,7 @@
 #include "common/mv_sw_if.h"
 #include "a390_gic_odmi_if.h"
 #include "gnss/mv_pp3_gnss_api.h"
+#include "coherency.h"
 
 #define MV_PP3_SHARED_NAME        "mv_pp3_shared"
 
