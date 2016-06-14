@@ -17,6 +17,12 @@
  * Generic Device Tree describing Marvell Armada CP-110 device
  */
 
+rtc@284000 {
+	compatible = "marvell,armada8k-rtc";
+	reg = <0x284000 0x20>, <0x284080 0x24>;
+	reg-names = "rtc", "rtc-soc";
+};
+
 cp110_clk: clk@0x440700 {
 	compatible = "marvell,armada-cp110-clock";
 	reg = <0x440700 0x4>;
