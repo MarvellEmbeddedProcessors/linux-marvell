@@ -118,9 +118,6 @@ void mv_pp3_msg_tasklet(unsigned long data)
 
 	if (chan_ctrl->status & MV_PP3_F_CHANNEL_CREATED)
 		mv_pp3_chan_rx_event(chan_ctrl);
-
-	/* Unmask all RX events of relevant queue */
-	mv_pp3_hmac_rxq_event_enable(chan_ctrl->frame, chan_ctrl->hmac_sw_rxq);
 }
 
 
@@ -456,6 +453,7 @@ static void mv_pp3_chan_rx_event(struct mv_pp3_channel *chan)
 		/* get number of recieved DG */
 		dg_num = proc_dg = mv_pp3_hmac_rxq_occ_get(chan->frame, chan->hmac_sw_rxq);
 		if (dg_num > chan->size*MV_PP3_CFH_MAX_SIZE/MV_PP3_CFH_DG_SIZE) {
+			chan->ch_stat.msg_rx_err++;
 			pr_err("%s: bad occupite datagramm counter %d received on channel %d: frame %d, queue %d.",
 				__func__, dg_num, chan->id, chan->frame, chan->hmac_sw_rxq);
 			return;
@@ -474,6 +472,7 @@ static void mv_pp3_chan_rx_event(struct mv_pp3_channel *chan)
 			}
 			if (cfh_size > proc_dg) {
 				mv_pp3_hmac_rxq_cfh_free(chan->frame, chan->hmac_sw_rxq, cfh_size);
+				chan->ch_stat.msg_rx_err++;
 				/* only part of CFH is moved to DRAM */
 				/* in next interrupt will processed full CFH */
 				break;
@@ -481,6 +480,7 @@ static void mv_pp3_chan_rx_event(struct mv_pp3_channel *chan)
 			proc_dg -= cfh_size;
 			if (cfh_ptr == NULL)
 				continue; /* get WA CFH */
+
 			chan->ch_stat.msg_rx++;
 			/* convert BE message header to native cpu format */
 			word0 = be32_to_cpu(cfh_ptr->msg_header.word0);
@@ -514,6 +514,13 @@ static void mv_pp3_chan_rx_event(struct mv_pp3_channel *chan)
 			chan->rcv_func(chan->id, (char *)cfh_ptr->fw_msg, msg_size, msg_seq_num, msg_flags,
 				msg_opcode, ret_code, num_ok);
 		}
+		/* Write a number of processed datagram */
+		if ((dg_num - proc_dg) > 0)
+			mv_pp3_hmac_rxq_occ_set(chan->frame, chan->hmac_sw_rxq, dg_num - proc_dg);
+
+		/* Unmask all RX events of relevant queue */
+		mv_pp3_hmac_rxq_event_enable(chan->frame, chan->hmac_sw_rxq);
+
 		if (ack_rec) {
 			u16 cfh_ind;
 			int i;
@@ -537,10 +544,6 @@ static void mv_pp3_chan_rx_event(struct mv_pp3_channel *chan)
 
 			MV_UNLOCK(&msngr_channel_lock, iflags);
 		}
-
-		/* Write a number of processed datagram */
-		if ((dg_num - proc_dg) > 0)
-			mv_pp3_hmac_rxq_occ_set(chan->frame, chan->hmac_sw_rxq, dg_num - proc_dg);
 	}
 
 	return;
