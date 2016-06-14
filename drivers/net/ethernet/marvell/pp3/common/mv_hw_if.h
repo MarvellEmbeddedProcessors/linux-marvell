@@ -35,8 +35,8 @@ disclaimer.
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
-#include "coherency.h"
 
+extern bool coherency_hard_mode;
 /*
 	access_addr - absolute address: Silicon base + unit base + table base + entry offset
 	words_num   - number of words (word = 32 bits) to read
@@ -92,14 +92,14 @@ static inline void mv_pp3_hw_reg_write(void __iomem *access_addr, u32 data)
 /* Cache coherency functions */
 static inline void mv_pp3_os_cache_io_sync(void *handle)
 {
-	if (likely(coherency_available()))
+	if (likely(coherency_hard_mode))
 		dma_sync_single_for_cpu(handle, (dma_addr_t) NULL,
 			(size_t) NULL, DMA_FROM_DEVICE);
 }
 
 static inline dma_addr_t mv_pp3_os_dma_map_single(struct device *dev, void *addr, size_t size, int direction)
 {
-	if (unlikely(!coherency_available()))
+	if (unlikely(!coherency_hard_mode))
 		return dma_map_single(dev, addr, size, direction);
 
 	return virt_to_phys(addr);
@@ -108,7 +108,7 @@ static inline dma_addr_t mv_pp3_os_dma_map_single(struct device *dev, void *addr
 static inline dma_addr_t mv_pp3_os_dma_map_page(struct device *dev, struct page *page, int offset,
 						size_t size, int direction)
 {
-	if (unlikely(!coherency_available()))
+	if (unlikely(!coherency_hard_mode))
 		return dma_map_page(dev, page, offset, size, direction);
 
 	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
