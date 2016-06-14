@@ -699,7 +699,7 @@ static void pp3_dbg_dev_nic_stats_dump(struct pp3_dev_priv *dev_priv)
 /*---------------------------------------------------------------------------*/
 
 /* Calculate SUM of single counter from TXQ statistics for all TXQs in virtual port */
-static int pp3_dbg_sum_txqs_cnt_get(struct pp3_vport *vp, int cnt_index)
+int pp3_dbg_sum_txqs_cnt_get(struct pp3_vport *vp, int cnt_index)
 {
 	int q, sum = 0;
 	unsigned int *stats;

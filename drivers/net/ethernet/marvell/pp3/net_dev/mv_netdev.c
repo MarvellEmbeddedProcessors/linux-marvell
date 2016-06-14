@@ -154,7 +154,7 @@ bool mv_pp3_is_nic_skb_recycle(void)
 	return mv_pp3_skb_recycle;
 }
 #else
-static bool mv_pp3_skb_recycle;
+bool mv_pp3_skb_recycle;
 #endif /* CONFIG_MV_PP3_SKB_RECYCLE */
 
 int mv_pp3_dev_num_get(void)
@@ -1114,9 +1114,10 @@ int mv_pp3_poll(struct napi_struct *napi, int budget)
 	struct pp3_vport *cpu_vp = dev_priv->cpu_vp[cpu];
 
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
-	if (dev_priv->flags & MV_PP3_F_DBG_POLL)
-		pr_info("%s: ENTER: netif:%s, cpu=%d, budget=%d\n",
-				__func__, napi->dev->name, cpu, budget);
+	if (dev_priv->flags & MV_PP3_F_DBG_POLL) {
+		pr_info("%s: poll ENTER: cpu=%d, budget=%d\n",
+			napi->dev->name, cpu, budget);
+	}
 #endif
 
 	STAT_INFO(cpu_vp->port.cpu.stats.napi_enter++);
@@ -1155,6 +1156,11 @@ int mv_pp3_poll(struct napi_struct *napi, int budget)
 			mv_pp3_hmac_group_event_unmask(frame, irq_group);
 		}
 	}
+#ifdef CONFIG_MV_PP3_DEBUG_CODE
+	if (dev_priv->flags & MV_PP3_F_DBG_POLL)
+		pr_info("%s: poll EXIT: cpu=%d, budget=%u, pkts_done=%u\n",
+			napi->dev->name, cpu, budget, rx_pkt_done);
+#endif /* CONFIG_MV_PP3_DEBUG_CODE */
 	return rx_pkt_done;
 }
 

@@ -65,7 +65,7 @@ static int read_show_cmd(char *buf, const struct kernel_param *kp)
 {
 	struct ts_ptp_uio *p = (void *)(*(u32 *)(kp->arg));
 	if (p) {
-		sprintf(buf, "region=%d region_offs=%x size=%lx",
+		sprintf(buf, "region=%d region_offs=%x size=%x",
 			p->dedicated_mg_region, p->dedicated_mg_region_offs,
 			(unsigned long)p->uio_info.mem[0].size);
 		pr_debug("%s device is used with parameters: %s\n", kp->name, buf);
