@@ -1,9 +1,10 @@
 config MVPP3
 	tristate "Marvell Armada 390 network interface support"
-	depends on MACH_ARMADA_38X
+	depends on ARCH_MVEBU
 	select MVMDIO
 	select MV_GNSS_SUPPORT
 	select MVEBU_ODMI
+	select MVNET_COMPLEX
 	---help---
 		Add support for PP3 driver.
 		This driver supports the network
