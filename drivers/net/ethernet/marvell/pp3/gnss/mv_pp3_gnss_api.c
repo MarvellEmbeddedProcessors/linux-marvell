@@ -17,6 +17,7 @@
 */
 #include "platform/mv_pp3.h"
 #include "fw/mv_pp3_fw_msg.h"
+#include "fw/mv_fw.h"
 #include "net_dev/mv_dev_vq.h"
 #include "net_dev/mv_netdev.h"
 
@@ -843,4 +844,22 @@ int mv_pp3_gnss_egress_vq_rate_limit_get(unsigned short vport, int vq, struct mv
 	return rc;
 }
 EXPORT_SYMBOL(mv_pp3_gnss_egress_vq_rate_limit_get);
+/*---------------------------------------------------------------------------*/
+
+int  mv_pp3_gnss_state_get(bool *state)
+{
+	int ppc;
+
+	for (ppc = 0; ppc < MV_PP3_PPC_MAX_NUM; ppc++) {
+		if (!mv_fw_keep_alive_get(ppc)) {
+			*state = false;
+			return 0;
+		}
+	}
+
+	*state = true;
+
+	return 0;
+}
+EXPORT_SYMBOL(mv_pp3_gnss_state_get);
 
