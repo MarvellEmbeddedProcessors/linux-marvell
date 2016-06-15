@@ -166,7 +166,8 @@ int mv_pp3_fw_request_file(char *path, struct mem_image *img)
 static int mv_pp3_ppc_fw_image_load(struct mem_image *ptr_to_image, int ppc)
 {
 	unsigned int data, size, curr_val, mask;
-	void __iomem *curr_apb_address, *addr = NULL;
+	void __iomem *curr_apb_address;
+	u32 *addr = NULL;
 	enum ppc_mem_type type;
 
 	size = ptr_to_image->size;
@@ -183,7 +184,7 @@ static int mv_pp3_ppc_fw_image_load(struct mem_image *ptr_to_image, int ppc)
 
 	for (curr_val = 0; curr_val < size; curr_val++)	{
 		data = ptr_to_image->rows[curr_val].data;
-		addr =  curr_apb_address + (ptr_to_image->rows[curr_val].address & mask);
+		addr = (u32 *)(curr_apb_address + (ptr_to_image->rows[curr_val].address & mask));
 		mv_pp3_hw_reg_write(addr, data);
 	}
 
@@ -486,7 +487,7 @@ void mv_fw_keep_alive_dump(int ppc)
 	dram_offset = host_to_nss_dram_addr[ppc][KEEP_ALIVE_BUFFER];
 
 	ptr_to_keep_alive_array = (u32 *)dram_offset;
-	for (i = 0; i < NUMBER_OF_PPNs; i++) {
+	for (i = 0; i < MV_NUM_OF_PPN; i++) {
 		num = cpu_to_be32(*(ptr_to_keep_alive_array + i));
 		pr_info("PPN #%2d:   0x%08x\n", i, num);
 	}
@@ -791,3 +792,80 @@ int mv_pp3_ppc_idle_wait_all(void)
 
 	return err;
 }
+
+static u32 mv_pp3_ppn_deq_status_get(int ppc)
+{
+	return	mv_pp3_hw_reg_read(mv_pp3_nss_regs_vaddr_get() +
+		MV_DP_PPC_BASE(ppc) +
+		MV_PPC_WAIT_FOR_DEQ_REG);
+}
+
+static void mv_pp3_sram_ppn_status_set(int ppc, u8 val)
+{
+	u32 words[MV_NUM_OF_PPN / sizeof(u32)];
+	u8 *buffer = (u8 *)words;
+	u32 *shared_sram_addr;
+	int i;
+
+	for (i = 0; i < MV_NUM_OF_PPN; i++)
+		*buffer++ = val;
+
+	shared_sram_addr = (u32 *)(apb_base_addr +
+				MV_DP_PPC_BASE(ppc) +
+				MV_PPC_SHARED_MEM_OFFS +
+				PPN_KEEPALIVE_SRAM_OFFSET);
+
+	mv_pp3_hw_write(shared_sram_addr, (MV_NUM_OF_PPN / 4), words);
+}
+
+static void mv_pp3_sram_ppn_status_get(int ppc, u32 *buffer)
+{
+	u32 *shared_sram_addr;
+
+	shared_sram_addr = (u32 *)(apb_base_addr +
+				MV_DP_PPC_BASE(ppc) +
+				MV_PPC_SHARED_MEM_OFFS +
+				PPN_KEEPALIVE_SRAM_OFFSET);
+
+	mv_pp3_hw_read(shared_sram_addr, (MV_NUM_OF_PPN / 4), buffer);
+}
+
+bool mv_fw_keep_alive_get(int ppc)
+{
+	int i;
+	u32 deq_status;
+	u8  sram_status[MV_NUM_OF_PPN];
+
+	if ((ppc < 0) || (ppc >= active_ppc_num)) {
+		pr_err("%s: Unexpected ppc number %d\n", __func__, ppc);
+		return false;
+	}
+
+	if (ppc_ppn_mask[ppc] <= 2) /* don't check fw debug versions with 1-2 PPNs only */
+		return true;
+
+	deq_status = mv_pp3_ppn_deq_status_get(ppc); /* all 16 */
+
+	mv_pp3_sram_ppn_status_get(ppc, (u32 *)sram_status);   /* all 16 - store in sram_status */
+
+	for (i = 0; i < MV_NUM_OF_PPN; i++) {
+		if (((deq_status & (1 << i)) == 0)  && (sram_status[i] != 0)) {
+			/* second check */
+			udelay(30);
+
+			deq_status = mv_pp3_ppn_deq_status_get(ppc); /* all 16 */
+
+			mv_pp3_sram_ppn_status_get(ppc, (u32 *)sram_status);
+
+			if (((deq_status & (1 << i)) == 0)  && (sram_status[i] != 0)) {
+				pr_info("keep alive: ppc=%d ppn=%d  failed\n", ppc, i);
+				return false; /* BAD */
+			}
+		}
+	}
+
+	mv_pp3_sram_ppn_status_set(ppc, 0x1); /* all 16 */
+
+	return true; /* GOOD */
+}
+

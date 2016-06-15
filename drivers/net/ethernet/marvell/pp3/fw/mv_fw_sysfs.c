@@ -34,38 +34,41 @@ disclaimer.
 static ssize_t mv_fw_help(char *b)
 {
 	int o = 0;
+	int p = PAGE_SIZE;
 
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
+	o += scnprintf(b + o, p - o, "\n");
 
-	o += scnprintf(b+o, PAGE_SIZE-o, "cat                               version         - show FW version\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [path]                     > fw_path         - define FW images folder\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [num]                      > ppc_active      - number of active PPCs\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [ppc] [ppn] [entry] [numb] > inf_lg_dump     - informational logger dump\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [ppc] [ppn] [entry] [numb] > cr_lg_dump      - critical logger dump\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [ppc]                      > keep_alive_dump - show Keep Alive array\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [port]                     > emac_vp_show    - show EMAC virtual port status\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [port]                     > vp_stats        - show virtual port FW statistics\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [queue]                    > hwq_stats       - show HW queue FW statistics\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [queue]                    > swq_stats       - show SW queue FW statistics\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [pool]                     > bmpool_stats    - show BM pool FW statistics\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [channel]                  > chan_stats      - show message channel FW statistics\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [st] [ind]                 > clear_stats     - clear FW statistics by type, 0 - all\n");
+	o += scnprintf(b + o, p - o, "cat                        version      - show FW version\n");
+	o += scnprintf(b + o, p - o, "echo [path]              > fw_path      - define FW images folder\n");
+	o += scnprintf(b + o, p - o, "echo [num]               > ppc_active   - number of active PPCs\n");
+	o += scnprintf(b + o, p - o, "echo [ppc] [ppn] [e] [n] > inf_lg_dump  - informational logger dump\n");
+	o += scnprintf(b + o, p - o, "echo [ppc] [ppn] [e] [n] > cr_lg_dump   - critical logger dump\n");
+	o += scnprintf(b + o, p - o, "echo [ppc]               > ka_dump      - dump keep alive array\n");
+	o += scnprintf(b + o, p - o, "echo [ppc_map]           > ka_get       - get keep alive status\n");
+	o += scnprintf(b + o, p - o, "echo [port]              > emac_vp_show - show EMAC virtual port status\n");
+	o += scnprintf(b + o, p - o, "echo [port]              > vp_stats     - show virtual port FW statistics\n");
+	o += scnprintf(b + o, p - o, "echo [queue]             > hwq_stats    - show HW queue FW statistics\n");
+	o += scnprintf(b + o, p - o, "echo [queue]             > swq_stats    - show SW queue FW statistics\n");
+	o += scnprintf(b + o, p - o, "echo [pool]              > bmpool_stats - show BM pool FW statistics\n");
+	o += scnprintf(b + o, p - o, "echo [channel]           > chan_stats   - show message channel FW statistics\n");
+	o += scnprintf(b + o, p - o, "echo [st] [ind]          > clear_stats  - clear FW statistics by type, 0-all\n");
 
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "parameters:\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [ppc]     - PPC number (decimal)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [ppn]     - PPN number in current PPC (decimal)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [entry]   - start entry number (decimal)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [numb]    - number of entries to print (decimal)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [port]    - virtual port number\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [queue]   - queue number\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [pool]    - pool number\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [channel] - message channel number\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [st]      - statistics type: 0-all, 1-vport, 2-hwq, 3-swq, 4-bm pool, 5-channel\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [ind]     - index according to statistics type\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [num]     - number of active PPCs (decimal)\n");
+	o += scnprintf(b + o, p - o, "\n");
+	o += scnprintf(b + o, p - o, "parameters:\n");
+	o += scnprintf(b + o, p - o, "      [ppc_map] - bit map of PPC clusters (decimal)\n");
+	o += scnprintf(b + o, p - o, "      [ppc]     - PPC number (decimal)\n");
+	o += scnprintf(b + o, p - o, "      [ppn]     - PPN number in current PPC (decimal)\n");
+	o += scnprintf(b + o, p - o, "      [entry]   - start entry number (decimal)\n");
+	o += scnprintf(b + o, p - o, "      [numb]    - number of entries to print (decimal)\n");
+	o += scnprintf(b + o, p - o, "      [port]    - virtual port number\n");
+	o += scnprintf(b + o, p - o, "      [queue]   - queue number\n");
+	o += scnprintf(b + o, p - o, "      [pool]    - pool number\n");
+	o += scnprintf(b + o, p - o, "      [channel] - message channel number\n");
+	o += scnprintf(b + o, p - o, "      [st]      - stats type: 0-all, 1-vport, 2-hwq, 3-swq, 4-bm pool, 5-chan\n");
+	o += scnprintf(b + o, p - o, "      [ind]     - index according to statistics type\n");
+	o += scnprintf(b + o, p - o, "      [num]     - number of active PPCs (decimal)\n");
 
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
+	o += scnprintf(b + o, p - o, "\n");
 
 	return o;
 }
@@ -133,12 +136,22 @@ static ssize_t mv_fw_store(struct device *dev,
 			mv_fw_critical_logger_dump(a, b, c, d);
 		else
 			err = 1;
-	} else if (!strcmp(name, "keep_alive_dump")) {
-		fields = sscanf(buf, "%d", &a);
-		if (fields == 1)
+	} else if (!strcmp(name, "ka_dump")) {
+		if (!kstrtoint(buf, 10, &a))
 			mv_fw_keep_alive_dump(a);
 		else
 			err = 1;
+	} else if (!strcmp(name, "ka_get")) {
+		if (!kstrtoint(buf, 10, &a)) {
+			int ppc;
+
+			for (ppc = 0; ppc < MV_PP3_PPC_MAX_NUM; ppc++) {
+				if ((a & (1 << ppc)) && mv_fw_keep_alive_get(ppc))
+					pr_info("ppc #%d: keep alive is OK\n", ppc);
+			}
+		} else {
+			err = 1;
+		}
 	} else if (!strcmp(name, "emac_vp_show")) {
 		int i;
 		unsigned char valid_macs;
@@ -223,7 +236,8 @@ static DEVICE_ATTR(fw_path,		S_IWUSR, NULL, mv_fw_store);
 static DEVICE_ATTR(inf_lg_dump,		S_IWUSR, NULL, mv_fw_store);
 static DEVICE_ATTR(ppc_active,		S_IWUSR, NULL, mv_fw_store);
 static DEVICE_ATTR(cr_lg_dump,		S_IWUSR, NULL, mv_fw_store);
-static DEVICE_ATTR(keep_alive_dump,	S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(ka_dump,		S_IWUSR, NULL, mv_fw_store);
+static DEVICE_ATTR(ka_get,		S_IWUSR, NULL, mv_fw_store);
 static DEVICE_ATTR(emac_vp_show,	S_IWUSR, NULL, mv_fw_store);
 static DEVICE_ATTR(vp_stats,		S_IWUSR, NULL, mv_fw_store);
 static DEVICE_ATTR(hwq_stats,		S_IWUSR, NULL, mv_fw_store);
@@ -240,7 +254,8 @@ static struct attribute *mv_fw_attrs[] = {
 	&dev_attr_inf_lg_dump.attr,
 	&dev_attr_ppc_active.attr,
 	&dev_attr_cr_lg_dump.attr,
-	&dev_attr_keep_alive_dump.attr,
+	&dev_attr_ka_dump.attr,
+	&dev_attr_ka_get.attr,
 	&dev_attr_emac_vp_show.attr,
 	&dev_attr_vp_stats.attr,
 	&dev_attr_hwq_stats.attr,
@@ -260,25 +275,26 @@ static struct attribute_group mv_fw_group = {
 static ssize_t mv_fw_debug_help(char *b)
 {
 	int o = 0;
+	int p = PAGE_SIZE;
 
-	o += scnprintf(b + o, PAGE_SIZE - o,
+	o += scnprintf(b + o, p - o,
 		       "echo [ppc] [path]                > imem_dnld     - Download PPC IMEM from file\n");
-	o += scnprintf(b + o, PAGE_SIZE - o,
+	o += scnprintf(b + o, p - o,
 		       "echo [ppc] [path]                > profile_dnld  - Download PPC profile table from file\n");
-	o += scnprintf(b + o, PAGE_SIZE - o,
+	o += scnprintf(b + o, p - o,
 		       "echo [path]                      > se_dnld       - Download SE from file\n");
-	o += scnprintf(b + o, PAGE_SIZE - o,
+	o += scnprintf(b + o, p - o,
 		       "echo                             > ppn_run       - Run PPN\n");
-	o += sprintf(b + o,
+	o += scnprintf(b + o, p - o,
 		       "echo [ppc][ppn][ind][adr][words] > sp_dump       - Print SP contents\n");
-	o += sprintf(b + o,
+	o += scnprintf(b + o, p - o,
 		       "echo [ppc][adr][words]           > rec_dump      - Print messages/packets buffer contents\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "\nparameters:\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [ppc]   - PPC number (decimal)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [ppn]   - PPN number in current PPC (decimal)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [ind]   - index of SP_image array (decimal)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [adr]   - offset to print (hex)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [words] - words number to print (decimal)\n");
+	o += scnprintf(b + o, p - o, "parameters:\n");
+	o += scnprintf(b + o, p - o, "      [ppc]   - PPC number (decimal)\n");
+	o += scnprintf(b + o, p - o, "      [ppn]   - PPN number in current PPC (decimal)\n");
+	o += scnprintf(b + o, p - o, "      [ind]   - index of SP_image array (decimal)\n");
+	o += scnprintf(b + o, p - o, "      [adr]   - offset to print (hex)\n");
+	o += scnprintf(b + o, p - o, "      [words] - words number to print (decimal)\n");
 
 
 	return o;

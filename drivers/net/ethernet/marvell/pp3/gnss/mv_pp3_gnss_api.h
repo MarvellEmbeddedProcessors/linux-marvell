@@ -94,3 +94,5 @@ int mv_pp3_gnss_ingress_vport_ext_stats_clean(int vport);
 int mv_pp3_gnss_ingress_vport_stats_clean(int vport);
 int mv_pp3_gnss_ext_vport_msec_get(void);
 
+int mv_pp3_gnss_state_get(bool *state);
+
