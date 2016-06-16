@@ -459,6 +459,13 @@
 				clocks = <&gateclk 18>;
 			};
 
+			udc@58100 {
+				compatible = "marvell,mv-udc";
+				reg = <0x58100 0x2000>;
+				interrupts = <0 18 0x4>;
+				clocks = <&gateclk 18>;
+			};
+
 			usb3@f0000 {
 				compatible = "marvell,xhci-armada-380";
 				reg = <0xf0000 0x3fff>,<0xf4000 0x3fff>;

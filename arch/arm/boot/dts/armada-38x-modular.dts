@@ -186,6 +186,10 @@
 				status = "disabled";
 			};
 
+			udc@58100 {
+				status = "disabled";
+			};
+
 			usb3@f0000 {
 				status = "disabled";
 			};
