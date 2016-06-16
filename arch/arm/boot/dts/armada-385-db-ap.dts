@@ -180,6 +180,23 @@
 				marvell,nand-keep-config;
 				marvell,nand-enable-arbiter;
 				nand-on-flash-bbt;
+
+				partition@0 {
+					label = "U-Boot";
+					reg = <0x00000000 0x00800000>;
+					read-only;
+				};
+
+				partition@800000 {
+					label = "uImage";
+					reg = <0x00800000 0x00400000>;
+					read-only;
+				};
+
+				partition@c00000 {
+					label = "Root";
+					reg = <0x00c00000 0x3f400000>;
+				};
 			};
 
 			usb@58000 {
