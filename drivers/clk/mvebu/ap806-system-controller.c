@@ -69,8 +69,12 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 		cpuclk_freq = 1300;
 		break;
 	default:
+		/* set cpuclk_freq as invalid value to continue and
+		** configure the MSS clock (used to calculate the
+		** baudrate of the UART
+		*/
+		cpuclk_freq = 0;
 		pr_err("invalid SAR value\n");
-		return;
 	}
 
 	/* Convert to hertz */
