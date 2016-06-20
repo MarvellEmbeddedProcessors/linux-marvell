@@ -55,6 +55,8 @@
 /* PIO registers base address and register offsets */
 #define PIO_BASE_ADDR					0x4000
 #define PIO_CTRL					0x0
+#define     PCIE_PIO_PCIE_TYPE_MASK			0xF
+#define     PCIE_PIO_DIS_ADDR_WIN_SHIFT			24
 #define PIO_STAT					0x4
 #define PIO_ADDR_LS					0x8
 #define PIO_ADDR_MS					0xc
@@ -429,6 +431,16 @@ static void advk_pcie_setup_hw(struct advk_pcie_port *port)
 #endif
 	advk_writel(port, state, PCIE_CORE_CTRL_REG_ADDR(PCIE_CORE_CTRL2_REG));
 
+	/* Enable the AXI address window mapping */
+	config = advk_readl(port, PCIE_CORE_CTRL_REG_ADDR(PCIE_CORE_CTRL2_REG));
+	config |= OB_WIN_ENABLE;
+	advk_writel(port, config, PCIE_CORE_CTRL_REG_ADDR(PCIE_CORE_CTRL2_REG));
+
+	/* Bypass the address window mapping for PIO */
+	config = advk_readl(port, PCIE_PIO_REG_ADDR(PIO_CTRL));
+	config |= (1 << PCIE_PIO_DIS_ADDR_WIN_SHIFT);
+	advk_writel(port, config, PCIE_PIO_REG_ADDR(PIO_CTRL));
+
 	/* Start link training */
 	state = advk_readl(port,
 		      PCIE_CORE_CONFIG_REG_ADDR(PCIE_CORE_LINK_CTRL_STAT_REG));
@@ -452,31 +464,6 @@ static void advk_pcie_setup_hw(struct advk_pcie_port *port)
 	state = advk_readl(port, PCIE_CORE_CONFIG_REG_ADDR(4));
 	state |= 0x7;
 	advk_writel(port, state, PCIE_CORE_CONFIG_REG_ADDR(4));
-}
-
-/*
- * This routine is used to enable or dieable AXI address window
- * location generation.
- * Disabled: No address window mapping. Use AXI user fields
- * provided by the AXI fabric.
- * Enabled: Enable the address window mapping. The HAL bridge
- * generates the AXI user field locally. Use the local generated AXI user
- * fields.
- * It should be disabled when access PCIe device by PIO.
- * It should be enabled when access PCIe device by memory access directly.
- */
-static int advk_pcie_enable_axi_addr_gen(struct advk_pcie_port *port,
-					 int enable)
-{
-	u32 reg32;
-
-	reg32 = advk_readl(port, PCIE_CORE_CTRL_REG_ADDR(PCIE_CORE_CTRL2_REG));
-	if (enable)
-		reg32 |= OB_WIN_ENABLE;
-	else
-		reg32 &= ~(OB_WIN_ENABLE);
-	advk_writel(port, reg32, PCIE_CORE_CTRL_REG_ADDR(PCIE_CORE_CTRL2_REG));
-	return 0;
 }
 
 /*
@@ -532,19 +519,18 @@ static int advk_pcie_hw_rd_conf(struct advk_pcie_port *port,
 
 	baseaddr = port->base;
 
-	advk_pcie_enable_axi_addr_gen(port, false);
-
 	/* Start PIO */
 	advk_writel(port, 0, PCIE_PIO_REG_ADDR(PIO_START));
 	advk_writel(port, 1, PCIE_PIO_REG_ADDR(PIO_ISR));
 
 	/* Program the control register */
+	reg_val = advk_readl(port, PCIE_PIO_REG_ADDR(PIO_CTRL));
+	reg_val &= ~(PCIE_PIO_PCIE_TYPE_MASK);
 	if (bus->number ==  1)
-		advk_writel(port, PCIE_CONFIG_RD_TYPE0,
-			    PCIE_PIO_REG_ADDR(PIO_CTRL));
+		reg_val |= PCIE_CONFIG_RD_TYPE0;
 	else
-		advk_writel(port, PCIE_CONFIG_RD_TYPE1,
-			    PCIE_PIO_REG_ADDR(PIO_CTRL));
+		reg_val |= PCIE_CONFIG_RD_TYPE1;
+	advk_writel(port, reg_val, PCIE_PIO_REG_ADDR(PIO_CTRL));
 
 	/* Program the address registers */
 	reg_val = PCIE_BDF(devfn)|PCIE_CONF_REG(where);
@@ -567,11 +553,8 @@ static int advk_pcie_hw_rd_conf(struct advk_pcie_port *port,
 		pr_err("%s config read failed!\nBus: %d, Dev: %d, Func: %d, Regs: 0x%X, Size: %d\n",
 		       __func__, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
 		       where, size);
-		advk_pcie_enable_axi_addr_gen(port, true);
 		return PCIBIOS_SET_FAILED;
 	}
-
-	advk_pcie_check_pio_status(port);
 
 	/* Get the read result */
 	*val = advk_readl(port, PCIE_PIO_REG_ADDR(PIO_RD_DATA));
@@ -580,7 +563,6 @@ static int advk_pcie_hw_rd_conf(struct advk_pcie_port *port,
 	else if (size == 2)
 		*val = (*val >> (8 * (where & 3))) & 0xffff;
 
-	advk_pcie_enable_axi_addr_gen(port, true);
 	return ret;
 }
 
@@ -596,18 +578,18 @@ static int advk_pcie_hw_wr_conf(struct advk_pcie_port *port,
 
 	baseaddr = port->base;
 
-	advk_pcie_enable_axi_addr_gen(port, false);
-
 	/* Start PIO */
 	advk_writel(port, 0, PCIE_PIO_REG_ADDR(PIO_START));
 	advk_writel(port, 1, PCIE_PIO_REG_ADDR(PIO_ISR));
 
+	/* Program the control register */
+	reg_val = advk_readl(port, PCIE_PIO_REG_ADDR(PIO_CTRL));
+	reg_val &= ~(PCIE_PIO_PCIE_TYPE_MASK);
 	if (bus->number == 1)
-		advk_writel(port, PCIE_CONFIG_WR_TYPE0,
-			    PCIE_PIO_REG_ADDR(PIO_CTRL));
+		reg_val |= PCIE_CONFIG_WR_TYPE0;
 	else
-		advk_writel(port, PCIE_CONFIG_WR_TYPE1,
-			    PCIE_PIO_REG_ADDR(PIO_CTRL));
+		reg_val |= PCIE_CONFIG_WR_TYPE1;
+	advk_writel(port, reg_val, PCIE_PIO_REG_ADDR(PIO_CTRL));
 
 	/* Program the address registers */
 	reg_val = PCIE_CONF_ADDR(bus->number, devfn, where);
@@ -647,23 +629,18 @@ static int advk_pcie_hw_wr_conf(struct advk_pcie_port *port,
 			reg_val = val << 16;
 			break;
 		default:
-			advk_pcie_enable_axi_addr_gen(port, true);
 			return PCIBIOS_SET_FAILED;
 		}
 		break;
 	case SZ_4:
-		if (where % 4) {
-			advk_pcie_enable_axi_addr_gen(port, true);
+		if (where % 4)
 			return PCIBIOS_SET_FAILED;
-		}
+
 		data_strobe = 0xf;
 		reg_val = val;
 		break;
 	default:
-		{
-			advk_pcie_enable_axi_addr_gen(port, true);
-			return PCIBIOS_SET_FAILED;
-		}
+		return PCIBIOS_SET_FAILED;
 	}
 
 	/* Program the data register */
@@ -683,16 +660,12 @@ static int advk_pcie_hw_wr_conf(struct advk_pcie_port *port,
 		pr_err("%s config write failed!\nBus: %d, Dev: %d, Func: %d, Regs: 0x%X, Val: 0x%X, Size: %d\n",
 		       __func__, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
 		       where, val, size);
-		advk_pcie_enable_axi_addr_gen(port, true);
 		return PCIBIOS_SET_FAILED;
 	}
 
 	advk_pcie_check_pio_status(port);
 
-	advk_pcie_enable_axi_addr_gen(port, true);
-
 	return ret;
-
 }
 
 static void advk_pcie_handle_iobase_change(struct advk_pcie_port *port)
@@ -732,8 +705,6 @@ static void advk_pcie_handle_iobase_change(struct advk_pcie_port *port)
 			    (port->bridge.iolimitupper << 16)) -
 			    iobase) + 1;
 
-	advk_pcie_enable_axi_addr_gen(port, false);
-
 	/* Register outbound window for configuration and set r/w config operations */
 	advk_pcie_set_ob_win(port,			/* reg base */
 		1,					/* window block*/
@@ -744,8 +715,6 @@ static void advk_pcie_handle_iobase_change(struct advk_pcie_port *port)
 		0,					/* remap ms */
 		port->iowin_base & 0xFFFFFFFF,		/* remap ls */
 		OB_PCIE_IO);
-
-	advk_pcie_enable_axi_addr_gen(port, true);
 }
 
 static void advk_pcie_handle_membase_change(struct advk_pcie_port *port)
@@ -774,8 +743,6 @@ static void advk_pcie_handle_membase_change(struct advk_pcie_port *port)
 		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
 		port->memwin_base + 1;
 
-	advk_pcie_enable_axi_addr_gen(port, false);
-
 	/*
 	 * Register outbound window for configuration and
 	 * set r/w config operations.
@@ -789,9 +756,6 @@ static void advk_pcie_handle_membase_change(struct advk_pcie_port *port)
 		0,					/* remap ms */
 		port->memwin_base & 0xFFFFFFFF,		/* remap ls */
 		(2 << 20)|OB_PCIE_MEM);
-
-	advk_pcie_enable_axi_addr_gen(port, true);
-
 }
 
 /*
@@ -1237,7 +1201,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
 		port->dn = child;
 
 		advk_sw_pci_bridge_init(port);
-		advk_pcie_enable_axi_addr_gen(port, true);
 
 		i++;
 	}
