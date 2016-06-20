@@ -53,20 +53,28 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 
 	freq_mode = reg & AP806_SAR_CLKFREQ_MODE_MASK;
 	switch (freq_mode) {
-	case 0x0 ... 0x5:
-		cpuclk_freq = 2000;
-		break;
-	case 0x6 ... 0xB:
-		cpuclk_freq = 1800;
-		break;
-	case 0xC ... 0x11:
+	case 0x4:
+	case 0xB ... 0x12:
 		cpuclk_freq = 1600;
 		break;
-	case 0x12 ... 0x16:
+	case 0x1A:
 		cpuclk_freq = 1400;
 		break;
-	case 0x17 ... 0x19:
+	case 0x14 ... 0x18:
 		cpuclk_freq = 1300;
+		break;
+	case 0x19:
+		cpuclk_freq = 1200;
+		break;
+	case 0x13:
+	case 0x1D:
+		cpuclk_freq = 1000;
+		break;
+	case 0x1C:
+		cpuclk_freq = 800;
+		break;
+	case 0x1B:
+		cpuclk_freq = 600;
 		break;
 	default:
 		/* set cpuclk_freq as invalid value to continue and
