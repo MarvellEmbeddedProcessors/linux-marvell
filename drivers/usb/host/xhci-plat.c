@@ -232,6 +232,11 @@ static int xhci_plat_remove(struct platform_device *dev)
 	return 0;
 }
 
+void xhci_plat_shutdown(struct platform_device *dev)
+{
+	xhci_plat_remove(dev);
+}
+
 #ifdef CONFIG_PM_SLEEP
 static int xhci_plat_suspend(struct device *dev)
 {
@@ -288,7 +293,7 @@ MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
 static struct platform_driver usb_xhci_driver = {
 	.probe		= xhci_plat_probe,
 	.remove		= xhci_plat_remove,
-	.shutdown	= xhci_plat_remove,
+	.shutdown	= xhci_plat_shutdown,
 	.driver	= {
 		.name = "xhci-hcd",
 		.pm = DEV_PM_OPS,
