@@ -195,16 +195,16 @@ static int armada_3700_pinctrl_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match =
 		of_match_device(armada_3700_pinctrl_of_match, &pdev->dev);
-	unsigned index;
+	unsigned long index;
 	struct mvebu_pinctrl_soc_info *soc;
 	struct resource *res;
 
 	if (!match)
 		return -ENODEV;
 
-	index = (unsigned) match->data;
+	index = (unsigned long) match->data;
 	if (index > I_MAXCONTROLLER) {
-		dev_err(&pdev->dev, "controller index error, index=%d max=%d\n", index, I_MAXCONTROLLER);
+		dev_err(&pdev->dev, "controller index error, index=%ld max=%d\n", index, I_MAXCONTROLLER);
 		return -ENODEV;
 	}
 
