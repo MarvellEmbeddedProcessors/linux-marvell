@@ -244,6 +244,12 @@
 			pinctrl: pinctrl@18000 {
 				reg = <0x18000 0x20>;
 
+				tdm_pins: tdm_pins {
+					marvell,pins = "mpp48", "mpp49", "mpp50",
+						       "mpp51", "mpp52", "mpp53";
+					marvell,function = "tdm";
+				};
+
 				ge0_rgmii_pins: ge-rgmii-pins-0 {
 					marvell,pins = "mpp6", "mpp7", "mpp8",
 						       "mpp9", "mpp10", "mpp11",
@@ -603,6 +609,16 @@
 				#size-cells = <1>;
 				interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&coredivclk 0>;
+				status = "disabled";
+			};
+
+			tdm@b0000 {
+				compatible = "marvell,armada-380-tdm";
+				reg = <0xb0000 0x5000>, <0x18400 0xc>, <0x18730 0x4>;
+				reg-names = "tdm_regs", "pll_regs", "dco_div";
+				interrupts = <0 27 0x4>;
+				clocks = <&gateclk 25>;
+				clock-names = "gateclk";
 				status = "disabled";
 			};
 
