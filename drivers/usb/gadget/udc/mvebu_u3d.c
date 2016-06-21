@@ -346,7 +346,8 @@ int eps_init(struct mvc2 *cp)
 	struct bd *bd;
 	unsigned int phys, bd_interval;
 
-	bd_interval = sizeof(bd) * 4;
+	bd_interval = sizeof(struct bd);
+
 	/* initialize endpoints */
 	for (i = 0; i < cp->epnum * 2; i++) {
 		ep = &cp->eps[i];
