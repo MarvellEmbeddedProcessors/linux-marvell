@@ -312,10 +312,12 @@ ppv22@000000 {
 	      <0x12b000 0x1000>,  /* MG Internal regs */
 	      <0x130000 0x6000>, /* MSPG regs */
 	      <0x130400 0x200>,  /* MSPG - XPCS regs */
+	      <0x130600 0x200>,  /* FCA - flow control regs*/
 	      <0x130e00 0x100>,  /* MSPG - GMAC regs */
 	      <0x130f00 0x100>,  /* MSPG - XLG MAC regs */
 	      <0x441000 0x1000>;  /* RFU-1 Regs */
-	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs", "gmac", "xlg", "rfu1";
+	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs",
+		    "fca", "gmac", "xlg", "rfu1";
 	clocks = <&gateclk 3>, <&gateclk 18>, <&gateclk 9>, <&gateclk 6>, <&gateclk 5>;
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 	status = "okay";
