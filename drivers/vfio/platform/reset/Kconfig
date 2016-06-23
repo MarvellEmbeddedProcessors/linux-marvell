@@ -14,6 +14,14 @@ config VFIO_PLATFORM_XHCI_RESET
 
 	  If you don't know what to do here, say N.
 
+config VFIO_PLATFORM_XOR_V2_RESET
+	tristate "VFIO support for XOR V2 reset"
+	depends on VFIO_PLATFORM
+	help
+	  Enables the VFIO platform driver to handle reset for XOR V2 engine
+
+	  If you don't know what to do here, say N.
+
 config VFIO_PLATFORM_AMDXGBE_RESET
 	tristate "VFIO support for AMD XGBE reset"
 	depends on VFIO_PLATFORM
