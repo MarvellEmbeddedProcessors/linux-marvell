@@ -1897,6 +1897,13 @@ int mv_pp3_set_mac_addr(struct net_device *dev, void *p)
 	if (!is_valid_ether_addr(addr->sa_data))
 		return -EADDRNOTAVAIL;
 
+	if (!dev_priv->vport) {
+		if (!dev->dev_addr)
+			goto error;
+		memcpy(dev->dev_addr, addr->sa_data, MV_MAC_ADDR_SIZE);
+		return 0;
+	}
+
 	if (dev_priv->vport->type != MV_PP3_NSS_PORT_ETH) {
 		memcpy(dev->dev_addr, addr->sa_data, MV_MAC_ADDR_SIZE);
 		return 0;
