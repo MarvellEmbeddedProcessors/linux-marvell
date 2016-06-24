@@ -1,6 +1,5 @@
 /*
- * Device Tree file for Marvell Armada 395 GP board
- * (DB-88F6925-GW-2.5G)
+ * Device Tree Include file for Marvell Armada 395 GP boards
  *
  * Copyright (C) 2014 Marvell
  *
@@ -39,13 +38,9 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
-/dts-v1/;
 #include "armada-395.dtsi"
 
 / {
-	model = "Marvell Armada 395 GP Board";
-	compatible = "marvell,a395-gp", "marvell,armada395", "marvell,armada380";
-
 	chosen {
 		bootargs = "console=ttyS0,115200 earlyprintk";
 	};
@@ -183,12 +178,6 @@
 			emac0: mac0 {
 				phy-mode = "rxaui";
 			};
-
-			emac3: mac3 {
-				phy = <&phy3>;
-				phy-mode = "sgmii";
-				force-link = "yes";
-			};
 		};
 
 		pp3_platform {
@@ -197,11 +186,6 @@
 			nic@0 {
 				status = "okay";
 				emac-data = <&emac0>;
-			};
-
-			nic@3 {
-				status = "okay";
-				emac-data = <&emac3>;
 			};
 
 			nss@0 {
