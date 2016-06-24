@@ -58,23 +58,6 @@
 #define GPIO_EDGE_MASK_OFF	0x0018
 #define GPIO_LEVEL_MASK_OFF	0x001c
 
-/*
- * GPIO unit register offsets for A3700.
- * there are 3 differences between A3700 and A38x/AXP
- * 1. for A38x, GPIO regs for IO and IRQ are in the same block
- *    but for A3700, there are two blocks for GPIO regs:
- *    a) GPIO IO, from 13800 to 13830
- *    b) GPIO IRQ, from 13c00 to 13c20
- * 2. for A3700, there is no BLINK and LEVEL mask reg
- * 3. for A3700, there are 36 GPIO pins at the same block in
- *    north bridge, so there is reg GPIO_OUTPUT_EN_HIGH for
- *    GPIO 32 to 35, and GPIO_OUTPUT_EN_LOW for GPIO 0 to 31.
- */
-/* GPIO in/out reg block, starts from 13800 */
-#define GPIO_OUT_OFF_A3700	0x0018
-#define GPIO_IO_CONF_OFF_A3700	0x0000
-#define GPIO_DATA_IN_OFF_A3700	0x0010
-
 /* The MV78200 has per-CPU registers for edge mask and level mask */
 #define GPIO_EDGE_MASK_MV78200_OFF(cpu)	  ((cpu) ? 0x30 : 0x18)
 #define GPIO_LEVEL_MASK_MV78200_OFF(cpu)  ((cpu) ? 0x34 : 0x1C)
@@ -89,10 +72,8 @@
 #define MVEBU_GPIO_SOC_VARIANT_ORION	0x1
 #define MVEBU_GPIO_SOC_VARIANT_MV78200	0x2
 #define MVEBU_GPIO_SOC_VARIANT_ARMADAXP 0x3
-#define MVEBU_GPIO_SOC_VARIANT_ARMADA3700	0x4
 
 #define MVEBU_MAX_GPIO_PER_BANK		32
-#define MVEBU_MAX_GPIO_PER_BANK_A3700	36
 
 struct mvebu_gpio_chip {
 	struct gpio_chip   chip;
@@ -105,9 +86,7 @@ struct mvebu_gpio_chip {
 
 	/* Used to preserve GPIO registers across suspend/resume */
 	u32                out_reg;
-	u32                out_reg_hi;		/* for A3700 */
 	u32                io_conf_reg;
-	u32                io_conf_reg_hi;	/* for A3700 */
 	u32                blink_en_reg;
 	u32                in_pol_reg;
 	u32                edge_mask_regs[4];
@@ -200,35 +179,6 @@ static void __iomem *mvebu_gpioreg_level_mask(struct mvebu_gpio_chip *mvchip)
 	default:
 		BUG();
 	}
-}
-/*
- * Functions returning addresses of individual registers for a given
- * A3700 GPIO controller.
- *
- * there are up to 36 GPIO pin in A3700, so there are two continuous
- * registers to configure a single feature. for example, to enable
- * GPIO output, for pin 0 - 31, it is in register GPIO_OUT_OFF_A3700,
- * for pin 32 - 35, it is in register GPIO_OUT_OFF_A3700 + 4.
- */
-#define GPIO_A3700_IO_BITWIDTH	32
-#define GPIO_A3700_REG_OFF(PIN)		((PIN / GPIO_A3700_IO_BITWIDTH) * sizeof(u32))
-#define GPIO_A3700_REG_PIN_OFF(PIN)	(PIN % GPIO_A3700_IO_BITWIDTH)
-
-static inline void __iomem *mvebu_gpioreg_out_a3700(struct mvebu_gpio_chip *mvchip, u32 pin)
-{
-	return mvchip->membase + GPIO_OUT_OFF_A3700 + GPIO_A3700_REG_OFF(pin);
-}
-
-static inline void __iomem *
-mvebu_gpioreg_io_conf_a3700(struct mvebu_gpio_chip *mvchip, u32 pin)
-{
-	return mvchip->membase + GPIO_IO_CONF_OFF_A3700 + GPIO_A3700_REG_OFF(pin);
-}
-
-static inline void __iomem *
-mvebu_gpioreg_data_in_a3700(struct mvebu_gpio_chip *mvchip, u32 pin)
-{
-	return mvchip->membase + GPIO_DATA_IN_OFF_A3700 + GPIO_A3700_REG_OFF(pin);
 }
 
 /*
@@ -340,114 +290,6 @@ static int mvebu_gpio_to_irq(struct gpio_chip *chip, unsigned pin)
 	struct mvebu_gpio_chip *mvchip =
 		container_of(chip, struct mvebu_gpio_chip, chip);
 	return irq_create_mapping(mvchip->domain, pin);
-}
-
-/*
- * Functions implementing the gpio_chip methods for A3700
- */
-
-static void mvebu_gpio_set_a3700(struct gpio_chip *chip, unsigned pin, int value)
-{
-	struct mvebu_gpio_chip *mvchip =
-		container_of(chip, struct mvebu_gpio_chip, chip);
-	unsigned long flags;
-	void __iomem *out_reg_addr;
-	u32 u;
-
-	out_reg_addr = mvebu_gpioreg_out_a3700(mvchip, pin);
-	pin = GPIO_A3700_REG_PIN_OFF(pin);
-
-	spin_lock_irqsave(&mvchip->lock, flags);
-	u = readl_relaxed(out_reg_addr);
-	if (value)
-		u |= 1 << pin;
-	else
-		u &= ~(1 << pin);
-	writel_relaxed(u, out_reg_addr);
-	spin_unlock_irqrestore(&mvchip->lock, flags);
-}
-
-static int mvebu_gpio_get_a3700(struct gpio_chip *chip, unsigned pin)
-{
-	struct mvebu_gpio_chip *mvchip =
-		container_of(chip, struct mvebu_gpio_chip, chip);
-	u32 u;
-
-	/* return value depends on PIN direction
-	 * - output, return output value.
-	 * - input, return input value.
-	 */
-	if (readl_relaxed(mvebu_gpioreg_io_conf_a3700(mvchip, pin)) & (1 << GPIO_A3700_REG_PIN_OFF(pin)))
-		u = readl_relaxed(mvebu_gpioreg_out_a3700(mvchip, pin));
-	else
-		u = readl_relaxed(mvebu_gpioreg_data_in_a3700(mvchip, pin));
-
-	pin = GPIO_A3700_REG_PIN_OFF(pin);
-	return (u >> pin) & 1;
-}
-
-static int mvebu_gpio_direction_input_a3700(struct gpio_chip *chip, unsigned pin)
-{
-	struct mvebu_gpio_chip *mvchip =
-		container_of(chip, struct mvebu_gpio_chip, chip);
-	unsigned long flags;
-	void __iomem *io_reg_addr;
-	int ret;
-	u32 u;
-
-	/* Check with the pinctrl driver whether this pin is usable as
-	 * an input GPIO
-	 */
-	ret = pinctrl_gpio_direction_input(chip->base + pin);
-	if (ret) {
-		dev_err(chip->cdev, "gpio_direction_input, pin (%d) is not a GPIO pin\n", pin);
-		return ret;
-	}
-
-	io_reg_addr = mvebu_gpioreg_io_conf_a3700(mvchip, pin);
-	pin = GPIO_A3700_REG_PIN_OFF(pin);
-
-	spin_lock_irqsave(&mvchip->lock, flags);
-	u = readl_relaxed(io_reg_addr);
-	u &= ~(1 << pin);
-	writel_relaxed(u, io_reg_addr);
-	spin_unlock_irqrestore(&mvchip->lock, flags);
-
-	return 0;
-}
-
-static int mvebu_gpio_direction_output_a3700(struct gpio_chip *chip, unsigned pin,
-				       int value)
-{
-	struct mvebu_gpio_chip *mvchip =
-		container_of(chip, struct mvebu_gpio_chip, chip);
-	unsigned long flags;
-	void __iomem *io_reg_addr;
-	int ret;
-	u32 u;
-
-	/* Check with the pinctrl driver whether this pin is usable as
-	 * an output GPIO
-	 */
-	ret = pinctrl_gpio_direction_output(chip->base + pin);
-	if (ret) {
-		dev_err(chip->cdev, "gpio_direction_output, pin (%d) is not a GPIO pin\n", pin);
-		return ret;
-	}
-
-	/* set output value first*/
-	mvebu_gpio_set_a3700(chip, pin, value);
-
-	io_reg_addr = mvebu_gpioreg_io_conf_a3700(mvchip, pin);
-	pin = GPIO_A3700_REG_PIN_OFF(pin);
-
-	spin_lock_irqsave(&mvchip->lock, flags);
-	u = readl_relaxed(io_reg_addr);
-	u |= 1 << pin;
-	writel_relaxed(u, io_reg_addr);
-	spin_unlock_irqrestore(&mvchip->lock, flags);
-
-	return 0;
 }
 
 /*
@@ -701,45 +543,6 @@ static void mvebu_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 		seq_printf(s, " (%s)\n", cause & msk ? "pending" : "clear  ");
 	}
 }
-
-static void mvebu_gpio_dbg_show_a3700(struct seq_file *s, struct gpio_chip *chip)
-{
-	struct mvebu_gpio_chip *mvchip =
-		container_of(chip, struct mvebu_gpio_chip, chip);
-	u32 out, io_conf, data_in;
-	int pin;
-
-	for (pin = 0; pin < chip->ngpio; pin++) {
-		const char *label;
-		u32 msk;
-		bool is_out;
-
-		label = gpiochip_is_requested(chip, pin);
-		if (!label)
-			continue;
-
-		out	= readl_relaxed(mvebu_gpioreg_out_a3700(mvchip, pin));
-		io_conf = readl_relaxed(mvebu_gpioreg_io_conf_a3700(mvchip, pin));
-		data_in = readl_relaxed(mvebu_gpioreg_data_in_a3700(mvchip, pin));
-		pin = GPIO_A3700_REG_PIN_OFF(pin);
-
-		msk = 1 << pin;
-		if (io_conf & msk)
-			is_out = true;
-		else
-			is_out = false;
-
-		seq_printf(s, " gpio-%-3d (%-20.20s)", chip->base + pin, label);
-
-		if (is_out) {
-			seq_printf(s, " out %s\n",
-				   out & msk ? "hi" : "lo");
-			continue;
-		}
-
-	}
-}
-
 #else
 #define mvebu_gpio_dbg_show NULL
 #endif
@@ -758,10 +561,6 @@ static const struct of_device_id mvebu_gpio_of_match[] = {
 		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ARMADAXP,
 	},
 	{
-		.compatible = "marvell,armada3700-gpio",
-		.data	    = (void *) MVEBU_GPIO_SOC_VARIANT_ARMADA3700,
-	},
-	{
 		/* sentinel */
 	},
 };
@@ -772,20 +571,10 @@ static int mvebu_gpio_suspend(struct platform_device *pdev, pm_message_t state)
 	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
 	int i;
 
-	if (mvchip->soc_variant == MVEBU_GPIO_SOC_VARIANT_ARMADA3700) {
-		/* there are 36 GPIO pin for A3700, so there are two registers holding
-		 * values, pin 0 - 31 is at the first reg, 32 - 35 are at the second
-		 */
-		mvchip->out_reg = readl(mvebu_gpioreg_out_a3700(mvchip, 0));
-		mvchip->io_conf_reg = readl(mvebu_gpioreg_io_conf_a3700(mvchip, 0));
-		mvchip->out_reg_hi = readl(mvebu_gpioreg_out_a3700(mvchip, GPIO_A3700_IO_BITWIDTH));
-		mvchip->io_conf_reg_hi = readl(mvebu_gpioreg_io_conf_a3700(mvchip, GPIO_A3700_IO_BITWIDTH));
-	} else {
-		mvchip->out_reg = readl(mvebu_gpioreg_out(mvchip));
-		mvchip->io_conf_reg = readl(mvebu_gpioreg_io_conf(mvchip));
-		mvchip->blink_en_reg = readl(mvebu_gpioreg_blink(mvchip));
-		mvchip->in_pol_reg = readl(mvebu_gpioreg_in_pol(mvchip));
-	}
+	mvchip->out_reg = readl(mvebu_gpioreg_out(mvchip));
+	mvchip->io_conf_reg = readl(mvebu_gpioreg_io_conf(mvchip));
+	mvchip->blink_en_reg = readl(mvebu_gpioreg_blink(mvchip));
+	mvchip->in_pol_reg = readl(mvebu_gpioreg_in_pol(mvchip));
 
 	switch (mvchip->soc_variant) {
 	case MVEBU_GPIO_SOC_VARIANT_ORION:
@@ -814,9 +603,6 @@ static int mvebu_gpio_suspend(struct platform_device *pdev, pm_message_t state)
 				      GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
 		}
 		break;
-	case MVEBU_GPIO_SOC_VARIANT_ARMADA3700:
-		/* no interrupt support for A3700 GPIO yet */
-		break;
 	default:
 		BUG();
 	}
@@ -829,20 +615,10 @@ static int mvebu_gpio_resume(struct platform_device *pdev)
 	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
 	int i;
 
-	if (mvchip->soc_variant == MVEBU_GPIO_SOC_VARIANT_ARMADA3700) {
-		/* there are 36 GPIO pin for A3700, so there are two registers holding
-		 * values, pin 0 - 31 is at the first reg, 32 - 35 are at the second
-		 */
-		writel(mvchip->out_reg, mvebu_gpioreg_out_a3700(mvchip, 0));
-		writel(mvchip->io_conf_reg, mvebu_gpioreg_io_conf_a3700(mvchip, 0));
-		writel(mvchip->out_reg_hi, mvebu_gpioreg_out_a3700(mvchip, GPIO_A3700_IO_BITWIDTH));
-		writel(mvchip->io_conf_reg_hi, mvebu_gpioreg_io_conf_a3700(mvchip, GPIO_A3700_IO_BITWIDTH));
-	} else {
-		writel(mvchip->out_reg, mvebu_gpioreg_out(mvchip));
-		writel(mvchip->io_conf_reg, mvebu_gpioreg_io_conf(mvchip));
-		writel(mvchip->blink_en_reg, mvebu_gpioreg_blink(mvchip));
-		writel(mvchip->in_pol_reg, mvebu_gpioreg_in_pol(mvchip));
-	}
+	writel(mvchip->out_reg, mvebu_gpioreg_out(mvchip));
+	writel(mvchip->io_conf_reg, mvebu_gpioreg_io_conf(mvchip));
+	writel(mvchip->blink_en_reg, mvebu_gpioreg_blink(mvchip));
+	writel(mvchip->in_pol_reg, mvebu_gpioreg_in_pol(mvchip));
 
 	switch (mvchip->soc_variant) {
 	case MVEBU_GPIO_SOC_VARIANT_ORION:
@@ -869,9 +645,6 @@ static int mvebu_gpio_resume(struct platform_device *pdev)
 			       mvchip->membase +
 			       GPIO_LEVEL_MASK_ARMADAXP_OFF(i));
 		}
-		break;
-	case MVEBU_GPIO_SOC_VARIANT_ARMADA3700:
-		/* no interrupt support for A3700 GPIO yet */
 		break;
 	default:
 		BUG();
@@ -932,24 +705,15 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
 	mvchip->chip.parent = &pdev->dev;
 	mvchip->chip.request = gpiochip_generic_request;
 	mvchip->chip.free = gpiochip_generic_free;
-	if (soc_variant == MVEBU_GPIO_SOC_VARIANT_ARMADA3700) {
-		mvchip->chip.direction_input = mvebu_gpio_direction_input_a3700;
-		mvchip->chip.get = mvebu_gpio_get_a3700;
-		mvchip->chip.direction_output = mvebu_gpio_direction_output_a3700;
-		mvchip->chip.set = mvebu_gpio_set_a3700;
-		mvchip->chip.base = id * MVEBU_MAX_GPIO_PER_BANK_A3700;
-		mvchip->chip.dbg_show = mvebu_gpio_dbg_show_a3700;
-	} else {
-		mvchip->chip.direction_input = mvebu_gpio_direction_input;
-		mvchip->chip.get = mvebu_gpio_get;
-		mvchip->chip.direction_output = mvebu_gpio_direction_output;
-		mvchip->chip.set = mvebu_gpio_set;
-		if (gpio_base != -1)
-			mvchip->chip.base = gpio_base;
-		else
-			mvchip->chip.base = id * MVEBU_MAX_GPIO_PER_BANK;
-		mvchip->chip.dbg_show = mvebu_gpio_dbg_show;
-	}
+	mvchip->chip.direction_input = mvebu_gpio_direction_input;
+	mvchip->chip.get = mvebu_gpio_get;
+	mvchip->chip.direction_output = mvebu_gpio_direction_output;
+	mvchip->chip.set = mvebu_gpio_set;
+	if (gpio_base != -1)
+		mvchip->chip.base = gpio_base;
+	else
+		mvchip->chip.base = id * MVEBU_MAX_GPIO_PER_BANK;
+	mvchip->chip.dbg_show = mvebu_gpio_dbg_show;
 	mvchip->chip.to_irq = mvebu_gpio_to_irq;
 	mvchip->chip.ngpio = ngpios;
 	mvchip->chip.can_sleep = false;
@@ -1001,9 +765,6 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
 			writel_relaxed(0, mvchip->percpu_membase +
 				       GPIO_LEVEL_MASK_ARMADAXP_OFF(cpu));
 		}
-		break;
-	case MVEBU_GPIO_SOC_VARIANT_ARMADA3700:
-		/* no interrupt support for A3700 GPIO yet */
 		break;
 	default:
 		BUG();
