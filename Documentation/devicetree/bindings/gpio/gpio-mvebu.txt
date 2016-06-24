@@ -2,14 +2,12 @@
 
 Required properties:
 
-- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio",
-  "marvell,armadaxp-gpio" or "marvell,armada3700-gpio".
-  "marvell,orion-gpio" should be used for Orion, Kirkwood, Dove,
-  Discovery (except MV78200) and Armada 370.
-  "marvell,mv78200-gpio" should be used for the Discovery MV78200.
-  "marvel,armadaxp-gpio" should be used for all Armada XP SoCs
-  (MV78230, MV78260, MV78460).
-  "marvell,armada3700-gpio" should be used for the Discovery Armada3700.
+- compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
+  or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
+  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
+  370. "marvell,mv78200-gpio" should be used for the Discovery
+  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
+  SoCs (MV78230, MV78260, MV78460).
 
 - reg: Address and length of the register set for the device. Only one
   entry is expected, except for the "marvell,armadaxp-gpio" variant
