@@ -77,12 +77,16 @@
 					pinctrl-0 = <&spi0_pins &spi_quad_pins>;
 
 					partition@0 {
-						label = "U-boot";
-						reg = <0 0x100000>;
+						label = "Bootloader";
+						reg = <0 0x200000>;
 					};
-					partition@100000 {
+					partition@200000 {
+						label = "U-boot Env";
+						reg = <0x200000 0x10000>;
+					};
+					partition@210000 {
 						label = "Linux";
-						reg = <0x100000 0x300000>;
+						reg = <0x210000 0xDF0000>;
 					};
 				};
 			};
