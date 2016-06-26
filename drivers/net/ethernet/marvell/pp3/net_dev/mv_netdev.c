@@ -2858,14 +2858,14 @@ int mv_pp3_dev_stop(struct net_device *dev)
 		mv_pp3_gop_port_events_mask(emac);
 		/* disable EMAC RX processing */
 		mv_pp3_emac_rx_enable(emac, false);
-
-		mv_pp3_dev_down(dev_priv);
 	}
+	/* Down IF_LINK_UP */
+	mv_pp3_dev_down(dev_priv);
 
 	/* set device state in FW to disable */
 	mv_pp3_dev_fw_down(dev_priv);
 
-	mdelay(10);
+	msleep(MV_PP3_TXDONE_TIMER_USEC_PERIOD/1000 + jiffies_to_msecs(1));
 
 	mv_pp3_dev_napi_disable(dev_priv);
 
@@ -2875,6 +2875,9 @@ int mv_pp3_dev_stop(struct net_device *dev)
 	/* make sure that rxqs/txqs are empty*/
 	if (mv_pp3_dev_queues_proc_done(dev_priv))
 		return -1;
+
+	/* Wait for TXDONE timer passed with releasing evrything needed */
+	msleep(MV_PP3_TXDONE_TIMER_USEC_PERIOD/1000 + jiffies_to_msecs(1));
 
 	mv_pp3_dev_pools_empty(dev_priv);
 
