@@ -79,9 +79,9 @@ For example to detect transaction between physical address 0x0 and 0x1000
     root:/# echo 0x1 > sys/bus/coresight/devices/f0840000.axim/channel/mon_enable
 
     /* read the channel counter */
-    root:/# echo 0x1 > sys/bus/coresight/devices/f0840000.axim/channel/counter
+    root:/# cat sys/bus/coresight/devices/f0840000.axim/channel/counter
     /* or read all channel counter */
-    root:/# echo 0x1 > sys/bus/coresight/devices/f0840000.axim/counters
+    root:/# cat sys/bus/coresight/devices/f0840000.axim/counters
 
 Another example is detecting all non secure shareable device accesses:
 
@@ -99,9 +99,9 @@ Another example is detecting all non secure shareable device accesses:
     root:/# echo 0x1 > sys/bus/coresight/devices/f0850000.axim/channel/mon_enable
 
     /* read the channel counter */
-    root:/# echo 0x1 > sys/bus/coresight/devices/f0850000.axim/channel/counter
+    root:/# cat sys/bus/coresight/devices/f0850000.axim/channel/counter
     /* or read all channel counter */
-    root:/# echo 0x1 > sys/bus/coresight/devices/f0850000.axim/counters
+    root:/# cat sys/bus/coresight/devices/f0850000.axim/counters
 
 The specific sysfs files and their functions are documented under:
 Documentation/ABI/testing/sysfs-bus-coresight-devices-axim
