@@ -22,6 +22,14 @@ config VFIO_PLATFORM_XOR_V2_RESET
 
 	  If you don't know what to do here, say N.
 
+config VFIO_PLATFORM_AHCI_RESET
+	tristate "VFIO support for SATA AHCI reset"
+	depends on VFIO_PLATFORM
+	help
+	  Enables the VFIO platform driver to handle reset for SATA AHCI
+
+	  If you don't know what to do here, say N.
+
 config VFIO_PLATFORM_AMDXGBE_RESET
 	tristate "VFIO support for AMD XGBE reset"
 	depends on VFIO_PLATFORM
