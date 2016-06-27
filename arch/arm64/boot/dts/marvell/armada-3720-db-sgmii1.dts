@@ -56,6 +56,9 @@
 				phy = <&phy1>;
 				status = "okay";
 			};
+			usb3@58000 {
+				status = "disabled";
+			};
 		};
 	};
 };
