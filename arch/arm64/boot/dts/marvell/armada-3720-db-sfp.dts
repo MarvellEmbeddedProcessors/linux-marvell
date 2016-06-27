@@ -64,6 +64,9 @@
 					full-duplex;
 				};
 			};
+			usb3@58000 {
+				status = "disabled";
+			};
 		};
 	};
 };
