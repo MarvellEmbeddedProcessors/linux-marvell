@@ -13,6 +13,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-community.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-router.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-nand.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-all-pcie.dtb
+dtb-$(CONFIG_ARCH_MVEBU_PD) += armada-7040-pd.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db-router.dtb
 
 always		:= $(dtb-y)
