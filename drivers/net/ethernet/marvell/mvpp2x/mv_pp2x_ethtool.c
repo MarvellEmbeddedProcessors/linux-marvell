@@ -42,6 +42,78 @@
 #include "mv_pp2x_hw.h"
 #include "mv_gop110_hw.h"
 
+int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
+					struct mv_port_link_status *pstatus)
+{
+	switch (cmd->duplex) {
+	case DUPLEX_FULL:
+		pstatus->duplex = MV_PORT_DUPLEX_FULL;
+		break;
+	case DUPLEX_HALF:
+		pstatus->duplex = MV_PORT_DUPLEX_HALF;
+		break;
+	default:
+		pr_err("Wrong duplex configuration\n");
+		return -1;
+	}
+
+	switch (cmd->speed) {
+	case SPEED_100:
+		pstatus->speed = MV_PORT_SPEED_100;
+		return 0;
+	case SPEED_10:
+		pstatus->speed = MV_PORT_SPEED_10;
+		return 0;
+	case SPEED_1000:
+		pstatus->speed = MV_PORT_SPEED_1000;
+		if (cmd->duplex)
+			return 0;
+		pr_err("1G port doesn't support half duplex\n");
+		return -1;
+	default:
+		pr_err("Wrong speed configuration\n");
+		return -1;
+	}
+}
+
+
+int mv_pp2x_autoneg_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
+			struct ethtool_cmd *cmd, struct mv_port_link_status *pstatus)
+{
+
+	int port_num = mac->gop_index;
+	int err;
+
+	switch (mac->phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+		err = mv_gop110_check_port_type(gop, port_num);
+		if (err) {
+			pr_err("GOP %d set to 1000Base-X and cannot be changed\n", port_num);
+			return -EINVAL;
+		}
+		if (!cmd->autoneg) {
+			err = mv_pp2x_check_speed_duplex_valid(cmd, pstatus);
+			if (err)
+				return -EINVAL;
+			}
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+	case PHY_INTERFACE_MODE_KR:
+		pr_err("XLG GOP %d doesn't support autonegotiation\n", port_num);
+		return -ENODEV;
+
+	break;
+	default:
+		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
+		return -1;
+	}
+	return 0;
+
+}
+
 /* Ethtool methods */
 
 /* Get settings (phy address, speed) for ethtools */
@@ -129,14 +201,28 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 					struct ethtool_cmd *cmd)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
+	int err;
+	struct mv_port_link_status status;
+	struct gop_hw *gop = &port->priv->hw.gop;
+	struct mv_mac_data *mac = &port->mac_data;
+	int gop_port = mac->gop_index;
 
-	if (!port->mac_data.phy_dev)
-		return -ENODEV;
-#if !defined(CONFIG_MV_PP2_PALLADIUM)
-	return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
-#else
+	err = mv_pp2x_autoneg_check_valid(mac, gop, cmd, &status);
+
+	if (err < 0) {
+		pr_err("Wrong negotiation mode set\n");
+		return err;
+	}
+
+	mv_gop110_force_link_mode_set(gop, mac, false, true);
+	mv_gop110_gmac_set_autoneg(gop, mac, cmd->autoneg);
+	if (cmd->autoneg)
+		mv_gop110_autoneg_restart(gop, mac);
+	else
+		mv_gop110_gmac_speed_duplex_set(gop, gop_port, status.speed, status.duplex);
+	mv_gop110_force_link_mode_set(gop, mac, false, false);
+
 	return 0;
-#endif
 }
 
 /* Set interrupt coalescing for ethtools */
