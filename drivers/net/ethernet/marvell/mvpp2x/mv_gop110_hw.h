@@ -99,19 +99,6 @@ enum mv_netc_lanes {
 	MV_NETC_LANE_45,
 };
 
-/* pp3_gop_ctrl flags */
-#define mv_gop_F_DEBUG_BIT		0
-#define mv_gop_F_ATTACH_BIT		1
-
-#define mv_gop_F_DEBUG		(1 << mv_gop_F_DEBUG_BIT)
-#define mv_gop_F_ATTACH		(1 << mv_gop_F_ATTACH_BIT)
-
-enum gop_port_flags {NOT_CREATED, CREATED, UNDER_RESET, ENABLED};
-
-struct gop_port_ctrl {
-	u32  flags;
-};
-
 #define MV_RGMII_TX_FIFO_MIN_TH		(0x41)
 #define MV_SGMII_TX_FIFO_MIN_TH		(0x5)
 #define MV_SGMII2_5_TX_FIFO_MIN_TH	(0xB)
