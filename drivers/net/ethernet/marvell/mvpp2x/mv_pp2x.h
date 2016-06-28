@@ -423,9 +423,6 @@ struct cpn110_gop_hw {
 	void __iomem *xpcs_base;
 	void __iomem *rfu1_base;
 
-#ifdef MV_PP22_GOP_DEBUG
-	static struct gop_port_ctrl gop_port_debug[MVCPN110_GOP_MAC_NUM];
-#endif
 };
 
 struct gop_hw {
