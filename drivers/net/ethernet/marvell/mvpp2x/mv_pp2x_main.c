@@ -4265,11 +4265,17 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 #if !defined(CONFIG_MV_PP2_FPGA)
 	/*AXI Bridge Configuration */
 
-	/* BM always non-cache  */
-	mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
-		MVPP22_AXI_ATTR_NON_CACHE);
-	mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
-		MVPP22_AXI_ATTR_NON_CACHE);
+	if (is_device_dma_coherent(&pdev->dev)) {
+		mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_HW_COH_WRITE);
+		mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_HW_COH_READ);
+	} else {
+		mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_NON_CACHE);
+		mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_NON_CACHE);
+	}
 
 	if (is_device_dma_coherent(&pdev->dev)) {
 		/* Descriptors */
