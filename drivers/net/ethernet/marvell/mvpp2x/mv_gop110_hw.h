@@ -144,6 +144,9 @@ bool mv_gop110_port_is_link_up(struct gop_hw *gop, struct mv_mac_data *mac);
 int mv_gop110_port_link_status(struct gop_hw *gop, struct mv_mac_data *mac,
 			       struct mv_port_link_status *pstatus);
 bool mv_gop110_port_autoneg_status(struct gop_hw *gop, struct mv_mac_data *mac);
+int mv_gop110_check_port_type(struct gop_hw *gop, int port_num);
+void mv_gop110_gmac_set_autoneg(struct gop_hw *gop, struct mv_mac_data *mac,
+				bool auto_neg);
 int mv_gop110_port_regs(struct gop_hw *gop, struct mv_mac_data *mac);
 int mv_gop110_port_events_mask(struct gop_hw *gop, struct mv_mac_data *mac);
 int mv_gop110_port_events_unmask(struct gop_hw *gop, struct mv_mac_data *mac);
