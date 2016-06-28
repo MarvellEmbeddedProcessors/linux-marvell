@@ -2243,20 +2243,18 @@ err_drop_frame:
 				data);
 			continue;
 		}
-		atomic_inc(&bm_pool->in_use);
-		refill_array[bm_pool->log_id]++;
 
 		skb = build_skb(data, bm_pool->frag_size > PAGE_SIZE ? 0 : bm_pool->frag_size);
-		/* After refill old buffer has to be unmapped regardless if
-		 * the skb is successfully built or not.
-		 */
-		dma_unmap_single(dev->dev.parent, buf_phys_addr,
-				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size), DMA_FROM_DEVICE);
-
 		if (!skb) {
 			pr_err("skb build failed\n");
 			goto err_drop_frame;
 		}
+
+		dma_unmap_single(dev->dev.parent, buf_phys_addr,
+				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size), DMA_FROM_DEVICE);
+
+		atomic_inc(&bm_pool->in_use);
+		refill_array[bm_pool->log_id]++;
 
 #ifdef MVPP2_VERBOSE
 		mv_pp2x_skb_dump(skb, rx_desc->data_size, 4);
