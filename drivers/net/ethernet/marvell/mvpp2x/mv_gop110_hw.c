@@ -1157,6 +1157,19 @@ int mv_gop110_port_link_status(struct gop_hw *gop, struct mv_mac_data *mac,
 	return 0;
 }
 
+bool mv_gop110_port_autoneg_status(struct gop_hw *gop, struct mv_mac_data *mac)
+{
+	u32 reg_val;
+
+		reg_val = mv_gop110_gmac_read(gop, mac->gop_index, MV_GMAC_PORT_AUTO_NEG_CFG_REG);
+
+		if (reg_val & MV_GMAC_PORT_AUTO_NEG_CFG_EN_FDX_AN_OFFS &&
+			reg_val & MV_GMAC_PORT_AUTO_NEG_CFG_EN_AN_SPEED_MASK)
+			return true;
+		else
+			return false;
+}
+
 int mv_gop110_port_regs(struct gop_hw *gop, struct mv_mac_data *mac)
 {
 	int port_num = mac->gop_index;
