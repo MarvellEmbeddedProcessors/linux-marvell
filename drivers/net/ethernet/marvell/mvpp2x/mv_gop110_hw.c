@@ -882,7 +882,8 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
-		/* As workaround do not reset mac before MAC configuration */
+		mv_gop110_force_link_mode_set(gop, mac, false, true);
+		mv_gop110_gmac_reset(gop, mac_num, RESET);
 		/* configure PCS */
 		mv_gop110_gpcs_mode_cfg(gop, mac_num, false);
 
@@ -896,10 +897,13 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		mv_gop110_gpcs_reset(gop, mac_num, UNRESET);
 		/* mac unreset */
 		mv_gop110_gmac_reset(gop, mac_num, UNRESET);
+		mv_gop110_force_link_mode_set(gop, mac, false, false);
 	break;
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
 		num_of_act_lanes = 1;
+		mv_gop110_force_link_mode_set(gop, mac, false, true);
+		mv_gop110_gmac_reset(gop, mac_num, RESET);
 		/* configure PCS */
 		mv_gop110_gpcs_mode_cfg(gop, mac_num, true);
 
@@ -912,6 +916,7 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		mv_gop110_gpcs_reset(gop, mac_num, UNRESET);
 		/* mac unreset */
 		mv_gop110_gmac_reset(gop, mac_num, UNRESET);
+		mv_gop110_force_link_mode_set(gop, mac, false, false);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
 		num_of_act_lanes = 4;
@@ -1052,6 +1057,8 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
 		mv_gop110_gmac_port_enable(gop, port_num);
+		mv_gop110_force_link_mode_set(gop, mac, false, false);
+		mv_gop110_gmac_reset(gop, port_num, UNRESET);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
@@ -1075,6 +1082,8 @@ void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
 		mv_gop110_gmac_port_disable(gop, port_num);
+		mv_gop110_force_link_mode_set(gop, mac, false, true);
+		mv_gop110_gmac_reset(gop, port_num, RESET);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
