@@ -92,6 +92,9 @@ struct armada_thermal_data {
 	unsigned int temp_mask;
 	unsigned int is_valid_shift;
 
+	/* DFX interrupt support (optional) */
+	bool dfx_interrupt;
+
 	struct thermal_zone_device_ops *ops;
 };
 
@@ -416,6 +419,7 @@ static const struct armada_thermal_data armada380_data = {
 	.coef_m = 2000096UL,
 	.coef_div = 4201,
 	.inverted = true,
+	.dfx_interrupt = 1,
 	.ops = &armada_ops,
 };
 
@@ -486,12 +490,16 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->control))
 		return PTR_ERR(priv->control);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-	priv->dfx = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(priv->dfx))
-		return PTR_ERR(priv->dfx);
-
 	priv->data = (struct armada_thermal_data *)match->data;
+
+	if (priv->data->dfx_interrupt) {
+		/* DFX interrupts are supported by some of the devices */
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+		priv->dfx = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(priv->dfx))
+			return PTR_ERR(priv->dfx);
+	}
+
 	priv->data->init_sensor(pdev, priv);
 
 	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
@@ -507,13 +515,12 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	/* Register overheat interrupt */
 	irq = platform_get_irq(pdev, 0);
 
-	if (irq < 0) {
-		dev_warn(&pdev->dev, "no irq\n");
-		return irq;
-	}
-	if (devm_request_irq(&pdev->dev, irq, a38x_temp_irq_handler,
-				0, pdev->name, priv) < 0) {
-		dev_warn(&pdev->dev, "Interrupt not available.\n");
+	if (irq >= 0) {
+		if (devm_request_irq(&pdev->dev, irq, a38x_temp_irq_handler,
+					0, pdev->name, priv) < 0)
+			dev_warn(&pdev->dev, "Interrupt not available.\n");
+	} else {
+		pr_debug("armada_thermal: no irq was assigned\n");
 	}
 
 	platform_set_drvdata(pdev, thermal);
