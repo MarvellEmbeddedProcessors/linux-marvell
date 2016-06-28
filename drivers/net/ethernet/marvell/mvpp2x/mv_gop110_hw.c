@@ -978,8 +978,6 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		return -1;
 	}
 
-	GOP_DEBUG(gop->gop_port_debug.flags = (1 << CREATED));
-
 	return 0;
 }
 
@@ -1069,8 +1067,6 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac)
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
 		return;
 	}
-
-	GOP_DEBUG(gop->gop_port_debug[port_num].flags |= (1 << ENABLED));
 }
 
 void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac)
@@ -1094,8 +1090,6 @@ void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac)
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
 		return;
 	}
-
-	GOP_DEBUG(gop->gop_port_debug[port_num].flags &= ~(1 << ENABLED));
 }
 
 void mv_gop110_port_periodic_xon_set(struct gop_hw *gop,
@@ -1312,10 +1306,7 @@ int mv_gop110_status_show(struct gop_hw *gop, struct mv_mac_data *mac)
 	bool port_en = false;
 
 	mv_gop110_port_link_status(gop, mac, &port_status);
-#ifdef MV_PP22_GOP_DEBUG
-	port_en = (gop->gop_port_debug[port_num].flags &
-		  (1 << ENABLED)) ? true : false;
-#endif
+
 	pr_info("-------------- Port %d configuration ----------------",
 		port_num);
 
