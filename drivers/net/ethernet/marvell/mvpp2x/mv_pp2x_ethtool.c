@@ -89,7 +89,8 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 
 		phy_mode = port->mac_data.phy_mode;
 		if ((phy_mode == PHY_INTERFACE_MODE_XAUI) ||
-		    (phy_mode == PHY_INTERFACE_MODE_RXAUI)) {
+		    (phy_mode == PHY_INTERFACE_MODE_RXAUI) ||
+		    (phy_mode == PHY_INTERFACE_MODE_KR)) {
 			cmd->autoneg = AUTONEG_DISABLE;
 			cmd->supported = (SUPPORTED_10000baseT_Full |
 				SUPPORTED_FIBRE);
@@ -108,8 +109,8 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 			cmd->port = PORT_MII;
 
 			/* check if speed and duplex are AN */
-			if (status.speed == MV_PORT_SPEED_AN &&
-			    status.duplex == MV_PORT_DUPLEX_AN) {
+			if (mv_gop110_port_autoneg_status(&port->priv->hw.gop,
+					   &port->mac_data)) {
 				cmd->lp_advertising = cmd->advertising = 0;
 				cmd->autoneg = AUTONEG_ENABLE;
 			} else {
