@@ -44,190 +44,13 @@
 
 /* Ethtool methods */
 
-#ifdef CONFIG_MV_PP2_FPGA
-
-#define ETH_MIB_GOOD_OCTETS_RECEIVED_LOW    0x0
-#define ETH_MIB_GOOD_OCTETS_RECEIVED_HIGH   0x4
-#define ETH_MIB_BAD_OCTETS_RECEIVED         0x8
-#define ETH_MIB_INTERNAL_MAC_TRANSMIT_ERR   0xc
-#define ETH_MIB_GOOD_FRAMES_RECEIVED        0x10
-#define ETH_MIB_BAD_FRAMES_RECEIVED         0x14
-#define ETH_MIB_BROADCAST_FRAMES_RECEIVED   0x18
-#define ETH_MIB_MULTICAST_FRAMES_RECEIVED   0x1c
-#define ETH_MIB_FRAMES_64_OCTETS            0x20
-#define ETH_MIB_FRAMES_65_TO_127_OCTETS     0x24
-#define ETH_MIB_FRAMES_128_TO_255_OCTETS    0x28
-#define ETH_MIB_FRAMES_256_TO_511_OCTETS    0x2c
-#define ETH_MIB_FRAMES_512_TO_1023_OCTETS   0x30
-#define ETH_MIB_FRAMES_1024_TO_MAX_OCTETS   0x34
-#define ETH_MIB_GOOD_OCTETS_SENT_LOW        0x38
-#define ETH_MIB_GOOD_OCTETS_SENT_HIGH       0x3c
-#define ETH_MIB_GOOD_FRAMES_SENT            0x40
-#define ETH_MIB_EXCESSIVE_COLLISION         0x44
-#define ETH_MIB_MULTICAST_FRAMES_SENT       0x48
-#define ETH_MIB_BROADCAST_FRAMES_SENT       0x4c
-#define ETH_MIB_UNREC_MAC_CONTROL_RECEIVED  0x50
-#define ETH_MIB_FC_SENT                     0x54
-#define ETH_MIB_GOOD_FC_RECEIVED            0x58
-#define ETH_MIB_BAD_FC_RECEIVED             0x5c
-#define ETH_MIB_UNDERSIZE_RECEIVED          0x60
-#define ETH_MIB_FRAGMENTS_RECEIVED          0x64
-#define ETH_MIB_OVERSIZE_RECEIVED           0x68
-#define ETH_MIB_JABBER_RECEIVED             0x6c
-#define ETH_MIB_MAC_RECEIVE_ERROR           0x70
-#define ETH_MIB_BAD_CRC_EVENT               0x74
-#define ETH_MIB_COLLISION                   0x78
-#define ETH_MIB_LATE_COLLISION              0x7c
-
-#endif
-
 /* Get settings (phy address, speed) for ethtools */
 static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 					struct ethtool_cmd *cmd)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
-
-#ifdef CONFIG_MV_PP2_FPGA
-	int val;
-	void *addr;
-	int port_id = port->id;
-	void *mv_pp2_vfpga_address;
-
-	pr_emerg("\n\n\n\nmv_pp2x_ethtool_get_drvinfo(%d):dev->name=%s port->id=%d\n",
-		 __LINE__, dev->name, port->id);
-
-	mv_pp2_vfpga_address = mv_pp2_vfpga_address_get();
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_GOOD_FRAMES_SENT;
-	val   = readl(addr);
-	pr_emerg("ETH_MIB_GOOD_FRAMES_SENT          =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_GOOD_FRAMES_RECEIVED;
-	val   = readl(addr);
-	pr_emerg("ETH_MIB_GOOD_FRAMES_RECEIVED      =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_GOOD_OCTETS_RECEIVED_LOW;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_GOOD_OCTETS_RECEIVED_LOW  =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_GOOD_OCTETS_RECEIVED_HIGH;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_GOOD_OCTETS_RECEIVED_HIGH =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_BAD_OCTETS_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_BAD_OCTETS_RECEIVED       =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_INTERNAL_MAC_TRANSMIT_ERR;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_INTERNAL_MAC_TRANSMIT_ERR =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_BAD_FRAMES_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_BAD_FRAMES_RECEIVED       =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_BROADCAST_FRAMES_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_BROADCAST_FRAMES_RECEIVED =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_MULTICAST_FRAMES_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_MULTICAST_FRAMES_RECEIVED =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_FRAMES_64_OCTETS;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_FRAMES_64_OCTETS          =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_GOOD_OCTETS_SENT_LOW;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_GOOD_OCTETS_SENT_LOW      =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_EXCESSIVE_COLLISION;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_EXCESSIVE_COLLISION       =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_BROADCAST_FRAMES_SENT;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_BROADCAST_FRAMES_SENT     =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_UNREC_MAC_CONTROL_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_UNREC_MAC_CONTROL_RECEIVED=%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_FC_SENT;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_FC_SENT                   =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_GOOD_FC_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_GOOD_FC_RECEIVED          =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_BAD_FC_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_BAD_FC_RECEIVED           =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_UNDERSIZE_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_UNDERSIZE_RECEIVED        =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_OVERSIZE_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_OVERSIZE_RECEIVED         =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_JABBER_RECEIVED;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_JABBER_RECEIVED           =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_MAC_RECEIVE_ERROR;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_MAC_RECEIVE_ERROR         =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_BAD_CRC_EVENT;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_BAD_CRC_EVENT             =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_COLLISION;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_COLLISION                 =%d  : 0x%p\n", val, addr);
-
-	addr = mv_pp2_vfpga_address + 0x100000 + 0x1000 + (port_id * 0x400) +
-			ETH_MIB_LATE_COLLISION;
-	val  = readl(addr);
-	pr_emerg("ETH_MIB_LATE_COLLISION            =%d  : 0x%p\n", val, addr);
-
-	val = readl(port->base + 0x10);
-	pr_emerg("print_reg(%d):port_id=%d: [0x%p] = 0x%x\n", __LINE__,
-		 port_id, port->base + 0x10, val);
-	return 0;
-#else
 	struct mv_port_link_status	status;
 	phy_interface_t			phy_mode;
-
-	mv_gop110_mib_counters_show(&port->priv->hw.gop,
-		port->mac_data.gop_index);
 
 	/* No Phy device mngmt */
 	if (!port->mac_data.phy_dev) {
@@ -298,7 +121,6 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 	}
 
 	return phy_ethtool_gset(port->mac_data.phy_dev, cmd);
-#endif
 }
 
 /* Set settings (phy address, speed) for ethtools */
