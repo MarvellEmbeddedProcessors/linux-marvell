@@ -4263,18 +4263,13 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	/*AXI Bridge Configuration */
 
 	if (is_device_dma_coherent(&pdev->dev)) {
+
+		/* BM */
 		mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
 			MVPP22_AXI_ATTR_HW_COH_WRITE);
 		mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
 			MVPP22_AXI_ATTR_HW_COH_READ);
-	} else {
-		mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_NON_CACHE);
-		mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_NON_CACHE);
-	}
 
-	if (is_device_dma_coherent(&pdev->dev)) {
 		/* Descriptors */
 		mv_pp2x_write(hw, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG,
 			MVPP22_AXI_ATTR_HW_COH_READ);
@@ -4291,6 +4286,13 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 		mv_pp2x_write(hw, MVPP22_AXI_RX_DATA_WR_ATTR_REG,
 			MVPP22_AXI_ATTR_HW_COH_WRITE);
 	} else {
+
+		/* BM */
+		mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
+			MVPP22_AXI_ATTR_NON_CACHE);
+		mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
+			MVPP22_AXI_ATTR_NON_CACHE);
+
 		/* Descriptors */
 		mv_pp2x_write(hw, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG,
 			MVPP22_AXI_ATTR_NON_CACHE);
