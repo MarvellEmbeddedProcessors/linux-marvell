@@ -1299,11 +1299,14 @@ int mv_gop110_port_events_clear(struct gop_hw *gop, struct mv_mac_data *mac)
 	return 0;
 }
 
-int mv_gop110_status_show(struct gop_hw *gop, struct mv_mac_data *mac)
+int mv_gop110_status_show(struct gop_hw *gop, struct mv_pp2x *pp2, int port_num)
 {
-	int port_num = mac->gop_index;
 	struct mv_port_link_status port_status;
-	bool port_en = false;
+	struct mv_pp2x_port *pp_port;
+	struct mv_mac_data *mac;
+
+	pp_port = mv_pp2x_port_struct_get(pp2, port_num);
+	mac = &pp_port->mac_data;
 
 	mv_gop110_port_link_status(gop, mac, &port_status);
 
@@ -1333,8 +1336,7 @@ int mv_gop110_status_show(struct gop_hw *gop, struct mv_mac_data *mac)
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
 		return -1;
 	}
-	pr_info("\nMAC status              : %s",
-		(port_en) ? "enable" : "disable");
+
 	pr_info("\nLink status             : %s",
 		(port_status.linkup) ? "link up" : "link down");
 	pr_info("\n");
@@ -1388,6 +1390,7 @@ int mv_gop110_status_show(struct gop_hw *gop, struct mv_mac_data *mac)
 
 	return 0;
 }
+EXPORT_SYMBOL(mv_gop110_status_show);
 
 /* get port speed and duplex */
 int mv_gop110_speed_duplex_get(struct gop_hw *gop, struct mv_mac_data *mac,
