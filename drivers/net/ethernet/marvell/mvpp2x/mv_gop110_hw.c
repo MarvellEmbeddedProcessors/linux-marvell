@@ -1179,6 +1179,38 @@ bool mv_gop110_port_autoneg_status(struct gop_hw *gop, struct mv_mac_data *mac)
 			return false;
 }
 
+int mv_gop110_check_port_type(struct gop_hw *gop, int port_num)
+{
+	u32 reg_val;
+
+	reg_val = mv_gop110_gmac_read(gop, port_num, MV_GMAC_PORT_CTRL0_REG);
+	return (reg_val & MV_GMAC_PORT_CTRL0_PORTTYPE_MASK) >>
+			MV_GMAC_PORT_CTRL0_PORTTYPE_OFFS;
+}
+
+void mv_gop110_gmac_set_autoneg(struct gop_hw *gop, struct mv_mac_data *mac, bool auto_neg)
+{
+	u32 reg_val;
+	int mac_num = mac->gop_index;
+
+	reg_val = mv_gop110_gmac_read(gop, mac_num,
+				MV_GMAC_PORT_AUTO_NEG_CFG_REG);
+
+	if (auto_neg) {
+		reg_val |= MV_GMAC_PORT_AUTO_NEG_CFG_EN_AN_SPEED_MASK;
+		reg_val |= MV_GMAC_PORT_AUTO_NEG_CFG_EN_FDX_AN_MASK;
+		}
+
+	else {
+		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_AN_SPEED_MASK;
+		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_FDX_AN_MASK;
+		}
+
+	mv_gop110_gmac_write(gop, mac_num,
+				MV_GMAC_PORT_AUTO_NEG_CFG_REG, reg_val);
+}
+
+
 int mv_gop110_port_regs(struct gop_hw *gop, struct mv_mac_data *mac)
 {
 	int port_num = mac->gop_index;
