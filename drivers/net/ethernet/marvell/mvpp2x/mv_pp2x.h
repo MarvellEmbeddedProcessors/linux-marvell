@@ -36,32 +36,6 @@
 
 #define IRQ_NAME_SIZE (36)
 
-
-#if defined(CONFIG_MV_PP2_FPGA) || defined(CONFIG_MV_PP2_PALLADIUM)
-#define CONFIG_MV_PP2_POLLING
-#endif
-
-#ifdef CONFIG_MV_PP2_PALLADIUM
-#define PALAD(x)	x
-#else
-#define PALAD(x)
-#endif
-
-#ifdef CONFIG_MV_PP2_FPGA
-#define FPGA	1
-#else
-#define FPGA	0
-#endif
-
-#if defined(CONFIG_MV_PP2_PALLADIUM)
-/*These are the indexes of
- * MVPP2_PRS_FL_IP4_UNTAG_NO_OPV4_OPTIONS/MVPP2_PRS_FL_NON_IP_UNTAG
- * in mv_pp2x_prs_flow_id_array[]
- */
-#define MVPP2_PRS_FL_IP4_UNTAG_NO_OPV4_OPTIONS	40
-#define MVPP2_PRS_FL_NON_IP_UNTAG_INDEX		50
-#endif
-
 #define DBG_MSG(fmt, args...)	printk(fmt, ## args)
 
 #ifdef MVPP2_DEBUG
@@ -182,20 +156,16 @@
 
 /* BM constants */
 #define MVPP2_BM_POOLS_NUM		16
-#define MVPP2_BM_POOLS_MAX_ALLOC_NUM	4 /* Max num of allowed BM pools allocations*/
+#define MVPP2_BM_POOLS_MAX_ALLOC_NUM	4 /* Max num of allowed BM pools
+					   * allocations
+					   */
 #define MVPP2_BM_POOL_SIZE_MAX		(16 * 1024 - \
 					MVPP2_BM_POOL_PTR_ALIGN / 4)
 #define MVPP2_BM_POOL_PTR_ALIGN		128
 
-#ifdef CONFIG_MV_PP2_PALLADIUM
-#define MVPP2_BM_SHORT_BUF_NUM		256
-#define MVPP2_BM_LONG_BUF_NUM		256
-#define MVPP2_BM_JUMBO_BUF_NUM		256
-#else
 #define MVPP2_BM_SHORT_BUF_NUM		2048
 #define MVPP2_BM_LONG_BUF_NUM		1024
 #define MVPP2_BM_JUMBO_BUF_NUM		512
-#endif
 
 #define MVPP2_ALL_BUFS			0
 
@@ -546,9 +516,6 @@ struct mv_pp2x_pcpu_stats {
 /* Per-CPU port control */
 struct mv_pp2x_port_pcpu {
 	struct hrtimer tx_done_timer;
-#ifdef CONFIG_MV_PP2_PALLADIUM
-	struct timer_list slow_tx_done_timer;
-#endif
 	bool timer_scheduled;
 	/* Tasklet for egress finalization */
 	struct tasklet_struct tx_done_tasklet;
@@ -748,10 +715,6 @@ struct mv_pp2x_pool_attributes {
 };
 
 extern struct mv_pp2x_pool_attributes mv_pp2x_pools[];
-
-#if defined(CONFIG_MV_PP2_FPGA) || defined(CONFIG_MV_PP2_PALLADIUM)
-void *mv_pp2x_vfpga_address_get(void);
-#endif
 
 void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
 			  int buf_num, bool is_skb);
