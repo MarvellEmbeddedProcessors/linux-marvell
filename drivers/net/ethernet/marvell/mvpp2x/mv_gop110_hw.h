@@ -138,7 +138,7 @@ int mv_gop110_port_regs(struct gop_hw *gop, struct mv_mac_data *mac);
 int mv_gop110_port_events_mask(struct gop_hw *gop, struct mv_mac_data *mac);
 int mv_gop110_port_events_unmask(struct gop_hw *gop, struct mv_mac_data *mac);
 int mv_gop110_port_events_clear(struct gop_hw *gop, struct mv_mac_data *mac);
-int mv_gop110_status_show(struct gop_hw *gop, struct mv_mac_data *mac);
+int mv_gop110_status_show(struct gop_hw *gop, struct mv_pp2x *pp2, int port_num);
 int mv_gop110_speed_duplex_get(struct gop_hw *gop, struct mv_mac_data *mac,
 			       enum mv_port_speed *speed,
 			       enum mv_port_duplex *duplex);
