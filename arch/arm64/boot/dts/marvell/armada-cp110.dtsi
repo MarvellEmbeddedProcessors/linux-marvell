@@ -319,6 +319,7 @@ ppv22@000000 {
 	clocks = <&gateclk 3>, <&gateclk 18>, <&gateclk 9>, <&gateclk 6>, <&gateclk 5>;
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 	status = "okay";
+	l4_chksum_jumbo_port = <0>;
 	eth0: eth0@010000 {
 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
 			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
