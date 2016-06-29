@@ -1850,6 +1850,8 @@ int mv_gop110_xlg_mac_mode_cfg(struct gop_hw *gop, int mac_num,
 					MV_XLG_MAC_CTRL4_FORWARD_PFC_EN_OFFS);
 	U32_SET_FIELD(val, MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN_MASK, 1 <<
 				MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN_OFFS);
+	U32_SET_FIELD(val, MV_XLG_MAC_CTRL4_EN_IDLE_CHECK_FOR_LINK_MASK, 0 <<
+				MV_XLG_MAC_CTRL4_EN_IDLE_CHECK_FOR_LINK_OFFS);
 	mv_gop110_xlg_mac_write(gop, mac_num, reg_addr, val);
 
 	/* Jumbo frame support - 0x1400*2= 0x2800 bytes */
