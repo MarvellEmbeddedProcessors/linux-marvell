@@ -244,8 +244,7 @@ static inline struct mv_pp2x_tx_queue *mv_pp2x_get_tx_queue(
 	return port->txqs[tx_queue];
 }
 
-static inline struct sk_buff *mv_pp2x_bm_virt_addr_get(struct mv_pp2x_hw *hw,
-							      u32 pool)
+static inline u8 *mv_pp2x_bm_virt_addr_get(struct mv_pp2x_hw *hw, u32 pool)
 {
 	uintptr_t val = 0;
 
@@ -259,7 +258,10 @@ static inline struct sk_buff *mv_pp2x_bm_virt_addr_get(struct mv_pp2x_hw *hw,
 	val <<= (32 - MVPP22_BM_VIRT_HIGH_ALLOC_OFFSET);
 #endif
 	val |= mv_pp2x_read(hw, MVPP2_BM_VIRT_ALLOC_REG);
-	return((struct sk_buff *)val);
+	/* TODO: Remove it when 40-bit supported */
+	val &= 0xffffffff;
+
+	return((u8 *)val);
 }
 
 static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,

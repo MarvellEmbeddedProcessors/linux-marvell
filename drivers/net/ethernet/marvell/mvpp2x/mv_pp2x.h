@@ -717,13 +717,13 @@ struct mv_pp2x_pool_attributes {
 extern struct mv_pp2x_pool_attributes mv_pp2x_pools[];
 
 void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
-			  int buf_num, bool is_skb);
+			  int buf_num);
 int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 			struct mv_pp2x_bm_pool *bm_pool, int buf_num);
 int mv_pp2x_bm_pool_add(struct device *dev, struct mv_pp2x *priv,
 			u32 *pool_num, u32 pkt_size);
 int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
-			   struct mv_pp2x_bm_pool *bm_pool, bool is_skb);
+			    struct mv_pp2x_bm_pool *bm_pool);
 int mv_pp2x_swf_bm_pool_assign(struct mv_pp2x_port *port, u32 rxq,
 			       u32 long_id, u32 short_id);
 int mv_pp2x_open(struct net_device *dev);
