@@ -3797,8 +3797,6 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			sizeof(u32), GFP_KERNEL);
 	port->of_irqs = port_irqs;
 	port->num_irqs = 0;
-	if (port_num_irq > PPV2_MAX_NUM_IRQ)
-		port_num_irq = PPV2_MAX_NUM_IRQ;
 	for (i = 0; i < port_num_irq; i++) {
 		port_irqs[i] = irq_of_parse_and_map(port_node, i);
 		if (port_irqs[i] == 0) {
