@@ -720,7 +720,7 @@ void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
 			  int buf_num);
 int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 			struct mv_pp2x_bm_pool *bm_pool, int buf_num);
-int mv_pp2x_bm_pool_add(struct device *dev, struct mv_pp2x *priv,
+int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
 			u32 *pool_num, u32 pkt_size);
 int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
 			    struct mv_pp2x_bm_pool *bm_pool);
