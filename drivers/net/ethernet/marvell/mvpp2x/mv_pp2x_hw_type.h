@@ -2213,7 +2213,8 @@ struct mv_pp2x_bm_pool {
 	/* Packet size */
 	int pkt_size;
 	int frag_size;
-
+	/* pool for external use (not kernel) */
+	bool external_pool;
 	/* BPPE virtual base address */
 	void *virt_addr;
 	/* BPPE physical base address */

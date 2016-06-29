@@ -369,11 +369,14 @@ void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
 		vaddr = mv_pp2x_bm_virt_addr_get(&priv->hw, bm_pool->id);
 		if (!vaddr)
 			break;
+		if (!bm_pool->external_pool) {
 #ifdef CONFIG_64BIT
-		mv_pp2x_frag_free(bm_pool, (u8 *)(bm_pool->data_high | (uintptr_t)vaddr));
+			mv_pp2x_frag_free(bm_pool,
+				(u8 *)(bm_pool->data_high | (uintptr_t)vaddr));
 #else
-		mv_pp2x_frag_free(bm_pool, vaddr);
+			mv_pp2x_frag_free(bm_pool, vaddr);
 #endif
+		}
 	}
 
 	/* Update BM driver with number of buffers removed from pool */
@@ -407,8 +410,8 @@ int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
 	return 0;
 }
 
-int mv_pp2x_bm_pool_add(struct device *dev, struct mv_pp2x *priv, u32 *pool_num,
-	u32 pkt_size)
+int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
+			    u32 *pool_num, u32 pkt_size)
 {
 	int err, size, enabled;
 	u8 first_pool = mv_pp2x_first_pool_get(priv);
@@ -444,6 +447,7 @@ int mv_pp2x_bm_pool_add(struct device *dev, struct mv_pp2x *priv, u32 *pool_num,
 	bm_pool = &priv->bm_pools[pool];
 	bm_pool->log_id = pool;
 	bm_pool->id = first_pool + pool;
+	bm_pool->external_pool = true;
 	mv_pp2x_pools[pool].pkt_size = pkt_size;
 		err = mv_pp2x_bm_pool_create(dev, hw, bm_pool, size);
 		if (err)
@@ -471,6 +475,7 @@ static int mv_pp2x_bm_pools_init(struct platform_device *pdev,
 		bm_pool = &priv->bm_pools[i];
 		bm_pool->log_id = i;
 		bm_pool->id = first_pool + i;
+		bm_pool->external_pool = false;
 		err = mv_pp2x_bm_pool_create(&pdev->dev, hw, bm_pool, size);
 		if (err)
 			goto err_unroll_pools;
