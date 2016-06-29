@@ -69,10 +69,7 @@ static u8 cos_classifer;
 static u32 pri_map = 0x3210; /* As default, cos0--rxq0, cos1--rxq1,
 			      * cos2--rxq2, cos3--rxq3
 			      */
-static u8 default_cos = 3; /* As default, non-IP packet has the
-			    * highest CoS value
-			    */
-static bool jumbo_pool;
+static u8 default_cos = 3; /* As default, non-IP packet has highest CoS value */
 static u16 rx_queue_size = MVPP2_MAX_RXD;
 static u16 tx_queue_size = MVPP2_MAX_TXD;
 static u16 buffer_scaling = 100;
@@ -114,9 +111,6 @@ MODULE_PARM_DESC(pri_map, "Set priority_map, nibble for each cos.");
 
 module_param(default_cos, byte, S_IRUGO);
 MODULE_PARM_DESC(default_cos, "Set default cos (0-(num_cose_queues-1)).");
-
-module_param(jumbo_pool, bool, S_IRUGO);
-MODULE_PARM_DESC(jumbo_pool, "no_jumbo_support(0), jumbo_support(1)");
 
 module_param(rx_queue_size, ushort, S_IRUGO);
 MODULE_PARM_DESC(rx_queue_size, "Rx queue size");
@@ -215,11 +209,6 @@ void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
 static inline u8 mv_pp2x_first_pool_get(struct mv_pp2x *priv)
 {
 	return priv->pp2_cfg.first_bm_pool;
-}
-
-static inline u8 mv_pp2x_kernel_num_pools_get(struct mv_pp2x *priv)
-{
-	return((priv->pp2_cfg.jumbo_pool == true) ? 3 : 2);
 }
 
 static inline u8 mv_pp2x_last_pool_get(struct mv_pp2x *priv)
@@ -494,7 +483,7 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 {
 	int i, err;
 	u8 first_pool = mv_pp2x_first_pool_get(priv);
-	u8 num_pools = mv_pp2x_kernel_num_pools_get(priv);
+	u8 num_pools = MVPP2_BM_SWF_NUM_POOLS;
 
 	for (i = first_pool; i < (first_pool + num_pools); i++) {
 		/* Mask BM all interrupts */
@@ -646,11 +635,17 @@ int mv_pp2x_swf_bm_pool_assign(struct mv_pp2x_port *port, u32 rxq,
 static int mv_pp2x_swf_bm_pool_init(struct mv_pp2x_port *port)
 {
 	int rxq;
+	enum mv_pp2x_bm_pool_log_num long_log_pool;
 	struct mv_pp2x_hw *hw = &(port->priv->hw);
+
+	if (port->pkt_size > MVPP2_BM_LONG_PKT_SIZE)
+		long_log_pool = MVPP2_BM_SWF_JUMBO_POOL;
+	else
+		long_log_pool = MVPP2_BM_SWF_LONG_POOL;
 
 	if (!port->pool_long) {
 		port->pool_long =
-		       mv_pp2x_bm_pool_use(port, MVPP2_BM_SWF_LONG_POOL);
+		       mv_pp2x_bm_pool_use(port, long_log_pool);
 		if (!port->pool_long)
 			return -ENOMEM;
 		port->pool_long->port_map |= (1 << port->id);
@@ -683,9 +678,11 @@ static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 	struct mv_pp2x_bm_pool *old_port_pool = port->pool_long;
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	enum mv_pp2x_bm_pool_log_num new_log_pool;
-	enum mv_pp2x_bm_pool_log_num old_log_pool = old_port_pool->log_id;
+	enum mv_pp2x_bm_pool_log_num old_log_pool;
 	int rxq;
 	int pkt_size = MVPP2_RX_PKT_SIZE(mtu);
+
+	old_log_pool = old_port_pool->log_id;
 
 	if (pkt_size > MVPP2_BM_LONG_PKT_SIZE)
 		new_log_pool = MVPP2_BM_SWF_JUMBO_POOL;
@@ -705,9 +702,20 @@ static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 		/* Remove port from old pool */
 		mv_pp2x_bm_pool_stop_use(port, old_log_pool);
 		old_port_pool->port_map &= ~(1 << port->id);
+
+		/* Update L4 checksum when jumbo enable/disable on port */
+		if (new_log_pool == MVPP2_BM_SWF_JUMBO_POOL) {
+			if (port->id != port->priv->l4_chksum_jumbo_port)
+				dev->hw_features &=
+					~(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
+		} else {
+			dev->hw_features |=
+				(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
+		}
 	}
 
 	dev->mtu = mtu;
+
 	netdev_update_features(dev);
 	return 0;
 }
@@ -2110,7 +2118,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	u32 rcvd_bytes = 0;
 	u32 refill_array[MVPP2_BM_POOLS_NUM] = {0};
 	u8  first_bm_pool = port->priv->pp2_cfg.first_bm_pool;
-	u8  num_pool = mv_pp2x_kernel_num_pools_get(port->priv);
+	u8  num_pool = MVPP2_BM_SWF_NUM_POOLS;
 
 #ifdef DEV_NETMAP
 		if (port->flags & MVPP2_F_IFCAP_NETMAP) {
@@ -2776,16 +2784,10 @@ static inline int mv_pp2x_check_mtu_valid(struct net_device *dev, int mtu)
 		netdev_err(dev, "cannot change mtu to less than 68\n");
 		return -EINVAL;
 	}
-	if (MVPP2_RX_PKT_SIZE(mtu) > MVPP2_BM_LONG_PKT_SIZE &&
-		jumbo_pool == false) {
-		netdev_err(dev, "jumbo packet not supported (%d)\n", mtu);
-		return -EINVAL;
-	}
 
-	/* 9676 == 9700 - 20 and rounding to 8 */
-	if (mtu > 9676) {
-		netdev_info(dev, "illegal MTU value %d, round to 9676\n", mtu);
-		mtu = 9676;
+	if (MVPP2_RX_PKT_SIZE(mtu) > MVPP2_BM_JUMBO_PKT_SIZE) {
+		netdev_info(dev, "illegal MTU value %d, round to 9704\n", mtu);
+		mtu = MVPP2_RX_MTU_SIZE(MVPP2_BM_JUMBO_PKT_SIZE);
 	}
 
 	return mtu;
@@ -3580,7 +3582,6 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 		phy_modes(phy_mode));
 	pr_debug("gop_mac(%d), phy_speed(%d)\n", id,  port->mac_data.speed);
 
-
 	phy_node = of_parse_phandle(emac_node, "phy", 0);
 	if (phy_node) {
 		port->mac_data.phy_node = phy_node;
@@ -4197,7 +4198,6 @@ static void mv_pp2x_init_config(struct mv_pp2x_param_config *pp2_cfg,
 	pp2_cfg->first_bm_pool = first_bm_pool;
 	pp2_cfg->first_sw_thread = first_addr_space;
 	pp2_cfg->first_log_rxq = first_log_rxq_queue;
-	pp2_cfg->jumbo_pool = jumbo_pool;
 	pp2_cfg->queue_mode = mv_pp2x_queue_mode;
 
 	pp2_cfg->cos_cfg.cos_classifier = cos_classifer;
@@ -4244,8 +4244,6 @@ void mv_pp2x_pp2_basic_print(struct platform_device *pdev, struct mv_pp2x *priv)
 
 	DBG_MSG("pp2_ver(%d)\n", priv->pp2_version);
 	DBG_MSG("queue_mode(%d)\n", priv->pp2_cfg.queue_mode);
-	DBG_MSG("first_bm_pool(%d) jumbo_pool(%d)\n",
-		priv->pp2_cfg.first_bm_pool, priv->pp2_cfg.jumbo_pool);
 	DBG_MSG("cell_index(%d) num_ports(%d)\n",
 		priv->pp2_cfg.cell_index, priv->num_ports);
 #ifdef CONFIG_64BIT
@@ -4492,6 +4490,14 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		hw->gop.gop_110.xlg_mac.obj_size = 0x1000;
 
 		MVPP2_PRINT_2LINE();
+
+		/* Jumbo L4_checksum port */
+		if (of_property_read_u32(dn, "l4_chksum_jumbo_port",
+					 &priv->l4_chksum_jumbo_port))
+			/* Init as a invalid value */
+			priv->l4_chksum_jumbo_port = MVPP2_MAX_PORTS;
+
+		MVPP2_PRINT_VAR(priv->l4_chksum_jumbo_port);
 	}
 
 	hw->gop_core_clk = devm_clk_get(&pdev->dev, "gop_core_clk");
@@ -4539,6 +4545,58 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		err = -ENODEV;
 	}
 	return 0;
+}
+
+static void mv_pp2x_tx_fifo_init(struct mv_pp2x *priv)
+{
+	int i;
+
+	/* Check l4_chksum_jumbo_port */
+	if (priv->l4_chksum_jumbo_port < MVPP2_MAX_PORTS) {
+		for (i = 0; i < priv->num_ports; i++) {
+			if (priv->port_list[i]->id ==
+				priv->l4_chksum_jumbo_port)
+				break;
+		}
+		if (i == priv->num_ports)
+			WARN(1, "Unavailable l4_chksum_jumbo_port %d\n",
+			     priv->l4_chksum_jumbo_port);
+	} else {
+		/* Find port with highest speed, allocate extra FIFO to it */
+		for (i = 0; i < priv->num_ports; i++) {
+			phy_interface_t phy_mode =
+					priv->port_list[i]->mac_data.phy_mode;
+
+			if ((phy_mode == PHY_INTERFACE_MODE_XAUI) ||
+			    (phy_mode == PHY_INTERFACE_MODE_RXAUI) ||
+			    (phy_mode == PHY_INTERFACE_MODE_KR)) {
+				/* Record l4_chksum_jumbo_port */
+				priv->l4_chksum_jumbo_port =
+							priv->port_list[i]->id;
+				break;
+			} else if (priv->port_list[i]->mac_data.speed == 2500 &&
+				   (priv->l4_chksum_jumbo_port ==
+							MVPP2_MAX_PORTS)) {
+				/* Only first 2.5G port may get extra FIFO */
+				priv->l4_chksum_jumbo_port =
+							priv->port_list[i]->id;
+			}
+		}
+		/* First 1G port in list get extra FIFO */
+		if (priv->l4_chksum_jumbo_port == MVPP2_MAX_PORTS)
+			priv->l4_chksum_jumbo_port = priv->port_list[0]->id;
+	}
+
+	/* Set FIFO according to l4_chksum_jumbo_port */
+	for (i = 0; i < priv->num_ports; i++) {
+		if (priv->port_list[i]->id != priv->l4_chksum_jumbo_port)
+			mv_pp2x_tx_fifo_set(&priv->hw,
+					    priv->port_list[i]->id,
+					    MVPP2_TX_FIFO_DATA_SIZE_3KB);
+	}
+	mv_pp2x_tx_fifo_set(&priv->hw,
+			    priv->l4_chksum_jumbo_port,
+			    MVPP2_TX_FIFO_DATA_SIZE_10KB);
 }
 
 static int mv_pp2x_probe(struct platform_device *pdev)
@@ -4639,6 +4697,10 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		if (err < 0)
 			goto err_clk;
 	}
+
+	/* Init tx fifo for each port */
+	mv_pp2x_tx_fifo_init(priv);
+
 	net_comp_config = mvp_pp2x_gop110_netc_cfg_create(priv);
 	mv_gop110_netc_init(&priv->hw.gop, net_comp_config,
 				MV_NETC_FIRST_PHASE);

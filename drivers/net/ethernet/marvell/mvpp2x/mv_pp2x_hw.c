@@ -6579,3 +6579,11 @@ void mv_pp22_rss_c2_enable(struct mv_pp2x_port *port, bool en)
 			      MVPP2_CLS2_ACT_DUP_ATTR_REG, regVal);
 	}
 }
+
+/* Initialize Tx FIFO's */
+void mv_pp2x_tx_fifo_set(struct mv_pp2x_hw *hw, u32 port_id, u32 val)
+{
+	mv_pp2x_write(hw,
+		      MVPP22_TX_FIFO_SIZE_REG(port_id),
+		      val & MVPP22_TX_FIFO_SIZE_MASK);
+}

@@ -106,7 +106,7 @@ void mv_pp2x_pool_status(struct mv_pp2x *priv, int log_pool_num)
 	struct mv_pp2x_bm_pool *bm_pool = NULL;
 	int /*buf_size,*/ total_size, i, pool;
 
-	if (mv_pp2x_max_check(log_pool_num, MVPP2_BM_SWF_POOL_OUT_OF_RANGE,
+	if (mv_pp2x_max_check(log_pool_num, MVPP2_BM_SWF_NUM_POOLS,
 			      "log_pool"))
 		return;
 
@@ -139,7 +139,7 @@ void mv_pp2_pool_stats_print(struct mv_pp2x *priv, int log_pool_num)
 	int i, pool;
 	struct mv_pp2x_bm_pool *bm_pool = NULL;
 
-	if (mv_pp2x_max_check(log_pool_num, MVPP2_BM_SWF_POOL_OUT_OF_RANGE,
+	if (mv_pp2x_max_check(log_pool_num, MVPP2_BM_SWF_NUM_POOLS,
 			      "log_pool"))
 		return;
 

@@ -180,6 +180,10 @@ extern  u32 debug_param;
 
 #define PPV2_MAX_NUM_IRQ		4
 
+/* TX FIFO constants */
+#define MVPP2_TX_FIFO_DATA_SIZE_10KB		0xa
+#define MVPP2_TX_FIFO_DATA_SIZE_3KB		0x3
+
 enum mvppv2_version {
 	PPV21 = 21,
 	PPV22
@@ -456,11 +460,6 @@ struct mv_pp2x_param_config {
 	struct mv_pp2x_cos cos_cfg;
 	struct mv_pp2x_rss rss_cfg;
 	u8 first_bm_pool;
-	bool jumbo_pool; /* pp2 always supports 2 pools :
-			 * short=MV_DEF_256, long=MV_DEF_2K.
-			 * Param defines option to have additional pool,
-			 * jumbo=MV_DEF_10K.
-			 */
 	u8 first_sw_thread; /* The index of the first PPv2.2
 			* sub-address space for this NET_INSTANCE.
 			*/
@@ -503,6 +502,7 @@ struct mv_pp2x {
 	* CPU idx according to weight
 	*/
 	u32 rx_indir_table[MVPP22_RSS_TBL_LINE_NUM];
+	u32 l4_chksum_jumbo_port;
 };
 
 struct mv_pp2x_pcpu_stats {
