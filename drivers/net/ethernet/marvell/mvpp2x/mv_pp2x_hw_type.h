@@ -1247,6 +1247,10 @@
 	ALIGN((mtu) + MVPP2_MH_SIZE + MVPP2_VLAN_TAG_LEN + \
 	      ETH_HLEN + ETH_FCS_LEN, MVPP2_CPU_D_CACHE_LINE_SIZE)
 
+#define MVPP2_RX_MTU_SIZE(pkt_size) \
+	(pkt_size - MVPP2_MH_SIZE - MVPP2_VLAN_TAG_LEN - \
+	 ETH_HLEN - ETH_FCS_LEN)
+
 #define MVPP2_RX_BUF_SIZE(pkt_size)	((pkt_size) + NET_SKB_PAD)
 #define MVPP2_RX_TOTAL_SIZE(buf_size)	((buf_size) + MVPP2_SKB_SHINFO_SIZE)
 #define MVPP2_RX_MAX_PKT_SIZE(total_size) \
@@ -1720,13 +1724,13 @@ struct mv_pp2x_prs_flow_id {
 
 #define MVPP2_BM_SHORT_FRAME_SIZE		1024
 #define MVPP2_BM_LONG_FRAME_SIZE		2048
-#define MVPP2_BM_JUMBO_FRAME_SIZE		8192 /*FIXME: What is max. size ? */
+#define MVPP2_BM_JUMBO_FRAME_SIZE		10240
 
 enum mv_pp2x_bm_pool_log_num {
 	MVPP2_BM_SWF_SHORT_POOL,
 	MVPP2_BM_SWF_LONG_POOL,
 	MVPP2_BM_SWF_JUMBO_POOL,
-	MVPP2_BM_SWF_POOL_OUT_OF_RANGE
+	MVPP2_BM_SWF_NUM_POOLS
 };
 
 /* The mv_pp2x_tx_desc and mv_pp2x_rx_desc structures describe the
