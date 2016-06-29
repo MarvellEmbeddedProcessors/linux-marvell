@@ -352,7 +352,7 @@ static int mv_pp2x_bm_pool_create(struct device *dev,
 }
 
 void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
-				int buf_num, bool is_skb)
+			  int buf_num)
 {
 	int i;
 
@@ -363,21 +363,17 @@ void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
 
 	}
 	for (i = 0; i < buf_num; i++) {
-		struct sk_buff *vaddr;
+		u8 *vaddr;
 
 		/* Get buffer virtual address (indirect access) */
 		vaddr = mv_pp2x_bm_virt_addr_get(&priv->hw, bm_pool->id);
 		if (!vaddr)
 			break;
-		if (is_skb) {
 #ifdef CONFIG_64BIT
-			dev_kfree_skb_any((struct sk_buff *)
-				(priv->pp2xdata->skb_base_addr |
-				(uintptr_t)vaddr));
+		mv_pp2x_frag_free(bm_pool, (u8 *)(bm_pool->data_high | (uintptr_t)vaddr));
 #else
-			dev_kfree_skb_any(vaddr);
+		mv_pp2x_frag_free(bm_pool, vaddr);
 #endif
-		}
 	}
 
 	/* Update BM driver with number of buffers removed from pool */
@@ -386,12 +382,12 @@ void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
 
 /* Cleanup pool */
 int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
-			   struct mv_pp2x_bm_pool *bm_pool, bool is_skb)
+			    struct mv_pp2x_bm_pool *bm_pool)
 {
 	u32 val;
 	int size_bytes;
 
-	mv_pp2x_bm_bufs_free(priv, bm_pool, bm_pool->buf_num, is_skb);
+	mv_pp2x_bm_bufs_free(priv, bm_pool, bm_pool->buf_num);
 	if (bm_pool->buf_num) {
 		WARN(1, "cannot free all buffers in pool %d, buf_num left %d\n",
 		     bm_pool->id,
@@ -485,8 +481,7 @@ static int mv_pp2x_bm_pools_init(struct platform_device *pdev,
 err_unroll_pools:
 	dev_err(&pdev->dev, "failed to create BM pool %d, size %d\n", i, size);
 	for (i = i - 1; i >= 0; i--)
-		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, &priv->bm_pools[i],
-					true);
+		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, &priv->bm_pools[i]);
 		return err;
 }
 
@@ -606,7 +601,7 @@ static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_use_internal(
 			return NULL;
 		}
 	} else if (add_num < 0) {
-		mv_pp2x_bm_bufs_free(port->priv, pool, -add_num, true);
+		mv_pp2x_bm_bufs_free(port->priv, pool, -add_num);
 	}
 
 	return pool;
@@ -4680,7 +4675,7 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 	for (i = 0; i < priv->num_pools; i++) {
 		struct mv_pp2x_bm_pool *bm_pool = &priv->bm_pools[i];
 
-		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, bm_pool, true);
+		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, bm_pool);
 	}
 
 	for_each_online_cpu(i) {
