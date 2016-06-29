@@ -1,4 +1,4 @@
-* Marvell Armada 370/375/380/XP thermal management
+* Marvell Armada 370/375/380/XP/70x0/80x0 thermal management
 
 Required properties:
 
@@ -8,6 +8,7 @@ Required properties:
 		marvell,armada380-thermal
 		marvell,armadaxp-thermal
 		marvell,armada-ap806-thermal
+		marvell,armada-cp110-thermal
 
 - reg:		Device's register space.
 		Two or three entries are expected, see the examples below.

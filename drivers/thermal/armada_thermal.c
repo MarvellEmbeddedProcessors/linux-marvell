@@ -42,9 +42,10 @@
 #define A375_UNIT_CONTROL_MASK		0x7
 #define A375_READOUT_INVERT		BIT(15)
 #define A375_HW_RESETn			BIT(8)
-#define A380_HW_RESET			BIT(8)
-#define A380_CONTROL_MSB_OFFSET		4
-#define A380_TSEN_TC_TRIM_MASK		0x7
+
+#define TSEN_HW_RESET			BIT(8)
+#define TSEN_CONTROL_MSB_OFFSET		4
+#define TSEN_TSEN_TC_TRIM_MASK		0x7
 
 #define AP806_START	BIT(0)
 #define AP806_RESET	BIT(1)
@@ -141,7 +142,7 @@ static void armada380_temp_set_threshold(struct platform_device *pdev,
 	}
 
 	temp = armada380_thresh_val_calc(thresh, data);
-	reg = readl_relaxed(priv->control + A380_CONTROL_MSB_OFFSET);
+	reg = readl_relaxed(priv->control + TSEN_CONTROL_MSB_OFFSET);
 
 	/* Set Threshold */
 	reg &= ~(data->temp_mask << A380_THRESH_OFFSET);
@@ -151,7 +152,7 @@ static void armada380_temp_set_threshold(struct platform_device *pdev,
 	reg &= ~(A380_THRESH_HYST_MASK << A380_THRESH_HYST_OFFSET);
 	reg |= (hyst << A380_THRESH_HYST_OFFSET);
 
-	writel(reg, priv->control + A380_CONTROL_MSB_OFFSET);
+	writel(reg, priv->control + TSEN_CONTROL_MSB_OFFSET);
 
 	/* hysteresis calculation is 2^(2+n) */
 	hyst = 1 << (hyst + 2);
@@ -225,24 +226,32 @@ static void armada375_init_sensor(struct platform_device *pdev,
 	mdelay(50);
 }
 
-static void armada380_init_sensor(struct platform_device *pdev,
-				  struct armada_thermal_priv *priv)
+static void tsen_init_sensor(struct armada_thermal_priv *priv)
 {
 	unsigned long reg = readl_relaxed(priv->control +
-					  A380_CONTROL_MSB_OFFSET);
+					  TSEN_CONTROL_MSB_OFFSET);
 
 	/* Reset hardware once */
-	if (!(reg & A380_HW_RESET)) {
-		reg |= A380_HW_RESET;
-		writel(reg, priv->control + A380_CONTROL_MSB_OFFSET);
+	if (!(reg & TSEN_HW_RESET)) {
+		reg |= TSEN_HW_RESET;
+		writel(reg, priv->control + TSEN_CONTROL_MSB_OFFSET);
 		mdelay(10);
 	}
 
 	/* set Tsen Tc Trim to correct default value (errata #132698) */
 	reg = readl_relaxed(priv->control);
-	reg &= ~A380_TSEN_TC_TRIM_MASK;
+	reg &= ~TSEN_TSEN_TC_TRIM_MASK;
 	reg |= 0x3;
 	writel(reg, priv->control);
+}
+
+static void armada380_init_sensor(struct platform_device *pdev,
+				  struct armada_thermal_priv *priv)
+{
+	unsigned long reg;
+
+	/* start the sensor */
+	tsen_init_sensor(priv);
 
 	/* Set thresholds */
 	armada380_temp_set_threshold(pdev, priv);
@@ -271,6 +280,13 @@ static void armada_ap806_init_sensor(struct platform_device *pdev,
 	reg |= AP806_ENABLE;
 	writel(reg, priv->control);
 	mdelay(10);
+}
+
+static void cp110_init_sensor(struct platform_device *pdev,
+				  struct armada_thermal_priv *priv)
+{
+	/* start the sensor */
+	tsen_init_sensor(priv);
 }
 
 static bool armada_is_valid(struct armada_thermal_priv *priv)
@@ -341,12 +357,42 @@ static int armada_ap806_get_temp(struct thermal_zone_device *thermal, int *temp)
 	return 0;
 }
 
+static int armada_cp110_get_temp(struct thermal_zone_device *thermal, int *temp)
+{
+	struct armada_thermal_priv *priv = thermal->devdata;
+	unsigned long reg;
+	unsigned long m, b, div;
+
+	/* Valid check */
+	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
+		dev_err(&thermal->device,
+			"Temperature sensor reading not valid\n");
+		return -EIO;
+	}
+
+	reg = readl_relaxed(priv->sensor);
+	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
+
+	/* Get formula coeficients */
+	b = priv->data->coef_b;
+	m = priv->data->coef_m;
+	div = priv->data->coef_div;
+
+	*temp = ((m * reg) - b) / div;
+
+	return 0;
+}
+
 static struct thermal_zone_device_ops armada_ops = {
 	.get_temp = armada_get_temp,
 };
 
 static struct thermal_zone_device_ops armada_ap806_ops = {
 	.get_temp = armada_ap806_get_temp,
+};
+
+static struct thermal_zone_device_ops armada_cp110_ops = {
+	.get_temp = armada_cp110_get_temp,
 };
 
 static irqreturn_t a38x_temp_irq_handler(int irq, void *data)
@@ -436,6 +482,19 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.ops = &armada_ap806_ops,
 };
 
+static const struct armada_thermal_data armada_cp110_data = {
+	.is_valid = armada_is_valid,
+	.init_sensor = cp110_init_sensor,
+	.is_valid_shift = 10,
+	.temp_shift = 0,
+	.temp_mask = 0x3ff,
+	.coef_b = 2791000UL,
+	.coef_m = 4761UL,
+	.coef_div = 10,
+	.inverted = true,
+	.ops = &armada_cp110_ops,
+};
+
 
 static const struct of_device_id armada_thermal_id_table[] = {
 	{
@@ -457,6 +516,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
 	{
 		.compatible = "marvell,armada-ap806-thermal",
 		.data       = &armada_ap806_data,
+	},
+	{
+		.compatible = "marvell,armada-cp110-thermal",
+		.data	    = &armada_cp110_data,
 	},
 	{
 		/* sentinel */
@@ -514,7 +577,6 @@ static int armada_thermal_probe(struct platform_device *pdev)
 
 	/* Register overheat interrupt */
 	irq = platform_get_irq(pdev, 0);
-
 	if (irq >= 0) {
 		if (devm_request_irq(&pdev->dev, irq, a38x_temp_irq_handler,
 					0, pdev->name, priv) < 0)
@@ -564,5 +626,5 @@ static struct platform_driver armada_thermal_driver = {
 module_platform_driver(armada_thermal_driver);
 
 MODULE_AUTHOR("Ezequiel Garcia <ezequiel.garcia@free-electrons.com>");
-MODULE_DESCRIPTION("Armada 370/380/XP thermal driver");
+MODULE_DESCRIPTION("Armada 370/380/XP/70x0/80x0 thermal driver");
 MODULE_LICENSE("GPL v2");
