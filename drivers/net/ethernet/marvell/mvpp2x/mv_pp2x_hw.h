@@ -781,5 +781,6 @@ int mv_pp22_rss_rxq_set(struct mv_pp2x_port *port, u32 cos_width);
 
 void mv_pp22_rss_c2_enable(struct mv_pp2x_port *port, bool en);
 int mv_pp22_rss_hw_dump(struct mv_pp2x_hw *hw);
+void mv_pp2x_tx_fifo_set(struct mv_pp2x_hw *hw, u32 port_id, u32 val);
 
 #endif /* _MVPP2_HW_H_ */
