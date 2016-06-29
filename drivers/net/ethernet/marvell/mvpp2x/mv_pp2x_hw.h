@@ -135,8 +135,8 @@ static inline int mv_pp2x_rxq_free(struct mv_pp2x_port *port, int rxq_id)
 {
 	u32 val = mv_pp2x_read(&port->priv->hw, MVPP2_RXQ_STATUS_REG(rxq_id));
 
-	return (val & (MVPP2_RXQ_NON_OCCUPIED_MASK >>
-		MVPP2_RXQ_NON_OCCUPIED_OFFSET));
+	return ((val & MVPP2_RXQ_NON_OCCUPIED_MASK) >>
+		MVPP2_RXQ_NON_OCCUPIED_OFFSET);
 }
 
 /* Update Rx queue status with the number of occupied and available
