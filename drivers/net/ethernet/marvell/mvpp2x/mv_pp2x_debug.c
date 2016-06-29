@@ -676,8 +676,19 @@ void mvPp2TxRegs(struct mv_pp2x *priv)
 				  "MVPP21_TX_FIFO_THRESH_REG");
 	} else {
 		for (i = 0 ; i < MVPP2_MAX_PORTS; i++) {
+			DBG_MSG("\n[TX port-%d registers]\n", i);
 			mv_pp2x_print_reg(hw, MVPP22_TX_FIFO_THRESH_REG(i),
 					  "MVPP22_TX_FIFO_THRESH_REG");
+			mv_pp2x_print_reg(hw, MVPP22_TX_FIFO_SIZE_REG(i),
+					  "MVPP22_TX_FIFO_SIZE_REG");
+			mv_pp2x_print_reg(hw, MVPP2_TX_BAD_FCS_CNTR_REG(i),
+					  "MVPP2_TX_BAD_FCS_CNTR_REG");
+			mv_pp2x_print_reg(hw, MVPP2_TX_DROP_CNTR_REG(i),
+					  "MVPP2_TX_DROP_CNTR_REG");
+			mv_pp2x_print_reg(hw, MVPP2_TX_ETH_DSEC_THRESH_REG(i),
+					  "MVPP2_TX_ETH_DSEC_THRESH_REG");
+			mv_pp2x_print_reg(hw, MVPP22_TX_EGR_PIPE_DELAY_REG(i),
+					  "MVPP22_TX_EGR_PIPE_DELAY_REG");
 		}
 	}
 	mv_pp2x_print_reg(hw, MVPP2_TX_PORT_FLUSH_REG,
