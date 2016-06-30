@@ -852,6 +852,20 @@ static void sdhci_xenon_enable_parallel_tran(struct sdhci_host *host,
 	sdhci_writel(host, reg, SDHC_SYS_EXT_OP_CTRL);
 }
 
+/*
+ * Disable the command conflict warning
+ * between host and device
+ */
+static void sdhci_xenon_disable_cmd_conflict(struct sdhci_host *host,
+					     unsigned char slot)
+{
+	u32 reg;
+
+	reg = sdhci_readl(host, SDHC_SYS_EXT_OP_CTRL);
+	reg |= (0x100 << slot);
+	sdhci_writel(host, reg, SDHC_SYS_EXT_OP_CTRL);
+}
+
 /* Disable re-tuning request, event and auto-retuning*/
 static void sdhci_xenon_setup_tuning(struct sdhci_host *host)
 {
@@ -1146,6 +1160,9 @@ static int sdhci_xenon_slot_probe(struct sdhci_host *host)
 
 	/* Enable Parallel Transfer Mode */
 	sdhci_xenon_enable_parallel_tran(host, slotno);
+
+	/* Disable command confliction */
+	sdhci_xenon_disable_cmd_conflict(host, slotno);
 
 	/* Do eMMC setup if it is an eMMC slot */
 	if (sdhci_xenon_slot_type_emmc(host, slotno)) {
