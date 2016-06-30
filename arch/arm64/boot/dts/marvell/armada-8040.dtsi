@@ -175,5 +175,14 @@
 				dma-coherent;
 			};
 		};
+		pcie@0x600000 {
+			msi-parent = <&gic_v2m0>;
+		};
+		pcie@0x620000 {
+			msi-parent = <&gic_v2m0>;
+		};
+		pcie@0x640000 {
+			msi-parent = <&gic_v2m0>;
+		};
 	};
 };
