@@ -476,4 +476,8 @@ int mv_gop110_netc_init(struct gop_hw *gop,
 			u32 net_comp_config, enum mv_netc_phase phase);
 void mv_gop110_netc_active_port(struct gop_hw *gop, u32 port, u32 val);
 
+/*Ethtool Functions */
+void mv_gop110_gmac_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff);
+void mv_gop110_xlg_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff);
+
 #endif /* _MV_GOP_HW_H_ */
