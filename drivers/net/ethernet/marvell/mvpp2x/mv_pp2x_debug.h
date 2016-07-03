@@ -56,7 +56,6 @@
 /* This macro returns absolute value                                        */
 #define MV_ABS(number)  (((int)(number) < 0) ? -(int)(number) : (int)(number))
 
-
 void mv_pp2x_print_reg(struct mv_pp2x_hw *hw, unsigned int reg_addr,
 			   char *reg_name);
 void mv_pp2x_print_reg2(struct mv_pp2x_hw *hw, unsigned int reg_addr,
@@ -109,7 +108,6 @@ int mv_pp2x_port_bind_cpu_set(struct mv_pp2x_port *port, u8 bind_cpu);
 int mv_pp2x_debug_param_set(u32 param);
 int mv_pp2x_debug_param_get(void);
 
-
 void mv_pp2x_bm_queue_map_dump_all(struct mv_pp2x_hw *hw);
 
 int mv_pp2x_cls_c2_qos_prio_set(struct mv_pp2x_cls_c2_qos_entry *qos, u8 pri);
@@ -130,6 +128,23 @@ int mv_pp2x_cls_c2_hw_dump(struct mv_pp2x_hw *hw);
 int mv_pp2x_cls_c2_qos_dscp_hw_dump(struct mv_pp2x_hw *hw);
 int mv_pp2x_cls_c2_qos_prio_hw_dump(struct mv_pp2x_hw *hw);
 
+void mv_pp2x_pp2_basic_print(struct platform_device *pdev,
+			     struct mv_pp2x *priv);
+void mv_pp2x_pp2_port_print(struct mv_pp2x_port *port);
+void mv_pp2x_pp2_ports_print(struct mv_pp2x *priv);
 
+int mv_pp2x_cls_hw_lkp_print(struct mv_pp2x_hw *hw, int lkpid, int way);
+int mv_pp2x_cls_sw_flow_dump(struct mv_pp2x_cls_flow_entry *fe);
+int mv_pp2x_cls_hw_regs_dump(struct mv_pp2x_hw *hw);
+int mv_pp2x_cls_hw_flow_dump(struct mv_pp2x_hw *hw);
+int mv_pp2x_cls_hw_flow_hits_dump(struct mv_pp2x_hw *hw);
+int mv_pp2x_cls_hw_lkp_hits_dump(struct mv_pp2x_hw *hw);
+int mv_pp2x_cls_sw_lkp_dump(struct mv_pp2x_cls_lookup_entry *lkp);
+int mv_pp2x_cls_hw_lkp_dump(struct mv_pp2x_hw *hw);
+
+int mv_pp2x_cls_c2_sw_words_dump(struct mv_pp2x_cls_c2_entry *c2);
+int mv_pp2x_cls_c2_hit_cntr_dump(struct mv_pp2x_hw *hw);
+int mv_pp2x_cls_c2_regs_dump(struct mv_pp2x_hw *hw);
+int mv_pp22_rss_hw_dump(struct mv_pp2x_hw *hw);
 
 #endif /* _MVPP2_DEBUG_H_ */
