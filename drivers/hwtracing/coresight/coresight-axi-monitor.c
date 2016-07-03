@@ -544,12 +544,21 @@ static void axim_init_default_data(struct axim_drvdata *axim)
 	u32 reg;
 
 	reg = readl_relaxed(axim->base + AXI_MON_VER);
-	axim->nr_chan = BMVAL(reg, 12, 15); /* NCH */
 	axim->nr_prof_reg = BMVAL(reg, 16, 19); /* NPRR */
 	axim->latency_en = BMVAL(reg, 24, 24);
 	axim->trace_en = BMVAL(reg, 25, 25);
 	axim->minor = BMVAL(reg, 4, 7);
 	axim->major = BMVAL(reg, 0, 3) + 1;
+
+	/* AXIM v1 doesn't have a version register and will
+	 * return 0 when reading from AXI_MON_VER. For all fields it
+	 * emulates a VER register fine except for nr_chan
+	 */
+	if (reg)
+		axim->nr_chan = BMVAL(reg, 12, 15); /* NCH */
+	else
+		axim->nr_chan = 4;
+
 }
 
 static int axim_probe(struct amba_device *adev, const struct amba_id *id)
