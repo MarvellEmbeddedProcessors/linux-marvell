@@ -42,6 +42,21 @@
 #include "mv_pp2x_hw.h"
 #include "mv_gop110_hw.h"
 
+#define MV_PP2X_STATS_LEN	ARRAY_SIZE(mv_pp2x_gstrings_stats)
+#define MV_PP2X_TEST_LEN	ARRAY_SIZE(mv_pp2x_gstrings_test)
+
+static const char mv_pp2x_gstrings_test[][ETH_GSTRING_LEN] = {
+	"Link test        (on/offline)",
+	"Mac loopback	  (on/offline)",
+	"Phy loopback	  (on/offline)",
+	"register test    (on/offline)",
+};
+
+static const char mv_pp2x_gstrings_stats[][ETH_GSTRING_LEN] = {
+	/* device-specific stats */
+	"rx_packets", "rx_bytes", "tx_packets", "tx_bytes",
+};
+
 int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
 					struct mv_port_link_status *pstatus)
 {
@@ -115,6 +130,59 @@ int mv_pp2x_autoneg_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
 }
 
 /* Ethtool methods */
+
+/* Ethtool statistic */
+static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
+	struct ethtool_stats *stats, u64 *data)
+{
+
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	int cpu = 0;
+
+	data[0] = 0;
+
+	for_each_possible_cpu(cpu) {
+		struct mv_pp2x_pcpu_stats *stats = per_cpu_ptr(port->stats, cpu);
+
+		u64_stats_update_begin(&stats->syncp);
+		data[0] += stats->rx_packets;
+		data[1] += stats->rx_bytes;
+		data[2] += stats->tx_packets;
+		data[3] += stats->tx_bytes;
+		u64_stats_update_end(&stats->syncp);
+		}
+}
+
+static void mv_pp2x_eth_tool_get_strings(struct net_device *dev,
+					u32 stringset, u8 *data)
+{
+
+	switch (stringset) {
+	case ETH_SS_TEST:
+		memcpy(data, *mv_pp2x_gstrings_test, sizeof(mv_pp2x_gstrings_test));
+		break;
+	case ETH_SS_STATS:
+		memcpy(data, *mv_pp2x_gstrings_stats, sizeof(mv_pp2x_gstrings_stats));
+		break;
+	default:
+		break;
+		}
+
+}
+
+static int mv_pp2x_eth_tool_get_sset_count(struct net_device *dev, int sset)
+{
+
+	switch (sset) {
+	case ETH_SS_TEST:
+		return MV_PP2X_TEST_LEN;
+	case ETH_SS_STATS:
+		return MV_PP2X_STATS_LEN;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+}
 
 /* Restart autonegotiation function */
 int mv_pp2x_eth_tool_nway_reset(struct net_device *dev)
@@ -471,6 +539,9 @@ static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_coalesce		= mv_pp2x_ethtool_get_coalesce,
 	.nway_reset		= mv_pp2x_eth_tool_nway_reset,
 	.get_drvinfo		= mv_pp2x_ethtool_get_drvinfo,
+	.get_ethtool_stats	= mv_pp2x_eth_tool_get_ethtool_stats,
+	.get_sset_count		= mv_pp2x_eth_tool_get_sset_count,
+	.get_strings		= mv_pp2x_eth_tool_get_strings,
 	.get_ringparam		= mv_pp2x_ethtool_get_ringparam,
 	.set_ringparam		= mv_pp2x_ethtool_set_ringparam,
 	.get_rxfh_indir_size	= mv_pp2x_ethtool_get_rxfh_indir_size,
