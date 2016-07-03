@@ -439,28 +439,6 @@ static inline void mv_gop110_rfu1_print(struct gop_hw *gop, char *reg_name,
 		mv_gop110_rfu1_read(gop, reg));
 }
 
-/* PTP Functions  */
-static inline u32 mv_gop110_ptp_read(struct gop_hw *gop, int mac_num,
-				     u32 offset)
-{
-	return mv_gop_gen_read(gop->gop_110.ptp.base,
-			       mac_num * gop->gop_110.ptp.obj_size + offset);
-}
-
-static inline void mv_gop110_ptp_write(struct gop_hw *gop, int mac_num,
-				       u32 offset, u32 data)
-{
-	mv_gop_gen_write(gop->gop_110.ptp.base,
-			 mac_num * gop->gop_110.ptp.obj_size + offset, data);
-}
-
-static inline void mv_gop110_ptp_print(struct gop_hw *gop, char *reg_name,
-				       int mac_num, u32 reg)
-{
-	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg,
-		mv_gop110_ptp_read(gop, mac_num, reg));
-}
-
 int mv_gop110_smi_init(struct gop_hw *gop);
 int mv_gop110_smi_phy_addr_cfg(struct gop_hw *gop, int port, int addr);
 
