@@ -408,7 +408,7 @@ int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
 	struct mv_pp2x_bm_pool *bm_pool;
 	struct mv_pp2x_hw *hw = &priv->hw;
 
-	if ((priv->num_pools + 1) >= MVPP2_BM_POOLS_MAX_ALLOC_NUM) {
+	if ((priv->num_pools + 1) > MVPP2_BM_POOLS_MAX_ALLOC_NUM) {
 		pr_err("Unable to add pool. Max BM pool alloc reached %d\n",
 		       priv->num_pools + 1);
 		return -ENOMEM;
