@@ -409,8 +409,8 @@ int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
 	struct mv_pp2x_hw *hw = &priv->hw;
 
 	if ((priv->num_pools + 1) >= MVPP2_BM_POOLS_MAX_ALLOC_NUM) {
-		DBG_MSG("Unable to add pool. Max BM pool alloc reached %d\n",
-			priv->num_pools + 1);
+		pr_err("Unable to add pool. Max BM pool alloc reached %d\n",
+		       priv->num_pools + 1);
 		return -ENOMEM;
 	}
 
@@ -419,7 +419,7 @@ int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
 		MVPP2_BM_STATE_MASK;
 
 	if (enabled) {
-		DBG_MSG("%s pool %d already enabled. Ignoring request\n",
+		pr_info("%s pool %d already enabled. Ignoring request\n",
 			__func__, pool);
 		return 0;
 	}
@@ -444,9 +444,6 @@ int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
 
 	*pool_num = pool;
 	priv->num_pools++;
-	DBG_MSG("log_id %d, id %d, pool_num %d, num_pools %d\n",
-		bm_pool->log_id, bm_pool->id, *pool_num, priv->num_pools);
-
 	return 0;
 }
 
@@ -4190,123 +4187,6 @@ static void mv_pp2x_init_rxfhindir(struct mv_pp2x *pp2)
 	for (i = 0; i < MVPP22_RSS_TBL_LINE_NUM; i++)
 		pp2->rx_indir_table[i] = i%online_cpus;
 }
-
-void mv_pp2x_pp2_basic_print(struct platform_device *pdev, struct mv_pp2x *priv)
-{
-	DBG_MSG("%s\n", __func__);
-
-	DBG_MSG("num_present_cpus(%d) num_act_cpus(%d) num_online_cpus(%d)\n",
-		num_present_cpus(), num_active_cpus(), num_online_cpus());
-	DBG_MSG("cpu_map(%x)\n", priv->cpu_map);
-
-	DBG_MSG("pdev->name(%s) pdev->id(%d)\n", pdev->name, pdev->id);
-	DBG_MSG("dev.init_name(%s) dev.id(%d)\n",
-		pdev->dev.init_name, pdev->dev.id);
-	DBG_MSG("dev.kobj.name(%s)\n", pdev->dev.kobj.name);
-	DBG_MSG("dev->bus.name(%s) pdev.dev->bus.dev_name(%s)\n",
-		pdev->dev.bus->name, pdev->dev.bus->dev_name);
-
-	DBG_MSG("Device dma_coherent(%d)\n", pdev->dev.archdata.dma_coherent);
-
-	DBG_MSG("pp2_ver(%d)\n", priv->pp2_version);
-	DBG_MSG("queue_mode(%d)\n", priv->pp2_cfg.queue_mode);
-	DBG_MSG("cell_index(%d) num_ports(%d)\n",
-		priv->pp2_cfg.cell_index, priv->num_ports);
-#ifdef CONFIG_64BIT
-	DBG_MSG("skb_base_addr(%p)\n", (void *)priv->pp2xdata->skb_base_addr);
-#endif
-	DBG_MSG("hw->base(%p)\n", priv->hw.base);
-	if (priv->pp2_version == PPV22) {
-		DBG_MSG("gop_addr: gmac(%p) xlg(%p) serdes(%p)\n",
-			priv->hw.gop.gop_110.gmac.base,
-			priv->hw.gop.gop_110.xlg_mac.base,
-			priv->hw.gop.gop_110.serdes.base);
-		DBG_MSG("gop_addr: xmib(%p) smi(%p) xsmi(%p)\n",
-			priv->hw.gop.gop_110.xmib.base,
-			priv->hw.gop.gop_110.smi_base,
-			priv->hw.gop.gop_110.xsmi_base);
-		DBG_MSG("gop_addr: mspg(%p) xpcs(%p) ptp(%p)\n",
-			priv->hw.gop.gop_110.mspg_base,
-			priv->hw.gop.gop_110.xpcs_base,
-			priv->hw.gop.gop_110.ptp.base);
-		DBG_MSG("gop_addr: rfu1(%p)\n",
-			priv->hw.gop.gop_110.rfu1_base);
-	}
-}
-EXPORT_SYMBOL(mv_pp2x_pp2_basic_print);
-
-void mv_pp2x_pp2_port_print(struct mv_pp2x_port *port)
-{
-	int i;
-
-	DBG_MSG("%s port_id(%d)\n", __func__, port->id);
-	DBG_MSG("\t ifname(%s)\n", port->dev->name);
-	DBG_MSG("\t first_rxq(%d)\n", port->first_rxq);
-	DBG_MSG("\t num_irqs(%d)\n", port->num_irqs);
-	for (i = 0; i < port->num_irqs; i++)
-		DBG_MSG("\t\t irq%d(%d)\n", i, port->of_irqs[i]);
-	DBG_MSG("\t pkt_size(%d)\n", port->pkt_size);
-	DBG_MSG("\t flags(%lx)\n", port->flags);
-	DBG_MSG("\t tx_ring_size(%d)\n", port->tx_ring_size);
-	DBG_MSG("\t rx_ring_size(%d)\n", port->rx_ring_size);
-	DBG_MSG("\t time_coal(%d)\n", port->tx_time_coal);
-	DBG_MSG("\t pool_long(%p)\n", port->pool_long);
-	DBG_MSG("\t pool_short(%p)\n", port->pool_short);
-	DBG_MSG("\t first_rxq(%d)\n", port->first_rxq);
-	DBG_MSG("\t num_rx_queues(%d)\n", port->num_rx_queues);
-	DBG_MSG("\t num_tx_queues(%d)\n", port->num_tx_queues);
-	DBG_MSG("\t num_qvector(%d)\n", port->num_qvector);
-
-	for (i = 0; i < port->num_qvector; i++) {
-		DBG_MSG("\t qvector_index(%d)\n", i);
-#if !defined(CONFIG_MV_PP2_POLLING)
-		DBG_MSG("\t\t irq(%d) irq_name:%s\n",
-			port->q_vector[i].irq, port->q_vector[i].irq_name);
-#endif
-		DBG_MSG("\t\t qv_type(%d)\n",
-			port->q_vector[i].qv_type);
-		DBG_MSG("\t\t sw_thread_id	(%d)\n",
-			port->q_vector[i].sw_thread_id);
-		DBG_MSG("\t\t sw_thread_mask(%d)\n",
-			port->q_vector[i].sw_thread_mask);
-		DBG_MSG("\t\t first_rx_queue(%d)\n",
-			port->q_vector[i].first_rx_queue);
-		DBG_MSG("\t\t num_rx_queues(%d)\n",
-			port->q_vector[i].num_rx_queues);
-		DBG_MSG("\t\t pending_cause_rx(%d)\n",
-			port->q_vector[i].pending_cause_rx);
-	}
-	DBG_MSG("\t GOP ind(%d) phy_mode(%d) phy_addr(%d)\n",
-		port->mac_data.gop_index, port->mac_data.phy_mode,
-		port->mac_data.phy_addr);
-	DBG_MSG("\t GOP force_link(%d) autoneg(%d) duplex(%d) speed(%d)\n",
-		port->mac_data.force_link, port->mac_data.autoneg,
-		port->mac_data.duplex, port->mac_data.speed);
-#if !defined(CONFIG_MV_PP2_POLLING)
-	DBG_MSG("\t GOP link_irq(%d) irq_name:%s\n", port->mac_data.link_irq,
-		port->mac_data.irq_name);
-#endif
-	DBG_MSG("\t GOP phy_dev(%p) phy_node(%p)\n", port->mac_data.phy_dev,
-		port->mac_data.phy_node);
-
-}
-EXPORT_SYMBOL(mv_pp2x_pp2_port_print);
-
-void mv_pp2x_pp2_ports_print(struct mv_pp2x *priv)
-{
-	int i;
-	struct mv_pp2x_port *port;
-
-	for (i = 0; i < priv->num_ports; i++) {
-		if (priv->port_list[i] == NULL) {
-			pr_emerg("\t port_list[%d]= NULL!\n", i);
-			continue;
-		}
-		port = priv->port_list[i];
-		mv_pp2x_pp2_port_print(port);
-	}
-}
-EXPORT_SYMBOL(mv_pp2x_pp2_ports_print);
 
 static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		struct mv_pp2x *priv,	u32 *cell_index, int *port_count)

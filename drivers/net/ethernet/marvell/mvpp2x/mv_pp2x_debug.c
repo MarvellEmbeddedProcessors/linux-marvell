@@ -2032,3 +2032,533 @@ EXPORT_SYMBOL(mv_pp2x_cls_c2_hw_dump);
 
 /*----------------------------------------------------------------------*/
 
+void mv_pp2x_pp2_basic_print(struct platform_device *pdev, struct mv_pp2x *priv)
+{
+	DBG_MSG("%s\n", __func__);
+
+	DBG_MSG("num_present_cpus(%d) num_act_cpus(%d) num_online_cpus(%d)\n",
+		num_present_cpus(), num_active_cpus(), num_online_cpus());
+	DBG_MSG("cpu_map(%x)\n", priv->cpu_map);
+
+	DBG_MSG("pdev->name(%s) pdev->id(%d)\n", pdev->name, pdev->id);
+	DBG_MSG("dev.init_name(%s) dev.id(%d)\n",
+		pdev->dev.init_name, pdev->dev.id);
+	DBG_MSG("dev.kobj.name(%s)\n", pdev->dev.kobj.name);
+	DBG_MSG("dev->bus.name(%s) pdev.dev->bus.dev_name(%s)\n",
+		pdev->dev.bus->name, pdev->dev.bus->dev_name);
+
+	DBG_MSG("Device dma_coherent(%d)\n", pdev->dev.archdata.dma_coherent);
+
+	DBG_MSG("pp2_ver(%d)\n", priv->pp2_version);
+	DBG_MSG("queue_mode(%d)\n", priv->pp2_cfg.queue_mode);
+	DBG_MSG("first_bm_pool(%d)\n", priv->pp2_cfg.first_bm_pool);
+	DBG_MSG("cell_index(%d) num_ports(%d)\n",
+		priv->pp2_cfg.cell_index, priv->num_ports);
+#ifdef CONFIG_64BIT
+	DBG_MSG("skb_base_addr(%p)\n", (void *)priv->pp2xdata->skb_base_addr);
+#endif
+	DBG_MSG("hw->base(%p)\n", priv->hw.base);
+	if (priv->pp2_version == PPV22) {
+		DBG_MSG("gop_addr: gmac(%p) xlg(%p) serdes(%p)\n",
+			priv->hw.gop.gop_110.gmac.base,
+			priv->hw.gop.gop_110.xlg_mac.base,
+			priv->hw.gop.gop_110.serdes.base);
+		DBG_MSG("gop_addr: xmib(%p) smi(%p) xsmi(%p)\n",
+			priv->hw.gop.gop_110.xmib.base,
+			priv->hw.gop.gop_110.smi_base,
+			priv->hw.gop.gop_110.xsmi_base);
+		DBG_MSG("gop_addr: mspg(%p) xpcs(%p) ptp(%p)\n",
+			priv->hw.gop.gop_110.mspg_base,
+			priv->hw.gop.gop_110.xpcs_base,
+			priv->hw.gop.gop_110.ptp.base);
+		DBG_MSG("gop_addr: rfu1(%p)\n",
+			priv->hw.gop.gop_110.rfu1_base);
+	}
+}
+EXPORT_SYMBOL(mv_pp2x_pp2_basic_print);
+
+void mv_pp2x_pp2_port_print(struct mv_pp2x_port *port)
+{
+	int i;
+
+	DBG_MSG("%s port_id(%d)\n", __func__, port->id);
+	DBG_MSG("\t ifname(%s)\n", port->dev->name);
+	DBG_MSG("\t first_rxq(%d)\n", port->first_rxq);
+	DBG_MSG("\t num_irqs(%d)\n", port->num_irqs);
+	for (i = 0; i < port->num_irqs; i++)
+		DBG_MSG("\t\t irq%d(%d)\n", i, port->of_irqs[i]);
+	DBG_MSG("\t pkt_size(%d)\n", port->pkt_size);
+	DBG_MSG("\t flags(%lx)\n", port->flags);
+	DBG_MSG("\t tx_ring_size(%d)\n", port->tx_ring_size);
+	DBG_MSG("\t rx_ring_size(%d)\n", port->rx_ring_size);
+	DBG_MSG("\t time_coal(%d)\n", port->tx_time_coal);
+	DBG_MSG("\t pool_long(%p)\n", port->pool_long);
+	DBG_MSG("\t pool_short(%p)\n", port->pool_short);
+	DBG_MSG("\t first_rxq(%d)\n", port->first_rxq);
+	DBG_MSG("\t num_rx_queues(%d)\n", port->num_rx_queues);
+	DBG_MSG("\t num_tx_queues(%d)\n", port->num_tx_queues);
+	DBG_MSG("\t num_qvector(%d)\n", port->num_qvector);
+
+	for (i = 0; i < port->num_qvector; i++) {
+		DBG_MSG("\t qvector_index(%d)\n", i);
+#if !defined(CONFIG_MV_PP2_POLLING)
+		DBG_MSG("\t\t irq(%d) irq_name:%s\n",
+			port->q_vector[i].irq, port->q_vector[i].irq_name);
+#endif
+		DBG_MSG("\t\t qv_type(%d)\n",
+			port->q_vector[i].qv_type);
+		DBG_MSG("\t\t sw_thread_id	(%d)\n",
+			port->q_vector[i].sw_thread_id);
+		DBG_MSG("\t\t sw_thread_mask(%d)\n",
+			port->q_vector[i].sw_thread_mask);
+		DBG_MSG("\t\t first_rx_queue(%d)\n",
+			port->q_vector[i].first_rx_queue);
+		DBG_MSG("\t\t num_rx_queues(%d)\n",
+			port->q_vector[i].num_rx_queues);
+		DBG_MSG("\t\t pending_cause_rx(%d)\n",
+			port->q_vector[i].pending_cause_rx);
+	}
+	DBG_MSG("\t GOP ind(%d) phy_mode(%d) phy_addr(%d)\n",
+		port->mac_data.gop_index, port->mac_data.phy_mode,
+		port->mac_data.phy_addr);
+	DBG_MSG("\t GOP force_link(%d) autoneg(%d) duplex(%d) speed(%d)\n",
+		port->mac_data.force_link, port->mac_data.autoneg,
+		port->mac_data.duplex, port->mac_data.speed);
+#if !defined(CONFIG_MV_PP2_POLLING)
+	DBG_MSG("\t GOP link_irq(%d) irq_name:%s\n", port->mac_data.link_irq,
+		port->mac_data.irq_name);
+#endif
+	DBG_MSG("\t GOP phy_dev(%p) phy_node(%p)\n", port->mac_data.phy_dev,
+		port->mac_data.phy_node);
+}
+EXPORT_SYMBOL(mv_pp2x_pp2_port_print);
+
+void mv_pp2x_pp2_ports_print(struct mv_pp2x *priv)
+{
+	int i;
+	struct mv_pp2x_port *port;
+
+	for (i = 0; i < priv->num_ports; i++) {
+		if (!priv->port_list[i]) {
+			pr_emerg("\t port_list[%d]= NULL!\n", i);
+			continue;
+		}
+		port = priv->port_list[i];
+		mv_pp2x_pp2_port_print(port);
+	}
+}
+EXPORT_SYMBOL(mv_pp2x_pp2_ports_print);
+
+int mv_pp2x_cls_hw_lkp_print(struct mv_pp2x_hw *hw, int lkpid, int way)
+{
+	unsigned int uint32bit;
+	int int32bit;
+	struct mv_pp2x_cls_lookup_entry lkp;
+
+	if (mv_pp2x_range_validate(way, 0, WAY_MAX) == MV_ERROR)
+		return MV_ERROR;
+
+	if (mv_pp2x_range_validate(lkpid, 0,
+				   MVPP2_CLS_FLOWS_TBL_SIZE) == MV_ERROR)
+		return MV_ERROR;
+
+	mv_pp2x_cls_hw_lkp_read(hw, lkpid, way, &lkp);
+
+	DBG_MSG(" 0x%2.2x  %1.1d\t", lkp.lkpid, lkp.way);
+	mv_pp2x_cls_sw_lkp_rxq_get(&lkp, &int32bit);
+	DBG_MSG("0x%2.2x\t", int32bit);
+	mv_pp2x_cls_sw_lkp_en_get(&lkp, &int32bit);
+	DBG_MSG("%1.1d\t", int32bit);
+	mv_pp2x_cls_sw_lkp_flow_get(&lkp, &int32bit);
+	DBG_MSG("0x%3.3x\t", int32bit);
+	mv_pp2x_cls_sw_lkp_mod_get(&lkp, &int32bit);
+	DBG_MSG(" 0x%2.2x\t", int32bit);
+	mv_pp2x_cls_hw_lkp_hit_get(hw, lkp.lkpid, way, &uint32bit);
+	DBG_MSG(" 0x%8.8x\n", uint32bit);
+	DBG_MSG("\n");
+
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_hw_lkp_print);
+
+/*----------------------------------------------------------------------*/
+
+int mv_pp2x_cls_sw_flow_dump(struct mv_pp2x_cls_flow_entry *fe)
+{
+	int	int32bit_1, int32bit_2, i;
+	int	fieldsArr[MVPP2_CLS_FLOWS_TBL_FIELDS_MAX];
+	int	status = MV_OK;
+
+	if (mv_pp2x_ptr_validate(fe) == MV_ERROR)
+		return MV_ERROR;
+
+	DBG_MSG(
+		"INDEX: F[0] F[1] F[2] F[3] PRT[T  ID] ENG LAST LKP_TYP  PRIO\n");
+
+	/*index*/
+	DBG_MSG("0x%3.3x  ", fe->index);
+
+	/*filed[0] filed[1] filed[2] filed[3]*/
+	status |= mv_pp2x_cls_sw_flow_hek_get(fe, &int32bit_1, fieldsArr);
+
+	for (i = 0 ; i < MVPP2_CLS_FLOWS_TBL_FIELDS_MAX; i++)
+		if (i < int32bit_1)
+			DBG_MSG("0x%2.2x ", fieldsArr[i]);
+		else
+			DBG_MSG(" NA  ");
+
+	/*port_type port_id*/
+	status |= mv_pp2x_cls_sw_flow_port_get(fe, &int32bit_1, &int32bit_2);
+	DBG_MSG("[%1d  0x%3.3x]  ", int32bit_1, int32bit_2);
+
+	/* engine_num last_bit*/
+	status |= mv_pp2x_cls_sw_flow_engine_get(fe, &int32bit_1, &int32bit_2);
+	DBG_MSG("%1d   %1d    ", int32bit_1, int32bit_2);
+
+	/* lookup_type priority*/
+	status |= mv_pp2x_cls_sw_flow_extra_get(fe, &int32bit_1, &int32bit_2);
+	DBG_MSG("0x%2.2x    0x%2.2x", int32bit_1, int32bit_2);
+
+	DBG_MSG("\n");
+	DBG_MSG("\n");
+	DBG_MSG("       PPPEO   VLAN   MACME   UDF7   SELECT SEQ_CTRL\n");
+	DBG_MSG("         %1d      %1d      %1d       %1d      %1d      %1d\n",
+		(fe->data[0] & MVPP2_FLOW_PPPOE_MASK) >> MVPP2_FLOW_PPPOE,
+		(fe->data[0] & MVPP2_FLOW_VLAN_MASK) >> MVPP2_FLOW_VLAN,
+		(fe->data[0] & MVPP2_FLOW_MACME_MASK) >> MVPP2_FLOW_MACME,
+		(fe->data[0] & MVPP2_FLOW_UDF7_MASK) >> MVPP2_FLOW_UDF7,
+		(fe->data[0] & MVPP2_FLOW_PORT_ID_SEL_MASK) >>
+		 MVPP2_FLOW_PORT_ID_SEL,
+		(fe->data[1] & MVPP2_FLOW_SEQ_CTRL_MASK) >>
+		 MVPP2_FLOW_SEQ_CTRL);
+	DBG_MSG("\n");
+
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_sw_flow_dump);
+
+/*----------------------------------------------------------------------*/
+
+/*----------------------------------------------------------------------*/
+/*	additional cls debug APIs					*/
+/*----------------------------------------------------------------------*/
+
+int mv_pp2x_cls_hw_regs_dump(struct mv_pp2x_hw *hw)
+{
+	int i = 0;
+	char reg_name[100];
+
+	mv_pp2x_print_reg(hw, MVPP2_CLS_MODE_REG,
+			  "MVPP2_CLS_MODE_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS_PORT_WAY_REG,
+			  "MVPP2_CLS_PORT_WAY_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS_LKP_INDEX_REG,
+			  "MVPP2_CLS_LKP_INDEX_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS_LKP_TBL_REG,
+			  "MVPP2_CLS_LKP_TBL_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS_FLOW_INDEX_REG,
+			  "MVPP2_CLS_FLOW_INDEX_REG");
+
+	mv_pp2x_print_reg(hw, MVPP2_CLS_FLOW_TBL0_REG,
+			  "MVPP2_CLS_FLOW_TBL0_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS_FLOW_TBL1_REG,
+			  "MVPP2_CLS_FLOW_TBL1_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS_FLOW_TBL2_REG,
+			  "MVPP2_CLS_FLOW_TBL2_REG");
+
+	mv_pp2x_print_reg(hw, MVPP2_CLS_PORT_SPID_REG,
+			  "MVPP2_CLS_PORT_SPID_REG");
+
+	for (i = 0; i < MVPP2_CLS_SPID_UNI_REGS; i++) {
+		sprintf(reg_name, "MVPP2_CLS_SPID_UNI_%d_REG", i);
+		mv_pp2x_print_reg(hw, (MVPP2_CLS_SPID_UNI_BASE_REG + (4 * i)),
+				  reg_name);
+	}
+	for (i = 0; i < MVPP2_CLS_GEM_VIRT_REGS_NUM; i++) {
+		/* indirect access */
+		mv_pp2x_write(hw, MVPP2_CLS_GEM_VIRT_INDEX_REG, i);
+		sprintf(reg_name, "MVPP2_CLS_GEM_VIRT_%d_REG", i);
+		mv_pp2x_print_reg(hw, MVPP2_CLS_GEM_VIRT_REG, reg_name);
+	}
+	for (i = 0; i < MVPP2_CLS_UDF_BASE_REGS; i++)	{
+		sprintf(reg_name, "MVPP2_CLS_UDF_REG_%d_REG", i);
+		mv_pp2x_print_reg(hw, MVPP2_CLS_UDF_REG(i), reg_name);
+	}
+	for (i = 0; i < 16; i++) {
+		sprintf(reg_name, "MVPP2_CLS_MTU_%d_REG", i);
+		mv_pp2x_print_reg(hw, MVPP2_CLS_MTU_REG(i), reg_name);
+	}
+	for (i = 0; i < MVPP2_MAX_PORTS; i++) {
+		sprintf(reg_name, "MVPP2_CLS_OVER_RXQ_LOW_%d_REG", i);
+		mv_pp2x_print_reg(hw, MVPP2_CLS_OVERSIZE_RXQ_LOW_REG(i),
+				  reg_name);
+	}
+	for (i = 0; i < MVPP2_MAX_PORTS; i++) {
+		sprintf(reg_name, "MVPP2_CLS_SWFWD_P2HQ_%d_REG", i);
+		mv_pp2x_print_reg(hw, MVPP2_CLS_SWFWD_P2HQ_REG(i), reg_name);
+	}
+
+	mv_pp2x_print_reg(hw, MVPP2_CLS_SWFWD_PCTRL_REG,
+			  "MVPP2_CLS_SWFWD_PCTRL_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS_SEQ_SIZE_REG,
+			  "MVPP2_CLS_SEQ_SIZE_REG");
+
+	for (i = 0; i < MVPP2_MAX_PORTS; i++) {
+		sprintf(reg_name, "MVPP2_CLS_PCTRL_%d_REG", i);
+		mv_pp2x_print_reg(hw, MV_PP2_CLS_PCTRL_REG(i), reg_name);
+	}
+
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_hw_regs_dump);
+
+/*----------------------------------------------------------------------*/
+
+int mv_pp2x_cls_hw_flow_dump(struct mv_pp2x_hw *hw)
+{
+	int index;
+	unsigned int cnt;
+
+	struct mv_pp2x_cls_flow_entry fe;
+
+	for (index = 0; index < MVPP2_CLS_FLOWS_TBL_SIZE ; index++) {
+		mv_pp2x_cls_hw_flow_read(hw, index, &fe);
+		mv_pp2x_cls_sw_flow_dump(&fe);
+		mv_pp2x_cls_hw_flow_hit_get(hw, index, &cnt);
+		DBG_MSG("HITS = %d\n", cnt);
+		DBG_MSG("-------------------------------------------------\n");
+	}
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_hw_flow_dump);
+
+/*----------------------------------------------------------------------*/
+/*PPv2.1 new counters MAS 3.20*/
+int mv_pp2x_cls_hw_flow_hits_dump(struct mv_pp2x_hw *hw)
+{
+	int index;
+	unsigned int cnt;
+	struct mv_pp2x_cls_flow_entry fe;
+
+	for (index = 0; index < MVPP2_CLS_FLOWS_TBL_SIZE ; index++) {
+		mv_pp2x_cls_hw_flow_hit_get(hw, index, &cnt);
+		if (cnt != 0) {
+			mv_pp2x_cls_hw_flow_read(hw, index, &fe);
+			mv_pp2x_cls_sw_flow_dump(&fe);
+			DBG_MSG("HITS = %d\n", cnt);
+			DBG_MSG("\n");
+		}
+	}
+
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_hw_flow_hits_dump);
+
+/*----------------------------------------------------------------------*/
+/*PPv2.1 new counters MAS 3.20*/
+int mv_pp2x_cls_hw_lkp_hits_dump(struct mv_pp2x_hw *hw)
+{
+	int index, way, entry_ind;
+	unsigned int cnt;
+
+	DBG_MSG("< ID  WAY >:	HITS\n");
+	for (index = 0; index < MVPP2_CLS_LKP_TBL_SIZE ; index++)
+		for (way = 0; way < 2 ; way++)	{
+			entry_ind = (way << MVPP2_CLS_LKP_INDEX_WAY_OFFS) |
+				index;
+			mv_pp2x_cls_hw_lkp_hit_get(hw, index, way,  &cnt);
+			if (cnt != 0)
+				DBG_MSG(" 0x%2.2x  %1.1d\t0x%8.8x\n",
+					index, way, cnt);
+	}
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_hw_lkp_hits_dump);
+
+/*----------------------------------------------------------------------*/
+int mv_pp2x_cls_sw_lkp_dump(struct mv_pp2x_cls_lookup_entry *lkp)
+{
+	int int32bit;
+	int status = 0;
+
+	if (mv_pp2x_ptr_validate(lkp) == MV_ERROR)
+		return MV_ERROR;
+
+	DBG_MSG("< ID  WAY >:	RXQ	EN	FLOW	MODE_BASE\n");
+
+	/* id */
+	DBG_MSG(" 0x%2.2x  %1.1d\t", lkp->lkpid, lkp->way);
+
+	/*rxq*/
+	status |= mv_pp2x_cls_sw_lkp_rxq_get(lkp, &int32bit);
+	DBG_MSG("0x%2.2x\t", int32bit);
+
+	/*enabe bit*/
+	status |= mv_pp2x_cls_sw_lkp_en_get(lkp, &int32bit);
+	DBG_MSG("%1.1d\t", int32bit);
+
+	/*flow*/
+	status |= mv_pp2x_cls_sw_lkp_flow_get(lkp, &int32bit);
+	DBG_MSG("0x%3.3x\t", int32bit);
+
+	/*mode*/
+	status |= mv_pp2x_cls_sw_lkp_mod_get(lkp, &int32bit);
+	DBG_MSG(" 0x%2.2x\t", int32bit);
+
+	DBG_MSG("\n");
+
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_sw_lkp_dump);
+
+int mv_pp2x_cls_hw_lkp_dump(struct mv_pp2x_hw *hw)
+{
+	int index, way, int32bit, ind;
+	unsigned int uint32bit;
+
+	struct mv_pp2x_cls_lookup_entry lkp;
+
+	DBG_MSG("< ID  WAY >:	RXQ	EN	FLOW	MODE_BASE  HITS\n");
+	for (index = 0; index < MVPP2_CLS_LKP_TBL_SIZE ; index++)
+		for (way = 0; way < 2 ; way++)	{
+			ind = (way << MVPP2_CLS_LKP_INDEX_WAY_OFFS) | index;
+			mv_pp2x_cls_hw_lkp_read(hw, index, way, &lkp);
+			DBG_MSG(" 0x%2.2x  %1.1d\t", lkp.lkpid, lkp.way);
+			mv_pp2x_cls_sw_lkp_rxq_get(&lkp, &int32bit);
+			DBG_MSG("0x%2.2x\t", int32bit);
+			mv_pp2x_cls_sw_lkp_en_get(&lkp, &int32bit);
+			DBG_MSG("%1.1d\t", int32bit);
+			mv_pp2x_cls_sw_lkp_flow_get(&lkp, &int32bit);
+			DBG_MSG("0x%3.3x\t", int32bit);
+			mv_pp2x_cls_sw_lkp_mod_get(&lkp, &int32bit);
+			DBG_MSG(" 0x%2.2x\t", int32bit);
+			mv_pp2x_cls_hw_lkp_hit_get(hw, index, way, &uint32bit);
+			DBG_MSG(" 0x%8.8x\n", uint32bit);
+			DBG_MSG("\n");
+		}
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_hw_lkp_dump);
+
+/*----------------------------------------------------------------------*/
+
+int mv_pp2x_cls_c2_sw_words_dump(struct mv_pp2x_cls_c2_entry *c2)
+{
+	int i;
+
+	if (mv_pp2x_ptr_validate(c2) == MV_ERROR)
+		return MV_ERROR;
+
+	/* TODO check size */
+	/* hw entry id */
+	DBG_MSG("[0x%3.3x] ", c2->index);
+
+	i = MVPP2_CLS_C2_TCAM_WORDS - 1;
+
+	while (i >= 0)
+		DBG_MSG("%4.4x ", (c2->tcam.words[i--]) & 0xFFFF);
+
+	DBG_MSG("| ");
+
+	DBG_MSG("%8.8x %8.8x %8.8x %8.8x %8.8x", c2->sram.words[4],
+		c2->sram.words[3], c2->sram.words[2], c2->sram.words[1],
+		c2->sram.words[0]);
+
+	/*tcam inValid bit*/
+	DBG_MSG(" %s", (c2->inv == 1) ? "[inv]" : "[valid]");
+
+	DBG_MSG("\n        ");
+
+	i = MVPP2_CLS_C2_TCAM_WORDS - 1;
+
+	while (i >= 0)
+		DBG_MSG("%4.4x ", ((c2->tcam.words[i--] >> 16)  & 0xFFFF));
+
+	DBG_MSG("\n");
+
+	return MV_OK;
+}
+
+/*----------------------------------------------------------------------*/
+int mv_pp2x_cls_c2_hit_cntr_dump(struct mv_pp2x_hw *hw)
+{
+	int i;
+	unsigned int cnt;
+
+	for (i = 0; i < MVPP2_CLS_C2_TCAM_SIZE; i++) {
+		mv_pp2x_cls_c2_hit_cntr_read(hw, i, &cnt);
+		if (cnt != 0)
+			DBG_MSG("INDEX: 0x%8.8X	VAL: 0x%8.8X\n", i, cnt);
+	}
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_c2_hit_cntr_dump);
+
+/*----------------------------------------------------------------------*/
+
+int mv_pp2x_cls_c2_regs_dump(struct mv_pp2x_hw *hw)
+{
+	int i;
+	char reg_name[100];
+
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_TCAM_IDX_REG,
+			  "MVPP2_CLS2_TCAM_IDX_REG");
+
+	for (i = 0; i < MVPP2_CLS_C2_TCAM_WORDS; i++) {
+		printk(reg_name, "MVPP2_CLS2_TCAM_DATA_%d_REG", i);
+		mv_pp2x_print_reg(hw, MVPP2_CLS2_TCAM_DATA_REG(i), reg_name);
+	}
+
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_TCAM_INV_REG,
+			  "MVPP2_CLS2_TCAM_INV_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_ACT_DATA_REG,
+			  "MVPP2_CLS2_ACT_DATA_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_DSCP_PRI_INDEX_REG,
+			  "MVPP2_CLS2_DSCP_PRI_INDEX_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_QOS_TBL_REG,
+			  "MVPP2_CLS2_QOS_TBL_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_ACT_REG,
+			  "MVPP2_CLS2_ACT_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_ACT_QOS_ATTR_REG,
+			  "MVPP2_CLS2_ACT_QOS_ATTR_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_ACT_HWF_ATTR_REG,
+			  "MVPP2_CLS2_ACT_HWF_ATTR_REG");
+	mv_pp2x_print_reg(hw, MVPP2_CLS2_ACT_DUP_ATTR_REG,
+			  "MVPP2_CLS2_ACT_DUP_ATTR_REG");
+	mv_pp2x_print_reg(hw, MVPP22_CLS2_ACT_SEQ_ATTR_REG,
+			  "MVPP22_CLS2_ACT_SEQ_ATTR_REG");
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp2x_cls_c2_regs_dump);
+
+int mv_pp22_rss_hw_dump(struct mv_pp2x_hw *hw)
+{
+	int tbl_id, tbl_line;
+
+	struct mv_pp22_rss_entry rss_entry;
+
+	memset(&rss_entry, 0, sizeof(struct mv_pp22_rss_entry));
+
+	rss_entry.sel = MVPP22_RSS_ACCESS_TBL;
+
+	for (tbl_id = 0; tbl_id < MVPP22_RSS_TBL_NUM; tbl_id++) {
+		DBG_MSG("\n-------- RSS TABLE %d-----------\n", tbl_id);
+		DBG_MSG("HASH	QUEUE	WIDTH\n");
+
+		for (tbl_line = 0; tbl_line < MVPP22_RSS_TBL_LINE_NUM;
+			tbl_line++) {
+			rss_entry.u.entry.tbl_id = tbl_id;
+			rss_entry.u.entry.tbl_line = tbl_line;
+			mv_pp22_rss_tbl_entry_get(hw, &rss_entry);
+			DBG_MSG("0x%2.2x\t", rss_entry.u.entry.tbl_line);
+			DBG_MSG("0x%2.2x\t", rss_entry.u.entry.rxq);
+			DBG_MSG("0x%2.2x", rss_entry.u.entry.width);
+			DBG_MSG("\n");
+		}
+	}
+	return MV_OK;
+}
+EXPORT_SYMBOL(mv_pp22_rss_hw_dump);
+
+
+
