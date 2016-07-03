@@ -208,3 +208,7 @@ config MVEBU_PIC
 config MVEBU_ADVK_IRQ
 	bool
 	select GENERIC_IRQ_CHIP
+
+config MVEBU_SEI_IRQ
+        bool
+	default y
