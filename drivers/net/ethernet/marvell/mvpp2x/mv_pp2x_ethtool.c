@@ -42,8 +42,10 @@
 #include "mv_pp2x_hw.h"
 #include "mv_gop110_hw.h"
 
-#define MV_PP2X_STATS_LEN	ARRAY_SIZE(mv_pp2x_gstrings_stats)
-#define MV_PP2X_TEST_LEN	ARRAY_SIZE(mv_pp2x_gstrings_test)
+#define MV_PP2_STATS_LEN	ARRAY_SIZE(mv_pp2x_gstrings_stats)
+#define MV_PP2_TEST_LEN	ARRAY_SIZE(mv_pp2x_gstrings_test)
+#define MV_PP2_REGS_GMAC_LEN  54
+#define MV_PP2_REGS_XLG_LEN  25
 
 static const char mv_pp2x_gstrings_test[][ETH_GSTRING_LEN] = {
 	"Link test        (on/offline)",
@@ -175,9 +177,9 @@ static int mv_pp2x_eth_tool_get_sset_count(struct net_device *dev, int sset)
 
 	switch (sset) {
 	case ETH_SS_TEST:
-		return MV_PP2X_TEST_LEN;
+		return MV_PP2_TEST_LEN;
 	case ETH_SS_STATS:
-		return MV_PP2X_STATS_LEN;
+		return MV_PP2_STATS_LEN;
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -531,6 +533,60 @@ static int mv_pp2x_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 	return 0;
 }
 
+static int mv_pp2x_ethtool_get_regs_len(struct net_device *dev)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct mv_mac_data *mac = &port->mac_data;
+
+	switch (mac->phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+		return MV_PP2_REGS_GMAC_LEN * sizeof(u32);
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+	case PHY_INTERFACE_MODE_KR:
+		return MV_PP2_REGS_XLG_LEN * sizeof(u32);
+	default:
+		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
+		return -1;
+	}
+}
+
+/*ethtool get registers function */
+static void mv_pp2x_ethtool_get_regs(struct net_device *dev,
+				     struct ethtool_regs *regs, void *p)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct mv_mac_data *mac = &port->mac_data;
+
+	if (!port) {
+		netdev_err(dev, "%s is not supported on %s\n",
+			   __func__, dev->name);
+		return;
+	}
+
+	regs->version = port->priv->pp2_version;
+
+	switch (mac->phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+		memset(p, 0, MV_PP2_REGS_GMAC_LEN * sizeof(u32));
+		mv_gop110_gmac_registers_dump(port, p);
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+	case PHY_INTERFACE_MODE_KR:
+		memset(p, 0, MV_PP2_REGS_XLG_LEN * sizeof(u32));
+		mv_gop110_xlg_registers_dump(port, p);
+	break;
+	default:
+		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
+		return;
+	}
+}
+
 static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_link		= ethtool_op_get_link,
 	.get_settings		= mv_pp2x_ethtool_get_settings,
@@ -548,6 +604,8 @@ static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_rxnfc		= mv_pp2x_ethtool_get_rxnfc,
 	.get_rxfh		= mv_pp2x_ethtool_get_rxfh,
 	.set_rxfh		= mv_pp2x_ethtool_set_rxfh,
+	.get_regs_len           = mv_pp2x_ethtool_get_regs_len,
+	.get_regs		= mv_pp2x_ethtool_get_regs,
 };
 
 void mv_pp2x_set_ethtool_ops(struct net_device *netdev)

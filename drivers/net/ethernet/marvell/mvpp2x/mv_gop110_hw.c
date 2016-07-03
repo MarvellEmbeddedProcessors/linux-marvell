@@ -2783,4 +2783,210 @@ int mv_gop110_netc_init(struct gop_hw *gop,
 	return 0;
 }
 
+/* Register dump for ethtool */
+void mv_gop110_gmac_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff)
+{
+	int i;
+	int index = 0;
 
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_CTRL0_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_CTRL1_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_CTRL2_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_AUTO_NEG_CFG_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_STATUS0_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_SERIAL_PARAM_CFG_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_FIFO_CFG_0_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_FIFO_CFG_1_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_INTERRUPT_CAUSE_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_INTERRUPT_MASK_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_SERDES_CFG0_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_SERDES_CFG1_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_SERDES_CFG2_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_SERDES_CFG3_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_PRBS_STATUS_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_PRBS_ERR_CNTR_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_STATUS1_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_MIB_CNTRS_CTRL_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_PORT_CTRL3_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_QSGMII_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_QSGMII_STATUS_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					    port->mac_data.gop_index,
+					    MV_GMAC_QSGMII_PRBS_CNTR_REG);
+	for (i = 0; i < 8; i++) {
+		regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					port->mac_data.gop_index,
+					MV_GMAC_CCFC_PORT_SPEED_TIMER_REG(i));
+	}
+	for (i = 0; i < 4; i++) {
+		regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+						port->mac_data.gop_index,
+						MV_GMAC_FC_DSA_TAG_REG(i));
+	}
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+				port->mac_data.gop_index,
+				MV_GMAC_LINK_LEVEL_FLOW_CTRL_WINDOW_REG_0);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+				port->mac_data.gop_index,
+				MV_GMAC_LINK_LEVEL_FLOW_CTRL_WINDOW_REG_1);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_PORT_CTRL4_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+				port->mac_data.gop_index,
+				MV_GMAC_PORT_SERIAL_PARAM_1_CFG_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_INTERRUPT_SUM_CAUSE_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_INTERRUPT_SUM_MASK_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_LPI_CTRL_0_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_LPI_CTRL_1_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_LPI_CTRL_2_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_LPI_STATUS_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_LPI_CNTR_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_PULSE_1_MS_LOW_REG);
+	regs_buff[index++] = mv_gop110_gmac_read(&port->priv->hw.gop,
+					     port->mac_data.gop_index,
+					     MV_GMAC_PULSE_1_MS_HIGH_REG);
+}
+
+void mv_gop110_xlg_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff)
+{
+	int gop_port = port->mac_data.gop_index;
+	int index = 0;
+
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_MAC_CTRL0_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_MAC_CTRL1_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_MAC_CTRL2_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_MAC_CTRL2_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_PORT_STATUS_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_FIFOS_THRS_CFG_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_INTERRUPT_CAUSE_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_INTERRUPT_MASK_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_MAC_CTRL3_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_PER_PRIO_FLOW_CTRL_STATUS_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_DEBUG_BUS_STATUS_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_METAL_FIX_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MIB_CNTRS_CTRL_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_CNCCFC_TIMERI_REG(gop_port));
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_EXTERNAL_INTERRUPT_CAUSE_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_EXTERNAL_INTERRUPT_MASK_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_FC_DSA_TAG_0_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_FC_DSA_TAG_1_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_FC_DSA_TAG_2_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_FC_DSA_TAG_3_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_DIC_BUDGET_COMPENSATION_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_MAC_CTRL4_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_PORT_MAC_CTRL5_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_EXT_CTRL_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_MACRO_CTRL_REG);
+	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
+						    port->mac_data.gop_index,
+						    MV_XLG_MAC_DIC_PPM_IPG_REDUCE_REG);
+}
