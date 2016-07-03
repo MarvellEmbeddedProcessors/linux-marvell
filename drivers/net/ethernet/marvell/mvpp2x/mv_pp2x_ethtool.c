@@ -285,13 +285,19 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 				SUPPORTED_100baseT_Full |
 				SUPPORTED_Autoneg | SUPPORTED_TP |
 				SUPPORTED_MII |	SUPPORTED_1000baseT_Full);
+			cmd->advertising = (ADVERTISED_10baseT_Half |
+				ADVERTISED_10baseT_Full |
+				ADVERTISED_100baseT_Half |
+				ADVERTISED_100baseT_Full |
+				ADVERTISED_1000baseT_Full |
+				ADVERTISED_Autoneg | ADVERTISED_TP |
+				ADVERTISED_MII);
 			cmd->transceiver = XCVR_INTERNAL;
 			cmd->port = PORT_MII;
 
 			/* check if speed and duplex are AN */
 			if (mv_gop110_port_autoneg_status(&port->priv->hw.gop,
 					   &port->mac_data)) {
-				cmd->lp_advertising = cmd->advertising = 0;
 				cmd->autoneg = AUTONEG_ENABLE;
 			} else {
 				cmd->autoneg = AUTONEG_DISABLE;
