@@ -97,7 +97,7 @@ int mv_pp2x_autoneg_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
 			err = mv_pp2x_check_speed_duplex_valid(cmd, pstatus);
 			if (err)
 				return -EINVAL;
-			}
+		}
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
@@ -115,6 +115,44 @@ int mv_pp2x_autoneg_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
 }
 
 /* Ethtool methods */
+
+/* Restart autonegotiation function */
+int mv_pp2x_eth_tool_nway_reset(struct net_device *dev)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct gop_hw *gop = &port->priv->hw.gop;
+	struct mv_mac_data *mac = &port->mac_data;
+	int err;
+
+	if (!(mac->flags & MV_EMAC_F_INIT)) {
+		pr_err("%s: interface %s is not initialized\n", __func__, dev->name);
+		return -EOPNOTSUPP;
+	}
+
+	switch (mac->phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+		err = mv_gop110_check_port_type(gop, mac->gop_index);
+		if (err) {
+			pr_err("GOP %d set to 1000Base-X\n", mac->gop_index);
+			return -EINVAL;
+		}
+		mv_gop110_autoneg_restart(gop, mac);
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+	case PHY_INTERFACE_MODE_KR:
+		pr_err("XLG GOP %d doesn't support autonegotiation\n", mac->gop_index);
+		return -ENODEV;
+	break;
+	default:
+		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
+		return -1;
+	}
+
+	return 0;
+}
 
 /* Get settings (phy address, speed) for ethtools */
 static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
@@ -431,6 +469,7 @@ static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.set_settings		= mv_pp2x_ethtool_set_settings,
 	.set_coalesce		= mv_pp2x_ethtool_set_coalesce,
 	.get_coalesce		= mv_pp2x_ethtool_get_coalesce,
+	.nway_reset		= mv_pp2x_eth_tool_nway_reset,
 	.get_drvinfo		= mv_pp2x_ethtool_get_drvinfo,
 	.get_ringparam		= mv_pp2x_ethtool_get_ringparam,
 	.set_ringparam		= mv_pp2x_ethtool_set_ringparam,
