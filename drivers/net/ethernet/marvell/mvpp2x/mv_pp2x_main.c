@@ -56,6 +56,15 @@
 #include <if_mv_pp2x_netmap.h>
 #endif
 
+#ifdef CONFIG_MV_PTP_SERVICE
+/* inline PTP procedures */
+#include <mv_pp2x_ptp_hook.c>
+/* non-inline init/config */
+#include <mv_ptp_if.h>
+#include <mv_ptp_service.h>
+#include <mv_pp2x_ptp_init.h>
+#endif
+
 #define MVPP2_SKB_TEST_SIZE 64
 #define MVPP2_ADDRESS 0xf2000000
 #define CPN110_ADDRESS_SPACE_SIZE (16*1024*1024)
@@ -2215,6 +2224,10 @@ err_drop_frame:
 		rcvd_pkts++;
 		rcvd_bytes += rx_bytes;
 		skb_reserve(skb, MVPP2_MH_SIZE+NET_SKB_PAD);
+#ifdef CONFIG_MV_PTP_SERVICE
+		/* If packet is PTP fetch timestamp info and built into packet data */
+		mv_pp2_is_pkt_ptp_rx_proc(port, rx_desc, rx_bytes, skb->data, rcvd_pkts);
+#endif
 		skb_put(skb, rx_bytes);
 		skb->protocol = eth_type_trans(skb, dev);
 		mv_pp2x_rx_csum(port, rx_status, skb);
@@ -2441,6 +2454,11 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	txq_pcpu->reserved_num -= frags;
 	aggr_txq->count += frags;
 	aggr_txq->xmit_bulk += frags;
+
+#ifdef CONFIG_MV_PTP_SERVICE
+	/* If packet is PTP add Time-Stamp request into the tx_desc */
+	mv_pp2_is_pkt_ptp_tx_proc(port, tx_desc, skb);
+#endif
 
 	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
 
@@ -4533,6 +4551,11 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	/* Init PP22 rxfhindir table evenly in probe */
 	mv_pp2x_init_rxfhindir(priv);
+
+#ifdef CONFIG_MV_PTP_SERVICE
+	mv_pp2x_ptp_init(pdev, priv, port_count);
+	mv_pp2x_ptp_hook_init(priv, port_count);
+#endif
 
 	/* Initialize ports */
 	for_each_available_child_of_node(dn, port_node) {

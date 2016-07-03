@@ -2455,32 +2455,6 @@ void mv_gop110_mib_counters_show(struct gop_hw *gop, int port)
 }
 EXPORT_SYMBOL(mv_gop110_mib_counters_show);
 
-void mv_gop110_ptp_enable(struct gop_hw *gop, int port, bool state)
-{
-	u32 reg_data;
-
-	if (state) {
-		/* PTP enable */
-		reg_data = mv_gop110_ptp_read(gop, port,
-					      MV_PTP_GENERAL_CTRL_REG);
-		reg_data |= MV_PTP_GENERAL_CTRL_PTP_UNIT_ENABLE_MASK;
-		/* enable PTP */
-		mv_gop110_ptp_write(gop, port, MV_PTP_GENERAL_CTRL_REG,
-				    reg_data);
-		/* unreset unit */
-		reg_data |= MV_PTP_GENERAL_CTRL_PTP_RESET_MASK;
-		mv_gop110_ptp_write(gop, port, MV_PTP_GENERAL_CTRL_REG,
-				    reg_data);
-	} else {
-		reg_data = mv_gop110_ptp_read(gop, port,
-					      MV_PTP_GENERAL_CTRL_REG);
-		reg_data &= ~MV_PTP_GENERAL_CTRL_PTP_UNIT_ENABLE_MASK;
-		/* disable PTP */
-		mv_gop110_ptp_write(gop, port, MV_PTP_GENERAL_CTRL_REG,
-				    reg_data);
-	}
-}
-
 void mv_gop110_netc_active_port(struct gop_hw *gop, u32 port, u32 val)
 {
 	u32 reg;
