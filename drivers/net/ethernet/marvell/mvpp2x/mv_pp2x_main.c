@@ -767,13 +767,8 @@ static void mv_pp2x_defaults_set(struct mv_pp2x_port *port)
 	for (lrxq = 0; lrxq < port->num_rx_queues; lrxq++) {
 		queue = port->rxqs[lrxq]->id;
 		val = mv_pp2x_read(hw, MVPP2_RXQ_CONFIG_REG(queue));
-		if (is_device_dma_coherent(port->dev->dev.parent)) {
-			val |= MVPP2_SNOOP_PKT_SIZE_MASK;
-			val |= MVPP2_SNOOP_BUF_HDR_MASK;
-		} else {
-			val &= ~MVPP2_SNOOP_PKT_SIZE_MASK;
-			val &= ~MVPP2_SNOOP_BUF_HDR_MASK;
-		}
+		val |= MVPP2_SNOOP_PKT_SIZE_MASK;
+		val |= MVPP2_SNOOP_BUF_HDR_MASK;
 		mv_pp2x_write(hw, MVPP2_RXQ_CONFIG_REG(queue), val);
 	}
 
@@ -4006,53 +4001,27 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 
 	/*AXI Bridge Configuration */
 
-	if (is_device_dma_coherent(&pdev->dev)) {
+	/* BM */
+	mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
+		      MVPP22_AXI_ATTR_HW_COH_WRITE);
+	mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
+		      MVPP22_AXI_ATTR_HW_COH_READ);
 
-		/* BM */
-		mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_HW_COH_WRITE);
-		mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_HW_COH_READ);
+	/* Descriptors */
+	mv_pp2x_write(hw, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG,
+		      MVPP22_AXI_ATTR_HW_COH_READ);
+	mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_WR_ATTR_REG,
+		      MVPP22_AXI_ATTR_HW_COH_WRITE);
+	mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_RD_ATTR_REG,
+		      MVPP22_AXI_ATTR_HW_COH_READ);
+	mv_pp2x_write(hw, MVPP22_AXI_RXQ_DESCR_WR_ATTR_REG,
+		      MVPP22_AXI_ATTR_HW_COH_WRITE);
 
-		/* Descriptors */
-		mv_pp2x_write(hw, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_HW_COH_READ);
-		mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_HW_COH_WRITE);
-		mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_HW_COH_READ);
-		mv_pp2x_write(hw, MVPP22_AXI_RXQ_DESCR_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_HW_COH_WRITE);
-
-		/* Buffer Data */
-		mv_pp2x_write(hw, MVPP22_AXI_TX_DATA_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_HW_COH_READ);
-		mv_pp2x_write(hw, MVPP22_AXI_RX_DATA_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_HW_COH_WRITE);
-	} else {
-
-		/* BM */
-		mv_pp2x_write(hw, MVPP22_AXI_BM_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_NON_CACHE);
-		mv_pp2x_write(hw, MVPP22_AXI_BM_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_NON_CACHE);
-
-		/* Descriptors */
-		mv_pp2x_write(hw, MVPP22_AXI_AGGRQ_DESCR_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_NON_CACHE);
-		mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_NON_CACHE);
-		mv_pp2x_write(hw, MVPP22_AXI_TXQ_DESCR_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_NON_CACHE);
-		mv_pp2x_write(hw, MVPP22_AXI_RXQ_DESCR_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_NON_CACHE);
-
-		/* Buffer Data */
-		mv_pp2x_write(hw, MVPP22_AXI_RX_DATA_WR_ATTR_REG,
-			MVPP22_AXI_ATTR_SW_COH_WRITE);
-		mv_pp2x_write(hw, MVPP22_AXI_TX_DATA_RD_ATTR_REG,
-			MVPP22_AXI_ATTR_SW_COH_READ);
-	}
+	/* Buffer Data */
+	mv_pp2x_write(hw, MVPP22_AXI_TX_DATA_RD_ATTR_REG,
+		      MVPP22_AXI_ATTR_HW_COH_READ);
+	mv_pp2x_write(hw, MVPP22_AXI_RX_DATA_WR_ATTR_REG,
+		      MVPP22_AXI_ATTR_HW_COH_WRITE);
 
 	val = MVPP22_AXI_CODE_CACHE_NON_CACHE << MVPP22_AXI_CODE_CACHE_OFFS;
 	val |= MVPP22_AXI_CODE_DOMAIN_SYSTEM << MVPP22_AXI_CODE_DOMAIN_OFFS;
@@ -4102,10 +4071,7 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	/* Rx Fifo Init is done only in uboot */
 
 	/* Set cache snoop when transmiting packets */
-	if (is_device_dma_coherent(&pdev->dev))
-		mv_pp2x_write(hw, MVPP2_TX_SNOOP_REG, 0x1);
-	else
-		mv_pp2x_write(hw, MVPP2_TX_SNOOP_REG, 0x0);
+	mv_pp2x_write(hw, MVPP2_TX_SNOOP_REG, 0x1);
 
 	/* Buffer Manager initialization */
 	err = mv_pp2x_bm_init(pdev, priv);
