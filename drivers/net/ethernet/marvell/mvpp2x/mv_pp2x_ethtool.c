@@ -43,14 +43,18 @@
 #include "mv_gop110_hw.h"
 
 #define MV_PP2_STATS_LEN	ARRAY_SIZE(mv_pp2x_gstrings_stats)
-#define MV_PP2_TEST_LEN	ARRAY_SIZE(mv_pp2x_gstrings_test)
-#define MV_PP2_REGS_GMAC_LEN  54
-#define MV_PP2_REGS_XLG_LEN  25
+#define MV_PP2_TEST_LEN		ARRAY_SIZE(mv_pp2x_gstrings_test)
+#define MV_PP2_REGS_GMAC_LEN	54
+#define MV_PP2_REGS_XLG_LEN	25
+#define MV_PP2_TEST_MASK1	0xFFFF
+#define MV_PP2_TEST_MASK2	0x00FE
+#define MV_PP2_TEST_MASK3	0x0
+#define MV_PP2_TEST_PATTERN1	0xFFFF
+#define MV_PP2_TEST_PATTERN2	0x00FE
+#define MV_PP2_TEST_PATTERN3	0x0
 
 static const char mv_pp2x_gstrings_test[][ETH_GSTRING_LEN] = {
 	"Link test        (on/offline)",
-	"Mac loopback	  (on/offline)",
-	"Phy loopback	  (on/offline)",
 	"register test    (on/offline)",
 };
 
@@ -124,7 +128,7 @@ int mv_pp2x_autoneg_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
 
 	break;
 	default:
-		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
+		pr_err("%s: Wrong port mode (%d)\n", __func__, mac->phy_mode);
 		return -1;
 	}
 	return 0;
@@ -217,7 +221,7 @@ int mv_pp2x_eth_tool_nway_reset(struct net_device *dev)
 		return -ENODEV;
 	break;
 	default:
-		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
+		pr_err("%s: Wrong port mode (%d)\n", __func__, mac->phy_mode);
 		return -1;
 	}
 
@@ -593,6 +597,149 @@ static void mv_pp2x_ethtool_get_regs(struct net_device *dev,
 	}
 }
 
+static u64 mv_pp2x_eth_tool_link_test(struct mv_pp2x_port *port)
+{
+	struct mv_port_link_status	status;
+
+	pr_info("Link testing starting\n");
+
+	mv_gop110_port_link_status(&port->priv->hw.gop,
+					&port->mac_data, &status);
+
+	if (status.linkup)
+		return 0;
+	return 1;
+}
+
+static bool mv_pp2x_reg_pattern_test(void *reg, u32 offset, u32 mask, u32 write)
+{
+	static const u32 test[] = {0x5A5A5A5A, 0xA5A5A5A5, 0x00000000, 0xFFFFFFFF};
+	u32 read, old;
+	int i;
+
+	if (!mask)
+		return false;
+	old = mv_gop_gen_read(reg, offset);
+
+	for (i = 0; i < ARRAY_SIZE(test); i++) {
+		mv_gop_gen_write(reg, offset, write & test[i]);
+		read = mv_gop_gen_read(reg, offset);
+		if (read != (write & test[i] & mask)) {
+			pr_err("pattern test reg %p(test 0x%08X write 0x%08X mask 0x%08X) failed: ",
+			      reg, test[i], write, mask);
+			pr_err("got 0x%08X expected 0x%08X\n", read, (write & test[i] & mask));
+			mv_gop_gen_write(reg, offset, old);
+			return true;
+		}
+	}
+
+	mv_gop_gen_write(reg, offset, old);
+
+	return false;
+}
+
+static u64 mv_pp2x_eth_tool_reg_test(struct mv_pp2x_port *port)
+{
+	int ind;
+	int err = 0;
+	struct mv_mac_data *mac = &port->mac_data;
+	int gop_port = mac->gop_index;
+	struct gop_hw *gop = &port->priv->hw.gop;
+	void *reg = gop->gop_110.gmac.base + gop_port * gop->gop_110.gmac.obj_size;
+
+	pr_info("Register testing starting\n");
+
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_CTRL0_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_CTRL1_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_CTRL2_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_AUTO_NEG_CFG_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_STATUS0_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_SERIAL_PARAM_CFG_REG, MV_PP2_TEST_MASK1,
+					MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_FIFO_CFG_0_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_FIFO_CFG_1_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_SERDES_CFG0_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_SERDES_CFG1_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_SERDES_CFG2_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_SERDES_CFG3_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_PRBS_STATUS_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_PRBS_ERR_CNTR_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_STATUS1_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_MIB_CNTRS_CTRL_REG, MV_PP2_TEST_MASK2, MV_PP2_TEST_PATTERN2);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_CTRL3_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_QSGMII_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_QSGMII_STATUS_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_QSGMII_PRBS_CNTR_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	for (ind = 0; ind < 8; ind++)
+		err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_CCFC_PORT_SPEED_TIMER_REG(ind), MV_PP2_TEST_MASK1,
+						MV_PP2_TEST_PATTERN1);
+
+	for (ind = 0; ind < 4; ind++)
+		err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_FC_DSA_TAG_REG(ind), MV_PP2_TEST_MASK1,
+						MV_PP2_TEST_PATTERN1);
+
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_LINK_LEVEL_FLOW_CTRL_WINDOW_REG_0, MV_PP2_TEST_MASK1,
+					MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_LINK_LEVEL_FLOW_CTRL_WINDOW_REG_1, MV_PP2_TEST_MASK1,
+					MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_CTRL4_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PORT_SERIAL_PARAM_1_CFG_REG, MV_PP2_TEST_MASK1,
+					MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_LPI_CTRL_0_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_LPI_CTRL_1_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_LPI_CTRL_2_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_LPI_STATUS_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_LPI_CNTR_REG, MV_PP2_TEST_MASK3, MV_PP2_TEST_PATTERN3);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PULSE_1_MS_LOW_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_PULSE_1_MS_HIGH_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_INTERRUPT_MASK_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+	err += mv_pp2x_reg_pattern_test(reg, MV_GMAC_INTERRUPT_SUM_MASK_REG, MV_PP2_TEST_MASK1, MV_PP2_TEST_PATTERN1);
+
+	if (err)
+		return 1;
+	return 0;
+}
+
+static void mv_pp2x_eth_tool_diag_test(struct net_device *netdev,
+	struct ethtool_test *test, u64 *data)
+{
+	struct mv_pp2x_port *port = netdev_priv(netdev);
+	int i;
+	struct mv_mac_data *mac = &port->mac_data;
+
+	if (!(mac->flags & MV_EMAC_F_INIT)) {
+		pr_err("%s: interface %s is not initialized\n", __func__, netdev->name);
+		for (i = 0; i < MV_PP2_TEST_LEN; i++)
+			data[i] = -ENONET;
+		test->flags |= ETH_TEST_FL_FAILED;
+		return;
+	}
+
+	memset(data, 0, MV_PP2_TEST_LEN * sizeof(u64));
+
+	switch (mac->phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+	case PHY_INTERFACE_MODE_KR:
+		pr_err("10G Phy mode (%d) do not support test\n", mac->phy_mode);
+		return;
+	default:
+		pr_err("%s: Wrong port mode (%d\n)", __func__, mac->phy_mode);
+		return;
+	}
+
+	data[0] = mv_pp2x_eth_tool_link_test(port);
+	data[1] = mv_pp2x_eth_tool_reg_test(port);
+	for (i = 0; i < MV_PP2_TEST_LEN; i++)
+		test->flags |= data[i] ? ETH_TEST_FL_FAILED : 0;
+
+	msleep_interruptible(4 * 1000);
+}
+
 static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_link		= ethtool_op_get_link,
 	.get_settings		= mv_pp2x_ethtool_get_settings,
@@ -612,6 +759,7 @@ static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.set_rxfh		= mv_pp2x_ethtool_set_rxfh,
 	.get_regs_len           = mv_pp2x_ethtool_get_regs_len,
 	.get_regs		= mv_pp2x_ethtool_get_regs,
+	.self_test		= mv_pp2x_eth_tool_diag_test,
 };
 
 void mv_pp2x_set_ethtool_ops(struct net_device *netdev)
