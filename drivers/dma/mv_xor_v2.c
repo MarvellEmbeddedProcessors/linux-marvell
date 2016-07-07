@@ -621,19 +621,15 @@ static void mv_xor_v2_tasklet(unsigned long data)
 	/* get thepending descriptors parameters */
 	num_of_pending = mv_xor_v2_get_pending_params(xor_dev, &pending_ptr);
 
-	/* next HW descriptor */
-	next_pending_hw_desc = (struct mv_xor_v2_descriptor *)
-		((void *)xor_dev->hw_desq_virt +
-		 (xor_dev->desc_size * (pending_ptr)));
-
 	/* loop over free descriptors */
 	for (i = 0; i < num_of_pending; i++) {
 
-		if (pending_ptr > MV_XOR_V2_MAX_DESC_NUM)
+		if (pending_ptr >= MV_XOR_V2_MAX_DESC_NUM)
 			pending_ptr = 0;
 
-		if (next_pending_sw_desc != NULL)
-			next_pending_hw_desc++;
+		next_pending_hw_desc = (struct mv_xor_v2_descriptor *)
+			((void *)xor_dev->hw_desq_virt +
+			 (xor_dev->desc_size * (pending_ptr)));
 
 		/* get the SW descriptor related to the HW descriptor */
 		next_pending_sw_desc =
