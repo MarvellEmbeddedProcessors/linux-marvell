@@ -60,6 +60,7 @@ DECLARE_RD_WR_FUNC(sctlr_el1);
 DECLARE_RD_WR_FUNC(s3_1_c15_c0_0);
 DECLARE_RD_WR_FUNC(s3_1_c11_c0_2);
 DECLARE_RD_WR_FUNC(s3_1_c11_c0_3);
+DECLARE_RD_WR_FUNC(s3_1_c15_c2_1);
 
 
 #define SYSREG_ENTRY(code, _desc)		\
@@ -77,6 +78,7 @@ static struct sysreg_entry sysregs_list[] = {
 	SYSREG_ENTRY(s3_1_c15_c0_0, "L2 Aux Ctrl"),
 	SYSREG_ENTRY(s3_1_c11_c0_2, "L2 Ctrl"),
 	SYSREG_ENTRY(s3_1_c11_c0_3, "L2 Ext Ctrl"),
+	SYSREG_ENTRY(s3_1_c15_c2_1, "CPU Ext Ctrl"),
 };
 
 
