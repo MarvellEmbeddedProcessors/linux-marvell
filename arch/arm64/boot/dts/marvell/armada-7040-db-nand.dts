@@ -93,6 +93,12 @@
 			usb3h1: usb3@510000 {
 				status = "okay";
 			};
+			u3d@520000 {
+				status = "disabled";
+			};
+			udc@524100 {
+				status = "disabled";
+			};
 			nand@720000 {
 				status = "okay";
 			};
