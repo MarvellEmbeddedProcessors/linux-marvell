@@ -3902,6 +3902,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 #ifdef DEV_NETMAP
 	mv_pp2x_netmap_attach(port);
 #endif /* DEV_NETMAP */
+#ifdef CONFIG_MV_PTP_SERVICE
+	mv_pp2x_ptp_init(pdev, port, id);
+#endif
 
 	return 0;
 	dev_err(&pdev->dev, "%s failed for port_id(%d)\n", __func__, id);
@@ -4549,11 +4552,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	/* Init PP22 rxfhindir table evenly in probe */
 	mv_pp2x_init_rxfhindir(priv);
-
-#ifdef CONFIG_MV_PTP_SERVICE
-	mv_pp2x_ptp_init(pdev, priv, port_count);
-	mv_pp2x_ptp_hook_init(priv, port_count);
-#endif
 
 	/* Initialize ports */
 	for_each_available_child_of_node(dn, port_node) {
