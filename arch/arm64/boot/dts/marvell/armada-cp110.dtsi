@@ -310,7 +310,7 @@ gop {
 
 ppv22@000000 {
 	compatible = "marvell,mv-pp22";
-	reg = <0x000000 0x80000>, /* Packet Processor regs */
+	reg = <0x000000 0x90000>, /* Packet Processor regs */
 	      <0x120000 0x9000>, /* SERDES regs */
 	      <0x129000 0x0600>, /* XMIB regs */
 	      <0x12a000 0x200>,  /* LED regs */
