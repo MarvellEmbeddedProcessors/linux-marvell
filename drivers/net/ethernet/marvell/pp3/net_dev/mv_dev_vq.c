@@ -822,12 +822,30 @@ static inline int mv_pp3_free_array_ind_get(struct pp3_cpu_port *cpu)
 {
 	int i;
 
-	/* find free queues list for changes */
+	/* find free queues list for changes:
+	 * napi_proc_qs[3][MV_PP3_VQ_NUM] keeps napi/vq mapping
+	 * napi_proc_qs[array_ind=i] is updated upon suspend, resume
+	 *  and then "i" switched to be current-active.
+	 * Before napi suspend/resume delete/add operation
+	 * the napi_proc_qs[i][..vq..] must be sync to the
+	 * latest valid (current) napi_next_array.
+	 * Refer mv_pp3_napi_array_sync()
+	 */
 	for (i = 0; i < 3; i++)
 		if ((i != cpu->napi_master_array) && (i != cpu->napi_next_array))
 			return i;
-
 	return -1;
+}
+
+static inline void mv_pp3_napi_array_sync(struct pp3_cpu_port *cpu,
+						int old, int new, int num)
+{
+	int i;
+
+	if (old == new)
+		return;
+	for (i = 0; i < num; i++)
+		cpu->napi_proc_qs[new][i] = cpu->napi_proc_qs[old][i];
 }
 
 void mv_pp3_dev_napi_queue_update(struct net_device *dev)
@@ -858,7 +876,6 @@ void mv_pp3_dev_napi_queue_update(struct net_device *dev)
 		for (i = 0; i < cpu_vp->rx_vqs_num; i++)
 			if (cpu_vp->rx_vqs[i]->valid)
 				cpu_vp->port.cpu.napi_proc_qs[array_ind][i] = cpu_vp->rx_vqs[i]->vq;
-
 		mv_pp3_vq_prio_sort(cpu_vp->rx_vqs, cpu_vp->port.cpu.napi_proc_qs[array_ind], cpu_vp->rx_vqs_num);
 		cpu_vp->port.cpu.napi_next_array = array_ind;
 	}
@@ -876,6 +893,7 @@ static void mv_pp3_dev_vq_napi_disable(struct pp3_vport *cpu_vp, int vq)
 	array_ind = mv_pp3_free_array_ind_get(cpu);
 	if (array_ind < 0)
 		return;
+	mv_pp3_napi_array_sync(cpu, cpu->napi_next_array, array_ind, cpu->napi_q_num);
 
 	/* to disable, remove queue from the list of napi queues */
 	for (i = 0; i < cpu->napi_q_num; i++) {
@@ -902,6 +920,7 @@ static void mv_pp3_dev_vq_napi_enable(struct pp3_vport *cpu_vp, int vq)
 	array_ind = mv_pp3_free_array_ind_get(cpu);
 	if (array_ind < 0)
 		return;
+	mv_pp3_napi_array_sync(cpu, cpu->napi_next_array, array_ind, cpu->napi_q_num);
 
 	/* to enable, add queue to the list of napi queues according to its priority */
 	cpu->napi_proc_qs[array_ind][cpu->napi_q_num] = vq;
