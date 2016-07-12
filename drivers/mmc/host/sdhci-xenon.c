@@ -309,25 +309,20 @@ static void sdhci_xenon_phy_reset(struct sdhci_host *host, unsigned int timing)
 		sdhci_writel(host, reg, EMMC_PHY_TIMING_ADJUST);
 	}
 
-	/* If SDIO card, set SDIO Mode
-	 * Otherwise, clear SDIO Mode and Slow Mode
-	 */
-	if (card && (card->type & MMC_TYPE_SDIO)) {
-		reg = sdhci_readl(host, EMMC_PHY_TIMING_ADJUST);
+	reg = sdhci_readl(host, EMMC_PHY_TIMING_ADJUST);
+	/* Clear SDIO and slow modes */
+	reg &= ~(TIMING_ADJUST_SDIO_MODE | TIMING_ADJUST_SLOW_MODE);
+	/* If SDIO card, set SDIO Mode */
+	if (card && (card->type & MMC_TYPE_SDIO))
 		reg |= TIMING_ADJUST_SDIO_MODE;
-
-		if ((timing == MMC_TIMING_UHS_SDR25) ||
-		    (timing == MMC_TIMING_UHS_SDR12) ||
-		    (timing == MMC_TIMING_SD_HS) ||
-		    (timing == MMC_TIMING_LEGACY))
-			reg |= TIMING_ADJUST_SLOW_MODE;
-
-		sdhci_writel(host, reg, EMMC_PHY_TIMING_ADJUST);
-	} else {
-		reg = sdhci_readl(host, EMMC_PHY_TIMING_ADJUST);
-		reg &= ~(TIMING_ADJUST_SDIO_MODE | TIMING_ADJUST_SLOW_MODE);
-		sdhci_writel(host, reg, EMMC_PHY_TIMING_ADJUST);
-	}
+	/* Enable slow mode in SDR mode below 50M */
+	if ((timing == MMC_TIMING_UHS_SDR50) ||
+	    (timing == MMC_TIMING_UHS_SDR25) ||
+	    (timing == MMC_TIMING_UHS_SDR12) ||
+	    (timing == MMC_TIMING_SD_HS) ||
+	    (timing == MMC_TIMING_LEGACY))
+		reg |= TIMING_ADJUST_SLOW_MODE;
+	sdhci_writel(host, reg, EMMC_PHY_TIMING_ADJUST);
 
 	/* Set preferred ZNR and ZPR value
 	 * The ZNR and ZPR value vary between different boards.
