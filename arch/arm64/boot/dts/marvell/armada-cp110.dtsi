@@ -203,6 +203,7 @@ cpxor0@6a0000 {
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
 	clocks = <&gateclk 14>, <&gateclk 8>;
+	status = "disabled";
 };
 
 cpxor1@6c0000 {
@@ -212,6 +213,7 @@ cpxor1@6c0000 {
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
 	clocks = <&gateclk 14>, <&gateclk 7>;
+	status = "disabled";
 };
 
 thermal@400078 {
