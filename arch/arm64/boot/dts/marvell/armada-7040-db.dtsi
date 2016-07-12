@@ -68,6 +68,7 @@
 			};
 			sdhci@6e0000 {
 				bus-width = <4>;
+				no-1-8-v;
 				non-removable; /* For now, need to configure the GPIO for card detect */
 			};
 		};

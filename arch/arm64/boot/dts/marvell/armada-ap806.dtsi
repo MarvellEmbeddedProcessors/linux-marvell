@@ -275,9 +275,6 @@
 				compatible = "marvell,xenon-sdhci";
 				reg = <0x6E0000 0x300>;
 				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-				mmc-ddr-1_8v;
-				mmc-hs200-1_8v;
-				mmc-hs400-1_8v;
 				xenon,slotno = <0>;
 				status = "disabled";
 			};
