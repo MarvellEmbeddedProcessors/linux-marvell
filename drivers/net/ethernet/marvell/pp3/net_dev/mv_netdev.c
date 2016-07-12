@@ -2097,9 +2097,16 @@ int mv_pp3_cpu_affinity_set(struct net_device *dev, int cpu)
  *----------------------------------------------------------------------------*/
 static int mv_pp3_late_init(struct net_device *dev)
 {
-	dev->features = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_RXCSUM;
-
-	dev->hw_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_RXCSUM;
+	dev->features = NETIF_F_RXCSUM;
+	dev->hw_features |= NETIF_F_RXCSUM;
+	/* Add HW-checksum for NOT "nssN" devices only.
+	 * NSS type is dev_priv->vport->type=MV_PP3_NSS_PORT_EXT
+	 * but dev_priv->vport==NULL here.
+	 */
+	if (!strstr(dev->name, "nss")) {
+		dev->features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+		dev->hw_features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+	}
 
 #ifdef CONFIG_MV_PP3_SG
 	dev->features |= NETIF_F_SG;
