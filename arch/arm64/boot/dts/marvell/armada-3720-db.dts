@@ -165,7 +165,8 @@
 
 			/* CON3 */
 			sata@e0000 {
-			       status = "okay";
+				target-supply = <&reg_5v_sata>;
+				status = "okay";
 			};
 			vcc_sd_reg1: regulator@0 {
 				compatible = "regulator-gpio";
@@ -181,6 +182,32 @@
 
 				enable-active-high;
 			};
+		};
+
+		reg_sata: pwr-sata {
+			compatible = "regulator-fixed";
+			regulator-name = "pwr_en_sata";
+			regulator-min-microvolt = <12000000>;
+			regulator-max-microvolt = <12000000>;
+			enable-active-high;
+			regulator-boot-on;
+			gpio = <&expander0 2 GPIO_ACTIVE_HIGH>;
+		};
+
+		reg_5v_sata: v5-sata {
+			compatible = "regulator-fixed";
+			regulator-name = "v5.0-sata";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			vin-supply = <&reg_sata>;
+		};
+
+		reg_12v_sata: v12-sata {
+			compatible = "regulator-fixed";
+			regulator-name = "v12.0-sata";
+			regulator-min-microvolt = <12000000>;
+			regulator-max-microvolt = <12000000>;
+			vin-supply = <&reg_sata>;
 		};
 
 		pcie-controller {
