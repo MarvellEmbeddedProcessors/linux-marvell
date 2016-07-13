@@ -119,6 +119,8 @@
 			i2c0: i2c@11000 {
 				compatible = "marvell,armada-3700-i2c";
 				reg = <0x11000 0x80>;
+				#address-cells = <1>;
+				#size-cells = <0>;
 				interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
 				mrvl,i2c-fast-mode;
 				clocks = <&ngateclk 17>;
@@ -128,6 +130,8 @@
 			i2c1: i2c@11080 {
 				compatible = "marvell,armada-3700-i2c";
 				reg = <0x11080 0x80>;
+				#address-cells = <1>;
+				#size-cells = <0>;
 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
 				mrvl,i2c-fast-mode;
 				clocks = <&ngateclk 16>;

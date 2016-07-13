@@ -93,6 +93,12 @@
 
 			i2c0: i2c@11000 {
 				status = "okay";
+				expander0: pca9555@22 {
+					compatible = "nxp,pca9555";
+					reg = <0x22>;
+					gpio-controller;
+					#gpio-cells = <2>;
+				};
 			};
 
 			i2c1: i2c@11080 {
