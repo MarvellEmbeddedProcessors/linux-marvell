@@ -135,7 +135,6 @@ struct mv_xor_v2_descriptor {
  * @sw_ll_lock: serializes enqueue/dequeue operations to the sw
  * descriptors pool
  * @push_lock: serializes enqueue operations to the DESCQ
- * @cookie_lock: serializes of cookies control
  * @dma_base: memory mapped DMA register base
  * @glob_base: memory mapped global register base
  * @irq_tasklet:
@@ -150,7 +149,6 @@ struct mv_xor_v2_descriptor {
 struct mv_xor_v2_device {
 	spinlock_t sw_ll_lock;
 	spinlock_t push_lock;
-	spinlock_t cookie_lock;
 	void __iomem *dma_base;
 	void __iomem *glob_base;
 	struct clk *clk[MAX_A8K_XOR_CLOCKS];
@@ -341,13 +339,10 @@ mv_xor_v2_tx_submit(struct dma_async_tx_descriptor *tx)
 		"%s sw_desc %p: async_tx %p\n",
 		__func__, sw_desc, &sw_desc->async_tx);
 
-	/* assign coookie */
-	spin_lock_bh(&xor_dev->cookie_lock);
-	cookie = dma_cookie_assign(tx);
-	spin_unlock_bh(&xor_dev->cookie_lock);
-
 	/* lock enqueue DESCQ */
 	spin_lock_bh(&xor_dev->push_lock);
+	/* assign coookie */
+	cookie = dma_cookie_assign(tx);
 
 	/* get the next available slot in the DESQ */
 	desq_ptr = mv_xor_v2_get_desq_write_ptr(xor_dev);
@@ -840,7 +835,6 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	/* init the channel locks */
 	spin_lock_init(&xor_dev->sw_ll_lock);
 	spin_lock_init(&xor_dev->push_lock);
-	spin_lock_init(&xor_dev->cookie_lock);
 
 	/* init the free SW descriptors list */
 	INIT_LIST_HEAD(&xor_dev->free_sw_desc);
