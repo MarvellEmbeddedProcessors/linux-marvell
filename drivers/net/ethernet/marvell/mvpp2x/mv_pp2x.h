@@ -33,18 +33,6 @@
 
 #define IRQ_NAME_SIZE (36)
 
-#ifdef MVPP2_DEBUG
-#define STAT_DBG(c) c
-#else
-#define STAT_DBG(c)
-#endif
-
-#ifdef MV_PP22_GOP_DEBUG
-#define GOP_DEBUG(x)	x
-#else
-#define GOP_DEBUG(x)
-#endif
-
 #define MV_ETH_SKB_SHINFO_SIZE	SKB_DATA_ALIGN(sizeof(struct skb_shared_info))
 
 /* START - Taken from mvPp2Commn.h, need to order TODO */
