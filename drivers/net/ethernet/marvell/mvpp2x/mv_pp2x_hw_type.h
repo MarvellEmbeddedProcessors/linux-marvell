@@ -2192,15 +2192,6 @@ struct mv_pp2x_c2_shadow {
 	struct mv_pp2x_c2_rule_idx rule_idx_info[8];
 };
 
-/* BM specific defines */
-#ifdef MVPP2_DEBUG
-struct mv_pp2x_bm_pool_stats {
-	u32 skb_alloc_oom;
-	u32 skb_alloc_ok;
-	u32 bm_put;
-};
-#endif
-
 struct mv_pp2x_bm_pool {
 	/* Pool number in the range 0-7 */
 	int id;
@@ -2230,10 +2221,6 @@ struct mv_pp2x_bm_pool {
 	/* Occupied buffers indicator */
 	atomic_t in_use;
 	int in_use_thresh;
-	/* Stats info */
-#ifdef MVPP2_DEBUG
-	struct mv_pp2x_bm_pool_stats stats;
-#endif
 #ifdef CONFIG_64BIT
 	u64 data_high;
 #endif
