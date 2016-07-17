@@ -174,17 +174,22 @@ struct mv_pp2x_pool_attributes mv_pp2x_pools[] = {
 static inline int mv_pp2x_txq_count(struct mv_pp2x_txq_pcpu *txq_pcpu)
 {
 
-	int index_diff = txq_pcpu->txq_put_index - txq_pcpu->txq_get_index;
+	int index_modulo = (txq_pcpu->txq_put_index - txq_pcpu->txq_get_index +
+				txq_pcpu->size) % txq_pcpu->size;
 
-	return(index_diff % txq_pcpu->size);
+	return index_modulo;
 }
 
 static inline int mv_pp2x_txq_free_count(struct mv_pp2x_txq_pcpu *txq_pcpu)
 {
 
-	int index_diff = txq_pcpu->txq_get_index - txq_pcpu->txq_put_index;
+	int index_modulo = (txq_pcpu->txq_get_index - txq_pcpu->txq_put_index +
+				txq_pcpu->size) % txq_pcpu->size;
 
-	return(index_diff % txq_pcpu->size);
+	if (index_modulo == 0)
+		return txq_pcpu->size;
+
+	return index_modulo;
 }
 
 static void mv_pp2x_txq_inc_get(struct mv_pp2x_txq_pcpu *txq_pcpu)
@@ -887,7 +892,7 @@ static void mv_pp2x_txq_done(struct mv_pp2x_port *port,
 
 	mv_pp2x_txq_bufs_free(port, txq_pcpu, tx_done);
 
-		if (netif_tx_queue_stopped(nq))
+	if (netif_tx_queue_stopped(nq))
 		if (mv_pp2x_txq_free_count(txq_pcpu) >= (MAX_SKB_FRAGS + 2))
 			netif_tx_wake_queue(nq);
 }
