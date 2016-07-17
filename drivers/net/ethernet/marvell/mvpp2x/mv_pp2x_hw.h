@@ -25,41 +25,38 @@
 
 #include <linux/platform_device.h>
 
-#if 1
-void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data);
-u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset);
-
-#else
 static inline void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
 {
-#if 1
-	if (smp_processor_id() != 0)
-		pr_emerg_once("Received mv_pp2x_write(%d) from CPU1 !!\n",
-			offset);
-#endif
-	pr_debug("mv_pp2x_write(%p)\n", hw->cpu_base[smp_processor_id()] +
-		offset);
-	writel(data, hw->cpu_base[smp_processor_id()] + offset);
+	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+
+	writel(data, reg_ptr);
+}
+
+static inline void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
+{
+	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+
+	writel_relaxed(data, reg_ptr);
 }
 
 static inline u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 {
-#if 1
-	if (smp_processor_id() != 0)
-		pr_emerg_once("Received mv_pp2x_read(%d) from CPU1 !!\n",
-			offset);
-#endif
-	pr_debug("mv_pp2x_read(%p)\n", hw->cpu_base[smp_processor_id()] +
-		offset);
+	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+	u32 val;
 
-	return readl(hw->cpu_base[smp_processor_id()] + offset);
+	val = readl(reg_ptr);
+
+	return val;
 }
-#endif
 
-void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 data);
-u32 mv_pp2x_relaxed_read(struct mv_pp2x_hw *hw, u32 offset);
+static inline u32 mv_pp2x_relaxed_read(struct mv_pp2x_hw *hw, u32 offset)
+{
+	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+	u32 val;
 
-
+	val = readl_relaxed(reg_ptr);
+	return val;
+}
 
 static inline void mv_pp22_thread_write(struct mv_pp2x_hw *hw, u32 sw_thread,
 					     u32 offset, u32 data)
