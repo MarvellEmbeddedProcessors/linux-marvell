@@ -16,9 +16,6 @@
 * ***************************************************************************
 */
 
-#ifdef ARMADA_390
-#include <linux/phy.h>
-#endif
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
