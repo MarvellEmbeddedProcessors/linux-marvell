@@ -126,14 +126,13 @@
 					status = "okay";
 				};
 				emac2_1: mac2 {
-					phy-mode = "rgmii"; /* lane-0 */
+					phy-mode = "rgmii"; /* rgmii-0 */
 					phy = <&phy2>;
-					status = "disabled";
+					status = "okay";
 				};
 				emac3_1: mac3 {
-					phy-mode = "rgmii"; /* rgmii-1 */
-					phy = <&phy3>;
-					status = "okay";
+					phy-mode = "sgmii"; /* lane-4 */
+					status = "disabled";
 				};
 			};
 			ppv22@000000 {
@@ -141,10 +140,10 @@
 					status = "okay";
 				};
 				eth1_1: eth1@020000 {
-					status = "disabled";
+					status = "okay";
 				};
 				eth2_1: eth2@030000 {
-					status = "okay";
+					status = "disabled";
 				};
 			};
 		};
