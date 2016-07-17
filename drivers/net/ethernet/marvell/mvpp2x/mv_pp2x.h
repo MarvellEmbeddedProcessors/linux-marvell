@@ -268,6 +268,8 @@ struct mv_pp2x_txq_pcpu {
 	/* Array of transmitted buffers' physical addresses */
 	dma_addr_t *tx_buffs;
 
+	int *data_size;
+
 	/* Index of last TX DMA descriptor that was inserted */
 	int txq_put_index;
 
