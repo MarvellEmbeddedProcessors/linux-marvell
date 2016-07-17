@@ -55,46 +55,6 @@ int mv_pp2x_range_validate(int value, int min, int max)
 }
 EXPORT_SYMBOL(mv_pp2x_range_validate);
 
-void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
-{
-	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
-
-	writel(data, reg_ptr);
-}
-EXPORT_SYMBOL(mv_pp2x_write);
-
-
-void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
-{
-	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
-
-	writel_relaxed(data, reg_ptr);
-}
-EXPORT_SYMBOL(mv_pp2x_relaxed_write);
-
-
-u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
-{
-	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
-	u32 val;
-
-	val = readl(reg_ptr);
-	return val;
-}
-EXPORT_SYMBOL(mv_pp2x_read);
-
-
-u32 mv_pp2x_relaxed_read(struct mv_pp2x_hw *hw, u32 offset)
-{
-	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
-	u32 val;
-
-	val = readl_relaxed(reg_ptr);
-	return val;
-}
-EXPORT_SYMBOL(mv_pp2x_relaxed_read);
-
-
 /* Parser configuration routines */
 
 /* Flow ID definetion array */
