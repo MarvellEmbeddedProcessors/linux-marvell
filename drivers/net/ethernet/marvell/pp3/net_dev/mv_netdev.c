@@ -2932,8 +2932,10 @@ static int mv_pp3_change_mtu_internals(struct net_device *dev, int mtu)
 			pr_warn("%s: FW long pool update failed\n", __func__);
 	}
 
-	emac_vp = dev_priv->vport;
+	if (dev_priv->vport->type != MV_PP3_NSS_PORT_ETH)
+		return 0;
 
+	emac_vp = dev_priv->vport;
 	emac_vp->port.emac.mtu = mtu;
 
 	if (pp3_fw_vport_mtu_set(emac_vp->vport, mtu) < 0)
@@ -2961,9 +2963,12 @@ static int mv_pp3_change_mtu(struct net_device *dev, int mtu)
 		return 0;
 	}
 
-	/* Supported only for EMAC virtual ports */
-	if (!dev_priv->vport || (dev_priv->vport->type != MV_PP3_NSS_PORT_ETH)) {
-		pr_err("%s: not supported for %s\n", __func__, dev->name);
+	if (!dev_priv->vport)
+		goto error;
+
+	if ((dev_priv->vport->type != MV_PP3_NSS_PORT_ETH) &&
+	    (dev_priv->id != MV_NSS_EXT_PORT_MAX)) {
+		pr_err("%s: MTU change is irrelevant for %s\n", dev->name, dev->name);
 		return -1;
 	}
 
