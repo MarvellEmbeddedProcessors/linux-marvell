@@ -201,8 +201,8 @@ void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
 			 struct mv_pp2x_tx_desc *tx_desc)
 {
 	txq_pcpu->tx_skb[txq_pcpu->txq_put_index] = skb;
-	if (skb)
-		txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] =
+	txq_pcpu->data_size[txq_pcpu->txq_put_index] = tx_desc->data_size;
+	txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] =
 				mv_pp2x_txdesc_phys_addr_get(pp2_ver, tx_desc);
 	txq_pcpu->txq_put_index++;
 	if (txq_pcpu->txq_put_index == txq_pcpu->size)
@@ -851,14 +851,15 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 		dma_addr_t buf_phys_addr =
 				    txq_pcpu->tx_buffs[txq_pcpu->txq_get_index];
 		struct sk_buff *skb = txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
+		int data_size = txq_pcpu->data_size[txq_pcpu->txq_get_index];
 
 		mv_pp2x_txq_inc_get(txq_pcpu);
 
+		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
+				 data_size, DMA_TO_DEVICE);
+
 		if (!skb)
 			continue;
-
-		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
-				 skb_headlen(skb), DMA_TO_DEVICE);
 		dev_kfree_skb_any(skb);
 	}
 }
@@ -1148,6 +1149,11 @@ static int mv_pp2x_txq_init(struct mv_pp2x_port *port,
 		if (!txq_pcpu->tx_buffs)
 			goto error;
 
+		txq_pcpu->data_size = kmalloc(txq_pcpu->size *
+						sizeof(int), GFP_KERNEL);
+		if (!txq_pcpu->data_size)
+			goto error;
+
 		txq_pcpu->count = 0;
 		txq_pcpu->reserved_num = 0;
 		txq_pcpu->txq_put_index = 0;
@@ -1182,6 +1188,7 @@ static void mv_pp2x_txq_deinit(struct mv_pp2x_port *port,
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 		kfree(txq_pcpu->tx_skb);
 		kfree(txq_pcpu->tx_buffs);
+		kfree(txq_pcpu->data_size);
 	}
 
 	if (txq->desc_mem)
