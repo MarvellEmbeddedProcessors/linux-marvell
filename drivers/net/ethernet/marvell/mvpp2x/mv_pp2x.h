@@ -18,9 +18,6 @@
 
 #ifndef _MVPP2_H_
 #define _MVPP2_H_
-#ifdef ARMADA_390
-#include <linux/interrupt.h>
-#endif
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/string.h>
