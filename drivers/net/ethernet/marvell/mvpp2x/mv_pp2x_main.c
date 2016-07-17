@@ -50,7 +50,6 @@
 #include "mv_pp2x.h"
 #include "mv_pp2x_hw.h"
 #include "mv_gop110_hw.h"
-#include "mv_pp2x_debug.h"
 
 #if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
 #include <if_mv_pp2x_netmap.h>
@@ -237,12 +236,12 @@ static inline int mv_pp2x_pool_buf_num_get(
 	return mv_pp2x_pools[log_id].buf_num;
 }
 
-static inline const char *
-	mv_pp2x_pool_description_get(
-		enum mv_pp2x_bm_pool_log_num  log_id)
+char *mv_pp2x_pool_description_get(enum mv_pp2x_bm_pool_log_num  log_id)
 {
 	return mv_pp2x_pools[log_id].description;
 }
+EXPORT_SYMBOL(mv_pp2x_pool_description_get);
+
 
 /* Buffer Manager configuration routines */
 static void *mv_pp2x_frag_alloc(const struct mv_pp2x_bm_pool *pool)
@@ -1726,14 +1725,8 @@ int mv_pp2x_cos_classifier_set(struct mv_pp2x_port *port,
 
 	return 0;
 }
+EXPORT_SYMBOL(mv_pp2x_cos_classifier_set);
 
-/* mv_pp2x_cos_classifier_get
-*  -- Get the cos classifier on the port.
-*/
-int mv_pp2x_cos_classifier_get(struct mv_pp2x_port *port)
-{
-	return port->priv->pp2_cfg.cos_cfg.cos_classifier;
-}
 
 /* mv_pp2x_cos_pri_map_set
 *  -- Set priority_map per port, nibble for each cos value(0~7).
@@ -1761,14 +1754,9 @@ int mv_pp2x_cos_pri_map_set(struct mv_pp2x_port *port, int cos_pri_map)
 
 	return 0;
 }
+EXPORT_SYMBOL(mv_pp2x_cos_pri_map_set);
 
-/* mv_pp2x_cos_pri_map_get
-*  -- Get priority_map on the port.
-*/
-int mv_pp2x_cos_pri_map_get(struct mv_pp2x_port *port)
-{
-	return port->priv->pp2_cfg.cos_cfg.pri_map;
-}
+
 
 /* mv_pp2x_cos_default_value_set
 *  -- Set default cos value for untagged or non-IP packets per port.
@@ -1794,14 +1782,8 @@ int mv_pp2x_cos_default_value_set(struct mv_pp2x_port *port, int cos_value)
 
 	return 0;
 }
+EXPORT_SYMBOL(mv_pp2x_cos_default_value_set);
 
-/* mv_pp2x_cos_default_value_get
-*  -- Get default cos value for untagged or non-IP packets on the port.
-*/
-int mv_pp2x_cos_default_value_get(struct mv_pp2x_port *port)
-{
-	return port->priv->pp2_cfg.cos_cfg.default_cos;
-}
 
 /* RSS API */
 
@@ -1977,6 +1959,8 @@ int mv_pp22_rss_mode_set(struct mv_pp2x_port *port, int rss_mode)
 
 	return 0;
 }
+EXPORT_SYMBOL(mv_pp22_rss_mode_set);
+
 
 /* mv_pp22_rss_default_cpu_set
 *  -- The API to update the default CPU to handle the non-IP packets.
@@ -2018,6 +2002,7 @@ int mv_pp22_rss_default_cpu_set(struct mv_pp2x_port *port, int default_cpu)
 
 	return 0;
 }
+EXPORT_SYMBOL(mv_pp22_rss_default_cpu_set);
 
 /* Main RX/TX processing routines */
 #if 0
