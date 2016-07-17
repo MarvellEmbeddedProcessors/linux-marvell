@@ -33,8 +33,6 @@
 
 #define IRQ_NAME_SIZE (36)
 
-#define DBG_MSG(fmt, args...)	printk(fmt, ## args)
-
 #ifdef MVPP2_DEBUG
 #define STAT_DBG(c) c
 #else
@@ -615,16 +613,6 @@ struct mv_pp2x_platform_data {
 #endif
 };
 
-static inline int mv_pp2x_max_check(int value, int limit, char *name)
-{
-	if ((value < 0) || (value >= limit)) {
-		DBG_MSG("%s %d is out of range [0..%d]\n",
-			name ? name : "value", value, (limit - 1));
-		return 1;
-	}
-	return 0;
-}
-
 static inline struct mv_pp2x_port *mv_pp2x_port_struct_get(struct mv_pp2x *priv,
 							   int port)
 {
@@ -716,7 +704,7 @@ struct mv_pp2x_pool_attributes {
 	int buf_num;
 };
 
-extern struct mv_pp2x_pool_attributes mv_pp2x_pools[];
+char *mv_pp2x_pool_description_get(enum mv_pp2x_bm_pool_log_num  log_id);
 
 void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
 			  int buf_num);
