@@ -59,28 +59,6 @@ void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
 {
 	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
 
-#if defined(MVPP2_DEBUG)
-	static void *last_used[20] = {0};
-	static int next_write;
-	int i;
-
-	for (i = 0; i < MVPP2_REG_BUF_SIZE; i++) {
-		if (last_used[i] == reg_ptr)
-			break;
-	}
-	if (i == MVPP2_REG_BUF_SIZE) {
-		pr_debug("NEW REG: mv_pp2x_write(%p)\n", reg_ptr);
-		last_used[next_write] = reg_ptr;
-		next_write++;
-		next_write = next_write % MVPP2_REG_BUF_SIZE;
-	} else {
-		/*pr_info("mv_pp2x_write(%d)=%d , caller %pS\n",
-		*	offset, data, __builtin_return_address(0));
-		*/
-	}
-#endif
-	if (debug_param)
-		pr_info("mv_pp2x_write: 0x%p data=0x%x\n", reg_ptr, data);
 	writel(data, reg_ptr);
 }
 EXPORT_SYMBOL(mv_pp2x_write);
@@ -97,34 +75,10 @@ EXPORT_SYMBOL(mv_pp2x_relaxed_write);
 
 u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 {
-#if defined(MVPP2_DEBUG)
-	static void *last_used[20] = {0};
-	static int next_write;
-	int i;
-#endif
 	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
 	u32 val;
 
 	val = readl(reg_ptr);
-#if defined(MVPP2_DEBUG)
-	for (i = 0; i < MVPP2_REG_BUF_SIZE; i++) {
-		if (last_used[i] == reg_ptr)
-			break;
-	}
-	if (i == MVPP2_REG_BUF_SIZE) {
-		pr_debug("NEW REG: mv_pp2x_read(%p)\n", reg_ptr);
-		last_used[next_write] = reg_ptr;
-		next_write++;
-		next_write = next_write % MVPP2_REG_BUF_SIZE;
-	} else {
-		/*pr_info("mv_pp2x_read(%d)=%d , caller %pS\n",
-		 *	offset, val, __builtin_return_address(0));
-		*/
-	}
-
-	if (debug_param)
-		pr_info("mv_pp2x_read: 0x%p data=0x%x\n", reg_ptr, val);
-#endif
 	return val;
 }
 EXPORT_SYMBOL(mv_pp2x_read);
@@ -3836,10 +3790,7 @@ void mv_pp21_port_reset(struct mv_pp2x_port *port)
 void mv_pp2x_pool_refill(struct mv_pp2x *priv, u32 pool,
 			 dma_addr_t phys_addr, u8 *cookie)
 {
-	STAT_DBG(struct mv_pp2x_bm_pool *bm_pool = &priv->bm_pools[pool]);
-
 	mv_pp2x_bm_pool_put(&priv->hw, pool, phys_addr, cookie);
-	STAT_DBG(bm_pool->stats.bm_put++);
 }
 
 /* Set pool buffer size */
