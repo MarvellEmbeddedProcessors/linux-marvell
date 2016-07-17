@@ -229,5 +229,12 @@ config  MV_PP3_PTP_SERVICE
 	---help---
 	PTP uio mapping and packet-timestamp in Marvell network driver
 
+config  MV_PP3_COHERENCY_HARD_MODE_ONLY
+	bool "Cache coherency HW mode"
+	default y
+	select UIO
+	---help---
+	coherency_available() is always HW, no SW run-time configuration
+
 endmenu
 

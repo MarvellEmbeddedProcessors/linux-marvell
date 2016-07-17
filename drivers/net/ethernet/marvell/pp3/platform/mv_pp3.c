@@ -728,7 +728,12 @@ static int mv_pp3_shared_probe(struct platform_device *pdev)
 	char name[20];
 
 	coherency_hard_mode = coherency_available();
-
+#ifdef CONFIG_MV_PP3_COHERENCY_HARD_MODE_ONLY
+	if (!coherency_hard_mode) {
+		pr_err("pp3 supported on ARMADA platform with HW cache coherency only\n");
+		return -ENODEV;
+	}
+#endif
 	pp3_device = kzalloc(sizeof(struct mv_pp3), GFP_KERNEL);
 	if (!pp3_device) {
 		pr_err("%s: out of memory\n", __func__);
