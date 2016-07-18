@@ -228,6 +228,135 @@ int mv_pp2x_eth_tool_nway_reset(struct net_device *dev)
 	return 0;
 }
 
+/* Get pause fc settings for ethtools */
+static void mv_pp2x_get_pauseparam(struct net_device *dev,
+					struct ethtool_pauseparam *pause)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct mv_port_link_status status;
+	struct mv_mac_data *mac = &port->mac_data;
+	struct gop_hw *gop = &port->priv->hw.gop;
+	int gop_port = mac->gop_index;
+	phy_interface_t phy_mode;
+
+	phy_mode = port->mac_data.phy_mode;
+
+	switch (phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+		mv_gop110_port_link_status(gop,	mac, &status);
+		pause->autoneg =
+			(status.autoneg_fc ? AUTONEG_ENABLE : AUTONEG_DISABLE);
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+	case PHY_INTERFACE_MODE_KR:
+		mv_gop110_port_link_status(gop,	mac, &status);
+		pause->autoneg = AUTONEG_DISABLE;
+	break;
+	default:
+		pr_err("%s: Wrong port mode (%d)", __func__, phy_mode);
+		return;
+	}
+
+	if (status.rx_fc == MV_PORT_FC_ACTIVE || status.rx_fc == MV_PORT_FC_ENABLE)
+		pause->rx_pause = 1;
+
+	if (mv_gop110_check_fca_tx_state(gop, gop_port)) {
+		pause->tx_pause = 1;
+		return;
+	}
+
+	if (status.tx_fc == MV_PORT_FC_ACTIVE || status.tx_fc == MV_PORT_FC_ENABLE)
+		pause->tx_pause = 1;
+}
+
+/* Set pause fc settings for ethtools */
+static int mv_pp2x_set_pauseparam(struct net_device *dev,
+					struct ethtool_pauseparam *pause)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct mv_mac_data *mac = &port->mac_data;
+	struct gop_hw *gop = &port->priv->hw.gop;
+	int gop_port = mac->gop_index;
+	phy_interface_t phy_mode;
+	int err;
+
+	if (!(mac->flags & MV_EMAC_F_INIT)) {
+		pr_err("%s: interface %s is not initialized\n", __func__, dev->name);
+		return -EOPNOTSUPP;
+	}
+
+	phy_mode = port->mac_data.phy_mode;
+
+	switch (phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+		if (mac->speed == SPEED_2500) {
+			err = mv_gop110_check_port_type(gop, gop_port);
+			if (err) {
+				pr_err("Peridot module doesn't support FC\n");
+				return -EINVAL;
+			}
+		}
+
+		mv_gop110_force_link_mode_set(gop, mac, false, true);
+
+		if (pause->autoneg) {
+			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_AN_SYM);
+			mv_gop110_autoneg_restart(gop, mac);
+			mv_gop110_fca_send_periodic(gop, gop_port, false);
+			}
+		else	{
+			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_AN_NO);
+			mv_gop110_fca_send_periodic(gop, gop_port, true);
+			}
+
+		if (pause->rx_pause)
+			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_RX_ENABLE);
+		else
+			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_RX_DISABLE);
+
+		if (pause->tx_pause) {
+			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_TX_ENABLE);
+			mv_gop110_fca_tx_enable(gop, gop_port, false);
+			}
+		else	{
+			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_TX_DISABLE);
+			mv_gop110_fca_tx_enable(gop, gop_port, true);
+			}
+
+		mv_gop110_force_link_mode_set(gop, mac, false, false);
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+	case PHY_INTERFACE_MODE_KR:
+		if (pause->autoneg) {
+			pr_err("10G port doesn't support fc autoneg\n");
+			return -EINVAL;
+			}
+		if (pause->rx_pause)
+			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_RX_ENABLE);
+		else
+			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_RX_DISABLE);
+
+		if (pause->tx_pause)
+			mv_gop110_fca_tx_enable(gop, gop_port, false);
+		else	{
+			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_TX_DISABLE);
+			mv_gop110_fca_tx_enable(gop, gop_port, true);
+			}
+	break;
+	default:
+		pr_err("%s: Wrong port mode (%d)", __func__, phy_mode);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /* Get settings (phy address, speed) for ethtools */
 static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 					struct ethtool_cmd *cmd)
@@ -753,6 +882,8 @@ static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_strings		= mv_pp2x_eth_tool_get_strings,
 	.get_ringparam		= mv_pp2x_ethtool_get_ringparam,
 	.set_ringparam		= mv_pp2x_ethtool_set_ringparam,
+	.get_pauseparam		= mv_pp2x_get_pauseparam,
+	.set_pauseparam		= mv_pp2x_set_pauseparam,
 	.get_rxfh_indir_size	= mv_pp2x_ethtool_get_rxfh_indir_size,
 	.get_rxnfc		= mv_pp2x_ethtool_get_rxnfc,
 	.get_rxfh		= mv_pp2x_ethtool_get_rxfh,

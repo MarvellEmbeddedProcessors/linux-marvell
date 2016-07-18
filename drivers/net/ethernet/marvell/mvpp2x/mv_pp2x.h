@@ -374,6 +374,7 @@ struct cpn110_gop_hw {
 	struct mv_mac_unit_desc xmib;
 	struct mv_mac_unit_desc tai;
 	struct mv_mac_unit_desc ptp;
+	struct mv_mac_unit_desc fca;
 	void __iomem *smi_base;
 	void __iomem *xsmi_base;
 	void __iomem *mspg_base;

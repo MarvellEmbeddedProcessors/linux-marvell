@@ -45,7 +45,11 @@ enum mv_port_fc {
 	MV_PORT_FC_AN_SYM,
 	MV_PORT_FC_AN_ASYM,
 	MV_PORT_FC_DISABLE,
+	MV_PORT_FC_TX_DISABLE,
+	MV_PORT_FC_RX_DISABLE,
 	MV_PORT_FC_ENABLE,
+	MV_PORT_FC_TX_ENABLE,
+	MV_PORT_FC_RX_ENABLE,
 	MV_PORT_FC_ACTIVE
 };
 
@@ -55,6 +59,7 @@ struct mv_port_link_status {
 	enum mv_port_duplex	duplex;
 	enum mv_port_fc		rx_fc;
 	enum mv_port_fc		tx_fc;
+	enum mv_port_fc		autoneg_fc;
 };
 
 /* different loopback types can be configure on different levels:
@@ -97,6 +102,13 @@ enum mv_netc_mii_mode {
 enum mv_netc_lanes {
 	MV_NETC_LANE_23,
 	MV_NETC_LANE_45,
+};
+
+enum mv_gop_port {
+	MV_GOP_PORT0 = 0,
+	MV_GOP_PORT1 = 1,
+	MV_GOP_PORT2 = 2,
+	MV_GOP_PORT3 = 3,
 };
 
 #define MV_RGMII_TX_FIFO_MIN_TH		(0x41)
@@ -453,6 +465,29 @@ void mv_gop110_ptp_enable(struct gop_hw *gop, int port, bool state);
 int mv_gop110_netc_init(struct gop_hw *gop,
 			u32 net_comp_config, enum mv_netc_phase phase);
 void mv_gop110_netc_active_port(struct gop_hw *gop, u32 port, u32 val);
+void mv_gop110_netc_xon_set(struct gop_hw *gop, enum mv_gop_port port, bool en);
+
+/* FCA Functions  */
+void mv_gop110_fca_send_periodic(struct gop_hw *gop, int mac_num, bool en);
+void mv_gop110_fca_set_periodic_timer(struct gop_hw *gop, int mac_num, u64 timer);
+
+void mv_gop110_fca_tx_enable(struct gop_hw *gop, int mac_num, bool en);
+
+bool mv_gop110_check_fca_tx_state(struct gop_hw *gop, int mac_num);
+
+static inline u32 mv_gop110_fca_read(struct gop_hw *gop, int mac_num,
+				     u32 offset)
+{
+	return mv_gop_gen_read(gop->gop_110.fca.base,
+			       mac_num * gop->gop_110.fca.obj_size + offset);
+}
+
+static inline void mv_gop110_fca_write(struct gop_hw *gop, int mac_num,
+				       u32 offset, u32 data)
+{
+	mv_gop_gen_write(gop->gop_110.fca.base,
+			 mac_num * gop->gop_110.fca.obj_size + offset, data);
+}
 
 /*Ethtool Functions */
 void mv_gop110_gmac_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff);
