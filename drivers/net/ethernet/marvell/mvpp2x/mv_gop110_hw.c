@@ -256,6 +256,7 @@ static void mv_gop110_gmac_sgmii_cfg(struct gop_hw *gop, int mac_num)
 
 	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL2_REG);
 	val |= MV_GMAC_PORT_CTRL2_DIS_PADING_OFFS;
+	val &= ~MV_GMAC_PORT_CTRL2_FC_MODE_MASK;
 	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL2_REG, val);
 
 	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL0_REG);
@@ -481,6 +482,17 @@ int mv_gop110_gmac_link_status(struct gop_hw *gop, int mac_num,
 	else
 		pstatus->rx_fc = MV_PORT_FC_DISABLE;
 
+	reg_val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_AUTO_NEG_CFG_REG);
+
+	if (reg_val & MV_GMAC_PORT_AUTO_NEG_CFG_EN_FC_AN_MASK) {
+		if (reg_val & MV_GMAC_PORT_AUTO_NEG_CFG_ADV_ASM_PAUSE_MASK)
+			pstatus->autoneg_fc = MV_PORT_FC_AN_ASYM;
+		else
+			pstatus->autoneg_fc = MV_PORT_FC_AN_SYM;
+		}
+	else
+		pstatus->autoneg_fc = MV_PORT_FC_AN_NO;
+
 	return 0;
 }
 
@@ -676,6 +688,7 @@ int mv_gop110_gmac_fc_set(struct gop_hw *gop, int mac_num, enum mv_port_fc fc)
 
 	reg_val = mv_gop110_gmac_read(gop, mac_num,
 				      MV_GMAC_PORT_AUTO_NEG_CFG_REG);
+	fc_en = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL4_REG);
 
 	switch (fc) {
 	case MV_PORT_FC_AN_NO:
@@ -699,22 +712,32 @@ int mv_gop110_gmac_fc_set(struct gop_hw *gop, int mac_num, enum mv_port_fc fc)
 	case MV_PORT_FC_DISABLE:
 		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_FC_AN_MASK;
 		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_ADV_ASM_PAUSE_MASK;
-		fc_en = mv_gop110_gmac_read(gop, mac_num,
-					    MV_GMAC_PORT_CTRL4_REG);
 		fc_en &= ~MV_GMAC_PORT_CTRL4_FC_EN_RX_MASK;
 		fc_en &= ~MV_GMAC_PORT_CTRL4_FC_EN_TX_MASK;
-		mv_gop110_gmac_write(gop, mac_num,
-				     MV_GMAC_PORT_CTRL4_REG, fc_en);
+		break;
+
+	case MV_PORT_FC_TX_DISABLE:
+		fc_en &= ~MV_GMAC_PORT_CTRL4_FC_EN_TX_MASK;
+		break;
+
+	case MV_PORT_FC_RX_DISABLE:
+		fc_en &= ~MV_GMAC_PORT_CTRL4_FC_EN_RX_MASK;
 		break;
 
 	case MV_PORT_FC_ENABLE:
 		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_FC_AN_MASK;
-		fc_en = mv_gop110_gmac_read(gop, mac_num,
-					    MV_GMAC_PORT_CTRL4_REG);
 		fc_en |= MV_GMAC_PORT_CTRL4_FC_EN_RX_MASK;
 		fc_en |= MV_GMAC_PORT_CTRL4_FC_EN_TX_MASK;
-		mv_gop110_gmac_write(gop, mac_num,
-				     MV_GMAC_PORT_CTRL4_REG, fc_en);
+		break;
+
+	case MV_PORT_FC_TX_ENABLE:
+		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_FC_AN_MASK;
+		fc_en |= MV_GMAC_PORT_CTRL4_FC_EN_TX_MASK;
+		break;
+
+	case MV_PORT_FC_RX_ENABLE:
+		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_FC_AN_MASK;
+		fc_en |= MV_GMAC_PORT_CTRL4_FC_EN_RX_MASK;
 		break;
 
 	default:
@@ -722,6 +745,8 @@ int mv_gop110_gmac_fc_set(struct gop_hw *gop, int mac_num, enum mv_port_fc fc)
 		return -EINVAL;
 	}
 
+	mv_gop110_gmac_write(gop, mac_num,
+			     MV_GMAC_PORT_CTRL4_REG, fc_en);
 	mv_gop110_gmac_write(gop, mac_num,
 			     MV_GMAC_PORT_AUTO_NEG_CFG_REG, reg_val);
 	return 0;
@@ -2102,6 +2127,22 @@ int mv_gop110_xlg_mac_fc_set(struct gop_hw *gop, int mac_num,
 		reg_val |= MV_XLG_MAC_CTRL0_TXFCEN_MASK;
 		break;
 
+	case MV_PORT_FC_TX_DISABLE:
+		reg_val &= ~MV_XLG_MAC_CTRL0_TXFCEN_MASK;
+		break;
+
+	case MV_PORT_FC_RX_DISABLE:
+		reg_val &= ~MV_XLG_MAC_CTRL0_RXFCEN_MASK;
+		break;
+
+	case MV_PORT_FC_TX_ENABLE:
+		reg_val |= MV_XLG_MAC_CTRL0_TXFCEN_MASK;
+		break;
+
+	case MV_PORT_FC_RX_ENABLE:
+		reg_val |= MV_XLG_MAC_CTRL0_RXFCEN_MASK;
+		break;
+
 	case MV_PORT_FC_AN_NO:
 	case MV_PORT_FC_AN_SYM:
 	case MV_PORT_FC_AN_ASYM:
@@ -2749,6 +2790,109 @@ int mv_gop110_netc_init(struct gop_hw *gop,
 	return 0;
 }
 
+void mv_gop110_netc_xon_set(struct gop_hw *gop, enum mv_gop_port port, bool en)
+{
+
+	u32 reg;
+
+	reg = mv_gop110_rfu1_read(gop, MV_NETCOMP_PORTS_CONTROL_0);
+
+	switch (port) {
+	case MV_GOP_PORT0:
+		U32_SET_FIELD(reg, NETC_PORT0_PAUSE_MASK,
+			      en << NETC_PORT0_PAUSE_OFFSET);
+		break;
+	case MV_GOP_PORT1:
+		pr_err("%s: Wrong gop port (%d)\n", __func__, port);
+		break;
+	case MV_GOP_PORT2:
+		U32_SET_FIELD(reg, NETC_PORT2_PAUSE_MASK,
+			      en << NETC_PORT2_PAUSE_OFFSET);
+		break;
+	case MV_GOP_PORT3:
+		U32_SET_FIELD(reg, NETC_PORT3_PAUSE_MASK,
+			      en << NETC_PORT3_PAUSE_OFFSET);
+		break;
+	}
+
+	mv_gop110_rfu1_write(gop, MV_NETCOMP_PORTS_CONTROL_0, reg);
+
+}
+EXPORT_SYMBOL(mv_gop110_netc_xon_set);
+
+void mv_gop110_fca_send_periodic(struct gop_hw *gop, int mac_num, bool en)
+{
+	int val;
+
+	val = mv_gop110_fca_read(gop, mac_num, FCA_CONTROL_REG);
+
+	U32_SET_FIELD(val, FCA_PORT_TYPE_MASK,
+			      FCA_PORT_TYPE_B << FCA_PORT_TYPE_OFFSET);
+	U32_SET_FIELD(val, FCA_SEND_PERIODIC_MASK,
+			      en << FCA_SEND_PERIODIC_OFFSET);
+	mv_gop110_fca_write(gop, mac_num, FCA_CONTROL_REG, val);
+}
+
+void mv_gop110_fca_enable_periodic(struct gop_hw *gop, int mac_num, bool en)
+{
+	int val;
+
+	val = mv_gop110_fca_read(gop, mac_num, FCA_CONTROL_REG);
+
+	U32_SET_FIELD(val, FCA_ENABLE_PERIODIC_MASK,
+			      en << FCA_ENABLE_PERIODIC_OFFSET);
+	mv_gop110_fca_write(gop, mac_num, FCA_CONTROL_REG, val);
+}
+
+void mv_gop110_fca_set_timer(struct gop_hw *gop, int mac_num, u32 lsb, u32 msb)
+{
+	mv_gop110_fca_write(gop, mac_num, PERIODIC_COUNTER_LSB_REG, lsb);
+	mv_gop110_fca_write(gop, mac_num, PERIODIC_COUNTER_MSB_REG, msb);
+}
+
+void mv_gop110_fca_set_periodic_timer(struct gop_hw *gop, int mac_num, u64 timer)
+{
+	u32 lsb, msb;
+
+	mv_gop110_fca_send_periodic(gop, mac_num, false);
+	mv_gop110_fca_enable_periodic(gop, mac_num, false);
+
+	lsb = lower_32_bits(timer);
+	msb = upper_32_bits(timer);
+
+	mv_gop110_fca_set_timer(gop, mac_num, lsb, msb);
+
+	mv_gop110_fca_send_periodic(gop, mac_num, true);
+	mv_gop110_fca_enable_periodic(gop, mac_num, true);
+}
+EXPORT_SYMBOL(mv_gop110_fca_set_periodic_timer);
+
+void mv_gop110_fca_tx_enable(struct gop_hw *gop, int mac_num, bool en)
+{
+	int val;
+
+	val = mv_gop110_fca_read(gop, mac_num, FCA_CONTROL_REG);
+
+	U32_SET_FIELD(val, FCA_PORT_TYPE_MASK,
+			      FCA_PORT_TYPE_B << FCA_PORT_TYPE_OFFSET);
+	U32_SET_FIELD(val, FCA_BYPASS_MASK,
+			      en << FCA_BYPASS_OFFSET);
+	mv_gop110_fca_write(gop, mac_num, FCA_CONTROL_REG, val);
+}
+
+
+bool mv_gop110_check_fca_tx_state(struct gop_hw *gop, int mac_num)
+{
+	int val;
+
+	val = mv_gop110_fca_read(gop, mac_num, FCA_CONTROL_REG);
+
+	if (val & FCA_BYPASS_MASK)
+		return false;
+
+	return true;
+}
+
 /* Register dump for ethtool */
 void mv_gop110_gmac_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff)
 {
@@ -2956,3 +3100,4 @@ void mv_gop110_xlg_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff)
 						    port->mac_data.gop_index,
 						    MV_XLG_MAC_DIC_PPM_IPG_REDUCE_REG);
 }
+
