@@ -2386,7 +2386,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	u16 txq_id;
 	u32 tx_cmd;
 
-	txq_id = 0/*skb_get_queue_mapping(skb)*/;
+	txq_id = skb_get_queue_mapping(skb);
 	nq = netdev_get_tx_queue(dev, txq_id);
 	txq = port->txqs[txq_id];
 	txq_pcpu = this_cpu_ptr(txq->pcpu);
@@ -2399,6 +2399,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	if (mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, frags) ||
 	    mv_pp2x_txq_reserved_desc_num_proc(port->priv, txq,
 					     txq_pcpu, frags)) {
+		netif_tx_stop_queue(nq);
 		frags = 0;
 		MVPP2_PRINT_LINE();
 		goto out;
@@ -2499,9 +2500,9 @@ out:
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
 	}
-	/* PPV21 TX Post-Processing */
+	/* PPV22 TX Post-Processing */
 
-	if (port->priv->pp2xdata->interrupt_tx_done == false && frags > 0)
+	if (port->priv->pp2xdata->interrupt_tx_done == false)
 		mv_pp2x_tx_done_post_proc(txq, txq_pcpu, port, frags);
 
 	return NETDEV_TX_OK;
