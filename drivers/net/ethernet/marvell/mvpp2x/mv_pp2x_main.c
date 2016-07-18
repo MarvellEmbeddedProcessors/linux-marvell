@@ -199,6 +199,19 @@ static void mv_pp2x_txq_inc_get(struct mv_pp2x_txq_pcpu *txq_pcpu)
 		txq_pcpu->txq_get_index = 0;
 }
 
+void mv_pp2x_txq_inc_error(struct mv_pp2x_txq_pcpu *txq_pcpu, int num)
+{
+	for (; num > 0; num--) {
+		txq_pcpu->txq_put_index--;
+		if (txq_pcpu->txq_put_index < 0)
+			txq_pcpu->txq_put_index = txq_pcpu->size - 1;
+		txq_pcpu->tx_skb[txq_pcpu->txq_put_index] = 0;
+		txq_pcpu->data_size[txq_pcpu->txq_put_index] = 0;
+		txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] = 0;
+	}
+}
+
+
 void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
 			 struct mv_pp2x_txq_pcpu *txq_pcpu,
 			 struct sk_buff *skb,
@@ -2329,6 +2342,8 @@ error:
 	/* Release all descriptors that were used to map fragments of
 	 * this packet, as well as the corresponding DMA mappings
 	 */
+	 mv_pp2x_txq_inc_error(txq_pcpu, i);
+
 	for (i = i - 1; i >= 0; i--) {
 		tx_desc = txq->first_desc + i;
 		tx_desc_unmap_put(port->dev->dev.parent, txq, tx_desc);
@@ -2443,6 +2458,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 		/* Continue with other skb fragments */
 		if (mv_pp2x_tx_frag_process(port, skb, aggr_txq, txq)) {
 			MVPP2_PRINT_LINE();
+			mv_pp2x_txq_inc_error(txq_pcpu, 1);
 			tx_desc_unmap_put(port->dev->dev.parent, txq, tx_desc);
 			frags = 0;
 			goto out;
