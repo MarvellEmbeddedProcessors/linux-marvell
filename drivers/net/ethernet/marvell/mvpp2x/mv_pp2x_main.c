@@ -3828,7 +3828,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 
 	port->num_tx_queues = mv_pp2x_txq_number;
 	port->num_rx_queues = mv_pp2x_rxq_number;
-	dev->tx_queue_len = MVPP2_MAX_TXD;
+	dev->tx_queue_len = tx_queue_size;
 	dev->watchdog_timeo = 5 * HZ;
 	dev->netdev_ops = &mv_pp2x_netdev_ops;
 	mv_pp2x_set_ethtool_ops(dev);
