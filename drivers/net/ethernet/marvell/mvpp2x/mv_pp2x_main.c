@@ -545,8 +545,6 @@ int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 		return 0;
 	}
 
-	MVPP2_PRINT_VAR(buf_num);
-
 	for (i = 0; i < buf_num; i++)
 		mv_pp2x_rx_refill_new(port, bm_pool, (u32)bm_pool->id, 0);
 
@@ -598,7 +596,6 @@ static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_use_internal(
 		pkts_num = mv_pp2x_bm_buf_calc(log_pool,
 					       pool->port_map |
 					       (1 << port->id));
-	MVPP2_PRINT_VAR(pkts_num);
 	} else {
 		pkts_num = mv_pp2x_bm_buf_calc(log_pool,
 					       pool->port_map &
@@ -606,7 +603,6 @@ static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_use_internal(
 	}
 
 	add_num = pkts_num - pool->buf_num;
-	MVPP2_PRINT_VAR(add_num);
 
 	/* Allocate buffers for this pool */
 	if (add_num > 0) {
@@ -2401,7 +2397,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 					     txq_pcpu, frags)) {
 		netif_tx_stop_queue(nq);
 		frags = 0;
-		MVPP2_PRINT_LINE();
 		goto out;
 	}
 
@@ -2430,7 +2425,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely(dma_mapping_error(dev->dev.parent, buf_phys_addr))) {
 		mv_pp2x_txq_desc_put(txq);
 		frags = 0;
-		MVPP2_PRINT_LINE();
 		goto out;
 	}
 	pr_debug("buf_phys_addr=%x\n", (unsigned int)buf_phys_addr);
@@ -2450,7 +2444,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 			txq_pcpu, skb, tx_desc);
 	} else {
 		/* First but not Last */
-		MVPP2_PRINT_LINE();
 		tx_cmd |= MVPP2_TXD_F_DESC | MVPP2_TXD_PADDING_DISABLE;
 		tx_desc->command = tx_cmd;
 		mv_pp2x_txq_inc_put(port->priv->pp2_version,
@@ -2458,7 +2451,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 
 		/* Continue with other skb fragments */
 		if (mv_pp2x_tx_frag_process(port, skb, aggr_txq, txq)) {
-			MVPP2_PRINT_LINE();
 			mv_pp2x_txq_inc_error(txq_pcpu, 1);
 			tx_desc_unmap_put(port->dev->dev.parent, txq, tx_desc);
 			frags = 0;
@@ -2477,7 +2469,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
 
 	if (mv_pp2x_txq_free_count(txq_pcpu) < (MAX_SKB_FRAGS + 2)) {
-		MVPP2_PRINT_LINE();
 		netif_tx_stop_queue(nq);
 	}
 
@@ -2495,8 +2486,6 @@ out:
 		stats->tx_bytes += skb->len;
 		u64_stats_update_end(&stats->syncp);
 	} else {
-		MVPP2_PRINT_LINE();
-
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
 	}
@@ -2757,7 +2746,6 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 
 	mv_pp2x_egress_enable(port);
 	mv_pp2x_ingress_enable(port);
-	MVPP2_PRINT_VAR(mac->phy_mode);
 	/* Unmask link_event */
 #if !defined(CONFIG_MV_PP2_POLLING)
 	if (port->priv->pp2_version == PPV22)
@@ -3046,7 +3034,6 @@ int mv_pp2x_open(struct net_device *dev)
 	if (err)
 		goto err_free_all;
 
-	MVPP2_PRINT_2LINE();
 	return 0;
 
 err_free_all:
@@ -3055,11 +3042,9 @@ err_free_irq:
 #if !defined(CONFIG_MV_PP2_POLLING)
 err_cleanup_txqs:
 	mv_pp2x_cleanup_txqs(port);
-	MVPP2_PRINT_2LINE();
 #endif
 err_cleanup_rxqs:
 	mv_pp2x_cleanup_rxqs(port);
-	MVPP2_PRINT_2LINE();
 	return err;
 }
 
@@ -4247,14 +4232,11 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 	if (auto_cell_index && cell_index_dts_flag)
 		return -ENXIO;
 
-	MVPP2_PRINT_VAR(*cell_index);
-
 	/* PPV2 Address Space */
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "pp");
 	hw->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(hw->base))
 		return PTR_ERR(hw->base);
-	MVPP2_PRINT_2LINE();
 
 	if (priv->pp2xdata->pp2x_ver == PPV21) {
 		res = platform_get_resource_byname(pdev,
@@ -4272,8 +4254,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 			return PTR_ERR(hw->gop.gop_110.serdes.base);
 		hw->gop.gop_110.serdes.obj_size = 0x1000;
 
-		MVPP2_PRINT_2LINE();
-
 		/* xmib */
 		res = platform_get_resource_byname(pdev,
 			IORESOURCE_MEM, "xmib");
@@ -4282,8 +4262,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if (IS_ERR(hw->gop.gop_110.xmib.base))
 			return PTR_ERR(hw->gop.gop_110.xmib.base);
 		hw->gop.gop_110.xmib.obj_size = 0x0100;
-
-		MVPP2_PRINT_2LINE();
 
 		/* skipped led */
 
@@ -4303,8 +4281,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if (IS_ERR(hw->gop.gop_110.rfu1_base))
 			return PTR_ERR(hw->gop.gop_110.rfu1_base);
 
-		MVPP2_PRINT_2LINE();
-
 		/* skipped tai */
 
 		/* xsmi  */
@@ -4314,8 +4290,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 			devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(hw->gop.gop_110.xsmi_base))
 			return PTR_ERR(hw->gop.gop_110.xsmi_base);
-
-		MVPP2_PRINT_2LINE();
 
 		/* MSPG - base register */
 		res = platform_get_resource_byname(pdev,
@@ -4327,8 +4301,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		mspg_base = res->start;
 		mspg_end  = res->end;
 
-		MVPP2_PRINT_2LINE();
-
 		/* xpcs */
 		res = platform_get_resource_byname(pdev,
 			IORESOURCE_MEM, "xpcs");
@@ -4337,8 +4309,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		hw->gop.gop_110.xpcs_base =
 			(void *)(hw->gop.gop_110.mspg_base +
 				(res->start-mspg_base));
-
-		MVPP2_PRINT_2LINE();
 
 		hw->gop.gop_110.ptp.base =
 			(void *)(hw->gop.gop_110.mspg_base + 0x0800);
@@ -4353,7 +4323,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 			(res->start-mspg_base));
 		hw->gop.gop_110.gmac.obj_size = 0x1000;
 
-		MVPP2_PRINT_2LINE();
 
 		/* MSPG - xlg */
 		res = platform_get_resource_byname(pdev,
@@ -4365,15 +4334,11 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 			(res->start-mspg_base));
 		hw->gop.gop_110.xlg_mac.obj_size = 0x1000;
 
-		MVPP2_PRINT_2LINE();
-
 		/* Jumbo L4_checksum port */
 		if (of_property_read_u32(dn, "l4_chksum_jumbo_port",
 					 &priv->l4_chksum_jumbo_port))
 			/* Init as a invalid value */
 			priv->l4_chksum_jumbo_port = MVPP2_MAX_PORTS;
-
-		MVPP2_PRINT_VAR(priv->l4_chksum_jumbo_port);
 	}
 
 	hw->gop_core_clk = devm_clk_get(&pdev->dev, "gop_core_clk");
@@ -4412,10 +4377,8 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 
 	/* Get system's tclk rate */
 	hw->tclk = clk_get_rate(hw->pp_clk);
-	MVPP2_PRINT_VAR(hw->tclk);
 
 	*port_count = of_get_available_child_count(dn);
-	MVPP2_PRINT_VAR(*port_count);
 	if (*port_count == 0) {
 		dev_err(&pdev->dev, "no ports enabled\n");
 		err = -ENODEV;
@@ -4497,8 +4460,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		pr_crit("mvpp2: platform_data get failed\n");
 		goto err_clk;
 	}
-	MVPP2_PRINT_2LINE();
-
 	priv->pp2_version = priv->pp2xdata->pp2x_ver;
 
 	/* DMA Configruation */
@@ -4515,7 +4476,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	if (priv->pp2xdata->skb_base_addr == 0) {
 		skb = alloc_skb(MVPP2_SKB_TEST_SIZE, GFP_KERNEL);
-		MVPP2_PRINT_VAR(skb);
 		if (!skb) {
 			err = ENOMEM;
 			goto err_clk;
