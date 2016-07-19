@@ -1962,6 +1962,14 @@ struct mv_pp2x_cls_flow_info {
 	u32 flow_entry_rss2;
 };
 
+/* The flow entry could become lkp pointer in lookup table */
+enum mv_pp2x_cls_lkp_ptr_candidate {
+	MVPP2_LKP_PTR_FLOW_DEFAULT,
+	MVPP2_LKP_PTR_FLOW_VLAN,
+	MVPP2_LKP_PTR_FLOW_DSCP,
+	MVPP2_LKP_PTR_NUM
+};
+
 struct mv_pp2x_cls_shadow {
 	struct mv_pp2x_cls_flow_info *flow_info;
 	u32 flow_free_start; /* The start of free entry index in flow table */

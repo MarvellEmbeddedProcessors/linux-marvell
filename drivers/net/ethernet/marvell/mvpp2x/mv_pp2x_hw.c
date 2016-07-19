@@ -2917,10 +2917,10 @@ static void mv_pp2x_cls_sw_flow_eng_set(struct mv_pp2x_cls_flow_entry *fe,
 	fe->data[0] |= MVPP2_FLOW_PORT_ID_SEL_MASK;
 }
 
-/* To init flow table waccording to different flow */
-static inline void mv_pp2x_cls_flow_cos(struct mv_pp2x_hw *hw,
-					struct mv_pp2x_cls_flow_entry *fe,
-					int lkpid, int cos_type)
+/* To init flow table according to different flow */
+static void mv_pp2x_cls_flow_cos(struct mv_pp2x_hw *hw,
+				 struct mv_pp2x_cls_flow_entry *fe,
+				 int lkpid, int cos_type)
 {
 	int hek_num, field_id, lkp_type, is_last;
 	int entry_idx = hw->cls_shadow->flow_free_start;
@@ -2973,9 +2973,9 @@ static inline void mv_pp2x_cls_flow_cos(struct mv_pp2x_hw *hw,
 }
 
 /* Init flow entry for RSS hash in PP22 */
-static inline void mv_pp2x_cls_flow_rss_hash(struct mv_pp2x_hw *hw,
-					     struct mv_pp2x_cls_flow_entry *fe,
-					     int lkpid, int rss_mode)
+static void mv_pp2x_cls_flow_rss_hash(struct mv_pp2x_hw *hw,
+				      struct mv_pp2x_cls_flow_entry *fe,
+				      int lkpid, int rss_mode)
 {
 	int field_id[4] = {0};
 	int entry_idx = hw->cls_shadow->flow_free_start;
@@ -3197,7 +3197,7 @@ EXPORT_SYMBOL(mv_pp2x_cls_hw_udf_set);
 void mv_pp2x_cls_lookup_tbl_config(struct mv_pp2x_hw *hw)
 {
 	int index, flow_idx;
-	int data[3];
+	int data[MVPP2_LKP_PTR_NUM];
 	struct mv_pp2x_cls_lookup_entry le;
 	struct mv_pp2x_cls_flow_info *flow_info;
 
@@ -3207,21 +3207,29 @@ void mv_pp2x_cls_lookup_tbl_config(struct mv_pp2x_hw *hw)
 
 	for (index = 0; index < (MVPP2_PRS_FL_LAST - MVPP2_PRS_FL_START);
 		index++) {
+		int i, j;
+
 		flow_info = &(hw->cls_shadow->flow_info[index]);
-		data[0] = MVPP2_FLOW_TBL_SIZE;
-		data[1] = MVPP2_FLOW_TBL_SIZE;
-		data[2] = MVPP2_FLOW_TBL_SIZE;
+		/* Init data[] as invalid value */
+		for (i = 0; i < MVPP2_LKP_PTR_NUM; i++)
+			data[i] = MVPP2_FLOW_TBL_SIZE;
 		le.lkpid = hw->cls_shadow->flow_info[index].lkpid;
 		/* Find the min non-zero one in flow_entry_dflt,
 		 * flow_entry_vlan, and flow_entry_dscp
 		 */
+		j = 0;
 		if (flow_info->flow_entry_dflt)
-			data[0] = flow_info->flow_entry_dflt;
+			data[j++] = flow_info->flow_entry_dflt;
 		if (flow_info->flow_entry_vlan)
-			data[1] = flow_info->flow_entry_vlan;
+			data[j++] = flow_info->flow_entry_vlan;
 		if (flow_info->flow_entry_dscp)
-			data[2] = flow_info->flow_entry_dscp;
-		flow_idx = min(data[0], min(data[1], data[2]));
+			data[j++] = flow_info->flow_entry_dscp;
+		/* Get the lookup table entry pointer */
+		flow_idx = data[0];
+		for (i = 0; i < j; i++) {
+			if (flow_idx > data[i])
+				flow_idx = data[i];
+		}
 
 		/* Set flow pointer index */
 		mv_pp2x_cls_sw_lkp_flow_set(&le, flow_idx);
@@ -5740,7 +5748,7 @@ static int mv_pp2x_c2_rule_add(struct mv_pp2x_port *port,
 
 /* Fill the qos table with queue */
 static void mv_pp2x_cls_c2_qos_tbl_fill(struct mv_pp2x_port *port,
-					u8 tbl_sel, u8 start_queue)
+					u8 tbl_sel, u8 tbl_id, u8 start_queue)
 {
 	struct mv_pp2x_cls_c2_qos_entry qos_entry;
 	u32 pri, line_num;
@@ -5753,7 +5761,7 @@ static void mv_pp2x_cls_c2_qos_tbl_fill(struct mv_pp2x_port *port,
 		line_num = MVPP2_QOS_TBL_LINE_NUM_DSCP;
 
 	memset(&qos_entry, 0, sizeof(struct mv_pp2x_cls_c2_qos_entry));
-	qos_entry.tbl_id = port->id;
+	qos_entry.tbl_id = tbl_id;
 	qos_entry.tbl_sel = tbl_sel;
 
 	/* Fill the QoS dscp/pbit table */
@@ -5776,6 +5784,29 @@ static void mv_pp2x_cls_c2_qos_tbl_fill(struct mv_pp2x_port *port,
 	}
 }
 
+static void mv_pp2x_cls_c2_entry_common_set(struct mv_pp2x_c2_add_entry *entry,
+					    u8 port,
+					    u8 lkp_type)
+{
+	memset(entry, 0, sizeof(struct mv_pp2x_c2_add_entry));
+	/* Port info */
+	entry->port.port_type = MVPP2_SRC_PORT_TYPE_PHY;
+	entry->port.port_value = (1 << port);
+	entry->port.port_mask = 0xff;
+	/* Lookup type */
+	entry->lkp_type = lkp_type;
+	entry->lkp_type_mask = 0x3F;
+	/* Action info */
+	entry->action.color_act = MVPP2_COLOR_ACTION_TYPE_NO_UPDT_LOCK;
+	entry->action.pri_act = MVPP2_ACTION_TYPE_NO_UPDT_LOCK;
+	entry->action.dscp_act = MVPP2_ACTION_TYPE_NO_UPDT_LOCK;
+	entry->action.q_low_act = MVPP2_ACTION_TYPE_UPDT_LOCK;
+	entry->action.q_high_act = MVPP2_ACTION_TYPE_UPDT_LOCK;
+	entry->action.rss_act = MVPP2_ACTION_TYPE_UPDT_LOCK;
+	/* To CPU */
+	entry->action.frwd_act = MVPP2_FRWD_ACTION_TYPE_SWF_LOCK;
+}
+
 /* C2 rule set */
 int mv_pp2x_cls_c2_rule_set(struct mv_pp2x_port *port, u8 start_queue)
 {
@@ -5786,35 +5817,15 @@ int mv_pp2x_cls_c2_rule_set(struct mv_pp2x_port *port, u8 start_queue)
 	/* QoS of pbit rule */
 	for (lkp_type = MVPP2_CLS_LKP_VLAN_PRI; lkp_type <=
 			MVPP2_CLS_LKP_DEFAULT; lkp_type++) {
-		memset(&c2_init_entry, 0, sizeof(struct mv_pp2x_c2_add_entry));
-
-		/* Port info */
-		c2_init_entry.port.port_type = MVPP2_SRC_PORT_TYPE_PHY;
-		c2_init_entry.port.port_value = (1 << port->id);
-		c2_init_entry.port.port_mask = 0xff;
-		/* Lookup type */
-		c2_init_entry.lkp_type = lkp_type;
-		c2_init_entry.lkp_type_mask = 0x3F;
-		/* Action info */
-		c2_init_entry.action.color_act =
-				MVPP2_COLOR_ACTION_TYPE_NO_UPDT_LOCK;
-		c2_init_entry.action.pri_act =
-				MVPP2_ACTION_TYPE_NO_UPDT_LOCK;
-		c2_init_entry.action.dscp_act =
-				MVPP2_ACTION_TYPE_NO_UPDT_LOCK;
-		c2_init_entry.action.q_low_act =
-				MVPP2_ACTION_TYPE_UPDT_LOCK;
-		c2_init_entry.action.q_high_act =
-				MVPP2_ACTION_TYPE_UPDT_LOCK;
-		if (port->priv->pp2_version == PPV22)
-			c2_init_entry.action.rss_act =
-				MVPP2_ACTION_TYPE_UPDT_LOCK;
-		/* To CPU */
-		c2_init_entry.action.frwd_act =
-				MVPP2_FRWD_ACTION_TYPE_SWF_LOCK;
+		/* Set common part of C2 rule */
+		mv_pp2x_cls_c2_entry_common_set(&c2_init_entry,
+						port->id,
+						lkp_type);
 
 		/* QoS info */
 		if (lkp_type != MVPP2_CLS_LKP_DEFAULT) {
+			u8 tbl_sel;
+
 			/* QoS info from C2 QoS table */
 			/* Set the QoS table index equal to port ID */
 			c2_init_entry.qos_info.qos_tbl_index = port->id;
@@ -5825,16 +5836,17 @@ int mv_pp2x_cls_c2_rule_set(struct mv_pp2x_port *port, u8 start_queue)
 			if (lkp_type == MVPP2_CLS_LKP_VLAN_PRI) {
 				c2_init_entry.qos_info.qos_tbl_type =
 					MVPP2_QOS_TBL_SEL_PRI;
-				mv_pp2x_cls_c2_qos_tbl_fill(port,
-							MVPP2_QOS_TBL_SEL_PRI,
-							start_queue);
+				tbl_sel = MVPP2_QOS_TBL_SEL_PRI;
 			} else if (lkp_type == MVPP2_CLS_LKP_DSCP_PRI) {
 				c2_init_entry.qos_info.qos_tbl_type =
 					MVPP2_QOS_TBL_SEL_DSCP;
-				mv_pp2x_cls_c2_qos_tbl_fill(port,
-							MVPP2_QOS_TBL_SEL_DSCP,
-							start_queue);
+				tbl_sel = MVPP2_QOS_TBL_SEL_DSCP;
 			}
+			/* Fill qos table */
+			mv_pp2x_cls_c2_qos_tbl_fill(port,
+						    tbl_sel,
+						    port->id,
+						    start_queue);
 		} else {
 			/* QoS info from C2 action table */
 			c2_init_entry.qos_info.q_low_src =
@@ -6052,9 +6064,25 @@ int mv_pp22_rss_rxq_set(struct mv_pp2x_port *port, u32 cos_width)
 	return 0;
 }
 
+static void mv_pp22_c2_rss_attr_set(struct mv_pp2x_hw *hw, u32 index, bool en)
+{
+	int reg_val;
+
+	/* write index reg */
+	mv_pp2x_write(hw, MVPP2_CLS2_TCAM_IDX_REG, index);
+	/* Update rss_attr in reg CLSC2_ATTR2 */
+	reg_val = mv_pp2x_read(hw, MVPP2_CLS2_ACT_DUP_ATTR_REG);
+	if (en)
+		reg_val |= MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_MASK;
+	else
+		reg_val &= (~MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_MASK);
+
+	mv_pp2x_write(hw, MVPP2_CLS2_ACT_DUP_ATTR_REG, reg_val);
+}
+
 void mv_pp22_rss_c2_enable(struct mv_pp2x_port *port, bool en)
 {
-	int lkp_type, regVal;
+	int lkp_type;
 	int c2_index[MVPP2_CLS_LKP_MAX];
 	struct mv_pp2x_c2_rule_idx *rule_idx;
 
@@ -6065,26 +6093,14 @@ void mv_pp22_rss_c2_enable(struct mv_pp2x_port *port, bool en)
 	c2_index[MVPP2_CLS_LKP_DSCP_PRI] = rule_idx->dscp_pri_idx;
 	c2_index[MVPP2_CLS_LKP_DEFAULT] = rule_idx->default_rule_idx;
 
-	for (lkp_type = 0; lkp_type < MVPP2_CLS_LKP_MAX; lkp_type++) {
-		/* For lookup type of MVPP2_CLS_LKP_HASH,
-		 * there is no corresponding C2 rule, so skip it
-		 */
-		if (lkp_type == MVPP2_CLS_LKP_HASH)
-			continue;
-		/* write index reg */
-		mv_pp2x_write(&port->priv->hw, MVPP2_CLS2_TCAM_IDX_REG,
-			      c2_index[lkp_type]);
-		/* Update rss_attr in reg CLSC2_ATTR2 */
-		regVal = mv_pp2x_read(&port->priv->hw,
-				      MVPP2_CLS2_ACT_DUP_ATTR_REG);
-		if (en)
-			regVal |= MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_MASK;
-		else
-			regVal &= (~MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_MASK);
-
-		mv_pp2x_write(&port->priv->hw,
-			      MVPP2_CLS2_ACT_DUP_ATTR_REG, regVal);
-	}
+	/* For lookup type of MVPP2_CLS_LKP_HASH,
+	 * there is no corresponding C2 rule, so skip it
+	 */
+	for (lkp_type = MVPP2_CLS_LKP_VLAN_PRI; lkp_type < MVPP2_CLS_LKP_MAX;
+	     lkp_type++)
+		mv_pp22_c2_rss_attr_set(&port->priv->hw,
+					c2_index[lkp_type],
+					en);
 }
 
 /* Initialize Tx FIFO's */

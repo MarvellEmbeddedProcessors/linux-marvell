@@ -50,6 +50,8 @@
 /*--------------------------------------------------------------------*/
 #define NOT_IN_USE					(-1)
 #define IN_USE						(1)
+#define BYTE_BITS					8
+#define BYTE_MASK					0xFF
 #define DWORD_BITS_LEN					32
 #define DWORD_BYTES_LEN                                 4
 #define RETRIES_EXCEEDED				15000
