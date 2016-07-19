@@ -107,7 +107,7 @@
 
 #define MVPP2_PRINT_VAR(var) \
 	pr_info("%s(%d): "#var"=0x%lx\n", __func__, __LINE__,\
-		(unsigned long)var)
+		(u64)var)
 #define MVPP2_PRINT_VAR_NAME(var, name) \
 	pr_info("%s(%d): %s=0x%lx\n", __func__, __LINE__, name, var)
 #else
@@ -203,7 +203,7 @@ enum mv_pp2x_rss_nf_udp_mode {
 
 struct mv_mac_data {
 	u8			gop_index;
-	unsigned long		flags;
+	u64			flags;
 	/* Whether a PHY is present, and if yes, at which address. */
 	int			phy_addr;
 	phy_interface_t		phy_mode; /* RXAUI, SGMII, etc. */
@@ -212,10 +212,10 @@ struct mv_mac_data {
 	int			link_irq;
 	char			irq_name[IRQ_NAME_SIZE];
 	bool			force_link;
-	unsigned int		autoneg;
-	unsigned int		link;
-	unsigned int		duplex;
-	unsigned int		speed;
+	u32			autoneg;
+	u32			link;
+	u32			duplex;
+	u32			speed;
 };
 
 /* Masks used for pp3_emac flags */
@@ -506,7 +506,7 @@ struct mv_pp2x_port_pcpu {
 };
 
 struct queue_vector {
-	unsigned int irq;
+	u32 irq;
 	char irq_name[IRQ_NAME_SIZE];
 	struct napi_struct napi;
 	enum mv_pp2x_queue_vector_type qv_type;
@@ -557,7 +557,7 @@ struct mv_pp2x_port {
 	/* Per-CPU port control */
 	struct mv_pp2x_port_pcpu __percpu *pcpu;
 	/* Flags */
-	unsigned long flags;
+	u64 flags;
 
 	u16 tx_ring_size;
 	u16 rx_ring_size;
