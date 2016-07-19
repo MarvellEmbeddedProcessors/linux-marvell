@@ -872,9 +872,6 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		pr_err("%s: illegal port number %d", __func__, mac_num);
 		return -1;
 	}
-	MVPP2_PRINT_VAR(mac_num);
-	MVPP2_PRINT_VAR(mac->phy_mode);
-
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
 		mv_gop110_force_link_mode_set(gop, mac, false, true);
@@ -2714,8 +2711,6 @@ int mv_gop110_netc_init(struct gop_hw *gop,
 			u32 net_comp_config, enum mv_netc_phase phase)
 {
 	u32 c = net_comp_config;
-
-	MVPP2_PRINT_VAR(net_comp_config);
 
 	if (c & MV_NETC_GE_MAC0_RXAUI_L23)
 		mv_gop110_netc_mac_to_rxaui(gop, 0, phase, MV_NETC_LANE_23);
