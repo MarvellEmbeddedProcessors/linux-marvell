@@ -2045,8 +2045,8 @@ enum mv_pp2x_src_port_type {
 
 struct mv_pp2x_src_port {
 	enum mv_pp2x_src_port_type	port_type;
-	unsigned int			port_value;
-	unsigned int			port_mask;
+	u32				port_value;
+	u32				port_mask;
 };
 
 enum mv_pp2x_qos_tbl_sel {
@@ -2063,9 +2063,9 @@ struct mv_pp2x_engine_qos_info {
 	/* dscp pri table or none */
 	enum mv_pp2x_qos_tbl_sel	qos_tbl_type;
 	/* dscp or pri table index */
-	unsigned int		qos_tbl_index;
+	u32				qos_tbl_index;
 	/* policer id, 0xffff do not assign policer */
-	unsigned short		policer_id;
+	u16				policer_id;
 	/* pri/dscp comes from qos or act tbl */
 	enum mv_pp2x_qos_src_tbl	pri_dscp_src;
 	/* gemport comes from qos or act tbl */
@@ -2133,44 +2133,44 @@ enum mv_pp2x_frwd_action_type {
 
 struct mv_pp2x_engine_pkt_action {
 	enum mv_pp2x_color_action_type		color_act;
-	enum mv_pp2x_general_action_type		pri_act;
-	enum mv_pp2x_general_action_type		dscp_act;
-	enum mv_pp2x_general_action_type		gemp_act;
-	enum mv_pp2x_general_action_type		q_low_act;
-	enum mv_pp2x_general_action_type		q_high_act;
-	enum mv_pp2x_general_action_type		rss_act;
+	enum mv_pp2x_general_action_type	pri_act;
+	enum mv_pp2x_general_action_type	dscp_act;
+	enum mv_pp2x_general_action_type	gemp_act;
+	enum mv_pp2x_general_action_type	q_low_act;
+	enum mv_pp2x_general_action_type	q_high_act;
+	enum mv_pp2x_general_action_type	rss_act;
 	enum mv_pp2x_flowid_action_type		flowid_act;
 	enum mv_pp2x_frwd_action_type		frwd_act;
 };
 
 struct mv_pp2x_qos_value {
-	unsigned short		pri;
-	unsigned short		dscp;
-	unsigned short		gemp;
-	unsigned short		q_low;
-	unsigned short		q_high;
+	u16		pri;
+	u16		dscp;
+	u16		gemp;
+	u16		q_low;
+	u16		q_high;
 };
 
 struct mv_pp2x_engine_pkt_mod {
-	unsigned int	mod_cmd_idx;
-	unsigned int	mod_data_idx;
-	unsigned int	l4_chksum_update_flag;
+	u32		mod_cmd_idx;
+	u32		mod_data_idx;
+	u32		l4_chksum_update_flag;
 };
 
 struct mv_pp2x_duplicate_info {
 	/* pkt duplication flow id */
-	unsigned int	flow_id;
+	u32		flow_id;
 	/* pkt duplication count */
-	unsigned int	flow_cnt;
+	u32		flow_cnt;
 };
 
 /* The logic C2 entry, easy to understand and use */
 struct mv_pp2x_c2_add_entry {
 	struct mv_pp2x_src_port		port;
-	unsigned char			lkp_type;
-	unsigned char			lkp_type_mask;
+	u8				lkp_type;
+	u8				lkp_type_mask;
 	/* priority in this look_type */
-	unsigned int			priority;
+	u32				priority;
 	/* all the qos input */
 	struct mv_pp2x_engine_qos_info	qos_info;
 	/* update&lock info */
