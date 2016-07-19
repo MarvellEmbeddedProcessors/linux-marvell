@@ -1649,16 +1649,18 @@ int mv_pp2x_cos_classifier_set(struct mv_pp2x_port *port,
 					enum mv_pp2x_cos_classifier cos_mode)
 {
 	int index, flow_idx, lkpid;
-	int data[3];
+	int data[MVPP2_LKP_PTR_NUM];
 	struct mv_pp2x_hw *hw = &(port->priv->hw);
 	struct mv_pp2x_cls_flow_info *flow_info;
 
 	for (index = 0; index < (MVPP2_PRS_FL_LAST - MVPP2_PRS_FL_START);
 		index++) {
+		int i, j;
+
 		flow_info = &(hw->cls_shadow->flow_info[index]);
-		data[0] = MVPP2_FLOW_TBL_SIZE;
-		data[1] = MVPP2_FLOW_TBL_SIZE;
-		data[2] = MVPP2_FLOW_TBL_SIZE;
+		/* Init data[] as invalid value */
+		for (i = 0; i < MVPP2_LKP_PTR_NUM; i++)
+			data[i] = MVPP2_FLOW_TBL_SIZE;
 		lkpid = index + MVPP2_PRS_FL_START;
 		/* Prepare a temp table for the lkpid */
 		mv_pp2x_cls_flow_tbl_temp_copy(hw, lkpid, &flow_idx);
@@ -1667,22 +1669,21 @@ int mv_pp2x_cos_classifier_set(struct mv_pp2x_port *port,
 		mv_pp2x_cls_lkp_flow_set(hw, lkpid, 1, flow_idx);
 		/* Update original flow table */
 		/* First, remove the port from original table */
-		if (flow_info->flow_entry_dflt) {
-			mv_pp2x_cls_flow_port_del(hw,
-			flow_info->flow_entry_dflt,
-			port->id);
-			data[0] =
-			flow_info->flow_entry_dflt;
-		}
-		if (flow_info->flow_entry_vlan) {
-			mv_pp2x_cls_flow_port_del(hw,
-				flow_info->flow_entry_vlan, port->id);
-			data[1] = flow_info->flow_entry_vlan;
-		}
-		if (flow_info->flow_entry_dscp) {
-			mv_pp2x_cls_flow_port_del(hw,
-				flow_info->flow_entry_dscp, port->id);
-			data[2] = flow_info->flow_entry_dscp;
+		j = 0;
+		if (flow_info->flow_entry_dflt)
+			data[j++] = flow_info->flow_entry_dflt;
+
+		if (flow_info->flow_entry_vlan)
+			data[j++] = flow_info->flow_entry_vlan;
+
+		if (flow_info->flow_entry_dscp)
+			data[j++] = flow_info->flow_entry_dscp;
+
+		for (i = 0; i < j; i++) {
+			if (data[i] != MVPP2_FLOW_TBL_SIZE)
+				mv_pp2x_cls_flow_port_del(hw,
+							  data[i],
+							  port->id);
 		}
 
 		/* Second, update the port in original table */
@@ -1715,7 +1716,11 @@ int mv_pp2x_cos_classifier_set(struct mv_pp2x_port *port,
 				flow_info->flow_entry_dscp, port->id);
 		}
 		/* Restore lookup table */
-		flow_idx = min(data[0], min(data[1], data[2]));
+		flow_idx = data[0];
+		for (i = 0; i < j; i++) {
+			if (flow_idx > data[i])
+				flow_idx = data[i];
+		}
 		mv_pp2x_cls_lkp_flow_set(hw, lkpid, 0, flow_idx);
 		mv_pp2x_cls_lkp_flow_set(hw, lkpid, 1, flow_idx);
 	}
