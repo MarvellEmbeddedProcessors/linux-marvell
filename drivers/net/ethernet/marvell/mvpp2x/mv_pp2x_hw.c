@@ -3281,7 +3281,6 @@ int mv_pp2x_cls_init(struct platform_device *pdev, struct mv_pp2x_hw *hw)
 				GFP_KERNEL);
 	if (!hw->cls_shadow->flow_info)
 		return -ENOMEM;
-	MVPP2_PRINT_LINE();
 
 	/* Start from entry 1 to allocate flow table */
 	hw->cls_shadow->flow_free_start = 1;
