@@ -320,10 +320,8 @@ static inline void mv_pp2x_port_interrupts_enable(struct mv_pp2x_port *port)
 
 	for (i = 0; i < port->num_qvector; i++)
 		sw_thread_mask |= q_vec[i].sw_thread_mask;
-#if !defined(CONFIG_MV_PP2_POLLING)
 	mv_pp2x_write(&port->priv->hw, MVPP2_ISR_ENABLE_REG(port->id),
 		      MVPP2_ISR_ENABLE_INTERRUPT(sw_thread_mask));
-#endif
 }
 
 static inline void mv_pp2x_port_interrupts_disable(struct mv_pp2x_port *port)
@@ -341,12 +339,10 @@ static inline void mv_pp2x_port_interrupts_disable(struct mv_pp2x_port *port)
 
 static inline void mv_pp2x_qvector_interrupt_enable(struct queue_vector *q_vec)
 {
-#if !defined(CONFIG_MV_PP2_POLLING)
 	struct mv_pp2x_port *port = q_vec->parent;
 
 	mv_pp2x_write(&port->priv->hw, MVPP2_ISR_ENABLE_REG(port->id),
 		      MVPP2_ISR_ENABLE_INTERRUPT(q_vec->sw_thread_mask));
-#endif
 }
 
 static inline void mv_pp2x_qvector_interrupt_disable(struct queue_vector *q_vec)

@@ -88,16 +88,6 @@ static u8 first_log_rxq_queue;
 
 u32 debug_param;
 
-#if defined(CONFIG_MV_PP2_POLLING)
-#define MV_PP2_FPGA_PERODIC_TIME 100
-#endif
-
-#if defined(CONFIG_MV_PP2_POLLING)
-struct timer_list cpu_poll_timer;
-static int cpu_poll_timer_ref_cnt;
-static void mv_pp22_cpu_timer_callback(unsigned long data);
-#endif
-
 module_param_named(num_cos_queues, mv_pp2x_num_cos_queues, byte, S_IRUGO);
 MODULE_PARM_DESC(num_cos_queues, "Set number of cos_queues (1-8), def=4");
 
@@ -1561,16 +1551,12 @@ static void mv_pp21_link_event(struct net_device *dev)
 void mv_pp2_link_change_tasklet(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-#if !defined(CONFIG_MV_PP2_POLLING)
 	struct mv_pp2x_port *port = netdev_priv(dev);
-#endif
 
 	mv_pp22_dev_link_event(dev);
 
-#if !defined(CONFIG_MV_PP2_POLLING)
 	/* Unmask interrupt */
 	mv_gop110_port_events_unmask(&port->priv->hw.gop, &port->mac_data);
-#endif
 }
 
 static void mv_pp2x_timer_set(struct mv_pp2x_port_pcpu *port_pcpu)
@@ -2726,9 +2712,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	mv_pp2x_port_napi_enable(port);
 
 	/* Enable RX/TX interrupts on all CPUs */
-#if !defined(CONFIG_MV_PP2_POLLING)
 	mv_pp2x_port_interrupts_enable(port);
-#endif
 
 	if (port->priv->pp2_version == PPV21) {
 		mv_pp21_port_enable(port);
@@ -2747,10 +2731,8 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	mv_pp2x_egress_enable(port);
 	mv_pp2x_ingress_enable(port);
 	/* Unmask link_event */
-#if !defined(CONFIG_MV_PP2_POLLING)
 	if (port->priv->pp2_version == PPV22)
 		mv_gop110_port_events_unmask(gop, mac);
-#endif
 }
 
 /* Set hw internals when stopping port */
@@ -2985,13 +2967,11 @@ int mv_pp2x_open(struct net_device *dev)
 		goto err_cleanup_rxqs;
 	}
 
-#if !defined(CONFIG_MV_PP2_POLLING)
 	err = mv_pp2x_setup_irqs(dev, port);
 	if (err) {
 		netdev_err(port->dev, "cannot allocate irq's\n");
 		goto err_cleanup_txqs;
 	}
-#endif
 	/* In default link is down */
 	netif_carrier_off(port->dev);
 
@@ -3004,23 +2984,12 @@ int mv_pp2x_open(struct net_device *dev)
 			goto err_free_irq;
 	}
 
-#if !defined(CONFIG_MV_PP2_POLLING)
-
 	/* Unmask interrupts on all CPUs */
 	on_each_cpu(mv_pp2x_interrupts_unmask, port, 1);
 
 	/* Unmask shared interrupts */
 	mv_pp2x_shared_thread_interrupts_unmask(port);
-#endif
 
-#if defined(CONFIG_MV_PP2_POLLING)
-	if (cpu_poll_timer_ref_cnt == 0) {
-		cpu_poll_timer.expires  =
-		jiffies + msecs_to_jiffies(MV_PP2_FPGA_PERODIC_TIME*100);
-		add_timer(&cpu_poll_timer);
-		cpu_poll_timer_ref_cnt++;
-	}
-#endif
 	/* Port is init in uboot */
 
 	if (port->priv->pp2_version == PPV22)
@@ -3039,10 +3008,8 @@ int mv_pp2x_open(struct net_device *dev)
 err_free_all:
 err_free_irq:
 	mv_pp2x_cleanup_irqs(port);
-#if !defined(CONFIG_MV_PP2_POLLING)
 err_cleanup_txqs:
 	mv_pp2x_cleanup_txqs(port);
-#endif
 err_cleanup_rxqs:
 	mv_pp2x_cleanup_rxqs(port);
 	return err;
@@ -3054,24 +3021,18 @@ int mv_pp2x_stop(struct net_device *dev)
 	struct mv_pp2x_port_pcpu *port_pcpu;
 	int cpu;
 
-#if defined(CONFIG_MV_PP2_POLLING)
-	cpu_poll_timer_ref_cnt--;
-	if (cpu_poll_timer_ref_cnt == 0)
-		del_timer_sync(&cpu_poll_timer);
-#endif
 	mv_pp2x_stop_dev(port);
 
 	if (port->priv->pp2_version == PPV21)
 		mv_pp2x_phy_disconnect(port);
 
-#if !defined(CONFIG_MV_PP2_POLLING)
 	/* Mask interrupts on all CPUs */
 	on_each_cpu(mv_pp2x_interrupts_mask, port, 1);
 
 	/* Mask shared interrupts */
 	mv_pp2x_shared_thread_interrupts_mask(port);
 	mv_pp2x_cleanup_irqs(port);
-#endif
+
 	if (port->priv->pp2xdata->interrupt_tx_done == false) {
 		for_each_online_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
@@ -3437,11 +3398,9 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 		q_vec[cpu].sw_thread_id = sw_thread_index++;
 		q_vec[cpu].sw_thread_mask = (1<<q_vec[cpu].sw_thread_id);
 		q_vec[cpu].pending_cause_rx = 0;
-#if !defined(CONFIG_MV_PP2_POLLING)
 		if (port->priv->pp2xdata->interrupt_tx_done == true ||
 		    mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
 			q_vec[cpu].irq = port->of_irqs[irq_index++];
-#endif
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
 		if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
@@ -3460,9 +3419,7 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 		q_vec[cpu].sw_thread_id = irq_index;
 		q_vec[cpu].sw_thread_mask = (1<<q_vec[cpu].sw_thread_id);
 		q_vec[cpu].pending_cause_rx = 0;
-#if !defined(CONFIG_MV_PP2_POLLING)
 		q_vec[cpu].irq = port->of_irqs[irq_index];
-#endif
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
 		q_vec[cpu].first_rx_queue = 0;
@@ -3534,9 +3491,7 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 		return -EINVAL;
 
 	port->mac_data.gop_index = id;
-#if !defined(CONFIG_MV_PP2_POLLING)
 	port->mac_data.link_irq = irq_of_parse_and_map(emac_node, 0);
-#endif
 
 	phy_mode = of_get_phy_mode(emac_node);
 
@@ -3731,10 +3686,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	u32 id;
 	int features, err = 0, i, cpu;
 	int priv_common_regs_num = 2;
-#if !defined(CONFIG_MV_PP2_POLLING)
 	unsigned int *port_irqs;
 	int port_num_irq;
-#endif
+
 	dev = alloc_etherdev_mqs(sizeof(struct mv_pp2x_port),
 		mv_pp2x_txq_number, mv_pp2x_rxq_number);
 	if (!dev)
@@ -3785,7 +3739,6 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	}
 
 	/* Tx/Rx Interrupt */
-#if !defined(CONFIG_MV_PP2_POLLING)
 	port_num_irq = mv_pp2x_of_irq_count(port_node);
 	if (port_num_irq != priv->pp2xdata->num_port_irq) {
 		dev_err(&pdev->dev,
@@ -3806,7 +3759,6 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		}
 		port->num_irqs++;
 	}
-#endif
 
 	/*FIXME, full handling loopback */
 	if (of_property_read_bool(port_node, "marvell,loopback"))
@@ -3916,9 +3868,7 @@ err_free_txq_pcpu:
 err_free_stats:
 	free_percpu(port->stats);
 err_free_irq:
-#if !defined(CONFIG_MV_PP2_POLLING)
 	mv_pp2x_port_irqs_dispose_mapping(port);
-#endif
 err_free_netdev:
 	free_netdev(dev);
 	return err;
@@ -3937,9 +3887,7 @@ static void mv_pp2x_port_remove(struct mv_pp2x_port *port)
 	free_percpu(port->stats);
 	for (i = 0; i < port->num_tx_queues; i++)
 		free_percpu(port->txqs[i]->pcpu);
-#if !defined(CONFIG_MV_PP2_POLLING)
 	mv_pp2x_port_irqs_dispose_mapping(port);
-#endif
 	free_netdev(port->dev);
 }
 
@@ -4143,11 +4091,7 @@ static struct mv_pp2x_platform_data pp22_pdata = {
 	.mv_pp2x_rxq_short_pool_set = mv_pp22_rxq_short_pool_set,
 	.mv_pp2x_rxq_long_pool_set = mv_pp22_rxq_long_pool_set,
 	.multi_addr_space = true,
-#ifdef CONFIG_MV_PP2_POLLING
-	.interrupt_tx_done = false,
-#else
-	.interrupt_tx_done = true, /*temp. value*/
-#endif
+	.interrupt_tx_done = true,
 	.multi_hw_instance = true,
 	.mv_pp2x_port_queue_vectors_init = mv_pp22_queue_vectors_init,
 	.mv_pp2x_port_isr_rx_group_cfg = mv_pp22_port_isr_rx_group_cfg,
@@ -4543,12 +4487,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	mv_gop110_netc_init(&priv->hw.gop, net_comp_config,
 				MV_NETC_SECOND_PHASE);
 
-#if defined(CONFIG_MV_PP2_POLLING)
-	init_timer(&cpu_poll_timer);
-	cpu_poll_timer.function = mv_pp22_cpu_timer_callback;
-	cpu_poll_timer.data     = (unsigned long)pdev;
-#endif
-
 	platform_set_drvdata(pdev, priv);
 	pr_debug("Platform Device Name : %s\n", kobject_name(&pdev->dev.kobj));
 	return 0;
@@ -4644,52 +4582,6 @@ static void __exit mpp2_module_exit(void)
 	platform_driver_unregister(&mv_pp2x_driver);
 }
 
-#if defined(CONFIG_MV_PP2_POLLING)
-static void mv_pp22_cpu_timer_callback(unsigned long data)
-{
-	struct platform_device *pdev = (struct platform_device *)data;
-	struct mv_pp2x *priv = platform_get_drvdata(pdev);
-	int i = 0, j, err;
-	struct mv_pp2x_port *port;
-	u32 timeout;
-
-	/* Check link_change for initialized ports */
-	for (i = 0 ; i < priv->num_ports; i++) {
-		port = priv->port_list[i];
-		if (port && port->link_change_tasklet.func)
-			tasklet_schedule(&port->link_change_tasklet);
-	}
-
-	/* Schedule napi for ports with link_up. */
-	for (i = 0 ; i < priv->num_ports; i++) {
-		port = priv->port_list[i];
-		if (port && netif_carrier_ok(port->dev)) {
-			for (j = 0 ; j < num_active_cpus(); j++) {
-				if (j == smp_processor_id()) {
-					napi_schedule(&port->q_vector[j].napi);
-				} else {
-					err = smp_call_function_single(j,
-						(smp_call_func_t)napi_schedule,
-						&port->q_vector[j].napi, 1);
-					if (err)
-						pr_crit("napi_schedule error: %s\n",
-							__func__);
-				}
-			}
-		} else if (port) {
-			pr_debug("mvpp2(%d): port=%p netif_carrier_ok=%d\n",
-				__LINE__, port,
-				netif_carrier_ok(port->dev));
-		} else
-			pr_debug("mvpp2(%d): mv_pp22_cpu_timer_callback. PORT NULL !!!!\n",
-				__LINE__);
-	}
-
-	timeout = MV_PP2_FPGA_PERODIC_TIME;
-	mod_timer(&cpu_poll_timer, jiffies + msecs_to_jiffies(timeout));
-}
-
-#endif
 module_init(mpp2_module_init);
 module_exit(mpp2_module_exit);
 
