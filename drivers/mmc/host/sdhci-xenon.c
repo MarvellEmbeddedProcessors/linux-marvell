@@ -893,9 +893,9 @@ static void sdhci_xenon_reset_exit(struct sdhci_host *host,
 	/* Disable tuning request and auto-retuing again */
 	sdhci_xenon_setup_tuning(host);
 
-	sdhci_xenon_set_acg(host, false);
+	sdhci_xenon_set_acg(host, true);
 
-	sdhci_xenon_set_sdclk_off_idle(host, slotno, false);
+	sdhci_xenon_set_sdclk_off_idle(host, slotno, true);
 }
 
 static void sdhci_xenon_reset(struct sdhci_host *host, u8 mask)
