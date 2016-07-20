@@ -131,6 +131,7 @@
 			/* CON31 */
 			usb3@58000 {
 				status = "okay";
+				usb-phy = <&usb3_phy>;
 			};
 
 			usb@5e000 {
@@ -222,6 +223,21 @@
 				status = "okay";
 			};
 		};
+	};
+
+	usb3_phy: usb3-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&exp_usb3_vbus>;
+	};
+
+	exp_usb3_vbus: usb3-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb3-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
 	};
 };
 
