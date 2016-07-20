@@ -1296,6 +1296,15 @@ enum mv_pp2x_tag_type {
 #define MVPP2_PRS_TCAM_PROTO_MASK_L	0x3f
 #define MVPP2_PRS_DBL_VLANS_MAX		100
 
+/* There is TCAM range reserved for MAC entries, range size is 113
+ * 1 BC MAC entry for all ports
+ * 4 M2M entries, 1 entry per port, and 4 ports in all
+ * 36 UC/MC MAC filter entries per port
+ * It is assumed that there are 3 ports for filter, not including loopback port
+ */
+#define MVPP2_PRS_MAC_UC_MC_FILT_MAX	36
+#define MVPP2_PRS_MAC_RANGE_SIZE	113
+
 /* Tcam structure:
  * - lookup ID - 4 bits
  * - port ID - 1 byte
@@ -1316,7 +1325,10 @@ enum mv_pp2x_tag_type {
 /* Tcam entries ID */
 #define MVPP2_PE_DROP_ALL		0
 #define MVPP2_PE_FIRST_FREE_TID		1
-#define MVPP2_PE_LAST_FREE_TID		(MVPP2_PRS_TCAM_SRAM_SIZE - 31)
+#define MVPP2_PE_MAC_RANGE_END		(MVPP2_PRS_TCAM_SRAM_SIZE - 31)
+#define MVPP2_PE_MAC_RANGE_START	(MVPP2_PE_MAC_RANGE_END -\
+					 MVPP2_PRS_MAC_RANGE_SIZE + 1)
+#define MVPP2_PE_LAST_FREE_TID		(MVPP2_PE_MAC_RANGE_START - 1)
 #define MVPP2_PE_IP6_EXT_PROTO_UN	(MVPP2_PRS_TCAM_SRAM_SIZE - 30)
 #define MVPP2_PE_MAC_MC_IP6		(MVPP2_PRS_TCAM_SRAM_SIZE - 29)
 #define MVPP2_PE_IP6_ADDR_UN		(MVPP2_PRS_TCAM_SRAM_SIZE - 28)
@@ -1599,6 +1611,13 @@ enum mv_pp2x_prs_udf {
 	MVPP2_PRS_UDF_L2_USER,
 };
 
+/* L2 cast in parser result info */
+enum mv_pp2x_l2_cast {
+	MVPP2_PRS_MAC_UC,
+	MVPP2_PRS_MAC_MC,
+	MVPP2_PRS_MAC_BC,
+};
+
 /* Lookup ID */
 enum mv_pp2x_prs_lookup {
 	MVPP2_PRS_LU_MH,
@@ -1691,6 +1710,11 @@ enum mv_pp2x_cos_type {
 enum mv_pp2x_rss_hash_mode {
 	MVPP2_RSS_HASH_2T = 0,
 	MVPP2_RSS_HASH_5T,
+};
+
+enum mv_pp2x_mac_del_option {
+	MVPP2_DEL_MAC_ALL = 0,
+	MVPP2_DEL_MAC_NOT_IN_LIST,
 };
 
 struct mv_pp2x_prs_result_info {

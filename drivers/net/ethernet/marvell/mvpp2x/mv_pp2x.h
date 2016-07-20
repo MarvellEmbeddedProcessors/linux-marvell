@@ -458,6 +458,8 @@ struct mv_pp2x_param_config {
 	u32 rx_cpu_map; /* The CPU that port bind, each port has a nibble
 			* indexed by port_id, nibble value is CPU id
 			*/
+	u8 uc_filter_max; /* The unicast filter list max, multiple of 4 */
+	u8 mc_filter_max; /* The multicast filter list max, multiple of 4 */
 };
 
 /* Shared Packet Processor resources */
