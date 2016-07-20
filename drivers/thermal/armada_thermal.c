@@ -56,6 +56,7 @@
 #define AP806_TSEN_OUTPUT_MSB		512
 #define AP806_TSEN_OUTPUT_COMP		1024
 
+#define AP806_TSEN_INT_MASK		(0x1 << 22) /* Server Int Mask */
 #define CP110_TSEN_INT_MASK		(0x1 << 20) /* Server Int Mask */
 #define TSEN_INT_SUM_MASK		(0x1 << 1)
 
@@ -66,6 +67,10 @@
 #define TSEN_THRESH_OFFSET		16
 #define TSEN_THRESH_HYST_MASK		0x3
 #define TSEN_THRESH_HYST_OFFSET		26
+
+#define EXT_TSEN_THRESH_OFFSET		3
+#define EXT_TSEN_THRESH_HYST_MASK	0x3
+#define EXT_TSEN_THRESH_HYST_OFFSET	19
 
 struct armada_thermal_data;
 
@@ -128,6 +133,35 @@ inline unsigned int tsen_thresh_celsius_calc(int thresh_val,
 	return CELSIUS(mcelsius_temp);
 }
 
+inline unsigned int ap806_thresh_val_calc(unsigned int celsius_temp,
+					  struct armada_thermal_data *data)
+{
+	int thresh_val;
+
+	thresh_val = (int)((MCELSIUS(celsius_temp) * data->coef_div) -
+		data->coef_b) / (int)data->coef_m;
+
+	/* TSEN output format is signed as a 2s complement number
+	** ranging from-512 to +511. when MSB is set, need to
+	** calculate the complement number
+	*/
+	if (thresh_val < 0)
+		thresh_val += AP806_TSEN_OUTPUT_COMP;
+
+	return thresh_val & data->temp_mask;
+}
+
+inline unsigned int ap806_thresh_celsius_calc(int thresh_val,
+					 int hyst, struct armada_thermal_data *data)
+{
+	unsigned int mcelsius_temp;
+
+	mcelsius_temp = (((data->coef_m * (thresh_val + hyst)) +
+			  data->coef_b) / data->coef_div);
+
+	return CELSIUS(mcelsius_temp);
+}
+
 static void tsen_temp_set_threshold(struct platform_device *pdev,
 				    struct armada_thermal_priv *priv)
 {
@@ -169,6 +203,50 @@ static void tsen_temp_set_threshold(struct platform_device *pdev,
 	dev_info(&pdev->dev, "Overheat threshold between %d..%d\n",
 		tsen_thresh_celsius_calc(temp, -hyst, data),
 		tsen_thresh_celsius_calc(temp, hyst, data));
+}
+
+static void ap806_temp_set_threshold(struct platform_device *pdev,
+				     struct armada_thermal_priv *priv)
+{
+	int temp, reg, hyst;
+	unsigned int thresh;
+	struct armada_thermal_data *data = priv->data;
+	struct device_node *np = pdev->dev.of_node;
+
+	/* get threshold value from DT */
+	if (of_property_read_u32(np, "threshold", &thresh)) {
+		thresh = THRESH_DEFAULT_TEMP;
+		dev_warn(&pdev->dev, "no threshold in DT, using default\n");
+	}
+
+	/* get hysteresis value from DT */
+	if (of_property_read_u32(np, "hysteresis", &hyst)) {
+		hyst = THRESH_DEFAULT_HYST;
+		dev_warn(&pdev->dev, "no hysteresis in DT, using default\n");
+	}
+
+	temp = ap806_thresh_val_calc(thresh, data);
+
+	pr_debug("armada_thermal: Threshold is %d Hyst is %d\n", thresh, hyst);
+
+	reg = readl_relaxed(priv->control + TSEN_CONTROL_MSB_OFFSET);
+
+	/* Set Threshold */
+	reg &= ~(data->temp_mask << EXT_TSEN_THRESH_OFFSET);
+	reg |= (temp << EXT_TSEN_THRESH_OFFSET);
+
+	/* Set Hysteresis */
+	reg &= ~(EXT_TSEN_THRESH_HYST_MASK << TSEN_THRESH_HYST_OFFSET);
+	reg |= (hyst << EXT_TSEN_THRESH_HYST_OFFSET);
+
+	writel(reg, priv->control + TSEN_CONTROL_MSB_OFFSET);
+
+	/* hysteresis calculation is 2^(2+n) */
+	hyst = 1 << (hyst + 2);
+
+	dev_info(&pdev->dev, "Overheat threshold between %d..%d\n",
+		ap806_thresh_celsius_calc(temp, -hyst, data),
+		ap806_thresh_celsius_calc(temp, hyst, data));
 }
 
 static void armadaxp_init_sensor(struct platform_device *pdev,
@@ -289,6 +367,22 @@ static void armada_ap806_init_sensor(struct platform_device *pdev,
 	reg |= AP806_ENABLE;
 	writel(reg, priv->control);
 	mdelay(10);
+
+	/* Set thresholds */
+	ap806_temp_set_threshold(pdev, priv);
+
+	/* Clear on Read DFX temperature irqs cause */
+	reg = readl_relaxed(priv->dfx + 0x8);
+
+	/* Unmask DFX Temperature overheat and cooldown irqs */
+	reg = readl_relaxed(priv->dfx + 0xC);
+	reg |= AP806_TSEN_INT_MASK;
+	writel(reg, priv->dfx + 0xC);
+
+	/* Unmask DFX Server irq */
+	reg = readl_relaxed(priv->dfx + 0x4);
+	reg |= TSEN_INT_SUM_MASK;
+	writel(reg, priv->dfx + 0x4);
 }
 
 static void cp110_init_sensor(struct platform_device *pdev,
@@ -448,6 +542,31 @@ static irqreturn_t a38x_temp_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t ap806_temp_irq_handler(int irq, void *data)
+{
+	struct armada_thermal_priv *priv = (struct armada_thermal_priv *)data;
+	struct device *dev = &priv->pdev->dev;
+	u32 reg;
+
+	/* Mask Temp irq */
+	reg = readl_relaxed(priv->dfx + 0xC);
+	reg &= ~AP806_TSEN_INT_MASK;
+	writel(reg, priv->dfx + 0xC);
+
+	/* Read & Clear Temp irq cause */
+	reg = readl_relaxed(priv->dfx + 0x8);
+
+	if (reg & AP806_TSEN_INT_MASK)
+		dev_warn(dev, "Overheat critical high threshold temperature reached\n");
+
+	/* UnMask Temp irq */
+	reg = readl_relaxed(priv->dfx + 0xC);
+	reg |= AP806_TSEN_INT_MASK;
+	writel(reg, priv->dfx + 0xC);
+
+	return IRQ_HANDLED;
+}
+
 irqreturn_t cp110_temp_irq_handler(int irq, void *data)
 {
 	struct armada_thermal_priv *priv = (struct armada_thermal_priv *)data;
@@ -525,6 +644,7 @@ static const struct armada_thermal_data armada380_data = {
 static const struct armada_thermal_data armada_ap806_data = {
 	.is_valid = armada_is_valid,
 	.init_sensor = armada_ap806_init_sensor,
+	.temp_irq_handler = ap806_temp_irq_handler,
 	.is_valid_shift = 16,
 	.temp_shift = 0,
 	.temp_mask = 0x3ff,
@@ -532,6 +652,7 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.coef_m = 425,
 	.coef_div = 1,
 	.inverted = true,
+	.dfx_interrupt = 1,
 	.ops = &armada_ap806_ops,
 };
 
