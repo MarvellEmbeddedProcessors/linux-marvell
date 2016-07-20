@@ -502,10 +502,6 @@ static inline void mv_pp22_txdesc_phys_addr_set(dma_addr_t phys_addr,
 #else
 	*((dma_addr_t *)buf_phys_addr_p) = phys_addr;
 	*((u8 *)buf_phys_addr_p + sizeof(dma_addr_t)) = 0; /*5th byte*/
-
-	/*pr_crit("phys_addr=%x, buf_phys_addr_hw_cmd2=%d\n",
-	* phys_addr, tx_desc->u.pp22.buf_phys_addr_hw_cmd2);
-	*/
 #endif
 }
 
