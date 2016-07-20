@@ -1493,14 +1493,14 @@ static void mv_pp22_dev_link_event(struct net_device *dev)
 
 		netif_carrier_on(dev);
 		netif_tx_wake_all_queues(dev);
-		netdev_info(dev, "%s: link up\n", dev->name);
+		netdev_info(dev, "link up\n");
 		port->mac_data.flags |= MV_EMAC_F_LINK_UP;
 	} else {
 		if (!netif_carrier_ok(dev))
 			return;
 		netif_carrier_off(dev);
 		netif_tx_stop_all_queues(dev);
-		netdev_info(dev, "%s: link down\n", dev->name);
+		netdev_info(dev, "link down\n");
 		port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
 	}
 }
