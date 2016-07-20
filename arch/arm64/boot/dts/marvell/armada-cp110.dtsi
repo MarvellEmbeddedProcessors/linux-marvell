@@ -218,7 +218,12 @@ cpxor1@6c0000 {
 
 thermal@400078 {
 	compatible = "marvell,armada-cp110-thermal";
-	reg = <0x400078 0x4>, <0x400070 0x8>;
+	reg = <0x400078 0x4>,
+	      <0x400070 0x8>,
+	      <0x400100 0x20>;
+	interrupts-extended = <&sei 37>;
+	threshold = <100>;
+	hysteresis = <2>;
 	status = "okay";
 };
 
