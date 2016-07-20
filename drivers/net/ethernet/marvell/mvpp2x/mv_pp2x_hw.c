@@ -864,9 +864,6 @@ static int mv_pp2x_prs_tcam_first_free(struct mv_pp2x_hw *hw,
 {
 	int tid;
 
-	/*pr_crit("mv_pp2x_prs_tcam_first_free start=%d, end=%d, caller=%pS\n",
-	 * start, end, __builtin_return_address(0));
-	 */
 	if (start > end)
 		swap(start, end);
 
@@ -877,7 +874,7 @@ static int mv_pp2x_prs_tcam_first_free(struct mv_pp2x_hw *hw,
 		if (!hw->prs_shadow[tid].valid)
 			return tid;
 	}
-	pr_crit("Out of TCAM Entries !!: %s(%d)\n", __FILENAME__, __LINE__);
+	pr_err("Out of TCAM Entries !!: %s(%d)\n", __FILENAME__, __LINE__);
 	return -EINVAL;
 }
 
@@ -1653,10 +1650,6 @@ static void mv_pp2x_prs_def_flow_init(struct mv_pp2x_hw *hw)
 
 		/* Update shadow table and hw entry */
 		mv_pp2x_prs_shadow_set(hw, pe.index, MVPP2_PRS_LU_FLOWS);
-
-		/*pr_crit("mv_pp2x_prs_def_flow_init: port(%d), index(%d)\n",
-		 * port, pe.index);
-		 */
 		mv_pp2x_prs_hw_write(hw, &pe);
 	}
 }
@@ -2688,10 +2681,6 @@ int mv_pp2x_prs_def_flow(struct mv_pp2x_port *port)
 
 		/* Update shadow table */
 		mv_pp2x_prs_shadow_set(hw, pe->index, MVPP2_PRS_LU_FLOWS);
-
-		/*pr_crit("mv_pp2x_prs_def_flow: index(%d) port->id\n",
-		 * pe->index, port->id);
-		 */
 	}
 
 	mv_pp2x_prs_tcam_port_map_set(pe, (1 << port->id));
