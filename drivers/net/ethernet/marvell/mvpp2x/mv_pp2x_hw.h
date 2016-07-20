@@ -524,11 +524,13 @@ int mv_pp2x_prs_default_init(struct platform_device *pdev,
 void mv_pp2x_prs_mac_promisc_set(struct mv_pp2x_hw *hw, int port, bool add);
 void mv_pp2x_prs_mac_multi_set(struct mv_pp2x_hw *hw, int port, int index,
 			       bool add);
-int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_hw *hw, int port,
+int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_port *port,
 			      const u8 *da, bool add);
 int mv_pp2x_prs_def_flow(struct mv_pp2x_port *port);
 int mv_pp2x_prs_flow_set(struct mv_pp2x_port *port);
-void mv_pp2x_prs_mcast_del_all(struct mv_pp2x_hw *hw, int port);
+void mv_pp2x_prs_mac_entry_del(struct mv_pp2x_port *port,
+			       enum mv_pp2x_l2_cast l2_cast,
+			       enum mv_pp2x_mac_del_option op);
 int mv_pp2x_prs_tag_mode_set(struct mv_pp2x_hw *hw, int port, int type);
 int mv_pp2x_prs_update_mac_da(struct net_device *dev, const u8 *da);
 void mv_pp2x_prs_flow_id_attr_init(void);

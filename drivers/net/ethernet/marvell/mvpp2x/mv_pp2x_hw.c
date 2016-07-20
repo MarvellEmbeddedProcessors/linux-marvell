@@ -2431,8 +2431,8 @@ mv_pp2x_prs_mac_da_range_find(struct mv_pp2x_hw *hw, int pmap, const u8 *da,
 	mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_MAC);
 
 	/* Go through the all entires with MVPP2_PRS_LU_MAC */
-	for (tid = MVPP2_PE_FIRST_FREE_TID;
-	     tid <= MVPP2_PE_LAST_FREE_TID; tid++) {
+	for (tid = MVPP2_PE_MAC_RANGE_START;
+	     tid <= MVPP2_PE_MAC_RANGE_END; tid++) {
 		unsigned int entry_pmap;
 
 		if (!hw->prs_shadow[tid].valid ||
@@ -2453,16 +2453,15 @@ mv_pp2x_prs_mac_da_range_find(struct mv_pp2x_hw *hw, int pmap, const u8 *da,
 }
 
 /* Update parser's mac da entry */
-int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_hw *hw, int port,
-				   const u8 *da, bool add)
+int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_port *port, const u8 *da, bool add)
 {
 	struct mv_pp2x_prs_entry *pe;
-	unsigned int pmap, len, ri;
+	unsigned int pmap, len, ri, tid;
 	unsigned char mask[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-	int tid;
+	struct mv_pp2x_hw *hw = &port->priv->hw;
 
 	/* Scan TCAM and see if entry with this <MAC DA, port> already exist */
-	pe = mv_pp2x_prs_mac_da_range_find(hw, (1 << port), da, mask,
+	pe = mv_pp2x_prs_mac_da_range_find(hw, (1 << port->id), da, mask,
 					   MVPP2_PRS_UDF_MAC_DEF);
 
 	/* No such entry */
@@ -2471,18 +2470,9 @@ int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_hw *hw, int port,
 			return 0;
 
 		/* Create new TCAM entry */
-		/* Find first range mac entry*/
-		for (tid = MVPP2_PE_FIRST_FREE_TID;
-		     tid <= MVPP2_PE_LAST_FREE_TID; tid++)
-			if (hw->prs_shadow[tid].valid &&
-			    (hw->prs_shadow[tid].lu == MVPP2_PRS_LU_MAC) &&
-			    (hw->prs_shadow[tid].udf ==
-						       MVPP2_PRS_UDF_MAC_RANGE))
-				break;
-
-		/* Go through the all entries from first to last */
-		tid = mv_pp2x_prs_tcam_first_free(hw, MVPP2_PE_FIRST_FREE_TID,
-						  tid - 1);
+		/* Go through all entries from first to last in MAC range */
+		tid = mv_pp2x_prs_tcam_first_free(hw, MVPP2_PE_MAC_RANGE_START,
+						  MVPP2_PE_MAC_RANGE_END);
 		if (tid < 0)
 			return tid;
 
@@ -2497,7 +2487,7 @@ int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_hw *hw, int port,
 	}
 
 	/* Update port mask */
-	mv_pp2x_prs_tcam_port_set(pe, port, add);
+	mv_pp2x_prs_tcam_port_set(pe, port->id, add);
 
 	/* Invalidate the entry if no ports are left enabled */
 	pmap = mv_pp2x_prs_tcam_port_map_get(pe);
@@ -2526,7 +2516,10 @@ int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_hw *hw, int port,
 	else if (is_multicast_ether_addr(da))
 		ri = MVPP2_PRS_RI_L2_MCAST;
 	else
-		ri = MVPP2_PRS_RI_L2_UCAST | MVPP2_PRS_RI_MAC_ME_MASK;
+		ri = MVPP2_PRS_RI_L2_UCAST;
+	/* Set M2M */
+	if (ether_addr_equal(da, port->dev->dev_addr))
+		ri |= MVPP2_PRS_RI_MAC_ME_MASK;
 
 	mv_pp2x_prs_sram_ri_update(pe, ri, MVPP2_PRS_RI_L2_CAST_MASK |
 				   MVPP2_PRS_RI_MAC_ME_MASK);
@@ -2550,33 +2543,75 @@ int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_hw *hw, int port,
 int mv_pp2x_prs_update_mac_da(struct net_device *dev, const u8 *da)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
+	u8 old_da[ETH_ALEN];
 	int err;
 
-	/* Remove old parser entry */
-	err = mv_pp2x_prs_mac_da_accept(&port->priv->hw,
-		port->id, dev->dev_addr, false);
-	if (err)
-		return err;
+	if (ether_addr_equal(da, dev->dev_addr))
+		return 0;
 
-	/* Add new parser entry */
-	err = mv_pp2x_prs_mac_da_accept(&port->priv->hw, port->id, da, true);
+	/* Record old DA */
+	ether_addr_copy(old_da, dev->dev_addr);
+
+	/* Remove old parser entry */
+	err = mv_pp2x_prs_mac_da_accept(port, dev->dev_addr, false);
 	if (err)
 		return err;
 
 	/* Set addr in the device */
 	ether_addr_copy(dev->dev_addr, da);
 
+	/* Add new parser entry */
+	err = mv_pp2x_prs_mac_da_accept(port, da, true);
+	if (err) {
+		/* Restore addr in the device */
+		ether_addr_copy(dev->dev_addr, old_da);
+		return err;
+	}
+
 	return 0;
 }
 
-/* Delete all port's multicast simple (not range) entries */
-void mv_pp2x_prs_mcast_del_all(struct mv_pp2x_hw *hw, int port)
+static bool mv_pp2x_mac_in_uc_list(struct net_device *dev, const u8 *da)
+{
+	struct netdev_hw_addr *ha;
+
+	if (!netdev_uc_count(dev))
+		return false;
+
+	netdev_for_each_uc_addr(ha, dev) {
+		if (ether_addr_equal(da, dev->dev_addr))
+			return true;
+	}
+
+	return false;
+}
+
+static bool mv_pp2x_mac_in_mc_list(struct net_device *dev, const u8 *da)
+{
+	struct netdev_hw_addr *ha;
+
+	if (!netdev_mc_count(dev))
+		return false;
+
+	netdev_for_each_mc_addr(ha, dev) {
+		if (ether_addr_equal(da, dev->dev_addr))
+			return true;
+	}
+
+	return false;
+}
+
+/* Delete port's uc/mc/bc simple (not range) entries with options */
+void mv_pp2x_prs_mac_entry_del(struct mv_pp2x_port *port,
+			       enum mv_pp2x_l2_cast l2_cast,
+			       enum mv_pp2x_mac_del_option op)
 {
 	struct mv_pp2x_prs_entry pe;
+	struct mv_pp2x_hw *hw = &port->priv->hw;
 	int index, tid;
 
-	for (tid = MVPP2_PE_FIRST_FREE_TID;
-	     tid <= MVPP2_PE_LAST_FREE_TID; tid++) {
+	for (tid = MVPP2_PE_MAC_RANGE_START;
+	     tid <= MVPP2_PE_MAC_RANGE_END; tid++) {
 		unsigned char da[ETH_ALEN], da_mask[ETH_ALEN];
 
 		if (!hw->prs_shadow[tid].valid ||
@@ -2592,10 +2627,34 @@ void mv_pp2x_prs_mcast_del_all(struct mv_pp2x_hw *hw, int port)
 		for (index = 0; index < ETH_ALEN; index++)
 			mv_pp2x_prs_tcam_data_byte_get(&pe, index, &da[index],
 						       &da_mask[index]);
-
-		if (is_multicast_ether_addr(da) && !is_broadcast_ether_addr(da))
-			/* Delete this entry */
-			mv_pp2x_prs_mac_da_accept(hw, port, da, false);
+		switch (l2_cast) {
+		case MVPP2_PRS_MAC_UC:
+			/* Do not delete M2M entry */
+			if (is_unicast_ether_addr(da) &&
+			    !ether_addr_equal(da, port->dev->dev_addr)) {
+				if (op == MVPP2_DEL_MAC_NOT_IN_LIST &&
+				    mv_pp2x_mac_in_uc_list(port->dev, da))
+					continue;
+				/* Delete this entry */
+				mv_pp2x_prs_mac_da_accept(port, da, false);
+			}
+			break;
+		case MVPP2_PRS_MAC_MC:
+			if (is_multicast_ether_addr(da) &&
+			    !is_broadcast_ether_addr(da)) {
+				if (op == MVPP2_DEL_MAC_NOT_IN_LIST &&
+				    mv_pp2x_mac_in_mc_list(port->dev, da))
+					continue;
+				/* Delete this entry */
+				mv_pp2x_prs_mac_da_accept(port, da, false);
+			}
+			break;
+		case MVPP2_PRS_MAC_BC:
+			if (is_broadcast_ether_addr(da))
+				/* Delete this entry */
+				mv_pp2x_prs_mac_da_accept(port, da, false);
+			break;
+		}
 	}
 }
 

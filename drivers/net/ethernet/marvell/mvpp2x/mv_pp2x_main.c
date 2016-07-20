@@ -85,6 +85,7 @@ static u32 port_cpu_bind_map;
 static u8 first_bm_pool;
 static u8 first_addr_space;
 static u8 first_log_rxq_queue;
+static u8 uc_filter_max = 4;
 
 u32 debug_param;
 
@@ -118,6 +119,10 @@ MODULE_PARM_DESC(tx_queue_size, "Tx queue size");
 
 module_param(buffer_scaling, ushort, S_IRUGO);
 MODULE_PARM_DESC(buffer_scaling, "Buffer scaling (TBD)");
+
+module_param(uc_filter_max, byte, S_IRUGO);
+MODULE_PARM_DESC(uc_filter_max,
+		 "Set unicast filter max size, it is multiple of 4. def=4");
 
 module_param(debug_param, uint, S_IRUGO);
 MODULE_PARM_DESC(debug_param,
@@ -2886,14 +2891,13 @@ int mv_pp2x_open_cls(struct net_device *dev)
 		return err;
 	}
 
-	err = mv_pp2x_prs_mac_da_accept(hw, port->id, mac_bcast, true);
+	err = mv_pp2x_prs_mac_da_accept(port, mac_bcast, true);
 	if (err) {
 		netdev_err(dev, "mv_pp2x_prs_mac_da_accept BC failed\n");
 		return err;
 	}
 
-	err = mv_pp2x_prs_mac_da_accept(hw, port->id,
-				      dev->dev_addr, true);
+	err = mv_pp2x_prs_mac_da_accept(port, dev->dev_addr, true);
 	if (err) {
 		netdev_err(dev, "mv_pp2x_prs_mac_da_accept M2M failed\n");
 		return err;
@@ -3071,6 +3075,36 @@ int mv_pp2x_stop(struct net_device *dev)
 	return 0;
 }
 
+static void mv_pp2x_set_rx_promisc(struct mv_pp2x_port *port)
+{
+	struct mv_pp2x_hw *hw = &port->priv->hw;
+	int id = port->id;
+
+	/* Accept all: Multicast + Unicast */
+	mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_ALL, true);
+	mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_IP6, true);
+	/* Enter promisc mode */
+	mv_pp2x_prs_mac_promisc_set(hw, id, true);
+	/* Remove all port->id's mcast enries */
+	mv_pp2x_prs_mac_entry_del(port, MVPP2_PRS_MAC_MC, MVPP2_DEL_MAC_ALL);
+	/* Remove all port->id's ucast enries except M2M entry */
+	mv_pp2x_prs_mac_entry_del(port, MVPP2_PRS_MAC_UC, MVPP2_DEL_MAC_ALL);
+}
+
+static void mv_pp2x_set_rx_allmulti(struct mv_pp2x_port *port)
+{
+	struct mv_pp2x_hw *hw = &port->priv->hw;
+	int id = port->id;
+
+	/* Accept all multicast */
+	mv_pp2x_prs_mac_multi_set(hw, id,
+				  MVPP2_PE_MAC_MC_ALL, true);
+	mv_pp2x_prs_mac_multi_set(hw, id,
+				  MVPP2_PE_MAC_MC_IP6, true);
+	/* Remove all multicast filter entries from parser */
+	mv_pp2x_prs_mac_entry_del(port, MVPP2_PRS_MAC_MC, MVPP2_DEL_MAC_ALL);
+}
+
 /* register unicast and multicast addresses */
 static void mv_pp2x_set_rx_mode(struct net_device *dev)
 {
@@ -3081,28 +3115,51 @@ static void mv_pp2x_set_rx_mode(struct net_device *dev)
 	int err;
 
 	if (dev->flags & IFF_PROMISC) {
-		/* Accept all: Multicast + Unicast */
-		mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_ALL, true);
-		mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_IP6, true);
-		/* Remove all port->id's mcast enries */
-		mv_pp2x_prs_mcast_del_all(hw, id);
-		/* Enter promisc mode */
-		mv_pp2x_prs_mac_promisc_set(hw, id, true);
+		mv_pp2x_set_rx_promisc(port);
 	} else {
+		/* Put dev into promisc if MAC num greater than uc filter max */
+		if (netdev_uc_count(dev) > port->priv->pp2_cfg.uc_filter_max) {
+			mv_pp2x_set_rx_promisc(port);
+			return;
+		}
+		/* Remove old enries not in uc list except M2M entry */
+		mv_pp2x_prs_mac_entry_del(port,
+					  MVPP2_PRS_MAC_UC,
+					  MVPP2_DEL_MAC_NOT_IN_LIST);
+		/* Add all entries into to uc mac addr filter list */
+		netdev_for_each_uc_addr(ha, dev) {
+			err = mv_pp2x_prs_mac_da_accept(port,
+							ha->addr, true);
+			if (err)
+				netdev_err(dev,
+					   "[%2x:%2x:%2x:%2x:%2x:%x]add fail\n",
+					   ha->addr[0], ha->addr[1],
+					   ha->addr[2], ha->addr[3],
+					   ha->addr[4], ha->addr[5]);
+		}
+		/* Leave promisc mode */
+		mv_pp2x_prs_mac_promisc_set(hw, id, false);
+
 		if (dev->flags & IFF_ALLMULTI) {
-			/* Accept all multicast */
-			mv_pp2x_prs_mac_multi_set(hw, id,
-						  MVPP2_PE_MAC_MC_ALL, true);
-			mv_pp2x_prs_mac_multi_set(hw, id,
-						  MVPP2_PE_MAC_MC_IP6, true);
-			/* Remove all port->id's mcast enries */
-			mv_pp2x_prs_mcast_del_all(hw, id);
+			mv_pp2x_set_rx_allmulti(port);
 		} else {
-			/* Accept only initialized multicast */
+			/* Put dev allmulti if MAC num exceeds mc filter max */
+			if (netdev_mc_count(dev) >
+					port->priv->pp2_cfg.mc_filter_max) {
+				mv_pp2x_set_rx_allmulti(port);
+				return;
+			}
+			/* Remove old mcast entries not in mc list */
+			mv_pp2x_prs_mac_entry_del(port,
+						  MVPP2_PRS_MAC_MC,
+						  MVPP2_DEL_MAC_NOT_IN_LIST);
+			/* Add all entries into to mc mac filter list */
 			if (!netdev_mc_empty(dev)) {
 				netdev_for_each_mc_addr(ha, dev) {
-					err = mv_pp2x_prs_mac_da_accept(hw,
-							id, ha->addr, true);
+					err =
+					mv_pp2x_prs_mac_da_accept(port,
+								  ha->addr,
+								  true);
 					if (err)
 						netdev_err(dev,
 						"MAC[%2x:%2x:%2x:%2x:%2x:%2x] add failed\n",
@@ -3111,13 +3168,12 @@ static void mv_pp2x_set_rx_mode(struct net_device *dev)
 						ha->addr[4], ha->addr[5]);
 				}
 			}
+			/* Reject other MC mac entries */
 			mv_pp2x_prs_mac_multi_set(hw, id,
 						  MVPP2_PE_MAC_MC_ALL, false);
 			mv_pp2x_prs_mac_multi_set(hw, id,
 						  MVPP2_PE_MAC_MC_IP6, false);
 		}
-		/* Leave promisc mode */
-		mv_pp2x_prs_mac_promisc_set(hw, id, false);
 	}
 }
 
@@ -3861,6 +3917,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	if (mv_pp2x_queue_mode)
 		dev->hw_features |= NETIF_F_RXHASH;
 	dev->vlan_features |= features;
+
+	dev->priv_flags |= IFF_UNICAST_FLT;
+
 	err = register_netdev(dev);
 	if (err < 0) {
 		dev_err(&pdev->dev, "failed to register netdev\n");
@@ -4156,6 +4215,9 @@ static void mv_pp2x_init_config(struct mv_pp2x_param_config *pp2_cfg,
 	pp2_cfg->rss_cfg.rss_mode = rss_mode;
 
 	pp2_cfg->rx_cpu_map = port_cpu_bind_map;
+
+	pp2_cfg->uc_filter_max = uc_filter_max;
+	pp2_cfg->mc_filter_max = MVPP2_PRS_MAC_UC_MC_FILT_MAX - uc_filter_max;
 }
 
 static void mv_pp2x_init_rxfhindir(struct mv_pp2x *pp2)
