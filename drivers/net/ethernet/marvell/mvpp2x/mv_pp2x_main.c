@@ -535,8 +535,10 @@ int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 		return 0;
 	}
 
+	preempt_disable();
 	for (i = 0; i < buf_num; i++)
 		mv_pp2x_rx_refill_new(port, bm_pool, (u32)bm_pool->id, 0);
+	preempt_enable();
 
 	/* Update BM driver with number of buffers added to pool */
 	bm_pool->buf_num += i;
@@ -1022,10 +1024,13 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 	u8 *buf_cookie;
 	dma_addr_t buf_phys_addr;
 
+	preempt_disable();
 	rx_received = mv_pp2x_rxq_received(port, rxq->id);
+	preempt_enable();
 	if (!rx_received)
 		return;
 
+	preempt_disable();
 	for (i = 0; i < rx_received; i++) {
 		struct mv_pp2x_rx_desc *rx_desc =
 			mv_pp2x_rxq_next_desc_get(rxq);
@@ -1040,6 +1045,7 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 		mv_pp2x_pool_refill(port->priv, MVPP2_RX_DESC_POOL(rx_desc),
 			buf_phys_addr, buf_cookie);
 	}
+	preempt_enable();
 	mv_pp2x_rxq_status_update(port, rxq->id, rx_received, rx_received);
 }
 

@@ -27,9 +27,11 @@
 
 static inline void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
 {
-	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+	int cpu = get_cpu();
+	void *reg_ptr = hw->cpu_base[cpu] + offset;
 
 	writel(data, reg_ptr);
+	put_cpu();
 }
 
 static inline void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
@@ -41,10 +43,12 @@ static inline void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 
 
 static inline u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 {
-	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+	int cpu = get_cpu();
+	void *reg_ptr = hw->cpu_base[cpu] + offset;
 	u32 val;
 
 	val = readl(reg_ptr);
+	put_cpu();
 
 	return val;
 }
