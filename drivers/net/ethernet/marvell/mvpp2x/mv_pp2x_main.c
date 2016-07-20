@@ -425,8 +425,8 @@ int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
 	struct mv_pp2x_hw *hw = &priv->hw;
 
 	if ((priv->num_pools + 1) > MVPP2_BM_POOLS_MAX_ALLOC_NUM) {
-		pr_err("Unable to add pool. Max BM pool alloc reached %d\n",
-		       priv->num_pools + 1);
+		dev_err(dev, "Unable to add pool. Max BM pool alloc reached %d\n",
+			priv->num_pools + 1);
 		return -ENOMEM;
 	}
 
@@ -435,8 +435,8 @@ int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
 		MVPP2_BM_STATE_MASK;
 
 	if (enabled) {
-		pr_info("%s pool %d already enabled. Ignoring request\n",
-			__func__, pool);
+		dev_info(dev, "%s pool %d already enabled. Ignoring request\n",
+			 __func__, pool);
 		return 0;
 	}
 
@@ -1478,14 +1478,14 @@ static void mv_pp22_dev_link_event(struct net_device *dev)
 
 		netif_carrier_on(dev);
 		netif_tx_wake_all_queues(dev);
-		pr_info("%s: link up\n", dev->name);
+		netdev_info(dev, "%s: link up\n", dev->name);
 		port->mac_data.flags |= MV_EMAC_F_LINK_UP;
 	} else {
 		if (!netif_carrier_ok(dev))
 			return;
 		netif_carrier_off(dev);
 		netif_tx_stop_all_queues(dev);
-		pr_info("%s: link down\n", dev->name);
+		netdev_info(dev, "%s: link down\n", dev->name);
 		port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
 	}
 }
@@ -2193,7 +2193,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		 * comprised by the RX descriptor.
 		 */
 		if (rx_status & MVPP2_RXD_ERR_SUMMARY) {
-			pr_err("MVPP2_RXD_ERR_SUMMARY\n");
+			netdev_warn(port->dev, "MVPP2_RXD_ERR_SUMMARY\n");
 err_drop_frame:
 			dev->stats.rx_errors++;
 			mv_pp2x_rx_error(port, rx_desc);
@@ -2205,7 +2205,7 @@ err_drop_frame:
 		skb = build_skb(data, bm_pool->frag_size > PAGE_SIZE ? 0 :
 				bm_pool->frag_size);
 		if (!skb) {
-			pr_err("skb build failed\n");
+			netdev_warn(port->dev, "skb build failed\n");
 			goto err_drop_frame;
 		}
 
@@ -3545,7 +3545,7 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 			break;
 
 		default:
-			pr_err("%s: incorrect phy-mode\n", __func__);
+			netdev_err(port->dev, "%s: incorrect phy-mode\n", __func__);
 			return -1;
 		}
 	}
@@ -3559,8 +3559,8 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 		port->mac_data.phy_node = phy_node;
 		if (of_property_read_u32(phy_node, "reg",
 		    &port->mac_data.phy_addr))
-			pr_err("%s: NO PHY address on emac %d\n", __func__,
-			       port->mac_data.gop_index);
+			netdev_err(port->dev, "%s: NO PHY address on emac %d\n",
+				   __func__, port->mac_data.gop_index);
 
 		pr_debug("gop_mac(%d), phy_reg(%d)\n", id,
 			     port->mac_data.phy_addr);
@@ -3811,7 +3811,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	if (mv_pp2_num_cpu_irqs(port) < num_active_cpus() &&
 	    port->priv->pp2xdata->interrupt_tx_done == true) {
 		port->priv->pp2xdata->interrupt_tx_done = false;
-		pr_info("mvpp2x: interrupt_tx_done override to false\n");
+		dev_info(&pdev->dev, "mvpp2x: interrupt_tx_done override to false\n");
 	}
 
 	err = mv_pp2x_port_init(port);
@@ -4423,7 +4423,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	err = mv_pp2x_platform_data_get(pdev, priv, &cell_index, &port_count);
 	if (err) {
-		pr_crit("mvpp2: platform_data get failed\n");
+		dev_err(&pdev->dev, "mvpp2: platform_data get failed\n");
 		goto err_clk;
 	}
 	priv->pp2_version = priv->pp2xdata->pp2x_ver;
@@ -4431,7 +4431,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	/* DMA Configruation */
 	err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 	if (err) {
-		pr_crit("mvpp2: cannot set dma_mask\n");
+		dev_err(&pdev->dev, "mvpp2: cannot set dma_mask\n");
 		goto err_clk;
 	}
 
