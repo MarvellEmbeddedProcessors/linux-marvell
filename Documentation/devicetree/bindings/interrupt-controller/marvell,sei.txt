@@ -1,0 +1,27 @@
+Marvell SEI Interrupt Controller
+-----------------------------------------------------
+The Marvell SEI (System Error Interrupt) controller is an interrupt aggregator.
+It receives interrupts from several sources and aggregates them to a single
+interrupt line (of SEI interrupt) on the primary interrupt controller.
+
+Required properties:
+- compatible: Should be "marvell,sei"
+- reg: Should contain SEI registers location and length.
+- #interrupt-cells: Number of cells to define interrupts. Should be 1. The cell is the IRQ number.
+- #size-cells: The size of the interrupt cell. Should be 1.
+- interrupt-controller: Identifies the node as an interrupt controller.
+- interrupt-parent : Indicates the node of the parent interrupt controller.
+- interrupts: Identifies the IRQ nunmber of the parent IRQ controller to which the SEI is connected to.
+
+Example:
+
+
+	sei: interrupt-controller@3f0200 {
+		compatible = "marvell,sei";
+		reg = <0x3f0200 0x30>;
+		#interrupt-cells = <1>;
+		#size-cells = <1>;
+		interrupt-controller;
+		interrupt-parent = <&gic>;
+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+	};
