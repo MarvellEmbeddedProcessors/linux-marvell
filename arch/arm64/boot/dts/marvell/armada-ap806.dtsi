@@ -335,7 +335,12 @@
 
 			thermal@6f808c {
 				compatible = "marvell,armada-ap806-thermal";
-				reg = <0x6f808C 0x4>, <0x6f8084 0x4>;
+				reg = <0x6f808C 0x4>,
+				      <0x6f8084 0x4>,
+				      <0x6f8100 0x20>;
+				interrupts-extended = <&sei 18>;
+				threshold = <100>;
+				hysteresis = <2>;
 				status = "okay";
 			};
 
