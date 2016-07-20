@@ -1451,6 +1451,8 @@ int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 				   port->mac_data.link_irq);
 			goto err_cleanup;
 		}
+		if (!dev->irq)
+			dev->irq = port->mac_data.link_irq;
 	}
 	return 0;
 err_cleanup:
