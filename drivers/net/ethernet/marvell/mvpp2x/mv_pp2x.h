@@ -398,6 +398,9 @@ struct mv_pp2x_hw {
 	void __iomem *lms_base;
 	void __iomem *cpu_base[MVPP2_MAX_CPUS];
 
+	phys_addr_t phys_addr_start;
+	phys_addr_t phys_addr_end;
+
 	struct gop_hw gop;
 	/* ppv22_base_address for each CPU.
 	 * PPv2.2 - cpu_base[x] = base +
