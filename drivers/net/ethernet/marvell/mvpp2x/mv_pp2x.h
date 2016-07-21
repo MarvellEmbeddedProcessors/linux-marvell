@@ -131,7 +131,7 @@
 /* Coalescing */
 #define MVPP2_TXDONE_COAL_PKTS		64
 #define MVPP2_TXDONE_HRTIMER_PERIOD_NS	1000000UL
-#define MVPP2_TXDONE_COAL_USEC		0 /* No tx_time_coalescing */
+#define MVPP2_TXDONE_COAL_USEC		10000
 
 #define MVPP2_RX_COAL_PKTS		32
 #define MVPP2_RX_COAL_USEC		64
