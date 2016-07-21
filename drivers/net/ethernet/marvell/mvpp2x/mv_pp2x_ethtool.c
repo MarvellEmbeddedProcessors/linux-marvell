@@ -479,6 +479,29 @@ static int mv_pp2x_ethtool_set_coalesce(struct net_device *dev,
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	int queue;
 
+	/* Check for not supported parameters  */
+	if ((c->rx_coalesce_usecs_irq) ||
+	    (c->rx_max_coalesced_frames_irq) ||
+	    (c->tx_coalesce_usecs_irq) ||
+	    (c->tx_max_coalesced_frames_irq) ||
+	    (c->stats_block_coalesce_usecs) ||
+	    (c->use_adaptive_rx_coalesce) ||
+	    (c->use_adaptive_tx_coalesce) ||
+	    (c->pkt_rate_low) ||
+	    (c->rx_coalesce_usecs_low) ||
+	    (c->rx_max_coalesced_frames_low) ||
+	    (c->tx_coalesce_usecs_low) ||
+	    (c->tx_max_coalesced_frames_low) ||
+	    (c->pkt_rate_high) ||
+	    (c->rx_coalesce_usecs_high) ||
+	    (c->rx_max_coalesced_frames_high) ||
+	    (c->tx_coalesce_usecs_high) ||
+	    (c->tx_max_coalesced_frames_high) ||
+	    (c->rate_sample_interval)) {
+		netdev_err(dev, "unsupported coalescing parameter\n");
+		return -EOPNOTSUPP;
+	}
+
 	for (queue = 0; queue < port->num_rx_queues; queue++) {
 		struct mv_pp2x_rx_queue *rxq = port->rxqs[queue];
 
