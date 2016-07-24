@@ -213,6 +213,7 @@ static int mv_pp3_ingress_vq_stats_update(int vport, int vq, int cpu)
 	ext_stats->pkts_fill_lvl = (unsigned int)((temp64 - collect_stats->swq_ext_stats_curr.pkts) & 0xFFFFFFFF);
 
 	ext_stats->pkts_fill_lvl_sum += ext_stats->pkts_fill_lvl;
+	/* _fill_lvl_max here is without WA-q-size */
 	ext_stats->pkts_fill_lvl_max = MV_MAX(ext_stats->pkts_fill_lvl_max, ext_stats->pkts_fill_lvl);
 
 	ext_stats->bytes_sum = collect_stats->swq_ext_stats_curr.bytes - collect_stats->swq_ext_stats_base.bytes;
@@ -223,6 +224,7 @@ static int mv_pp3_ingress_vq_stats_update(int vport, int vq, int cpu)
 	ext_stats->bytes_fill_lvl = (unsigned int)((temp64 - collect_stats->swq_ext_stats_curr.bytes) & 0xFFFFFFFF);
 
 	ext_stats->bytes_fill_lvl_sum += ext_stats->bytes_fill_lvl;
+	/* _fill_lvl_max here is without WA-q-size */
 	ext_stats->bytes_fill_lvl_max = MV_MAX(ext_stats->bytes_fill_lvl_max, ext_stats->bytes_fill_lvl);
 	MV_UNLOCK(stats_lock, flags);
 	return 0;
@@ -589,7 +591,7 @@ int mv_pp3_gnss_ingress_vport_ext_stats_get(int vport, bool clean, int size,
 	struct mv_pp3_vq_update_stats *ext_stats;
 	int cpu, i, vq_num, swq_max_pkt, swq_max_bytes, rc;
 	unsigned long flags = 0;
-	uint64_t temp64;
+	struct mv_pp3_vq_update_stats tmps[MV_PP3_VQ_NUM];
 
 	 if (!dev) {
 		pr_err("%s: function failed\n", __func__);
@@ -609,8 +611,20 @@ int mv_pp3_gnss_ingress_vport_ext_stats_get(int vport, bool clean, int size,
 
 	}
 
+	/* Check vq-size BEFORE any size-depend operation.
+	 * All CPUs have the same VQ-size (MV_PP3_VQ_NUM)
+	 */
+	cpu = 0;
+	vq_num = mv_pp3_dev_rxvq_num_get(dev, cpu);
+
+	if (size > vq_num) {
+		pr_err("%s: vport %d have only %d rx virtual queues\n",
+		       __func__, vport, vq_num);
+		return -1;
+	}
 	/* clear input */
 	memset(res_stats, 0, sizeof(struct mv_nss_vq_advance_stats) * size);
+	memset(tmps, 0, sizeof(struct mv_pp3_vq_update_stats) * size);
 
 	swq_max_pkt = swq_max_bytes = rc = 0;
 
@@ -621,62 +635,66 @@ int mv_pp3_gnss_ingress_vport_ext_stats_get(int vport, bool clean, int size,
 		if (!mv_pp3_dev_cpu_inuse(dev, cpu))
 			continue;
 
-		vq_num = mv_pp3_dev_rxvq_num_get(dev, cpu);
-
-		if (size > vq_num) {
-			pr_err("%s: vport %d have only %d rx virtual queues\n",
-						__func__, vport, vq_num);
-			MV_UNLOCK(vp_priv->stats_lock, flags);
-			return -1;
-		}
 		for (i = 0; i < size; i++) {
 
 			ext_stats = mv_pp3_update_stats_get(vport, i, cpu);
 
+			/* "INSTANT" values < u32 and saved in res_stats[]
+			 * SUM-values are saved in tmps{u64}, the AVG and
+			 *  RATE results are u32 again.
+			 *
+			 * WORKAROUND "WA-q-size":
+			 * Queue-fill Non-Atomic sequence:
+			 *  1). read(SW/DDR-DDR_counters)
+			 *  2). read(FW_counters)
+			 *  3). FILL = (FW_counters) - (SW/DDR_counters)
+			 * =>  FILL may be > Q-size
+			 * Clip the "_fill_lvl" and "_fill_lvl_max" to swq_max_.
+			 * to swq_max_ depends upon run-time MTU, so get it every run.
+			 * The SUM is not clipped.
+			 */
 			mv_pp3_vq_max_size_get(vport, i, &swq_max_pkt, &swq_max_bytes);
 
-			/* WA - fix packets fill level */
-			if (ext_stats->pkts_fill_lvl > swq_max_pkt)
-				ext_stats->pkts_fill_lvl = swq_max_pkt;
-
-			/* WA - fix bytes fill level */
-			if (res_stats[i].bytes_fill_lvl > swq_max_bytes)
-				res_stats[i].bytes_fill_lvl = swq_max_bytes;
-
-			/* time elapsed in msec */
-			res_stats[i].time_elapsed = vp_priv->time_elapsed / 1000;
+			ext_stats->pkts_fill_lvl = MV_MIN(ext_stats->pkts_fill_lvl, swq_max_pkt);
+			ext_stats->bytes_fill_lvl = MV_MIN(ext_stats->bytes_fill_lvl, swq_max_bytes);
 
 			res_stats[i].pkts_fill_lvl += ext_stats->pkts_fill_lvl;
+			res_stats[i].bytes_fill_lvl += ext_stats->bytes_fill_lvl;
+
 			res_stats[i].pkts_fill_lvl_max =
 				MV_MAX(res_stats[i].pkts_fill_lvl_max, ext_stats->pkts_fill_lvl_max);
-
-			res_stats[i].bytes_fill_lvl += ext_stats->bytes_fill_lvl;
 			res_stats[i].bytes_fill_lvl_max =
 				MV_MAX(res_stats[i].bytes_fill_lvl_max, ext_stats->bytes_fill_lvl_max);
+			res_stats[i].pkts_fill_lvl_max = MV_MIN(res_stats[i].pkts_fill_lvl_max, swq_max_pkt);
+			res_stats[i].bytes_fill_lvl_max = MV_MIN(res_stats[i].bytes_fill_lvl_max, swq_max_bytes);
 
+			tmps[i].pkts_fill_lvl_sum += ext_stats->pkts_fill_lvl_sum;
+			tmps[i].bytes_fill_lvl_sum += ext_stats->bytes_fill_lvl_sum;
 
-			res_stats[i].pkts_fill_lvl_avg += ext_stats->pkts_fill_lvl_sum;
-			res_stats[i].bytes_fill_lvl_avg += ext_stats->bytes_fill_lvl_sum;
+			tmps[i].pkts_sum += ext_stats->pkts_sum;
+			tmps[i].bytes_sum += ext_stats->bytes_sum;
 
-			res_stats[i].pkts_rate += ext_stats->pkts_sum;
-			res_stats[i].bytes_rate += ext_stats->bytes_sum;
+			/* time elapsed in msec. MAX=(int)0x7FFFFFFF usec = 35min */
+			res_stats[i].time_elapsed = vp_priv->time_elapsed / 1000;
 		}
 	}
 
 	for (i = 0; i < size; i++) {
 		if (vp_priv->iter) {
-			res_stats[i].pkts_fill_lvl_avg = res_stats[i].pkts_fill_lvl_avg / vp_priv->iter;
-			res_stats[i].bytes_fill_lvl_avg = res_stats[i].bytes_fill_lvl_avg / vp_priv->iter;
+			do_div(tmps[i].pkts_fill_lvl_sum, vp_priv->iter);
+			do_div(tmps[i].bytes_fill_lvl_sum, vp_priv->iter);
+			res_stats[i].pkts_fill_lvl_avg = (u32)tmps[i].pkts_fill_lvl_sum;
+			res_stats[i].bytes_fill_lvl_avg = (u32)tmps[i].bytes_fill_lvl_sum;
 		}
 
 		if (vp_priv->time_elapsed) {
-			temp64 = ((uint64_t)res_stats[i].pkts_rate) *  1000000;
-			do_div(temp64, vp_priv->time_elapsed);
-			res_stats[i].pkts_rate = (unsigned int) (temp64 & 0xFFFFFFFF);
+			tmps[i].pkts_sum *= 1000000;
+			do_div(tmps[i].pkts_sum, vp_priv->time_elapsed);
+			res_stats[i].pkts_rate = (u32)tmps[i].pkts_sum;
 
-			temp64 = ((uint64_t)res_stats[i].bytes_rate) *  1000000;
-			do_div(temp64, vp_priv->time_elapsed);
-			res_stats[i].bytes_rate = (unsigned int) (temp64 & 0xFFFFFFFF);
+			tmps[i].bytes_sum *= 1000000;
+			do_div(tmps[i].bytes_sum, vp_priv->time_elapsed);
+			res_stats[i].bytes_rate = (u32)tmps[i].bytes_sum;
 		}
 	}
 	if (clean)
