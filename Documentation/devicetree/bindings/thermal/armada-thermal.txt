@@ -19,6 +19,10 @@ Required properties:
 		Armada 38x.
 
 - interrupts:	Should contain interrupt for thermal system
+or
+- interrupts-extended:
+		Should contain parent node and interrupt for thermal system
+		(relevant for devices with irq-chip).
 
 - threshold:	Temperature threshold in Celsius, the threshold +/- calculated
 		hysteresis (formula below) define the upper and lower watermark
@@ -29,13 +33,28 @@ Required properties:
 		Following are the corresponding degrees corresponding to
 		hysteresis value: 0=>1.9, 1=>3.8,  2=>7.6, 3=>15.2
 
-Example:
+Example for a38x:
 
 	thermal@e4078 {
 		compatible = "marvell,armada380-thermal";
-		reg = <0xe4078 0x4>, <0xe4074 0x4>, <0xe4100 0x20>;
+		reg = <0xe4078 0x4>,
+		      <0xe4074 0x4>,
+		      <0xe4100 0x20>;
 		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
 		threshold = <100>;
 		hysteresis = <2>;
 		status = "okay";
 	};
+
+or Example for Armada-7040 (with irq-chip):
+
+	thermal@400078 {
+		compatible = "marvell,armada-cp110-thermal";
+		reg = <0x400078 0x4>,
+		      <0x400070 0x8>,
+		      <0x400100 0x20>;
+		interrupts-extended = <&sei 37>;
+		threshold = <100>;
+		hysteresis = <2>;
+		status = "okay";
+	}
