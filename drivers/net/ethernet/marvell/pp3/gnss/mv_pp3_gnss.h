@@ -18,16 +18,18 @@
 
 #include "platform/mv_pp3.h"
 
+/* SW-only structure mv_pp3_vq_update_stats (no sync to HW) */
 struct mv_pp3_vq_update_stats {
 	unsigned int	pkts_fill_lvl;       /* Current queue fill level, packets */
 	unsigned int	pkts_fill_lvl_max;   /* Maximum queue fill level, packets */
-	unsigned int	pkts_fill_lvl_sum;   /* Sum of pkts_fill_lvl */
 	unsigned int	bytes_fill_lvl;      /* Current queue fill level, octets */
 	unsigned int	bytes_fill_lvl_max;  /* Maximum queue fill level, octets */
-	unsigned int	bytes_fill_lvl_sum;  /* Sum of bytes_fill_lvl */
-	unsigned int	pkts_sum;
-	unsigned int	bytes_sum;
+	u64		pkts_fill_lvl_sum;   /* Sum of pkts_fill_lvl */
+	u64		bytes_fill_lvl_sum;  /* Sum of bytes_fill_lvl */
+	u64		pkts_sum;
+	u64		bytes_sum;
 };
+
 struct mv_pp3_vq_collect_stats {
 	struct pp3_swq_stats swq_ext_stats_base;
 	struct pp3_swq_stats swq_ext_stats_curr;
