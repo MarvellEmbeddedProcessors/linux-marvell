@@ -102,15 +102,15 @@
 					spi-max-frequency = <20000000>;
 					partition@0 {
 						label = "boot";
-						reg = <0x0 0x200000>;
+						reg = <0x0 0x300000>;
 					};
 					partition@200000 {
 						label = "Filesystem";
-						reg = <0x200000 0xd00000>;
+						reg = <0x300000 0xc00000>;
 					};
 					partition@d00000 {
 						label = "boot_2nd";
-						reg = <0xd00000 0x100000>;
+						reg = <0xf00000 0x100000>;
 					};
 				};
 			};
