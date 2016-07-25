@@ -1625,7 +1625,10 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 
 #ifdef PP3_INTERNAL_DEBUG
 		if (pp3_dbg_cfh_rx_checker(dev_priv, (u32 *)cfh) < 0) {
-			/*debug_stop_rx = true;*/
+			/* BUG situation: can't handle bad packet,
+			 *  queue/buffer/skb are never released
+			 */
+			debug_stop_rx = true;
 			break;
 		}
 #endif
