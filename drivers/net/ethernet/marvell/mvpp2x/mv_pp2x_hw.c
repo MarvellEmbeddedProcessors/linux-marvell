@@ -3985,9 +3985,8 @@ int mv_pp2x_prs_default_init(struct platform_device *pdev,
 	}
 
 	/* Invalidate all tcam entries */
-	for (index = 0; index < MVPP2_PRS_TCAM_SRAM_SIZE; index++) {
+	for (index = 0; index < MVPP2_PRS_TCAM_SRAM_SIZE; index++)
 		mv_pp2x_prs_hw_inv(hw, index);
-	}
 
 	hw->prs_shadow = devm_kcalloc(&pdev->dev, MVPP2_PRS_TCAM_SRAM_SIZE,
 				      sizeof(struct mv_pp2x_prs_shadow),
@@ -5314,9 +5313,8 @@ void mv_pp2x_cls_c2_hw_inv_all(struct mv_pp2x_hw *hw)
 {
 	int index;
 
-	for (index = 0; index < MVPP2_CLS_C2_TCAM_SIZE; index++) {
+	for (index = 0; index < MVPP2_CLS_C2_TCAM_SIZE; index++)
 		mv_pp2x_cls_c2_hw_inv(hw, index);
-	}
 }
 EXPORT_SYMBOL(mv_pp2x_cls_c2_hw_inv_all);
 
