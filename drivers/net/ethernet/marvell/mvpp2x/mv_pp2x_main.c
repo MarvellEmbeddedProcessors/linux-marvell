@@ -109,7 +109,8 @@ module_param(pri_map, uint, S_IRUGO);
 MODULE_PARM_DESC(pri_map, "Set priority_map, nibble for each cos.");
 
 module_param(default_cos, byte, S_IRUGO);
-MODULE_PARM_DESC(default_cos, "Set default cos (0-(num_cose_queues-1)).");
+MODULE_PARM_DESC(default_cos,
+		 "Set default cos value(0-7) for unclassified traffic");
 
 module_param(rx_queue_size, ushort, S_IRUGO);
 MODULE_PARM_DESC(rx_queue_size, "Rx queue size");
