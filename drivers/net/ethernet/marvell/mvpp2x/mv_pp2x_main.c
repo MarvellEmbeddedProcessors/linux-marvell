@@ -4468,14 +4468,21 @@ static void mv_pp2x_tx_fifo_init(struct mv_pp2x *priv)
 
 	/* Set FIFO according to l4_chksum_jumbo_port */
 	for (i = 0; i < priv->num_ports; i++) {
-		if (priv->port_list[i]->id != priv->l4_chksum_jumbo_port)
-			mv_pp2x_tx_fifo_set(&priv->hw,
+		if (priv->port_list[i]->id != priv->l4_chksum_jumbo_port) {
+			mv_pp2x_tx_fifo_size_set(&priv->hw,
 					    priv->port_list[i]->id,
 					    MVPP2_TX_FIFO_DATA_SIZE_3KB);
+			mv_pp2x_tx_fifo_threshold_set(&priv->hw,
+					    priv->port_list[i]->id,
+					    MVPP2_TX_FIFO_THRESHOLD_3KB);
+			}
 	}
-	mv_pp2x_tx_fifo_set(&priv->hw,
+	mv_pp2x_tx_fifo_size_set(&priv->hw,
 			    priv->l4_chksum_jumbo_port,
 			    MVPP2_TX_FIFO_DATA_SIZE_10KB);
+	mv_pp2x_tx_fifo_threshold_set(&priv->hw,
+			    priv->l4_chksum_jumbo_port,
+			    MVPP2_TX_FIFO_THRESHOLD_10KB);
 }
 
 static int mv_pp2x_probe(struct platform_device *pdev)
