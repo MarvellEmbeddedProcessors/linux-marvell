@@ -343,7 +343,7 @@ orion_spi_write_read_8bit(struct spi_device *spi,
 	orion_spi = spi_master_get_devdata(spi->master);
 
 	if (cs_single_byte)
-		orion_spi_set_cs(spi, 1);
+		orion_spi_set_cs(spi, 0);
 
 	tx_reg = spi_reg(orion_spi, ORION_SPI_DATA_OUT_REG);
 	rx_reg = spi_reg(orion_spi, ORION_SPI_DATA_IN_REG);
@@ -359,7 +359,7 @@ orion_spi_write_read_8bit(struct spi_device *spi,
 
 	if (orion_spi_wait_till_ready(orion_spi) < 0) {
 		if (cs_single_byte) {
-			orion_spi_set_cs(spi, 0);
+			orion_spi_set_cs(spi, 1);
 			/* Satisfy some SLIC devices requirements */
 			udelay(4);
 		}
@@ -371,7 +371,7 @@ orion_spi_write_read_8bit(struct spi_device *spi,
 		*(*rx_buf)++ = readl(rx_reg);
 
 	if (cs_single_byte) {
-		orion_spi_set_cs(spi, 0);
+		orion_spi_set_cs(spi, 1);
 		/* Satisfy some SLIC devices requirements */
 		udelay(4);
 	}
