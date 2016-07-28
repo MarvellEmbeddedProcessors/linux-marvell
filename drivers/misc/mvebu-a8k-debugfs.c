@@ -13,11 +13,13 @@
 #include <linux/init.h>
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
+#include <linux/ioctl.h>
 
 struct mvebu_a8k_state {
 	struct dentry *debugfs_root;
 	struct dentry *debugfs_ap;
 	struct dentry *debugfs_sysregs;
+	struct dentry *debugfs_debug;
 };
 
 struct sysreg_entry {
@@ -173,11 +175,113 @@ static const struct file_operations mvebu_ap806_sysregs_debug_fops = {
 	.release = single_release,
 };
 
+#define MVEBU_DBG_VA2PA		_IOWR('q', 1, struct va2pa_args *)
+
+#define VA2PA_TYPE_USER		0
+#define VA2PA_TYPE_KERNEL	1
+
+#define BMVAL(val, lsb, msb)	((val & GENMASK(msb, lsb)) >> lsb)
+#define BMVAL_64(val, lsb, msb)	((val & GENMASK_ULL(msb, lsb)) >> lsb)
+
+#define PAR_EL1_FAULT_BIT	0
+#define PAR_EL1_FST_START	1
+#define PAR_EL1_FST_END		6
+#define PAR_EL1_SHA_START	7
+#define PAR_EL1_SHA_END		8
+#define PAR_EL1_NS_BIT		9
+#define PAR_EL1_PA_START	12
+#define PAR_EL1_PA_END		47
+#define PAR_EL1_MAIR_START	56
+#define PAR_EL1_MAIR_END	63
+
+struct va2pa_args {
+	void *va;
+	void *pa;
+	int type;
+	u8  esr_fault;
+	bool non_secure;
+	u8   sharability;
+	u8   mair;
+};
+
+static long mvebu_debug_va2pa(unsigned long arg)
+{
+	u64 pa, par_el1;
+	struct va2pa_args va2pa;
+	char __user *argp = (char __user *)arg;
+
+	if (copy_from_user(&va2pa, argp, sizeof(struct va2pa_args))) {
+		pr_err("Failed to copy from user\n");
+		return -EFAULT;
+	}
+
+	switch (va2pa.type) {
+	case VA2PA_TYPE_USER:
+		asm volatile("at s1e0r, %0" :: "r" (va2pa.va));
+		goto translate;
+
+	case VA2PA_TYPE_KERNEL:
+		asm volatile("at s1e1r, %0" :: "r" (va2pa.va));
+		goto translate;
+
+	default:
+		pr_err("bad translation type %d\n", va2pa.type);
+		return -EINVAL;
+	}
+
+translate:
+	asm volatile("mrs %0, par_el1" : "=r" (par_el1));
+
+	/* Check if translation was sucessfull */
+	if (BMVAL(par_el1, PAR_EL1_FAULT_BIT, PAR_EL1_FAULT_BIT)) {
+		va2pa.pa = (void *)~0ULL;
+		va2pa.esr_fault = BMVAL(par_el1, PAR_EL1_FST_START, PAR_EL1_FST_END);
+		return -EFAULT;
+	}
+
+	/* lowest 12 bits are offset inside page so
+	 * take them from the virtual address
+	 */
+	pa = BMVAL_64(par_el1, PAR_EL1_PA_START, PAR_EL1_PA_END) << 12;
+	va2pa.pa = (void *)(pa | BMVAL((u64)va2pa.va, 0, 11));
+
+	/* Figure out the attributes */
+	va2pa.sharability = BMVAL(par_el1, PAR_EL1_SHA_START, PAR_EL1_SHA_END);
+	va2pa.non_secure = BMVAL(par_el1, PAR_EL1_NS_BIT, PAR_EL1_NS_BIT);
+	va2pa.mair = BMVAL(par_el1, PAR_EL1_MAIR_START, PAR_EL1_MAIR_END);
+
+	if (copy_to_user(argp, &va2pa, sizeof(struct va2pa_args))) {
+		pr_err("Failed to copy to user\n");
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static long mvebu_debug_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+
+	switch (cmd) {
+
+	case MVEBU_DBG_VA2PA:
+		return mvebu_debug_va2pa(arg);
+
+	default:
+		pr_err("unknown debug ioctl\n");
+		return -EINVAL;
+	}
+
+}
+static const struct file_operations mvebu_debug_fops = {
+	.unlocked_ioctl = mvebu_debug_ioctl,
+};
+
 static __init int mvebu_a8k_debugfs_init(void)
 {
 	struct mvebu_a8k_state *s = &a8k_state;
 
-	s->debugfs_root = debugfs_create_dir("mvebu-a8k", NULL);
+	s->debugfs_root = debugfs_create_dir("mvebu", NULL);
+	s->debugfs_debug = debugfs_create_file("debug", 0660, s->debugfs_root, NULL, &mvebu_debug_fops);
 	if (s->debugfs_root) {
 		s->debugfs_ap = debugfs_create_dir("ap806", s->debugfs_root);
 		s->debugfs_sysregs = debugfs_create_file("sysregs", 0660,
