@@ -19,6 +19,8 @@
 #define APOLLO_MOUSE_MINOR	7	/* unused */
 #define PC110PAD_MINOR		9	/* unused */
 /*#define ADB_MOUSE_MINOR	10	FIXME OBSOLETE */
+#define SLICDEV_MINOR           73      /* Marvell SLIC control device */
+#define TALDEV_MINOR            74      /* Marvell TAL device */
 #define WATCHDOG_MINOR		130	/* Watchdog timer     */
 #define TEMP_MINOR		131	/* Temperature Sensor */
 #define RTC_MINOR		135
