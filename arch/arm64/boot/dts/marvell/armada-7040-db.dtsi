@@ -79,6 +79,16 @@
 			i2c1: i2c@701000 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&i2c0_pins>;
+				eeprom@57 {
+					compatible = "at24,24c64";
+					reg = <0x57>;
+					pagesize = <32>;
+				};
+				eeprom@50 {
+					compatible = "at24,24c64";
+					reg = <0x50>;
+					pagesize = <32>;
+				};
 				expander0: pca9555@21 {
 					compatible = "nxp,pca9555";
 					pinctrl-names = "default";
