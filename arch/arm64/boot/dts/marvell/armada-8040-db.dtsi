@@ -64,8 +64,34 @@
 			i2c@511000 {
 				status = "okay";
 				clock-frequency = <100000>;
+				eeprom@57 {
+					compatible = "at24,24c64";
+					reg = <0x57>;
+					pagesize = <32>;
+				};
+				eeprom@50 {
+					compatible = "at24,24c64";
+					reg = <0x50>;
+					pagesize = <32>;
+				};
 			};
 		};
 	};
 
+	cpn-110-slave {
+		config-space {
+			i2c@701000 {
+				eeprom@57 {
+					compatible = "at24,24c64";
+					reg = <0x57>;
+					pagesize = <32>;
+				};
+				eeprom@50 {
+					compatible = "at24,24c64";
+					reg = <0x50>;
+					pagesize = <32>;
+				};
+			};
+		};
+	};
 };
