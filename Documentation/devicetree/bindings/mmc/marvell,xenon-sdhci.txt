@@ -1,0 +1,78 @@
+Marvell's Xenon SDHCI Controller device tree bindings
+This file documents differences between the core mmc properties
+described by mmc.txt and the properties used by the Xenon implementation.
+
+Required Properties:
+- compatible: should be "marvell,xenon-sdhci"
+
+- Input Clock Name
+  Some SOCs require additional clock for AXI bus.
+  The input clock for Xenon IP core should be named as "core".
+  The optional AXI clock should be named as "axi".
+  - clocks = <&core_clk>, <&axi_clock>;
+  - clock-names = "core", "axi";
+
+- Register Set Size
+  Different Xenon SDHC release has different register set size.
+  The specific size should refer to the SOC implementation.
+
+Optional Properties:
+- Slot Index
+  Xenon can supports multiple slots in a single IP.
+  Each SDHC slot has its own setting bit.
+  The specific slot index in Xenon IP should be provided.
+  - xenon,slotno = <slot_index>;
+  If this property is not provided, slot index will be set as 0 by defalut.
+
+- PHY Type
+  Xenon support mutilple types of PHYs.
+  To select eMMC 5.1 PHY, set:
+  - xenon,phy-type = "emmc 5.1 phy"
+  eMMC 5.1 PHY is the default choice if this property is not provided.
+  To select eMMC 5.0 PHY, set:
+  - xenon,phy-type = "emmc 5.0 phy"
+  To select SDH PHY, set:
+  - xenon,phy-type = "sdh phy"
+
+- Customized PHY Parameters
+  Some boards require different values of some specific PHY parameters.
+  These properties enable diverse boards to customize the PHY parameters.
+  The supported eMMC PHY parameters are listed in below:
+  - ZNR
+  xenon,phy-znr = <value>;
+  - ZPR
+  xenon,phy-zpr = <value>;
+  - Disable Hardware DLL tuning
+  xenon,phy-no-dll-tuning;
+
+- Re-tuning Counter
+  Xenon SDHC SOC usually doesn't provide re-tuning counter in
+  Capabilities Register 3 Bit[11:8].
+  This property provides the re-tuning counter.
+  xenon,tuning-count = <count>;
+  If this property is not set, default re-tuning counter will
+  be set as 0x9 in driver.
+
+Example:
+- For eMMC slot:
+
+	sdhci@aa0000 {
+		compatible = "marvell,xenon-sdhci";
+		reg = <0xaa0000 0x1000>;
+		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
+		clocks = <&emmcclk>;
+		xenon,slotno = <0>;
+		xenon,phy-type = "emmc 5.1 phy";
+		bus-width = <8>;
+		tuning-count = <11>;
+	};
+
+- For SD/SDIO slot:
+
+	sdhci@ab0000 {
+		compatible = "marvell,xenon-sdhci";
+		reg = <0xaa0000 0x1000>;
+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
+		clocks = <&sdclk>;
+		bus-width = <4>;
+	}
