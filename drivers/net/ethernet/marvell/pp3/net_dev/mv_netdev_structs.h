@@ -119,6 +119,7 @@ struct pp3_dev_priv {
 	int			rx_time_prof; /* RX time coalescing profile this device connected to */
 	int			tx_done_pkt_coal; /* TX Done coalescing [pkts] for this device */
 	int			tx_done_time_coal; /* TX Done coalescing [usec] for this device */
+	spinlock_t	rxrefill_lock; /* BM pool RX buffer refill lock */
 	struct pp3_netdev_stats __percpu *dev_stats;
 };
 /*---------------------------------------------------------------------------*/
