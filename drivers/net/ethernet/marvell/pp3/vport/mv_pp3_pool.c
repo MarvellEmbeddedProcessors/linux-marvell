@@ -81,7 +81,7 @@ const char *mv_pp3_pool_name_get(struct pp3_pool *ppool)
 struct pp3_pool *mv_pp3_pool_alloc(int capacity)
 {
 	struct pp3_pool *ppool;
-	int size;
+	int size, cpu;
 
 	if (capacity % 16) {
 		pr_err("%s: pool size must be multiple of 16\n", __func__);
@@ -105,6 +105,10 @@ struct pp3_pool *mv_pp3_pool_alloc(int capacity)
 		goto oom;
 	}
 	ppool->capacity = capacity;
+
+	ppool->buf_missed = alloc_percpu(int);
+	for_each_possible_cpu(cpu)
+		PPOOL_BUF_MISSED(ppool, cpu) = 0;
 
 	return ppool;
 
@@ -482,6 +486,9 @@ void pp3_dbg_pool_stats_print(int pool)
 
 	pr_info("buff_num............................%10d\n", ppool->buf_num);
 	pr_info("buff_in_use.........................%10d\n", atomic_read(&ppool->in_use));
+
+	for_each_possible_cpu(cpu)
+		pr_info("buf_missed on cpu %d ................%10d\n", cpu, PPOOL_BUF_MISSED(ppool, cpu));
 
 	/* Calculate summary for all CPUs */
 	memset(&total_stats, 0, sizeof(total_stats));

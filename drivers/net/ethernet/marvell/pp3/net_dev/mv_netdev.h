@@ -112,6 +112,7 @@ int mv_pp3_ctrl_nic_skb_recycle(int en);
 bool mv_pp3_is_nic_skb_recycle(void);
 #endif
 
+#define MV_PP3_RXREFILL_TIMER_USEC_PERIOD (20000)
 #define MV_PP3_TXDONE_TIMER_USEC_PERIOD (1000)
 #define MV_PP3_BUF_REQUEST_SIZE	(8)
 

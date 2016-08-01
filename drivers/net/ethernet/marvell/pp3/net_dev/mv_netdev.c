@@ -414,19 +414,23 @@ static void mv_pp3_skb_free(struct net_device *dev, struct sk_buff *skb)
 {
 	mv_pp3_gnss_skb_free(dev, skb);
 }
+
 /*---------------------------------------------------------------------------*/
 /* Allocate RX buffer */
 static inline void *mv_pp3_pool_buff_alloc(struct net_device *dev, struct pp3_pool *ppool, gfp_t gfp_mask,
 					unsigned long *phys_addr)
 {
 	static struct sk_buff *skb;
+	int cpu;
 
 	skb = mv_pp3_skb_alloc(dev, ppool->pkt_max_size, gfp_mask, phys_addr);
 
 	if (!skb) {
-		STAT_ERR(PPOOL_STATS(ppool, smp_processor_id())->buff_alloc_err++);
-		pr_err("can't allocate %d bytes buffer for pool #%d\n",
-			ppool->buf_size, ppool->pool);
+		cpu = smp_processor_id();
+		STAT_ERR(PPOOL_STATS(ppool, cpu)->buff_alloc_err++);
+		if (gfp_mask != GFP_ATOMIC)
+			pr_err("%s on cpu_%d can't refill BM pool #%d, buff_alloc_err=%d\n",
+			       dev->name, cpu, ppool->pool, PPOOL_STATS(ppool, cpu)->buff_alloc_err);
 		return NULL;
 	}
 	/* TODO inc atomic */
@@ -442,32 +446,83 @@ static inline void mv_pp3_pool_buff_free(struct net_device *dev, struct pp3_pool
 	/* TODO inc atomic */
 	STAT_DBG(PPOOL_STATS(ppool, smp_processor_id())->buff_free++);
 }
-/*---------------------------------------------------------------------------*/
-/* Allocate new buffer and push it to bm pool */
+
+/*---------------------------------------------------------------------------
+* Allocate new buffer and push it to bm pool
+* If alloc_skb failed - save remind for next refill, also start rxrefill timer
+*/
 static inline int mv_pp3_pool_refill(struct net_device *dev, struct pp3_pool *ppool,
 					gfp_t gfp_mask,	int buf_num)
 {
 	void *virt;
 	unsigned long phys_addr = 0;
 	unsigned long flags  = 0;
-	int i, extra = 0;
+	int i, cpu = smp_processor_id();
+	struct pp3_vport *cpu_vp;
+	struct mv_pp3_timer *tmr;
 
+	if (unlikely(PPOOL_BUF_MISSED(ppool, cpu))) {
+		buf_num += PPOOL_BUF_MISSED(ppool, cpu);
+		PPOOL_BUF_MISSED(ppool, cpu) = 0;
+	}
 
-	for (i = 0; i < (buf_num + extra); i++) {
+	for (i = 0; i < buf_num; i++) {
+		/* For cli if-down/up called with GFP_ATOMIC, otherwise GFP_KERNEL */
 		virt = mv_pp3_pool_buff_alloc(dev, ppool, gfp_mask, &phys_addr);
-		if (virt == NULL)
+		if (!virt) {
+			/* This is exception. Start timer, no-stop on purpose */
+			cpu_vp = MV_PP3_PRIV(dev)->cpu_vp[cpu];
+			PPOOL_BUF_MISSED(ppool, cpu) = buf_num - i;
+			tmr = &cpu_vp->port.cpu.rxrefill_timer;
+			mv_pp3_timer_add(tmr);
 			break;
-
+		}
 		MV_LIGHT_LOCK(flags);
 		if (mv_pp3_pool_buff_put(ppool->pool, virt, phys_addr)) {
 			mv_pp3_pool_buff_free(dev, ppool, virt);
 			MV_LIGHT_UNLOCK(flags);
+			PPOOL_BUF_MISSED(ppool, cpu) = buf_num - i;
+			pr_err("%s: Can't add buf to BM pool #%d on cpu_%d\n",
+			       dev->name, ppool->pool, cpu);
 			break;
 		}
 		MV_LIGHT_UNLOCK(flags);
 	}
 
 	return i;
+}
+
+static void mv_pp3_pool_refill_deferred(unsigned long data)
+{
+	/* timer callback */
+	int cpu = smp_processor_id();
+	struct pp3_dev_priv *dev_priv = (struct pp3_dev_priv *)data;
+	struct net_device *dev = dev_priv->dev;
+	struct pp3_vport *cpu_vp = dev_priv->cpu_vp[cpu];
+	struct pp3_cpu_shared *cpu_shared = cpu_vp->port.cpu.cpu_shared;
+	struct mv_pp3_timer *this_tmr = &cpu_vp->port.cpu.rxrefill_timer;
+	struct pp3_pool *ppool;
+	int rem = 0;
+
+	if (!mv_pp3_timer_is_running(this_tmr))
+		return; /* stop/complete has been requested */
+
+	/* Easy - first (short). Try (0+buf_missed) */
+	ppool = cpu_shared->short_pool;
+	if (ppool && PPOOL_BUF_MISSED(ppool, cpu)) {
+		mv_pp3_pool_refill(dev, ppool, GFP_ATOMIC, 0);
+		rem += PPOOL_BUF_MISSED(ppool, cpu);
+	}
+	ppool = cpu_shared->long_pool;
+	if (ppool && PPOOL_BUF_MISSED(ppool, cpu)) {
+		mv_pp3_pool_refill(dev, ppool, GFP_ATOMIC, 0);
+		rem += PPOOL_BUF_MISSED(ppool, cpu);
+	}
+	mv_pp3_timer_complete(this_tmr); /* just clean TIMER_SCHED_BIT */
+	if (rem) {
+		printk_once(KERN_ERR "%s: persistent no memory for BM pool\n", dev->name);
+		mv_pp3_timer_add(this_tmr); /* try again later */
+	}
 }
 
 /* Flush cache of skb that doesn't copied to CFH */
@@ -1552,7 +1607,7 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 	unsigned char *cfh_pdata;
 	struct pp3_pool *ppool;
 	int occ_dg, num_dg, cpu;
-	int wr_offset, cfh_data_len, pkt_len, cfh_len, buf_num, bpid = 0;
+	int wr_offset, cfh_data_len, pkt_len, cfh_len, bpid = 0;
 	int rx_short = 0, rx_long = 0, rx_unknown = 0, rx_pkt_done = 0, rx_dg_done = 0;
 
 	occ_dg = mv_pp3_hmac_rxq_occ_get(rx_swq->frame_num, rx_swq->swq);
@@ -1740,29 +1795,13 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 	if (rx_short) {
 		ppool = cpu_shared->short_pool;
 		STAT_DBG(PPOOL_STATS(ppool, cpu)->buff_rx += rx_short);
-		buf_num = mv_pp3_pool_refill(dev, ppool, GFP_ATOMIC, rx_short);
-
-#ifdef PP3_INTERNAL_DEBUG
-		if (buf_num != rx_short) {
-			pr_err("%s: Can't refill buffer to BM pool #%d on cpu #%d\n",
-				dev->name, bpid, cpu);
-			debug_stop_rx = true;
-		}
-#endif
+		mv_pp3_pool_refill(dev, ppool, GFP_ATOMIC, rx_short);
 	}
 
 	if (rx_long) {
 		ppool = cpu_shared->long_pool;
 		STAT_DBG(PPOOL_STATS(ppool, cpu)->buff_rx += rx_long);
-		buf_num = mv_pp3_pool_refill(dev, ppool, GFP_ATOMIC, rx_long);
-
-#ifdef PP3_INTERNAL_DEBUG
-		if (buf_num != rx_long) {
-			pr_err("%s: Can't refill buffer to BM pool #%d on cpu #%d\n",
-				dev->name, bpid, cpu);
-			debug_stop_rx = true;
-		}
-#endif
+		mv_pp3_pool_refill(dev, ppool, GFP_ATOMIC, rx_long);
 	}
 
 	if (rx_unknown) {
@@ -1793,10 +1832,6 @@ int mv_pp3_pool_bufs_add(int buf_num, struct net_device *dev, struct pp3_pool *p
 
 	i = mv_pp3_pool_refill(dev, ppool, GFP_KERNEL, buf_num);
 
-	if (i != buf_num)
-		pr_err("Can't add all required buffers to BM pool #%d on cpu #%d\n",
-			ppool->pool, smp_processor_id());
-
 	ppool->buf_num += i;
 
 	ppool->in_use_thresh = ppool->buf_num / 4;
@@ -1816,6 +1851,10 @@ int mv_pp3_pool_bufs_free(int buf_num, struct net_device *dev, struct pp3_pool *
 	struct pp3_cpu *cpu_ctrl;
 	int free_buf = 0, time_out = 0, buf_num_old;
 	int time_out_max = 1000;
+	int buf_missed = 0;
+	struct pp3_dev_priv *dev_priv;
+	struct pp3_vport *cpu_vp;
+	struct mv_pp3_timer *tmr;
 
 	cpu_ctrl = pp3_cpus[cpu];
 
@@ -1832,6 +1871,22 @@ int mv_pp3_pool_bufs_free(int buf_num, struct net_device *dev, struct pp3_pool *
 	if (buf_num == 0)
 		return 0;
 
+	dev_priv = MV_PP3_PRIV(dev);
+	MV_LOCK(&dev_priv->rxrefill_lock, flags);
+	/* "bufs_free" called AFTER interface down (e.g. down on each-cpu).
+	 * But the timerS could be started before the down,
+	 * make timer_complete first (so callback do nothing)
+	 */
+	for_each_possible_cpu(cpu) {
+		cpu_vp = dev_priv->cpu_vp[cpu];
+		tmr = &cpu_vp->port.cpu.rxrefill_timer;
+		mv_pp3_timer_complete(tmr);
+	}
+	for_each_possible_cpu(cpu) {
+		buf_missed += PPOOL_BUF_MISSED(ppool, cpu);
+		PPOOL_BUF_MISSED(ppool, cpu) = 0;
+	}
+	MV_UNLOCK(&dev_priv->rxrefill_lock, flags);
 
 	buf_num_old = ppool->buf_num;
 
@@ -1840,6 +1895,10 @@ int mv_pp3_pool_bufs_free(int buf_num, struct net_device *dev, struct pp3_pool *
 		buf_num = ppool->buf_num;
 
 	MV_LIGHT_LOCK(flags);
+
+	if (buf_num >= buf_missed)
+		buf_num -= buf_missed; /* these are already not allocated */
+
 	while ((time_out++ < time_out_max) && (buf_num > 0)) {
 		free_buf = pp3_pool_bufs_free_internal(buf_num, dev, ppool);
 
@@ -2695,6 +2754,8 @@ static int mv_pp3_dev_priv_sw_init(struct pp3_dev_priv *dev_priv)
 			pr_err("%s: cannot get gnss ops for %s\n", __func__, dev_priv->dev->name);
 	}
 
+	spin_lock_init(&dev_priv->rxrefill_lock);
+
 	/* Init cpu virtual ports */
 	for_each_possible_cpu(cpu) {
 		cpu_vp = dev_priv->cpu_vp[cpu];
@@ -2729,11 +2790,13 @@ static int mv_pp3_dev_priv_sw_init(struct pp3_dev_priv *dev_priv)
 		/* Init cpu virtual port NAPI */
 		netif_napi_add(dev_priv->dev, &cpu_vp->port.cpu.napi, mv_pp3_poll, 64);
 
-		/* init txdone timer */
+		/* init txdone and rxrefill timers */
 		mv_pp3_timer_init(&cpu_vp->port.cpu.txdone_timer, cpu,
 					dev_priv->tx_done_time_coal, MV_PP3_TASKLET,
 					mv_pp3_txdone_timer_callback, (unsigned long)cpu_vp);
-
+		mv_pp3_timer_init(&cpu_vp->port.cpu.rxrefill_timer, cpu,
+				  MV_PP3_RXREFILL_TIMER_USEC_PERIOD, MV_PP3_TASKLET,
+				  mv_pp3_pool_refill_deferred, (unsigned long)dev_priv);
 
 		/* set cpu vport dflt dest to EMAC virtual port esle left unknown */
 		if (vp_priv->type == MV_PP3_NSS_PORT_ETH)

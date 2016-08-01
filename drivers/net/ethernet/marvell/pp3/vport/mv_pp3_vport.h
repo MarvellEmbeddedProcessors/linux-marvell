@@ -108,6 +108,7 @@ struct pp3_cpu_port {
 	struct pp3_cpu_shared	*cpu_shared;		/* Pointer to shared CPU structure (per poort)*/
 	struct pp3_cpu_vp_stats	stats;                  /* Pointer to CPU virtual port statistics */
 	struct mv_pp3_timer	txdone_timer;		/* TX done - free buffers form linux pool */
+	struct mv_pp3_timer	rxrefill_timer;		/* refill RX buffers alloc-failed in RX-irq */
 	struct napi_struct	napi;			/* NAPI structure */
 	int			napi_q_num;		/* number of queues processed by napi */
 	int			napi_proc_qs[3][MV_PP3_VQ_NUM];
