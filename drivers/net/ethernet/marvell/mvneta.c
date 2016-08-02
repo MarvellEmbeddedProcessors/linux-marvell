@@ -1461,7 +1461,7 @@ static void mvneta_tx_done_pkts_coal_set(struct mvneta_port *pp,
 }
 
 /* Handle rx descriptor fill by setting buf_cookie and buf_phys_addr */
-static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
+static inline void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
 				u32 phys_addr, u32 cookie)
 {
 	rx_desc->buf_cookie = cookie;
@@ -1669,7 +1669,7 @@ static void mvneta_frag_free(const struct mvneta_port *pp, void *data)
 }
 
 /* Refill processing */
-static int mvneta_rx_refill(struct mvneta_port *pp,
+static inline int mvneta_rx_refill(struct mvneta_port *pp,
 			    struct mvneta_rx_desc *rx_desc)
 {
 	dma_addr_t phys_addr;
@@ -1860,6 +1860,9 @@ static int mvneta_rx(struct mvneta_port *pp, int rx_todo,
 #else
 		data = (u8 *)rx_desc->buf_cookie;
 #endif
+		/* Prefetch header */
+		prefetch(data + NET_SKB_PAD);
+
 		phys_addr = rx_desc->buf_phys_addr;
 
 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
