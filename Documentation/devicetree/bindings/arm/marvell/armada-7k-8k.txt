@@ -23,11 +23,13 @@ Boards:
    - "marvell,armada7040-db-router", "marvell,armada7040-db"
       when the board being used is the Armada 7040 Development board
 
+   - "marvell,armada7040-db-nand", "marvell,armada7040-db"
+      when the board being used is the Armada 7040 Development board
+
    - "marvell,armada8040-db-router", "marvell,armada8040-db"
       when the board being used is the Armada 8040 Development board
 
-
 Example:
 
-compatible = "marvell,armada7040-db-router", "marvell,armada7040-db", "marvell,armada7040",
+compatible = "marvell,armada7040-db-router", "marvell,armada7040-db-nand", "marvell,armada7040-db", "marvell,armada7040",
              "marvell,ap806-quad", "marvell,ap806";
