@@ -10,7 +10,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db-sgmii1.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db-sfp.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-router.dtb
-
+dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-nand.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db-router.dtb
 
 always		:= $(dtb-y)
