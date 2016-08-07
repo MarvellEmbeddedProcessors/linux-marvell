@@ -690,7 +690,7 @@ int mv_pp3_shared_start(struct mv_pp3 *priv)
 		pr_cont(".%d\n", drv_ver->debug_d);
 
 	memcpy(version_name, fw_ver.name, ver_name_size);
-	pr_info("FW version:     %s:%02d.%02d.%d\n",
+	pr_info("FW version:     %s:%02d.%02d.%d",
 		version_name, fw_ver.major_x, fw_ver.minor_y, fw_ver.local_z);
 	if (fw_ver.debug_d)
 		pr_cont(".%d\n", fw_ver.debug_d);
