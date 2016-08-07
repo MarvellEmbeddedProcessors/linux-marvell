@@ -63,6 +63,7 @@ DECLARE_RD_WR_FUNC(s3_1_c15_c0_0);
 DECLARE_RD_WR_FUNC(s3_1_c11_c0_2);
 DECLARE_RD_WR_FUNC(s3_1_c11_c0_3);
 DECLARE_RD_WR_FUNC(s3_1_c15_c2_1);
+DECLARE_RD_WR_FUNC(s3_1_c15_c2_0);
 
 
 #define SYSREG_ENTRY(code, _desc)		\
@@ -81,6 +82,7 @@ static struct sysreg_entry sysregs_list[] = {
 	SYSREG_ENTRY(s3_1_c11_c0_2, "L2 Ctrl"),
 	SYSREG_ENTRY(s3_1_c11_c0_3, "L2 Ext Ctrl"),
 	SYSREG_ENTRY(s3_1_c15_c2_1, "CPU Ext Ctrl"),
+	SYSREG_ENTRY(s3_1_c15_c2_0, "CPU Aux Ctrl"),
 };
 
 
@@ -93,7 +95,7 @@ static int mvebu_ap806_sysregs_debug_show(struct seq_file *seq, void *v)
 	for (i = 0; i < ARRAY_SIZE(sysregs_list); i++) {
 		seq_printf(seq, "%s\t\t- ", sysregs_list[i].name);
 		val = sysregs_list[i].read_func();
-		seq_printf(seq, "0x%08llx", val);
+		seq_printf(seq, "0x%016llx", val);
 		seq_printf(seq, " (%s).\n", sysregs_list[i].desc);
 	}
 
@@ -152,7 +154,7 @@ static ssize_t mvebu_ap806_sysregs_debug_write(struct file *f, const char __user
 
 		sysregs_list[i].write_func(val64);
 
-		pr_info("New value %s - 0x%08llx.\n", sysregs_list[i].name,
+		pr_info("New value %s - 0x%016llx.\n", sysregs_list[i].name,
 				sysregs_list[i].read_func());
 	} else {
 		pr_err("Bad system register name.\n");
