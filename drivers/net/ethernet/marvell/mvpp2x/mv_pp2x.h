@@ -656,6 +656,19 @@ static inline struct mv_pp2x_port *mv_pp2x_port_struct_get(struct mv_pp2x *priv,
 	return NULL;
 }
 
+static inline
+struct mv_pp2x_port *mv_pp2x_port_struct_get_by_gop_index(struct mv_pp2x *priv,
+							  int gop_index)
+{
+	int i;
+
+	for (i = 0; i < priv->num_ports; i++) {
+		if (priv->port_list[i]->mac_data.gop_index == gop_index)
+			return priv->port_list[i];
+	}
+	return NULL;
+}
+
 static inline u8 mv_pp2x_cosval_queue_map(struct mv_pp2x_port *port,
 					  u8 cos_value)
 {
