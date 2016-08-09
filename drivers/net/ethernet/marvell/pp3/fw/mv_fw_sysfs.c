@@ -165,7 +165,9 @@ static ssize_t mv_fw_store(struct device *dev,
 					a, MV_NSS_ETH_PORT_MIN, MV_NSS_ETH_PORT_MAX);
 				goto out;
 			}
-			pp3_fw_emac_vport_msg_show(a);
+			err = pp3_fw_emac_vport_msg_show(a);
+			if (err)
+				goto out;
 
 			err = pp3_fw_vport_mac_list_get(a, MV_PP3_MAC_ADDR_NUM, &macs_list[0][0],
 						&valid_macs);
