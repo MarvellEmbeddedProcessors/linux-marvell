@@ -1977,7 +1977,7 @@ struct net_device_stats *mv_pp3_get_stats(struct net_device *dev)
 /*---------------------------------------------------------------------------*/
 static int mv_pp3_proc_mac_mc(struct net_device *dev)
 {
-	int macs_list_size;
+	int macs_list_size, mc_list_size;
 	unsigned char *macs_list;
 	struct netdev_hw_addr *ha;
 	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
@@ -1985,11 +1985,18 @@ static int mv_pp3_proc_mac_mc(struct net_device *dev)
 
 	macs_list_size = netdev_hw_addr_list_count(&dev->mc);
 
-	/* currently FW support up to three mcast addresses */
+	/* FW supports (MV_PP3_MAC_ADDR_NUM-1) multicasts (-1 for Unicast).
+	 * Linux-net creates mcast-list without size-limit and doesn't check result.
+	 * Linux-net requires up to 3 places: +2 "common" and +1 local-ipv6-addr.
+	 * An ordering inside of list may be changed by Linux-net,
+	 * so always go ahead with new list, even it is too long (just cut it).
+	 */
 	if (macs_list_size >= MV_PP3_MAC_ADDR_NUM) {
-		/* in such case last addresses will not passed to FW */
-		pr_err("Error: support up to %d mcast address\n", MV_PP3_MAC_ADDR_NUM - 1);
-		return -1;
+		mc_list_size = MV_PP3_MAC_ADDR_NUM - 1;
+		pr_err("%s: Warning: support up to %d mcast addresses. Please delete %d addresses\n",
+		       dev->name, mc_list_size, macs_list_size - mc_list_size);
+	} else {
+		mc_list_size = macs_list_size;
 	}
 
 	macs_list = kzalloc(macs_list_size * MV_MAC_ADDR_SIZE, GFP_ATOMIC);
@@ -2009,7 +2016,7 @@ static int mv_pp3_proc_mac_mc(struct net_device *dev)
 		offset += MV_MAC_ADDR_SIZE;
 	}
 
-	err = pp3_fw_vport_mac_list_set(dev_priv->vport->vport, macs_list_size, macs_list);
+	err = pp3_fw_vport_mac_list_set(dev_priv->vport->vport, mc_list_size, macs_list);
 	if (err < 0) {
 		pr_err("%s error: %s failed to send mcast list to FW\n", __func__, dev->name);
 		kfree(macs_list);
@@ -2045,7 +2052,7 @@ void mv_pp3_set_rx_mode(struct net_device *dev)
 			/* Accept initialized Multicast */
 			if (!netdev_mc_empty(dev))
 				if (mv_pp3_proc_mac_mc(dev) < 0) {
-					pr_err("%s: failed to set multicast list\n", __func__);
+					pr_err("%s: failed to set multicast list\n", dev->name);
 					return;
 				}
 		}
