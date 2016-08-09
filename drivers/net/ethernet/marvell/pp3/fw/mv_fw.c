@@ -43,6 +43,7 @@ disclaimer.
 #include "mv_fw_shared.h"
 #include "fw/mv_pp3_fw_msg.h"
 #include "fw/mv_pp3_fw_msg_structs.h"
+#include "fw/mv_fw.h"
 
 static struct mv_pp3 *pp3_fw_priv;
 static u32 mv_pp3_fw_buffers[MV_PP3_PPN_MEM_BUFS];
@@ -50,6 +51,7 @@ static u32 mv_pp3_fw_buffers[MV_PP3_PPN_MEM_BUFS];
 static unsigned int active_ppc_num;
 static void __iomem *apb_base_addr;
 static unsigned char *mv_pp3_fw_path;
+static bool mv_pp3_fw_is_available_bool;
 
 /* active PPNs mask per cluster */
 static u32 ppc_ppn_mask[MV_PP3_PPC_MAX_NUM];
@@ -653,7 +655,13 @@ int mv_pp3_fw_load(void)
 		pr_err("%s: FW load to search engine failed\n", __func__);
 		return -1;
 	}
+	mv_pp3_fw_is_available_bool = true;
 	return 0;
+}
+
+bool mv_pp3_fw_is_available(void)
+{
+	return mv_pp3_fw_is_available_bool;
 }
 
 /* set path for FW files download */
