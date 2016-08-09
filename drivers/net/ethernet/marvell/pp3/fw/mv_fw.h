@@ -80,6 +80,7 @@ int mv_pp3_fw_image_load(struct mem_image *ptr_to_image);
 int mv_pp3_fw_dram_allocation(void);
 int mv_pp3_fw_init(struct mv_pp3 *priv);
 int mv_pp3_fw_load(void);
+bool mv_pp3_fw_is_available(void);
 int mv_pp3_imem_dump(char *path);
 int mv_pp3_fw_half_range_addr_cfg(void);
 

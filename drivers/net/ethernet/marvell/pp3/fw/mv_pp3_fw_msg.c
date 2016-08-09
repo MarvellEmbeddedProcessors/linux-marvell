@@ -26,6 +26,8 @@
 #include "vport/mv_pp3_cpu.h"
 #include "msg/mv_pp3_msg_drv.h"
 #include "fw/mv_pp3_fw_msg_structs.h"
+#include "fw/mv_pp3_fw_msg.h"
+#include "fw/mv_fw.h"
 
 #ifdef CONFIG_MV_PP3_FPGA
 #include "gmac/mv_gmac.h"
@@ -321,13 +323,15 @@ int pp3_fw_emac_vport_msg_get(int vport, struct mv_pp3_fw_emac_vport *out_msg)
 }
 /*---------------------------------------------------------------------------*/
 
-void pp3_fw_emac_vport_msg_show(int vport)
+int pp3_fw_emac_vport_msg_show(int vport)
 {
-	int err;
+	int err = -1;
 	struct mv_pp3_fw_emac_vport out_msg;
 
-	pr_info("---- EMAC virtual port #%d information from Firmware ----\n", vport);
-	err = pp3_fw_emac_vport_msg_get(vport, &out_msg);
+	if (pp3_vports[vport]) {
+		pr_info("---- EMAC virtual port #%d information from Firmware ----\n", vport);
+		err = pp3_fw_emac_vport_msg_get(vport, &out_msg);
+	}
 	if (!err) {
 		pr_info("state       : %s\n", out_msg.state ? "Enable" : "Disable");
 		pr_info("mtu         : %u\n", out_msg.mtu);
@@ -337,6 +341,7 @@ void pp3_fw_emac_vport_msg_show(int vport)
 		mv_mac_addr_print("ucast MAC   :", &out_msg.mac_addr[0], NULL);
 	} else
 		pr_err("vport #%d FW information is unavailable. err = %d\n", vport, err);
+	return err;
 }
 /*---------------------------------------------------------------------------*/
 
@@ -703,6 +708,7 @@ int pp3_fw_vport_stat_get(int vport, struct mv_pp3_fw_vport_stat *vport_stat)
 {
 	unsigned short param;
 
+	/* vport validity checked in caller */
 	param = cpu_to_be16((unsigned short)vport);
 	if (pp3_fw_set_wait_req(MV_FW_VPORT_STATS_GET, &param, sizeof(param), vport_stat,
 		sizeof(struct mv_pp3_fw_vport_stat)) == 0)
@@ -723,8 +729,10 @@ Return:
 ---------------------------------------------------------------------------*/
 int pp3_fw_hwq_stat_get(unsigned short q, bool clean, struct mv_pp3_fw_hwq_stat *hw_stat)
 {
-
 	struct mv_pp3_fw_hwq_stats_get msg_stat;
+
+	if (!mv_pp3_fw_is_available())
+		return -1;
 
 	msg_stat.hwq = cpu_to_be16(q);
 	msg_stat.clear = clean;
@@ -749,6 +757,9 @@ Return:
 ---------------------------------------------------------------------------*/
 int pp3_fw_swq_stat_get(unsigned char q, struct mv_pp3_fw_swq_stat *sw_stat)
 {
+	if (!mv_pp3_fw_is_available())
+		return -1;
+
 	if (pp3_fw_set_wait_req(MV_FW_SWQ_STATS_GET, &q, sizeof(unsigned char), sw_stat,
 		sizeof(struct mv_pp3_fw_swq_stat)) == 0)
 		mv_be32_convert((u32 *)sw_stat, sizeof(struct mv_pp3_fw_swq_stat)/sizeof(u32));
@@ -768,6 +779,9 @@ Return:
 ---------------------------------------------------------------------------*/
 int pp3_fw_bm_pool_stat_get(unsigned char q, struct mv_pp3_fw_bm_pool_stat *stat)
 {
+	if (!mv_pp3_fw_is_available())
+		return -1;
+
 	if (pp3_fw_set_wait_req(MV_FW_BM_POOL_STATS_GET, &q, sizeof(unsigned char), stat,
 		sizeof(struct mv_pp3_fw_bm_pool_stat)) == 0)
 		mv_be32_convert((u32 *)stat, sizeof(struct mv_pp3_fw_bm_pool_stat)/sizeof(u32));
@@ -787,6 +801,9 @@ Return:
 ---------------------------------------------------------------------------*/
 int pp3_fw_channel_stat_get(unsigned char q, struct mv_pp3_fw_msg_chan_stat *stat)
 {
+	if (!mv_pp3_fw_is_available())
+		return -1;
+
 	if (pp3_fw_set_wait_req(MV_FW_MSG_CHAN_STATS_GET, &q, sizeof(unsigned char), stat,
 		sizeof(struct mv_pp3_fw_msg_chan_stat)) == 0)
 		mv_be32_convert((u32 *)stat, sizeof(struct mv_pp3_fw_msg_chan_stat)/sizeof(u32));
@@ -807,6 +824,9 @@ Return:
 int pp3_fw_clear_stat_set(unsigned char stat_type, unsigned short num)
 {
 	struct mv_pp3_fw_reset_stat msg_stat;
+
+	if (!mv_pp3_fw_is_available())
+		return -1;
 
 	msg_stat.type = stat_type;
 	msg_stat.reserved = 0;
