@@ -142,6 +142,22 @@ cpxor1@6c0000 {
 	status = "disabled";
 };
 
+thermal@400078 {
+	compatible = "marvell,armada-cp110-thermal";
+	reg = <0x400078 0x4>,
+		<0x400070 0x8>,
+		<0x400100 0x20>;
+	/* interrupt assignment by ICU supports single thermal sensor unit,
+	 * currently cp0 thermal sensor irq is enabled.
+	 * To enable cp1 thermal sensor interrupt,
+	 * first disable cp0 thermal sensor interrupt.
+	 */
+	/* interrupts-extended = <&sei 37>;*/
+	threshold = <100>;
+	hysteresis = <2>;
+	status = "okay";
+};
+
 mdio@12a200 {
 	#address-cells = <1>;
 	#size-cells = <0>;
