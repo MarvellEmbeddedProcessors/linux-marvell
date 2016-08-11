@@ -37,8 +37,7 @@ gateclk: clock-gating-control@440220 {
 };
 
 pinctrl@440000 {
-	compatible = "marvell,a70x0-pinctrl";
-	reg = <0x440000 0x10>;
+	reg = <0x440000 0x20>;
 };
 
 gpio@440100 {
