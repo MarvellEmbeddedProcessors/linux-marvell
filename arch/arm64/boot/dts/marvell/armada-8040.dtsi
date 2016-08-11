@@ -133,6 +133,9 @@
 			ppv22@000000 {
 				dma-coherent;
 			};
+			pinctrl@440000 {
+				compatible = "marvell,a80x0-cp0-pinctrl";
+			};
 			usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
 			};
@@ -173,6 +176,9 @@
 			};
 			ppv22@000000 {
 				dma-coherent;
+			};
+			pinctrl@440000 {
+				compatible = "marvell,a80x0-cp1-pinctrl";
 			};
 		};
 		pcie@0x600000 {
