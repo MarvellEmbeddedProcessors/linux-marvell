@@ -223,8 +223,6 @@ static void sdhci_do_reset(struct sdhci_host *host, u8 mask)
 	}
 }
 
-static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
-
 static void sdhci_init(struct sdhci_host *host, int soft)
 {
 	if (soft)
@@ -1636,7 +1634,7 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 	spin_unlock_irqrestore(&host->lock, flags);
 }
 
-static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
 
@@ -1644,6 +1642,7 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	sdhci_do_set_ios(host, ios);
 	sdhci_runtime_pm_put(host);
 }
+EXPORT_SYMBOL_GPL(sdhci_set_ios);
 
 static int sdhci_do_get_cd(struct sdhci_host *host)
 {
