@@ -1776,7 +1776,7 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
 }
 
 static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
-						struct mmc_ios *ios)
+					 struct mmc_ios *ios)
 {
 	struct mmc_host *mmc = host->mmc;
 	u16 ctrl;
@@ -1866,7 +1866,7 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 	}
 }
 
-static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 	struct mmc_ios *ios)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
@@ -1879,6 +1879,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 	sdhci_runtime_pm_put(host);
 	return err;
 }
+EXPORT_SYMBOL_GPL(sdhci_start_signal_voltage_switch);
 
 static int sdhci_card_busy(struct mmc_host *mmc)
 {
