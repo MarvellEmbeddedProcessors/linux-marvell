@@ -786,3 +786,12 @@ config MMC_MTK
 	  If you have a machine with a integrated SD/MMC card reader, say Y or M here.
 	  This is needed if support for any SD/SDIO/MMC devices is required.
 	  If unsure, say N.
+
+config MMC_SDHCI_XENON
+	tristate "Marvell Xenon eMMC/SD/SDIO SDHCI driver"
+	depends on MMC_SDHCI && MMC_SDHCI_PLTFM
+	help
+	  This selects Marvell Xenon eMMC/SD/SDIO SDHCI.
+	  If you have a machine with integrated  Marvell Xenon SDHC IP,
+	  say Y or M here.
+	  If unsure, say N
