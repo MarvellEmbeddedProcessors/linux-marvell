@@ -1,6 +1,5 @@
 /*
- * Device Tree Include file for Marvell Armada 372x family of RZ SoCs
- * (also named 88F3720-RZ)
+ * Device Tree Include file for Marvell Armada 37xx family of RZ SoCs.
  *
  * Copyright (C) 2016 Marvell
  *
@@ -45,19 +44,8 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "armada-37xx-rz.dtsi"
+#include "armada-37xx.dtsi"
 
 / {
-	model = "Marvell Armada 3720 RZ SoC";
-	compatible = "marvell,armada3720", "marvell,armada3710";
-
-	cpus {
-		cpu@1 {
-			device_type = "cpu";
-			compatible = "arm,cortex-a53","arm,armv8";
-			reg = <0x1>;
-			enable-method = "psci";
-		};
-	};
-
+	model = "Marvell Armada 37xx RZ SoC";
 };
