@@ -31,39 +31,42 @@
 #include "common/mv_hw_if.h"
 
 
+#define MV_HLP(STR) { o += scnprintf(b + o, PAGE_SIZE - o, STR); }
+
 static ssize_t pp3_dev_debug_help(char *b)
 {
 	int o = 0;
 
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "cat                                     help           - show this help\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [ifname]                         > mac_show       - show MAC addresses for network interface\n");
+MV_HLP("\n");
+MV_HLP("cat                       help           - show this help\n");
+MV_HLP("echo [ifname]           > mac_show       - show MAC addresses for network interface\n");
 #if 0
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [cpu]                            > txdone_history - show tx done history staistics\n");
+MV_HLP("echo [cpu]              > txdone_history - show tx done history staistics\n");
 #endif
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [0|1]                            > internal_debug - enable/disable internal debug checkers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [ifname] [mask]                  > debug          - enable/disable network interface debug messages\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [ifname] [cir] [eir] [cbs] [ebs] > tx_shaper      - set shaping rates and burst sizes for egress emac port\n");
+MV_HLP("echo [0|1|2]            > internal_debug - action on error: warn|stop|panic\n");
+MV_HLP("echo [ifname] [mask]    > debug          - enable/disable network interface debug messages\n");
+MV_HLP("echo [ifname] [cir] [eir] [cbs] [ebs] > tx_shaper\n");
+MV_HLP("                                         - set shaping rates and burst sizes for egress emac port\n");
 #if 0
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [cpu] [mask]                     > cpu_debug      - enable/disable cpu debug messages\n");
+MV_HLP("echo [cpu] [mask]       > cpu_debug      - enable/disable cpu debug messages\n");
 #ifndef CONFIG_MV_PP3_FPGA
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [0|1]                            > rx_isr_mode    - set rx ISR mode for all network interfaces. 0-poll, 1-isr\n");
+MV_HLP("echo [0|1]              > rx_isr_mode    - set rx ISR mode for all network interfaces. 0-poll, 1-isr\n");
 #endif /* CONFIG_MV_PP3_FPGA */
 #endif
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [ifname] [rx] [tx]               > create         - create new virtual network device (no emac connectivity)\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "parameters:\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [ifname]    - network interface name e.g. nic0, nic1, etc\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [mode]      - 0 for 4 HWQ per SWQ, 1 for 1 HWQ per SWQ\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [mask]      - for debug command: b0-rx, b1-tx, b2-isr, b3-poll\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "                  - for cpu_devug command: b0-buff push, b1-buff pop\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [rx]        - number of rx virtual queueus\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [tx]        - number of tx virtual queueus\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [cir]       - committed information rate in [Mbps] units, granularity of [10 Mbps]\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [eir]       - excessive information rate in [Mbps] units, granularity of [10 Mbps]\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [cbs]       - committed burst size in [KBytes]\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [ebs]       - excessive burst size in [KBytes]\n");
+MV_HLP("echo [ifname] [rx] [tx] > create         - create new virtual network device (no emac connectivity)\n");
+MV_HLP("\n");
+MV_HLP("parameters:\n");
+MV_HLP("      [ifname]    - network interface name e.g. nic0, nic1, etc\n");
+MV_HLP("      [mode]      - 0 for 4 HWQ per SWQ, 1 for 1 HWQ per SWQ\n");
+MV_HLP("      [mask]      - for debug command: b0-rx, b1-tx, b2-isr, b3-poll\n");
+MV_HLP("                  - for cpu_devug command: b0-buff push, b1-buff pop\n");
+MV_HLP("      [rx]        - number of rx virtual queueus\n");
+MV_HLP("      [tx]        - number of tx virtual queueus\n");
+MV_HLP("      [cir]       - committed information rate in [Mbps] units, granularity of [10 Mbps]\n");
+MV_HLP("      [eir]       - excessive information rate in [Mbps] units, granularity of [10 Mbps]\n");
+MV_HLP("      [cbs]       - committed burst size in [KBytes]\n");
+MV_HLP("      [ebs]       - excessive burst size in [KBytes]\n");
 #endif
 	return o;
 }

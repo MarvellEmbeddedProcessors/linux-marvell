@@ -47,8 +47,15 @@ disclaimer.
 #define PP3_INTERNAL_DEBUG
 
 #ifdef PP3_INTERNAL_DEBUG
-int mv_pp3_ctrl_internal_debug_set(int en);
-bool mv_pp3_is_internal_debug(void);
+enum mv_dbg_action {
+	MV_DBG_ACTION_WARNING = 0,
+	MV_DBG_ACTION_STOP,
+	MV_DBG_ACTION_PANIC,
+	MV_DBG_ACTION_MAX
+};
+
+int mv_pp3_ctrl_internal_debug_set(int action);
+const char *mv_pp3_get_internal_debug_str(void);
 #endif
 
 #define TOS_TO_DSCP(tos)	((tos) >> 2)
