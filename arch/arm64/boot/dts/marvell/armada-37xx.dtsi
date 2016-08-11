@@ -321,6 +321,26 @@
 				status = "disabled";
 			};
 
+			sdhci1: sdhci@d0000 {
+				compatible = "marvell,xenon-sdhci";
+				reg = <0xd0000 0x300>;
+				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+				xenon,slotno = <0>;
+				clock-names = "core";
+				clocks = <&core_clk 7>;
+				status = "disabled";
+			};
+
+			sdhci0: sdhci@d8000 {
+				compatible = "marvell,xenon-sdhci";
+				reg = <0xd8000 0x300>;
+				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+				xenon,slotno = <0>;
+				clock-names = "core";
+				clocks = <&core_clk 7>;
+				status = "disabled";
+			};
+
 			sata@e0000 {
 				compatible = "marvell,armada-3700-ahci";
 				reg = <0xe0000 0x2000>;
