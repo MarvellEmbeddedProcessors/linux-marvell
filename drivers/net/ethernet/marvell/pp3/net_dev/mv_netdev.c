@@ -101,18 +101,57 @@ static struct mv_nss_if_ops mv_pp3_nss_if_ops = {
 
 /* debug parameters */
 #ifdef PP3_INTERNAL_DEBUG
-static bool internal_debug_en;
-static bool debug_stop_rx;
+static enum mv_dbg_action internal_debug_action;
+static bool debug_stop_rx_tx;
 
-bool mv_pp3_is_internal_debug(void)
+const char *mv_pp3_get_internal_debug_str(void)
 {
-	return internal_debug_en;
+	switch (internal_debug_action) {
+	case MV_DBG_ACTION_WARNING:
+		return "print only";
+	case MV_DBG_ACTION_STOP:
+		return "STOP on error";
+	case MV_DBG_ACTION_PANIC:
+		return "PANIC on error";
+	default:
+		return "UNKNOWN"; /* never here, see "_set()" */
+	}
+	return NULL; /* never here */
 }
 
-int mv_pp3_ctrl_internal_debug_set(int en)
+int mv_pp3_ctrl_internal_debug_set(int action)
 {
-	internal_debug_en = (en != 0);
+	if (action >= MV_DBG_ACTION_MAX) /* ~invalid */
+		return -1;
+	internal_debug_action = action;
 	return 0;
+}
+
+static int mv_pp3_internal_debug_action_on_err(struct net_device *dev)
+{
+	/* Error detail is already printed */
+	if (internal_debug_action == MV_DBG_ACTION_STOP) {
+		debug_stop_rx_tx = true;
+		pr_err("%s: unrecoverable problem. Net-device <%s> STOPPED!!!\n",
+		       dev->name, dev->name);
+	} else if (internal_debug_action == MV_DBG_ACTION_PANIC) {
+		debug_stop_rx_tx = true;
+		/* PANIC rather then Oops/BUG */
+		panic("%s: unrecoverable problem. PANIC\n", dev->name);
+	} else {
+		/* Try continue ordinary */
+		/* Warn-info already printed by calling-context. */
+		return 0;
+	}
+	return -1;
+}
+
+static void mv_pp3_internal_debug_init(void)
+{
+	/* Default-action PANIC if Kernel-panic goes to reboot with _timeout
+	 * Otherwize no reboot but stall, so we could also use STOP
+	 */
+	internal_debug_action = (panic_timeout) ? MV_DBG_ACTION_PANIC : MV_DBG_ACTION_STOP;
 }
 #endif /* PP3_INTERNAL_DEBUG */
 
@@ -378,7 +417,7 @@ void mv_pp3_config_show(void)
 #endif
 
 #ifdef PP3_INTERNAL_DEBUG
-	pr_info("  o Internal DEBUG mode (%s)\n",  mv_pp3_is_internal_debug() ? "Enabled" : "Disabled");
+	pr_info("  o Internal DEBUG mode (%s)\n",  mv_pp3_get_internal_debug_str());
 #endif
 
 #ifdef CONFIG_MV_PP3_SKB_RECYCLE
@@ -1183,7 +1222,7 @@ int mv_pp3_poll(struct napi_struct *napi, int budget)
 	/* start from high priority queue */
 	for (i = cpu_vp->port.cpu.napi_q_num - 1; i >= 0; i--) {
 #ifdef PP3_INTERNAL_DEBUG
-		if (debug_stop_rx) {
+		if (debug_stop_rx_tx) {
 			napi_complete(napi);
 			STAT_INFO(cpu_vp->port.cpu.stats.napi_complete++);
 			return rx_pkt_done;
@@ -1257,9 +1296,9 @@ static inline int pp3_pool_bufs_free_internal(int buf_num, struct net_device *de
 			pr_err("%s: hmac (%d:%d): timeout error on pool #%d, cpu #%d\n",
 				__func__, frame, queue, ppool->pool, smp_processor_id());
 			pr_err("\twaiting for %d buffers, received %d\n", buffs_req, occ);
-#ifdef PP3_INTERNAL_DEBUG
-			debug_stop_rx = true;
-#endif
+			/* Return error, so CALLER decides about mv_pp3_internal_debug_action_on_err();
+			 * permits also to see where from it has been called
+			*/
 			return -1;
 		}
 
@@ -1341,7 +1380,7 @@ static inline int mv_pp3_tx_done(struct net_device *dev, int tx_todo)
 		if (total_free < 0) {
 			pr_err("%s: Invalid state, try to release %d. Total_free (%d) cannot be < 0\n",
 				__func__, tx_todo, total_free);
-			debug_stop_rx = true;
+			mv_pp3_internal_debug_action_on_err(dev);
 			return -1;
 		}
 	}
@@ -1616,9 +1655,9 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 
 #ifdef PP3_INTERNAL_DEBUG
 	if (occ_dg > rx_swq->cur_size * MV_PP3_CFH_DG_MAX_NUM) {
-		debug_stop_rx = true;
 		pr_err("%s: bad occupied datagram counter %d received on frame %d, queue %d\n",
 				__func__, occ_dg, rx_swq->frame_num, rx_swq->swq);
+		mv_pp3_internal_debug_action_on_err(dev);
 		return 0;
 	}
 #endif
@@ -1644,7 +1683,7 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 		cfh = (struct mv_cfh_common *)mv_pp3_hmac_rxq_next_cfh(rx_swq->frame_num, rx_swq->swq, &num_dg);
 #ifdef PP3_INTERNAL_DEBUG
 		if (num_dg == 0) {
-			debug_stop_rx = true;
+			mv_pp3_internal_debug_action_on_err(dev);
 			break;
 		}
 
@@ -1654,9 +1693,7 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 			/* in next interrupt will processed full CFH */
 			pr_info("%s: only part of CFH is moved to DRAM (num_dg = %d, occ_dg = %d)\n",
 				dev->name, num_dg, occ_dg);
-
-			debug_stop_rx = true;
-
+			mv_pp3_internal_debug_action_on_err(dev);
 			break;
 		}
 #endif
@@ -1683,7 +1720,7 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 			/* BUG situation: can't handle bad packet,
 			 *  queue/buffer/skb are never released
 			 */
-			debug_stop_rx = true;
+			mv_pp3_internal_debug_action_on_err(dev);
 			break;
 		}
 #endif
@@ -1906,6 +1943,7 @@ int mv_pp3_pool_bufs_free(int buf_num, struct net_device *dev, struct pp3_pool *
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
 			pr_err("%s: Error, function failed. Try to release %d buffers\n",
 				__func__, buf_num);
+			mv_pp3_internal_debug_action_on_err(dev);
 #endif
 			MV_LIGHT_UNLOCK(flags);
 			return -1;
@@ -2875,11 +2913,15 @@ int mv_pp3_dev_open(struct net_device *dev)
 
 	/* link interrupts and emac are closed */
 
-	if (!mv_pp3_shared_initialized(pp3_priv))
+	if (!mv_pp3_shared_initialized(pp3_priv)) {
 		if (mv_pp3_shared_start(pp3_priv)) {
 			pr_err("%s: mv_pp3_shared_start fail\n", __func__);
 			return -1;
 		}
+#ifdef PP3_INTERNAL_DEBUG
+		mv_pp3_internal_debug_init();
+#endif
+	}
 
 	if (!(dev_priv->flags & MV_PP3_F_INIT)) {
 		if (mv_pp3_dev_priv_alloc(dev_priv))
@@ -3179,7 +3221,7 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 #endif
 
 #ifdef PP3_INTERNAL_DEBUG
-	if (debug_stop_rx)
+	if (debug_stop_rx_tx)
 		return NETDEV_TX_OK;
 #endif
 	MV_LIGHT_LOCK(flags);
