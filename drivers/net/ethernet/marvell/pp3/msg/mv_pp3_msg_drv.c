@@ -257,6 +257,10 @@ static void pp3_chan_callback(int chan, void *msg, int size, int seq_num, int fl
 		p->num_ok = num_ok;
 		p->size_of_reply = size;
 		msg_info->msg_cb((void *)msg_info->p1);
+	} else if (ret_code) {
+		pr_info("FW no-callback-request opcode=%d N%d/%d FAILED with ret=%d\n",
+			msg_opcode, seq_num, msg_info->seq_num, ret_code);
 	}
+
 	mv_pp3_drv_request_delete(seq_num);
 }
