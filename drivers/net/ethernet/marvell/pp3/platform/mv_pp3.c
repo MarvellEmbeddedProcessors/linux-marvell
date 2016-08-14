@@ -621,6 +621,7 @@ int mv_pp3_shared_start(struct mv_pp3 *priv)
 	struct mv_pp3_version fw_ver, *drv_ver;
 	char *version_name;
 	int ver_name_size;
+	char buf[80];
 
 	if (priv->initialized)
 		return 0;
@@ -684,17 +685,19 @@ int mv_pp3_shared_start(struct mv_pp3 *priv)
 	drv_ver = mv_pp3_get_driver_version();
 	memcpy(version_name, drv_ver->name, ver_name_size);
 	pr_info("\n");
-	pr_info("Driver version: %s:%02d.%02d.%d",
+	sprintf(buf, "Driver version: %s:%02d.%02d.%d",
 		version_name, drv_ver->major_x, drv_ver->minor_y, drv_ver->local_z);
 	if (drv_ver->debug_d)
-		pr_cont(".%d\n", drv_ver->debug_d);
-
+		pr_info("%s.%d\n", buf, drv_ver->debug_d);
+	else
+		pr_info("%s\n", buf);
 	memcpy(version_name, fw_ver.name, ver_name_size);
-	pr_info("FW version:     %s:%02d.%02d.%d",
+	sprintf(buf, "FW version:     %s:%02d.%02d.%d",
 		version_name, fw_ver.major_x, fw_ver.minor_y, fw_ver.local_z);
 	if (fw_ver.debug_d)
-		pr_cont(".%d\n", fw_ver.debug_d);
-
+		pr_info("%s.%d\n", buf, fw_ver.debug_d);
+	else
+		pr_info("%s\n", buf);
 	pr_info("\n");
 	kfree(version_name);
 
