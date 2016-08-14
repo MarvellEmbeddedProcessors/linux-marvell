@@ -241,7 +241,7 @@ int mv_pp3_dev_rxvq_num_get(struct net_device *dev, int cpu)
 
 	return dev_priv->cpu_vp[cpu]->rx_vqs_num;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev->name, __func__);
 	return -1;
 
 }
@@ -606,7 +606,7 @@ int mv_pp3_rx_time_coal_get(struct net_device *dev, int *usec)
 	*usec = dev_priv->rx_time_coal;
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev->name, __func__);
 	return -1;
 }
 /*---------------------------------------------------------------------------*/
@@ -635,7 +635,7 @@ int mv_pp3_rx_pkt_coal_set(struct net_device *dev, int pkts_num)
 	dev_priv->rx_pkt_coal = pkts_num;
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev->name, __func__);
 	return -1;
 }
 /*---------------------------------------------------------------------------*/
@@ -655,7 +655,7 @@ int mv_pp3_rx_pkt_coal_get(struct net_device *dev, int *pkts_num)
 	*pkts_num = dev_priv->rx_pkt_coal;
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev->name, __func__);
 	return -1;
 }
 /*---------------------------------------------------------------------------*/
@@ -691,7 +691,7 @@ int mv_pp3_txdone_pkt_coal_get(struct net_device *dev, int *pkts_num)
 
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev->name, __func__);
 	return -1;
 
 }
@@ -721,7 +721,7 @@ int mv_pp3_txdone_time_coal_set(struct net_device *dev, unsigned int usec)
 	dev_priv->tx_done_time_coal = usec;
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev->name, __func__);
 	return -1;
 }
 /*---------------------------------------------------------------------------*/
@@ -742,7 +742,7 @@ int mv_pp3_txdone_time_coal_get(struct net_device *dev, unsigned int *usec)
 
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev->name, __func__);
 	return -1;
 }
 
@@ -796,7 +796,8 @@ static void mv_pp3_dev_link_event(struct pp3_dev_priv *dev_priv)
 	char link_str[100];
 
 	if (dev_priv->vport->type != MV_PP3_NSS_PORT_ETH) {
-		pr_err("%s: error, this function relevant only for EMAC virtual ports\n", __func__);
+		pr_err("%s: %s relevant only for EMAC virtual ports\n",
+		       dev_priv->dev->name, __func__);
 		return;
 	}
 
@@ -1096,7 +1097,7 @@ static int mv_pp3_dev_rx_irq_init(struct pp3_dev_priv *dev_priv)
 
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev_priv->dev->name, __func__);
 	mv_pp3_dev_rx_irqs_free(dev_priv);
 	return -1;
 }
@@ -1133,7 +1134,7 @@ static int mv_pp3_dev_irqs_init(struct pp3_dev_priv *dev_priv)
 	return 0;
 
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev_priv->dev->name, __func__);
 
 	if (vp_priv->type == MV_PP3_NSS_PORT_ETH) {
 		disable_irq(vp_priv->port.emac.lc_irq_num);
@@ -1293,9 +1294,9 @@ static inline int pp3_pool_bufs_free_internal(int buf_num, struct net_device *de
 
 		if (time_out >=  time_out_max) {
 			STAT_ERR(PPOOL_STATS(ppool, cpu_ctrl->cpu)->buff_get_timeout_err++);
-			pr_err("%s: hmac (%d:%d): timeout error on pool #%d, cpu #%d\n",
-				__func__, frame, queue, ppool->pool, smp_processor_id());
-			pr_err("\twaiting for %d buffers, received %d\n", buffs_req, occ);
+			pr_err("%s: free pool_%d timeout, hmac:cpu%d:bm_frame=%d:bm_swq=%d\n",
+			       dev->name, ppool->pool, smp_processor_id(), frame, queue);
+			pr_err("    waiting for %d buffers, received %d\n", buffs_req, occ);
 			/* Return error, so CALLER decides about mv_pp3_internal_debug_action_on_err();
 			 * permits also to see where from it has been called
 			*/
@@ -1375,16 +1376,14 @@ static inline int mv_pp3_tx_done(struct net_device *dev, int tx_todo)
 
 	if (tx_todo) {
 		total_free = pp3_pool_bufs_free_internal(tx_todo, dev, dev_priv->cpu_shared->txdone_pool);
-
 #ifdef PP3_INTERNAL_DEBUG
 		if (total_free < 0) {
-			pr_err("%s: Invalid state, try to release %d. Total_free (%d) cannot be < 0\n",
-				__func__, tx_todo, total_free);
+			pr_err("%s: tx_done failed to release %d buffers\n", dev->name, tx_todo);
 			mv_pp3_internal_debug_action_on_err(dev);
 			return -1;
 		}
-	}
 #endif
+	}
 	return total_free;
 }
 
@@ -1656,7 +1655,7 @@ static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp
 #ifdef PP3_INTERNAL_DEBUG
 	if (occ_dg > rx_swq->cur_size * MV_PP3_CFH_DG_MAX_NUM) {
 		pr_err("%s: bad occupied datagram counter %d received on frame %d, queue %d\n",
-				__func__, occ_dg, rx_swq->frame_num, rx_swq->swq);
+		       dev->name, occ_dg, rx_swq->frame_num, rx_swq->swq);
 		mv_pp3_internal_debug_action_on_err(dev);
 		return 0;
 	}
@@ -1863,7 +1862,7 @@ int mv_pp3_pool_bufs_add(int buf_num, struct net_device *dev, struct pp3_pool *p
 	size = ppool->buf_size;
 
 	if (size == 0) {
-		pr_err("%s: invalid pool #%d state: buf_size = %d\n", __func__, ppool->pool, size);
+		pr_err("%s: pool #%d: invalid buf_size=0\n", dev->name, ppool->pool);
 		return -EINVAL;
 	}
 
@@ -1873,8 +1872,8 @@ int mv_pp3_pool_bufs_add(int buf_num, struct net_device *dev, struct pp3_pool *p
 
 	ppool->in_use_thresh = ppool->buf_num / 4;
 
-	pr_info("%s pool #%d:  buf_size=%4d - %d of %d buffers added\n",
-		mv_pp3_pool_name_get(ppool), ppool->pool, size, i, buf_num);
+	pr_info("%s: %s pool #%d:  buf_size=%4d - %d of %d buffers added\n",
+		dev->name, mv_pp3_pool_name_get(ppool), ppool->pool, size, i, buf_num);
 
 	return 0;
 }
@@ -1892,16 +1891,17 @@ int mv_pp3_pool_bufs_free(int buf_num, struct net_device *dev, struct pp3_pool *
 	struct pp3_dev_priv *dev_priv;
 	struct pp3_vport *cpu_vp;
 	struct mv_pp3_timer *tmr;
+	const char *extra_str;
 
 	cpu_ctrl = pp3_cpus[cpu];
 
 	if (!cpu_ctrl) {
-		pr_err("%s: CPU %d pointer in NULL\n", __func__, cpu);
+		pr_err("%s: buf-free: cpu_%d ctrl ptr = NULL\n", dev->name, cpu);
 		return -EINVAL;
 	}
 
 	if (!ppool) {
-		pr_err("%s: pool pointer in NULL\n", __func__);
+		pr_err("%s: buf-free: pool pointer = NULL\n", dev->name);
 		return -EINVAL;
 	}
 
@@ -1941,9 +1941,8 @@ int mv_pp3_pool_bufs_free(int buf_num, struct net_device *dev, struct pp3_pool *
 
 		if (free_buf < 0) {
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
-			pr_err("%s: Error, function failed. Try to release %d buffers\n",
-				__func__, buf_num);
-			mv_pp3_internal_debug_action_on_err(dev);
+			pr_err("%s: slow-context %s failed to release %d buffers\n",
+			       dev->name, __func__, buf_num);
 #endif
 			MV_LIGHT_UNLOCK(flags);
 			return -1;
@@ -1952,15 +1951,18 @@ int mv_pp3_pool_bufs_free(int buf_num, struct net_device *dev, struct pp3_pool *
 	}
 	MV_LIGHT_UNLOCK(flags);
 
-	pr_info("%s pool #%d:  buf_size=%4d - free %d of %d buffers\n",
-		mv_pp3_pool_name_get(ppool),
-		ppool->pool, ppool->buf_size, buf_num_old - ppool->buf_num, buf_num_old);
+	if (time_out >= time_out_max)
+		extra_str = "TIMEOUT";
+	else
+		extra_str = "ok";
 
-	if (time_out >= time_out_max) {
-		pr_err("%s: timeout - retries exceeded\n", __func__);
+	pr_info("%s: %s pool #%d:  buf_size=%4d - free %d of %d buffers %s\n",
+		dev->name, mv_pp3_pool_name_get(ppool),
+		ppool->pool, ppool->buf_size, buf_num_old - ppool->buf_num, buf_num_old,
+		extra_str);
+
+	if (time_out >= time_out_max)
 		return -1;
-	}
-
 	return 0;
 }
 /*---------------------------------------------------------------------------*/
@@ -1971,7 +1973,7 @@ static int mv_pp3_set_mac_addr_internals(struct net_device *dev, u8 *mac)
 
 	if (mv_pp3_shared_initialized(pp3_priv)) {
 		if (pp3_fw_port_mac_addr(dev_priv->vport->vport, mac) < 0) {
-			pr_err("%s: MAC address set command failed\n", __func__);
+			pr_err("%s: MAC address set command failed\n", dev->name);
 			return -1;
 		}
 	}
@@ -1988,7 +1990,7 @@ int mv_pp3_set_mac_addr(struct net_device *dev, void *p)
 	struct pp3_dev_priv *dev_priv;
 
 	if (!dev || !addr) {
-		pr_err("%s: cannot change MAC for device %p", __func__, dev);
+		pr_err("%s: cannot change MAC for device %p", dev->name, dev);
 		return -1;
 	}
 
@@ -2099,7 +2101,7 @@ static int mv_pp3_proc_mac_mc(struct net_device *dev)
 	macs_list = kzalloc(macs_list_size * MV_MAC_ADDR_SIZE, GFP_ATOMIC);
 
 	if (!macs_list) {
-		pr_err("%s: out of memory\n", __func__);
+		pr_err("%s: %s out of memory\n", dev->name, __func__);
 		return -ENOMEM;
 	}
 
@@ -2189,8 +2191,8 @@ int mv_pp3_cpu_affinity_set(struct net_device *dev, int cpu)
 		}
 
 		if (pp3_fw_vport_def_dest_set(vp_priv->vport, MV_PP3_CPU_VPORT_ID(cpu)) < 0) {
-			pr_warn("%s Error: FW vport %d default destination update failed\n",
-				__func__, vp_priv->vport);
+			pr_warn("%s: %s Error: FW vport %d default destination update failed\n",
+				dev->name, __func__, vp_priv->vport);
 			return -1;
 		}
 		vp_priv->dest_vp = MV_PP3_CPU_VPORT_ID(cpu);
@@ -2250,7 +2252,7 @@ int mv_pp3_netdev_set_emac_params(struct net_device *dev, struct device_node *np
 	struct pp3_dev_priv *dev_priv;
 
 	if (!dev) {
-		pr_err("%s: network device pointer is NULL\n", __func__);
+		pr_err("%s: network device pointer is NULL\n", dev->name);
 		goto err;
 	}
 
@@ -2270,7 +2272,7 @@ int mv_pp3_netdev_set_emac_params(struct net_device *dev, struct device_node *np
 
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s: %s failed\n", dev->name, __func__);
 	return -1;
 }
 /*---------------------------------------------------------------------------*/
@@ -2456,7 +2458,7 @@ static bool mv_pp3_dev_txdone_is_empty(struct pp3_dev_priv *dev_priv)
 	int cpu;
 
 	if (!dev_priv) {
-		pr_err("%s: invalid param", __func__);
+		pr_err("%s: %s invalid param", dev_priv->dev->name, __func__);
 		return -1;
 	}
 
@@ -2480,8 +2482,8 @@ static int mv_pp3_dev_pool_update(struct net_device *dev, struct pp3_pool *ppool
 
 	if (size > ppool->capacity) {
 		ppool->pool_size = ppool->capacity;
-		pr_warn("%s: Warning! %d pool capacity %d is less than recommended value %d\n",
-			__func__, ppool->pool, ppool->capacity, size);
+		pr_warn("%s: %s: Warning! %d pool capacity %d is less than recommended value %d\n",
+			dev->name, __func__, ppool->pool, ppool->capacity, size);
 	} else
 		ppool->pool_size = size;
 
@@ -2498,7 +2500,7 @@ static int mv_pp3_dev_pools_empty(struct pp3_dev_priv *dev_priv)
 	struct pp3_pool *ppool;
 
 	if (!dev_priv) {
-		pr_err("%s: invalid param", __func__);
+		pr_err("%s: %s invalid param", dev_priv->dev->name, __func__);
 		return -1;
 	}
 
@@ -2552,7 +2554,7 @@ static int mv_pp3_dev_pools_fill(struct pp3_dev_priv *dev_priv)
 	int size;
 
 	if (!dev_priv) {
-		pr_err("%s: invalid param", __func__);
+		pr_err("%s: %s invalid param", dev_priv->dev->name, __func__);
 		return -1;
 	}
 
@@ -2963,7 +2965,7 @@ int mv_pp3_dev_open(struct net_device *dev)
 
 	return 0;
 err:
-	pr_err("%s: function failed\n", __func__);
+	pr_err("%s open failed\n", dev->name);
 	return -1;
 }
 /*---------------------------------------------------------------------------*/
@@ -3044,7 +3046,7 @@ static int mv_pp3_change_mtu_internals(struct net_device *dev, int mtu)
 						MV_RX_PKT_SIZE(mtu));
 
 		if (pp3_fw_bm_pool_set(long_pool) < 0)
-			pr_warn("%s: FW long pool update failed\n", __func__);
+			pr_warn("%s: FW long pool update failed\n", dev->name);
 	}
 
 	if (dev_priv->vport->type != MV_PP3_NSS_PORT_ETH)
@@ -3054,7 +3056,7 @@ static int mv_pp3_change_mtu_internals(struct net_device *dev, int mtu)
 	emac_vp->port.emac.mtu = mtu;
 
 	if (pp3_fw_vport_mtu_set(emac_vp->vport, mtu) < 0)
-		pr_warn("%s: FW EMAC vport mtu set failed\n", __func__);
+		pr_warn("%s: FW EMAC vport mtu set failed\n", dev->name);
 
 	/* TODO - check if necessary */
 	/* netdev_update_features(dev); */
@@ -3237,7 +3239,7 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
 	if (cos > MV_PP3_PRIO_NUM) {
-		pr_err("%s: cannot map packet priority %d to queue.\n", __func__, cos);
+		pr_err("%s: tx cannot map packet priority %d to queue.\n", dev->name, cos);
 		goto out;
 	}
 #endif
@@ -3384,7 +3386,7 @@ out:
 
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
 	if (dev_priv->flags & MV_PP3_F_DBG_TX)
-		pr_info("%s: packet is dropped.\n", __func__);
+		pr_info("%s: tx packet is dropped.\n", dev->name);
 #endif
 
 	MV_LIGHT_UNLOCK(flags);
