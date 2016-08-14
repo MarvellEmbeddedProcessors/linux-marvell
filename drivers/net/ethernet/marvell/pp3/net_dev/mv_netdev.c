@@ -1378,7 +1378,8 @@ static inline int mv_pp3_tx_done(struct net_device *dev, int tx_todo)
 		total_free = pp3_pool_bufs_free_internal(tx_todo, dev, dev_priv->cpu_shared->txdone_pool);
 #ifdef PP3_INTERNAL_DEBUG
 		if (total_free < 0) {
-			pr_err("%s: tx_done failed to release %d buffers\n", dev->name, tx_todo);
+			pr_err("%s: tx_done failed to release %d buffers (in %s)\n",
+			       dev->name, tx_todo, in_interrupt() ? "timer" : "direct tx");
 			mv_pp3_internal_debug_action_on_err(dev);
 			return -1;
 		}
