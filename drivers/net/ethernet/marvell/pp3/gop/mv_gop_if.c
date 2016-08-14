@@ -662,10 +662,12 @@ int mv_pp3_gop_autoneg_restart(int port_num)
 	break;
 	case MV_PORT_XAUI:
 	case MV_PORT_RXAUI:
-		pr_err("%s: on supported for port mode (%d)", __func__, gop_ports[port_num].port_mode);
+		pr_err("gop port %d: autoneg-restart not supported for mode=%d (XAUI/RXAUI)\n",
+		       port_num, gop_ports[port_num].port_mode);
 		return -1;
 	default:
-		pr_err("%s: Wrong port mode (%d)", __func__, gop_ports[port_num].port_mode);
+		pr_err("gop port %d: autoneg-restart wrong mode=%d\n",
+		       port_num, gop_ports[port_num].port_mode);
 		return -1;
 	}
 	return 0;
