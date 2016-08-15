@@ -142,28 +142,6 @@
 				status = "okay";
 			};
 
-			sdhci1: sdhci@d0000 {
-				wp-inverted;
-				bus-width = <4>;
-				cd-gpios = <&gpio_sb 2 GPIO_ACTIVE_LOW>;
-				vqmmc-supply = <&vcc_sd_reg1>;
-				status = "okay";
-
-				pinctrl-names = "default";
-				pinctrl-0 = <&sdio_pins &cd_pins>;
-			};
-
-			sdhci0: sdhci@d8000 {
-				xenon,emmc;
-				non-removable;
-				bus-width = <8>;
-				tuning-count = <6>;
-				status = "okay";
-
-				pinctrl-names = "default";
-				pinctrl-0 = <&mmc_pins>;
-			};
-
 			/* CON3 */
 			sata@e0000 {
 				target-supply = <&reg_5v_sata>;
