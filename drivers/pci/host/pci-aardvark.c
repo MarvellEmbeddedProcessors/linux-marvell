@@ -818,7 +818,7 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
 	int err, res_valid = 0;
 	struct device *dev = &pcie->pdev->dev;
 	struct device_node *np = dev->of_node;
-	struct resource_entry *win;
+	struct resource_entry *win, *tmp;
 	resource_size_t iobase;
 
 	INIT_LIST_HEAD(&pcie->resources);
@@ -828,7 +828,7 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
 	if (err)
 		return err;
 
-	resource_list_for_each_entry(win, &pcie->resources) {
+	resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
 		struct resource *parent = NULL;
 		struct resource *res = win->res;
 
@@ -839,6 +839,7 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
 			if (err) {
 				dev_warn(dev, "error %d: failed to map resource %pR\n",
 					 err, res);
+				resource_list_destroy_entry(win);
 				continue;
 			}
 			break;
