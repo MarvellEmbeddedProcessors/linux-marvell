@@ -426,8 +426,7 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_NEED_DELAY_AFTER_INT_CLK_RST	(1<<16)
 /* Some host controller separates HS200 and HS400 definitions */
 #define SDHCI_QUIRK2_TIMING_HS200_HS400			(1<<17)
-/* Some host controller does not support tuning in DDR50 mode */
-#define SDHCI_QUIRK2_BROKEN_DDR50_TUNING		(1<<18)
+
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
 
@@ -558,8 +557,6 @@ struct sdhci_ops {
 					 struct mmc_card *card,
 					 unsigned int max_dtr, int host_drv,
 					 int card_drv, int *drv_type);
-	void	(*voltage_switch_pre)(struct sdhci_host *host);
-	int	(*delay_adj)(struct sdhci_host *host, struct mmc_ios *ios);
 	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
 };
 

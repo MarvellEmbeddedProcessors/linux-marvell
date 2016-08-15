@@ -1467,13 +1467,11 @@ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
 	 * defined in original SDHCI.
 	 */
 	if (host->quirks2 & SDHCI_QUIRK2_TIMING_HS200_HS400) {
-		if (timing == MMC_TIMING_MMC_HS200) {
-			ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+		ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+		if (timing == MMC_TIMING_MMC_HS200)
 			ctrl_2 |= SDHCI_CTRL_HS200_ONLY;
-		} else if (timing == MMC_TIMING_MMC_HS400) {
-			ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
+		else if (timing == MMC_TIMING_MMC_HS400)
 			ctrl_2 |= SDHCI_CTRL_HS400_ONLY;
-		}
 	}
 
 	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
@@ -1636,9 +1634,6 @@ static void sdhci_do_set_ios(struct sdhci_host *host, struct mmc_ios *ios)
 
 	mmiowb();
 	spin_unlock_irqrestore(&host->lock, flags);
-
-	if (host->ops->delay_adj)
-		host->ops->delay_adj(host, ios);
 }
 
 static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
@@ -1795,10 +1790,6 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 	if (host->version < SDHCI_SPEC_300)
 		return 0;
 
-	/* Some controller need to do more before switching */
-	if (host->ops->voltage_switch_pre)
-		host->ops->voltage_switch_pre(host);
-
 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 
 	switch (ios->signal_voltage) {
@@ -1818,10 +1809,6 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 		}
 		/* Wait for 5ms */
 		usleep_range(5000, 5500);
-
-		/* Some controller need to do more when switching */
-		if (host->ops->voltage_switch)
-			host->ops->voltage_switch(host);
 
 		/* 3.3V regulator output should be stable within 5 ms */
 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
@@ -1928,11 +1915,6 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	unsigned long flags;
 	unsigned int tuning_count = 0;
 	bool hs400_tuning;
-
-	/* Some host controller does not support tuning in DDR50 mode */
-	if ((host->timing == MMC_TIMING_UHS_DDR50) &&
-	    (host->quirks2 & SDHCI_QUIRK2_BROKEN_DDR50_TUNING))
-		return 0;
 
 	sdhci_runtime_pm_get(host);
 	spin_lock_irqsave(&host->lock, flags);
