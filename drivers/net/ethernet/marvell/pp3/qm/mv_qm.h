@@ -259,12 +259,9 @@ int qm_queue_len_get(int queue, u32 *length, u32 *status);
 */
 void qm_idle_status_get(u32 *status);
 
-/**
- * Configure REORDER with class command when permission is granted.
- *  Return values:
- *		0 - success
- */
-int qm_ru_class_cmd_set(u32 host, u32 host_class, u32 host_sid, u32 cmd);
+/* Set port to class mapping */
+int qm_ru_port_to_class_set(int port, int class, int sid_pool);
+
 /*
  *  Check error bits.
  *  If set to 1, and print the error that occurred.
