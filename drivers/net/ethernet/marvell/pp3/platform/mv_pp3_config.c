@@ -38,6 +38,7 @@ struct mv_pp3_net_if_cfg {
 };
 
 struct mv_pp3_cpu_cfg {
+	u32 sw_max_q_num[MV_PP3_HFRM_NUM];
 	u32 sw_free_rxq[MV_PP3_HFRM_NUM];	/* free HMAC RX SW queue number per frame */
 	u32 sw_free_txq[MV_PP3_HFRM_NUM];	/* free HMAC TX SW queue number per frame */
 	u32 free_irq_group[MV_PP3_HFRM_NUM];	/* free HMAC IRQ group number per frame */
@@ -87,8 +88,13 @@ void mv_pp3_configurator_init(struct mv_pp3 *priv)
 	/* first internal BP group */
 	mv_pp3_cfg_sw_info.bp_group_id = 1;
 
-	for (i = 0; i < MV_PP3_HFRM_NUM; i++)
+	for (i = 0; i < MV_PP3_HFRM_NUM; i++) {
 		mv_pp3_cfg_sw_info.frame_vip_vport[i] = -1;
+		if (i == 2)
+			mv_pp3_cfg_sw_info.sw_max_q_num[i] = 8;
+		else
+			mv_pp3_cfg_sw_info.sw_max_q_num[i] = MV_PP3_HFRM_Q_NUM;
+	}
 
 	/* init configurator clients */
 	for (i = 0; i < PP3_CLIENTS_NUM; i++) {
@@ -795,8 +801,9 @@ int mv_pp3_cfg_dp_reserve_txq(int id, int if_num, int cpu, int q_num)
 		/* sort all frames per free RXQs number */
 		mv_pp3_cfg_sort(mv_pp3_cfg_sw_info.sw_free_txq, ind_arr);
 
-		for (i = 0; (i < MV_PP3_HFRM_NUM) && !found; i++) {
-			if ((mv_pp3_cfg_sw_info.sw_free_txq[ind_arr[i]] + q_num) > MV_PP3_HFRM_Q_NUM)
+		/* Don't use HF3 and HF2-Q8..15 for Data Path TXQs - No enough RU classes */
+		for (i = 0; (i < (MV_PP3_HFRM_NUM - 1)) && !found; i++) {
+			if ((mv_pp3_cfg_sw_info.sw_free_txq[ind_arr[i]] + q_num) >= mv_pp3_cfg_sw_info.sw_max_q_num[i])
 				continue;
 
 			/* each emac interface placed in different frame */
