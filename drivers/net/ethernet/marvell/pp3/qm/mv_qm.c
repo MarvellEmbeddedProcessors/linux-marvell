@@ -1490,7 +1490,7 @@ static int qm_port_default_set(int port, enum mv_tm_source_type type)
 	return 0;
 }
 
-static int qm_ru_port_to_class_set(int port, int class, int sid_pool)
+int qm_ru_port_to_class_set(int port, int class, int sid_pool)
 {
 	u32 port2class_entry;
 
@@ -1510,7 +1510,7 @@ static int qm_ru_port_to_class_set(int port, int class, int sid_pool)
 	}
 
 	port2class_entry = class | (sid_pool << 6);
-	qm_register_write(qm.reorder.ru_port2class, port * 4, 4, &port2class_entry);
+	qm_register_write(qm.reorder.ru_port2class, port * 4, 1, &port2class_entry);
 	return 0;
 }
 
@@ -1524,9 +1524,9 @@ static int qm_ru_port_to_class_set(int port, int class, int sid_pool)
  -------------------------------------
  | CMAC  |   6 - 7     |   6 - 7     |
  -------------------------------------
- | HMAC  |   8 - 71    |   8 - 15    |  Warp around every 8
+ | HMAC  |   8 - 71    |   8 - 47    |  Wrap around every 40
  -------------------------------------
- | FW    |   72 - 119  |   16 - 63   |
+ | FW    |   72 - 119  |   48 - 63   |  Wrap around every 16
  -------------------------------------
 */
 
@@ -1552,15 +1552,14 @@ static int qm_ru_port_to_class_default_set(void)
 
 	class = 8;
 	for (port = 8; port < 72; port++) {
-		if (qm_ru_port_to_class_set(port, class + (port % 8), 0) < 0)
+		if (qm_ru_port_to_class_set(port, class + ((port - 8) % 40), 0) < 0)
 			goto err;
 	}
 
-	class = 16;
+	class += 40;
 	for (port = 72; port < 120; port++) {
-		if (qm_ru_port_to_class_set(port, class, 0) < 0)
+		if (qm_ru_port_to_class_set(port, class + ((port - 72) % 16), 0) < 0)
 			goto err;
-		class++;
 	}
 
 	return 0;
