@@ -457,6 +457,8 @@ int mv_gop110_smi_phy_addr_cfg(struct gop_hw *gop, int port, int addr);
 /* MIB Functions  */
 u64 mv_gop110_mib_read64(struct gop_hw *gop, int port, unsigned int offset);
 void mv_gop110_mib_counters_show(struct gop_hw *gop, int port);
+void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port,
+					struct gop_stat *gop_statistics);
 
 /* PTP Functions */
 void mv_gop110_ptp_enable(struct gop_hw *gop, int port, bool state);
