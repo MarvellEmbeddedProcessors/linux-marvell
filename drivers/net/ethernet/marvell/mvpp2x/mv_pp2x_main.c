@@ -236,24 +236,17 @@ void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
 #endif /* __BIG_ENDIAN */
 }
 
-static inline u8 mv_pp2x_first_pool_get(struct mv_pp2x *priv)
+static u8 mv_pp2x_first_pool_get(struct mv_pp2x *priv)
 {
 	return priv->pp2_cfg.first_bm_pool;
 }
 
-static inline u8 mv_pp2x_last_pool_get(struct mv_pp2x *priv)
-{
-	return(mv_pp2x_first_pool_get(priv) + priv->num_pools);
-}
-
-static inline int mv_pp2x_pool_pkt_size_get(
-		enum mv_pp2x_bm_pool_log_num  log_id)
+static int mv_pp2x_pool_pkt_size_get(enum mv_pp2x_bm_pool_log_num  log_id)
 {
 	return mv_pp2x_pools[log_id].pkt_size;
 }
 
-static inline int mv_pp2x_pool_buf_num_get(
-		enum mv_pp2x_bm_pool_log_num  log_id)
+static int mv_pp2x_pool_buf_num_get(enum mv_pp2x_bm_pool_log_num  log_id)
 {
 	return mv_pp2x_pools[log_id].buf_num;
 }
@@ -1624,7 +1617,7 @@ static enum hrtimer_restart mv_pp2x_hr_timer_cb(struct hrtimer *timer)
 }
 
 /* The function get the number of cpu online */
-static inline int mv_pp2x_num_online_cpu_get(struct mv_pp2x *pp2)
+static int mv_pp2x_num_online_cpu_get(struct mv_pp2x *pp2)
 {
 	u8 num_online_cpus = 0;
 	u16 x = pp2->cpu_map;
@@ -1638,8 +1631,8 @@ static inline int mv_pp2x_num_online_cpu_get(struct mv_pp2x *pp2)
 }
 
 /* The function calculate the width, such as cpu width, cos queue width */
-static inline void mv_pp2x_width_calc(struct mv_pp2x *pp2, u32 *cpu_width,
-				u32 *cos_width, u32 *port_rxq_width)
+static void mv_pp2x_width_calc(struct mv_pp2x *pp2, u32 *cpu_width,
+			       u32 *cos_width, u32 *port_rxq_width)
 {
 	if (pp2) {
 		/* Calculate CPU width */
@@ -1815,8 +1808,8 @@ EXPORT_SYMBOL(mv_pp2x_cos_default_value_set);
 /* RSS API */
 
 /* Translate CPU sequence number to real CPU ID */
-static inline int mv_pp22_cpu_id_from_indir_tbl_get(struct mv_pp2x *pp2,
-					int cpu_seq, u32 *cpu_id)
+static int mv_pp22_cpu_id_from_indir_tbl_get(struct mv_pp2x *pp2,
+					     int cpu_seq, u32 *cpu_id)
 {
 	int i;
 	int seq = 0;
@@ -2666,7 +2659,7 @@ void mv_pp2x_port_napi_disable(struct mv_pp2x_port *port)
 		napi_disable(&port->q_vector[i].napi);
 }
 
-static inline void mv_pp2x_port_irqs_dispose_mapping(struct mv_pp2x_port *port)
+static void mv_pp2x_port_irqs_dispose_mapping(struct mv_pp2x_port *port)
 {
 	int i;
 
@@ -2795,7 +2788,7 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 }
 
 /* Return positive if MTU is valid */
-static inline int mv_pp2x_check_mtu_valid(struct net_device *dev, int mtu)
+static int mv_pp2x_check_mtu_valid(struct net_device *dev, int mtu)
 {
 	if (mtu < 68) {
 		netdev_err(dev, "cannot change mtu to less than 68\n");
