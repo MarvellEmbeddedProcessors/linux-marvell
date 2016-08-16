@@ -600,7 +600,7 @@ void mv_pp21_port_loopback_set(struct mv_pp2x_port *port);
 void mv_pp21_port_reset(struct mv_pp2x_port *port);
 
 void mv_pp2x_rx_pkts_coal_set(struct mv_pp2x_port *port,
-			      struct mv_pp2x_rx_queue *rxq, u32 pkts);
+			      struct mv_pp2x_rx_queue *rxq);
 void mv_pp2x_rx_time_coal_set(struct mv_pp2x_port *port,
 			      struct mv_pp2x_rx_queue *rxq, u32 usec);
 void mv_pp2x_tx_done_pkts_coal_set(void *arg);
