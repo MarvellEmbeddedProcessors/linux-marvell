@@ -14,6 +14,7 @@ a number of clocks:
  - 1: clock of CPU cluster 1
  - 2: fixed PLL at 1200 Mhz
  - 3: MSS clock, derived from the fixed PLL
+ - 4: AP HCLK, derived from sample-at-reset configuration.
 
 Required properties:
 
@@ -22,13 +23,13 @@ Required properties:
  - reg: register area of the AP806 system controller
  - #clock-cells: must be set to 1
  - clock-output-names: must be defined to:
-    "cpu-cluster-0", "cpu-cluster-1", "fixed", "mss"
+    "cpu-cluster-0", "cpu-cluster-1", "fixed", "mss", "ap-hclk"
 
 Example:
 
 	syscon: system-controller@6f4000 {
 		compatible = "marvell,ap806-system-controller", "syscon";
 		#clock-cells = <1>;
-		clock-output-names = "cpu-cluster-0", "cpu-cluster-1", "fixed", "mss";
+		clock-output-names = "cpu-cluster-0", "cpu-cluster-1", "fixed", "mss", "ap-hclk";
 		reg = <0x6f4000 0x1000>;
 	};
