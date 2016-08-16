@@ -80,6 +80,27 @@
 		};
 	};
 
+	cpn-110-master {
+		config-space {
+			i2c@701000 {
+				status = "okay";
+				clock-frequency = <100000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&cpm_i2c0_pins>;
+				eeprom@57 {
+					compatible = "at24,24c64";
+					reg = <0x57>;
+					pagesize = <32>;
+				};
+				eeprom@50 {
+					compatible = "at24,24c64";
+					reg = <0x50>;
+					pagesize = <32>;
+				};
+			};
+		};
+	};
+
 	cpn-110-slave {
 		config-space {
 			i2c@701000 {

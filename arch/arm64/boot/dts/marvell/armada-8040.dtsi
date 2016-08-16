@@ -135,6 +135,11 @@
 			};
 			pinctrl@440000 {
 				compatible = "marvell,a80x0-cp0-pinctrl";
+
+				cpm_i2c0_pins: i2c-pins-0 {
+					marvell,pins = "mpp37", "mpp38";
+					marvell,function = "i2c0";
+				};
 			};
 			usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
