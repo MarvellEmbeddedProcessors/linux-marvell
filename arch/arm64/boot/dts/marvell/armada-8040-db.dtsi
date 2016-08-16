@@ -64,6 +64,8 @@
 			i2c@511000 {
 				status = "okay";
 				clock-frequency = <100000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&ap_i2c0_pins>;
 				eeprom@57 {
 					compatible = "at24,24c64";
 					reg = <0x57>;
