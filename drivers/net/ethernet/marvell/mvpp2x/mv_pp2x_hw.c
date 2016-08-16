@@ -3496,6 +3496,8 @@ void mv_pp2x_tx_done_pkts_coal_set(void *arg)
 	for (queue = 0; queue < port->num_tx_queues; queue++) {
 		struct mv_pp2x_tx_queue *txq = port->txqs[queue];
 
+		if (txq->pkts_coal > MVPP2_MAX_TRANSMITTED_THRESH)
+			txq->pkts_coal = MVPP2_MAX_TRANSMITTED_THRESH;
 		val = (txq->pkts_coal << MVPP2_TRANSMITTED_THRESH_OFFSET) &
 		       MVPP2_TRANSMITTED_THRESH_MASK;
 		mv_pp2x_write(&port->priv->hw, MVPP2_TXQ_NUM_REG, txq->id);
