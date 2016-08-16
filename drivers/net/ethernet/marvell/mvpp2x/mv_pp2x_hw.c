@@ -6170,3 +6170,21 @@ void mv_pp2x_tx_fifo_threshold_set(struct mv_pp2x_hw *hw, u32 port_id, u32 val)
 		      MVPP22_TX_FIFO_THRESH_REG(port_id),
 		      val & MVPP22_TX_FIFO_THRESH_MASK);
 }
+
+/* Check number of buffers in BM pool */
+int mv_pp2x_check_hw_buf_num(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool)
+{
+
+	int buf_num = 0;
+
+	buf_num += mv_pp2x_read(&priv->hw, MVPP2_BM_POOL_PTRS_NUM_REG(bm_pool->id))
+					& MVPP22_BM_POOL_PTRS_NUM_MASK;
+	buf_num += mv_pp2x_read(&priv->hw, MVPP2_BM_BPPI_PTRS_NUM_REG(bm_pool->id))
+					& MVPP2_BM_BPPI_PTR_NUM_MASK;
+
+	/* HW has one buffer ready and is not reflected in "external + internal" counters */
+	if (buf_num)
+		return (buf_num + 1);
+	else
+		return 0;
+}
