@@ -89,6 +89,21 @@ static u8 uc_filter_max = 4;
 
 u32 debug_param;
 
+struct mv_pp2x_pool_attributes mv_pp2x_pools[] = {
+	{
+		.description =  "short", /* pkt_size=MVPP2_BM_SHORT_PKT_SIZE */
+		.buf_num     =  MVPP2_BM_SHORT_BUF_NUM,
+	},
+	{
+		.description =  "long", /* pkt_size=MVPP2_BM_LONG_PKT_SIZE */
+		.buf_num     =  MVPP2_BM_LONG_BUF_NUM,
+	},
+	{
+		.description =	"jumbo", /* pkt_size=MVPP2_BM_JUMBO_PKT_SIZE */
+		.buf_num     =  MVPP2_BM_JUMBO_BUF_NUM,
+	}
+};
+
 module_param_named(num_cos_queues, mv_pp2x_num_cos_queues, byte, S_IRUGO);
 MODULE_PARM_DESC(num_cos_queues, "Set number of cos_queues (1-8), def=4");
 
@@ -129,6 +144,15 @@ module_param(debug_param, uint, S_IRUGO);
 MODULE_PARM_DESC(debug_param,
 	"Ad-hoc parameter, which can be used for various debug operations.");
 
+module_param_named(short_pool, mv_pp2x_pools[MVPP2_BM_SWF_SHORT_POOL].buf_num, uint, S_IRUGO);
+MODULE_PARM_DESC(short_pool, "Short pool size (0-8192), def=2048");
+
+module_param_named(long_pool, mv_pp2x_pools[MVPP2_BM_SWF_LONG_POOL].buf_num, uint, S_IRUGO);
+MODULE_PARM_DESC(long_pool, "Long pool size (0-8192), def=1024");
+
+module_param_named(jumbo_pool, mv_pp2x_pools[MVPP2_BM_SWF_JUMBO_POOL].buf_num, uint, S_IRUGO);
+MODULE_PARM_DESC(jumbo_pool, "Jumbo pool size (0-8192), def=512");
+
 /*TODO:  Below module_params will not go to ML. Created for testing. */
 
 module_param(port_cpu_bind_map, uint, S_IRUGO);
@@ -156,24 +180,6 @@ void set_device_base_address(struct net_device *dev)
 static int mv_pp2x_rxq_number;
 /* Number of TXQs used by single port */
 static int mv_pp2x_txq_number;
-
-struct mv_pp2x_pool_attributes mv_pp2x_pools[] = {
-	{
-		.description =  "short",
-		/*.pkt_size    =	MVPP2_BM_SHORT_PKT_SIZE, */
-		.buf_num     =  MVPP2_BM_SHORT_BUF_NUM,
-	},
-	{
-		.description =  "long",
-		/*.pkt_size    =	MVPP2_BM_LONG_PKT_SIZE,*/
-		.buf_num     =  MVPP2_BM_LONG_BUF_NUM,
-	},
-	{
-		.description =	"jumbo",
-		/*.pkt_size    =	MVPP2_BM_JUMBO_PKT_SIZE, */
-		.buf_num     =  MVPP2_BM_JUMBO_BUF_NUM,
-	}
-};
 
 static inline int mv_pp2x_txq_count(struct mv_pp2x_txq_pcpu *txq_pcpu)
 {
