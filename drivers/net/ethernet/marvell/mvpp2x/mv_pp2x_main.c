@@ -1015,7 +1015,7 @@ static int mv_pp2x_rxq_init(struct mv_pp2x_port *port,
 
 	/* Set coalescing pkts and time */
 	mv_pp2x_rx_pkts_coal_set(port, rxq);
-	mv_pp2x_rx_time_coal_set(port, rxq, rxq->time_coal);
+	mv_pp2x_rx_time_coal_set(port, rxq);
 
 	/* Add number of descriptors ready for receiving packets */
 	mv_pp2x_rxq_status_update(port, rxq->id, 0, rxq->size);
