@@ -86,6 +86,8 @@ static u8 first_bm_pool;
 static u8 first_addr_space;
 static u8 first_log_rxq_queue;
 static u8 uc_filter_max = 4;
+static u16 stats_delay_msec = STATS_DELAY;
+static u16 stats_delay;
 
 u32 debug_param;
 
@@ -143,6 +145,9 @@ MODULE_PARM_DESC(uc_filter_max,
 module_param(debug_param, uint, S_IRUGO);
 MODULE_PARM_DESC(debug_param,
 	"Ad-hoc parameter, which can be used for various debug operations.");
+
+module_param(stats_delay_msec, ushort, S_IRUGO);
+MODULE_PARM_DESC(stats_delay_msec, "Set statistic delay in msec, def=250");
 
 module_param_named(short_pool, mv_pp2x_pools[MVPP2_BM_SWF_SHORT_POOL].buf_num, uint, S_IRUGO);
 MODULE_PARM_DESC(short_pool, "Short pool size (0-8192), def=2048");
@@ -3698,6 +3703,35 @@ static u32 mvp_pp2x_gop110_netc_cfg_create(struct mv_pp2x *priv)
 	return val;
 }
 
+static void mv_pp2x_get_port_stats(struct mv_pp2x_port *port)
+{
+	bool link_is_up;
+	struct mv_mac_data *mac = &port->mac_data;
+	struct gop_hw *gop = &port->priv->hw.gop;
+	int gop_port = mac->gop_index;
+	struct gop_stat	*gop_statistics = &mac->gop_statistics;
+
+	link_is_up = mv_gop110_port_is_link_up(gop, &port->mac_data);
+
+	if (link_is_up)
+		mv_gop110_mib_counters_stat_update(gop, gop_port, gop_statistics);
+}
+
+static void mv_pp2x_get_device_stats(struct work_struct *work)
+{
+	struct delayed_work *delay = to_delayed_work(work);
+	struct mv_pp2x *priv = container_of(delay, struct mv_pp2x,
+						 stats_task);
+	int i;
+
+	for (i = 0; i < priv->num_ports; i++) {
+		if (priv->port_list[i])
+			mv_pp2x_get_port_stats(priv->port_list[i]);
+	}
+
+	queue_delayed_work(priv->workqueue, &priv->stats_task, stats_delay);
+}
+
 /* Initialize port HW */
 static int mv_pp2x_port_init(struct mv_pp2x_port *port)
 {
@@ -4047,6 +4081,9 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	const struct mbus_dram_target_info *dram_target_info;
 	u8 pp2_ver = priv->pp2xdata->pp2x_ver;
 	struct mv_pp2x_hw *hw = &priv->hw;
+
+	/* Set statistic delay */
+	stats_delay = (stats_delay_msec * HZ) / 1000;
 
 	/* Checks for hardware constraints */
 	if (mv_pp2x_num_cos_queues <= 0 || mv_pp2x_num_cos_queues > MVPP2_MAX_TXQ) {
@@ -4607,6 +4644,14 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		err = -ENOMEM;
 		goto err_clk;
 	}
+	priv->workqueue = create_singlethread_workqueue("mv_pp2x");
+
+	if (!priv->workqueue) {
+		err = -ENOMEM;
+		goto err_clk;
+	}
+
+	INIT_DELAYED_WORK(&priv->stats_task, mv_pp2x_get_device_stats);
 
 	/* Init PP22 rxfhindir table evenly in probe */
 	mv_pp2x_init_rxfhindir(priv);
@@ -4628,6 +4673,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 				MV_NETC_SECOND_PHASE);
 
 	platform_set_drvdata(pdev, priv);
+	queue_delayed_work(priv->workqueue, &priv->stats_task, stats_delay);
 	pr_debug("Platform Device Name : %s\n", kobject_name(&pdev->dev.kobj));
 	return 0;
 
@@ -4645,6 +4691,9 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 	struct mv_pp2x *priv = platform_get_drvdata(pdev);
 	struct mv_pp2x_hw *hw = &priv->hw;
 	int i;
+
+	flush_workqueue(priv->workqueue);
+	destroy_workqueue(priv->workqueue);
 
 	for (i = 0; i < priv->num_ports; i++) {
 		if (priv->port_list[i])
