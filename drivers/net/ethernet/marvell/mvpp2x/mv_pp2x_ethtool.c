@@ -531,7 +531,7 @@ static int mv_pp2x_ethtool_set_coalesce(struct net_device *dev,
 
 		rxq->time_coal = c->rx_coalesce_usecs;
 		rxq->pkts_coal = c->rx_max_coalesced_frames;
-		mv_pp2x_rx_pkts_coal_set(port, rxq, rxq->pkts_coal);
+		mv_pp2x_rx_pkts_coal_set(port, rxq);
 		mv_pp2x_rx_time_coal_set(port, rxq, rxq->time_coal);
 	}
 	port->tx_time_coal = c->tx_coalesce_usecs;
