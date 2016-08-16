@@ -207,8 +207,35 @@ enum mv_pp2x_rss_nf_udp_mode {
 				*/
 };
 
+struct gop_stat {
+	u64 rx_byte;
+	u64 rx_unicast;
+	u64 rx_mcast;
+	u64 rx_bcast;
+	u64 rx_frames;
+	u64 rx_pause;
+	u64 rx_overrun;
+	u64 rx_crc;
+	u64 rx_runt;
+	u64 rx_giant;
+	u64 rx_fragments_err;
+	u64 rx_mac_err;
+	u64 rx_jabber;
+	u64 rx_total_err;
+	u64 tx_byte;
+	u64 tx_unicast;
+	u64 tx_mcast;
+	u64 tx_bcast;
+	u64 tx_frames;
+	u64 tx_pause;
+	u64 tx_crc_sent;
+	u64 collision;
+	u64 late_collision;
+};
+
 struct mv_mac_data {
 	u8			gop_index;
+	struct gop_stat		gop_statistics;
 	u64			flags;
 	/* Whether a PHY is present, and if yes, at which address. */
 	int			phy_addr;
