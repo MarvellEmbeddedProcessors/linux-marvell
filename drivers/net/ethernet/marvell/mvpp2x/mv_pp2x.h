@@ -33,6 +33,8 @@
 
 #define IRQ_NAME_SIZE (36)
 
+#define STATS_DELAY	250
+
 #define MV_ETH_SKB_SHINFO_SIZE	SKB_DATA_ALIGN(sizeof(struct skb_shared_info))
 
 /* START - Taken from mvPp2Commn.h, need to order TODO */
@@ -525,6 +527,9 @@ struct mv_pp2x {
 	*/
 	u32 rx_indir_table[MVPP22_RSS_TBL_LINE_NUM];
 	u32 l4_chksum_jumbo_port;
+
+	struct delayed_work stats_task;
+	struct workqueue_struct *workqueue;
 };
 
 struct mv_pp2x_pcpu_stats {
