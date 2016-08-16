@@ -3475,11 +3475,16 @@ void mv_pp2x_rx_pkts_coal_set(struct mv_pp2x_port *port,
 
 /* Set the time delay in usec before Rx interrupt */
 void mv_pp2x_rx_time_coal_set(struct mv_pp2x_port *port,
-			      struct mv_pp2x_rx_queue *rxq, u32 usec)
+			      struct mv_pp2x_rx_queue *rxq)
 {
 	u32 val;
 
-	val = (port->priv->hw.tclk / USEC_PER_SEC) * usec;
+	val = (port->priv->hw.tclk / USEC_PER_SEC) * rxq->time_coal;
+	if (val > MVPP2_MAX_ISR_RX_THRESHOLD) {
+		rxq->time_coal = (MVPP2_MAX_ISR_RX_THRESHOLD *
+			USEC_PER_SEC) / port->priv->hw.tclk;
+		val = MVPP2_MAX_ISR_RX_THRESHOLD;
+	}
 	mv_pp2x_write(&port->priv->hw,
 		      MVPP2_ISR_RX_THRESHOLD_REG(rxq->id), val);
 }
