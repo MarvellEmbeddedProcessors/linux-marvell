@@ -4017,6 +4017,11 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	struct mv_pp2x_hw *hw = &priv->hw;
 
 	/* Checks for hardware constraints */
+	if (mv_pp2x_num_cos_queues <= 0 || mv_pp2x_num_cos_queues > MVPP2_MAX_TXQ) {
+		dev_err(&pdev->dev, "Illegal num_cos_queue parameter\n");
+		return -EINVAL;
+	}
+
 	last_log_rx_queue = first_log_rxq_queue + mv_pp2x_rxq_number;
 	if (last_log_rx_queue > priv->pp2xdata->pp2x_max_port_rxqs) {
 		dev_err(&pdev->dev, "too high num_cos_queue parameter\n");
