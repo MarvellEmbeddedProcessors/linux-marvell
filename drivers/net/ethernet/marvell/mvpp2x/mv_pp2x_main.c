@@ -2837,6 +2837,37 @@ int mv_pp2x_check_ringparam_valid(struct net_device *dev,
 	return 0;
 }
 
+void mv_pp2x_check_queue_size_valid(struct mv_pp2x_port *port)
+{
+	u16 tx_queue_size = port->tx_ring_size;
+	u16 rx_queue_size = port->rx_ring_size;
+
+	if (tx_queue_size == 0)
+		port->tx_ring_size = MVPP2_MAX_TXD;
+
+	if (rx_queue_size == 0)
+		port->rx_ring_size = MVPP2_MAX_RXD;
+
+	if (port->tx_ring_size > MVPP2_MAX_TXD)
+		port->tx_ring_size = MVPP2_MAX_TXD;
+	else if (!IS_ALIGNED(port->tx_ring_size, 16))
+		port->tx_ring_size = ALIGN(port->tx_ring_size, 16);
+
+	if (port->rx_ring_size > MVPP2_MAX_RXD)
+		port->rx_ring_size = MVPP2_MAX_RXD;
+	else if (!IS_ALIGNED(port->rx_ring_size, 16))
+		port->rx_ring_size = ALIGN(port->rx_ring_size, 16);
+
+	if (tx_queue_size != port->tx_ring_size)
+		pr_err("illegal Tx queue size value %d, round to %d\n",
+			    tx_queue_size, port->tx_ring_size);
+
+	if (rx_queue_size != port->rx_ring_size)
+		pr_err("illegal Rx queue size value %d, round to %d\n",
+			    rx_queue_size, port->rx_ring_size);
+
+}
+
 static int mv_pp2x_phy_connect(struct mv_pp2x_port *port)
 {
 	struct phy_device *phy_dev;
@@ -3868,6 +3899,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 
 	port->tx_ring_size = tx_queue_size;
 	port->rx_ring_size = rx_queue_size;
+
+	mv_pp2x_check_queue_size_valid(port);
 
 	if (mv_pp2_num_cpu_irqs(port) < num_active_cpus() &&
 	    port->priv->pp2xdata->interrupt_tx_done == true) {
