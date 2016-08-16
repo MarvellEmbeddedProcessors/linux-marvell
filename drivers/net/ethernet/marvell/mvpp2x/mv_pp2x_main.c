@@ -4602,7 +4602,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 err_clk:
 	clk_disable_unprepare(hw->gop_clk);
 	clk_disable_unprepare(hw->pp_clk);
-	clk_disable_unprepare(hw->gop_clk);
 	clk_disable_unprepare(hw->gop_core_clk);
 	clk_disable_unprepare(hw->mg_clk);
 	clk_disable_unprepare(hw->mg_core_clk);
