@@ -126,7 +126,7 @@ static inline int mv_pp2x_txq_phys(int port, int txq)
 /* Get number of Rx descriptors occupied by received packets */
 static inline int mv_pp2x_rxq_received(struct mv_pp2x_port *port, int rxq_id)
 {
-	u32 val = mv_pp2x_relaxed_read(&port->priv->hw, MVPP2_RXQ_STATUS_REG(rxq_id));
+	u32 val = mv_pp2x_read(&port->priv->hw, MVPP2_RXQ_STATUS_REG(rxq_id));
 
 	return val & MVPP2_RXQ_OCCUPIED_MASK;
 }
