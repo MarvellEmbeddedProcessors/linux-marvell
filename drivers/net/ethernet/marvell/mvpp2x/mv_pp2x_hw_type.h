@@ -846,7 +846,8 @@
 
 /* Interrupt Cause and Mask registers */
 #define MVPP22_ISR_TX_THRESHOLD_REG(port)	(0x5140 + 4 * (port))
-#define MVPP22_ISR_TX_THRESHOLD_MASK		0xfffff0
+#define MVPP22_MAX_ISR_TX_THRESHOLD		0xfffff0
+#define MVPP22_ISR_TX_THRESHOLD_MASK		MVPP22_MAX_ISR_TX_THRESHOLD
 
 #define MVPP2_ISR_RX_THRESHOLD_REG(rxq)		(0x5200 + 4 * (rxq))
 #define MVPP2_ISR_RX_THRESHOLD_MASK		0xfffff0
