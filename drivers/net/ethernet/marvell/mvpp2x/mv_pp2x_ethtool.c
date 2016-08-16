@@ -139,6 +139,38 @@ int mv_pp2x_autoneg_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
 
 }
 
+void mv_pp2x_ethtool_valid_coalesce(struct ethtool_coalesce *c,
+				struct mv_pp2x_port *port)
+{
+	u64 val;
+
+	if (c->rx_max_coalesced_frames > MVPP2_MAX_OCCUPIED_THRESH)
+		pr_err("RX coalesced frames value too high, rounded to %d\n",
+			MVPP2_MAX_OCCUPIED_THRESH);
+
+	if (c->tx_max_coalesced_frames > MVPP2_MAX_TRANSMITTED_THRESH) {
+		pr_err("TX coalesced frames value too high, rounded to %d\n",
+			MVPP2_MAX_TRANSMITTED_THRESH);
+		c->tx_max_coalesced_frames = MVPP2_MAX_TRANSMITTED_THRESH;
+	}
+
+	val = (port->priv->hw.tclk / USEC_PER_SEC) * c->rx_coalesce_usecs;
+	if (val > MVPP2_MAX_ISR_RX_THRESHOLD)
+		pr_err("RX coalesced time value too high, rounded to %ld usecs\n",
+			(MVPP2_MAX_ISR_RX_THRESHOLD * USEC_PER_SEC)
+			/ port->priv->hw.tclk);
+
+	val = (port->priv->hw.tclk / USEC_PER_SEC) * c->tx_coalesce_usecs;
+	if (val > MVPP22_MAX_ISR_TX_THRESHOLD) {
+		pr_err("TX coalesced time value too high, rounded to %ld usecs\n",
+			(MVPP22_MAX_ISR_TX_THRESHOLD * USEC_PER_SEC)
+			/ port->priv->hw.tclk);
+		c->tx_coalesce_usecs =
+			(MVPP22_MAX_ISR_TX_THRESHOLD * USEC_PER_SEC)
+			/ port->priv->hw.tclk;
+	}
+}
+
 /* Ethtool methods */
 
 /* Ethtool statistic */
@@ -525,6 +557,8 @@ static int mv_pp2x_ethtool_set_coalesce(struct net_device *dev,
 		netdev_err(dev, "unsupported coalescing parameter\n");
 		return -EOPNOTSUPP;
 	}
+
+	mv_pp2x_ethtool_valid_coalesce(c, port);
 
 	for (queue = 0; queue < port->num_rx_queues; queue++) {
 		struct mv_pp2x_rx_queue *rxq = port->rxqs[queue];
