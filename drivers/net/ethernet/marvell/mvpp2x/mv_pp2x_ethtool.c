@@ -60,7 +60,11 @@ static const char mv_pp2x_gstrings_test[][ETH_GSTRING_LEN] = {
 
 static const char mv_pp2x_gstrings_stats[][ETH_GSTRING_LEN] = {
 	/* device-specific stats */
-	"rx_packets", "rx_bytes", "tx_packets", "tx_bytes",
+	"rx_bytes", "rx_frames", "rx_unicast", "rx_mcast", "rx_bcast",
+	"tx_bytes", "tx_frames", "tx_unicast", "tx_mcast", "tx_bcast",
+	"rx_pause", "tx_pause", "rx_overrun", "rx_crc", "rx_runt", "rx_giant",
+	"rx_fragments_err", "rx_mac_err", "rx_jabber", "rx_sw_drop", "rx_total_err",
+	"tx_drop", "tx_crc_sent", "collision", "late_collision",
 };
 
 int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
@@ -143,20 +147,40 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 {
 
 	struct mv_pp2x_port *port = netdev_priv(dev);
-	int cpu = 0;
+	struct mv_mac_data *mac = &port->mac_data;
+	struct gop_hw *gop = &port->priv->hw.gop;
+	int gop_port = mac->gop_index;
+	struct gop_stat	*gop_statistics = &mac->gop_statistics;
+	int i = 0;
 
-	data[0] = 0;
+	mv_gop110_mib_counters_stat_update(gop, gop_port, gop_statistics);
 
-	for_each_possible_cpu(cpu) {
-		struct mv_pp2x_pcpu_stats *stats = per_cpu_ptr(port->stats, cpu);
+	data[i++] = gop_statistics->rx_byte;
+	data[i++] = gop_statistics->rx_frames;
+	data[i++] = gop_statistics->rx_unicast;
+	data[i++] = gop_statistics->rx_mcast;
+	data[i++] = gop_statistics->rx_bcast;
+	data[i++] = gop_statistics->tx_byte;
+	data[i++] = gop_statistics->tx_frames;
+	data[i++] = gop_statistics->tx_unicast;
+	data[i++] = gop_statistics->tx_mcast;
+	data[i++] = gop_statistics->tx_bcast;
+	data[i++] = gop_statistics->rx_pause;
+	data[i++] = gop_statistics->tx_pause;
+	data[i++] = gop_statistics->rx_overrun;
+	data[i++] = gop_statistics->rx_crc;
+	data[i++] = gop_statistics->rx_runt;
+	data[i++] = gop_statistics->rx_giant;
+	data[i++] = gop_statistics->rx_fragments_err;
+	data[i++] = gop_statistics->rx_mac_err;
+	data[i++] = gop_statistics->rx_jabber;
+	data[i++] = dev->stats.rx_dropped;
+	data[i++] = gop_statistics->rx_total_err + dev->stats.rx_dropped;
+	data[i++] = dev->stats.tx_dropped;
+	data[i++] = gop_statistics->tx_crc_sent;
+	data[i++] = gop_statistics->collision;
+	data[i++] = gop_statistics->late_collision;
 
-		u64_stats_update_begin(&stats->syncp);
-		data[0] += stats->rx_packets;
-		data[1] += stats->rx_bytes;
-		data[2] += stats->tx_packets;
-		data[3] += stats->tx_bytes;
-		u64_stats_update_end(&stats->syncp);
-		}
 }
 
 static void mv_pp2x_eth_tool_get_strings(struct net_device *dev,
