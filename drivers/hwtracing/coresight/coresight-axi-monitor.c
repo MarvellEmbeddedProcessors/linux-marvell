@@ -21,6 +21,7 @@
 #include <linux/err.h>
 #include <linux/coresight.h>
 #include <linux/amba/bus.h>
+#include <linux/delay.h>
 #include "coresight-axi-monitor.h"
 
 static int boot_enable;
@@ -338,6 +339,140 @@ static ssize_t mon_enable_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(mon_enable);
 
+
+static ssize_t prof_enable_show(struct device *dev,
+		       struct device_attribute *attr,
+		       char *buf)
+{
+	unsigned long val;
+	struct axim_drvdata *axim = dev_get_drvdata(dev->parent);
+
+	val = readl(axim->base + AXI_MON_PR_CTL);
+	val = (val >> AXI_MON_PROF_EN_OFF) & 0x1;
+	return scnprintf(buf, PAGE_SIZE, "%ld\n", val);
+}
+
+static ssize_t prof_enable_store(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t size)
+{
+	unsigned long reg, val;
+	struct axim_drvdata *axim = dev_get_drvdata(dev->parent);
+
+	if (!axim->prof_en)
+		return -EPERM;
+
+	if (kstrtoul(buf, 16, &val))
+		return -EINVAL;
+
+	reg = readl(axim->base + AXI_MON_PR_CTL);
+	if (val) {
+		reg |= (1 << AXI_MON_PROF_EN_OFF);
+		reg &= ~(AXI_MON_PROF_CYCG_MASK	<< AXI_MON_PROF_CYCG_OFF);
+		reg |= (AXI_MON_PROF_CYCG_4_CYC	<< AXI_MON_PROF_CYCG_OFF);
+		if (AXI_MON_PROF_CYCG_4_CYC != 0)
+			axim->prof_cyc_mul = 1 << (AXI_MON_PROF_CYCG_4_CYC + 1);
+		else
+			axim->prof_cyc_mul = 1;
+	} else {
+		reg &= ~(1 << AXI_MON_PROF_EN_OFF);
+	}
+	writel(reg, axim->base + AXI_MON_PR_CTL);
+
+	return size;
+}
+static DEVICE_ATTR_RW(prof_enable);
+
+static char *memfmt(char *buf, unsigned long n)
+{
+	if (n >= (1UL << 30))
+		sprintf(buf, "%lu GB", n >> 30);
+	else if (n >= (1UL << 20))
+		sprintf(buf, "%lu MB", n >> 20);
+	else
+		sprintf(buf, "%lu KB", n >> 10);
+	return buf;
+}
+
+
+static ssize_t prof_counters_show(struct device *dev,
+		       struct device_attribute *attr,
+		       char *buf)
+{
+	int timeout = 100;
+	ssize_t size = 0;
+	uint32_t msec, val, trans, temp;
+	uint64_t val_64;
+	uint32_t min_lat, max_lat, total_lat;
+	struct axim_drvdata *axim = dev_get_drvdata(dev->parent);
+	char fmt_buf[16];
+
+	/* Start event sampling */
+	val = readl(axim->base + AXI_MON_EV_SW_TRIG);
+	val |= AXI_EV_SW_TRIG_SAMPLE_EN;
+	writel(val, axim->base + AXI_MON_EV_SW_TRIG);
+
+	/* Wait till sampling is done. */
+	while (timeout) {
+		val = readl(axim->base + AXI_MON_STAT) & AXI_MON_STAT_SIP_MASK;
+		if (!val)
+			break;
+		udelay(10);
+		timeout--;
+	}
+
+	if (!timeout) {
+		size += scnprintf(buf, PAGE_SIZE, "Error - Event sampling timeout.\n");
+		return size;
+	}
+
+	/* # of cycles. */
+	val_64 = readl(axim->base + AXI_MON_PR_SMP_CYC) * axim->prof_cyc_mul;
+	msec = val_64 / axim->clock_freq_mhz / 1000;
+	size += scnprintf(buf + size, PAGE_SIZE, "Cycles  - %10u [%d msec]\n", (u32)val_64, msec);
+
+	/* # of transactions */
+	trans = readl(axim->base + AXI_MON_PR_SMP_TRANS);
+	size += scnprintf(buf + size, PAGE_SIZE, "Trans   - %10u [%d trans/sec]\n", trans, trans * 1000 / msec);
+
+	/* # of AXI beats */
+	val = readl(axim->base + AXI_MON_PR_SMP_BEATS);
+	size += scnprintf(buf + size, PAGE_SIZE, "Beats   - %10u [%d beats/sec]\n", val, (u32)((u64)val * 1000 / msec));
+
+	/* # of Bytes */
+	val = readl(axim->base + AXI_MON_PR_SMP_BYTES);
+	temp = (u32)((u64)val * 1000 / msec);
+	size += scnprintf(buf + size, PAGE_SIZE, "Bytes   - %10u [%d B/sec, %sps]\n", val, temp,
+			memfmt(fmt_buf, temp));
+
+	/* Latency */
+	total_lat = readl(axim->base + AXI_MON_PR_SMP_LATEN);
+	max_lat = readl(axim->base + AXI_MON_PR_SMP_MAX);
+	min_lat = readl(axim->base + AXI_MON_PR_SMP_MIN);
+
+	/* Convert latency values from clock cycles to nsec.
+	** Multiply by 1000 and divide by MHz
+	*/
+	size += scnprintf(buf + size, PAGE_SIZE, "Latency - %10u [Avg - %u ns]\n",
+			total_lat, (u32)((u64)total_lat * 1000 / trans / axim->clock_freq_mhz));
+	size += scnprintf(buf + size, PAGE_SIZE, "Min lat - %10u [%d ns]\n", min_lat,
+			min_lat * 1000 / axim->clock_freq_mhz);
+	size += scnprintf(buf + size, PAGE_SIZE, "Max lat - %10u [%d ns]\n", max_lat,
+			max_lat * 1000 / axim->clock_freq_mhz);
+
+	/* Resume event collection */
+	val = readl(axim->base + AXI_MON_EV_CLR);
+	val |= AXI_MON_EV_SMPR;
+	writel(val, axim->base + AXI_MON_EV_CLR);
+
+	if (val & AXI_MON_EV_PE)
+		size += scnprintf(buf + size, PAGE_SIZE,
+				"Warning - Counter overflow occurred in one of the SMP counters.\n");
+
+	return size;
+}
+static DEVICE_ATTR_RO(prof_counters);
+
 static ssize_t freeze_show(struct device *dev,
 		       struct device_attribute *attr,
 		       char *buf)
@@ -391,6 +526,8 @@ static struct attribute *coresight_axim_attrs[] = {
 	&dev_attr_counters.attr,
 	&dev_attr_mon_enable.attr,
 	&dev_attr_freeze.attr,
+	&dev_attr_prof_enable.attr,
+	&dev_attr_prof_counters.attr,
 	NULL,
 };
 
@@ -554,11 +691,13 @@ static void axim_init_default_data(struct axim_drvdata *axim)
 	 * return 0 when reading from AXI_MON_VER. For all fields it
 	 * emulates a VER register fine except for nr_chan
 	 */
-	if (reg)
+	if (reg) {
 		axim->nr_chan = BMVAL(reg, 12, 15); /* NCH */
-	else
+		axim->prof_en = true;
+	} else {
 		axim->nr_chan = 4;
-
+		axim->prof_en = false;
+	}
 }
 
 static int axim_probe(struct amba_device *adev, const struct amba_id *id)
@@ -609,6 +748,20 @@ static int axim_probe(struct amba_device *adev, const struct amba_id *id)
 
 	axim_init_default_data(axim);
 	axim_reset(axim);
+
+	if (axim->prof_en) {
+		axim->clk = devm_clk_get(dev, "hclk");
+		if (IS_ERR(axim->clk)) {
+			pr_warn("Cannot get profiling clock frequency, Disabling profiling support.\n");
+			axim->prof_en = false;
+		} else {
+			ret = clk_prepare_enable(axim->clk);
+			if (ret)
+				return ret;
+			axim->clock_freq_mhz = clk_get_rate(axim->clk) / 1000000;
+		}
+
+	}
 
 	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
 	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
