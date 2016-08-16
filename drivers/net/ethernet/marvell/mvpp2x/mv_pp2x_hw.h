@@ -780,4 +780,6 @@ void mv_pp2x_tx_fifo_size_set(struct mv_pp2x_hw *hw, u32 port_id, u32 val);
 
 void mv_pp2x_tx_fifo_threshold_set(struct mv_pp2x_hw *hw, u32 port_id, u32 val);
 
+int mv_pp2x_check_hw_buf_num(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool);
+
 #endif /* _MVPP2_HW_H_ */

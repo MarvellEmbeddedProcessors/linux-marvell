@@ -411,10 +411,16 @@ int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
 			    struct mv_pp2x_bm_pool *bm_pool)
 {
 	u32 val;
-	int size_bytes;
+	int size_bytes, buf_num;
 
-	mv_pp2x_bm_bufs_free(priv, bm_pool, bm_pool->buf_num);
-	if (bm_pool->buf_num) {
+	buf_num = mv_pp2x_check_hw_buf_num(priv, bm_pool);
+
+	mv_pp2x_bm_bufs_free(priv, bm_pool, buf_num);
+
+	/* Check buffer counters after free */
+	buf_num = mv_pp2x_check_hw_buf_num(priv, bm_pool);
+
+	if (buf_num) {
 		WARN(1, "cannot free all buffers in pool %d, buf_num left %d\n",
 		     bm_pool->id,
 		     bm_pool->buf_num);
