@@ -90,6 +90,22 @@
 /* Attribute register */
 #define AXI_CHAN_ATTR(dom, cache, qos, prot)	(dom << 24 | cache << 16 | qos << 8 | prot)
 
+/* Axi Mon Event Clear register */
+#define AXI_MON_EV_PE			(1 << 17)
+#define AXI_MON_EV_SMPR			(1 << 24)
+
+/* AXI Mon Stat register */
+#define AXI_MON_STAT_SIP_OFF		(23)
+#define AXI_MON_STAT_SIP_MASK		(0x3 << AXI_MON_STAT_SIP_OFF)
+
+/* SW Trigger register */
+#define AXI_EV_SW_TRIG_SAMPLE_EN	(1 << 16)
+
+/* Profiling Control */
+#define AXI_MON_PROF_EN_OFF		(31)
+#define AXI_MON_PROF_CYCG_OFF		(8)
+#define AXI_MON_PROF_CYCG_MASK		(7)
+#define AXI_MON_PROF_CYCG_4_CYC		(1)
 
 /* Supported versions */
 #define AXI_MON_VER_MASK		(0x0F)
@@ -155,27 +171,34 @@ struct axim_chan_data {
  * @boot_enable:True if we should start tracing at boot time.
  * @latency_en: Indicate latency measurment support.
  * @trace_en:	Indicate trace support.
+ * @prof_en:	Indicate profiling support.
  * @nr_chan:	Number of comparator channels.
  * @curr_chan:	Channel Number for configuration.
  * @nr_prof_reg:Number of profiling registers.
  * @major:	Major HW version.
  * @minor:	Minor HW version.
+ * @prof_cyc_mul: Cycle multiplier for profiling clock events.
+ * @clock_freq_mhz: Profiler clock frequency in MHz.
  * @channels:	Channel descriptor.
  */
 struct axim_drvdata {
 	void __iomem			*base;
 	struct device			*dev;
 	struct coresight_device		*csdev;
+	struct clk			*clk;
 	bool				enable;
 	bool				boot_enable;
 	bool				latency_en;
 	bool				trace_en;
+	bool				prof_en;
 	u8				nr_chan;
 	u8				curr_chan;
 	u8				nr_prof_reg;
 	u8				major;
 	u8				minor;
+	u8				prof_cyc_mul;
 	u32				bus_width;
+	u32				clock_freq_mhz;
 	struct axim_chan_data		channel[AXI_MON_MAX_CHANNELS];
 };
 
