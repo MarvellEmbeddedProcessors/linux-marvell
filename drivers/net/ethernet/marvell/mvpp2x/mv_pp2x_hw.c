@@ -3511,6 +3511,8 @@ void mv_pp2x_tx_done_time_coal_set(struct mv_pp2x_port *port, u32 usec)
 	u32 val;
 
 	val = (port->priv->hw.tclk / USEC_PER_SEC) * usec;
+	if (val > MVPP22_MAX_ISR_TX_THRESHOLD)
+		val = MVPP22_MAX_ISR_TX_THRESHOLD;
 	mv_pp2x_write(&port->priv->hw,
 		      MVPP22_ISR_TX_THRESHOLD_REG(port->id), val);
 }
