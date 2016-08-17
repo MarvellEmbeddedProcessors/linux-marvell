@@ -209,7 +209,7 @@
 				reg = <0x14000 0x1000>;
 				interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
 				clock-latency = <1000>;
-				clocks = <&core_clk 0>;
+				clocks = <&core_clk 4>;
 			};
 
 			eth0: ethernet@30000 {
