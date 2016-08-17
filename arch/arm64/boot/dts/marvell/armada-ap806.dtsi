@@ -285,6 +285,8 @@
 				compatible = "marvell,xenon-sdhci";
 				reg = <0x6E0000 0x300>;
 				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+				clock-names = "core";
+				clocks = <&syscon 4>;
 				xenon,slotno = <0>;
 				status = "disabled";
 			};
