@@ -607,8 +607,6 @@ static struct mvebu_mpp_mode armada_cp110_mpp_modes[] = {
 		 MPP_VAR_FUNCTION(10,	"ge",		"mdc",		V_ARMADA_80X0_CP0_PLUS)),
 };
 
-static struct mvebu_pinctrl_soc_info armada_cp110_pinctrl_info;
-
 static const struct of_device_id armada_cp110_pinctrl_of_match[] = {
 	{
 		.compatible	= "marvell,a70x0-pinctrl",
@@ -636,13 +634,18 @@ static struct pinctrl_gpio_range armada_cp110_mpp_gpio_ranges[] = {
 
 static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 {
-	struct mvebu_pinctrl_soc_info *soc = &armada_cp110_pinctrl_info;
+	struct mvebu_pinctrl_soc_info *soc;
 	const struct of_device_id *match =
 		of_match_device(armada_cp110_pinctrl_of_match, &pdev->dev);
 	struct resource *res;
 
 	if (!match)
 		return -ENODEV;
+
+	soc = devm_kzalloc(&pdev->dev,
+			   sizeof(struct mvebu_pinctrl_soc_info), GFP_KERNEL);
+	if (!soc)
+		return -ENOMEM;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	mpp_base = devm_ioremap_resource(&pdev->dev, res);
