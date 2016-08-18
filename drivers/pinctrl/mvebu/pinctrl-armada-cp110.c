@@ -23,18 +23,29 @@
 
 #include "pinctrl-mvebu.h"
 
-static void __iomem *mpp_base;
+static void __iomem *cp0_mpp_base;
 
-static int armada_cp110_mpp_ctrl_get(unsigned pid, unsigned long *config)
+static int armada_cp110_0_mpp_ctrl_get(unsigned pid, unsigned long *config)
 {
-	return default_mpp_ctrl_get(mpp_base, pid, config);
+	return default_mpp_ctrl_get(cp0_mpp_base, pid, config);
 }
 
-static int armada_cp110_mpp_ctrl_set(unsigned pid, unsigned long config)
+static int armada_cp110_0_mpp_ctrl_set(unsigned pid, unsigned long config)
 {
-	return default_mpp_ctrl_set(mpp_base, pid, config);
+	return default_mpp_ctrl_set(cp0_mpp_base, pid, config);
 }
 
+static void __iomem *cp1_mpp_base;
+
+static int armada_cp110_1_mpp_ctrl_get(unsigned pid, unsigned long *config)
+{
+	return default_mpp_ctrl_get(cp1_mpp_base, pid, config);
+}
+
+static int armada_cp110_1_mpp_ctrl_set(unsigned pid, unsigned long config)
+{
+	return default_mpp_ctrl_set(cp1_mpp_base, pid, config);
+}
 /* In Armada-70x0 (single CP) all the MPPs are available.
 ** In Armada-80x0 (dual CP) the MPPs are split into 2 parts, MPPs 0-31 from
 ** CP1, and MPPs 32-62 from CP0, the below flags (V_ARMADA_80X0_CP0,
@@ -623,13 +634,21 @@ static const struct of_device_id armada_cp110_pinctrl_of_match[] = {
 	{ },
 };
 
-static struct mvebu_mpp_ctrl armada_cp110_mpp_controls[] = {
-	MPP_FUNC_CTRL(0, 62, NULL, armada_cp110_mpp_ctrl),
+static struct mvebu_mpp_ctrl armada_cp110_0_mpp_controls[] = {
+	MPP_FUNC_CTRL(0, 62, NULL, armada_cp110_0_mpp_ctrl),
 };
 
-static struct pinctrl_gpio_range armada_cp110_mpp_gpio_ranges[] = {
+static struct mvebu_mpp_ctrl armada_cp110_1_mpp_controls[] = {
+	MPP_FUNC_CTRL(0, 62, NULL, armada_cp110_1_mpp_ctrl),
+};
+
+static struct pinctrl_gpio_range armada_cp110_0_mpp_gpio_ranges[] = {
 	MPP_GPIO_RANGE(0, 0, 0, 32),
 	MPP_GPIO_RANGE(1, 32, 32, 31),
+};
+
+static struct pinctrl_gpio_range armada_cp110_1_mpp_gpio_ranges[] = {
+	MPP_GPIO_RANGE(0, 0, 0, 32),
 };
 
 static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
@@ -648,17 +667,34 @@ static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	mpp_base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(mpp_base))
-		return PTR_ERR(mpp_base);
 
 	soc->variant = (u64)match->data & 0xff;
-	soc->controls = armada_cp110_mpp_controls;
-	soc->ncontrols = ARRAY_SIZE(armada_cp110_mpp_controls);
-	soc->gpioranges = armada_cp110_mpp_gpio_ranges;
-	soc->ngpioranges = ARRAY_SIZE(armada_cp110_mpp_gpio_ranges);
-	soc->modes = armada_cp110_mpp_modes;
-	soc->nmodes = armada_cp110_mpp_controls[0].npins;
+
+	switch (soc->variant) {
+	case V_ARMADA_70X0:
+	case V_ARMADA_80X0_CP0:
+		cp0_mpp_base = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(cp0_mpp_base))
+			return PTR_ERR(cp0_mpp_base);
+		soc->controls = armada_cp110_0_mpp_controls;
+		soc->ncontrols = ARRAY_SIZE(armada_cp110_0_mpp_controls);
+		soc->gpioranges = armada_cp110_0_mpp_gpio_ranges;
+		soc->ngpioranges = ARRAY_SIZE(armada_cp110_0_mpp_gpio_ranges);
+		soc->modes = armada_cp110_mpp_modes;
+		soc->nmodes = armada_cp110_0_mpp_controls[0].npins;
+		break;
+	case V_ARMADA_80X0_CP1:
+		cp1_mpp_base = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(cp1_mpp_base))
+			return PTR_ERR(cp1_mpp_base);
+		soc->controls = armada_cp110_1_mpp_controls;
+		soc->ncontrols = ARRAY_SIZE(armada_cp110_1_mpp_controls);
+		soc->gpioranges = armada_cp110_1_mpp_gpio_ranges;
+		soc->ngpioranges = ARRAY_SIZE(armada_cp110_1_mpp_gpio_ranges);
+		soc->modes = armada_cp110_mpp_modes;
+		soc->nmodes = armada_cp110_1_mpp_controls[0].npins;
+		break;
+	}
 
 	pdev->dev.platform_data = soc;
 
