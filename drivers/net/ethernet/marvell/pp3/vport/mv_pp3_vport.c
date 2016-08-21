@@ -607,7 +607,7 @@ void mv_pp3_cpu_vport_cnt_dump(struct pp3_vport **cpu_vp, int cpu_num)
 	pr_cont("%s", line1);
 	if (num > 1)
 		pr_cont(" SUM");
-	pr_cont("\n%22s %s\n", "", line2);
+	pr_info("%22s %s\n", "", line2);
 	pr_info("------------------------------------------------------------------------\n");
 
 	PP3_DBG_GROUP_CNT_DUMP(cpu_vp, num, irq);
