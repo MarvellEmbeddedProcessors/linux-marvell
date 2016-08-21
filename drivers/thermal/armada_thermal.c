@@ -151,10 +151,18 @@ inline unsigned int ap806_thresh_val_calc(unsigned int celsius_temp,
 	return thresh_val & data->temp_mask;
 }
 
-inline unsigned int ap806_thresh_celsius_calc(int thresh_val,
-					 int hyst, struct armada_thermal_data *data)
+inline unsigned int ap806_thresh_celsius_calc(int thresh_val, int hyst,
+					      struct armada_thermal_data *data)
 {
 	unsigned int mcelsius_temp;
+
+	/* This calculation is the opposite to the calculation done in
+	 * ap806_thresh_val_calc(). In order to get the right result,
+	 * need to revert the 2s complement calculation,
+	 * which occurs when threshold bigger then TSEN max value(511).
+	 */
+	if (thresh_val >= AP806_TSEN_OUTPUT_MSB)
+		thresh_val -= AP806_TSEN_OUTPUT_COMP;
 
 	mcelsius_temp = (((data->coef_m * (thresh_val + hyst)) +
 			  data->coef_b) / data->coef_div);
