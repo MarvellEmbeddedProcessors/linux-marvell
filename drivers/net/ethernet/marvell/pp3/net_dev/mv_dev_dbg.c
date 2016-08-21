@@ -691,8 +691,8 @@ static void pp3_dbg_dev_nic_stats_dump(struct pp3_dev_priv *dev_priv)
 {
 	char name[100];
 
-	sprintf(name, "\n%s stats:", dev_priv->dev->name);
-	pr_cont("\n%-24s", name);
+	sprintf(name, "%s stats:", dev_priv->dev->name);
+	pr_info("%-24s", name);
 
 	mv_pp3_cpu_vport_cnt_dump(dev_priv->cpu_vp, CONFIG_NR_CPUS);
 }
@@ -894,7 +894,7 @@ static void pp3_dbg_dev_lnx_pools_stats_dump(struct pp3_dev_priv *dev_priv)
 
 	pools[num] = dev_priv->cpu_shared->txdone_pool;
 
-	pr_cont("\n%-24s", "Linux pools stats:");
+	pr_info("%-24s", "Linux pools stats:");
 	for_each_possible_cpu(cpu) {
 		sprintf(name, "cpu%d-[%d]", cpu, pools[num] ? pools[num]->pool : -1);
 		pr_cont("%-15s", name);
@@ -923,7 +923,7 @@ static void pp3_dbg_dev_rx_pools_stats_dump(struct pp3_dev_priv *dev_priv)
 	int i, num = 0;
 	u32 cpus_num;
 
-	pr_cont("\n%-24s", "RX pools stats:");
+	pr_info("%-24s", "RX pools stats:");
 	pools[num] = dev_priv->cpu_shared->long_pool;
 	sprintf(name, "Long-[%d]", pools[num] ? pools[num]->pool : -1);
 	pr_cont("%-45s", name);
@@ -995,28 +995,27 @@ static void pp3_dbg_dev_timers_stats_dump(struct net_device *dev)
 	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
 
 	/* print CPU statistics */
-	pr_cont("\n%-24s", "timers stats:");
+	pr_info("%-24s", "timers stats:");
 
 	for_each_possible_cpu(cpu)
 		pr_cont("CPU%-10d", cpu);
 
 	pr_info("-------------------------------------------------------------\n");
 
-	pr_cont("%-24s", "timer_add");
+	pr_info("%-24s", "timer_add");
 	for_each_possible_cpu(cpu) {
 		cpu_vp = dev_priv->cpu_vp[cpu];
 		if (cpu_vp)
 			pr_cont("%-13u", cpu_vp->port.cpu.txdone_timer.stats.timer_add);
 	}
 
-	pr_cont("\n%-24s", "timer_sched");
+	pr_info("%-24s", "timer_sched");
 	for_each_possible_cpu(cpu) {
 		cpu_vp = dev_priv->cpu_vp[cpu];
 		if (cpu_vp)
 			pr_cont("%-13u", cpu_vp->port.cpu.txdone_timer.stats.timer_sched);
 	}
-
-
+	pr_info("\n");
 }
 /*---------------------------------------------------------------------------*/
 
@@ -1081,13 +1080,15 @@ void pp3_dbg_dev_stats_dump(struct net_device *dev)
 	/* aggregation of rxqs and txqs counters */
 	pp3_dbg_dev_nic_cnt_update_all(dev_priv);
 
-	pr_cont("\n");
+	pr_info("\n");
 
 	/* print BM pool statistics */
 	pp3_dbg_dev_rx_pools_stats_dump(dev_priv);
+	pr_info("\n");
 	pp3_dbg_dev_lnx_pools_stats_dump(dev_priv);
 
 	/* NIC statistics */
+	pr_info("\n");
 	pp3_dbg_dev_nic_stats_dump(dev_priv);
 }
 /*---------------------------------------------------------------------------*/
