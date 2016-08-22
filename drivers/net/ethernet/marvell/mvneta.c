@@ -524,6 +524,7 @@ struct mvneta_tx_queue {
 	 * descriptor ring
 	 */
 	int count;
+	int pending;
 	int tx_stop_threshold;
 	int tx_wake_threshold;
 
@@ -827,8 +828,9 @@ static void mvneta_txq_pend_desc_add(struct mvneta_port *pp,
 	/* Only 255 descriptors can be added at once ; Assume caller
 	 * process TX desriptors in quanta less than 256
 	 */
-	val = pend_desc;
+	val = pend_desc + txq->pending;
 	mvreg_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
+	txq->pending = 0;
 }
 
 /* Get pointer to next TX descriptor to be processed (send) by HW */
@@ -2213,10 +2215,13 @@ out:
 		struct netdev_queue *nq = netdev_get_tx_queue(dev, txq_id);
 
 		txq->count += frags;
-		mvneta_txq_pend_desc_add(pp, txq, frags);
-
 		if (txq->count >= txq->tx_stop_threshold)
 			netif_tx_stop_queue(nq);
+
+		if (!skb->xmit_more || netif_xmit_stopped(nq))
+			mvneta_txq_pend_desc_add(pp, txq, frags);
+		else
+			txq->pending += frags;
 
 		u64_stats_update_begin(&stats->syncp);
 		stats->tx_packets++;
