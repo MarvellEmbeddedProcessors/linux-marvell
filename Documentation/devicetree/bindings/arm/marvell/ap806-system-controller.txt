@@ -14,7 +14,7 @@ a number of clocks:
  - 1: clock of CPU cluster 1
  - 2: fixed PLL at 1200 Mhz
  - 3: MSS clock, derived from the fixed PLL
- - 4: AP HCLK, derived from sample-at-reset configuration.
+ - 5: AP HCLK, derived from sample-at-reset configuration.
 
 Required properties:
 
