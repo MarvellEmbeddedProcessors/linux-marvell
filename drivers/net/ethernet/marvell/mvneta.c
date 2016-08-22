@@ -3269,21 +3269,10 @@ static int mvneta_open(struct net_device *dev)
 	/* In default link is down */
 	netif_carrier_off(pp->dev);
 
-	ret = mvneta_mdio_probe(pp);
-	if (ret < 0) {
-		netdev_err(dev, "cannot probe MDIO bus\n");
-		goto err_free_irq;
-	}
-
 	mvneta_start_dev(pp);
 
 	return 0;
 
-err_free_irq:
-	if (pp->neta_armada3700)
-		free_irq(pp->dev->irq, pp);
-	else
-		free_percpu_irq(pp->dev->irq, pp->ports);
 err_cleanup_txqs:
 	mvneta_cleanup_txqs(pp);
 err_cleanup_rxqs:
@@ -3307,13 +3296,11 @@ static int mvneta_stop(struct net_device *dev)
 		spin_unlock(&pp->lock);
 
 		mvneta_stop_dev(pp);
-		mvneta_mdio_remove(pp);
 		unregister_cpu_notifier(&pp->cpu_notifier);
 		on_each_cpu(mvneta_percpu_disable, pp, true);
 		free_percpu_irq(dev->irq, pp->ports);
 	} else {
 		mvneta_stop_dev(pp);
-		mvneta_mdio_remove(pp);
 		free_irq(dev->irq, pp);
 	}
 
@@ -4143,6 +4130,12 @@ static int mvneta_probe(struct platform_device *pdev)
 	pp->cleanup_timer.function = mvneta_cleanup_timer_callback;
 	pp->cleanup_timer.data = (unsigned long)pp;
 
+	err = mvneta_mdio_probe(pp);
+	if (err < 0) {
+		netdev_err(dev, "cannot probe MDIO bus\n");
+		goto err_free_stats;
+	}
+
 	return 0;
 
 err_free_stats:
@@ -4166,6 +4159,7 @@ static int mvneta_remove(struct platform_device *pdev)
 	struct net_device  *dev = platform_get_drvdata(pdev);
 	struct mvneta_port *pp = netdev_priv(dev);
 
+	mvneta_mdio_remove(pp);
 	unregister_netdev(dev);
 	clk_disable_unprepare(pp->clk);
 	free_percpu(pp->ports);
