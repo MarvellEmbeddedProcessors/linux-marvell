@@ -175,7 +175,6 @@ static int xmdio_probe(struct platform_device *pdev)
 	bus->read = xmdio_read;
 	bus->write = xmdio_write;
 	bus->reset = xmdio_reset;
-	bus->irq = bus->priv;
 	bus->parent = &pdev->dev;
 	snprintf(bus->id, MII_BUS_ID_SIZE, "%llx", (unsigned long long)res.start);
 
