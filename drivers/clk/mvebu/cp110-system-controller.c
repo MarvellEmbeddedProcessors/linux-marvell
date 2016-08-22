@@ -142,8 +142,11 @@ static struct clk *cp110_register_gate(const char *name,
 	if (!gate)
 		return ERR_PTR(-ENOMEM);
 
+	memset(&init, 0, sizeof(init));
+
 	init.name = name;
 	init.ops = &cp110_gate_ops;
+	init.flags = CLK_IS_BASIC;
 	init.parent_names = &parent_name;
 	init.num_parents = 1;
 
