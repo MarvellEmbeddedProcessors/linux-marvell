@@ -10,7 +10,6 @@ obj-$(CONFIG_MSYS_CLK)	+= msys.o
 obj-$(CONFIG_ARMADA_AP806_SYSCON) += ap806-system-controller.o
 obj-$(CONFIG_ARMADA_AP806_CORE_CLK) += ap806-core.o
 obj-$(CONFIG_ARMADA_AP806_RING_CLK) += ap806-ring.o
-obj-$(CONFIG_ARMADA_CP110_CLK)  += cp110.o
 obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
 obj-$(CONFIG_DOVE_CLK)		+= dove.o
 obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
