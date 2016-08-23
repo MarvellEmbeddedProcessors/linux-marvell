@@ -227,6 +227,8 @@
 
 #define MVNETA_CAUSE_TXQ_SENT_DESC_ALL_MASK	 0xff
 
+#define MVNETA_REGS_GMAC_LEN                     0xAC9
+
 /* Descriptor ring Macros */
 #define MVNETA_QUEUE_NEXT_DESC(q, index)	\
 	(((index) < (q)->last_desc) ? ((index) + 1) : 0)
@@ -3645,6 +3647,123 @@ static int mvneta_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 	return 0;
 }
 
+static int mvneta_ethtool_get_regs_len(struct net_device *netdev)
+{
+	return MVNETA_REGS_GMAC_LEN * sizeof(u32);
+}
+
+/*ethtool get registers function */
+static void mvneta_ethtool_get_regs(struct net_device *dev,
+				    struct ethtool_regs *regs, void *p)
+{
+	struct mvneta_port *pp = netdev_priv(dev);
+	u32 *regs_buff = p;
+	u32 reg_base = MVNETA_RXQ_CONFIG_REG(0);
+	int i, reg_index;
+
+	memset(p, 0, MVNETA_REGS_GMAC_LEN * sizeof(u32));
+
+	for (i = 0; i < rxq_number; i++) {
+		reg_index = ((MVNETA_RXQ_CONFIG_REG(i) - reg_base) >> 2);
+		regs_buff[reg_index] = mvreg_read(pp, MVNETA_RXQ_CONFIG_REG(i));
+
+		reg_index = ((MVNETA_RXQ_THRESHOLD_REG(i) - reg_base) >> 2);
+		regs_buff[reg_index] = mvreg_read(pp,
+						  MVNETA_RXQ_THRESHOLD_REG(i));
+
+		reg_index = ((MVNETA_RXQ_BASE_ADDR_REG(i) - reg_base) >> 2);
+		regs_buff[reg_index] = mvreg_read(pp,
+						  MVNETA_RXQ_BASE_ADDR_REG(i));
+
+		reg_index = ((MVNETA_RXQ_SIZE_REG(i) - reg_base) >> 2);
+		regs_buff[reg_index] = mvreg_read(pp, MVNETA_RXQ_SIZE_REG(i));
+
+		reg_index = ((MVNETA_RXQ_STATUS_REG(i) - reg_base) >> 2);
+		regs_buff[reg_index] = mvreg_read(pp, MVNETA_RXQ_STATUS_REG(i));
+
+		reg_index = ((MVNETA_RXQ_STATUS_UPDATE_REG(i) - reg_base) >> 2);
+		regs_buff[reg_index] =
+				mvreg_read(pp, MVNETA_RXQ_STATUS_UPDATE_REG(i));
+	}
+
+	reg_index = ((MVNETA_PORT_RX_RESET - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_PORT_RX_RESET);
+
+	reg_index = ((MVNETA_PHY_ADDR - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_PHY_ADDR);
+
+	reg_index = ((MVNETA_MBUS_RETRY - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_MBUS_RETRY);
+
+	reg_index = ((MVNETA_UNIT_INTR_CAUSE - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_UNIT_INTR_CAUSE);
+
+	reg_index = ((MVNETA_UNIT_CONTROL - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_UNIT_CONTROL);
+
+	reg_index = ((MVNETA_UNIT_CONTROL - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_UNIT_CONTROL);
+
+	for (i = 0; i < 6; i++) {
+		reg_index = ((MVNETA_WIN_BASE(i) - reg_base) >> 2);
+		regs_buff[reg_index] = mvreg_read(pp, MVNETA_WIN_BASE(i));
+
+		reg_index = ((MVNETA_WIN_SIZE(i) - reg_base) >> 2);
+		regs_buff[reg_index] = mvreg_read(pp, MVNETA_WIN_SIZE(i));
+
+		reg_index = ((MVNETA_WIN_REMAP(i) - reg_base) >> 2);
+		regs_buff[reg_index] = mvreg_read(pp, MVNETA_WIN_REMAP(i));
+	}
+
+	reg_index = ((MVNETA_BASE_ADDR_ENABLE - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_BASE_ADDR_ENABLE);
+
+	reg_index = ((MVNETA_ACCESS_PROTECT_ENABLE - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_ACCESS_PROTECT_ENABLE);
+
+	reg_index = ((MVNETA_PORT_CONFIG - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_PORT_CONFIG);
+
+	reg_index = ((MVNETA_PORT_CONFIG_EXTEND - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_PORT_CONFIG_EXTEND);
+
+	reg_index = ((MVNETA_MAC_ADDR_LOW - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_MAC_ADDR_LOW);
+
+	reg_index = ((MVNETA_MAC_ADDR_HIGH - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_MAC_ADDR_HIGH);
+
+	reg_index = ((MVNETA_SDMA_CONFIG - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_SDMA_CONFIG);
+
+	reg_index = ((MVNETA_PORT_STATUS - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_PORT_STATUS);
+
+	reg_index = ((MVNETA_RX_MIN_FRAME_SIZE - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_RX_MIN_FRAME_SIZE);
+
+	reg_index = ((MVNETA_SERDES_CFG - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_SERDES_CFG);
+
+	reg_index = ((MVNETA_TYPE_PRIO - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_TYPE_PRIO);
+
+	reg_index = ((MVNETA_ACC_MODE - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_ACC_MODE);
+
+	reg_index = ((MVNETA_GMAC_CTRL_0 - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_GMAC_CTRL_0);
+
+	reg_index = ((MVNETA_GMAC_CTRL_2 - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+
+	reg_index = ((MVNETA_GMAC_STATUS - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_GMAC_STATUS);
+
+	reg_index = ((MVNETA_GMAC_AUTONEG_CONFIG - reg_base) >> 2);
+	regs_buff[reg_index] = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
+}
+
 static const struct net_device_ops mvneta_netdev_ops = {
 	.ndo_open            = mvneta_open,
 	.ndo_stop            = mvneta_stop,
@@ -3673,6 +3792,8 @@ const struct ethtool_ops mvneta_eth_tool_ops = {
 	.get_rxnfc	= mvneta_ethtool_get_rxnfc,
 	.get_rxfh	= mvneta_ethtool_get_rxfh,
 	.set_rxfh	= mvneta_ethtool_set_rxfh,
+	.get_regs_len	= mvneta_ethtool_get_regs_len,
+	.get_regs	= mvneta_ethtool_get_regs,
 };
 
 /* Initialize hw */
