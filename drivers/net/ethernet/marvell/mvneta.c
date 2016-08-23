@@ -3776,6 +3776,22 @@ static void mvneta_ethtool_get_regs(struct net_device *dev,
 	regs_buff[reg_index] = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
 }
 
+static int mvneta_ethtool_nway_reset(struct net_device *dev)
+{
+	struct mvneta_port *pp = netdev_priv(dev);
+
+	if (!netif_running(dev))
+		return -EAGAIN;
+
+	if (!pp->phy_dev)
+		return -EOPNOTSUPP;
+
+	if (pp->phy_dev->autoneg == AUTONEG_DISABLE)
+		return -EINVAL;
+
+	return phy_start_aneg(pp->phy_dev);
+}
+
 static const struct net_device_ops mvneta_netdev_ops = {
 	.ndo_open            = mvneta_open,
 	.ndo_stop            = mvneta_stop,
@@ -3806,6 +3822,7 @@ const struct ethtool_ops mvneta_eth_tool_ops = {
 	.set_rxfh	= mvneta_ethtool_set_rxfh,
 	.get_regs_len	= mvneta_ethtool_get_regs_len,
 	.get_regs	= mvneta_ethtool_get_regs,
+	.nway_reset	= mvneta_ethtool_nway_reset,
 };
 
 /* Initialize hw */
