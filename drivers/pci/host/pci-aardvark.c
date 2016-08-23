@@ -9,6 +9,7 @@
  * warranty of any kind, whether express or implied.
  */
 
+#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
@@ -920,6 +921,7 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	struct pci_bus *bus, *child;
 	struct msi_controller *msi;
 	struct device_node *msi_node;
+	struct clk *clk;
 	int ret, irq;
 
 	pcie = devm_kzalloc(&pdev->dev, sizeof(struct advk_pcie),
@@ -946,10 +948,22 @@ static int advk_pcie_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(clk)) {
+		dev_err(&pdev->dev, "Failed to obtain clock from DT\n");
+		return PTR_ERR(clk);
+	}
+
+	ret = clk_prepare_enable(clk);
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to enable clock\n");
+		return ret;
+	}
+
 	ret = advk_pcie_parse_request_of_pci_ranges(pcie);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to parse resources\n");
-		return ret;
+		goto err_clk;
 	}
 
 	advk_pcie_setup_hw(pcie);
@@ -957,14 +971,14 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	ret = advk_pcie_init_irq_domain(pcie);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to initialize irq\n");
-		return ret;
+		goto err_clk;
 	}
 
 	ret = advk_pcie_init_msi_irq_domain(pcie);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to initialize irq\n");
 		advk_pcie_remove_irq_domain(pcie);
-		return ret;
+		goto err_clk;
 	}
 
 	msi_node = of_parse_phandle(pdev->dev.of_node, "msi-parent", 0);
@@ -978,7 +992,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	if (!bus) {
 		advk_pcie_remove_msi_irq_domain(pcie);
 		advk_pcie_remove_irq_domain(pcie);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err_clk;
 	}
 
 	pci_bus_assign_resources(bus);
@@ -989,6 +1004,10 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	pci_bus_add_devices(bus);
 
 	return 0;
+
+err_clk:
+	clk_disable_unprepare(clk);
+	return ret;
 }
 
 static const struct of_device_id advk_pcie_of_match_table[] = {
