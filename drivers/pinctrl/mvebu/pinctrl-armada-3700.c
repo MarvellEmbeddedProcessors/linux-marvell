@@ -53,6 +53,17 @@ struct  armada_3700_mpp_setting_bitmap {
 
 static void __iomem *mpp_base[I_MAXCONTROLLER];/* north & south bridge mpp base */
 
+struct  armada_3700_mpp_conf {
+	struct mvebu_pinctrl_soc_info *soc_info;
+	struct mvebu_mpp_mode *modes;
+	int nmodes;
+	struct armada_3700_mpp_setting_bitmap *bitmap;
+	int nbitmaps;
+	enum armada_3700_bridge index;
+};
+
+struct armada_3700_mpp_conf *a3700_mpp_conf_ptr[I_MAXCONTROLLER];
+
 static int armada_3700_mpp_ctrl_get(unsigned pid,
 				    struct armada_3700_mpp_setting_bitmap mpp_setting_bitmap[],
 				    void __iomem *mpp_base_addr,
@@ -281,12 +292,12 @@ static int armada_3700_nb_mpp_ctrl_get(unsigned pid, unsigned long *config)
 {
 	int rc;
 
-	if (pid > ARRAY_SIZE(armada_3700_nb_mpp_modes)) {
+	if (pid > a3700_mpp_conf_ptr[I_NORTHBRIDGE]->nmodes) {
 		pr_err("North bridge pin id %u is out of range!\n", pid);
 		return -EINVAL;
 	}
 
-	rc = armada_3700_mpp_ctrl_get(pid, armada_3700_nb_mpp_bitmap, mpp_base[I_NORTHBRIDGE], config);
+	rc = armada_3700_mpp_ctrl_get(pid, a3700_mpp_conf_ptr[I_NORTHBRIDGE]->bitmap, mpp_base[I_NORTHBRIDGE], config);
 	if (rc) {
 		pr_err("Failed to get north bridge pin %d's config!\n", pid);
 		return rc;
@@ -300,12 +311,12 @@ static int armada_3700_nb_mpp_ctrl_set(unsigned pid, unsigned long config)
 {
 	int rc;
 
-	if (pid > ARRAY_SIZE(armada_3700_nb_mpp_modes)) {
+	if (pid > a3700_mpp_conf_ptr[I_NORTHBRIDGE]->nmodes) {
 		pr_err("North bridge Pin id %u is out of range!\n", pid);
 		return -EINVAL;
 	}
 
-	rc = armada_3700_mpp_ctrl_set(pid, armada_3700_nb_mpp_bitmap, mpp_base[I_NORTHBRIDGE], config);
+	rc = armada_3700_mpp_ctrl_set(pid, a3700_mpp_conf_ptr[I_NORTHBRIDGE]->bitmap, mpp_base[I_NORTHBRIDGE], config);
 	if (rc) {
 		pr_err("Failed to set config %lu for north bridge pin %d!\n", config, pid);
 		return rc;
@@ -458,12 +469,12 @@ static int armada_3700_sb_mpp_ctrl_get(unsigned pid, unsigned long *config)
 {
 	int rc;
 
-	if (pid > ARRAY_SIZE(armada_3700_sb_mpp_modes)) {
+	if (pid > a3700_mpp_conf_ptr[I_SOUTHBRIDGE]->nmodes) {
 		pr_err("South bridge pin id %u is out of range!\n", pid);
 		return -EINVAL;
 	}
 
-	rc = armada_3700_mpp_ctrl_get(pid, armada_3700_sb_mpp_bitmap, mpp_base[I_SOUTHBRIDGE], config);
+	rc = armada_3700_mpp_ctrl_get(pid, a3700_mpp_conf_ptr[I_SOUTHBRIDGE]->bitmap, mpp_base[I_SOUTHBRIDGE], config);
 	if (rc) {
 		pr_err("Failed to get south bridge pin %d's config!\n", pid);
 		return rc;
@@ -477,12 +488,12 @@ static int armada_3700_sb_mpp_ctrl_set(unsigned pid, unsigned long config)
 {
 	int rc;
 
-	if (pid > ARRAY_SIZE(armada_3700_sb_mpp_modes)) {
+	if (pid > a3700_mpp_conf_ptr[I_SOUTHBRIDGE]->nmodes) {
 		pr_err("South bridge Pin id %u is out of range!\n", pid);
 		return -EINVAL;
 	}
 
-	rc = armada_3700_mpp_ctrl_set(pid, armada_3700_sb_mpp_bitmap, mpp_base[I_SOUTHBRIDGE], config);
+	rc = armada_3700_mpp_ctrl_set(pid, a3700_mpp_conf_ptr[I_SOUTHBRIDGE]->bitmap, mpp_base[I_SOUTHBRIDGE], config);
 	if (rc) {
 		pr_err("Failed to set config %lu for south bridge pin %d!\n", config, pid);
 		return rc;
@@ -492,32 +503,20 @@ static int armada_3700_sb_mpp_ctrl_set(unsigned pid, unsigned long config)
 	return 0;
 }
 
-static unsigned int armada_3700_mpp_consistency_check(unsigned index)
+static unsigned int armada_3700_mpp_consistency_check(struct armada_3700_mpp_conf *mpp_conf)
 {
 	unsigned int i, bitmap_array_size, modes_array_size;
 	struct mvebu_mpp_mode *mpp_mode;
 	struct armada_3700_mpp_setting_bitmap *bit_map;
 	struct mvebu_mpp_ctrl_setting *set;
 
-	switch (index) {
-	case I_NORTHBRIDGE:
-		bitmap_array_size = ARRAY_SIZE(armada_3700_nb_mpp_bitmap);
-		modes_array_size = ARRAY_SIZE(armada_3700_nb_mpp_modes);
-		mpp_mode = armada_3700_nb_mpp_modes;
-		bit_map = armada_3700_nb_mpp_bitmap;
-		break;
-	case I_SOUTHBRIDGE:
-		bitmap_array_size = ARRAY_SIZE(armada_3700_sb_mpp_bitmap);
-		modes_array_size = ARRAY_SIZE(armada_3700_sb_mpp_modes);
-		mpp_mode = armada_3700_sb_mpp_modes;
-		bit_map = armada_3700_sb_mpp_bitmap;
-		break;
-	default:
-		return -EFAULT;
-	}
+	bitmap_array_size = mpp_conf->nbitmaps;
+	modes_array_size = mpp_conf->nmodes;
+	mpp_mode = mpp_conf->modes;
+	bit_map = mpp_conf->bitmap;
 
 	if (bitmap_array_size != modes_array_size) {
-		pr_err("The sizes of bitmap and modes arrays are not same for bank %d!\n", index);
+		pr_err("The sizes of bitmap and modes arrays are not same for bank %d!\n", mpp_conf->index);
 		return -EFAULT;
 	}
 
@@ -529,7 +528,8 @@ static unsigned int armada_3700_mpp_consistency_check(unsigned index)
 			setting_num++;
 
 		if (bit_map[i].config_num != setting_num) {
-			pr_err("bank %d pid %d's config num are not same in bitmap and modes arrays!\n", index, i);
+			pr_err("bank %d pid %d's config num are not same in bitmap and modes arrays!\n",
+				mpp_conf->index, i);
 			return -EFAULT;
 		}
 	}
@@ -545,17 +545,51 @@ static struct mvebu_mpp_ctrl armada_3700_sb_mpp_controls[] = {
 static struct pinctrl_gpio_range armada_3700_sb_mpp_gpio_ranges[] = {
 	MPP_GPIO_RANGE(0, 0, 36, 30),
 };
+static struct mvebu_pinctrl_soc_info a3700_mpp_sb_soc_info = {
+	.variant = 0,
+	.controls = armada_3700_sb_mpp_controls,
+	.ncontrols = ARRAY_SIZE(armada_3700_sb_mpp_controls),
+	.modes = armada_3700_sb_mpp_modes,
+	.nmodes = ARRAY_SIZE(armada_3700_sb_mpp_modes),
+	.gpioranges = armada_3700_sb_mpp_gpio_ranges,
+	.ngpioranges = ARRAY_SIZE(armada_3700_sb_mpp_gpio_ranges),
+};
 
-static struct mvebu_pinctrl_soc_info armada_3700_pinctrl_info[I_MAXCONTROLLER];
+static struct armada_3700_mpp_conf a3700_mpp_sb_conf = {
+	.soc_info = &a3700_mpp_sb_soc_info,
+	.modes = armada_3700_sb_mpp_modes,
+	.nmodes = ARRAY_SIZE(armada_3700_sb_mpp_modes),
+	.bitmap = armada_3700_sb_mpp_bitmap,
+	.nbitmaps = ARRAY_SIZE(armada_3700_sb_mpp_bitmap),
+	.index = I_SOUTHBRIDGE,
+};
+static struct mvebu_pinctrl_soc_info a3700_mpp_nb_soc_info = {
+	.variant = 0,
+	.controls = armada_3700_nb_mpp_controls,
+	.ncontrols = ARRAY_SIZE(armada_3700_nb_mpp_controls),
+	.modes = armada_3700_nb_mpp_modes,
+	.nmodes = ARRAY_SIZE(armada_3700_nb_mpp_modes),
+	.gpioranges = armada_3700_nb_mpp_gpio_ranges,
+	.ngpioranges = ARRAY_SIZE(armada_3700_nb_mpp_gpio_ranges),
+};
+
+static struct armada_3700_mpp_conf a3700_mpp_nb_conf = {
+	.soc_info = &a3700_mpp_nb_soc_info,
+	.modes = armada_3700_nb_mpp_modes,
+	.nmodes = ARRAY_SIZE(armada_3700_nb_mpp_modes),
+	.bitmap = armada_3700_nb_mpp_bitmap,
+	.nbitmaps = ARRAY_SIZE(armada_3700_nb_mpp_bitmap),
+	.index = I_NORTHBRIDGE,
+};
 
 static const struct of_device_id armada_3700_pinctrl_of_match[] = {
 	{
 		.compatible = "marvell,armada-3700-nb-pinctrl",
-		.data       = (void *) I_NORTHBRIDGE
+		.data       = (void *) &a3700_mpp_nb_conf
 	},
 	{
 		.compatible = "marvell,armada-3700-sb-pinctrl",
-		.data       = (void *) I_SOUTHBRIDGE,
+		.data       = (void *) &a3700_mpp_sb_conf,
 	},
 	{ },
 };
@@ -564,46 +598,29 @@ static int armada_3700_pinctrl_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match =
 		of_match_device(armada_3700_pinctrl_of_match, &pdev->dev);
-	unsigned long index;
-	struct mvebu_pinctrl_soc_info *soc;
+	struct armada_3700_mpp_conf *mpp_conf;
 	struct resource *res;
 
 	if (!match)
 		return -ENODEV;
 
-	index = (unsigned long) match->data;
-	if (index > I_MAXCONTROLLER) {
-		dev_err(&pdev->dev, "controller index error, index=%ld max=%d\n", index, I_MAXCONTROLLER);
+	mpp_conf = (struct armada_3700_mpp_conf *) match->data;
+	if (mpp_conf->index > I_MAXCONTROLLER) {
+		dev_err(&pdev->dev, "controller index error, index=%d max=%d\n", mpp_conf->index, I_MAXCONTROLLER);
 		return -ENODEV;
 	}
 
-	if (armada_3700_mpp_consistency_check(index) != 0)
+	if (armada_3700_mpp_consistency_check(mpp_conf) != 0)
 		return -EFAULT;
 
-	soc = &armada_3700_pinctrl_info[index];
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	mpp_base[index] = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(mpp_base[index]))
-		return PTR_ERR(mpp_base[index]);
+	mpp_base[mpp_conf->index] = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(mpp_base[mpp_conf->index]))
+		return PTR_ERR(mpp_base[mpp_conf->index]);
 
-	soc->variant = 0; /* no variants for Armada 3700 */
-	if (index == I_NORTHBRIDGE) {
-		soc->controls = armada_3700_nb_mpp_controls;
-		soc->ncontrols = ARRAY_SIZE(armada_3700_nb_mpp_controls);
-		soc->modes = armada_3700_nb_mpp_modes;
-		soc->nmodes = ARRAY_SIZE(armada_3700_nb_mpp_modes);
-		soc->gpioranges = armada_3700_nb_mpp_gpio_ranges;
-		soc->ngpioranges = ARRAY_SIZE(armada_3700_nb_mpp_gpio_ranges);
-	} else if (index == I_SOUTHBRIDGE) {
-		soc->controls = armada_3700_sb_mpp_controls;
-		soc->ncontrols = ARRAY_SIZE(armada_3700_sb_mpp_controls);
-		soc->modes = armada_3700_sb_mpp_modes;
-		soc->nmodes = ARRAY_SIZE(armada_3700_sb_mpp_modes);
-		soc->gpioranges = armada_3700_sb_mpp_gpio_ranges;
-		soc->ngpioranges = ARRAY_SIZE(armada_3700_sb_mpp_gpio_ranges);
-	}
+	a3700_mpp_conf_ptr[mpp_conf->index] = mpp_conf;
 
-	pdev->dev.platform_data = soc;
+	pdev->dev.platform_data = mpp_conf->soc_info;
 
 	return mvebu_pinctrl_probe(pdev);
 }
