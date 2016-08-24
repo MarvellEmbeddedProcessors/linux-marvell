@@ -65,6 +65,9 @@ struct emmc_phy_params {
 
 	/* Number of consecutive Sampling Points of a Valid Sampling Window */
 	u8 nr_tun_times;
+
+	/* Divider for calculating Tuning Step */
+	u8 tun_step_divider;
 };
 
 static void xenon_emmc_phy_strobe_delay_adj(struct sdhci_host *host,
@@ -131,6 +134,11 @@ static int emmc_phy_parse_param_dt(struct device_node *np,
 		params->nr_tun_times = value & TUN_CONSECUTIVE_TIMES_MASK;
 	else
 		params->nr_tun_times = TUN_CONSECUTIVE_TIMES;
+
+	if (!of_property_read_u32(np, "xenon,phy-tun-step-divider", &value))
+		params->tun_step_divider = value & 0xFF;
+	else
+		params->tun_step_divider = TUNING_STEP_DIVIDER;
 
 	return 0;
 }
@@ -481,7 +489,7 @@ static void xenon_emmc_phy_config_tuning(struct sdhci_host *host)
 	}
 
 	reg = sdhci_readl(host, SDHC_SLOT_DLL_CUR_DLY_VAL);
-	tuning_step = reg / 40;
+	tuning_step = reg / params->tun_step_divider;
 	if (unlikely(tuning_step > TUNING_STEP_MASK)) {
 		WARN("%s: HS200 TUNING_STEP %d is larger than MAX value\n",
 					mmc_hostname(host->mmc), tuning_step);
