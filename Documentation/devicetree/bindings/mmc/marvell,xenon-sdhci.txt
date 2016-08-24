@@ -58,6 +58,16 @@ Optional Properties:
   Valid range = [1:7]. Set as 0x4 by default if this property is not provided.
   - xenon,phy-nr-tun-times = <nr_times>;
 
+  Divider for TUN_STEP
+  Set the divider for calculating TUN_STEP.
+  Set as 64 by default if this property is not provided.
+  HW DLL will generate the tuning step value, then the driver applies it to
+  tuning step register after divider. The divider value is based on testing.                                                                                    Now all the SoC using XENON IP work at common divider value 64.
+  However since the timing is also relevant to board, it is better to
+  provide this configuration in DTS for customer to test and find the right
+  divider value if the common divider value 64 does not work on their platform.
+  - xenon,phy-tun-step-divider = <divider>;
+
 - Re-tuning Counter
   Xenon SDHC SOC usually doesn't provide re-tuning counter in
   Capabilities Register 3 Bit[11:8].
