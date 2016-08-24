@@ -45,6 +45,13 @@ Optional Properties:
   - Disable Hardware DLL tuning
   xenon,phy-no-dll-tuning;
 
+  SoC specific PHY PAD voltage setting for fixed 1.8V
+  The PHY PAD setting is only available for specific SOC such as Armada 3700.
+  Always set corresponding PHY PAD as 1.8V.
+  It is used for eMMC and some SDIO devices which always work in 1.8v signal
+  voltage.
+  - xenon,fixed-1-8v-pad-ctrl;
+
 - Re-tuning Counter
   Xenon SDHC SOC usually doesn't provide re-tuning counter in
   Capabilities Register 3 Bit[11:8].
