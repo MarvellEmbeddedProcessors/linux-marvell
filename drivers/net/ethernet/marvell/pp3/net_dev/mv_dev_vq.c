@@ -727,8 +727,9 @@ int mv_pp3_dev_egress_vport_shaper_set(struct net_device *dev, struct mv_nss_met
 
 	return rc;
 }
-/*---------------------------------------------------------------------------*/
 
+/*---------------------------------------------------------------------------*/
+/* Set/init defaults for Queues and for Ports */
 int mv_pp3_dev_egress_vqs_defaults_set(struct net_device *dev)
 {
 	int vq, vqs_num, prio;
@@ -776,6 +777,9 @@ int mv_pp3_dev_egress_vqs_defaults_set(struct net_device *dev)
 			meter.cbs = 16;
 			meter.ebs = 16;
 		}
+
+		if (mv_pp3_egress_vport_shaper_set(emac_vp, &meter))
+			return -1;
 	}
 
 	for (vq = 0; vq < vqs_num; vq++) {
