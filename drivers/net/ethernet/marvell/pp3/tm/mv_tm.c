@@ -564,8 +564,6 @@ int tm_cfg1(void)
 	struct tm_port_params p_params;
 	enum tm_port_bw port_speed = TM_10G_PORT;
 
-	uint32_t cbw = MV_TM_2HG_BW; /* shaping rate 2.5G */
-	uint16_t dp_index = 1; /* drop profile index */
 	uint8_t port_index;
 	uint8_t i;
 	int rc;
@@ -683,8 +681,7 @@ int tm_cfg1(void)
 		}
 
 		if (port_index == TM_A0_PORT_EMAC0) {
-			/* 2.5G "shaping" drop */
-			p_params.wred_profile_ref = (uint8_t) dp_index;
+			p_params.wred_profile_ref = TM_NO_DROP_PROFILE;
 			rc = tm_create_port(hndl, port_index, port_speed, &p_params,
 				num_of_c_nodes,
 				(num_of_b_nodes*num_of_c_nodes),
@@ -723,9 +720,6 @@ int tm_cfg1(void)
 		if (rc)
 			goto err_out;
 	}
-
-	/* 2.5G shaping on port EMAC0 */
-	rc = tm_set_min_shaping(hndl, P_LEVEL, TM_A0_PORT_EMAC0, cbw);
 
 err_out:
 	if (rc == 0)
