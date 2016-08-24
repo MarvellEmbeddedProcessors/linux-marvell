@@ -68,6 +68,11 @@ Optional Properties:
   divider value if the common divider value 64 does not work on their platform.
   - xenon,phy-tun-step-divider = <divider>;
 
+  Force PHY into slow mode.
+  Only available when bus frequency is not more than 50MHz in SDR mode.
+  Disabled by default. Enable phy-slow-mode only if normal mode doesn't work.
+  - xenon,phy-slow-mode;
+
 - Re-tuning Counter
   Xenon SDHC SOC usually doesn't provide re-tuning counter in
   Capabilities Register 3 Bit[11:8].
