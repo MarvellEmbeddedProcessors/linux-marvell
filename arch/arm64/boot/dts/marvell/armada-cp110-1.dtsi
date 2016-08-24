@@ -23,17 +23,24 @@ rtc@284000 {
 	status = "disabled";
 };
 
-cp110_clk_1: clk@0x440700 {
-	compatible = "marvell,armada-cp110-clock";
-	reg = <0x440700 0x4>;
-	#clock-cells = <1>;
-};
-
-gateclk_1: clock-gating-control@440220 {
-	compatible = "marvell,armada-cp110-gating-clock";
-	reg = <0x440220 0x4>;
-	clocks = <&cp110_clk_1 3>;
-	#clock-cells = <1>;
+cps_syscon0: system-controller@440000 {
+	compatible = "marvell,cp110-system-controller0",
+		     "syscon";
+	reg = <0x440000 0x1000>;
+	#clock-cells = <2>;
+	core-clock-output-names =
+		"cps-apll", "cps-ppv2-core", "cps-eip",
+		"cps-core", "cps-nand-core";
+	gate-clock-output-names =
+		"cps-audio", "cps-communit", "cps-nand",
+		"cps-ppv2", "cps-sdio", "cps-mg-domain",
+		"cps-mg-core", "cps-xor1", "cps-xor0",
+		"cps-gop-dp", "none", "cps-pcie_x10",
+		"cps-pcie_x11", "cps-pcie_x4", "cps-pcie-xor",
+		"cps-sata", "cps-sata-usb", "cps-main",
+		"cps-sd-mmc", "none", "none",
+		"cps-slow-io", "cps-usb3h0", "cps-usb3h1",
+		"cps-usb3dev", "cps-eip150", "cps-eip197";
 };
 
 pinctrl@440000 {
@@ -44,7 +51,7 @@ sata@540000 {
 	compatible = "marvell,armada-3700-ahci";
 	reg = <0x540000 0x30000>;
 	interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 15>, <&gateclk_1 16>;
+	clocks = <&cps_syscon0 1 15>;
 	status = "disabled";
 	port_base = <0x10000>;
 	port_offset = <0x10000>;
@@ -55,7 +62,7 @@ usb3h0_1: usb3@500000 {
 	reg = <0x500000 0x4000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 22>, <&gateclk_1 16>;
+	clocks = <&cps_syscon0 1 22>;
 	status = "disabled";
 };
 
@@ -64,7 +71,7 @@ usb3h1_1: usb3@510000 {
 	reg = <0x510000 0x4000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 23>, <&gateclk_1 16>;
+	clocks = <&cps_syscon0 1 23>;
 	status = "disabled";
 };
 
@@ -74,7 +81,7 @@ spi@700600 {
 	#address-cells = <0x1>;
 	#size-cells = <0x0>;
 	cell-index = <0x0>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cps_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -84,7 +91,7 @@ spi@700680 {
 	#address-cells = <0x1>;
 	#size-cells = <0x0>;
 	cell-index = <0x0>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cps_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -95,7 +102,7 @@ i2c@701000 {
 	#size-cells = <0>;
 	interrupts = <GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH>;
 	timeout-ms = <1000>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cps_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -106,7 +113,7 @@ i2c@701100 {
 	#size-cells = <0>;
 	interrupts = <GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH>;
 	timeout-ms = <1000>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cps_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -119,7 +126,7 @@ nand@720000 {
 	marvell,nand-enable-arbiter;
 	nand-on-flash-bbt;
 	interrupts = <GIC_SPI 307 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 2>;
+	clocks = <&cps_syscon0 1 2>;
 	nand-ecc-strength = <4>;
 	nand-ecc-step-size = <512>;
 	status = "disabled";
@@ -131,7 +138,7 @@ cpxor0@6a0000 {
 	      <0x6b0000 0x1000>;
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
-	clocks = <&gateclk_1 14>, <&gateclk_1 8>;
+	clocks = <&cps_syscon0 1 8>;
 	status = "disabled";
 };
 
@@ -141,7 +148,7 @@ cpxor1@6c0000 {
 	      <0x6d0000 0x1000>;
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
-	clocks = <&gateclk_1 14>, <&gateclk_1 7>;
+	clocks = <&cps_syscon0 1 7>;
 	status = "disabled";
 };
 
@@ -265,7 +272,8 @@ ppv22@000000 {
 	      <0x441000 0x1000>;  /* RFU-1 Regs */
 	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs",
 		    "fca", "gmac", "xlg", "rfu1";
-	clocks = <&gateclk_1 3>, <&gateclk_1 18>, <&gateclk_1 9>, <&gateclk_1 6>, <&gateclk_1 5>;
+	clocks = <&cps_syscon0 1 3>, <&cps_syscon0 1 18>, <&cps_syscon0 1 9>,
+		 <&cps_syscon0 1 6>, <&cps_syscon0 1 5>;
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 	status = "okay";
 	eth0_1: eth0@010000 {
@@ -304,6 +312,6 @@ eip197@800000 {
 	reg = <0x800000 0x200000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk_1 26>;
+	clocks = <&cps_syscon0 1 26>;
 	status = "disabled";
 };
