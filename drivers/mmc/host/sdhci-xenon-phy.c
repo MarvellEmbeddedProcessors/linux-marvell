@@ -53,6 +53,8 @@ static int xenon_delay_adj_test(struct mmc_card *card);
  */
 
 struct emmc_phy_params {
+	bool	slow_mode;
+
 	u8 znr;
 	u8 zpr;
 	bool no_dll_tuning;
@@ -106,6 +108,11 @@ static int emmc_phy_parse_param_dt(struct device_node *np,
 {
 	u32 value;
 
+	if (of_property_read_bool(np, "xenon,phy-slow-mode"))
+		params->slow_mode = true;
+	else
+		params->slow_mode = false;
+
 	if (of_get_property(np, "xenon,phy-no-dll-tuning", NULL))
 		params->no_dll_tuning = true;
 	else
@@ -148,6 +155,7 @@ static int xenon_emmc_phy_init(struct sdhci_host *host)
 	u32 wait, clock;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct emmc_phy_params *params = priv->phy_params;
 	int timing_adj_reg;
 
 	if (priv->phy_type == EMMC_5_0_PHY)
@@ -157,6 +165,8 @@ static int xenon_emmc_phy_init(struct sdhci_host *host)
 
 	reg = sdhci_readl(host, timing_adj_reg);
 	reg |= PHY_INITIALIZAION;
+	if (params->slow_mode)
+		reg |= TIMING_ADJUST_SLOW_MODE | OUTPUT_QSN_PHASE_SELECT;
 	sdhci_writel(host, reg, timing_adj_reg);
 
 	/* Add duration of FC_SYNC_RST */
@@ -476,7 +486,8 @@ static void xenon_emmc_phy_config_tuning(struct sdhci_host *host)
 	int ret;
 	unsigned long flags;
 
-	WARN_ON(host->clock <= MMC_HIGH_52_MAX_DTR);
+	if (!params->slow_mode)
+		WARN_ON(host->clock <= MMC_HIGH_52_MAX_DTR);
 	if (host->clock <= MMC_HIGH_52_MAX_DTR)
 		return;
 
