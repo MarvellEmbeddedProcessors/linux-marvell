@@ -62,6 +62,9 @@ struct emmc_phy_params {
 
 	/* MMC PAD address */
 	void __iomem *pad_ctrl_addr;
+
+	/* Number of consecutive Sampling Points of a Valid Sampling Window */
+	u8 nr_tun_times;
 };
 
 static void xenon_emmc_phy_strobe_delay_adj(struct sdhci_host *host,
@@ -124,9 +127,13 @@ static int emmc_phy_parse_param_dt(struct device_node *np,
 	if (IS_ERR(params->pad_ctrl_addr))
 		params->pad_ctrl_addr = 0;
 
+	if (!of_property_read_u32(np, "xenon,phy-nr-tun-times", &value))
+		params->nr_tun_times = value & TUN_CONSECUTIVE_TIMES_MASK;
+	else
+		params->nr_tun_times = TUN_CONSECUTIVE_TIMES;
+
 	return 0;
 }
-
 static int xenon_emmc_phy_init(struct sdhci_host *host)
 {
 	u32 reg;
@@ -454,6 +461,9 @@ static int xenon_emmc_phy_enable_dll(struct sdhci_host *host)
 
 static void xenon_emmc_phy_config_tuning(struct sdhci_host *host)
 {
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct emmc_phy_params *params = priv->phy_params;
 	u32 reg, tuning_step;
 	int ret;
 	unsigned long flags;
@@ -480,7 +490,7 @@ static void xenon_emmc_phy_config_tuning(struct sdhci_host *host)
 
 	reg = sdhci_readl(host, SDHC_SLOT_OP_STATUS_CTRL);
 	reg &= ~(TUN_CONSECUTIVE_TIMES_MASK << TUN_CONSECUTIVE_TIMES_SHIFT);
-	reg |= (TUN_CONSECUTIVE_TIMES << TUN_CONSECUTIVE_TIMES_SHIFT);
+	reg |= (params->nr_tun_times << TUN_CONSECUTIVE_TIMES_SHIFT);
 	reg &= ~(TUNING_STEP_MASK << TUNING_STEP_SHIFT);
 	reg |= (tuning_step << TUNING_STEP_SHIFT);
 	sdhci_writel(host, reg, SDHC_SLOT_OP_STATUS_CTRL);
