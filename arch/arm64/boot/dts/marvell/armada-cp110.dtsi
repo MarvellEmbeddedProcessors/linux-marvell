@@ -17,23 +17,30 @@
  * Generic Device Tree describing Marvell Armada CP-110 device
  */
 
+cpm_syscon0: system-controller@440000 {
+	compatible = "marvell,cp110-system-controller0",
+		     "syscon";
+	reg = <0x440000 0x1000>;
+	#clock-cells = <2>;
+	core-clock-output-names =
+		"cpm-apll", "cpm-ppv2-core", "cpm-eip",
+		"cpm-core", "cpm-nand-core";
+	gate-clock-output-names =
+		"cpm-audio", "cpm-communit", "cpm-nand",
+		"cpm-ppv2", "cpm-sdio", "cpm-mg-domain",
+		"cpm-mg-core", "cpm-xor1", "cpm-xor0",
+		"cpm-gop-dp", "none", "cpm-pcie_x10",
+		"cpm-pcie_x11", "cpm-pcie_x4", "cpm-pcie-xor",
+		"cpm-sata", "cpm-sata-usb", "cpm-main",
+		"cpm-sd-mmc", "none", "none",
+		"cpm-slow-io", "cpm-usb3h0", "cpm-usb3h1",
+		"cpm-usb3dev", "cpm-eip150", "cpm-eip197";
+};
+
 rtc@284000 {
 	compatible = "marvell,armada8k-rtc";
 	reg = <0x284000 0x20>, <0x284080 0x24>;
 	reg-names = "rtc", "rtc-soc";
-};
-
-cp110_clk: clk@0x440700 {
-	compatible = "marvell,armada-cp110-clock";
-	reg = <0x440700 0x4>;
-	#clock-cells = <1>;
-};
-
-gateclk: clock-gating-control@440220 {
-	compatible = "marvell,armada-cp110-gating-clock";
-	reg = <0x440220 0x4>;
-	clocks = <&cp110_clk 3>;
-	#clock-cells = <1>;
 };
 
 pinctrl@440000 {
@@ -76,7 +83,7 @@ serial@702000 {
 	reg-shift = <2>;
 	interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
 	reg-io-width = <1>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cpm_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -86,7 +93,7 @@ serial@702100 {
 	reg-shift = <2>;
 	interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
 	reg-io-width = <1>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cpm_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -96,7 +103,7 @@ serial@702200 {
 	reg-shift = <2>;
 	interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
 	reg-io-width = <1>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cpm_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -106,7 +113,7 @@ serial@702300 {
 	reg-shift = <2>;
 	interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
 	reg-io-width = <1>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cpm_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -114,7 +121,7 @@ sata: sata@540000 {
 	compatible = "marvell,armada-3700-ahci";
 	reg = <0x540000 0x30000>;
 	interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk 15>, <&gateclk 16>;
+	clocks = <&cpm_syscon0 1 15>;
 	status = "disabled";
 	port_base = <0x10000>;
 	port_offset = <0x10000>;
@@ -125,7 +132,7 @@ usb3h0: usb3@500000 {
 	reg = <0x500000 0x4000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk 22>, <&gateclk 16>;
+	clocks = <&cpm_syscon0 1 22>;
 	status = "disabled";
 };
 
@@ -134,7 +141,7 @@ usb3h1: usb3@510000 {
 	reg = <0x510000 0x4000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk 23>, <&gateclk 16>;
+	clocks = <&cpm_syscon0 1 23>;
 	status = "disabled";
 };
 
@@ -144,7 +151,7 @@ spi@700600 {
 	#address-cells = <0x1>;
 	#size-cells = <0x0>;
 	cell-index = <0x0>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cpm_syscon0 0  3>;
 	status = "disabled";
 };
 
@@ -154,7 +161,7 @@ spi@700680 {
 	#address-cells = <0x1>;
 	#size-cells = <0x0>;
 	cell-index = <0x0>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cpm_syscon0 1 21>;
 	status = "disabled";
 };
 
@@ -165,7 +172,7 @@ i2c1: i2c@701000 {
 	#size-cells = <0>;
 	interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
 	timeout-ms = <1000>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cpm_syscon0 1 21>;
 	status = "disabled";
 };
 
@@ -176,7 +183,7 @@ i2c2: i2c@701100 {
 	#size-cells = <0>;
 	interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
 	timeout-ms = <1000>;
-	clocks = <&cp110_clk 3>;
+	clocks = <&cpm_syscon0 1 21>;
 	status = "disabled";
 };
 
@@ -189,7 +196,7 @@ nand@720000 {
 	marvell,nand-enable-arbiter;
 	nand-on-flash-bbt;
 	interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-	clocks = <&gateclk 2>;
+	clocks = <&cpm_syscon0 1 2>;
 	nand-ecc-strength = <4>;
 	nand-ecc-step-size = <512>;
 	status = "disabled";
@@ -201,7 +208,7 @@ cpxor0@6a0000 {
 	      <0x6b0000 0x1000>;
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
-	clocks = <&gateclk 14>, <&gateclk 8>;
+	clocks = <&cpm_syscon0 1 8>;
 	status = "disabled";
 };
 
@@ -211,7 +218,7 @@ cpxor1@6c0000 {
 	      <0x6d0000 0x1000>;
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
-	clocks = <&gateclk 14>, <&gateclk 7>;
+	clocks = <&cpm_syscon0 1 7>;
 	status = "disabled";
 };
 
@@ -330,7 +337,8 @@ ppv22@000000 {
 	      <0x441000 0x1000>;  /* RFU-1 Regs */
 	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs",
 		    "fca", "gmac", "xlg", "rfu1";
-	clocks = <&gateclk 3>, <&gateclk 18>, <&gateclk 9>, <&gateclk 6>, <&gateclk 5>;
+	clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 18>, <&cpm_syscon0 1 9>,
+		 <&cpm_syscon0 1 6>, <&cpm_syscon0 1 5>;
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 	status = "okay";
 	l4_chksum_jumbo_port = <0>;
@@ -375,6 +383,6 @@ eip197: eip197@800000 {
 			<GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
 			<GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
 	interrupt-names = "ring0", "ring1", "ring2", "ring3", "global";
-	clocks = <&gateclk 26>;
+	clocks = <&cpm_syscon0 1 26>;
 	status = "disabled";
 };
