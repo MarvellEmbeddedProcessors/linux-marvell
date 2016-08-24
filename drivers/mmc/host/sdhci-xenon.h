@@ -143,4 +143,6 @@ static inline int enable_xenon_internal_clk(struct sdhci_host *host)
 int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
 int xenon_phy_parse_dt(struct device_node *np,
 			struct sdhci_xenon_priv *priv);
+void xenon_soc_pad_ctrl(struct sdhci_host *host,
+			unsigned char signal_voltage);
 #endif

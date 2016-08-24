@@ -23,6 +23,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/card.h>
+#include <linux/of_address.h>
 
 #include "../core/core.h"
 #include "../core/sdio_ops.h"
@@ -55,6 +56,12 @@ struct emmc_phy_params {
 	u8 znr;
 	u8 zpr;
 	bool no_dll_tuning;
+
+	/* Set SOC PHY PAD ctrl to fixed 1.8V */
+	bool fixed_1_8v_pad_ctrl;
+
+	/* MMC PAD address */
+	void __iomem *pad_ctrl_addr;
 };
 
 static void xenon_emmc_phy_strobe_delay_adj(struct sdhci_host *host,
@@ -64,12 +71,15 @@ static int xenon_emmc_phy_fix_sampl_delay_adj(struct sdhci_host *host,
 static void xenon_emmc_phy_set(struct sdhci_host *host,
 					unsigned char timing);
 static void xenon_emmc_phy_config_tuning(struct sdhci_host *host);
+static void xenon_emmc_soc_pad_ctrl(struct sdhci_host *host,
+					unsigned char signal_voltage);
 
 static const struct xenon_phy_ops emmc_phy_ops = {
 	.strobe_delay_adj = xenon_emmc_phy_strobe_delay_adj,
 	.fix_sampl_delay_adj = xenon_emmc_phy_fix_sampl_delay_adj,
 	.phy_set = xenon_emmc_phy_set,
 	.config_tuning = xenon_emmc_phy_config_tuning,
+	.soc_pad_ctrl = xenon_emmc_soc_pad_ctrl,
 };
 
 static int alloc_emmc_phy(struct sdhci_xenon_priv *priv)
@@ -104,6 +114,15 @@ static int emmc_phy_parse_param_dt(struct device_node *np,
 		params->zpr = value & ZPR_MASK;
 	else
 		params->zpr = ZPR_DEF_VALUE;
+
+	if (of_property_read_bool(np, "xenon,fixed-1-8v-pad-ctrl"))
+		params->fixed_1_8v_pad_ctrl = true;
+	else
+		params->fixed_1_8v_pad_ctrl = false;
+
+	params->pad_ctrl_addr = of_iomap(np, 1);
+	if (IS_ERR(params->pad_ctrl_addr))
+		params->pad_ctrl_addr = 0;
 
 	return 0;
 }
@@ -164,6 +183,33 @@ static int xenon_emmc_phy_init(struct sdhci_host *host)
 	}
 
 	return 0;
+}
+
+static inline void soc_pad_voltage_set(void __iomem *pad_ctrl,
+					unsigned char signal_voltage)
+{
+	if (!pad_ctrl)
+		return;
+
+	if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+		writel(SOC_PAD_1_8V, pad_ctrl);
+	else if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+		writel(SOC_PAD_3_3V, pad_ctrl);
+}
+
+static void xenon_emmc_soc_pad_ctrl(struct sdhci_host *host,
+					unsigned char signal_voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct emmc_phy_params *params = priv->phy_params;
+
+	if (params->fixed_1_8v_pad_ctrl)
+		soc_pad_voltage_set(params->pad_ctrl_addr,
+					MMC_SIGNAL_VOLTAGE_180);
+	else
+		soc_pad_voltage_set(params->pad_ctrl_addr,
+					signal_voltage);
 }
 
 static int xenon_emmc_phy_set_fix_sampl_delay(struct sdhci_host *host,
@@ -778,6 +824,16 @@ static int alloc_sdh_phy(struct sdhci_xenon_priv *priv)
 /*
  * Common functions for all PHYs
  */
+void xenon_soc_pad_ctrl(struct sdhci_host *host,
+			unsigned char signal_voltage)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+
+	if (priv->phy_ops.soc_pad_ctrl)
+		priv->phy_ops.soc_pad_ctrl(host, signal_voltage);
+}
+
 static int __xenon_emmc_delay_adj_test(struct mmc_card *card)
 {
 	int err;
