@@ -121,8 +121,8 @@ static int armada_3700_mpp_ctrl_set(unsigned pid,
 	return 0;
 }
 
-/* south bridge pin-ctl */
-static struct mvebu_mpp_mode armada_3700_nb_mpp_modes[] = {
+/* North bridge pin-ctl for Z1 */
+static struct mvebu_mpp_mode armada_3700_z1_nb_mpp_modes[] = {
 	MPP_MODE(0,
 	   MPP_FUNCTION(0x0, "i2c1", "sck"),
 	   MPP_FUNCTION(0x1, "gpio", NULL)),
@@ -246,8 +246,8 @@ static struct mvebu_mpp_mode armada_3700_nb_mpp_modes[] = {
 	   MPP_FUNCTION(0x0, "spi", NULL)),
 };
 
-/* North bridge pins' configs setting bitmaps, this array idx is north bridge pin id. */
-static struct armada_3700_mpp_setting_bitmap armada_3700_nb_mpp_bitmap[] = {
+/* North bridge pins' configs setting bitmaps for Z1, this array idx is north bridge pin id. */
+static struct armada_3700_mpp_setting_bitmap armada_3700_z1_nb_mpp_bitmap[] = {
 	/* mask			config_num	configs */
 	{BIT(10),		2,		{0, BIT(10)}			},	/* pin 0 */
 	{BIT(10),		2,		{0, BIT(10)}			},	/* pin 1 */
@@ -335,8 +335,8 @@ static struct pinctrl_gpio_range armada_3700_nb_mpp_gpio_ranges[] = {
 	MPP_GPIO_RANGE(0, 0, 0, 36),
 };
 
-/* south bridge pin-ctl */
-static struct mvebu_mpp_mode armada_3700_sb_mpp_modes[] = {
+/* south bridge pin-ctl for Z1 */
+static struct mvebu_mpp_mode armada_3700_z1_sb_mpp_modes[] = {
 	MPP_MODE(0,
 	   MPP_FUNCTION(0x0, "usb32", "drvvbus0"),
 	   MPP_FUNCTION(0x1, "gpio", NULL)),
@@ -430,8 +430,8 @@ static struct mvebu_mpp_mode armada_3700_sb_mpp_modes[] = {
 	   MPP_FUNCTION(0x1, "gpio", NULL)),
 };
 
-/* south bridge pins' configs setting bitmaps, this array idx is south bridge pin id */
-static struct armada_3700_mpp_setting_bitmap armada_3700_sb_mpp_bitmap[] = {
+/* south bridge pins' configs setting bitmaps for Z1, this array idx is south bridge pin id */
+static struct armada_3700_mpp_setting_bitmap armada_3700_z1_sb_mpp_bitmap[] = {
 	/*mask			config_num	configs*/
 	{BIT(0),		2,		{0, BIT(0)}			},	/* pin 0 */
 	{BIT(1),		2,		{0, BIT(1)}			},	/* pin 1 */
@@ -545,51 +545,51 @@ static struct mvebu_mpp_ctrl armada_3700_sb_mpp_controls[] = {
 static struct pinctrl_gpio_range armada_3700_sb_mpp_gpio_ranges[] = {
 	MPP_GPIO_RANGE(0, 0, 36, 30),
 };
-static struct mvebu_pinctrl_soc_info a3700_mpp_sb_soc_info = {
+static struct mvebu_pinctrl_soc_info a3700_z1_mpp_sb_soc_info = {
 	.variant = 0,
 	.controls = armada_3700_sb_mpp_controls,
 	.ncontrols = ARRAY_SIZE(armada_3700_sb_mpp_controls),
-	.modes = armada_3700_sb_mpp_modes,
-	.nmodes = ARRAY_SIZE(armada_3700_sb_mpp_modes),
+	.modes = armada_3700_z1_sb_mpp_modes,
+	.nmodes = ARRAY_SIZE(armada_3700_z1_sb_mpp_modes),
 	.gpioranges = armada_3700_sb_mpp_gpio_ranges,
 	.ngpioranges = ARRAY_SIZE(armada_3700_sb_mpp_gpio_ranges),
 };
 
-static struct armada_3700_mpp_conf a3700_mpp_sb_conf = {
-	.soc_info = &a3700_mpp_sb_soc_info,
-	.modes = armada_3700_sb_mpp_modes,
-	.nmodes = ARRAY_SIZE(armada_3700_sb_mpp_modes),
-	.bitmap = armada_3700_sb_mpp_bitmap,
-	.nbitmaps = ARRAY_SIZE(armada_3700_sb_mpp_bitmap),
+static struct armada_3700_mpp_conf a3700_z1_mpp_sb_conf = {
+	.soc_info = &a3700_z1_mpp_sb_soc_info,
+	.modes = armada_3700_z1_sb_mpp_modes,
+	.nmodes = ARRAY_SIZE(armada_3700_z1_sb_mpp_modes),
+	.bitmap = armada_3700_z1_sb_mpp_bitmap,
+	.nbitmaps = ARRAY_SIZE(armada_3700_z1_sb_mpp_bitmap),
 	.index = I_SOUTHBRIDGE,
 };
-static struct mvebu_pinctrl_soc_info a3700_mpp_nb_soc_info = {
+static struct mvebu_pinctrl_soc_info a3700_z1_mpp_nb_soc_info = {
 	.variant = 0,
 	.controls = armada_3700_nb_mpp_controls,
 	.ncontrols = ARRAY_SIZE(armada_3700_nb_mpp_controls),
-	.modes = armada_3700_nb_mpp_modes,
-	.nmodes = ARRAY_SIZE(armada_3700_nb_mpp_modes),
+	.modes = armada_3700_z1_nb_mpp_modes,
+	.nmodes = ARRAY_SIZE(armada_3700_z1_nb_mpp_modes),
 	.gpioranges = armada_3700_nb_mpp_gpio_ranges,
 	.ngpioranges = ARRAY_SIZE(armada_3700_nb_mpp_gpio_ranges),
 };
 
-static struct armada_3700_mpp_conf a3700_mpp_nb_conf = {
-	.soc_info = &a3700_mpp_nb_soc_info,
-	.modes = armada_3700_nb_mpp_modes,
-	.nmodes = ARRAY_SIZE(armada_3700_nb_mpp_modes),
-	.bitmap = armada_3700_nb_mpp_bitmap,
-	.nbitmaps = ARRAY_SIZE(armada_3700_nb_mpp_bitmap),
+static struct armada_3700_mpp_conf a3700_z1_mpp_nb_conf = {
+	.soc_info = &a3700_z1_mpp_nb_soc_info,
+	.modes = armada_3700_z1_nb_mpp_modes,
+	.nmodes = ARRAY_SIZE(armada_3700_z1_nb_mpp_modes),
+	.bitmap = armada_3700_z1_nb_mpp_bitmap,
+	.nbitmaps = ARRAY_SIZE(armada_3700_z1_nb_mpp_bitmap),
 	.index = I_NORTHBRIDGE,
 };
 
 static const struct of_device_id armada_3700_pinctrl_of_match[] = {
 	{
-		.compatible = "marvell,armada-3700-nb-pinctrl",
-		.data       = (void *) &a3700_mpp_nb_conf
+		.compatible = "marvell,armada-3700-z1-nb-pinctrl",
+		.data       = (void *) &a3700_z1_mpp_nb_conf
 	},
 	{
-		.compatible = "marvell,armada-3700-sb-pinctrl",
-		.data       = (void *) &a3700_mpp_sb_conf,
+		.compatible = "marvell,armada-3700-z1-sb-pinctrl",
+		.data       = (void *) &a3700_z1_mpp_sb_conf,
 	},
 	{ },
 };
