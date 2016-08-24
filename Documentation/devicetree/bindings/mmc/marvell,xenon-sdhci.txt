@@ -52,6 +52,12 @@ Optional Properties:
   voltage.
   - xenon,fixed-1-8v-pad-ctrl;
 
+  Number of successful tuning times
+  Set the number of required consecutive successful sampling points used to
+  identify a valid sampling window, in tuning process.
+  Valid range = [1:7]. Set as 0x4 by default if this property is not provided.
+  - xenon,phy-nr-tun-times = <nr_times>;
+
 - Re-tuning Counter
   Xenon SDHC SOC usually doesn't provide re-tuning counter in
   Capabilities Register 3 Bit[11:8].
