@@ -4,7 +4,7 @@ Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
 part and usage.
 
 Required properties:
-- compatible: "marvell,armada-3700-nb-pinctrl" or "marvell,armada-3700-sb-pinctrl"
+- compatible: "marvell,armada-3700-z1-nb-pinctrl" or "marvell,armada-3700-z1-sb-pinctrl"
 - reg: register specifier of MPP registers
 
 Available mpp pins/groups and functions:
@@ -12,7 +12,7 @@ Note: brackets (x) are not part of the mpp name for marvell,function and given
 only for more detailed description in this document. Customer should make sure
 that there are no mpps configuration conflicts.
 
-North bridge: "marvell,armada-3700-nb-pinctrl"
+North bridge: "marvell,armada-3700-z1-nb-pinctrl"
 name          pins     functions
 ================================================================================
 mpp0          0        i2c1(sck), gpio
@@ -53,7 +53,7 @@ mpp34         34       mmc, gpio
 mpp35         35       mmc, gpio
 mpp36         36       spi
 
-South bridge: "marvell,armada-3700-sb-pinctrl"
+South bridge: "marvell,armada-3700-z1-sb-pinctrl"
 name          pins     functions
 ================================================================================
 mpp0          0        usb32(drvvbus0), gpio

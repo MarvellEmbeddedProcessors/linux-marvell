@@ -48,4 +48,16 @@
 
 / {
 	model = "Marvell Armada 37xx RZ SoC";
+
+	soc {
+		internal-regs {
+			npinctrl: north-bridge-pinctrl@13830 {
+				compatible = "marvell,armada-3700-z1-nb-pinctrl";
+			};
+
+			spinctrl: south-bridge-pinctrl@18830 {
+				compatible = "marvell,armada-3700-z1-sb-pinctrl";
+			};
+		};
+	};
 };
