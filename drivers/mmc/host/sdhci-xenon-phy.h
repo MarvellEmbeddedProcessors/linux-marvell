@@ -103,6 +103,9 @@
 #define EMMC_5_0_PHY_LOGIC_TIMING_ADJUST	(EMMC_5_0_PHY_REG_BASE + 0x14)
 #define EMMC_PHY_LOGIC_TIMING_ADJUST		(EMMC_PHY_REG_BASE + 0x18)
 
+#define SOC_PAD_1_8V				0x1
+#define SOC_PAD_3_3V				0x0
+
 enum sampl_fix_delay_phase {
 	PHASE_0_DEGREE = 0x0,
 	PHASE_90_DEGREE = 0x1,
@@ -124,5 +127,6 @@ struct xenon_phy_ops {
 				struct mmc_card *card);
 	void (*phy_set)(struct sdhci_host *host, unsigned char timing);
 	void (*config_tuning)(struct sdhci_host *host);
+	void (*soc_pad_ctrl)(struct sdhci_host *host, unsigned char signal_voltage);
 };
 #endif

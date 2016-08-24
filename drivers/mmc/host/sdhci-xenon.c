@@ -336,8 +336,12 @@ static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
 	enable_xenon_internal_clk(host);
 
 	if (priv->card_candidate) {
-		if (mmc_card_mmc(priv->card_candidate))
+		if (mmc_card_mmc(priv->card_candidate)) {
+			/* Set SoC PAD register for MMC PHY voltage */
+			xenon_soc_pad_ctrl(host, ios->signal_voltage);
+
 			return xenon_emmc_signal_voltage_switch(mmc, ios);
+		}
 	}
 
 	return sdhci_start_signal_voltage_switch(mmc, ios);
@@ -544,6 +548,12 @@ static int sdhci_xenon_probe(struct platform_device *pdev)
 
 	/* Set tuning functionality of this slot */
 	xenon_slot_tuning_setup(host);
+
+	/* Initialize SoC PAD register for MMC PHY voltage
+	 * For eMMC, it is set to 1.8V
+	 * For SD/SDIO, it is set to 3.3V
+	 */
+	xenon_soc_pad_ctrl(host, MMC_SIGNAL_VOLTAGE_330);
 
 	return 0;
 
