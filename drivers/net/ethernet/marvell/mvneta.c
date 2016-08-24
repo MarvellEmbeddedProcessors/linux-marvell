@@ -178,9 +178,10 @@
 #define MVNETA_GMAC_CTRL_0                       0x2c00
 #define      MVNETA_GMAC_MAX_RX_SIZE_SHIFT       2
 #define      MVNETA_GMAC_MAX_RX_SIZE_MASK        0x7ffc
+#define      MVNETA_GMAC0_PORT_1000BASE_X        BIT(1)
 #define      MVNETA_GMAC0_PORT_ENABLE            BIT(0)
 #define MVNETA_GMAC_CTRL_2                       0x2c08
-#define      MVNETA_GMAC2_INBAND_AN_ENABLE       BIT(0)
+#define      MVNETA_GMAC2_SGMII_INBAND_AN_MODE   BIT(0)
 #define      MVNETA_GMAC2_PCS_ENABLE             BIT(3)
 #define      MVNETA_GMAC2_PORT_RGMII             BIT(4)
 #define      MVNETA_GMAC2_PORT_RESET             BIT(6)
@@ -197,9 +198,14 @@
 #define      MVNETA_GMAC_FORCE_LINK_DOWN         BIT(0)
 #define      MVNETA_GMAC_FORCE_LINK_PASS         BIT(1)
 #define      MVNETA_GMAC_INBAND_AN_ENABLE        BIT(2)
+#define      MVNETA_GMAC_INBAND_AN_BYPASS_EN     BIT(3)
+#define      MVNETA_GMAC_INBAND_RESTART_AN       BIT(4)
 #define      MVNETA_GMAC_CONFIG_MII_SPEED        BIT(5)
 #define      MVNETA_GMAC_CONFIG_GMII_SPEED       BIT(6)
 #define      MVNETA_GMAC_AN_SPEED_EN             BIT(7)
+#define      MVNETA_GMAC_CONFIG_FLOW_CTRL        BIT(8)
+#define      MVNETA_GMAC_ADVERT_SYM_FLOW_CTRL    BIT(9)
+#define      MVNETA_GMAC_ADVERT_ASYM_FC_ADV      BIT(10)
 #define      MVNETA_GMAC_AN_FLOW_CTRL_EN         BIT(11)
 #define      MVNETA_GMAC_CONFIG_FULL_DUPLEX      BIT(12)
 #define      MVNETA_GMAC_AN_DUPLEX_EN            BIT(13)
@@ -228,6 +234,11 @@
 #define MVNETA_CAUSE_TXQ_SENT_DESC_ALL_MASK	 0xff
 
 #define MVNETA_REGS_GMAC_LEN                     0xAC9
+
+enum mvneta_port_type {
+	PORT_TYPE_SGMII,
+	PORT_TYPE_1000BASE_X
+};
 
 /* Descriptor ring Macros */
 #define MVNETA_QUEUE_NEXT_DESC(q, index)	\
@@ -1044,42 +1055,111 @@ static void mvneta_set_other_mcast_table(struct mvneta_port *pp, int queue)
 		mvreg_write(pp, MVNETA_DA_FILT_OTH_MCAST + offset, val);
 }
 
-static void mvneta_set_autoneg(struct mvneta_port *pp, int enable)
+/* Get the port type, 0 - SGMII, 1 -- 1000BaseX */
+static enum mvneta_port_type mvneta_port_type_get(struct mvneta_port *pp)
 {
 	u32 val;
 
-	if (enable) {
-		val = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
-		val &= ~(MVNETA_GMAC_FORCE_LINK_PASS |
-			 MVNETA_GMAC_FORCE_LINK_DOWN |
-			 MVNETA_GMAC_AN_FLOW_CTRL_EN);
-		val |= MVNETA_GMAC_INBAND_AN_ENABLE |
-		       MVNETA_GMAC_AN_SPEED_EN |
-		       MVNETA_GMAC_AN_DUPLEX_EN;
-		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
+	val = mvreg_read(pp, MVNETA_GMAC_CTRL_0);
+	if (val & MVNETA_GMAC0_PORT_1000BASE_X)
+		return PORT_TYPE_1000BASE_X;
+	else
+		return PORT_TYPE_SGMII;
+}
 
-		val = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
-		val |= MVNETA_GMAC_1MS_CLOCK_ENABLE;
-		mvreg_write(pp, MVNETA_GMAC_CLOCK_DIVIDER, val);
+static void mvneta_mac_config(struct mvneta_port *pp)
+{
+	enum mvneta_port_type port_type = mvneta_port_type_get(pp);
+	u32 new_ctrl2, gmac_ctrl2 = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+	u32 new_clk, gmac_clk = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
+	u32 new_an, gmac_an = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
 
-		val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
-		val |= MVNETA_GMAC2_INBAND_AN_ENABLE;
-		mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
+	/* Clear all fields need to config with different work mode */
+	new_ctrl2 = gmac_ctrl2 & ~MVNETA_GMAC2_SGMII_INBAND_AN_MODE;
+	new_clk = gmac_clk & ~MVNETA_GMAC_1MS_CLOCK_ENABLE;
+	new_an = gmac_an & ~(MVNETA_GMAC_INBAND_AN_ENABLE |
+			     MVNETA_GMAC_INBAND_RESTART_AN |
+			     MVNETA_GMAC_CONFIG_MII_SPEED |
+			     MVNETA_GMAC_CONFIG_GMII_SPEED |
+			     MVNETA_GMAC_AN_SPEED_EN |
+			     MVNETA_GMAC_ADVERT_SYM_FLOW_CTRL |
+			     MVNETA_GMAC_CONFIG_FLOW_CTRL |
+			     MVNETA_GMAC_AN_FLOW_CTRL_EN |
+			     MVNETA_GMAC_CONFIG_FULL_DUPLEX |
+			     MVNETA_GMAC_AN_DUPLEX_EN |
+			     MVNETA_GMAC_FORCE_LINK_PASS |
+			     MVNETA_GMAC_FORCE_LINK_DOWN);
+
+	if (pp->use_inband_status) {
+		switch (port_type) {
+		case PORT_TYPE_SGMII:
+			/* SGMII mode receives the state from the PHY */
+			new_ctrl2 |= MVNETA_GMAC2_SGMII_INBAND_AN_MODE;
+			new_clk |= MVNETA_GMAC_1MS_CLOCK_ENABLE;
+			/* SGMII aoto-nego clock */
+			new_an |= MVNETA_GMAC_INBAND_AN_ENABLE |
+				   MVNETA_GMAC_INBAND_AN_BYPASS_EN |
+				   MVNETA_GMAC_AN_SPEED_EN |
+				   MVNETA_GMAC_AN_DUPLEX_EN;
+			break;
+
+		case PORT_TYPE_1000BASE_X:
+			/* A3700 spec: In 1000BASE-X, the port must be set to work
+			 * in full-duplex mode, at 1000 Mbps.
+			 * Duplex and Speed Auto-Negotiation must be disabled
+			 */
+			new_an |= MVNETA_GMAC_INBAND_AN_ENABLE |
+				  MVNETA_GMAC_INBAND_AN_BYPASS_EN |
+				  MVNETA_GMAC_CONFIG_GMII_SPEED |
+				  MVNETA_GMAC_ADVERT_SYM_FLOW_CTRL |
+				  MVNETA_GMAC_AN_FLOW_CTRL_EN |
+				  MVNETA_GMAC_CONFIG_FLOW_CTRL |
+				  MVNETA_GMAC_CONFIG_FULL_DUPLEX;
+
+			break;
+		}
 	} else {
-		val = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
-		val &= ~(MVNETA_GMAC_INBAND_AN_ENABLE |
-		       MVNETA_GMAC_AN_SPEED_EN |
-		       MVNETA_GMAC_AN_DUPLEX_EN);
-		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
+		/* SMI auto-nego, GMAC will get info from PHY with SMI */
+		if (pp->phy_dev) {
+			if (pp->phy_dev->duplex)
+				new_an |= MVNETA_GMAC_CONFIG_FULL_DUPLEX;
 
-		val = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
-		val &= ~MVNETA_GMAC_1MS_CLOCK_ENABLE;
-		mvreg_write(pp, MVNETA_GMAC_CLOCK_DIVIDER, val);
+			if (pp->phy_dev->speed == SPEED_1000)
+				new_an |= MVNETA_GMAC_CONFIG_GMII_SPEED;
+			else if (pp->phy_dev->speed == SPEED_100)
+				new_an |= MVNETA_GMAC_CONFIG_MII_SPEED;
 
-		val = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
-		val &= ~MVNETA_GMAC2_INBAND_AN_ENABLE;
-		mvreg_write(pp, MVNETA_GMAC_CTRL_2, val);
+			if (pp->phy_dev->pause)
+				new_an |= MVNETA_GMAC_CONFIG_FLOW_CTRL;
+
+			if (pp->phy_dev->asym_pause)
+				new_an |= MVNETA_GMAC_ADVERT_ASYM_FC_ADV;
+
+			/* Fixed link, Force link up */
+			if (phy_is_pseudo_fixed_link(pp->phy_dev)) {
+				new_an |= MVNETA_GMAC_FORCE_LINK_PASS;
+				new_an &= ~MVNETA_GMAC_FORCE_LINK_DOWN;
+			}
+		}
 	}
+
+	/* Armada 370 documentation says we can only change the port mode
+	 * and in-band enable when the link is down, so force it down
+	 * while making these changes. We also do this for GMAC_CTRL2
+	 */
+	if ((new_ctrl2 ^ gmac_ctrl2) & MVNETA_GMAC2_SGMII_INBAND_AN_MODE ||
+	    (new_an  ^ gmac_an) & MVNETA_GMAC_INBAND_AN_ENABLE) {
+		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG,
+			    (gmac_an & ~MVNETA_GMAC_FORCE_LINK_PASS) |
+			    MVNETA_GMAC_FORCE_LINK_DOWN);
+	}
+
+	if (new_ctrl2 != gmac_ctrl2)
+		mvreg_write(pp, MVNETA_GMAC_CTRL_2, new_ctrl2);
+	if (new_clk != gmac_clk)
+		mvreg_write(pp, MVNETA_GMAC_CLOCK_DIVIDER, new_clk);
+	if (new_an != gmac_an)
+		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, new_an);
 }
 
 static void mvneta_percpu_unmask_interrupt(void *arg)
@@ -1227,7 +1307,7 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
 	val &= ~MVNETA_PHY_POLLING_ENABLE;
 	mvreg_write(pp, MVNETA_UNIT_CONTROL, val);
 
-	mvneta_set_autoneg(pp, pp->use_inband_status);
+	mvneta_mac_config(pp);
 	mvneta_set_ucast_table(pp, -1);
 	mvneta_set_special_mcast_table(pp, -1);
 	mvneta_set_other_mcast_table(pp, -1);
@@ -2801,7 +2881,8 @@ static void mvneta_start_dev(struct mvneta_port *pp)
 		    MVNETA_CAUSE_LINK_CHANGE |
 		    MVNETA_CAUSE_PSC_SYNC_CHANGE);
 
-	phy_start(pp->phy_dev);
+	if (!pp->use_inband_status)
+		phy_start(pp->phy_dev);
 	netif_tx_start_all_queues(pp->dev);
 }
 
@@ -2810,7 +2891,8 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
 	struct mvneta_pcpu_port *port;
 	unsigned int cpu;
 
-	phy_stop(pp->phy_dev);
+	if (!pp->use_inband_status)
+		phy_stop(pp->phy_dev);
 
 	if (!pp->neta_armada3700) {
 		for_each_online_cpu(cpu) {
@@ -3358,48 +3440,24 @@ int mvneta_ethtool_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 /* Set settings (phy address, speed) for ethtools */
 int mvneta_ethtool_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
+	int ret = 0;
 	struct mvneta_port *pp = netdev_priv(dev);
 	struct phy_device *phydev = pp->phy_dev;
 
-	if (!phydev)
-		return -ENODEV;
-
-	if (mvneta_spd_dplx_valid(pp, cmd))
-		return -EINVAL;
-
-	if ((cmd->autoneg == AUTONEG_ENABLE) != pp->use_inband_status) {
-		u32 val;
-
-		mvneta_set_autoneg(pp, cmd->autoneg == AUTONEG_ENABLE);
-
-		if (cmd->autoneg == AUTONEG_DISABLE) {
-			val = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
-			val &= ~(MVNETA_GMAC_CONFIG_MII_SPEED |
-				 MVNETA_GMAC_CONFIG_GMII_SPEED |
-				 MVNETA_GMAC_CONFIG_FULL_DUPLEX);
-
-			if (phydev->duplex)
-				val |= MVNETA_GMAC_CONFIG_FULL_DUPLEX;
-
-			if (phydev->speed == SPEED_1000)
-				val |= MVNETA_GMAC_CONFIG_GMII_SPEED;
-			else if (phydev->speed == SPEED_100)
-				val |= MVNETA_GMAC_CONFIG_MII_SPEED;
-
-			mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
-		}
-
-		pp->use_inband_status = (cmd->autoneg == AUTONEG_ENABLE);
-		netdev_info(pp->dev, "autoneg status set to %i\n",
-			    pp->use_inband_status);
-
-		if (netif_running(dev)) {
-			mvneta_port_down(pp);
-			mvneta_port_up(pp);
-		}
+	if (phydev) {
+		/* Fixed link not allowed to update speed/duplex */
+		if (phy_is_pseudo_fixed_link(pp->phy_dev))
+			return -EINVAL;
+		if (mvneta_spd_dplx_valid(pp, cmd))
+			return -EINVAL;
+		ret = phy_ethtool_sset(pp->phy_dev, cmd);
+		if (ret)
+			return ret;
 	}
+	/* Config MAC */
+	mvneta_mac_config(pp);
 
-	return phy_ethtool_sset(pp->phy_dev, cmd);
+	return ret;
 }
 
 /* Set interrupt coalescing for ethtools */
@@ -4026,6 +4084,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	err = of_property_read_string(dn, "managed", &managed);
 	pp->use_inband_status = (err == 0 &&
 				 strcmp(managed, "in-band-status") == 0);
+
 	pp->cpu_notifier.notifier_call = mvneta_percpu_notifier;
 
 	pp->rxq_def = rxq_def;
@@ -4172,10 +4231,12 @@ static int mvneta_probe(struct platform_device *pdev)
 	pp->cleanup_timer.function = mvneta_cleanup_timer_callback;
 	pp->cleanup_timer.data = (unsigned long)pp;
 
-	err = mvneta_mdio_probe(pp);
-	if (err < 0) {
-		netdev_err(dev, "cannot probe MDIO bus\n");
-		goto err_free_stats;
+	if (!pp->use_inband_status) {
+		err = mvneta_mdio_probe(pp);
+		if (err < 0) {
+			netdev_err(dev, "cannot probe MDIO bus\n");
+			goto err_free_stats;
+		}
 	}
 
 	return 0;
@@ -4201,7 +4262,8 @@ static int mvneta_remove(struct platform_device *pdev)
 	struct net_device  *dev = platform_get_drvdata(pdev);
 	struct mvneta_port *pp = netdev_priv(dev);
 
-	mvneta_mdio_remove(pp);
+	if (!pp->use_inband_status)
+		mvneta_mdio_remove(pp);
 	unregister_netdev(dev);
 	clk_disable_unprepare(pp->clk);
 	free_percpu(pp->ports);
