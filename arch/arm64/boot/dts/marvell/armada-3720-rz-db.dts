@@ -154,7 +154,7 @@
 			};
 
 			sdhci0: sdhci@d8000 {
-				xenon,emmc;
+				xenon,fixed-1-8v-pad-ctrl;
 				non-removable;
 				bus-width = <8>;
 				tuning-count = <6>;

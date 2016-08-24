@@ -308,7 +308,8 @@
 
 			sdhci1: sdhci@d0000 {
 				compatible = "marvell,xenon-sdhci";
-				reg = <0xd0000 0x300>;
+				reg = <0xd0000 0x300>,
+				      <0x1e808 0x4>;
 				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
 				xenon,slotno = <0>;
 				clock-names = "core";
@@ -318,7 +319,8 @@
 
 			sdhci0: sdhci@d8000 {
 				compatible = "marvell,xenon-sdhci";
-				reg = <0xd8000 0x300>;
+				reg = <0xd8000 0x300>,
+				      <0x17808 0x4>;
 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
 				xenon,slotno = <0>;
 				clock-names = "core";
