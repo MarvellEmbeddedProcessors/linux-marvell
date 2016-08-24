@@ -611,6 +611,19 @@ struct mvneta_rx_queue {
 	int next_desc_to_proc;
 };
 
+#define MVNETA_TEST_LEN		ARRAY_SIZE(mvneta_gstrings_test)
+#define MVNETA_TEST_MASK1	0xFFFF
+#define MVNETA_TEST_MASK2	0x0FF0
+#define MVNETA_TEST_MASK3	0x0
+#define MVNETA_TEST_PATTERN1	0xFFFF
+#define MVNETA_TEST_PATTERN2	0x0FF0
+#define MVNETA_TEST_PATTERN3	0x0
+
+static const char mvneta_gstrings_test[][ETH_GSTRING_LEN] = {
+	"Link test        (on/offline)",
+	"register test    (on/offline)",
+};
+
 /* The hardware supports eight (8) rx queues, but we are only allowing
  * the first one to be used. Therefore, let's just allocate one queue.
  */
@@ -4022,6 +4035,8 @@ static void mvneta_ethtool_get_strings(struct net_device *netdev, u32 sset,
 		for (i = 0; i < ARRAY_SIZE(mvneta_statistics); i++)
 			memcpy(data + i * ETH_GSTRING_LEN,
 			       mvneta_statistics[i].name, ETH_GSTRING_LEN);
+	} else if (sset == ETH_SS_TEST) {
+		memcpy(data, *mvneta_gstrings_test, sizeof(mvneta_gstrings_test));
 	}
 }
 
@@ -4068,6 +4083,9 @@ static int mvneta_ethtool_get_sset_count(struct net_device *dev, int sset)
 {
 	if (sset == ETH_SS_STATS)
 		return ARRAY_SIZE(mvneta_statistics);
+	else if (sset == ETH_SS_TEST)
+		return MVNETA_TEST_LEN;
+
 	return -EOPNOTSUPP;
 }
 
@@ -4313,6 +4331,112 @@ static int mvneta_ethtool_nway_reset(struct net_device *dev)
 	return phy_start_aneg(pp->phy_dev);
 }
 
+int mvneta_gmac_link_status(struct mvneta_port *pp, int *link_status)
+{
+	u32 reg_val;
+
+	reg_val = mvreg_read(pp, MVNETA_GMAC_STATUS);
+	if (reg_val & MVNETA_GMAC_LINK_UP)
+		*link_status = 1 /*TRUE*/;
+	else
+		*link_status = 0 /*FALSE*/;
+
+	return 0;
+}
+
+static u64 mvneta_eth_tool_link_test(struct mvneta_port *pp)
+{
+	int link_status;
+
+	netdev_info(pp->dev, "Link testing starting\n");
+
+	mvneta_gmac_link_status(pp, &link_status);
+
+	if (link_status)
+		return 0;
+
+	return 1;
+}
+
+static bool mvneta_reg_pattern_test(struct mvneta_port *pp, u32 offset, u32 mask, u32 write)
+{
+	static const u32 test[] = {0x5A5A5A5A, 0xA5A5A5A5, 0x00000000, 0xFFFFFFFF};
+	u32 read, old;
+	int i;
+
+	if (!mask)
+		return false;
+	old = mvreg_read(pp, offset);
+
+	for (i = 0; i < ARRAY_SIZE(test); i++) {
+		mvreg_write(pp, offset, write & test[i]);
+		read = mvreg_read(pp, offset);
+		if (read != (write & test[i] & mask)) {
+			netdev_err(pp->dev, "test %s offset 0x%x(test 0x%08X write 0x%08X mask 0x%08X) failed: ",
+				   pp->dev->name, offset, test[i], write, mask);
+			netdev_err(pp->dev, "got 0x%08X expected 0x%08X\n", read, (write & test[i] & mask));
+			mvreg_write(pp, offset, old);
+			return true;
+		}
+	}
+
+	mvreg_write(pp, offset, old);
+
+	return false;
+}
+
+static u64 mvneta_eth_tool_reg_test(struct mvneta_port *pp)
+{
+	int ind;
+	int err = 0;
+
+	netdev_info(pp->dev, "Register testing starting\n");
+
+	err += mvneta_reg_pattern_test(pp, MVNETA_GMAC_CTRL_0, MVNETA_TEST_MASK1, MVNETA_TEST_PATTERN1);
+	err += mvneta_reg_pattern_test(pp, MVNETA_GMAC_STATUS, MVNETA_TEST_MASK3, MVNETA_TEST_PATTERN3);
+
+	for (ind = 0; ind < rxq_number; ind++) {
+		err += mvneta_reg_pattern_test(pp, MVNETA_RXQ_CONFIG_REG(ind),
+					       MVNETA_TEST_MASK2, MVNETA_TEST_PATTERN2);
+		err += mvneta_reg_pattern_test(pp, MVNETA_RXQ_THRESHOLD_REG(ind),
+					       MVNETA_TEST_MASK2, MVNETA_TEST_PATTERN2);
+		err += mvneta_reg_pattern_test(pp, MVNETA_RXQ_BASE_ADDR_REG(ind),
+					       MVNETA_TEST_MASK3, MVNETA_TEST_PATTERN3);
+		err += mvneta_reg_pattern_test(pp, MVNETA_RXQ_SIZE_REG(ind),
+					       MVNETA_TEST_MASK2, MVNETA_TEST_PATTERN2);
+		err += mvneta_reg_pattern_test(pp, MVNETA_RXQ_STATUS_REG(ind),
+					       MVNETA_TEST_MASK3, MVNETA_TEST_PATTERN3);
+	}
+
+	for (ind = 0; ind < 6; ind++) {
+		err += mvneta_reg_pattern_test(pp, MVNETA_WIN_BASE(ind),
+					       MVNETA_TEST_MASK1, MVNETA_TEST_PATTERN1);
+		err += mvneta_reg_pattern_test(pp, MVNETA_WIN_SIZE(ind),
+					       MVNETA_TEST_MASK3, MVNETA_TEST_PATTERN3);
+	}
+
+	if (err)
+		return 1;
+
+	return 0;
+}
+
+static void mvneta_ethtool_diag_test(struct net_device *dev,
+				     struct ethtool_test *test, u64 *data)
+{
+	struct mvneta_port *pp = netdev_priv(dev);
+	int i;
+
+	memset(data, 0, MVNETA_TEST_LEN * sizeof(u64));
+
+	data[0] = mvneta_eth_tool_link_test(pp);
+	data[1] = mvneta_eth_tool_reg_test(pp);
+	for (i = 0; i < MVNETA_TEST_LEN; i++)
+		test->flags |= data[i] ? ETH_TEST_FL_FAILED : 0;
+
+	msleep_interruptible(4 * 1000);
+}
+
 static const struct net_device_ops mvneta_netdev_ops = {
 	.ndo_open            = mvneta_open,
 	.ndo_stop            = mvneta_stop,
@@ -4344,6 +4468,7 @@ const struct ethtool_ops mvneta_eth_tool_ops = {
 	.get_regs_len	= mvneta_ethtool_get_regs_len,
 	.get_regs	= mvneta_ethtool_get_regs,
 	.nway_reset	= mvneta_ethtool_nway_reset,
+	.self_test	= mvneta_ethtool_diag_test,
 };
 
 /* Initialize hw */
