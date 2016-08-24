@@ -19,6 +19,7 @@ contain the following properties:
  - interrupt-map-mask and interrupt-map: standard PCI properties to
    define the mapping of the PCIe interface to interrupt numbers.
  - bus-range: PCI bus numbers covered
+ - clocks: a pointer to the PCI core clock for this device.
 
 In addition, the Device Tree describing an Aardvark PCIe controller
 must include a sub-node that describes the legacy interrupt controller
@@ -42,6 +43,7 @@ Example:
 		#interrupt-cells = <1>;
 		msi-controller;
 		msi-parent = <&pcie0>;
+		clocks = <&sgateclk 14>;
 		ranges = <0x82000000 0 0xe8000000   0 0xe8000000 0 0x1000000 /* Port 0 MEM */
 			  0x81000000 0 0xe9000000   0 0xe9000000 0 0x10000>; /* Port 0 IO*/
 		interrupt-map-mask = <0 0 0 7>;
