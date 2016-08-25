@@ -36,6 +36,7 @@
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/clk.h>
 
 #define CP110_PM_CLOCK_GATING_REG	0x220
 #define CP110_NAND_FLASH_CLK_CTRL_REG	0x700
@@ -221,7 +222,7 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
 	/* Register the APLL which is the root of the clk tree */
 	of_property_read_string_index(np, "core-clock-output-names",
 				      CP110_CORE_APLL, &apll_name);
-	clk = clk_register_fixed_rate(NULL, apll_name, NULL, 0,
+	clk = clk_register_fixed_rate(NULL, apll_name, NULL, CLK_IS_ROOT,
 				      1000 * 1000 * 1000);
 	if (IS_ERR(clk)) {
 		ret = PTR_ERR(clk);
