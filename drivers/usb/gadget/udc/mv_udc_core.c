@@ -72,7 +72,7 @@ static const struct usb_endpoint_descriptor mv_ep0_desc = {
 	.bDescriptorType =	USB_DT_ENDPOINT,
 	.bEndpointAddress =	0,
 	.bmAttributes =		USB_ENDPOINT_XFER_CONTROL,
-	.wMaxPacketSize =	EP0_MAX_PKT_SIZE,
+	.wMaxPacketSize =	cpu_to_le16(EP0_MAX_PKT_SIZE),
 };
 
 static void ep0_reset(struct mv_udc *udc)
@@ -90,11 +90,11 @@ static void ep0_reset(struct mv_udc *udc)
 		ep->dqh = &udc->ep_dqh[i];
 
 		/* configure ep0 endpoint capabilities in dQH */
-		ep->dqh->max_packet_length =
+		ep->dqh->max_packet_length = cpu_to_le32(
 			(EP0_MAX_PKT_SIZE << EP_QUEUE_HEAD_MAX_PKT_LEN_POS)
-			| EP_QUEUE_HEAD_IOS;
+			| EP_QUEUE_HEAD_IOS);
 
-		ep->dqh->next_dtd_ptr = EP_QUEUE_HEAD_NEXT_TERMINATE;
+		ep->dqh->next_dtd_ptr = cpu_to_le32(EP_QUEUE_HEAD_NEXT_TERMINATE);
 
 		epctrlx = readl(&udc->op_regs->epctrlx[0]);
 		if (i) {	/* TX */
@@ -146,16 +146,16 @@ static int process_ep_req(struct mv_udc *udc, int index,
 	actual = curr_req->req.length;
 
 	for (i = 0; i < curr_req->dtd_count; i++) {
-		if (curr_dtd->size_ioc_sts & DTD_STATUS_ACTIVE) {
+		if (le32_to_cpu(curr_dtd->size_ioc_sts) & DTD_STATUS_ACTIVE) {
 			dev_dbg(&udc->dev->dev, "%s, dTD not completed\n",
 				udc->eps[index].name);
 			return 1;
 		}
 
-		errors = curr_dtd->size_ioc_sts & DTD_ERROR_MASK;
+		errors = le32_to_cpu(curr_dtd->size_ioc_sts) & DTD_ERROR_MASK;
 		if (!errors) {
 			remaining_length =
-				(curr_dtd->size_ioc_sts	& DTD_PACKET_SIZE)
+				(le32_to_cpu(curr_dtd->size_ioc_sts)	& DTD_PACKET_SIZE)
 					>> DTD_LENGTH_BIT_POS;
 			actual -= remaining_length;
 
@@ -175,7 +175,8 @@ static int process_ep_req(struct mv_udc *udc, int index,
 				errors);
 			if (errors & DTD_STATUS_HALTED) {
 				/* Clear the errors and Halt condition */
-				curr_dqh->size_ioc_int_sts &= ~errors;
+				curr_dqh->size_ioc_int_sts =
+					cpu_to_le32(le32_to_cpu(curr_dqh->size_ioc_int_sts) & (~errors));
 				retval = -EPIPE;
 			} else if (errors & DTD_STATUS_DATA_BUFF_ERR) {
 				retval = -EPROTO;
@@ -194,8 +195,8 @@ static int process_ep_req(struct mv_udc *udc, int index,
 	else
 		bit_pos = 1 << (16 + curr_req->ep->ep_num);
 
-	while ((curr_dqh->curr_dtd_ptr == curr_dtd->td_dma)) {
-		if (curr_dtd->dtd_next == EP_QUEUE_HEAD_NEXT_TERMINATE) {
+	while ((curr_dqh->curr_dtd_ptr == cpu_to_le32(curr_dtd->td_dma))) {
+		if (curr_dtd->dtd_next == cpu_to_le32(EP_QUEUE_HEAD_NEXT_TERMINATE)) {
 			while (readl(&udc->op_regs->epstatus) & bit_pos)
 				udelay(1);
 			break;
@@ -277,7 +278,7 @@ static int queue_dtd(struct mv_ep *ep, struct mv_req *req)
 		struct mv_req *lastreq;
 		lastreq = list_entry(ep->queue.prev, struct mv_req, queue);
 		lastreq->tail->dtd_next =
-			req->head->td_dma & EP_QUEUE_HEAD_NEXT_POINTER_MASK;
+			cpu_to_le32(req->head->td_dma & EP_QUEUE_HEAD_NEXT_POINTER_MASK);
 
 		wmb();
 
@@ -325,11 +326,12 @@ static int queue_dtd(struct mv_ep *ep, struct mv_req *req)
 	}
 
 	/* Write dQH next pointer and terminate bit to 0 */
-	dqh->next_dtd_ptr = req->head->td_dma
-				& EP_QUEUE_HEAD_NEXT_POINTER_MASK;
+	dqh->next_dtd_ptr = cpu_to_le32(req->head->td_dma
+				& EP_QUEUE_HEAD_NEXT_POINTER_MASK);
 
 	/* clear active and halt bit, in case set from a previous error */
-	dqh->size_ioc_int_sts &= ~(DTD_STATUS_ACTIVE | DTD_STATUS_HALTED);
+	dqh->size_ioc_int_sts =
+		cpu_to_le32(le32_to_cpu(dqh->size_ioc_int_sts) & (~(DTD_STATUS_ACTIVE | DTD_STATUS_HALTED)));
 
 	/* Ensure that updates to the QH will occur before priming. */
 	wmb();
@@ -352,7 +354,7 @@ static struct mv_dtd *build_dtd(struct mv_req *req, unsigned *length,
 	/* how big will this transfer be? */
 	if (usb_endpoint_xfer_isoc(req->ep->ep.desc)) {
 		dqh = req->ep->dqh;
-		mult = (dqh->max_packet_length >> EP_QUEUE_HEAD_MULT_POS)
+		mult = (le32_to_cpu(dqh->max_packet_length) >> EP_QUEUE_HEAD_MULT_POS)
 				& 0x3;
 		*length = min(req->req.length - req->req.actual,
 				(unsigned)(mult * req->ep->ep.maxpacket));
@@ -402,7 +404,7 @@ static struct mv_dtd *build_dtd(struct mv_req *req, unsigned *length,
 
 	temp |= mult << 10;
 
-	dtd->size_ioc_sts = temp;
+	dtd->size_ioc_sts = cpu_to_le32(temp);
 
 	mb();
 
@@ -429,7 +431,7 @@ static int req_to_dtd(struct mv_req *req)
 			is_first = 0;
 			req->head = dtd;
 		} else {
-			last_dtd->dtd_next = dma;
+			last_dtd->dtd_next = cpu_to_le32(dma);
 			last_dtd->next_dtd_virt = dtd;
 		}
 		last_dtd = dtd;
@@ -437,8 +439,7 @@ static int req_to_dtd(struct mv_req *req)
 	} while (!is_last);
 
 	/* set terminate bit to 1 for the last dTD */
-	dtd->dtd_next = DTD_NEXT_TERMINATE;
-
+	dtd->dtd_next = cpu_to_le32(DTD_NEXT_TERMINATE);
 	req->tail = dtd;
 
 	return 0;
@@ -514,12 +515,12 @@ static int mv_ep_enable(struct usb_ep *_ep,
 	spin_lock_irqsave(&udc->lock, flags);
 	/* Get the endpoint queue head address */
 	dqh = ep->dqh;
-	dqh->max_packet_length = (max << EP_QUEUE_HEAD_MAX_PKT_LEN_POS)
+	dqh->max_packet_length = cpu_to_le32((max << EP_QUEUE_HEAD_MAX_PKT_LEN_POS)
 		| (mult << EP_QUEUE_HEAD_MULT_POS)
 		| (zlt ? EP_QUEUE_HEAD_ZLT_SEL : 0)
-		| (ios ? EP_QUEUE_HEAD_IOS : 0);
-	dqh->next_dtd_ptr = 1;
-	dqh->size_ioc_int_sts = 0;
+		| (ios ? EP_QUEUE_HEAD_IOS : 0));
+	dqh->next_dtd_ptr = cpu_to_le32(1);
+	dqh->size_ioc_int_sts = cpu_to_le32(0);
 
 	ep->ep.maxpacket = max;
 	ep->ep.desc = desc;
@@ -588,7 +589,7 @@ static int  mv_ep_disable(struct usb_ep *_ep)
 	bit_pos = 1 << ((direction == EP_DIR_OUT ? 0 : 16) + ep->ep_num);
 
 	/* Reset the max packet length and the interrupt on Setup */
-	dqh->max_packet_length = 0;
+	dqh->max_packet_length = cpu_to_le32(0);
 
 	/* Disable the endpoint for Rx or Tx and reset the endpoint type */
 	epctrlx = readl(&udc->op_regs->epctrlx[ep->ep_num]);
@@ -768,11 +769,12 @@ static void mv_prime_ep(struct mv_ep *ep, struct mv_req *req)
 	u32 bit_pos;
 
 	/* Write dQH next pointer and terminate bit to 0 */
-	dqh->next_dtd_ptr = req->head->td_dma
-		& EP_QUEUE_HEAD_NEXT_POINTER_MASK;
+	dqh->next_dtd_ptr = cpu_to_le32(req->head->td_dma
+		& EP_QUEUE_HEAD_NEXT_POINTER_MASK);
 
 	/* clear active and halt bit, in case set from a previous error */
-	dqh->size_ioc_int_sts &= ~(DTD_STATUS_ACTIVE | DTD_STATUS_HALTED);
+	dqh->size_ioc_int_sts =
+		cpu_to_le32(le32_to_cpu(dqh->size_ioc_int_sts) & (~(DTD_STATUS_ACTIVE | DTD_STATUS_HALTED)));
 
 	/* Ensure that updates to the QH will occure before priming. */
 	wmb();
@@ -836,8 +838,8 @@ static int mv_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 			struct mv_dqh *qh;
 
 			qh = ep->dqh;
-			qh->next_dtd_ptr = 1;
-			qh->size_ioc_int_sts = 0;
+			qh->next_dtd_ptr = cpu_to_le32(1);
+			qh->size_ioc_int_sts = cpu_to_le32(0);
 		}
 
 		/* The request hasn't been processed, patch up the TD chain */
@@ -847,7 +849,6 @@ static int mv_ep_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 		prev_req = list_entry(req->queue.prev, struct mv_req, queue);
 		writel(readl(&req->tail->dtd_next),
 				&prev_req->tail->dtd_next);
-
 	}
 
 	done(ep, req, -ECONNRESET);
@@ -1531,7 +1532,7 @@ static void mv_udc_testmode(struct mv_udc *udc, u16 index)
 
 static void ch9setaddress(struct mv_udc *udc, struct usb_ctrlrequest *setup)
 {
-	udc->dev_addr = (u8)setup->wValue;
+	udc->dev_addr = le16_to_cpu(setup->wValue);
 
 	/* update usb state */
 	udc->usb_state = USB_STATE_ADDRESS;
@@ -1561,8 +1562,8 @@ static void ch9getstatus(struct mv_udc *udc, u8 ep_num,
 			== USB_RECIP_ENDPOINT) {
 		u8 ep_num, direction;
 
-		ep_num = setup->wIndex & USB_ENDPOINT_NUMBER_MASK;
-		direction = (setup->wIndex & USB_ENDPOINT_DIR_MASK)
+		ep_num = le16_to_cpu(setup->wIndex) & USB_ENDPOINT_NUMBER_MASK;
+		direction = (le16_to_cpu(setup->wIndex) & USB_ENDPOINT_DIR_MASK)
 				? EP_DIR_IN : EP_DIR_OUT;
 		status = ep_is_stall(udc, ep_num, direction)
 				<< USB_ENDPOINT_HALT;
@@ -1583,7 +1584,7 @@ static void ch9clearfeature(struct mv_udc *udc, struct usb_ctrlrequest *setup)
 
 	if ((setup->bRequestType & (USB_TYPE_MASK | USB_RECIP_MASK))
 		== ((USB_TYPE_STANDARD | USB_RECIP_DEVICE))) {
-		switch (setup->wValue) {
+		switch (le16_to_cpu(setup->wValue)) {
 		case USB_DEVICE_REMOTE_WAKEUP:
 			udc->remote_wakeup = 0;
 			break;
@@ -1592,12 +1593,12 @@ static void ch9clearfeature(struct mv_udc *udc, struct usb_ctrlrequest *setup)
 		}
 	} else if ((setup->bRequestType & (USB_TYPE_MASK | USB_RECIP_MASK))
 		== ((USB_TYPE_STANDARD | USB_RECIP_ENDPOINT))) {
-		switch (setup->wValue) {
+		switch (le16_to_cpu(setup->wValue)) {
 		case USB_ENDPOINT_HALT:
-			ep_num = setup->wIndex & USB_ENDPOINT_NUMBER_MASK;
-			direction = (setup->wIndex & USB_ENDPOINT_DIR_MASK)
+			ep_num = le16_to_cpu(setup->wIndex) & USB_ENDPOINT_NUMBER_MASK;
+			direction = (le16_to_cpu(setup->wIndex) & USB_ENDPOINT_DIR_MASK)
 				? EP_DIR_IN : EP_DIR_OUT;
-			if (setup->wValue != 0 || setup->wLength != 0
+			if (le16_to_cpu(setup->wValue) != 0 || le16_to_cpu(setup->wLength) != 0
 				|| ep_num > udc->max_eps)
 				goto out;
 			ep = &udc->eps[ep_num * 2 + direction];
@@ -1626,12 +1627,12 @@ static void ch9setfeature(struct mv_udc *udc, struct usb_ctrlrequest *setup)
 
 	if ((setup->bRequestType & (USB_TYPE_MASK | USB_RECIP_MASK))
 		== ((USB_TYPE_STANDARD | USB_RECIP_DEVICE))) {
-		switch (setup->wValue) {
+		switch (le16_to_cpu(setup->wValue)) {
 		case USB_DEVICE_REMOTE_WAKEUP:
 			udc->remote_wakeup = 1;
 			break;
 		case USB_DEVICE_TEST_MODE:
-			if (setup->wIndex & 0xFF
+			if (le16_to_cpu(setup->wIndex) & 0xFF
 				||  udc->gadget.speed != USB_SPEED_HIGH)
 				ep0_stall(udc);
 
@@ -1640,19 +1641,19 @@ static void ch9setfeature(struct mv_udc *udc, struct usb_ctrlrequest *setup)
 				&& udc->usb_state != USB_STATE_DEFAULT)
 				ep0_stall(udc);
 
-			mv_udc_testmode(udc, (setup->wIndex >> 8));
+			mv_udc_testmode(udc, (le16_to_cpu(setup->wIndex) >> 8));
 			goto out;
 		default:
 			goto out;
 		}
 	} else if ((setup->bRequestType & (USB_TYPE_MASK | USB_RECIP_MASK))
 		== ((USB_TYPE_STANDARD | USB_RECIP_ENDPOINT))) {
-		switch (setup->wValue) {
+		switch (le16_to_cpu(setup->wValue)) {
 		case USB_ENDPOINT_HALT:
-			ep_num = setup->wIndex & USB_ENDPOINT_NUMBER_MASK;
-			direction = (setup->wIndex & USB_ENDPOINT_DIR_MASK)
+			ep_num = le16_to_cpu(setup->wIndex) & USB_ENDPOINT_NUMBER_MASK;
+			direction = (le16_to_cpu(setup->wIndex) & USB_ENDPOINT_DIR_MASK)
 				? EP_DIR_IN : EP_DIR_OUT;
-			if (setup->wValue != 0 || setup->wLength != 0
+			if (le16_to_cpu(setup->wValue) != 0 || le16_to_cpu(setup->wLength) != 0
 				|| ep_num > udc->max_eps)
 				goto out;
 			spin_unlock(&udc->lock);
@@ -1711,7 +1712,7 @@ static void handle_setup_packet(struct mv_udc *udc, u8 ep_num,
 	/* delegate USB standard requests to the gadget driver */
 	if (delegate == true) {
 		/* USB requests handled by gadget */
-		if (setup->wLength) {
+		if (le16_to_cpu(setup->wLength)) {
 			/* DATA phase from gadget, STATUS phase from udc */
 			udc->ep0_dir = (setup->bRequestType & USB_DIR_IN)
 					?  EP_DIR_IN : EP_DIR_OUT;
@@ -2026,6 +2027,7 @@ static irqreturn_t mv_udc_irq(int irq, void *dev)
 
 	status = readl(&udc->op_regs->usbsts);
 	intr = readl(&udc->op_regs->usbintr);
+
 	status &= intr;
 
 	if (status == 0) {
