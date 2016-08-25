@@ -84,7 +84,6 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	struct clk              *clk;
 	int			ret;
 	int			irq;
-	int			i;
 
 	if (usb_disabled())
 		return -ENODEV;
@@ -124,20 +123,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	hcd->rsrc_start = res->start;
 	hcd->rsrc_len = resource_size(res);
 
-	xhci = hcd_to_xhci(hcd);
-
 	/*
 	 * Not all platforms have a clk so it is not an error if the
 	 * clock does not exists.
 	 */
-	for (i = 0; i < MAX_XHCI_CLOCKS; i++) {
-		clk = of_clk_get(pdev->dev.of_node, i);
-		if (!IS_ERR(clk)) {
-			ret = clk_prepare_enable(clk);
-			if (ret)
-				goto disable_clk;
-			xhci->clk[i] = clk;
-		}
+	clk = devm_clk_get(&pdev->dev, NULL);
+	if (!IS_ERR(clk)) {
+		ret = clk_prepare_enable(clk);
+		if (ret)
+			goto put_hcd;
+	} else if (PTR_ERR(clk) == -EPROBE_DEFER) {
+		ret = -EPROBE_DEFER;
+		goto put_hcd;
 	}
 
 	if (of_device_is_compatible(pdev->dev.of_node,
@@ -151,6 +148,8 @@ static int xhci_plat_probe(struct platform_device *pdev)
 
 	device_wakeup_enable(hcd->self.controller);
 
+	xhci = hcd_to_xhci(hcd);
+	xhci->clk = clk;
 	xhci->main_hcd = hcd;
 	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
 			dev_name(&pdev->dev), hcd);
@@ -199,10 +198,8 @@ put_usb3_hcd:
 	usb_put_hcd(xhci->shared_hcd);
 
 disable_clk:
-	for (i = 0; i < MAX_XHCI_CLOCKS; i++) {
-		if (!IS_ERR(xhci->clk[i]))
-			clk_disable_unprepare(xhci->clk[i]);
-	}
+	if (!IS_ERR(clk))
+		clk_disable_unprepare(clk);
 
 put_hcd:
 	usb_put_hcd(hcd);
@@ -214,7 +211,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 {
 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-	int i;
+	struct clk *clk = xhci->clk;
 
 	xhci->xhc_state |= XHCI_STATE_REMOVING;
 
@@ -224,11 +221,8 @@ static int xhci_plat_remove(struct platform_device *dev)
 	usb_remove_hcd(hcd);
 	usb_put_hcd(xhci->shared_hcd);
 
-	for (i = 0; i < MAX_XHCI_CLOCKS; i++) {
-		if (!IS_ERR(xhci->clk[i]))
-			clk_disable_unprepare(xhci->clk[i]);
-	}
-
+	if (!IS_ERR(clk))
+		clk_disable_unprepare(clk);
 	usb_put_hcd(hcd);
 
 	return 0;
