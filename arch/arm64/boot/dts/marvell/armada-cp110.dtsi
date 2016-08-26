@@ -373,6 +373,17 @@ ppv22@000000 {
 		status = "disabled";
 	};
 };
+
+cpm_trng: trng@760000 {
+	compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
+	reg = <0x760000 0x7D>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&cpm_syscon0 1 25>;
+	status = "okay";
+};
+
 eip197: eip197@800000 {
 	compatible = "marvell,eip197";
 	reg = <0x800000 0x200000>;
