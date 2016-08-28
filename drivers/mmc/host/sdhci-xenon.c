@@ -495,7 +495,6 @@ static int sdhci_xenon_probe(struct platform_device *pdev)
 {
 	struct sdhci_pltfm_host *pltfm_host;
 	struct sdhci_host *host;
-	struct clk *clk, *axi_clk;
 	struct sdhci_xenon_priv *priv;
 	int err;
 
@@ -513,25 +512,31 @@ static int sdhci_xenon_probe(struct platform_device *pdev)
 	 */
 	xenon_replace_mmc_host_ops(host);
 
-	clk = devm_clk_get(&pdev->dev, "core");
-	if (IS_ERR(clk)) {
+	pltfm_host->clk = devm_clk_get(&pdev->dev, "core");
+	if (!IS_ERR(pltfm_host->clk)) {
+		err = clk_prepare_enable(pltfm_host->clk);
+		if (err)
+			goto free_pltfm;
+	} else if (PTR_ERR(pltfm_host->clk) == -EPROBE_DEFER) {
+		err = -EPROBE_DEFER;
+		goto free_pltfm;
+	} else {
 		pr_err("%s: Failed to setup input clk.\n",
 			mmc_hostname(host->mmc));
-		err = PTR_ERR(clk);
+		err = PTR_ERR(pltfm_host->clk);
 		goto free_pltfm;
 	}
-	clk_prepare_enable(clk);
-	pltfm_host->clk = clk;
 
 	/*
 	 * Some SOCs require additional clock to
 	 * manage AXI bus clock.
 	 * It is optional.
 	 */
-	axi_clk = devm_clk_get(&pdev->dev, "axi");
-	if (!IS_ERR(axi_clk)) {
-		clk_prepare_enable(axi_clk);
-		priv->axi_clk = axi_clk;
+	priv->axi_clk = devm_clk_get(&pdev->dev, "axi");
+	if (!IS_ERR(priv->axi_clk)) {
+		err = clk_prepare_enable(priv->axi_clk);
+		if (err)
+			goto err_clk;
 	}
 
 	err = xenon_probe_dt(pdev);
@@ -560,9 +565,10 @@ static int sdhci_xenon_probe(struct platform_device *pdev)
 remove_slot:
 	xenon_slot_remove(host);
 err_clk:
-	clk_disable_unprepare(pltfm_host->clk);
-	if (!IS_ERR(axi_clk))
-		clk_disable_unprepare(axi_clk);
+	if (!IS_ERR(pltfm_host->clk))
+		clk_disable_unprepare(pltfm_host->clk);
+	if (!IS_ERR(priv->axi_clk))
+		clk_disable_unprepare(priv->axi_clk);
 free_pltfm:
 	sdhci_pltfm_free(pdev);
 	return err;
