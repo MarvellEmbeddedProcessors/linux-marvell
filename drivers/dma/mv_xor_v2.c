@@ -771,20 +771,22 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, xor_dev);
 
-	xor_dev->clk = devm_clk_get(dev, NULL);
+	xor_dev->clk = devm_clk_get(&pdev->dev, NULL);
 	if (!IS_ERR(xor_dev->clk)) {
 		ret = clk_prepare_enable(xor_dev->clk);
-		if (ret) {
-			dev_err(dev, "Failed to enable XOR clock.\n");
-			devm_clk_put(dev, xor_dev->clk);
+		if (ret)
 			return ret;
-		}
+	} else if (PTR_ERR(xor_dev->clk) == -EPROBE_DEFER) {
+		return -EPROBE_DEFER;
+	} else {
+		dev_err(dev, "Failed to enable XOR clock.\n");
+		return PTR_ERR(xor_dev->clk);
 	}
 
 	ret = platform_msi_domain_alloc_irqs(&pdev->dev, 1,
 					     mv_xor_v2_set_msi_msg);
 	if (ret)
-		return ret;
+		goto disable_clk;
 
 	msi_desc = first_msi_entry(&pdev->dev);
 	if (!msi_desc)
@@ -883,6 +885,9 @@ free_hw_desq:
 			  xor_dev->hw_desq_virt, xor_dev->hw_desq);
 free_msi_irqs:
 	platform_msi_domain_free_irqs(&pdev->dev);
+disable_clk:
+	if (!IS_ERR(xor_dev->clk))
+		clk_disable_unprepare(xor_dev->clk);
 	return ret;
 }
 
