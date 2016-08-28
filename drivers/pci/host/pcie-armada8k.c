@@ -289,8 +289,6 @@ fail_free:
 	if (!IS_ERR(armada8k_pcie->clk))
 		clk_disable_unprepare(armada8k_pcie->clk);
 
-	devm_kfree(dev, armada8k_pcie);
-
 	return ret;
 }
 
