@@ -86,9 +86,6 @@
 /* descriptors queue size */
 #define MV_XOR_V2_MAX_DESC_NUM	1024
 
-/* Maximum number of XOR engine gating clocks. */
-#define MAX_A8K_XOR_CLOCKS	4
-
 /**
  * struct mv_xor_v2_descriptor - DMA HW descriptor
  * @desc_id: used by S/W and is not affected by H/W.
@@ -151,7 +148,7 @@ struct mv_xor_v2_device {
 	spinlock_t push_lock;
 	void __iomem *dma_base;
 	void __iomem *glob_base;
-	struct clk *clk[MAX_A8K_XOR_CLOCKS];
+	struct clk *clk;
 	struct tasklet_struct irq_tasklet;
 	struct list_head free_sw_desc;
 	struct dma_device dmadev;
@@ -755,7 +752,6 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	struct mv_xor_v2_sw_desc *sw_desc;
 	struct msi_desc *msi_desc;
 	struct device *dev = &pdev->dev;
-	struct clk *clk;
 
 	dev_notice(&pdev->dev, "Marvell Version 2 XOR driver\n");
 
@@ -775,16 +771,13 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, xor_dev);
 
-	/* Optionaly enable clocks */
-	for (i = 0; i < MAX_A8K_XOR_CLOCKS; i++) {
-		clk = of_clk_get(dev->of_node, i);
-		if (!IS_ERR(clk)) {
-			if (clk_prepare_enable(clk)) {
-				dev_err(dev, "Failed to enable clock %d for XOR engine.\n", i);
-				devm_clk_put(dev, clk);
-				goto free_clocks;
-			}
-			xor_dev->clk[i] = clk;
+	xor_dev->clk = devm_clk_get(dev, NULL);
+	if (!IS_ERR(xor_dev->clk)) {
+		ret = clk_prepare_enable(xor_dev->clk);
+		if (ret) {
+			dev_err(dev, "Failed to enable XOR clock.\n");
+			devm_clk_put(dev, xor_dev->clk);
+			return ret;
 		}
 	}
 
@@ -890,15 +883,6 @@ free_hw_desq:
 			  xor_dev->hw_desq_virt, xor_dev->hw_desq);
 free_msi_irqs:
 	platform_msi_domain_free_irqs(&pdev->dev);
-
-free_clocks:
-	for (i = 0; i < MAX_A8K_XOR_CLOCKS; i++) {
-		if (xor_dev->clk[i]) {
-			clk_disable_unprepare(xor_dev->clk[i]);
-			devm_clk_put(dev, xor_dev->clk[i]);
-		}
-	}
-
 	return ret;
 }
 
