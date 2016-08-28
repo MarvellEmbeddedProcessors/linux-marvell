@@ -25,12 +25,10 @@
 
 #include "pcie-designware.h"
 
-#define MAX_A8K_PCIE_CLOCKS	2
-
 struct armada8k_pcie {
 	void __iomem		*regs_base;
 	struct phy		*phy;
-	struct clk		*clk[MAX_A8K_PCIE_CLOCKS];
+	struct clk		*clk;
 	struct pcie_port	pp;
 };
 
@@ -235,12 +233,17 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	struct pcie_port *pp;
 	struct device *dev = &pdev->dev;
 	struct resource *base;
-	struct clk *clk;
-	int ret = 0, i;
+	int ret = 0;
 
 	armada8k_pcie = devm_kzalloc(dev, sizeof(*armada8k_pcie), GFP_KERNEL);
 	if (!armada8k_pcie)
 		return -ENOMEM;
+
+	armada8k_pcie->clk = devm_clk_get(dev, NULL);
+	if (IS_ERR(armada8k_pcie->clk))
+		return PTR_ERR(armada8k_pcie->clk);
+
+	clk_prepare_enable(armada8k_pcie->clk);
 
 #if 0
 	/* Keep this code commented out till we write a PHY driver for
@@ -258,19 +261,6 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 
 	phy_init(armada8k_pcie->phy);
 #endif
-
-	/* Optionaly enable clocks */
-	for (i = 0; i < MAX_A8K_PCIE_CLOCKS; i++) {
-		clk = of_clk_get(dev->of_node, i);
-		if (!IS_ERR(clk)) {
-			if (clk_prepare_enable(clk)) {
-				dev_err(dev, "couldn't enable clk %d for pcie port\n", i);
-				devm_clk_put(dev, clk);
-				goto fail_free;
-			}
-			armada8k_pcie->clk[i] = clk;
-		}
-	}
 
 	pp = &armada8k_pcie->pp;
 
@@ -296,12 +286,8 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	return 0;
 
 fail_free:
-	for (i = 0; i < MAX_A8K_PCIE_CLOCKS; i++) {
-		if (armada8k_pcie->clk[i]) {
-			clk_disable_unprepare(armada8k_pcie->clk[i]);
-			devm_clk_put(dev, armada8k_pcie->clk[i]);
-		}
-	}
+	if (!IS_ERR(armada8k_pcie->clk))
+		clk_disable_unprepare(armada8k_pcie->clk);
 
 	devm_kfree(dev, armada8k_pcie);
 
