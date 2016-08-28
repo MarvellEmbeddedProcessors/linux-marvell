@@ -1776,13 +1776,16 @@ static int alloc_nand_resource(struct platform_device *pdev)
 	spin_lock_init(&chip->controller->lock);
 	init_waitqueue_head(&chip->controller->wq);
 	info->clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(info->clk)) {
+	if (!IS_ERR(info->clk)) {
+		ret = clk_prepare_enable(info->clk);
+		if (ret < 0)
+			return ret;
+	} else if (PTR_ERR(info->clk) == -EPROBE_DEFER) {
+		return -EPROBE_DEFER;
+	} else {
 		dev_err(&pdev->dev, "failed to get nand clock\n");
 		return PTR_ERR(info->clk);
 	}
-	ret = clk_prepare_enable(info->clk);
-	if (ret < 0)
-		return ret;
 
 	if (use_dma) {
 		r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
