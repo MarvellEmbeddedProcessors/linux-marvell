@@ -4586,7 +4586,8 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	err = mv_pp2x_platform_data_get(pdev, priv, &cell_index, &port_count);
 	if (err) {
-		dev_err(&pdev->dev, "mvpp2: platform_data get failed\n");
+		if (err != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "mvpp2: platform_data get failed\n");
 		goto err_clk;
 	}
 	priv->pp2_version = priv->pp2xdata->pp2x_ver;
