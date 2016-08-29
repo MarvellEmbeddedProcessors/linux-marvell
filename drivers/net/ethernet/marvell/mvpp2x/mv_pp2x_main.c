@@ -2156,6 +2156,8 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 
 			if (netmap_rx_irq(port->dev, 0, &netmap_done))
 				return netmap_done;
+		/* Netmap implementation includes all queues in i/f.*/
+		return 1;
 		}
 #endif /* DEV_NETMAP */
 
