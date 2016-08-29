@@ -87,13 +87,13 @@ config MV_PP3_RXQ_SIZE
 
 config  MV_PP3_TXQ_NUM
 	int "Number of TX VQs for NIC devices"
-        default 2
+        default 1
         ---help---
 	Number of virtual TXQs for each NIC network interface
 
 config  MV_PP3_GNSS_TXQ_NUM
 	int "Number of TX VQs for NSS devices"
-        default 2
+        default 1
         ---help---
 	Number of virtual TXQs for each NSS network interface
 
