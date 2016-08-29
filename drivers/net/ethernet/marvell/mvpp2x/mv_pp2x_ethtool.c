@@ -683,21 +683,117 @@ static u32 mv_pp2x_ethtool_get_rxfh_indir_size(struct net_device *dev)
 	return ARRAY_SIZE(port->priv->rx_indir_table);
 }
 
+static int mv_pp2x_get_rss_hash_opts(struct mv_pp2x_port *port,
+				     struct ethtool_rxnfc *nfc)
+{
+	switch (nfc->flow_type) {
+	case TCP_V4_FLOW:
+	case TCP_V6_FLOW:
+		nfc->data |= RXH_IP_SRC | RXH_IP_DST;
+		nfc->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		break;
+	case UDP_V4_FLOW:
+	case UDP_V6_FLOW:
+		nfc->data |= RXH_IP_SRC | RXH_IP_DST;
+		if (port->priv->pp2_cfg.rss_cfg.rss_mode == MVPP2_RSS_NF_UDP_5T)
+			nfc->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		break;
+	case IPV4_FLOW:
+	case IPV6_FLOW:
+		nfc->data |= RXH_IP_SRC | RXH_IP_DST;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return 0;
+}
+
 static int mv_pp2x_ethtool_get_rxnfc(struct net_device *dev,
-				     struct ethtool_rxnfc *info,
+				     struct ethtool_rxnfc *cmd,
 				     u32 *rules)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
+	int ret = -EOPNOTSUPP;
 
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -EOPNOTSUPP;
 
-	if (info->cmd == ETHTOOL_GRXRINGS) {
-		if (port)
-			info->data = ARRAY_SIZE(port->priv->rx_indir_table);
+	if (!port)
+		return -EIO;
+
+	switch (cmd->cmd) {
+	case ETHTOOL_GRXRINGS:
+			cmd->data = ARRAY_SIZE(port->priv->rx_indir_table);
+			ret = 0;
+			break;
+	case ETHTOOL_GRXFH:
+			ret = mv_pp2x_get_rss_hash_opts(port, cmd);
+			break;
+	default:
+			break;
+	}
+
+	return ret;
+}
+
+static int mv_pp2x_set_rss_hash_opt(struct mv_pp2x_port *port,
+				struct ethtool_rxnfc *nfc)
+{
+	if (nfc->data & ~(RXH_IP_SRC | RXH_IP_DST |
+			  RXH_L4_B_0_1 | RXH_L4_B_2_3))
+		return -EINVAL;
+
+	switch (nfc->flow_type) {
+	case TCP_V4_FLOW:
+	case TCP_V6_FLOW:
+		if (!(nfc->data & RXH_IP_SRC) ||
+		    !(nfc->data & RXH_IP_DST) ||
+		    !(nfc->data & RXH_L4_B_0_1) ||
+		    !(nfc->data & RXH_L4_B_2_3))
+			return -EINVAL;
+		break;
+	case UDP_V4_FLOW:
+	case UDP_V6_FLOW:
+		if (!(nfc->data & RXH_IP_SRC) ||
+		    !(nfc->data & RXH_IP_DST))
+			return -EINVAL;
+		switch (nfc->data & (RXH_L4_B_0_1 | RXH_L4_B_2_3)) {
+		case 0:
+			mv_pp22_rss_mode_set(port, MVPP2_RSS_NF_UDP_2T);
+			break;
+		case (RXH_L4_B_0_1 | RXH_L4_B_2_3):
+			mv_pp22_rss_mode_set(port, MVPP2_RSS_NF_UDP_5T);
+			break;
+		default:
+			return -EINVAL;
+		}
+		break;
+	default:
+		return -EINVAL;
 	}
 	return 0;
 }
+
+static int mv_pp2x_ethtool_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	int ret = -EOPNOTSUPP;
+
+	/* Single mode doesn't support RSS features */
+	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+		return -EOPNOTSUPP;
+
+	switch (cmd->cmd) {
+	case ETHTOOL_SRXFH:
+		ret =  mv_pp2x_set_rss_hash_opt(port, cmd);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
 
 static int mv_pp2x_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 				    u8 *hfunc)
@@ -967,6 +1063,7 @@ static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.set_pauseparam		= mv_pp2x_set_pauseparam,
 	.get_rxfh_indir_size	= mv_pp2x_ethtool_get_rxfh_indir_size,
 	.get_rxnfc		= mv_pp2x_ethtool_get_rxnfc,
+	.set_rxnfc		= mv_pp2x_ethtool_set_rxnfc,
 	.get_rxfh		= mv_pp2x_ethtool_get_rxfh,
 	.set_rxfh		= mv_pp2x_ethtool_set_rxfh,
 	.get_regs_len           = mv_pp2x_ethtool_get_regs_len,
