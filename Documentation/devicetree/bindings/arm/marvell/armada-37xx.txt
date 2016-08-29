@@ -11,6 +11,20 @@ following property before the previous one:
 
  - compatible: must contain "marvell,armada3720"
 
+Soc:
+   - "marvell,armada3710"
+      when the SoC being used is the Armada 3710
+
+   - "marvell,armada3720"
+      when the SoC being used is the Armada 3720
+
+Boards:
+   - "marvell,armada-3720-db"
+      when the board being used is the Armada 3720 Development board
+
+   - "marvell,armada-3720-community"
+      when the board being used is the Armada 3720 Community board
+
 Example:
 
-compatible = "marvell,armada-3720-db", "marvell,armada3710", "marvell,armada3720";
+compatible = "marvell,armada-3720-db", "marvell,armada3720";
