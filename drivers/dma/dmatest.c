@@ -21,6 +21,7 @@
 #include <linux/random.h>
 #include <linux/slab.h>
 #include <linux/wait.h>
+#include <linux/raid/xor.h>
 
 static unsigned int test_buf_size = 16384;
 module_param(test_buf_size, uint, S_IRUGO | S_IWUSR);
@@ -77,6 +78,24 @@ MODULE_PARM_DESC(verbose, "Enable \"success\" result messages (default: off)");
 static unsigned int caps_mask = 0x7;
 module_param(caps_mask, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(caps_mask, "Mask of required DMA capabilities to be tested. COPY=0x1, XOR=0x2, PQ=0x4  (default: 0x7 [all])");
+
+static bool performance;
+module_param(performance, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(performance, "Run in performance measurement mode (default: off)");
+
+static int outstanding_req = 1;
+module_param(outstanding_req, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(outstanding_req, "Number of outstanding requests to send to engine (default: 1).");
+
+static bool sw_mode;
+module_param(sw_mode, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(sw_mode, "Execute memory operation by software, instead of using the DMA engine (default: off)");
+
+static bool cached_src;
+module_param(cached_src, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(cached_src, "Use the same source buffer for all operations (default: off)");
+
+static int buf_pool_size = (4 << 20); /* 4MB */
 
 /**
  * struct dmatest_params - test parameters.
@@ -330,9 +349,12 @@ static void dmatest_callback(void *arg)
 {
 	struct dmatest_done *done = arg;
 
-	done->done = true;
-	wake_up_all(done->wait);
+	if (done) {
+		done->done = true;
+		wake_up_all(done->wait);
+	}
 }
+
 
 static unsigned int min_odd(unsigned int x, unsigned int y)
 {
@@ -385,6 +407,280 @@ static unsigned long long dmatest_KBs(s64 runtime, unsigned long long len)
 {
 	return dmatest_persec(runtime, len >> 10);
 }
+
+static int dmatest_perf_func(void *data)
+{
+	struct dmatest_thread	*thread = data;
+	struct dmatest_info	*info;
+	struct dmatest_params	*params;
+	struct dma_chan		*chan;
+	struct dma_device	*dev;
+	unsigned int		failed_tests = 0;
+	unsigned int		total_tests = 0;
+	unsigned int		outs_push = 0, outs_pop = 0;
+	dma_cookie_t		*cookie;
+	enum dma_status		status;
+	enum dma_ctrl_flags	flags;
+	u8			*pq_coefs = NULL;
+	int			ret;
+	int			src_cnt;
+	int			dst_cnt;
+	int			i;
+	ktime_t			ktime;
+	s64			runtime = 0;
+	unsigned long long	total_len = 0;
+	void			*buf_pool_addr, *buf_pool_ptr;
+
+	set_freezable();
+
+	ret = -ENOMEM;
+
+	smp_rmb();
+	info = thread->info;
+	params = &info->params;
+	chan = thread->chan;
+	dev = chan->device;
+	if (thread->type == DMA_MEMCPY)
+		src_cnt = dst_cnt = 1;
+	else if (thread->type == DMA_XOR) {
+		/* force odd to ensure dst = src */
+		src_cnt = min_odd(params->xor_sources | 1, dev->max_xor);
+		dst_cnt = 1;
+	} else if (thread->type == DMA_PQ) {
+		/* force odd to ensure dst = src */
+		src_cnt = min_odd(params->pq_sources | 1, dma_maxpq(dev, 0));
+		dst_cnt = 2;
+
+		pq_coefs = kmalloc(params->pq_sources+1, GFP_KERNEL);
+		if (!pq_coefs)
+			goto err_thread_type;
+
+		for (i = 0; i < src_cnt; i++)
+			pq_coefs[i] = 1;
+	} else
+		goto err_thread_type;
+
+	cookie = kcalloc(outstanding_req, sizeof(dma_cookie_t), GFP_KERNEL);
+	if (!cookie)
+		goto err_thread_type;
+
+	buf_pool_ptr = buf_pool_addr = kmalloc(buf_pool_size, GFP_KERNEL);
+	if (!buf_pool_addr)
+		goto err_bufpool;
+
+	thread->srcs = kcalloc(src_cnt+1, sizeof(u8 *), GFP_KERNEL);
+	if (!thread->srcs)
+		goto err_srcs;
+
+	thread->dsts = kcalloc(dst_cnt+1, sizeof(u8 *), GFP_KERNEL);
+	if (!thread->dsts)
+		goto err_dsts;
+
+	set_user_nice(current, 10);
+
+	/*
+	 * src and dst buffers are freed by ourselves below
+	 */
+	flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
+
+	ktime = ktime_get();
+	while (!kthread_should_stop()
+	       && !(params->iterations && total_tests >= params->iterations)) {
+		struct dma_async_tx_descriptor *tx = NULL;
+		struct dmaengine_unmap_data *um;
+		dma_addr_t srcs[src_cnt];
+		dma_addr_t *dsts;
+		unsigned int src_off = 0, dst_off = 0, len;
+		u8 align = 0;
+
+		total_tests++;
+
+		/* honor alignment restrictions */
+		if (thread->type == DMA_MEMCPY)
+			align = dev->copy_align;
+		else if (thread->type == DMA_XOR)
+			align = dev->xor_align;
+
+		if (1 << align > params->buf_size) {
+			pr_err("%u-byte buffer too small for %d-byte alignment\n",
+			       params->buf_size, 1 << align);
+			break;
+		}
+
+		len = params->buf_size;
+
+		len = (len >> align) << align;
+		if (!len)
+			len = 1 << align;
+
+		total_len += len;
+
+		if ((cached_src == false) || (total_tests == 1)) {
+			for (i = 0; i < src_cnt; i++) {
+				thread->srcs[i] = buf_pool_ptr;
+				buf_pool_ptr += params->buf_size;
+				if ((buf_pool_ptr - buf_pool_addr) >= buf_pool_size)
+					buf_pool_ptr = buf_pool_addr;
+			}
+		}
+
+		for (i = 0; i < dst_cnt; i++) {
+			thread->dsts[i] = buf_pool_ptr;
+			buf_pool_ptr += params->buf_size;
+			if ((buf_pool_ptr - buf_pool_addr) >= buf_pool_size)
+				buf_pool_ptr = buf_pool_addr;
+		}
+
+		if (sw_mode) {
+			if (thread->type == DMA_MEMCPY)
+				memcpy(thread->dsts[0], thread->srcs[0], len);
+			else if (thread->type == DMA_XOR)
+				xor_blocks(src_cnt, len, thread->dsts[0], (void **)thread->srcs);
+			continue;
+		}
+
+		um = dmaengine_get_unmap_data(dev->dev, src_cnt+dst_cnt,
+					      GFP_KERNEL);
+		if (!um) {
+			failed_tests++;
+			result("unmap data NULL", total_tests,
+			       src_off, dst_off, len, ret);
+			continue;
+		}
+
+		um->len = params->buf_size;
+		for (i = 0; i < src_cnt; i++) {
+			void *buf = thread->srcs[i];
+			struct page *pg = virt_to_page(buf);
+			unsigned pg_off = (unsigned long) buf & ~PAGE_MASK;
+
+			um->addr[i] = dma_map_page(dev->dev, pg, pg_off,
+						   um->len, DMA_TO_DEVICE);
+			srcs[i] = um->addr[i] + src_off;
+			ret = dma_mapping_error(dev->dev, um->addr[i]);
+			if (ret) {
+				dmaengine_unmap_put(um);
+				result("src mapping error", total_tests,
+				       src_off, dst_off, len, ret);
+				failed_tests++;
+				continue;
+			}
+			um->to_cnt++;
+		}
+
+		/* map with DMA_BIDIRECTIONAL to force writeback/invalidate */
+		dsts = &um->addr[src_cnt];
+		for (i = 0; i < dst_cnt; i++) {
+			void *buf = thread->dsts[i];
+			struct page *pg = virt_to_page(buf);
+			unsigned pg_off = (unsigned long) buf & ~PAGE_MASK;
+
+			dsts[i] = dma_map_page(dev->dev, pg, pg_off, um->len,
+					       DMA_BIDIRECTIONAL);
+			ret = dma_mapping_error(dev->dev, dsts[i]);
+			if (ret) {
+				dmaengine_unmap_put(um);
+				result("dst mapping error", total_tests,
+				       src_off, dst_off, len, ret);
+				failed_tests++;
+				continue;
+			}
+			um->bidi_cnt++;
+		}
+
+		if (thread->type == DMA_MEMCPY)
+			tx = dev->device_prep_dma_memcpy(chan,
+							 dsts[0] + dst_off,
+							 srcs[0], len, flags);
+		else if (thread->type == DMA_XOR)
+			tx = dev->device_prep_dma_xor(chan,
+						      dsts[0] + dst_off,
+						      srcs, src_cnt,
+						      len, flags);
+		else if (thread->type == DMA_PQ) {
+			dma_addr_t dma_pq[dst_cnt];
+
+			for (i = 0; i < dst_cnt; i++)
+				dma_pq[i] = dsts[i] + dst_off;
+			tx = dev->device_prep_dma_pq(chan, dma_pq, srcs,
+						     src_cnt, pq_coefs,
+						     len, flags);
+		}
+
+		if (!tx) {
+			dmaengine_unmap_put(um);
+			result("prep error", total_tests, src_off,
+			       dst_off, len, ret);
+			msleep(100);
+			failed_tests++;
+			continue;
+		}
+
+		tx->callback = dmatest_callback;
+		tx->callback_param = NULL;
+		cookie[outs_push] = tx->tx_submit(tx);
+
+		if (dma_submit_error(cookie[outs_push])) {
+			dmaengine_unmap_put(um);
+			result("submit error", total_tests, src_off,
+			       dst_off, len, ret);
+			msleep(100);
+			failed_tests++;
+			continue;
+		}
+		dma_async_issue_pending(chan);
+
+		outs_push = (outs_push + 1) % outstanding_req;
+		while (1) {
+			status = dma_async_is_tx_complete(chan, cookie[outs_pop], NULL, NULL);
+			if (status != DMA_COMPLETE) {
+				if ((outs_push == outs_pop) || (total_tests == params->iterations))
+					continue;
+				break;
+			}
+			outs_pop = (outs_pop + 1) % outstanding_req;
+			if (outs_pop == outs_push)
+				break;
+		}
+
+		if (status == DMA_ERROR) {
+			pr_err("DMA Error was reported.\n");
+			failed_tests++;
+			continue;
+		}
+
+		dmaengine_unmap_put(um);
+
+		verbose_result("test passed", total_tests, src_off,
+			       dst_off, len, 0);
+	}
+	runtime = ktime_us_delta(ktime_get(), ktime);
+
+	ret = 0;
+
+	kfree(thread->dsts);
+err_dsts:
+	kfree(thread->srcs);
+err_srcs:
+	kfree(buf_pool_ptr);
+err_bufpool:
+	kfree(cookie);
+err_thread_type:
+	pr_info("%s: summary %u tests, %u failures %llu iops %llu KB/s (%d)\n",
+		current->comm, total_tests, failed_tests,
+		dmatest_persec(runtime, total_tests),
+		dmatest_KBs(runtime, total_len), ret);
+
+	/* terminate all transfers on specified channels */
+	if (ret)
+		dmaengine_terminate_all(chan);
+
+	thread->done = true;
+	wake_up(&thread_wait);
+
+	return ret;
+}
+
 
 /*
  * This function repeatedly tests DMA transfers of various lengths and
@@ -770,8 +1066,12 @@ static int dmatest_add_threads(struct dmatest_info *info,
 		thread->chan = dtc->chan;
 		thread->type = type;
 		smp_wmb();
-		thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
-				dma_chan_name(chan), op, i);
+		if (performance)
+			thread->task = kthread_create(dmatest_perf_func, thread, "%s-%s%u",
+					dma_chan_name(chan), op, i);
+		else
+			thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
+					dma_chan_name(chan), op, i);
 		if (IS_ERR(thread->task)) {
 			pr_warn("Failed to create thread %s-%s%u\n",
 				dma_chan_name(chan), op, i);
