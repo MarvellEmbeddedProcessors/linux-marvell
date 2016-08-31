@@ -74,6 +74,10 @@ static bool verbose;
 module_param(verbose, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(verbose, "Enable \"success\" result messages (default: off)");
 
+static unsigned int caps_mask = 0x7;
+module_param(caps_mask, uint, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(caps_mask, "Mask of required DMA capabilities to be tested. COPY=0x1, XOR=0x2, PQ=0x4  (default: 0x7 [all])");
+
 /**
  * struct dmatest_params - test parameters.
  * @buf_size:		size of the memcpy test buffer
@@ -801,15 +805,18 @@ static int dmatest_add_channel(struct dmatest_info *info,
 	dtc->chan = chan;
 	INIT_LIST_HEAD(&dtc->threads);
 
-	if (dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask)) {
+	if ((caps_mask & (1 << DMA_MEMCPY)) &&
+	    dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask)) {
 		cnt = dmatest_add_threads(info, dtc, DMA_MEMCPY);
 		thread_count += cnt > 0 ? cnt : 0;
 	}
-	if (dma_has_cap(DMA_XOR, dma_dev->cap_mask)) {
+	if ((caps_mask & (1 << DMA_XOR)) &&
+	    dma_has_cap(DMA_XOR, dma_dev->cap_mask)) {
 		cnt = dmatest_add_threads(info, dtc, DMA_XOR);
 		thread_count += cnt > 0 ? cnt : 0;
 	}
-	if (dma_has_cap(DMA_PQ, dma_dev->cap_mask)) {
+	if ((caps_mask & (1 << DMA_PQ)) &&
+	    dma_has_cap(DMA_PQ, dma_dev->cap_mask)) {
 		cnt = dmatest_add_threads(info, dtc, DMA_PQ);
 		thread_count += cnt > 0 ? cnt : 0;
 	}
