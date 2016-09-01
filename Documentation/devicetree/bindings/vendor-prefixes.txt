@@ -114,6 +114,7 @@ iom	Iomega Corporation
 img	Imagination Technologies Ltd.
 ingenic	Ingenic Semiconductor
 innolux	Innolux Corporation
+inside-secure	INSIDE Secure
 intel	Intel Corporation
 intercontrol	Inter Control Group
 invensense	InvenSense Inc.
