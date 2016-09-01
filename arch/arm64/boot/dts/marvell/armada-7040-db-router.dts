@@ -120,7 +120,6 @@
 				};
 				emac2: mac2 {
 					phy-mode = "sgmii"; /* lane-0 */
-					phy-speed = <2500>;
 				};
 				emac3: mac3 {
 					phy-mode = "rgmii"; /* rgmii-1 */
