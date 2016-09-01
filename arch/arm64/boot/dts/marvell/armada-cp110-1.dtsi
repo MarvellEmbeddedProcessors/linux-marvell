@@ -16,6 +16,8 @@
 /*
  * Generic Device Tree describing Marvell Armada CP-110 device
  */
+#include <dt-bindings/interrupt-controller/mvebu-icu.h>
+
 rtc@284000 {
 	compatible = "marvell,armada8k-rtc";
 	reg = <0x284000 0x20>, <0x284080 0x24>;
@@ -43,6 +45,17 @@ cps_syscon0: system-controller@440000 {
 		"cps-usb3dev", "cps-eip150", "cps-eip197";
 };
 
+icu_s: interrupt-controller@1E0000 {
+	compatible = "marvell,icu";
+	reg = <0x1E0000 0x10>;
+	#interrupt-cells = <3>;
+	#size-cells = <1>;
+	#address-cells = <0>;
+	icu-spi-base = <0>;
+	interrupt-controller;
+	interrupt-parent = <&gic>;
+	gicp-spi = <0x0 0xF03F0040 0x0 0xF03F0048>;
+};
 pinctrl@440000 {
 	reg = <0x440000 0x10>;
 };
@@ -51,7 +64,7 @@ sata@540000 {
 	compatible = "marvell,armada-cp110-ahci";
 	reg = <0x540000 0x30000>;
 	dma-coherent;
-	interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 15>;
 	status = "disabled";
 	port_base = <0x10000>;
@@ -62,7 +75,7 @@ usb3h0_1: usb3@500000 {
 	compatible = "generic-xhci";
 	reg = <0x500000 0x4000>;
 	dma-coherent;
-	interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 22>;
 	status = "disabled";
 };
@@ -71,7 +84,7 @@ usb3h1_1: usb3@510000 {
 	compatible = "generic-xhci";
 	reg = <0x510000 0x4000>;
 	dma-coherent;
-	interrupts = <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 105 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 23>;
 	status = "disabled";
 };
@@ -101,7 +114,7 @@ i2c@701000 {
 	reg = <0x701000 0x20>;
 	#address-cells = <1>;
 	#size-cells = <0>;
-	interrupts = <GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 120 IRQ_TYPE_LEVEL_HIGH>;
 	timeout-ms = <1000>;
 	clocks = <&cps_syscon0 1 21>;
 	status = "disabled";
@@ -112,7 +125,7 @@ i2c@701100 {
 	reg = <0x701100 0x20>;
 	#address-cells = <1>;
 	#size-cells = <0>;
-	interrupts = <GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 121 IRQ_TYPE_LEVEL_HIGH>;
 	timeout-ms = <1000>;
 	clocks = <&cps_syscon0 1 21>;
 	status = "disabled";
@@ -126,7 +139,7 @@ nand@720000 {
 	num-cs = <1>;
 	marvell,nand-enable-arbiter;
 	nand-on-flash-bbt;
-	interrupts = <GIC_SPI 307 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 2>;
 	nand-ecc-strength = <4>;
 	nand-ecc-step-size = <512>;
@@ -245,17 +258,17 @@ axim-hb1-wr@3c9000 {
 
 gop {
 	emac0_1: mac0 {
-		interrupts = <GIC_SPI 292 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		interrupts = <ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
 		mac-address = [00 00 00 00 00 04];
 		port-id = <0>; /* gop_port_id */
 	};
 	emac2_1: mac2 {
-		interrupts = <GIC_SPI 291 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		interrupts = <ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
 		mac-address = [00 00 00 00 00 05];
 		port-id = <2>; /* gop_port_id */
 	};
 	emac3_1: mac3 {
-		interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
+		interrupts = <ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
 		mac-address = [00 00 00 00 00 06];
 		port-id = <3>; /* gop_port_id */
 	};
@@ -283,31 +296,31 @@ ppv22@000000 {
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 	status = "okay";
 	eth0_1: eth0@010000 {
-		interrupts = <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
-			     <GIC_SPI 265 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
-			     <GIC_SPI 269 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
-			     <GIC_SPI 273 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
-			     <GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
+		interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
 		port-id = <0>; /* pp2_port_id */
 		emac-data = <&emac0_1>;
 		status = "disabled";
 	};
 	eth1_1: eth1@020000 {
-		interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
-			     <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
-			     <GIC_SPI 270 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
-			     <GIC_SPI 274 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
-			     <GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
+		interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
 		port-id = <1>; /* pp2_port_id */
 		emac-data = <&emac2_1>;
 		status = "disabled";
 	};
 	eth2_1: eth2@030000 {
-		interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
-			     <GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
-			     <GIC_SPI 271 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
-			     <GIC_SPI 275 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
-			     <GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
+		interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+			     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
+			     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
+			     <ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
+			     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
 		port-id = <2>; /* pp2_port_id */
 		emac-data = <&emac3_1>;
 		status = "disabled";
@@ -319,7 +332,7 @@ cps_trng: trng@760000 {
 	reg = <0x760000 0x7D>;
 	#address-cells = <1>;
 	#size-cells = <0>;
-	interrupts = <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 95 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 25>;
 	status = "okay";
 };
@@ -328,7 +341,7 @@ eip197@800000 {
 	compatible = "marvell,eip197";
 	reg = <0x800000 0x200000>;
 	dma-coherent;
-	interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 88 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 26>;
 	status = "disabled";
 };
