@@ -208,3 +208,6 @@ config MVEBU_PIC
 config MVEBU_SEI_IRQ
         bool
 	default y
+
+config MVEBU_ICU_IRQ
+        bool
