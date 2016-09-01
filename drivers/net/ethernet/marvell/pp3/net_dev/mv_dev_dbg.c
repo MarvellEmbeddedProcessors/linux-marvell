@@ -848,6 +848,14 @@ static void pp3_dbg_pools_stats_dump(struct pp3_pool *pools[], int num, u32 cpus
 				pr_cont("%-15u", cpu);
 				continue;
 			}
+			if (cnt_index == -2) {
+				pr_cont("%-15u", PPOOL_BUF_MISSED(ppool, cpu));
+				continue;
+			}
+			if (cnt_index == -3) {
+				pr_cont("%-15u", PPOOL_BUF_TXDONE(ppool, cpu));
+				continue;
+			}
 			stats = (u32 *)PPOOL_STATS(ppool, cpu);
 			pr_cont("%-15u", stats[cnt_index]);
 
@@ -904,6 +912,7 @@ static void pp3_dbg_dev_lnx_pools_stats_dump(struct pp3_dev_priv *dev_priv)
 	pp3_dbg_separate_line_print(24 + 15 * (cpu_num + 1));
 
 	num++;
+	pp3_dbg_pools_stats_dump(pools, num, cpu_num, -3, "buff_txdone");
 	PP3_DBG_POOLS_STATS_DUMP(pools, num, cpu_num, buff_get_timeout_err);
 	PP3_DBG_POOLS_STATS_DUMP(pools, num, cpu_num, buff_get_request);
 	PP3_DBG_POOLS_STATS_DUMP(pools, num, cpu_num, buff_get);
@@ -953,6 +962,7 @@ static void pp3_dbg_dev_rx_pools_stats_dump(struct pp3_dev_priv *dev_priv)
 	pp3_dbg_pools_stats_dump(pools, num, cpus_num, -1, "CPUs");
 	pp3_dbg_separate_line_print(24 + (45 * num));
 
+	pp3_dbg_pools_stats_dump(pools, num, cpus_num, -2, "buff_missed");
 	PP3_DBG_POOLS_STATS_DUMP(pools, num, cpus_num, buff_rx);
 	PP3_DBG_POOLS_STATS_DUMP(pools, num, cpus_num, buff_put);
 	PP3_DBG_POOLS_STATS_DUMP(pools, num, cpus_num, buff_alloc);
@@ -1063,6 +1073,7 @@ void pp3_dbg_dev_pools_stats_dump(struct net_device *dev)
 
 	/* print BM pool statistics */
 	pp3_dbg_dev_rx_pools_stats_dump(dev_priv);
+	pr_info("\n");
 	pp3_dbg_dev_lnx_pools_stats_dump(dev_priv);
 }
 
@@ -1079,8 +1090,6 @@ void pp3_dbg_dev_stats_dump(struct net_device *dev)
 
 	/* aggregation of rxqs and txqs counters */
 	pp3_dbg_dev_nic_cnt_update_all(dev_priv);
-
-	pr_info("\n");
 
 	/* print BM pool statistics */
 	pp3_dbg_dev_rx_pools_stats_dump(dev_priv);
