@@ -95,6 +95,36 @@
 					full-duplex;
 				};
 			};
+
+			nfc: nand@d0000 {
+				status = "okay";
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				num-cs = <1>;
+				nand-ecc-strength = <4>;
+				nand-ecc-step-size = <512>;
+				marvell,nand-keep-config;
+				marvell,nand-enable-arbiter;
+				nand-on-flash-bbt;
+
+				partition@0 {
+					label = "U-Boot";
+					reg = <0x00000000 0x00800000>;
+					read-only;
+				};
+
+				partition@800000 {
+					label = "uImage";
+					reg = <0x00800000 0x00800000>;
+					read-only;
+				};
+
+				partition@1000000 {
+					label = "Root";
+					reg = <0x01000000 0x3f000000>;
+				};
+			};
 		};
 	};
 };
