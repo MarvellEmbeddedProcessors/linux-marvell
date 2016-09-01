@@ -58,3 +58,4 @@ obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
 obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
 obj-$(CONFIG_MVEBU_PIC)			+= irq-mvebu-pic.o
 obj-$(CONFIG_MVEBU_SEI_IRQ)		+= irq-mvebu-sei.o
+obj-$(CONFIG_MVEBU_ICU_IRQ)		+= irq-mvebu-icu.o

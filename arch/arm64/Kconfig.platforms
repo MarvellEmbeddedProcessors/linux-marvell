@@ -5,6 +5,7 @@ config ARCH_MVEBU
 	select ARM_GIC_ODMI
 	select ARM_GIC_V2M
 	select MVEBU_PIC
+	select MVEBU_ICU_IRQ
 	select MVEBU_CLK_COMMON
 	select ARMADA_3700_CLK
 	select PINCTRL
