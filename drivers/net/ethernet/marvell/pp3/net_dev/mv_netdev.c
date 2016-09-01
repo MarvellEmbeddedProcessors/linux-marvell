@@ -146,7 +146,7 @@ static int mv_pp3_internal_debug_action_on_err(struct net_device *dev)
 	return -1;
 }
 
-static void mv_pp3_internal_debug_init(void)
+void mv_pp3_internal_debug_init(void)
 {
 	/* Default-action PANIC if Kernel-panic goes to reboot with _timeout
 	 * Otherwize no reboot but stall, so we could also use STOP
@@ -168,7 +168,7 @@ static struct mv_pp3 *pp3_priv;
 static const struct net_device_ops mv_pp3_netdev_ops;
 
 /* functions */
-static int mv_pp3_tx_done(struct net_device *dev, int tx_todo);
+static int mv_pp3_tx_done(struct net_device *dev, int tx_todo, struct pp3_pool *ppool);
 static void mv_pp3_txdone_timer_callback(unsigned long data);
 static int mv_pp3_check_mtu_valid(int mtu);
 static int mv_pp3_rx(struct net_device *dev, struct pp3_vport *cpu_vp, struct pp3_vq *rx_vq, int budget);
@@ -384,47 +384,6 @@ static int mv_pp3_dev_fw_update(struct pp3_dev_priv *dev_priv)
 	return pp3_fw_sync();
 }
 /*---------------------------------------------------------------------------*/
-
-void mv_pp3_config_show(void)
-{
-	struct mv_pp3_version *drv_ver;
-
-	drv_ver = mv_pp3_get_driver_version();
-	pr_info("\nmv_pp3 driver version: \t%s:%d.%d.%d.%d",
-			drv_ver->name, drv_ver->major_x, drv_ver->minor_y, drv_ver->local_z, drv_ver->debug_d);
-
-	if (pp3_priv)
-		pr_info("  o %d Network interfaces supported\n", mv_pp3_ports_num_get(pp3_priv));
-
-	pr_info("  o %d PPCs num supported\n", mv_pp3_fw_ppc_num_get());
-
-	pr_info("  o Cache coherency mode: %s\n", coherency_hard_mode ? "HW" : "SW");
-
-#ifdef CONFIG_MV_PP3_STAT_ERR
-	pr_info("  o ERROR statistics enabled\n");
-#endif
-
-#ifdef CONFIG_MV_PP3_STAT_INF
-	pr_info("  o INFO statistics enabled\n");
-#endif
-
-#ifdef CONFIG_MV_PP3_STAT_DBG
-	pr_info("  o DEBUG statistics enabled\n");
-#endif
-
-#ifdef CONFIG_MV_PP3_DEBUG_CODE
-	pr_info("  o Debug messages enabled\n");
-#endif
-
-#ifdef PP3_INTERNAL_DEBUG
-	pr_info("  o Internal DEBUG mode (%s)\n",  mv_pp3_get_internal_debug_str());
-#endif
-
-#ifdef CONFIG_MV_PP3_SKB_RECYCLE
-	pr_info("  o NIC SKB recycle supported (%s)\n", mv_pp3_skb_recycle ? "Enabled" : "Disabled");
-#endif
-
-}
 
 static inline struct sk_buff *mv_pp3_skb_alloc(struct net_device *dev, int pkt_size, gfp_t gfp_mask,
 										unsigned long *phys_addr)
@@ -833,30 +792,44 @@ static void mv_pp3_dev_link_event(struct pp3_dev_priv *dev_priv)
 static void mv_pp3_txdone_timer_callback(unsigned long data)
 {
 	unsigned long flags = 0;
+	int cpu = smp_processor_id();
 	struct pp3_vport *cpu_vp = (struct pp3_vport *)data;
 	struct mv_pp3_timer *pp3_timer = &cpu_vp->port.cpu.txdone_timer;
-	int tx_todo, total_free;
+	struct net_device *dev = (struct net_device *)cpu_vp->root;
+	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
+	struct pp3_pool *ppool = dev_priv->cpu_shared->txdone_pool;
+	int txdone_todo, txdone_free;
 
-	if (cpu_vp->port.cpu.cpu_num != smp_processor_id()) {
+	if (cpu_vp->port.cpu.cpu_num != cpu) {
 		pr_err("timer run on incorrect CPU (%d)\n", smp_processor_id());
 		mv_pp3_timer_complete(pp3_timer);
 		return;
 	}
 
-	tx_todo = cpu_vp->port.cpu.txdone_todo;
-	if (tx_todo) {
-		MV_LIGHT_LOCK(flags);
+	MV_LIGHT_LOCK(flags);
+	txdone_todo = PPOOL_BUF_TXDONE(ppool, cpu);
+	if (txdone_todo) {
 		STAT_INFO(cpu_vp->port.cpu.stats.txdone++);
-		total_free = mv_pp3_tx_done((struct net_device *)cpu_vp->root, tx_todo);
-		cpu_vp->port.cpu.txdone_todo -= total_free;
-		MV_LIGHT_UNLOCK(flags);
+		txdone_free = mv_pp3_tx_done(dev, txdone_todo, ppool);
+		if (txdone_free == -1) {
+			pr_err("%s: tx_done in Timer (cpu = %d) failed to release %d buffers\n",
+			       dev->name, cpu, txdone_todo);
+#ifdef PP3_INTERNAL_DEBUG
+			mv_pp3_internal_debug_action_on_err(dev);
+#endif
+		} else {
+			txdone_todo -= txdone_free;
+			PPOOL_BUF_TXDONE(ppool, cpu) = txdone_todo;
+		}
 	}
+	MV_LIGHT_UNLOCK(flags);
 
 	mv_pp3_timer_complete(pp3_timer);
 
-	if (cpu_vp->port.cpu.txdone_todo)
+	if (txdone_todo)
 		mv_pp3_timer_add(pp3_timer);
 }
+
 #ifndef CONFIG_MV_PP3_FPGA
 /*---------------------------------------------------------------------------*/
 /* mac link change event interrupt handle (IRQ 81 - 84)                      */
@@ -1297,7 +1270,7 @@ static inline int pp3_pool_bufs_free_internal(int buf_num, struct net_device *de
 			STAT_ERR(PPOOL_STATS(ppool, cpu_ctrl->cpu)->buff_get_timeout_err++);
 			pr_err("%s: free pool_%d timeout, hmac:cpu%d:bm_frame=%d:bm_swq=%d\n",
 			       dev->name, ppool->pool, smp_processor_id(), frame, queue);
-			pr_err("    waiting for %d buffers, received %d\n", buffs_req, occ);
+			pr_err("    waiting for %d of %d buffers, received %d\n", buffs_req, buf_num, occ);
 			/* Return error, so CALLER decides about mv_pp3_internal_debug_action_on_err();
 			 * permits also to see where from it has been called
 			*/
@@ -1351,7 +1324,6 @@ static inline int pp3_pool_bufs_free_internal(int buf_num, struct net_device *de
 
 			buffs_free++;
 		}
-		ppool->buf_num -= buffs_free;
 		total_free += buffs_free;
 
 		if (zero_flag)
@@ -1370,22 +1342,13 @@ return values:
 	failed - return -1
 ---------------------------------------------------------------------------*/
 
-static inline int mv_pp3_tx_done(struct net_device *dev, int tx_todo)
+static inline int mv_pp3_tx_done(struct net_device *dev, int tx_todo, struct pp3_pool *ppool)
 {
 	int total_free = 0;
-	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
 
-	if (tx_todo) {
-		total_free = pp3_pool_bufs_free_internal(tx_todo, dev, dev_priv->cpu_shared->txdone_pool);
-#ifdef PP3_INTERNAL_DEBUG
-		if (total_free < 0) {
-			pr_err("%s: tx_done failed to release %d buffers (in %s)\n",
-			       dev->name, tx_todo, in_interrupt() ? "timer" : "direct tx");
-			mv_pp3_internal_debug_action_on_err(dev);
-			return -1;
-		}
-#endif
-	}
+	if (tx_todo)
+		total_free = pp3_pool_bufs_free_internal(tx_todo, dev, ppool);
+
 	return total_free;
 }
 
@@ -1493,7 +1456,6 @@ static inline u32 mv_pp3_skb_tx_csum(struct sk_buff *skb, struct pp3_vport *cpu_
 static inline struct pp3_pool *mv_pp3_skb_recycle_pool_get(struct sk_buff *skb)
 {
 	struct pp3_pool *ppool = NULL;
-
 
 #ifdef CONFIG_MV_PP3_SKB_RECYCLE
 	if (mv_pp3_skb_recycle) {
@@ -1951,6 +1913,7 @@ int mv_pp3_pool_bufs_free(int buf_num, struct net_device *dev, struct pp3_pool *
 		}
 		buf_num -= free_buf;
 	}
+	ppool->buf_num = buf_num;
 	MV_LIGHT_UNLOCK(flags);
 
 	if (time_out >= time_out_max)
@@ -2456,22 +2419,18 @@ int mv_pp3_netdev_global_init(struct mv_pp3 *priv)
 /* return true if txdoen pool is empty, otherwise return false               */
 static bool mv_pp3_dev_txdone_is_empty(struct pp3_dev_priv *dev_priv)
 {
-	struct pp3_vport *cpu_vp;
+	struct pp3_pool *ppool = dev_priv->cpu_shared->txdone_pool;
 	int cpu;
 
-	if (!dev_priv) {
-		pr_err("%s: %s invalid param", dev_priv->dev->name, __func__);
+	if (!ppool) {
+		pr_err("%s: Invalid txdone pool", dev_priv->dev->name);
 		return -1;
 	}
 
 	for_each_possible_cpu(cpu) {
-
-		cpu_vp = dev_priv->cpu_vp[cpu];
-
-		if (cpu_vp && cpu_vp->port.cpu.txdone_todo)
+		if (PPOOL_BUF_TXDONE(ppool, cpu))
 			return false;
 	}
-
 	return true;
 }
 
@@ -2922,9 +2881,6 @@ int mv_pp3_dev_open(struct net_device *dev)
 			pr_err("%s: mv_pp3_shared_start fail\n", __func__);
 			return -1;
 		}
-#ifdef PP3_INTERNAL_DEBUG
-		mv_pp3_internal_debug_init();
-#endif
 	}
 
 	if (!(dev_priv->flags & MV_PP3_F_INIT)) {
@@ -3208,12 +3164,12 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 	int cpu = smp_processor_id();
 	int global_cpu_vp, vq = 0;
 	unsigned int l3_l4_info;
-	int total_free;
+	int txdone_todo, txdone_free;
 	struct pp3_dev_priv *dev_priv = MV_PP3_PRIV(dev);
 	struct pp3_vport *cpu_vp = dev_priv->cpu_vp[cpu];
 	struct pp3_vq *tx_vq = NULL;
 	struct pp3_swq *tx_swq = NULL;
-	struct pp3_pool *ppool = NULL;
+	struct pp3_pool *ppool;
 	int pkt_len, rd_offs, cfh_data_len, cfh_dg_size, cfh_size;
 	unsigned long flags = 0;
 	bool pkt_in_cfh = false;
@@ -3253,6 +3209,7 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 	/* virtual queue equal software queue */
 	tx_vq = cpu_vp->tx_vqs[vq];
 	tx_swq = tx_vq->swq;
+
 	/* Add dummy Marvell header to skb */
 	__skb_push(skb, MV_MH_SIZE);
 
@@ -3310,7 +3267,8 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 
 	if (pkt_in_cfh) {
 		/* CFH store packet data, pdata point to start point of payload data in cfh */
-
+		txdone_todo = 0;
+		ppool = NULL;
 		cfh->vm_bp = cfh->marker_l = cfh->phys_l = 0;
 
 		cfh->ctrl &= ~MV_CFH_RD_MASK;
@@ -3320,15 +3278,14 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 		STAT_DBG(cpu_vp->port.cpu.stats.tx_cfh_pkt++);
 	} else {
 		ppool = cpu_vp->port.cpu.cpu_shared->txdone_pool;
-		ppool->buf_num++;
 		cfh->vm_bp = MV_CFH_BPID_SET(ppool->pool);
-		cpu_vp->port.cpu.txdone_todo++;
+		txdone_todo = PPOOL_BUF_TXDONE(ppool, cpu);
+		txdone_todo++;
 		cfh->marker_l = (unsigned int)skb;
 		/* Flush Cache */
 		cfh->phys_l = mv_pp3_os_dma_map_single(dev->dev.parent, skb->head,
 					       pkt_len + rd_offs, DMA_TO_DEVICE);
 	}
-
 	cfh->tag1 = MV_CFH_ADD_CRC_BIT_SET | MV_CFH_L2_PAD_BIT_SET;
 
 #ifdef CONFIG_MV_PP3_DEBUG_CODE
@@ -3366,14 +3323,26 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 	STAT_DBG(tx_swq->stats.pkts++);
 	STAT_DBG(cpu_vp->port.cpu.stats.tx_bytes += (pkt_len - MV_MH_SIZE));
 
-
 	if (ppool && (ppool->mode == POOL_MODE_TXDONE)) {
-		if (cpu_vp->port.cpu.txdone_todo > dev_priv->tx_done_pkt_coal) {
+		if (txdone_todo > dev_priv->tx_done_pkt_coal) {
 			STAT_INFO(cpu_vp->port.cpu.stats.txdone++);
-			total_free = mv_pp3_tx_done(dev, dev_priv->tx_done_pkt_coal);
-			cpu_vp->port.cpu.txdone_todo -= total_free;
+			txdone_free = mv_pp3_tx_done(dev, dev_priv->tx_done_pkt_coal, ppool);
+			if (txdone_free == -1) {
+				pr_err("%s: tx_done in TX (cpu = %d) failed to release %d buffers\n",
+				       dev->name, cpu, dev_priv->tx_done_pkt_coal);
+
+#ifdef PP3_INTERNAL_DEBUG
+				mv_pp3_internal_debug_action_on_err(dev);
+#endif
+			} else {
+			/*	pr_info("%s: TXDONE from TX: txdone_todo = %d, total_free = %d\n",
+			*			dev->name, txdone_todo, txdone_free);
+			*/
+				txdone_todo -= txdone_free;
+			}
 		}
-		if (cpu_vp->port.cpu.txdone_todo)
+		PPOOL_BUF_TXDONE(ppool, cpu) = txdone_todo;
+		if (txdone_todo)
 			mv_pp3_timer_add(&cpu_vp->port.cpu.txdone_timer);
 	}
 

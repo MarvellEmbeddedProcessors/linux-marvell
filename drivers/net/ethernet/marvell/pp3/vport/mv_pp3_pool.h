@@ -23,7 +23,8 @@
 #include "platform/mv_pp3.h"
 
 #define PPOOL_STATS(ppool, cpu)		per_cpu_ptr((ppool)->stats, (cpu))
-#define PPOOL_BUF_MISSED(ppool, cpu)		(*per_cpu_ptr((ppool->buf_missed), (cpu)))
+#define PPOOL_BUF_MISSED(ppool, cpu)	(*per_cpu_ptr((ppool->buf_missed), (cpu)))
+#define PPOOL_BUF_TXDONE(ppool, cpu)	(*per_cpu_ptr((ppool->buf_txdone), (cpu)))
 
 /************************/
 /*   pool structures    */
@@ -76,6 +77,7 @@ struct pp3_pool {
 	enum pp3_pool_mode mode;
 	enum pp3_pool_type type;
 	int __percpu *buf_missed; /* ~ allocation failed */
+	int __percpu *buf_txdone; /* ~ wait for release */
 	struct pp3_pool_stats __percpu *stats;
 };
 

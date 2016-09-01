@@ -120,6 +120,11 @@ static inline bool mv_pp3_timer_is_running(struct mv_pp3_timer *pp3_timer)
 /* add time period to timer on the current CPU */
 static inline void mv_pp3_timer_add(struct mv_pp3_timer *pp3_timer)
 {
+#ifdef PP3_INTERNAL_DEBUG
+	if (debug_stop_rx_tx)
+		return;
+#endif /* PP3_INTERNAL_DEBUG */
+
 	if (test_and_set_bit(MV_PP3_TIMER_SCHED_BIT, &(pp3_timer->flags)))
 		return;
 
@@ -144,9 +149,6 @@ int mv_pp3_timer_init(struct mv_pp3_timer *pp3_timer, unsigned int cpu, unsigned
 			enum mv_pp3_timer_internal_type type, void (*func)(unsigned long), unsigned long cookie);
 /* Timer kill */
 int mv_pp3_timer_kill(struct mv_pp3_timer *pp3_timer);
-
- /* Add time period to timer on the current CPU */
-void mv_pp3_timer_add(struct mv_pp3_timer *pp3_timer);
 
 /* Set timer time period, input in micro seconds */
 int mv_pp3_timer_usec_set(struct mv_pp3_timer *pp3_timer, unsigned long usec);

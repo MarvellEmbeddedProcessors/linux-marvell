@@ -102,7 +102,6 @@ struct pp3_cpu_vp_stats {
 struct pp3_cpu_port {
 	int			cpu_num;                /* CPU number */
 	int			irq_num;                /* RX IRQ number */
-	int			txdone_todo;		/* number of trasmited buffers that not released yet */
 	char			irq_name[15];		/* RX IRQ name */
 	struct pp3_cpu		*cpu_ctrl;              /* Pointer to physical CPU control structure */
 	struct pp3_cpu_shared	*cpu_shared;		/* Pointer to shared CPU structure (per poort)*/

@@ -254,6 +254,40 @@ static void pp3_sysfs_exit(struct mv_pp3 *priv)
 	platform_device_unregister(priv->sysfs_pdev);
 }
 
+void mv_pp3_config_show(void)
+{
+	if (pp3_device)
+		pr_info("  o %d Network interfaces supported\n", mv_pp3_ports_num_get(pp3_device));
+
+	pr_info("  o %d PPCs num supported\n", mv_pp3_fw_ppc_num_get());
+
+	pr_info("  o Cache coherency mode: %s\n", coherency_hard_mode ? "HW" : "SW");
+
+#ifdef CONFIG_MV_PP3_STAT_ERR
+	pr_info("  o ERROR statistics enabled\n");
+#endif
+
+#ifdef CONFIG_MV_PP3_STAT_INF
+	pr_info("  o INFO statistics enabled\n");
+#endif
+
+#ifdef CONFIG_MV_PP3_STAT_DBG
+	pr_info("  o DEBUG statistics enabled\n");
+#endif
+
+#ifdef CONFIG_MV_PP3_DEBUG_CODE
+	pr_info("  o Debug messages enabled\n");
+#endif
+
+#ifdef PP3_INTERNAL_DEBUG
+	pr_info("  o Internal DEBUG mode (%s)\n",  mv_pp3_get_internal_debug_str());
+#endif
+
+#ifdef CONFIG_MV_PP3_SKB_RECYCLE
+	pr_info("  o NIC SKB recycle supported (%s)\n", mv_pp3_skb_recycle ? "Enabled" : "Disabled");
+#endif
+}
+
 /*---------------------------------------------------------------------------*/
 #ifdef CONFIG_HIGH_RES_TIMERS
 /* high resolution timer callback function */
@@ -261,6 +295,7 @@ static enum hrtimer_restart mv_pp3_hr_timer_callback(struct hrtimer *timer)
 {
 	struct mv_pp3_timer *pp3_timer = container_of(timer, struct mv_pp3_timer, hr_timer);
 
+	STAT_INFO(pp3_timer->stats.timer_sched++);
 	if (pp3_timer->wq) {
 		struct work_struct work = pp3_timer->timer_work->work;
 		/* TODO debug error */
@@ -277,10 +312,9 @@ static enum hrtimer_restart mv_pp3_hr_timer_callback(struct hrtimer *timer)
 /* normal timer callback function */
 static void mv_pp3_normal_timer_callback(unsigned long data)
 {
-
 	struct mv_pp3_timer *pp3_timer = (struct mv_pp3_timer *)data;
-	STAT_INFO(pp3_timer->stats.timer_sched++);
 
+	STAT_INFO(pp3_timer->stats.timer_sched++);
 	if (pp3_timer->wq) {
 		if (!queue_work(pp3_timer->wq, &pp3_timer->timer_work->work))
 			pr_err("%s: Internal error, work already in queue\n", __func__);
@@ -670,6 +704,10 @@ int mv_pp3_shared_start(struct mv_pp3 *priv)
 	mv_pp3_messenger_init(priv);
 	mv_pp3_drv_messenger_init(MV_PP3_CHAN_SIZE, false);
 
+#ifdef PP3_INTERNAL_DEBUG
+	mv_pp3_internal_debug_init();
+#endif
+
 	/* get FW version */
 	rc = pp3_fw_version_get(&fw_ver);
 	if (rc) {
@@ -700,6 +738,8 @@ int mv_pp3_shared_start(struct mv_pp3 *priv)
 		pr_info("%s\n", buf);
 	pr_info("\n");
 	kfree(version_name);
+
+	mv_pp3_config_show();
 
 	/* Send request for memory buffer size needed by FW */
 	if (mv_pp3_fw_memory_alloc(pp3_device) < 0)
