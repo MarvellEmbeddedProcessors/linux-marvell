@@ -1,0 +1,55 @@
+Marvell ICU Interrupt Controller
+-----------------------------------------------------
+The Marvell ICU (Interrupt Consolidation Unit) controller is responsible for
+accumulating all wired-interrupt sources in the CP and communicating them to
+the GIC in the AP, the unit translates interrupt requests on input wires to MSG
+memory mapped transactions to the GIC.
+
+The interrupts from the ICU to the GIC can be mapped to one of the following groups:
+	- Shared Peripheral Interrupt - Non-Secured (SPI_NSR)
+	- Shared Peripheral Interrupt - Secured (SPI_SR)
+	- System Error Interrupt (SEI)
+	- RAM Error Interrupt (REI)
+
+Required properties:
+- compatible: Should be "marvell,icu"
+- reg: Should contain ICU registers location and length.
+- #interrupt-cells: Number of cells to define interrupts.
+		Should be 3:
+			Group type of the ICU interrupt (SPI_NSR, SPI_SR, SEI, and REI)
+			Index of the unit in ICU unit
+			Type of the interrupt
+- #size-cells: The size of the interrupt cell. Should be 1.
+- #address-cells: The size of unit addresses, should be 0.
+- interrupt-controller: Identifies the node as an interrupt controller.
+- interrupt-parent: Indicates the node of the parent interrupt controller.
+		Should be pointer for GIC node.
+- gicp-spi: GICP SPI assert & deassert interrupt address on remote side (AP) Must contain 4 entries:
+		- 2 entries to specify the high and low portions of the GIC
+		  register address for asserting an interrupt
+		- 2 entries to specify the high and low portions of the GIC
+		  register address for deasserting an interrupt
+		The full gicp-spi entry should be in the below order:
+		<GICP_SPI_SET_HIGH GICP_SPI_SET_LOW GICP_SPI_CLR_HIGH GICP_SPI_CLR_LOW>
+
+Example:
+
+icu: interrupt-controller@1E0000 {
+	compatible = "marvell,icu";
+	reg = <0x1E0000 0x10>;
+	#interrupt-cells = <2>;
+	#size-cells = <1>;
+	#address-cells = <0>;
+	interrupt-controller;
+	interrupt-parent = <&gic>;
+	gicp-spi = <0x0 0xF03F0040 0x0 0xF03F0048>;
+};
+
+Usage in device:
+usb3h0: usb3@500000 {
+...
+interrupt-parent = <&icu>;
+interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
+...
+};
+
