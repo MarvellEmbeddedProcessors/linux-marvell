@@ -110,6 +110,10 @@ struct pp3_pool *mv_pp3_pool_alloc(int capacity)
 	for_each_possible_cpu(cpu)
 		PPOOL_BUF_MISSED(ppool, cpu) = 0;
 
+	ppool->buf_txdone = alloc_percpu(int);
+	for_each_possible_cpu(cpu)
+		PPOOL_BUF_TXDONE(ppool, cpu) = 0;
+
 	return ppool;
 
 oom:

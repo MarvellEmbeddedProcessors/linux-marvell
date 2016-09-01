@@ -54,6 +54,7 @@ enum mv_dbg_action {
 	MV_DBG_ACTION_MAX
 };
 
+void mv_pp3_internal_debug_init(void);
 int mv_pp3_ctrl_internal_debug_set(int action);
 const char *mv_pp3_get_internal_debug_str(void);
 #endif
