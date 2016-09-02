@@ -90,6 +90,9 @@
 				};
 			};
 			ppv22@000000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&cpm_ge2_rgmii_pins>;
+
 				eth0: eth0@010000 {
 					status = "okay";
 				};
@@ -130,6 +133,9 @@
 				};
 			};
 			ppv22@000000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&cps_ge1_rgmii_pins>;
+
 				eth0_1: eth0@010000 {
 					status = "okay";
 				};

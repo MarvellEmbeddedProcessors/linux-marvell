@@ -140,6 +140,13 @@
 					marvell,pins = "mpp37", "mpp38";
 					marvell,function = "i2c0";
 				};
+				cpm_ge2_rgmii_pins: ge-rgmii-pins-0 {
+					marvell,pins = "mpp44", "mpp45", "mpp46",
+						       "mpp47", "mpp48", "mpp49",
+						       "mpp50", "mpp51", "mpp52",
+						       "mpp53", "mpp54", "mpp55";
+					marvell,function = "ge1";
+				};
 			};
 			usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
@@ -184,6 +191,14 @@
 			};
 			pinctrl@440000 {
 				compatible = "marvell,a80x0-cp1-pinctrl";
+
+				cps_ge1_rgmii_pins: ge-rgmii-pins-0 {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+						       "mpp3", "mpp4", "mpp5",
+						       "mpp6", "mpp7", "mpp8",
+						       "mpp9", "mpp10", "mpp11";
+					marvell,function = "ge0";
+				};
 			};
 		};
 		pcie@0x600000 {
