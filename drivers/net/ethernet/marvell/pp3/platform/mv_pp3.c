@@ -768,7 +768,6 @@ static int mv_pp3_shared_probe(struct platform_device *pdev)
 	struct msi_desc *msi_desc;
 	struct resource *a2m[MV_PP3_A2M_MAX_MASTER], *amb, *nss_regs;
 	struct net_device *dev;
-	char name[20];
 
 	coherency_hard_mode = coherency_available();
 #ifdef CONFIG_MV_PP3_COHERENCY_HARD_MODE_ONLY
@@ -939,14 +938,9 @@ static int mv_pp3_shared_probe(struct platform_device *pdev)
 			continue;
 
 		if (!strcmp(child->name, "nic")) {
-			of_property_read_u32(child, "id", &i);
-			sprintf(name, "nic%d", i);
-			dev = mv_pp3_netdev_init(name, CONFIG_MV_PP3_RXQ_NUM, CONFIG_MV_PP3_TXQ_NUM);
+			dev = mv_pp3_netdev_nic_init(child);
 			if (!dev)
 				return -ENODEV;
-
-			mv_pp3_netdev_set_emac_params(dev, child);
-			mv_pp3_netdev_show(dev);
 		}
 	}
 	if (mv_pp3_gnss_dev_create(MV_NSS_EXT_PORT_MAX, false, NULL))

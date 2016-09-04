@@ -77,6 +77,7 @@ int mv_pp3_dev_num_get(void);
 struct pp3_dev_priv *mv_pp3_dev_priv_get(int i);
 struct net_device *mv_pp3_vport_dev_get(int vport);
 struct net_device *mv_pp3_netdev_init(const char *name, int rx_vqs, int tx_vqs);
+struct net_device *mv_pp3_netdev_nic_init(struct device_node *np);
 void mv_pp3_netdev_delete(struct net_device *dev);
 int mv_pp3_netdev_set_emac_params(struct net_device *dev, struct device_node *np);
 int mv_pp3_rx_dg_to_pkts(struct pp3_dev_priv *dev_priv, int dg);

@@ -353,3 +353,10 @@ const struct ethtool_ops mv_pp3_ethtool_ops = {
 	.set_coalesce				= mv_pp3_eth_tool_set_coalesce,
 	.nway_reset				= mv_pp3_eth_tool_nway_reset,
 };
+
+/* NSS ports ethtool functions */
+const struct ethtool_ops mv_pp3_gnss_ethtool_ops = {
+	.get_drvinfo				= mv_pp3_eth_tool_get_drvinfo,
+	.get_coalesce				= mv_pp3_eth_tool_get_coalesce,
+	.set_coalesce				= mv_pp3_eth_tool_set_coalesce,
+};
