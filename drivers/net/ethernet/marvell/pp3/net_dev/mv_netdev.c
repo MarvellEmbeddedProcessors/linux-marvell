@@ -1270,7 +1270,8 @@ static inline int pp3_pool_bufs_free_internal(int buf_num, struct net_device *de
 	int buffs_req, buffs_free, total_free = 0;
 	u32  ph_addr[MV_PP3_BUF_REQUEST_SIZE], vr_addr[MV_PP3_BUF_REQUEST_SIZE], pool_id[MV_PP3_BUF_REQUEST_SIZE];
 	int time_out = 0, occ, i;
-	struct pp3_cpu	*cpu_ctrl = pp3_cpus[smp_processor_id()];
+	int cpu = smp_processor_id();
+	struct pp3_cpu	*cpu_ctrl = pp3_cpus[cpu];
 	int frame = cpu_ctrl->bm_frame;
 	int queue = cpu_ctrl->bm_swq;
 	bool zero_flag;
@@ -3223,11 +3224,12 @@ static int mv_pp3_tx(struct sk_buff *skb, struct net_device *dev)
 	int tx_ts_queue;
 #endif
 
+	MV_LIGHT_LOCK(flags);
+
 #ifdef PP3_INTERNAL_DEBUG
 	if (debug_stop_rx_tx)
-		return NETDEV_TX_OK;
+		goto out;
 #endif
-	MV_LIGHT_LOCK(flags);
 
 	/* No support for scatter-gather */
 	if (unlikely(skb_is_nonlinear(skb))) {
