@@ -2230,8 +2230,6 @@ int mv_pp3_netdev_set_emac_params(struct net_device *dev, struct device_node *np
 	mv_pp3_ftd_mac_data_get(np, &dev_priv->mac_data);
 	mv_pp3_fdt_mac_address_get(np, dev_priv->dev->dev_addr);
 
-	dev->ethtool_ops = &mv_pp3_ethtool_ops;
-
 	/* set mac connectivity flag */
 	set_bit(MV_PP3_F_MAC_CONNECT_BIT, &(dev_priv->flags));
 
@@ -2390,6 +2388,25 @@ void mv_pp3_netdev_show(struct net_device *dev)
 }
 /*---------------------------------------------------------------------------*/
 
+struct net_device *mv_pp3_netdev_nic_init(struct device_node *np)
+{
+	struct net_device *dev;
+	int i;
+	char name[20];
+
+	of_property_read_u32(np, "id", &i);
+	sprintf(name, "nic%d", i);
+	dev = mv_pp3_netdev_init(name, CONFIG_MV_PP3_RXQ_NUM, CONFIG_MV_PP3_TXQ_NUM);
+	if (!dev)
+		return NULL;
+
+	dev->ethtool_ops = &mv_pp3_ethtool_ops;
+
+	mv_pp3_netdev_set_emac_params(dev, np);
+	mv_pp3_netdev_show(dev);
+
+	return dev;
+}
 /*---------------------------------------------------------------------------*/
 /* alloc global structure memory					     */
 /*---------------------------------------------------------------------------*/
