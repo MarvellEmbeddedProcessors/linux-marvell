@@ -20,6 +20,7 @@
 #include "fw/mv_fw.h"
 #include "net_dev/mv_dev_vq.h"
 #include "net_dev/mv_netdev.h"
+#include "net_dev/mv_ethtool.h"
 
 #include "mv_pp3_gnss_api.h"
 #include <net/gnss/mv_nss_defs.h>
@@ -111,6 +112,8 @@ int mv_pp3_gnss_dev_create(unsigned short vport, bool state, unsigned char *mac)
 	/* copy MAC */
 	if (mac)
 		memcpy(dev->dev_addr, mac, MV_MAC_ADDR_SIZE);
+
+	dev->ethtool_ops = &mv_pp3_gnss_ethtool_ops;
 
 	dev->mtu = MV_EXT_PORT_MTU;
 	dev_priv = MV_PP3_PRIV(dev);

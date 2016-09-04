@@ -31,5 +31,6 @@ disclaimer.
 #include <linux/ethtool.h>
 
 extern const struct ethtool_ops mv_pp3_ethtool_ops;
+extern const struct ethtool_ops mv_pp3_gnss_ethtool_ops;
 
 #endif /* __mv_ethtool_h__ */
