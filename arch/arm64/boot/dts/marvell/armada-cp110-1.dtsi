@@ -81,7 +81,7 @@ spi@700600 {
 	#address-cells = <0x1>;
 	#size-cells = <0x0>;
 	cell-index = <0x0>;
-	clocks = <&cps_syscon0 0  3>;
+	clocks = <&cps_syscon0 1 21>;
 	status = "disabled";
 };
 
@@ -91,7 +91,7 @@ spi@700680 {
 	#address-cells = <0x1>;
 	#size-cells = <0x0>;
 	cell-index = <0x0>;
-	clocks = <&cps_syscon0 0  3>;
+	clocks = <&cps_syscon0 1 21>;
 	status = "disabled";
 };
 
@@ -102,7 +102,7 @@ i2c@701000 {
 	#size-cells = <0>;
 	interrupts = <GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH>;
 	timeout-ms = <1000>;
-	clocks = <&cps_syscon0 0  3>;
+	clocks = <&cps_syscon0 1 21>;
 	status = "disabled";
 };
 
@@ -113,7 +113,7 @@ i2c@701100 {
 	#size-cells = <0>;
 	interrupts = <GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH>;
 	timeout-ms = <1000>;
-	clocks = <&cps_syscon0 0  3>;
+	clocks = <&cps_syscon0 1 21>;
 	status = "disabled";
 };
 
