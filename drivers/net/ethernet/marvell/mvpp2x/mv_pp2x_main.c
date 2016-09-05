@@ -247,6 +247,14 @@ void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
 #endif /* __BIG_ENDIAN */
 }
 
+static void mv_pp2x_txq_dec_put(struct mv_pp2x_txq_pcpu *txq_pcpu)
+{
+	if (txq_pcpu->txq_put_index == 0)
+		txq_pcpu->txq_put_index = txq_pcpu->size - 1;
+	else
+		txq_pcpu->txq_put_index--;
+}
+
 static u8 mv_pp2x_first_pool_get(struct mv_pp2x *priv)
 {
 	return priv->pp2_cfg.first_bm_pool;
@@ -811,6 +819,50 @@ static void mv_pp2x_defaults_set(struct mv_pp2x_port *port)
 	mv_pp2x_port_interrupts_disable(port);
 }
 
+static inline void *mv_pp2_extra_pool_get(struct mv_pp2x_port *port)
+{
+	void *ext_buf;
+	struct mv_pp2x_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
+	struct mv_pp2x_ext_buf_struct *ext_buf_struct;
+
+	if (!list_empty(&port_pcpu->ext_buf_port_list)) {
+
+		ext_buf_struct = list_first_entry(&port_pcpu->ext_buf_port_list,
+				struct mv_pp2x_ext_buf_struct, ext_buf_list);
+		list_del(&ext_buf_struct->ext_buf_list);
+		port_pcpu->ext_buf_pool->buf_pool_in_use--;
+
+		ext_buf = ext_buf_struct->ext_buf_data;
+
+	} else {
+		ext_buf = kmalloc(MVPP2_EXTRA_BUF_SIZE, GFP_ATOMIC);
+	}
+
+	return ext_buf;
+}
+
+static inline int mv_pp2_extra_pool_put(struct mv_pp2x_port *port, void *ext_buf)
+{
+	struct mv_pp2x_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
+	struct mv_pp2x_ext_buf_struct *ext_buf_struct;
+
+	if (port_pcpu->ext_buf_pool->buf_pool_in_use >= port_pcpu->ext_buf_pool->buf_pool_size) {
+		kfree(ext_buf);
+		return 1;
+	}
+
+	ext_buf_struct =
+		&port_pcpu->ext_buf_pool->ext_buf_struct[port_pcpu->ext_buf_pool->buf_pool_in_use];
+
+	ext_buf_struct->ext_buf_data = ext_buf;
+
+	list_add(&ext_buf_struct->ext_buf_list,
+				&port_pcpu->ext_buf_port_list);
+	port_pcpu->ext_buf_pool->buf_pool_in_use++;
+
+	return 0;
+}
+
 /* Check if there are enough reserved descriptors for transmission.
  * If not, request chunk of reserved descriptors and check again.
  */
@@ -879,17 +931,47 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 	for (i = 0; i < num; i++) {
 		dma_addr_t buf_phys_addr =
 				    txq_pcpu->tx_buffs[txq_pcpu->txq_get_index];
-		struct sk_buff *skb = txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
+		uintptr_t skb = (uintptr_t)txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
 		int data_size = txq_pcpu->data_size[txq_pcpu->txq_get_index];
 
 		mv_pp2x_txq_inc_get(txq_pcpu);
+
+		if (skb & MVPP2_ETH_SHADOW_EXT) {
+			skb &= ~MVPP2_ETH_SHADOW_EXT;
+			mv_pp2_extra_pool_put(port, (void *)skb);
+			continue;
+		}
 
 		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
 				 data_size, DMA_TO_DEVICE);
 
 		if (!skb)
 			continue;
-		dev_kfree_skb_any(skb);
+		if (skb & MVPP2_ETH_SHADOW_SKB) {
+			skb &= ~MVPP2_ETH_SHADOW_SKB;
+			dev_kfree_skb_any((struct sk_buff *)skb);
+		}
+	}
+}
+
+static void mv_pp2x_txq_buf_free(struct mv_pp2x_port *port, uintptr_t skb,
+				 dma_addr_t  buf_phys_addr, int data_size)
+{
+
+	if (skb & MVPP2_ETH_SHADOW_EXT) {
+		skb &= ~MVPP2_ETH_SHADOW_EXT;
+		mv_pp2_extra_pool_put(port, (void *)skb);
+		return;
+	}
+
+	dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
+			 data_size, DMA_TO_DEVICE);
+
+	if (!skb)
+		return;
+	if (skb & MVPP2_ETH_SHADOW_SKB) {
+		skb &= ~MVPP2_ETH_SHADOW_SKB;
+		dev_kfree_skb_any((struct sk_buff *)skb);
 	}
 }
 
@@ -2349,8 +2431,10 @@ static int mv_pp2x_tx_frag_process(struct mv_pp2x_port *port,
 		if (i == (skb_shinfo(skb)->nr_frags - 1)) {
 			/* Last descriptor */
 			tx_desc->command = MVPP2_TXD_L_DESC;
-			mv_pp2x_txq_inc_put(port->priv->pp2_version,
-				txq_pcpu, skb, tx_desc);
+			mv_pp2x_txq_inc_put(port->priv->pp2_version, txq_pcpu,
+				(struct sk_buff *)((uintptr_t) skb | MVPP2_ETH_SHADOW_SKB),
+				tx_desc);
+
 		} else {
 			/* Descriptor in the middle: Not First, Not Last */
 			tx_desc->command = 0;
@@ -2395,6 +2479,322 @@ static inline void mv_pp2x_tx_done_post_proc(struct mv_pp2x_tx_queue *txq,
 	}
 }
 
+/* Validate TSO */
+static inline int mv_pp2_tso_validate(struct sk_buff *skb, struct net_device *dev)
+{
+	if (!(dev->features & NETIF_F_TSO)) {
+		pr_err("skb_is_gso(skb) returns true but features is not NETIF_F_TSO\n");
+		return 1;
+	}
+	if (skb_shinfo(skb)->frag_list != NULL) {
+		pr_err("frag_list is not null\n");
+		return 1;
+	}
+	if (skb_shinfo(skb)->gso_segs == 1) {
+		pr_err("Only one TSO segment\n");
+		return 1;
+	}
+	if (skb->len <= skb_shinfo(skb)->gso_size) {
+		pr_err("total_len (%d) less than gso_size (%d)\n",
+			skb->len, skb_shinfo(skb)->gso_size);
+		return 1;
+	}
+	if ((htons(ETH_P_IP) != skb->protocol) || (ip_hdr(skb)->protocol != IPPROTO_TCP)
+		|| (tcp_hdr(skb) == NULL)) {
+		pr_err("Protocol is not TCP over IP\n");
+		return 1;
+	}
+
+	return 0;
+}
+
+static inline int mv_pp2_tso_build_hdr_desc(struct mv_pp2x_tx_desc *tx_desc,
+					    u8 *data, struct mv_pp2x_port *port,
+					    struct sk_buff *skb,
+					    struct mv_pp2x_txq_pcpu *txq_pcpu,
+					    u16 *mh, int hdr_len, int size,
+					    u32 tcp_seq, u16 ip_id, int left_len)
+{
+	struct iphdr *iph;
+	struct tcphdr *tcph;
+	u8 *mac;
+	dma_addr_t buf_phys_addr;
+	int mac_hdr_len = skb_network_offset(skb);
+	u8 *data_orig = data;
+
+	/* Reserve 2 bytes for IP header alignment */
+	mac = data + MVPP2_MH_SIZE;
+	iph = (struct iphdr *)(mac + mac_hdr_len);
+
+	memcpy(mac, skb->data, hdr_len);
+
+	if (iph) {
+		iph->id = htons(ip_id);
+		iph->tot_len = htons(size + hdr_len - mac_hdr_len);
+	}
+
+	tcph = (struct tcphdr *)(mac + skb_transport_offset(skb));
+	tcph->seq = htonl(tcp_seq);
+
+	if (left_len) {
+		/* Clear all special flags for not last packet */
+		tcph->psh = 0;
+		tcph->fin = 0;
+		tcph->rst = 0;
+	}
+
+	if (mh) {
+		/* Start tarnsmit from MH - add 2 bytes to size */
+		*((u16 *)data) = *mh;
+		/* increment ip_offset field in TX descriptor by 2 bytes */
+		mac_hdr_len += MVPP2_MH_SIZE;
+		hdr_len += MVPP2_MH_SIZE;
+	} else {
+		/* Start transmit from MAC */
+		data = mac;
+	}
+
+	tx_desc->data_size = hdr_len;
+	tx_desc->command = mv_pp2x_txq_desc_csum(mac_hdr_len, ntohs(skb->protocol),
+				((u8 *)tcph - (u8 *)iph) >> 2, IPPROTO_TCP);
+	tx_desc->command |= MVPP2_TXD_F_DESC;
+
+	buf_phys_addr = dma_map_single(port->dev->dev.parent, data,
+				       tx_desc->data_size, DMA_TO_DEVICE);
+
+	if (unlikely(dma_mapping_error(port->dev->dev.parent, buf_phys_addr))) {
+		pr_err("%s dma_map_single error\n", __func__);
+		return -1;
+	}
+
+	tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_ALIGN;
+
+	mv_pp2x_txdesc_phys_addr_set(port->priv->pp2_version,
+		buf_phys_addr & ~MVPP2_TX_DESC_ALIGN, tx_desc);
+
+	mv_pp2x_txq_inc_put(port->priv->pp2_version,
+				txq_pcpu,
+				(struct sk_buff *)((uintptr_t) data_orig |
+				MVPP2_ETH_SHADOW_EXT), tx_desc);
+
+	return hdr_len;
+}
+
+static inline int mv_pp2_tso_build_data_desc(struct mv_pp2x_port *port,
+					     struct mv_pp2x_tx_desc *tx_desc,
+					     struct sk_buff *skb,
+					     struct mv_pp2x_txq_pcpu *txq_pcpu,
+					     char *frag_ptr, int frag_size,
+					     int data_left, int total_left)
+{
+	dma_addr_t buf_phys_addr;
+	int size;
+	uintptr_t val = 0;
+
+	size = min(frag_size, data_left);
+
+	tx_desc->data_size = size;
+
+	buf_phys_addr = dma_map_single(port->dev->dev.parent, frag_ptr,
+				       size, DMA_TO_DEVICE);
+	if (unlikely(dma_mapping_error(port->dev->dev.parent, buf_phys_addr))) {
+		pr_err("%s dma_map_single error\n", __func__);
+		return -1;
+	}
+
+	tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_ALIGN;
+
+	mv_pp2x_txdesc_phys_addr_set(port->priv->pp2_version,
+		buf_phys_addr & ~MVPP2_TX_DESC_ALIGN, tx_desc);
+
+	tx_desc->command = 0;
+
+	if (size == data_left) {
+		/* last descriptor in the TCP packet */
+		tx_desc->command = MVPP2_TXD_L_DESC;
+
+		if (total_left == 0) {
+			/* last descriptor in SKB */
+			val = ((uintptr_t) skb | MVPP2_ETH_SHADOW_SKB);
+		}
+	}
+	mv_pp2x_txq_inc_put(port->priv->pp2_version, txq_pcpu,
+				(struct sk_buff *)(val), tx_desc);
+
+	return size;
+}
+
+/* send tso packet */
+static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
+			 struct mv_pp2x_tx_queue *txq,
+			 struct mv_pp2x_aggr_tx_queue *aggr_txq)
+{
+	int frag = 0, i;
+	int total_len, hdr_len, size, frag_size, data_left;
+	int total_desc_num, total_bytes = 0, max_desc_num = 0;
+	char *frag_ptr;
+	struct mv_pp2x_tx_desc *tx_desc;
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct mv_pp2x_txq_pcpu *txq_pcpu = this_cpu_ptr(txq->pcpu);
+	u16 ip_id, *mh = NULL;
+	u32 tcp_seq = 0;
+	skb_frag_t *skb_frag_ptr;
+	const struct tcphdr *th = tcp_hdr(skb);
+
+	if (mv_pp2_tso_validate(skb, dev))
+		return 0;
+
+	/* Calculate expected number of TX descriptors */
+	max_desc_num = skb_shinfo(skb)->gso_segs * 2 + skb_shinfo(skb)->nr_frags;
+
+	/* Check number of available descriptors */
+	if (mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, max_desc_num) ||
+	    mv_pp2x_txq_reserved_desc_num_proc(port->priv, txq,
+					     txq_pcpu, max_desc_num)) {
+		return 0;
+	}
+
+	total_len = skb->len;
+	hdr_len = (skb_transport_offset(skb) + tcp_hdrlen(skb));
+
+	total_len -= hdr_len;
+	ip_id = ntohs(ip_hdr(skb)->id);
+	tcp_seq = ntohl(th->seq);
+
+	frag_size = skb_headlen(skb);
+	frag_ptr = skb->data;
+
+	if (frag_size < hdr_len) {
+		pr_err("frag_size=%d, hdr_len=%d\n", frag_size, hdr_len);
+		return 0;
+	}
+
+	/* Skip header - we'll add header in another buffer (from extra pool) */
+	frag_size -= hdr_len;
+	frag_ptr += hdr_len;
+
+	/* A special case where the first skb's frag contains only the packet's header */
+	if (frag_size == 0) {
+		skb_frag_ptr = &skb_shinfo(skb)->frags[frag];
+
+		/* Move to next segment */
+		frag_size = skb_frag_ptr->size;
+		frag_ptr = page_address(skb_frag_ptr->page.p) + skb_frag_ptr->page_offset;
+		frag++;
+	}
+	total_desc_num = 0;
+
+	/* Each iteration - create new TCP segment */
+	while (total_len > 0) {
+		u8 *data;
+
+		data_left = min((int)(skb_shinfo(skb)->gso_size), total_len);
+
+		/* Sanity check */
+		if (total_desc_num >= max_desc_num) {
+			pr_err("%s: Used TX descriptors number %d is larger than allocated %d\n",
+				__func__, total_desc_num, max_desc_num);
+			goto outNoTxDesc;
+		}
+
+		data = mv_pp2_extra_pool_get(port);
+		if (!data) {
+			pr_err("Can't allocate extra buffer for TSO\n");
+			goto outNoTxDesc;
+		}
+		tx_desc = mv_pp2x_txq_next_desc_get(aggr_txq);
+		tx_desc->phys_txq = txq->id;
+
+		total_desc_num++;
+		total_len -= data_left;
+
+		/* prepare packet headers: MAC + IP + TCP */
+		size = mv_pp2_tso_build_hdr_desc(tx_desc, data, port, skb,
+						 txq_pcpu, mh, hdr_len,
+						 data_left, tcp_seq, ip_id,
+						 total_len);
+		if (size < 0)
+			goto outNoTxDesc;
+
+		total_bytes += size;
+
+		/* Update packet's IP ID */
+		ip_id++;
+
+		while (data_left > 0) {
+
+			/* Sanity check */
+			if (total_desc_num >= max_desc_num) {
+				pr_err("%s: Used TX descriptors number %d is larger than allocated %d\n",
+					__func__, total_desc_num, max_desc_num);
+				goto outNoTxDesc;
+			}
+			tx_desc = mv_pp2x_txq_next_desc_get(aggr_txq);
+			tx_desc->phys_txq = txq->id;
+
+			size = mv_pp2_tso_build_data_desc(port, tx_desc, skb, txq_pcpu,
+							  frag_ptr, frag_size, data_left, total_len);
+
+			if (size < 0)
+				goto outNoTxDesc;
+
+			total_desc_num++;
+			total_bytes += size;
+			data_left -= size;
+
+			/* Update TCP sequence number */
+			tcp_seq += size;
+
+			/* Update frag size, and offset */
+			frag_size -= size;
+			frag_ptr += size;
+
+			if ((frag_size == 0) && (frag < skb_shinfo(skb)->nr_frags)) {
+				skb_frag_ptr = &skb_shinfo(skb)->frags[frag];
+
+				/* Move to next segment */
+				frag_size = skb_frag_ptr->size;
+				frag_ptr = page_address(skb_frag_ptr->page.p) + skb_frag_ptr->page_offset;
+				frag++;
+			}
+		}
+	}
+	/* TCP segment is ready - transmit it */
+	mv_pp2x_aggr_txq_pend_desc_add(port, total_desc_num);
+
+	txq_pcpu->reserved_num -= total_desc_num;
+	txq_pcpu->count += total_desc_num;
+	aggr_txq->count += total_desc_num;
+
+	return total_desc_num;
+
+outNoTxDesc:
+	/* No enough memory for packet header - rollback */
+	pr_err("%s: No TX descriptors - rollback %d, txq_count=%d, nr_frags=%d, skb=%p, len=%d, gso_segs=%d\n",
+			__func__, total_desc_num, aggr_txq->count, skb_shinfo(skb)->nr_frags,
+			skb, skb->len, skb_shinfo(skb)->gso_segs);
+
+	for (i = 0; i < total_desc_num; i++) {
+		struct sk_buff *shadow_skb;
+		dma_addr_t  shadow_buf;
+		int data_size;
+
+		mv_pp2x_txq_dec_put(txq_pcpu);
+
+		shadow_skb = txq_pcpu->tx_skb[txq_pcpu->txq_put_index];
+		shadow_buf = txq_pcpu->tx_buffs[txq_pcpu->txq_put_index];
+		data_size = txq_pcpu->data_size[txq_pcpu->txq_get_index];
+
+
+		mv_pp2x_txq_buf_free(port, (uintptr_t)shadow_skb, shadow_buf,
+					data_size);
+
+		mv_pp2x_txq_prev_desc_get(aggr_txq);
+	}
+
+	return 0;
+}
+
 /* Main tx processing */
 static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 {
@@ -2414,6 +2814,12 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	txq = port->txqs[txq_id];
 	txq_pcpu = this_cpu_ptr(txq->pcpu);
 	aggr_txq = &port->priv->aggr_txqs[smp_processor_id()];
+
+	/* GSO/TSO */
+	if (skb_is_gso(skb)) {
+		frags = mv_pp2_tx_tso(skb, dev, txq, aggr_txq);
+		goto out;
+	}
 
 	frags = skb_shinfo(skb)->nr_frags + 1;
 	pr_debug("txq_id=%d, frags=%d\n", txq_id, frags);
@@ -2461,14 +2867,14 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 		buf_phys_addr & ~MVPP2_TX_DESC_ALIGN, tx_desc);
 
 	tx_cmd = mv_pp2x_skb_tx_csum(port, skb);
-
 	if (frags == 1) {
 		/* First and Last descriptor */
 
 		tx_cmd |= MVPP2_TXD_F_DESC | MVPP2_TXD_L_DESC;
 		tx_desc->command = tx_cmd;
 		mv_pp2x_txq_inc_put(port->priv->pp2_version,
-			txq_pcpu, skb, tx_desc);
+			txq_pcpu, (struct sk_buff *)((uintptr_t) skb |
+			MVPP2_ETH_SHADOW_SKB), tx_desc);
 	} else {
 		/* First but not Last */
 		tx_cmd |= MVPP2_TXD_F_DESC | MVPP2_TXD_PADDING_DISABLE;
@@ -2497,7 +2903,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 
 	if (mv_pp2x_txq_free_count(txq_pcpu) < (MAX_SKB_FRAGS + 2))
 		netif_tx_stop_queue(nq);
-
 	/* Enable transmit */
 	if (!skb->xmit_more || netif_xmit_stopped(nq)) {
 		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
@@ -3847,6 +4252,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	u32 id;
 	int features, err = 0, i, cpu;
 	int priv_common_regs_num = 2;
+	struct mv_pp2x_ext_buf_struct *ext_buf_struct;
 	unsigned int *port_irqs;
 	int port_num_irq;
 
@@ -3994,11 +4400,39 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 				mv_pp2x_tx_proc_cb, (unsigned long)dev);
 		}
 	}
+	/* Init pool of external buffers for TSO, fragmentation, etc */
+	for_each_online_cpu(cpu) {
+		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+		port_pcpu->ext_buf_size = MVPP2_EXTRA_BUF_SIZE;
+
+		INIT_LIST_HEAD(&port_pcpu->ext_buf_port_list);
+		port_pcpu->ext_buf_pool = devm_kzalloc(port->dev->dev.parent,
+			sizeof(struct mv_pp2x_ext_buf_pool), GFP_ATOMIC);
+		port_pcpu->ext_buf_pool->buf_pool_size = MVPP2_EXTRA_BUF_NUM;
+		port_pcpu->ext_buf_pool->ext_buf_struct =
+			devm_kzalloc(port->dev->dev.parent,
+			sizeof(*ext_buf_struct) * MVPP2_EXTRA_BUF_NUM, GFP_ATOMIC);
+
+		for (i = 0; i < MVPP2_EXTRA_BUF_NUM; i++) {
+			u8 *ext_buf = kmalloc(MVPP2_EXTRA_BUF_SIZE, GFP_ATOMIC);
+
+			port_pcpu->ext_buf_pool->ext_buf_struct[i].ext_buf_data = ext_buf;
+			if (ext_buf == NULL) {
+				pr_warn("\to %s Warning: %d of %d extra buffers allocated\n",
+					__func__, i, MVPP2_EXTRA_BUF_NUM);
+				break;
+			}
+			list_add(&port_pcpu->ext_buf_pool->ext_buf_struct[i].ext_buf_list,
+				&port_pcpu->ext_buf_port_list);
+			port_pcpu->ext_buf_pool->buf_pool_in_use++;
+		}
+	}
+
 	features = NETIF_F_SG;
 	dev->features = features | NETIF_F_RXCSUM | NETIF_F_IP_CSUM |
-				NETIF_F_IPV6_CSUM;
+			NETIF_F_IPV6_CSUM | NETIF_F_TSO;
 	dev->hw_features |= features | NETIF_F_RXCSUM | NETIF_F_GRO |
-				NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+			NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_TSO;
 	/* Only when multi queue mode, rxhash is supported */
 	if (mv_pp2x_queue_mode)
 		dev->hw_features |= NETIF_F_RXHASH;
