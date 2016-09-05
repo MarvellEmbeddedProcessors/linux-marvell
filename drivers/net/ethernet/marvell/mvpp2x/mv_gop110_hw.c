@@ -342,6 +342,12 @@ int mv_gop110_gmac_mode_cfg(struct gop_hw *gop, struct mv_mac_data *mac)
 		return -1;
 	}
 
+	/* Control packets are forwarded into the ingress pipe */
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_SERIAL_PARAM_CFG_REG);
+	U32_SET_FIELD(val, MV_GMAC_PORT_SERIAL_PARAM_CFG_FORWARD_802_3X_FC_EN_MASK,
+		      (0x1 << MV_GMAC_PORT_SERIAL_PARAM_CFG_FORWARD_802_3X_FC_EN_OFFS));
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_SERIAL_PARAM_CFG_REG, val);
+
 	/* Jumbo frame support - 0x1400*2= 0x2800 bytes */
 	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL0_REG);
 	U32_SET_FIELD(val, MV_GMAC_PORT_CTRL0_FRAMESIZELIMIT_MASK,
