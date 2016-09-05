@@ -479,7 +479,6 @@ struct mv_pp2x_rss {
 };
 
 struct mv_pp2x_param_config {
-	struct mv_pp2x_cos cos_cfg;
 	struct mv_pp2x_rss rss_cfg;
 	u8 first_bm_pool;
 	u8 first_sw_thread; /* The index of the first PPv2.2
@@ -620,6 +619,7 @@ struct mv_pp2x_port {
 	struct queue_vector q_vector[MVPP2_MAX_CPUS + MVPP2_MAX_SHARED];
 
 	struct mv_pp2x_ptp_desc *ptp_desc;
+	struct mv_pp2x_cos cos_cfg;
 };
 
 struct pp2x_hw_params {
@@ -675,10 +675,10 @@ static inline u8 mv_pp2x_cosval_queue_map(struct mv_pp2x_port *port,
 	int cos_width, cos_mask;
 
 	cos_width = ilog2(roundup_pow_of_two(
-			  port->priv->pp2_cfg.cos_cfg.num_cos_queues));
+			  port->cos_cfg.num_cos_queues));
 	cos_mask  = (1 << cos_width) - 1;
 
-	return((port->priv->pp2_cfg.cos_cfg.pri_map >>
+	return((port->cos_cfg.pri_map >>
 	       (cos_value * 4)) & cos_mask);
 }
 
@@ -687,7 +687,7 @@ static inline u8 mv_pp2x_bound_cpu_first_rxq_calc(struct mv_pp2x_port *port)
 	u8 cos_width, bind_cpu;
 
 	cos_width = ilog2(roundup_pow_of_two(
-			  port->priv->pp2_cfg.cos_cfg.num_cos_queues));
+			  port->cos_cfg.num_cos_queues));
 	bind_cpu = (port->priv->pp2_cfg.rx_cpu_map >> (4 * port->id)) & 0xF;
 
 	return(port->first_rxq + (bind_cpu << cos_width));

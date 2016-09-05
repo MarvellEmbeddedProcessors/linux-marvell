@@ -1648,9 +1648,11 @@ static int mv_pp2x_num_online_cpu_get(struct mv_pp2x *pp2)
 }
 
 /* The function calculate the width, such as cpu width, cos queue width */
-static void mv_pp2x_width_calc(struct mv_pp2x *pp2, u32 *cpu_width,
+static void mv_pp2x_width_calc(struct mv_pp2x_port *port, u32 *cpu_width,
 			       u32 *cos_width, u32 *port_rxq_width)
 {
+	struct mv_pp2x *pp2 = port->priv;
+
 	if (pp2) {
 		/* Calculate CPU width */
 		if (cpu_width)
@@ -1659,7 +1661,7 @@ static void mv_pp2x_width_calc(struct mv_pp2x *pp2, u32 *cpu_width,
 		/* Calculate cos queue width */
 		if (cos_width)
 			*cos_width = ilog2(roundup_pow_of_two(
-				pp2->pp2_cfg.cos_cfg.num_cos_queues));
+				port->cos_cfg.num_cos_queues));
 		/* Calculate rx queue width on the port */
 		if (port_rxq_width)
 			*port_rxq_width = ilog2(roundup_pow_of_two(
@@ -1758,7 +1760,7 @@ int mv_pp2x_cos_classifier_set(struct mv_pp2x_port *port,
 	}
 
 	/* Update it in priv */
-	port->priv->pp2_cfg.cos_cfg.cos_classifier = cos_mode;
+	port->cos_cfg.cos_classifier = cos_mode;
 
 	return 0;
 }
@@ -1774,18 +1776,18 @@ int mv_pp2x_cos_pri_map_set(struct mv_pp2x_port *port, int cos_pri_map)
 	u8 bound_cpu_first_rxq;
 
 
-	if (port->priv->pp2_cfg.cos_cfg.pri_map == cos_pri_map)
+	if (port->cos_cfg.pri_map == cos_pri_map)
 		return 0;
 
-	prev_pri_map = port->priv->pp2_cfg.cos_cfg.pri_map;
-	port->priv->pp2_cfg.cos_cfg.pri_map = cos_pri_map;
+	prev_pri_map = port->cos_cfg.pri_map;
+	port->cos_cfg.pri_map = cos_pri_map;
 
 
 	/* Update C2 rules with nre pri_map */
 	bound_cpu_first_rxq  = mv_pp2x_bound_cpu_first_rxq_calc(port);
 	ret = mv_pp2x_cls_c2_rule_set(port, bound_cpu_first_rxq);
 	if (ret) {
-		port->priv->pp2_cfg.cos_cfg.pri_map = prev_pri_map;
+		port->cos_cfg.pri_map = prev_pri_map;
 		return ret;
 	}
 
@@ -1803,17 +1805,17 @@ int mv_pp2x_cos_default_value_set(struct mv_pp2x_port *port, int cos_value)
 	int ret, prev_cos_value;
 	u8 bound_cpu_first_rxq;
 
-	if (port->priv->pp2_cfg.cos_cfg.default_cos == cos_value)
+	if (port->cos_cfg.default_cos == cos_value)
 		return 0;
 
-	prev_cos_value = port->priv->pp2_cfg.cos_cfg.default_cos;
-	port->priv->pp2_cfg.cos_cfg.default_cos = cos_value;
+	prev_cos_value = port->cos_cfg.default_cos;
+	port->cos_cfg.default_cos = cos_value;
 
 	/* Update C2 rules with the pri_map */
 	bound_cpu_first_rxq  = mv_pp2x_bound_cpu_first_rxq_calc(port);
 	ret = mv_pp2x_cls_c2_rule_set(port, bound_cpu_first_rxq);
 	if (ret) {
-		port->priv->pp2_cfg.cos_cfg.default_cos = prev_cos_value;
+		port->cos_cfg.default_cos = prev_cos_value;
 		return ret;
 	}
 
@@ -1855,7 +1857,7 @@ int mv_pp22_rss_rxfh_indir_set(struct mv_pp2x_port *port)
 	struct mv_pp22_rss_entry rss_entry;
 	int rss_tbl, entry_idx;
 	u32 cos_width = 0, cpu_width = 0, cpu_id = 0;
-	int rss_tbl_needed = port->priv->pp2_cfg.cos_cfg.num_cos_queues;
+	int rss_tbl_needed = port->cos_cfg.num_cos_queues;
 
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -1;
@@ -1866,7 +1868,7 @@ int mv_pp22_rss_rxfh_indir_set(struct mv_pp2x_port *port)
 		return -1;
 
 	/* Calculate cpu and cos width */
-	mv_pp2x_width_calc(port->priv, &cpu_width, &cos_width, NULL);
+	mv_pp2x_width_calc(port, &cpu_width, &cos_width, NULL);
 
 	rss_entry.u.entry.width = cos_width + cpu_width;
 
@@ -2012,7 +2014,7 @@ int mv_pp22_rss_default_cpu_set(struct mv_pp2x_port *port, int default_cpu)
 		return -1;
 
 	/* Calculate width */
-	mv_pp2x_width_calc(port->priv, &cpu_width, &cos_width, NULL);
+	mv_pp2x_width_calc(port, &cpu_width, &cos_width, NULL);
 	q_cpu_mask = (1 << cpu_width) - 1;
 
 	/* Update LSB[cpu_width + cos_width - 1 : cos_width]
@@ -2927,7 +2929,7 @@ int mv_pp2x_open_cls(struct net_device *dev)
 	u8 bound_cpu_first_rxq;
 
 	/* Calculate width */
-	mv_pp2x_width_calc(port->priv, &cpu_width, &cos_width, &port_rxq_width);
+	mv_pp2x_width_calc(port, &cpu_width, &cos_width, &port_rxq_width);
 	if (cpu_width + cos_width > port_rxq_width) {
 		err = -1;
 		netdev_err(dev, "cpu or cos queue width invalid\n");
@@ -3821,6 +3823,14 @@ err_free_percpu:
 	return err;
 }
 
+static void mv_pp2x_port_init_config(struct mv_pp2x_cos *cos_cfg)
+{
+	cos_cfg->cos_classifier = cos_classifer;
+	cos_cfg->default_cos = default_cos;
+	cos_cfg->num_cos_queues = mv_pp2x_num_cos_queues;
+	cos_cfg->pri_map = pri_map;
+}
+
 /* Ports initialization */
 static int mv_pp2x_port_probe(struct platform_device *pdev,
 			    struct device_node *port_node,
@@ -3850,6 +3860,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	port->dev = dev;
 	SET_NETDEV_DEV(dev, &pdev->dev);
 	port->priv = priv;
+
+	mv_pp2x_port_init_config(&port->cos_cfg);
 
 	if (of_property_read_u32(port_node, "port-id", &id)) {
 		err = -EINVAL;
@@ -4285,11 +4297,6 @@ static void mv_pp2x_init_config(struct mv_pp2x_param_config *pp2_cfg,
 	pp2_cfg->first_sw_thread = first_addr_space;
 	pp2_cfg->first_log_rxq = first_log_rxq_queue;
 	pp2_cfg->queue_mode = mv_pp2x_queue_mode;
-
-	pp2_cfg->cos_cfg.cos_classifier = cos_classifer;
-	pp2_cfg->cos_cfg.default_cos = default_cos;
-	pp2_cfg->cos_cfg.num_cos_queues = mv_pp2x_num_cos_queues;
-	pp2_cfg->cos_cfg.pri_map = pri_map;
 
 	pp2_cfg->rss_cfg.dflt_cpu = default_cpu;
 	/* RSS is disabled as default, which can be update in running time */
