@@ -559,6 +559,8 @@ u32 mv_pp2x_txq_desc_csum(int l3_offs, int l3_proto,
 			  int ip_hdr_len, int l4_proto);
 struct mv_pp2x_tx_desc *mv_pp2x_txq_next_desc_get(
 		struct mv_pp2x_aggr_tx_queue *aggr_txq);
+struct mv_pp2x_tx_desc *mv_pp2x_txq_prev_desc_get(
+		struct mv_pp2x_aggr_tx_queue *aggr_txq);
 int mv_pp2x_txq_alloc_reserved_desc(struct mv_pp2x *priv,
 				    struct mv_pp2x_tx_queue *txq,
 				    int num);

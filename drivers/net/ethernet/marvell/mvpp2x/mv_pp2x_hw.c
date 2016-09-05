@@ -3645,6 +3645,20 @@ struct mv_pp2x_tx_desc *mv_pp2x_txq_next_desc_get(
 	return aggr_txq->first_desc + tx_desc;
 }
 
+/* Get pointer to previous aggregated TX descriptor for rollback when needed */
+struct mv_pp2x_tx_desc *mv_pp2x_txq_prev_desc_get(
+		struct mv_pp2x_aggr_tx_queue *aggr_txq)
+{
+	int tx_desc = aggr_txq->next_desc_to_proc;
+
+	if (tx_desc > 0)
+		aggr_txq->next_desc_to_proc = tx_desc - 1;
+	else
+		aggr_txq->next_desc_to_proc = aggr_txq->last_desc;
+
+	return (aggr_txq->first_desc + tx_desc);
+}
+
 /* Update HW with number of aggregated Tx descriptors to be sent */
 void mv_pp2x_aggr_txq_pend_desc_add(struct mv_pp2x_port *port, int pending)
 {
