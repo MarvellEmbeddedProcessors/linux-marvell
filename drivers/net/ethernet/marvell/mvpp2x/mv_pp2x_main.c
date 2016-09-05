@@ -5157,6 +5157,7 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 	struct mv_pp2x_hw *hw = &priv->hw;
 	int i;
 
+	cancel_delayed_work(&priv->stats_task);
 	flush_workqueue(priv->workqueue);
 	destroy_workqueue(priv->workqueue);
 
