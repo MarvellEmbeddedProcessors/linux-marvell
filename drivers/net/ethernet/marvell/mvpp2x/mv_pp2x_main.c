@@ -1991,21 +1991,23 @@ void mv_pp22_rss_enable(struct mv_pp2x_port *port, bool en)
 
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_MULTI_MODE) {
 		mv_pp22_rss_c2_enable(port, en);
+		port->rss_cfg.rss_en = en;
 		if (en) {
 			if (mv_pp22_rss_default_cpu_set(port,
-				port->rss_cfg.dflt_cpu))
+				port->rss_cfg.dflt_cpu)) {
 				netdev_err(port->dev,
 				"cannot set rss default cpu on port(%d)\n",
 				port->id);
-			else
-				port->rss_cfg.rss_en = 1;
+				port->rss_cfg.rss_en = 0;
+			}
 		} else {
-			if (mv_pp2x_cls_c2_rule_set(port, bound_cpu_first_rxq))
+			if (mv_pp2x_cls_c2_rule_set(port,
+						    bound_cpu_first_rxq)) {
 				netdev_err(port->dev,
 				"cannot set c2 and qos table on port(%d)\n",
 				port->id);
-			else
-				port->rss_cfg.rss_en = 0;
+				port->rss_cfg.rss_en = 1;
+			}
 		}
 	}
 }
