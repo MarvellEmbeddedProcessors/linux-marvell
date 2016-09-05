@@ -486,7 +486,6 @@ struct mv_pp2x_rss {
 };
 
 struct mv_pp2x_param_config {
-	struct mv_pp2x_rss rss_cfg;
 	u8 first_bm_pool;
 	u8 first_sw_thread; /* The index of the first PPv2.2
 			* sub-address space for this NET_INSTANCE.
@@ -630,6 +629,7 @@ struct mv_pp2x_port {
 
 	struct mv_pp2x_ptp_desc *ptp_desc;
 	struct mv_pp2x_cos cos_cfg;
+	struct mv_pp2x_rss rss_cfg;
 };
 
 struct pp2x_hw_params {

@@ -5933,7 +5933,7 @@ int mv_pp2x_cls_c2_rule_set(struct mv_pp2x_port *port, u8 start_queue)
 					MVPP2_CLS2_ACT_QOS_ATTR_QL_BITS;
 		}
 		/* RSS En in PP22 */
-		c2_init_entry.rss_en = port->priv->pp2_cfg.rss_cfg.rss_en;
+		c2_init_entry.rss_en = port->rss_cfg.rss_en;
 
 		/* Add rule to C2 TCAM */
 		ret = mv_pp2x_c2_rule_add(port, &c2_init_entry);
