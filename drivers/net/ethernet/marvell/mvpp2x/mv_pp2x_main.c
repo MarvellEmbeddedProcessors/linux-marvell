@@ -5157,13 +5157,15 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 {
 	struct mv_pp2x *priv = platform_get_drvdata(pdev);
 	struct mv_pp2x_hw *hw = &priv->hw;
-	int i;
+	int i, num_of_ports;
 
 	cancel_delayed_work(&priv->stats_task);
 	flush_workqueue(priv->workqueue);
 	destroy_workqueue(priv->workqueue);
 
-	for (i = 0; i < priv->num_ports; i++) {
+	num_of_ports = priv->num_ports;
+
+	for (i = 0; i < num_of_ports; i++) {
 		if (priv->port_list[i])
 			mv_pp2x_port_remove(priv->port_list[i]);
 		priv->num_ports--;
