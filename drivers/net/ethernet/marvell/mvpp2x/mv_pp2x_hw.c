@@ -5906,7 +5906,7 @@ int mv_pp2x_cls_c2_rule_set(struct mv_pp2x_port *port, u8 start_queue)
 					MVPP2_QOS_SRC_ACTION_TBL;
 			c2_init_entry.qos_info.q_high_src =
 					MVPP2_QOS_SRC_ACTION_TBL;
-			cos_value = port->priv->pp2_cfg.cos_cfg.default_cos;
+			cos_value = port->cos_cfg.default_cos;
 			cos_queue = mv_pp2x_cosval_queue_map(port, cos_value);
 			/* map to physical queue */
 			/* Physical queue contains 2 parts: port ID and CPU ID,
