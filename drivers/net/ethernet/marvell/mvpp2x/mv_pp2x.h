@@ -172,6 +172,13 @@ extern  u32 debug_param;
 #define MVPP2_TX_FIFO_THRESHOLD_3KB	(MVPP2_TX_FIFO_DATA_SIZE_3KB * 1024 - \
 					MVPP2_TX_FIFO_MINIMUM_THRESHOLD)
 
+/* Used for define type of data saved in shadow: SKB or extended buffer or nothing */
+#define MVPP2_ETH_SHADOW_SKB		0x1
+#define MVPP2_ETH_SHADOW_EXT		0x2
+
+#define MVPP2_EXTRA_BUF_SIZE	120
+#define MVPP2_EXTRA_BUF_NUM	MVPP2_MAX_TXD
+
 enum mvppv2_version {
 	PPV21 = 21,
 	PPV22
@@ -545,6 +552,9 @@ struct mv_pp2x_port_pcpu {
 	bool timer_scheduled;
 	/* Tasklet for egress finalization */
 	struct tasklet_struct tx_done_tasklet;
+	int ext_buf_size;
+	struct list_head ext_buf_port_list;
+	struct mv_pp2x_ext_buf_pool *ext_buf_pool;
 };
 
 struct queue_vector {
@@ -642,6 +652,18 @@ struct mv_pp2x_platform_data {
 	uintptr_t skb_base_addr;
 	uintptr_t skb_base_mask;
 #endif
+};
+
+struct mv_pp2x_ext_buf_struct {
+	struct list_head ext_buf_list;
+	u8 *ext_buf_data;
+};
+
+struct mv_pp2x_ext_buf_pool {
+	int buf_pool_size;
+	int buf_pool_next_free;
+	int buf_pool_in_use;
+	struct mv_pp2x_ext_buf_struct *ext_buf_struct;
 };
 
 static inline struct mv_pp2x_port *mv_pp2x_port_struct_get(struct mv_pp2x *priv,
