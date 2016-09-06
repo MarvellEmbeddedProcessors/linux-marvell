@@ -58,6 +58,10 @@
 			spinctrl: south-bridge-pinctrl@18830 {
 				compatible = "marvell,armada-3700-z1-sb-pinctrl";
 			};
+
+			usb3@58000 {
+				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+			};
 		};
 	};
 };
