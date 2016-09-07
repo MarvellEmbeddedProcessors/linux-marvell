@@ -202,7 +202,7 @@ nand@720000 {
 	status = "disabled";
 };
 
-cpxor0@6a0000 {
+cp_xor0: cpxor0@6a0000 {
 	compatible = "marvell,mv-xor-v2";
 	reg = <0x6a0000 0x1000>,
 	      <0x6b0000 0x1000>;
@@ -212,7 +212,7 @@ cpxor0@6a0000 {
 	status = "okay";
 };
 
-cpxor1@6c0000 {
+cp_xor1: cpxor1@6c0000 {
 	compatible = "marvell,mv-xor-v2";
 	reg = <0x6c0000 0x1000>,
 	      <0x6d0000 0x1000>;
