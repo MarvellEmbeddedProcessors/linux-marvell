@@ -139,7 +139,7 @@ cpxor0@6a0000 {
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
 	clocks = <&cps_syscon0 1 8>;
-	status = "disabled";
+	status = "okay";
 };
 
 cpxor1@6c0000 {
@@ -149,7 +149,7 @@ cpxor1@6c0000 {
 	dma-coherent;
 	msi-parent = <&gic_v2m0>;
 	clocks = <&cps_syscon0 1 7>;
-	status = "disabled";
+	status = "okay";
 };
 
 thermal@400078 {
