@@ -132,10 +132,14 @@ static int mv_pp3_internal_debug_action_on_err(struct net_device *dev)
 	/* Error detail is already printed */
 	if (internal_debug_action == MV_DBG_ACTION_STOP) {
 		debug_stop_rx_tx = true;
+		/* Memory barrier to unsure debug_stop_rx_tx is visible to all CPUs */
+		wmb();
 		pr_err("%s: unrecoverable problem. Net-device <%s> STOPPED!!!\n",
 		       dev->name, dev->name);
 	} else if (internal_debug_action == MV_DBG_ACTION_PANIC) {
 		debug_stop_rx_tx = true;
+		/* Memory barrier to unsure debug_stop_rx_tx is visible to all CPUs */
+		wmb();
 		/* PANIC rather then Oops/BUG */
 		panic("%s: unrecoverable problem. PANIC\n", dev->name);
 	} else {
@@ -801,10 +805,15 @@ static void mv_pp3_txdone_timer_callback(unsigned long data)
 	int txdone_todo, txdone_free;
 
 	if (cpu_vp->port.cpu.cpu_num != cpu) {
-		pr_err("timer run on incorrect CPU (%d)\n", smp_processor_id());
+		pr_err("timer run on incorrect CPU (%d)\n", cpu);
 		mv_pp3_timer_complete(pp3_timer);
 		return;
 	}
+
+#ifdef PP3_INTERNAL_DEBUG
+	if (debug_stop_rx_tx)
+		return;
+#endif
 
 	MV_LIGHT_LOCK(flags);
 	txdone_todo = PPOOL_BUF_TXDONE(ppool, cpu);
@@ -812,10 +821,12 @@ static void mv_pp3_txdone_timer_callback(unsigned long data)
 		STAT_INFO(cpu_vp->port.cpu.stats.txdone++);
 		txdone_free = mv_pp3_tx_done(dev, txdone_todo, ppool);
 		if (txdone_free == -1) {
-			pr_err("%s: tx_done in Timer (cpu = %d) failed to release %d buffers\n",
+			pr_err("%s: (cpu = %d) TX_DONE in Timer failed to release %d buffers\n",
 			       dev->name, cpu, txdone_todo);
 #ifdef PP3_INTERNAL_DEBUG
 			mv_pp3_internal_debug_action_on_err(dev);
+			MV_LIGHT_UNLOCK(flags);
+			return;
 #endif
 		} else {
 			txdone_todo -= txdone_free;
@@ -1249,7 +1260,7 @@ static inline int pp3_pool_bufs_free_internal(int buf_num, struct net_device *de
 	int queue = cpu_ctrl->bm_swq;
 	bool zero_flag;
 
-	static int time_out_max = 100;
+	static int time_out_max = 10000;
 
 	buffs_req = MV_MIN(buf_num, MV_PP3_BUF_REQUEST_SIZE);
 
@@ -1268,9 +1279,8 @@ static inline int pp3_pool_bufs_free_internal(int buf_num, struct net_device *de
 
 		if (time_out >=  time_out_max) {
 			STAT_ERR(PPOOL_STATS(ppool, cpu_ctrl->cpu)->buff_get_timeout_err++);
-			pr_err("%s: free pool_%d timeout, hmac:cpu%d:bm_frame=%d:bm_swq=%d\n",
-			       dev->name, ppool->pool, smp_processor_id(), frame, queue);
-			pr_err("    waiting for %d of %d buffers, received %d\n", buffs_req, buf_num, occ);
+			pr_err_ratelimited("%s: free pool_%d timeout, cpu = %d: waiting for %d of %d buffers, received %d\n",
+					   dev->name, ppool->pool, cpu, buffs_req, buf_num, occ);
 			/* Return error, so CALLER decides about mv_pp3_internal_debug_action_on_err();
 			 * permits also to see where from it has been called
 			*/
