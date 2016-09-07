@@ -120,11 +120,6 @@ static inline bool mv_pp3_timer_is_running(struct mv_pp3_timer *pp3_timer)
 /* add time period to timer on the current CPU */
 static inline void mv_pp3_timer_add(struct mv_pp3_timer *pp3_timer)
 {
-#ifdef PP3_INTERNAL_DEBUG
-	if (debug_stop_rx_tx)
-		return;
-#endif /* PP3_INTERNAL_DEBUG */
-
 	if (test_and_set_bit(MV_PP3_TIMER_SCHED_BIT, &(pp3_timer->flags)))
 		return;
 
