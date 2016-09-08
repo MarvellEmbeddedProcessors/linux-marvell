@@ -1,0 +1,18 @@
+* MTD SPI driver for Micron MT29F (and similar) serial nand flash chips
+
+Required properties:
+- #address-cells, #size-cells : Must be present if the device has sub-nodes
+  representing partitions.
+- compatible : Should be "spinand,mt29f"
+- reg : Chip-Select number
+- spi-max-frequency : Maximum frequency of the SPI bus the chip can operate at
+
+Example:
+
+	spi-flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "spinand,mt29f";
+		reg = <0>; /* Chip select 0 */
+		spi-max-frequency = <104000000>;
+	};
