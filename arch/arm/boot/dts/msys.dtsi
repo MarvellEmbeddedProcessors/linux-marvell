@@ -61,17 +61,17 @@
 				#clock-cells = <1>;
 			};
 
+			soc-id@f8244 {
+				compatible = "marvell,msys-soc-id";
+				reg = <0xf8244 0x4>;
+			};
+
 			coredivclk: corediv-clock@f8268 {
 				compatible = "marvell,msys-corediv-clock";
 				reg = <0xf8268 0xc>;
 				#clock-cells = <1>;
 				clocks = <&coreclk 3>;
 				clock-output-names = "nand";
-			};
-
-			soc-id@f8244 {
-				compatible = "marvell,msys-soc-id";
-				reg = <0xf8244 0x4>;
 			};
 		};
 
@@ -99,19 +99,10 @@
 				pinctrl-names = "default";
 			};
 
-			interrupt-controller@20a00 {
-			      reg = <0x20a00 0x2d0>, <0x21070 0x58>, <0x21870 0x390>;
-			};
-
-			pmsu@22000 {
-				compatible = "marvell,msys-pmsu";
-				reg = <0x22000 0x1000>, <0x20984 0x4>;
-			};
-
-			cpurst: cpurst@20800 {
-				compatible = "marvell,armada-370-cpu-reset";
-				reg = <0x20800 0x10>;
-				#reset-cells = <1>;
+			i2c0: i2c@11000 {
+				reg = <0x11000 0x20>;
+				status = "okay";
+				clock-frequency = <100000>;
 			};
 
 			pinctrl@18000 {
@@ -168,59 +159,6 @@
 
 			};
 
-			timer@20300 {
-				compatible = "marvell,armada-xp-timer";
-				clocks = <&coreclk 0>, <&refclk>;
-				clock-names = "nbclk", "fixed";
-			};
-
-			gateclk: clock-gating-control@18220 {
-				compatible = "marvell,msys-gating-clock";
-				reg = <0x18220 0x4>;
-				clocks = <&coreclk 0>;
-				#clock-cells = <1>;
-			};
-
-			system-controller@18200 {
-				compatible = "marvell,armada-370-xp-system-controller";
-				reg = <0x18200 0x500>;
-			};
-
-			/* Overwrite FIFO size */
-			eth0: ethernet@70000 {
-				tx-csum-limit = <9800>;
-			};
-
-			eth1: ethernet@74000 {
-				tx-csum-limit = <9800>;
-			};
-
-			i2c0: i2c@11000 {
-				reg = <0x11000 0x20>;
-				status = "okay";
-				clock-frequency = <100000>;
-			};
-
-			xor@f0800 {
-				compatible = "marvell,orion-xor";
-				reg = <0xF0800 0x100
-				       0xF0A00 0x100>;
-				clocks = <&gateclk 22>;
-				status = "okay";
-
-				xor00 {
-					interrupts = <51>;
-					dmacap,memcpy;
-					dmacap,xor;
-				};
-				xor01 {
-					interrupts = <52>;
-					dmacap,memcpy;
-					dmacap,xor;
-					dmacap,memset;
-				};
-			};
-
 			gpio0: gpio@18100 {
 				compatible = "marvell,orion-gpio";
 				reg = <0x18100 0x40>;
@@ -242,8 +180,69 @@
 				#interrupt-cells = <2>;
 				interrupts = <87>;
 			};
-		};
 
+			system-controller@18200 {
+				compatible = "marvell,armada-370-xp-system-controller";
+				reg = <0x18200 0x500>;
+			};
+
+			gateclk: clock-gating-control@18220 {
+				compatible = "marvell,msys-gating-clock";
+				reg = <0x18220 0x4>;
+				clocks = <&coreclk 0>;
+				#clock-cells = <1>;
+			};
+
+			timer@20300 {
+				compatible = "marvell,armada-xp-timer";
+				clocks = <&coreclk 0>, <&refclk>;
+				clock-names = "nbclk", "fixed";
+			};
+
+			cpurst: cpurst@20800 {
+				compatible = "marvell,armada-370-cpu-reset";
+				reg = <0x20800 0x10>;
+				#reset-cells = <1>;
+			};
+
+			interrupt-controller@20a00 {
+			      reg = <0x20a00 0x2d0>, <0x21070 0x58>, <0x21870 0x390>;
+			};
+
+			pmsu@22000 {
+				compatible = "marvell,msys-pmsu";
+				reg = <0x22000 0x1000>, <0x20984 0x4>;
+			};
+
+			/* Overwrite FIFO size */
+			eth0: ethernet@70000 {
+				tx-csum-limit = <9800>;
+			};
+
+			eth1: ethernet@74000 {
+				tx-csum-limit = <9800>;
+			};
+
+			xor@f0800 {
+				compatible = "marvell,orion-xor";
+				reg = <0xF0800 0x100
+				       0xF0A00 0x100>;
+				clocks = <&gateclk 22>;
+				status = "okay";
+
+				xor00 {
+					interrupts = <51>;
+					dmacap,memcpy;
+					dmacap,xor;
+				};
+				xor01 {
+					interrupts = <52>;
+					dmacap,memcpy;
+					dmacap,xor;
+					dmacap,memset;
+				};
+			};
+		};
 	};
 
 	clocks {

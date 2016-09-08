@@ -40,6 +40,29 @@
 			  MBUS_ID(0x08, 0x00) 0 0 0xfc000000 0x100000>;	/* dfx */
 
 		internal-regs {
+			spi0: spi@10600 {
+				status = "okay";
+
+				spi-flash@0 {
+					#address-cells = <1>;
+					#size-cells = <1>;
+					compatible = "jedec,spi-nor";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <108000000>;
+				};
+			};
+
+			i2c0: i2c@11000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&i2c0_pins>;
+				eeprom@50 {
+					compatible = "atmel,24c64";
+					pagesize = <32>;
+					reg = <0x50>;
+					marvell,board_id_reg = <0x7>;
+				};
+			};
+
 			serial@12000 {
 				status = "okay";
 			};
@@ -49,6 +72,11 @@
 				pinctrl-0 = <&uart1_pins>;
 				status = "okay";
 			};
+
+			usb@50000 {
+				status = "okay";
+			};
+
 			ethernet@70000 {
 				status = "okay";
 				compatible = "marvell,armada-xp-neta";
@@ -65,32 +93,6 @@
 				fixed-link {
 					speed = <1000>;
 					full-duplex;
-				};
-			};
-			spi0: spi@10600 {
-				status = "okay";
-
-				spi-flash@0 {
-					#address-cells = <1>;
-					#size-cells = <1>;
-					compatible = "jedec,spi-nor";
-					reg = <0>; /* Chip select 0 */
-					spi-max-frequency = <108000000>;
-				};
-			};
-
-			usb@50000 {
-				status = "okay";
-			};
-
-			i2c0: i2c@11000 {
-				pinctrl-names = "default";
-				pinctrl-0 = <&i2c0_pins>;
-				eeprom@50 {
-					compatible = "atmel,24c64";
-					pagesize = <32>;
-					reg = <0x50>;
-					marvell,board_id_reg = <0x7>;
 				};
 			};
 		};
