@@ -3027,8 +3027,9 @@ static int mv_pp3_change_mtu_internals(struct net_device *dev, int mtu)
 	dev->mtu = mtu;
 
 	if (long_pool) {
-		mv_pp3_pool_long_sw_init(long_pool, long_pool->headroom,
-						MV_RX_PKT_SIZE(mtu));
+		if (mv_pp3_pool_long_sw_init(long_pool, long_pool->headroom,
+					     MV_RX_PKT_SIZE(mtu)))
+			return -1;
 
 		if (pp3_fw_bm_pool_set(long_pool) < 0)
 			pr_warn("%s: FW long pool update failed\n", dev->name);
