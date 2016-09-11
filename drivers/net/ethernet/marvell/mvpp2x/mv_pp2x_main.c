@@ -330,7 +330,7 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 static int mv_pp2x_bm_pool_create(struct device *dev,
 					 struct mv_pp2x_hw *hw,
 					 struct mv_pp2x_bm_pool *bm_pool,
-					 int size)
+					 int size, int pkt_size)
 {
 	int size_bytes;
 
@@ -360,7 +360,7 @@ static int mv_pp2x_bm_pool_create(struct device *dev,
 	mv_pp2x_bm_hw_pool_create(hw, bm_pool->id, bm_pool->phys_addr, size);
 
 	bm_pool->size = size;
-	bm_pool->pkt_size = mv_pp2x_pool_pkt_size_get(bm_pool->log_id);
+	bm_pool->pkt_size = pkt_size;
 	bm_pool->frag_size = SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(
 				bm_pool->pkt_size)) + MVPP2_SKB_SHINFO_SIZE;
 	bm_pool->buf_num = 0;
@@ -485,10 +485,9 @@ int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
 	bm_pool->log_id = pool;
 	bm_pool->id = first_pool + pool;
 	bm_pool->external_pool = true;
-	mv_pp2x_pools[pool].pkt_size = pkt_size;
-		err = mv_pp2x_bm_pool_create(dev, hw, bm_pool, size);
-		if (err)
-			return err;
+	err = mv_pp2x_bm_pool_create(dev, hw, bm_pool, size, pkt_size);
+	if (err)
+		return err;
 
 	*pool_num = pool;
 	priv->num_pools++;
@@ -510,7 +509,8 @@ static int mv_pp2x_bm_pools_init(struct platform_device *pdev,
 		bm_pool->log_id = i;
 		bm_pool->id = first_pool + i;
 		bm_pool->external_pool = false;
-		err = mv_pp2x_bm_pool_create(&pdev->dev, hw, bm_pool, size);
+		err = mv_pp2x_bm_pool_create(&pdev->dev, hw, bm_pool, size,
+					     mv_pp2x_pool_pkt_size_get(bm_pool->log_id));
 		if (err)
 			goto err_unroll_pools;
 	}
