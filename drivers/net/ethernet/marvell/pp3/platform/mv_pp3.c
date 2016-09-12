@@ -919,7 +919,9 @@ static int mv_pp3_shared_probe(struct platform_device *pdev)
 		if (!ppool)
 			return -ENOMEM;
 
-		pr_cont("%d bytes of coherent memory allocated\n", ppool->capacity * sizeof(unsigned int));
+		pr_cont("%d bytes of coherent memory allocated ", ppool->capacity * sizeof(unsigned int));
+		pr_cont("- paddr = 0x%x, vaddr = 0x%p\n", ppool->phys_base, ppool->virt_base);
+
 		mv_pp3_pool_set_id(ppool, pool);
 	}
 
