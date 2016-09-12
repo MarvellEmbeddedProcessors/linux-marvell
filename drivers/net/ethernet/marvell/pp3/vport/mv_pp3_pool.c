@@ -412,41 +412,6 @@ void pp3_dbg_pool_status_print(int pool)
 }
 /*---------------------------------------------------------------------------*/
 
-int pp3_dbg_pool_dump(int pool, int v)
-{
-	int i;
-	struct pp3_pool *ppool;
-	u32 *arr;
-
-	if ((pool < 0) || (pool >= BM_POOLS_NUM)) {
-		pr_err("%s: pool=%d is out of range\n", __func__, pool);
-		return -EINVAL;
-	}
-
-	if (v) {
-
-		if ((pp3_pools == NULL) || (pp3_pools[pool] == NULL)) {
-			pr_err("%s: pool=%d is not initialized\n", __func__, pool);
-			return -EINVAL;
-		}
-
-		ppool = pp3_pools[pool];
-
-		arr = (u32 *)ppool->virt_base;
-
-		for (i = 0; i < ppool->capacity; i = i + 2)
-			pr_info("%d	virt = 0x%08x	phys = 0x%08x\n", i/2, arr[i+1], arr[i]);
-	}
-
-	pr_info("\n");
-
-	bm_pool_status_dump(pool);
-
-	return 0;
-}
-/*---------------------------------------------------------------------------*/
-
-
 /* Clear BM pool statistics */
 void pp3_dbg_pool_stats_clear(int pool)
 {
