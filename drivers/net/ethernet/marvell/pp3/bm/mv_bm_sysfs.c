@@ -34,6 +34,7 @@ disclaimer.
 
 #include "common/mv_sw_if.h"
 #include "platform/mv_pp3.h"
+#include "vport/mv_pp3_pool.h"
 #include "mv_bm.h"
 
 static ssize_t pp3_dev_bm_help(char *b)
@@ -44,8 +45,10 @@ static ssize_t pp3_dev_bm_help(char *b)
 	o += scnprintf(b+o, PAGE_SIZE-o, "cat                   > regs         - show BM registers\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "cat                   > err_regs     - show BM erorr registers\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "cat                   > idle_regs    - show BM idle mode registers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [pool] [0|1]     > pool_regs    - show BM pool registers\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "echo [pool] [0|1]     > pool_enable  - enable/disable BM pool\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "echo [pool] [mode]    > pool_regs    - show BM pool registers\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "echo [pool] [mode]    > pool_dump    - show BM pool memory dump\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "echo [pool]           > pool_check   - check BM pool validity\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "echo [pool] [mode]    > pool_enable  - enable/disable BM pool\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [bank]           > bank_regs    - show BM bank registers\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [bank]           > bank_dump    - show BM bank cache memory\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "echo [mask]           > debug        - Registers read and write debug outputs\n");
@@ -55,7 +58,8 @@ static ssize_t pp3_dev_bm_help(char *b)
 	o += scnprintf(b+o, PAGE_SIZE-o, "parameters:\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "      [pool]  - pool number\n");
 	o += scnprintf(b+o, PAGE_SIZE-o, "      [bank]  - bank number\n");
-	o += scnprintf(b+o, PAGE_SIZE-o, "      [mask]  - b0:read, b1:write\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "      [mask]  - b0 : read, b1 : write\n");
+	o += scnprintf(b+o, PAGE_SIZE-o, "      [mode]  - 0 : short, 1 : full\n");
 
 	return o;
 }
@@ -81,7 +85,42 @@ static ssize_t pp3_dev_bm_show(struct device *dev,
 	return off;
 }
 
+int pp3_dbg_pool_check(int pool)
+{
+	int err;
+	struct pp3_pool *ppool;
 
+	ppool = mv_pp3_pool_get(pool);
+
+	if (!ppool || !ppool->virt_base) {
+		pr_err("%s: pool=%d is not initialized\n", __func__, pool);
+		return -EINVAL;
+	}
+	err = bm_bank0_pool_check(pool, ppool->virt_base);
+
+	return err;
+}
+
+int pp3_dbg_pool_dump(int pool, int mode)
+{
+	int err, capacity = 0;
+	struct pp3_pool *ppool = NULL;
+	u32 *virt_base = NULL;
+
+	if (mode) {
+		ppool = mv_pp3_pool_get(pool);
+		if (!ppool || !ppool->virt_base) {
+			pr_err("%s: pool=%d is not initialized\n", __func__, pool);
+			return -EINVAL;
+		}
+		virt_base = (u32 *)ppool->virt_base;
+		capacity = ppool->capacity;
+	}
+
+	err = bm_pool_dump(pool, mode, virt_base, capacity);
+
+	return err;
+}
 
 static ssize_t pp3_dev_bm_store(struct device *dev,
 				   struct device_attribute *attr, const char *buf, size_t len)
@@ -89,7 +128,6 @@ static ssize_t pp3_dev_bm_store(struct device *dev,
 	const char      *name = attr->attr.name;
 	int             err;
 	unsigned int    a, b, c;
-	unsigned long   flags;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -98,12 +136,14 @@ static ssize_t pp3_dev_bm_store(struct device *dev,
 	err = a = b = c = 0;
 	sscanf(buf, "%d %d %d", &a, &b, &c);
 
-	local_irq_save(flags);
-
 	if (!strcmp(name, "pool_enable")) {
 		(b == 0) ? bm_pool_disable(a) : bm_pool_enable(a);
 	} else if (!strcmp(name, "pool_regs")) {
 		(b == 0) ? bm_pool_registers_dump(a) :  bm_pool_registers_parse(a);
+	} else if (!strcmp(name, "pool_dump")) {
+		pp3_dbg_pool_dump(a, b);
+	} else if (!strcmp(name, "pool_check")) {
+		pp3_dbg_pool_check(a);
 	} else if (!strcmp(name, "bank_regs")) {
 		bm_bank_registers_dump(a);
 	} else if (!strcmp(name, "bank_dump")) {
@@ -116,14 +156,14 @@ static ssize_t pp3_dev_bm_store(struct device *dev,
 		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
 	}
 
-	local_irq_restore(flags);
-
 	if (err)
 		pr_err("%s: error %d\n", __func__, err);
 
 	return err ? -EINVAL : len;
 }
 
+static DEVICE_ATTR(pool_check,		S_IWUSR, NULL, pp3_dev_bm_store);
+static DEVICE_ATTR(pool_dump,		S_IWUSR, NULL, pp3_dev_bm_store);
 static DEVICE_ATTR(pool_regs,		S_IWUSR, NULL, pp3_dev_bm_store);
 static DEVICE_ATTR(pool_enable,		S_IWUSR, NULL, pp3_dev_bm_store);
 static DEVICE_ATTR(bank_regs,		S_IWUSR, NULL, pp3_dev_bm_store);
@@ -142,6 +182,8 @@ static struct attribute *pp3_dev_bm_attrs[] = {
 	&dev_attr_bank_dump.attr,
 	&dev_attr_regs.attr,
 	&dev_attr_pool_regs.attr,
+	&dev_attr_pool_dump.attr,
+	&dev_attr_pool_check.attr,
 	&dev_attr_pool_enable.attr,
 	&dev_attr_debug.attr,
 	NULL

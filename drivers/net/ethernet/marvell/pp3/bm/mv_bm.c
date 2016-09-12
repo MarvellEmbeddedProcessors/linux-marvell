@@ -207,8 +207,7 @@ static int bm_entry_print(char *name, int offs, int words)
 	unsigned int *entry;
 	int i;
 
-	entry = kzalloc(words * sizeof(unsigned int), GFP_KERNEL);
-
+	entry = kcalloc(words, sizeof(unsigned int), GFP_KERNEL);
 	if (!entry) {
 		pr_info("%s: Error - out of memory\n", __func__);
 		return -ENOMEM;
@@ -1131,7 +1130,8 @@ void bm_pool_status_dump(int pool)
 	dram_fill = mv_field_get(BM_TPR_DRW_MNG_BALL_DYN_DRAM_FILL_OFFS,
 		BM_TPR_DRW_MNG_BALL_DYN_DRAM_FILL_BITS, drw_mng_ball_entry);
 
-	pr_info("dram fill      [PEs]: %d\n", dram_fill * 8);
+	/* fields in unit of 8 bytes,  2 = 8 / PE size in dram */
+	pr_info("dram fill      [PEs]: %d\n", dram_fill * 2);
 	/*---------------------------------------------------------------------*/
 	entry_offset = BM_TPR_CTRS_BANK_TBL_ENTRY(bid, pid_local);
 	bm_entry_read(entry_offset, BM_TPR_CTRS_BANK_TBL_ENTRY_WORDS, tpr_ctrs_entry);
@@ -1173,8 +1173,7 @@ void bm_pool_registers_parse(int pool)
 	pid_local = bm_pid_to_local(pool);
 	pid_global = bm_pid_to_global(pool);
 
-	pr_info("\nbm_pool_registers_dump\n\n");
-	/*---------------------------------------------------------------------*/
+	pr_info("\n-------------- BM pool %d registers parse -----------\n", pool);
 
 	if  (bid == 0) {	/* QM pools */
 		bm_gl_reg_print("BANK_POOL_CFG_REG", BM_B0_POOL_CFG_REG(pid_local));
@@ -1394,7 +1393,7 @@ void bm_error_dump(void)
 
 
 	for (bid = 0; bid < BM_BANK_NUM; bid++) {
-		pr_info("bank %d innterrupt regs:\n", bid);
+		pr_info("bank %d interrupt regs:\n", bid);
 		sprintf(reg_name, "B%d_SYS_REC_INTERRUPT_CAUSE", bid);
 		bm_gl_reg_none_zr_print(reg_name, BM_BANK_SYS_REC_INTERRUPT_CAUSE_REG(bid));
 
@@ -1420,4 +1419,317 @@ void bm_error_dump(void)
 	bm_gl_reg_none_zr_print("ERR_INTERRUPT_CAUSE_REG", BM_ERR_INTERRUPT_CAUSE_REG);
 	bm_gl_reg_none_zr_print("FUNC_INTERRUPT_CAUSE_REG", BM_FUNC_INTERRUPT_CAUSE_REG);
 	bm_gl_reg_none_zr_print("ECC_ERR_INTERRUPT_CAUSE_REG", BM_ECC_ERR_INTERRUPT_CAUSE_REG);
+}
+
+/* mode: 0 - print only pool status, 1 - print all PEs from DRAM,  2 - print only valid PEs from DRAM */
+int bm_pool_dump(int pool, int mode, u32 *pool_base, int capacity)
+{
+	int i;
+
+	if ((mode > 0) && pool_base) {
+		pr_info("\n-------------- BM pool %d dump: vaddr = 0x%p, paddr = 0x%08x -----------\n",
+			pool, pool_base, virt_to_phys(pool_base));
+		pr_info(" Pool addr (offs)  :   paddr       vaddr     |    paddr       vaddr\n");
+		for (i = 0; i < capacity; i = i + 4)
+			pr_info("0x%p (%4d)  : 0x%08x  0x%08x  |  0x%08x  0x%08x\n",
+				&pool_base[i], i, pool_base[i], pool_base[i + 1],
+				pool_base[i + 2], pool_base[i + 3]);
+	}
+	bm_pool_status_dump(pool);
+	return 0;
+}
+
+int bm_bank0_pool_find_buf(int pool, u32 *pool_base, unsigned int buf)
+{
+	int count, bid, pid_local, pid_global, i, line, max = 0;
+	unsigned int dram_rd, dram_wr, dram_fill, dram_size, dram_start, entry_offset;
+	unsigned int cache_rd, cache_wr, cache_start, cache_end, cache_fill_min, cache_fill_max;
+	unsigned int start, end;
+	u32 val;
+	unsigned int drw_mng_ball_entry[BM_TPR_DRW_MNG_BALL_DYN_TBL_ENTRY_WORDS];
+	unsigned int tpr_dro_mng_entry[BM_TPR_DRO_MNG_BALL_DYN_TBL_ENTRY_WORDS];
+	unsigned int dpr_d_mng_entry[BM_DPR_D_MNG_BALL_STAT_TBL_ENTRY_WORDS];
+	unsigned int sram_cache_entry[BM_SRAM_B0_CACHE_TBL_ENTRY_WORDS];
+	unsigned int dpr_c_mng_entry[BM_DPR_C_MNG_BANK_STAT_TBL_ENTRY_WORDS];
+	unsigned int tpr_c_mng_entry[BM_TPR_C_MNG_BANK_DYN_TBL_ENTRY_WORDS];
+
+	if ((pool < BM_QM_GPM_POOL_0) && (pool > BM_QM_GPM_POOL_1)) {
+		pr_err("%s: Supported only for GPM pools 0..1\n", __func__);
+		return -1;
+	}
+
+	bid = bm_pid_to_bid(pool);
+	pid_local = bm_pid_to_local(pool);
+	pid_global = bm_pid_to_global(pool);
+
+	entry_offset = BM_TPR_DRW_MNG_BALL_DYN_TBL_ENTRY(pid_global);
+	bm_entry_read(entry_offset, BM_TPR_DRW_MNG_BALL_DYN_TBL_ENTRY_WORDS, drw_mng_ball_entry);
+
+	dram_fill = mv_field_get(BM_TPR_DRW_MNG_BALL_DYN_DRAM_FILL_OFFS,
+				 BM_TPR_DRW_MNG_BALL_DYN_DRAM_FILL_BITS, drw_mng_ball_entry);
+
+	entry_offset = BM_TPR_DRO_MNG_BALL_DYN_TBL_ENTRY(pid_global);
+	bm_entry_read(entry_offset, BM_TPR_DRO_MNG_BALL_DYN_TBL_ENTRY_WORDS, tpr_dro_mng_entry);
+
+	dram_rd = mv_field_get(BM_TPR_DRO_MNG_BALL_DYN_DRAM_RD_PTR_OFFS,
+			       BM_TPR_DRO_MNG_BALL_DYN_DRAM_RD_PTR_BITS, tpr_dro_mng_entry);
+	dram_wr = mv_field_get(BM_TPR_DRO_MNG_BALL_DYN_DRAM_WR_PTR_OFFS,
+			       BM_TPR_DRO_MNG_BALL_DYN_DRAM_WR_PTR_BITS, tpr_dro_mng_entry);
+
+	entry_offset = BM_DPR_D_MNG_BALL_STAT_TBL_ENTRY(pid_global);
+	bm_entry_read(entry_offset, BM_DPR_D_MNG_BALL_STAT_TBL_ENTRY_WORDS, dpr_d_mng_entry);
+	dram_start = mv_field_get(BM_DPR_D_MNG_BALL_STAT_DRAM_START_LSB_OFFS,
+				  BM_DPR_D_MNG_BALL_STAT_DRAM_START_LSB_BITS, dpr_d_mng_entry);
+
+	dram_size = mv_field_get(BM_DPR_D_MNG_BALL_STAT_DRAM_SIZE_OFFS,
+				 BM_DPR_D_MNG_BALL_STAT_DRAM_SIZE_BITS, dpr_d_mng_entry);
+
+	dram_size *= 16;
+	dram_rd *= 2;
+	dram_wr *= 2;
+	dram_fill *= 2;
+
+	/* valid DRAM enries from dram_read to dram_write */
+	start = dram_rd;
+	if (dram_wr > dram_rd)
+		end = dram_wr;
+	else
+		end = dram_size;
+
+	count = 0;
+	pr_cont("Buf 0x%04x: ", buf);
+	while (count < dram_fill) {
+		for (i = start; i < end; i++) {
+			val = pool_base[i];
+			if (val > dram_size) {
+				pr_info("BM pool #%d: Unexpected buffer index 0x%04x on DRAM offset %d\n",
+					pool, val, i);
+				break;
+			}
+			if (val == buf) {
+				pr_cont("D_%-4d ", i);
+				max++;
+			}
+			count++;
+		}
+		start = 0;
+		end = dram_wr;
+	}
+
+	/* Check Cache */
+	entry_offset = BM_DPR_C_MNG_BANK_STAT_TBL_ENTRY(bid, pid_local);
+	bm_entry_read(entry_offset, BM_DPR_C_MNG_BANK_STAT_TBL_ENTRY_WORDS, dpr_c_mng_entry);
+
+	cache_start = mv_field_get(BM_DPR_C_MNG_BANK_STAT_CACHE_START_OFFS,
+				   BM_DPR_C_MNG_BANK_STAT_CACHE_START_BITS, dpr_c_mng_entry);
+	cache_end = mv_field_get(BM_DPR_C_MNG_BANK_STAT_CACHE_END_OFFS,
+				 BM_DPR_C_MNG_BANK_STAT_CACHE_END_BITS, dpr_c_mng_entry);
+
+	cache_start *= 4;
+	cache_end = (cache_end + 1) * 4 - 1;
+
+	entry_offset = BM_TPR_C_MNG_BANK_DYN_TBL_ENTRY(bid, pid_local);
+	bm_entry_read(entry_offset, BM_TPR_C_MNG_BANK_DYN_TBL_ENTRY_WORDS, tpr_c_mng_entry);
+
+	cache_fill_min = mv_field_get(BM_TPR_C_MNG_BANK_DYN_CACHE_FILL_MIN_OFFS,
+				      BM_TPR_C_MNG_BANK_DYN_CACHE_FILL_MIN_BITS, tpr_c_mng_entry);
+	cache_fill_max = mv_field_get(BM_TPR_C_MNG_BANK_DYN_CACHE_FILL_MAX_OFFS,
+				      BM_TPR_C_MNG_BANK_DYN_CACHE_FILL_MAX_BITS, tpr_c_mng_entry);
+	cache_wr = mv_field_get(BM_TPR_C_MNG_BANK_DYN_CACHE_WR_PTR_OFFS,
+				BM_TPR_C_MNG_BANK_DYN_CACHE_WR_PTR_BITS, tpr_c_mng_entry);
+	cache_rd = mv_field_get(BM_TPR_C_MNG_BANK_DYN_CACHE_RD_PTR_OFFS,
+				BM_TPR_C_MNG_BANK_DYN_CACHE_RD_PTR_BITS, tpr_c_mng_entry);
+
+	start = cache_rd;
+	if (cache_wr > cache_rd)
+		end = cache_wr;
+	else
+		end = cache_end;
+
+	count = 0;
+	while (count < cache_fill_max) {
+		for (line = start; line < end; line++) {
+			entry_offset = BM_SRAM_B0_CACHE_TBL_ENTRY(line);
+			bm_entry_read(entry_offset, BM_SRAM_B0_CACHE_TBL_ENTRY_WORDS, sram_cache_entry);
+			for (i = 0; i < 4; i++) {
+				val = sram_cache_entry[i];
+				if (val > dram_size) {
+					pr_info("BM pool #%d: Unexpected buffer index 0x%04x on CACHE line #%d:%d\n",
+						pool, val, line, i);
+					break;
+				}
+
+				if (val == buf) {
+					pr_cont("C_%-3d:%d ", line, i);
+					max++;
+				}
+				count++;
+			}
+		}
+		start = cache_start;
+		end = cache_wr;
+	}
+	pr_cont("- found %d times\n", max);
+
+	return max;
+}
+
+int bm_bank0_pool_check(int pool, u32 *pool_base)
+{
+	int count, bid, pid_local, pid_global, i, line, dup;
+	unsigned int dram_rd, dram_wr, dram_fill, dram_size, dram_start, entry_offset;
+	unsigned int cache_rd, cache_wr, cache_start, cache_end, cache_fill_min, cache_fill_max;
+	unsigned int start, end;
+	u32 *pool_shadow, val;
+	unsigned int drw_mng_ball_entry[BM_TPR_DRW_MNG_BALL_DYN_TBL_ENTRY_WORDS];
+	unsigned int tpr_dro_mng_entry[BM_TPR_DRO_MNG_BALL_DYN_TBL_ENTRY_WORDS];
+	unsigned int dpr_d_mng_entry[BM_DPR_D_MNG_BALL_STAT_TBL_ENTRY_WORDS];
+	unsigned int sram_cache_entry[BM_SRAM_B0_CACHE_TBL_ENTRY_WORDS];
+	unsigned int dpr_c_mng_entry[BM_DPR_C_MNG_BANK_STAT_TBL_ENTRY_WORDS];
+	unsigned int tpr_c_mng_entry[BM_TPR_C_MNG_BANK_DYN_TBL_ENTRY_WORDS];
+
+	if ((pool < BM_QM_GPM_POOL_0) && (pool > BM_QM_GPM_POOL_1)) {
+		pr_err("%s: Supported only for GPM pools 0..1\n", __func__);
+		return -1;
+	}
+
+	bid = bm_pid_to_bid(pool);
+	pid_local = bm_pid_to_local(pool);
+	pid_global = bm_pid_to_global(pool);
+
+	pr_info("\n-------------- BM pool %d check: vaddr = 0x%p, paddr = 0x%08x -----------\n",
+		pool, pool_base, virt_to_phys(pool_base));
+
+	/* DRAM parameters */
+	entry_offset = BM_TPR_DRW_MNG_BALL_DYN_TBL_ENTRY(pid_global);
+	bm_entry_read(entry_offset, BM_TPR_DRW_MNG_BALL_DYN_TBL_ENTRY_WORDS, drw_mng_ball_entry);
+
+	dram_fill = mv_field_get(BM_TPR_DRW_MNG_BALL_DYN_DRAM_FILL_OFFS,
+				 BM_TPR_DRW_MNG_BALL_DYN_DRAM_FILL_BITS, drw_mng_ball_entry);
+
+	entry_offset = BM_TPR_DRO_MNG_BALL_DYN_TBL_ENTRY(pid_global);
+	bm_entry_read(entry_offset, BM_TPR_DRO_MNG_BALL_DYN_TBL_ENTRY_WORDS, tpr_dro_mng_entry);
+
+	dram_rd = mv_field_get(BM_TPR_DRO_MNG_BALL_DYN_DRAM_RD_PTR_OFFS,
+			       BM_TPR_DRO_MNG_BALL_DYN_DRAM_RD_PTR_BITS, tpr_dro_mng_entry);
+	dram_wr = mv_field_get(BM_TPR_DRO_MNG_BALL_DYN_DRAM_WR_PTR_OFFS,
+			       BM_TPR_DRO_MNG_BALL_DYN_DRAM_WR_PTR_BITS, tpr_dro_mng_entry);
+
+	entry_offset = BM_DPR_D_MNG_BALL_STAT_TBL_ENTRY(pid_global);
+	bm_entry_read(entry_offset, BM_DPR_D_MNG_BALL_STAT_TBL_ENTRY_WORDS, dpr_d_mng_entry);
+	dram_start = mv_field_get(BM_DPR_D_MNG_BALL_STAT_DRAM_START_LSB_OFFS,
+				  BM_DPR_D_MNG_BALL_STAT_DRAM_START_LSB_BITS, dpr_d_mng_entry);
+
+	dram_size = mv_field_get(BM_DPR_D_MNG_BALL_STAT_DRAM_SIZE_OFFS,
+				 BM_DPR_D_MNG_BALL_STAT_DRAM_SIZE_BITS, dpr_d_mng_entry);
+
+	dram_size *= 16;
+	dram_rd *= 2;
+	dram_wr *= 2;
+	dram_fill *= 2;
+
+	pr_info("BM pool #%d: DRAM [PEs]: size=%d, read=%d, write=%d, fill=%d\n",
+		pool, dram_size, dram_rd, dram_wr, dram_fill);
+
+	/* Cache parameters */
+	entry_offset = BM_DPR_C_MNG_BANK_STAT_TBL_ENTRY(bid, pid_local);
+	bm_entry_read(entry_offset, BM_DPR_C_MNG_BANK_STAT_TBL_ENTRY_WORDS, dpr_c_mng_entry);
+
+	cache_start = mv_field_get(BM_DPR_C_MNG_BANK_STAT_CACHE_START_OFFS,
+				   BM_DPR_C_MNG_BANK_STAT_CACHE_START_BITS, dpr_c_mng_entry);
+	cache_end = mv_field_get(BM_DPR_C_MNG_BANK_STAT_CACHE_END_OFFS,
+				 BM_DPR_C_MNG_BANK_STAT_CACHE_END_BITS, dpr_c_mng_entry);
+
+	cache_start *= 4;
+	cache_end = (cache_end + 1) * 4 - 1;
+
+	entry_offset = BM_TPR_C_MNG_BANK_DYN_TBL_ENTRY(bid, pid_local);
+	bm_entry_read(entry_offset, BM_TPR_C_MNG_BANK_DYN_TBL_ENTRY_WORDS, tpr_c_mng_entry);
+
+	cache_fill_min = mv_field_get(BM_TPR_C_MNG_BANK_DYN_CACHE_FILL_MIN_OFFS,
+				      BM_TPR_C_MNG_BANK_DYN_CACHE_FILL_MIN_BITS, tpr_c_mng_entry);
+	cache_fill_max = mv_field_get(BM_TPR_C_MNG_BANK_DYN_CACHE_FILL_MAX_OFFS,
+				      BM_TPR_C_MNG_BANK_DYN_CACHE_FILL_MAX_BITS, tpr_c_mng_entry);
+	cache_wr = mv_field_get(BM_TPR_C_MNG_BANK_DYN_CACHE_WR_PTR_OFFS,
+				BM_TPR_C_MNG_BANK_DYN_CACHE_WR_PTR_BITS, tpr_c_mng_entry);
+	cache_rd = mv_field_get(BM_TPR_C_MNG_BANK_DYN_CACHE_RD_PTR_OFFS,
+				BM_TPR_C_MNG_BANK_DYN_CACHE_RD_PTR_BITS, tpr_c_mng_entry);
+
+	pr_info("BM pool #%d: CACHE [Lines]: start=%d, end=%d, read=%d, write=%d, fill=%d..%d\n",
+		pool, cache_start, cache_end, cache_rd, cache_wr, cache_fill_min, cache_fill_max);
+	pr_info("\n");
+
+	pool_shadow = kcalloc(dram_size, sizeof(u32), GFP_KERNEL);
+
+	/* valid DRAM enries from dram_read to dram_write */
+	start = dram_rd;
+	if (dram_wr > dram_rd)
+		end = dram_wr;
+	else
+		end = dram_size;
+
+	count = 0;
+	dup = 0;
+	while (count < dram_fill) {
+		for (i = start; i < end; i++) {
+			val = pool_base[i];
+			if (val > dram_size) {
+				pr_info("BM pool #%d: Unexpected buffer index 0x%04x on DRAM offset %d\n",
+					pool, val, i);
+				break;
+			}
+			if (pool_shadow[val] == 1) {
+				/* pr_info("BM pool #%d: Multiple index 0x%04x on DRAM offset %d. count=%d\n",
+				*	pool, val, i, pool_shadow[val]);
+				*/
+				bm_bank0_pool_find_buf(pool, pool_base, val);
+				dup++;
+			}
+			pool_shadow[val]++;
+			count++;
+		}
+		start = 0;
+		end = dram_wr;
+	}
+
+	/* Check Cache */
+	start = cache_rd;
+	if (cache_wr > cache_rd)
+		end = cache_wr;
+	else
+		end = cache_end;
+
+	count = 0;
+	while (count < cache_fill_max) {
+		for (line = start; line < end; line++) {
+			entry_offset = BM_SRAM_B0_CACHE_TBL_ENTRY(line);
+			bm_entry_read(entry_offset, BM_SRAM_B0_CACHE_TBL_ENTRY_WORDS, sram_cache_entry);
+			for (i = 0; i < 4; i++) {
+				val = sram_cache_entry[i];
+				if (val > dram_size) {
+					pr_info("BM pool #%d: Unexpected buffer index 0x%04x on CACHE line #%d:%d\n",
+						pool, val, line, i);
+					break;
+				}
+
+				if (pool_shadow[val] == 1) {
+				/*	pr_info("BM pool #%d: Multiple index 0x%04x on CACHE line #%d:%d. count=%d\n",
+				*			pool, val, line, i, pool_shadow[val]);
+				*/
+					bm_bank0_pool_find_buf(pool, pool_base, val);
+					dup++;
+				}
+				pool_shadow[val]++;
+				count++;
+			}
+		}
+		start = cache_start;
+		end = cache_wr;
+	}
+
+	pr_info("BM pool #%d: %d duplicated pointers are found\n", pool, dup);
+	pr_info("\n");
+
+	kfree(pool_shadow);
+	return 0;
 }

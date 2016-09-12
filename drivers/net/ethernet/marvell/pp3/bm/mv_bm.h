@@ -279,7 +279,9 @@ int bm_pool_disable(int pool);
 
 void bm_pool_status_dump(int pool);
 
+int bm_bank0_pool_check(int pool, u32 *pool_base);
 
+int bm_pool_dump(int pool, int mode, u32 *pool_base, int capacity);
 /*
  BM sysFS function
 */
