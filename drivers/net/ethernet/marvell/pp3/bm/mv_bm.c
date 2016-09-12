@@ -479,6 +479,8 @@ static int bm_qm_pool_quick_enable(int pool, int buf_num, struct mv_a40 *base_ad
 	bm_pool_fill_level_set(pool, buf_num, MV_32_BITS);
 
 	bm_memory_fill(buf_num, base_address);
+	/* Memory barrier to enshure GPM indexes are written to DRAM before enable BM/QM */
+	wmb();
 
 	/* set quick int bit */
 	reg_val = bm_gl_reg_read(BM_B0_POOL_CFG_REG(pid_local));
@@ -785,7 +787,7 @@ static int bm_pool_quick_init_complete(int pool)
 }
 
 /* Quick init of QM pools */
-int bm_qm_gpm_pools_def_quick_init(int buf_num, struct mv_a40 *qece_base, struct mv_a40 *pl_base)
+int bm_qm_gpm_pools_def_quick_init(int buf_num, struct mv_a40 *p0_base, struct mv_a40 *p1_base)
 {
 	struct mv_a40 *base_address;
 	bool bm_enable;
@@ -808,7 +810,7 @@ int bm_qm_gpm_pools_def_quick_init(int buf_num, struct mv_a40 *qece_base, struct
 
 	for (pool = BM_QM_GPM_POOL_0; pool <= BM_QM_GPM_POOL_1; pool++) {
 
-		base_address = (pool == BM_QM_GPM_POOL_0) ? pl_base : qece_base;
+		base_address = (pool == BM_QM_GPM_POOL_0) ? p0_base : p1_base;
 
 		ret_val |= bm_pool_dram_set(pool, buf_num, MV_32_BITS, base_address,
 						BM_DRAM_AE(buf_num), BM_DRAM_AF(buf_num));
@@ -832,20 +834,18 @@ int bm_qm_gpm_pools_def_quick_init(int buf_num, struct mv_a40 *qece_base, struct
 	return 0;
 }
 
-int bm_qm_dram_pools_def_quick_init(struct device *dev, int buf_num, struct mv_a40 *qece_base, struct mv_a40 *pl_base)
+int bm_qm_dram_pools_def_quick_init(struct device *dev, int buf_num, struct mv_a40 *p0_base, struct mv_a40 *p1_base)
 {
-
 	struct mv_a40 *base_address;
 	struct mv_a40 address_allocate[BM_QM_DRAM_POOLS_NUM];
 	unsigned int pool, ret_val = 0;
 	int index;
 
-
 	memset(address_allocate, 0, BM_QM_DRAM_POOLS_NUM * sizeof(struct mv_a40));
 
 	for (pool = BM_QM_DRAM_POOL_0; pool <= BM_QM_DRAM_POOL_1; pool++) {
 
-		base_address = (pool == BM_QM_DRAM_POOL_0) ? pl_base : qece_base;
+		base_address = (pool == BM_QM_DRAM_POOL_0) ? p0_base : p1_base;
 		index = pool - BM_QM_DRAM_POOL_0;
 
 		ret_val |= bm_pool_dram_set(pool, buf_num, MV_32_BITS, base_address,
@@ -1051,7 +1051,6 @@ void bm_pool_status_dump(int pool)
 
 	entry_offset = BM_DPR_C_MNG_BANK_STAT_TBL_ENTRY(bid, pid_local);
 	bm_entry_read(entry_offset, BM_DPR_C_MNG_BANK_STAT_TBL_ENTRY_WORDS, dpr_c_mng_entry);
-
 
 	cache_vmid = mv_field_get(BM_DPR_C_MNG_BANK_STAT_CACHE_VMID_OFFS,
 					BM_DPR_C_MNG_BANK_STAT_CACHE_VMID_BITS, dpr_c_mng_entry);

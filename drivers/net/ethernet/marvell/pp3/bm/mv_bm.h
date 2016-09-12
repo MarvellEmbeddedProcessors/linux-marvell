@@ -168,7 +168,7 @@ void bm_attr_all_pools_def_set(void);
  *  Return values:
  *		0 - success
  */
-int bm_qm_gpm_pools_def_quick_init(int buf_num, struct mv_a40 *qece_base, struct mv_a40 *pl_base);
+int bm_qm_gpm_pools_def_quick_init(int buf_num, struct mv_a40 *p0_base, struct mv_a40 *p1_base);
 
 /**
  *  Initiates of DRAM pools with default values
@@ -176,7 +176,7 @@ int bm_qm_gpm_pools_def_quick_init(int buf_num, struct mv_a40 *qece_base, struct
  *  Return values:
  *		0 - success
  */
-int bm_qm_dram_pools_def_quick_init(struct device *dev, int buf_num, struct mv_a40 *qece_base, struct mv_a40 *pl_base);
+int bm_qm_dram_pools_def_quick_init(struct device *dev, int buf_num, struct mv_a40 *p0_base, struct mv_a40 *p1_base);
 
 /**
  *  Basic initialization of general purpose pools with default values
