@@ -1,0 +1,28 @@
+Marvell USB2 device controller
+
+This controller is integrated in Armada 38x/3700/8K.
+
+Required properties:
+- compatible	: Must be "marvell,mv-udc"
+- reg		: Physical base address and size of the USB2 device registers map.
+- interrupts	: Should contain single irq line of USB2 device controller
+- clocks	: the clock associated to this controller
+- dma-coherent	: if controller is DMA coherent
+
+Optional properties :
+- vbus-gpio	: VBUS interrupt GPIO pin
+		  set to trigger VBUS event notification to PHY/controller
+		  whether VBUS was powered or not
+
+Example:
+	udc@524100 {
+		compatible = "marvell,mv-udc";
+		reg = <0x524100 0x2000>;
+		interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&gateclk 24>, <&gateclk 16>;
+ 		dma-coherent;
+		vbus-gpio = <&gpio1 19 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
+	};
+
+
