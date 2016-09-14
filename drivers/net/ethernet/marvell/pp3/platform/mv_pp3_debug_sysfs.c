@@ -132,8 +132,7 @@ static ssize_t pp3_hex_debug_store(struct device *dev,
 {
 	const char      *name = attr->attr.name;
 	int             err;
-	unsigned int    a, b, c;
-	unsigned long   flags;
+	unsigned int    a, b, c, size, val;
 	u32             *arr;
 	int i, ret;
 
@@ -143,63 +142,52 @@ static ssize_t pp3_hex_debug_store(struct device *dev,
 	/* Read port and value */
 	err = a = b = c = 0;
 	ret = sscanf(buf, "%x %x %x", &a, &b, &c);
+	if (ret == 2) {
+		/* read*/
+		size = b;
+		val = 0;
+	} else if (ret == 3) {
+		/* write */
+		size = c;
+		val = b;
+	} else {
+		pr_info("Wrong number of arguments: %d", ret);
+		return -EINVAL;
+	}
 
-	local_irq_save(flags);
-
-	arr = kzalloc(sizeof(unsigned int) * PP3_DEBUG_ARRAY_SIZE, GFP_KERNEL);
+	arr = kcalloc(size, sizeof(unsigned int), GFP_KERNEL);
+	if (!arr)
+		return -ENOMEM;
 
 	if (!strcmp(name, "write_nss_reg")) {
-		if (c > PP3_DEBUG_ARRAY_SIZE) {
-			pr_info("can't write more than %d values", PP3_DEBUG_ARRAY_SIZE);
-			err = 1;
-			goto end;
-		}
-		for (i = 0; i < c; i++)
-			arr[i] = b;
-		mv_pp3_hw_write(a + mv_pp3_nss_regs_vaddr_get(), c, arr);
+		for (i = 0; i < size; i++)
+			arr[i] = val;
+		mv_pp3_hw_write(a + mv_pp3_nss_regs_vaddr_get(), size, arr);
 	} else if (!strcmp(name, "read_nss_reg")) {
-		if (b > PP3_DEBUG_ARRAY_SIZE) {
-			pr_info("can't read more than %d values", PP3_DEBUG_ARRAY_SIZE);
-			err = 1;
-			goto end;
-		}
-		mv_pp3_hw_read(a + mv_pp3_nss_regs_vaddr_get(), b, arr);
-		for (i = 0; i < b; i++)
-			pr_info("0x%x = 0x%08x\n", a+i*4, arr[i]);
+		mv_pp3_hw_read(a + mv_pp3_nss_regs_vaddr_get(), size, arr);
+		for (i = 0; i < size; i++)
+			pr_info("0x%x = 0x%08x\n", a + i * 4, arr[i]);
 	} else if (!strcmp(name, "write_u32_le")) {
-		if (c > PP3_DEBUG_ARRAY_SIZE) {
-			pr_info("can't write more than %d values", PP3_DEBUG_ARRAY_SIZE);
-			err = 1;
-			goto end;
-		}
-		for (i = 0; i < c; i++)
-			arr[i] = b;
-		mv_pp3_hw_write((void __iomem *)a, c, arr);
+		for (i = 0; i < size; i++)
+			arr[i] = val;
+		mv_pp3_hw_write((void __iomem *)a, size, arr);
 	} else if (!strcmp(name, "read_u32_le")) {
-		if (b > PP3_DEBUG_ARRAY_SIZE) {
-			pr_info("can't read more than %d values", PP3_DEBUG_ARRAY_SIZE);
-			err = 1;
-			goto end;
-		}
-		mv_pp3_hw_read((void __iomem *)a, b, arr);
-		for (i = 0; i < b; i++)
-			pr_info("0x%x = 0x%08x\n", a + i*4, arr[i]);
+		mv_pp3_hw_read((void __iomem *)a, size, arr);
+		for (i = 0; i < size; i++)
+			pr_info("0x%x = 0x%08x\n", a + i * 4, arr[i]);
 
 	} else if (!strcmp(name, "read_u32")) {
-		for (i = 0; i < b; i++)
-			pr_info("0x%x = 0x%08x\n", a + i*4, *(u32 *)(a + 4*i));
+		for (i = 0; i < size; i++)
+			pr_info("0x%x = 0x%08x\n", a + i * 4, *(u32 *)(a + 4 * i));
 
 	} else if (!strcmp(name, "write_u32")) {
-		for (i = 0; i < c; i++)
-			*(u32 *)(a + 4*i) = b;
+		for (i = 0; i < size; i++)
+			*(u32 *)(a + 4 * i) = val;
 	} else {
 		err = 1;
 		pr_err("%s: illegal operation <%s>\n", __func__, attr->attr.name);
 	}
-end:
 	kfree(arr);
-
-	local_irq_restore(flags);
 
 	if (err)
 		pr_err("%s: error %d\n", __func__, err);
