@@ -147,6 +147,10 @@
 						       "mpp53", "mpp54", "mpp55";
 					marvell,function = "ge1";
 				};
+				pca0_pins: pca0_pins {
+					marvell,pins = "mpp62";
+					marvell,function = "gpio";
+				};
 			};
 			usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
