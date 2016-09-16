@@ -87,6 +87,26 @@
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&cpm_i2c0_pins>;
+
+				/* U31 */
+				expander0: pca9555@21 {
+					compatible = "nxp,pca9555";
+					pinctrl-names = "default";
+					pinctrl-0 = <&pca0_pins>;
+					gpio-controller;
+					#gpio-cells = <2>;
+					reg = <0x21>;
+				};
+
+				/* U25 */
+				expander1: pca9555@25 {
+					compatible = "nxp,pca9555";
+					pinctrl-names = "default";
+					gpio-controller;
+					#gpio-cells = <2>;
+					reg = <0x25>;
+				};
+
 				eeprom@57 {
 					compatible = "at24,24c64";
 					reg = <0x57>;
