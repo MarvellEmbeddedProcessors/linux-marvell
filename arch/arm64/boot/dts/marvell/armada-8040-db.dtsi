@@ -117,7 +117,46 @@
 					reg = <0x50>;
 					pagesize = <32>;
 				};
+
 			};
+
+			/* CON9 */
+			usb3@500000 {
+				usb-phy = <&cpm_usb3h0_phy>;
+			};
+
+			/* CON10 */
+			usb3@510000 {
+				usb-phy = <&cpm_usb3h1_phy>;
+			};
+		};
+
+		cpm_usb3h0_phy: cpm_usb3_phy0 {
+			compatible = "usb-nop-xceiv";
+			vcc-supply = <&cpm_reg_usb3h0_vbus>;
+		};
+
+		cpm_reg_usb3h0_vbus: cpm_usb3-vbus0 {
+			compatible = "regulator-fixed";
+			regulator-name = "cpm-usb3-vbus-h0";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			enable-active-high;
+			gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
+		};
+
+		cpm_usb3h1_phy: cpm_usb3_phy1 {
+			compatible = "usb-nop-xceiv";
+			vcc-supply = <&cpm_reg_usb3h1_vbus>;
+		};
+
+		cpm_reg_usb3h1_vbus: cpm_usb3-vbus1 {
+			compatible = "regulator-fixed";
+			regulator-name = "cpm-usb3-vbus-h1";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			enable-active-high;
+			gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
 		};
 	};
 
@@ -135,6 +174,25 @@
 					pagesize = <32>;
 				};
 			};
+
+			/* CON9 */
+			usb3@500000 {
+				usb-phy = <&cps_usb3h0_phy>;
+			};
+		};
+
+		cps_usb3h0_phy: cps_usb3_phy0 {
+			compatible = "usb-nop-xceiv";
+			vcc-supply = <&cps_reg_usb3h0_vbus>;
+		};
+
+		cps_reg_usb3h0_vbus: cps_usb3-vbus0 {
+			compatible = "regulator-fixed";
+			regulator-name = "cps-usb3-vbus-h0";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			enable-active-high;
+			gpio = <&expander1 0 GPIO_ACTIVE_HIGH>;
 		};
 	};
 };
