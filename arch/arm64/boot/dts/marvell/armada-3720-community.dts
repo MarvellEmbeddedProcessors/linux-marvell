@@ -43,7 +43,7 @@
 
 /dts-v1/;
 
-#include "armada-372x-rz.dtsi"
+#include "armada-372x.dtsi"
 
 / {
 	model = "Marvell Armada 3720 Community Board";
