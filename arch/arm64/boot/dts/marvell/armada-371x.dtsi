@@ -50,38 +50,4 @@
 / {
 	model = "Marvell Armada 3710 SoC";
 	compatible = "marvell,armada3710", "marvell,armada3700";
-	soc {
-		internal-regs {
-			eth0: ethernet@30000 {
-				   dma-coherent;
-			};
-			eth1: ethernet@40000 {
-				dma-coherent;
-			};
-			usb3@58000 {
-				dma-coherent;
-			};
-			usb@5e000 {
-				dma-coherent;
-			};
-			xor@60900 {
-				dma-coherent;
-			};
-			sdhci1: sdhci@d0000 {
-				dma-coherent;
-			};
-
-			sdhci0: sdhci@d8000 {
-				dma-coherent;
-			};
-			sata@e0000 {
-				dma-coherent;
-			};
-			pcie-controller {
-				pcie@1,0 {
-					dma-coherent;
-				};
-			};
-		};
-	};
 };
