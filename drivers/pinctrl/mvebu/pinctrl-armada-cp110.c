@@ -643,12 +643,12 @@ static struct mvebu_mpp_ctrl armada_cp110_1_mpp_controls[] = {
 };
 
 static struct pinctrl_gpio_range armada_cp110_0_mpp_gpio_ranges[] = {
-	MPP_GPIO_RANGE(0, 0, 0, 32),
-	MPP_GPIO_RANGE(1, 32, 32, 31),
+	MPP_GPIO_RANGE(0, 0, 20, 32),
+	MPP_GPIO_RANGE(1, 32, 52, 31),
 };
 
 static struct pinctrl_gpio_range armada_cp110_1_mpp_gpio_ranges[] = {
-	MPP_GPIO_RANGE(0, 0, 0, 32),
+	MPP_GPIO_RANGE(0, 0, 20, 32),
 };
 
 static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
