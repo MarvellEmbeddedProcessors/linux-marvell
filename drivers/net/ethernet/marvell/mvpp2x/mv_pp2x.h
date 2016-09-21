@@ -772,8 +772,8 @@ struct mv_pp2x_pool_attributes {
 
 char *mv_pp2x_pool_description_get(enum mv_pp2x_bm_pool_log_num  log_id);
 
-void mv_pp2x_bm_bufs_free(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_pool,
-			  int buf_num);
+void mv_pp2x_bm_bufs_free(struct device *dev, struct mv_pp2x *priv,
+			struct mv_pp2x_bm_pool *bm_pool, int buf_num);
 int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 			struct mv_pp2x_bm_pool *bm_pool, int buf_num);
 int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
