@@ -245,24 +245,23 @@ static inline struct mv_pp2x_tx_queue *mv_pp2x_get_tx_queue(
 	return port->txqs[tx_queue];
 }
 
-static inline u8 *mv_pp2x_bm_virt_addr_get(struct mv_pp2x_hw *hw, u32 pool)
+static inline dma_addr_t mv_pp2x_bm_phys_addr_get(struct mv_pp2x_hw *hw, u32 pool)
 {
-	uintptr_t val = 0;
+	dma_addr_t val;
 
-	mv_pp2x_read(hw, MVPP2_BM_PHY_ALLOC_REG(pool));
-/*TODO: Validate this is  correct CONFIG_XXX for (sk_buff *),
- * it is a kmem_cache address (YuvalC).
- */
+	val = mv_pp2x_read(hw, MVPP2_BM_PHY_ALLOC_REG(pool));
+
 #ifdef CONFIG_PHYS_ADDR_T_64BIT
-	val = mv_pp2x_read(hw, MVPP22_BM_PHY_VIRT_HIGH_ALLOC_REG);
-	val &= MVPP22_BM_VIRT_HIGH_ALLOC_MASK;
-	val <<= (32 - MVPP22_BM_VIRT_HIGH_ALLOC_OFFSET);
-#endif
-	val |= mv_pp2x_read(hw, MVPP2_BM_VIRT_ALLOC_REG);
-	/* TODO: Remove it when 40-bit supported */
-	val &= 0xffffffff;
+	{
+	u64 val2;
 
-	return((u8 *)val);
+	val2 = mv_pp2x_read(hw, MVPP22_BM_PHY_VIRT_HIGH_ALLOC_REG);
+	val2 &= MVPP22_BM_PHY_HIGH_ALLOC_MASK;
+	val |= (val2 << 32);
+	}
+#endif
+
+	return val;
 }
 
 static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,
@@ -274,7 +273,7 @@ static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,
 
 	mv_pp2x_write(hw, MVPP2_BM_POOL_BASE_ADDR_REG(pool),
 		      lower_32_bits(pool_addr));
-#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+#if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT) && defined(CONFIG_PHYS_ADDR_T_64BIT)
 	mv_pp2x_write(hw, MVPP22_BM_POOL_BASE_ADDR_HIGH_REG,
 		      (upper_32_bits(pool_addr) & MVPP22_ADDR_HIGH_MASK));
 #endif
@@ -285,17 +284,29 @@ static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,
 	mv_pp2x_write(hw, MVPP2_BM_POOL_CTRL_REG(pool), val);
 }
 
-/* Release buffer to BM */
-static inline void mv_pp2x_bm_pool_put(struct mv_pp2x_hw *hw, u32 pool,
+static inline void mv_pp2x_bm_pool_put_virtual(struct mv_pp2x_hw *hw, u32 pool,
 					      dma_addr_t buf_phys_addr,
 					      u8 *buf_virt_addr)
 {
-
 	mv_pp2x_relaxed_write(hw, MVPP2_BM_VIRT_RLS_REG,
 			      lower_32_bits((uintptr_t)buf_virt_addr));
-	mv_pp2x_relaxed_write(hw, MVPP2_BM_PHY_RLS_REG(pool),
-		      lower_32_bits(buf_phys_addr));
 
+	mv_pp2x_relaxed_write(hw, MVPP2_BM_PHY_RLS_REG(pool),
+				lower_32_bits(buf_phys_addr));
+}
+
+/* Release buffer to BM */
+static inline void mv_pp2x_bm_pool_put(struct mv_pp2x_hw *hw, u32 pool,
+					      dma_addr_t buf_phys_addr)
+{
+
+#if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT) && defined(CONFIG_PHYS_ADDR_T_64BIT)
+	mv_pp2x_relaxed_write(hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
+			upper_32_bits(buf_phys_addr));
+#endif
+
+	mv_pp2x_relaxed_write(hw, MVPP2_BM_PHY_RLS_REG(pool),
+				lower_32_bits(buf_phys_addr));
 }
 
 /* Release multicast buffer */
@@ -313,8 +324,7 @@ static inline void mv_pp2x_bm_pool_mc_put(struct mv_pp2x_port *port, int pool,
 	 */
 	mv_pp2x_bm_pool_put(&(port->priv->hw), pool,
 			    (dma_addr_t)(buf_phys_addr |
-			    MVPP2_BM_PHY_RLS_MC_BUFF_MASK),
-			    (u8 *)(u64)(buf_virt_addr));
+			    MVPP2_BM_PHY_RLS_MC_BUFF_MASK));
 }
 
 static inline void mv_pp2x_port_interrupts_enable(struct mv_pp2x_port *port)
@@ -445,7 +455,7 @@ static inline dma_addr_t mv_pp22_rxdesc_phys_addr_get(
 {
 	return((dma_addr_t)
 		(rx_desc->u.pp22.buf_phys_addr_key_hash &
-		DMA_BIT_MASK(32)));
+		DMA_BIT_MASK(40)));
 }
 
 static inline struct sk_buff *mv_pp21_txdesc_cookie_get(
@@ -496,7 +506,7 @@ static inline void mv_pp22_txdesc_phys_addr_set(dma_addr_t phys_addr,
 {
 	u64 *buf_phys_addr_p = &tx_desc->u.pp22.buf_phys_addr_hw_cmd2;
 
-#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+#if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT) && defined(CONFIG_PHYS_ADDR_T_64BIT)
 	*buf_phys_addr_p &= ~(DMA_BIT_MASK(40));
 	*buf_phys_addr_p |= phys_addr & DMA_BIT_MASK(40);
 #else
@@ -575,6 +585,9 @@ void mv_pp2x_bm_pool_bufsize_set(struct mv_pp2x_hw *hw,
 				 struct mv_pp2x_bm_pool *bm_pool,
 				 int buf_size);
 void mv_pp2x_pool_refill(struct mv_pp2x *priv, u32 pool,
+			 dma_addr_t phys_addr);
+
+void mv_pp2x_pool_refill_virtual(struct mv_pp2x *priv, u32 pool,
 			 dma_addr_t phys_addr, u8 *cookie);
 
 void mv_pp21_rxq_long_pool_set(struct mv_pp2x_hw *hw,

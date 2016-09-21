@@ -978,6 +978,7 @@
 #define MVPP22_BM_PHY_HIGH_ALLOC_OFFSET		0
 #define MVPP22_BM_VIRT_HIGH_ALLOC_OFFSET	8
 #define MVPP22_BM_VIRT_HIGH_ALLOC_MASK		0xff00
+#define MVPP22_BM_PHY_HIGH_ALLOC_MASK		0xff
 
 #define MVPP2_BM_PHY_RLS_REG(pool)		(0x6480 + ((pool) * 4))
 #define MVPP2_BM_PHY_RLS_MC_BUFF_MASK		BIT(0)
@@ -2258,9 +2259,6 @@ struct mv_pp2x_bm_pool {
 	/* Occupied buffers indicator */
 	atomic_t in_use;
 	int in_use_thresh;
-#ifdef CONFIG_64BIT
-	u64 data_high;
-#endif
 };
 
 struct mv_pp2x_buff_hdr {
