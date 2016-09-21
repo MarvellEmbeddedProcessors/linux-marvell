@@ -748,10 +748,15 @@ static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 
 		/* Update L4 checksum when jumbo enable/disable on port */
 		if (new_log_pool == MVPP2_BM_SWF_JUMBO_POOL) {
-			if (port->id != port->priv->l4_chksum_jumbo_port)
+			if (port->id != port->priv->l4_chksum_jumbo_port) {
+				dev->features &=
+					~(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
 				dev->hw_features &=
 					~(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
+				}
 		} else {
+			dev->features |=
+				(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
 			dev->hw_features |=
 				(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
 		}
@@ -759,6 +764,7 @@ static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 
 	dev->mtu = mtu;
 
+	dev->wanted_features = dev->features;
 	netdev_update_features(dev);
 	return 0;
 }
@@ -4451,6 +4457,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			NETIF_F_IPV6_CSUM | NETIF_F_TSO;
 	dev->hw_features |= features | NETIF_F_RXCSUM | NETIF_F_GRO |
 			NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_TSO;
+
 	/* Only when multi queue mode, rxhash is supported */
 	if (mv_pp2x_queue_mode)
 		dev->hw_features |= NETIF_F_RXHASH;
