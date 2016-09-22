@@ -810,7 +810,7 @@ int mv_pp22_rss_default_cpu_set(struct mv_pp2x_port *port, int default_cpu);
 int mv_pp2x_txq_reserved_desc_num_proc(struct mv_pp2x *priv,
 				       struct mv_pp2x_tx_queue *txq,
 				       struct mv_pp2x_txq_pcpu *txq_pcpu,
-				       int num);
+				       int num, int cpu);
 
 #endif /*_MVPP2_H_*/
 
