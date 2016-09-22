@@ -44,6 +44,7 @@
 #include <uapi/linux/ppp_defs.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
+#include <net/busy_poll.h>
 #include <asm/cacheflush.h>
 #include <linux/dma-mapping.h>
 
@@ -2345,6 +2346,7 @@ err_drop_frame:
 		mv_pp2x_rx_csum(port, rx_status, skb);
 		skb_record_rx_queue(skb, (u16)rxq->id);
 		mv_pp2x_set_skb_hash(rx_desc, rx_status, skb);
+		skb_mark_napi_id(skb, napi);
 
 		napi_gro_receive(napi, skb);
 	}
@@ -3796,12 +3798,23 @@ static int mv_pp2x_netdev_set_features(struct net_device *dev,
 	return 0;
 }
 
+u16 mv_pp2x_select_queue(struct net_device *dev, struct sk_buff *skb,
+		       void *accel_priv, select_queue_fallback_t fallback)
+
+{
+	if (skb->napi_id)
+		return skb->napi_id - 1;
+
+	return fallback(dev, skb) % mv_pp2x_txq_number;
+}
+
 /* Device ops */
 
 static const struct net_device_ops mv_pp2x_netdev_ops = {
 	.ndo_open		= mv_pp2x_open,
 	.ndo_stop		= mv_pp2x_stop,
 	.ndo_start_xmit		= mv_pp2x_tx,
+	.ndo_select_queue	= mv_pp2x_select_queue,
 	.ndo_set_rx_mode	= mv_pp2x_set_rx_mode,
 	.ndo_set_mac_address	= mv_pp2x_set_mac_address,
 	.ndo_change_mtu		= mv_pp2x_change_mtu,
@@ -3930,6 +3943,7 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 			q_vec[cpu].irq = port->of_irqs[irq_index++];
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
+		napi_hash_add(&q_vec[cpu].napi);
 		if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
 			q_vec[cpu].num_rx_queues = mv_pp2x_num_cos_queues;
 			q_vec[cpu].first_rx_queue = cpu*mv_pp2x_num_cos_queues;
@@ -3949,6 +3963,7 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 		q_vec[cpu].irq = port->of_irqs[irq_index];
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
 			NAPI_POLL_WEIGHT);
+		napi_hash_add(&q_vec[cpu].napi);
 		q_vec[cpu].first_rx_queue = 0;
 		q_vec[cpu].num_rx_queues = port->num_rx_queues;
 
