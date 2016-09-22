@@ -3680,13 +3680,12 @@ EXPORT_SYMBOL(mv_pp2x_aggr_desc_num_read);
  */
 int mv_pp2x_aggr_desc_num_check(struct mv_pp2x *priv,
 				struct mv_pp2x_aggr_tx_queue *aggr_txq,
-				int num)
+				int num, int cpu)
 {
 	if ((aggr_txq->count + num) > aggr_txq->size) {
 		/* Update number of occupied aggregated Tx descriptors */
-		int cpu = smp_processor_id();
 		u32 val = mv_pp2x_relaxed_read(&priv->hw,
-				MVPP2_AGGR_TXQ_STATUS_REG(cpu));
+				MVPP2_AGGR_TXQ_STATUS_REG(cpu), cpu);
 
 		aggr_txq->count = val & MVPP2_AGGR_TXQ_PENDING_MASK;
 
@@ -3699,14 +3698,14 @@ int mv_pp2x_aggr_desc_num_check(struct mv_pp2x *priv,
 
 /* Reserved Tx descriptors allocation request */
 int mv_pp2x_txq_alloc_reserved_desc(struct mv_pp2x *priv,
-				    struct mv_pp2x_tx_queue *txq, int num)
+				    struct mv_pp2x_tx_queue *txq, int num, int cpu)
 {
 	u32 val;
 
 	val = (txq->id << MVPP2_TXQ_RSVD_REQ_Q_OFFSET) | num;
-	mv_pp2x_relaxed_write(&priv->hw, MVPP2_TXQ_RSVD_REQ_REG, val);
+	mv_pp2x_relaxed_write(&priv->hw, MVPP2_TXQ_RSVD_REQ_REG, val, cpu);
 
-	val = mv_pp2x_relaxed_read(&priv->hw, MVPP2_TXQ_RSVD_RSLT_REG);
+	val = mv_pp2x_relaxed_read(&priv->hw, MVPP2_TXQ_RSVD_RSLT_REG, cpu);
 
 	return val & MVPP2_TXQ_RSVD_RSLT_MASK;
 }
@@ -3825,15 +3824,17 @@ void mv_pp21_port_reset(struct mv_pp2x_port *port)
 
 /* Refill BM pool */
 void mv_pp2x_pool_refill(struct mv_pp2x *priv, u32 pool,
-			 dma_addr_t phys_addr)
+			 dma_addr_t phys_addr, int cpu)
 {
-	mv_pp2x_bm_pool_put(&priv->hw, pool, phys_addr);
+	mv_pp2x_bm_pool_put(&priv->hw, pool, phys_addr, cpu);
 }
 
 void mv_pp2x_pool_refill_virtual(struct mv_pp2x *priv, u32 pool,
 			 dma_addr_t phys_addr, u8 *cookie)
 {
-	mv_pp2x_bm_pool_put_virtual(&priv->hw, pool, phys_addr, cookie);
+	int cpu = smp_processor_id();
+
+	mv_pp2x_bm_pool_put_virtual(&priv->hw, pool, phys_addr, cookie, cpu);
 }
 
 /* Set pool buffer size */
