@@ -5529,7 +5529,7 @@ EXPORT_SYMBOL(mv_pp2x_cls_c2_queue_high_set);
 
 int mv_pp2x_cls_c2_forward_set(struct mv_pp2x_cls_c2_entry *c2, int cmd)
 {
-	if (!c2 || cmd > MVPP2_ACTION_TYPE_UPDT_LOCK)
+	if (!c2 || cmd > MVPP2_FRWD_ACTION_TYPE_HWF_LOW_LATENCY_LOCK)
 		return -EINVAL;
 
 	c2->sram.regs.actions &= ~MVPP2_CLS2_ACT_FRWD_MASK;
