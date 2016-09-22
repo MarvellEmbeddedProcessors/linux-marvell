@@ -34,9 +34,10 @@ static inline void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
 	put_cpu();
 }
 
-static inline void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
+static inline void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 data,
+					int cpu)
 {
-	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+	void *reg_ptr = hw->cpu_base[cpu] + offset;
 
 	writel_relaxed(data, reg_ptr);
 }
@@ -53,9 +54,9 @@ static inline u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 	return val;
 }
 
-static inline u32 mv_pp2x_relaxed_read(struct mv_pp2x_hw *hw, u32 offset)
+static inline u32 mv_pp2x_relaxed_read(struct mv_pp2x_hw *hw, u32 offset, int cpu)
 {
-	void *reg_ptr = hw->cpu_base[smp_processor_id()] + offset;
+	void *reg_ptr = hw->cpu_base[cpu] + offset;
 	u32 val;
 
 	val = readl_relaxed(reg_ptr);
@@ -286,34 +287,34 @@ static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,
 
 static inline void mv_pp2x_bm_pool_put_virtual(struct mv_pp2x_hw *hw, u32 pool,
 					      dma_addr_t buf_phys_addr,
-					      u8 *buf_virt_addr)
+					      u8 *buf_virt_addr, int cpu)
 {
 	mv_pp2x_relaxed_write(hw, MVPP2_BM_VIRT_RLS_REG,
-			      lower_32_bits((uintptr_t)buf_virt_addr));
+			      lower_32_bits((uintptr_t)buf_virt_addr), cpu);
 
 	mv_pp2x_relaxed_write(hw, MVPP2_BM_PHY_RLS_REG(pool),
-				lower_32_bits(buf_phys_addr));
+				lower_32_bits(buf_phys_addr), cpu);
 }
 
 /* Release buffer to BM */
 static inline void mv_pp2x_bm_pool_put(struct mv_pp2x_hw *hw, u32 pool,
-					      dma_addr_t buf_phys_addr)
+					      dma_addr_t buf_phys_addr, int cpu)
 {
 
 #if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT) && defined(CONFIG_PHYS_ADDR_T_64BIT)
 	mv_pp2x_relaxed_write(hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
-			upper_32_bits(buf_phys_addr));
+			upper_32_bits(buf_phys_addr), cpu);
 #endif
 
 	mv_pp2x_relaxed_write(hw, MVPP2_BM_PHY_RLS_REG(pool),
-				lower_32_bits(buf_phys_addr));
+				lower_32_bits(buf_phys_addr), cpu);
 }
 
 /* Release multicast buffer */
 static inline void mv_pp2x_bm_pool_mc_put(struct mv_pp2x_port *port, int pool,
 						   u32 buf_phys_addr,
 						   u32 buf_virt_addr,
-						   int mc_id)
+						   int mc_id, int cpu)
 {
 	u32 val = 0;
 
@@ -324,7 +325,7 @@ static inline void mv_pp2x_bm_pool_mc_put(struct mv_pp2x_port *port, int pool,
 	 */
 	mv_pp2x_bm_pool_put(&(port->priv->hw), pool,
 			    (dma_addr_t)(buf_phys_addr |
-			    MVPP2_BM_PHY_RLS_MC_BUFF_MASK));
+			    MVPP2_BM_PHY_RLS_MC_BUFF_MASK), cpu);
 }
 
 static inline void mv_pp2x_port_interrupts_enable(struct mv_pp2x_port *port)
@@ -573,23 +574,22 @@ struct mv_pp2x_tx_desc *mv_pp2x_txq_prev_desc_get(
 		struct mv_pp2x_aggr_tx_queue *aggr_txq);
 int mv_pp2x_txq_alloc_reserved_desc(struct mv_pp2x *priv,
 				    struct mv_pp2x_tx_queue *txq,
-				    int num);
+				    int num, int cpu);
 void mv_pp2x_aggr_txq_pend_desc_add(struct mv_pp2x_port *port, int pending);
 int mv_pp2x_aggr_desc_num_read(struct mv_pp2x *priv, int cpu);
 int mv_pp2x_aggr_desc_num_check(struct mv_pp2x *priv,
 				struct mv_pp2x_aggr_tx_queue *aggr_txq,
-				int num);
+				int num, int cpu);
 void mv_pp2x_rxq_offset_set(struct mv_pp2x_port *port,
 			    int prxq, int offset);
 void mv_pp2x_bm_pool_bufsize_set(struct mv_pp2x_hw *hw,
 				 struct mv_pp2x_bm_pool *bm_pool,
 				 int buf_size);
 void mv_pp2x_pool_refill(struct mv_pp2x *priv, u32 pool,
-			 dma_addr_t phys_addr);
+			 dma_addr_t phys_addr, int cpu);
 
 void mv_pp2x_pool_refill_virtual(struct mv_pp2x *priv, u32 pool,
-			 dma_addr_t phys_addr, u8 *cookie);
-
+				dma_addr_t phys_addr, u8 *cookie);
 void mv_pp21_rxq_long_pool_set(struct mv_pp2x_hw *hw,
 			       int prxq, int long_pool);
 void mv_pp21_rxq_short_pool_set(struct mv_pp2x_hw *hw,
