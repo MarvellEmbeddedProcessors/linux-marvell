@@ -2213,6 +2213,18 @@ static void mv_pp2x_buff_hdr_rx(struct mv_pp2x_port *port,
 	} while (!MVPP2_B_HDR_INFO_IS_LAST(buff_hdr->info));
 }
 
+static void mv_pp2x_set_skb_hash(struct mv_pp2x_rx_desc *rx_desc, u32 rx_status,
+				struct sk_buff *skb)
+{
+	u32 hash;
+
+	hash = (u32) (rx_desc->u.pp22.buf_phys_addr_key_hash >> 40);
+	if ((rx_status & MVPP2_RXD_L4_UDP) || (rx_status & MVPP2_RXD_L4_TCP))
+		skb_set_hash(skb, hash, PKT_HASH_TYPE_L4);
+	else
+		skb_set_hash(skb, hash, PKT_HASH_TYPE_L3);
+}
+
 /* Main rx processing */
 static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 			int rx_todo, struct mv_pp2x_rx_queue *rxq)
@@ -2331,6 +2343,7 @@ err_drop_frame:
 		skb_put(skb, rx_bytes);
 		skb->protocol = eth_type_trans(skb, dev);
 		mv_pp2x_rx_csum(port, rx_status, skb);
+		mv_pp2x_set_skb_hash(rx_desc, rx_status, skb);
 
 		napi_gro_receive(napi, skb);
 	}
