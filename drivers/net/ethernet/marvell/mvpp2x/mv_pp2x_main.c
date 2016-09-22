@@ -301,10 +301,6 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 	dma_addr_t phys_addr;
 	void *data;
 
-	if (is_recycle &&
-	    (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
-		return 0;
-
 	data = mv_pp2x_frag_alloc(bm_pool);
 	if (!data)
 		return -ENOMEM;
@@ -319,7 +315,6 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 	}
 
 	mv_pp2x_pool_refill(port->priv, pool, phys_addr);
-	atomic_dec(&bm_pool->in_use);
 	return 0;
 }
 
@@ -363,7 +358,7 @@ static int mv_pp2x_bm_pool_create(struct device *dev,
 	bm_pool->buf_num = 0;
 	mv_pp2x_bm_pool_bufsize_set(hw, bm_pool,
 				    MVPP2_RX_BUF_SIZE(bm_pool->pkt_size));
-	atomic_set(&bm_pool->in_use, 0);
+
 
 	return 0;
 }
@@ -2137,17 +2132,12 @@ static int mv_pp2x_rx_refill(struct mv_pp2x_port *port,
 	struct sk_buff *skb;
 	dma_addr_t phys_addr;
 
-	if (is_recycle &&
-	    (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
-		return 0;
-
 	/* No recycle or too many buffers are in use, so allocate a new skb */
 	skb = mv_pp2x_skb_alloc(port, bm_pool, &phys_addr, GFP_ATOMIC);
 	if (!skb)
 		return -ENOMEM;
 
 	mv_pp2x_pool_refill(port->priv, pool, phys_addr, skb);
-	atomic_dec(&bm_pool->in_use);
 	return 0;
 }
 #endif
@@ -2321,7 +2311,6 @@ err_drop_frame:
 				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
 				 DMA_FROM_DEVICE);
 
-		atomic_inc(&bm_pool->in_use);
 		refill_array[bm_pool->log_id]++;
 
 #ifdef MVPP2_VERBOSE
