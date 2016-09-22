@@ -3454,6 +3454,7 @@ void mv_pp2x_rx_csum(struct mv_pp2x_port *port, u32 status,
 		     (status & MVPP2_RXD_L4_TCP)) &&
 		     (status & MVPP2_RXD_L4_CSUM_OK)) {
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
+			skb->csum_level = 1;
 			return;
 		}
 
