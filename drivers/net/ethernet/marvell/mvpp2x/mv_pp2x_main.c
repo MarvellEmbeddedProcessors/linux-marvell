@@ -856,7 +856,7 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 					struct mv_pp2x_txq_pcpu *txq_pcpu,
 					int num, int cpu)
 {
-	int req;
+	int req, cpu_desc, desc_count;
 
 	if (txq_pcpu->reserved_num >= num)
 		return 0;
@@ -872,30 +872,24 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 
 	req = MVPP2_CPU_DESC_CHUNK;
 
-#if (MVPP2_CPU_DESC_CHUNK < MAX_SKB_FRAGS)
-	{
-		int cpu_desc, desc_count;
+	if ((num - txq_pcpu->reserved_num) > req) {
+		req = num - txq_pcpu->reserved_num;
+		desc_count = 0;
+		/* Compute total of used descriptors */
+		for_each_online_cpu(cpu_desc) {
+			int txq_count;
+			struct mv_pp2x_txq_pcpu *txq_pcpu_aux;
 
-		if ((num - txq_pcpu->reserved_num) > req) {
-			req = num - txq_pcpu->reserved_num;
-			desc_count = 0;
-			/* Compute total of used descriptors */
-			for_each_online_cpu(cpu_desc) {
-				int txq_count;
-				struct mv_pp2x_txq_pcpu *txq_pcpu_aux;
+			txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu_desc);
+			txq_count = mv_pp2x_txq_count(txq_pcpu_aux);
+			desc_count += txq_count;
 
-				txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu_desc);
-				txq_count = mv_pp2x_txq_count(txq_pcpu_aux);
-				desc_count += txq_count;
-
-			}
-			desc_count += req;
-
-			if (desc_count > txq->size)
-				return -ENOMEM;
 		}
+		desc_count += req;
+
+		if (desc_count > txq->size)
+			return -ENOMEM;
 	}
-#endif
 
 	txq_pcpu->reserved_num += mv_pp2x_txq_alloc_reserved_desc(priv, txq,
 							req, cpu);
