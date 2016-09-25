@@ -3784,7 +3784,7 @@ u16 mv_pp2x_select_queue(struct net_device *dev, struct sk_buff *skb,
 		       void *accel_priv, select_queue_fallback_t fallback)
 
 {
-	if (skb->napi_id)
+	if (skb->queue_mapping)
 		return skb->napi_id - 1;
 
 	return fallback(dev, skb) % mv_pp2x_txq_number;
