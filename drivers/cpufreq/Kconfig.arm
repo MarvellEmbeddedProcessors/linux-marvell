@@ -249,6 +249,18 @@ config ARM_ARMADA3700_CPUFREQ
 	  Armada3700 PMU supports 4 frequency and VDD levels,
 	  which will be preset and loaded later.
 
+config ARM_ARMADA_8K_CPUFREQ
+	tristate "Armada 8K CPUFreq driver"
+	depends on ARCH_MVEBU && CPUFREQ_DT
+	default y
+	help
+	  This enables the CPUFreq driver support for Marvell
+	  Armada8k SOCs.
+	  Armada8K device has the AP806 which supports scaling
+	  to any full integer divider.
+
+	  If in doubt, say N.
+
 config ACPI_CPPC_CPUFREQ
 	tristate "CPUFreq driver based on the ACPI CPPC spec"
 	depends on ACPI

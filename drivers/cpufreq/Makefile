@@ -77,6 +77,7 @@ obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
 obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
 obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
 obj-$(CONFIG_ARM_ARMADA3700_CPUFREQ)	+= armada3700-cpufreq.o
+obj-$(CONFIG_ARM_ARMADA_8K_CPUFREQ)	+= armada8k-cpufreq.o
 obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
 
 
