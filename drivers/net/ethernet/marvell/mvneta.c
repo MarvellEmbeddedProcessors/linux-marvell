@@ -1547,7 +1547,6 @@ static u32 mvneta_txq_desc_csum(int l3_offs, int l3_proto,
 	return command;
 }
 
-
 /* Display more error info */
 static void mvneta_rx_error(struct mvneta_port *pp,
 			    struct mvneta_rx_desc *rx_desc)
@@ -3191,6 +3190,11 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
 			 * elected CPU
 			 */
 			rxq_map |= MVNETA_CPU_RXQ_ACCESS(pp->rxq_def);
+		else
+			/* Unmap the default receive queue queue to the
+			 * unelected CPU
+			 */
+			rxq_map &= ~MVNETA_CPU_RXQ_ACCESS(pp->rxq_def);
 
 		/* We update the TX queue map only if we have one
 		 * queue. In this case we associate the TX queue to
