@@ -64,3 +64,6 @@ config ARMADA_AP806_CORE_CLK
 
 config ARMADA_AP806_RING_CLK
 	bool
+
+config ARMADA_AP806_CPU_CLK
+	bool
