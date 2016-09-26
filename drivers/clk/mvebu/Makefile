@@ -11,6 +11,7 @@ obj-$(CONFIG_ARMADA_AP806_SYSCON) += ap806-system-controller.o
 obj-$(CONFIG_ARMADA_CP110_SYSCON) += cp110-system-controller.o
 obj-$(CONFIG_ARMADA_AP806_CORE_CLK) += ap806-core.o
 obj-$(CONFIG_ARMADA_AP806_RING_CLK) += ap806-ring.o
+obj-$(CONFIG_ARMADA_AP806_CPU_CLK) += ap806-cpu-clk.o
 obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
 obj-$(CONFIG_DOVE_CLK)		+= dove.o
 obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
