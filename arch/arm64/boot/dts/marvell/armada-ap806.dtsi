@@ -167,6 +167,14 @@
 					     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
+			ap806_clock: ap806_clock@6f8200 {
+				compatible = "marvell,ap806-cpu-clk", "syscon";
+				#clock-cells = <1>;
+				clocks = <&syscon 0>;
+				reg = <0x6f8200 0x100>;
+				status = "okay";
+			};
+
 			axim-ddr-rd@840000 {
 				compatible = "marvell,coresight-axim", "arm,primecell";
 				reg = <0x840000 0x1000>;
