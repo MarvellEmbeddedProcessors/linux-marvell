@@ -58,24 +58,28 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x000>;
+			clocks = <&ap806_clock 0>;
 			enable-method = "psci";
 		};
 		cpu1: cpu@001 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x001>;
+			clocks = <&ap806_clock 0>;
 			enable-method = "psci";
 		};
 		cpu2: cpu@100 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x100>;
+			clocks = <&ap806_clock 1>;
 			enable-method = "psci";
 		};
 		cpu3: cpu@101 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x101>;
+			clocks = <&ap806_clock 1>;
 			enable-method = "psci";
 		};
 	};
