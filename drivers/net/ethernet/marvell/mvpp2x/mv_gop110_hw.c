@@ -33,7 +33,6 @@ void mv_gop110_register_bases_dump(struct gop_hw *gop)
 {
 	pr_info("  %-32s: 0x%p\n", "GMAC", gop->gop_110.gmac.base);
 	pr_info("  %-32s: 0x%p\n", "XLG_MAC", gop->gop_110.xlg_mac.base);
-	pr_info("  %-32s: 0x%p\n", "SERDES", gop->gop_110.serdes.base);
 	pr_info("  %-32s: 0x%p\n", "XMIB", gop->gop_110.xmib.base);
 	pr_info("  %-32s: 0x%p\n", "SMI", gop->gop_110.smi_base);
 	pr_info("  %-32s: 0x%p\n", "XSMI", gop->gop_110.xsmi_base);
@@ -924,7 +923,6 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 	break;
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
-		num_of_act_lanes = 1;
 		mv_gop110_force_link_mode_set(gop, mac, false, true);
 		mv_gop110_gmac_reset(gop, mac_num, RESET);
 		/* configure PCS */
@@ -956,11 +954,6 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 	break;
 	case PHY_INTERFACE_MODE_RXAUI:
 		num_of_act_lanes = 2;
-		/* mapped to serdes 6 */
-		mv_gop110_serdes_init(gop, 0, MV_RXAUI);
-		/* mapped to serdes 5 */
-		mv_gop110_serdes_init(gop, 1, MV_RXAUI);
-
 		mac_num = 0;
 		/* configure PCS */
 		mv_gop110_xpcs_mode(gop, num_of_act_lanes);
@@ -972,12 +965,6 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 
 		/* mac unreset */
 		mv_gop110_xlg_mac_reset(gop, mac_num, UNRESET);
-
-		/* run digital reset / unreset */
-		mv_gop110_serdes_reset(gop, 0, false, false, true);
-		mv_gop110_serdes_reset(gop, 1, false, false, true);
-		mv_gop110_serdes_reset(gop, 0, false, false, false);
-		mv_gop110_serdes_reset(gop, 1, false, false, false);
 	break;
 	case PHY_INTERFACE_MODE_KR:
 
@@ -1672,72 +1659,6 @@ int  mv_gop110_gpcs_reset(struct gop_hw *gop, int pcs_num, enum mv_reset act)
 
 	mv_gop110_gmac_write(gop, pcs_num, MV_GMAC_PORT_CTRL2_REG, reg_data);
 	return 0;
-}
-
-/* print value of unit registers */
-void mv_gop110_serdes_lane_regs_dump(struct gop_hw *gop, int lane)
-{
-	pr_info("\nSerdes Lane #%d registers]\n", lane);
-	mv_gop110_serdes_print(gop, "MV_SERDES_CFG_0_REG", lane,
-			       MV_SERDES_CFG_0_REG);
-	mv_gop110_serdes_print(gop, "MV_SERDES_CFG_1_REG", lane,
-			       MV_SERDES_CFG_1_REG);
-	mv_gop110_serdes_print(gop, "MV_SERDES_CFG_2_REG", lane,
-			       MV_SERDES_CFG_2_REG);
-	mv_gop110_serdes_print(gop, "MV_SERDES_CFG_3_REG", lane,
-			       MV_SERDES_CFG_3_REG);
-	mv_gop110_serdes_print(gop, "MV_SERDES_MISC_REG", lane,
-			       MV_SERDES_MISC_REG);
-}
-EXPORT_SYMBOL(mv_gop110_serdes_lane_regs_dump);
-
-void mv_gop110_serdes_init(struct gop_hw *gop, int lane,
-			   enum sd_media_mode mode)
-{
-	u32 reg_val;
-
-	/* Media Interface Mode */
-	reg_val = mv_gop110_serdes_read(gop, lane, MV_SERDES_CFG_0_REG);
-	if (mode == MV_RXAUI)
-		reg_val |= MV_SERDES_CFG_0_MEDIA_MODE_MASK;
-	else
-		reg_val &= ~MV_SERDES_CFG_0_MEDIA_MODE_MASK;
-
-	/* Pull-Up PLL to StandAlone mode */
-	reg_val |= MV_SERDES_CFG_0_PU_PLL_MASK;
-	/* powers up the SD Rx/Tx PLL */
-	reg_val |= MV_SERDES_CFG_0_RX_PLL_MASK;
-	reg_val |= MV_SERDES_CFG_0_TX_PLL_MASK;
-	mv_gop110_serdes_write(gop, lane, MV_SERDES_CFG_0_REG, reg_val);
-
-	mv_gop110_serdes_reset(gop, lane, false, false, false);
-
-	reg_val = 0x17f;
-	mv_gop110_serdes_write(gop, lane, MV_SERDES_MISC_REG, reg_val);
-}
-
-void mv_gop110_serdes_reset(struct gop_hw *gop, int lane, bool analog_reset,
-			    bool core_reset, bool digital_reset)
-{
-	u32 reg_val;
-
-	reg_val = mv_gop110_serdes_read(gop, lane, MV_SERDES_CFG_1_REG);
-	if (analog_reset)
-		reg_val &= ~MV_SERDES_CFG_1_ANALOG_RESET_MASK;
-	else
-		reg_val |= MV_SERDES_CFG_1_ANALOG_RESET_MASK;
-
-	if (core_reset)
-		reg_val &= ~MV_SERDES_CFG_1_CORE_RESET_MASK;
-	else
-		reg_val |= MV_SERDES_CFG_1_CORE_RESET_MASK;
-
-	if (digital_reset)
-		reg_val &= ~MV_SERDES_CFG_1_DIGITAL_RESET_MASK;
-	else
-		reg_val |= MV_SERDES_CFG_1_DIGITAL_RESET_MASK;
-
-	mv_gop110_serdes_write(gop, lane, MV_SERDES_CFG_1_REG, reg_val);
 }
 
 /**************************************************************************
