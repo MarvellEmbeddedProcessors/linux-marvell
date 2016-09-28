@@ -4797,15 +4797,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if (IS_ERR(hw->lms_base))
 			return PTR_ERR(hw->lms_base);
 	} else {
-		/* serdes */
-		res = platform_get_resource_byname(pdev,
-			IORESOURCE_MEM, "serdes");
-		hw->gop.gop_110.serdes.base =
-			devm_ioremap_resource(&pdev->dev, res);
-		if (IS_ERR(hw->gop.gop_110.serdes.base))
-			return PTR_ERR(hw->gop.gop_110.serdes.base);
-		hw->gop.gop_110.serdes.obj_size = 0x1000;
-
 		/* xmib */
 		res = platform_get_resource_byname(pdev,
 			IORESOURCE_MEM, "xmib");

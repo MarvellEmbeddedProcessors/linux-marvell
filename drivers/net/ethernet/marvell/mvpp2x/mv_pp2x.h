@@ -412,7 +412,6 @@ struct mv_mac_unit_desc {
 struct cpn110_gop_hw {
 	struct mv_mac_unit_desc gmac;
 	struct mv_mac_unit_desc xlg_mac;
-	struct mv_mac_unit_desc serdes;
 	struct mv_mac_unit_desc xmib;
 	struct mv_mac_unit_desc tai;
 	struct mv_mac_unit_desc ptp;
