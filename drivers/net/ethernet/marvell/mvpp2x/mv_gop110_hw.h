@@ -173,35 +173,6 @@ void mv_gop_reg_print(char *reg_name, u32 reg);
 int mv_gop110_gpcs_mode_cfg(struct gop_hw *gop, int pcs_num, bool en);
 int mv_gop110_gpcs_reset(struct gop_hw *gop, int pcs_num, enum mv_reset act);
 
-/* Serdes Functions */
-static inline u32 mv_gop110_serdes_read(struct gop_hw *gop, int lane_num,
-					u32 offset)
-{
-	return(mv_gop_gen_read(gop->gop_110.serdes.base,
-		lane_num * gop->gop_110.serdes.obj_size + offset));
-}
-
-static inline void mv_gop110_serdes_write(struct gop_hw *gop, int lane_num,
-					  u32 offset, u32 data)
-{
-	mv_gop_gen_write(gop->gop_110.serdes.base,
-			 lane_num * gop->gop_110.serdes.obj_size +
-			 offset, data);
-}
-
-static inline void mv_gop110_serdes_print(struct gop_hw *gop, char *reg_name,
-					  int lane_num, u32 reg)
-{
-	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg,
-		mv_gop110_serdes_read(gop, lane_num, reg));
-}
-
-void mv_gop110_serdes_lane_regs_dump(struct gop_hw *gop, int lane);
-void mv_gop110_serdes_init(struct gop_hw *gop, int lane,
-			   enum sd_media_mode mode);
-void mv_gop110_serdes_reset(struct gop_hw *gop, int lane, bool analog_reset,
-			    bool core_reset, bool digital_reset);
-
 /* MPCS Functions */
 
 static inline u32 mv_gop110_mpcs_global_read(struct gop_hw *gop, u32 offset)
