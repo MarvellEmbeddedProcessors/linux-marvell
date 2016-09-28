@@ -268,7 +268,7 @@ ppv22@000000 {
 	      <0x130600 0x200>,  /* FCA - flow control regs*/
 	      <0x130e00 0x100>,  /* MSPG - GMAC regs */
 	      <0x130f00 0x100>,  /* MSPG - XLG MAC regs */
-	      <0x441000 0x1000>;  /* RFU-1 Regs */
+	      <0x441100 0x100>;  /* RFU-1 Regs */
 	reg-names = "pp", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs",
 		    "fca", "gmac", "xlg", "rfu1";
 	clocks = <&cps_syscon0 1 3>, <&cps_syscon0 1 18>, <&cps_syscon0 1 9>,
