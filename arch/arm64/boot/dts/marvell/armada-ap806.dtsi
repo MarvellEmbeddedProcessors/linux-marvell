@@ -64,6 +64,26 @@
 		method = "smc";
 	};
 
+	/* CPUfreq Cluster settings:
+	 * - Initial required static OPP entry of 100Mhz - suited for all CPU boot options
+	 * - Additional OPP entries are registered at runtime by cpufreq driver
+	 */
+	cluster0_opp: opp_table0 {
+		compatible = "operating-points-v2";
+		opp-shared;
+		opp@0 {
+			opp-hz = /bits/ 64 <100000000>;
+			clock-latency-ns = <50000>;
+		};
+	};
+	cluster1_opp: opp_table1 {
+		compatible = "operating-points-v2";
+		opp-shared;
+		opp@0 {
+			opp-hz = /bits/ 64 <100000000>;
+			clock-latency-ns = <50000>;
+		};
+	};
 
 	ap806 {
 		#address-cells = <2>;
