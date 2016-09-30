@@ -1,0 +1,15 @@
+config MTD_SPINAND_GD5F
+	tristate "SPINAND Device Support for Gigadevice"
+	depends on MTD_NAND && SPI
+	help
+	  This enables support for accessing GigaDevice
+	  SPI NAND flash devices.
+	  If you have a GigaDevice SPI NAND chip say yes.
+	  If unsure, say no here.
+
+config MTD_SPINAND_ONDIEECC
+	bool "Use SPINAND internal ECC"
+	depends on MTD_SPINAND_GD5F
+	help
+	  Internal ECC.
+	  Enables Hardware ECC support for GigaDevice SPI NAND.
