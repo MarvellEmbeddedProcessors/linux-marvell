@@ -146,6 +146,11 @@
 	};
 	usb3h0_phy: usb3-h0-phy {
 		compatible = "usb-nop-xceiv";
+		/* vcc-supply can be changed by io-expander or GPIO,
+		 * for A7040-DB we are using by default io-expander
+		 * for other board GPIO may be needed, should update
+		 * the phandle to gpio regulator
+		 */
 		vcc-supply = <&exp_usb3h0_vbus>;
 	};
 	usb3h1_phy: usb3-h1-phy {
@@ -169,5 +174,19 @@
 		enable-active-high;
 		regulator-always-on;
 		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
+	};
+	/* following GPIO entry is not used (for reference only)
+	 * GPIO is not connected in default A7040-DB board
+	 */
+	gpio_usb3_vbus: usb3-gpio-vbus {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&xhci0_vbus_pins>;
+		regulator-name = "xhci0-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
 	};
 };
