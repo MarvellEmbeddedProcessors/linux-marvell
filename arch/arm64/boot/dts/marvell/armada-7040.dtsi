@@ -55,6 +55,9 @@
 	aliases {
 		gpio1 = &gpio1;
 		gpio2 = &gpio2;
+		ethernet0 = &emac0;
+		ethernet1 = &emac2;
+		ethernet2 = &emac3;
 	};
 
 	ap806 {

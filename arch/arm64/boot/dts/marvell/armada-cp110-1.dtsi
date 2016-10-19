@@ -231,12 +231,6 @@ axim-hb1-wr@3c9000 {
 	bus-width = <40>;
 };
 
-aliases {
-	ethernet0_1 = &emac0_1;
-	ethernet1_1 = &emac2_1;
-	ethernet2_1 = &emac3_1;
-};
-
 gop {
 	emac0_1: mac0 {
 		interrupts = <GIC_SPI 292 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
