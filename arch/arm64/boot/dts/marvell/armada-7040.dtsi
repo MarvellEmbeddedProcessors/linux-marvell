@@ -80,6 +80,13 @@
 					marvell,pins = "mpp37", "mpp38";
 					marvell,function = "i2c0";
 				};
+				/* following GPIO entry is not used (for reference only)
+				 * GPIO is not connected in default A7040-DB board
+				 */
+				xhci0_vbus_pins: xhci0-vbus-pins {
+					marvell,pins = "mpp12";
+					marvell,function = "gpio";
+				};
 			};
 			gpio1: gpio@440100 {
 			};
