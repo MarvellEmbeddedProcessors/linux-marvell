@@ -53,6 +53,14 @@
 	model = "Marvell Armada 8040";
 	compatible = "marvell,armada8040", "marvell,armada-ap806-quad",
 	             "marvell,armada-ap806";
+	aliases {
+		ethernet0 = &emac0;
+		ethernet1 = &emac2;
+		ethernet2 = &emac3;
+		ethernet3 = &emac0_1;
+		ethernet4 = &emac2_1;
+		ethernet5 = &emac3_1;
+	};
 
 	ap806 {
 		config-space {
