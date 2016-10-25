@@ -647,10 +647,6 @@ struct mv_pp2x_platform_data {
 	void (*mv_pp2x_port_queue_vectors_init)(struct mv_pp2x_port *);
 	void (*mv_pp2x_port_isr_rx_group_cfg)(struct mv_pp2x_port *);
 	struct pp2x_hw_params hw;
-#ifdef CONFIG_64BIT
-	uintptr_t skb_base_addr;
-	uintptr_t skb_base_mask;
-#endif
 };
 
 struct mv_pp2x_ext_buf_struct {
