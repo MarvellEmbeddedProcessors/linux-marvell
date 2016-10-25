@@ -2722,3 +2722,139 @@ struct mv_pp2x_mc_entry {
 
 #endif /*_MVPP2_HW_TYPE_H_*/
 
+/* Policer */
+#define MVPP2_PLCR_NUM		48
+
+/*********************************** RX Policer Registers *******************/
+/* exist only in ppv2.0 */
+#define MVPP2_PLCR_ENABLE_REG			(0x1300)
+
+#define MVPP2_PLCR_EN_OFFS			0
+#define MVPP2_PLCR_EN_ALL_MASK			(((1 << MVPP2_PLCR_NUM) - 1) << MVPP2_PLCR_EN_OFFS)
+#define MVPP2_PLCR_EN_MASK(plcr)		((1 << (plcr)) << MVPP2_PLCR_EN_OFFS)
+/*--------------------------------------------------------------------------------------------*/
+
+#define MVPP2_PLCR_BASE_PERIOD_REG		(0x1304)
+
+#define MVPP2_PLCR_BASE_PERIOD_OFFS		0
+#define MVPP2_PLCR_BASE_PERIOD_BITS		16
+#define MVPP2_PLCR_BASE_PERIOD_ALL_MASK	\
+		(((1 << MVPP2_PLCR_BASE_PERIOD_BITS) - 1) << MVPP2_PLCR_BASE_PERIOD_OFFS)
+#define MVPP2_PLCR_BASE_PERIOD_MASK(p)		\
+		(((p) << MVPP2_PLCR_BASE_PERIOD_OFFS) & MVPP2_PLCR_BASE_PERIOD_ALL_MASK)
+
+#define MVPP2_PLCR_ADD_TOKENS_EN_BIT		16
+#define MVPP2_PLCR_ADD_TOKENS_EN_MASK		(1 << MVPP2_PLCR_ADD_TOKENS_EN_BIT)
+/*--------------------------------------------------------------------------------------------*/
+#define MVPP2_PLCR_MODE_REG			(0x1308)
+#define MVPP2_PLCR_MODE_BITS			(3)
+#define MVPP2_PLCR_MODE_MASK			(((1 << MVPP2_PLCR_MODE_BITS) - 1) << 0)
+
+/*---------------------------------------------------------------------------------------------*/
+/* exist only in ppv2.1*/
+#define MVPP2_PLCR_TABLE_INDEX_REG		(0x130c)
+#define MVPP2_PLCR_COMMIT_TOKENS_REG		(0x1310)
+#define MVPP2_PLCR_EXCESS_TOKENS_REG		(0x1314)
+/*---------------------------------------------------------------------------------------------*/
+
+#define MVPP2_PLCR_BUCKET_SIZE_REG		(0x1318)
+
+#define MVPP2_PLCR_COMMIT_SIZE_OFFS		0
+#define MVPP2_PLCR_COMMIT_SIZE_BITS		16
+#define MVPP2_PLCR_COMMIT_SIZE_ALL_MASK	\
+		(((1 << MVPP2_PLCR_COMMIT_SIZE_BITS) - 1) << MVPP2_PLCR_COMMIT_SIZE_OFFS)
+#define MVPP2_PLCR_COMMIT_SIZE_MASK(size)	\
+		(((size) << MVPP2_PLCR_COMMIT_SIZE_OFFS) & MVPP2_PLCR_COMMIT_SIZE_ALL_MASK)
+
+#define MVPP2_PLCR_EXCESS_SIZE_OFFS		16
+#define MVPP2_PLCR_EXCESS_SIZE_BITS		16
+#define MVPP2_PLCR_EXCESS_SIZE_ALL_MASK	\
+		(((1 << MVPP2_PLCR_EXCESS_SIZE_BITS) - 1) << MVPP2_PLCR_EXCESS_SIZE_OFFS)
+#define MVPP2_PLCR_EXCESS_SIZE_MASK(size)	\
+		(((size) << MVPP2_PLCR_EXCESS_SIZE_OFFS) & MVPP2_PLCR_EXCESS_SIZE_ALL_MASK)
+/*---------------------------------------------------------------------------------------------*/
+
+#define MVPP2_PLCR_TOKEN_CFG_REG		(0x131c)
+
+#define MVPP2_PLCR_TOKEN_VALUE_OFFS		0
+#define MVPP2_PLCR_TOKEN_VALUE_BITS		10
+#define MVPP2_PLCR_TOKEN_VALUE_ALL_MASK	\
+		(((1 << MVPP2_PLCR_TOKEN_VALUE_BITS) - 1) << MVPP2_PLCR_TOKEN_VALUE_OFFS)
+#define MVPP2_PLCR_TOKEN_VALUE_MASK(val)	\
+		(((val) << MVPP2_PLCR_TOKEN_VALUE_OFFS) & MVPP2_PLCR_TOKEN_VALUE_ALL_MASK)
+
+#define MVPP2_PLCR_TOKEN_TYPE_OFFS		12
+#define MVPP2_PLCR_TOKEN_TYPE_BITS		3
+#define MVPP2_PLCR_TOKEN_TYPE_ALL_MASK		\
+		(((1 << MVPP2_PLCR_TOKEN_TYPE_BITS) - 1) << MVPP2_PLCR_TOKEN_TYPE_OFFS)
+#define MVPP2_PLCR_TOKEN_TYPE_MASK(type)	\
+		(((type) << MVPP2_PLCR_TOKEN_TYPE_OFFS) & MVPP2_PLCR_TOKEN_TYPE_ALL_MASK)
+
+#define MVPP2_PLCR_TOKEN_UNIT_BIT		31
+#define MVPP2_PLCR_TOKEN_UNIT_MASK		(1 << MVPP2_PLCR_TOKEN_UNIT_BIT)
+#define MVPP2_PLCR_TOKEN_UNIT_BYTES		(0 << MVPP2_PLCR_TOKEN_UNIT_BIT)
+#define MVPP2_PLCR_TOKEN_UNIT_PKTS		(1 << MVPP2_PLCR_TOKEN_UNIT_BIT)
+
+#define MVPP2_PLCR_COLOR_MODE_BIT		30
+#define MVPP2_PLCR_COLOR_MODE_MASK		(1 << MVPP2_PLCR_COLOR_MODE_BIT)
+#define MVPP2_PLCR_COLOR_MODE_BLIND		(0 << MVPP2_PLCR_COLOR_MODE_BIT)
+#define MVPP2_PLCR_COLOR_MODE_AWARE		(1 << MVPP2_PLCR_COLOR_MODE_BIT)
+
+#define MVPP2_PLCR_ENABLE_BIT			29
+#define MVPP2_PLCR_ENABLE_MASK			(1 << MVPP2_PLCR_ENABLE_BIT)
+/*---------------------------------------------------------------------------------------------*/
+
+#define MVPP2_PLCR_MIN_PKT_LEN_REG		(0x1320)
+
+#define MVPP2_PLCR_MIN_PKT_LEN_OFFS		0
+#define MVPP2_PLCR_MIN_PKT_LEN_BITS		8
+#define MVPP2_PLCR_MIN_PKT_LEN_ALL_MASK	\
+		(((1 << MVPP2_PLCR_MIN_PKT_LEN_BITS) - 1) << MVPP2_PLCR_MIN_PKT_LEN_OFFS)
+#define MVPP2_PLCR_MIN_PKT_LEN_MASK(len)	\
+		(((len) << MVPP2_PLCR_MIN_PKT_LEN_OFFS) & MVPP2_PLCR_MIN_PKT_LEN_ALL_MASK)
+/*---------------------------------------------------------------------------------------------*/
+
+#define MVPP2_PLCR_EDROP_EN_REG		(0x1330)
+
+#define MVPP2_PLCR_EDROP_EN_BIT		0
+#define MVPP2_PLCR_EDROP_EN_MASK		(1 << MVPP2_PLCR_EDROP_EN_BIT)
+/*---------------------------------------------------------------------------------------------*/
+/*ppv2.1 policer early drop threshold mechanism changed*/
+#define MVPP2_V0_PLCR_EDROP_THRESH_NUM		4
+
+#define MVPP2_V0_PLCR_EDROP_TR_OFFS(i)		((i % 2) ? 16 : 0)
+#define MVPP2_V0_PLCR_EDROP_TR_BITS		14
+#define MVPP2_V0_PLCR_EDROP_TR_ALL_MASK(i)	\
+		(((1 << MVPP2_V0_PLCR_EDROP_TR_BITS) - 1) << MVPP2_V0_PLCR_EDROP_TR_OFFS(i))
+#define MVPP2_V0_PLCR_EDROP_TR_MASK(i, tr)	\
+		(((tr) << MVPP2_V0_PLCR_EDROP_TR_OFFS(i)) & MVPP2_V0_PLCR_EDROP_TR_ALL_MASK(i))
+
+#define MVPP2_V0_PLCR_EDROP_CPU_TR_REG(i)	(0x1340 + (((i) / 2) << 2))
+#define MVPP2_V0_PLCR_EDROP_HWF_TR_REG(i)	(0x1350 + (((i) / 2) << 2))
+/*---------------------------------------------------------------------------------------------*/
+/*ppv2.1 policer early drop threshold new mechanism*/
+#define MVPP2_V1_PLCR_EDROP_THRESH_NUM		16
+
+#define MVPP2_V1_PLCR_EDROP_TR_OFFS		0
+#define MVPP2_V1_PLCR_EDROP_TR_BITS		14
+
+#define MVPP2_V1_PLCR_EDROP_TR_MASK(i)		\
+		(((1 << MVPP2_V1_PLCR_EDROP_TR_BITS) - 1) << MVPP2_V1_PLCR_EDROP_TR_OFFS)
+
+#define MVPP2_V1_PLCR_EDROP_CPU_TR_REG(i)	(0x1380 + ((i) * 4))
+#define MVPP2_V1_PLCR_EDROP_HWF_TR_REG(i)	(0x13c0 + ((i) * 4))
+
+/*---------------------------------------------------------------------------------------------*/
+
+#define MVPP2_PLCR_EDROP_RXQ_REG		(0x1348)
+#define MVPP2_PLCR_EDROP_RXQ_TR_REG		(0x134c)
+/*--------------------------------------------------------------------------*/
+
+#define MVPP2_PLCR_EDROP_TXQ_REG		(0x1358)
+#define MVPP2_PLCR_EDROP_TXQ_TR_REG		(0x135c)
+/*--------------------------------------------------------------------------*/
+#define MVPP2_V1_PLCR_PKT_GREEN_REG(pol)	(0x7400 + 4 * (pol))
+#define MVPP2_V1_PLCR_PKT_YELLOW_REG(pol)	(0x7500 + 4 * (pol))
+#define MVPP2_V1_PLCR_PKT_RED_REG(pol)		(0x7600 + 4 * (pol))
+/*---------------------------------------------------------------------------------------------*/
+
