@@ -3397,7 +3397,8 @@ void mv_pp21_get_mac_address(struct mv_pp2x_port *port, unsigned char *addr)
 {
 	u32 mac_addr_l, mac_addr_m, mac_addr_h;
 
-	mac_addr_l = readl(port->base + MVPP2_GMAC_CTRL_1_REG);
+	mac_addr_l = readl(port->priv->hw.base + MVPP2_GMAC_CTRL_1_REG) +
+			(port->id << MVPP2_GMAC_SA_LOW_OFFS);
 	mac_addr_m = readl(port->priv->hw.lms_base + MVPP2_SRC_ADDR_MIDDLE);
 	mac_addr_h = readl(port->priv->hw.lms_base + MVPP2_SRC_ADDR_HIGH);
 	addr[0] = (mac_addr_h >> 24) & 0xFF;
