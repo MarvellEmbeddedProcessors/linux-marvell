@@ -4735,10 +4735,6 @@ static struct mv_pp2x_platform_data pp21_pdata = {
 	.mv_pp2x_port_isr_rx_group_cfg = mv_pp21x_port_isr_rx_group_cfg,
 	.num_port_irq = 1,
 	.hw.desc_queue_addr_shift = MVPP21_DESC_ADDR_SHIFT,
-#ifdef CONFIG_64BIT
-	.skb_base_addr = 0,
-	.skb_base_mask = DMA_BIT_MASK(32),
-#endif
 };
 
 static struct mv_pp2x_platform_data pp22_pdata = {
@@ -4753,10 +4749,6 @@ static struct mv_pp2x_platform_data pp22_pdata = {
 	.mv_pp2x_port_isr_rx_group_cfg = mv_pp22_port_isr_rx_group_cfg,
 	.num_port_irq = 5,
 	.hw.desc_queue_addr_shift = MVPP22_DESC_ADDR_SHIFT,
-#ifdef CONFIG_64BIT
-	.skb_base_addr = 0,
-	.skb_base_mask = DMA_BIT_MASK(32),
-#endif
 };
 
 static const struct of_device_id mv_pp2x_match_tbl[] = {
@@ -5119,24 +5111,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 			goto err_clk;
 		}
 	}
-
-#ifdef CONFIG_64BIT
-{
-	/* Set skb_base_address (MSB bits) */
-	struct sk_buff *skb;
-
-	if (priv->pp2xdata->skb_base_addr == 0) {
-		skb = alloc_skb(MVPP2_SKB_TEST_SIZE, GFP_KERNEL);
-		if (!skb) {
-			err = ENOMEM;
-			goto err_clk;
-		}
-		priv->pp2xdata->skb_base_addr =
-			(uintptr_t)skb & ~(priv->pp2xdata->skb_base_mask);
-		kfree_skb(skb);
-	}
-}
-#endif
 
 	/* Save cpu_present_mask + populate the per_cpu address space */
 	cpu_map = 0;
