@@ -388,6 +388,7 @@ static inline int mv_pp2x_txq_sent_desc_proc(struct mv_pp2x_port *port,
 
 	/* Reading status reg resets transmitted descriptor counter */
 	if (port->priv->pp2_version == PPV21) {
+		sw_thread = 0;
 		val = mv_pp22_thread_relaxed_read(&port->priv->hw,
 							sw_thread,
 							MVPP21_TXQ_SENT_REG(txq_id));
