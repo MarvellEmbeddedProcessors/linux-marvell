@@ -185,6 +185,9 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 	struct gop_stat	*gop_statistics = &mac->gop_statistics;
 	int i = 0;
 
+	if (port->priv->pp2_version == PPV21)
+		return;
+
 	mv_gop110_mib_counters_stat_update(gop, gop_port, gop_statistics);
 
 	data[i++] = gop_statistics->rx_byte;
@@ -254,6 +257,9 @@ int mv_pp2x_eth_tool_nway_reset(struct net_device *dev)
 	struct mv_mac_data *mac = &port->mac_data;
 	int err;
 
+	if (port->priv->pp2_version == PPV21)
+		return -EOPNOTSUPP;
+
 	if (!(mac->flags & MV_EMAC_F_INIT)) {
 		pr_err("%s: interface %s is not initialized\n", __func__, dev->name);
 		return -EOPNOTSUPP;
@@ -294,6 +300,9 @@ static void mv_pp2x_get_pauseparam(struct net_device *dev,
 	struct gop_hw *gop = &port->priv->hw.gop;
 	int gop_port = mac->gop_index;
 	phy_interface_t phy_mode;
+
+	if (port->priv->pp2_version == PPV21)
+		return;
 
 	phy_mode = port->mac_data.phy_mode;
 
@@ -338,6 +347,9 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 	int gop_port = mac->gop_index;
 	phy_interface_t phy_mode;
 	int err;
+
+	if (port->priv->pp2_version == PPV21)
+		return -EOPNOTSUPP;
 
 	if (!(mac->flags & MV_EMAC_F_INIT)) {
 		pr_err("%s: interface %s is not initialized\n", __func__, dev->name);
@@ -420,6 +432,12 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_port_link_status	status;
 	phy_interface_t			phy_mode;
+
+	if (port->priv->pp2_version == PPV21) {
+		if (!port->mac_data.phy_dev)
+			return -ENODEV;
+		return phy_ethtool_gset(port->mac_data.phy_dev, cmd);
+	}
 
 	/* No Phy device mngmt */
 	if (!port->mac_data.phy_dev) {
@@ -509,6 +527,12 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 	struct gop_hw *gop = &port->priv->hw.gop;
 	struct mv_mac_data *mac = &port->mac_data;
 	int gop_port = mac->gop_index;
+
+	if (port->priv->pp2_version == PPV21) {
+		if (!port->mac_data.phy_dev)
+			return -ENODEV;
+		return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
+	}
 
 	err = mv_pp2x_autoneg_check_valid(mac, gop, cmd, &status);
 
@@ -680,6 +704,9 @@ static u32 mv_pp2x_ethtool_get_rxfh_indir_size(struct net_device *dev)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
 
+	if (port->priv->pp2_version == PPV21)
+		return -EOPNOTSUPP;
+
 	return ARRAY_SIZE(port->priv->rx_indir_table);
 }
 
@@ -714,6 +741,9 @@ static int mv_pp2x_ethtool_get_rxnfc(struct net_device *dev,
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	int ret = -EOPNOTSUPP;
+
+	if (port->priv->pp2_version == PPV21)
+		return -EOPNOTSUPP;
 
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -EOPNOTSUPP;
@@ -779,6 +809,9 @@ static int mv_pp2x_ethtool_set_rxnfc(struct net_device *dev, struct ethtool_rxnf
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	int ret = -EOPNOTSUPP;
 
+	if (port->priv->pp2_version == PPV21)
+		return -EOPNOTSUPP;
+
 	/* Single mode doesn't support RSS features */
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -EOPNOTSUPP;
@@ -801,6 +834,9 @@ static int mv_pp2x_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 	size_t copy_size;
 	struct mv_pp2x_port *port = netdev_priv(dev);
 
+	if (port->priv->pp2_version == PPV21)
+		return -EOPNOTSUPP;
+
 	/* Single mode doesn't support RSS features */
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -EOPNOTSUPP;
@@ -822,6 +858,9 @@ static int mv_pp2x_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 {
 	int i, err;
 	struct mv_pp2x_port *port = netdev_priv(dev);
+
+	if (port->priv->pp2_version == PPV21)
+		return -EOPNOTSUPP;
 
 	/* Single mode doesn't support RSS features */
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
@@ -854,6 +893,9 @@ static int mv_pp2x_ethtool_get_regs_len(struct net_device *dev)
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_mac_data *mac = &port->mac_data;
 
+	if (port->priv->pp2_version == PPV21)
+		return -EOPNOTSUPP;
+
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
@@ -875,6 +917,9 @@ static void mv_pp2x_ethtool_get_regs(struct net_device *dev,
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_mac_data *mac = &port->mac_data;
+
+	if (port->priv->pp2_version == PPV21)
+		return;
 
 	if (!port) {
 		netdev_err(dev, "%s is not supported on %s\n",
@@ -1012,6 +1057,9 @@ static void mv_pp2x_eth_tool_diag_test(struct net_device *netdev,
 	struct mv_pp2x_port *port = netdev_priv(netdev);
 	int i;
 	struct mv_mac_data *mac = &port->mac_data;
+
+	if (port->priv->pp2_version == PPV21)
+		return;
 
 	if (!(mac->flags & MV_EMAC_F_INIT)) {
 		pr_err("%s: interface %s is not initialized\n", __func__, netdev->name);
