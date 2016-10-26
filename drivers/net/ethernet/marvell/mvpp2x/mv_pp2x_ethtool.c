@@ -528,28 +528,29 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 	struct mv_mac_data *mac = &port->mac_data;
 	int gop_port = mac->gop_index;
 
-	if (port->priv->pp2_version == PPV21) {
+	if (port->priv->pp2_version == PPV21)
 		if (!port->mac_data.phy_dev)
 			return -ENODEV;
-		return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
+
+	if (!port->mac_data.phy_dev) {
+		err = mv_pp2x_autoneg_check_valid(mac, gop, cmd, &status);
+
+		if (err < 0) {
+			pr_err("Wrong negotiation mode set\n");
+			return err;
+		}
+
+		mv_gop110_force_link_mode_set(gop, mac, false, true);
+		mv_gop110_gmac_set_autoneg(gop, mac, cmd->autoneg);
+		if (cmd->autoneg)
+			mv_gop110_autoneg_restart(gop, mac);
+		else
+			mv_gop110_gmac_speed_duplex_set(gop, gop_port, status.speed, status.duplex);
+		mv_gop110_force_link_mode_set(gop, mac, false, false);
+		return 0;
 	}
 
-	err = mv_pp2x_autoneg_check_valid(mac, gop, cmd, &status);
-
-	if (err < 0) {
-		pr_err("Wrong negotiation mode set\n");
-		return err;
-	}
-
-	mv_gop110_force_link_mode_set(gop, mac, false, true);
-	mv_gop110_gmac_set_autoneg(gop, mac, cmd->autoneg);
-	if (cmd->autoneg)
-		mv_gop110_autoneg_restart(gop, mac);
-	else
-		mv_gop110_gmac_speed_duplex_set(gop, gop_port, status.speed, status.duplex);
-	mv_gop110_force_link_mode_set(gop, mac, false, false);
-
-	return 0;
+	return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
 }
 
 /* Set interrupt coalescing for ethtools */
