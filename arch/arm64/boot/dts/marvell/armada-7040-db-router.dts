@@ -130,6 +130,7 @@
 				};
 				emac2: mac2 {
 					phy-mode = "sgmii"; /* lane-0 */
+					phy = <&phy2>;
 				};
 				emac3: mac3 {
 					phy-mode = "rgmii"; /* rgmii-1 */
