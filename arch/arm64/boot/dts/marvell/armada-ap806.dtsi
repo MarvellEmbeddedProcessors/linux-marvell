@@ -311,6 +311,7 @@
 				      <0x410000 0x1000>;
 				msi-parent = <&gic_v2m0>;
 				dma-coherent;
+				clocks = <&syscon 3>;
 				status = "okay";
 			};
 
@@ -320,6 +321,7 @@
 				      <0x430000 0x1000>;
 				msi-parent = <&gic_v2m0>;
 				dma-coherent;
+				clocks = <&syscon 3>;
 				status = "okay";
 			};
 
@@ -329,6 +331,7 @@
 				      <0x450000 0x1000>;
 				msi-parent = <&gic_v2m0>;
 				dma-coherent;
+				clocks = <&syscon 3>;
 				status = "okay";
 			};
 
@@ -338,6 +341,7 @@
 				      <0x470000 0x1000>;
 				msi-parent = <&gic_v2m0>;
 				dma-coherent;
+				clocks = <&syscon 3>;
 				status = "okay";
 			};
 
