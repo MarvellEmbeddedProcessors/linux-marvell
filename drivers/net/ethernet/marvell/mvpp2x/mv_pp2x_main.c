@@ -1500,7 +1500,8 @@ static irqreturn_t mv_pp2_link_change_isr(int irq, void *data)
 		mv_gop110_port_events_clear(&port->priv->hw.gop, &port->mac_data);
 	}
 
-	tasklet_schedule(&port->link_change_tasklet);
+	if (!port->mac_data.phy_dev)
+		tasklet_schedule(&port->link_change_tasklet);
 
 	return IRQ_HANDLED;
 
@@ -1648,7 +1649,57 @@ static void mv_pp21_link_event(struct net_device *dev)
 			mv_pp2x_ingress_disable(port);
 			mv_pp2x_egress_disable(port);
 		}
-		phy_print_status(phydev);
+	}
+}
+
+static void mv_pp22_link_event(struct net_device *dev)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct phy_device *phydev = port->mac_data.phy_dev;
+	int status_change = 0;
+
+	if (!phydev)
+		return;
+
+	if (phydev->link) {
+		if ((port->mac_data.speed != phydev->speed) ||
+		    (port->mac_data.duplex != phydev->duplex)) {
+			port->mac_data.duplex = phydev->duplex;
+			port->mac_data.speed  = phydev->speed;
+		}
+		port->mac_data.flags |= MV_EMAC_F_LINK_UP;
+	}
+
+	if (phydev->link != port->mac_data.link) {
+		if (!phydev->link) {
+			port->mac_data.duplex = -1;
+			port->mac_data.speed = 0;
+		}
+
+		port->mac_data.link = phydev->link;
+		status_change = 1;
+	}
+
+	if (status_change) {
+		if (phydev->link) {
+			mv_gop110_port_events_mask(&port->priv->hw.gop,
+						   &port->mac_data);
+			mv_gop110_port_enable(&port->priv->hw.gop,
+					      &port->mac_data);
+			mv_pp2x_egress_enable(port);
+			mv_pp2x_ingress_enable(port);
+			mv_gop110_port_events_unmask(&port->priv->hw.gop,
+						     &port->mac_data);
+			port->mac_data.flags |= MV_EMAC_F_LINK_UP;
+		} else {
+			mv_pp2x_ingress_disable(port);
+			mv_pp2x_egress_disable(port);
+			mv_gop110_port_events_mask(&port->priv->hw.gop,
+						   &port->mac_data);
+			mv_gop110_port_disable(&port->priv->hw.gop,
+					       &port->mac_data);
+			port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
+		}
 	}
 }
 
@@ -3154,16 +3205,17 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 		mv_gop110_port_events_mask(gop, mac);
 		mv_gop110_port_enable(gop, mac);
 	}
+
 	if (port->mac_data.phy_dev)
 		phy_start(port->mac_data.phy_dev);
-	else
+	else {
 		mv_pp22_dev_link_event(port->dev);
+		tasklet_init(&port->link_change_tasklet, mv_pp2_link_change_tasklet,
+				(unsigned long)(port->dev));
+	}
 
-	if (port->priv->pp2_version == PPV21)
+	if (port->mac_data.phy_dev)
 		netif_tx_start_all_queues(port->dev);
-
-	tasklet_init(&port->link_change_tasklet, mv_pp2_link_change_tasklet,
-		(unsigned long)(port->dev));
 
 	mv_pp2x_egress_enable(port);
 	mv_pp2x_ingress_enable(port);
@@ -3198,11 +3250,12 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 		mv_gop110_port_events_mask(gop, mac);
 		mv_gop110_port_disable(gop, mac);
 		port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
-		tasklet_kill(&port->link_change_tasklet);
 	}
 
 	if (port->mac_data.phy_dev)
 		phy_stop(port->mac_data.phy_dev);
+	else
+		tasklet_kill(&port->link_change_tasklet);
 }
 
 /* Return positive if MTU is valid */
@@ -3289,11 +3342,17 @@ void mv_pp2x_check_queue_size_valid(struct mv_pp2x_port *port)
 static int mv_pp2x_phy_connect(struct mv_pp2x_port *port)
 {
 	struct phy_device *phy_dev;
+	void (*fp)(struct net_device *);
+
+	if (port->priv->pp2_version == PPV21)
+		fp = mv_pp21_link_event;
+	else
+		fp = mv_pp22_link_event;
 
 	phy_dev = of_phy_connect(port->dev, port->mac_data.phy_node,
-		mv_pp21_link_event, 0, port->mac_data.phy_mode);
+		fp, 0, port->mac_data.phy_mode);
 	if (!phy_dev) {
-		netdev_err(port->dev, "cannot connect to phy\n");
+		dev_err(port->dev->dev.parent, "port ID: %d cannot connect to phy\n", port->id);
 		return -ENODEV;
 	}
 	phy_dev->supported &= PHY_GBIT_FEATURES;
@@ -3446,15 +3505,6 @@ int mv_pp2x_open(struct net_device *dev)
 	/* In default link is down */
 	netif_carrier_off(port->dev);
 
-	/*FIXME: Should check which gop_version
-	 * (better, gop_version_attr: support_phy_connect), not the pp_version
-	 */
-	if (port->priv->pp2_version == PPV21) {
-		err = mv_pp2x_phy_connect(port);
-		if (err < 0)
-			goto err_free_irq;
-	}
-
 	/* Unmask interrupts on all CPUs */
 	on_each_cpu(mv_pp2x_interrupts_unmask, port, 1);
 
@@ -3477,7 +3527,6 @@ int mv_pp2x_open(struct net_device *dev)
 	return 0;
 
 err_free_all:
-err_free_irq:
 	mv_pp2x_cleanup_irqs(port);
 err_cleanup_txqs:
 	mv_pp2x_cleanup_txqs(port);
@@ -3493,9 +3542,6 @@ int mv_pp2x_stop(struct net_device *dev)
 	int cpu;
 
 	mv_pp2x_stop_dev(port);
-
-	if (port->priv->pp2_version == PPV21)
-		mv_pp2x_phy_disconnect(port);
 
 	/* Mask interrupts on all CPUs */
 	on_each_cpu(mv_pp2x_interrupts_mask, port, 1);
@@ -4329,6 +4375,12 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			goto err_free_netdev;
 	}
 
+	if (port->mac_data.phy_node) {
+		err = mv_pp2x_phy_connect(port);
+		if (err < 0)
+			goto err_free_netdev;
+	}
+
 	/* get MAC address */
 	dt_mac_addr = of_get_mac_address(emac_node);
 	if (dt_mac_addr && is_valid_ether_addr(dt_mac_addr)) {
@@ -4529,6 +4581,9 @@ static void mv_pp2x_port_remove(struct mv_pp2x_port *port)
 #ifdef DEV_NETMAP
 	netmap_detach(port->dev);
 #endif /* DEV_NETMAP */
+
+	if (port->mac_data.phy_node)
+		mv_pp2x_phy_disconnect(port);
 
 	unregister_netdev(port->dev);
 	free_percpu(port->pcpu);
