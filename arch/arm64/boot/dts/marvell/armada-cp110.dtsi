@@ -269,6 +269,17 @@ mdio@15b000 {
 	reg = <0x12a600 0x10>;
 };
 
+sdhci@780000 {
+	compatible = "marvell,xenon-sdhci";
+	reg = <0x780000 0x300>;
+	interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+	clock-names = "core";
+	clocks = <&cpm_syscon0 1 4>;
+	xenon,slotno = <0>;
+	dma-coherent;
+	status = "disabled";
+};
+
 axim-cp-rd@3c5000 {
 	compatible = "marvell,coresight-axim", "arm,primecell";
 	reg = <0x3c5000 0x1000>;
