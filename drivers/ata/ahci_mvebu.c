@@ -16,6 +16,7 @@
 #include <linux/mbus.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/of_address.h>
 #include <linux/platform_device.h>
 #include "ahci.h"
 
@@ -122,10 +123,75 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 		ahci_mvebu_regret_option(hpriv);
 	}
 
-#ifdef CONFIG_CP110_SATA_ADDR_WA
-	of_property_read_u32(pdev->dev.of_node, "port_base", &hpriv->port_base);
-	of_property_read_u32(pdev->dev.of_node, "port_offset", &hpriv->port_offset);
-#endif
+	/* In A8k A0 AHCI unit the port register offsets are not
+	 * according to AHCI specification. We need a WA for a8k (cp110).
+	 */
+	if (of_device_is_compatible(pdev->dev.of_node,
+	    "marvell,armada-cp110-ahci")) {
+
+		struct device_node *node;
+		void __iomem *gwd_iidr2;
+		const unsigned int *reg;
+		phys_addr_t paddr;
+
+		/* Read the node which holds the "Global Watchdog Interface
+		 * Identification Register (GWD_IIDR2)" address - holds the revision.
+		 */
+		node = of_find_compatible_node(NULL, NULL,
+					       "marvell,ap806-rev-info");
+		if (!node) {
+			dev_err(&pdev->dev, "unable to read rev-info node\n");
+			of_node_put(node);
+			return -ENODEV;
+		}
+
+		/* Read the offset of the register */
+		reg = of_get_property(node, "reg", NULL);
+		if (!reg) {
+			dev_err(&pdev->dev, "unable to read reg property from rev-info node\n");
+			of_node_put(node);
+			return -ENODEV;
+		}
+
+		/* Translate the offset to phyisical address */
+		paddr = of_translate_address(node, reg);
+		if (paddr == OF_BAD_ADDR) {
+			dev_err(&pdev->dev, "of_translate_address failed\n");
+			of_node_put(node);
+			return -EINVAL;
+		}
+
+		gwd_iidr2 = ioremap(paddr, reg[1]);
+		if (!gwd_iidr2) {
+			dev_err(&pdev->dev, "rev-info ioremap() failed\n");
+			of_node_put(node);
+			return -EINVAL;
+		}
+
+#define GWD_IIDR2_REV_ID_OFFSET	12
+#define GWD_IIDR2_REV_ID_MASK	0xF
+#define APN806_REV_ID_A0	0
+
+		/* The workaround is required only for A0 revision.
+		 * read gwd_iidr2 register to determing the revision
+		 */
+		if (((readl(gwd_iidr2) >> GWD_IIDR2_REV_ID_OFFSET) &
+		    GWD_IIDR2_REV_ID_MASK) == APN806_REV_ID_A0) {
+
+			/* Read the correct port base and offset from the
+			 * device tree and set hpriv->a8k_a0_wa for future use.
+			 */
+			hpriv->a8k_a0_wa = 1;
+			of_property_read_u32(pdev->dev.of_node, "port_base",
+					     &hpriv->port_base);
+			of_property_read_u32(pdev->dev.of_node, "port_offset",
+					     &hpriv->port_offset);
+		}
+
+		/* Release resources */
+		iounmap(gwd_iidr2);
+		of_node_put(node);
+	}
 
 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
 				     &ahci_platform_sht);
