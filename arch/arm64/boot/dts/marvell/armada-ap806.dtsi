@@ -489,6 +489,11 @@
 				reg = <0x6f8200 0x8>;
 				status = "okay";
 			};
+
+			revision-info@610fcc {
+				compatible = "marvell,ap806-rev-info";
+				reg = <0x610fcc 0x4>;
+			};
 		};
 	};
 };
