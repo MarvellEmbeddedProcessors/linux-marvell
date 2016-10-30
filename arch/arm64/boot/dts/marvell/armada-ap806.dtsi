@@ -367,6 +367,11 @@
 				reg = <0xF000 0x1000>;
 				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
 			};
+
+			revision-info@610fcc {
+				compatible = "marvell,ap806-rev-info";
+				reg = <0x610FCC 0x4>;
+			};
 		};
 	};
 
