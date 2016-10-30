@@ -142,6 +142,7 @@ disable_resources:
 static const struct of_device_id ahci_mvebu_of_match[] = {
 	{ .compatible = "marvell,armada-380-ahci", },
 	{ .compatible = "marvell,armada-3700-ahci", },
+	{ .compatible = "marvell,armada-cp110-ahci", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, ahci_mvebu_of_match);
