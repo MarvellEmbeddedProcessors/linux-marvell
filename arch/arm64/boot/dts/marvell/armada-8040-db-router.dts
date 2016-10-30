@@ -124,13 +124,20 @@
 			sata@540000 {
 				status = "okay";
 			};
+			mdio@12a200 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				phy2_1: ethernet-phy@2 {
+					reg = <0>;
+				};
+			};
 			gop {
 				emac0_1: mac0 {
 					phy-mode = "kr"; /* lane-2 */
 				};
 				emac2_1: mac2 {
 					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&phy2>;
+					phy = <&phy2_1>;
 				};
 				emac3_1: mac3 {
 					phy-mode = "sgmii"; /* lane-4 */
