@@ -352,10 +352,16 @@ struct ahci_host_priv {
 	 * be overridden anytime before the host is activated.
 	 */
 	void			(*start_engine)(struct ata_port *ap);
-#ifdef CONFIG_CP110_SATA_ADDR_WA
+
+	/* In A8k A0 AHCI unit the port register offsets are not
+	 * according to AHCI specification. We determine at runtime the revision
+	 * and set the correct offsets from device-tree.
+	 */
 	u32			port_base;	/* Offset of ports registers */
 	u32			port_offset;	/* Offset between port registers */
-#endif
+	int			a8k_a0_wa;	/* Boolean to determine if A0
+						 * WA should be applied
+						 */
 };
 
 extern int ahci_ignore_sss;
@@ -411,10 +417,9 @@ static inline void __iomem *__ahci_port_base(struct ata_host *host,
 	struct ahci_host_priv *hpriv = host->private_data;
 	void __iomem *mmio = hpriv->mmio;
 
-#ifdef CONFIG_CP110_SATA_ADDR_WA
-	if (hpriv->port_base && hpriv->port_offset)
+	if (hpriv->a8k_a0_wa && hpriv->port_base && hpriv->port_offset)
 		return mmio + hpriv->port_base + (port_no * hpriv->port_offset);
-#endif
+
 	return mmio + 0x100 + (port_no * 0x80);
 }
 
