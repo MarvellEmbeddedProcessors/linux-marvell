@@ -118,7 +118,7 @@ serial@702300 {
 };
 
 sata: sata@540000 {
-	compatible = "marvell,armada-3700-ahci";
+	compatible = "marvell,armada-cp110-ahci";
 	reg = <0x540000 0x30000>;
 	dma-coherent;
 	interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
