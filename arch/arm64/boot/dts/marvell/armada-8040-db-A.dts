@@ -42,14 +42,14 @@
 
 /*
  * Device Tree file for Marvell Armada 8040 development board
- * This board file supports the A0 revision of the board
+ * This file supports the default configuration of the board
  */
 
 #include "armada-8040-db.dtsi"
 
 / {
 	model = "Marvell Armada-8040 development board router setup";
-	compatible = "marvell,armada8040-db-router", "marvell,armada8040-db", "marvell,armada8040",
+	compatible = "marvell,armada8040-db-A", "marvell,armada8040-db", "marvell,armada8040",
 			"marvell,armada-ap806-quad", "marvell,armada-ap806";
 	#address-cells = <2>;
 	#size-cells = <2>;
@@ -61,6 +61,7 @@
 			sata@540000 {
 				status = "okay";
 			};
+			/* usb3h0 is USB2 only (UTMI) */
 			usb3h0: usb3@500000 {
 				status = "okay";
 			};
@@ -108,13 +109,16 @@
 				status = "okay";
 			};
 		};
-
+		pcie@0x600000 {
+			status = "okay";
+		};
 		pcie@0x640000 {
 			status = "okay";
 		};
 	};
 	cpn-110-slave {
 		config-space {
+			/* usb3h0_1 is USB2 only (UTMI) */
 			usb3h0_1: usb3@500000 {
 				status = "okay";
 			};
@@ -147,6 +151,12 @@
 					status = "disabled";
 				};
 			};
+		};
+		pcie@0x600000 {
+			status = "okay";
+		};
+		pcie@0x620000 {
+			status = "okay";
 		};
 		pcie@0x640000 {
 			status = "okay";
