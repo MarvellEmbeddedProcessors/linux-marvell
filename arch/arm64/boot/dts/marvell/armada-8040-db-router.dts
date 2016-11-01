@@ -110,6 +110,9 @@
 			eip197@800000 {
 				status = "okay";
 			};
+			comphy {
+				status = "okay";
+			};
 		};
 
 		pcie@0x640000 {
@@ -156,6 +159,9 @@
 				eth2_1: eth2@030000 {
 					status = "disabled";
 				};
+			};
+			comphy {
+				status = "okay";
 			};
 		};
 		pcie@0x640000 {
