@@ -19,6 +19,8 @@
 #include <linux/platform_device.h>
 #include <dt-bindings/phy/phy-mvebu-comphy.h>
 
+#include "phy-mvebu-comphy.h"
+
 #define MVEBU_COMPHY_MAX_CNT	6
 #define MVEBU_COMPHY_FUNC_MAX	11
 
@@ -103,12 +105,86 @@ u32 __maybe_unused polling_with_timeout(void __iomem *addr, u32 val, u32 mask,
 	return 0;
 }
 
+/* PHY selector configures SATA and Network modes */
+static void mvebu_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
+					  struct mvebu_comphy *comphy)
+{
+	u32 reg, mask;
+	u32 comphy_offset = COMMON_SELECTOR_COMPHYN_FIELD_WIDTH * comphy->index;
+	int mode;
+
+	/* Comphy mode (compound of the IO mode and id) is stored during
+	 * the execution of mvebu_comphy_of_xlate.
+	 * Here, only the IO mode is required to distinguish between SATA and
+	 * network modes.
+	 */
+	mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+
+	mask = COMMON_SELECTOR_COMPHY_MASK << comphy_offset;
+	reg = readl(priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
+	reg &= ~mask;
+
+	/* SATA port 0/1 require the same configuration */
+	if (mode == COMPHY_SATA_MODE) {
+		/* SATA selector values is always 4 */
+		reg |= COMMON_SELECTOR_COMPHYN_SATA << comphy_offset;
+	} else {
+		switch (comphy->index) {
+		case(0):
+		case(1):
+		case(2):
+			/* For comphy 0,1, and 2:
+			 *	Network selector value is always 1.
+			 */
+			reg |= COMMON_SELECTOR_COMPHY0_1_2_NETWORK << comphy_offset;
+			break;
+		case(3):
+			/* For comphy 3:
+			 * 0x1 = RXAUI_Lane1
+			 * 0x2 = SGMII/HS-SGMII Port1
+			 */
+			if (mode == COMPHY_RXAUI_MODE)
+				reg |= COMMON_SELECTOR_COMPHY3_RXAUI << comphy_offset;
+			else
+				reg |= COMMON_SELECTOR_COMPHY3_SGMII << comphy_offset;
+			break;
+		case(4):
+			 /* For comphy 4:
+			  * 0x1 = SGMII/HS-SGMII Port2
+			  * 0x2 = SGMII/HS-SGMII Port1: XFI/SFI, RXAUI_Lane0
+			  */
+			if (priv->lanes[comphy->index].mode == COMPHY_SGMII2 ||
+			    priv->lanes[comphy->index].mode == COMPHY_HS_SGMII2)
+				reg |= COMMON_SELECTOR_COMPHY4_SGMII2 << comphy_offset;
+			else
+				reg |= COMMON_SELECTOR_COMPHY4_ALL_OTHERS << comphy_offset;
+			break;
+		case(5):
+			/* For comphy 5:
+			 * 0x1 = SGMII/HS-SGMII Port2
+			 * 0x2 = RXAUI Lane1
+			 */
+			if (mode == COMPHY_RXAUI_MODE)
+				reg |= COMMON_SELECTOR_COMPHY5_RXAUI << comphy_offset;
+			else
+				reg |= COMMON_SELECTOR_COMPHY5_SGMII << comphy_offset;
+			break;
+		}
+	}
+
+	writel(reg, priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
+
+}
+
 static int mvebu_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 				      struct mvebu_comphy *comphy)
 {
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
 	dev_err(priv->dev, "SATA mode is not implemented\n");
+
+	/* configure phy selector for SATA */
+	mvebu_comphy_set_phy_selector(priv, comphy);
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
@@ -121,6 +197,9 @@ static int mvebu_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
 	dev_err(priv->dev, "SGMII mode is not implemented\n");
+
+	/* configure phy selector for SGMII */
+	mvebu_comphy_set_phy_selector(priv, comphy);
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
@@ -158,6 +237,9 @@ static int mvebu_comphy_rxaui_power_on(struct mvebu_comphy_priv *priv,
 
 	dev_err(priv->dev, "RXAUI mode is not implemented\n");
 
+	/* configure phy selector for RXAUI */
+	mvebu_comphy_set_phy_selector(priv, comphy);
+
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
 	return -ENOTSUPP;
@@ -169,6 +251,9 @@ static int mvebu_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
 	dev_err(priv->dev, "XFI/SFI mode is not implemented\n");
+
+	/* configure phy selector for XFI/SFI */
+	mvebu_comphy_set_phy_selector(priv, comphy);
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
