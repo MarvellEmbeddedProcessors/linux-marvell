@@ -87,6 +87,16 @@ config PHY_PXA_28NM_USB2
 
 	  To compile this driver as a module, choose M here.
 
+config PHY_MVEBU_COMPHY
+	def_bool y
+	depends on ARCH_MVEBU
+	depends on OF
+	select GENERIC_PHY
+	help
+	  Enable this to support Marvell comphy driver. This driver is
+	  responsible for configuring all SerDes lanes according to the
+	  selected configuration.
+
 config PHY_MVEBU_SATA
 	def_bool y
 	depends on ARCH_DOVE || MACH_DOVE || MACH_KIRKWOOD
