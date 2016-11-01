@@ -320,3 +320,11 @@ eip197@800000 {
 	clocks = <&cps_syscon0 1 26>;
 	status = "disabled";
 };
+
+comphy1: comphy {
+	compatible = "marvell,cp110-comphy";
+	reg = <0x441000 0x100>, <0x120000 0x6000>;
+	reg-names = "comphy", "serdes";
+	#phy-cells = <2>;
+	status = "disabled";
+};
