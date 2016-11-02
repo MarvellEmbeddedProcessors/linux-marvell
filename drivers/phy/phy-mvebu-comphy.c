@@ -397,16 +397,200 @@ static int mvebu_comphy_rxaui_power_on(struct mvebu_comphy_priv *priv,
 static int mvebu_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 				     struct mvebu_comphy *comphy)
 {
+	void __iomem *hpipe_addr, *sd_ip_addr, *comphy_addr, *addr;
+	u32 mask, data;
+	int ret = 0;
+
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
-	dev_err(priv->dev, "XFI/SFI mode is not implemented\n");
+	hpipe_addr = HPIPE_ADDR(priv->comphy_pipe_regs, comphy->index);
+	sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
+	comphy_addr = COMPHY_ADDR(priv->comphy_regs, comphy->index);
 
 	/* configure phy selector for XFI/SFI */
 	mvebu_comphy_set_phy_selector(priv, comphy);
 
-	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+	dev_dbg(priv->dev, "stage: RFU configurations - hard reset comphy\n");
+	/* RFU configurations - hard reset comphy */
+	mask = COMMON_PHY_CFG1_PWR_UP_MASK;
+	data = 0x1 << COMMON_PHY_CFG1_PWR_UP_OFFSET;
+	mask |= COMMON_PHY_CFG1_PIPE_SELECT_MASK;
+	data |= 0x0 << COMMON_PHY_CFG1_PIPE_SELECT_OFFSET;
+	reg_set(comphy_addr + COMMON_PHY_CFG1_REG, data, mask);
 
-	return -ENOTSUPP;
+	/* Select Baud Rate of Comphy And PD_PLL/Tx/Rx */
+	mask = SD_EXTERNAL_CONFIG0_SD_PU_PLL_MASK;
+	data = 0x0 << SD_EXTERNAL_CONFIG0_SD_PU_PLL_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG0_SD_PHY_GEN_RX_MASK;
+	data |= 0xE << SD_EXTERNAL_CONFIG0_SD_PHY_GEN_RX_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG0_SD_PHY_GEN_TX_MASK;
+	data |= 0xE << SD_EXTERNAL_CONFIG0_SD_PHY_GEN_TX_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG0_SD_PU_RX_MASK;
+	data |= 0 << SD_EXTERNAL_CONFIG0_SD_PU_RX_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG0_SD_PU_TX_MASK;
+	data |= 0 << SD_EXTERNAL_CONFIG0_SD_PU_TX_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG0_HALF_BUS_MODE_MASK;
+	data |= 0 << SD_EXTERNAL_CONFIG0_HALF_BUS_MODE_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG0_REG, data, mask);
+
+	/* release from hard reset */
+	mask = SD_EXTERNAL_CONFIG1_RESET_IN_MASK;
+	data = 0x0 << SD_EXTERNAL_CONFIG1_RESET_IN_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG1_RESET_CORE_MASK;
+	data |= 0x0 << SD_EXTERNAL_CONFIG1_RESET_CORE_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG1_RF_RESET_IN_MASK;
+	data |= 0x0 << SD_EXTERNAL_CONFIG1_RF_RESET_IN_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
+
+	mask = SD_EXTERNAL_CONFIG1_RESET_IN_MASK;
+	data = 0x1 << SD_EXTERNAL_CONFIG1_RESET_IN_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG1_RESET_CORE_MASK;
+	data |= 0x1 << SD_EXTERNAL_CONFIG1_RESET_CORE_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
+
+
+	/* Wait 1ms - until band gap and ref clock ready */
+	mdelay(1);
+
+	/* Start comphy Configuration */
+	dev_dbg(priv->dev, "stage: Comphy configuration\n");
+	/* set reference clock */
+	mask = HPIPE_MISC_ICP_FORCE_MASK;
+	data = 0x1 << HPIPE_MISC_ICP_FORCE_OFFSET;
+	mask |= HPIPE_MISC_REFCLK_SEL_MASK;
+	data |= 0x0 << HPIPE_MISC_REFCLK_SEL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_MISC_REG, data, mask);
+	/* Power and PLL Control */
+	mask = HPIPE_PWR_PLL_REF_FREQ_MASK;
+	data = 0x1 << HPIPE_PWR_PLL_REF_FREQ_OFFSET;
+	mask |= HPIPE_PWR_PLL_PHY_MODE_MASK;
+	data |= 0x4 << HPIPE_PWR_PLL_PHY_MODE_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PWR_PLL_REG, data, mask);
+	/* Loopback register */
+	mask = HPIPE_LOOPBACK_SEL_MASK;
+	data = 0x1 << HPIPE_LOOPBACK_SEL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_LOOPBACK_REG, data, mask);
+	/* rx control 1 */
+	mask = HPIPE_RX_CONTROL_1_RXCLK2X_SEL_MASK;
+	data = 0x1 << HPIPE_RX_CONTROL_1_RXCLK2X_SEL_OFFSET;
+	mask |= HPIPE_RX_CONTROL_1_CLK8T_EN_MASK;
+	data |= 0x1 << HPIPE_RX_CONTROL_1_CLK8T_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_RX_CONTROL_1_REG, data, mask);
+	/* DTL Control */
+	mask = HPIPE_PWR_CTR_DTL_FLOOP_EN_MASK;
+	data = 0x1 << HPIPE_PWR_CTR_DTL_FLOOP_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PWR_CTR_DTL_REG, data, mask);
+
+	/* Set analog parameters from ETP(HW) */
+	dev_dbg(priv->dev, "stage: Analog parameters from ETP(HW)\n");
+	/* SERDES External Configuration 2 */
+	mask = SD_EXTERNAL_CONFIG2_PIN_DFE_EN_MASK;
+	data = 0x1 << SD_EXTERNAL_CONFIG2_PIN_DFE_EN_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG2_REG, data, mask);
+	/* 0x7-DFE Resolution control */
+	mask = HPIPE_DFE_RES_FORCE_MASK;
+	data = 0x1 << HPIPE_DFE_RES_FORCE_OFFSET;
+	reg_set(hpipe_addr + HPIPE_DFE_REG0, data, mask);
+	/* 0xd-G1_Setting_0 */
+	mask = HPIPE_G1_SET_0_G1_TX_AMP_MASK;
+	data = 0x1c << HPIPE_G1_SET_0_G1_TX_AMP_OFFSET;
+	mask |= HPIPE_G1_SET_0_G1_TX_EMPH1_MASK;
+	data |= 0xe << HPIPE_G1_SET_0_G1_TX_EMPH1_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SET_0_REG, data, mask);
+	/* Genration 1 setting 2 (G1_Setting_2) */
+	mask = HPIPE_G1_SET_2_G1_TX_EMPH0_MASK;
+	data = 0x0 << HPIPE_G1_SET_2_G1_TX_EMPH0_OFFSET;
+	mask |= HPIPE_G1_SET_2_G1_TX_EMPH0_EN_MASK;
+	data |= 0x1 << HPIPE_G1_SET_2_G1_TX_EMPH0_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SET_2_REG, data, mask);
+	/* Transmitter Slew Rate Control register (tx_reg1) */
+	mask = HPIPE_TX_REG1_TX_EMPH_RES_MASK;
+	data = 0x3 << HPIPE_TX_REG1_TX_EMPH_RES_OFFSET;
+	mask |= HPIPE_TX_REG1_SLC_EN_MASK;
+	data |= 0x3f << HPIPE_TX_REG1_SLC_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_TX_REG1_REG, data, mask);
+	/* Impedance Calibration Control register (cal_reg1) */
+	mask = HPIPE_CAL_REG_1_EXT_TXIMP_MASK;
+	data = 0xe << HPIPE_CAL_REG_1_EXT_TXIMP_OFFSET;
+	mask |= HPIPE_CAL_REG_1_EXT_TXIMP_EN_MASK;
+	data |= 0x1 << HPIPE_CAL_REG_1_EXT_TXIMP_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_CAL_REG1_REG, data, mask);
+	/* Generation 1 Setting 5 (g1_setting_5) */
+	mask = HPIPE_G1_SETTING_5_G1_ICP_MASK;
+	data = 0 << HPIPE_CAL_REG_1_EXT_TXIMP_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SETTING_5_REG, data, mask);
+	/* 0xE-G1_Setting_1 */
+	mask = HPIPE_G1_SET_1_G1_RX_SELMUPI_MASK;
+	data = 0x1 << HPIPE_G1_SET_1_G1_RX_SELMUPI_OFFSET;
+	mask |= HPIPE_G1_SET_1_G1_RX_SELMUPP_MASK;
+	data |= 0x1 << HPIPE_G1_SET_1_G1_RX_SELMUPP_OFFSET;
+	mask |= HPIPE_G1_SET_1_G1_RX_DFE_EN_MASK;
+	data |= 0x1 << HPIPE_G1_SET_1_G1_RX_DFE_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SET_1_REG, data, mask);
+	/* 0xA-DFE_Reg3 */
+	mask = HPIPE_DFE_F3_F5_DFE_EN_MASK;
+	data = 0x0 << HPIPE_DFE_F3_F5_DFE_EN_OFFSET;
+	mask |= HPIPE_DFE_F3_F5_DFE_CTRL_MASK;
+	data |= 0x0 << HPIPE_DFE_F3_F5_DFE_CTRL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_DFE_F3_F5_REG, data, mask);
+
+	/* 0x111-G1_Setting_4 */
+	mask = HPIPE_G1_SETTINGS_4_G1_DFE_RES_MASK;
+	data = 0x1 << HPIPE_G1_SETTINGS_4_G1_DFE_RES_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SETTINGS_4_REG, data, mask);
+	/* Genration 1 setting 3 (G1_Setting_3) */
+	mask = HPIPE_G1_SETTINGS_3_G1_FBCK_SEL_MASK;
+	data = 0x1 << HPIPE_G1_SETTINGS_3_G1_FBCK_SEL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SETTINGS_3_REG, data, mask);
+
+	dev_dbg(priv->dev, "stage: RFU configurations- Power Up PLL,Tx,Rx\n");
+	/* SERDES External Configuration */
+	mask = SD_EXTERNAL_CONFIG0_SD_PU_PLL_MASK;
+	data = 0x1 << SD_EXTERNAL_CONFIG0_SD_PU_PLL_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG0_SD_PU_RX_MASK;
+	data |= 0x1 << SD_EXTERNAL_CONFIG0_SD_PU_RX_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG0_SD_PU_TX_MASK;
+	data |= 0x1 << SD_EXTERNAL_CONFIG0_SD_PU_TX_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG0_REG, data, mask);
+
+	/* check PLL rx & tx ready */
+	addr = sd_ip_addr + SD_EXTERNAL_STATUS0_REG;
+	data = SD_EXTERNAL_STATUS0_PLL_RX_MASK | SD_EXTERNAL_STATUS0_PLL_TX_MASK;
+	mask = data;
+	data = polling_with_timeout(addr, data, mask, 15000);
+	if (data != 0) {
+		if (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK)
+			dev_err(priv->dev, "RX PLL is not locked\n");
+		if (data & SD_EXTERNAL_STATUS0_PLL_TX_MASK)
+			dev_err(priv->dev, "TX PLL is not locked\n");
+
+		ret = -ETIMEDOUT;
+	}
+
+	/* RX init */
+	mask = SD_EXTERNAL_CONFIG1_RX_INIT_MASK;
+	data = 0x1 << SD_EXTERNAL_CONFIG1_RX_INIT_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
+
+	/* check that RX init done */
+	addr = sd_ip_addr + SD_EXTERNAL_STATUS0_REG;
+	data = SD_EXTERNAL_STATUS0_RX_INIT_MASK;
+	mask = data;
+	data = polling_with_timeout(addr, data, mask, 100);
+	if (data != 0) {
+		dev_err(priv->dev, "RX init failed\n");
+		ret = -ETIMEDOUT;
+	}
+
+	dev_dbg(priv->dev, "stage: RF Reset\n");
+	/* RF Reset */
+	mask =  SD_EXTERNAL_CONFIG1_RX_INIT_MASK;
+	data = 0x0 << SD_EXTERNAL_CONFIG1_RX_INIT_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG1_RF_RESET_IN_MASK;
+	data |= 0x1 << SD_EXTERNAL_CONFIG1_RF_RESET_IN_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
+
+	return ret;
 }
 
 static int mvebu_comphy_power_on(struct phy *phy)
