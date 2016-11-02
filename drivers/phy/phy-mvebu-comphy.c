@@ -265,6 +265,13 @@ static int mvebu_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 	/* Wait 1ms - until band gap and ref clock ready */
 	mdelay(1);
 
+	/* Make sure that 40 data bits is disabled
+	 * This bit is not cleared by reset
+	 */
+	mask = COMMON_PHY_CFG6_IF_40_SEL_MASK;
+	data = 0 << COMMON_PHY_CFG6_IF_40_SEL_OFFSET;
+	reg_set(comphy_addr + COMMON_PHY_CFG6_REG, data, mask);
+
 	/* Start comphy Configuration */
 	dev_dbg(priv->dev, "stage: Comphy configuration\n");
 	/* set reference clock */
