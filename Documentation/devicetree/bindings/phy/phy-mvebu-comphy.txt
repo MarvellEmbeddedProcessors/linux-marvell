@@ -1,0 +1,52 @@
+Marvell EBU Comphy binding
+==========================
+
+This binding describes a Comphy device that is used to control
+and configure comphy hardware on Marvell SoCs.
+
+Each Comphy device has several PHYs which can be configured
+to support various modes:
+SATA, USB, PCIE, Network modes, etc.
+
+Required properties for comphy node:
+	- compatible:	Should be "marvell,cp110-comphy"
+	- reg:			Address and length of register sets
+				    for each device in "reg-names"
+	- reg-names:	The names of the register addresses
+					corresponding to the registers filled in "reg".
+	- #phy-cells:	Standard property (Documentation: phy-bindings.txt)
+					Should be 2.
+	Example will be provided in the end of this file.
+
+Each device using Comphy should have handle with the following properties:
+	- Handle to the Comphy node.
+	- Comphy index (SerDes lane number).
+	- Required Comphy mode (SATA/PCIE/USB/Network).
+	Example will be provided in the end of this file.
+
+Example:
+Comphy Node:
+============
+		comphy0: comphy {
+				compatible = "marvell,cp110-comphy";
+				reg = <0x441000 0x100>, <0x120000 0x6000>;
+				reg-names = "comphy", "serdes";
+				#phy-cells = <2>;
+				status = "okay";
+		};
+
+		comphy1: comphy {
+				compatible = "marvell,cp110-comphy";
+				reg = <0x441000 0x100>, <0x120000 0x6000>;
+				reg-names = "comphy", "serdes";
+				#phy-cells = <2>;
+				status = "okay";
+		};
+
+Comphy consumer:
+=============
+		sata@540000 {
+				phys = <&comphy0 4 COMPHY_SATA0>;
+				status = "okay";
+		};
+
