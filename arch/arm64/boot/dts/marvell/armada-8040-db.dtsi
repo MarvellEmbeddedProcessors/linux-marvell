@@ -152,6 +152,9 @@
 			usb3@510000 {
 				usb-phy = <&cpm_usb3h1_phy>;
 			};
+			sdhci@780000 {
+				non-removable;
+			};
 		};
 
 		cpm_usb3h0_phy: cpm_usb3_phy0 {
