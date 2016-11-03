@@ -103,6 +103,9 @@
 			usb3h1: usb3@510000 {
 				usb-phy = <&usb3h1_phy>;
 			};
+			sdhci@780000 {
+				non-removable;
+			};
 			spi@700680 {
 				spi-flash@0 {
 					#address-cells = <0x1>;
