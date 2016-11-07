@@ -18,6 +18,16 @@ config AB8500_USB
 	  This transceiver supports high and full speed devices plus,
 	  in host mode, low speed.
 
+config USB_A3700_OTG
+	bool "Armada3700 USB OTG Transceiver Driver"
+	depends on USB_XHCI_MVEBU && USB_MVEBU_U3D
+	select USB_PHY
+	help
+	  Enable this to support the USB OTG transceiver on Marvell
+	  Armada3700 board.
+	  This transceiver supports both HOST & Device modes and
+	  can work on USB3.0 and USB2.0 protocol.
+
 config FSL_USB2_OTG
 	bool "Freescale USB OTG Transceiver Driver"
 	depends on USB_EHCI_FSL && USB_FSL_USB2 && USB_OTG_FSM && PM
