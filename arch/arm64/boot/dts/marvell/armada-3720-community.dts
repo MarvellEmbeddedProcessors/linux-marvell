@@ -81,6 +81,28 @@
 				};
 			};
 
+			mdio: mdio@32004 {
+				switch0: switch@0 {
+					compatible = "marvell,mv88e6085";
+					reg = <1>;
+
+					mdio@0 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						phy1: phy1@1 {
+							reg = <17>;
+						};
+						phy2: phy2@2 {
+							reg = <18>;
+						};
+						phy3: phy3@3 {
+							reg = <19>;
+						};
+					};
+				};
+			};
+
 			usb3@58000 {
 				status = "okay";
 			};
@@ -103,6 +125,46 @@
 			sata@e0000 {
 				status = "okay";
 			};
+		};
+	};
+	dsa@0 {
+		compatible = "marvell,dsa";
+		dsa,ethernet = <&eth0>;
+		dsa,mii-bus = <&mdio>;
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		switch@0 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <1 0>;
+
+				port@0 {
+						reg = <0>;
+						label = "cpu";
+						fixed-link {
+							speed = <1000>;
+							full-duplex;
+						};
+				};
+
+				port@1 {
+						reg = <1>;
+						label = "wan";
+						phy-handle = <&phy1>;
+				};
+
+				port@2 {
+						reg = <2>;
+						label = "lan0";
+						phy-handle = <&phy2>;
+				};
+
+				port@3 {
+						reg = <3>;
+						label = "lan1";
+						phy-handle = <&phy3>;
+				};
 		};
 	};
 };
