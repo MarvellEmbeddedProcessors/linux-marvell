@@ -1,0 +1,21 @@
+USB Armada3700 OTG PHY
+
+This controller is integrated only in Armada-3700.
+
+Required properties:
+- compatible	: should be "marvell,armada-3700-otg"
+- reg		: Physical base address and size of the USB3 device registers map.
+- interrupts	: Should contain single irq line of USB3 device controller
+
+Optional properties:
+- vcc-supply: phandle to the regulator that provides power to the PHY.
+
+Example:
+
+	otg_phy: otg@5d800 {
+		compatible = "marvell,usb-3700-otg";
+		reg = <0x5d800 0x100>;
+		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+		vcc-supply = <&exp_usb3_vbus>;
+		status = "okay";
+	};
