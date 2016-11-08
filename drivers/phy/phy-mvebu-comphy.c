@@ -740,11 +740,39 @@ static enum phy_mode mvebu_comphy_get_mode(struct phy *phy)
 	return (enum phy_mode)mode;
 }
 
+static int mvebu_comphy_is_pll_locked(struct phy *phy)
+{
+
+	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
+	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
+	void __iomem *sd_ip_addr, *addr;
+	u32 mask, data;
+	int ret = 0;
+
+	sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
+
+	addr = sd_ip_addr + SD_EXTERNAL_STATUS0_REG;
+	data = SD_EXTERNAL_STATUS0_PLL_TX_MASK & SD_EXTERNAL_STATUS0_PLL_RX_MASK;
+	mask = data;
+	data = polling_with_timeout(addr, data, mask, PLL_LOCK_TIMEOUT);
+	if (data != 0) {
+		if (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK)
+			dev_err(priv->dev, "RX PLL is not locked\n");
+		if (data & SD_EXTERNAL_STATUS0_PLL_TX_MASK)
+			dev_err(priv->dev, "TX PLL is not locked\n");
+
+		ret = -ETIMEDOUT;
+	}
+
+	return ret;
+}
+
 static struct phy_ops mvebu_comphy_ops = {
 	.power_on	= mvebu_comphy_power_on,
 	.power_off	= mvebu_comphy_power_off,
 	.set_mode	= mvebu_comphy_set_mode,
 	.get_mode	= mvebu_comphy_get_mode,
+	.is_pll_locked  = mvebu_comphy_is_pll_locked,
 	.owner		= THIS_MODULE,
 };
 
