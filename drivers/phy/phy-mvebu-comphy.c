@@ -418,6 +418,13 @@ static int mvebu_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	data |= 0x0 << COMMON_PHY_CFG1_PIPE_SELECT_OFFSET;
 	reg_set(comphy_addr + COMMON_PHY_CFG1_REG, data, mask);
 
+	/* Make sure that 40 data bits is disabled
+	 * This bit is not cleared by reset
+	 */
+	mask = COMMON_PHY_CFG6_IF_40_SEL_MASK;
+	data = 0 << COMMON_PHY_CFG6_IF_40_SEL_OFFSET;
+	reg_set(comphy_addr + COMMON_PHY_CFG6_REG, data, mask);
+
 	/* Select Baud Rate of Comphy And PD_PLL/Tx/Rx */
 	mask = SD_EXTERNAL_CONFIG0_SD_PU_PLL_MASK;
 	data = 0x0 << SD_EXTERNAL_CONFIG0_SD_PU_PLL_OFFSET;
