@@ -2684,6 +2684,12 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 				PORT_PCS_CTRL_LINK_UP |
 				PORT_PCS_CTRL_DUPLEX_FULL |
 				PORT_PCS_CTRL_FORCE_DUPLEX;
+			if (mv88e6xxx_6352_family(ps)) {
+				/* configure RGMII Delay on cpu / dsa port */
+				reg |= PORT_PCS_CTRL_FORCE_SPEED |
+					PORT_PCS_CTRL_RGMII_DELAY_TXCLK |
+					PORT_PCS_CTRL_RGMII_DELAY_RXCLK;
+			}
 			if (mv88e6xxx_6065_family(ps))
 				reg |= PORT_PCS_CTRL_100;
 			else
@@ -3170,8 +3176,7 @@ int mv88e6xxx_mdio_page_read(struct dsa_switch *ds, int port, int page, int reg)
 	return ret;
 }
 
-int mv88e6xxx_mdio_page_write(struct dsa_switch *ds, int port, int page,
-			      int reg, int val)
+int mv88e6xxx_mdio_page_write(struct dsa_switch *ds, int port, int page, int reg, int val)
 {
 	struct mv88e6xxx_priv_state *ps = ds_to_priv(ds);
 	int ret;
@@ -3183,11 +3188,14 @@ int mv88e6xxx_mdio_page_write(struct dsa_switch *ds, int port, int page,
 	return ret;
 }
 
-static int mv88e6xxx_port_to_mdio_addr(struct mv88e6xxx_priv_state *ps,
-				       int port)
+static int mv88e6xxx_port_to_mdio_addr(struct mv88e6xxx_priv_state *ps, int port)
 {
-	if (port >= 0 && port < ps->info->num_ports)
-		return port;
+	if (port >= 0 && port < ps->info->num_ports) {
+		if (mv88e6xxx_has(ps, MV88E6XXX_FLAG_PHY_ADDR))
+			return (port + 0x10);
+		else
+			return port;
+	}
 	return -EINVAL;
 }
 
@@ -3213,8 +3221,7 @@ static int mv88e6xxx_mdio_read(struct mii_bus *bus, int port, int regnum)
 	return ret;
 }
 
-static int mv88e6xxx_mdio_write(struct mii_bus *bus, int port, int regnum,
-				u16 val)
+static int mv88e6xxx_mdio_write(struct mii_bus *bus, int port, int regnum, u16 val)
 {
 	struct mv88e6xxx_priv_state *ps = bus->priv;
 	int addr = mv88e6xxx_port_to_mdio_addr(ps, port);
@@ -3236,8 +3243,7 @@ static int mv88e6xxx_mdio_write(struct mii_bus *bus, int port, int regnum,
 	return ret;
 }
 
-static int mv88e6xxx_mdio_register(struct mv88e6xxx_priv_state *ps,
-				   struct device_node *np)
+static int mv88e6xxx_mdio_register(struct mv88e6xxx_priv_state *ps, struct device_node *np)
 {
 	static int index;
 	struct mii_bus *bus;
@@ -3274,6 +3280,7 @@ static int mv88e6xxx_mdio_register(struct mv88e6xxx_priv_state *ps,
 		dev_err(ps->dev, "Cannot register MDIO bus (%d)\n", err);
 		goto out;
 	}
+
 	ps->mdio_bus = bus;
 
 	return 0;
@@ -3584,6 +3591,14 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.num_ports = 7,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6352,
 	},
+	[MV88E6341] = {
+		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
+		.family = MV88E6XXX_FAMILY_6352,
+		.name = "Marvell 88E6341",
+		.num_databases = 4096,
+		.num_ports = 6,
+		.flags = MV88E6XXX_FLAGS_FAMILY_6352 | MV88E6XXX_FLAG_PHY_ADDR,
+	},
 };
 
 static const struct mv88e6xxx_info *
@@ -3637,7 +3652,6 @@ static const char *mv88e6xxx_drv_probe(struct device *dsa_dev,
 	ps->info = info;
 	ps->dev = dsa_dev;
 	mutex_init(&ps->smi_mutex);
-
 	err = mv88e6xxx_mdio_register(ps, NULL);
 	if (err)
 		return NULL;
