@@ -147,5 +147,7 @@
 #define HPIPE_G1_SETTING_5_G1_ICP_OFFSET	0
 #define HPIPE_G1_SETTING_5_G1_ICP_MASK		(0xf << HPIPE_G1_SETTING_5_G1_ICP_OFFSET)
 
+/* General defines */
+#define PLL_LOCK_TIMEOUT			15000
 #endif /* _MVEBU_COMPHY_H */
 
