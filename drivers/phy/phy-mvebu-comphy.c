@@ -205,16 +205,81 @@ static void mvebu_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 static int mvebu_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 				      struct mvebu_comphy *comphy)
 {
-	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+	void __iomem *hpipe_addr, *sd_ip_addr, *comphy_addr;
+	u32 mask, data;
+	int ret = 0;
 
-	dev_err(priv->dev, "SATA mode is not implemented\n");
+	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
 	/* configure phy selector for SATA */
 	mvebu_comphy_set_phy_selector(priv, comphy);
 
-	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+	hpipe_addr = HPIPE_ADDR(priv->comphy_pipe_regs, comphy->index);
+	sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
+	comphy_addr = COMPHY_ADDR(priv->comphy_regs, comphy->index);
 
-	return -ENOTSUPP;
+	dev_dbg(priv->dev, "stage: RFU configurations - hard reset comphy\n");
+	/* RFU configurations - hard reset comphy */
+	mask = COMMON_PHY_CFG1_PWR_UP_MASK;
+	data = 0x1 << COMMON_PHY_CFG1_PWR_UP_OFFSET;
+	mask |= COMMON_PHY_CFG1_PIPE_SELECT_MASK;
+	data |= 0x0 << COMMON_PHY_CFG1_PIPE_SELECT_OFFSET;
+	mask |= COMMON_PHY_CFG1_PWR_ON_RESET_MASK;
+	data |= 0x0 << COMMON_PHY_CFG1_PWR_ON_RESET_OFFSET;
+	mask |= COMMON_PHY_CFG1_CORE_RSTN_MASK;
+	data |= 0x0 << COMMON_PHY_CFG1_CORE_RSTN_OFFSET;
+	reg_set(comphy_addr + COMMON_PHY_CFG1_REG, data, mask);
+
+	/* Set select data  width 40Bit - SATA mode only */
+	reg_set(comphy_addr + COMMON_PHY_CFG6_REG,
+		0x1 << COMMON_PHY_CFG6_IF_40_SEL_OFFSET, COMMON_PHY_CFG6_IF_40_SEL_MASK);
+
+	/* release from hard reset in SD external */
+	mask = SD_EXTERNAL_CONFIG1_RESET_IN_MASK;
+	data = 0x1 << SD_EXTERNAL_CONFIG1_RESET_IN_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG1_RESET_CORE_MASK;
+	data |= 0x1 << SD_EXTERNAL_CONFIG1_RESET_CORE_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
+
+	/* Wait 1ms - until band gap and ref clock ready */
+	mdelay(1);
+
+	dev_dbg(priv->dev, "stage: Comphy configuration\n");
+	/* Start comphy Configuration */
+	/* Set reference clock to comes from group 1 - choose 25Mhz */
+	reg_set(hpipe_addr + HPIPE_MISC_REG,
+		0x0 << HPIPE_MISC_REFCLK_SEL_OFFSET, HPIPE_MISC_REFCLK_SEL_MASK);
+	/* Reference frequency select set 1 (for SATA = 25Mhz) */
+	mask = HPIPE_PWR_PLL_REF_FREQ_MASK;
+	data = 0x1 << HPIPE_PWR_PLL_REF_FREQ_OFFSET;
+	/* PHY mode select (set SATA = 0x0 */
+	mask |= HPIPE_PWR_PLL_PHY_MODE_MASK;
+	data |= 0x0 << HPIPE_PWR_PLL_PHY_MODE_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PWR_PLL_REG, data, mask);
+	/* Set max PHY generation setting - 6Gbps */
+	reg_set(hpipe_addr + HPIPE_INTERFACE_REG,
+		0x2 << HPIPE_INTERFACE_GEN_MAX_OFFSET, HPIPE_INTERFACE_GEN_MAX_MASK);
+	/* Set select data  width 40Bit (SEL_BITS[2:0]) */
+	reg_set(hpipe_addr + HPIPE_LOOPBACK_REG,
+		0x2 << HPIPE_LOOPBACK_SEL_OFFSET, HPIPE_LOOPBACK_SEL_MASK);
+
+	dev_dbg(priv->dev, "stage: Analog parameters from ETP(HW)\n");
+	/* TODO: Set analog parameters from ETP(HW) - for now use the default datas */
+
+	/* DFE reset sequence */
+	reg_set(hpipe_addr + HPIPE_PWR_CTR_REG,
+		0x1 << HPIPE_PWR_CTR_RST_DFE_OFFSET, HPIPE_PWR_CTR_RST_DFE_MASK);
+	reg_set(hpipe_addr + HPIPE_PWR_CTR_REG,
+		0x0 << HPIPE_PWR_CTR_RST_DFE_OFFSET, HPIPE_PWR_CTR_RST_DFE_MASK);
+	/* SW reset for interrupt logic */
+	reg_set(hpipe_addr + HPIPE_PWR_CTR_REG,
+		0x1 << HPIPE_PWR_CTR_SFT_RST_OFFSET, HPIPE_PWR_CTR_SFT_RST_MASK);
+	reg_set(hpipe_addr + HPIPE_PWR_CTR_REG,
+		0x0 << HPIPE_PWR_CTR_SFT_RST_OFFSET, HPIPE_PWR_CTR_SFT_RST_MASK);
+
+	dev_dbg(priv->dev, "stage: Comphy power up\n");
+
+	return ret;
 }
 
 static int mvebu_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
