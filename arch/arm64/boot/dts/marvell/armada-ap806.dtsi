@@ -368,6 +368,14 @@
 				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
+			watchdog@2a440000 {
+				compatible = "arm,sbsa-gwdt";
+				reg = <0x610000 0x1000>,
+				      <0x600000 0x1000>;
+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+				timeout-sec = <30>;
+			};
+
 			revision-info@610fcc {
 				compatible = "marvell,ap806-rev-info";
 				reg = <0x610FCC 0x4>;
