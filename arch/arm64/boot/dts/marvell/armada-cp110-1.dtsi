@@ -81,7 +81,7 @@ spi@700600 {
 	reg = <0x700600 0x50>;
 	#address-cells = <0x1>;
 	#size-cells = <0x0>;
-	cell-index = <0x0>;
+	cell-index = <0x3>;
 	clocks = <&cps_syscon0 1 21>;
 	status = "disabled";
 };
@@ -91,7 +91,7 @@ spi@700680 {
 	reg = <0x700680 0x50>;
 	#address-cells = <0x1>;
 	#size-cells = <0x0>;
-	cell-index = <0x0>;
+	cell-index = <0x4>;
 	clocks = <&cps_syscon0 1 21>;
 	status = "disabled";
 };
