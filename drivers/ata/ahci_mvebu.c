@@ -99,6 +99,137 @@ static struct scsi_host_template ahci_platform_sht = {
 	AHCI_SHT(DRV_NAME),
 };
 
+static void reg_set(void __iomem *addr, u32 data, u32 mask)
+{
+	u32 reg_data;
+
+	reg_data = readl(addr);
+	reg_data &= ~mask;
+	reg_data |= data;
+	writel(reg_data, addr);
+}
+
+#define SATA3_VENDOR_ADDRESS			0xA0
+#define SATA3_VENDOR_ADDR_OFSSET		0
+#define SATA3_VENDOR_ADDR_MASK			(0xFFFFFFFF << SATA3_VENDOR_ADDR_OFSSET)
+#define SATA3_VENDOR_DATA			0xA4
+
+#define SATA_CONTROL_REG			0x0
+#define SATA3_CTRL_SATA0_PD_OFFSET		6
+#define SATA3_CTRL_SATA0_PD_MASK		(1 << SATA3_CTRL_SATA0_PD_OFFSET)
+#define SATA3_CTRL_SATA1_PD_OFFSET		14
+#define SATA3_CTRL_SATA1_PD_MASK		(1 << SATA3_CTRL_SATA1_PD_OFFSET)
+#define SATA3_CTRL_SATA1_ENABLE_OFFSET		22
+#define SATA3_CTRL_SATA1_ENABLE_MASK		(1 << SATA3_CTRL_SATA1_ENABLE_OFFSET)
+#define SATA3_CTRL_SATA_SSU_OFFSET		23
+#define SATA3_CTRL_SATA_SSU_MASK		(1 << SATA3_CTRL_SATA_SSU_OFFSET)
+
+#define SATA_MBUS_SIZE_SELECT_REG		0x4
+#define SATA_MBUS_REGRET_EN_OFFSET		7
+#define SATA_MBUS_REGRET_EN_MASK		(0x1 << SATA_MBUS_REGRET_EN_OFFSET)
+/**
+ * ahci_mvebu_cp_110_power_up
+ *
+ * @pdev:	A pointer to ahci platform device
+ * @hpriv:	A pointer to achi host private structure
+ *
+ * This function configures corresponding comphy to SATA mode.
+ * AHCI driver acquires an handle to the corresponding PHY from
+ * the device-tree (In ahci_platform_get_resources).
+ * cp110 require the following sequence:
+ *	1. Power down AHCI macs
+ *	2. Configure the corresponding comphy (comphy driver).
+ *	3. Power up AHCI macs
+ *	4. Check if comphy PLL was locked
+ *
+ * Return: 0 on success; Error code otherwise.
+ */
+static int ahci_mvebu_cp_110_power_up(struct platform_device *pdev,
+				      struct ahci_host_priv *hpriv)
+{
+	u32 mask, data, i;
+	int err = 0;
+
+	/* Power off AHCI macs */
+	reg_set(hpriv->mmio + SATA3_VENDOR_ADDRESS,
+		SATA_CONTROL_REG << SATA3_VENDOR_ADDR_OFSSET,
+		SATA3_VENDOR_ADDR_MASK);
+	/* SATA port 0 power down */
+	mask = SATA3_CTRL_SATA0_PD_MASK;
+	data = 0x1 << SATA3_CTRL_SATA0_PD_OFFSET;
+	/* SATA port 1 power down */
+	mask |= SATA3_CTRL_SATA1_PD_MASK;
+	data |= 0x1 << SATA3_CTRL_SATA1_PD_OFFSET;
+	/* SATA SSU disable */
+	mask |= SATA3_CTRL_SATA1_ENABLE_MASK;
+	data |= 0x0 << SATA3_CTRL_SATA1_ENABLE_OFFSET;
+	/* SATA port 1 disable
+	 * There's no option to disable SATA port 0, so we power down both
+	 * ports (during previous steps) but disable onlt SATA port 1
+	 */
+	mask |= SATA3_CTRL_SATA_SSU_MASK;
+	data |= 0x0 << SATA3_CTRL_SATA_SSU_OFFSET;
+	reg_set(hpriv->mmio + SATA3_VENDOR_DATA, data, mask);
+
+	/* Configure corresponding comphy
+	 * First we need to call phy_power_off because the phy_power_on
+	 * was called by generic AHCI code.
+	 * Next, we call phy_power_on in order to configure the comphy
+	 * while AHCI is powered down.
+	 */
+	for (i = 0; i < hpriv->nports; i++) {
+		err = phy_power_off(hpriv->phys[i]);
+		if (err) {
+			dev_err(&pdev->dev, "unable to power off SATA comphy\n");
+			return -EINVAL;
+		}
+		err = phy_power_on(hpriv->phys[i]);
+		if (err) {
+			dev_err(&pdev->dev, "unable to power on SATA comphy\n");
+			return -EINVAL;
+		}
+	}
+
+	/* Power up AHCI macs */
+	reg_set(hpriv->mmio + SATA3_VENDOR_ADDRESS,
+		SATA_CONTROL_REG << SATA3_VENDOR_ADDR_OFSSET,
+		SATA3_VENDOR_ADDR_MASK);
+	/* SATA port 0 power up */
+	mask = SATA3_CTRL_SATA0_PD_MASK;
+	data = 0x0 << SATA3_CTRL_SATA0_PD_OFFSET;
+	/* SATA port 1 power up */
+	mask |= SATA3_CTRL_SATA1_PD_MASK;
+	data |= 0x0 << SATA3_CTRL_SATA1_PD_OFFSET;
+	/* SATA SSU enable */
+	mask |= SATA3_CTRL_SATA1_ENABLE_MASK;
+	data |= 0x1 << SATA3_CTRL_SATA1_ENABLE_OFFSET;
+	/* SATA port 1 enable */
+	mask |= SATA3_CTRL_SATA_SSU_MASK;
+	data |= 0x1 << SATA3_CTRL_SATA_SSU_OFFSET;
+	reg_set(hpriv->mmio + SATA3_VENDOR_DATA, data, mask);
+
+	/* MBUS request size and interface select register */
+	reg_set(hpriv->mmio + SATA3_VENDOR_ADDRESS,
+		SATA_MBUS_SIZE_SELECT_REG << SATA3_VENDOR_ADDR_OFSSET,
+		SATA3_VENDOR_ADDR_MASK);
+	/* Mbus regret enable */
+	reg_set(hpriv->mmio + SATA3_VENDOR_DATA,
+		0x1 << SATA_MBUS_REGRET_EN_OFFSET,
+		SATA_MBUS_REGRET_EN_MASK);
+
+	/* Check if comphy PLL is locked */
+	for (i = 0; i < hpriv->nports; i++) {
+		err = phy_is_pll_locked(hpriv->phys[i]);
+		if (err) {
+			dev_err(&pdev->dev, "port %d: comphy PLL is not locked for SATA. Unable to power on SATA comphy\n",
+				i);
+			return err;
+		}
+	}
+
+	return err;
+}
+
 static int ahci_mvebu_probe(struct platform_device *pdev)
 {
 	struct ahci_host_priv *hpriv;
@@ -121,6 +252,14 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 
 		ahci_mvebu_mbus_config(hpriv, dram);
 		ahci_mvebu_regret_option(hpriv);
+	}
+
+	/* Call cp110 comphy initialization flow */
+	if (of_device_is_compatible(pdev->dev.of_node,
+	    "marvell,armada-cp110-ahci")) {
+		rc = ahci_mvebu_cp_110_power_up(pdev, hpriv);
+		if (rc)
+			return rc;
 	}
 
 	/* In A8k A0 AHCI unit the port register offsets are not
