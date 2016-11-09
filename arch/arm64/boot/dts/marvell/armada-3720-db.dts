@@ -72,6 +72,7 @@
 					compatible = "jedec,spi-nor";
 					reg = <0>; /* Chip select 0 */
 					spi-max-frequency = <104000000>;
+					m25p,fast-read;
 
 					pinctrl-names = "default";
 					pinctrl-0 = <&spi0_pins &spi_quad_pins>;
