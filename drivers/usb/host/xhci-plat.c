@@ -24,6 +24,7 @@
 #include "xhci.h"
 #include "xhci-mvebu.h"
 #include "xhci-rcar.h"
+#include <linux/usb/otg.h>
 
 static struct hc_driver __read_mostly xhci_plat_hc_driver;
 
@@ -174,17 +175,37 @@ static int xhci_plat_probe(struct platform_device *pdev)
 			goto put_usb3_hcd;
 	}
 
-	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
-	if (ret)
-		goto disable_usb_phy;
-
 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
 		xhci->shared_hcd->can_do_streams = 1;
 
-	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
-	if (ret)
-		goto dealloc_usb2_hcd;
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-3700-xhci-otg")) {
+		/* If Armada3700 needs to enable OTG support, register XHCI
+		 * driver to OTG PHY, and wait for it to call usb_add_hcd
+		 * at the right time (start working in USB Host mode).
+		 */
 
+		if (hcd->usb_phy == NULL) {
+			dev_err(&pdev->dev, "unable to find OTG PHY\n");
+			goto disable_usb_phy;
+		}
+
+		hcd->irq = irq;
+
+		ret = otg_set_host(hcd->usb_phy->otg, &hcd->self);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to register with OTG PHY\n");
+			goto disable_usb_phy;
+		}
+	} else {
+		ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+		if (ret)
+			goto disable_usb_phy;
+
+		ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+		if (ret)
+			goto dealloc_usb2_hcd;
+	}
 	return 0;
 
 
@@ -215,10 +236,16 @@ static int xhci_plat_remove(struct platform_device *dev)
 
 	xhci->xhc_state |= XHCI_STATE_REMOVING;
 
-	usb_remove_hcd(xhci->shared_hcd);
-	usb_phy_shutdown(hcd->usb_phy);
+	if (of_device_is_compatible(dev->dev.of_node,
+				    "marvell,armada-3700-xhci-otg")) {
+		otg_set_host(hcd->usb_phy->otg, NULL);
+	} else {
+		usb_remove_hcd(xhci->shared_hcd);
+		usb_phy_shutdown(hcd->usb_phy);
 
-	usb_remove_hcd(hcd);
+		usb_remove_hcd(hcd);
+	}
+
 	usb_put_hcd(xhci->shared_hcd);
 
 	if (!IS_ERR(clk))
@@ -269,6 +296,7 @@ static const struct of_device_id usb_xhci_of_match[] = {
 	{ .compatible = "marvell,armada-380-xhci"},
 	{ .compatible = "renesas,xhci-r8a7790"},
 	{ .compatible = "renesas,xhci-r8a7791"},
+	{ .compatible = "marvell,armada-3700-xhci-otg"},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
