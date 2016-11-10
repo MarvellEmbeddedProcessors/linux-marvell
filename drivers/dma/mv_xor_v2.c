@@ -168,7 +168,7 @@ struct mv_xor_v2_device {
  * @idx: descriptor index
  * @async_tx: support for the async_tx api
  * @hw_desc: assosiated HW descriptor
- * @node: node of the SW descriprots
+ * @node: node of the SW descriprots (free_sw_desc or alloc_sw_desc or complete_sw_desc)
 */
 struct mv_xor_v2_sw_desc {
 	int idx;
@@ -437,8 +437,8 @@ mv_xor_v2_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src
 	hw_descriptor->desc_ctrl =
 		DESC_OP_MODE_MEMCPY << DESC_OP_MODE_SHIFT;
 
-	if (flags & DMA_PREP_INTERRUPT)
-		hw_descriptor->desc_ctrl |= DESC_IOD;
+	/* Enable interrupt for all descriptions, as preparation for coalescing feature */
+	hw_descriptor->desc_ctrl |= DESC_IOD;
 
 	/* Set source address */
 	hw_descriptor->fill_pattern_src_addr[0] = lower_32_bits(src);
@@ -506,8 +506,8 @@ mv_xor_v2_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 		DESC_OP_MODE_XOR << DESC_OP_MODE_SHIFT;
 	hw_descriptor->desc_ctrl |= DESC_P_BUFFER_ENABLE;
 
-	if (flags & DMA_PREP_INTERRUPT)
-		hw_descriptor->desc_ctrl |= DESC_IOD;
+	/* Enable interrupt for all descriptions, as preparation for coalescing feature */
+	hw_descriptor->desc_ctrl |= DESC_IOD;
 
 	/* Set the data buffers */
 	for (i = 0; i < src_cnt; i++)
