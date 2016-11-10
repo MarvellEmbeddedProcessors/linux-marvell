@@ -1,0 +1,54 @@
+* Clock bindings for Marvell MVEBU AP806 CPU clock
+
+The Marvell MVEBU Armada 7K/8K SoCs contains a block called AP806,
+hosting the CPU and other core components of the CPU.
+This Device Tree binding allows to describe the AP806 CPU clock settings
+and CPU mapping of the AP806, whose frequencies are determined by
+reading the Sample-At-Reset (SAR)register.
+
+NOTE:
+When ap806_clock node is enabled, and CPU clock driver initialized
+successfully, it will also register and enable the cpufreq-dt generic
+driver for CPU frequency scaling.
+
+
+Required properties for ap806_clock node:
+- compatible: must be be the following:
+	"marvell,ap806-cpu-clk", "syscon"
+- reg: must be the register address of the CPU Dynamic Frequency Base
+	Scaling register base (which is the Sample-At-Reset (SAR) register base)
+- #clock-cells: from common clock binding; shall be set to 1
+- #clock: pointer to "ap-cpu-cluster-0" clock entry in ap806-system-controller node
+
+Required properties for CPU nodes:
+- clocks: a list of phandle + clock-specifier pairs to ap806_clock,
+		one for each CPU node.
+
+Example:
+	cpu0: cpu@000 {
+		..
+		clocks = <&ap806_clock 0>;
+		..
+	};
+	cpu1: cpu@001 {
+		..
+		clocks = <&ap806_clock 0>;
+		..
+	};
+	cpu2: cpu@100 {
+		..
+		clocks = <&ap806_clock 1>;
+		..
+	};
+	cpu3: cpu@101 {
+		..
+		clocks = <&ap806_clock 1>;
+		..
+	};
+
+	ap806_clock: ap806_clock {
+		compatible = "marvell,ap806-cpu-clk", "syscon";
+		#clock-cells = <1>;
+		clocks = <&ap_syscon 0>;
+		reg = <0x6f8200 0x100>;
+	};
