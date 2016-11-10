@@ -136,6 +136,8 @@ struct mv_xor_v2_descriptor {
  * @glob_base: memory mapped global register base
  * @irq_tasklet:
  * @free_sw_desc: linked list of free SW descriptors
+ * @alloc_sw_desc: linked list of allocated SW descriptors
+ * @complete_sw_desc: linked list of completed SW descriptors
  * @dmadev: dma device
  * @dmachan: dma channel
  * @hw_desq: HW descriptors queue
@@ -151,6 +153,8 @@ struct mv_xor_v2_device {
 	struct clk *clk;
 	struct tasklet_struct irq_tasklet;
 	struct list_head free_sw_desc;
+	struct list_head alloc_sw_desc;
+	struct list_head complete_sw_desc;
 	struct dma_device dmadev;
 	struct dma_chan	dmachan;
 	dma_addr_t hw_desq;
@@ -164,13 +168,13 @@ struct mv_xor_v2_device {
  * @idx: descriptor index
  * @async_tx: support for the async_tx api
  * @hw_desc: assosiated HW descriptor
- * @free_list: node of the free SW descriprots list
+ * @node: node of the SW descriprots
 */
 struct mv_xor_v2_sw_desc {
 	int idx;
 	struct dma_async_tx_descriptor async_tx;
 	struct mv_xor_v2_descriptor hw_desc;
-	struct list_head free_list;
+	struct list_head node;
 };
 
 /*
@@ -371,10 +375,11 @@ mv_xor_v2_prep_sw_desc(struct mv_xor_v2_device *xor_dev)
 	spin_lock_bh(&xor_dev->sw_ll_lock);
 
 	if (!list_empty(&xor_dev->free_sw_desc)) {
-		/* get a free SW descriptor from the SW DESQ */
+		/* get a free SW descriptor from the free list */
 		sw_desc = list_first_entry(&xor_dev->free_sw_desc,
-					   struct mv_xor_v2_sw_desc, free_list);
-		list_del(&sw_desc->free_list);
+					   struct mv_xor_v2_sw_desc, node);
+		/* move the node from free list to allocated list */
+		list_move_tail(&sw_desc->node, &xor_dev->alloc_sw_desc);
 
 		/* Release the channel */
 		spin_unlock_bh(&xor_dev->sw_ll_lock);
@@ -607,8 +612,17 @@ static void mv_xor_v2_tasklet(unsigned long data)
 	int pending_ptr, num_of_pending, i;
 	struct mv_xor_v2_descriptor *next_pending_hw_desc = NULL;
 	struct mv_xor_v2_sw_desc *next_pending_sw_desc = NULL;
+	struct mv_xor_v2_sw_desc *iter, *_iter;
 
 	dev_dbg(xor_dev->dmadev.dev, "%s %d\n", __func__, __LINE__);
+
+	/* free the compeleted descriptors (check the ctrl ack flag) */
+	list_for_each_entry_safe(iter, _iter, &xor_dev->complete_sw_desc,
+				 node) {
+
+		if (async_tx_test_ack(&iter->async_tx))
+			list_move_tail(&iter->node, &xor_dev->free_sw_desc);
+	}
 
 	/* get thepending descriptors parameters */
 	num_of_pending = mv_xor_v2_get_pending_params(xor_dev, &pending_ptr);
@@ -648,9 +662,15 @@ static void mv_xor_v2_tasklet(unsigned long data)
 		/* Lock the channel */
 		spin_lock_bh(&xor_dev->sw_ll_lock);
 
-		/* add the SW descriptor to the free descriptors list */
-		list_add(&next_pending_sw_desc->free_list,
-			 &xor_dev->free_sw_desc);
+		/*
+		 * add the SW descriptor to the free/completed descriptors list
+		 * depends on ctrl ack flag
+		 */
+		if (!async_tx_test_ack(&next_pending_sw_desc->async_tx))
+			list_move_tail(&next_pending_sw_desc->node, &xor_dev->complete_sw_desc);
+		else
+			list_move_tail(&next_pending_sw_desc->node, &xor_dev->free_sw_desc);
+
 
 		/* Release the channel */
 		spin_unlock_bh(&xor_dev->sw_ll_lock);
@@ -831,13 +851,15 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	spin_lock_init(&xor_dev->sw_ll_lock);
 	spin_lock_init(&xor_dev->push_lock);
 
-	/* init the free SW descriptors list */
+	/* init the SW descriptors lists */
 	INIT_LIST_HEAD(&xor_dev->free_sw_desc);
+	INIT_LIST_HEAD(&xor_dev->complete_sw_desc);
+	INIT_LIST_HEAD(&xor_dev->alloc_sw_desc);
 
 	/* add all SW descriptors to the free list */
 	for (i = 0; i < MV_XOR_V2_MAX_DESC_NUM; i++) {
 		xor_dev->sw_desq[i].idx = i;
-		list_add(&xor_dev->sw_desq[i].free_list,
+		list_add(&xor_dev->sw_desq[i].node,
 			 &xor_dev->free_sw_desc);
 	}
 
