@@ -209,10 +209,10 @@ static int a3700_spi_pin_mode_set(struct a3700_spi *a3700_spi)
 	 * Only support single mode: 1x_instr_pin,
 	 * 1x_addr_pin and 1x_data_pin.
 	 */
-	val = spireg_read(a3700_spi, A3700_SPI_IF_CTRL_REG);
+	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
 	val &= ~(A3700_SPI_INST_PIN | A3700_SPI_ADDR_PIN);
 	val &= ~(A3700_SPI_DATA_PIN_MASK << A3700_SPI_DATA_PIN_BIT);
-	spireg_write(a3700_spi, A3700_SPI_IF_CTRL_REG, val);
+	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
 
 	return 0;
 }
