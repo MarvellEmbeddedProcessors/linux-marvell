@@ -79,6 +79,8 @@
 #define A3700_SPI_WFIFO_THRS_BIT		28
 #define A3700_SPI_RFIFO_THRS_BIT		24
 #define A3700_SPI_FIFO_THRS_MASK		0x7
+#define A3700_SPI_WFIFO_THRS_7_DATA_ENTRIES	7
+#define A3700_SPI_RFIFO_THRS_1_DATA_ENTRY	0
 
 #define A3700_SPI_DATA_PIN_BIT		10
 #define A3700_SPI_DATA_PIN_MASK		0x3
@@ -291,17 +293,18 @@ static void a3700_spi_bytelen_set(struct a3700_spi *a3700_spi, unsigned int len)
 	a3700_spi->status.byte_len = len;
 }
 
-static void a3700_spi_fifo_thres_set(struct a3700_spi *a3700_spi,
-	unsigned int bytes)
+static void a3700_spi_fifo_thres_set(struct a3700_spi *a3700_spi)
 {
 	u32 val;
 
 	if (a3700_spi->flags & HAS_FIFO) {
 		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
 		val &= ~(A3700_SPI_FIFO_THRS_MASK << A3700_SPI_RFIFO_THRS_BIT);
-		val |= (bytes - 1) << A3700_SPI_RFIFO_THRS_BIT;
+		/* set 1 data entry for read FIFO threshold */
+		val |= A3700_SPI_RFIFO_THRS_1_DATA_ENTRY << A3700_SPI_RFIFO_THRS_BIT;
 		val &= ~(A3700_SPI_FIFO_THRS_MASK << A3700_SPI_WFIFO_THRS_BIT);
-		val |= (7 - bytes) << A3700_SPI_WFIFO_THRS_BIT;
+		/* set 7 data entries for write FIFO threshold */
+		val |= A3700_SPI_WFIFO_THRS_7_DATA_ENTRIES << A3700_SPI_WFIFO_THRS_BIT;
 		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
 	}
 }
@@ -484,7 +487,7 @@ static int a3700_spi_transfer_setup(struct spi_device *spi,
 		a3700_spi_bytelen_set(a3700_spi, byte_len);
 
 		/* Set FIFO threshold */
-		a3700_spi_fifo_thres_set(a3700_spi, byte_len);
+		a3700_spi_fifo_thres_set(a3700_spi);
 
 		/* Activate CS */
 		a3700_spi_activate_cs(a3700_spi, spi->chip_select);
