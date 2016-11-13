@@ -696,10 +696,26 @@ static int mvebu_comphy_set_mode(struct phy *phy, enum phy_mode mode)
 	return 0;
 }
 
+static enum phy_mode mvebu_comphy_get_mode(struct phy *phy)
+{
+	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
+	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
+	int mode;
+
+	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	mode = priv->lanes[comphy->index].mode;
+
+	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+
+	return (enum phy_mode)mode;
+}
+
 static struct phy_ops mvebu_comphy_ops = {
 	.power_on	= mvebu_comphy_power_on,
 	.power_off	= mvebu_comphy_power_off,
 	.set_mode	= mvebu_comphy_set_mode,
+	.get_mode	= mvebu_comphy_get_mode,
 	.owner		= THIS_MODULE,
 };
 
