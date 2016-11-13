@@ -671,9 +671,35 @@ static int mvebu_comphy_power_off(struct phy *phy)
 	return 0;
 }
 
+static int mvebu_comphy_set_mode(struct phy *phy, enum phy_mode mode)
+{
+	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
+	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
+	int i;
+
+	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	for (i = 0; i < MVEBU_COMPHY_FUNC_MAX; i++)
+		if (priv->sinfo->functions[comphy->index][i] == (int)mode)
+			break;
+
+	if (i == MVEBU_COMPHY_FUNC_MAX) {
+		dev_err(priv->dev, "can't set mode 0x%x for COMPHY%d\n",
+			mode, comphy->index);
+		return -EINVAL;
+	}
+
+	priv->lanes[comphy->index].mode = (int)mode;
+
+	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+
+	return 0;
+}
+
 static struct phy_ops mvebu_comphy_ops = {
 	.power_on	= mvebu_comphy_power_on,
 	.power_off	= mvebu_comphy_power_off,
+	.set_mode	= mvebu_comphy_set_mode,
 	.owner		= THIS_MODULE,
 };
 
