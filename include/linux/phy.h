@@ -82,6 +82,8 @@ typedef enum {
 	PHY_INTERFACE_MODE_QSGMII,
 	PHY_INTERFACE_MODE_XAUI,
 	PHY_INTERFACE_MODE_RXAUI,
+	PHY_INTERFACE_MODE_SFI,
+	PHY_INTERFACE_MODE_XFI,
 	PHY_INTERFACE_MODE_KR,
 	PHY_INTERFACE_MODE_MAX,
 } phy_interface_t;
@@ -130,6 +132,10 @@ static inline const char *phy_modes(phy_interface_t interface)
 		return "xaui";
 	case PHY_INTERFACE_MODE_RXAUI:
 		return "rxaui";
+	case PHY_INTERFACE_MODE_SFI:
+		return "sfi";
+	case PHY_INTERFACE_MODE_XFI:
+		return "xfi";
 	case PHY_INTERFACE_MODE_KR:
 		return "kr";
 	default:
