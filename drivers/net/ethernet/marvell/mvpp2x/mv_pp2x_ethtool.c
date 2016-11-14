@@ -127,6 +127,8 @@ int mv_pp2x_autoneg_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		pr_err("XLG GOP %d doesn't support autonegotiation\n", port_num);
 		return -ENODEV;
 
@@ -279,6 +281,8 @@ int mv_pp2x_eth_tool_nway_reset(struct net_device *dev)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		pr_err("XLG GOP %d doesn't support autonegotiation\n", mac->gop_index);
 		return -ENODEV;
 	break;
@@ -317,6 +321,8 @@ static void mv_pp2x_get_pauseparam(struct net_device *dev,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_port_link_status(gop,	mac, &status);
 		pause->autoneg = AUTONEG_DISABLE;
 	break;
@@ -401,6 +407,8 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		if (pause->autoneg) {
 			pr_err("10G port doesn't support fc autoneg\n");
 			return -EINVAL;
@@ -477,7 +485,9 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 		phy_mode = port->mac_data.phy_mode;
 		if ((phy_mode == PHY_INTERFACE_MODE_XAUI) ||
 		    (phy_mode == PHY_INTERFACE_MODE_RXAUI) ||
-		    (phy_mode == PHY_INTERFACE_MODE_KR)) {
+		    (phy_mode == PHY_INTERFACE_MODE_KR)   ||
+		    (phy_mode == PHY_INTERFACE_MODE_SFI) ||
+		    (phy_mode == PHY_INTERFACE_MODE_XFI)) {
 			cmd->autoneg = AUTONEG_DISABLE;
 			cmd->supported = (SUPPORTED_10000baseT_Full |
 				SUPPORTED_FIBRE);
@@ -905,6 +915,8 @@ static int mv_pp2x_ethtool_get_regs_len(struct net_device *dev)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		return MV_PP2_REGS_XLG_LEN * sizeof(u32);
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
@@ -940,6 +952,8 @@ static void mv_pp2x_ethtool_get_regs(struct net_device *dev,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		memset(p, 0, MV_PP2_REGS_XLG_LEN * sizeof(u32));
 		mv_gop110_xlg_registers_dump(port, p);
 	break;
@@ -1080,6 +1094,8 @@ static void mv_pp2x_eth_tool_diag_test(struct net_device *netdev,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		pr_err("10G Phy mode (%d) do not support test\n", mac->phy_mode);
 		return;
 	default:
