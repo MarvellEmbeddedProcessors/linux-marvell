@@ -61,6 +61,7 @@
 			clocks = <&ap806_clock 0>;
 			operating-points-v2 = <&cluster0_opp>;
 			enable-method = "psci";
+			cpu-idle-states;
 		};
 		cpu1: cpu@001 {
 			device_type = "cpu";
@@ -69,6 +70,7 @@
 			clocks = <&ap806_clock 0>;
 			operating-points-v2 = <&cluster0_opp>;
 			enable-method = "psci";
+			cpu-idle-states;
 		};
 		cpu2: cpu@100 {
 			device_type = "cpu";
@@ -77,6 +79,7 @@
 			clocks = <&ap806_clock 1>;
 			operating-points-v2 = <&cluster1_opp>;
 			enable-method = "psci";
+			cpu-idle-states;
 		};
 		cpu3: cpu@101 {
 			device_type = "cpu";
@@ -85,6 +88,7 @@
 			clocks = <&ap806_clock 1>;
 			operating-points-v2 = <&cluster1_opp>;
 			enable-method = "psci";
+			cpu-idle-states;
 		};
 	};
 
