@@ -38,6 +38,7 @@ emac required properties:
 - interrupts: Link change interrupt for the mac.
 - port-id: Should be '0', '2', or '3' for ethernet macs, references the mac-id (GOP port-id).
 - phy-mode: See ethernet.txt file in the same directory
+- phy-speed: For 2.5Gbits SGMII port 2500 phy-speed should be set(used only for 2.5Gbits SGMII port)
 
 emac optional properties:
 ========================
@@ -52,15 +53,14 @@ gop {
 		mac-address = [00 00 00 00 00 01];
 		port-id = <0>; /* gop_port_id */
                 phy-mode = "sgmii"; /* lane-2 */
-                status = "okay";
         };
 	emac2: mac2 {
 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
 		mac-address = [00 00 00 00 00 02];
 		port-id = <2>; /* gop_port_id */
-                phy-mode = "rgmii"; /* rgmii-0 */
+		phy-mode = "sgmii"; /* lane-0 */
+		phy-speed = <2500>;
                 phy = <&phy2>;
-                status = "okay";
 	};
 	emac3: mac3 {
 		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
@@ -68,15 +68,13 @@ gop {
 		port-id = <3>; /* gop_port_id */
                 phy-mode = "rgmii"; /* rgmii-1 */
                 phy = <&phy3>;
-                status = "okay";
 	};
 };
 
 
 ppv22@000000 {
 	compatible = "marvell,mv-pp22";
-	reg = <0x000000 0x80000>, /* Packet Processor regs */
-	      <0x120000 0x9000>, /* SERDES regs */
+	reg = <0x000000 0x90000>, /* Packet Processor regs */
 	      <0x129000 0x0600>, /* XMIB regs */
 	      <0x12a000 0x200>,  /* LED regs */
 	      <0x12a200 0x200>,  /* SMI regs */
@@ -88,8 +86,8 @@ ppv22@000000 {
 	      <0x130600 0x200>,  /* FCA - flow control regs*/
 	      <0x130e00 0x100>,  /* MSPG - GMAC regs */
 	      <0x130f00 0x100>,  /* MSPG - XLG MAC regs */
-	      <0x441000 0x1000>;  /* RFU-1 Regs */
-	reg-names = "pp", "serdes", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs",
+	      <0x441100 0x100>;  /* RFU-1 Regs */
+	reg-names = "pp", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs",
 		    "fca", "gmac", "xlg", "rfu1";
 	clocks = <&gateclk 3>, <&gateclk 18>, <&gateclk 9>, <&gateclk 6>, <&gateclk 5>;
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
