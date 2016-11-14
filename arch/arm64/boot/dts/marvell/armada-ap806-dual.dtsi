@@ -54,21 +54,23 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		cpu@000 {
+		cpu0: cpu@000 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x000>;
 			clocks = <&ap806_clock 0>;
 			operating-points-v2 = <&cluster0_opp>;
 			enable-method = "psci";
+			cpu-idle-states;
 		};
-		cpu@001 {
+		cpu1: cpu@001 {
 			device_type = "cpu";
 			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x001>;
 			clocks = <&ap806_clock 0>;
 			operating-points-v2 = <&cluster0_opp>;
 			enable-method = "psci";
+			cpu-idle-states;
 		};
 	};
 };
