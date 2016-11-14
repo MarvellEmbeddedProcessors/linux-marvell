@@ -967,6 +967,8 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		mv_gop110_xlg_mac_reset(gop, mac_num, UNRESET);
 	break;
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 
 		num_of_act_lanes = 2;
 		mac_num = 0;
@@ -1040,6 +1042,8 @@ int mv_gop110_port_reset(struct gop_hw *gop, struct mv_mac_data *mac)
 	break;
 	/* Stefan: need to check KR case */
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		/* pcs unreset */
 		mv_gop110_xpcs_reset(gop, RESET);
 		/* mac unreset */
@@ -1071,6 +1075,8 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_port_enable(gop, port_num);
 	break;
 	default:
@@ -1094,6 +1100,8 @@ void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_port_disable(gop, port_num);
 	break;
 	default:
@@ -1116,6 +1124,8 @@ void mv_gop110_port_periodic_xon_set(struct gop_hw *gop,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_port_periodic_xon_set(gop, port_num, enable);
 	break;
 	default:
@@ -1137,6 +1147,8 @@ bool mv_gop110_port_is_link_up(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		udelay(1000);
 		return mv_gop110_xlg_mac_link_status_get(gop, port_num);
 	break;
@@ -1161,6 +1173,8 @@ int mv_gop110_port_link_status(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_link_status(gop, port_num, pstatus);
 	break;
 	default:
@@ -1229,6 +1243,8 @@ int mv_gop110_port_regs(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		pr_info("\n[gop XLG MAC #%d registers]\n", port_num);
 		mv_gop110_xlg_mac_regs_dump(gop, port_num);
 	break;
@@ -1252,6 +1268,8 @@ int mv_gop110_port_events_mask(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_port_link_event_mask(gop, port_num);
 	break;
 	default:
@@ -1278,6 +1296,8 @@ int mv_gop110_port_events_unmask(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_port_external_event_unmask(gop, port_num, 1);
 	break;
 	default:
@@ -1300,6 +1320,8 @@ int mv_gop110_port_events_clear(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_port_link_event_clear(gop, port_num);
 	break;
 	default:
@@ -1341,6 +1363,12 @@ int mv_gop110_status_show(struct gop_hw *gop, struct mv_pp2x *pp2, int port_num)
 	break;
 	case PHY_INTERFACE_MODE_KR:
 		pr_info("Port mode               : KR");
+	break;
+	case PHY_INTERFACE_MODE_SFI:
+		pr_info("Port mode               : SFI");
+	break;
+	case PHY_INTERFACE_MODE_XFI:
+		pr_info("Port mode               : XFI");
 	break;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
@@ -1419,6 +1447,8 @@ int mv_gop110_speed_duplex_get(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_speed_duplex_get(gop, port_num, speed,
 						   duplex);
 	break;
@@ -1445,6 +1475,8 @@ int mv_gop110_speed_duplex_set(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_speed_duplex_set(gop, port_num, speed,
 						   duplex);
 	break;
@@ -1469,6 +1501,8 @@ int mv_gop110_autoneg_restart(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		pr_err("%s: on supported for port mode (%d)", __func__,
 		       mac->phy_mode);
 		return -1;
@@ -1502,6 +1536,8 @@ int mv_gop110_fl_cfg(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		return 0;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
@@ -1529,6 +1565,8 @@ int mv_gop110_force_link_mode_set(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		return 0;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
@@ -1555,6 +1593,8 @@ int mv_gop110_force_link_mode_get(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		return 0;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
@@ -1585,6 +1625,8 @@ int mv_gop110_loopback_set(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
 		return 0;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);

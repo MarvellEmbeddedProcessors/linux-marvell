@@ -3185,6 +3185,8 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 		case PHY_INTERFACE_MODE_XAUI:
 		case PHY_INTERFACE_MODE_RXAUI:
 		case PHY_INTERFACE_MODE_KR:
+		case PHY_INTERFACE_MODE_SFI:
+		case PHY_INTERFACE_MODE_XFI:
 			mv_gop110_xlg_mac_max_rx_size_set(gop,
 					mac_num, port->pkt_size);
 		break;
@@ -4118,6 +4120,8 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 		case PHY_INTERFACE_MODE_RGMII:
 			break;
 		case PHY_INTERFACE_MODE_KR:
+		case PHY_INTERFACE_MODE_SFI:
+		case PHY_INTERFACE_MODE_XFI:
 			break;
 
 		default:
@@ -5057,7 +5061,9 @@ static void mv_pp22_tx_fifo_init(struct mv_pp2x *priv)
 
 			if ((phy_mode == PHY_INTERFACE_MODE_XAUI) ||
 			    (phy_mode == PHY_INTERFACE_MODE_RXAUI) ||
-			    (phy_mode == PHY_INTERFACE_MODE_KR)) {
+			    (phy_mode == PHY_INTERFACE_MODE_KR) ||
+			    (phy_mode == PHY_INTERFACE_MODE_SFI) ||
+			    (phy_mode == PHY_INTERFACE_MODE_XFI)) {
 				/* Record l4_chksum_jumbo_port */
 				priv->l4_chksum_jumbo_port =
 							priv->port_list[i]->id;
