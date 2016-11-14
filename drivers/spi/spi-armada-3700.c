@@ -102,6 +102,7 @@ struct a3700_spi_initdata {
 	unsigned int bits_per_word_mask;
 	unsigned int instr_cnt;
 	unsigned int addr_cnt;
+	unsigned int dummy_cnt;
 };
 
 /* struct a3700_spi .flags */
@@ -131,7 +132,8 @@ struct a3700_spi_status {
 struct a3700_max_hdr_cnt {
 	unsigned int            addr_cnt;
 	unsigned int            instr_cnt;
-	unsigned int            hdr_cnt; /* addr_cnt + instr_cnt = hdr_cnt */
+	unsigned int            dummy_cnt;
+	unsigned int            hdr_cnt; /* addr_cnt + instr_cnt + dummy_cnt = hdr_cnt */
 };
 
 struct a3700_spi {
@@ -629,10 +631,10 @@ static void a3700_spi_header_set(struct a3700_spi *a3700_spi)
 {
 	struct a3700_spi_status *status = &a3700_spi->status;
 	struct a3700_max_hdr_cnt *max_cnt = &a3700_spi->max_cnt;
-	unsigned int instr_cnt, addr_cnt;
-	u32 val;
+	unsigned int instr_cnt, addr_cnt, dummy_cnt;
+	u32 val = 0;
 
-	instr_cnt = addr_cnt = 0;
+	instr_cnt = addr_cnt = dummy_cnt = 0;
 
 	/* Clear the header registers */
 	spireg_write(a3700_spi, A3700_SPI_IF_INST_REG, 0);
@@ -640,19 +642,33 @@ static void a3700_spi_header_set(struct a3700_spi *a3700_spi)
 	spireg_write(a3700_spi, A3700_SPI_IF_RMODE_REG, 0);
 
 	/* Set header counters */
-	val = 0;
-	if (status->buf_len <= max_cnt->hdr_cnt && status->tx_buf) {
-		instr_cnt = min(status->buf_len, max_cnt->instr_cnt);
-		addr_cnt  = status->buf_len - max_cnt->instr_cnt;
+	if (status->tx_buf) {
+
+		if (status->buf_len <= max_cnt->instr_cnt) {
+			instr_cnt = status->buf_len;
+		} else if (status->buf_len <= max_cnt->instr_cnt + max_cnt->addr_cnt) {
+			instr_cnt = max_cnt->instr_cnt;
+			addr_cnt = status->buf_len - instr_cnt;
+		} else if (status->buf_len <= max_cnt->hdr_cnt) {
+			instr_cnt = max_cnt->instr_cnt;
+			addr_cnt = max_cnt->addr_cnt;
+			/* Need to handle the normal write case with 1 byte data */
+			if (!status->tx_buf[instr_cnt + addr_cnt])
+				dummy_cnt = status->buf_len - instr_cnt - addr_cnt;
+		}
+
 		val |= ((instr_cnt & A3700_SPI_INSTR_CNT_MASK)
-			<< A3700_SPI_INSTR_CNT_BIT);
+			    << A3700_SPI_INSTR_CNT_BIT);
 		val |= ((addr_cnt & A3700_SPI_ADDR_CNT_MASK)
-			<< A3700_SPI_ADDR_CNT_BIT);
+			    << A3700_SPI_ADDR_CNT_BIT);
+		val |= ((dummy_cnt & A3700_SPI_DUMMY_CNT_MASK)
+			    << A3700_SPI_DUMMY_CNT_BIT);
 	}
+
 	spireg_write(a3700_spi, A3700_SPI_IF_HDR_CNT_REG, val);
 
 	/* Update the buffer length to be transferred */
-	status->buf_len -= (instr_cnt + addr_cnt);
+	status->buf_len -= (instr_cnt + addr_cnt + dummy_cnt);
 
 	/* Set Instruction */
 	val = 0;
@@ -996,6 +1012,7 @@ static const struct a3700_spi_initdata armada_3700_spi_initdata = {
 	.bits_per_word_mask = SPI_BPW_MASK(8) | SPI_BPW_MASK(32),
 	.instr_cnt          = 1,
 	.addr_cnt           = 3,
+	.dummy_cnt      = 1,
 };
 
 static const struct of_device_id a3700_spi_of_match_table[] = {
@@ -1097,8 +1114,9 @@ static int a3700_spi_probe(struct platform_device *pdev)
 
 		spi->max_cnt.instr_cnt = initdata->instr_cnt;
 		spi->max_cnt.addr_cnt  = initdata->addr_cnt;
+		spi->max_cnt.dummy_cnt  = initdata->dummy_cnt;
 		spi->max_cnt.hdr_cnt   = initdata->instr_cnt
-				+ initdata->addr_cnt;
+				+ initdata->addr_cnt + initdata->dummy_cnt;
 	} else {
 		dev_err(&pdev->dev, "legacy mode\n");
 		spi->spi_pre_xfer  = a3700_spi_transfer_start_legacy;
@@ -1107,6 +1125,7 @@ static int a3700_spi_probe(struct platform_device *pdev)
 
 		spi->max_cnt.instr_cnt = 0;
 		spi->max_cnt.addr_cnt  = 0;
+		spi->max_cnt.dummy_cnt  = 0;
 		spi->max_cnt.hdr_cnt   = 0;
 	}
 
