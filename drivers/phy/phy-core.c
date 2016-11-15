@@ -299,8 +299,9 @@ int phy_power_on(struct phy *phy)
 			dev_err(&phy->dev, "phy poweron failed --> %d\n", ret);
 			goto err_pwr_on;
 		}
+		++phy->power_count;
 	}
-	++phy->power_count;
+
 	mutex_unlock(&phy->mutex);
 	return 0;
 
@@ -330,8 +331,9 @@ int phy_power_off(struct phy *phy)
 			mutex_unlock(&phy->mutex);
 			return ret;
 		}
+		--phy->power_count;
 	}
-	--phy->power_count;
+
 	mutex_unlock(&phy->mutex);
 	phy_pm_runtime_put(phy);
 
