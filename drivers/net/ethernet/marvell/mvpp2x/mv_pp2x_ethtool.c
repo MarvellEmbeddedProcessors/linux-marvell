@@ -37,6 +37,8 @@
 #include <uapi/linux/ppp_defs.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
+#include <linux/phy/phy.h>
+#include <dt-bindings/phy/phy-mvebu-comphy.h>
 
 #include "mv_pp2x.h"
 #include "mv_pp2x_hw.h"
@@ -77,6 +79,14 @@ int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
 	case DUPLEX_HALF:
 		pstatus->duplex = MV_PORT_DUPLEX_HALF;
 		break;
+	case DUPLEX_UNKNOWN:
+		if (cmd->speed == SPEED_1000)
+			pstatus->duplex = MV_PORT_DUPLEX_FULL;
+		else {
+			pstatus->duplex = MV_PORT_DUPLEX_FULL;
+			pr_err("Unknown duplex configuration, full duplex set\n");
+		}
+		break;
 	default:
 		pr_err("Wrong duplex configuration\n");
 		return -1;
@@ -101,44 +111,41 @@ int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
 	}
 }
 
-
-int mv_pp2x_autoneg_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
+int mv_pp2x_autoneg_gmac_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
 			struct ethtool_cmd *cmd, struct mv_port_link_status *pstatus)
 {
 
 	int port_num = mac->gop_index;
 	int err;
 
-	switch (mac->phy_mode) {
-	case PHY_INTERFACE_MODE_RGMII:
-	case PHY_INTERFACE_MODE_SGMII:
-	case PHY_INTERFACE_MODE_QSGMII:
-		err = mv_gop110_check_port_type(gop, port_num);
-		if (err) {
-			pr_err("GOP %d set to 1000Base-X and cannot be changed\n", port_num);
+	err = mv_gop110_check_port_type(gop, port_num);
+	if (err) {
+		if (cmd->autoneg) {
+			pr_err("GOP %d set to 1000Base-X and doesn't support autonegotiation\n", port_num);
 			return -EINVAL;
 		}
-		if (!cmd->autoneg) {
-			err = mv_pp2x_check_speed_duplex_valid(cmd, pstatus);
-			if (err)
-				return -EINVAL;
-		}
-	break;
-	case PHY_INTERFACE_MODE_XAUI:
-	case PHY_INTERFACE_MODE_RXAUI:
-	case PHY_INTERFACE_MODE_KR:
-	case PHY_INTERFACE_MODE_SFI:
-	case PHY_INTERFACE_MODE_XFI:
-		pr_err("XLG GOP %d doesn't support autonegotiation\n", port_num);
-		return -ENODEV;
-
-	break;
-	default:
-		pr_err("%s: Wrong port mode (%d)\n", __func__, mac->phy_mode);
-		return -1;
+		return 0;
 	}
-	return 0;
+	if (!cmd->autoneg) {
+		err = mv_pp2x_check_speed_duplex_valid(cmd, pstatus);
+		if (err)
+			return -EINVAL;
+	}
 
+	return 0;
+}
+
+int mv_pp2x_autoneg_xlg_check_valid(struct mv_mac_data *mac, struct ethtool_cmd *cmd)
+{
+
+	int port_num = mac->gop_index;
+
+	if (cmd->autoneg) {
+		pr_err("XLG GOP %d doesn't support autonegotiation\n", port_num);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 void mv_pp2x_ethtool_valid_coalesce(struct ethtool_coalesce *c,
@@ -527,6 +534,50 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 	return phy_ethtool_gset(port->mac_data.phy_dev, cmd);
 }
 
+void mv_pp2x_ethtool_set_gmac_config(struct mv_port_link_status status, struct gop_hw *gop,
+			int gop_port, struct mv_mac_data *mac, struct ethtool_cmd *cmd)
+{
+
+	mv_gop110_force_link_mode_set(gop, mac, false, true);
+	mv_gop110_gmac_set_autoneg(gop, mac, cmd->autoneg);
+	if (cmd->autoneg)
+		mv_gop110_autoneg_restart(gop, mac);
+	else
+		mv_gop110_gmac_speed_duplex_set(gop, gop_port, status.speed, status.duplex);
+	mv_gop110_force_link_mode_set(gop, mac, false, false);
+}
+
+int mv_pp2x_get_new_comphy_mode(struct ethtool_cmd *cmd, int port_id)
+{
+
+	if (cmd->speed == SPEED_10000 && port_id == 0)
+		return COMPHY_DEF(COMPHY_SFI_MODE, port_id);
+	else if (cmd->speed == SPEED_2500)
+		return COMPHY_DEF(COMPHY_HS_SGMII_MODE, port_id);
+	else if (cmd->speed == SPEED_1000 || cmd->speed == SPEED_100 ||
+			cmd->speed == SPEED_10)
+		return COMPHY_DEF(COMPHY_SGMII_MODE, port_id);
+	else
+		return -EINVAL;
+
+}
+
+void mv_pp2x_set_new_phy_mode(struct ethtool_cmd *cmd, struct mv_mac_data *mac)
+{
+	if (cmd->speed == SPEED_10000)
+		mac->phy_mode = PHY_INTERFACE_MODE_SFI;
+	else if (cmd->speed == SPEED_2500) {
+		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
+		mac->speed = SPEED_2500;
+		mac->flags |= MV_EMAC_F_SGMII2_5;
+	} else {
+		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
+		mac->speed = SPEED_1000;
+		mac->flags &= ~MV_EMAC_F_SGMII2_5;
+	}
+}
+
+
 /* Set settings (phy address, speed) for ethtools */
 static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 					struct ethtool_cmd *cmd)
@@ -537,30 +588,85 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 	struct gop_hw *gop = &port->priv->hw.gop;
 	struct mv_mac_data *mac = &port->mac_data;
 	int gop_port = mac->gop_index;
+	bool phy_mode_update = false;
 
 	if (port->priv->pp2_version == PPV21)
 		if (!port->mac_data.phy_dev)
 			return -ENODEV;
 
-	if (!port->mac_data.phy_dev) {
-		err = mv_pp2x_autoneg_check_valid(mac, gop, cmd, &status);
+	if (port->mac_data.phy_dev)
+		return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
 
-		if (err < 0) {
-			pr_err("Wrong negotiation mode set\n");
-			return err;
+	if (port->comphy)  {
+		int comphy_old_mode, comphy_new_mode;
+
+		comphy_new_mode = mv_pp2x_get_new_comphy_mode(cmd, port->id);
+
+		if (comphy_new_mode < 0) {
+			pr_err("Port ID %d: unsupported speed set\n", port->id);
+			return comphy_new_mode;
 		}
+		comphy_old_mode = phy_get_mode(port->comphy);
 
-		mv_gop110_force_link_mode_set(gop, mac, false, true);
-		mv_gop110_gmac_set_autoneg(gop, mac, cmd->autoneg);
-		if (cmd->autoneg)
-			mv_gop110_autoneg_restart(gop, mac);
-		else
-			mv_gop110_gmac_speed_duplex_set(gop, gop_port, status.speed, status.duplex);
-		mv_gop110_force_link_mode_set(gop, mac, false, false);
-		return 0;
+		if (comphy_old_mode != comphy_new_mode) {
+			err = phy_set_mode(port->comphy, comphy_new_mode);
+			if (err < 0) {
+				phy_set_mode(port->comphy, comphy_old_mode);
+				pr_err("Port ID %d: COMPHY lane is busy\n", port->id);
+				return err;
+			}
+
+			if (mac->flags & MV_EMAC_F_PORT_UP) {
+				netif_carrier_off(port->dev);
+				mv_gop110_port_events_mask(gop, mac);
+				mv_gop110_port_disable(gop, mac);
+				phy_power_off(port->comphy);
+			}
+
+			mv_pp2x_set_new_phy_mode(cmd, mac);
+			phy_mode_update = true;
+		}
 	}
 
-	return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
+	if (phy_mode_update) {
+		if (mac->flags & MV_EMAC_F_INIT) {
+			mac->flags &= ~MV_EMAC_F_INIT;
+			mvcpn110_mac_hw_init(port);
+		}
+		mv_pp22_set_net_comp(port->priv);
+
+		if (mac->flags & MV_EMAC_F_PORT_UP) {
+			mv_gop110_port_events_unmask(gop, mac);
+			mv_gop110_port_enable(gop, mac);
+			phy_power_on(port->comphy);
+		}
+	}
+
+	switch (mac->phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+		err = mv_pp2x_autoneg_gmac_check_valid(mac, gop, cmd, &status);
+		if (err < 0)
+			return err;
+		if (cmd->speed != SPEED_2500)
+			mv_pp2x_ethtool_set_gmac_config(status, gop, gop_port, mac, cmd);
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+	case PHY_INTERFACE_MODE_XFI:
+		mv_pp2x_autoneg_xlg_check_valid(mac, cmd);
+		if (err < 0)
+			return err;
+	break;
+	default:
+		pr_err("Wrong port mode (%d)\n", mac->phy_mode);
+		return -1;
+	}
+
+	return 0;
 }
 
 /* Set interrupt coalescing for ethtools */

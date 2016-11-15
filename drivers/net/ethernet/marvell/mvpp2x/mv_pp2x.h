@@ -264,10 +264,13 @@ struct mv_mac_data {
 #define MV_EMAC_F_LINK_UP_BIT	0
 #define MV_EMAC_F_INIT_BIT	1
 #define MV_EMAC_F_SGMII2_5_BIT	2
+#define MV_EMAC_F_PORT_UP_BIT	3
 
 #define MV_EMAC_F_LINK_UP	(1 << MV_EMAC_F_LINK_UP_BIT)
 #define MV_EMAC_F_INIT		(1 << MV_EMAC_F_INIT_BIT)
 #define MV_EMAC_F_SGMII2_5	(1 << MV_EMAC_F_SGMII2_5_BIT)
+#define MV_EMAC_F_PORT_UP	(1 << MV_EMAC_F_PORT_UP_BIT)
+
 
 #define MVPP2_NO_LINK_IRQ	0
 
@@ -619,6 +622,8 @@ struct mv_pp2x_port {
 					* (long or jumbo)
 					*/
 	struct mv_pp2x_bm_pool *pool_short; /* Pointer to the short pool_id */
+
+	struct phy *comphy; /* comphy handler */
 
 	u32 num_qvector;
 	/* q_vector is the parameter that will be passed to
