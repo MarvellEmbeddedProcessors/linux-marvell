@@ -1077,6 +1077,8 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_KR:
 	case PHY_INTERFACE_MODE_SFI:
 	case PHY_INTERFACE_MODE_XFI:
+		mv_gop110_mpcs_clock_reset(gop,  UNRESET);
+		mv_gop110_xlg_mac_reset(gop, port_num, UNRESET);
 		mv_gop110_xlg_mac_port_enable(gop, port_num);
 	break;
 	default:
@@ -1103,6 +1105,8 @@ void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_SFI:
 	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_port_disable(gop, port_num);
+		mv_gop110_xlg_mac_reset(gop, port_num, RESET);
+		mv_gop110_mpcs_clock_reset(gop,  RESET);
 	break;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
@@ -2365,6 +2369,27 @@ int mv_gop110_mpcs_mode(struct gop_hw *gop)
 
 	return 0;
 }
+
+void mv_gop110_mpcs_clock_reset(struct gop_hw *gop, enum mv_reset reset)
+{
+	u32 val, reg_addr, val1;
+
+	if (reset == RESET)
+		val1 = 0x0;
+	else
+		val1 = 0x1;
+
+	/* configure PCS CLOCK RESET */
+	reg_addr = PCS_CLOCK_RESET;
+	val = mv_gop110_mpcs_global_read(gop, reg_addr);
+
+	U32_SET_FIELD(val, MAC_CLK_RESET_MASK, val1 << MAC_CLK_RESET_OFFSET);
+	U32_SET_FIELD(val, RX_SD_CLK_RESET_MASK, val1 << RX_SD_CLK_RESET_OFFSET);
+	U32_SET_FIELD(val, TX_SD_CLK_RESET_MASK, val1 << TX_SD_CLK_RESET_OFFSET);
+
+	mv_gop110_mpcs_global_write(gop, reg_addr, val);
+}
+
 
 u64 mv_gop110_mib_read64(struct gop_hw *gop, int port, unsigned int offset)
 {

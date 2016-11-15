@@ -36,6 +36,7 @@
 #include <linux/of_address.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/phy/phy.h>
 
 #include <linux/phy.h>
 #include <linux/clk.h>
@@ -47,6 +48,7 @@
 #include <net/busy_poll.h>
 #include <asm/cacheflush.h>
 #include <linux/dma-mapping.h>
+#include <dt-bindings/phy/phy-mvebu-comphy.h>
 
 #include "mv_pp2x.h"
 #include "mv_pp2x_hw.h"
@@ -3133,7 +3135,42 @@ static void mv_pp2x_port_irqs_dispose_mapping(struct mv_pp2x_port *port)
 		irq_dispose_mapping(port->of_irqs[i]);
 }
 
-static int mvcpn110_mac_hw_init(struct mv_pp2x_port *port)
+static void mv_serdes_port_init(struct mv_pp2x_port *port)
+{
+	int mode;
+
+	switch (port->mac_data.phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
+		break;
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_QSGMII:
+		if (port->mac_data.flags & MV_EMAC_F_SGMII2_5)
+			mode = COMPHY_DEF(COMPHY_HS_SGMII_MODE, port->id);
+		else
+			mode = COMPHY_DEF(COMPHY_SGMII_MODE, port->id);
+		phy_set_mode(port->comphy, mode);
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+		mode = COMPHY_DEF(COMPHY_RXAUI_MODE, port->id);
+		phy_set_mode(port->comphy, mode);
+	break;
+	case PHY_INTERFACE_MODE_KR:
+	case PHY_INTERFACE_MODE_SFI:
+		mode = COMPHY_DEF(COMPHY_SFI_MODE, port->id);
+		phy_set_mode(port->comphy, mode);
+	break;
+	case PHY_INTERFACE_MODE_XFI:
+		mode = COMPHY_DEF(COMPHY_XFI_MODE, port->id);
+		phy_set_mode(port->comphy, mode);
+	break;
+	default:
+		pr_err("%s: Wrong port mode (%d)", __func__, port->mac_data.phy_mode);
+	}
+}
+
+
+int mvcpn110_mac_hw_init(struct mv_pp2x_port *port)
 {
 
 	struct gop_hw *gop = &port->priv->hw.gop;
@@ -3145,6 +3182,9 @@ static int mvcpn110_mac_hw_init(struct mv_pp2x_port *port)
 
 	/* configure port PHY address */
 	mv_gop110_smi_phy_addr_cfg(gop, gop_port, mac->phy_addr);
+
+	if (port->comphy)
+		mv_serdes_port_init(port);
 
 	mv_gop110_port_init(gop, mac);
 
@@ -3201,6 +3241,11 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	/* Enable RX/TX interrupts on all CPUs */
 	mv_pp2x_port_interrupts_enable(port);
 
+	if (port->comphy) {
+		mv_gop110_port_disable(gop, mac);
+		phy_power_on(port->comphy);
+		}
+
 	if (port->priv->pp2_version == PPV21) {
 		mv_pp21_port_enable(port);
 	} else {
@@ -3222,8 +3267,10 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	mv_pp2x_egress_enable(port);
 	mv_pp2x_ingress_enable(port);
 	/* Unmask link_event */
-	if (port->priv->pp2_version == PPV22)
+	if (port->priv->pp2_version == PPV22) {
 		mv_gop110_port_events_unmask(gop, mac);
+		port->mac_data.flags |= MV_EMAC_F_PORT_UP;
+	}
 }
 
 /* Set hw internals when stopping port */
@@ -3246,12 +3293,17 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 	netif_tx_stop_all_queues(port->dev);
 
 	mv_pp2x_egress_disable(port);
+
+	if (port->comphy)
+		phy_power_off(port->comphy);
+
 	if (port->priv->pp2_version == PPV21) {
 		mv_pp21_port_disable(port);
 	} else {
 		mv_gop110_port_events_mask(gop, mac);
 		mv_gop110_port_disable(gop, mac);
 		port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
+		port->mac_data.flags &= ~MV_EMAC_F_PORT_UP;
 	}
 
 	if (port->mac_data.phy_dev)
@@ -4329,6 +4381,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	unsigned int *port_irqs;
 	int port_num_irq;
 	int phy_mode;
+	struct phy *comphy;
 
 	dev = alloc_etherdev_mqs(sizeof(struct mv_pp2x_port),
 		mv_pp2x_txq_number, mv_pp2x_rxq_number);
@@ -4377,6 +4430,11 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		/* Init emac_data, includes link interrupt */
 		if (mv_pp2_init_emac_data(port, emac_node))
 			goto err_free_netdev;
+
+		comphy = devm_of_phy_get(&pdev->dev, emac_node, "comphy");
+
+		if (!IS_ERR(comphy))
+			port->comphy = comphy;
 	}
 
 	if (port->mac_data.phy_node) {
@@ -5136,6 +5194,16 @@ static void mv_pp21_fifo_init(struct mv_pp2x *priv)
 	mvpp21_tx_fifo_init(priv);
 }
 
+void mv_pp22_set_net_comp(struct mv_pp2x *priv)
+{
+	u32 net_comp_config;
+
+	net_comp_config = mvp_pp2x_gop110_netc_cfg_create(priv);
+	mv_gop110_netc_init(&priv->hw.gop, net_comp_config, MV_NETC_FIRST_PHASE);
+	mv_gop110_netc_init(&priv->hw.gop, net_comp_config, MV_NETC_SECOND_PHASE);
+}
+
+
 static int mv_pp2x_probe(struct platform_device *pdev)
 {
 	struct mv_pp2x *priv;
@@ -5144,7 +5212,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	int i, err;
 	u16 cpu_map;
 	u32 cell_index = 0;
-	u32 net_comp_config;
 	struct device_node *dn = pdev->dev.of_node;
 	struct device_node *port_node;
 
@@ -5231,13 +5298,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	if (priv->pp2_version == PPV22) {
 		/* Init tx fifo for each port */
 		mv_pp22_tx_fifo_init(priv);
-
-		net_comp_config = mvp_pp2x_gop110_netc_cfg_create(priv);
-		mv_gop110_netc_init(&priv->hw.gop, net_comp_config,
-					MV_NETC_FIRST_PHASE);
-
-		mv_gop110_netc_init(&priv->hw.gop, net_comp_config,
-					MV_NETC_SECOND_PHASE);
+		mv_pp22_set_net_comp(priv);
 	}
 
 	else

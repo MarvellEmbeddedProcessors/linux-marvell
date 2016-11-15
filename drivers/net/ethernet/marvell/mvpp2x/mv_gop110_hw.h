@@ -238,6 +238,7 @@ void mv_gop110_xpcs_lane_regs_dump(struct gop_hw *gop, int lane);
 int mv_gop110_xpcs_reset(struct gop_hw *gop, enum mv_reset reset);
 int mv_gop110_xpcs_mode(struct gop_hw *gop, int num_of_lanes);
 int mv_gop110_mpcs_mode(struct gop_hw *gop);
+void mv_gop110_mpcs_clock_reset(struct gop_hw *gop,  enum mv_reset reset);
 
 /* XLG MAC Functions */
 static inline u32 mv_gop110_xlg_mac_read(struct gop_hw *gop, int mac_num,
