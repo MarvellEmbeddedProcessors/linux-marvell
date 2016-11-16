@@ -80,10 +80,12 @@
 			};
 			gop {
 				emac0: mac0 {
-					phy-mode = "kr"; /* lane-2 */
+					phy-mode = "sfi"; /* lane-2 */
+					phys = <&comphy0 2 COMPHY_SFI>;
+					phy-names = "comphy";
 				};
 				emac2: mac2 {
-					phy-mode = "rgmii"; /* lane-0 */
+					phy-mode = "rgmii"; /* rgmii-0 */
 					phy = <&phy2>;
 				};
 				emac3: mac3 {
@@ -130,7 +132,9 @@
 			};
 			gop {
 				emac0_1: mac0 {
-					phy-mode = "kr"; /* lane-2 */
+					phy-mode = "sfi"; /* lane-2 */
+					phys = <&comphy1 2 COMPHY_SFI>;
+					phy-names = "comphy";
 				};
 				emac2_1: mac2 {
 					phy-mode = "rgmii"; /* rgmii-0 */
