@@ -127,10 +127,14 @@
 			gop {
 				emac0: mac0 {
 					phy-mode = "sgmii"; /* lane-2 */
+					phys = <&comphy0 2 COMPHY_SGMII0>;
+					phy-names = "comphy";
 				};
 				emac2: mac2 {
 					phy-mode = "sgmii"; /* lane-0 */
 					phy = <&phy2>;
+					phys = <&comphy0 0 COMPHY_SGMII1>;
+					phy-names = "comphy";
 				};
 				emac3: mac3 {
 					phy-mode = "rgmii"; /* rgmii-1 */
