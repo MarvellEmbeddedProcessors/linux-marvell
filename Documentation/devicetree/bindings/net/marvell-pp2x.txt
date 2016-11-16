@@ -39,6 +39,8 @@ emac required properties:
 - port-id: Should be '0', '2', or '3' for ethernet macs, references the mac-id (GOP port-id).
 - phy-mode: See ethernet.txt file in the same directory
 - phy-speed: For 2.5Gbits SGMII port 2500 phy-speed should be set(used only for 2.5Gbits SGMII port)
+- phy-names: Used in MAC's connected to comphy. See phy-mvebu-comphy.txt in the phy directory
+- phys: Used in MAC's connected to comphy. Comphy index, see  phy-mvebu-comphy.txt in the phy directory
 
 emac optional properties:
 ========================
@@ -53,6 +55,8 @@ gop {
 		mac-address = [00 00 00 00 00 01];
 		port-id = <0>; /* gop_port_id */
                 phy-mode = "sgmii"; /* lane-2 */
+		phys = <&comphy0 2 COMPHY_SGMII>;
+		phy-names = "comphy";
         };
 	emac2: mac2 {
 		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
@@ -60,6 +64,8 @@ gop {
 		port-id = <2>; /* gop_port_id */
 		phy-mode = "sgmii"; /* lane-0 */
 		phy-speed = <2500>;
+		phys = <&comphy0 0 COMPHY_HS_SGMII>;
+                phy-names = "comphy";
                 phy = <&phy2>;
 	};
 	emac3: mac3 {
