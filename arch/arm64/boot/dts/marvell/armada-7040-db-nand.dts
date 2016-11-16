@@ -126,7 +126,9 @@
 			};
 			gop {
 				emac0: mac0 {
-					phy-mode = "kr"; /* lane-2 */
+					phy-mode = "sfi"; /* lane-2 */
+					phys = <&comphy0 2 COMPHY_SFI>;
+					phy-names = "comphy";
 				};
 				emac2: mac2 {
 					phy-mode = "rgmii"; /* rgmii-0 */
