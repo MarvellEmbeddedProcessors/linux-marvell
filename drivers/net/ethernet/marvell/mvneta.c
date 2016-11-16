@@ -4245,12 +4245,14 @@ static int mvneta_probe(struct platform_device *pdev)
 		err = mvneta_mdio_probe(pp);
 		if (err < 0) {
 			netdev_err(dev, "cannot probe MDIO bus\n");
-			goto err_free_stats;
+			goto err_netdev;
 		}
 	}
 
 	return 0;
 
+err_netdev:
+	unregister_netdev(dev);
 err_free_stats:
 	free_percpu(pp->stats);
 err_free_ports:
