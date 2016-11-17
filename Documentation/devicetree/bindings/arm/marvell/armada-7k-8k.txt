@@ -38,6 +38,9 @@ Boards:
    - "marvell,armada8040-db-router", "marvell,armada8040-db"
       when the board being used is the Armada 8040 Development board
 
+   - "marvell,armada8040-mcbin"
+      when the board being used is the MACCHIATOBin community board
+
 Example:
 
 compatible = "marvell,armada7040-db-router", "marvell,armada7040-db-nand", "marvell,armada7040-db-all-pcie", "marvell,armada7040-pd",
