@@ -154,7 +154,14 @@ static void __init mvebu_init_irq(void)
 	irqchip_init();
 	mvebu_scu_enable();
 	coherency_init();
-	BUG_ON(mvebu_mbus_dt_init(coherency_available()));
+
+	/* In case we are running from MSYS, skip mbus initialization. The
+	 * mvebu_mbus_dt_init was executed earlier in msys_irqchip_init. This
+	 * was required by switch interrupt driver (marvell,swic), which had
+	 * to have access to switch region (decoding windows had to be opened).
+	 */
+	if (!(of_machine_is_compatible("marvell,msys")))
+		BUG_ON(mvebu_mbus_dt_init(coherency_available()));
 }
 
 static void __init msys_irqchip_init(void)
