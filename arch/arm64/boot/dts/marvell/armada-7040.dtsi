@@ -68,6 +68,13 @@
 					      <&cp_xor0 0x489>,
 					      <&cp_xor1 0x48a>;
 			};
+			pinctrl@6f4000 {
+				ap_emmc_pins: emmc-pins-0 {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+					"mpp3", "mpp4", "mpp5";
+					marvell,function = "sdio";
+				};
+			};
 		};
 	};
 
@@ -79,6 +86,11 @@
 				i2c0_pins: i2c-pins-0 {
 					marvell,pins = "mpp37", "mpp38";
 					marvell,function = "i2c0";
+				};
+				cpm_sdhci_pins: cpm-sdhi-pins {
+					marvell,pins = "mpp56", "mpp57", "mpp58",
+						       "mpp59", "mpp60", "mpp61";
+					marvell,function = "sdio";
 				};
 				/* following GPIO entry is not used (for reference only)
 				 * GPIO is not connected in default A7040-DB board
