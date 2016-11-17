@@ -114,6 +114,14 @@
 				mmu-masters = <&usb3h0 0x483>,
 					      <&usb3h1 0x484>;
 			};
+			pinctrl@6f4000 {
+				ap_emmc_pins: emmc-pins-0 {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+					"mpp3", "mpp4", "mpp5", "mpp6", "mpp7",
+					"mpp8", "mpp9", "mpp10";
+					marvell,function = "sdio";
+				};
+			};
 		};
 	};
 
@@ -158,6 +166,11 @@
 				pca0_pins: pca0_pins {
 					marvell,pins = "mpp62";
 					marvell,function = "gpio";
+				};
+				cpm_sdhci_pins: cpm-sdhi-pins {
+					marvell,pins = "mpp56", "mpp57", "mpp58",
+						       "mpp59", "mpp60", "mpp61";
+					marvell,function = "sdio";
 				};
 			};
 			usb3h0: usb3@500000 {
