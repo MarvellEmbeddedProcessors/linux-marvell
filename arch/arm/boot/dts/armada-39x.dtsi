@@ -187,7 +187,7 @@
 			};
 
 			i2c0: i2c@11000 {
-				compatible = "marvell,mv64xxx-i2c";
+				compatible = "marvell,mv78230-i2c";
 				reg = <0x11000 0x20>;
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -198,7 +198,7 @@
 			};
 
 			i2c1: i2c@11100 {
-				compatible = "marvell,mv64xxx-i2c";
+				compatible = "marvell,mv78230-i2c";
 				reg = <0x11100 0x20>;
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -209,7 +209,7 @@
 			};
 
 			i2c2: i2c@11200 {
-				compatible = "marvell,mv64xxx-i2c";
+				compatible = "marvell,mv78230-i2c";
 				reg = <0x11200 0x20>;
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -220,7 +220,7 @@
 			};
 
 			i2c3: i2c@11300 {
-				compatible = "marvell,mv64xxx-i2c";
+				compatible = "marvell,mv78230-i2c";
 				reg = <0x11300 0x20>;
 				#address-cells = <1>;
 				#size-cells = <0>;
