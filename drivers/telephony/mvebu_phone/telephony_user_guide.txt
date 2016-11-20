@@ -1,0 +1,158 @@
+Marvell TDM telephony user guide
+================================
+
+Introduction:
+------------
+There are 2 telephony controllers in Marvell SoCs:
+	- 2-channel TDM (TDM2C, available in A380)
+	- Multi-channel TDM (TDMMC, available in A8k)
+
+In order to use telephony drivers the following SW modules are required
+(Explanation will be provided later is this document):
+	- Linux Kernel Image with telephony support
+	- Linux Kernel device-tree with telephony support
+	- SLIC (Subscriber line interface card) Linux Kernel module
+	- Demo user-space application (mv-voice-tool)
+
+Linux Image:
+-----------
+There are config options for both telephony controllers:
+	- MV_TDMMC_SUPPORT for multi-channel TDM
+	- MV_TDM2C_SUPPORT for 2-channel TDM
+arch/arm/configs/mvebu_v7_lsp_defconfig enables both controllers
+arch/arm64/confgs/mvebu_v8_lsp_defconfig enables MV_TDMMC_SUPPORT.
+
+Device-tree:
+------------
+Refer to: Documentation/devicetree/bindings/telephony/mvebu-phone.txt
+
+SLIC:
+----
+There are pre-compiled Linux Kernel modules for supported SLIC devices.
+Silabs SLICs: silabs-si3217x.ko, silabs-si3226x.ko
+Zarlink SLICs: zarlink-ve792.ko zarlink-ve880.ko
+	       zarlink-ve886.ko zarlink-ve888.ko zarlink-ve890.ko
+
+The corresponding Kernel module should be inserted after boot using:
+insmod <Kernel_module_name>
+For example: insmod silabs-si3226x.ko
+
+mv-voice-tool:
+-------------
+User-space application which communicates via ioctl with the telephony
+driver. mv-voice-tool must suit the SLIC which is used:
+	SLIC			mv-voice-tool
+	------			---------------
+	silabs-si3226x.ko	mv_voice_tool-si3217x
+	silabs-si3217x.ko	mv_voice_tool-si3217x
+	zarlink-ve792.ko	mv_voice_tool-ve792
+	zarlink-ve880.ko	mv_voice_tool-ve880
+	zarlink-ve886.ko	mv_voice_tool-ve886
+	zarlink-ve888.ko	mv_voice_tool-ve888
+	zarlink-ve890.ko	mv_voice_tool-ve890
+
+In order to run mv-voice tool, run the following command:
+run mv-voice-tool:
+./mv_voice_tool-<version>
+
+Example for connecting 2 phones using mv-voice-tool:
+	# ./mv_voice_tool-si3226x
+
+	>>  Please enter total lines number: 2
+	>>  Please enter PCM sample size(1/2/4): 1
+
+	!!! Remember to start phone devices before performing any action !!!
+
+	Marvell Voice Tool (Silabs Edition):
+	0. Read from SLIC register
+	1. Write to SLIC register
+	2. Start ring
+	3. Stop ring
+	4. Start/Stop HW Dial tone
+	5. Start SW Dial tone
+	6. Self echo on local phone
+	7. Loopback two local phones
+	8. Digital Loopback
+	9. Channel balancing
+	c. Config TDM PCLK
+	m. Multiple local phone pairs loopback
+	t. Start Phone devices
+	u. Stop Phone devices
+	a. Analog Looopback
+	b. record from phone and replay
+	y. Loopback two local phones endlessly for Abacus
+	z. Loopback two local phones for Abacus
+	q. Quit
+
+	>>  Please select option: t
+	[   33.542089] mvebu_phone f47a0000.tdm: Loading Marvell Telephony Driver
+	[   33.570432] ioctl: SILABS_MOD_IOX_CTRL_IF
+	[   33.574470] ioctl: SILABS_MOD_IOX_DEVICE_INIT
+	[   33.578866] ioctl: SILABS_MOD_IOX_CHAN_INIT
+	[   33.583076] ioctl: SILABS_MOD_IOX_CHAN_INIT
+	[   33.587286] ioctl: SILABS_MOD_IOX_CHAN_INIT
+	[   33.591495] ioctl: SILABS_MOD_IOX_CHAN_INIT
+	[   33.595699] ioctl: SILABS_MOD_IOX_CTRL_IF
+	[   33.599734] ioctl: SILABS_MOD_IOX_CHAN_OP
+	[   34.103808] ioctl: SILABS_MOD_IOX_CHAN_OP
+	[   34.607878] ioctl: SILABS_MOD_IOX_CHAN_ALL
+	[   34.612191] Si3226x: Channel 0 : Type = PROSLIC
+	[   34.616917] Si3226x: Channel 1 : Type = PROSLIC
+	[   34.621585] Si3226x: Channel 0 : Chip Type 28
+	[   34.625971] Si3226x: Channel 0 : Chip Rev 3
+	[   34.630289] Si3226x: Channel 1 : Chip Type 28
+	[   34.634672] Si3226x: Channel 1 : Chip Rev 3
+	[   34.639379] Si3226x: loading patch: 08132013
+	[   34.758946] Si3226x: loading patch: 08132013
+	[   35.270230] Si3226x: VBAT @ 50ms = 59.111 v
+	[   35.336159] Si3226x: VBAT Up = 59.111 v
+	[   35.403180] Si3226x: VBAT @ 50ms = 59.635 v
+	[   35.469114] Si3226x: VBAT Up = 59.845 v
+	[   36.141300] ioctl: SILABS_MOD_IOX_CHAN_ALL
+	[   36.145419] Si3226x: Starting LB Cal on channel 0
+	[   38.262691] Si3226x: Starting LB Cal on channel 1
+	[   40.379965] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.393731] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.405775] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.432049] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.439158] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.453907] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.467656] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.479694] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.505975] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.513090] ioctl: SILABS_MOD_IOX_CHAN_SETUP
+	[   40.527837] ioctl: SILABS_MOD_IOX_PCM_TS_SETUP
+	[   40.532526] ioctl: SILABS_MOD_IOX_CHAN_LINE_FEED
+	[   40.537281] ioctl: SILABS_MOD_IOX_PCM_TS_SETUP
+	[   40.541969] ioctl: SILABS_MOD_IOX_CHAN_LINE_FEED
+	[   40.546724] ioctl: SILABS_MOD_IOX_CHAN_OP
+	[   40.551030] ioctl: SILABS_MOD_IOX_CHAN_OP
+	[   40.555294] ioctl: SILABS_MOD_IOX_CHAN_OP
+	[   40.559328] Si3226x: PCMStart
+	[   40.562425] ioctl: SILABS_MOD_IOX_CHAN_OP
+	[   40.566459] Si3226x: PCMStart
+
+	Marvell Voice Tool (Silabs Edition):
+	0. Read from SLIC register
+	1. Write to SLIC register
+	2. Start ring
+	3. Stop ring
+	4. Start/Stop HW Dial tone
+	5. Start SW Dial tone
+	6. Self echo on local phone
+	7. Loopback two local phones
+	8. Digital Loopback
+	9. Channel balancing
+	c. Config TDM PCLK
+	m. Multiple local phone pairs loopback
+	t. Start Phone devices
+	u. Stop Phone devices
+	a. Analog Looopback
+	b. record from phone and replay
+	y. Loopback two local phones endlessly for Abacus
+	z. Loopback two local phones for Abacus
+	q. Quit
+
+	>>  Please select option: 7
+	>>  Enter line #0: 1
+	>>  Enter line #1: 0
