@@ -11,7 +11,7 @@ Required properties:
 - interrupt-map-mask and interrupt-map, standard PCI properties to
   define the mapping of the PCIe interface to interrupt numbers.
 - All other definitions as per generic PCI bindings
-See "documentation/devicetree/bindings/pci/designware-pcie.txt"
+See "Documentation/devicetree/bindings/pci/designware-pcie.txt"
 
 Optional properties:
 PHY support is still not supported for armada-8k, once it will, the following parameters can be used:
