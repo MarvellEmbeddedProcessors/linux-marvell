@@ -385,6 +385,8 @@ void mv_pp2x_bm_bufs_free(struct device *dev, struct mv_pp2x *priv,
 		if (!phys_addr)
 			break;
 		if (!bm_pool->external_pool) {
+			dma_unmap_single(dev, phys_addr,
+				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size), DMA_TO_DEVICE);
 			virt_addr = phys_to_virt(dma_to_phys(dev, phys_addr));
 			mv_pp2x_frag_free(bm_pool, virt_addr);
 		}
