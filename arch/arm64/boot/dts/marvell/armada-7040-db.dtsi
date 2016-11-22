@@ -97,6 +97,11 @@
 					reg = <0x21>;
 				};
 			};
+			u3d@520000 {
+				pinctrl-0 = <&u3d_vbus_pins>;
+				pinctrl-names = "default";
+				vbus-gpio = <&gpio2 30 GPIO_ACTIVE_HIGH>;
+			};
 			usb3h0: usb3@500000 {
 				usb-phy = <&usb3h0_phy>;
 			};
