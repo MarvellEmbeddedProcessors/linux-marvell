@@ -151,7 +151,7 @@ u3d@520000 {
 	/* 0: 0x520000: USB 3.0 Device port 0: DEV_INFO_REG(0:15 - version_id)
 	 * 1: 0x121F10: Clock Source High reg: VBUS present indication in PHY SerDes lane#1
 	 */
-	reg = <0x520000 0x2000>;
+	reg = <0x520000 0x2000>, <0x121f10 0x40>;
 	interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cpm_syscon0 1 24>;
 	dma-coherent;
