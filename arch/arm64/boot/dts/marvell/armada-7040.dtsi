@@ -92,11 +92,16 @@
 						       "mpp59", "mpp60", "mpp61";
 					marvell,function = "sdio";
 				};
-				/* following GPIO entry is not used (for reference only)
-				 * GPIO is not connected in default A7040-DB board
+				/* following VBUS IN/OUT GPIO entries is not used
+				 * (for reference only) GPIO is not connected
+				 * in default A7040-DB board
 				 */
 				xhci0_vbus_pins: xhci0-vbus-pins {
 					marvell,pins = "mpp12";
+					marvell,function = "gpio";
+				};
+				u3d_vbus_pins: u3d-vbus-pins {
+					marvell,pins = "mpp62";
 					marvell,function = "gpio";
 				};
 			};
