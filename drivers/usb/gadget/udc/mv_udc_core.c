@@ -2432,7 +2432,7 @@ static int mv_udc_suspend(struct device *dev)
 	if (udc->transceiver)
 		return 0;
 
-	if (udc->pdata->vbus && udc->pdata->vbus->poll)
+	if (udc->pdata && udc->pdata->vbus && udc->pdata->vbus->poll)
 		if (udc->pdata->vbus->poll() == VBUS_HIGH) {
 			dev_info(&udc->dev->dev, "USB cable is connected!\n");
 			return -EAGAIN;
