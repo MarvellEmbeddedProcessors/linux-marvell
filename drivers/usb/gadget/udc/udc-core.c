@@ -506,12 +506,9 @@ int usb_udc_attach_driver(const char *name, struct usb_gadget_driver *driver)
 	int ret = -ENODEV;
 
 	mutex_lock(&udc_lock);
-	list_for_each_entry(udc, &udc_list, list) {
-		ret = strcmp(name, dev_name(&udc->dev));
-		if (!ret)
-			break;
-	}
-	if (ret) {
+
+	udc = udc_detect(&udc_list, driver);
+	if (!udc) {
 		ret = -ENODEV;
 		goto out;
 	}
