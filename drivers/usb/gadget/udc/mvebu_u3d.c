@@ -1960,7 +1960,8 @@ static irqreturn_t mvc2_irq(int irq, void *devid)
 
 				cp->status &= ~MVCP_STATUS_USB2;
 				glue.status = cp->status;
-				schedule_work(cp->work);
+				if (cp->work)
+					schedule_work(cp->work);
 			}
 		}
 
@@ -1983,7 +1984,8 @@ static irqreturn_t mvc2_irq(int irq, void *devid)
 
 			cp->status |= MVCP_STATUS_USB2;
 			glue.status = cp->status;
-			schedule_work(cp->work);
+			if (cp->work)
+				schedule_work(cp->work);
 		}
 
 		if ((refint & MVCP_REF_INTEN_USB2_DISCNT) &&
@@ -1993,7 +1995,8 @@ static irqreturn_t mvc2_irq(int irq, void *devid)
 			if (mvc2_checkvbus(cp)) {
 				cp->status &= ~MVCP_STATUS_USB2;
 				glue.status = cp->status;
-				schedule_work(cp->work);
+				if (cp->work)
+					schedule_work(cp->work);
 			}
 		}
 
