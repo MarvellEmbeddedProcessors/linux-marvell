@@ -47,7 +47,7 @@ struct xmdio_controller {
 } __packed;
 
 /* Check if XSMI bus is idle */
-static int xmdio_chck_idle(struct xmdio_controller __iomem *regs)
+static int xmdio_check_idle(struct xmdio_controller __iomem *regs)
 {
 	return !(readl(&regs->xmdio_mngmnt) & XBUSY);
 }
@@ -58,7 +58,7 @@ static int xmdio_wait_free(struct device *dev, struct xmdio_controller __iomem *
 	int ntries = NTRIES;
 
 	while (ntries > 0) {
-		if (xmdio_chck_idle(regs))
+		if (xmdio_check_idle(regs))
 			return 0;
 
 		usleep_range(TIMEOUT_MIN, TIMEOUT_MAX);
@@ -70,7 +70,7 @@ static int xmdio_wait_free(struct device *dev, struct xmdio_controller __iomem *
 }
 
 /* Check if XSMI bus read operaton is done */
-static int xmdio_chck_read_done(struct xmdio_controller __iomem *regs)
+static int xmdio_check_read_done(struct xmdio_controller __iomem *regs)
 {
 	return readl(&regs->xmdio_mngmnt) & XREAD_VALID;
 }
@@ -81,7 +81,7 @@ static int xmdio_wait_read_done(struct device *dev, struct xmdio_controller __io
 	int ntries = NTRIES;
 
 	while (ntries > 0) {
-		if (xmdio_chck_read_done(regs))
+		if (xmdio_check_read_done(regs))
 			return 0;
 
 		usleep_range(TIMEOUT_MIN, TIMEOUT_MAX);
