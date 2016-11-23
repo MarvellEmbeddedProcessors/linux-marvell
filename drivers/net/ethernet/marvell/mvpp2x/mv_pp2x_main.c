@@ -72,7 +72,11 @@
 #define CPN110_ADDRESS_SPACE_SIZE (16*1024*1024)
 
 /* Declaractions */
+#if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
+u8 mv_pp2x_num_cos_queues = 1;
+#else
 u8 mv_pp2x_num_cos_queues = 4;
+#endif
 static u8 mv_pp2x_queue_mode = MVPP2_QDIST_SINGLE_MODE;
 static u8 rss_mode;
 static u8 default_cpu;
