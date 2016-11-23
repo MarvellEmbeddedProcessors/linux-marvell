@@ -35,7 +35,7 @@ static struct clk_onecell_data ap806_clk_data = {
 
 static void __init ap806_syscon_clk_init(struct device_node *np)
 {
-	unsigned int freq_mode, cpuclk_freq, hclk_freq;
+	unsigned int freq_mode, cpuclk_freq, dclk_freq;
 	const char *name, *fixedclk_name;
 	struct regmap *regmap;
 	u32 reg;
@@ -85,46 +85,46 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 		pr_err("invalid SAR value\n");
 	}
 
-	/* Get HCLK frequency */
+	/* Get DCLK frequency */
 	switch (freq_mode) {
 	case 0x4:
 	case 0x10:
 	case 0x14:
 	case 0x19 ... 0x1D:
-		hclk_freq = 400;
+		dclk_freq = 400;
 		break;
 	case 0xC:
-		hclk_freq = 600;
+		dclk_freq = 600;
 		break;
 	case 0xD:
 	case 0x16:
-		hclk_freq = 525;
+		dclk_freq = 525;
 		break;
 	case 0xB:
 	case 0xE:
 	case 0xF:
-		hclk_freq = 450;
+		dclk_freq = 450;
 		break;
 	case 0x12:
 	case 0x13:
 	case 0x17:
-		hclk_freq = 325;
+		dclk_freq = 325;
 		break;
 	case 0x11:
 	case 0x15:
-		hclk_freq = 800;
+		dclk_freq = 800;
 		break;
 	case 0x18:
-		hclk_freq = 650;
+		dclk_freq = 650;
 		break;
 	default:
-		hclk_freq = 0;
+		dclk_freq = 0;
 		pr_err("invalid SAR value\n");
 	}
 
 	/* Convert to hertz */
 	cpuclk_freq *= 1000 * 1000;
-	hclk_freq *= 1000 * 1000;
+	dclk_freq *= 1000 * 1000;
 
 	/* CPU clocks depend on the Sample At Reset configuration */
 	of_property_read_string_index(np, "clock-output-names",
@@ -158,7 +158,7 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 	of_property_read_string_index(np, "clock-output-names",
 				      5, &name);
 	ap806_clks[5] = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT,
-						hclk_freq);
+						dclk_freq);
 
 	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_clk_data);
 }
