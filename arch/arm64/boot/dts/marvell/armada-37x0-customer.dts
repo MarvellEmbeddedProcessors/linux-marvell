@@ -1,0 +1,322 @@
+/*
+ * Device Tree file for Marvell Armada 3720 development board
+ * (DB-88F3720-DDR3)
+ * Copyright (C) 2016 Marvell
+ *
+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPL or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This file is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This file is distributed in the hope that it will be useful
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ * Example device tree for Armada 3700
+ * Customer may use this file as a reference.
+ * Each field that needs to be update (phys, mpps, addresses, frequencies)
+ * is marked with "UPDATE" comment.
+ *
+ * NOTE: all interfaces are disabled!
+ *
+ * Refer to ./Documentation/mvebu/porting_guide.txt for for information
+ */
+/dts-v1/;
+
+/* UPDATE
+ * Include one of the following dtsi files:
+ *	armada-372x.dtsi - used for dual core
+ *	armada-371x.dtsi - used for single core
+ */
+#include "armada-372x.dtsi"
+
+/ {
+	/* UPDATE */
+	model = "customer board model";
+	/* UPDATE
+	 * marvell,armada3720 - used for dual core
+	 * marvell,armada3710 - used for single core
+	 * NOTE: The compatile MUST match the included *.dtsi file
+	 */
+	compatible = "customer-board-compatible", "marvell,armada3720", "marvell,armada3710";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	/* UPDATE */
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
+	};
+
+	soc {
+		internal-regs {
+			spi0: spi@10600 {
+				status = "disabled";
+				/* UPDATE */
+				spi-flash@0 {
+					#address-cells = <1>;
+					#size-cells = <1>;
+					compatible = "jedec,spi-nor";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <104000000>;
+					m25p,fast-read;
+
+					pinctrl-names = "default";
+					pinctrl-0 = <&spi0_pins &spi_quad_pins>;
+
+					partition@0 {
+						label = "Bootloader";
+						reg = <0 0x200000>;
+					};
+					partition@200000 {
+						label = "U-boot Env";
+						reg = <0x200000 0x10000>;
+					};
+					partition@210000 {
+						label = "Linux";
+						reg = <0x210000 0xDF0000>;
+					};
+				};
+			};
+
+			i2c0: i2c@11000 {
+				status = "disabled";
+				/* UPDATE */
+				expander0: pca9555@22 {
+					compatible = "nxp,pca9555";
+					reg = <0x22>;
+					gpio-controller;
+					#gpio-cells = <2>;
+				};
+			};
+
+			i2c1: i2c@11080 {
+				status = "disabled";
+			};
+
+			/*
+			* Exported on the micro USB connector CON32
+			* through an FTDI
+			*/
+			uart0: serial@12000 {
+				status = "disabled";
+			};
+
+			eth0: ethernet@30000 {
+				/* UPDATE */
+				phy-mode = "rgmii-id";
+				status = "okay";
+				fixed-link {
+					speed = <1000>;
+					full-duplex;
+				};
+			};
+
+			mdio: mdio@32004 {
+				/* UPDATE */
+				switch0: switch@0 {
+					compatible = "marvell,mv88e6085";
+					reg = <1>;
+
+					mdio@0 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+
+						phy1: phy1@1 {
+							reg = <17>;
+						};
+						phy2: phy2@2 {
+							reg = <18>;
+						};
+						phy3: phy3@3 {
+							reg = <19>;
+						};
+					};
+				};
+			};
+
+			u3d@50000 {
+				status = "disabled";
+			};
+
+			udc@54100 {
+				status = "disabled";
+			};
+
+			/* CON31 */
+			usb3@58000 {
+				status = "disabled";
+				usb-phy = <&usb3_phy>;
+			};
+
+			usb@5e000 {
+				status = "disabled";
+			};
+
+			interrupt-controller@74840 {
+				status = "disabled";
+			};
+
+			sdhci1: sdhci@d0000 {
+				wp-inverted;
+				bus-width = <4>;
+				cd-gpios = <&gpio_sb 2 GPIO_ACTIVE_LOW>;
+				vqmmc-supply = <&vcc_sd_reg1>;
+				status = "disabled";
+				/* UPDATE */
+				pinctrl-names = "default";
+				pinctrl-0 = <&sdio_pins &cd_pins>;
+			};
+
+			sdhci0: sdhci@d8000 {
+				xenon,fixed-1-8v-pad-ctrl;
+				non-removable;
+				bus-width = <8>;
+				tuning-count = <9>;
+				status = "disabled";
+				/* UPDATE */
+				pinctrl-names = "default";
+				pinctrl-0 = <&mmc_pins>;
+			};
+
+			/* CON3 */
+			sata@e0000 {
+				target-supply = <&reg_5v_sata>;
+				status = "disabled";
+			};
+			vcc_sd_reg1: regulator@0 {
+				compatible = "regulator-gpio";
+				regulator-name = "vcc_sd1";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-boot-on;
+
+				gpios = <&gpio_sb 23 GPIO_ACTIVE_HIGH>;
+				gpios-states = <0>;
+				states = <1800000 0x1 3300000 0x0>;
+				enable-active-high;
+			};
+		};
+
+		reg_sata: pwr-sata {
+			compatible = "regulator-fixed";
+			regulator-name = "pwr_en_sata";
+			regulator-min-microvolt = <12000000>;
+			regulator-max-microvolt = <12000000>;
+			enable-active-high;
+			regulator-boot-on;
+			gpio = <&expander0 2 GPIO_ACTIVE_HIGH>;
+		};
+
+		reg_5v_sata: v5-sata {
+			compatible = "regulator-fixed";
+			regulator-name = "v5.0-sata";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			vin-supply = <&reg_sata>;
+		};
+
+		reg_12v_sata: v12-sata {
+			compatible = "regulator-fixed";
+			regulator-name = "v12.0-sata";
+			regulator-min-microvolt = <12000000>;
+			regulator-max-microvolt = <12000000>;
+			vin-supply = <&reg_sata>;
+		};
+
+	};
+	dsa@0 {
+		compatible = "marvell,dsa";
+		dsa,ethernet = <&eth0>;
+		dsa,mii-bus = <&mdio>;
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		switch@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <1 0>;
+			/* UPDATE */
+			port@0 {
+				reg = <0>;
+				label = "cpu";
+				fixed-link {
+					speed = <1000>;
+					full-duplex;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				label = "wan";
+				phy-handle = <&phy1>;
+			};
+
+			port@2 {
+				reg = <2>;
+				label = "lan0";
+				phy-handle = <&phy2>;
+			};
+
+			port@3 {
+			reg = <3>;
+				label = "lan1";
+				phy-handle = <&phy3>;
+			};
+		};
+	};
+	usb3_phy: usb3-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&exp_usb3_vbus>;
+	};
+
+	exp_usb3_vbus: usb3-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb3-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+/* CON17 (PCIe) / CON12 (mini-PCIe) */
+&pcie0 {
+	status = "disabled";
+};
