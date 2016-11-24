@@ -42,6 +42,8 @@
 #define DMA_IMSG_THRD_OFF	0x018
 #define   DMA_IMSG_THRD_MASK			0x7FFF
 #define   DMA_IMSG_THRD_SHIFT			0x0
+#define   DMA_IMSG_TIMER_MASK			0x1
+#define   DMA_IMSG_TIMER_SHIFT			18
 #define DMA_DESQ_AWATTR_OFF	0x01C
   /* Same flags as DMA_DESQ_ARATTR_OFF */
 #define DMA_DESQ_ALLOC_OFF	0x04C
@@ -55,6 +57,9 @@
 #define DMA_DESQ_STOP_OFF	0x800
 #define DMA_DESQ_DEALLOC_OFF	0x804
 #define DMA_DESQ_ADD_OFF	0x808
+#define DMA_IMSG_TMOT		0x810
+#define   DMA_IMSG_TIMER_THRD_MASK		0x1FFF
+#define   DMA_IMSG_TIMER_THRD_SHIFT		0x0
 
 /* XOR Global registers */
 #define GLOB_BW_CTRL		0x4
@@ -85,6 +90,12 @@
 
 /* descriptors queue size */
 #define MV_XOR_V2_MAX_DESC_NUM	1024
+
+/* Threshold values for descriptors and timeout
+** got this values after runnig benchmarks with RAID5
+*/
+#define MV_XOR_DONE_IMSG_THRD	0x14
+#define MV_XOR_TIMER_THRD	0xB0
 
 /**
  * struct mv_xor_v2_descriptor - DMA HW descriptor
@@ -294,16 +305,24 @@ void mv_xor_v2_free_chan_resources(struct dma_chan *chan)
  * Set the IMSG threshold
  */
 static inline
-void mv_xor_v2_set_imsg_thrd(struct mv_xor_v2_device *xor_dev, int thrd_val)
+void mv_xor_v2_enable_imsg_thrd(struct mv_xor_v2_device *xor_dev)
 {
 	u32 reg;
 
 	reg = readl(xor_dev->dma_base + DMA_IMSG_THRD_OFF);
-
+	/* Configure threshold for IMSG */
 	reg &= (~DMA_IMSG_THRD_MASK << DMA_IMSG_THRD_SHIFT);
-	reg |= (thrd_val << DMA_IMSG_THRD_SHIFT);
-
+	reg |= (MV_XOR_DONE_IMSG_THRD << DMA_IMSG_THRD_SHIFT);
+	/* Enable IMSG-timer */
+	reg &= ~(DMA_IMSG_TIMER_MASK << DMA_IMSG_TIMER_SHIFT);
+	reg |= (0x1 << DMA_IMSG_TIMER_SHIFT);
 	writel(reg, xor_dev->dma_base + DMA_IMSG_THRD_OFF);
+
+	/* Configure Timer Threshold */
+	reg = readl(xor_dev->dma_base + DMA_IMSG_TMOT);
+	reg &= (~DMA_IMSG_TIMER_THRD_MASK << DMA_IMSG_TIMER_THRD_SHIFT);
+	reg |= (MV_XOR_TIMER_THRD << DMA_IMSG_TIMER_THRD_SHIFT);
+	writel(reg, xor_dev->dma_base + DMA_IMSG_TMOT);
 }
 
 static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
@@ -883,6 +902,8 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 
 	list_add_tail(&xor_dev->dmachan.device_node,
 		      &dma_dev->channels);
+
+	mv_xor_v2_enable_imsg_thrd(xor_dev);
 
 	mv_xor_v2_descq_init(xor_dev);
 
