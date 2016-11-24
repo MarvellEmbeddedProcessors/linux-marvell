@@ -103,7 +103,7 @@ do
 		;;
 	s)	PLATFORM=$OPTARG
 		case "$OPTARG" in
-			a380|a385|a388|a37xx|none) ;;
+			a380|a385|a388|a37xx|a8040|a7040|none) ;;
 			*) do_error "-${flag}: wrong option ${OPTARG}" ;;
 		esac
 		;;
@@ -132,7 +132,7 @@ do
 		fi
 		;;
 	*)	echo "Usage: $0"
-		echo "		-s <a380|a385|a388|a37xx|none>: platform used with nas_init"
+		echo "		-s <a380|a385|a388|a37xx|a8040|a7040|none>: platform used with nas_init"
 		echo "		-f <ext4|xfs|btrfs|fat32>: file system type ext4, xfs, btrfs or fat32"
 		echo "		-t <sd|rd0|rd1|rd5|rd6>: drive topology"
 		echo "		-n <num>: partition number to be mounted"
@@ -153,7 +153,7 @@ done
 
 # verify supporting arch
 case "$PLATFORM" in
-    a380|a385|a388|a37xx|none)	;;
+    a380|a385|a388|a37xx|a8040|a7040|none)	;;
     *)	do_error "Platform ${PLATFORM} unsupported, please pass valid -s option" ;;
 esac
 
@@ -782,6 +782,39 @@ elif [ "$PLATFORM" == "a37xx" ]; then
 	echo 2 > /proc/irq/32/smp_affinity
 	# PCI-E SATA controller
 	echo 2  > /proc/irq/34/smp_affinity
+
+	set +o verbose
+	echo -ne "[Done]\n"
+elif [ "$PLATFORM" == "a8040" ]; then
+	set -o verbose
+
+	# XOR Engines for AP
+	echo 1 > /proc/irq/67/smp_affinity
+	echo 2 > /proc/irq/68/smp_affinity
+	echo 4 > /proc/irq/69/smp_affinity
+	echo 8 > /proc/irq/70/smp_affinity
+
+	# SATA
+	echo 2 > /proc/irq/41/smp_affinity
+
+	# To use CP XOR engines, need to parse interrupt map and
+	# read interrupt numbers assigned to XOR engine (ICU driver
+	# dynamically assigns interrupts for CP interfaces)"
+
+	set +o verbose
+	echo -ne "[Done]\n"
+elif [ "$PLATFORM" == "a7040" ]; then
+	set -o verbose
+
+	# XOR Engines for AP
+	echo 1 > /proc/irq/123/smp_affinity
+	echo 2 > /proc/irq/124/smp_affinity
+	echo 4 > /proc/irq/125/smp_affinity
+	echo 8 > /proc/irq/126/smp_affinity
+
+	# To use CP XOR engines, need to parse interrupt map and
+	# read interrupt numbers assigned to XOR engine (ICU driver
+	# dynamically assigns interrupts for CP interfaces)"
 
 	set +o verbose
 	echo -ne "[Done]\n"
