@@ -310,12 +310,6 @@ static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
 {
 	struct mv_xor_v2_device *xor_dev = data;
 
-	/*
-	 * Update IMSG threshold, to disable new IMSG interrupts until
-	 * end of the tasklet
-	 */
-	mv_xor_v2_set_imsg_thrd(xor_dev, MV_XOR_V2_MAX_DESC_NUM);
-
 	/* schedule a tasklet to handle descriptors callbacks */
 	tasklet_schedule(&xor_dev->irq_tasklet);
 
@@ -683,9 +677,6 @@ static void mv_xor_v2_tasklet(unsigned long data)
 		/* free the descriptores */
 		mv_xor_v2_free_desc_from_desq(xor_dev, num_of_pending);
 	}
-
-	/* Update IMSG threshold, to enable new IMSG interrupts */
-	mv_xor_v2_set_imsg_thrd(xor_dev, 0);
 }
 
 /*
