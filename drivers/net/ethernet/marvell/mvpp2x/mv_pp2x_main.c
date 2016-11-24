@@ -3771,6 +3771,13 @@ static int mv_pp2x_change_mtu(struct net_device *dev, int mtu)
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	int err;
 
+#ifdef DEV_NETMAP
+	if (port->flags & MVPP2_F_IFCAP_NETMAP) {
+		netdev_err(dev, "MTU can not be modified for port configured to Netmap mode\n");
+		return -EPERM;
+	}
+#endif
+
 	mtu = mv_pp2x_check_mtu_valid(dev, mtu);
 	if (mtu < 0) {
 		err = mtu;
