@@ -297,6 +297,13 @@
 				status = "disabled";
 			};
 
+			otg_phy: otg@5d800 {
+				compatible = "marvell,armada-3700-otg";
+				reg = <0x5d800 0x100>;
+				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+				status = "disabled";
+			};
+
 			usb@5e000 {
 				compatible = "marvell,armada-3700-ehci";
 				reg = <0x5e000 0x2000>;
