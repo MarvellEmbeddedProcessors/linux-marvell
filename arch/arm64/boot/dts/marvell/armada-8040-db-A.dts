@@ -56,6 +56,20 @@
 
 	chosen { };
 
+	ap806 {
+		config-space {
+			serial@512000 {
+				status = "okay";
+			};
+			i2c@511000 {
+				status = "disabled";
+			};
+			spi0: spi@510600 {
+				status = "disabled";
+			};
+		};
+	};
+
 	cpn-110-master {
 		config-space {
 			sata@540000 {
