@@ -109,6 +109,7 @@ enum {
 	A3700_TBG_TO_USB_CLK,
 	A3700_TBG_TO_GBE0_CLK,
 	A3700_TBG_TO_GBE1_CLK,
+	A3700_TBG_TO_SPI_CLK,
 };
 
 static const struct coreclk_ratio armada_3700_coreclk_ratios[] __initconst = {
@@ -119,6 +120,7 @@ static const struct coreclk_ratio armada_3700_coreclk_ratios[] __initconst = {
 	{ .id = A3700_TBG_TO_USB_CLK, .name = "usb32-ss-sys" },
 	{ .id = A3700_TBG_TO_GBE0_CLK, .name = "gbe0-core" },
 	{ .id = A3700_TBG_TO_GBE1_CLK, .name = "gbe1-core" },
+	{ .id = A3700_TBG_TO_SPI_CLK, .name = "spi-core" },
 };
 
 /***************************************************************************************************
@@ -194,6 +196,16 @@ static void __init armada_3700_get_clk_ratio(
 		div2 = (clkr32(MVEBU_SOUTH_CLOCK_DIVIDER_SELECT1_REG) >> GBE1_CORE_CLK_DIV_OFFSET) &
 					MVEBU_TBG_CLK_DIV_MASK;
 		*div = (prscl1 * prscl2) << div2;
+		break;
+
+	case A3700_TBG_TO_SPI_CLK:
+		*tbg = (clkr32(MVEBU_NORTH_CLOCK_TBG_SELECT_REG) >> TBG_SPI_PCLK_SEL_OFFSET) &
+					MVEBU_TBG_CLK_SEL_MASK;
+		prscl1 = (clkr32(MVEBU_NORTH_CLOCK_DIVIDER_SELECT1_REG) >> SPI_CLK_PRSCL1_OFFSET) &
+					MVEBU_TBG_CLK_PRSCL_MASK;
+		prscl2 = (clkr32(MVEBU_NORTH_CLOCK_DIVIDER_SELECT1_REG) >> SPI_CLK_PRSCL2_OFFSET) &
+					MVEBU_TBG_CLK_PRSCL_MASK;
+		*div = prscl1 * prscl2;
 		break;
 
 	default:
@@ -288,6 +300,7 @@ CLK_OF_DECLARE(armada_3700_core_clk, "marvell,armada-3700-core-clock",
  */
 static const struct clk_gating_soc_desc armada_3700_north_bridge_gating_desc[] __initconst = {
 	{ "sata-host-gate", "sata-host", 3, 0, CLK_GATE_SET_TO_DISABLE },
+	{ "spi-gate", "spi-core", 12, 0, CLK_GATE_SET_TO_DISABLE },
 	{ "twsi2", NULL, 16, 0, CLK_GATE_SET_TO_DISABLE },
 	{ "twsi1", NULL, 17, 0, CLK_GATE_SET_TO_DISABLE },
 	{ }
