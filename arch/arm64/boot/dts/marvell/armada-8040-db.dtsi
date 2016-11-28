@@ -56,6 +56,15 @@
 		reg = <0x0 0x0 0x0 0x80000000>;
 	};
 
+	ap806 {
+		config-space {
+			sdhci@6e0000 {
+				bus-width = <8>;
+				non-removable;
+			};
+		};
+	};
+
 	cpn-110-master {
 		config-space {
 			i2c@701000 {
@@ -106,6 +115,7 @@
 				usb-phy = <&cpm_usb3h1_phy>;
 			};
 			sdhci@780000 {
+				bus-width = <4>;
 				non-removable;
 			};
 		};
