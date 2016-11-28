@@ -93,6 +93,7 @@ struct a3700_clk_desc {
 /* north bridge clock TBG select register */
 #define MVEBU_NORTH_CLOCK_TBG_SELECT_REG	(0x0)
 #define TBG_WCPU_PCLK_SEL_OFFSET		(22)
+#define TBG_SPI_PCLK_SEL_OFFSET			(12)
 #define TBG_SATA_HOST_PCLK_SEL_OFFSET		(2)
 #define TBG_MMC_PCLK_SEL_OFFSET		(0)
 
@@ -101,6 +102,8 @@ struct a3700_clk_desc {
 #define WCPU_CLK_DIV_PRSCL_OFFSET	(28)
 
 #define MVEBU_NORTH_CLOCK_DIVIDER_SELECT1_REG	(0x8)
+#define SPI_CLK_PRSCL1_OFFSET			(27)
+#define SPI_CLK_PRSCL2_OFFSET			(24)
 
 #define MVEBU_NORTH_CLOCK_DIVIDER_SELECT2_REG	(0xC)
 #define MMC_CLK_PRSCL1_OFFSET		(16)
