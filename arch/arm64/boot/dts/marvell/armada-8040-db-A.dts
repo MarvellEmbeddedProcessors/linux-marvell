@@ -61,6 +61,9 @@
 			serial@512000 {
 				status = "okay";
 			};
+			sdhci@6e0000 {
+				status = "okay";
+			};
 			i2c@511000 {
 				status = "disabled";
 			};
@@ -80,6 +83,9 @@
 				status = "okay";
 			};
 			usb3h1: usb3@510000 {
+				status = "okay";
+			};
+			sdhci@780000 {
 				status = "okay";
 			};
 			mdio@12a200 {
