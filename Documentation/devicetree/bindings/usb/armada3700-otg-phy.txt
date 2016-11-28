@@ -2,6 +2,15 @@ USB Armada3700 OTG PHY
 
 This controller is integrated only in Armada-3700.
 
+Armada-3700 could be working in USB OTG mode which supports USB Host/Device mode
+switching dynamically. To do that, the following dts changes are required:
+- Enable both USB Host (usb3) and Device (u3d and udc) controller DT nodes.
+- In USB Host DT node, use special XHCI driver compatible string:
+  "marvell,armada-3700-xhci-otg", while the default one "generic-xhci" is for
+  USB Host only mode.
+- Enable OTG PHY TD node and make sure XHCI DT node have reference to it with
+  "usb-phy" property.
+
 Required properties:
 - compatible	: should be "marvell,armada-3700-otg"
 - reg		: Physical base address and size of the USB3 device registers map.
@@ -11,6 +20,11 @@ Optional properties:
 - vcc-supply: phandle to the regulator that provides power to the PHY.
 
 Example:
+	usb3@58000 {
+		compatible = "marvell,armada-3700-xhci-otg";
+		status = "okay";
+		usb-phy = <&otg_phy>;
+	};
 
 	otg_phy: otg@5d800 {
 		compatible = "marvell,usb-3700-otg";
