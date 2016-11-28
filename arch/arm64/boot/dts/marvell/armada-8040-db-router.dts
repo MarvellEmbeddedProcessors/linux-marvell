@@ -61,6 +61,9 @@
 			serial@512000 {
 				status = "okay";
 			};
+			sdhci@6e0000 {
+				status = "disabled";
+			};
 			i2c@511000 {
 				status = "okay";
 				clock-frequency = <100000>;
