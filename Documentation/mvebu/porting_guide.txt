@@ -155,6 +155,9 @@ A37x0
 	- Marvell A37x0 SPI driver
 	  spi/spi-armada-3700.txt
 
+	- Marvell A37x0 USB OTG (Host/Device Switching) PHY driver
+	  Binding: usb/armada3700-otg-phy.txt
+
 A39x
 ----
 	- Marvell A39x Pinctrl driver
