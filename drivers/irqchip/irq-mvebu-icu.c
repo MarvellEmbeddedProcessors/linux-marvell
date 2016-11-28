@@ -69,6 +69,8 @@
 
 #define ICU_GET_GIC_IDX(x)	(ICU_GET_IDX_BY_GIC_BASE(x))
 
+#define ICU_SATA0_IRQ_INT		109
+#define ICU_SATA1_IRQ_INT		107
 
 struct mvebu_icu_irq_data {
 	void __iomem *base;	/* ICU register base */
@@ -190,6 +192,19 @@ static int mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int vi
 		icu_int |= 0 << ICU_IS_EDGE_OFFSET;
 	icu_int |= icu_group << ICU_GROUP_OFFSET;
 	writel(icu_int, icu->base + ICU_INT_CFG(hwirq));
+
+	/* The SATA unit has 2 ports, and a dedicated ICU entry per port.
+	** The ahci sata driver supports only one irq interrupt per SATA unit.
+	** to solve this conflict, we configure the 2 SATA wired interrupts in the
+	** south bridge into 1 GIC interrupt in the north bridge.
+	** Even if only a single port is enabled, if sata node is enabled, both
+	** interrupts are configured. (regardless of which port is actually in use)
+	** The ICU index of SATA0 = 107, SATA1 = 109
+	*/
+	if (hwirq == ICU_SATA0_IRQ_INT || hwirq == ICU_SATA1_IRQ_INT) {
+		writel(icu_int, icu->base + ICU_INT_CFG(ICU_SATA0_IRQ_INT));
+		writel(icu_int, icu->base + ICU_INT_CFG(ICU_SATA1_IRQ_INT));
+	}
 
 	err = irq_domain_set_hwirq_and_chip(domain, virq, hwirq, &mvebu_icu_irq_chip, icu);
 	if (err) {
