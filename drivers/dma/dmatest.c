@@ -539,7 +539,7 @@ static int dmatest_perf_func(void *data)
 			for (i = 0; i < src_cnt; i++) {
 				thread->srcs[i] = buf_pool_ptr;
 				buf_pool_ptr += params->buf_size;
-				if ((buf_pool_ptr - buf_pool_addr) >= buf_pool_size)
+				if ((buf_pool_ptr - buf_pool_addr + params->buf_size) >= buf_pool_size)
 					buf_pool_ptr = buf_pool_addr;
 			}
 		}
@@ -547,7 +547,7 @@ static int dmatest_perf_func(void *data)
 		for (i = 0; i < dst_cnt; i++) {
 			thread->dsts[i] = buf_pool_ptr;
 			buf_pool_ptr += params->buf_size;
-			if ((buf_pool_ptr - buf_pool_addr) >= buf_pool_size)
+			if ((buf_pool_ptr - buf_pool_addr + params->buf_size) >= buf_pool_size)
 				buf_pool_ptr = buf_pool_addr;
 		}
 
