@@ -35,6 +35,9 @@
 
 #define STATS_DELAY	250
 
+#define TSO_TXQ_LIMIT 100
+#define TXQ_LIMIT (MAX_SKB_FRAGS + 2)
+
 #define MV_ETH_SKB_SHINFO_SIZE	SKB_DATA_ALIGN(sizeof(struct skb_shared_info))
 
 /* START - Taken from mvPp2Commn.h, need to order TODO */
@@ -624,6 +627,7 @@ struct mv_pp2x_port {
 	struct mv_pp2x_bm_pool *pool_short; /* Pointer to the short pool_id */
 
 	struct phy *comphy; /* comphy handler */
+	int txq_stop_limit;
 
 	u32 num_qvector;
 	/* q_vector is the parameter that will be passed to

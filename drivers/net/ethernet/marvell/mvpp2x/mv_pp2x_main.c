@@ -826,9 +826,8 @@ static inline void *mv_pp2_extra_pool_get(struct mv_pp2x_port *port)
 
 		ext_buf = ext_buf_struct->ext_buf_data;
 
-	} else {
+	} else
 		ext_buf = kmalloc(MVPP2_EXTRA_BUF_SIZE, GFP_ATOMIC);
-	}
 
 	return ext_buf;
 }
@@ -928,14 +927,14 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 
 		mv_pp2x_txq_inc_get(txq_pcpu);
 
+		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
+				 data_size, DMA_TO_DEVICE);
+
 		if (skb & MVPP2_ETH_SHADOW_EXT) {
 			skb &= ~MVPP2_ETH_SHADOW_EXT;
 			mv_pp2_extra_pool_put(port, (void *)skb);
 			continue;
 		}
-
-		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
-				 data_size, DMA_TO_DEVICE);
 
 		if (!skb)
 			continue;
@@ -949,15 +948,14 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 static void mv_pp2x_txq_buf_free(struct mv_pp2x_port *port, uintptr_t skb,
 				 dma_addr_t  buf_phys_addr, int data_size)
 {
+	dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
+			 data_size, DMA_TO_DEVICE);
 
 	if (skb & MVPP2_ETH_SHADOW_EXT) {
 		skb &= ~MVPP2_ETH_SHADOW_EXT;
 		mv_pp2_extra_pool_put(port, (void *)skb);
 		return;
 	}
-
-	dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
-			 data_size, DMA_TO_DEVICE);
 
 	if (!skb)
 		return;
@@ -992,7 +990,7 @@ static void mv_pp2x_txq_done(struct mv_pp2x_port *port,
 	mv_pp2x_txq_bufs_free(port, txq_pcpu, tx_done);
 
 	if (netif_tx_queue_stopped(nq))
-		if (mv_pp2x_txq_free_count(txq_pcpu) >= (MAX_SKB_FRAGS + 2))
+		if (mv_pp2x_txq_free_count(txq_pcpu) >= port->txq_stop_limit)
 			netif_tx_wake_queue(nq);
 }
 
@@ -2677,7 +2675,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			 struct mv_pp2x_aggr_tx_queue *aggr_txq, int cpu)
 {
 	int frag = 0, i;
-	int total_len, hdr_len, size, frag_size, data_left;
+	int total_len, hdr_len, size, frag_size, data_left, txq_id;
 	int total_desc_num, total_bytes = 0, max_desc_num = 0;
 	char *frag_ptr;
 	struct mv_pp2x_tx_desc *tx_desc;
@@ -2687,9 +2685,13 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	u32 tcp_seq = 0;
 	skb_frag_t *skb_frag_ptr;
 	const struct tcphdr *th = tcp_hdr(skb);
+	struct netdev_queue *nq;
 
 	if (mv_pp2_tso_validate(skb, dev))
 		return 0;
+
+	txq_id = skb_get_queue_mapping(skb);
+	nq = netdev_get_tx_queue(dev, txq_id);
 
 	/* Calculate expected number of TX descriptors */
 	max_desc_num = skb_shinfo(skb)->gso_segs * 2 + skb_shinfo(skb)->nr_frags;
@@ -2697,9 +2699,14 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	/* Check number of available descriptors */
 	if (mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, max_desc_num, cpu) ||
 	    mv_pp2x_txq_reserved_desc_num_proc(port->priv, txq,
-					     txq_pcpu, max_desc_num, cpu)) {
+						   txq_pcpu, max_desc_num, cpu)) {
+		netif_tx_stop_queue(nq);
 		return 0;
 	}
+
+	if (unlikely(max_desc_num > port->txq_stop_limit))
+		if (mv_pp2x_txq_free_count(txq_pcpu) < max_desc_num)
+			return 0;
 
 	total_len = skb->len;
 	hdr_len = (skb_transport_offset(skb) + tcp_hdrlen(skb));
@@ -2806,6 +2813,11 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			}
 		}
 	}
+
+	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
+	if (mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit)
+		netif_tx_stop_queue(nq);
+
 	/* TCP segment is ready - transmit it */
 	mv_pp2x_aggr_txq_pend_desc_add(port, total_desc_num);
 
@@ -2949,7 +2961,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
 
-	if (mv_pp2x_txq_free_count(txq_pcpu) < (MAX_SKB_FRAGS + 2))
+	if (mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit)
 		netif_tx_stop_queue(nq);
 	/* Enable transmit */
 	if (!skb->xmit_more || netif_xmit_stopped(nq)) {
@@ -3900,6 +3912,13 @@ static int mv_pp2x_netdev_set_features(struct net_device *dev,
 		}
 	}
 
+	if (changed & NETIF_F_TSO) {
+		if (features & NETIF_F_TSO)
+			port->txq_stop_limit = TSO_TXQ_LIMIT;
+		else
+			port->txq_stop_limit = TXQ_LIMIT;
+	}
+
 	dev->features = features;
 
 	return 0;
@@ -4608,6 +4627,12 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	/* Only when multi queue mode, rxhash is supported */
 	if (mv_pp2x_queue_mode)
 		dev->hw_features |= NETIF_F_RXHASH;
+
+	if (dev->features & NETIF_F_TSO)
+		port->txq_stop_limit = TSO_TXQ_LIMIT;
+	else
+		port->txq_stop_limit = TXQ_LIMIT;
+
 	dev->vlan_features |= features;
 
 	dev->priv_flags |= IFF_UNICAST_FLT;
