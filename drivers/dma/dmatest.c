@@ -431,7 +431,7 @@ static int dmatest_perf_func(void *data)
 	unsigned int		failed_tests = 0;
 	unsigned int		total_tests = 0;
 	unsigned int		outs_push = 0, outs_pop = 0;
-	dma_cookie_t		*cookie;
+	dma_cookie_t		*cookie = NULL;
 	enum dma_status		status;
 	enum dma_ctrl_flags	flags;
 	u8			*pq_coefs = NULL;
@@ -442,13 +442,17 @@ static int dmatest_perf_func(void *data)
 	ktime_t			ktime;
 	s64			runtime = 0;
 	unsigned long long	total_len = 0;
-	void			*buf_pool_addr, *buf_pool_ptr;
+	void			*buf_pool_addr, *buf_pool_ptr = NULL;
+	struct dmaengine_unmap_data *um;
+	struct dmaengine_unmap_data **um_list = NULL;
 
 	set_freezable();
 
 	ret = -ENOMEM;
 
 	smp_rmb();
+	thread->srcs = NULL;
+	thread->dsts = NULL;
 	info = thread->info;
 	params = &info->params;
 	chan = thread->chan;
@@ -475,19 +479,23 @@ static int dmatest_perf_func(void *data)
 
 	cookie = kcalloc(outstanding_req, sizeof(dma_cookie_t), GFP_KERNEL);
 	if (!cookie)
-		goto err_thread_type;
+		goto alloc_fail;
+
+	um_list = kcalloc(outstanding_req, sizeof(um), GFP_KERNEL);
+	if (!um_list)
+		goto alloc_fail;
 
 	buf_pool_ptr = buf_pool_addr = kmalloc(buf_pool_size, GFP_KERNEL);
 	if (!buf_pool_addr)
-		goto err_bufpool;
+		goto alloc_fail;
 
 	thread->srcs = kcalloc(src_cnt+1, sizeof(u8 *), GFP_KERNEL);
 	if (!thread->srcs)
-		goto err_srcs;
+		goto alloc_fail;
 
 	thread->dsts = kcalloc(dst_cnt+1, sizeof(u8 *), GFP_KERNEL);
 	if (!thread->dsts)
-		goto err_dsts;
+		goto alloc_fail;
 
 	set_user_nice(current, 10);
 
@@ -500,7 +508,6 @@ static int dmatest_perf_func(void *data)
 	while (!kthread_should_stop()
 	       && !(params->iterations && total_tests >= params->iterations)) {
 		struct dma_async_tx_descriptor *tx = NULL;
-		struct dmaengine_unmap_data *um;
 		dma_addr_t srcs[src_cnt];
 		dma_addr_t *dsts;
 		unsigned int src_off = 0, dst_off = 0, len;
@@ -632,6 +639,7 @@ static int dmatest_perf_func(void *data)
 		tx->callback = dmatest_callback;
 		tx->callback_param = NULL;
 		cookie[outs_push] = tx->tx_submit(tx);
+		um_list[outs_push] = um;
 
 		if (dma_submit_error(cookie[outs_push])) {
 			dmaengine_unmap_put(um);
@@ -646,7 +654,9 @@ static int dmatest_perf_func(void *data)
 		outs_push = (outs_push + 1) % outstanding_req;
 		while (1) {
 			status = dma_async_is_tx_complete(chan, cookie[outs_pop], NULL, NULL);
-			if (status != DMA_COMPLETE) {
+			if (status == DMA_COMPLETE) {
+				dmaengine_unmap_put(um_list[outs_pop]);
+			} else {
 				if ((outs_push == outs_pop) || (total_tests == params->iterations))
 					continue;
 				break;
@@ -662,8 +672,6 @@ static int dmatest_perf_func(void *data)
 			continue;
 		}
 
-		dmaengine_unmap_put(um);
-
 		verbose_result("test passed", total_tests, src_off,
 			       dst_off, len, 0);
 	}
@@ -671,13 +679,12 @@ static int dmatest_perf_func(void *data)
 
 	ret = 0;
 
+alloc_fail:
 	kfree(thread->dsts);
-err_dsts:
 	kfree(thread->srcs);
-err_srcs:
 	kfree(buf_pool_ptr);
-err_bufpool:
 	kfree(cookie);
+	kfree(um_list);
 err_thread_type:
 	pr_info("%s: summary %u tests, %u failures %llu iops %llu KB/s (%d)\n",
 		current->comm, total_tests, failed_tests,
