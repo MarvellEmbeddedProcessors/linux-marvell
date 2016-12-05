@@ -234,6 +234,11 @@
 						       "mpp10", "mpp11";
 					marvell,function = "spi0";
 				};
+				cps_spi1_pins: spi-pins-1 {
+					marvell,pins = "mpp13", "mpp14", "mpp15",
+						       "mpp16", "mpp17";
+					marvell,function = "spi1";
+				};
 			};
 		};
 		pcie@0x600000 {
