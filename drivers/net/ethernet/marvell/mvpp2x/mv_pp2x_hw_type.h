@@ -1221,13 +1221,13 @@
 #define MVPP2_MAX_RXD			1024
 
 /* Max number of Tx descriptors */
-#define MVPP2_MAX_TXD			1024
+#define MVPP2_MAX_TXD			2048
 
 /* Amount of Tx descriptors that can be reserved at once by CPU */
-#define MVPP2_CPU_DESC_CHUNK		64
+#define MVPP2_CPU_DESC_CHUNK		128
 
 /* Max number of Tx descriptors in each aggregated queue */
-#define MVPP2_AGGR_TXQ_SIZE		256
+#define MVPP2_AGGR_TXQ_SIZE		512
 
 /* Descriptor aligned size */
 #define MVPP2_DESC_ALIGNED_SIZE		32
