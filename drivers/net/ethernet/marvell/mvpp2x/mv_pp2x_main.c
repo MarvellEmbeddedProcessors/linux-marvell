@@ -863,6 +863,38 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 					struct mv_pp2x_txq_pcpu *txq_pcpu,
 					int num, int cpu)
 {
+	int req;
+
+	if (likely(txq_pcpu->reserved_num >= num))
+		return 0;
+
+	/* Not enough descriptors reserved! Update the reserved descriptor
+	 * count and check again.
+	 */
+
+	/* Entire txq_size is used for SWF . Must be changed when HWF
+	 * is implemented.
+	 * There will always be at least one CHUNK available
+	 */
+
+	req = MVPP2_CPU_DESC_CHUNK;
+
+	txq_pcpu->reserved_num += mv_pp2x_txq_alloc_reserved_desc(priv, txq,
+							req, cpu);
+
+	/* OK, the descriptor cound has been updated: check again. */
+	if (unlikely(txq_pcpu->reserved_num < num))
+		return -ENOMEM;
+
+	return 0;
+}
+
+int mv_pp2x_tso_txq_reserved_desc_num_proc(
+					struct mv_pp2x *priv,
+					struct mv_pp2x_tx_queue *txq,
+					struct mv_pp2x_txq_pcpu *txq_pcpu,
+					int num, int cpu)
+{
 	int req, cpu_desc, desc_count;
 
 	if (txq_pcpu->reserved_num >= num)
@@ -879,7 +911,7 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 
 	req = MVPP2_CPU_DESC_CHUNK;
 
-	if ((num - txq_pcpu->reserved_num) > req) {
+	if (unlikely((num - txq_pcpu->reserved_num) > req)) {
 		req = num - txq_pcpu->reserved_num;
 		desc_count = 0;
 		/* Compute total of used descriptors */
@@ -894,7 +926,7 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 		}
 		desc_count += req;
 
-		if (desc_count > txq->size)
+		if (unlikely(desc_count > txq->size))
 			return -ENOMEM;
 	}
 
@@ -902,7 +934,7 @@ int mv_pp2x_txq_reserved_desc_num_proc(
 							req, cpu);
 
 	/* OK, the descriptor cound has been updated: check again. */
-	if (txq_pcpu->reserved_num < num)
+	if (unlikely(txq_pcpu->reserved_num < num))
 		return -ENOMEM;
 
 	return 0;
@@ -2698,7 +2730,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 
 	/* Check number of available descriptors */
 	if (mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, max_desc_num, cpu) ||
-	    mv_pp2x_txq_reserved_desc_num_proc(port->priv, txq,
+	    mv_pp2x_tso_txq_reserved_desc_num_proc(port->priv, txq,
 						   txq_pcpu, max_desc_num, cpu)) {
 		netif_tx_stop_queue(nq);
 		return 0;
