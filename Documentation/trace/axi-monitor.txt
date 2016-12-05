@@ -1,5 +1,5 @@
-		AXI Monitor - A bus monitor for debug and trace
-		===============================================
+AXI Monitor
+===========
 
    Author:   Yehuda Yitschak <yehuday@marvell.com>
    Date:     April 6th, 2016
@@ -22,16 +22,16 @@ The profiling counters can also be independently traced to the STM.
 An AXIM monitors a single direction bus, meaning a read channel or write channel.
 A typical AXIM connection may look like this.
 
-					     -------
-					     |	   |
-			--------    -------->| CTI |
-AXI channel (rd/wr)	|      |    |	     |     |
------------------------>| AXIM | ---|	     -------
-			|      |    |        -------	  -------
-			--------    |	     |     |      |     |
-				    -------->| STM |----->| ETF |
-				             |     |      |     |
-					     -------      -------
+								|-------
+								|       |
+					--------    -------->| CTI |
+		AXI channel (rd/wr) |      |    |      |     |
+		----------------------->| AXIM | ---|   -------
+					|      |    |      -------      -------
+					--------    |      |     |      |     |
+							-------->| STM |----->| ETF |
+									 |     |      |     |
+								 -------      -------
 
 The AXI monitor has several revisions with different feature set:
 
@@ -42,13 +42,10 @@ Rev 2
    * Profiling of transaction variables
    * Tracing detected events and profiling counters
 
-Acronyms and Classification
----------------------------
-
-Acronyms:
-
-STM:     System trace Macrocell
-CTI:     Cross Trigger Interface
+Acronyms
+--------
+- STM:	System trace Macrocell
+- CTI:	Cross Trigger Interface
 
 Device Tree Bindings
 ----------------------
@@ -106,7 +103,8 @@ Another example is detecting all non secure shareable device accesses:
 The specific sysfs files and their functions are documented under:
 Documentation/ABI/testing/sysfs-bus-coresight-devices-axim
 
-NOTE:
+NOTE
+----
 CPU or device accesses may not map the same to AXI bus transactions.
 For example when a CPU accesses a non 64byte aligned address (e.g 0x10), the L2 may
 issue a cache line prefetch to the aligned address (0x0). Therefore it is advised
