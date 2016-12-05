@@ -1,77 +1,62 @@
-==============================
 Porting Guide for Marvell SoCs
 ==============================
 
-This document provides instructions for porting the Marvell Linux package
-to a customer board.
+This document provides instructions for porting Marvell Linux package
+to a customer's board.
 
-================
 Relevant Devices
-================
+----------------
+	- Armada-80x0
+	- Armada-70x0
+	- Armada-37x0
+	- Armada-38x
+	- Armada-39x
 
-	Armada-80x0
-	Armada-70x0
-	Armada-37x0
-	Armada-38x
-	Armada-39x
-
-============
 Introduction
-============
+------------
+The device-tree includes runtime configuration for the Linux Kernel.
+In addition, the device-tree enables passing configuration parameters to drivers.
 
-	This section provides general and Marvell specific information about
-	the Linux device-tree.
+For general information about the device-tree please refer to:
+http://elinux.org/Device_Tree
 
-	The device-tree includes the runtime configuration of Linux Kernel.
-	In addition, the device-tree enables passing configuration parameters
-	for each of the drivers.
-
-	For general information about the device-tree please refer to:
-	http://elinux.org/Device_Tree
-
-	Marvell's device-tree are located in the following locations:
-	- arch/arm64/boot/dts/marvell for 64bit devices (A37x0, A80x0 and A70x0)
-	- arch/arm/boot/dts for 32bit devices (A38x and A39x).
-
-	Marvell specific device-tree information (binding documents) will be
-	provided later in this document.
-
-==================================
-Customer board device-tree porting
-==================================
-
-device-tree files:
+Device-tree files
 -----------------
-	Marvell device-trees consists of 2 types of file:
-	- *.dtsi - Those files represents the SoC. Each available interface
-			   has a node which holds the SoC information.
-	- *.dts  - Those files holds the configuration of the board itself,
-			   enabling/disabling nodes from SoCs, adding board information
-			   to each node (if required).
+Marvell's device-tree files are located in the following locations:
+- arch/arm64/boot/dts/marvell for 64-bit devices (A37x0, A80x0 and A70x0)
+- arch/arm/boot/dts for 32-bit devices (A38x and A39x).
 
-porting procedure:
+Marvell device-trees consists of 2 types of file:
+	- *.dtsi - These files represents the SoC. Each available interface
+		   has a node which holds the SoC information.
+	- *.dts  - These files holds the configuration of the board itself,
+		   enabling/disabling nodes from SoCs, adding board information
+		   to each node (if required).
+
+Porting procedure
 -----------------
 	1. Choose one of the following example device-trees (for the SoC in use):
-			arch/arm64/boot/dts/marvell/armada-80x0-customer.dts
-			arch/arm64/boot/dts/marvell/armada-70x0-customer.dts
-			arch/arm64/boot/dts/marvell/armada-37x0-customer.dts
-			arch/arm/boot/dts/marvell/armada-38x-customer.dts	/* TODO - generate */
-			arch/arm/boot/dts/marvell/armada-39x-customer.dts	/* TODO - generate */
-	   Copy the selected file, change the name and place the file
-			in the correct folder, for example:
-				./arch/arm64/boot/dts/marvell/armada-8040-<new_name>.dts
-				./arch/arm/boot/dts/armada-38x-<new_name>.dts
+		- arch/arm64/boot/dts/marvell/armada-80x0-customer.dts
+		- arch/arm64/boot/dts/marvell/armada-70x0-customer.dts
+		- arch/arm64/boot/dts/marvell/armada-37x0-customer.dts
+		- arch/arm/boot/dts/marvell/armada-38x-customer.dts	/* TODO - generate */
+		- arch/arm/boot/dts/marvell/armada-39x-customer.dts	/* TODO - generate */
+
+		Copy the selected file, change the name and place the file in the correct folder, for example:
+		- "/arch/arm64/boot/dts/marvell/armada-8040-<new_name>.dts"
+		- "./arch/arm/boot/dts/armada-38x-<new_name>.dts"
 
 	2. Add the new device-tree file to the corrisponding Makefile:
-			./arch/arm64/boot/dts/marvell/Makefile	(A80x0, A70x0, A37x0)
-			./arch/arm/boot/dts/Makefile		(A38x, A39x)
-			For example:
-			dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-<new_name>.dtb
+		- ./arch/arm64/boot/dts/marvell/Makefile (A80x0, A70x0, A37x0)
+		- ./arch/arm/boot/dts/Makefile		 (A38x, A39x)
+
+		For example:
+		"dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-<new_name>.dtb"
 
 	3. Look for "UPDATE" comments in the device tree and update board
 	   specific information:
-		- model: "Costumer board model"
-		- compatible: "costumer-board-compatible"
+		- Model: "Customer board model"
+		- Compatible: "customer-board-compatible"
 		- Memory size: Update "memory" node properties
 		- MPPs: pinctrl-0 = <handle>
 		- PHY addresses for network nodes
@@ -79,112 +64,63 @@ porting procedure:
 		- SPI flash (if needed)
 		- I2c devices (if needed)
 
-	Driver specific information can be found in the device-tree binding,
-	refer to the next section on this document ("Device-tree bindings").
 
+Device-Tree Bindings
 ====================
-Device-tree bindings
-====================
+In order to make the porting of the drivers easier, each Linux driver
+has a device tree binding document which explains the usage of the driver.
+All binding documents are located in: Documentation/devicetree/bindings.
 
-	In order to make the porting of the drivers easier, each Linux driver
-	has a device tree binding document which explains the usage of the driver.
-	All binding documents are located in: Documentation/devicetree/bindings.
+The tables below list the binding documents for Marvell's drivers.
 
-	A list of binding documents for Marvell's drivers (All drivers are available
-	in all supported SoC, unless otherwise stated):
+Common Drivers
+--------------
+	Driver				| Binding file
+	--------------------------------|---------------------------------------
+	Marvell SATA driver		| ata/ahci-platform.txt
+	USB xHCI controller		| usb/usb-xhci.txt
+	USB device controller		| usb/marvell-u3d.txt, usb/marvell-udc.txt
+	Marvell Xenon SDHCI driver	| mmc/marvell,xenon-sdhci.txt
+	Marvell MDIO ethernet driver	| net/marvell-orion-mdio.txt
+	Marvell PCIe driver		| pci/armada8k-pcie.txt
 
-Common
-------
-	- Marvell SATA driver
-	  Binding: ata/ahci-platform.txt
-
-	- USB xHCI controller
-	  Binding: usb/usb-xhci.txt
-
-	- USB device controller
-	  Binding: usb/marvell-u3d.txt
-		   usb/marvell-udc.txt
-
-	- Marvell Xenon SDHCI driver
-	  Binding: mmc/marvell,xenon-sdhci.txt
-
-	- Marvell MDIO ethernet driver
-	  Binding: net/marvell-orion-mdio.txt
-
-	- Marvell PCIe driver
-	  Binding: pci/armada8k-pcie.txt
-
-A80x0/7040
------------
-	- Marvell A80x0/7040 pin control driver
-	  Binding: pinctrl/marvell,armada-ap806-pinctrl.txt
-		   pinctrl/marvell,armada-cp110-pinctrl.txt
-
-	- Marvell Comphy driver
-	  Binding: phy/phy-mvebu-comphy.txt
-
-	- Marvell Telephony driver
-	  Binding: telephony/mvebu-phone.txt
-
-	- Marvell PPv2x ethernet driver
-	  Binding: net/marvell-pp2x.txt
-
-	- Marvell EIP197 security driver (A80x0, A70x0)
-	  Binding: crypto/mv_eip197.txt
-
-	- Marvell AP806 CPU Clock Driver
-	  Binding: clock/mvebu-armada-ap806-cpu-clock.txt
-
-	- Marvell SPI driver
-	  Binding: spi/spi-orion.txt
-
-	- Marvell I2c driver
-	  Binding: i2c/i2c-mv64xxx.txt
+A80x0/A70x0
+----------
+	Driver				| Binding file
+	--------------------------------|---------------------------------------
+	Marvell A80x0/A70x0 Pinctrl driver| pinctrl/marvell,armada-ap806-pinctrl.txt, pinctrl/marvell,armada-cp110-pinctrl.txt
+	Marvell Comphy driver		| phy/phy-mvebu-comphy.txt
+	Marvell Telephony driver	| telephony/mvebu-phone.txt
+	Marvell PPv2x ethernet driver	| net/marvell-pp2x.txt
+	Marvell EIP197 security driver	| crypto/mv_eip197.txt
+	Marvell AP806 CPU Clock Driver	| clock/mvebu-armada-ap806-cpu-clock.txt
+	Marvell SPI driver		| spi/spi-orion.txt
+	Marvell I2c driver		| i2c/i2c-mv64xxx.txt
 
 A37x0
 -----
-	- Marvell A37x0 Pinctrl driver
-	  Binding: pinctrl/marvell,armada-3700-pinctrl.txt
-
-	- Marvell Neta Ethernet controller
-	  Binding: net/marvell-armada-370-neta.txt
-
-	- Marvell A37x0 i2c driver:
-	  Binding: i2c/i2c-pxa.txt
-
-	- Marvell A37x0 SPI driver
-	  spi/spi-armada-3700.txt
-
-	- Marvell A37x0 USB OTG (Host/Device Switching) PHY driver
-	  Binding: usb/armada3700-otg-phy.txt
+	Driver				| Binding file
+	--------------------------------|---------------------------------------
+	Marvell A37x0 Pinctrl driver	| pinctrl/marvell,armada-3700-pinctrl.txt
+	Marvell Neta Ethernet controller| net/marvell-armada-370-neta.txt
+	Marvell A37x0 i2c driver	| i2c/i2c-pxa.txt
+	Marvell A37x0 SPI driver	| spi/spi-armada-3700.txt
 
 A39x
 ----
-	- Marvell A39x Pinctrl driver
-	  Binding: pinctrl/marvell,armada-39x-pinctrl.txt
-
-	- Marvell PP3 Ethernet controller
-	  Binding: net/marvell-pp3-platform.txt
-
-	- Marvell SPI driver
-	  Binding: spi/spi-orion.txt
-
-	- Marvell I2c driver
-	  Binding: i2c/i2c-mv64xxx.txt
+	Driver				| Binding file
+	--------------------------------|---------------------------------------
+	Marvell A39x Pinctrl driver	| pinctrl/marvell,armada-39x-pinctrl.txt
+	Marvell PP3 Ethernet controller	| net/marvell-pp3-platform.txt
+	Marvell SPI driver		| spi/spi-orion.txt
+	Marvell I2c driver		| i2c/i2c-mv64xxx.txt
 
 A38x
 ----
-	- Marvell A38x Pinctrl driver
-	  Binding: pinctrl/marvell,armada-38x-pinctrl.txt
-
-	- Marvell Telephony driver
-	  Binding: telephony/mvebu-phone.txt
-
-	- Marvell Neta Ethernet controller
-	  marvell-armada-370-neta.txt
-
-	- Marvell SPI driver
-	  Binding: spi/spi-orion.txt
-
-	- Marvell I2c driver
-	  Binding: i2c/i2c-mv64xxx.txt
+	Driver				| Binding file
+	--------------------------------|---------------------------------------
+	Marvell A38x Pinctrl driver	| pinctrl/marvell,armada-38x-pinctrl.txt
+	Marvell Telephony driver	| telephony/mvebu-phone.txt
+	Marvell Neta Ethernet controller| marvell-armada-370-neta.txt
+	Marvell SPI driver		| spi/spi-orion.txt
+	Marvell I2c driver		| i2c/i2c-mv64xxx.txt
