@@ -510,7 +510,7 @@ err_unroll_pools:
 
 static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 {
-	int i, err;
+	int i, err, cpu;
 	u8 first_pool = mv_pp2x_first_pool_get(priv);
 	u8 num_pools = MVPP2_BM_SWF_NUM_POOLS;
 
@@ -527,6 +527,17 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 				      GFP_KERNEL);
 	if (!priv->bm_pools)
 		return -ENOMEM;
+
+	/* On PPV22 high virtual and physical address buffer manager register should be
+	 * initialized to 0 to avoid writing to the random addresses an 32 Bit systems.
+	 */
+	if (priv->pp2_version == PPV22) {
+		for_each_online_cpu(cpu) {
+			/* Reset the BM virtual and physical address high register */
+			mv_pp2x_relaxed_write(&priv->hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
+					      0, cpu);
+		}
+	}
 
 	err = mv_pp2x_bm_pools_init(pdev, priv, first_pool, num_pools);
 	if (err < 0)
