@@ -2913,6 +2913,21 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 #ifdef MVPP2_VERBOSE
 		mv_pp2x_skb_dump(skb, tx_desc->data_size, 4);
 #endif
+	/* Mandatory tx_desc fields are always initialized, but
+	 * service-specific fields are NOT cleared => old tx_desc impacts
+	 * new TX by irrelevant data inside. Clear these fields before usage.
+	 * The clear shold be done in an asm-optimized way.
+	 * Bit-field and Byte access generates in assembler some additional asm commands.
+	 * But Write32bitZero only to required fields is most effective.
+	 */
+#ifdef CONFIG_MV_PTP_SERVICE
+	/* Clearing the following fields:
+	 * u32[2]: 0x08: L4iChk , DSATTag, DP, GEM_port_id/PTP_Descriptor[11:0]
+	 * u32[5]: 0x14: Buffer_physical_pointer ,PTP Descriptor
+	 */
+	*((u32 *)tx_desc + 2) = 0;
+	*((u32 *)tx_desc + 5) = 0;
+#endif
 
 	buf_phys_addr = dma_map_single(dev->dev.parent, skb->data,
 				       tx_desc->data_size, DMA_TO_DEVICE);
