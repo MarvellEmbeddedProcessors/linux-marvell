@@ -214,17 +214,19 @@ static inline int mv_pp2x_txq_free_count(struct mv_pp2x_txq_pcpu *txq_pcpu)
 
 static void mv_pp2x_txq_inc_get(struct mv_pp2x_txq_pcpu *txq_pcpu)
 {
-	txq_pcpu->txq_get_index++;
-	if (txq_pcpu->txq_get_index == txq_pcpu->size)
+	if (txq_pcpu->txq_get_index == txq_pcpu->size - 1)
 		txq_pcpu->txq_get_index = 0;
+	else
+		txq_pcpu->txq_get_index++;
 }
 
 void mv_pp2x_txq_inc_error(struct mv_pp2x_txq_pcpu *txq_pcpu, int num)
 {
 	for (; num > 0; num--) {
-		txq_pcpu->txq_put_index--;
-		if (txq_pcpu->txq_put_index < 0)
+		if (txq_pcpu->txq_put_index < 1)
 			txq_pcpu->txq_put_index = txq_pcpu->size - 1;
+		else
+			txq_pcpu->txq_put_index--;
 		txq_pcpu->tx_skb[txq_pcpu->txq_put_index] = 0;
 		txq_pcpu->data_size[txq_pcpu->txq_put_index] = 0;
 		txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] = 0;
@@ -240,9 +242,10 @@ void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
 	txq_pcpu->data_size[txq_pcpu->txq_put_index] = tx_desc->data_size;
 	txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] =
 				mv_pp2x_txdesc_phys_addr_get(pp2_ver, tx_desc);
-	txq_pcpu->txq_put_index++;
-	if (txq_pcpu->txq_put_index == txq_pcpu->size)
+	if (txq_pcpu->txq_put_index == txq_pcpu->size - 1)
 		txq_pcpu->txq_put_index = 0;
+	else
+		txq_pcpu->txq_put_index++;
 #if defined(__BIG_ENDIAN)
 	if (pp2_ver == PPV21)
 		mv_pp21_tx_desc_swap(tx_desc);
@@ -950,23 +953,21 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 		uintptr_t skb = (uintptr_t)txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
 		int data_size = txq_pcpu->data_size[txq_pcpu->txq_get_index];
 
-		mv_pp2x_txq_inc_get(txq_pcpu);
-
 		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
 				 data_size, DMA_TO_DEVICE);
 
 		if (skb & MVPP2_ETH_SHADOW_EXT) {
 			skb &= ~MVPP2_ETH_SHADOW_EXT;
 			mv_pp2_extra_pool_put(port, (void *)skb);
+			mv_pp2x_txq_inc_get(txq_pcpu);
 			continue;
 		}
 
-		if (!skb)
-			continue;
 		if (skb & MVPP2_ETH_SHADOW_SKB) {
 			skb &= ~MVPP2_ETH_SHADOW_SKB;
 			dev_kfree_skb_any((struct sk_buff *)skb);
 		}
+		mv_pp2x_txq_inc_get(txq_pcpu);
 	}
 }
 
