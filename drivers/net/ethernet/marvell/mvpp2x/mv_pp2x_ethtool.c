@@ -70,7 +70,7 @@ static const char mv_pp2x_gstrings_stats[][ETH_GSTRING_LEN] = {
 };
 
 int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
-					struct mv_port_link_status *pstatus)
+				     struct mv_port_link_status *pstatus)
 {
 	switch (cmd->duplex) {
 	case DUPLEX_FULL:
@@ -80,9 +80,9 @@ int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
 		pstatus->duplex = MV_PORT_DUPLEX_HALF;
 		break;
 	case DUPLEX_UNKNOWN:
-		if (cmd->speed == SPEED_1000)
+		if (cmd->speed == SPEED_1000) {
 			pstatus->duplex = MV_PORT_DUPLEX_FULL;
-		else {
+		} else {
 			pstatus->duplex = MV_PORT_DUPLEX_FULL;
 			pr_err("Unknown duplex configuration, full duplex set\n");
 		}
@@ -112,9 +112,8 @@ int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
 }
 
 int mv_pp2x_autoneg_gmac_check_valid(struct mv_mac_data *mac, struct gop_hw *gop,
-			struct ethtool_cmd *cmd, struct mv_port_link_status *pstatus)
+				     struct ethtool_cmd *cmd, struct mv_port_link_status *pstatus)
 {
-
 	int port_num = mac->gop_index;
 	int err;
 
@@ -137,7 +136,6 @@ int mv_pp2x_autoneg_gmac_check_valid(struct mv_mac_data *mac, struct gop_hw *gop
 
 int mv_pp2x_autoneg_xlg_check_valid(struct mv_mac_data *mac, struct ethtool_cmd *cmd)
 {
-
 	int port_num = mac->gop_index;
 
 	if (cmd->autoneg) {
@@ -149,30 +147,30 @@ int mv_pp2x_autoneg_xlg_check_valid(struct mv_mac_data *mac, struct ethtool_cmd 
 }
 
 void mv_pp2x_ethtool_valid_coalesce(struct ethtool_coalesce *c,
-				struct mv_pp2x_port *port)
+				    struct mv_pp2x_port *port)
 {
 	u64 val;
 
 	if (c->rx_max_coalesced_frames > MVPP2_MAX_OCCUPIED_THRESH)
 		pr_err("RX coalesced frames value too high, rounded to %d\n",
-			MVPP2_MAX_OCCUPIED_THRESH);
+		       MVPP2_MAX_OCCUPIED_THRESH);
 
 	if (c->tx_max_coalesced_frames > MVPP2_MAX_TRANSMITTED_THRESH) {
 		pr_err("TX coalesced frames value too high, rounded to %d\n",
-			MVPP2_MAX_TRANSMITTED_THRESH);
+		       MVPP2_MAX_TRANSMITTED_THRESH);
 		c->tx_max_coalesced_frames = MVPP2_MAX_TRANSMITTED_THRESH;
 	}
 
 	val = (port->priv->hw.tclk / USEC_PER_SEC) * c->rx_coalesce_usecs;
 	if (val > MVPP2_MAX_ISR_RX_THRESHOLD)
 		pr_err("RX coalesced time value too high, rounded to %ld usecs\n",
-			(MVPP2_MAX_ISR_RX_THRESHOLD * USEC_PER_SEC)
+		       (MVPP2_MAX_ISR_RX_THRESHOLD * USEC_PER_SEC)
 			/ port->priv->hw.tclk);
 
 	val = (port->priv->hw.tclk / USEC_PER_SEC) * c->tx_coalesce_usecs;
 	if (val > MVPP22_MAX_ISR_TX_THRESHOLD) {
 		pr_err("TX coalesced time value too high, rounded to %ld usecs\n",
-			(MVPP22_MAX_ISR_TX_THRESHOLD * USEC_PER_SEC)
+		       (MVPP22_MAX_ISR_TX_THRESHOLD * USEC_PER_SEC)
 			/ port->priv->hw.tclk);
 		c->tx_coalesce_usecs =
 			(MVPP22_MAX_ISR_TX_THRESHOLD * USEC_PER_SEC)
@@ -184,9 +182,8 @@ void mv_pp2x_ethtool_valid_coalesce(struct ethtool_coalesce *c,
 
 /* Ethtool statistic */
 static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
-	struct ethtool_stats *stats, u64 *data)
+					       struct ethtool_stats *stats, u64 *data)
 {
-
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_mac_data *mac = &port->mac_data;
 	struct gop_hw *gop = &port->priv->hw.gop;
@@ -224,13 +221,11 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 	data[i++] = gop_statistics->tx_crc_sent;
 	data[i++] = gop_statistics->collision;
 	data[i++] = gop_statistics->late_collision;
-
 }
 
 static void mv_pp2x_eth_tool_get_strings(struct net_device *dev,
-					u32 stringset, u8 *data)
+					 u32 stringset, u8 *data)
 {
-
 	switch (stringset) {
 	case ETH_SS_TEST:
 		memcpy(data, *mv_pp2x_gstrings_test, sizeof(mv_pp2x_gstrings_test));
@@ -241,12 +236,10 @@ static void mv_pp2x_eth_tool_get_strings(struct net_device *dev,
 	default:
 		break;
 		}
-
 }
 
 static int mv_pp2x_eth_tool_get_sset_count(struct net_device *dev, int sset)
 {
-
 	switch (sset) {
 	case ETH_SS_TEST:
 		return MV_PP2_TEST_LEN;
@@ -255,7 +248,6 @@ static int mv_pp2x_eth_tool_get_sset_count(struct net_device *dev, int sset)
 	default:
 		return -EOPNOTSUPP;
 	}
-
 }
 
 /* Restart autonegotiation function */
@@ -303,7 +295,7 @@ int mv_pp2x_eth_tool_nway_reset(struct net_device *dev)
 
 /* Get pause fc settings for ethtools */
 static void mv_pp2x_get_pauseparam(struct net_device *dev,
-					struct ethtool_pauseparam *pause)
+				   struct ethtool_pauseparam *pause)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_port_link_status status;
@@ -352,7 +344,7 @@ static void mv_pp2x_get_pauseparam(struct net_device *dev,
 
 /* Set pause fc settings for ethtools */
 static int mv_pp2x_set_pauseparam(struct net_device *dev,
-					struct ethtool_pauseparam *pause)
+				  struct ethtool_pauseparam *pause)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_mac_data *mac = &port->mac_data;
@@ -425,9 +417,9 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 		else
 			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_RX_DISABLE);
 
-		if (pause->tx_pause)
+		if (pause->tx_pause) {
 			mv_gop110_fca_tx_enable(gop, gop_port, false);
-		else	{
+		} else	{
 			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_TX_DISABLE);
 			mv_gop110_fca_tx_enable(gop, gop_port, true);
 			}
@@ -463,7 +455,7 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 		mv_gop110_port_link_status(&port->priv->hw.gop,
 					   &port->mac_data, &status);
 
-		if (status.linkup == true) {
+		if (status.linkup) {
 			switch (status.speed) {
 			case MV_PORT_SPEED_10000:
 				cmd->speed = SPEED_10000;
@@ -521,7 +513,7 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 
 			/* check if speed and duplex are AN */
 			if (mv_gop110_port_autoneg_status(&port->priv->hw.gop,
-					   &port->mac_data)) {
+							  &port->mac_data)) {
 				cmd->autoneg = AUTONEG_ENABLE;
 			} else {
 				cmd->autoneg = AUTONEG_DISABLE;
@@ -535,9 +527,8 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 }
 
 void mv_pp2x_ethtool_set_gmac_config(struct mv_port_link_status status, struct gop_hw *gop,
-			int gop_port, struct mv_mac_data *mac, struct ethtool_cmd *cmd)
+				     int gop_port, struct mv_mac_data *mac, struct ethtool_cmd *cmd)
 {
-
 	mv_gop110_force_link_mode_set(gop, mac, false, true);
 	mv_gop110_gmac_set_autoneg(gop, mac, cmd->autoneg);
 	if (cmd->autoneg)
@@ -549,24 +540,22 @@ void mv_pp2x_ethtool_set_gmac_config(struct mv_port_link_status status, struct g
 
 int mv_pp2x_get_new_comphy_mode(struct ethtool_cmd *cmd, int port_id)
 {
-
 	if (cmd->speed == SPEED_10000 && port_id == 0)
 		return COMPHY_DEF(COMPHY_SFI_MODE, port_id);
 	else if (cmd->speed == SPEED_2500)
 		return COMPHY_DEF(COMPHY_HS_SGMII_MODE, port_id);
 	else if (cmd->speed == SPEED_1000 || cmd->speed == SPEED_100 ||
-			cmd->speed == SPEED_10)
+		 cmd->speed == SPEED_10)
 		return COMPHY_DEF(COMPHY_SGMII_MODE, port_id);
 	else
 		return -EINVAL;
-
 }
 
 void mv_pp2x_set_new_phy_mode(struct ethtool_cmd *cmd, struct mv_mac_data *mac)
 {
-	if (cmd->speed == SPEED_10000)
+	if (cmd->speed == SPEED_10000) {
 		mac->phy_mode = PHY_INTERFACE_MODE_SFI;
-	else if (cmd->speed == SPEED_2500) {
+	} else if (cmd->speed == SPEED_2500) {
 		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
 		mac->speed = SPEED_2500;
 		mac->flags |= MV_EMAC_F_SGMII2_5;
@@ -576,7 +565,6 @@ void mv_pp2x_set_new_phy_mode(struct ethtool_cmd *cmd, struct mv_mac_data *mac)
 		mac->flags &= ~MV_EMAC_F_SGMII2_5;
 	}
 }
-
 
 /* Set settings (phy address, speed) for ethtools */
 static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
@@ -715,7 +703,7 @@ static int mv_pp2x_ethtool_set_coalesce(struct net_device *dev,
 
 		txq->pkts_coal = c->tx_max_coalesced_frames;
 	}
-	if (port->priv->pp2xdata->interrupt_tx_done == true) {
+	if (port->priv->pp2xdata->interrupt_tx_done) {
 		mv_pp2x_tx_done_time_coal_set(port, port->tx_time_coal);
 		on_each_cpu(mv_pp2x_tx_done_pkts_coal_set, port, 1);
 	}
@@ -884,7 +872,7 @@ static int mv_pp2x_ethtool_get_rxnfc(struct net_device *dev,
 }
 
 static int mv_pp2x_set_rss_hash_opt(struct mv_pp2x_port *port,
-				struct ethtool_rxnfc *nfc)
+				    struct ethtool_rxnfc *nfc)
 {
 	if (nfc->data & ~(RXH_IP_SRC | RXH_IP_DST |
 			  RXH_L4_B_0_1 | RXH_L4_B_2_3))
@@ -943,7 +931,6 @@ static int mv_pp2x_ethtool_set_rxnfc(struct net_device *dev, struct ethtool_rxnf
 
 	return ret;
 }
-
 
 static int mv_pp2x_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 				    u8 *hfunc)
@@ -1076,7 +1063,7 @@ static u64 mv_pp2x_eth_tool_link_test(struct mv_pp2x_port *port)
 	pr_info("Link testing starting\n");
 
 	mv_gop110_port_link_status(&port->priv->hw.gop,
-					&port->mac_data, &status);
+				   &port->mac_data, &status);
 
 	if (status.linkup)
 		return 0;
@@ -1098,7 +1085,7 @@ static bool mv_pp2x_reg_pattern_test(void *reg, u32 offset, u32 mask, u32 write)
 		read = mv_gop_gen_read(reg, offset);
 		if (read != (write & test[i] & mask)) {
 			pr_err("pattern test reg %p(test 0x%08X write 0x%08X mask 0x%08X) failed: ",
-			      reg, test[i], write, mask);
+			       reg, test[i], write, mask);
 			pr_err("got 0x%08X expected 0x%08X\n", read, (write & test[i] & mask));
 			mv_gop_gen_write(reg, offset, old);
 			return true;
@@ -1173,7 +1160,7 @@ static u64 mv_pp2x_eth_tool_reg_test(struct mv_pp2x_port *port)
 }
 
 static void mv_pp2x_eth_tool_diag_test(struct net_device *netdev,
-	struct ethtool_test *test, u64 *data)
+				       struct ethtool_test *test, u64 *data)
 {
 	struct mv_pp2x_port *port = netdev_priv(netdev);
 	int i;

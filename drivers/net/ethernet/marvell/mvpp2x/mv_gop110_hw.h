@@ -245,14 +245,14 @@ static inline u32 mv_gop110_xlg_mac_read(struct gop_hw *gop, int mac_num,
 					 u32 offset)
 {
 	return(mv_gop_gen_read(gop->gop_110.xlg_mac.base,
-	       mac_num * gop->gop_110.xlg_mac.obj_size + offset));
+			       mac_num * gop->gop_110.xlg_mac.obj_size + offset));
 }
 
 static inline void mv_gop110_xlg_mac_write(struct gop_hw *gop, int mac_num,
 					   u32 offset, u32 data)
 {
 	mv_gop_gen_write(gop->gop_110.xlg_mac.base,
-		mac_num * gop->gop_110.xlg_mac.obj_size + offset, data);
+			 mac_num * gop->gop_110.xlg_mac.obj_size + offset, data);
 }
 
 static inline void mv_gop110_xlg_mac_print(struct gop_hw *gop, char *reg_name,
@@ -267,7 +267,7 @@ static inline u32 mv_gop110_xmib_mac_read(struct gop_hw *gop, int mac_num,
 					  u32 offset)
 {
 	return(mv_gop_gen_read(gop->gop_110.xmib.base,
-	       mac_num * gop->gop_110.xmib.obj_size + offset));
+			       mac_num * gop->gop_110.xmib.obj_size + offset));
 }
 
 static inline void mv_gop110_xmib_mac_write(struct gop_hw *gop, int mac_num,
@@ -330,7 +330,7 @@ static inline u32 mv_gop110_gmac_read(struct gop_hw *gop, int mac_num,
 				      u32 offset)
 {
 	return(mv_gop_gen_read(gop->gop_110.gmac.base,
-	       mac_num * gop->gop_110.gmac.obj_size + offset));
+			       mac_num * gop->gop_110.gmac.obj_size + offset));
 }
 
 static inline void mv_gop110_gmac_write(struct gop_hw *gop, int mac_num,
@@ -411,13 +411,15 @@ static inline u32 mv_gop110_rfu1_read(struct gop_hw *gop, u32 offset)
 {
 	return mv_gop_gen_read(gop->gop_110.rfu1_base, offset);
 }
+
 static inline void mv_gop110_rfu1_write(struct gop_hw *gop, u32 offset,
-		u32 data)
+					u32 data)
 {
 	mv_gop_gen_write(gop->gop_110.rfu1_base, offset, data);
 }
+
 static inline void mv_gop110_rfu1_print(struct gop_hw *gop, char *reg_name,
-		u32 reg)
+					u32 reg)
 {
 	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg,
 		mv_gop110_rfu1_read(gop, reg));
