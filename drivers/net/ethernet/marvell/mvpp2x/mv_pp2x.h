@@ -83,7 +83,6 @@
 
 #define SRAM_BIT_TO_BYTE(_bit_) HW_BYTE_OFFS((_bit_) / 8)
 
-
 #define TCAM_DATA_BYTE_OFFS_LE(_offs_)		(((_offs_) - \
 	((_offs_) % 2)) * 2 + ((_offs_) % 2))
 #define TCAM_DATA_MASK_OFFS_LE(_offs_) (((_offs_) * 2) - ((_offs_) % 2)  + 2)
@@ -105,16 +104,14 @@
 #define __FILENAME__ (strrchr(__FILE__, '/') ? \
 	strrchr(__FILE__, '/') + 1 : __FILE__)
 
-
 #ifdef MVPP2_VERBOSE
 #define MVPP2_PRINT_LINE() \
 	pr_info("Passed: %s(%d)\n", __func__, __LINE__)
 
 #define MVPP2_PRINT_VAR(var) \
-	pr_info("%s(%d): "#var"=0x%lx\n", __func__, __LINE__,\
-		(u64)var)
+	pr_info("%s (%d): " #var "=0x%lx\n", __func__, __LINE__, (u64)var)
 #define MVPP2_PRINT_VAR_NAME(var, name) \
-	pr_info("%s(%d): %s=0x%lx\n", __func__, __LINE__, name, var)
+	pr_info("%s (%d): %s = 0x%lx\n", __func__, __LINE__, name, var)
 #else
 #define MVPP2_PRINT_LINE()
 #define MVPP2_PRINT_VAR(var)
@@ -159,7 +156,6 @@
 #define RX_TOTAL_SIZE(buf_size)		((buf_size) + MV_ETH_SKB_SHINFO_SIZE)
 #define RX_TRUE_SIZE(total_size)	roundup_pow_of_two(total_size)
 extern  u32 debug_param;
-
 
 /* Convert cpu_id to sw_thread_id */
 #define QV_THR_2_CPU(sw_thread_id)	(sw_thread_id - first_addr_space)
@@ -269,11 +265,10 @@ struct mv_mac_data {
 #define MV_EMAC_F_SGMII2_5_BIT	2
 #define MV_EMAC_F_PORT_UP_BIT	3
 
-#define MV_EMAC_F_LINK_UP	(1 << MV_EMAC_F_LINK_UP_BIT)
-#define MV_EMAC_F_INIT		(1 << MV_EMAC_F_INIT_BIT)
-#define MV_EMAC_F_SGMII2_5	(1 << MV_EMAC_F_SGMII2_5_BIT)
-#define MV_EMAC_F_PORT_UP	(1 << MV_EMAC_F_PORT_UP_BIT)
-
+#define MV_EMAC_F_LINK_UP	BIT(MV_EMAC_F_LINK_UP_BIT)
+#define MV_EMAC_F_INIT		BIT(MV_EMAC_F_INIT_BIT)
+#define MV_EMAC_F_SGMII2_5	BIT(MV_EMAC_F_SGMII2_5_BIT)
+#define MV_EMAC_F_PORT_UP	BIT(MV_EMAC_F_PORT_UP_BIT)
 
 #define MVPP2_NO_LINK_IRQ	0
 
@@ -777,11 +772,11 @@ struct mv_pp2x_pool_attributes {
 char *mv_pp2x_pool_description_get(enum mv_pp2x_bm_pool_log_num  log_id);
 
 void mv_pp2x_bm_bufs_free(struct device *dev, struct mv_pp2x *priv,
-			struct mv_pp2x_bm_pool *bm_pool, int buf_num);
+			  struct mv_pp2x_bm_pool *bm_pool, int buf_num);
 int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 			struct mv_pp2x_bm_pool *bm_pool, int buf_num);
 int mv_pp2x_bm_pool_ext_add(struct device *dev, struct mv_pp2x *priv,
-			u32 *pool_num, u32 pkt_size);
+			    u32 *pool_num, u32 pkt_size);
 int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
 			    struct mv_pp2x_bm_pool *bm_pool);
 int mv_pp2x_swf_bm_pool_assign(struct mv_pp2x_port *port, u32 rxq,
