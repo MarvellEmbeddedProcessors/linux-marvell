@@ -1847,7 +1847,6 @@
 #define MV_MIB_COLLISION			0x78
 #define MV_MIB_LATE_COLLISION			0x7c
 
-
 /******************************************************************************/
 /* System Soft Reset 1 */
 #define MV_GOP_SOFT_RESET_1_REG		0x8

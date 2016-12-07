@@ -40,7 +40,6 @@ void mv_gop110_register_bases_dump(struct gop_hw *gop)
 	pr_info("  %-32s: 0x%p\n", "XPCS", gop->gop_110.xpcs_base);
 	pr_info("  %-32s: 0x%p\n", "PTP", gop->gop_110.ptp.base);
 	pr_info("  %-32s: 0x%p\n", "RFU1", gop->gop_110.rfu1_base);
-
 }
 EXPORT_SYMBOL(mv_gop110_register_bases_dump);
 
@@ -494,9 +493,9 @@ int mv_gop110_gmac_link_status(struct gop_hw *gop, int mac_num,
 			pstatus->autoneg_fc = MV_PORT_FC_AN_ASYM;
 		else
 			pstatus->autoneg_fc = MV_PORT_FC_AN_SYM;
-		}
-	else
+	} else {
 		pstatus->autoneg_fc = MV_PORT_FC_AN_NO;
+	}
 
 	return 0;
 }
@@ -1195,7 +1194,7 @@ bool mv_gop110_port_autoneg_status(struct gop_hw *gop, struct mv_mac_data *mac)
 		reg_val = mv_gop110_gmac_read(gop, mac->gop_index, MV_GMAC_PORT_AUTO_NEG_CFG_REG);
 
 		if (reg_val & MV_GMAC_PORT_AUTO_NEG_CFG_EN_FDX_AN_OFFS &&
-			reg_val & MV_GMAC_PORT_AUTO_NEG_CFG_EN_AN_SPEED_MASK)
+		    reg_val & MV_GMAC_PORT_AUTO_NEG_CFG_EN_AN_SPEED_MASK)
 			return true;
 		else
 			return false;
@@ -1216,7 +1215,7 @@ void mv_gop110_gmac_set_autoneg(struct gop_hw *gop, struct mv_mac_data *mac, boo
 	int mac_num = mac->gop_index;
 
 	reg_val = mv_gop110_gmac_read(gop, mac_num,
-				MV_GMAC_PORT_AUTO_NEG_CFG_REG);
+				      MV_GMAC_PORT_AUTO_NEG_CFG_REG);
 
 	if (auto_neg) {
 		reg_val |= MV_GMAC_PORT_AUTO_NEG_CFG_EN_AN_SPEED_MASK;
@@ -1229,9 +1228,8 @@ void mv_gop110_gmac_set_autoneg(struct gop_hw *gop, struct mv_mac_data *mac, boo
 		}
 
 	mv_gop110_gmac_write(gop, mac_num,
-				MV_GMAC_PORT_AUTO_NEG_CFG_REG, reg_val);
+			     MV_GMAC_PORT_AUTO_NEG_CFG_REG, reg_val);
 }
-
 
 int mv_gop110_port_regs(struct gop_hw *gop, struct mv_mac_data *mac)
 {
@@ -2355,12 +2353,12 @@ int mv_gop110_mpcs_mode(struct gop_hw *gop)
 	reg_addr = PCS_CLOCK_RESET;
 	val = mv_gop110_mpcs_global_read(gop, reg_addr);
 	U32_SET_FIELD(val, CLK_DIVISION_RATIO_MASK,
-			1 << CLK_DIVISION_RATIO_OFFSET);
+		      1 << CLK_DIVISION_RATIO_OFFSET);
 
 	mv_gop110_mpcs_global_write(gop, reg_addr, val);
 
 	U32_SET_FIELD(val, CLK_DIV_PHASE_SET_MASK,
-			0 << CLK_DIV_PHASE_SET_OFFSET);
+		      0 << CLK_DIV_PHASE_SET_OFFSET);
 	U32_SET_FIELD(val, MAC_CLK_RESET_MASK, 1 << MAC_CLK_RESET_OFFSET);
 	U32_SET_FIELD(val, RX_SD_CLK_RESET_MASK, 1 << RX_SD_CLK_RESET_OFFSET);
 	U32_SET_FIELD(val, TX_SD_CLK_RESET_MASK, 1 << TX_SD_CLK_RESET_OFFSET);
@@ -2389,7 +2387,6 @@ void mv_gop110_mpcs_clock_reset(struct gop_hw *gop, enum mv_reset reset)
 
 	mv_gop110_mpcs_global_write(gop, reg_addr, val);
 }
-
 
 u64 mv_gop110_mib_read64(struct gop_hw *gop, int port, unsigned int offset)
 {
@@ -2486,7 +2483,6 @@ EXPORT_SYMBOL(mv_gop110_mib_counters_show);
 
 void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop_stat *gop_statistics)
 {
-
 	u64 val;
 
 	gop_statistics->rx_byte += mv_gop110_mib_read64(gop, port,
@@ -2564,7 +2560,6 @@ void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop
 							MV_MIB_LATE_COLLISION);
 }
 
-
 void mv_gop110_netc_active_port(struct gop_hw *gop, u32 port, u32 val)
 {
 	u32 reg;
@@ -2625,8 +2620,6 @@ static void mv_gop110_netc_rxaui1_enable(struct gop_hw *gop, u32 port, u32 val)
 	mv_gop110_rfu1_write(gop, SD1_CONTROL_1_REG, reg);
 }
 
-
-
 static void mv_gop110_netc_mii_mode(struct gop_hw *gop, u32 port, u32 val)
 {
 	u32 reg;
@@ -2641,8 +2634,6 @@ static void mv_gop110_netc_mii_mode(struct gop_hw *gop, u32 port, u32 val)
 
 	mv_gop110_rfu1_write(gop, MV_NETCOMP_CONTROL_0, reg);
 }
-
-
 
 static void mv_gop110_netc_gop_reset(struct gop_hw *gop, u32 val)
 {
@@ -2690,7 +2681,7 @@ static void mv_gop110_netc_port_rf_reset(struct gop_hw *gop, u32 port, u32 val)
 }
 
 static void mv_gop110_netc_gbe_sgmii_mode_select(struct gop_hw *gop, u32 port,
-						u32 val)
+						 u32 val)
 {
 	u32 reg, mask, offset;
 
@@ -2751,7 +2742,7 @@ static void mv_gop110_netc_mac_to_xgmii(struct gop_hw *gop, u32 port,
 		mv_gop110_netc_bus_width_select(gop, 1);
 		/* Select RGMII mode */
 		mv_gop110_netc_gbe_sgmii_mode_select(gop, port,
-							MV_NETC_GBE_XMII);
+						     MV_NETC_GBE_XMII);
 		break;
 	case MV_NETC_SECOND_PHASE:
 		/* De-assert the relevant port HB reset */
@@ -2770,7 +2761,7 @@ static void mv_gop110_netc_mac_to_sgmii(struct gop_hw *gop, u32 port,
 		/* Select SGMII mode */
 		if (port >= 1)
 			mv_gop110_netc_gbe_sgmii_mode_select(gop, port,
-			MV_NETC_GBE_SGMII);
+							     MV_NETC_GBE_SGMII);
 
 		/* Configure the sample stages */
 		mv_gop110_netc_sample_stages_timing(gop, 0);
@@ -2808,7 +2799,7 @@ static void mv_gop110_netc_mac_to_rxaui(struct gop_hw *gop, u32 port,
 }
 
 static void mv_gop110_netc_mac_to_xaui(struct gop_hw *gop, u32 port,
-					enum mv_netc_phase phase)
+				       enum mv_netc_phase phase)
 {
 	switch (phase) {
 	case MV_NETC_FIRST_PHASE:
@@ -2821,7 +2812,6 @@ static void mv_gop110_netc_mac_to_xaui(struct gop_hw *gop, u32 port,
 		break;
 	}
 }
-
 
 int mv_gop110_netc_init(struct gop_hw *gop,
 			u32 net_comp_config, enum mv_netc_phase phase)
@@ -2841,9 +2831,9 @@ int mv_gop110_netc_init(struct gop_hw *gop,
 		mv_gop110_netc_mac_to_sgmii(gop, 2, phase);
 	else
 		mv_gop110_netc_mac_to_xgmii(gop, 2, phase);
-	if (c & MV_NETC_GE_MAC3_SGMII)
+	if (c & MV_NETC_GE_MAC3_SGMII) {
 		mv_gop110_netc_mac_to_sgmii(gop, 3, phase);
-	else {
+	} else {
 		mv_gop110_netc_mac_to_xgmii(gop, 3, phase);
 		if (c & MV_NETC_GE_MAC3_RGMII)
 			mv_gop110_netc_mii_mode(gop, 3, MV_NETC_GBE_RGMII);
@@ -2867,7 +2857,6 @@ int mv_gop110_netc_init(struct gop_hw *gop,
 
 void mv_gop110_netc_xon_set(struct gop_hw *gop, enum mv_gop_port port, bool en)
 {
-
 	u32 reg;
 
 	reg = mv_gop110_rfu1_read(gop, MV_NETCOMP_PORTS_CONTROL_0);
@@ -2891,7 +2880,6 @@ void mv_gop110_netc_xon_set(struct gop_hw *gop, enum mv_gop_port port, bool en)
 	}
 
 	mv_gop110_rfu1_write(gop, MV_NETCOMP_PORTS_CONTROL_0, reg);
-
 }
 EXPORT_SYMBOL(mv_gop110_netc_xon_set);
 
@@ -2902,9 +2890,9 @@ void mv_gop110_fca_send_periodic(struct gop_hw *gop, int mac_num, bool en)
 	val = mv_gop110_fca_read(gop, mac_num, FCA_CONTROL_REG);
 
 	U32_SET_FIELD(val, FCA_PORT_TYPE_MASK,
-			      FCA_PORT_TYPE_B << FCA_PORT_TYPE_OFFSET);
+		      FCA_PORT_TYPE_B << FCA_PORT_TYPE_OFFSET);
 	U32_SET_FIELD(val, FCA_SEND_PERIODIC_MASK,
-			      en << FCA_SEND_PERIODIC_OFFSET);
+		      en << FCA_SEND_PERIODIC_OFFSET);
 	mv_gop110_fca_write(gop, mac_num, FCA_CONTROL_REG, val);
 }
 
@@ -2915,7 +2903,7 @@ void mv_gop110_fca_enable_periodic(struct gop_hw *gop, int mac_num, bool en)
 	val = mv_gop110_fca_read(gop, mac_num, FCA_CONTROL_REG);
 
 	U32_SET_FIELD(val, FCA_ENABLE_PERIODIC_MASK,
-			      en << FCA_ENABLE_PERIODIC_OFFSET);
+		      en << FCA_ENABLE_PERIODIC_OFFSET);
 	mv_gop110_fca_write(gop, mac_num, FCA_CONTROL_REG, val);
 }
 
@@ -2949,12 +2937,11 @@ void mv_gop110_fca_tx_enable(struct gop_hw *gop, int mac_num, bool en)
 	val = mv_gop110_fca_read(gop, mac_num, FCA_CONTROL_REG);
 
 	U32_SET_FIELD(val, FCA_PORT_TYPE_MASK,
-			      FCA_PORT_TYPE_B << FCA_PORT_TYPE_OFFSET);
+		      FCA_PORT_TYPE_B << FCA_PORT_TYPE_OFFSET);
 	U32_SET_FIELD(val, FCA_BYPASS_MASK,
-			      en << FCA_BYPASS_OFFSET);
+		      en << FCA_BYPASS_OFFSET);
 	mv_gop110_fca_write(gop, mac_num, FCA_CONTROL_REG, val);
 }
-
 
 bool mv_gop110_check_fca_tx_state(struct gop_hw *gop, int mac_num)
 {
