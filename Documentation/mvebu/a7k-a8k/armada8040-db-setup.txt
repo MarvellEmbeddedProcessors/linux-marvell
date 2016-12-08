@@ -19,6 +19,9 @@ To switch board configuration:
 Board Setup
 ------------
 
+For A8040 A1 revision SoC - Please use armada-8040-db-A configuration
+For A8040 A0 revision SoC - Please use armada-8040-db-router configuration
+
 ### setup A: armada-8040-db-A.dts  ###
 --------------------------------------
 
