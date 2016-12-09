@@ -815,9 +815,8 @@ static int a3700_spi_fifo_write(struct a3700_spi *a3700_spi)
 				val |= *status->tx_buf++ << (8 * i);
 				i++;
 				status->buf_len--;
-
-				spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
 			}
+			spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
 			break;
 		}
 
