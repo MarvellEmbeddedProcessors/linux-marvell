@@ -1,5 +1,5 @@
 /*
- * RTC driver for the Armada 38x Marvell SoCs
+ * RTC driver for the Armada 38x & A8K Marvell SoCs
  *
  * Copyright (C) 2015 Marvell
  *
@@ -20,15 +20,28 @@
 #include <linux/platform_device.h>
 #include <linux/rtc.h>
 
+#define RTC_IRQ1_CONF			0x4
+#define RTC_IRQ_AL_EN			BIT(0)
+#define RTC_IRQ_FREQ_EN			BIT(1)
+#define RTC_IRQ_FREQ_1HZ		BIT(2)
+#define RTC_TIME			0xC
+#define RTC_ALARM1			0x10
+
+/* armada38x Interrupt registers  */
 #define RTC_38X_STATUS			0x0
 #define RTC_38X_STATUS_ALARM1		BIT(0)
 #define RTC_38X_STATUS_ALARM2		BIT(1)
-#define RTC_IRQ1_CONF			0x4
-#define RTC_IRQ1_AL_EN			BIT(0)
-#define RTC_IRQ1_FREQ_EN		BIT(1)
-#define RTC_IRQ1_FREQ_1HZ		BIT(2)
-#define RTC_TIME			0xC
-#define RTC_ALARM1			0x10
+#define SOC_RTC_38X_INTERRUPT		0x8
+#define SOC_RTC_38X_ALARM1		BIT(0)
+#define SOC_RTC_38X_ALARM2		BIT(1)
+#define SOC_RTC_38X_ALARM1_MASK		BIT(2)
+#define SOC_RTC_38X_ALARM2_MASK		BIT(3)
+
+/* armada70x0 Interrupt registers  */
+#define RTC_70X0_STATUS			0x90
+#define RTC_70X0_ALARM_MASK		0x94
+#define RTC_70X0_ALARM1_MASK		BIT(1)
+#define RTC_70X0_ALARM2_MASK		BIT(0)
 
 /* armada38x SoC registers  */
 #define RTC_38X_BRIDGE_TIMING_CTRL_REG_OFFS		0x0
@@ -47,15 +60,16 @@
 #define RTC_70X0_READ_OUTPUT_DELAY_OFFS			0
 #define RTC_70X0_READ_OUTPUT_DELAY_MASK			(0xFFFF << RTC_70X0_READ_OUTPUT_DELAY_OFFS)
 
-
-#define SOC_RTC_38X_INTERRUPT		0x8
-#define SOC_RTC_38X_ALARM1		BIT(0)
-#define SOC_RTC_38X_ALARM2		BIT(1)
-#define SOC_RTC_38X_ALARM1_MASK		BIT(2)
-#define SOC_RTC_38X_ALARM2_MASK		BIT(3)
-
-
 #define SAMPLE_NR 100
+
+/* Armada-38x SoC supports alarm 1
+ * Armada-8K SoC sopports alarm 2 (though it has 2 alarm units, as
+ *				   alarm 1 interrupt is not connected)
+ */
+#define ALARM1	0
+#define ALARM2	1
+
+#define ALARM_REG(base, alarm)		(base + alarm * sizeof(u32))
 
 struct armada38x_rtc {
 	struct rtc_device   *rtc_dev;
@@ -67,6 +81,7 @@ struct armada38x_rtc {
 };
 
 struct armada38x_rtc_data {
+	int		active_alarm;		/* the alarm which is wired to the interrupt */
 	void (*update_mbus_timing)(struct armada38x_rtc *rtc); /* Initialize the RTC-MBUS bridge timing */
 	unsigned long (*read_rtc_reg)(struct armada38x_rtc *rtc, uint8_t rtc_reg);
 	void (*rtc_alarm_irq_ack)(struct armada38x_rtc *rtc);
@@ -180,6 +195,12 @@ static void armada38x_rtc_alarm_irq_ack(struct armada38x_rtc *rtc)
 	rtc_delayed_write(RTC_38X_STATUS_ALARM1, rtc, RTC_38X_STATUS);
 }
 
+static void armada70x0_rtc_alarm_irq_ack(struct armada38x_rtc *rtc)
+{
+	/* Only Alarm 2 is wired to ICU/GIC */
+	rtc_delayed_write(RTC_70X0_ALARM2_MASK, rtc, RTC_70X0_STATUS);
+}
+
 static void armada38x_rtc_mask_interrupt(struct armada38x_rtc *rtc)
 {
 	u32 val;
@@ -189,7 +210,17 @@ static void armada38x_rtc_mask_interrupt(struct armada38x_rtc *rtc)
 	rtc->regs_soc + SOC_RTC_38X_INTERRUPT);
 }
 
+static void armada70x0_rtc_mask_interrupt(struct armada38x_rtc *rtc)
+{
+	u32 val;
+
+	val = rtc->data->read_rtc_reg(rtc, RTC_70X0_ALARM_MASK);
+	/* Only Alarm 2 is wired to ICU/GIC */
+	writel(val | RTC_70X0_ALARM2_MASK, rtc->regs + RTC_70X0_ALARM_MASK);
+}
+
 static const struct armada38x_rtc_data armada38x_data = {
+	.active_alarm = ALARM1,
 	.update_mbus_timing = rtc_update_38x_mbus_timing_params,
 	.read_rtc_reg = read_rtc_38x_reg_wa,
 	.rtc_alarm_irq_ack = armada38x_rtc_alarm_irq_ack,
@@ -197,10 +228,11 @@ static const struct armada38x_rtc_data armada38x_data = {
 };
 
 static const struct armada38x_rtc_data armada70x0_data = {
+	.active_alarm = ALARM2, /* Only alarm 2 is wired to ICU/GIC */
 	.update_mbus_timing = rtc_update_70x0_mbus_timing_params,
 	.read_rtc_reg = read_rtc_reg,
-	.rtc_alarm_irq_ack = NULL,
-	.rtc_mask_interrupt = NULL,
+	.rtc_alarm_irq_ack = armada70x0_rtc_alarm_irq_ack,
+	.rtc_mask_interrupt = armada70x0_rtc_mask_interrupt,
 };
 
 #ifdef CONFIG_OF
@@ -261,8 +293,8 @@ static int armada38x_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 	spin_lock_irqsave(&rtc->lock, flags);
 
-	time = rtc->data->read_rtc_reg(rtc, RTC_ALARM1);
-	val = rtc->data->read_rtc_reg(rtc, RTC_IRQ1_CONF) & RTC_IRQ1_AL_EN;
+	time = rtc->data->read_rtc_reg(rtc, ALARM_REG(RTC_ALARM1, rtc->data->active_alarm));
+	val = rtc->data->read_rtc_reg(rtc, ALARM_REG(RTC_IRQ1_CONF, rtc->data->active_alarm)) & RTC_IRQ_AL_EN;
 
 	spin_unlock_irqrestore(&rtc->lock, flags);
 
@@ -285,10 +317,11 @@ static int armada38x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 	spin_lock_irqsave(&rtc->lock, flags);
 
-	rtc_delayed_write(time, rtc, RTC_ALARM1);
+	rtc_delayed_write(time, rtc, ALARM_REG(RTC_ALARM1, rtc->data->active_alarm));
 
 	if (alrm->enabled) {
-		rtc_delayed_write(RTC_IRQ1_AL_EN, rtc, RTC_IRQ1_CONF);
+		/* enable the alarm */
+		rtc_delayed_write(RTC_IRQ_AL_EN, rtc, ALARM_REG(RTC_IRQ1_CONF, rtc->data->active_alarm));
 
 		/* mask RTC interrupt */
 		rtc->data->rtc_mask_interrupt(rtc);
@@ -309,9 +342,9 @@ static int armada38x_rtc_alarm_irq_enable(struct device *dev,
 	spin_lock_irqsave(&rtc->lock, flags);
 
 	if (enabled)
-		rtc_delayed_write(RTC_IRQ1_AL_EN, rtc, RTC_IRQ1_CONF);
+		rtc_delayed_write(RTC_IRQ_AL_EN, rtc, ALARM_REG(RTC_IRQ1_CONF, rtc->data->active_alarm));
 	else
-		rtc_delayed_write(0, rtc, RTC_IRQ1_CONF);
+		rtc_delayed_write(0, rtc, ALARM_REG(RTC_IRQ1_CONF, rtc->data->active_alarm));
 
 	spin_unlock_irqrestore(&rtc->lock, flags);
 
@@ -331,14 +364,14 @@ static irqreturn_t armada38x_rtc_alarm_irq(int irq, void *data)
 	/* Ack the event */
 	rtc->data->rtc_alarm_irq_ack(rtc);
 
-	val = rtc->data->read_rtc_reg(rtc, RTC_IRQ1_CONF);
+	val = rtc->data->read_rtc_reg(rtc, ALARM_REG(RTC_IRQ1_CONF, rtc->data->active_alarm));
 	/* disable the alarm */
-	rtc_delayed_write(0, rtc, RTC_IRQ1_CONF);
+	rtc_delayed_write(0, rtc, ALARM_REG(RTC_IRQ1_CONF, rtc->data->active_alarm));
 
 	spin_unlock(&rtc->lock);
 
-	if (val & RTC_IRQ1_FREQ_EN) {
-		if (val & RTC_IRQ1_FREQ_1HZ)
+	if (val & RTC_IRQ_FREQ_EN) {
+		if (val & RTC_IRQ_FREQ_1HZ)
 			event |= RTC_UF;
 		else
 			event |= RTC_PF;
@@ -385,27 +418,23 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
 
 	rtc->data = (struct armada38x_rtc_data *)match->data;
 	rtc->irq = platform_get_irq(pdev, 0);
-	if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada8k-rtc")) {
+
+	if (rtc->irq < 0) {
+		dev_err(&pdev->dev, "no irq\n");
+		return rtc->irq;
+	}
+	if (devm_request_irq(&pdev->dev, rtc->irq, armada38x_rtc_alarm_irq,
+				0, pdev->name, rtc) < 0) {
+		dev_warn(&pdev->dev, "Interrupt not available.\n");
 		rtc->irq = -1;
+		/*
+		 * If there is no interrupt available then we can't
+		 * use the alarm
+		 */
 		armada38x_rtc_ops.set_alarm = NULL;
 		armada38x_rtc_ops.alarm_irq_enable = NULL;
-	} else {
-		if (rtc->irq < 0) {
-			dev_err(&pdev->dev, "no irq\n");
-			return rtc->irq;
-		}
-		if (devm_request_irq(&pdev->dev, rtc->irq, armada38x_rtc_alarm_irq,
-					0, pdev->name, rtc) < 0) {
-			dev_warn(&pdev->dev, "Interrupt not available.\n");
-			rtc->irq = -1;
-			/*
-			 * If there is no interrupt available then we can't
-			 * use the alarm
-			 */
-			armada38x_rtc_ops.set_alarm = NULL;
-			armada38x_rtc_ops.alarm_irq_enable = NULL;
-		}
 	}
+
 	platform_set_drvdata(pdev, rtc);
 	if (rtc->irq != -1)
 		device_init_wakeup(&pdev->dev, 1);
