@@ -20,15 +20,15 @@
 #include <linux/platform_device.h>
 #include <linux/rtc.h>
 
-#define RTC_STATUS	    0x0
-#define RTC_STATUS_ALARM1	    BIT(0)
-#define RTC_STATUS_ALARM2	    BIT(1)
-#define RTC_IRQ1_CONF	    0x4
-#define RTC_IRQ1_AL_EN		    BIT(0)
-#define RTC_IRQ1_FREQ_EN	    BIT(1)
-#define RTC_IRQ1_FREQ_1HZ	    BIT(2)
-#define RTC_TIME	    0xC
-#define RTC_ALARM1	    0x10
+#define RTC_38X_STATUS			0x0
+#define RTC_38X_STATUS_ALARM1		BIT(0)
+#define RTC_38X_STATUS_ALARM2		BIT(1)
+#define RTC_IRQ1_CONF			0x4
+#define RTC_IRQ1_AL_EN			BIT(0)
+#define RTC_IRQ1_FREQ_EN		BIT(1)
+#define RTC_IRQ1_FREQ_1HZ		BIT(2)
+#define RTC_TIME			0xC
+#define RTC_ALARM1			0x10
 
 /* armada38x SoC registers  */
 #define RTC_38X_BRIDGE_TIMING_CTRL_REG_OFFS		0x0
@@ -48,11 +48,11 @@
 #define RTC_70X0_READ_OUTPUT_DELAY_MASK			(0xFFFF << RTC_70X0_READ_OUTPUT_DELAY_OFFS)
 
 
-#define SOC_RTC_INTERRUPT   0x8
-#define SOC_RTC_ALARM1		BIT(0)
-#define SOC_RTC_ALARM2		BIT(1)
-#define SOC_RTC_ALARM1_MASK	BIT(2)
-#define SOC_RTC_ALARM2_MASK	BIT(3)
+#define SOC_RTC_38X_INTERRUPT		0x8
+#define SOC_RTC_38X_ALARM1		BIT(0)
+#define SOC_RTC_38X_ALARM2		BIT(1)
+#define SOC_RTC_38X_ALARM1_MASK		BIT(2)
+#define SOC_RTC_38X_ALARM2_MASK		BIT(3)
 
 
 #define SAMPLE_NR 100
@@ -67,9 +67,10 @@ struct armada38x_rtc {
 };
 
 struct armada38x_rtc_data {
-	/* Initialize the RTC-MBUS bridge timing */
-	void (*update_mbus_timing)(struct armada38x_rtc *rtc);
+	void (*update_mbus_timing)(struct armada38x_rtc *rtc); /* Initialize the RTC-MBUS bridge timing */
 	unsigned long (*read_rtc_reg)(struct armada38x_rtc *rtc, uint8_t rtc_reg);
+	void (*rtc_alarm_irq_ack)(struct armada38x_rtc *rtc);
+	void (*rtc_mask_interrupt)(struct armada38x_rtc *rtc);
 };
 
 /*
@@ -84,8 +85,8 @@ struct armada38x_rtc_data {
 
 static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
 {
-	writel(0, rtc->regs + RTC_STATUS);
-	writel(0, rtc->regs + RTC_STATUS);
+	writel(0, rtc->regs + RTC_38X_STATUS);
+	writel(0, rtc->regs + RTC_38X_STATUS);
 	writel(val, rtc->regs + offset);
 	udelay(5);
 }
@@ -168,14 +169,38 @@ static unsigned long read_rtc_reg(struct armada38x_rtc *rtc, uint8_t rtc_reg)
 	return value;
 }
 
+static void armada38x_rtc_alarm_irq_ack(struct armada38x_rtc *rtc)
+{
+	u32 val;
+
+	val = rtc->data->read_rtc_reg(rtc, SOC_RTC_38X_INTERRUPT);
+	writel(val & ~SOC_RTC_38X_ALARM1, rtc->regs_soc + SOC_RTC_38X_INTERRUPT);
+
+	/* Ack the event */
+	rtc_delayed_write(RTC_38X_STATUS_ALARM1, rtc, RTC_38X_STATUS);
+}
+
+static void armada38x_rtc_mask_interrupt(struct armada38x_rtc *rtc)
+{
+	u32 val;
+
+	val = rtc->data->read_rtc_reg(rtc, SOC_RTC_38X_INTERRUPT);
+	writel(val | SOC_RTC_38X_ALARM1_MASK,
+	rtc->regs_soc + SOC_RTC_38X_INTERRUPT);
+}
+
 static const struct armada38x_rtc_data armada38x_data = {
 	.update_mbus_timing = rtc_update_38x_mbus_timing_params,
 	.read_rtc_reg = read_rtc_38x_reg_wa,
+	.rtc_alarm_irq_ack = armada38x_rtc_alarm_irq_ack,
+	.rtc_mask_interrupt = armada38x_rtc_mask_interrupt,
 };
 
 static const struct armada38x_rtc_data armada70x0_data = {
 	.update_mbus_timing = rtc_update_70x0_mbus_timing_params,
 	.read_rtc_reg = read_rtc_reg,
+	.rtc_alarm_irq_ack = NULL,
+	.rtc_mask_interrupt = NULL,
 };
 
 #ifdef CONFIG_OF
@@ -252,7 +277,6 @@ static int armada38x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
 	unsigned long time, flags;
 	int ret = 0;
-	u32 val;
 
 	ret = rtc_tm_to_time(&alrm->time, &time);
 
@@ -264,10 +288,10 @@ static int armada38x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	rtc_delayed_write(time, rtc, RTC_ALARM1);
 
 	if (alrm->enabled) {
-			rtc_delayed_write(RTC_IRQ1_AL_EN, rtc, RTC_IRQ1_CONF);
-			val = rtc->data->read_rtc_reg(rtc, SOC_RTC_INTERRUPT);
-			writel(val | SOC_RTC_ALARM1_MASK,
-			       rtc->regs_soc + SOC_RTC_INTERRUPT);
+		rtc_delayed_write(RTC_IRQ1_AL_EN, rtc, RTC_IRQ1_CONF);
+
+		/* mask RTC interrupt */
+		rtc->data->rtc_mask_interrupt(rtc);
 	}
 
 	spin_unlock_irqrestore(&rtc->lock, flags);
@@ -304,14 +328,12 @@ static irqreturn_t armada38x_rtc_alarm_irq(int irq, void *data)
 
 	spin_lock(&rtc->lock);
 
-	val = rtc->data->read_rtc_reg(rtc, SOC_RTC_INTERRUPT);
-
-	writel(val & ~SOC_RTC_ALARM1, rtc->regs_soc + SOC_RTC_INTERRUPT);
-	val = rtc->data->read_rtc_reg(rtc, RTC_IRQ1_CONF);
-	/* disable all the interrupts for alarm 1 */
-	rtc_delayed_write(0, rtc, RTC_IRQ1_CONF);
 	/* Ack the event */
-	rtc_delayed_write(RTC_STATUS_ALARM1, rtc, RTC_STATUS);
+	rtc->data->rtc_alarm_irq_ack(rtc);
+
+	val = rtc->data->read_rtc_reg(rtc, RTC_IRQ1_CONF);
+	/* disable the alarm */
+	rtc_delayed_write(0, rtc, RTC_IRQ1_CONF);
 
 	spin_unlock(&rtc->lock);
 
