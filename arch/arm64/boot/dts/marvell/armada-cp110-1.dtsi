@@ -22,6 +22,9 @@ rtc@284000 {
 	compatible = "marvell,armada8k-rtc";
 	reg = <0x284000 0x20>, <0x284080 0x24>;
 	reg-names = "rtc", "rtc-soc";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
 	status = "disabled";
 };
 
