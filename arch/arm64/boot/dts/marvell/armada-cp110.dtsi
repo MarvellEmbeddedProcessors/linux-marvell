@@ -54,6 +54,7 @@ rtc@284000 {
 	compatible = "marvell,armada8k-rtc";
 	reg = <0x284000 0x20>, <0x284080 0x24>;
 	reg-names = "rtc", "rtc-soc";
+	status = "disabled";
 };
 
 pinctrl@440000 {
