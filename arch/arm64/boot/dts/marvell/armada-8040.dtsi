@@ -240,6 +240,9 @@
 					marvell,function = "spi1";
 				};
 			};
+			rtc@284000 {
+				status = "okay";
+			};
 		};
 		pcie@0x600000 {
 			msi-parent = <&gic_v2m0>;
