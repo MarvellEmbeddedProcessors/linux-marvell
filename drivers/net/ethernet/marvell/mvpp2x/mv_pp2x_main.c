@@ -1007,7 +1007,8 @@ static void mv_pp2x_txq_done(struct mv_pp2x_port *port,
 			     struct mv_pp2x_tx_queue *txq,
 				   struct mv_pp2x_txq_pcpu *txq_pcpu)
 {
-	struct netdev_queue *nq = netdev_get_tx_queue(port->dev, txq->log_id);
+	struct netdev_queue *nq = netdev_get_tx_queue(port->dev, (txq->log_id +
+						     (txq_pcpu->cpu * mv_pp2x_txq_number)));
 	int tx_done;
 
 #ifdef DEV_NETMAP
@@ -2693,8 +2694,8 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	if (mv_pp2_tso_validate(skb, dev))
 		return 0;
 
-	txq_id = skb_get_queue_mapping(skb);
-	nq = netdev_get_tx_queue(dev, txq_id);
+	txq_id = skb_get_queue_mapping(skb) % mv_pp2x_txq_number;
+	nq = netdev_get_tx_queue(dev, (txq_id + (cpu * mv_pp2x_txq_number)));
 
 	/* Calculate expected number of TX descriptors */
 	max_desc_num = skb_shinfo(skb)->gso_segs * 2 + skb_shinfo(skb)->nr_frags;
@@ -2870,8 +2871,9 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	u32 tx_cmd;
 	int cpu = smp_processor_id();
 
-	txq_id = skb_get_queue_mapping(skb);
-	nq = netdev_get_tx_queue(dev, txq_id);
+	/* Set relevant physical TxQ and Linux netdev queue */
+	txq_id = skb_get_queue_mapping(skb) % mv_pp2x_txq_number;
+	nq = netdev_get_tx_queue(dev, (txq_id + (cpu * mv_pp2x_txq_number)));
 	txq = port->txqs[txq_id];
 	txq_pcpu = this_cpu_ptr(txq->pcpu);
 	aggr_txq = &port->priv->aggr_txqs[cpu];
@@ -3941,10 +3943,15 @@ u16 mv_pp2x_select_queue(struct net_device *dev, struct sk_buff *skb,
 			 void *accel_priv, select_queue_fallback_t fallback)
 
 {
-	if (skb->queue_mapping)
-		return skb->napi_id - 1;
+	int val;
 
-	return fallback(dev, skb) % mv_pp2x_txq_number;
+	/* If packet in coming from Rx -> RxQ = TxQ, callback function used for packets from CPU Tx */
+	if (skb->queue_mapping)
+		val = skb->queue_mapping - 1;
+	else
+		val = fallback(dev, skb);
+
+	return (val % mv_pp2x_txq_number) + (smp_processor_id() * mv_pp2x_txq_number);
 }
 
 /* Device ops */
@@ -4428,7 +4435,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	struct phy *comphy;
 
 	dev = alloc_etherdev_mqs(sizeof(struct mv_pp2x_port),
-				 mv_pp2x_txq_number, mv_pp2x_rxq_number);
+				 mv_pp2x_txq_number * num_active_cpus(), mv_pp2x_rxq_number);
 	if (!dev)
 		return -ENOMEM;
 
