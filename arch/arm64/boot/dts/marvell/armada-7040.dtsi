@@ -105,6 +105,9 @@
 					marvell,function = "gpio";
 				};
 			};
+			rtc@284000 {
+				status = "okay";
+			};
 			gpio1: gpio@440100 {
 			};
 			gpio2: gpio@440140 {
