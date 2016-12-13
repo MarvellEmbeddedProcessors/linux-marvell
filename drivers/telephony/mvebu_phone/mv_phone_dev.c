@@ -135,10 +135,6 @@ static inline void tdm_if_pcm_tx_process(void);
 static void tdm2c_if_stop_channels(unsigned long args);
 #endif
 
-/* Module */
-static int tdm_if_module_init(void);
-static void tdm_if_module_exit(void);
-
 /* Globals */
 #if !(defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) && !(defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
 static DECLARE_TASKLET(tdm_if_rx_tasklet, tdm_if_pcm_rx_process, 0);
@@ -173,15 +169,6 @@ static u32 mv_tdm_unit_type;
 static u32 mv_phone_get_irq(int id)
 {
 	return priv->irq[id];
-}
-
-/* Get TDM unit type. */
-static enum mv_phone_unit_type mv_phone_get_unit_type(void)
-{
-	if (!mv_phone_enabled)
-		return MV_TDM_UNIT_NONE;
-
-	return priv->tdm_type;
 }
 
 /* Initialize the TDM subsystem. */
@@ -271,16 +258,6 @@ static const struct file_operations proc_tdm_operations = {
 	.llseek		= seq_lseek,
 	.release	= seq_release,
 };
-
-static void tdm_if_unit_type_set(u32 tdm_unit)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&tdm_if_lock, flags);
-
-	mv_tdm_unit_type = tdm_unit;
-	spin_unlock_irqrestore(&tdm_if_lock, flags);
-}
 
 static u32 tdm_if_unit_type_get(void)
 {
@@ -858,7 +835,7 @@ static int tdm_if_write(u8 *buffer, int size)
 	return 0;
 }
 
-static struct tal_if tdm_if = {
+static struct tal_if tdm2c_if = {
 	.init		= tdm_if_init,
 	.exit		= tdm_if_exit,
 	.pcm_start	= tdm_if_pcm_start,
@@ -868,29 +845,15 @@ static struct tal_if tdm_if = {
 	.stats_get	= tdm_if_stats_get,
 };
 
-static int tdm_if_module_init(void)
-{
-	u32 tdm_unit;
-
-	tdm_unit = mv_phone_get_unit_type();
-
-	if ((tdm_unit == MV_TDM_UNIT_TDM2C) ||
-		tdm_unit == MV_TDM_UNIT_TDMMC) {
-		tal_set_if(&tdm_if);
-		tdm_if_unit_type_set(tdm_unit);
-	}
-	return 0;
-}
-
-static void tdm_if_module_exit(void)
-{
-	u32 tdm_unit;
-
-	tdm_unit = mv_phone_get_unit_type();
-	if (tdm_unit == MV_TDM_UNIT_TDM2C ||
-	    tdm_unit == MV_TDM_UNIT_TDMMC)
-		tal_set_if(NULL);
-}
+static struct tal_if tdmmc_if = {
+	.init		= tdm_if_init,
+	.exit		= tdm_if_exit,
+	.pcm_start	= tdm_if_pcm_start,
+	.pcm_stop	= tdm_if_pcm_stop,
+	.control	= tdm_if_control,
+	.write		= tdm_if_write,
+	.stats_get	= tdm_if_stats_get,
+};
 
 /* Enable device interrupts. */
 void mv_phone_intr_enable(u8 dev_id)
@@ -1155,6 +1118,10 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 					     mv_mbus_dram_info());
 		if (err < 0)
 			goto err_clk;
+
+
+		tal_set_if(&tdm2c_if);
+		mv_tdm_unit_type = MV_TDM_UNIT_TDM2C;
 	}
 
 	if (of_device_is_compatible(priv->np, "marvell,armada-xp-tdm")) {
@@ -1162,6 +1129,9 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		err = tdmmc_set_mbus_windows(&pdev->dev, priv->tdm_base);
 		if (err < 0)
 			goto err_clk;
+
+		tal_set_if(&tdmmc_if);
+		mv_tdm_unit_type = MV_TDM_UNIT_TDMMC;
 	}
 
 	if (of_device_is_compatible(priv->np, "marvell,armada-a8k-tdm")) {
@@ -1179,11 +1149,12 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "platform_get_irq failed\n");
 			return -ENXIO;
 		}
+
+		tal_set_if(&tdmmc_if);
+		mv_tdm_unit_type = MV_TDM_UNIT_TDMMC;
 	}
 
 	mv_phone_enabled = 1;
-
-	tdm_if_module_init();
 
 	priv->dev = &pdev->dev;
 	return 0;
@@ -1196,7 +1167,7 @@ err_clk:
 
 static int mvebu_phone_remove(struct platform_device *pdev)
 {
-	tdm_if_module_exit();
+	tal_set_if(NULL);
 
 	clk_disable_unprepare(priv->clk);
 
