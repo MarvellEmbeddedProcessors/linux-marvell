@@ -228,14 +228,7 @@ ENTRY(vectors)
 	ventry	el0_sync			// Synchronous 64-bit EL0
 	ventry	el0_irq				// IRQ 64-bit EL0
 	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
-#ifdef CONFIG_IGNORE_ASYNC_ABORT
-	/* If CONFIG_IGNORE_ASYNC_ABORT is enabled, in a case of exeption,
-	 * ignore it be performing eret (in el0_ignore).
-	 */
-	ventry	el0_ignore
-#else
 	ventry	el0_error_invalid		// Error 64-bit EL0
-#endif
 
 #ifdef CONFIG_COMPAT
 	ventry	el0_sync_compat			// Synchronous 32-bit EL0
@@ -307,10 +300,6 @@ ENDPROC(el1_error_invalid)
 el1_ignore:
 	eret
 ENDPROC(el1_ignore)
-
-el0_ignore:
-	eret
-ENDPROC(el0_ignore)
 #endif
 
 /*
