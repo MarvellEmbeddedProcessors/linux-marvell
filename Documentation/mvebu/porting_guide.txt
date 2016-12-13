@@ -46,7 +46,7 @@ Porting procedure
 		- "/arch/arm64/boot/dts/marvell/armada-8040-<new_name>.dts"
 		- "./arch/arm/boot/dts/armada-38x-<new_name>.dts"
 
-	2. Add the new device-tree file to the corrisponding Makefile:
+	2. Add the new device-tree file to the corresponding Makefile:
 		- ./arch/arm64/boot/dts/marvell/Makefile (A80x0, A70x0, A37x0)
 		- ./arch/arm/boot/dts/Makefile		 (A38x, A39x)
 
