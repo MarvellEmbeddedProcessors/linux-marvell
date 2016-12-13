@@ -119,7 +119,6 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id);
 
 /* PCM start/stop */
 static void tdm_if_pcm_start(void);
-static void tdm_if_pcm_stop(void);
 
 /* Rx/Tx Tasklets  */
 #if !(defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) && !(defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
@@ -160,9 +159,9 @@ static u32 pcm_stop_fail;
 #ifdef CONFIG_MV_TDM2C_SUPPORT
 static int pcm_stop_flag;
 static int pcm_stop_status;
+#endif
 static u32 pcm_start_stop_state;
 static u32 is_pcm_stopping;
-#endif
 static u32 mv_tdm_unit_type;
 
 /* Get TDM unit interrupt number */
@@ -262,6 +261,47 @@ static const struct file_operations proc_tdm_operations = {
 static u32 tdm_if_unit_type_get(void)
 {
 	return mv_tdm_unit_type;
+}
+
+static void tdm2c_if_pcm_stop(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&tdm_if_lock, flags);
+
+	if (!pcm_enable) {
+		spin_unlock_irqrestore(&tdm_if_lock, flags);
+		return;
+	}
+
+	pcm_enable = 0;
+	if (is_pcm_stopping == 0) {
+		is_pcm_stopping = 1;
+		tdm2c_pcm_stop();
+	} else {
+		pcm_start_stop_state--;
+		dev_dbg(priv->dev, "pcm_start_stop_state(%d)\n",
+			pcm_start_stop_state);
+	}
+
+	spin_unlock_irqrestore(&tdm_if_lock, flags);
+}
+
+static void tdmmc_if_pcm_stop(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&tdm_if_lock, flags);
+
+	if (!pcm_enable) {
+		spin_unlock_irqrestore(&tdm_if_lock, flags);
+		return;
+	}
+
+	pcm_enable = 0;
+	tdmmc_pcm_stop();
+
+	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
 int tdm_if_init(struct tal_params *tal_params)
@@ -373,7 +413,7 @@ int tdm_if_init(struct tal_params *tal_params)
 	/* WA to stop the MCDMA gracefully after commUnit initialization */
 #ifdef CONFIG_MV_TDMMC_SUPPORT
 	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDMMC)
-		tdm_if_pcm_stop();
+		tdmmc_if_pcm_stop();
 #endif
 	return 0;
 }
@@ -387,7 +427,12 @@ void tdm_if_exit(void)
 
 	/* Stop PCM channels */
 	if (pcm_enable)
-		tdm_if_pcm_stop();
+#ifdef CONFIG_MV_TDM2C_SUPPORT
+		tdm2c_if_pcm_stop();
+#endif
+#ifdef CONFIG_MV_TDMMC_SUPPORT
+		tdmmc_if_pcm_stop();
+#endif
 
 #ifdef CONFIG_MV_TDM2C_SUPPORT
 		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C) {
@@ -490,33 +535,6 @@ static void tdm_if_pcm_start(void)
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
-static void tdm_if_pcm_stop(void)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&tdm_if_lock, flags);
-	if (pcm_enable) {
-		pcm_enable = 0;
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C) {
-			if (is_pcm_stopping == 0) {
-				is_pcm_stopping = 1;
-				tdm2c_pcm_stop();
-			} else {
-				pcm_start_stop_state--;
-				dev_dbg(priv->dev, "pcm_start_stop_state(%d)\n",
-					pcm_start_stop_state);
-			}
-		}
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDMMC)
-			tdmmc_pcm_stop();
-#endif
-	}
-	spin_unlock_irqrestore(&tdm_if_lock, flags);
-}
-
 static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 {
 	struct mv_phone_intr_info tdm_int_info;
@@ -555,7 +573,7 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 			/* If Rx/Tx tasklets already scheduled, let them do the work. */
 			if ((!rx_buff) && (!tx_buff)) {
 				dev_dbg(priv->dev, "Stopping the TDM\n");
-				tdm_if_pcm_stop();
+				tdm2c_if_pcm_stop();
 				pcm_stop_flag = 0;
 				tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
 			} else {
@@ -688,7 +706,7 @@ static void tdm_if_pcm_rx_process(unsigned long arg)
 	if (tdm_type == MV_TDM_UNIT_TDM2C) {
 		if ((pcm_stop_flag == 1) && !tx_buff) {
 			dev_dbg(priv->dev, "Stopping TDM from Rx tasklet\n");
-			tdm_if_pcm_stop();
+			tdm2c_if_pcm_stop();
 			spin_lock_irqsave(&tdm_if_lock, flags);
 			pcm_stop_flag = 0;
 			spin_unlock_irqrestore(&tdm_if_lock, flags);
@@ -745,28 +763,13 @@ static void tdm_if_pcm_tx_process(unsigned long arg)
 	if (tdm_type == MV_TDM_UNIT_TDM2C) {
 		if ((pcm_stop_flag == 1) && !rx_buff) {
 			dev_dbg(priv->dev, "Stopping TDM from Tx tasklet\n");
-			tdm_if_pcm_stop();
+			tdm2c_if_pcm_stop();
 			spin_lock_irqsave(&tdm_if_lock, flags);
 			pcm_stop_flag = 0;
 			spin_unlock_irqrestore(&tdm_if_lock, flags);
 			tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
 		}
 	}
-#endif
-}
-
-static void tdm_if_stats_get(struct tal_stats *tdm_if_stats)
-{
-	if (tdm_init == 0)
-		return;
-
-	tdm_if_stats->tdm_init = tdm_init;
-	tdm_if_stats->rx_miss = rx_miss;
-	tdm_if_stats->tx_miss = tx_miss;
-	tdm_if_stats->rx_over = rx_over;
-	tdm_if_stats->tx_under = tx_under;
-#ifdef CONFIG_MV_TDM_EXT_STATS
-	tdm2c_ext_stats_get(&tdm_if_stats->tdm_ext_stats);
 #endif
 }
 
@@ -820,28 +823,44 @@ static int tdm_if_control(int cmd, void *arg)
 	return 0;
 }
 
-static int tdm_if_write(u8 *buffer, int size)
+static int tdm2c_if_write(u8 *buffer, int size)
 {
-	if (test_enable) {
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C)
-			return tdm2c_tx(buffer);
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDMMC)
-			return tdmmc_tx(buffer);
-#endif
-	}
+	if (test_enable)
+		return tdm2c_tx(buffer);
+
 	return 0;
+}
+
+static int tdmmc_if_write(u8 *buffer, int size)
+{
+	if (test_enable)
+		return tdmmc_tx(buffer);
+
+	return 0;
+}
+
+static void tdm_if_stats_get(struct tal_stats *tdm_if_stats)
+{
+	if (tdm_init == 0)
+		return;
+
+	tdm_if_stats->tdm_init = tdm_init;
+	tdm_if_stats->rx_miss = rx_miss;
+	tdm_if_stats->tx_miss = tx_miss;
+	tdm_if_stats->rx_over = rx_over;
+	tdm_if_stats->tx_under = tx_under;
+#ifdef CONFIG_MV_TDM_EXT_STATS
+	tdm2c_ext_stats_get(&tdm_if_stats->tdm_ext_stats);
+#endif
 }
 
 static struct tal_if tdm2c_if = {
 	.init		= tdm_if_init,
 	.exit		= tdm_if_exit,
 	.pcm_start	= tdm_if_pcm_start,
-	.pcm_stop	= tdm_if_pcm_stop,
+	.pcm_stop	= tdm2c_if_pcm_stop,
 	.control	= tdm_if_control,
-	.write		= tdm_if_write,
+	.write		= tdm2c_if_write,
 	.stats_get	= tdm_if_stats_get,
 };
 
@@ -849,9 +868,9 @@ static struct tal_if tdmmc_if = {
 	.init		= tdm_if_init,
 	.exit		= tdm_if_exit,
 	.pcm_start	= tdm_if_pcm_start,
-	.pcm_stop	= tdm_if_pcm_stop,
+	.pcm_stop	= tdmmc_if_pcm_stop,
 	.control	= tdm_if_control,
-	.write		= tdm_if_write,
+	.write		= tdmmc_if_write,
 	.stats_get	= tdm_if_stats_get,
 };
 
