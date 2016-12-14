@@ -117,9 +117,6 @@ struct mv_phone_dev *priv;
 /* TDM Interrupt Service Routine */
 static irqreturn_t tdm_if_isr(int irq, void *dev_id);
 
-/* PCM start/stop */
-static void tdm_if_pcm_start(void);
-
 /* Rx/Tx Tasklets  */
 #if !(defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) && !(defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
 static void tdm_if_pcm_rx_process(unsigned long arg);
@@ -156,10 +153,8 @@ static u16 test_enable;
 #ifdef CONFIG_MV_TDM_EXT_STATS
 static u32 pcm_stop_fail;
 #endif
-#ifdef CONFIG_MV_TDM2C_SUPPORT
 static int pcm_stop_flag;
 static int pcm_stop_status;
-#endif
 static u32 pcm_start_stop_state;
 static u32 is_pcm_stopping;
 static u32 mv_tdm_unit_type;
@@ -261,6 +256,74 @@ static const struct file_operations proc_tdm_operations = {
 static u32 tdm_if_unit_type_get(void)
 {
 	return mv_tdm_unit_type;
+}
+
+static void tdm2c_if_pcm_start(void)
+{
+	unsigned long flags;
+	u32 max_poll = 0;
+
+	spin_lock_irqsave(&tdm_if_lock, flags);
+
+	if (pcm_enable) {
+		spin_unlock_irqrestore(&tdm_if_lock, flags);
+		return;
+	}
+
+	pcm_enable = 1;
+	if (is_pcm_stopping == 0) {
+		pcm_stop_flag = 0;
+		pcm_stop_status = 0;
+		pcm_start_stop_state = 0;
+		rx_buff = tx_buff = NULL;
+		tdm2c_pcm_start();
+	} else {
+		pcm_start_stop_state++;
+		while (is_pcm_stopping && max_poll < TDM_STOP_MAX_POLLING_TIME) {
+			spin_unlock_irqrestore(&tdm_if_lock, flags);
+			mdelay(1);
+			max_poll++;
+			spin_lock_irqsave(&tdm_if_lock, flags);
+		}
+
+		if (is_pcm_stopping) {
+			/* Issue found or timeout */
+			if (tdm2c_pcm_stop_int_miss())
+				dev_dbg(priv->dev, "pcm stop issue found\n");
+			else
+				dev_dbg(priv->dev, "pcm stop timeout\n");
+
+			is_pcm_stopping = 0;
+			pcm_stop_flag = 0;
+			pcm_stop_status = 0;
+			pcm_start_stop_state = 0;
+			rx_buff = tx_buff = NULL;
+			tdm2c_pcm_start();
+		} else {
+			dev_dbg(priv->dev, "pcm_start_stop_state(%d), max_poll=%d\n",
+				pcm_start_stop_state, max_poll);
+		}
+	}
+
+	spin_unlock_irqrestore(&tdm_if_lock, flags);
+}
+
+static void tdmmc_if_pcm_start(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&tdm_if_lock, flags);
+
+	if (pcm_enable) {
+		spin_unlock_irqrestore(&tdm_if_lock, flags);
+		return;
+	}
+
+	pcm_enable = 1;
+	rx_buff = tx_buff = NULL;
+	tdmmc_pcm_start();
+
+	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
 static void tdm2c_if_pcm_stop(void)
@@ -479,62 +542,6 @@ void tdm_if_exit(void)
 	}
 }
 
-static void tdm_if_pcm_start(void)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&tdm_if_lock, flags);
-	if (!pcm_enable) {
-		pcm_enable = 1;
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C) {
-			u32 max_poll = 0;
-
-			if (is_pcm_stopping == 0) {
-				pcm_stop_flag = 0;
-				pcm_stop_status = 0;
-				pcm_start_stop_state = 0;
-				rx_buff = tx_buff = NULL;
-				tdm2c_pcm_start();
-			} else {
-				pcm_start_stop_state++;
-				while (is_pcm_stopping && max_poll < TDM_STOP_MAX_POLLING_TIME) {
-					spin_unlock_irqrestore(&tdm_if_lock, flags);
-					mdelay(1);
-					max_poll++;
-					spin_lock_irqsave(&tdm_if_lock, flags);
-				}
-
-				if (is_pcm_stopping) {
-					/* Issue found or timeout */
-					if (tdm2c_pcm_stop_int_miss())
-						dev_dbg(priv->dev, "pcm stop issue found\n");
-					else
-						dev_dbg(priv->dev, "pcm stop timeout\n");
-
-					is_pcm_stopping = 0;
-					pcm_stop_flag = 0;
-					pcm_stop_status = 0;
-					pcm_start_stop_state = 0;
-					rx_buff = tx_buff = NULL;
-					tdm2c_pcm_start();
-				} else {
-					dev_dbg(priv->dev, "pcm_start_stop_state(%d), max_poll=%d\n",
-						pcm_start_stop_state, max_poll);
-				}
-			}
-		}
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDMMC) {
-			rx_buff = tx_buff = NULL;
-			tdmmc_pcm_start();
-		}
-#endif
-	}
-	spin_unlock_irqrestore(&tdm_if_lock, flags);
-}
-
 static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 {
 	struct mv_phone_intr_info tdm_int_info;
@@ -632,9 +639,9 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 			dev_dbg(priv->dev, "%s: Received MV_CHAN_STOP_INT indication\n", __func__);
 			is_pcm_stopping = 0;
 			if (pcm_start_stop_state) {
-				dev_dbg(priv->dev, "%s: calling to tdm_if_pcm_start()\n", __func__);
+				dev_dbg(priv->dev, "%s: calling to tdm2c_if_pcm_start()\n", __func__);
 				pcm_enable = 0;
-				tdm_if_pcm_start();
+				tdm2c_if_pcm_start();
 			}
 		}
 	}
@@ -801,7 +808,7 @@ static void tdm2c_if_stop_channels(unsigned long arg)
 	spin_lock_irqsave(&tdm_if_lock, flags);
 	is_pcm_stopping = 0;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
-	tdm_if_pcm_start();
+	tdm2c_if_pcm_start();
 }
 #endif
 
@@ -857,7 +864,7 @@ static void tdm_if_stats_get(struct tal_stats *tdm_if_stats)
 static struct tal_if tdm2c_if = {
 	.init		= tdm_if_init,
 	.exit		= tdm_if_exit,
-	.pcm_start	= tdm_if_pcm_start,
+	.pcm_start	= tdm2c_if_pcm_start,
 	.pcm_stop	= tdm2c_if_pcm_stop,
 	.control	= tdm_if_control,
 	.write		= tdm2c_if_write,
@@ -867,7 +874,7 @@ static struct tal_if tdm2c_if = {
 static struct tal_if tdmmc_if = {
 	.init		= tdm_if_init,
 	.exit		= tdm_if_exit,
-	.pcm_start	= tdm_if_pcm_start,
+	.pcm_start	= tdmmc_if_pcm_start,
 	.pcm_stop	= tdmmc_if_pcm_stop,
 	.control	= tdm_if_control,
 	.write		= tdmmc_if_write,
