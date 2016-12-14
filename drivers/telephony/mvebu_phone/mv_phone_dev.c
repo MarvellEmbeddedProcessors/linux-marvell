@@ -118,13 +118,8 @@ struct mv_phone_dev *priv;
 static irqreturn_t tdm_if_isr(int irq, void *dev_id);
 
 /* Rx/Tx Tasklets  */
-#if !(defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) && !(defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
 static void tdm_if_pcm_rx_process(unsigned long arg);
 static void tdm_if_pcm_tx_process(unsigned long arg);
-#else
-static inline void tdm_if_pcm_rx_process(void);
-static inline void tdm_if_pcm_tx_process(void);
-#endif
 
 /* TDM SW Reset */
 #ifdef CONFIG_MV_TDM2C_SUPPORT
@@ -132,10 +127,8 @@ static void tdm2c_if_stop_channels(unsigned long args);
 #endif
 
 /* Globals */
-#if !(defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) && !(defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
 static DECLARE_TASKLET(tdm_if_rx_tasklet, tdm_if_pcm_rx_process, 0);
 static DECLARE_TASKLET(tdm_if_tx_tasklet, tdm_if_pcm_tx_process, 0);
-#endif
 #ifdef CONFIG_MV_TDM2C_SUPPORT
 static DECLARE_TASKLET(tdm2c_if_stop_tasklet, tdm2c_if_stop_channels, 0);
 #endif
@@ -437,13 +430,6 @@ int tdm_if_init(struct tal_params *tal_params)
 #endif
 
 	/* Register TDM interrupt */
-#ifdef CONFIG_MV_PHONE_USE_FIQ_PROCESSING
-	ret = request_fiq(irqnr[0], tdm_if_isr, 0x0, "tdm", NULL);
-	if (ret) {
-		dev_err(priv->dev, "%s: Failed to connect fiq(%d)\n", __func__, irqnr[0]);
-		return ret;
-	}
-#else /* CONFIG_MV_PHONE_USE_FIQ_PROCESSING */
 	ret = request_irq(irqnr[0], tdm_if_isr, 0x0, "tdm", NULL);
 	if (ret) {
 		dev_err(priv->dev, "%s: Failed to connect irq(%d)\n", __func__, irqnr[0]);
@@ -462,7 +448,6 @@ int tdm_if_init(struct tal_params *tal_params)
 		return ret;
 	}
 #endif
-#endif /* CONFIG_MV_PHONE_USE_FIQ_PROCESSING */
 
 	irq_init = 1;
 
@@ -513,15 +498,11 @@ void tdm_if_exit(void)
 
 	if (irq_init) {
 		/* Release interrupt */
-#ifndef CONFIG_MV_PHONE_USE_FIQ_PROCESSING
 		free_irq(irqnr[0], NULL);
 #if (!(defined(CONFIG_MACH_ARMADA_38X) || defined(CONFIG_MACH_ARMADA_XP)))
 		free_irq(irqnr[1], NULL);
 		free_irq(irqnr[2], NULL);
 #endif
-#else /* !CONFIG_MV_PHONE_USE_FIQ_PROCESSING */
-		free_fiq(irqnr[0], NULL);
-#endif /* !CONFIG_MV_PHONE_USE_FIQ_PROCESSING */
 		irq_init = 0;
 	}
 
@@ -603,14 +584,9 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 			dev_dbg(priv->dev, "%s: Warning, missed Rx buffer processing !!!\n", __func__);
 		} else {
 			rx_buff = tdm_int_info.tdm_rx_buff;
-#if (defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) || (defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
-			dev_dbg(priv->dev, "%s: running Rx in ISR\n", __func__);
-			tdm_if_pcm_rx_process();
-#else
 			/* Schedule Rx processing within SOFT_IRQ context */
 			dev_dbg(priv->dev, "%s: schedule Rx tasklet\n", __func__);
 			tasklet_hi_schedule(&tdm_if_rx_tasklet);
-#endif
 		}
 	}
 
@@ -621,14 +597,9 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 			dev_dbg(priv->dev, "%s: Warning, missed Tx buffer processing !!!\n", __func__);
 		} else {
 			tx_buff = tdm_int_info.tdm_tx_buff;
-#if (defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) || (defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
-			dev_dbg(priv->dev, "%s: running Tx in ISR\n", __func__);
-			tdm_if_pcm_tx_process();
-#else
 			/* Schedule Tx processing within SOFT_IRQ context */
 			dev_dbg(priv->dev, "%s: schedule Tx tasklet\n", __func__);
 			tasklet_hi_schedule(&tdm_if_tx_tasklet);
-#endif
 		}
 	}
 
@@ -669,12 +640,8 @@ skip_rx_tx:
 out:
 	return IRQ_HANDLED;
 }
-#if (defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) || (defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
-static inline void tdm_if_pcm_rx_process(void)
-#else
 /* Rx tasklet */
 static void tdm_if_pcm_rx_process(unsigned long arg)
-#endif
 {
 	unsigned long flags;
 	u32 tdm_type;
@@ -723,12 +690,8 @@ static void tdm_if_pcm_rx_process(unsigned long arg)
 #endif
 }
 
-#if (defined CONFIG_MV_PHONE_USE_IRQ_PROCESSING) || (defined CONFIG_MV_PHONE_USE_FIQ_PROCESSING)
-static inline void tdm_if_pcm_tx_process(void)
-#else
 /* Tx tasklet */
 static void tdm_if_pcm_tx_process(unsigned long arg)
-#endif
 {
 	unsigned long flags;
 	u32 tdm_type;
