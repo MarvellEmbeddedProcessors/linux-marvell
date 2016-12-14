@@ -64,6 +64,8 @@
 	soc {
 		internal-regs {
 			spi0: spi@10600 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&spi_quad_pins>;
 				status = "okay";
 
 				m25p80@0 {
@@ -94,6 +96,8 @@
 			};
 
 			i2c0: i2c@11000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&i2c1_pins>;
 				status = "okay";
 				expander0: pca9555@22 {
 					compatible = "nxp,pca9555";
@@ -116,16 +120,20 @@
 			* through an FTDI
 			*/
 			uart0: serial@12000 {
-				status = "okay";
-			};
-
-			uart1: serial@12200 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&uart1_pins>;
 				status = "okay";
 			};
 
+			uart1: serial@12200 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&uart2_pins>;
+				status = "okay";
+			};
+
 			eth0: ethernet@30000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&rgmii_pins>;
 				phy-mode = "rgmii-id";
 				phy = <&phy0>;
 				status = "okay";
