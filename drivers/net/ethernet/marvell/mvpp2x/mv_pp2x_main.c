@@ -1731,6 +1731,7 @@ static void mv_pp22_link_event(struct net_device *dev)
 			mv_gop110_port_events_unmask(&port->priv->hw.gop,
 						     &port->mac_data);
 			port->mac_data.flags |= MV_EMAC_F_LINK_UP;
+			netdev_info(dev, "link up\n");
 		} else {
 			mv_pp2x_ingress_disable(port);
 			mv_pp2x_egress_disable(port);
@@ -1739,6 +1740,7 @@ static void mv_pp22_link_event(struct net_device *dev)
 			mv_gop110_port_disable(&port->priv->hw.gop,
 					       &port->mac_data);
 			port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
+			netdev_info(dev, "link down\n");
 		}
 	}
 }
