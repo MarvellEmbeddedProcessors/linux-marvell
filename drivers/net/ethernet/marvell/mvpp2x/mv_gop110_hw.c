@@ -1152,7 +1152,6 @@ bool mv_gop110_port_is_link_up(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_KR:
 	case PHY_INTERFACE_MODE_SFI:
 	case PHY_INTERFACE_MODE_XFI:
-		udelay(1000);
 		return mv_gop110_xlg_mac_link_status_get(gop, port_num);
 	break;
 	default:
