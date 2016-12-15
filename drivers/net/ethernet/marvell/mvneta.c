@@ -1903,7 +1903,10 @@ err_drop_frame:
 
 			skb->protocol = eth_type_trans(skb, dev);
 			mvneta_rx_csum(pp, rx_status, skb);
-			napi_gro_receive(napi, skb);
+			if (dev->features & NETIF_F_GRO)
+				napi_gro_receive(napi, skb);
+			else
+				netif_receive_skb(skb);
 
 			rcvd_pkts++;
 			rcvd_bytes += rx_bytes;
@@ -1958,7 +1961,10 @@ err_drop_frame:
 
 		mvneta_rx_csum(pp, rx_status, skb);
 
-		napi_gro_receive(napi, skb);
+		if (dev->features & NETIF_F_GRO)
+			napi_gro_receive(napi, skb);
+		else
+			netif_receive_skb(skb);
 	}
 
 	if (rcvd_pkts) {
