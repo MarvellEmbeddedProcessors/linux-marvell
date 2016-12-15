@@ -616,6 +616,18 @@ static u32 mvreg_read(struct mvneta_port *pp, u32 offset)
 	return readl(pp->base + offset);
 }
 
+/* Write helper method */
+static inline void mvreg_relaxed_write(struct mvneta_port *pp, u32 offset, u32 data)
+{
+	writel_relaxed(data, pp->base + offset);
+}
+
+/* Read helper method */
+static inline u32 mvreg_relaxed_read(struct mvneta_port *pp, u32 offset)
+{
+	return readl_relaxed(pp->base + offset);
+}
+
 /* Increment txq get counter */
 static void mvneta_txq_inc_get(struct mvneta_tx_queue *txq)
 {
@@ -742,6 +754,9 @@ static void mvneta_rxq_desc_num_update(struct mvneta_port *pp,
 		return;
 	}
 
+	/* do one write barrier and use relaxed write in loop */
+	__iowmb();
+
 	/* Only 255 descriptors can be added at once */
 	while ((rx_done > 0) || (rx_filled > 0)) {
 		if (rx_done <= 0xff) {
@@ -758,7 +773,7 @@ static void mvneta_rxq_desc_num_update(struct mvneta_port *pp,
 			val |= 0xff << MVNETA_RXQ_ADD_NON_OCCUPIED_SHIFT;
 			rx_filled -= 0xff;
 		}
-		mvreg_write(pp, MVNETA_RXQ_STATUS_UPDATE_REG(rxq->id), val);
+		mvreg_relaxed_write(pp, MVNETA_RXQ_STATUS_UPDATE_REG(rxq->id), val);
 	}
 }
 
@@ -1174,10 +1189,10 @@ static void mvneta_percpu_unmask_interrupt(void *arg)
 	/* All the queue are unmasked, but actually only the ones
 	 * mapped to this CPU will be unmasked
 	 */
-	mvreg_write(pp, MVNETA_INTR_NEW_MASK,
-		    MVNETA_RX_INTR_MASK_ALL |
-		    MVNETA_TX_INTR_MASK_ALL |
-		    MVNETA_MISCINTR_INTR_MASK);
+	mvreg_relaxed_write(pp, MVNETA_INTR_NEW_MASK,
+			    MVNETA_RX_INTR_MASK_ALL |
+			    MVNETA_TX_INTR_MASK_ALL |
+			    MVNETA_MISCINTR_INTR_MASK);
 }
 
 static void mvneta_percpu_mask_interrupt(void *arg)
@@ -1187,9 +1202,9 @@ static void mvneta_percpu_mask_interrupt(void *arg)
 	/* All the queue are masked, but actually only the ones
 	 * mapped to this CPU will be masked
 	 */
-	mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
-	mvreg_write(pp, MVNETA_INTR_OLD_MASK, 0);
-	mvreg_write(pp, MVNETA_INTR_MISC_MASK, 0);
+	mvreg_relaxed_write(pp, MVNETA_INTR_NEW_MASK, 0);
+	mvreg_relaxed_write(pp, MVNETA_INTR_OLD_MASK, 0);
+	mvreg_relaxed_write(pp, MVNETA_INTR_MISC_MASK, 0);
 }
 
 static void mvneta_percpu_clear_intr_cause(void *arg)
@@ -1199,9 +1214,9 @@ static void mvneta_percpu_clear_intr_cause(void *arg)
 	/* All the queue are cleared, but actually only the ones
 	 * mapped to this CPU will be cleared
 	 */
-	mvreg_write(pp, MVNETA_INTR_NEW_CAUSE, 0);
-	mvreg_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
-	mvreg_write(pp, MVNETA_INTR_OLD_CAUSE, 0);
+	mvreg_relaxed_write(pp, MVNETA_INTR_NEW_CAUSE, 0);
+	mvreg_relaxed_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
+	mvreg_relaxed_write(pp, MVNETA_INTR_OLD_CAUSE, 0);
 }
 
 /* This method sets defaults to the NETA port:
@@ -1483,12 +1498,12 @@ static void mvneta_txq_sent_desc_dec(struct mvneta_port *pp,
 	/* Only 255 TX descriptors can be updated at once */
 	while (sent_desc > 0xff) {
 		val = 0xff << MVNETA_TXQ_DEC_SENT_SHIFT;
-		mvreg_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
+		mvreg_relaxed_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
 		sent_desc = sent_desc - 0xff;
 	}
 
 	val = sent_desc << MVNETA_TXQ_DEC_SENT_SHIFT;
-	mvreg_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
+	mvreg_relaxed_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
 }
 
 /* Get number of TX descriptors already sent by HW */
@@ -2480,7 +2495,7 @@ static irqreturn_t mvneta_isr(int irq, void *dev_id)
 {
 	struct mvneta_port *pp = (struct mvneta_port *)dev_id;
 
-	mvreg_write(pp, MVNETA_INTR_NEW_MASK, 0);
+	mvreg_relaxed_write(pp, MVNETA_INTR_NEW_MASK, 0);
 	napi_schedule(&pp->napi);
 
 	return IRQ_HANDLED;
@@ -2541,11 +2556,11 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
 	}
 
 	/* Read cause register */
-	cause_rx_tx = mvreg_read(pp, MVNETA_INTR_NEW_CAUSE);
+	cause_rx_tx = mvreg_relaxed_read(pp, MVNETA_INTR_NEW_CAUSE);
 	if (cause_rx_tx & MVNETA_MISCINTR_INTR_MASK) {
-		u32 cause_misc = mvreg_read(pp, MVNETA_INTR_MISC_CAUSE);
+		u32 cause_misc = mvreg_relaxed_read(pp, MVNETA_INTR_MISC_CAUSE);
 
-		mvreg_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
+		mvreg_relaxed_write(pp, MVNETA_INTR_MISC_CAUSE, 0);
 		if (pp->use_inband_status && (cause_misc &
 				(MVNETA_CAUSE_PHY_STATUS_CHANGE |
 				 MVNETA_CAUSE_LINK_CHANGE |
@@ -2580,10 +2595,10 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
 
 		if (pp->neta_armada3700) {
 			local_irq_save(flags);
-			mvreg_write(pp, MVNETA_INTR_NEW_MASK,
-				    MVNETA_RX_INTR_MASK(rxq_number) |
-				    MVNETA_TX_INTR_MASK(txq_number) |
-				    MVNETA_MISCINTR_INTR_MASK);
+			mvreg_relaxed_write(pp, MVNETA_INTR_NEW_MASK,
+					    MVNETA_RX_INTR_MASK(rxq_number) |
+					    MVNETA_TX_INTR_MASK(txq_number) |
+					    MVNETA_MISCINTR_INTR_MASK);
 			local_irq_restore(flags);
 		} else {
 			enable_percpu_irq(pp->dev->irq, 0);
