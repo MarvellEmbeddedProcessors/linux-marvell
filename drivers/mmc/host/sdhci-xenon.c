@@ -591,6 +591,48 @@ static int sdhci_xenon_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int sdhci_xenon_suspend(struct device *dev)
+{
+	int ret;
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+
+	ret = sdhci_suspend_host(host);
+
+	if (pltfm_host->clk)
+		clk_disable_unprepare(pltfm_host->clk);
+
+	return ret;
+}
+
+static int sdhci_xenon_resume(struct device *dev)
+{
+	int ret;
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+
+	if (pltfm_host->clk)
+		ret = clk_prepare_enable(pltfm_host->clk);
+
+	ret = xenon_sdhc_probe(host);
+
+	/* Initialize SoC PAD register for MMC PHY voltage
+	 * For eMMC, it is set to 1.8V
+	 * For SD/SDIO, it is set to 3.3V
+	 */
+	xenon_soc_pad_ctrl(host, MMC_SIGNAL_VOLTAGE_330);
+
+	ret = sdhci_resume_host(host);
+
+	return ret;
+}
+
+static const struct dev_pm_ops sdhci_xenon_pmops = {
+	SET_SYSTEM_SLEEP_PM_OPS(sdhci_xenon_suspend, sdhci_xenon_resume)
+};
+#endif
+
 static const struct of_device_id sdhci_xenon_dt_ids[] = {
 	{ .compatible = "marvell,armada8k-sdhci",},
 	{ .compatible = "marvell,armada-3700-sdhci",},
@@ -602,7 +644,9 @@ static struct platform_driver sdhci_xenon_driver = {
 	.driver	= {
 		.name	= "xenon-sdhci",
 		.of_match_table = sdhci_xenon_dt_ids,
-		.pm = &sdhci_pltfm_pmops,
+#ifdef CONFIG_PM
+		.pm = &sdhci_xenon_pmops,
+#endif
 	},
 	.probe	= sdhci_xenon_probe,
 	.remove	= sdhci_xenon_remove,
