@@ -206,7 +206,7 @@ static inline int mv_pp2x_txq_free_count(struct mv_pp2x_txq_pcpu *txq_pcpu)
 	int index_modulo = (txq_pcpu->txq_get_index - txq_pcpu->txq_put_index +
 				txq_pcpu->size) % txq_pcpu->size;
 
-	if (index_modulo == 0)
+	if (unlikely(index_modulo == 0))
 		return txq_pcpu->size;
 
 	return index_modulo;
@@ -214,7 +214,7 @@ static inline int mv_pp2x_txq_free_count(struct mv_pp2x_txq_pcpu *txq_pcpu)
 
 static void mv_pp2x_txq_inc_get(struct mv_pp2x_txq_pcpu *txq_pcpu)
 {
-	if (txq_pcpu->txq_get_index == txq_pcpu->size - 1)
+	if (unlikely(txq_pcpu->txq_get_index == txq_pcpu->size - 1))
 		txq_pcpu->txq_get_index = 0;
 	else
 		txq_pcpu->txq_get_index++;
@@ -223,7 +223,7 @@ static void mv_pp2x_txq_inc_get(struct mv_pp2x_txq_pcpu *txq_pcpu)
 void mv_pp2x_txq_inc_error(struct mv_pp2x_txq_pcpu *txq_pcpu, int num)
 {
 	for (; num > 0; num--) {
-		if (txq_pcpu->txq_put_index < 1)
+		if (unlikely(txq_pcpu->txq_put_index < 1))
 			txq_pcpu->txq_put_index = txq_pcpu->size - 1;
 		else
 			txq_pcpu->txq_put_index--;
@@ -242,7 +242,7 @@ void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
 	txq_pcpu->data_size[txq_pcpu->txq_put_index] = tx_desc->data_size;
 	txq_pcpu->tx_buffs[txq_pcpu->txq_put_index] =
 				mv_pp2x_txdesc_phys_addr_get(pp2_ver, tx_desc);
-	if (txq_pcpu->txq_put_index == txq_pcpu->size - 1)
+	if (unlikely(txq_pcpu->txq_put_index == txq_pcpu->size - 1))
 		txq_pcpu->txq_put_index = 0;
 	else
 		txq_pcpu->txq_put_index++;
@@ -256,7 +256,7 @@ void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,
 
 static void mv_pp2x_txq_dec_put(struct mv_pp2x_txq_pcpu *txq_pcpu)
 {
-	if (txq_pcpu->txq_put_index == 0)
+	if (unlikely(txq_pcpu->txq_put_index == 0))
 		txq_pcpu->txq_put_index = txq_pcpu->size - 1;
 	else
 		txq_pcpu->txq_put_index--;
