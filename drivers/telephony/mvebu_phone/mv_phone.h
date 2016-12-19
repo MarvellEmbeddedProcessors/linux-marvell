@@ -231,6 +231,7 @@ struct mv_phone_dev {
 	struct device_node *np;
 	struct clk *clk;
 	u32 pclk_freq_mhz;
+	u8 irq_count;
 	int irq[3];
 
 	/* Used to preserve TDM registers across suspend/resume */

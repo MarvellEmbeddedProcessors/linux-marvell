@@ -134,12 +134,10 @@ static DECLARE_TASKLET(tdm2c_if_stop_tasklet, tdm2c_if_stop_channels, 0);
 #endif
 static DEFINE_SPINLOCK(tdm_if_lock);
 static u8 *rx_buff, *tx_buff;
-static char irqnr[3];
 static u32 rx_miss, tx_miss;
 static u32 rx_over, tx_under;
 static struct proc_dir_entry *tdm_stats;
 static int pcm_enable;
-static int irq_init;
 static int tdm_init;
 static int buff_size;
 static u16 test_enable;
@@ -151,56 +149,6 @@ static int pcm_stop_status;
 static u32 pcm_start_stop_state;
 static u32 is_pcm_stopping;
 static u32 mv_tdm_unit_type;
-
-/* Get TDM unit interrupt number */
-static u32 mv_phone_get_irq(int id)
-{
-	return priv->irq[id];
-}
-
-/* Initialize the TDM subsystem. */
-static int mv_phone_init(struct mv_phone_params *tdm_params)
-{
-	struct mv_phone_data hal_data;
-	u8 spi_mode = 0;
-	int ret;
-
-	hal_data.spi_mode = spi_mode;
-
-	switch (priv->pclk_freq_mhz) {
-	case 8:
-		hal_data.frame_ts = MV_FRAME_128TS;
-		break;
-	case 4:
-		hal_data.frame_ts = MV_FRAME_64TS;
-		break;
-	case 2:
-		hal_data.frame_ts = MV_FRAME_32TS;
-		break;
-	default:
-		hal_data.frame_ts = MV_FRAME_128TS;
-		break;
-	}
-
-	switch (priv->tdm_type) {
-	case MV_TDM_UNIT_TDM2C:
-		ret = tdm2c_init(priv->tdm_base, priv->dev, tdm_params, &hal_data);
-		break;
-	case MV_TDM_UNIT_TDMMC:
-		ret = tdmmc_init(priv->tdm_base, priv->dev, tdm_params, &hal_data);
-		/* Issue SLIC reset */
-		ret |= tdmmc_reset_slic();
-		break;
-	default:
-		dev_err(&priv->parent->dev, "%s: undefined TDM type\n",
-			__func__);
-		return -EINVAL;
-	}
-
-	priv->tdm_params = tdm_params;
-
-	return ret;
-}
 
 static int proc_tdm_status_show(struct seq_file *m, void *v)
 {
@@ -360,10 +308,63 @@ static void tdmmc_if_pcm_stop(void)
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
+/* Initialize the TDM subsystem. */
+static int tdm_hw_init(struct mv_phone_params *tdm_params)
+{
+	struct mv_phone_data hal_data;
+	u8 spi_mode = 0;
+	int ret;
+
+	hal_data.spi_mode = spi_mode;
+
+	switch (priv->pclk_freq_mhz) {
+	case 8:
+		hal_data.frame_ts = MV_FRAME_128TS;
+		break;
+	case 4:
+		hal_data.frame_ts = MV_FRAME_64TS;
+		break;
+	case 2:
+		hal_data.frame_ts = MV_FRAME_32TS;
+		break;
+	default:
+		hal_data.frame_ts = MV_FRAME_128TS;
+		break;
+	}
+
+	switch (priv->tdm_type) {
+	case MV_TDM_UNIT_TDM2C:
+		ret = tdm2c_init(priv->tdm_base, priv->dev, tdm_params, &hal_data);
+
+		/* Soft reset to PCM I/F */
+		tdm2c_pcm_if_reset();
+
+		break;
+	case MV_TDM_UNIT_TDMMC:
+		ret = tdmmc_init(priv->tdm_base, priv->dev, tdm_params, &hal_data);
+
+		/* Issue SLIC reset */
+		ret |= tdmmc_reset_slic();
+
+		/* WA to stop the MCDMA gracefully after tdmmc initialization */
+		tdmmc_if_pcm_stop();
+
+		break;
+	default:
+		dev_err(&priv->parent->dev, "%s: undefined TDM type\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	priv->tdm_params = tdm_params;
+
+	return ret;
+}
+
 int tdm_if_init(struct tal_params *tal_params)
 {
 	struct mv_phone_params tdm_params;
-	int ret;
+	int i, irqs_requested, ret;
 
 	if (tdm_init) {
 		dev_warn(priv->dev, "Marvell Telephony Driver already started...\n");
@@ -379,98 +380,66 @@ int tdm_if_init(struct tal_params *tal_params)
 	}
 
 	/* Reset globals */
-	rx_buff = tx_buff = NULL;
-	irq_init = 0;
 	tdm_init = 0;
 
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C) {
-
-		pcm_enable = 0;
-		is_pcm_stopping = 0;
-		pcm_stop_flag = 0;
-		pcm_stop_status = 0;
-	}
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDMMC)
-		pcm_enable = 1;
-#endif
+	pcm_enable = 0;
+	is_pcm_stopping = 0;
+	pcm_stop_flag = 0;
+	pcm_stop_status = 0;
 
 #ifdef CONFIG_MV_TDM_EXT_STATS
 	pcm_stop_fail = 0;
 #endif
-
 	/* Calculate Rx/Tx buffer size(use in callbacks) */
 	buff_size = (tal_params->pcm_format * tal_params->total_lines * 80 *
-			(tal_params->sampling_period/MV_TDM_BASE_SAMPLING_PERIOD));
-
-	/* Extract TDM irq number */
-	irqnr[0] = mv_phone_get_irq(0);
-#if (!(defined(CONFIG_MACH_ARMADA_38X) || defined(CONFIG_MACH_ARMADA_XP)))
-	irqnr[1] = mv_phone_get_irq(1);
-	irqnr[2] = mv_phone_get_irq(2);
-#endif
+		    (tal_params->sampling_period/MV_TDM_BASE_SAMPLING_PERIOD));
 
 	/* Assign TDM parameters */
 	memcpy(&tdm_params, tal_params, sizeof(struct mv_phone_params));
 
-	/* TDM init */
-	ret = mv_phone_init(&tdm_params);
+	/* TDM hardware initialization */
+	ret = tdm_hw_init(&tdm_params);
 	if (ret) {
-		dev_err(priv->dev, "%s: Error, TDM initialization failed !!!\n", __func__);
+		dev_err(priv->dev, "%s: TDM initialization failed\n", __func__);
 		return ret;
 	}
-	tdm_init = 1;
 
-	/* Soft reset to PCM I/F */
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C)
-		tdm2c_pcm_if_reset();
-#endif
-
-	/* Register TDM interrupt */
-	ret = request_irq(irqnr[0], tdm_if_isr, 0x0, "tdm", NULL);
-	if (ret) {
-		dev_err(priv->dev, "%s: Failed to connect irq(%d)\n", __func__, irqnr[0]);
-		return ret;
-	}
-#if (!(defined(CONFIG_MACH_ARMADA_38X) || defined(CONFIG_MACH_ARMADA_XP)))
-	/* XXX add proper error path */
-	ret = request_irq(irqnr[1], tdm_if_isr, 0x0, "tdm", NULL);
-	if (ret) {
-		dev_err(priv->dev, "%s: Failed to connect irq(%d)\n", __func__, irqnr[1]);
-		return ret;
-	}
-	ret = request_irq(irqnr[2], tdm_if_isr, 0x0, "tdm", NULL);
-	if (ret) {
-		dev_err(priv->dev, "%s: Failed to connect irq(%d)\n", __func__, irqnr[2]);
-		return ret;
-	}
-#endif
-
-	irq_init = 1;
-
-	/* Create TDM procFS statistics */
+	/* Create TDM procfs statistics */
 	tdm_stats = proc_mkdir("tdm", NULL);
 	if (tdm_stats != NULL) {
 		if (!proc_create("tdm_stats", S_IRUGO, tdm_stats, &proc_tdm_operations))
 			return -ENOMEM;
 	}
 
-	/* WA to stop the MCDMA gracefully after commUnit initialization */
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDMMC)
-		tdmmc_if_pcm_stop();
-#endif
-	return 0;
-}
+	/* Register TDM interrupts */
+	irqs_requested = 0;
+	for (i = 0; i < priv->irq_count; i++) {
+		ret = request_irq(priv->irq[i], tdm_if_isr, 0x0, "tdm", NULL);
+		if (ret) {
+			dev_err(priv->dev, "%s: Failed to connect irq(%d)\n",
+				__func__, priv->irq[i]);
+			goto err_irq;
+		}
+		irqs_requested++;
+	}
 
+	tdm_init = 1;
+
+	return 0;
+
+err_irq:
+	for (i = 0; i < irqs_requested; i++)
+		free_irq(priv->irq[i], NULL);
+
+	return ret;
+}
 
 void tdm_if_exit(void)
 {
+	int i;
+
 	/* Check if already stopped */
-	if (!irq_init && !pcm_enable && !tdm_init)
+	if (!pcm_enable && !tdm_init)
 		return;
 
 	/* Stop PCM channels */
@@ -496,16 +465,6 @@ void tdm_if_exit(void)
 		}
 #endif
 
-	if (irq_init) {
-		/* Release interrupt */
-		free_irq(irqnr[0], NULL);
-#if (!(defined(CONFIG_MACH_ARMADA_38X) || defined(CONFIG_MACH_ARMADA_XP)))
-		free_irq(irqnr[1], NULL);
-		free_irq(irqnr[2], NULL);
-#endif
-		irq_init = 0;
-	}
-
 	if (tdm_init) {
 #ifdef CONFIG_MV_TDM2C_SUPPORT
 		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C)
@@ -518,6 +477,10 @@ void tdm_if_exit(void)
 		/* Remove proc directory & entries */
 		remove_proc_entry("tdm_stats", tdm_stats);
 		remove_proc_entry("tdm", NULL);
+
+		/* Release interrupt */
+		for (i = 0; i < priv->irq_count; i++)
+			free_irq(priv->irq[i], NULL);
 
 		tdm_init = 0;
 	}
@@ -1047,7 +1010,7 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct resource *mem;
-	int err;
+	int err, i;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(struct mv_phone_dev),
 			    GFP_KERNEL);
@@ -1061,13 +1024,6 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->tdm_base))
 		return PTR_ERR(priv->tdm_base);
 	tdm_base = (long int)priv->tdm_base;
-
-	/* Get the first IRQ */
-	priv->irq[0] = platform_get_irq(pdev, 0);
-	if (priv->irq[0] <= 0) {
-		dev_err(&pdev->dev, "platform_get_irq failed\n");
-		return -ENXIO;
-	}
 
 	priv->clk = devm_clk_get(&pdev->dev, "gateclk");
 	if (PTR_ERR(priv->clk) == -EPROBE_DEFER)
@@ -1108,6 +1064,7 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		if (err < 0)
 			goto err_clk;
 
+		priv->irq_count = 1;
 
 		tal_set_if(&tdm2c_if);
 		mv_tdm_unit_type = MV_TDM_UNIT_TDM2C;
@@ -1119,6 +1076,8 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		if (err < 0)
 			goto err_clk;
 
+		priv->irq_count = 1;
+
 		tal_set_if(&tdmmc_if);
 		mv_tdm_unit_type = MV_TDM_UNIT_TDMMC;
 	}
@@ -1127,20 +1086,20 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		priv->tdm_type = MV_TDM_UNIT_TDMMC;
 		mv_tdmmc_a8k_windows(&pdev->dev, priv->tdm_base);
 
-		/* Get the second and third IRQ - in A8k there are 3 IRQs */
-		priv->irq[1] = platform_get_irq(pdev, 1);
-		if (priv->irq[1] <= 0) {
-			dev_err(&pdev->dev, "platform_get_irq failed\n");
-			return -ENXIO;
-		}
-		priv->irq[2] = platform_get_irq(pdev, 2);
-		if (priv->irq[2] <= 0) {
-			dev_err(&pdev->dev, "platform_get_irq failed\n");
-			return -ENXIO;
-		}
+		priv->irq_count = 3;
 
 		tal_set_if(&tdmmc_if);
 		mv_tdm_unit_type = MV_TDM_UNIT_TDMMC;
+	}
+
+	/* Obtain IRQ numbers */
+	for (i = 0; i < priv->irq_count; i++) {
+		priv->irq[i] = platform_get_irq(pdev, i);
+		if (priv->irq[i] <= 0) {
+			dev_err(&pdev->dev, "platform_get_irq %d failed\n", i);
+			err = priv->irq[i];
+			goto err_clk;
+		}
 	}
 
 	mv_phone_enabled = 1;
