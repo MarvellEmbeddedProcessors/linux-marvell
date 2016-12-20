@@ -113,7 +113,7 @@
 				clock-frequency = <160000>;
 				max-frequency = <40000>;
 				fifo-mode;
-				interrupts = <0 0 4>;
+				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
 			};
 
