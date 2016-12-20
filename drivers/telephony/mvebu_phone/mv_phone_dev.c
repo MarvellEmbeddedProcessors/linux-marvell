@@ -434,6 +434,23 @@ err_irq:
 	return ret;
 }
 
+void tdm2c_pcm_disable(void)
+{
+	u32 max_poll = 0;
+
+	tdm2c_if_pcm_stop();
+
+	while ((is_pcm_stopping != 0) && (max_poll < 20)) {
+		mdelay(1);
+		max_poll++;
+	}
+
+	if (max_poll >= 20)
+		dev_warn(priv->dev, "%s: stopping pcm channels exceeded 20ms\n",
+			 __func__);
+
+}
+
 void tdm_if_exit(void)
 {
 	int i;
@@ -443,37 +460,34 @@ void tdm_if_exit(void)
 		return;
 
 	/* Stop PCM channels */
-	if (pcm_enable)
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-		tdm2c_if_pcm_stop();
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-		tdmmc_if_pcm_stop();
-#endif
-
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C) {
-			u32 max_poll = 0;
-
-			while ((is_pcm_stopping != 0) && (max_poll < 20)) {
-				mdelay(1);
-				max_poll++;
-			}
-
-			if (max_poll >= 20)
-				dev_warn(priv->dev, "%s: waiting for pcm channels to stop exceeded 20ms\n", __func__);
+	if (pcm_enable) {
+		switch (priv->tdm_type) {
+		case MV_TDM_UNIT_TDM2C:
+			tdm2c_pcm_disable();
+			break;
+		case MV_TDM_UNIT_TDMMC:
+			tdmmc_if_pcm_stop();
+			break;
+		default:
+			dev_err(&priv->parent->dev, "%s: undefined TDM type\n",
+				__func__);
 		}
-#endif
+	}
 
+	/* Disable TDM and release resources */
 	if (tdm_init) {
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C)
+		switch (priv->tdm_type) {
+		case MV_TDM_UNIT_TDM2C:
 			tdm2c_release();
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-		if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDMMC)
+			break;
+		case MV_TDM_UNIT_TDMMC:
 			tdmmc_release();
-#endif
+			break;
+		default:
+			dev_err(&priv->parent->dev, "%s: undefined TDM type\n",
+				__func__);
+		}
+
 		/* Remove proc directory & entries */
 		remove_proc_entry("tdm_stats", tdm_stats);
 		remove_proc_entry("tdm", NULL);
