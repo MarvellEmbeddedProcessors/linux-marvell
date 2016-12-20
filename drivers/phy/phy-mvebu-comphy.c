@@ -116,16 +116,12 @@ static void mvebu_comphy_clr_phy_selector(struct mvebu_comphy_priv *priv,
 	reg = readl(priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
 	field = reg & mask;
 
-	/* We need to clear comphy selector for network protocols but we can't
-	 * clear the whole register because we don't support SATA initialization.
-	 * So we clear a comphy field only if two conditions present:
-	 *	1. The value of the comphy selector is NOT '0' (if it's '0',
-	 *	   comphy selector is unconnected, no need to update).
-	 *	2. The value of the comphy is NOT 0x4 (0x4 selects SATA).
-	 * If both condition present, set '0' for the specific comphy.
+	/* Clear comphy selector - if it was set by u-boot.
+	 * (might be that this comphy was configured as PCIe/USB,
+	 * in such case, no need to clear comphy selector because PCIe/USB
+	 * are controlled by hpipe selector.
 	 */
-	if (field &&
-	    !(field == (COMMON_SELECTOR_COMPHYN_SATA << comphy_offset))) {
+	if (field) {
 		reg &= ~mask;
 		writel(reg, priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
 	}
