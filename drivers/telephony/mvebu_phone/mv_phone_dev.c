@@ -122,16 +122,12 @@ static void tdm_if_pcm_rx_process(unsigned long arg);
 static void tdm_if_pcm_tx_process(unsigned long arg);
 
 /* TDM SW Reset */
-#ifdef CONFIG_MV_TDM2C_SUPPORT
 static void tdm2c_if_stop_channels(unsigned long args);
-#endif
 
 /* Globals */
 static DECLARE_TASKLET(tdm_if_rx_tasklet, tdm_if_pcm_rx_process, 0);
 static DECLARE_TASKLET(tdm_if_tx_tasklet, tdm_if_pcm_tx_process, 0);
-#ifdef CONFIG_MV_TDM2C_SUPPORT
 static DECLARE_TASKLET(tdm2c_if_stop_tasklet, tdm2c_if_stop_channels, 0);
-#endif
 static DEFINE_SPINLOCK(tdm_if_lock);
 static u8 *rx_buff, *tx_buff;
 static u32 rx_miss, tx_miss;
@@ -507,17 +503,23 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 	int ret = 0;
 
 	/* Extract interrupt information from low level ISR */
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C)
+	switch (priv->tdm_type) {
+	case MV_TDM_UNIT_TDM2C:
 		ret = tdm2c_intr_low(&tdm_int_info);
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDMMC)
-		ret = tdmmc_intr_low(&tdm_int_info);
-#endif
+		break;
+	case MV_TDM_UNIT_TDMMC:
+		tdmmc_intr_low(&tdm_int_info);
+		break;
+	default:
+		dev_err(&priv->parent->dev, "%s: undefined TDM type\n", __func__);
+		return IRQ_NONE;
+	}
 
 	int_type = tdm_int_info.int_type;
-	/*device_id = tdm_int_info.cs;*/
+
+	/* Nothing to do - return */
+	if (int_type == MV_EMPTY_INT)
+		return IRQ_HANDLED;
 
 	/* Handle ZSI interrupts */
 	if (mv_phone_get_slic_board_type() == MV_BOARD_SLIC_ZSI_ID)
@@ -526,39 +528,31 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 	else if (mv_phone_get_slic_board_type() == MV_BOARD_SLIC_ISI_ID)
 		silabs_if_isi_interrupt();
 
-	/* Nothing to do - return */
-	if (int_type == MV_EMPTY_INT)
-		goto out;
+	if (ret && (pcm_stop_status == 0))	{
+		pcm_stop_status = 1;
 
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C) {
-		if ((ret == -1) && (pcm_stop_status == 0))	{
-			pcm_stop_status = 1;
-
-			/* If Rx/Tx tasklets already scheduled, let them do the work. */
-			if ((!rx_buff) && (!tx_buff)) {
-				dev_dbg(priv->dev, "Stopping the TDM\n");
-				tdm2c_if_pcm_stop();
-				pcm_stop_flag = 0;
-				tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
-			} else {
-				dev_dbg(priv->dev, "Some tasklet is running, mark pcm_stop_flag\n");
-				pcm_stop_flag = 1;
-			}
+		/* If Rx/Tx tasklets are already scheduled, let them do the work */
+		if (!rx_buff && !tx_buff) {
+			dev_dbg(priv->dev, "Stopping the TDM\n");
+			tdm2c_if_pcm_stop();
+			pcm_stop_flag = 0;
+			tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
+		} else {
+			dev_dbg(priv->dev, "Tasklet already runningstop_flag\n");
+			pcm_stop_flag = 1;
 		}
-
-		/* Restarting PCM, skip Rx/Tx handling */
-		if (pcm_stop_status)
-			goto skip_rx_tx;
 	}
-#endif
+
+	/* Restarting PCM, skip Rx/Tx handling */
+	if (pcm_stop_status)
+		goto skip_rx_tx;
 
 	/* Support multiple interrupt handling */
 	/* RX interrupt */
 	if (int_type & MV_RX_INT) {
 		if (rx_buff != NULL) {
 			rx_miss++;
-			dev_dbg(priv->dev, "%s: Warning, missed Rx buffer processing !!!\n", __func__);
+			dev_dbg(priv->dev, "%s: Rx buffer not ready\n", __func__);
 		} else {
 			rx_buff = tdm_int_info.tdm_rx_buff;
 			/* Schedule Rx processing within SOFT_IRQ context */
@@ -571,7 +565,7 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 	if (int_type & MV_TX_INT) {
 		if (tx_buff != NULL) {
 			tx_miss++;
-			dev_dbg(priv->dev, "%s: Warning, missed Tx buffer processing !!!\n", __func__);
+			dev_dbg(priv->dev, "%s: Tx buffer not ready\n", __func__);
 		} else {
 			tx_buff = tdm_int_info.tdm_tx_buff;
 			/* Schedule Tx processing within SOFT_IRQ context */
@@ -580,43 +574,35 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 		}
 	}
 
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-	if (tdm_if_unit_type_get() == MV_TDM_UNIT_TDM2C) {
-		/* TDM2CH PCM channels stop indication */
-		if ((int_type & MV_CHAN_STOP_INT) && (tdm_int_info.data == 4)) {
-			dev_dbg(priv->dev, "%s: Received MV_CHAN_STOP_INT indication\n", __func__);
-			is_pcm_stopping = 0;
-			if (pcm_start_stop_state) {
-				dev_dbg(priv->dev, "%s: calling to tdm2c_if_pcm_start()\n", __func__);
-				pcm_enable = 0;
-				tdm2c_if_pcm_start();
-			}
+
+	/* TDM2CH PCM channels stop indication */
+	if ((int_type & MV_CHAN_STOP_INT) && (tdm_int_info.data == 4)) {
+		dev_dbg(priv->dev, "%s: Received MV_CHAN_STOP_INT indication\n",
+			__func__);
+		is_pcm_stopping = 0;
+		if (pcm_start_stop_state) {
+			dev_dbg(priv->dev, "%s: calling to tdm2c_if_pcm_start()\n",
+				__func__);
+			pcm_enable = 0;
+			tdm2c_if_pcm_start();
 		}
 	}
-#endif
 
-#ifdef CONFIG_MV_TDM2C_SUPPORT
 skip_rx_tx:
-#endif
-
 	/* PHONE interrupt, Lantiq specific */
-	if (int_type & MV_PHONE_INT) {
-		/* TBD */
+	if (int_type & MV_PHONE_INT)
 		drv_dxt_if_signal_interrupt();
-	}
 
 	/* ERROR interrupt */
-	if (int_type & MV_ERROR_INT) {
-		if (int_type & MV_RX_ERROR_INT)
-			rx_over++;
+	if (int_type & MV_RX_ERROR_INT)
+		rx_over++;
 
-		if (int_type & MV_TX_ERROR_INT)
-			tx_under++;
-	}
+	if (int_type & MV_TX_ERROR_INT)
+		tx_under++;
 
-out:
 	return IRQ_HANDLED;
 }
+
 /* Rx tasklet */
 static void tdm_if_pcm_rx_process(unsigned long arg)
 {
@@ -720,7 +706,6 @@ static void tdm_if_pcm_tx_process(unsigned long arg)
 #endif
 }
 
-#ifdef CONFIG_MV_TDM2C_SUPPORT
 static void tdm2c_if_stop_channels(unsigned long arg)
 {
 	u32 max_poll = 0;
@@ -750,7 +735,6 @@ static void tdm2c_if_stop_channels(unsigned long arg)
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 	tdm2c_if_pcm_start();
 }
-#endif
 
 static int tdm_if_control(int cmd, void *arg)
 {
