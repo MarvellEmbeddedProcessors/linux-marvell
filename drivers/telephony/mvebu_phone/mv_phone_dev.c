@@ -147,7 +147,8 @@ static int pcm_stop_status;
 static u32 pcm_start_stop_state;
 static u32 is_pcm_stopping;
 
-static int proc_tdm_status_show(struct seq_file *m, void *v)
+/* Statistic printout in userspace via /proc/tdm */
+static int mv_phone_status_show(struct seq_file *m, void *v)
 {
 #ifdef CONFIG_MV_TDM_EXT_STATS
 	struct mv_phone_extended_stats tdm_ext_stats;
@@ -179,13 +180,13 @@ static int proc_tdm_status_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-static int proc_tdm_status_open(struct inode *inode, struct file *file)
+static int mv_phone_status_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, proc_tdm_status_show, PDE_DATA(inode));
+	return single_open(file, mv_phone_status_show, PDE_DATA(inode));
 }
 
-static const struct file_operations proc_tdm_operations = {
-	.open		= proc_tdm_status_open,
+static const struct file_operations mv_phone_operations = {
+	.open		= mv_phone_status_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= seq_release,
@@ -399,7 +400,7 @@ int tdm_if_init(struct tal_params *tal_params)
 	/* Create TDM procfs statistics */
 	tdm_stats = proc_mkdir("tdm", NULL);
 	if (tdm_stats != NULL) {
-		if (!proc_create("tdm_stats", S_IRUGO, tdm_stats, &proc_tdm_operations))
+		if (!proc_create("tdm_stats", S_IRUGO, tdm_stats, &mv_phone_operations))
 			return -ENOMEM;
 	}
 
