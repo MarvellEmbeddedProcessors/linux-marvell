@@ -298,12 +298,11 @@ mdio@15b000 {
 };
 
 sdhci@780000 {
-	compatible = "marvell,xenon-sdhci";
+	compatible = "marvell,armada8k-sdhci";
 	reg = <0x780000 0x300>;
 	interrupts = <ICU_GRP_NSR 27 IRQ_TYPE_LEVEL_HIGH>;
 	clock-names = "core";
 	clocks = <&cpm_syscon0 1 4>;
-	xenon,slotno = <0>;
 	dma-coherent;
 	status = "disabled";
 };

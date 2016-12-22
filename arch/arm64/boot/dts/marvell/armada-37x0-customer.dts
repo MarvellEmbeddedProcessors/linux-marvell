@@ -197,6 +197,7 @@
 				bus-width = <4>;
 				cd-gpios = <&gpio_sb 2 GPIO_ACTIVE_LOW>;
 				vqmmc-supply = <&vcc_sd_reg1>;
+				marvell,pad-type = "sd";
 				status = "disabled";
 				/* UPDATE */
 				pinctrl-names = "default";
@@ -204,10 +205,10 @@
 			};
 
 			sdhci0: sdhci@d8000 {
-				xenon,fixed-1-8v-pad-ctrl;
+				marvell,pad-type = "fixed-1-8v";
+				marvell,xenon-tun-count = <9>;
 				non-removable;
 				bus-width = <8>;
-				tuning-count = <9>;
 				status = "disabled";
 				/* UPDATE */
 				pinctrl-names = "default";

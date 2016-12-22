@@ -116,6 +116,7 @@
 				bus-width = <4>;
 				cd-gpios = <&gpio_nb 3 GPIO_ACTIVE_LOW>;
 				no-1-8-v;
+				marvell,pad-type = "sd";
 				status = "okay";
 
 				pinctrl-names = "default";
