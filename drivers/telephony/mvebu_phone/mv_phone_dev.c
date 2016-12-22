@@ -112,8 +112,6 @@ int use_pclk_external;
 int mv_phone_enabled;
 struct mv_phone_dev *priv;
 
-#define TDM_STOP_MAX_POLLING_TIME 20 /* ms */
-
 /* TDM Interrupt Service Routine */
 static irqreturn_t tdm_if_isr(int irq, void *dev_id);
 
@@ -213,7 +211,7 @@ static void tdm2c_if_pcm_start(void)
 		tdm2c_pcm_start();
 	} else {
 		pcm_start_stop_state++;
-		while (is_pcm_stopping && max_poll < TDM_STOP_MAX_POLLING_TIME) {
+		while (is_pcm_stopping && max_poll < MV_TDM_STOP_POLLING_TIMEOUT) {
 			spin_unlock_irqrestore(&tdm_if_lock, flags);
 			mdelay(1);
 			max_poll++;
@@ -427,20 +425,21 @@ err_irq:
 	return ret;
 }
 
+/* Disable TDM2C PCM */
 void tdm2c_pcm_disable(void)
 {
 	u32 max_poll = 0;
 
 	tdm2c_if_pcm_stop();
 
-	while ((is_pcm_stopping != 0) && (max_poll < 20)) {
+	while ((is_pcm_stopping != 0) && (max_poll < MV_TDM_STOP_POLLING_TIMEOUT)) {
 		mdelay(1);
 		max_poll++;
 	}
 
-	if (max_poll >= 20)
-		dev_warn(priv->dev, "%s: stopping pcm channels exceeded 20ms\n",
-			 __func__);
+	if (max_poll >= MV_TDM_STOP_POLLING_TIMEOUT)
+		dev_warn(priv->dev, "\n%s: Channels disabling timeout (%dms)\n",
+			 __func__, MV_TDM_STOP_POLLING_TIMEOUT);
 
 }
 
