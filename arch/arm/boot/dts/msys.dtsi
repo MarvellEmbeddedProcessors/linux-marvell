@@ -44,6 +44,9 @@
 	soc {
 		compatible = "marvell,armadaxp-mbus", "simple-bus";
 
+		pcie-mem-aperture = <0xe8000000 0x7e00000>;
+		pcie-io-aperture  = <0xefe00000 0x100000>;
+
 		bootrom {
 			compatible = "marvell,bootrom";
 			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
