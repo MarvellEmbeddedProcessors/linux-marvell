@@ -120,7 +120,8 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id);
 /* Rx/Tx Tasklets  */
 static void tdm2c_if_pcm_rx_process(unsigned long arg);
 static void tdmmc_if_pcm_rx_process(unsigned long arg);
-static void tdm_if_pcm_tx_process(unsigned long arg);
+static void tdm2c_if_pcm_tx_process(unsigned long arg);
+static void tdmmc_if_pcm_tx_process(unsigned long arg);
 
 /* TDM SW Reset */
 static void tdm2c_if_stop_channels(unsigned long args);
@@ -128,7 +129,8 @@ static void tdm2c_if_stop_channels(unsigned long args);
 /* Globals */
 static DECLARE_TASKLET(tdm2c_if_rx_tasklet, tdm2c_if_pcm_rx_process, 0);
 static DECLARE_TASKLET(tdmmc_if_rx_tasklet, tdmmc_if_pcm_rx_process, 0);
-static DECLARE_TASKLET(tdm_if_tx_tasklet, tdm_if_pcm_tx_process, 0);
+static DECLARE_TASKLET(tdm2c_if_tx_tasklet, tdm2c_if_pcm_tx_process, 0);
+static DECLARE_TASKLET(tdmmc_if_tx_tasklet, tdmmc_if_pcm_tx_process, 0);
 static DECLARE_TASKLET(tdm2c_if_stop_tasklet, tdm2c_if_stop_channels, 0);
 static DEFINE_SPINLOCK(tdm_if_lock);
 static u8 *rx_buff, *tx_buff;
@@ -146,7 +148,6 @@ static int pcm_stop_flag;
 static int pcm_stop_status;
 static u32 pcm_start_stop_state;
 static u32 is_pcm_stopping;
-static u32 mv_tdm_unit_type;
 
 static int proc_tdm_status_show(struct seq_file *m, void *v)
 {
@@ -191,11 +192,6 @@ static const struct file_operations proc_tdm_operations = {
 	.llseek		= seq_lseek,
 	.release	= seq_release,
 };
-
-static u32 tdm_if_unit_type_get(void)
-{
-	return mv_tdm_unit_type;
-}
 
 static void tdm2c_if_pcm_start(void)
 {
@@ -502,6 +498,7 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 {
 	struct mv_phone_intr_info tdm_int_info;
 	struct tasklet_struct *tdm_rx_tasklet = NULL;
+	struct tasklet_struct *tdm_tx_tasklet = NULL;
 	u32 int_type;
 	int ret = 0;
 
@@ -510,10 +507,12 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 	case MV_TDM_UNIT_TDM2C:
 		ret = tdm2c_intr_low(&tdm_int_info);
 		tdm_rx_tasklet = &tdm2c_if_rx_tasklet;
+		tdm_tx_tasklet = &tdm2c_if_tx_tasklet;
 		break;
 	case MV_TDM_UNIT_TDMMC:
 		tdmmc_intr_low(&tdm_int_info);
 		tdm_rx_tasklet = &tdmmc_if_rx_tasklet;
+		tdm_tx_tasklet = &tdmmc_if_tx_tasklet;
 		break;
 	default:
 		dev_err(&priv->parent->dev, "%s: undefined TDM type\n", __func__);
@@ -575,7 +574,7 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 			tx_buff = tdm_int_info.tdm_tx_buff;
 			/* Schedule Tx processing within SOFT_IRQ context */
 			dev_dbg(priv->dev, "%s: schedule Tx tasklet\n", __func__);
-			tasklet_hi_schedule(&tdm_if_tx_tasklet);
+			tasklet_hi_schedule(tdm_tx_tasklet);
 		}
 	}
 
@@ -665,13 +664,10 @@ static void tdmmc_if_pcm_rx_process(unsigned long arg)
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
-/* Tx tasklet */
-static void tdm_if_pcm_tx_process(unsigned long arg)
+/* Tx tasklets */
+static void tdm2c_if_pcm_tx_process(unsigned long arg)
 {
 	unsigned long flags;
-	u32 tdm_type;
-
-	tdm_type = tdm_if_unit_type_get();
 
 	if (pcm_enable) {
 		if (tx_buff == NULL) {
@@ -682,20 +678,10 @@ static void tdm_if_pcm_tx_process(unsigned long arg)
 		/* Dispatch Tx handler */
 		tal_mmp_tx(tx_buff, buff_size);
 
-		if (test_enable == 0) {
-#ifdef CONFIG_MV_TDM2C_SUPPORT
+		if (!test_enable) {
 			/* Fill Tx aggregated buffer */
-			if (tdm_type == MV_TDM_UNIT_TDM2C) {
-				if (tdm2c_tx(tx_buff) != 0)
-					dev_warn(priv->dev, "%s: could not fill Tx buffer\n", __func__);
-			}
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-			if (tdm_type == MV_TDM_UNIT_TDMMC) {
-				if (tdmmc_tx(tx_buff) != 0)
-					dev_warn(priv->dev, "%s: could not fill Tx buffer\n", __func__);
-			}
-#endif
+			if (tdm2c_tx(tx_buff) != 0)
+				dev_warn(priv->dev, "%s: Could not fill Tx buffer\n", __func__);
 		}
 	}
 
@@ -704,18 +690,39 @@ static void tdm_if_pcm_tx_process(unsigned long arg)
 	tx_buff = NULL;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-	if (tdm_type == MV_TDM_UNIT_TDM2C) {
-		if ((pcm_stop_flag == 1) && !rx_buff) {
-			dev_dbg(priv->dev, "Stopping TDM from Tx tasklet\n");
-			tdm2c_if_pcm_stop();
-			spin_lock_irqsave(&tdm_if_lock, flags);
-			pcm_stop_flag = 0;
-			spin_unlock_irqrestore(&tdm_if_lock, flags);
-			tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
+	if ((pcm_stop_flag == 1) && !rx_buff) {
+		dev_dbg(priv->dev, "Stopping TDM from Tx tasklet\n");
+		tdm2c_if_pcm_stop();
+		spin_lock_irqsave(&tdm_if_lock, flags);
+		pcm_stop_flag = 0;
+		spin_unlock_irqrestore(&tdm_if_lock, flags);
+		tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
+	}
+}
+
+static void tdmmc_if_pcm_tx_process(unsigned long arg)
+{
+	unsigned long flags;
+
+	if (pcm_enable) {
+		if (tx_buff == NULL) {
+			dev_warn(priv->dev, "%s: Error, empty Tx processing\n", __func__);
+			return;
+		}
+
+		/* Dispatch Tx handler */
+		tal_mmp_tx(tx_buff, buff_size);
+
+		if (!test_enable) {
+			if (tdmmc_tx(tx_buff) != 0)
+				dev_warn(priv->dev, "%s: Could not fill Tx buffer\n", __func__);
 		}
 	}
-#endif
+
+	spin_lock_irqsave(&tdm_if_lock, flags);
+	/* Clear tx_buff for next iteration */
+	tx_buff = NULL;
+	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
 static void tdm2c_if_stop_channels(unsigned long arg)
@@ -1077,7 +1084,6 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		priv->irq_count = 1;
 
 		tal_set_if(&tdm2c_if);
-		mv_tdm_unit_type = MV_TDM_UNIT_TDM2C;
 	}
 
 	if (of_device_is_compatible(priv->np, "marvell,armada-xp-tdm")) {
@@ -1089,7 +1095,6 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		priv->irq_count = 1;
 
 		tal_set_if(&tdmmc_if);
-		mv_tdm_unit_type = MV_TDM_UNIT_TDMMC;
 	}
 
 	if (of_device_is_compatible(priv->np, "marvell,armada-a8k-tdm")) {
@@ -1099,7 +1104,6 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		priv->irq_count = 3;
 
 		tal_set_if(&tdmmc_if);
-		mv_tdm_unit_type = MV_TDM_UNIT_TDMMC;
 	}
 
 	/* Obtain IRQ numbers */
