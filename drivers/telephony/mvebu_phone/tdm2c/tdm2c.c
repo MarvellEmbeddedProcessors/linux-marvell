@@ -990,3 +990,34 @@ void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdmExtStats)
 	tdmExtStats->pcm_restart_count = pcm_restart_count;
 }
 #endif
+
+/* Initialize decoding windows */
+int tdm2c_set_mbus_windows(struct device *dev, void __iomem *regs,
+			   const struct mbus_dram_target_info *dram)
+{
+	int i;
+
+	if (!dram) {
+		dev_err(dev, "no mbus dram info\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < TDM_MBUS_MAX_WIN; i++) {
+		writel(0, regs + TDM_WIN_CTRL_REG(i));
+		writel(0, regs + TDM_WIN_BASE_REG(i));
+	}
+
+	for (i = 0; i < dram->num_cs; i++) {
+		const struct mbus_dram_window *cs = dram->cs + i;
+
+		/* Write size, attributes and target id to control register */
+		writel(((cs->size - 1) & 0xffff0000) |
+			(cs->mbus_attr << 8) |
+			(dram->mbus_dram_target_id << 4) | 1,
+			regs + TDM_WIN_CTRL_REG(i));
+		/* Write base address to base register */
+		writel(cs->base, regs + TDM_WIN_BASE_REG(i));
+	}
+
+	return 0;
+}
