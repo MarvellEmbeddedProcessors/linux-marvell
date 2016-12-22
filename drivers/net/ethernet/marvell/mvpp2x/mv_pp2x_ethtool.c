@@ -531,10 +531,13 @@ void mv_pp2x_ethtool_set_gmac_config(struct mv_port_link_status status, struct g
 {
 	mv_gop110_force_link_mode_set(gop, mac, false, true);
 	mv_gop110_gmac_set_autoneg(gop, mac, cmd->autoneg);
-	if (cmd->autoneg)
+	if (cmd->autoneg) {
 		mv_gop110_autoneg_restart(gop, mac);
-	else
+		mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_AN_SYM);
+	} else {
 		mv_gop110_gmac_speed_duplex_set(gop, gop_port, status.speed, status.duplex);
+		mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_AN_NO);
+	}
 	mv_gop110_force_link_mode_set(gop, mac, false, false);
 }
 
@@ -578,12 +581,15 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 	int gop_port = mac->gop_index;
 	bool phy_mode_update = false;
 
-	if (port->priv->pp2_version == PPV21)
+	/* PPv21 - only PHY should be configured
+	*  PPv22 - set Serdes&GoP configuration and then configure PHY
+	*/
+	if (port->priv->pp2_version == PPV21) {
 		if (!port->mac_data.phy_dev)
 			return -ENODEV;
-
-	if (port->mac_data.phy_dev)
-		return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
+		else
+			return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
+	}
 
 	if (port->comphy)  {
 		int comphy_old_mode, comphy_new_mode;
@@ -653,6 +659,9 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 		pr_err("Wrong port mode (%d)\n", mac->phy_mode);
 		return -1;
 	}
+
+	if (port->mac_data.phy_dev)
+		return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
 
 	return 0;
 }
