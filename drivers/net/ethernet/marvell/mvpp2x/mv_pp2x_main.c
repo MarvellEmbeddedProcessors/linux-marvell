@@ -1728,6 +1728,8 @@ static void mv_pp22_link_event(struct net_device *dev)
 					      &port->mac_data);
 			mv_pp2x_egress_enable(port);
 			mv_pp2x_ingress_enable(port);
+			netif_carrier_on(dev);
+			netif_tx_wake_all_queues(dev);
 			mv_gop110_port_events_unmask(&port->priv->hw.gop,
 						     &port->mac_data);
 			port->mac_data.flags |= MV_EMAC_F_LINK_UP;
@@ -1739,6 +1741,8 @@ static void mv_pp22_link_event(struct net_device *dev)
 						   &port->mac_data);
 			mv_gop110_port_disable(&port->priv->hw.gop,
 					       &port->mac_data);
+			netif_carrier_off(dev);
+			netif_tx_stop_all_queues(dev);
 			port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
 			netdev_info(dev, "link down\n");
 		}
