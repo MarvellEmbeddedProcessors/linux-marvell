@@ -118,14 +118,16 @@ struct mv_phone_dev *priv;
 static irqreturn_t tdm_if_isr(int irq, void *dev_id);
 
 /* Rx/Tx Tasklets  */
-static void tdm_if_pcm_rx_process(unsigned long arg);
+static void tdm2c_if_pcm_rx_process(unsigned long arg);
+static void tdmmc_if_pcm_rx_process(unsigned long arg);
 static void tdm_if_pcm_tx_process(unsigned long arg);
 
 /* TDM SW Reset */
 static void tdm2c_if_stop_channels(unsigned long args);
 
 /* Globals */
-static DECLARE_TASKLET(tdm_if_rx_tasklet, tdm_if_pcm_rx_process, 0);
+static DECLARE_TASKLET(tdm2c_if_rx_tasklet, tdm2c_if_pcm_rx_process, 0);
+static DECLARE_TASKLET(tdmmc_if_rx_tasklet, tdmmc_if_pcm_rx_process, 0);
 static DECLARE_TASKLET(tdm_if_tx_tasklet, tdm_if_pcm_tx_process, 0);
 static DECLARE_TASKLET(tdm2c_if_stop_tasklet, tdm2c_if_stop_channels, 0);
 static DEFINE_SPINLOCK(tdm_if_lock);
@@ -499,6 +501,7 @@ void tdm_if_exit(void)
 static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 {
 	struct mv_phone_intr_info tdm_int_info;
+	struct tasklet_struct *tdm_rx_tasklet = NULL;
 	u32 int_type;
 	int ret = 0;
 
@@ -506,9 +509,11 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 	switch (priv->tdm_type) {
 	case MV_TDM_UNIT_TDM2C:
 		ret = tdm2c_intr_low(&tdm_int_info);
+		tdm_rx_tasklet = &tdm2c_if_rx_tasklet;
 		break;
 	case MV_TDM_UNIT_TDMMC:
 		tdmmc_intr_low(&tdm_int_info);
+		tdm_rx_tasklet = &tdmmc_if_rx_tasklet;
 		break;
 	default:
 		dev_err(&priv->parent->dev, "%s: undefined TDM type\n", __func__);
@@ -557,7 +562,7 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 			rx_buff = tdm_int_info.tdm_rx_buff;
 			/* Schedule Rx processing within SOFT_IRQ context */
 			dev_dbg(priv->dev, "%s: schedule Rx tasklet\n", __func__);
-			tasklet_hi_schedule(&tdm_if_rx_tasklet);
+			tasklet_hi_schedule(tdm_rx_tasklet);
 		}
 	}
 
@@ -603,35 +608,23 @@ skip_rx_tx:
 	return IRQ_HANDLED;
 }
 
-/* Rx tasklet */
-static void tdm_if_pcm_rx_process(unsigned long arg)
+/* Rx tasklets */
+static void tdm2c_if_pcm_rx_process(unsigned long arg)
 {
 	unsigned long flags;
-	u32 tdm_type;
 
-	tdm_type = tdm_if_unit_type_get();
 	if (pcm_enable) {
 		if (rx_buff == NULL) {
 			dev_warn(priv->dev, "%s: Error, empty Rx processing\n", __func__);
 			return;
 		}
-#ifdef CONFIG_MV_TDM2C_SUPPORT
+
 		/* Fill TDM Rx aggregated buffer */
-		if (tdm_type == MV_TDM_UNIT_TDM2C) {
-			if (tdm2c_rx(rx_buff) == 0)
-				tal_mmp_rx(rx_buff, buff_size); /* Dispatch Rx handler */
-			else
-				dev_warn(priv->dev, "%s: could not fill Rx buffer\n", __func__);
-		}
-#endif
-#ifdef CONFIG_MV_TDMMC_SUPPORT
-		if (tdm_type == MV_TDM_UNIT_TDMMC) {
-			if (tdmmc_rx(rx_buff) == 0)
-				tal_mmp_rx(rx_buff, buff_size); /* Dispatch Rx handler */
-			else
-				dev_warn(priv->dev, "%s: could not fill Rx buffer\n", __func__);
-		}
-#endif
+		if (tdm2c_rx(rx_buff) == 0)
+			/* Dispatch Rx handler */
+			tal_mmp_rx(rx_buff, buff_size);
+		else
+			dev_warn(priv->dev, "%s: Could not fill Rx buffer\n", __func__);
 	}
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
@@ -639,18 +632,37 @@ static void tdm_if_pcm_rx_process(unsigned long arg)
 	rx_buff = NULL;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 
-#ifdef CONFIG_MV_TDM2C_SUPPORT
-	if (tdm_type == MV_TDM_UNIT_TDM2C) {
-		if ((pcm_stop_flag == 1) && !tx_buff) {
-			dev_dbg(priv->dev, "Stopping TDM from Rx tasklet\n");
-			tdm2c_if_pcm_stop();
-			spin_lock_irqsave(&tdm_if_lock, flags);
-			pcm_stop_flag = 0;
-			spin_unlock_irqrestore(&tdm_if_lock, flags);
-			tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
-		}
+	if ((pcm_stop_flag == 1) && !tx_buff) {
+		dev_dbg(priv->dev, "Stopping TDM from Rx tasklet\n");
+		tdm2c_if_pcm_stop();
+		spin_lock_irqsave(&tdm_if_lock, flags);
+		pcm_stop_flag = 0;
+		spin_unlock_irqrestore(&tdm_if_lock, flags);
+		tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
 	}
-#endif
+}
+
+static void tdmmc_if_pcm_rx_process(unsigned long arg)
+{
+	unsigned long flags;
+
+	if (pcm_enable) {
+		if (rx_buff == NULL) {
+			dev_warn(priv->dev, "%s: Error, empty Rx processing\n", __func__);
+			return;
+		}
+
+		if (tdmmc_rx(rx_buff) == 0)
+			/* Dispatch Rx handler */
+			tal_mmp_rx(rx_buff, buff_size);
+		else
+			dev_warn(priv->dev, "%s: could not fill Rx buffer\n", __func__);
+	}
+
+	spin_lock_irqsave(&tdm_if_lock, flags);
+	/* Clear rx_buff for next iteration */
+	rx_buff = NULL;
+	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
 /* Tx tasklet */
