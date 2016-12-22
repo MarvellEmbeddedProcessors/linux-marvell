@@ -122,16 +122,14 @@ static void tdm2c_if_pcm_rx_process(unsigned long arg);
 static void tdmmc_if_pcm_rx_process(unsigned long arg);
 static void tdm2c_if_pcm_tx_process(unsigned long arg);
 static void tdmmc_if_pcm_tx_process(unsigned long arg);
-
-/* TDM SW Reset */
-static void tdm2c_if_stop_channels(unsigned long args);
+static void tdm2c_if_reset_channels(unsigned long arg);
 
 /* Globals */
 static DECLARE_TASKLET(tdm2c_if_rx_tasklet, tdm2c_if_pcm_rx_process, 0);
 static DECLARE_TASKLET(tdmmc_if_rx_tasklet, tdmmc_if_pcm_rx_process, 0);
 static DECLARE_TASKLET(tdm2c_if_tx_tasklet, tdm2c_if_pcm_tx_process, 0);
 static DECLARE_TASKLET(tdmmc_if_tx_tasklet, tdmmc_if_pcm_tx_process, 0);
-static DECLARE_TASKLET(tdm2c_if_stop_tasklet, tdm2c_if_stop_channels, 0);
+static DECLARE_TASKLET(tdm2c_if_reset_tasklet, tdm2c_if_reset_channels, 0);
 static DEFINE_SPINLOCK(tdm_if_lock);
 static u8 *rx_buff, *tx_buff;
 static u32 rx_miss, tx_miss;
@@ -540,7 +538,7 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 			dev_dbg(priv->dev, "Stopping the TDM\n");
 			tdm2c_if_pcm_stop();
 			pcm_stop_flag = 0;
-			tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
+			tasklet_hi_schedule(&tdm2c_if_reset_tasklet);
 		} else {
 			dev_dbg(priv->dev, "Tasklet already runningstop_flag\n");
 			pcm_stop_flag = 1;
@@ -637,7 +635,7 @@ static void tdm2c_if_pcm_rx_process(unsigned long arg)
 		spin_lock_irqsave(&tdm_if_lock, flags);
 		pcm_stop_flag = 0;
 		spin_unlock_irqrestore(&tdm_if_lock, flags);
-		tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
+		tasklet_hi_schedule(&tdm2c_if_reset_tasklet);
 	}
 }
 
@@ -696,7 +694,7 @@ static void tdm2c_if_pcm_tx_process(unsigned long arg)
 		spin_lock_irqsave(&tdm_if_lock, flags);
 		pcm_stop_flag = 0;
 		spin_unlock_irqrestore(&tdm_if_lock, flags);
-		tasklet_hi_schedule(&tdm2c_if_stop_tasklet);
+		tasklet_hi_schedule(&tdm2c_if_reset_tasklet);
 	}
 }
 
@@ -725,24 +723,27 @@ static void tdmmc_if_pcm_tx_process(unsigned long arg)
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
-static void tdm2c_if_stop_channels(unsigned long arg)
+/* TDM2C restart channel callback */
+static void tdm2c_if_reset_channels(unsigned long arg)
 {
 	u32 max_poll = 0;
 	unsigned long flags;
-	void __iomem *tdm_base = get_tdm_base();
 
 	/* Wait for all channels to stop  */
-	while (((readl(tdm_base + CH_ENABLE_REG(0)) & 0x101) ||
-		(readl(tdm_base + CH_ENABLE_REG(1)) & 0x101)) && (max_poll < 30)) {
+	while (((readl(priv->tdm_base + CH_ENABLE_REG(0)) & CH_RXTX_EN_MASK) ||
+		(readl(priv->tdm_base + CH_ENABLE_REG(1)) & CH_RXTX_EN_MASK)) &&
+		(max_poll < MV_TDM_STOP_POLLING_TIMEOUT)) {
+
 		mdelay(1);
 		max_poll++;
 	}
 
 	dev_dbg(priv->dev, "Finished polling on channels disable\n");
-	if (max_poll >= 30) {
-		writel(0, tdm_base + CH_ENABLE_REG(0));
-		writel(0, tdm_base + CH_ENABLE_REG(1));
-		dev_warn(priv->dev, "\n\npolling on channels disabling exceeded 30ms\n\n");
+	if (max_poll >= MV_TDM_STOP_POLLING_TIMEOUT) {
+		writel(0, priv->tdm_base + CH_ENABLE_REG(0));
+		writel(0, priv->tdm_base + CH_ENABLE_REG(1));
+		dev_warn(priv->dev, "\n%s: Channels disabling timeout (%dms)\n",
+			 __func__, MV_TDM_STOP_POLLING_TIMEOUT);
 #ifdef CONFIG_MV_TDM_EXT_STATS
 		pcm_stop_fail++;
 #endif
@@ -752,6 +753,8 @@ static void tdm2c_if_stop_channels(unsigned long arg)
 	spin_lock_irqsave(&tdm_if_lock, flags);
 	is_pcm_stopping = 0;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
+
+	/* Restart channels */
 	tdm2c_if_pcm_start();
 }
 

@@ -126,6 +126,7 @@
 #define CH_TX_CUR_ADDR_REG(ch)	(0x60 | ((ch) << 3))
 #define CH_RX_CUR_ADDR_REG(ch)	(0x64 | ((ch) << 3))
 #define CH_ENABLE_REG(ch)	(((ch) + 1) << 4)
+#define CH_RXTX_EN_MASK		0x101
 #define CH_BUFF_OWN_REG(ch)	(0x04 | (((ch) + 1) << 4))
 #define CH_TX_ADDR_REG(ch)	(0x08 | (((ch) + 1) << 4))
 #define CH_RX_ADDR_REG(ch)	(0x0c | (((ch) + 1) << 4))
@@ -254,6 +255,7 @@
 #define MV_TDM_MAX_SAMPLING_PERIOD		30	/* ms */
 #define MV_TDM_BASE_SAMPLING_PERIOD		10	/* ms */
 #define MV_TDM_TOTAL_CH_SAMPLES			80	/* samples */
+#define MV_TDM_STOP_POLLING_TIMEOUT		30	/* ms */
 
 /* TDM IRQ types */
 #define MV_EMPTY_INT		0
