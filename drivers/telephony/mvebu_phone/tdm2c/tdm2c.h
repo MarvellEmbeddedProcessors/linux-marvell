@@ -328,5 +328,7 @@ void tdm2c_regs_dump(void);
 void tdm2c_intr_enable(void);
 void tdm2c_intr_disable(void);
 void tdm2c_pcm_if_reset(void);
+int tdm2c_set_mbus_windows(struct device *dev, void __iomem *regs,
+			   const struct mbus_dram_target_info *dram);
 
 #endif /* _TDM2C_H_ */

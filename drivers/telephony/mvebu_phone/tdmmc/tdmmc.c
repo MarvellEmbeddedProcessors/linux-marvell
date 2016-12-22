@@ -984,3 +984,17 @@ int tdmmc_set_mbus_windows(struct device *dev, void __iomem *regs)
 	return 0;
 }
 
+/* Initialize decoding windows for Armada 8k SoC */
+int tdmmc_set_a8k_windows(struct device *dev, void __iomem *regs)
+{
+	int i;
+
+	for (i = 0; i < COMM_UNIT_MBUS_MAX_WIN; i++) {
+		writel(0xce00, regs + COMM_UNIT_WIN_CTRL_REG(i));
+		writel(0xffff0000, regs + COMM_UNIT_WIN_SIZE_REG(i));
+		if (i > 0)
+			writel(0x0, regs + COMM_UNIT_WIN_ENABLE_REG(i));
+	}
+
+	return 0;
+}
