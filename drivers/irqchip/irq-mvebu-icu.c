@@ -45,7 +45,8 @@
 
 #include <dt-bindings/interrupt-controller/mvebu-icu.h>
 
-#define ICU_MAX_IRQ_SIZE	128
+#define ICU_MAX_IRQS		207
+#define ICU_MAX_SPI_IRQ_IN_GIC	128
 #define ICU_GIC_SPI_BASE0	64
 #define ICU_GIC_SPI_BASE1	288
 
@@ -78,7 +79,7 @@ struct mvebu_icu_irq_data {
 };
 
 static DEFINE_SPINLOCK(icu_lock);
-static DECLARE_BITMAP(icu_irq_alloc, ICU_MAX_IRQ_SIZE);
+static DECLARE_BITMAP(icu_irq_alloc, ICU_MAX_SPI_IRQ_IN_GIC);
 
 static struct irq_chip mvebu_icu_irq_chip = {
 	.name			= "ICU",
@@ -103,8 +104,8 @@ static int mvebu_icu_irq_parent_domain_alloc(struct irq_domain *domain,
 
 	/* Find first free interrupt in ICU pool */
 	spin_lock(&icu_lock);
-	*irq_msg_num = find_first_zero_bit(icu_irq_alloc, ICU_MAX_IRQ_SIZE);
-	if (*irq_msg_num == ICU_MAX_IRQ_SIZE) {
+	*irq_msg_num = find_first_zero_bit(icu_irq_alloc, ICU_MAX_SPI_IRQ_IN_GIC);
+	if (*irq_msg_num == ICU_MAX_SPI_IRQ_IN_GIC) {
 		pr_err("No free ICU interrupt found\n");
 		spin_unlock(&icu_lock);
 		return -EINVAL;
@@ -252,6 +253,7 @@ static int __init mvebu_icu_of_init(struct device_node *node, struct device_node
 	struct mvebu_icu_irq_data *icu;
 	struct irq_domain *parent_domain;
 	u32 gicp_spi_reg[4];
+	u32 i, icu_int;
 
 	icu = kzalloc(sizeof(struct mvebu_icu_irq_data), GFP_KERNEL);
 	if (!icu)
@@ -279,7 +281,7 @@ static int __init mvebu_icu_of_init(struct device_node *node, struct device_node
 		goto err_iounmap;
 	}
 
-	icu->domain = irq_domain_add_hierarchy(parent_domain, 0, ICU_MAX_IRQ_SIZE,
+	icu->domain = irq_domain_add_hierarchy(parent_domain, 0, ICU_MAX_SPI_IRQ_IN_GIC,
 			node, &mvebu_icu_domain_ops, icu);
 	if (!icu->domain) {
 		pr_err("Failed to create ICU domain\n");
@@ -293,6 +295,15 @@ static int __init mvebu_icu_of_init(struct device_node *node, struct device_node
 	writel(gicp_spi_reg[1], icu->base + ICU_SETSPI_NSR_AL);
 	writel(gicp_spi_reg[2], icu->base + ICU_CLRSPI_NSR_AH);
 	writel(gicp_spi_reg[3], icu->base + ICU_CLRSPI_NSR_AL);
+
+	/* Clean all ICU interrupts with type SPI_NSR, required to avoid
+	** unpredictable SPI assignments done by firmware
+	**/
+	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
+		icu_int = readl(icu->base + ICU_INT_CFG(i));
+		if ((icu_int >> ICU_GROUP_OFFSET) == ICU_GRP_NSR)
+			writel(0x0, icu->base + ICU_INT_CFG(i));
+	}
 
 	pr_debug("ICU irq chip init successfully\n");
 
