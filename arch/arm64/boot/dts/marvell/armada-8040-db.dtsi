@@ -59,6 +59,7 @@
 	ap806 {
 		config-space {
 			sdhci@6e0000 {
+				marvell,xenon-emmc;
 				bus-width = <8>;
 				non-removable;
 			};
@@ -116,6 +117,9 @@
 			};
 			sdhci@780000 {
 				bus-width = <4>;
+				no-1-8-v;
+				non-removable;
+				marvell,pad-type = "sd";
 				non-removable;
 			};
 		};
