@@ -374,6 +374,20 @@ enum phy_mode phy_get_mode(struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(phy_get_mode);
 
+int phy_is_pll_locked(struct phy *phy)
+{
+	int ret;
+
+	if (!phy || !phy->ops->is_pll_locked)
+		return 0;
+
+	mutex_lock(&phy->mutex);
+	ret = phy->ops->is_pll_locked(phy);
+	mutex_unlock(&phy->mutex);
+
+	return ret;
+}
+
 /**
  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
  * @np: device_node for which to get the phy
