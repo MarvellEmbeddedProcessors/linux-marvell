@@ -109,7 +109,10 @@
 				usb-phy = <&usb3h1_phy>;
 			};
 			sdhci@780000 {
+				bus-width = <4>;
+				no-1-8-v;
 				non-removable;
+				marvell,pad-type = "sd";
 			};
 			spi@700680 {
 				spi-flash@0 {
