@@ -190,6 +190,9 @@ static const struct file_operations mv_phone_operations = {
 	.release	= seq_release,
 };
 
+/* TAL callbacks */
+
+/* PCM start */
 static void tdm2c_if_pcm_start(void)
 {
 	unsigned long flags;
@@ -258,6 +261,7 @@ static void tdmmc_if_pcm_start(void)
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
+/* PCM stop */
 static void tdm2c_if_pcm_stop(void)
 {
 	unsigned long flags;
@@ -299,7 +303,7 @@ static void tdmmc_if_pcm_stop(void)
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
-/* Initialize the TDM subsystem. */
+/* TDM low-level initialization */
 static int tdm_hw_init(struct mv_phone_params *tdm_params)
 {
 	struct mv_phone_data hal_data;
@@ -352,6 +356,7 @@ static int tdm_hw_init(struct mv_phone_params *tdm_params)
 	return ret;
 }
 
+/* Main TDM initialization routine */
 int tdm_if_init(struct tal_params *tal_params)
 {
 	struct mv_phone_params tdm_params;
@@ -443,6 +448,7 @@ void tdm2c_pcm_disable(void)
 
 }
 
+/* Main TDM deinitialization routine */
 void tdm_if_exit(void)
 {
 	int i;
@@ -492,6 +498,7 @@ void tdm_if_exit(void)
 	}
 }
 
+/* Common interrupt top-half handler */
 static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 {
 	struct mv_phone_intr_info tdm_int_info;
