@@ -989,52 +989,6 @@ static int mv_phone_dco_post_div_config(struct platform_device *pdev,
 	return 0;
 }
 
-/* Initialize decoding windows */
-static int mv_tdm2c_mbus_windows(struct device *dev, void __iomem *regs,
-				 const struct mbus_dram_target_info *dram)
-{
-	int i;
-
-	if (!dram) {
-		dev_err(dev, "no mbus dram info\n");
-		return -EINVAL;
-	}
-
-	for (i = 0; i < TDM_MBUS_MAX_WIN; i++) {
-		writel(0, regs + TDM_WIN_CTRL_REG(i));
-		writel(0, regs + TDM_WIN_BASE_REG(i));
-	}
-
-	for (i = 0; i < dram->num_cs; i++) {
-		const struct mbus_dram_window *cs = dram->cs + i;
-
-		/* Write size, attributes and target id to control register */
-		writel(((cs->size - 1) & 0xffff0000) |
-			(cs->mbus_attr << 8) |
-			(dram->mbus_dram_target_id << 4) | 1,
-			regs + TDM_WIN_CTRL_REG(i));
-		/* Write base address to base register */
-		writel(cs->base, regs + TDM_WIN_BASE_REG(i));
-	}
-
-	return 0;
-}
-
-/* Initialize decoding windows */
-static int mv_tdmmc_a8k_windows(struct device *dev, void __iomem *regs)
-{
-	int i;
-
-	for (i = 0; i < COMM_UNIT_MBUS_MAX_WIN; i++) {
-		writel(0xce00, regs + COMM_UNIT_WIN_CTRL_REG(i));
-		writel(0xffff0000, regs + COMM_UNIT_WIN_SIZE_REG(i));
-		if (i > 0)
-			writel(0x0, regs + COMM_UNIT_WIN_ENABLE_REG(i));
-	}
-
-	return 0;
-}
-
 static int mvebu_phone_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -1088,8 +1042,8 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		priv->tdm_type = MV_TDM_UNIT_TDM2C;
 		err = mv_phone_tdm_clk_pll_config(pdev);
 		err |= mv_phone_dco_post_div_config(pdev, priv->pclk_freq_mhz);
-		err |= mv_tdm2c_mbus_windows(&pdev->dev, priv->tdm_base,
-					     mv_mbus_dram_info());
+		err |= tdm2c_set_mbus_windows(&pdev->dev, priv->tdm_base,
+					      mv_mbus_dram_info());
 		if (err < 0)
 			goto err_clk;
 
@@ -1111,7 +1065,7 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 
 	if (of_device_is_compatible(priv->np, "marvell,armada-a8k-tdm")) {
 		priv->tdm_type = MV_TDM_UNIT_TDMMC;
-		mv_tdmmc_a8k_windows(&pdev->dev, priv->tdm_base);
+		tdmmc_set_a8k_windows(&pdev->dev, priv->tdm_base);
 
 		priv->irq_count = 3;
 
@@ -1172,8 +1126,8 @@ static int mvebu_phone_resume(struct device *dev)
 	struct platform_device *pdev = priv->parent;
 	int err, i;
 
-	err = mv_tdm2c_mbus_windows(dev, priv->tdm_base,
-				    mv_mbus_dram_info());
+	err = tdm2c_set_mbus_windows(dev, priv->tdm_base,
+				     mv_mbus_dram_info());
 	if (err < 0)
 		return err;
 

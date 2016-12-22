@@ -396,6 +396,7 @@ void tdmmc_intr_enable(u8 device_id);
 void tdmmc_intr_disable(u8 device_id);
 int tdmmc_reset_slic(void);
 int tdmmc_set_mbus_windows(struct device *dev, void __iomem *regs);
+int tdmmc_set_a8k_windows(struct device *dev, void __iomem *regs);
 
 #endif /* _TDMMC_H_ */
 
