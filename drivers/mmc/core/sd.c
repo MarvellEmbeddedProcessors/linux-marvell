@@ -627,8 +627,7 @@ static int mmc_sd_init_uhs_card(struct mmc_card *card)
 	 */
 	if (!mmc_host_is_spi(card->host) &&
 		(card->host->ios.timing == MMC_TIMING_UHS_SDR50 ||
-		 (!(card->host->caps2 & MMC_CAP2_NO_DDR50_TUNING) &&
-		 (card->host->ios.timing == MMC_TIMING_UHS_DDR50)) ||
+		 card->host->ios.timing == MMC_TIMING_UHS_DDR50 ||
 		 card->host->ios.timing == MMC_TIMING_UHS_SDR104)) {
 		err = mmc_execute_tuning(card);
 
