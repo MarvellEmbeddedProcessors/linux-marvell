@@ -498,6 +498,77 @@ void tdm_if_exit(void)
 	}
 }
 
+static int tdm_if_control(int cmd, void *arg)
+{
+	switch (cmd) {
+	case TDM_DEV_TDM_TEST_MODE_ENABLE:
+		test_enable = 1;
+		break;
+
+	case TDM_DEV_TDM_TEST_MODE_DISABLE:
+		test_enable = 0;
+		break;
+
+	default:
+		return -EINVAL;
+	};
+
+	return 0;
+}
+
+static int tdm2c_if_write(u8 *buffer, int size)
+{
+	if (test_enable)
+		return tdm2c_tx(buffer);
+
+	return 0;
+}
+
+static int tdmmc_if_write(u8 *buffer, int size)
+{
+	if (test_enable)
+		return tdmmc_tx(buffer);
+
+	return 0;
+}
+
+static void tdm_if_stats_get(struct tal_stats *tdm_if_stats)
+{
+	if (tdm_init == 0)
+		return;
+
+	tdm_if_stats->tdm_init = tdm_init;
+	tdm_if_stats->rx_miss = rx_miss;
+	tdm_if_stats->tx_miss = tx_miss;
+	tdm_if_stats->rx_over = rx_over;
+	tdm_if_stats->tx_under = tx_under;
+#ifdef CONFIG_MV_TDM_EXT_STATS
+	tdm2c_ext_stats_get(&tdm_if_stats->tdm_ext_stats);
+#endif
+}
+
+static struct tal_if tdm2c_if = {
+	.pcm_start	= tdm2c_if_pcm_start,
+	.pcm_stop	= tdm2c_if_pcm_stop,
+	.init		= tdm_if_init,
+	.exit		= tdm_if_exit,
+	.control	= tdm_if_control,
+	.write		= tdm2c_if_write,
+	.stats_get	= tdm_if_stats_get,
+};
+
+static struct tal_if tdmmc_if = {
+	.pcm_start	= tdmmc_if_pcm_start,
+	.pcm_stop	= tdmmc_if_pcm_stop,
+	.init		= tdm_if_init,
+	.exit		= tdm_if_exit,
+	.control	= tdm_if_control,
+	.write		= tdmmc_if_write,
+	.stats_get	= tdm_if_stats_get,
+};
+
+/* Interrupt handling and tasklet callbacks */
+
 /* Common interrupt top-half handler */
 static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 {
@@ -764,75 +835,6 @@ static void tdm2c_if_reset_channels(unsigned long arg)
 	/* Restart channels */
 	tdm2c_if_pcm_start();
 }
-
-static int tdm_if_control(int cmd, void *arg)
-{
-	switch (cmd) {
-	case TDM_DEV_TDM_TEST_MODE_ENABLE:
-		test_enable = 1;
-		break;
-
-	case TDM_DEV_TDM_TEST_MODE_DISABLE:
-		test_enable = 0;
-		break;
-
-	default:
-		return -EINVAL;
-	};
-
-	return 0;
-}
-
-static int tdm2c_if_write(u8 *buffer, int size)
-{
-	if (test_enable)
-		return tdm2c_tx(buffer);
-
-	return 0;
-}
-
-static int tdmmc_if_write(u8 *buffer, int size)
-{
-	if (test_enable)
-		return tdmmc_tx(buffer);
-
-	return 0;
-}
-
-static void tdm_if_stats_get(struct tal_stats *tdm_if_stats)
-{
-	if (tdm_init == 0)
-		return;
-
-	tdm_if_stats->tdm_init = tdm_init;
-	tdm_if_stats->rx_miss = rx_miss;
-	tdm_if_stats->tx_miss = tx_miss;
-	tdm_if_stats->rx_over = rx_over;
-	tdm_if_stats->tx_under = tx_under;
-#ifdef CONFIG_MV_TDM_EXT_STATS
-	tdm2c_ext_stats_get(&tdm_if_stats->tdm_ext_stats);
-#endif
-}
-
-static struct tal_if tdm2c_if = {
-	.init		= tdm_if_init,
-	.exit		= tdm_if_exit,
-	.pcm_start	= tdm2c_if_pcm_start,
-	.pcm_stop	= tdm2c_if_pcm_stop,
-	.control	= tdm_if_control,
-	.write		= tdm2c_if_write,
-	.stats_get	= tdm_if_stats_get,
-};
-
-static struct tal_if tdmmc_if = {
-	.init		= tdm_if_init,
-	.exit		= tdm_if_exit,
-	.pcm_start	= tdmmc_if_pcm_start,
-	.pcm_stop	= tdmmc_if_pcm_stop,
-	.control	= tdm_if_control,
-	.write		= tdmmc_if_write,
-	.stats_get	= tdm_if_stats_get,
-};
 
 /* Enable device interrupts. */
 void mv_phone_intr_enable(u8 dev_id)
