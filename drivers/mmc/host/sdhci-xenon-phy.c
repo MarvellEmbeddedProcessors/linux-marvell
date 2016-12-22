@@ -233,9 +233,12 @@ static int emmc_phy_init(struct sdhci_host *host)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	struct xenon_emmc_phy_regs *phy_regs = priv->emmc_phy_regs;
+	struct emmc_phy_params *params = priv->phy_params;
 
 	reg = sdhci_readl(host, phy_regs->timing_adj);
 	reg |= SDHCI_PHY_INITIALIZAION;
+	if (params->slow_mode)
+		reg |= SDHCI_TIMING_ADJUST_SLOW_MODE;
 	sdhci_writel(host, reg, phy_regs->timing_adj);
 
 	/* Add duration of FC_SYNC_RST */
@@ -325,7 +328,11 @@ static int emmc_phy_enable_dll(struct sdhci_host *host)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	struct xenon_emmc_phy_regs *phy_regs = priv->emmc_phy_regs;
+	struct emmc_phy_params *params = priv->phy_params;
 	u8 timeout;
+
+	if (params->slow_mode && (host->clock <= MMC_HIGH_52_MAX_DTR))
+		return 0;
 
 	if (WARN_ON(host->clock <= MMC_HIGH_52_MAX_DTR))
 		return -EINVAL;
@@ -380,6 +387,9 @@ static int emmc_phy_config_tuning(struct sdhci_host *host)
 	u32 reg, tuning_step;
 	int ret;
 	unsigned long flags;
+
+	if (params->slow_mode && (host->clock <= MMC_HIGH_52_MAX_DTR))
+		return 0;
 
 	if (WARN_ON(host->clock <= MMC_HIGH_52_MAX_DTR))
 		return -EINVAL;
