@@ -129,21 +129,6 @@ static DECLARE_TASKLET(tdm2c_if_tx_tasklet, tdm2c_if_pcm_tx_process, 0);
 static DECLARE_TASKLET(tdmmc_if_tx_tasklet, tdmmc_if_pcm_tx_process, 0);
 static DECLARE_TASKLET(tdm2c_if_reset_tasklet, tdm2c_if_reset_channels, 0);
 static DEFINE_SPINLOCK(tdm_if_lock);
-static u8 *rx_buff, *tx_buff;
-static u32 rx_miss, tx_miss;
-static u32 rx_over, tx_under;
-static struct proc_dir_entry *tdm_stats;
-static int pcm_enable;
-static int tdm_init;
-static int buff_size;
-static u16 test_enable;
-#ifdef CONFIG_MV_TDM_EXT_STATS
-static u32 pcm_stop_fail;
-#endif
-static int pcm_stop_flag;
-static int pcm_stop_status;
-static u32 pcm_start_stop_state;
-static u32 is_pcm_stopping;
 
 /* Statistic printout in userspace via /proc/tdm */
 static int mv_phone_status_show(struct seq_file *m, void *v)
@@ -152,11 +137,11 @@ static int mv_phone_status_show(struct seq_file *m, void *v)
 	struct mv_phone_extended_stats tdm_ext_stats;
 #endif
 
-	seq_printf(m, "tdm_init:	%u\n", tdm_init);
-	seq_printf(m, "rx_miss:		%u\n", rx_miss);
-	seq_printf(m, "tx_miss:		%u\n", tx_miss);
-	seq_printf(m, "rx_over:		%u\n", rx_over);
-	seq_printf(m, "tx_under:	%u\n", tx_under);
+	seq_printf(m, "tdm_init:	%u\n", priv->tdm_init);
+	seq_printf(m, "rx_miss:		%u\n", priv->rx_miss);
+	seq_printf(m, "tx_miss:		%u\n", priv->tx_miss);
+	seq_printf(m, "rx_over:		%u\n", priv->rx_over);
+	seq_printf(m, "tx_under:	%u\n", priv->tx_under);
 
 #ifdef CONFIG_MV_TDM_EXT_STATS
 	tdm2c_ext_stats_get(&tdm_ext_stats);
@@ -173,7 +158,7 @@ static int mv_phone_status_show(struct seq_file *m, void *v)
 	seq_printf(m, "int_tx1_miss	= %u\n", tdm_ext_stats.int_rx1_miss);
 	seq_printf(m, "int_tx1_miss	= %u\n", tdm_ext_stats.int_tx1_miss);
 	seq_printf(m, "pcm_restart_count= %u\n", tdm_ext_stats.pcm_restart_count);
-	seq_printf(m, "pcm_stop_fail	= %u\n", pcm_stop_fail);
+	seq_printf(m, "pcm_stop_fail	= %u\n", priv->pcm_stop_fail);
 #endif
 	return 0;
 }
@@ -200,43 +185,45 @@ static void tdm2c_if_pcm_start(void)
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
 
-	if (pcm_enable) {
+	if (priv->pcm_enable) {
 		spin_unlock_irqrestore(&tdm_if_lock, flags);
 		return;
 	}
 
-	pcm_enable = 1;
-	if (is_pcm_stopping == 0) {
-		pcm_stop_flag = 0;
-		pcm_stop_status = 0;
-		pcm_start_stop_state = 0;
-		rx_buff = tx_buff = NULL;
+	priv->pcm_enable = true;
+	if (!priv->pcm_is_stopping) {
+		priv->pcm_stop_flag = false;
+		priv->pcm_stop_status = false;
+		priv->pcm_start_stop_state = 0;
+		priv->rx_buff = NULL;
+		priv->tx_buff = NULL;
 		tdm2c_pcm_start();
 	} else {
-		pcm_start_stop_state++;
-		while (is_pcm_stopping && max_poll < MV_TDM_STOP_POLLING_TIMEOUT) {
+		priv->pcm_start_stop_state++;
+		while (priv->pcm_is_stopping && max_poll < MV_TDM_STOP_POLLING_TIMEOUT) {
 			spin_unlock_irqrestore(&tdm_if_lock, flags);
 			mdelay(1);
 			max_poll++;
 			spin_lock_irqsave(&tdm_if_lock, flags);
 		}
 
-		if (is_pcm_stopping) {
+		if (priv->pcm_is_stopping) {
 			/* Issue found or timeout */
 			if (tdm2c_pcm_stop_int_miss())
 				dev_dbg(priv->dev, "pcm stop issue found\n");
 			else
 				dev_dbg(priv->dev, "pcm stop timeout\n");
 
-			is_pcm_stopping = 0;
-			pcm_stop_flag = 0;
-			pcm_stop_status = 0;
-			pcm_start_stop_state = 0;
-			rx_buff = tx_buff = NULL;
+			priv->pcm_is_stopping = false;
+			priv->pcm_stop_flag = false;
+			priv->pcm_stop_status = false;
+			priv->pcm_start_stop_state = 0;
+			priv->rx_buff = NULL;
+			priv->tx_buff = NULL;
 			tdm2c_pcm_start();
 		} else {
 			dev_dbg(priv->dev, "pcm_start_stop_state(%d), max_poll=%d\n",
-				pcm_start_stop_state, max_poll);
+				priv->pcm_start_stop_state, max_poll);
 		}
 	}
 
@@ -249,13 +236,14 @@ static void tdmmc_if_pcm_start(void)
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
 
-	if (pcm_enable) {
+	if (priv->pcm_enable) {
 		spin_unlock_irqrestore(&tdm_if_lock, flags);
 		return;
 	}
 
-	pcm_enable = 1;
-	rx_buff = tx_buff = NULL;
+	priv->pcm_enable = true;
+	priv->rx_buff = NULL;
+	priv->tx_buff = NULL;
 	tdmmc_pcm_start();
 
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
@@ -268,19 +256,19 @@ static void tdm2c_if_pcm_stop(void)
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
 
-	if (!pcm_enable) {
+	if (!priv->pcm_enable) {
 		spin_unlock_irqrestore(&tdm_if_lock, flags);
 		return;
 	}
 
-	pcm_enable = 0;
-	if (is_pcm_stopping == 0) {
-		is_pcm_stopping = 1;
+	priv->pcm_enable = false;
+	if (!priv->pcm_is_stopping) {
+		priv->pcm_is_stopping = true;
 		tdm2c_pcm_stop();
 	} else {
-		pcm_start_stop_state--;
+		priv->pcm_start_stop_state--;
 		dev_dbg(priv->dev, "pcm_start_stop_state(%d)\n",
-			pcm_start_stop_state);
+			priv->pcm_start_stop_state);
 	}
 
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
@@ -292,12 +280,12 @@ static void tdmmc_if_pcm_stop(void)
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
 
-	if (!pcm_enable) {
+	if (!priv->pcm_enable) {
 		spin_unlock_irqrestore(&tdm_if_lock, flags);
 		return;
 	}
 
-	pcm_enable = 0;
+	priv->pcm_enable = false;
 	tdmmc_pcm_stop();
 
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
@@ -362,7 +350,7 @@ int tdm_if_init(struct tal_params *tal_params)
 	struct mv_phone_params tdm_params;
 	int i, irqs_requested, ret;
 
-	if (tdm_init) {
+	if (priv->tdm_init) {
 		dev_warn(priv->dev, "Marvell Telephony Driver already started...\n");
 		return 0;
 	}
@@ -375,20 +363,18 @@ int tdm_if_init(struct tal_params *tal_params)
 
 	}
 
-	/* Reset globals */
-	tdm_init = 0;
-
-	pcm_enable = 0;
-	is_pcm_stopping = 0;
-	pcm_stop_flag = 0;
-	pcm_stop_status = 0;
-
+	/* Reset operation flags */
+	priv->tdm_init = false;
+	priv->pcm_enable = false;
+	priv->pcm_is_stopping = false;
+	priv->pcm_stop_flag = false;
+	priv->pcm_stop_status = false;
 #ifdef CONFIG_MV_TDM_EXT_STATS
-	pcm_stop_fail = 0;
+	priv->pcm_stop_fail = 0;
 #endif
 	/* Calculate Rx/Tx buffer size(use in callbacks) */
-	buff_size = (tal_params->pcm_format * tal_params->total_lines * 80 *
-		    (tal_params->sampling_period/MV_TDM_BASE_SAMPLING_PERIOD));
+	priv->buff_size = (tal_params->pcm_format * tal_params->total_lines * 80 *
+			  (tal_params->sampling_period/MV_TDM_BASE_SAMPLING_PERIOD));
 
 	/* Assign TDM parameters */
 	memcpy(&tdm_params, tal_params, sizeof(struct mv_phone_params));
@@ -401,9 +387,10 @@ int tdm_if_init(struct tal_params *tal_params)
 	}
 
 	/* Create TDM procfs statistics */
-	tdm_stats = proc_mkdir("tdm", NULL);
-	if (tdm_stats != NULL) {
-		if (!proc_create("tdm_stats", S_IRUGO, tdm_stats, &mv_phone_operations))
+	priv->tdm_stats = proc_mkdir("tdm", NULL);
+	if (priv->tdm_stats) {
+		if (!proc_create("tdm_stats", S_IRUGO,
+				 priv->tdm_stats, &mv_phone_operations))
 			return -ENOMEM;
 	}
 
@@ -419,7 +406,7 @@ int tdm_if_init(struct tal_params *tal_params)
 		irqs_requested++;
 	}
 
-	tdm_init = 1;
+	priv->tdm_init = true;
 
 	return 0;
 
@@ -437,7 +424,7 @@ void tdm2c_pcm_disable(void)
 
 	tdm2c_if_pcm_stop();
 
-	while ((is_pcm_stopping != 0) && (max_poll < MV_TDM_STOP_POLLING_TIMEOUT)) {
+	while (priv->pcm_is_stopping && (max_poll < MV_TDM_STOP_POLLING_TIMEOUT)) {
 		mdelay(1);
 		max_poll++;
 	}
@@ -454,11 +441,11 @@ void tdm_if_exit(void)
 	int i;
 
 	/* Check if already stopped */
-	if (!pcm_enable && !tdm_init)
+	if (!priv->pcm_enable && !priv->tdm_init)
 		return;
 
 	/* Stop PCM channels */
-	if (pcm_enable) {
+	if (priv->pcm_enable) {
 		switch (priv->tdm_type) {
 		case MV_TDM_UNIT_TDM2C:
 			tdm2c_pcm_disable();
@@ -473,7 +460,7 @@ void tdm_if_exit(void)
 	}
 
 	/* Disable TDM and release resources */
-	if (tdm_init) {
+	if (priv->tdm_init) {
 		switch (priv->tdm_type) {
 		case MV_TDM_UNIT_TDM2C:
 			tdm2c_release();
@@ -487,14 +474,14 @@ void tdm_if_exit(void)
 		}
 
 		/* Remove proc directory & entries */
-		remove_proc_entry("tdm_stats", tdm_stats);
+		remove_proc_entry("tdm_stats", priv->tdm_stats);
 		remove_proc_entry("tdm", NULL);
 
 		/* Release interrupt */
 		for (i = 0; i < priv->irq_count; i++)
 			free_irq(priv->irq[i], NULL);
 
-		tdm_init = 0;
+		priv->tdm_init = false;
 	}
 }
 
@@ -502,11 +489,11 @@ static int tdm_if_control(int cmd, void *arg)
 {
 	switch (cmd) {
 	case TDM_DEV_TDM_TEST_MODE_ENABLE:
-		test_enable = 1;
+		priv->test_enable = true;
 		break;
 
 	case TDM_DEV_TDM_TEST_MODE_DISABLE:
-		test_enable = 0;
+		priv->test_enable = false;
 		break;
 
 	default:
@@ -518,7 +505,7 @@ static int tdm_if_control(int cmd, void *arg)
 
 static int tdm2c_if_write(u8 *buffer, int size)
 {
-	if (test_enable)
+	if (priv->test_enable)
 		return tdm2c_tx(buffer);
 
 	return 0;
@@ -526,7 +513,7 @@ static int tdm2c_if_write(u8 *buffer, int size)
 
 static int tdmmc_if_write(u8 *buffer, int size)
 {
-	if (test_enable)
+	if (priv->test_enable)
 		return tdmmc_tx(buffer);
 
 	return 0;
@@ -534,14 +521,14 @@ static int tdmmc_if_write(u8 *buffer, int size)
 
 static void tdm_if_stats_get(struct tal_stats *tdm_if_stats)
 {
-	if (tdm_init == 0)
+	if (!priv->tdm_init)
 		return;
 
-	tdm_if_stats->tdm_init = tdm_init;
-	tdm_if_stats->rx_miss = rx_miss;
-	tdm_if_stats->tx_miss = tx_miss;
-	tdm_if_stats->rx_over = rx_over;
-	tdm_if_stats->tx_under = tx_under;
+	tdm_if_stats->tdm_init = priv->tdm_init;
+	tdm_if_stats->rx_miss = priv->rx_miss;
+	tdm_if_stats->tx_miss = priv->tx_miss;
+	tdm_if_stats->rx_over = priv->rx_over;
+	tdm_if_stats->tx_under = priv->tx_under;
 #ifdef CONFIG_MV_TDM_EXT_STATS
 	tdm2c_ext_stats_get(&tdm_if_stats->tdm_ext_stats);
 #endif
@@ -608,33 +595,33 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 	else if (mv_phone_get_slic_board_type() == MV_BOARD_SLIC_ISI_ID)
 		silabs_if_isi_interrupt();
 
-	if (ret && (pcm_stop_status == 0))	{
-		pcm_stop_status = 1;
+	if (ret && !priv->pcm_stop_status)	{
+		priv->pcm_stop_status = true;
 
 		/* If Rx/Tx tasklets are already scheduled, let them do the work */
-		if (!rx_buff && !tx_buff) {
+		if (!priv->rx_buff && !priv->tx_buff) {
 			dev_dbg(priv->dev, "Stopping the TDM\n");
 			tdm2c_if_pcm_stop();
-			pcm_stop_flag = 0;
+			priv->pcm_stop_flag = false;
 			tasklet_hi_schedule(&tdm2c_if_reset_tasklet);
 		} else {
 			dev_dbg(priv->dev, "Tasklet already runningstop_flag\n");
-			pcm_stop_flag = 1;
+			priv->pcm_stop_flag = true;
 		}
 	}
 
 	/* Restarting PCM, skip Rx/Tx handling */
-	if (pcm_stop_status)
+	if (priv->pcm_stop_status)
 		goto skip_rx_tx;
 
 	/* Support multiple interrupt handling */
 	/* RX interrupt */
 	if (int_type & MV_RX_INT) {
-		if (rx_buff != NULL) {
-			rx_miss++;
+		if (priv->rx_buff) {
+			priv->rx_miss++;
 			dev_dbg(priv->dev, "%s: Rx buffer not ready\n", __func__);
 		} else {
-			rx_buff = tdm_int_info.tdm_rx_buff;
+			priv->rx_buff = tdm_int_info.tdm_rx_buff;
 			/* Schedule Rx processing within SOFT_IRQ context */
 			dev_dbg(priv->dev, "%s: schedule Rx tasklet\n", __func__);
 			tasklet_hi_schedule(tdm_rx_tasklet);
@@ -643,11 +630,11 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 
 	/* TX interrupt */
 	if (int_type & MV_TX_INT) {
-		if (tx_buff != NULL) {
-			tx_miss++;
+		if (priv->tx_buff) {
+			priv->tx_miss++;
 			dev_dbg(priv->dev, "%s: Tx buffer not ready\n", __func__);
 		} else {
-			tx_buff = tdm_int_info.tdm_tx_buff;
+			priv->tx_buff = tdm_int_info.tdm_tx_buff;
 			/* Schedule Tx processing within SOFT_IRQ context */
 			dev_dbg(priv->dev, "%s: schedule Tx tasklet\n", __func__);
 			tasklet_hi_schedule(tdm_tx_tasklet);
@@ -659,11 +646,11 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 	if ((int_type & MV_CHAN_STOP_INT) && (tdm_int_info.data == 4)) {
 		dev_dbg(priv->dev, "%s: Received MV_CHAN_STOP_INT indication\n",
 			__func__);
-		is_pcm_stopping = 0;
-		if (pcm_start_stop_state) {
+		priv->pcm_is_stopping = false;
+		if (priv->pcm_start_stop_state) {
 			dev_dbg(priv->dev, "%s: calling to tdm2c_if_pcm_start()\n",
 				__func__);
-			pcm_enable = 0;
+			priv->pcm_enable = false;
 			tdm2c_if_pcm_start();
 		}
 	}
@@ -675,10 +662,10 @@ skip_rx_tx:
 
 	/* ERROR interrupt */
 	if (int_type & MV_RX_ERROR_INT)
-		rx_over++;
+		priv->rx_over++;
 
 	if (int_type & MV_TX_ERROR_INT)
-		tx_under++;
+		priv->tx_under++;
 
 	return IRQ_HANDLED;
 }
@@ -688,30 +675,30 @@ static void tdm2c_if_pcm_rx_process(unsigned long arg)
 {
 	unsigned long flags;
 
-	if (pcm_enable) {
-		if (rx_buff == NULL) {
+	if (priv->pcm_enable) {
+		if (!priv->rx_buff) {
 			dev_warn(priv->dev, "%s: Error, empty Rx processing\n", __func__);
 			return;
 		}
 
 		/* Fill TDM Rx aggregated buffer */
-		if (tdm2c_rx(rx_buff) == 0)
+		if (tdm2c_rx(priv->rx_buff) == 0)
 			/* Dispatch Rx handler */
-			tal_mmp_rx(rx_buff, buff_size);
+			tal_mmp_rx(priv->rx_buff, priv->buff_size);
 		else
 			dev_warn(priv->dev, "%s: Could not fill Rx buffer\n", __func__);
 	}
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
-	/* Clear rx_buff for next iteration */
-	rx_buff = NULL;
+	/* Clear Rx buff for next iteration */
+	priv->rx_buff = NULL;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 
-	if ((pcm_stop_flag == 1) && !tx_buff) {
+	if (priv->pcm_stop_flag && !priv->tx_buff) {
 		dev_dbg(priv->dev, "Stopping TDM from Rx tasklet\n");
 		tdm2c_if_pcm_stop();
 		spin_lock_irqsave(&tdm_if_lock, flags);
-		pcm_stop_flag = 0;
+		priv->pcm_stop_flag = false;
 		spin_unlock_irqrestore(&tdm_if_lock, flags);
 		tasklet_hi_schedule(&tdm2c_if_reset_tasklet);
 	}
@@ -721,22 +708,22 @@ static void tdmmc_if_pcm_rx_process(unsigned long arg)
 {
 	unsigned long flags;
 
-	if (pcm_enable) {
-		if (rx_buff == NULL) {
+	if (priv->pcm_enable) {
+		if (!priv->rx_buff) {
 			dev_warn(priv->dev, "%s: Error, empty Rx processing\n", __func__);
 			return;
 		}
 
-		if (tdmmc_rx(rx_buff) == 0)
+		if (tdmmc_rx(priv->rx_buff) == 0)
 			/* Dispatch Rx handler */
-			tal_mmp_rx(rx_buff, buff_size);
+			tal_mmp_rx(priv->rx_buff, priv->buff_size);
 		else
 			dev_warn(priv->dev, "%s: could not fill Rx buffer\n", __func__);
 	}
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
-	/* Clear rx_buff for next iteration */
-	rx_buff = NULL;
+	/* Clear priv->rx_buff for next iteration */
+	priv->rx_buff = NULL;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
@@ -745,32 +732,32 @@ static void tdm2c_if_pcm_tx_process(unsigned long arg)
 {
 	unsigned long flags;
 
-	if (pcm_enable) {
-		if (tx_buff == NULL) {
+	if (priv->pcm_enable) {
+		if (!priv->tx_buff) {
 			dev_warn(priv->dev, "%s: Error, empty Tx processing\n", __func__);
 			return;
 		}
 
 		/* Dispatch Tx handler */
-		tal_mmp_tx(tx_buff, buff_size);
+		tal_mmp_tx(priv->tx_buff, priv->buff_size);
 
-		if (!test_enable) {
+		if (!priv->test_enable) {
 			/* Fill Tx aggregated buffer */
-			if (tdm2c_tx(tx_buff) != 0)
+			if (tdm2c_tx(priv->tx_buff) != 0)
 				dev_warn(priv->dev, "%s: Could not fill Tx buffer\n", __func__);
 		}
 	}
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
-	/* Clear tx_buff for next iteration */
-	tx_buff = NULL;
+	/* Clear Tx buff for next iteration */
+	priv->tx_buff = NULL;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 
-	if ((pcm_stop_flag == 1) && !rx_buff) {
+	if (priv->pcm_stop_flag && !priv->rx_buff) {
 		dev_dbg(priv->dev, "Stopping TDM from Tx tasklet\n");
 		tdm2c_if_pcm_stop();
 		spin_lock_irqsave(&tdm_if_lock, flags);
-		pcm_stop_flag = 0;
+		priv->pcm_stop_flag = false;
 		spin_unlock_irqrestore(&tdm_if_lock, flags);
 		tasklet_hi_schedule(&tdm2c_if_reset_tasklet);
 	}
@@ -780,24 +767,24 @@ static void tdmmc_if_pcm_tx_process(unsigned long arg)
 {
 	unsigned long flags;
 
-	if (pcm_enable) {
-		if (tx_buff == NULL) {
+	if (priv->pcm_enable) {
+		if (!priv->tx_buff) {
 			dev_warn(priv->dev, "%s: Error, empty Tx processing\n", __func__);
 			return;
 		}
 
 		/* Dispatch Tx handler */
-		tal_mmp_tx(tx_buff, buff_size);
+		tal_mmp_tx(priv->tx_buff, priv->buff_size);
 
-		if (!test_enable) {
-			if (tdmmc_tx(tx_buff) != 0)
+		if (!priv->test_enable) {
+			if (tdmmc_tx(priv->tx_buff) != 0)
 				dev_warn(priv->dev, "%s: Could not fill Tx buffer\n", __func__);
 		}
 	}
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
-	/* Clear tx_buff for next iteration */
-	tx_buff = NULL;
+	/* Clear Tx buff for next iteration */
+	priv->tx_buff = NULL;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 }
 
@@ -823,13 +810,13 @@ static void tdm2c_if_reset_channels(unsigned long arg)
 		dev_warn(priv->dev, "\n%s: Channels disabling timeout (%dms)\n",
 			 __func__, MV_TDM_STOP_POLLING_TIMEOUT);
 #ifdef CONFIG_MV_TDM_EXT_STATS
-		pcm_stop_fail++;
+		priv->pcm_stop_fail++;
 #endif
 		mdelay(10);
 	}
 
 	spin_lock_irqsave(&tdm_if_lock, flags);
-	is_pcm_stopping = 0;
+	priv->pcm_is_stopping = false;
 	spin_unlock_irqrestore(&tdm_if_lock, flags);
 
 	/* Restart channels */
