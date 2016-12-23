@@ -242,6 +242,30 @@ struct mv_phone_dev {
 	u32 tdm_misc_reg;
 
 	struct device *dev;
+
+	/* Transmit buffers */
+	u8 *rx_buff;
+	u8 *tx_buff;
+	int buff_size;
+
+	/* Transmit statistics */
+	struct proc_dir_entry *tdm_stats;
+	u32 rx_miss;
+	u32 tx_miss;
+	u32 rx_over;
+	u32 tx_under;
+
+	/* TDM operation flags */
+	bool tdm_init;
+	bool test_enable;
+	bool pcm_enable;
+	bool pcm_stop_flag;
+	bool pcm_stop_status;
+	int pcm_start_stop_state;
+	bool pcm_is_stopping;
+#ifdef CONFIG_MV_TDM_EXT_STATS
+	u32 pcm_stop_fail;
+#endif
 };
 
 /* This enumerator defines the Marvell Units ID */
