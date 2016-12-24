@@ -648,10 +648,10 @@ static irqreturn_t tdm_if_isr(int irq, void *dev_id)
 			__func__);
 		priv->pcm_is_stopping = false;
 		if (priv->pcm_start_stop_state) {
-			dev_dbg(priv->dev, "%s: calling to tdm2c_if_pcm_start()\n",
-				__func__);
+			dev_dbg(priv->dev, "%s: Resetting controller\n", __func__);
 			priv->pcm_enable = false;
-			tdm2c_if_pcm_start();
+			/* Issue SW reset */
+			tasklet_hi_schedule(&tdm2c_if_reset_tasklet);
 		}
 	}
 
