@@ -233,6 +233,7 @@ struct mv_phone_dev {
 	u32 pclk_freq_mhz;
 	u8 irq_count;
 	int irq[3];
+	spinlock_t lock;
 
 	/* Used to preserve TDM registers across suspend/resume */
 	u32 tdm_ctrl_regs[TDM_CTRL_REGS_NUM];
