@@ -24,7 +24,7 @@
 #define AP806_SAR_REG			0x400
 #define AP806_SAR_CLKFREQ_MODE_MASK	0x1f
 
-#define AP806_CLK_NUM			6
+#define AP806_CLK_NUM			8
 
 static struct clk *ap806_clks[AP806_CLK_NUM];
 
@@ -35,8 +35,8 @@ static struct clk_onecell_data ap806_clk_data = {
 
 static void __init ap806_syscon_clk_init(struct device_node *np)
 {
-	unsigned int freq_mode, cpuclk_freq, dclk_freq;
-	const char *name, *fixedclk_name;
+	unsigned int freq_mode, cpuclk_freq, dclk_freq, ringclk_freq;
+	const char *name, *fixedclk_name, *ringclk_name;
 	struct regmap *regmap;
 	u32 reg;
 
@@ -126,6 +126,9 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 	cpuclk_freq *= 1000 * 1000;
 	dclk_freq *= 1000 * 1000;
 
+	/* In all SAR values ring_clk is twice ddr clock */
+	ringclk_freq = 2 * dclk_freq;
+
 	/* CPU clocks depend on the Sample At Reset configuration */
 	of_property_read_string_index(np, "clock-output-names",
 				      0, &name);
@@ -159,6 +162,17 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 				      5, &name);
 	ap806_clks[5] = clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT,
 						dclk_freq);
+
+	of_property_read_string_index(np, "clock-output-names",
+				      6, &ringclk_name);
+	ap806_clks[6] = clk_register_fixed_rate(NULL, ringclk_name, NULL, CLK_IS_ROOT,
+						ringclk_freq);
+
+	/* External ring is 1/2 of ring clk */
+	of_property_read_string_index(np, "clock-output-names",
+				      7, &name);
+	ap806_clks[7] = clk_register_fixed_factor(NULL, name, ringclk_name,
+						  0, 1, 2);
 
 	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_clk_data);
 }
