@@ -433,7 +433,8 @@ static ssize_t prof_counters_show(struct device *dev,
 
 	/* # of transactions */
 	trans = readl(axim->base + AXI_MON_PR_SMP_TRANS);
-	size += scnprintf(buf + size, PAGE_SIZE, "Trans   - %10u [%d trans/sec]\n", trans, trans * 1000 / msec);
+	size += scnprintf(buf + size, PAGE_SIZE, "Trans   - %10u [%d trans/sec]\n", trans,
+			  (u32)((u64)trans * 1000 / msec));
 
 	/* # of AXI beats */
 	val = readl(axim->base + AXI_MON_PR_SMP_BEATS);
