@@ -88,10 +88,10 @@
 			axim-ddr-wr@841000 {
 				status = "diabled";
 			};
-			axim-ihb-rd@848000 {
+			axim-sb-rd@848000 {
 				status ="disabled";
 			};
-			axim-ihb-rd@849000 {
+			axim-sb-wr@849000 {
 				status ="disabled";
 			};
 			etm0@c40000 {
