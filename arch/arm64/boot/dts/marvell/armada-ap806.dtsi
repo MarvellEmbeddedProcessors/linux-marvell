@@ -237,7 +237,7 @@
 				bus-width = <40>;
 			};
 
-			axim-ihb-rd@848000 {
+			axim-sb-rd@848000 {
 				compatible = "marvell,coresight-axim", "arm,primecell";
 				reg = <0x848000 0x1000>;
 				clocks = <&syscon 3>;
@@ -245,7 +245,7 @@
 				bus-width = <40>;
 			};
 
-			axim-ihb-rd@849000 {
+			axim-sb-wr@849000 {
 				compatible = "marvell,coresight-axim", "arm,primecell";
 				reg = <0x849000 0x1000>;
 				clocks = <&syscon 3>;
