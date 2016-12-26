@@ -87,6 +87,13 @@
 			};
 			sata: sata@540000 {
 				status = "okay";
+
+				sata-port@0 {
+					status = "disabled";
+				};
+				sata-port@1 {
+					status = "okay";
+				};
 			};
 			usb3h0: usb3@500000 {
 				status = "okay";

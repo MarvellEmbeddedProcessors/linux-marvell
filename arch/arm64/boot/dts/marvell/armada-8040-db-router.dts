@@ -109,6 +109,13 @@
 		config-space {
 			sata@540000 {
 				status = "okay";
+
+				sata-port@0 {
+					satus = "disabled";
+				};
+				sata-port@1 {
+					status = "okay";
+				};
 			};
 			usb3h0: usb3@500000 {
 				status = "okay";
@@ -177,6 +184,13 @@
 			};
 			sata@540000 {
 				status = "okay";
+
+				sata-port@0 {
+					satus = "disabled";
+				};
+				sata-port@1 {
+					status = "okay";
+				};
 			};
 			mdio@12a200 {
 				#address-cells = <1>;
