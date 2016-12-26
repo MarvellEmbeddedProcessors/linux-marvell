@@ -143,6 +143,17 @@ sata: sata@540000 {
 	status = "disabled";
 	port_base = <0x10000>;
 	port_offset = <0x10000>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	sata-port@0 {
+		reg = <0>;
+		satus = "disabled";
+	};
+	sata-port@1 {
+		reg = <1>;
+		status = "disabled";
+	};
 };
 
 usb3h0: usb3@500000 {

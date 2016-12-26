@@ -113,6 +113,13 @@
 			};
 			sata@540000 {
 				status = "okay";
+
+				sata-port@0 {
+					status = "disabled";
+				};
+				sata-port@1 {
+					status = "okay";
+				};
 			};
 			gop {
 				emac0_0: mac0 {
@@ -165,6 +172,13 @@
 			};
 			sata@540000 {
 				status = "okay";
+
+				sata-port@0 {
+					status = "okay";
+				};
+				sata-port@1 {
+					status = "okay";
+				};
 			};
 			gop {
 				emac0_1: mac0 {
