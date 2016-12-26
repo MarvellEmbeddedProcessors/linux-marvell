@@ -77,6 +77,13 @@
 		config-space {
 			sata@540000 {
 				status = "okay";
+
+				sata-port@0 {
+					satus = "okay";
+				};
+				sata-port@1 {
+					status = "okay";
+				};
 			};
 			/* usb3h0 is USB2 only (UTMI) */
 			usb3h0: usb3@500000 {
@@ -149,6 +156,13 @@
 			};
 			sata@540000 {
 				status = "okay";
+
+				sata-port@0 {
+					status = "okay";
+				};
+				sata-port@1 {
+					status = "okay";
+				};
 			};
 			mdio@12a200 {
 				#address-cells = <1>;

@@ -128,6 +128,15 @@
 			};
 			sata: sata@540000 {
 				status = "disabled";
+
+				sata-port@0 {
+					/* UPDATE */
+					status = "disabled";
+				};
+				sata-port@1 {
+					/* UPDATE */
+					status = "disabled";
+				};
 			};
 			usb3h0: usb3@500000 {
 				status = "disabled";
