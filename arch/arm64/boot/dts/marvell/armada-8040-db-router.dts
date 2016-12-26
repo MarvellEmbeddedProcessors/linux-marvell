@@ -114,6 +114,8 @@
 					satus = "disabled";
 				};
 				sata-port@1 {
+					phys = <&comphy0 3 COMPHY_SATA1>;
+					phy-names = "comphy";
 					status = "okay";
 				};
 			};
@@ -189,6 +191,8 @@
 					satus = "disabled";
 				};
 				sata-port@1 {
+					phys = <&comphy1 3 COMPHY_SATA1>;
+					phy-names = "comphy";
 					status = "okay";
 				};
 			};
