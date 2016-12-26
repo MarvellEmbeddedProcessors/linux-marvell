@@ -67,6 +67,7 @@
 struct orion_ehci_hcd {
 	struct clk *clk;
 	struct phy *phy;
+	bool reset_on_resume;
 };
 
 static const char hcd_name[] = "ehci-orion";
@@ -262,6 +263,11 @@ static int ehci_orion_drv_probe(struct platform_device *pdev)
 	if (!IS_ERR(priv->clk))
 		clk_prepare_enable(priv->clk);
 
+	if (of_property_read_bool(pdev->dev.of_node, "needs-reset-on-resume"))
+		priv->reset_on_resume = true;
+	else
+		priv->reset_on_resume = false;
+
 	priv->phy = devm_phy_optional_get(&pdev->dev, "usb");
 	if (IS_ERR(priv->phy)) {
 		err = PTR_ERR(priv->phy);
@@ -353,8 +359,8 @@ static int ehci_orion_drv_suspend(struct platform_device *pdev,
 				  pm_message_t state)
 {
 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-
-	int addr, i;
+	bool do_wakeup = device_may_wakeup(&pdev->dev);
+	int addr, i, rc;
 
 	for (addr = USB_CAUSE, i = 0; addr <= USB_IPG; addr += 0x4, i++)
 		usb_save[i] = readl_relaxed(hcd->regs + addr);
@@ -362,6 +368,10 @@ static int ehci_orion_drv_suspend(struct platform_device *pdev,
 	for (addr = USB_PHY_PWR_CTRL; addr <= USB_PHY_TST_GRP_CTRL;
 	     addr += 0x4, i++)
 		usb_save[i] = readl_relaxed(hcd->regs + addr);
+
+	rc = ehci_suspend(hcd, do_wakeup);
+	if (rc)
+		return rc;
 
 	return 0;
 }
@@ -378,6 +388,7 @@ static int ehci_orion_drv_suspend(struct platform_device *pdev,
 static int ehci_orion_drv_resume(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
+	struct orion_ehci_hcd *priv = hcd_to_orion_priv(hcd);
 	int addr, regVal, i;
 
 	for (addr = USB_CAUSE, i = 0; addr <= USB_IPG; addr += 0x4, i++)
@@ -416,6 +427,8 @@ static int ehci_orion_drv_resume(struct platform_device *pdev)
 	/* Set USB_MODE register */
 	regVal = MV_USB_CORE_MODE_HOST;
 	writel_relaxed(regVal, hcd->regs + 0x1A8);
+
+	ehci_resume(hcd, priv->reset_on_resume);
 
 	return 0;
 }
