@@ -186,6 +186,11 @@
 							"mpp31", "mpp32", "mpp33", "mpp34", "mpp35";
 					marvell,function = "mmc";
 				};
+
+				uart1_pins: uart1_pins {
+					marvell,pins = "mpp18", "mpp19";
+					marvell,function = "uart2";
+				};
 			};
 
 			sgateclk: south-bridge-gate-clk@18014 {
