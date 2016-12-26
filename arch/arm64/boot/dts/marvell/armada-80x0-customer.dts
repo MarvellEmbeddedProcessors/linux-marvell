@@ -140,10 +140,14 @@
 
 				sata-port@0 {
 					/* UPDATE */
+					phys = <&comphy0 1 COMPHY_SATA0>;
+					phy-names = "comphy";
 					status = "disabled";
 				};
 				sata-port@1 {
 					/* UPDATE */
+					phys = <&comphy0 3 COMPHY_SATA1>;
+					phy-names = "comphy";
 					status = "disabled";
 				};
 			};
@@ -255,10 +259,14 @@
 
 				sata-port@0 {
 					/* UPDATE */
+					phys = <&comphy1 1 COMPHY_SATA0>;
+					phy-names = "comphy";
 					status = "disabled";
 				};
 				sata-port@1 {
 					/* UPDATE */
+					phys = <&comphy1 3 COMPHY_SATA1>;
+					phy-names = "comphy";
 					status = "disabled";
 				};
 			};
