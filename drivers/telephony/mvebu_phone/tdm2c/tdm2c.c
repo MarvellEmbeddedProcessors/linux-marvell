@@ -96,27 +96,6 @@
 
 #include "mv_phone.h"
 
-/* Defines */
-#define INT_SAMPLE			2
-#define BUFF_IS_FULL			1
-#define BUFF_IS_EMPTY			0
-#define FIRST_INT			1
-#define TOTAL_BUFFERS			2
-#define MV_TDM_NEXT_BUFFER(buf)		((buf + 1) % TOTAL_BUFFERS)
-#define MV_TDM_PREV_BUFFER(buf, step)	((TOTAL_BUFFERS + buf - step) % TOTAL_BUFFERS)
-#define MV_TDM_CS			0
-#define BUFF_INVALID			-1
-
-/* TDM channel info structure */
-struct tdm2c_ch_info {
-	u8 ch;
-	u8 *rxBuffVirt[TOTAL_BUFFERS], *txBuffVirt[TOTAL_BUFFERS];
-	dma_addr_t rxBuffPhys[TOTAL_BUFFERS], txBuffPhys[TOTAL_BUFFERS];
-	u8 rxBuffFull[TOTAL_BUFFERS], txBuffFull[TOTAL_BUFFERS];
-	u8 rxCurrBuff, txCurrBuff;
-	u8 rxFirst;
-};
-
 /* Globals */
 static u8 *rx_aggr_buff_virt, *tx_aggr_buff_virt;
 static u8 rx_int, tx_int;
@@ -377,11 +356,6 @@ static void tdm2c_reset(void)
 
 		}
 	}
-}
-
-void __iomem *get_tdm_base(void)
-{
-	return regs;
 }
 
 int tdm2c_init(void __iomem *base, struct device *dev,

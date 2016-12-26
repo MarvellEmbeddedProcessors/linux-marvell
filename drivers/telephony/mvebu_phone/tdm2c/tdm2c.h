@@ -315,9 +315,33 @@
 	((SAMPLES_BUFF_SIZE(bandMode, factor)<<TOTAL_CNT_OFFS) |	\
 	(INT_SAMPLE<<INT_CNT_OFFS))
 
-/* APIs */
-void __iomem *get_tdm_base(void);
+/* Defines */
+#define INT_SAMPLE			2
+#define BUFF_IS_FULL			1
+#define BUFF_IS_EMPTY			0
+#define FIRST_INT			1
+#define TOTAL_BUFFERS			2
+#define MV_TDM_NEXT_BUFFER(buf)		((buf + 1) % TOTAL_BUFFERS)
+#define MV_TDM_PREV_BUFFER(buf, step)	((TOTAL_BUFFERS + buf - step) % TOTAL_BUFFERS)
+#define MV_TDM_CS			0
+#define BUFF_INVALID			-1
 
+/* Structures */
+/* TDM channel info structure */
+struct tdm2c_ch_info {
+	u8 ch;
+	u8 *rxBuffVirt[TOTAL_BUFFERS];
+	u8 *txBuffVirt[TOTAL_BUFFERS];
+	dma_addr_t rxBuffPhys[TOTAL_BUFFERS];
+	dma_addr_t txBuffPhys[TOTAL_BUFFERS];
+	u8 rxBuffFull[TOTAL_BUFFERS];
+	u8 txBuffFull[TOTAL_BUFFERS];
+	u8 rxCurrBuff;
+	u8 txCurrBuff;
+	u8 rxFirst;
+};
+
+/* APIs */
 void tdm2c_release(void);
 int tdm2c_pcm_stop_int_miss(void);
 void tdm2c_pcm_start(void);
