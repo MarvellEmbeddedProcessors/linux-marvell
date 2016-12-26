@@ -114,6 +114,12 @@
 				status = "okay";
 			};
 
+			uart1: serial@12200 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&uart1_pins>;
+				status = "okay";
+			};
+
 			eth0: ethernet@30000 {
 				phy-mode = "rgmii-id";
 				phy = <&phy0>;
