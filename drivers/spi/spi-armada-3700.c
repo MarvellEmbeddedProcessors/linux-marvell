@@ -100,6 +100,7 @@
 
 #define DATA_CAP_CLOCK_CYCLE_NS		14	/*Minimum clock cycle of flash*/
 #define RVT_EDGE_FLASH_CAP_FREQ		(1000 * 1000 * 1000 / DATA_CAP_CLOCK_CYCLE_NS)
+#define A3700_SPI_MAX_OUTPUT_CLK_FREQ		(50 * 1000 * 1000)	/*50MHz*/
 
 struct a3700_spi_initdata {
 	unsigned int cs_num;
@@ -146,7 +147,6 @@ struct a3700_spi {
 	void __iomem           *base;
 	struct clk             *clk;
 	unsigned int	input_clk_freq;
-	unsigned int	max_clk_freq;
 	unsigned int            irq;
 	unsigned int            flags;
 	enum a3700_spi_pin_mode  pin_mode;
@@ -277,11 +277,11 @@ static int a3700_spi_clock_set(struct a3700_spi *a3700_spi,
 	u32 prescale;
 
 	/*
-	* compare SPI control input frequency and flash input frequency
-	* to choose lower frequency for using
+	* SPI controller has a maximum output clock freq to flash,
+	* flash could not be working in higher freq than this.
 	*/
-	if (speed_hz >= a3700_spi->max_clk_freq)
-		prescale = a3700_spi->input_clk_freq / a3700_spi->max_clk_freq;
+	if (speed_hz >= A3700_SPI_MAX_OUTPUT_CLK_FREQ)
+		prescale = a3700_spi->input_clk_freq / A3700_SPI_MAX_OUTPUT_CLK_FREQ;
 	else
 		prescale = DIV_ROUND_UP(a3700_spi->input_clk_freq, speed_hz);
 
@@ -1115,13 +1115,7 @@ static int a3700_spi_probe(struct platform_device *pdev)
 		init_completion(&spi->status.done);
 	}
 
-	of_property_read_u32(of_node, "max-frequency", &spi->max_clk_freq);
-	if (!spi->max_clk_freq) {
-		dev_err(&pdev->dev, "could not find spi-max-frequency\n");
-		goto error_clk;
-	}
-
-	/* Enable SPI gating clock and get MAX input clock */
+	/* Enable SPI gating clock*/
 	spi->clk = devm_clk_get(&pdev->dev, NULL);
 	if (!IS_ERR(spi->clk)) {
 		ret = clk_prepare_enable(spi->clk);
