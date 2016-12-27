@@ -329,15 +329,15 @@
 /* TDM channel info structure */
 struct tdm2c_ch_info {
 	u8 ch;
-	u8 *rxBuffVirt[TOTAL_BUFFERS];
-	u8 *txBuffVirt[TOTAL_BUFFERS];
-	dma_addr_t rxBuffPhys[TOTAL_BUFFERS];
-	dma_addr_t txBuffPhys[TOTAL_BUFFERS];
-	u8 rxBuffFull[TOTAL_BUFFERS];
-	u8 txBuffFull[TOTAL_BUFFERS];
-	u8 rxCurrBuff;
-	u8 txCurrBuff;
-	u8 rxFirst;
+	u8 *rx_buff_virt[TOTAL_BUFFERS];
+	u8 *tx_buff_virt[TOTAL_BUFFERS];
+	dma_addr_t rx_buff_phys[TOTAL_BUFFERS];
+	dma_addr_t tx_buff_phys[TOTAL_BUFFERS];
+	u8 rx_buff_full[TOTAL_BUFFERS];
+	u8 tx_buff_empty[TOTAL_BUFFERS];
+	u8 rx_curr_buff;
+	u8 tx_curr_buff;
+	u8 rx_first;
 };
 
 /* APIs */
