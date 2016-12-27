@@ -27,6 +27,10 @@ Optional properties:
 
 - use-pclk-external: chooses SLIC as an external pclk source
 
+- spi-mode: set <0> for direct connection and <1> for daisy-chain mode.
+  If not set, by default direct mode is used. This property is valid
+  only for TDM2C devices, for TDMMC it will be ignored.
+
 Example:
 
 tdm@b0000 {

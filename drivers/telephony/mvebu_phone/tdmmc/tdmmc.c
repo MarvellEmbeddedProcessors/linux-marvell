@@ -358,7 +358,7 @@ void tdmmc_show(void)
 }
 
 int tdmmc_init(void __iomem *base, struct device *dev,
-	       struct mv_phone_params *tdm_params, struct mv_phone_data *hal_data,
+	       struct mv_phone_params *tdm_params, enum mv_phone_frame_ts frame_ts,
 	       enum tdmmc_ip_version tdmmc_ip_ver)
 {
 	u16 pcm_slot, index;
@@ -532,9 +532,9 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 		pcm_slot = tdm_params->pcm_slot[chan];
 
 		/* Verify time slot is within frame boundries */
-		if (pcm_slot >= hal_data->frame_ts) {
+		if (pcm_slot >= frame_ts) {
 			dev_err(pdev, "Error, time slot(%d) exceeded maximum(%d)\n",
-				pcm_slot, hal_data->frame_ts);
+				pcm_slot, frame_ts);
 			ret = -ETIME;
 			goto err_dpram;
 		}
@@ -567,7 +567,7 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 
 		/* WideBand mode */
 		if (sample_size == MV_PCM_FORMAT_4BYTES) {
-			index = (index + (hal_data->frame_ts / sample_size));
+			index = (index + (frame_ts / sample_size));
 			/* DPRAM low half */
 			act_dpram_entry->mask = 0xff;
 			writel(*((u32 *) act_dpram_entry), regs + FLEX_TDM_RDPR_REG(index));
@@ -589,9 +589,9 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 
 	/* Index for last entry */
 	if (sample_size == MV_PCM_FORMAT_1BYTE)
-		index = (hal_data->frame_ts - 1);
+		index = (frame_ts - 1);
 	else
-		index = ((hal_data->frame_ts / 2) - 1);
+		index = ((frame_ts / 2) - 1);
 
 	/* Low half */
 	writel(*((u32 *) act_dpram_entry), regs + FLEX_TDM_TDPR_REG(index));
@@ -626,7 +626,7 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 	writel(0, regs + MCSC_EXTENDED_INT_CAUSE_REG);
 
 	/* Set output sync counter bits for FS */
-	count = hal_data->frame_ts * 8;
+	count = frame_ts * 8;
 	writel(((count << TDM_SYNC_BIT_RX_OFFS) & TDM_SYNC_BIT_RX_MASK) | (count & TDM_SYNC_BIT_TX_MASK),
 	       regs + TDM_OUTPUT_SYNC_BIT_COUNT_REG);
 

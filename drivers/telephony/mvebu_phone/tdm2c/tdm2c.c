@@ -378,7 +378,8 @@ static void tdm2c_reset(void)
 }
 
 int tdm2c_init(void __iomem *base, struct device *dev,
-	       struct mv_phone_params *tdm_params, struct mv_phone_data *phone_data)
+	       struct mv_phone_params *tdm_params, enum mv_phone_frame_ts frame_ts,
+	       enum mv_phone_spi_mode spi_mode)
 {
 	u8 ch;
 	u32 pcm_ctrl_reg, nb_delay = 0, wb_delay = 0;
@@ -442,7 +443,7 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 	for (ch = 0; ch < MV_TDM2C_TOTAL_CHANNELS; ch++) {
 		nb_delay = ((tdm_params->pcm_slot[ch] * PCM_SLOT_PCLK) + 1);
 		/* Offset required by ZARLINK VE880 SLIC */
-		wb_delay = (nb_delay + ((phone_data->frame_ts / 2) * PCM_SLOT_PCLK));
+		wb_delay = (nb_delay + ((frame_ts / 2) * PCM_SLOT_PCLK));
 		ch_delay[ch] = ((nb_delay << CH_RX_DELAY_OFFS) | (nb_delay << CH_TX_DELAY_OFFS));
 		ch_delay[(ch + 2)] = ((wb_delay << CH_RX_DELAY_OFFS) | (wb_delay << CH_TX_DELAY_OFFS));
 	}
@@ -468,7 +469,7 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 	/* SPI SCLK freq */
 	writel(SPI_CLK_2MHZ, tdm2c->regs + SPI_CLK_PRESCALAR_REG);
 	/* Number of timeslots (PCLK) */
-	writel((u32)phone_data->frame_ts, tdm2c->regs + FRAME_TIMESLOT_REG);
+	writel((u32)frame_ts, tdm2c->regs + FRAME_TIMESLOT_REG);
 
 	if (tdm2c->band_mode == MV_NARROW_BAND) {
 		pcm_ctrl_reg = (CONFIG_PCM_CRTL | (((u8)tdm2c->pcm_format - 1) << PCM_SAMPLE_SIZE_OFFS));
@@ -507,7 +508,7 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 	mdelay(1);
 	writel(1, tdm2c->regs + MISC_CTRL_REG);
 
-	if (phone_data->spi_mode) {
+	if (spi_mode == MV_SPI_MODE_DAISY_CHAIN) {
 		/* Configure TDM to work in daisy chain mode */
 		tdm2c_daisy_chain_mode_set();
 	}
