@@ -184,21 +184,21 @@ static int tdm2c_ch_init(u8 ch)
 
 	for (buff = 0; buff < TOTAL_BUFFERS; buff++) {
 		/* Buffers must be 32B aligned */
-		ch_info->rxBuffVirt[buff] = dma_alloc_coherent(tdm2c->dev,
+		ch_info->rx_buff_virt[buff] = dma_alloc_coherent(tdm2c->dev,
 				MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor),
-				&(ch_info->rxBuffPhys[buff]), GFP_KERNEL);
-		ch_info->rxBuffFull[buff] = BUFF_IS_EMPTY;
+				&(ch_info->rx_buff_phys[buff]), GFP_KERNEL);
+		ch_info->rx_buff_full[buff] = BUFF_IS_EMPTY;
 
-		ch_info->txBuffVirt[buff] = dma_alloc_coherent(tdm2c->dev,
+		ch_info->tx_buff_virt[buff] = dma_alloc_coherent(tdm2c->dev,
 				MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor),
-				&(ch_info->txBuffPhys[buff]), GFP_KERNEL);
-		ch_info->txBuffFull[buff] = BUFF_IS_FULL;
+				&(ch_info->tx_buff_phys[buff]), GFP_KERNEL);
+		ch_info->tx_buff_empty[buff] = BUFF_IS_FULL;
 
-		memset(ch_info->txBuffVirt[buff], 0,
+		memset(ch_info->tx_buff_virt[buff], 0,
 				MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor));
 
-		if (((ulong) ch_info->rxBuffVirt[buff] | ch_info->rxBuffPhys[buff] |
-		     (ulong) ch_info->txBuffVirt[buff] | ch_info->txBuffPhys[buff]) & 0x1f) {
+		if (((ulong) ch_info->rx_buff_virt[buff] | ch_info->rx_buff_phys[buff] |
+		     (ulong) ch_info->tx_buff_virt[buff] | ch_info->tx_buff_phys[buff]) & 0x1f) {
 			dev_err(tdm2c->dev, "%s: error, unaligned buffer allocation\n", __func__);
 		}
 	}
@@ -216,20 +216,20 @@ static inline int tdm2c_ch_tx_low(u8 ch)
 	/* Count tx interrupts */
 	tdm2c->tx_int++;
 
-	if (ch_info->txBuffFull[ch_info->txCurrBuff] == BUFF_IS_FULL)
+	if (ch_info->tx_buff_empty[ch_info->tx_curr_buff] == BUFF_IS_FULL)
 		dev_dbg(tdm2c->dev, "curr buff full for hw [MMP ok]\n");
 	else
 		dev_warn(tdm2c->dev, "curr buf is empty [MMP miss write]\n");
 
 	/* Change buffers */
-	ch_info->txCurrBuff = MV_TDM_NEXT_BUFFER(ch_info->txCurrBuff);
+	ch_info->tx_curr_buff = MV_TDM_NEXT_BUFFER(ch_info->tx_curr_buff);
 
 	/*
 	 * Mark next buff to be transmitted by HW as empty. Give it to the HW
 	 * for next frame. The app need to write the data before HW takes it.
 	 */
-	ch_info->txBuffFull[ch_info->txCurrBuff] = BUFF_IS_EMPTY;
-	dev_dbg(tdm2c->dev, "->%s clear buf(%d) for channel(%d)\n", __func__, ch_info->txCurrBuff, ch);
+	ch_info->tx_buff_empty[ch_info->tx_curr_buff] = BUFF_IS_EMPTY;
+	dev_dbg(tdm2c->dev, "->%s clear buf(%d) for channel(%d)\n", __func__, ch_info->tx_curr_buff, ch);
 
 	/* Poll on SW ownership (single check) */
 	dev_dbg(tdm2c->dev, "start poll for SW ownership\n");
@@ -243,10 +243,10 @@ static inline int tdm2c_ch_tx_low(u8 ch)
 		return -ETIME;
 	}
 
-	dev_dbg(tdm2c->dev, "ch%d, start tx buff %d\n", ch, ch_info->txCurrBuff);
+	dev_dbg(tdm2c->dev, "ch%d, start tx buff %d\n", ch, ch_info->tx_curr_buff);
 
 	/* Set TX buff address (must be 32 byte aligned) */
-	writel(ch_info->txBuffPhys[ch_info->txCurrBuff], tdm2c->regs + CH_TX_ADDR_REG(ch_info->ch));
+	writel(ch_info->tx_buff_phys[ch_info->tx_curr_buff], tdm2c->regs + CH_TX_ADDR_REG(ch_info->ch));
 
 	/* Set HW ownership */
 	writeb(OWN_BY_HW, tdm2c->regs + CH_BUFF_OWN_REG(ch_info->ch) + TX_OWN_BYTE_OFFS);
@@ -259,7 +259,7 @@ static inline int tdm2c_ch_tx_low(u8 ch)
 		return -EBUSY;
 
 	tdm2c->tx_int = 0;
-	tdm2c->tx_empty = ch_info->txCurrBuff;
+	tdm2c->tx_empty = ch_info->tx_curr_buff;
 
 	return 0;
 }
@@ -271,12 +271,12 @@ static inline int tdm2c_ch_rx_low(u8 ch)
 
 	dev_dbg(tdm2c->dev, "%s: Enter, ch%d\n", __func__, ch);
 
-	if (ch_info->rxFirst)
-		ch_info->rxFirst = !FIRST_INT;
+	if (ch_info->rx_first)
+		ch_info->rx_first = !FIRST_INT;
 	else
 		tdm2c->rx_int++;
 
-	if (ch_info->rxBuffFull[ch_info->rxCurrBuff] == BUFF_IS_EMPTY)
+	if (ch_info->rx_buff_full[ch_info->rx_curr_buff] == BUFF_IS_EMPTY)
 		dev_dbg(tdm2c->dev, "curr buff empty for hw [MMP ok]\n");
 	else
 		dev_warn(tdm2c->dev, "curr buf is full [MMP miss read]\n");
@@ -285,10 +285,10 @@ static inline int tdm2c_ch_rx_low(u8 ch)
 	 * Mark last buff that was received by HW as full. Give next buff to HW for
 	 * next frame. The app need to read the data before next irq
 	 */
-	ch_info->rxBuffFull[ch_info->rxCurrBuff] = BUFF_IS_FULL;
+	ch_info->rx_buff_full[ch_info->rx_curr_buff] = BUFF_IS_FULL;
 
 	/* Change buffers */
-	ch_info->rxCurrBuff = MV_TDM_NEXT_BUFFER(ch_info->rxCurrBuff);
+	ch_info->rx_curr_buff = MV_TDM_NEXT_BUFFER(ch_info->rx_curr_buff);
 
 	/* Poll on SW ownership (single check) */
 	dev_dbg(tdm2c->dev, "start poll for ownership\n");
@@ -303,10 +303,10 @@ static inline int tdm2c_ch_rx_low(u8 ch)
 		return -ETIME;
 	}
 
-	dev_dbg(tdm2c->dev, "ch%d, start rx buff %d\n", ch, ch_info->rxCurrBuff);
+	dev_dbg(tdm2c->dev, "ch%d, start rx buff %d\n", ch, ch_info->rx_curr_buff);
 
 	/* Set RX buff address (must be 32 byte aligned) */
-	writel(ch_info->rxBuffPhys[ch_info->rxCurrBuff], tdm2c->regs + CH_RX_ADDR_REG(ch_info->ch));
+	writel(ch_info->rx_buff_phys[ch_info->rx_curr_buff], tdm2c->regs + CH_RX_ADDR_REG(ch_info->ch));
 
 	/* Set HW ownership */
 	writeb(OWN_BY_HW, tdm2c->regs + CH_BUFF_OWN_REG(ch_info->ch) + RX_OWN_BYTE_OFFS);
@@ -319,7 +319,7 @@ static inline int tdm2c_ch_rx_low(u8 ch)
 		return -EBUSY;
 
 	tdm2c->rx_int = 0;
-	tdm2c->rx_full = MV_TDM_PREV_BUFFER(ch_info->rxCurrBuff, 2);
+	tdm2c->rx_full = MV_TDM_PREV_BUFFER(ch_info->rx_curr_buff, 2);
 	dev_dbg(tdm2c->dev, "buff %d is FULL for ch0/1\n", tdm2c->rx_full);
 
 	return 0;
@@ -342,9 +342,9 @@ static int tdm2c_ch_remove(u8 ch)
 
 	for (buff = 0; buff < TOTAL_BUFFERS; buff++) {
 		dma_free_coherent(tdm2c->dev, MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor),
-				  ch_info->rxBuffVirt[buff], (dma_addr_t)ch_info->rxBuffPhys[buff]);
+				  ch_info->rx_buff_virt[buff], (dma_addr_t)ch_info->rx_buff_phys[buff]);
 		dma_free_coherent(tdm2c->dev, MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor),
-				  ch_info->txBuffVirt[buff], (dma_addr_t)ch_info->txBuffPhys[buff]);
+				  ch_info->tx_buff_virt[buff], (dma_addr_t)ch_info->tx_buff_phys[buff]);
 	}
 
 	kfree(ch_info);
@@ -367,18 +367,18 @@ static void tdm2c_reset(void)
 
 	for (ch = 0; ch < MV_TDM2C_TOTAL_CHANNELS; ch++) {
 		ch_info = tdm2c->ch_info[ch];
-		ch_info->rxFirst = FIRST_INT;
-		ch_info->txCurrBuff = ch_info->rxCurrBuff = 0;
+		ch_info->rx_first = FIRST_INT;
+		ch_info->tx_curr_buff = ch_info->rx_curr_buff = 0;
 		for (buff = 0; buff < TOTAL_BUFFERS; buff++) {
-			ch_info->rxBuffFull[buff] = BUFF_IS_EMPTY;
-			ch_info->txBuffFull[buff] = BUFF_IS_FULL;
+			ch_info->rx_buff_full[buff] = BUFF_IS_EMPTY;
+			ch_info->tx_buff_empty[buff] = BUFF_IS_FULL;
 
 		}
 	}
 }
 
 int tdm2c_init(void __iomem *base, struct device *dev,
-	       struct mv_phone_params *tdmParams, struct mv_phone_data *halData)
+	       struct mv_phone_params *tdm_params, struct mv_phone_data *phone_data)
 {
 	u8 ch;
 	u32 pcm_ctrl_reg, nb_delay = 0, wb_delay = 0;
@@ -396,7 +396,7 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 
 	/* Initialize remaining parameters */
 	tdm2c->regs = base;
-	tdm2c->pcm_format = tdmParams->pcm_format;
+	tdm2c->pcm_format = tdm_params->pcm_format;
 	tdm2c->rx_full = BUFF_INVALID;
 	tdm2c->tx_empty = BUFF_INVALID;
 	tdm2c->dev = dev;
@@ -404,11 +404,11 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 	dev_info(dev, "TDM dual channel device rev 0x%x\n",
 		 readl(tdm2c->regs + TDM_REV_REG));
 
-	if (tdmParams->sampling_period > MV_TDM_MAX_SAMPLING_PERIOD)
+	if (tdm_params->sampling_period > MV_TDM_MAX_SAMPLING_PERIOD)
 		/* Use base sample period(10ms) */
 		tdm2c->factor = 1;
 	else
-		tdm2c->factor = (tdmParams->sampling_period / MV_TDM_BASE_SAMPLING_PERIOD);
+		tdm2c->factor = (tdm_params->sampling_period / MV_TDM_BASE_SAMPLING_PERIOD);
 
 	/* Extract pcm format & band mode */
 	if (tdm2c->pcm_format == MV_PCM_FORMAT_4BYTES) {
@@ -440,9 +440,9 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 
 	/* Calculate CH(0/1) Delay Control for narrow/wideband modes */
 	for (ch = 0; ch < MV_TDM2C_TOTAL_CHANNELS; ch++) {
-		nb_delay = ((tdmParams->pcm_slot[ch] * PCM_SLOT_PCLK) + 1);
+		nb_delay = ((tdm_params->pcm_slot[ch] * PCM_SLOT_PCLK) + 1);
 		/* Offset required by ZARLINK VE880 SLIC */
-		wb_delay = (nb_delay + ((halData->frame_ts / 2) * PCM_SLOT_PCLK));
+		wb_delay = (nb_delay + ((phone_data->frame_ts / 2) * PCM_SLOT_PCLK));
 		ch_delay[ch] = ((nb_delay << CH_RX_DELAY_OFFS) | (nb_delay << CH_TX_DELAY_OFFS));
 		ch_delay[(ch + 2)] = ((wb_delay << CH_RX_DELAY_OFFS) | (wb_delay << CH_TX_DELAY_OFFS));
 	}
@@ -468,7 +468,7 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 	/* SPI SCLK freq */
 	writel(SPI_CLK_2MHZ, tdm2c->regs + SPI_CLK_PRESCALAR_REG);
 	/* Number of timeslots (PCLK) */
-	writel((u32)halData->frame_ts, tdm2c->regs + FRAME_TIMESLOT_REG);
+	writel((u32)phone_data->frame_ts, tdm2c->regs + FRAME_TIMESLOT_REG);
 
 	if (tdm2c->band_mode == MV_NARROW_BAND) {
 		pcm_ctrl_reg = (CONFIG_PCM_CRTL | (((u8)tdm2c->pcm_format - 1) << PCM_SAMPLE_SIZE_OFFS));
@@ -507,7 +507,7 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 	mdelay(1);
 	writel(1, tdm2c->regs + MISC_CTRL_REG);
 
-	if (halData->spi_mode) {
+	if (phone_data->spi_mode) {
 		/* Configure TDM to work in daisy chain mode */
 		tdm2c_daisy_chain_mode_set();
 	}
@@ -560,11 +560,11 @@ void tdm2c_pcm_start(void)
 		ch_info = tdm2c->ch_info[ch];
 
 		/* Set Tx buff */
-		writel(ch_info->txBuffPhys[ch_info->txCurrBuff], tdm2c->regs + CH_TX_ADDR_REG(ch));
+		writel(ch_info->tx_buff_phys[ch_info->tx_curr_buff], tdm2c->regs + CH_TX_ADDR_REG(ch));
 		writeb(OWN_BY_HW, tdm2c->regs + CH_BUFF_OWN_REG(ch) + TX_OWN_BYTE_OFFS);
 
 		/* Set Rx buff */
-		writel(ch_info->rxBuffPhys[ch_info->rxCurrBuff], tdm2c->regs + CH_RX_ADDR_REG(ch));
+		writel(ch_info->rx_buff_phys[ch_info->rx_curr_buff], tdm2c->regs + CH_RX_ADDR_REG(ch));
 		writeb(OWN_BY_HW, tdm2c->regs + CH_BUFF_OWN_REG(ch) + RX_OWN_BYTE_OFFS);
 
 	}
@@ -624,12 +624,12 @@ int tdm2c_tx(u8 *tdm_tx_buff)
 		dev_dbg(tdm2c->dev, "ch%d: fill buf %d with %d bytes\n",
 			ch, tdm2c->tx_empty,
 			MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor));
-		ch_info->txBuffFull[tdm2c->tx_empty] = BUFF_IS_FULL;
+		ch_info->tx_buff_empty[tdm2c->tx_empty] = BUFF_IS_FULL;
 		tx_buff = tdm_tx_buff +
 			  (ch * MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor));
 
 		/* Copy data from voice engine buffer to DMA */
-		memcpy(ch_info->txBuffVirt[tdm2c->tx_empty], tx_buff,
+		memcpy(ch_info->tx_buff_virt[tdm2c->tx_empty], tx_buff,
 		       MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor));
 	}
 
@@ -662,14 +662,14 @@ int tdm2c_rx(u8 *tdm_rx_buff)
 
 	for (ch = 0; ch < MV_TDM2C_TOTAL_CHANNELS; ch++) {
 		ch_info = tdm2c->ch_info[ch];
-		ch_info->rxBuffFull[tdm2c->rx_full] = BUFF_IS_EMPTY;
+		ch_info->rx_buff_full[tdm2c->rx_full] = BUFF_IS_EMPTY;
 		dev_dbg(tdm2c->dev, "%s get Rx buffer(%d) for channel(%d)\n",
 			__func__, tdm2c->rx_full, ch);
 		rx_buff = tdm_rx_buff +
 			  (ch * MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor));
 
 		/* Copy data from DMA to voice engine buffer */
-		memcpy(rx_buff, ch_info->rxBuffVirt[tdm2c->rx_full],
+		memcpy(rx_buff, ch_info->rx_buff_virt[tdm2c->rx_full],
 		       MV_TDM_CH_BUFF_SIZE(tdm2c->pcm_format, tdm2c->band_mode, tdm2c->factor));
 	}
 
@@ -973,31 +973,31 @@ void tdm2c_regs_dump(void)
 		ch_info = tdm2c->ch_info[i];
 		dev_info(tdm2c->dev, "RX buffs:\n");
 		dev_info(tdm2c->dev, "buff0: virt=%p phys=%p\n",
-			 ch_info->rxBuffVirt[0], (u32 *) (ch_info->rxBuffPhys[0]));
+			 ch_info->rx_buff_virt[0], (u32 *) (ch_info->rx_buff_phys[0]));
 		dev_info(tdm2c->dev, "buff1: virt=%p phys=%p\n",
-			 ch_info->rxBuffVirt[1], (u32 *) (ch_info->rxBuffPhys[1]));
+			 ch_info->rx_buff_virt[1], (u32 *) (ch_info->rx_buff_phys[1]));
 		dev_info(tdm2c->dev, "TX buffs:\n");
 		dev_info(tdm2c->dev, "buff0: virt=%p phys=%p\n",
-			 ch_info->txBuffVirt[0], (u32 *) (ch_info->txBuffPhys[0]));
+			 ch_info->tx_buff_virt[0], (u32 *) (ch_info->tx_buff_phys[0]));
 		dev_info(tdm2c->dev, "buff1: virt=%p phys=%p\n",
-			 ch_info->txBuffVirt[1], (u32 *) (ch_info->txBuffPhys[1]));
+			 ch_info->tx_buff_virt[1], (u32 *) (ch_info->tx_buff_phys[1]));
 	}
 }
 
 #ifdef CONFIG_MV_TDM_EXT_STATS
-void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdmExtStats)
+void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdm_ext_stats)
 {
-	tdmExtStats->int_rx_count = tdm2c->int_rx_count;
-	tdmExtStats->int_tx_count = tdm2c->int_tx_count;
-	tdmExtStats->int_rx0_count = tdm2c->int_rx0_count;
-	tdmExtStats->int_tx0_count = tdm2c->int_tx0_count;
-	tdmExtStats->int_rx1_count = tdm2c->int_rx1_count;
-	tdmExtStats->int_tx1_count = tdm2c->int_tx1_count;
-	tdmExtStats->int_rx0_miss = tdm2c->int_rx0_miss;
-	tdmExtStats->int_tx0_miss = tdm2c->int_tx0_miss;
-	tdmExtStats->int_rx1_miss = tdm2c->int_rx1_miss;
-	tdmExtStats->int_tx1_miss = tdm2c->int_tx1_miss;
-	tdmExtStats->pcm_restart_count = tdm2c->pcm_restart_count;
+	tdm_ext_stats->int_rx_count = tdm2c->int_rx_count;
+	tdm_ext_stats->int_tx_count = tdm2c->int_tx_count;
+	tdm_ext_stats->int_rx0_count = tdm2c->int_rx0_count;
+	tdm_ext_stats->int_tx0_count = tdm2c->int_tx0_count;
+	tdm_ext_stats->int_rx1_count = tdm2c->int_rx1_count;
+	tdm_ext_stats->int_tx1_count = tdm2c->int_tx1_count;
+	tdm_ext_stats->int_rx0_miss = tdm2c->int_rx0_miss;
+	tdm_ext_stats->int_tx0_miss = tdm2c->int_tx0_miss;
+	tdm_ext_stats->int_rx1_miss = tdm2c->int_rx1_miss;
+	tdm_ext_stats->int_tx1_miss = tdm2c->int_tx1_miss;
+	tdm_ext_stats->pcm_restart_count = tdm2c->pcm_restart_count;
 }
 #endif
 
