@@ -184,6 +184,11 @@ enum mv_phone_frame_ts {
 	MV_FRAME_128TS = 128
 };
 
+enum mv_phone_spi_mode {
+	MV_SPI_MODE_DIRECT = 0,
+	MV_SPI_MODE_DAISY_CHAIN = 1
+};
+
 #ifdef CONFIG_MV_TDM_EXT_STATS
 struct mv_phone_extended_stats {
 	u32 int_rx_count;
@@ -213,11 +218,6 @@ struct mv_phone_params {
 	u16 pcm_slot[32];
 	u8 sampling_period;
 	u16 total_channels;
-};
-
-struct mv_phone_data {
-	u8 spi_mode;
-	enum mv_phone_frame_ts frame_ts;
 };
 
 struct mv_phone_dev {
@@ -266,6 +266,9 @@ struct mv_phone_dev {
 #ifdef CONFIG_MV_TDM_EXT_STATS
 	u32 pcm_stop_fail;
 #endif
+
+	/* TDM2C SPI operation mode */
+	enum mv_phone_spi_mode tdm2c_spi_mode;
 
 	/* TDMMC silicon revision */
 	enum tdmmc_ip_version tdmmc_ip_ver;
@@ -317,7 +320,9 @@ void mv_phone_intr_disable(u8 deviceId);
 
 /* TDM2C */
 int tdm2c_init(void __iomem *base, struct device *dev,
-	       struct mv_phone_params *tdmParams, struct mv_phone_data *halData);
+	       struct mv_phone_params *tdm_params,
+	       enum mv_phone_frame_ts frame_ts,
+	       enum mv_phone_spi_mode spi_mode);
 int tdm2c_intr_low(struct mv_phone_intr_info *tdm_intr_info);
 #ifdef CONFIG_MV_TDM_EXT_STATS
 void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdmExtStats);
@@ -325,7 +330,7 @@ void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdmExtStats);
 
 /* TDMMC */
 int tdmmc_init(void __iomem *base, struct device *dev, struct mv_phone_params *tdm_params,
-	       struct mv_phone_data *hal_data, enum tdmmc_ip_version tdmmc_ip_ver);
+	       enum mv_phone_frame_ts frame_ts, enum tdmmc_ip_version tdmmc_ip_ver);
 int tdmmc_intr_low(struct mv_phone_intr_info *tdm_intr_info);
 
 #endif /* _MV_PHONE_H_ */

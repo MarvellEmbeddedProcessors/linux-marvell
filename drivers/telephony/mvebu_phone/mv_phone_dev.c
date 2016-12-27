@@ -293,30 +293,28 @@ static void tdmmc_if_pcm_stop(void)
 /* TDM low-level initialization */
 static int tdm_hw_init(struct mv_phone_params *tdm_params)
 {
-	struct mv_phone_data hal_data;
-	u8 spi_mode = 0;
+	enum mv_phone_frame_ts frame_ts;
 	int ret;
-
-	hal_data.spi_mode = spi_mode;
 
 	switch (priv->pclk_freq_mhz) {
 	case 8:
-		hal_data.frame_ts = MV_FRAME_128TS;
+		frame_ts = MV_FRAME_128TS;
 		break;
 	case 4:
-		hal_data.frame_ts = MV_FRAME_64TS;
+		frame_ts = MV_FRAME_64TS;
 		break;
 	case 2:
-		hal_data.frame_ts = MV_FRAME_32TS;
+		frame_ts = MV_FRAME_32TS;
 		break;
 	default:
-		hal_data.frame_ts = MV_FRAME_128TS;
+		frame_ts = MV_FRAME_128TS;
 		break;
 	}
 
 	switch (priv->tdm_type) {
 	case MV_TDM_UNIT_TDM2C:
-		ret = tdm2c_init(priv->tdm_base, priv->dev, tdm_params, &hal_data);
+		ret = tdm2c_init(priv->tdm_base, priv->dev, tdm_params,
+				 frame_ts, priv->tdm2c_spi_mode);
 
 		/* Soft reset to PCM I/F */
 		tdm2c_pcm_if_reset();
@@ -324,7 +322,7 @@ static int tdm_hw_init(struct mv_phone_params *tdm_params)
 		break;
 	case MV_TDM_UNIT_TDMMC:
 		ret = tdmmc_init(priv->tdm_base, priv->dev, tdm_params,
-				 &hal_data, priv->tdmmc_ip_ver);
+				 frame_ts, priv->tdmmc_ip_ver);
 
 		/* Issue SLIC reset */
 		ret |= tdmmc_reset_slic();
@@ -1069,6 +1067,15 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 			err = priv->irq[i];
 			goto err_clk;
 		}
+	}
+
+	if (priv->tdm_type == MV_TDM_UNIT_TDM2C) {
+		if (of_property_read_u32(np, "spi-mode", &priv->tdm2c_spi_mode) ||
+		    (priv->tdm2c_spi_mode != 0 && priv->tdm2c_spi_mode != 1))
+			priv->tdm2c_spi_mode = 0;
+
+		dev_info(&pdev->dev, "using %s SPI mode\n",
+			 priv->tdm2c_spi_mode ? "daisy-chain" : "direct");
 	}
 
 	spin_lock_init(&priv->lock);
