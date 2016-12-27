@@ -123,9 +123,6 @@
 /****************************************************************/
 /*************** Telephony configuration ************************/
 /****************************************************************/
-extern int use_pclk_external;
-extern long int tdm_base;
-#define MV_TDM_REGS_BASE	(tdm_base)
 
 /* Core DivClk Control Register */
 
@@ -269,6 +266,8 @@ struct mv_phone_dev {
 
 	/* TDM2C SPI operation mode */
 	enum mv_phone_spi_mode tdm2c_spi_mode;
+	/* TDM2C PCLK source */
+	bool use_pclk_external;
 
 	/* TDMMC silicon revision */
 	enum tdmmc_ip_version tdmmc_ip_ver;
@@ -322,7 +321,8 @@ void mv_phone_intr_disable(u8 device_id);
 int tdm2c_init(void __iomem *base, struct device *dev,
 	       struct mv_phone_params *tdm_params,
 	       enum mv_phone_frame_ts frame_ts,
-	       enum mv_phone_spi_mode spi_mode);
+	       enum mv_phone_spi_mode spi_mode,
+	       bool use_pclk_external);
 int tdm2c_intr_low(struct mv_phone_intr_info *tdm_intr_info);
 #ifdef CONFIG_MV_TDM_EXT_STATS
 void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdm_ext_stats);
