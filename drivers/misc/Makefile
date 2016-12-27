@@ -57,3 +57,4 @@ obj-$(CONFIG_ECHO)		+= echo/
 obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
 obj-$(CONFIG_CXL_BASE)		+= cxl/
 obj-$(CONFIG_MVEBU_A8K_DEBUGFS)	+= mvebu-a8k-debugfs.o
+obj-$(CONFIG_MVEBU_SOC_INFO)	+= mv_soc_info.o
