@@ -390,6 +390,39 @@ struct tdmmc_dram_entry {
 	u32 reserved31_27:5;
 };
 
+/* Main TDM structure definition */
+struct tdmmc_dev {
+	/* Resources */
+	void __iomem *regs;
+	struct device *dev;
+
+	/* Silicon revision */
+	enum tdmmc_ip_version ip_ver;
+
+	/* Buffers */
+	u8 *rx_buff_virt[TOTAL_CHAINS];
+	u8 *tx_buff_virt[TOTAL_CHAINS];
+	dma_addr_t rx_buff_phys[TOTAL_CHAINS];
+	dma_addr_t tx_buff_phys[TOTAL_CHAINS];
+	u8 prev_rx;
+	u8 next_tx;
+
+	/* MCDMA descriptors */
+	struct tdmmc_mcdma_rx_desc *rx_desc_virt[TOTAL_CHAINS];
+	struct tdmmc_mcdma_tx_desc *tx_desc_virt[TOTAL_CHAINS];
+	dma_addr_t rx_desc_phys[TOTAL_CHAINS];
+	dma_addr_t tx_desc_phys[TOTAL_CHAINS];
+
+	/* Flags */
+	bool tdm_enable;
+	bool pcm_enable;
+
+	/* Parameters */
+	u8 sample_size;
+	u8 sampling_coeff;
+	u16 total_channels;
+};
+
 /* TDMMC APIs */
 void tdmmc_pcm_start(void);
 void tdmmc_pcm_stop(void);
