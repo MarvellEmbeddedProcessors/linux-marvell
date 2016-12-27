@@ -107,11 +107,6 @@
 
 #define DRV_NAME "mvebu_phone"
 
-long int tdm_base;
-int use_pclk_external;
-int mv_phone_enabled;
-struct mv_phone_dev *priv;
-
 /* TDM Interrupt Service Routine */
 static irqreturn_t tdm_if_isr(int irq, void *dev_id);
 
@@ -123,6 +118,7 @@ static void tdmmc_if_pcm_tx_process(unsigned long arg);
 static void tdm2c_if_reset_channels(unsigned long arg);
 
 /* Globals */
+static struct mv_phone_dev *priv;
 static DECLARE_TASKLET(tdm2c_if_rx_tasklet, tdm2c_if_pcm_rx_process, 0);
 static DECLARE_TASKLET(tdmmc_if_rx_tasklet, tdmmc_if_pcm_rx_process, 0);
 static DECLARE_TASKLET(tdm2c_if_tx_tasklet, tdm2c_if_pcm_tx_process, 0);
@@ -314,7 +310,8 @@ static int tdm_hw_init(struct mv_phone_params *tdm_params)
 	switch (priv->tdm_type) {
 	case MV_TDM_UNIT_TDM2C:
 		ret = tdm2c_init(priv->tdm_base, priv->dev, tdm_params,
-				 frame_ts, priv->tdm2c_spi_mode);
+				 frame_ts, priv->tdm2c_spi_mode,
+				 priv->use_pclk_external);
 
 		/* Soft reset to PCM I/F */
 		tdm2c_pcm_if_reset();
@@ -991,7 +988,6 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 	priv->tdm_base = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(priv->tdm_base))
 		return PTR_ERR(priv->tdm_base);
-	tdm_base = (long int)priv->tdm_base;
 
 	priv->clk = devm_clk_get(&pdev->dev, "gateclk");
 	if (PTR_ERR(priv->clk) == -EPROBE_DEFER)
@@ -1005,14 +1001,6 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 	err = clk_prepare_enable(priv->clk);
 	if (err)
 		return err;
-
-	if (of_property_read_bool(np, "use-external-pclk")) {
-		dev_info(&pdev->dev, "using external pclk\n");
-		use_pclk_external = 1;
-	} else {
-		dev_info(&pdev->dev, "using internal pclk\n");
-		use_pclk_external = 0;
-	}
 
 	if (of_property_read_u32(np, "pclk-freq-mhz", &priv->pclk_freq_mhz) ||
 	    (priv->pclk_freq_mhz != 8 && priv->pclk_freq_mhz != 4 &&
@@ -1070,6 +1058,10 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 	}
 
 	if (priv->tdm_type == MV_TDM_UNIT_TDM2C) {
+		priv->use_pclk_external = of_property_read_bool(np, "use-external-pclk");
+		dev_info(&pdev->dev, "using %s pclk\n",
+			 priv->use_pclk_external ? "external" : "internal");
+
 		if (of_property_read_u32(np, "spi-mode", &priv->tdm2c_spi_mode) ||
 		    (priv->tdm2c_spi_mode != 0 && priv->tdm2c_spi_mode != 1))
 			priv->tdm2c_spi_mode = 0;
@@ -1079,8 +1071,6 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 	}
 
 	spin_lock_init(&priv->lock);
-
-	mv_phone_enabled = 1;
 
 	priv->dev = &pdev->dev;
 	return 0;
