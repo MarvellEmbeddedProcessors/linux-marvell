@@ -326,7 +326,6 @@
 #define MV_TDM_CS			0
 #define BUFF_INVALID			-1
 
-/* Structures */
 /* TDM channel info structure */
 struct tdm2c_ch_info {
 	u8 ch;
