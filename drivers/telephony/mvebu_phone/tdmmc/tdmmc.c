@@ -622,13 +622,7 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 	writel(0, regs + MCSC_EXTENDED_INT_CAUSE_REG);
 
 	/* Set output sync counter bits for FS */
-#if defined(MV_TDM_PCM_CLK_8MHZ)
-	count = MV_FRAME_128TS * 8;
-#elif defined(MV_TDM_PCM_CLK_4MHZ)
-	count = MV_FRAME_64TS * 8;
-#else /* MV_TDM_PCM_CLK_2MHZ */
-	count = MV_FRAME_32TS * 8;
-#endif
+	count = hal_data->frame_ts * 8;
 	writel(((count << TDM_SYNC_BIT_RX_OFFS) & TDM_SYNC_BIT_RX_MASK) | (count & TDM_SYNC_BIT_TX_MASK),
 	       regs + TDM_OUTPUT_SYNC_BIT_COUNT_REG);
 
