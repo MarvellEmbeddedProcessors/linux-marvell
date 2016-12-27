@@ -323,7 +323,8 @@ static int tdm_hw_init(struct mv_phone_params *tdm_params)
 
 		break;
 	case MV_TDM_UNIT_TDMMC:
-		ret = tdmmc_init(priv->tdm_base, priv->dev, tdm_params, &hal_data);
+		ret = tdmmc_init(priv->tdm_base, priv->dev, tdm_params,
+				 &hal_data, priv->tdmmc_ip_ver);
 
 		/* Issue SLIC reset */
 		ret |= tdmmc_reset_slic();
@@ -1045,6 +1046,7 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 			goto err_clk;
 
 		priv->irq_count = 1;
+		priv->tdmmc_ip_ver = TDMMC_REV1;
 
 		tal_set_if(&tdmmc_if);
 	}
@@ -1054,6 +1056,7 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 		tdmmc_set_a8k_windows(&pdev->dev, priv->tdm_base);
 
 		priv->irq_count = 3;
+		priv->tdmmc_ip_ver = TDMMC_REV1;
 
 		tal_set_if(&tdmmc_if);
 	}

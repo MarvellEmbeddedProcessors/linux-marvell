@@ -343,12 +343,6 @@
 #define	CONFIG_TDM_DATA_DELAY_AND_CLK_CTRL \
 	(TX_CLK_OUT_ENABLE_MASK | RX_CLK_OUT_ENABLE_MASK)
 
-/* SoC ID's */
-#define MV_65XX_DEV_ID		0x6500	/* MV88F6500 family */
-#define MV_78XX0		0x78000	/* Armada XP Family */
-#define MV_88F66X0		0x6600	/* Avanta LP Family */
-#define MV_88F67X0		0x6700	/* Armada 375 Family */
-
 /* Defines */
 #define TOTAL_CHAINS		2
 #define CONFIG_RBSZ		16
@@ -359,9 +353,10 @@
 #define OLD_INT_WA_BIT		(1 << 15)
 #define MV_TDM_PCM_CLK_8MHZ	1
 
+/* Enums */
 enum tdmmc_ip_version {
-	MV_COMMUNIT_IP_VER_ORIGIN   = 0,
-	MV_COMMUNIT_IP_VER_REVISE_1,
+	TDMMC_REV0 = 0,
+	TDMMC_REV1
 };
 
 /* Structures */
