@@ -4,6 +4,7 @@ Required properties:
 - compatible : should be "marvell,armada3700-spi"
 - reg        : offset and length of the spi register
 - cell-index : index of SPI controllers
+- clocks     : gating clock
 Optional properties:
 - interrupts : interrupt id of SPI controller
                If interrupts cell is missing, the driver
@@ -18,6 +19,7 @@ Example:
 	       #size-cells = <0>;
 	       cell-index = <0>;
 	       reg = <0x10600 0xA00>;
+	       clocks = <&ngateclk 12>;
 	       interrupts = <0 0 4>;
 		   fifo-mode;
 	       status = "disabled";

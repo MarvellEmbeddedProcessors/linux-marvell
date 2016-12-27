@@ -1094,15 +1094,15 @@ static int a3700_spi_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "could not find spi-max-frequency\n");
 		goto error_clk;
 	}
-	of_property_read_u32(of_node, "clock-frequency", &spi->input_clk_freq);
-	if (!spi->input_clk_freq) {
-		dev_err(&pdev->dev, "could not find clock-frequency\n");
-		goto error_clk;
+
+	/* Enable SPI gating clock and get MAX input clock */
+	spi->clk = devm_clk_get(&pdev->dev, NULL);
+	if (!IS_ERR(spi->clk)) {
+		ret = clk_prepare_enable(spi->clk);
+		if (ret)
+			goto error;
+		spi->input_clk_freq = clk_get_rate(spi->clk);
 	}
-	/* TO-DO: there is no gating clock driver so far, and SPI clock
-	 * configuration has been done in boot rom. So we are good for now.
-	 * but when gating clock is ready, need to enable the clock here.
-	 */
 
 	if (of_find_property(of_node, "fifo-mode", NULL)) {
 		dev_err(&pdev->dev, "fifo mode\n");
@@ -1131,8 +1131,10 @@ static int a3700_spi_probe(struct platform_device *pdev)
 	spi->pin_mode = A3700_SPI_SGL_PIN; /* fix-me: add device tree support */
 
 	ret = a3700_spi_init(spi);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev, "Failed to init SPI\n");
 		goto error_clk;
+	}
 
 	if (!(spi->flags & XFER_POLL)) {
 		ret = devm_request_irq(&pdev->dev, spi->irq,
@@ -1144,14 +1146,15 @@ static int a3700_spi_probe(struct platform_device *pdev)
 	}
 
 	ret = spi_register_master(master);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev, "failed to register SPI master\n");
 		goto error_clk;
-
+	}
 out:
 	return ret;
 
 error_clk:
-	/* TO-DO: when gating clock is ready, need to disable the clock. */
+	clk_disable_unprepare(spi->clk);
 
 error:
 	spi_master_put(master);
@@ -1160,9 +1163,12 @@ error:
 
 static int a3700_spi_remove(struct platform_device *pdev)
 {
+	struct a3700_spi *a3700_spi;
 	struct spi_master *master = platform_get_drvdata(pdev);
 
-	/* TO-DO: when gating clock is ready, need to disable the clock. */
+	a3700_spi = spi_master_get_devdata(master);
+	if (!a3700_spi->clk)
+		clk_disable_unprepare(a3700_spi->clk);
 
 	spi_unregister_master(master);
 
