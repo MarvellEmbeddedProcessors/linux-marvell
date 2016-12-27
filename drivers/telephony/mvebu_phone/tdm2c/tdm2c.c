@@ -379,7 +379,7 @@ static void tdm2c_reset(void)
 
 int tdm2c_init(void __iomem *base, struct device *dev,
 	       struct mv_phone_params *tdm_params, enum mv_phone_frame_ts frame_ts,
-	       enum mv_phone_spi_mode spi_mode)
+	       enum mv_phone_spi_mode spi_mode, bool use_pclk_external)
 {
 	u8 ch;
 	u32 pcm_ctrl_reg, nb_delay = 0, wb_delay = 0;
