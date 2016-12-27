@@ -378,6 +378,7 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 	u32 buff_size, chan, total_rx_desc_size, total_tx_desc_size;
 	u32 max_poll, clk_sync_ctrl_reg, count;
 	struct tdmmc_dram_entry *act_dpram_entry;
+	int ret;
 
 	regs = base;
 	/* Initialize driver resources */
@@ -404,7 +405,7 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 	/* Calculate single Rx/Tx buffer size */
 	buff_size = (sample_size * MV_TDM_TOTAL_CH_SAMPLES * sampling_coeff);
 
-	/* Allocate cached data buffers for all channels */
+	/* Allocate non-cached data buffers for all channels */
 	dev_dbg(pdev, "%s: allocate 0x%x for data buffers total_channels = %d\n",
 		__func__, (buff_size * total_channels), total_channels);
 
@@ -413,6 +414,11 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 						       &rx_buff_phys[index], GFP_KERNEL);
 		tx_buff_virt[index] = dma_alloc_coherent(pdev, buff_size * total_channels,
 						       &tx_buff_phys[index], GFP_KERNEL);
+
+		if (!rx_buff_virt[index] || !tx_buff_virt[index]) {
+			ret = -ENOMEM;
+			goto err_buff_virt;
+		}
 	}
 
 	/* Allocate non-cached MCDMA Rx/Tx descriptors */
@@ -427,12 +433,17 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 		mcdma_tx_desc_ptr[index] = dma_alloc_coherent(pdev, total_tx_desc_size,
 							   &mcdma_tx_desc_phys[index], GFP_KERNEL);
 
-		/* XXX Add BUG() */
+		if (!mcdma_rx_desc_ptr[index] || !mcdma_tx_desc_ptr[index]) {
+			ret = -ENOMEM;
+			goto err_mcdma_desc;
+		}
+
 		/* Check descriptors alignment */
 		if (((ulong) mcdma_rx_desc_ptr[index] | (ulong)mcdma_tx_desc_ptr[index]) &
 		    (sizeof(struct tdmmc_mcdma_rx_desc) - 1)) {
 			dev_err(pdev, "%s: Error, unaligned MCDMA Rx/Tx descriptors\n", __func__);
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto err_mcdma_desc;
 		}
 	}
 
@@ -445,7 +456,8 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 
 	if (max_poll >= MAX_POLL_USEC) {
 		dev_err(pdev, "Error, MCDMA reset completion timout\n");
-		return -ETIME;
+		ret = -ETIME;
+		goto err_mcdma_desc;
 	}
 
 	/* Poll MCSC for RAM initialization done */
@@ -459,7 +471,8 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 
 		if (max_poll >= MAX_POLL_USEC) {
 			dev_err(pdev, "Error, MCDMA RAM initialization timout\n");
-			return -ETIME;
+			ret = -ETIME;
+			goto err_mcdma_desc;
 		}
 	}
 
@@ -511,8 +524,10 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 	/* Time Division Multiplexing(TDM) Configuration */
 	/*************************************************/
 	act_dpram_entry = kmalloc(sizeof(struct tdmmc_dram_entry), GFP_KERNEL);
-	if (!act_dpram_entry)
-		return -EINVAL;
+	if (!act_dpram_entry) {
+		ret = -EINVAL;
+		goto err_mcdma_desc;
+	}
 
 	memcpy(act_dpram_entry, &def_dpram_entry, sizeof(struct tdmmc_dram_entry));
 	/* Set repeat mode bits for (sample_size > 1) */
@@ -533,14 +548,16 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 		if (pcm_slot >= hal_data->frame_ts) {
 			dev_err(pdev, "Error, time slot(%d) exceeded maximum(%d)\n",
 				pcm_slot, hal_data->frame_ts);
-			goto err;
+			ret = -ETIME;
+			goto err_dpram;
 		}
 
 		/* Verify time slot is aligned to sample size */
 		if ((sample_size > MV_PCM_FORMAT_1BYTE) && (pcm_slot & 1)) {
 			dev_err(pdev, "Error, time slot(%d) not aligned to Linear PCM sample size\n",
 				pcm_slot);
-			goto err;
+			ret = -EINVAL;
+			goto err_dpram;
 		}
 
 		/* Update relevant DPRAM fields */
@@ -647,9 +664,29 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 
 	kfree(act_dpram_entry);
 	return 0;
-err:
+
+err_dpram:
 	kfree(act_dpram_entry);
-	return -EINVAL;
+err_mcdma_desc:
+	for (index = 0; index < TOTAL_CHAINS; index++) {
+		if (mcdma_rx_desc_ptr[index])
+			dma_free_coherent(pdev, total_rx_desc_size,
+					  mcdma_rx_desc_ptr[index], mcdma_rx_desc_phys[index]);
+		if (mcdma_tx_desc_ptr[index])
+			dma_free_coherent(pdev, total_tx_desc_size,
+					  mcdma_tx_desc_ptr[index], mcdma_tx_desc_phys[index]);
+	}
+err_buff_virt:
+	for (index = 0; index < TOTAL_CHAINS; index++) {
+		if (rx_buff_phys[index])
+			dma_free_coherent(pdev, buff_size, rx_buff_virt[index],
+					  rx_buff_phys[index]);
+		if (tx_buff_phys[index])
+			dma_free_coherent(pdev, buff_size, tx_buff_virt[index],
+					  tx_buff_phys[index]);
+	}
+
+	return ret;
 }
 
 void tdmmc_release(void)
