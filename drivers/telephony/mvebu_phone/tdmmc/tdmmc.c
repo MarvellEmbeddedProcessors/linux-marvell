@@ -109,23 +109,9 @@ static struct tdmmc_mcdma_rx_desc *mcdma_rx_desc_ptr[TOTAL_CHAINS];
 static struct tdmmc_mcdma_tx_desc *mcdma_tx_desc_ptr[TOTAL_CHAINS];
 static dma_addr_t mcdma_rx_desc_phys[TOTAL_CHAINS], mcdma_tx_desc_phys[TOTAL_CHAINS];
 static struct tdmmc_dram_entry def_dpram_entry = { 0, 0, 0x1, 0x1, 0, 0, 0x1, 0, 0, 0, 0 };
-static u32 ctrl_family_id;
+static enum tdmmc_ip_version ip_ver;
 static struct device *pdev;
 static void __iomem *regs;
-
-static enum tdmmc_ip_version tdmmc_ip_ver_get(u32 ctrl_family_id)
-{
-	switch (ctrl_family_id) {
-	case MV_65XX_DEV_ID:
-		return MV_COMMUNIT_IP_VER_ORIGIN;
-	case MV_78XX0:
-	case MV_88F66X0:
-	case MV_88F67X0:
-		return MV_COMMUNIT_IP_VER_REVISE_1;
-	default:
-		return MV_COMMUNIT_IP_VER_REVISE_1;
-	}
-}
 
 static void tdmmc_desc_chain_build(void)
 {
@@ -194,7 +180,7 @@ static void tdmmc_mcdma_mcsc_start(void)
 	}
 
 	/* Set Rx/Tx periodical interrupts */
-	if (tdmmc_ip_ver_get(ctrl_family_id) == MV_COMMUNIT_IP_VER_ORIGIN)
+	if (ip_ver == TDMMC_REV0)
 		writel(CONFIG_VOICE_PERIODICAL_INT_CONTROL_WA,
 		       regs + VOICE_PERIODICAL_INT_CONTROL_REG);
 	else
@@ -372,7 +358,8 @@ void tdmmc_show(void)
 }
 
 int tdmmc_init(void __iomem *base, struct device *dev,
-	       struct mv_phone_params *tdm_params, struct mv_phone_data *hal_data)
+	       struct mv_phone_params *tdm_params, struct mv_phone_data *hal_data,
+	       enum tdmmc_ip_version tdmmc_ip_ver)
 {
 	u16 pcm_slot, index;
 	u32 buff_size, chan, total_rx_desc_size, total_tx_desc_size;
@@ -387,7 +374,7 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 	total_channels = tdm_params->total_channels;
 	prev_rx_buff = 0;
 	next_tx_buff = 0;
-	ctrl_family_id = hal_data->family_id;
+	ip_ver = tdmmc_ip_ver;
 	pdev = dev;
 
 	/* Check parameters */
@@ -657,7 +644,7 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 
 	/* Keep the software workaround to enable TEN while set Fsync for none-ALP chips */
 	/* Enable TDM */
-	if (tdmmc_ip_ver_get(ctrl_family_id) == MV_COMMUNIT_IP_VER_ORIGIN)
+	if (ip_ver == TDMMC_REV0)
 		mv_phone_set_bit(regs + FLEX_TDM_CONFIG_REG, TDM_TEN_MASK);
 
 	dev_dbg(pdev, "%s: Exit\n", __func__);
@@ -706,7 +693,7 @@ void tdmmc_release(void)
 		mv_phone_reset_bit(regs + MCSC_GLOBAL_CONFIG_REG, MCSC_GLOBAL_CONFIG_MAI_MASK);
 
 		/* Disable TDM */
-		if (tdmmc_ip_ver_get(ctrl_family_id) == MV_COMMUNIT_IP_VER_ORIGIN)
+		if (ip_ver == TDMMC_REV0)
 			mv_phone_reset_bit(regs + FLEX_TDM_CONFIG_REG, TDM_TEN_MASK);
 
 		/* Disable PCLK */
@@ -766,7 +753,7 @@ void tdmmc_pcm_start(void)
 		writel(CONFIG_COMM_UNIT_TOP_MASK, regs + COMM_UNIT_TOP_MASK_REG);
 
 		/* Enable TDM */
-		if (tdmmc_ip_ver_get(ctrl_family_id) == MV_COMMUNIT_IP_VER_REVISE_1)
+		if (ip_ver == TDMMC_REV1)
 			mv_phone_set_bit(regs + FLEX_TDM_CONFIG_REG, TDM_TEN_MASK);
 	}
 }
@@ -801,7 +788,7 @@ void tdmmc_pcm_stop(void)
 			memset(rx_buff_virt[index], 0, buff_size);
 
 		/* Disable TDM */
-		if (tdmmc_ip_ver_get(ctrl_family_id) == MV_COMMUNIT_IP_VER_REVISE_1)
+		if (ip_ver == TDMMC_REV1)
 			mv_phone_reset_bit(regs + FLEX_TDM_CONFIG_REG, TDM_TEN_MASK);
 	}
 }
@@ -814,7 +801,7 @@ int tdmmc_tx(u8 *tdm_tx_buff)
 	/* Calculate total Tx buffer size */
 	buff_size = (sample_size * MV_TDM_TOTAL_CH_SAMPLES * sampling_coeff * total_channels);
 
-	if (tdmmc_ip_ver_get(ctrl_family_id) == MV_COMMUNIT_IP_VER_ORIGIN) {
+	if (ip_ver == TDMMC_REV0) {
 		if (sample_size > MV_PCM_FORMAT_1BYTE) {
 			dev_dbg(pdev, "Linear mode (Tx): swapping bytes\n");
 			for (index = 0; index < buff_size; index += 2) {
@@ -837,7 +824,7 @@ int tdmmc_rx(u8 *tdm_rx_buff)
 	/* Calculate total Rx buffer size */
 	buff_size = (sample_size * MV_TDM_TOTAL_CH_SAMPLES * sampling_coeff * total_channels);
 
-	if (tdmmc_ip_ver_get(ctrl_family_id) == MV_COMMUNIT_IP_VER_ORIGIN) {
+	if (ip_ver == TDMMC_REV0) {
 		if (sample_size > MV_PCM_FORMAT_1BYTE) {
 			dev_dbg(pdev, "Linear mode (Rx): swapping bytes\n");
 			for (index = 0; index < buff_size; index += 2) {

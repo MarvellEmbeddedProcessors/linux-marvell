@@ -217,7 +217,6 @@ struct mv_phone_params {
 
 struct mv_phone_data {
 	u8 spi_mode;
-	u32 family_id;
 	enum mv_phone_frame_ts frame_ts;
 };
 
@@ -267,6 +266,9 @@ struct mv_phone_dev {
 #ifdef CONFIG_MV_TDM_EXT_STATS
 	u32 pcm_stop_fail;
 #endif
+
+	/* TDMMC silicon revision */
+	enum tdmmc_ip_version tdmmc_ip_ver;
 };
 
 /* This enumerator defines the Marvell Units ID */
@@ -323,7 +325,7 @@ void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdmExtStats);
 
 /* TDMMC */
 int tdmmc_init(void __iomem *base, struct device *dev, struct mv_phone_params *tdm_params,
-	       struct mv_phone_data *hal_data);
+	       struct mv_phone_data *hal_data, enum tdmmc_ip_version tdmmc_ip_ver);
 int tdmmc_intr_low(struct mv_phone_intr_info *tdm_intr_info);
 
 #endif /* _MV_PHONE_H_ */
