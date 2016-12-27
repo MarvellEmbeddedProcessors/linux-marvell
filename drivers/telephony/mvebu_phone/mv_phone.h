@@ -311,12 +311,12 @@ static inline void mv_phone_reset_bit(void __iomem *addr, u32 bit_mask)
 
 /* MV Phone */
 u32 mv_phone_get_slic_board_type(void);
-void mv_phone_spi_write(u16 lineId, u8 *cmdBuff, u8 cmdSize,
-			u8 *dataBuff, u8 dataSize, u32 spiType);
-void mv_phone_spi_read(u16 lineId, u8 *cmdBuff, u8 cmdSize,
-		       u8 *dataBuff, u8 dataSize, u32 spiType);
-void mv_phone_intr_enable(u8 deviceId);
-void mv_phone_intr_disable(u8 deviceId);
+void mv_phone_spi_write(u16 line_id, u8 *cmd_buff, u8 cmd_size,
+			u8 *data_buff, u8 data_size, u32 spi_type);
+void mv_phone_spi_read(u16 line_id, u8 *cmd_buff, u8 cmd_size,
+		       u8 *data_buff, u8 data_size, u32 spi_type);
+void mv_phone_intr_enable(u8 device_id);
+void mv_phone_intr_disable(u8 device_id);
 
 /* TDM2C */
 int tdm2c_init(void __iomem *base, struct device *dev,
@@ -325,7 +325,7 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 	       enum mv_phone_spi_mode spi_mode);
 int tdm2c_intr_low(struct mv_phone_intr_info *tdm_intr_info);
 #ifdef CONFIG_MV_TDM_EXT_STATS
-void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdmExtStats);
+void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdm_ext_stats);
 #endif
 
 /* TDMMC */
