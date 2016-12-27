@@ -349,6 +349,16 @@
 #define MV_88F66X0		0x6600	/* Avanta LP Family */
 #define MV_88F67X0		0x6700	/* Armada 375 Family */
 
+/* Defines */
+#define TOTAL_CHAINS		2
+#define CONFIG_RBSZ		16
+#define NEXT_BUFF(buff)		((buff + 1) % TOTAL_CHAINS)
+#define PREV_BUFF(buff)		(buff == 0 ? (TOTAL_CHAINS - 1) : (buff - 1))
+#define MAX_POLL_USEC		100000	/* 100ms */
+#define COMM_UNIT_SW_RST	(1 << 5)
+#define OLD_INT_WA_BIT		(1 << 15)
+#define MV_TDM_PCM_CLK_8MHZ	1
+
 enum tdmmc_ip_version {
 	MV_COMMUNIT_IP_VER_ORIGIN   = 0,
 	MV_COMMUNIT_IP_VER_REVISE_1,

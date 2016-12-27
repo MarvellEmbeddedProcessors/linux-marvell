@@ -96,20 +96,6 @@
 
 #include "mv_phone.h"
 
-#undef	MV_COMM_UNIT_DEBUG
-#define	MV_COMM_UNIT_RPT_SUPPORT /* Repeat mode must be set */
-#undef	MV_COMM_UNIT_TEST_SUPPORT
-
-/* defines */
-#define TOTAL_CHAINS		2
-#define CONFIG_RBSZ		16
-#define NEXT_BUFF(buff)		((buff + 1) % TOTAL_CHAINS)
-#define PREV_BUFF(buff)		(buff == 0 ? (TOTAL_CHAINS-1) : (buff-1))
-#define MAX_POLL_USEC		100000	/* 100ms */
-#define COMM_UNIT_SW_RST	(1 << 5)
-#define OLD_INT_WA_BIT		(1 << 15)
-#define MV_TDM_PCM_CLK_8MHZ	1
-
 /* globals */
 static int tdm_enable;
 static int pcm_enable;
@@ -370,18 +356,18 @@ void tdmmc_show(void)
 
 	/* Dump data buffers & descriptors addresses */
 	for (index = 0; index < TOTAL_CHAINS; index++) {
-		dev_info(pdev, "Rx Buff(%d): virt = 0x%lx, phys = 0x%lx\n",
-			 index, (ulong)rx_buff_virt[index],
-			 (ulong)rx_buff_phys[index]);
-		dev_info(pdev, "Tx Buff(%d): virt = 0x%lx, phys = 0x%lx\n",
-			 index, (ulong)tx_buff_virt[index],
-			 (ulong)tx_buff_phys[index]);
-		dev_info(pdev, "Rx Desc(%d): virt = 0x%lx, phys = 0x%lx\n",
-			 index, (ulong)mcdma_rx_desc_ptr[index],
-			 (ulong) mcdma_rx_desc_phys[index]);
-		dev_info(pdev, "Tx Desc(%d): virt = 0x%lx, phys = 0x%lx\n",
-			 index, (ulong)mcdma_tx_desc_ptr[index],
-			 (ulong)mcdma_tx_desc_phys[index]);
+		dev_dbg(pdev, "Rx Buff(%d): virt = 0x%lx, phys = 0x%lx\n",
+			index, (ulong)rx_buff_virt[index],
+			(ulong)rx_buff_phys[index]);
+		dev_dbg(pdev, "Tx Buff(%d): virt = 0x%lx, phys = 0x%lx\n",
+			index, (ulong)tx_buff_virt[index],
+			(ulong)tx_buff_phys[index]);
+		dev_dbg(pdev, "Rx Desc(%d): virt = 0x%lx, phys = 0x%lx\n",
+			index, (ulong)mcdma_rx_desc_ptr[index],
+			(ulong) mcdma_rx_desc_phys[index]);
+		dev_dbg(pdev, "Tx Desc(%d): virt = 0x%lx, phys = 0x%lx\n",
+			index, (ulong)mcdma_tx_desc_ptr[index],
+			(ulong)mcdma_tx_desc_phys[index]);
 	}
 }
 
@@ -427,17 +413,6 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 						       &rx_buff_phys[index], GFP_KERNEL);
 		tx_buff_virt[index] = dma_alloc_coherent(pdev, buff_size * total_channels,
 						       &tx_buff_phys[index], GFP_KERNEL);
-#ifdef MV_COMM_UNIT_TEST_SUPPORT
-	/* Fill Tx buffers with incremental pattern */
-		{
-			int i, j;
-
-			for (j = 0; j < total_channels; j++) {
-				for (i = 0; i < buffSize; i++)
-					*(u8 *) (tx_buff_virt[index]+i+(j*buffSize)) = (u8)(i+1);
-			}
-		}
-#endif
 	}
 
 	/* Allocate non-cached MCDMA Rx/Tx descriptors */
@@ -657,9 +632,7 @@ int tdmmc_init(void __iomem *base, struct device *dev,
 	writel(((count << TDM_SYNC_BIT_RX_OFFS) & TDM_SYNC_BIT_RX_MASK) | (count & TDM_SYNC_BIT_TX_MASK),
 	       regs + TDM_OUTPUT_SYNC_BIT_COUNT_REG);
 
-#ifdef MV_COMM_UNIT_DEBUG
 	tdmmc_show();
-#endif
 
 	/* Enable PCM */
 	tdmmc_pcm_start();
