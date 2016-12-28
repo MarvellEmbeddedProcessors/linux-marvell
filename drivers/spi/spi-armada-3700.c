@@ -100,7 +100,7 @@
 
 #define DATA_CAP_CLOCK_CYCLE_NS		14	/*Minimum clock cycle of flash*/
 #define RVT_EDGE_FLASH_CAP_FREQ		(1000 * 1000 * 1000 / DATA_CAP_CLOCK_CYCLE_NS)
-#define A3700_SPI_MAX_OUTPUT_CLK_FREQ		(50 * 1000 * 1000)	/*50MHz*/
+#define A3700_SPI_MAX_OUTPUT_CLK_FREQ		(100 * 1000 * 1000)	/*100MHz*/
 
 struct a3700_spi_initdata {
 	unsigned int cs_num;
