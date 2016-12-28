@@ -110,8 +110,8 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				cell-index = <0>;
-				clock-frequency = <160000>;
-				max-frequency = <40000>;
+				clock-frequency = <200000000>;
+				max-frequency = <50000000>;
 				fifo-mode;
 				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
