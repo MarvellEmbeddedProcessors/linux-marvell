@@ -613,6 +613,12 @@ else
 KBUILD_CFLAGS	+= -O2
 endif
 
+ifdef BUILD_TAG
+KBUILD_CFLAGS += -DBUILD_TAG='"Build:$(BUILD_TAG)"'
+else
+KBUILD_CFLAGS += -DBUILD_TAG=''
+endif
+
 # Tell gcc to never replace conditional load with a non-conditional one
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
 
