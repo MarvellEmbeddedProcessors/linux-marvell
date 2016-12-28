@@ -95,6 +95,11 @@
 #define A3700_SPI_INSTR_CNT_BIT		0
 #define A3700_SPI_INSTR_CNT_MASK		0x3
 
+/* A3700_SPI_IF_TIME_REG */
+#define A3700_SPI_CLK_CAPT_EDGE		(1 << 7)
+
+#define DATA_CAP_CLOCK_CYCLE_NS		14	/*Minimum clock cycle of flash*/
+#define RVT_EDGE_FLASH_CAP_FREQ		(1000 * 1000 * 1000 / DATA_CAP_CLOCK_CYCLE_NS)
 
 struct a3700_spi_initdata {
 	unsigned int cs_num;
@@ -283,6 +288,19 @@ static int a3700_spi_clock_set(struct a3700_spi *a3700_spi,
 
 	val = val | (prescale & A3700_SPI_CLK_PRESCALE_MASK);
 	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
+
+	/*
+	* If the data output delay from the flash is greater than 1/2 of the clock cycle
+	* (this is usually the case when running at high frequency) needs to set negative
+	* edge of the clock to capture data. For most of SPI flashes, the number is 7ns
+	* (catpuring data time). So it means that SOC set CLK_CAPT_EDGE to negative
+	* edge when SPI flash output flash frequency is more than 71MHz(1/14ns).
+	*/
+	if (a3700_spi->input_clk_freq / prescale > RVT_EDGE_FLASH_CAP_FREQ) {
+		val = spireg_read(a3700_spi, A3700_SPI_IF_TIME_REG);
+		val |= A3700_SPI_CLK_CAPT_EDGE;
+		spireg_write(a3700_spi, A3700_SPI_IF_TIME_REG, val);
+	}
 
 	return 0;
 }
