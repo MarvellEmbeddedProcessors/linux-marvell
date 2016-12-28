@@ -263,14 +263,20 @@ static void a3700_spi_mode_set(struct a3700_spi *a3700_spi,
 	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
 }
 
-static int a3700_spi_baudrate_set(struct a3700_spi *a3700_spi,
+static int a3700_spi_clock_set(struct a3700_spi *a3700_spi,
 	unsigned int speed_hz)
 {
 	u32 val;
 	u32 prescale;
 
-	/* calculate Prescaler = (spi_input_freq / spi_max_freq) */
-	prescale = a3700_spi->input_clk_freq / a3700_spi->max_clk_freq;
+	/*
+	* compare SPI control input frequency and flash input frequency
+	* to choose lower frequency for using
+	*/
+	if (speed_hz >= a3700_spi->max_clk_freq)
+		prescale = a3700_spi->input_clk_freq / a3700_spi->max_clk_freq;
+	else
+		prescale = DIV_ROUND_UP(a3700_spi->input_clk_freq, speed_hz);
 
 	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
 	val = val & ~A3700_SPI_CLK_PRESCALE_MASK;
@@ -476,9 +482,9 @@ static int a3700_spi_transfer_setup(struct spi_device *spi,
 
 	if (!(a3700_spi->flags & AUTO_CS) && !a3700_spi->status.cs_active) {
 		/* Set SPI clock prescaler */
-		ret = a3700_spi_baudrate_set(a3700_spi, xfer->speed_hz);
+		ret = a3700_spi_clock_set(a3700_spi, xfer->speed_hz);
 		if (ret) {
-			dev_err(&spi->dev, "set baudrate failed\n");
+			dev_err(&spi->dev, "set clock failed\n");
 			goto out;
 		}
 
