@@ -1,25 +1,5 @@
 menu "Marvell Telephony options"
-	depends on MV_INCLUDE_TDM
-
-config MV_TDMMC_SUPPORT
-	bool "Support communit - multichannel TDM"
-	depends on MACH_ARMADA_XP || ARCH_MVEBU
-	default y
-	---help---
-	Choosing this option enables Marvell
-	32CH TDM voice interface.
-	The TDM bus may be used for transferring
-	voice samples through analog phone interface.
-
-config MV_TDM2C_SUPPORT
-	bool "Support legacy TDM(2 channels)"
-	depends on MACH_ARMADA_38X
-	default y
-	---help---
-	Choosing this option enables Marvell
-	2CH TDM voice interface.
-	The TDM bus may be used for transferring
-	voice samples through analog phone interface.
+	depends on MVEBU_PHONE
 
 config MV_TDM_EXT_STATS
 	bool "Enable legacy TDM extended statistics"

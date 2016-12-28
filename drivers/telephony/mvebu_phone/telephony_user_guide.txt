@@ -16,11 +16,10 @@ In order to use telephony drivers the following SW modules are required
 
 Linux Image
 -----------
-There are config options for both telephony controllers:
-	- MV_TDMMC_SUPPORT for multi-channel TDM
-	- MV_TDM2C_SUPPORT for 2-channel TDM
-arch/arm/configs/mvebu_v7_lsp_defconfig enables both controllers
-arch/arm64/confgs/mvebu_v8_lsp_defconfig enables MV_TDMMC_SUPPORT.
+arch/arm/configs/mvebu_v7_lsp_defconfig
+arch/arm64/confgs/mvebu_v8_lsp_defconfig
+enabe usage of both TDM2C and TDMMC, proper operation mode is fully
+determined by Device Tree entry.
 
 Device-tree
 ------------

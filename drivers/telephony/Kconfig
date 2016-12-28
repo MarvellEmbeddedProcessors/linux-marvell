@@ -13,7 +13,7 @@ menuconfig PHONE
 
 if PHONE
 
-config MV_INCLUDE_TDM
+config MVEBU_PHONE
 	bool "Mvebu TDM Telephony"
 	depends on ARCH_MVEBU
 	default y
@@ -24,8 +24,9 @@ config MV_INCLUDE_TDM
 	  2. ARMADA-375.
 	  3. ARMADA-38x.
 	  4. ARMADA-XP.
+	  5. ARMADA-7k/8k.
 
-if MV_INCLUDE_TDM
+if MVEBU_PHONE
 	source "drivers/telephony/mvebu_phone/Kconfig"
 endif
 
