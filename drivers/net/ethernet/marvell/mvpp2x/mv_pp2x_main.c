@@ -2710,7 +2710,6 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	if (mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, max_desc_num, cpu) ||
 	    mv_pp2x_tso_txq_reserved_desc_num_proc(port->priv, txq,
 						   txq_pcpu, max_desc_num, cpu)) {
-		netif_tx_stop_queue(nq);
 		return 0;
 	}
 
@@ -2897,7 +2896,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	if (mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, frags, cpu) ||
 	    mv_pp2x_txq_reserved_desc_num_proc(port->priv, txq,
 					       txq_pcpu, frags, cpu)) {
-		netif_tx_stop_queue(nq);
 		frags = 0;
 		goto out;
 	}
