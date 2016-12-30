@@ -256,15 +256,17 @@ static int a3700_spi_fifo_flush(struct a3700_spi *a3700_spi)
 }
 
 static void a3700_spi_mode_set(struct a3700_spi *a3700_spi,
-	unsigned int mode_bits)
+	u16 mode)
 {
 	u32 val;
 
 	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-	if (mode_bits & SPI_CPOL)
+	val &= ~(A3700_SPI_CLK_POL | A3700_SPI_CLK_PHA);
+	if (mode & SPI_CPOL)
 		val |= A3700_SPI_CLK_POL;
-	if (mode_bits & SPI_CPHA)
+	if (mode & SPI_CPHA)
 		val |= A3700_SPI_CLK_PHA;
+
 	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
 }
 
