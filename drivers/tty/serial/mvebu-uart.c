@@ -86,7 +86,7 @@
 
 #define UART_BRDV		0x10
 
-#define MVEBU_NR_UARTS		1
+#define MVEBU_NR_UARTS		2
 
 #define MVEBU_UART_TYPE		"mvebu-uart"
 #define DRIVER_NAME		"mvebu-serial"
@@ -557,7 +557,15 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	port = &mvebu_uart_ports[0];
+	if (pdev->dev.of_node)
+		pdev->id = of_alias_get_id(pdev->dev.of_node, "serial");
+
+	if (pdev->id >= MVEBU_NR_UARTS) {
+		dev_err(&pdev->dev, "exceed max uart ports\n");
+		return -EINVAL;
+	}
+
+	port = &mvebu_uart_ports[pdev->id];
 
 	spin_lock_init(&port->lock);
 
@@ -569,7 +577,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	port->fifosize   = 32;
 	port->iotype     = UPIO_MEM32;
 	port->flags      = UPF_FIXED_PORT;
-	port->line       = 0; /* single port: force line number to  0 */
+	port->line       = pdev->id;
 
 	port->irq        = irq->start;
 	port->irqflags   = IRQF_SHARED;
@@ -592,6 +600,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	ret = uart_add_one_port(&mvebu_uart_driver, port);
 	if (ret)
 		return ret;
+
 	return 0;
 }
 
