@@ -376,9 +376,6 @@ static int a3700_spi_init(struct a3700_spi *a3700_spi)
 		goto out;
 	}
 
-	/* Set SPI mode */
-	a3700_spi_mode_set(a3700_spi, master->mode_bits);
-
 	/* Reset counters */
 	spireg_write(a3700_spi, A3700_SPI_IF_HDR_CNT_REG, 0);
 	spireg_write(a3700_spi, A3700_SPI_IF_DIN_CNT_REG, 0);
@@ -507,6 +504,9 @@ static int a3700_spi_transfer_setup(struct spi_device *spi,
 			dev_err(&spi->dev, "set clock failed\n");
 			goto out;
 		}
+
+		/* Set SPI mode */
+		a3700_spi_mode_set(a3700_spi, spi->mode);
 
 		/* Set FIFO threshold */
 		a3700_spi_fifo_thres_set(a3700_spi);
