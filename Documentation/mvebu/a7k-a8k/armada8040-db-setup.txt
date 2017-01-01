@@ -20,7 +20,7 @@ Board Setup
 ------------
 
 For A8040 A1 revision SoC - Please use armada-8040-db-A configuration
-For A8040 A0 revision SoC - Please use armada-8040-db-router configuration
+For A8040 A0 revision SoC - Please use armada-8040-db-A0 configuration
 
 ### setup A: armada-8040-db-A.dts  ###
 --------------------------------------
@@ -38,7 +38,7 @@ For A8040 A0 revision SoC - Please use armada-8040-db-router configuration
 			SW1, SW2, SW3, SW4, SW6, SW7, SW8 = OFF
 
 
-### setup 2: armada-8040-db-router.dts ###
+### setup A0: armada-8040-db-A0.dts ###
 ------------------------------------------
 
 	- Jumper-module (CON44): SLM1564
@@ -55,8 +55,8 @@ The tables below summarizes the interface configuration of each setup
 
 SERDES PHY configuration
 ------------------------
-Setup  #	|	A	|	B	| 	TBD	|
-Name   #	|     db-A	|    db-router	|		|
+Setup  #	|	A	|	A0	| 	TBD	|
+Name   #	|     db-A	|    db-A0	|		|
 -----------------------------------------------------------------
 CP0:								|
 -----------------------------------------------------------------
@@ -85,7 +85,7 @@ USB2_H0 (UTMI only)
 Multi-purpose pin configurations
 --------------------------------
 Setup  #	|	1	|	2	|	TBD	|
-Name   #	|     Default 	|    Router	|		|
+Name   #	|     Default 	|    A0		|		|
 -----------------------------------------------------------------
 AP806:								|
 -----------------------------------------------------------------
