@@ -99,6 +99,12 @@
 			sdhci@780000 {
 				status = "okay";
 			};
+			i2c@701000 {
+				clock-frequency = <100000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&cpm_i2c0_pins>;
+				status = "okay";
+			};
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -152,6 +158,9 @@
 		config-space {
 			/* usb3h0_1 is USB2 only (UTMI) */
 			usb3h0_1: usb3@500000 {
+				status = "okay";
+			};
+			serial@702000 {
 				status = "okay";
 			};
 			sata@540000 {
