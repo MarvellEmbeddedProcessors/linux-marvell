@@ -710,6 +710,8 @@ int mv_pp2x_cls_hw_lkp_hit_get(struct mv_pp2x_hw *hw, int lkpid, int way,
 			       unsigned int *cnt);
 void mv_pp2x_cls_flow_write(struct mv_pp2x_hw *hw,
 			    struct mv_pp2x_cls_flow_entry *fe);
+void mv_pp2x_cls_flow_read(struct mv_pp2x_hw *hw, int index,
+			   struct mv_pp2x_cls_flow_entry *fe);
 int mv_pp2x_cls_sw_flow_port_set(struct mv_pp2x_cls_flow_entry *fe,
 				 int type, int portid);
 int mv_pp2x_cls_sw_flow_hek_num_set(struct mv_pp2x_cls_flow_entry *fe,

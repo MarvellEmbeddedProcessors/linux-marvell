@@ -3149,8 +3149,8 @@ void mv_pp2x_cls_flow_write(struct mv_pp2x_hw *hw,
 }
 EXPORT_SYMBOL(mv_pp2x_cls_flow_write);
 
-static void mv_pp2x_cls_flow_read(struct mv_pp2x_hw *hw, int index,
-				  struct mv_pp2x_cls_flow_entry *fe)
+void mv_pp2x_cls_flow_read(struct mv_pp2x_hw *hw, int index,
+			   struct mv_pp2x_cls_flow_entry *fe)
 {
 	fe->index = index;
 	/*write index*/
@@ -3160,6 +3160,7 @@ static void mv_pp2x_cls_flow_read(struct mv_pp2x_hw *hw, int index,
 	fe->data[1] = mv_pp2x_read(hw, MVPP2_CLS_FLOW_TBL1_REG);
 	fe->data[2] = mv_pp2x_read(hw, MVPP2_CLS_FLOW_TBL2_REG);
 }
+EXPORT_SYMBOL(mv_pp2x_cls_flow_read);
 
 /* Update classification lookup table register */
 static void mv_pp2x_cls_lookup_write(struct mv_pp2x_hw *hw,
@@ -3613,6 +3614,9 @@ int mv_pp2x_cls_init(struct platform_device *pdev, struct mv_pp2x_hw *hw)
 
 	/* Start from entry 1 to allocate flow table */
 	hw->cls_shadow->flow_free_start = 1;
+	hw->cls_shadow->flow_swap_area = MVPP2_CLS_FLOWS_TBL_SIZE -
+					 MVPP2_CLS_FLOWS_TBL_SWAP_SIZE;
+
 	for (index = 0; index < (MVPP2_PRS_FL_LAST - MVPP2_PRS_FL_START);
 		index++)
 		hw->cls_shadow->flow_info[index].lkpid = index +
@@ -5497,7 +5501,7 @@ void mv_pp2x_cls_flow_tbl_temp_copy(struct mv_pp2x_hw *hw, int lkpid,
 {
 	struct mv_pp2x_cls_flow_entry fe;
 	int index = lkpid - MVPP2_PRS_FL_START;
-	int flow_start = hw->cls_shadow->flow_free_start;
+	int flow_start = hw->cls_shadow->flow_swap_area;
 	struct mv_pp2x_cls_flow_info *flow_info;
 
 	flow_info = &hw->cls_shadow->flow_info[index];
@@ -5528,7 +5532,7 @@ void mv_pp2x_cls_flow_tbl_temp_copy(struct mv_pp2x_hw *hw, int lkpid,
 		mv_pp2x_cls_flow_write(hw, &fe);
 	}
 
-	*temp_flow_idx = hw->cls_shadow->flow_free_start;
+	*temp_flow_idx = hw->cls_shadow->flow_swap_area;
 }
 
 /* C2 rule and Qos table */

@@ -1778,6 +1778,7 @@ struct mv_pp2x_prs_flow_id {
 #define MVPP2_CLS_FLOWS_TBL_SIZE	512
 #define MVPP2_CLS_FLOWS_TBL_DATA_WORDS	3
 #define MVPP2_CLS_FLOWS_TBL_FIELDS_MAX	4
+#define MVPP2_CLS_FLOWS_TBL_SWAP_SIZE	20
 
 #define MVPP2_CLS_LKP_TBL_SIZE		64
 
@@ -2047,6 +2048,7 @@ struct mv_pp2x_cls_shadow {
 	struct mv_pp2x_cls_flow_info *flow_info;
 	u32 flow_free_start; /* The start of free entry index in flow table */
 	/* TODO: does need a spin_lock for flow_free_start? */
+	u32 flow_swap_area;
 };
 
 /* Classifier engine2 and QoS structure */

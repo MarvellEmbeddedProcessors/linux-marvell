@@ -2054,6 +2054,54 @@ static void mv_pp2x_width_calc(struct mv_pp2x_port *port, u32 *cpu_width,
 	}
 }
 
+int mv_pp2x_update_flow_info(struct mv_pp2x_hw *hw)
+{
+	struct mv_pp2x_cls_flow_info *flow_info;
+	struct mv_pp2x_cls_lookup_entry le;
+	struct mv_pp2x_cls_flow_entry fe;
+	int flow_index, lkp_type, prio, is_last, engine, update_rss2;
+	int i, j, err;
+
+	for (i = 0; i < (MVPP2_PRS_FL_LAST - MVPP2_PRS_FL_START); i++) {
+		is_last = 0;
+		update_rss2 = 0;
+		flow_info = &hw->cls_shadow->flow_info[i];
+		mv_pp2x_cls_lookup_read(hw, MVPP2_PRS_FL_START + i, 0, &le);
+		err = mv_pp2x_cls_sw_lkp_flow_get(&le, &flow_index);
+		if (err)
+			return err;
+		for (j = 0; is_last == 0; j++) {
+			mv_pp2x_cls_flow_read(hw, flow_index + j, &fe);
+			err = mv_pp2x_cls_sw_flow_engine_get(&fe, &engine,
+							     &is_last);
+			if (err)
+				return err;
+			err = mv_pp2x_cls_sw_flow_extra_get(&fe, &lkp_type,
+							    &prio);
+			if (err)
+				return err;
+			if (lkp_type == MVPP2_CLS_LKP_DEFAULT) {
+				flow_info->flow_entry_dflt = flow_index + j;
+			} else if (lkp_type == MVPP2_CLS_LKP_VLAN_PRI) {
+				flow_info->flow_entry_vlan = flow_index + j;
+			} else if (lkp_type == MVPP2_CLS_LKP_DSCP_PRI) {
+				flow_info->flow_entry_dscp = flow_index + j;
+			} else if (lkp_type == MVPP2_CLS_LKP_HASH) {
+				if (!update_rss2) {
+					flow_info->flow_entry_rss1 =
+								flow_index + j;
+					update_rss2 = 1;
+				} else {
+					flow_info->flow_entry_rss2 =
+								flow_index + j;
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
 /* CoS API */
 
 /* mv_pp2x_cos_classifier_set
@@ -2136,6 +2184,11 @@ int mv_pp2x_cos_classifier_set(struct mv_pp2x_port *port,
 		}
 		/* Restore lookup table */
 		flow_idx = data[0];
+		if (flow_info->flow_entry_rss1)
+			flow_idx = min_t(int, flow_info->flow_entry_rss1, flow_idx);
+		if (flow_info->flow_entry_rss2)
+			flow_idx = min_t(int, flow_info->flow_entry_rss2, flow_idx);
+
 		for (i = 0; i < j; i++) {
 			if (flow_idx > data[i])
 				flow_idx = data[i];
@@ -2315,6 +2368,13 @@ int mv_pp22_rss_mode_set(struct mv_pp2x_port *port, int rss_mode)
 	int data[3];
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	struct mv_pp2x_cls_flow_info *flow_info;
+	int err;
+
+	err = mv_pp2x_update_flow_info(hw);
+	if (err) {
+		netdev_err(port->dev, "cannot update flow info\n");
+		return err;
+	}
 
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -1;
@@ -3919,6 +3979,12 @@ int mv_pp2x_open_cls(struct net_device *dev)
 	err = mv_pp2x_prs_flow_set(port);
 	if (err) {
 		netdev_err(dev, "mv_pp2x_prs_flow_set failed\n");
+		return err;
+	}
+
+	err = mv_pp2x_update_flow_info(hw);
+	if (err) {
+		netdev_err(port->dev, "cannot update flow info\n");
 		return err;
 	}
 
