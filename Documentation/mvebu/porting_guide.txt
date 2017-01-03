@@ -83,6 +83,8 @@ Common Drivers
 	Marvell Xenon SDHCI driver	| mmc/marvell,xenon-sdhci.txt
 	Marvell MDIO ethernet driver	| net/marvell-orion-mdio.txt
 	Marvell PCIe driver		| pci/armada8k-pcie.txt
+	Marvell eHCI driver		| usb/ehci-orion.txt
+	Marvell XOR engines driver	| dma/mv-xor.txt
 
 A80x0/A70x0
 ----------
@@ -105,6 +107,11 @@ A37x0
 	Marvell Neta Ethernet controller| net/marvell-armada-370-neta.txt
 	Marvell A37x0 i2c driver	| i2c/i2c-pxa.txt
 	Marvell A37x0 SPI driver	| spi/spi-armada-3700.txt
+	Marvell A37x0 UART driver	| tty/serial/mvebu-uart.txt
+	Marvell A37x0 Clock driver	| clock/mvebu-armada3700-clock.txt
+	Marvell A37x0 GPIO driver	| gpio/gpio-armada-3700.txt
+	Marvell A37x0 PCIe driver	| pci/aardvark-pci.txt
+	Marvell A37x0 USB OTG PHY driver| usb/armada3700-otg-phy.txt
 
 A39x
 ----
