@@ -42,14 +42,14 @@
 
 /*
  * Device Tree file for Marvell Armada 7040 development board
- * This board file supports the router configuration of the board
+ * This board file supports the A configuration of the board
  */
 
 #include "armada-7040-db.dtsi"
 
 / {
-	model = "Marvell Armada-7040 development board router setup";
-	compatible = "marvell,armada7040-db-router", "marvell,armada7040-db", "marvell,armada7040",
+	model = "Marvell Armada-7040 development board A setup";
+	compatible = "marvell,armada7040-db-A", "marvell,armada7040-db", "marvell,armada7040",
 			"marvell,armada-ap806-quad", "marvell,armada-ap806";
 	#address-cells = <2>;
 	#size-cells = <2>;
@@ -135,8 +135,8 @@
 			};
 			gop {
 				emac0: mac0 {
-					phy-mode = "sgmii"; /* lane-2 */
-					phys = <&comphy0 2 COMPHY_SGMII0>;
+					phy-mode = "sfi"; /* lane-2 */
+					phys = <&comphy0 2 COMPHY_SFI>;
 					phy-names = "comphy";
 				};
 				emac2: mac2 {

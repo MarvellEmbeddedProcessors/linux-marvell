@@ -20,7 +20,7 @@ SoC:
       when the SoC being used is the Armada 8040
 
 Boards:
-   - "marvell,armada7040-db-router", "marvell,armada7040-db"
+   - "marvell,armada7040-db-A", "marvell,armada7040-db"
       when the board being used is the Armada 7040 Development board
 
    - "marvell,armada7040-db-nand", "marvell,armada7040-db"
