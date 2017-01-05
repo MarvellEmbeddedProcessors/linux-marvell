@@ -1,0 +1,176 @@
+/*
+ * Copyright (C) 2016 Marvell Technology Group Ltd.
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPLv2 or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This library is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This library is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ * Device Tree file for Marvell Armada 7040 development board
+ * This board file supports the B configuration of the board
+ */
+
+#include "armada-7040-db.dtsi"
+
+/ {
+	model = "Marvell Armada-7040 development board B setup";
+	compatible = "marvell,armada7040-db-B", "marvell,armada7040-db", "marvell,armada7040",
+			"marvell,armada-ap806-quad", "marvell,armada-ap806";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	chosen { };
+
+	ap806 {
+		config-space {
+			sdhci@6e0000 {
+				status = "okay";
+			};
+			serial@512000 {
+				status = "okay";
+			};
+			i2c@511000 {
+				status = "disabled";
+				clock-frequency = <100000>;
+			};
+		};
+	};
+
+	cpn-110-master {
+		config-space {
+			serial@702000 {
+				status = "disabled";
+			};
+			serial@702100 {
+				status = "disabled";
+			};
+			serial@702200 {
+				status = "disabled";
+			};
+			serial@702300 {
+				status = "disabled";
+			};
+			sata: sata@540000 {
+				status = "disabled";
+
+				sata-port@0 {
+					status = "disabled";
+				};
+				sata-port@1 {
+					status = "disabled";
+				};
+			};
+			usb3h0: usb3@500000 {
+				status = "disabled";
+			};
+			usb3h1: usb3@510000 {
+				status = "okay";
+			};
+			u3d@520000 {
+				status = "disabled";
+			};
+			udc@524100 {
+				status = "disabled";
+			};
+			sdhci@780000 {
+				status = "okay";
+			};
+			spi@700680 {
+				status = "okay";
+			};
+			i2c1: i2c@701000 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+			i2c2: i2c@701100 {
+				status = "disabled";
+			};
+
+			mdio@12a200 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				phy2: ethernet-phy@2 {
+					reg = <0>;
+				};
+				phy3: ethernet-phy@3 {
+					reg = <1>;
+				};
+			};
+			gop {
+				emac0: mac0 {
+					/*disabled*/
+				};
+				emac2: mac2 {
+					phy-mode = "rgmii"; /* rgmii-1 */
+					phy = <&phy2>;
+				};
+				emac3: mac3 {
+					phy-mode = "rgmii"; /* rgmii-2 */
+					phy = <&phy3>;
+				};
+			};
+			ppv22@000000 {
+				eth0: eth0@010000 {
+					status = "disabled";
+				};
+				eth1: eth1@020000 {
+					status = "okay";
+				};
+				eth2: eth2@030000 {
+					status = "okay";
+				};
+			};
+			eip197: eip197@800000 {
+				status = "okay";
+			};
+			comphy {
+				status = "okay";
+			};
+		};
+		pcie@0x600000 {
+			status = "okay";
+			num-lanes = <4>;
+		};
+		pcie@0x620000 {
+			status = "disabled";
+		};
+		pcie@0x640000 {
+			status = "okay";
+		};
+	};
+};
