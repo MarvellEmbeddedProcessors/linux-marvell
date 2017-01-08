@@ -840,9 +840,10 @@ static inline void *mv_pp2_extra_pool_get(struct mv_pp2x_port *port)
 	return ext_buf;
 }
 
-static inline int mv_pp2_extra_pool_put(struct mv_pp2x_port *port, void *ext_buf)
+static inline int mv_pp2_extra_pool_put(struct mv_pp2x_port *port, void *ext_buf,
+					int cpu)
 {
-	struct mv_pp2x_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
+	struct mv_pp2x_port_pcpu *port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 	struct mv_pp2x_ext_buf_struct *ext_buf_struct;
 
 	if (port_pcpu->ext_buf_pool->buf_pool_in_use >= port_pcpu->ext_buf_pool->buf_pool_size) {
@@ -969,7 +970,7 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 
 		if (skb & MVPP2_ETH_SHADOW_EXT) {
 			skb &= ~MVPP2_ETH_SHADOW_EXT;
-			mv_pp2_extra_pool_put(port, (void *)skb);
+			mv_pp2_extra_pool_put(port, (void *)skb, txq_pcpu->cpu);
 			mv_pp2x_txq_inc_get(txq_pcpu);
 			continue;
 		}
@@ -983,14 +984,15 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 }
 
 static void mv_pp2x_txq_buf_free(struct mv_pp2x_port *port, uintptr_t skb,
-				 dma_addr_t  buf_phys_addr, int data_size)
+				 dma_addr_t  buf_phys_addr, int data_size,
+				 int cpu)
 {
 	dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
 			 data_size, DMA_TO_DEVICE);
 
 	if (skb & MVPP2_ETH_SHADOW_EXT) {
 		skb &= ~MVPP2_ETH_SHADOW_EXT;
-		mv_pp2_extra_pool_put(port, (void *)skb);
+		mv_pp2_extra_pool_put(port, (void *)skb, cpu);
 		return;
 	}
 
@@ -2853,7 +2855,7 @@ out_no_tx_desc:
 		data_size = txq_pcpu->data_size[txq_pcpu->txq_get_index];
 
 		mv_pp2x_txq_buf_free(port, (uintptr_t)shadow_skb, shadow_buf,
-				     data_size);
+				     data_size, cpu);
 
 		mv_pp2x_txq_prev_desc_get(aggr_txq);
 	}
