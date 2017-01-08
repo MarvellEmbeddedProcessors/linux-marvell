@@ -2688,7 +2688,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			 struct mv_pp2x_aggr_tx_queue *aggr_txq, int cpu)
 {
 	int frag = 0, i;
-	int total_len, hdr_len, size, frag_size, data_left, txq_id;
+	int total_len, hdr_len, size, frag_size, data_left;
 	int total_desc_num, total_bytes = 0, max_desc_num = 0;
 	char *frag_ptr;
 	struct mv_pp2x_tx_desc *tx_desc;
@@ -2698,13 +2698,9 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	u32 tcp_seq = 0;
 	skb_frag_t *skb_frag_ptr;
 	const struct tcphdr *th = tcp_hdr(skb);
-	struct netdev_queue *nq;
 
 	if (mv_pp2_tso_validate(skb, dev))
 		return 0;
-
-	txq_id = skb_get_queue_mapping(skb) % mv_pp2x_txq_number;
-	nq = netdev_get_tx_queue(dev, (txq_id + (cpu * mv_pp2x_txq_number)));
 
 	/* Calculate expected number of TX descriptors */
 	max_desc_num = skb_shinfo(skb)->gso_segs * 2 + skb_shinfo(skb)->nr_frags;
@@ -2825,10 +2821,6 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 		}
 	}
 
-	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
-	if (mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit)
-		netif_tx_stop_queue(nq);
-
 	/* TCP segment is ready - transmit it */
 	mv_pp2x_aggr_txq_pend_desc_add(port, total_desc_num);
 
@@ -2881,10 +2873,19 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/* Set relevant physical TxQ and Linux netdev queue */
 	txq_id = skb_get_queue_mapping(skb) % mv_pp2x_txq_number;
-	nq = netdev_get_tx_queue(dev, (txq_id + (cpu * mv_pp2x_txq_number)));
 	txq = port->txqs[txq_id];
 	txq_pcpu = this_cpu_ptr(txq->pcpu);
 	aggr_txq = &port->priv->aggr_txqs[cpu];
+
+	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
+	if (mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit) {
+		if (cpu == skb->sender_cpu) {
+			nq = netdev_get_tx_queue(dev, skb_get_queue_mapping(skb));
+			netif_tx_stop_queue(nq);
+		}
+		frags = 0;
+		goto out;
+	}
 
 	/* GSO/TSO */
 	if (skb_is_gso(skb)) {
@@ -2984,12 +2985,8 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	mv_pp2_is_pkt_ptp_tx_proc(port, tx_desc, skb);
 #endif
 
-	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
-
-	if (mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit)
-		netif_tx_stop_queue(nq);
 	/* Enable transmit */
-	if (!skb->xmit_more || netif_xmit_stopped(nq)) {
+	if (!skb->xmit_more) {
 		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
 		aggr_txq->xmit_bulk = 0;
 	}
