@@ -35,6 +35,9 @@ Boards:
    - "marvell,armada8040-db-A", "marvell,armada8040-db"
       when the board being used is the Armada 8040 Development board
 
+   - "marvell,armada8040-db-C", "marvell,armada8040-db"
+      when the board being used is the Armada 8040 Development board
+
    - "marvell,armada8040-db-D", "marvell,armada8040-db"
       when the board being used is the Armada 8040 Development board
 
