@@ -2853,7 +2853,7 @@ out_no_tx_desc:
 
 		shadow_skb = txq_pcpu->tx_skb[txq_pcpu->txq_put_index];
 		shadow_buf = txq_pcpu->tx_buffs[txq_pcpu->txq_put_index];
-		data_size = txq_pcpu->data_size[txq_pcpu->txq_get_index];
+		data_size = txq_pcpu->data_size[txq_pcpu->txq_put_index];
 
 		mv_pp2x_txq_buf_free(port, (uintptr_t)shadow_skb, shadow_buf,
 				     data_size, cpu);
