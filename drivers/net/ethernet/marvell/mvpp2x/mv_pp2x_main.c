@@ -1310,6 +1310,7 @@ error:
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 		kfree(txq_pcpu->tx_skb);
 		kfree(txq_pcpu->tx_buffs);
+		kfree(txq_pcpu->data_size);
 	}
 
 	dma_free_coherent(port->dev->dev.parent,
