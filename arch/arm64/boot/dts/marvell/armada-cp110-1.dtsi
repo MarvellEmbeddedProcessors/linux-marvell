@@ -355,7 +355,12 @@ eip197@800000 {
 	compatible = "marvell,eip197";
 	reg = <0x800000 0x200000>;
 	dma-coherent;
-	interrupts = <ICU_GRP_NSR 88 IRQ_TYPE_LEVEL_HIGH>;
+	interrupts = <ICU_GRP_NSR 88 IRQ_TYPE_LEVEL_HIGH>,
+			<ICU_GRP_NSR 89 IRQ_TYPE_LEVEL_HIGH>,
+			<ICU_GRP_NSR 90 IRQ_TYPE_LEVEL_HIGH>,
+			<ICU_GRP_NSR 91 IRQ_TYPE_LEVEL_HIGH>,
+			<ICU_GRP_NSR 92 IRQ_TYPE_LEVEL_HIGH>;
+	interrupt-names = "ring0", "ring1", "ring2", "ring3", "global";
 	clocks = <&cps_syscon0 1 26>;
 	status = "disabled";
 };
