@@ -996,8 +996,6 @@ static void mv_pp2x_txq_buf_free(struct mv_pp2x_port *port, uintptr_t skb,
 		return;
 	}
 
-	if (!skb)
-		return;
 	if (skb & MVPP2_ETH_SHADOW_SKB) {
 		skb &= ~MVPP2_ETH_SHADOW_SKB;
 		dev_kfree_skb_any((struct sk_buff *)skb);
