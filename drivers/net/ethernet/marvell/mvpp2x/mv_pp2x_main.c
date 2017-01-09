@@ -2765,7 +2765,6 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 		tx_desc = mv_pp2x_txq_next_desc_get(aggr_txq);
 		tx_desc->phys_txq = txq->id;
 
-		total_desc_num++;
 		total_len -= data_left;
 
 		/* prepare packet headers: MAC + IP + TCP */
@@ -2775,6 +2774,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 						 total_len);
 		if (size < 0)
 			goto out_no_tx_desc;
+		total_desc_num++;
 
 		total_bytes += size;
 
