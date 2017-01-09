@@ -36,6 +36,17 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 
+enum reg_uart_type {
+	REG_UART_A3700,
+};
+
+struct uart_regs_layout {
+	unsigned int uart_ctrl;
+	unsigned int uart_rbr;
+	unsigned int uart_tsh;
+	unsigned int uart_brdv;
+	unsigned int uart_stat;
+};
 /* Register Map */
 #define UART_RBR		0x00
 #define  RBR_BRK_DET		BIT(15)
@@ -86,6 +97,17 @@
 
 #define UART_BRDV		0x10
 
+/* UART register layout definitions */
+static struct uart_regs_layout uart_regs_layout[] = {
+	[REG_UART_A3700] = {
+		.uart_ctrl = UART_CTRL,
+		.uart_rbr  = UART_RBR,
+		.uart_tsh  = UART_TSH,
+		.uart_brdv = UART_BRDV,
+		.uart_stat = UART_STAT,
+	}
+};
+
 #define MVEBU_NR_UARTS		2
 
 #define MVEBU_UART_TYPE		"mvebu-uart"
@@ -94,18 +116,27 @@
 static struct uart_port mvebu_uart_ports[MVEBU_NR_UARTS];
 
 struct mvebu_uart_data {
-	struct uart_port *port;
-	struct clk       *clk;
+	struct uart_port        *port;
+	struct clk              *clk;
+	struct uart_regs_layout *regs;
+	enum reg_uart_type       reg_type;
 };
+
+#define REG_CTRL(uart_data)	((uart_data)->regs->uart_ctrl)
+#define REG_RBR(uart_data)	((uart_data)->regs->uart_rbr)
+#define REG_TSH(uart_data)	((uart_data)->regs->uart_tsh)
+#define REG_BRDV(uart_data)	((uart_data)->regs->uart_brdv)
+#define REG_STAT(uart_data)	((uart_data)->regs->uart_stat)
 
 /* Core UART Driver Operations */
 static unsigned int mvebu_uart_tx_empty(struct uart_port *port)
 {
 	unsigned long flags;
 	unsigned int st;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	spin_lock_irqsave(&port->lock, flags);
-	st = readl(port->membase + UART_STAT);
+	st = readl(port->membase + REG_STAT(uart_data));
 	spin_unlock_irqrestore(&port->lock, flags);
 
 	return (st & STAT_TX_FIFO_EMP) ? TIOCSER_TEMT : 0;
@@ -127,40 +158,46 @@ static void mvebu_uart_set_mctrl(struct uart_port *port,
 
 static void mvebu_uart_stop_tx(struct uart_port *port)
 {
-	unsigned int ctl = readl(port->membase + UART_CTRL);
+	unsigned int ctl;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
+	ctl = readl(port->membase + REG_CTRL(uart_data));
 	ctl &= ~CTRL_TX_RDY_INT;
-	writel(ctl, port->membase + UART_CTRL);
+	writel(ctl, port->membase + REG_CTRL(uart_data));
 }
 
 static void mvebu_uart_start_tx(struct uart_port *port)
 {
-	unsigned int ctl = readl(port->membase + UART_CTRL);
+	unsigned int ctl;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
+	ctl = readl(port->membase + REG_CTRL(uart_data));
 	ctl |= CTRL_TX_RDY_INT;
-	writel(ctl, port->membase + UART_CTRL);
+	writel(ctl, port->membase + REG_CTRL(uart_data));
 }
 
 static void mvebu_uart_stop_rx(struct uart_port *port)
 {
-	unsigned int ctl = readl(port->membase + UART_CTRL);
+	unsigned int ctl;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
+	ctl = readl(port->membase + REG_CTRL(uart_data));
 	ctl &= ~CTRL_RX_INT;
-	writel(ctl, port->membase + UART_CTRL);
+	writel(ctl, port->membase + REG_CTRL(uart_data));
 }
 
 static void mvebu_uart_break_ctl(struct uart_port *port, int brk)
 {
 	unsigned int ctl;
 	unsigned long flags;
-
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 	spin_lock_irqsave(&port->lock, flags);
-	ctl = readl(port->membase + UART_CTRL);
+	ctl = readl(port->membase + REG_CTRL(uart_data));
 	if (brk == -1)
 		ctl |= CTRL_SND_BRK_SEQ;
 	else
 		ctl &= ~CTRL_SND_BRK_SEQ;
-	writel(ctl, port->membase + UART_CTRL);
+	writel(ctl, port->membase + REG_CTRL(uart_data));
 	spin_unlock_irqrestore(&port->lock, flags);
 }
 
@@ -169,10 +206,11 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
 	struct tty_port *tport = &port->state->port;
 	unsigned char ch = 0;
 	char flag = 0;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	do {
 		if (status & STAT_RX_RDY) {
-			ch = readl(port->membase + UART_RBR);
+			ch = readl(port->membase + REG_RBR(uart_data));
 			ch &= 0xff;
 			flag = TTY_NORMAL;
 			port->icount.rx++;
@@ -220,7 +258,7 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
 			tty_insert_flip_char(tport, 0, TTY_OVERRUN);
 
 ignore_char:
-		status = readl(port->membase + UART_STAT);
+		status = readl(port->membase + REG_STAT(uart_data));
 	} while (status & (STAT_RX_RDY | STAT_BRK_DET));
 
 	tty_flip_buffer_push(tport);
@@ -231,9 +269,10 @@ static void mvebu_uart_tx_chars(struct uart_port *port, unsigned int status)
 	struct circ_buf *xmit = &port->state->xmit;
 	unsigned int count;
 	unsigned int st;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	if (port->x_char) {
-		writel(port->x_char, port->membase + UART_TSH);
+		writel(port->x_char, port->membase + REG_TSH(uart_data));
 		port->icount.tx++;
 		port->x_char = 0;
 		return;
@@ -245,14 +284,14 @@ static void mvebu_uart_tx_chars(struct uart_port *port, unsigned int status)
 	}
 
 	for (count = 0; count < port->fifosize; count++) {
-		writel(xmit->buf[xmit->tail], port->membase + UART_TSH);
+		writel(xmit->buf[xmit->tail], port->membase + REG_TSH(uart_data));
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 		port->icount.tx++;
 
 		if (uart_circ_empty(xmit))
 			break;
 
-		st = readl(port->membase + UART_STAT);
+		st = readl(port->membase + REG_STAT(uart_data));
 		if (st & STAT_TX_FIFO_FUL)
 			break;
 	}
@@ -267,7 +306,10 @@ static void mvebu_uart_tx_chars(struct uart_port *port, unsigned int status)
 static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
 {
 	struct uart_port *port = (struct uart_port *)dev_id;
-	unsigned int st = readl(port->membase + UART_STAT);
+	unsigned int st;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+
+	st = readl(port->membase + REG_STAT(uart_data));
 
 	if (st & (STAT_RX_RDY | STAT_OVR_ERR | STAT_FRM_ERR | STAT_BRK_DET))
 		mvebu_uart_rx_chars(port, st);
@@ -281,11 +323,12 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
 static int mvebu_uart_startup(struct uart_port *port)
 {
 	int ret;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
-	       port->membase + UART_CTRL);
+		port->membase + REG_CTRL(uart_data));
 	udelay(1);
-	writel(CTRL_RX_INT, port->membase + UART_CTRL);
+	writel(CTRL_RX_INT, port->membase + REG_CTRL(uart_data));
 
 	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, DRIVER_NAME,
 			  port);
@@ -299,7 +342,9 @@ static int mvebu_uart_startup(struct uart_port *port)
 
 static void mvebu_uart_shutdown(struct uart_port *port)
 {
-	writel(0, port->membase + UART_CTRL);
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+
+	writel(0, port->membase + REG_CTRL(uart_data));
 }
 
 static void mvebu_uart_set_termios(struct uart_port *port,
@@ -352,20 +397,24 @@ static int mvebu_uart_request_port(struct uart_port *port)
 #ifdef CONFIG_CONSOLE_POLL
 static int mvebu_uart_get_poll_char(struct uart_port *port)
 {
-	unsigned int st = readl(port->membase + UART_STAT);
+	unsigned int st;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+
+	st = readl(port->membase + REG_STAT(uart_data));
 
 	if (!(st & STAT_RX_RDY))
 		return NO_POLL_CHAR;
 
-	return readl(port->membase + UART_RBR);
+	return readl(port->membase + REG_RBR(uart_data));
 }
 
 static void mvebu_uart_put_poll_char(struct uart_port *port, unsigned char c)
 {
 	unsigned int st;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	for (;;) {
-		st = readl(port->membase + UART_STAT);
+		st = readl(port->membase + REG_STAT(uart_data));
 
 		if (!(st & STAT_TX_FIFO_FUL))
 			break;
@@ -373,7 +422,7 @@ static void mvebu_uart_put_poll_char(struct uart_port *port, unsigned char c)
 		udelay(1);
 	}
 
-	writel(c, port->membase + UART_TSH);
+	writel(c, port->membase + REG_TSH(uart_data));
 }
 #endif
 
@@ -447,22 +496,26 @@ OF_EARLYCON_DECLARE(ar3700_uart, "marvell,armada-3700-uart",
 
 static void wait_for_xmitr(struct uart_port *port)
 {
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 	u32 val;
 
-	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
-				  (val & STAT_TX_EMP), 1, 10000);
+	readl_poll_timeout_atomic(port->membase + REG_STAT(uart_data),
+				  val, (val & STAT_TX_EMP), 1, 10000);
 }
 
 static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
 {
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+
 	wait_for_xmitr(port);
-	writel(ch, port->membase + UART_TSH);
+	writel(ch, port->membase + REG_TSH(uart_data));
 }
 
 static void mvebu_uart_console_write(struct console *co, const char *s,
 				     unsigned int count)
 {
 	struct uart_port *port = &mvebu_uart_ports[co->index];
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 	unsigned long flags;
 	unsigned int ier;
 	int locked = 1;
@@ -472,16 +525,16 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
 	else
 		spin_lock_irqsave(&port->lock, flags);
 
-	ier = readl(port->membase + UART_CTRL) &
+	ier = readl(port->membase + REG_CTRL(uart_data)) &
 		(CTRL_RX_INT | CTRL_TX_RDY_INT);
-	writel(0, port->membase + UART_CTRL);
+	writel(0, port->membase + REG_CTRL(uart_data));
 
 	uart_console_write(port, s, count, mvebu_uart_console_putchar);
 
 	wait_for_xmitr(port);
 
 	if (ier)
-		writel(ier, port->membase + UART_CTRL);
+		writel(ier, port->membase + REG_CTRL(uart_data));
 
 	if (locked)
 		spin_unlock_irqrestore(&port->lock, flags);
@@ -544,10 +597,13 @@ static struct uart_driver mvebu_uart_driver = {
 #endif
 };
 
+static const struct of_device_id mvebu_uart_of_match[];
+
 static int mvebu_uart_probe(struct platform_device *pdev)
 {
 	struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	const struct of_device_id *match = of_match_device(mvebu_uart_of_match, &pdev->dev);
 	struct uart_port *port;
 	struct mvebu_uart_data *data;
 	int ret;
@@ -592,7 +648,9 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	if (!data)
 		return -ENOMEM;
 
-	data->port = port;
+	data->reg_type = (enum reg_uart_type)match->data;
+	data->regs     = &uart_regs_layout[data->reg_type];
+	data->port     = port;
 
 	port->private_data = data;
 	platform_set_drvdata(pdev, data);
@@ -616,7 +674,7 @@ static int mvebu_uart_remove(struct platform_device *pdev)
 
 /* Match table for of_platform binding */
 static const struct of_device_id mvebu_uart_of_match[] = {
-	{ .compatible = "marvell,armada-3700-uart", },
+	{ .compatible = "marvell,armada-3700-uart", .data = (void *)REG_UART_A3700 },
 	{}
 };
 MODULE_DEVICE_TABLE(of, mvebu_uart_of_match);
