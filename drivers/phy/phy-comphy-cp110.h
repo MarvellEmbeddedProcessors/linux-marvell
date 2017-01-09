@@ -1,5 +1,7 @@
-#ifndef _MVEBU_COMPHY_H
-#define _MVEBU_COMPHY_H
+#ifndef _COMPHY_CP110_H
+#define _COMPHY_CP110_H
+
+extern const struct mvebu_comphy_soc_info cp110_comphy;
 
 #define SD_ADDR(base, lane)			(base + 0x1000 * lane)
 #define HPIPE_ADDR(base, lane)			(SD_ADDR(base, lane) + 0x800)
@@ -229,5 +231,6 @@
 
 /* General defines */
 #define PLL_LOCK_TIMEOUT			15000
-#endif /* _MVEBU_COMPHY_H */
+
+#endif /* _COMPHY_CP110_H */
 

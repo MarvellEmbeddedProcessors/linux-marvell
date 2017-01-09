@@ -48,7 +48,7 @@
 #include <net/busy_poll.h>
 #include <asm/cacheflush.h>
 #include <linux/dma-mapping.h>
-#include <dt-bindings/phy/phy-mvebu-comphy.h>
+#include <dt-bindings/phy/phy-comphy-mvebu.h>
 
 #include "mv_pp2x.h"
 #include "mv_pp2x_hw.h"

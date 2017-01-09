@@ -88,12 +88,22 @@ config PHY_PXA_28NM_USB2
 	  To compile this driver as a module, choose M here.
 
 config PHY_MVEBU_COMPHY
-	def_bool y
+	def_bool n
 	depends on ARCH_MVEBU
 	depends on OF
 	select GENERIC_PHY
 	help
-	  Enable this to support Marvell comphy driver. This driver is
+	  Enable this to support Marvell comphy driver. The comphy driver
+	  supports CP110 and Armada-3700 and each of them has a separate
+	  kconfig option.
+
+config PHY_MVEBU_COMPHY_CP110
+	def_bool y
+	depends on ARCH_MVEBU
+	depends on OF
+	select PHY_MVEBU_COMPHY
+	help
+	  Enable this to support Marvell CP110 comphy driver. This driver is
 	  responsible for configuring all SerDes lanes according to the
 	  selected configuration.
 

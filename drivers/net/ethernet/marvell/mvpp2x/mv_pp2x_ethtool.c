@@ -38,7 +38,7 @@
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <linux/phy/phy.h>
-#include <dt-bindings/phy/phy-mvebu-comphy.h>
+#include <dt-bindings/phy/phy-comphy-mvebu.h>
 
 #include "mv_pp2x.h"
 #include "mv_pp2x_hw.h"
