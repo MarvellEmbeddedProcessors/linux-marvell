@@ -17,7 +17,7 @@
  * Device Tree file for Marvell Armada CPN-110 Master.
  */
 
-#include <dt-bindings/phy/phy-mvebu-comphy.h>
+#include <dt-bindings/phy/phy-comphy-mvebu.h>
 
 / {
 	cpn-110-master {

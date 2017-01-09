@@ -1,5 +1,5 @@
-#ifndef _DT_BINDINGS_PHY_MVEBU_COMPHY
-#define _DT_BINDINGS_PHY_MVEBU_COMPHY
+#ifndef _DT_BINDINGS_PHY_COMPHY_MVEBU
+#define _DT_BINDINGS_PHY_COMPHY_MVEBU
 
 /* A lane is described by 2 fields:
  *	- 8 lsb represent the index of the lane
@@ -42,5 +42,5 @@
 #define COMPHY_XFI_MODE		0x8
 #define COMPHY_SFI_MODE		0x9
 
-#endif /* _DT_BINDINGS_COMPHY_MVEBU_COMPHY */
+#endif /* _DT_BINDINGS_PHY_COMPHY_MVEBU */
 
