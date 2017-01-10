@@ -11,3 +11,8 @@ Example:
 		reg = <0x12000 0x200>;
 		interrupts = <43>;
 	};
+	serial@12200 {
+		compatible = "marvell,armada-3700-uart-ext";
+		reg = <0x12200 0x30>,
+		status = "disabled";
+	};
