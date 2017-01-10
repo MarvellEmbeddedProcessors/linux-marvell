@@ -122,6 +122,13 @@ struct mvebu_uart_data {
 	enum reg_uart_type       reg_type;
 
 	struct {
+		unsigned int (*ctrl_rx_rdy_int)(struct mvebu_uart_data *data);
+		unsigned int (*ctrl_tx_rdy_int)(struct mvebu_uart_data *data);
+		unsigned int (*stat_rx_rdy)(struct mvebu_uart_data *data);
+		unsigned int (*stat_tx_rdy)(struct mvebu_uart_data *data);
+	} reg_bits;
+
+	struct {
 		unsigned int ctrl_reg;
 	} intr;
 };
@@ -131,6 +138,51 @@ struct mvebu_uart_data {
 #define REG_TSH(uart_data)	((uart_data)->regs->uart_tsh)
 #define REG_BRDV(uart_data)	((uart_data)->regs->uart_brdv)
 #define REG_STAT(uart_data)	((uart_data)->regs->uart_stat)
+
+/* helper functions for 1-byte transfer */
+static inline unsigned int get_ctrl_rx_1byte_rdy_int(struct mvebu_uart_data *data)
+{
+	switch (data->reg_type) {
+	case REG_UART_A3700:
+		return CTRL_RX_RDY_INT;
+	default:
+		break;
+	}
+	return 0;
+}
+
+static inline unsigned int get_ctrl_tx_1byte_rdy_int(struct mvebu_uart_data *data)
+{
+	switch (data->reg_type) {
+	case REG_UART_A3700:
+		return CTRL_TX_RDY_INT;
+	default:
+		break;
+	}
+	return 0;
+}
+
+static inline unsigned int get_stat_rx_1byte_rdy(struct mvebu_uart_data *data)
+{
+	switch (data->reg_type) {
+	case REG_UART_A3700:
+		return STAT_RX_RDY;
+	default:
+		break;
+	}
+	return 0;
+}
+
+static inline unsigned int get_stat_tx_1byte_rdy(struct mvebu_uart_data *data)
+{
+	switch (data->reg_type) {
+	case REG_UART_A3700:
+		return STAT_TX_RDY;
+	default:
+		break;
+	}
+	return 0;
+}
 
 /* Core UART Driver Operations */
 static unsigned int mvebu_uart_tx_empty(struct uart_port *port)
@@ -166,7 +218,7 @@ static void mvebu_uart_stop_tx(struct uart_port *port)
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
-	ctl &= ~CTRL_TX_RDY_INT;
+	ctl &= ~uart_data->reg_bits.ctrl_tx_rdy_int(uart_data);
 	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 }
 
@@ -176,7 +228,7 @@ static void mvebu_uart_start_tx(struct uart_port *port)
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
-	ctl |= CTRL_TX_RDY_INT;
+	ctl |= uart_data->reg_bits.ctrl_tx_rdy_int(uart_data);
 	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 }
 
@@ -190,7 +242,7 @@ static void mvebu_uart_stop_rx(struct uart_port *port)
 	writel(ctl, port->membase + REG_CTRL(uart_data));
 
 	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
-	ctl &= ~CTRL_RX_RDY_INT;
+	ctl &= ~uart_data->reg_bits.ctrl_rx_rdy_int(uart_data);
 	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 }
 
@@ -215,9 +267,10 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
 	unsigned char ch = 0;
 	char flag = 0;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+	unsigned int stat_bit_rx_rdy = uart_data->reg_bits.stat_rx_rdy(uart_data);
 
 	do {
-		if (status & STAT_RX_RDY) {
+		if (status & stat_bit_rx_rdy) {
 			ch = readl(port->membase + REG_RBR(uart_data));
 			ch &= 0xff;
 			flag = TTY_NORMAL;
@@ -244,7 +297,7 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
 			goto ignore_char;
 
 		if (status & port->ignore_status_mask & STAT_PAR_ERR)
-			status &= ~STAT_RX_RDY;
+			status &= ~stat_bit_rx_rdy;
 
 		status &= port->read_status_mask;
 
@@ -253,7 +306,7 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
 
 		status &= ~port->ignore_status_mask;
 
-		if (status & STAT_RX_RDY)
+		if (status & stat_bit_rx_rdy)
 			tty_insert_flip_char(tport, ch, flag);
 
 		if (status & STAT_BRK_DET)
@@ -267,7 +320,7 @@ static void mvebu_uart_rx_chars(struct uart_port *port, unsigned int status)
 
 ignore_char:
 		status = readl(port->membase + REG_STAT(uart_data));
-	} while (status & (STAT_RX_RDY | STAT_BRK_DET));
+	} while (status & (stat_bit_rx_rdy | STAT_BRK_DET));
 
 	tty_flip_buffer_push(tport);
 }
@@ -339,7 +392,7 @@ static int mvebu_uart_startup(struct uart_port *port)
 	udelay(1);
 	writel(CTRL_BRK_INT, port->membase + REG_CTRL(uart_data));
 	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
-	ctl |= CTRL_RX_RDY_INT;
+	ctl |= uart_data->reg_bits.ctrl_rx_rdy_int(uart_data);
 	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 
 	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, DRIVER_NAME,
@@ -366,11 +419,14 @@ static void mvebu_uart_set_termios(struct uart_port *port,
 {
 	unsigned long flags;
 	unsigned int baud;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+	unsigned int stat_bit_rx_rdy = uart_data->reg_bits.stat_rx_rdy(uart_data);
+	unsigned int stat_bit_tx_rdy = uart_data->reg_bits.stat_tx_rdy(uart_data);
 
 	spin_lock_irqsave(&port->lock, flags);
 
-	port->read_status_mask = STAT_RX_RDY | STAT_OVR_ERR |
-		STAT_TX_RDY | STAT_TX_FIFO_FUL;
+	port->read_status_mask = stat_bit_rx_rdy | STAT_OVR_ERR |
+		stat_bit_tx_rdy | STAT_TX_FIFO_FUL;
 
 	if (termios->c_iflag & INPCK)
 		port->read_status_mask |= STAT_FRM_ERR | STAT_PAR_ERR;
@@ -381,7 +437,7 @@ static void mvebu_uart_set_termios(struct uart_port *port,
 			STAT_FRM_ERR | STAT_PAR_ERR | STAT_OVR_ERR;
 
 	if ((termios->c_cflag & CREAD) == 0)
-		port->ignore_status_mask |= STAT_RX_RDY | STAT_BRK_ERR;
+		port->ignore_status_mask |= stat_bit_rx_rdy | STAT_BRK_ERR;
 
 	if (old)
 		tty_termios_copy_hw(termios, old);
@@ -540,7 +596,8 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
 
 	ier = readl(port->membase + REG_CTRL(uart_data)) & CTRL_BRK_INT;
 	intr = readl(port->membase + uart_data->intr.ctrl_reg);
-	intr &= (CTRL_RX_RDY_INT | CTRL_TX_RDY_INT);
+	intr &= (uart_data->reg_bits.ctrl_rx_rdy_int(uart_data)
+		| uart_data->reg_bits.ctrl_tx_rdy_int(uart_data));
 
 	writel(0, port->membase + REG_CTRL(uart_data));
 	writel(0, port->membase + uart_data->intr.ctrl_reg);
@@ -672,6 +729,16 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	data->reg_type = (enum reg_uart_type)match->data;
 	data->regs     = &uart_regs_layout[data->reg_type];
 	data->port     = port;
+
+	/* Set interrupt register bits callbacks */
+	/* Todo:
+	 *     Set the callbacks according to the transfer mode.
+	 *     Now, only 1-byte transfer is supported.
+	 */
+	data->reg_bits.ctrl_rx_rdy_int = get_ctrl_rx_1byte_rdy_int;
+	data->reg_bits.ctrl_tx_rdy_int = get_ctrl_tx_1byte_rdy_int;
+	data->reg_bits.stat_rx_rdy     = get_stat_rx_1byte_rdy;
+	data->reg_bits.stat_tx_rdy     = get_stat_tx_1byte_rdy;
 
 	/* Set interrupt registers */
 	data->intr.ctrl_reg = REG_CTRL(data);
