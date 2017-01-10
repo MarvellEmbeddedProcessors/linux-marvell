@@ -74,8 +74,8 @@ struct uart_regs_layout {
 #define  CTRL_FRM_ERR_INT	BIT(2)
 #define  CTRL_PAR_ERR_INT	BIT(1)
 #define  CTRL_OVR_ERR_INT	BIT(0)
-#define  CTRL_RX_INT			(CTRL_RX_RDY_INT | CTRL_BRK_DET_INT |\
-	CTRL_FRM_ERR_INT | CTRL_PAR_ERR_INT | CTRL_OVR_ERR_INT)
+#define  CTRL_BRK_INT		(CTRL_BRK_DET_INT | CTRL_FRM_ERR_INT\
+				 | CTRL_PAR_ERR_INT | CTRL_OVR_ERR_INT)
 
 #define UART_STAT		0x0c
 #define  STAT_TX_FIFO_EMP	BIT(13)
@@ -120,6 +120,10 @@ struct mvebu_uart_data {
 	struct clk              *clk;
 	struct uart_regs_layout *regs;
 	enum reg_uart_type       reg_type;
+
+	struct {
+		unsigned int ctrl_reg;
+	} intr;
 };
 
 #define REG_CTRL(uart_data)	((uart_data)->regs->uart_ctrl)
@@ -161,9 +165,9 @@ static void mvebu_uart_stop_tx(struct uart_port *port)
 	unsigned int ctl;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
-	ctl = readl(port->membase + REG_CTRL(uart_data));
+	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
 	ctl &= ~CTRL_TX_RDY_INT;
-	writel(ctl, port->membase + REG_CTRL(uart_data));
+	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 }
 
 static void mvebu_uart_start_tx(struct uart_port *port)
@@ -171,9 +175,9 @@ static void mvebu_uart_start_tx(struct uart_port *port)
 	unsigned int ctl;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
-	ctl = readl(port->membase + REG_CTRL(uart_data));
+	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
 	ctl |= CTRL_TX_RDY_INT;
-	writel(ctl, port->membase + REG_CTRL(uart_data));
+	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 }
 
 static void mvebu_uart_stop_rx(struct uart_port *port)
@@ -182,8 +186,12 @@ static void mvebu_uart_stop_rx(struct uart_port *port)
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	ctl = readl(port->membase + REG_CTRL(uart_data));
-	ctl &= ~CTRL_RX_INT;
+	ctl &= ~CTRL_BRK_INT;
 	writel(ctl, port->membase + REG_CTRL(uart_data));
+
+	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
+	ctl &= ~CTRL_RX_RDY_INT;
+	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 }
 
 static void mvebu_uart_break_ctl(struct uart_port *port, int brk)
@@ -324,11 +332,15 @@ static int mvebu_uart_startup(struct uart_port *port)
 {
 	int ret;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+	unsigned int ctl;
 
 	writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
 		port->membase + REG_CTRL(uart_data));
 	udelay(1);
-	writel(CTRL_RX_INT, port->membase + REG_CTRL(uart_data));
+	writel(CTRL_BRK_INT, port->membase + REG_CTRL(uart_data));
+	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
+	ctl |= CTRL_RX_RDY_INT;
+	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 
 	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, DRIVER_NAME,
 			  port);
@@ -345,6 +357,7 @@ static void mvebu_uart_shutdown(struct uart_port *port)
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	writel(0, port->membase + REG_CTRL(uart_data));
+	writel(0, port->membase + uart_data->intr.ctrl_reg);
 }
 
 static void mvebu_uart_set_termios(struct uart_port *port,
@@ -517,7 +530,7 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
 	struct uart_port *port = &mvebu_uart_ports[co->index];
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 	unsigned long flags;
-	unsigned int ier;
+	unsigned int ier, intr, ctl;
 	int locked = 1;
 
 	if (oops_in_progress)
@@ -525,9 +538,12 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
 	else
 		spin_lock_irqsave(&port->lock, flags);
 
-	ier = readl(port->membase + REG_CTRL(uart_data)) &
-		(CTRL_RX_INT | CTRL_TX_RDY_INT);
+	ier = readl(port->membase + REG_CTRL(uart_data)) & CTRL_BRK_INT;
+	intr = readl(port->membase + uart_data->intr.ctrl_reg);
+	intr &= (CTRL_RX_RDY_INT | CTRL_TX_RDY_INT);
+
 	writel(0, port->membase + REG_CTRL(uart_data));
+	writel(0, port->membase + uart_data->intr.ctrl_reg);
 
 	uart_console_write(port, s, count, mvebu_uart_console_putchar);
 
@@ -535,6 +551,11 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
 
 	if (ier)
 		writel(ier, port->membase + REG_CTRL(uart_data));
+
+	if (intr) {
+		ctl = intr | readl(port->membase + uart_data->intr.ctrl_reg);
+		writel(ctl, port->membase + uart_data->intr.ctrl_reg);
+	}
 
 	if (locked)
 		spin_unlock_irqrestore(&port->lock, flags);
@@ -651,6 +672,9 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	data->reg_type = (enum reg_uart_type)match->data;
 	data->regs     = &uart_regs_layout[data->reg_type];
 	data->port     = port;
+
+	/* Set interrupt registers */
+	data->intr.ctrl_reg = REG_CTRL(data);
 
 	port->private_data = data;
 	platform_set_drvdata(pdev, data);
