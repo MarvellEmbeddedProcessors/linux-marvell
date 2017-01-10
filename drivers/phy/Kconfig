@@ -123,6 +123,12 @@ config PHY_MVEBU_SATA
 	depends on OF
 	select GENERIC_PHY
 
+config PHY_ARMADA3700_UTMI
+	def_bool y
+	depends on ARCH_MVEBU
+	depends on OF
+	select GENERIC_PHY
+
 config PHY_MIPHY28LP
 	tristate "STMicroelectronics MIPHY28LP PHY driver for STiH407"
 	depends on ARCH_STI
