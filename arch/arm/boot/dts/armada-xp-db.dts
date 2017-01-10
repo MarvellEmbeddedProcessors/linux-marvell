@@ -207,6 +207,19 @@
 				bm,pool-long = <3>;
 			};
 
+			tdm@b0000 {
+				pinctrl-0 = <&tdm_pins>;
+				pinctrl-names = "default";
+				pclk-freq-mhz = <8>;
+				/*
+				 * Node remains disabled, because of
+				 * MPP's overlapping SDIO interface.
+				 * In order to use TDM, disable
+				 * mvsdio@d4000 node, and enable
+				 * tdm@b0000.
+				 */
+			};
+
 			bm@c0000 {
 				status = "okay";
 			};
@@ -232,6 +245,8 @@
 			};
 
 			spi0: spi@10600 {
+				pinctrl-0 = <&spi0_pins>;
+				pinctrl-names = "default";
 				status = "okay";
 
 				spi-flash@0 {
@@ -240,6 +255,30 @@
 					compatible = "m25p64", "jedec,spi-nor";
 					reg = <0>; /* Chip select 0 */
 					spi-max-frequency = <20000000>;
+				};
+
+				slic@1 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "mv_slic";
+					reg = <1>; /* Chip select 1 */
+					spi-max-frequency = <3000000>;
+					spi-1byte-cs;
+					spi-cpol;
+					spi-cpha;
+					slic-id = <0>;
+				};
+
+				slic@2 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "mv_slic";
+					reg = <2>; /* Chip select 2 */
+					spi-max-frequency = <3000000>;
+					spi-1byte-cs;
+					spi-cpol;
+					spi-cpha;
+					slic-id = <1>;
 				};
 			};
 		};
