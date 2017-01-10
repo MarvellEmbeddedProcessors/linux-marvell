@@ -242,7 +242,7 @@
 
 			pmsu@22000 {
 				compatible = "marvell,armada-370-pmsu";
-				reg = <0x22000 0x1000>;
+				reg = <0x22000 0x1000>, <0x20280 0x4>;
 			};
 
 			usb@50000 {
