@@ -115,6 +115,8 @@ static void __iomem *pmsu_mp_base;
 static void __iomem *cib_control;
 static void __iomem *pmsu_msys_ba_redirect_reg;
 
+static bool freq_id_wa;
+
 static void *mvebu_cpu_resume;
 static int (*mvebu_pmsu_dfs_request_ptr)(int cpu);
 
@@ -261,6 +263,16 @@ static int __init mvebu_v7_pmsu_init(void)
 		ret = msys_ba_redirect_quirk(np);
 		if (ret)
 			iounmap(pmsu_mp_base);
+	}
+
+	if (of_machine_is_compatible("marvell,armadaxp")) {
+		/*
+		 * Enable work-around for modifying Frequency ID during
+		 * CPU_PM_EXIT. Change added originally for Armada 38x
+		 * SoC does not work on Armada XP and causes very early
+		 * fail during boot.
+		 */
+		freq_id_wa = true;
 	}
 
  out:
@@ -414,11 +426,18 @@ void mvebu_v7_pmsu_idle_exit(void)
 	reg &= ~PMSU_CTL_CFG_L2_PWDDN;
 
 	/*
-	 * When exiting from idle state such as cpuidle or hotplug,
-	 * Enable PMU wait for the CPU to enter WFI when doing DFS
-	 * by setting CPUx Frequency ID to 1
+	 * Below modification of Frequency ID is valid only on Armada 38x
+	 * SoC. Due to hardware issue it causes fail on Armada XP, so
+	 * avoid this section, depending on freq_id_wa flag value.
 	 */
-	reg |= 1 << PMSU_CTL_CFG_CPU0_FRQ_ID_SFT;
+	if (!freq_id_wa) {
+		/*
+		 * When exiting from idle state such as cpuidle or hotplug,
+		 * Enable PMU wait for the CPU to enter WFI when doing DFS
+		 * by setting CPUx Frequency ID to 1
+		 */
+		reg |= 1 << PMSU_CTL_CFG_CPU0_FRQ_ID_SFT;
+	}
 	writel(reg, pmsu_mp_base + PMSU_CTL_CFG(hw_cpu));
 
 	/* cancel Enable wakeup events and mask interrupts */
