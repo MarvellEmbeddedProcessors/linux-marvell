@@ -269,6 +269,16 @@
 				status = "disabled";
 			};
 
+			tdm@b0000 {
+				compatible = "marvell,armada-xp-tdm";
+				reg = <0xb0000 0x9000>;
+				reg-names = "tdm_regs";
+				interrupts = <56>;
+				clocks = <&gateclk 25>;
+				clock-names = "gateclk";
+				status = "disabled";
+			};
+
 			xor@f0900 {
 				compatible = "marvell,orion-xor";
 				reg = <0xF0900 0x100
@@ -358,6 +368,14 @@
 		marvell,function = "ge1";
 	};
 
+	tdm_pins: tdm-pins {
+		marvell,pins =
+		     "mpp24", "mpp25", "mpp26", "mpp27",
+		     "mpp28", "mpp29", "mpp30", "mpp31",
+		     "mpp32", "mpp33", "mpp34", "mpp35";
+		marvell,function = "tdm";
+	};
+
 	sdio_pins: sdio-pins {
 		marvell,pins = "mpp30", "mpp31", "mpp32",
 			       "mpp33", "mpp34", "mpp35";
@@ -365,8 +383,8 @@
 	};
 
 	spi0_pins: spi0-pins {
-		marvell,pins = "mpp36", "mpp37",
-			       "mpp38", "mpp39";
+		marvell,pins = "mpp36", "mpp37", "mpp38",
+			       "mpp39", "mpp40", "mpp41";
 		marvell,function = "spi0";
 	};
 
