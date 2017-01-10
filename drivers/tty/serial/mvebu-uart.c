@@ -38,16 +38,20 @@
 
 enum reg_uart_type {
 	REG_UART_A3700,
+	REG_UART_A3700_EXT,
 };
 
 struct uart_regs_layout {
 	unsigned int uart_ctrl;
+	unsigned int uart_ctrl2;
 	unsigned int uart_rbr;
 	unsigned int uart_tsh;
 	unsigned int uart_brdv;
 	unsigned int uart_stat;
 };
 /* Register Map */
+
+/* REG_UART_A3700 */
 #define UART_RBR		0x00
 #define  RBR_BRK_DET		BIT(15)
 #define  RBR_FRM_ERR_DET	BIT(14)
@@ -97,6 +101,23 @@ struct uart_regs_layout {
 
 #define UART_BRDV		0x10
 
+/* REG_UART_A3700_EXT */
+#define UART_EXT_CTRL		0x04
+
+#define UART_EXT_STAT		0x0c
+#define  EXT_STAT_TX_RDY_1B		BIT(15)
+#define  EXT_STAT_RX_RDY_1B		BIT(14)
+
+#define UART_EXT_BRDV		0x10
+
+#define UART_EXT_RBR_1BYTE	0x18
+
+#define UART_EXT_TSH_1BYTE	0x1c
+
+#define UART_EXT_CTRL2		0x20
+#define EXT_CTRL2_TX_RDY_INT_1B	BIT(6)
+#define EXT_CTRL2_RX_RDY_INT_1B	BIT(5)
+
 /* UART register layout definitions */
 static struct uart_regs_layout uart_regs_layout[] = {
 	[REG_UART_A3700] = {
@@ -105,7 +126,15 @@ static struct uart_regs_layout uart_regs_layout[] = {
 		.uart_tsh  = UART_TSH,
 		.uart_brdv = UART_BRDV,
 		.uart_stat = UART_STAT,
-	}
+	},
+	[REG_UART_A3700_EXT] = {
+		.uart_ctrl  = UART_EXT_CTRL,
+		.uart_ctrl2 = UART_EXT_CTRL2,
+		.uart_rbr   = UART_EXT_RBR_1BYTE,
+		.uart_tsh   = UART_EXT_TSH_1BYTE,
+		.uart_brdv  = UART_EXT_BRDV,
+		.uart_stat  = UART_EXT_STAT,
+	},
 };
 
 #define MVEBU_NR_UARTS		2
@@ -134,6 +163,7 @@ struct mvebu_uart_data {
 };
 
 #define REG_CTRL(uart_data)	((uart_data)->regs->uart_ctrl)
+#define REG_CTRL2(uart_data)	((uart_data)->regs->uart_ctrl2)
 #define REG_RBR(uart_data)	((uart_data)->regs->uart_rbr)
 #define REG_TSH(uart_data)	((uart_data)->regs->uart_tsh)
 #define REG_BRDV(uart_data)	((uart_data)->regs->uart_brdv)
@@ -145,6 +175,8 @@ static inline unsigned int get_ctrl_rx_1byte_rdy_int(struct mvebu_uart_data *dat
 	switch (data->reg_type) {
 	case REG_UART_A3700:
 		return CTRL_RX_RDY_INT;
+	case REG_UART_A3700_EXT:
+		return EXT_CTRL2_RX_RDY_INT_1B;
 	default:
 		break;
 	}
@@ -156,6 +188,8 @@ static inline unsigned int get_ctrl_tx_1byte_rdy_int(struct mvebu_uart_data *dat
 	switch (data->reg_type) {
 	case REG_UART_A3700:
 		return CTRL_TX_RDY_INT;
+	case REG_UART_A3700_EXT:
+		return EXT_CTRL2_TX_RDY_INT_1B;
 	default:
 		break;
 	}
@@ -167,6 +201,8 @@ static inline unsigned int get_stat_rx_1byte_rdy(struct mvebu_uart_data *data)
 	switch (data->reg_type) {
 	case REG_UART_A3700:
 		return STAT_RX_RDY;
+	case REG_UART_A3700_EXT:
+		return EXT_STAT_RX_RDY_1B;
 	default:
 		break;
 	}
@@ -178,6 +214,8 @@ static inline unsigned int get_stat_tx_1byte_rdy(struct mvebu_uart_data *data)
 	switch (data->reg_type) {
 	case REG_UART_A3700:
 		return STAT_TX_RDY;
+	case REG_UART_A3700_EXT:
+		return EXT_STAT_TX_RDY_1B;
 	default:
 		break;
 	}
@@ -741,7 +779,15 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	data->reg_bits.stat_tx_rdy     = get_stat_tx_1byte_rdy;
 
 	/* Set interrupt registers */
-	data->intr.ctrl_reg = REG_CTRL(data);
+	/* Todo:
+	 * CTRL2 register is used for tx and rx interrupt control
+	 * ONLY in 1-byte transfer mode with REG_A3700_EXT registers
+	 * layout.
+	 */
+	if (data->reg_type == REG_UART_A3700_EXT)
+		data->intr.ctrl_reg = REG_CTRL2(data);
+	else
+		data->intr.ctrl_reg = REG_CTRL(data);
 
 	port->private_data = data;
 	platform_set_drvdata(pdev, data);
@@ -765,7 +811,8 @@ static int mvebu_uart_remove(struct platform_device *pdev)
 
 /* Match table for of_platform binding */
 static const struct of_device_id mvebu_uart_of_match[] = {
-	{ .compatible = "marvell,armada-3700-uart", .data = (void *)REG_UART_A3700 },
+	{ .compatible = "marvell,armada-3700-uart",     .data = (void *)REG_UART_A3700     },
+	{ .compatible = "marvell,armada-3700-uart-ext", .data = (void *)REG_UART_A3700_EXT },
 	{}
 };
 MODULE_DEVICE_TABLE(of, mvebu_uart_of_match);
