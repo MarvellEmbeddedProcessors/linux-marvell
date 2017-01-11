@@ -792,6 +792,11 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	port->private_data = data;
 	platform_set_drvdata(pdev, data);
 
+	/* UART Soft Reset*/
+	writel(CTRL_SOFT_RST, port->membase + REG_CTRL(data));
+	udelay(1);
+	writel(0, port->membase + REG_CTRL(data));
+
 	ret = uart_add_one_port(&mvebu_uart_driver, port);
 	if (ret)
 		return ret;
