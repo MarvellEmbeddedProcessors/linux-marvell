@@ -7,6 +7,11 @@
 #define to_mvebu_comphy_priv(lane) \
 	container_of((lane), struct mvebu_comphy_priv, lanes[(lane)->index])
 
+enum reg_width_type {
+	REG_16BIT = 0,
+	REG_32BIT,
+};
+
 struct mvebu_comphy_priv {
 	struct device *dev;
 	void __iomem *comphy_regs;
@@ -36,16 +41,30 @@ static inline void __maybe_unused reg_set(void __iomem *addr, u32 data, u32 mask
 	writel(reg_data, addr);
 }
 
+static inline void __maybe_unused reg_set16(void __iomem *addr, u16 data, u16 mask)
+{
+	u16 reg_data;
+
+	reg_data = readw(addr);
+	reg_data &= ~mask;
+	reg_data |= data;
+	writew(reg_data, addr);
+}
+
 static inline u32 __maybe_unused polling_with_timeout(void __iomem *addr,
 						      u32 val,
 						      u32 mask,
-						      unsigned long usec_timout)
+						      unsigned long usec_timout,
+						      enum reg_width_type type)
 {
 	u32 data;
 
 	do {
 		udelay(1);
-		data = readl(addr) & mask;
+		if (type == REG_16BIT)
+			data = readw(addr) & mask;
+		else
+			data = readl(addr) & mask;
 	} while (data != val  && --usec_timout > 0);
 
 	if (usec_timout == 0)

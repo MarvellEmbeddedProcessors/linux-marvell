@@ -393,7 +393,7 @@ static int mvebu_cp110_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 	addr = sd_ip_addr + SD_EXTERNAL_STATUS0_REG;
 	data = SD_EXTERNAL_STATUS0_PLL_RX_MASK | SD_EXTERNAL_STATUS0_PLL_TX_MASK;
 	mask = data;
-	data = polling_with_timeout(addr, data, mask, 15000);
+	data = polling_with_timeout(addr, data, mask, 15000, REG_32BIT);
 	if (data != 0) {
 		if (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK)
 			dev_err(priv->dev, "RX PLL is not locked\n");
@@ -412,7 +412,7 @@ static int mvebu_cp110_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 	addr = sd_ip_addr + SD_EXTERNAL_STATUS0_REG;
 	data = SD_EXTERNAL_STATUS0_RX_INIT_MASK;
 	mask = data;
-	data = polling_with_timeout(addr, data, mask, 100);
+	data = polling_with_timeout(addr, data, mask, 100, REG_32BIT);
 	if (data != 0) {
 		dev_err(priv->dev, "RX init failed\n");
 		ret = -ETIMEDOUT;
@@ -638,7 +638,7 @@ static int mvebu_cp110_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	addr = sd_ip_addr + SD_EXTERNAL_STATUS0_REG;
 	data = SD_EXTERNAL_STATUS0_PLL_RX_MASK | SD_EXTERNAL_STATUS0_PLL_TX_MASK;
 	mask = data;
-	data = polling_with_timeout(addr, data, mask, 15000);
+	data = polling_with_timeout(addr, data, mask, 15000, REG_32BIT);
 	if (data != 0) {
 		if (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK)
 			dev_err(priv->dev, "RX PLL is not locked\n");
@@ -657,7 +657,7 @@ static int mvebu_cp110_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	addr = sd_ip_addr + SD_EXTERNAL_STATUS0_REG;
 	data = SD_EXTERNAL_STATUS0_RX_INIT_MASK;
 	mask = data;
-	data = polling_with_timeout(addr, data, mask, 100);
+	data = polling_with_timeout(addr, data, mask, 100, REG_32BIT);
 	if (data != 0) {
 		dev_err(priv->dev, "RX init failed\n");
 		ret = -ETIMEDOUT;
@@ -762,7 +762,7 @@ static int mvebu_cp110_comphy_is_pll_locked(struct phy *phy)
 	addr = sd_ip_addr + SD_EXTERNAL_STATUS0_REG;
 	data = SD_EXTERNAL_STATUS0_PLL_TX_MASK & SD_EXTERNAL_STATUS0_PLL_RX_MASK;
 	mask = data;
-	data = polling_with_timeout(addr, data, mask, PLL_LOCK_TIMEOUT);
+	data = polling_with_timeout(addr, data, mask, PLL_LOCK_TIMEOUT, REG_32BIT);
 	if (data != 0) {
 		if (data & SD_EXTERNAL_STATUS0_PLL_RX_MASK)
 			dev_err(priv->dev, "RX PLL is not locked\n");
