@@ -64,6 +64,12 @@ Zarlink/Silabs SLIC devices require also following properties:
 
 - spi-cpha - accept data on clk trailing edge
 
+Optional property:
+
+- slic-id - logical ID of SPI device from range 0 - 31. If not used,
+  the driver will set it to '0'. If more than one SLIC device is
+  used, this property is obligatory for proper operation.
+
 spi1: spi@10680 {
 	pinctrl-0 = <&spi1_pins>;
 	pinctrl-names = "default";
@@ -78,5 +84,6 @@ spi1: spi@10680 {
 		spi-1byte-cs;
 		spi-cpol;
 		spi-cpha;
+		slic-id = <1>;
 	};
 };
