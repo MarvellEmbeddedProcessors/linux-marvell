@@ -101,12 +101,16 @@
 
 #undef MVEBU_PHONE_SPI_DEBUG
 
-struct spi_device *slic_spi;
+#define MAX_SLIC_DEVICES 32
+
+/* Global array of pointers to SLIC SPI devices */
+struct spi_device *slic_devs[MAX_SLIC_DEVICES];
 
 /* Telephony register read via SPI interface. */
 void mv_phone_spi_read(u16 dev_id, u8 *cmd_buff, u8 cmd_size,
 		       u8 *data_buff, u8 data_size, u32 spi_type)
 {
+	struct spi_device *slic_spi = slic_devs[dev_id];
 	int err;
 
 #ifdef MVEBU_PHONE_SPI_DEBUG
@@ -132,6 +136,7 @@ void mv_phone_spi_write(u16 dev_id, u8 *cmd_buff, u8 cmd_size,
 {
 	int err;
 	struct spi_message m;
+	struct spi_device *slic_spi = slic_devs[dev_id];
 	struct spi_transfer t[2] = { { .tx_buf = (const void *)cmd_buff,
 				       .len = cmd_size, },
 				     { .tx_buf = (const void *)data_buff,
@@ -157,6 +162,30 @@ void mv_phone_spi_write(u16 dev_id, u8 *cmd_buff, u8 cmd_size,
 static int mvebu_phone_spi_probe(struct spi_device *spi)
 {
 	int err;
+	u32 dev_id;
+
+	/* Obtain SLIC ID */
+	err = of_property_read_u32(spi->dev.of_node, "slic-id", &dev_id);
+	if (err == -EINVAL) {
+		/* Assign '0' ID in case the 'slic-id' property is not used */
+		dev_id = 0;
+	} else if (err) {
+		dev_err(&spi->dev, "unable to get SLIC ID\n");
+		return err;
+	} else if (dev_id >= MAX_SLIC_DEVICES) {
+		dev_err(&spi->dev, "SLIC ID (%d) exceeds maximum (%d)\n",
+			dev_id, MAX_SLIC_DEVICES - 1);
+		return -EINVAL;
+	}
+
+	/* Check if this ID wasn't used by previous devices */
+	if (slic_devs[dev_id]) {
+		dev_err(&spi->dev, "overlapping ID (%d) at bus #%d, CS #%d\n",
+			dev_id, spi->master->bus_num, spi->chip_select);
+		return -EINVAL;
+	}
+
+	slic_devs[dev_id] = spi;
 
 	err = spi_setup(spi);
 	if (err) {
@@ -164,10 +193,8 @@ static int mvebu_phone_spi_probe(struct spi_device *spi)
 		return err;
 	}
 
-	slic_spi = spi;
-
-	dev_info(&spi->dev, "registered slic spi device at bus #%d, CS #%d",
-		 spi->master->bus_num, spi->chip_select);
+	dev_info(&spi->dev, "registered slic spi device %d at bus #%d, CS #%d",
+		 dev_id, spi->master->bus_num, spi->chip_select);
 
 	return 0;
 }
