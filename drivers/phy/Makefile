@@ -15,6 +15,7 @@ obj-$(CONFIG_PHY_PXA_28NM_USB2)		+= phy-pxa-28nm-usb2.o
 obj-$(CONFIG_PHY_PXA_28NM_HSIC)		+= phy-pxa-28nm-hsic.o
 obj-$(CONFIG_PHY_MVEBU_COMPHY)		+= phy-comphy-mvebu.o
 obj-$(CONFIG_PHY_MVEBU_COMPHY_CP110)	+= phy-comphy-cp110.o
+obj-$(CONFIG_PHY_MVEBU_COMPHY_A3700)	+= phy-comphy-a3700.o
 obj-$(CONFIG_PHY_MVEBU_SATA)		+= phy-mvebu-sata.o
 obj-$(CONFIG_PHY_MIPHY28LP) 		+= phy-miphy28lp.o
 obj-$(CONFIG_PHY_MIPHY365X)		+= phy-miphy365x.o
