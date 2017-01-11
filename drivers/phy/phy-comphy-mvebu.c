@@ -21,6 +21,7 @@
 
 #include "phy-comphy-mvebu.h"
 #include "phy-comphy-cp110.h"
+#include "phy-comphy-a3700.h"
 
 /* mvebu_comphy_set_mode: shared by all SoCs */
 int mvebu_comphy_set_mode(struct phy *phy, enum phy_mode mode)
@@ -76,6 +77,9 @@ static const struct of_device_id mvebu_comphy_of_match[] = {
 #ifdef CONFIG_PHY_MVEBU_COMPHY_CP110
 	{ .compatible = "marvell,cp110-comphy", .data = &cp110_comphy },
 #endif /* CONFIG_PHY_MVEBU_COMPHY_CP110 */
+#ifdef CONFIG_PHY_MVEBU_COMPHY_A3700
+	{ .compatible = "marvell,armada-3700-comphy", .data = &a3700_comphy },
+#endif /* CONFIG_PHY_MVEBU_COMPHY_A3700 */
 	{ },
 };
 MODULE_DEVICE_TABLE(of, mvebu_comphy_of_match);

@@ -107,6 +107,16 @@ config PHY_MVEBU_COMPHY_CP110
 	  responsible for configuring all SerDes lanes according to the
 	  selected configuration.
 
+config PHY_MVEBU_COMPHY_A3700
+	def_bool y
+	depends on ARCH_MVEBU
+	depends on OF
+	select PHY_MVEBU_COMPHY
+	help
+	  Enable this to support Marvell Armada3700 comphy driver. This driver is
+	  responsible for configuring all SerDes lanes according to the
+	  selected configuration.
+
 config PHY_MVEBU_SATA
 	def_bool y
 	depends on ARCH_DOVE || MACH_DOVE || MACH_KIRKWOOD

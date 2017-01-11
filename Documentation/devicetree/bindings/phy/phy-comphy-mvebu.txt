@@ -38,6 +38,7 @@ Each device using Comphy should have handle with the following properties:
 				- COMPHY_RXAUI0 COMPHY_RXAUI1
 				- COMPHY_XFI
 				- COMPHY_SFI
+				- COMPHY_USB3
 	  2. Complex description (for specific speed and/or polarity invert settings)
 	     With this approach, comphy settings are selected by the macro COMPHY_DEF,
 	     which defines comphy mode, unit index, comphy speed, and comphy RX/TX invert settings.
@@ -52,6 +53,7 @@ Each device using Comphy should have handle with the following properties:
 				- COMPHY_RXAUI_MODE
 				- COMPHY_XFI_MODE
 				- COMPHY_SFI_MODE
+				- COMPHY_USB3_MODE
 			COMPHY_UNIT_ID: unit index
 				- relevant to following interfaces, SATA, USB, RXAUI, SGMII and PCIE.
 				- SATA/USB/RXAUI: 0/1
@@ -88,6 +90,17 @@ Comphy Node:
 		status = "okay";
 	};
 
+	a3700_comphy: comphy@18300 {
+			compatible = "marvell,mvebu-comphy", "marvell,armada-3700-comphy";
+			reg = <0x18300 0x300>, /* comphy */
+			      <0x1F000 0x1000>, /* serdes */
+			      <0x5c000 0x1000>, /* usb3_gbe1 phy reg */
+			      <0xe0178 0x8>; /* lane2 indirect access */
+			reg-names = "comphy", "serdes", "usb3_gbe1_phy", "indirect";
+			#phy-cells = <2>;
+			status = "okay";
+	};
+
 Comphy consumer:
 ===============
 	(1) The example with simplified option of comphy description:
@@ -104,6 +117,11 @@ Comphy consumer:
 			- the unit index of the sata interface is 0
 			- the speed is default
 			- the invert is also default without polarity inverted
+
+		sata@e0000 {
+				status = "okay";
+				phys = <&a3700_comphy 2 COMPHY_SATA0>;
+		};
 
 	(2) Examples with complex option of comphy description:
 		(2.1)	emac2: mac2 {
