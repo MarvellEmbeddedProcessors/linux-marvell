@@ -128,9 +128,7 @@ static DECLARE_TASKLET(tdm2c_if_reset_tasklet, tdm2c_if_reset_channels, 0);
 /* Statistic printout in userspace via /proc/tdm */
 static int mv_phone_status_show(struct seq_file *m, void *v)
 {
-#ifdef CONFIG_MV_TDM_EXT_STATS
 	struct mv_phone_extended_stats tdm_ext_stats;
-#endif
 
 	seq_printf(m, "tdm_init:	%u\n", priv->tdm_init);
 	seq_printf(m, "rx_miss:		%u\n", priv->rx_miss);
@@ -138,7 +136,9 @@ static int mv_phone_status_show(struct seq_file *m, void *v)
 	seq_printf(m, "rx_over:		%u\n", priv->rx_over);
 	seq_printf(m, "tx_under:	%u\n", priv->tx_under);
 
-#ifdef CONFIG_MV_TDM_EXT_STATS
+	if (!priv->use_tdm_ext_stats)
+		return 0;
+
 	tdm2c_ext_stats_get(&tdm_ext_stats);
 
 	seq_puts(m, "\nTDM Extended Statistics:\n");
@@ -154,7 +154,7 @@ static int mv_phone_status_show(struct seq_file *m, void *v)
 	seq_printf(m, "int_tx1_miss	= %u\n", tdm_ext_stats.int_tx1_miss);
 	seq_printf(m, "pcm_restart_count= %u\n", tdm_ext_stats.pcm_restart_count);
 	seq_printf(m, "pcm_stop_fail	= %u\n", priv->pcm_stop_fail);
-#endif
+
 	return 0;
 }
 
@@ -364,9 +364,8 @@ int tdm_if_init(struct tal_params *tal_params)
 	priv->pcm_is_stopping = false;
 	priv->pcm_stop_flag = false;
 	priv->pcm_stop_status = false;
-#ifdef CONFIG_MV_TDM_EXT_STATS
 	priv->pcm_stop_fail = 0;
-#endif
+
 	/* Calculate Rx/Tx buffer size(use in callbacks) */
 	priv->buff_size = (tal_params->pcm_format * tal_params->total_lines * 80 *
 			  (tal_params->sampling_period/MV_TDM_BASE_SAMPLING_PERIOD));
@@ -524,9 +523,9 @@ static void tdm_if_stats_get(struct tal_stats *tdm_if_stats)
 	tdm_if_stats->tx_miss = priv->tx_miss;
 	tdm_if_stats->rx_over = priv->rx_over;
 	tdm_if_stats->tx_under = priv->tx_under;
-#ifdef CONFIG_MV_TDM_EXT_STATS
-	tdm2c_ext_stats_get(&tdm_if_stats->tdm_ext_stats);
-#endif
+
+	if (priv->use_tdm_ext_stats)
+		tdm2c_ext_stats_get(&tdm_if_stats->tdm_ext_stats);
 }
 
 static struct tal_if tdm2c_if = {
@@ -804,9 +803,7 @@ static void tdm2c_if_reset_channels(unsigned long arg)
 		writel(0, priv->tdm_base + CH_ENABLE_REG(1));
 		dev_warn(priv->dev, "\n%s: Channels disabling timeout (%dms)\n",
 			 __func__, MV_TDM_STOP_POLLING_TIMEOUT);
-#ifdef CONFIG_MV_TDM_EXT_STATS
 		priv->pcm_stop_fail++;
-#endif
 		mdelay(10);
 	}
 
@@ -1068,6 +1065,10 @@ static int mvebu_phone_probe(struct platform_device *pdev)
 
 		dev_info(&pdev->dev, "using %s SPI mode\n",
 			 priv->tdm2c_spi_mode ? "daisy-chain" : "direct");
+
+#ifdef CONFIG_MV_TDM_EXT_STATS
+		priv->use_tdm_ext_stats = true;
+#endif
 	}
 
 	spin_lock_init(&priv->lock);

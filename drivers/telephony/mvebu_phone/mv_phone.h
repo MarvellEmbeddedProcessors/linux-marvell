@@ -186,7 +186,6 @@ enum mv_phone_spi_mode {
 	MV_SPI_MODE_DAISY_CHAIN = 1
 };
 
-#ifdef CONFIG_MV_TDM_EXT_STATS
 struct mv_phone_extended_stats {
 	u32 int_rx_count;
 	u32 int_tx_count;
@@ -200,7 +199,6 @@ struct mv_phone_extended_stats {
 	u32 int_tx1_miss;
 	u32 pcm_restart_count;
 };
-#endif
 
 struct mv_phone_intr_info {
 	u8 *tdm_rx_buff;
@@ -260,9 +258,8 @@ struct mv_phone_dev {
 	bool pcm_stop_status;
 	int pcm_start_stop_state;
 	bool pcm_is_stopping;
-#ifdef CONFIG_MV_TDM_EXT_STATS
 	u32 pcm_stop_fail;
-#endif
+	bool use_tdm_ext_stats;
 
 	/* TDM2C SPI operation mode */
 	enum mv_phone_spi_mode tdm2c_spi_mode;
@@ -324,9 +321,7 @@ int tdm2c_init(void __iomem *base, struct device *dev,
 	       enum mv_phone_spi_mode spi_mode,
 	       bool use_pclk_external);
 int tdm2c_intr_low(struct mv_phone_intr_info *tdm_intr_info);
-#ifdef CONFIG_MV_TDM_EXT_STATS
 void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdm_ext_stats);
-#endif
 
 /* TDMMC */
 int tdmmc_init(void __iomem *base, struct device *dev, struct mv_phone_params *tdm_params,

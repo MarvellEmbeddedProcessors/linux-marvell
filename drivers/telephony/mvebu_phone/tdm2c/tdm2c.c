@@ -985,7 +985,6 @@ void tdm2c_regs_dump(void)
 	}
 }
 
-#ifdef CONFIG_MV_TDM_EXT_STATS
 void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdm_ext_stats)
 {
 	tdm_ext_stats->int_rx_count = tdm2c->int_rx_count;
@@ -1000,7 +999,6 @@ void tdm2c_ext_stats_get(struct mv_phone_extended_stats *tdm_ext_stats)
 	tdm_ext_stats->int_tx1_miss = tdm2c->int_tx1_miss;
 	tdm_ext_stats->pcm_restart_count = tdm2c->pcm_restart_count;
 }
-#endif
 
 /* Initialize decoding windows */
 int tdm2c_set_mbus_windows(struct device *dev, void __iomem *regs,

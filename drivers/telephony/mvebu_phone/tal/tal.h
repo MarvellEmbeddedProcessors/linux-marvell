@@ -131,9 +131,7 @@ struct tal_stats {
 	u32 tx_miss;
 	u32 rx_over;
 	u32 tx_under;
-#ifdef CONFIG_MV_TDM_EXT_STATS
 	struct mv_phone_extended_stats tdm_ext_stats;
-#endif
 };
 
 struct tal_mmp_ops {
