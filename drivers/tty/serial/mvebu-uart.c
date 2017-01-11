@@ -159,6 +159,14 @@ struct mvebu_uart_data {
 
 	struct {
 		unsigned int ctrl_reg;
+		/* Uart summary interrupt includes the TX and RX interrupts
+		 * if the uart port uses summary interrupt, TX/RX interrupts
+		 * are not needed any more. Otherwise if the uart port doen't
+		 * use summary irq, TX/RX interrupts need to be handled separately.
+		 */
+		int irq_sum;
+		int irq_rx;
+		int irq_tx;
 	} intr;
 };
 
@@ -419,9 +427,61 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static int mvebu_uart_startup(struct uart_port *port)
+static irqreturn_t mvebu_uart_rx_isr(int irq, void *dev_id)
+{
+	struct uart_port *port = (struct uart_port *)dev_id;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+	unsigned int st = readl(port->membase + REG_STAT(uart_data));
+	unsigned int stat_bit_rx_rdy = uart_data->reg_bits.stat_rx_rdy(uart_data);
+
+	if (st & (stat_bit_rx_rdy | STAT_OVR_ERR | STAT_FRM_ERR | STAT_BRK_DET))
+		mvebu_uart_rx_chars(port, st);
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t mvebu_uart_tx_isr(int irq, void *dev_id)
+{
+	struct uart_port *port = (struct uart_port *)dev_id;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+	unsigned int st = readl(port->membase + REG_STAT(uart_data));
+	unsigned int stat_bit_tx_rdy = uart_data->reg_bits.stat_tx_rdy(uart_data);
+
+	if (st & stat_bit_tx_rdy)
+		mvebu_uart_tx_chars(port, st);
+
+	return IRQ_HANDLED;
+}
+
+static int mvebu_uart_irq_request(struct uart_port *port)
 {
 	int ret;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+
+	if (uart_data->intr.irq_sum > 0) {
+		ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, DRIVER_NAME, port);
+		if (ret) {
+			dev_err(port->dev, "failed to request irq\n");
+			return ret;
+		}
+	} else if ((uart_data->intr.irq_rx > 0) && (uart_data->intr.irq_tx > 0)) {
+		ret = request_irq(uart_data->intr.irq_rx, mvebu_uart_rx_isr, IRQF_SHARED, DRIVER_NAME"-rx", port);
+		if (ret) {
+			dev_err(port->dev, "failed to request rx irq\n");
+			return ret;
+		}
+		ret = request_irq(uart_data->intr.irq_tx, mvebu_uart_tx_isr, IRQF_SHARED, DRIVER_NAME"-tx", port);
+		if (ret) {
+			dev_err(port->dev, "failed to request tx irq\n");
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+static int mvebu_uart_startup(struct uart_port *port)
+{
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 	unsigned int ctl;
 
@@ -433,14 +493,9 @@ static int mvebu_uart_startup(struct uart_port *port)
 	ctl |= uart_data->reg_bits.ctrl_rx_rdy_int(uart_data);
 	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 
-	ret = request_irq(port->irq, mvebu_uart_isr, port->irqflags, DRIVER_NAME,
-			  port);
-	if (ret) {
-		dev_err(port->dev, "failed to request irq\n");
-		return ret;
-	}
+	/* Requset irq_sum, irq_tx, irq_rx separately for uart ports */
+	return mvebu_uart_irq_request(port);
 
-	return 0;
 }
 
 static void mvebu_uart_shutdown(struct uart_port *port)
@@ -718,14 +773,22 @@ static const struct of_device_id mvebu_uart_of_match[];
 static int mvebu_uart_probe(struct platform_device *pdev)
 {
 	struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+
+	int irq_sum = platform_get_irq_byname(pdev, "irq_sum");
+	int irq_rx = platform_get_irq_byname(pdev, "irq_rx");
+	int irq_tx = platform_get_irq_byname(pdev, "irq_tx");
 	const struct of_device_id *match = of_match_device(mvebu_uart_of_match, &pdev->dev);
 	struct uart_port *port;
 	struct mvebu_uart_data *data;
 	int ret;
 
-	if (!reg || !irq) {
-		dev_err(&pdev->dev, "no registers/irq defined\n");
+	if (!reg) {
+		dev_err(&pdev->dev, "no registers defined\n");
+		return -EINVAL;
+	}
+
+	if ((irq_sum < 0) && ((irq_rx < 0) || (irq_tx < 0))) {
+		dev_err(&pdev->dev, "no irq defined\n");
 		return -EINVAL;
 	}
 
@@ -751,7 +814,6 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	port->flags      = UPF_FIXED_PORT;
 	port->line       = pdev->id;
 
-	port->irq        = irq->start;
 	port->irqflags   = IRQF_SHARED;
 	port->mapbase    = reg->start;
 
@@ -767,6 +829,16 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	data->reg_type = (enum reg_uart_type)match->data;
 	data->regs     = &uart_regs_layout[data->reg_type];
 	data->port     = port;
+
+	/* First of all, if sum irq is legal, use sum irq. Otherwise, use tx irq and rx irq.*/
+	if (irq_sum > 0) {
+		port->irq = irq_sum;
+		data->intr.irq_sum = irq_sum;
+	} else if ((irq_rx > 0) && (irq_tx > 0)) {
+		port->irq = irq_rx;
+		data->intr.irq_rx = irq_rx;
+		data->intr.irq_tx = irq_tx;
+	}
 
 	/* Set interrupt register bits callbacks */
 	/* Todo:
