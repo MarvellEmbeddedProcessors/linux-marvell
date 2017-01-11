@@ -588,15 +588,12 @@ static enum dma_status mv_xor_v2_tx_status(struct dma_chan *chan,
 }
 
 /*
- * push pending transactions to hardware
+ * DMA framework requires this routine, since it's not
+ * checking if device_issue_pending pointer is set or NULL
  */
 static void mv_xor_v2_issue_pending(struct dma_chan *chan)
 {
-	struct mv_xor_v2_device *xor_dev =
-		container_of(chan, struct mv_xor_v2_device, dmachan);
-
-	/* Activate the channel */
-	writel(0, xor_dev->dma_base + DMA_DESQ_STOP_OFF);
+	/* nothing to be done here */
 }
 
 static inline
