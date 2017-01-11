@@ -104,14 +104,14 @@
 struct spi_device *slic_spi;
 
 /* Telephony register read via SPI interface. */
-void mv_phone_spi_read(u16 line_id, u8 *cmd_buff, u8 cmd_size,
+void mv_phone_spi_read(u16 dev_id, u8 *cmd_buff, u8 cmd_size,
 		       u8 *data_buff, u8 data_size, u32 spi_type)
 {
 	int err;
 
 #ifdef MVEBU_PHONE_SPI_DEBUG
-	pr_info("%s():line(%d) Spi ID=%d line_id=%d Spi CS=%d Spi type=%d\n",
-		__func__, __LINE__, slic_spi->master->bus_num, line_id,
+	pr_info("%s():line(%d) Spi ID=%d dev_id=%d Spi CS=%d Spi type=%d\n",
+		__func__, __LINE__, slic_spi->master->bus_num, dev_id,
 		slic_spi->chip_select, spi_type);
 #endif
 
@@ -127,7 +127,7 @@ void mv_phone_spi_read(u16 line_id, u8 *cmd_buff, u8 cmd_size,
 }
 
 /* Telephony register write via SPI interface. */
-void mv_phone_spi_write(u16 line_id, u8 *cmd_buff, u8 cmd_size,
+void mv_phone_spi_write(u16 dev_id, u8 *cmd_buff, u8 cmd_size,
 			u8 *data_buff, u8 data_size, u32 spi_type)
 {
 	int err;
@@ -138,8 +138,8 @@ void mv_phone_spi_write(u16 line_id, u8 *cmd_buff, u8 cmd_size,
 				       .len = data_size, }, };
 
 #ifdef MVEBU_PHONE_SPI_DEBUG
-	pr_info("%s():line(%d) Spi ID=%d line_id=%d Spi CS=%d Spi type=%d\n",
-		__func__, __LINE__, slic_spi->master->bus_num, line_id,
+	pr_info("%s():line(%d) Spi ID=%d dev_id=%d Spi CS=%d Spi type=%d\n",
+		__func__, __LINE__, slic_spi->master->bus_num, dev_id,
 		slic_spi->chip_select, spi_type);
 	pr_info("CMD = 0x%x, cmd_size = 0x%x, DATA = 0x%x, data_size = 0x%x\n",
 		*cmd_buff, cmd_size, *data_buff, data_size);
