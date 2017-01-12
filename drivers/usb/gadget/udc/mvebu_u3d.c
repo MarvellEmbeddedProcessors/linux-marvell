@@ -2342,6 +2342,11 @@ static int mvc2_probe(struct platform_device *pdev)
 
 	/* setup vbus gpio */
 	cp->vbus_pin = of_get_named_gpio(pdev->dev.of_node, "vbus-gpio", 0);
+	if ((cp->vbus_pin == -ENODEV) || (cp->vbus_pin == -EPROBE_DEFER)) {
+		ret = -EPROBE_DEFER;
+		goto err_clk;
+	}
+
 	if (cp->vbus_pin < 0)
 		cp->vbus_pin = -ENODEV;
 
