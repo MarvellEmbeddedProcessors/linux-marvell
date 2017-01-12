@@ -2348,12 +2348,16 @@ static int mvc2_probe(struct platform_device *pdev)
 	if (gpio_is_valid(cp->vbus_pin)) {
 		cp->prev_vbus = 0;
 		if (!devm_gpio_request(&pdev->dev, cp->vbus_pin, "mvebu-u3d")) {
-			ret = devm_request_irq(&pdev->dev,
+			/* Use the 'any_context' version of function to allow
+			 * requesting both direct GPIO interrupt (hardirq) and
+			 * IO-expander's GPIO (nested interrupt)
+			 */
+			ret = devm_request_any_context_irq(&pdev->dev,
 					       gpio_to_irq(cp->vbus_pin),
 					       mvc2_vbus_irq,
 					       IRQ_TYPE_EDGE_BOTH, "mvebu-u3d",
 					       cp);
-			if (ret) {
+			if (ret < 0) {
 				cp->vbus_pin = -ENODEV;
 				dev_warn(&pdev->dev,
 					 "failed to request vbus irq; "
