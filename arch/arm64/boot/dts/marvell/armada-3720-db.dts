@@ -193,8 +193,10 @@
 			/* CON3 */
 			sata@e0000 {
 				target-supply = <&reg_5v_sata>;
+				phys = <&a3700_comphy 2 COMPHY_SATA0>;
 				status = "okay";
 			};
+
 			vcc_sd_reg1: regulator@0 {
 				compatible = "regulator-gpio";
 				regulator-name = "vcc_sd1";
