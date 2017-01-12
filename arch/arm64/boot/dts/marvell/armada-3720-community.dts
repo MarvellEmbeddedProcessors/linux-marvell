@@ -127,6 +127,7 @@
 			};
 
 			sata@e0000 {
+				phys = <&a3700_comphy 2 COMPHY_SATA0>;
 				status = "okay";
 			};
 		};
