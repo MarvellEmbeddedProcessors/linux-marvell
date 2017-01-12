@@ -77,18 +77,135 @@ static void mvebu_a3700_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 	writel(reg, priv->comphy_regs + COMPHY_SELECTOR_PHY_REG_OFFSET);
 }
 
+/***************************************************************************************************
+  * mvebu_comphy_reg_set_indirect
+  * It is only used for SATA and USB3 on comphy lane2.
+  * return: void
+ ***************************************************************************************************/
+static void mvebu_comphy_reg_set_indirect(void __iomem *addr, u32 reg_offset, u16 data, u16 mask, int mode)
+{
+	/*
+	 * When Lane 2 PHY is for USB3, access the PHY registers
+	 * through indirect Address and Data registers INDIR_ACC_PHY_ADDR (RD00E0178h [31:0]) and
+	 * INDIR_ACC_PHY_DATA (RD00E017Ch [31:0]) within the SATA Host Controller registers, Lane 2
+	 * base register offset is 0x200
+	 */
+	if (mode == COMPHY_UNUSED)
+		return;
+
+	if (mode == COMPHY_SATA_MODE)
+		writel(reg_offset, addr + COMPHY_LANE2_INDIR_ADDR_OFFSET);
+	else
+		writel(reg_offset + USB3PHY_LANE2_REG_BASE_OFFSET, addr + COMPHY_LANE2_INDIR_ADDR_OFFSET);
+
+	reg_set(addr + COMPHY_LANE2_INDIR_DATA_OFFSET, data, mask);
+}
+
 static int mvebu_a3700_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 					    struct mvebu_comphy *comphy)
 {
+	int ret = 0;
+	u32 reg_offset, data = 0;
+	void __iomem *comphy_indir_regs;
+	struct resource *res;
+	struct platform_device *pdev = container_of(priv->dev, struct platform_device, dev);
+	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+	int invert = COMPHY_GET_POLARITY_INVERT(priv->lanes[comphy->index].mode);
+
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
+	/* Get the indirect access register resource and map */
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "indirect");
+	if (res) {
+		comphy_indir_regs = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(comphy_indir_regs))
+			return PTR_ERR(comphy_indir_regs);
+	} else {
+		dev_err(priv->dev, "no inirect register resource\n");
+		return -ENOTSUPP;
+	}
+
+	/* Configure phy selector for SATA */
 	mvebu_a3700_comphy_set_phy_selector(priv, comphy);
 
-	dev_err(priv->dev, "SATA mode is not implemented\n");
+	/*
+	 * 0. Check the Polarity invert bits
+	 */
+	if (invert & COMPHY_POLARITY_TXD_INVERT)
+		data |= TXD_INVERT_BIT;
+	if (invert & COMPHY_POLARITY_RXD_INVERT)
+		data |= RXD_INVERT_BIT;
+
+	reg_offset = COMPHY_SYNC_PATTERN_REG + SATAPHY_LANE2_REG_BASE_OFFSET;
+	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
+				      reg_offset,
+				      data,
+				      TXD_INVERT_BIT | RXD_INVERT_BIT,
+				      mode);
+
+	/*
+	 * 1. Select 40-bit data width width
+	 */
+	reg_offset = COMPHY_LOOPBACK_REG0 + SATAPHY_LANE2_REG_BASE_OFFSET;
+	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
+				      reg_offset,
+				      (DATA_WIDTH_40BIT << SEL_DATA_WIDTH_OFFSET),
+				      SEL_DATA_WIDTH_MASK,
+				      mode);
+
+	/*
+	 * 2. Select reference clock(25M) and PHY mode (SATA)
+	 */
+	reg_offset = COMPHY_POWER_PLL_CTRL + SATAPHY_LANE2_REG_BASE_OFFSET;
+	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
+				      reg_offset,
+				      ((REF_CLOCK_SPEED_25M << REF_FREF_SEL_OFFSET) |
+				       (PHY_MODE_SATA << PHY_MODE_OFFSET)),
+				      REF_FREF_SEL_MASK | PHY_MODE_MASK,
+				      mode);
+
+	/*
+	 * 3. Use maximum PLL rate (no power save)
+	 */
+	reg_offset = COMPHY_KVCO_CAL_CTRL + SATAPHY_LANE2_REG_BASE_OFFSET;
+	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
+				      reg_offset,
+				      USE_MAX_PLL_RATE_BIT,
+				      USE_MAX_PLL_RATE_BIT,
+				      mode);
+
+	/*
+	 * 4. Reset reserved bit
+	 */
+	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
+				      COMPHY_RESERVED_REG,
+				      0,
+				      PHYCTRL_FRM_PIN_BIT,
+				      mode);
+
+	/*
+	 * 5. Set vendor-specific configuration (It is done in sata driver)
+	 */
+
+	/* Wait for > 55 us to allow PLL be enabled */
+	udelay(PLL_SET_DELAY_US);
+
+	/* Polling status */
+	writel(COMPHY_LOOPBACK_REG0 + SATAPHY_LANE2_REG_BASE_OFFSET,
+	       comphy_indir_regs + COMPHY_LANE2_INDIR_ADDR_OFFSET);
+	ret = polling_with_timeout(comphy_indir_regs + COMPHY_LANE2_INDIR_DATA_OFFSET,
+				   PLL_READY_TX_BIT,
+				   PLL_READY_TX_BIT,
+				   A3700_COMPHY_PLL_LOCK_TIMEOUT,
+				   REG_32BIT);
+
+	/* Unmap resource */
+	devm_iounmap(&pdev->dev, comphy_indir_regs);
+	devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
-	return -ENOTSUPP;
+	return ret;
 }
 
 static int mvebu_a3700_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
