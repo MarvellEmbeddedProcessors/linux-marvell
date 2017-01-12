@@ -129,15 +129,16 @@ static void reg_set(void __iomem *addr, u32 data, u32 mask)
 #define SATA_MBUS_REGRET_EN_OFFSET		7
 #define SATA_MBUS_REGRET_EN_MASK		(0x1 << SATA_MBUS_REGRET_EN_OFFSET)
 /**
- * ahci_mvebu_cp_110_power_up
+ * ahci_mvebu_pll_power_up
  *
  * @pdev:	A pointer to ahci platform device
  * @hpriv:	A pointer to achi host private structure
+ * @pd_polarity: 1 or 0 to power down the PLL
  *
  * This function configures corresponding comphy to SATA mode.
  * AHCI driver acquires an handle to the corresponding PHY from
  * the device-tree (In ahci_platform_get_resources).
- * cp110 require the following sequence:
+ * Mvebu SATA require the following sequence:
  *	1. Power down AHCI macs
  *	2. Configure the corresponding comphy (comphy driver).
  *	3. Power up AHCI macs
@@ -145,8 +146,9 @@ static void reg_set(void __iomem *addr, u32 data, u32 mask)
  *
  * Return: 0 on success; Error code otherwise.
  */
-static int ahci_mvebu_cp_110_power_up(struct platform_device *pdev,
-				      struct ahci_host_priv *hpriv)
+static int ahci_mvebu_pll_power_up(struct platform_device *pdev,
+				   struct ahci_host_priv *hpriv,
+				   u32 pd_polarity)
 {
 	u32 mask, data, i;
 	int err = 0;
@@ -157,19 +159,29 @@ static int ahci_mvebu_cp_110_power_up(struct platform_device *pdev,
 		SATA3_VENDOR_ADDR_MASK);
 	/* SATA port 0 power down */
 	mask = SATA3_CTRL_SATA0_PD_MASK;
-	data = 0x1 << SATA3_CTRL_SATA0_PD_OFFSET;
-	/* SATA port 1 power down */
-	mask |= SATA3_CTRL_SATA1_PD_MASK;
-	data |= 0x1 << SATA3_CTRL_SATA1_PD_OFFSET;
-	/* SATA SSU disable */
-	mask |= SATA3_CTRL_SATA1_ENABLE_MASK;
-	data |= 0x0 << SATA3_CTRL_SATA1_ENABLE_OFFSET;
-	/* SATA port 1 disable
-	 * There's no option to disable SATA port 0, so we power down both
-	 * ports (during previous steps) but disable onlt SATA port 1
+	/*
+	 * Marvell SoC have different power down polarity.
+	 * For Armada 3700, 0 means that power down the PLL, 1 means power up.
+	 * but for CP110, 1 means to power down the PLL while 0 for power up.
 	 */
-	mask |= SATA3_CTRL_SATA_SSU_MASK;
-	data |= 0x0 << SATA3_CTRL_SATA_SSU_OFFSET;
+	if (pd_polarity)
+		data = 0x1 << SATA3_CTRL_SATA0_PD_OFFSET;
+	else
+		data = 0x0 << SATA3_CTRL_SATA0_PD_OFFSET;
+	if (hpriv->nports > 1) {
+		/* SATA port 1 power down */
+		mask |= SATA3_CTRL_SATA1_PD_MASK;
+		data |= 0x1 << SATA3_CTRL_SATA1_PD_OFFSET;
+		/* SATA SSU disable */
+		mask |= SATA3_CTRL_SATA1_ENABLE_MASK;
+		data |= 0x0 << SATA3_CTRL_SATA1_ENABLE_OFFSET;
+		/* SATA port 1 disable
+		 * There's no option to disable SATA port 0, so we power down both
+		 * ports (during previous steps) but disable only SATA port 1
+		 */
+		mask |= SATA3_CTRL_SATA_SSU_MASK;
+		data |= 0x0 << SATA3_CTRL_SATA_SSU_OFFSET;
+	}
 	reg_set(hpriv->mmio + SATA3_VENDOR_DATA, data, mask);
 
 	/* Configure corresponding comphy
@@ -197,16 +209,26 @@ static int ahci_mvebu_cp_110_power_up(struct platform_device *pdev,
 		SATA3_VENDOR_ADDR_MASK);
 	/* SATA port 0 power up */
 	mask = SATA3_CTRL_SATA0_PD_MASK;
-	data = 0x0 << SATA3_CTRL_SATA0_PD_OFFSET;
-	/* SATA port 1 power up */
-	mask |= SATA3_CTRL_SATA1_PD_MASK;
-	data |= 0x0 << SATA3_CTRL_SATA1_PD_OFFSET;
-	/* SATA SSU enable */
-	mask |= SATA3_CTRL_SATA1_ENABLE_MASK;
-	data |= 0x1 << SATA3_CTRL_SATA1_ENABLE_OFFSET;
-	/* SATA port 1 enable */
-	mask |= SATA3_CTRL_SATA_SSU_MASK;
-	data |= 0x1 << SATA3_CTRL_SATA_SSU_OFFSET;
+	/*
+	 * Marvell SoC have different power down polarity.
+	 * For Armada 3700, 0 means that power down the PLL, 1 means power up.
+	 * but for CP110, 1 means to power down the PLL while 0 for power down.
+	 */
+	if (pd_polarity)
+		data = 0x0 << SATA3_CTRL_SATA0_PD_OFFSET;
+	else
+		data = 0x1 << SATA3_CTRL_SATA0_PD_OFFSET;
+	if (hpriv->nports > 1) {
+		/* SATA port 1 power up */
+		mask |= SATA3_CTRL_SATA1_PD_MASK;
+		data |= 0x0 << SATA3_CTRL_SATA1_PD_OFFSET;
+		/* SATA SSU enable */
+		mask |= SATA3_CTRL_SATA1_ENABLE_MASK;
+		data |= 0x1 << SATA3_CTRL_SATA1_ENABLE_OFFSET;
+		/* SATA port 1 enable */
+		mask |= SATA3_CTRL_SATA_SSU_MASK;
+		data |= 0x1 << SATA3_CTRL_SATA_SSU_OFFSET;
+	}
 	reg_set(hpriv->mmio + SATA3_VENDOR_DATA, data, mask);
 
 	/* MBUS request size and interface select register */
@@ -255,10 +277,18 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 		ahci_mvebu_regret_option(hpriv);
 	}
 
-	/* Call cp110 comphy initialization flow */
+	/* Call comphy initialization flow */
 	if (of_device_is_compatible(pdev->dev.of_node,
-	    "marvell,armada-cp110-ahci")) {
-		rc = ahci_mvebu_cp_110_power_up(pdev, hpriv);
+				    "marvell,armada-cp110-ahci")) {
+		rc = ahci_mvebu_pll_power_up(pdev, hpriv, 1);
+		if (rc)
+			return rc;
+	}
+
+	/* Call comphy initialization flow */
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-3700-ahci")) {
+		rc = ahci_mvebu_pll_power_up(pdev, hpriv, 0);
 		if (rc)
 			return rc;
 	}
