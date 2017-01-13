@@ -101,6 +101,16 @@ static void mvebu_comphy_reg_set_indirect(void __iomem *addr, u32 reg_offset, u1
 	reg_set(addr + COMPHY_LANE2_INDIR_DATA_OFFSET, data, mask);
 }
 
+/***************************************************************************************************
+  * mvebu_comphy_usb3_reg_set_direct
+  * It is only used USB3 direct access not on comphy lane2.
+  * return: void
+ ***************************************************************************************************/
+static void mvebu_comphy_usb3_reg_set_direct(void __iomem *addr, u32 reg_offset, u16 data, u16 mask, int mode)
+{
+	reg_set16((reg_offset * PHY_SHFT(USB3) + addr), data, mask);
+}
+
 static int mvebu_a3700_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 					    struct mvebu_comphy *comphy)
 {
@@ -222,13 +232,238 @@ static int mvebu_a3700_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 static int mvebu_a3700_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 					    struct mvebu_comphy *comphy)
 {
+	int ret = 0;
+	void __iomem *usb3_gbe1_phy_regs = NULL, *comphy_indir_regs = NULL;
+	void __iomem *reg_base = NULL;
+	struct resource *res = NULL, *res_indirect = NULL;
+	struct platform_device *pdev = container_of(priv->dev, struct platform_device, dev);
+	void (*usb3_reg_set)(void __iomem *addr, u32 reg_offset, u16 data, u16 mask, int mode);
+	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+	int invert = COMPHY_GET_POLARITY_INVERT(priv->lanes[comphy->index].mode);
+
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
-	dev_err(priv->dev, "USB mode is not implemented\n");
+	/* Set phy seclector */
+	mvebu_a3700_comphy_set_phy_selector(priv, comphy);
+
+	/* Set usb3 reg access func, Lane2 is indirect access */
+	if (comphy->index == COMPHY_LANE2) {
+		usb3_reg_set = &mvebu_comphy_reg_set_indirect;
+		/* Get the indirect access register resource and map */
+		res_indirect = platform_get_resource_byname(pdev, IORESOURCE_MEM, "indirect");
+		if (res_indirect) {
+			comphy_indir_regs = devm_ioremap_resource(&pdev->dev, res_indirect);
+			if (IS_ERR(comphy_indir_regs))
+				return PTR_ERR(comphy_indir_regs);
+		} else {
+			dev_err(priv->dev, "no inirect register resource\n");
+			return -ENOTSUPP;
+		}
+		reg_base = comphy_indir_regs;
+	} else {
+		/* Get the direct access register resource and map */
+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "usb3_gbe1_phy");
+		if (res) {
+			usb3_gbe1_phy_regs = devm_ioremap_resource(&pdev->dev, res);
+			if (IS_ERR(usb3_gbe1_phy_regs))
+				return PTR_ERR(usb3_gbe1_phy_regs);
+		} else {
+			dev_err(priv->dev, "no usb3_gbe1_phy register resource\n");
+			return -ENOTSUPP;
+		}
+		usb3_reg_set = &mvebu_comphy_usb3_reg_set_direct;
+		reg_base = usb3_gbe1_phy_regs;
+	}
+
+	/*
+	 * 0. Set PHY OTG Control(0x5d034), bit 4, Power up OTG module
+	 *    The register belong to UTMI module, so it is set
+	 *    in UTMI phy driver.
+	 */
+
+	/*
+	 * 1. Set PRD_TXDEEMPH (3.5db de-emph)
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_LANE_CFG0_ADDR,
+		     PRD_TXDEEMPH_MASK,
+		     (PRD_TXDEEMPH_MASK | PRD_TXMARGIN_MASK |
+		      PRD_TXSWING_MASK | CFG_TX_ALIGN_POS_MASK),
+		     mode);
+
+	/*
+	 * 2. Unset BIT0: set Tx Electrical Idle Mode
+	 *    unset BIT4: set G2 Tx Datapath with no Delayed Latency
+	 *    unset BIT6: set Tx Detect Rx Mode at LoZ mode
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_LANE_CFG1_ADDR,
+		     0x0,
+		     REG_16_BIT_MASK,
+		     mode);
+
+	/*
+	 * 3. Set Spread Spectrum Clock Enabled
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_LANE_CFG4_ADDR,
+		     SPREAD_SPECTRUM_CLK_EN,
+		     SPREAD_SPECTRUM_CLK_EN,
+		     mode);
+
+	/*
+	 * 4. Set Override Margining Controls From the MAC:
+	 *    Use margining signals from lane configuration
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_TEST_MODE_CTRL_ADDR,
+		     MODE_MARGIN_OVERRIDE,
+		     REG_16_BIT_MASK,
+		     mode);
+
+	/*
+	 * 5. Set Lane-to-Lane Bundle Clock Sampling Period = per PCLK cycles
+	 *    set Mode Clock Source = PCLK is generated from REFCLK
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_GLOB_CLK_SRC_LO_ADDR,
+		     0x0,
+		     (MODE_CLK_SRC | BUNDLE_PERIOD_SEL | BUNDLE_PERIOD_SCALE |
+		      BUNDLE_SAMPLE_CTRL | PLL_READY_DLY),
+		     mode);
+
+	/*
+	 * 6. Set G2 Spread Spectrum Clock Amplitude at 4K
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_GEN2_SETTINGS_2,
+		     G2_TX_SSC_AMP_VALUE_20,
+		     G2_TX_SSC_AMP_MASK,
+		     mode);
+
+	/*
+	 * 7. Unset G3 Spread Spectrum Clock Amplitude
+	 *    set G3 TX and RX Register Master Current Select
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_GEN2_SETTINGS_3,
+		     G3_VREG_RXTX_MAS_ISET_60U,
+		     G3_TX_SSC_AMP_MASK | G3_VREG_RXTX_MAS_ISET_MASK | RSVD_PH03FH_6_0_MASK,
+		     mode);
+
+	/*
+	 * 8. Check crystal jumper setting and program the Power and PLL Control accordingly
+	 *    Change RX wait
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_POWER_PLL_CTRL,
+		     (PU_IVREF_BIT | PU_PLL_BIT | PU_RX_BIT |
+		      PU_TX_BIT | PU_TX_INTP_BIT | PU_DFE_BIT |
+		      PHY_MODE_USB3 | USB3_REF_CLOCK_SPEED_25M),
+		     (PU_IVREF_BIT | PU_PLL_BIT | PU_RX_BIT |
+		      PU_TX_BIT | PU_TX_INTP_BIT | PU_DFE_BIT |
+		      PLL_LOCK_BIT | PHY_MODE_MASK | REF_FREF_SEL_MASK),
+		     mode);
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_PWR_MGM_TIM1_ADDR,
+		     CFG_PM_RXDEN_WAIT_1_UNIT | CFG_PM_RXDLOZ_WAIT_7_UNIT,
+		     CFG_PM_OSCCLK_WAIT_MASK | CFG_PM_RXDEN_WAIT_MASK | CFG_PM_RXDLOZ_WAIT_MASK,
+		     mode);
+
+	/*
+	 * 9. Enable idle sync
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_UNIT_CTRL_ADDR,
+		     UNIT_CTRL_DEFAULT_VALUE | IDLE_SYNC_EN,
+		     REG_16_BIT_MASK,
+		     mode);
+
+	/*
+	 * 10. Enable the output of 500M clock
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_MISC_REG0_ADDR,
+		     MISC_REG0_DEFAULT_VALUE | CLK500M_EN,
+		     REG_16_BIT_MASK,
+		     mode);
+
+	/*
+	 * 11. Set 20-bit data width
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_LOOPBACK_REG0,
+		     DATA_WIDTH_20BIT,
+		     REG_16_BIT_MASK,
+		     mode);
+
+	/*
+	 * 12. Override Speed_PLL value and use MAC PLL
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_KVCO_CAL_CTRL,
+		     SPEED_PLL_VALUE_16 | USE_MAX_PLL_RATE_BIT,
+		     REG_16_BIT_MASK,
+		     mode);
+
+	/*
+	 * 13. Check the Polarity invert bit
+	 */
+	if (invert & COMPHY_POLARITY_TXD_INVERT)
+		usb3_reg_set(reg_base,
+			     COMPHY_SYNC_PATTERN_REG,
+			     TXD_INVERT_BIT,
+			     TXD_INVERT_BIT,
+			     mode);
+	if (invert & COMPHY_POLARITY_RXD_INVERT)
+		usb3_reg_set(reg_base,
+			     COMPHY_SYNC_PATTERN_REG,
+			     RXD_INVERT_BIT,
+			     RXD_INVERT_BIT,
+			     mode);
+
+	/*
+	 * 14. Release SW reset
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_GLOB_PHY_CTRL0_ADDR,
+		     MODE_CORE_CLK_FREQ_SEL | MODE_PIPE_WIDTH_32 | MODE_REFDIV_BY_4,
+		     REG_16_BIT_MASK,
+		     mode);
+
+	/* Wait for > 55 us to allow PCLK be enabled */
+	udelay(PLL_SET_DELAY_US);
+
+	if (comphy->index == COMPHY_LANE2) {
+		writel(COMPHY_LOOPBACK_REG0 + USB3PHY_LANE2_REG_BASE_OFFSET,
+		       comphy_indir_regs + COMPHY_LANE2_INDIR_ADDR_OFFSET);
+		ret = polling_with_timeout(comphy_indir_regs + COMPHY_LANE2_INDIR_DATA_OFFSET,
+					   TXDCLK_PCLK_EN,
+					   TXDCLK_PCLK_EN,
+					   A3700_COMPHY_PLL_LOCK_TIMEOUT,
+					   REG_32BIT);
+	} else {
+		ret = polling_with_timeout(LANE_STATUS1_ADDR(USB3) + usb3_gbe1_phy_regs,
+					   TXDCLK_PCLK_EN,
+					   TXDCLK_PCLK_EN,
+					   A3700_COMPHY_PLL_LOCK_TIMEOUT,
+					   REG_16BIT);
+	}
+	if (ret)
+		dev_err(priv->dev, "Failed to lock USB3 PLL\n");
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
-	return -ENOTSUPP;
+	/* Unmap resource */
+	if (comphy->index == COMPHY_LANE2) {
+		devm_iounmap(&pdev->dev, comphy_indir_regs);
+		devm_release_mem_region(&pdev->dev, res->start, resource_size(res_indirect));
+	} else {
+		devm_iounmap(&pdev->dev, usb3_gbe1_phy_regs);
+		devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
+	}
+
+	return ret;
 }
 
 static int mvebu_a3700_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
