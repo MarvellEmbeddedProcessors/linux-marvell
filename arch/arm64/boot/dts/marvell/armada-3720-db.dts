@@ -140,6 +140,8 @@
 
 			u3d@50000 {
 				status = "disabled";
+				phys = <&a3700_comphy 1 COMPHY_USB3>;
+				phy-names = "usb";
 			};
 
 			udc@54100 {
