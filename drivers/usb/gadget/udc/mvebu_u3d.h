@@ -350,6 +350,7 @@ struct mvc2 {
 	struct device   *dev;
 	struct clk  *clk;
 	struct usb_phy *phy;
+	struct phy *comphy;
 	int irq;
 	void    __iomem *base;
 	void    __iomem *win_base;

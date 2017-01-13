@@ -42,6 +42,7 @@
 #include <linux/highmem.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
+#include <linux/phy/phy.h>
 
 #include "mvebu_u3d.h"
 
@@ -2398,6 +2399,20 @@ static int mvc2_probe(struct platform_device *pdev)
 		cp->reg->global_control = 0x24;
 	}
 
+	/* Get comphy and init if there is */
+	cp->comphy = devm_of_phy_get(&pdev->dev, pdev->dev.of_node, "usb");
+	if (!IS_ERR(cp->comphy)) {
+		ret = phy_init(cp->comphy);
+		if (ret)
+			goto disable_phy;
+
+		ret = phy_power_on(cp->comphy);
+		if (ret) {
+			phy_exit(cp->comphy);
+			goto disable_phy;
+		}
+	}
+
 	spin_lock_init(&cp->lock);
 
 	/* init irq status */
@@ -2427,6 +2442,11 @@ err_alloc_eps:
 err_qwork:
 	if (cp->qwork)
 		destroy_workqueue(cp->qwork);
+disable_phy:
+	if (cp->comphy) {
+		phy_power_off(cp->comphy);
+		phy_exit(cp->comphy);
+	}
 err_base:
 	iounmap(base);
 err_phybase:
@@ -2462,6 +2482,12 @@ static int mvc2_remove(struct platform_device *dev)
 	if (cp->qwork) {
 		flush_workqueue(cp->qwork);
 		destroy_workqueue(cp->qwork);
+	}
+
+	/* PHY exit if there is */
+	if (cp->comphy) {
+		phy_power_off(cp->comphy);
+		phy_exit(cp->comphy);
 	}
 
 	return 0;
