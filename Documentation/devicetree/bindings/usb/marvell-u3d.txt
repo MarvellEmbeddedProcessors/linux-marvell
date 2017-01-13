@@ -13,6 +13,8 @@ Optional properties :
 - vbus-gpio	: VBUS interrupt GPIO pin
 		  set to trigger VBUS event notification to PHY/controller
 		  whether VBUS was powered or not
+- phys		: the COMPHY associated to this controller
+- phy-names:	: the name of COMPHY indicated by above property of phys
 
 Example:
 	u3d@520000 {
@@ -22,6 +24,8 @@ Example:
 		clocks = <&gateclk 24>, <&gateclk 16>;
 		dma-coherent;
 		vbus-gpio = <&gpio1 19 GPIO_ACTIVE_HIGH>;
+		phys = <&a3700_comphy 1 COMPHY_USB3>;
+		phy-names = "usb";
 		status = "disabled";
 	};
 
