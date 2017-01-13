@@ -930,7 +930,8 @@ static int a3700_spi_transfer_finish_non_legacy(struct spi_device *spi,
 	/*
 	 * Stop a write transfer in fifo mode:
 	 *	- wait all the bytes in wfifo to be shifted out
-	 *	 - set XFER_STOP bit
+	 *	- wait spi ready for spi interface to be in idle
+	 *	- set XFER_STOP bit
 	 *	- wait XFER_START bit clear
 	 *	- clear XFER_STOP bit
 	 * Stop a read transfer in fifo mode:
@@ -949,16 +950,11 @@ static int a3700_spi_transfer_finish_non_legacy(struct spi_device *spi,
 				dev_err(&spi->dev, "wait write fifo empty timed out\n");
 				return -ETIMEDOUT;
 			}
-		} else {
-			/*
-			 * If the instruction in SPI_INSTR does not require data to be
-			 * written to the SPI device, wait until SPI_RDY is 1 for the
-			 * SPI interface to be in idle.
-			 */
-			if (!a3700_spi_transfer_wait(spi, A3700_SPI_XFER_RDY)) {
-				dev_err(&spi->dev, "wait transfer ready timed out\n");
-				return -ETIMEDOUT;
-			}
+		}
+
+		if (!a3700_spi_transfer_wait(spi, A3700_SPI_XFER_RDY)) {
+			dev_err(&spi->dev, "wait transfer ready timed out\n");
+			return -ETIMEDOUT;
 		}
 
 		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
