@@ -15,6 +15,7 @@ Example:
 	serial@12200 {
 		compatible = "marvell,armada-3700-uart-ext";
 		reg = <0x12200 0x30>,
+		      <0x8a00 0x30>;
 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
 		             <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "irq_rx", "irq_tx";

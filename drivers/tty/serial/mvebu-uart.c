@@ -118,6 +118,25 @@ struct uart_regs_layout {
 #define EXT_CTRL2_TX_RDY_INT_1B	BIT(6)
 #define EXT_CTRL2_RX_RDY_INT_1B	BIT(5)
 
+/* REG_NORTH_BRIDGE_FOR_UART_A3700_EXT */
+/* UART Interrupt Registers are not part of UART Register space.
+ * It is in the common North Bridge Interrupt register space.
+ *
+ * UART Interrupt Select register:
+ * The Uart interrupt could be either level triggered or pulse trigger.
+ * By default, the interrupt mode is level triggered - '0'.
+ * In order to enable the pulse interrupt select register, the UART
+ * Interrupt Select register MUST be setted to '1'.
+ */
+#define NORTH_BRIDGE_UART_EXT_INT_SEL	0x1c
+#define UART_EXT_TX_INT_SEL		BIT(27)
+#define UART_EXT_RX_INT_SEL		BIT(26)
+
+/* UART Interrupt State register*/
+#define NORTH_BRIDGE_UART_EXT_INT_STAT	0x10
+#define UART_EXT_STAT_TX_INT		BIT(27)
+#define UART_EXT_STAT_RX_INT		BIT(26)
+
 /* UART register layout definitions */
 static struct uart_regs_layout uart_regs_layout[] = {
 	[REG_UART_A3700] = {
@@ -167,6 +186,13 @@ struct mvebu_uart_data {
 		int irq_sum;
 		int irq_rx;
 		int irq_tx;
+		/* Uart_int_base is the North Bridge Interrupt Register base.
+		 * It is necessary to fetch the Interrupt Status register and Interrupt
+		 * Select register.
+		 * It is used for setting Uart TX and RX interrupt trigger mode
+		 * and clearing the TX/RX interrupt in the ISR.
+		 */
+		unsigned char __iomem *uart_int_base;
 	} intr;
 };
 
@@ -437,6 +463,11 @@ static irqreturn_t mvebu_uart_rx_isr(int irq, void *dev_id)
 	if (st & (stat_bit_rx_rdy | STAT_OVR_ERR | STAT_FRM_ERR | STAT_BRK_DET))
 		mvebu_uart_rx_chars(port, st);
 
+	if (!IS_ERR_OR_NULL(uart_data->intr.uart_int_base)) {
+		st = readl(uart_data->intr.uart_int_base + NORTH_BRIDGE_UART_EXT_INT_STAT);
+		/* Clear the RX Interrupt State Register*/
+		writel(st | UART_EXT_STAT_RX_INT, uart_data->intr.uart_int_base + NORTH_BRIDGE_UART_EXT_INT_STAT);
+	}
 	return IRQ_HANDLED;
 }
 
@@ -450,6 +481,11 @@ static irqreturn_t mvebu_uart_tx_isr(int irq, void *dev_id)
 	if (st & stat_bit_tx_rdy)
 		mvebu_uart_tx_chars(port, st);
 
+	if (!IS_ERR_OR_NULL(uart_data->intr.uart_int_base)) {
+		st = readl(uart_data->intr.uart_int_base + NORTH_BRIDGE_UART_EXT_INT_STAT);
+		/* Clear the TX Interrupt State Register*/
+		writel(st | UART_EXT_STAT_TX_INT, uart_data->intr.uart_int_base + NORTH_BRIDGE_UART_EXT_INT_STAT);
+	}
 	return IRQ_HANDLED;
 }
 
@@ -773,6 +809,7 @@ static const struct of_device_id mvebu_uart_of_match[];
 static int mvebu_uart_probe(struct platform_device *pdev)
 {
 	struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	struct resource *uart_int_base = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 
 	int irq_sum = platform_get_irq_byname(pdev, "irq_sum");
 	int irq_rx = platform_get_irq_byname(pdev, "irq_rx");
@@ -781,6 +818,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 	struct uart_port *port;
 	struct mvebu_uart_data *data;
 	int ret;
+	u32 value;
 
 	if (!reg) {
 		dev_err(&pdev->dev, "no registers defined\n");
@@ -863,6 +901,17 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 
 	port->private_data = data;
 	platform_set_drvdata(pdev, data);
+
+	/* UART interrupt status selected */
+	/* Select UART_EXT RX and TX as the interrupt status mode*/
+	if (uart_int_base) {
+		data->intr.uart_int_base = devm_ioremap_resource(&pdev->dev, uart_int_base);
+		if (IS_ERR(data->intr.uart_int_base))
+			return -PTR_ERR(data->intr.uart_int_base);
+		value = readl(data->intr.uart_int_base);
+		writel(value | UART_EXT_TX_INT_SEL | UART_EXT_RX_INT_SEL, data->intr.uart_int_base +
+			   NORTH_BRIDGE_UART_EXT_INT_SEL);
+	}
 
 	/* UART Soft Reset*/
 	writel(CTRL_SOFT_RST, port->membase + REG_CTRL(data));
