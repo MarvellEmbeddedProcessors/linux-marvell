@@ -72,7 +72,6 @@
 				no-1-8-v;
 				non-removable;
 				marvell,xenon-emmc;
-				marvell,pad-type = "fixed-1-8v";
 				status = "okay";
 			};
 			vccq_mmc_reg: regulator@0 {
@@ -103,7 +102,6 @@
 				bus-width = <4>;
 				no-1-8-v;
 				broken-cd;
-				marvell,pad-type = "sd";
 				pinctrl-names = "default";
 				pinctrl-0 = <&cpm_sdhci_pins>;
 				status = "okay";
