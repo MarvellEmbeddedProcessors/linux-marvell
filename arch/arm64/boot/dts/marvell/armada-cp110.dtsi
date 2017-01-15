@@ -304,6 +304,7 @@ sdhci@780000 {
 	clock-names = "core";
 	clocks = <&cpm_syscon0 1 4>;
 	dma-coherent;
+	marvell,xenon-phy-tun-step-divider = <25>;
 	status = "disabled";
 };
 
