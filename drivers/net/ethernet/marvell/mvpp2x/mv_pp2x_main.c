@@ -4670,6 +4670,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		goto err_free_port_pcpu;
 	}
 
+	/* Clear MIB counters statistic */
+	mv_gop110_mib_counters_clear(&port->priv->hw.gop, port->mac_data.gop_index);
+
 	mv_pp2x_port_irq_names_update(port);
 
 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);

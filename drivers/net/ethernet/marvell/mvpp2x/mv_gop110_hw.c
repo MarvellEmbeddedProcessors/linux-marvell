@@ -2559,6 +2559,32 @@ void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop
 							MV_MIB_LATE_COLLISION);
 }
 
+void mv_gop110_mib_counters_clear(struct gop_hw *gop, int port)
+{
+	mv_gop110_mib_read64(gop, port, MV_MIB_GOOD_OCTETS_RECEIVED_LOW);
+	mv_gop110_mib_read64(gop, port, MV_MIB_UNICAST_FRAMES_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_BROADCAST_FRAMES_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_MULTICAST_FRAMES_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_GOOD_OCTETS_SENT_LOW);
+	mv_gop110_mib_read64(gop, port, MV_MIB_UNICAST_FRAMES_SENT);
+	mv_gop110_mib_read64(gop, port, MV_MIB_MULTICAST_FRAMES_SENT);
+	mv_gop110_mib_read64(gop, port, MV_MIB_BROADCAST_FRAMES_SENT);
+	mv_gop110_mib_read64(gop, port, MV_MIB_CRC_ERRORS_SENT);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FC_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FC_SENT);
+	mv_gop110_mib_read64(gop, port, MV_MIB_RX_FIFO_OVERRUN);
+	mv_gop110_mib_read64(gop, port, MV_MIB_UNDERSIZE_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FRAGMENTS_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_OVERSIZE_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_JABBER_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_MAC_RECEIVE_ERROR);
+	mv_gop110_mib_read64(gop, port, MV_MIB_BAD_CRC_EVENT);
+	mv_gop110_mib_read64(gop, port, MV_MIB_COLLISION);
+
+	/* This counter must be read last. Read it clear all read counters. */
+	mv_gop110_mib_read64(gop, port, MV_MIB_LATE_COLLISION);
+}
+
 void mv_gop110_netc_active_port(struct gop_hw *gop, u32 port, u32 val)
 {
 	u32 reg;
