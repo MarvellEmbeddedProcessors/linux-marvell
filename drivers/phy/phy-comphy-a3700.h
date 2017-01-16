@@ -186,5 +186,33 @@ enum {
 #define CFG_PM_RXDLOZ_WAIT_7_UNIT			(7 << CFG_PM_RXDLOZ_WAIT_OFF)
 #define CFG_PM_RXDLOZ_WAIT_12_UNIT			(0xC << CFG_PM_RXDLOZ_WAIT_OFF)
 
+/* SGMII */
+#define COMPHY_PHY_CFG1_OFFSET(lane)		((lane) * 0x28)
+#define PIN_PU_IVEREF_BIT					BIT(1)
+#define PIN_RESET_CORE_BIT					BIT(11)
+#define PIN_RESET_COMPHY_BIT				BIT(12)
+#define PIN_PU_PLL_BIT						BIT(16)
+#define PIN_PU_RX_BIT						BIT(17)
+#define PIN_PU_TX_BIT						BIT(18)
+#define PIN_TX_IDLE_BIT						BIT(19)
+#define GEN_RX_SEL_OFFSET					22
+#define GEN_RX_SEL_MASK						(0xF << GEN_RX_SEL_OFFSET)
+#define GEN_TX_SEL_OFFSET					26
+#define GEN_TX_SEL_MASK						(0xF << GEN_TX_SEL_OFFSET)
+#define PHY_RX_INIT_BIT						BIT(30)
+#define SD_SPEED_1_25_G						0x6
+#define SD_SPEED_2_5_G						0x8
+
+/* COMPHY status reg:
+ * lane0: PCIe/GbE0 PHY Status 1
+ * lane1: USB3/GbE1 PHY Status 1
+ */
+#define COMPHY_PHY_STATUS_OFFSET(lane)		(0x18 + (lane) * 0x28)
+#define PHY_RX_INIT_DONE_BIT				BIT(0)
+#define PHY_PLL_READY_RX_BIT				BIT(2)
+#define PHY_PLL_READY_TX_BIT				BIT(3)
+
+#define SGMIIPHY_ADDR(lane, off, base)		(((off & 0x00007FF) * 2) + base)
+
 #endif /* _COMPHY_A3700_H */
 
