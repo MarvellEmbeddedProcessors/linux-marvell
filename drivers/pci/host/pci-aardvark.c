@@ -21,6 +21,7 @@
 #include <linux/of_address.h>
 #include <linux/of_pci.h>
 #include <linux/phy/phy.h>
+#include <linux/of_gpio.h>
 
 /* PCIe core registers */
 #define PCIE_CORE_CMD_STATUS_REG				0x4
@@ -202,6 +203,8 @@ struct advk_pcie {
 	struct mutex msi_used_lock;
 	u16 msi_msg;
 	int root_bus_nr;
+	char *reset_name;
+	struct gpio_desc *reset_gpio;
 };
 
 static inline void advk_writel(struct advk_pcie *pcie, u32 val, u64 reg)
@@ -921,6 +924,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	struct phy *comphy;
 	struct device_node *dn = pdev->dev.of_node;
 	int ret, irq;
+	enum of_gpio_flags flags;
+	int reset_gpio;
 
 	pcie = devm_kzalloc(&pdev->dev, sizeof(struct advk_pcie),
 			    GFP_KERNEL);
@@ -969,12 +974,61 @@ static int advk_pcie_probe(struct platform_device *pdev)
 		return PTR_ERR(clk);
 	}
 
+	/* Config reset gpio for pcie */
+	reset_gpio = of_get_named_gpio_flags(dn, "reset-gpios", 0, &flags);
+	if (reset_gpio != -EPROBE_DEFER) {
+		pcie->reset_gpio = gpio_to_desc(reset_gpio);
+		if (gpio_is_valid(reset_gpio)) {
+			unsigned long gpio_flags;
+
+			/* WA: to avoid reset fail, set the reset gpio to low first */
+			gpiod_direction_output(pcie->reset_gpio, 0);
+
+			/* Enable pcie clock and after 200ms to reset pcie */
+			ret = clk_prepare_enable(clk);
+			if (ret) {
+				dev_err(&pdev->dev, "Failed to enable clock\n");
+				return ret;
+			}
+			mdelay(200);
+
+			/* Set GPIO for pcie reset */
+			pcie->reset_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s-reset",
+							  pdev->name);
+			if (!pcie->reset_name) {
+				ret = -ENOMEM;
+				dev_err(&pdev->dev, "devm_kasprintf failed\n");
+				return ret;
+			}
+
+			if (flags & OF_GPIO_ACTIVE_LOW) {
+				dev_info(&pdev->dev, "%s: reset gpio is active low\n",
+					 of_node_full_name(dn));
+				gpio_flags = GPIOF_ACTIVE_LOW |
+					     GPIOF_OUT_INIT_LOW;
+			} else {
+				gpio_flags = GPIOF_OUT_INIT_HIGH;
+			}
+
+			ret = devm_gpio_request_one(&pdev->dev, reset_gpio, gpio_flags,
+						    pcie->reset_name);
+			if (ret) {
+				dev_err(&pdev->dev,
+					"gpio_request for gpio failed, err = %d\n",
+					ret);
+				return ret;
+			}
+			/* continue init flow after pcie reset */
+			goto after_pcie_reset;
+		}
+	}
+
 	ret = clk_prepare_enable(clk);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to enable clock\n");
 		return ret;
 	}
-
+after_pcie_reset:
 	ret = advk_pcie_parse_request_of_pci_ranges(pcie);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to parse resources\n");
