@@ -149,7 +149,7 @@ static int mvebu_a3700_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 	reg_offset = COMPHY_LOOPBACK_REG0 + SATAPHY_LANE2_REG_BASE_OFFSET;
 	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
 				      reg_offset,
-				      (DATA_WIDTH_40BIT << SEL_DATA_WIDTH_OFFSET),
+				      DATA_WIDTH_40BIT,
 				      SEL_DATA_WIDTH_MASK,
 				      mode);
 
@@ -159,8 +159,7 @@ static int mvebu_a3700_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 	reg_offset = COMPHY_POWER_PLL_CTRL + SATAPHY_LANE2_REG_BASE_OFFSET;
 	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
 				      reg_offset,
-				      ((REF_CLOCK_SPEED_25M << REF_FREF_SEL_OFFSET) |
-				       (PHY_MODE_SATA << PHY_MODE_OFFSET)),
+				      REF_CLOCK_SPEED_25M | PHY_MODE_SATA,
 				      REF_FREF_SEL_MASK | PHY_MODE_MASK,
 				      mode);
 
@@ -235,13 +234,96 @@ static int mvebu_a3700_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 static int mvebu_a3700_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 					    struct mvebu_comphy *comphy)
 {
+	int ret;
+	int invert = COMPHY_GET_POLARITY_INVERT(priv->lanes[comphy->index].mode);
+
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
-	dev_err(priv->dev, "PCIE mode is not implemented\n");
+	/*
+	 * 1. Enable max PLL.
+	 */
+	reg_set16(LANE_CFG1_ADDR(PCIE) + priv->comphy_pipe_regs, USE_MAX_PLL_RATE_EN, 0x0);
+
+	/*
+	 * 2. Select 20 bit SERDES interface.
+	 */
+	reg_set16(GLOB_CLK_SRC_LO_ADDR(PCIE) + priv->comphy_pipe_regs, CFG_SEL_20B, 0);
+
+	/*
+	 * 3. Force to use reg setting for PCIe mode
+	 */
+	reg_set16(MISC_REG1_ADDR(PCIE) + priv->comphy_pipe_regs, SEL_BITS_PCIE_FORCE, 0);
+
+	/*
+	 * 4. Change RX wait
+	 */
+	reg_set16(PWR_MGM_TIM1_ADDR(PCIE) + priv->comphy_pipe_regs,
+		  CFG_PM_RXDEN_WAIT_1_UNIT | CFG_PM_RXDLOZ_WAIT_12_UNIT,
+		  CFG_PM_OSCCLK_WAIT_MASK | CFG_PM_RXDEN_WAIT_MASK | CFG_PM_RXDLOZ_WAIT_MASK);
+
+	/*
+	 * 5. Enable idle sync
+	 */
+	reg_set16(UNIT_CTRL_ADDR(PCIE) + priv->comphy_pipe_regs,
+		  UNIT_CTRL_DEFAULT_VALUE | IDLE_SYNC_EN, REG_16_BIT_MASK);
+
+	/*
+	 * 6. Enable the output of 100M/125M/500M clock
+	 */
+	reg_set16(MISC_REG0_ADDR(PCIE) + priv->comphy_pipe_regs,
+		  MISC_REG0_DEFAULT_VALUE | CLK500M_EN | CLK100M_125M_EN,
+		  REG_16_BIT_MASK);
+
+	/*
+	 * 7. Enable TX, PCIE global register, 0xd0074814, it is done in  PCI-E driver
+	 */
+
+	/*
+	 * 8. Check crystal jumper setting and program the Power and PLL Control accordingly
+	 */
+	reg_set16(PWR_PLL_CTRL_ADDR(PCIE) + priv->comphy_pipe_regs,
+		  (PU_IVREF_BIT | PU_PLL_BIT | PU_RX_BIT | PU_TX_BIT |
+		   PU_TX_INTP_BIT | PU_DFE_BIT | PCIE_REF_CLOCK_SPEED_25M | PHY_MODE_PCIE),
+		   REG_16_BIT_MASK);
+
+	/*
+	 * 9. Override Speed_PLL value and use MAC PLL
+	 */
+	reg_set16(KVCO_CAL_CTRL_ADDR(PCIE) + priv->comphy_pipe_regs,
+		  SPEED_PLL_VALUE_16 | USE_MAX_PLL_RATE_BIT, REG_16_BIT_MASK);
+
+	/*
+	 * 10. Check the Polarity invert bit
+	 */
+	if (invert & COMPHY_POLARITY_TXD_INVERT)
+		reg_set16(SYNC_PATTERN_REG_ADDR(PCIE) + priv->comphy_pipe_regs,
+			  TXD_INVERT_BIT, 0x0);
+
+	if (invert & COMPHY_POLARITY_RXD_INVERT)
+		reg_set16(SYNC_PATTERN_REG_ADDR(PCIE) + priv->comphy_pipe_regs,
+			  RXD_INVERT_BIT, 0x0);
+
+	/*
+	 * 11. Release SW reset
+	 */
+	reg_set16(GLOB_PHY_CTRL0_ADDR(PCIE) + priv->comphy_pipe_regs,
+		  MODE_CORE_CLK_FREQ_SEL | MODE_PIPE_WIDTH_32,
+		  SOFT_RESET | MODE_REFDIV);
+
+	/* Wait for > 55 us to allow PCLK be enabled */
+	udelay(PLL_SET_DELAY_US);
+
+	ret = polling_with_timeout(LANE_STATUS1_ADDR(PCIE) + priv->comphy_pipe_regs,
+				   TXDCLK_PCLK_EN,
+				   TXDCLK_PCLK_EN,
+				   A3700_COMPHY_PLL_LOCK_TIMEOUT,
+				   REG_16BIT);
+	if (ret)
+		dev_err(priv->dev, "Failed to lock PCIE PLL\n");
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
-	return -ENOTSUPP;
+	return ret;
 }
 
 static int mvebu_a3700_comphy_power_on(struct phy *phy)
