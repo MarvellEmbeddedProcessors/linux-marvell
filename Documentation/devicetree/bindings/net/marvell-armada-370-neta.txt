@@ -17,7 +17,7 @@ Optional properties:
   Value is presented in bytes. If not used, by default 1600B is set for
   "marvell,armada-370-neta" and 9800B for others.
 
-Optional properties (valid only for Armada XP/38x):
+Optional properties (valid only for Armada XP/38x/3700):
 
 - buffer-manager: a phandle to a buffer manager node. Please refer to
   Documentation/devicetree/bindings/net/marvell-neta-bm.txt
@@ -28,6 +28,10 @@ Optional properties (valid only for Armada XP/38x):
 - bm,pool-short: ID of a pool, that will be used for accepting
   packets of a size lower than given threshold. If not set, the port
   will use a single 'long' pool for all packets, as defined above.
+- phys: the serdes PHY associated to this device. Currently the property
+  is only used by armada-3700 for SGMII interface.
+  Format: <comphy_parent lane_number lane_type>.
+- phy-names: the name of dedicated serdes indicated by above property of phys.
 
 Example:
 
@@ -43,4 +47,21 @@ ethernet@70000 {
 	buffer-manager = <&bm>;
 	bm,pool-long = <0>;
 	bm,pool-short = <1>;
+};
+
+Example with serdes PHY:
+	eth1: ethernet@40000 {
+	compatible = "marvell,armada3700-neta";
+	reg = <0x40000 0x4000>;
+	interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+	mac-address = [00 50 43 01 02 03];
+	clocks = <&sgateclk 4>;
+	status = "okay";
+	phy-mode = "sgmii";
+	phy = <&phy1>;
+	buffer-manager = <&bm>;
+	bm,pool-long = <0>;
+	bm,pool-short = <1>;
+	phys = <&a3700_comphy 1 COMPHY_SGMII1>;
+	phy-names = "comphy";
 };
