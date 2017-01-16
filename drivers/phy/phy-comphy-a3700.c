@@ -220,13 +220,204 @@ static int mvebu_a3700_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 static int mvebu_a3700_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 					     struct mvebu_comphy *comphy)
 {
+	int ret = 0;
+	u32 mask, data;
+	struct resource *res = NULL;
+	void __iomem *sd_ip_addr;
+	struct platform_device *pdev = container_of(priv->dev, struct platform_device, dev);
+	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+	int invert = COMPHY_GET_POLARITY_INVERT(priv->lanes[comphy->index].mode);
+
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
-	dev_err(priv->dev, "SGMII mode is not implemented\n");
+	/* Set selector */
+	mvebu_a3700_comphy_set_phy_selector(priv, comphy);
+
+	/* Serdes IP Base address
+	 * COMPHY Lane0 -- PCIe/GBE0
+	 * COMPHY Lane1 -- USB3/GBE1
+	 */
+	if (comphy->index == COMPHY_LANE1) {
+		/* Get usb3 and gbe register resource and map */
+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "usb3_gbe1_phy");
+		if (res) {
+			sd_ip_addr = devm_ioremap_resource(&pdev->dev, res);
+			if (IS_ERR(sd_ip_addr))
+				return PTR_ERR(sd_ip_addr);
+		} else {
+			dev_err(priv->dev, "no usb3_gbe1_phy register resource\n");
+			return -ENOTSUPP;
+		}
+	} else {
+		sd_ip_addr = priv->comphy_pipe_regs;
+	}
+
+	/*
+	 * 1. Reset PHY by setting PHY input port PIN_RESET=1.
+	 * 2. Set PHY input port PIN_TX_IDLE=1, PIN_PU_IVREF=1 to keep
+	 *    PHY TXP/TXN output to idle state during PHY initialization
+	 * 3. Set PHY input port PIN_PU_PLL=0, PIN_PU_RX=0, PIN_PU_TX=0.
+	 */
+	data = PIN_PU_IVEREF_BIT | PIN_TX_IDLE_BIT | PIN_RESET_COMPHY_BIT;
+	mask = PIN_RESET_CORE_BIT | PIN_PU_PLL_BIT | PIN_PU_RX_BIT | PIN_PU_TX_BIT;
+	reg_set(priv->comphy_regs + COMPHY_PHY_CFG1_OFFSET(comphy->index), data, mask);
+
+	/*
+	 * 4. Release reset to the PHY by setting PIN_RESET=0.
+	 */
+	data = 0;
+	mask = PIN_RESET_COMPHY_BIT;
+	reg_set(priv->comphy_regs + COMPHY_PHY_CFG1_OFFSET(comphy->index), data, mask);
+
+	/*
+	 * 5. Set PIN_PHY_GEN_TX[3:0] and PIN_PHY_GEN_RX[3:0] to decide COMPHY bit rate
+	 */
+	if (mode == COMPHY_SGMII_MODE) {
+		/* SGMII 1G, SerDes speed 1.25G */
+		data |= SD_SPEED_1_25_G << GEN_RX_SEL_OFFSET;
+		data |= SD_SPEED_1_25_G << GEN_TX_SEL_OFFSET;
+	} else if (mode == COMPHY_HS_SGMII_MODE) {
+		/* HS SGMII (2.5G), SerDes speed 3.125G */
+		data |= SD_SPEED_2_5_G << GEN_RX_SEL_OFFSET;
+		data |= SD_SPEED_2_5_G << GEN_TX_SEL_OFFSET;
+	} else {
+		/* Other rates are not supported */
+		dev_err(priv->dev, "unsupported SGMII speed on comphy lane%d\n",
+			comphy->index);
+		return -EINVAL;
+	}
+	mask = GEN_RX_SEL_MASK | GEN_TX_SEL_MASK;
+	reg_set(priv->comphy_regs + COMPHY_PHY_CFG1_OFFSET(comphy->index),
+		data, mask);
+
+	/* 6. Wait 10mS for bandgap and reference clocks to stabilize; then start SW programming. */
+	mdelay(10);
+
+	/* 7. Program COMPHY register PHY_MODE */
+	data = PHY_MODE_SGMII;
+	mask = PHY_MODE_MASK;
+	reg_set16(SGMIIPHY_ADDR(comphy->index, COMPHY_POWER_PLL_CTRL, sd_ip_addr), data, mask);
+
+	/* 8. Set COMPHY register REFCLK_SEL to select the correct REFCLK source */
+	data = 0;
+	mask = PHY_REF_CLK_SEL;
+	reg_set16(SGMIIPHY_ADDR(comphy->index, COMPHY_MISC_REG0_ADDR, priv), data, mask);
+
+	/* 9. Set correct reference clock frequency in COMPHY register REF_FREF_SEL. */
+	data = REF_CLOCK_SPEED_25M;
+	mask = REF_FREF_SEL_MASK;
+	reg_set16(SGMIIPHY_ADDR(comphy->index, COMPHY_POWER_PLL_CTRL, sd_ip_addr), data, mask);
+
+	/* 10. Program COMPHY register PHY_GEN_MAX[1:0]
+	 * This step is mentioned in the flow received from verification team.
+	 *  However the PHY_GEN_MAX value is only meaningful for other interfaces (not SGMII)
+	 *  For instance, it selects SATA speed 1.5/3/6 Gbps or PCIe speed  2.5/5 Gbps
+	 */
+
+	/* 11. Program COMPHY register SEL_BITS to set correct parallel data bus width */
+	data = DATA_WIDTH_10BIT;
+	mask = SEL_DATA_WIDTH_MASK;
+	reg_set16(SGMIIPHY_ADDR(comphy->index, COMPHY_LOOPBACK_REG0, sd_ip_addr), data, mask);
+
+	/* 12. As long as DFE function needs to be enabled in any mode,
+	 *  COMPHY register DFE_UPDATE_EN[5:0] shall be programmed to 0x3F
+	 *  for real chip during COMPHY power on.
+	 * The step 14 exists (and empty) in the original initialization flow obtained from
+	 *  the verification team. According to the functional specification DFE_UPDATE_EN
+	 *  already has the default value 0x3F
+	 */
+
+	/* 13. Program COMPHY GEN registers.
+	 *  These registers should be programmed based on the lab testing result
+	 *  to achieve optimal performance. Please contact the CEA group to get
+	 *  the related GEN table during real chip bring-up.
+	 *  We only required to run though the entire registers programming flow
+	 *  defined by "comphy_sgmii_phy_init" when the REF clock is 40 MHz.
+	 *  For REF clock 25 MHz the default values stored in PHY registers are OK.
+	 *  For REF clock 40MHz, it is in TODO list, because no API to get REF clock.
+	 */
+
+	/* 14. [Simulation Only] should not be used for real chip.
+	 *  By pass power up calibration by programming EXT_FORCE_CAL_DONE
+	 *  (R02h[9]) to 1 to shorten COMPHY simulation time.
+	 */
+
+	/* 15. [Simulation Only: should not be used for real chip]
+	 *  Program COMPHY register FAST_DFE_TIMER_EN=1 to shorten RX training simulation time.
+	 */
+
+	/*
+	 * 16. Check the PHY Polarity invert bit
+	 */
+	data = 0x0;
+	if (invert & COMPHY_POLARITY_TXD_INVERT)
+		data |= TXD_INVERT_BIT;
+	if (invert & COMPHY_POLARITY_RXD_INVERT)
+		data |= RXD_INVERT_BIT;
+	reg_set16(SGMIIPHY_ADDR(comphy->index, COMPHY_SYNC_PATTERN_REG, sd_ip_addr), data, 0);
+
+	/*
+	 *  17. Set PHY input ports PIN_PU_PLL, PIN_PU_TX and PIN_PU_RX to 1 to start
+	 *  PHY power up sequence. All the PHY register programming should be done before
+	 *  PIN_PU_PLL=1.
+	 *  There should be no register programming for normal PHY operation from this point.
+	 */
+	reg_set(priv->comphy_regs + COMPHY_PHY_CFG1_OFFSET(comphy->index),
+		PIN_PU_PLL_BIT | PIN_PU_RX_BIT | PIN_PU_TX_BIT,
+		PIN_PU_PLL_BIT | PIN_PU_RX_BIT | PIN_PU_TX_BIT);
+
+	/*
+	 * 18. Wait for PHY power up sequence to finish by checking output ports
+	 * PIN_PLL_READY_TX=1 and PIN_PLL_READY_RX=1.
+	 */
+	ret = polling_with_timeout(priv->comphy_regs + COMPHY_PHY_STATUS_OFFSET(comphy->index),
+				   PHY_PLL_READY_TX_BIT | PHY_PLL_READY_RX_BIT,
+				   PHY_PLL_READY_TX_BIT | PHY_PLL_READY_RX_BIT,
+				   A3700_COMPHY_PLL_LOCK_TIMEOUT,
+				   REG_32BIT);
+	if (ret)
+		dev_err(priv->dev, "Failed to lock PLL for SGMII PHY %d\n", comphy->index);
+
+	/*
+	 * 19. Set COMPHY input port PIN_TX_IDLE=0
+	 */
+	reg_set(priv->comphy_regs + COMPHY_PHY_CFG1_OFFSET(comphy->index), 0x0, PIN_TX_IDLE_BIT);
+
+	/*
+	 * 20. After valid data appear on PIN_RXDATA bus, set PIN_RX_INIT=1.
+	 * to start RX initialization. PIN_RX_INIT_DONE will be cleared to 0 by the PHY
+	 * After RX initialization is done, PIN_RX_INIT_DONE will be set to 1 by COMPHY
+	 * Set PIN_RX_INIT=0 after PIN_RX_INIT_DONE= 1.
+	 * Please refer to RX initialization part for details.
+	 */
+	reg_set(priv->comphy_regs + COMPHY_PHY_CFG1_OFFSET(comphy->index), PHY_RX_INIT_BIT, 0x0);
+
+	ret = polling_with_timeout(priv->comphy_regs + COMPHY_PHY_STATUS_OFFSET(comphy->index),
+				  PHY_PLL_READY_TX_BIT | PHY_PLL_READY_RX_BIT,
+				  PHY_PLL_READY_TX_BIT | PHY_PLL_READY_RX_BIT,
+				  A3700_COMPHY_PLL_LOCK_TIMEOUT,
+				  REG_32BIT);
+	if (ret)
+		dev_err(priv->dev, "Failed to lock PLL for SGMII PHY %d\n", comphy->index);
+
+
+	ret = polling_with_timeout(priv->comphy_regs + COMPHY_PHY_STATUS_OFFSET(comphy->index),
+				   PHY_RX_INIT_DONE_BIT,
+				   PHY_RX_INIT_DONE_BIT,
+				   A3700_COMPHY_PLL_LOCK_TIMEOUT,
+				   REG_32BIT);
+	if (ret)
+		dev_err(priv->dev, "Failed to init RX of SGMII PHY %d\n", comphy->index);
+
+	/* Unmap resource */
+	if (comphy->index == COMPHY_LANE1) {
+		devm_iounmap(&pdev->dev, sd_ip_addr);
+		devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
+	}
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
-	return -ENOTSUPP;
+	return ret;
 }
 
 static int mvebu_a3700_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
