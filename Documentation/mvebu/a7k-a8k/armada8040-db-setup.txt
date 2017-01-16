@@ -132,7 +132,7 @@ Network configuration
 5: D:
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
- eth0		| 0	| 0		| 0		| SGMII				|
+ eth0		| 0	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
  eth1		| 0	| 2		| 3		| RGMII1			|
  eth2		| 1	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
 
