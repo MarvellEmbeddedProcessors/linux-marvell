@@ -2358,7 +2358,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		pool = MVPP2_RX_DESC_POOL(rx_desc);
 		bm_pool = &port->priv->bm_pools[pool - first_bm_pool];
 		/* Check if buffer header is used */
-		if (rx_status & MVPP2_RXD_BUF_HDR) {
+		if (unlikely(rx_status & MVPP2_RXD_BUF_HDR)) {
 			mv_pp2x_buff_hdr_rx(port, rx_desc, cpu);
 			continue;
 		}
@@ -2381,7 +2381,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		 * by the hardware, and the information about the buffer is
 		 * comprised by the RX descriptor.
 		 */
-		if (rx_status & MVPP2_RXD_ERR_SUMMARY) {
+		if (unlikely(rx_status & MVPP2_RXD_ERR_SUMMARY)) {
 			netdev_warn(port->dev, "MVPP2_RXD_ERR_SUMMARY\n");
 err_drop_frame:
 			dev->stats.rx_errors++;
@@ -2392,7 +2392,7 @@ err_drop_frame:
 
 		skb = build_skb(data, bm_pool->frag_size > PAGE_SIZE ? 0 :
 				bm_pool->frag_size);
-		if (!skb) {
+		if (unlikely(!skb)) {
 			netdev_warn(port->dev, "skb build failed\n");
 			goto err_drop_frame;
 		}
@@ -2400,7 +2400,7 @@ err_drop_frame:
 		err = mv_pp2x_rx_refill_new(port, bm_pool,
 					    bm_pool->log_id, 0, cpu);
 
-		if (err)
+		if (unlikely(err))
 			netdev_err(port->dev, "failed to refill BM pools\n");
 
 		dma_unmap_single(dev->dev.parent, buf_phys_addr,
@@ -2428,7 +2428,7 @@ err_drop_frame:
 		napi_gro_receive(napi, skb);
 	}
 
-	if (rcvd_pkts) {
+	if (likely(rcvd_pkts)) {
 		struct mv_pp2x_pcpu_stats *stats = this_cpu_ptr(port->stats);
 
 		u64_stats_update_begin(&stats->syncp);
@@ -2698,21 +2698,21 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	skb_frag_t *skb_frag_ptr;
 	const struct tcphdr *th = tcp_hdr(skb);
 
-	if (mv_pp2_tso_validate(skb, dev))
+	if (unlikely(mv_pp2_tso_validate(skb, dev)))
 		return 0;
 
 	/* Calculate expected number of TX descriptors */
 	max_desc_num = skb_shinfo(skb)->gso_segs * 2 + skb_shinfo(skb)->nr_frags;
 
 	/* Check number of available descriptors */
-	if (mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, max_desc_num, cpu) ||
-	    mv_pp2x_tso_txq_reserved_desc_num_proc(port->priv, txq,
-						   txq_pcpu, max_desc_num, cpu)) {
+	if (unlikely(mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, max_desc_num, cpu) ||
+		     mv_pp2x_tso_txq_reserved_desc_num_proc(port->priv, txq,
+							    txq_pcpu, max_desc_num, cpu))) {
 		return 0;
 	}
 
 	if (unlikely(max_desc_num > port->txq_stop_limit))
-		if (mv_pp2x_txq_free_count(txq_pcpu) < max_desc_num)
+		if (likely(mv_pp2x_txq_free_count(txq_pcpu) < max_desc_num))
 			return 0;
 
 	total_len = skb->len;
@@ -2725,7 +2725,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	frag_size = skb_headlen(skb);
 	frag_ptr = skb->data;
 
-	if (frag_size < hdr_len) {
+	if (unlikely(frag_size < hdr_len)) {
 		pr_err("frag_size=%d, hdr_len=%d\n", frag_size, hdr_len);
 		return 0;
 	}
@@ -2746,20 +2746,20 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	total_desc_num = 0;
 
 	/* Each iteration - create new TCP segment */
-	while (total_len > 0) {
+	while (likely(total_len > 0)) {
 		u8 *data;
 
 		data_left = min((int)(skb_shinfo(skb)->gso_size), total_len);
 
 		/* Sanity check */
-		if (total_desc_num >= max_desc_num) {
+		if (unlikely(total_desc_num >= max_desc_num)) {
 			pr_err("%s: Used TX descriptors number %d is larger than allocated %d\n",
 			       __func__, total_desc_num, max_desc_num);
 			goto out_no_tx_desc;
 		}
 
 		data = mv_pp2_extra_pool_get(port);
-		if (!data) {
+		if (unlikely(!data)) {
 			pr_err("Can't allocate extra buffer for TSO\n");
 			goto out_no_tx_desc;
 		}
@@ -2773,7 +2773,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 						 txq_pcpu, mh, hdr_len,
 						 data_left, tcp_seq, ip_id,
 						 total_len);
-		if (size < 0)
+		if (unlikely(size < 0))
 			goto out_no_tx_desc;
 		total_desc_num++;
 
@@ -2782,9 +2782,9 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 		/* Update packet's IP ID */
 		ip_id++;
 
-		while (data_left > 0) {
+		while (likely(data_left > 0)) {
 			/* Sanity check */
-			if (total_desc_num >= max_desc_num) {
+			if (unlikely(total_desc_num >= max_desc_num)) {
 				pr_err("%s: Used TX descriptors number %d is larger than allocated %d\n",
 				       __func__, total_desc_num, max_desc_num);
 				goto out_no_tx_desc;
@@ -2795,7 +2795,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			size = mv_pp2_tso_build_data_desc(port, tx_desc, skb, txq_pcpu,
 							  frag_ptr, frag_size, data_left, total_len);
 
-			if (size < 0)
+			if (unlikely(size < 0))
 				goto out_no_tx_desc;
 
 			total_desc_num++;
@@ -2877,7 +2877,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	aggr_txq = &port->priv->aggr_txqs[cpu];
 
 	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
-	if (mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit) {
+	if (unlikely(mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit)) {
 		if (cpu == skb->sender_cpu) {
 			nq = netdev_get_tx_queue(dev, skb_get_queue_mapping(skb));
 			netif_tx_stop_queue(nq);
@@ -2896,9 +2896,9 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	pr_debug("txq_id=%d, frags=%d\n", txq_id, frags);
 
 	/* Check number of available descriptors */
-	if (mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, frags, cpu) ||
-	    mv_pp2x_txq_reserved_desc_num_proc(port->priv, txq,
-					       txq_pcpu, frags, cpu)) {
+	if (unlikely(mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, frags, cpu) ||
+		     mv_pp2x_txq_reserved_desc_num_proc(port->priv, txq,
+							txq_pcpu, frags, cpu))) {
 		frags = 0;
 		goto out;
 	}
@@ -2968,7 +2968,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 				    txq_pcpu, NULL, tx_desc);
 
 		/* Continue with other skb fragments */
-		if (mv_pp2x_tx_frag_process(port, skb, aggr_txq, txq)) {
+		if (unlikely(mv_pp2x_tx_frag_process(port, skb, aggr_txq, txq))) {
 			mv_pp2x_txq_inc_error(txq_pcpu, 1);
 			tx_desc_unmap_put(port->dev->dev.parent, txq, tx_desc);
 			frags = 0;
@@ -2990,7 +2990,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 		aggr_txq->xmit_bulk = 0;
 	}
 out:
-	if (frags > 0) {
+	if (likely(frags > 0)) {
 		struct mv_pp2x_pcpu_stats *stats = this_cpu_ptr(port->stats);
 
 		u64_stats_update_begin(&stats->syncp);
