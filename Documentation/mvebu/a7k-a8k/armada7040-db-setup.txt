@@ -19,79 +19,84 @@ To switch board configuration:
 Board Setup
 ------------
 
-## Set UP 1: Router ###
+For A7040 A revision SoC - Please use armada-7040-db-A configuration,
 
-  SERDES site
-   - module: SLM1524
-   - Module DIP switch:
-	- SW1 = ON
-	- SW2 = OFF
-	- SW3 = NA
-	- SW4 = OFF
-	- SW5 = ON
-	- SW6 - NA
-	- SW7 - NA
-	- SW8 - OFF
+|		| 		1: A	|
+|---------------|-----------------------|
+|Device tree	|armada-7040-db-A.dtb	|
+|CP0-SW1:1	| ON			|
+|CP0-SW1:2	| OFF			|
+|CP0-SW1:3	| ON			|
+|CP0-SW1:4	| OFF			|
+|CP0-SW1:5	| OFF			|
+|CP0-SW1:6	| ON			|
+|CP0-SW1:7	| ON			|
+|CP0-SW1:8	| OFF			|
+-----------------------------------------
 
-## Set UP 4: NAND ###
-
-  SERDES site
-   - module: SLM1521
-   - Module DIP switch:
-	- SW1 = OFF
-	- SW2 = ON
-	- SW3 = NA
-	- SW4 = OFF
-	- SW5 = ON
-	- SW6 - NA
-	- SW7 - NA
-	- SW8 - OFF
-
-## Set UP 6: RXAUI ###
-
-  SERDES site
-   - module: SLM1522
-   - No module DIP switch
+DPR Setting
+------------
+|					| 	1: A				 |
+|---------------------------------------|----------------------------------------|
+| Mpp Jumper Module (SLM1548)		| Default release (ALL DPRs 1-2 position)|
+| Serdess Jumper Module (SLM1547)	| DPR152,153,154,155 - 1-2 position	 |
+|					| DPR148,149,150,151 - 2-3 position	 |
+| CP0 Serdess module (SLM1521)		| SW1 - (1,3,6,7)= ON,  (2,4,5,8)=OFF	 |
+| 					| DPR2,3,4,5 - 1-2 position		 |
+----------------------------------------|----------------------------------------|
 
 The tables below summarizes the interface configuration of each setup
 
-SERDES PHY configuration
+SerDes Configuration
 ------------------------
-Setup  #	|	1	|	4	| 	6	|
-Name   #	|     Router 	|     NAND	|     RXAUI	|
------------------------------------------------------------------
-SERDES:	lane0	| sgmii2	| pex_x4_l0	|  sata1	|
-	lane1	| usb3h0	| usb3h0	|  sata0	|
-	lane2	| sgmii0	| kr		|  sgmii0	|
-	lane3	| sata1		| sata1		|  sgmii2	|
-	lane4	| usb3h1	| usb3h1	|  rxauil0	|
-	lane5	| pex_x1_1	| pex_x1_1	|  rxauil1	|
------------------------------------------------------------------
+
+| CP0 Lane 	| 	1: A		|
+|---------------|-----------------------|
+| 0		| SGMII2		|
+| 1		| USB3_HOST0		|
+| 2		| KR (10G)		|
+| 3		| SATA1			|
+| 4		| USB3_HOST1		|
+| 5		| PCIE2 (x1)		|
+-----------------------------------------
+
+- USB2_H0 (UTMI only)
+- USB2_H1 (UTMI & USB3 SerDes)
 
 
 Multi-purpose pin configurations
 --------------------------------
-Setup  #	|	1	|       4	| 	6	|
-Name   #	|     Router 	|     NAND	|     RXAUI	|
------------------------------------------------------------------
-AP806:								|
------------------------------------------------------------------
-	AP-SDIO | [0-10]	| [0-10]	| [0-10]	|
-	AP-SPI0 | N/C		| N/C		| N/C		|
-	AP-UART0| [11,19]	| 11,19]	| [11,19]	|
------------------------------------------------------------------
-CP:								|
------------------------------------------------------------------
-	CP-SPI0	| N/C		| N/C		| N/C		|
-	CP-SPI1	| [13-16]	| N/C		| [13-16]	|
-	NAND	| N/C		| [13,17-27]	| N/C		|
-	RGMII0	| N/C		| [0-12]	| N/C		|
-	RGMII1	| N/C		| [44-55]	| N/C		|
-	CP-UART0| [29-30]	| [29-30]	| [29-30]	|
-	CP-UART1| [40-41]	| [40-41]	| [40-41]	|
-	SD	| [56-62]	| [56-62]	| [56-62]	|
-	TDM	| [0-11]	| N/C		| N/C		|
-	TWSI	| [37-38]	| [37-38]	| [37-38]	|
-	SATA0	| [36]		| N/C		| [36]		|
-	SATA1	| [28]		| [28]		| [28]		|
------------------------------------------------------------------
+Setup  #	|	1	|
+Name   #	|  	A 	|
+---------------------------------
+AP806:				|
+---------------------------------
+	AP-SDIO | [0-5]		|
+	AP-UART0| [11,19]	|
+---------------------------------
+CP:				|
+---------------------------------
+	CP-SPI0	| N/C		|
+	CP-SPI1	| [13-16]	|
+	NAND	| N/C		|
+	RGMII0	| N/C		|
+	RGMII1	| [0-11]	|
+	CP-UART0| [29-30]	|
+	CP-UART1| N/C		|
+	SD	| [56-61]	|
+	GPIO	| [62]		|
+	TDM	| N/C		|
+	TWSI	| [37-38]	|
+	SATA0	| N/C		|
+	SATA1	| [28]		|
+---------------------------------
+
+Network configuration
+---------------------
+1: A:
+ Interface	| CP#	| PPv2 Port	| GMAC Port	| Board Interface		|
+ ---------------|-------|---------------|---------------|-------------------------------|
+ eth0		| CP0	| eth0		| 0		| SFI (10G)			|
+ eth1		| CP0	| eth1		| 2		| RGMII1			|
+ eth2		| CP0	| eth2		| 3		| RGMII2			|
+ ----------------------------------------------------------------------------------------
