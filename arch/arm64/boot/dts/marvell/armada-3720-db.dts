@@ -251,4 +251,6 @@
 /* CON17 (PCIe) / CON12 (mini-PCIe) */
 &pcie0 {
 	status = "okay";
+	phys = <&a3700_comphy 0 COMPHY_PCIE0>;
+	phy-names = "comphy";
 };
