@@ -20,6 +20,7 @@ contain the following properties:
    define the mapping of the PCIe interface to interrupt numbers.
  - bus-range: PCI bus numbers covered
  - clocks: a pointer to the PCI core clock for this device.
+ - reset-gpios: a pointer to the PCI device reset via gpio
 
 In addition, the Device Tree describing an Aardvark PCIe controller
 must include a sub-node that describes the legacy interrupt controller
@@ -55,4 +56,5 @@ Example:
 			interrupt-controller;
 			#interrupt-cells = <1>;
 		};
+		reset-gpios = <&gpio_sb 3 GPIO_ACTIVE_HIGH>;
 	};
