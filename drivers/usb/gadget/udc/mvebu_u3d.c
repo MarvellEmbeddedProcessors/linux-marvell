@@ -2360,8 +2360,8 @@ static int mvc2_probe(struct platform_device *pdev)
 			ret = devm_request_any_context_irq(&pdev->dev,
 					       gpio_to_irq(cp->vbus_pin),
 					       mvc2_vbus_irq,
-					       IRQ_TYPE_EDGE_BOTH, "mvebu-u3d",
-					       cp);
+					       IRQ_TYPE_EDGE_BOTH | IRQF_ONESHOT,
+					       "mvebu-u3d", cp);
 			if (ret < 0) {
 				cp->vbus_pin = -ENODEV;
 				dev_warn(&pdev->dev,
