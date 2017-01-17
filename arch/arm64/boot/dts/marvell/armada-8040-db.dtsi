@@ -104,6 +104,15 @@
 					gpio-controller;
 					#gpio-cells = <2>;
 					reg = <0x21>;
+					/*
+					 * Support USB-DEVICE with SD in 8040
+					 * To enable IO expander interrupts, SD/MMC on CP
+					 * Must be disabled in U-Boot & Linux
+					 * interrupt-parent = <&cpm_gpio1>;
+					 * interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
+					 * interrupt-controller;
+					 * #interrupt-cells = <2>;
+					 */
 				};
 
 				/* U25 */
@@ -113,6 +122,18 @@
 					gpio-controller;
 					#gpio-cells = <2>;
 					reg = <0x25>;
+					/*
+					 * Support USB-DEVICE with SD in 8040
+					 * To enable IO expander interrupts, SD/MMC on CP
+					 * Must be disabled in U-Boot & Linux
+					 * interrupt-parent = <&cpm_gpio1>;
+					 * interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
+					 * gpio-controller;
+					 * #gpio-cells = <2>;
+					 * interrupt-controller;
+					 * #interrupt-cells = <2>;
+					 * reg = <0x25>;
+					 */
 				};
 
 				eeprom@57 {
