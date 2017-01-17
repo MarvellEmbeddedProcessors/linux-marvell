@@ -64,7 +64,7 @@ pinctrl@440000 {
 	reg = <0x440000 0x20>;
 };
 
-gpio@440100 {
+cpm_gpio0: gpio@440100 {
 	compatible = "marvell,orion-gpio";
 	reg = <0x440100 0x40>;
 	ngpios = <32>;
@@ -79,7 +79,7 @@ gpio@440100 {
 		   <ICU_GRP_NSR 83 IRQ_TYPE_LEVEL_HIGH>;
 };
 
-gpio@440140 {
+cpm_gpio1: gpio@440140 {
 	compatible = "marvell,orion-gpio";
 	reg = <0x440140 0x40>;
 	ngpios = <31>;

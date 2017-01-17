@@ -54,6 +54,8 @@
 	compatible = "marvell,armada8040", "marvell,armada-ap806-quad",
 	             "marvell,armada-ap806";
 	aliases {
+		gpio0 = &cpm_gpio0;
+		gpio1 = &cpm_gpio1;
 		ethernet0 = &emac0;
 		ethernet1 = &emac2;
 		ethernet2 = &emac3;

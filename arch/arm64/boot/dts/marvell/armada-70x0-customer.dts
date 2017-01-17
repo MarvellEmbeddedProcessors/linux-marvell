@@ -72,8 +72,8 @@
 	#size-cells = <2>;
 
 	aliases {
-		gpio1 = &gpio1;
-		gpio2 = &gpio2;
+		gpio1 = &cpm_gpio0;
+		gpio2 = &cpm_gpio1;
 	};
 
 	/* UPDATE */
@@ -114,6 +114,12 @@
 
 	cpn-110-master {
 		config-space {
+			pinctrl@440000 {
+				u3d_vbus_pins: pca0_pins {
+					marvell,pins = "mpp62";
+					marvell,function = "gpio";
+				};
+			};
 			serial@702000 {
 				status = "disabled";
 			};
@@ -152,7 +158,7 @@
 				/* UPDATE */
 				pinctrl-0 = <&u3d_vbus_pins>;
 				pinctrl-names = "default";
-				vbus-gpio = <&gpio2 30 GPIO_ACTIVE_HIGH>;
+				vbus-gpio = <&cpm_gpio1 30 GPIO_ACTIVE_HIGH>;
 				status = "disabled";
 			};
 			udc@524100 {
@@ -341,7 +347,7 @@
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
 		enable-active-high;
-		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+		gpio = <&cpm_gpio0 12 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
 };
