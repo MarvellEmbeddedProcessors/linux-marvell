@@ -2308,7 +2308,7 @@ static int mvc2_probe(struct platform_device *pdev)
 	/* phy address for VBUS toggling */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (res) {
-		phy_base = devm_ioremap_resource(&pdev->dev, res);
+		phy_base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
 		if (!phy_base) {
 			dev_err(&pdev->dev, "%s: register mapping failed\n", __func__);
 			ret = -ENXIO;
