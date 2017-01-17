@@ -196,6 +196,8 @@ struct mv_udc {
 	struct mv_req			*status_req;
 	struct usb_ctrlrequest		local_setup_buff;
 
+	struct phy			*utmi_phy;
+
 	unsigned int		resume_state;	/* USB state to resume */
 	unsigned int		usb_state;	/* USB current state */
 	unsigned int		ep0_state;	/* Endpoint zero state */
