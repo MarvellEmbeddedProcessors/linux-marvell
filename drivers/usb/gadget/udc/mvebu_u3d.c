@@ -1519,7 +1519,7 @@ static void mvc2_vbus_work(struct work_struct *work)
 	cp = container_of(work, struct mvc2, vbus_work);
 
 	if (gpio_is_valid(cp->vbus_pin))
-		vbus = gpio_get_value(cp->vbus_pin);
+		vbus = gpio_get_value_cansleep(cp->vbus_pin);
 	else {
 		dev_err(cp->dev, "VBUS interrupt status is missing\n");
 		return;
