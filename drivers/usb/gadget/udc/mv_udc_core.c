@@ -2156,6 +2156,12 @@ static int mv_udc_remove(struct platform_device *pdev)
 	/* free dev, wait for the release() finished */
 	wait_for_completion(udc->done);
 
+	/* Power off PHY and exit */
+	if (udc->utmi_phy) {
+		phy_power_off(udc->utmi_phy);
+		phy_exit(udc->utmi_phy);
+	}
+
 	return 0;
 }
 
@@ -2167,6 +2173,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 	struct resource *capregs, *phyregs, *irq;
 	size_t size;
 	struct clk *clk;
+	int err;
 
 	udc = devm_kzalloc(&pdev->dev, sizeof(*udc), GFP_KERNEL);
 	if (!udc)
@@ -2188,6 +2195,20 @@ static int mv_udc_probe(struct platform_device *pdev)
 		udc->vbus_pin = of_get_named_gpio(pdev->dev.of_node, "vbus-gpio", 0);
 		if (udc->vbus_pin < 0)
 			udc->vbus_pin = -ENODEV;
+
+		/* Get comphy and init if there is */
+		udc->utmi_phy = devm_of_phy_get(&pdev->dev, pdev->dev.of_node, "usb");
+		if (!IS_ERR(udc->utmi_phy)) {
+			err = phy_init(udc->utmi_phy);
+			if (err)
+				goto disable_phys;
+
+			err = phy_power_on(udc->utmi_phy);
+			if (err) {
+				phy_exit(udc->utmi_phy);
+				goto disable_phys;
+			}
+		}
 
 	} else if (pdata) {
 		udc->pdata = pdev->dev.platform_data;
@@ -2417,6 +2438,11 @@ err_free_dma:
 			udc->ep_dqh, udc->ep_dqh_dma);
 err_disable_clock:
 	mv_udc_disable_internal(udc);
+disable_phys:
+	if (udc->utmi_phy) {
+		phy_power_off(udc->utmi_phy);
+		phy_exit(udc->utmi_phy);
+	}
 
 	return retval;
 }
