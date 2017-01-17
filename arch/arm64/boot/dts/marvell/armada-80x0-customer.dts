@@ -71,11 +71,6 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
-	aliases {
-		gpio1 = &gpio1;
-		gpio2 = &gpio2;
-	};
-
 	/* UPDATE */
 	memory@00000000 {
 		device_type = "memory";
@@ -212,10 +207,6 @@
 			comphy {
 				status = "disabled";
 			};
-			gpio1: gpio@440100 {
-			};
-			gpio2: gpio@440140 {
-			};
 			pinctrl@440000 {
 				/* UPDATE */
 				xhci0_vbus_pins: xhci0-vbus-pins {
@@ -239,7 +230,7 @@
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
 			enable-active-high;
-			gpio = <&gpio2 15 GPIO_ACTIVE_HIGH>;
+			gpio = <&cpm_gpio1 15 GPIO_ACTIVE_HIGH>;
 			status = "okay";
 		};
 		vccq_sdio_reg: regulator@1 {

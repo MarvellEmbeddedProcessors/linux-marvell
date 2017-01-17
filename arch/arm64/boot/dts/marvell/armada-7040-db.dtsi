@@ -76,6 +76,13 @@
 
 	cpn-110-master {
 		config-space {
+			pinctrl@440000 {
+			compatible = "marvell,a70x0-pinctrl";
+				u3d_vbus_pins: u3d-vbus-pins {
+					marvell,pins = "mpp62";
+					marvell,function = "gpio";
+				};
+			};
 			i2c1: i2c@701000 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&i2c0_pins>;
@@ -100,7 +107,7 @@
 			u3d@520000 {
 				pinctrl-0 = <&u3d_vbus_pins>;
 				pinctrl-names = "default";
-				vbus-gpio = <&gpio2 30 GPIO_ACTIVE_HIGH>;
+				vbus-gpio = <&cpm_gpio1 30 GPIO_ACTIVE_HIGH>;
 			};
 			usb3h0: usb3@500000 {
 				usb-phy = <&usb3h0_phy>;
@@ -195,7 +202,7 @@
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
 		enable-active-high;
-		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+		gpio = <&cpm_gpio0 12 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
 };
