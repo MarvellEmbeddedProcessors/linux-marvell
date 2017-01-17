@@ -149,6 +149,17 @@
 
 			};
 
+			u3d@520000 {
+				/* There is no need to set pinctlr, since the
+				 * gpio is from io-expander
+				 */
+
+				/* To enable IO expander interrupts, SD/MMC on CP
+				 * Must be disabled in U-Boot & Linux
+				 * vbus-gpio = <&expander0 3 GPIO_ACTIVE_HIGH>;
+				 */
+			};
+
 			/* CON9 */
 			usb3@500000 {
 				usb-phy = <&cpm_usb3h0_phy>;
