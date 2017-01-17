@@ -141,6 +141,8 @@
 
 			udc@54100 {
 				status = "disabled";
+				phys = <&utmi_usb32>;
+				phy-names = "usb";
 			};
 
 			/* CON31 */
