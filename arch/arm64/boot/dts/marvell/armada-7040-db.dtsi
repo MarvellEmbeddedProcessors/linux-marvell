@@ -78,7 +78,7 @@
 		config-space {
 			pinctrl@440000 {
 			compatible = "marvell,a70x0-pinctrl";
-				u3d_vbus_pins: u3d-vbus-pins {
+				pca0_pins: pca0_pins {
 					marvell,pins = "mpp62";
 					marvell,function = "gpio";
 				};
@@ -99,8 +99,14 @@
 				expander0: pca9555@21 {
 					compatible = "nxp,pca9555";
 					pinctrl-names = "default";
+					pinctrl-0 = <&pca0_pins>;
+					interrupt-parent = <&cpm_gpio1>;
+					/* GPIO 62 is defined as GPIO 30 of cpm_gpio1 */
+					interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
 					gpio-controller;
 					#gpio-cells = <2>;
+					interrupt-controller;
+					#interrupt-cells = <2>;
 					reg = <0x21>;
 				};
 			};
