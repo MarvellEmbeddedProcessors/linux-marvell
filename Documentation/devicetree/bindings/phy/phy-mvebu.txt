@@ -41,3 +41,47 @@ Example:
 			reg = <0x18400 0x4>;
 			#phy-cells = <1>
 		};
+
+Armada 3700 UTMI PHY
+----------------------
+Armada 3700 comes with two UTMI PHYs for USB2.
+
+Required Properties:
+
+- compatible: "marvell,armada-3700-utmi-phy"
+- reg: Offset and length of the register set for the UTMI PHY
+- utmi-port: The port utmi phy connected to
+- #phy-cells: Standard property (Documentation: phy-bindings.txt) Should be 0.
+
+Example:
+UTMI PHY Node:
+============
+		utmi_usb32: utmi@5d000 {
+			compatible = "marvell,armada-3700-utmi-phy";
+			reg = <0x5d000 0x1000>;
+			utmi-port = <0>;
+			#phy-cells = <0>;
+			status = "okay";
+		};
+
+		utmi_usb2: utmi@5f000 {
+			compatible = "marvell,armada-3700-utmi-phy";
+			reg = <0x5f000 0x1000>;
+			utmi-port = <3>;
+			#phy-cells = <0>;
+			status = "okay";
+		};
+
+UTMI PHY consumer:
+=============
+		usb@5e000 {
+			status = "okay";
+			phys = <&utmi_usb2>;
+			phy-names = "usb";
+		};
+
+		udc@54100 {
+			status = "okay";
+			phys = <&utmi_usb32>;
+			phy-names = "usb";
+		};
