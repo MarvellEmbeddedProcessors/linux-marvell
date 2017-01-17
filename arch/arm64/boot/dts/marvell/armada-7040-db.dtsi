@@ -116,6 +116,8 @@
 				usb-phy = <&usb3h1_phy>;
 			};
 			sdhci@780000 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&cpm_sdhci_pins>;
 				bus-width = <4>;
 				non-removable;
 			};
