@@ -249,6 +249,67 @@ static int mvebu_cp110_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 	data |= 0x1 << HPIPE_PWR_CTR_DTL_CLK_MODE_FORCE_OFFSET;
 	reg_set(hpipe_addr + HPIPE_PWR_CTR_DTL_REG, data, mask);
 
+	/* Trigger sampler enable pulse */
+	mask = HPIPE_SMAPLER_MASK;
+	data = 0x1 << HPIPE_SMAPLER_OFFSET;
+	reg_set(hpipe_addr + HPIPE_SAMPLER_N_PROC_CALIB_CTRL_REG, data, mask);
+	mask = HPIPE_SMAPLER_MASK;
+	data = 0x0 << HPIPE_SMAPLER_OFFSET;
+	reg_set(hpipe_addr + HPIPE_SAMPLER_N_PROC_CALIB_CTRL_REG, data, mask);
+
+	/* VDD Calibration Control 3 */
+	mask = HPIPE_EXT_SELLV_RXSAMPL_MASK;
+	data = 0x10 << HPIPE_EXT_SELLV_RXSAMPL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_VDD_CAL_CTRL_REG, data, mask);
+
+	/* DFE Resolution Control */
+	mask = HPIPE_DFE_RES_FORCE_MASK;
+	data = 0x1 << HPIPE_DFE_RES_FORCE_OFFSET;
+	reg_set(hpipe_addr + HPIPE_DFE_REG0, data, mask);
+
+	/* DFE F3-F5 Coefficient Control */
+	mask = HPIPE_DFE_F3_F5_DFE_EN_MASK;
+	data = 0x0 << HPIPE_DFE_F3_F5_DFE_EN_OFFSET;
+	mask |= HPIPE_DFE_F3_F5_DFE_CTRL_MASK;
+	data = 0x0 << HPIPE_DFE_F3_F5_DFE_CTRL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_DFE_F3_F5_REG, data, mask);
+
+	/* G3 Setting 3 */
+	mask = HPIPE_G3_FFE_CAP_SEL_MASK;
+	data = 0xf << HPIPE_G3_FFE_CAP_SEL_OFFSET;
+	mask |= HPIPE_G3_FFE_RES_SEL_MASK;
+	data |= 0x4 << HPIPE_G3_FFE_RES_SEL_OFFSET;
+	mask |= HPIPE_G3_FFE_SETTING_FORCE_MASK;
+	data |= 0x1 << HPIPE_G3_FFE_SETTING_FORCE_OFFSET;
+	mask |= HPIPE_G3_FFE_DEG_RES_LEVEL_MASK;
+	data |= 0x1 << HPIPE_G3_FFE_DEG_RES_LEVEL_OFFSET;
+	mask |= HPIPE_G3_FFE_LOAD_RES_LEVEL_MASK;
+	data |= 0x3 << HPIPE_G3_FFE_LOAD_RES_LEVEL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G3_SETTING_3_REG, data, mask);
+
+	/* G3 Setting 4 */
+	mask = HPIPE_G3_DFE_RES_MASK;
+	data = 0x2 << HPIPE_G3_DFE_RES_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G3_SETTING_4_REG, data, mask);
+
+	/* Offset Phase Control */
+	mask = HPIPE_OS_PH_OFFSET_MASK;
+	data = 0x5c << HPIPE_OS_PH_OFFSET_OFFSET;
+	mask |= HPIPE_OS_PH_OFFSET_FORCE_MASK;
+	data |= 0x1 << HPIPE_OS_PH_OFFSET_FORCE_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PHASE_CONTROL_REG, data, mask);
+	mask = HPIPE_OS_PH_VALID_MASK;
+	data = 0x1 << HPIPE_OS_PH_VALID_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PHASE_CONTROL_REG, data, mask);
+	mask = HPIPE_OS_PH_VALID_MASK;
+	data = 0x0 << HPIPE_OS_PH_VALID_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PHASE_CONTROL_REG, data, mask);
+
+	/* SERDES External Configuration 2 register */
+	mask = SD_EXTERNAL_CONFIG2_SSC_ENABLE_MASK;
+	data = 0x1 << SD_EXTERNAL_CONFIG2_SSC_ENABLE_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG2_REG, data, mask);
+
 	/* DFE reset sequence */
 	reg_set(hpipe_addr + HPIPE_PWR_CTR_REG,
 		0x1 << HPIPE_PWR_CTR_RST_DFE_OFFSET, HPIPE_PWR_CTR_RST_DFE_MASK);
