@@ -491,7 +491,7 @@ static irqreturn_t mvebu_uart_tx_isr(int irq, void *dev_id)
 
 static int mvebu_uart_irq_request(struct uart_port *port)
 {
-	int ret;
+	int ret = 0;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	if (uart_data->intr.irq_sum > 0) {
