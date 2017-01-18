@@ -103,9 +103,13 @@ static struct phy *mvebu_comphy_of_xlate(struct device *dev,
 		return ERR_PTR(-ENODEV);
 	}
 
-	for (i = 0; i < MVEBU_COMPHY_FUNC_MAX; i++)
-		if (priv->soc_info->functions[lane][i] == mode)
+	for (i = 0; i < MVEBU_COMPHY_FUNC_MAX; i++) {
+		int functions = priv->soc_info->functions[lane][i];
+		/* Only comphy mode and id are checked here */
+		if (COMPHY_GET_MODE(functions) == COMPHY_GET_MODE(mode) &&
+		    COMPHY_GET_ID(functions) == COMPHY_GET_ID(mode))
 			break;
+	}
 
 	if (i == MVEBU_COMPHY_FUNC_MAX) {
 		dev_err(dev, "Wrong mode 0x%x for COMPHY\n", mode);

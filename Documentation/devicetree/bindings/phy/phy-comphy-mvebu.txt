@@ -21,7 +21,50 @@ Required properties for comphy node:
 Each device using Comphy should have handle with the following properties:
 	- Handle to the Comphy node.
 	- Comphy index (SerDes lane number).
-	- Required Comphy mode (SATA/PCIE/USB/Network).
+	- Required Comphy description.
+	  There are 2 options to describe the COMPHY settings.
+	  1. Simplified description (default speed & invert settings)
+	     With this approach, comphy settings are selected by a single definition
+	     which describes the COMPHY type and the unit index. This description
+	     configures default speed and no polarity invert for COMPHY lane.
+	     Default speed is for COMPHYs with configurable speed, such as SGMII - 1Gbps/2.5Gbps
+	     - Simplified usage options:
+					COMPHY_SATA0 COMPHY_SATA1
+					COMPHY_SGMII0 COMPHY_SGMII1 COMPHY_SGMII2
+					COMPHY_HS_SGMII0 COMPHY_HS_SGMII1 COMPHY_HS_SGMII2
+					COMPHY_USB3H0 COMPHY_USB3H1
+					COMPHY_USB3D0
+					COMPHY_PCIE0 COMPHY_PCIE1 COMPHY_PCIE2 COMPHY_PCIE3
+					COMPHY_RXAUI0 COMPHY_RXAUI1
+					COMPHY_XFI
+					COMPHY_SFI
+	  2. Complex description (for specific speed and/or polarity invert settings)
+	     With this approach, comphy settings are selected by the macro COMPHY_DEF,
+	     which defines comphy mode, unit index, comphy speed, and comphy RX/TX invert settings.
+	     - COMPHY_DEF definition:
+		COMPHY_DEF(COMPHY_MODE, COMPHY_ID, COMPHY_SPEED, COMPHY_INVERT)
+			COMPHY_MODE:
+				- COMPHY_SATA_MODE
+				- COMPHY_SGMII_MODE
+				- COMPHY_USB3H_MODE
+				- COMPHY_USB3D_MODE
+				- COMPHY_PCIE_MODE
+				- COMPHY_RXAUI_MODE
+				- COMPHY_XFI_MODE
+				- COMPHY_SFI_MODE
+			COMPHY_UNIT_ID: unit index
+				- relevant to following interfaces, SATA, USB, RXAUI, SGMII and PCIE.
+				- SATA/USB/RXAUI: 0/1
+				- SGMII/PCIE: 0/1/2
+			COMPHY_SPEED:
+				- COMPHY_SPEED_DEFAULT: for COMPHY type uses fixed speed
+				- COMPHY_SPEED_1_25: for SMGII works at 1Gbps
+				- COMPHY_SPEED_3_125: for SMGII works at 2.5Gbps
+			COMPHY_INVERT: polarity invert
+				- COMPHY_POLARITY_NO_INVERT:  there is no polarity inverted
+				- COMPHY_POLARITY_TXD_INVERT: there is TX polarity inverted
+				- COMPHY_POLARITY_RXD_INVERT: there is RX polarity inverted
+				- COMPHY_POLARITY_ALL_INVERT: there are both TX and RX polarity inverted
 	Example will be provided in the end of this file.
 
 Example:
@@ -45,8 +88,35 @@ Comphy Node:
 
 Comphy consumer:
 =============
+	(1) The example with simplified option of comphy description:
 		sata@540000 {
-				phys = <&comphy0 4 COMPHY_SATA0>;
+				phys = <&comphy0 4 COMPHY_SATA0>
 				status = "okay";
 		};
 
+		Explain for above sata example:
+			- phy handler is comphy0
+			- the sata interface uses lane 4 of comphy
+			- COMPHY description:
+					- the comphy works at SATA mode
+					- the unit index of the sata interface is 0
+					- the speed is default
+					- the invert is also default without polarity inverted
+
+	(2) The example with complex option of comphy description:
+		emac2: mac2 {
+				phys = <&comphy0 0 COMPHY_DEF(COMPHY_SGMII_MODE,
+							      1,
+							      COMPHY_SPEED_1_25G,
+							      COMPHY_POLARITY_RXD_INVERT)>;
+				phy-names = "comphy";
+		};
+
+		Explain for above SGMII example:
+			- phy handler is comphy0
+			- the SGMII interface uses lane 0 of comphy
+			- COMPHY description:
+					- the comphy works at SGMII mode
+					- the unit index of the sata interface is 1
+					- the speed is 1Gbps
+					- the comphy has rx polarity inverted

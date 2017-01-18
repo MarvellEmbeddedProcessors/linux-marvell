@@ -544,12 +544,15 @@ void mv_pp2x_ethtool_set_gmac_config(struct mv_port_link_status status, struct g
 int mv_pp2x_get_new_comphy_mode(struct ethtool_cmd *cmd, int port_id)
 {
 	if (cmd->speed == SPEED_10000 && port_id == 0)
-		return COMPHY_DEF(COMPHY_SFI_MODE, port_id);
+		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
+				  COMPHY_SPEED_DEFAULT, COMPHY_POLARITY_NO_INVERT);
 	else if (cmd->speed == SPEED_2500)
-		return COMPHY_DEF(COMPHY_HS_SGMII_MODE, port_id);
+		return COMPHY_DEF(COMPHY_HS_SGMII_MODE, port_id,
+				  COMPHY_SPEED_DEFAULT, COMPHY_POLARITY_NO_INVERT);
 	else if (cmd->speed == SPEED_1000 || cmd->speed == SPEED_100 ||
 		 cmd->speed == SPEED_10)
-		return COMPHY_DEF(COMPHY_SGMII_MODE, port_id);
+		return COMPHY_DEF(COMPHY_SGMII_MODE, port_id,
+				  COMPHY_SPEED_DEFAULT, COMPHY_POLARITY_NO_INVERT);
 	else
 		return -EINVAL;
 }
