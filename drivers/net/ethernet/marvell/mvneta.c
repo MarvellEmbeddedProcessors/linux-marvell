@@ -284,7 +284,7 @@ enum mvneta_port_type {
 #define TSO_HEADER_SIZE 128
 
 /* Max number of Rx descriptors */
-#define MVNETA_MAX_RXD 128
+#define MVNETA_MAX_RXD 256
 
 /* Max number of Tx descriptors */
 #define MVNETA_MAX_TXD 532
