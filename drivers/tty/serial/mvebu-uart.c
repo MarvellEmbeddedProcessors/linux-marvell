@@ -542,6 +542,7 @@ static void mvebu_uart_shutdown(struct uart_port *port)
 	writel(0, port->membase + uart_data->intr.ctrl_reg);
 }
 
+static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud);
 static void mvebu_uart_set_termios(struct uart_port *port,
 				   struct ktermios *termios,
 				   struct ktermios *old)
@@ -568,12 +569,10 @@ static void mvebu_uart_set_termios(struct uart_port *port,
 	if ((termios->c_cflag & CREAD) == 0)
 		port->ignore_status_mask |= stat_bit_rx_rdy | STAT_BRK_ERR;
 
-	if (old)
-		tty_termios_copy_hw(termios, old);
-
 	baud = uart_get_baud_rate(port, termios, old, 0, 460800);
 	uart_update_timeout(port, termios->c_cflag, baud);
-
+	/* Baud-rate set*/
+	mvebu_uart_baud_rate_set(port, baud);
 	spin_unlock_irqrestore(&port->lock, flags);
 }
 
@@ -747,6 +746,22 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
 		spin_unlock_irqrestore(&port->lock, flags);
 }
 
+static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
+{
+	unsigned int baud_rate_div;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+
+	/* The Uart clock is divided by the value of divisor to generate
+	 * UCLK_OUT clock, which must be 16 times faster than the target
+	 * baud rate:
+	 * UCLK_OUT = 16 times the taregt baud rate.
+	 */
+	if (!IS_ERR(uart_data->clk)) {
+		baud_rate_div = port->uartclk / (baud * 16);
+		writel(baud_rate_div, port->membase + REG_BRDV(uart_data));
+	}
+}
+
 static int mvebu_uart_console_setup(struct console *co, char *options)
 {
 	struct uart_port *port;
@@ -810,6 +825,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 {
 	struct resource *reg = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	struct resource *uart_int_base = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	struct device_node *np = pdev->dev.of_node;
 
 	int irq_sum = platform_get_irq_byname(pdev, "irq_sum");
 	int irq_rx = platform_get_irq_byname(pdev, "irq_rx");
@@ -876,6 +892,17 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 		port->irq = irq_rx;
 		data->intr.irq_rx = irq_rx;
 		data->intr.irq_tx = irq_tx;
+	}
+
+	/* Get fixed-clock frequency*/
+	data->clk = of_clk_get(np, 0);
+	if (!IS_ERR(data->clk)) {
+		ret = clk_prepare_enable(data->clk);
+		if (ret) {
+			clk_put(data->clk);
+			dev_err(&pdev->dev, "failed to get the reference clock\n");
+		}
+		port->uartclk = clk_get_rate(data->clk);
 	}
 
 	/* Set interrupt register bits callbacks */
