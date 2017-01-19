@@ -6,9 +6,17 @@ Required properties:
 - interrupts: device interrupt
 
 Example:
+	clocks {
+		osc: osc {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <25000000>;
+		};
+	};
 	serial@12000 {
 		compatible = "marvell,armada-3700-uart";
 		reg = <0x12000 0x200>;
+		clocks = <&osc>;
 		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "irq_sum";
 	};
@@ -16,6 +24,7 @@ Example:
 		compatible = "marvell,armada-3700-uart-ext";
 		reg = <0x12200 0x30>,
 		      <0x8a00 0x30>;
+		clocks = <&osc>;
 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
 		             <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "irq_rx", "irq_tx";
