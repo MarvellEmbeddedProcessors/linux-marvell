@@ -298,7 +298,15 @@ static void mvebu_uart_start_tx(struct uart_port *port)
 {
 	unsigned int ctl;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+	struct circ_buf *xmit = &port->state->xmit;
 
+	if (!IS_ERR_OR_NULL(uart_data->intr.uart_int_base)) {
+		if (!uart_circ_empty(xmit)) {
+			writel(xmit->buf[xmit->tail], port->membase + REG_TSH(uart_data));
+			xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+			port->icount.tx++;
+		}
+	}
 	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
 	ctl |= uart_data->reg_bits.ctrl_tx_rdy_int(uart_data);
 	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
@@ -400,7 +408,6 @@ ignore_char:
 static void mvebu_uart_tx_chars(struct uart_port *port, unsigned int status)
 {
 	struct circ_buf *xmit = &port->state->xmit;
-	unsigned int count;
 	unsigned int st;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
@@ -416,7 +423,7 @@ static void mvebu_uart_tx_chars(struct uart_port *port, unsigned int status)
 		return;
 	}
 
-	for (count = 0; count < port->fifosize; count++) {
+	for (;;) {
 		writel(xmit->buf[xmit->tail], port->membase + REG_TSH(uart_data));
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 		port->icount.tx++;
