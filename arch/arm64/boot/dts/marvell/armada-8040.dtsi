@@ -121,6 +121,11 @@
 					"mpp8", "mpp9", "mpp10";
 					marvell,function = "sdio";
 				};
+				ap_spi0_pins: spi-pins-0 {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+					"mpp3";
+					marvell,function = "spi0";
+				};
 			};
 		};
 	};

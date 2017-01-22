@@ -70,6 +70,8 @@
 			};
 			spi0: spi@510600 {
 				status = "okay";
+				pinctrl-names = "default";
+				pinctrl-0 = <&ap_spi0_pins>;
 			};
 		};
 	};
