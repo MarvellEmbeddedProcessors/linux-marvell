@@ -430,7 +430,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
 {
 	struct armada_thermal_priv *priv = thermal->devdata;
 	unsigned long reg;
-	unsigned long m, b, div;
+	long m, b, div;
 
 	/* Valid check */
 	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
@@ -448,9 +448,10 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
 	div = priv->data->coef_div;
 
 	if (priv->data->inverted)
-		*temp = ((m * reg) - b) / div;
+		*temp = ((m * (long)reg) - b) / div;
 	else
-		*temp = (b - (m * reg)) / div;
+		*temp = (b - (m * (long)reg)) / div;
+
 	return 0;
 }
 
@@ -490,7 +491,7 @@ static int armada_cp110_get_temp(struct thermal_zone_device *thermal, int *temp)
 {
 	struct armada_thermal_priv *priv = thermal->devdata;
 	unsigned long reg;
-	unsigned long m, b, div;
+	long m, b, div;
 
 	/* Valid check */
 	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
@@ -507,7 +508,7 @@ static int armada_cp110_get_temp(struct thermal_zone_device *thermal, int *temp)
 	m = priv->data->coef_m;
 	div = priv->data->coef_div;
 
-	*temp = ((m * reg) - b) / div;
+	*temp = ((m * (long)reg) - b) / div;
 
 	return 0;
 }
