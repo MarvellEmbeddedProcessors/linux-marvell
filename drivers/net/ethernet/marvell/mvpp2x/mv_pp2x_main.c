@@ -1303,7 +1303,6 @@ static int mv_pp2x_txq_init(struct mv_pp2x_port *port,
 		if (!txq_pcpu->data_size)
 			goto error;
 
-		txq_pcpu->count = 0;
 		txq_pcpu->reserved_num = 0;
 		txq_pcpu->txq_put_index = 0;
 		txq_pcpu->txq_get_index = 0;
@@ -2835,7 +2834,6 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	}
 
 	txq_pcpu->reserved_num -= total_desc_num;
-	txq_pcpu->count += total_desc_num;
 	aggr_txq->count += total_desc_num;
 
 	return total_desc_num;
