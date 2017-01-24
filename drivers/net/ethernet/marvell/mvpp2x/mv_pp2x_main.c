@@ -1272,7 +1272,6 @@ static int mv_pp2x_txq_init(struct mv_pp2x_port *port,
 	val |= MVPP2_TXQ_REFILL_TOKENS_ALL_MASK;
 	mv_pp2x_write(hw, MVPP2_TXQ_SCHED_REFILL_REG(txq->log_id), val);
 
-	mv_pp2x_write(hw, MVPP2_TXP_SCHED_FIXED_PRIO_REG, 0);
 	val = MVPP2_TXQ_TOKEN_SIZE_MAX;
 	mv_pp2x_write(hw, MVPP2_TXQ_SCHED_TOKEN_SIZE_REG(txq->log_id),
 		      val);
@@ -2820,8 +2819,12 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 		}
 	}
 
-	/* TCP segment is ready - transmit it */
-	mv_pp2x_aggr_txq_pend_desc_add(port, total_desc_num);
+	aggr_txq->xmit_bulk += total_desc_num;
+	if (!skb->xmit_more) {
+		/* Transmit TCP segment with bulked descriptors*/
+		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
+		aggr_txq->xmit_bulk = 0;
+	}
 
 	txq_pcpu->reserved_num -= total_desc_num;
 	txq_pcpu->count += total_desc_num;
@@ -3951,13 +3954,13 @@ u16 mv_pp2x_select_queue(struct net_device *dev, struct sk_buff *skb,
 			 void *accel_priv, select_queue_fallback_t fallback)
 
 {
-	/* TXQ software ring underrun workaround:
-	  * Using of same physical TXQ from different CPU's cause reading of wrong
-	  * value in Transmitted Descriptors Counter during TX done procedure
-	  * and as result TXQ software ring underrun.
-	  * WA: Each CPU will use different physical TXQ with same equal weighted round robin.
-	  */
-	int val = skb->napi_id - 1;
+	int val;
+
+	/* If packet in coming from Rx -> RxQ = TxQ, callback function used for packets from CPU Tx */
+	if (skb->queue_mapping)
+		val = skb->queue_mapping - 1;
+	else
+		val = fallback(dev, skb);
 
 	return (val % mv_pp2x_txq_number) + (smp_processor_id() * mv_pp2x_txq_number);
 }
