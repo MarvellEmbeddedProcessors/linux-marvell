@@ -472,10 +472,18 @@ static int mvebu_cp110_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 					   struct mvebu_comphy *comphy)
 {
 	void __iomem *hpipe_addr, *sd_ip_addr, *comphy_addr, *addr;
-	u32 mask, data;
+	u32 mask, data, speed = COMPHY_GET_SPEED(priv->lanes[comphy->index].mode);
 	int ret = 0;
 
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	if ((speed != COMPHY_SPEED_5_15625G) &&
+	     (speed != COMPHY_SPEED_10_3125G) &&
+	     (speed != COMPHY_SPEED_DEFAULT)) {
+		dev_err(priv->dev, "comphy:%d: unsupported sfi/xfi speed\n",
+			comphy->index);
+		return -EINVAL;
+	}
 
 	hpipe_addr = HPIPE_ADDR(priv->comphy_pipe_regs, comphy->index);
 	sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
@@ -537,7 +545,9 @@ static int mvebu_cp110_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	dev_dbg(priv->dev, "stage: Comphy configuration\n");
 	/* set reference clock */
 	mask = HPIPE_MISC_ICP_FORCE_MASK;
-	data = 0x1 << HPIPE_MISC_ICP_FORCE_OFFSET;
+	data = (speed == COMPHY_SPEED_5_15625G) ?
+		(0x0 << HPIPE_MISC_ICP_FORCE_OFFSET) :
+		(0x1 << HPIPE_MISC_ICP_FORCE_OFFSET);
 	mask |= HPIPE_MISC_REFCLK_SEL_MASK;
 	data |= 0x0 << HPIPE_MISC_REFCLK_SEL_OFFSET;
 	reg_set(hpipe_addr + HPIPE_MISC_REG, data, mask);
@@ -562,6 +572,19 @@ static int mvebu_cp110_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	data = 0x1 << HPIPE_PWR_CTR_DTL_FLOOP_EN_OFFSET;
 	reg_set(hpipe_addr + HPIPE_PWR_CTR_DTL_REG, data, mask);
 
+	/* Transmitter/Receiver Speed Divider Force */
+	if (speed == COMPHY_SPEED_5_15625G) {
+		mask = HPIPE_SPD_DIV_FORCE_RX_SPD_DIV_MASK;
+		data = 1 << HPIPE_SPD_DIV_FORCE_RX_SPD_DIV_OFFSET;
+		mask |= HPIPE_SPD_DIV_FORCE_RX_SPD_DIV_FORCE_MASK;
+		data |= 1 << HPIPE_SPD_DIV_FORCE_RX_SPD_DIV_FORCE_OFFSET;
+		mask |= HPIPE_SPD_DIV_FORCE_TX_SPD_DIV_MASK;
+		data |= 1 << HPIPE_SPD_DIV_FORCE_TX_SPD_DIV_OFFSET;
+		mask |= HPIPE_SPD_DIV_FORCE_TX_SPD_DIV_FORCE_MASK;
+		data |= 1 << HPIPE_SPD_DIV_FORCE_TX_SPD_DIV_FORCE_OFFSET;
+		reg_set(hpipe_addr + HPIPE_SPD_DIV_FORCE_REG, data, mask);
+	}
+
 	/* Set analog parameters from ETP(HW) */
 	dev_dbg(priv->dev, "stage: Analog parameters from ETP(HW)\n");
 	/* SERDES External Configuration 2 */
@@ -573,10 +596,15 @@ static int mvebu_cp110_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	data = 0x1 << HPIPE_DFE_RES_FORCE_OFFSET;
 	reg_set(hpipe_addr + HPIPE_DFE_REG0, data, mask);
 	/* 0xd-G1_Setting_0 */
-	mask = HPIPE_G1_SET_0_G1_TX_AMP_MASK;
-	data = 0x1c << HPIPE_G1_SET_0_G1_TX_AMP_OFFSET;
-	mask |= HPIPE_G1_SET_0_G1_TX_EMPH1_MASK;
-	data |= 0xe << HPIPE_G1_SET_0_G1_TX_EMPH1_OFFSET;
+	if (speed == COMPHY_SPEED_5_15625G) {
+		mask = HPIPE_G1_SET_0_G1_TX_EMPH1_MASK;
+		data = 0x6 << HPIPE_G1_SET_0_G1_TX_EMPH1_OFFSET;
+	} else {
+		mask = HPIPE_G1_SET_0_G1_TX_AMP_MASK;
+		data = 0x1c << HPIPE_G1_SET_0_G1_TX_AMP_OFFSET;
+		mask |= HPIPE_G1_SET_0_G1_TX_EMPH1_MASK;
+		data |= 0xe << HPIPE_G1_SET_0_G1_TX_EMPH1_OFFSET;
+	}
 	reg_set(hpipe_addr + HPIPE_G1_SET_0_REG, data, mask);
 	/* Genration 1 setting 2 (G1_Setting_2) */
 	mask = HPIPE_G1_SET_2_G1_TX_EMPH0_MASK;
@@ -622,6 +650,15 @@ static int mvebu_cp110_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	/* Genration 1 setting 3 (G1_Setting_3) */
 	mask = HPIPE_G1_SETTINGS_3_G1_FBCK_SEL_MASK;
 	data = 0x1 << HPIPE_G1_SETTINGS_3_G1_FBCK_SEL_OFFSET;
+	if (speed == COMPHY_SPEED_5_15625G) {
+		/* Force FFE (Feed Forward Equalization) to 5G */
+		mask |= HPIPE_G1_SETTINGS_3_G1_FFE_CAP_SEL_MASK;
+		data |= 0xf << HPIPE_G1_SETTINGS_3_G1_FFE_CAP_SEL_OFFSET;
+		mask |= HPIPE_G1_SETTINGS_3_G1_FFE_RES_SEL_MASK;
+		data |= 0x4 << HPIPE_G1_SETTINGS_3_G1_FFE_RES_SEL_OFFSET;
+		mask |= HPIPE_G1_SETTINGS_3_G1_FFE_SETTING_FORCE_MASK;
+		data |= 0x1 << HPIPE_G1_SETTINGS_3_G1_FFE_SETTING_FORCE_OFFSET;
+	}
 	reg_set(hpipe_addr + HPIPE_G1_SETTINGS_3_REG, data, mask);
 
 	dev_dbg(priv->dev, "stage: RFU configurations- Power Up PLL,Tx,Rx\n");
