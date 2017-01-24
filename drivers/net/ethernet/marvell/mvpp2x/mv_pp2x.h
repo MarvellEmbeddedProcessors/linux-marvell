@@ -279,11 +279,6 @@ struct mv_pp2x_txq_pcpu {
 	/* Number of Tx DMA descriptors in the descriptor ring */
 	int size;
 
-	/* Number of currently used Tx DMA descriptor in the
-	 * descriptor ring
-	 */
-	int count;
-
 	/* Number of Tx DMA descriptors reserved for each CPU */
 	int reserved_num;
 
