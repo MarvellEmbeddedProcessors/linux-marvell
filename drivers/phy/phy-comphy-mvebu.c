@@ -31,9 +31,17 @@ int mvebu_comphy_set_mode(struct phy *phy, enum phy_mode mode)
 
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
-	for (i = 0; i < MVEBU_COMPHY_FUNC_MAX; i++)
-		if (priv->soc_info->functions[comphy->index][i] == (int)mode)
+	for (i = 0; i < MVEBU_COMPHY_FUNC_MAX; i++) {
+		/* We need to find a match between requested mode and
+		 * the SoC configuration which is stored in
+		 * mvebu_comphy_soc_info.
+		 */
+		int functions = priv->soc_info->functions[comphy->index][i];
+
+		if (COMPHY_GET_MODE(functions) == COMPHY_GET_MODE((int)mode) &&
+		    COMPHY_GET_ID(functions) == COMPHY_GET_ID((int)mode))
 			break;
+	}
 
 	if (i == MVEBU_COMPHY_FUNC_MAX) {
 		dev_err(priv->dev, "can't set mode 0x%x for COMPHY%d\n",
@@ -104,8 +112,12 @@ static struct phy *mvebu_comphy_of_xlate(struct device *dev,
 	}
 
 	for (i = 0; i < MVEBU_COMPHY_FUNC_MAX; i++) {
+		/* We need to find a match between requested mode and
+		 * the SoC configuration which is stored in
+		 * mvebu_comphy_soc_info.
+		 */
 		int functions = priv->soc_info->functions[lane][i];
-		/* Only comphy mode and id are checked here */
+
 		if (COMPHY_GET_MODE(functions) == COMPHY_GET_MODE(mode) &&
 		    COMPHY_GET_ID(functions) == COMPHY_GET_ID(mode))
 			break;
