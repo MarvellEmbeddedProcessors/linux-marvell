@@ -1,0 +1,41 @@
+From 234d7fb6add95d194b70eb9432d29b8ffb96ee50 Mon Sep 17 00:00:00 2001
+From: Marcin Wojtas <mw@semihalf.com>
+Date: Tue, 24 Jan 2017 11:58:29 +0100
+Subject: [PATCH 3/3] rt: clean compilation warnings after applying PREEMPT_RT
+ patch
+
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+---
+ drivers/tty/serial/amba-pl011.c | 2 +-
+ kernel/sched/core.c             | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 3ff6363..5cd664b 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2062,7 +2062,7 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ {
+ 	struct uart_amba_port *uap = amba_ports[co->index];
+ 	unsigned int status, old_cr = 0, new_cr;
+-	unsigned long flags;
++	unsigned long flags = 0;
+ 	int locked = 1;
+ 
+ 	clk_enable(uap->clk);
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index da96d97..d641c61 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -3468,7 +3468,7 @@ static __always_inline int preemptible_lazy(void)
+ 	return 1;
+ }
+ 
+-#else
++#elif defined(CONFIG_PREEMPT)
+ 
+ static int preemptible_lazy(void)
+ {
+-- 
+1.9.1
+
