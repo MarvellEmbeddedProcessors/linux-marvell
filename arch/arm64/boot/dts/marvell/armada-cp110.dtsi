@@ -395,7 +395,6 @@ ppv22@000000 {
 		 <&cpm_syscon0 1 6>, <&cpm_syscon0 1 5>;
 	clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 	status = "okay";
-	l4_chksum_jumbo_port = <0>;
 	eth0: eth0@010000 {
 		interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
 			     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
