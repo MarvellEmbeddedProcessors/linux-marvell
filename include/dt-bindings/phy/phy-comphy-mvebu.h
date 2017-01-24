@@ -102,6 +102,8 @@
 /* COMPHY speed macro */
 #define COMPHY_SPEED_1_25G		0 /* SGMII 1G */
 #define COMPHY_SPEED_3_125G		1 /* SGMII 2.5G */
+#define COMPHY_SPEED_5_15625G		2 /* XFI 5G */
+#define COMPHY_SPEED_10_3125G		3 /* XFI 10G */
 #define COMPHY_SPEED_MAX		0x3F
 /* The  default speed for IO with fixed known speed */
 #define COMPHY_SPEED_DEFAULT		COMPHY_SPEED_MAX
