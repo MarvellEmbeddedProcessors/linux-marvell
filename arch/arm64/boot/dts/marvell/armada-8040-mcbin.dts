@@ -132,6 +132,7 @@
 				};
 			};
 			ppv22@000000 {
+				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
 				eth0_0: eth0@010000 {
 					status = "okay";
@@ -205,6 +206,7 @@
 				};
 			};
 			ppv22@000000 {
+				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
 				eth0_1: eth0@010000 {
 					status = "okay";

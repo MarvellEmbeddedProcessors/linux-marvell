@@ -131,6 +131,7 @@
 				};
 			};
 			ppv22@000000 {
+				l4_chksum_jumbo_port = <0>;
 				eth0: eth0@010000 {
 					status = "okay";
 				};
@@ -199,6 +200,7 @@
 				};
 			};
 			ppv22@000000 {
+				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&cps_ge1_rgmii_pins>;
 

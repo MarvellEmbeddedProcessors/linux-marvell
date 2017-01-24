@@ -127,6 +127,7 @@
 				};
 			};
 			ppv22@000000 {
+				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&cpm_ge2_rgmii_pins>;
 
@@ -190,6 +191,7 @@
 				};
 			};
 			ppv22@000000 {
+				l4_chksum_jumbo_port = <0>;
 				eth0_1: eth0@010000 {
 					status = "okay";
 				};

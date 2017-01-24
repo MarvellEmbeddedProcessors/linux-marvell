@@ -138,6 +138,7 @@
 				};
 			};
 			ppv22@000000 {
+				l4_chksum_jumbo_port = <1>;
 				eth0: eth0@010000 {
 					status = "disabled";
 				};
