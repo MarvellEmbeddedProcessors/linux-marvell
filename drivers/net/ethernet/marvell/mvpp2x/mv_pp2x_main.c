@@ -3001,6 +3001,11 @@ out:
 		stats->tx_bytes += skb->len;
 		u64_stats_update_end(&stats->syncp);
 	} else {
+		/* Transmit bulked descriptors*/
+		if (aggr_txq->xmit_bulk > 0) {
+			mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
+			aggr_txq->xmit_bulk = 0;
+		}
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
 	}
