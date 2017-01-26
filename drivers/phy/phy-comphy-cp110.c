@@ -89,12 +89,12 @@ static void mvebu_cp110_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 			break;
 		case(4):
 			 /* For comphy 4:
-			  * 0x1 = SGMII/HS-SGMII Port2
-			  * 0x2 = SGMII/HS-SGMII Port1: XFI/SFI, RXAUI_Lane0
+			  * 0x1 = SGMII/HS-SGMII Port1
+			  * 0x2 = SGMII/HS-SGMII Port0: XFI/SFI, RXAUI_Lane0
 			  */
-			if (priv->lanes[comphy->index].mode == COMPHY_SGMII2 ||
-			    priv->lanes[comphy->index].mode == COMPHY_HS_SGMII2)
-				reg |= COMMON_SELECTOR_COMPHY4_SGMII2 << comphy_offset;
+			if (priv->lanes[comphy->index].mode == COMPHY_SGMII1 ||
+			    priv->lanes[comphy->index].mode == COMPHY_HS_SGMII1)
+				reg |= COMMON_SELECTOR_COMPHY4_SGMII1 << comphy_offset;
 			else
 				reg |= COMMON_SELECTOR_COMPHY4_ALL_OTHERS << comphy_offset;
 			break;
