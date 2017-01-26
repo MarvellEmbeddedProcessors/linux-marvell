@@ -2881,7 +2881,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
 	if (unlikely(mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit)) {
-		if (cpu == skb->sender_cpu) {
+		if ((txq->log_id + (cpu * mv_pp2x_txq_number)) == skb_get_queue_mapping(skb)) {
 			nq = netdev_get_tx_queue(dev, skb_get_queue_mapping(skb));
 			netif_tx_stop_queue(nq);
 		}
