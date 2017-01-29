@@ -29,6 +29,9 @@ Boards:
    - "marvell,armada7040-db-C", "marvell,armada7040-db"
       when the board being used is the Armada 7040 Development board
 
+   - "marvell,armada7040-db-E", "marvell,armada7040-db"
+      when the board being used is the Armada 7040 Development board
+
    - "marvell,armada7040-db-nand", "marvell,armada7040-db"
       when the board being used is the Armada 7040 Development board
 
