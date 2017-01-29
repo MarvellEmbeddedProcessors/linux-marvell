@@ -2420,7 +2420,7 @@ err_drop_frame:
 		skb_put(skb, rx_bytes);
 		skb->protocol = eth_type_trans(skb, dev);
 		mv_pp2x_rx_csum(port, rx_status, skb);
-		skb_record_rx_queue(skb, (u16)rxq->id);
+		skb_record_rx_queue(skb, (u16)rxq->log_id);
 		mv_pp2x_set_skb_hash(rx_desc, rx_status, skb);
 		skb_mark_napi_id(skb, napi);
 
