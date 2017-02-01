@@ -435,13 +435,7 @@
 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
 				timeout-sec = <30>;
 			};
-
-			revision-info@610fcc {
-				compatible = "marvell,ap806-rev-info";
-				reg = <0x610FCC 0x4>;
-			};
 		};
 	};
-
 };
 
