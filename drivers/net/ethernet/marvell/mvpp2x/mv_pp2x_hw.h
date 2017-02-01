@@ -251,6 +251,10 @@ static inline dma_addr_t mv_pp2x_bm_phys_addr_get(struct mv_pp2x_hw *hw, u32 poo
 
 	val = mv_pp2x_read(hw, MVPP2_BM_PHY_ALLOC_REG(pool));
 
+	/*  Disregard BM_ADDR_HIGH_ALLOC if Buffer Manager failed to return buffer */
+	if (!val)
+		return 0;
+
 #ifdef CONFIG_PHYS_ADDR_T_64BIT
 	{
 	u64 val2;
