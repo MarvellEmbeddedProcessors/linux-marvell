@@ -263,22 +263,6 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 			return rc;
 	}
 
-	/* Armada-8k revision A0, port register offsets of the aHCI unit are not
-	 * according to aHCI specification, so we need a WA for A8k rev A0 (CP110).
-	 */
-	if (of_device_is_compatible(pdev->dev.of_node, "marvell,armada-cp110-ahci")
-		&& mv_soc_info_get_revision() == APN806_REV_ID_A0) {
-		pr_debug("setting aHCI port offset WA for A8k revision A0");
-		/* Read the correct port base and offset from the
-		 * device tree and set hpriv->a8k_a0_wa for future use.
-		 */
-		hpriv->a8k_a0_wa = 1;
-		of_property_read_u32(pdev->dev.of_node, "port_base",
-				     &hpriv->port_base);
-		of_property_read_u32(pdev->dev.of_node, "port_offset",
-				     &hpriv->port_offset);
-	}
-
 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
 				     &ahci_platform_sht);
 	if (rc)
