@@ -75,6 +75,7 @@
 
 struct mvebu_icu_irq_data {
 	void __iomem *base;	/* ICU register base */
+	void __iomem *gicp_clr_spi_base;
 	struct irq_domain *domain;
 };
 
@@ -185,6 +186,13 @@ static int mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int vi
 		return err;
 	}
 
+	/*
+	 * Clear Non-Secure SPI in GICP,
+	 * in case it was asserted in bootloader.
+	 */
+	if (icu_group == ICU_GRP_NSR)
+		writel(irq_msg_num, icu->gicp_clr_spi_base);
+
 	/* Configure the ICU with irq number & type */
 	icu_int  = (irq_msg_num) | (1 << ICU_INT_ENABLE_OFFSET);
 	if (type & IRQ_TYPE_EDGE_RISING)
@@ -250,6 +258,7 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
 static int __init mvebu_icu_of_init(struct device_node *node, struct device_node *parent)
 {
 	int ret;
+	resource_size_t gicp_clr_spi_base;
 	struct mvebu_icu_irq_data *icu;
 	struct irq_domain *parent_domain;
 	u32 gicp_spi_reg[4];
@@ -295,6 +304,15 @@ static int __init mvebu_icu_of_init(struct device_node *node, struct device_node
 	writel(gicp_spi_reg[1], icu->base + ICU_SETSPI_NSR_AL);
 	writel(gicp_spi_reg[2], icu->base + ICU_CLRSPI_NSR_AH);
 	writel(gicp_spi_reg[3], icu->base + ICU_CLRSPI_NSR_AL);
+
+	gicp_clr_spi_base = (u64)gicp_spi_reg[3];
+
+	icu->gicp_clr_spi_base = ioremap(gicp_clr_spi_base, 0x4);
+	if (!icu->gicp_clr_spi_base) {
+		pr_err("Fail to map GICP SPI_CLR register\n");
+		ret = -ENOMEM;
+		goto err_iounmap;
+	}
 
 	/* Clean all ICU interrupts with type SPI_NSR, required to avoid
 	** unpredictable SPI assignments done by firmware
