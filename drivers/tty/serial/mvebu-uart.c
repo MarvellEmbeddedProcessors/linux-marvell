@@ -935,7 +935,7 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 		data->intr.uart_int_base = devm_ioremap_resource(&pdev->dev, uart_int_base);
 		if (IS_ERR(data->intr.uart_int_base))
 			return -PTR_ERR(data->intr.uart_int_base);
-		value = readl(data->intr.uart_int_base);
+		value = readl(data->intr.uart_int_base + NORTH_BRIDGE_UART_EXT_INT_SEL);
 		writel(value | UART_EXT_TX_INT_SEL | UART_EXT_RX_INT_SEL, data->intr.uart_int_base +
 			   NORTH_BRIDGE_UART_EXT_INT_SEL);
 	}
