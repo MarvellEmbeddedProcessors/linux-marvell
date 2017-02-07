@@ -374,6 +374,21 @@ enum phy_mode phy_get_mode(struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(phy_get_mode);
 
+int phy_send_command(struct phy *phy, u32 command)
+{
+	int ret;
+
+	if (!phy || !phy->ops->get_mode)
+		return 0;
+
+	mutex_lock(&phy->mutex);
+	ret = phy->ops->send_command(phy, command);
+	mutex_unlock(&phy->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(phy_send_command);
+
 int phy_is_pll_locked(struct phy *phy)
 {
 	int ret;

@@ -38,6 +38,7 @@ enum phy_mode {
  * @set_mode: set the mode of the phy
  * @get_mode: get the mode of the phy
  * @is_pll_locked: check phy's PLL status (locked/unlocked)
+ * @send_command: request specific operations from the phy
  * @owner: the module owner containing the ops
  */
 struct phy_ops {
@@ -47,6 +48,7 @@ struct phy_ops {
 	int	(*power_off)(struct phy *phy);
 	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
 	enum phy_mode	(*get_mode)(struct phy *phy);
+	int	(*send_command)(struct phy *phy, u32 command);
 	int	(*is_pll_locked)(struct phy *phy);
 	struct module *owner;
 };
@@ -134,6 +136,7 @@ int phy_power_on(struct phy *phy);
 int phy_power_off(struct phy *phy);
 int phy_set_mode(struct phy *phy, enum phy_mode mode);
 enum phy_mode phy_get_mode(struct phy *phy);
+int phy_send_command(struct phy *phy, u32 command);
 int phy_is_pll_locked(struct phy *phy);
 static inline int phy_get_bus_width(struct phy *phy)
 {
@@ -248,6 +251,13 @@ static inline int phy_set_mode(struct phy *phy, enum phy_mode mode)
 }
 
 static inline enum phy_mode phy_get_mode(struct phy *phy)
+{
+	if (!phy)
+		return 0;
+	return -ENOSYS;
+}
+
+static inline int phy_send_command(struct phy *phy, u32 command)
 {
 	if (!phy)
 		return 0;
