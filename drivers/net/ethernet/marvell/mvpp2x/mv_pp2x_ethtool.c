@@ -616,7 +616,7 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 			if (mac->flags & MV_EMAC_F_PORT_UP) {
 				netif_carrier_off(port->dev);
 				mv_gop110_port_events_mask(gop, mac);
-				mv_gop110_port_disable(gop, mac);
+				mv_gop110_port_disable(gop, mac, port->comphy);
 				phy_power_off(port->comphy);
 			}
 
@@ -634,7 +634,7 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 
 		if (mac->flags & MV_EMAC_F_PORT_UP) {
 			mv_gop110_port_events_unmask(gop, mac);
-			mv_gop110_port_enable(gop, mac);
+			mv_gop110_port_enable(gop, mac, port->comphy);
 			phy_power_on(port->comphy);
 		}
 	}

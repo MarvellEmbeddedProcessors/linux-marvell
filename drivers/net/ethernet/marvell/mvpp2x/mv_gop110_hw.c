@@ -22,6 +22,8 @@
 #include <linux/platform_device.h>
 #include <linux/inetdevice.h>
 #include <uapi/linux/ppp_defs.h>
+#include <dt-bindings/phy/phy-comphy-mvebu.h>
+#include <linux/phy/phy.h>
 
 #include <net/ip.h>
 #include <net/ipv6.h>
@@ -1059,7 +1061,7 @@ int mv_gop110_port_reset(struct gop_hw *gop, struct mv_mac_data *mac)
 }
 
 /*-------------------------------------------------------------------*/
-void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac)
+void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac, struct phy *comphy)
 {
 	int port_num = mac->gop_index;
 
@@ -1076,6 +1078,7 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_KR:
 	case PHY_INTERFACE_MODE_SFI:
 	case PHY_INTERFACE_MODE_XFI:
+		phy_send_command(comphy, COMPHY_COMMAND_DIGITAL_PWR_ON);
 		mv_gop110_mpcs_clock_reset(gop,  UNRESET);
 		mv_gop110_xlg_mac_reset(gop, port_num, UNRESET);
 		mv_gop110_xlg_mac_port_enable(gop, port_num);
@@ -1086,7 +1089,7 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac)
 	}
 }
 
-void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac)
+void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac, struct phy *comphy)
 {
 	int port_num = mac->gop_index;
 
@@ -1106,6 +1109,7 @@ void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac)
 		mv_gop110_xlg_mac_port_disable(gop, port_num);
 		mv_gop110_xlg_mac_reset(gop, port_num, RESET);
 		mv_gop110_mpcs_clock_reset(gop,  RESET);
+		phy_send_command(comphy, COMPHY_COMMAND_DIGITAL_PWR_OFF);
 	break;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);

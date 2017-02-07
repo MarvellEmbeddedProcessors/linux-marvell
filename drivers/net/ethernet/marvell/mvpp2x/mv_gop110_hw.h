@@ -134,8 +134,8 @@ static inline void mv_gop_gen_write(void __iomem *base, u32 offset, u32 data)
 /* GOP port configuration functions */
 int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac);
 int mv_gop110_port_reset(struct gop_hw *gop, struct mv_mac_data *mac);
-void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac);
-void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac);
+void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac, struct phy *comphy);
+void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac, struct phy *comphy);
 void mv_gop110_port_periodic_xon_set(struct gop_hw *gop,
 				     struct mv_mac_data *mac,
 				     int enable);
