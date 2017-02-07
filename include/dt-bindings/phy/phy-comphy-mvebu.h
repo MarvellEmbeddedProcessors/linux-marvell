@@ -111,5 +111,9 @@
 /* The  default speed for IO with fixed known speed */
 #define COMPHY_SPEED_DEFAULT		COMPHY_SPEED_MAX
 
+/* Commands for comphy driver */
+#define COMPHY_COMMAND_DIGITAL_PWR_OFF	0x00000001
+#define COMPHY_COMMAND_DIGITAL_PWR_ON	0x00000002
+
 #endif /* _DT_BINDINGS_PHY_COMPHY_MVEBU */
 

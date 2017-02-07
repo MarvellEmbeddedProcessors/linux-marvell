@@ -846,6 +846,60 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 	return 0;
 }
 
+/*
+ * This function allows to reset the digital synchronizers between
+ * the MAC and the PHY, it is required when the MAC changes its state.
+ */
+static int mvebu_cp110_comphy_digital_reset(struct mvebu_comphy *comphy,
+					     struct mvebu_comphy_priv *priv,
+					     u32 command)
+{
+	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+	void __iomem *sd_ip_addr;
+	u32 mask, data;
+
+	sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
+
+	switch (mode) {
+	case (COMPHY_SGMII_MODE):
+	case (COMPHY_HS_SGMII_MODE):
+	case (COMPHY_XFI_MODE):
+	case (COMPHY_SFI_MODE):
+		mask = SD_EXTERNAL_CONFIG1_RF_RESET_IN_MASK;
+		data = ((command == COMPHY_COMMAND_DIGITAL_PWR_OFF) ? 0x0 : 0x1) <<
+			SD_EXTERNAL_CONFIG1_RF_RESET_IN_OFFSET;
+		reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
+		break;
+	default:
+		dev_err(priv->dev, "comphy%d: COMPHY_COMMAND_DIGITAL_PWR_ON/OFF is not supported\n",
+			comphy->index);
+			return -EINVAL;
+	}
+
+	return 0;
+
+}
+
+static int mvebu_cp110_comphy_send_command(struct phy *phy, u32 command)
+{
+	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
+	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
+	int ret = 0;
+
+	switch (command) {
+	case(COMPHY_COMMAND_DIGITAL_PWR_OFF):
+	case(COMPHY_COMMAND_DIGITAL_PWR_ON):
+		ret = mvebu_cp110_comphy_digital_reset(comphy, priv, command);
+		break;
+	default:
+		dev_err(priv->dev, "%s: unsupported command (0x%x)\n",
+			__func__, command);
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
 static int mvebu_cp110_comphy_is_pll_locked(struct phy *phy)
 {
 
@@ -878,6 +932,7 @@ static struct phy_ops cp110_comphy_ops = {
 	.power_off	= mvebu_cp110_comphy_power_off,
 	.set_mode	= mvebu_comphy_set_mode,
 	.get_mode	= mvebu_comphy_get_mode,
+	.send_command	= mvebu_cp110_comphy_send_command,
 	.is_pll_locked  = mvebu_cp110_comphy_is_pll_locked,
 	.owner		= THIS_MODULE,
 };
