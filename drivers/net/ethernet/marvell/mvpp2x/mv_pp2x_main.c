@@ -1733,7 +1733,7 @@ static void mv_pp22_link_event(struct net_device *dev)
 			mv_gop110_port_events_mask(&port->priv->hw.gop,
 						   &port->mac_data);
 			mv_gop110_port_enable(&port->priv->hw.gop,
-					      &port->mac_data);
+					      &port->mac_data, port->comphy);
 			mv_pp2x_egress_enable(port);
 			mv_pp2x_ingress_enable(port);
 			netif_carrier_on(dev);
@@ -1748,7 +1748,7 @@ static void mv_pp22_link_event(struct net_device *dev)
 			mv_gop110_port_events_mask(&port->priv->hw.gop,
 						   &port->mac_data);
 			mv_gop110_port_disable(&port->priv->hw.gop,
-					       &port->mac_data);
+					       &port->mac_data, port->comphy);
 			netif_carrier_off(dev);
 			netif_tx_stop_all_queues(dev);
 			port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
@@ -3299,7 +3299,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	mv_pp2x_port_interrupts_enable(port);
 
 	if (port->comphy) {
-		mv_gop110_port_disable(gop, mac);
+		mv_gop110_port_disable(gop, mac, port->comphy);
 		phy_power_on(port->comphy);
 		}
 
@@ -3307,7 +3307,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 		mv_pp21_port_enable(port);
 	} else {
 		mv_gop110_port_events_mask(gop, mac);
-		mv_gop110_port_enable(gop, mac);
+		mv_gop110_port_enable(gop, mac, port->comphy);
 	}
 
 	if (port->mac_data.phy_dev) {
@@ -3358,7 +3358,7 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 		mv_pp21_port_disable(port);
 	} else {
 		mv_gop110_port_events_mask(gop, mac);
-		mv_gop110_port_disable(gop, mac);
+		mv_gop110_port_disable(gop, mac, port->comphy);
 		port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
 		port->mac_data.flags &= ~MV_EMAC_F_PORT_UP;
 	}
@@ -4352,7 +4352,7 @@ static int mv_pp2x_port_init(struct mv_pp2x_port *port)
 	if (port->priv->pp2_version == PPV21)
 		mv_pp21_port_disable(port);
 	else
-		mv_gop110_port_disable(gop, mac);
+		mv_gop110_port_disable(gop, mac, port->comphy);
 
 	/* Allocate queues */
 	port->txqs = devm_kcalloc(dev, port->num_tx_queues, sizeof(*port->txqs),
