@@ -549,7 +549,22 @@ static void mvebu_uart_shutdown(struct uart_port *port)
 	writel(0, port->membase + uart_data->intr.ctrl_reg);
 }
 
-static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud);
+static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
+{
+	unsigned int baud_rate_div;
+	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+
+	/* The Uart clock is divided by the value of divisor to generate
+	 * UCLK_OUT clock, which must be 16 times faster than the target
+	 * baud rate:
+	 * UCLK_OUT = 16 times the taregt baud rate.
+	 */
+	if (!IS_ERR(uart_data->clk)) {
+		baud_rate_div = port->uartclk / (baud * 16);
+		writel(baud_rate_div, port->membase + REG_BRDV(uart_data));
+	}
+}
+
 static void mvebu_uart_set_termios(struct uart_port *port,
 				   struct ktermios *termios,
 				   struct ktermios *old)
@@ -751,22 +766,6 @@ static void mvebu_uart_console_write(struct console *co, const char *s,
 
 	if (locked)
 		spin_unlock_irqrestore(&port->lock, flags);
-}
-
-static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
-{
-	unsigned int baud_rate_div;
-	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
-
-	/* The Uart clock is divided by the value of divisor to generate
-	 * UCLK_OUT clock, which must be 16 times faster than the target
-	 * baud rate:
-	 * UCLK_OUT = 16 times the taregt baud rate.
-	 */
-	if (!IS_ERR(uart_data->clk)) {
-		baud_rate_div = port->uartclk / (baud * 16);
-		writel(baud_rate_div, port->membase + REG_BRDV(uart_data));
-	}
 }
 
 static int mvebu_uart_console_setup(struct console *co, char *options)
