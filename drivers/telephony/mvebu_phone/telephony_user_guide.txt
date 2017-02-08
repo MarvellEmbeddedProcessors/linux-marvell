@@ -27,7 +27,8 @@ Refer to: Documentation/devicetree/bindings/telephony/mvebu-phone.txt
 
 SLIC
 ----
-There are pre-compiled Linux Kernel modules for supported SLIC devices.
+There are pre-compiled Linux Kernel modules for supported SLIC devices
+located in the LSP release (rootfs/lib/modules/slic/):
 - Silabs SLICs:
 	- silabs-si3217x.ko
 	- silabs-si3226x.ko
@@ -46,8 +47,9 @@ For example: insmod silabs-si3226x.ko
 
 mv-voice-tool
 -------------
-User-space application which communicates via ioctl with the telephony
-driver. mv-voice-tool must suit the SLIC which is used:
+User-space application which communicates via ioctl with the telephony driver.
+The application is located in the LSP release (rootfs/usr/local/voice-tool).
+mv-voice-tool must suit the SLIC which is used:
 	SLIC			|	mv-voice-tool
 	------------------------|------------------------
 	silabs-si3226x.ko	|	mv_voice_tool-si3217x
