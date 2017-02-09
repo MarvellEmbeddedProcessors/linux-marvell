@@ -881,6 +881,16 @@ static int gd5f_ecc_init(struct nand_ecc_ctrl *ecc, int strength,
 		ecc->read_page = spinand_read_page_hwecc;
 		ecc->write_page = spinand_write_page_hwecc;
 		ecc->layout = &ecc_layout_4KB_8bit;
+	} else if (strength == 8 && ecc_stepsize == 512 && page_size == 2048) {
+		ecc->mode = NAND_ECC_HW;
+		ecc->size = 512;
+		ecc->bytes = 32;
+		ecc->steps = 4;
+		ecc->strength = 8;
+		ecc->total = ecc->steps * ecc->bytes;
+		ecc->read_page = spinand_read_page_hwecc;
+		ecc->write_page = spinand_write_page_hwecc;
+		ecc->layout = &ecc_layout_4KB_8bit;
 	} else {
 		pr_err("ECC strength %d at page size %d is not supported\n",
 		       strength, page_size);
