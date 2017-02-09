@@ -662,7 +662,7 @@ static int spinand_program_page(struct spi_device *spi_nand,
 
 #ifdef CONFIG_MTD_SPINAND_ONDIEECC
 static int spinand_write_page_hwecc(struct mtd_info *mtd,
-				    struct nand_chip *chip, const uint8_t *buf, int oob_required)
+				    struct nand_chip *chip, const uint8_t *buf, int oob_required, int page)
 {
 	enable_hw_ecc = 1;
 	chip->write_buf(mtd, buf, chip->ecc.size * chip->ecc.steps);
