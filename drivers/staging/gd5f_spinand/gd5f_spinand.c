@@ -990,7 +990,7 @@ static int spinand_probe(struct spi_device *spi_nand)
 	       sizeof(struct nand_flash_dev));
 	gd9f_flash_dev[1].name = NULL;
 	/* This should set up mtd->writesize, mtd->oobsize, etc. */
-	if (nand_scan_ident(mtd, 1, gd9f_flash_dev))
+	if (nand_scan(mtd, 1))
 		return -ENXIO;
 
 	/* Establish HW ECC parameters if there is on die ECC */
