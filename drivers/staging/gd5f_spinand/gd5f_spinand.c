@@ -843,6 +843,9 @@ static void spinand_cmdfunc(struct mtd_info *mtd, unsigned int command,
 	case NAND_CMD_ERASE1:
 		spinand_erase_block(info->spi, page);
 		break;
+	/* ERASE2 do nothing because ERASE1 has done the entire erase operation */
+	case NAND_CMD_ERASE2:
+		break;
 	/* SEQIN sets up the addr buffer and all registers except the length */
 	case NAND_CMD_SEQIN:
 		state->col = column;
