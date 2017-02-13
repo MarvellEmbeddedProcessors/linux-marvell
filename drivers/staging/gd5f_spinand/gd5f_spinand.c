@@ -26,6 +26,7 @@
 #define MAX_WAIT_JIFFIES		(40 * HZ)
 #define MAX_WAIT_ERASE_JIFFIES		((HZ * 400) / 1000)
 #define AVERAGE_WAIT_JIFFIES		((HZ * 20) / 1000)
+#define STAT_MASK			0x80
 
 #ifdef CONFIG_MTD_SPINAND_ONDIEECC
 
@@ -864,6 +865,14 @@ static void spinand_cmdfunc(struct mtd_info *mtd, unsigned int command,
 				"%s Wait execution complete timedout!\n",
 				__func__);
 		spinand_reset(info->spi);
+		break;
+	case NAND_CMD_STATUS:
+		spinand_get_protection(info->spi, state->buf);
+		if (!(state->buf[0] & STAT_MASK))
+			state->buf[0] |= STAT_MASK;
+		else
+			state->buf[0] &= ~STAT_MASK;
+		state->buf_ptr = 0;
 		break;
 	default:
 		dev_err(&mtd->dev, "Command 0x%x not implementd or unknown.\n",
