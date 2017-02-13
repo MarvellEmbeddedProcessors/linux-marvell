@@ -84,6 +84,8 @@
 #define MII_M1111_COPPER		0
 #define MII_M1111_FIBER			1
 
+#define MII_M1112_PHY_ENERGY_STATE	0x10
+
 #define MII_88E1121_PHY_MSCR_PAGE	2
 #define MII_88E1121_PHY_MSCR_REG	21
 #define MII_88E1121_PHY_MSCR_RX_DELAY	BIT(5)
@@ -1187,6 +1189,22 @@ static int marvell_probe(struct phy_device *phydev)
 	return 0;
 }
 
+static int m88e1112_read_status(struct phy_device *phydev)
+{
+	int val, bmcr;
+
+	if ((phydev->autoneg != AUTONEG_ENABLE) & (phydev->speed == SPEED_10)) {
+		val = phy_read(phydev, MII_M1011_IEVENT);
+		/* PHY reset required to detect link partner speed change and proper status read */
+		if (val & MII_M1112_PHY_ENERGY_STATE) {
+			bmcr = phy_read(phydev, MII_BMCR);
+			phy_write(phydev, MII_BMCR, bmcr | BMCR_RESET);
+		}
+	}
+
+	return genphy_read_status(phydev);
+}
+
 static struct phy_driver marvell_drivers[] = {
 	{
 		.phy_id = MARVELL_PHY_ID_88E1101,
@@ -1215,7 +1233,7 @@ static struct phy_driver marvell_drivers[] = {
 		.probe = marvell_probe,
 		.config_init = &m88e1111_config_init,
 		.config_aneg = &marvell_config_aneg,
-		.read_status = &genphy_read_status,
+		.read_status = &m88e1112_read_status,
 		.ack_interrupt = &marvell_ack_interrupt,
 		.config_intr = &marvell_config_intr,
 		.resume = &genphy_resume,
