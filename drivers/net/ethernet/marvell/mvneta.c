@@ -1948,8 +1948,10 @@ static inline int mvneta_rx_refill(struct mvneta_port *pp,
 		return -ENOMEM;
 
 #ifdef CONFIG_64BIT
-	if (unlikely(pp->data_high != ((u64)data & 0xffffffff00000000)))
+	if (unlikely(pp->data_high != ((u64)data & 0xffffffff00000000))) {
+		mvneta_frag_free(pp->frag_size, data);
 		return -ENOMEM;
+	}
 #endif
 
 	phys_addr = dma_map_single(pp->dev->dev.parent, data,
