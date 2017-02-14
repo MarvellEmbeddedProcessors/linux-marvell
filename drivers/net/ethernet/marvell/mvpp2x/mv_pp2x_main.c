@@ -3214,13 +3214,22 @@ static void mv_serdes_port_init(struct mv_pp2x_port *port)
 	break;
 	case PHY_INTERFACE_MODE_KR:
 	case PHY_INTERFACE_MODE_SFI:
-		mode = COMPHY_DEF(COMPHY_SFI_MODE, port->id,
-				  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
+		if (port->mac_data.flags & MV_EMAC_F_5G)
+			mode = COMPHY_DEF(COMPHY_SFI_MODE, port->id,
+					  COMPHY_SPEED_5_15625G, COMPHY_POLARITY_NO_INVERT);
+		else
+			mode = COMPHY_DEF(COMPHY_SFI_MODE, port->id,
+					  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
 		phy_set_mode(port->comphy, mode);
 	break;
 	case PHY_INTERFACE_MODE_XFI:
-		mode = COMPHY_DEF(COMPHY_XFI_MODE, port->id,
-				  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
+		if (port->mac_data.flags & MV_EMAC_F_5G)
+			mode = COMPHY_DEF(COMPHY_XFI_MODE, port->id,
+					  COMPHY_SPEED_5_15625G, COMPHY_POLARITY_NO_INVERT);
+		else
+			mode = COMPHY_DEF(COMPHY_XFI_MODE, port->id,
+					  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
+
 		phy_set_mode(port->comphy, mode);
 	break;
 	default:
@@ -4227,15 +4236,15 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 			/* check phy speed */
 			of_property_read_u32(emac_node, "phy-speed", &speed);
 			switch (speed) {
-			case 1000:
-				port->mac_data.speed = 1000; /* sgmii */
+			case SPEED_1000:
+				port->mac_data.speed = SPEED_1000; /* sgmii */
 				break;
-			case 2500:
-				port->mac_data.speed = 2500; /* sgmii */
+			case SPEED_2500:
+				port->mac_data.speed = SPEED_2500; /* sgmii */
 				port->mac_data.flags |= MV_EMAC_F_SGMII2_5;
 				break;
 			default:
-				port->mac_data.speed = 1000; /* sgmii */
+				port->mac_data.speed = SPEED_1000; /* sgmii */
 			}
 			break;
 		case PHY_INTERFACE_MODE_RXAUI:
@@ -4247,6 +4256,20 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 		case PHY_INTERFACE_MODE_KR:
 		case PHY_INTERFACE_MODE_SFI:
 		case PHY_INTERFACE_MODE_XFI:
+			speed = 0;
+			/* check phy speed */
+			of_property_read_u32(emac_node, "phy-speed", &speed);
+			switch (speed) {
+			case SPEED_10000:
+				port->mac_data.speed = SPEED_10000;
+				break;
+			case SPEED_5000:
+				port->mac_data.speed = SPEED_5000;
+				port->mac_data.flags |= MV_EMAC_F_5G;
+				break;
+			default:
+				port->mac_data.speed = SPEED_10000;
+			}
 			break;
 
 		default:
