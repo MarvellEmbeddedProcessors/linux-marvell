@@ -546,6 +546,9 @@ int mv_pp2x_get_new_comphy_mode(struct ethtool_cmd *cmd, int port_id)
 	if (cmd->speed == SPEED_10000 && port_id == 0)
 		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
 				  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
+	else if (cmd->speed == SPEED_5000 && port_id == 0)
+		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
+				  COMPHY_SPEED_5_15625G, COMPHY_POLARITY_NO_INVERT);
 	else if (cmd->speed == SPEED_2500)
 		return COMPHY_DEF(COMPHY_HS_SGMII_MODE, port_id,
 				  COMPHY_SPEED_3_125G, COMPHY_POLARITY_NO_INVERT);
@@ -559,8 +562,15 @@ int mv_pp2x_get_new_comphy_mode(struct ethtool_cmd *cmd, int port_id)
 
 void mv_pp2x_set_new_phy_mode(struct ethtool_cmd *cmd, struct mv_mac_data *mac)
 {
+	mac->flags &= ~(MV_EMAC_F_SGMII2_5 | MV_EMAC_F_5G);
+
 	if (cmd->speed == SPEED_10000) {
 		mac->phy_mode = PHY_INTERFACE_MODE_SFI;
+		mac->speed = SPEED_10000;
+	} else if (cmd->speed == SPEED_5000) {
+		mac->phy_mode = PHY_INTERFACE_MODE_SFI;
+		mac->speed = SPEED_5000;
+		mac->flags |= MV_EMAC_F_5G;
 	} else if (cmd->speed == SPEED_2500) {
 		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
 		mac->speed = SPEED_2500;
@@ -568,7 +578,6 @@ void mv_pp2x_set_new_phy_mode(struct ethtool_cmd *cmd, struct mv_mac_data *mac)
 	} else {
 		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
 		mac->speed = SPEED_1000;
-		mac->flags &= ~MV_EMAC_F_SGMII2_5;
 	}
 }
 
