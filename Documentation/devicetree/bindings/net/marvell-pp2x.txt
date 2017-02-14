@@ -38,7 +38,8 @@ emac required properties:
 - interrupts: Link change interrupt for the mac.
 - port-id: Should be '0', '2', or '3' for ethernet macs, references the mac-id (GOP port-id).
 - phy-mode: See ethernet.txt file in the same directory
-- phy-speed: For 2.5Gbits SGMII port 2500 phy-speed should be set(used only for 2.5Gbits SGMII port)
+- phy-speed: For 2.5Gbits SGMII port 2500 phy-speed should be set.
+	     For 5Gbits XSI/SFI port 5000 phy-speed should be set(used only for 2.5Gbits and 5Gbits)
 - phy-names: Used in MAC's connected to comphy. See phy-mvebu-comphy.txt in the phy directory
 - phys: Used in MAC's connected to comphy. Comphy index, see  phy-mvebu-comphy.txt in the phy directory
 
