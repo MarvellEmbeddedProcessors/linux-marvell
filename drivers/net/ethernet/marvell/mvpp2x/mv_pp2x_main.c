@@ -2318,6 +2318,8 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	int rx_received, rx_filled, i;
 	u32 rcvd_pkts = 0;
 	u32 rcvd_bytes = 0;
+	u32 refill_array[MVPP2_BM_POOLS_NUM] = {0};
+	u8  num_pool = MVPP2_BM_SWF_NUM_POOLS;
 	u8  first_bm_pool = port->priv->pp2_cfg.first_bm_pool;
 	int cpu = smp_processor_id();
 
@@ -2348,7 +2350,6 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		int rx_bytes;
 		dma_addr_t buf_phys_addr;
 		unsigned char *data;
-		int err;
 
 #if defined(__BIG_ENDIAN)
 		if (port->priv->pp2_version == PPV21)
@@ -2403,15 +2404,10 @@ err_drop_frame:
 			goto err_drop_frame;
 		}
 
-		err = mv_pp2x_rx_refill_new(port, bm_pool,
-					    bm_pool->log_id, 0, cpu);
-
-		if (unlikely(err))
-			netdev_err(port->dev, "failed to refill BM pools\n");
-
 		dma_unmap_single(dev->dev.parent, buf_phys_addr,
 				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
 				 DMA_FROM_DEVICE);
+		refill_array[bm_pool->log_id]++;
 
 #ifdef MVPP2_VERBOSE
 		mv_pp2x_skb_dump(skb, rx_desc->data_size, 4);
@@ -2432,6 +2428,27 @@ err_drop_frame:
 		skb_mark_napi_id(skb, napi);
 
 		napi_gro_receive(napi, skb);
+	}
+
+	/* Refill pool */
+	for (i = 0; i < num_pool; i++) {
+		int err;
+		struct mv_pp2x_bm_pool *refill_bm_pool;
+
+		if (!refill_array[i])
+			continue;
+
+		refill_bm_pool = &port->priv->bm_pools[i];
+		while (likely(refill_array[i]--)) {
+			err = mv_pp2x_rx_refill_new(port, refill_bm_pool,
+						    refill_bm_pool->id, 0, cpu);
+			if (unlikely(err)) {
+				netdev_err(port->dev, "failed to refill BM pools\n");
+				refill_array[i]++;
+				rx_filled -= refill_array[i];
+				break;
+			}
+		}
 	}
 
 	if (likely(rcvd_pkts)) {
