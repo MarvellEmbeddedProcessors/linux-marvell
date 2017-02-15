@@ -555,12 +555,25 @@ static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
 	/* The Uart clock is divided by the value of divisor to generate
-	 * UCLK_OUT clock, which must be 16 times faster than the target
-	 * baud rate:
+	 * UCLK_OUT clock, which is 16 times faster than the target baud rate:
 	 * UCLK_OUT = 16 times the taregt baud rate.
+	 * So the baudrate divisor can be calculated by:
+	 * divisor = input_clock / (baudrate * 16).
+	 * The divisor value is round up, and it works well with the baudrate 9600,
+	 * 19200, 38400, 57600, 115200, 230400.
+	 * But when working with baudrate 460800, the rounding up doesn't work,
+	 * since the error per bit frame is 15.2%.
+	 * (460800 - (25MHz / (0x4 * 16)))) / 460800 = 15.2%
+	 * Theoretically, neither round-up nor round-down will work well. However,
+	 * in this case, it needs to use Fractional Divisor when greater baud rate
+	 * accuracy is required. UCLK_OUT is no longer fixed at 16 times faster than
+	 * the desired baudrate but rather M times the desired baud rate. Where
+	 * M = (3*m1 + 3*m2 + 2*m3 +2*m4)/10. (m1, m2, m3, m4) are set with RD0012214h
+	 * (UART 2 Programmable Oversampling Stack).
+	 * Fraction divisor feature should be supported in the future on demand.
 	 */
 	if (!IS_ERR(uart_data->clk)) {
-		baud_rate_div = port->uartclk / (baud * 16);
+		baud_rate_div = DIV_ROUND_UP(port->uartclk, (16 * baud));
 		writel(baud_rate_div, port->membase + REG_BRDV(uart_data));
 	}
 }
