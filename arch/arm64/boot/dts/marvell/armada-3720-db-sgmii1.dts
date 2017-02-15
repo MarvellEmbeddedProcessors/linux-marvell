@@ -55,6 +55,9 @@
 				phy-mode = "sgmii";
 				phy = <&phy1>;
 				status = "okay";
+				buffer-manager = <&bm>;
+				bm,pool-long = <2>;
+				bm,pool-short = <3>;
 			};
 			usb3@58000 {
 				status = "disabled";
