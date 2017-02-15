@@ -100,6 +100,8 @@ struct uart_regs_layout {
 				 | STAT_PAR_ERR | STAT_OVR_ERR)
 
 #define UART_BRDV		0x10
+#define  BAUD_MASK		0x000003ff
+#define  BAUD_OFFSET		0
 
 /* REG_UART_A3700_EXT */
 #define UART_EXT_CTRL		0x04
@@ -551,6 +553,7 @@ static void mvebu_uart_shutdown(struct uart_port *port)
 
 static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
 {
+	unsigned int value;
 	unsigned int baud_rate_div;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 
@@ -574,7 +577,10 @@ static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
 	 */
 	if (!IS_ERR(uart_data->clk)) {
 		baud_rate_div = DIV_ROUND_UP(port->uartclk, (16 * baud));
-		writel(baud_rate_div, port->membase + REG_BRDV(uart_data));
+		value = readl(port->membase + REG_BRDV(uart_data));
+		value &= ~BAUD_MASK;
+		value |= baud_rate_div << BAUD_OFFSET;
+		writel(value, port->membase + REG_BRDV(uart_data));
 	}
 }
 
