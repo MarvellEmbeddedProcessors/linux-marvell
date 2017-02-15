@@ -94,6 +94,18 @@ gpio@440140 {
 		   <ICU_GRP_NSR 79 IRQ_TYPE_LEVEL_HIGH>;
 };
 
+tdm@7a0000 {
+	compatible = "marvell,armada-a8k-tdm";
+	reg = <0x7a0000 0x20000>;
+	reg-names = "tdm_regs";
+	interrupts = <ICU_GRP_NSR 111 IRQ_TYPE_LEVEL_HIGH>,
+		     <ICU_GRP_NSR 112 IRQ_TYPE_LEVEL_HIGH>,
+		     <ICU_GRP_NSR 113 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&cpm_syscon0 1 1>;
+	clock-names = "gateclk";
+	status = "disabled";
+};
+
 serial@702000 {
 	compatible = "snps,dw-apb-uart";
 	reg = <0x702000 0x100>;
