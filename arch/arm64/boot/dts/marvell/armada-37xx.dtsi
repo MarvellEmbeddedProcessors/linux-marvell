@@ -423,6 +423,22 @@
 				#phy-cells = <2>;
 				status = "disabled";
 			};
+
+			bm: bm@c0000 {
+				compatible = "marvell,armada-380-neta-bm";
+				reg = <0xc0000 0xac>;
+				clocks = <&sgateclk 9>;
+				internal-mem = <&bm_bppi>;
+				status = "disabled";
+			};
+
+			bm_bppi: bm-bppi {
+				compatible = "mmio-sram";
+				reg = <0xc8000 0x100000>;
+				clocks = <&sgateclk 9>;
+				no-memory-wc;
+				status = "disabled";
+			};
 		};
 
 		pcie0: pcie@d0070000 {

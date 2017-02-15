@@ -124,6 +124,9 @@
 				phy-mode = "rgmii-id";
 				phy = <&phy0>;
 				status = "okay";
+				buffer-manager = <&bm>;
+				bm,pool-long = <1>;
+				bm,pool-short = <3>;
 			};
 
 			mdio@32004 {
@@ -203,6 +206,12 @@
 					  3300000 0x0>;
 
 				enable-active-high;
+			};
+			bm: bm@c0000 {
+				status = "okay";
+			};
+			bm_bppi: bm-bppi {
+				status = "okay";
 			};
 		};
 
