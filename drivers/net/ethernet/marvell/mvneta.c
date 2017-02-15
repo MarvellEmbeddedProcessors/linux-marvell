@@ -310,12 +310,6 @@ enum mvneta_port_type {
 /* descriptor aligned size */
 #define MVNETA_DESC_ALIGNED_SIZE	32
 
-/* Number of bytes to be taken into account by HW when putting incoming data
- * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
- * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.
- */
-#define MVNETA_RX_PKT_OFFSET_CORRECTION	64
-
 #define MVNETA_RX_PKT_SIZE(mtu) \
 	ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
 	      ETH_HLEN + ETH_FCS_LEN,			     \
@@ -977,6 +971,7 @@ static inline void mvneta_bm_pool_bufsize_set(struct mvneta_port *pp,
 {
 	u32 val;
 
+	buf_size -= pp->rx_offset_correction;
 	if (!IS_ALIGNED(buf_size, 8)) {
 		dev_warn(pp->dev->dev.parent,
 			 "illegal buf_size value %d, round to %d\n",
@@ -2385,7 +2380,7 @@ err_drop_frame:
 		/* After refill old buffer has to be unmapped regardless
 		 * the skb is successfully built or not.
 		 */
-		dma_unmap_single(&pp->bm_priv->pdev->dev, phys_addr,
+		dma_unmap_single(&pp->bm_priv->pdev->dev, phys_addr - pp->rx_offset_correction,
 				 bm_pool->buf_size, DMA_FROM_DEVICE);
 		if (!skb)
 			goto err_drop_frame;
