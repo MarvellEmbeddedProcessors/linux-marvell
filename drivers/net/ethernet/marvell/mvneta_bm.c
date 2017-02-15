@@ -98,13 +98,17 @@ int mvneta_bm_construct(struct hwbm_pool *hwbm_pool, void *buf)
 
 	/* In order to update buf_cookie field of RX descriptor properly,
 	 * BM hardware expects buf virtual address to be placed in the
-	 * first four bytes of mapped buffer.
+	 * first four bytes of corrected mapped buffer.
 	 */
-	*(u32 *)buf = (u32)buf;
+	u8 *tmp = (u8 *)buf + priv->rx_offset_correction;
+	*(u32 *)tmp = (u32)((uintptr_t)buf & 0xffffffff);
+
 	phys_addr = dma_map_single(&priv->pdev->dev, buf, bm_pool->buf_size,
 				   DMA_FROM_DEVICE);
 	if (unlikely(dma_mapping_error(&priv->pdev->dev, phys_addr)))
 		return -ENOMEM;
+
+	phys_addr += priv->rx_offset_correction;
 
 	mvneta_bm_pool_put_bp(priv, bm_pool, phys_addr);
 	return 0;
@@ -115,9 +119,11 @@ EXPORT_SYMBOL_GPL(mvneta_bm_construct);
 static int mvneta_bm_pool_create(struct mvneta_bm *priv,
 				 struct mvneta_bm_pool *bm_pool)
 {
+	const struct mbus_dram_target_info *dram_target_info;
 	struct platform_device *pdev = priv->pdev;
 	u8 target_id, attr;
-	int size_bytes, err;
+	int size_bytes, i;
+
 	size_bytes = sizeof(u32) * bm_pool->hwbm_pool.size;
 	bm_pool->virt_addr = dma_alloc_coherent(&pdev->dev, size_bytes,
 						&bm_pool->phys_addr,
@@ -125,7 +131,7 @@ static int mvneta_bm_pool_create(struct mvneta_bm *priv,
 	if (!bm_pool->virt_addr)
 		return -ENOMEM;
 
-	if (!IS_ALIGNED((u32)bm_pool->virt_addr, MVNETA_BM_POOL_PTR_ALIGN)) {
+	if (!IS_ALIGNED((uintptr_t)bm_pool->virt_addr, MVNETA_BM_POOL_PTR_ALIGN)) {
 		dma_free_coherent(&pdev->dev, size_bytes, bm_pool->virt_addr,
 				  bm_pool->phys_addr);
 		dev_err(&pdev->dev, "BM pool %d is not %d bytes aligned\n",
@@ -133,19 +139,26 @@ static int mvneta_bm_pool_create(struct mvneta_bm *priv,
 		return -ENOMEM;
 	}
 
-	err = mvebu_mbus_get_dram_win_info(bm_pool->phys_addr, &target_id,
-					   &attr);
-	if (err < 0) {
-		dma_free_coherent(&pdev->dev, size_bytes, bm_pool->virt_addr,
-				  bm_pool->phys_addr);
-		return err;
+	dram_target_info = mv_mbus_dram_info();
+	if (dram_target_info) {
+		target_id = dram_target_info->mbus_dram_target_id;
+		attr = 0;
+		/* Try to find matching DRAM window for buffer phyaddr */
+		for (i = 0; i < dram_target_info->num_cs; i++) {
+			const struct mbus_dram_window *cs = dram_target_info->cs + i;
+
+			if ((cs->base <= bm_pool->phys_addr) &&
+			    (bm_pool->phys_addr <= (cs->base + cs->size - 1))) {
+				attr = cs->mbus_attr;
+				break;
+			}
+		}
+		mvneta_bm_pool_target_set(priv, bm_pool->id, target_id, attr);
 	}
 
 	/* Set pool address */
-	mvneta_bm_write(priv, MVNETA_BM_POOL_BASE_REG(bm_pool->id),
-			bm_pool->phys_addr);
+	mvneta_bm_write(priv, MVNETA_BM_POOL_BASE_REG(bm_pool->id), bm_pool->phys_addr);
 
-	mvneta_bm_pool_target_set(priv, bm_pool->id, target_id,  attr);
 	mvneta_bm_pool_enable(priv, bm_pool->id);
 
 	return 0;
@@ -373,8 +386,10 @@ static int mvneta_bm_get_sram(struct device_node *dn,
 			      struct mvneta_bm *priv)
 {
 	priv->bppi_pool = of_gen_pool_get(dn, "internal-mem", 0);
-	if (!priv->bppi_pool)
+	if (!priv->bppi_pool) {
+		pr_err("%s:: no internal-mem node found\n", __func__);
 		return -ENOMEM;
+	}
 
 	priv->bppi_virt_addr = gen_pool_dma_alloc(priv->bppi_pool,
 						  MVNETA_BM_BPPI_SIZE,
@@ -428,6 +443,12 @@ static int mvneta_bm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to initialize controller\n");
 		goto err_sram;
 	}
+
+	/* HW support packet headroom up to 127 bytes.
+	 * MVNETA_RX_PKT_OFFSET_CORRECTION (64) defines maximum headroom size supported by driver.
+	 * rx_offset_correction calculated to meet requirement above.
+	 */
+	priv->rx_offset_correction = max(0, NET_SKB_PAD - MVNETA_RX_PKT_OFFSET_CORRECTION);
 
 	dn->data = priv;
 	platform_set_drvdata(pdev, priv);

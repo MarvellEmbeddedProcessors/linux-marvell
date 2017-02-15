@@ -13,6 +13,12 @@
 #ifndef _MVNETA_BM_H_
 #define _MVNETA_BM_H_
 
+/* Number of bytes to be taken into account by HW when putting incoming data
+ * to the buffers. It is needed in case NET_SKB_PAD exceeds maximum packet
+ * offset supported in MVNETA_RXQ_CONFIG_REG(q) registers.
+ */
+#define MVNETA_RX_PKT_OFFSET_CORRECTION		64
+
 /* BM Configuration Register */
 #define MVNETA_BM_CONFIG_REG			0x0
 #define    MVNETA_BM_STATUS_MASK		0x30
@@ -96,6 +102,7 @@ struct mvneta_bm {
 	void __iomem *reg_base;
 	struct clk *clk;
 	struct platform_device *pdev;
+	u16 rx_offset_correction;
 
 	struct gen_pool *bppi_pool;
 	/* BPPI virtual base address */
@@ -120,6 +127,7 @@ struct mvneta_bm_pool {
 
 	/* BPPE virtual base address */
 	u32 *virt_addr;
+
 	/* BPPE physical base address */
 	dma_addr_t phys_addr;
 
