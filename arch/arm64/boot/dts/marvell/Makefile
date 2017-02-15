@@ -10,6 +10,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-community.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-37x0-customer.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-A.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-B.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-C.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-nand.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db-all-pcie.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-70x0-customer.dtb

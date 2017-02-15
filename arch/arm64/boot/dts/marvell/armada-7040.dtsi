@@ -82,7 +82,11 @@
 		config-space {
 			pinctrl@440000 {
 			compatible = "marvell,a70x0-pinctrl";
-
+				cpm_tdm_pins: tdm-pins {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+					"mpp3", "mpp4", "mpp5";
+					marvell,function = "tdm";
+				};
 				i2c0_pins: i2c-pins-0 {
 					marvell,pins = "mpp37", "mpp38";
 					marvell,function = "i2c0";
