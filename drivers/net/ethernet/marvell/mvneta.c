@@ -298,10 +298,14 @@ enum mvneta_port_type {
 #define TSO_HEADER_SIZE 128
 
 /* Max number of Rx descriptors */
-#define MVNETA_MAX_RXD 128
+#define MVNETA_MAX_RXD 4096
+/* Default number of Rx descriptors */
+#define MVNETA_RXD_NUM 128
 
 /* Max number of Tx descriptors */
-#define MVNETA_MAX_TXD 532
+#define MVNETA_MAX_TXD 4096
+/* Default number of Tx descriptors */
+#define MVNETA_TXD_NUM 532
 
 /* Max number of allowed TCP segments for software TSO */
 #define MVNETA_MAX_TSO_SEGS 100
@@ -4008,6 +4012,9 @@ static int mvneta_ethtool_set_ringparam(struct net_device *dev,
 		return -EINVAL;
 	pp->rx_ring_size = ring->rx_pending < MVNETA_MAX_RXD ?
 		ring->rx_pending : MVNETA_MAX_RXD;
+	if (pp->rx_ring_size != ring->rx_pending)
+		netdev_warn(dev, "RX queue size set to %u (requested %u)\n",
+			    pp->rx_ring_size, ring->rx_pending);
 
 	pp->tx_ring_size = clamp_t(u16, ring->tx_pending,
 				   MVNETA_MAX_SKB_DESCS * 2, MVNETA_MAX_TXD);
@@ -4660,7 +4667,7 @@ static int mvneta_probe(struct platform_device *pdev)
 		goto err_put_phy_node;
 	}
 
-	dev->tx_queue_len = MVNETA_MAX_TXD;
+	dev->tx_queue_len = MVNETA_TXD_NUM;
 	dev->watchdog_timeo = 5 * HZ;
 	dev->netdev_ops = &mvneta_netdev_ops;
 
@@ -4774,8 +4781,8 @@ static int mvneta_probe(struct platform_device *pdev)
 	if (dram_target_info || pp->neta_armada3700)
 		mvneta_conf_mbus_windows(pp, dram_target_info);
 
-	pp->tx_ring_size = MVNETA_MAX_TXD;
-	pp->rx_ring_size = MVNETA_MAX_RXD;
+	pp->tx_ring_size = MVNETA_TXD_NUM;
+	pp->rx_ring_size = MVNETA_RXD_NUM;
 
 	pp->dev = dev;
 	SET_NETDEV_DEV(dev, &pdev->dev);
