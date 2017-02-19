@@ -642,9 +642,11 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 		mv_pp22_set_net_comp(port->priv);
 
 		if (mac->flags & MV_EMAC_F_PORT_UP) {
+			mv_gop110_port_disable(gop, mac, port->comphy);
+			phy_power_on(port->comphy);
 			mv_gop110_port_events_unmask(gop, mac);
 			mv_gop110_port_enable(gop, mac, port->comphy);
-			phy_power_on(port->comphy);
+			netif_carrier_on(port->dev);
 		}
 	}
 
