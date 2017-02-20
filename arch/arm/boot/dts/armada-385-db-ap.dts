@@ -221,6 +221,11 @@
 				status = "okay";
 				usb-phy = <&usb3_phy>;
 			};
+
+			crypto@90000 {
+				status = "okay";
+			};
+
 		};
 
 		bm-bppi {

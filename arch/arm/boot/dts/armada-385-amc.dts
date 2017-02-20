@@ -139,6 +139,11 @@
 				};
 			};
 
+			crypto@90000 {
+				status = "okay";
+			};
+
+
 		};
 
 		pcie-controller {

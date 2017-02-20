@@ -196,6 +196,11 @@
 					reg = <0x280000 0x680000>;   /* 6.5MB */
 				};
 			};
+
+			crypto@90000 {
+				status = "okay";
+			};
+
 		};
 
 		pcie-controller {

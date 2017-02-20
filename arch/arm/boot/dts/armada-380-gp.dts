@@ -195,6 +195,10 @@
 				vcc-supply = <&reg_usb3_vbus>;
 				status = "okay";
 			};
+
+			crypto@90000 {
+				status = "okay";
+			};
 		};
 
 		pcie-controller {
