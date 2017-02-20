@@ -127,6 +127,11 @@
 			usb3@f0000 {
 				status = "okay";
 			};
+
+			crypto@90000 {
+				status = "okay";
+			};
+
 		};
 
 		pcie-controller {

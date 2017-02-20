@@ -131,7 +131,7 @@
 				};
 			};
 
-			crypto@9D000 {
+			crypto@90000 {
 				status = "okay";
 			};
 
