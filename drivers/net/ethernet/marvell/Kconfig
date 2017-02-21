@@ -80,12 +80,13 @@ config MVNETA
 	  (Dove, Orion, Discovery, Kirkwood).
 
 config MVPP2
-	tristate "Marvell Armada 375 network interface support"
-	depends on MACH_ARMADA_375
+	tristate "Marvell Armada 375/70xx/80xx network interface support(mainline)"
+	depends on ARCH_MVEBU
 	select MVMDIO
+	select MVXMDIO
 	---help---
 	  This driver supports the network interface units in the
-	  Marvell ARMADA 375 SoC.
+	  Marvell ARMADA 375/70xx/80xx SoC series
 
 config MVPP2X
         tristate "Marvell Armada 375/70xx/80xx network interface support"
