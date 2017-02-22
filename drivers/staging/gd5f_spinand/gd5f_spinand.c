@@ -56,27 +56,6 @@ static struct nand_ecclayout ecc_layout_4KB_8bit = {
 };
 #endif
 
-static struct nand_flash_dev gd5f_spinand_flash_types[] = {
-	{
-		.name = "4Gb SPI NAND 3.3V",
-		/* MID, DID, DID */
-		.id = { 0xC8, 0xB4, 0x68 },
-		/* Page size in bytes */
-		.pagesize = 4096,
-		/* Chip size in MB */
-		.chipsize = 512,
-		/* Erase size in bytes = page size x number pages per block*/
-		.erasesize = 4096 * 64,
-		.id_len = 3,
-		/* OOB size per page in bytes */
-		.oobsize = 256,
-		/* ECC correctability = no of ECC bits per step */
-		.ecc.strength_ds = 8,
-		/* EC step */
-		.ecc.step_ds = 512
-	}
-};
-
 /* mtd_to_state - obtain the spinand state from the mtd info provided */
 static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
 {
@@ -921,9 +900,7 @@ static int spinand_probe(struct spi_device *spi_nand)
 	struct spinand_info *info;
 	struct spinand_state *state;
 	struct mtd_part_parser_data ppdata;
-	struct nand_flash_dev gd9f_flash_dev[2];
-	u16 id;
-	int i, num, ret;
+	int ret;
 
 	/* Allocate, verify and initialize spinand_info */
 	info  = devm_kzalloc(&spi_nand->dev, sizeof(struct spinand_info),
@@ -973,22 +950,6 @@ static int spinand_probe(struct spi_device *spi_nand)
 	chip->options	|= NAND_CACHEPRG;
 	chip->select_chip = spinand_select_chip;
 
-	/* Read ID and establish type of chip */
-	chip->cmdfunc(mtd, NAND_CMD_READID, 0, 0);
-	id = *((u16 *)(state->buf));
-	num = ARRAY_SIZE(gd5f_spinand_flash_types);
-	for (i = 0; i < num; i++) {
-		if (*((u16 *)(gd5f_spinand_flash_types[i].id)) == id)
-			break;
-	}
-	if (i == num) {
-		pr_err("Error! Flash is not defined.\n");
-		return -EINVAL;
-	}
-
-	memcpy(&gd9f_flash_dev[0], gd5f_spinand_flash_types + i,
-	       sizeof(struct nand_flash_dev));
-	gd9f_flash_dev[1].name = NULL;
 	/* This should set up mtd->writesize, mtd->oobsize, etc. */
 	if (nand_scan(mtd, 1))
 		return -ENXIO;
