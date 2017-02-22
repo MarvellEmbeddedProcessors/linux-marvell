@@ -1,0 +1,13 @@
+GigaDevice 4Gb SPI NAND flash
+
+Required properties:
+- compatible: "gigadevice,gd5f"
+- reg: SPI chip select line
+- spi-max-frequency : maximum frequency of the SPI bus the chip can operate at
+
+
+gd5f: spi@18101000 {
+	compatible = "gigadevice,gd5f";
+	reg = <1>; /* Chip select 1 */
+	spi-max-frequency = <6250000>;
+};
