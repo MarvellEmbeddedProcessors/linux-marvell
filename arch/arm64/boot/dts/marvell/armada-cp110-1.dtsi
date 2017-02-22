@@ -349,9 +349,10 @@ cps_trng: trng@760000 {
 	status = "okay";
 };
 
-eip197@800000 {
+cps_eip197: eip197@800000 {
 	compatible = "marvell,eip197";
-	reg = <0x800000 0x200000>;
+	reg = <0x800000 0x100000 0x880000 0x1000 0x881000 0x1000 0x882000 0x1000 0x883000 0x1000>;
+	reg-names = "global", "ring0", "ring1", "ring2", "ring3";
 	dma-coherent;
 	interrupts = <ICU_GRP_NSR 88 IRQ_TYPE_LEVEL_HIGH>,
 			<ICU_GRP_NSR 89 IRQ_TYPE_LEVEL_HIGH>,
