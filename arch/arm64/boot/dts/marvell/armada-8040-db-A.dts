@@ -214,7 +214,7 @@
 				};
 			};
 			eip197@800000 {
-				status = "disabled";
+				status = "okay";
 			};
 			comphy {
 				status = "okay";
