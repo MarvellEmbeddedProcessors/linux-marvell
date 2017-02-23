@@ -172,4 +172,5 @@
 
 &pcie0 {
 	status = "okay";
+	reset-gpios = <&gpio_sb 3 GPIO_ACTIVE_HIGH>;
 };
