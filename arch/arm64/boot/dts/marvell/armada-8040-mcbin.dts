@@ -97,6 +97,9 @@
 					marvell,function = "gpio";
 				};
 			};
+			comphy0: comphy {
+				status = "okay";
+			};
 			sdhci@780000 {
 				vqmmc-supply = <&vccq_sdio_reg>;
 				bus-width = <4>;
@@ -166,6 +169,9 @@
 
 	cpn-110-slave {
 		config-space {
+			comphy1: comphy {
+				status = "okay";
+			};
 			usb3h0_1: usb3@500000 {
 				usb-phy = <&usb3h0_phy>;
 				status = "okay";
