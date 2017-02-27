@@ -305,6 +305,43 @@ static int mvebu_cp110_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 	data = 0x0 << HPIPE_OS_PH_VALID_OFFSET;
 	reg_set(hpipe_addr + HPIPE_PHASE_CONTROL_REG, data, mask);
 
+	/* Set G1 TX amplitude and TX post emphasis value */
+	mask = HPIPE_G1_SET_0_G1_TX_AMP_MASK;
+	data = 0x8 << HPIPE_G1_SET_0_G1_TX_AMP_OFFSET;
+	mask |= HPIPE_G1_SET_0_G1_TX_AMP_ADJ_MASK;
+	data |= 0x1 << HPIPE_G1_SET_0_G1_TX_AMP_ADJ_OFFSET;
+	mask |= HPIPE_G1_SET_0_G1_TX_EMPH1_MASK;
+	data |= 0x1 << HPIPE_G1_SET_0_G1_TX_EMPH1_OFFSET;
+	mask |= HPIPE_G1_SET_0_G1_TX_EMPH1_EN_MASK;
+	data |= 0x1 << HPIPE_G1_SET_0_G1_TX_EMPH1_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SET_0_REG, data, mask);
+
+	/* Set G2 TX amplitude and TX post emphasis value */
+	mask = HPIPE_G2_SET_0_G2_TX_AMP_MASK;
+	data = 0xa << HPIPE_G2_SET_0_G2_TX_AMP_OFFSET;
+	mask |= HPIPE_G2_SET_0_G2_TX_AMP_ADJ_MASK;
+	data |= 0x1 << HPIPE_G2_SET_0_G2_TX_AMP_ADJ_OFFSET;
+	mask |= HPIPE_G2_SET_0_G2_TX_EMPH1_MASK;
+	data |= 0x2 << HPIPE_G2_SET_0_G2_TX_EMPH1_OFFSET;
+	mask |= HPIPE_G2_SET_0_G2_TX_EMPH1_EN_MASK;
+	data |= 0x1 << HPIPE_G2_SET_0_G2_TX_EMPH1_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G2_SET_0_REG, data, mask);
+
+	/* Set G3 TX amplitude and TX post emphasis value */
+	mask = HPIPE_G3_SET_0_G3_TX_AMP_MASK;
+	data = 0xe << HPIPE_G3_SET_0_G3_TX_AMP_OFFSET;
+	mask |= HPIPE_G3_SET_0_G3_TX_AMP_ADJ_MASK;
+	data |= 0x1 << HPIPE_G3_SET_0_G3_TX_AMP_ADJ_OFFSET;
+	mask |= HPIPE_G3_SET_0_G3_TX_EMPH1_MASK;
+	data |= 0x6 << HPIPE_G3_SET_0_G3_TX_EMPH1_OFFSET;
+	mask |= HPIPE_G3_SET_0_G3_TX_EMPH1_EN_MASK;
+	data |= 0x1 << HPIPE_G3_SET_0_G3_TX_EMPH1_EN_OFFSET;
+	mask |= HPIPE_G3_SET_0_G3_TX_SLEW_RATE_SEL_MASK;
+	data |= 0x4 << HPIPE_G3_SET_0_G3_TX_SLEW_RATE_SEL_OFFSET;
+	mask |= HPIPE_G3_SET_0_G3_TX_SLEW_CTRL_EN_MASK;
+	data |= 0x0 << HPIPE_G3_SET_0_G3_TX_SLEW_CTRL_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G3_SET_0_REG, data, mask);
+
 	/* SERDES External Configuration 2 register */
 	mask = SD_EXTERNAL_CONFIG2_SSC_ENABLE_MASK;
 	data = 0x1 << SD_EXTERNAL_CONFIG2_SSC_ENABLE_OFFSET;
