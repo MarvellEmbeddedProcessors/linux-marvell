@@ -1264,7 +1264,7 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
 #define ATTR(id)   (((id) & 0x00FF0000) >> 16)
 
 static int __init mbus_dt_setup_win(struct mvebu_mbus_state *mbus,
-				    u32 base, u32 size,
+				    u32 base, u32 size, u32 remap,
 				    u8 target, u8 attr)
 {
 	if (!mvebu_mbus_window_conflicts(mbus, base, size, target, attr)) {
@@ -1273,7 +1273,7 @@ static int __init mbus_dt_setup_win(struct mvebu_mbus_state *mbus,
 		return -EBUSY;
 	}
 
-	if (mvebu_mbus_alloc_window(mbus, base, size, MVEBU_MBUS_NO_REMAP,
+	if (mvebu_mbus_alloc_window(mbus, base, size, remap,
 				    target, attr)) {
 		pr_err("cannot add window '%04x:%04x', too many windows\n",
 		       target, attr);
@@ -1284,7 +1284,7 @@ static int __init mbus_dt_setup_win(struct mvebu_mbus_state *mbus,
 
 static int
 mbus_parse_ranges(struct device_node *node,
-		  int *addr_cells, int *c_addr_cells, int *c_size_cells,
+		  int *addr_cells, int *c_addr_cells, int *c_size_cells, int *c_remap_cells,
 		  int *cell_count, const __be32 **ranges_start,
 		  const __be32 **ranges_end)
 {
@@ -1294,7 +1294,7 @@ mbus_parse_ranges(struct device_node *node,
 	/* Allow a node with no 'ranges' property */
 	*ranges_start = of_get_property(node, "ranges", &ranges_len);
 	if (*ranges_start == NULL) {
-		*addr_cells = *c_addr_cells = *c_size_cells = *cell_count = 0;
+		*addr_cells = *c_addr_cells = *c_size_cells = *c_remap_cells = *cell_count = 0;
 		*ranges_start = *ranges_end = NULL;
 		return 0;
 	}
@@ -1308,7 +1308,10 @@ mbus_parse_ranges(struct device_node *node,
 	prop = of_get_property(node, "#size-cells", NULL);
 	*c_size_cells = be32_to_cpup(prop);
 
-	*cell_count = *addr_cells + *c_addr_cells + *c_size_cells;
+	prop = of_get_property(node, "#remap-cells", NULL);
+	*c_remap_cells = prop ? be32_to_cpup(prop) : 0;
+
+	*cell_count = *addr_cells + *c_addr_cells + *c_size_cells + *c_remap_cells;
 	tuple_len = (*cell_count) * sizeof(__be32);
 
 	if (ranges_len % tuple_len) {
@@ -1321,18 +1324,18 @@ mbus_parse_ranges(struct device_node *node,
 static int __init mbus_dt_setup(struct mvebu_mbus_state *mbus,
 				struct device_node *np)
 {
-	int addr_cells, c_addr_cells, c_size_cells;
+	int addr_cells, c_addr_cells, c_size_cells, c_remap_cells;
 	int i, ret, cell_count;
 	const __be32 *r, *ranges_start, *ranges_end;
 
 	ret = mbus_parse_ranges(np, &addr_cells, &c_addr_cells,
-				&c_size_cells, &cell_count,
+				&c_size_cells, &c_remap_cells, &cell_count,
 				&ranges_start, &ranges_end);
 	if (ret < 0)
 		return ret;
 
 	for (i = 0, r = ranges_start; r < ranges_end; r += cell_count, i++) {
-		u32 windowid, base, size;
+		u32 windowid, base, size, remap;
 		u8 target, attr;
 
 		/*
@@ -1349,7 +1352,13 @@ static int __init mbus_dt_setup(struct mvebu_mbus_state *mbus,
 		base = of_read_number(r + c_addr_cells, addr_cells);
 		size = of_read_number(r + c_addr_cells + addr_cells,
 				      c_size_cells);
-		ret = mbus_dt_setup_win(mbus, base, size, target, attr);
+		if (c_remap_cells)
+			remap = of_read_number(r + c_addr_cells + addr_cells
+				      + c_size_cells, c_remap_cells);
+		else
+			remap = MVEBU_MBUS_NO_REMAP;
+
+		ret = mbus_dt_setup_win(mbus, base, size, remap, target, attr);
 		if (ret < 0)
 			return ret;
 	}
