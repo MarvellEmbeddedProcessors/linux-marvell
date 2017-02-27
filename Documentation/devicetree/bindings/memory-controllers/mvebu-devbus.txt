@@ -19,9 +19,12 @@ Required properties:
 
  - #address-cells:      Must be set to 1
  - #size-cells:         Must be set to 1
+ - #remap-cells:        Optional, if exists then must be set to 1
  - ranges:              Must be set up to reflect the memory layout with four
                         integer values for each chip-select line in use:
-                        0 <physical address of mapping> <size>
+                        0 <physical address of mapping> <size> [<remap>]
+                        The missing remap ( remap_cells==(0||unset) )
+                        means no remap
 
 Optional properties:
 
