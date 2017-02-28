@@ -152,6 +152,8 @@ sata: sata@540000 {
 	dma-coherent;
 	interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cpm_syscon0 1 15>;
+	comreset_u = <0x17>;
+	comwake = <0x6>;
 	status = "disabled";
 	#address-cells = <1>;
 	#size-cells = <0>;

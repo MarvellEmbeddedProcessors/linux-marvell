@@ -70,6 +70,8 @@ sata@540000 {
 	interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 15>;
 	status = "disabled";
+	comreset_u = <0x17>;
+	comwake = <0x6>;
 	#address-cells = <1>;
 	#size-cells = <0>;
 
