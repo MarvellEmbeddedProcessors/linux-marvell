@@ -142,6 +142,8 @@ enum {
 	PORT_SCR_NTF		= 0x3c, /* SATA phy register: SNotification */
 	PORT_FBS		= 0x40, /* FIS-based Switching */
 	PORT_DEVSLP		= 0x44, /* device sleep */
+	PORT_INDIRECT_ADDR	= 0x78, /* Indirect Access Port PHY Address Register */
+	PORT_INDIRECT_DATA	= 0x7c, /* Indirect Access Port PHY Data Register */
 
 	/* PORT_IRQ_{STAT,MASK} bits */
 	PORT_IRQ_COLD_PRES	= (1 << 31), /* cold presence detect */
@@ -214,6 +216,12 @@ enum {
 	PORT_DEVSLP_DETO_OFFSET	= 2,              /* DevSlp exit timeout */
 	PORT_DEVSLP_DSP		= (1 << 1),       /* DevSlp present */
 	PORT_DEVSLP_ADSE	= (1 << 0),       /* Aggressive DevSlp enable */
+
+	/* PORT OOB Params */
+	PORT_OOB_INDIRECT_ADDR	= 0x48,		/* OOB register address */
+	PORT_OOB_COMRESET_U_MASK = 0x3f,	/* OOB COMRESET UPPER LIMIT MASK */
+	PORT_OOB_COMWAKE_OFFSET	= 12,		/* OOB COMWAKE OFFSET */
+	PORT_OOB_COMWAKE_MASK	= (0xf << 12),	/* OOB COMWAKE MASK */
 
 	/* hpriv->flags bits */
 
@@ -346,6 +354,13 @@ struct ahci_host_priv {
 	unsigned		nports;		/* Number of ports */
 	void			*plat_data;	/* Other platform data */
 	unsigned int		irq;		/* interrupt line */
+
+	/* OOB (Out of Band) parameters */
+	/* High limit of the spacing between two bursts of COMRESET */
+	u32 comreset_u;
+	/* High limit of the spacing between two bursts of COMWAKE */
+	u32 comwake;
+
 	/*
 	 * Optional ahci_start_engine override, if not set this gets set to the
 	 * default ahci_start_engine during ahci_save_initial_config, this can

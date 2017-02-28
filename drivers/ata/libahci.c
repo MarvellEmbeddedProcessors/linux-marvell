@@ -1128,6 +1128,40 @@ static void ahci_port_init(struct device *dev, struct ata_port *ap,
 	if (rc)
 		dev_warn(dev, "%s (%d)\n", emsg, rc);
 
+	if (hpriv->comreset_u) {
+		u32 reg;
+
+		/* Modify COMRESET spacing upper limit which controls the high
+		 * limit of the spacing between two bursts of COMRESET where we
+		 * still respond to COMRESET command.
+		 *
+		 * This is indirect access, so we write the required address,
+		 * then read the register, modify it and write back.
+		 */
+		writel(PORT_OOB_INDIRECT_ADDR, port_mmio + PORT_INDIRECT_ADDR);
+		reg = readl(port_mmio + PORT_INDIRECT_DATA);
+		reg &= ~PORT_OOB_COMRESET_U_MASK;
+		reg |= hpriv->comreset_u;
+		writel(reg, port_mmio + PORT_INDIRECT_DATA);
+	}
+
+	if (hpriv->comwake) {
+		u32 reg;
+
+		/* Modify COMWAKE spacing upper limit which controls the high
+		 * limit of the spacing between two bursts of COMWAKE where we
+		 * still respond to COMWAKE command.
+		 *
+		 * This is indirect access, so we write the required address,
+		 * then read the register, modify it and write back.
+		 */
+		writel(PORT_OOB_INDIRECT_ADDR, port_mmio + PORT_INDIRECT_ADDR);
+		reg = readl(port_mmio + PORT_INDIRECT_DATA);
+		reg &= ~PORT_OOB_COMWAKE_MASK;
+		reg |= hpriv->comwake << PORT_OOB_COMWAKE_OFFSET;
+		writel(reg, port_mmio + PORT_INDIRECT_DATA);
+	}
+
 	/* clear SError */
 	tmp = readl(port_mmio + PORT_SCR_ERR);
 	VPRINTK("PORT_SCR_ERR 0x%x\n", tmp);
