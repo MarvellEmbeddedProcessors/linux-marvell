@@ -1,7 +1,7 @@
-From 234d7fb6add95d194b70eb9432d29b8ffb96ee50 Mon Sep 17 00:00:00 2001
+From ad68cec696d85b555dbbc82ef6cd49d43aec9d86 Mon Sep 17 00:00:00 2001
 From: Marcin Wojtas <mw@semihalf.com>
 Date: Tue, 24 Jan 2017 11:58:29 +0100
-Subject: [PATCH 3/3] rt: clean compilation warnings after applying PREEMPT_RT
+Subject: [PATCH 2/3] rt: clean compilation warnings after applying PREEMPT_RT
  patch
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
@@ -24,18 +24,18 @@ index 3ff6363..5cd664b 100644
  
  	clk_enable(uap->clk);
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index da96d97..d641c61 100644
+index e9b8d51..e7c89af 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -3468,7 +3468,7 @@ static __always_inline int preemptible_lazy(void)
+@@ -3494,7 +3494,7 @@ static __always_inline int preemptible_lazy(void)
  	return 1;
  }
  
 -#else
 +#elif defined(CONFIG_PREEMPT)
  
- static int preemptible_lazy(void)
+ static inline int preemptible_lazy(void)
  {
 -- 
-1.9.1
+1.8.3.1
 
