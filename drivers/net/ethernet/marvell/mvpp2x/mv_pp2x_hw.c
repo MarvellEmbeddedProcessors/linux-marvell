@@ -6447,3 +6447,58 @@ int mv_pp2x_check_hw_buf_num(struct mv_pp2x *priv, struct mv_pp2x_bm_pool *bm_po
 	else
 		return 0;
 }
+
+/*  Update Mvpp2x counter statistic */
+void mv_pp2x_counters_stat_update(struct mv_pp2x_port *port,
+				  struct gop_stat *gop_statistics)
+{
+	struct mv_pp2x_hw *hw = &port->priv->hw;
+	int val, queue;
+
+	val = mv_pp2x_read(hw, MV_PP2_OVERRUN_DROP_REG(port->id));
+	gop_statistics->rx_ppv2_overrun += val;
+	gop_statistics->rx_total_err += val;
+	gop_statistics->rx_sw_drop += val;
+
+	val = mv_pp2x_read(hw, MV_PP2_CLS_DROP_REG(port->id));
+	gop_statistics->rx_cls_drop += val;
+	gop_statistics->rx_hw_drop += val;
+
+	preempt_disable();
+	for (queue = port->first_rxq; queue < (port->first_rxq +
+			port->num_rx_queues); queue++) {
+		mv_pp2x_write(hw, MVPP2_CNT_IDX_REG, queue);
+		val = mv_pp2x_read(hw, MVPP2_RX_PKT_FULLQ_DROP_REG);
+		gop_statistics->rx_fullq_drop += val;
+		gop_statistics->rx_hw_drop += val;
+
+		val = mv_pp2x_read(hw, MVPP2_RX_PKT_EARLY_DROP_REG);
+		gop_statistics->rx_early_drop += val;
+		gop_statistics->rx_hw_drop += val;
+
+		val = mv_pp2x_read(hw, MVPP2_RX_PKT_BM_DROP_REG);
+		gop_statistics->rx_bm_drop += val;
+		gop_statistics->rx_hw_drop += val;
+	}
+	preempt_enable();
+}
+
+/*  Clear Mvpp2x counter statistic */
+void mv_pp2x_counters_stat_clear(struct mv_pp2x_port *port)
+{
+	struct mv_pp2x_hw *hw = &port->priv->hw;
+	int queue;
+
+	mv_pp2x_read(hw, MV_PP2_OVERRUN_DROP_REG(port->id));
+	mv_pp2x_read(hw, MV_PP2_CLS_DROP_REG(port->id));
+
+	preempt_disable();
+	for (queue = port->first_rxq; queue < (port->first_rxq +
+			port->num_rx_queues); queue++) {
+		mv_pp2x_write(hw, MVPP2_CNT_IDX_REG, queue);
+		mv_pp2x_read(hw, MVPP2_RX_PKT_FULLQ_DROP_REG);
+		mv_pp2x_read(hw, MVPP2_RX_PKT_EARLY_DROP_REG);
+		mv_pp2x_read(hw, MVPP2_RX_PKT_BM_DROP_REG);
+	}
+	preempt_enable();
+}

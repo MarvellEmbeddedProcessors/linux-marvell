@@ -64,9 +64,12 @@ static const char mv_pp2x_gstrings_stats[][ETH_GSTRING_LEN] = {
 	/* device-specific stats */
 	"rx_bytes", "rx_frames", "rx_unicast", "rx_mcast", "rx_bcast",
 	"tx_bytes", "tx_frames", "tx_unicast", "tx_mcast", "tx_bcast",
-	"rx_pause", "tx_pause", "rx_overrun", "rx_crc", "rx_runt", "rx_giant",
-	"rx_fragments_err", "rx_mac_err", "rx_jabber", "rx_sw_drop", "rx_total_err",
-	"tx_drop", "tx_crc_sent", "collision", "late_collision",
+	"rx_pause", "tx_pause", "rx_mac_overrun", "rx_crc", "rx_runt",
+	"rx_giant", "rx_fragments_err", "rx_mac_err", "rx_jabber", "rx_ppv2_overrun",
+	"rx_cls_drop", "rx_fullq_drop", "rx_early_drop", "rx_bm_drop",
+	"rx_total_err",	"rx_sw_drop", "rx_hw_drop", "tx_crc_sent",
+	"tx_drop", "collision",	"late_collision", "frames_64", "frames_65_to_127",
+	"frames_128_to_255", "frames_256_to_511", "frames_512_to_1023", "frames_1024_to_max",
 };
 
 int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
@@ -195,6 +198,7 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 		return;
 
 	mv_gop110_mib_counters_stat_update(gop, gop_port, gop_statistics);
+	mv_pp2x_counters_stat_update(port, gop_statistics);
 
 	data[i++] = gop_statistics->rx_byte;
 	data[i++] = gop_statistics->rx_frames;
@@ -208,19 +212,31 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 	data[i++] = gop_statistics->tx_bcast;
 	data[i++] = gop_statistics->rx_pause;
 	data[i++] = gop_statistics->tx_pause;
-	data[i++] = gop_statistics->rx_overrun;
+	data[i++] = gop_statistics->rx_mac_overrun;
 	data[i++] = gop_statistics->rx_crc;
 	data[i++] = gop_statistics->rx_runt;
 	data[i++] = gop_statistics->rx_giant;
 	data[i++] = gop_statistics->rx_fragments_err;
 	data[i++] = gop_statistics->rx_mac_err;
 	data[i++] = gop_statistics->rx_jabber;
-	data[i++] = dev->stats.rx_dropped;
-	data[i++] = gop_statistics->rx_total_err + dev->stats.rx_dropped;
-	data[i++] = dev->stats.tx_dropped;
+	data[i++] = gop_statistics->rx_ppv2_overrun;
+	data[i++] = gop_statistics->rx_cls_drop;
+	data[i++] = gop_statistics->rx_fullq_drop;
+	data[i++] = gop_statistics->rx_early_drop;
+	data[i++] = gop_statistics->rx_bm_drop;
+	data[i++] = gop_statistics->rx_total_err;
+	data[i++] = gop_statistics->rx_sw_drop;
+	data[i++] = gop_statistics->rx_hw_drop;
 	data[i++] = gop_statistics->tx_crc_sent;
+	data[i++] = dev->stats.tx_dropped;
 	data[i++] = gop_statistics->collision;
 	data[i++] = gop_statistics->late_collision;
+	data[i++] = gop_statistics->frames_64;
+	data[i++] = gop_statistics->frames_65_to_127;
+	data[i++] = gop_statistics->frames_128_to_255;
+	data[i++] = gop_statistics->frames_256_to_511;
+	data[i++] = gop_statistics->frames_512_to_1023;
+	data[i++] = gop_statistics->frames_1024_to_max;
 }
 
 static void mv_pp2x_eth_tool_get_strings(struct net_device *dev,

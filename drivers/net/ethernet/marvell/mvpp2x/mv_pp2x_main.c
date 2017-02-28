@@ -4385,8 +4385,10 @@ static void mv_pp2x_get_port_stats(struct mv_pp2x_port *port)
 
 	link_is_up = mv_gop110_port_is_link_up(gop, &port->mac_data);
 
-	if (link_is_up)
+	if (link_is_up) {
 		mv_gop110_mib_counters_stat_update(gop, gop_port, gop_statistics);
+		mv_pp2x_counters_stat_update(port, gop_statistics);
+	}
 }
 
 static void mv_pp2x_get_device_stats(struct work_struct *work)
@@ -4755,8 +4757,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		goto err_free_port_pcpu;
 	}
 
-	/* Clear MIB counters statistic */
+	/* Clear MIB and mvpp2 counters statistic */
 	mv_gop110_mib_counters_clear(&port->priv->hw.gop, port->mac_data.gop_index);
+	mv_pp2x_counters_stat_clear(port);
 
 	mv_pp2x_port_irq_names_update(port);
 
