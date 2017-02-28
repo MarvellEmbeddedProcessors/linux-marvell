@@ -2504,6 +2504,23 @@ void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop
 	gop_statistics->rx_mcast += val;
 	gop_statistics->rx_frames += val;
 
+	gop_statistics->frames_64 += mv_gop110_mib_read64(gop, port, MV_MIB_FRAMES_64_OCTETS);
+
+	gop_statistics->frames_65_to_127 += mv_gop110_mib_read64(gop, port,
+								 MV_MIB_FRAMES_65_TO_127_OCTETS);
+
+	gop_statistics->frames_128_to_255 += mv_gop110_mib_read64(gop, port,
+								  MV_MIB_FRAMES_128_TO_255_OCTETS);
+
+	gop_statistics->frames_256_to_511 += mv_gop110_mib_read64(gop, port,
+								  MV_MIB_FRAMES_256_TO_511_OCTETS);
+
+	gop_statistics->frames_512_to_1023 += mv_gop110_mib_read64(gop, port,
+								   MV_MIB_FRAMES_512_TO_1023_OCTETS);
+
+	gop_statistics->frames_1024_to_max += mv_gop110_mib_read64(gop, port,
+								   MV_MIB_FRAMES_1024_TO_MAX_OCTETS);
+
 	gop_statistics->tx_byte += mv_gop110_mib_read64(gop, port,
 							MV_MIB_GOOD_OCTETS_SENT_LOW);
 
@@ -2529,31 +2546,38 @@ void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop
 							MV_MIB_FC_SENT);
 
 	val = mv_gop110_mib_read64(gop, port, MV_MIB_RX_FIFO_OVERRUN);
-	gop_statistics->rx_overrun += val;
+	gop_statistics->rx_mac_overrun += val;
+	gop_statistics->rx_sw_drop += val;
 	gop_statistics->rx_total_err += val;
 
 	val = mv_gop110_mib_read64(gop, port, MV_MIB_UNDERSIZE_RECEIVED);
 	gop_statistics->rx_runt += val;
+	gop_statistics->rx_sw_drop += val;
 	gop_statistics->rx_total_err += val;
 
 	val = mv_gop110_mib_read64(gop, port, MV_MIB_FRAGMENTS_RECEIVED);
 	gop_statistics->rx_fragments_err += val;
+	gop_statistics->rx_sw_drop += val;
 	gop_statistics->rx_total_err += val;
 
 	val = mv_gop110_mib_read64(gop, port, MV_MIB_OVERSIZE_RECEIVED);
 	gop_statistics->rx_giant += val;
+	gop_statistics->rx_sw_drop += val;
 	gop_statistics->rx_total_err += val;
 
 	val = mv_gop110_mib_read64(gop, port, MV_MIB_JABBER_RECEIVED);
 	gop_statistics->rx_jabber += val;
+	gop_statistics->rx_sw_drop += val;
 	gop_statistics->rx_total_err += val;
 
 	val = mv_gop110_mib_read64(gop, port, MV_MIB_MAC_RECEIVE_ERROR);
 	gop_statistics->rx_jabber += val;
+	gop_statistics->rx_sw_drop += val;
 	gop_statistics->rx_total_err += val;
 
 	val = mv_gop110_mib_read64(gop, port, MV_MIB_BAD_CRC_EVENT);
 	gop_statistics->rx_crc += val;
+	gop_statistics->rx_sw_drop += val;
 	gop_statistics->rx_total_err += val;
 
 	gop_statistics->collision += mv_gop110_mib_read64(gop, port,
@@ -2570,6 +2594,12 @@ void mv_gop110_mib_counters_clear(struct gop_hw *gop, int port)
 	mv_gop110_mib_read64(gop, port, MV_MIB_UNICAST_FRAMES_RECEIVED);
 	mv_gop110_mib_read64(gop, port, MV_MIB_BROADCAST_FRAMES_RECEIVED);
 	mv_gop110_mib_read64(gop, port, MV_MIB_MULTICAST_FRAMES_RECEIVED);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FRAMES_64_OCTETS);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FRAMES_65_TO_127_OCTETS);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FRAMES_128_TO_255_OCTETS);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FRAMES_256_TO_511_OCTETS);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FRAMES_512_TO_1023_OCTETS);
+	mv_gop110_mib_read64(gop, port, MV_MIB_FRAMES_1024_TO_MAX_OCTETS);
 	mv_gop110_mib_read64(gop, port, MV_MIB_GOOD_OCTETS_SENT_LOW);
 	mv_gop110_mib_read64(gop, port, MV_MIB_UNICAST_FRAMES_SENT);
 	mv_gop110_mib_read64(gop, port, MV_MIB_MULTICAST_FRAMES_SENT);

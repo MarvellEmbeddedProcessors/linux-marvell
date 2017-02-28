@@ -222,14 +222,21 @@ struct gop_stat {
 	u64 rx_bcast;
 	u64 rx_frames;
 	u64 rx_pause;
-	u64 rx_overrun;
+	u64 rx_mac_overrun;
 	u64 rx_crc;
 	u64 rx_runt;
 	u64 rx_giant;
 	u64 rx_fragments_err;
 	u64 rx_mac_err;
 	u64 rx_jabber;
+	u64 rx_ppv2_overrun;
+	u64 rx_cls_drop;
+	u64 rx_fullq_drop;
+	u64 rx_early_drop;
+	u64 rx_bm_drop;
 	u64 rx_total_err;
+	u64 rx_hw_drop;
+	u64 rx_sw_drop;
 	u64 tx_byte;
 	u64 tx_unicast;
 	u64 tx_mcast;
@@ -239,6 +246,12 @@ struct gop_stat {
 	u64 tx_crc_sent;
 	u64 collision;
 	u64 late_collision;
+	u64 frames_64;
+	u64 frames_65_to_127;
+	u64 frames_128_to_255;
+	u64 frames_256_to_511;
+	u64 frames_512_to_1023;
+	u64 frames_1024_to_max;
 };
 
 struct mv_mac_data {
