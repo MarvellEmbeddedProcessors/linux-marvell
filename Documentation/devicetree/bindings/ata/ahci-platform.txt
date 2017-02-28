@@ -36,6 +36,12 @@ Optional properties:
 		      are available for software to use. Useful if PORTS_IMPL
 		      is not programmed by the BIOS, which is true with
 		      some embedded SOC's.
+- comreset_u        : allows to modify COMRESET spacing upper limit which controls
+		      the high limit of the spacing between two bursts of COMRESET.
+		      This field should contain the hexacecimal value in nano seconds.
+- comwake           : allows to modify COMWAKE spacing upper limit which controls
+		      the high limit of the spacing between two bursts of COMWAKE.
+		      This field should contain the hexacecimal value in nano seconds.
 
 Required properties when using sub-nodes:
 - #address-cells    : number of cells to encode an address

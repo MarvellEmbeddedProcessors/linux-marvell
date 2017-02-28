@@ -263,6 +263,14 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 			return rc;
 	}
 
+	if (of_property_read_u32(pdev->dev.of_node, "comwake",
+				 &hpriv->comwake))
+		hpriv->comwake = 0;
+
+	if (of_property_read_u32(pdev->dev.of_node, "comreset_u",
+				 &hpriv->comreset_u))
+		hpriv->comreset_u = 0;
+
 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
 				     &ahci_platform_sht);
 	if (rc)
