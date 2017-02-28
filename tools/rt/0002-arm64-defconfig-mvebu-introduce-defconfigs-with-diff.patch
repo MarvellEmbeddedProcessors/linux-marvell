@@ -1,7 +1,7 @@
-From 94517383b238bcb366ab3b4d6da72f968c10f247 Mon Sep 17 00:00:00 2001
+From b723b2aa6ec66aca4fd40396527cf80226025b48 Mon Sep 17 00:00:00 2001
 From: Marcin Wojtas <mw@semihalf.com>
 Date: Mon, 21 Nov 2016 14:24:00 +0100
-Subject: [PATCH 2/2] arm64: defconfig: mvebu: introduce defconfigs with
+Subject: [PATCH 3/3] arm64: defconfig: mvebu: introduce defconfigs with
  different preempt levels
 
 Recent commit adding PREEMPT_RT support expanded kernel's preemption level
@@ -22,18 +22,18 @@ This commit adds two new optional defconfigs:
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- arch/arm64/configs/mvebu_v8_pll_lsp_defconfig | 280 ++++++++++++++++++++++++++
- arch/arm64/configs/mvebu_v8_rtb_lsp_defconfig | 278 +++++++++++++++++++++++++
- 2 files changed, 558 insertions(+)
+ arch/arm64/configs/mvebu_v8_pll_lsp_defconfig | 284 ++++++++++++++++++++++++++
+ arch/arm64/configs/mvebu_v8_rtb_lsp_defconfig | 283 +++++++++++++++++++++++++
+ 2 files changed, 567 insertions(+)
  create mode 100644 arch/arm64/configs/mvebu_v8_pll_lsp_defconfig
  create mode 100644 arch/arm64/configs/mvebu_v8_rtb_lsp_defconfig
 
 diff --git a/arch/arm64/configs/mvebu_v8_pll_lsp_defconfig b/arch/arm64/configs/mvebu_v8_pll_lsp_defconfig
 new file mode 100644
-index 0000000..df0e93c
+index 0000000..5e26556
 --- /dev/null
 +++ b/arch/arm64/configs/mvebu_v8_pll_lsp_defconfig
-@@ -0,0 +1,280 @@
+@@ -0,0 +1,284 @@
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
 +CONFIG_FHANDLE=y
@@ -87,7 +87,8 @@ index 0000000..df0e93c
 +CONFIG_CPU_IDLE=y
 +CONFIG_ARM_CPUIDLE=y
 +CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
 +CONFIG_CPUFREQ_DT=y
 +CONFIG_NET=y
 +CONFIG_PACKET=y
@@ -144,14 +145,16 @@ index 0000000..df0e93c
 +CONFIG_MD_RAID1=y
 +CONFIG_MD_RAID10=y
 +CONFIG_MD_RAID456=y
++CONFIG_BLK_DEV_DM=y
++CONFIG_DM_CRYPT=y
 +CONFIG_NETDEVICES=y
++CONFIG_BONDING=y
 +CONFIG_MACVLAN=y
 +CONFIG_MACVTAP=y
 +CONFIG_TUN=y
 +CONFIG_VIRTIO_NET=y
 +CONFIG_VHOST_NET=y
 +CONFIG_NET_DSA_MV88E6XXX=y
-+CONFIG_E1000=y
 +CONFIG_E1000E=y
 +CONFIG_IGB=y
 +CONFIG_IGBVF=y
@@ -218,6 +221,7 @@ index 0000000..df0e93c
 +CONFIG_USB_OHCI_HCD_PLATFORM=y
 +CONFIG_USB_STORAGE=y
 +CONFIG_USB_ISP1760=y
++CONFIG_USB_A3700_OTG=y
 +CONFIG_NOP_USB_XCEIV=y
 +CONFIG_USB_ULPI=y
 +CONFIG_USB_GADGET=y
@@ -316,10 +320,10 @@ index 0000000..df0e93c
 +CONFIG_CRC_CCITT=y
 diff --git a/arch/arm64/configs/mvebu_v8_rtb_lsp_defconfig b/arch/arm64/configs/mvebu_v8_rtb_lsp_defconfig
 new file mode 100644
-index 0000000..20d41dd
+index 0000000..ae9f5d2
 --- /dev/null
 +++ b/arch/arm64/configs/mvebu_v8_rtb_lsp_defconfig
-@@ -0,0 +1,278 @@
+@@ -0,0 +1,283 @@
 +CONFIG_SYSVIPC=y
 +CONFIG_POSIX_MQUEUE=y
 +CONFIG_FHANDLE=y
@@ -373,7 +377,8 @@ index 0000000..20d41dd
 +CONFIG_CPU_IDLE=y
 +CONFIG_ARM_CPUIDLE=y
 +CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
 +CONFIG_CPUFREQ_DT=y
 +CONFIG_NET=y
 +CONFIG_PACKET=y
@@ -430,14 +435,16 @@ index 0000000..20d41dd
 +CONFIG_MD_RAID1=y
 +CONFIG_MD_RAID10=y
 +CONFIG_MD_RAID456=y
++CONFIG_BLK_DEV_DM=y
++CONFIG_DM_CRYPT=y
 +CONFIG_NETDEVICES=y
++CONFIG_BONDING=y
 +CONFIG_MACVLAN=y
 +CONFIG_MACVTAP=y
 +CONFIG_TUN=y
 +CONFIG_VIRTIO_NET=y
 +CONFIG_VHOST_NET=y
 +CONFIG_NET_DSA_MV88E6XXX=y
-+CONFIG_E1000=y
 +CONFIG_E1000E=y
 +CONFIG_IGB=y
 +CONFIG_IGBVF=y
@@ -504,6 +511,7 @@ index 0000000..20d41dd
 +CONFIG_USB_OHCI_HCD_PLATFORM=y
 +CONFIG_USB_STORAGE=y
 +CONFIG_USB_ISP1760=y
++CONFIG_USB_A3700_OTG=y
 +CONFIG_NOP_USB_XCEIV=y
 +CONFIG_USB_ULPI=y
 +CONFIG_USB_GADGET=y
@@ -580,6 +588,7 @@ index 0000000..20d41dd
 +CONFIG_DEBUG_KERNEL=y
 +CONFIG_LOCKUP_DETECTOR=y
 +# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_PREEMPT is not set
 +# CONFIG_FTRACE is not set
 +CONFIG_MEMTEST=y
 +CONFIG_ARM64_PTDUMP=y
@@ -599,5 +608,5 @@ index 0000000..20d41dd
 +CONFIG_CRYPTO_CRC32_ARM64=y
 +CONFIG_CRC_CCITT=y
 -- 
-1.9.1
+1.8.3.1
 
