@@ -221,7 +221,18 @@ static int ahci_mvebu_pll_power_up(struct platform_device *pdev,
 #ifdef CONFIG_PM_SLEEP
 static int ahci_mvebu_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	return ahci_platform_suspend_host(&pdev->dev);
+	int err;
+	struct ata_host *host = platform_get_drvdata(pdev);
+	struct ahci_host_priv *hpriv = host->private_data;
+
+	err = ahci_platform_suspend_host(&pdev->dev);
+	if (err)
+		return err;
+
+	/* AHCI resources, such as PHY, clock, etc. should be disabled */
+	ahci_platform_disable_resources(hpriv);
+
+	return 0;
 }
 
 static int ahci_mvebu_resume(struct platform_device *pdev)
@@ -229,12 +240,29 @@ static int ahci_mvebu_resume(struct platform_device *pdev)
 	struct ata_host *host = platform_get_drvdata(pdev);
 	struct ahci_host_priv *hpriv = host->private_data;
 	const struct mbus_dram_target_info *dram;
+	int err;
 
-	dram = mv_mbus_dram_info();
-	if (dram)
-		ahci_mvebu_mbus_config(hpriv, dram);
+	/* AHCI resources, such as PHY, clock, etc. should be enabled first */
+	err = ahci_platform_enable_resources(hpriv);
+	if (err)
+		return err;
 
-	ahci_mvebu_regret_option(hpriv);
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-380-ahci")) {
+		dram = mv_mbus_dram_info();
+		if (dram)
+			ahci_mvebu_mbus_config(hpriv, dram);
+
+		ahci_mvebu_regret_option(hpriv);
+	}
+
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-cp110-ahci"))
+		ahci_mvebu_pll_power_up(pdev, hpriv, 1);
+
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-3700-ahci"))
+		ahci_mvebu_pll_power_up(pdev, hpriv, 0);
 
 	return ahci_platform_resume_host(&pdev->dev);
 }
