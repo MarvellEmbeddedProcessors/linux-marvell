@@ -1,7 +1,7 @@
-From ad68cec696d85b555dbbc82ef6cd49d43aec9d86 Mon Sep 17 00:00:00 2001
+From 5da7882843894d915f1cb0bcb7cb39a18424f05d Mon Sep 17 00:00:00 2001
 From: Marcin Wojtas <mw@semihalf.com>
 Date: Tue, 24 Jan 2017 11:58:29 +0100
-Subject: [PATCH 2/3] rt: clean compilation warnings after applying PREEMPT_RT
+Subject: [PATCH 2/2] rt: clean compilation warnings after applying PREEMPT_RT
  patch
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>

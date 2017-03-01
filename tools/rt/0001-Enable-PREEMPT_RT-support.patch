@@ -1,394 +1,506 @@
-From 4403e178c75129974a9741e01d28bfd449ba5ad0 Mon Sep 17 00:00:00 2001
+From 6f441f19133ceb855e10aba6f11dcb5c0cd60709 Mon Sep 17 00:00:00 2001
 From: Marcin Wojtas <mw@semihalf.com>
 Date: Tue, 28 Feb 2017 16:19:09 +0100
-Subject: [PATCH 1/3] Enable PREEMPT_RT support
+Subject: [PATCH 1/2] Enable PREEMPT_RT support
 
 * Apply patch-4.4.50-rt62.patch
 * Resolve conflicts in mm/page_alloc.c
 
 Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 ---
- Documentation/kernel-parameters.txt                |   9 +
- Documentation/sysrq.txt                            |  11 +-
- Makefile                                           |   3 +
- arch/Kconfig                                       |   2 +
- arch/arm/Kconfig                                   |   3 +-
- arch/arm/include/asm/switch_to.h                   |   8 +
- arch/arm/include/asm/thread_info.h                 |   8 +-
- arch/arm/kernel/asm-offsets.c                      |   1 +
- arch/arm/kernel/entry-armv.S                       |  19 +-
- arch/arm/kernel/entry-common.S                     |   9 +-
- arch/arm/kernel/patch.c                            |   6 +-
- arch/arm/kernel/process.c                          |  24 +
- arch/arm/kernel/signal.c                           |   3 +-
- arch/arm/kernel/smp.c                              |   5 +-
- arch/arm/kernel/unwind.c                           |  14 +-
- arch/arm/kvm/arm.c                                 |  14 +-
- arch/arm/kvm/psci.c                                |   4 +-
- arch/arm/mach-at91/Kconfig                         |   1 +
- arch/arm/mach-at91/at91rm9200.c                    |   2 -
- arch/arm/mach-at91/at91sam9.c                      |   2 -
- arch/arm/mach-at91/generic.h                       |  13 +-
- arch/arm/mach-at91/pm.c                            |  70 +-
- arch/arm/mach-at91/sama5.c                         |   2 +-
- arch/arm/mach-exynos/platsmp.c                     |  12 +-
- arch/arm/mach-hisi/platmcpm.c                      |  22 +-
- arch/arm/mach-imx/Kconfig                          |   2 +-
- arch/arm/mach-omap2/omap-smp.c                     |  10 +-
- arch/arm/mach-prima2/platsmp.c                     |  10 +-
- arch/arm/mach-qcom/platsmp.c                       |  10 +-
- arch/arm/mach-spear/platsmp.c                      |  10 +-
- arch/arm/mach-sti/platsmp.c                        |  10 +-
- arch/arm/mm/fault.c                                |   6 +
- arch/arm/mm/highmem.c                              |  58 +-
- arch/arm/plat-versatile/platsmp.c                  |  10 +-
- arch/arm64/Kconfig                                 |   3 +-
- arch/arm64/include/asm/thread_info.h               |   6 +-
- arch/arm64/kernel/asm-offsets.c                    |   1 +
- arch/arm64/kernel/entry.S                          |  13 +-
- arch/mips/Kconfig                                  |   2 +-
- arch/mips/kvm/mips.c                               |   8 +-
- arch/powerpc/Kconfig                               |   6 +-
- arch/powerpc/include/asm/kvm_host.h                |   4 +-
- arch/powerpc/include/asm/thread_info.h             |  11 +-
- arch/powerpc/kernel/asm-offsets.c                  |   1 +
- arch/powerpc/kernel/entry_32.S                     |  17 +-
- arch/powerpc/kernel/entry_64.S                     |  14 +-
- arch/powerpc/kernel/irq.c                          |   2 +
- arch/powerpc/kernel/misc_32.S                      |   2 +
- arch/powerpc/kernel/misc_64.S                      |   2 +
- arch/powerpc/kvm/Kconfig                           |   1 +
- arch/powerpc/kvm/book3s_hv.c                       |  23 +-
- arch/powerpc/platforms/ps3/device-init.c           |   2 +-
- arch/s390/include/asm/kvm_host.h                   |   2 +-
- arch/s390/kvm/interrupt.c                          |   4 +-
- arch/sh/kernel/irq.c                               |   2 +
- arch/sparc/Kconfig                                 |   6 +-
- arch/sparc/kernel/irq_64.c                         |   2 +
- arch/x86/Kconfig                                   |   8 +-
- arch/x86/crypto/aesni-intel_glue.c                 |  24 +-
- arch/x86/crypto/cast5_avx_glue.c                   |  21 +-
- arch/x86/crypto/glue_helper.c                      |  31 +-
- arch/x86/entry/common.c                            |  11 +-
- arch/x86/entry/entry_32.S                          |  16 +
- arch/x86/entry/entry_64.S                          |  18 +
- arch/x86/include/asm/preempt.h                     |  31 +-
- arch/x86/include/asm/signal.h                      |  13 +
- arch/x86/include/asm/stackprotector.h              |   9 +-
- arch/x86/include/asm/thread_info.h                 |   6 +
- arch/x86/include/asm/uv/uv_bau.h                   |  14 +-
- arch/x86/include/asm/uv/uv_hub.h                   |   2 +-
- arch/x86/kernel/acpi/boot.c                        |   2 +
- arch/x86/kernel/apic/io_apic.c                     |   3 +-
- arch/x86/kernel/apic/x2apic_uv_x.c                 |   2 +-
- arch/x86/kernel/asm-offsets.c                      |   2 +
- arch/x86/kernel/cpu/mcheck/mce.c                   | 120 ++-
- arch/x86/kernel/cpu/perf_event_intel_rapl.c        |  20 +-
- arch/x86/kernel/dumpstack_32.c                     |   4 +-
- arch/x86/kernel/dumpstack_64.c                     |   8 +-
- arch/x86/kernel/irq_32.c                           |   2 +
- arch/x86/kernel/kvm.c                              |  37 +-
- arch/x86/kernel/nmi.c                              |  16 +-
- arch/x86/kernel/process_32.c                       |  32 +
- arch/x86/kernel/reboot.c                           |  20 +
- arch/x86/kvm/lapic.c                               |   7 +-
- arch/x86/kvm/x86.c                                 |   7 +
- arch/x86/mm/highmem_32.c                           |  13 +-
- arch/x86/mm/iomap_32.c                             |  11 +-
- arch/x86/platform/uv/tlb_uv.c                      |  26 +-
- arch/x86/platform/uv/uv_time.c                     |  21 +-
- block/blk-core.c                                   |  23 +-
- block/blk-ioc.c                                    |   5 +-
- block/blk-iopoll.c                                 |   3 +
- block/blk-mq-cpu.c                                 |  17 +-
- block/blk-mq.c                                     |  38 +-
- block/blk-mq.h                                     |   9 +-
- block/blk-softirq.c                                |   3 +
- block/bounce.c                                     |   4 +-
- crypto/algapi.c                                    |   4 +-
- crypto/api.c                                       |   6 +-
- crypto/internal.h                                  |   4 +-
- drivers/acpi/acpica/acglobal.h                     |   2 +-
- drivers/acpi/acpica/hwregs.c                       |   4 +-
- drivers/acpi/acpica/hwxface.c                      |   4 +-
- drivers/acpi/acpica/utmutex.c                      |   4 +-
- drivers/ata/libata-sff.c                           |  12 +-
- drivers/block/zram/zram_drv.c                      |  30 +-
- drivers/block/zram/zram_drv.h                      |  41 +
- drivers/char/random.c                              |  14 +-
- drivers/clk/at91/clk-generated.c                   |  95 +-
- drivers/clk/at91/clk-h32mx.c                       |  40 +-
- drivers/clk/at91/clk-main.c                        | 324 +++----
- drivers/clk/at91/clk-master.c                      |  94 +-
- drivers/clk/at91/clk-peripheral.c                  | 136 +--
- drivers/clk/at91/clk-pll.c                         | 150 ++--
- drivers/clk/at91/clk-plldiv.c                      |  44 +-
- drivers/clk/at91/clk-programmable.c                |  96 +-
- drivers/clk/at91/clk-slow.c                        |  34 +-
- drivers/clk/at91/clk-smd.c                         |  56 +-
- drivers/clk/at91/clk-system.c                      |  96 +-
- drivers/clk/at91/clk-usb.c                         | 123 +--
- drivers/clk/at91/clk-utmi.c                        |  80 +-
- drivers/clk/at91/pmc.c                             | 426 +--------
- drivers/clk/at91/pmc.h                             |  98 +--
- drivers/clocksource/tcb_clksrc.c                   |  69 +-
- drivers/clocksource/timer-atmel-pit.c              |  23 +-
- drivers/clocksource/timer-atmel-st.c               |  32 +-
- drivers/cpufreq/Kconfig.x86                        |   2 +-
- drivers/cpuidle/coupled.c                          |   1 -
- drivers/gpu/drm/i915/i915_gem_execbuffer.c         |   2 +
- drivers/gpu/drm/i915/i915_gem_shrinker.c           |   2 +-
- drivers/gpu/drm/i915/i915_irq.c                    |   2 +
- drivers/gpu/drm/i915/intel_display.c               |   2 +-
- drivers/gpu/drm/i915/intel_sprite.c                |  11 +-
- drivers/gpu/drm/radeon/radeon_display.c            |   2 +
- drivers/hv/vmbus_drv.c                             |   2 +-
- drivers/i2c/busses/i2c-omap.c                      |   5 +-
- drivers/ide/alim15x3.c                             |   4 +-
- drivers/ide/hpt366.c                               |   4 +-
- drivers/ide/ide-io-std.c                           |   8 +-
- drivers/ide/ide-io.c                               |   2 +-
- drivers/ide/ide-iops.c                             |   4 +-
- drivers/ide/ide-probe.c                            |   4 +-
- drivers/ide/ide-taskfile.c                         |   6 +-
- drivers/infiniband/ulp/ipoib/ipoib_multicast.c     |   4 +-
- drivers/input/gameport/gameport.c                  |  12 +-
- drivers/iommu/amd_iommu.c                          |  12 +-
- drivers/leds/trigger/Kconfig                       |   2 +-
- drivers/md/bcache/Kconfig                          |   1 +
- drivers/md/dm.c                                    |   2 +-
- drivers/md/raid5.c                                 |   7 +-
- drivers/md/raid5.h                                 |   1 +
- drivers/media/platform/vsp1/vsp1_video.c           |   2 +-
- drivers/misc/Kconfig                               |  42 +-
- drivers/misc/Makefile                              |   1 +
- drivers/mmc/host/mmci.c                            |   5 -
- drivers/net/ethernet/3com/3c59x.c                  |   8 +-
- drivers/net/ethernet/atheros/atl1c/atl1c_main.c    |   6 +-
- drivers/net/ethernet/atheros/atl1e/atl1e_main.c    |   3 +-
- drivers/net/ethernet/chelsio/cxgb/sge.c            |   3 +-
- drivers/net/ethernet/neterion/s2io.c               |   7 +-
- .../net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c   |   6 +-
- drivers/net/ethernet/realtek/8139too.c             |   2 +-
- drivers/net/ethernet/tehuti/tehuti.c               |   9 +-
- drivers/net/rionet.c                               |   6 +-
- drivers/net/wireless/orinoco/orinoco_usb.c         |   2 +-
- drivers/pci/access.c                               |   2 +-
- drivers/scsi/fcoe/fcoe.c                           |  20 +-
- drivers/scsi/fcoe/fcoe_ctlr.c                      |   4 +-
- drivers/scsi/libfc/fc_exch.c                       |   4 +-
- drivers/scsi/libsas/sas_ata.c                      |   4 +-
- drivers/scsi/qla2xxx/qla_inline.h                  |   4 +-
- drivers/thermal/x86_pkg_temp_thermal.c             |  50 +-
- drivers/tty/serial/8250/8250_core.c                |  11 +-
- drivers/tty/serial/8250/8250_port.c                |   5 +-
- drivers/tty/serial/amba-pl011.c                    |  15 +-
- drivers/tty/serial/omap-serial.c                   |  12 +-
- drivers/usb/core/hcd.c                             |   4 +-
- drivers/usb/gadget/function/f_fs.c                 |   2 +-
- drivers/usb/gadget/legacy/inode.c                  |   4 +-
- drivers/usb/gadget/udc/atmel_usba_udc.c            |  20 +-
- drivers/usb/gadget/udc/atmel_usba_udc.h            |   2 +
- fs/aio.c                                           |  24 +-
- fs/autofs4/autofs_i.h                              |   1 +
- fs/autofs4/expire.c                                |   2 +-
- fs/buffer.c                                        |  21 +-
- fs/dcache.c                                        |  20 +-
- fs/eventpoll.c                                     |   4 +-
- fs/exec.c                                          |   2 +
- fs/f2fs/f2fs.h                                     |   4 +-
- fs/jbd2/checkpoint.c                               |   2 +
- fs/namespace.c                                     |   8 +-
- fs/ntfs/aops.c                                     |  14 +-
- fs/timerfd.c                                       |   5 +-
- include/acpi/platform/aclinux.h                    |  15 +
- include/asm-generic/bug.h                          |  14 +
- include/asm-generic/preempt.h                      |   4 +-
- include/linux/blk-mq.h                             |   1 +
- include/linux/blkdev.h                             |   3 +-
- include/linux/bottom_half.h                        |  34 +
- include/linux/buffer_head.h                        |  42 +
- include/linux/cgroup-defs.h                        |   2 +
- include/linux/clk/at91_pmc.h                       |  12 -
- include/linux/completion.h                         |   9 +-
- include/linux/cpu.h                                |   4 +
- include/linux/delay.h                              |   6 +
- include/linux/ftrace.h                             |  12 +
- include/linux/highmem.h                            |  32 +-
- include/linux/hrtimer.h                            |  27 +-
- include/linux/idr.h                                |   4 +
- include/linux/init_task.h                          |   9 +-
- include/linux/interrupt.h                          |  66 +-
- include/linux/irq.h                                |   4 +-
- include/linux/irq_work.h                           |   7 +
- include/linux/irqdesc.h                            |   1 +
- include/linux/irqflags.h                           |  29 +-
- include/linux/jbd2.h                               |  24 +
- include/linux/kdb.h                                |   2 +
- include/linux/kernel.h                             |  14 +
- include/linux/kvm_host.h                           |   5 +-
- include/linux/lglock.h                             |  24 +
- include/linux/list_bl.h                            |  30 +-
- include/linux/mm_types.h                           |   4 +
- include/linux/mutex.h                              |  20 +-
- include/linux/netdevice.h                          |  22 +
- include/linux/netfilter/x_tables.h                 |   7 +
- include/linux/notifier.h                           |  34 +-
- include/linux/percpu.h                             |  29 +
- include/linux/pid.h                                |   1 +
- include/linux/preempt.h                            |  78 +-
- include/linux/printk.h                             |   2 +
- include/linux/radix-tree.h                         |   7 +-
- include/linux/random.h                             |   2 +-
- include/linux/rbtree.h                             |  11 +-
- include/linux/rcupdate.h                           |  26 +
- include/linux/rcutree.h                            |  18 +-
- include/linux/rtmutex.h                            |  30 +-
- include/linux/rwlock_types.h                       |   7 +-
- include/linux/rwsem.h                              |   6 +
- include/linux/sched.h                              | 212 ++++-
- include/linux/seqlock.h                            |  56 +-
- include/linux/signal.h                             |   1 +
- include/linux/skbuff.h                             |   7 +
- include/linux/smp.h                                |   3 +
- include/linux/spinlock.h                           |  18 +-
- include/linux/spinlock_api_smp.h                   |   4 +-
- include/linux/spinlock_types.h                     |  79 +-
- include/linux/srcu.h                               |   6 +-
- include/linux/suspend.h                            |   6 +
- include/linux/swap.h                               |   5 +-
- include/linux/thread_info.h                        |  12 +-
- include/linux/timer.h                              |   2 +-
- include/linux/trace_events.h                       |   3 +
- include/linux/uaccess.h                            |   2 +
- include/linux/uprobes.h                            |   1 +
- include/linux/vmstat.h                             |   4 +
- include/linux/wait.h                               |   1 +
- include/net/dst.h                                  |   2 +-
- include/net/neighbour.h                            |   4 +-
- include/net/netns/ipv4.h                           |   1 +
- include/trace/events/writeback.h                   | 121 +--
- init/Kconfig                                       |  11 +-
- init/Makefile                                      |   2 +-
- init/main.c                                        |   1 +
- ipc/msg.c                                          | 101 +--
- ipc/sem.c                                          |  10 +
- kernel/Kconfig.locks                               |   4 +-
- kernel/Kconfig.preempt                             |  33 +-
- kernel/cgroup.c                                    |   9 +-
- kernel/cpu.c                                       | 325 ++++++-
- kernel/debug/kdb/kdb_io.c                          |   6 +-
- kernel/events/core.c                               |   2 +
- kernel/exit.c                                      |   2 +-
- kernel/fork.c                                      |  38 +-
- kernel/futex.c                                     | 109 ++-
- kernel/irq/handle.c                                |   8 +-
- kernel/irq/irqdesc.c                               |  21 +-
- kernel/irq/manage.c                                | 102 ++-
- kernel/irq/settings.h                              |  12 +
- kernel/irq/spurious.c                              |   8 +
- kernel/irq_work.c                                  |  56 +-
- kernel/ksysfs.c                                    |  12 +
- kernel/locking/Makefile                            |   9 +-
- kernel/locking/lglock.c                            |  91 +-
- kernel/locking/lockdep.c                           |   2 +
- kernel/locking/locktorture.c                       |   1 -
- kernel/locking/rtmutex.c                           | 963 ++++++++++++++++++---
- kernel/locking/rtmutex_common.h                    |  17 +-
- kernel/locking/spinlock.c                          |   7 +
- kernel/locking/spinlock_debug.c                    |   5 +
- kernel/panic.c                                     |  47 +-
- kernel/power/hibernate.c                           |  14 +
- kernel/power/suspend.c                             |   9 +
- kernel/printk/printk.c                             | 150 +++-
- kernel/ptrace.c                                    |   9 +-
- kernel/rcu/rcutorture.c                            |   7 +
- kernel/rcu/tree.c                                  | 170 +++-
- kernel/rcu/tree.h                                  |  19 +-
- kernel/rcu/tree_plugin.h                           | 193 ++---
- kernel/rcu/update.c                                |   2 +
- kernel/relay.c                                     |  14 +-
- kernel/sched/Makefile                              |   2 +-
- kernel/sched/completion.c                          |  32 +-
- kernel/sched/core.c                                | 425 +++++++--
- kernel/sched/cpudeadline.c                         |   4 +-
- kernel/sched/cpupri.c                              |   4 +-
- kernel/sched/cputime.c                             |  52 +-
- kernel/sched/deadline.c                            |  31 +-
- kernel/sched/debug.c                               |   7 +
- kernel/sched/fair.c                                |  16 +-
- kernel/sched/features.h                            |   8 +
- kernel/sched/rt.c                                  |  26 +-
- kernel/sched/sched.h                               |  10 +
- kernel/signal.c                                    | 120 ++-
- kernel/softirq.c                                   | 784 ++++++++++++++---
- kernel/stop_machine.c                              |  59 +-
- kernel/time/hrtimer.c                              | 267 +++++-
- kernel/time/itimer.c                               |   1 +
- kernel/time/jiffies.c                              |   7 +-
- kernel/time/ntp.c                                  |  43 +
- kernel/time/posix-cpu-timers.c                     | 193 ++++-
- kernel/time/posix-timers.c                         |  37 +-
- kernel/time/tick-broadcast-hrtimer.c               |   1 +
- kernel/time/tick-common.c                          |  10 +-
- kernel/time/tick-sched.c                           |  35 +-
- kernel/time/timekeeping.c                          |   6 +-
- kernel/time/timekeeping.h                          |   3 +-
- kernel/time/timer.c                                | 104 ++-
- kernel/trace/Kconfig                               | 104 +++
- kernel/trace/Makefile                              |   4 +
- kernel/trace/trace.c                               |  38 +-
- kernel/trace/trace.h                               |   2 +
- kernel/trace/trace_events.c                        |  10 +
- kernel/trace/trace_irqsoff.c                       |  11 +
- kernel/trace/trace_output.c                        |  18 +-
- kernel/user.c                                      |   4 +-
- kernel/watchdog.c                                  |  13 +-
- kernel/workqueue.c                                 | 236 ++---
- kernel/workqueue_internal.h                        |   5 +-
- lib/Kconfig                                        |   1 +
- lib/debugobjects.c                                 |   5 +-
- lib/idr.c                                          |  43 +-
- lib/locking-selftest.c                             |  50 ++
- lib/percpu_ida.c                                   |  20 +-
- lib/radix-tree.c                                   |   5 +-
- lib/rbtree.c                                       |  11 +
- lib/scatterlist.c                                  |   6 +-
- lib/smp_processor_id.c                             |   5 +-
- mm/Kconfig                                         |   2 +-
- mm/backing-dev.c                                   |   4 +-
- mm/compaction.c                                    |   6 +-
- mm/filemap.c                                       |  11 +-
- mm/highmem.c                                       |   6 +-
- mm/memcontrol.c                                    |  31 +-
- mm/mmu_context.c                                   |   2 +
- mm/page_alloc.c                                    | 147 +++-
- mm/slab.h                                          |   4 +
- mm/slub.c                                          | 126 ++-
- mm/swap.c                                          |  71 +-
- mm/truncate.c                                      |   7 +-
- mm/vmalloc.c                                       |  13 +-
- mm/vmstat.c                                        |   6 +
- mm/workingset.c                                    |  23 +-
- mm/zsmalloc.c                                      |   6 +-
- net/core/dev.c                                     | 167 +++-
- net/core/skbuff.c                                  |  28 +-
- net/core/sock.c                                    |   3 +-
- net/ipv4/icmp.c                                    |  38 +
- net/ipv4/sysctl_net_ipv4.c                         |   7 +
- net/ipv4/tcp_ipv4.c                                |   7 +
- net/mac80211/rx.c                                  |   2 +-
- net/netfilter/core.c                               |   6 +
- net/packet/af_packet.c                             |   5 +-
- net/rds/ib_rdma.c                                  |   3 +-
- net/sched/sch_generic.c                            |   2 +-
- net/sunrpc/svc_xprt.c                              |   6 +-
- scripts/mkcompile_h                                |   4 +-
- sound/core/pcm_native.c                            |   8 +-
- virt/kvm/async_pf.c                                |   4 +-
- virt/kvm/kvm_main.c                                |  17 +-
- 379 files changed, 7946 insertions(+), 3398 deletions(-)
+ Documentation/hwlat_detector.txt                   |   64 +
+ Documentation/kernel-parameters.txt                |    9 +
+ Documentation/sysrq.txt                            |   11 +-
+ Documentation/trace/histograms.txt                 |  186 +++
+ Makefile                                           |    3 +
+ arch/Kconfig                                       |    2 +
+ arch/arm/Kconfig                                   |    3 +-
+ arch/arm/include/asm/switch_to.h                   |    8 +
+ arch/arm/include/asm/thread_info.h                 |    8 +-
+ arch/arm/kernel/asm-offsets.c                      |    1 +
+ arch/arm/kernel/entry-armv.S                       |   19 +-
+ arch/arm/kernel/entry-common.S                     |    9 +-
+ arch/arm/kernel/patch.c                            |    6 +-
+ arch/arm/kernel/process.c                          |   24 +
+ arch/arm/kernel/signal.c                           |    3 +-
+ arch/arm/kernel/smp.c                              |    5 +-
+ arch/arm/kernel/unwind.c                           |   14 +-
+ arch/arm/kvm/arm.c                                 |   14 +-
+ arch/arm/kvm/psci.c                                |    4 +-
+ arch/arm/mach-at91/Kconfig                         |    1 +
+ arch/arm/mach-at91/at91rm9200.c                    |    2 -
+ arch/arm/mach-at91/at91sam9.c                      |    2 -
+ arch/arm/mach-at91/generic.h                       |   13 +-
+ arch/arm/mach-at91/pm.c                            |   70 +-
+ arch/arm/mach-at91/sama5.c                         |    2 +-
+ arch/arm/mach-exynos/platsmp.c                     |   12 +-
+ arch/arm/mach-hisi/platmcpm.c                      |   22 +-
+ arch/arm/mach-imx/Kconfig                          |    2 +-
+ arch/arm/mach-omap2/omap-smp.c                     |   10 +-
+ arch/arm/mach-prima2/platsmp.c                     |   10 +-
+ arch/arm/mach-qcom/platsmp.c                       |   10 +-
+ arch/arm/mach-spear/platsmp.c                      |   10 +-
+ arch/arm/mach-sti/platsmp.c                        |   10 +-
+ arch/arm/mm/fault.c                                |    6 +
+ arch/arm/mm/highmem.c                              |   58 +-
+ arch/arm/plat-versatile/platsmp.c                  |   10 +-
+ arch/arm64/Kconfig                                 |    3 +-
+ arch/arm64/include/asm/thread_info.h               |    6 +-
+ arch/arm64/kernel/asm-offsets.c                    |    1 +
+ arch/arm64/kernel/entry.S                          |   13 +-
+ arch/mips/Kconfig                                  |    2 +-
+ arch/mips/kvm/mips.c                               |    8 +-
+ arch/powerpc/Kconfig                               |    6 +-
+ arch/powerpc/include/asm/kvm_host.h                |    4 +-
+ arch/powerpc/include/asm/thread_info.h             |   11 +-
+ arch/powerpc/kernel/asm-offsets.c                  |    1 +
+ arch/powerpc/kernel/entry_32.S                     |   17 +-
+ arch/powerpc/kernel/entry_64.S                     |   14 +-
+ arch/powerpc/kernel/irq.c                          |    2 +
+ arch/powerpc/kernel/misc_32.S                      |    2 +
+ arch/powerpc/kernel/misc_64.S                      |    2 +
+ arch/powerpc/kvm/Kconfig                           |    1 +
+ arch/powerpc/kvm/book3s_hv.c                       |   23 +-
+ arch/powerpc/platforms/ps3/device-init.c           |    2 +-
+ arch/s390/include/asm/kvm_host.h                   |    2 +-
+ arch/s390/kvm/interrupt.c                          |    4 +-
+ arch/sh/kernel/irq.c                               |    2 +
+ arch/sparc/Kconfig                                 |    6 +-
+ arch/sparc/kernel/irq_64.c                         |    2 +
+ arch/x86/Kconfig                                   |    8 +-
+ arch/x86/crypto/aesni-intel_glue.c                 |   24 +-
+ arch/x86/crypto/cast5_avx_glue.c                   |   21 +-
+ arch/x86/crypto/glue_helper.c                      |   31 +-
+ arch/x86/entry/common.c                            |   11 +-
+ arch/x86/entry/entry_32.S                          |   16 +
+ arch/x86/entry/entry_64.S                          |   18 +
+ arch/x86/include/asm/preempt.h                     |   31 +-
+ arch/x86/include/asm/signal.h                      |   13 +
+ arch/x86/include/asm/stackprotector.h              |    9 +-
+ arch/x86/include/asm/thread_info.h                 |    6 +
+ arch/x86/include/asm/uv/uv_bau.h                   |   14 +-
+ arch/x86/include/asm/uv/uv_hub.h                   |    2 +-
+ arch/x86/kernel/acpi/boot.c                        |    2 +
+ arch/x86/kernel/apic/io_apic.c                     |    3 +-
+ arch/x86/kernel/apic/x2apic_uv_x.c                 |    2 +-
+ arch/x86/kernel/asm-offsets.c                      |    2 +
+ arch/x86/kernel/cpu/mcheck/mce.c                   |  120 +-
+ arch/x86/kernel/cpu/perf_event_intel_rapl.c        |   20 +-
+ arch/x86/kernel/dumpstack_32.c                     |    4 +-
+ arch/x86/kernel/dumpstack_64.c                     |    8 +-
+ arch/x86/kernel/irq_32.c                           |    2 +
+ arch/x86/kernel/kvm.c                              |   37 +-
+ arch/x86/kernel/nmi.c                              |   16 +-
+ arch/x86/kernel/process_32.c                       |   32 +
+ arch/x86/kernel/reboot.c                           |   20 +
+ arch/x86/kvm/lapic.c                               |    7 +-
+ arch/x86/kvm/x86.c                                 |    7 +
+ arch/x86/mm/highmem_32.c                           |   13 +-
+ arch/x86/mm/iomap_32.c                             |   11 +-
+ arch/x86/platform/uv/tlb_uv.c                      |   26 +-
+ arch/x86/platform/uv/uv_time.c                     |   21 +-
+ block/blk-core.c                                   |   23 +-
+ block/blk-ioc.c                                    |    5 +-
+ block/blk-iopoll.c                                 |    3 +
+ block/blk-mq-cpu.c                                 |   17 +-
+ block/blk-mq.c                                     |   38 +-
+ block/blk-mq.h                                     |    9 +-
+ block/blk-softirq.c                                |    3 +
+ block/bounce.c                                     |    4 +-
+ crypto/algapi.c                                    |    4 +-
+ crypto/api.c                                       |    6 +-
+ crypto/internal.h                                  |    4 +-
+ drivers/acpi/acpica/acglobal.h                     |    2 +-
+ drivers/acpi/acpica/hwregs.c                       |    4 +-
+ drivers/acpi/acpica/hwxface.c                      |    4 +-
+ drivers/acpi/acpica/utmutex.c                      |    4 +-
+ drivers/ata/libata-sff.c                           |   12 +-
+ drivers/block/zram/zram_drv.c                      |   30 +-
+ drivers/block/zram/zram_drv.h                      |   41 +
+ drivers/char/random.c                              |   14 +-
+ drivers/clk/at91/clk-generated.c                   |   95 +-
+ drivers/clk/at91/clk-h32mx.c                       |   40 +-
+ drivers/clk/at91/clk-main.c                        |  324 +++--
+ drivers/clk/at91/clk-master.c                      |   94 +-
+ drivers/clk/at91/clk-peripheral.c                  |  136 ++-
+ drivers/clk/at91/clk-pll.c                         |  150 ++-
+ drivers/clk/at91/clk-plldiv.c                      |   44 +-
+ drivers/clk/at91/clk-programmable.c                |   96 +-
+ drivers/clk/at91/clk-slow.c                        |   34 +-
+ drivers/clk/at91/clk-smd.c                         |   56 +-
+ drivers/clk/at91/clk-system.c                      |   96 +-
+ drivers/clk/at91/clk-usb.c                         |  123 +-
+ drivers/clk/at91/clk-utmi.c                        |   80 +-
+ drivers/clk/at91/pmc.c                             |  426 +------
+ drivers/clk/at91/pmc.h                             |   98 +-
+ drivers/clocksource/tcb_clksrc.c                   |   69 +-
+ drivers/clocksource/timer-atmel-pit.c              |   23 +-
+ drivers/clocksource/timer-atmel-st.c               |   32 +-
+ drivers/cpufreq/Kconfig.x86                        |    2 +-
+ drivers/cpuidle/coupled.c                          |    1 -
+ drivers/gpu/drm/i915/i915_gem_execbuffer.c         |    2 +
+ drivers/gpu/drm/i915/i915_gem_shrinker.c           |    2 +-
+ drivers/gpu/drm/i915/i915_irq.c                    |    2 +
+ drivers/gpu/drm/i915/intel_display.c               |    2 +-
+ drivers/gpu/drm/i915/intel_sprite.c                |   11 +-
+ drivers/gpu/drm/radeon/radeon_display.c            |    2 +
+ drivers/hv/vmbus_drv.c                             |    2 +-
+ drivers/i2c/busses/i2c-omap.c                      |    5 +-
+ drivers/ide/alim15x3.c                             |    4 +-
+ drivers/ide/hpt366.c                               |    4 +-
+ drivers/ide/ide-io-std.c                           |    8 +-
+ drivers/ide/ide-io.c                               |    2 +-
+ drivers/ide/ide-iops.c                             |    4 +-
+ drivers/ide/ide-probe.c                            |    4 +-
+ drivers/ide/ide-taskfile.c                         |    6 +-
+ drivers/infiniband/ulp/ipoib/ipoib_multicast.c     |    4 +-
+ drivers/input/gameport/gameport.c                  |   12 +-
+ drivers/iommu/amd_iommu.c                          |   12 +-
+ drivers/leds/trigger/Kconfig                       |    2 +-
+ drivers/md/bcache/Kconfig                          |    1 +
+ drivers/md/dm.c                                    |    2 +-
+ drivers/md/raid5.c                                 |    7 +-
+ drivers/md/raid5.h                                 |    1 +
+ drivers/media/platform/vsp1/vsp1_video.c           |    2 +-
+ drivers/misc/Kconfig                               |   42 +-
+ drivers/misc/Makefile                              |    1 +
+ drivers/misc/hwlat_detector.c                      | 1240 ++++++++++++++++++++
+ drivers/mmc/host/mmci.c                            |    5 -
+ drivers/net/ethernet/3com/3c59x.c                  |    8 +-
+ drivers/net/ethernet/atheros/atl1c/atl1c_main.c    |    6 +-
+ drivers/net/ethernet/atheros/atl1e/atl1e_main.c    |    3 +-
+ drivers/net/ethernet/chelsio/cxgb/sge.c            |    3 +-
+ drivers/net/ethernet/neterion/s2io.c               |    7 +-
+ .../net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c   |    6 +-
+ drivers/net/ethernet/realtek/8139too.c             |    2 +-
+ drivers/net/ethernet/tehuti/tehuti.c               |    9 +-
+ drivers/net/rionet.c                               |    6 +-
+ drivers/net/wireless/orinoco/orinoco_usb.c         |    2 +-
+ drivers/pci/access.c                               |    2 +-
+ drivers/scsi/fcoe/fcoe.c                           |   20 +-
+ drivers/scsi/fcoe/fcoe_ctlr.c                      |    4 +-
+ drivers/scsi/libfc/fc_exch.c                       |    4 +-
+ drivers/scsi/libsas/sas_ata.c                      |    4 +-
+ drivers/scsi/qla2xxx/qla_inline.h                  |    4 +-
+ drivers/thermal/x86_pkg_temp_thermal.c             |   50 +-
+ drivers/tty/serial/8250/8250_core.c                |   11 +-
+ drivers/tty/serial/8250/8250_port.c                |    5 +-
+ drivers/tty/serial/amba-pl011.c                    |   15 +-
+ drivers/tty/serial/omap-serial.c                   |   12 +-
+ drivers/usb/core/hcd.c                             |    4 +-
+ drivers/usb/gadget/function/f_fs.c                 |    2 +-
+ drivers/usb/gadget/legacy/inode.c                  |    4 +-
+ drivers/usb/gadget/udc/atmel_usba_udc.c            |   20 +-
+ drivers/usb/gadget/udc/atmel_usba_udc.h            |    2 +
+ fs/aio.c                                           |   24 +-
+ fs/autofs4/autofs_i.h                              |    1 +
+ fs/autofs4/expire.c                                |    2 +-
+ fs/buffer.c                                        |   21 +-
+ fs/dcache.c                                        |   20 +-
+ fs/eventpoll.c                                     |    4 +-
+ fs/exec.c                                          |    2 +
+ fs/f2fs/f2fs.h                                     |    4 +-
+ fs/jbd2/checkpoint.c                               |    2 +
+ fs/namespace.c                                     |    8 +-
+ fs/ntfs/aops.c                                     |   14 +-
+ fs/timerfd.c                                       |    5 +-
+ include/acpi/platform/aclinux.h                    |   15 +
+ include/asm-generic/bug.h                          |   14 +
+ include/asm-generic/preempt.h                      |    4 +-
+ include/linux/blk-mq.h                             |    1 +
+ include/linux/blkdev.h                             |    3 +-
+ include/linux/bottom_half.h                        |   34 +
+ include/linux/buffer_head.h                        |   42 +
+ include/linux/cgroup-defs.h                        |    2 +
+ include/linux/clk/at91_pmc.h                       |   12 -
+ include/linux/completion.h                         |    9 +-
+ include/linux/cpu.h                                |    4 +
+ include/linux/delay.h                              |    6 +
+ include/linux/ftrace.h                             |   12 +
+ include/linux/highmem.h                            |   32 +-
+ include/linux/hrtimer.h                            |   27 +-
+ include/linux/idr.h                                |    4 +
+ include/linux/init_task.h                          |    9 +-
+ include/linux/interrupt.h                          |   66 +-
+ include/linux/irq.h                                |    4 +-
+ include/linux/irq_work.h                           |    7 +
+ include/linux/irqdesc.h                            |    1 +
+ include/linux/irqflags.h                           |   29 +-
+ include/linux/jbd2.h                               |   24 +
+ include/linux/kdb.h                                |    2 +
+ include/linux/kernel.h                             |   14 +
+ include/linux/kvm_host.h                           |    5 +-
+ include/linux/lglock.h                             |   24 +
+ include/linux/list_bl.h                            |   30 +-
+ include/linux/locallock.h                          |  276 +++++
+ include/linux/mm_types.h                           |    4 +
+ include/linux/mutex.h                              |   20 +-
+ include/linux/mutex_rt.h                           |   84 ++
+ include/linux/netdevice.h                          |   22 +
+ include/linux/netfilter/x_tables.h                 |    7 +
+ include/linux/notifier.h                           |   34 +-
+ include/linux/percpu.h                             |   29 +
+ include/linux/pid.h                                |    1 +
+ include/linux/preempt.h                            |   78 +-
+ include/linux/printk.h                             |    2 +
+ include/linux/radix-tree.h                         |    7 +-
+ include/linux/random.h                             |    2 +-
+ include/linux/rbtree.h                             |   11 +-
+ include/linux/rcupdate.h                           |   26 +
+ include/linux/rcutree.h                            |   18 +-
+ include/linux/rtmutex.h                            |   30 +-
+ include/linux/rwlock_rt.h                          |   99 ++
+ include/linux/rwlock_types.h                       |    7 +-
+ include/linux/rwlock_types_rt.h                    |   33 +
+ include/linux/rwsem.h                              |    6 +
+ include/linux/rwsem_rt.h                           |  152 +++
+ include/linux/sched.h                              |  212 +++-
+ include/linux/seqlock.h                            |   56 +-
+ include/linux/signal.h                             |    1 +
+ include/linux/skbuff.h                             |    7 +
+ include/linux/smp.h                                |    3 +
+ include/linux/spinlock.h                           |   18 +-
+ include/linux/spinlock_api_smp.h                   |    4 +-
+ include/linux/spinlock_rt.h                        |  165 +++
+ include/linux/spinlock_types.h                     |   79 +-
+ include/linux/spinlock_types_nort.h                |   33 +
+ include/linux/spinlock_types_raw.h                 |   56 +
+ include/linux/spinlock_types_rt.h                  |   51 +
+ include/linux/srcu.h                               |    6 +-
+ include/linux/suspend.h                            |    6 +
+ include/linux/swait.h                              |  173 +++
+ include/linux/swap.h                               |    5 +-
+ include/linux/swork.h                              |   24 +
+ include/linux/thread_info.h                        |   12 +-
+ include/linux/timer.h                              |    2 +-
+ include/linux/trace_events.h                       |    3 +
+ include/linux/uaccess.h                            |    2 +
+ include/linux/uprobes.h                            |    1 +
+ include/linux/vmstat.h                             |    4 +
+ include/linux/wait.h                               |    1 +
+ include/net/dst.h                                  |    2 +-
+ include/net/neighbour.h                            |    4 +-
+ include/net/netns/ipv4.h                           |    1 +
+ include/trace/events/hist.h                        |   73 ++
+ include/trace/events/latency_hist.h                |   29 +
+ include/trace/events/writeback.h                   |  121 +-
+ init/Kconfig                                       |   11 +-
+ init/Makefile                                      |    2 +-
+ init/main.c                                        |    1 +
+ ipc/msg.c                                          |  101 +-
+ ipc/sem.c                                          |   10 +
+ kernel/Kconfig.locks                               |    4 +-
+ kernel/Kconfig.preempt                             |   33 +-
+ kernel/cgroup.c                                    |    9 +-
+ kernel/cpu.c                                       |  325 ++++-
+ kernel/debug/kdb/kdb_io.c                          |    6 +-
+ kernel/events/core.c                               |    2 +
+ kernel/exit.c                                      |    2 +-
+ kernel/fork.c                                      |   38 +-
+ kernel/futex.c                                     |  109 +-
+ kernel/irq/handle.c                                |    8 +-
+ kernel/irq/irqdesc.c                               |   21 +-
+ kernel/irq/manage.c                                |  102 +-
+ kernel/irq/settings.h                              |   12 +
+ kernel/irq/spurious.c                              |    8 +
+ kernel/irq_work.c                                  |   56 +-
+ kernel/ksysfs.c                                    |   12 +
+ kernel/locking/Makefile                            |    9 +-
+ kernel/locking/lglock.c                            |   91 +-
+ kernel/locking/lockdep.c                           |    2 +
+ kernel/locking/locktorture.c                       |    1 -
+ kernel/locking/rt.c                                |  474 ++++++++
+ kernel/locking/rtmutex.c                           |  963 +++++++++++++--
+ kernel/locking/rtmutex_common.h                    |   17 +-
+ kernel/locking/spinlock.c                          |    7 +
+ kernel/locking/spinlock_debug.c                    |    5 +
+ kernel/panic.c                                     |   47 +-
+ kernel/power/hibernate.c                           |   14 +
+ kernel/power/suspend.c                             |    9 +
+ kernel/printk/printk.c                             |  150 ++-
+ kernel/ptrace.c                                    |    9 +-
+ kernel/rcu/rcutorture.c                            |    7 +
+ kernel/rcu/tree.c                                  |  170 ++-
+ kernel/rcu/tree.h                                  |   19 +-
+ kernel/rcu/tree_plugin.h                           |  193 +--
+ kernel/rcu/update.c                                |    2 +
+ kernel/relay.c                                     |   14 +-
+ kernel/sched/Makefile                              |    2 +-
+ kernel/sched/completion.c                          |   32 +-
+ kernel/sched/core.c                                |  425 +++++--
+ kernel/sched/cpudeadline.c                         |    4 +-
+ kernel/sched/cpupri.c                              |    4 +-
+ kernel/sched/cputime.c                             |   52 +-
+ kernel/sched/deadline.c                            |   31 +-
+ kernel/sched/debug.c                               |    7 +
+ kernel/sched/fair.c                                |   16 +-
+ kernel/sched/features.h                            |    8 +
+ kernel/sched/rt.c                                  |   26 +-
+ kernel/sched/sched.h                               |   10 +
+ kernel/sched/swait.c                               |  143 +++
+ kernel/sched/swork.c                               |  173 +++
+ kernel/signal.c                                    |  120 +-
+ kernel/softirq.c                                   |  784 ++++++++++---
+ kernel/stop_machine.c                              |   59 +-
+ kernel/time/hrtimer.c                              |  267 ++++-
+ kernel/time/itimer.c                               |    1 +
+ kernel/time/jiffies.c                              |    7 +-
+ kernel/time/ntp.c                                  |   43 +
+ kernel/time/posix-cpu-timers.c                     |  193 ++-
+ kernel/time/posix-timers.c                         |   37 +-
+ kernel/time/tick-broadcast-hrtimer.c               |    1 +
+ kernel/time/tick-common.c                          |   10 +-
+ kernel/time/tick-sched.c                           |   35 +-
+ kernel/time/timekeeping.c                          |    6 +-
+ kernel/time/timekeeping.h                          |    3 +-
+ kernel/time/timer.c                                |  104 +-
+ kernel/trace/Kconfig                               |  104 ++
+ kernel/trace/Makefile                              |    4 +
+ kernel/trace/latency_hist.c                        | 1178 +++++++++++++++++++
+ kernel/trace/trace.c                               |   38 +-
+ kernel/trace/trace.h                               |    2 +
+ kernel/trace/trace_events.c                        |   10 +
+ kernel/trace/trace_irqsoff.c                       |   11 +
+ kernel/trace/trace_output.c                        |   18 +-
+ kernel/user.c                                      |    4 +-
+ kernel/watchdog.c                                  |   13 +-
+ kernel/workqueue.c                                 |  236 ++--
+ kernel/workqueue_internal.h                        |    5 +-
+ lib/Kconfig                                        |    1 +
+ lib/debugobjects.c                                 |    5 +-
+ lib/idr.c                                          |   43 +-
+ lib/locking-selftest.c                             |   50 +
+ lib/percpu_ida.c                                   |   20 +-
+ lib/radix-tree.c                                   |    5 +-
+ lib/rbtree.c                                       |   11 +
+ lib/scatterlist.c                                  |    6 +-
+ lib/smp_processor_id.c                             |    5 +-
+ localversion-rt                                    |    1 +
+ mm/Kconfig                                         |    2 +-
+ mm/backing-dev.c                                   |    4 +-
+ mm/compaction.c                                    |    6 +-
+ mm/filemap.c                                       |   11 +-
+ mm/highmem.c                                       |    6 +-
+ mm/memcontrol.c                                    |   31 +-
+ mm/mmu_context.c                                   |    2 +
+ mm/page_alloc.c                                    |  147 ++-
+ mm/slab.h                                          |    4 +
+ mm/slub.c                                          |  126 +-
+ mm/swap.c                                          |   71 +-
+ mm/truncate.c                                      |    7 +-
+ mm/vmalloc.c                                       |   13 +-
+ mm/vmstat.c                                        |    6 +
+ mm/workingset.c                                    |   23 +-
+ mm/zsmalloc.c                                      |    6 +-
+ net/core/dev.c                                     |  167 ++-
+ net/core/skbuff.c                                  |   28 +-
+ net/core/sock.c                                    |    3 +-
+ net/ipv4/icmp.c                                    |   38 +
+ net/ipv4/sysctl_net_ipv4.c                         |    7 +
+ net/ipv4/tcp_ipv4.c                                |    7 +
+ net/mac80211/rx.c                                  |    2 +-
+ net/netfilter/core.c                               |    6 +
+ net/packet/af_packet.c                             |    5 +-
+ net/rds/ib_rdma.c                                  |    3 +-
+ net/sched/sch_generic.c                            |    2 +-
+ net/sunrpc/svc_xprt.c                              |    6 +-
+ scripts/mkcompile_h                                |    4 +-
+ sound/core/pcm_native.c                            |    8 +-
+ virt/kvm/async_pf.c                                |    4 +-
+ virt/kvm/kvm_main.c                                |   17 +-
+ 400 files changed, 12653 insertions(+), 3398 deletions(-)
+ create mode 100644 Documentation/hwlat_detector.txt
+ create mode 100644 Documentation/trace/histograms.txt
+ create mode 100644 drivers/misc/hwlat_detector.c
+ create mode 100644 include/linux/locallock.h
+ create mode 100644 include/linux/mutex_rt.h
+ create mode 100644 include/linux/rwlock_rt.h
+ create mode 100644 include/linux/rwlock_types_rt.h
+ create mode 100644 include/linux/rwsem_rt.h
+ create mode 100644 include/linux/spinlock_rt.h
+ create mode 100644 include/linux/spinlock_types_nort.h
+ create mode 100644 include/linux/spinlock_types_raw.h
+ create mode 100644 include/linux/spinlock_types_rt.h
+ create mode 100644 include/linux/swait.h
+ create mode 100644 include/linux/swork.h
+ create mode 100644 include/trace/events/hist.h
+ create mode 100644 include/trace/events/latency_hist.h
+ create mode 100644 kernel/locking/rt.c
+ create mode 100644 kernel/sched/swait.c
+ create mode 100644 kernel/sched/swork.c
+ create mode 100644 kernel/trace/latency_hist.c
+ create mode 100644 localversion-rt
 
+diff --git a/Documentation/hwlat_detector.txt b/Documentation/hwlat_detector.txt
+new file mode 100644
+index 0000000..cb61516
+--- /dev/null
++++ b/Documentation/hwlat_detector.txt
+@@ -0,0 +1,64 @@
++Introduction:
++-------------
++
++The module hwlat_detector is a special purpose kernel module that is used to
++detect large system latencies induced by the behavior of certain underlying
++hardware or firmware, independent of Linux itself. The code was developed
++originally to detect SMIs (System Management Interrupts) on x86 systems,
++however there is nothing x86 specific about this patchset. It was
++originally written for use by the "RT" patch since the Real Time
++kernel is highly latency sensitive.
++
++SMIs are usually not serviced by the Linux kernel, which typically does not
++even know that they are occuring. SMIs are instead are set up by BIOS code
++and are serviced by BIOS code, usually for "critical" events such as
++management of thermal sensors and fans. Sometimes though, SMIs are used for
++other tasks and those tasks can spend an inordinate amount of time in the
++handler (sometimes measured in milliseconds). Obviously this is a problem if
++you are trying to keep event service latencies down in the microsecond range.
++
++The hardware latency detector works by hogging all of the cpus for configurable
++amounts of time (by calling stop_machine()), polling the CPU Time Stamp Counter
++for some period, then looking for gaps in the TSC data. Any gap indicates a
++time when the polling was interrupted and since the machine is stopped and
++interrupts turned off the only thing that could do that would be an SMI.
++
++Note that the SMI detector should *NEVER* be used in a production environment.
++It is intended to be run manually to determine if the hardware platform has a
++problem with long system firmware service routines.
++
++Usage:
++------
++
++Loading the module hwlat_detector passing the parameter "enabled=1" (or by
++setting the "enable" entry in "hwlat_detector" debugfs toggled on) is the only
++step required to start the hwlat_detector. It is possible to redefine the
++threshold in microseconds (us) above which latency spikes will be taken
++into account (parameter "threshold=").
++
++Example:
++
++	# modprobe hwlat_detector enabled=1 threshold=100
++
++After the module is loaded, it creates a directory named "hwlat_detector" under
++the debugfs mountpoint, "/debug/hwlat_detector" for this text. It is necessary
++to have debugfs mounted, which might be on /sys/debug on your system.
++
++The /debug/hwlat_detector interface contains the following files:
++
++count			- number of latency spikes observed since last reset
++enable			- a global enable/disable toggle (0/1), resets count
++max			- maximum hardware latency actually observed (usecs)
++sample			- a pipe from which to read current raw sample data
++			  in the format <timestamp> <latency observed usecs>
++			  (can be opened O_NONBLOCK for a single sample)
++threshold		- minimum latency value to be considered (usecs)
++width			- time period to sample with CPUs held (usecs)
++			  must be less than the total window size (enforced)
++window			- total period of sampling, width being inside (usecs)
++
++By default we will set width to 500,000 and window to 1,000,000, meaning that
++we will sample every 1,000,000 usecs (1s) for 500,000 usecs (0.5s). If we
++observe any latencies that exceed the threshold (initially 100 usecs),
++then we write to a global sample ring buffer of 8K samples, which is
++consumed by reading from the "sample" (pipe) debugfs file interface.
 diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
 index 5b8d440..c7b9d98f 100644
 --- a/Documentation/kernel-parameters.txt
@@ -433,6 +545,198 @@ index 13f5619..f64d075 100644
  *  What are the 'command' keys?
  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  'b'     - Will immediately reboot the system without syncing or unmounting
+diff --git a/Documentation/trace/histograms.txt b/Documentation/trace/histograms.txt
+new file mode 100644
+index 0000000..6f2aeab
+--- /dev/null
++++ b/Documentation/trace/histograms.txt
+@@ -0,0 +1,186 @@
++		Using the Linux Kernel Latency Histograms
++
++
++This document gives a short explanation how to enable, configure and use
++latency histograms. Latency histograms are primarily relevant in the
++context of real-time enabled kernels (CONFIG_PREEMPT/CONFIG_PREEMPT_RT)
++and are used in the quality management of the Linux real-time
++capabilities.
++
++
++* Purpose of latency histograms
++
++A latency histogram continuously accumulates the frequencies of latency
++data. There are two types of histograms
++- potential sources of latencies
++- effective latencies
++
++
++* Potential sources of latencies
++
++Potential sources of latencies are code segments where interrupts,
++preemption or both are disabled (aka critical sections). To create
++histograms of potential sources of latency, the kernel stores the time
++stamp at the start of a critical section, determines the time elapsed
++when the end of the section is reached, and increments the frequency
++counter of that latency value - irrespective of whether any concurrently
++running process is affected by latency or not.
++- Configuration items (in the Kernel hacking/Tracers submenu)
++  CONFIG_INTERRUPT_OFF_LATENCY
++  CONFIG_PREEMPT_OFF_LATENCY
++
++
++* Effective latencies
++
++Effective latencies are actually occuring during wakeup of a process. To
++determine effective latencies, the kernel stores the time stamp when a
++process is scheduled to be woken up, and determines the duration of the
++wakeup time shortly before control is passed over to this process. Note
++that the apparent latency in user space may be somewhat longer, since the
++process may be interrupted after control is passed over to it but before
++the execution in user space takes place. Simply measuring the interval
++between enqueuing and wakeup may also not appropriate in cases when a
++process is scheduled as a result of a timer expiration. The timer may have
++missed its deadline, e.g. due to disabled interrupts, but this latency
++would not be registered. Therefore, the offsets of missed timers are
++recorded in a separate histogram. If both wakeup latency and missed timer
++offsets are configured and enabled, a third histogram may be enabled that
++records the overall latency as a sum of the timer latency, if any, and the
++wakeup latency. This histogram is called "timerandwakeup".
++- Configuration items (in the Kernel hacking/Tracers submenu)
++  CONFIG_WAKEUP_LATENCY
++  CONFIG_MISSED_TIMER_OFSETS
++
++
++* Usage
++
++The interface to the administration of the latency histograms is located
++in the debugfs file system. To mount it, either enter
++
++mount -t sysfs nodev /sys
++mount -t debugfs nodev /sys/kernel/debug
++
++from shell command line level, or add
++
++nodev	/sys			sysfs	defaults	0 0
++nodev	/sys/kernel/debug	debugfs	defaults	0 0
++
++to the file /etc/fstab. All latency histogram related files are then
++available in the directory /sys/kernel/debug/tracing/latency_hist. A
++particular histogram type is enabled by writing non-zero to the related
++variable in the /sys/kernel/debug/tracing/latency_hist/enable directory.
++Select "preemptirqsoff" for the histograms of potential sources of
++latencies and "wakeup" for histograms of effective latencies etc. The
++histogram data - one per CPU - are available in the files
++
++/sys/kernel/debug/tracing/latency_hist/preemptoff/CPUx
++/sys/kernel/debug/tracing/latency_hist/irqsoff/CPUx
++/sys/kernel/debug/tracing/latency_hist/preemptirqsoff/CPUx
++/sys/kernel/debug/tracing/latency_hist/wakeup/CPUx
++/sys/kernel/debug/tracing/latency_hist/wakeup/sharedprio/CPUx
++/sys/kernel/debug/tracing/latency_hist/missed_timer_offsets/CPUx
++/sys/kernel/debug/tracing/latency_hist/timerandwakeup/CPUx
++
++The histograms are reset by writing non-zero to the file "reset" in a
++particular latency directory. To reset all latency data, use
++
++#!/bin/sh
++
++TRACINGDIR=/sys/kernel/debug/tracing
++HISTDIR=$TRACINGDIR/latency_hist
++
++if test -d $HISTDIR
++then
++  cd $HISTDIR
++  for i in `find . | grep /reset$`
++  do
++    echo 1 >$i
++  done
++fi
++
++
++* Data format
++
++Latency data are stored with a resolution of one microsecond. The
++maximum latency is 10,240 microseconds. The data are only valid, if the
++overflow register is empty. Every output line contains the latency in
++microseconds in the first row and the number of samples in the second
++row. To display only lines with a positive latency count, use, for
++example,
++
++grep -v " 0$" /sys/kernel/debug/tracing/latency_hist/preemptoff/CPU0
++
++#Minimum latency: 0 microseconds.
++#Average latency: 0 microseconds.
++#Maximum latency: 25 microseconds.
++#Total samples: 3104770694
++#There are 0 samples greater or equal than 10240 microseconds
++#usecs	         samples
++    0	      2984486876
++    1	        49843506
++    2	        58219047
++    3	         5348126
++    4	         2187960
++    5	         3388262
++    6	          959289
++    7	          208294
++    8	           40420
++    9	            4485
++   10	           14918
++   11	           18340
++   12	           25052
++   13	           19455
++   14	            5602
++   15	             969
++   16	              47
++   17	              18
++   18	              14
++   19	               1
++   20	               3
++   21	               2
++   22	               5
++   23	               2
++   25	               1
++
++
++* Wakeup latency of a selected process
++
++To only collect wakeup latency data of a particular process, write the
++PID of the requested process to
++
++/sys/kernel/debug/tracing/latency_hist/wakeup/pid
++
++PIDs are not considered, if this variable is set to 0.
++
++
++* Details of the process with the highest wakeup latency so far
++
++Selected data of the process that suffered from the highest wakeup
++latency that occurred in a particular CPU are available in the file
++
++/sys/kernel/debug/tracing/latency_hist/wakeup/max_latency-CPUx.
++
++In addition, other relevant system data at the time when the
++latency occurred are given.
++
++The format of the data is (all in one line):
++<PID> <Priority> <Latency> (<Timeroffset>) <Command> \
++<- <PID> <Priority> <Command> <Timestamp>
++
++The value of <Timeroffset> is only relevant in the combined timer
++and wakeup latency recording. In the wakeup recording, it is
++always 0, in the missed_timer_offsets recording, it is the same
++as <Latency>.
++
++When retrospectively searching for the origin of a latency and
++tracing was not enabled, it may be helpful to know the name and
++some basic data of the task that (finally) was switching to the
++late real-tlme task. In addition to the victim's data, also the
++data of the possible culprit are therefore displayed after the
++"<-" symbol.
++
++Finally, the timestamp of the time when the latency occurred
++in <seconds>.<microseconds> after the most recent system boot
++is provided.
++
++These data are also reset when the wakeup histogram is reset.
 diff --git a/Makefile b/Makefile
 index d9d9a63..40724fc 100644
 --- a/Makefile
@@ -9443,6 +9747,1252 @@ index cd7f697..143a5b2 100644
  obj-$(CONFIG_SPEAR13XX_PCIE_GADGET)	+= spear13xx_pcie_gadget.o
  obj-$(CONFIG_VMWARE_BALLOON)	+= vmw_balloon.o
  obj-$(CONFIG_ARM_CHARLCD)	+= arm-charlcd.o
+diff --git a/drivers/misc/hwlat_detector.c b/drivers/misc/hwlat_detector.c
+new file mode 100644
+index 0000000..52f5ad5
+--- /dev/null
++++ b/drivers/misc/hwlat_detector.c
+@@ -0,0 +1,1240 @@
++/*
++ * hwlat_detector.c - A simple Hardware Latency detector.
++ *
++ * Use this module to detect large system latencies induced by the behavior of
++ * certain underlying system hardware or firmware, independent of Linux itself.
++ * The code was developed originally to detect the presence of SMIs on Intel
++ * and AMD systems, although there is no dependency upon x86 herein.
++ *
++ * The classical example usage of this module is in detecting the presence of
++ * SMIs or System Management Interrupts on Intel and AMD systems. An SMI is a
++ * somewhat special form of hardware interrupt spawned from earlier CPU debug
++ * modes in which the (BIOS/EFI/etc.) firmware arranges for the South Bridge
++ * LPC (or other device) to generate a special interrupt under certain
++ * circumstances, for example, upon expiration of a special SMI timer device,
++ * due to certain external thermal readings, on certain I/O address accesses,
++ * and other situations. An SMI hits a special CPU pin, triggers a special
++ * SMI mode (complete with special memory map), and the OS is unaware.
++ *
++ * Although certain hardware-inducing latencies are necessary (for example,
++ * a modern system often requires an SMI handler for correct thermal control
++ * and remote management) they can wreak havoc upon any OS-level performance
++ * guarantees toward low-latency, especially when the OS is not even made
++ * aware of the presence of these interrupts. For this reason, we need a
++ * somewhat brute force mechanism to detect these interrupts. In this case,
++ * we do it by hogging all of the CPU(s) for configurable timer intervals,
++ * sampling the built-in CPU timer, looking for discontiguous readings.
++ *
++ * WARNING: This implementation necessarily introduces latencies. Therefore,
++ *          you should NEVER use this module in a production environment
++ *          requiring any kind of low-latency performance guarantee(s).
++ *
++ * Copyright (C) 2008-2009 Jon Masters, Red Hat, Inc. <jcm@redhat.com>
++ *
++ * Includes useful feedback from Clark Williams <clark@redhat.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/ring_buffer.h>
++#include <linux/time.h>
++#include <linux/hrtimer.h>
++#include <linux/kthread.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
++#include <linux/uaccess.h>
++#include <linux/version.h>
++#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/trace_clock.h>
++
++#define BUF_SIZE_DEFAULT	262144UL		/* 8K*(sizeof(entry)) */
++#define BUF_FLAGS		(RB_FL_OVERWRITE)	/* no block on full */
++#define U64STR_SIZE		22			/* 20 digits max */
++
++#define VERSION			"1.0.0"
++#define BANNER			"hwlat_detector: "
++#define DRVNAME			"hwlat_detector"
++#define DEFAULT_SAMPLE_WINDOW	1000000			/* 1s */
++#define DEFAULT_SAMPLE_WIDTH	500000			/* 0.5s */
++#define DEFAULT_LAT_THRESHOLD	10			/* 10us */
++
++/* Module metadata */
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Jon Masters <jcm@redhat.com>");
++MODULE_DESCRIPTION("A simple hardware latency detector");
++MODULE_VERSION(VERSION);
++
++/* Module parameters */
++
++static int debug;
++static int enabled;
++static int threshold;
++
++module_param(debug, int, 0);			/* enable debug */
++module_param(enabled, int, 0);			/* enable detector */
++module_param(threshold, int, 0);		/* latency threshold */
++
++/* Buffering and sampling */
++
++static struct ring_buffer *ring_buffer;		/* sample buffer */
++static DEFINE_MUTEX(ring_buffer_mutex);		/* lock changes */
++static unsigned long buf_size = BUF_SIZE_DEFAULT;
++static struct task_struct *kthread;		/* sampling thread */
++
++/* DebugFS filesystem entries */
++
++static struct dentry *debug_dir;		/* debugfs directory */
++static struct dentry *debug_max;		/* maximum TSC delta */
++static struct dentry *debug_count;		/* total detect count */
++static struct dentry *debug_sample_width;	/* sample width us */
++static struct dentry *debug_sample_window;	/* sample window us */
++static struct dentry *debug_sample;		/* raw samples us */
++static struct dentry *debug_threshold;		/* threshold us */
++static struct dentry *debug_enable;		/* enable/disable */
++
++/* Individual samples and global state */
++
++struct sample;					/* latency sample */
++struct data;					/* Global state */
++
++/* Sampling functions */
++static int __buffer_add_sample(struct sample *sample);
++static struct sample *buffer_get_sample(struct sample *sample);
++
++/* Threading and state */
++static int kthread_fn(void *unused);
++static int start_kthread(void);
++static int stop_kthread(void);
++static void __reset_stats(void);
++static int init_stats(void);
++
++/* Debugfs interface */
++static ssize_t simple_data_read(struct file *filp, char __user *ubuf,
++				size_t cnt, loff_t *ppos, const u64 *entry);
++static ssize_t simple_data_write(struct file *filp, const char __user *ubuf,
++				 size_t cnt, loff_t *ppos, u64 *entry);
++static int debug_sample_fopen(struct inode *inode, struct file *filp);
++static ssize_t debug_sample_fread(struct file *filp, char __user *ubuf,
++				  size_t cnt, loff_t *ppos);
++static int debug_sample_release(struct inode *inode, struct file *filp);
++static int debug_enable_fopen(struct inode *inode, struct file *filp);
++static ssize_t debug_enable_fread(struct file *filp, char __user *ubuf,
++				  size_t cnt, loff_t *ppos);
++static ssize_t debug_enable_fwrite(struct file *file,
++				   const char __user *user_buffer,
++				   size_t user_size, loff_t *offset);
++
++/* Initialization functions */
++static int init_debugfs(void);
++static void free_debugfs(void);
++static int detector_init(void);
++static void detector_exit(void);
++
++/* Individual latency samples are stored here when detected and packed into
++ * the ring_buffer circular buffer, where they are overwritten when
++ * more than buf_size/sizeof(sample) samples are received. */
++struct sample {
++	u64		seqnum;		/* unique sequence */
++	u64		duration;	/* ktime delta */
++	u64		outer_duration;	/* ktime delta (outer loop) */
++	struct timespec	timestamp;	/* wall time */
++	unsigned long   lost;
++};
++
++/* keep the global state somewhere. */
++static struct data {
++
++	struct mutex lock;		/* protect changes */
++
++	u64	count;			/* total since reset */
++	u64	max_sample;		/* max hardware latency */
++	u64	threshold;		/* sample threshold level */
++
++	u64	sample_window;		/* total sampling window (on+off) */
++	u64	sample_width;		/* active sampling portion of window */
++
++	atomic_t sample_open;		/* whether the sample file is open */
++
++	wait_queue_head_t wq;		/* waitqeue for new sample values */
++
++} data;
++
++/**
++ * __buffer_add_sample - add a new latency sample recording to the ring buffer
++ * @sample: The new latency sample value
++ *
++ * This receives a new latency sample and records it in a global ring buffer.
++ * No additional locking is used in this case.
++ */
++static int __buffer_add_sample(struct sample *sample)
++{
++	return ring_buffer_write(ring_buffer,
++				 sizeof(struct sample), sample);
++}
++
++/**
++ * buffer_get_sample - remove a hardware latency sample from the ring buffer
++ * @sample: Pre-allocated storage for the sample
++ *
++ * This retrieves a hardware latency sample from the global circular buffer
++ */
++static struct sample *buffer_get_sample(struct sample *sample)
++{
++	struct ring_buffer_event *e = NULL;
++	struct sample *s = NULL;
++	unsigned int cpu = 0;
++
++	if (!sample)
++		return NULL;
++
++	mutex_lock(&ring_buffer_mutex);
++	for_each_online_cpu(cpu) {
++		e = ring_buffer_consume(ring_buffer, cpu, NULL, &sample->lost);
++		if (e)
++			break;
++	}
++
++	if (e) {
++		s = ring_buffer_event_data(e);
++		memcpy(sample, s, sizeof(struct sample));
++	} else
++		sample = NULL;
++	mutex_unlock(&ring_buffer_mutex);
++
++	return sample;
++}
++
++#ifndef CONFIG_TRACING
++#define time_type	ktime_t
++#define time_get()	ktime_get()
++#define time_to_us(x)	ktime_to_us(x)
++#define time_sub(a, b)	ktime_sub(a, b)
++#define init_time(a, b)	(a).tv64 = b
++#define time_u64(a)	((a).tv64)
++#else
++#define time_type	u64
++#define time_get()	trace_clock_local()
++#define time_to_us(x)	div_u64(x, 1000)
++#define time_sub(a, b)	((a) - (b))
++#define init_time(a, b)	(a = b)
++#define time_u64(a)	a
++#endif
++/**
++ * get_sample - sample the CPU TSC and look for likely hardware latencies
++ *
++ * Used to repeatedly capture the CPU TSC (or similar), looking for potential
++ * hardware-induced latency. Called with interrupts disabled and with
++ * data.lock held.
++ */
++static int get_sample(void)
++{
++	time_type start, t1, t2, last_t2;
++	s64 diff, total = 0;
++	u64 sample = 0;
++	u64 outer_sample = 0;
++	int ret = -1;
++
++	init_time(last_t2, 0);
++	start = time_get(); /* start timestamp */
++
++	do {
++
++		t1 = time_get();	/* we'll look for a discontinuity */
++		t2 = time_get();
++
++		if (time_u64(last_t2)) {
++			/* Check the delta from outer loop (t2 to next t1) */
++			diff = time_to_us(time_sub(t1, last_t2));
++			/* This shouldn't happen */
++			if (diff < 0) {
++				pr_err(BANNER "time running backwards\n");
++				goto out;
++			}
++			if (diff > outer_sample)
++				outer_sample = diff;
++		}
++		last_t2 = t2;
++
++		total = time_to_us(time_sub(t2, start)); /* sample width */
++
++		/* This checks the inner loop (t1 to t2) */
++		diff = time_to_us(time_sub(t2, t1));     /* current diff */
++
++		/* This shouldn't happen */
++		if (diff < 0) {
++			pr_err(BANNER "time running backwards\n");
++			goto out;
++		}
++
++		if (diff > sample)
++			sample = diff; /* only want highest value */
++
++	} while (total <= data.sample_width);
++
++	ret = 0;
++
++	/* If we exceed the threshold value, we have found a hardware latency */
++	if (sample > data.threshold || outer_sample > data.threshold) {
++		struct sample s;
++
++		ret = 1;
++
++		data.count++;
++		s.seqnum = data.count;
++		s.duration = sample;
++		s.outer_duration = outer_sample;
++		s.timestamp = CURRENT_TIME;
++		__buffer_add_sample(&s);
++
++		/* Keep a running maximum ever recorded hardware latency */
++		if (sample > data.max_sample)
++			data.max_sample = sample;
++	}
++
++out:
++	return ret;
++}
++
++/*
++ * kthread_fn - The CPU time sampling/hardware latency detection kernel thread
++ * @unused: A required part of the kthread API.
++ *
++ * Used to periodically sample the CPU TSC via a call to get_sample. We
++ * disable interrupts, which does (intentionally) introduce latency since we
++ * need to ensure nothing else might be running (and thus pre-empting).
++ * Obviously this should never be used in production environments.
++ *
++ * Currently this runs on which ever CPU it was scheduled on, but most
++ * real-worald hardware latency situations occur across several CPUs,
++ * but we might later generalize this if we find there are any actualy
++ * systems with alternate SMI delivery or other hardware latencies.
++ */
++static int kthread_fn(void *unused)
++{
++	int ret;
++	u64 interval;
++
++	while (!kthread_should_stop()) {
++
++		mutex_lock(&data.lock);
++
++		local_irq_disable();
++		ret = get_sample();
++		local_irq_enable();
++
++		if (ret > 0)
++			wake_up(&data.wq); /* wake up reader(s) */
++
++		interval = data.sample_window - data.sample_width;
++		do_div(interval, USEC_PER_MSEC); /* modifies interval value */
++
++		mutex_unlock(&data.lock);
++
++		if (msleep_interruptible(interval))
++			break;
++	}
++
++	return 0;
++}
++
++/**
++ * start_kthread - Kick off the hardware latency sampling/detector kthread
++ *
++ * This starts a kernel thread that will sit and sample the CPU timestamp
++ * counter (TSC or similar) and look for potential hardware latencies.
++ */
++static int start_kthread(void)
++{
++	kthread = kthread_run(kthread_fn, NULL,
++					DRVNAME);
++	if (IS_ERR(kthread)) {
++		pr_err(BANNER "could not start sampling thread\n");
++		enabled = 0;
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++/**
++ * stop_kthread - Inform the hardware latency samping/detector kthread to stop
++ *
++ * This kicks the running hardware latency sampling/detector kernel thread and
++ * tells it to stop sampling now. Use this on unload and at system shutdown.
++ */
++static int stop_kthread(void)
++{
++	int ret;
++
++	ret = kthread_stop(kthread);
++
++	return ret;
++}
++
++/**
++ * __reset_stats - Reset statistics for the hardware latency detector
++ *
++ * We use data to store various statistics and global state. We call this
++ * function in order to reset those when "enable" is toggled on or off, and
++ * also at initialization. Should be called with data.lock held.
++ */
++static void __reset_stats(void)
++{
++	data.count = 0;
++	data.max_sample = 0;
++	ring_buffer_reset(ring_buffer); /* flush out old sample entries */
++}
++
++/**
++ * init_stats - Setup global state statistics for the hardware latency detector
++ *
++ * We use data to store various statistics and global state. We also use
++ * a global ring buffer (ring_buffer) to keep raw samples of detected hardware
++ * induced system latencies. This function initializes these structures and
++ * allocates the global ring buffer also.
++ */
++static int init_stats(void)
++{
++	int ret = -ENOMEM;
++
++	mutex_init(&data.lock);
++	init_waitqueue_head(&data.wq);
++	atomic_set(&data.sample_open, 0);
++
++	ring_buffer = ring_buffer_alloc(buf_size, BUF_FLAGS);
++
++	if (WARN(!ring_buffer, KERN_ERR BANNER
++			       "failed to allocate ring buffer!\n"))
++		goto out;
++
++	__reset_stats();
++	data.threshold = threshold ?: DEFAULT_LAT_THRESHOLD; /* threshold us */
++	data.sample_window = DEFAULT_SAMPLE_WINDOW; /* window us */
++	data.sample_width = DEFAULT_SAMPLE_WIDTH;   /* width us */
++
++	ret = 0;
++
++out:
++	return ret;
++
++}
++
++/*
++ * simple_data_read - Wrapper read function for global state debugfs entries
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The userspace provided buffer to read value into
++ * @cnt: The maximum number of bytes to read
++ * @ppos: The current "file" position
++ * @entry: The entry to read from
++ *
++ * This function provides a generic read implementation for the global state
++ * "data" structure debugfs filesystem entries. It would be nice to use
++ * simple_attr_read directly, but we need to make sure that the data.lock
++ * is held during the actual read.
++ */
++static ssize_t simple_data_read(struct file *filp, char __user *ubuf,
++				size_t cnt, loff_t *ppos, const u64 *entry)
++{
++	char buf[U64STR_SIZE];
++	u64 val = 0;
++	int len = 0;
++
++	memset(buf, 0, sizeof(buf));
++
++	if (!entry)
++		return -EFAULT;
++
++	mutex_lock(&data.lock);
++	val = *entry;
++	mutex_unlock(&data.lock);
++
++	len = snprintf(buf, sizeof(buf), "%llu\n", (unsigned long long)val);
++
++	return simple_read_from_buffer(ubuf, cnt, ppos, buf, len);
++
++}
++
++/*
++ * simple_data_write - Wrapper write function for global state debugfs entries
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The userspace provided buffer to write value from
++ * @cnt: The maximum number of bytes to write
++ * @ppos: The current "file" position
++ * @entry: The entry to write to
++ *
++ * This function provides a generic write implementation for the global state
++ * "data" structure debugfs filesystem entries. It would be nice to use
++ * simple_attr_write directly, but we need to make sure that the data.lock
++ * is held during the actual write.
++ */
++static ssize_t simple_data_write(struct file *filp, const char __user *ubuf,
++				 size_t cnt, loff_t *ppos, u64 *entry)
++{
++	char buf[U64STR_SIZE];
++	int csize = min(cnt, sizeof(buf));
++	u64 val = 0;
++	int err = 0;
++
++	memset(buf, '\0', sizeof(buf));
++	if (copy_from_user(buf, ubuf, csize))
++		return -EFAULT;
++
++	buf[U64STR_SIZE-1] = '\0';			/* just in case */
++	err = kstrtoull(buf, 10, &val);
++	if (err)
++		return -EINVAL;
++
++	mutex_lock(&data.lock);
++	*entry = val;
++	mutex_unlock(&data.lock);
++
++	return csize;
++}
++
++/**
++ * debug_count_fopen - Open function for "count" debugfs entry
++ * @inode: The in-kernel inode representation of the debugfs "file"
++ * @filp: The active open file structure for the debugfs "file"
++ *
++ * This function provides an open implementation for the "count" debugfs
++ * interface to the hardware latency detector.
++ */
++static int debug_count_fopen(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++/**
++ * debug_count_fread - Read function for "count" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The userspace provided buffer to read value into
++ * @cnt: The maximum number of bytes to read
++ * @ppos: The current "file" position
++ *
++ * This function provides a read implementation for the "count" debugfs
++ * interface to the hardware latency detector. Can be used to read the
++ * number of latency readings exceeding the configured threshold since
++ * the detector was last reset (e.g. by writing a zero into "count").
++ */
++static ssize_t debug_count_fread(struct file *filp, char __user *ubuf,
++				     size_t cnt, loff_t *ppos)
++{
++	return simple_data_read(filp, ubuf, cnt, ppos, &data.count);
++}
++
++/**
++ * debug_count_fwrite - Write function for "count" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The user buffer that contains the value to write
++ * @cnt: The maximum number of bytes to write to "file"
++ * @ppos: The current position in the debugfs "file"
++ *
++ * This function provides a write implementation for the "count" debugfs
++ * interface to the hardware latency detector. Can be used to write a
++ * desired value, especially to zero the total count.
++ */
++static ssize_t  debug_count_fwrite(struct file *filp,
++				       const char __user *ubuf,
++				       size_t cnt,
++				       loff_t *ppos)
++{
++	return simple_data_write(filp, ubuf, cnt, ppos, &data.count);
++}
++
++/**
++ * debug_enable_fopen - Dummy open function for "enable" debugfs interface
++ * @inode: The in-kernel inode representation of the debugfs "file"
++ * @filp: The active open file structure for the debugfs "file"
++ *
++ * This function provides an open implementation for the "enable" debugfs
++ * interface to the hardware latency detector.
++ */
++static int debug_enable_fopen(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++/**
++ * debug_enable_fread - Read function for "enable" debugfs interface
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The userspace provided buffer to read value into
++ * @cnt: The maximum number of bytes to read
++ * @ppos: The current "file" position
++ *
++ * This function provides a read implementation for the "enable" debugfs
++ * interface to the hardware latency detector. Can be used to determine
++ * whether the detector is currently enabled ("0\n" or "1\n" returned).
++ */
++static ssize_t debug_enable_fread(struct file *filp, char __user *ubuf,
++				      size_t cnt, loff_t *ppos)
++{
++	char buf[4];
++
++	if ((cnt < sizeof(buf)) || (*ppos))
++		return 0;
++
++	buf[0] = enabled ? '1' : '0';
++	buf[1] = '\n';
++	buf[2] = '\0';
++	if (copy_to_user(ubuf, buf, strlen(buf)))
++		return -EFAULT;
++	return *ppos = strlen(buf);
++}
++
++/**
++ * debug_enable_fwrite - Write function for "enable" debugfs interface
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The user buffer that contains the value to write
++ * @cnt: The maximum number of bytes to write to "file"
++ * @ppos: The current position in the debugfs "file"
++ *
++ * This function provides a write implementation for the "enable" debugfs
++ * interface to the hardware latency detector. Can be used to enable or
++ * disable the detector, which will have the side-effect of possibly
++ * also resetting the global stats and kicking off the measuring
++ * kthread (on an enable) or the converse (upon a disable).
++ */
++static ssize_t  debug_enable_fwrite(struct file *filp,
++					const char __user *ubuf,
++					size_t cnt,
++					loff_t *ppos)
++{
++	char buf[4];
++	int csize = min(cnt, sizeof(buf));
++	long val = 0;
++	int err = 0;
++
++	memset(buf, '\0', sizeof(buf));
++	if (copy_from_user(buf, ubuf, csize))
++		return -EFAULT;
++
++	buf[sizeof(buf)-1] = '\0';			/* just in case */
++	err = kstrtoul(buf, 10, &val);
++	if (err)
++		return -EINVAL;
++
++	if (val) {
++		if (enabled)
++			goto unlock;
++		enabled = 1;
++		__reset_stats();
++		if (start_kthread())
++			return -EFAULT;
++	} else {
++		if (!enabled)
++			goto unlock;
++		enabled = 0;
++		err = stop_kthread();
++		if (err) {
++			pr_err(BANNER "cannot stop kthread\n");
++			return -EFAULT;
++		}
++		wake_up(&data.wq);		/* reader(s) should return */
++	}
++unlock:
++	return csize;
++}
++
++/**
++ * debug_max_fopen - Open function for "max" debugfs entry
++ * @inode: The in-kernel inode representation of the debugfs "file"
++ * @filp: The active open file structure for the debugfs "file"
++ *
++ * This function provides an open implementation for the "max" debugfs
++ * interface to the hardware latency detector.
++ */
++static int debug_max_fopen(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++/**
++ * debug_max_fread - Read function for "max" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The userspace provided buffer to read value into
++ * @cnt: The maximum number of bytes to read
++ * @ppos: The current "file" position
++ *
++ * This function provides a read implementation for the "max" debugfs
++ * interface to the hardware latency detector. Can be used to determine
++ * the maximum latency value observed since it was last reset.
++ */
++static ssize_t debug_max_fread(struct file *filp, char __user *ubuf,
++				   size_t cnt, loff_t *ppos)
++{
++	return simple_data_read(filp, ubuf, cnt, ppos, &data.max_sample);
++}
++
++/**
++ * debug_max_fwrite - Write function for "max" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The user buffer that contains the value to write
++ * @cnt: The maximum number of bytes to write to "file"
++ * @ppos: The current position in the debugfs "file"
++ *
++ * This function provides a write implementation for the "max" debugfs
++ * interface to the hardware latency detector. Can be used to reset the
++ * maximum or set it to some other desired value - if, then, subsequent
++ * measurements exceed this value, the maximum will be updated.
++ */
++static ssize_t  debug_max_fwrite(struct file *filp,
++				     const char __user *ubuf,
++				     size_t cnt,
++				     loff_t *ppos)
++{
++	return simple_data_write(filp, ubuf, cnt, ppos, &data.max_sample);
++}
++
++
++/**
++ * debug_sample_fopen - An open function for "sample" debugfs interface
++ * @inode: The in-kernel inode representation of this debugfs "file"
++ * @filp: The active open file structure for the debugfs "file"
++ *
++ * This function handles opening the "sample" file within the hardware
++ * latency detector debugfs directory interface. This file is used to read
++ * raw samples from the global ring_buffer and allows the user to see a
++ * running latency history. Can be opened blocking or non-blocking,
++ * affecting whether it behaves as a buffer read pipe, or does not.
++ * Implements simple locking to prevent multiple simultaneous use.
++ */
++static int debug_sample_fopen(struct inode *inode, struct file *filp)
++{
++	if (!atomic_add_unless(&data.sample_open, 1, 1))
++		return -EBUSY;
++	else
++		return 0;
++}
++
++/**
++ * debug_sample_fread - A read function for "sample" debugfs interface
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The user buffer that will contain the samples read
++ * @cnt: The maximum bytes to read from the debugfs "file"
++ * @ppos: The current position in the debugfs "file"
++ *
++ * This function handles reading from the "sample" file within the hardware
++ * latency detector debugfs directory interface. This file is used to read
++ * raw samples from the global ring_buffer and allows the user to see a
++ * running latency history. By default this will block pending a new
++ * value written into the sample buffer, unless there are already a
++ * number of value(s) waiting in the buffer, or the sample file was
++ * previously opened in a non-blocking mode of operation.
++ */
++static ssize_t debug_sample_fread(struct file *filp, char __user *ubuf,
++					size_t cnt, loff_t *ppos)
++{
++	int len = 0;
++	char buf[64];
++	struct sample *sample = NULL;
++
++	if (!enabled)
++		return 0;
++
++	sample = kzalloc(sizeof(struct sample), GFP_KERNEL);
++	if (!sample)
++		return -ENOMEM;
++
++	while (!buffer_get_sample(sample)) {
++
++		DEFINE_WAIT(wait);
++
++		if (filp->f_flags & O_NONBLOCK) {
++			len = -EAGAIN;
++			goto out;
++		}
++
++		prepare_to_wait(&data.wq, &wait, TASK_INTERRUPTIBLE);
++		schedule();
++		finish_wait(&data.wq, &wait);
++
++		if (signal_pending(current)) {
++			len = -EINTR;
++			goto out;
++		}
++
++		if (!enabled) {			/* enable was toggled */
++			len = 0;
++			goto out;
++		}
++	}
++
++	len = snprintf(buf, sizeof(buf), "%010lu.%010lu\t%llu\t%llu\n",
++		       sample->timestamp.tv_sec,
++		       sample->timestamp.tv_nsec,
++		       sample->duration,
++		       sample->outer_duration);
++
++
++	/* handling partial reads is more trouble than it's worth */
++	if (len > cnt)
++		goto out;
++
++	if (copy_to_user(ubuf, buf, len))
++		len = -EFAULT;
++
++out:
++	kfree(sample);
++	return len;
++}
++
++/**
++ * debug_sample_release - Release function for "sample" debugfs interface
++ * @inode: The in-kernel inode represenation of the debugfs "file"
++ * @filp: The active open file structure for the debugfs "file"
++ *
++ * This function completes the close of the debugfs interface "sample" file.
++ * Frees the sample_open "lock" so that other users may open the interface.
++ */
++static int debug_sample_release(struct inode *inode, struct file *filp)
++{
++	atomic_dec(&data.sample_open);
++
++	return 0;
++}
++
++/**
++ * debug_threshold_fopen - Open function for "threshold" debugfs entry
++ * @inode: The in-kernel inode representation of the debugfs "file"
++ * @filp: The active open file structure for the debugfs "file"
++ *
++ * This function provides an open implementation for the "threshold" debugfs
++ * interface to the hardware latency detector.
++ */
++static int debug_threshold_fopen(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++/**
++ * debug_threshold_fread - Read function for "threshold" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The userspace provided buffer to read value into
++ * @cnt: The maximum number of bytes to read
++ * @ppos: The current "file" position
++ *
++ * This function provides a read implementation for the "threshold" debugfs
++ * interface to the hardware latency detector. It can be used to determine
++ * the current threshold level at which a latency will be recorded in the
++ * global ring buffer, typically on the order of 10us.
++ */
++static ssize_t debug_threshold_fread(struct file *filp, char __user *ubuf,
++					 size_t cnt, loff_t *ppos)
++{
++	return simple_data_read(filp, ubuf, cnt, ppos, &data.threshold);
++}
++
++/**
++ * debug_threshold_fwrite - Write function for "threshold" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The user buffer that contains the value to write
++ * @cnt: The maximum number of bytes to write to "file"
++ * @ppos: The current position in the debugfs "file"
++ *
++ * This function provides a write implementation for the "threshold" debugfs
++ * interface to the hardware latency detector. It can be used to configure
++ * the threshold level at which any subsequently detected latencies will
++ * be recorded into the global ring buffer.
++ */
++static ssize_t  debug_threshold_fwrite(struct file *filp,
++					const char __user *ubuf,
++					size_t cnt,
++					loff_t *ppos)
++{
++	int ret;
++
++	ret = simple_data_write(filp, ubuf, cnt, ppos, &data.threshold);
++
++	if (enabled)
++		wake_up_process(kthread);
++
++	return ret;
++}
++
++/**
++ * debug_width_fopen - Open function for "width" debugfs entry
++ * @inode: The in-kernel inode representation of the debugfs "file"
++ * @filp: The active open file structure for the debugfs "file"
++ *
++ * This function provides an open implementation for the "width" debugfs
++ * interface to the hardware latency detector.
++ */
++static int debug_width_fopen(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++/**
++ * debug_width_fread - Read function for "width" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The userspace provided buffer to read value into
++ * @cnt: The maximum number of bytes to read
++ * @ppos: The current "file" position
++ *
++ * This function provides a read implementation for the "width" debugfs
++ * interface to the hardware latency detector. It can be used to determine
++ * for how many us of the total window us we will actively sample for any
++ * hardware-induced latecy periods. Obviously, it is not possible to
++ * sample constantly and have the system respond to a sample reader, or,
++ * worse, without having the system appear to have gone out to lunch.
++ */
++static ssize_t debug_width_fread(struct file *filp, char __user *ubuf,
++				     size_t cnt, loff_t *ppos)
++{
++	return simple_data_read(filp, ubuf, cnt, ppos, &data.sample_width);
++}
++
++/**
++ * debug_width_fwrite - Write function for "width" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The user buffer that contains the value to write
++ * @cnt: The maximum number of bytes to write to "file"
++ * @ppos: The current position in the debugfs "file"
++ *
++ * This function provides a write implementation for the "width" debugfs
++ * interface to the hardware latency detector. It can be used to configure
++ * for how many us of the total window us we will actively sample for any
++ * hardware-induced latency periods. Obviously, it is not possible to
++ * sample constantly and have the system respond to a sample reader, or,
++ * worse, without having the system appear to have gone out to lunch. It
++ * is enforced that width is less that the total window size.
++ */
++static ssize_t  debug_width_fwrite(struct file *filp,
++				       const char __user *ubuf,
++				       size_t cnt,
++				       loff_t *ppos)
++{
++	char buf[U64STR_SIZE];
++	int csize = min(cnt, sizeof(buf));
++	u64 val = 0;
++	int err = 0;
++
++	memset(buf, '\0', sizeof(buf));
++	if (copy_from_user(buf, ubuf, csize))
++		return -EFAULT;
++
++	buf[U64STR_SIZE-1] = '\0';			/* just in case */
++	err = kstrtoull(buf, 10, &val);
++	if (err)
++		return -EINVAL;
++
++	mutex_lock(&data.lock);
++	if (val < data.sample_window)
++		data.sample_width = val;
++	else {
++		mutex_unlock(&data.lock);
++		return -EINVAL;
++	}
++	mutex_unlock(&data.lock);
++
++	if (enabled)
++		wake_up_process(kthread);
++
++	return csize;
++}
++
++/**
++ * debug_window_fopen - Open function for "window" debugfs entry
++ * @inode: The in-kernel inode representation of the debugfs "file"
++ * @filp: The active open file structure for the debugfs "file"
++ *
++ * This function provides an open implementation for the "window" debugfs
++ * interface to the hardware latency detector. The window is the total time
++ * in us that will be considered one sample period. Conceptually, windows
++ * occur back-to-back and contain a sample width period during which
++ * actual sampling occurs.
++ */
++static int debug_window_fopen(struct inode *inode, struct file *filp)
++{
++	return 0;
++}
++
++/**
++ * debug_window_fread - Read function for "window" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The userspace provided buffer to read value into
++ * @cnt: The maximum number of bytes to read
++ * @ppos: The current "file" position
++ *
++ * This function provides a read implementation for the "window" debugfs
++ * interface to the hardware latency detector. The window is the total time
++ * in us that will be considered one sample period. Conceptually, windows
++ * occur back-to-back and contain a sample width period during which
++ * actual sampling occurs. Can be used to read the total window size.
++ */
++static ssize_t debug_window_fread(struct file *filp, char __user *ubuf,
++				      size_t cnt, loff_t *ppos)
++{
++	return simple_data_read(filp, ubuf, cnt, ppos, &data.sample_window);
++}
++
++/**
++ * debug_window_fwrite - Write function for "window" debugfs entry
++ * @filp: The active open file structure for the debugfs "file"
++ * @ubuf: The user buffer that contains the value to write
++ * @cnt: The maximum number of bytes to write to "file"
++ * @ppos: The current position in the debugfs "file"
++ *
++ * This function provides a write implementation for the "window" debufds
++ * interface to the hardware latency detetector. The window is the total time
++ * in us that will be considered one sample period. Conceptually, windows
++ * occur back-to-back and contain a sample width period during which
++ * actual sampling occurs. Can be used to write a new total window size. It
++ * is enfoced that any value written must be greater than the sample width
++ * size, or an error results.
++ */
++static ssize_t  debug_window_fwrite(struct file *filp,
++					const char __user *ubuf,
++					size_t cnt,
++					loff_t *ppos)
++{
++	char buf[U64STR_SIZE];
++	int csize = min(cnt, sizeof(buf));
++	u64 val = 0;
++	int err = 0;
++
++	memset(buf, '\0', sizeof(buf));
++	if (copy_from_user(buf, ubuf, csize))
++		return -EFAULT;
++
++	buf[U64STR_SIZE-1] = '\0';			/* just in case */
++	err = kstrtoull(buf, 10, &val);
++	if (err)
++		return -EINVAL;
++
++	mutex_lock(&data.lock);
++	if (data.sample_width < val)
++		data.sample_window = val;
++	else {
++		mutex_unlock(&data.lock);
++		return -EINVAL;
++	}
++	mutex_unlock(&data.lock);
++
++	return csize;
++}
++
++/*
++ * Function pointers for the "count" debugfs file operations
++ */
++static const struct file_operations count_fops = {
++	.open		= debug_count_fopen,
++	.read		= debug_count_fread,
++	.write		= debug_count_fwrite,
++	.owner		= THIS_MODULE,
++};
++
++/*
++ * Function pointers for the "enable" debugfs file operations
++ */
++static const struct file_operations enable_fops = {
++	.open		= debug_enable_fopen,
++	.read		= debug_enable_fread,
++	.write		= debug_enable_fwrite,
++	.owner		= THIS_MODULE,
++};
++
++/*
++ * Function pointers for the "max" debugfs file operations
++ */
++static const struct file_operations max_fops = {
++	.open		= debug_max_fopen,
++	.read		= debug_max_fread,
++	.write		= debug_max_fwrite,
++	.owner		= THIS_MODULE,
++};
++
++/*
++ * Function pointers for the "sample" debugfs file operations
++ */
++static const struct file_operations sample_fops = {
++	.open		= debug_sample_fopen,
++	.read		= debug_sample_fread,
++	.release	= debug_sample_release,
++	.owner		= THIS_MODULE,
++};
++
++/*
++ * Function pointers for the "threshold" debugfs file operations
++ */
++static const struct file_operations threshold_fops = {
++	.open		= debug_threshold_fopen,
++	.read		= debug_threshold_fread,
++	.write		= debug_threshold_fwrite,
++	.owner		= THIS_MODULE,
++};
++
++/*
++ * Function pointers for the "width" debugfs file operations
++ */
++static const struct file_operations width_fops = {
++	.open		= debug_width_fopen,
++	.read		= debug_width_fread,
++	.write		= debug_width_fwrite,
++	.owner		= THIS_MODULE,
++};
++
++/*
++ * Function pointers for the "window" debugfs file operations
++ */
++static const struct file_operations window_fops = {
++	.open		= debug_window_fopen,
++	.read		= debug_window_fread,
++	.write		= debug_window_fwrite,
++	.owner		= THIS_MODULE,
++};
++
++/**
++ * init_debugfs - A function to initialize the debugfs interface files
++ *
++ * This function creates entries in debugfs for "hwlat_detector", including
++ * files to read values from the detector, current samples, and the
++ * maximum sample that has been captured since the hardware latency
++ * dectector was started.
++ */
++static int init_debugfs(void)
++{
++	int ret = -ENOMEM;
++
++	debug_dir = debugfs_create_dir(DRVNAME, NULL);
++	if (!debug_dir)
++		goto err_debug_dir;
++
++	debug_sample = debugfs_create_file("sample", 0444,
++					       debug_dir, NULL,
++					       &sample_fops);
++	if (!debug_sample)
++		goto err_sample;
++
++	debug_count = debugfs_create_file("count", 0444,
++					      debug_dir, NULL,
++					      &count_fops);
++	if (!debug_count)
++		goto err_count;
++
++	debug_max = debugfs_create_file("max", 0444,
++					    debug_dir, NULL,
++					    &max_fops);
++	if (!debug_max)
++		goto err_max;
++
++	debug_sample_window = debugfs_create_file("window", 0644,
++						      debug_dir, NULL,
++						      &window_fops);
++	if (!debug_sample_window)
++		goto err_window;
++
++	debug_sample_width = debugfs_create_file("width", 0644,
++						     debug_dir, NULL,
++						     &width_fops);
++	if (!debug_sample_width)
++		goto err_width;
++
++	debug_threshold = debugfs_create_file("threshold", 0644,
++						  debug_dir, NULL,
++						  &threshold_fops);
++	if (!debug_threshold)
++		goto err_threshold;
++
++	debug_enable = debugfs_create_file("enable", 0644,
++					       debug_dir, &enabled,
++					       &enable_fops);
++	if (!debug_enable)
++		goto err_enable;
++
++	else {
++		ret = 0;
++		goto out;
++	}
++
++err_enable:
++	debugfs_remove(debug_threshold);
++err_threshold:
++	debugfs_remove(debug_sample_width);
++err_width:
++	debugfs_remove(debug_sample_window);
++err_window:
++	debugfs_remove(debug_max);
++err_max:
++	debugfs_remove(debug_count);
++err_count:
++	debugfs_remove(debug_sample);
++err_sample:
++	debugfs_remove(debug_dir);
++err_debug_dir:
++out:
++	return ret;
++}
++
++/**
++ * free_debugfs - A function to cleanup the debugfs file interface
++ */
++static void free_debugfs(void)
++{
++	/* could also use a debugfs_remove_recursive */
++	debugfs_remove(debug_enable);
++	debugfs_remove(debug_threshold);
++	debugfs_remove(debug_sample_width);
++	debugfs_remove(debug_sample_window);
++	debugfs_remove(debug_max);
++	debugfs_remove(debug_count);
++	debugfs_remove(debug_sample);
++	debugfs_remove(debug_dir);
++}
++
++/**
++ * detector_init - Standard module initialization code
++ */
++static int detector_init(void)
++{
++	int ret = -ENOMEM;
++
++	pr_info(BANNER "version %s\n", VERSION);
++
++	ret = init_stats();
++	if (ret)
++		goto out;
++
++	ret = init_debugfs();
++	if (ret)
++		goto err_stats;
++
++	if (enabled)
++		ret = start_kthread();
++
++	goto out;
++
++err_stats:
++	ring_buffer_free(ring_buffer);
++out:
++	return ret;
++
++}
++
++/**
++ * detector_exit - Standard module cleanup code
++ */
++static void detector_exit(void)
++{
++	int err;
++
++	if (enabled) {
++		enabled = 0;
++		err = stop_kthread();
++		if (err)
++			pr_err(BANNER "cannot stop kthread\n");
++	}
++
++	free_debugfs();
++	ring_buffer_free(ring_buffer);	/* free up the ring buffer */
++
++}
++
++module_init(detector_init);
++module_exit(detector_exit);
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
 index acece32..58ea04a 100644
 --- a/drivers/mmc/host/mmci.c
@@ -11715,6 +13265,288 @@ index 8132214..89ffaa7 100644
  }
  
  static inline bool hlist_bl_is_locked(struct hlist_bl_head *b)
+diff --git a/include/linux/locallock.h b/include/linux/locallock.h
+new file mode 100644
+index 0000000..e572a39
+--- /dev/null
++++ b/include/linux/locallock.h
+@@ -0,0 +1,276 @@
++#ifndef _LINUX_LOCALLOCK_H
++#define _LINUX_LOCALLOCK_H
++
++#include <linux/percpu.h>
++#include <linux/spinlock.h>
++
++#ifdef CONFIG_PREEMPT_RT_BASE
++
++#ifdef CONFIG_DEBUG_SPINLOCK
++# define LL_WARN(cond)	WARN_ON(cond)
++#else
++# define LL_WARN(cond)	do { } while (0)
++#endif
++
++/*
++ * per cpu lock based substitute for local_irq_*()
++ */
++struct local_irq_lock {
++	spinlock_t		lock;
++	struct task_struct	*owner;
++	int			nestcnt;
++	unsigned long		flags;
++};
++
++#define DEFINE_LOCAL_IRQ_LOCK(lvar)					\
++	DEFINE_PER_CPU(struct local_irq_lock, lvar) = {			\
++		.lock = __SPIN_LOCK_UNLOCKED((lvar).lock) }
++
++#define DECLARE_LOCAL_IRQ_LOCK(lvar)					\
++	DECLARE_PER_CPU(struct local_irq_lock, lvar)
++
++#define local_irq_lock_init(lvar)					\
++	do {								\
++		int __cpu;						\
++		for_each_possible_cpu(__cpu)				\
++			spin_lock_init(&per_cpu(lvar, __cpu).lock);	\
++	} while (0)
++
++/*
++ * spin_lock|trylock|unlock_local flavour that does not migrate disable
++ * used for __local_lock|trylock|unlock where get_local_var/put_local_var
++ * already takes care of the migrate_disable/enable
++ * for CONFIG_PREEMPT_BASE map to the normal spin_* calls.
++ */
++#ifdef CONFIG_PREEMPT_RT_FULL
++# define spin_lock_local(lock)			rt_spin_lock__no_mg(lock)
++# define spin_trylock_local(lock)		rt_spin_trylock__no_mg(lock)
++# define spin_unlock_local(lock)		rt_spin_unlock__no_mg(lock)
++#else
++# define spin_lock_local(lock)			spin_lock(lock)
++# define spin_trylock_local(lock)		spin_trylock(lock)
++# define spin_unlock_local(lock)		spin_unlock(lock)
++#endif
++
++static inline void __local_lock(struct local_irq_lock *lv)
++{
++	if (lv->owner != current) {
++		spin_lock_local(&lv->lock);
++		LL_WARN(lv->owner);
++		LL_WARN(lv->nestcnt);
++		lv->owner = current;
++	}
++	lv->nestcnt++;
++}
++
++#define local_lock(lvar)					\
++	do { __local_lock(&get_local_var(lvar)); } while (0)
++
++#define local_lock_on(lvar, cpu)				\
++	do { __local_lock(&per_cpu(lvar, cpu)); } while (0)
++
++static inline int __local_trylock(struct local_irq_lock *lv)
++{
++	if (lv->owner != current && spin_trylock_local(&lv->lock)) {
++		LL_WARN(lv->owner);
++		LL_WARN(lv->nestcnt);
++		lv->owner = current;
++		lv->nestcnt = 1;
++		return 1;
++	}
++	return 0;
++}
++
++#define local_trylock(lvar)						\
++	({								\
++		int __locked;						\
++		__locked = __local_trylock(&get_local_var(lvar));	\
++		if (!__locked)						\
++			put_local_var(lvar);				\
++		__locked;						\
++	})
++
++static inline void __local_unlock(struct local_irq_lock *lv)
++{
++	LL_WARN(lv->nestcnt == 0);
++	LL_WARN(lv->owner != current);
++	if (--lv->nestcnt)
++		return;
++
++	lv->owner = NULL;
++	spin_unlock_local(&lv->lock);
++}
++
++#define local_unlock(lvar)					\
++	do {							\
++		__local_unlock(this_cpu_ptr(&lvar));		\
++		put_local_var(lvar);				\
++	} while (0)
++
++#define local_unlock_on(lvar, cpu)                       \
++	do { __local_unlock(&per_cpu(lvar, cpu)); } while (0)
++
++static inline void __local_lock_irq(struct local_irq_lock *lv)
++{
++	spin_lock_irqsave(&lv->lock, lv->flags);
++	LL_WARN(lv->owner);
++	LL_WARN(lv->nestcnt);
++	lv->owner = current;
++	lv->nestcnt = 1;
++}
++
++#define local_lock_irq(lvar)						\
++	do { __local_lock_irq(&get_local_var(lvar)); } while (0)
++
++#define local_lock_irq_on(lvar, cpu)					\
++	do { __local_lock_irq(&per_cpu(lvar, cpu)); } while (0)
++
++static inline void __local_unlock_irq(struct local_irq_lock *lv)
++{
++	LL_WARN(!lv->nestcnt);
++	LL_WARN(lv->owner != current);
++	lv->owner = NULL;
++	lv->nestcnt = 0;
++	spin_unlock_irq(&lv->lock);
++}
++
++#define local_unlock_irq(lvar)						\
++	do {								\
++		__local_unlock_irq(this_cpu_ptr(&lvar));		\
++		put_local_var(lvar);					\
++	} while (0)
++
++#define local_unlock_irq_on(lvar, cpu)					\
++	do {								\
++		__local_unlock_irq(&per_cpu(lvar, cpu));		\
++	} while (0)
++
++static inline int __local_lock_irqsave(struct local_irq_lock *lv)
++{
++	if (lv->owner != current) {
++		__local_lock_irq(lv);
++		return 0;
++	} else {
++		lv->nestcnt++;
++		return 1;
++	}
++}
++
++#define local_lock_irqsave(lvar, _flags)				\
++	do {								\
++		if (__local_lock_irqsave(&get_local_var(lvar)))		\
++			put_local_var(lvar);				\
++		_flags = __this_cpu_read(lvar.flags);			\
++	} while (0)
++
++#define local_lock_irqsave_on(lvar, _flags, cpu)			\
++	do {								\
++		__local_lock_irqsave(&per_cpu(lvar, cpu));		\
++		_flags = per_cpu(lvar, cpu).flags;			\
++	} while (0)
++
++static inline int __local_unlock_irqrestore(struct local_irq_lock *lv,
++					    unsigned long flags)
++{
++	LL_WARN(!lv->nestcnt);
++	LL_WARN(lv->owner != current);
++	if (--lv->nestcnt)
++		return 0;
++
++	lv->owner = NULL;
++	spin_unlock_irqrestore(&lv->lock, lv->flags);
++	return 1;
++}
++
++#define local_unlock_irqrestore(lvar, flags)				\
++	do {								\
++		if (__local_unlock_irqrestore(this_cpu_ptr(&lvar), flags)) \
++			put_local_var(lvar);				\
++	} while (0)
++
++#define local_unlock_irqrestore_on(lvar, flags, cpu)			\
++	do {								\
++		__local_unlock_irqrestore(&per_cpu(lvar, cpu), flags);	\
++	} while (0)
++
++#define local_spin_trylock_irq(lvar, lock)				\
++	({								\
++		int __locked;						\
++		local_lock_irq(lvar);					\
++		__locked = spin_trylock(lock);				\
++		if (!__locked)						\
++			local_unlock_irq(lvar);				\
++		__locked;						\
++	})
++
++#define local_spin_lock_irq(lvar, lock)					\
++	do {								\
++		local_lock_irq(lvar);					\
++		spin_lock(lock);					\
++	} while (0)
++
++#define local_spin_unlock_irq(lvar, lock)				\
++	do {								\
++		spin_unlock(lock);					\
++		local_unlock_irq(lvar);					\
++	} while (0)
++
++#define local_spin_lock_irqsave(lvar, lock, flags)			\
++	do {								\
++		local_lock_irqsave(lvar, flags);			\
++		spin_lock(lock);					\
++	} while (0)
++
++#define local_spin_unlock_irqrestore(lvar, lock, flags)			\
++	do {								\
++		spin_unlock(lock);					\
++		local_unlock_irqrestore(lvar, flags);			\
++	} while (0)
++
++#define get_locked_var(lvar, var)					\
++	(*({								\
++		local_lock(lvar);					\
++		this_cpu_ptr(&var);					\
++	}))
++
++#define put_locked_var(lvar, var)	local_unlock(lvar);
++
++#define local_lock_cpu(lvar)						\
++	({								\
++		local_lock(lvar);					\
++		smp_processor_id();					\
++	})
++
++#define local_unlock_cpu(lvar)			local_unlock(lvar)
++
++#else /* PREEMPT_RT_BASE */
++
++#define DEFINE_LOCAL_IRQ_LOCK(lvar)		__typeof__(const int) lvar
++#define DECLARE_LOCAL_IRQ_LOCK(lvar)		extern __typeof__(const int) lvar
++
++static inline void local_irq_lock_init(int lvar) { }
++
++#define local_lock(lvar)			preempt_disable()
++#define local_unlock(lvar)			preempt_enable()
++#define local_lock_irq(lvar)			local_irq_disable()
++#define local_unlock_irq(lvar)			local_irq_enable()
++#define local_lock_irqsave(lvar, flags)		local_irq_save(flags)
++#define local_unlock_irqrestore(lvar, flags)	local_irq_restore(flags)
++
++#define local_spin_trylock_irq(lvar, lock)	spin_trylock_irq(lock)
++#define local_spin_lock_irq(lvar, lock)		spin_lock_irq(lock)
++#define local_spin_unlock_irq(lvar, lock)	spin_unlock_irq(lock)
++#define local_spin_lock_irqsave(lvar, lock, flags)	\
++	spin_lock_irqsave(lock, flags)
++#define local_spin_unlock_irqrestore(lvar, lock, flags)	\
++	spin_unlock_irqrestore(lock, flags)
++
++#define get_locked_var(lvar, var)		get_cpu_var(var)
++#define put_locked_var(lvar, var)		put_cpu_var(var)
++
++#define local_lock_cpu(lvar)			get_cpu()
++#define local_unlock_cpu(lvar)			put_cpu()
++
++#endif
++
++#endif
 diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
 index 2ccccbf..4b016eb 100644
 --- a/include/linux/mm_types.h
@@ -11782,6 +13614,96 @@ index 2cb7531e..b3fdfc8 100644
  extern int atomic_dec_and_mutex_lock(atomic_t *cnt, struct mutex *lock);
  
  #endif /* __LINUX_MUTEX_H */
+diff --git a/include/linux/mutex_rt.h b/include/linux/mutex_rt.h
+new file mode 100644
+index 0000000..c38a44b
+--- /dev/null
++++ b/include/linux/mutex_rt.h
+@@ -0,0 +1,84 @@
++#ifndef __LINUX_MUTEX_RT_H
++#define __LINUX_MUTEX_RT_H
++
++#ifndef __LINUX_MUTEX_H
++#error "Please include mutex.h"
++#endif
++
++#include <linux/rtmutex.h>
++
++/* FIXME: Just for __lockfunc */
++#include <linux/spinlock.h>
++
++struct mutex {
++	struct rt_mutex		lock;
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++	struct lockdep_map	dep_map;
++#endif
++};
++
++#define __MUTEX_INITIALIZER(mutexname)					\
++	{								\
++		.lock = __RT_MUTEX_INITIALIZER(mutexname.lock)		\
++		__DEP_MAP_MUTEX_INITIALIZER(mutexname)			\
++	}
++
++#define DEFINE_MUTEX(mutexname)						\
++	struct mutex mutexname = __MUTEX_INITIALIZER(mutexname)
++
++extern void __mutex_do_init(struct mutex *lock, const char *name, struct lock_class_key *key);
++extern void __lockfunc _mutex_lock(struct mutex *lock);
++extern int __lockfunc _mutex_lock_interruptible(struct mutex *lock);
++extern int __lockfunc _mutex_lock_killable(struct mutex *lock);
++extern void __lockfunc _mutex_lock_nested(struct mutex *lock, int subclass);
++extern void __lockfunc _mutex_lock_nest_lock(struct mutex *lock, struct lockdep_map *nest_lock);
++extern int __lockfunc _mutex_lock_interruptible_nested(struct mutex *lock, int subclass);
++extern int __lockfunc _mutex_lock_killable_nested(struct mutex *lock, int subclass);
++extern int __lockfunc _mutex_trylock(struct mutex *lock);
++extern void __lockfunc _mutex_unlock(struct mutex *lock);
++
++#define mutex_is_locked(l)		rt_mutex_is_locked(&(l)->lock)
++#define mutex_lock(l)			_mutex_lock(l)
++#define mutex_lock_interruptible(l)	_mutex_lock_interruptible(l)
++#define mutex_lock_killable(l)		_mutex_lock_killable(l)
++#define mutex_trylock(l)		_mutex_trylock(l)
++#define mutex_unlock(l)			_mutex_unlock(l)
++#define mutex_destroy(l)		rt_mutex_destroy(&(l)->lock)
++
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++# define mutex_lock_nested(l, s)	_mutex_lock_nested(l, s)
++# define mutex_lock_interruptible_nested(l, s) \
++					_mutex_lock_interruptible_nested(l, s)
++# define mutex_lock_killable_nested(l, s) \
++					_mutex_lock_killable_nested(l, s)
++
++# define mutex_lock_nest_lock(lock, nest_lock)				\
++do {									\
++	typecheck(struct lockdep_map *, &(nest_lock)->dep_map);		\
++	_mutex_lock_nest_lock(lock, &(nest_lock)->dep_map);		\
++} while (0)
++
++#else
++# define mutex_lock_nested(l, s)	_mutex_lock(l)
++# define mutex_lock_interruptible_nested(l, s) \
++					_mutex_lock_interruptible(l)
++# define mutex_lock_killable_nested(l, s) \
++					_mutex_lock_killable(l)
++# define mutex_lock_nest_lock(lock, nest_lock) mutex_lock(lock)
++#endif
++
++# define mutex_init(mutex)				\
++do {							\
++	static struct lock_class_key __key;		\
++							\
++	rt_mutex_init(&(mutex)->lock);			\
++	__mutex_do_init((mutex), #mutex, &__key);	\
++} while (0)
++
++# define __mutex_init(mutex, name, key)			\
++do {							\
++	rt_mutex_init(&(mutex)->lock);			\
++	__mutex_do_init((mutex), name, key);		\
++} while (0)
++
++#endif
 diff --git a/include/linux/netdevice.h b/include/linux/netdevice.h
 index 4035bbe..81ebe70 100644
 --- a/include/linux/netdevice.h
@@ -12473,6 +14395,111 @@ index 1abba5c..30211c62 100644
  extern int rt_mutex_timed_lock(struct rt_mutex *lock,
  			       struct hrtimer_sleeper *timeout);
  
+diff --git a/include/linux/rwlock_rt.h b/include/linux/rwlock_rt.h
+new file mode 100644
+index 0000000..49ed2d4
+--- /dev/null
++++ b/include/linux/rwlock_rt.h
+@@ -0,0 +1,99 @@
++#ifndef __LINUX_RWLOCK_RT_H
++#define __LINUX_RWLOCK_RT_H
++
++#ifndef __LINUX_SPINLOCK_H
++#error Do not include directly. Use spinlock.h
++#endif
++
++#define rwlock_init(rwl)				\
++do {							\
++	static struct lock_class_key __key;		\
++							\
++	rt_mutex_init(&(rwl)->lock);			\
++	__rt_rwlock_init(rwl, #rwl, &__key);		\
++} while (0)
++
++extern void __lockfunc rt_write_lock(rwlock_t *rwlock);
++extern void __lockfunc rt_read_lock(rwlock_t *rwlock);
++extern int __lockfunc rt_write_trylock(rwlock_t *rwlock);
++extern int __lockfunc rt_write_trylock_irqsave(rwlock_t *trylock, unsigned long *flags);
++extern int __lockfunc rt_read_trylock(rwlock_t *rwlock);
++extern void __lockfunc rt_write_unlock(rwlock_t *rwlock);
++extern void __lockfunc rt_read_unlock(rwlock_t *rwlock);
++extern unsigned long __lockfunc rt_write_lock_irqsave(rwlock_t *rwlock);
++extern unsigned long __lockfunc rt_read_lock_irqsave(rwlock_t *rwlock);
++extern void __rt_rwlock_init(rwlock_t *rwlock, char *name, struct lock_class_key *key);
++
++#define read_trylock(lock)	__cond_lock(lock, rt_read_trylock(lock))
++#define write_trylock(lock)	__cond_lock(lock, rt_write_trylock(lock))
++
++#define write_trylock_irqsave(lock, flags)	\
++	__cond_lock(lock, rt_write_trylock_irqsave(lock, &flags))
++
++#define read_lock_irqsave(lock, flags)			\
++	do {						\
++		typecheck(unsigned long, flags);	\
++		flags = rt_read_lock_irqsave(lock);	\
++	} while (0)
++
++#define write_lock_irqsave(lock, flags)			\
++	do {						\
++		typecheck(unsigned long, flags);	\
++		flags = rt_write_lock_irqsave(lock);	\
++	} while (0)
++
++#define read_lock(lock)		rt_read_lock(lock)
++
++#define read_lock_bh(lock)				\
++	do {						\
++		local_bh_disable();			\
++		rt_read_lock(lock);			\
++	} while (0)
++
++#define read_lock_irq(lock)	read_lock(lock)
++
++#define write_lock(lock)	rt_write_lock(lock)
++
++#define write_lock_bh(lock)				\
++	do {						\
++		local_bh_disable();			\
++		rt_write_lock(lock);			\
++	} while (0)
++
++#define write_lock_irq(lock)	write_lock(lock)
++
++#define read_unlock(lock)	rt_read_unlock(lock)
++
++#define read_unlock_bh(lock)				\
++	do {						\
++		rt_read_unlock(lock);			\
++		local_bh_enable();			\
++	} while (0)
++
++#define read_unlock_irq(lock)	read_unlock(lock)
++
++#define write_unlock(lock)	rt_write_unlock(lock)
++
++#define write_unlock_bh(lock)				\
++	do {						\
++		rt_write_unlock(lock);			\
++		local_bh_enable();			\
++	} while (0)
++
++#define write_unlock_irq(lock)	write_unlock(lock)
++
++#define read_unlock_irqrestore(lock, flags)		\
++	do {						\
++		typecheck(unsigned long, flags);	\
++		(void) flags;				\
++		rt_read_unlock(lock);			\
++	} while (0)
++
++#define write_unlock_irqrestore(lock, flags) \
++	do {						\
++		typecheck(unsigned long, flags);	\
++		(void) flags;				\
++		rt_write_unlock(lock);			\
++	} while (0)
++
++#endif
 diff --git a/include/linux/rwlock_types.h b/include/linux/rwlock_types.h
 index cc0072e..d0da966 100644
 --- a/include/linux/rwlock_types.h
@@ -12497,6 +14524,45 @@ index cc0072e..d0da966 100644
 +	rwlock_t name __cacheline_aligned_in_smp = __RW_LOCK_UNLOCKED(name)
  
  #endif /* __LINUX_RWLOCK_TYPES_H */
+diff --git a/include/linux/rwlock_types_rt.h b/include/linux/rwlock_types_rt.h
+new file mode 100644
+index 0000000..b138321
+--- /dev/null
++++ b/include/linux/rwlock_types_rt.h
+@@ -0,0 +1,33 @@
++#ifndef __LINUX_RWLOCK_TYPES_RT_H
++#define __LINUX_RWLOCK_TYPES_RT_H
++
++#ifndef __LINUX_SPINLOCK_TYPES_H
++#error "Do not include directly. Include spinlock_types.h instead"
++#endif
++
++/*
++ * rwlocks - rtmutex which allows single reader recursion
++ */
++typedef struct {
++	struct rt_mutex		lock;
++	int			read_depth;
++	unsigned int		break_lock;
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++	struct lockdep_map	dep_map;
++#endif
++} rwlock_t;
++
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++# define RW_DEP_MAP_INIT(lockname)	.dep_map = { .name = #lockname }
++#else
++# define RW_DEP_MAP_INIT(lockname)
++#endif
++
++#define __RW_LOCK_UNLOCKED(name) \
++	{ .lock = __RT_MUTEX_INITIALIZER_SAVE_STATE(name.lock),	\
++	  RW_DEP_MAP_INIT(name) }
++
++#define DEFINE_RWLOCK(name) \
++	rwlock_t name __cacheline_aligned_in_smp = __RW_LOCK_UNLOCKED(name)
++
++#endif
 diff --git a/include/linux/rwsem.h b/include/linux/rwsem.h
 index 8f498cd..2b21484 100644
 --- a/include/linux/rwsem.h
@@ -12519,6 +14585,164 @@ index 8f498cd..2b21484 100644
 +#endif /* !PREEMPT_RT_FULL */
 +
  #endif /* _LINUX_RWSEM_H */
+diff --git a/include/linux/rwsem_rt.h b/include/linux/rwsem_rt.h
+new file mode 100644
+index 0000000..f97860b
+--- /dev/null
++++ b/include/linux/rwsem_rt.h
+@@ -0,0 +1,152 @@
++#ifndef _LINUX_RWSEM_RT_H
++#define _LINUX_RWSEM_RT_H
++
++#ifndef _LINUX_RWSEM_H
++#error "Include rwsem.h"
++#endif
++
++/*
++ * RW-semaphores are a spinlock plus a reader-depth count.
++ *
++ * Note that the semantics are different from the usual
++ * Linux rw-sems, in PREEMPT_RT mode we do not allow
++ * multiple readers to hold the lock at once, we only allow
++ * a read-lock owner to read-lock recursively. This is
++ * better for latency, makes the implementation inherently
++ * fair and makes it simpler as well.
++ */
++
++#include <linux/rtmutex.h>
++
++struct rw_semaphore {
++	struct rt_mutex		lock;
++	int			read_depth;
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++	struct lockdep_map	dep_map;
++#endif
++};
++
++#define __RWSEM_INITIALIZER(name) \
++	{ .lock = __RT_MUTEX_INITIALIZER(name.lock), \
++	  RW_DEP_MAP_INIT(name) }
++
++#define DECLARE_RWSEM(lockname) \
++	struct rw_semaphore lockname = __RWSEM_INITIALIZER(lockname)
++
++extern void  __rt_rwsem_init(struct rw_semaphore *rwsem, const char *name,
++				     struct lock_class_key *key);
++
++#define __rt_init_rwsem(sem, name, key)			\
++	do {						\
++		rt_mutex_init(&(sem)->lock);		\
++		__rt_rwsem_init((sem), (name), (key));\
++	} while (0)
++
++#define __init_rwsem(sem, name, key) __rt_init_rwsem(sem, name, key)
++
++# define rt_init_rwsem(sem)				\
++do {							\
++	static struct lock_class_key __key;		\
++							\
++	__rt_init_rwsem((sem), #sem, &__key);		\
++} while (0)
++
++extern void rt_down_write(struct rw_semaphore *rwsem);
++extern void rt_down_read_nested(struct rw_semaphore *rwsem, int subclass);
++extern void rt_down_write_nested(struct rw_semaphore *rwsem, int subclass);
++extern void rt_down_write_nested_lock(struct rw_semaphore *rwsem,
++				      struct lockdep_map *nest);
++extern void rt__down_read(struct rw_semaphore *rwsem);
++extern void rt_down_read(struct rw_semaphore *rwsem);
++extern int  rt_down_write_trylock(struct rw_semaphore *rwsem);
++extern int  rt__down_read_trylock(struct rw_semaphore *rwsem);
++extern int  rt_down_read_trylock(struct rw_semaphore *rwsem);
++extern void __rt_up_read(struct rw_semaphore *rwsem);
++extern void rt_up_read(struct rw_semaphore *rwsem);
++extern void rt_up_write(struct rw_semaphore *rwsem);
++extern void rt_downgrade_write(struct rw_semaphore *rwsem);
++
++#define init_rwsem(sem)		rt_init_rwsem(sem)
++#define rwsem_is_locked(s)	rt_mutex_is_locked(&(s)->lock)
++
++static inline int rwsem_is_contended(struct rw_semaphore *sem)
++{
++	/* rt_mutex_has_waiters() */
++	return !RB_EMPTY_ROOT(&sem->lock.waiters);
++}
++
++static inline void __down_read(struct rw_semaphore *sem)
++{
++	rt__down_read(sem);
++}
++
++static inline void down_read(struct rw_semaphore *sem)
++{
++	rt_down_read(sem);
++}
++
++static inline int __down_read_trylock(struct rw_semaphore *sem)
++{
++	return rt__down_read_trylock(sem);
++}
++
++static inline int down_read_trylock(struct rw_semaphore *sem)
++{
++	return rt_down_read_trylock(sem);
++}
++
++static inline void down_write(struct rw_semaphore *sem)
++{
++	rt_down_write(sem);
++}
++
++static inline int down_write_trylock(struct rw_semaphore *sem)
++{
++	return rt_down_write_trylock(sem);
++}
++
++static inline void __up_read(struct rw_semaphore *sem)
++{
++	__rt_up_read(sem);
++}
++
++static inline void up_read(struct rw_semaphore *sem)
++{
++	rt_up_read(sem);
++}
++
++static inline void up_write(struct rw_semaphore *sem)
++{
++	rt_up_write(sem);
++}
++
++static inline void downgrade_write(struct rw_semaphore *sem)
++{
++	rt_downgrade_write(sem);
++}
++
++static inline void down_read_nested(struct rw_semaphore *sem, int subclass)
++{
++	return rt_down_read_nested(sem, subclass);
++}
++
++static inline void down_write_nested(struct rw_semaphore *sem, int subclass)
++{
++	rt_down_write_nested(sem, subclass);
++}
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++static inline void down_write_nest_lock(struct rw_semaphore *sem,
++		struct rw_semaphore *nest_lock)
++{
++	rt_down_write_nested_lock(sem, &nest_lock->dep_map);
++}
++
++#else
++
++static inline void down_write_nest_lock(struct rw_semaphore *sem,
++		struct rw_semaphore *nest_lock)
++{
++	rt_down_write_nested_lock(sem, NULL);
++}
++#endif
++#endif
 diff --git a/include/linux/sched.h b/include/linux/sched.h
 index ce0f61d..eee28eb 100644
 --- a/include/linux/sched.h
@@ -13172,6 +15396,177 @@ index 5344268..043263f 100644
 +#endif
  
  #endif /* __LINUX_SPINLOCK_API_SMP_H */
+diff --git a/include/linux/spinlock_rt.h b/include/linux/spinlock_rt.h
+new file mode 100644
+index 0000000..7eb8758
+--- /dev/null
++++ b/include/linux/spinlock_rt.h
+@@ -0,0 +1,165 @@
++#ifndef __LINUX_SPINLOCK_RT_H
++#define __LINUX_SPINLOCK_RT_H
++
++#ifndef __LINUX_SPINLOCK_H
++#error Do not include directly. Use spinlock.h
++#endif
++
++#include <linux/bug.h>
++
++extern void
++__rt_spin_lock_init(spinlock_t *lock, char *name, struct lock_class_key *key);
++
++#define spin_lock_init(slock)				\
++do {							\
++	static struct lock_class_key __key;		\
++							\
++	rt_mutex_init(&(slock)->lock);			\
++	__rt_spin_lock_init(slock, #slock, &__key);	\
++} while (0)
++
++void __lockfunc rt_spin_lock__no_mg(spinlock_t *lock);
++void __lockfunc rt_spin_unlock__no_mg(spinlock_t *lock);
++int __lockfunc rt_spin_trylock__no_mg(spinlock_t *lock);
++
++extern void __lockfunc rt_spin_lock(spinlock_t *lock);
++extern unsigned long __lockfunc rt_spin_lock_trace_flags(spinlock_t *lock);
++extern void __lockfunc rt_spin_lock_nested(spinlock_t *lock, int subclass);
++extern void __lockfunc rt_spin_unlock(spinlock_t *lock);
++extern int __lockfunc rt_spin_unlock_no_deboost(spinlock_t *lock);
++extern void __lockfunc rt_spin_unlock_wait(spinlock_t *lock);
++extern int __lockfunc rt_spin_trylock_irqsave(spinlock_t *lock, unsigned long *flags);
++extern int __lockfunc rt_spin_trylock_bh(spinlock_t *lock);
++extern int __lockfunc rt_spin_trylock(spinlock_t *lock);
++extern int atomic_dec_and_spin_lock(atomic_t *atomic, spinlock_t *lock);
++
++/*
++ * lockdep-less calls, for derived types like rwlock:
++ * (for trylock they can use rt_mutex_trylock() directly.
++ */
++extern void __lockfunc __rt_spin_lock__no_mg(struct rt_mutex *lock);
++extern void __lockfunc __rt_spin_lock(struct rt_mutex *lock);
++extern void __lockfunc __rt_spin_unlock(struct rt_mutex *lock);
++extern int __lockfunc __rt_spin_trylock(struct rt_mutex *lock);
++
++#define spin_lock(lock)			rt_spin_lock(lock)
++
++#define spin_lock_bh(lock)			\
++	do {					\
++		local_bh_disable();		\
++		rt_spin_lock(lock);		\
++	} while (0)
++
++#define spin_lock_irq(lock)		spin_lock(lock)
++
++#define spin_do_trylock(lock)		__cond_lock(lock, rt_spin_trylock(lock))
++
++#define spin_trylock(lock)			\
++({						\
++	int __locked;				\
++	__locked = spin_do_trylock(lock);	\
++	__locked;				\
++})
++
++#ifdef CONFIG_LOCKDEP
++# define spin_lock_nested(lock, subclass)		\
++	do {						\
++		rt_spin_lock_nested(lock, subclass);	\
++	} while (0)
++
++#define spin_lock_bh_nested(lock, subclass)		\
++	do {						\
++		local_bh_disable();			\
++		rt_spin_lock_nested(lock, subclass);	\
++	} while (0)
++
++# define spin_lock_irqsave_nested(lock, flags, subclass) \
++	do {						 \
++		typecheck(unsigned long, flags);	 \
++		flags = 0;				 \
++		rt_spin_lock_nested(lock, subclass);	 \
++	} while (0)
++#else
++# define spin_lock_nested(lock, subclass)	spin_lock(lock)
++# define spin_lock_bh_nested(lock, subclass)	spin_lock_bh(lock)
++
++# define spin_lock_irqsave_nested(lock, flags, subclass) \
++	do {						 \
++		typecheck(unsigned long, flags);	 \
++		flags = 0;				 \
++		spin_lock(lock);			 \
++	} while (0)
++#endif
++
++#define spin_lock_irqsave(lock, flags)			 \
++	do {						 \
++		typecheck(unsigned long, flags);	 \
++		flags = 0;				 \
++		spin_lock(lock);			 \
++	} while (0)
++
++static inline unsigned long spin_lock_trace_flags(spinlock_t *lock)
++{
++	unsigned long flags = 0;
++#ifdef CONFIG_TRACE_IRQFLAGS
++	flags = rt_spin_lock_trace_flags(lock);
++#else
++	spin_lock(lock); /* lock_local */
++#endif
++	return flags;
++}
++
++/* FIXME: we need rt_spin_lock_nest_lock */
++#define spin_lock_nest_lock(lock, nest_lock) spin_lock_nested(lock, 0)
++
++#define spin_unlock(lock)			rt_spin_unlock(lock)
++#define spin_unlock_no_deboost(lock)		rt_spin_unlock_no_deboost(lock)
++
++#define spin_unlock_bh(lock)				\
++	do {						\
++		rt_spin_unlock(lock);			\
++		local_bh_enable();			\
++	} while (0)
++
++#define spin_unlock_irq(lock)		spin_unlock(lock)
++
++#define spin_unlock_irqrestore(lock, flags)		\
++	do {						\
++		typecheck(unsigned long, flags);	\
++		(void) flags;				\
++		spin_unlock(lock);			\
++	} while (0)
++
++#define spin_trylock_bh(lock)	__cond_lock(lock, rt_spin_trylock_bh(lock))
++#define spin_trylock_irq(lock)	spin_trylock(lock)
++
++#define spin_trylock_irqsave(lock, flags)	\
++	rt_spin_trylock_irqsave(lock, &(flags))
++
++#define spin_unlock_wait(lock)		rt_spin_unlock_wait(lock)
++
++#ifdef CONFIG_GENERIC_LOCKBREAK
++# define spin_is_contended(lock)	((lock)->break_lock)
++#else
++# define spin_is_contended(lock)	(((void)(lock), 0))
++#endif
++
++static inline int spin_can_lock(spinlock_t *lock)
++{
++	return !rt_mutex_is_locked(&lock->lock);
++}
++
++static inline int spin_is_locked(spinlock_t *lock)
++{
++	return rt_mutex_is_locked(&lock->lock);
++}
++
++static inline void assert_spin_locked(spinlock_t *lock)
++{
++	BUG_ON(!spin_is_locked(lock));
++}
++
++#define atomic_dec_and_lock(atomic, lock) \
++	atomic_dec_and_spin_lock(atomic, lock)
++
++#endif
 diff --git a/include/linux/spinlock_types.h b/include/linux/spinlock_types.h
 index 73548eb..10bac71 100644
 --- a/include/linux/spinlock_types.h
@@ -13264,6 +15659,164 @@ index 73548eb..10bac71 100644
 -#include <linux/rwlock_types.h>
 -
  #endif /* __LINUX_SPINLOCK_TYPES_H */
+diff --git a/include/linux/spinlock_types_nort.h b/include/linux/spinlock_types_nort.h
+new file mode 100644
+index 0000000..f1dac1f
+--- /dev/null
++++ b/include/linux/spinlock_types_nort.h
+@@ -0,0 +1,33 @@
++#ifndef __LINUX_SPINLOCK_TYPES_NORT_H
++#define __LINUX_SPINLOCK_TYPES_NORT_H
++
++#ifndef __LINUX_SPINLOCK_TYPES_H
++#error "Do not include directly. Include spinlock_types.h instead"
++#endif
++
++/*
++ * The non RT version maps spinlocks to raw_spinlocks
++ */
++typedef struct spinlock {
++	union {
++		struct raw_spinlock rlock;
++
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++# define LOCK_PADSIZE (offsetof(struct raw_spinlock, dep_map))
++		struct {
++			u8 __padding[LOCK_PADSIZE];
++			struct lockdep_map dep_map;
++		};
++#endif
++	};
++} spinlock_t;
++
++#define __SPIN_LOCK_INITIALIZER(lockname) \
++	{ { .rlock = __RAW_SPIN_LOCK_INITIALIZER(lockname) } }
++
++#define __SPIN_LOCK_UNLOCKED(lockname) \
++	(spinlock_t ) __SPIN_LOCK_INITIALIZER(lockname)
++
++#define DEFINE_SPINLOCK(x)	spinlock_t x = __SPIN_LOCK_UNLOCKED(x)
++
++#endif
+diff --git a/include/linux/spinlock_types_raw.h b/include/linux/spinlock_types_raw.h
+new file mode 100644
+index 0000000..edffc4d
+--- /dev/null
++++ b/include/linux/spinlock_types_raw.h
+@@ -0,0 +1,56 @@
++#ifndef __LINUX_SPINLOCK_TYPES_RAW_H
++#define __LINUX_SPINLOCK_TYPES_RAW_H
++
++#if defined(CONFIG_SMP)
++# include <asm/spinlock_types.h>
++#else
++# include <linux/spinlock_types_up.h>
++#endif
++
++#include <linux/lockdep.h>
++
++typedef struct raw_spinlock {
++	arch_spinlock_t raw_lock;
++#ifdef CONFIG_GENERIC_LOCKBREAK
++	unsigned int break_lock;
++#endif
++#ifdef CONFIG_DEBUG_SPINLOCK
++	unsigned int magic, owner_cpu;
++	void *owner;
++#endif
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++	struct lockdep_map dep_map;
++#endif
++} raw_spinlock_t;
++
++#define SPINLOCK_MAGIC		0xdead4ead
++
++#define SPINLOCK_OWNER_INIT	((void *)-1L)
++
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++# define SPIN_DEP_MAP_INIT(lockname)	.dep_map = { .name = #lockname }
++#else
++# define SPIN_DEP_MAP_INIT(lockname)
++#endif
++
++#ifdef CONFIG_DEBUG_SPINLOCK
++# define SPIN_DEBUG_INIT(lockname)		\
++	.magic = SPINLOCK_MAGIC,		\
++	.owner_cpu = -1,			\
++	.owner = SPINLOCK_OWNER_INIT,
++#else
++# define SPIN_DEBUG_INIT(lockname)
++#endif
++
++#define __RAW_SPIN_LOCK_INITIALIZER(lockname)	\
++	{					\
++	.raw_lock = __ARCH_SPIN_LOCK_UNLOCKED,	\
++	SPIN_DEBUG_INIT(lockname)		\
++	SPIN_DEP_MAP_INIT(lockname) }
++
++#define __RAW_SPIN_LOCK_UNLOCKED(lockname)	\
++	(raw_spinlock_t) __RAW_SPIN_LOCK_INITIALIZER(lockname)
++
++#define DEFINE_RAW_SPINLOCK(x)	raw_spinlock_t x = __RAW_SPIN_LOCK_UNLOCKED(x)
++
++#endif
+diff --git a/include/linux/spinlock_types_rt.h b/include/linux/spinlock_types_rt.h
+new file mode 100644
+index 0000000..9fd4319
+--- /dev/null
++++ b/include/linux/spinlock_types_rt.h
+@@ -0,0 +1,51 @@
++#ifndef __LINUX_SPINLOCK_TYPES_RT_H
++#define __LINUX_SPINLOCK_TYPES_RT_H
++
++#ifndef __LINUX_SPINLOCK_TYPES_H
++#error "Do not include directly. Include spinlock_types.h instead"
++#endif
++
++#include <linux/cache.h>
++
++/*
++ * PREEMPT_RT: spinlocks - an RT mutex plus lock-break field:
++ */
++typedef struct spinlock {
++	struct rt_mutex		lock;
++	unsigned int		break_lock;
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++	struct lockdep_map	dep_map;
++#endif
++} spinlock_t;
++
++#ifdef CONFIG_DEBUG_RT_MUTEXES
++# define __RT_SPIN_INITIALIZER(name) \
++	{ \
++	.wait_lock = __RAW_SPIN_LOCK_UNLOCKED(name.wait_lock), \
++	.save_state = 1, \
++	.file = __FILE__, \
++	.line = __LINE__ , \
++	}
++#else
++# define __RT_SPIN_INITIALIZER(name) \
++	{								\
++	.wait_lock = __RAW_SPIN_LOCK_UNLOCKED(name.wait_lock),		\
++	.save_state = 1, \
++	}
++#endif
++
++/*
++.wait_list = PLIST_HEAD_INIT_RAW((name).lock.wait_list, (name).lock.wait_lock)
++*/
++
++#define __SPIN_LOCK_UNLOCKED(name)			\
++	{ .lock = __RT_SPIN_INITIALIZER(name.lock),		\
++	  SPIN_DEP_MAP_INIT(name) }
++
++#define __DEFINE_SPINLOCK(name) \
++	spinlock_t name = __SPIN_LOCK_UNLOCKED(name)
++
++#define DEFINE_SPINLOCK(name) \
++	spinlock_t name __cacheline_aligned_in_smp = __SPIN_LOCK_UNLOCKED(name)
++
++#endif
 diff --git a/include/linux/srcu.h b/include/linux/srcu.h
 index f5f80c5..ec1a8f0 100644
 --- a/include/linux/srcu.h
@@ -13307,6 +15860,185 @@ index 8b6ec7e..9b77d4c 100644
  #ifdef CONFIG_SUSPEND
  /**
   * suspend_set_ops - set platform dependent suspend operations
+diff --git a/include/linux/swait.h b/include/linux/swait.h
+new file mode 100644
+index 0000000..83f004a
+--- /dev/null
++++ b/include/linux/swait.h
+@@ -0,0 +1,173 @@
++#ifndef _LINUX_SWAIT_H
++#define _LINUX_SWAIT_H
++
++#include <linux/list.h>
++#include <linux/stddef.h>
++#include <linux/spinlock.h>
++#include <asm/current.h>
++
++/*
++ * Simple wait queues
++ *
++ * While these are very similar to the other/complex wait queues (wait.h) the
++ * most important difference is that the simple waitqueue allows for
++ * deterministic behaviour -- IOW it has strictly bounded IRQ and lock hold
++ * times.
++ *
++ * In order to make this so, we had to drop a fair number of features of the
++ * other waitqueue code; notably:
++ *
++ *  - mixing INTERRUPTIBLE and UNINTERRUPTIBLE sleeps on the same waitqueue;
++ *    all wakeups are TASK_NORMAL in order to avoid O(n) lookups for the right
++ *    sleeper state.
++ *
++ *  - the exclusive mode; because this requires preserving the list order
++ *    and this is hard.
++ *
++ *  - custom wake functions; because you cannot give any guarantees about
++ *    random code.
++ *
++ * As a side effect of this; the data structures are slimmer.
++ *
++ * One would recommend using this wait queue where possible.
++ */
++
++struct task_struct;
++
++struct swait_queue_head {
++	raw_spinlock_t		lock;
++	struct list_head	task_list;
++};
++
++struct swait_queue {
++	struct task_struct	*task;
++	struct list_head	task_list;
++};
++
++#define __SWAITQUEUE_INITIALIZER(name) {				\
++	.task		= current,					\
++	.task_list	= LIST_HEAD_INIT((name).task_list),		\
++}
++
++#define DECLARE_SWAITQUEUE(name)					\
++	struct swait_queue name = __SWAITQUEUE_INITIALIZER(name)
++
++#define __SWAIT_QUEUE_HEAD_INITIALIZER(name) {				\
++	.lock		= __RAW_SPIN_LOCK_UNLOCKED(name.lock),		\
++	.task_list	= LIST_HEAD_INIT((name).task_list),		\
++}
++
++#define DECLARE_SWAIT_QUEUE_HEAD(name)					\
++	struct swait_queue_head name = __SWAIT_QUEUE_HEAD_INITIALIZER(name)
++
++extern void __init_swait_queue_head(struct swait_queue_head *q, const char *name,
++				    struct lock_class_key *key);
++
++#define init_swait_queue_head(q)				\
++	do {							\
++		static struct lock_class_key __key;		\
++		__init_swait_queue_head((q), #q, &__key);	\
++	} while (0)
++
++#ifdef CONFIG_LOCKDEP
++# define __SWAIT_QUEUE_HEAD_INIT_ONSTACK(name)			\
++	({ init_swait_queue_head(&name); name; })
++# define DECLARE_SWAIT_QUEUE_HEAD_ONSTACK(name)			\
++	struct swait_queue_head name = __SWAIT_QUEUE_HEAD_INIT_ONSTACK(name)
++#else
++# define DECLARE_SWAIT_QUEUE_HEAD_ONSTACK(name)			\
++	DECLARE_SWAIT_QUEUE_HEAD(name)
++#endif
++
++static inline int swait_active(struct swait_queue_head *q)
++{
++	return !list_empty(&q->task_list);
++}
++
++extern void swake_up(struct swait_queue_head *q);
++extern void swake_up_all(struct swait_queue_head *q);
++extern void swake_up_locked(struct swait_queue_head *q);
++extern void swake_up_all_locked(struct swait_queue_head *q);
++
++extern void __prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait);
++extern void prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait, int state);
++extern long prepare_to_swait_event(struct swait_queue_head *q, struct swait_queue *wait, int state);
++
++extern void __finish_swait(struct swait_queue_head *q, struct swait_queue *wait);
++extern void finish_swait(struct swait_queue_head *q, struct swait_queue *wait);
++
++/* as per ___wait_event() but for swait, therefore "exclusive == 0" */
++#define ___swait_event(wq, condition, state, ret, cmd)			\
++({									\
++	struct swait_queue __wait;					\
++	long __ret = ret;						\
++									\
++	INIT_LIST_HEAD(&__wait.task_list);				\
++	for (;;) {							\
++		long __int = prepare_to_swait_event(&wq, &__wait, state);\
++									\
++		if (condition)						\
++			break;						\
++									\
++		if (___wait_is_interruptible(state) && __int) {		\
++			__ret = __int;					\
++			break;						\
++		}							\
++									\
++		cmd;							\
++	}								\
++	finish_swait(&wq, &__wait);					\
++	__ret;								\
++})
++
++#define __swait_event(wq, condition)					\
++	(void)___swait_event(wq, condition, TASK_UNINTERRUPTIBLE, 0,	\
++			    schedule())
++
++#define swait_event(wq, condition)					\
++do {									\
++	if (condition)							\
++		break;							\
++	__swait_event(wq, condition);					\
++} while (0)
++
++#define __swait_event_timeout(wq, condition, timeout)			\
++	___swait_event(wq, ___wait_cond_timeout(condition),		\
++		      TASK_UNINTERRUPTIBLE, timeout,			\
++		      __ret = schedule_timeout(__ret))
++
++#define swait_event_timeout(wq, condition, timeout)			\
++({									\
++	long __ret = timeout;						\
++	if (!___wait_cond_timeout(condition))				\
++		__ret = __swait_event_timeout(wq, condition, timeout);	\
++	__ret;								\
++})
++
++#define __swait_event_interruptible(wq, condition)			\
++	___swait_event(wq, condition, TASK_INTERRUPTIBLE, 0,		\
++		      schedule())
++
++#define swait_event_interruptible(wq, condition)			\
++({									\
++	int __ret = 0;							\
++	if (!(condition))						\
++		__ret = __swait_event_interruptible(wq, condition);	\
++	__ret;								\
++})
++
++#define __swait_event_interruptible_timeout(wq, condition, timeout)	\
++	___swait_event(wq, ___wait_cond_timeout(condition),		\
++		      TASK_INTERRUPTIBLE, timeout,			\
++		      __ret = schedule_timeout(__ret))
++
++#define swait_event_interruptible_timeout(wq, condition, timeout)	\
++({									\
++	long __ret = timeout;						\
++	if (!___wait_cond_timeout(condition))				\
++		__ret = __swait_event_interruptible_timeout(wq,		\
++						condition, timeout);	\
++	__ret;								\
++})
++
++#endif /* _LINUX_SWAIT_H */
 diff --git a/include/linux/swap.h b/include/linux/swap.h
 index d8ca2ea..19e0380 100644
 --- a/include/linux/swap.h
@@ -13337,6 +16069,36 @@ index d8ca2ea..19e0380 100644
  extern void lru_cache_add(struct page *);
  extern void lru_cache_add_anon(struct page *page);
  extern void lru_cache_add_file(struct page *page);
+diff --git a/include/linux/swork.h b/include/linux/swork.h
+new file mode 100644
+index 0000000..f175fa9
+--- /dev/null
++++ b/include/linux/swork.h
+@@ -0,0 +1,24 @@
++#ifndef _LINUX_SWORK_H
++#define _LINUX_SWORK_H
++
++#include <linux/list.h>
++
++struct swork_event {
++	struct list_head item;
++	unsigned long flags;
++	void (*func)(struct swork_event *);
++};
++
++static inline void INIT_SWORK(struct swork_event *event,
++			      void (*func)(struct swork_event *))
++{
++	event->flags = 0;
++	event->func = func;
++}
++
++bool swork_queue(struct swork_event *sev);
++
++int swork_get(void);
++void swork_put(void);
++
++#endif /* _LINUX_SWORK_H */
 diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
 index ff307b5..be9f9dc 100644
 --- a/include/linux/thread_info.h
@@ -13502,6 +16264,120 @@ index c68926b..dd0751e 100644
  	int sysctl_icmp_ignore_bogus_error_responses;
  	int sysctl_icmp_ratelimit;
  	int sysctl_icmp_ratemask;
+diff --git a/include/trace/events/hist.h b/include/trace/events/hist.h
+new file mode 100644
+index 0000000..f7710de
+--- /dev/null
++++ b/include/trace/events/hist.h
+@@ -0,0 +1,73 @@
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM hist
++
++#if !defined(_TRACE_HIST_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HIST_H
++
++#include "latency_hist.h"
++#include <linux/tracepoint.h>
++
++#if !defined(CONFIG_PREEMPT_OFF_HIST) && !defined(CONFIG_INTERRUPT_OFF_HIST)
++#define trace_preemptirqsoff_hist(a, b)
++#define trace_preemptirqsoff_hist_rcuidle(a, b)
++#else
++TRACE_EVENT(preemptirqsoff_hist,
++
++	TP_PROTO(int reason, int starthist),
++
++	TP_ARGS(reason, starthist),
++
++	TP_STRUCT__entry(
++		__field(int,	reason)
++		__field(int,	starthist)
++	),
++
++	TP_fast_assign(
++		__entry->reason		= reason;
++		__entry->starthist	= starthist;
++	),
++
++	TP_printk("reason=%s starthist=%s", getaction(__entry->reason),
++		  __entry->starthist ? "start" : "stop")
++);
++#endif
++
++#ifndef CONFIG_MISSED_TIMER_OFFSETS_HIST
++#define trace_hrtimer_interrupt(a, b, c, d)
++#else
++TRACE_EVENT(hrtimer_interrupt,
++
++	TP_PROTO(int cpu, long long offset, struct task_struct *curr,
++		struct task_struct *task),
++
++	TP_ARGS(cpu, offset, curr, task),
++
++	TP_STRUCT__entry(
++		__field(int,		cpu)
++		__field(long long,	offset)
++		__array(char,		ccomm,	TASK_COMM_LEN)
++		__field(int,		cprio)
++		__array(char,		tcomm,	TASK_COMM_LEN)
++		__field(int,		tprio)
++	),
++
++	TP_fast_assign(
++		__entry->cpu	= cpu;
++		__entry->offset	= offset;
++		memcpy(__entry->ccomm, curr->comm, TASK_COMM_LEN);
++		__entry->cprio  = curr->prio;
++		memcpy(__entry->tcomm, task != NULL ? task->comm : "<none>",
++			task != NULL ? TASK_COMM_LEN : 7);
++		__entry->tprio  = task != NULL ? task->prio : -1;
++	),
++
++	TP_printk("cpu=%d offset=%lld curr=%s[%d] thread=%s[%d]",
++		__entry->cpu, __entry->offset, __entry->ccomm,
++		__entry->cprio, __entry->tcomm, __entry->tprio)
++);
++#endif
++
++#endif /* _TRACE_HIST_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/events/latency_hist.h b/include/trace/events/latency_hist.h
+new file mode 100644
+index 0000000..d3f2fbd
+--- /dev/null
++++ b/include/trace/events/latency_hist.h
+@@ -0,0 +1,29 @@
++#ifndef _LATENCY_HIST_H
++#define _LATENCY_HIST_H
++
++enum hist_action {
++	IRQS_ON,
++	PREEMPT_ON,
++	TRACE_STOP,
++	IRQS_OFF,
++	PREEMPT_OFF,
++	TRACE_START,
++};
++
++static char *actions[] = {
++	"IRQS_ON",
++	"PREEMPT_ON",
++	"TRACE_STOP",
++	"IRQS_OFF",
++	"PREEMPT_OFF",
++	"TRACE_START",
++};
++
++static inline char *getaction(int action)
++{
++	if (action >= 0 && action <= sizeof(actions)/sizeof(actions[0]))
++		return actions[action];
++	return "unknown";
++}
++
++#endif /* _LATENCY_HIST_H */
 diff --git a/include/trace/events/writeback.h b/include/trace/events/writeback.h
 index fff846b..73614ce 100644
 --- a/include/trace/events/writeback.h
@@ -15759,6 +18635,486 @@ index 8ef1919..291fc19 100644
  #include <linux/mutex.h>
  #include <linux/rwsem.h>
  #include <linux/smp.h>
+diff --git a/kernel/locking/rt.c b/kernel/locking/rt.c
+new file mode 100644
+index 0000000..d4ab61c
+--- /dev/null
++++ b/kernel/locking/rt.c
+@@ -0,0 +1,474 @@
++/*
++ * kernel/rt.c
++ *
++ * Real-Time Preemption Support
++ *
++ * started by Ingo Molnar:
++ *
++ *  Copyright (C) 2004-2006 Red Hat, Inc., Ingo Molnar <mingo@redhat.com>
++ *  Copyright (C) 2006, Timesys Corp., Thomas Gleixner <tglx@timesys.com>
++ *
++ * historic credit for proving that Linux spinlocks can be implemented via
++ * RT-aware mutexes goes to many people: The Pmutex project (Dirk Grambow
++ * and others) who prototyped it on 2.4 and did lots of comparative
++ * research and analysis; TimeSys, for proving that you can implement a
++ * fully preemptible kernel via the use of IRQ threading and mutexes;
++ * Bill Huey for persuasively arguing on lkml that the mutex model is the
++ * right one; and to MontaVista, who ported pmutexes to 2.6.
++ *
++ * This code is a from-scratch implementation and is not based on pmutexes,
++ * but the idea of converting spinlocks to mutexes is used here too.
++ *
++ * lock debugging, locking tree, deadlock detection:
++ *
++ *  Copyright (C) 2004, LynuxWorks, Inc., Igor Manyilov, Bill Huey
++ *  Released under the General Public License (GPL).
++ *
++ * Includes portions of the generic R/W semaphore implementation from:
++ *
++ *  Copyright (c) 2001   David Howells (dhowells@redhat.com).
++ *  - Derived partially from idea by Andrea Arcangeli <andrea@suse.de>
++ *  - Derived also from comments by Linus
++ *
++ * Pending ownership of locks and ownership stealing:
++ *
++ *  Copyright (C) 2005, Kihon Technologies Inc., Steven Rostedt
++ *
++ *   (also by Steven Rostedt)
++ *    - Converted single pi_lock to individual task locks.
++ *
++ * By Esben Nielsen:
++ *    Doing priority inheritance with help of the scheduler.
++ *
++ *  Copyright (C) 2006, Timesys Corp., Thomas Gleixner <tglx@timesys.com>
++ *  - major rework based on Esben Nielsens initial patch
++ *  - replaced thread_info references by task_struct refs
++ *  - removed task->pending_owner dependency
++ *  - BKL drop/reacquire for semaphore style locks to avoid deadlocks
++ *    in the scheduler return path as discussed with Steven Rostedt
++ *
++ *  Copyright (C) 2006, Kihon Technologies Inc.
++ *    Steven Rostedt <rostedt@goodmis.org>
++ *  - debugged and patched Thomas Gleixner's rework.
++ *  - added back the cmpxchg to the rework.
++ *  - turned atomic require back on for SMP.
++ */
++
++#include <linux/spinlock.h>
++#include <linux/rtmutex.h>
++#include <linux/sched.h>
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/kallsyms.h>
++#include <linux/syscalls.h>
++#include <linux/interrupt.h>
++#include <linux/plist.h>
++#include <linux/fs.h>
++#include <linux/futex.h>
++#include <linux/hrtimer.h>
++
++#include "rtmutex_common.h"
++
++/*
++ * struct mutex functions
++ */
++void __mutex_do_init(struct mutex *mutex, const char *name,
++		     struct lock_class_key *key)
++{
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++	/*
++	 * Make sure we are not reinitializing a held lock:
++	 */
++	debug_check_no_locks_freed((void *)mutex, sizeof(*mutex));
++	lockdep_init_map(&mutex->dep_map, name, key, 0);
++#endif
++	mutex->lock.save_state = 0;
++}
++EXPORT_SYMBOL(__mutex_do_init);
++
++void __lockfunc _mutex_lock(struct mutex *lock)
++{
++	mutex_acquire(&lock->dep_map, 0, 0, _RET_IP_);
++	rt_mutex_lock(&lock->lock);
++}
++EXPORT_SYMBOL(_mutex_lock);
++
++int __lockfunc _mutex_lock_interruptible(struct mutex *lock)
++{
++	int ret;
++
++	mutex_acquire(&lock->dep_map, 0, 0, _RET_IP_);
++	ret = rt_mutex_lock_interruptible(&lock->lock);
++	if (ret)
++		mutex_release(&lock->dep_map, 1, _RET_IP_);
++	return ret;
++}
++EXPORT_SYMBOL(_mutex_lock_interruptible);
++
++int __lockfunc _mutex_lock_killable(struct mutex *lock)
++{
++	int ret;
++
++	mutex_acquire(&lock->dep_map, 0, 0, _RET_IP_);
++	ret = rt_mutex_lock_killable(&lock->lock);
++	if (ret)
++		mutex_release(&lock->dep_map, 1, _RET_IP_);
++	return ret;
++}
++EXPORT_SYMBOL(_mutex_lock_killable);
++
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++void __lockfunc _mutex_lock_nested(struct mutex *lock, int subclass)
++{
++	mutex_acquire_nest(&lock->dep_map, subclass, 0, NULL, _RET_IP_);
++	rt_mutex_lock(&lock->lock);
++}
++EXPORT_SYMBOL(_mutex_lock_nested);
++
++void __lockfunc _mutex_lock_nest_lock(struct mutex *lock, struct lockdep_map *nest)
++{
++	mutex_acquire_nest(&lock->dep_map, 0, 0, nest, _RET_IP_);
++	rt_mutex_lock(&lock->lock);
++}
++EXPORT_SYMBOL(_mutex_lock_nest_lock);
++
++int __lockfunc _mutex_lock_interruptible_nested(struct mutex *lock, int subclass)
++{
++	int ret;
++
++	mutex_acquire_nest(&lock->dep_map, subclass, 0, NULL, _RET_IP_);
++	ret = rt_mutex_lock_interruptible(&lock->lock);
++	if (ret)
++		mutex_release(&lock->dep_map, 1, _RET_IP_);
++	return ret;
++}
++EXPORT_SYMBOL(_mutex_lock_interruptible_nested);
++
++int __lockfunc _mutex_lock_killable_nested(struct mutex *lock, int subclass)
++{
++	int ret;
++
++	mutex_acquire(&lock->dep_map, subclass, 0, _RET_IP_);
++	ret = rt_mutex_lock_killable(&lock->lock);
++	if (ret)
++		mutex_release(&lock->dep_map, 1, _RET_IP_);
++	return ret;
++}
++EXPORT_SYMBOL(_mutex_lock_killable_nested);
++#endif
++
++int __lockfunc _mutex_trylock(struct mutex *lock)
++{
++	int ret = rt_mutex_trylock(&lock->lock);
++
++	if (ret)
++		mutex_acquire(&lock->dep_map, 0, 1, _RET_IP_);
++
++	return ret;
++}
++EXPORT_SYMBOL(_mutex_trylock);
++
++void __lockfunc _mutex_unlock(struct mutex *lock)
++{
++	mutex_release(&lock->dep_map, 1, _RET_IP_);
++	rt_mutex_unlock(&lock->lock);
++}
++EXPORT_SYMBOL(_mutex_unlock);
++
++/*
++ * rwlock_t functions
++ */
++int __lockfunc rt_write_trylock(rwlock_t *rwlock)
++{
++	int ret;
++
++	migrate_disable();
++	ret = rt_mutex_trylock(&rwlock->lock);
++	if (ret)
++		rwlock_acquire(&rwlock->dep_map, 0, 1, _RET_IP_);
++	else
++		migrate_enable();
++
++	return ret;
++}
++EXPORT_SYMBOL(rt_write_trylock);
++
++int __lockfunc rt_write_trylock_irqsave(rwlock_t *rwlock, unsigned long *flags)
++{
++	int ret;
++
++	*flags = 0;
++	ret = rt_write_trylock(rwlock);
++	return ret;
++}
++EXPORT_SYMBOL(rt_write_trylock_irqsave);
++
++int __lockfunc rt_read_trylock(rwlock_t *rwlock)
++{
++	struct rt_mutex *lock = &rwlock->lock;
++	int ret = 1;
++
++	/*
++	 * recursive read locks succeed when current owns the lock,
++	 * but not when read_depth == 0 which means that the lock is
++	 * write locked.
++	 */
++	if (rt_mutex_owner(lock) != current) {
++		migrate_disable();
++		ret = rt_mutex_trylock(lock);
++		if (ret)
++			rwlock_acquire(&rwlock->dep_map, 0, 1, _RET_IP_);
++		else
++			migrate_enable();
++
++	} else if (!rwlock->read_depth) {
++		ret = 0;
++	}
++
++	if (ret)
++		rwlock->read_depth++;
++
++	return ret;
++}
++EXPORT_SYMBOL(rt_read_trylock);
++
++void __lockfunc rt_write_lock(rwlock_t *rwlock)
++{
++	rwlock_acquire(&rwlock->dep_map, 0, 0, _RET_IP_);
++	__rt_spin_lock(&rwlock->lock);
++}
++EXPORT_SYMBOL(rt_write_lock);
++
++void __lockfunc rt_read_lock(rwlock_t *rwlock)
++{
++	struct rt_mutex *lock = &rwlock->lock;
++
++
++	/*
++	 * recursive read locks succeed when current owns the lock
++	 */
++	if (rt_mutex_owner(lock) != current) {
++		rwlock_acquire(&rwlock->dep_map, 0, 0, _RET_IP_);
++		__rt_spin_lock(lock);
++	}
++	rwlock->read_depth++;
++}
++
++EXPORT_SYMBOL(rt_read_lock);
++
++void __lockfunc rt_write_unlock(rwlock_t *rwlock)
++{
++	/* NOTE: we always pass in '1' for nested, for simplicity */
++	rwlock_release(&rwlock->dep_map, 1, _RET_IP_);
++	__rt_spin_unlock(&rwlock->lock);
++	migrate_enable();
++}
++EXPORT_SYMBOL(rt_write_unlock);
++
++void __lockfunc rt_read_unlock(rwlock_t *rwlock)
++{
++	/* Release the lock only when read_depth is down to 0 */
++	if (--rwlock->read_depth == 0) {
++		rwlock_release(&rwlock->dep_map, 1, _RET_IP_);
++		__rt_spin_unlock(&rwlock->lock);
++		migrate_enable();
++	}
++}
++EXPORT_SYMBOL(rt_read_unlock);
++
++unsigned long __lockfunc rt_write_lock_irqsave(rwlock_t *rwlock)
++{
++	rt_write_lock(rwlock);
++
++	return 0;
++}
++EXPORT_SYMBOL(rt_write_lock_irqsave);
++
++unsigned long __lockfunc rt_read_lock_irqsave(rwlock_t *rwlock)
++{
++	rt_read_lock(rwlock);
++
++	return 0;
++}
++EXPORT_SYMBOL(rt_read_lock_irqsave);
++
++void __rt_rwlock_init(rwlock_t *rwlock, char *name, struct lock_class_key *key)
++{
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++	/*
++	 * Make sure we are not reinitializing a held lock:
++	 */
++	debug_check_no_locks_freed((void *)rwlock, sizeof(*rwlock));
++	lockdep_init_map(&rwlock->dep_map, name, key, 0);
++#endif
++	rwlock->lock.save_state = 1;
++	rwlock->read_depth = 0;
++}
++EXPORT_SYMBOL(__rt_rwlock_init);
++
++/*
++ * rw_semaphores
++ */
++
++void  rt_up_write(struct rw_semaphore *rwsem)
++{
++	rwsem_release(&rwsem->dep_map, 1, _RET_IP_);
++	rt_mutex_unlock(&rwsem->lock);
++}
++EXPORT_SYMBOL(rt_up_write);
++
++void __rt_up_read(struct rw_semaphore *rwsem)
++{
++	if (--rwsem->read_depth == 0)
++		rt_mutex_unlock(&rwsem->lock);
++}
++
++void  rt_up_read(struct rw_semaphore *rwsem)
++{
++	rwsem_release(&rwsem->dep_map, 1, _RET_IP_);
++	__rt_up_read(rwsem);
++}
++EXPORT_SYMBOL(rt_up_read);
++
++/*
++ * downgrade a write lock into a read lock
++ * - just wake up any readers at the front of the queue
++ */
++void  rt_downgrade_write(struct rw_semaphore *rwsem)
++{
++	BUG_ON(rt_mutex_owner(&rwsem->lock) != current);
++	rwsem->read_depth = 1;
++}
++EXPORT_SYMBOL(rt_downgrade_write);
++
++int  rt_down_write_trylock(struct rw_semaphore *rwsem)
++{
++	int ret = rt_mutex_trylock(&rwsem->lock);
++
++	if (ret)
++		rwsem_acquire(&rwsem->dep_map, 0, 1, _RET_IP_);
++	return ret;
++}
++EXPORT_SYMBOL(rt_down_write_trylock);
++
++void  rt_down_write(struct rw_semaphore *rwsem)
++{
++	rwsem_acquire(&rwsem->dep_map, 0, 0, _RET_IP_);
++	rt_mutex_lock(&rwsem->lock);
++}
++EXPORT_SYMBOL(rt_down_write);
++
++void  rt_down_write_nested(struct rw_semaphore *rwsem, int subclass)
++{
++	rwsem_acquire(&rwsem->dep_map, subclass, 0, _RET_IP_);
++	rt_mutex_lock(&rwsem->lock);
++}
++EXPORT_SYMBOL(rt_down_write_nested);
++
++void rt_down_write_nested_lock(struct rw_semaphore *rwsem,
++			       struct lockdep_map *nest)
++{
++	rwsem_acquire_nest(&rwsem->dep_map, 0, 0, nest, _RET_IP_);
++	rt_mutex_lock(&rwsem->lock);
++}
++EXPORT_SYMBOL(rt_down_write_nested_lock);
++
++int rt__down_read_trylock(struct rw_semaphore *rwsem)
++{
++	struct rt_mutex *lock = &rwsem->lock;
++	int ret = 1;
++
++	/*
++	 * recursive read locks succeed when current owns the rwsem,
++	 * but not when read_depth == 0 which means that the rwsem is
++	 * write locked.
++	 */
++	if (rt_mutex_owner(lock) != current)
++		ret = rt_mutex_trylock(&rwsem->lock);
++	else if (!rwsem->read_depth)
++		ret = 0;
++
++	if (ret)
++		rwsem->read_depth++;
++	return ret;
++
++}
++
++int  rt_down_read_trylock(struct rw_semaphore *rwsem)
++{
++	int ret;
++
++	ret = rt__down_read_trylock(rwsem);
++	if (ret)
++		rwsem_acquire(&rwsem->dep_map, 0, 1, _RET_IP_);
++
++	return ret;
++}
++EXPORT_SYMBOL(rt_down_read_trylock);
++
++void rt__down_read(struct rw_semaphore *rwsem)
++{
++	struct rt_mutex *lock = &rwsem->lock;
++
++	if (rt_mutex_owner(lock) != current)
++		rt_mutex_lock(&rwsem->lock);
++	rwsem->read_depth++;
++}
++EXPORT_SYMBOL(rt__down_read);
++
++static void __rt_down_read(struct rw_semaphore *rwsem, int subclass)
++{
++	rwsem_acquire_read(&rwsem->dep_map, subclass, 0, _RET_IP_);
++	rt__down_read(rwsem);
++}
++
++void  rt_down_read(struct rw_semaphore *rwsem)
++{
++	__rt_down_read(rwsem, 0);
++}
++EXPORT_SYMBOL(rt_down_read);
++
++void  rt_down_read_nested(struct rw_semaphore *rwsem, int subclass)
++{
++	__rt_down_read(rwsem, subclass);
++}
++EXPORT_SYMBOL(rt_down_read_nested);
++
++void  __rt_rwsem_init(struct rw_semaphore *rwsem, const char *name,
++			      struct lock_class_key *key)
++{
++#ifdef CONFIG_DEBUG_LOCK_ALLOC
++	/*
++	 * Make sure we are not reinitializing a held lock:
++	 */
++	debug_check_no_locks_freed((void *)rwsem, sizeof(*rwsem));
++	lockdep_init_map(&rwsem->dep_map, name, key, 0);
++#endif
++	rwsem->read_depth = 0;
++	rwsem->lock.save_state = 0;
++}
++EXPORT_SYMBOL(__rt_rwsem_init);
++
++/**
++ * atomic_dec_and_mutex_lock - return holding mutex if we dec to 0
++ * @cnt: the atomic which we are to dec
++ * @lock: the mutex to return holding if we dec to 0
++ *
++ * return true and hold lock if we dec to 0, return false otherwise
++ */
++int atomic_dec_and_mutex_lock(atomic_t *cnt, struct mutex *lock)
++{
++	/* dec if we can't possibly hit 0 */
++	if (atomic_add_unless(cnt, -1, 1))
++		return 0;
++	/* we might hit 0, so take the lock */
++	mutex_lock(lock);
++	if (!atomic_dec_and_test(cnt)) {
++		/* when we actually did the dec, we didn't hit 0 */
++		mutex_unlock(lock);
++		return 0;
++	}
++	/* we hit 0, and we hold the lock */
++	return 1;
++}
++EXPORT_SYMBOL(atomic_dec_and_mutex_lock);
 diff --git a/kernel/locking/rtmutex.c b/kernel/locking/rtmutex.c
 index b066724d..0e9a626 100644
 --- a/kernel/locking/rtmutex.c
@@ -20343,6 +23699,334 @@ index 0517abd..a8a9b156 100644
  extern struct rt_bandwidth def_rt_bandwidth;
  extern void init_rt_bandwidth(struct rt_bandwidth *rt_b, u64 period, u64 runtime);
  
+diff --git a/kernel/sched/swait.c b/kernel/sched/swait.c
+new file mode 100644
+index 0000000..205fe36
+--- /dev/null
++++ b/kernel/sched/swait.c
+@@ -0,0 +1,143 @@
++#include <linux/sched.h>
++#include <linux/swait.h>
++#include <linux/suspend.h>
++
++void __init_swait_queue_head(struct swait_queue_head *q, const char *name,
++			     struct lock_class_key *key)
++{
++	raw_spin_lock_init(&q->lock);
++	lockdep_set_class_and_name(&q->lock, key, name);
++	INIT_LIST_HEAD(&q->task_list);
++}
++EXPORT_SYMBOL(__init_swait_queue_head);
++
++/*
++ * The thing about the wake_up_state() return value; I think we can ignore it.
++ *
++ * If for some reason it would return 0, that means the previously waiting
++ * task is already running, so it will observe condition true (or has already).
++ */
++void swake_up_locked(struct swait_queue_head *q)
++{
++	struct swait_queue *curr;
++
++	if (list_empty(&q->task_list))
++		return;
++
++	curr = list_first_entry(&q->task_list, typeof(*curr), task_list);
++	wake_up_process(curr->task);
++	list_del_init(&curr->task_list);
++}
++EXPORT_SYMBOL(swake_up_locked);
++
++void swake_up_all_locked(struct swait_queue_head *q)
++{
++	struct swait_queue *curr;
++	int wakes = 0;
++
++	while (!list_empty(&q->task_list)) {
++
++		curr = list_first_entry(&q->task_list, typeof(*curr),
++					task_list);
++		wake_up_process(curr->task);
++		list_del_init(&curr->task_list);
++		wakes++;
++	}
++	if (pm_in_action)
++		return;
++	WARN(wakes > 2, "complate_all() with %d waiters\n", wakes);
++}
++EXPORT_SYMBOL(swake_up_all_locked);
++
++void swake_up(struct swait_queue_head *q)
++{
++	unsigned long flags;
++
++	if (!swait_active(q))
++		return;
++
++	raw_spin_lock_irqsave(&q->lock, flags);
++	swake_up_locked(q);
++	raw_spin_unlock_irqrestore(&q->lock, flags);
++}
++EXPORT_SYMBOL(swake_up);
++
++/*
++ * Does not allow usage from IRQ disabled, since we must be able to
++ * release IRQs to guarantee bounded hold time.
++ */
++void swake_up_all(struct swait_queue_head *q)
++{
++	struct swait_queue *curr;
++	LIST_HEAD(tmp);
++
++	if (!swait_active(q))
++		return;
++
++	raw_spin_lock_irq(&q->lock);
++	list_splice_init(&q->task_list, &tmp);
++	while (!list_empty(&tmp)) {
++		curr = list_first_entry(&tmp, typeof(*curr), task_list);
++
++		wake_up_state(curr->task, TASK_NORMAL);
++		list_del_init(&curr->task_list);
++
++		if (list_empty(&tmp))
++			break;
++
++		raw_spin_unlock_irq(&q->lock);
++		raw_spin_lock_irq(&q->lock);
++	}
++	raw_spin_unlock_irq(&q->lock);
++}
++EXPORT_SYMBOL(swake_up_all);
++
++void __prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait)
++{
++	wait->task = current;
++	if (list_empty(&wait->task_list))
++		list_add(&wait->task_list, &q->task_list);
++}
++
++void prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait, int state)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&q->lock, flags);
++	__prepare_to_swait(q, wait);
++	set_current_state(state);
++	raw_spin_unlock_irqrestore(&q->lock, flags);
++}
++EXPORT_SYMBOL(prepare_to_swait);
++
++long prepare_to_swait_event(struct swait_queue_head *q, struct swait_queue *wait, int state)
++{
++	if (signal_pending_state(state, current))
++		return -ERESTARTSYS;
++
++	prepare_to_swait(q, wait, state);
++
++	return 0;
++}
++EXPORT_SYMBOL(prepare_to_swait_event);
++
++void __finish_swait(struct swait_queue_head *q, struct swait_queue *wait)
++{
++	__set_current_state(TASK_RUNNING);
++	if (!list_empty(&wait->task_list))
++		list_del_init(&wait->task_list);
++}
++
++void finish_swait(struct swait_queue_head *q, struct swait_queue *wait)
++{
++	unsigned long flags;
++
++	__set_current_state(TASK_RUNNING);
++
++	if (!list_empty_careful(&wait->task_list)) {
++		raw_spin_lock_irqsave(&q->lock, flags);
++		list_del_init(&wait->task_list);
++		raw_spin_unlock_irqrestore(&q->lock, flags);
++	}
++}
++EXPORT_SYMBOL(finish_swait);
+diff --git a/kernel/sched/swork.c b/kernel/sched/swork.c
+new file mode 100644
+index 0000000..1950f40
+--- /dev/null
++++ b/kernel/sched/swork.c
+@@ -0,0 +1,173 @@
++/*
++ * Copyright (C) 2014 BMW Car IT GmbH, Daniel Wagner daniel.wagner@bmw-carit.de
++ *
++ * Provides a framework for enqueuing callbacks from irq context
++ * PREEMPT_RT_FULL safe. The callbacks are executed in kthread context.
++ */
++
++#include <linux/swait.h>
++#include <linux/swork.h>
++#include <linux/kthread.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/export.h>
++
++#define SWORK_EVENT_PENDING     (1 << 0)
++
++static DEFINE_MUTEX(worker_mutex);
++static struct sworker *glob_worker;
++
++struct sworker {
++	struct list_head events;
++	struct swait_queue_head wq;
++
++	raw_spinlock_t lock;
++
++	struct task_struct *task;
++	int refs;
++};
++
++static bool swork_readable(struct sworker *worker)
++{
++	bool r;
++
++	if (kthread_should_stop())
++		return true;
++
++	raw_spin_lock_irq(&worker->lock);
++	r = !list_empty(&worker->events);
++	raw_spin_unlock_irq(&worker->lock);
++
++	return r;
++}
++
++static int swork_kthread(void *arg)
++{
++	struct sworker *worker = arg;
++
++	for (;;) {
++		swait_event_interruptible(worker->wq,
++					swork_readable(worker));
++		if (kthread_should_stop())
++			break;
++
++		raw_spin_lock_irq(&worker->lock);
++		while (!list_empty(&worker->events)) {
++			struct swork_event *sev;
++
++			sev = list_first_entry(&worker->events,
++					struct swork_event, item);
++			list_del(&sev->item);
++			raw_spin_unlock_irq(&worker->lock);
++
++			WARN_ON_ONCE(!test_and_clear_bit(SWORK_EVENT_PENDING,
++							 &sev->flags));
++			sev->func(sev);
++			raw_spin_lock_irq(&worker->lock);
++		}
++		raw_spin_unlock_irq(&worker->lock);
++	}
++	return 0;
++}
++
++static struct sworker *swork_create(void)
++{
++	struct sworker *worker;
++
++	worker = kzalloc(sizeof(*worker), GFP_KERNEL);
++	if (!worker)
++		return ERR_PTR(-ENOMEM);
++
++	INIT_LIST_HEAD(&worker->events);
++	raw_spin_lock_init(&worker->lock);
++	init_swait_queue_head(&worker->wq);
++
++	worker->task = kthread_run(swork_kthread, worker, "kswork");
++	if (IS_ERR(worker->task)) {
++		kfree(worker);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	return worker;
++}
++
++static void swork_destroy(struct sworker *worker)
++{
++	kthread_stop(worker->task);
++
++	WARN_ON(!list_empty(&worker->events));
++	kfree(worker);
++}
++
++/**
++ * swork_queue - queue swork
++ *
++ * Returns %false if @work was already on a queue, %true otherwise.
++ *
++ * The work is queued and processed on a random CPU
++ */
++bool swork_queue(struct swork_event *sev)
++{
++	unsigned long flags;
++
++	if (test_and_set_bit(SWORK_EVENT_PENDING, &sev->flags))
++		return false;
++
++	raw_spin_lock_irqsave(&glob_worker->lock, flags);
++	list_add_tail(&sev->item, &glob_worker->events);
++	raw_spin_unlock_irqrestore(&glob_worker->lock, flags);
++
++	swake_up(&glob_worker->wq);
++	return true;
++}
++EXPORT_SYMBOL_GPL(swork_queue);
++
++/**
++ * swork_get - get an instance of the sworker
++ *
++ * Returns an negative error code if the initialization if the worker did not
++ * work, %0 otherwise.
++ *
++ */
++int swork_get(void)
++{
++	struct sworker *worker;
++
++	mutex_lock(&worker_mutex);
++	if (!glob_worker) {
++		worker = swork_create();
++		if (IS_ERR(worker)) {
++			mutex_unlock(&worker_mutex);
++			return -ENOMEM;
++		}
++
++		glob_worker = worker;
++	}
++
++	glob_worker->refs++;
++	mutex_unlock(&worker_mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(swork_get);
++
++/**
++ * swork_put - puts an instance of the sworker
++ *
++ * Will destroy the sworker thread. This function must not be called until all
++ * queued events have been completed.
++ */
++void swork_put(void)
++{
++	mutex_lock(&worker_mutex);
++
++	glob_worker->refs--;
++	if (glob_worker->refs > 0)
++		goto out;
++
++	swork_destroy(glob_worker);
++	glob_worker = NULL;
++out:
++	mutex_unlock(&worker_mutex);
++}
++EXPORT_SYMBOL_GPL(swork_put);
 diff --git a/kernel/signal.c b/kernel/signal.c
 index f3f1f7a..bc2c990 100644
 --- a/kernel/signal.c
@@ -23148,6 +26832,1190 @@ index 05ea516..bc08c67 100644
  obj-$(CONFIG_NOP_TRACER) += trace_nop.o
  obj-$(CONFIG_STACK_TRACER) += trace_stack.o
  obj-$(CONFIG_MMIOTRACE) += trace_mmiotrace.o
+diff --git a/kernel/trace/latency_hist.c b/kernel/trace/latency_hist.c
+new file mode 100644
+index 0000000..7f6ee70
+--- /dev/null
++++ b/kernel/trace/latency_hist.c
+@@ -0,0 +1,1178 @@
++/*
++ * kernel/trace/latency_hist.c
++ *
++ * Add support for histograms of preemption-off latency and
++ * interrupt-off latency and wakeup latency, it depends on
++ * Real-Time Preemption Support.
++ *
++ *  Copyright (C) 2005 MontaVista Software, Inc.
++ *  Yi Yang <yyang@ch.mvista.com>
++ *
++ *  Converted to work with the new latency tracer.
++ *  Copyright (C) 2008 Red Hat, Inc.
++ *    Steven Rostedt <srostedt@redhat.com>
++ *
++ */
++#include <linux/module.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
++#include <linux/percpu.h>
++#include <linux/kallsyms.h>
++#include <linux/uaccess.h>
++#include <linux/sched.h>
++#include <linux/sched/rt.h>
++#include <linux/slab.h>
++#include <linux/atomic.h>
++#include <asm/div64.h>
++
++#include "trace.h"
++#include <trace/events/sched.h>
++
++#define NSECS_PER_USECS 1000L
++
++#define CREATE_TRACE_POINTS
++#include <trace/events/hist.h>
++
++enum {
++	IRQSOFF_LATENCY = 0,
++	PREEMPTOFF_LATENCY,
++	PREEMPTIRQSOFF_LATENCY,
++	WAKEUP_LATENCY,
++	WAKEUP_LATENCY_SHAREDPRIO,
++	MISSED_TIMER_OFFSETS,
++	TIMERANDWAKEUP_LATENCY,
++	MAX_LATENCY_TYPE,
++};
++
++#define MAX_ENTRY_NUM 10240
++
++struct hist_data {
++	atomic_t hist_mode; /* 0 log, 1 don't log */
++	long offset; /* set it to MAX_ENTRY_NUM/2 for a bipolar scale */
++	long min_lat;
++	long max_lat;
++	unsigned long long below_hist_bound_samples;
++	unsigned long long above_hist_bound_samples;
++	long long accumulate_lat;
++	unsigned long long total_samples;
++	unsigned long long hist_array[MAX_ENTRY_NUM];
++};
++
++struct enable_data {
++	int latency_type;
++	int enabled;
++};
++
++static char *latency_hist_dir_root = "latency_hist";
++
++#ifdef CONFIG_INTERRUPT_OFF_HIST
++static DEFINE_PER_CPU(struct hist_data, irqsoff_hist);
++static char *irqsoff_hist_dir = "irqsoff";
++static DEFINE_PER_CPU(cycles_t, hist_irqsoff_start);
++static DEFINE_PER_CPU(int, hist_irqsoff_counting);
++#endif
++
++#ifdef CONFIG_PREEMPT_OFF_HIST
++static DEFINE_PER_CPU(struct hist_data, preemptoff_hist);
++static char *preemptoff_hist_dir = "preemptoff";
++static DEFINE_PER_CPU(cycles_t, hist_preemptoff_start);
++static DEFINE_PER_CPU(int, hist_preemptoff_counting);
++#endif
++
++#if defined(CONFIG_PREEMPT_OFF_HIST) && defined(CONFIG_INTERRUPT_OFF_HIST)
++static DEFINE_PER_CPU(struct hist_data, preemptirqsoff_hist);
++static char *preemptirqsoff_hist_dir = "preemptirqsoff";
++static DEFINE_PER_CPU(cycles_t, hist_preemptirqsoff_start);
++static DEFINE_PER_CPU(int, hist_preemptirqsoff_counting);
++#endif
++
++#if defined(CONFIG_PREEMPT_OFF_HIST) || defined(CONFIG_INTERRUPT_OFF_HIST)
++static notrace void probe_preemptirqsoff_hist(void *v, int reason, int start);
++static struct enable_data preemptirqsoff_enabled_data = {
++	.latency_type = PREEMPTIRQSOFF_LATENCY,
++	.enabled = 0,
++};
++#endif
++
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++struct maxlatproc_data {
++	char comm[FIELD_SIZEOF(struct task_struct, comm)];
++	char current_comm[FIELD_SIZEOF(struct task_struct, comm)];
++	int pid;
++	int current_pid;
++	int prio;
++	int current_prio;
++	long latency;
++	long timeroffset;
++	cycle_t timestamp;
++};
++#endif
++
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++static DEFINE_PER_CPU(struct hist_data, wakeup_latency_hist);
++static DEFINE_PER_CPU(struct hist_data, wakeup_latency_hist_sharedprio);
++static char *wakeup_latency_hist_dir = "wakeup";
++static char *wakeup_latency_hist_dir_sharedprio = "sharedprio";
++static notrace void probe_wakeup_latency_hist_start(void *v,
++	struct task_struct *p);
++static notrace void probe_wakeup_latency_hist_stop(void *v,
++	bool preempt, struct task_struct *prev, struct task_struct *next);
++static notrace void probe_sched_migrate_task(void *,
++	struct task_struct *task, int cpu);
++static struct enable_data wakeup_latency_enabled_data = {
++	.latency_type = WAKEUP_LATENCY,
++	.enabled = 0,
++};
++static DEFINE_PER_CPU(struct maxlatproc_data, wakeup_maxlatproc);
++static DEFINE_PER_CPU(struct maxlatproc_data, wakeup_maxlatproc_sharedprio);
++static DEFINE_PER_CPU(struct task_struct *, wakeup_task);
++static DEFINE_PER_CPU(int, wakeup_sharedprio);
++static unsigned long wakeup_pid;
++#endif
++
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++static DEFINE_PER_CPU(struct hist_data, missed_timer_offsets);
++static char *missed_timer_offsets_dir = "missed_timer_offsets";
++static notrace void probe_hrtimer_interrupt(void *v, int cpu,
++	long long offset, struct task_struct *curr, struct task_struct *task);
++static struct enable_data missed_timer_offsets_enabled_data = {
++	.latency_type = MISSED_TIMER_OFFSETS,
++	.enabled = 0,
++};
++static DEFINE_PER_CPU(struct maxlatproc_data, missed_timer_offsets_maxlatproc);
++static unsigned long missed_timer_offsets_pid;
++#endif
++
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) && \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++static DEFINE_PER_CPU(struct hist_data, timerandwakeup_latency_hist);
++static char *timerandwakeup_latency_hist_dir = "timerandwakeup";
++static struct enable_data timerandwakeup_enabled_data = {
++	.latency_type = TIMERANDWAKEUP_LATENCY,
++	.enabled = 0,
++};
++static DEFINE_PER_CPU(struct maxlatproc_data, timerandwakeup_maxlatproc);
++#endif
++
++void notrace latency_hist(int latency_type, int cpu, long latency,
++			  long timeroffset, cycle_t stop,
++			  struct task_struct *p)
++{
++	struct hist_data *my_hist;
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++	struct maxlatproc_data *mp = NULL;
++#endif
++
++	if (!cpu_possible(cpu) || latency_type < 0 ||
++	    latency_type >= MAX_LATENCY_TYPE)
++		return;
++
++	switch (latency_type) {
++#ifdef CONFIG_INTERRUPT_OFF_HIST
++	case IRQSOFF_LATENCY:
++		my_hist = &per_cpu(irqsoff_hist, cpu);
++		break;
++#endif
++#ifdef CONFIG_PREEMPT_OFF_HIST
++	case PREEMPTOFF_LATENCY:
++		my_hist = &per_cpu(preemptoff_hist, cpu);
++		break;
++#endif
++#if defined(CONFIG_PREEMPT_OFF_HIST) && defined(CONFIG_INTERRUPT_OFF_HIST)
++	case PREEMPTIRQSOFF_LATENCY:
++		my_hist = &per_cpu(preemptirqsoff_hist, cpu);
++		break;
++#endif
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++	case WAKEUP_LATENCY:
++		my_hist = &per_cpu(wakeup_latency_hist, cpu);
++		mp = &per_cpu(wakeup_maxlatproc, cpu);
++		break;
++	case WAKEUP_LATENCY_SHAREDPRIO:
++		my_hist = &per_cpu(wakeup_latency_hist_sharedprio, cpu);
++		mp = &per_cpu(wakeup_maxlatproc_sharedprio, cpu);
++		break;
++#endif
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++	case MISSED_TIMER_OFFSETS:
++		my_hist = &per_cpu(missed_timer_offsets, cpu);
++		mp = &per_cpu(missed_timer_offsets_maxlatproc, cpu);
++		break;
++#endif
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) && \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++	case TIMERANDWAKEUP_LATENCY:
++		my_hist = &per_cpu(timerandwakeup_latency_hist, cpu);
++		mp = &per_cpu(timerandwakeup_maxlatproc, cpu);
++		break;
++#endif
++
++	default:
++		return;
++	}
++
++	latency += my_hist->offset;
++
++	if (atomic_read(&my_hist->hist_mode) == 0)
++		return;
++
++	if (latency < 0 || latency >= MAX_ENTRY_NUM) {
++		if (latency < 0)
++			my_hist->below_hist_bound_samples++;
++		else
++			my_hist->above_hist_bound_samples++;
++	} else
++		my_hist->hist_array[latency]++;
++
++	if (unlikely(latency > my_hist->max_lat ||
++	    my_hist->min_lat == LONG_MAX)) {
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++		if (latency_type == WAKEUP_LATENCY ||
++		    latency_type == WAKEUP_LATENCY_SHAREDPRIO ||
++		    latency_type == MISSED_TIMER_OFFSETS ||
++		    latency_type == TIMERANDWAKEUP_LATENCY) {
++			strncpy(mp->comm, p->comm, sizeof(mp->comm));
++			strncpy(mp->current_comm, current->comm,
++			    sizeof(mp->current_comm));
++			mp->pid = task_pid_nr(p);
++			mp->current_pid = task_pid_nr(current);
++			mp->prio = p->prio;
++			mp->current_prio = current->prio;
++			mp->latency = latency;
++			mp->timeroffset = timeroffset;
++			mp->timestamp = stop;
++		}
++#endif
++		my_hist->max_lat = latency;
++	}
++	if (unlikely(latency < my_hist->min_lat))
++		my_hist->min_lat = latency;
++	my_hist->total_samples++;
++	my_hist->accumulate_lat += latency;
++}
++
++static void *l_start(struct seq_file *m, loff_t *pos)
++{
++	loff_t *index_ptr = NULL;
++	loff_t index = *pos;
++	struct hist_data *my_hist = m->private;
++
++	if (index == 0) {
++		char minstr[32], avgstr[32], maxstr[32];
++
++		atomic_dec(&my_hist->hist_mode);
++
++		if (likely(my_hist->total_samples)) {
++			long avg = (long) div64_s64(my_hist->accumulate_lat,
++			    my_hist->total_samples);
++			snprintf(minstr, sizeof(minstr), "%ld",
++			    my_hist->min_lat - my_hist->offset);
++			snprintf(avgstr, sizeof(avgstr), "%ld",
++			    avg - my_hist->offset);
++			snprintf(maxstr, sizeof(maxstr), "%ld",
++			    my_hist->max_lat - my_hist->offset);
++		} else {
++			strcpy(minstr, "<undef>");
++			strcpy(avgstr, minstr);
++			strcpy(maxstr, minstr);
++		}
++
++		seq_printf(m, "#Minimum latency: %s microseconds\n"
++			   "#Average latency: %s microseconds\n"
++			   "#Maximum latency: %s microseconds\n"
++			   "#Total samples: %llu\n"
++			   "#There are %llu samples lower than %ld"
++			   " microseconds.\n"
++			   "#There are %llu samples greater or equal"
++			   " than %ld microseconds.\n"
++			   "#usecs\t%16s\n",
++			   minstr, avgstr, maxstr,
++			   my_hist->total_samples,
++			   my_hist->below_hist_bound_samples,
++			   -my_hist->offset,
++			   my_hist->above_hist_bound_samples,
++			   MAX_ENTRY_NUM - my_hist->offset,
++			   "samples");
++	}
++	if (index < MAX_ENTRY_NUM) {
++		index_ptr = kmalloc(sizeof(loff_t), GFP_KERNEL);
++		if (index_ptr)
++			*index_ptr = index;
++	}
++
++	return index_ptr;
++}
++
++static void *l_next(struct seq_file *m, void *p, loff_t *pos)
++{
++	loff_t *index_ptr = p;
++	struct hist_data *my_hist = m->private;
++
++	if (++*pos >= MAX_ENTRY_NUM) {
++		atomic_inc(&my_hist->hist_mode);
++		return NULL;
++	}
++	*index_ptr = *pos;
++	return index_ptr;
++}
++
++static void l_stop(struct seq_file *m, void *p)
++{
++	kfree(p);
++}
++
++static int l_show(struct seq_file *m, void *p)
++{
++	int index = *(loff_t *) p;
++	struct hist_data *my_hist = m->private;
++
++	seq_printf(m, "%6ld\t%16llu\n", index - my_hist->offset,
++	    my_hist->hist_array[index]);
++	return 0;
++}
++
++static const struct seq_operations latency_hist_seq_op = {
++	.start = l_start,
++	.next  = l_next,
++	.stop  = l_stop,
++	.show  = l_show
++};
++
++static int latency_hist_open(struct inode *inode, struct file *file)
++{
++	int ret;
++
++	ret = seq_open(file, &latency_hist_seq_op);
++	if (!ret) {
++		struct seq_file *seq = file->private_data;
++		seq->private = inode->i_private;
++	}
++	return ret;
++}
++
++static const struct file_operations latency_hist_fops = {
++	.open = latency_hist_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = seq_release,
++};
++
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++static void clear_maxlatprocdata(struct maxlatproc_data *mp)
++{
++	mp->comm[0] = mp->current_comm[0] = '\0';
++	mp->prio = mp->current_prio = mp->pid = mp->current_pid =
++	    mp->latency = mp->timeroffset = -1;
++	mp->timestamp = 0;
++}
++#endif
++
++static void hist_reset(struct hist_data *hist)
++{
++	atomic_dec(&hist->hist_mode);
++
++	memset(hist->hist_array, 0, sizeof(hist->hist_array));
++	hist->below_hist_bound_samples = 0ULL;
++	hist->above_hist_bound_samples = 0ULL;
++	hist->min_lat = LONG_MAX;
++	hist->max_lat = LONG_MIN;
++	hist->total_samples = 0ULL;
++	hist->accumulate_lat = 0LL;
++
++	atomic_inc(&hist->hist_mode);
++}
++
++static ssize_t
++latency_hist_reset(struct file *file, const char __user *a,
++		   size_t size, loff_t *off)
++{
++	int cpu;
++	struct hist_data *hist = NULL;
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++	struct maxlatproc_data *mp = NULL;
++#endif
++	off_t latency_type = (off_t) file->private_data;
++
++	for_each_online_cpu(cpu) {
++
++		switch (latency_type) {
++#ifdef CONFIG_PREEMPT_OFF_HIST
++		case PREEMPTOFF_LATENCY:
++			hist = &per_cpu(preemptoff_hist, cpu);
++			break;
++#endif
++#ifdef CONFIG_INTERRUPT_OFF_HIST
++		case IRQSOFF_LATENCY:
++			hist = &per_cpu(irqsoff_hist, cpu);
++			break;
++#endif
++#if defined(CONFIG_INTERRUPT_OFF_HIST) && defined(CONFIG_PREEMPT_OFF_HIST)
++		case PREEMPTIRQSOFF_LATENCY:
++			hist = &per_cpu(preemptirqsoff_hist, cpu);
++			break;
++#endif
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++		case WAKEUP_LATENCY:
++			hist = &per_cpu(wakeup_latency_hist, cpu);
++			mp = &per_cpu(wakeup_maxlatproc, cpu);
++			break;
++		case WAKEUP_LATENCY_SHAREDPRIO:
++			hist = &per_cpu(wakeup_latency_hist_sharedprio, cpu);
++			mp = &per_cpu(wakeup_maxlatproc_sharedprio, cpu);
++			break;
++#endif
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++		case MISSED_TIMER_OFFSETS:
++			hist = &per_cpu(missed_timer_offsets, cpu);
++			mp = &per_cpu(missed_timer_offsets_maxlatproc, cpu);
++			break;
++#endif
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) && \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++		case TIMERANDWAKEUP_LATENCY:
++			hist = &per_cpu(timerandwakeup_latency_hist, cpu);
++			mp = &per_cpu(timerandwakeup_maxlatproc, cpu);
++			break;
++#endif
++		}
++
++		hist_reset(hist);
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++		if (latency_type == WAKEUP_LATENCY ||
++		    latency_type == WAKEUP_LATENCY_SHAREDPRIO ||
++		    latency_type == MISSED_TIMER_OFFSETS ||
++		    latency_type == TIMERANDWAKEUP_LATENCY)
++			clear_maxlatprocdata(mp);
++#endif
++	}
++
++	return size;
++}
++
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++static ssize_t
++show_pid(struct file *file, char __user *ubuf, size_t cnt, loff_t *ppos)
++{
++	char buf[64];
++	int r;
++	unsigned long *this_pid = file->private_data;
++
++	r = snprintf(buf, sizeof(buf), "%lu\n", *this_pid);
++	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
++}
++
++static ssize_t do_pid(struct file *file, const char __user *ubuf,
++		      size_t cnt, loff_t *ppos)
++{
++	char buf[64];
++	unsigned long pid;
++	unsigned long *this_pid = file->private_data;
++
++	if (cnt >= sizeof(buf))
++		return -EINVAL;
++
++	if (copy_from_user(&buf, ubuf, cnt))
++		return -EFAULT;
++
++	buf[cnt] = '\0';
++
++	if (kstrtoul(buf, 10, &pid))
++		return -EINVAL;
++
++	*this_pid = pid;
++
++	return cnt;
++}
++#endif
++
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++static ssize_t
++show_maxlatproc(struct file *file, char __user *ubuf, size_t cnt, loff_t *ppos)
++{
++	int r;
++	struct maxlatproc_data *mp = file->private_data;
++	int strmaxlen = (TASK_COMM_LEN * 2) + (8 * 8);
++	unsigned long long t;
++	unsigned long usecs, secs;
++	char *buf;
++
++	if (mp->pid == -1 || mp->current_pid == -1) {
++		buf = "(none)\n";
++		return simple_read_from_buffer(ubuf, cnt, ppos, buf,
++		    strlen(buf));
++	}
++
++	buf = kmalloc(strmaxlen, GFP_KERNEL);
++	if (buf == NULL)
++		return -ENOMEM;
++
++	t = ns2usecs(mp->timestamp);
++	usecs = do_div(t, USEC_PER_SEC);
++	secs = (unsigned long) t;
++	r = snprintf(buf, strmaxlen,
++	    "%d %d %ld (%ld) %s <- %d %d %s %lu.%06lu\n", mp->pid,
++	    MAX_RT_PRIO-1 - mp->prio, mp->latency, mp->timeroffset, mp->comm,
++	    mp->current_pid, MAX_RT_PRIO-1 - mp->current_prio, mp->current_comm,
++	    secs, usecs);
++	r = simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
++	kfree(buf);
++	return r;
++}
++#endif
++
++static ssize_t
++show_enable(struct file *file, char __user *ubuf, size_t cnt, loff_t *ppos)
++{
++	char buf[64];
++	struct enable_data *ed = file->private_data;
++	int r;
++
++	r = snprintf(buf, sizeof(buf), "%d\n", ed->enabled);
++	return simple_read_from_buffer(ubuf, cnt, ppos, buf, r);
++}
++
++static ssize_t
++do_enable(struct file *file, const char __user *ubuf, size_t cnt, loff_t *ppos)
++{
++	char buf[64];
++	long enable;
++	struct enable_data *ed = file->private_data;
++
++	if (cnt >= sizeof(buf))
++		return -EINVAL;
++
++	if (copy_from_user(&buf, ubuf, cnt))
++		return -EFAULT;
++
++	buf[cnt] = 0;
++
++	if (kstrtoul(buf, 10, &enable))
++		return -EINVAL;
++
++	if ((enable && ed->enabled) || (!enable && !ed->enabled))
++		return cnt;
++
++	if (enable) {
++		int ret;
++
++		switch (ed->latency_type) {
++#if defined(CONFIG_INTERRUPT_OFF_HIST) || defined(CONFIG_PREEMPT_OFF_HIST)
++		case PREEMPTIRQSOFF_LATENCY:
++			ret = register_trace_preemptirqsoff_hist(
++			    probe_preemptirqsoff_hist, NULL);
++			if (ret) {
++				pr_info("wakeup trace: Couldn't assign "
++				    "probe_preemptirqsoff_hist "
++				    "to trace_preemptirqsoff_hist\n");
++				return ret;
++			}
++			break;
++#endif
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++		case WAKEUP_LATENCY:
++			ret = register_trace_sched_wakeup(
++			    probe_wakeup_latency_hist_start, NULL);
++			if (ret) {
++				pr_info("wakeup trace: Couldn't assign "
++				    "probe_wakeup_latency_hist_start "
++				    "to trace_sched_wakeup\n");
++				return ret;
++			}
++			ret = register_trace_sched_wakeup_new(
++			    probe_wakeup_latency_hist_start, NULL);
++			if (ret) {
++				pr_info("wakeup trace: Couldn't assign "
++				    "probe_wakeup_latency_hist_start "
++				    "to trace_sched_wakeup_new\n");
++				unregister_trace_sched_wakeup(
++				    probe_wakeup_latency_hist_start, NULL);
++				return ret;
++			}
++			ret = register_trace_sched_switch(
++			    probe_wakeup_latency_hist_stop, NULL);
++			if (ret) {
++				pr_info("wakeup trace: Couldn't assign "
++				    "probe_wakeup_latency_hist_stop "
++				    "to trace_sched_switch\n");
++				unregister_trace_sched_wakeup(
++				    probe_wakeup_latency_hist_start, NULL);
++				unregister_trace_sched_wakeup_new(
++				    probe_wakeup_latency_hist_start, NULL);
++				return ret;
++			}
++			ret = register_trace_sched_migrate_task(
++			    probe_sched_migrate_task, NULL);
++			if (ret) {
++				pr_info("wakeup trace: Couldn't assign "
++				    "probe_sched_migrate_task "
++				    "to trace_sched_migrate_task\n");
++				unregister_trace_sched_wakeup(
++				    probe_wakeup_latency_hist_start, NULL);
++				unregister_trace_sched_wakeup_new(
++				    probe_wakeup_latency_hist_start, NULL);
++				unregister_trace_sched_switch(
++				    probe_wakeup_latency_hist_stop, NULL);
++				return ret;
++			}
++			break;
++#endif
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++		case MISSED_TIMER_OFFSETS:
++			ret = register_trace_hrtimer_interrupt(
++			    probe_hrtimer_interrupt, NULL);
++			if (ret) {
++				pr_info("wakeup trace: Couldn't assign "
++				    "probe_hrtimer_interrupt "
++				    "to trace_hrtimer_interrupt\n");
++				return ret;
++			}
++			break;
++#endif
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) && \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++		case TIMERANDWAKEUP_LATENCY:
++			if (!wakeup_latency_enabled_data.enabled ||
++			    !missed_timer_offsets_enabled_data.enabled)
++				return -EINVAL;
++			break;
++#endif
++		default:
++			break;
++		}
++	} else {
++		switch (ed->latency_type) {
++#if defined(CONFIG_INTERRUPT_OFF_HIST) || defined(CONFIG_PREEMPT_OFF_HIST)
++		case PREEMPTIRQSOFF_LATENCY:
++			{
++				int cpu;
++
++				unregister_trace_preemptirqsoff_hist(
++				    probe_preemptirqsoff_hist, NULL);
++				for_each_online_cpu(cpu) {
++#ifdef CONFIG_INTERRUPT_OFF_HIST
++					per_cpu(hist_irqsoff_counting,
++					    cpu) = 0;
++#endif
++#ifdef CONFIG_PREEMPT_OFF_HIST
++					per_cpu(hist_preemptoff_counting,
++					    cpu) = 0;
++#endif
++#if defined(CONFIG_INTERRUPT_OFF_HIST) && defined(CONFIG_PREEMPT_OFF_HIST)
++					per_cpu(hist_preemptirqsoff_counting,
++					    cpu) = 0;
++#endif
++				}
++			}
++			break;
++#endif
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++		case WAKEUP_LATENCY:
++			{
++				int cpu;
++
++				unregister_trace_sched_wakeup(
++				    probe_wakeup_latency_hist_start, NULL);
++				unregister_trace_sched_wakeup_new(
++				    probe_wakeup_latency_hist_start, NULL);
++				unregister_trace_sched_switch(
++				    probe_wakeup_latency_hist_stop, NULL);
++				unregister_trace_sched_migrate_task(
++				    probe_sched_migrate_task, NULL);
++
++				for_each_online_cpu(cpu) {
++					per_cpu(wakeup_task, cpu) = NULL;
++					per_cpu(wakeup_sharedprio, cpu) = 0;
++				}
++			}
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++			timerandwakeup_enabled_data.enabled = 0;
++#endif
++			break;
++#endif
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++		case MISSED_TIMER_OFFSETS:
++			unregister_trace_hrtimer_interrupt(
++			    probe_hrtimer_interrupt, NULL);
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++			timerandwakeup_enabled_data.enabled = 0;
++#endif
++			break;
++#endif
++		default:
++			break;
++		}
++	}
++	ed->enabled = enable;
++	return cnt;
++}
++
++static const struct file_operations latency_hist_reset_fops = {
++	.open = tracing_open_generic,
++	.write = latency_hist_reset,
++};
++
++static const struct file_operations enable_fops = {
++	.open = tracing_open_generic,
++	.read = show_enable,
++	.write = do_enable,
++};
++
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++static const struct file_operations pid_fops = {
++	.open = tracing_open_generic,
++	.read = show_pid,
++	.write = do_pid,
++};
++
++static const struct file_operations maxlatproc_fops = {
++	.open = tracing_open_generic,
++	.read = show_maxlatproc,
++};
++#endif
++
++#if defined(CONFIG_INTERRUPT_OFF_HIST) || defined(CONFIG_PREEMPT_OFF_HIST)
++static notrace void probe_preemptirqsoff_hist(void *v, int reason,
++	int starthist)
++{
++	int cpu = raw_smp_processor_id();
++	int time_set = 0;
++
++	if (starthist) {
++		cycle_t uninitialized_var(start);
++
++		if (!preempt_count() && !irqs_disabled())
++			return;
++
++#ifdef CONFIG_INTERRUPT_OFF_HIST
++		if ((reason == IRQS_OFF || reason == TRACE_START) &&
++		    !per_cpu(hist_irqsoff_counting, cpu)) {
++			per_cpu(hist_irqsoff_counting, cpu) = 1;
++			start = ftrace_now(cpu);
++			time_set++;
++			per_cpu(hist_irqsoff_start, cpu) = start;
++		}
++#endif
++
++#ifdef CONFIG_PREEMPT_OFF_HIST
++		if ((reason == PREEMPT_OFF || reason == TRACE_START) &&
++		    !per_cpu(hist_preemptoff_counting, cpu)) {
++			per_cpu(hist_preemptoff_counting, cpu) = 1;
++			if (!(time_set++))
++				start = ftrace_now(cpu);
++			per_cpu(hist_preemptoff_start, cpu) = start;
++		}
++#endif
++
++#if defined(CONFIG_INTERRUPT_OFF_HIST) && defined(CONFIG_PREEMPT_OFF_HIST)
++		if (per_cpu(hist_irqsoff_counting, cpu) &&
++		    per_cpu(hist_preemptoff_counting, cpu) &&
++		    !per_cpu(hist_preemptirqsoff_counting, cpu)) {
++			per_cpu(hist_preemptirqsoff_counting, cpu) = 1;
++			if (!time_set)
++				start = ftrace_now(cpu);
++			per_cpu(hist_preemptirqsoff_start, cpu) = start;
++		}
++#endif
++	} else {
++		cycle_t uninitialized_var(stop);
++
++#ifdef CONFIG_INTERRUPT_OFF_HIST
++		if ((reason == IRQS_ON || reason == TRACE_STOP) &&
++		    per_cpu(hist_irqsoff_counting, cpu)) {
++			cycle_t start = per_cpu(hist_irqsoff_start, cpu);
++
++			stop = ftrace_now(cpu);
++			time_set++;
++			if (start) {
++				long latency = ((long) (stop - start)) /
++				    NSECS_PER_USECS;
++
++				latency_hist(IRQSOFF_LATENCY, cpu, latency, 0,
++				    stop, NULL);
++			}
++			per_cpu(hist_irqsoff_counting, cpu) = 0;
++		}
++#endif
++
++#ifdef CONFIG_PREEMPT_OFF_HIST
++		if ((reason == PREEMPT_ON || reason == TRACE_STOP) &&
++		    per_cpu(hist_preemptoff_counting, cpu)) {
++			cycle_t start = per_cpu(hist_preemptoff_start, cpu);
++
++			if (!(time_set++))
++				stop = ftrace_now(cpu);
++			if (start) {
++				long latency = ((long) (stop - start)) /
++				    NSECS_PER_USECS;
++
++				latency_hist(PREEMPTOFF_LATENCY, cpu, latency,
++				    0, stop, NULL);
++			}
++			per_cpu(hist_preemptoff_counting, cpu) = 0;
++		}
++#endif
++
++#if defined(CONFIG_INTERRUPT_OFF_HIST) && defined(CONFIG_PREEMPT_OFF_HIST)
++		if ((!per_cpu(hist_irqsoff_counting, cpu) ||
++		     !per_cpu(hist_preemptoff_counting, cpu)) &&
++		   per_cpu(hist_preemptirqsoff_counting, cpu)) {
++			cycle_t start = per_cpu(hist_preemptirqsoff_start, cpu);
++
++			if (!time_set)
++				stop = ftrace_now(cpu);
++			if (start) {
++				long latency = ((long) (stop - start)) /
++				    NSECS_PER_USECS;
++
++				latency_hist(PREEMPTIRQSOFF_LATENCY, cpu,
++				    latency, 0, stop, NULL);
++			}
++			per_cpu(hist_preemptirqsoff_counting, cpu) = 0;
++		}
++#endif
++	}
++}
++#endif
++
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++static DEFINE_RAW_SPINLOCK(wakeup_lock);
++static notrace void probe_sched_migrate_task(void *v, struct task_struct *task,
++	int cpu)
++{
++	int old_cpu = task_cpu(task);
++
++	if (cpu != old_cpu) {
++		unsigned long flags;
++		struct task_struct *cpu_wakeup_task;
++
++		raw_spin_lock_irqsave(&wakeup_lock, flags);
++
++		cpu_wakeup_task = per_cpu(wakeup_task, old_cpu);
++		if (task == cpu_wakeup_task) {
++			put_task_struct(cpu_wakeup_task);
++			per_cpu(wakeup_task, old_cpu) = NULL;
++			cpu_wakeup_task = per_cpu(wakeup_task, cpu) = task;
++			get_task_struct(cpu_wakeup_task);
++		}
++
++		raw_spin_unlock_irqrestore(&wakeup_lock, flags);
++	}
++}
++
++static notrace void probe_wakeup_latency_hist_start(void *v,
++	struct task_struct *p)
++{
++	unsigned long flags;
++	struct task_struct *curr = current;
++	int cpu = task_cpu(p);
++	struct task_struct *cpu_wakeup_task;
++
++	raw_spin_lock_irqsave(&wakeup_lock, flags);
++
++	cpu_wakeup_task = per_cpu(wakeup_task, cpu);
++
++	if (wakeup_pid) {
++		if ((cpu_wakeup_task && p->prio == cpu_wakeup_task->prio) ||
++		    p->prio == curr->prio)
++			per_cpu(wakeup_sharedprio, cpu) = 1;
++		if (likely(wakeup_pid != task_pid_nr(p)))
++			goto out;
++	} else {
++		if (likely(!rt_task(p)) ||
++		    (cpu_wakeup_task && p->prio > cpu_wakeup_task->prio) ||
++		    p->prio > curr->prio)
++			goto out;
++		if ((cpu_wakeup_task && p->prio == cpu_wakeup_task->prio) ||
++		    p->prio == curr->prio)
++			per_cpu(wakeup_sharedprio, cpu) = 1;
++	}
++
++	if (cpu_wakeup_task)
++		put_task_struct(cpu_wakeup_task);
++	cpu_wakeup_task = per_cpu(wakeup_task, cpu) = p;
++	get_task_struct(cpu_wakeup_task);
++	cpu_wakeup_task->preempt_timestamp_hist =
++		ftrace_now(raw_smp_processor_id());
++out:
++	raw_spin_unlock_irqrestore(&wakeup_lock, flags);
++}
++
++static notrace void probe_wakeup_latency_hist_stop(void *v,
++	bool preempt, struct task_struct *prev, struct task_struct *next)
++{
++	unsigned long flags;
++	int cpu = task_cpu(next);
++	long latency;
++	cycle_t stop;
++	struct task_struct *cpu_wakeup_task;
++
++	raw_spin_lock_irqsave(&wakeup_lock, flags);
++
++	cpu_wakeup_task = per_cpu(wakeup_task, cpu);
++
++	if (cpu_wakeup_task == NULL)
++		goto out;
++
++	/* Already running? */
++	if (unlikely(current == cpu_wakeup_task))
++		goto out_reset;
++
++	if (next != cpu_wakeup_task) {
++		if (next->prio < cpu_wakeup_task->prio)
++			goto out_reset;
++
++		if (next->prio == cpu_wakeup_task->prio)
++			per_cpu(wakeup_sharedprio, cpu) = 1;
++
++		goto out;
++	}
++
++	if (current->prio == cpu_wakeup_task->prio)
++		per_cpu(wakeup_sharedprio, cpu) = 1;
++
++	/*
++	 * The task we are waiting for is about to be switched to.
++	 * Calculate latency and store it in histogram.
++	 */
++	stop = ftrace_now(raw_smp_processor_id());
++
++	latency = ((long) (stop - next->preempt_timestamp_hist)) /
++	    NSECS_PER_USECS;
++
++	if (per_cpu(wakeup_sharedprio, cpu)) {
++		latency_hist(WAKEUP_LATENCY_SHAREDPRIO, cpu, latency, 0, stop,
++		    next);
++		per_cpu(wakeup_sharedprio, cpu) = 0;
++	} else {
++		latency_hist(WAKEUP_LATENCY, cpu, latency, 0, stop, next);
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++		if (timerandwakeup_enabled_data.enabled) {
++			latency_hist(TIMERANDWAKEUP_LATENCY, cpu,
++			    next->timer_offset + latency, next->timer_offset,
++			    stop, next);
++		}
++#endif
++	}
++
++out_reset:
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++	next->timer_offset = 0;
++#endif
++	put_task_struct(cpu_wakeup_task);
++	per_cpu(wakeup_task, cpu) = NULL;
++out:
++	raw_spin_unlock_irqrestore(&wakeup_lock, flags);
++}
++#endif
++
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++static notrace void probe_hrtimer_interrupt(void *v, int cpu,
++	long long latency_ns, struct task_struct *curr,
++	struct task_struct *task)
++{
++	if (latency_ns <= 0 && task != NULL && rt_task(task) &&
++	    (task->prio < curr->prio ||
++	    (task->prio == curr->prio &&
++	    !cpumask_test_cpu(cpu, &task->cpus_allowed)))) {
++		long latency;
++		cycle_t now;
++
++		if (missed_timer_offsets_pid) {
++			if (likely(missed_timer_offsets_pid !=
++			    task_pid_nr(task)))
++				return;
++		}
++
++		now = ftrace_now(cpu);
++		latency = (long) div_s64(-latency_ns, NSECS_PER_USECS);
++		latency_hist(MISSED_TIMER_OFFSETS, cpu, latency, latency, now,
++		    task);
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++		task->timer_offset = latency;
++#endif
++	}
++}
++#endif
++
++static __init int latency_hist_init(void)
++{
++	struct dentry *latency_hist_root = NULL;
++	struct dentry *dentry;
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++	struct dentry *dentry_sharedprio;
++#endif
++	struct dentry *entry;
++	struct dentry *enable_root;
++	int i = 0;
++	struct hist_data *my_hist;
++	char name[64];
++	char *cpufmt = "CPU%d";
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) || \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++	char *cpufmt_maxlatproc = "max_latency-CPU%d";
++	struct maxlatproc_data *mp = NULL;
++#endif
++
++	dentry = tracing_init_dentry();
++	latency_hist_root = debugfs_create_dir(latency_hist_dir_root, dentry);
++	enable_root = debugfs_create_dir("enable", latency_hist_root);
++
++#ifdef CONFIG_INTERRUPT_OFF_HIST
++	dentry = debugfs_create_dir(irqsoff_hist_dir, latency_hist_root);
++	for_each_possible_cpu(i) {
++		sprintf(name, cpufmt, i);
++		entry = debugfs_create_file(name, 0444, dentry,
++		    &per_cpu(irqsoff_hist, i), &latency_hist_fops);
++		my_hist = &per_cpu(irqsoff_hist, i);
++		atomic_set(&my_hist->hist_mode, 1);
++		my_hist->min_lat = LONG_MAX;
++	}
++	entry = debugfs_create_file("reset", 0644, dentry,
++	    (void *)IRQSOFF_LATENCY, &latency_hist_reset_fops);
++#endif
++
++#ifdef CONFIG_PREEMPT_OFF_HIST
++	dentry = debugfs_create_dir(preemptoff_hist_dir,
++	    latency_hist_root);
++	for_each_possible_cpu(i) {
++		sprintf(name, cpufmt, i);
++		entry = debugfs_create_file(name, 0444, dentry,
++		    &per_cpu(preemptoff_hist, i), &latency_hist_fops);
++		my_hist = &per_cpu(preemptoff_hist, i);
++		atomic_set(&my_hist->hist_mode, 1);
++		my_hist->min_lat = LONG_MAX;
++	}
++	entry = debugfs_create_file("reset", 0644, dentry,
++	    (void *)PREEMPTOFF_LATENCY, &latency_hist_reset_fops);
++#endif
++
++#if defined(CONFIG_INTERRUPT_OFF_HIST) && defined(CONFIG_PREEMPT_OFF_HIST)
++	dentry = debugfs_create_dir(preemptirqsoff_hist_dir,
++	    latency_hist_root);
++	for_each_possible_cpu(i) {
++		sprintf(name, cpufmt, i);
++		entry = debugfs_create_file(name, 0444, dentry,
++		    &per_cpu(preemptirqsoff_hist, i), &latency_hist_fops);
++		my_hist = &per_cpu(preemptirqsoff_hist, i);
++		atomic_set(&my_hist->hist_mode, 1);
++		my_hist->min_lat = LONG_MAX;
++	}
++	entry = debugfs_create_file("reset", 0644, dentry,
++	    (void *)PREEMPTIRQSOFF_LATENCY, &latency_hist_reset_fops);
++#endif
++
++#if defined(CONFIG_INTERRUPT_OFF_HIST) || defined(CONFIG_PREEMPT_OFF_HIST)
++	entry = debugfs_create_file("preemptirqsoff", 0644,
++	    enable_root, (void *)&preemptirqsoff_enabled_data,
++	    &enable_fops);
++#endif
++
++#ifdef CONFIG_WAKEUP_LATENCY_HIST
++	dentry = debugfs_create_dir(wakeup_latency_hist_dir,
++	    latency_hist_root);
++	dentry_sharedprio = debugfs_create_dir(
++	    wakeup_latency_hist_dir_sharedprio, dentry);
++	for_each_possible_cpu(i) {
++		sprintf(name, cpufmt, i);
++
++		entry = debugfs_create_file(name, 0444, dentry,
++		    &per_cpu(wakeup_latency_hist, i),
++		    &latency_hist_fops);
++		my_hist = &per_cpu(wakeup_latency_hist, i);
++		atomic_set(&my_hist->hist_mode, 1);
++		my_hist->min_lat = LONG_MAX;
++
++		entry = debugfs_create_file(name, 0444, dentry_sharedprio,
++		    &per_cpu(wakeup_latency_hist_sharedprio, i),
++		    &latency_hist_fops);
++		my_hist = &per_cpu(wakeup_latency_hist_sharedprio, i);
++		atomic_set(&my_hist->hist_mode, 1);
++		my_hist->min_lat = LONG_MAX;
++
++		sprintf(name, cpufmt_maxlatproc, i);
++
++		mp = &per_cpu(wakeup_maxlatproc, i);
++		entry = debugfs_create_file(name, 0444, dentry, mp,
++		    &maxlatproc_fops);
++		clear_maxlatprocdata(mp);
++
++		mp = &per_cpu(wakeup_maxlatproc_sharedprio, i);
++		entry = debugfs_create_file(name, 0444, dentry_sharedprio, mp,
++		    &maxlatproc_fops);
++		clear_maxlatprocdata(mp);
++	}
++	entry = debugfs_create_file("pid", 0644, dentry,
++	    (void *)&wakeup_pid, &pid_fops);
++	entry = debugfs_create_file("reset", 0644, dentry,
++	    (void *)WAKEUP_LATENCY, &latency_hist_reset_fops);
++	entry = debugfs_create_file("reset", 0644, dentry_sharedprio,
++	    (void *)WAKEUP_LATENCY_SHAREDPRIO, &latency_hist_reset_fops);
++	entry = debugfs_create_file("wakeup", 0644,
++	    enable_root, (void *)&wakeup_latency_enabled_data,
++	    &enable_fops);
++#endif
++
++#ifdef CONFIG_MISSED_TIMER_OFFSETS_HIST
++	dentry = debugfs_create_dir(missed_timer_offsets_dir,
++	    latency_hist_root);
++	for_each_possible_cpu(i) {
++		sprintf(name, cpufmt, i);
++		entry = debugfs_create_file(name, 0444, dentry,
++		    &per_cpu(missed_timer_offsets, i), &latency_hist_fops);
++		my_hist = &per_cpu(missed_timer_offsets, i);
++		atomic_set(&my_hist->hist_mode, 1);
++		my_hist->min_lat = LONG_MAX;
++
++		sprintf(name, cpufmt_maxlatproc, i);
++		mp = &per_cpu(missed_timer_offsets_maxlatproc, i);
++		entry = debugfs_create_file(name, 0444, dentry, mp,
++		    &maxlatproc_fops);
++		clear_maxlatprocdata(mp);
++	}
++	entry = debugfs_create_file("pid", 0644, dentry,
++	    (void *)&missed_timer_offsets_pid, &pid_fops);
++	entry = debugfs_create_file("reset", 0644, dentry,
++	    (void *)MISSED_TIMER_OFFSETS, &latency_hist_reset_fops);
++	entry = debugfs_create_file("missed_timer_offsets", 0644,
++	    enable_root, (void *)&missed_timer_offsets_enabled_data,
++	    &enable_fops);
++#endif
++
++#if defined(CONFIG_WAKEUP_LATENCY_HIST) && \
++	defined(CONFIG_MISSED_TIMER_OFFSETS_HIST)
++	dentry = debugfs_create_dir(timerandwakeup_latency_hist_dir,
++	    latency_hist_root);
++	for_each_possible_cpu(i) {
++		sprintf(name, cpufmt, i);
++		entry = debugfs_create_file(name, 0444, dentry,
++		    &per_cpu(timerandwakeup_latency_hist, i),
++		    &latency_hist_fops);
++		my_hist = &per_cpu(timerandwakeup_latency_hist, i);
++		atomic_set(&my_hist->hist_mode, 1);
++		my_hist->min_lat = LONG_MAX;
++
++		sprintf(name, cpufmt_maxlatproc, i);
++		mp = &per_cpu(timerandwakeup_maxlatproc, i);
++		entry = debugfs_create_file(name, 0444, dentry, mp,
++		    &maxlatproc_fops);
++		clear_maxlatprocdata(mp);
++	}
++	entry = debugfs_create_file("reset", 0644, dentry,
++	    (void *)TIMERANDWAKEUP_LATENCY, &latency_hist_reset_fops);
++	entry = debugfs_create_file("timerandwakeup", 0644,
++	    enable_root, (void *)&timerandwakeup_enabled_data,
++	    &enable_fops);
++#endif
++	return 0;
++}
++
++device_initcall(latency_hist_init);
 diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
 index 059233a..cad1a28 100644
 --- a/kernel/trace/trace.c
@@ -24615,6 +29483,13 @@ index 1afec32..11fa431 100644
  
  	print_symbol("caller is %s\n", (long)__builtin_return_address(0));
  	dump_stack();
+diff --git a/localversion-rt b/localversion-rt
+new file mode 100644
+index 0000000..40d81d8
+--- /dev/null
++++ b/localversion-rt
+@@ -0,0 +1 @@
++-rt62
 diff --git a/mm/Kconfig b/mm/Kconfig
 index 97a4e06..9614351 100644
 --- a/mm/Kconfig
