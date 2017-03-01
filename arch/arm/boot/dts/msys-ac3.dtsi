@@ -21,5 +21,10 @@
 				compatible = "marvell,ac3-pinctrl";
 			};
 		};
+		prestera {
+			pinctrl-names = "default";
+			pinctrl-0 = <&pp_pin>;
+			interrupts = <33>;
+		};
 	};
 };
