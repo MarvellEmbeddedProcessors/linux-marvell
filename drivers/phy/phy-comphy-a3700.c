@@ -138,6 +138,13 @@ static int mvebu_a3700_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 	/* Configure phy selector for SATA */
 	mvebu_a3700_comphy_set_phy_selector(priv, comphy);
 
+	/* Clear phy isolation mode to make it work in normal mode */
+	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
+				      COMPHY_ISOLATION_CTRL_REG + SATAPHY_LANE2_REG_BASE_OFFSET,
+				      0,
+				      PHY_ISOLATE_MODE,
+				      mode);
+
 	/*
 	 * 0. Check the Polarity invert bits
 	 */
@@ -215,6 +222,50 @@ static int mvebu_a3700_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
 	return ret;
+}
+
+static int mvebu_a3700_comphy_sata_power_off(struct mvebu_comphy_priv *priv,
+							     struct mvebu_comphy *comphy)
+{
+	void __iomem *comphy_indir_regs;
+	struct resource *res;
+	struct platform_device *pdev = container_of(priv->dev, struct platform_device, dev);
+	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+
+	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	/* Get the indirect access register resource and map */
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "indirect");
+	if (res) {
+		comphy_indir_regs = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(comphy_indir_regs))
+			return PTR_ERR(comphy_indir_regs);
+	} else {
+		dev_err(priv->dev, "no inirect register resource\n");
+		return -ENOTSUPP;
+	}
+
+	/* Set phy isolation mode */
+	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
+				      COMPHY_ISOLATION_CTRL_REG + SATAPHY_LANE2_REG_BASE_OFFSET,
+				      PHY_ISOLATE_MODE,
+				      PHY_ISOLATE_MODE,
+				      mode);
+
+	/* Power off PLL, Tx, Rx */
+	mvebu_comphy_reg_set_indirect(comphy_indir_regs,
+				      COMPHY_POWER_PLL_CTRL + SATAPHY_LANE2_REG_BASE_OFFSET,
+				      0,
+				      PU_PLL_BIT | PU_RX_BIT | PU_TX_BIT,
+				      mode);
+
+	/* Unmap resource */
+	devm_iounmap(&pdev->dev, comphy_indir_regs);
+	devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
+
+	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+
+	return 0;
 }
 
 static int mvebu_a3700_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
@@ -799,18 +850,30 @@ static int mvebu_a3700_comphy_power_off(struct phy *phy)
 {
 	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
 	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
+	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+	int err = 0;
 
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
 	spin_lock(&priv->lock);
 
-	dev_dbg(priv->dev, "power off is not implemented\n");
+	switch (mode) {
+	case (COMPHY_SATA_MODE):
+		err = mvebu_a3700_comphy_sata_power_off(priv, comphy);
+		break;
+
+	default:
+		dev_err(priv->dev, "comphy%d: unsupported comphy mode\n",
+			comphy->index);
+		err = -EINVAL;
+		break;
+	}
 
 	spin_unlock(&priv->lock);
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
-	return 0;
+	return err;
 }
 
 static int mvebu_a3700_comphy_sata_is_pll_locked(struct phy *phy)
