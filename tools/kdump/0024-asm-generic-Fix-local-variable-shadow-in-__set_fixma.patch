@@ -1,0 +1,55 @@
+From 316b66b091c9f0f3041f063d48ae9364f44d72da Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Mon, 25 Jan 2016 11:44:55 +0000
+Subject: [PATCH 024/123] asm-generic: Fix local variable shadow in
+ __set_fixmap_offset
+
+Currently __set_fixmap_offset is a macro function which has a local
+variable called 'addr'. If a caller passes a 'phys' parameter which is
+derived from a variable also called 'addr', the local variable will
+shadow this, and the compiler will complain about the use of an
+uninitialized variable. To avoid the issue with namespace clashes,
+'addr' is prefixed with a liberal sprinkling of underscores.
+
+Turning __set_fixmap_offset into a static inline breaks the build for
+several architectures. Fixing this properly requires updates to a number
+of architectures to make them agree on the prototype of __set_fixmap (it
+could be done as a subsequent patch series).
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+[catalin.marinas@arm.com: squashed the original function patch and macro fixup]
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+
+(cherry picked from commit 3694bd76781b76c4f8d2ecd85018feeb1609f0e5)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ include/asm-generic/fixmap.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/include/asm-generic/fixmap.h b/include/asm-generic/fixmap.h
+index 1cbb833..827e4d3 100644
+--- a/include/asm-generic/fixmap.h
++++ b/include/asm-generic/fixmap.h
+@@ -70,12 +70,12 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
+ #endif
+ 
+ /* Return a pointer with offset calculated */
+-#define __set_fixmap_offset(idx, phys, flags)		      \
+-({							      \
+-	unsigned long addr;				      \
+-	__set_fixmap(idx, phys, flags);			      \
+-	addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1)); \
+-	addr;						      \
++#define __set_fixmap_offset(idx, phys, flags)				\
++({									\
++	unsigned long ________addr;					\
++	__set_fixmap(idx, phys, flags);					\
++	________addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1));	\
++	________addr;							\
+ })
+ 
+ #define set_fixmap_offset(idx, phys) \
+-- 
+1.8.3.1
+

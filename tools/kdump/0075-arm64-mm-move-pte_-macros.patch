@@ -1,0 +1,73 @@
+From 1fd7e60179496bb6c1dde16dc0f78a817b91d0d4 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Mon, 25 Jan 2016 11:45:03 +0000
+Subject: [PATCH 075/123] arm64: mm: move pte_* macros
+
+For pmd, pud, and pgd levels of table, functions including p?d_index and
+p?d_offset are defined after the p?d_page_vaddr function for the
+immediately higher level of table.
+
+The pte functions however are defined much earlier, even though several
+rely on the later definition of pmd_page_vaddr. While this isn't
+currently a problem as these are macros, it prevents the logical
+grouping of later C functions (which cannot rely on prototypes for
+functions not yet defined).
+
+Move these definitions after pmd_page_vaddr, for consistency with the
+placement of these functions for other levels of table.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit 053520f7d3923cc6d37afb28f9887cb1e7d77454)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/include/asm/pgtable.h | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index a11053a..0dba915 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -136,16 +136,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
+ #define pte_clear(mm,addr,ptep)	set_pte(ptep, __pte(0))
+ #define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
+ 
+-/* Find an entry in the third-level page table. */
+-#define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+-
+-#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
+-
+-#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
+-#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
+-#define pte_unmap(pte)			do { } while (0)
+-#define pte_unmap_nested(pte)		do { } while (0)
+-
+ /*
+  * The following only work if pte_present(). Undefined behaviour otherwise.
+  */
+@@ -430,6 +420,16 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
+ }
+ 
++/* Find an entry in the third-level page table. */
++#define pte_index(addr)		(((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
++
++#define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + pte_index(addr))
++
++#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
++#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
++#define pte_unmap(pte)			do { } while (0)
++#define pte_unmap_nested(pte)		do { } while (0)
++
+ #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 
+ /*
+-- 
+1.8.3.1
+

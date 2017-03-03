@@ -1,0 +1,89 @@
+From 2c9ec1754e50a1f8131dd8f37cb12fbc6f6859a6 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Mon, 25 Jan 2016 11:45:09 +0000
+Subject: [PATCH 084/123] arm64: mm: allocate pagetables anywhere
+
+Now that create_mapping uses fixmap slots to modify pte, pmd, and pud
+entries, we can access page tables anywhere in physical memory,
+regardless of the extent of the linear mapping.
+
+Given that, we no longer need to limit memblock allocations during page
+table creation, and can leave the limit as its default
+MEMBLOCK_ALLOC_ANYWHERE.
+
+We never add memory which will fall outside of the linear map range
+given phys_offset and MAX_MEMBLOCK_ADDR are configured appropriately, so
+any tables we create will fall in the linear map of the final tables.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit cdef5f6e9e0e5ee397759b664a9f875ff59ccf01)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 35 -----------------------------------
+ 1 file changed, 35 deletions(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 36203c2..dc6665f 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -376,20 +376,6 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+ static void __init map_mem(void)
+ {
+ 	struct memblock_region *reg;
+-	phys_addr_t limit;
+-
+-	/*
+-	 * Temporarily limit the memblock range. We need to do this as
+-	 * create_mapping requires puds, pmds and ptes to be allocated from
+-	 * memory addressable from the initial direct kernel mapping.
+-	 *
+-	 * The initial direct kernel mapping, located at swapper_pg_dir, gives
+-	 * us PUD_SIZE (with SECTION maps) or PMD_SIZE (without SECTION maps,
+-	 * memory starting from PHYS_OFFSET (which must be aligned to 2MB as
+-	 * per Documentation/arm64/booting.txt).
+-	 */
+-	limit = PHYS_OFFSET + SWAPPER_INIT_MAP_SIZE;
+-	memblock_set_current_limit(limit);
+ 
+ 	/* map all the memory banks */
+ 	for_each_memblock(memory, reg) {
+@@ -399,29 +385,8 @@ static void __init map_mem(void)
+ 		if (start >= end)
+ 			break;
+ 
+-		if (ARM64_SWAPPER_USES_SECTION_MAPS) {
+-			/*
+-			 * For the first memory bank align the start address and
+-			 * current memblock limit to prevent create_mapping() from
+-			 * allocating pte page tables from unmapped memory. With
+-			 * the section maps, if the first block doesn't end on section
+-			 * size boundary, create_mapping() will try to allocate a pte
+-			 * page, which may be returned from an unmapped area.
+-			 * When section maps are not used, the pte page table for the
+-			 * current limit is already present in swapper_pg_dir.
+-			 */
+-			if (start < limit)
+-				start = ALIGN(start, SECTION_SIZE);
+-			if (end < limit) {
+-				limit = end & SECTION_MASK;
+-				memblock_set_current_limit(limit);
+-			}
+-		}
+ 		__map_memblock(start, end);
+ 	}
+-
+-	/* Limit no longer required. */
+-	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
+ }
+ 
+ static void __init fixup_executable(void)
+-- 
+1.8.3.1
+

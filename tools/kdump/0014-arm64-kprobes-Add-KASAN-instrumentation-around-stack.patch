@@ -1,0 +1,74 @@
+From 66bd115d97975967a9006eccd41b5eb5fcb8951b Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Thu, 21 Jul 2016 10:54:54 +0100
+Subject: [PATCH 014/123] arm64: kprobes: Add KASAN instrumentation around
+ stack accesses
+
+commit f7e35c5ba4322838ce84b23a2f1a6d6b7f0b57ec upstream.
+
+This patch disables KASAN around the memcpy from/to the kernel or IRQ
+stacks to avoid warnings like below:
+
+BUG: KASAN: stack-out-of-bounds in setjmp_pre_handler+0xe4/0x170 at addr ffff800935cbbbc0
+Read of size 128 by task swapper/0/1
+page:ffff7e0024d72ec0 count:0 mapcount:0 mapping:          (null) index:0x0
+flags: 0x1000000000000000()
+page dumped because: kasan: bad access detected
+CPU: 4 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc4+ #1
+Hardware name: ARM Juno development board (r0) (DT)
+Call trace:
+[<ffff20000808ad88>] dump_backtrace+0x0/0x280
+[<ffff20000808b01c>] show_stack+0x14/0x20
+[<ffff200008563a64>] dump_stack+0xa4/0xc8
+[<ffff20000824a1fc>] kasan_report_error+0x4fc/0x528
+[<ffff20000824a5e8>] kasan_report+0x40/0x48
+[<ffff20000824948c>] check_memory_region+0x144/0x1a0
+[<ffff200008249814>] memcpy+0x34/0x68
+[<ffff200008c3ee2c>] setjmp_pre_handler+0xe4/0x170
+[<ffff200008c3ec5c>] kprobe_breakpoint_handler+0xec/0x1d8
+[<ffff2000080853a4>] brk_handler+0x5c/0xa0
+[<ffff2000080813f0>] do_debug_exception+0xa0/0x138
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ arch/arm64/kernel/probes/kprobes.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index 2354554..6487b62 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -16,6 +16,7 @@
+  * General Public License for more details.
+  *
+  */
++#include <linux/kasan.h>
+ #include <linux/kernel.h>
+ #include <linux/kprobes.h>
+ #include <linux/module.h>
+@@ -495,8 +496,10 @@ int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
+ 	 * we also save and restore enough stack bytes to cover
+ 	 * the argument area.
+ 	 */
++	kasan_disable_current();
+ 	memcpy(kcb->jprobes_stack, (void *)stack_ptr,
+ 	       min_stack_size(stack_ptr));
++	kasan_enable_current();
+ 
+ 	instruction_pointer_set(regs, (unsigned long) jp->entry);
+ 	preempt_disable();
+@@ -548,8 +551,10 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 	}
+ 	unpause_graph_tracing();
+ 	*regs = kcb->jprobe_saved_regs;
++	kasan_disable_current();
+ 	memcpy((void *)stack_addr, kcb->jprobes_stack,
+ 	       min_stack_size(stack_addr));
++	kasan_enable_current();
+ 	preempt_enable_no_resched();
+ 	return 1;
+ }
+-- 
+1.8.3.1
+

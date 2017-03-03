@@ -1,0 +1,27 @@
+From 6c210c24ec5d823f8db4c663248d14096a275efc Mon Sep 17 00:00:00 2001
+From: Geoff Levand <geoff@infradead.org>
+Date: Thu, 23 Jun 2016 17:54:48 +0000
+Subject: [PATCH 110/123] arm64/kexec: Enable kexec in the arm64 defconfig
+
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit b26a4ae39963faf6f9014f6ff72e3661c83753ce)
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6fddf58..c1d4dec 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -60,6 +60,7 @@ CONFIG_KSM=y
+ CONFIG_TRANSPARENT_HUGEPAGE=y
+ CONFIG_CMA=y
+ CONFIG_CMDLINE="console=ttyAMA0"
++CONFIG_KEXEC=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ CONFIG_COMPAT=y
+ CONFIG_CPU_IDLE=y
+-- 
+1.8.3.1
+

@@ -1,0 +1,461 @@
+From f7c5e57e8f87ea9911556b1ed8a0567a82a475c0 Mon Sep 17 00:00:00 2001
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Date: Wed, 27 Apr 2016 17:47:05 +0100
+Subject: [PATCH 100/123] arm64: kvm: allows kvm cpu hotplug
+
+The current kvm implementation on arm64 does cpu-specific initialization
+at system boot, and has no way to gracefully shutdown a core in terms of
+kvm. This prevents kexec from rebooting the system at EL2.
+
+This patch adds a cpu tear-down function and also puts an existing cpu-init
+code into a separate function, kvm_arch_hardware_disable() and
+kvm_arch_hardware_enable() respectively.
+We don't need the arm64 specific cpu hotplug hook any more.
+
+Since this patch modifies common code between arm and arm64, one stub
+definition, __cpu_reset_hyp_mode(), is added on arm side to avoid
+compilation errors.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+[Rebase, added separate VHE init/exit path, changed resets use of
+ kvm_call_hyp() to the __version, en/disabled hardware in init_subsystems(),
+ added icache maintenance to __kvm_hyp_reset() and removed lr restore, removed
+ guest-enter after teardown handling]
+Signed-off-by: James Morse <james.morse@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+(cherry picked from commit 67f6919766620e7ea7aab11a6a3470dc7b451359)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Conflicts:
+	arch/arm64/include/asm/kvm_host.h
+---
+ arch/arm/include/asm/kvm_host.h   |  10 +++-
+ arch/arm/include/asm/kvm_mmu.h    |   1 +
+ arch/arm/kvm/arm.c                | 119 +++++++++++++++++++++++---------------
+ arch/arm/kvm/mmu.c                |   5 ++
+ arch/arm64/include/asm/kvm_asm.h  |   1 +
+ arch/arm64/include/asm/kvm_host.h |  13 ++++-
+ arch/arm64/include/asm/kvm_mmu.h  |   1 +
+ arch/arm64/kvm/hyp-init.S         |  38 ++++++++++++
+ arch/arm64/kvm/reset.c            |  14 +++++
+ 9 files changed, 152 insertions(+), 50 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 945bfa5..bedaf65 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -218,6 +218,15 @@ static inline void __cpu_init_stage2(void)
+ {
+ }
+ 
++static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
++					phys_addr_t phys_idmap_start)
++{
++	/*
++	 * TODO
++	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
++	 */
++}
++
+ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+ {
+ 	return 0;
+@@ -230,7 +239,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ 
+ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+ 
+-static inline void kvm_arch_hardware_disable(void) {}
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 9203c21..c7ba9a4 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+ phys_addr_t kvm_mmu_get_httbr(void);
+ phys_addr_t kvm_mmu_get_boot_httbr(void);
+ phys_addr_t kvm_get_idmap_vector(void);
++phys_addr_t kvm_get_idmap_start(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
+ 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 99b2703..4cddf20 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -16,7 +16,6 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
+ 
+-#include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+@@ -65,6 +64,8 @@ static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
+ static bool vgic_present;
+ 
++static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
++
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+ {
+ 	BUG_ON(preemptible());
+@@ -89,11 +90,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
+ 	return &kvm_arm_running_vcpu;
+ }
+ 
+-int kvm_arch_hardware_enable(void)
+-{
+-	return 0;
+-}
+-
+ int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
+ {
+ 	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
+@@ -964,11 +960,6 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 	}
+ }
+ 
+-static void cpu_init_stage2(void *dummy)
+-{
+-	__cpu_init_stage2();
+-}
+-
+ static void cpu_init_hyp_mode(void *dummy)
+ {
+ 	phys_addr_t boot_pgd_ptr;
+@@ -996,43 +987,87 @@ static void cpu_hyp_reinit(void)
+ {
+ 	if (is_kernel_in_hyp_mode()) {
+ 		/*
+-		 * cpu_init_stage2() is safe to call even if the PM
++		 * __cpu_init_stage2() is safe to call even if the PM
+ 		 * event was cancelled before the CPU was reset.
+ 		 */
+-		cpu_init_stage2(NULL);
++		__cpu_init_stage2();
+ 	} else {
+ 		if (__hyp_get_vectors() == hyp_default_vectors)
+ 			cpu_init_hyp_mode(NULL);
+ 	}
+ }
+ 
+-static int hyp_init_cpu_notify(struct notifier_block *self,
+-			       unsigned long action, void *cpu)
++static void cpu_hyp_reset(void)
++{
++	phys_addr_t boot_pgd_ptr;
++	phys_addr_t phys_idmap_start;
++
++	if (!is_kernel_in_hyp_mode()) {
++		boot_pgd_ptr = kvm_mmu_get_boot_httbr();
++		phys_idmap_start = kvm_get_idmap_start();
++
++		__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
++	}
++}
++
++static void _kvm_arch_hardware_enable(void *discard)
+ {
+-	switch (action) {
+-	case CPU_STARTING:
+-	case CPU_STARTING_FROZEN:
++	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
+ 		cpu_hyp_reinit();
++		__this_cpu_write(kvm_arm_hardware_enabled, 1);
+ 	}
++}
++
++int kvm_arch_hardware_enable(void)
++{
++	_kvm_arch_hardware_enable(NULL);
++	return 0;
++}
+ 
+-	return NOTIFY_OK;
++static void _kvm_arch_hardware_disable(void *discard)
++{
++	if (__this_cpu_read(kvm_arm_hardware_enabled)) {
++		cpu_hyp_reset();
++		__this_cpu_write(kvm_arm_hardware_enabled, 0);
++	}
+ }
+ 
+-static struct notifier_block hyp_init_cpu_nb = {
+-	.notifier_call = hyp_init_cpu_notify,
+-};
++void kvm_arch_hardware_disable(void)
++{
++	_kvm_arch_hardware_disable(NULL);
++}
+ 
+ #ifdef CONFIG_CPU_PM
+ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
+ 				    unsigned long cmd,
+ 				    void *v)
+ {
+-	if (cmd == CPU_PM_EXIT) {
+-		cpu_hyp_reinit();
++	/*
++	 * kvm_arm_hardware_enabled is left with its old value over
++	 * PM_ENTER->PM_EXIT. It is used to indicate PM_EXIT should
++	 * re-enable hyp.
++	 */
++	switch (cmd) {
++	case CPU_PM_ENTER:
++		if (__this_cpu_read(kvm_arm_hardware_enabled))
++			/*
++			 * don't update kvm_arm_hardware_enabled here
++			 * so that the hardware will be re-enabled
++			 * when we resume. See below.
++			 */
++			cpu_hyp_reset();
++
++		return NOTIFY_OK;
++	case CPU_PM_EXIT:
++		if (__this_cpu_read(kvm_arm_hardware_enabled))
++			/* The hardware was enabled before suspend. */
++			cpu_hyp_reinit();
++
+ 		return NOTIFY_OK;
+-	}
+ 
+-	return NOTIFY_DONE;
++	default:
++		return NOTIFY_DONE;
++	}
+ }
+ 
+ static struct notifier_block hyp_init_cpu_pm_nb = {
+@@ -1067,18 +1102,12 @@ static int init_common_resources(void)
+ 
+ static int init_subsystems(void)
+ {
+-	int err;
++	int err = 0;
+ 
+ 	/*
+-	 * Register CPU Hotplug notifier
++	 * Enable hardware so that subsystem initialisation can access EL2.
+ 	 */
+-	cpu_notifier_register_begin();
+-	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+-	cpu_notifier_register_done();
+-	if (err) {
+-		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
+-		return err;
+-	}
++	on_each_cpu(_kvm_arch_hardware_enable, NULL, 1);
+ 
+ 	/*
+ 	 * Register CPU lower-power notifier
+@@ -1096,9 +1125,10 @@ static int init_subsystems(void)
+ 	case -ENODEV:
+ 	case -ENXIO:
+ 		vgic_present = false;
++		err = 0;
+ 		break;
+ 	default:
+-		return err;
++		goto out;
+ 	}
+ 
+ 	/*
+@@ -1106,12 +1136,15 @@ static int init_subsystems(void)
+ 	 */
+ 	err = kvm_timer_hyp_init();
+ 	if (err)
+-		return err;
++		goto out;
+ 
+ 	kvm_perf_init();
+ 	kvm_coproc_table_init();
+ 
+-	return 0;
++out:
++	on_each_cpu(_kvm_arch_hardware_disable, NULL, 1);
++
++	return err;
+ }
+ 
+ static void teardown_hyp_mode(void)
+@@ -1128,11 +1161,6 @@ static void teardown_hyp_mode(void)
+ 
+ static int init_vhe_mode(void)
+ {
+-	/*
+-	 * Execute the init code on each CPU.
+-	 */
+-	on_each_cpu(cpu_init_stage2, NULL, 1);
+-
+ 	/* set size of VMID supported by CPU */
+ 	kvm_vmid_bits = kvm_get_vmid_bits();
+ 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+@@ -1219,11 +1247,6 @@ static int init_hyp_mode(void)
+ 		}
+ 	}
+ 
+-	/*
+-	 * Execute the init code on each CPU.
+-	 */
+-	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+-
+ #ifndef CONFIG_HOTPLUG_CPU
+ 	free_boot_hyp_pgd();
+ #endif
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index bf3697c..7678724 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -1655,6 +1655,11 @@ phys_addr_t kvm_get_idmap_vector(void)
+ 	return hyp_idmap_vector;
+ }
+ 
++phys_addr_t kvm_get_idmap_start(void)
++{
++	return hyp_idmap_start;
++}
++
+ int kvm_mmu_init(void)
+ {
+ 	int err;
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index edb51b8..fca5148 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -51,6 +51,7 @@ struct kvm_vcpu;
+ 
+ extern char __kvm_hyp_init[];
+ extern char __kvm_hyp_init_end[];
++extern char __kvm_hyp_reset[];
+ 
+ extern char __kvm_hyp_vector[];
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index bbdaa56..3be7a7b 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -44,6 +44,7 @@
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ int kvm_arch_dev_ioctl_check_extension(long ext);
++phys_addr_t kvm_hyp_reset_entry(void);
+ 
+ struct kvm_arch {
+ 	/* The VMID generation used for the virt. memory system */
+@@ -330,7 +331,17 @@ static inline void __cpu_init_stage2(void)
+ {
+ }
+ 
+-static inline void kvm_arch_hardware_disable(void) {}
++static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
++					phys_addr_t phys_idmap_start)
++{
++	/*
++	 * Call reset code, and switch back to stub hyp vectors.
++	 * Uses __kvm_call_hyp() to avoid kaslr's kvm_ksym_ref() translation.
++	 */
++	__kvm_call_hyp((void *)kvm_hyp_reset_entry(),
++		       boot_pgd_ptr, phys_idmap_start);
++}
++
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 0bf8b43..342a5ac 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -99,6 +99,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+ phys_addr_t kvm_mmu_get_httbr(void);
+ phys_addr_t kvm_mmu_get_boot_httbr(void);
+ phys_addr_t kvm_get_idmap_vector(void);
++phys_addr_t kvm_get_idmap_start(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
+ 
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 034d152c..d87635e 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -152,6 +152,44 @@ merged:
+ 	eret
+ ENDPROC(__kvm_hyp_init)
+ 
++	/*
++	 * x0: HYP boot pgd
++	 * x1: HYP phys_idmap_start
++	 */
++ENTRY(__kvm_hyp_reset)
++	/* We're in trampoline code in VA, switch back to boot page tables */
++	msr	ttbr0_el2, x0
++	isb
++
++	/* Ensure the PA branch doesn't find a stale tlb entry or stale code. */
++	ic	iallu
++	tlbi	alle2
++	dsb	sy
++	isb
++
++	/* Branch into PA space */
++	adr	x0, 1f
++	bfi	x1, x0, #0, #PAGE_SHIFT
++	br	x1
++
++	/* We're now in idmap, disable MMU */
++1:	mrs	x0, sctlr_el2
++	ldr	x1, =SCTLR_ELx_FLAGS
++	bic	x0, x0, x1		// Clear SCTL_M and etc
++	msr	sctlr_el2, x0
++	isb
++
++	/* Invalidate the old TLBs */
++	tlbi	alle2
++	dsb	sy
++
++	/* Install stub vectors */
++	adr_l	x0, __hyp_stub_vectors
++	msr	vbar_el2, x0
++
++	eret
++ENDPROC(__kvm_hyp_reset)
++
+ 	.ltorg
+ 
+ 	.popsection
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index f34745c..d6e155a 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -29,7 +29,9 @@
+ #include <asm/cputype.h>
+ #include <asm/ptrace.h>
+ #include <asm/kvm_arm.h>
++#include <asm/kvm_asm.h>
+ #include <asm/kvm_coproc.h>
++#include <asm/kvm_mmu.h>
+ 
+ /*
+  * ARMv8 Reset Values
+@@ -123,3 +125,15 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	/* Reset timer */
+ 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+ }
++
++extern char __hyp_idmap_text_start[];
++
++phys_addr_t kvm_hyp_reset_entry(void)
++{
++	unsigned long offset;
++
++	offset = (unsigned long)__kvm_hyp_reset
++		 - ((unsigned long)__hyp_idmap_text_start & PAGE_MASK);
++
++	return TRAMPOLINE_VA + offset;
++}
+-- 
+1.8.3.1
+

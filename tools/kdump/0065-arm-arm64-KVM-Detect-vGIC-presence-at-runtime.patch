@@ -1,0 +1,101 @@
+From d86e04923e7b56a7c1a6c512640526ab533ff92e Mon Sep 17 00:00:00 2001
+From: Pavel Fedin <p.fedin@samsung.com>
+Date: Fri, 18 Dec 2015 14:38:43 +0300
+Subject: [PATCH 065/123] arm/arm64: KVM: Detect vGIC presence at runtime
+
+Before commit 662d9715840aef44dcb573b0f9fab9e8319c868a
+("arm/arm64: KVM: Kill CONFIG_KVM_ARM_{VGIC,TIMER}") is was possible to
+compile the kernel without vGIC and vTimer support. Commit message says
+about possibility to detect vGIC support in runtime, but this has never
+been implemented.
+
+This patch introduces runtime check, restoring the lost functionality.
+It again allows to use KVM on hardware without vGIC. Interrupt
+controller has to be emulated in userspace in this case.
+
+-ENODEV return code from probe function means there's no GIC at all.
+-ENXIO happens when, for example, there is GIC node in the device tree,
+but it does not specify vGIC resources. Any other error code is still
+treated as full stop because it might mean some really serious problems.
+
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+(cherry picked from commit c7da6fa43cb1c5e649da0f478a491feb9208cae7)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm/kvm/arm.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 0178376..b936475 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -63,6 +63,8 @@ static u32 kvm_next_vmid;
+ static unsigned int kvm_vmid_bits __read_mostly;
+ static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
++static bool vgic_present;
++
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+ {
+ 	BUG_ON(preemptible());
+@@ -134,7 +136,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ 	kvm->arch.vmid_gen = 0;
+ 
+ 	/* The maximum number of VCPUs is limited by the host's GIC model */
+-	kvm->arch.max_vcpus = kvm_vgic_get_max_vcpus();
++	kvm->arch.max_vcpus = vgic_present ?
++				kvm_vgic_get_max_vcpus() : KVM_MAX_VCPUS;
+ 
+ 	return ret;
+ out_free_stage2_pgd:
+@@ -172,6 +175,8 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	int r;
+ 	switch (ext) {
+ 	case KVM_CAP_IRQCHIP:
++		r = vgic_present;
++		break;
+ 	case KVM_CAP_IOEVENTFD:
+ 	case KVM_CAP_DEVICE_CTRL:
+ 	case KVM_CAP_USER_MEMORY:
+@@ -914,6 +919,8 @@ static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+ 
+ 	switch (dev_id) {
+ 	case KVM_ARM_DEVICE_VGIC_V2:
++		if (!vgic_present)
++			return -ENXIO;
+ 		return kvm_vgic_addr(kvm, type, &dev_addr->addr, true);
+ 	default:
+ 		return -ENODEV;
+@@ -928,6 +935,8 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 
+ 	switch (ioctl) {
+ 	case KVM_CREATE_IRQCHIP: {
++		if (!vgic_present)
++			return -ENXIO;
+ 		return kvm_vgic_create(kvm, KVM_DEV_TYPE_ARM_VGIC_V2);
+ 	}
+ 	case KVM_ARM_SET_DEVICE_ADDR: {
+@@ -1118,8 +1127,17 @@ static int init_hyp_mode(void)
+ 	 * Init HYP view of VGIC
+ 	 */
+ 	err = kvm_vgic_hyp_init();
+-	if (err)
++	switch (err) {
++	case 0:
++		vgic_present = true;
++		break;
++	case -ENODEV:
++	case -ENXIO:
++		vgic_present = false;
++		break;
++	default:
+ 		goto out_free_context;
++	}
+ 
+ 	/*
+ 	 * Init HYP architected timer support
+-- 
+1.8.3.1
+

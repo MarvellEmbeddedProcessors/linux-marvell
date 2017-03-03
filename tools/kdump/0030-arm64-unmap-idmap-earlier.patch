@@ -1,0 +1,66 @@
+From f3351b59420be88177dd7242bb70a5c1d9b8d3a1 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Mon, 25 Jan 2016 11:44:59 +0000
+Subject: [PATCH 030/123] arm64: unmap idmap earlier
+
+During boot we leave the idmap in place until paging_init, as we
+previously had to wait for the zero page to become allocated and
+accessible.
+
+Now that we have a statically-allocated zero page, we can uninstall the
+idmap much earlier in the boot process, making it far easier to spot
+accidental use of physical addresses. This also brings the cold boot
+path in line with the secondary boot path.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit 86ccce896cb0aa800a7a6dcd29b41ffc4eeb1a75)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/kernel/setup.c | 6 ++++++
+ arch/arm64/mm/mmu.c       | 6 ------
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index f6621ba..cfed56f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -314,6 +314,12 @@ void __init setup_arch(char **cmdline_p)
+ 	 */
+ 	local_async_enable();
+ 
++	/*
++	 * TTBR0 is only used for the identity mapping at this stage. Make it
++	 * point to zero page to avoid speculatively fetching new entries.
++	 */
++	cpu_uninstall_idmap();
++
+ 	efi_init();
+ 	arm64_memblock_init();
+ 
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 74898e5..1e2ae80 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -453,12 +453,6 @@ void __init paging_init(void)
+ 	fixup_executable();
+ 
+ 	bootmem_init();
+-
+-	/*
+-	 * TTBR0 is only used for the identity mapping at this stage. Make it
+-	 * point to zero page to avoid speculatively fetching new entries.
+-	 */
+-	cpu_uninstall_idmap();
+ }
+ 
+ /*
+-- 
+1.8.3.1
+

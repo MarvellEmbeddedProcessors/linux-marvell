@@ -1,0 +1,41 @@
+From 1a8ccc494af8f0726fb82db78a9f42ce3e0b65e4 Mon Sep 17 00:00:00 2001
+From: Laura Abbott <labbott@fedoraproject.org>
+Date: Fri, 5 Feb 2016 16:24:48 -0800
+Subject: [PATCH 092/123] arm64: ptdump: Indicate whether memory should be
+ faulting
+
+With CONFIG_DEBUG_PAGEALLOC, pages do not have the valid bit
+set when free in the buddy allocator. Add an indiciation to
+the page table dumping code that the valid bit is not set,
+'F' for fault, to make this easier to understand.
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit d7e9d59494a9a5d83274f5af2148b82ca22dff3f)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/mm/dump.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index 5a22a11..f381ac9 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -90,6 +90,11 @@ struct prot_bits {
+ 
+ static const struct prot_bits pte_bits[] = {
+ 	{
++		.mask	= PTE_VALID,
++		.val	= PTE_VALID,
++		.set	= " ",
++		.clear	= "F",
++	}, {
+ 		.mask	= PTE_USER,
+ 		.val	= PTE_USER,
+ 		.set	= "USR",
+-- 
+1.8.3.1
+

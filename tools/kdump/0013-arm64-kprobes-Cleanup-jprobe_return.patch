@@ -1,0 +1,83 @@
+From a6e5298aaf88fa7e703a1b22757c993a9ccd7109 Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Thu, 21 Jul 2016 09:44:17 +0100
+Subject: [PATCH 013/123] arm64: kprobes: Cleanup jprobe_return
+
+commit 3b7d14e9f3f1efd4c4348800e977fd1ce4ca660e upstream.
+
+jprobe_return seems to have aged badly. Comments referring to
+non-existent behaviours, and a dangerous habit of messing
+with registers without telling the compiler.
+
+This patches applies the following remedies:
+- Fix the comments to describe the actual behaviour
+- Tidy up the asm sequence to directly assign the
+  stack pointer without clobbering extra registers
+- Mark the rest of the function as unreachable() so
+  that the compiler knows that there is no need for
+  an epilogue
+- Stop making jprobe_return_break a global function
+  (you really don't want to call that guy, and it isn't
+  even a function).
+
+Tested with tcp_probe.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ arch/arm64/kernel/probes/kprobes.c | 22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index b118974..2354554 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -34,8 +34,6 @@
+ 
+ #include "decode-insn.h"
+ 
+-void jprobe_return_break(void);
+-
+ DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
+ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
+ 
+@@ -513,18 +511,17 @@ void __kprobes jprobe_return(void)
+ 	/*
+ 	 * Jprobe handler return by entering break exception,
+ 	 * encoded same as kprobe, but with following conditions
+-	 * -a magic number in x0 to identify from rest of other kprobes.
++	 * -a special PC to identify it from the other kprobes.
+ 	 * -restore stack addr to original saved pt_regs
+ 	 */
+-	asm volatile ("ldr x0, [%0]\n\t"
+-		      "mov sp, x0\n\t"
+-		      ".globl jprobe_return_break\n\t"
+-		      "jprobe_return_break:\n\t"
+-		      "brk %1\n\t"
+-		      :
+-		      : "r"(&kcb->jprobe_saved_regs.sp),
+-		      "I"(BRK64_ESR_KPROBES)
+-		      : "memory");
++	asm volatile("				mov sp, %0	\n"
++		     "jprobe_return_break:	brk %1		\n"
++		     :
++		     : "r" (kcb->jprobe_saved_regs.sp),
++		       "I" (BRK64_ESR_KPROBES)
++		     : "memory");
++
++	unreachable();
+ }
+ 
+ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+@@ -533,6 +530,7 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 	long stack_addr = kcb->jprobe_saved_regs.sp;
+ 	long orig_sp = kernel_stack_pointer(regs);
+ 	struct jprobe *jp = container_of(p, struct jprobe, kp);
++	extern const char jprobe_return_break[];
+ 
+ 	if (instruction_pointer(regs) != (u64) jprobe_return_break)
+ 		return 0;
+-- 
+1.8.3.1
+

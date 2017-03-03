@@ -1,0 +1,50 @@
+From 6cda01f69d18d3fd107c59c92b2b58e659ce3f53 Mon Sep 17 00:00:00 2001
+From: James Morse <james.morse@arm.com>
+Date: Wed, 27 Apr 2016 17:47:09 +0100
+Subject: [PATCH 072/123] arm64: Promote KERNEL_START/KERNEL_END definitions to
+ a header file
+
+KERNEL_START and KERNEL_END are useful outside head.S, move them to a
+header file.
+
+Signed-off-by: James Morse <james.morse@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+(cherry picked from commit 28c7258330ee4ce701a4da7af96d6605d1a0b3bd)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/include/asm/memory.h | 3 +++
+ arch/arm64/kernel/head.S        | 3 ---
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 853953c..5773a66 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -70,6 +70,9 @@
+ 
+ #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+ 
++#define KERNEL_START      _text
++#define KERNEL_END        _end
++
+ /*
+  * Physical vs virtual RAM address space conversion.  These are
+  * private definitions which should NOT be used outside memory.h
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index bb92dd0..0d84e73 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -48,9 +48,6 @@
+ #error TEXT_OFFSET must be less than 2MB
+ #endif
+ 
+-#define KERNEL_START	_text
+-#define KERNEL_END	_end
+-
+ /*
+  * Kernel startup entry point.
+  * ---------------------------
+-- 
+1.8.3.1
+

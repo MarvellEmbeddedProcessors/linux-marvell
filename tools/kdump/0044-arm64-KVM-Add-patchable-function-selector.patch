@@ -1,0 +1,59 @@
+From 1e9d78cf5842586f0dbeec9bb16fa235a564e7a6 Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Wed, 28 Oct 2015 08:45:37 +0000
+Subject: [PATCH 044/123] arm64: KVM: Add patchable function selector
+
+KVM so far relies on code patching, and is likely to use it more
+in the future. The main issue is that our alternative system works
+at the instruction level, while we'd like to have alternatives at
+the function level.
+
+In order to cope with this, add the "hyp_alternate_select" macro that
+outputs a brief sequence of code that in turn can be patched, allowing
+an alternative function to be selected.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+(cherry picked from commit c1bf6e18e97e7ead77371d4251f8ef1567455584)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/kvm/hyp/hyp.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 0809653..73419a7 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -29,6 +29,30 @@
+ #define hyp_kern_va(v) (typeof(v))((unsigned long)(v) - HYP_PAGE_OFFSET \
+ 						      + PAGE_OFFSET)
+ 
++/**
++ * hyp_alternate_select - Generates patchable code sequences that are
++ * used to switch between two implementations of a function, depending
++ * on the availability of a feature.
++ *
++ * @fname: a symbol name that will be defined as a function returning a
++ * function pointer whose type will match @orig and @alt
++ * @orig: A pointer to the default function, as returned by @fname when
++ * @cond doesn't hold
++ * @alt: A pointer to the alternate function, as returned by @fname
++ * when @cond holds
++ * @cond: a CPU feature (as described in asm/cpufeature.h)
++ */
++#define hyp_alternate_select(fname, orig, alt, cond)			\
++typeof(orig) * __hyp_text fname(void)					\
++{									\
++	typeof(alt) *val = orig;					\
++	asm volatile(ALTERNATIVE("nop		\n",			\
++				 "mov	%0, %1	\n",			\
++				 cond)					\
++		     : "+r" (val) : "r" (alt));				\
++	return val;							\
++}
++
+ void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+ 
+-- 
+1.8.3.1
+

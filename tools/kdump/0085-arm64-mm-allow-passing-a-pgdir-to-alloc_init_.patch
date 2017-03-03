@@ -1,0 +1,131 @@
+From eafe89143983974574fd45207cc42c3f784494ae Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Mon, 25 Jan 2016 11:45:10 +0000
+Subject: [PATCH 085/123] arm64: mm: allow passing a pgdir to alloc_init_*
+
+To allow us to initialise pgdirs which are fixmapped, allow explicitly
+passing a pgdir rather than an mm. A new __create_pgd_mapping function
+is added for this, with existing __create_mapping callers migrated to
+this.
+
+The mm argument was previously only used at the top level. Now that it
+is redundant at all levels, it is removed. To indicate its new found
+similarity to alloc_init_{pud,pmd,pte}, __create_mapping is renamed to
+init_pgd.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit 11509a306bb6ea595878b2d246d2d56b1783e040)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 33 +++++++++++++++++++--------------
+ 1 file changed, 19 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index dc6665f..fd4c95b 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -146,8 +146,7 @@ static void split_pud(pud_t *old_pud, pmd_t *pmd)
+ 	} while (pmd++, i++, i < PTRS_PER_PMD);
+ }
+ 
+-static void alloc_init_pmd(struct mm_struct *mm, pud_t *pud,
+-				  unsigned long addr, unsigned long end,
++static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void))
+ {
+@@ -215,8 +214,7 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+ 	return true;
+ }
+ 
+-static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+-				  unsigned long addr, unsigned long end,
++static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void))
+ {
+@@ -257,7 +255,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+ 				}
+ 			}
+ 		} else {
+-			alloc_init_pmd(mm, pud, addr, next, phys, prot,
++			alloc_init_pmd(pud, addr, next, phys, prot,
+ 				       pgtable_alloc);
+ 		}
+ 		phys += next - addr;
+@@ -270,8 +268,7 @@ static void alloc_init_pud(struct mm_struct *mm, pgd_t *pgd,
+  * Create the page directory entries and any necessary page tables for the
+  * mapping specified by 'md'.
+  */
+-static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+-				    phys_addr_t phys, unsigned long virt,
++static void init_pgd(pgd_t *pgd, phys_addr_t phys, unsigned long virt,
+ 				    phys_addr_t size, pgprot_t prot,
+ 				    phys_addr_t (*pgtable_alloc)(void))
+ {
+@@ -283,7 +280,7 @@ static void  __create_mapping(struct mm_struct *mm, pgd_t *pgd,
+ 	end = addr + length;
+ 	do {
+ 		next = pgd_addr_end(addr, end);
+-		alloc_init_pud(mm, pgd, addr, next, phys, prot, pgtable_alloc);
++		alloc_init_pud(pgd, addr, next, phys, prot, pgtable_alloc);
+ 		phys += next - addr;
+ 	} while (pgd++, addr = next, addr != end);
+ }
+@@ -298,6 +295,14 @@ static phys_addr_t late_pgtable_alloc(void)
+ 	return __pa(ptr);
+ }
+ 
++static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
++				 unsigned long virt, phys_addr_t size,
++				 pgprot_t prot,
++				 phys_addr_t (*alloc)(void))
++{
++	init_pgd(pgd_offset_raw(pgdir, virt), phys, virt, size, prot, alloc);
++}
++
+ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 				  phys_addr_t size, pgprot_t prot)
+ {
+@@ -306,16 +311,16 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 			&phys, virt);
+ 		return;
+ 	}
+-	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
+-			 size, prot, early_pgtable_alloc);
++	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
++			     early_pgtable_alloc);
+ }
+ 
+ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ 			       unsigned long virt, phys_addr_t size,
+ 			       pgprot_t prot)
+ {
+-	__create_mapping(mm, pgd_offset(mm, virt), phys, virt, size, prot,
+-				late_pgtable_alloc);
++	__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
++			     late_pgtable_alloc);
+ }
+ 
+ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+@@ -327,8 +332,8 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 		return;
+ 	}
+ 
+-	return __create_mapping(&init_mm, pgd_offset_k(virt),
+-				phys, virt, size, prot, late_pgtable_alloc);
++	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
++			     late_pgtable_alloc);
+ }
+ 
+ #ifdef CONFIG_DEBUG_RODATA
+-- 
+1.8.3.1
+

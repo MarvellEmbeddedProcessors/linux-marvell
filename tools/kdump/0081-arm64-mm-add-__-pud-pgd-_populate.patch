@@ -1,0 +1,86 @@
+From 18b08b0f0b374a6e2ec1480759917e484115ecf1 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Mon, 25 Jan 2016 11:45:06 +0000
+Subject: [PATCH 081/123] arm64: mm: add __{pud,pgd}_populate
+
+We currently have __pmd_populate for creating a pmd table entry given
+the physical address of a pte, but don't have equivalents for the pud or
+pgd levels of table.
+
+To enable us to manipulate tables which are mapped outside of the linear
+mapping (where we have a PA, but not a linear map VA), it is useful to
+have these functions.
+
+This patch adds __{pud,pgd}_populate. As these should not be called when
+the kernel uses folded {pmd,pud}s, in these cases they expand to
+BUILD_BUG(). So long as the appropriate checks are made on the {pud,pgd}
+entry prior to attempting population, these should be optimized out at
+compile time.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit 1e531cce68c92b46c7d29f36a72f9a3e5886678f)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/include/asm/pgalloc.h | 26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index c150539..ff98585 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -42,11 +42,20 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
+ 	free_page((unsigned long)pmd);
+ }
+ 
+-static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
+ {
+-	set_pud(pud, __pud(__pa(pmd) | PMD_TYPE_TABLE));
++	set_pud(pud, __pud(pmd | prot));
+ }
+ 
++static inline void pud_populate(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
++{
++	__pud_populate(pud, __pa(pmd), PMD_TYPE_TABLE);
++}
++#else
++static inline void __pud_populate(pud_t *pud, phys_addr_t pmd, pudval_t prot)
++{
++	BUILD_BUG();
++}
+ #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+ 
+ #if CONFIG_PGTABLE_LEVELS > 3
+@@ -62,11 +71,20 @@ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
+ 	free_page((unsigned long)pud);
+ }
+ 
+-static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
++static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
+ {
+-	set_pgd(pgd, __pgd(__pa(pud) | PUD_TYPE_TABLE));
++	set_pgd(pgdp, __pgd(pud | prot));
+ }
+ 
++static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pud_t *pud)
++{
++	__pgd_populate(pgd, __pa(pud), PUD_TYPE_TABLE);
++}
++#else
++static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pud, pgdval_t prot)
++{
++	BUILD_BUG();
++}
+ #endif	/* CONFIG_PGTABLE_LEVELS > 3 */
+ 
+ extern pgd_t *pgd_alloc(struct mm_struct *mm);
+-- 
+1.8.3.1
+

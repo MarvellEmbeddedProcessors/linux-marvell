@@ -1,0 +1,164 @@
+From 47a90102ae6b7d2892bcd6fa18750f71ad7a21be Mon Sep 17 00:00:00 2001
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 16 Feb 2016 13:52:39 +0100
+Subject: [PATCH 094/123] arm64: kvm: deal with kernel symbols outside of
+ linear mapping
+
+KVM on arm64 uses a fixed offset between the linear mapping at EL1 and
+the HYP mapping at EL2. Before we can move the kernel virtual mapping
+out of the linear mapping, we have to make sure that references to kernel
+symbols that are accessed via the HYP mapping are translated to their
+linear equivalent.
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit a0bf9776cd0be4490d4675d4108e13379849fc7f)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Conflicts:
+	arch/arm64/kvm/hyp.S
+---
+ arch/arm/include/asm/kvm_asm.h    |  2 ++
+ arch/arm/kvm/arm.c                |  8 +++++---
+ arch/arm64/include/asm/kvm_asm.h  | 17 +++++++++++++++++
+ arch/arm64/include/asm/kvm_host.h |  8 +++++---
+ arch/arm64/kvm/hyp.S              |  6 +++---
+ 5 files changed, 32 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 194c91b..c35c349 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -79,6 +79,8 @@
+ #define rr_lo_hi(a1, a2) a1, a2
+ #endif
+ 
++#define kvm_ksym_ref(kva)	(kva)
++
+ #ifndef __ASSEMBLY__
+ struct kvm;
+ struct kvm_vcpu;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 30c9f7b..7a81332 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -979,7 +979,7 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	pgd_ptr = kvm_mmu_get_httbr();
+ 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
+ 	hyp_stack_ptr = stack_page + PAGE_SIZE;
+-	vector_ptr = (unsigned long)__kvm_hyp_vector;
++	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
+ 
+ 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+ 	__cpu_init_stage2();
+@@ -1072,13 +1072,15 @@ static int init_hyp_mode(void)
+ 	/*
+ 	 * Map the Hyp-code called directly from the host
+ 	 */
+-	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
++	err = create_hyp_mappings(kvm_ksym_ref(__kvm_hyp_code_start),
++				  kvm_ksym_ref(__kvm_hyp_code_end));
+ 	if (err) {
+ 		kvm_err("Cannot map world-switch code\n");
+ 		goto out_free_mappings;
+ 	}
+ 
+-	err = create_hyp_mappings(__start_rodata, __end_rodata);
++	err = create_hyp_mappings(kvm_ksym_ref(__start_rodata),
++				  kvm_ksym_ref(__end_rodata));
+ 	if (err) {
+ 		kvm_err("Cannot map rodata section\n");
+ 		goto out_free_mappings;
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 52b777b..31b5600 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -26,7 +26,24 @@
+ #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+ #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+ 
++#define kvm_ksym_ref(sym)		((void *)&sym + kvm_ksym_shift)
++
+ #ifndef __ASSEMBLY__
++#if __GNUC__ > 4
++#define kvm_ksym_shift			(PAGE_OFFSET - KIMAGE_VADDR)
++#else
++/*
++ * GCC versions 4.9 and older will fold the constant below into the addend of
++ * the reference to 'sym' above if kvm_ksym_shift is declared static or if the
++ * constant is used directly. However, since we use the small code model for
++ * the core kernel, the reference to 'sym' will be emitted as a adrp/add pair,
++ * with a +/- 4 GB range, resulting in linker relocation errors if the shift
++ * is sufficiently large. So prevent the compiler from folding the shift into
++ * the addend, by making the shift a variable with external linkage.
++ */
++__weak u64 kvm_ksym_shift = PAGE_OFFSET - KIMAGE_VADDR;
++#endif
++
+ struct kvm;
+ struct kvm_vcpu;
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 1b37b5d..bbdaa56 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -301,7 +301,7 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+ 
+-u64 kvm_call_hyp(void *hypfn, ...);
++u64 __kvm_call_hyp(void *hypfn, ...);
+ void force_vm_exit(const cpumask_t *mask);
+ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+ 
+@@ -322,8 +322,8 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 	 * Call initialization code, and switch to the full blown
+ 	 * HYP code.
+ 	 */
+-	kvm_call_hyp((void *)boot_pgd_ptr, pgd_ptr,
+-		     hyp_stack_ptr, vector_ptr);
++	__kvm_call_hyp((void *)boot_pgd_ptr, pgd_ptr,
++		       hyp_stack_ptr, vector_ptr);
+ }
+ 
+ static inline void __cpu_init_stage2(void)
+@@ -341,4 +341,6 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
+ 
++#define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
++
+ #endif /* __ARM64_KVM_HOST_H__ */
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 0689a74..48f19a3 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -22,7 +22,7 @@
+ #include <asm/cpufeature.h>
+ 
+ /*
+- * u64 kvm_call_hyp(void *hypfn, ...);
++ * u64 __kvm_call_hyp(void *hypfn, ...);
+  *
+  * This is not really a variadic function in the classic C-way and care must
+  * be taken when calling this to ensure parameters are passed in registers
+@@ -39,7 +39,7 @@
+  * used to implement __hyp_get_vectors in the same way as in
+  * arch/arm64/kernel/hyp_stub.S.
+  */
+-ENTRY(kvm_call_hyp)
++ENTRY(__kvm_call_hyp)
+ alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+ 	hvc	#0
+ 	ret
+@@ -47,4 +47,4 @@ alternative_else
+ 	b	__vhe_hyp_call
+ 	nop
+ alternative_endif
+-ENDPROC(kvm_call_hyp)
++ENDPROC(__kvm_call_hyp)
+-- 
+1.8.3.1
+

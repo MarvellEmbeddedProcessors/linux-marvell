@@ -1,0 +1,51 @@
+From e662feff3c13d70a5ce737b3c0738b0815d86bea Mon Sep 17 00:00:00 2001
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Date: Mon, 1 Feb 2016 18:01:29 +0100
+Subject: [PATCH 017/123] ARM: 8510/1: rework ARM_CPU_SUSPEND dependencies
+
+The code enabled by the ARM_CPU_SUSPEND config option is used by
+kernel subsystems for purposes that go beyond system suspend so its
+config entry should be augmented to take more default options into
+account and avoid forcing its selection to prevent dependencies
+override.
+
+To achieve this goal, this patch reworks the ARM_CPU_SUSPEND config
+entry and updates its default config value (by adding the BL_SWITCHER
+option to it) and its dependencies (ARCH_SUSPEND_POSSIBLE), so that the
+symbol is still selected by default by the subsystems requiring it and
+at the same time enforcing the dependencies correctly.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+(cherry picked from commit 1b9bdf5c1661873a10e193b8cbb803a87fe5c4a1)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ceee970..20ae5d2 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1423,7 +1423,6 @@ config BIG_LITTLE
+ config BL_SWITCHER
+ 	bool "big.LITTLE switcher support"
+ 	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU && ARM_GIC
+-	select ARM_CPU_SUSPEND
+ 	select CPU_PM
+ 	help
+ 	  The big.LITTLE "switcher" provides the core functionality to
+@@ -2140,7 +2139,8 @@ config ARCH_SUSPEND_POSSIBLE
+ 	def_bool y
+ 
+ config ARM_CPU_SUSPEND
+-	def_bool PM_SLEEP
++	def_bool PM_SLEEP || BL_SWITCHER
++	depends on ARCH_SUSPEND_POSSIBLE
+ 
+ config ARCH_HIBERNATION_POSSIBLE
+ 	bool
+-- 
+1.8.3.1
+

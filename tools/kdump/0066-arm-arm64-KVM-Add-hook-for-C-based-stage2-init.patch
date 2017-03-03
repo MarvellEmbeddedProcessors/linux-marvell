@@ -1,0 +1,63 @@
+From ec0b2813a6a693ed6b067119e089fcb102f716bb Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Mon, 1 Feb 2016 17:54:35 +0000
+Subject: [PATCH 066/123] arm/arm64: KVM: Add hook for C-based stage2 init
+
+As we're about to move the stage2 init to C code, introduce some
+C hooks that will later be populated with arch-specific implementations.
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+(cherry picked from commit 35a2491a624af1fa7ab6990639f5246cd5f12592)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm/include/asm/kvm_host.h   | 4 ++++
+ arch/arm/kvm/arm.c                | 1 +
+ arch/arm64/include/asm/kvm_host.h | 4 ++++
+ 3 files changed, 9 insertions(+)
+
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 6692982..945bfa5 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -214,6 +214,10 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+ }
+ 
++static inline void __cpu_init_stage2(void)
++{
++}
++
+ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+ {
+ 	return 0;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index b936475..30c9f7b 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -982,6 +982,7 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	vector_ptr = (unsigned long)__kvm_hyp_vector;
+ 
+ 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
++	__cpu_init_stage2();
+ 
+ 	kvm_arm_init_debug();
+ }
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 975db14..1b37b5d 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -326,6 +326,10 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 		     hyp_stack_ptr, vector_ptr);
+ }
+ 
++static inline void __cpu_init_stage2(void)
++{
++}
++
+ static inline void kvm_arch_hardware_disable(void) {}
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+-- 
+1.8.3.1
+

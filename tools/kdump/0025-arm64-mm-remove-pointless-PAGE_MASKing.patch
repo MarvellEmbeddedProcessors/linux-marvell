@@ -1,0 +1,47 @@
+From 8ac80c9772b85518dd7800b9667d5fb0ab348d1a Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Wed, 9 Dec 2015 12:44:36 +0000
+Subject: [PATCH 025/123] arm64: mm: remove pointless PAGE_MASKing
+
+As pgd_offset{,_k} shift the input address by PGDIR_SHIFT, the sub-page
+bits will always be shifted out. There is no need to apply PAGE_MASK
+before this.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+(cherry picked from commit e2c30ee320eb96304896c7ab84499e5bc5e5fb6e)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 653735a..41b62ef 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -280,7 +280,7 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 			&phys, virt);
+ 		return;
+ 	}
+-	__create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK), phys, virt,
++	__create_mapping(&init_mm, pgd_offset_k(virt), phys, virt,
+ 			 size, prot, early_alloc);
+ }
+ 
+@@ -301,7 +301,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 		return;
+ 	}
+ 
+-	return __create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK),
++	return __create_mapping(&init_mm, pgd_offset_k(virt),
+ 				phys, virt, size, prot, late_alloc);
+ }
+ 
+-- 
+1.8.3.1
+

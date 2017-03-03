@@ -1,0 +1,57 @@
+From d956e9f811728706e81b353289141c11eb2fab34 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Wed, 6 Jan 2016 11:05:27 +0000
+Subject: [PATCH 027/123] arm64: head.S: use memset to clear BSS
+
+Currently we use an open-coded memzero to clear the BSS. As it is a
+trivial implementation, it is sub-optimal.
+
+Our optimised memset doesn't use the stack, is position-independent, and
+for the memzero case can use of DC ZVA to clear large blocks
+efficiently. In __mmap_switched the MMU is on and there are no live
+caller-saved registers, so we can safely call an uninstrumented memset.
+
+This patch changes __mmap_switched to use memset when clearing the BSS.
+We use the __pi_memset alias so as to avoid any instrumentation in all
+kernel configurations.
+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+(cherry picked from commit 2a803c4db615d85126c5c7afd5849a3cfde71422)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/kernel/head.S | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 20ceb5e..10eeeab 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -415,14 +415,13 @@ ENDPROC(__create_page_tables)
+  */
+ 	.set	initial_sp, init_thread_union + THREAD_START_SP
+ __mmap_switched:
+-	adr_l	x6, __bss_start
+-	adr_l	x7, __bss_stop
+-
+-1:	cmp	x6, x7
+-	b.hs	2f
+-	str	xzr, [x6], #8			// Clear BSS
+-	b	1b
+-2:
++	// Clear BSS
++	adr_l	x0, __bss_start
++	mov	x1, xzr
++	adr_l	x2, __bss_stop
++	sub	x2, x2, x0
++	bl	__pi_memset
++
+ 	adr_l	sp, initial_sp, x4
+ 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+ 	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
+-- 
+1.8.3.1
+
