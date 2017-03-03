@@ -1,0 +1,98 @@
+From a40abe4f0254ef23b2d1f5b325478ec7040869a4 Mon Sep 17 00:00:00 2001
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Date: Tue, 23 Feb 2016 10:31:41 +0000
+Subject: [PATCH 103/123] arm64: Move cpu_die_early to smp.c
+
+This patch moves cpu_die_early to smp.c, where it fits better.
+No functional changes, except for adding the necessary checks
+for CONFIG_HOTPLUG_CPU.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit fce6361fe9b0caeba0c05b7d72ceda406f8780df)
+---
+ arch/arm64/include/asm/smp.h   |  1 +
+ arch/arm64/kernel/cpufeature.c | 19 -------------------
+ arch/arm64/kernel/smp.c        | 22 ++++++++++++++++++++++
+ 3 files changed, 23 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index b93eb33..51913be 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -77,6 +77,7 @@ extern int __cpu_disable(void);
+ 
+ extern void __cpu_die(unsigned int cpu);
+ extern void cpu_die(void);
++extern void cpu_die_early(void);
+ 
+ static inline void cpu_park_loop(void)
+ {
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 0fab3b1..111e06f 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -845,25 +845,6 @@ static u64 __raw_read_system_reg(u32 sys_id)
+ }
+ 
+ /*
+- * Kill the calling secondary CPU, early in bringup before it is turned
+- * online.
+- */
+-void cpu_die_early(void)
+-{
+-	int cpu = smp_processor_id();
+-
+-	pr_crit("CPU%d: will not boot\n", cpu);
+-
+-	/* Mark this CPU absent */
+-	set_cpu_present(cpu, 0);
+-
+-	/* Check if we can park ourselves */
+-	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+-		cpu_ops[cpu]->cpu_die(cpu);
+-	cpu_park_loop();
+-}
+-
+-/*
+  * Run through the enabled system capabilities and enable() it on this CPU.
+  * The capabilities were decided based on the available CPUs at the boot time.
+  * Any new CPU should match the system wide status of the capability. If the
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index a84623d..ee247d4 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -311,6 +311,28 @@ void cpu_die(void)
+ }
+ #endif
+ 
++/*
++ * Kill the calling secondary CPU, early in bringup before it is turned
++ * online.
++ */
++void cpu_die_early(void)
++{
++	int cpu = smp_processor_id();
++
++	pr_crit("CPU%d: will not boot\n", cpu);
++
++	/* Mark this CPU absent */
++	set_cpu_present(cpu, 0);
++
++#ifdef CONFIG_HOTPLUG_CPU
++	/* Check if we can park ourselves */
++	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
++		cpu_ops[cpu]->cpu_die(cpu);
++#endif
++
++	cpu_park_loop();
++}
++
+ static void __init hyp_mode_check(void)
+ {
+ 	if (is_hyp_mode_available())
+-- 
+1.8.3.1
+

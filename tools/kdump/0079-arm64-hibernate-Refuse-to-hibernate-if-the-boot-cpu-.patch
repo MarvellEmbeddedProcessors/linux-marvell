@@ -1,0 +1,79 @@
+From 6d9215745a831a590fdbca32e94ad50b9ecfb6c0 Mon Sep 17 00:00:00 2001
+From: James Morse <james.morse@arm.com>
+Date: Wed, 27 Apr 2016 17:47:13 +0100
+Subject: [PATCH 079/123] arm64: hibernate: Refuse to hibernate if the boot cpu
+ is offline
+
+Hibernation represents a system state save/restore through
+a system reboot; this implies that the logical cpus carrying
+out hibernation/thawing must be the same, so that the context
+saved in the snapshot image on hibernation is consistent with
+the state of the system on resume. If resume from hibernation
+is driven through kernel command line parameter, the cpu responsible
+for thawing the system will be whatever CPU firmware boots the system
+on upon cold-boot (ie logical cpu 0); this means that in order to
+keep system context consistent between the hibernate snapshot image
+and system state on kernel resume from hibernate, logical cpu 0 must
+be online on hibernation and must be the logical cpu that creates
+the snapshot image.
+
+This patch adds a PM notifier that enforces logical cpu 0 is online
+when the hibernation is started (and prevents hibernation if it is
+not), which is sufficient to guarantee it will be the one creating
+the snapshot image therefore providing the resume cpu a consistent
+snapshot of the system to resume to.
+
+Signed-off-by: James Morse <james.morse@arm.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+(cherry picked from commit 1fe492ce6482b77807b25d29690a48c46456beee)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/kernel/hibernate.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 7e16fb3..f8df75d 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -17,6 +17,7 @@
+ #define pr_fmt(x) "hibernate: " x
+ #include <linux/kvm_host.h>
+ #include <linux/mm.h>
++#include <linux/notifier.h>
+ #include <linux/pm.h>
+ #include <linux/sched.h>
+ #include <linux/suspend.h>
+@@ -459,3 +460,28 @@ int swsusp_arch_resume(void)
+ out:
+ 	return rc;
+ }
++
++static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
++					     unsigned long action, void *ptr)
++{
++	if (action == PM_HIBERNATION_PREPARE &&
++	     cpumask_first(cpu_online_mask) != 0) {
++		pr_warn("CPU0 is offline.\n");
++		return notifier_from_errno(-ENODEV);
++	}
++
++	return NOTIFY_OK;
++}
++
++static int __init check_boot_cpu_online_init(void)
++{
++	/*
++	 * Set this pm_notifier callback with a lower priority than
++	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
++	 * called earlier to disable cpu hotplug before the cpu online check.
++	 */
++	pm_notifier(check_boot_cpu_online_pm_callback, -INT_MAX);
++
++	return 0;
++}
++core_initcall(check_boot_cpu_online_init);
+-- 
+1.8.3.1
+

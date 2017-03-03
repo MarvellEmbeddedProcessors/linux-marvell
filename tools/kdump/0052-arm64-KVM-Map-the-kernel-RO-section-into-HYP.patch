@@ -1,0 +1,44 @@
+From e0bbb13819e101b291c0cf9f933ada646727a5af Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Tue, 27 Oct 2015 12:18:48 +0000
+Subject: [PATCH 052/123] arm64: KVM: Map the kernel RO section into HYP
+
+In order to run C code in HYP, we must make sure that the kernel's
+RO section is mapped into HYP (otherwise things break badly).
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+(cherry picked from commit 910917bb7db070cc67557a6b3c8fcceaa5c398a7)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm/kvm/arm.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index d7bef21..449e312 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -44,6 +44,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_psci.h>
++#include <asm/sections.h>
+ 
+ #ifdef REQUIRES_VIRT
+ __asm__(".arch_extension	virt");
+@@ -1065,6 +1066,12 @@ static int init_hyp_mode(void)
+ 		goto out_free_mappings;
+ 	}
+ 
++	err = create_hyp_mappings(__start_rodata, __end_rodata);
++	if (err) {
++		kvm_err("Cannot map rodata section\n");
++		goto out_free_mappings;
++	}
++
+ 	/*
+ 	 * Map the Hyp stack pages
+ 	 */
+-- 
+1.8.3.1
+

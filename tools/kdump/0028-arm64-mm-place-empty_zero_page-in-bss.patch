@@ -1,0 +1,118 @@
+From 70b6ef26fe7328bdb7d9be2cb1cf915809df7ac8 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Mon, 25 Jan 2016 11:44:57 +0000
+Subject: [PATCH 028/123] arm64: mm: place empty_zero_page in bss
+
+Currently the zero page is set up in paging_init, and thus we cannot use
+the zero page earlier. We use the zero page as a reserved TTBR value
+from which no TLB entries may be allocated (e.g. when uninstalling the
+idmap). To enable such usage earlier (as may be required for invasive
+changes to the kernel page tables), and to minimise the time that the
+idmap is active, we need to be able to use the zero page before
+paging_init.
+
+This patch follows the example set by x86, by allocating the zero page
+at compile time, in .bss. This means that the zero page itself is
+available immediately upon entry to start_kernel (as we zero .bss before
+this), and also means that the zero page takes up no space in the raw
+Image binary. The associated struct page is allocated in bootmem_init,
+and remains unavailable until this time.
+
+Outside of arch code, the only users of empty_zero_page assume that the
+empty_zero_page symbol refers to the zeroed memory itself, and that
+ZERO_PAGE(x) must be used to acquire the associated struct page,
+following the example of x86. This patch also brings arm64 inline with
+these assumptions.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit 5227cfa71f9e8574373f4d0e9e754942d76cdf67)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/include/asm/mmu_context.h | 2 +-
+ arch/arm64/include/asm/pgtable.h     | 4 ++--
+ arch/arm64/kernel/head.S             | 1 +
+ arch/arm64/mm/mmu.c                  | 9 +--------
+ 4 files changed, 5 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 2416578..600eacb 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -48,7 +48,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
+  */
+ static inline void cpu_set_reserved_ttbr0(void)
+ {
+-	unsigned long ttbr = page_to_phys(empty_zero_page);
++	unsigned long ttbr = virt_to_phys(empty_zero_page);
+ 
+ 	asm(
+ 	"	msr	ttbr0_el1, %0			// set TTBR0\n"
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 67c2ad6..a11053a 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -123,8 +123,8 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+  * ZERO_PAGE is a global shared page that is always zero: used
+  * for zero-mapped memory areas etc..
+  */
+-extern struct page *empty_zero_page;
+-#define ZERO_PAGE(vaddr)	(empty_zero_page)
++extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
++#define ZERO_PAGE(vaddr)	virt_to_page(empty_zero_page)
+ 
+ #define pte_ERROR(pte)		__pte_error(__FILE__, __LINE__, pte_val(pte))
+ 
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 10eeeab..8e22dfe 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -421,6 +421,7 @@ __mmap_switched:
+ 	adr_l	x2, __bss_stop
+ 	sub	x2, x2, x0
+ 	bl	__pi_memset
++	dsb	ishst				// Make zero page visible to PTW
+ 
+ 	adr_l	sp, initial_sp, x4
+ 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f823302..7319529 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -49,7 +49,7 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
+  * Empty_zero_page is a special page that is used for zero-initialized data
+  * and COW.
+  */
+-struct page *empty_zero_page;
++unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
+ EXPORT_SYMBOL(empty_zero_page);
+ 
+ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+@@ -449,18 +449,11 @@ void fixup_init(void)
+  */
+ void __init paging_init(void)
+ {
+-	void *zero_page;
+-
+ 	map_mem();
+ 	fixup_executable();
+ 
+-	/* allocate the zero page. */
+-	zero_page = early_pgtable_alloc();
+-
+ 	bootmem_init();
+ 
+-	empty_zero_page = virt_to_page(zero_page);
+-
+ 	/*
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * point to zero page to avoid speculatively fetching new entries.
+-- 
+1.8.3.1
+

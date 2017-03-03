@@ -1,0 +1,74 @@
+From 96af576852d969328982e8fd4f9843ab486f1071 Mon Sep 17 00:00:00 2001
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Date: Tue, 26 Jan 2016 15:29:29 +0900
+Subject: [PATCH 115/123] arm64: limit memory regions based on DT property,
+ usable-memory-range
+
+Crash dump kernel utilizes only a subset of available memory as System RAM.
+On arm64 kdump, This memory range is advertized to crash dump kernel via
+a device-tree property under /chosen,
+   linux,usable-memory-range = <BASE SIZE>
+
+Crash dump kernel reads this property at boot time and calls
+memblock_cap_memory_range() to limit usable memory ranges which are
+described as entries in UEFI memory map table or "memory" nodes in
+a device tree blob.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Reviewed-by: Geoff Levand <geoff@infradead.org>
+(cherry picked from commit 730c31632a7c31afcd704635990ca11d15d4d247)
+---
+ arch/arm64/mm/init.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index b37e259..007ee97 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -157,8 +157,43 @@ static int __init early_mem(char *p)
+ }
+ early_param("mem", early_mem);
+ 
++static int __init early_init_dt_scan_usablemem(unsigned long node,
++		const char *uname, int depth, void *data)
++{
++	struct memblock_region *usablemem = (struct memblock_region *)data;
++	const __be32 *reg;
++	int len;
++
++	usablemem->size = 0;
++
++	if (depth != 1 || strcmp(uname, "chosen") != 0)
++		return 0;
++
++	reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
++	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
++		return 1;
++
++	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
++	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
++
++	return 1;
++}
++
++static void __init fdt_enforce_memory_region(void)
++{
++	struct memblock_region reg;
++
++	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
++
++	if (reg.size)
++		memblock_cap_memory_range(reg.base, reg.size);
++}
++
+ void __init arm64_memblock_init(void)
+ {
++	/* Handle linux,usable-memory-range property */
++	fdt_enforce_memory_region();
++
+ 	memblock_enforce_memory_limit(memory_limit);
+ 
+ 	/*
+-- 
+1.8.3.1
+

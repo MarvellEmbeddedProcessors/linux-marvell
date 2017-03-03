@@ -1,0 +1,47 @@
+From 05e05be66299eeed95715bf97077207e75e7f342 Mon Sep 17 00:00:00 2001
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Date: Tue, 12 Apr 2016 15:46:00 +0100
+Subject: [PATCH 105/123] arm64: Add cpu_panic_kernel helper
+
+During the activation of a secondary CPU, we could report serious
+configuration issues and hence request to crash the kernel. We do
+this for CPU ASID bit check now. We will need it also for handling
+mismatched exception levels for the CPUs with VHE. Hence, add a
+helper to do the same for reusability.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+(cherry picked from commit 17eebd1a435c8616c47b715e3447f4a9c15b741f)
+---
+ arch/arm64/include/asm/smp.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index 817a067..433e504 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -113,6 +113,17 @@ static inline void update_cpu_boot_status(int val)
+ 	dsb(ishst);
+ }
+ 
++/*
++ * The calling secondary CPU has detected serious configuration mismatch,
++ * which calls for a kernel panic. Update the boot status and park the calling
++ * CPU.
++ */
++static inline void cpu_panic_kernel(void)
++{
++	update_cpu_boot_status(CPU_PANIC_KERNEL);
++	cpu_park_loop();
++}
++
+ #endif /* ifndef __ASSEMBLY__ */
+ 
+ #endif /* ifndef __ASM_SMP_H */
+-- 
+1.8.3.1
+

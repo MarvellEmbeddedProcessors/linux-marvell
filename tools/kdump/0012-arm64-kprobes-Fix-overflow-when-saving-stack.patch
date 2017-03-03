@@ -1,0 +1,78 @@
+From 8caaa405b29a1b6bedf7653a2b0d2124d5f3cf63 Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Thu, 29 Sep 2016 18:18:23 -0400
+Subject: [PATCH 012/123] arm64: kprobes: Fix overflow when saving stack
+
+commit ab4c1325d4bf111a590a1f773e3d93bde7f40201 upstream.
+
+The MIN_STACK_SIZE macro tries evaluate how much stack space needs
+to be saved in the jprobes_stack array, sized at 128 bytes.
+
+When using the IRQ stack, said macro can happily return up to
+IRQ_STACK_SIZE, which is 16kB. Mayhem follows.
+
+This patch fixes things by getting rid of the crazy macro and
+limiting the copy to be at most the size of the jprobes_stack
+array, no matter which stack we're on.
+
+[dave.long@linaro.org: Since there is no irq_stack in this kernel version
+this fix is not strictly necessary, but is included for completeness.]
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: David A. Long <dave.long@linaro.org>
+---
+ arch/arm64/kernel/probes/kprobes.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index a9b274c..b118974 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -34,9 +34,6 @@
+ 
+ #include "decode-insn.h"
+ 
+-#define MIN_STACK_SIZE(addr)	min((unsigned long)MAX_STACK_SIZE,	\
+-	(unsigned long)current_thread_info() + THREAD_START_SP - (addr))
+-
+ void jprobe_return_break(void);
+ 
+ DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
+@@ -45,6 +42,15 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
+ static void __kprobes
+ post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
+ 
++static inline unsigned long min_stack_size(unsigned long addr)
++{
++	unsigned long size;
++
++	size = (unsigned long)current_thread_info() + THREAD_START_SP - addr;
++
++	return min(size, FIELD_SIZEOF(struct kprobe_ctlblk, jprobes_stack));
++}
++
+ static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
+ {
+ 	/* prepare insn slot */
+@@ -492,7 +498,7 @@ int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
+ 	 * the argument area.
+ 	 */
+ 	memcpy(kcb->jprobes_stack, (void *)stack_ptr,
+-	       MIN_STACK_SIZE(stack_ptr));
++	       min_stack_size(stack_ptr));
+ 
+ 	instruction_pointer_set(regs, (unsigned long) jp->entry);
+ 	preempt_disable();
+@@ -545,7 +551,7 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 	unpause_graph_tracing();
+ 	*regs = kcb->jprobe_saved_regs;
+ 	memcpy((void *)stack_addr, kcb->jprobes_stack,
+-	       MIN_STACK_SIZE(stack_addr));
++	       min_stack_size(stack_addr));
+ 	preempt_enable_no_resched();
+ 	return 1;
+ }
+-- 
+1.8.3.1
+

@@ -1,0 +1,27 @@
+From d39732d4ef63ba02d04f842656ee4470f35d5f51 Mon Sep 17 00:00:00 2001
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Date: Mon, 28 Nov 2016 13:34:42 +0900
+Subject: [PATCH 123/123] fixup! arm64: kdump: add VMCOREINFO's for user-space
+ tools
+
+If KASLR is backported, this patch won't be necessary.
+---
+ arch/arm64/kernel/machine_kexec.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 0ff4ec5..9fc748a 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -224,8 +224,6 @@ void arch_crash_save_vmcoreinfo(void)
+ {
+ 	VMCOREINFO_NUMBER(VA_BITS);
+ 	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
+-	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
+-						kimage_voffset);
+ 	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
+ 						PHYS_OFFSET);
+ }
+-- 
+1.8.3.1
+

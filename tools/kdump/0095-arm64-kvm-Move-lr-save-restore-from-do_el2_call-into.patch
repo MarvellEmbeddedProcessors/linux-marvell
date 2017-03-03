@@ -1,0 +1,100 @@
+From ca748b3834788c363eb004b3b30ed4282bf70738 Mon Sep 17 00:00:00 2001
+From: James Morse <james.morse@arm.com>
+Date: Wed, 27 Apr 2016 17:47:02 +0100
+Subject: [PATCH 095/123] arm64: kvm: Move lr save/restore from do_el2_call
+ into EL1
+
+Today the 'hvc' calling KVM or the hyp-stub is expected to preserve all
+registers. KVM saves/restores the registers it needs on the EL2 stack using
+do_el2_call(). The hyp-stub has no stack, later patches need to be able to
+be able to clobber the link register.
+
+Move the link register save/restore to the the call sites.
+
+Signed-off-by: James Morse <james.morse@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+(cherry picked from commit 00a44cdaba0900c63a003e0c431f506f49376a90)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/kernel/hyp-stub.S   | 10 ++++++++--
+ arch/arm64/kvm/hyp.S           |  7 ++++++-
+ arch/arm64/kvm/hyp/hyp-entry.S |  6 ++----
+ 3 files changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index a272f33..7eab8ac 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -101,10 +101,16 @@ ENDPROC(\label)
+  */
+ 
+ ENTRY(__hyp_get_vectors)
++	str	lr, [sp, #-16]!
+ 	mov	x0, xzr
+-	// fall through
+-ENTRY(__hyp_set_vectors)
+ 	hvc	#0
++	ldr	lr, [sp], #16
+ 	ret
+ ENDPROC(__hyp_get_vectors)
++
++ENTRY(__hyp_set_vectors)
++	str	lr, [sp, #-16]!
++	hvc	#0
++	ldr	lr, [sp], #16
++	ret
+ ENDPROC(__hyp_set_vectors)
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 48f19a3..4ee5612 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -38,13 +38,18 @@
+  * A function pointer with a value of 0 has a special meaning, and is
+  * used to implement __hyp_get_vectors in the same way as in
+  * arch/arm64/kernel/hyp_stub.S.
++ * HVC behaves as a 'bl' call and will clobber lr.
+  */
+ ENTRY(__kvm_call_hyp)
+-alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
++	str     lr, [sp, #-16]!
+ 	hvc	#0
++	ldr     lr, [sp], #16
+ 	ret
+ alternative_else
+ 	b	__vhe_hyp_call
+ 	nop
++	nop
++	nop
+ alternative_endif
+ ENDPROC(__kvm_call_hyp)
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 1bdeee7..ca8a8ea 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -43,19 +43,17 @@
+ 	 * Shuffle the parameters before calling the function
+ 	 * pointed to in x0. Assumes parameters in x[1,2,3].
+ 	 */
+-	sub	sp, sp, #16
+-	str	lr, [sp]
+ 	mov	lr, x0
+ 	mov	x0, x1
+ 	mov	x1, x2
+ 	mov	x2, x3
+ 	blr	lr
+-	ldr	lr, [sp]
+-	add	sp, sp, #16
+ .endm
+ 
+ ENTRY(__vhe_hyp_call)
++	str	lr, [sp, #-16]!
+ 	do_el2_call
++	ldr	lr, [sp], #16
+ 	/*
+ 	 * We used to rely on having an exception return to get
+ 	 * an implicit isb. In the E2H case, we don't have it anymore.
+-- 
+1.8.3.1
+

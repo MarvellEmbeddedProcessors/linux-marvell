@@ -1,0 +1,94 @@
+From 012166d18ca4a8fe8ffc57a496343322ce3c7267 Mon Sep 17 00:00:00 2001
+From: Pratyush Anand <panand@redhat.com>
+Date: Thu, 29 Sep 2016 18:14:59 -0400
+Subject: [PATCH 006/123] arm64: Treat all entry code as non-kprobe-able
+
+commit 888b3c8720e0a4033db09ba2364afde6a4763638 upstream.
+
+Entry symbols are not kprobe safe. So blacklist them for kprobing.
+
+[dave.long@linaro.org: Remove check for hypervisor text]
+
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: David A. Long <dave.long@linaro.org>
+Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+[catalin.marinas@arm.com: Do not include syscall wrappers in .entry.text]
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/entry.S          |  3 +++
+ arch/arm64/kernel/probes/kprobes.c | 18 ++++++++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S    |  1 +
+ 3 files changed, 22 insertions(+)
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 698c4c6..e88854e 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -207,6 +207,7 @@ tsk	.req	x28		// current thread_info
+ /*
+  * Exception vectors.
+  */
++	.pushsection ".entry.text", "ax"
+ 
+ 	.align	11
+ ENTRY(vectors)
+@@ -748,6 +749,8 @@ __ni_sys_trace:
+ 	bl	do_ni_syscall
+ 	b	__sys_trace_return
+ 
++	.popsection				// .entry.text
++
+ /*
+  * Special system call wrappers.
+  */
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index 55e3e01..bb3d380 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -30,6 +30,7 @@
+ #include <asm/insn.h>
+ #include <asm/uaccess.h>
+ #include <asm/irq.h>
++#include <asm-generic/sections.h>
+ 
+ #include "decode-insn.h"
+ 
+@@ -516,6 +517,23 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 	return 1;
+ }
+ 
++bool arch_within_kprobe_blacklist(unsigned long addr)
++{
++	extern char __idmap_text_start[], __idmap_text_end[];
++
++	if ((addr >= (unsigned long)__kprobes_text_start &&
++	    addr < (unsigned long)__kprobes_text_end) ||
++	    (addr >= (unsigned long)__entry_text_start &&
++	    addr < (unsigned long)__entry_text_end) ||
++	    (addr >= (unsigned long)__idmap_text_start &&
++	    addr < (unsigned long)__idmap_text_end) ||
++	    !!search_exception_tables(addr))
++		return true;
++
++
++	return false;
++}
++
+ int __init arch_init_kprobes(void)
+ {
+ 	return 0;
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index bc6b631..2fb8560 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -102,6 +102,7 @@ SECTIONS
+ 			*(.exception.text)
+ 			__exception_text_end = .;
+ 			IRQENTRY_TEXT
++			ENTRY_TEXT
+ 			TEXT_TEXT
+ 			SCHED_TEXT
+ 			LOCK_TEXT
+-- 
+1.8.3.1
+

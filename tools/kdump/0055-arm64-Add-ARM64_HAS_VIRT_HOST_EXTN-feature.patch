@@ -1,0 +1,80 @@
+From f60b9674e10653eb9027092c449e4e3a7be5e656 Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Thu, 29 Jan 2015 11:24:05 +0000
+Subject: [PATCH 055/123] arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
+
+Add a new ARM64_HAS_VIRT_HOST_EXTN features to indicate that the
+CPU has the ARMv8.1 VHE capability.
+
+This will be used to trigger kernel patching in KVM.
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+(cherry picked from commit d88701bea3664cea99b8b7380f63a3bd0ec3ead3)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Conflicts:
+	arch/arm64/include/asm/cpufeature.h
+---
+ arch/arm64/include/asm/cpufeature.h |  7 ++++++-
+ arch/arm64/kernel/cpufeature.c      | 11 +++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 8884b5d..7abfd41 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -32,7 +32,12 @@
+ #define ARM64_WORKAROUND_834220			7
+ #define ARM64_WORKAROUND_CAVIUM_27456		8
+ 
+-#define ARM64_NCAPS				9
++/* #define ARM64_HAS_NO_HW_PREFETCH		8 */
++/* #define ARM64_HAS_UAO			9 */
++/* #define ARM64_ALT_PAN_NOT_UAO		10 */
++#define ARM64_HAS_VIRT_HOST_EXTN		11
++
++#define ARM64_NCAPS				12
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 2735bf8..b9c7176 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -28,6 +28,7 @@
+ #include <asm/cpu_ops.h>
+ #include <asm/processor.h>
+ #include <asm/sysreg.h>
++#include <asm/virt.h>
+ 
+ unsigned long elf_hwcap __read_mostly;
+ EXPORT_SYMBOL_GPL(elf_hwcap);
+@@ -623,6 +624,11 @@ static bool has_useable_gicv3_cpuif(const struct arm64_cpu_capabilities *entry)
+ 	return has_sre;
+ }
+ 
++static bool runs_at_el2(const struct arm64_cpu_capabilities *entry)
++{
++	return is_kernel_in_hyp_mode();
++}
++
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -653,6 +659,11 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.min_field_value = 2,
+ 	},
+ #endif /* CONFIG_AS_LSE && CONFIG_ARM64_LSE_ATOMICS */
++	{
++		.desc = "Virtualization Host Extensions",
++		.capability = ARM64_HAS_VIRT_HOST_EXTN,
++		.matches = runs_at_el2,
++	},
+ 	{},
+ };
+ 
+-- 
+1.8.3.1
+

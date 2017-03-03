@@ -1,0 +1,85 @@
+From 31f22f216d1e6291395bf397e8a6f6b97a195644 Mon Sep 17 00:00:00 2001
+From: James Morse <james.morse@arm.com>
+Date: Wed, 27 Apr 2016 17:47:04 +0100
+Subject: [PATCH 097/123] arm64: hyp/kvm: Make hyp-stub reject kvm_call_hyp()
+
+A later patch implements kvm_arch_hardware_disable(), to remove kvm
+from el2, and re-instate the hyp-stub.
+
+This can happen while guests are running, particularly when kvm_reboot()
+calls kvm_arch_hardware_disable() on each cpu. This can interrupt a guest,
+remove kvm, then allow the guest to be scheduled again. This causes
+kvm_call_hyp() to be run against the hyp-stub.
+
+Change the hyp-stub to return a new exception type when this happens,
+and add code to kvm's handle_exit() to tell userspace we failed to
+enter the guest.
+
+Signed-off-by: James Morse <james.morse@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+(cherry picked from commit c94b0cf28281d483c8b43b4874fcb7ab14ade1b1)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/include/asm/kvm_asm.h | 2 ++
+ arch/arm64/kernel/hyp-stub.S     | 5 +++--
+ arch/arm64/kvm/handle_exit.c     | 7 +++++++
+ 3 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 31b5600..edb51b8 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -22,6 +22,8 @@
+ 
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_TRAP	  1
++/* The hyp-stub will return this for any kvm_call_hyp() call */
++#define ARM_EXCEPTION_HYP_GONE	  2
+ 
+ #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
+ #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index 894fb40..8727f44 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -23,6 +23,7 @@
+ 
+ #include <asm/assembler.h>
+ #include <asm/kvm_arm.h>
++#include <asm/kvm_asm.h>
+ #include <asm/ptrace.h>
+ #include <asm/virt.h>
+ 
+@@ -70,8 +71,8 @@ el1_sync:
+ 	msr	vbar_el2, x1
+ 	b	9f
+ 
+-	/* Unrecognised call type */
+-2:	mov     x0, xzr
++	/* Someone called kvm_call_hyp() against the hyp-stub... */
++2:	mov     x0, #ARM_EXCEPTION_HYP_GONE
+ 
+ 9:	eret
+ ENDPROC(el1_sync)
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 198cf10..25006a7 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -183,6 +183,13 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		exit_handler = kvm_get_exit_handler(vcpu);
+ 
+ 		return exit_handler(vcpu, run);
++	case ARM_EXCEPTION_HYP_GONE:
++		/*
++		 * EL2 has been reset to the hyp-stub. This happens when a guest
++		 * is pre-empted by kvm_reboot()'s shutdown call.
++		 */
++		run->exit_reason = KVM_EXIT_FAIL_ENTRY;
++		return 0;
+ 	default:
+ 		kvm_pr_unimpl("Unsupported exception type: %d",
+ 			      exception_index);
+-- 
+1.8.3.1
+

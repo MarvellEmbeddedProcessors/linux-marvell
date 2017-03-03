@@ -1,0 +1,141 @@
+From 2e8ab1af32c8644ce07df46a1dbefc83f6d61b56 Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Mon, 4 Jan 2016 15:44:32 +0100
+Subject: [PATCH 020/123] ARM: 8480/2: arm64: add implementation for arm-smccc
+
+Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC.
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+(cherry picked from commit 14457459f9ca2ff8521686168ea179edc3a56a44)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Conflicts:
+	arch/arm64/kernel/arm64ksyms.c
+---
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/kernel/Makefile      |  2 +-
+ arch/arm64/kernel/arm64ksyms.c  |  5 +++++
+ arch/arm64/kernel/asm-offsets.c |  3 +++
+ arch/arm64/kernel/smccc-call.S  | 43 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 53 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/smccc-call.S
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7a2b7a2..41d2637 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -95,6 +95,7 @@ config ARM64
+ 	select SPARSE_IRQ
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select HAVE_CONTEXT_TRACKING
++	select HAVE_ARM_SMCCC
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
+ 
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index cfa290b..0a987eb 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -17,7 +17,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
+ 			   return_address.o cpuinfo.o cpu_errata.o		\
+ 			   cpufeature.o alternative.o cacheinfo.o		\
+-			   smp.o smp_spin_table.o topology.o
++			   smp.o smp_spin_table.o topology.o smccc-call.o
+ 
+ extra-$(CONFIG_EFI)			:= efi-entry.o
+ 
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index fbec403..fce2b116 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -27,6 +27,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/io.h>
+ #include <linux/kprobes.h>
++#include <linux/arm-smccc.h>
+ 
+ #include <asm/checksum.h>
+ 
+@@ -70,3 +71,7 @@ EXPORT_SYMBOL(test_and_change_bit);
+ EXPORT_SYMBOL(_mcount);
+ NOKPROBE_SYMBOL(_mcount);
+ #endif
++
++	/* arm-smccc */
++EXPORT_SYMBOL(arm_smccc_smc);
++EXPORT_SYMBOL(arm_smccc_hvc);
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index dd292519..2a948bf 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -28,6 +28,7 @@
+ #include <asm/suspend.h>
+ #include <asm/vdso_datapage.h>
+ #include <linux/kbuild.h>
++#include <linux/arm-smccc.h>
+ 
+ int main(void)
+ {
+@@ -173,5 +174,7 @@ int main(void)
+   DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
+   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
+ #endif
++  DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
++  DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
+   return 0;
+ }
+diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+new file mode 100644
+index 0000000..ae0496f
+--- /dev/null
++++ b/arch/arm64/kernel/smccc-call.S
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License Version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/linkage.h>
++#include <asm/asm-offsets.h>
++
++	.macro SMCCC instr
++	.cfi_startproc
++	\instr	#0
++	ldr	x4, [sp]
++	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
++	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
++	ret
++	.cfi_endproc
++	.endm
++
++/*
++ * void arm_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
++ *		  unsigned long a3, unsigned long a4, unsigned long a5,
++ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
++ */
++ENTRY(arm_smccc_smc)
++	SMCCC	smc
++ENDPROC(arm_smccc_smc)
++
++/*
++ * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
++ *		  unsigned long a3, unsigned long a4, unsigned long a5,
++ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
++ */
++ENTRY(arm_smccc_hvc)
++	SMCCC	hvc
++ENDPROC(arm_smccc_hvc)
+-- 
+1.8.3.1
+

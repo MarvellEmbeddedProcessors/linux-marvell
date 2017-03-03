@@ -1,0 +1,87 @@
+From 296fe0a67f0153994d68ef7303b35568aaf8c59e Mon Sep 17 00:00:00 2001
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 16 Feb 2016 13:52:36 +0100
+Subject: [PATCH 093/123] arm64: introduce KIMAGE_VADDR as the virtual base of
+ the kernel region
+
+This introduces the preprocessor symbol KIMAGE_VADDR which will serve as
+the symbolic virtual base of the kernel region, i.e., the kernel's virtual
+offset will be KIMAGE_VADDR + TEXT_OFFSET. For now, we define it as being
+equal to PAGE_OFFSET, but in the future, it will be moved below it once
+we move the kernel virtual mapping out of the linear mapping.
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit ab893fb9f1b17f02139bce547bb4b69e96b9ae16)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/include/asm/memory.h | 10 ++++++++--
+ arch/arm64/kernel/head.S        |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S |  4 ++--
+ 3 files changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 5773a66..2e979ec 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -51,7 +51,8 @@
+ #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+ #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+ #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
+-#define MODULES_END		(PAGE_OFFSET)
++#define KIMAGE_VADDR		(PAGE_OFFSET)
++#define MODULES_END		(KIMAGE_VADDR)
+ #define MODULES_VADDR		(MODULES_END - SZ_64M)
+ #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+@@ -78,8 +79,13 @@
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+  */
+-#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
++#define __virt_to_phys(x) ({						\
++	phys_addr_t __x = (phys_addr_t)(x);				\
++	__x >= PAGE_OFFSET ? (__x - PAGE_OFFSET + PHYS_OFFSET) :	\
++			     (__x - KIMAGE_VADDR + PHYS_OFFSET); })
++
+ #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
++#define __phys_to_kimg(x)	((unsigned long)((x) - PHYS_OFFSET + KIMAGE_VADDR))
+ 
+ /*
+  * Convert a page to/from a physical address
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0d84e73..2f38749 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -386,7 +386,7 @@ __create_page_tables:
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
+ 	 */
+ 	mov	x0, x26				// swapper_pg_dir
+-	mov	x5, #PAGE_OFFSET
++	ldr	x5, =KIMAGE_VADDR
+ 	create_pgd_entry x0, x5, x3, x6
+ 	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
+ 	mov	x3, x24				// phys offset
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index fa2fc07..9e570d4 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -99,7 +99,7 @@ SECTIONS
+ 		*(.discard.*)
+ 	}
+ 
+-	. = PAGE_OFFSET + TEXT_OFFSET;
++	. = KIMAGE_VADDR + TEXT_OFFSET;
+ 
+ 	.head.text : {
+ 		_text = .;
+@@ -205,4 +205,4 @@ ASSERT(__hibernate_exit_text_end - (__hibernate_exit_text_start & ~(SZ_4K - 1))
+ /*
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
+  */
+-ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
++ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
+-- 
+1.8.3.1
+

@@ -1,0 +1,42 @@
+From 90948bbaab6bd564412bd072baf4ba62d362a4fd Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Fri, 11 Dec 2015 11:04:31 +0000
+Subject: [PATCH 032/123] arm64: mm: place __cpu_setup in .text
+
+We drop __cpu_setup in .text.init, which ends up being part of .text.
+The .text.init section was a legacy section name which has been unused
+elsewhere for a long time.
+
+The ".text.init" name is misleading if read as a synonym for
+".init.text". Any CPU may execute __cpu_setup before turning the MMU on,
+so it should simply live in .text.
+
+Remove the pointless section assignment. This will leave __cpu_setup in
+the .text section.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+(cherry picked from commit f00083cae331e5d3eecade6b4fdc35d0825e73ef)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+---
+ arch/arm64/mm/proc.S | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 18201e9..3a44efb 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -152,8 +152,6 @@ alternative_else
+ alternative_endif
+ ENDPROC(cpu_do_switch_mm)
+ 
+-	.section ".text.init", #alloc, #execinstr
+-
+ /*
+  *	__cpu_setup
+  *
+-- 
+1.8.3.1
+

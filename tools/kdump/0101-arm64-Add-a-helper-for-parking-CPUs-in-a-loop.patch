@@ -1,0 +1,54 @@
+From f6e7b201aedd14a1d3921f4ca9e7b76009444351 Mon Sep 17 00:00:00 2001
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Date: Tue, 23 Feb 2016 10:31:39 +0000
+Subject: [PATCH 101/123] arm64: Add a helper for parking CPUs in a loop
+
+Adds a routine which can be used to park CPUs (spinning in kernel)
+when they can't be killed.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+(cherry picked from commit c4bc34d20273db698c51951a1951dba0a722e162)
+---
+ arch/arm64/include/asm/smp.h   | 8 ++++++++
+ arch/arm64/kernel/cpufeature.c | 5 +----
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index 2013a4d..b93eb33 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -78,4 +78,12 @@ extern int __cpu_disable(void);
+ extern void __cpu_die(unsigned int cpu);
+ extern void cpu_die(void);
+ 
++static inline void cpu_park_loop(void)
++{
++	for (;;) {
++		wfe();
++		wfi();
++	}
++}
++
+ #endif /* ifndef __ASM_SMP_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index b9c7176..a323cce 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -860,10 +860,7 @@ static void fail_incapable_cpu(char *cap_type,
+ 	/* Check if we can park ourselves */
+ 	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_die)
+ 		cpu_ops[cpu]->cpu_die(cpu);
+-	asm(
+-	"1:	wfe\n"
+-	"	wfi\n"
+-	"	b	1b");
++	cpu_park_loop();
+ }
+ 
+ /*
+-- 
+1.8.3.1
+
