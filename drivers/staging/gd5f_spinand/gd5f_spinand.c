@@ -560,7 +560,7 @@ static int spinand_program_page(struct spi_device *spi_nand,
 	if (ret < 0) {
 		dev_err(&spi_nand->dev, "Error %d on page read.\n",
 			(int)ret);
-		return ret;
+		goto err_free_mem;
 	}
 	for (i = offset, j = 0; j < len; i++, j++)
 		wbuf[i] &= buf[j];
@@ -580,7 +580,7 @@ static int spinand_program_page(struct spi_device *spi_nand,
 	if (ret < 0) {
 		dev_err(&spi_nand->dev, "Error %d on write enable.\n",
 			(int)ret);
-		return ret;
+		goto err_free_mem;
 	}
 
 	/* Issue program cache command */
@@ -588,7 +588,7 @@ static int spinand_program_page(struct spi_device *spi_nand,
 	if (ret < 0) {
 		dev_err(&spi_nand->dev, "Error %d when programming cache.\n",
 			(int)ret);
-		return ret;
+		goto err_free_mem;
 	}
 
 	/* Issue program execute command */
@@ -596,7 +596,7 @@ static int spinand_program_page(struct spi_device *spi_nand,
 	if (ret < 0) {
 		dev_err(&spi_nand->dev, "Error %d when programming NAND cells.\n",
 			(int)ret);
-		return ret;
+		goto err_free_mem;
 	}
 
 	/* Wait until the operation completes or a timeout occurs. */
@@ -606,12 +606,13 @@ static int spinand_program_page(struct spi_device *spi_nand,
 			dev_err(&spi_nand->dev,
 				"%s: Wait execution complete failed!\n",
 				__func__);
-			return ret;
+			goto err_free_mem;
 		}
 			dev_err(&spi_nand->dev,
 				"%s Wait execution complete timedout!\n",
 				__func__);
-			return -1;
+			ret = -1;
+			goto err_free_mem;
 	}
 
 	/* Check status register for program fail bit */
@@ -619,11 +620,12 @@ static int spinand_program_page(struct spi_device *spi_nand,
 	if (ret < 0) {
 		dev_err(&spi_nand->dev, "Error %d reading status register.\n",
 			(int)ret);
-		return ret;
+		goto err_free_mem;
 	}
 	if (status & SPI_NAND_PF) {
 		dev_err(&spi_nand->dev, "Program failed on page %d\n", page_id);
-		return -1;
+		ret = -1;
+		goto err_free_mem;
 	}
 
 	/* Disable ECC if HW ECC available */
@@ -635,9 +637,16 @@ static int spinand_program_page(struct spi_device *spi_nand,
 			dev_err(&spi_nand->dev, "Disable HW ECC failed.");
 		enable_hw_ecc = 0;
 	}
+	devm_kfree(&spi_nand->dev, wbuf);
 #endif
 
 	return 0;
+
+err_free_mem:
+#ifdef CONFIG_MTD_SPINAND_ONDIEECC
+	devm_kfree(&spi_nand->dev, wbuf);
+#endif
+	return ret;
 }
 
 #ifdef CONFIG_MTD_SPINAND_ONDIEECC
