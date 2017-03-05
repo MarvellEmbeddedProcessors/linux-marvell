@@ -141,6 +141,9 @@
 					status = "okay";
 				};
 			};
+			eip197@800000 {
+				status = "okay";
+			};
 		};
 		pcie@0x600000 {
 			num-lanes = <4>;
@@ -223,6 +226,9 @@
 				eth2_1: eth2@030000 {
 					status = "okay";
 				};
+			};
+			eip197@800000 {
+				status = "okay";
 			};
 		};
 	};

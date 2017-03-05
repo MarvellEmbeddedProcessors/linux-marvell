@@ -223,6 +223,9 @@
 					marvell,function = "gpio";
 				};
 			};
+			eip197@800000 {
+				status = "okay";
+			};
 		};
 
 		pcie@0x640000 {
@@ -322,6 +325,9 @@
 				pinctrl-names = "default";
 				pclk-freq-mhz = <8>;
 				status = "disabled";
+			};
+			eip197@800000 {
+				status = "okay";
 			};
 		};
 		pcie@0x640000 {
