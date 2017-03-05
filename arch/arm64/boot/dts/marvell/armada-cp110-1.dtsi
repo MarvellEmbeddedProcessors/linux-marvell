@@ -352,16 +352,17 @@ cps_trng: trng@760000 {
 };
 
 cps_eip197: eip197@800000 {
-	compatible = "marvell,eip197";
-	reg = <0x800000 0x100000 0x880000 0x1000 0x881000 0x1000 0x882000 0x1000 0x883000 0x1000>;
-	reg-names = "global", "ring0", "ring1", "ring2", "ring3";
+	compatible = "inside-secure,safexcel-eip197";
+	reg = <0x800000 0x200000>;
 	dma-coherent;
-	interrupts = <ICU_GRP_NSR 88 IRQ_TYPE_LEVEL_HIGH>,
-			<ICU_GRP_NSR 89 IRQ_TYPE_LEVEL_HIGH>,
-			<ICU_GRP_NSR 90 IRQ_TYPE_LEVEL_HIGH>,
-			<ICU_GRP_NSR 91 IRQ_TYPE_LEVEL_HIGH>,
-			<ICU_GRP_NSR 92 IRQ_TYPE_LEVEL_HIGH>;
-	interrupt-names = "ring0", "ring1", "ring2", "ring3", "global";
+	interrupts = <ICU_GRP_REI 87 IRQ_TYPE_LEVEL_HIGH>,
+		     <ICU_GRP_NSR 88 IRQ_TYPE_LEVEL_HIGH>,
+		     <ICU_GRP_NSR 89 IRQ_TYPE_LEVEL_HIGH>,
+		     <ICU_GRP_NSR 90 IRQ_TYPE_LEVEL_HIGH>,
+		     <ICU_GRP_NSR 91 IRQ_TYPE_LEVEL_HIGH>,
+		     <ICU_GRP_NSR 92 IRQ_TYPE_LEVEL_HIGH>;
+	interrupt-names = "eip_addr", "ring0", "ring1",
+			  "ring2", "ring3", "eip_out";
 	clocks = <&cps_syscon0 1 26>;
 	status = "disabled";
 };
