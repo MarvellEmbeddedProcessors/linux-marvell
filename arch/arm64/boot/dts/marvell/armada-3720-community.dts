@@ -159,6 +159,9 @@
 				phys = <&a3700_comphy 2 COMPHY_SATA0>;
 				status = "okay";
 			};
+			eip97: eip97@90000 {
+				status = "okay";
+			};
 		};
 	};
 	dsa@0 {

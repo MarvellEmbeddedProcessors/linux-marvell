@@ -239,6 +239,9 @@
 			bm_bppi: bm-bppi {
 				status = "okay";
 			};
+			eip97: eip97@90000 {
+				status = "okay";
+			};
 		};
 
 		reg_sata: pwr-sata {
