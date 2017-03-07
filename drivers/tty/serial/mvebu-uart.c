@@ -48,6 +48,7 @@ struct uart_regs_layout {
 	unsigned int uart_tsh;
 	unsigned int uart_brdv;
 	unsigned int uart_stat;
+	unsigned int uart_over_sample;
 };
 /* Register Map */
 
@@ -103,6 +104,8 @@ struct uart_regs_layout {
 #define  BAUD_MASK		0x000003ff
 #define  BAUD_OFFSET		0
 
+#define UART_OSAMP		0x14
+
 /* REG_UART_A3700_EXT */
 #define UART_EXT_CTRL		0x04
 
@@ -111,6 +114,8 @@ struct uart_regs_layout {
 #define  EXT_STAT_RX_RDY_1B		BIT(14)
 
 #define UART_EXT_BRDV		0x10
+
+#define UART_EXT_OSAMP		0x14
 
 #define UART_EXT_RBR_1BYTE	0x18
 
@@ -147,6 +152,7 @@ static struct uart_regs_layout uart_regs_layout[] = {
 		.uart_tsh  = UART_TSH,
 		.uart_brdv = UART_BRDV,
 		.uart_stat = UART_STAT,
+		.uart_over_sample = UART_OSAMP,
 	},
 	[REG_UART_A3700_EXT] = {
 		.uart_ctrl  = UART_EXT_CTRL,
@@ -155,6 +161,7 @@ static struct uart_regs_layout uart_regs_layout[] = {
 		.uart_tsh   = UART_EXT_TSH_1BYTE,
 		.uart_brdv  = UART_EXT_BRDV,
 		.uart_stat  = UART_EXT_STAT,
+		.uart_over_sample = UART_EXT_OSAMP,
 	},
 };
 
@@ -170,6 +177,13 @@ struct mvebu_uart_data {
 	struct clk              *clk;
 	struct uart_regs_layout *regs;
 	enum reg_uart_type       reg_type;
+
+#ifdef CONFIG_PM
+	/* Used to restore the uart registers status*/
+	struct uart_regs_layout pm_reg_value;
+	/* Used to restore the uart interrupt type */
+	unsigned int		uart_ext_int_type;
+#endif
 
 	struct {
 		unsigned int (*ctrl_rx_rdy_int)(struct mvebu_uart_data *data);
@@ -204,6 +218,8 @@ struct mvebu_uart_data {
 #define REG_TSH(uart_data)	((uart_data)->regs->uart_tsh)
 #define REG_BRDV(uart_data)	((uart_data)->regs->uart_brdv)
 #define REG_STAT(uart_data)	((uart_data)->regs->uart_stat)
+#define REG_OSAMP(uart_data)	((uart_data)->regs->uart_over_sample)
+
 
 /* helper functions for 1-byte transfer */
 static inline unsigned int get_ctrl_rx_1byte_rdy_int(struct mvebu_uart_data *data)
@@ -990,9 +1006,46 @@ static int mvebu_uart_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
+
+/* Uart registers status save in suspend process*/
+static int mvebu_uart_reg_save(struct mvebu_uart_data *data)
+{
+	data->pm_reg_value.uart_ctrl = readl(data->port->membase + REG_CTRL(data));
+
+	if (data->reg_type == REG_UART_A3700_EXT)
+		data->pm_reg_value.uart_ctrl2 = readl(data->port->membase + REG_CTRL2(data));
+
+	data->pm_reg_value.uart_tsh = readl(data->port->membase + REG_TSH(data));
+	data->pm_reg_value.uart_brdv = readl(data->port->membase + REG_BRDV(data));
+	data->pm_reg_value.uart_over_sample = readl(data->port->membase + REG_OSAMP(data));
+	if (!IS_ERR_OR_NULL(data->intr.uart_int_base))
+		data->uart_ext_int_type = readl(data->intr.uart_int_base + NORTH_BRIDGE_UART_EXT_INT_SEL);
+
+	return 0;
+}
+
+/* Uart registers status restore in resume process*/
+static int mvebu_uart_reg_restore(struct mvebu_uart_data *data)
+{
+	writel(data->pm_reg_value.uart_ctrl, data->port->membase + REG_CTRL(data));
+
+	if (data->reg_type == REG_UART_A3700_EXT)
+		writel(data->pm_reg_value.uart_ctrl2, data->port->membase + REG_CTRL2(data));
+
+	writel(data->pm_reg_value.uart_tsh, data->port->membase + REG_TSH(data));
+	writel(data->pm_reg_value.uart_brdv, data->port->membase + REG_BRDV(data));
+	writel(data->pm_reg_value.uart_over_sample, data->port->membase + REG_OSAMP(data));
+	if (!IS_ERR_OR_NULL(data->intr.uart_int_base))
+		writel(data->uart_ext_int_type, data->intr.uart_int_base + NORTH_BRIDGE_UART_EXT_INT_SEL);
+
+	return 0;
+}
+
 static int mvebu_uart_suspend(struct device *dev)
 {
 	struct mvebu_uart_data *data = dev_get_drvdata(dev);
+
+	mvebu_uart_reg_save(data);
 
 	if (data->port)
 		uart_suspend_port(&mvebu_uart_driver, data->port);
@@ -1005,6 +1058,8 @@ static int mvebu_uart_suspend(struct device *dev)
 static int mvebu_uart_resume(struct device *dev)
 {
 	struct mvebu_uart_data *data = dev_get_drvdata(dev);
+
+	mvebu_uart_reg_restore(data);
 
 	if (data->port)
 		uart_resume_port(&mvebu_uart_driver, data->port);
