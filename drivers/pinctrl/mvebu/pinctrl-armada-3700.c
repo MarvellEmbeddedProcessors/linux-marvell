@@ -18,6 +18,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/syscore_ops.h>
 #include <linux/pinctrl/pinctrl.h>
 #include "pinctrl-mvebu.h"
 
@@ -52,6 +53,7 @@ struct  armada_3700_mpp_setting_bitmap {
 };
 
 static void __iomem *mpp_base[I_MAXCONTROLLER];/* north & south bridge mpp base */
+static unsigned int mpp_saved_regs[I_MAXCONTROLLER];/* north & south bridge mpp status, for suspend/resume usage */
 
 struct  armada_3700_mpp_conf {
 	struct mvebu_pinctrl_soc_info *soc_info;
@@ -974,6 +976,32 @@ static int armada_3700_pinctrl_remove(struct platform_device *pdev)
 	return mvebu_pinctrl_remove(pdev);
 }
 
+#ifdef CONFIG_PM
+static int armada_3700_pinctrl_suspend(void)
+{
+	int i;
+
+	for (i = 0; i < I_MAXCONTROLLER; i++)
+		if (mpp_base[i] && (!IS_ERR(mpp_base[i])))
+			mpp_saved_regs[i] = readl(mpp_base[i]);
+	return 0;
+}
+
+static void armada_3700_pinctrl_resume(void)
+{
+	int i;
+
+	for (i = 0; i < I_MAXCONTROLLER; i++)
+		if (mpp_base[i] && (!IS_ERR(mpp_base[i])))
+			writel(mpp_saved_regs[i], mpp_base[i]);
+}
+
+static struct syscore_ops armada_3700_pinctrl_syscore_ops = {
+	.suspend = armada_3700_pinctrl_suspend,
+	.resume = armada_3700_pinctrl_resume,
+};
+#endif
+
 static struct platform_driver armada_3700_pinctrl_driver = {
 	.driver = {
 		.name = "armada-3700-pinctrl",
@@ -983,7 +1011,27 @@ static struct platform_driver armada_3700_pinctrl_driver = {
 	.remove = armada_3700_pinctrl_remove,
 };
 
-module_platform_driver(armada_3700_pinctrl_driver);
+static int __init armada_3700_pinctrl_init(void)
+{
+#ifdef CONFIG_PM
+	/*
+	 * Register syscore ops for save/restore of registers across suspend.
+	 * It's important to ensure that this driver is running at an earlier
+	 * initcall level than any arch-specific init calls.
+	 */
+	register_syscore_ops(&armada_3700_pinctrl_syscore_ops);
+#endif
+	return platform_driver_register(&armada_3700_pinctrl_driver);
+}
+
+postcore_initcall(armada_3700_pinctrl_init);
+
+static void __exit armada_3700_pinctrl_exit(void)
+{
+	platform_driver_unregister(&armada_3700_pinctrl_driver);
+}
+
+module_exit(armada_3700_pinctrl_exit);
 
 MODULE_AUTHOR("Terry Zhou <bjzhou@marvell.com>");
 MODULE_DESCRIPTION("Marvell Armada 3700 pinctrl driver");
