@@ -294,7 +294,7 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
 
 	/* Set PCIe Device Control and Status 1 PF0 register */
 	reg = PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE |
-		(7 << PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
+		(2 << PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
 		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE |
 		PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT;
 	advk_writel(pcie, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
