@@ -11,57 +11,56 @@
 #ifndef SDHCI_XENON_H_
 #define SDHCI_XENON_H_
 
-
 /* Register Offset of Xenon SDHC self-defined register */
-#define SDHCI_SYS_CFG_INFO			0x0104
-#define SDHCI_SLOT_TYPE_SDIO_SHIFT		24
-#define SDHCI_NR_SUPPORTED_SLOT_MASK		0x7
+#define XENON_SYS_CFG_INFO			0x0104
+#define XENON_SLOT_TYPE_SDIO_SHIFT		24
+#define XENON_NR_SUPPORTED_SLOT_MASK		0x7
 
-#define SDHCI_SYS_OP_CTRL			0x0108
-#define SDHCI_AUTO_CLKGATE_DISABLE_MASK		BIT(20)
-#define SDHCI_SDCLK_IDLEOFF_ENABLE_SHIFT	8
-#define SDHCI_SLOT_ENABLE_SHIFT			0
+#define XENON_SYS_OP_CTRL			0x0108
+#define XENON_AUTO_CLKGATE_DISABLE_MASK		BIT(20)
+#define XENON_SDCLK_IDLEOFF_ENABLE_SHIFT	8
+#define XENON_SLOT_ENABLE_SHIFT			0
 
-#define SDHCI_SYS_EXT_OP_CTRL			0x010C
-#define SDHCI_MASK_CMD_CONFLICT_ERROR		BIT(8)
+#define XENON_SYS_EXT_OP_CTRL			0x010C
+#define XENON_MASK_CMD_CONFLICT_ERR		BIT(8)
 
-#define SDHCI_SLOT_OP_STATUS_CTRL		0x0128
+#define XENON_SLOT_OP_STATUS_CTRL		0x0128
 
-#define SDHCI_TUN_CONSECUTIVE_TIMES_SHIFT	16
-#define SDHCI_TUN_CONSECUTIVE_TIMES_MASK	0x7
-#define SDHCI_TUN_CONSECUTIVE_TIMES		0x4
-#define SDHCI_TUNING_STEP_SHIFT			12
-#define SDHCI_TUNING_STEP_MASK			0xF
-#define SDHCI_TUNING_STEP_DIVIDER		BIT(6)
+#define XENON_TUN_CONSECUTIVE_TIMES_SHIFT	16
+#define XENON_TUN_CONSECUTIVE_TIMES_MASK	0x7
+#define XENON_TUN_CONSECUTIVE_TIMES		0x4
+#define XENON_TUNING_STEP_SHIFT			12
+#define XENON_TUNING_STEP_MASK			0xF
+#define XENON_TUNING_STEP_DIVIDER		BIT(6)
 
-#define SDHCI_SLOT_EMMC_CTRL			0x0130
-#define SDHCI_ENABLE_DATA_STROBE		BIT(24)
-#define SDHCI_EMMC_VCCQ_MASK			0x3
-#define SDHCI_EMMC_VCCQ_1_8V			0x1
-#define SDHCI_EMMC_VCCQ_3_3V			0x3
+#define XENON_SLOT_EMMC_CTRL			0x0130
+#define XENON_ENABLE_DATA_STROBE		BIT(24)
+#define XENON_EMMC_VCCQ_MASK			0x3
+#define XENON_EMMC_VCCQ_1_8V			0x1
+#define XENON_EMMC_VCCQ_3_3V			0x3
 
-#define SDHCI_SLOT_RETUNING_REQ_CTRL		0x0144
+#define XENON_SLOT_RETUNING_REQ_CTRL		0x0144
 /* retuning compatible */
-#define SDHCI_RETUNING_COMPATIBLE		0x1
+#define XENON_RETUNING_COMPATIBLE		0x1
 
-#define SDHCI_SLOT_EXT_PRESENT_STATE		0x014C
-#define SDHCI_DLL_LOCK_STATE			0x1
+#define XENON_SLOT_EXT_PRESENT_STATE		0x014C
+#define XENON_DLL_LOCK_STATE			0x1
 
-#define SDHCI_SLOT_DLL_CUR_DLY_VAL		0x0150
+#define XENON_SLOT_DLL_CUR_DLY_VAL		0x0150
 
 /* Tuning Parameter */
-#define SDHCI_TMR_RETUN_NO_PRESENT		0xF
-#define SDHCI_DEF_TUNING_COUNT			0x9
+#define XENON_TMR_RETUN_NO_PRESENT		0xF
+#define XENON_DEF_TUNING_COUNT			0x9
 
-#define SDHCI_DEFAULT_SDCLK_FREQ		(400000)
-#define SDHCI_LOWEST_SDCLK_FREQ			(100000)
+#define XENON_DEFAULT_SDCLK_FREQ		400000
+#define XENON_LOWEST_SDCLK_FREQ			100000
 
 /* Xenon specific Mode Select value */
-#define SDHCI_XENON_CTRL_HS200			0x5
-#define SDHCI_XENON_CTRL_HS400			0x6
+#define XENON_CTRL_HS200			0x5
+#define XENON_CTRL_HS400			0x6
 
 /* Indicate Card Type is not clear yet */
-#define SDHCI_CARD_TYPE_UNKNOWN			0xF
+#define XENON_CARD_TYPE_UNKNOWN			0xF
 
 struct sdhci_xenon_priv {
 	unsigned char	tuning_count;
@@ -101,7 +100,6 @@ struct sdhci_xenon_priv {
 	void		*phy_params;
 	struct xenon_emmc_phy_regs *emmc_phy_regs;
 };
-
 
 int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
 int xenon_phy_parse_dt(struct device_node *np,

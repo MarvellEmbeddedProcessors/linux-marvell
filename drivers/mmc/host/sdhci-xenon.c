@@ -52,15 +52,15 @@ static void xenon_set_sdclk_off_idle(struct sdhci_host *host,
 	u32 reg;
 	u32 mask;
 
-	reg = sdhci_readl(host, SDHCI_SYS_OP_CTRL);
+	reg = sdhci_readl(host, XENON_SYS_OP_CTRL);
 	/* Get the bit shift basing on the SDHC index */
-	mask = (0x1 << (SDHCI_SDCLK_IDLEOFF_ENABLE_SHIFT + sdhc_id));
+	mask = (0x1 << (XENON_SDCLK_IDLEOFF_ENABLE_SHIFT + sdhc_id));
 	if (enable)
 		reg |= mask;
 	else
 		reg &= ~mask;
 
-	sdhci_writel(host, reg, SDHCI_SYS_OP_CTRL);
+	sdhci_writel(host, reg, XENON_SYS_OP_CTRL);
 }
 
 /* Enable/Disable the Auto Clock Gating function */
@@ -68,12 +68,12 @@ static void xenon_set_acg(struct sdhci_host *host, bool enable)
 {
 	u32 reg;
 
-	reg = sdhci_readl(host, SDHCI_SYS_OP_CTRL);
+	reg = sdhci_readl(host, XENON_SYS_OP_CTRL);
 	if (enable)
-		reg &= ~SDHCI_AUTO_CLKGATE_DISABLE_MASK;
+		reg &= ~XENON_AUTO_CLKGATE_DISABLE_MASK;
 	else
-		reg |= SDHCI_AUTO_CLKGATE_DISABLE_MASK;
-	sdhci_writel(host, reg, SDHCI_SYS_OP_CTRL);
+		reg |= XENON_AUTO_CLKGATE_DISABLE_MASK;
+	sdhci_writel(host, reg, XENON_SYS_OP_CTRL);
 }
 
 /* Enable this SDHC */
@@ -82,9 +82,9 @@ static void xenon_enable_sdhc(struct sdhci_host *host,
 {
 	u32 reg;
 
-	reg = sdhci_readl(host, SDHCI_SYS_OP_CTRL);
-	reg |= (BIT(sdhc_id) << SDHCI_SLOT_ENABLE_SHIFT);
-	sdhci_writel(host, reg, SDHCI_SYS_OP_CTRL);
+	reg = sdhci_readl(host, XENON_SYS_OP_CTRL);
+	reg |= (BIT(sdhc_id) << XENON_SLOT_ENABLE_SHIFT);
+	sdhci_writel(host, reg, XENON_SYS_OP_CTRL);
 
 	/*
 	 * Manually set the flag which all the card types require,
@@ -99,9 +99,9 @@ static void xenon_disable_sdhc(struct sdhci_host *host,
 {
 	u32 reg;
 
-	reg = sdhci_readl(host, SDHCI_SYS_OP_CTRL);
-	reg &= ~(BIT(sdhc_id) << SDHCI_SLOT_ENABLE_SHIFT);
-	sdhci_writel(host, reg, SDHCI_SYS_OP_CTRL);
+	reg = sdhci_readl(host, XENON_SYS_OP_CTRL);
+	reg &= ~(BIT(sdhc_id) << XENON_SLOT_ENABLE_SHIFT);
+	sdhci_writel(host, reg, XENON_SYS_OP_CTRL);
 }
 
 /* Enable Parallel Transfer Mode */
@@ -110,26 +110,39 @@ static void xenon_enable_sdhc_parallel_tran(struct sdhci_host *host,
 {
 	u32 reg;
 
-	reg = sdhci_readl(host, SDHCI_SYS_EXT_OP_CTRL);
+	reg = sdhci_readl(host, XENON_SYS_EXT_OP_CTRL);
 	reg |= BIT(sdhc_id);
-	sdhci_writel(host, reg, SDHCI_SYS_EXT_OP_CTRL);
+	sdhci_writel(host, reg, XENON_SYS_EXT_OP_CTRL);
 }
 
-static void xenon_sdhc_tuning_setup(struct sdhci_host *host)
+/* Mask command conflict error */
+static void xenon_mask_cmd_conflict_err(struct sdhci_host *host)
+{
+	u32  reg;
+
+	reg = sdhci_readl(host, XENON_SYS_EXT_OP_CTRL);
+	reg |= XENON_MASK_CMD_CONFLICT_ERR;
+	sdhci_writel(host, reg, XENON_SYS_EXT_OP_CTRL);
+}
+
+static void xenon_sdhc_retune_setup(struct sdhci_host *host)
 {
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	u32 reg;
 
 	/* Disable the Re-Tuning Request functionality */
-	reg = sdhci_readl(host, SDHCI_SLOT_RETUNING_REQ_CTRL);
-	reg &= ~SDHCI_RETUNING_COMPATIBLE;
-	sdhci_writel(host, reg, SDHCI_SLOT_RETUNING_REQ_CTRL);
+	reg = sdhci_readl(host, XENON_SLOT_RETUNING_REQ_CTRL);
+	reg &= ~XENON_RETUNING_COMPATIBLE;
+	sdhci_writel(host, reg, XENON_SLOT_RETUNING_REQ_CTRL);
 
-	/* Disable the Re-tuning Event Signal Enable */
+	/* Disable the Re-tuning Interrupt */
 	reg = sdhci_readl(host, SDHCI_SIGNAL_ENABLE);
 	reg &= ~SDHCI_INT_RETUNE;
 	sdhci_writel(host, reg, SDHCI_SIGNAL_ENABLE);
+	reg = sdhci_readl(host, SDHCI_INT_ENABLE);
+	reg &= ~SDHCI_INT_RETUNE;
+	sdhci_writel(host, reg, SDHCI_INT_ENABLE);
 
 	/* Force to use Tuning Mode 1 */
 	host->tuning_mode = SDHCI_TUNING_MODE_1;
@@ -149,11 +162,13 @@ static void sdhci_xenon_reset_exit(struct sdhci_host *host,
 		return;
 
 	/* Disable tuning request and auto-retuning again */
-	xenon_sdhc_tuning_setup(host);
+	xenon_sdhc_retune_setup(host);
 
 	xenon_set_acg(host, true);
 
 	xenon_set_sdclk_off_idle(host, sdhc_id, false);
+
+	xenon_mask_cmd_conflict_err(host);
 }
 
 static void sdhci_xenon_reset(struct sdhci_host *host, u8 mask)
@@ -178,7 +193,7 @@ static void xenon_set_uhs_signaling(struct sdhci_host *host,
 	/* Select Bus Speed Mode for host */
 	ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
 	if (timing == MMC_TIMING_MMC_HS200)
-		ctrl_2 |= SDHCI_XENON_CTRL_HS200;
+		ctrl_2 |= XENON_CTRL_HS200;
 	else if (timing == MMC_TIMING_UHS_SDR104)
 		ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
 	else if (timing == MMC_TIMING_UHS_SDR12)
@@ -191,7 +206,7 @@ static void xenon_set_uhs_signaling(struct sdhci_host *host,
 		 (timing == MMC_TIMING_MMC_DDR52))
 		ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
 	else if (timing == MMC_TIMING_MMC_HS400)
-		ctrl_2 |= SDHCI_XENON_CTRL_HS400;
+		ctrl_2 |= XENON_CTRL_HS400;
 	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
 }
 
@@ -234,6 +249,7 @@ static void xenon_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	    (ios->timing == MMC_TIMING_MMC_HS)) {
 		host->preset_enabled = false;
 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+		host->flags &= ~SDHCI_PV_ENABLED;
 
 		reg = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 		reg &= ~SDHCI_CTRL_PRESET_VAL_ENABLE;
@@ -246,7 +262,7 @@ static void xenon_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	sdhci_set_ios(mmc, ios);
 	xenon_phy_adj(host, ios);
 
-	if (host->clock > SDHCI_DEFAULT_SDCLK_FREQ) {
+	if (host->clock > XENON_DEFAULT_SDCLK_FREQ) {
 		spin_lock_irqsave(&host->lock, flags);
 		xenon_set_sdclk_off_idle(host, priv->sdhc_id, true);
 		spin_unlock_irqrestore(&host->lock, flags);
@@ -264,26 +280,26 @@ static int xenon_emmc_signal_voltage_switch(struct mmc_host *mmc,
 	if ((voltage == MMC_SIGNAL_VOLTAGE_330) ||
 	    (voltage == MMC_SIGNAL_VOLTAGE_180)) {
 		if (voltage == MMC_SIGNAL_VOLTAGE_330)
-			voltage_code = SDHCI_EMMC_VCCQ_3_3V;
+			voltage_code = XENON_EMMC_VCCQ_3_3V;
 		else if (voltage == MMC_SIGNAL_VOLTAGE_180)
-			voltage_code = SDHCI_EMMC_VCCQ_1_8V;
+			voltage_code = XENON_EMMC_VCCQ_1_8V;
 
 		/*
 		 * This host is for eMMC, XENON self-defined
 		 * eMMC control register should be accessed
 		 * instead of Host Control 2
 		 */
-		ctrl = sdhci_readl(host, SDHCI_SLOT_EMMC_CTRL);
-		ctrl &= ~SDHCI_EMMC_VCCQ_MASK;
+		ctrl = sdhci_readl(host, XENON_SLOT_EMMC_CTRL);
+		ctrl &= ~XENON_EMMC_VCCQ_MASK;
 		ctrl |= voltage_code;
-		sdhci_writel(host, ctrl, SDHCI_SLOT_EMMC_CTRL);
+		sdhci_writel(host, ctrl, XENON_SLOT_EMMC_CTRL);
 
 		/* There is no standard to determine this waiting period */
 		usleep_range(1000, 2000);
 
 		/* Check whether io voltage switch is done */
-		ctrl = sdhci_readl(host, SDHCI_SLOT_EMMC_CTRL);
-		ctrl &= SDHCI_EMMC_VCCQ_MASK;
+		ctrl = sdhci_readl(host, XENON_SLOT_EMMC_CTRL);
+		ctrl &= XENON_EMMC_VCCQ_MASK;
 		/*
 		 * This bit is set only when regulator feeds back
 		 * the voltage switch results to Xenon SDHC.
@@ -351,6 +367,14 @@ static int xenon_execute_tuning(struct mmc_host *mmc, u32 opcode)
 	if (host->timing == MMC_TIMING_UHS_DDR50)
 		return 0;
 
+	/*
+	 * Currently force Xenon driver back to support mode 1 only,
+	 * even though Xenon might claim to support mode 2 or mode 3.
+	 * It requires more time to test mode 2/mode 3 on more platforms.
+	 */
+	if (host->tuning_mode != SDHCI_TUNING_MODE_1)
+		xenon_sdhc_retune_setup(host);
+
 	return sdhci_execute_tuning(mmc, opcode);
 }
 
@@ -369,14 +393,14 @@ static void xenon_enable_sdio_irq(struct mmc_host *mmc, int enable)
 		 * Set SDIO Card Inserted indication
 		 * to enable detecting SDIO async irq.
 		 */
-		reg = sdhci_readl(host, SDHCI_SYS_CFG_INFO);
-		reg |= (1 << (sdhc_id + SDHCI_SLOT_TYPE_SDIO_SHIFT));
-		sdhci_writel(host, reg, SDHCI_SYS_CFG_INFO);
+		reg = sdhci_readl(host, XENON_SYS_CFG_INFO);
+		reg |= (1 << (sdhc_id + XENON_SLOT_TYPE_SDIO_SHIFT));
+		sdhci_writel(host, reg, XENON_SYS_CFG_INFO);
 	} else {
 		/* Clear SDIO Card Inserted indication */
-		reg = sdhci_readl(host, SDHCI_SYS_CFG_INFO);
-		reg &= ~(1 << (sdhc_id + SDHCI_SLOT_TYPE_SDIO_SHIFT));
-		sdhci_writel(host, reg, SDHCI_SYS_CFG_INFO);
+		reg = sdhci_readl(host, XENON_SYS_CFG_INFO);
+		reg &= ~(1 << (sdhc_id + XENON_SLOT_TYPE_SDIO_SHIFT));
+		sdhci_writel(host, reg, XENON_SYS_CFG_INFO);
 	}
 }
 
@@ -391,46 +415,12 @@ static void xenon_replace_mmc_host_ops(struct sdhci_host *host)
 }
 
 /*
- * Parse child node in Xenon DT.
- * Search for the following item(s):
- * - eMMC card type
+ * Parse Xenon specific DT properties:
+ * init_card_type: check whether this SDHC is for eMMC
+ * sdhc-id: the index of current SDHC.
+ *	    Refer to XENON_SYS_CFG_INFO register
+ * tun-count: the interval between re-tuning
  */
-static int xenon_child_node_of_parse(struct platform_device *pdev)
-{
-	struct device_node *np = pdev->dev.of_node;
-	struct sdhci_host *host = platform_get_drvdata(pdev);
-	struct mmc_host *mmc = host->mmc;
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-	struct device_node *child;
-	int nr_child;
-
-	priv->init_card_type = SDHCI_CARD_TYPE_UNKNOWN;
-
-	nr_child = of_get_child_count(np);
-	if (!nr_child)
-		return 0;
-
-	for_each_child_of_node(np, child) {
-		if (of_device_is_compatible(child, "mmc-card"))	{
-			priv->init_card_type = MMC_TYPE_MMC;
-			mmc->caps |= MMC_CAP_NONREMOVABLE;
-
-			/*
-			 * Force to clear BUS_TEST to
-			 * skip bus_test_pre and bus_test_post
-			 */
-			mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
-			mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
-				      MMC_CAP2_PACKED_CMD |
-				      MMC_CAP2_NO_SD |
-				      MMC_CAP2_NO_SDIO;
-		}
-	}
-
-	return 0;
-}
-
 static int xenon_probe_dt(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
@@ -438,34 +428,28 @@ static int xenon_probe_dt(struct platform_device *pdev)
 	struct mmc_host *mmc = host->mmc;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-	int err;
 	u32 sdhc_id, nr_sdhc;
 	u32 tuning_count;
 
-	/* Standard MMC property */
-	err = mmc_of_parse(mmc);
-	if (err)
-		return err;
+	/* Disable HS200 on Armada AP806 */
+	if (of_device_is_compatible(np, "marvell,armada-ap806-sdhci"))
+		host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
 
-	/* Standard SDHCI property */
-	sdhci_get_of_property(pdev);
-
-	/*
-	 * Xenon Specific property:
-	 * init_card_type: check whether this SDHC is for eMMC
-	 * sdhc-id: the index of current SDHC.
-	 *	    Refer to SDHCI_SYS_CFG_INFO register
-	 * tun-count: the interval between re-tuning
-	 */
-	/* Parse child node, including checking emmc type */
-	err = xenon_child_node_of_parse(pdev);
-	if (err)
-		return err;
+	priv->init_card_type = XENON_CARD_TYPE_UNKNOWN;
+	/* Check if mmc-card sub-node exists */
+	if (mmc_of_parse_mmc_card(mmc)) {
+		priv->init_card_type = MMC_TYPE_MMC;
+		/*
+		 * Force to clear BUS_TEST to
+		 * skip bus_test_pre and bus_test_post
+		 */
+		mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
+	}
 
 	priv->sdhc_id = 0x0;
 	if (!of_property_read_u32(np, "marvell,xenon-sdhc-id", &sdhc_id)) {
-		nr_sdhc = sdhci_readl(host, SDHCI_SYS_CFG_INFO);
-		nr_sdhc &= SDHCI_NR_SUPPORTED_SLOT_MASK;
+		nr_sdhc = sdhci_readl(host, XENON_SYS_CFG_INFO);
+		nr_sdhc &= XENON_NR_SUPPORTED_SLOT_MASK;
 		if (unlikely(sdhc_id > nr_sdhc)) {
 			dev_err(mmc_dev(mmc), "SDHC Index %d exceeds Number of SDHCs %d\n",
 				sdhc_id, nr_sdhc);
@@ -473,13 +457,13 @@ static int xenon_probe_dt(struct platform_device *pdev)
 		}
 	}
 
-	tuning_count = SDHCI_DEF_TUNING_COUNT;
+	tuning_count = XENON_DEF_TUNING_COUNT;
 	if (!of_property_read_u32(np, "marvell,xenon-tun-count",
 				  &tuning_count)) {
-		if (unlikely(tuning_count >= SDHCI_TMR_RETUN_NO_PRESENT)) {
+		if (unlikely(tuning_count >= XENON_TMR_RETUN_NO_PRESENT)) {
 			dev_err(mmc_dev(mmc), "Wrong Re-tuning Count. Set default value %d\n",
-				SDHCI_DEF_TUNING_COUNT);
-			tuning_count = SDHCI_DEF_TUNING_COUNT;
+				XENON_DEF_TUNING_COUNT);
+			tuning_count = XENON_DEF_TUNING_COUNT;
 		}
 	}
 	priv->tuning_count = tuning_count;
@@ -502,8 +486,7 @@ static int xenon_sdhc_probe(struct sdhci_host *host)
 	/* Enable Parallel Transfer Mode */
 	xenon_enable_sdhc_parallel_tran(host, sdhc_id);
 
-	/* Set tuning functionality of this SDHC */
-	xenon_sdhc_tuning_setup(host);
+	xenon_mask_cmd_conflict_err(host);
 
 	return 0;
 }
@@ -551,6 +534,13 @@ static int sdhci_xenon_probe(struct platform_device *pdev)
 	if (err)
 		goto free_pltfm;
 
+	err = mmc_of_parse(host->mmc);
+	if (err)
+		goto err_clk;
+
+	sdhci_get_of_property(pdev);
+
+	/* Xenon specific dt parse */
 	err = xenon_probe_dt(pdev);
 	if (err)
 		goto err_clk;
@@ -578,11 +568,10 @@ static int sdhci_xenon_remove(struct platform_device *pdev)
 {
 	struct sdhci_host *host = platform_get_drvdata(pdev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xFFFFFFFF);
 
 	xenon_sdhc_remove(host);
 
-	sdhci_remove_host(host, dead);
+	sdhci_remove_host(host, 0);
 
 	clk_disable_unprepare(pltfm_host->clk);
 
@@ -634,7 +623,8 @@ static const struct dev_pm_ops sdhci_xenon_pmops = {
 #endif
 
 static const struct of_device_id sdhci_xenon_dt_ids[] = {
-	{ .compatible = "marvell,armada8k-sdhci",},
+	{ .compatible = "marvell,armada-ap806-sdhci",},
+	{ .compatible = "marvell,armada-cp110-sdhci",},
 	{ .compatible = "marvell,armada-3700-sdhci",},
 	{}
 };
