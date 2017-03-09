@@ -341,7 +341,7 @@
 			};
 			/* The SDIO should not be enabled in Z1 DSTI/DST */
 			sdhci@6e0000 {
-				compatible = "marvell,armada8k-sdhci";
+				compatible = "marvell,armada-ap806-sdhci";
 				reg = <0x6e0000 0x300>;
 				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
 				clock-names = "core";
@@ -350,8 +350,6 @@
 				 * The AP SDIO interface should work in PHY slow mode
 				 * and clock not higher than 50MHz due to HW limitation
 				 */
-				marvell,xenon-phy-slow-mode;
-				max-frequency = <50000000>;
 				dma-coherent;
 				status = "disabled";
 			};

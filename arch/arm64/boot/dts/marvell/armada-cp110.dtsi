@@ -310,7 +310,7 @@ mdio@15b000 {
 };
 
 sdhci@780000 {
-	compatible = "marvell,armada8k-sdhci";
+	compatible = "marvell,armada-cp110-sdhci";
 	reg = <0x780000 0x300>;
 	interrupts = <ICU_GRP_NSR 27 IRQ_TYPE_LEVEL_HIGH>;
 	clock-names = "core";
