@@ -16,3 +16,4 @@ obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
 obj-$(CONFIG_DOVE_CLK)		+= dove.o
 obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
 obj-$(CONFIG_ORION_CLK)		+= orion.o
+obj-$(CONFIG_ARMADA_37XX_PM_CLK) += armada-37xx-pm-clk.o
