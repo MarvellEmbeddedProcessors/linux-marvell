@@ -2004,6 +2004,30 @@ static const struct mmc_bus_ops mmc_ops = {
 };
 
 /*
+ * Parse mmc-card dt sub-node and set eMMC common caps
+ * if mmc-card exists.
+ * If mmc-card is detected, return true.
+ * Otherwise, return false.
+ */
+bool mmc_of_parse_mmc_card(struct mmc_host *host)
+{
+	struct device_node *np;
+	bool ret = false;
+
+	np = mmc_of_find_child_device(host, 0);
+	if (np && of_device_is_compatible(np, "mmc-card")) {
+		/* mmc-card sub-node indicates eMMC card is in use. */
+		host->caps |= MMC_CAP_NONREMOVABLE;
+		host->caps2 |= MMC_CAP2_NO_SDIO | MMC_CAP2_NO_SD;
+		ret = true;
+	}
+
+	of_node_put(np);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(mmc_of_parse_mmc_card);
+
+/*
  * Starting point for MMC card init.
  */
 int mmc_attach_mmc(struct mmc_host *host)
