@@ -69,10 +69,8 @@
 #define   GLOB_BW_CTRL_NUM_OSTD_WR_VAL		8
 #define   GLOB_BW_CTRL_RD_BURST_LEN_SHIFT	12
 #define   GLOB_BW_CTRL_RD_BURST_LEN_VAL		4
-#define   GLOB_BW_CTRL_RD_BURST_LEN_VAL_Z1	2
 #define   GLOB_BW_CTRL_WR_BURST_LEN_SHIFT	16
 #define   GLOB_BW_CTRL_WR_BURST_LEN_VAL      	4
-#define   GLOB_BW_CTRL_WR_BURST_LEN_VAL_Z1     	2
 #define GLOB_PAUSE		0x014
 #define   GLOB_PAUSE_AXI_TIME_DIS_VAL		0x8
 #define GLOB_SYS_INT_CAUSE	0x200
@@ -104,8 +102,8 @@
  * @crc32_result: CRC32 calculation result
  * @desc_ctrl: operation mode and control flags
  * @buff_size: amount of bytes to be processed
- * @fill_pattern_src_addr: Fill-Pattern or Source-Address and
- * AW-Attributes
+ * @fill_pattern_src_addr: Source-Address
+ * @fill_pattern_dst_addr: Destination-Address
  * @data_buff_addr: Source (and might be RAID6 destination)
  * addresses of data buffers in RAID5 and RAID6
  * @reserved: reserved
@@ -133,7 +131,8 @@ struct mv_xor_v2_descriptor {
 #define DESC_IOD			BIT(27)
 
 	u32 buff_size;
-	u32 fill_pattern_src_addr[4];
+	u32 fill_pattern_src_addr[2];
+	u32 fill_pattern_dst_addr[2];
 	u32 data_buff_addr[MV_XOR_V2_DESC_BUFF_D_ADDR_SIZE];
 	u32 reserved[MV_XOR_V2_DESC_RESERVED_SIZE];
 };
@@ -187,17 +186,6 @@ struct mv_xor_v2_sw_desc {
 	struct mv_xor_v2_descriptor hw_desc;
 	struct list_head node;
 };
-
-/*
- * Hold XOR engine parameters depending on the matched
- * compatible string.
- */
-struct mv_xor_v2_compat_data {
-	u32 rd_burst_len;
-	u32 wr_burst_len;
-};
-
-static const struct of_device_id mv_xor_v2_dt_ids[];
 
 /*
  * Fill the data buffers to a HW descriptor
@@ -463,13 +451,13 @@ mv_xor_v2_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src
 		hw_descriptor->fill_pattern_src_addr[1] = 0;
 
 	/* Set Destination address */
-	hw_descriptor->fill_pattern_src_addr[2] = lower_32_bits(dest);
+	hw_descriptor->fill_pattern_dst_addr[0] = lower_32_bits(dest);
 
 	if (IS_ENABLED(CONFIG_ARCH_DMA_ADDR_T_64BIT))
-		hw_descriptor->fill_pattern_src_addr[3] =
+		hw_descriptor->fill_pattern_dst_addr[1] =
 			upper_32_bits(dest) & 0xFFFF;
 	else
-		hw_descriptor->fill_pattern_src_addr[3] = 0;
+		hw_descriptor->fill_pattern_dst_addr[1] = 0;
 
 	/* Set buffers size */
 	hw_descriptor->buff_size = len;
@@ -530,12 +518,12 @@ mv_xor_v2_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 		src_cnt << DESC_NUM_ACTIVE_D_BUF_SHIFT;
 
 	/* Set Destination address */
-	hw_descriptor->fill_pattern_src_addr[2] = lower_32_bits(dest);
+	hw_descriptor->fill_pattern_dst_addr[0] = lower_32_bits(dest);
 	if (IS_ENABLED(CONFIG_ARCH_DMA_ADDR_T_64BIT))
-		hw_descriptor->fill_pattern_src_addr[3] =
+		hw_descriptor->fill_pattern_dst_addr[1] =
 			upper_32_bits(dest) & 0xFFFF;
 	else
-		hw_descriptor->fill_pattern_src_addr[3] = 0;
+		hw_descriptor->fill_pattern_dst_addr[1] = 0;
 
 	/* Set buffers size */
 	hw_descriptor->buff_size = len;
@@ -710,8 +698,6 @@ static void mv_xor_v2_set_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
 static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 {
 	u32 reg;
-	const struct of_device_id *match;
-	struct mv_xor_v2_compat_data *data;
 
 	/* write the DESQ size to the DMA engine */
 	writel(MV_XOR_V2_MAX_DESC_NUM, xor_dev->dma_base + DMA_DESQ_SIZE_OFF);
@@ -751,15 +737,10 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 	 * -  Limit the number of outstanding write & read data
 	 *    (OBB/IBB) requests to the maximal value.
 	*/
-	match = of_match_node(mv_xor_v2_dt_ids, xor_dev->dmadev.dev->of_node);
-	if (WARN_ON(!match))
-		return -1;
-	data = (struct mv_xor_v2_compat_data *)match->data;
-
 	reg = (GLOB_BW_CTRL_NUM_OSTD_RD_VAL << GLOB_BW_CTRL_NUM_OSTD_RD_SHIFT) |
 		(GLOB_BW_CTRL_NUM_OSTD_WR_VAL << GLOB_BW_CTRL_NUM_OSTD_WR_SHIFT) |
-		(data->rd_burst_len << GLOB_BW_CTRL_RD_BURST_LEN_SHIFT) |
-		(data->wr_burst_len << GLOB_BW_CTRL_WR_BURST_LEN_SHIFT);
+		(GLOB_BW_CTRL_RD_BURST_LEN_VAL << GLOB_BW_CTRL_RD_BURST_LEN_SHIFT) |
+		(GLOB_BW_CTRL_WR_BURST_LEN_VAL << GLOB_BW_CTRL_WR_BURST_LEN_SHIFT);
 	writel(reg, xor_dev->glob_base + GLOB_BW_CTRL);
 
 	/* Disable the AXI timer feature */
@@ -966,22 +947,8 @@ static int mv_xor_v2_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_OF
-
-struct mv_xor_v2_compat_data xor_compat_data = {
-	.rd_burst_len = GLOB_BW_CTRL_RD_BURST_LEN_VAL,
-	.wr_burst_len = GLOB_BW_CTRL_WR_BURST_LEN_VAL
-};
-
-struct mv_xor_v2_compat_data xor_compat_data_z1 = {
-	.rd_burst_len = GLOB_BW_CTRL_RD_BURST_LEN_VAL_Z1,
-	.wr_burst_len = GLOB_BW_CTRL_WR_BURST_LEN_VAL_Z1
-};
-
 static const struct of_device_id mv_xor_v2_dt_ids[] = {
-	{ .compatible = "marvell,mv-xor-v2",
-	  .data = &xor_compat_data},
-	{ .compatible = "marvell,mv-xor-v2-z1",
-	  .data = &xor_compat_data_z1 },
+	{ .compatible = "marvell,mv-xor-v2", },
 	{},
 };
 
