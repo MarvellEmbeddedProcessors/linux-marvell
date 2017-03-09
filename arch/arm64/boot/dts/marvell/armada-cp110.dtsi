@@ -25,7 +25,7 @@ cpm_syscon0: system-controller@440000 {
 	#clock-cells = <2>;
 	core-clock-output-names =
 		"cpm-apll", "cpm-ppv2-core", "cpm-eip",
-		"cpm-core", "cpm-nand-core";
+		"cpm-core", "cpm-nand-core", "cpm-emmc";
 	gate-clock-output-names =
 		"cpm-audio", "cpm-communit", "cpm-nand",
 		"cpm-ppv2", "cpm-sdio", "cpm-mg-domain",
