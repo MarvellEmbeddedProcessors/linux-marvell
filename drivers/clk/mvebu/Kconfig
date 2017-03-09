@@ -67,3 +67,7 @@ config ARMADA_AP806_RING_CLK
 
 config ARMADA_AP806_CPU_CLK
 	bool
+
+config ARMADA_37XX_PM_CLK
+	bool
+	select REGULATOR_ARMADA3700

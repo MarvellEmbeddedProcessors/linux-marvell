@@ -1,0 +1,44 @@
+* Clock bindings for Marvell MVEBU Armada 3700 CPU PM clock
+
+The Marvell MVEBU Armada 3700 SoC contains a PMU block, used for power
+management, and DFS is supported by this PMU.
+This Device Tree binding allows to describe the DFS clock settings
+and CPU mapping of the Armada 3700, whose frequencies are determined by
+the CPU load index with PMU DFS unit.
+
+NOTE:
+When cpu_pm_clock node is enabled, and CPU clock driver initialized
+successfully, it will also register and enable the cpufreq-dt generic
+driver for CPU frequency scaling.
+
+
+Required properties for cpu_pm_clock node:
+- compatible: must be be the following:
+	"marvell,armada-37xx-cpu-pm-clk"
+- reg: must be the register address of the CPU Dynamic Frequency Base
+	Scaling register base
+- #clock-cells: from common clock binding; shall be set to 1
+- #clock: pointer to CPU core clock
+
+Required properties for CPU nodes:
+- clocks: a list of phandle + clock-specifier pairs to cpu_pm_clk,
+		one for each CPU node.
+
+Example:
+	cpu0: cpu@000 {
+		..
+		clocks = <&cpu_pm_clk 0>;
+		..
+	};
+	cpu1: cpu@001 {
+		..
+		clocks = <&cpu_pm_clk 0>;
+		..
+	};
+
+	cpu_pm_clk: cpu-pm-clk@14018 {
+		compatible = "marvell,armada-37xx-cpu-pm-clk";
+		reg = <0x14018 0x1C>;
+		#clock-cells = <1>;
+		clocks = <&core_clk 4>;
+	};
