@@ -11,15 +11,16 @@
  */
 
 /*
- * CP110 has 5 core clocks:
+ * CP110 has 6 core clocks:
  *
  *  - APLL		(1 Ghz)
  *    - PPv2 core	(1/3 APLL)
  *    - EIP		(1/2 APLL)
  *      - Core		(1/2 EIP)
+ *    - MMC		(2/5 APLL)
  *
  *  - NAND clock, which is either:
- *    - Equal to the core clock
+ *    - Equal to MMC clock
  *    - 2/5 APLL
  *
  * CP110 has 32 gatable clocks, for the various peripherals in the
@@ -47,7 +48,7 @@ enum {
 	CP110_CLK_TYPE_GATABLE,
 };
 
-#define CP110_MAX_CORE_CLOCKS		5
+#define CP110_MAX_CORE_CLOCKS		6
 #define CP110_MAX_GATABLE_CLOCKS	32
 
 #define CP110_CLK_NUM \
@@ -58,6 +59,7 @@ enum {
 #define CP110_CORE_EIP			2
 #define CP110_CORE_CORE			3
 #define CP110_CORE_NAND			4
+#define CP110_CORE_MMC			5
 
 /* A number of gatable clocks need special handling */
 #define CP110_GATE_AUDIO		0
@@ -190,7 +192,7 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
 {
 	struct regmap *regmap;
 	struct device_node *np = pdev->dev.of_node;
-	const char *ppv2_name, *apll_name, *core_name, *eip_name, *nand_name;
+	const char *ppv2_name, *apll_name, *core_name, *eip_name, *nand_name, *mmc_name;
 	struct clk_onecell_data *cp110_clk_data;
 	struct clk *clk, **cp110_clks;
 	u32 nand_clk_ctrl;
@@ -280,6 +282,20 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
 
 	cp110_clks[CP110_CORE_NAND] = clk;
 
+	/* MMC clock is APLL/2.5 */
+	of_property_read_string_index(np, "core-clock-output-names",
+				      CP110_CORE_MMC, &mmc_name);
+
+	clk = clk_register_fixed_factor(NULL, mmc_name,
+					apll_name, 0, 2, 5);
+
+	if (IS_ERR(clk)) {
+		ret = PTR_ERR(clk);
+		goto fail5;
+	}
+
+	cp110_clks[CP110_CORE_MMC] = clk;
+
 	for (i = 0; i < CP110_MAX_GATABLE_CLOCKS; i++) {
 		const char *parent, *name;
 		int ret;
@@ -311,9 +327,7 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
 			parent = ppv2_name;
 			break;
 		case CP110_GATE_SDIO:
-			of_property_read_string_index(np,
-						      "gate-clock-output-names",
-						      CP110_GATE_SDMMC, &parent);
+			parent = mmc_name;
 			break;
 		case CP110_GATE_XOR1:
 		case CP110_GATE_XOR0:
@@ -363,6 +377,9 @@ fail_gate:
 			cp110_unregister_gate(clk);
 	}
 
+
+	clk_unregister_fixed_factor(cp110_clks[CP110_CORE_MMC]);
+fail5:
 	clk_unregister_fixed_factor(cp110_clks[CP110_CORE_NAND]);
 fail4:
 	clk_unregister_fixed_factor(cp110_clks[CP110_CORE_CORE]);
@@ -390,6 +407,7 @@ static int cp110_syscon_clk_remove(struct platform_device *pdev)
 			cp110_unregister_gate(clk);
 	}
 
+	clk_unregister_fixed_factor(cp110_clks[CP110_CORE_MMC]);
 	clk_unregister_fixed_factor(cp110_clks[CP110_CORE_NAND]);
 	clk_unregister_fixed_factor(cp110_clks[CP110_CORE_CORE]);
 	clk_unregister_fixed_factor(cp110_clks[CP110_CORE_EIP]);
