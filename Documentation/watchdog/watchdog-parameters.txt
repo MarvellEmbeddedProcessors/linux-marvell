@@ -407,3 +407,8 @@ wm8350_wdt:
 nowayout: Watchdog cannot be stopped once started
 	(default=kernel config parameter)
 -------------------------------------------------
+a3700_wdt:
+heartbeat: Initial watchdog heartbeat in seconds
+nowayout: Watchdog cannot be stopped once started
+	(default=kernel config parameter)
+-------------------------------------------------
