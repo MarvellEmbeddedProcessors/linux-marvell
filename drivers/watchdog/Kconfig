@@ -387,6 +387,16 @@ config ORION_WATCHDOG
 	  To compile this driver as a module, choose M here: the
 	  module will be called orion_wdt.
 
+config ARMADA3700_WATCHDOG
+	tristate "Armada3700 watchdog"
+	depends on ARCH_MVEBU
+	select WATCHDOG_CORE
+	help
+	  Say Y here if to include support for the watchdog timer
+	  in the Marvell Armada-3700 SoC.
+	  To compile this driver as a module, choose M here: the
+	  module will be called armada3700_wdt.
+
 config RN5T618_WATCHDOG
 	tristate "Ricoh RN5T618 watchdog"
 	depends on MFD_RN5T618

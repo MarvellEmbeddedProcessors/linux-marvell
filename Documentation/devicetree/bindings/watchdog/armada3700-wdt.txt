@@ -1,0 +1,18 @@
+* Armada37x0 Watchdog driver : Watchdog driver used in Marvell Armada37x0 SoC
+
+Required properties:
+
+- compatible : should be "marvell,armada-3700-wdt"
+- reg : base addresses and lengths of the watchdog control register and global counter registers.
+	watchdog control register point to the CPU watchdog timer select register, while global
+	counter register points to the timers referred by watchdog.
+- clocks: input clock of watchdog timer.
+
+Example:
+
+wdt: watchdog-timer@8300 {
+	compatible = "marvell,armada-3700-wdt";
+	reg = <0xd064 0x4>,
+	      <0x8300 0x40>;
+	clocks = <&osc>;
+};
