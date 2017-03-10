@@ -198,13 +198,34 @@ static int xhci_plat_probe(struct platform_device *pdev)
 			goto disable_usb_phy;
 		}
 	} else {
-		ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
-		if (ret)
-			goto disable_usb_phy;
+		/*
+		 * When "separated-phys-for-usb2-usb3" is set, it indicates that usb3 host controller
+		 * uses a dedicated utmi phy for USB 2 and another phy for USB 3, for example,
+		 * armada 3700 usb3 host controller uses a dedicated utmi phy for USB 2 and a
+		 * common phy for USB 3;
+		 * usb hcd should be added with phy name as below:
+		 *        - main hcd is added with "usb2"
+		 *        - shared hcd is added with "usb3"
+		 * When "separated-phys-for-usb2-usb3" is not set, USB 2 and USB 3 shares a same phy,
+		 * main hcd and shared hcd are both added with the default phy name of "usb"
+		 */
+		if (of_property_read_bool(pdev->dev.of_node, "separated-phys-for-usb2-usb3")) {
+			ret = usb_add_hcd_with_phy_name(hcd, irq, IRQF_SHARED, "usb2");
+			if (ret)
+				goto disable_usb_phy;
 
-		ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
-		if (ret)
-			goto dealloc_usb2_hcd;
+			ret = usb_add_hcd_with_phy_name(xhci->shared_hcd, irq, IRQF_SHARED, "usb3");
+			if (ret)
+				goto dealloc_usb2_hcd;
+		} else {
+			ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+			if (ret)
+				goto disable_usb_phy;
+
+			ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+			if (ret)
+				goto dealloc_usb2_hcd;
+		}
 	}
 	return 0;
 
