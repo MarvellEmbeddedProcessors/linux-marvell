@@ -2681,17 +2681,22 @@ static void usb_put_invalidate_rhdev(struct usb_hcd *hcd)
 }
 
 /**
- * usb_add_hcd - finish generic HCD structure initialization and register
+ * usb_add_hcd_with_phy_name - finish generic HCD structure initialization
+ * and register with generic phy name
  * @hcd: the usb_hcd structure to initialize
  * @irqnum: Interrupt line to allocate
  * @irqflags: Interrupt type flags
+ * @phy_name: generic phy name
  *
- * Finish the remaining parts of generic HCD initialization: allocate the
- * buffers of consistent memory, register the bus, request the IRQ line,
- * and call the driver's reset() and start() routines.
+ * Finish the remaining parts of generic HCD initialization with generic phy
+ * name: allocate the buffers of consistent memory, register the bus,
+ * request the IRQ line, and call the driver's reset() and start() routines.
  */
-int usb_add_hcd(struct usb_hcd *hcd,
-		unsigned int irqnum, unsigned long irqflags)
+int usb_add_hcd_with_phy_name(struct usb_hcd *hcd,
+			      unsigned int irqnum,
+			      unsigned long irqflags,
+			      const char *phy_name)
+
 {
 	int retval;
 	struct usb_device *rhdev;
@@ -2715,7 +2720,12 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	}
 
 	if (IS_ENABLED(CONFIG_GENERIC_PHY) && !hcd->phy) {
-		struct phy *phy = phy_get(hcd->self.controller, "usb");
+		struct phy *phy;
+
+		if (phy_name == NULL)
+			phy = phy_get(hcd->self.controller, "usb");
+		else
+			phy = phy_get(hcd->self.controller, phy_name);
 
 		if (IS_ERR(phy)) {
 			retval = PTR_ERR(phy);
@@ -2913,6 +2923,23 @@ err_phy:
 		hcd->usb_phy = NULL;
 	}
 	return retval;
+}
+EXPORT_SYMBOL_GPL(usb_add_hcd_with_phy_name);
+
+/**
+ * usb_add_hcd - finish generic HCD structure initialization and register
+ * @hcd: the usb_hcd structure to initialize
+ * @irqnum: Interrupt line to allocate
+ * @irqflags: Interrupt type flags
+ *
+ * Finish the remaining parts of generic HCD initialization: allocate the
+ * buffers of consistent memory, register the bus, request the IRQ line,
+ * and call the driver's reset() and start() routines.
+ */
+int usb_add_hcd(struct usb_hcd *hcd,
+		unsigned int irqnum, unsigned long irqflags)
+{
+	return usb_add_hcd_with_phy_name(hcd, irqnum, irqflags, NULL);
 }
 EXPORT_SYMBOL_GPL(usb_add_hcd);
 
