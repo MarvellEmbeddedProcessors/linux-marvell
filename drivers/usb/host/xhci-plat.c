@@ -287,6 +287,7 @@ static int xhci_plat_suspend(struct device *dev)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+	int ret;
 
 	/*
 	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
@@ -296,13 +297,73 @@ static int xhci_plat_suspend(struct device *dev)
 	 * reconsider this when xhci_plat_suspend enlarges its scope, e.g.,
 	 * also applies to runtime suspend.
 	 */
-	return xhci_suspend(xhci, device_may_wakeup(dev));
+	ret = xhci_suspend(xhci, device_may_wakeup(dev));
+	if (ret) {
+		dev_err(dev, "unable to suspend xhci\n");
+		return ret;
+	}
+
+	/*
+	* xhci's main hcd is for USB2 while its shared hcd is for USB3;
+	* If phys are separated for USB2 and USB3, then main hcd's phy
+	* represents the dedicated USB2 phy while shared hcd's phy
+	* represents the USB3 phy which is a different phy than main hcd, we
+	* must power off both phys; otherwise the two hcds shares a same
+	* phy which is for both USB2 and USB3, we only need to power off
+	* the phy once.
+	* Here hcd is the main hcd.
+	*/
+	phy_power_off(hcd->phy);
+	phy_exit(hcd->phy);
+
+	if (of_property_read_bool(dev->of_node, "separated-phys-for-usb2-usb3")) {
+		phy_power_off(xhci->shared_hcd->phy);
+		phy_exit(xhci->shared_hcd->phy);
+	}
+
+	return 0;
 }
 
 static int xhci_plat_resume(struct device *dev)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+	int ret;
+
+	/*
+	* xhci's main hcd is for USB2 while its shared hcd is for USB3;
+	* If phys are separated for USB2 and USB3, then main hcd's phy
+	* represents the dedicated USB2 phy while shared hcd's phy
+	* represents the USB3 phy which is a different phy than main hcd, we
+	* must init and power on both phys; otherwise the two hcds shares
+	* a same phy which is for both USB2 and USB3, we only need to init
+	* and power on the phy once.
+	* Here hcd is the main hcd.
+	*/
+	ret = phy_init(hcd->phy);
+	if (ret)
+		return ret;
+
+	ret = phy_power_on(hcd->phy);
+	if (ret) {
+		phy_exit(hcd->phy);
+		return ret;
+	}
+
+	if (of_property_read_bool(dev->of_node, "separated-phys-for-usb2-usb3")) {
+		ret = phy_init(xhci->shared_hcd->phy);
+		if (ret)
+			return ret;
+
+		ret = phy_power_on(xhci->shared_hcd->phy);
+		if (ret) {
+			phy_exit(xhci->shared_hcd->phy);
+			/* roll back main hcd's phy */
+			phy_power_off(hcd->phy);
+			phy_exit(hcd->phy);
+			return ret;
+		}
+	}
 
 	return xhci_resume(xhci, 0);
 }
