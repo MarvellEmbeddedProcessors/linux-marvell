@@ -339,6 +339,7 @@
 				reg = <0x58000 0x4000>;
 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&sgateclk 17>;
+				separated-phys-for-usb2-usb3;
 				status = "disabled";
 			};
 
