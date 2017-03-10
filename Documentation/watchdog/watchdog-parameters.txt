@@ -10,6 +10,11 @@ modules.
 
 
 -------------------------------------------------
+a3700_wdt:
+heartbeat: Initial watchdog heartbeat in seconds
+nowayout: Watchdog cannot be stopped once started
+	(default=kernel config parameter)
+-------------------------------------------------
 acquirewdt:
 wdt_stop: Acquire WDT 'stop' io port (default 0x43)
 wdt_start: Acquire WDT 'start' io port (default 0x443)
