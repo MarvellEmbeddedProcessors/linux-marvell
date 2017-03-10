@@ -112,6 +112,9 @@
 
 			usb3@58000 {
 				status = "okay";
+				phys = <&utmi_usb32>, /* utmi usb32 dedicated phy */
+				       <&a3700_comphy 1 COMPHY_USB3>; /* usb3 comphy */
+				phy-names = "usb2", "usb3";
 			};
 
 			usb@5e000 {
