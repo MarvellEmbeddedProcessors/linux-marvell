@@ -708,9 +708,6 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 	writel((xor_dev->hw_desq & 0xFFFF00000000) >> 32,
 	       xor_dev->dma_base + DMA_DESQ_BAHR_OFF);
 
-	/* enable the DMA engine */
-	writel(0, xor_dev->dma_base + DMA_DESQ_STOP_OFF);
-
 	/*
 	 * This is a temporary solution, until we activate the
 	 * SMMU. Set the attributes for reading & writing data buffers
@@ -747,6 +744,9 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 	reg = readl(xor_dev->glob_base + GLOB_PAUSE);
 	reg |= GLOB_PAUSE_AXI_TIME_DIS_VAL;
 	writel(reg, xor_dev->glob_base + GLOB_PAUSE);
+
+	/* enable the DMA engine */
+	writel(0, xor_dev->dma_base + DMA_DESQ_STOP_OFF);
 
 	return 0;
 }
