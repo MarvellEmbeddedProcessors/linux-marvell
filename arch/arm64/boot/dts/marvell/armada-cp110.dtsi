@@ -17,6 +17,7 @@
 #define CP110_PCIEx_REG0_BASE(iface)		(CP110_BASE + 0x600000 + (iface) * 0x20000)
 #define CP110_PCIEx_REG1_BASE(iface)		(CP110_PCIEx_CPU_MEM_BASE(iface) + CP110_PCIE_MEM_SIZE)
 
+#define CP110_EIP197_INDEX			CP110_NUM
 #define CP110_SPI_BUS_ID(n)			((CP110_NUM * 2) + (n))
 
 / {
@@ -374,6 +375,7 @@
 			interrupt-names = "mem", "ring0", "ring1",
 				"ring2", "ring3", "eip";
 			clocks = <&CP110_LABEL(clk) 1 26>;
+			cell-index = <CP110_EIP197_INDEX>;
 			dma-coherent;
 		};
 	};
