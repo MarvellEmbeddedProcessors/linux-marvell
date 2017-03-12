@@ -154,6 +154,9 @@ struct mv_xor_v2_descriptor {
  * @hw_desq_virt: virtual address of DESCQ
  * @sw_desq: SW descriptors queue
  * @desc_size: HW descriptor size
+ * @npendings: number of pending descriptors (for which tx_submit has
+ * been called, but not yet issue_pending)
+ * @hw_queue_idx: index of next HW descriptor to push to the queue
 */
 struct mv_xor_v2_device {
 	spinlock_t sw_ll_lock;
@@ -171,6 +174,8 @@ struct mv_xor_v2_device {
 	struct mv_xor_v2_descriptor *hw_desq_virt;
 	struct mv_xor_v2_sw_desc *sw_desq;
 	int desc_size;
+	unsigned int npendings;
+	int hw_queue_idx;
 };
 
 /**
@@ -226,18 +231,6 @@ static void mv_xor_v2_set_data_buffers(struct mv_xor_v2_device *xor_dev,
 			desc->data_buff_addr[arr_index + 2] |=
 				(upper_32_bits(src) & 0xFFFF) << 16;
 	}
-}
-
-/*
- * Return the next available index in the DESQ.
- */
-static inline int mv_xor_v2_get_desq_write_ptr(struct mv_xor_v2_device *xor_dev)
-{
-	/* read the index for the next available descriptor in the DESQ */
-	u32 reg = readl(xor_dev->dma_base + DMA_DESQ_ALLOC_OFF);
-
-	return ((reg >> DMA_DESQ_ALLOC_WRPTR_SHIFT)
-		& DMA_DESQ_ALLOC_WRPTR_MASK);
 }
 
 /*
@@ -329,7 +322,6 @@ static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
 static dma_cookie_t
 mv_xor_v2_tx_submit(struct dma_async_tx_descriptor *tx)
 {
-	int desq_ptr;
 	void *dest_hw_desc;
 	dma_cookie_t cookie;
 	struct mv_xor_v2_sw_desc *sw_desc =
@@ -346,17 +338,19 @@ mv_xor_v2_tx_submit(struct dma_async_tx_descriptor *tx)
 	/* assign coookie */
 	cookie = dma_cookie_assign(tx);
 
-	/* get the next available slot in the DESQ */
-	desq_ptr = mv_xor_v2_get_desq_write_ptr(xor_dev);
-
 	/* copy the HW descriptor from the SW descriptor to the DESQ */
 	dest_hw_desc = ((void *)xor_dev->hw_desq_virt +
-			(xor_dev->desc_size * desq_ptr));
+			(xor_dev->desc_size * xor_dev->hw_queue_idx));
+	/*
+	 * Increase the push index for the HW queue and check if reach
+	 * the end of HW buffer
+	 */
+	if (++xor_dev->hw_queue_idx >= MV_XOR_V2_MAX_DESC_NUM)
+		xor_dev->hw_queue_idx = 0;
 
 	memcpy(dest_hw_desc, &sw_desc->hw_desc, xor_dev->desc_size);
 
-	/* update the DMA Engine with the new descriptor */
-	mv_xor_v2_add_desc_to_desq(xor_dev, 1);
+	xor_dev->npendings++;
 
 	/* unlock enqueue DESCQ */
 	spin_unlock_bh(&xor_dev->push_lock);
@@ -576,12 +570,22 @@ static enum dma_status mv_xor_v2_tx_status(struct dma_chan *chan,
 }
 
 /*
- * DMA framework requires this routine, since it's not
- * checking if device_issue_pending pointer is set or NULL
+ * issue all the pending descriptors (update the DMA Engine with
+ * the ready descriptors)
  */
 static void mv_xor_v2_issue_pending(struct dma_chan *chan)
 {
-	/* nothing to be done here */
+	struct mv_xor_v2_device *xor_dev =
+		container_of(chan, struct mv_xor_v2_device, dmachan);
+
+	/* Lock the channel */
+	spin_lock_bh(&xor_dev->push_lock);
+	if (xor_dev->npendings > 0) {
+		mv_xor_v2_add_desc_to_desq(xor_dev, xor_dev->npendings);
+		xor_dev->npendings = 0;
+	}
+	/* Release the channel */
+	spin_unlock_bh(&xor_dev->push_lock);
 }
 
 static inline
@@ -838,6 +842,8 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 		     (unsigned long) xor_dev);
 
 	xor_dev->desc_size = mv_xor_v2_set_desc_size(xor_dev);
+	xor_dev->npendings = 0;
+	xor_dev->hw_queue_idx = 0;
 
 	dma_cookie_init(&xor_dev->dmachan);
 
