@@ -25,9 +25,12 @@
 
 #include "safexcel.h"
 
-static u32 max_rings = EIP197_MAX_RINGS;
-module_param(max_rings, uint, 0644);
-MODULE_PARM_DESC(max_rings, "Maximum number of rings to use.");
+/* eip_in_use holds the active engine id */
+static int eip_in_use = -1;
+
+/* Module param to save the assigned rings to the Kernel */
+static uint rings[MAX_EIP_DEVICE] = {RINGS_UNINITIALIZED, RINGS_UNINITIALIZED};
+
 
 static void eip197_trc_cache_init(struct safexcel_crypto_priv *priv)
 {
@@ -313,7 +316,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 	if (priv->version == EIP197) {
 		/* enable HIA input interface arbiter and rings */
 		writel(EIP197_HIA_RA_PE_CTRL_EN |
-		       GENMASK(priv->config.rings - 1, 0),
+		       GENMASK(priv->config.hw_rings - 1, 0),
 		       EIP197_HIA_AIC(priv) + EIP197_HIA_RA_PE_CTRL);
 	}
 
@@ -358,7 +361,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 	writel(val, EIP197_PE(priv) + EIP197_PE_EIP96_FUNCTION_EN);
 
 	/* Command Descriptor Rings prepare */
-	for (i = 0; i < priv->config.rings; i++) {
+	for (i = 0; i < priv->config.hw_rings; i++) {
 		/* Clear interrupts for this ring */
 		writel(GENMASK(31, 0),
 		       EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ENABLE_CLR(i));
@@ -384,7 +387,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 	}
 
 	/* Result Descriptor Ring prepare */
-	for (i = 0; i < priv->config.rings; i++) {
+	for (i = 0; i < priv->config.hw_rings; i++) {
 		/* Disable external triggering*/
 		writel(0, EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_CFG);
 
@@ -407,11 +410,11 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 	}
 
 	/* Enable command descriptor rings */
-	writel(EIP197_DxE_THR_CTRL_EN | GENMASK(priv->config.rings - 1, 0),
+	writel(EIP197_DxE_THR_CTRL_EN | GENMASK(priv->config.hw_rings - 1, 0),
 	       EIP197_HIA_DFE_THR(priv) + EIP197_HIA_DFE_THR_CTRL);
 
 	/* Enable result descriptor rings */
-	writel(EIP197_DxE_THR_CTRL_EN | GENMASK(priv->config.rings - 1, 0),
+	writel(EIP197_DxE_THR_CTRL_EN | GENMASK(priv->config.hw_rings - 1, 0),
 	       EIP197_HIA_DSE_THR(priv) + EIP197_HIA_DSE_THR_CTRL);
 
 	/* Clear any HIA interrupt */
@@ -829,11 +832,28 @@ static void safexcel_configure(struct safexcel_crypto_priv *priv)
 	u32 val, mask;
 
 	val = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_OPTIONS);
+
+	/* Read number of rings from the engine */
+	priv->config.hw_rings = val & EIP197_N_RINGS_MASK;
+
 	val = (val & GENMASK(27, 25)) >> 25;
 	mask = BIT(val) - 1;
 
-	val = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_OPTIONS);
-	priv->config.rings = min_t(u32, val & GENMASK(3, 0), max_rings);
+	/* Check the requested number of rings given in the module param.
+	 * If the module param is uninitialized, use all available rings
+	 */
+	if (rings[priv->id] == RINGS_UNINITIALIZED)
+		rings[priv->id] = priv->config.hw_rings;
+
+	/* Check if the number of requested rings in module param is valid */
+	if (rings[priv->id] > priv->config.hw_rings) {
+		/* Invalid, use all available rings */
+		priv->config.rings = priv->config.hw_rings;
+		dev_warn(priv->dev, "requested %d rings, given only %d rings\n",
+			 rings[priv->id], priv->config.hw_rings);
+	} else  {
+		priv->config.rings = rings[priv->id];
+	}
 
 	priv->config.cd_size = (sizeof(struct safexcel_command_desc) / sizeof(u32));
 	priv->config.cd_offset = (priv->config.cd_size + mask) & ~mask;
@@ -989,10 +1009,22 @@ static int safexcel_probe(struct platform_device *pdev)
 		goto err_clk;
 	}
 
-	ret = safexcel_register_algorithms(priv);
-	if (ret) {
-		dev_err(dev, "Failed to register algorithms (%d)\n", ret);
-		goto err_clk;
+	/*
+	 * Kernel crypto API doesn't allow to register 2 engines.
+	 * Allowing working with 2 engines requires additional modification
+	 * which are planned as future work (Modify the Kernel crypto API or
+	 * implement load balance in EIP driver to handle 2 engines).
+	 *
+	 * Currently we want to register the first probed engine.
+	 */
+	if (eip_in_use == -1 && priv->config.rings) {
+		eip_in_use = priv->id;
+		ret = safexcel_register_algorithms(priv);
+		if (ret) {
+			dev_err(dev, "Failed to register algorithms (%d)\n",
+				ret);
+			goto err_clk;
+		}
 	}
 
 	return 0;
@@ -1008,7 +1040,9 @@ static int safexcel_remove(struct platform_device *pdev)
 	struct safexcel_crypto_priv *priv = platform_get_drvdata(pdev);
 	int i;
 
-	safexcel_unregister_algorithms(priv);
+	if (priv->id == eip_in_use)
+		safexcel_unregister_algorithms(priv);
+
 	clk_disable_unprepare(priv->clk);
 
 	for (i = 0; i < priv->config.rings; i++)
@@ -1039,6 +1073,8 @@ static struct platform_driver  crypto_safexcel = {
 	},
 };
 module_platform_driver(crypto_safexcel);
+module_param_array(rings, uint, NULL, 0644);
+MODULE_PARM_DESC(rings, "number of rings to be used by the driver");
 
 MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
 MODULE_AUTHOR("Ofer Heifetz <oferh@marvell.com>");

@@ -18,6 +18,11 @@
 #define EIP197_HIA_VERSION_LE			0xca35
 #define EIP197_HIA_VERSION_BE			0x35ca
 
+/* Number of eip devices */
+#define MAX_EIP_DEVICE					2
+
+#define RINGS_UNINITIALIZED				0xff
+
 /* Static configuration */
 #define EIP197_DEFAULT_RING_SIZE		400
 #define EIP197_MAX_TOKENS			5
@@ -170,6 +175,9 @@
 
 #define EIP197_HIA_RA_PE_CTRL_RESET		BIT(31)
 #define EIP197_HIA_RA_PE_CTRL_EN		BIT(30)
+
+/* EIP197_HIA_OPTIONS */
+#define EIP197_N_RINGS_MASK			GENMASK(3, 0)
 
 /* EIP197_HIA_AIC_R_ENABLE_CTRL */
 #define EIP197_CDR_IRQ(n)			BIT((n) * 2)
@@ -489,6 +497,7 @@ struct safexcel_request {
 
 struct safexcel_config {
 	u32 rings;
+	u32 hw_rings;
 
 	u32 cd_size;
 	u32 cd_offset;
