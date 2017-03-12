@@ -24,6 +24,9 @@
 /* eip_in_use holds the active engine id */
 static int eip_in_use = -1;
 
+/* Module param to save the assigned rings to the Kernel */
+static uint rings[MAX_EIP_ENGINE] = {RINGS_UNINITIALIZED, RINGS_UNINITIALIZED};
+
 static void eip197_prng_init(struct safexcel_crypto_priv *priv)
 {
 	/* disable PRNG and set to manual mode */
@@ -511,7 +514,7 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	      EIP197_PE(priv) + EIP197_PE_IN_TBUF_THRES);
 
 	/* enable HIA input interface arbiter and rings */
-	writel(EIP197_HIA_RA_PE_CTRL_EN | GENMASK(priv->config.rings - 1, 0),
+	writel(EIP197_HIA_RA_PE_CTRL_EN | GENMASK(priv->config.hw_rings - 1, 0),
 	       EIP197_HIA_AIC(priv) + EIP197_HIA_RA_PE_CTRL);
 
 	/*
@@ -547,7 +550,7 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	/*
 	 * Command Descriptor Rings prepare
 	 */
-	for (i = 0; i < priv->config.rings; i++) {
+	for (i = 0; i < priv->config.hw_rings; i++) {
 		/* Clear interrupts for this ring */
 		writel(GENMASK(31, 0),
 		       EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ENABLE_CLR(i));
@@ -574,7 +577,7 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	 * Result Descriptor Ring prepare
 	 */
 
-	for (i = 0; i < priv->config.rings; i++) {
+	for (i = 0; i < priv->config.hw_rings; i++) {
 		/* disable external triggering*/
 		writel(0, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_CFG);
 
@@ -595,11 +598,11 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	}
 
 	/* Enable command descriptor rings */
-	writel(EIP197_DxE_THR_CTRL_EN | GENMASK(priv->config.rings - 1, 0),
+	writel(EIP197_DxE_THR_CTRL_EN | GENMASK(priv->config.hw_rings - 1, 0),
 	       EIP197_HIA_DFE_THRD(priv) + EIP197_HIA_DFE_THR_CTRL);
 
 	/* Enable result descriptor rings */
-	writel(EIP197_DxE_THR_CTRL_EN | GENMASK(priv->config.rings - 1, 0),
+	writel(EIP197_DxE_THR_CTRL_EN | GENMASK(priv->config.hw_rings - 1, 0),
 	       EIP197_HIA_DSE_THRD(priv) + EIP197_HIA_DSE_THR_CTRL);
 
 	/* Clear any HIA interrupt */
@@ -1062,8 +1065,25 @@ static void safexcel_configure(struct safexcel_crypto_priv *priv)
 	val = (val & EIP197_xDR_HDW_MASK) >> EIP197_xDR_HDW_OFFSET;
 	mask = BIT(val) - 1;
 
+	/* Read number of rings from the engine */
 	val = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_OPTIONS);
-	priv->config.rings = (val & GENMASK(3, 0));
+	priv->config.hw_rings = (val & GENMASK(3, 0));
+
+	/* Check the requested number of rings given in the module param.
+	 * If the module param is uninitialized, use all available rings
+	 */
+	if (rings[priv->id] == RINGS_UNINITIALIZED)
+		rings[priv->id] = priv->config.hw_rings;
+
+	/* Check if the number of requested rings in module param is valid */
+	if (rings[priv->id] > priv->config.hw_rings) {
+		/* Invalid, use all available rings */
+		priv->config.rings = priv->config.hw_rings;
+		dev_warn(priv->dev, "requested %d rings, given only %d rings\n",
+			 rings[priv->id], priv->config.hw_rings);
+	} else  {
+		priv->config.rings = rings[priv->id];
+	}
 
 	priv->config.cd_size = (sizeof(struct safexcel_command_desc) / sizeof(u32));
 	priv->config.cd_offset = (priv->config.cd_size + mask) & ~mask;
@@ -1197,7 +1217,7 @@ static int safexcel_probe(struct platform_device *pdev)
 	 *
 	 * Currently we want to register the first probed engine.
 	 */
-	if (eip_in_use == -1) {
+	if (eip_in_use == -1 && priv->config.rings) {
 		eip_in_use = priv->id;
 		ret = safexcel_register_algorithms(priv);
 		if (ret) {
@@ -1252,6 +1272,8 @@ static struct platform_driver  crypto_safexcel = {
 	},
 };
 module_platform_driver(crypto_safexcel);
+module_param_array(rings, uint, NULL, 0);
+MODULE_PARM_DESC(rings, "number of rings to be used by the driver");
 
 MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
 MODULE_DESCRIPTION("Support for SafeXcel Cryptographic Engines EIP197");

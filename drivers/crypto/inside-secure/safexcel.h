@@ -25,6 +25,14 @@
 #define EIP197_HIA_VERSION_LE				0xca35
 #define EIP197_HIA_VERSION_BE				0x35ca
 
+/* Number of engines */
+#define MAX_EIP_ENGINE					2
+
+#define RINGS_UNINITIALIZED				0xff
+
+/* This could be retrieved from EIP97_HIA_OPTIONS */
+#define EIP97_MAX_RINGS					4
+
 /* Static configuration */
 #define EIP197_DEFAULT_RING_SIZE			300
 #define EIP197_MAX_TOKENS				5
@@ -554,6 +562,7 @@ struct safexcel_unit_offset {
 
 struct safexcel_config {
 	u32 rings;
+	u32 hw_rings;
 
 	u32 cd_size;
 	u32 cd_offset;
