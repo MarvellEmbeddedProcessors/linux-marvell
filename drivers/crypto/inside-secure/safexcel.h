@@ -535,6 +535,8 @@ struct safexcel_crypto_priv {
 
 	atomic_t ring_used;
 
+	int id;
+
 	struct {
 		spinlock_t lock;
 		spinlock_t egress_lock;
