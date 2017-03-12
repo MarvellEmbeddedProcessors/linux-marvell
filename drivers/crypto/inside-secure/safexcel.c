@@ -1002,6 +1002,12 @@ static int safexcel_probe(struct platform_device *pdev)
 		return PTR_ERR(priv->base);
 	}
 
+	ret = of_property_read_u32(dev->of_node, "cell-index", &priv->id);
+	if (ret) {
+		dev_err(dev, "failed to read cell-index property\n");
+		return ret;
+	}
+
 	priv->clk = devm_clk_get(&pdev->dev, NULL);
 	ret = PTR_ERR_OR_ZERO(priv->clk);
 	/* The clock isn't mandatory */
