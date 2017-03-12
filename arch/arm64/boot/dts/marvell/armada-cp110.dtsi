@@ -462,6 +462,7 @@ cpm_eip197: eip197@800000 {
 	interrupt-names = "eip_addr", "ring0", "ring1",
 			  "ring2", "ring3", "eip_out";
 	clocks = <&cpm_syscon0 1 26>;
+	cell-index = <0>;
 	status = "disabled";
 };
 
