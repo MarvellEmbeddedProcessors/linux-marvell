@@ -728,6 +728,20 @@ static int mvebu_a3700_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 	return ret;
 }
 
+static int mvebu_a3700_comphy_usb3_power_off(struct mvebu_comphy_priv *priv,
+					    struct mvebu_comphy *comphy)
+{
+	/*
+	 * Currently the USB3 MAC will control the USB3 PHY to set it to low state,
+	 * thus do not need to power off USB3 PHY again.
+	 */
+	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+
+	return 0;
+}
+
 static int mvebu_a3700_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 					    struct mvebu_comphy *comphy)
 {
@@ -878,6 +892,9 @@ static int mvebu_a3700_comphy_power_off(struct phy *phy)
 	spin_lock(&priv->lock);
 
 	switch (mode) {
+	case (COMPHY_USB3_MODE):
+		err = mvebu_a3700_comphy_usb3_power_off(priv, comphy);
+		break;
 	case (COMPHY_SATA_MODE):
 		err = mvebu_a3700_comphy_sata_power_off(priv, comphy);
 		break;
