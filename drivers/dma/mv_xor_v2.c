@@ -618,13 +618,16 @@ static void mv_xor_v2_tasklet(unsigned long data)
 
 	dev_dbg(xor_dev->dmadev.dev, "%s %d\n", __func__, __LINE__);
 
+	/* Lock the channel */
+	spin_lock_bh(&xor_dev->sw_ll_lock);
 	/* free the compeleted descriptors (check the ctrl ack flag) */
 	list_for_each_entry_safe(iter, _iter, &xor_dev->complete_sw_desc,
 				 node) {
-
 		if (async_tx_test_ack(&iter->async_tx))
 			list_move_tail(&iter->node, &xor_dev->free_sw_desc);
 	}
+	/* Release the channel */
+	spin_unlock_bh(&xor_dev->sw_ll_lock);
 
 	/* get thepending descriptors parameters */
 	num_of_pending = mv_xor_v2_get_pending_params(xor_dev, &pending_ptr);
