@@ -189,7 +189,7 @@
 			status = "disabled";
 		};
 		pcie@0x600000{
-			status="disabled";
+			status="okay";
 		};
 	};
 };
