@@ -119,6 +119,8 @@
 
 			usb@5e000 {
 				status = "okay";
+				phys = <&utmi_usb2>;
+				phy-names = "usb";
 			};
 
 			sdhci1: sdhci@d0000 {
