@@ -37,6 +37,7 @@
 #include <linux/of_address.h>
 #include <linux/of_device.h>
 #include <linux/phy/phy.h>
+#include <linux/if_vlan.h>
 
 #include <linux/phy.h>
 #include <linux/clk.h>
@@ -3893,6 +3894,28 @@ error:
 	return err;
 }
 
+static int mv_pp2x_rx_add_vid(struct net_device *dev, u16 proto, u16 vid)
+{
+	int err;
+
+	if (vid >= VLAN_N_VID)
+		return -EINVAL;
+
+	err = mv_pp2x_prs_vid_entry_accept(dev, proto, vid, true);
+	return err;
+}
+
+static int mv_pp2x_rx_kill_vid(struct net_device *dev, u16 proto, u16 vid)
+{
+	int err;
+
+	if (vid >= VLAN_N_VID)
+		return -EINVAL;
+
+	err = mv_pp2x_prs_vid_entry_accept(dev, proto, vid, false);
+	return err;
+}
+
 static struct rtnl_link_stats64 *
 mv_pp2x_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 {
@@ -4015,6 +4038,8 @@ static const struct net_device_ops mv_pp2x_netdev_ops = {
 	.ndo_get_stats64	= mv_pp2x_get_stats64,
 	.ndo_do_ioctl		= mv_pp2x_ioctl,
 	.ndo_set_features	= mv_pp2x_netdev_set_features,
+	.ndo_vlan_rx_add_vid	= mv_pp2x_rx_add_vid,
+	.ndo_vlan_rx_kill_vid	= mv_pp2x_rx_kill_vid,
 };
 
 /* Driver initialization */
@@ -4716,6 +4741,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		port->txq_stop_limit = TXQ_LIMIT;
 
 	dev->vlan_features |= features;
+
+	/* Add support for VLAN filtering */
+	dev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 
 	dev->priv_flags |= IFF_UNICAST_FLT;
 
