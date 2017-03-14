@@ -340,6 +340,7 @@
 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&sgateclk 17>;
 				separated-phys-for-usb2-usb3;
+				needs-reset-on-resume;
 				status = "disabled";
 			};
 
