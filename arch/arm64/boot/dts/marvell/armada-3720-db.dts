@@ -165,6 +165,8 @@
 
 			usb@5e000 {
 				status = "okay";
+				phys = <&utmi_usb2>;
+				phy-names = "usb";
 			};
 
 			interrupt-controller@74840 {

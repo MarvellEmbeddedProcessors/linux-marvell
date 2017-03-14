@@ -355,6 +355,7 @@
 				compatible = "marvell,armada-3700-ehci";
 				reg = <0x5e000 0x1000>;
 				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+				needs-reset-on-resume;
 				status = "disabled";
 			};
 
