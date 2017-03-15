@@ -30,6 +30,35 @@
 #define AHCI_WINDOW_BASE(win)	(0x64 + ((win) << 4))
 #define AHCI_WINDOW_SIZE(win)	(0x68 + ((win) << 4))
 
+#define SATA3_VENDOR_ADDRESS			0xA0
+#define SATA3_VENDOR_ADDR_OFSSET		0
+#define SATA3_VENDOR_ADDR_MASK			(0xFFFFFFFF << SATA3_VENDOR_ADDR_OFSSET)
+#define SATA3_VENDOR_DATA			0xA4
+
+#define SATA_CONTROL_REG			0x0
+#define SATA3_CTRL_SATA0_PD_OFFSET		6
+#define SATA3_CTRL_SATA0_PD_MASK		(1 << SATA3_CTRL_SATA0_PD_OFFSET)
+#define SATA3_CTRL_SATA1_PD_OFFSET		14
+#define SATA3_CTRL_SATA1_PD_MASK		(1 << SATA3_CTRL_SATA1_PD_OFFSET)
+#define SATA3_CTRL_SATA1_ENABLE_OFFSET		22
+#define SATA3_CTRL_SATA1_ENABLE_MASK		(1 << SATA3_CTRL_SATA1_ENABLE_OFFSET)
+#define SATA3_CTRL_SATA_SSU_OFFSET		23
+#define SATA3_CTRL_SATA_SSU_MASK		(1 << SATA3_CTRL_SATA_SSU_OFFSET)
+
+#define SATA_MBUS_SIZE_SELECT_REG		0x4
+#define SATA_MBUS_REGRET_EN_OFFSET		7
+#define SATA_MBUS_REGRET_EN_MASK		(0x1 << SATA_MBUS_REGRET_EN_OFFSET)
+
+static void reg_set(void __iomem *addr, u32 data, u32 mask)
+{
+	u32 reg_data;
+
+	reg_data = readl(addr);
+	reg_data &= ~mask;
+	reg_data |= data;
+	writel(reg_data, addr);
+}
+
 static void ahci_mvebu_mbus_config(struct ahci_host_priv *hpriv,
 				   const struct mbus_dram_target_info *dram)
 {
@@ -64,70 +93,6 @@ static void ahci_mvebu_regret_option(struct ahci_host_priv *hpriv)
 	writel(0x80, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int ahci_mvebu_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	return ahci_platform_suspend_host(&pdev->dev);
-}
-
-static int ahci_mvebu_resume(struct platform_device *pdev)
-{
-	struct ata_host *host = platform_get_drvdata(pdev);
-	struct ahci_host_priv *hpriv = host->private_data;
-	const struct mbus_dram_target_info *dram;
-
-	dram = mv_mbus_dram_info();
-	if (dram)
-		ahci_mvebu_mbus_config(hpriv, dram);
-
-	ahci_mvebu_regret_option(hpriv);
-
-	return ahci_platform_resume_host(&pdev->dev);
-}
-#else
-#define ahci_mvebu_suspend NULL
-#define ahci_mvebu_resume NULL
-#endif
-
-static const struct ata_port_info ahci_mvebu_port_info = {
-	.flags	   = AHCI_FLAG_COMMON,
-	.pio_mask  = ATA_PIO4,
-	.udma_mask = ATA_UDMA6,
-	.port_ops  = &ahci_platform_ops,
-};
-
-static struct scsi_host_template ahci_platform_sht = {
-	AHCI_SHT(DRV_NAME),
-};
-
-static void reg_set(void __iomem *addr, u32 data, u32 mask)
-{
-	u32 reg_data;
-
-	reg_data = readl(addr);
-	reg_data &= ~mask;
-	reg_data |= data;
-	writel(reg_data, addr);
-}
-
-#define SATA3_VENDOR_ADDRESS			0xA0
-#define SATA3_VENDOR_ADDR_OFSSET		0
-#define SATA3_VENDOR_ADDR_MASK			(0xFFFFFFFF << SATA3_VENDOR_ADDR_OFSSET)
-#define SATA3_VENDOR_DATA			0xA4
-
-#define SATA_CONTROL_REG			0x0
-#define SATA3_CTRL_SATA0_PD_OFFSET		6
-#define SATA3_CTRL_SATA0_PD_MASK		(1 << SATA3_CTRL_SATA0_PD_OFFSET)
-#define SATA3_CTRL_SATA1_PD_OFFSET		14
-#define SATA3_CTRL_SATA1_PD_MASK		(1 << SATA3_CTRL_SATA1_PD_OFFSET)
-#define SATA3_CTRL_SATA1_ENABLE_OFFSET		22
-#define SATA3_CTRL_SATA1_ENABLE_MASK		(1 << SATA3_CTRL_SATA1_ENABLE_OFFSET)
-#define SATA3_CTRL_SATA_SSU_OFFSET		23
-#define SATA3_CTRL_SATA_SSU_MASK		(1 << SATA3_CTRL_SATA_SSU_OFFSET)
-
-#define SATA_MBUS_SIZE_SELECT_REG		0x4
-#define SATA_MBUS_REGRET_EN_OFFSET		7
-#define SATA_MBUS_REGRET_EN_MASK		(0x1 << SATA_MBUS_REGRET_EN_OFFSET)
 /**
  * ahci_mvebu_pll_power_up
  *
@@ -252,6 +217,42 @@ static int ahci_mvebu_pll_power_up(struct platform_device *pdev,
 
 	return err;
 }
+
+#ifdef CONFIG_PM_SLEEP
+static int ahci_mvebu_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	return ahci_platform_suspend_host(&pdev->dev);
+}
+
+static int ahci_mvebu_resume(struct platform_device *pdev)
+{
+	struct ata_host *host = platform_get_drvdata(pdev);
+	struct ahci_host_priv *hpriv = host->private_data;
+	const struct mbus_dram_target_info *dram;
+
+	dram = mv_mbus_dram_info();
+	if (dram)
+		ahci_mvebu_mbus_config(hpriv, dram);
+
+	ahci_mvebu_regret_option(hpriv);
+
+	return ahci_platform_resume_host(&pdev->dev);
+}
+#else
+#define ahci_mvebu_suspend NULL
+#define ahci_mvebu_resume NULL
+#endif
+
+static const struct ata_port_info ahci_mvebu_port_info = {
+	.flags	   = AHCI_FLAG_COMMON,
+	.pio_mask  = ATA_PIO4,
+	.udma_mask = ATA_UDMA6,
+	.port_ops  = &ahci_platform_ops,
+};
+
+static struct scsi_host_template ahci_platform_sht = {
+	AHCI_SHT(DRV_NAME),
+};
 
 static int ahci_mvebu_probe(struct platform_device *pdev)
 {
