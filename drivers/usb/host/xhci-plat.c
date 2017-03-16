@@ -45,6 +45,9 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 	 * dev struct in order to setup MSI
 	 */
 	xhci->quirks |= XHCI_PLAT;
+
+	if (of_property_read_bool(dev->of_node, "needs-reset-on-resume"))
+		xhci->quirks |= XHCI_RESET_ON_RESUME;
 }
 
 /* called during probe() after chip reset completes */
