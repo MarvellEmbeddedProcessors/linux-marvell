@@ -813,11 +813,88 @@ static int mvebu_a3700_comphy_power_off(struct phy *phy)
 	return 0;
 }
 
+static int mvebu_a3700_comphy_sata_is_pll_locked(struct phy *phy)
+{
+	u32 data;
+	void __iomem *comphy_indir_regs;
+	struct resource *res;
+	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
+	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
+	struct platform_device *pdev = container_of(priv->dev, struct platform_device, dev);
+	int ret = 0;
+
+	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	/* Get the indirect access register resource and map */
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "indirect");
+	if (res) {
+		comphy_indir_regs = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(comphy_indir_regs))
+			return PTR_ERR(comphy_indir_regs);
+	} else {
+		dev_err(priv->dev, "no inirect register resource\n");
+		return -ENOTSUPP;
+	}
+
+	/* Polling status */
+	writel(COMPHY_LOOPBACK_REG0 + SATAPHY_LANE2_REG_BASE_OFFSET,
+	       comphy_indir_regs + COMPHY_LANE2_INDIR_ADDR_OFFSET);
+	data = polling_with_timeout(comphy_indir_regs + COMPHY_LANE2_INDIR_DATA_OFFSET,
+				    PLL_READY_TX_BIT,
+				    PLL_READY_TX_BIT,
+				    A3700_COMPHY_PLL_LOCK_TIMEOUT,
+				    REG_32BIT);
+
+	if (data != 0) {
+		dev_err(priv->dev, "TX PLL is not locked\n");
+		ret = -ETIMEDOUT;
+	}
+
+	/* Unmap resource */
+	devm_iounmap(&pdev->dev, comphy_indir_regs);
+	devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
+
+	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+
+	return ret;
+}
+
+static int mvebu_a3700_comphy_is_pll_locked(struct phy *phy)
+{
+	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
+	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
+	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+	int ret = 0;
+
+	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	spin_lock(&priv->lock);
+
+	switch (mode) {
+	case(COMPHY_SATA_MODE):
+		ret = mvebu_a3700_comphy_sata_is_pll_locked(phy);
+		break;
+
+	default:
+		dev_err(priv->dev, "comphy%d: unsupported comphy mode to get PLL lock state\n",
+			comphy->index);
+		ret = -EINVAL;
+		break;
+	}
+
+	spin_unlock(&priv->lock);
+
+	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+
+	return ret;
+}
+
 static struct phy_ops a3700_comphy_ops = {
 	.power_on	= mvebu_a3700_comphy_power_on,
 	.power_off	= mvebu_a3700_comphy_power_off,
 	.set_mode	= mvebu_comphy_set_mode,
 	.get_mode	= mvebu_comphy_get_mode,
+	.is_pll_locked  = mvebu_a3700_comphy_is_pll_locked,
 	.owner		= THIS_MODULE,
 };
 
