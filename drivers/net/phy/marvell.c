@@ -107,7 +107,7 @@
 #define MII_88E1318S_PHY_LED_PAGE                           0x03
 #define MII_88E1318S_PHY_LED_TCR                            0x12
 #define MII_88E1318S_PHY_LED_TCR_FORCE_INT                  BIT(15)
-#define MII_88E1318S_PHY_LED_TCR_INTn_ENABLE                BIT(7)
+#define MII_88E1318S_PHY_LED_TCR_INTN_ENABLE                BIT(7)
 #define MII_88E1318S_PHY_LED_TCR_INT_ACTIVE_LOW             BIT(11)
 
 /* Magic Packet MAC address registers */
@@ -312,7 +312,8 @@ static int marvell_config_aneg(struct phy_device *phydev)
 
 	/* The Marvell PHY has an errata which requires
 	 * that certain registers get written in order
-	 * to restart autonegotiation */
+	 * to restart autonegotiation
+	 */
 	err = phy_write(phydev, MII_BMCR, BMCR_RESET);
 
 	if (err < 0)
@@ -354,8 +355,7 @@ static int marvell_config_aneg(struct phy_device *phydev)
 	if (phydev->autoneg != AUTONEG_ENABLE) {
 		int bmcr;
 
-		/*
-		 * A write to speed/duplex bits (that is performed by
+		 /*A write to speed/duplex bits (that is performed by
 		 * genphy_config_aneg() call above) must be followed by
 		 * a software reset. Otherwise, the write has no effect.
 		 */
@@ -372,8 +372,7 @@ static int marvell_config_aneg(struct phy_device *phydev)
 }
 
 #ifdef CONFIG_OF_MDIO
-/*
- * Set and/or override some configuration registers based on the
+/* Set and/or override some configuration registers based on the
  * marvell,reg-init property stored in the of_node for the phydev.
  *
  * marvell,reg-init = <reg-page reg mask value>,...;
@@ -436,7 +435,6 @@ static int marvell_of_reg_init(struct phy_device *phydev)
 		ret = phy_write(phydev, reg, val);
 		if (ret < 0)
 			goto err;
-
 	}
 err:
 	if (page_changed) {
@@ -465,12 +463,11 @@ static int m88e1121_config_aneg(struct phy_device *phydev)
 		return err;
 
 	if (phy_interface_is_rgmii(phydev)) {
-
 		mscr = phy_read(phydev, MII_88E1121_PHY_MSCR_REG) &
 			MII_88E1121_PHY_MSCR_DELAY_MASK;
 
 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
-			phydev->interface == PHY_INTERFACE_MODE_RGMII)
+		    phydev->interface == PHY_INTERFACE_MODE_RGMII)
 			mscr |= (MII_88E1121_PHY_MSCR_RX_DELAY |
 				 MII_88E1121_PHY_MSCR_TX_DELAY);
 		else if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID)
@@ -666,13 +663,12 @@ static int m88e1111_config_init(struct phy_device *phydev)
 	int temp;
 
 	if (phy_interface_is_rgmii(phydev)) {
-
 		temp = phy_read(phydev, MII_M1111_PHY_EXT_CR);
 		if (temp < 0)
 			return temp;
 
 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID ||
-			phydev->interface == PHY_INTERFACE_MODE_RGMII) {
+		    phydev->interface == PHY_INTERFACE_MODE_RGMII) {
 			temp |= (MII_M1111_RX_DELAY | MII_M1111_TX_DELAY);
 		} else if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID) {
 			temp &= ~MII_M1111_TX_DELAY;
@@ -980,6 +976,7 @@ static int m88e1145_config_init(struct phy_device *phydev)
 
 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
 		int temp = phy_read(phydev, MII_M1145_PHY_EXT_CR);
+
 		if (temp < 0)
 			return temp;
 
@@ -1179,12 +1176,13 @@ static int marvell_read_status(struct phy_device *phydev)
 	int status = 0;
 
 	/* Update the link, but return if there
-	 * was an error */
+	 * was an error
+	 */
 	err = genphy_update_link(phydev);
 	if (err)
 		return err;
 
-	if (AUTONEG_ENABLE == phydev->autoneg) {
+	if (phydev->autoneg == AUTONEG_ENABLE) {
 		status = phy_read(phydev, MII_M1011_PHY_STATUS);
 		if (status < 0)
 			return status;
@@ -1212,7 +1210,8 @@ static int marvell_read_status(struct phy_device *phydev)
 			phydev->duplex = DUPLEX_HALF;
 
 		status = status & MII_M1011_PHY_STATUS_SPD_MASK;
-		phydev->pause = phydev->asym_pause = 0;
+		phydev->pause = 0;
+		phydev->asym_pause = 0;
 
 		switch (status) {
 		case MII_M1011_PHY_STATUS_1000:
@@ -1250,7 +1249,8 @@ static int marvell_read_status(struct phy_device *phydev)
 		else
 			phydev->speed = SPEED_10;
 
-		phydev->pause = phydev->asym_pause = 0;
+		phydev->pause = 0;
+		phydev->asym_pause = 0;
 		phydev->lp_advertising = 0;
 	}
 
@@ -1536,7 +1536,7 @@ static int m88e1318_set_wol(struct phy_device *phydev, struct ethtool_wolinfo *w
 		/* Setup LED[2] as interrupt pin (active low) */
 		temp = phy_read(phydev, MII_88E1318S_PHY_LED_TCR);
 		temp &= ~MII_88E1318S_PHY_LED_TCR_FORCE_INT;
-		temp |= MII_88E1318S_PHY_LED_TCR_INTn_ENABLE;
+		temp |= MII_88E1318S_PHY_LED_TCR_INTN_ENABLE;
 		temp |= MII_88E1318S_PHY_LED_TCR_INT_ACTIVE_LOW;
 		err = phy_write(phydev, MII_88E1318S_PHY_LED_TCR, temp);
 		if (err < 0)
