@@ -20,6 +20,8 @@ Optional properties:
   - phys: phandle + phy specifier pair, reference to the USB PHYs
   - phy-names: can be "usb2", "usb3" when "separated-phys-for-usb2-usb3" is
     set or "usb" when "separated-phys-for-usb2-usb3" is not set.
+  - needs-reset-on-resume: boolean, set this to force XHCI reset after resume,
+    for example, Armada 3700 must force XHCI reset after resume
 
 Examples:
 	usb@f0931000 {
@@ -39,4 +41,5 @@ Examples:
 		       <&a3700_comphy 1 COMPHY_USB3>; /* usb3 comphy */
 		phy-names = "usb2", "usb3";
 		separated-phys-for-usb2-usb3;
+		needs-reset-on-resume;
 	};
