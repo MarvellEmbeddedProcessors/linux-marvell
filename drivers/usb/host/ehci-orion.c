@@ -373,6 +373,10 @@ static int ehci_orion_drv_suspend(struct platform_device *pdev,
 	if (rc)
 		return rc;
 
+	/* Power off PHY */
+	phy_power_off(hcd->phy);
+	phy_exit(hcd->phy);
+
 	return 0;
 }
 
@@ -389,7 +393,18 @@ static int ehci_orion_drv_resume(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
 	struct orion_ehci_hcd *priv = hcd_to_orion_priv(hcd);
-	int addr, regVal, i;
+	int addr, regVal, i, rc;
+
+	/* Init and power on PHY */
+	rc = phy_init(hcd->phy);
+	if (rc)
+		return rc;
+
+	rc = phy_power_on(hcd->phy);
+	if (rc) {
+		phy_exit(hcd->phy);
+		return rc;
+	}
 
 	for (addr = USB_CAUSE, i = 0; addr <= USB_IPG; addr += 0x4, i++)
 		writel_relaxed(usb_save[i], hcd->regs + addr);
