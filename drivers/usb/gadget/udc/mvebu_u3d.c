@@ -2461,11 +2461,44 @@ err_mem:
 #ifdef CONFIG_PM
 static int mvc2_suspend(struct device *dev)
 {
+	struct mvc2 *cp = (struct mvc2 *)dev_get_drvdata(dev);
+
+	/* Stop the current activities */
+	if (cp->driver)
+		stop_activity(cp, cp->driver);
+
+	/* PHY exit if there is */
+	if (cp->comphy) {
+		phy_power_off(cp->comphy);
+		phy_exit(cp->comphy);
+	}
+
 	return 0;
 }
 
 static int mvc2_resume(struct device *dev)
 {
+	struct mvc2 *cp = (struct mvc2 *)dev_get_drvdata(dev);
+	int ret;
+
+	/* PHY init if there is */
+	if (cp->comphy) {
+		ret = phy_init(cp->comphy);
+		if (ret)
+			return ret;
+
+		ret = phy_power_on(cp->comphy);
+		if (ret) {
+			phy_power_off(cp->comphy);
+			phy_exit(cp->comphy);
+			return ret;
+		}
+	}
+
+	/* Start the current device if driver is connected */
+	if (cp->driver)
+		mvc2_start(&cp->gadget, cp->driver);
+
 	return 0;
 }
 
