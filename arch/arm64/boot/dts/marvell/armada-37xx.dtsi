@@ -421,7 +421,6 @@
 				      <0xe0178 0x8>; /* lane2 indirect access */
 				reg-names = "comphy", "serdes", "usb3_gbe1_phy", "indirect";
 				#phy-cells = <2>;
-				status = "disabled";
 			};
 
 			bm: bm@c0000 {
