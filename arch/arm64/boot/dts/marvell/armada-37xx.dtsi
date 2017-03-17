@@ -214,6 +214,13 @@
 				};
 			};
 
+			cpu_pm_clk: cpu-pm-clk@14018 {
+				compatible = "marvell,armada-37xx-cpu-pm-clk";
+				reg = <0x14018 0x1C>;
+				#clock-cells = <1>;
+				clocks = <&core_clk 4>;
+			};
+
 			sgateclk: south-bridge-gate-clk@18014 {
 				compatible = "marvell,armada-3700-south-bridge-gating-clock";
 				reg = <0x18014 0x4>;
@@ -233,14 +240,6 @@
 					marvell,pins = "mpp2";
 					marvell,function = "gpio";
 				};
-			};
-
-			cpufreq@14000 {
-				compatible = "marvell,armada-3700-cpufreq";
-				reg = <0x14000 0x1000>;
-				interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
-				clock-latency = <1000>;
-				clocks = <&core_clk 4>;
 			};
 
 			eth0: ethernet@30000 {
