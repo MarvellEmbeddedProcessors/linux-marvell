@@ -106,6 +106,10 @@
 				status = "okay";
 			};
 
+			reg_avs: avs@11500 {
+				status = "okay";
+			};
+
 			/*
 			* Exported on the micro USB connector CON32
 			* through an FTDI
