@@ -56,6 +56,8 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53","arm,armv8";
 			reg = <0x1>;
+			cks = <&cpu_pm_clk 0>;
+			operating-points-v2 = <&cluster0_opp>;
 			enable-method = "psci";
 		};
 	};

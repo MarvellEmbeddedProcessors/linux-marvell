@@ -65,6 +65,15 @@
 		gpio1 = &gpio_sb;
 	};
 
+	cluster0_opp: opp_table0 {
+		compatible = "operating-points-v2";
+		opp-shared;
+		opp@0 {
+			opp-hz = /bits/ 64 <200000000>;
+			clock-latency-ns = <50000>;
+		};
+	};
+
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -72,6 +81,8 @@
 			device_type = "cpu";
 			compatible = "arm,cortex-a53", "arm,armv8";
 			reg = <0>;
+			clocks = <&cpu_pm_clk 0>;
+			operating-points-v2 = <&cluster0_opp>;
 			enable-method = "psci";
 		};
 	};
