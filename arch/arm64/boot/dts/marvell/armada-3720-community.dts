@@ -72,6 +72,10 @@
 				status = "okay";
 			};
 
+			reg_avs: avs@11500 {
+				status = "okay";
+			};
+
 			eth0: ethernet@30000 {
 				phy-mode = "rgmii-id";
 				status = "okay";
