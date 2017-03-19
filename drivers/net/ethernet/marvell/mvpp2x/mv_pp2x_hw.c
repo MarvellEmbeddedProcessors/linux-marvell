@@ -5496,14 +5496,7 @@ int mv_pp2x_cls_c2_hw_write(struct mv_pp2x_hw *hw, int index,
 	/* write index reg */
 	mv_pp2x_write(hw, MVPP2_CLS2_TCAM_IDX_REG, index);
 
-	/* write valid bit*/
-	c2->inv = 0;
-	mv_pp2x_write(hw, MVPP2_CLS2_TCAM_INV_REG,
-		      ((c2->inv) << MVPP2_CLS2_TCAM_INV_INVALID_OFF));
-
-	for (tcm_idx = 0; tcm_idx < MVPP2_CLS_C2_TCAM_WORDS; tcm_idx++)
-		mv_pp2x_write(hw, MVPP2_CLS2_TCAM_DATA_REG(tcm_idx),
-			      c2->tcam.words[tcm_idx]);
+	mv_pp2x_cls_c2_hw_inv(hw, index);
 
 	/* write action_tbl CLSC2_ACT_DATA */
 	mv_pp2x_write(hw, MVPP2_CLS2_ACT_DATA_REG, c2->sram.regs.action_tbl);
@@ -5519,6 +5512,15 @@ int mv_pp2x_cls_c2_hw_write(struct mv_pp2x_hw *hw, int index,
 
 	/* write rss_attr CLSC2_ATTR2 */
 	mv_pp2x_write(hw, MVPP2_CLS2_ACT_DUP_ATTR_REG, c2->sram.regs.rss_attr);
+
+	/* write valid bit*/
+	c2->inv = 0;
+	mv_pp2x_write(hw, MVPP2_CLS2_TCAM_INV_REG,
+		      ((c2->inv) << MVPP2_CLS2_TCAM_INV_INVALID_OFF));
+
+	for (tcm_idx = 0; tcm_idx < MVPP2_CLS_C2_TCAM_WORDS; tcm_idx++)
+		mv_pp2x_write(hw, MVPP2_CLS2_TCAM_DATA_REG(tcm_idx),
+			      c2->tcam.words[tcm_idx]);
 
 	return 0;
 }
