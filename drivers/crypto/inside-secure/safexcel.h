@@ -516,6 +516,10 @@ struct safexcel_ring {
 	unsigned offset;
 };
 
+enum safexcel_alg_type {
+	SAFEXCEL_ALG_TYPE_CIPHER,
+};
+
 struct safexcel_request {
 	struct list_head list;
 	struct crypto_async_request *req;
@@ -613,6 +617,20 @@ struct safexcel_context {
 	dma_addr_t cache_dma;
 	unsigned int cache_sz;
 };
+
+/*
+ * Template structure to describe the algorithms in order to register them.
+ * It also has the purpose to contain our private structure and is actually
+ * the only way I know in this framework to avoid having global pointers...
+ */
+struct safexcel_alg_template {
+	struct safexcel_crypto_priv *priv;
+	enum safexcel_alg_type type;
+	union {
+		struct crypto_alg crypto;
+	} alg;
+};
+
 struct safexcel_inv_result {
 	struct completion completion;
 	int error;
@@ -651,4 +669,7 @@ struct safexcel_result_desc *safexcel_add_rdesc(struct safexcel_crypto_priv *pri
 						phys_addr_t data, u32 len);
 void safexcel_inv_complete(struct crypto_async_request *req, int error);
 
+/* available algorithms */
+extern struct safexcel_alg_template safexcel_alg_ecb_aes;
+extern struct safexcel_alg_template safexcel_alg_cbc_aes;
 #endif
