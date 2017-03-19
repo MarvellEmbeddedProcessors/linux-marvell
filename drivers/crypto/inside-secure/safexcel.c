@@ -362,6 +362,91 @@ static void eip_priv_unit_offset_init(struct safexcel_crypto_priv *priv)
 	unit_off->pe = EIP197_HIA_PE_ADDR;
 }
 
+/* Configure the command descriptor ring manager */
+static int eip_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
+{
+	u32 hdw, cd_size_rnd, val;
+	int i;
+
+	hdw = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_OPTIONS);
+	hdw = (hdw & EIP197_xDR_HDW_MASK) >> EIP197_xDR_HDW_OFFSET;
+
+	cd_size_rnd = (priv->config.cd_size + (BIT(hdw) - 1)) >> hdw;
+
+	for (i = 0; i < priv->config.rings; i++) {
+		/* ring base address */
+		writel(lower_32_bits(priv->ring[i].cdr.base_dma),
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_RING_BASE_ADDR_LO);
+		writel(upper_32_bits(priv->ring[i].cdr.base_dma),
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_RING_BASE_ADDR_HI);
+
+		writel(EIP197_xDR_DESC_MODE_64BIT |
+		       (priv->config.cd_offset << EIP197_xDR_DESC_CD_OFFSET) |
+		       priv->config.cd_size,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_DESC_SIZE);
+		writel(((EIP197_FETCH_COUNT * (cd_size_rnd << hdw)) << EIP197_XDR_CD_FETCH_THRESH) |
+		       (EIP197_FETCH_COUNT * priv->config.cd_offset),
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_CFG);
+
+		/* Configure DMA tx control */
+		val = EIP197_HIA_xDR_CFG_WR_CACHE(WR_CACHE_3BITS);
+		val |= EIP197_HIA_xDR_CFG_RD_CACHE(RD_CACHE_3BITS);
+		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_DMA_CFG);
+
+		/* clear any pending interrupt */
+		writel(EIP197_CDR_INTR_MASK,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_STAT);
+	}
+
+	return 0;
+}
+
+/* Configure the result descriptor ring manager */
+static int eip_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
+{
+	u32 hdw, rd_size_rnd, val;
+	int i;
+
+	hdw = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_OPTIONS);
+	hdw = (hdw & EIP197_xDR_HDW_MASK) >> EIP197_xDR_HDW_OFFSET;
+
+	rd_size_rnd = (priv->config.rd_size + (BIT(hdw) - 1)) >> hdw;
+
+	for (i = 0; i < priv->config.rings; i++) {
+		/* ring base address */
+		writel(lower_32_bits(priv->ring[i].rdr.base_dma),
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_RING_BASE_ADDR_LO);
+		writel(upper_32_bits(priv->ring[i].rdr.base_dma),
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_RING_BASE_ADDR_HI);
+
+		writel(EIP197_xDR_DESC_MODE_64BIT |
+		       priv->config.rd_offset << EIP197_xDR_DESC_CD_OFFSET |
+		       priv->config.rd_size,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_DESC_SIZE);
+
+		writel((EIP197_FETCH_COUNT * (rd_size_rnd << hdw)) << EIP197_XDR_CD_FETCH_THRESH |
+		       (EIP197_FETCH_COUNT * priv->config.rd_offset),
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_CFG);
+
+		/* Configure DMA tx control */
+		val = EIP197_HIA_xDR_CFG_WR_CACHE(WR_CACHE_3BITS);
+		val |= EIP197_HIA_xDR_CFG_RD_CACHE(RD_CACHE_3BITS);
+		val |= EIP197_HIA_xDR_WR_RES_BUF | EIP197_HIA_xDR_WR_CTRL_BUG;
+		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_DMA_CFG);
+
+		/* clear any pending interrupt */
+		writel(EIP197_RDR_INTR_MASK,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_STAT);
+
+		/* enable ring interrupt */
+		val = readl(EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ENABLE_CTRL(i));
+		val |= EIP197_RDR_IRQ(i);
+		writel(val, EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ENABLE_CTRL(i));
+	}
+
+	return 0;
+}
+
 static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 {
 	u32 version, val;
@@ -534,15 +619,401 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 		return ret;
 	}
 
+	eip_hw_setup_cdesc_rings(priv);
+	eip_hw_setup_rdesc_rings(priv);
+
 	return 0;
+}
+
+/* Dequeue crypto API requests and send to the engine */
+void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
+{
+	struct crypto_async_request *req, *backlog;
+	struct safexcel_context *ctx;
+	struct safexcel_request *request;
+	int ret, nreq = 0;
+	int cdesc = 0, rdesc = 0;
+	int commands, results;
+	u32 val;
+
+	do {
+		spin_lock_bh(&priv->ring[ring].queue_lock);
+		req = crypto_dequeue_request(&priv->ring[ring].queue);
+		backlog = crypto_get_backlog(&priv->ring[ring].queue);
+		spin_unlock_bh(&priv->ring[ring].queue_lock);
+
+		if (!req)
+			goto finalize;
+
+		if (backlog)
+			backlog->complete(backlog, -EINPROGRESS);
+
+		request = kzalloc(sizeof(*request), EIP197_GFP_FLAGS(*req));
+		if (!request) {
+			ret = -ENOMEM;
+			goto resource_fail;
+		}
+
+		ctx = crypto_tfm_ctx(req->tfm);
+		ret = ctx->send(req, ring, request, &commands, &results);
+		if (ret) {
+			kfree(request);
+			goto resource_fail;
+		}
+
+		spin_lock_bh(&priv->ring[ring].egress_lock);
+		list_add_tail(&request->list, &priv->ring[ring].list);
+		spin_unlock_bh(&priv->ring[ring].egress_lock);
+
+		cdesc += commands;
+		rdesc += results;
+		nreq++;
+	} while (true);
+
+resource_fail:
+	/* resource alloc fail, bail out, complete the request and */
+	/* leave dequeue enabled since we have not cleaned it all  */
+	priv->ring[ring].need_dequeue = true;
+
+	local_bh_disable();
+	req->complete(req, ret);
+	local_bh_enable();
+
+finalize:
+	if (!nreq)
+		return;
+
+	spin_lock_bh(&priv->ring[ring].lock);
+
+	/* Configure when we want an interrupt */
+	val = EIP197_HIA_RDR_THRESH_PKT_MODE | EIP197_HIA_RDR_THRESH_PROC_PKT(nreq);
+	val |= EIP197_HIA_RDR_THRESH_TIMEOUT(0x80);
+	writel_relaxed(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_THRESH);
+
+	/* let the RDR know we have pending descriptors */
+	writel_relaxed((rdesc * priv->config.rd_offset) << EIP197_xDR_PREP_RD_COUNT_INCR_OFFSET,
+	       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PREP_COUNT);
+
+	/* let the CDR know we have pending descriptors */
+	writel((cdesc * priv->config.cd_offset) << EIP197_xDR_PREP_RD_COUNT_INCR_OFFSET,
+	       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(ring) + EIP197_HIA_xDR_PREP_COUNT);
+
+	spin_unlock_bh(&priv->ring[ring].lock);
+}
+
+/* Select the ring which will be used for the operation */
+inline int safexcel_select_ring(struct safexcel_crypto_priv *priv)
+{
+	return (atomic_inc_return(&priv->ring_used) % priv->config.rings);
+}
+
+/* Default IRQ handler */
+static irqreturn_t safexcel_irq_default(int irq, void *data)
+{
+	struct safexcel_crypto_priv *priv = data;
+
+	dev_err(priv->dev, "Got an interrupt handled by the default handler.\n");
+
+	return IRQ_NONE;
+}
+
+/* Global IRQ handler */
+static irqreturn_t safexcel_irq_global(int irq, void *data)
+{
+	struct safexcel_crypto_priv *priv = data;
+	u32 status = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ENABLED_STAT);
+
+	writel(status, EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
+
+	return IRQ_HANDLED;
+}
+
+/* Free crypto API result mapping */
+void safexcel_free_context(struct safexcel_crypto_priv *priv,
+				  struct crypto_async_request *req,
+				  int result_sz)
+{
+	struct safexcel_context *ctx = crypto_tfm_ctx(req->tfm);
+
+	if (ctx->result_dma)
+		dma_unmap_single(priv->dev, ctx->result_dma, result_sz,
+				 DMA_FROM_DEVICE);
+
+	if (ctx->cache_dma) {
+		dma_unmap_single(priv->dev, ctx->cache_dma, ctx->cache_sz,
+				 DMA_TO_DEVICE);
+		ctx->cache_sz = 0;
+	}
+}
+
+/* Acknoledge and release the used descriptors */
+void safexcel_complete(struct safexcel_crypto_priv *priv, int ring)
+{
+	struct safexcel_command_desc *cdesc;
+
+	/* Acknowledge the command descriptors */
+	do {
+		cdesc = safexcel_ring_next_rptr(priv, &priv->ring[ring].cdr);
+		if (IS_ERR(cdesc)) {
+			dev_err(priv->dev,
+				"Could not retrieve the command descriptor\n");
+			return;
+		}
+	} while (!cdesc->last_seg);
+}
+
+/* Context completion cache invalidation */
+void safexcel_inv_complete(struct crypto_async_request *req, int error)
+{
+	struct safexcel_inv_result *result = req->data;
+
+	if (error == -EINPROGRESS)
+		return;
+
+	result->error = error;
+	complete(&result->completion);
+}
+
+/* Context cache invalidation */
+int safexcel_invalidate_cache(struct crypto_async_request *async,
+			      struct safexcel_context *ctx,
+			      struct safexcel_crypto_priv *priv,
+			      dma_addr_t ctxr_dma,
+			      int ring, struct safexcel_request *request)
+{
+	struct safexcel_command_desc *cdesc;
+	struct safexcel_result_desc *rdesc;
+	phys_addr_t ctxr_phys;
+	int ret;
+
+	ctxr_phys = dma_to_phys(priv->dev, ctxr_dma);
+
+	spin_lock_bh(&priv->ring[ring].egress_lock);
+
+	/* prepare command descriptor */
+	cdesc = safexcel_add_cdesc(priv, ring, true, true,
+				   0, 0, 0, ctxr_phys);
+
+	if (IS_ERR(cdesc)) {
+		ret = PTR_ERR(cdesc);
+		goto unlock;
+	}
+
+	cdesc->control_data.type = CONTEXT_CONTROL_TYPE_AUTONOMUS_TOKEN;
+	cdesc->control_data.options = 0;
+	cdesc->control_data.refresh = 0;
+	cdesc->control_data.control0 = CONTEXT_CONTROL_INV_TR <<
+				       CONTEXT_CONTROL_HW_SERVICES_OFFSET;
+
+	/* prepare result descriptor */
+	rdesc = safexcel_add_rdesc(priv, ring, true, true, ctxr_phys, 0);
+
+	if (IS_ERR(rdesc)) {
+		ret = PTR_ERR(rdesc);
+		goto cdesc_rollback;
+	}
+
+	request->req = async;
+
+	spin_unlock_bh(&priv->ring[ring].egress_lock);
+
+	return 0;
+
+cdesc_rollback:
+	safexcel_ring_rollback_wptr(priv, &priv->ring[ring].cdr);
+
+unlock:
+	spin_unlock_bh(&priv->ring[ring].egress_lock);
+	return ret;
+}
+
+/* Generic result handler */
+static inline void safexcel_handle_result_descriptor(struct safexcel_crypto_priv *priv,
+						     int ring)
+{
+	struct safexcel_request *sreq;
+	struct safexcel_context *ctx;
+	int ret, i, nreq, ndesc = 0;
+	bool should_complete;
+
+	nreq = readl(EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PROC_COUNT);
+	nreq = (nreq >> EIP197_xDR_PROC_xD_PKT_OFFSET) & EIP197_xDR_PROC_xD_PKT_MASK;
+
+	if (!nreq)
+		return;
+
+	for (i = 0; i < nreq; i++) {
+		spin_lock_bh(&priv->ring[ring].egress_lock);
+		sreq = list_first_entry(&priv->ring[ring].list, struct safexcel_request, list);
+		list_del(&sreq->list);
+		spin_unlock_bh(&priv->ring[ring].egress_lock);
+
+		WARN_ON(!virt_addr_valid(sreq->req->tfm));
+
+		ctx = crypto_tfm_ctx(sreq->req->tfm);
+		ndesc = ctx->handle_result(priv, ring, sreq->req,
+					   &should_complete, &ret);
+		if (ndesc < 0) {
+			dev_err(priv->dev, "failed to handle result (%d)", ndesc);
+			return;
+		}
+
+		if (should_complete) {
+			local_bh_disable();
+			sreq->req->complete(sreq->req, ret);
+			local_bh_enable();
+		}
+
+		kfree(sreq);
+	}
+
+	writel(EIP197_HIA_RDR_THRESH_PKT_MODE | EIP197_xDR_PROC_xD_PKT(i),
+	       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PROC_COUNT);
+}
+
+/* Result worker routine */
+static void safexcel_handle_result_work(struct work_struct *work)
+{
+	struct safexcel_work_data *data = container_of(work, struct safexcel_work_data, work);
+	struct safexcel_crypto_priv *priv = data->priv;
+
+	safexcel_handle_result_descriptor(priv, data->ring);
+
+	if (priv->ring[data->ring].need_dequeue) {
+		priv->ring[data->ring].need_dequeue = false;
+		safexcel_dequeue(data->priv, data->ring);
+	}
+}
+
+struct safexcel_ring_irq_data {
+	struct safexcel_crypto_priv *priv;
+	int ring;
+};
+
+/* Ring IRQ handler */
+static irqreturn_t safexcel_irq_ring(int irq, void *data)
+{
+	struct safexcel_ring_irq_data *irq_data = data;
+	struct safexcel_crypto_priv *priv = irq_data->priv;
+	int ring = irq_data->ring;
+	u32 status, stat;
+
+	status = readl(EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ENABLED_STAT(ring));
+
+	if (!status)
+		return IRQ_NONE;
+
+	/* CDR interrupts */
+	if (status & EIP197_CDR_IRQ(ring)) {
+		stat = readl_relaxed(EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(ring) + EIP197_HIA_xDR_STAT);
+
+		if (unlikely(stat & EIP197_xDR_ERR)) {
+			/*
+			 * Fatal error, the CDR is unusable and must be
+			 * reinitialized. This should not happen under
+			 * normal circumstances.
+			 */
+			dev_err(priv->dev, "CDR: fatal error.");
+		}
+
+		/* ACK the interrupts */
+		writel_relaxed(stat & 0xff, EIP197_HIA_AIC_xDR(priv) +
+			       EIP197_HIA_CDR(ring) + EIP197_HIA_xDR_STAT);
+	}
+
+	/* RDR interrupts */
+	if (status & EIP197_RDR_IRQ(ring)) {
+		stat = readl_relaxed(EIP197_HIA_AIC_xDR(priv) +
+				     EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_STAT);
+
+		if (unlikely(stat & EIP197_xDR_ERR)) {
+			/*
+			 * Fatal error, the CDR is unusable and must be
+			 * reinitialized. This should not happen under
+			 * normal circumstances.
+			 */
+			dev_err(priv->dev, "RDR: fatal error.");
+		}
+
+		if (likely(stat & EIP197_xDR_THRESH)) {
+			writel_relaxed(0, EIP197_HIA_AIC_xDR(priv) +
+				       EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_THRESH);
+			queue_work(priv->ring[ring].workqueue, &priv->ring[ring].work_data.work);
+		} else if (unlikely(stat & EIP197_xDR_TIMEOUT)) {
+			queue_work(priv->ring[ring].workqueue, &priv->ring[ring].work_data.work);
+		}
+
+		/* ACK the interrupts */
+		writel_relaxed(stat & 0xff, EIP197_HIA_AIC_xDR(priv) +
+			       EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_STAT);
+	}
+
+	/* ACK the interrupts */
+	writel(status, EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ACK(ring));
+
+	return IRQ_HANDLED;
+}
+
+/* Register gloabl interrupts */
+static int safexcel_request_irq(struct platform_device *pdev, const char *name,
+				irq_handler_t handler,
+				struct safexcel_crypto_priv *priv)
+{
+	int ret, irq = platform_get_irq_byname(pdev, name);
+
+	if (irq < 0) {
+		dev_err(&pdev->dev, "unable to get IRQ '%s'\n", name);
+		return irq;
+	}
+
+	ret = devm_request_irq(&pdev->dev, irq, handler, 0,
+			       dev_name(&pdev->dev), priv);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to request IRQ %d\n", irq);
+		return ret;
+	}
+
+	return irq;
+}
+
+/* Register ring interrupts */
+static int safexcel_request_ring_irq(struct platform_device *pdev, const char *name,
+				     irq_handler_t handler,
+				     struct safexcel_ring_irq_data *ring_irq_priv)
+{
+	int ret, irq = platform_get_irq_byname(pdev, name);
+
+	if (irq < 0) {
+		dev_err(&pdev->dev, "unable to get IRQ '%s'\n", name);
+		return irq;
+	}
+
+	ret = devm_request_irq(&pdev->dev, irq, handler, 0,
+			       dev_name(&pdev->dev), ring_irq_priv);
+	if (ret) {
+		dev_err(&pdev->dev, "unable to request IRQ %d\n", irq);
+		return ret;
+	}
+
+	return irq;
 }
 
 static void safexcel_configure(struct safexcel_crypto_priv *priv)
 {
-	u32 val;
+	u32 val, mask;
+
+	val = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_OPTIONS);
+	val = (val & EIP197_xDR_HDW_MASK) >> EIP197_xDR_HDW_OFFSET;
+	mask = BIT(val) - 1;
 
 	val = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_OPTIONS);
 	priv->config.rings = (val & GENMASK(3, 0));
+
+	priv->config.cd_size = (sizeof(struct safexcel_command_desc) / sizeof(u32));
+	priv->config.cd_offset = (priv->config.cd_size + mask) & ~mask;
+
+	priv->config.rd_size = (sizeof(struct safexcel_result_desc) / sizeof(u32));
+	priv->config.rd_offset = (priv->config.rd_size + mask) & ~mask;
 }
 
 static int safexcel_probe(struct platform_device *pdev)
@@ -550,7 +1021,7 @@ static int safexcel_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct resource *res;
 	struct safexcel_crypto_priv *priv;
-	int ret;
+	int i, ret;
 
 	priv = devm_kzalloc(dev, sizeof(struct safexcel_crypto_priv),
 			    GFP_KERNEL);
@@ -582,20 +1053,84 @@ static int safexcel_probe(struct platform_device *pdev)
 			return -EPROBE_DEFER;
 	}
 
+	priv->context_pool = dmam_pool_create("safexcel-context", dev,
+					      sizeof(struct safexcel_context_record),
+					      1, 0);
+	if (!priv->context_pool) {
+		ret = -ENOMEM;
+		goto err_clk;
+	}
+
 	safexcel_configure(priv);
 
-	platform_set_drvdata(pdev, priv);
+	ret = safexcel_request_irq(pdev, "eip_out", safexcel_irq_global, priv);
+	if (ret < 0)
+		goto err_pool;
 
-	spin_lock_init(&priv->lock);
+	ret = safexcel_request_irq(pdev, "eip_addr", safexcel_irq_default, priv);
+	if (ret < 0)
+		goto err_pool;
+
+	for (i = 0; i < priv->config.rings; i++) {
+		char irq_name[6] = {0}; /* "ringX\0" */
+		char wq_name[9] = {0}; /* "wq_ringX\0" */
+		int irq;
+		struct safexcel_ring_irq_data *ring_irq;
+
+		ret = safexcel_init_ring_descriptors(priv,
+						     &priv->ring[i].cdr,
+						     &priv->ring[i].rdr);
+		if (ret)
+			goto err_pool;
+
+		ring_irq = devm_kzalloc(dev, sizeof(struct safexcel_ring_irq_data),
+					GFP_KERNEL);
+		if (!ring_irq) {
+			ret = -ENOMEM;
+			goto err_pool;
+		}
+
+		ring_irq->priv = priv;
+		ring_irq->ring = i;
+
+		snprintf(irq_name, 6, "ring%d", i);
+		irq = safexcel_request_ring_irq(pdev, irq_name, safexcel_irq_ring,
+						ring_irq);
+
+		if (irq < 0)
+			goto err_pool;
+
+		priv->ring[i].work_data.priv = priv;
+		priv->ring[i].work_data.ring = i;
+		INIT_WORK(&priv->ring[i].work_data.work, safexcel_handle_result_work);
+
+		snprintf(wq_name, 9, "wq_ring%d", i);
+		priv->ring[i].workqueue = create_singlethread_workqueue(wq_name);
+		if (!priv->ring[i].workqueue) {
+			ret = -ENOMEM;
+			goto err_pool;
+		}
+
+		INIT_LIST_HEAD(&priv->ring[i].list);
+		spin_lock_init(&priv->ring[i].lock);
+		spin_lock_init(&priv->ring[i].egress_lock);
+		spin_lock_init(&priv->ring[i].queue_lock);
+		crypto_init_queue(&priv->ring[i].queue, EIP197_DEFAULT_RING_SIZE);
+	}
+	atomic_set(&priv->ring_used, 0);
+
+	platform_set_drvdata(pdev, priv);
 
 	ret = eip_hw_init(dev, priv);
 	if (ret) {
 		dev_err(dev, "EIP h/w init failed (%d)\n", ret);
-		goto err_clk;
+		goto err_pool;
 	}
 
 	return 0;
 
+err_pool:
+	dma_pool_destroy(priv->context_pool);
 err_clk:
 	clk_disable_unprepare(priv->clk);
 	return ret;
@@ -605,8 +1140,15 @@ err_clk:
 static int safexcel_remove(struct platform_device *pdev)
 {
 	struct safexcel_crypto_priv *priv = platform_get_drvdata(pdev);
+	int i;
 
 	clk_disable_unprepare(priv->clk);
+
+	for (i = 0; i < priv->config.rings; i++) {
+		safexcel_free_ring_descriptors(priv, &priv->ring[i].cdr,
+					       &priv->ring[i].rdr);
+		destroy_workqueue(priv->ring[i].workqueue);
+	}
 
 	return 0;
 }
