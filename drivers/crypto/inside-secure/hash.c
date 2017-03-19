@@ -276,11 +276,14 @@ send_command:
 		goto cdesc_rollback;
 	}
 
+	ctx->base.handle_result = safexcel_handle_result;
+	request->req = &areq->base;
+
+	list_add_tail(&request->list, &priv->ring[ring].list);
+
 	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	req->len += areq->nbytes;
-	request->req = &areq->base;
-	ctx->base.handle_result = safexcel_handle_result;
 
 	*commands = n_cdesc;
 	*results = 1;

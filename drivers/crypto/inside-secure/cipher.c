@@ -259,10 +259,11 @@ static int safexcel_aes_send(struct crypto_async_request *async,
 		n_rdesc++;
 	}
 
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
-
 	ctx->base.handle_result = safexcel_handle_result;
 	request->req = &req->base;
+	list_add_tail(&request->list, &priv->ring[ring].list);
+
+	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	*commands = n_cdesc;
 	*results = nr_dst;

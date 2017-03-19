@@ -667,10 +667,6 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 			goto resource_fail;
 		}
 
-		spin_lock_bh(&priv->ring[ring].egress_lock);
-		list_add_tail(&request->list, &priv->ring[ring].list);
-		spin_unlock_bh(&priv->ring[ring].egress_lock);
-
 		cdesc += commands;
 		rdesc += results;
 		nreq++;
@@ -820,6 +816,7 @@ int safexcel_invalidate_cache(struct crypto_async_request *async,
 	}
 
 	request->req = async;
+	list_add_tail(&request->list, &priv->ring[ring].list);
 
 	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
@@ -853,8 +850,6 @@ static inline void safexcel_handle_result_descriptor(struct safexcel_crypto_priv
 		sreq = list_first_entry(&priv->ring[ring].list, struct safexcel_request, list);
 		list_del(&sreq->list);
 		spin_unlock_bh(&priv->ring[ring].egress_lock);
-
-		WARN_ON(!virt_addr_valid(sreq->req->tfm));
 
 		ctx = crypto_tfm_ctx(sreq->req->tfm);
 		ndesc = ctx->handle_result(priv, ring, sreq->req,
