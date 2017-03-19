@@ -21,6 +21,9 @@
 
 #include "safexcel.h"
 
+/* eip_in_use holds the active engine id */
+static int eip_in_use = -1;
+
 static void eip197_prng_init(struct safexcel_crypto_priv *priv)
 {
 	/* disable PRNG and set to manual mode */
@@ -998,6 +1001,59 @@ static int safexcel_request_ring_irq(struct platform_device *pdev, const char *n
 	return irq;
 }
 
+/* List of supported algorithms */
+static struct safexcel_alg_template *safexcel_algs[] = {
+	&safexcel_alg_ecb_aes,
+	&safexcel_alg_cbc_aes,
+	&safexcel_alg_sha1,
+	&safexcel_alg_sha224,
+	&safexcel_alg_sha256,
+	&safexcel_alg_hmac_sha1,
+};
+
+/* Register the supported hash and cipher algorithms */
+static int safexcel_register_algorithms(struct safexcel_crypto_priv *priv)
+{
+	int i, j, ret = 0;
+
+	for (i = 0; i < ARRAY_SIZE(safexcel_algs); i++) {
+		safexcel_algs[i]->priv = priv;
+
+		if (safexcel_algs[i]->type == SAFEXCEL_ALG_TYPE_CIPHER)
+			ret = crypto_register_alg(&safexcel_algs[i]->alg.crypto);
+		else
+			ret = crypto_register_ahash(&safexcel_algs[i]->alg.ahash);
+
+		if (ret)
+			goto fail;
+	}
+
+	return 0;
+
+fail:
+	for (j = i; j < 0; j--) {
+		if (safexcel_algs[j]->type == SAFEXCEL_ALG_TYPE_CIPHER)
+			crypto_unregister_alg(&safexcel_algs[j]->alg.crypto);
+		else
+			crypto_unregister_ahash(&safexcel_algs[j]->alg.ahash);
+	}
+
+	return ret;
+}
+
+/* Unregister the hash and cipher algorithms */
+static void safexcel_unregister_algorithms(struct safexcel_crypto_priv *priv)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(safexcel_algs); i++) {
+		if (safexcel_algs[i]->type == SAFEXCEL_ALG_TYPE_CIPHER)
+			crypto_unregister_alg(&safexcel_algs[i]->alg.crypto);
+		else
+			crypto_unregister_ahash(&safexcel_algs[i]->alg.ahash);
+	}
+}
+
 static void safexcel_configure(struct safexcel_crypto_priv *priv)
 {
 	u32 val, mask;
@@ -1133,6 +1189,23 @@ static int safexcel_probe(struct platform_device *pdev)
 		goto err_pool;
 	}
 
+	/*
+	 * Kernel crypto API doesn't allow to register 2 engines.
+	 * Allowing working with 2 engines requires additional modification
+	 * which are planned as future work (Modify the Kernel crypto API or
+	 * implement load balance in EIP driver to handle 2 engines).
+	 *
+	 * Currently we want to register the first probed engine.
+	 */
+	if (eip_in_use == -1) {
+		eip_in_use = priv->id;
+		ret = safexcel_register_algorithms(priv);
+		if (ret) {
+			dev_err(dev, "Failed to register algorithms (%d)\n", ret);
+			goto err_pool;
+		}
+	}
+
 	return 0;
 
 err_pool:
@@ -1147,6 +1220,9 @@ static int safexcel_remove(struct platform_device *pdev)
 {
 	struct safexcel_crypto_priv *priv = platform_get_drvdata(pdev);
 	int i;
+
+	if (priv->id == eip_in_use)
+		safexcel_unregister_algorithms(priv);
 
 	clk_disable_unprepare(priv->clk);
 
