@@ -470,4 +470,6 @@ static inline void mv_gop110_fca_write(struct gop_hw *gop, int mac_num,
 void mv_gop110_gmac_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff);
 void mv_gop110_xlg_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff);
 
+int mv_gop110_update_comphy(struct mv_pp2x_port *port, u32 speed);
+
 #endif /* _MV_GOP_HW_H_ */

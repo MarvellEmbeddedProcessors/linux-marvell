@@ -30,6 +30,7 @@
 
 #include "mv_pp2x.h"
 #include "mv_gop110_hw.h"
+#include "mv_pp2x_hw.h"
 
 void mv_gop110_register_bases_dump(struct gop_hw *gop)
 {
@@ -3190,5 +3191,110 @@ void mv_gop110_xlg_registers_dump(struct mv_pp2x_port *port, u32 *regs_buff)
 	regs_buff[index++] = mv_gop110_xlg_mac_read(&port->priv->hw.gop,
 						    port->mac_data.gop_index,
 						    MV_XLG_MAC_DIC_PPM_IPG_REDUCE_REG);
+}
+
+static void mv_gop110_set_new_phy_mode(u32 speed, struct mv_mac_data *mac)
+{
+	mac->flags &= ~(MV_EMAC_F_SGMII2_5 | MV_EMAC_F_5G);
+
+	if (speed == SPEED_10000) {
+		mac->phy_mode = PHY_INTERFACE_MODE_SFI;
+		mac->speed = SPEED_10000;
+	} else if (speed == SPEED_5000) {
+		mac->phy_mode = PHY_INTERFACE_MODE_SFI;
+		mac->speed = SPEED_5000;
+		mac->flags |= MV_EMAC_F_5G;
+	} else if (speed == SPEED_2500) {
+		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
+		mac->speed = SPEED_2500;
+		mac->flags |= MV_EMAC_F_SGMII2_5;
+	} else {
+		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
+		mac->speed = SPEED_1000;
+	}
+}
+
+static int mv_gop110_get_new_comphy_mode(u32 speed, int port_id)
+{
+	if (speed == SPEED_10000 && port_id == 0)
+		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
+				  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
+	else if (speed == SPEED_5000 && port_id == 0)
+		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
+				  COMPHY_SPEED_5_15625G, COMPHY_POLARITY_NO_INVERT);
+	else if (speed == SPEED_2500)
+		return COMPHY_DEF(COMPHY_HS_SGMII_MODE, port_id,
+				  COMPHY_SPEED_3_125G, COMPHY_POLARITY_NO_INVERT);
+	else if (speed == SPEED_1000 || speed == SPEED_100 ||
+		 speed == SPEED_10)
+		return COMPHY_DEF(COMPHY_SGMII_MODE, port_id,
+				  COMPHY_SPEED_1_25G, COMPHY_POLARITY_NO_INVERT);
+	else
+		return -EINVAL;
+}
+
+/* Routine update comphy and GoP according to port speed.
+  * Speed could be changed by ethtool and phy driver.
+  */
+int mv_gop110_update_comphy(struct mv_pp2x_port *port, u32 speed)
+{
+	int comphy_old_mode, comphy_new_mode;
+	int err = 0;
+	struct gop_hw *gop = &port->priv->hw.gop;
+	struct mv_mac_data *mac = &port->mac_data;
+
+	comphy_new_mode = mv_gop110_get_new_comphy_mode(speed, port->id);
+
+	if (comphy_new_mode < 0) {
+		pr_err("Port ID %d: unsupported speed set\n", port->id);
+			return comphy_new_mode;
+	}
+
+	comphy_old_mode = phy_get_mode(port->comphy);
+
+	if (comphy_old_mode == comphy_new_mode)
+		return 0;
+
+	/* If port is UP:
+	* 1. Shutdown down dev state.
+	* 2. Mask Link interrupt.
+	* 3. Turn down MAC.
+	* 4. Power off Serdes.
+	*/
+	if (mac->flags & MV_EMAC_F_PORT_UP) {
+		netif_carrier_off(port->dev);
+		mv_gop110_port_events_mask(gop, mac);
+		mv_gop110_port_disable(gop, mac, port->comphy);
+		phy_power_off(port->comphy);
+	}
+
+	err = phy_set_mode(port->comphy, comphy_new_mode);
+	if (err < 0) {
+		phy_set_mode(port->comphy, comphy_old_mode);
+		pr_err("Port ID %d: err %d COMPHY lane is busy\n", err, port->id);
+		goto out;
+	}
+
+	mv_gop110_set_new_phy_mode(speed, mac);
+
+	/* Reconfigure GoP and Serdes if port were initialized */
+	if (mac->flags & MV_EMAC_F_INIT) {
+		mac->flags &= ~MV_EMAC_F_INIT;
+		mvcpn110_mac_hw_init(port);
+	}
+
+	mv_pp22_set_net_comp(port->priv);
+
+out:
+	/* Turn ON port */
+	if (mac->flags & MV_EMAC_F_PORT_UP) {
+		mv_gop110_port_disable(gop, mac, port->comphy);
+		phy_power_on(port->comphy);
+		mv_gop110_port_events_unmask(gop, mac);
+		mv_gop110_port_enable(gop, mac, port->comphy);
+		netif_carrier_on(port->dev);
+	}
+
+	return err;
 }
 
