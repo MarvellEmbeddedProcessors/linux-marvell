@@ -1713,6 +1713,8 @@ static void mv_pp22_link_event(struct net_device *dev)
 	if (phydev->link) {
 		if ((port->mac_data.speed != phydev->speed) ||
 		    (port->mac_data.duplex != phydev->duplex)) {
+			if (port->comphy)
+				mv_gop110_update_comphy(port, phydev->speed);
 			port->mac_data.duplex = phydev->duplex;
 			port->mac_data.speed  = phydev->speed;
 		}

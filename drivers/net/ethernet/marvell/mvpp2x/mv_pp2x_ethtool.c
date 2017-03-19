@@ -541,46 +541,6 @@ void mv_pp2x_ethtool_set_gmac_config(struct mv_port_link_status status, struct g
 	mv_gop110_force_link_mode_set(gop, mac, false, false);
 }
 
-int mv_pp2x_get_new_comphy_mode(struct ethtool_cmd *cmd, int port_id)
-{
-	if (cmd->speed == SPEED_10000 && port_id == 0)
-		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
-				  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
-	else if (cmd->speed == SPEED_5000 && port_id == 0)
-		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
-				  COMPHY_SPEED_5_15625G, COMPHY_POLARITY_NO_INVERT);
-	else if (cmd->speed == SPEED_2500)
-		return COMPHY_DEF(COMPHY_HS_SGMII_MODE, port_id,
-				  COMPHY_SPEED_3_125G, COMPHY_POLARITY_NO_INVERT);
-	else if (cmd->speed == SPEED_1000 || cmd->speed == SPEED_100 ||
-		 cmd->speed == SPEED_10)
-		return COMPHY_DEF(COMPHY_SGMII_MODE, port_id,
-				  COMPHY_SPEED_1_25G, COMPHY_POLARITY_NO_INVERT);
-	else
-		return -EINVAL;
-}
-
-void mv_pp2x_set_new_phy_mode(struct ethtool_cmd *cmd, struct mv_mac_data *mac)
-{
-	mac->flags &= ~(MV_EMAC_F_SGMII2_5 | MV_EMAC_F_5G);
-
-	if (cmd->speed == SPEED_10000) {
-		mac->phy_mode = PHY_INTERFACE_MODE_SFI;
-		mac->speed = SPEED_10000;
-	} else if (cmd->speed == SPEED_5000) {
-		mac->phy_mode = PHY_INTERFACE_MODE_SFI;
-		mac->speed = SPEED_5000;
-		mac->flags |= MV_EMAC_F_5G;
-	} else if (cmd->speed == SPEED_2500) {
-		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
-		mac->speed = SPEED_2500;
-		mac->flags |= MV_EMAC_F_SGMII2_5;
-	} else {
-		mac->phy_mode = PHY_INTERFACE_MODE_SGMII;
-		mac->speed = SPEED_1000;
-	}
-}
-
 /* Set settings (phy address, speed) for ethtools */
 static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 					struct ethtool_cmd *cmd)
@@ -591,7 +551,6 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 	struct gop_hw *gop = &port->priv->hw.gop;
 	struct mv_mac_data *mac = &port->mac_data;
 	int gop_port = mac->gop_index;
-	bool phy_mode_update = false;
 
 	/* PPv21 - only PHY should be configured
 	*  PPv22 - set Serdes&GoP configuration and then configure PHY
@@ -603,51 +562,10 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 			return phy_ethtool_sset(port->mac_data.phy_dev, cmd);
 	}
 
-	if (port->comphy)  {
-		int comphy_old_mode, comphy_new_mode;
-
-		comphy_new_mode = mv_pp2x_get_new_comphy_mode(cmd, port->id);
-
-		if (comphy_new_mode < 0) {
-			pr_err("Port ID %d: unsupported speed set\n", port->id);
-			return comphy_new_mode;
-		}
-		comphy_old_mode = phy_get_mode(port->comphy);
-
-		if (comphy_old_mode != comphy_new_mode) {
-			err = phy_set_mode(port->comphy, comphy_new_mode);
-			if (err < 0) {
-				phy_set_mode(port->comphy, comphy_old_mode);
-				pr_err("Port ID %d: COMPHY lane is busy\n", port->id);
-				return err;
-			}
-
-			if (mac->flags & MV_EMAC_F_PORT_UP) {
-				netif_carrier_off(port->dev);
-				mv_gop110_port_events_mask(gop, mac);
-				mv_gop110_port_disable(gop, mac, port->comphy);
-				phy_power_off(port->comphy);
-			}
-
-			mv_pp2x_set_new_phy_mode(cmd, mac);
-			phy_mode_update = true;
-		}
-	}
-
-	if (phy_mode_update) {
-		if (mac->flags & MV_EMAC_F_INIT) {
-			mac->flags &= ~MV_EMAC_F_INIT;
-			mvcpn110_mac_hw_init(port);
-		}
-		mv_pp22_set_net_comp(port->priv);
-
-		if (mac->flags & MV_EMAC_F_PORT_UP) {
-			mv_gop110_port_disable(gop, mac, port->comphy);
-			phy_power_on(port->comphy);
-			mv_gop110_port_events_unmask(gop, mac);
-			mv_gop110_port_enable(gop, mac, port->comphy);
-			netif_carrier_on(port->dev);
-		}
+	if (port->comphy) {
+		err = mv_gop110_update_comphy(port, (u32)cmd->speed);
+		if (err < 0)
+			return err;
 	}
 
 	switch (mac->phy_mode) {
