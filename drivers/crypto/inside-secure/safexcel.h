@@ -518,6 +518,7 @@ struct safexcel_ring {
 
 enum safexcel_alg_type {
 	SAFEXCEL_ALG_TYPE_CIPHER,
+	SAFEXCEL_ALG_TYPE_AHASH,
 };
 
 struct safexcel_request {
@@ -618,6 +619,21 @@ struct safexcel_context {
 	unsigned int cache_sz;
 };
 
+/* Ahash structures */
+struct safexcel_ahash_req {
+	bool last_req;
+	bool finish;
+	bool hmac;
+
+	u8 state_sz;	/* expected sate size, only set once */
+	u32 state[SHA256_DIGEST_SIZE / sizeof(u32)];
+
+	u64 len;
+
+	u8 cache[SHA256_BLOCK_SIZE] __aligned(sizeof(u32));
+	u8 cache_next[SHA256_BLOCK_SIZE] __aligned(sizeof(u32));
+};
+
 /*
  * Template structure to describe the algorithms in order to register them.
  * It also has the purpose to contain our private structure and is actually
@@ -628,6 +644,7 @@ struct safexcel_alg_template {
 	enum safexcel_alg_type type;
 	union {
 		struct crypto_alg crypto;
+		struct ahash_alg ahash;
 	} alg;
 };
 
@@ -672,4 +689,9 @@ void safexcel_inv_complete(struct crypto_async_request *req, int error);
 /* available algorithms */
 extern struct safexcel_alg_template safexcel_alg_ecb_aes;
 extern struct safexcel_alg_template safexcel_alg_cbc_aes;
+extern struct safexcel_alg_template safexcel_alg_sha1;
+extern struct safexcel_alg_template safexcel_alg_sha224;
+extern struct safexcel_alg_template safexcel_alg_sha256;
+extern struct safexcel_alg_template safexcel_alg_hmac_sha1;
+
 #endif
