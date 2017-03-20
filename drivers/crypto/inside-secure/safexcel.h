@@ -249,6 +249,17 @@
 #define EIP197_CLASSIFICATION_RAMS			0xe0000
 #define EIP197_HIA_GC					0xf0000
 
+#define EIP97_HIA_AIC_ADDR				0x00000
+#define EIP97_HIA_AIC_G_ADDR				0x00000
+#define EIP97_HIA_AIC_R_ADDR				0x00000
+#define EIP97_HIA_AIC_xDR_ADDR				0x00000
+#define EIP97_HIA_AIC_DFE_ADDR				0x0f000
+#define EIP97_HIA_AIC_DFE_THRD_ADDR			0x0f200
+#define EIP97_HIA_AIC_DSE_ADDR				0x0f400
+#define EIP97_HIA_AIC_DSE_THRD_ADDR			0x0f600
+#define EIP97_HIA_PE_ADDR				0x10000
+#define EIP97_HIA_GC					0x10000
+
 #define EIP197_HIA_AIC_R_OFF(r)			((r) * 0x1000)
 #define EIP197_HIA_AIC_R_ENABLE_CTRL(r)		(0xe008 - EIP197_HIA_AIC_R_OFF(r))
 #define EIP197_HIA_AIC_R_ENABLED_STAT(r)	(0xe010 - EIP197_HIA_AIC_R_OFF(r))
@@ -513,6 +524,7 @@ enum eip197_fw {
 
 enum safexcel_eip_type {
 	EIP197,
+	EIP97,
 };
 
 struct safexcel_ring {

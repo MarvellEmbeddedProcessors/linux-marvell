@@ -356,16 +356,29 @@ static void eip_priv_unit_offset_init(struct safexcel_crypto_priv *priv)
 {
 	struct safexcel_unit_offset *unit_off = &priv->unit_off;
 
-	unit_off->hia_aic = EIP197_HIA_AIC_ADDR;
-	unit_off->hia_aic_g = EIP197_HIA_AIC_G_ADDR;
-	unit_off->hia_aic_r = EIP197_HIA_AIC_R_ADDR;
-	unit_off->hia_xdr = EIP197_HIA_AIC_xDR_ADDR;
-	unit_off->hia_dfe = EIP197_HIA_AIC_DFE_ADDR;
-	unit_off->hia_dfe_thrd = EIP197_HIA_AIC_DFE_THRD_ADDR;
-	unit_off->hia_dse = EIP197_HIA_AIC_DSE_ADDR;
-	unit_off->hia_dse_thrd = EIP197_HIA_AIC_DSE_THRD_ADDR;
-	unit_off->hia_gen_cfg = EIP197_HIA_GC;
-	unit_off->pe = EIP197_HIA_PE_ADDR;
+	if (priv->eip_type == EIP197) {
+		unit_off->hia_aic = EIP197_HIA_AIC_ADDR;
+		unit_off->hia_aic_g = EIP197_HIA_AIC_G_ADDR;
+		unit_off->hia_aic_r = EIP197_HIA_AIC_R_ADDR;
+		unit_off->hia_xdr = EIP197_HIA_AIC_xDR_ADDR;
+		unit_off->hia_dfe = EIP197_HIA_AIC_DFE_ADDR;
+		unit_off->hia_dfe_thrd = EIP197_HIA_AIC_DFE_THRD_ADDR;
+		unit_off->hia_dse = EIP197_HIA_AIC_DSE_ADDR;
+		unit_off->hia_dse_thrd = EIP197_HIA_AIC_DSE_THRD_ADDR;
+		unit_off->hia_gen_cfg = EIP197_HIA_GC;
+		unit_off->pe = EIP197_HIA_PE_ADDR;
+	} else {
+		unit_off->hia_aic = EIP97_HIA_AIC_ADDR;
+		unit_off->hia_aic_g = EIP97_HIA_AIC_G_ADDR;
+		unit_off->hia_aic_r = EIP97_HIA_AIC_R_ADDR;
+		unit_off->hia_xdr = EIP97_HIA_AIC_xDR_ADDR;
+		unit_off->hia_dfe = EIP97_HIA_AIC_DFE_ADDR;
+		unit_off->hia_dfe_thrd = EIP97_HIA_AIC_DFE_THRD_ADDR;
+		unit_off->hia_dse = EIP97_HIA_AIC_DSE_ADDR;
+		unit_off->hia_dse_thrd = EIP97_HIA_AIC_DSE_THRD_ADDR;
+		unit_off->hia_gen_cfg = EIP97_HIA_GC;
+		unit_off->pe = EIP97_HIA_PE_ADDR;
+	}
 }
 
 /* Configure the command descriptor ring manager */
@@ -492,9 +505,12 @@ static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	writel(EIP197_DxE_THR_CTRL_RESET_PE,
 	       EIP197_HIA_DFE_THRD(priv) + EIP197_HIA_DFE_THR_CTRL);
 
-	/* Reset HIA input interface arbiter */
-	writel(EIP197_HIA_RA_PE_CTRL_RESET,
-	       EIP197_HIA_AIC(priv) + EIP197_HIA_RA_PE_CTRL);
+	/* Configure ring arbiter, available only for EIP197 */
+	if (priv->eip_type == EIP197) {
+		/* Reset HIA input interface arbiter */
+		writel(EIP197_HIA_RA_PE_CTRL_RESET,
+		       EIP197_HIA_AIC(priv) + EIP197_HIA_RA_PE_CTRL);
+	}
 
 	/* DMA transfer size to use */
 	val = EIP197_HIA_DFE_CFG_DIS_DEBUG;
@@ -513,9 +529,12 @@ static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	writel(EIP197_PE_IN_xBUF_THRES_MIN(5) | EIP197_PE_IN_xBUF_THRES_MAX(7),
 	      EIP197_PE(priv) + EIP197_PE_IN_TBUF_THRES);
 
-	/* enable HIA input interface arbiter and rings */
-	writel(EIP197_HIA_RA_PE_CTRL_EN | GENMASK(priv->config.hw_rings - 1, 0),
-	       EIP197_HIA_AIC(priv) + EIP197_HIA_RA_PE_CTRL);
+	/* Configure ring arbiter, available only for EIP197 */
+	if (priv->eip_type == EIP197) {
+		/* enable HIA input interface arbiter and rings */
+		writel(EIP197_HIA_RA_PE_CTRL_EN | GENMASK(priv->config.hw_rings - 1, 0),
+		       EIP197_HIA_AIC(priv) + EIP197_HIA_RA_PE_CTRL);
+	}
 
 	/*
 	 * Data Store Engine configuration
@@ -535,7 +554,16 @@ static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	val |= EIP197_HIA_DxE_CFG_MIN_DATA_SIZE(7) | EIP197_HIA_DxE_CFG_MAX_DATA_SIZE(8);
 	val |= EIP197_HIA_DxE_CFG_DATA_CACHE_CTRL(WR_CACHE_3BITS);
 	val |= EIP197_HIA_DSE_CFG_ALLWAYS_BUFFERABLE;
-	val |= EIP197_HIA_DSE_CFG_EN_SINGLE_WR;
+	/*
+	 * TODO: Generally, EN_SINGLE_WR should be enabled.
+	 * Some instabilities with this option enabled might occur,
+	 * so further investigation is required before enabling it.
+	 *
+	 * Using EIP97 engine without SINGLE_WR impacts the performance.
+	 */
+	if (priv->eip_type == EIP197)
+		val |= EIP197_HIA_DSE_CFG_EN_SINGLE_WR;
+
 	writel(val, EIP197_HIA_DSE(priv) + EIP197_HIA_DSE_CFG);
 
 	/* Leave the DSE threads reset state */
@@ -610,21 +638,29 @@ static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	/* Clear any HIA interrupt */
 	writel(EIP197_AIC_G_ACK_HIA_MASK, EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
 
-	/* init PRNG */
-	eip197_prng_init(priv);
+	/*
+	 * Initialize EIP197 specifics:
+	 *	- PRNG
+	 *	- Cache
+	 *	- Firmware
+	 */
+	if (priv->eip_type == EIP197) {
+		/* init PRNG */
+		eip197_prng_init(priv);
 
-	/* init transform record cache */
-	ret = eip197_trc_cache_init(dev, priv);
-	if (ret) {
-		dev_err(dev, "eip197_trc_cache_init failed\n");
-		return ret;
-	}
+		/* init transform record cache */
+		ret = eip197_trc_cache_init(dev, priv);
+		if (ret) {
+			dev_err(dev, "eip197_trc_cache_init failed\n");
+			return ret;
+		}
 
-	/* Firmware load */
-	ret = eip197_load_fw(dev, priv);
-	if (ret) {
-		dev_err(dev, "eip197_load_fw failed\n");
-		return ret;
+		/* Firmware load */
+		ret = eip197_load_fw(dev, priv);
+		if (ret) {
+			dev_err(dev, "eip197_load_fw failed\n");
+			return ret;
+		}
 	}
 
 	eip_hw_setup_cdesc_rings(priv);
@@ -1269,6 +1305,10 @@ static int safexcel_remove(struct platform_device *pdev)
 
 static const struct of_device_id safexcel_of_match_table[] = {
 	{
+		.compatible = "inside-secure,safexcel-eip97",
+		.data = (void *)EIP97,
+	},
+	{
 		.compatible = "inside-secure,safexcel-eip197",
 		.data = (void *)EIP197,
 	},
@@ -1288,5 +1328,5 @@ module_param_array(rings, uint, NULL, 0);
 MODULE_PARM_DESC(rings, "number of rings to be used by the driver");
 
 MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
-MODULE_DESCRIPTION("Support for SafeXcel Cryptographic Engines EIP197");
+MODULE_DESCRIPTION("Support for SafeXcel Cryptographic Engines EIP97/197");
 MODULE_LICENSE("GPL v2");

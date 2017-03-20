@@ -1,18 +1,19 @@
-Inside-secure EIP197 Cryptographic Engines And Security Accelerator
+Inside-secure EIP197/97 Cryptographic Engines And Security Accelerator
 ======================================================================
 
-The EIP197 is a hybrid packet engine designed to off-load a security
+The EIP197/97 is a hybrid packet engine designed to off-load a security
 host processor to improve the speed of IPsec ESP, IPsec AH, SRTP, SSL, TLS,
 DTLS and MACsec protocol operations.
 
 Required properties:
 --------------------
-- compatible	  : Should be "inside-secure,safexcel-eip197".
+- compatible	  : Should be "inside-secure,safexcel-eip197" " for EIP197 or
+			      "inside-secure,safexcel-eip97" for EIP97.
 - reg		  : Base physical address of the engine and length
 		    of memory mapped region.
 - interrupts	  : A list of interrupts required for EIP engine.
 - interrupt-names : Names of the interrupts listed in interrupts property.
-- clocks	  : Reference to the crypto engine clocks.
+- clocks	  : Reference to the crypto engine clocks (Only for EIP197).
 - dma-coherent	  : Present if dma operations are coherent.
 - dma-bus-width   : DMA address bus width.
 - cell-index	  : Should contain the EIP197 engine ID.
@@ -35,6 +36,23 @@ Examples:
 		clocks = <&cpm_syscon0 1 26>;
 		dma-coherent;
 		dma-bus-width = <40>;
+		cell-index = <0>;
+		status = "disabled";
+	};
+
+	eip97: eip97@90000 {
+		compatible = "inside-secure,safexcel-eip97";
+		reg = <0x90000 0x20000>;
+		interrupt-names = "eip_out", "ring0", "ring1",
+				  "ring2", "ring3", "eip_addr";
+		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+		dma-coherent;
+		dma-bus-width = <32>;
 		cell-index = <0>;
 		status = "disabled";
 	};

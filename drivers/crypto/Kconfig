@@ -506,7 +506,7 @@ config CRYPTO_DEV_SAFEXCEL
 	select CRYPTO_AES
 	select CRYPTO_SHA1
 	help
-	  This driver interfaces with the SafeXcel EIP-197 cryptographic hardwares
+	  This driver interfaces with the SafeXcel EIP-97/197 cryptographic hardwares
 	  designed by Inside Secure. The driver support only basic initialiazation of the
 	  engine, without interacation with Kernel crypto API.
 

@@ -530,8 +530,16 @@ static int safexcel_ahash_update(struct ahash_request *areq)
 
 	ctx->base.send = safexcel_ahash_send;
 
+	/*
+	 * Check if the context exists, if yes:
+	 *	- EIP197: check if it needs to be invalidated
+	 *	- EIP97: Nothing to be done
+	 * If context not exists, allocate it (for both EIP97 & EIP197)
+	 * and set the send routine for the new allocated context.
+	 * If it's EIP97 with existing context, the send routine is already set.
+	 */
 	if (ctx->base.ctxr) {
-		if (ctx->base.needs_inv)
+		if (priv->eip_type == EIP197 && ctx->base.needs_inv)
 			ctx->base.send = safexcel_ahash_send_inv;
 	} else {
 		ctx->base.ring = safexcel_select_ring(priv);
@@ -556,11 +564,17 @@ static int safexcel_ahash_final(struct ahash_request *areq)
 {
 	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
 	struct safexcel_ahash_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(areq));
+	struct safexcel_crypto_priv *priv = ctx->priv;
 
 	req->last_req = true;
 	req->finish = true;
 
-	if (req->len && ctx->digest == CONTEXT_CONTROL_DIGEST_PRECOMPUTED)
+	/*
+	 * Check if we need to invalidate the context,
+	 * this should be done only for EIP197 (no cache in EIP97).
+	 */
+	if (priv->eip_type == EIP197 && req->len &&
+	    ctx->digest == CONTEXT_CONTROL_DIGEST_PRECOMPUTED)
 		ctx->base.needs_inv = safexcel_ahash_needs_inv_get(areq);
 
 	return safexcel_ahash_update(areq);
@@ -655,9 +669,22 @@ static void safexcel_ahash_cra_exit(struct crypto_tfm *tfm)
 	if (!ctx->base.ctxr)
 		return;
 
-	ret = safexcel_ahash_exit_inv(tfm);
-	if (ret != -EINPROGRESS)
-		dev_warn(priv->dev, "hash: invalidation error %d\n", ret);
+	/*
+	 * EIP197 has internal cache which needs to be invalidated
+	 * when the context is closed.
+	 * dma_pool_free will be called in the invalidation result
+	 * handler (different context).
+	 * EIP97 doesn't have internal cache, so no need to invalidate
+	 * it and we can just release the dma pool.
+	 */
+	if (priv->eip_type == EIP197) {
+		ret = safexcel_ahash_exit_inv(tfm);
+		if (ret != -EINPROGRESS)
+			dev_warn(priv->dev, "hash: invalidation error %d\n", ret);
+	} else {
+		dma_pool_free(priv->context_pool, ctx->base.ctxr,
+			      ctx->base.ctxr_dma);
+	}
 }
 
 struct safexcel_alg_template safexcel_alg_sha1 = {
@@ -766,6 +793,7 @@ static int safexcel_hmac_sha1_setkey(struct crypto_ahash *tfm, const u8 *key,
 				     unsigned int keylen)
 {
 	struct safexcel_ahash_ctx *ctx = crypto_tfm_ctx(crypto_ahash_tfm(tfm));
+	struct safexcel_crypto_priv *priv = ctx->priv;
 	struct ahash_request *areq;
 	struct crypto_ahash *ahash;
 	struct sha1_state s0, s1;
@@ -829,11 +857,17 @@ static int safexcel_hmac_sha1_setkey(struct crypto_ahash *tfm, const u8 *key,
 
 	ret = safexcel_hmac_prepare_pad(areq, opad, blocksize, &s1, false);
 
-	for (i = 0; i < ARRAY_SIZE(s0.state); i++) {
-		if (ctx->ipad[i] != le32_to_cpu(s0.state[i]) ||
-		    ctx->opad[i] != le32_to_cpu(s1.state[i])) {
-			ctx->base.needs_inv = true;
-			break;
+	/*
+	 * For EIP197 we need to Check if the ipad/opad were changed,
+	 * if yes, need to invalidate the context.
+	 */
+	if (priv->eip_type == EIP197) {
+		for (i = 0; i < ARRAY_SIZE(s0.state); i++) {
+			if (ctx->ipad[i] != le32_to_cpu(s0.state[i]) ||
+			    ctx->opad[i] != le32_to_cpu(s1.state[i])) {
+				ctx->base.needs_inv = true;
+				break;
+			}
 		}
 	}
 

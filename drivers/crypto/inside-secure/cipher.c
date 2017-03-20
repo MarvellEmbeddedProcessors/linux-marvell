@@ -423,8 +423,16 @@ static int safexcel_aes(struct ablkcipher_request *req,
 	ctx->direction = dir;
 	ctx->mode = mode;
 
+	/*
+	 * Check if the context exists, if yes:
+	 *	- EIP197: check if it needs to be invalidated
+	 *	- EIP97: Nothing to be done
+	 * If context not exists, allocate it (for both EIP97 & EIP197)
+	 * and set the send routine for the new allocated context.
+	 * If it's EIP97 with existing context, the send routine is already set.
+	 */
 	if (ctx->base.ctxr) {
-		if (ctx->base.needs_inv)
+		if (priv->eip_type == EIP197 && ctx->base.needs_inv)
 			ctx->base.send = safexcel_cipher_send_inv;
 	} else {
 		ctx->base.ring = safexcel_select_ring(priv);
@@ -479,9 +487,23 @@ static void safexcel_ablkcipher_cra_exit(struct crypto_tfm *tfm)
 	if (!ctx->base.ctxr)
 		return;
 
-	ret = safexcel_cipher_exit_inv(tfm);
-	if (ret != -EINPROGRESS)
-		dev_warn(priv->dev, "cipher: invalidation error %d\n", ret);
+	/*
+	 * EIP197 has internal cache which needs to be invalidated
+	 * when the context is closed.
+	 * dma_pool_free will be called in the invalidation result
+	 * handler (different context).
+	 * EIP97 doesn't have internal cache, so no need to invalidate
+	 * it and we can just release the dma pool.
+	 */
+	if (priv->eip_type == EIP197) {
+		ret = safexcel_cipher_exit_inv(tfm);
+		if (ret != -EINPROGRESS)
+			dev_warn(priv->dev, "cipher: invalidation error %d\n",
+				 ret);
+	} else {
+		dma_pool_free(priv->context_pool, ctx->base.ctxr,
+			      ctx->base.ctxr_dma);
+	}
 }
 
 struct safexcel_alg_template safexcel_alg_ecb_aes = {
