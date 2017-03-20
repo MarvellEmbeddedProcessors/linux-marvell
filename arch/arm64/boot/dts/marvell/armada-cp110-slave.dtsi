@@ -102,4 +102,11 @@
 			status = "disabled";
 		};
 	};
+
+	cpn-110-slave {
+		config-space {
+			cp1_xor0: dma_xor@6a0000 { };
+			cp1_xor1: dma_xor@6c0000 { };
+		};
+	};
 };
