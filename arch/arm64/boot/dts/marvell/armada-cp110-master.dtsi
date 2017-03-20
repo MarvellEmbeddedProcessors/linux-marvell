@@ -104,4 +104,11 @@
 			status = "disabled";
 		};
 	};
+
+	cpn-110-master {
+		config-space {
+			cp0_xor0: dma_xor@6a0000 { };
+			cp0_xor1: dma_xor@6c0000 { };
+		};
+	};
 };

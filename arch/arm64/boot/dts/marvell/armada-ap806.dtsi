@@ -363,7 +363,7 @@
 				reg = <0x6f4000 0x1000>;
 			};
 
-			xor0@400000 {
+			ap_xor0: dma_xor@400000 {
 				compatible = "marvell,mv-xor-v2";
 				reg = <0x400000 0x1000>,
 				      <0x410000 0x1000>;
@@ -373,7 +373,7 @@
 				status = "okay";
 			};
 
-			xor1@420000 {
+			ap_xor1: dma_xor@420000 {
 				compatible = "marvell,mv-xor-v2";
 				reg = <0x420000 0x1000>,
 				      <0x430000 0x1000>;
@@ -383,7 +383,7 @@
 				status = "okay";
 			};
 
-			xor2@440000 {
+			ap_xor2: dma_xor@440000 {
 				compatible = "marvell,mv-xor-v2";
 				reg = <0x440000 0x1000>,
 				      <0x450000 0x1000>;
@@ -393,7 +393,7 @@
 				status = "okay";
 			};
 
-			xor3@460000 {
+			ap_xor3: dma_xor@460000 {
 				compatible = "marvell,mv-xor-v2";
 				reg = <0x460000 0x1000>,
 				      <0x470000 0x1000>;

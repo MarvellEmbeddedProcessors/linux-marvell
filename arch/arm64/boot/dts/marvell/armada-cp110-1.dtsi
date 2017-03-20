@@ -172,7 +172,7 @@ tdm@7a0000 {
 	status = "disabled";
 };
 
-cpxor0@6a0000 {
+dma_xor@6a0000 {
 	compatible = "marvell,mv-xor-v2";
 	reg = <0x6a0000 0x1000>,
 	      <0x6b0000 0x1000>;
@@ -182,7 +182,7 @@ cpxor0@6a0000 {
 	status = "okay";
 };
 
-cpxor1@6c0000 {
+dma_xor@6c0000 {
 	compatible = "marvell,mv-xor-v2";
 	reg = <0x6c0000 0x1000>,
 	      <0x6d0000 0x1000>;
