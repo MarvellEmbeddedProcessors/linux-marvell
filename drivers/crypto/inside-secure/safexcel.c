@@ -669,7 +669,11 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 
 		cdesc += commands;
 		rdesc += results;
-		nreq++;
+
+		if (++nreq > EIP197_MAX_BATCH_SZ) {
+			priv->ring[ring].need_dequeue = true;
+			goto finalize;
+		}
 	} while (true);
 
 resource_fail:

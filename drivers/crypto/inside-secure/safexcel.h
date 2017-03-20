@@ -39,7 +39,7 @@
 #define EIP197_MAX_RINGS				4
 
 #define EIP197_FETCH_COUNT				1
-#define EIP197_MAX_BATCH_SZ				8
+#define EIP197_MAX_BATCH_SZ				32
 
 #define EIP197_GFP_FLAGS(base)	((base).flags & CRYPTO_TFM_REQ_MAY_SLEEP ? \
 				 GFP_KERNEL : GFP_ATOMIC)
