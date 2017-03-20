@@ -2479,6 +2479,12 @@ static int mv_udc_suspend(struct device *dev)
 		mv_udc_disable_internal(udc);
 	}
 
+	/* PHY exit if there is */
+	if (udc->utmi_phy) {
+		phy_power_off(udc->utmi_phy);
+		phy_exit(udc->utmi_phy);
+	}
+
 	return 0;
 }
 
@@ -2492,6 +2498,20 @@ static int mv_udc_resume(struct device *dev)
 	/* if OTG is enabled, the following will be done in OTG driver*/
 	if (udc->transceiver)
 		return 0;
+
+	/* PHY init if there is */
+	if (udc->utmi_phy) {
+		retval = phy_init(udc->utmi_phy);
+		if (retval)
+			return retval;
+
+		retval = phy_power_on(udc->utmi_phy);
+		if (retval) {
+			phy_power_off(udc->utmi_phy);
+			phy_exit(udc->utmi_phy);
+			return retval;
+		}
+	}
 
 	if (!udc->clock_gating) {
 		retval = mv_udc_enable_internal(udc);
