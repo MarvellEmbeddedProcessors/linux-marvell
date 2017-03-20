@@ -25,7 +25,6 @@
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/irqdomain.h>
-#include <linux/cpumask.h>
 #include <linux/platform_data/dma-mv_xor.h>
 
 #include "dmaengine.h"
@@ -34,6 +33,11 @@
 enum mv_xor_mode {
 	XOR_MODE_IN_REG,
 	XOR_MODE_IN_DESC,
+};
+
+/* engine coefficients  */
+static u8 mv_xor_raid6_coefs[8] = {
+	0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80
 };
 
 static void mv_xor_issue_pending(struct dma_chan *chan);
@@ -48,7 +52,6 @@ static void mv_xor_issue_pending(struct dma_chan *chan);
 	((chan)->dmadev.dev)
 
 static void mv_desc_init(struct mv_xor_desc_slot *desc,
-			 dma_addr_t addr, u32 byte_count,
 			 enum dma_ctrl_flags flags)
 {
 	struct mv_xor_desc *hw_desc = desc->hw_desc;
@@ -58,8 +61,6 @@ static void mv_desc_init(struct mv_xor_desc_slot *desc,
 	/* Enable end-of-descriptor interrupts only for DMA_PREP_INTERRUPT */
 	hw_desc->desc_command = (flags & DMA_PREP_INTERRUPT) ?
 				XOR_DESC_EOD_INT_EN : 0;
-	hw_desc->phy_dest_addr = addr;
-	hw_desc->byte_count = byte_count;
 }
 
 static void mv_desc_set_mode(struct mv_xor_desc_slot *desc)
@@ -74,10 +75,21 @@ static void mv_desc_set_mode(struct mv_xor_desc_slot *desc)
 	case DMA_MEMCPY:
 		hw_desc->desc_command |= XOR_DESC_OPERATION_MEMCPY;
 		break;
+	case DMA_PQ:
+		hw_desc->desc_command |= XOR_DESC_OPERATION_PQ;
+		break;
 	default:
 		BUG();
 		return;
 	}
+}
+
+static void mv_desc_set_byte_count(struct mv_xor_desc_slot *desc,
+				   u32 byte_count)
+{
+	struct mv_xor_desc *hw_desc = desc->hw_desc;
+
+	hw_desc->byte_count = byte_count;
 }
 
 static void mv_desc_set_next_desc(struct mv_xor_desc_slot *desc,
@@ -88,12 +100,32 @@ static void mv_desc_set_next_desc(struct mv_xor_desc_slot *desc,
 	hw_desc->phy_next_desc = next_desc_addr;
 }
 
+static void mv_desc_set_dest_addr(struct mv_xor_desc_slot *desc,
+				  dma_addr_t addr)
+{
+	struct mv_xor_desc *hw_desc = desc->hw_desc;
+
+	hw_desc->phy_dest_addr = addr;
+	if (desc->type == DMA_PQ)
+		hw_desc->desc_command |= (1 << 8);
+}
+
+static void mv_desc_set_q_dest_addr(struct mv_xor_desc_slot *desc,
+				  dma_addr_t addr)
+{
+	struct mv_xor_desc *hw_desc = desc->hw_desc;
+
+	hw_desc->phy_q_dest_addr = addr;
+	if (desc->type == DMA_PQ)
+		hw_desc->desc_command |= (1 << 9);
+}
+
 static void mv_desc_set_src_addr(struct mv_xor_desc_slot *desc,
 				 int index, dma_addr_t addr)
 {
 	struct mv_xor_desc *hw_desc = desc->hw_desc;
 	hw_desc->phy_src_addr[mv_phy_src_idx(index)] = addr;
-	if (desc->type == DMA_XOR)
+	if ((desc->type == DMA_XOR) || (desc->type == DMA_PQ))
 		hw_desc->desc_command |= (1 << index);
 }
 
@@ -476,6 +508,65 @@ static int mv_xor_alloc_chan_resources(struct dma_chan *chan)
 }
 
 static struct dma_async_tx_descriptor *
+mv_xor_prep_dma_pq(struct dma_chan *chan, dma_addr_t *dst, dma_addr_t *src,
+			unsigned int src_cnt, const unsigned char *scf,
+			size_t len, unsigned long flags)
+{
+	struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+	struct mv_xor_desc_slot *sw_desc;
+	int src_i = 0;
+	int i = 0;
+
+	if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+		return NULL;
+
+	WARN_ON(len > MV_XOR_MAX_BYTE_COUNT);
+
+	dev_dbg(mv_chan_to_devp(mv_chan),
+		"%s src_cnt: %d len: %u flags: %ld\n",
+		__func__, src_cnt, (unsigned int)len, flags);
+
+	/*
+	 * since the coefs on Marvell engine are hardcoded,
+	 * do not support mult and sum product requests
+	 */
+	if ((flags & DMA_PREP_PQ_MULT) || (flags & DMA_PREP_PQ_SUM_PRODUCT))
+		return NULL;
+
+	sw_desc = mv_chan_alloc_slot(mv_chan);
+	if (sw_desc) {
+		sw_desc->type = DMA_PQ;
+		sw_desc->async_tx.flags = flags;
+		mv_desc_init(sw_desc, flags);
+		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+			mv_desc_set_mode(sw_desc);
+		mv_desc_set_byte_count(sw_desc, len);
+		if (!(flags & DMA_PREP_PQ_DISABLE_P))
+			mv_desc_set_dest_addr(sw_desc, dst[0]);
+		if (!(flags & DMA_PREP_PQ_DISABLE_Q))
+			mv_desc_set_q_dest_addr(sw_desc, dst[1]);
+		while (src_cnt) {
+			if (scf[src_i] == mv_xor_raid6_coefs[i]) {
+				/* coefs are hardcoded, assign the src to the
+				 * right place
+				 */
+				mv_desc_set_src_addr(sw_desc, i, src[src_i]);
+				src_i++;
+				i++;
+				src_cnt--;
+			} else {
+				i++;
+			}
+		}
+	}
+
+	dev_dbg(mv_chan_to_devp(mv_chan),
+		"%s sw_desc %p async_tx %p\n",
+		__func__, sw_desc, &sw_desc->async_tx);
+	return sw_desc ? &sw_desc->async_tx : NULL;
+}
+
+static struct dma_async_tx_descriptor *
 mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 		    unsigned int src_cnt, size_t len, unsigned long flags)
 {
@@ -495,7 +586,9 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 	if (sw_desc) {
 		sw_desc->type = DMA_XOR;
 		sw_desc->async_tx.flags = flags;
-		mv_desc_init(sw_desc, dest, len, flags);
+		mv_desc_init(sw_desc, flags);
+		mv_desc_set_byte_count(sw_desc, len);
+		mv_desc_set_dest_addr(sw_desc, dest);
 		if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
 			mv_desc_set_mode(sw_desc);
 		while (src_cnt--)
@@ -1001,6 +1094,10 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 		dma_dev->max_xor = 8;
 		dma_dev->device_prep_dma_xor = mv_xor_prep_dma_xor;
 	}
+	if (dma_has_cap(DMA_PQ, dma_dev->cap_mask)) {
+		dma_set_maxpq(dma_dev, 8, 0);
+		dma_dev->device_prep_dma_pq = mv_xor_prep_dma_pq;
+	}
 
 	mv_chan->mmr_base = xordev->xor_base;
 	mv_chan->mmr_high_base = xordev->xor_high_base;
@@ -1046,11 +1143,12 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 			goto err_free_irq;
 	}
 
-	dev_info(&pdev->dev, "Marvell XOR (%s): ( %s%s%s)\n",
+	dev_info(&pdev->dev, "Marvell XOR (%s): ( %s%s%s%s)\n",
 		 mv_chan->op_in_desc ? "Descriptor Mode" : "Registers Mode",
 		 dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "xor " : "",
 		 dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask) ? "cpy " : "",
-		 dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask) ? "intr " : "");
+		 dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask) ? "intr " : "",
+		 dma_has_cap(DMA_PQ, dma_dev->cap_mask) ? "pq " : "");
 
 	dma_async_device_register(dma_dev);
 	return mv_chan;
@@ -1263,6 +1361,7 @@ static int mv_xor_probe(struct platform_device *pdev)
 			dma_cap_set(DMA_MEMCPY, cap_mask);
 			dma_cap_set(DMA_XOR, cap_mask);
 			dma_cap_set(DMA_INTERRUPT, cap_mask);
+			dma_cap_set(DMA_PQ, cap_mask);
 
 			irq = irq_of_parse_and_map(np, 0);
 			if (!irq) {
