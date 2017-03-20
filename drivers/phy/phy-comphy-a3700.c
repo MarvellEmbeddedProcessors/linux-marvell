@@ -528,20 +528,22 @@ static int mvebu_a3700_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 	 */
 	usb3_reg_set(reg_base,
 		     COMPHY_REG_LANE_CFG0_ADDR,
-		     PRD_TXDEEMPH_MASK,
-		     (PRD_TXDEEMPH_MASK | PRD_TXMARGIN_MASK |
+		     PRD_TXDEEMPH0_MASK,
+		     (PRD_TXDEEMPH0_MASK | PRD_TXMARGIN_MASK |
 		      PRD_TXSWING_MASK | CFG_TX_ALIGN_POS_MASK),
 		     mode);
 
 	/*
-	 * 2. Unset BIT0: set Tx Electrical Idle Mode
-	 *    unset BIT4: set G2 Tx Datapath with no Delayed Latency
-	 *    unset BIT6: set Tx Detect Rx Mode at LoZ mode
+	 * 2. Set BIT0: enable transmitter in high impedance mode
+	 *    Set BIT[3:4]: delay 2 clock cycles for HiZ off latency
+	 *    Set BIT6: Tx detect Rx at HiZ mode
+	 *    Unset BIT15: set to 0 to set USB3 De-emphasize level to -3.5db
+	 *                 together with bit 0 of COMPHY_REG_LANE_CFG0_ADDR register
 	 */
 	usb3_reg_set(reg_base,
 		     COMPHY_REG_LANE_CFG1_ADDR,
-		     0x0,
-		     REG_16_BIT_MASK,
+		     TX_DET_RX_MODE | GEN2_TX_DATA_DLY_DEFT | TX_ELEC_IDLE_MODE_EN,
+		     PRD_TXDEEMPH1_MASK | TX_DET_RX_MODE | GEN2_TX_DATA_DLY_MASK | TX_ELEC_IDLE_MODE_EN,
 		     mode);
 
 	/*
@@ -665,7 +667,25 @@ static int mvebu_a3700_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 			     mode);
 
 	/*
-	 * 14. Release SW reset
+	 * 14. Set max speed generation to USB3.0 5Gbps
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_SYNC_MASK_GEN_REG,
+		     PHY_GEN_USB3_5G,
+		     PHY_GEN_MAX_MASK,
+		     mode);
+
+	/*
+	 * 15. Set capacitor value for FFE gain peaking to 0xF
+	 */
+	usb3_reg_set(reg_base,
+		     COMPHY_REG_GEN3_SETTINGS_3,
+		     COMPHY_GEN_FFE_CAP_SEL_VALUE,
+		     COMPHY_GEN_FFE_CAP_SEL_MASK,
+		     mode);
+
+	/*
+	 * 16. Release SW reset
 	 */
 	usb3_reg_set(reg_base,
 		     COMPHY_REG_GLOB_PHY_CTRL0_ADDR,
