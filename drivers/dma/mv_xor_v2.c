@@ -102,8 +102,8 @@
  * @crc32_result: CRC32 calculation result
  * @desc_ctrl: operation mode and control flags
  * @buff_size: amount of bytes to be processed
- * @fill_pattern_src_addr: Source-Address
- * @fill_pattern_dst_addr: Destination-Address
+ * @fill_pattern_src_addr: Source-Address, or Q-Buffer-Address
+ * @fill_pattern_dst_addr: Destination-Address, or P-Buffer-Address
  * @data_buff_addr: Source (and might be RAID6 destination)
  * addresses of data buffers in RAID5 and RAID6
  * @reserved: reserved
@@ -416,7 +416,7 @@ mv_xor_v2_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src
 
 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
 
-	/* did we get a valid descriptor? */
+	/* If there's no empty discriptor, return NULL to dma stack */
 	if (!sw_desc)
 		return NULL;
 
@@ -472,7 +472,7 @@ mv_xor_v2_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 	struct mv_xor_v2_device		*xor_dev;
 	int i;
 
-	BUG_ON(src_cnt > MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF || src_cnt < 1);
+	WARN_ON(src_cnt > MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF || src_cnt < 1);
 
 	xor_dev = container_of(chan, struct mv_xor_v2_device, dmachan);
 
@@ -480,11 +480,11 @@ mv_xor_v2_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
 		__func__, src_cnt, len, &dest, flags);
 
-	BUG_ON(xor_dev->desc_size != MV_XOR_V2_EXT_DESC_SIZE);
+	WARN_ON(xor_dev->desc_size != MV_XOR_V2_EXT_DESC_SIZE);
 
 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
 
-	/* did we get a valid descriptor? */
+	/* If there's no empty discriptor, return NULL to dma stack */
 	if (!sw_desc)
 		return NULL;
 
@@ -527,6 +527,100 @@ mv_xor_v2_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
 }
 
 /*
+ * Prepare a HW descriptor for a XOR operation
+ */
+static struct dma_async_tx_descriptor *
+mv_xor_v2_prep_dma_pq(struct dma_chan *chan, dma_addr_t *dest, dma_addr_t *src,
+			unsigned int src_cnt, const unsigned char *scf,
+			size_t len, unsigned long flags)
+{
+	struct mv_xor_v2_sw_desc	*sw_desc;
+	struct mv_xor_v2_descriptor	*hw_descriptor;
+	struct mv_xor_v2_device		*xor_dev;
+	int i;
+
+	WARN_ON(src_cnt > MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF || src_cnt < 1);
+
+	xor_dev = container_of(chan, struct mv_xor_v2_device, dmachan);
+
+	dev_dbg(xor_dev->dmadev.dev,
+		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
+		__func__, src_cnt, len, &dest, flags);
+
+	WARN_ON(xor_dev->desc_size != MV_XOR_V2_EXT_DESC_SIZE);
+
+	/*
+	 * Because of limitation in our XORv2 unit, XORv2 do not
+	 * support mult and sum product requests. If Raid6 have double
+	 * parity devices the scf array will include multiple and sum
+	 * parameters for the equations, but in XORv2 unit does not
+	 * support thus operations.
+	 * return NULL to DMA stack, to let the CPU do the mult
+	 * and SUM operations
+	 */
+	if ((flags & DMA_PREP_PQ_MULT) || (flags & DMA_PREP_PQ_SUM_PRODUCT))
+		return NULL;
+
+	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
+
+	/* If there's no empty discriptor, return NULL to dma stack */
+	if (!sw_desc)
+		return NULL;
+
+	sw_desc->async_tx.flags = flags;
+
+	/* set the HW descriptor */
+	hw_descriptor = &sw_desc->hw_desc;
+
+	/* save the SW descriptor ID to restore when operation is done */
+	hw_descriptor->desc_id = sw_desc->idx;
+
+	/* Set the XOR control word */
+	hw_descriptor->desc_ctrl =
+		DESC_OP_MODE_RAID6 << DESC_OP_MODE_SHIFT;
+
+	if (flags & DMA_PREP_INTERRUPT)
+		hw_descriptor->desc_ctrl |= DESC_IOD;
+
+	hw_descriptor->desc_ctrl |=
+		src_cnt << DESC_NUM_ACTIVE_D_BUF_SHIFT;
+
+	if (!(flags & DMA_PREP_PQ_DISABLE_Q)) {
+		hw_descriptor->desc_ctrl |= DESC_Q_BUFFER_ENABLE;
+
+		/* Set Q-Buffer-Address */
+		hw_descriptor->fill_pattern_src_addr[0] = lower_32_bits(dest[1]);
+		if (IS_ENABLED(CONFIG_ARCH_DMA_ADDR_T_64BIT))
+			hw_descriptor->fill_pattern_src_addr[1] =
+				upper_32_bits(dest[1]) & 0xFFFF;
+		else
+			hw_descriptor->fill_pattern_src_addr[1] = 0;
+	}
+
+	if (!(flags & DMA_PREP_PQ_DISABLE_P)) {
+		hw_descriptor->desc_ctrl |= DESC_P_BUFFER_ENABLE;
+
+		/* Set P-Buffer-Address */
+		hw_descriptor->fill_pattern_dst_addr[0] = lower_32_bits(dest[0]);
+		if (IS_ENABLED(CONFIG_ARCH_DMA_ADDR_T_64BIT))
+			hw_descriptor->fill_pattern_dst_addr[1] =
+				upper_32_bits(dest[0]) & 0xFFFF;
+		else
+			hw_descriptor->fill_pattern_dst_addr[1] = 0;
+	}
+
+	/* Set the data buffers */
+	for (i = 0; i < src_cnt; i++)
+		mv_xor_v2_set_data_buffers(xor_dev, hw_descriptor, src[i], i);
+
+	/* Set buffers size */
+	hw_descriptor->buff_size = len;
+
+	/* return the async tx descriptor */
+	return &sw_desc->async_tx;
+}
+
+/*
  * Prepare a HW descriptor for interrupt operation.
  */
 static struct dma_async_tx_descriptor *
@@ -540,7 +634,7 @@ mv_xor_v2_prep_dma_interrupt(struct dma_chan *chan, unsigned long flags)
 
 	sw_desc = mv_xor_v2_prep_sw_desc(xor_dev);
 
-	/* did we get a valid descriptor? */
+	/* If there's no empty discriptor, return NULL to dma stack */
 	if (!sw_desc)
 		return NULL;
 
@@ -895,6 +989,7 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
 	dma_cap_set(DMA_XOR, dma_dev->cap_mask);
 	dma_cap_set(DMA_INTERRUPT, dma_dev->cap_mask);
+	dma_cap_set(DMA_PQ, dma_dev->cap_mask);
 
 	/* init dma link list */
 	INIT_LIST_HEAD(&dma_dev->channels);
@@ -910,8 +1005,10 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 
 	dma_dev->device_prep_dma_memcpy = mv_xor_v2_prep_dma_memcpy;
 	dma_dev->device_prep_dma_interrupt = mv_xor_v2_prep_dma_interrupt;
-	dma_dev->max_xor = 8;
+	dma_dev->max_xor = MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF;
 	dma_dev->device_prep_dma_xor = mv_xor_v2_prep_dma_xor;
+	dma_set_maxpq(dma_dev, MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF, 0);
+	dma_dev->device_prep_dma_pq = mv_xor_v2_prep_dma_pq;
 
 	xor_dev->dmachan.device = dma_dev;
 
