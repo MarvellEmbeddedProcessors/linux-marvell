@@ -351,6 +351,14 @@
 				status = "disabled";
 			};
 
+			utmi_usb32: utmi@5d000 {
+				compatible = "marvell,armada-3700-utmi-phy";
+				reg = <0x5d000 0x1000>;
+				utmi-port = <UTMI_PHY_TO_USB3_HOST0>;
+				#phy-cells = <0>;
+				status = "disabled";
+			};
+
 			otg_phy: otg@5d800 {
 				compatible = "marvell,armada-3700-otg";
 				reg = <0x5d800 0x100>;
@@ -363,14 +371,6 @@
 				reg = <0x5e000 0x1000>;
 				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
 				needs-reset-on-resume;
-				status = "disabled";
-			};
-
-			utmi_usb32: utmi@5d000 {
-				compatible = "marvell,armada-3700-utmi-phy";
-				reg = <0x5d000 0x1000>;
-				utmi-port = <UTMI_PHY_TO_USB3_HOST0>;
-				#phy-cells = <0>;
 				status = "disabled";
 			};
 

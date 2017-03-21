@@ -123,6 +123,14 @@
 				phy-names = "usb";
 			};
 
+			utmi_usb32: utmi@5d000 {
+				status = "okay";
+			};
+
+			utmi_usb2: utmi@5f000 {
+				status = "okay";
+			};
+
 			sdhci1: sdhci@d0000 {
 				wp-inverted;
 				bus-width = <4>;
