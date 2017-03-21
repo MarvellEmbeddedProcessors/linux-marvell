@@ -27,6 +27,7 @@ static int eip_in_use = -1;
 /* Module param to save the assigned rings to the Kernel */
 static uint rings[MAX_EIP_ENGINE] = {RINGS_UNINITIALIZED, RINGS_UNINITIALIZED};
 
+/* Initialize pseudo random generator */
 static void eip197_prng_init(struct safexcel_crypto_priv *priv)
 {
 	/* disable PRNG and set to manual mode */
@@ -59,21 +60,14 @@ static void eip197_prng_init(struct safexcel_crypto_priv *priv)
 	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_CTRL);
 }
 
+/* Initialize transform record cache */
 static int eip197_trc_cache_init(struct device *dev,
 				 struct safexcel_crypto_priv *priv)
 {
-	u32 i, reg, reg_addr,
-		rc_rec_wc,
-		rc_rec1_wc,
-		rc_rec2_wc,
-		rc_record_cnt,
-		rc_ht_wc,
-		rc_ht_byte_offset,
-		rc_ht_sz,
-		rc_ht_factor,
-		rc_ht_entry_cnt,
-		rc_admn_ram_wc,
-		rc_admn_ram_entry_cnt;
+	u32 i, reg, reg_addr, rc_rec_wc, rc_rec1_wc, rc_rec2_wc,
+	    rc_record_cnt, rc_ht_wc, rc_ht_byte_offset, rc_ht_sz,
+	    rc_ht_factor, rc_ht_entry_cnt, rc_admn_ram_wc,
+	    rc_admn_ram_entry_cnt;
 
 	rc_rec1_wc = EIP197_CS_TRC_REC_WC;
 	rc_rec2_wc = EIP197_CS_TRC_LG_REC_WC;
@@ -183,8 +177,8 @@ static int eip197_trc_cache_init(struct device *dev,
 		reg_addr = EIP197_CLASSIF_RAM_ACCESS_SPACE + i * EIP197_RC_HEADER_WC * sizeof(u32);
 
 		/* Write word 0 */
-		writel((EIP197_RC_NULL << 20) |		/* Hash_Collision_Prev */
-			 (EIP197_RC_NULL << 10),	/* Hash_Collision_Next */
+		writel((EIP197_RC_NULL << EIP197_RC_HASH_COLLISION_PREV) | /* Hash_Collision_Prev */
+		       (EIP197_RC_NULL << EIP197_RC_HASH_COLLISION_NEXT),  /* Hash_Collision_Next */
 			 priv->base + reg_addr);
 
 		/* Write word 1 */
@@ -192,18 +186,18 @@ static int eip197_trc_cache_init(struct device *dev,
 
 		if (i == rc_record_cnt - 1) {
 			/* last record */
-			writel(((i - 1) << 10) |	/* Free_List_Prev */
-				 EIP197_RC_NULL,	/* Free_List_Prev */
+			writel(((i - 1) << EIP197_RC_FREE_LIST_PREV) |	/* Free_List_Prev */
+				 EIP197_RC_NULL,			/* Free_List_Prev */
 				 priv->base + reg_addr);
 		} else if (!i) {
 			/* first record */
-			writel((EIP197_RC_NULL << 10) |	/* Free_List_Prev */
-			       (i + 1),			/* Free_List_Prev */
+			writel((EIP197_RC_NULL << EIP197_RC_FREE_LIST_PREV) |	/* Free_List_Prev */
+			       (i + 1),						/* Free_List_Prev */
 			       priv->base + reg_addr);
 		} else {
 			/* All other records */
-			writel(((i - 1) << 10) |	/* Free_List_Prev */
-			       (i + 1),			/* Free_List_Prev */
+			writel(((i - 1) << EIP197_RC_FREE_LIST_PREV) |	/* Free_List_Prev */
+			       (i + 1),					/* Free_List_Prev */
 			       priv->base + reg_addr);
 		}
 
@@ -222,20 +216,21 @@ static int eip197_trc_cache_init(struct device *dev,
 
 	/* Clear all hash table words */
 	for (i = 0; i < rc_ht_wc; i++)
-		writel(GENMASK(29, 0),
+		writel(EIP197_RC_HASH_TABLE_MASK,
 		       priv->base + rc_ht_byte_offset + i * sizeof(u32));
 
 	/* Disable Record Cache RAM access */
 	writel(0, priv->base + EIP197_CS_RAM_CTRL);
 
 	/* Write head and tail pointers to the RC Free Chain */
-	writel(((rc_record_cnt - 1) & GENMASK(9, 0)) << 16,
-		 priv->base + EIP197_TRC_FREECHAIN);
+	writel(((rc_record_cnt - 1) & EIP197_TRC_TAIL_PTR_MASK) <<
+	       EIP197_TRC_TAIL_PTR_OFFSET,
+	       priv->base + EIP197_TRC_FREECHAIN);
 
 	/* Set Hash Table start */
-	reg = ((EIP197_CS_TRC_REC_WC << 18) |
-		(EIP197_RC_DMA_WR_COMB_DLY << 10) |
-		(rc_record_cnt & GENMASK(9, 0)));
+	reg = ((EIP197_CS_TRC_REC_WC << EIP197_TRC_RECORD_SIZE2_OFFSET)		|
+		(EIP197_RC_DMA_WR_COMB_DLY << EIP197_TRC_DMA_WR_COMB_DLY_OFFSET)|
+		(rc_record_cnt & EIP197_TRC_HASH_TABLE_START_MASK));
 	writel(reg, priv->base + EIP197_TRC_PARAMS2);
 
 	/* Select the highest clock count as specified by
@@ -243,14 +238,17 @@ static int eip197_trc_cache_init(struct device *dev,
 	 */
 
 	/* Take Record Cache out of reset */
-	reg = ((rc_rec2_wc & GENMASK(8, 0)) << 18)	| /* large record_size */
-	       (1 << 10)				| /* block_timebase */
-	       ((rc_ht_sz & GENMASK(2, 0)) << 4);	  /* hash_table_size */
+	reg = ((rc_rec2_wc & EIP197_TRC_RECORD_SIZE_MASK) <<
+	       EIP197_TRC_RECORD_SIZE_OFFSET)			| /* large record_size */
+	       (1 << EIP197_TRC_BLCOK_TIMEBASE_OFFSET)		| /* block_timebase */
+	       ((rc_ht_sz & EIP197_TRC_HASH_TABLE_SIZE_MASK) <<
+	       EIP197_TRC_HASH_TABLE_SIZE_OFFSET);		  /* hash_table_size */
 	writel(reg, priv->base + EIP197_TRC_PARAMS);
 
 	return 0;
 }
 
+/* Load EIP197 firmare into the engine */
 static int eip197_load_fw(struct device *dev, struct safexcel_crypto_priv *priv)
 {
 	const struct firmware	*fw[MAX_FW_NR] = {0};
@@ -352,6 +350,7 @@ release_fw:
 	return ret;
 }
 
+/* Store offset of each configurable unit in the engine */
 static void eip_priv_unit_offset_init(struct safexcel_crypto_priv *priv)
 {
 	struct safexcel_unit_offset *unit_off = &priv->unit_off;
@@ -453,7 +452,7 @@ static int eip_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
 	return 0;
 }
 
-static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
+static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 {
 	u32 version, val;
 	int i, ret;
@@ -482,7 +481,7 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	writel(0, EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ENABLE_CTRL);
 
 	/* Clear any pending interrupt */
-	writel(GENMASK(31, 0), EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
+	writel(EIP197_AIC_G_ACK_ALL_MASK, EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
 
 	/*
 	 * Data Fetch Engine configuration
@@ -527,7 +526,7 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 
 	/* Wait for all DSE threads to complete */
 	while ((readl(EIP197_HIA_DSE_THRD(priv) + EIP197_HIA_DSE_THR_STAT) &
-	       GENMASK(15, 12)) != GENMASK(15, 12))
+	       EIP197_DSE_THR_RDR_ID_MASK) != EIP197_DSE_THR_RDR_ID_MASK)
 		;
 
 	/* DMA transfer size to use */
@@ -553,7 +552,7 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	 */
 	for (i = 0; i < priv->config.hw_rings; i++) {
 		/* Clear interrupts for this ring */
-		writel(GENMASK(31, 0),
+		writel(EIP197_HIA_AIC_R_ENABLE_CLR_ALL_MASK,
 		       EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ENABLE_CLR(i));
 
 		/* disable external triggering */
@@ -607,7 +606,7 @@ static int eip_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	       EIP197_HIA_DSE_THRD(priv) + EIP197_HIA_DSE_THR_CTRL);
 
 	/* Clear any HIA interrupt */
-	writel(GENMASK(30, 20), EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
+	writel(EIP197_AIC_G_ACK_HIA_MASK, EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
 
 	/* init PRNG */
 	eip197_prng_init(priv);
@@ -1057,6 +1056,7 @@ static void safexcel_unregister_algorithms(struct safexcel_crypto_priv *priv)
 	}
 }
 
+/* Configure rings basic parameters */
 static void safexcel_configure(struct safexcel_crypto_priv *priv)
 {
 	u32 val, mask;
@@ -1067,7 +1067,7 @@ static void safexcel_configure(struct safexcel_crypto_priv *priv)
 
 	/* Read number of rings from the engine */
 	val = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_OPTIONS);
-	priv->config.hw_rings = (val & GENMASK(3, 0));
+	priv->config.hw_rings = val & EIP197_N_RINGS_MASK;
 
 	/* Check the requested number of rings given in the module param.
 	 * If the module param is uninitialized, use all available rings
@@ -1203,7 +1203,7 @@ static int safexcel_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, priv);
 
-	ret = eip_hw_init(dev, priv);
+	ret = eip197_hw_init(dev, priv);
 	if (ret) {
 		dev_err(dev, "EIP h/w init failed (%d)\n", ret);
 		goto err_pool;
