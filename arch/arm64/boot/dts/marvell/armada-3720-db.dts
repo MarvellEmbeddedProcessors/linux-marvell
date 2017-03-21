@@ -163,10 +163,18 @@
 				phy-names = "usb2", "usb3";
 			};
 
+			utmi_usb32: utmi@5d000 {
+				status = "okay";
+			};
+
 			usb@5e000 {
 				status = "okay";
 				phys = <&utmi_usb2>;
 				phy-names = "usb";
+			};
+
+			utmi_usb2: utmi@5f000 {
+				status = "okay";
 			};
 
 			interrupt-controller@74840 {
