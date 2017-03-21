@@ -14,6 +14,9 @@ Required properties:
 - interrupt-names : Names of the interrupts listed in interrupts property.
 - clocks	  : Reference to the crypto engine clocks.
 - dma-coherent	  : Present if dma operations are coherent.
+- cell-index	  : Should contain the EIP197 engine ID.
+		    For Example, in Marvell Armada 8040, there are 2 engines (one on each CP).
+                    cell-index will be 0 for CP0 and  1 for CP1.
 
 Examples:
 ---------
@@ -30,5 +33,6 @@ Examples:
 				  "ring2", "ring3", "eip_out";
 		clocks = <&cpm_syscon0 1 26>;
 		dma-coherent;
+		cell-index = <0>;
 		status = "disabled";
 	};
