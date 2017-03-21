@@ -7,6 +7,9 @@ Required properties:
 - reg: Base physical address of the engine and length of memory mapped region.
 - interrupts: Interrupt numbers for the rings and engine.
 - interrupt-names: Should be "ring0", "ring1", "ring2", "ring3", "eip", "mem".
+- cell-index: Should contain the EIP197 engine ID.
+	      For Example, in Marvell Armada 8040, there are 2 engines (one on each CP).
+	      cell-index will be 0 for CP0 and  1 for CP1.
 
 Optional properties:
 - clocks: Reference to the crypto engine clocks, the second clock is
@@ -37,4 +40,5 @@ Example:
 		interrupt-names = "mem", "ring0", "ring1", "ring2", "ring3",
 				  "eip";
 		clocks = <&cpm_syscon0 1 26>;
+		cell-index = <0>;
 	};
