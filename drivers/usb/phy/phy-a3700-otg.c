@@ -389,6 +389,27 @@ static int a3700_otg_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int a3700_otg_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int a3700_otg_resume(struct device *dev)
+{
+	struct a3700_otg *mvotg = dev_get_drvdata(dev);
+
+	a3700_otg_enable_irq(mvotg);
+
+	return 0;
+}
+
+static const struct dev_pm_ops a3700_otg_pm_ops = {
+	.suspend	= a3700_otg_suspend,
+	.resume		= a3700_otg_resume,
+};
+#endif
+
 static const struct of_device_id a3700_otg_dt_ids[] = {
 	{ .compatible = "marvell,armada-3700-otg" },
 	{ }
@@ -402,6 +423,9 @@ static struct platform_driver a3700_otg_driver = {
 	.driver		= {
 		.name	= "a3700_otg_phy",
 		.of_match_table = a3700_otg_dt_ids,
+#ifdef CONFIG_PM
+		.pm     = &a3700_otg_pm_ops,
+#endif
 	},
 };
 
