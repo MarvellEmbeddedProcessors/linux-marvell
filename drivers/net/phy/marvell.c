@@ -1660,6 +1660,12 @@ int m88e3310_resume(struct phy_device *phydev)
 	return 0;
 }
 
+int m88e3310_soft_reset(struct phy_device *phydev)
+{
+	/* Do nothing for now */
+	return 0;
+}
+
 #ifndef UINT64_MAX
 #define UINT64_MAX              (u64)(~((u64)0))
 #endif
@@ -1979,6 +1985,7 @@ static struct phy_driver marvell_drivers[] = {
 		.flags = PHY_HAS_INTERRUPT,
 		.probe = marvell_probe,
 		.config_aneg = &m88e3310_config_aneg,
+		.soft_reset = &m88e3310_soft_reset,
 		.config_init = &m88e3310_config_init,
 		.aneg_done = &m88e3310_aneg_done,
 		.read_status = &m88e3310_read_status,
