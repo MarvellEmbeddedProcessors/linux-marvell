@@ -110,6 +110,18 @@
 				};
 			};
 
+			u3d@50000 {
+				status = "disabled";
+				phys = <&a3700_comphy 1 COMPHY_USB3>;
+				phy-names = "usb";
+			};
+
+			udc@54100 {
+				status = "disabled";
+				phys = <&utmi_usb32>;
+				phy-names = "usb";
+			};
+
 			usb3@58000 {
 				status = "okay";
 				phys = <&utmi_usb32>, /* utmi usb32 dedicated phy */
