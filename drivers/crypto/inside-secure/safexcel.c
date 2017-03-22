@@ -865,6 +865,9 @@ static inline void safexcel_handle_result_descriptor(struct safexcel_crypto_priv
 			return;
 		}
 
+		writel(EIP197_xDR_PROC_xD_PKT(1) | EIP197_xDR_PROC_xD_COUNT(ndesc * priv->config.rd_offset),
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PROC_COUNT);
+
 		if (should_complete) {
 			local_bh_disable();
 			sreq->req->complete(sreq->req, ret);
@@ -873,9 +876,6 @@ static inline void safexcel_handle_result_descriptor(struct safexcel_crypto_priv
 
 		kfree(sreq);
 	}
-
-	writel(EIP197_HIA_RDR_THRESH_PKT_MODE | EIP197_xDR_PROC_xD_PKT(i),
-	       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PROC_COUNT);
 }
 
 /* Result worker routine */
