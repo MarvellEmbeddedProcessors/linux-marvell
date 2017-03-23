@@ -1,0 +1,79 @@
+Inside-Secure EIP197 user guide
+===============================
+
+Introduction
+------------
+The EIP197 is a hybrid packet engine designed to off-load various security
+protocols such as IPsec ESP, IPsec AH, SRTP, SSL, TLS,
+DTLS and MACsec.
+
+The EIP197 uses firmware, which should be loaded by the driver during
+the probe process.
+
+The EIP197 engine has 4 hardware rings which can be used for
+cryptographic operations.
+
+This document provides a brief EIP197 driver usage.
+
+Kernel infrastructure
+---------------------
+The EIP197 driver uses Kernel crypto infrastructure, for more information
+refer to: http://www.chronox.de/crypto-API/
+
+Linux Kernel Image
+------------------
+As mentioned above, EIP197 driver loads firmware into the engine.
+Due to that fact, the EIP197 driver should be compiled as a module (The
+driver should be probed only after the file system is mounted).
+
+
+The kernel object file (named crypto_safexcel) is generated in:
+./drivers/crypto/inside-secure/crypto_safexcel.ko
+
+Device-Tree
+-----------
+Refer to: Documentation/devicetree/bindings/crypto/inside_secure_eip.txt
+
+Firmware
+--------
+The EIP197 driver, loads two firmware images in to the engine:
+	- ipue.bin:	Input Pull-Up micro-Engine
+	- ifpp.bin:	Input Flow Post-Processor micro-Engine
+The driver expects to find the firmware images in /lib/firmware/eip197,
+if the firmware images aren't present there, the probe process of
+the EIP197 driver will fail.
+
+Basic usage
+-----------
+Currently EIP197 engine available on Marvell Aramada8040/7040 devices.
+Armada8040 - 2 engines.
+Armada7040 - 1 engine.
+Currently, due to Kernel crypto API limitations, the EIP197 driver
+operates only with one engine in the Kernel (support of multiple engines
+is planned as future work).
+
+The user can request a number of rings (up to 4 per engine) using module
+param called "rings":
+	insmode crypto_safexcel.ko rings=x,y
+		x - number of rings on EIP197-0 engine
+		y - number of rings on EIP197-1 engin (For device with
+		    more than one engine, such as Aramada8040)
+
+In Armada8040, due to the Kernel limitation stated above, the first
+engine with rings!=0 will be used.
+
+------------|---------------|----------|----------|-------------|
+   device   |     rings	    | EIP197-0 | EIP197-1 |  Operating  |
+	    |		    |	       |	  |    engine	|
+------------|---------------|----------|----------|-------------|
+ Armada7040 |   rings=4	    |	  4    |    N/A   |      0	|
+------------|---------------|----------|----------|-------------|
+	    |   rings=4,0   |	  4    |     0	  |	 0	|
+	    |   rings=0,4   |     0    |     4    |	 1	|
+ Armada8040 |   rings=4,4   |     4    |     4    |	 0	|
+	    |   rings=3,4   |     3    |     4    |	 0	|
+	    |   rings=4,3   |     4    |     3    |	 0      |
+------------|---------------|----------|----------|-------------|
+If "rings" is not provided, the default value is:
+	Armada7040:	rings=4
+	Armada8040:	rings=4,4 (Operating engine is engine 0)
