@@ -7,4 +7,4 @@ Driver's guide for Marvell LSP
 	mv_xor, mv_xor2		| DMA Engine			| Documentation/dmaengine/00-INDEX
 	Telephony		| Marvell proprietary		| drivers/telephony/mvebu_phone/telephony_user_guide.txt
 	cpufreq			| generic cpufreq-dt		| Documentation/cpu-freq/user-guide.txt
-
+	EIP197			| Kernel crypto API		| drivers/crypto/inside-secure/user-guide.txt
