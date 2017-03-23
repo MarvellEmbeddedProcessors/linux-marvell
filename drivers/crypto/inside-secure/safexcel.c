@@ -255,7 +255,8 @@ static int eip197_load_fw(struct device *dev, struct safexcel_crypto_priv *priv)
 	const u32		*fw_data;
 	int			i, ret;
 	u32			fw_size, reg;
-	const char		*fw_name[MAX_FW_NR] = {"ifpp.bin", "ipue.bin"};
+	const char		*fw_name[MAX_FW_NR] = {"eip197/ifpp.bin",
+						       "eip197/ipue.bin"};
 
 	for (i = 0; i < MAX_FW_NR; i++) {
 		ret = request_firmware(&fw[i], fw_name[i], dev);
