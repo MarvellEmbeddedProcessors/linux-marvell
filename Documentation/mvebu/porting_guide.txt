@@ -98,6 +98,7 @@ A80x0/A70x0
 	Marvell AP806 CPU Clock Driver	| clock/mvebu-armada-ap806-cpu-clock.txt
 	Marvell SPI driver		| spi/spi-orion.txt
 	Marvell I2c driver		| i2c/i2c-mv64xxx.txt
+	Marvell EIP197 crypto driver	| crypto/inside_secure_eip.txt
 
 A37x0
 -----
