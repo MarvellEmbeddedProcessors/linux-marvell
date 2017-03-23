@@ -199,6 +199,13 @@
 				#clock-cells = <1>;
 			};
 
+			wdt: watchdog-timer@8300 {
+				compatible = "marvell,armada-3700-wdt";
+				reg = <0xd064 0x4>,
+				      <0x8300 0x40>;
+				clocks = <&osc>;
+			};
+
 			npinctrl: north-bridge-pinctrl@13830 {
 				compatible = "marvell,armada-3700-nb-pinctrl";
 				reg = <0x13830 0x4>;
