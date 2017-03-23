@@ -86,6 +86,12 @@
 			ranges = <0x0 0x0 0xd0000000 0x2000000>;
 			dma-coherent;
 
+			wdt: watchdog-timer@8300 {
+				compatible = "marvell,armada-3700-wdt";
+				reg = <0xd064 0x4>, <0x8300 0x40>;
+				clocks = <&xtalclk>;
+			};
+
 			spi0: spi@10600 {
 				compatible = "marvell,armada-3700-spi";
 				#address-cells = <1>;
