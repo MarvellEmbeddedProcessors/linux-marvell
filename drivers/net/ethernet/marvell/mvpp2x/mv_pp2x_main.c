@@ -38,7 +38,7 @@
 #include <linux/of_device.h>
 #include <linux/phy/phy.h>
 #include <linux/if_vlan.h>
-
+#include <linux/cpu.h>
 #include <linux/phy.h>
 #include <linux/clk.h>
 #include <linux/hrtimer.h>
@@ -541,7 +541,7 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	 * initialized to 0 to avoid writing to the random addresses an 32 Bit systems.
 	 */
 	if (priv->pp2_version == PPV22) {
-		for_each_online_cpu(cpu) {
+		for_each_present_cpu(cpu) {
 			/* Reset the BM virtual and physical address high register */
 			mv_pp2x_relaxed_write(&priv->hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
 					      0, cpu);
@@ -933,7 +933,7 @@ int mv_pp2x_tso_txq_reserved_desc_num_proc(
 		req = num - txq_pcpu->reserved_num;
 		desc_count = 0;
 		/* Compute total of used descriptors */
-		for_each_online_cpu(cpu_desc) {
+		for_each_present_cpu(cpu_desc) {
 			int txq_count;
 			struct mv_pp2x_txq_pcpu *txq_pcpu_aux;
 
@@ -1285,7 +1285,7 @@ static int mv_pp2x_txq_init(struct mv_pp2x_port *port,
 	mv_pp2x_write(hw, MVPP2_TXQ_SCHED_TOKEN_SIZE_REG(txq->log_id),
 		      val);
 
-	for_each_online_cpu(cpu) {
+	for_each_present_cpu(cpu) {
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 		txq_pcpu->size = txq->size;
 		txq_pcpu->tx_skb = kmalloc(txq_pcpu->size *
@@ -1312,7 +1312,7 @@ static int mv_pp2x_txq_init(struct mv_pp2x_port *port,
 	return 0;
 
 error:
-	for_each_online_cpu(cpu) {
+	for_each_present_cpu(cpu) {
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 		kfree(txq_pcpu->tx_skb);
 		kfree(txq_pcpu->tx_buffs);
@@ -1334,11 +1334,13 @@ static void mv_pp2x_txq_deinit(struct mv_pp2x_port *port,
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	int cpu;
 
-	for_each_online_cpu(cpu) {
+	for_each_present_cpu(cpu) {
+		preempt_disable();
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 		kfree(txq_pcpu->tx_skb);
 		kfree(txq_pcpu->tx_buffs);
 		kfree(txq_pcpu->data_size);
+		preempt_enable();
 	}
 
 	if (txq->desc_mem)
@@ -1418,9 +1420,10 @@ static void mv_pp2x_txq_clean(struct mv_pp2x_port *port,
 	val &= ~MVPP2_TXQ_DRAIN_EN_MASK;
 	mv_pp2x_write(hw, MVPP2_TXQ_PREF_BUF_REG, val);
 
-	for_each_online_cpu(cpu) {
+	for_each_present_cpu(cpu) {
 		int txq_count;
 
+		preempt_disable();
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 
 		/* Release all packets */
@@ -1430,6 +1433,7 @@ static void mv_pp2x_txq_clean(struct mv_pp2x_port *port,
 		/* Reset queue */
 		txq_pcpu->txq_put_index = 0;
 		txq_pcpu->txq_get_index = 0;
+		preempt_enable();
 	}
 }
 
@@ -1437,7 +1441,7 @@ static void mv_pp2x_txq_clean(struct mv_pp2x_port *port,
 void mv_pp2x_cleanup_txqs(struct mv_pp2x_port *port)
 {
 	struct mv_pp2x_tx_queue *txq;
-	int queue;
+	int queue, cpu;
 	u32 val;
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 
@@ -1453,7 +1457,18 @@ void mv_pp2x_cleanup_txqs(struct mv_pp2x_port *port)
 		mv_pp2x_txq_deinit(port, txq);
 	}
 
-	on_each_cpu(mv_pp2x_txq_sent_counter_clear, port, 1);
+	/* Mvpp21 and Mvpp22 has different per cpu register access.
+	* Mvpp21 - to access CPUx should run on CPUx
+	* Mvpp22 - CPUy can access CPUx from CPUx address space
+	* If added to support CPU hot plug feature supported only by Mvpp22
+	*/
+	if (port->priv->pp2_version == PPV22)
+		for_each_present_cpu(cpu)
+			for (queue = 0; queue < port->num_tx_queues; queue++)
+				mv_pp2x_txq_sent_desc_proc(port, QV_CPU_2_THR(cpu),
+							   port->txqs[queue]->id);
+	else
+		on_each_cpu(mv_pp2x_txq_sent_counter_clear, port, 1);
 
 	val &= ~MVPP2_TX_PORT_FLUSH_MASK(port->id);
 	mv_pp2x_write(hw, MVPP2_TX_PORT_FLUSH_REG, val);
@@ -1489,7 +1504,7 @@ err_cleanup:
 int mv_pp2x_setup_txqs(struct mv_pp2x_port *port)
 {
 	struct mv_pp2x_tx_queue *txq;
-	int queue, err;
+	int queue, err, cpu;
 
 	for (queue = 0; queue < port->num_tx_queues; queue++) {
 		txq = port->txqs[queue];
@@ -1501,7 +1516,21 @@ int mv_pp2x_setup_txqs(struct mv_pp2x_port *port)
 		mv_pp2x_tx_done_time_coal_set(port, port->tx_time_coal);
 		on_each_cpu(mv_pp2x_tx_done_pkts_coal_set, port, 1);
 	}
-	on_each_cpu(mv_pp2x_txq_sent_counter_clear, port, 1);
+
+	/* Mvpp21 and Mvpp22 has different per cpu register access.
+	* Mvpp21 - to access CPUx should run on CPUx
+	* Mvpp22 - CPUy can access CPUx from CPUx address space
+	* If added to support CPU hot plug feature supported only by Mvpp22
+	*/
+
+	if (port->priv->pp2_version == PPV22)
+		for_each_present_cpu(cpu)
+			for (queue = 0; queue < port->num_tx_queues; queue++)
+				mv_pp2x_txq_sent_desc_proc(port, QV_CPU_2_THR(cpu),
+							   port->txqs[queue]->id);
+	else
+		on_each_cpu(mv_pp2x_txq_sent_counter_clear, port, 1);
+
 	return 0;
 
 err_cleanup:
@@ -3643,6 +3672,11 @@ int mv_pp2x_open(struct net_device *dev)
 		netdev_err(port->dev, "cannot allocate irq's\n");
 		goto err_cleanup_txqs;
 	}
+
+	/* Only Mvpp22 support hot plug feature */
+	if (port->priv->pp2_version == PPV22)
+		register_hotcpu_notifier(&port->port_hotplug_nb);
+
 	/* In default link is down */
 	netif_carrier_off(port->dev);
 
@@ -3691,8 +3725,11 @@ int mv_pp2x_stop(struct net_device *dev)
 	mv_pp2x_shared_thread_interrupts_mask(port);
 	mv_pp2x_cleanup_irqs(port);
 
+	if (port->priv->pp2_version == PPV22)
+		unregister_hotcpu_notifier(&port->port_hotplug_nb);
+
 	if (!port->priv->pp2xdata->interrupt_tx_done) {
-		for_each_online_cpu(cpu) {
+		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 			hrtimer_cancel(&port_pcpu->tx_done_timer);
 			port_pcpu->timer_scheduled = false;
@@ -3928,7 +3965,7 @@ mv_pp2x_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 	unsigned int start;
 	int cpu;
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		struct mv_pp2x_pcpu_stats *cpu_stats;
 		u64 rx_packets;
 		u64 rx_bytes;
@@ -4081,7 +4118,7 @@ static int  mv_pp2x_port_txqs_init(struct device *dev,
 		txq->log_id = queue;
 		txq->pkts_coal = MVPP2_TXDONE_COAL_PKTS;
 
-		for_each_online_cpu(cpu) {
+		for_each_present_cpu(cpu) {
 			txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 			txq_pcpu->cpu = cpu;
 		}
@@ -4505,6 +4542,43 @@ static void mv_pp2x_port_init_config(struct mv_pp2x_port *port)
 	port->rss_cfg.rss_mode = rss_mode;
 }
 
+/* Routine called by port CPU hot plug notifier. If port up callback set irq affinity for private interrupts,
+*  unmask private interrupt, set packet coalescing and clear counters.
+*/
+static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
+				     unsigned long action, void *hcpu)
+{
+	unsigned int cpu = (unsigned long)hcpu;
+	int qvec_id;
+	struct queue_vector *qvec;
+	cpumask_t cpus_mask;
+	struct mv_pp2x_port *port = container_of(nfb, struct mv_pp2x_port, port_hotplug_nb);
+
+	switch (action) {
+	case CPU_ONLINE:
+	case CPU_ONLINE_FROZEN:
+		cpumask_set_cpu(cpu, &cpus_mask);
+		for (qvec_id = 0; qvec_id < port->num_qvector; qvec_id++) {
+			qvec = &port->q_vector[qvec_id];
+			if (!qvec->irq)
+				continue;
+			if (qvec->qv_type == MVPP2_PRIVATE && QV_THR_2_CPU(qvec->sw_thread_id) == cpu) {
+				irq_set_affinity_hint(qvec->irq, cpumask_of(cpu));
+				on_each_cpu_mask(&cpus_mask, mv_pp2x_interrupts_unmask, port, 1);
+				if (port->priv->pp2_cfg.queue_mode ==
+					MVPP2_QDIST_MULTI_MODE)
+					irq_set_status_flags(qvec->irq,
+							     IRQ_NO_BALANCING);
+			}
+		}
+		if (port->priv->pp2xdata->interrupt_tx_done)
+			on_each_cpu_mask(&cpus_mask, mv_pp2x_tx_done_pkts_coal_set, port, 1);
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
 /* Ports initialization */
 static int mv_pp2x_port_probe(struct platform_device *pdev,
 			      struct device_node *port_node,
@@ -4691,7 +4765,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		goto err_free_txq_pcpu;
 	}
 	if (!port->priv->pp2xdata->interrupt_tx_done) {
-		for_each_online_cpu(cpu) {
+		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 
 			hrtimer_init(&port_pcpu->tx_done_timer, CLOCK_MONOTONIC,
@@ -4704,7 +4778,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		}
 	}
 	/* Init pool of external buffers for TSO, fragmentation, etc */
-	for_each_online_cpu(cpu) {
+	for_each_present_cpu(cpu) {
 		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 		port_pcpu->ext_buf_size = MVPP2_EXTRA_BUF_SIZE;
 
@@ -4765,6 +4839,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	mv_pp2x_counters_stat_clear(port);
 
 	mv_pp2x_port_irq_names_update(port);
+
+	if (priv->pp2_version == PPV22)
+		port->port_hotplug_nb.notifier_call = mv_pp2x_port_cpu_callback;
 
 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
 
@@ -4949,7 +5026,7 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	priv->num_aggr_qs = num_active_cpus();
 
 	i = 0;
-	for_each_online_cpu(cpu) {
+	for_each_present_cpu(cpu) {
 		priv->aggr_txqs[i].id = cpu;
 		priv->aggr_txqs[i].size = MVPP2_AGGR_TXQ_SIZE;
 
@@ -5361,6 +5438,36 @@ void mv_pp22_set_net_comp(struct mv_pp2x *priv)
 	mv_gop110_netc_init(&priv->hw.gop, net_comp_config, MV_NETC_SECOND_PHASE);
 }
 
+/* Routine called by CP CPU hot plug notifier. Callback reconfigure RSS RX flow hash indir'n table */
+static int mv_pp2x_cp_cpu_callback(struct notifier_block *nfb,
+				   unsigned long action, void *hcpu)
+{
+	struct mv_pp2x *priv = container_of(nfb, struct mv_pp2x, cp_hotplug_nb);
+	unsigned int cpu = (unsigned long)hcpu;
+	int i;
+	struct mv_pp2x_port *port;
+
+	/* RSS rebalanced to equal */
+	mv_pp22_init_rxfhindir(priv);
+
+	switch (action) {
+	case CPU_DEAD:
+	case CPU_DEAD_FROZEN:
+		/* If default CPU is down, CPU0 will be default CPU */
+		for (i = 0; i < priv->num_ports; i++) {
+			port = priv->port_list[i];
+			if (port && (cpu == port->rss_cfg.dflt_cpu)) {
+				port->rss_cfg.dflt_cpu = 0;
+				if (port->rss_cfg.rss_en && netif_running(port->dev))
+					mv_pp22_rss_default_cpu_set(port,
+								    port->rss_cfg.dflt_cpu);
+			}
+		}
+	}
+
+	return NOTIFY_OK;
+}
+
 static int mv_pp2x_probe(struct platform_device *pdev)
 {
 	struct mv_pp2x *priv;
@@ -5400,7 +5507,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	/* Save cpu_present_mask + populate the per_cpu address space */
 	cpu_map = 0;
 	i = 0;
-	for_each_online_cpu(cpu) {
+	for_each_present_cpu(cpu) {
 		cpu_map |= (1 << cpu);
 		hw->cpu_base[cpu] = hw->base;
 		if (priv->pp2xdata->multi_addr_space) {
@@ -5460,6 +5567,13 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		err = -ENOMEM;
 		goto err_clk;
 	}
+
+	/* Only Mvpp22 support hot plug feature */
+	if (priv->pp2_version == PPV22 && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
+		priv->cp_hotplug_nb.notifier_call = mv_pp2x_cp_cpu_callback;
+		register_hotcpu_notifier(&priv->cp_hotplug_nb);
+	}
+
 	INIT_DELAYED_WORK(&priv->stats_task, mv_pp2x_get_device_stats);
 
 	queue_delayed_work(priv->workqueue, &priv->stats_task, stats_delay);
@@ -5483,6 +5597,9 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 	struct mv_pp2x_hw *hw = &priv->hw;
 	int i, num_of_ports;
 
+	if (priv->pp2_version == PPV22 && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
+		unregister_hotcpu_notifier(&priv->cp_hotplug_nb);
+
 	cancel_delayed_work(&priv->stats_task);
 	flush_workqueue(priv->workqueue);
 	destroy_workqueue(priv->workqueue);
@@ -5501,7 +5618,7 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, bm_pool);
 	}
 
-	for_each_online_cpu(i) {
+	for_each_present_cpu(i) {
 		struct mv_pp2x_aggr_tx_queue *aggr_txq = &priv->aggr_txqs[i];
 
 		dma_free_coherent(&pdev->dev,

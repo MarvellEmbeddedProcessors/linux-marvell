@@ -545,6 +545,7 @@ struct mv_pp2x {
 
 	struct delayed_work stats_task;
 	struct workqueue_struct *workqueue;
+	struct notifier_block	cp_hotplug_nb;
 };
 
 struct mv_pp2x_pcpu_stats {
@@ -643,6 +644,7 @@ struct mv_pp2x_port {
 	struct mv_pp2x_ptp_desc *ptp_desc;
 	struct mv_pp2x_cos cos_cfg;
 	struct mv_pp2x_rss rss_cfg;
+	struct notifier_block	port_hotplug_nb;
 };
 
 struct pp2x_hw_params {
