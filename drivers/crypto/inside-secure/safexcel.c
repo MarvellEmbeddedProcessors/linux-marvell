@@ -534,7 +534,7 @@ static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	val = EIP197_HIA_DSE_CFG_DIS_DEBUG;
 	val |= EIP197_HIA_DxE_CFG_MIN_DATA_SIZE(7) | EIP197_HIA_DxE_CFG_MAX_DATA_SIZE(8);
 	val |= EIP197_HIA_DxE_CFG_DATA_CACHE_CTRL(WR_CACHE_3BITS);
-	val |= EIP197_HIA_DSE_CFG_BUFFER_CTRL(2);
+	val |= EIP197_HIA_DSE_CFG_ALLWAYS_BUFFERABLE;
 	val |= EIP197_HIA_DSE_CFG_EN_SINGLE_WR;
 	writel(val, EIP197_HIA_DSE(priv) + EIP197_HIA_DSE_CFG);
 
