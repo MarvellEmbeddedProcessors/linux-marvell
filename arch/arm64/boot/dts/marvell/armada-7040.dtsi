@@ -65,6 +65,7 @@
 			smmu: iommu@5000000 {
 				mmu-masters = <&usb3h0 0x483>,
 					      <&usb3h1 0x484>,
+					      <&sata 0x485>,
 					      <&cp_xor0 0x489>,
 					      <&cp_xor1 0x48a>;
 			};
@@ -118,6 +119,9 @@
 			};
 			ppv22@000000 {
 				dma-coherent;
+			};
+			sata: sata@540000 {
+				#stream-id-cells = <1>;
 			};
 			usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
