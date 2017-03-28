@@ -51,7 +51,7 @@ int vfio_platform_ahci_reset(struct vfio_platform_device *vdev)
 	return 0;
 }
 
-module_vfio_reset_handler("marvell,armada-3700-ahci", vfio_platform_ahci_reset);
+module_vfio_reset_handler("marvell,armada-cp110-ahci", vfio_platform_ahci_reset);
 
 MODULE_VERSION(DRIVER_VERSION);
 MODULE_LICENSE("GPL v2");
