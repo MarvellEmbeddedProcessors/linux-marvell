@@ -350,6 +350,8 @@
 				 * The AP SDIO interface should work in PHY slow mode
 				 * and clock not higher than 50MHz due to HW limitation
 				 */
+				marvell,xenon-phy-slow-mode;
+				max-frequency = <50000000>;
 				dma-coherent;
 				status = "disabled";
 			};
