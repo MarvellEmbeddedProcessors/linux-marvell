@@ -2299,7 +2299,7 @@ static int mv_pp2x_prs_ip4_init(struct mv_pp2x_hw *hw)
 static int mv_pp2x_prs_ip6_init(struct mv_pp2x_hw *hw)
 {
 	struct mv_pp2x_prs_entry pe;
-	int tid, err;
+	int err;
 
 	/* Set entries for TCP, UDP and ICMP over IPv6 */
 	err = mv_pp2x_prs_ip6_proto(hw, IPPROTO_TCP,
@@ -2334,32 +2334,6 @@ static int mv_pp2x_prs_ip6_init(struct mv_pp2x_hw *hw)
 	err = mv_pp2x_prs_ip6_cast(hw, MVPP2_PRS_L3_MULTI_CAST);
 	if (err)
 		return err;
-
-	/* Entry for checking hop limit */
-	tid = mv_pp2x_prs_tcam_first_free(hw, MVPP2_PE_FIRST_FREE_TID,
-					  MVPP2_PE_LAST_FREE_TID);
-	if (tid < 0)
-		return tid;
-
-	memset(&pe, 0, sizeof(struct mv_pp2x_prs_entry));
-	mv_pp2x_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP6);
-	pe.index = tid;
-
-	/* Finished: go to flowid generation */
-	mv_pp2x_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_FLOWS);
-	mv_pp2x_prs_sram_bits_set(&pe, MVPP2_PRS_SRAM_LU_GEN_BIT, 1);
-	mv_pp2x_prs_sram_ri_update(&pe, MVPP2_PRS_RI_L3_UN |
-				   MVPP2_PRS_RI_DROP_MASK,
-				   MVPP2_PRS_RI_L3_PROTO_MASK |
-				   MVPP2_PRS_RI_DROP_MASK);
-
-	mv_pp2x_prs_tcam_data_byte_set(&pe, 1, 0x00, MVPP2_PRS_IPV6_HOP_MASK);
-	mv_pp2x_prs_tcam_ai_update(&pe, MVPP2_PRS_IPV6_NO_EXT_AI_BIT,
-				   MVPP2_PRS_IPV6_NO_EXT_AI_BIT);
-
-	/* Update shadow table and hw entry */
-	mv_pp2x_prs_shadow_set(hw, pe.index, MVPP2_PRS_LU_IP4);
-	mv_pp2x_prs_hw_write(hw, &pe);
 
 	/* Default IPv6 entry for unknown protocols */
 	memset(&pe, 0, sizeof(struct mv_pp2x_prs_entry));
