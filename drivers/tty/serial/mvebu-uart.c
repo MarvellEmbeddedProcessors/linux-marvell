@@ -566,7 +566,12 @@ static void mvebu_uart_shutdown(struct uart_port *port)
 	writel(0, port->membase + REG_CTRL(uart_data));
 	writel(0, port->membase + uart_data->intr.ctrl_reg);
 
-	free_irq(port->irq, port);
+	if (uart_data->intr.irq_sum > 0)
+		free_irq(port->irq, port);
+	else {
+		free_irq(uart_data->intr.irq_tx, port);
+		free_irq(uart_data->intr.irq_rx, port);
+	}
 }
 
 static void mvebu_uart_baud_rate_set(struct uart_port *port, unsigned int baud)
