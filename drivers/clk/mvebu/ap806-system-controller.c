@@ -53,6 +53,9 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 
 	freq_mode = reg & AP806_SAR_CLKFREQ_MODE_MASK;
 	switch (freq_mode) {
+	case 0x0 ... 0x1:
+		cpuclk_freq = 2000;
+		break;
 	case 0x4:
 	case 0xB ... 0x12:
 		cpuclk_freq = 1600;
@@ -87,6 +90,12 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 
 	/* Get DCLK frequency */
 	switch (freq_mode) {
+	case 0x0:
+		dclk_freq = 600;
+		break;
+	case 0x1:
+		dclk_freq = 525;
+		break;
 	case 0x4:
 	case 0x10:
 	case 0x14:
