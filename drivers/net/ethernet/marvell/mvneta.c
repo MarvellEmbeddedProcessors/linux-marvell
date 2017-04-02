@@ -36,6 +36,7 @@
 #include <net/ipv6.h>
 #include <net/tso.h>
 #include <linux/phy/phy.h>
+#include <dt-bindings/phy/phy-comphy-mvebu.h>
 
 /* Registers */
 #define MVNETA_RXQ_CONFIG_REG(q)                (0x1400 + ((q) << 2))
@@ -4690,7 +4691,8 @@ static int mvneta_probe(struct platform_device *pdev)
 			phy_exit(pp->comphy);
 			goto err_exit_phy;
 		}
-	}
+	} else
+		pp->comphy = NULL;
 
 	err = of_property_read_string(dn, "managed", &managed);
 	pp->use_inband_status = (err == 0 &&
@@ -4915,13 +4917,112 @@ static int mvneta_remove(struct platform_device *pdev)
 				       1 << pp->id);
 	}
 
-	if (!IS_ERR(pp->comphy)) {
+	if (pp->comphy) {
 		phy_power_off(pp->comphy);
 		phy_exit(pp->comphy);
 	}
 
 	return 0;
 }
+
+#ifdef CONFIG_PM_SLEEP
+static int mvneta_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct net_device *dev = platform_get_drvdata(pdev);
+	struct mvneta_port *pp = netdev_priv(dev);
+
+	mvneta_ethtool_update_stats(pp);
+
+	if (!netif_running(dev))
+		goto phy_off;
+
+	netif_device_detach(dev);
+
+	mvneta_stop_dev(pp);
+	if (!pp->neta_armada3700)
+		unregister_cpu_notifier(&pp->cpu_notifier);
+	mvneta_cleanup_rxqs(pp);
+	mvneta_cleanup_txqs(pp);
+
+phy_off:
+	if (!pp->use_inband_status)
+		mvneta_mdio_remove(pp);
+	/* trurn off serdes */
+	if (pp->comphy) {
+		phy_power_off(pp->comphy);
+		phy_exit(pp->comphy);
+	}
+
+	/* Reset link status */
+	pp->link = 0;
+	pp->duplex = -1;
+	pp->speed = 0;
+
+	return 0;
+}
+
+static int mvneta_resume(struct platform_device *pdev)
+{
+	const struct mbus_dram_target_info *dram_target_info;
+	struct net_device *dev = platform_get_drvdata(pdev);
+	struct mvneta_port *pp = netdev_priv(dev);
+	int ret;
+
+	/* trurn on serdes */
+	if (pp->comphy) {
+		ret = phy_init(pp->comphy);
+		if (ret)
+			return -1;
+
+		ret = phy_power_on(pp->comphy);
+		if (ret) {
+			pr_err("%s: cannot phy_power_on on port %d\n", __func__, pp->id);
+			phy_exit(pp->comphy);
+			return -1;
+		}
+	}
+	if (!pp->use_inband_status) {
+		ret = mvneta_mdio_probe(pp);
+		if (ret < 0) {
+			netdev_err(dev, "cannot probe MDIO bus\n");
+			return -1;
+		}
+	}
+	mvneta_defaults_set(pp);
+	mvneta_port_power_up(pp, pp->phy_interface);
+
+	dram_target_info = mv_mbus_dram_info();
+	if (dram_target_info || pp->neta_armada3700)
+		mvneta_conf_mbus_windows(pp, dram_target_info);
+
+	if (!netif_running(dev))
+		return 0;
+
+	ret = mvneta_setup_rxqs(pp);
+	if (ret) {
+		netdev_err(dev, "unable to setup rxqs after resume\n");
+		return ret;
+	}
+
+	ret = mvneta_setup_txqs(pp);
+	if (ret) {
+		netdev_err(dev, "unable to setup txqs after resume\n");
+		return ret;
+	}
+
+	mvneta_set_rx_mode(dev);
+	if (!pp->neta_armada3700) {
+		mvneta_percpu_elect(pp);
+		register_cpu_notifier(&pp->cpu_notifier);
+	}
+
+	mvneta_start_dev(pp);
+
+	netif_device_attach(dev);
+
+	return 0;
+}
+#endif /* CONFIG_PM_SLEEP */
 
 static const struct of_device_id mvneta_match[] = {
 	{ .compatible = "marvell,armada-370-neta" },
@@ -4934,6 +5035,10 @@ MODULE_DEVICE_TABLE(of, mvneta_match);
 static struct platform_driver mvneta_driver = {
 	.probe = mvneta_probe,
 	.remove = mvneta_remove,
+#ifdef CONFIG_PM_SLEEP
+	.suspend = mvneta_suspend,
+	.resume = mvneta_resume,
+#endif
 	.driver = {
 		.name = MVNETA_DRIVER_NAME,
 		.of_match_table = mvneta_match,
