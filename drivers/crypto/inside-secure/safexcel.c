@@ -1231,7 +1231,7 @@ static int safexcel_probe(struct platform_device *pdev)
 	return 0;
 
 err_pool:
-	dma_pool_destroy(priv->context_pool);
+	dmam_pool_destroy(priv->context_pool);
 err_clk:
 	clk_disable_unprepare(priv->clk);
 	return ret;
