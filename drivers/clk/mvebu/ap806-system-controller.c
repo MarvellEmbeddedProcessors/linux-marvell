@@ -56,21 +56,25 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 	case 0x0 ... 0x1:
 		cpuclk_freq = 2000;
 		break;
+	case 0x6 ... 0x7:
+		cpuclk_freq = 1800;
+		break;
 	case 0x4:
-	case 0xB ... 0x12:
+	case 0xD:
 		cpuclk_freq = 1600;
 		break;
 	case 0x1A:
 		cpuclk_freq = 1400;
 		break;
-	case 0x14 ... 0x18:
+	case 0x14:
+	case 0x17:
 		cpuclk_freq = 1300;
 		break;
 	case 0x19:
 		cpuclk_freq = 1200;
 		break;
-	case 0x13:
 	case 0x1D:
+	case 0x13:
 		cpuclk_freq = 1000;
 		break;
 	case 0x1C:
@@ -85,50 +89,36 @@ static void __init ap806_syscon_clk_init(struct device_node *np)
 		** baudrate of the UART
 		*/
 		cpuclk_freq = 0;
-		pr_err("invalid SAR value\n");
+		pr_err("invalid Sample at Reset value\n");
 	}
 
-	/* Get DCLK frequency */
+	/* Get DCLK frequency (DCLK = 0.5*DDR_CLK) */
 	switch (freq_mode) {
 	case 0x0:
+	case 0x6:
 		dclk_freq = 600;
 		break;
 	case 0x1:
-		dclk_freq = 525;
-		break;
-	case 0x4:
-	case 0x10:
-	case 0x14:
-	case 0x19 ... 0x1D:
-		dclk_freq = 400;
-		break;
-	case 0xC:
-		dclk_freq = 600;
-		break;
+	case 0x7:
 	case 0xD:
-	case 0x16:
 		dclk_freq = 525;
 		break;
-	case 0xB:
-	case 0xE:
-	case 0xF:
-		dclk_freq = 450;
-		break;
-	case 0x12:
 	case 0x13:
 	case 0x17:
 		dclk_freq = 325;
 		break;
-	case 0x11:
-	case 0x15:
-		dclk_freq = 800;
-		break;
-	case 0x18:
-		dclk_freq = 650;
+	case 0x4:
+	case 0x14:
+	case 0x19:
+	case 0x1A:
+	case 0x1B:
+	case 0x1C:
+	case 0x1D:
+		dclk_freq = 400;
 		break;
 	default:
 		dclk_freq = 0;
-		pr_err("invalid SAR value\n");
+		pr_err("invalid Sample at Reset value\n");
 	}
 
 	/* Convert to hertz */
