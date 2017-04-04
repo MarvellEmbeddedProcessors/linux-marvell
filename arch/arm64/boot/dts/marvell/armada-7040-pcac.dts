@@ -147,8 +147,12 @@
 						reg = <0x0 0x200000>;
 					};
 					partition@200000 {
+						label = "recovery_image";
+						reg = <0x200000 0x200000>;
+					};
+					partition@400000 {
 						label = "Filesystem";
-						reg = <0x200000 0xd00000>;
+						reg = <0x400000 0xc00000>;
 					};
 				};
 			};

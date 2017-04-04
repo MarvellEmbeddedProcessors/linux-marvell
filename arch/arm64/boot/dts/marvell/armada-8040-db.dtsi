@@ -76,12 +76,12 @@
 						reg = <0x0 0x200000>;
 					};
 					partition@200000 {
-						label = "Filesystem";
-						reg = <0x200000 0xd00000>;
+						label = "recovery_image";
+						reg = <0x200000 0x200000>;
 					};
-					partition@d00000 {
-						label = "boot_2nd";
-						reg = <0xf00000 0x100000>;
+					partition@400000 {
+						label = "Filesystem";
+						reg = <0x400000 0xc00000>;
 					};
 				};
 			};
