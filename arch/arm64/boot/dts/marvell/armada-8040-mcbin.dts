@@ -215,7 +215,8 @@
 				};
 				emac3_1: mac3 {
 					phy-mode = "sgmii"; /* lane-5 */
-					phys = <&comphy1 5 COMPHY_SGMII2>;
+					phy-speed = <2500>;
+					phys = <&comphy1 5 COMPHY_HS_SGMII2>;
 					phy-names = "comphy";
 				};
 			};
