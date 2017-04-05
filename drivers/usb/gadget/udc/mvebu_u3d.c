@@ -2321,21 +2321,21 @@ static int mvc2_probe(struct platform_device *pdev)
 	if (!res) {
 		dev_err(&pdev->dev, "missing mem resource\n");
 		ret = -ENODEV;
-		goto err_phybase;
+		goto err_clk;
 	}
 
 	base = devm_ioremap_resource(&pdev->dev, res);
 	if (!base) {
 		dev_err(&pdev->dev, "%s: register mapping failed\n", __func__);
 		ret = -ENXIO;
-		goto err_phybase;
+		goto err_clk;
 	}
 
 	ver = ioread32(base);
 	if (ver == 0) {
 		dev_err(&pdev->dev, "IP version error!\n");
 		ret = -ENXIO;
-		goto err_base;
+		goto err_clk;
 	}
 
 	cp->mvc2_version = ver & 0xFFFF;
@@ -2370,7 +2370,7 @@ static int mvc2_probe(struct platform_device *pdev)
 		if (!cp->qwork) {
 			dev_err(&pdev->dev, "cannot create workqueue\n");
 			ret = -ENOMEM;
-			goto err_base;
+			goto err_clk;
 		}
 
 		INIT_WORK(&cp->vbus_work, mvc2_vbus_work);
@@ -2451,10 +2451,6 @@ disable_phy:
 		phy_power_off(cp->comphy);
 		phy_exit(cp->comphy);
 	}
-err_base:
-	iounmap(base);
-err_phybase:
-	iounmap(phy_base);
 err_clk:
 	clk_disable_unprepare(cp->clk);
 err_mem:
