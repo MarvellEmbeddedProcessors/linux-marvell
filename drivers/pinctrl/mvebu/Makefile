@@ -9,5 +9,6 @@ obj-$(CONFIG_PINCTRL_ARMADA_XP)  += pinctrl-armada-xp.o
 obj-$(CONFIG_PINCTRL_ARMADA_3700) += pinctrl-armada-3700.o
 obj-$(CONFIG_PINCTRL_ARMADA_AP806) += pinctrl-armada-ap806.o
 obj-$(CONFIG_PINCTRL_ARMADA_CP110) += pinctrl-armada-cp110.o
+obj-$(CONFIG_PINCTRL_ARMADA_37XX)  += pinctrl-armada-37xx.o
 obj-$(CONFIG_PINCTRL_ORION)  += pinctrl-orion.o
 obj-$(CONFIG_PINCTRL_MSYS)  += pinctrl-msys.o
