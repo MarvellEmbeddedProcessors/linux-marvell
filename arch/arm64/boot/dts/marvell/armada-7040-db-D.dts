@@ -73,6 +73,13 @@
 
 	cpn-110-master {
 		config-space {
+			pinctrl@440000 {
+			compatible = "marvell,a70x0-pinctrl";
+				pca0_pins: pca0_pins {
+					marvell,pins = "mpp7";
+					marvell,function = "gpio";
+				};
+			};
 			serial@702000 {
 				status = "disabled";
 			};
@@ -104,6 +111,7 @@
 				status = "okay";
 			};
 			u3d@520000 {
+				vbus-gpio = <&expander0 3 GPIO_ACTIVE_HIGH>;
 				status = "okay";
 			};
 			udc@524100 {
@@ -113,6 +121,11 @@
 				status = "okay";
 			};
 			sdhci@780000 {
+				/* Support SD detection in Linux, disabled for
+				 * now
+				 * cd-gpios = <&expander0 12 GPIO_ACTIVE_HIGH>;
+				 * pinctrl-0 = <&cpm_sdhci_pins>;
+				 */
 				status = "okay";
 			};
 			spi@700680 {
@@ -121,6 +134,15 @@
 			i2c1: i2c@701000 {
 				status = "okay";
 				clock-frequency = <100000>;
+
+				expander0: pca9555@21 {
+					pinctrl-0 = <&pca0_pins>;
+					/* GPIO 62 is defined as GPIO 30 of cpm_gpio1 */
+					interrupt-parent = <&cpm_gpio0>;
+					interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
+					interrupt-controller;
+					#interrupt-cells = <2>;
+				};
 			};
 			i2c2: i2c@701100 {
 				status = "disabled";

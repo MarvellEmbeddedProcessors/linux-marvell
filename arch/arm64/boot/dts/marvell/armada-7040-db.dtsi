@@ -76,13 +76,6 @@
 
 	cpn-110-master {
 		config-space {
-			pinctrl@440000 {
-			compatible = "marvell,a70x0-pinctrl";
-				pca0_pins: pca0_pins {
-					marvell,pins = "mpp62";
-					marvell,function = "gpio";
-				};
-			};
 			i2c1: i2c@701000 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&i2c0_pins>;
@@ -99,21 +92,10 @@
 				expander0: pca9555@21 {
 					compatible = "nxp,pca9555";
 					pinctrl-names = "default";
-					pinctrl-0 = <&pca0_pins>;
-					interrupt-parent = <&cpm_gpio1>;
-					/* GPIO 62 is defined as GPIO 30 of cpm_gpio1 */
-					interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
 					gpio-controller;
 					#gpio-cells = <2>;
-					interrupt-controller;
-					#interrupt-cells = <2>;
 					reg = <0x21>;
 				};
-			};
-			u3d@520000 {
-				pinctrl-0 = <&u3d_vbus_pins>;
-				pinctrl-names = "default";
-				vbus-gpio = <&cpm_gpio1 30 GPIO_ACTIVE_HIGH>;
 			};
 			usb3h0: usb3@500000 {
 				usb-phy = <&usb3h0_phy>;
@@ -123,9 +105,7 @@
 			};
 			sdhci@780000 {
 				pinctrl-names = "default";
-				pinctrl-0 = <&cpm_sdhci_pins>;
 				bus-width = <4>;
-				non-removable;
 			};
 			spi@700680 {
 				spi-flash@0 {
