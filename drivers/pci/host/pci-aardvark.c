@@ -44,10 +44,6 @@
 #define     PCIE_CORE_ERR_CAPCTL_ECRC_CHK_TX_EN			BIT(6)
 #define     PCIE_CORE_ERR_CAPCTL_ECRC_CHCK			BIT(7)
 #define     PCIE_CORE_ERR_CAPCTL_ECRC_CHCK_RCV			BIT(8)
-#define PCIE_PHY_REF_CLOCK					0x4814
-#define     PCIE_PHY_CTRL_OFF					16
-#define     PCIE_PHY_BUF_CTRL_OFF				0
-#define     PCIE_PHY_BUF_CTRL_INIT_VAL				0x1342
 
 /* PIO registers base address and register offsets */
 #define PIO_BASE_ADDR				0x4000
@@ -100,6 +96,10 @@
 #define     PCIE_CORE_CTRL2_STRICT_ORDER_ENABLE	BIT(5)
 #define     PCIE_CORE_CTRL2_OB_WIN_ENABLE	BIT(6)
 #define     PCIE_CORE_CTRL2_MSI_ENABLE		BIT(10)
+#define PCIE_PHY_REF_CLOCK			(CONTROL_BASE_ADDR + 0x14)
+#define     PCIE_PHY_CTRL_OFF			16
+#define     PCIE_PHY_BUF_CTRL_OFF		0
+#define     PCIE_PHY_BUF_CTRL_INIT_VAL		0x1342
 #define PCIE_ISR0_REG				(CONTROL_BASE_ADDR + 0x40)
 #define PCIE_ISR0_MASK_REG			(CONTROL_BASE_ADDR + 0x44)
 #define     PCIE_ISR0_MSI_INT_PENDING		BIT(24)
@@ -208,6 +208,8 @@ struct advk_pcie {
 	int root_bus_nr;
 	char *reset_name;
 	struct gpio_desc *reset_gpio;
+	enum of_gpio_flags flags;
+	struct clk *clk;
 };
 
 static inline void advk_writel(struct advk_pcie *pcie, u32 val, u64 reg)
@@ -276,6 +278,9 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
 	/* Point PCIe unit MBUS decode windows to DRAM space */
 	for (i = 0; i < 8; i++)
 		advk_pcie_set_ob_win(pcie, i, 0, 0, 0, 0, 0, 0, 0);
+
+	/* Set HW Reference Clock Buffer Control */
+	advk_writel(pcie, PCIE_PHY_BUF_CTRL_INIT_VAL, PCIE_PHY_REF_CLOCK);
 
 	/* Set to Direct mode */
 	reg = advk_readl(pcie, CTRL_CONFIG_REG);
@@ -973,6 +978,28 @@ static void advk_pcie_configure_mps(struct pci_bus *bus, struct advk_pcie *pcie)
 	pci_walk_bus(bus, advk_pcie_bus_configure_mps, &smpss);
 }
 
+static int advk_pcie_clk_enable_then_reset(struct advk_pcie *pcie)
+{
+	int ret;
+
+	/* WA: to avoid reset fail, set the reset gpio to low first */
+	gpiod_direction_output(pcie->reset_gpio, 0);
+
+	/* Enable pcie clock */
+	ret = clk_prepare_enable(pcie->clk);
+	if (ret) {
+		dev_err(&pcie->pdev->dev, "Failed to enable clock\n");
+		return ret;
+	}
+
+	/* After 200ms to reset pcie */
+	mdelay(200);
+	gpiod_direction_output(pcie->reset_gpio,
+			       (pcie->flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1);
+
+	return ret;
+}
+
 static int advk_pcie_probe(struct platform_device *pdev)
 {
 	struct advk_pcie *pcie;
@@ -980,11 +1007,9 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	struct pci_bus *bus, *child;
 	struct msi_controller *msi;
 	struct device_node *msi_node;
-	struct clk *clk;
 	struct phy *comphy;
 	struct device_node *dn = pdev->dev.of_node;
 	int ret, irq;
-	enum of_gpio_flags flags;
 	int reset_gpio;
 
 	pcie = devm_kzalloc(&pdev->dev, sizeof(struct advk_pcie),
@@ -1005,8 +1030,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	/* Get comphy and init if there is */
 	comphy = devm_of_phy_get(&pdev->dev, dn, "comphy");
 	if (!IS_ERR(comphy)) {
-		/* Set HW Reference Clock Buffer Control */
-		advk_writel(pcie, PCIE_PHY_BUF_CTRL_INIT_VAL, PCIE_PHY_REF_CLOCK);
 		pcie->phy = comphy;
 		ret = phy_init(pcie->phy);
 		if (ret)
@@ -1028,62 +1051,27 @@ static int advk_pcie_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	clk = devm_clk_get(&pdev->dev, NULL);
-	if (IS_ERR(clk)) {
+	pcie->clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(pcie->clk)) {
 		dev_err(&pdev->dev, "Failed to obtain clock from DT\n");
-		return PTR_ERR(clk);
+		return PTR_ERR(pcie->clk);
 	}
 
 	/* Config reset gpio for pcie */
-	reset_gpio = of_get_named_gpio_flags(dn, "reset-gpios", 0, &flags);
+	reset_gpio = of_get_named_gpio_flags(dn, "reset-gpios", 0, &pcie->flags);
 	if (reset_gpio != -EPROBE_DEFER) {
-		pcie->reset_gpio = gpio_to_desc(reset_gpio);
 		if (gpio_is_valid(reset_gpio)) {
-			unsigned long gpio_flags;
-
-			/* WA: to avoid reset fail, set the reset gpio to low first */
-			gpiod_direction_output(pcie->reset_gpio, 0);
-
-			/* Enable pcie clock and after 200ms to reset pcie */
-			ret = clk_prepare_enable(clk);
-			if (ret) {
-				dev_err(&pdev->dev, "Failed to enable clock\n");
+			pcie->reset_gpio = gpio_to_desc(reset_gpio);
+			ret = advk_pcie_clk_enable_then_reset(pcie);
+			if (ret)
 				return ret;
-			}
-			mdelay(200);
 
-			/* Set GPIO for pcie reset */
-			pcie->reset_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s-reset",
-							  pdev->name);
-			if (!pcie->reset_name) {
-				ret = -ENOMEM;
-				dev_err(&pdev->dev, "devm_kasprintf failed\n");
-				return ret;
-			}
-
-			if (flags & OF_GPIO_ACTIVE_LOW) {
-				dev_info(&pdev->dev, "%s: reset gpio is active low\n",
-					 of_node_full_name(dn));
-				gpio_flags = GPIOF_ACTIVE_LOW |
-					     GPIOF_OUT_INIT_LOW;
-			} else {
-				gpio_flags = GPIOF_OUT_INIT_HIGH;
-			}
-
-			ret = devm_gpio_request_one(&pdev->dev, reset_gpio, gpio_flags,
-						    pcie->reset_name);
-			if (ret) {
-				dev_err(&pdev->dev,
-					"gpio_request for gpio failed, err = %d\n",
-					ret);
-				return ret;
-			}
 			/* continue init flow after pcie reset */
 			goto after_pcie_reset;
 		}
 	}
 
-	ret = clk_prepare_enable(clk);
+	ret = clk_prepare_enable(pcie->clk);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to enable clock\n");
 		return ret;
@@ -1138,7 +1126,7 @@ after_pcie_reset:
 	return 0;
 
 err_clk:
-	clk_disable_unprepare(clk);
+	clk_disable_unprepare(pcie->clk);
 err_exit_phy:
 	if (pcie->phy)
 		phy_exit(pcie->phy);
@@ -1146,9 +1134,59 @@ err_exit_phy:
 	return ret;
 }
 
+static int advk_pcie_suspend_noirq(struct device *dev)
+{
+	struct advk_pcie *pcie;
+
+	pcie = dev_get_drvdata(dev);
+
+	/* Gating clock */
+	clk_disable_unprepare(pcie->clk);
+
+	/* Power off PHY */
+	if (!IS_ERR(pcie->phy)) {
+		phy_power_off(pcie->phy);
+		phy_exit(pcie->phy);
+	}
+
+	return 0;
+}
+
+static int advk_pcie_resume_noirq(struct device *dev)
+{
+	struct advk_pcie *pcie;
+	int ret;
+
+	pcie = dev_get_drvdata(dev);
+
+	/* Power on PHY, it must be first, or pcie register access fail */
+	if (!IS_ERR(pcie->phy)) {
+		phy_init(pcie->phy);
+		phy_power_on(pcie->phy);
+	}
+
+	if (pcie->reset_gpio)
+		ret = advk_pcie_clk_enable_then_reset(pcie);
+	else
+		ret = clk_prepare_enable(pcie->clk);
+	if (ret) {
+		dev_err(dev, "Failed to enable clock\n");
+		return ret;
+	}
+
+	advk_pcie_setup_hw(pcie);
+
+	return 0;
+}
+
 static const struct of_device_id advk_pcie_of_match_table[] = {
 	{ .compatible = "marvell,armada-3700-pcie", },
 	{},
+};
+
+static const struct dev_pm_ops advk_pcie_pm_ops = {
+	.suspend_noirq = advk_pcie_suspend_noirq,
+	.resume_noirq = advk_pcie_resume_noirq,
 };
 
 static struct platform_driver advk_pcie_driver = {
@@ -1157,6 +1195,7 @@ static struct platform_driver advk_pcie_driver = {
 		.of_match_table = advk_pcie_of_match_table,
 		/* Driver unloading/unbinding currently not supported */
 		.suppress_bind_attrs = true,
+		.pm = &advk_pcie_pm_ops,
 	},
 	.probe = advk_pcie_probe,
 };
