@@ -106,9 +106,6 @@ struct a3700_spi_initdata {
 	unsigned int cs_num;
 	unsigned int mode;
 	unsigned int bits_per_word_mask;
-	unsigned int instr_cnt;
-	unsigned int addr_cnt;
-	unsigned int dummy_cnt;
 };
 
 /* struct a3700_spi .flags */
@@ -135,13 +132,6 @@ struct a3700_spi_status {
 	struct completion       done;
 };
 
-struct a3700_max_hdr_cnt {
-	unsigned int            addr_cnt;
-	unsigned int            instr_cnt;
-	unsigned int            dummy_cnt;
-	unsigned int            hdr_cnt; /* addr_cnt + instr_cnt + dummy_cnt = hdr_cnt */
-};
-
 struct a3700_spi {
 	struct spi_master      *master;
 	void __iomem           *base;
@@ -152,7 +142,6 @@ struct a3700_spi {
 	unsigned int		spi_cfg;
 	unsigned int		spi_timing;
 	enum a3700_spi_pin_mode  pin_mode;
-	struct a3700_max_hdr_cnt max_cnt;
 	struct a3700_spi_status  status;
 
 	int (*spi_pre_xfer)(struct spi_device *spi, struct spi_transfer *xfer);
@@ -658,61 +647,39 @@ static int a3700_spi_transfer_finish_legacy(struct spi_device *spi,
 static void a3700_spi_header_set(struct a3700_spi *a3700_spi)
 {
 	struct a3700_spi_status *status = &a3700_spi->status;
-	struct a3700_max_hdr_cnt *max_cnt = &a3700_spi->max_cnt;
-	unsigned int instr_cnt, addr_cnt, dummy_cnt;
+	unsigned int addr_cnt = 0;
 	u32 val = 0;
-
-	instr_cnt = addr_cnt = dummy_cnt = 0;
 
 	/* Clear the header registers */
 	spireg_write(a3700_spi, A3700_SPI_IF_INST_REG, 0);
 	spireg_write(a3700_spi, A3700_SPI_IF_ADDR_REG, 0);
 	spireg_write(a3700_spi, A3700_SPI_IF_RMODE_REG, 0);
+	spireg_write(a3700_spi, A3700_SPI_IF_HDR_CNT_REG, 0);
 
-	/* Set header counters */
-	if (status->tx_buf) {
-
-		if (status->buf_len <= max_cnt->instr_cnt) {
-			instr_cnt = status->buf_len;
-		} else if (status->buf_len <= max_cnt->instr_cnt + max_cnt->addr_cnt) {
-			instr_cnt = max_cnt->instr_cnt;
-			addr_cnt = status->buf_len - instr_cnt;
-		} else if (status->buf_len <= max_cnt->hdr_cnt) {
-			instr_cnt = max_cnt->instr_cnt;
-			addr_cnt = max_cnt->addr_cnt;
-			/* Need to handle the normal write case with 1 byte data */
-			if (!status->tx_buf[instr_cnt + addr_cnt])
-				dummy_cnt = status->buf_len - instr_cnt - addr_cnt;
-		}
-
-		val |= ((instr_cnt & A3700_SPI_INSTR_CNT_MASK)
-			    << A3700_SPI_INSTR_CNT_BIT);
+	if (status->tx_buf && status->buf_len % 4) {
+		/* when tx data is not 4 bytes aligned, there will be unexpected
+		 * MSB bytes of SPI output register, since it always shifts out
+		 * as whole 4 bytes. Which might causes incorrect transaction with
+		 * some device and flash. To fix this, Serial Peripheral Interface
+		 * Address (0xd0010614) in header count is used to transfer
+		 * 1 to 3 bytes to make the rest of data 4 bytes aligned.
+		 */
+		addr_cnt = status->buf_len % 4;
 		val |= ((addr_cnt & A3700_SPI_ADDR_CNT_MASK)
 			    << A3700_SPI_ADDR_CNT_BIT);
-		val |= ((dummy_cnt & A3700_SPI_DUMMY_CNT_MASK)
-			    << A3700_SPI_DUMMY_CNT_BIT);
+		spireg_write(a3700_spi, A3700_SPI_IF_HDR_CNT_REG, val);
+
+		/* Update the buffer length to be transferred */
+		status->buf_len -= addr_cnt;
+
+		/* transfer 1~3 bytes by address count */
+		val = 0;
+		while (addr_cnt--) {
+			val = (val << 8) | status->tx_buf[0];
+			status->tx_buf++;
+		}
+		spireg_write(a3700_spi, A3700_SPI_IF_ADDR_REG, val);
 	}
-
-	spireg_write(a3700_spi, A3700_SPI_IF_HDR_CNT_REG, val);
-
-	/* Update the buffer length to be transferred */
-	status->buf_len -= (instr_cnt + addr_cnt + dummy_cnt);
-
-	/* Set Instruction */
-	val = 0;
-	while (instr_cnt--) {
-		val = (val << 8) | status->tx_buf[0];
-		status->tx_buf++;
-	}
-	spireg_write(a3700_spi, A3700_SPI_IF_INST_REG, val);
-
-	/* Set Address */
-	val = 0;
-	while (addr_cnt--) {
-		val = (val << 8) | status->tx_buf[0];
-		status->tx_buf++;
-	}
-	spireg_write(a3700_spi, A3700_SPI_IF_ADDR_REG, val);
 }
 
 static int a3700_spi_transfer_start_non_legacy(struct spi_device *spi,
@@ -746,7 +713,7 @@ static int a3700_spi_transfer_start_non_legacy(struct spi_device *spi,
 		val |= A3700_SPI_XFER_START;
 		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
 	} else if (xfer->tx_buf) {
-		/* Start Write transfer */
+		/* Start Write transfer for the reset 4 bytes aligned data */
 		val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
 		val |= (A3700_SPI_XFER_START | A3700_SPI_RW_EN);
 		spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
@@ -817,37 +784,16 @@ static int a3700_spi_fifo_write(struct a3700_spi *a3700_spi)
 {
 	struct a3700_spi_status *status = &a3700_spi->status;
 	u32 val;
-	int i = 0;
 
 	while (!a3700_is_wfifo_full(a3700_spi) && status->buf_len) {
 		/* Write bytes to data out register */
-		val = 0;
-		if (status->buf_len >= 4) {
-			val |= status->tx_buf[3] << 24;
-			val |= status->tx_buf[2] << 16;
-			val |= status->tx_buf[1] << 8;
-			val |= status->tx_buf[0];
-
-			status->buf_len -= 4;
-			status->tx_buf += 4;
-
-			spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
-		} else {
-			/*
-			* If the remained buffer length is less than 4-bytes, we should pad the write buffer with
-			* all ones. So that it avoids overwrite the unexpected bytes following the last one;
-			*/
-			val = 0xffffffff;
-			while (status->buf_len) {
-				val &= ~(0xff << (8 * i));
-				val |= *status->tx_buf++ << (8 * i);
-				i++;
-				status->buf_len--;
-			}
-			spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
-			break;
-		}
-
+		val = (status->tx_buf[3] << 24)
+		      | (status->tx_buf[2] << 16)
+		      | (status->tx_buf[1] << 8)
+		      | status->tx_buf[0];
+		spireg_write(a3700_spi, A3700_SPI_DATA_OUT_REG, val);
+		status->buf_len -= 4;
+		status->tx_buf += 4;
 	}
 
 	return 0;
@@ -1033,9 +979,6 @@ static const struct a3700_spi_initdata armada_3700_spi_initdata = {
 	.cs_num             = 4,
 	.mode               = SPI_CPHA | SPI_CPOL,
 	.bits_per_word_mask = SPI_BPW_MASK(8) | SPI_BPW_MASK(32),
-	.instr_cnt          = 1,
-	.addr_cnt           = 3,
-	.dummy_cnt      = 1,
 };
 
 static const struct of_device_id a3700_spi_of_match_table[] = {
@@ -1128,22 +1071,11 @@ static int a3700_spi_probe(struct platform_device *pdev)
 		spi->spi_pre_xfer  = a3700_spi_transfer_start_non_legacy;
 		spi->spi_do_xfer   = a3700_spi_do_transfer_non_legacy;
 		spi->spi_post_xfer = a3700_spi_transfer_finish_non_legacy;
-
-		spi->max_cnt.instr_cnt = initdata->instr_cnt;
-		spi->max_cnt.addr_cnt  = initdata->addr_cnt;
-		spi->max_cnt.dummy_cnt  = initdata->dummy_cnt;
-		spi->max_cnt.hdr_cnt   = initdata->instr_cnt
-				+ initdata->addr_cnt + initdata->dummy_cnt;
 	} else {
 		dev_err(&pdev->dev, "legacy mode\n");
 		spi->spi_pre_xfer  = a3700_spi_transfer_start_legacy;
 		spi->spi_do_xfer   = a3700_spi_do_transfer_legacy;
 		spi->spi_post_xfer = a3700_spi_transfer_finish_legacy;
-
-		spi->max_cnt.instr_cnt = 0;
-		spi->max_cnt.addr_cnt  = 0;
-		spi->max_cnt.dummy_cnt  = 0;
-		spi->max_cnt.hdr_cnt   = 0;
 	}
 
 	spi->pin_mode = A3700_SPI_SGL_PIN; /* fix-me: add device tree support */
