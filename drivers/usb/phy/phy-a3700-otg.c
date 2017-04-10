@@ -72,7 +72,6 @@ struct a3700_otg {
 
 	enum port_status old_state;
 	enum port_status port_state;
-	bool host_started;
 };
 
 #define set_bit(nr, val) (val |= 1 << (nr))
@@ -88,7 +87,7 @@ static void a3700_otg_start_host(struct a3700_otg *mvotg, int on)
 	struct usb_hcd *hcd;
 	struct usb_otg *otg = mvotg->phy.otg;
 
-	if ((!otg->host) || ((!mvotg->host_started) && (!on)))
+	if (!otg->host)
 		return;
 
 	dev_dbg(mvotg->dev, "%s, %s\n", __func__, on ? "on":"off");
@@ -96,7 +95,6 @@ static void a3700_otg_start_host(struct a3700_otg *mvotg, int on)
 	hcd = bus_to_hcd(otg->host);
 
 	if (on) {
-		mvotg->host_started = true;
 		usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
 		usb_add_hcd(hcd->shared_hcd, hcd->irq, IRQF_SHARED);
 		device_wakeup_enable(hcd->self.controller);
@@ -108,7 +106,6 @@ static void a3700_otg_start_host(struct a3700_otg *mvotg, int on)
 			usb_remove_hcd(hcd);
 			usb_remove_hcd(hcd->shared_hcd);
 		}
-		mvotg->host_started = false;
 	}
 
 	if (!IS_ERR(mvotg->vcc)) {
@@ -263,6 +260,10 @@ static int a3700_otg_set_peripheral(struct usb_otg *otg, struct usb_gadget *gadg
 
 static int a3700_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
 {
+	struct a3700_otg *mvotg;
+
+	mvotg = container_of(otg->usb_phy, struct a3700_otg, phy);
+
 	if (!otg)
 		return -ENODEV;
 
@@ -272,6 +273,12 @@ static int a3700_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
 	}
 
 	otg->host = host;
+
+	if (mvotg->port_state == USB_HOST_ATTACHED) {
+		/* USB DOK has already been connected */
+		a3700_otg_start_host(mvotg, 1);
+	}
+
 	return 0;
 }
 
@@ -348,7 +355,6 @@ static int a3700_otg_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, mvotg);
 
 	mvotg->port_state = USB_PORT_IDLE;
-	mvotg->host_started = false;
 
 	mvotg->qwork = create_singlethread_workqueue("a3700_otg_queue");
 	if (!mvotg->qwork) {
