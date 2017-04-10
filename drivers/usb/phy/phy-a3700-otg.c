@@ -34,8 +34,17 @@
 
 #define USB_HOST_MODE_ACT_OFF		0
 #define USB_HOST_MODE_DEACT_OFF		1
+#define USB_IDDIG_NEG_INTR_OFF		2
+#define USB_IDDIG_POS_INTR_OFF		3
 #define USB_DEVICE_MODE_ACT_OFF		4
 #define USB_DEVICE_MODE_DEACT_OFF	5
+
+/* usb_id_sts reg bits offset */
+#define USB_HARDWARE_ID_OFF		1
+
+/* usb_ctrl_mode reg bits offset */
+#define USB_ID_MODE_OFF			0
+#define USB_SOFT_ID_OFF			1
 
 #define USB_ID_DEVICE			1
 #define USB_ID_HOST			0
@@ -44,6 +53,13 @@ enum port_status {
 	USB_PORT_IDLE,
 	USB_HOST_ATTACHED,
 	USB_DEVICE_ATTACHED,
+};
+
+enum usb_mode {
+	USB_MODE_DYNAMIC,
+	USB_MODE_STATIC_HOST,
+	USB_MODE_STATIC_DEVICE,
+	USB_MODE_MAX
 };
 
 struct a3700_otg_regs {
@@ -72,6 +88,7 @@ struct a3700_otg {
 
 	enum port_status old_state;
 	enum port_status port_state;
+	enum usb_mode mode;
 };
 
 #define set_bit(nr, val) (val |= 1 << (nr))
@@ -129,10 +146,15 @@ void a3700_otg_enable_irq(struct a3700_otg *mvotg)
 	u32 reg_val;
 
 	reg_val = readl(&mvotg->otg_regs->usb_ier);
-	clear_bit(USB_HOST_MODE_ACT_OFF, reg_val);
-	clear_bit(USB_HOST_MODE_DEACT_OFF, reg_val);
-	clear_bit(USB_DEVICE_MODE_ACT_OFF, reg_val);
-	clear_bit(USB_DEVICE_MODE_DEACT_OFF, reg_val);
+	if (mvotg->mode == USB_MODE_STATIC_HOST) {
+		clear_bit(USB_IDDIG_NEG_INTR_OFF, reg_val);
+		clear_bit(USB_IDDIG_POS_INTR_OFF, reg_val);
+	} else {
+		clear_bit(USB_HOST_MODE_ACT_OFF, reg_val);
+		clear_bit(USB_HOST_MODE_DEACT_OFF, reg_val);
+		clear_bit(USB_DEVICE_MODE_ACT_OFF, reg_val);
+		clear_bit(USB_DEVICE_MODE_DEACT_OFF, reg_val);
+	}
 	writel(reg_val, &mvotg->otg_regs->usb_ier);
 };
 void a3700_otg_disable_irq(struct a3700_otg *mvotg)
@@ -140,10 +162,15 @@ void a3700_otg_disable_irq(struct a3700_otg *mvotg)
 	u32 reg_val;
 
 	reg_val = readl(&mvotg->otg_regs->usb_ier);
-	set_bit(USB_HOST_MODE_ACT_OFF, reg_val);
-	set_bit(USB_HOST_MODE_DEACT_OFF, reg_val);
-	set_bit(USB_DEVICE_MODE_ACT_OFF, reg_val);
-	set_bit(USB_DEVICE_MODE_DEACT_OFF, reg_val);
+	if (mvotg->mode == USB_MODE_STATIC_HOST) {
+		set_bit(USB_IDDIG_NEG_INTR_OFF, reg_val);
+		set_bit(USB_IDDIG_POS_INTR_OFF, reg_val);
+	} else {
+		set_bit(USB_HOST_MODE_ACT_OFF, reg_val);
+		set_bit(USB_HOST_MODE_DEACT_OFF, reg_val);
+		set_bit(USB_DEVICE_MODE_ACT_OFF, reg_val);
+		set_bit(USB_DEVICE_MODE_DEACT_OFF, reg_val);
+	}
 	writel(reg_val, &mvotg->otg_regs->usb_ier);
 };
 
@@ -180,6 +207,41 @@ static void a3700_otg_work(struct work_struct *work)
 	}
 }
 
+static void a3700_static_host_work(struct work_struct *work)
+{
+	struct a3700_otg *mvotg;
+	bool vbus_on = false;
+
+	mvotg = container_of(to_delayed_work(work), struct a3700_otg, work);
+
+	switch (mvotg->old_state) {
+	case USB_PORT_IDLE:
+		if (mvotg->port_state == USB_HOST_ATTACHED) {
+			dev_dbg(mvotg->dev, "moving to host mode\n");
+			vbus_on = true;
+		}
+		break;
+	case USB_HOST_ATTACHED:
+		if (mvotg->port_state == USB_PORT_IDLE) {
+			dev_dbg(mvotg->dev, "moving to idle mode\n");
+			vbus_on = false;
+		}
+		break;
+	default:
+		break;
+	}
+
+	if (!IS_ERR(mvotg->vcc)) {
+		if (vbus_on) {
+			if (regulator_enable(mvotg->vcc))
+				dev_err(mvotg->dev, "Failed to enable power\n");
+		} else {
+			if (regulator_disable(mvotg->vcc))
+				dev_err(mvotg->dev, "Failed to disable power\n");
+		}
+	}
+}
+
 static void a3700_otg_run_state_machine(struct a3700_otg *mvotg,
 				     unsigned long delay)
 {
@@ -188,6 +250,49 @@ static void a3700_otg_run_state_machine(struct a3700_otg *mvotg,
 		return;
 
 	queue_delayed_work(mvotg->qwork, &mvotg->work, delay);
+}
+
+static irqreturn_t a3700_usb_id_isr_static_host(int irq, void *data)
+{
+	u32 reg_val;
+	u32 usb_id;
+	enum port_status port_state_original;
+	struct a3700_otg *mvotg = data;
+
+	a3700_otg_disable_irq(mvotg);
+
+	reg_val = readl(&mvotg->otg_regs->usb_isr);
+	usb_id = ((1 << USB_HARDWARE_ID_OFF) & readl(&mvotg->otg_regs->usb_id_sts)) >> USB_HARDWARE_ID_OFF;
+	port_state_original = mvotg->port_state;
+	dev_dbg(mvotg->dev, "receive usb-id-static-host interrupt!, status: 0x%x, usb_id: %d\n", reg_val, usb_id);
+
+	switch (mvotg->port_state) {
+	case USB_PORT_IDLE:
+		dev_dbg(mvotg->dev, "current state USB_PORT_IDLE!\n");
+		if (test_bit(USB_IDDIG_NEG_INTR_OFF, reg_val) && (usb_id == USB_ID_HOST))
+			mvotg->port_state = USB_HOST_ATTACHED;
+		break;
+	case USB_HOST_ATTACHED:
+		dev_dbg(mvotg->dev, "current state USB_HOST_ATTACHED!\n");
+		if (test_bit(USB_IDDIG_POS_INTR_OFF, reg_val) && (usb_id == USB_ID_DEVICE))
+			mvotg->port_state = USB_PORT_IDLE;
+		break;
+	default:
+		dev_err(mvotg->dev, "Unknown state found!\n");
+		break;
+	}
+
+	if (port_state_original != mvotg->port_state) {
+		mvotg->old_state = port_state_original;
+		a3700_otg_run_state_machine(mvotg, 0);
+	}
+
+	/* ack irq */
+	writel(reg_val, &mvotg->otg_regs->usb_isr);
+
+	a3700_otg_enable_irq(mvotg);
+
+	return IRQ_HANDLED;
 }
 
 static irqreturn_t a3700_usb_id_isr(int irq, void *data)
@@ -274,8 +379,12 @@ static int a3700_otg_set_host(struct usb_otg *otg, struct usb_bus *host)
 
 	otg->host = host;
 
-	if (mvotg->port_state == USB_HOST_ATTACHED) {
-		/* USB DOK has already been connected */
+	if (mvotg->port_state == USB_HOST_ATTACHED || mvotg->mode == USB_MODE_STATIC_HOST) {
+		/*
+		 * In two cases host should be start here:
+		 * 1. USB DOK has already been connected
+		 * 2. OTG is working in static_host_mode
+		 */
 		a3700_otg_start_host(mvotg, 1);
 	}
 
@@ -330,12 +439,32 @@ int a3700_otg_phy_create_phy(struct device *dev, struct a3700_otg *mvotg,
 	return 0;
 }
 
+static int a3700_otg_set_usb_id_mode(struct a3700_otg *mvotg)
+{
+	u32 reg_val;
+
+	reg_val = readl(&mvotg->otg_regs->usb_ctrl_mode);
+	if (mvotg->mode == USB_MODE_STATIC_HOST) {
+		/* set soft_id mode to static-host */
+		set_bit(USB_ID_MODE_OFF, reg_val);
+		clear_bit(USB_SOFT_ID_OFF, reg_val);
+	} else {
+		/* set hardware_id mode */
+		clear_bit(USB_ID_MODE_OFF, reg_val);
+	}
+	writel(reg_val, &mvotg->otg_regs->usb_ctrl_mode);
+
+	return 0;
+}
+
 static int a3700_otg_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	struct device *dev = &pdev->dev;
 	struct a3700_otg	*mvotg;
 	int err;
+	void (*otg_work)(struct work_struct *);
+	irq_handler_t otg_irq;
 
 	mvotg = devm_kzalloc(dev, sizeof(*mvotg), GFP_KERNEL);
 	if (!mvotg)
@@ -362,13 +491,25 @@ static int a3700_otg_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	INIT_DELAYED_WORK(&mvotg->work, a3700_otg_work);
+	if (of_find_property(dev->of_node, "marvell,static-host-mode", NULL)) {
+		mvotg->mode = USB_MODE_STATIC_HOST;
+		otg_work = a3700_static_host_work;
+		otg_irq = a3700_usb_id_isr_static_host;
+	} else {
+		mvotg->mode = USB_MODE_DYNAMIC;
+		otg_work = a3700_otg_work;
+		otg_irq = a3700_usb_id_isr;
+	}
+
+	a3700_otg_set_usb_id_mode(mvotg);
+
+	INIT_DELAYED_WORK(&mvotg->work, otg_work);
 
 	/* unmask irq */
 	a3700_otg_enable_irq(mvotg);
 
 	if (mvotg->irq) {
-		ret = request_irq(mvotg->irq, a3700_usb_id_isr, IRQF_TRIGGER_HIGH, "usb-id", mvotg);
+		ret = request_irq(mvotg->irq, otg_irq, IRQF_TRIGGER_HIGH, "usb-id", mvotg);
 		if (ret) {
 			dev_err(&pdev->dev, "failed to request gpio interrupt, ret: %x\n", ret);
 			return -EFAULT;
@@ -405,6 +546,7 @@ static int a3700_otg_resume(struct device *dev)
 {
 	struct a3700_otg *mvotg = dev_get_drvdata(dev);
 
+	a3700_otg_set_usb_id_mode(mvotg);
 	a3700_otg_enable_irq(mvotg);
 
 	return 0;

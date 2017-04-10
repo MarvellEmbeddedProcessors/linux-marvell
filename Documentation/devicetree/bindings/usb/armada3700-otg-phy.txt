@@ -7,9 +7,11 @@ switching dynamically. To do that, the following dts changes are required:
 - Enable both USB Host (usb3) and Device (u3d and udc) controller DT nodes.
 - In USB Host DT node, use special XHCI driver compatible string:
   "marvell,armada-3700-xhci-otg", while the default one "generic-xhci" is for
-  USB Host only mode.
+  USB static host mode.
 - Enable OTG PHY TD node and make sure XHCI DT node have reference to it with
   "usb-phy" property.
+Armada-3700 could also be working in USB static host mode, when USB Device feature
+is not required.
 
 Required properties:
 - compatible	: should be "marvell,armada-3700-otg"
@@ -18,8 +20,10 @@ Required properties:
 
 Optional properties:
 - vcc-supply: phandle to the regulator that provides power to the PHY.
+- marvell,static-host-mode: OTG PHY is working in usb static host mode, with no host/device
+  switching supported.
 
-Example:
+USB OTG mode example:
 	usb3@58000 {
 		compatible = "marvell,armada-3700-xhci-otg";
 		status = "okay";
@@ -30,6 +34,16 @@ Example:
 		compatible = "marvell,usb-3700-otg";
 		reg = <0x5d800 0x100>;
 		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+		vcc-supply = <&exp_usb3_vbus>;
+		status = "okay";
+	};
+
+USB Static Host mode example, no modification to USB3 host controller DT node:
+	otg_phy: otg@5d800 {
+		compatible = "marvell,usb-3700-otg";
+		reg = <0x5d800 0x100>;
+		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+		marvell,static-host-mode;
 		vcc-supply = <&exp_usb3_vbus>;
 		status = "okay";
 	};
