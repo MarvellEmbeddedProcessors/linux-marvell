@@ -900,9 +900,9 @@ static int mvebu_a3700_comphy_power_off(struct phy *phy)
 		break;
 
 	default:
-		dev_err(priv->dev, "comphy%d: unsupported comphy mode\n",
-			comphy->index);
-		err = -EINVAL;
+		dev_dbg(priv->dev,
+			"comphy%d: power off is not implemented for mode %d\n",
+			comphy->index, mode);
 		break;
 	}
 
