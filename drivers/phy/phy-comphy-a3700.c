@@ -719,7 +719,8 @@ static int mvebu_a3700_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 	/* Unmap resource */
 	if (comphy->index == COMPHY_LANE2) {
 		devm_iounmap(&pdev->dev, comphy_indir_regs);
-		devm_release_mem_region(&pdev->dev, res->start, resource_size(res_indirect));
+		devm_release_mem_region(&pdev->dev, res_indirect->start,
+					resource_size(res_indirect));
 	} else {
 		devm_iounmap(&pdev->dev, usb3_gbe1_phy_regs);
 		devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
