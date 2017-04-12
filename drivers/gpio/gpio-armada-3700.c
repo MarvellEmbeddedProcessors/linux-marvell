@@ -487,6 +487,9 @@ static int mvebu_gpio_suspend(struct platform_device *pdev, pm_message_t state)
 static int mvebu_gpio_resume(struct platform_device *pdev)
 {
 	struct mvebu_gpio_chip *mvchip = platform_get_drvdata(pdev);
+	u32 i, mask, type, level;
+	u32 *polarity;
+	int irq;
 
 	/*
 	 * There are 36 GPIO pin for A3700, so there are two registers holding
@@ -496,11 +499,36 @@ static int mvebu_gpio_resume(struct platform_device *pdev)
 	writel(mvchip->io_conf_reg, mvebu_gpioreg_io_conf(mvchip, 0));
 	writel(mvchip->out_reg_hi, mvebu_gpioreg_out(mvchip, GPIO_IO_BITWIDTH));
 	writel(mvchip->io_conf_reg_hi, mvebu_gpioreg_io_conf(mvchip, GPIO_IO_BITWIDTH));
-	writel(mvchip->irq_pol_reg, mvebu_gpioreg_int_pol(mvchip, 0));
-	writel(mvchip->irq_pol_reg_hi, mvebu_gpioreg_int_pol(mvchip, GPIO_IO_BITWIDTH));
 	writel(mvchip->edge_mask_regs[0], mvebu_gpioreg_edge_mask(mvchip, 0));
 	if (mvchip->chip.ngpio > GPIO_IO_BITWIDTH)
 		writel(mvchip->edge_mask_regs[1], mvebu_gpioreg_edge_mask(mvchip, GPIO_IO_BITWIDTH));
+
+	/*
+	* For the gpios which are used for both-edge irqs, in system suspend
+	* their input levels may be changed but their polarities are not updated
+	* accordingly since interrupts are not handled in suspend; then in resume
+	* their polarities needs to be synchronized with their levels.
+	*/
+	for (i = 0; i < mvchip->chip.ngpio; i++) {
+		irq = mvchip->irqbase + i;
+		mask = mvchip->edge_mask_regs[i / GPIO_IO_BITWIDTH];
+		type = irq_get_trigger_type(irq);
+
+		if (!(mask & (1 << GPIO_REG_PIN_OFF(i))))
+			continue;
+
+		if ((type & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH) {
+			level = readl_relaxed(mvebu_gpioreg_data_in(mvchip, i));
+			polarity = &mvchip->irq_pol_reg + i / GPIO_IO_BITWIDTH;
+
+			if ((*polarity ^ level) & (1 << GPIO_REG_PIN_OFF(i))) {
+				/* Synchronize gpio polarity with level for both-edge irqs */
+				*polarity ^= 1 << i;
+			}
+		}
+	}
+	writel(mvchip->irq_pol_reg, mvebu_gpioreg_int_pol(mvchip, 0));
+	writel(mvchip->irq_pol_reg_hi, mvebu_gpioreg_int_pol(mvchip, GPIO_IO_BITWIDTH));
 
 	return 0;
 }
