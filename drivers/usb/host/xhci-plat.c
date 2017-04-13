@@ -217,7 +217,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	}
 
 	if (of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-3700-xhci-otg")) {
+				    "marvell,armada-3700-xhci")) {
 		/* If Armada3700 needs to enable OTG support, register XHCI
 		 * driver to OTG PHY, and wait for it to call usb_add_hcd
 		 * at the right time (start working in USB Host mode).
@@ -313,7 +313,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 	struct clk *clk = xhci->clk;
 
 	if (of_device_is_compatible(dev->dev.of_node,
-				    "marvell,armada-3700-xhci-otg")) {
+				    "marvell,armada-3700-xhci")) {
 		otg_set_host(hcd->usb_phy->otg, NULL);
 	} else {
 		usb_remove_hcd(xhci->shared_hcd);
@@ -438,7 +438,7 @@ static const struct of_device_id usb_xhci_of_match[] = {
 	{ .compatible = "marvell,armada-380-xhci"},
 	{ .compatible = "renesas,xhci-r8a7790"},
 	{ .compatible = "renesas,xhci-r8a7791"},
-	{ .compatible = "marvell,armada-3700-xhci-otg"},
+	{ .compatible = "marvell,armada-3700-xhci"},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
