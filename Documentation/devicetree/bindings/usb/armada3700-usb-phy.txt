@@ -14,7 +14,7 @@ Armada-3700 could also be working in USB static host mode, when USB Device featu
 is not required.
 
 Required properties:
-- compatible	: should be "marvell,armada-3700-otg"
+- compatible	: should be "marvell,armada-3700-usb-phy"
 - reg		: Physical base address and size of the USB3 device registers map.
 - interrupts	: Should contain single irq line of USB3 device controller
 
@@ -30,8 +30,8 @@ USB OTG mode example:
 		usb-phy = <&otg_phy>;
 	};
 
-	otg_phy: otg@5d800 {
-		compatible = "marvell,usb-3700-otg";
+	usb_phy: usb_phy@5d800 {
+		compatible = "marvell,armada-3700-usb-phy";
 		reg = <0x5d800 0x100>;
 		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
 		vcc-supply = <&exp_usb3_vbus>;
@@ -39,8 +39,8 @@ USB OTG mode example:
 	};
 
 USB Static Host mode example, no modification to USB3 host controller DT node:
-	otg_phy: otg@5d800 {
-		compatible = "marvell,usb-3700-otg";
+	usb_phy: usb_phy@5d800 {
+		compatible = "marvell,armada-3700-usb-phy";
 		reg = <0x5d800 0x100>;
 		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
 		marvell,static-host-mode;
