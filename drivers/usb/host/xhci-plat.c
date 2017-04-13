@@ -77,6 +77,41 @@ static int xhci_plat_start(struct usb_hcd *hcd)
 	return xhci_run(hcd);
 }
 
+/*
+ * this routine finds phy with its name, init/power-on it, then
+ * hook it to hcd->phy. Normally, it could be done within routine
+ * usb_add_hcd_with_phy_name, but for the case of OTG, usb_add_hcd
+ * will be invoked in otg driver, which has no idea about the phy
+ * name. so before register hcd to otg driver, hcd->phy has to be
+ * configured.
+ */
+int xhci_phy_init(struct usb_hcd *hcd, const char *phy_name)
+{
+	struct phy *phy = NULL;
+	int ret = 0;
+
+	phy = phy_get(hcd->self.controller, phy_name);
+
+	if (IS_ERR(phy)) {
+		ret = PTR_ERR(phy);
+	} else {
+		ret = phy_init(phy);
+		if (ret) {
+			phy_put(phy);
+			return ret;
+		}
+		ret = phy_power_on(phy);
+		if (ret) {
+			phy_exit(phy);
+			phy_put(phy);
+			return ret;
+		}
+		hcd->phy = phy;
+	}
+
+	return ret;
+}
+
 static int xhci_plat_probe(struct platform_device *pdev)
 {
 	struct device_node	*node = pdev->dev.of_node;
@@ -194,6 +229,25 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		}
 
 		hcd->irq = irq;
+
+		/*
+		 * init/power-on the phy, then hook it to hcd->phy.
+		 * Normally, in non-otg mode, this is done by routine usb_add_hcd_with_phy_name,
+		 * but in the case of otg, usb_add_hcd has to be invoked in otg driver,
+		 * which has no idea about the phy name. So before register hcd to otg
+		 * driver, hcd->phy has to be configured, then when otg driver calls
+		 * usb_add_hcd, phy has already been setup correctly.
+		 */
+		if (of_property_read_bool(pdev->dev.of_node, "separated-phys-for-usb2-usb3")) {
+			if (xhci_phy_init(hcd, "usb2")) {
+				dev_err(&pdev->dev, "unable to init and power on USB2 PHY\n");
+				goto disable_usb_phy;
+			}
+			if (xhci_phy_init(xhci->shared_hcd, "usb3")) {
+				dev_err(&pdev->dev, "unable to init and power on USB3 PHY\n");
+				goto disable_usb_phy;
+			}
+		}
 
 		ret = otg_set_host(hcd->usb_phy->otg, &hcd->self);
 		if (ret) {
