@@ -559,7 +559,7 @@ static const struct dev_pm_ops a3700_otg_pm_ops = {
 #endif
 
 static const struct of_device_id a3700_otg_dt_ids[] = {
-	{ .compatible = "marvell,armada-3700-otg" },
+	{ .compatible = "marvell,armada-3700-usb-phy" },
 	{ }
 };
 
