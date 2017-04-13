@@ -32,11 +32,11 @@ Examples:
 
 	For Armada 3700 which uses separated PHYs for USB 2 and USB 3:
 	usb3@58000 {
-		compatible = "generic-xhci";
+		compatible = "marvell,armada-3700-xhci";
 		reg = <0x58000 0x4000>;
 		interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&sgateclk 17>;
-		usb-phy = <&usb3_phy>;
+		usb-phy = <&usb_phy>;
 		phys = <&utmi_usb32>, /* utmi usb32 dedicated phy */
 		       <&a3700_comphy 1 COMPHY_USB3>; /* usb3 comphy */
 		phy-names = "usb2", "usb3";
