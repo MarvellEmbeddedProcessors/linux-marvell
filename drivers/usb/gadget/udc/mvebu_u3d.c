@@ -43,6 +43,7 @@
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
 #include <linux/phy/phy.h>
+#include <linux/usb/composite.h>
 
 #include "mvebu_u3d.h"
 
@@ -935,6 +936,13 @@ static int mvc2_ep_disable(struct usb_ep *_ep)
 	return 0;
 }
 
+static inline void mvc2_send_erdy(struct mvc2 *cp)
+{
+	/* ep0 erdy should be smp safe, and no lock is needed */
+	MV_CP_WRITE(MV_CP_READ(MVCP_ENDPOINT_0_CONFIG) |
+		    MVCP_ENDPOINT_0_CONFIG_CHG_STATE, MVCP_ENDPOINT_0_CONFIG);
+}
+
 #ifndef ASSEMBLE_REQ
 /* queues (submits) an I/O request to an endpoint */
 static int
@@ -953,8 +961,18 @@ mvc2_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 	num = _ep->desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 	/* Reset the endpoint 0 to prevent previous left data */
 	if (num == 0) {
-		if (!req->req.length)
+		/*
+		 * After USB_GADGET_DELAYED_STATUS is set and the USB upper layer in USB function thread
+		 * finishes the handling, the USB compsite layer will send request to continue with the
+		 * control transfer, within this request, the request length is set 0.
+		 * Since the request length will not be 0 for normal transfer, once it is 0, it means
+		 * that to continue the transfer after USB_GADGET_DELAYED_STATUS. Thus the erdy is set
+		 * here to notify the host that device is ready for latter transfer.
+		 */
+		if (!req->req.length) {
+			mvc2_send_erdy(cp);
 			return 0;
+		}
 
 		if (cp->ep0_dir == USB_DIR_IN)
 			ep = &cp->eps[1];
@@ -1013,8 +1031,18 @@ mvc2_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 	num = _ep->desc->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
 	/* Reset the endpoint 0 to prevent previous left data */
 	if (num == 0) {
-		if (!req->req.length)
+		/*
+		 * After USB_GADGET_DELAYED_STATUS is set and the USB upper layer in USB function thread
+		 * finishes the handling, the USB compsite layer will send request to continue with the
+		 * control transfer. Within this request, the request length is set 0.
+		 * Since the request length will not be 0 for normal transfer, once it is 0, it means
+		 * that to continue the transfer after USB_GADGET_DELAYED_STATUS. Thus the erdy is set
+		 * here to notify the host that device is ready for latter transfer.
+		 */
+		if (!req->req.length) {
+			mvc2_send_erdy(cp);
 			return 0;
+		}
 
 		if (cp->ep0_dir == USB_DIR_IN)
 			ep = &cp->eps[1];
@@ -1296,13 +1324,6 @@ static void stop_activity(struct mvc2 *udc, struct usb_gadget_driver *driver)
 	/* report disconnect; the driver is already quiesced */
 	if (driver)
 		driver->disconnect(&udc->gadget);
-}
-
-static inline void mvc2_send_erdy(struct mvc2 *cp)
-{
-	/* ep0 erdy should be smp safe, and no lock is needed */
-	MV_CP_WRITE(MV_CP_READ(MVCP_ENDPOINT_0_CONFIG) |
-		    MVCP_ENDPOINT_0_CONFIG_CHG_STATE, MVCP_ENDPOINT_0_CONFIG);
 }
 
 static void mvc2_init_interrupt(struct mvc2 *cp)
@@ -1633,9 +1654,13 @@ void mvc2_handle_setup(struct mvc2 *cp)
 		ep_set_halt(cp, 0, 0, 1);
 	/*
 	 * If current setup has no data pharse or failed, we would directly
-	 * jump to status pharse
+	 * jump to status pharse.
+	 * If the USB_GADGET_DELAYED_STATUS is set, the USB interface requests
+	 * delay for it to handle the setup, thus here should not send erdy to
+	 * continue the transfer. Instead, the erdy will be sent from mvc2_ep_queue,
+	 * once a request with length 0 is issued.
 	 */
-	if (r->wLength == 0 || ret < 0)
+	 if ((ret < 0) || (r->wLength == 0 && ret != USB_GADGET_DELAYED_STATUS))
 		mvc2_send_erdy(cp);
 }
 
