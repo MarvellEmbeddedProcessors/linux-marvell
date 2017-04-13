@@ -25,7 +25,7 @@ Optional properties:
 
 USB OTG mode example:
 	usb3@58000 {
-		compatible = "marvell,armada-3700-xhci-otg";
+		compatible = "marvell,armada-3700-xhci";
 		status = "okay";
 		usb-phy = <&otg_phy>;
 	};
