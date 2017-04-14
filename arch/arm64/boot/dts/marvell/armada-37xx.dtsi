@@ -353,7 +353,7 @@
 				status = "disabled";
 			};
 			usb3@58000 {
-				compatible = "generic-xhci";
+				compatible = "marvell,armada-3700-xhci";
 				reg = <0x58000 0x4000>;
 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&sgateclk 17>;
