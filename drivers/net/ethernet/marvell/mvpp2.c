@@ -5958,7 +5958,7 @@ static int mvpp2_set_mac_address(struct net_device *dev, void *p)
 
 	if (!is_valid_ether_addr(addr->sa_data)) {
 		err = -EADDRNOTAVAIL;
-		goto error;
+		goto log_error;
 	}
 
 	if (!netif_running(dev)) {
@@ -5968,7 +5968,7 @@ static int mvpp2_set_mac_address(struct net_device *dev, void *p)
 		/* Reconfigure parser to accept the original MAC address */
 		err = mvpp2_prs_update_mac_da(dev, dev->dev_addr);
 		if (err)
-			goto error;
+			goto log_error;
 	}
 
 	mvpp2_stop_dev(port);
@@ -5980,14 +5980,13 @@ static int mvpp2_set_mac_address(struct net_device *dev, void *p)
 	/* Reconfigure parser accept the original MAC address */
 	err = mvpp2_prs_update_mac_da(dev, dev->dev_addr);
 	if (err)
-		goto error;
+		goto log_error;
 out_start:
 	mvpp2_start_dev(port);
 	mvpp2_egress_enable(port);
 	mvpp2_ingress_enable(port);
 	return 0;
-
-error:
+log_error:
 	netdev_err(dev, "fail to change MAC address\n");
 	return err;
 }
@@ -6000,7 +5999,7 @@ static int mvpp2_change_mtu(struct net_device *dev, int mtu)
 	mtu = mvpp2_check_mtu_valid(dev, mtu);
 	if (mtu < 0) {
 		err = mtu;
-		goto error;
+		goto log_error;
 	}
 
 	if (!netif_running(dev)) {
@@ -6013,7 +6012,7 @@ static int mvpp2_change_mtu(struct net_device *dev, int mtu)
 		/* Reconfigure BM to the original MTU */
 		err = mvpp2_bm_update_mtu(dev, dev->mtu);
 		if (err)
-			goto error;
+			goto log_error;
 	}
 
 	mvpp2_stop_dev(port);
@@ -6027,7 +6026,7 @@ static int mvpp2_change_mtu(struct net_device *dev, int mtu)
 	/* Reconfigure BM to the original MTU */
 	err = mvpp2_bm_update_mtu(dev, dev->mtu);
 	if (err)
-		goto error;
+		goto log_error;
 
 out_start:
 	mvpp2_start_dev(port);
@@ -6035,8 +6034,7 @@ out_start:
 	mvpp2_ingress_enable(port);
 
 	return 0;
-
-error:
+log_error:
 	netdev_err(dev, "fail to change MTU\n");
 	return err;
 }
