@@ -1610,7 +1610,7 @@ static void mvpp2_prs_mac_drop_all_set(struct mvpp2 *priv, int port, bool add)
 		mvpp2_prs_hw_read(priv, &pe);
 	} else {
 		/* Entry doesn't exist - create new */
-		memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+		memset(&pe, 0, sizeof(pe));
 		mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_MAC);
 		pe.index = MVPP2_PE_DROP_ALL;
 
@@ -1647,7 +1647,7 @@ static void mvpp2_prs_mac_promisc_set(struct mvpp2 *priv, int port, bool add)
 		mvpp2_prs_hw_read(priv, &pe);
 	} else {
 		/* Entry doesn't exist - create new */
-		memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+		memset(&pe, 0, sizeof(pe));
 		mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_MAC);
 		pe.index = MVPP2_PE_MAC_PROMISCUOUS;
 
@@ -1693,7 +1693,7 @@ static void mvpp2_prs_mac_multi_set(struct mvpp2 *priv, int port, int index,
 		mvpp2_prs_hw_read(priv, &pe);
 	} else {
 		/* Entry doesn't exist - create new */
-		memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+		memset(&pe, 0, sizeof(pe));
 		mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_MAC);
 		pe.index = index;
 
@@ -1745,7 +1745,7 @@ static void mvpp2_prs_dsa_tag_set(struct mvpp2 *priv, int port, bool add,
 		mvpp2_prs_hw_read(priv, &pe);
 	} else {
 		/* Entry doesn't exist - create new */
-		memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+		memset(&pe, 0, sizeof(pe));
 		mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_DSA);
 		pe.index = tid;
 
@@ -1808,7 +1808,7 @@ static void mvpp2_prs_dsa_tag_ethertype_set(struct mvpp2 *priv, int port,
 		mvpp2_prs_hw_read(priv, &pe);
 	} else {
 		/* Entry doesn't exist - create new */
-		memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+		memset(&pe, 0, sizeof(pe));
 		mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_DSA);
 		pe.index = tid;
 
@@ -2133,7 +2133,7 @@ static int mvpp2_prs_ip4_proto(struct mvpp2 *priv, unsigned short proto,
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP4);
 	pe.index = tid;
 
@@ -2191,7 +2191,7 @@ static int mvpp2_prs_ip4_cast(struct mvpp2 *priv, unsigned short l3_cast)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP4);
 	pe.index = tid;
 
@@ -2247,7 +2247,7 @@ static int mvpp2_prs_ip6_proto(struct mvpp2 *priv, unsigned short proto,
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP6);
 	pe.index = tid;
 
@@ -2286,7 +2286,7 @@ static int mvpp2_prs_ip6_cast(struct mvpp2 *priv, unsigned short l3_cast)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP6);
 	pe.index = tid;
 
@@ -2346,7 +2346,7 @@ static void mvpp2_prs_def_flow_init(struct mvpp2 *priv)
 	int port;
 
 	for (port = 0; port < MVPP2_MAX_PORTS; port++) {
-		memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+		memset(&pe, 0, sizeof(pe));
 		mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_FLOWS);
 		pe.index = MVPP2_PE_FIRST_DEFAULT_FLOW - port;
 
@@ -2368,7 +2368,7 @@ static void mvpp2_prs_mh_init(struct mvpp2 *priv)
 {
 	struct mvpp2_prs_entry pe;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 
 	pe.index = MVPP2_PE_MH_DEFAULT;
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_MH);
@@ -2391,7 +2391,7 @@ static void mvpp2_prs_mac_init(struct mvpp2 *priv)
 {
 	struct mvpp2_prs_entry pe;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 
 	/* Non-promiscuous mode for all ports - DROP unknown packets */
 	pe.index = MVPP2_PE_MAC_NON_PROMISCUOUS;
@@ -2452,7 +2452,7 @@ static void mvpp2_prs_dsa_init(struct mvpp2 *priv)
 					MVPP2_PRS_TAGGED, MVPP2_PRS_DSA);
 
 	/* Set default entry, in case DSA or EDSA tag not found */
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_DSA);
 	pe.index = MVPP2_PE_DSA_DEFAULT;
 	mvpp2_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_VLAN);
@@ -2482,7 +2482,7 @@ static int mvpp2_prs_etype_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_L2);
 	pe.index = tid;
 
@@ -2508,7 +2508,7 @@ static int mvpp2_prs_etype_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_L2);
 	pe.index = tid;
 
@@ -2538,7 +2538,7 @@ static int mvpp2_prs_etype_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_L2);
 	pe.index = tid;
 
@@ -2572,7 +2572,7 @@ static int mvpp2_prs_etype_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_L2);
 	pe.index = tid;
 
@@ -2637,7 +2637,7 @@ static int mvpp2_prs_etype_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_L2);
 	pe.index = tid;
 
@@ -2734,7 +2734,7 @@ static int mvpp2_prs_vlan_init(struct platform_device *pdev, struct mvpp2 *priv)
 		return err;
 
 	/* Set default double vlan entry */
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_VLAN);
 	pe.index = MVPP2_PE_VLAN_DBL;
 
@@ -2754,7 +2754,7 @@ static int mvpp2_prs_vlan_init(struct platform_device *pdev, struct mvpp2 *priv)
 	mvpp2_prs_hw_write(priv, &pe);
 
 	/* Set default vlan none entry */
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_VLAN);
 	pe.index = MVPP2_PE_VLAN_NONE;
 
@@ -2784,7 +2784,7 @@ static int mvpp2_prs_pppoe_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_PPPOE);
 	pe.index = tid;
 
@@ -2834,7 +2834,7 @@ static int mvpp2_prs_pppoe_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_PPPOE);
 	pe.index = tid;
 
@@ -2861,7 +2861,7 @@ static int mvpp2_prs_pppoe_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_PPPOE);
 	pe.index = tid;
 
@@ -2919,7 +2919,7 @@ static int mvpp2_prs_ip4_init(struct mvpp2 *priv)
 		return err;
 
 	/* Default IPv4 entry for unknown protocols */
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP4);
 	pe.index = MVPP2_PE_IP4_PROTO_UN;
 
@@ -2944,7 +2944,7 @@ static int mvpp2_prs_ip4_init(struct mvpp2 *priv)
 	mvpp2_prs_hw_write(priv, &pe);
 
 	/* Default IPv4 entry for unicast address */
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP4);
 	pe.index = MVPP2_PE_IP4_ADDR_UN;
 
@@ -3012,7 +3012,7 @@ static int mvpp2_prs_ip6_init(struct mvpp2 *priv)
 	if (tid < 0)
 		return tid;
 
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP6);
 	pe.index = tid;
 
@@ -3033,7 +3033,7 @@ static int mvpp2_prs_ip6_init(struct mvpp2 *priv)
 	mvpp2_prs_hw_write(priv, &pe);
 
 	/* Default IPv6 entry for unknown protocols */
-	memset(&pe, 0, sizeof(struct mvpp2_prs_entry));
+	memset(&pe, 0, sizeof(pe));
 	mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_IP6);
 	pe.index = MVPP2_PE_IP6_PROTO_UN;
 
