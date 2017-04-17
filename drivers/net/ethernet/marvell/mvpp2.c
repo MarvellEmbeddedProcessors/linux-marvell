@@ -6113,7 +6113,7 @@ out_start:
 	mvpp2_ingress_enable(port);
 	return 0;
 log_error:
-	netdev_err(dev, "fail to change MAC address\n");
+	netdev_err(dev, "failed to change MAC address\n");
 	return err;
 }
 
@@ -6161,7 +6161,7 @@ out_start:
 
 	return 0;
 log_error:
-	netdev_err(dev, "fail to change MTU\n");
+	netdev_err(dev, "failed to change MTU\n");
 	return err;
 }
 
@@ -6350,7 +6350,7 @@ static int mvpp2_ethtool_set_ringparam(struct net_device *dev,
 err_clean_rxqs:
 	mvpp2_cleanup_rxqs(port);
 err_out:
-	netdev_err(dev, "fail to change ring parameters");
+	netdev_err(dev, "failed to change ring parameters");
 	return err;
 }
 
