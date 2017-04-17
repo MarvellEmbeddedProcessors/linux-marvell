@@ -6758,7 +6758,7 @@ static int mvpp2_probe(struct platform_device *pdev)
 	int port_count, first_rxq;
 	int err;
 
-	priv = devm_kzalloc(&pdev->dev, sizeof(struct mvpp2), GFP_KERNEL);
+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
@@ -6835,8 +6835,8 @@ static int mvpp2_probe(struct platform_device *pdev)
 	}
 
 	priv->port_list = devm_kcalloc(&pdev->dev, port_count,
-				      sizeof(struct mvpp2_port *),
-				      GFP_KERNEL);
+				       sizeof(*priv->port_list),
+				       GFP_KERNEL);
 	if (!priv->port_list) {
 		err = -ENOMEM;
 		goto err_mg_clk;
