@@ -116,13 +116,23 @@ static void a3700_otg_start_host(struct a3700_otg *mvotg, int on)
 		usb_add_hcd(hcd->shared_hcd, hcd->irq, IRQF_SHARED);
 		device_wakeup_enable(hcd->self.controller);
 	} else {
-		if (hcd->state == HC_STATE_RUNNING) {
-			usb_remove_hcd(hcd->shared_hcd);
-			usb_remove_hcd(hcd);
-		} else {
-			usb_remove_hcd(hcd);
-			usb_remove_hcd(hcd->shared_hcd);
-		}
+		/*
+		 * Now the USB dok has already been unplugged, and usb_id changes from
+		 * usb host to usb device, then USB PHY starts to transfer all interrupt
+		 * and data to USB device controller instead of USB host controller.
+		 * So USB host controller gets nothing and does not even know the USB DOK
+		 * is gone.
+		 * Here are two hcd need to be removed, shared_hcd is for USB3 bus, while
+		 * main hcd is for USB2 bus.
+		 * when a hcd is removed, it finds xhci (usb host controller) is active, then
+		 * it would try to talk with the USB DOK/HUB on its bus, since it thinks it is
+		 * still there, and then get a timeout error.
+		 * To fix this issue, the xhci needs to be stopped first, then these two hcd
+		 * could be removed issue free.
+		 */
+		hcd->driver->stop(hcd);
+		usb_remove_hcd(hcd->shared_hcd);
+		usb_remove_hcd(hcd);
 	}
 
 	if (!IS_ERR(mvotg->vcc)) {
