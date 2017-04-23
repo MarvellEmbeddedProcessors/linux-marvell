@@ -111,9 +111,9 @@ void safexcel_ring_rollback_wptr(struct safexcel_crypto_priv *priv,
 struct safexcel_command_desc *safexcel_add_cdesc(struct safexcel_crypto_priv *priv,
 						 int ring_id,
 						 bool first, bool last,
-						 phys_addr_t data, u32 data_len,
+						 dma_addr_t data, u32 data_len,
 						 u32 full_data_len,
-						 phys_addr_t context) {
+						 dma_addr_t context) {
 	struct safexcel_command_desc *cdesc;
 	int i;
 
@@ -158,7 +158,7 @@ struct safexcel_command_desc *safexcel_add_cdesc(struct safexcel_crypto_priv *pr
 struct safexcel_result_desc *safexcel_add_rdesc(struct safexcel_crypto_priv *priv,
 						int ring_id,
 						bool first, bool last,
-						phys_addr_t data, u32 len)
+						dma_addr_t data, u32 len)
 {
 	struct safexcel_result_desc *rdesc;
 
