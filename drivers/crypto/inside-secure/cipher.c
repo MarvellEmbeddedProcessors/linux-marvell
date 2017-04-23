@@ -186,7 +186,6 @@ static int safexcel_aes_send(struct crypto_async_request *async,
 	struct safexcel_command_desc *cdesc;
 	struct safexcel_result_desc *rdesc;
 	struct scatterlist *sg;
-	phys_addr_t ctxr_phys;
 	int nr_src, nr_dst, n_cdesc = 0, n_rdesc = 0, queued = req->nbytes;
 	int i, ret = 0;
 
@@ -210,15 +209,12 @@ static int safexcel_aes_send(struct crypto_async_request *async,
 		}
 	}
 
-	ctxr_phys = dma_to_phys(priv->dev, ctx->base.ctxr_dma);
-
 	memcpy(ctx->base.ctxr->data, ctx->key, ctx->key_len);
 
 	spin_lock_bh(&priv->ring[ring].egress_lock);
 
 	/* command descriptors */
 	for_each_sg(req->src, sg, nr_src, i) {
-		phys_addr_t sg_phys = dma_to_phys(priv->dev, sg_dma_address(sg));
 		int len = sg_dma_len(sg);
 
 		/* Do not overflow the request */
@@ -226,7 +222,9 @@ static int safexcel_aes_send(struct crypto_async_request *async,
 			len = queued;
 
 		cdesc = safexcel_add_cdesc(priv, ring, !n_cdesc, !(queued - len),
-					   sg_phys, len, req->nbytes, ctxr_phys);
+					   sg_dma_address(sg), len, req->nbytes,
+					   ctx->base.ctxr_dma);
+
 		if (IS_ERR(cdesc)) {
 			/* No space left in the command descriptor ring */
 			ret = PTR_ERR(cdesc);
@@ -247,10 +245,10 @@ static int safexcel_aes_send(struct crypto_async_request *async,
 	/* result descriptors */
 	for_each_sg(req->dst, sg, nr_dst, i) {
 		bool first = !i, last = (i == nr_dst - 1);
-		phys_addr_t sg_phys = dma_to_phys(priv->dev, sg_dma_address(sg));
 		u32 len = sg_dma_len(sg);
 
-		rdesc = safexcel_add_rdesc(priv, ring, first, last, sg_phys, len);
+		rdesc = safexcel_add_rdesc(priv, ring, first, last,
+					   sg_dma_address(sg), len);
 		if (IS_ERR(rdesc)) {
 			/* No space left in the result descriptor ring */
 			ret = PTR_ERR(rdesc);

@@ -791,16 +791,13 @@ int safexcel_invalidate_cache(struct crypto_async_request *async,
 {
 	struct safexcel_command_desc *cdesc;
 	struct safexcel_result_desc *rdesc;
-	phys_addr_t ctxr_phys;
 	int ret;
-
-	ctxr_phys = dma_to_phys(priv->dev, ctxr_dma);
 
 	spin_lock_bh(&priv->ring[ring].egress_lock);
 
 	/* prepare command descriptor */
 	cdesc = safexcel_add_cdesc(priv, ring, true, true,
-				   0, 0, 0, ctxr_phys);
+				   0, 0, 0, ctxr_dma);
 
 	if (IS_ERR(cdesc)) {
 		ret = PTR_ERR(cdesc);
@@ -814,7 +811,7 @@ int safexcel_invalidate_cache(struct crypto_async_request *async,
 				       CONTEXT_CONTROL_HW_SERVICES_OFFSET;
 
 	/* prepare result descriptor */
-	rdesc = safexcel_add_rdesc(priv, ring, true, true, ctxr_phys, 0);
+	rdesc = safexcel_add_rdesc(priv, ring, true, true, ctxr_dma, 0);
 
 	if (IS_ERR(rdesc)) {
 		ret = PTR_ERR(rdesc);

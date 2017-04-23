@@ -693,13 +693,13 @@ void safexcel_ring_rollback_wptr(struct safexcel_crypto_priv *priv,
 struct safexcel_command_desc *safexcel_add_cdesc(struct safexcel_crypto_priv *priv,
 						 int ring_id,
 						 bool first, bool last,
-						 phys_addr_t data, u32 len,
+						 dma_addr_t data, u32 len,
 						 u32 full_data_len,
-						 phys_addr_t context);
+						 dma_addr_t context);
 struct safexcel_result_desc *safexcel_add_rdesc(struct safexcel_crypto_priv *priv,
 						 int ring_id,
 						bool first, bool last,
-						phys_addr_t data, u32 len);
+						dma_addr_t data, u32 len);
 void safexcel_inv_complete(struct crypto_async_request *req, int error);
 
 /* available algorithms */

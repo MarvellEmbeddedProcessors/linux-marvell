@@ -177,7 +177,6 @@ static int safexcel_ahash_send(struct crypto_async_request *async, int ring,
 	struct scatterlist *sg;
 	int i, nents, queued, len = req->len, n_cdesc = 0, ret = 0;
 	int cache_len = do_div(len, crypto_ahash_blocksize(ahash));
-	phys_addr_t ctxr_phys = 0;
 
 	if (req->last_req) {
 		if (!cache_len)
@@ -188,8 +187,6 @@ static int safexcel_ahash_send(struct crypto_async_request *async, int ring,
 		queued = len = (cache_len + areq->nbytes) &
 			       ~(crypto_ahash_blocksize(ahash) - 1);
 	}
-
-	ctxr_phys = dma_to_phys(priv->dev, ctx->base.ctxr_dma);
 
 	spin_lock_bh(&priv->ring[ring].egress_lock);
 
@@ -205,8 +202,9 @@ static int safexcel_ahash_send(struct crypto_async_request *async, int ring,
 		ctx->base.cache_sz = cache_len;
 		first_cdesc = safexcel_add_cdesc(priv, ring, 1,
 						 (cache_len == len),
-						 dma_to_phys(priv->dev, ctx->base.cache_dma),
-						 cache_len, len, ctxr_phys);
+						 ctx->base.cache_dma,
+						 cache_len, len,
+						 ctx->base.ctxr_dma);
 		if (IS_ERR(first_cdesc)) {
 			ret = PTR_ERR(first_cdesc);
 			goto free_cache;
@@ -226,7 +224,6 @@ static int safexcel_ahash_send(struct crypto_async_request *async, int ring,
 	}
 
 	for_each_sg(areq->src, sg, nents, i) {
-		phys_addr_t sg_phys = dma_to_phys(priv->dev, sg_dma_address(sg));
 		int sglen = sg_dma_len(sg);
 
 		/* Do not overflow the request */
@@ -234,8 +231,9 @@ static int safexcel_ahash_send(struct crypto_async_request *async, int ring,
 			sglen = queued;
 
 		cdesc = safexcel_add_cdesc(priv, ring, !n_cdesc,
-					   !(queued - sglen), sg_phys, sglen,
-					   len, ctxr_phys);
+					   !(queued - sglen), sg_dma_address(sg),
+					   sglen, len, ctx->base.ctxr_dma);
+
 		if (IS_ERR(cdesc)) {
 			ret = PTR_ERR(cdesc);
 			goto cdesc_rollback;
