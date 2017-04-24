@@ -269,6 +269,7 @@ dma_xor@6a0000 {
 	reg = <0x6a0000 0x1000>,
 	      <0x6b0000 0x1000>;
 	dma-coherent;
+	dma-bus-width = <40>;
 	msi-parent = <&gic_v2m0>;
 	clocks = <&cpm_syscon0 1 8>;
 	status = "okay";
@@ -279,6 +280,7 @@ dma_xor@6c0000 {
 	reg = <0x6c0000 0x1000>,
 	      <0x6d0000 0x1000>;
 	dma-coherent;
+	dma-bus-width = <40>;
 	msi-parent = <&gic_v2m0>;
 	clocks = <&cpm_syscon0 1 7>;
 	status = "okay";
