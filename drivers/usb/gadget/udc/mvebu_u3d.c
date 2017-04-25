@@ -2525,14 +2525,41 @@ static int mvc2_resume(struct device *dev)
 		}
 	}
 
-	/* Start the current device if driver is connected */
-	if (cp->driver)
-		mvc2_start(&cp->gadget, cp->driver);
+	/*
+	 * USB device will be started only in mvc2_complete, once all other
+	 * required device drivers have been resumed.
+	 * This is done to avoid a state which U3D driver is resumed too early
+	 * before mass storage thread has been resumed, which will lead to USB
+	 * transfer time out.
+	*/
 
 	return 0;
 }
 
-SIMPLE_DEV_PM_OPS(mvc2_pm_ops, mvc2_suspend, mvc2_resume);
+/*
+ * The PM core executes complete() callbacks after it has executed
+ * the appropriate resume callbacks for all device drivers.
+ * This routine starts USB device by enabling EP, which starts the USB transfer between
+ * host and device. Later on the USB mass storage function thread will be resumed,
+ * which will finish the USB transfer to let the USB device continue to work after
+ * resume.
+ * If start the USB device in "resume" operation, some device resuming after USB device
+ * resuming might take long time, which leads to USB transfer time out.
+ */
+static void mvc2_complete(struct device *dev)
+{
+	struct mvc2 *cp = (struct mvc2 *)dev_get_drvdata(dev);
+
+	/* Start the current device if driver is connected */
+	if (cp->driver)
+		mvc2_start(&cp->gadget, cp->driver);
+}
+
+static const struct dev_pm_ops mvc2_pm_ops = {
+	.suspend = mvc2_suspend,
+	.resume = mvc2_resume,
+	.complete = mvc2_complete
+};
 #endif
 
 static int mvc2_remove(struct platform_device *dev)
