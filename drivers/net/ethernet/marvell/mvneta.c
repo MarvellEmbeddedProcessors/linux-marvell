@@ -991,6 +991,7 @@ static inline void mvneta_bm_pool_bufsize_set(struct mvneta_port *pp,
 	}
 
 	val = mvreg_read(pp, MVNETA_PORT_POOL_BUFFER_SZ_REG(pool_id));
+	val &= ~MVNETA_PORT_POOL_BUFFER_SZ_MASK;
 	val |= buf_size & MVNETA_PORT_POOL_BUFFER_SZ_MASK;
 	mvreg_write(pp, MVNETA_PORT_POOL_BUFFER_SZ_REG(pool_id), val);
 }
@@ -1089,6 +1090,8 @@ static int mvneta_bm_port_init(struct platform_device *pdev,
 
 	mvneta_bm_pool_bufsize_set(pp, pp->pool_long->buf_size,
 				   pp->pool_long->id);
+	netdev_info(pp->dev, "create long pool %d for port %d, buffer size %d\n",
+		    pp->pool_long->id, pp->id, pp->pool_long->buf_size);
 
 	/* If short pool id is not defined, assume using single pool */
 	if (of_property_read_u32(dn, "bm,pool-short", &short_pool_id))
@@ -1109,6 +1112,8 @@ static int mvneta_bm_port_init(struct platform_device *pdev,
 		mvneta_bm_pool_bufsize_set(pp, pp->pool_short->buf_size,
 					   pp->pool_short->id);
 	}
+	netdev_info(pp->dev, "create short pool %d for port %d, buffer size %d\n",
+		    pp->pool_short->id, pp->id, pp->pool_short->buf_size);
 
 	return 0;
 }
