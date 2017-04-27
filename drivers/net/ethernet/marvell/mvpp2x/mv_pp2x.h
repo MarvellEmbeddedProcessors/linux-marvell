@@ -161,16 +161,6 @@ extern  u32 debug_param;
 #define QV_THR_2_CPU(sw_thread_id)	(sw_thread_id - first_addr_space)
 #define QV_CPU_2_THR(cpu_id)		(first_addr_space + cpu_id)
 
-/* TX FIFO constants */
-#define MVPP2_TX_FIFO_DATA_SIZE_10KB		0xa
-#define MVPP2_TX_FIFO_DATA_SIZE_3KB		0x3
-
-#define MVPP2_TX_FIFO_MINIMUM_THRESHOLD		256
-#define MVPP2_TX_FIFO_THRESHOLD_10KB	(MVPP2_TX_FIFO_DATA_SIZE_10KB * 1024 - \
-					MVPP2_TX_FIFO_MINIMUM_THRESHOLD)
-#define MVPP2_TX_FIFO_THRESHOLD_3KB	(MVPP2_TX_FIFO_DATA_SIZE_3KB * 1024 - \
-					MVPP2_TX_FIFO_MINIMUM_THRESHOLD)
-
 /* Used for define type of data saved in shadow: SKB or extended buffer or nothing */
 #define MVPP2_ETH_SHADOW_SKB		0x1
 #define MVPP2_ETH_SHADOW_EXT		0x2
