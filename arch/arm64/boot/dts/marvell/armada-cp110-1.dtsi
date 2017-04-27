@@ -355,6 +355,7 @@ cps_eip197: eip197@800000 {
 	compatible = "inside-secure,safexcel-eip197";
 	reg = <0x800000 0x200000>;
 	dma-coherent;
+	dma-bus-width = <40>;
 	interrupts = <ICU_GRP_REI 87 IRQ_TYPE_LEVEL_HIGH>,
 		     <ICU_GRP_NSR 88 IRQ_TYPE_LEVEL_HIGH>,
 		     <ICU_GRP_NSR 89 IRQ_TYPE_LEVEL_HIGH>,

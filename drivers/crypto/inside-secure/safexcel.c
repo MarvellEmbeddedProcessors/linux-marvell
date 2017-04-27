@@ -1100,6 +1100,7 @@ static int safexcel_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct safexcel_crypto_priv *priv;
 	int i, ret;
+	u32 dma_bus_width;
 
 	priv = devm_kzalloc(dev, sizeof(struct safexcel_crypto_priv),
 			    GFP_KERNEL);
@@ -1136,6 +1137,18 @@ static int safexcel_probe(struct platform_device *pdev)
 		if (PTR_ERR(priv->clk) == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
 	}
+
+	ret = of_property_read_u32(dev->of_node, "dma-bus-width",
+				   &dma_bus_width);
+	if (ret) {
+		dev_err(dev, "Failed to read dma-bus-width property\n");
+		goto err_clk;
+	}
+
+	ret = dma_set_mask_and_coherent(&pdev->dev,
+					DMA_BIT_MASK(dma_bus_width));
+	if (ret)
+		goto err_clk;
 
 	priv->context_pool = dmam_pool_create("safexcel-context", dev,
 					      sizeof(struct safexcel_context_record),
