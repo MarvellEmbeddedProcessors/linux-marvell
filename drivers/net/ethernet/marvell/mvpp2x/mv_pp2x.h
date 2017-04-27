@@ -528,6 +528,7 @@ struct mv_pp2x {
 	/* RX flow hash indir'n table, in pp22, the table contains the
 	* CPU idx according to weight
 	*/
+	u8 num_rss_tables; /* created for sysfs usage */
 	u32 rx_indir_table[MVPP22_RSS_TBL_LINE_NUM];
 	u32 l4_chksum_jumbo_port;
 
