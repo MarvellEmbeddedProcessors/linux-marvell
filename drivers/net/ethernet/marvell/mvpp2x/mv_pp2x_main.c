@@ -5581,8 +5581,10 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	}
 
 	/* Init PP22 rxfhindir table evenly in probe */
-	if (priv->pp2_version == PPV22)
+	if (priv->pp2_version == PPV22) {
 		mv_pp22_init_rxfhindir(priv);
+		priv->num_rss_tables = mv_pp2x_queue_mode * mv_pp2x_num_cos_queues;
+	}
 
 	/* Initialize ports */
 	for_each_available_child_of_node(dn, port_node) {
