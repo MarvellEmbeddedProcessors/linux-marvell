@@ -511,8 +511,6 @@ struct mv_pp2x {
 	struct	mv_pp2x_hw hw;
 	struct mv_pp2x_platform_data *pp2xdata;
 
-	u16 cpu_map; /* Bitmap of the participating cpu's */
-
 	struct mv_pp2x_param_config pp2_cfg;
 
 	/* List of pointers to port structures */

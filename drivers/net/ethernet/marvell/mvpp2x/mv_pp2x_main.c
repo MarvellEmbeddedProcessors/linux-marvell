@@ -1868,20 +1868,6 @@ static enum hrtimer_restart mv_pp2x_hr_timer_cb(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
-/* The function get the number of cpu online */
-static int mv_pp2x_num_online_cpu_get(struct mv_pp2x *pp2)
-{
-	u8 num_online_cpus = 0;
-	u16 x = pp2->cpu_map;
-
-	while (x) {
-		x &= (x - 1);
-		num_online_cpus++;
-	}
-
-	return num_online_cpus;
-}
-
 /* The function calculate the width, such as cpu width, cos queue width */
 static void mv_pp2x_width_calc(struct mv_pp2x_port *port, u32 *cpu_width,
 			       u32 *cos_width, u32 *port_rxq_width)
@@ -1892,7 +1878,7 @@ static void mv_pp2x_width_calc(struct mv_pp2x_port *port, u32 *cpu_width,
 		/* Calculate CPU width */
 		if (cpu_width)
 			*cpu_width = ilog2(roundup_pow_of_two(
-				mv_pp2x_num_online_cpu_get(pp2)));
+				num_online_cpus()));
 		/* Calculate cos queue width */
 		if (cos_width)
 			*cos_width = ilog2(roundup_pow_of_two(
@@ -2066,7 +2052,7 @@ static int mv_pp22_cpu_id_from_indir_tbl_get(struct mv_pp2x *pp2,
 		return -EINVAL;
 
 	for (i = 0; i < 16; i++) {
-		if (pp2->cpu_map & (1 << i)) {
+		if ((*cpumask_bits(cpu_online_mask)) & (1 << i)) {
 			if (seq == cpu_seq) {
 				*cpu_id = i;
 				return 0;
@@ -2092,9 +2078,6 @@ int mv_pp22_rss_rxfh_indir_set(struct mv_pp2x_port *port)
 		return -1;
 
 	memset(&rss_entry, 0, sizeof(struct mv_pp22_rss_entry));
-
-	if (!port->priv->cpu_map)
-		return -1;
 
 	/* Calculate cpu and cos width */
 	mv_pp2x_width_calc(port, &cpu_width, &cos_width, NULL);
@@ -2248,7 +2231,7 @@ int mv_pp22_rss_default_cpu_set(struct mv_pp2x_port *port, int default_cpu)
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -1;
 
-	if (!(port->priv->cpu_map & (1 << default_cpu))) {
+	if (!(*cpumask_bits(cpu_online_mask) & (1 << default_cpu))) {
 		pr_err("Invalid default cpu id %d\n", default_cpu);
 		return -EINVAL;
 	}
@@ -4189,7 +4172,7 @@ static void mv_pp21_port_queue_vectors_init(struct mv_pp2x_port *port)
 	q_vec[0].pending_cause_rx = 0;
 	q_vec[0].qv_type = MVPP2_SHARED;
 	q_vec[0].sw_thread_id = 0;
-	q_vec[0].sw_thread_mask = port->priv->cpu_map;
+	q_vec[0].sw_thread_mask = *cpumask_bits(cpu_online_mask);
 	q_vec[0].irq = port->of_irqs[0];
 	netif_napi_add(port->dev, &q_vec[0].napi, mv_pp21_poll,
 		       NAPI_POLL_WEIGHT);
@@ -5160,7 +5143,7 @@ static int mv_pp2x_init_config(struct mv_pp2x_param_config *pp2_cfg,
 static void mv_pp22_init_rxfhindir(struct mv_pp2x *pp2)
 {
 	int i;
-	int online_cpus = mv_pp2x_num_online_cpu_get(pp2);
+	int online_cpus = num_online_cpus();
 
 	if (!online_cpus)
 		return;
@@ -5535,7 +5518,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	struct mv_pp2x_hw *hw;
 	int port_count = 0, cpu;
 	int i, err;
-	u16 cpu_map;
 	u32 cell_index = 0;
 	struct device_node *dn = pdev->dev.of_node;
 	struct device_node *port_node;
@@ -5566,10 +5548,8 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	}
 
 	/* Save cpu_present_mask + populate the per_cpu address space */
-	cpu_map = 0;
 	i = 0;
 	for_each_present_cpu(cpu) {
-		cpu_map |= (1 << cpu);
 		hw->cpu_base[cpu] = hw->base;
 		if (priv->pp2xdata->multi_addr_space) {
 			hw->cpu_base[cpu] +=
@@ -5577,7 +5557,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 			i++;
 		}
 	}
-	priv->cpu_map = cpu_map;
 
 	/*Init PP2 Configuration */
 	err = mv_pp2x_init_config(&priv->pp2_cfg, cell_index);
