@@ -108,7 +108,11 @@ struct armada_thermal_data {
 	/* DFX interrupt support (optional) */
 	bool dfx_interrupt;
 
+	/* for handling non-DT based thermal zones */
 	struct thermal_zone_device_ops *ops;
+
+	/* for handling DT based thermal zones */
+	struct thermal_zone_of_device_ops *ops_of;
 };
 
 inline unsigned int tsen_thresh_val_calc(unsigned int celsius_temp,
@@ -455,15 +459,15 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
 	return 0;
 }
 
-static int armada_ap806_get_temp(struct thermal_zone_device *thermal, int *temp)
+static int armada_ap806_get_temp(void *thermal_priv, int *temp)
 {
-	struct armada_thermal_priv *priv = thermal->devdata;
+	struct armada_thermal_priv *priv = (struct armada_thermal_priv *)thermal_priv;
 	unsigned long reg;
 	unsigned long m, b, div;
 
 	/* Valid check */
 	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-		dev_err(&thermal->device,
+		dev_err(&(priv->pdev->dev),
 			"Temperature sensor reading not valid\n");
 		return -EIO;
 	}
@@ -517,7 +521,7 @@ static struct thermal_zone_device_ops armada_ops = {
 	.get_temp = armada_get_temp,
 };
 
-static struct thermal_zone_device_ops armada_ap806_ops = {
+static struct thermal_zone_of_device_ops armada_ap806_ops = {
 	.get_temp = armada_ap806_get_temp,
 };
 
@@ -662,7 +666,7 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.coef_div = 1,
 	.inverted = true,
 	.dfx_interrupt = 1,
-	.ops = &armada_ap806_ops,
+	.ops_of = &armada_ap806_ops,
 };
 
 static const struct armada_thermal_data armada_cp110_data = {
@@ -751,8 +755,17 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	/* Init sensor */
 	priv->data->init_sensor(pdev, priv);
 
-	thermal = thermal_zone_device_register("armada_thermal", 0, 0,
-					       priv, priv->data->ops, NULL, 0, 0);
+	/*
+	 * AP806 thermal sensor registers as a sensor of a Device Tree thermal zone,
+	 * so it's binded differently from rest of thermal sensors supported by this driver.
+	 */
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-ap806-thermal"))
+		thermal = thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &armada_ap806_ops);
+	else
+		thermal = thermal_zone_device_register("armada_thermal", 0, 0,
+						       priv, priv->data->ops, NULL, 0, 0);
+
 	if (IS_ERR(thermal)) {
 		dev_err(&pdev->dev,
 			"Failed to register thermal zone device\n");
