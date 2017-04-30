@@ -111,6 +111,14 @@
 		};
 	};
 
+	thermal-zones {
+		cpu_thermal: cpu {
+			polling-delay-passive = <100>;
+			polling-delay = <1000>;
+			thermal-sensors = <&thermal>;
+		};
+	};
+
 	ap806 {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -409,7 +417,7 @@
 				status = "okay";
 			};
 
-			thermal@6f808c {
+			thermal: thermal@6f808c {
 				compatible = "marvell,armada-ap806-thermal";
 				reg = <0x6f808C 0x4>,
 				      <0x6f8084 0x4>,
@@ -418,6 +426,7 @@
 				threshold = <100>;
 				hysteresis = <2>;
 				status = "okay";
+				#thermal-sensor-cells = <0>;
 			};
 
 			pmu {
