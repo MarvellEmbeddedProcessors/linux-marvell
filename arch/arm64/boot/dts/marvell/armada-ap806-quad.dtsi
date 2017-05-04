@@ -60,6 +60,7 @@
 			reg = <0x000>;
 			clocks = <&ap806_clock 0>;
 			operating-points-v2 = <&cluster0_opp>;
+			#cooling-cells = <2>; /* min followed by max */
 			enable-method = "psci";
 			cpu-idle-states;
 		};
@@ -78,6 +79,7 @@
 			reg = <0x100>;
 			clocks = <&ap806_clock 1>;
 			operating-points-v2 = <&cluster1_opp>;
+			#cooling-cells = <2>; /* min followed by max */
 			enable-method = "psci";
 			cpu-idle-states;
 		};
@@ -91,6 +93,32 @@
 			cpu-idle-states;
 		};
 	};
+
+	thermal-zones {
+		cpu_thermal: cpu {
+			cooling-maps {
+				/* at hot alert, cut CPUfreq in half (CPUfreq OPP point #1) */
+				hot_cluster0 {
+					trip = <&cpu_hot>;
+					cooling-device = <&cpu0 1 1>;
+				};
+				hot_cluster1 {
+					trip = <&cpu_hot>;
+					cooling-device = <&cpu2 1 1>;
+				};
+				/* at hot_critical alert, set CPUfreq at 100Mhz (last CPUfreq OPP point#3) */
+				hot_critical_cluster0 {
+					trip = <&cpu_hot_critical>;
+					cooling-device = <&cpu0 3 3>;
+				};
+				hot_critical_cluster1 {
+					trip = <&cpu_hot_critical>;
+					cooling-device = <&cpu2 3 3>;
+				};
+			};
+		};
+	};
+
 
 	ap806 {
 		config-space {
