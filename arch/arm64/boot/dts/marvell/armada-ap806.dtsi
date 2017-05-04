@@ -116,6 +116,28 @@
 			polling-delay-passive = <100>;
 			polling-delay = <1000>;
 			thermal-sensors = <&thermal>;
+
+			trips {
+				/*
+				 * 1st trip isn't binded to any cooling device, and used only
+				 * to reduce polling delay when reached it's alert temperature
+				 */
+				cpu_almost_warm_alert {
+					temperature = <90000>;
+					hysteresis = <2000>;
+					type = "passive";
+				};
+				cpu_hot: cpu_hot {
+					temperature = <95000>;
+					hysteresis = <2000>;
+					type = "passive";
+				};
+				cpu_hot_critical: cpu_hot_critical {
+					temperature = <102000>;
+					hysteresis = <2000>;
+					type = "passive";
+				};
+			};
 		};
 	};
 
