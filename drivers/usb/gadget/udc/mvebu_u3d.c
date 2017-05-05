@@ -2539,10 +2539,11 @@ static int mvc2_resume(struct device *dev)
 /*
  * The PM core executes complete() callbacks after it has executed
  * the appropriate resume callbacks for all device drivers.
- * This routine starts USB device by enabling EP, which starts the USB transfer between
- * host and device. Later on the USB mass storage function thread will be resumed,
- * which will finish the USB transfer to let the USB device continue to work after
- * resume.
+ * This routine enables USB3 irq in device mode, later on the USB device will be started
+ * once it receives VBUS on interrupt, which starts USB device by enabling EP, and starts
+ * the USB transfer between host and device.
+ * Later on the USB mass storage function thread will be resumed, which will finish the
+ * USB transfer to let the USB device continue to work after resume.
  * If start the USB device in "resume" operation, some device resuming after USB device
  * resuming might take long time, which leads to USB transfer time out.
  */
@@ -2550,9 +2551,8 @@ static void mvc2_complete(struct device *dev)
 {
 	struct mvc2 *cp = (struct mvc2 *)dev_get_drvdata(dev);
 
-	/* Start the current device if driver is connected */
-	if (cp->driver)
-		mvc2_start(&cp->gadget, cp->driver);
+	/* Re-enable USB3 device irq */
+	mvc2_init_interrupt(cp);
 }
 
 static const struct dev_pm_ops mvc2_pm_ops = {
