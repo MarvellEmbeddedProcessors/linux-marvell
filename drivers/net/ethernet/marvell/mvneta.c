@@ -1067,13 +1067,13 @@ static int mvneta_bm_port_init(struct platform_device *pdev,
 	err = mvneta_mbus_io_win_set(pp, pp->bm_priv->bppi_phys_addr, wsize,
 				     target, attr);
 	if (err < 0) {
-		netdev_info(pp->dev, "fail to configure mbus window to BM\n");
+		dev_info(&pdev->dev, "fail to configure mbus window to BM\n");
 		return err;
 	}
 #endif
 
 	if (of_property_read_u32(dn, "bm,pool-long", &long_pool_id)) {
-		netdev_info(pp->dev, "missing long pool id\n");
+		dev_info(&pdev->dev, "missing long pool id\n");
 		return -EINVAL;
 	}
 
@@ -1082,7 +1082,7 @@ static int mvneta_bm_port_init(struct platform_device *pdev,
 					   MVNETA_BM_LONG, pp->id,
 					   MVNETA_RX_PKT_SIZE(pp->dev->mtu));
 	if (!pp->pool_long) {
-		netdev_info(pp->dev, "fail to obtain long pool for port\n");
+		dev_info(&pdev->dev, "fail to obtain long pool for port\n");
 		return -ENOMEM;
 	}
 
@@ -1090,8 +1090,8 @@ static int mvneta_bm_port_init(struct platform_device *pdev,
 
 	mvneta_bm_pool_bufsize_set(pp, pp->pool_long->buf_size,
 				   pp->pool_long->id);
-	netdev_info(pp->dev, "create long pool %d for port %d, buffer size %d\n",
-		    pp->pool_long->id, pp->id, pp->pool_long->buf_size);
+	dev_info(&pdev->dev, "create long pool N%d, buffer size %d\n",
+		 pp->pool_long->id, pp->pool_long->buf_size);
 
 	/* If short pool id is not defined, assume using single pool */
 	if (of_property_read_u32(dn, "bm,pool-short", &short_pool_id))
@@ -1102,7 +1102,7 @@ static int mvneta_bm_port_init(struct platform_device *pdev,
 					    MVNETA_BM_SHORT, pp->id,
 					    MVNETA_BM_SHORT_PKT_SIZE);
 	if (!pp->pool_short) {
-		netdev_info(pp->dev, "fail to obtain short pool for port\n");
+		dev_info(&pdev->dev, "fail to obtain short pool for port\n");
 		mvneta_bm_pool_destroy(pp->bm_priv, pp->pool_long, 1 << pp->id);
 		return -ENOMEM;
 	}
@@ -1112,8 +1112,8 @@ static int mvneta_bm_port_init(struct platform_device *pdev,
 		mvneta_bm_pool_bufsize_set(pp, pp->pool_short->buf_size,
 					   pp->pool_short->id);
 	}
-	netdev_info(pp->dev, "create short pool %d for port %d, buffer size %d\n",
-		    pp->pool_short->id, pp->id, pp->pool_short->buf_size);
+	dev_info(&pdev->dev, "create short pool N%d, buffer size %d\n",
+		 pp->pool_short->id, pp->pool_short->buf_size);
 
 	return 0;
 }
