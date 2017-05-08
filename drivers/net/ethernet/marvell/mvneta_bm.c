@@ -278,7 +278,7 @@ void mvneta_bm_pool_destroy(struct mvneta_bm *priv,
 
 	mvneta_bm_bufs_free(priv, bm_pool, port_map);
 	if (hwbm_pool->buf_num)
-		WARN(1, "cannot free all buffers in pool %d\n", bm_pool->id);
+		WARN(1, "cannot free %d buffers in pool %d\n", hwbm_pool->buf_num, bm_pool->id);
 
 	if (bm_pool->virt_addr) {
 		dma_free_coherent(&priv->pdev->dev,
