@@ -2296,7 +2296,6 @@ void mvc2_connect(struct mvc2 *cp, int is_on)
 		val = MV_CP_READ(cp->reg->global_control);
 		val &= ~MVCP_GLOBAL_CONTROL_SOFT_CONNECT;
 		MV_CP_WRITE(val, cp->reg->global_control);
-		mvc2_hw_reset(cp);
 	}
 }
 
