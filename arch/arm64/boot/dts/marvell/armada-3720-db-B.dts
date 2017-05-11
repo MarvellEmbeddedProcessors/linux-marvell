@@ -61,6 +61,9 @@
 				bm,pool-long = <2>;
 				bm,pool-short = <3>;
 			};
+			u3d@50000 {
+				status = "disabled";
+			};
 			usb3@58000 {
 				status = "disabled";
 			};
