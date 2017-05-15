@@ -288,6 +288,11 @@ send_command:
 	return 0;
 
 cdesc_rollback:
+	if (nents)
+		dma_unmap_sg(priv->dev, areq->src,
+			     sg_nents_for_len(areq->src, areq->nbytes),
+			     DMA_TO_DEVICE);
+
 	for (i = 0; i < n_cdesc; i++)
 		safexcel_ring_rollback_wptr(priv, &priv->ring[ring].cdr);
 free_cache:
