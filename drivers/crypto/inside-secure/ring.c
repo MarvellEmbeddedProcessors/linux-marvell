@@ -32,30 +32,14 @@ int safexcel_init_ring_descriptors(struct safexcel_crypto_priv *priv,
 	rdr->base = dmam_alloc_coherent(priv->dev,
 					rdr->offset * EIP197_DEFAULT_RING_SIZE,
 					&rdr->base_dma, GFP_KERNEL);
-	if (!rdr->base) {
-		dmam_free_coherent(priv->dev,
-				   cdr->offset * EIP197_DEFAULT_RING_SIZE,
-				   cdr->base, cdr->base_dma);
+	if (!rdr->base)
 		return -ENOMEM;
-	}
+
 	rdr->write = rdr->base;
 	rdr->base_end = rdr->base + rdr->offset * EIP197_DEFAULT_RING_SIZE;
 	rdr->read = rdr->base;
 
 	return 0;
-}
-
-/* Free the ring descriptors */
-void safexcel_free_ring_descriptors(struct safexcel_crypto_priv *priv,
-				    struct safexcel_ring *cdr,
-				    struct safexcel_ring *rdr)
-{
-	dmam_free_coherent(priv->dev,
-			   cdr->offset * EIP197_DEFAULT_RING_SIZE,
-			   cdr->base, cdr->base_dma);
-	dmam_free_coherent(priv->dev,
-			   rdr->offset * EIP197_DEFAULT_RING_SIZE,
-			   rdr->base, rdr->base_dma);
 }
 
 /* Return the next available descriptor for use (command/result) */

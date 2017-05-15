@@ -1374,11 +1374,8 @@ static int safexcel_remove(struct platform_device *pdev)
 
 	clk_disable_unprepare(priv->clk);
 
-	for (i = 0; i < priv->config.rings; i++) {
-		safexcel_free_ring_descriptors(priv, &priv->ring[i].cdr,
-					       &priv->ring[i].rdr);
+	for (i = 0; i < priv->config.rings; i++)
 		destroy_workqueue(priv->ring[i].workqueue);
-	}
 
 	return 0;
 }
