@@ -341,7 +341,7 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	ctx->base.send = safexcel_aes_send;
 
 	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	enq_ret = crypto_enqueue_request(&priv->ring[ctx->base.ring].queue, async);
+	enq_ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, req);
 	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
 
 	if (enq_ret != -EINPROGRESS)
@@ -400,7 +400,7 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 	ctx->base.send = safexcel_cipher_send_inv;
 
 	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	ret = crypto_enqueue_request(&priv->ring[ctx->base.ring].queue, &req.base);
+	ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, &req);
 	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
 
 	queue_work(priv->ring[ctx->base.ring].workqueue,
@@ -452,7 +452,7 @@ static int safexcel_aes(struct ablkcipher_request *req,
 	}
 
 	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	ret = crypto_enqueue_request(&priv->ring[ctx->base.ring].queue, &req->base);
+	ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, req);
 	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
 
 	queue_work(priv->ring[ctx->base.ring].workqueue,
