@@ -22,11 +22,14 @@ struct safexcel_cipher_ctx {
 	struct safexcel_context base;
 	struct safexcel_crypto_priv *priv;
 
-	enum safexcel_cipher_direction direction;
 	u32 mode;
 
 	__le32 key[8];
 	unsigned int key_len;
+};
+
+struct safexcel_cipher_reqctx {
+	enum safexcel_cipher_direction direction;
 };
 
 /* Build cipher token */
@@ -87,12 +90,15 @@ static int safexcel_aes_setkey(struct crypto_ablkcipher *ctfm, const u8 *key,
 
 /* Build cipher context control data */
 static int safexcel_context_control(struct safexcel_cipher_ctx *ctx,
+				    struct crypto_async_request *async,
 				    struct safexcel_command_desc *cdesc)
 {
 	struct safexcel_crypto_priv *priv = ctx->priv;
+	struct ablkcipher_request *req = ablkcipher_request_cast(async);
+	struct safexcel_cipher_reqctx *rctx = ablkcipher_request_ctx(req);
 	int ctrl_size;
 
-	if (ctx->direction == SAFEXCEL_ENCRYPT)
+	if (rctx->direction == SAFEXCEL_ENCRYPT)
 		cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_CRYPTO_OUT;
 	else
 		cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_CRYPTO_IN;
@@ -233,7 +239,7 @@ static int safexcel_aes_send(struct crypto_async_request *async,
 		n_cdesc++;
 
 		if (n_cdesc == 1) {
-			safexcel_context_control(ctx, cdesc);
+			safexcel_context_control(ctx, async, cdesc);
 			safexcel_cipher_token(ctx, async, cdesc, req->nbytes);
 		}
 
@@ -417,10 +423,11 @@ static int safexcel_aes(struct ablkcipher_request *req,
 			enum safexcel_cipher_direction dir, u32 mode)
 {
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
+	struct safexcel_cipher_reqctx *rctx = ablkcipher_request_ctx(req);
 	struct safexcel_crypto_priv *priv = ctx->priv;
 	int ret;
 
-	ctx->direction = dir;
+	rctx->direction = dir;
 	ctx->mode = mode;
 
 	/*
@@ -473,6 +480,8 @@ static int safexcel_ablkcipher_cra_init(struct crypto_tfm *tfm)
 		container_of(tfm->__crt_alg, struct safexcel_alg_template, alg.crypto);
 
 	ctx->priv = tmpl->priv;
+
+	tfm->crt_ablkcipher.reqsize = sizeof(struct safexcel_cipher_reqctx);
 
 	return 0;
 }
