@@ -863,7 +863,7 @@ int safexcel_invalidate_cache(struct crypto_async_request *async,
 				       CONTEXT_CONTROL_HW_SERVICES_OFFSET;
 
 	/* prepare result descriptor */
-	rdesc = safexcel_add_rdesc(priv, ring, true, true, ctxr_dma, 0);
+	rdesc = safexcel_add_rdesc(priv, ring, true, true, 0, 0);
 
 	if (IS_ERR(rdesc)) {
 		ret = PTR_ERR(rdesc);
