@@ -207,13 +207,14 @@
 #define EIP197_HIA_CDR_THRESH_TIMEOUT(n)		((n) << 24) /* x256 clk cycles */
 
 /* EIP197_HIA_RDR_THRESH */
-#define EIP197_HIA_RDR_THRESH_PROC_PKT(n)		((n) << 0)
+#define EIP197_HIA_RDR_THRESH_PROC_PKT(n)		(GENMASK(15, 0) & (n))
 #define EIP197_HIA_RDR_THRESH_PKT_MODE			BIT(23)
 #define EIP197_HIA_RDR_THRESH_TIMEOUT(n)		((n) << 24) /* x256 clk cycles */
 
 /* EIP197_HIA_xDR_PREP_COUNT */
 #define EIP197_xDR_PREP_CLR_COUNT			BIT(31)
-#define EIP197_xDR_PREP_RD_COUNT_INCR_OFFSET		2
+#define EIP197_xDR_PREP_xD_COUNT_INCR_OFFSET		2
+#define EIP197_xDR_PREP_RD_COUNT_INCR_MASK		(GENMASK(14, 0))
 
 /* EIP197_HIA_xDR_PROC_COUNT */
 #define EIP197_xDR_PROC_xD_PKT_OFFSET			24
@@ -610,8 +611,10 @@ struct safexcel_crypto_priv {
 	struct {
 		spinlock_t lock;
 		spinlock_t egress_lock;
+		int egress_cnt;
 
 		struct list_head list;
+		int busy;
 		struct crypto_async_request *req;
 		struct crypto_async_request *backlog;
 		struct workqueue_struct *workqueue;
