@@ -267,7 +267,7 @@ send_command:
 
 	/* Add a result descriptor */
 	rdesc = safexcel_add_rdesc(priv, ring, 1, 1,
-				   dma_to_phys(priv->dev, ctx->base.result_dma),
+				   ctx->base.result_dma,
 				   req->state_sz);
 	if (IS_ERR(rdesc)) {
 		ret = PTR_ERR(rdesc);
