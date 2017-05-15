@@ -42,9 +42,9 @@ static void mvebu_a3700_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 
 	case (COMPHY_SGMII_MODE):
 	case (COMPHY_HS_SGMII_MODE):
-		if (comphy->index == COMPHY_LANE1)
+		if (comphy->index == COMPHY_LANE0)
 			reg &= ~COMPHY_SELECTOR_USB3_GBE1_SEL_BIT;
-		else if (comphy->index == COMPHY_LANE0)
+		else if (comphy->index == COMPHY_LANE1)
 			reg &= ~COMPHY_SELECTOR_PCIE_GBE0_SEL_BIT;
 		else
 			dev_err(priv->dev, "COMPHY[%d] mode[%d] is invalid\n", comphy->index, mode);
@@ -55,15 +55,15 @@ static void mvebu_a3700_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 	case (COMPHY_USB3_MODE):
 		if (comphy->index == COMPHY_LANE2)
 			reg |= COMPHY_SELECTOR_USB3_PHY_SEL_BIT;
-		else if (comphy->index == COMPHY_LANE1)
+		else if (comphy->index == COMPHY_LANE0)
 			reg |= COMPHY_SELECTOR_USB3_GBE1_SEL_BIT;
 		else
 			dev_err(priv->dev, "COMPHY[%d] mode[%d] is invalid\n", comphy->index, mode);
 		break;
 
 	case (COMPHY_PCIE_MODE):
-		/* PCIE must be in Lane0 */
-		if (comphy->index == COMPHY_LANE0)
+		/* PCIE must be in Lane1 */
+		if (comphy->index == COMPHY_LANE1)
 			reg |= COMPHY_SELECTOR_PCIE_GBE0_SEL_BIT;
 		else
 			dev_err(priv->dev, "COMPHY[%d] mode[%d] is invalid\n", comphy->index, mode);
@@ -285,10 +285,10 @@ static int mvebu_a3700_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 	mvebu_a3700_comphy_set_phy_selector(priv, comphy);
 
 	/* Serdes IP Base address
-	 * COMPHY Lane0 -- PCIe/GBE0
-	 * COMPHY Lane1 -- USB3/GBE1
+	 * COMPHY Lane0 -- USB3/GBE1
+	 * COMPHY Lane1 -- PCIe/GBE0
 	 */
-	if (comphy->index == COMPHY_LANE1) {
+	if (comphy->index == COMPHY_LANE0) {
 		/* Get usb3 and gbe register resource and map */
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "usb3_gbe1_phy");
 		if (res) {
@@ -461,7 +461,7 @@ static int mvebu_a3700_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 		dev_err(priv->dev, "Failed to init RX of SGMII PHY %d\n", comphy->index);
 
 	/* Unmap resource */
-	if (comphy->index == COMPHY_LANE1) {
+	if (comphy->index == COMPHY_LANE0) {
 		devm_iounmap(&pdev->dev, sd_ip_addr);
 		devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
 	}
@@ -1003,9 +1003,9 @@ const struct mvebu_comphy_soc_info a3700_comphy = {
 	.num_of_lanes = 3,
 	.functions = {
 		/* Lane 0 */
-		{COMPHY_UNUSED, COMPHY_PCIE0, COMPHY_SGMII0},
-		/* Lane 1 */
 		{COMPHY_UNUSED, COMPHY_SGMII1, COMPHY_HS_SGMII1, COMPHY_USB3},
+		/* Lane 1 */
+		{COMPHY_UNUSED, COMPHY_PCIE0, COMPHY_SGMII0},
 		/* Lane 2 */
 		{COMPHY_UNUSED, COMPHY_SATA0, COMPHY_USB3},
 	},

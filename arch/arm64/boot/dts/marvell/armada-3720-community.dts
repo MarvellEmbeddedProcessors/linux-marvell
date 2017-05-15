@@ -112,7 +112,7 @@
 
 			u3d@50000 {
 				status = "disabled";
-				phys = <&a3700_comphy 1 COMPHY_USB3>;
+				phys = <&a3700_comphy 0 COMPHY_USB3>;
 				phy-names = "usb";
 			};
 
@@ -126,7 +126,7 @@
 				compatible = "generic-xhci";
 				status = "okay";
 				phys = <&utmi_usb32>, /* utmi usb32 dedicated phy */
-				       <&a3700_comphy 1 COMPHY_USB3>; /* usb3 comphy */
+				       <&a3700_comphy 0 COMPHY_USB3>; /* usb3 comphy */
 				phy-names = "usb2", "usb3";
 			};
 
@@ -209,7 +209,7 @@
 
 &pcie0 {
 	status = "okay";
-	phys = <&a3700_comphy 0 COMPHY_PCIE0>;
+	phys = <&a3700_comphy 1 COMPHY_PCIE0>;
 	phy-names = "comphy";
 	reset-gpios = <&gpio_sb 3 GPIO_ACTIVE_HIGH>;
 };
