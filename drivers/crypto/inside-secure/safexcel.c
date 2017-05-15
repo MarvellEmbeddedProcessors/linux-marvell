@@ -1244,14 +1244,13 @@ static int safexcel_probe(struct platform_device *pdev)
 			return -EPROBE_DEFER;
 	}
 
-	ret = of_property_read_u32(dev->of_node, "dma-bus-width",
-				   &dma_bus_width);
+	ret = of_property_read_u32(dev->of_node, "dma-bus-width", &dma_bus_width);
 	if (ret) {
 		dev_err(dev, "Failed to read dma-bus-width property\n");
 		goto err_clk;
 	}
 
-	ret = dma_set_mask_and_coherent(&pdev->dev,
+	ret = dma_set_mask_and_coherent(dev,
 					DMA_BIT_MASK(dma_bus_width));
 	if (ret)
 		goto err_clk;
