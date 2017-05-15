@@ -680,17 +680,25 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 	int commands, results;
 	u32 val;
 
+	req = priv->ring[ring].req;
+	backlog = priv->ring[ring].backlog;
+
 	do {
-		spin_lock_bh(&priv->ring[ring].queue_lock);
-		req = crypto_dequeue_request(&priv->ring[ring].queue);
-		backlog = crypto_get_backlog(&priv->ring[ring].queue);
-		spin_unlock_bh(&priv->ring[ring].queue_lock);
+		/* get a new request if no ring saved req */
+		if (!req) {
+			spin_lock_bh(&priv->ring[ring].queue_lock);
+			backlog = crypto_get_backlog(&priv->ring[ring].queue);
+			req = crypto_dequeue_request(&priv->ring[ring].queue);
+			spin_unlock_bh(&priv->ring[ring].queue_lock);
+		}
 
-		if (!req)
+		/* no more requests, update ring saved req */
+		if (!req) {
+			/* no more requests, clear */
+			priv->ring[ring].req = NULL;
+			priv->ring[ring].backlog = NULL;
 			goto finalize;
-
-		if (backlog)
-			backlog->complete(backlog, -EINPROGRESS);
+		}
 
 		request = kzalloc(sizeof(*request), EIP197_GFP_FLAGS(*req));
 		if (!request) {
@@ -705,23 +713,25 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 			goto resource_fail;
 		}
 
+		if (backlog)
+			backlog->complete(backlog, -EINPROGRESS);
+
+		backlog = NULL;
+		req = NULL;
+
 		cdesc += commands;
 		rdesc += results;
-
-		if (++nreq > EIP197_MAX_BATCH_SZ) {
-			priv->ring[ring].need_dequeue = true;
-			goto finalize;
-		}
+		nreq++;
 	} while (true);
 
 resource_fail:
-	/* resource alloc fail, bail out, complete the request and */
-	/* leave dequeue enabled since we have not cleaned it all  */
+	/*
+	 * resource alloc fail, bail out, save the request and backlog
+	 * for later dequeue handling
+	 */
+	priv->ring[ring].req = req;
+	priv->ring[ring].backlog = backlog;
 	priv->ring[ring].need_dequeue = true;
-
-	local_bh_disable();
-	req->complete(req, ret);
-	local_bh_enable();
 
 finalize:
 	if (!nreq)
@@ -1240,6 +1250,9 @@ static int safexcel_probe(struct platform_device *pdev)
 			ret = -ENOMEM;
 			goto err_pool;
 		}
+
+		priv->ring[i].req = NULL;
+		priv->ring[i].backlog = NULL;
 
 		INIT_LIST_HEAD(&priv->ring[i].list);
 		spin_lock_init(&priv->ring[i].lock);

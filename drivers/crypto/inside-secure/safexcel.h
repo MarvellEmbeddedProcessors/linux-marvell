@@ -612,6 +612,8 @@ struct safexcel_crypto_priv {
 		spinlock_t egress_lock;
 
 		struct list_head list;
+		struct crypto_async_request *req;
+		struct crypto_async_request *backlog;
 		struct workqueue_struct *workqueue;
 		struct safexcel_work_data work_data;
 
