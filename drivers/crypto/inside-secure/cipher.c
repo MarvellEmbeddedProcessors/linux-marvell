@@ -347,8 +347,8 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	if (enq_ret != -EINPROGRESS)
 		*ret = enq_ret;
 
-	if (!priv->ring[ctx->base.ring].need_dequeue)
-		safexcel_dequeue(priv, ctx->base.ring);
+	queue_work(priv->ring[ctx->base.ring].workqueue,
+		   &priv->ring[ctx->base.ring].work_data.work);
 
 	*should_complete = false;
 
@@ -403,8 +403,8 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 	ret = crypto_enqueue_request(&priv->ring[ctx->base.ring].queue, &req.base);
 	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
 
-	if (!priv->ring[ctx->base.ring].need_dequeue)
-		safexcel_dequeue(priv, ctx->base.ring);
+	queue_work(priv->ring[ctx->base.ring].workqueue,
+		   &priv->ring[ctx->base.ring].work_data.work);
 
 	wait_for_completion_interruptible(&result.completion);
 
@@ -418,7 +418,7 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 	return ret;
 }
 
-/* Encrypt/Decrypt operation - Insert request to Crypro API queue */
+/* Encrypt/Decrypt operation - Insert request to Crypto API queue */
 static int safexcel_aes(struct ablkcipher_request *req,
 			enum safexcel_cipher_direction dir, u32 mode)
 {
@@ -455,8 +455,8 @@ static int safexcel_aes(struct ablkcipher_request *req,
 	ret = crypto_enqueue_request(&priv->ring[ctx->base.ring].queue, &req->base);
 	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
 
-	if (!priv->ring[ctx->base.ring].need_dequeue)
-		safexcel_dequeue(priv, ctx->base.ring);
+	queue_work(priv->ring[ctx->base.ring].workqueue,
+		   &priv->ring[ctx->base.ring].work_data.work);
 
 	return ret;
 }

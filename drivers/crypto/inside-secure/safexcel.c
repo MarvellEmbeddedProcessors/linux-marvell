@@ -731,28 +731,34 @@ resource_fail:
 	 */
 	priv->ring[ring].req = req;
 	priv->ring[ring].backlog = backlog;
-	priv->ring[ring].need_dequeue = true;
 
 finalize:
-	if (!nreq)
-		return;
-
 	spin_lock_bh(&priv->ring[ring].lock);
 
-	/* Configure when we want an interrupt */
-	val = EIP197_HIA_RDR_THRESH_PKT_MODE | EIP197_HIA_RDR_THRESH_PROC_PKT(nreq);
-	val |= EIP197_HIA_RDR_THRESH_TIMEOUT(0x80);
-	writel_relaxed(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_THRESH);
+	/* update the ring request count */
+	priv->ring[ring].egress_cnt += nreq;
 
-	/* let the RDR know we have pending descriptors */
-	writel_relaxed((rdesc * priv->config.rd_offset) << EIP197_xDR_PREP_RD_COUNT_INCR_OFFSET,
-	       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PREP_COUNT);
+	if (!priv->ring[ring].busy && priv->ring[ring].egress_cnt) {
+		/* Configure when we want an interrupt */
+		priv->ring[ring].busy = 1;
 
-	/* let the CDR know we have pending descriptors */
-	writel((cdesc * priv->config.cd_offset) << EIP197_xDR_PREP_RD_COUNT_INCR_OFFSET,
-	       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(ring) + EIP197_HIA_xDR_PREP_COUNT);
+		val = EIP197_HIA_RDR_THRESH_PKT_MODE |
+			EIP197_HIA_RDR_THRESH_PROC_PKT(min(priv->ring[ring].egress_cnt,
+							   EIP197_MAX_BATCH_SZ));
+		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_THRESH);
+	}
 
 	spin_unlock_bh(&priv->ring[ring].lock);
+
+	if (nreq) {
+		/* let the RDR know we have pending descriptors */
+		writel_relaxed((rdesc * priv->config.rd_offset) << EIP197_xDR_PREP_xD_COUNT_INCR_OFFSET,
+			       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PREP_COUNT);
+
+		/* let the CDR know we have pending descriptors */
+		writel((cdesc * priv->config.cd_offset) << EIP197_xDR_PREP_xD_COUNT_INCR_OFFSET,
+			EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(ring) + EIP197_HIA_xDR_PREP_COUNT);
+	}
 }
 
 /* Select the ring which will be used for the operation */
@@ -880,21 +886,25 @@ unlock:
 }
 
 /* Generic result handler */
-static inline void safexcel_handle_result_descriptor(struct safexcel_crypto_priv *priv,
-						     int ring)
+static void safexcel_handle_result_descriptor(struct safexcel_crypto_priv *priv,
+					      int ring)
 {
 	struct safexcel_request *sreq;
 	struct safexcel_context *ctx;
-	int ret, i, nreq, ndesc = 0;
+	int ret, i, ndesc, ndesc_tot, nreq_cnt, nreq_tot;
+	u32 val, results;
 	bool should_complete;
+	int egress_cnt;
 
-	nreq = readl(EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PROC_COUNT);
-	nreq = (nreq >> EIP197_xDR_PROC_xD_PKT_OFFSET) & EIP197_xDR_PROC_xD_PKT_MASK;
+more_results:
+	results = readl(EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PROC_COUNT);
+	results = (results >> EIP197_xDR_PROC_xD_PKT_OFFSET) & EIP197_xDR_PROC_xD_PKT_MASK;
 
-	if (!nreq)
-		return;
+	nreq_cnt = 0;
+	nreq_tot = 0;
+	ndesc_tot = 0;
 
-	for (i = 0; i < nreq; i++) {
+	for (i = 0; i < results; i++) {
 		spin_lock_bh(&priv->ring[ring].egress_lock);
 		sreq = list_first_entry(&priv->ring[ring].list, struct safexcel_request, list);
 		list_del(&sreq->list);
@@ -904,12 +914,13 @@ static inline void safexcel_handle_result_descriptor(struct safexcel_crypto_priv
 		ndesc = ctx->handle_result(priv, ring, sreq->req,
 					   &should_complete, &ret);
 		if (ndesc < 0) {
+			kfree(sreq);
 			dev_err(priv->dev, "failed to handle result (%d)", ndesc);
 			return;
 		}
 
-		writel(EIP197_xDR_PROC_xD_PKT(1) | EIP197_xDR_PROC_xD_COUNT(ndesc * priv->config.rd_offset),
-		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_PROC_COUNT);
+		nreq_cnt++;
+		ndesc_tot += ndesc;
 
 		if (should_complete) {
 			local_bh_disable();
@@ -919,26 +930,80 @@ static inline void safexcel_handle_result_descriptor(struct safexcel_crypto_priv
 
 		kfree(sreq);
 	}
+
+	if (nreq_cnt) {
+		/* decrement the handled results */
+		val = EIP197_xDR_PROC_xD_PKT(nreq_cnt) |
+			EIP197_xDR_PROC_xD_COUNT(ndesc_tot * priv->config.rd_offset);
+
+		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) +
+		       EIP197_HIA_xDR_PROC_COUNT);
+
+		nreq_tot += nreq_cnt;
+	}
+
+	spin_lock_bh(&priv->ring[ring].lock);
+
+	/* update the ring request count */
+	priv->ring[ring].egress_cnt -= nreq_tot;
+
+	/* more results ready in the ring? */
+	if (results == EIP197_xDR_PROC_xD_PKT_MASK) {
+		spin_unlock_bh(&priv->ring[ring].lock);
+		goto more_results;
+	}
+
+	/* get the pending request count */
+	egress_cnt = min(priv->ring[ring].egress_cnt, EIP197_MAX_BATCH_SZ);
+
+	if (!egress_cnt) {
+		/* no more request in ring */
+		priv->ring[ring].busy = 0;
+		spin_unlock_bh(&priv->ring[ring].lock);
+
+		return;
+	}
+
+	/* Configure when we want an interrupt */
+	val = EIP197_HIA_RDR_THRESH_PKT_MODE |
+		EIP197_HIA_RDR_THRESH_PROC_PKT(egress_cnt);
+
+	writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) +
+	       EIP197_HIA_xDR_THRESH);
+
+	spin_unlock_bh(&priv->ring[ring].lock);
 }
 
-/* Result worker routine */
-static void safexcel_handle_result_work(struct work_struct *work)
+/* dequeue from Crypto API FIFO and insert requests into HW ring */
+static void safexcel_handle_queued_work(struct work_struct *work)
 {
 	struct safexcel_work_data *data = container_of(work, struct safexcel_work_data, work);
 	struct safexcel_crypto_priv *priv = data->priv;
 
-	safexcel_handle_result_descriptor(priv, data->ring);
-
-	if (priv->ring[data->ring].need_dequeue) {
-		priv->ring[data->ring].need_dequeue = false;
-		safexcel_dequeue(data->priv, data->ring);
-	}
+	safexcel_dequeue(priv, data->ring);
 }
 
 struct safexcel_ring_irq_data {
 	struct safexcel_crypto_priv *priv;
 	int ring;
 };
+
+/* threaded irq handler that handles all results from a ring */
+static irqreturn_t safexcel_irq_ring_thread_handler(int irq, void *data)
+{
+	struct safexcel_ring_irq_data *irq_data = data;
+	struct safexcel_crypto_priv *priv = irq_data->priv;
+	int ring = irq_data->ring;
+
+	/* handle all ring results */
+	safexcel_handle_result_descriptor(priv, ring);
+
+	/* schedule enqueue worker */
+	queue_work(priv->ring[ring].workqueue,
+		   &priv->ring[ring].work_data.work);
+
+	return IRQ_HANDLED;
+}
 
 /* Ring IRQ handler */
 static irqreturn_t safexcel_irq_ring(int irq, void *data)
@@ -947,11 +1012,12 @@ static irqreturn_t safexcel_irq_ring(int irq, void *data)
 	struct safexcel_crypto_priv *priv = irq_data->priv;
 	int ring = irq_data->ring;
 	u32 status, stat;
+	int rc = IRQ_NONE;
 
 	status = readl(EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ENABLED_STAT(ring));
 
 	if (!status)
-		return IRQ_NONE;
+		return rc;
 
 	/* CDR interrupts */
 	if (status & EIP197_CDR_IRQ(ring)) {
@@ -985,13 +1051,8 @@ static irqreturn_t safexcel_irq_ring(int irq, void *data)
 			dev_err(priv->dev, "RDR: fatal error.");
 		}
 
-		if (likely(stat & EIP197_xDR_THRESH)) {
-			writel_relaxed(0, EIP197_HIA_AIC_xDR(priv) +
-				       EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_THRESH);
-			queue_work(priv->ring[ring].workqueue, &priv->ring[ring].work_data.work);
-		} else if (unlikely(stat & EIP197_xDR_TIMEOUT)) {
-			queue_work(priv->ring[ring].workqueue, &priv->ring[ring].work_data.work);
-		}
+		if (stat & EIP197_xDR_THRESH)
+			rc = IRQ_WAKE_THREAD;
 
 		/* ACK the interrupts */
 		writel_relaxed(stat & 0xff, EIP197_HIA_AIC_xDR(priv) +
@@ -1001,7 +1062,7 @@ static irqreturn_t safexcel_irq_ring(int irq, void *data)
 	/* ACK the interrupts */
 	writel(status, EIP197_HIA_AIC_R(priv) + EIP197_HIA_AIC_R_ACK(ring));
 
-	return IRQ_HANDLED;
+	return rc;
 }
 
 /* Register gloabl interrupts */
@@ -1028,7 +1089,8 @@ static int safexcel_request_irq(struct platform_device *pdev, const char *name,
 
 /* Register ring interrupts */
 static int safexcel_request_ring_irq(struct platform_device *pdev, const char *name,
-				     irq_handler_t handler,
+				     irq_handler_t irq_handler,
+				     irq_handler_t irq_thread_handler,
 				     struct safexcel_ring_irq_data *ring_irq_priv)
 {
 	int ret, irq = platform_get_irq_byname(pdev, name);
@@ -1038,8 +1100,9 @@ static int safexcel_request_ring_irq(struct platform_device *pdev, const char *n
 		return irq;
 	}
 
-	ret = devm_request_irq(&pdev->dev, irq, handler, 0,
-			       dev_name(&pdev->dev), ring_irq_priv);
+	ret = devm_request_threaded_irq(&pdev->dev, irq, irq_handler,
+					irq_thread_handler, IRQF_ONESHOT,
+					dev_name(&pdev->dev), ring_irq_priv);
 	if (ret) {
 		dev_err(&pdev->dev, "unable to request IRQ %d\n", irq);
 		return ret;
@@ -1235,6 +1298,7 @@ static int safexcel_probe(struct platform_device *pdev)
 
 		snprintf(irq_name, 6, "ring%d", i);
 		irq = safexcel_request_ring_irq(pdev, irq_name, safexcel_irq_ring,
+						safexcel_irq_ring_thread_handler,
 						ring_irq);
 
 		if (irq < 0)
@@ -1242,7 +1306,7 @@ static int safexcel_probe(struct platform_device *pdev)
 
 		priv->ring[i].work_data.priv = priv;
 		priv->ring[i].work_data.ring = i;
-		INIT_WORK(&priv->ring[i].work_data.work, safexcel_handle_result_work);
+		INIT_WORK(&priv->ring[i].work_data.work, safexcel_handle_queued_work);
 
 		snprintf(wq_name, 9, "wq_ring%d", i);
 		priv->ring[i].workqueue = create_singlethread_workqueue(wq_name);
@@ -1250,6 +1314,9 @@ static int safexcel_probe(struct platform_device *pdev)
 			ret = -ENOMEM;
 			goto err_pool;
 		}
+
+		priv->ring[i].egress_cnt = 0;
+		priv->ring[i].busy = 0;
 
 		priv->ring[i].req = NULL;
 		priv->ring[i].backlog = NULL;
