@@ -544,11 +544,17 @@ static int mvebu_uart_irq_request(struct uart_port *port)
 static int mvebu_uart_startup(struct uart_port *port)
 {
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
-	unsigned int ctl;
+	unsigned int ctl, ret;
 
 	writel(CTRL_TXFIFO_RST | CTRL_RXFIFO_RST,
 		port->membase + REG_CTRL(uart_data));
 	udelay(1);
+
+	/* Clear the Error bits of state reg before irq request */
+	ret = readl(port->membase + REG_STAT(uart_data));
+	ret |= STAT_BRK_ERR;
+	writel(ret, port->membase + REG_STAT(uart_data));
+
 	writel(CTRL_BRK_INT, port->membase + REG_CTRL(uart_data));
 	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
 	ctl |= uart_data->reg_bits.ctrl_rx_rdy_int(uart_data);
