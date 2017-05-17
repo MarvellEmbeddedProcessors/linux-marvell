@@ -236,6 +236,7 @@ static int advk_pcie_wait_for_link(struct advk_pcie *pcie)
 static void advk_pcie_setup_hw(struct advk_pcie *pcie)
 {
 	u32 reg;
+	phys_addr_t msi_msg_phys;
 
 	/* Set HW Reference Clock Buffer Control */
 	advk_writel(pcie, PCIE_PHY_BUF_CTRL_INIT_VAL, PCIE_PHY_REF_CLOCK);
@@ -286,6 +287,13 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
 	reg = advk_readl(pcie, PCIE_CORE_CTRL0_REG);
 	reg |= LINK_TRAINING_EN;
 	advk_writel(pcie, reg, PCIE_CORE_CTRL0_REG);
+
+	/* Set MSI Address in RC mode */
+	msi_msg_phys = virt_to_phys(&pcie->msi_msg);
+	advk_writel(pcie, lower_32_bits(msi_msg_phys),
+		    PCIE_MSI_ADDR_LOW_REG);
+	advk_writel(pcie, upper_32_bits(msi_msg_phys),
+		    PCIE_MSI_ADDR_HIGH_REG);
 
 	/* Enable MSI */
 	reg = advk_readl(pcie, PCIE_CORE_CTRL2_REG);
@@ -642,7 +650,6 @@ static int advk_pcie_init_msi_irq_domain(struct advk_pcie *pcie)
 	struct device_node *node = dev->of_node;
 	struct irq_chip *msi_irq_chip;
 	struct msi_controller *msi;
-	phys_addr_t msi_msg_phys;
 	int ret;
 
 	msi_irq_chip = &pcie->msi_irq_chip;
@@ -664,13 +671,6 @@ static int advk_pcie_init_msi_irq_domain(struct advk_pcie *pcie)
 	msi->of_node = node;
 
 	mutex_init(&pcie->msi_used_lock);
-
-	msi_msg_phys = virt_to_phys(&pcie->msi_msg);
-
-	advk_writel(pcie, lower_32_bits(msi_msg_phys),
-		    PCIE_MSI_ADDR_LOW_REG);
-	advk_writel(pcie, upper_32_bits(msi_msg_phys),
-		    PCIE_MSI_ADDR_HIGH_REG);
 
 	pcie->msi_domain =
 		irq_domain_add_linear(NULL, MSI_IRQ_NUM,
