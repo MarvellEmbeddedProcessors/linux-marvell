@@ -1,0 +1,12 @@
+menu "PCI End-point controller drivers"
+	depends on PCI
+
+config PCIE_A8K_DW_EP
+	bool "Armada-8K DesignWare PCI End-point driver "
+	depends on OF && HAS_IOMEM
+	help
+	 Enables support for the Armada-8k DesignWare PCIe end-point controller.
+	 The driver enables to configure the end-point BARs and respective
+	 address space.
+
+endmenu

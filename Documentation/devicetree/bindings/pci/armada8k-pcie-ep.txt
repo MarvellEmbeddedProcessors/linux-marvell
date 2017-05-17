@@ -1,0 +1,19 @@
+Armada-8K PCIe End-point DT details:
+====================================
+
+Armada-8k uses synopsis designware PCIe controller.
+
+Required properties:
+- compatible : should be "marvell,armada8k-pcie-ep", "snps,dw-pcie".
+- reg: base addresses and lengths of the pcie core, link management and shadow registers.
+- All other definitions as per generic PCI bindings
+See "Documentation/devicetree/bindings/pci/designware-pcie.txt"
+
+Example of PCIE EP X1:
+pcie-ep@0x600000 {
+	compatible = "marvell,armada8k-pcie-ep", "snps,dw-pcie";
+	reg = <0 0xf2600000 0 0x4000>, <0 0xf2608000 0 0x80000>, <0 0xf2604000 0 0x1000>;
+	reg-names = "core", "lm", "shadow_core";
+	clocks = <&cpm_syscon0 1 13>;
+	status = "disabled";
+};

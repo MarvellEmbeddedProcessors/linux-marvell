@@ -62,3 +62,4 @@ ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
 
 # PCI host controller drivers
 obj-y += host/
+obj-y += ep/
