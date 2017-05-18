@@ -53,6 +53,8 @@
 		internal-regs {
 			eth1: ethernet@40000 {
 				phy-mode = "sgmii";
+				phys = <&a3700_comphy 0 COMPHY_SGMII1>;
+				phy-names = "comphy";
 				status = "okay";
 				fixed-link {
 					/* Here "speed" is set to 1000, GBE MAC is running in 1G mode, */
