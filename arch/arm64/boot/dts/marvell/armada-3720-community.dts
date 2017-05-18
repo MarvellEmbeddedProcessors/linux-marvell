@@ -123,6 +123,7 @@
 			};
 
 			usb3@58000 {
+				compatible = "generic-xhci";
 				status = "okay";
 				phys = <&utmi_usb32>, /* utmi usb32 dedicated phy */
 				       <&a3700_comphy 1 COMPHY_USB3>; /* usb3 comphy */
