@@ -1026,7 +1026,6 @@ static int mvebu_uart_reg_save(struct mvebu_uart_data *data)
 	if (data->reg_type == REG_UART_A3700_EXT)
 		data->pm_reg_value.uart_ctrl2 = readl(data->port->membase + REG_CTRL2(data));
 
-	data->pm_reg_value.uart_tsh = readl(data->port->membase + REG_TSH(data));
 	data->pm_reg_value.uart_brdv = readl(data->port->membase + REG_BRDV(data));
 	data->pm_reg_value.uart_over_sample = readl(data->port->membase + REG_OSAMP(data));
 	if (!IS_ERR_OR_NULL(data->intr.uart_int_base))
@@ -1043,7 +1042,6 @@ static int mvebu_uart_reg_restore(struct mvebu_uart_data *data)
 	if (data->reg_type == REG_UART_A3700_EXT)
 		writel(data->pm_reg_value.uart_ctrl2, data->port->membase + REG_CTRL2(data));
 
-	writel(data->pm_reg_value.uart_tsh, data->port->membase + REG_TSH(data));
 	writel(data->pm_reg_value.uart_brdv, data->port->membase + REG_BRDV(data));
 	writel(data->pm_reg_value.uart_over_sample, data->port->membase + REG_OSAMP(data));
 	if (!IS_ERR_OR_NULL(data->intr.uart_int_base))
