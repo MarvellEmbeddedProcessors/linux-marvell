@@ -39,6 +39,14 @@
 		/* PCIe ports have unique addressing so they do not
 		 * come from the common CP110 dtsi
 		 */
+		pcie-ep@0x600000 {
+			compatible = "marvell,armada8k-pcie-ep", "snps,dw-pcie";
+			reg = <0 0xf2600000 0 0x4000>, <0 0xf2608000 0 0x80000>, <0 0xf2604000 0 0x1000>;
+			reg-names = "core", "lm", "shadow_core";
+			clocks = <&cpm_syscon0 1 13>;
+			status = "disabled";
+		};
+
 		pcie@0x600000 {
 			compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
 			reg = <0 0xf2600000 0 0x10000>, <0 0xf6f00000 0 0x80000>;	/* Last 512KB of mem space */
