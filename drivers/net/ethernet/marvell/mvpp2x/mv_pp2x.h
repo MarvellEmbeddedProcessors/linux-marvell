@@ -133,6 +133,7 @@
 /* Coalescing */
 #define MVPP2_TXDONE_COAL_PKTS		64
 #define MVPP2_TXDONE_HRTIMER_PERIOD_NS	1000000UL
+#define MVPP2_TX_HRTIMER_PERIOD_NS	50000UL
 #define MVPP2_TXDONE_COAL_USEC		1000
 
 #define MVPP2_RX_COAL_PKTS		32
@@ -554,6 +555,10 @@ struct mv_pp2x_port_pcpu {
 	int ext_buf_size;
 	struct list_head ext_buf_port_list;
 	struct mv_pp2x_ext_buf_pool *ext_buf_pool;
+
+	struct hrtimer tx_timer;
+	struct tasklet_struct tx_tasklet;
+	bool tx_timer_scheduled;
 };
 
 struct queue_vector {

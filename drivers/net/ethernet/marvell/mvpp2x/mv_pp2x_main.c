@@ -1838,6 +1838,28 @@ static void mv_pp2x_timer_set(struct mv_pp2x_port_pcpu *port_pcpu)
 	}
 }
 
+/* Set transmit TX timer */
+static void mv_pp2x_tx_timer_set(struct mv_pp2x_port_pcpu *port_pcpu)
+{
+	ktime_t interval;
+
+	if (!port_pcpu->tx_timer_scheduled) {
+		port_pcpu->tx_timer_scheduled = true;
+		interval = ktime_set(0, MVPP2_TX_HRTIMER_PERIOD_NS);
+		hrtimer_start(&port_pcpu->tx_timer, interval,
+			      HRTIMER_MODE_REL_PINNED);
+	}
+}
+
+/* Cancel transmit TX timer */
+static void mv_pp2x_tx_timer_kill(struct mv_pp2x_port_pcpu *port_pcpu)
+{
+	if (port_pcpu->tx_timer_scheduled) {
+		port_pcpu->tx_timer_scheduled = false;
+		hrtimer_cancel(&port_pcpu->tx_timer);
+	}
+}
+
 static void mv_pp2x_tx_proc_cb(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
@@ -1858,12 +1880,41 @@ static void mv_pp2x_tx_proc_cb(unsigned long data)
 		mv_pp2x_timer_set(port_pcpu);
 }
 
+/* Tasklet transmit procedure */
+static void mv_pp2x_tx_send_proc_cb(unsigned long data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct mv_pp2x_aggr_tx_queue *aggr_txq;
+	struct mv_pp2x_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
+	int cpu = smp_processor_id();
+
+	port_pcpu->tx_timer_scheduled = false;
+
+	aggr_txq = &port->priv->aggr_txqs[cpu];
+
+	if (likely(aggr_txq->xmit_bulk > 0)) {
+		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
+		aggr_txq->xmit_bulk = 0;
+	}
+}
+
 static enum hrtimer_restart mv_pp2x_hr_timer_cb(struct hrtimer *timer)
 {
 	struct mv_pp2x_port_pcpu *port_pcpu = container_of(timer,
 			 struct mv_pp2x_port_pcpu, tx_done_timer);
 
 	tasklet_schedule(&port_pcpu->tx_done_tasklet);
+
+	return HRTIMER_NORESTART;
+}
+
+static enum hrtimer_restart mv_pp2x_tx_hr_timer_cb(struct hrtimer *timer)
+{
+	struct mv_pp2x_port_pcpu *port_pcpu = container_of(timer,
+			 struct mv_pp2x_port_pcpu, tx_timer);
+
+	tasklet_schedule(&port_pcpu->tx_tasklet);
 
 	return HRTIMER_NORESTART;
 }
@@ -2764,6 +2815,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	u32 tcp_seq = 0;
 	skb_frag_t *skb_frag_ptr;
 	const struct tcphdr *th = tcp_hdr(skb);
+	struct mv_pp2x_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
 
 	if (unlikely(mv_pp2_tso_validate(skb, dev)))
 		return 0;
@@ -2889,9 +2941,10 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 
 	aggr_txq->xmit_bulk += total_desc_num;
 	if (!skb->xmit_more) {
-		/* Transmit TCP segment with bulked descriptors*/
+		/* Transmit TCP segment with bulked descriptors and cancel tx hr timer if exist */
 		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
 		aggr_txq->xmit_bulk = 0;
+		mv_pp2x_tx_timer_kill(port_pcpu);
 	}
 
 	txq_pcpu->reserved_num -= total_desc_num;
@@ -2939,6 +2992,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	u16 txq_id;
 	u32 tx_cmd;
 	int cpu = smp_processor_id();
+	struct mv_pp2x_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
 
 	/* Set relevant physical TxQ and Linux netdev queue */
 	txq_id = skb_get_queue_mapping(skb) % mv_pp2x_txq_number;
@@ -3054,11 +3108,10 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	mv_pp2_is_pkt_ptp_tx_proc(port, tx_desc, skb);
 #endif
 
-	/* Enable transmit */
-	if (!skb->xmit_more) {
-		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
-		aggr_txq->xmit_bulk = 0;
-	}
+	/* Start 50 microseconds timer to transmit */
+	if (!skb->xmit_more)
+		mv_pp2x_tx_timer_set(port_pcpu);
+
 out:
 	if (likely(frags > 0)) {
 		struct mv_pp2x_pcpu_stats *stats = this_cpu_ptr(port->stats);
@@ -3743,6 +3796,12 @@ int mv_pp2x_stop(struct net_device *dev)
 			hrtimer_cancel(&port_pcpu->tx_done_timer);
 			port_pcpu->timer_scheduled = false;
 			tasklet_kill(&port_pcpu->tx_done_tasklet);
+		}
+		for_each_present_cpu(cpu) {
+			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+			hrtimer_cancel(&port_pcpu->tx_timer);
+			port_pcpu->tx_timer_scheduled = false;
+			tasklet_kill(&port_pcpu->tx_tasklet);
 		}
 	}
 
@@ -4785,6 +4844,23 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			tasklet_init(&port_pcpu->tx_done_tasklet,
 				     mv_pp2x_tx_proc_cb, (unsigned long)dev);
 		}
+	}
+
+	/* Init hrtimer for tx transmit procedure.
+	 * Instead of reg_write atfer each xmit callback, 50 microsecond
+	 * hrtimer would be started. Hrtimer will reduce amount of accesses
+	 * to transmit register and dmb() influence on network performance.
+	 */
+	for_each_present_cpu(cpu) {
+		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+
+		hrtimer_init(&port_pcpu->tx_timer, CLOCK_MONOTONIC,
+			     HRTIMER_MODE_REL_PINNED);
+		port_pcpu->tx_timer.function = mv_pp2x_tx_hr_timer_cb;
+		port_pcpu->tx_timer_scheduled = false;
+
+		tasklet_init(&port_pcpu->tx_tasklet,
+			     mv_pp2x_tx_send_proc_cb, (unsigned long)dev);
 	}
 	/* Init pool of external buffers for TSO, fragmentation, etc */
 	for_each_present_cpu(cpu) {
