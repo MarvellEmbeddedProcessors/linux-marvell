@@ -194,6 +194,7 @@ extern  u32 debug_param;
 
 #define MVPP2_EXTRA_BUF_SIZE	120
 #define MVPP2_EXTRA_BUF_NUM	(MVPP2_MAX_TXD * MVPP2_MAX_TXQ)
+#define MVPP2_SKB_NUM		(MVPP2_MAX_RXD * MVPP2_MAX_RXQ * MVPP2_MAX_PORTS)
 
 enum mvppv2_version {
 	PPV21 = 21,
@@ -552,6 +553,9 @@ struct mv_pp2x {
 	u16 num_pools;
 	struct mv_pp2x_bm_pool *bm_pools;
 
+	/* Per-CPU CP control */
+	struct mv_pp2x_cp_pcpu __percpu *pcpu;
+
 	/* RX flow hash indir'n table, in pp22, the table contains the
 	* CPU idx according to weight
 	*/
@@ -585,6 +589,12 @@ struct mv_pp2x_port_pcpu {
 	struct hrtimer tx_timer;
 	struct tasklet_struct tx_tasklet;
 	bool tx_timer_scheduled;
+};
+
+/* Per-CPU CP control */
+struct mv_pp2x_cp_pcpu {
+	struct list_head skb_port_list;
+	struct mv_pp2x_skb_pool *skb_pool;
 };
 
 struct queue_vector {
@@ -690,11 +700,23 @@ struct mv_pp2x_ext_buf_struct {
 	u8 *ext_buf_data;
 };
 
+struct mv_pp2x_skb_struct {
+	struct list_head skb_list;
+	struct sk_buff *skb;
+};
+
 struct mv_pp2x_ext_buf_pool {
 	int buf_pool_size;
 	int buf_pool_next_free;
 	int buf_pool_in_use;
 	struct mv_pp2x_ext_buf_struct *ext_buf_struct;
+};
+
+struct mv_pp2x_skb_pool {
+	int skb_pool_size;
+	int skb_pool_in_use;
+	int skb_pool_next_free;
+	struct mv_pp2x_skb_struct *skb_struct;
 };
 
 static inline struct mv_pp2x_port *mv_pp2x_port_struct_get(struct mv_pp2x *priv,

@@ -271,6 +271,14 @@ static void mv_pp2x_extra_pool_inc(struct mv_pp2x_ext_buf_pool *ext_buf_pool)
 		ext_buf_pool->buf_pool_next_free++;
 }
 
+static void mv_pp2x_skb_pool_inc(struct mv_pp2x_skb_pool *skb_pool)
+{
+	if (unlikely(skb_pool->skb_pool_next_free == skb_pool->skb_pool_size - 1))
+		skb_pool->skb_pool_next_free = 0;
+	else
+		skb_pool->skb_pool_next_free++;
+}
+
 static u8 mv_pp2x_first_pool_get(struct mv_pp2x *priv)
 {
 	return priv->pp2_cfg.first_bm_pool;
@@ -912,6 +920,51 @@ static inline int mv_pp2_extra_pool_put(struct mv_pp2x_port *port, void *ext_buf
 	return 0;
 }
 
+static inline struct sk_buff *mv_pp2_skb_pool_get(struct mv_pp2x_port *port)
+{
+	struct sk_buff *skb;
+	struct mv_pp2x_cp_pcpu *cp_pcpu = this_cpu_ptr(port->priv->pcpu);
+	struct mv_pp2x_skb_struct *skb_struct;
+
+	if (!list_empty(&cp_pcpu->skb_port_list)) {
+		skb_struct = list_last_entry(&cp_pcpu->skb_port_list,
+					     struct mv_pp2x_skb_struct, skb_list);
+		list_del(&skb_struct->skb_list);
+		cp_pcpu->skb_pool->skb_pool_in_use--;
+
+		skb = skb_struct->skb;
+
+	} else {
+		skb = NULL;
+	}
+
+	return skb;
+}
+
+static inline int mv_pp2_skb_pool_put(struct mv_pp2x_port *port, struct sk_buff *skb,
+				      int cpu)
+{
+	struct mv_pp2x_cp_pcpu *cp_pcpu = per_cpu_ptr(port->priv->pcpu, cpu);
+	struct mv_pp2x_skb_struct *skb_struct;
+
+	if (cp_pcpu->skb_pool->skb_pool_in_use >= cp_pcpu->skb_pool->skb_pool_size) {
+		dev_kfree_skb_any(skb);
+		return 1;
+	}
+	cp_pcpu->skb_pool->skb_pool_in_use++;
+
+	skb_struct =
+		&cp_pcpu->skb_pool->skb_struct[cp_pcpu->skb_pool->skb_pool_next_free];
+	mv_pp2x_skb_pool_inc(cp_pcpu->skb_pool);
+
+	skb_struct->skb = skb;
+
+	list_add(&skb_struct->skb_list,
+		 &cp_pcpu->skb_port_list);
+
+	return 0;
+}
+
 /* Check if there are enough reserved descriptors for transmission.
  * If not, request chunk of reserved descriptors and check again.
  */
@@ -1036,7 +1089,8 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 			skb_rec->head = NULL;
 			atomic_dec(&bm_pool->in_use);
 
-			dev_kfree_skb_any((struct sk_buff *)skb);
+			mv_pp2_skb_pool_put(port, (struct sk_buff *)skb, txq_pcpu->cpu);
+
 			mv_pp2x_txq_inc_get(txq_pcpu);
 			continue;
 		}
@@ -2441,6 +2495,38 @@ static void mv_pp2x_set_skb_hash(struct mv_pp2x_rx_desc *rx_desc, u32 rx_status,
 		skb_set_hash(skb, MVPP2_UNIQUE_HASH, PKT_HASH_TYPE_L3);
 }
 
+/* Function is similar to build_skb routine without sbk kmem_cache_alloc */
+static void mv_pp2x_build_skb(struct sk_buff *skb, unsigned char *data,
+			      unsigned int frag_size)
+{
+	struct skb_shared_info *shinfo;
+	unsigned int size = frag_size ? : ksize(data);
+
+	size -= SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+	memset(skb, 0, offsetof(struct sk_buff, tail));
+	skb->truesize = SKB_TRUESIZE(size);
+	atomic_set(&skb->users, 1);
+	skb->head = data;
+	skb->data = data;
+	skb_reset_tail_pointer(skb);
+	skb->end = skb->tail + size;
+	skb->mac_header = (typeof(skb->mac_header))~0U;
+	skb->transport_header = (typeof(skb->transport_header))~0U;
+
+	/* make sure we initialize shinfo sequentially */
+	shinfo = skb_shinfo(skb);
+	memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
+	atomic_set(&shinfo->dataref, 1);
+	kmemcheck_annotate_variable(shinfo->destructor_arg);
+
+	if (skb && frag_size) {
+		skb->head_frag = 1;
+		if (page_is_pfmemalloc(virt_to_head_page(data)))
+			skb->pfmemalloc = 1;
+	}
+}
+
 /* Main rx processing */
 static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		      int rx_todo, struct mv_pp2x_rx_queue *rxq)
@@ -2528,9 +2614,19 @@ err_drop_frame:
 			atomic_dec(&bm_pool->in_use);
 			continue;
 		}
+		/* Try to get skb from CP skb pool
+		*  If get func return skb -> use mv_pp2x_build_skb to reset skb
+		*  else -> use regular build_skb callback
+		*/
+		skb = mv_pp2_skb_pool_get(port);
 
-		skb = build_skb(data, bm_pool->frag_size > PAGE_SIZE ? 0 :
+		if (skb)
+			mv_pp2x_build_skb(skb, data, bm_pool->frag_size > PAGE_SIZE ? 0 :
 				bm_pool->frag_size);
+		else
+			skb = build_skb(data, bm_pool->frag_size > PAGE_SIZE ? 0 :
+				bm_pool->frag_size);
+
 		if (unlikely(!skb)) {
 			netdev_warn(port->dev, "skb build failed\n");
 			goto err_drop_frame;
@@ -5712,6 +5808,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	u32 cell_index = 0;
 	struct device_node *dn = pdev->dev.of_node;
 	struct device_node *port_node;
+	struct mv_pp2x_cp_pcpu *cp_pcpu;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(struct mv_pp2x), GFP_KERNEL);
 	if (!priv)
@@ -5769,6 +5866,25 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	if (!priv->port_list) {
 		err = -ENOMEM;
 		goto err_clk;
+	}
+
+	priv->pcpu = alloc_percpu(struct mv_pp2x_cp_pcpu);
+	if (!priv->pcpu) {
+		err = -ENOMEM;
+		goto  err_clk;
+	}
+
+	/* Init per CPU CP skb list for skb recycling */
+	for_each_present_cpu(cpu) {
+		cp_pcpu = per_cpu_ptr(priv->pcpu, cpu);
+
+		INIT_LIST_HEAD(&cp_pcpu->skb_port_list);
+		cp_pcpu->skb_pool = devm_kzalloc(&pdev->dev,
+			sizeof(struct mv_pp2x_skb_pool), GFP_ATOMIC);
+		cp_pcpu->skb_pool->skb_pool_size = MVPP2_SKB_NUM;
+		cp_pcpu->skb_pool->skb_struct =
+			devm_kzalloc(&pdev->dev,
+				     sizeof(struct mv_pp2x_skb_struct) * MVPP2_SKB_NUM, GFP_ATOMIC);
 	}
 
 	/* Init PP22 rxfhindir table evenly in probe */
