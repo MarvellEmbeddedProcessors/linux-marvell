@@ -1793,6 +1793,7 @@ enum mv_pp2x_bm_pool_log_num {
 
 #define MVPP2_TXD_L3_OFF_SHIFT		0
 #define MVPP2_TXD_IP_HLEN_SHIFT		8
+#define MVPP2_TXD_BUF_MOD		BIT(7)
 #define MVPP2_TXD_L4_CSUM_FRAG		BIT(13)
 #define MVPP2_TXD_L4_CSUM_NOT		BIT(14)
 #define MVPP2_TXD_IP_CSUM_DISABLE	BIT(15)
@@ -2279,6 +2280,7 @@ struct mv_pp2x_bm_pool {
 
 	/* Ports using BM pool */
 	u32 port_map;
+	atomic_t in_use;
 
 	int in_use_thresh;
 };
