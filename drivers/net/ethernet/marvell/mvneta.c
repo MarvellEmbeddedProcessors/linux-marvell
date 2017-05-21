@@ -637,7 +637,8 @@ static int txq_number = 8;
 
 static int rxq_def;
 
-static int rx_copybreak __read_mostly = 256;
+#define MV_RX_COPYBREAK_DEF	(256)
+static int rx_copybreak __read_mostly = MV_RX_COPYBREAK_DEF;
 
 /* HW BM need that each port be identify by a unique ID */
 static int global_port_id;
@@ -2077,9 +2078,11 @@ static void mvneta_cleanup_timer_callback(unsigned long data)
 			mvneta_rxq_desc_num_update(pp, rxq, 0, refill_num);
 
 			/* Update refill stop flag */
-			if (!atomic_read(&rxq->missed))
+			if (!atomic_read(&rxq->missed)) {
 				atomic_set(&rxq->refill_stop, 0);
-
+				/* enable copy a small frame through RX and not unmap the DMA region */
+				rx_copybreak = MV_RX_COPYBREAK_DEF;
+			}
 			pr_debug("%s: %d buffers refilled to rxq #%d - missed = %d\n",
 				 __func__, refill_num, rxq->id, atomic_read(&rxq->missed));
 		}
@@ -2239,6 +2242,8 @@ err_drop_frame:
 				atomic_set(&rxq->refill_stop, 1);
 				netdev_err(dev, "Linux processing - Can't refill queue %d\n",
 					   rxq->id);
+				/* disable rx_copybreak mode */
+				/* to prevent hidden buffer refill and buffers disorder */
 				rx_copybreak = 0;
 				atomic_inc(&rxq->missed);
 
