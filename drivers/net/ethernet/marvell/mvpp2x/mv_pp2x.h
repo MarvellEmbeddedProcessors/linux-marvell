@@ -29,6 +29,29 @@
 #define MVPP2_DRIVER_NAME "mvpp2"
 #define MVPP2_DRIVER_VERSION "1.0"
 
+#define MVPP2X_SKB_MAGIC_MASK		0xFFFFFFC0
+#define MVPP2X_SKB_MAGIC_SKB_OFFS	3
+#define MVPP2X_SKB_PP2_CELL_OFFS	4
+#define MVPP2X_CB_REC_OFFS			5
+#define MVPP2X_SKB_BPID_MASK		0xF
+#define MVPP2X_SKB_CELL_MASK		0x3
+
+/* SKB magic, mainly used for skb recycle, here it is the address[34 : 8] of skb */
+#define MVPP2X_SKB_MAGIC(skb)   (((unsigned int)(((u64)skb) >> \
+				MVPP2X_SKB_MAGIC_SKB_OFFS)) & MVPP2X_SKB_MAGIC_MASK)
+/* Cb to store magic and bpid, IPv6 TCP will consume the most cb[] with 44 bytes, so the last 5 bytes is safe to use */
+#define MVPP2X_SKB_CB(skb)                          (*(unsigned int *)(&skb->cb[sizeof(skb->cb) - MVPP2X_CB_REC_OFFS]))
+/* Set magic and bpid, magic[31:5], pp2_id[5:4], source pool[3:0] */
+#define MVPP2X_SKB_MAGIC_BPID_SET(skb, magic_bpid)  (MVPP2X_SKB_CB(skb) = magic_bpid)
+/* Get bpid */
+#define MVPP2X_SKB_BPID_GET(skb)                    (MVPP2X_SKB_CB(skb) & MVPP2X_SKB_BPID_MASK)
+#define MVPP2X_SKB_PP2_CELL_GET(skb)        ((MVPP2X_SKB_CB(skb) >> MVPP2X_SKB_PP2_CELL_OFFS) & \
+						MVPP2X_SKB_CELL_MASK)
+
+#define MVPP2X_SKB_RECYCLE_MAGIC_GET(skb)           (MVPP2X_SKB_CB(skb) & MVPP2X_SKB_MAGIC_MASK)
+/* Recycle magic check */
+#define MVPP2X_SKB_RECYCLE_MAGIC_IS_OK(skb)         (MVPP2X_SKB_MAGIC(skb) == MVPP2X_SKB_RECYCLE_MAGIC_GET(skb))
+
 #define PFX			MVPP2_DRIVER_NAME ": "
 
 #define IRQ_NAME_SIZE (36)
@@ -165,6 +188,9 @@ extern  u32 debug_param;
 /* Used for define type of data saved in shadow: SKB or extended buffer or nothing */
 #define MVPP2_ETH_SHADOW_SKB		0x1
 #define MVPP2_ETH_SHADOW_EXT		0x2
+#define MVPP2_ETH_SHADOW_REC		0x4
+
+#define MVPP2_UNIQUE_HASH		0x4567492
 
 #define MVPP2_EXTRA_BUF_SIZE	120
 #define MVPP2_EXTRA_BUF_NUM	(MVPP2_MAX_TXD * MVPP2_MAX_TXQ)

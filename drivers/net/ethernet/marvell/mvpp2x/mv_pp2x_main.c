@@ -316,6 +316,14 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 	dma_addr_t phys_addr;
 	void *data;
 
+	/* BM pool is refilled only if number of used buffers is bellow
+	 * refill threshold. Number of used buffers could be decremented
+	 * by recycling mechanism.
+	 */
+	if (is_recycle &&
+	    (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
+		return 0;
+
 	data = mv_pp2x_frag_alloc(bm_pool);
 	if (!data)
 		return -ENOMEM;
@@ -330,6 +338,11 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 	}
 
 	mv_pp2x_pool_refill(port->priv, pool, phys_addr, cpu);
+
+	/* Decrement only if refill called from RX */
+	if (likely(is_recycle))
+		atomic_dec(&bm_pool->in_use);
+
 	return 0;
 }
 
@@ -373,6 +386,7 @@ static int mv_pp2x_bm_pool_create(struct device *dev,
 	bm_pool->buf_num = 0;
 	mv_pp2x_bm_pool_bufsize_set(hw, bm_pool,
 				    MVPP2_RX_BUF_SIZE(bm_pool->pkt_size));
+	atomic_set(&bm_pool->in_use, 0);
 
 	return 0;
 }
@@ -999,16 +1013,36 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 				    txq_pcpu->tx_buffs[txq_pcpu->txq_get_index];
 		uintptr_t skb = (uintptr_t)txq_pcpu->tx_skb[txq_pcpu->txq_get_index];
 		int data_size = txq_pcpu->data_size[txq_pcpu->txq_get_index];
-
-		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
-				 data_size, DMA_TO_DEVICE);
+		struct sk_buff *skb_rec;
 
 		if (skb & MVPP2_ETH_SHADOW_EXT) {
+			/* Refill TSO external pool */
 			skb &= ~MVPP2_ETH_SHADOW_EXT;
 			mv_pp2_extra_pool_put(port, (void *)skb, txq_pcpu->cpu);
 			mv_pp2x_txq_inc_get(txq_pcpu);
+			dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
+					 data_size, DMA_TO_DEVICE);
+			continue;
+		} else if (skb & MVPP2_ETH_SHADOW_REC) {
+			/* Release skb without data buffer, if data buffer were marked as
+			 * recycled in TX routine.
+			 */
+			struct mv_pp2x_bm_pool *bm_pool;
+
+			skb &= ~MVPP2_ETH_SHADOW_REC;
+			skb_rec = (struct sk_buff *)skb;
+			bm_pool = &port->priv->bm_pools[MVPP2X_SKB_BPID_GET(skb_rec)];
+			/* Do not release buffer of recycled skb */
+			skb_rec->head = NULL;
+			atomic_dec(&bm_pool->in_use);
+
+			dev_kfree_skb_any((struct sk_buff *)skb);
+			mv_pp2x_txq_inc_get(txq_pcpu);
 			continue;
 		}
+
+		dma_unmap_single(port->dev->dev.parent, buf_phys_addr,
+				 data_size, DMA_TO_DEVICE);
 
 		if (skb & MVPP2_ETH_SHADOW_SKB) {
 			skb &= ~MVPP2_ETH_SHADOW_SKB;
@@ -1191,6 +1225,7 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 	int rx_received, i, cpu;
 	u8 *buf_cookie;
 	dma_addr_t buf_phys_addr;
+	struct mv_pp2x_bm_pool *bm_pool;
 
 	preempt_disable();
 	rx_received = mv_pp2x_rxq_received(port, rxq->id);
@@ -1202,6 +1237,7 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 	for (i = 0; i < rx_received; i++) {
 		struct mv_pp2x_rx_desc *rx_desc =
 			mv_pp2x_rxq_next_desc_get(rxq);
+		bm_pool = &port->priv->bm_pools[MVPP2_RX_DESC_POOL(rx_desc)];
 
 		if (port->priv->pp2_version == PPV21)
 			buf_phys_addr = mv_pp21_rxdesc_phys_addr_get(rx_desc);
@@ -1212,6 +1248,7 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 
 		mv_pp2x_pool_refill(port->priv, MVPP2_RX_DESC_POOL(rx_desc),
 				    buf_phys_addr, cpu);
+		atomic_dec(&bm_pool->in_use);
 	}
 	put_cpu();
 	mv_pp2x_rxq_status_update(port, rxq->id, rx_received, rx_received);
@@ -2393,13 +2430,15 @@ static void mv_pp2x_buff_hdr_rx(struct mv_pp2x_port *port,
 static void mv_pp2x_set_skb_hash(struct mv_pp2x_rx_desc *rx_desc, u32 rx_status,
 				 struct sk_buff *skb)
 {
-	u32 hash;
-
-	hash = (u32)(rx_desc->u.pp22.buf_phys_addr_key_hash >> 40);
+	/* Store unique Marvell hash to indicate recycled skb.
+	*  Hash is used as additional to skb->cb protection
+	*  for recycling. skb->hash unused in xmit procedure since
+	*  .ndo_select_queue callback implemented in driver.
+	*/
 	if ((rx_status & MVPP2_RXD_L4_UDP) || (rx_status & MVPP2_RXD_L4_TCP))
-		skb_set_hash(skb, hash, PKT_HASH_TYPE_L4);
+		skb_set_hash(skb, MVPP2_UNIQUE_HASH, PKT_HASH_TYPE_L4);
 	else
-		skb_set_hash(skb, hash, PKT_HASH_TYPE_L3);
+		skb_set_hash(skb, MVPP2_UNIQUE_HASH, PKT_HASH_TYPE_L3);
 }
 
 /* Main rx processing */
@@ -2486,6 +2525,7 @@ err_drop_frame:
 			dev->stats.rx_errors++;
 			mv_pp2x_rx_error(port, rx_desc);
 			mv_pp2x_pool_refill(port->priv, pool, buf_phys_addr, cpu);
+			atomic_dec(&bm_pool->in_use);
 			continue;
 		}
 
@@ -2500,6 +2540,7 @@ err_drop_frame:
 				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
 				 DMA_FROM_DEVICE);
 		refill_array[bm_pool->log_id]++;
+		atomic_inc(&bm_pool->in_use);
 
 #ifdef MVPP2_VERBOSE
 		mv_pp2x_skb_dump(skb, rx_desc->data_size, 4);
@@ -2517,6 +2558,10 @@ err_drop_frame:
 
 		if (likely(dev->features & NETIF_F_RXCSUM))
 			mv_pp2x_rx_csum(port, rx_status, skb);
+		/* Store skb magic id sequence for recycling  */
+		MVPP2X_SKB_MAGIC_BPID_SET(skb, (MVPP2X_SKB_MAGIC(skb) |
+					(port->priv->pp2_cfg.cell_index << 4) |
+							pool));
 
 		skb_record_rx_queue(skb, (u16)rxq->log_id);
 		mv_pp2x_set_skb_hash(rx_desc, rx_status, skb);
@@ -2536,7 +2581,7 @@ err_drop_frame:
 		refill_bm_pool = &port->priv->bm_pools[i];
 		while (likely(refill_array[i]--)) {
 			err = mv_pp2x_rx_refill_new(port, refill_bm_pool,
-						    refill_bm_pool->id, 0, cpu);
+						    refill_bm_pool->id, true, cpu);
 			if (unlikely(err)) {
 				netdev_err(port->dev, "failed to refill BM pools\n");
 				refill_array[i]++;
@@ -2978,6 +3023,62 @@ out_no_tx_desc:
 	return 0;
 }
 
+/* Routine to check if skb recyclable. Data buffer cannot be recycled if:
+ * 1. skb is cloned, shared, nonlinear, zero copied.
+ * 2. skb with not align data buffer.
+ * 3. IRQs are disabled.
+ */
+static inline bool mv_pp2x_skb_is_recycleable(const struct sk_buff *skb, int skb_size)
+{
+	if (unlikely(irqs_disabled()))
+		return false;
+
+	if (unlikely(skb_shinfo(skb)->tx_flags & SKBTX_DEV_ZEROCOPY))
+		return false;
+
+	if (unlikely(skb_is_nonlinear(skb) || skb->fclone != SKB_FCLONE_UNAVAILABLE))
+		return false;
+
+	skb_size = SKB_DATA_ALIGN(skb_size + NET_SKB_PAD);
+	if (unlikely(skb_end_pointer(skb) - skb->head < skb_size))
+		return false;
+
+	if (unlikely(skb_shared(skb) || skb_cloned(skb)))
+		return false;
+
+	return true;
+}
+
+/* Routine to get BM pool from skb cb */
+static inline struct mv_pp2x_bm_pool *mv_pp2x_skb_recycle_get_pool(struct mv_pp2x *priv, struct sk_buff *skb)
+{
+	if (MVPP2X_SKB_RECYCLE_MAGIC_IS_OK(skb))
+		return &priv->bm_pools[MVPP2X_SKB_BPID_GET(skb)];
+	else
+		return NULL;
+}
+
+/* Routine:
+ * 1. Check that it's save to recycle skb by mv_pp2x_skb_is_recycleable routine
+ * 2. Check if MVPP2 unique hash were set in RX routine.
+ * 3. Check that recycle is on same CPN.
+ * 4. Test skb->cb magic and return BM pool ID if its pass all criterions.
+ * Otherwise -1 returned.
+ */
+static inline int mv_pp2x_skb_recycle_check(struct mv_pp2x *priv, struct sk_buff *skb)
+{
+	struct mv_pp2x_bm_pool *bm_pool;
+
+	if ((skb->hash == MVPP2_UNIQUE_HASH) && (MVPP2X_SKB_PP2_CELL_GET(skb) == priv->pp2_cfg.cell_index)) {
+		bm_pool = mv_pp2x_skb_recycle_get_pool(priv, skb);
+		if (bm_pool)
+			if (mv_pp2x_skb_is_recycleable(skb, bm_pool->pkt_size) && (atomic_read(&bm_pool->in_use) > 0))
+				return bm_pool->id;
+	}
+
+	return -1;
+}
+
 /* Main tx processing */
 static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 {
@@ -2988,11 +3089,12 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	struct netdev_queue *nq;
 	struct mv_pp2x_tx_desc *tx_desc;
 	dma_addr_t buf_phys_addr;
-	int frags = 0;
+	int frags = 0, pool_id;
 	u16 txq_id;
 	u32 tx_cmd;
 	int cpu = smp_processor_id();
 	struct mv_pp2x_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
+	u8 recycling;
 
 	/* Set relevant physical TxQ and Linux netdev queue */
 	txq_id = skb_get_queue_mapping(skb) % mv_pp2x_txq_number;
@@ -3076,14 +3178,27 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 				     buf_phys_addr & ~MVPP2_TX_DESC_DATA_OFFSET, tx_desc);
 
 	tx_cmd = mv_pp2x_skb_tx_csum(port, skb);
+
 	if (frags == 1) {
 		/* First and Last descriptor */
+		/* Check if skb should be recycled */
+		pool_id = mv_pp2x_skb_recycle_check(port->priv, skb);
+		/* If pool ID provided -> packet should be recycled.
+		*  Set recycled field in TX descriptor and add skb recycle shadow.
+		*/
+		if (pool_id > -1) {
+			tx_cmd |= MVPP2_TXD_BUF_MOD;
+			tx_cmd |= ((pool_id << MVPP2_RXD_BM_POOL_ID_OFFS) & MVPP2_RXD_BM_POOL_ID_MASK);
+			recycling = MVPP2_ETH_SHADOW_REC;
+		} else {
+			recycling = MVPP2_ETH_SHADOW_SKB;
+		}
 
 		tx_cmd |= MVPP2_TXD_F_DESC | MVPP2_TXD_L_DESC;
 		tx_desc->command = tx_cmd;
 		mv_pp2x_txq_inc_put(port->priv->pp2_version,
 				    txq_pcpu, (struct sk_buff *)((uintptr_t)skb |
-			MVPP2_ETH_SHADOW_SKB), tx_desc);
+					recycling), tx_desc);
 	} else {
 		/* First but not Last */
 		tx_cmd |= MVPP2_TXD_F_DESC | MVPP2_TXD_PADDING_DISABLE;
