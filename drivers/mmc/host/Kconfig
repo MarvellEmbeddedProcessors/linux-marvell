@@ -789,9 +789,8 @@ config MMC_MTK
 
 config MMC_SDHCI_XENON
 	tristate "Marvell Xenon eMMC/SD/SDIO SDHCI driver"
-	depends on MMC_SDHCI && MMC_SDHCI_PLTFM
+	depends on MMC_SDHCI_PLTFM
 	help
 	  This selects Marvell Xenon eMMC/SD/SDIO SDHCI.
-	  If you have a machine with integrated  Marvell Xenon SDHC IP,
-	  say Y or M here.
-	  If unsure, say N
+	  If you have a controller with this interface, say Y or M here.
+	  If unsure, say N.
