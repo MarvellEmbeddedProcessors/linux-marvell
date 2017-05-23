@@ -111,13 +111,11 @@ Example:
 		bus-width = <4>;
 		marvell,xenon-phy-slow-mode;
 		marvell,xenon-tun-count = <11>;
+		non-removable;
+		no-sd;
+		no-sdio;
 
-		#address-cells = <1>;
-		#size-cells = <0>;
-		apm_mmccard: mmccard@0 {
-			compatible = "mmc-card";
-			reg = <0>;
-		};
+		/* Vmmc and Vqmmc are both fixed */
 	};
 
 - For SD/SDIO:
@@ -126,7 +124,8 @@ Example:
 		compatible = "marvell,armada-cp110-sdhci";
 		reg = <0xab0000 0x1000>;
 		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
-		vqmmc-supply = <&sd_regulator>;
+		vqmmc-supply = <&sd_vqmmc_regulator>;
+		vmmc-supply = <&sd_vmmc_regulator>;
 		clocks = <&sdclk>;
 		clock-names = "core";
 		bus-width = <4>;
@@ -145,15 +144,13 @@ Example:
 		bus-width = <8>;
 		mmc-ddr-1_8v;
 		mmc-hs400-1_8v;
+		non-removable;
+		no-sd;
+		no-sdio;
+
+		/* Vmmc and Vqmmc are both fixed */
 
 		marvell,pad-type = "fixed-1-8v";
-
-		#address-cells = <1>;
-		#size-cells = <0>;
-		mmccard: mmccard@0 {
-			compatible = "mmc-card";
-			reg = <0>;
-		};
 	};
 
 - For SD/SDIO with compatible "marvell,armada-3700-sdhci":
@@ -164,6 +161,7 @@ Example:
 		      <phy_addr 0x4>;
 		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
 		vqmmc-supply = <&sd_regulator>;
+		/* Vmmc is fixed */
 		clocks = <&sdclk>;
 		clock-names = "core";
 		bus-width = <4>;
