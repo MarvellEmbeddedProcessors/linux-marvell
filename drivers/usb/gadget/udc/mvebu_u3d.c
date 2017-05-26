@@ -1495,7 +1495,9 @@ static int mvc2_vbus_session(struct usb_gadget *gadget, int is_active)
 
 	val = MV_CP_READ(MVCP_DMA_GLOBAL_CONFIG);
 	if (is_active) {
-		mvc2_hw_reset(cp);
+		/* For Armada 3700, need to skip PHY HW reset */
+		if (cp->phy_hw_reset)
+			mvc2_hw_reset(cp);
 		pm_stay_awake(cp->dev);
 		/* turn on dma int */
 		val |= MVCP_DMA_GLOBAL_CONFIG_RUN
