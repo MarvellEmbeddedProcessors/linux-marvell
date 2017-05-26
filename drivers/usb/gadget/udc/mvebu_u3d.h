@@ -394,6 +394,8 @@ struct mvc2 {
 	int prev_vbus;
 	struct work_struct	vbus_work;
 	struct workqueue_struct *qwork;
+	/* Flags for HW reset. false: no need reset; true: need reset */
+	bool phy_hw_reset;
 };
 
 extern void mvc2_usb2_connect(void);
