@@ -2432,6 +2432,13 @@ static int mvc2_probe(struct platform_device *pdev)
 		cp->reg->global_control = 0x24;
 	}
 
+	/* For Armada 3700, need to skip PHY HW reset */
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada3700-u3d"))
+		cp->phy_hw_reset = false;
+	else
+		cp->phy_hw_reset = true;
+
 	/* Get comphy and init if there is */
 	cp->comphy = devm_of_phy_get(&pdev->dev, pdev->dev.of_node, "usb");
 	if (!IS_ERR(cp->comphy)) {
@@ -2463,7 +2470,8 @@ static int mvc2_probe(struct platform_device *pdev)
 
 	eps_init(cp);
 
-	mvc2_hw_reset(cp);
+	if (cp->phy_hw_reset)
+		mvc2_hw_reset(cp);
 
 	dev_set_drvdata(cp->dev, cp);
 	dev_info(cp->dev, "Detected ver %x from Marvell Central IP.\n", ver);
