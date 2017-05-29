@@ -323,13 +323,14 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 {
 	dma_addr_t phys_addr;
 	void *data;
+	struct mv_pp2x_cp_pcpu *cp_pcpu = this_cpu_ptr(port->priv->pcpu);
 
 	/* BM pool is refilled only if number of used buffers is bellow
 	 * refill threshold. Number of used buffers could be decremented
 	 * by recycling mechanism.
 	 */
 	if (is_recycle &&
-	    (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
+	    (cp_pcpu->in_use < bm_pool->in_use_thresh))
 		return 0;
 
 	data = mv_pp2x_frag_alloc(bm_pool);
@@ -348,8 +349,8 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 	mv_pp2x_pool_refill(port->priv, pool, phys_addr, cpu);
 
 	/* Decrement only if refill called from RX */
-	if (likely(is_recycle))
-		atomic_dec(&bm_pool->in_use);
+	if (is_recycle)
+		cp_pcpu->in_use--;
 
 	return 0;
 }
@@ -394,7 +395,6 @@ static int mv_pp2x_bm_pool_create(struct device *dev,
 	bm_pool->buf_num = 0;
 	mv_pp2x_bm_pool_bufsize_set(hw, bm_pool,
 				    MVPP2_RX_BUF_SIZE(bm_pool->pkt_size));
-	atomic_set(&bm_pool->in_use, 0);
 
 	return 0;
 }
@@ -600,7 +600,7 @@ int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 
 	/* Update BM driver with number of buffers added to pool */
 	bm_pool->buf_num += i;
-	bm_pool->in_use_thresh = bm_pool->buf_num / 4;
+	bm_pool->in_use_thresh = bm_pool->buf_num / MVPP2_BM_PER_CPU_THRESHOLD;
 
 	netdev_dbg(port->dev,
 		   "%s pool %d: pkt_size=%4d, buf_size=%4d, total_size=%4d\n",
@@ -1081,13 +1081,14 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 			 * recycled in TX routine.
 			 */
 			struct mv_pp2x_bm_pool *bm_pool;
+			struct mv_pp2x_cp_pcpu *cp_pcpu = this_cpu_ptr(port->priv->pcpu);
 
 			skb &= ~MVPP2_ETH_SHADOW_REC;
 			skb_rec = (struct sk_buff *)skb;
 			bm_pool = &port->priv->bm_pools[MVPP2X_SKB_BPID_GET(skb_rec)];
 			/* Do not release buffer of recycled skb */
 			skb_rec->head = NULL;
-			atomic_dec(&bm_pool->in_use);
+			cp_pcpu->in_use--;
 
 			mv_pp2_skb_pool_put(port, (struct sk_buff *)skb, txq_pcpu->cpu);
 
@@ -1280,6 +1281,7 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 	u8 *buf_cookie;
 	dma_addr_t buf_phys_addr;
 	struct mv_pp2x_bm_pool *bm_pool;
+	struct mv_pp2x_cp_pcpu *cp_pcpu = this_cpu_ptr(port->priv->pcpu);
 
 	preempt_disable();
 	rx_received = mv_pp2x_rxq_received(port, rxq->id);
@@ -1302,7 +1304,7 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 
 		mv_pp2x_pool_refill(port->priv, MVPP2_RX_DESC_POOL(rx_desc),
 				    buf_phys_addr, cpu);
-		atomic_dec(&bm_pool->in_use);
+		cp_pcpu->in_use--;
 	}
 	put_cpu();
 	mv_pp2x_rxq_status_update(port, rxq->id, rx_received, rx_received);
@@ -2539,6 +2541,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	u8  num_pool = MVPP2_BM_SWF_NUM_POOLS;
 	u8  first_bm_pool = port->priv->pp2_cfg.first_bm_pool;
 	int cpu = smp_processor_id();
+	struct mv_pp2x_cp_pcpu *cp_pcpu = this_cpu_ptr(port->priv->pcpu);
 
 #ifdef DEV_NETMAP
 		if (port->flags & MVPP2_F_IFCAP_NETMAP) {
@@ -2611,7 +2614,7 @@ err_drop_frame:
 			dev->stats.rx_errors++;
 			mv_pp2x_rx_error(port, rx_desc);
 			mv_pp2x_pool_refill(port->priv, pool, buf_phys_addr, cpu);
-			atomic_dec(&bm_pool->in_use);
+			cp_pcpu->in_use--;
 			continue;
 		}
 		/* Try to get skb from CP skb pool
@@ -2636,7 +2639,7 @@ err_drop_frame:
 				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
 				 DMA_FROM_DEVICE);
 		refill_array[bm_pool->log_id]++;
-		atomic_inc(&bm_pool->in_use);
+		cp_pcpu->in_use++;
 
 #ifdef MVPP2_VERBOSE
 		mv_pp2x_skb_dump(skb, rx_desc->data_size, 4);
@@ -3164,11 +3167,12 @@ static inline struct mv_pp2x_bm_pool *mv_pp2x_skb_recycle_get_pool(struct mv_pp2
 static inline int mv_pp2x_skb_recycle_check(struct mv_pp2x *priv, struct sk_buff *skb)
 {
 	struct mv_pp2x_bm_pool *bm_pool;
+	struct mv_pp2x_cp_pcpu *cp_pcpu = this_cpu_ptr(priv->pcpu);
 
 	if ((skb->hash == MVPP2_UNIQUE_HASH) && (MVPP2X_SKB_PP2_CELL_GET(skb) == priv->pp2_cfg.cell_index)) {
 		bm_pool = mv_pp2x_skb_recycle_get_pool(priv, skb);
 		if (bm_pool)
-			if (mv_pp2x_skb_is_recycleable(skb, bm_pool->pkt_size) && (atomic_read(&bm_pool->in_use) > 0))
+			if (mv_pp2x_skb_is_recycleable(skb, bm_pool->pkt_size) && (cp_pcpu->in_use > 0))
 				return bm_pool->id;
 	}
 

@@ -174,6 +174,7 @@
 #define MVPP2_BM_SHORT_BUF_NUM		2048
 #define MVPP2_BM_LONG_BUF_NUM		1024
 #define MVPP2_BM_JUMBO_BUF_NUM		512
+#define MVPP2_BM_PER_CPU_THRESHOLD	(MVPP2_MAX_CPUS * 2)
 
 #define MVPP2_ALL_BUFS			0
 
@@ -595,6 +596,7 @@ struct mv_pp2x_port_pcpu {
 struct mv_pp2x_cp_pcpu {
 	struct list_head skb_port_list;
 	struct mv_pp2x_skb_pool *skb_pool;
+	int in_use;
 };
 
 struct queue_vector {
