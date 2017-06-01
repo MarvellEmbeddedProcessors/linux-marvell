@@ -83,11 +83,18 @@
 #define MII_M1111_HWCFG_FIBER_COPPER_AUTO	0x8000
 #define MII_M1111_HWCFG_FIBER_COPPER_RES	0x2000
 
+#define MII_M1112_SPEC_STAT_REG		0x11
+#define MII_M1112_FIBER_COPPER_RES	0x80
+
+#define MII_M1112_PHY_ENERGY_STATE	0x10
+#define MII_M1112_PHY_COPPER_STATE	0x10
+
+#define COPPER_PAGE		0
+#define FIBER_PAGE		1
+
 #define COPPER_BASE_T		BIT(1)
 #define FIBER_BASE_R		BIT(2)
 #define FIBER_BASE_X		BIT(3)
-
-#define MII_M1112_PHY_ENERGY_STATE	0x10
 
 #define MII_88E1121_PHY_MSCR_PAGE	2
 #define MII_88E1121_PHY_MSCR_REG	21
@@ -1721,20 +1728,246 @@ static int marvell_probe(struct phy_device *phydev)
 	return 0;
 }
 
-static int m88e1112_read_status(struct phy_device *phydev)
+static int m88e1112_config_advert(struct phy_device *phydev)
 {
-	int val, bmcr;
+	u32 advertise;
+	int oldadv, adv, bmsr;
+	int err, changed = 0;
 
-	if ((phydev->autoneg != AUTONEG_ENABLE) & (phydev->speed == SPEED_10)) {
-		val = phy_read(phydev, MII_M1011_IEVENT);
-		/* PHY reset required to detect link partner speed change and proper status read */
-		if (val & MII_M1112_PHY_ENERGY_STATE) {
-			bmcr = phy_read(phydev, MII_BMCR);
-			phy_write(phydev, MII_BMCR, bmcr | BMCR_RESET);
-		}
+	/* Only allow advertising what this PHY supports */
+	phydev->advertising &= phydev->supported;
+	advertise = phydev->advertising;
+
+	/* Setup standard advertisement */
+	adv = phy_read(phydev, MII_ADVERTISE);
+	oldadv = adv;
+
+	if (phydev->dev_flags & FIBER_BASE_R) {
+		adv &= ~(ADVERTISE_1000XFULL | ADVERTISE_1000XHALF | ADVERTISE_1000XPAUSE | ADVERTISE_1000XPSE_ASYM);
+		adv |= ethtool_adv_to_mii_adv_x(advertise);
+	} else {
+		adv &= ~(ADVERTISE_ALL | ADVERTISE_100BASE4 | ADVERTISE_PAUSE_CAP |
+				 ADVERTISE_PAUSE_ASYM);
+		adv |= ethtool_adv_to_mii_adv_t(advertise);
 	}
 
-	return genphy_read_status(phydev);
+	if (adv != oldadv) {
+		phy_write(phydev, MII_ADVERTISE, adv);
+		changed = 1;
+	}
+
+	if (!(phydev->dev_flags & FIBER_BASE_R)) {
+		bmsr = phy_read(phydev, MII_BMSR);
+
+	    /* Per 802.3-2008, Section 22.2.4.2.16 Extended status all
+	     * 1000Mbits/sec capable PHYs shall have the BMSR_ESTATEN bit set to a
+	     * logical 1.
+	     */
+		if (!(bmsr & BMSR_ESTATEN))
+			return changed;
+
+	    /* Configure gigabit if it's supported */
+	    adv = phy_read(phydev, MII_CTRL1000);
+
+	    oldadv = adv;
+	    adv &= ~(ADVERTISE_1000FULL | ADVERTISE_1000HALF);
+
+		if (phydev->supported & (SUPPORTED_1000baseT_Half | SUPPORTED_1000baseT_Full))
+			adv |= ethtool_adv_to_mii_ctrl1000_t(advertise);
+
+		if (adv != oldadv)
+			changed = 1;
+
+	    err = phy_write(phydev, MII_CTRL1000, adv);
+	}
+
+	return changed;
+}
+
+int m88e1112_control_aneg(struct phy_device *phydev)
+{
+	int result;
+
+	if (phydev->autoneg != AUTONEG_ENABLE)
+		return genphy_setup_forced(phydev);
+
+	result = m88e1112_config_advert(phydev);
+
+	if (result == 0) {
+		/* Advertisement hasn't changed, but maybe aneg was never on to
+		*  begin with?  Or maybe phy was isolated?
+		*/
+		int ctl = phy_read(phydev, MII_BMCR);
+
+		if (!(ctl & BMCR_ANENABLE) || (ctl & BMCR_ISOLATE))
+			result = 1; /* do restart aneg */
+	}
+
+	/* Only restart aneg if we are advertising something different
+	* than we were before.
+	*/
+	if (result > 0)
+		result = genphy_restart_aneg(phydev);
+
+	return result;
+}
+
+static int m88e1112_config_aneg(struct phy_device *phydev)
+{
+	int err;
+
+	if (phydev->dev_flags & FIBER_BASE_R)
+		err = phy_write(phydev, MII_MARVELL_PHY_PAGE, FIBER_PAGE);
+	else
+		err = phy_write(phydev, MII_MARVELL_PHY_PAGE, COPPER_PAGE);
+
+	err = phy_write(phydev, MII_BMCR, BMCR_RESET);
+
+	if (!(phydev->dev_flags & FIBER_BASE_R)) {
+		err = marvell_set_polarity(phydev, phydev->mdix);
+		if (err < 0)
+			return err;
+	}
+
+	m88e1112_control_aneg(phydev);
+
+	if (phydev->autoneg != AUTONEG_ENABLE) {
+		int bmcr;
+
+		/* A write to speed/duplex bits (that is performed by
+		 * genphy_config_aneg() call above) must be followed by
+		 * a software reset. Otherwise, the write has no effect.
+		 */
+		bmcr = phy_read(phydev, MII_BMCR);
+
+		phy_write(phydev, MII_BMCR, bmcr | BMCR_RESET);
+	}
+
+	return 0;
+}
+
+static int m88e1112_read_status(struct phy_device *phydev)
+{
+	int adv;
+	int err;
+	int lpa;
+	int lpagb = 0;
+	int common_adv;
+	int common_adv_gb = 0;
+	int combo_mode, val;
+
+	/* Update the link, but return if there was an error */
+	err = genphy_update_link(phydev);
+	if (err)
+		return err;
+
+	combo_mode = phy_read(phydev, MII_M1112_SPEC_STAT_REG);
+
+	if (phydev->dev_flags & FIBER_BASE_R) {
+		if (!(combo_mode & MII_M1112_FIBER_COPPER_RES)) {
+			phydev->dev_flags &= ~FIBER_BASE_R;
+			m88e1112_config_aneg(phydev);
+		}
+	} else {
+		if (combo_mode & MII_M1112_FIBER_COPPER_RES) {
+			phydev->dev_flags |= FIBER_BASE_R;
+			m88e1112_config_aneg(phydev);
+		}
+	}
+	phydev->lp_advertising = 0;
+
+	if (phydev->autoneg == AUTONEG_ENABLE) {
+		if (phydev->dev_flags & FIBER_BASE_R) {
+			lpa = phy_read(phydev, MII_LPA);
+
+			phydev->lp_advertising |= mii_lpa_to_ethtool_lpa_x(lpa);
+
+			adv = phy_read(phydev, MII_ADVERTISE);
+
+			common_adv = lpa & adv;
+
+			phydev->speed = SPEED_10;
+			phydev->duplex = DUPLEX_HALF;
+			phydev->pause = 1;
+			phydev->asym_pause = 1;
+
+			if (common_adv & (LPA_1000FULL | LPA_1000HALF)) {
+				phydev->speed = SPEED_1000;
+
+				if (common_adv & LPA_1000FULL)
+					phydev->duplex = DUPLEX_FULL;
+		   }
+
+			if (phydev->duplex == DUPLEX_FULL) {
+				phydev->pause = lpa & LPA_1000XPAUSE ? 1 : 0;
+				phydev->asym_pause = lpa & LPA_1000XPAUSE_ASYM ? 1 : 0;
+			}
+		} else {
+			if (phydev->supported & (SUPPORTED_1000baseT_Half
+					   | SUPPORTED_1000baseT_Full)) {
+				lpagb = phy_read(phydev, MII_STAT1000);
+
+				adv = phy_read(phydev, MII_CTRL1000);
+
+				phydev->lp_advertising = mii_stat1000_to_ethtool_lpa_t(lpagb);
+				common_adv_gb = lpagb & adv << 2;
+			}
+
+			lpa = phy_read(phydev, MII_LPA);
+			phydev->lp_advertising |= mii_lpa_to_ethtool_lpa_t(lpa);
+			adv = phy_read(phydev, MII_ADVERTISE);
+			common_adv = lpa & adv;
+
+			phydev->speed = SPEED_10;
+			phydev->duplex = DUPLEX_HALF;
+			phydev->pause = 0;
+			phydev->asym_pause = 0;
+
+			if (common_adv_gb & (LPA_1000FULL | LPA_1000HALF)) {
+				phydev->speed = SPEED_1000;
+
+				if (common_adv_gb & LPA_1000FULL)
+					phydev->duplex = DUPLEX_FULL;
+			} else if (common_adv & (LPA_100FULL | LPA_100HALF)) {
+				phydev->speed = SPEED_100;
+
+				if (common_adv & LPA_100FULL)
+					phydev->duplex = DUPLEX_FULL;
+			} else {
+				if (common_adv & LPA_10FULL)
+					phydev->duplex = DUPLEX_FULL;
+			}
+
+			if (phydev->duplex == DUPLEX_FULL) {
+				phydev->pause = lpa & LPA_PAUSE_CAP ? 1 : 0;
+				phydev->asym_pause = lpa & LPA_PAUSE_ASYM ? 1 : 0;
+			}
+		}
+	} else {
+		int bmcr = phy_read(phydev, MII_BMCR);
+
+		if (bmcr & BMCR_FULLDPLX)
+			phydev->duplex = DUPLEX_FULL;
+		else
+			phydev->duplex = DUPLEX_HALF;
+
+		if (bmcr & BMCR_SPEED1000) {
+			phydev->speed = SPEED_1000;
+		} else if (bmcr & BMCR_SPEED100) {
+			phydev->speed = SPEED_100;
+		} else {
+			phydev->speed = SPEED_10;
+			val = phy_read(phydev, MII_M1011_IEVENT);
+			if ((val & MII_M1112_PHY_ENERGY_STATE) || (val & MII_M1112_PHY_COPPER_STATE)) {
+				bmcr = phy_read(phydev, MII_BMCR);
+				phy_write(phydev, MII_BMCR, bmcr | BMCR_RESET);
+			}
+		}
+		phydev->pause = 0;
+		phydev->asym_pause = 0;
+	}
+
+	return 0;
 }
 
 static struct phy_driver marvell_drivers[] = {
@@ -1764,7 +1997,8 @@ static struct phy_driver marvell_drivers[] = {
 		.flags = PHY_HAS_INTERRUPT,
 		.probe = marvell_probe,
 		.config_init = &m88e1111_config_init,
-		.config_aneg = &marvell_config_aneg,
+		.config_aneg = &m88e1112_config_aneg,
+		.aneg_done = &marvell_aneg_done,
 		.read_status = &m88e1112_read_status,
 		.ack_interrupt = &marvell_ack_interrupt,
 		.config_intr = &marvell_config_intr,
