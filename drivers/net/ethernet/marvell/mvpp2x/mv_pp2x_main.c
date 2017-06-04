@@ -5796,15 +5796,16 @@ static void mv_pp22_tx_fifo_init(struct mv_pp2x *priv)
 			priv->l4_chksum_jumbo_port = priv->port_list[0]->id;
 	}
 
-	/* Set FIFO according to l4_chksum_jumbo_port */
-	for (i = 0; i < priv->num_ports; i++) {
-		if (priv->port_list[i]->id != priv->l4_chksum_jumbo_port) {
-			mv_pp2x_tx_fifo_size_set(&priv->hw,
-						 priv->port_list[i]->id,
-					    MVPP2_TX_FIFO_DATA_SIZE_3KB);
-			mv_pp2x_tx_fifo_threshold_set(&priv->hw,
-						      priv->port_list[i]->id,
-					    MVPP2_TX_FIFO_THRESHOLD_3KB);
+	/* Set FIFO according to l4_chksum_jumbo_port.
+	*  10KB for l4_chksum_jumbo_port and 3KB for other ports.
+	*  TX FIFO should be set for all ports, even if port not initialized.
+	*/
+	for (i = 0; i < MVPP2_MAX_PORTS; i++) {
+		if (i != priv->l4_chksum_jumbo_port) {
+			mv_pp2x_tx_fifo_size_set(&priv->hw, i,
+						 MVPP2_TX_FIFO_DATA_SIZE_3KB);
+			mv_pp2x_tx_fifo_threshold_set(&priv->hw, i,
+						      MVPP2_TX_FIFO_THRESHOLD_3KB);
 			}
 	}
 	mv_pp2x_tx_fifo_size_set(&priv->hw,
