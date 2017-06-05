@@ -2598,6 +2598,7 @@ static void mvc2_shutdown(struct platform_device *dev)
 
 static const struct of_device_id mv_usb3_dt_match[] = {
 	{.compatible = "marvell,mvebu-u3d"},
+	{.compatible = "marvell,armada3700-u3d"},
 	{},
 };
 

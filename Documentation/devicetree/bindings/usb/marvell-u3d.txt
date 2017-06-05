@@ -3,7 +3,8 @@ Marvell USB3 device controller
 This controller is integrated in Armada 38x/3700/8K.
 
 Required properties:
-- compatible	: Must be "marvell,mvebu-u3d"
+- compatible	: Must be "marvell,mvebu-u3d" except Armada 3700,
+		  for Armada 3700 it is "marvell,armada3700-u3d".
 - reg		: Physical base address and size of the USB3 device registers map.
 - interrupts	: Should contain single irq line of USB3 device controller
 - clocks	: the clock associated to this controller
@@ -16,7 +17,7 @@ Optional properties :
 - phys		: the COMPHY associated to this controller
 - phy-names:	: the name of COMPHY indicated by above property of phys
 
-Example:
+Example for all SoCs, except Armada-3700:
 	u3d@520000 {
 		compatible = "marvell,mvebu-u3d";
 		reg = <0x520000 0x2000>;
@@ -26,6 +27,16 @@ Example:
 		vbus-gpio = <&gpio1 19 GPIO_ACTIVE_HIGH>;
 		phys = <&a3700_comphy 1 COMPHY_USB3>;
 		phy-names = "usb";
+		status = "disabled";
+	};
+
+Example for Armada-3700:
+	u3d@50000 {
+		compatible = "marvell,armada3700-u3d";
+		/* 0: 0x50000: USB 3.0 Device port 0: DEV_INFO_REG(0:15 - version_id) */
+		reg = <0x50000 0x2000>;
+		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&sgateclk 17>;
 		status = "disabled";
 	};
 
