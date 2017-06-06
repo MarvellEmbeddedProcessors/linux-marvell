@@ -82,6 +82,21 @@
 			reg = <0 0x4000000 0 0x200000>;
 			no-map;
 		};
+
+		/* Reserve 16M memory for TEE code, data, communication and share memory with
+		 * Non-Trusted World
+		 *
+		 * For TEE code and data section, it will be configured unacceable
+		 * to Non-Trusted World by memory controller.
+		 *
+		 * The rest are either used for communication or shared memory between
+		 * Trusted-World and Non-trusted World, which is TEE implementation defined
+		 * and may be managed by the TEE driver.
+		 */
+		tee@4400000 {
+			reg = <0 0x4400000 0 0x1000000>;
+			no-map;
+		};
 	};
 
 	cpus {
