@@ -64,6 +64,17 @@
 		method = "smc";
 	};
 
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		psci-area@4000000 {
+			reg = <0 0x4000000 0 0x200000>;
+			no-map;
+		};
+	};
+
 	/* CPUfreq Cluster settings:
 	 * - Initial required static OPP entry of 100Mhz - suited for all CPU boot options
 	 * - Additional OPP entries are registered at runtime by cpufreq driver
