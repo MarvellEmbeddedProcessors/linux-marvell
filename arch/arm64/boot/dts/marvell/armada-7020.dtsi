@@ -52,4 +52,16 @@
 	model = "Marvell Armada 7020";
 	compatible = "marvell,armada7020", "marvell,armada-ap806-dual",
 	             "marvell,armada-ap806";
+
+	cpn-110-master {
+		pcie@0x600000 {
+			msi-parent = <&gic_v2m0>;
+		};
+		pcie@0x620000 {
+			msi-parent = <&gic_v2m0>;
+		};
+		pcie@0x640000 {
+			msi-parent = <&gic_v2m0>;
+		};
+	};
 };
