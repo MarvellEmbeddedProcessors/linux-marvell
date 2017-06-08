@@ -1224,8 +1224,8 @@
 					MVPP2_DESC_Q_ALIGN)
 #define MVPP2_DESCQ_MEM_ALIGN(mem)	(ALIGN(mem, MVPP2_DESC_Q_ALIGN))
 
-/* Descriptor alignment mask */
-#define MVPP2_TX_DESC_ALIGN		(MVPP2_DESC_ALIGNED_SIZE - 1)
+/* TX descriptor data offset mask */
+#define MVPP2_TX_DESC_DATA_OFFSET		0XFF
 
 /* TX FIFO constants */
 #define MVPP2_TX_FIFO_DATA_SIZE_10KB		0xa

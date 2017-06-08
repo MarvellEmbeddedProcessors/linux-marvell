@@ -2599,9 +2599,9 @@ static int mv_pp2x_tx_frag_process(struct mv_pp2x_port *port,
 			mv_pp2x_txq_desc_put(txq);
 			goto error;
 		}
-		tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_ALIGN;
+		tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_DATA_OFFSET;
 		mv_pp2x_txdesc_phys_addr_set(port->priv->pp2_version,
-					     buf_phys_addr & ~MVPP2_TX_DESC_ALIGN, tx_desc);
+					     buf_phys_addr & ~MVPP2_TX_DESC_DATA_OFFSET, tx_desc);
 
 		if (i == (skb_shinfo(skb)->nr_frags - 1)) {
 			/* Last descriptor */
@@ -2742,10 +2742,10 @@ static inline int mv_pp2_tso_build_hdr_desc(struct mv_pp2x_tx_desc *tx_desc,
 		return -1;
 	}
 
-	tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_ALIGN;
+	tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_DATA_OFFSET;
 
 	mv_pp2x_txdesc_phys_addr_set(port->priv->pp2_version,
-				     buf_phys_addr & ~MVPP2_TX_DESC_ALIGN, tx_desc);
+				     buf_phys_addr & ~MVPP2_TX_DESC_DATA_OFFSET, tx_desc);
 
 	mv_pp2x_txq_inc_put(port->priv->pp2_version,
 			    txq_pcpu,
@@ -2777,10 +2777,10 @@ static inline int mv_pp2_tso_build_data_desc(struct mv_pp2x_port *port,
 		return -1;
 	}
 
-	tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_ALIGN;
+	tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_DATA_OFFSET;
 
 	mv_pp2x_txdesc_phys_addr_set(port->priv->pp2_version,
-				     buf_phys_addr & ~MVPP2_TX_DESC_ALIGN, tx_desc);
+				     buf_phys_addr & ~MVPP2_TX_DESC_DATA_OFFSET, tx_desc);
 
 	tx_desc->command = 0;
 
@@ -3071,9 +3071,9 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	}
 	pr_debug("buf_phys_addr=%x\n", (unsigned int)buf_phys_addr);
 
-	tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_ALIGN;
+	tx_desc->packet_offset = buf_phys_addr & MVPP2_TX_DESC_DATA_OFFSET;
 	mv_pp2x_txdesc_phys_addr_set(port->priv->pp2_version,
-				     buf_phys_addr & ~MVPP2_TX_DESC_ALIGN, tx_desc);
+				     buf_phys_addr & ~MVPP2_TX_DESC_DATA_OFFSET, tx_desc);
 
 	tx_cmd = mv_pp2x_skb_tx_csum(port, skb);
 	if (frags == 1) {
