@@ -191,6 +191,9 @@
 #define MII_88E3310_COPPER_SP_1000	0x0040
 #define MII_88E3310_COPPER_SP_100	0x2000
 
+#define MII_88E3310_AUT_NEG_CON		0x8000
+#define MII_88E3310_AUT_NEG_ST		0x8001
+
 MODULE_DESCRIPTION("Marvell PHY driver");
 MODULE_AUTHOR("Andy Fleming");
 MODULE_LICENSE("GPL");
@@ -659,6 +662,10 @@ int m88e3310_phy_update_link(struct phy_device *phydev)
 
 static int m88e3310_config_init(struct phy_device *phydev)
 {
+	/* Add 1000baseT_Full to supported modes. Supported mode required by
+	 * MII advertise control function.
+	 */
+	phydev->supported |= SUPPORTED_1000baseT_Full;
 	m88e3310_phy_update_link(phydev);
 
 	return 0;
@@ -1053,7 +1060,7 @@ int m88e3310_restart_aneg(struct phy_device *phydev)
 	/* Don't isolate the PHY if we're negotiating */
 	ctl &= ~BMCR_ISOLATE;
 
-	return phy_write(phydev, MV_XMDIO(MDIO_MMD_PCS, MII_BMCR), ctl);
+	return phy_write(phydev, MV_XMDIO(MDIO_MMD_AN, MII_BMCR), ctl);
 }
 
 int m88e3310_setup_forced(struct phy_device *phydev)
@@ -1104,7 +1111,7 @@ static int m88e3310_config_advert(struct phy_device *phydev)
 		changed = 1;
 	}
 
-	bmsr = phy_read(phydev, MV_XMDIO(MDIO_MMD_PMAPMD, MII_BMSR));
+	bmsr = phy_read(phydev, MV_XMDIO(MDIO_MMD_AN, MII_88E3310_AUT_NEG_ST));
 
 	/* Per 802.3-2008, Section 22.2.4.2.16 Extended status all
 	 * 1000Mbits/sec capable PHYs shall have the BMSR_ESTATEN bit set to a
@@ -1127,6 +1134,8 @@ static int m88e3310_config_advert(struct phy_device *phydev)
 	if (adv != oldadv)
 		changed = 1;
 
+	phy_write(phydev, MV_XMDIO(MDIO_MMD_AN, MII_88E3310_AUT_NEG_CON), adv);
+
 	return changed;
 }
 
@@ -1134,8 +1143,12 @@ int m88e3310_config_aneg(struct phy_device *phydev)
 {
 	int result;
 
-	/* Only COPPER_BASE_T support autoneg*/
+	/* Only COPPER_BASE_T support autoneg */
 	if ((phydev->dev_flags & FIBER_BASE_X) || (phydev->dev_flags & FIBER_BASE_R))
+		return 0;
+
+	/* Current code doesn't support COPPER_BASE_T 10G autoneg */
+	if (phydev->speed == SPEED_10000 || phydev->speed == SPEED_5000)
 		return 0;
 
 	if (phydev->autoneg != AUTONEG_ENABLE)
@@ -1283,6 +1296,10 @@ static void m88e3310_copper_read_status(struct phy_device *phydev)
 		phydev->lp_advertising = mii_lpa_to_ethtool_lpa_t(lpa);
 
 		lpa &= adv;
+
+		adv = phy_read(phydev, MV_XMDIO(MDIO_MMD_AN, MII_88E3310_AUT_NEG_ST));
+
+		phydev->lp_advertising |= mii_stat1000_to_ethtool_lpa_t(adv);
 
 		if (status & MII_M1011_PHY_STATUS_FULLDUPLEX)
 			phydev->duplex = DUPLEX_FULL;
