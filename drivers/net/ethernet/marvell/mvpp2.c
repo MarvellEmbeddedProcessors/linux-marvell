@@ -367,6 +367,8 @@
 #define MVPP22_SMI_MISC_CFG_REG			0x1204
 #define     MVPP22_SMI_POLLING_EN		BIT(10)
 
+#define MVPP22_SMI_PHY_ADDR(port)		(0x120c + (port) * 0x4)
+
 #define MVPP22_GMAC_BASE(port)		(0x7000 + (port) * 0x1000 + 0xe00)
 
 #define MVPP2_CAUSE_TXQ_SENT_DESC_ALL_MASK	0xff
@@ -6254,7 +6256,9 @@ static void mvpp21_get_mac_address(struct mvpp2_port *port, unsigned char *addr)
 
 static int mvpp2_phy_connect(struct mvpp2_port *port)
 {
+	struct mvpp2 *priv = port->priv;
 	struct phy_device *phy_dev;
+	u32 phy_addr;
 
 	phy_dev = of_phy_connect(port->dev, port->phy_node, mvpp2_link_event, 0,
 				 port->phy_interface);
@@ -6269,6 +6273,16 @@ static int mvpp2_phy_connect(struct mvpp2_port *port)
 	port->duplex  = 0;
 	port->speed   = 0;
 
+	if (priv->hw_version != MVPP22)
+		return 0;
+
+	/* Set the SMI PHY address */
+	if (of_property_read_u32(port->phy_node, "reg", &phy_addr)) {
+		netdev_err(port->dev, "cannot find the PHY address\n");
+		return -EINVAL;
+	}
+
+	writel(phy_addr, priv->iface_base + MVPP22_SMI_PHY_ADDR(port->gop_id));
 	return 0;
 }
 
