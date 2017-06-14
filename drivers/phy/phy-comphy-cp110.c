@@ -589,13 +589,130 @@ static int mvebu_cp110_comphy_sgmii_power_on(struct mvebu_comphy_priv *priv,
 static int mvebu_cp110_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 					    struct mvebu_comphy *comphy)
 {
+	void __iomem *hpipe_addr, *comphy_addr, *addr;
+	u32 mask, data;
+	int ret = 0;
+
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
-	dev_err(priv->dev, "USB mode is not implemented\n");
+	/* Configure PIPE selector for USB3 */
+	mvebu_cp110_comphy_set_pipe_selector(priv, comphy);
+
+	hpipe_addr = HPIPE_ADDR(priv->comphy_pipe_regs, comphy->index);
+	comphy_addr = COMPHY_ADDR(priv->comphy_regs, comphy->index);
+
+	dev_dbg(priv->dev, "stage: RFU configurations - hard reset comphy\n");
+	/* RFU configurations - hard reset comphy */
+	mask = COMMON_PHY_CFG1_PWR_UP_MASK;
+	data = 0x1 << COMMON_PHY_CFG1_PWR_UP_OFFSET;
+	mask |= COMMON_PHY_CFG1_PIPE_SELECT_MASK;
+	data |= 0x1 << COMMON_PHY_CFG1_PIPE_SELECT_OFFSET;
+	mask |= COMMON_PHY_CFG1_PWR_ON_RESET_MASK;
+	data |= 0x0 << COMMON_PHY_CFG1_PWR_ON_RESET_OFFSET;
+	mask |= COMMON_PHY_CFG1_CORE_RSTN_MASK;
+	data |= 0x0 << COMMON_PHY_CFG1_CORE_RSTN_OFFSET;
+	mask |= COMMON_PHY_PHY_MODE_MASK;
+	data |= 0x1 << COMMON_PHY_PHY_MODE_OFFSET;
+	reg_set(comphy_addr + COMMON_PHY_CFG1_REG, data, mask);
+
+	/* release from hard reset */
+	mask = COMMON_PHY_CFG1_PWR_ON_RESET_MASK;
+	data = 0x1 << COMMON_PHY_CFG1_PWR_ON_RESET_OFFSET;
+	mask |= COMMON_PHY_CFG1_CORE_RSTN_MASK;
+	data |= 0x1 << COMMON_PHY_CFG1_CORE_RSTN_OFFSET;
+	reg_set(comphy_addr + COMMON_PHY_CFG1_REG, data, mask);
+
+	/* Wait 1ms - until band gap and ref clock ready */
+	mdelay(1);
+
+	/* Start comphy Configuration */
+	dev_dbg(priv->dev, "stage: Comphy configuration\n");
+	/* Set PIPE soft reset */
+	mask = HPIPE_RST_CLK_CTRL_PIPE_RST_MASK;
+	data = 0x1 << HPIPE_RST_CLK_CTRL_PIPE_RST_OFFSET;
+	/* Set PHY datapath width mode for V0 */
+	mask |= HPIPE_RST_CLK_CTRL_FIXED_PCLK_MASK;
+	data |= 0x0 << HPIPE_RST_CLK_CTRL_FIXED_PCLK_OFFSET;
+	/* Set Data bus width USB mode for V0 */
+	mask |= HPIPE_RST_CLK_CTRL_PIPE_WIDTH_MASK;
+	data |= 0x0 << HPIPE_RST_CLK_CTRL_PIPE_WIDTH_OFFSET;
+	/* Set CORE_CLK output frequency for 250Mhz */
+	mask |= HPIPE_RST_CLK_CTRL_CORE_FREQ_SEL_MASK;
+	data |= 0x0 << HPIPE_RST_CLK_CTRL_CORE_FREQ_SEL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_RST_CLK_CTRL_REG, data, mask);
+	/* Set PLL ready delay for 0x2 */
+	reg_set(hpipe_addr + HPIPE_CLK_SRC_LO_REG,
+		0x2 << HPIPE_CLK_SRC_LO_PLL_RDY_DL_OFFSET,
+		HPIPE_CLK_SRC_LO_PLL_RDY_DL_MASK);
+	/* Set reference clock to come from group 1 - 25Mhz */
+	reg_set(hpipe_addr + HPIPE_MISC_REG,
+		0x0 << HPIPE_MISC_REFCLK_SEL_OFFSET,
+		HPIPE_MISC_REFCLK_SEL_MASK);
+	/* Set reference frequcency select - 0x2 */
+	mask = HPIPE_PWR_PLL_REF_FREQ_MASK;
+	data = 0x2 << HPIPE_PWR_PLL_REF_FREQ_OFFSET;
+	/* Set PHY mode to USB - 0x5 */
+	mask |= HPIPE_PWR_PLL_PHY_MODE_MASK;
+	data |= 0x5 << HPIPE_PWR_PLL_PHY_MODE_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PWR_PLL_REG, data, mask);
+	/* Set the amount of time spent in the LoZ state - set for 0x7 */
+	reg_set(hpipe_addr + HPIPE_GLOBAL_PM_CTRL,
+		0x7 << HPIPE_GLOBAL_PM_RXDLOZ_WAIT_OFFSET,
+		HPIPE_GLOBAL_PM_RXDLOZ_WAIT_MASK);
+	/* Set max PHY generation setting - 5Gbps */
+	reg_set(hpipe_addr + HPIPE_INTERFACE_REG,
+		0x1 << HPIPE_INTERFACE_GEN_MAX_OFFSET,
+		HPIPE_INTERFACE_GEN_MAX_MASK);
+	/* Set select data width 20Bit (SEL_BITS[2:0]) */
+	reg_set(hpipe_addr + HPIPE_LOOPBACK_REG,
+		0x1 << HPIPE_LOOPBACK_SEL_OFFSET,
+		HPIPE_LOOPBACK_SEL_MASK);
+	/* select de-emphasize 3.5db */
+	reg_set(hpipe_addr + HPIPE_LANE_CONFIG0_REG,
+		0x1 << HPIPE_LANE_CONFIG0_TXDEEMPH0_OFFSET,
+		HPIPE_LANE_CONFIG0_TXDEEMPH0_MASK);
+	/* override tx margining from the MAC */
+	reg_set(hpipe_addr + HPIPE_TST_MODE_CTRL_REG,
+		0x1 << HPIPE_TST_MODE_CTRL_MODE_MARGIN_OFFSET,
+		HPIPE_TST_MODE_CTRL_MODE_MARGIN_MASK);
+
+	/* Start analog parameters from ETP(HW) */
+	dev_dbg(priv->dev, "stage: Analog parameters from ETP(HW)\n");
+	/* Set Pin DFE_PAT_DIS -> Bit[1]: PIN_DFE_PAT_DIS = 0x0 */
+	mask = HPIPE_LANE_CFG4_DFE_CTRL_MASK;
+	data = 0x1 << HPIPE_LANE_CFG4_DFE_CTRL_OFFSET;
+	/* Set Override PHY DFE control pins for 0x1 */
+	mask |= HPIPE_LANE_CFG4_DFE_OVER_MASK;
+	data |= 0x1 << HPIPE_LANE_CFG4_DFE_OVER_OFFSET;
+	/* Set Spread Spectrum Clock Enable fot 0x1 */
+	mask |= HPIPE_LANE_CFG4_SSC_CTRL_MASK;
+	data |= 0x1 << HPIPE_LANE_CFG4_SSC_CTRL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_LANE_CFG4_REG, data, mask);
+	/* End of analog parameters */
+
+	dev_dbg(priv->dev, "stage: Comphy power up\n");
+	/* Release from PIPE soft reset */
+	reg_set(hpipe_addr + HPIPE_RST_CLK_CTRL_REG,
+		0x0 << HPIPE_RST_CLK_CTRL_PIPE_RST_OFFSET,
+		HPIPE_RST_CLK_CTRL_PIPE_RST_MASK);
+
+	/* wait 15ms - for comphy calibration done */
+	dev_dbg(priv->dev, "stage: Check PLL\n");
+	/* Read lane status */
+	addr = hpipe_addr + HPIPE_LANE_STATUS1_REG;
+	data = HPIPE_LANE_STATUS1_PCLK_EN_MASK;
+	mask = data;
+	data = polling_with_timeout(addr, data, mask, 15000, REG_32BIT);
+	if (data != 0) {
+		dev_dbg(priv->dev, "Read from reg = %p - value = 0x%x\n",
+			hpipe_addr + HPIPE_LANE_STATUS1_REG, data);
+		dev_err(priv->dev, "HPIPE_LANE_STATUS1_PCLK_EN_MASK is 0\n");
+		ret = -ETIMEDOUT;
+	}
 
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
-	return -ENOTSUPP;
+	return ret;
 }
 
 static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
