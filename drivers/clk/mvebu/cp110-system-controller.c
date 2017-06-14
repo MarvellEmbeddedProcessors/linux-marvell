@@ -360,6 +360,25 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
 		cp110_clks[CP110_MAX_CORE_CLOCKS + i] = clk;
 	}
 
+	/*
+	 * Gated clock 18 feeds many core clocks in CP110, one of this clocks
+	 * is the eMMC clock. eMMC driver supports only one clock - the core
+	 * clock of eMMC) so we need to enable clock 18 in CP110 clock level
+	 * and not the eMMC driver itself.
+	 * TODO:
+	 * This is a workaround, the complete solution should be nesting all
+	 * clock providers and consumers in the CP110 driver. One possible
+	 * drawback of this WA is the fact that if we boot without IOs which
+	 * use this clock, this clock will be still enabled.
+	 */
+	if (cp110_clks[CP110_MAX_CORE_CLOCKS + CP110_GATE_SDMMC]) {
+		ret = clk_prepare_enable(cp110_clks[CP110_MAX_CORE_CLOCKS +
+						    CP110_GATE_SDMMC]);
+		if (ret)
+			goto fail_clk_add;
+
+	}
+
 	ret = of_clk_add_provider(np, cp110_of_clk_get, cp110_clk_data);
 	if (ret)
 		goto fail_clk_add;
@@ -399,6 +418,14 @@ static int cp110_syscon_clk_remove(struct platform_device *pdev)
 	int i;
 
 	of_clk_del_provider(pdev->dev.of_node);
+
+	/*
+	 * Disable gated clock 18 if it exists.
+	 * (We enabled it in cp110_syscon_clk_probe).
+	 */
+	if (cp110_clks[CP110_MAX_CORE_CLOCKS + CP110_GATE_SDMMC])
+		clk_disable_unprepare(cp110_clks[CP110_MAX_CORE_CLOCKS +
+						 CP110_GATE_SDMMC]);
 
 	for (i = 0; i < CP110_MAX_GATABLE_CLOCKS; i++) {
 		struct clk *clk = cp110_clks[CP110_MAX_CORE_CLOCKS + i];
