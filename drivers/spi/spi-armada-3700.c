@@ -98,6 +98,9 @@
 
 /* A3700_SPI_IF_TIME_REG */
 #define A3700_SPI_CLK_CAPT_EDGE		BIT(7)
+#define DATA_CAP_CLOCK_CYCLE_NS		14	/*Minimum clock cycle of flash*/
+#define RVT_EDGE_FLASH_CAP_FREQ		(1000 * 1000 * 1000 / DATA_CAP_CLOCK_CYCLE_NS)
+#define A3700_SPI_MAX_OUTPUT_CLK_FREQ	(100 * 1000 * 1000)	/*100MHz*/
 
 /* Flags and macros for struct a3700_spi */
 #define A3700_INSTR_CNT			1
@@ -223,7 +226,14 @@ static void a3700_spi_clock_set(struct a3700_spi *a3700_spi,
 	u32 val;
 	u32 prescale;
 
-	prescale = DIV_ROUND_UP(clk_get_rate(a3700_spi->clk), speed_hz);
+	/*
+	* SPI controller has a maximum output clock freq to flash,
+	* flash could not be working in higher freq than this.
+	*/
+	if (speed_hz >= A3700_SPI_MAX_OUTPUT_CLK_FREQ)
+		prescale = DIV_ROUND_UP(clk_get_rate(a3700_spi->clk), A3700_SPI_MAX_OUTPUT_CLK_FREQ);
+	else
+		prescale = DIV_ROUND_UP(clk_get_rate(a3700_spi->clk), speed_hz);
 
 	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
 	val = val & ~A3700_SPI_CLK_PRESCALE_MASK;
@@ -231,7 +241,14 @@ static void a3700_spi_clock_set(struct a3700_spi *a3700_spi,
 	val = val | (prescale & A3700_SPI_CLK_PRESCALE_MASK);
 	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
 
-	if (prescale <= 2) {
+	/*
+	* If the data output delay from the flash is greater than 1/2 of the clock cycle
+	* (this is usually the case when running at high frequency) needs to set negative
+	* edge of the clock to capture data. For most of SPI flashes, the number is 7ns
+	* (catpuring data time). So it means that SOC set CLK_CAPT_EDGE to negative
+	* edge when SPI flash output flash frequency is more than 71MHz(1/14ns).
+	*/
+	if (clk_get_rate(a3700_spi->clk) / prescale > RVT_EDGE_FLASH_CAP_FREQ) {
 		val = spireg_read(a3700_spi, A3700_SPI_IF_TIME_REG);
 		val |= A3700_SPI_CLK_CAPT_EDGE;
 		spireg_write(a3700_spi, A3700_SPI_IF_TIME_REG, val);
