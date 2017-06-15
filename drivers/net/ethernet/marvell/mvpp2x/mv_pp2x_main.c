@@ -2547,7 +2547,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		if (port->flags & MVPP2_F_IFCAP_NETMAP) {
 			int netmap_done = 0;
 
-			if (netmap_rx_irq(port->dev, 0, &netmap_done))
+			if (netmap_rx_irq(port->dev, rxq->log_id, &netmap_done))
 				return netmap_done;
 		/* Netmap implementation includes all queues in i/f.*/
 		return 1;
@@ -3346,6 +3346,11 @@ out:
 	}
 	/* PPV22 TX Post-Processing */
 
+#ifdef DEV_NETMAP
+	/* Don't check tx done for ports working in Netmap mode */
+	if ((port->flags & MVPP2_F_IFCAP_NETMAP))
+		return NETDEV_TX_OK;
+#endif
 	if (!port->priv->pp2xdata->interrupt_tx_done)
 		mv_pp2x_tx_done_post_proc(txq, txq_pcpu, port, frags);
 
@@ -3393,16 +3398,8 @@ static inline int mv_pp2x_cause_rx_handle(struct mv_pp2x_port *port,
 
 #ifdef DEV_NETMAP
 	if ((port->flags & MVPP2_F_IFCAP_NETMAP)) {
-		u32 state;
-
-		state = mv_pp2x_qvector_interrupt_state_get(q_vec);
-		if (state)
-			mv_pp2x_qvector_interrupt_disable(q_vec);
-		cause_rx = 0;
 		napi_complete(napi);
-		if (state)
-			mv_pp2x_qvector_interrupt_enable(q_vec);
-		q_vec->pending_cause_rx = cause_rx;
+		q_vec->pending_cause_rx = 0;
 		return rx_done;
 	}
 #endif
@@ -4017,8 +4014,8 @@ int mv_pp2x_stop(struct net_device *dev)
 
 	if (port->priv->pp2_version == PPV22)
 		unregister_hotcpu_notifier(&port->port_hotplug_nb);
-
-	if (!port->priv->pp2xdata->interrupt_tx_done) {
+	/* Cancel tx timers in case Tx done interrupts are disabled and if port is not in Netmap mode */
+	if (!(port->flags & MVPP2_F_IFCAP_NETMAP) && !port->priv->pp2xdata->interrupt_tx_done)  {
 		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 			hrtimer_cancel(&port_pcpu->tx_done_timer);

@@ -185,7 +185,8 @@ static inline void mv_pp2x_interrupts_unmask(void *arg)
 	u32 val;
 
 	val = MVPP2_CAUSE_MISC_SUM_MASK | MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
-	if (port->priv->pp2xdata->interrupt_tx_done)
+	/* Don't unmask Tx done interrupts for ports working in Netmap mode*/
+	if (!(port->flags & MVPP2_F_IFCAP_NETMAP) && port->priv->pp2xdata->interrupt_tx_done)
 		val |= MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
 
 	mv_pp2x_write(&port->priv->hw,
