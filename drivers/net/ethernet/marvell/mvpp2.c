@@ -6032,10 +6032,6 @@ static int mvpp2_open(struct net_device *dev)
 	/* In default link is down */
 	netif_carrier_off(port->dev);
 
-	err = mvpp2_phy_connect(port);
-	if (err < 0)
-		goto err_free_irq;
-
 	/* Unmask interrupts on all CPUs */
 	on_each_cpu(mvpp2_interrupts_unmask, port, 1);
 
@@ -6043,8 +6039,6 @@ static int mvpp2_open(struct net_device *dev)
 
 	return 0;
 
-err_free_irq:
-	free_irq(port->irq, port);
 err_cleanup_txqs:
 	mvpp2_cleanup_txqs(port);
 err_cleanup_rxqs:
@@ -6059,7 +6053,6 @@ static int mvpp2_stop(struct net_device *dev)
 	int cpu;
 
 	mvpp2_stop_dev(port);
-	mvpp2_phy_disconnect(port);
 
 	/* Mask interrupts on all CPUs */
 	on_each_cpu(mvpp2_interrupts_mask, port, 1);
@@ -6621,6 +6614,13 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 		goto err_free_irq;
 	}
 
+	port->dev = dev;
+	SET_NETDEV_DEV(dev, &pdev->dev);
+
+	err = mvpp2_phy_connect(port);
+	if (err < 0)
+		goto err_free_stats;
+
 	dt_mac_addr = of_get_mac_address(port_node);
 	if (dt_mac_addr && is_valid_ether_addr(dt_mac_addr)) {
 		mac_from = "device tree";
@@ -6639,8 +6639,6 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 
 	port->tx_ring_size = MVPP2_MAX_TXD;
 	port->rx_ring_size = MVPP2_MAX_RXD;
-	port->dev = dev;
-	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	err = mvpp2_port_init(port);
 	if (err < 0) {
@@ -6710,6 +6708,7 @@ static void mvpp2_port_remove(struct mvpp2_port *port)
 {
 	int i;
 
+	mvpp2_phy_disconnect(port);
 	unregister_netdev(port->dev);
 	of_node_put(port->phy_node);
 	free_percpu(port->pcpu);
