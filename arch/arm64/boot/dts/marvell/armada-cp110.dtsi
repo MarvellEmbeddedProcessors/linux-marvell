@@ -473,7 +473,9 @@ comphy0: comphy {
 	compatible = "marvell,cp110-comphy";
 	reg = <0x441000 0x100>, <0x120000 0x6000>;
 	reg-names = "comphy", "serdes";
+	dfx-reg = <0x400280 4>;
 	#phy-cells = <2>;
+	sar-data = <&cpm_sar>;
 	status = "disabled";
 };
 
