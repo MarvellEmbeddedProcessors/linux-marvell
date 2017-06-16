@@ -32,6 +32,10 @@ struct mvebu_comphy_priv {
 		struct phy *phy;
 		int mode;
 		int index;
+		struct misc_info {
+			int pcie_width: 8;
+			int pcie_is_ep: 1;
+		} misc;
 	} lanes[MVEBU_COMPHY_MAX_CNT];
 };
 

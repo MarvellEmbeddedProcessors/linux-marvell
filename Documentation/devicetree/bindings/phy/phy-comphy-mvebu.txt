@@ -16,6 +16,12 @@ Required properties for comphy node:
 					corresponding to the registers filled in "reg".
 	- #phy-cells:	Standard property (Documentation: phy-bindings.txt)
 					Should be 2.
+	- dfx-reg:	Address and length of DFX register which is needed when PCIe
+			COMPHY initialization on CP110. It is optional, and should not
+			be modified if it exist.
+	- sar-data:	The phandle to Sample At Reset(SAR), which is needed when PCIe
+			COMPHY initialization on CP110. It is optional, and should not
+			be modified if it exist.
 	Example will be provided in the end of this file.
 
 Each device using Comphy should have handle with the following properties:
@@ -78,7 +84,9 @@ Comphy Node:
 		compatible = "marvell,cp110-comphy";
 		reg = <0x441000 0x100>, <0x120000 0x6000>;
 		reg-names = "comphy", "serdes";
+		dfx-reg = <0x400280 4>;
 		#phy-cells = <2>;
+		sar-data = <&cpm_sar>;
 		status = "okay";
 	};
 
@@ -86,7 +94,9 @@ Comphy Node:
 		compatible = "marvell,cp110-comphy";
 		reg = <0x441000 0x100>, <0x120000 0x6000>;
 		reg-names = "comphy", "serdes";
+		dfx-reg = <0x400280 4>;
 		#phy-cells = <2>;
+		sar-data = <&cps_sar>;
 		status = "okay";
 	};
 
