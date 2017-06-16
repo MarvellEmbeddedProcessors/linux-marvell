@@ -22,12 +22,14 @@
 #include <linux/resource.h>
 #include <linux/of_pci.h>
 #include <linux/of_irq.h>
+#include <dt-bindings/phy/phy-comphy-mvebu.h>
 
 #include "pcie-designware.h"
 
 struct armada8k_pcie {
 	void __iomem		*regs_base;
-	struct phy		*phy;
+	struct phy		**phys;
+	int			phy_count;
 	struct clk		*clk;
 	struct pcie_port	pp;
 };
@@ -231,8 +233,12 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 {
 	struct armada8k_pcie *armada8k_pcie;
 	struct pcie_port *pp;
+	struct phy **phys = NULL;
 	struct device *dev = &pdev->dev;
 	struct resource *base;
+	int i, phy_count = 0;
+	u32 command;
+	char phy_name[16];
 	int ret = 0;
 
 	armada8k_pcie = devm_kzalloc(dev, sizeof(*armada8k_pcie), GFP_KERNEL);
@@ -245,26 +251,54 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 
 	clk_prepare_enable(armada8k_pcie->clk);
 
-#if 0
-	/* Keep this code commented out till we write a PHY driver for
-	** armada-8k PCIe PHY. */
-	armada8k_pcie->phy = devm_phy_get(dev, "pcie-phy");
-	if (IS_ERR(armada8k_pcie->phy)) {
-		ret = PTR_ERR(armada8k_pcie->phy);
-		if (ret == -EPROBE_DEFER)
-			dev_info(dev, "probe deferred\n");
-		else
-			dev_err(dev, "couldn't get pcie-phy\n");
+	/* Get PHY count according to phy name */
+	phy_count = of_property_count_strings(pdev->dev.of_node, "phy-names");
+	if (phy_count > 0) {
+		phys = devm_kzalloc(dev, sizeof(*phys) * phy_count, GFP_KERNEL);
+		if (!phys)
+			return -ENOMEM;
 
-		goto fail_free;
+		for (i = 0; i < phy_count; i++) {
+			snprintf(phy_name, sizeof(phy_name), "pcie-phy%d", i);
+			phys[i] = devm_phy_get(dev, phy_name);
+			if (IS_ERR(phys[i]))
+				goto err_phy;
+
+			/* Tell COMPHY the PCIE width based on phy command,
+			 * and in PHY command callback, the width will be
+			 * checked for its validation.
+			 */
+			switch (phy_count) {
+			case PCIE_LNK_X1:
+				command = COMPHY_COMMAND_PCIE_WIDTH_1;
+				break;
+			case PCIE_LNK_X2:
+				command = COMPHY_COMMAND_PCIE_WIDTH_2;
+				break;
+			case PCIE_LNK_X4:
+				command = COMPHY_COMMAND_PCIE_WIDTH_4;
+				break;
+			default:
+				command = COMPHY_COMMAND_PCIE_WIDTH_UNSUPPORT;
+			}
+			phy_send_command(phys[i], command);
+
+			ret = phy_init(phys[i]);
+			if (ret < 0)
+				goto err_phy;
+
+			ret = phy_power_on(phys[i]);
+			if (ret < 0) {
+				phy_exit(phys[i]);
+				goto err_phy;
+			}
+		}
 	}
 
-	phy_init(armada8k_pcie->phy);
-#endif
-
 	pp = &armada8k_pcie->pp;
-
 	pp->dev = dev;
+	armada8k_pcie->phys = phys;
+	armada8k_pcie->phy_count = phy_count;
 	platform_set_drvdata(pdev, armada8k_pcie);
 
 	/* Get the dw-pcie unit configuration/control registers base. */
@@ -282,8 +316,13 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	ret = armada8k_add_pcie_port(pp, pdev);
 	if (ret < 0)
 		goto fail_free;
-
 	return 0;
+
+err_phy:
+	while (--i >= 0) {
+		phy_power_off(phys[i]);
+		phy_exit(phys[i]);
+	}
 
 fail_free:
 	if (!IS_ERR(armada8k_pcie->clk))
