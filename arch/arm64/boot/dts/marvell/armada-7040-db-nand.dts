@@ -169,9 +169,13 @@
 		};
 		pcie@0x600000 {
 			status = "okay";
+			phys = <&comphy0 0 COMPHY_PCIE0>;
+			phy-names = "pcie-phy0";
 		};
 		pcie@0x640000 {
 			status = "okay";
+			phys = <&comphy0 5 COMPHY_PCIE2>;
+			phy-names = "pcie-phy0";
 		};
 	};
 };
