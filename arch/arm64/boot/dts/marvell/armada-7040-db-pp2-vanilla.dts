@@ -205,6 +205,8 @@
 
 		pcie@0x640000 {
 			status = "okay";
+			phys = <&comphy0 5 COMPHY_PCIE2>;
+			phy-names = "pcie-phy0";
 		};
 	};
 };
