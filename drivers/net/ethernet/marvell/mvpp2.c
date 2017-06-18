@@ -4262,6 +4262,14 @@ static void mvpp2_port_enable(struct mvpp2_port *port)
 		val |= MVPP2_GMAC_PORT_EN_MASK;
 		val |= MVPP2_GMAC_MIB_CNTR_EN_MASK;
 		writel(val, port->base + MVPP2_GMAC_CTRL_0_REG);
+
+		val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
+		val &= ~(MVPP2_GMAC_FORCE_LINK_DOWN);
+		writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
+
+		val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
+		val &= ~(MVPP2_GMAC_PORT_RESET_MASK);
+		writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
 	}
 }
 
@@ -4281,6 +4289,14 @@ static void mvpp2_port_disable(struct mvpp2_port *port)
 		val = readl(port->base + MVPP2_GMAC_CTRL_0_REG);
 		val &= ~(MVPP2_GMAC_PORT_EN_MASK);
 		writel(val, port->base + MVPP2_GMAC_CTRL_0_REG);
+
+		val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
+		val |= MVPP2_GMAC_FORCE_LINK_DOWN;
+		writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
+
+		val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
+		val |= MVPP2_GMAC_PORT_RESET_MASK;
+		writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
 	}
 }
 
