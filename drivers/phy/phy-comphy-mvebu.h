@@ -7,6 +7,16 @@
 #define to_mvebu_comphy_priv(lane) \
 	container_of((lane), struct mvebu_comphy_priv, lanes[(lane)->index])
 
+enum {
+	COMPHY_LANE0 = 0,
+	COMPHY_LANE1,
+	COMPHY_LANE2,
+	COMPHY_LANE3,
+	COMPHY_LANE4,
+	COMPHY_LANE5,
+	COMPHY_LANE_MAX,
+};
+
 enum reg_width_type {
 	REG_16BIT = 0,
 	REG_32BIT,

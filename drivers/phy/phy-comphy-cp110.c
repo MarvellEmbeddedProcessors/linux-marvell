@@ -120,6 +120,55 @@ static void mvebu_cp110_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 
 }
 
+/* PIPE selector configures for PCIe, USB 3.0 Host, and USB 3.0 Device mode */
+void mvebu_cp110_comphy_set_pipe_selector(struct mvebu_comphy_priv *priv,
+					  struct mvebu_comphy *comphy)
+{
+	u32 reg;
+	u32 shift = COMMON_SELECTOR_COMPHYN_FIELD_WIDTH * comphy->index;
+	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
+	u32 mask = COMMON_SELECTOR_COMPHY_MASK << shift;
+	u32 pipe_sel = 0x0;
+
+	reg = readl(priv->comphy_regs + COMMON_SELECTOR_PIPE_REG_OFFSET);
+	reg &= ~mask;
+
+	switch (mode) {
+	case (COMPHY_PCIE_MODE):
+		/* For lanes support PCIE, selector value are all same */
+		pipe_sel = COMMON_SELECTOR_PIPE_COMPHY_PCIE;
+		break;
+
+	case (COMPHY_USB3H_MODE):
+		/* Only lane 1-4 support USB host, selector value is same */
+		if (comphy->index == COMPHY_LANE0 ||
+		    comphy->index == COMPHY_LANE5)
+			dev_err(priv->dev, "COMPHY[%d] mode[%d] is invalid\n",
+				comphy->index, mode);
+		else
+			pipe_sel = COMMON_SELECTOR_PIPE_COMPHY_USBH;
+		break;
+
+	case (COMPHY_USB3D_MODE):
+		/* Lane 1 and 4 support USB device, selector value is same */
+		if (comphy->index == COMPHY_LANE1 ||
+		    comphy->index == COMPHY_LANE4)
+			pipe_sel = COMMON_SELECTOR_PIPE_COMPHY_USBD;
+		else
+			dev_err(priv->dev, "COMPHY[%d] mode[%d] is invalid\n",
+				comphy->index, mode);
+		break;
+
+	default:
+		dev_err(priv->dev, "COMPHY[%d] mode[%d] is invalid\n",
+			comphy->index, mode);
+		break;
+	}
+
+	writel(reg | (pipe_sel << shift),
+	       priv->comphy_regs + COMMON_SELECTOR_PIPE_REG_OFFSET);
+}
+
 static int mvebu_cp110_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 					    struct mvebu_comphy *comphy)
 {

@@ -7,12 +7,6 @@ extern const struct mvebu_comphy_soc_info a3700_comphy;
 #define A3700_COMPHY_PLL_LOCK_TIMEOUT		1000
 #define REG_16_BIT_MASK				0xFFFF
 
-enum {
-	COMPHY_LANE0 = 0,
-	COMPHY_LANE1,
-	COMPHY_LANE2,
-	COMPHY_LANE_MAX,
-};
 #define COMPHY_SELECTOR_PHY_REG_OFFSET		0xFC
 /* bit0: 0: Lane0 is GBE0; 1: Lane1 is PCIE */
 #define COMPHY_SELECTOR_PCIE_GBE0_SEL_BIT	BIT(0)
