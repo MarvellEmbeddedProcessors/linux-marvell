@@ -3270,9 +3270,9 @@ static void mv_pp2x_cls_flow_rss_hash(struct mv_pp2x_hw *hw,
 				      MVPP2_CLS_LKP_HASH, MVPP2_CLS_FL_RSS_PRI);
 	fe->index = entry_idx;
 
-	/* Update last for UDP NF flow */
-	if ((lkpid_attr & MVPP2_PRS_FL_ATTR_UDP_BIT) &&
-	    !(lkpid_attr & MVPP2_PRS_FL_ATTR_FRAG_BIT)) {
+	/* Update last for TCP & UDP NF flow */
+	if (((lkpid_attr & (MVPP2_PRS_FL_ATTR_TCP_BIT | MVPP2_PRS_FL_ATTR_UDP_BIT)) &&
+	     !(lkpid_attr & MVPP2_PRS_FL_ATTR_FRAG_BIT))) {
 		if (!hw->cls_shadow->flow_info[lkpid -
 			MVPP2_PRS_FL_START].flow_entry_rss1) {
 			if (rss_mode == MVPP2_RSS_HASH_2T)
@@ -3331,8 +3331,9 @@ void mv_pp2x_cls_flow_tbl_config(struct mv_pp2x_hw *hw)
 					     MVPP2_COS_TYPE_DSCP);
 			/* RSS hash rule */
 			if ((!(lkpid_attr & MVPP2_PRS_FL_ATTR_FRAG_BIT)) &&
-			    (lkpid_attr & MVPP2_PRS_FL_ATTR_UDP_BIT)) {
-				/* RSS hash rules for UDP rss mode update */
+			    (lkpid_attr & (MVPP2_PRS_FL_ATTR_TCP_BIT |
+				MVPP2_PRS_FL_ATTR_UDP_BIT))) {
+				/* RSS hash rules for TCP & UDP rss mode update */
 				mv_pp2x_cls_flow_rss_hash(hw, &fe, lkpid,
 							  MVPP2_RSS_HASH_2T);
 				mv_pp2x_cls_flow_rss_hash(hw, &fe, lkpid,
@@ -3355,8 +3356,9 @@ void mv_pp2x_cls_flow_tbl_config(struct mv_pp2x_hw *hw)
 					     MVPP2_COS_TYPE_DSCP);
 			/* RSS hash rule */
 			if ((!(lkpid_attr & MVPP2_PRS_FL_ATTR_FRAG_BIT)) &&
-			    (lkpid_attr & MVPP2_PRS_FL_ATTR_UDP_BIT)) {
-				/* RSS hash rules for UDP rss mode update */
+			    (lkpid_attr & (MVPP2_PRS_FL_ATTR_TCP_BIT |
+				MVPP2_PRS_FL_ATTR_UDP_BIT))) {
+				/* RSS hash rules for TCP & UDP rss mode update */
 				mv_pp2x_cls_flow_rss_hash(hw, &fe, lkpid,
 							  MVPP2_RSS_HASH_2T);
 				mv_pp2x_cls_flow_rss_hash(hw, &fe, lkpid,

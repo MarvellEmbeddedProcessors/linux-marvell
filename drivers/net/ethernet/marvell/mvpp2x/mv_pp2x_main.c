@@ -2314,8 +2314,8 @@ int mv_pp22_rss_mode_set(struct mv_pp2x_port *port, int rss_mode)
 		lkpid = index + MVPP2_PRS_FL_START;
 		/* Get lookup ID attribute */
 		lkpid_attr = mv_pp2x_prs_flow_id_attr_get(lkpid);
-		/* Only non-frag UDP can set rss mode */
-		if ((lkpid_attr & MVPP2_PRS_FL_ATTR_UDP_BIT) &&
+		/* Only non-frag TCP & UDP can set rss mode */
+		if ((lkpid_attr & (MVPP2_PRS_FL_ATTR_TCP_BIT | MVPP2_PRS_FL_ATTR_UDP_BIT)) &&
 		    !(lkpid_attr & MVPP2_PRS_FL_ATTR_FRAG_BIT)) {
 			/* Prepare a temp table for the lkpid */
 			mv_pp2x_cls_flow_tbl_temp_copy(hw, lkpid, &flow_idx);
