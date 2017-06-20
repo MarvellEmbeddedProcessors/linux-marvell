@@ -476,3 +476,9 @@ comphy0: comphy {
 	#phy-cells = <2>;
 	status = "disabled";
 };
+
+cpm_sar: sar@400200 {
+	compatible = "marvell,sample-at-reset-cp110";
+	reg = <0x400200 0x8>;
+	status = "okay";
+};
