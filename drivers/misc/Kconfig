@@ -541,6 +541,15 @@ config MVEBU_SOC_INFO
 	help
 	  Marvell AP806 SoC information driver for AP806
 
+config MVEBU_A8K_SAR
+	bool "Marvell Aramda-8K Sample at reset info driver"
+	depends on ARCH_MVEBU
+	default y
+	help
+	  Marvell Sample at reset driver for Armada 7K/8K.
+	  This driver provides API to read and dump SAR register.
+	  The driver supports AP806 and CP110 currently.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
