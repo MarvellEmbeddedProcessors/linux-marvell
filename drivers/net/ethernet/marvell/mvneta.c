@@ -2117,6 +2117,9 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 	for (i = 0; i < rxq->size; i++) {
 		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
 		void *data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
+
+		if (!data)
+			continue;
 #ifdef CONFIG_64BIT
 		/* In Neta HW only 32 bits data is supported, so in order to
 		 * obtain whole 64 bits address from RX descriptor, we store the
@@ -2248,6 +2251,7 @@ err_drop_frame:
 				atomic_inc(&rxq->missed);
 
 				/* record the first rx desc refilled failure */
+				rx_desc->buf_cookie = 0;
 				rxq->missed_desc = rx_desc;
 
 				/* add cleanup timer */
@@ -2258,6 +2262,7 @@ err_drop_frame:
 			}
 		} else {
 			/* refill already stopped - only update missed counter */
+			rx_desc->buf_cookie = 0;
 			atomic_inc(&rxq->missed);
 		}
 
@@ -3163,6 +3168,8 @@ static void mvneta_rxq_deinit(struct mvneta_port *pp,
 	rxq->last_desc         = 0;
 	rxq->next_desc_to_proc = 0;
 	rxq->descs_phys        = 0;
+	rxq->missed_desc       = NULL;
+	atomic_set(&rxq->missed, 0);
 }
 
 /* Create and initialize a tx queue */
@@ -3467,6 +3474,7 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
 	mvneta_stop_dev(pp);
 	on_each_cpu(mvneta_percpu_disable, pp, true);
 
+	usleep_range(10, 20);
 	mvneta_cleanup_txqs(pp);
 	mvneta_cleanup_rxqs(pp);
 
