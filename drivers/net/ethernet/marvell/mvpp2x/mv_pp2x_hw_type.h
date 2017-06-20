@@ -1269,8 +1269,10 @@
 #define MVPP2_MAX_L3_ADDR_SIZE		16
 
 /* Port flags */
-#define MVPP2_F_LOOPBACK		BIT(0)
-#define MVPP2_F_IFCAP_NETMAP    BIT(1)
+#define MVPP2_F_LOOPBACK		BIT(0) /* Loopback port */
+#define MVPP2_F_IFCAP_NETMAP		BIT(1) /* netmap port */
+#define MVPP2_F_IF_MUSDK		BIT(2) /* musdk port */
+#define MVPP2_F_IF_MUSDK_DOWN		BIT(3) /* musdk port that has been put stopped */
 
 /* Marvell tag types */
 enum mv_pp2x_tag_type {

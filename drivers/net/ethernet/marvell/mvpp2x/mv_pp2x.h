@@ -852,6 +852,7 @@ int mv_pp2x_setup_rxqs(struct mv_pp2x_port *port);
 int mv_pp2x_setup_txqs(struct mv_pp2x_port *port);
 void mv_pp2x_cleanup_txqs(struct mv_pp2x_port *port);
 void mv_pp2x_set_ethtool_ops(struct net_device *netdev);
+void mv_pp2x_set_non_kernel_ethtool_ops(struct net_device *netdev);
 int mv_pp22_rss_rxfh_indir_set(struct mv_pp2x_port *port);
 int mv_pp2x_cos_classifier_set(struct mv_pp2x_port *port,
 			       enum mv_pp2x_cos_classifier cos_mode);

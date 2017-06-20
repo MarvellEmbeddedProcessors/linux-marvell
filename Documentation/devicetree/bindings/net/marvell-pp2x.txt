@@ -26,6 +26,13 @@ ppv22 port required properties:
 - emac-data: A phandle to an emac node, defining the mac (a.k.a. GOP) properties of the node.
 	     The emac nodes are under the gop section.
 
+ppv22 port optional properties:
+==============================
+- musdk-status: Defines if this is a musdk port or not. Possible values are "private" or "shared".
+		'musdk' stands for the 'Marvell Userspace Development Kit', is intended for US networking in Linux env.
+- marvell,loopback: Is this the ppv2 loopback port.
+		    ppv2 loopback port is only used, if at least one musdk_port is defined.
+
 gop section:
 ===========
 The gop section is separated from the ppv22 node.
@@ -105,6 +112,7 @@ ppv22@000000 {
 		port-id = <0>; /* pp2_port_id */
 		emac-data = <&emac0>;
 		status = "disabled";
+		musdk-status = "private";
 	};
 	eth1: eth1@020000 {
 		interrupts = <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>; /* TX/RX Interrupt */
@@ -118,4 +126,10 @@ ppv22@000000 {
 		emac-data = <&emac3>;
 		status = "disabled";
 	};
+	lpbk3_1: lpbk3@040000 {
+		interrupts = <ICU_GRP_NSR 42 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
+		port-id = <3>; /* pp2_port_id */
+		marvell,loopback;
+		status = "disabled";
+     };
 };

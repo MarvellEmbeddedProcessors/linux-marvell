@@ -3644,16 +3644,20 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	if (port->priv->pp2_version == PPV21) {
 		mv_pp21_port_enable(port);
 	} else {
-		mv_gop110_port_events_mask(gop, mac);
-		mv_gop110_port_enable(gop, mac, port->comphy);
+		if (!(port->flags & MVPP2_F_LOOPBACK)) {
+			mv_gop110_port_events_mask(gop, mac);
+			mv_gop110_port_enable(gop, mac, port->comphy);
+		}
 	}
 
 	if (port->mac_data.phy_dev) {
 		phy_start(port->mac_data.phy_dev);
 	} else {
-		mv_pp22_dev_link_event(port->dev);
-		tasklet_init(&port->link_change_tasklet, mv_pp2_link_change_tasklet,
-			     (unsigned long)(port->dev));
+		if (!(port->flags & MVPP2_F_LOOPBACK)) {
+			mv_pp22_dev_link_event(port->dev);
+			tasklet_init(&port->link_change_tasklet, mv_pp2_link_change_tasklet,
+				     (unsigned long)(port->dev));
+		}
 	}
 
 	if (port->mac_data.phy_dev)
@@ -3662,7 +3666,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	mv_pp2x_egress_enable(port);
 	mv_pp2x_ingress_enable(port);
 	/* Unmask link_event */
-	if (port->priv->pp2_version == PPV22) {
+	if (port->priv->pp2_version == PPV22 && !(port->flags & MVPP2_F_LOOPBACK)) {
 		mv_gop110_port_events_unmask(gop, mac);
 		port->mac_data.flags |= MV_EMAC_F_PORT_UP;
 	}
@@ -3695,16 +3699,19 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 	if (port->priv->pp2_version == PPV21) {
 		mv_pp21_port_disable(port);
 	} else {
-		mv_gop110_port_events_mask(gop, mac);
-		mv_gop110_port_disable(gop, mac, port->comphy);
-		port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
-		port->mac_data.flags &= ~MV_EMAC_F_PORT_UP;
+		if (!(port->flags & MVPP2_F_LOOPBACK)) {
+			mv_gop110_port_events_mask(gop, mac);
+			mv_gop110_port_disable(gop, mac, port->comphy);
+			port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
+			port->mac_data.flags &= ~MV_EMAC_F_PORT_UP;
+		}
 	}
 
 	if (port->mac_data.phy_dev)
 		phy_stop(port->mac_data.phy_dev);
 	else
-		tasklet_kill(&port->link_change_tasklet);
+		if (!(port->flags & MVPP2_F_LOOPBACK))
+			tasklet_kill(&port->link_change_tasklet);
 }
 
 /* Return positive if MTU is valid */
@@ -3930,6 +3937,11 @@ int mv_pp2x_open(struct net_device *dev)
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	int err;
 
+	if (port->flags & MVPP2_F_IF_MUSDK_DOWN) {
+		netdev_warn(dev, "skipping ndo_open as this port isn't really down\n");
+		return 0;
+	}
+
 	set_device_base_address(dev);
 
 	/* Allocate the Rx/Tx queues */
@@ -3943,29 +3955,30 @@ int mv_pp2x_open(struct net_device *dev)
 		netdev_err(port->dev, "cannot allocate Tx queues\n");
 		goto err_cleanup_rxqs;
 	}
-
-	err = mv_pp2x_setup_irqs(dev, port);
+	if (!(port->flags & MVPP2_F_IF_MUSDK))
+		err = mv_pp2x_setup_irqs(dev, port);
 	if (err) {
 		netdev_err(port->dev, "cannot allocate irq's\n");
 		goto err_cleanup_txqs;
 	}
 
 	/* Only Mvpp22 support hot plug feature */
-	if (port->priv->pp2_version == PPV22)
+	if (port->priv->pp2_version == PPV22  && !(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK)))
 		register_hotcpu_notifier(&port->port_hotplug_nb);
 
 	/* In default link is down */
 	netif_carrier_off(port->dev);
 
-	/* Unmask interrupts on all CPUs */
-	on_each_cpu(mv_pp2x_interrupts_unmask, port, 1);
+	if (!(port->flags & MVPP2_F_IF_MUSDK)) {
+		/* Unmask interrupts on all CPUs */
+		on_each_cpu(mv_pp2x_interrupts_unmask, port, 1);
 
-	/* Unmask shared interrupts */
-	mv_pp2x_shared_thread_interrupts_unmask(port);
+		/* Unmask shared interrupts */
+		mv_pp2x_shared_thread_interrupts_unmask(port);
 
-	/* Port is init in uboot */
-
-	if (port->priv->pp2_version == PPV22)
+		/* Port is init in uboot */
+	}
+	if ((port->priv->pp2_version == PPV22) && !(port->flags & MVPP2_F_LOOPBACK))
 		mvcpn110_mac_hw_init(port);
 	mv_pp2x_start_dev(port);
 
@@ -4350,8 +4363,29 @@ u16 mv_pp2x_select_queue(struct net_device *dev, struct sk_buff *skb,
 	return (val % mv_pp2x_txq_number) + (smp_processor_id() * mv_pp2x_txq_number);
 }
 
-/* Device ops */
+/* Dummy netdev_ops for non-kernel (i.e. musdk) network devices */
+static int mv_pp2x_dummy_change_mtu(struct net_device *dev, int mtu)
+{
+	netdev_warn(dev, "ndo_change_mtu not supported\n");
+	return 0;
+}
 
+int mv_pp2x_dummy_stop(struct net_device *dev)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+
+	port->flags |= MVPP2_F_IF_MUSDK_DOWN;
+	netdev_warn(dev, "ndo_stop not supported\n");
+	return 0;
+}
+
+static int mv_pp2x_dummy_tx(struct sk_buff *skb, struct net_device *dev)
+{
+	pr_debug("mv_pp2x_dummy_tx\n");
+	return NETDEV_TX_OK;
+}
+
+/* Device ops */
 static const struct net_device_ops mv_pp2x_netdev_ops = {
 	.ndo_open		= mv_pp2x_open,
 	.ndo_stop		= mv_pp2x_stop,
@@ -4360,6 +4394,22 @@ static const struct net_device_ops mv_pp2x_netdev_ops = {
 	.ndo_set_rx_mode	= mv_pp2x_set_rx_mode,
 	.ndo_set_mac_address	= mv_pp2x_set_mac_address,
 	.ndo_change_mtu		= mv_pp2x_change_mtu,
+	.ndo_get_stats64	= mv_pp2x_get_stats64,
+	.ndo_do_ioctl		= mv_pp2x_ioctl,
+	.ndo_set_features	= mv_pp2x_netdev_set_features,
+	.ndo_vlan_rx_add_vid	= mv_pp2x_rx_add_vid,
+	.ndo_vlan_rx_kill_vid	= mv_pp2x_rx_kill_vid,
+};
+
+/* musdk ports contain dummy operations for those functions that are performed in UserSpace (i.e. musdk) */
+static const struct net_device_ops mv_pp2x_non_kernel_netdev_ops = {
+	.ndo_open		= mv_pp2x_open,
+	.ndo_stop		= mv_pp2x_dummy_stop,
+	.ndo_start_xmit		= mv_pp2x_dummy_tx,
+	/*.ndo_select_queue	= mv_pp2x_select_queue,*/
+	.ndo_set_rx_mode	= mv_pp2x_set_rx_mode,
+	.ndo_set_mac_address	= mv_pp2x_set_mac_address,
+	.ndo_change_mtu		= mv_pp2x_dummy_change_mtu,
 	.ndo_get_stats64	= mv_pp2x_get_stats64,
 	.ndo_do_ioctl		= mv_pp2x_ioctl,
 	.ndo_set_features	= mv_pp2x_netdev_set_features,
@@ -4705,12 +4755,12 @@ static void mv_pp2x_get_port_stats(struct mv_pp2x_port *port)
 
 	if (port->priv->pp2_version == PPV21)
 		return;
-
-	link_is_up = mv_gop110_port_is_link_up(gop, &port->mac_data);
-
-	if (link_is_up) {
-		mv_gop110_mib_counters_stat_update(gop, gop_port, gop_statistics);
-		mv_pp2x_counters_stat_update(port, gop_statistics);
+	if (!(port->flags & MVPP2_F_LOOPBACK)) {
+		link_is_up = mv_gop110_port_is_link_up(gop, &port->mac_data);
+		if (link_is_up) {
+			mv_gop110_mib_counters_stat_update(gop, gop_port, gop_statistics);
+			mv_pp2x_counters_stat_update(port, gop_statistics);
+		}
 	}
 }
 
@@ -4744,7 +4794,8 @@ static int mv_pp2x_port_init(struct mv_pp2x_port *port)
 	if (port->priv->pp2_version == PPV21)
 		mv_pp21_port_disable(port);
 	else
-		mv_gop110_port_disable(gop, mac, port->comphy);
+		if (!(port->flags & MVPP2_F_LOOPBACK))
+			mv_gop110_port_disable(gop, mac, port->comphy);
 
 	/* Allocate queues */
 	port->txqs = devm_kcalloc(dev, port->num_tx_queues, sizeof(*port->txqs),
@@ -4769,7 +4820,9 @@ static int mv_pp2x_port_init(struct mv_pp2x_port *port)
 		goto err_free_percpu;
 
 	/* Configure queue_vectors */
-	priv->pp2xdata->mv_pp2x_port_queue_vectors_init(port);
+
+	if (!(port->flags & MVPP2_F_IF_MUSDK))
+		priv->pp2xdata->mv_pp2x_port_queue_vectors_init(port);
 
 	/* Configure Rx queue group interrupt for this port */
 	priv->pp2xdata->mv_pp2x_port_isr_rx_group_cfg(port);
@@ -4796,7 +4849,8 @@ static int mv_pp2x_port_init(struct mv_pp2x_port *port)
 	port->pkt_size = MVPP2_RX_PKT_SIZE(port->dev->mtu);
 
 	/* Initialize pools for swf */
-	err = mv_pp2x_swf_bm_pool_init(port);
+	if (!(port->flags & MVPP2_F_IF_MUSDK))
+		err = mv_pp2x_swf_bm_pool_init(port);
 	if (err)
 		goto err_free_percpu;
 	return 0;
@@ -4867,15 +4921,15 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			      struct device_node *port_node,
 			    struct mv_pp2x *priv)
 {
-	struct device_node *emac_node;
-	struct device_node *phy_node;
+	struct device_node *emac_node = NULL;
+	struct device_node *phy_node = NULL;
 	struct mv_pp2x_port *port;
 	struct mv_pp2x_port_pcpu *port_pcpu;
 	struct net_device *dev;
 	struct resource *res;
-	const char *dt_mac_addr;
+	const char *dt_mac_addr = NULL;
 	const char *mac_from;
-	char hw_mac_addr[ETH_ALEN];
+	char hw_mac_addr[ETH_ALEN] = {0};
 	u32 id;
 	int features, err = 0, i, cpu;
 	int priv_common_regs_num = 2;
@@ -4883,10 +4937,17 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	unsigned int *port_irqs;
 	int port_num_irq;
 	int phy_mode;
-	struct phy *comphy;
+	struct phy *comphy = NULL;
+	const char *musdk_status;
+	int statlen;
 
-	dev = alloc_etherdev_mqs(sizeof(struct mv_pp2x_port),
-				 mv_pp2x_txq_number * num_active_cpus(), mv_pp2x_rxq_number);
+	if (of_property_read_bool(port_node, "marvell,loopback")) {
+		dev = alloc_netdev_mqs(sizeof(struct mv_pp2x_port), "pp2_lpbk%d", NET_NAME_UNKNOWN,
+				       ether_setup, mv_pp2x_txq_number * num_active_cpus(), mv_pp2x_rxq_number);
+	} else {
+		dev = alloc_etherdev_mqs(sizeof(struct mv_pp2x_port),
+					 mv_pp2x_txq_number * num_active_cpus(), mv_pp2x_rxq_number);
+	}
 	if (!dev)
 		return -ENOMEM;
 
@@ -4895,6 +4956,13 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	port->dev = dev;
 	SET_NETDEV_DEV(dev, &pdev->dev);
 	port->priv = priv;
+	port->flags = 0;
+
+	musdk_status = of_get_property(port_node, "musdk-status", &statlen);
+
+	/* Set musdk_flag, only if status is "private", not if status is "shared" */
+	if (musdk_status && !strcmp(musdk_status, "private"))
+		port->flags |= MVPP2_F_IF_MUSDK;
 
 	mv_pp2x_port_init_config(port);
 
@@ -4923,20 +4991,27 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		port->mac_data.phy_node = phy_node;
 		emac_node = port_node;
 	} else {
-		emac_node = of_parse_phandle(port_node, "emac-data", 0);
-		if (!emac_node) {
-			dev_err(&pdev->dev, "missing emac-data\n");
-			err = -EINVAL;
-			goto err_free_netdev;
+		if (of_property_read_bool(port_node, "marvell,loopback"))
+			port->flags |= MVPP2_F_LOOPBACK;
+
+		if (!(port->flags & MVPP2_F_LOOPBACK)) {
+			emac_node = of_parse_phandle(port_node, "emac-data", 0);
+			if (!emac_node) {
+				dev_err(&pdev->dev, "missing emac-data\n");
+				err = -EINVAL;
+				goto err_free_netdev;
+			}
+			/* Init emac_data, includes link interrupt */
+			if (mv_pp2_init_emac_data(port, emac_node))
+				goto err_free_netdev;
+
+			comphy = devm_of_phy_get(&pdev->dev, emac_node, "comphy");
+
+			if (!IS_ERR(comphy))
+				port->comphy = comphy;
+		} else {
+			port->mac_data.link_irq = MVPP2_NO_LINK_IRQ;
 		}
-		/* Init emac_data, includes link interrupt */
-		if (mv_pp2_init_emac_data(port, emac_node))
-			goto err_free_netdev;
-
-		comphy = devm_of_phy_get(&pdev->dev, emac_node, "comphy");
-
-		if (!IS_ERR(comphy))
-			port->comphy = comphy;
 	}
 
 	if (port->mac_data.phy_node) {
@@ -4946,7 +5021,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	}
 
 	/* get MAC address */
-	dt_mac_addr = of_get_mac_address(emac_node);
+	if (emac_node)
+		dt_mac_addr = of_get_mac_address(emac_node);
+
 	if (dt_mac_addr && is_valid_ether_addr(dt_mac_addr)) {
 		mac_from = "device tree";
 		ether_addr_copy(dev->dev_addr, dt_mac_addr);
@@ -4968,7 +5045,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 
 	/* Tx/Rx Interrupt */
 	port_num_irq = mv_pp2x_of_irq_count(port_node);
-	if (port_num_irq != priv->pp2xdata->num_port_irq) {
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		port_num_irq = 0;
+	if ((!(port->flags & MVPP2_F_IF_MUSDK)) && port_num_irq != priv->pp2xdata->num_port_irq) {
 		dev_err(&pdev->dev,
 			"port(%d)-number of irq's doesn't match hw\n", id);
 		goto err_free_netdev;
@@ -4988,16 +5067,20 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		port->num_irqs++;
 	}
 
-	/*FIXME, full handling loopback */
-	if (of_property_read_bool(port_node, "marvell,loopback"))
-		port->flags |= MVPP2_F_LOOPBACK;
-
-	port->num_tx_queues = mv_pp2x_txq_number;
-	port->num_rx_queues = mv_pp2x_rxq_number;
 	dev->tx_queue_len = tx_queue_size;
 	dev->watchdog_timeo = 5 * HZ;
-	dev->netdev_ops = &mv_pp2x_netdev_ops;
-	mv_pp2x_set_ethtool_ops(dev);
+
+	if (port->flags & MVPP2_F_IF_MUSDK) {
+		port->num_tx_queues = 0;
+		port->num_rx_queues = 0;
+		dev->netdev_ops = &mv_pp2x_non_kernel_netdev_ops;
+		mv_pp2x_set_non_kernel_ethtool_ops(dev);
+	} else {
+		port->num_tx_queues = mv_pp2x_txq_number;
+		port->num_rx_queues = mv_pp2x_rxq_number;
+		dev->netdev_ops = &mv_pp2x_netdev_ops;
+		mv_pp2x_set_ethtool_ops(dev);
+	}
 
 	if (priv->pp2_version == PPV21)
 		port->first_rxq = (port->id) * mv_pp2x_rxq_number +
@@ -5047,7 +5130,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		err = -ENOMEM;
 		goto err_free_txq_pcpu;
 	}
-	if (!port->priv->pp2xdata->interrupt_tx_done) {
+	if ((!(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK))) && !port->priv->pp2xdata->interrupt_tx_done) {
 		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 
@@ -5060,23 +5143,26 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 				     mv_pp2x_tx_proc_cb, (unsigned long)dev);
 		}
 	}
-
 	/* Init hrtimer for tx transmit procedure.
 	 * Instead of reg_write atfer each xmit callback, 50 microsecond
 	 * hrtimer would be started. Hrtimer will reduce amount of accesses
 	 * to transmit register and dmb() influence on network performance.
 	 */
-	for_each_present_cpu(cpu) {
-		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+	if (!(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK))) {
+		for_each_present_cpu(cpu) {
+			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 
-		hrtimer_init(&port_pcpu->tx_timer, CLOCK_MONOTONIC,
-			     HRTIMER_MODE_REL_PINNED);
-		port_pcpu->tx_timer.function = mv_pp2x_tx_hr_timer_cb;
-		port_pcpu->tx_timer_scheduled = false;
+			hrtimer_init(&port_pcpu->tx_timer, CLOCK_MONOTONIC,
+				     HRTIMER_MODE_REL_PINNED);
+			port_pcpu->tx_timer.function = mv_pp2x_tx_hr_timer_cb;
+			port_pcpu->tx_timer_scheduled = false;
 
-		tasklet_init(&port_pcpu->tx_tasklet,
-			     mv_pp2x_tx_send_proc_cb, (unsigned long)dev);
+			tasklet_init(&port_pcpu->tx_tasklet,
+				     mv_pp2x_tx_send_proc_cb, (unsigned long)dev);
+		}
 	}
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		goto skip_tso_buffers;
 	/* Init pool of external buffers for TSO, fragmentation, etc */
 	for_each_present_cpu(cpu) {
 		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
@@ -5105,7 +5191,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			port_pcpu->ext_buf_pool->buf_pool_in_use++;
 		}
 	}
-
+skip_tso_buffers:
 	features = NETIF_F_SG;
 	dev->features = features | NETIF_F_RXCSUM | NETIF_F_IP_CSUM |
 			NETIF_F_IPV6_CSUM | NETIF_F_TSO;
@@ -5138,7 +5224,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	mv_gop110_mib_counters_clear(&port->priv->hw.gop, port->mac_data.gop_index);
 	mv_pp2x_counters_stat_clear(port);
 
-	mv_pp2x_port_irq_names_update(port);
+	if (!(port->flags & MVPP2_F_IF_MUSDK))
+		mv_pp2x_port_irq_names_update(port);
 
 	if (priv->pp2_version == PPV22)
 		port->port_hotplug_nb.notifier_call = mv_pp2x_port_cpu_callback;
