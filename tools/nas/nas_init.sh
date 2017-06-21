@@ -9,6 +9,7 @@ SYSDISKEXIST="no"
 LINK_NUM=0
 JUMPPARTSIZE="0"
 CPU_COUNT=`grep -c ^processor /proc/cpuinfo`
+XOR_IRQS=`cat /proc/interrupts | grep xor | cut -d ":" -f 1 | paste -sd " " -`
 LARGE_PAGE=`/usr/bin/getconf PAGESIZE`
 SAMBASTATUS="enabled"
 APPS="which ethtool ifconfig ifenslave smbd nmbd \
@@ -35,6 +36,20 @@ function do_error {
     echo -e " Please see help\n"
     echo -e "\n****************************************************************\n"
     exit 1
+}
+
+function xor_set_irq_affinity {
+        CPU_I=0
+        for irq in ${XOR_IRQS}
+        do
+                echo $((1<<$CPU_I)) > /proc/irq/$irq/smp_affinity
+
+                if [ $CPU_I -eq $(($CPU_COUNT-1)) ]; then
+                        CPU_I=0
+                else
+                        (( CPU_I++ ))
+                fi
+        done
 }
 
 if [ "$CPU_COUNT" == "0" ]; then
@@ -748,10 +763,8 @@ if [ "$PLATFORM" == "a385" ]; then
 	set -o verbose
 
 	# XOR Engines
-	echo 1 > /proc/irq/54/smp_affinity
-	echo 2 > /proc/irq/55/smp_affinity
-	echo 1 > /proc/irq/97/smp_affinity
-	echo 2 > /proc/irq/98/smp_affinity
+	xor_set_irq_affinity
+
 	# ETH
 	echo 1 > /proc/irq/363/smp_affinity
 	echo 2 > /proc/irq/365/smp_affinity
@@ -764,10 +777,8 @@ elif [ "$PLATFORM" == "a388" ]; then
 	set -o verbose
 
 	# XOR Engines
-	echo 1 > /proc/irq/54/smp_affinity
-	echo 1 > /proc/irq/55/smp_affinity
-	echo 2 > /proc/irq/97/smp_affinity
-	echo 2 > /proc/irq/98/smp_affinity
+	xor_set_irq_affinity
+
 	# SATA
 	echo 2 > /proc/irq/60/smp_affinity
 	# PCI-E SATA controller
@@ -788,33 +799,19 @@ elif [ "$PLATFORM" == "a37xx" ]; then
 elif [ "$PLATFORM" == "a8040" ]; then
 	set -o verbose
 
-	# XOR Engines for AP
-	echo 1 > /proc/irq/67/smp_affinity
-	echo 2 > /proc/irq/68/smp_affinity
-	echo 4 > /proc/irq/69/smp_affinity
-	echo 8 > /proc/irq/70/smp_affinity
+	# XOR Engines
+	xor_set_irq_affinity
 
 	# SATA
 	echo 2 > /proc/irq/41/smp_affinity
-
-	# To use CP XOR engines, need to parse interrupt map and
-	# read interrupt numbers assigned to XOR engine (ICU driver
-	# dynamically assigns interrupts for CP interfaces)"
 
 	set +o verbose
 	echo -ne "[Done]\n"
 elif [ "$PLATFORM" == "a7040" ]; then
 	set -o verbose
 
-	# XOR Engines for AP
-	echo 1 > /proc/irq/123/smp_affinity
-	echo 2 > /proc/irq/124/smp_affinity
-	echo 4 > /proc/irq/125/smp_affinity
-	echo 8 > /proc/irq/126/smp_affinity
-
-	# To use CP XOR engines, need to parse interrupt map and
-	# read interrupt numbers assigned to XOR engine (ICU driver
-	# dynamically assigns interrupts for CP interfaces)"
+	# XOR Engines
+	xor_set_irq_affinity
 
 	set +o verbose
 	echo -ne "[Done]\n"
