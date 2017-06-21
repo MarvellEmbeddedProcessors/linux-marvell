@@ -6298,6 +6298,10 @@ int mv_pp22_rss_tbl_entry_get(struct mv_pp2x_hw *hw,
 		return -EINVAL;
 
 	if (rss->sel == MVPP22_RSS_ACCESS_POINTER) {
+		/* Set index */
+		reg_val |= (rss->u.pointer.rxq_idx <<
+				MVPP22_RSS_IDX_RXQ_NUM_OFF);
+		mv_pp2x_write(hw, MVPP22_RSS_IDX_REG, reg_val);
 		/* Read entry */
 		rss->u.pointer.rss_tbl_ptr =
 			mv_pp2x_read(hw, MVPP22_RSS_RXQ2RSS_TBL_REG) &
