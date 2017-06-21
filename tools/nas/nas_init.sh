@@ -697,6 +697,7 @@ cat << EOF > ${SMB_CONF}
 	use sendfile = yes
 	dns proxy = no
 	max log size = 200
+	server max protocol = SMB3
 	log level = 0
 	socket options = IPTOS_LOWDELAY TCP_NODELAY
 	local master = no
@@ -708,7 +709,7 @@ cat << EOF > ${SMB_CONF}
 	printcap name = /dev/null
 	load printers = no
 	disable spoolss = yes
-	max xmit = 131072
+	max xmit = 1310720
 	disable netbios = yes
 	csc policy = disable
 	strict allocate = yes
