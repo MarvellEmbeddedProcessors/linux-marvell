@@ -610,6 +610,8 @@ else # RAID TOPOLOGY
 	echo -e 2048 > /sys/block/md0/queue/read_ahead_kb
 	echo 100000 > /sys/block/md0/md/sync_speed_min
 
+	echo $CPU_COUNT > /sys/block/md0/md/group_thread_cnt
+
 	set +o verbose
 	echo -ne "[Done]\n"
 fi
