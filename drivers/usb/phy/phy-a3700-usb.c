@@ -213,8 +213,10 @@ static void a3700_otg_work(struct work_struct *work)
 		}
 		break;
 	default:
+		dev_dbg(mvotg->dev, "wrong state.\n");
 		break;
 	}
+	mvotg->old_state = mvotg->port_state;
 }
 
 static void a3700_static_host_work(struct work_struct *work)
@@ -245,9 +247,19 @@ static void a3700_static_host_work(struct work_struct *work)
 		if (vbus_on) {
 			if (regulator_enable(mvotg->vcc))
 				dev_err(mvotg->dev, "Failed to enable power\n");
+			else
+				/* done for moving to host mode and need to
+				 * store state after regulator enabled.
+				 */
+				mvotg->old_state = USB_HOST_ATTACHED;
 		} else {
 			if (regulator_disable(mvotg->vcc))
 				dev_err(mvotg->dev, "Failed to disable power\n");
+			else
+				/* done for moving to idle mode and need to
+				 * store state after regulator disabled.
+				 */
+				mvotg->old_state = USB_PORT_IDLE;
 		}
 	}
 }
@@ -293,7 +305,6 @@ static irqreturn_t a3700_usb_id_isr_static_host(int irq, void *data)
 	}
 
 	if (port_state_original != mvotg->port_state) {
-		mvotg->old_state = port_state_original;
 		a3700_otg_run_state_machine(mvotg, 0);
 	}
 
@@ -346,7 +357,6 @@ static irqreturn_t a3700_usb_id_isr(int irq, void *data)
 	}
 
 	if (port_state_original != mvotg->port_state) {
-		mvotg->old_state = port_state_original;
 		a3700_otg_run_state_machine(mvotg, 0);
 	}
 
