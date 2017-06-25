@@ -18,6 +18,7 @@
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/skbuff.h>
 #include <net/hwbm.h>
@@ -385,6 +386,22 @@ static int mvneta_bm_init(struct mvneta_bm *priv)
 static int mvneta_bm_get_sram(struct device_node *dn,
 			      struct mvneta_bm *priv)
 {
+	struct platform_device *pdev;
+	struct device_node *np_pool;
+	struct resource *res;
+
+	np_pool = of_parse_phandle(dn, "internal-mem", 0);
+	if (!np_pool)
+		return -1;
+	pdev = of_find_device_by_node(np_pool);
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		pr_err("%s:: found no memory resource\n", __func__);
+		return -EINVAL;
+	}
+	/* get size of internal SRAM access region */
+	priv->bppi_size = resource_size(res);
+
 	priv->bppi_pool = of_gen_pool_get(dn, "internal-mem", 0);
 	if (!priv->bppi_pool) {
 		pr_err("%s:: no internal-mem node found\n", __func__);
@@ -392,7 +409,7 @@ static int mvneta_bm_get_sram(struct device_node *dn,
 	}
 
 	priv->bppi_virt_addr = gen_pool_dma_alloc(priv->bppi_pool,
-						  MVNETA_BM_BPPI_SIZE,
+						  priv->bppi_size,
 						  &priv->bppi_phys_addr);
 	if (!priv->bppi_virt_addr)
 		return -ENOMEM;
@@ -402,8 +419,7 @@ static int mvneta_bm_get_sram(struct device_node *dn,
 
 static void mvneta_bm_put_sram(struct mvneta_bm *priv)
 {
-	gen_pool_free(priv->bppi_pool, priv->bppi_phys_addr,
-		      MVNETA_BM_BPPI_SIZE);
+	gen_pool_free(priv->bppi_pool, priv->bppi_phys_addr, priv->bppi_size);
 }
 
 static int mvneta_bm_probe(struct platform_device *pdev)

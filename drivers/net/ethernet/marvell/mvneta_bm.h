@@ -88,8 +88,6 @@
 
 #define MVNETA_BM_POOL_ACCESS_OFFS		8
 
-#define MVNETA_BM_BPPI_SIZE			0x100000
-
 #define MVNETA_RX_BUF_SIZE(pkt_size)   ((pkt_size) + NET_SKB_PAD)
 
 enum mvneta_bm_type {
@@ -109,6 +107,8 @@ struct mvneta_bm {
 	void __iomem *bppi_virt_addr;
 	/* BPPI physical base address */
 	dma_addr_t bppi_phys_addr;
+	/* BPPI size */
+	size_t bppi_size;
 
 	/* BM pools */
 	struct mvneta_bm_pool *bm_pools;
