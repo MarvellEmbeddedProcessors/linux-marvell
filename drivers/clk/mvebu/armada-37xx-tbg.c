@@ -83,7 +83,7 @@ static unsigned int tbg_get_div(void __iomem *reg, const struct tbg_def *ptbg)
 static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
-	struct clk_hw_onecell_data *hw_tbg_data;
+	struct clk_onecell_data *hw_tbg_data;
 	struct device *dev = &pdev->dev;
 	const char *parent_name;
 	struct resource *res;
@@ -96,7 +96,7 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
 				   GFP_KERNEL);
 	if (!hw_tbg_data)
 		return -ENOMEM;
-	hw_tbg_data->num = NUM_TBG;
+	hw_tbg_data->clk_num = NUM_TBG;
 	platform_set_drvdata(pdev, hw_tbg_data);
 
 	parent = devm_clk_get(dev, NULL);
@@ -118,13 +118,13 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
 		name = tbg[i].name;
 		mult = tbg_get_mult(reg, &tbg[i]);
 		div = tbg_get_div(reg, &tbg[i]);
-		hw_tbg_data->hws[i] = clk_hw_register_fixed_factor(NULL, name,
+		hw_tbg_data->clks[i] = clk_register_fixed_factor(NULL, name,
 						parent_name, 0, mult, div);
-		if (IS_ERR(hw_tbg_data->hws[i]))
+		if (IS_ERR(hw_tbg_data->clks[i]))
 			dev_err(dev, "Can't register TBG clock %s\n", name);
 	}
 
-	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get, hw_tbg_data);
+	ret = of_clk_add_provider(np, of_clk_src_onecell_get, hw_tbg_data);
 
 	return ret;
 }
@@ -132,11 +132,11 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
 static int armada_3700_tbg_clock_remove(struct platform_device *pdev)
 {
 	int i;
-	struct clk_hw_onecell_data *hw_tbg_data = platform_get_drvdata(pdev);
+	struct clk_onecell_data *hw_tbg_data = platform_get_drvdata(pdev);
 
 	of_clk_del_provider(pdev->dev.of_node);
-	for (i = 0; i < hw_tbg_data->num; i++)
-		clk_hw_unregister_fixed_factor(hw_tbg_data->hws[i]);
+	for (i = 0; i < hw_tbg_data->clk_num; i++)
+		clk_unregister_fixed_factor(hw_tbg_data->clks[i]);
 
 	return 0;
 }
