@@ -98,14 +98,6 @@
 		};
 	};
 
-	clocks {
-		osc: osc {
-			compatible = "fixed-clock";
-			#clock-cells = <0>;
-			clock-frequency = <25000000>;
-		};
-	};
-
 	psci {
 		compatible = "arm,psci-0.2";
 		method = "smc";
@@ -143,7 +135,7 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				cell-index = <0>;
-				clocks = <&ngateclk 12>;
+				clocks = <&nb_periph_clk 7>;
 				fifo-mode;
 				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
@@ -156,7 +148,7 @@
 				#size-cells = <0>;
 				interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
 				mrvl,i2c-fast-mode;
-				clocks = <&ngateclk 17>;
+				clocks = <&nb_periph_clk 10>;
 				status = "disabled";
 			};
 
@@ -167,21 +159,21 @@
 				#size-cells = <0>;
 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
 				mrvl,i2c-fast-mode;
-				clocks = <&ngateclk 16>;
+				clocks = <&nb_periph_clk 9>;
 				status = "disabled";
 			};
 
 			reg_avs: avs@11500 {
 				compatible = "marvell,armada-3700-avs";
 				reg = <0x11500 0x40>;
-				clocks = <&core_clk 4>;
+				clocks = <&nb_periph_clk 6>;
 				status = "disabled";
 			};
 
 			uart0: serial@12000 {
 				compatible = "marvell,armada-3700-uart";
 				reg = <0x12000 0x200>;
-				clocks = <&osc>;
+				clocks = <&xtalclk>;
 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 				interrupt-names = "irq_sum";
 				status = "disabled";
@@ -191,30 +183,18 @@
 				compatible = "marvell,armada-3700-uart-ext";
 				reg = <0x12200 0x30>,
 					<0x8a00 0x30>;
-				clocks = <&osc>;
+				clocks = <&xtalclk>;
 				interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>,
 						<GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
 				interrupt-names = "irq_rx", "irq_tx";
 				status = "disabled";
 			};
 
-			core_clk: core-clocks@13000 {
-				compatible = "marvell,armada-3700-core-clock";
-				reg = <0x13000 0x6000>;
-				#clock-cells = <1>;
-			};
-
-			ngateclk: north-bridge-gate-clk@13014 {
-				compatible = "marvell,armada-3700-north-bridge-gating-clock";
-				reg = <0x13014 0x4>;
-				#clock-cells = <1>;
-			};
-
 			wdt: watchdog-timer@8300 {
 				compatible = "marvell,armada-3700-wdt";
 				reg = <0xd064 0x4>,
 				      <0x8300 0x40>;
-				clocks = <&osc>;
+				clocks = <&xtalclk>;
 			};
 
 			npinctrl: north-bridge-pinctrl@13830 {
@@ -247,13 +227,7 @@
 				compatible = "marvell,armada-37xx-cpu-pm-clk";
 				reg = <0x14018 0x1C>;
 				#clock-cells = <1>;
-				clocks = <&core_clk 4>;
-			};
-
-			sgateclk: south-bridge-gate-clk@18014 {
-				compatible = "marvell,armada-3700-south-bridge-gating-clock";
-				reg = <0x18014 0x4>;
-				#clock-cells = <1>;
+				clocks = <&nb_periph_clk 16>;
 			};
 
 			spinctrl: south-bridge-pinctrl@18830 {
@@ -276,7 +250,7 @@
 				   reg = <0x30000 0x4000>;
 				   interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
 				   mac-address = [00 50 43 01 02 03];
-				   clocks = <&sgateclk 5>;
+				   clocks = <&sb_periph_clk 8>;
 				   status = "disabled";
 			};
 
@@ -292,7 +266,7 @@
 				reg = <0x40000 0x4000>;
 				interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
 				mac-address = [00 50 43 01 02 33];
-				clocks = <&sgateclk 4>;
+				clocks = <&sb_periph_clk 7>;
 				status = "disabled";
 			};
 
@@ -372,7 +346,7 @@
 				/* 0: 0x50000: USB 3.0 Device port 0: DEV_INFO_REG(0:15 - version_id) */
 				reg = <0x50000 0x2000>;
 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-				clocks = <&sgateclk 17>;
+				clocks = <&sb_periph_clk 12>;
 				status = "disabled";
 			};
 
@@ -380,14 +354,14 @@
 				compatible = "marvell,mv-udc";
 				reg = <0x54100 0x2000>;
 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-				clocks = <&sgateclk 17>;
+				clocks = <&sb_periph_clk 12>;
 				status = "disabled";
 			};
 			usb3@58000 {
 				compatible = "marvell,armada-3700-xhci";
 				reg = <0x58000 0x4000>;
 				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-				clocks = <&sgateclk 17>;
+				clocks = <&sb_periph_clk 12>;
 				separated-phys-for-usb2-usb3;
 				needs-reset-on-resume;
 				status = "disabled";
@@ -450,7 +424,7 @@
 				      <0x1e808 0x4>;
 				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
 				clock-names = "core";
-				clocks = <&core_clk 7>;
+				clocks = <&nb_periph_clk 0>;
 				status = "disabled";
 			};
 
@@ -461,7 +435,7 @@
 				       0x17808 0x4>;
 				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
 				clock-names = "core";
-				clocks = <&core_clk 7>;
+				clocks = <&nb_periph_clk 0>;
 				status = "disabled";
 			};
 
@@ -469,7 +443,7 @@
 				compatible = "marvell,armada-3700-ahci";
 				reg = <0xe0000 0x178>;
 				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-				clocks = <&ngateclk 3>;
+				clocks = <&nb_periph_clk 1>;
 				status = "disabled";
 			};
 
@@ -495,7 +469,7 @@
 			bm: bm@c0000 {
 				compatible = "marvell,armada-380-neta-bm";
 				reg = <0xc0000 0xac>;
-				clocks = <&sgateclk 9>;
+				clocks = <&sb_periph_clk 9>;
 				internal-mem = <&bm_bppi>;
 				status = "disabled";
 			};
@@ -503,7 +477,7 @@
 			bm_bppi: bm-bppi {
 				compatible = "mmio-sram";
 				reg = <0xc8000 0x1000>;
-				clocks = <&sgateclk 9>;
+				clocks = <&sb_periph_clk 9>;
 				no-memory-wc;
 				status = "disabled";
 			};
@@ -538,7 +512,7 @@
 			#interrupt-cells = <1>;
 			msi-parent = <&pcie0>;
 			msi-controller;
-			clocks = <&sgateclk 14>;
+			clocks = <&sb_periph_clk 13>;
 			ranges = <0x82000000 0 0xd8200000   0 0xd8200000 0 0x1000000 /* Port 0 MEM */
 				  0x81000000 0 0xd9200000   0 0xd9200000 0 0x10000>; /* Port 0 IO*/
 			interrupt-map-mask = <0 0 0 7>;
