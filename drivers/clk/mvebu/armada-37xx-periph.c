@@ -34,7 +34,7 @@
 #define CLK_DIS		0x14
 
 struct clk_periph_driver_data {
-	struct clk_hw_onecell_data *hw_data;
+	struct clk_onecell_data *hw_data;
 	spinlock_t lock;
 };
 
@@ -305,7 +305,7 @@ static const struct of_device_id armada_3700_periph_clock_of_match[] = {
 };
 static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
 					 void __iomem *reg, spinlock_t *lock,
-					 struct device *dev, struct clk_hw **hw)
+					 struct device *dev, struct clk **hw)
 {
 	const struct clk_ops *mux_ops = NULL, *gate_ops = NULL,
 		*rate_ops = NULL;
@@ -354,7 +354,7 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
 		}
 	}
 
-	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
+	*hw = clk_register_composite(dev, data->name, data->parent_names,
 				       data->num_parents, mux_hw,
 				       mux_ops, rate_hw, rate_ops,
 				       gate_hw, gate_ops, CLK_IGNORE_UNUSED);
@@ -396,12 +396,12 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
 			    GFP_KERNEL);
 	if (!driver_data->hw_data)
 		return -ENOMEM;
-	driver_data->hw_data->num = num_periph;
+	driver_data->hw_data->clk_num = num_periph;
 
 	spin_lock_init(&driver_data->lock);
 
 	for (i = 0; i < num_periph; i++) {
-		struct clk_hw **hw = &driver_data->hw_data->hws[i];
+		struct clk **hw = &driver_data->hw_data->clks[i];
 
 		if (armada_3700_add_composite_clk(&data[i], reg,
 						  &driver_data->lock, dev, hw))
@@ -410,11 +410,11 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
 
 	}
 
-	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
+	ret = of_clk_add_provider(np, of_clk_src_onecell_get,
 				  driver_data->hw_data);
 	if (ret) {
 		for (i = 0; i < num_periph; i++)
-			clk_hw_unregister(driver_data->hw_data->hws[i]);
+			clk_unregister(driver_data->hw_data->clks[i]);
 		return ret;
 	}
 
@@ -425,13 +425,13 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
 static int armada_3700_periph_clock_remove(struct platform_device *pdev)
 {
 	struct clk_periph_driver_data *data = platform_get_drvdata(pdev);
-	struct clk_hw_onecell_data *hw_data = data->hw_data;
+	struct clk_onecell_data *hw_data = data->hw_data;
 	int i;
 
 	of_clk_del_provider(pdev->dev.of_node);
 
-	for (i = 0; i < hw_data->num; i++)
-		clk_hw_unregister(hw_data->hws[i]);
+	for (i = 0; i < hw_data->clk_num; i++)
+		clk_unregister(hw_data->clks[i]);
 
 	return 0;
 }
