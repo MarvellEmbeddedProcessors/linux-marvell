@@ -481,6 +481,12 @@
 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
 				timeout-sec = <30>;
 			};
+
+			ap806_sar: sar@6f8200 {
+				compatible = "marvell,sample-at-reset-ap806";
+				reg = <0x6f8200 0x8>;
+				status = "okay";
+			};
 		};
 	};
 };
