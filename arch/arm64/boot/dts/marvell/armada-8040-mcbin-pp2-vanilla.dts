@@ -1,0 +1,260 @@
+/*
+ * Copyright (C) 2016 Marvell Technology Group Ltd.
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPLv2 or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This library is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This library is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ * Device Tree file for MACCHIATOBin Armada 8040 community board platform
+ */
+
+#include "armada-8040.dtsi"
+
+/ {
+	model = "Marvell 8040 MACHIATOBin - pp2-vanilla";
+	compatible = "marvell,armada8040-mcbin", "marvell,armada8040",
+			"marvell,armada-ap806-quad", "marvell,armada-ap806";
+
+	memory@00000000 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	ap806 {
+		config-space {
+			serial@512000 {
+				status = "okay";
+			};
+			sdhci@6e0000 {
+				vqmmc-supply = <&vccq_mmc_reg>;
+				bus-width = <8>;
+				no-1-8-v;
+				non-removable;
+				marvell,xenon-emmc;
+				status = "okay";
+			};
+			vccq_mmc_reg: regulator@0 {
+				compatible = "regulator-fixed";
+				regulator-name = "vccq-mmc-reg";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+				status = "okay";
+			};
+		};
+	};
+
+	cpn-110-master {
+		config-space {
+			/delete-node/ppv22@000000;
+			pinctrl@440000 {
+				xhci0_vbus_pins: xhci0-vbus-pins {
+					marvell,pins = "mpp47";
+					marvell,function = "gpio";
+				};
+			};
+			comphy0: comphy {
+				status = "disabled";
+			};
+			sdhci@780000 {
+				vqmmc-supply = <&vccq_sdio_reg>;
+				bus-width = <4>;
+				no-1-8-v;
+				broken-cd;
+				pinctrl-names = "default";
+				pinctrl-0 = <&cpm_sdhci_pins>;
+				status = "okay";
+			};
+			i2c@701000 {
+				clock-frequency = <100000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&cpm_i2c0_pins>;
+				status = "okay";
+			};
+			sata@540000 {
+				status = "okay";
+
+				sata-port@0 {
+					status = "disabled";
+				};
+				sata-port@1 {
+					phys = <&comphy0 5 COMPHY_SATA1>;
+					phy-names = "comphy";
+					status = "okay";
+				};
+			};
+			mdio@12a200 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				smi_phy0: ethernet-phy@0 {
+					reg = <0>;
+				};
+			};
+			mdio@15b000 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				phy0: ethernet-phy@0 {
+					compatible = "ethernet-phy-ieee802.3-c45";
+					reg = <0>;
+				};
+				phy1: ethernet-phy@1 {
+					compatible = "ethernet-phy-ieee802.3-c45";
+					reg = <8>;
+				};
+			};
+			ppv22_vanilla@000000 {
+				compatible = "marvell,armada-7k-pp22";
+				reg = <0x0 0x100000>, <0x129000 0xb000>;
+				clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+				clock-names = "pp_clk", "gop_clk", "mg_clk";
+				dma-coherent;
+				pinctrl-names = "default";
+				status = "okay";
+				eth0: eth0@010000 {
+					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>;
+					port-id = <0>; /* pp2_port_id */
+					gop-port-id = <0>;
+					phy-mode = "sfi"; /* lane-2 */
+					phy = <&phy0>;
+					status = "okay";
+				};
+				eth1: eth1@020000 {
+					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>;
+					port-id = <1>; /* pp2_port_id */
+					gop-port-id = <2>;
+					status = "disabled";
+				};
+				eth2: eth2@030000 {
+					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>;
+					port-id = <2>; /* pp2_port_id */
+					gop-port-id = <3>;
+					status = "disabled";
+				};
+			};
+			eip197@800000 {
+				status = "okay";
+			};
+		};
+		pcie@0x600000 {
+			num-lanes = <4>;
+			status = "okay";
+		};
+		reg_usb3h0_vbus: usb3-vbus0 {
+			compatible = "regulator-fixed";
+			pinctrl-names = "default";
+			pinctrl-0 = <&xhci0_vbus_pins>;
+			regulator-name = "reg-usb3h0-vbus";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			enable-active-high;
+			gpio = <&cpm_gpio1 15 GPIO_ACTIVE_HIGH>;
+			status = "okay";
+		};
+		vccq_sdio_reg: regulator@1 {
+			compatible = "regulator-fixed";
+			regulator-name = "vccq-sdio-reg";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-always-on;
+			status = "okay";
+		};
+	};
+
+	cpn-110-slave {
+		config-space {
+			/delete-node/ppv22@000000;
+			comphy1: comphy {
+				status = "disabled";
+			};
+			usb3h0_1: usb3@500000 {
+				usb-phy = <&usb3h0_phy>;
+				status = "okay";
+			};
+			usb3h0_phy: usb3_phy0 {
+				compatible = "usb-nop-xceiv";
+				vcc-supply = <&reg_usb3h0_vbus>;
+			};
+			sata@540000 {
+				status = "okay";
+
+				sata-port@0 {
+					phys = <&comphy1 1 COMPHY_SATA0>;
+					phy-names = "comphy";
+					status = "okay";
+				};
+				sata-port@1 {
+					phys = <&comphy1 3 COMPHY_SATA1>;
+					phy-names = "comphy";
+					status = "okay";
+				};
+			};
+			ppv22_vanilla@000000 {
+				compatible = "marvell,armada-7k-pp22";
+				reg = <0x0 0x100000>, <0x129000 0xb000>;
+				clocks = <&cps_syscon0 1 3>, <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+				clock-names = "pp_clk", "gop_clk", "mg_clk";
+				dma-coherent;
+				pinctrl-names = "default";
+				status = "okay";
+				eth0_1: eth0@010000 {
+					phy-mode = "sfi";
+					phy = <&phy1>;
+					port-id = <0>; /* pp2_port_id */
+					gop-port-id = <0>;
+					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>;
+					status = "okay";
+				};
+				eth1_1: eth1@020000 {
+					phy-mode = "sgmii";
+					port-id = <1>; /* pp2_port_id */
+					phy = <&smi_phy0>;
+					gop-port-id = <2>;
+					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>;
+					status = "okay";
+				};
+				eth2_1: eth2@030000 {
+					status = "disabled";
+				};
+			};
+			eip197@800000 {
+				status = "okay";
+			};
+		};
+	};
+};
