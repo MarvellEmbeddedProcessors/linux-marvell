@@ -14,12 +14,15 @@ Required properties:
 See "Documentation/devicetree/bindings/pci/designware-pcie.txt"
 
 Optional properties:
-PHY support is still not supported for armada-8k, once it will, the following parameters can be used:
+PHY support is supported for armada-8k, and the following parameters are used:
 - phys		    : phandle to phy node associated with pcie controller.
-- phy-names	    : must be "pcie-phy"
+- phy-names	    : must be "pcie-phyX", such as pcie-phy0, pcie-phy1, etc. The X means the pcie
+                      lane index from perspective of PCIe controller although the physical phy is comphy
+                      serdes lane5 or other comphy lane. In this way, driver implementation will support
+                      PCIe case with width more than 1, such as X2, X4.
 
-Example:
 
+Example of PCIE RC X1:
 pcie@0x06000000 {
 	compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
 	reg = <0 0x608000 0 0x1000>, <0 0x00600000 0 0x01000>;
@@ -35,5 +38,32 @@ pcie@0x06000000 {
 	num-lanes = <1>;
 	clocks = <&clks 14>, <&clks 26>;
 	clock-names = "pcie", "pcie_bus";
+	phys = <&comphy0 0 COMPHY_PCIE0>;
+	phy-names = "pcie-phy0";
+	status = "okay";
+};
+
+Example of PCIE RC X4:
+pcie@0x06000000 {
+	compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
+	reg = <0 0x608000 0 0x1000>, <0 0x00600000 0 0x01000>;
+	reg-names = "ctrl", "config";
+	#address-cells = <3>;
+	#size-cells = <2>;
+	device_type = "pci";
+
+	ranges = <0x00000000 0 0x80000    0  0x00600000 0 0x2000	/* configuration space */
+		0x81000000 0 0xf8000000 0  0xf8000000 0 0x10000		/* downstream I/O */
+		0x82000000 0 0xf5000000 0  0xf5000000 0 0x1000000>;	/* non-prefetchable memory */
+
+	num-lanes = <4>;
+	clocks = <&clks 14>, <&clks 26>;
+	clock-names = "pcie", "pcie_bus";
+	phys = <&comphy0 0 COMPHY_PCIE0
+		&comphy0 1 COMPHY_PCIE0
+		&comphy0 2 COMPHY_PCIE0
+		&comphy0 3 COMPHY_PCIE0
+		>;
+	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 	status = "okay";
 };
