@@ -391,12 +391,16 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
 	if (!driver_data)
 		return -ENOMEM;
 
-	driver_data->hw_data = devm_kzalloc(dev, sizeof(*driver_data->hw_data) +
-			    sizeof(*driver_data->hw_data->hws) * num_periph,
+	driver_data->hw_data = devm_kzalloc(dev, sizeof(*driver_data->hw_data),
 			    GFP_KERNEL);
 	if (!driver_data->hw_data)
 		return -ENOMEM;
 	driver_data->hw_data->clk_num = num_periph;
+	driver_data->hw_data->clks = devm_kzalloc(dev, driver_data->hw_data->clk_num *
+						  sizeof(*driver_data->hw_data->clks),
+						  GFP_KERNEL);
+	if (!driver_data->hw_data->clks)
+		return -ENOMEM;
 
 	spin_lock_init(&driver_data->lock);
 
