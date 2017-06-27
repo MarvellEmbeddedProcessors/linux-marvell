@@ -502,11 +502,51 @@ static int mvneta_bm_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int mvneta_bm_suspend(struct device *dev)
+{
+	struct mvneta_bm *priv = dev_get_drvdata(dev);
+	u8 all_ports_map = 0xff;
+	int i = 0;
+
+	for (i = 0; i < MVNETA_BM_POOLS_NUM; i++) {
+		struct mvneta_bm_pool *bm_pool = &priv->bm_pools[i];
+
+		mvneta_bm_pool_destroy(priv, bm_pool, all_ports_map);
+	}
+
+	/* Dectivate BM unit */
+	mvneta_bm_write(priv, MVNETA_BM_COMMAND_REG, MVNETA_BM_STOP_MASK);
+	return 0;
+}
+
+int mvneta_bm_resume(struct device *dev)
+{
+	struct mvneta_bm *priv = dev_get_drvdata(dev);
+	int err = 0;
+
+	/* Initialize buffer manager internals */
+	err = mvneta_bm_init(priv);
+	if (err < 0)
+		pr_err("%s: failed to resume BM controller\n", __func__);
+
+	return err;
+}
+
+#endif
+
 static const struct of_device_id mvneta_bm_match[] = {
 	{ .compatible = "marvell,armada-380-neta-bm" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, mvneta_bm_match);
+
+#ifdef CONFIG_PM_SLEEP
+static const struct dev_pm_ops mvneta_bm_pm_ops = {
+	.suspend_late = mvneta_bm_suspend,
+	.resume_early = mvneta_bm_resume,
+};
+#endif
 
 static struct platform_driver mvneta_bm_driver = {
 	.probe = mvneta_bm_probe,
@@ -514,6 +554,9 @@ static struct platform_driver mvneta_bm_driver = {
 	.driver = {
 		.name = MVNETA_BM_DRIVER_NAME,
 		.of_match_table = mvneta_bm_match,
+#ifdef CONFIG_PM_SLEEP
+		.pm = &mvneta_bm_pm_ops,
+#endif
 	},
 };
 
