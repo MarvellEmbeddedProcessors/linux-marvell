@@ -4958,7 +4958,7 @@ static int mvneta_suspend(struct platform_device *pdev, pm_message_t state)
 phy_off:
 	if (!pp->use_inband_status)
 		mvneta_mdio_remove(pp);
-	/* trurn off serdes */
+	/* turn off serdes */
 	if (pp->comphy) {
 		phy_power_off(pp->comphy);
 		phy_exit(pp->comphy);
@@ -4999,8 +4999,15 @@ static int mvneta_resume(struct platform_device *pdev)
 			return -1;
 		}
 	}
+	if (pp->bm_priv) {
+		ret = mvneta_bm_port_init(pdev, pp);
+		if (ret < 0) {
+			netdev_err(dev, "Cannot resume HW BM, use SW buffer management\n");
+			pp->bm_priv = NULL;
+		}
+	}
+
 	mvneta_defaults_set(pp);
-	mvneta_port_power_up(pp, pp->phy_interface);
 
 	dram_target_info = mv_mbus_dram_info();
 	if (dram_target_info || pp->neta_armada3700)
@@ -5028,6 +5035,7 @@ static int mvneta_resume(struct platform_device *pdev)
 	}
 
 	mvneta_start_dev(pp);
+	mvneta_port_power_up(pp, pp->phy_interface);
 
 	netif_device_attach(dev);
 
