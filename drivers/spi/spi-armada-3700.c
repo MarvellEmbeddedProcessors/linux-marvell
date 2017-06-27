@@ -858,8 +858,8 @@ static int a3700_spi_probe(struct platform_device *pdev)
 
 	spi->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(spi->clk)) {
-		dev_err(dev, "could not find clk: %ld\n", PTR_ERR(spi->clk));
-		goto error;
+		ret = -EPROBE_DEFER;
+		goto out;
 	}
 
 	ret = clk_prepare(spi->clk);
