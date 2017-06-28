@@ -16,8 +16,8 @@ Optional properties (port):
   not set.
 - pool<0 : 3>,pkt-size: maximum size of a packet accepted by a given buffer
   pointers' pool (id 0 : 3). It will be taken into consideration only when pool
-  type is 'short'. For 'long' ones it would be overridden by port's MTU.
-  If not set a driver will choose a default value.
+  type is 'long'. For 'short' ones it would be overridden by MVNETA_BM_SHORT_PKT_SIZE.
+  If not set a driver will set a default value MVNETA_BM_LONG_PKT_SIZE.
 
 In order to see how to hook the BM to a given ethernet port, please
 refer to Documentation/devicetree/bindings/net/marvell-armada-370-neta.txt.
