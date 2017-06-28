@@ -1293,6 +1293,14 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 	for (i = 0; i < rx_received; i++) {
 		struct mv_pp2x_rx_desc *rx_desc =
 			mv_pp2x_rxq_next_desc_get(rxq);
+
+#if defined(__BIG_ENDIAN)
+		if (port->priv->pp2_version == PPV21)
+			mv_pp21_rx_desc_swap(rx_desc);
+		else
+			mv_pp22_rx_desc_swap(rx_desc);
+#endif /* __BIG_ENDIAN */
+
 		bm_pool = &port->priv->bm_pools[MVPP2_RX_DESC_POOL(rx_desc)];
 
 		if (port->priv->pp2_version == PPV21)
