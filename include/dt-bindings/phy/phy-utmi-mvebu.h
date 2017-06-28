@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Marvell
+ * Copyright (C) 2017 Marvell
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -7,8 +7,8 @@
  * (at your option) any later version.
  */
 
-#ifndef _DT_BINDINGS_PHY_ARMADA3700_UTMI
-#define _DT_BINDINGS_PHY_ARMADA3700_UTMI
+#ifndef _DT_BINDINGS_PHY_UTMI_MVEBU
+#define _DT_BINDINGS_PHY_UTMI_MVEBU
 
 #define UTMI_PHY_TO_USB3_HOST0		0
 #define UTMI_PHY_TO_USB3_HOST1		1
@@ -16,4 +16,4 @@
 #define UTMI_PHY_TO_USB2_HOST0		3
 #define UTMI_PHY_INVALID		0xff
 
-#endif /* _DT_BINDINGS_PHY_ARMADA3700_UTMI */
+#endif /* _DT_BINDINGS_PHY_UTMI_MVEBU */

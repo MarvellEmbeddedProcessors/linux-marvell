@@ -123,11 +123,15 @@ config PHY_MVEBU_SATA
 	depends on OF
 	select GENERIC_PHY
 
-config PHY_ARMADA3700_UTMI
+config PHY_MVEBU_UTMI
 	def_bool y
 	depends on ARCH_MVEBU
 	depends on OF
 	select GENERIC_PHY
+	help
+	  Enable this to support Marvell utmi phy driver. The utmi driver
+	  supports Armada-3700. This driver is responsible for configuring
+	  PHY accordingly.
 
 config PHY_MIPHY28LP
 	tristate "STMicroelectronics MIPHY28LP PHY driver for STiH407"

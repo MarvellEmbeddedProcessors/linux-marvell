@@ -46,7 +46,7 @@
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/phy/phy-armada3700-utmi.h>
+#include <dt-bindings/phy/phy-utmi-mvebu.h>
 #include <dt-bindings/phy/phy-comphy-mvebu.h>
 
 / {
