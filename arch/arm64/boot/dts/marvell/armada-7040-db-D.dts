@@ -114,8 +114,9 @@
 			};
 			usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&comphy0 4 COMPHY_USB3H1>;
-				phy-names = "usb3";
+				phys = <&utmi1>,
+				       <&comphy0 4 COMPHY_USB3H1>;
+				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
 			u3d@520000 {
@@ -125,6 +126,8 @@
 				status = "okay";
 			};
 			udc@524100 {
+				phys = <&utmi0>;
+				phy-names = "usb";
 				status = "okay";
 			};
 			nand@720000 {
@@ -192,6 +195,9 @@
 				};
 			};
 			comphy {
+				status = "okay";
+			};
+			utmi1: utmi@581000 {
 				status = "okay";
 			};
 		};

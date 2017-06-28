@@ -17,6 +17,7 @@
  * Generic Device Tree describing Marvell Armada CP-110 device
  */
 #include <dt-bindings/interrupt-controller/mvebu-icu.h>
+#include <dt-bindings/phy/phy-utmi-mvebu.h>
 
 rtc@284000 {
 	compatible = "marvell,armada8k-rtc";
@@ -102,6 +103,18 @@ usb3h1_1: usb3@510000 {
 	interrupts = <ICU_GRP_NSR 105 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 23>;
 	needs-reset-on-resume;
+	status = "disabled";
+};
+
+utmi0_1: utmi@580000 {
+	compatible = "marvell,cp110-utmi-phy";
+	reg = <0x580000 0x1000>,
+	      <0x440420 0x4>,
+	      <0x440440 0x4>;
+	reg-names = "utmi", "usb-cfg-reg", "utmi-cfg-reg";
+	utmi-port = <UTMI_PHY_TO_USB3_HOST0>;
+	utmi-index = <0>;
+	#phy-cells = <0>;
 	status = "disabled";
 };
 

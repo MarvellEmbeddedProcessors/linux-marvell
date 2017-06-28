@@ -144,8 +144,9 @@
 			usb3h0_1: usb3@500000 {
 				usb-phy = <&usb3h0_phy>;
 				separated-phys-for-usb2-usb3;
-				phys = <&comphy1 2 COMPHY_USB3H0>;
-				phy-names = "usb3";
+				phys = <&utmi0_1>,
+				       <&comphy1 2 COMPHY_USB3H0>;
+				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
 			usb3h0_phy: usb3_phy0 {
