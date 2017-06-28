@@ -1447,7 +1447,7 @@ error:
 	}
 
 	dma_free_coherent(port->dev->dev.parent,
-			  txq->size * MVPP2_DESC_ALIGNED_SIZE,
+			  MVPP2_DESCQ_MEM_SIZE(txq->size),
 			  txq->first_desc, txq->descs_phys);
 
 	return -ENOMEM;
