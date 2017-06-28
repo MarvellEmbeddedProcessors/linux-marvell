@@ -78,6 +78,7 @@
 
 /* Other definitions */
 #define MVNETA_BM_SHORT_PKT_SIZE		256
+#define MVNETA_BM_LONG_PKT_SIZE			(9 * 1024)
 #define MVNETA_BM_POOLS_NUM			4
 #define MVNETA_BM_POOL_CAP_MIN			128
 #define MVNETA_BM_POOL_CAP_DEF			2048

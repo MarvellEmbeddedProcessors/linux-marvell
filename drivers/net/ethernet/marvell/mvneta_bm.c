@@ -188,7 +188,7 @@ struct mvneta_bm_pool *mvneta_bm_pool_use(struct mvneta_bm *priv, u8 pool_id,
 		return NULL;
 	}
 
-	if (new_pool->pkt_size == 0 || type != MVNETA_BM_SHORT)
+	if (type == MVNETA_BM_SHORT)
 		new_pool->pkt_size = pkt_size;
 
 	/* Allocate buffers in case BM pool hasn't been used yet */
@@ -344,7 +344,8 @@ static void mvneta_bm_pools_init(struct mvneta_bm *priv)
 		/* Obtain custom pkt_size from DT */
 		sprintf(prop, "pool%d,pkt-size", i);
 		if (of_property_read_u32(dn, prop, &bm_pool->pkt_size))
-			bm_pool->pkt_size = 0;
+			/* if not specified by DT, set default buffer size to support Jumbo */
+			bm_pool->pkt_size = MVNETA_BM_LONG_PKT_SIZE;
 	}
 }
 
