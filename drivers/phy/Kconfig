@@ -130,8 +130,8 @@ config PHY_MVEBU_UTMI
 	select GENERIC_PHY
 	help
 	  Enable this to support Marvell utmi phy driver. The utmi driver
-	  supports Armada-3700. This driver is responsible for configuring
-	  PHY accordingly.
+	  supports Armada-3700 and CP110. This driver is responsible for
+	  configuring PHY accordingly.
 
 config PHY_MIPHY28LP
 	tristate "STMicroelectronics MIPHY28LP PHY driver for STiH407"

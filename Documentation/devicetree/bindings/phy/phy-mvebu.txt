@@ -42,19 +42,27 @@ Example:
 			#phy-cells = <1>
 		};
 
-Armada 3700 UTMI PHY
+Armada 3700 and CP110 UTMI PHY
 ----------------------
-Armada 3700 comes with two UTMI PHYs for USB2.
+Armada 3700 and CP110 comes with two UTMI PHYs for USB2.
 
 Required Properties:
 
-- compatible: "marvell,armada-3700-utmi-phy"
-- reg: Offset and length of the register set for the UTMI PHY
-- utmi-port: The port utmi phy connected to
+- compatible: For Armada-3700 it is "marvell,armada-3700-utmi-phy",
+              and for CP110 it is "marvell,cp110-utmi-phy".
+- reg: register ranges as listed in the reg-names property
+- reg-names: include the following entries:
+             "utmi": utmi registers, which is mandatory and must be first one.
+             "utmi-cfg-reg": UTMI config Register, which is needed on CP110.
+             "usb-cfg-reg": USB config Register, which is needed on CP110, and
+             UTMI0 and UTMI1 share the same USB config register.
+- utmi-port: The USB port utmi phy connected to
 - #phy-cells: Standard property (Documentation: phy-bindings.txt) Should be 0.
+- utmi-index: The index to differentiate the PHY if there are 2 same UTMI PHY,
+              and currently it is used by CP110 for UTMI mux config.
 
 Example:
-UTMI PHY Node:
+Armada-3700 UTMI PHY Node:
 ============
 		utmi_usb32: utmi@5d000 {
 			compatible = "marvell,armada-3700-utmi-phy";
@@ -72,7 +80,33 @@ UTMI PHY Node:
 			status = "okay";
 		};
 
-UTMI PHY consumer:
+CP110 UTMI PHY Node:
+============
+		utmi0: utmi@580000 {
+			compatible = "marvell,cp110-utmi-phy";
+			reg = <0x580000 0x1000>,
+			      <0x440420 0x4>,
+			      <0x440440 0x4>;
+			reg-names = "utmi", "usb-cfg-reg", "utmi-cfg-reg";
+			utmi-port = <UTMI_PHY_TO_USB3_HOST0>;
+			utmi-index = <0>;
+			#phy-cells = <0>;
+			status = "okay";
+		};
+
+		utmi1: utmi@581000 {
+			compatible = "marvell,cp110-utmi-phy";
+			reg = <0x581000 0x1000>,
+			      <0x440420 0x4>
+			      <0x440444 0x4>;
+			reg-names = "utmi", "usb-cfg-reg", "utmi-cfg-reg";
+			utmi-port = <UTMI_PHY_TO_USB3_HOST1>;
+			utmi-index = <1>;
+			#phy-cells = <0>;
+			status = "okay";
+		};
+
+Armada-3700 UTMI PHY consumer:
 =============
 		usb@5e000 {
 			status = "okay";
@@ -83,5 +117,18 @@ UTMI PHY consumer:
 		udc@54100 {
 			status = "okay";
 			phys = <&utmi_usb32>;
+			phy-names = "usb";
+		};
+
+CP110 UTMI PHY consumer:
+=============
+		usb3h0: usb3@500000 {
+			status = "okay";
+			phys = <&utmi0>;
+			phy-names = "usb";
+		};
+		usb3h1: usb3@510000 {
+			status = "okay";
+			phys = <&utmi1>;
 			phy-names = "usb";
 		};
