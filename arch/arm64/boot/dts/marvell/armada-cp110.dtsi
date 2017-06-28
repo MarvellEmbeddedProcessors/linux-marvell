@@ -17,6 +17,7 @@
  * Generic Device Tree describing Marvell Armada CP-110 device
  */
 #include <dt-bindings/interrupt-controller/mvebu-icu.h>
+#include <dt-bindings/phy/phy-utmi-mvebu.h>
 
 cpm_syscon0: system-controller@440000 {
 	compatible = "marvell,cp110-system-controller0",
@@ -206,6 +207,30 @@ udc@524100 {
 	interrupts = <ICU_GRP_NSR 102 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cpm_syscon0 1 24>;
 	dma-coherent;
+	status = "disabled";
+};
+
+utmi0: utmi@580000 {
+	compatible = "marvell,cp110-utmi-phy";
+	reg = <0x580000 0x1000>,
+	      <0x440420 0x4>,
+	      <0x440440 0x4>;
+	reg-names = "utmi", "usb-cfg-reg", "utmi-cfg-reg";
+	utmi-port = <UTMI_PHY_TO_USB3_HOST0>;
+	utmi-index = <0>;
+	#phy-cells = <0>;
+	status = "disabled";
+};
+
+utmi1: utmi@581000 {
+	compatible = "marvell,cp110-utmi-phy";
+	reg = <0x581000 0x1000>,
+	      <0x440420 0x4>,
+	      <0x440444 0x4>;
+	reg-names = "utmi", "usb-cfg-reg", "utmi-cfg-reg";
+	utmi-port = <UTMI_PHY_TO_USB3_HOST1>;
+	utmi-index = <1>;
+	#phy-cells = <0>;
 	status = "disabled";
 };
 

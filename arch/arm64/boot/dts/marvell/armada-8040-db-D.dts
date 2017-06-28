@@ -99,11 +99,14 @@
 			/* usb3h0 is USB2 only (UTMI) */
 			usb3h0: usb3@500000 {
 				status = "okay";
+				phys = <&utmi0>;
+				phy-names = "usb";
 			};
 			usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&comphy0 4 COMPHY_USB3H1>;
-				phy-names = "usb3";
+				phys = <&utmi1>,
+				       <&comphy0 4 COMPHY_USB3H1>;
+				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
 			sdhci@780000 {
@@ -154,6 +157,12 @@
 			comphy {
 				status = "okay";
 			};
+			utmi0: utmi@580000 {
+				status = "okay";
+			};
+			utmi1: utmi@581000 {
+				status = "okay";
+			};
 		};
 		pcie@0x600000 {
 			status = "okay";
@@ -171,6 +180,8 @@
 			/* usb3h0_1 is USB2 only (UTMI) */
 			usb3h0_1: usb3@500000 {
 				status = "okay";
+				phys = <&utmi0_1>;
+				phy-names = "usb";
 			};
 			sata@540000 {
 				status = "okay";
@@ -217,6 +228,9 @@
 				};
 			};
 			comphy {
+				status = "okay";
+			};
+			utmi0_1: utmi@580000 {
 				status = "okay";
 			};
 		};
