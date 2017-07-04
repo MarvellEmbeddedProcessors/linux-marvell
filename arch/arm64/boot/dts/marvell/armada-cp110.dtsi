@@ -264,7 +264,7 @@ nand@720000 {
 	status = "disabled";
 };
 
-dma_xor@6a0000 {
+cp0_xor0: dma_xor@6a0000 {
 	compatible = "marvell,mv-xor-v2";
 	reg = <0x6a0000 0x1000>,
 	      <0x6b0000 0x1000>;
@@ -275,7 +275,7 @@ dma_xor@6a0000 {
 	status = "okay";
 };
 
-dma_xor@6c0000 {
+cp0_xor1: dma_xor@6c0000 {
 	compatible = "marvell,mv-xor-v2";
 	reg = <0x6c0000 0x1000>,
 	      <0x6d0000 0x1000>;
