@@ -161,7 +161,6 @@ static int a3700_spi_pin_mode_set(struct a3700_spi *a3700_spi,
 	u32 val;
 
 	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
-	val &= ~(A3700_SPI_INST_PIN | A3700_SPI_ADDR_PIN);
 	val &= ~(A3700_SPI_DATA_PIN0 | A3700_SPI_DATA_PIN1);
 
 	switch (pin_mode) {
@@ -306,6 +305,20 @@ static int a3700_spi_init(struct a3700_spi *a3700_spi)
 
 	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
 	val &= ~A3700_SPI_SRST;
+	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
+
+	/*
+	* Address Register is used to send none 4 byte aligned
+	* header data at first while Data Out/In register is used to
+	* send remain 4 byte aligned data, so address transfer pins
+	* number should be same as data pins; otherwise some commands
+	* such as spi nor's commands of READ_FROM_CACHE_DUAL_IO(0xeb)
+	* and READ_FROM_CACHE_DUAL_IO(0xbb) will fail because these
+	* commands must send address bytes, dummy bytes and data bytes
+	* in 4(quad)/2(dual) pins.
+	*/
+	val = spireg_read(a3700_spi, A3700_SPI_IF_CFG_REG);
+	val |= A3700_SPI_ADDR_PIN;
 	spireg_write(a3700_spi, A3700_SPI_IF_CFG_REG, val);
 
 	/* Disable AUTO_CS and deactivate all chip-selects */
