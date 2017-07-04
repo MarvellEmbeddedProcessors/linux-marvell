@@ -19,16 +19,16 @@ To switch board configuration:
 Board Setup
 ------------
 
-For A8040 A1 revision SoC - Please use armada-8040-db-A configuration,
+For A8040 A1 revision SoC - Please use armada-8040-db configuration,
 			    Please use armada-8040-db-B configuration,
 			    Please use armada-8040-db-C configuration,
 			    Please use armada-8040-db-D configuration,
 			    Please use armada-8040-db-E configuration
 For A8040 A0 revision SoC - Please use armada-8040-db-A0 configuration
 
-|		| 1: A			| 3: B			| 4: C			| 5: D			| 6: E			|
+|		| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
 |---------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
-|Device tree	|armada-8040-db-A.dtb	|armada-8040-db-B.dtb	|armada-8040-db-C.dtb	|armada-8040-db-D.dtb	|armada-8040-db-E.dtb	|
+|Device tree	|armada-8040-db.dtb	|armada-8040-db-B.dtb	|armada-8040-db-C.dtb	|armada-8040-db-D.dtb	|armada-8040-db-E.dtb	|
 |CP0-SW1:1	| OFF			| OFF			| OFF			| OFF			| OFF			|
 |CP0-SW1:2	| OFF			| OFF			| OFF			| OFF			| OFF			|
 |CP0-SW1:3	| OFF			| OFF			| OFF			| OFF			| OFF			|
@@ -48,7 +48,7 @@ For A8040 A0 revision SoC - Please use armada-8040-db-A0 configuration
 
 DPR Setting
 ------------
-|						| 1: A		| 3: B			| 4: c				|
+|						| 1: default (A)| 3: B			| 4: c				|
 |-----------------------------------------------|---------------|-----------------------|-------------------------------|
 | Jumper-module (CON44): SLM1564		| DPR all = 1-2	| DPR all = 1-2		| DPR 96-108 = 2-3		|
 | Serdes CP0 site module (CON42): SLM1521	| DPR 2-5 = 1-2	| DPR 2-5 = 2-3		| DPR 2-5 = 1-2			|
@@ -69,7 +69,7 @@ The tables below summarizes the interface configuration of each setup
 SerDes Configuration
 ------------------------
 
- CP0 Lane	| 1: A			| 3: B			| 4: C			| 5: D			| 6: E			|
+ CP0 Lane	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
 ----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
  0		| PCIe0 (x1)		| PCIe0 (x4)		| PCIe0 (x1)		| PCIe0 (x1)		| PCIe0 (x1)		|
  1		| SATA0			| PCIe0 (x4)		| SATA0			| SATA0			| SATA0			|
@@ -81,7 +81,7 @@ SerDes Configuration
 - USB2_H0 (UTMI only)
 - USB2_H1 (UTMI & USB3 SerDes)
 
- CP1 Lane	| 1: A			| 3: B			| 4: C			| 5: D			| 6: E			|
+ CP1 Lane	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
 ----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
  0		| PCIe0 (x1)		| PCIe0 (x1)		| PCIe0 (x1)		| PCIe0 (x1)		| PCIe0 (x1)		|
  1		| SATA0			| USB3_HOST0		| SATA0			| SATA0			| SATA0			|
@@ -96,14 +96,14 @@ SerDes Configuration
 Multi-purpose pin configurations
 --------------------------------
 
- AP806 pin	| 1: A			| 3: B			| 4: C			| 5: D			| 6: E			|
+ AP806 pin	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
 ----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
     AP-SDIO	| [0-10]		| [0-10]		| [0-10]		| [0-10]		| N/C			|
     I2C0	| N/C			| N/C			| N/C			| N/C			| N/C			|
     AP-SPI0	| N/C			| N/C			| N/C			| N/C			| [0,3]			|
     AP-UART0	| [11,19]		| [11,19]		| [11,19]		| [11,19]		| [11,19]		|
 
- CP0 pin	| 1: A			| 3: B			| 4: C			| 5: D			| 6: E			|
+ CP0 pin	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
 ----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
     CP0-SMI	| [32,34]		| [32,34]		| [32,34]		| [32,34]		| N/C			|
     CP0-XSMI	| [42-43]		| [42-43]		| [42-43]		| [42-43]		| [42-43]		|
@@ -122,7 +122,7 @@ GPIOS:
 	- 35: MSS_GPIO[3]: MSS_PWDN (only in configuration 1,4,5,6)
 	- 36: MSS_GPIO[5]: MSS_VTT_EN (only in configuration 1,4,5,6)
 
- CP1 pin	| 1: A			| 3: B			| 4: C			| 5: D			| 6: E			|
+ CP1 pin	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
 ----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
     CP1-RGMII0	| [0-11]		| [0-11]		| N/C			| N/C			| [0-11]		|
     CP1-SMI	| [27,31]		| [27,31]		| N/C			| N/C			| [27,31]		|
@@ -136,7 +136,7 @@ GPIOS:
 
 Network configuration
 ---------------------
-1: A:
+1: default (A):
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
