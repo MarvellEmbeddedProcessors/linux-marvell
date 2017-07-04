@@ -18,11 +18,11 @@ To switch board configuration:
 
 Board Setup
 ------------
-For A7040 A revision SoC - Please use armada-7040-db-A configuration,
+For A7040 A revision SoC - Please use armada-7040-db configuration,
 
-|		| 	1: A		|	2:B		|	3:C		|       4:D             |       4:E             |
+|		| 	1: default (A)	|	2:B		|	3:C		|       4:D             |       4:E             |
 |---------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
-|Device tree	|armada-7040-db-A.dtb	|armada-7040-db-B.dtb	|armada-7040-db-C.dtb	|armada-7040-db-D.dtb   |armada-7040-db-E.dtb	|
+|Device tree	|armada-7040-db.dtb	|armada-7040-db-B.dtb	|armada-7040-db-C.dtb	|armada-7040-db-D.dtb   |armada-7040-db-E.dtb	|
 |CP0-SW1:1	| ON			| OFF			| ON			| ON 			| OFF                   |
 |CP0-SW1:2	| OFF			| ON			| OFF			| OFF 			| OFF                   |
 |CP0-SW1:3	| ON			| ON			| ON			| ON			| ON                    |
@@ -35,7 +35,7 @@ For A7040 A revision SoC - Please use armada-7040-db-A configuration,
 
 DPR Setting
 ------------
-|					| 	1: A				 |	2: B:                             |
+|					| 	1: default (A)			 |	2: B:                             |
 |---------------------------------------|----------------------------------------|----------------------------------------|
 | Mpp Jumper Module (SLM1548)		| Default release (ALL DPRs 1-2 position)| Default release (ALL DPRs 1-2 position)|
 | Serdess Jumper Module (SLM1547)	| DPR152,153,154,155 - 1-2 position	 | DPR152,153,154,155 - 1-2 position      |
@@ -66,7 +66,7 @@ The tables below summarizes the interface configuration of each setup
 SerDes Configuration
 ------------------------
 
-| CP0 Lane 	| 	1: A		|   2: B	| 3: C            | 4:D		  | 5:E		  |
+| CP0 Lane 	| 	1: default (A)	|   2: B	| 3: C            | 4:D		  | 5:E		  |
 |---------------|-----------------------|---------------|-----------------|---------------|---------------|
 | 0		| SGMII2		| PICE0 (x4)	| PCIE0 (x1)      |  PCIE0 (x1)   | PCIE0 (x1)	  |
 | 1		| USB3_HOST0		| PCIE0 (x4)	| USB3_HOST0      |  USB3_DEVICE0 | SATA0	  |
@@ -84,7 +84,7 @@ Multi-purpose pin configurations
 --------------------------------
 
 Setup  #	|	1	|	2	|       3       |	4	|	5	|
-Name   #	|  	A 	|	B	|       C       |	D	|	E	|
+Name   #	|  default (A) 	|	B	|       C       |	D	|	E	|
 -------------------------------------------------------------------------------------------------
 AP806:				|		|		|		|		|
 -------------------------------------------------------------------------------------------------
@@ -113,7 +113,7 @@ CP:				|		|		|		|		|
 
 Network configuration
 ---------------------
-1: A:
+1: default (A):
  Interface	| CP#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| CP0	| eth0		| 0		| SFI (10G)			|
