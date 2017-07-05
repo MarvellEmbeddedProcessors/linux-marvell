@@ -1,0 +1,230 @@
+/*
+ * Copyright (C) 2017 Marvell Technology Group Ltd.
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPLv2 or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This library is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This library is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+#include "armada-7040.dtsi"
+
+/ {
+	model = "Marvell Armada 3900-Z1";
+	compatible = "marvell,armada7040", "marvell,armada-ap806-quad",
+		     "marvell,armada-ap806";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	memory@00000000 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	ap806 {
+		config-space {
+			serial@512000 {
+				status = "okay";
+			};
+			i2c@511000 {
+				status = "okay";
+				clock-frequency = <100000>;
+			};
+
+			spi0: spi@510600 {
+				status = "okay";
+				spi-flash@0 {
+					#address-cells = <0x1>;
+					#size-cells = <0x1>;
+					compatible = "jedec,spi-nor";
+					reg = <0x0>;
+					spi-max-frequency = <20000000>;
+					partition@0 {
+						label = "boot";
+						reg = <0x0 0x200000>;
+					};
+					partition@200000 {
+						label = "Filesystem";
+						reg = <0x200000 0xd00000>;
+					};
+					partition@d00000 {
+						label = "boot_2nd";
+						reg = <0xf00000 0x100000>;
+					};
+				};
+			};
+		};
+	};
+
+	cpn-110-master {
+		config-space {
+			usb3h0: usb3@500000 {
+				status = "okay";
+			};
+			usb3h1: usb3@510000 {
+				separated-phys-for-usb2-usb3;
+				phys = <&comphy0 4 COMPHY_USB3H1>;
+				phy-names = "usb3";
+				status = "okay";
+			};
+			nand@720000 {
+				nand-ecc-strength = <4>;
+				nand-ecc-step-size = <512>;
+				status = "okay";
+				partition@0 {
+					label = "boot";
+					reg = <0 0x500000>;
+				};
+				partition@500000 {
+					label = "env";
+					reg = <0x500000 0x400000>;
+				};
+				partition@1000000 {
+					label = "rootfs";
+					reg = <0x1000000 0x1f800000>;
+				};
+				partition@20800000 {
+					label = "alt_rootfs";
+					reg = <0x20800000 0x1f800000>;
+				};
+			};
+			i2c1: i2c@701000 {
+				status = "disabled";
+				clock-frequency = <100000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&i2c0_pins>;
+
+				eeprom@57 {
+					compatible = "atmel,24c64";
+					reg = <0x57>;
+					pagesize = <32>;
+				};
+
+				eeprom@50 {
+					compatible = "atmel,24c64";
+					reg = <0x50>;
+					pagesize = <32>;
+				};
+			};
+			mdio@15b000 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				phy0: ethernet-phy@0 {
+					compatible = "ethernet-phy-ieee802.3-c45";
+					reg = <0>;
+					max-speed = <5000>;
+					marvell,c45-reg-init = <1 0xc000 0xfffe 0x1>; /* setup lane swap */
+				};
+				phy1: ethernet-phy@1 {
+					compatible = "ethernet-phy-ieee802.3-c45";
+					reg = <1>;
+					max-speed = <2500>;
+					marvell,c45-reg-init = <1 0xc000 0xfffe 0x1>; /* setup lane swap */
+				};
+			};
+			gop {
+				emac0: mac0 {
+					phy-mode = "sfi";
+					phy-speed = <5000>;
+					phys = <&comphy0 2 COMPHY_SFI>;
+					phy-names = "comphy";
+					phy = <&phy0>;
+				};
+				emac2: mac2 {
+					phy-mode = "sgmii";
+					phy-speed = <2500>;
+					phys = <&comphy0 3 COMPHY_HS_SGMII1>;
+					phy-names = "comphy";
+					phy = <&phy1>;
+				};
+			};
+			ppv22@000000 {
+				eth0: eth0@010000 {
+					status = "okay";
+				};
+				eth1: eth1@020000 {
+					status = "okay";
+				};
+			};
+			comphy {
+				status = "okay";
+			};
+		};
+		pcie@0x600000 {
+			status = "okay";
+			ranges = <0x81000000 0 0xf7000000 0  0xf7000000 0 0x10000	/* downstream I/O */
+				  0x82000000 0 0xf6000000 0  0xf6000000 0 0xf00000>;	/* non-prefetchable memory */
+		};
+		pcie@0x640000 {
+			status = "okay";
+			phys = <&comphy0 5 COMPHY_PCIE2>;
+			phy-names = "pcie-phy0";
+			ranges = <0x81000000 0 0xf7020000 0  0xf7020000 0 0x10000	/* downstream I/O */
+				  0x82000000 0 0xf8000000 0  0xf8000000 0 0xf00000>;	/* non-prefetchable memory */
+		};
+	};
+
+	/* USB3 VBus controller through GPIO */
+	usb3h0_phy: usb3-h0-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cpm_reg_usb3_vbus0>;
+	};
+	usb3h1_phy: usb3-h1-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cpm_reg_usb3_vbus1>;
+	};
+	cpm_reg_usb3_vbus0: cpm_usb3_vbus@0 {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&cpm_xhci0_vbus_pins>;
+		regulator-name = "cpm-xhci0-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+	};
+	cpm_reg_usb3_vbus1: cpm_usb3_vbus@1 {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&cpm_xhci1_vbus_pins>;
+		regulator-name = "cpm-xhci1-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+	};
+};

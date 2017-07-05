@@ -1,7 +1,7 @@
 Marvell Armada 7K/8K Platforms Device Tree Bindings
 ---------------------------------------------------
 
-Boards using a SoC of the Marvell Armada 7K or 8K families must carry
+Boards using a SoC of the Marvell Armada 3900, 7K, or 8K families must carry
 the following root node property:
 
  - compatible, with one of the following values:
@@ -11,7 +11,7 @@ SoC:
       when the SoC being used is the Armada 7020
 
    - "marvell,armada7040", "marvell,armada-ap806-quad", "marvell,armada-ap806"
-      when the SoC being used is the Armada 7040
+      when the SoC being used is the Armada 7040 or Armada 3900
 
    - "marvell,armada8020", "marvell,armada-ap806-dual", "marvell,armada-ap806"
       when the SoC being used is the Armada 8020
@@ -20,6 +20,12 @@ SoC:
       when the SoC being used is the Armada 8040
 
 Boards:
+   - "marvell,armada3900-db-axis"
+      when the board being used is the Armada 3900 axis board
+
+   - "marvell,armada3900-db-vd"
+      when the board being used is the Armada 3900 validation board
+
    - "marvell,armada7020-amc"
       when the board being used is the Armada 7020 AMC board
 
