@@ -177,6 +177,7 @@
 
 struct advk_pcie {
 	struct platform_device *pdev;
+	struct pci_bus *bus;
 	void __iomem *base;
 	struct phy *phy;
 	struct list_head resources;
@@ -904,9 +905,10 @@ static int advk_pcie_bus_configure_mps(struct pci_dev *dev, void *data)
 	return 0;
 }
 
-static void advk_pcie_configure_mps(struct pci_bus *bus, struct advk_pcie *pcie)
+static void advk_pcie_configure_mps(struct advk_pcie *pcie)
 {
 	u8 smpss = PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ;
+	struct pci_bus *bus = pcie->bus;
 	u32 reg;
 
 	/* Find the minimal supported MAX payload size */
@@ -1060,12 +1062,13 @@ after_pcie_reset:
 	}
 
 	pci_bus_assign_resources(bus);
+	pcie->bus = bus;
 
 	list_for_each_entry(child, &bus->children, node)
 		pcie_bus_configure_settings(child);
 
 	/* Configure the MAX pay load size */
-	advk_pcie_configure_mps(bus, pcie);
+	advk_pcie_configure_mps(pcie);
 
 	pci_bus_add_devices(bus);
 
@@ -1121,6 +1124,9 @@ static int advk_pcie_resume_noirq(struct device *dev)
 	}
 
 	advk_pcie_setup_hw(pcie);
+
+	/* Reconfigure the MAX pay load size */
+	advk_pcie_configure_mps(pcie);
 
 	return 0;
 }
