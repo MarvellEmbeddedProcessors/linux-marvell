@@ -732,6 +732,9 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
+	/* Register device in thermal data structure */
+	priv->pdev = pdev;
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	priv->sensor = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(priv->sensor))
@@ -771,9 +774,6 @@ static int armada_thermal_probe(struct platform_device *pdev)
 			"Failed to register thermal zone device\n");
 		return PTR_ERR(thermal);
 	}
-
-	/* Register device in thermal data structure */
-	priv->pdev = pdev;
 
 	/* Register overheat interrupt */
 	irq = platform_get_irq(pdev, 0);
