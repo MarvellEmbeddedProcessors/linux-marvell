@@ -40,6 +40,7 @@
 #include <asm/irq.h>
 #include <linux/uaccess.h>
 
+#define MII_MARVELL_REG_INIT_FIELDS	4
 #define MII_MARVELL_PHY_PAGE		22
 
 #define MII_M1011_IEVENT		0x13
@@ -193,6 +194,39 @@
 
 #define MII_88E3310_AUT_NEG_CON		0x8000
 #define MII_88E3310_AUT_NEG_ST		0x8001
+
+#define MII_88E2110_IMASK		0x8010
+#define MII_88E2110_IMASK_INIT		0x6400
+#define MII_88E2110_IMASK_CLEAR		0x0000
+
+#define MII_88E2110_ISTATUS		0x8011
+
+#define MII_88E2110_PHY_STATUS		0x8008
+#define MII_88E2110_PHY_STATUS_SPD_MASK	0xc00c
+#define MII_88E2110_PHY_STATUS_5000	0xc008
+#define MII_88E2110_PHY_STATUS_2500	0xc004
+#define MII_88E2110_PHY_STATUS_1000	0x8000
+#define MII_88E2110_PHY_STATUS_100	0x4000
+#define MII_88E2110_PHY_STATUS_DUPLEX	0x2000
+#define MII_88E2110_PHY_STATUS_SPDDONE	0x0800
+#define MII_88E2110_PHY_STATUS_LINK	0x0400
+
+#define MII_88E2110_NG_EXT_CTRL			0xc000
+#define MII_88E2110_NG_EXT_CTRL_SWAP_ABCD	0x1
+
+#define MII_88E2110_AN_CTRL		0x0
+#define MII_88E2110_AN_CTRL_EXT_NP_CTRL 0x2000
+#define MII_88E2110_AN_CTRL_AN_EN	0x1000
+#define MII_88E2110_AN_CTRL_RESTART_AN	0x0200
+
+#define MII_88E2110_ADVERTISE		0x10
+#define MII_88E2110_LPA			0x13
+#define MII_88E2110_STAT1000		0x8001
+
+#define MII_88E2110_MGBASET_AN_CTRL1			0x20
+#define MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_5000	0x01e1
+#define MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_2500	0x00a1
+#define MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_1000	0x0001
 
 MODULE_DESCRIPTION("Marvell PHY driver");
 MODULE_AUTHOR("Andy Fleming");
@@ -454,8 +488,68 @@ err:
 	}
 	return ret;
 }
+
+/* Set and/or override some configuration registers based on the
+ * "marvell,c45-reg-init" property stored in the of_node for the phydev.
+ *
+ * marvell,c45-reg-init = <devid reg mask value>,...;
+ *
+ * There may be one or more sets of <devid reg mask value>:
+ *
+ * devid: device id
+ * reg: the register offset belonging to specified id
+ * mask: if non-zero, ANDed with existing register value.
+ * val: mask != 0 ? reg |= val : reg = val
+ *
+ */
+static int marvell_of_reg_c45_init(struct phy_device *phydev)
+{
+	const __be32 *paddr;
+	int len, i, ret;
+
+	if (!phydev->mdio.dev.of_node)
+		return 0;
+
+	paddr = of_get_property(phydev->mdio.dev.of_node,
+				"marvell,c45-reg-init", &len);
+	if (!paddr)
+		return 0;
+
+	ret = 0;
+	len /= sizeof(*paddr);
+	for (i = 0; i < len - (MII_MARVELL_REG_INIT_FIELDS - 1);
+	     i += MII_MARVELL_REG_INIT_FIELDS) {
+		u16 devid = be32_to_cpup(paddr + i);
+		u16 reg = be32_to_cpup(paddr + i + 1);
+		u16 mask = be32_to_cpup(paddr + i + 2);
+		u16 val_bits = be32_to_cpup(paddr + i + 3);
+		int val;
+
+		val = 0;
+		if (mask) {
+			val = phy_read_mmd(phydev, devid, reg);
+			if (val < 0) {
+				ret = val;
+				goto err;
+			}
+			val &= mask;
+		}
+		val |= val_bits;
+
+		ret = phy_write_mmd(phydev, devid, reg, val);
+		if (ret < 0)
+			goto err;
+	}
+err:
+	return ret;
+}
 #else
 static int marvell_of_reg_init(struct phy_device *phydev)
+{
+	return 0;
+}
+
+static int marvell_of_reg_c45_init(struct phy_device *phydev)
 {
 	return 0;
 }
@@ -552,6 +646,12 @@ static int marvell_config_init(struct phy_device *phydev)
 {
 	/* Set registers from marvell,reg-init DT property */
 	return marvell_of_reg_init(phydev);
+}
+
+static int marvell_c45_config_init(struct phy_device *phydev)
+{
+	/* Set registers from marvell,c45-reg-init DT property */
+	return marvell_of_reg_c45_init(phydev);
 }
 
 static int m88e1116r_config_init(struct phy_device *phydev)
@@ -1693,6 +1793,184 @@ int m88e3310_soft_reset(struct phy_device *phydev)
 	return 0;
 }
 
+static int m88e2110_ack_interrupt(struct phy_device *phydev)
+{
+	int err;
+
+	/* Clear the interrupts by reading the reg */
+	err = phy_read_mmd(phydev, MDIO_MMD_PCS, MII_88E2110_ISTATUS);
+
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
+static int m88e2110_config_aneg(struct phy_device *phydev)
+{
+	struct device_node *node = phydev->mdio.dev.of_node;
+	u32 max_speed;
+	int reg, change = 0;
+
+	if (!of_property_read_u32(node, "max-speed", &max_speed)) {
+		reg = phy_read_mmd(phydev, MDIO_MMD_AN,
+				   MII_88E2110_MGBASET_AN_CTRL1);
+		switch (max_speed) {
+		case SPEED_5000:
+			/* Disabled 10G advertisement */
+			if (reg != MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_5000) {
+				phy_write_mmd(phydev, MDIO_MMD_AN,
+					      MII_88E2110_MGBASET_AN_CTRL1,
+					      MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_5000);
+				change = 1;
+			}
+			break;
+		case SPEED_2500:
+			/* Disabled 10G/5G advertisements */
+			if (reg != MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_2500) {
+				phy_write_mmd(phydev, MDIO_MMD_AN,
+					      MII_88E2110_MGBASET_AN_CTRL1,
+					      MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_2500);
+				change = 1;
+			}
+			break;
+		default:
+			/* Disable 10G/5G/2.5G auto-negotiation advertisements */
+			if (reg != MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_1000) {
+				phy_write_mmd(phydev, MDIO_MMD_AN,
+					      MII_88E2110_MGBASET_AN_CTRL1,
+					      MII_88E2110_MGBASET_AN_CTRL1_ADVERTISE_1000);
+				change = 1;
+			}
+			break;
+		}
+	}
+
+	/* Restart auto-negotiation */
+	if (change)
+		phy_write_mmd(phydev, MDIO_MMD_AN, MII_88E2110_AN_CTRL,
+			      MII_88E2110_AN_CTRL_EXT_NP_CTRL |
+			      MII_88E2110_AN_CTRL_AN_EN |
+			      MII_88E2110_AN_CTRL_RESTART_AN);
+
+	return 0;
+}
+
+static int m88e2110_config_init(struct phy_device *phydev)
+{
+	return marvell_c45_config_init(phydev);
+}
+
+static int m88e2110_config_intr(struct phy_device *phydev)
+{
+	int err;
+
+	if (phydev->interrupts == PHY_INTERRUPT_ENABLED)
+		err = phy_write_mmd(phydev, MDIO_MMD_PCS, MII_88E2110_IMASK,
+				    MII_88E2110_IMASK_INIT);
+	else
+		err = phy_write_mmd(phydev, MDIO_MMD_PCS, MII_88E2110_IMASK,
+				    MII_88E2110_IMASK_CLEAR);
+
+	return err;
+}
+
+static int m88e2110_read_status(struct phy_device *phydev)
+{
+	int adv, lpa, lpagb, status;
+
+	status = phy_read_mmd(phydev, MDIO_MMD_PCS, MII_88E2110_PHY_STATUS);
+	if (status < 0)
+		return status;
+
+	if (!(status & MII_88E2110_PHY_STATUS_LINK)) {
+		phydev->link = 0;
+		return 0;
+	}
+
+	phydev->link = 1;
+	if (status & MII_88E2110_PHY_STATUS_DUPLEX)
+		phydev->duplex = DUPLEX_FULL;
+	else
+		phydev->duplex = DUPLEX_HALF;
+
+	phydev->pause = 0;
+	phydev->asym_pause = 0;
+
+	switch (status & MII_88E2110_PHY_STATUS_SPD_MASK) {
+	case MII_88E2110_PHY_STATUS_5000:
+		phydev->speed = SPEED_5000;
+		break;
+	case MII_88E2110_PHY_STATUS_2500:
+		phydev->speed = SPEED_2500;
+		break;
+	case MII_88E2110_PHY_STATUS_1000:
+		phydev->speed = SPEED_1000;
+		break;
+	case MII_88E2110_PHY_STATUS_100:
+		phydev->speed = SPEED_100;
+		break;
+	default:
+		phydev->speed = SPEED_10;
+		break;
+	}
+
+	if (phydev->autoneg == AUTONEG_ENABLE) {
+		lpa = phy_read_mmd(phydev, MDIO_MMD_AN, MII_88E2110_LPA);
+		if (lpa < 0)
+			return lpa;
+
+		lpagb = phy_read_mmd(phydev, MDIO_MMD_AN, MII_88E2110_STAT1000);
+		if (lpagb < 0)
+			return lpagb;
+
+		adv = phy_read_mmd(phydev, MDIO_MMD_AN, MII_88E2110_ADVERTISE);
+		if (adv < 0)
+			return adv;
+
+		phydev->lp_advertising = mii_stat1000_to_ethtool_lpa_t(lpagb) |
+					 mii_lpa_to_ethtool_lpa_t(lpa);
+
+		lpa &= adv;
+
+		if (phydev->duplex == DUPLEX_FULL) {
+			phydev->pause = lpa & LPA_PAUSE_CAP ? 1 : 0;
+			phydev->asym_pause = lpa & LPA_PAUSE_ASYM ? 1 : 0;
+		}
+	} else {
+		phydev->lp_advertising = 0;
+	}
+
+	return 0;
+}
+
+static int m88e2110_aneg_done(struct phy_device *phydev)
+{
+	int retval;
+
+	retval = phy_read_mmd(phydev, MDIO_MMD_PCS, MII_88E2110_PHY_STATUS);
+
+	return ((retval < 0) ? retval : (retval & MII_88E2110_PHY_STATUS_SPDDONE));
+}
+
+static int m88e2110_did_interrupt(struct phy_device *phydev)
+{
+	int imask;
+
+	imask = phy_read_mmd(phydev, MDIO_MMD_PCS, MII_88E2110_ISTATUS);
+
+	if (imask & MII_88E2110_IMASK_INIT)
+		return 1;
+
+	return 0;
+}
+
+static int m88e2110_soft_reset(struct phy_device *phydev)
+{
+	/* Do nothing for now */
+	return 0;
+}
+
 #ifndef UINT64_MAX
 #define UINT64_MAX              (u64)(~((u64)0))
 #endif
@@ -2252,6 +2530,22 @@ static struct phy_driver marvell_drivers[] = {
 		.get_strings = marvell_get_strings,
 		.get_stats = marvell_get_stats,
 	},
+	{
+		.phy_id = MARVELL_PHY_ID_88E2110,
+		.phy_id_mask = MARVELL_PHY_ID_MASK,
+		.name = "Marvell 88E2110",
+		.features = PHY_BASIC_FEATURES,
+		.flags = PHY_HAS_INTERRUPT,
+		.probe = marvell_probe,
+		.config_aneg = &m88e2110_config_aneg,
+		.config_init = &m88e2110_config_init,
+		.aneg_done = &m88e2110_aneg_done,
+		.read_status = &m88e2110_read_status,
+		.ack_interrupt = &m88e2110_ack_interrupt,
+		.config_intr = &m88e2110_config_intr,
+		.did_interrupt = &m88e2110_did_interrupt,
+		.soft_reset = &m88e2110_soft_reset,
+	},
 };
 
 module_phy_driver(marvell_drivers);
@@ -2269,6 +2563,7 @@ static struct mdio_device_id __maybe_unused marvell_tbl[] = {
 	{ MARVELL_PHY_ID_88E1116R, MARVELL_PHY_ID_MASK },
 	{ MARVELL_PHY_ID_88E1510, MARVELL_PHY_ID_MASK },
 	{ MARVELL_PHY_ID_88E1540, MARVELL_PHY_ID_MASK },
+	{ MARVELL_PHY_ID_88E2110, MARVELL_PHY_ID_MASK },
 	{ MARVELL_PHY_ID_88E3016, MARVELL_PHY_ID_MASK },
 	{ MARVELL_PHY_ID_88E3310, MARVELL_PHY_ID_MASK },
 	{ }

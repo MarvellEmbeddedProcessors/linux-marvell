@@ -1,0 +1,28 @@
+Marvell E2110 PHY supports 10M/100M/1G/2.5G/5G base-t and has more setup
+bindings in addition to the standard PHY bindings. For undescribed properties,
+please refer to Documentation/devicetree/bindings/net/phy.txt.
+
+Compatible: "ethernet-phy-ieee802.3-c45"
+
+Optional Properties:
+
+- marvell,c45-reg-init :
+  one of more sets of 4 cells to overwrite initial register value
+  1st: the MDIO Manageable Device (MMD) address
+  2nd: the second a register address within the MMD
+  3rd: the third cell contains a mask to be ANDed with the existing
+       register value
+  4th: ORed with he result to yield the new register value.
+  If the third cell has a value of zero, no read of the existing value is
+  performed.
+
+Example:
+	phy0: ethernet-phy@0 {
+		compatible = "ethernet-phy-ieee802.3-c45";
+		reg = <0>;
+		max-speed = <5000>;
+
+		/* setup the lane swap */
+		marvell,c45-reg-init = <1 0xc000 0xfffe 0x1>;
+        };
+
