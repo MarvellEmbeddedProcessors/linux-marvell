@@ -51,6 +51,8 @@
 #define AP806_RESET	BIT(1)
 #define AP806_ENABLE	BIT(2)
 
+#define AP806_INIT_TIMEOUT	10
+
 /* For AP806 TSEN output format is signed as a 2s complement number
 	ranging from-512 to +511*/
 #define AP806_TSEN_OUTPUT_MSB		512
@@ -372,13 +374,23 @@ static void armada380_init_sensor(struct platform_device *pdev,
 static void armada_ap806_init_sensor(struct platform_device *pdev,
 				  struct armada_thermal_priv *priv)
 {
+	unsigned int timeout;
 	unsigned long reg = readl_relaxed(priv->control);
 
 	reg &= ~AP806_RESET;
 	reg |= AP806_START;
 	reg |= AP806_ENABLE;
 	writel(reg, priv->control);
-	mdelay(10);
+
+	timeout = AP806_INIT_TIMEOUT;
+	if (priv->data->is_valid) {
+		do {
+			mdelay(10);
+			if (priv->data->is_valid(priv))
+				break;
+			timeout--;
+		} while (timeout != 0);
+	}
 
 	/* Set thresholds */
 	ap806_temp_set_threshold(pdev, priv);
