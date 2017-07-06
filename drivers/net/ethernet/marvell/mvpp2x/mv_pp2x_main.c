@@ -3349,6 +3349,7 @@ out:
 	} else {
 		/* Transmit bulked descriptors*/
 		if (aggr_txq->xmit_bulk > 0) {
+			mv_pp2x_tx_timer_kill(cp_pcpu);
 			aggr_txq->sw_count -= aggr_txq->xmit_bulk;
 			aggr_txq->hw_count += aggr_txq->xmit_bulk;
 			mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
