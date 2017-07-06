@@ -4893,6 +4893,8 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 	struct queue_vector *qvec;
 	cpumask_t cpus_mask;
 	struct mv_pp2x_port *port = container_of(nfb, struct mv_pp2x_port, port_hotplug_nb);
+	struct mv_pp2x_aggr_tx_queue *aggr_txq;
+	struct mv_pp2x_cp_pcpu *cp_pcpu;
 
 	switch (action) {
 	case CPU_ONLINE:
@@ -4914,6 +4916,14 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 		if (port->priv->pp2xdata->interrupt_tx_done)
 			on_each_cpu_mask(&cpus_mask, mv_pp2x_tx_done_pkts_coal_set, port, 1);
 		break;
+	case CPU_DOWN_PREPARE:
+		cp_pcpu = per_cpu_ptr(port->priv->pcpu, cpu);
+		aggr_txq = &port->priv->aggr_txqs[cpu];
+		mv_pp2x_tx_timer_kill(cp_pcpu);
+		aggr_txq->sw_count -= aggr_txq->xmit_bulk;
+		aggr_txq->hw_count += aggr_txq->xmit_bulk;
+		mv_pp22_thread_write(&port->priv->hw, cpu, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->xmit_bulk);
+		aggr_txq->xmit_bulk = 0;
 	}
 
 	return NOTIFY_OK;
