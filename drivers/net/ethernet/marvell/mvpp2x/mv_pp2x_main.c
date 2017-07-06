@@ -1068,6 +1068,15 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 		int data_size = txq_pcpu->data_size[txq_pcpu->txq_get_index];
 		struct sk_buff *skb_rec;
 
+		txq_pcpu->tx_buffs[txq_pcpu->txq_get_index] = 0;
+		txq_pcpu->tx_skb[txq_pcpu->txq_get_index] = 0;
+		txq_pcpu->data_size[txq_pcpu->txq_get_index] = 0;
+
+		if (unlikely(!buf_phys_addr)) {
+			mv_pp2x_txq_inc_get(txq_pcpu);
+			continue;
+		}
+
 		if (skb & MVPP2_ETH_SHADOW_EXT) {
 			/* Refill TSO external pool */
 			skb &= ~MVPP2_ETH_SHADOW_EXT;
@@ -1415,18 +1424,18 @@ static int mv_pp2x_txq_init(struct mv_pp2x_port *port,
 	for_each_present_cpu(cpu) {
 		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
 		txq_pcpu->size = txq->size;
-		txq_pcpu->tx_skb = kmalloc(txq_pcpu->size *
+		txq_pcpu->tx_skb = kcalloc(txq_pcpu->size,
 					   sizeof(*txq_pcpu->tx_skb),
 					   GFP_KERNEL);
 		if (!txq_pcpu->tx_skb)
 			goto error;
 
-		txq_pcpu->tx_buffs = kmalloc(txq_pcpu->size *
+		txq_pcpu->tx_buffs = kcalloc(txq_pcpu->size,
 					     sizeof(dma_addr_t), GFP_KERNEL);
 		if (!txq_pcpu->tx_buffs)
 			goto error;
 
-		txq_pcpu->data_size = kmalloc(txq_pcpu->size *
+		txq_pcpu->data_size = kcalloc(txq_pcpu->size,
 						sizeof(int), GFP_KERNEL);
 		if (!txq_pcpu->data_size)
 			goto error;
