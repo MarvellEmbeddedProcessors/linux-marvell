@@ -371,8 +371,11 @@ struct mv_pp2x_aggr_tx_queue {
 	/* Number of Tx DMA descriptors in the descriptor ring */
 	int size;
 
-	/* Number of currently used Tx DMA descriptor in the descriptor ring */
-	int count;
+	/* Number of currently used Tx DMA descriptor in the descriptor ring used by SW */
+	int sw_count;
+
+	/* Number of currently used Tx DMA descriptor in the descriptor ring used by HW */
+	int hw_count;
 
 	/* Virtual pointer to address of the Aggr_Tx DMA descriptors
 	* memory_allocation

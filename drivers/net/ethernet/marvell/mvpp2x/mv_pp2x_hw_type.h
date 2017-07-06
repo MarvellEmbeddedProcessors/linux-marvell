@@ -1214,7 +1214,7 @@
 #define MVPP2_CPU_DESC_CHUNK		128
 
 /* Max number of Tx descriptors in each aggregated queue */
-#define MVPP2_AGGR_TXQ_SIZE		512
+#define MVPP2_AGGR_TXQ_SIZE		2048
 
 /* Descriptor aligned size */
 #define MVPP2_DESC_ALIGNED_SIZE		32

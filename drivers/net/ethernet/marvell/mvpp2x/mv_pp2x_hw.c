@@ -3894,14 +3894,14 @@ int mv_pp2x_aggr_desc_num_check(struct mv_pp2x *priv,
 				struct mv_pp2x_aggr_tx_queue *aggr_txq,
 				int num, int cpu)
 {
-	if ((aggr_txq->count + num) > aggr_txq->size) {
+	if ((aggr_txq->sw_count + aggr_txq->hw_count + num) > aggr_txq->size) {
 		/* Update number of occupied aggregated Tx descriptors */
 		u32 val = mv_pp2x_relaxed_read(&priv->hw,
 				MVPP2_AGGR_TXQ_STATUS_REG(cpu), cpu);
 
-		aggr_txq->count = val & MVPP2_AGGR_TXQ_PENDING_MASK;
+		aggr_txq->hw_count = val & MVPP2_AGGR_TXQ_PENDING_MASK;
 
-		if ((aggr_txq->count + num) > aggr_txq->size)
+		if ((aggr_txq->sw_count + aggr_txq->hw_count + num) > aggr_txq->size)
 			return -ENOMEM;
 	}
 
