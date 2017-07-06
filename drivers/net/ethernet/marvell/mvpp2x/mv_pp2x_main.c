@@ -1995,6 +1995,8 @@ static void mv_pp2x_tx_send_proc_cb(unsigned long data)
 	aggr_txq = &port->priv->aggr_txqs[cpu];
 
 	if (likely(aggr_txq->xmit_bulk > 0)) {
+		aggr_txq->sw_count -= aggr_txq->xmit_bulk;
+		aggr_txq->hw_count += aggr_txq->xmit_bulk;
 		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
 		aggr_txq->xmit_bulk = 0;
 	}
@@ -3090,23 +3092,25 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 		}
 	}
 
+	aggr_txq->sw_count += total_desc_num;
 	aggr_txq->xmit_bulk += total_desc_num;
 	if (!skb->xmit_more) {
 		/* Transmit TCP segment with bulked descriptors and cancel tx hr timer if exist */
+		aggr_txq->sw_count -= aggr_txq->xmit_bulk;
+		aggr_txq->hw_count += aggr_txq->xmit_bulk;
 		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
 		aggr_txq->xmit_bulk = 0;
 		mv_pp2x_tx_timer_kill(port_pcpu);
 	}
 
 	txq_pcpu->reserved_num -= total_desc_num;
-	aggr_txq->count += total_desc_num;
 
 	return total_desc_num;
 
 out_no_tx_desc:
 	/* No enough memory for packet header - rollback */
 	pr_err("%s: No TX descriptors - rollback %d, txq_count=%d, nr_frags=%d, skb=%p, len=%d, gso_segs=%d\n",
-	       __func__, total_desc_num, aggr_txq->count, skb_shinfo(skb)->nr_frags,
+	       __func__, total_desc_num, (aggr_txq->hw_count + aggr_txq->sw_count), skb_shinfo(skb)->nr_frags,
 			skb, skb->len, skb_shinfo(skb)->gso_segs);
 
 	for (i = 0; i < total_desc_num; i++) {
@@ -3322,7 +3326,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 	txq_pcpu->reserved_num -= frags;
-	aggr_txq->count += frags;
+	aggr_txq->sw_count += frags;
 	aggr_txq->xmit_bulk += frags;
 
 #ifdef CONFIG_MV_PTP_SERVICE
@@ -3345,6 +3349,8 @@ out:
 	} else {
 		/* Transmit bulked descriptors*/
 		if (aggr_txq->xmit_bulk > 0) {
+			aggr_txq->sw_count -= aggr_txq->xmit_bulk;
+			aggr_txq->hw_count += aggr_txq->xmit_bulk;
 			mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
 			aggr_txq->xmit_bulk = 0;
 		}
