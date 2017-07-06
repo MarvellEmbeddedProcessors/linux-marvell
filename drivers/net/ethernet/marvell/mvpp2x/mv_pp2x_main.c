@@ -330,7 +330,7 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 	 * by recycling mechanism.
 	 */
 	if (is_recycle &&
-	    (cp_pcpu->in_use < bm_pool->in_use_thresh))
+	    (cp_pcpu->in_use[bm_pool->id] < bm_pool->in_use_thresh))
 		return 0;
 
 	data = mv_pp2x_frag_alloc(bm_pool);
@@ -350,7 +350,7 @@ static int mv_pp2x_rx_refill_new(struct mv_pp2x_port *port,
 
 	/* Decrement only if refill called from RX */
 	if (is_recycle)
-		cp_pcpu->in_use--;
+		cp_pcpu->in_use[bm_pool->id]--;
 
 	return 0;
 }
@@ -1088,7 +1088,7 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 			bm_pool = &port->priv->bm_pools[MVPP2X_SKB_BPID_GET(skb_rec)];
 			/* Do not release buffer of recycled skb */
 			skb_rec->head = NULL;
-			cp_pcpu->in_use--;
+			cp_pcpu->in_use[bm_pool->id]--;
 
 			mv_pp2_skb_pool_put(port, (struct sk_buff *)skb, txq_pcpu->cpu);
 
@@ -1312,7 +1312,7 @@ static void mv_pp2x_rxq_drop_pkts(struct mv_pp2x_port *port,
 
 		mv_pp2x_pool_refill(port->priv, MVPP2_RX_DESC_POOL(rx_desc),
 				    buf_phys_addr, cpu);
-		cp_pcpu->in_use--;
+		cp_pcpu->in_use[bm_pool->id]--;
 	}
 	put_cpu();
 	mv_pp2x_rxq_status_update(port, rxq->id, rx_received, rx_received);
@@ -2622,7 +2622,6 @@ err_drop_frame:
 			dev->stats.rx_errors++;
 			mv_pp2x_rx_error(port, rx_desc);
 			mv_pp2x_pool_refill(port->priv, pool, buf_phys_addr, cpu);
-			cp_pcpu->in_use--;
 			continue;
 		}
 		/* Try to get skb from CP skb pool
@@ -2647,7 +2646,7 @@ err_drop_frame:
 				 MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
 				 DMA_FROM_DEVICE);
 		refill_array[bm_pool->log_id]++;
-		cp_pcpu->in_use++;
+		cp_pcpu->in_use[bm_pool->id]++;
 
 #ifdef MVPP2_VERBOSE
 		mv_pp2x_skb_dump(skb, rx_desc->data_size, 4);
@@ -3180,7 +3179,7 @@ static inline int mv_pp2x_skb_recycle_check(struct mv_pp2x *priv, struct sk_buff
 	if ((skb->hash == MVPP2_UNIQUE_HASH) && (MVPP2X_SKB_PP2_CELL_GET(skb) == priv->pp2_cfg.cell_index)) {
 		bm_pool = mv_pp2x_skb_recycle_get_pool(priv, skb);
 		if (bm_pool)
-			if (mv_pp2x_skb_is_recycleable(skb, bm_pool->pkt_size) && (cp_pcpu->in_use > 0))
+			if (mv_pp2x_skb_is_recycleable(skb, bm_pool->pkt_size) && (cp_pcpu->in_use[bm_pool->id] > 0))
 				return bm_pool->id;
 	}
 

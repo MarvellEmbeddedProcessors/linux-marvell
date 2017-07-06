@@ -596,7 +596,7 @@ struct mv_pp2x_port_pcpu {
 struct mv_pp2x_cp_pcpu {
 	struct list_head skb_port_list;
 	struct mv_pp2x_skb_pool *skb_pool;
-	int in_use;
+	int in_use[MVPP2_BM_POOLS_NUM];
 };
 
 struct queue_vector {
