@@ -67,6 +67,7 @@ enum {
 #define CP110_GATE_NAND			2
 #define CP110_GATE_PPV2			3
 #define CP110_GATE_SDIO			4
+#define CP110_GATE_MG			6
 #define CP110_GATE_XOR1			7
 #define CP110_GATE_XOR0			8
 #define CP110_GATE_PCIE_X1_0		11
@@ -361,10 +362,12 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
 	}
 
 	/*
-	 * Gated clock 18 feeds many core clocks in CP110, one of this clocks
-	 * is the eMMC clock. eMMC driver supports only one clock - the core
+	 * Gated clocks 18 and 6 feeds many core clocks in CP110.
+	 * Clock 18 feeds eMMC clock. eMMC driver supports only one clock - the core
 	 * clock of eMMC) so we need to enable clock 18 in CP110 clock level
 	 * and not the eMMC driver itself.
+	 * Gated clock 6 feeds XSMI clock. If ppv2 ports on CP0 connected
+	 * to XSMI on CP1 and there are no enabled ppv2 ports on CP1. XSMI won't be enabled.
 	 * TODO:
 	 * This is a workaround, the complete solution should be nesting all
 	 * clock providers and consumers in the CP110 driver. One possible
@@ -376,7 +379,13 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
 						    CP110_GATE_SDMMC]);
 		if (ret)
 			goto fail_clk_add;
+	}
 
+	if (cp110_clks[CP110_MAX_CORE_CLOCKS + CP110_GATE_MG]) {
+		ret = clk_prepare_enable(cp110_clks[CP110_MAX_CORE_CLOCKS +
+						    CP110_GATE_MG]);
+		if (ret)
+			goto fail_clk_add;
 	}
 
 	ret = of_clk_add_provider(np, cp110_of_clk_get, cp110_clk_data);
