@@ -82,11 +82,30 @@ struct mvebu_icu_irq_data {
 static DEFINE_SPINLOCK(icu_lock);
 static DECLARE_BITMAP(icu_irq_alloc, ICU_MAX_SPI_IRQ_IN_GIC);
 
+static void mvebu_icu_irq_chip_eoi(struct irq_data *data)
+{
+	struct mvebu_icu_irq_data *icu = data->domain->host_data;
+	struct irq_data *irq_parent = data->parent_data;
+	int irq_msg_num = ICU_GET_GIC_IDX(irqd_to_hwirq(irq_parent));
+
+	if (!irqd_is_level_type(data)) {
+		/*
+		 * Workaround for edge interrupts support by GICP:
+		 * Since GICP supports only level interrupts and don't clear
+		 * edge interrupts, we need to clear interrupt by ourselves.
+		 * Clear the interrupt only for interrupts configured as Edge.
+		 */
+		writel(irq_msg_num, icu->gicp_clr_spi_base);
+	}
+	/* Invoke the standard EOI on the parent interrupt function */
+	irq_chip_eoi_parent(data);
+}
+
 static struct irq_chip mvebu_icu_irq_chip = {
 	.name			= "ICU",
 	.irq_mask		= irq_chip_mask_parent,
 	.irq_unmask		= irq_chip_unmask_parent,
-	.irq_eoi		= irq_chip_eoi_parent,
+	.irq_eoi		= mvebu_icu_irq_chip_eoi,
 	.irq_set_type           = irq_chip_set_type_parent,
 #ifdef CONFIG_SMP
 	.irq_set_affinity       = irq_chip_set_affinity_parent,
