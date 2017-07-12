@@ -536,7 +536,7 @@ err_unroll_pools:
 	dev_err(&pdev->dev, "failed to create BM pool %d, size %d\n", i, size);
 	for (i = i - 1; i >= 0; i--)
 		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, &priv->bm_pools[i]);
-		return err;
+	return err;
 }
 
 static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
