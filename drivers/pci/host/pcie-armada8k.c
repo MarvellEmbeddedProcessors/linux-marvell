@@ -361,6 +361,101 @@ fail_free:
 	return ret;
 }
 
+static int armada8k_pcie_suspend_noirq(struct device *dev)
+{
+	int i;
+	struct armada8k_pcie *pcie;
+
+	pcie = dev_get_drvdata(dev);
+
+	/* Gating clock */
+	if (!IS_ERR(pcie->clk))
+		clk_disable_unprepare(pcie->clk);
+
+	/* Power off PHY */
+	for (i = 0; i < pcie->phy_count; i++) {
+		if (pcie->phys[i]) {
+			phy_power_off(pcie->phys[i]);
+			phy_exit(pcie->phys[i]);
+		}
+	}
+
+	return 0;
+}
+
+static int armada8k_pcie_resume_noirq(struct device *dev)
+{
+	struct armada8k_pcie *pcie;
+	int i, ret;
+
+	pcie = dev_get_drvdata(dev);
+
+	if (!IS_ERR(pcie->clk)) {
+		ret = clk_prepare_enable(pcie->clk);
+		if (ret) {
+			dev_err(dev, "Failed to enable clock\n");
+			return ret;
+		}
+	}
+
+	/* Power on PHY */
+	for (i = 0; i < pcie->phy_count; i++) {
+		if (pcie->phys[i]) {
+			u32 command;
+			/* Tell COMPHY the PCIE width based on phy command,
+			 * and in PHY command callback, the width will be
+			 * checked for its validation.
+			 */
+			switch (pcie->phy_count) {
+			case PCIE_LNK_X1:
+				command = COMPHY_COMMAND_PCIE_WIDTH_1;
+				break;
+			case PCIE_LNK_X2:
+				command = COMPHY_COMMAND_PCIE_WIDTH_2;
+				break;
+			case PCIE_LNK_X4:
+				command = COMPHY_COMMAND_PCIE_WIDTH_4;
+				break;
+			default:
+				command = COMPHY_COMMAND_PCIE_WIDTH_UNSUPPORT;
+			}
+			phy_send_command(pcie->phys[i], command);
+
+			ret = phy_init(pcie->phys[i]);
+			if (ret < 0)
+				goto err_phy;
+			ret = phy_power_on(pcie->phys[i]);
+			if (ret < 0) {
+				phy_exit(pcie->phys[i]);
+				goto err_phy;
+			}
+		}
+	}
+
+	/* Reset PCIe if it is connected to GPIO */
+	if (pcie->reset_gpio)
+		armada8k_pcie_reset(pcie);
+
+	/* Reinit PCIE host */
+	armada8k_pcie_host_init(&pcie->pp);
+	return 0;
+
+err_phy:
+	while (--i >= 0) {
+		phy_power_off(pcie->phys[i]);
+		phy_exit(pcie->phys[i]);
+	}
+	if (!IS_ERR(pcie->clk))
+		clk_disable_unprepare(pcie->clk);
+
+	return ret;
+}
+
+static const struct dev_pm_ops armada8k_pcie_pm_ops = {
+	.suspend_noirq = armada8k_pcie_suspend_noirq,
+	.resume_noirq = armada8k_pcie_resume_noirq,
+};
+
 static const struct of_device_id armada8k_pcie_of_match[] = {
 	{ .compatible = "marvell,armada8k-pcie", },
 	{},
@@ -372,6 +467,7 @@ static struct platform_driver armada8k_pcie_driver = {
 	.driver = {
 		.name	= "armada8k-pcie",
 		.of_match_table = of_match_ptr(armada8k_pcie_of_match),
+		.pm	= &armada8k_pcie_pm_ops,
 	},
 };
 
