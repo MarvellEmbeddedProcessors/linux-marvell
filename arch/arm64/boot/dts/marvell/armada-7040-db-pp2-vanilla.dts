@@ -146,7 +146,7 @@
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>;
 					port-id = <0>; /* pp2_port_id */
 					gop-port-id = <0>;
-					status = "okay";
+					status = "disabled";
 				};
 				eth1: eth1@020000 {
 					phy-mode = "sgmii"; /* lane-0 */
