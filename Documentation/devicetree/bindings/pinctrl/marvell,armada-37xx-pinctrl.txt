@@ -139,9 +139,13 @@ group ptp_trig
  - pin 58
  - functions ptp, mii
 
+group mii
+ - pin 59
+ - functions mii, gpio
+
 group mii_col
  - pin 59
- - functions mii, mii_err
+ - functions mii_col, mii_err
 
 GPIO subnode:
 
