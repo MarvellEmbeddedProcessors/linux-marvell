@@ -70,6 +70,8 @@
 				bus-width = <4>;
 				no-1-8-v;
 				non-removable; /* For now, need to configure the GPIO for card detect */
+				pinctrl-names = "default";
+				pinctrl-0 = <&ap_emmc_pins>;
 			};
 		};
 	};
@@ -105,6 +107,7 @@
 			};
 			sdhci@780000 {
 				pinctrl-names = "default";
+				pinctrl-0 = <&cpm_sdhci_pins>;
 				bus-width = <4>;
 			};
 			spi@700680 {
