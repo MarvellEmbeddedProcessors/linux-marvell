@@ -34,6 +34,7 @@
 
 #define pr_fmt(fmt) "mvebu-icu: " fmt
 
+#include <linux/cpu_pm.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/irqchip/chained_irq.h>
@@ -46,6 +47,7 @@
 #include <dt-bindings/interrupt-controller/mvebu-icu.h>
 
 #define ICU_MAX_IRQS		208
+#define ICU_MAX_REGS		28
 #define ICU_MAX_SPI_IRQ_IN_GIC	128
 #define ICU_GIC_SPI_BASE0	64
 #define ICU_GIC_SPI_BASE1	288
@@ -74,10 +76,17 @@
 #define ICU_SATA1_IRQ_INT		107
 
 struct mvebu_icu_irq_data {
+	struct list_head node;
 	void __iomem *base;	/* ICU register base */
 	void __iomem *gicp_clr_spi_base;
+
+	u32 *icu_reg;
+	u32 *icu_cfg;
 	struct irq_domain *domain;
 };
+
+/* Global list of devices for suspend and resume (struct mvebu_icu_irq_data) */
+static LIST_HEAD(icu_data_list);
 
 static DEFINE_SPINLOCK(icu_lock);
 static DECLARE_BITMAP(icu_irq_alloc, ICU_MAX_SPI_IRQ_IN_GIC);
@@ -274,6 +283,67 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
 	.free			= mvebu_icu_irq_domain_free,
 };
 
+#ifdef CONFIG_PM_SLEEP
+/* Save ICU generic registers and all ICU interrupt registers */
+static void mvebu_icu_save(void)
+{
+	int reg;
+	int irq;
+	struct mvebu_icu_irq_data *icu;
+
+	list_for_each_entry(icu, &icu_data_list, node) {
+		for (reg = 0; reg < ICU_MAX_REGS; reg++)
+			icu->icu_reg[reg] = readl(icu->base + sizeof(u32) * reg);
+
+		for (irq = 0; irq < ICU_MAX_IRQS; irq++)
+			icu->icu_cfg[irq] = readl(icu->base + ICU_INT_CFG(irq));
+	}
+}
+
+/* Restore ICU generic registers and all ICU interrupt registers */
+static void mvebu_icu_restore(void)
+{
+	int reg;
+	int irq;
+	struct mvebu_icu_irq_data *icu;
+
+	list_for_each_entry(icu, &icu_data_list, node) {
+		for (reg = 0; reg < ICU_MAX_REGS; reg++)
+			writel(icu->icu_reg[reg], icu->base + sizeof(u32) * reg);
+
+		for (irq = 0; irq < ICU_MAX_IRQS; irq++)
+			writel(icu->icu_cfg[irq], icu->base + ICU_INT_CFG(irq));
+	}
+}
+
+static int mvebu_icu_notifier(struct notifier_block *self, unsigned long cmd, void *v)
+{
+	switch (cmd) {
+	case CPU_PM_ENTER:
+		mvebu_icu_save();
+		break;
+	case CPU_PM_ENTER_FAILED:
+	case CPU_PM_EXIT:
+		mvebu_icu_restore();
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block mvebu_icu_notifier_block = {
+	.notifier_call = mvebu_icu_notifier,
+};
+
+static int __init mvebu_icu_pm_init(void)
+{
+	return cpu_pm_register_notifier(&mvebu_icu_notifier_block);
+}
+arch_initcall(mvebu_icu_pm_init);
+#endif
+
 static int __init mvebu_icu_of_init(struct device_node *node, struct device_node *parent)
 {
 	int ret;
@@ -341,6 +411,11 @@ static int __init mvebu_icu_of_init(struct device_node *node, struct device_node
 		if ((icu_int >> ICU_GROUP_OFFSET) == ICU_GRP_NSR)
 			writel(0x0, icu->base + ICU_INT_CFG(i));
 	}
+
+	/* Initialize the ICU structure */
+	icu->icu_reg = kzalloc(sizeof(u32) * ICU_MAX_REGS, GFP_KERNEL);
+	icu->icu_cfg = kzalloc(sizeof(u32) * ICU_MAX_IRQS, GFP_KERNEL);
+	list_add_tail(&icu->node, &icu_data_list);
 
 	pr_debug("ICU irq chip init successfully\n");
 
