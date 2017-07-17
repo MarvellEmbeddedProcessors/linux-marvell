@@ -5828,6 +5828,9 @@ static void mvpp2_link_event(struct net_device *dev)
 	struct mvpp2_port *port = netdev_priv(dev);
 	struct phy_device *phydev = dev->phydev;
 
+	if (!netif_running(dev))
+		return;
+
 	if (phydev->link) {
 		if ((port->speed != phydev->speed) ||
 		    (port->duplex != phydev->duplex)) {
