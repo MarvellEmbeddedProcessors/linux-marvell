@@ -3965,8 +3965,7 @@ int mv_pp2x_open(struct net_device *dev)
 		netdev_err(port->dev, "cannot allocate Tx queues\n");
 		goto err_cleanup_rxqs;
 	}
-	if (!(port->flags & MVPP2_F_IF_MUSDK))
-		err = mv_pp2x_setup_irqs(dev, port);
+	err = mv_pp2x_setup_irqs(dev, port);
 	if (err) {
 		netdev_err(port->dev, "cannot allocate irq's\n");
 		goto err_cleanup_txqs;
@@ -5212,8 +5211,7 @@ skip_tso_buffers:
 	mv_gop110_mib_counters_clear(&port->priv->hw.gop, port->mac_data.gop_index);
 	mv_pp2x_counters_stat_clear(port);
 
-	if (!(port->flags & MVPP2_F_IF_MUSDK))
-		mv_pp2x_port_irq_names_update(port);
+	mv_pp2x_port_irq_names_update(port);
 
 	if (priv->pp2_version == PPV22)
 		port->port_hotplug_nb.notifier_call = mv_pp2x_port_cpu_callback;
