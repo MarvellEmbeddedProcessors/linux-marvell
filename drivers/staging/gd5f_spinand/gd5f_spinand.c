@@ -483,7 +483,6 @@ static int spinand_read_page(struct spi_device *spi_nand, u32 page_id,
 	if (status  == SPI_NAND_ECC_UNABLE_TO_CORRECT) {
 		dev_err(&spi_nand->dev, "ECC error reading page %d.\n",
 			page_id);
-		return -1;
 	}
 
 	/* Read page from internal cache to our buffers */
