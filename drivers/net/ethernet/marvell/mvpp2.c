@@ -347,16 +347,24 @@
 #define     MVPP2_GMAC_FLOW_CTRL_AUTONEG	BIT(11)
 #define     MVPP2_GMAC_CONFIG_FULL_DUPLEX	BIT(12)
 #define     MVPP2_GMAC_AN_DUPLEX_EN		BIT(13)
+#define MVPP2_GMAC_STATUS0			0x10
+#define     MVPP2_GMAC_STATUS0_LINK_UP		BIT(0)
 #define MVPP2_GMAC_PORT_FIFO_CFG_1_REG		0x1c
 #define     MVPP2_GMAC_TX_FIFO_MIN_TH_OFFS	6
 #define     MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK	0x1fc0
 #define     MVPP2_GMAC_TX_FIFO_MIN_TH_MASK(v)	(((v) << 6) & \
 					MVPP2_GMAC_TX_FIFO_MIN_TH_ALL_MASK)
+#define MVPP22_GMAC_INT_STAT			0x20
+#define     MVPP22_GMAC_INT_STAT_LINK		BIT(1)
+#define MVPP22_GMAC_INT_MASK			0x24
+#define     MVPP22_GMAC_INT_MASK_LINK_STAT	BIT(1)
 #define MVPP22_GMAC_CTRL_4_REG			0x90
 #define     MVPP22_CTRL4_EXT_PIN_GMII_SEL	BIT(0)
 #define     MVPP22_CTRL4_DP_CLK_SEL		BIT(5)
 #define     MVPP22_CTRL4_SYNC_BYPASS_DIS	BIT(6)
 #define     MVPP22_CTRL4_QSGMII_BYPASS_ACTIVE	BIT(7)
+#define MVPP22_GMAC_INT_SUM_MASK		0xa4
+#define     MVPP22_GMAC_INT_SUM_MASK_LINK_STAT	BIT(1)
 
 /* Per-port XGMAC registers. PPv2.2 only, only for GOP port 0,
  * relative to port->base.
@@ -366,12 +374,19 @@
 #define     MVPP22_XLG_CTRL0_MAC_RESET_DIS	BIT(1)
 #define     MVPP22_XLG_CTRL0_RX_FLOW_CTRL_EN	BIT(7)
 #define     MVPP22_XLG_CTRL0_MIB_CNT_DIS	BIT(14)
-
+#define MVPP22_XLG_STATUS			0x10c
+#define     MVPP22_XLG_STATUS_LINK_UP		BIT(0)
+#define MVPP22_XLG_INT_STAT			0x114
+#define     MVPP22_XLG_INT_STAT_LINK		BIT(1)
+#define MVPP22_XLG_INT_MASK			0x118
+#define     MVPP22_XLG_INT_MASK_LINK		BIT(1)
 #define MVPP22_XLG_CTRL3_REG			0x11c
 #define     MVPP22_XLG_CTRL3_MACMODESELECT_MASK	(7 << 13)
 #define     MVPP22_XLG_CTRL3_MACMODESELECT_GMAC	(0 << 13)
 #define     MVPP22_XLG_CTRL3_MACMODESELECT_10G	BIT(13)
-
+#define MVPP22_XLG_EXT_INT_MASK			0x15c
+#define     MVPP22_XLG_EXT_INT_MASK_XLG		BIT(1)
+#define     MVPP22_XLG_EXT_INT_MASK_GIG		BIT(2)
 #define MVPP22_XLG_CTRL4_REG			0x184
 #define     MVPP22_XLG_CTRL4_FWD_FC		BIT(5)
 #define     MVPP22_XLG_CTRL4_FWD_PFC		BIT(6)
@@ -838,6 +853,8 @@ struct mvpp2_port {
 	 * of view
 	 */
 	int gop_id;
+
+	int link_irq;
 
 	struct mvpp2 *priv;
 
@@ -4415,6 +4432,63 @@ invalid_conf:
 	return -EINVAL;
 }
 
+static void mvpp22_gop_unmask_irq(struct mvpp2_port *port)
+{
+	u32 val;
+
+	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+		/* Enable the GMAC link status irq for this port */
+		val = readl(port->base + MVPP22_GMAC_INT_SUM_MASK);
+		val |= MVPP22_GMAC_INT_SUM_MASK_LINK_STAT;
+		writel(val, port->base + MVPP22_GMAC_INT_SUM_MASK);
+	}
+
+	/* Enable the XLG/GIG irqs for this port */
+	val = readl(port->base + MVPP22_XLG_EXT_INT_MASK);
+	if (port->gop_id == 0 &&
+	    port->phy_interface == PHY_INTERFACE_MODE_SFI)
+		val |= MVPP22_XLG_EXT_INT_MASK_XLG;
+	else
+		val |= MVPP22_XLG_EXT_INT_MASK_GIG;
+	writel(val, port->base + MVPP22_XLG_EXT_INT_MASK);
+}
+
+static void mvpp22_gop_mask_irq(struct mvpp2_port *port)
+{
+	u32 val;
+
+	val = readl(port->base + MVPP22_XLG_EXT_INT_MASK);
+	val &= ~(MVPP22_XLG_EXT_INT_MASK_XLG |
+			 MVPP22_XLG_EXT_INT_MASK_GIG);
+	writel(val, port->base + MVPP22_XLG_EXT_INT_MASK);
+
+	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+		val = readl(port->base + MVPP22_GMAC_INT_SUM_MASK);
+		val &= ~MVPP22_GMAC_INT_SUM_MASK_LINK_STAT;
+		writel(val, port->base + MVPP22_GMAC_INT_SUM_MASK);
+	}
+}
+
+static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
+{
+	u32 val;
+
+	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+		val = readl(port->base + MVPP22_GMAC_INT_MASK);
+		val |= MVPP22_GMAC_INT_MASK_LINK_STAT;
+		writel(val, port->base + MVPP22_GMAC_INT_MASK);
+	}
+
+	val = readl(port->base + MVPP22_XLG_INT_MASK);
+	val |= MVPP22_XLG_INT_MASK_LINK;
+	writel(val, port->base + MVPP22_XLG_INT_MASK);
+
+	mvpp22_gop_unmask_irq(port);
+}
+
 static void mvpp2_port_mii_gmac_configure_mode(struct mvpp2_port *port)
 {
 	u32 val;
@@ -5694,6 +5768,60 @@ static irqreturn_t mvpp2_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+/* Per-port interrupt for link status changes */
+static irqreturn_t mvpp2_link_status_isr(int irq, void *dev_id)
+{
+	struct mvpp2_port *port = (struct mvpp2_port *)dev_id;
+	struct net_device *dev = port->dev;
+	bool event = false, link = false;
+	u32 val;
+
+	mvpp22_gop_mask_irq(port);
+
+	if (port->gop_id == 0 &&
+	    port->phy_interface == PHY_INTERFACE_MODE_SFI) {
+		val = readl(port->base + MVPP22_XLG_INT_STAT);
+		if (val & MVPP22_XLG_INT_STAT_LINK) {
+			event = true;
+			val = readl(port->base + MVPP22_XLG_STATUS);
+			if (val & MVPP22_XLG_STATUS_LINK_UP)
+				link = true;
+		}
+	} else if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+		   port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
+		val = readl(port->base + MVPP22_GMAC_INT_STAT);
+		if (val & MVPP22_GMAC_INT_STAT_LINK) {
+			event = true;
+			val = readl(port->base + MVPP2_GMAC_STATUS0);
+			if (val & MVPP2_GMAC_STATUS0_LINK_UP)
+				link = true;
+		}
+	}
+
+	if (!netif_running(dev) || !event)
+		goto handled;
+
+	if (link) {
+		mvpp2_interrupts_enable(port);
+
+		mvpp2_egress_enable(port);
+		mvpp2_ingress_enable(port);
+		netif_carrier_on(dev);
+		netif_tx_wake_all_queues(dev);
+	} else {
+		netif_tx_stop_all_queues(dev);
+		netif_carrier_off(dev);
+		mvpp2_ingress_disable(port);
+		mvpp2_egress_disable(port);
+
+		mvpp2_interrupts_disable(port);
+	}
+
+handled:
+	mvpp22_gop_unmask_irq(port);
+	return IRQ_HANDLED;
+}
+
 /* Adjust link */
 static void mvpp2_link_event(struct net_device *dev)
 {
@@ -6577,6 +6705,7 @@ static void mvpp2_irqs_deinit(struct mvpp2_port *port)
 static int mvpp2_open(struct net_device *dev)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
+	struct mvpp2 *priv = port->priv;
 	unsigned char mac_bcast[ETH_ALEN] = {
 			0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	int err;
@@ -6622,6 +6751,18 @@ static int mvpp2_open(struct net_device *dev)
 		goto err_cleanup_txqs;
 	}
 
+	if (priv->hw_version == MVPP22 && !port->phy_node && port->link_irq) {
+		err = request_irq(port->link_irq, mvpp2_link_status_isr, 0,
+				  dev->name, port);
+		if (err) {
+			netdev_err(port->dev, "cannot request link IRQ %d\n",
+				   port->link_irq);
+			goto err_free_irq;
+		}
+
+		mvpp22_gop_setup_irq(port);
+	}
+
 	/* In default link is down */
 	netif_carrier_off(port->dev);
 
@@ -6633,6 +6774,8 @@ static int mvpp2_open(struct net_device *dev)
 
 	return 0;
 
+err_free_irq:
+	mvpp2_irqs_deinit(port);
 err_cleanup_txqs:
 	mvpp2_cleanup_txqs(port);
 err_cleanup_rxqs:
@@ -7332,6 +7475,15 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	err = mvpp2_queue_vectors_init(port, port_node);
 	if (err)
 		goto err_free_netdev;
+
+	port->link_irq = of_irq_get_byname(port_node, "link");
+	if (port->link_irq == -EPROBE_DEFER) {
+		err = -EPROBE_DEFER;
+		goto err_deinit_qvecs;
+	}
+	if (port->link_irq <= 0)
+		/* the link irq is optional */
+		port->link_irq = 0;
 
 	if (of_property_read_bool(port_node, "marvell,loopback"))
 		port->flags |= MVPP2_F_LOOPBACK;
