@@ -392,6 +392,7 @@ struct mvneta_pcpu_port {
 };
 
 #define MVNETA_PORT_F_CLEANUP_TIMER_BIT  0
+#define MVNETA_PORT_F_IF_MUSDK           2
 
 struct mvneta_port {
 	u8 id;
@@ -3814,6 +3815,13 @@ static int mvneta_open(struct net_device *dev)
 	struct mvneta_port *pp = netdev_priv(dev);
 	int ret;
 
+	if (pp->flags & MVNETA_PORT_F_IF_MUSDK) {
+		if (!pp->use_inband_status)
+			phy_start(pp->phy_dev);
+		netdev_warn(dev, "skipping ndo_open as this port is User Space port\n");
+		return 0;
+	}
+
 	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
 	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
 	                SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
@@ -3892,6 +3900,23 @@ static int mvneta_stop(struct net_device *dev)
 	mvneta_cleanup_rxqs(pp);
 	mvneta_cleanup_txqs(pp);
 
+	return 0;
+}
+
+int mvneta_dummy_stop(struct net_device *dev)
+{
+	netdev_warn(dev, "ndo_stop not supported\n");
+	return 0;
+}
+
+static int mvneta_dummy_tx(struct sk_buff *skb, struct net_device *dev)
+{
+	return NETDEV_TX_OK;
+}
+
+static int mvneta_dummy_change_mtu(struct net_device *dev, int mtu)
+{
+	netdev_warn(dev, "ndo_change_mtu not supported\n");
 	return 0;
 }
 
@@ -4499,6 +4524,35 @@ const struct ethtool_ops mvneta_eth_tool_ops = {
 	.self_test	= mvneta_ethtool_diag_test,
 };
 
+static const struct net_device_ops mvneta_non_kernel_netdev_ops = {
+	.ndo_open            = mvneta_open,
+	.ndo_stop            = mvneta_dummy_stop,
+	.ndo_start_xmit      = mvneta_dummy_tx,
+	.ndo_set_rx_mode     = mvneta_set_rx_mode,
+	.ndo_set_mac_address = mvneta_set_mac_addr,
+	.ndo_change_mtu      = mvneta_dummy_change_mtu,
+	.ndo_fix_features    = mvneta_fix_features,
+	.ndo_get_stats64     = mvneta_get_stats64,
+	.ndo_do_ioctl        = mvneta_ioctl,
+};
+
+const struct ethtool_ops mvneta_non_kernel_eth_tool_ops = {
+	.get_link       = ethtool_op_get_link,
+	.get_settings   = mvneta_ethtool_get_settings,
+	.get_drvinfo    = mvneta_ethtool_get_drvinfo,
+	.get_strings	= mvneta_ethtool_get_strings,
+	.get_ethtool_stats = mvneta_ethtool_get_stats,
+	.get_sset_count	= mvneta_ethtool_get_sset_count,
+	.get_rxfh_indir_size = mvneta_ethtool_get_rxfh_indir_size,
+	.get_rxnfc	= mvneta_ethtool_get_rxnfc,
+	.get_rxfh	= mvneta_ethtool_get_rxfh,
+	.set_rxfh	= mvneta_ethtool_set_rxfh,
+	.get_regs_len	= mvneta_ethtool_get_regs_len,
+	.get_regs	= mvneta_ethtool_get_regs,
+	.nway_reset	= mvneta_ethtool_nway_reset,
+	.self_test	= mvneta_ethtool_diag_test,
+};
+
 /* Initialize hw */
 static int mvneta_init(struct device *dev, struct mvneta_port *pp)
 {
@@ -4649,6 +4703,8 @@ static int mvneta_probe(struct platform_device *pdev)
 	int phy_mode;
 	int err;
 	int cpu;
+	const char *musdk_status;
+	int statlen;
 
 	dev = alloc_etherdev_mqs(sizeof(struct mvneta_port), txq_number, rxq_number);
 	if (!dev)
@@ -4749,6 +4805,17 @@ static int mvneta_probe(struct platform_device *pdev)
 		goto err_clk;
 	}
 
+	/* check MUSDK port status */
+	musdk_status = of_get_property(dn, "musdk-status", &statlen);
+
+	/* Set musdk_flag, only if status is "private" */
+	if (musdk_status && !strcmp(musdk_status, "private")) {
+		pp->flags |= MVNETA_PORT_F_IF_MUSDK;
+		/* overwrite mvneta_netdev_ops and mvneta_eth_tool_ops */
+		dev->netdev_ops = &mvneta_non_kernel_netdev_ops;
+		dev->ethtool_ops = &mvneta_non_kernel_eth_tool_ops;
+	}
+
 	/* Alloc per-cpu port structure */
 	pp->ports = alloc_percpu(struct mvneta_pcpu_port);
 	if (!pp->ports) {
@@ -4812,7 +4879,7 @@ static int mvneta_probe(struct platform_device *pdev)
 
 	/* Obtain access to BM resources if enabled and already initialized */
 	bm_node = of_parse_phandle(dn, "buffer-manager", 0);
-	if (bm_node && bm_node->data) {
+	if (bm_node && bm_node->data && !(pp->flags & MVNETA_PORT_F_IF_MUSDK)) {
 		pp->bm_priv = bm_node->data;
 		err = mvneta_bm_port_init(pdev, pp);
 		if (err < 0) {
@@ -4834,16 +4901,18 @@ static int mvneta_probe(struct platform_device *pdev)
 	/* Armada3700 network controller does not support per-cpu
 	 * operation, so only single NAPI should be initialized.
 	 */
-	if (pp->neta_armada3700) {
-		netif_napi_add(dev, &pp->napi, mvneta_poll, NAPI_POLL_WEIGHT);
-	} else {
-		for_each_present_cpu(cpu) {
-			struct mvneta_pcpu_port *port =
-						    per_cpu_ptr(pp->ports, cpu);
+	if (!(pp->flags & MVNETA_PORT_F_IF_MUSDK)) {
+		if (pp->neta_armada3700) {
+			netif_napi_add(dev, &pp->napi, mvneta_poll, NAPI_POLL_WEIGHT);
+		} else {
+			for_each_present_cpu(cpu) {
+				struct mvneta_pcpu_port *port =
+							    per_cpu_ptr(pp->ports, cpu);
 
-			netif_napi_add(dev, &port->napi, mvneta_poll,
-				       NAPI_POLL_WEIGHT);
-			port->pp = pp;
+				netif_napi_add(dev, &port->napi, mvneta_poll,
+					       NAPI_POLL_WEIGHT);
+				port->pp = pp;
+			}
 		}
 	}
 
@@ -4871,10 +4940,14 @@ static int mvneta_probe(struct platform_device *pdev)
 
 		put_device(&phy->mdio.dev);
 	}
-	/* Initialize cleanup */
-	init_timer(&pp->cleanup_timer);
-	pp->cleanup_timer.function = mvneta_cleanup_timer_callback;
-	pp->cleanup_timer.data = (unsigned long)pp;
+
+	if (!(pp->flags & MVNETA_PORT_F_IF_MUSDK)) {
+		/* Initialize cleanup */
+		init_timer(&pp->cleanup_timer);
+		pp->cleanup_timer.function = mvneta_cleanup_timer_callback;
+		pp->cleanup_timer.data = (unsigned long)pp;
+	} else
+		netdev_info(dev, "Port belong to User Space (MUSDK)\n");
 
 	if (!pp->use_inband_status) {
 		err = mvneta_mdio_probe(pp);
