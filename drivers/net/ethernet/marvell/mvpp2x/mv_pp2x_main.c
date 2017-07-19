@@ -2002,11 +2002,10 @@ static void mv_pp2x_tx_send_proc_cb(unsigned long data)
 
 	aggr_txq = &priv->aggr_txqs[cpu];
 
-	if (likely(aggr_txq->xmit_bulk > 0)) {
-		aggr_txq->sw_count -= aggr_txq->xmit_bulk;
-		aggr_txq->hw_count += aggr_txq->xmit_bulk;
-		mv_pp2x_write(&priv->hw, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->xmit_bulk);
-		aggr_txq->xmit_bulk = 0;
+	if (likely(aggr_txq->sw_count > 0)) {
+		aggr_txq->hw_count += aggr_txq->sw_count;
+		mv_pp2x_write(&priv->hw, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->sw_count);
+		aggr_txq->sw_count = 0;
 	}
 }
 
@@ -3101,14 +3100,12 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	}
 
 	aggr_txq->sw_count += total_desc_num;
-	aggr_txq->xmit_bulk += total_desc_num;
 
 	if (!skb->xmit_more) {
 		/* Transmit TCP segment with bulked descriptors and cancel tx hr timer if exist */
-		aggr_txq->sw_count -= aggr_txq->xmit_bulk;
-		aggr_txq->hw_count += aggr_txq->xmit_bulk;
-		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
-		aggr_txq->xmit_bulk = 0;
+		aggr_txq->hw_count += aggr_txq->sw_count;
+		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count);
+		aggr_txq->sw_count = 0;
 		mv_pp2x_tx_timer_kill(cp_pcpu);
 	}
 
@@ -3336,7 +3333,6 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	}
 	txq_pcpu->reserved_num -= frags;
 	aggr_txq->sw_count += frags;
-	aggr_txq->xmit_bulk += frags;
 
 #ifdef CONFIG_MV_PTP_SERVICE
 	/* If packet is PTP add Time-Stamp request into the tx_desc */
@@ -3357,12 +3353,11 @@ out:
 		u64_stats_update_end(&stats->syncp);
 	} else {
 		/* Transmit bulked descriptors*/
-		if (aggr_txq->xmit_bulk > 0) {
+		if (aggr_txq->sw_count > 0) {
 			mv_pp2x_tx_timer_kill(cp_pcpu);
-			aggr_txq->sw_count -= aggr_txq->xmit_bulk;
-			aggr_txq->hw_count += aggr_txq->xmit_bulk;
-			mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
-			aggr_txq->xmit_bulk = 0;
+			aggr_txq->hw_count += aggr_txq->sw_count;
+			mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count);
+			aggr_txq->sw_count = 0;
 		}
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
@@ -3701,10 +3696,9 @@ static void mv_pp2x_trans_aggr_txq(void *arg)
 	struct mv_pp2x_aggr_tx_queue *aggr_txq = &port->priv->aggr_txqs[cpu];
 
 	mv_pp2x_tx_timer_kill(cp_pcpu);
-	aggr_txq->sw_count -= aggr_txq->xmit_bulk;
-	aggr_txq->hw_count += aggr_txq->xmit_bulk;
-	mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
-	aggr_txq->xmit_bulk = 0;
+	aggr_txq->hw_count += aggr_txq->sw_count;
+	mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count);
+	aggr_txq->sw_count = 0;
 }
 
 /* Set hw internals when stopping port */
@@ -4949,10 +4943,9 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 		cp_pcpu = per_cpu_ptr(port->priv->pcpu, cpu);
 		aggr_txq = &port->priv->aggr_txqs[cpu];
 		mv_pp2x_tx_timer_kill(cp_pcpu);
-		aggr_txq->sw_count -= aggr_txq->xmit_bulk;
-		aggr_txq->hw_count += aggr_txq->xmit_bulk;
-		mv_pp22_thread_write(&port->priv->hw, cpu, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->xmit_bulk);
-		aggr_txq->xmit_bulk = 0;
+		aggr_txq->hw_count += aggr_txq->sw_count;
+		mv_pp22_thread_write(&port->priv->hw, cpu, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->sw_count);
+		aggr_txq->sw_count = 0;
 	}
 
 	return NOTIFY_OK;
