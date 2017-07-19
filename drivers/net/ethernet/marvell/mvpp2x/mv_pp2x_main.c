@@ -4944,7 +4944,8 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 		if (port->priv->pp2xdata->interrupt_tx_done)
 			on_each_cpu_mask(&cpus_mask, mv_pp2x_tx_done_pkts_coal_set, port, 1);
 		break;
-	case CPU_DOWN_PREPARE:
+	case CPU_DEAD:
+	case CPU_DEAD_FROZEN:
 		cp_pcpu = per_cpu_ptr(port->priv->pcpu, cpu);
 		aggr_txq = &port->priv->aggr_txqs[cpu];
 		mv_pp2x_tx_timer_kill(cp_pcpu);
