@@ -3692,6 +3692,21 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	}
 }
 
+/* Clear aggregated TXQ and kill transmit hrtimer */
+static void mv_pp2x_trans_aggr_txq(void *arg)
+{
+	struct mv_pp2x_port *port = arg;
+	struct mv_pp2x_cp_pcpu *cp_pcpu = this_cpu_ptr(port->priv->pcpu);
+	int cpu = smp_processor_id();
+	struct mv_pp2x_aggr_tx_queue *aggr_txq = &port->priv->aggr_txqs[cpu];
+
+	mv_pp2x_tx_timer_kill(cp_pcpu);
+	aggr_txq->sw_count -= aggr_txq->xmit_bulk;
+	aggr_txq->hw_count += aggr_txq->xmit_bulk;
+	mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->xmit_bulk);
+	aggr_txq->xmit_bulk = 0;
+}
+
 /* Set hw internals when stopping port */
 void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 {
@@ -3705,6 +3720,9 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 
 	/* Disable interrupts on all CPUs */
 	mv_pp2x_port_interrupts_disable(port);
+
+	/* Drain aggregated TXQ on all CPU's */
+	on_each_cpu(mv_pp2x_trans_aggr_txq, port, 1);
 
 	mv_pp2x_port_napi_disable(port);
 
