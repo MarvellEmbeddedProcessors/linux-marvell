@@ -1,0 +1,151 @@
+/*
+ * Copyright (C) 2017 Marvell Technology Group Ltd.
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPLv2 or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This library is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This library is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ * Device Tree file for OCP Armada 8040 board platform
+ */
+
+#include "armada-8040.dtsi"
+
+/ {
+	model = "Armada 8040 OCP";
+	compatible = "marvell,armada8040-ocp", "marvell,armada8040",
+			"marvell,armada-ap806-quad", "marvell,armada-ap806";
+
+	memory@00000000 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	ap806 {
+		config-space {
+			serial@512000 {
+				status = "okay";
+			};
+			sdhci@6e0000 {
+				vqmmc-supply = <&vccq_mmc_reg>;
+				bus-width = <8>;
+				no-1-8-v;
+				non-removable;
+				marvell,xenon-emmc;
+				status = "okay";
+			};
+			vccq_mmc_reg: regulator@0 {
+				compatible = "regulator-fixed";
+				regulator-name = "vccq-mmc-reg";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+				status = "okay";
+			};
+		};
+	};
+
+	cpn-110-master {
+		config-space {
+			comphy0: comphy {
+				status = "okay";
+			};
+			i2c@701000 {
+				clock-frequency = <100000>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&cpm_i2c0_pins>;
+				status = "disabled";
+			};
+			gop {
+				emac0_0: mac0 {
+					phys = <&comphy0 4 COMPHY_SFI>;
+					phy-names = "comphy";
+					phy-mode = "sfi"; /* lane-4 */
+				};
+				emac2_0: mac2 {
+					phy-mode = "none";
+				};
+				emac3_0: mac3 {
+					phy-mode = "none";
+				};
+			};
+			ppv22@000000 {
+				l4_chksum_jumbo_port = <0>;
+				pinctrl-names = "default";
+				eth0_0: eth0@010000 {
+					status = "okay";
+				};
+			};
+		};
+	};
+
+	cpn-110-slave {
+		config-space {
+			comphy1: comphy {
+				status = "okay";
+			};
+			gop {
+				emac0_1: mac0 {
+					phys = <&comphy0 4 COMPHY_SFI>;
+					phy-names = "comphy";
+					phy-mode = "sfi"; /* lane-4 */
+				};
+				emac2_1: mac2 {
+					phy-mode = "none";
+				};
+				emac3_1: mac3 {
+					phy-mode = "none";
+				};
+			};
+			ppv22@000000 {
+				l4_chksum_jumbo_port = <0>;
+				pinctrl-names = "default";
+				eth0_1: eth0@010000 {
+					status = "okay";
+				};
+				eth1_1: eth1@020000 {
+					status = "disabled";
+				};
+				eth2_1: eth2@030000 {
+					status = "disabled";
+				};
+			};
+		};
+	};
+};
+

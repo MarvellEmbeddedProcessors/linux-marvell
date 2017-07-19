@@ -71,6 +71,9 @@ Boards:
    - "marvell,armada8040-mcbin"
       when the board being used is the MACCHIATOBin community board
 
+   - "marvell,armada8040-ocp"
+      when the board being used is the OCP board
+
 Example:
 
 compatible = "marvell,armada7040-db-router", "marvell,armada7040-db-nand", "marvell,armada7040-db-all-pcie", "marvell,armada7040-pd",
