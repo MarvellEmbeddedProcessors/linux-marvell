@@ -265,7 +265,6 @@ struct snd_queue {
 	u64		*skbuff;
 	void		*desc;
 
-#define	TSO_HEADER_SIZE	128
 	/* For TSO segment's header */
 	char		*tso_hdrs;
 	dma_addr_t	tso_hdrs_phys;
