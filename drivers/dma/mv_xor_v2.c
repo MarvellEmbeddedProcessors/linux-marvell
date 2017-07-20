@@ -723,7 +723,7 @@ static void mv_xor_v2_tasklet(unsigned long data)
 	/* Release the channel */
 	spin_unlock_bh(&xor_dev->sw_ll_lock);
 
-	/* get thepending descriptors parameters */
+	/* get the pending descriptors parameters */
 	num_of_pending = mv_xor_v2_get_pending_params(xor_dev, &pending_ptr);
 
 	/* loop over free descriptors */
@@ -779,7 +779,7 @@ static void mv_xor_v2_tasklet(unsigned long data)
 	}
 
 	if (num_of_pending != 0) {
-		/* free the descriptores */
+		/* free the descriptors */
 		mv_xor_v2_free_desc_from_desq(xor_dev, num_of_pending);
 	}
 }
