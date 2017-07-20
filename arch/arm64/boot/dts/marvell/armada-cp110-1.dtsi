@@ -91,6 +91,7 @@ usb3h0_1: usb3@500000 {
 	dma-coherent;
 	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 22>;
+	needs-reset-on-resume;
 	status = "disabled";
 };
 
@@ -100,6 +101,7 @@ usb3h1_1: usb3@510000 {
 	dma-coherent;
 	interrupts = <ICU_GRP_NSR 105 IRQ_TYPE_LEVEL_HIGH>;
 	clocks = <&cps_syscon0 1 23>;
+	needs-reset-on-resume;
 	status = "disabled";
 };
 
