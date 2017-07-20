@@ -154,7 +154,7 @@
 				status = "okay";
 
 				pinctrl-names = "default";
-				pinctrl-0 = <&sdio_pins &cd_pins>;
+				pinctrl-0 = <&sdio_pins>;
 			};
 
 			sata@e0000 {
@@ -225,6 +225,8 @@
 };
 
 &pcie0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie_pins>;
 	status = "okay";
 	phys = <&a3700_comphy 1 COMPHY_PCIE0>;
 	phy-names = "comphy";
