@@ -120,8 +120,12 @@ group rgmii
  - functions mii, gpio
 
 group pcie1
- - pins 39-40
+ - pins 39-41
  - functions pcie, gpio
+
+group smi
+ - pins 54-55
+ - functions smi, gpio
 
 group ptp
  - pins 56-58
