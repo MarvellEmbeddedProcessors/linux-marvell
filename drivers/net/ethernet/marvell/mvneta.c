@@ -2324,6 +2324,9 @@ err_drop_frame:
 			continue;
 		}
 
+		/* Prefetch header */
+		prefetch(data);
+
 		if (rx_bytes <= rx_copybreak) {
 			/* better copy a small frame and not unmap the DMA region */
 			skb = napi_alloc_skb(napi, rx_bytes);
@@ -4923,7 +4926,6 @@ static int mvneta_probe(struct platform_device *pdev)
 			goto err_netdev;
 		}
 	}
-
 	return 0;
 
 err_netdev:
