@@ -991,7 +991,7 @@ void mv_pp2x_prs_mac_multi_set(struct mv_pp2x_hw *hw, int port, int index,
 					   MVPP2_PRS_RI_L2_CAST_MASK);
 
 		/* Update tcam entry data first byte */
-		mv_pp2x_prs_tcam_data_byte_set(&pe, 0, da_mc, 0xff);
+		mv_pp2x_prs_tcam_data_byte_set(&pe, 0, da_mc, da_mc);
 
 		/* Shift to ethertype */
 		mv_pp2x_prs_sram_shift_set(&pe, 2 * ETH_ALEN,
