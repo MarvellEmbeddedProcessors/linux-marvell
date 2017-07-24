@@ -2204,7 +2204,7 @@ err_drop_frame:
 			if (err) {
 				/* set refill stop flag */
 				atomic_set(&rxq->refill_stop, 1);
-				netdev_err(dev, "Linux processing - Can't refill queue %d\n",
+				netdev_dbg(dev, "Linux processing - Can't refill queue %d\n",
 					   rxq->id);
 				/* disable rx_copybreak mode */
 				/* to prevent hidden buffer refill and buffers disorder */
@@ -3382,12 +3382,15 @@ static int mvneta_check_mtu_valid(struct net_device *dev, int mtu)
 		return -EINVAL;
 	}
 
-	if (MVNETA_RX_PKT_SIZE(mtu) > pp->pool_long->pkt_size) {
-		netdev_info(dev, "Illegal MTU value %d\n", mtu);
-		mtu = pp->pool_long->pkt_size -
-		      (MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + ETH_HLEN + ETH_FCS_LEN);
-		netdev_info(dev, "Round to %d to fit in buffer size %d\n",
-			    mtu, pp->pool_long->pkt_size);
+	if (pp->bm_priv) {
+		/* HWBM case. MTU can't be larger than buffers in Long pool */
+		if (MVNETA_RX_PKT_SIZE(mtu) > pp->pool_long->pkt_size) {
+			netdev_info(dev, "Illegal MTU value %d\n", mtu);
+			mtu = pp->pool_long->pkt_size -
+			      (MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + ETH_HLEN + ETH_FCS_LEN);
+			netdev_info(dev, "Round to %d to fit in buffer size %d\n",
+				    mtu, pp->pool_long->pkt_size);
+		}
 	}
 
 	if (!IS_ALIGNED(MVNETA_RX_PKT_SIZE(mtu), 8)) {
