@@ -787,15 +787,6 @@ int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios)
 	return ret;
 }
 
-void xenon_clean_phy(struct sdhci_host *host)
-{
-	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-	struct xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
-
-	devm_kfree(mmc_dev(host->mmc), priv->phy_params); /* Ken Ma */
-	/* kfree(priv->phy_params); ORIG */
-}
-
 static int xenon_add_phy(struct device_node *np, struct sdhci_host *host,
 			 const char *phy_name)
 {
@@ -820,11 +811,7 @@ static int xenon_add_phy(struct device_node *np, struct sdhci_host *host,
 	if (ret)
 		return ret;
 
-	ret = xenon_emmc_phy_parse_param_dt(host, np, priv->phy_params);
-	if (ret)
-		xenon_clean_phy(host);
-
-	return ret;
+	return xenon_emmc_phy_parse_param_dt(host, np, priv->phy_params);
 }
 
 int xenon_phy_parse_dt(struct device_node *np, struct sdhci_host *host)
