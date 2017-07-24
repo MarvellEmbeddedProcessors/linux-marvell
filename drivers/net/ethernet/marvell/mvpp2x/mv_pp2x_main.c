@@ -3340,8 +3340,16 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 #endif
 
 	/* Start 50 microseconds timer to transmit */
-	if (!skb->xmit_more)
-		mv_pp2x_tx_timer_set(cp_pcpu);
+	if (!skb->xmit_more) {
+		if (skb->hash == MVPP2_UNIQUE_HASH) {
+			mv_pp2x_tx_timer_set(cp_pcpu);
+		} else {
+			mv_pp2x_tx_timer_kill(cp_pcpu);
+			aggr_txq->hw_count += aggr_txq->sw_count;
+			mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count);
+			aggr_txq->sw_count = 0;
+		}
+	}
 
 out:
 	if (likely(frags > 0)) {
