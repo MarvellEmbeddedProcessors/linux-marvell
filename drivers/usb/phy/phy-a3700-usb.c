@@ -99,35 +99,21 @@ struct a3700_otg {
 	(IRQF_SHARED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | \
 		IRQF_ONESHOT)
 
-static int a3700_otg_start_host(struct a3700_otg *mvotg, int on)
+static void a3700_otg_start_host(struct a3700_otg *mvotg, int on)
 {
 	struct usb_hcd *hcd;
 	struct usb_otg *otg = mvotg->phy.otg;
-	int ret;
 
 	if (!otg->host)
-		return -EINVAL;
+		return;
 
 	dev_dbg(mvotg->dev, "%s, %s\n", __func__, on ? "on":"off");
 
 	hcd = bus_to_hcd(otg->host);
 
 	if (on) {
-		/*
-		 * Sometimes host controller cannot read status (likes STS_HALT)
-		 * during USB DoK plug/unplugged quickly and repeated. Mostly this
-		 * case occurs in function xhci_handshake() and return -ETIMEDOUT.
-		 * If don't handle this case in here, will be oops while calling
-		 * usb_remove_hcd. Just return and will be handled by caller.
-		 */
-		ret = usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
-		if (ret < 0)
-			return ret;
-		ret = usb_add_hcd(hcd->shared_hcd, hcd->irq, IRQF_SHARED);
-		if (ret < 0) {
-			usb_remove_hcd(hcd);
-			return ret;
-		}
+		usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
+		usb_add_hcd(hcd->shared_hcd, hcd->irq, IRQF_SHARED);
 		device_wakeup_enable(hcd->self.controller);
 	} else {
 		/*
@@ -158,7 +144,6 @@ static int a3700_otg_start_host(struct a3700_otg *mvotg, int on)
 				dev_err(mvotg->dev, "Failed to disable power\n");
 		}
 	}
-	return 0;
 }
 
 static void a3700_otg_start_periphrals(struct a3700_otg *mvotg, int on)
@@ -202,7 +187,6 @@ void a3700_otg_disable_irq(struct a3700_otg *mvotg)
 static void a3700_otg_work(struct work_struct *work)
 {
 	struct a3700_otg *mvotg;
-	int ret = 0;
 
 	mvotg = container_of(to_delayed_work(work), struct a3700_otg, work);
 
@@ -210,7 +194,7 @@ static void a3700_otg_work(struct work_struct *work)
 	case USB_PORT_IDLE:
 		if (mvotg->port_state == USB_HOST_ATTACHED) {
 			dev_dbg(mvotg->dev, "moving to host mode\n");
-			ret = a3700_otg_start_host(mvotg, 1);
+			a3700_otg_start_host(mvotg, 1);
 		} else if (mvotg->port_state == USB_DEVICE_ATTACHED) {
 			dev_dbg(mvotg->dev, "moving to device mode\n");
 			a3700_otg_start_periphrals(mvotg, 1);
@@ -219,7 +203,6 @@ static void a3700_otg_work(struct work_struct *work)
 	case USB_HOST_ATTACHED:
 		if (mvotg->port_state == USB_PORT_IDLE) {
 			dev_dbg(mvotg->dev, "moving to idle mode\n");
-			/* always success for host stop */
 			a3700_otg_start_host(mvotg, 0);
 		}
 		break;
@@ -233,10 +216,7 @@ static void a3700_otg_work(struct work_struct *work)
 		dev_dbg(mvotg->dev, "wrong state.\n");
 		break;
 	}
-
-	/* transfer state machine for success only */
-	if (!ret)
-		mvotg->old_state = mvotg->port_state;
+	mvotg->old_state = mvotg->port_state;
 }
 
 static void a3700_static_host_work(struct work_struct *work)
