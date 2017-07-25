@@ -82,6 +82,12 @@
 
 	cpn-110-master {
 		config-space {
+			pinctrl@440000 {
+				xhci0_vbus_pins: xhci0-vbus-pins {
+					marvell,pins = "mpp47";
+					marvell,function = "gpio";
+				};
+			};
 			comphy0: comphy {
 				status = "okay";
 			};
@@ -111,6 +117,17 @@
 					status = "okay";
 				};
 			};
+			reg_usb3h0_vbus: usb3-vbus0 {
+				compatible = "regulator-fixed";
+				pinctrl-names = "default";
+				pinctrl-0 = <&xhci0_vbus_pins>;
+				regulator-name = "reg-usb3h0-vbus";
+				regulator-min-microvolt = <5000000>;
+				regulator-max-microvolt = <5000000>;
+				enable-active-high;
+				gpio = <&cpm_gpio1 15 GPIO_ACTIVE_HIGH>;
+				status = "okay";
+			};
 		};
 	};
 
@@ -118,6 +135,14 @@
 		config-space {
 			comphy1: comphy {
 				status = "okay";
+			};
+			usb3h0_1: usb3@500000 {
+				usb-phy = <&usb3h0_phy>;
+				status = "okay";
+			};
+			usb3h0_phy: usb3_phy0 {
+				compatible = "usb-nop-xceiv";
+				vcc-supply = <&reg_usb3h0_vbus>;
 			};
 			gop {
 				emac0_1: mac0 {
