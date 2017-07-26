@@ -2144,8 +2144,17 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
 
 err_drop_frame:
 			dev->stats.rx_errors++;
-			/* leave the descriptor untouched */
-			rx_filled++;
+			if (atomic_read(&rxq->refill_stop)) {
+				/* refill already stopped - free skb */
+				rx_desc->buf_cookie = 0;
+				atomic_inc(&rxq->missed);
+				dma_unmap_single(dev->dev.parent, phys_addr - pp->rx_offset_correction,
+						 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+				mvneta_frag_free(pp->frag_size, data);
+			} else {
+				/* leave the descriptor untouched */
+				rx_filled++;
+			}
 			continue;
 		}
 
