@@ -53,7 +53,6 @@ enum port_status {
 	USB_PORT_IDLE,
 	USB_HOST_ATTACHED,
 	USB_DEVICE_ATTACHED,
-	USB_BOUNCING,
 };
 
 enum usb_mode {
@@ -230,10 +229,6 @@ static void a3700_otg_work(struct work_struct *work)
 			a3700_otg_start_periphrals(mvotg, 0);
 		}
 		break;
-	case USB_BOUNCING:
-		if (mvotg->port_state == USB_PORT_IDLE)
-			dev_dbg(mvotg->dev, "moving to idle mode\n");
-		break;
 	default:
 		dev_dbg(mvotg->dev, "wrong state.\n");
 		break;
@@ -358,17 +353,12 @@ static irqreturn_t a3700_usb_id_isr(int irq, void *data)
 	switch (mvotg->port_state) {
 	case USB_PORT_IDLE:
 		dev_dbg(mvotg->dev, "current state USB_PORT_IDLE!\n");
-		if (test_bit(USB_HOST_MODE_ACT_OFF, reg_val)
-			&& !test_bit(USB_HOST_MODE_DEACT_OFF, reg_val)
-			&& (usb_id == USB_ID_HOST)) {
+		if (test_bit(USB_HOST_MODE_ACT_OFF, reg_val) && (usb_id == USB_ID_HOST)) {
 			mvotg->port_state = USB_HOST_ATTACHED;
 		} else if (test_bit(USB_DEVICE_MODE_ACT_OFF, reg_val)
 			&& !test_bit(USB_DEVICE_MODE_DEACT_OFF, reg_val)
 			&& usb_id == USB_ID_DEVICE) {
 			mvotg->port_state = USB_DEVICE_ATTACHED;
-		} else if (test_bit(USB_DEVICE_MODE_ACT_OFF, reg_val)
-			&& test_bit(USB_DEVICE_MODE_DEACT_OFF, reg_val)) {
-			mvotg->port_state = USB_BOUNCING;
 		}
 		break;
 	case USB_HOST_ATTACHED:
@@ -379,11 +369,6 @@ static irqreturn_t a3700_usb_id_isr(int irq, void *data)
 	case USB_DEVICE_ATTACHED:
 		dev_dbg(mvotg->dev, "current state USB_DEVICE_ATTACHED!\n");
 		if (test_bit(USB_DEVICE_MODE_DEACT_OFF, reg_val))
-			mvotg->port_state = USB_PORT_IDLE;
-		break;
-	case USB_BOUNCING:
-		dev_dbg(mvotg->dev, "current state USB_BOUNCING!\n");
-		if (test_bit(USB_HOST_MODE_DEACT_OFF, reg_val))
 			mvotg->port_state = USB_PORT_IDLE;
 		break;
 	default:
