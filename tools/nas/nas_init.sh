@@ -22,6 +22,7 @@ mdadm blockdev cryptsetup"
 : ${MNT_DIR:="/mnt/public"}
 : ${BOND_IF:="bond0"}
 : ${IP_ADDR:="192.168.0.5"}
+: ${IF_MTU:="1500"}
 : ${IP_MASK:="255.255.255.0"}
 : ${CRYPTO_NAME:="cryptovol1"}
 : ${KEY_SIZE:="192"}
@@ -351,6 +352,7 @@ echo -ne "    IPv4:\t\t$IP_ADDR\n"
 echo -ne "    Netmask:\t\t$IP_MASK\n"
 [ "$LINK_NUM" -gt 1 ] && echo -ne "    Bond:\t\t$BOND_IF\n"
 [ -n "$ETH_IFS" ] && echo -ne "    Interfaces:\t\t$ETH_IFS\n"
+echo -ne "    MTU:\t\t$IF_MTU\n"
 echo -ne "    drives:\t\t$DRIVES\n"
 echo -ne "    partition size:\t$PART_SIZE\n"
 echo -ne "    Page Size:\t\t$LARGE_PAGE\n"
@@ -633,11 +635,11 @@ else
 		ifconfig ${BOND_IF} ${IP_ADDR} netmask ${IP_MASK} down
 		echo layer2+3    > /sys/class/net/${BOND_IF}/bonding/xmit_hash_policy
 		echo balance-xor > /sys/class/net/${BOND_IF}/bonding/mode
-		ifconfig ${BOND_IF} up
+		ifconfig ${BOND_IF} mtu ${IF_MTU} up
 
 		ifenslave ${BOND_IF} ${ETH_IFS}
 	else
-		ifconfig ${ETH_IFS} ${IP_ADDR} netmask ${IP_MASK} up
+		ifconfig ${ETH_IFS} ${IP_ADDR} netmask ${IP_MASK} mtu ${IF_MTU} up
 	fi
 
 	set +o verbose
