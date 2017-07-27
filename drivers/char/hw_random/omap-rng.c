@@ -479,7 +479,9 @@ err_register:
 	if (!IS_ERR(priv->clk))
 		clk_disable_unprepare(priv->clk);
 err_ioremap:
-	dev_err(dev, "initialization failed.\n");
+	if (ret != -EPROBE_DEFER)
+		dev_err(dev, "initialization failed.\n");
+
 	return ret;
 }
 
