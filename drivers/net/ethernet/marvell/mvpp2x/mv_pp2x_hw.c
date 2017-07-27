@@ -4153,6 +4153,12 @@ void mv_pp2x_egress_enable(struct mv_pp2x_port *port)
 	int tx_port_num = mv_pp2x_egress_port(port);
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 
+	/* Don't do nothing for MUSDK ports since MUSDK manages
+	 * its own queues
+	 */
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		return;
+
 	/* Enable all initialized TXs. */
 	qmap = 0;
 	for (queue = 0; queue < port->num_tx_queues; queue++) {
@@ -4177,6 +4183,12 @@ void mv_pp2x_egress_disable(struct mv_pp2x_port *port)
 	int delay;
 	int tx_port_num = mv_pp2x_egress_port(port);
 	struct mv_pp2x_hw *hw = &port->priv->hw;
+
+	/* Don't do nothing for MUSDK ports since MUSDK manages
+	 * its own queues
+	 */
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		return;
 
 	/* Issue stop command for active channels only */
 	mv_pp2x_write(hw, MVPP2_TXP_SCHED_PORT_INDEX_REG, tx_port_num);
