@@ -318,6 +318,20 @@ static void mvebu_uart_start_tx(struct uart_port *port)
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 	struct circ_buf *xmit = &port->state->xmit;
 
+	/* When Armada37x0 works with pulse interrupt, the TX interrupt
+	 * is triggered only when TX FIFO state transmites in following
+	 * two scenarios:
+	 * - FIFO FULL => FIFO NON-FULL
+	 * - FIFO EMPTY => FIFO NON-FULL
+	 *
+	 * In order to transmit the sequential data, the driver send out
+	 * the first byte to toggle the FIFO state. And the rest bytes
+	 * are supposed to be sent out until TX READY interrupt comes.
+	 */
+	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
+	ctl |= uart_data->reg_bits.ctrl_tx_rdy_int(uart_data);
+	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
+
 	if (!IS_ERR_OR_NULL(uart_data->intr.uart_int_base)) {
 		if (!uart_circ_empty(xmit)) {
 			writel(xmit->buf[xmit->tail], port->membase + REG_TSH(uart_data));
@@ -325,9 +339,6 @@ static void mvebu_uart_start_tx(struct uart_port *port)
 			port->icount.tx++;
 		}
 	}
-	ctl = readl(port->membase + uart_data->intr.ctrl_reg);
-	ctl |= uart_data->reg_bits.ctrl_tx_rdy_int(uart_data);
-	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 }
 
 static void mvebu_uart_stop_rx(struct uart_port *port)
