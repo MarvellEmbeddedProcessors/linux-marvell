@@ -177,6 +177,7 @@ struct mvebu_uart_data {
 	struct clk              *clk;
 	struct uart_regs_layout *regs;
 	enum reg_uart_type       reg_type;
+	spinlock_t               tx_lock;
 
 #ifdef CONFIG_PM
 	/* Used to restore the uart registers status*/
@@ -220,6 +221,25 @@ struct mvebu_uart_data {
 #define REG_STAT(uart_data)	((uart_data)->regs->uart_stat)
 #define REG_OSAMP(uart_data)	((uart_data)->regs->uart_over_sample)
 
+/* mvebu_uart_tx_lock:
+ * This lock is only used to lock the TX data when pulse interrupt is enabled.
+ */
+#define mvebu_uart_tx_lock(uart_data, flags)							\
+do {												\
+	if (!IS_ERR_OR_NULL(uart_data->intr.uart_int_base)) {					\
+		spin_lock_irqsave(&uart_data->tx_lock, flags);					\
+	}											\
+} while (0)
+
+/* mvebu_uart_tx_unlock:
+ * This lock is only used to lock the TX data when pulse interrupt is enabled.
+ */
+#define mvebu_uart_tx_unlock(uart_data, flags)							\
+do {												\
+	if (!IS_ERR_OR_NULL(uart_data->intr.uart_int_base)) {					\
+		spin_unlock_irqrestore(&uart_data->tx_lock, flags);				\
+	}											\
+} while (0)
 
 /* helper functions for 1-byte transfer */
 static inline unsigned int get_ctrl_rx_1byte_rdy_int(struct mvebu_uart_data *data)
@@ -315,6 +335,7 @@ static void mvebu_uart_stop_tx(struct uart_port *port)
 static void mvebu_uart_start_tx(struct uart_port *port)
 {
 	unsigned int ctl;
+	unsigned long flags;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 	struct circ_buf *xmit = &port->state->xmit;
 
@@ -332,6 +353,10 @@ static void mvebu_uart_start_tx(struct uart_port *port)
 	ctl |= uart_data->reg_bits.ctrl_tx_rdy_int(uart_data);
 	writel(ctl, port->membase + uart_data->intr.ctrl_reg);
 
+	/* Use spin_lock to lock the action that write one character to tx fifo.
+	 * This can prevent the tx interrupt from breaking the writing action.
+	 */
+	mvebu_uart_tx_lock(uart_data, flags);
 	if (!IS_ERR_OR_NULL(uart_data->intr.uart_int_base)) {
 		if (!uart_circ_empty(xmit)) {
 			writel(xmit->buf[xmit->tail], port->membase + REG_TSH(uart_data));
@@ -339,6 +364,7 @@ static void mvebu_uart_start_tx(struct uart_port *port)
 			port->icount.tx++;
 		}
 	}
+	mvebu_uart_tx_unlock(uart_data, flags);
 }
 
 static void mvebu_uart_stop_rx(struct uart_port *port)
@@ -477,14 +503,18 @@ static irqreturn_t mvebu_uart_isr(int irq, void *dev_id)
 	struct uart_port *port = (struct uart_port *)dev_id;
 	unsigned int st;
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
+	unsigned long flags;
 
 	st = readl(port->membase + REG_STAT(uart_data));
 
 	if (st & (STAT_RX_RDY | STAT_OVR_ERR | STAT_FRM_ERR | STAT_BRK_DET))
 		mvebu_uart_rx_chars(port, st);
 
-	if (st & STAT_TX_RDY)
+	if (st & STAT_TX_RDY) {
+		mvebu_uart_tx_lock(uart_data, flags);
 		mvebu_uart_tx_chars(port, st);
+		mvebu_uart_tx_unlock(uart_data, flags);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -513,9 +543,13 @@ static irqreturn_t mvebu_uart_tx_isr(int irq, void *dev_id)
 	struct mvebu_uart_data *uart_data = (struct mvebu_uart_data *)port->private_data;
 	unsigned int st = readl(port->membase + REG_STAT(uart_data));
 	unsigned int stat_bit_tx_rdy = uart_data->reg_bits.stat_tx_rdy(uart_data);
+	unsigned long flags;
 
-	if (st & stat_bit_tx_rdy)
+	if (st & stat_bit_tx_rdy) {
+		mvebu_uart_tx_lock(uart_data, flags);
 		mvebu_uart_tx_chars(port, st);
+		mvebu_uart_tx_unlock(uart_data, flags);
+	}
 
 	if (!IS_ERR_OR_NULL(uart_data->intr.uart_int_base)) {
 		st = readl(uart_data->intr.uart_int_base + NORTH_BRIDGE_UART_EXT_INT_STAT);
@@ -990,6 +1024,9 @@ static int mvebu_uart_probe(struct platform_device *pdev)
 		data->intr.ctrl_reg = REG_CTRL2(data);
 	else
 		data->intr.ctrl_reg = REG_CTRL(data);
+
+	/* Initialize the tx spin_lock */
+	spin_lock_init(&data->tx_lock);
 
 	port->private_data = data;
 	platform_set_drvdata(pdev, data);
