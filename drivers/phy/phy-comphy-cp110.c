@@ -91,9 +91,14 @@ static void mvebu_cp110_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 			 /* For comphy 4:
 			  * 0x1 = SGMII/HS-SGMII Port1
 			  * 0x2 = SGMII/HS-SGMII Port0: XFI/SFI, RXAUI_Lane0
+			  *
+			  * We want to check if SGMII1/HS_SGMII1 is the requested mode in order to
+			  * determine which value should be set (all other modes use the same value)
+			  * so we need to strip the mode, and check the ID because we might handle
+			  * SGMII0/HS_SGMII0 too.
 			  */
-			if (priv->lanes[comphy->index].mode == COMPHY_SGMII1 ||
-			    priv->lanes[comphy->index].mode == COMPHY_HS_SGMII1)
+			if ((mode == COMPHY_SGMII_MODE || mode == COMPHY_HS_SGMII_MODE) &&
+			    COMPHY_GET_ID(priv->lanes[comphy->index].mode) == 1)
 				reg |= COMMON_SELECTOR_COMPHY4_SGMII1 << comphy_offset;
 			else
 				reg |= COMMON_SELECTOR_COMPHY4_ALL_OTHERS << comphy_offset;
