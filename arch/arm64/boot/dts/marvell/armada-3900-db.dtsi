@@ -64,6 +64,10 @@
 				clock-frequency = <100000>;
 			};
 
+			sd_mmc_reg0: regulator@0 {
+				status = "disabled";
+			};
+
 			spi0: spi@510600 {
 				status = "okay";
 				spi-flash@0 {
