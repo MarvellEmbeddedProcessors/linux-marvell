@@ -330,7 +330,9 @@
 
 			pinctrl@6f4000 {
 				compatible = "marvell,ap806-pinctrl";
-				reg = <0x6f4000 0x10>;
+				reg = <0x6f4000 0x10>, /* pinctrl regs */
+				      <0x6f4100 0x4>; /* eMMC PHY IO Control 0 Register */
+				reg-names = "pinctrl", "mmcio";
 
 				ap_i2c0_pins: i2c-pins-0 {
 					marvell,pins = "mpp4", "mpp5";
