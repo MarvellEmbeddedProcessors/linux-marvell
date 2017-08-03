@@ -5,7 +5,10 @@ part and usage.
 
 Required properties:
 - compatible: "marvell,ap806-pinctrl"
-- reg: register specifier of MPP registers
+- reg: register ranges as listed in the reg-names property
+- reg-names: include the following entries:
+             "pinctrl": pinctrl registers, which is mandatory and must be first one.
+             "mmcio": eMMC PHY IO Control 0 Register.
 
 Available MPP pins/groups and functions:
 Note: Brackets (x) are not part of the MPP name for the Marvell function and are
