@@ -3044,7 +3044,6 @@ static int __init its_probe_one(struct resource *res,
 			baser |= GITS_CBASER_nC;
 			gits_write_cbaser(baser, its->base + GITS_CBASER);
 		}
-		pr_info("ITS: using cache flushing for cmd queue\n");
 		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
 	}
 
@@ -3064,6 +3063,9 @@ static int __init its_probe_one(struct resource *res,
 		baser |= GITS_CBASER_nCnB | GITS_CBASER_NonShareable;
 		writeq_relaxed(baser, its->base + GITS_CBASER);
 	}
+
+	if (its->flags & ITS_FLAGS_CMDQ_NEEDS_FLUSHING)
+		pr_info("ITS: using cache flushing for cmd queue\n");
 
 	gits_write_cwriter(0, its->base + GITS_CWRITER);
 	ctlr = readl_relaxed(its->base + GITS_CTLR);
