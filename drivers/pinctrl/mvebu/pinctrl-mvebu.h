@@ -120,11 +120,13 @@ struct mvebu_pinctrl_soc_info {
 /**
  * struct mvebu_pinctrl_pm_save - pinctrl register save when PM
  * @regs: to save register value when suspend
- * @settings: inidcates register space length to save
+ * @length: inidcates register space length to save
+ * @emmc_phy_ctrl: used to save eMMC PHY IO Control register if eMMC is valid
  */
 struct mvebu_pinctrl_pm_save {
 	unsigned int *regs;
 	unsigned int length;
+	unsigned int emmc_phy_ctrl;
 };
 
 #define MPP_FUNC_CTRL(_idl, _idh, _name, _func)			\
