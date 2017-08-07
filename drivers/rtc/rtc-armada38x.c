@@ -459,7 +459,7 @@ static int armada38x_rtc_suspend(struct device *dev)
 	if (device_may_wakeup(dev)) {
 		struct armada38x_rtc *rtc = dev_get_drvdata(dev);
 
-		return enable_irq_wake(rtc->irq);
+		enable_irq_wake(rtc->irq);
 	}
 
 	return 0;
@@ -473,7 +473,7 @@ static int armada38x_rtc_resume(struct device *dev)
 		/* Update RTC-MBUS bridge timing parameters */
 		rtc->data->update_mbus_timing(rtc);
 
-		return disable_irq_wake(rtc->irq);
+		disable_irq_wake(rtc->irq);
 	}
 
 	return 0;
