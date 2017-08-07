@@ -294,14 +294,16 @@ static int mvebu_cp110_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 
 	/* G3 Setting 4 */
 	mask = HPIPE_G3_DFE_RES_MASK;
-	data = 0x2 << HPIPE_G3_DFE_RES_OFFSET;
+	data = 0x1 << HPIPE_G3_DFE_RES_OFFSET;
 	reg_set(hpipe_addr + HPIPE_G3_SETTING_4_REG, data, mask);
 
 	/* Offset Phase Control */
 	mask = HPIPE_OS_PH_OFFSET_MASK;
-	data = 0x5c << HPIPE_OS_PH_OFFSET_OFFSET;
+	data = 0x61 << HPIPE_OS_PH_OFFSET_OFFSET;
 	mask |= HPIPE_OS_PH_OFFSET_FORCE_MASK;
 	data |= 0x1 << HPIPE_OS_PH_OFFSET_FORCE_OFFSET;
+	mask |= HPIPE_OS_PH_VALID_MASK;
+	data |= 0x0 << HPIPE_OS_PH_VALID_OFFSET;
 	reg_set(hpipe_addr + HPIPE_PHASE_CONTROL_REG, data, mask);
 	mask = HPIPE_OS_PH_VALID_MASK;
 	data = 0x1 << HPIPE_OS_PH_VALID_OFFSET;
@@ -334,11 +336,11 @@ static int mvebu_cp110_comphy_sata_power_on(struct mvebu_comphy_priv *priv,
 
 	/* Set G3 TX amplitude and TX post emphasis value */
 	mask = HPIPE_G3_SET_0_G3_TX_AMP_MASK;
-	data = 0xe << HPIPE_G3_SET_0_G3_TX_AMP_OFFSET;
+	data = 0x1e << HPIPE_G3_SET_0_G3_TX_AMP_OFFSET;
 	mask |= HPIPE_G3_SET_0_G3_TX_AMP_ADJ_MASK;
 	data |= 0x1 << HPIPE_G3_SET_0_G3_TX_AMP_ADJ_OFFSET;
 	mask |= HPIPE_G3_SET_0_G3_TX_EMPH1_MASK;
-	data |= 0x6 << HPIPE_G3_SET_0_G3_TX_EMPH1_OFFSET;
+	data |= 0xe << HPIPE_G3_SET_0_G3_TX_EMPH1_OFFSET;
 	mask |= HPIPE_G3_SET_0_G3_TX_EMPH1_EN_MASK;
 	data |= 0x1 << HPIPE_G3_SET_0_G3_TX_EMPH1_EN_OFFSET;
 	mask |= HPIPE_G3_SET_0_G3_TX_SLEW_RATE_SEL_MASK;
