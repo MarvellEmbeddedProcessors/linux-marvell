@@ -542,6 +542,8 @@ struct mv_pp2x {
 
 	struct mv_pp2x_param_config pp2_cfg;
 
+	struct platform_device *pdev;
+
 	/* List of pointers to port structures */
 	u16 num_ports;
 	struct mv_pp2x_port **port_list;
