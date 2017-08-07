@@ -602,7 +602,7 @@ int irq_set_irq_wake(unsigned int irq, unsigned int on)
 		}
 	} else {
 		if (desc->wake_depth == 0) {
-			WARN(1, "Unbalanced IRQ %d wake disable\n", irq);
+			pr_info("Unbalanced IRQ %d wake disable\n", irq);
 		} else if (--desc->wake_depth == 0) {
 			ret = set_irq_wake_real(irq, on);
 			if (ret)
