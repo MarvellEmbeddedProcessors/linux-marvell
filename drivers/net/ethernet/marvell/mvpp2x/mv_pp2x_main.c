@@ -5937,6 +5937,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 	hw = &priv->hw;
+	priv->pdev = pdev;
 
 	err = mv_pp2x_platform_data_get(pdev, priv, &cell_index, &port_count);
 	if (err) {
@@ -6131,6 +6132,151 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+/* Ports initialization after suspend */
+static int mv_pp2x_port_resume(struct platform_device *pdev,
+			       struct device_node *port_node,
+			       struct mv_pp2x *priv, struct mv_pp2x_port *port)
+{
+	struct device_node *emac_node = NULL;
+	int i;
+
+	if (priv->pp2_version == PPV22 && !(port->flags & MVPP2_F_LOOPBACK)) {
+		emac_node = of_parse_phandle(port_node, "emac-data", 0);
+		port->mac_data.link_irq = irq_of_parse_and_map(emac_node, 0);
+	}
+
+	if (port->mac_data.phy_node)
+		mv_pp2x_phy_connect(port);
+
+	for (i = 0; i < port->num_irqs; i++)
+		port->of_irqs[i] = irq_of_parse_and_map(port_node, i);
+
+	mv_pp2x_port_hw_init(port);
+
+	return 0;
+}
+
+/* Routine configure mvpp2x HW after suspend */
+static int mv_pp2x_probe_after_suspend(struct device *dev)
+{
+	struct mv_pp2x *priv = dev_get_drvdata(dev);
+	int i, err;
+	struct platform_device *pdev = priv->pdev;
+	struct device_node *dn = pdev->dev.of_node;
+	struct device_node *port_node;
+
+	/* Resume network controller */
+	err = mv_pp2x_init(pdev, priv);
+	if (err < 0) {
+		dev_err(&pdev->dev, "failed to resume controller\n");
+		return err;
+	}
+
+	i = 0;
+	/* Resume ports */
+	for_each_available_child_of_node(dn, port_node) {
+		mv_pp2x_port_resume(pdev, port_node, priv, priv->port_list[i]);
+		i++;
+	}
+
+	if (priv->pp2_version == PPV22) {
+		/* Init tx&rx fifo for each port */
+		mv_pp22_tx_fifo_init(priv);
+		mv_pp22_rx_fifo_init(priv);
+		mv_pp22_set_net_comp(priv);
+	} else {
+		mv_pp21_fifo_init(priv);
+	}
+
+	return 0;
+}
+
+/* Routine suspend to RAM CP */
+static int mvpp2x_suspend(struct device *dev)
+{
+	struct mv_pp2x *priv = dev_get_drvdata(dev);
+	int i, num_of_ports;
+	struct platform_device *pdev = priv->pdev;
+
+	num_of_ports = priv->num_ports;
+	for (i = 0; i < num_of_ports; i++) {
+		struct mv_mac_data *mac = &priv->port_list[i]->mac_data;
+		/* Stop interface if port is up */
+		if (netif_running(priv->port_list[i]->dev))
+			mv_pp2x_stop(priv->port_list[i]->dev);
+		/* Dispose all port IRQ's */
+		if (mac->link_irq != MVPP2_NO_LINK_IRQ)
+			irq_dispose_mapping(mac->link_irq);
+		mv_pp2x_port_irqs_dispose_mapping(priv->port_list[i]);
+
+		if (mac->phy_node)
+			mv_pp2x_phy_disconnect(priv->port_list[i]);
+
+		/* Null all pointers to BM pools, pool's will be reconfigured in resume procedure */
+		priv->port_list[i]->pool_short = NULL;
+		priv->port_list[i]->pool_long = NULL;
+		/* Missing flag will trigger GoP reconfiguration in resume routine */
+		mac->flags &= ~MV_EMAC_F_INIT;
+	}
+
+	for_each_present_cpu(i) {
+		struct mv_pp2x_aggr_tx_queue *aggr_txq = &priv->aggr_txqs[i];
+
+		dma_free_coherent(&pdev->dev,
+				  MVPP2_DESCQ_MEM_SIZE(aggr_txq->size),
+				  aggr_txq->desc_mem, aggr_txq->descs_phys);
+	}
+
+	devm_kfree(&pdev->dev, priv->hw.prs_shadow);
+	devm_kfree(&pdev->dev, priv->hw.cls_shadow);
+	devm_kfree(&pdev->dev, priv->hw.c2_shadow);
+	devm_kfree(&pdev->dev, priv->aggr_txqs);
+
+	for (i = 0; i < priv->num_pools; i++) {
+		struct mv_pp2x_bm_pool *bm_pool = &priv->bm_pools[i];
+
+		mv_pp2x_bm_pool_destroy(dev, priv, bm_pool);
+	}
+
+	return 0;
+}
+
+/* Routine resume CP after S2RAM */
+static int mvpp2x_resume(struct device *dev)
+{
+	struct mv_pp2x *priv;
+	int i, num_of_ports, err;
+
+	err = mv_pp2x_probe_after_suspend(dev);
+	if (err < 0)
+		return err;
+
+	priv = dev_get_drvdata(dev);
+	num_of_ports = priv->num_ports;
+
+	for (i = 0; i < num_of_ports; i++) {
+		if (priv->port_list[i]->comphy)
+			phy_init(priv->port_list[i]->comphy);
+		/* Start interface if port was up before suspend */
+		if (netif_running(priv->port_list[i]->dev))
+			mv_pp2x_open(priv->port_list[i]->dev);
+
+		if (priv->port_list[i]->dev->flags & IFF_PROMISC)
+			mv_pp2x_set_rx_promisc(priv->port_list[i]);
+		else if (priv->port_list[i]->dev->flags & IFF_ALLMULTI)
+			mv_pp2x_set_rx_allmulti(priv->port_list[i]);
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops mv_pp2x_pm_ops = {
+	.suspend = mvpp2x_suspend,
+	.resume = mvpp2x_resume,
+};
+#endif /* CONFIG_PM_SLEEP */
+
 MODULE_DEVICE_TABLE(of, mv_pp2x_match_tbl);
 
 static struct platform_driver mv_pp2x_driver = {
@@ -6139,6 +6285,9 @@ static struct platform_driver mv_pp2x_driver = {
 	.driver = {
 		.name = MVPP2_DRIVER_NAME,
 		.of_match_table = mv_pp2x_match_tbl,
+#ifdef CONFIG_PM_SLEEP
+		.pm = &mv_pp2x_pm_ops,
+#endif
 	},
 };
 
