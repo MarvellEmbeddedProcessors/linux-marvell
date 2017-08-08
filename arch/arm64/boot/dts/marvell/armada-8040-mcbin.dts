@@ -94,6 +94,10 @@
 					marvell,pins = "mpp47";
 					marvell,function = "gpio";
 				};
+				pcie_reset_pins: pcie-reset-pins {
+					marvell,pins = "mpp52";
+					marvell,function = "gpio";
+				};
 			};
 			comphy0: comphy {
 				status = "okay";
@@ -172,6 +176,9 @@
 				&comphy0 3 COMPHY_PCIE0
 				>;
 			phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
+			reset-gpios = <&cpm_gpio1 20 GPIO_ACTIVE_HIGH>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pcie_reset_pins>;
 		};
 		reg_usb3h0_vbus: usb3-vbus0 {
 			compatible = "regulator-fixed";
