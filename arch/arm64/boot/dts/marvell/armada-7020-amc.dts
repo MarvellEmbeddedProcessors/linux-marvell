@@ -187,7 +187,7 @@
 		pcie@0x600000 {
 			/* overwrite the PCIe memory address since it request for 64MB */
 			ranges = <0x81000000 0 0xfa000000 0  0xfa000000 0 0x10000 /* downstream I/O */
-				  0x82000000 0 0xf6000000 0  0xf6000000 0 0x4000000>; /* non-prefetchable memory */
+				  0x82000000 0 0xf6000000 0  0xf6000000 0 0x6000000>; /* non-prefetchable memory */
 			num-lanes = <4>;
 			status = "okay";
 		};
