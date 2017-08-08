@@ -127,7 +127,8 @@ static int __init armada3700_cpufreq_driver_init(void)
 
 	return PTR_ERR_OR_ZERO(pdev);
 }
-module_init(armada3700_cpufreq_driver_init);
+/* late_initcall, to guarantee the driver is loaded after A3700 clock driver */
+late_initcall(armada3700_cpufreq_driver_init);
 
 MODULE_AUTHOR("Victor Gu <xigu@marvell.com>");
 MODULE_AUTHOR("Evan Wang <xswang@marvell.com>");
