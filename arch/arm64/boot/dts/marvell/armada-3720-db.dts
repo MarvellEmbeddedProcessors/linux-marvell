@@ -198,7 +198,7 @@
 			sdhci1: sdhci@d0000 {
 				wp-inverted;
 				bus-width = <4>;
-				cd-gpios = <&gpio_sb 2 GPIO_ACTIVE_LOW>;
+				cd-gpios = <&gpiosb 2 GPIO_ACTIVE_LOW>;
 				vqmmc-supply = <&vcc_sd_reg1>;
 				marvell,pad-type = "sd";
 				status = "okay";
@@ -235,7 +235,7 @@
 				regulator-max-microvolt = <3300000>;
 				regulator-boot-on;
 
-				gpios = <&gpio_sb 23 GPIO_ACTIVE_HIGH>;
+				gpios = <&gpiosb 23 GPIO_ACTIVE_HIGH>;
 				gpios-states = <0>;
 				states = <1800000 0x1
 					  3300000 0x0>;
@@ -298,5 +298,5 @@
 	status = "okay";
 	phys = <&a3700_comphy 1 COMPHY_PCIE0>;
 	phy-names = "comphy";
-	reset-gpios = <&gpio_sb 3 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&gpiosb 3 GPIO_ACTIVE_HIGH>;
 };
