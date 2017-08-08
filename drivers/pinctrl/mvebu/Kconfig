@@ -3,10 +3,6 @@ config PINCTRL_MVEBU
 	select PINMUX
 	select PINCONF
 
-config PINCTRL_ARMADA_3700
-	bool
-	select PINCTRL_MVEBU
-
 config PINCTRL_ARMADA_AP806
 	bool
 	select PINCTRL_MVEBU
