@@ -166,13 +166,13 @@
 			sdhci1: sdhci@d0000 {
 				wp-inverted;
 				bus-width = <4>;
-				cd-gpios = <&gpio_sb 2 GPIO_ACTIVE_LOW>;
+				cd-gpios = <&gpiosb 2 GPIO_ACTIVE_LOW>;
 				vqmmc-supply = <&vcc_sd_reg1>;
 				marvell,pad-type = "sd";
 				status = "disabled";
 				/* UPDATE */
 				pinctrl-names = "default";
-				pinctrl-0 = <&sdio_pins &cd_pins>;
+				pinctrl-0 = <&sdio_pins>;
 			};
 
 			sdhci0: sdhci@d8000 {
@@ -198,7 +198,7 @@
 				regulator-max-microvolt = <3300000>;
 				regulator-boot-on;
 
-				gpios = <&gpio_sb 23 GPIO_ACTIVE_HIGH>;
+				gpios = <&gpiosb 23 GPIO_ACTIVE_HIGH>;
 				gpios-states = <0>;
 				states = <1800000 0x1 3300000 0x0>;
 				enable-active-high;
