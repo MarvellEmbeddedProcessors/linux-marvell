@@ -295,22 +295,6 @@ config GPIO_MVEBU
 	depends on OF
 	select GENERIC_IRQ_CHIP
 
-config GPIO_MVEBU_A3700
-	bool "Marvell Armada 3700 GPIO support"
-	default n
-	depends on ARCH_MVEBU
-	depends on OF
-	select GENERIC_IRQ_CHIP
-	help
-	  If you say 'Yes' to this option, it
-	  selects the armada 3700 GPIO driver.
-	  Armada 3700 GPIO has 2 registers sets
-	  - general registers set and interrupt
-	  registers set. Armada 3700 gpio only
-	  supports edge interrupts, its gpio
-	  interrupt controllers are cascaded to
-	  root gic interrupt controller.
-
 config GPIO_MXC
 	def_bool y
 	depends on ARCH_MXC
