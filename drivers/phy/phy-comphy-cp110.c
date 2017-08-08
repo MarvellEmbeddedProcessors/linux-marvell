@@ -1568,6 +1568,180 @@ static int mvebu_cp110_comphy_xfi_power_on(struct mvebu_comphy_priv *priv,
 	return ret;
 }
 
+/* This function performs RX training for one Feed Forward Equalization (FFE)
+ * value.
+ * The RX traiing result is stored in 'Saved DFE values Register' (SAV_F0D).
+ *
+ * Return '0' on success, error code in  a case of failure.
+ */
+static int mvebu_cp110_comphy_test_single_ffe(struct mvebu_comphy_priv *priv,
+					      struct mvebu_comphy *comphy,
+					      u32 ffe, u32 *result)
+{
+	u32 mask, data, timeout;
+	void __iomem *hpipe_addr = HPIPE_ADDR(priv->comphy_pipe_regs, comphy->index);
+	void __iomem *sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
+
+	/* Configure PRBS counters */
+	mask = HPIPE_PHY_TEST_PATTERN_SEL_MASK;
+	data = 0xe << HPIPE_PHY_TEST_PATTERN_SEL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PHY_TEST_CONTROL_REG, data, mask);
+
+	mask = HPIPE_PHY_TEST_DATA_MASK;
+	data = 0x64 << HPIPE_PHY_TEST_DATA_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PHY_TEST_DATA_REG, data, mask);
+
+	mask = HPIPE_PHY_TEST_EN_MASK;
+	data = 0x1 << HPIPE_PHY_TEST_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PHY_TEST_CONTROL_REG, data, mask);
+
+	mdelay(50);
+
+	/* Set the FFE value */
+	mask = HPIPE_G1_SETTINGS_3_G1_FFE_RES_SEL_MASK;
+	data = ffe << HPIPE_G1_SETTINGS_3_G1_FFE_RES_SEL_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SETTINGS_3_REG, data, mask);
+
+	/* Start RX training */
+	mask = SD_EXTERNAL_STATUS_START_RX_TRAINING_MASK;
+	data = 1 << SD_EXTERNAL_STATUS_START_RX_TRAINING_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_STATUS_REG, data, mask);
+
+	/* Check the result of RX training */
+	timeout = RX_TRAINING_TIMEOUT;
+	while (timeout) {
+		data = readl(sd_ip_addr + SD_EXTERNAL_STATAUS1_REG);
+		if (data & SD_EXTERNAL_STATAUS1_REG_RX_TRAIN_COMP_MASK)
+			break;
+		mdelay(1);
+		timeout--;
+	}
+
+	if (timeout == 0)
+		return -ETIMEDOUT;
+
+	if (data & SD_EXTERNAL_STATAUS1_REG_RX_TRAIN_FAILED_MASK)
+		return -EINVAL;
+
+	/* Stop RX training */
+	mask = SD_EXTERNAL_STATUS_START_RX_TRAINING_MASK;
+	data = 0 << SD_EXTERNAL_STATUS_START_RX_TRAINING_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_STATUS_REG, data, mask);
+
+	/* Read the result */
+	data = readl(hpipe_addr + HPIPE_SAVED_DFE_VALUES_REG);
+	data &= HPIPE_SAVED_DFE_VALUES_SAV_F0D_MASK;
+	data >>= HPIPE_SAVED_DFE_VALUES_SAV_F0D_OFFSET;
+	*result = data;
+
+	mask = HPIPE_PHY_TEST_RESET_MASK;
+	data = 0x1 << HPIPE_PHY_TEST_RESET_OFFSET;
+	mask |= HPIPE_PHY_TEST_EN_MASK;
+	data |= 0x0 << HPIPE_PHY_TEST_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PHY_TEST_CONTROL_REG, data, mask);
+
+	mask = HPIPE_PHY_TEST_RESET_MASK;
+	data = 0x0 << HPIPE_PHY_TEST_RESET_OFFSET;
+	reg_set(hpipe_addr + HPIPE_PHY_TEST_CONTROL_REG, data, mask);
+
+	return 0;
+}
+
+/* This function runs complete RX training sequence:
+ *	- Run RX training for all possible Feed Forward Equalization values
+ *	- Choose the FFE which gives the best result.
+ *	- Run RX training again with the best result.
+ *
+ * Return '0' on success, error code in  a case of failure.
+ */
+static int mvebu_cp110_comphy_xfi_rx_training(struct mvebu_comphy_priv *priv,
+					      struct mvebu_comphy *comphy)
+{
+	u32 mask, data, max_rx_train = 0, max_rx_train_index = 0;
+	void __iomem *hpipe_addr = HPIPE_ADDR(priv->comphy_pipe_regs, comphy->index);
+	u32 rx_train_result;
+	int ret, i;
+
+	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	/* Configure SQ threshold and CDR lock */
+	mask = HPIPE_SQUELCH_THRESH_IN_MASK;
+	data = 0xc << HPIPE_SQUELCH_THRESH_IN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_SQUELCH_FFE_SETTING_REG, data, mask);
+
+	mask = HPIPE_SQ_DEGLITCH_WIDTH_P_MASK;
+	data = 0xf << HPIPE_SQ_DEGLITCH_WIDTH_P_OFFSET;
+	mask |= HPIPE_SQ_DEGLITCH_WIDTH_N_MASK;
+	data |= 0xf << HPIPE_SQ_DEGLITCH_WIDTH_N_OFFSET;
+	mask |= HPIPE_SQ_DEGLITCH_EN_MASK;
+	data |= 0x1 << HPIPE_SQ_DEGLITCH_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_SQ_GLITCH_FILTER_CTRL, data, mask);
+
+	mask = HPIPE_CDR_LOCK_DET_EN_MASK;
+	data = 0x1 << HPIPE_CDR_LOCK_DET_EN_OFFSET;
+	reg_set(hpipe_addr + HPIPE_LOOPBACK_REG, data, mask);
+
+	udelay(100);
+
+	/* Determine if we have a cable attached to this comphy, if not,
+	 * we can't perform RX training.
+	 */
+	data = readl(hpipe_addr + HPIPE_SQUELCH_FFE_SETTING_REG);
+	if (data & HPIPE_SQUELCH_DETECTED_MASK) {
+		dev_err(priv->dev, "Squelsh is not detected, can't perform RX training\n");
+		return -EINVAL;
+	}
+
+	data = readl(hpipe_addr + HPIPE_LOOPBACK_REG);
+	if (!(data & HPIPE_CDR_LOCK_MASK)) {
+		dev_err(priv->dev, "CDR is not locked, can't perform RX training\n");
+		return -EINVAL;
+	}
+
+	/* Do preparations for RX training */
+	mask = HPIPE_DFE_RES_FORCE_MASK;
+	data = 0x0 << HPIPE_DFE_RES_FORCE_OFFSET;
+	reg_set(hpipe_addr + HPIPE_DFE_REG0, data, mask);
+
+	mask = HPIPE_G1_SETTINGS_3_G1_FFE_CAP_SEL_MASK;
+	data = 0xf << HPIPE_G1_SETTINGS_3_G1_FFE_CAP_SEL_OFFSET;
+	mask |= HPIPE_G1_SETTINGS_3_G1_FFE_SETTING_FORCE_MASK;
+	data |= 1 << HPIPE_G1_SETTINGS_3_G1_FFE_SETTING_FORCE_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G1_SETTINGS_3_REG, data, mask);
+
+	/* Perform RX training for all possible FFE (Feed Forward
+	 * Equalization, possible values are 0-7).
+	 * We update the best value reached and the FFE which gave this value.
+	 */
+	for (i = 0; i < MAX_NUM_OF_FFE; i++) {
+		rx_train_result = 0;
+		ret = mvebu_cp110_comphy_test_single_ffe(priv, comphy, i,
+							 &rx_train_result);
+
+		if ((!ret) && (rx_train_result > max_rx_train)) {
+			max_rx_train = rx_train_result;
+			max_rx_train_index = i;
+		}
+	}
+
+	/* If we were able to determine which FFE gives the best value,
+	 * now we need to set it and run RX training again (only for this
+	 * FFE).
+	 */
+	if (max_rx_train) {
+		ret = mvebu_cp110_comphy_test_single_ffe(priv, comphy,
+							 max_rx_train_index,
+							 &rx_train_result);
+	} else {
+		dev_err(priv->dev, "RX Training failed for comphy%d\n", comphy->index);
+		ret = -EINVAL;
+	}
+
+	dev_dbg(priv->dev, "%s: Exit\n", __func__);
+
+	return ret;
+}
+
 static int mvebu_cp110_comphy_power_on(struct phy *phy)
 {
 	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
@@ -1738,6 +1912,17 @@ static int mvebu_cp110_comphy_send_command(struct phy *phy, u32 command)
 	 */
 	case COMPHY_COMMAND_PCIE_IS_EP:
 		priv->lanes[comphy->index].misc.pcie_is_ep = true;
+	case(COMPHY_COMMAND_SFI_RX_TRAINING):
+		switch (COMPHY_GET_MODE(priv->lanes[comphy->index].mode)) {
+		case (COMPHY_XFI_MODE):
+		case (COMPHY_SFI_MODE):
+			ret = mvebu_cp110_comphy_xfi_rx_training(priv, comphy);
+			break;
+		default:
+			dev_err(priv->dev, "%s: RX training (command 0x%x) is supported only for SFI/XFI mode!\n",
+				__func__, command);
+			ret = -EINVAL;
+		}
 		break;
 	default:
 		dev_err(priv->dev, "%s: unsupported command (0x%x)\n",
