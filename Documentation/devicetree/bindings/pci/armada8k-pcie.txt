@@ -20,6 +20,7 @@ PHY support is supported for armada-8k, and the following parameters are used:
                       lane index from perspective of PCIe controller although the physical phy is comphy
                       serdes lane5 or other comphy lane. In this way, driver implementation will support
                       PCIe case with width more than 1, such as X2, X4.
+- reset-gpios	    : a pointer to the PCI device reset via gpio. This entry is mandatory of A8040 MCBin.
 
 
 Example of PCIE RC X1:
@@ -65,5 +66,7 @@ pcie@0x06000000 {
 		&comphy0 3 COMPHY_PCIE0
 		>;
 	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
+	/* GPIO for PCIe reset - optionally */
+	reset-gpios = <&cpm_gpio1 20 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };

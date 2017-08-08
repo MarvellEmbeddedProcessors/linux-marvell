@@ -23,6 +23,7 @@
 #include <linux/of_pci.h>
 #include <linux/of_irq.h>
 #include <dt-bindings/phy/phy-comphy-mvebu.h>
+#include <linux/of_gpio.h>
 
 #include "pcie-designware.h"
 
@@ -32,6 +33,8 @@ struct armada8k_pcie {
 	int			phy_count;
 	struct clk		*clk;
 	struct pcie_port	pp;
+	struct gpio_desc	*reset_gpio;
+	enum of_gpio_flags	flags;
 };
 
 #define PCIE_GLOBAL_CONTROL             0x0
@@ -229,6 +232,24 @@ static int armada8k_add_pcie_port(struct pcie_port *pp,
 	return 0;
 }
 
+/* armada8k_pcie_reset
+ * The function implements the PCIe reset via GPIO.
+ * First, pull down the GPIO used for PCIe reset, and wait 200ms;
+ * Second, set the GPIO output value with setting from DTS, and wait
+ * 200ms for taking effect.
+ * Return: void, always success.
+ */
+static void armada8k_pcie_reset(struct armada8k_pcie *pcie)
+{
+	/* Set the reset gpio to low first */
+	gpiod_direction_output(pcie->reset_gpio, 0);
+	/* After 200ms to reset pcie */
+	mdelay(200);
+	gpiod_direction_output(pcie->reset_gpio,
+			       (pcie->flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1);
+	mdelay(200);
+}
+
 static int armada8k_pcie_probe(struct platform_device *pdev)
 {
 	struct armada8k_pcie *armada8k_pcie;
@@ -236,7 +257,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	struct phy **phys = NULL;
 	struct device *dev = &pdev->dev;
 	struct resource *base;
-	int i, phy_count = 0;
+	int i, reset_gpio, phy_count = 0;
 	u32 command;
 	char phy_name[16];
 	int ret = 0;
@@ -293,6 +314,15 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 				goto err_phy;
 			}
 		}
+	}
+
+	/* Config reset gpio for pcie if the reset connected to gpio */
+	reset_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
+					     "reset-gpios", 0,
+					     &armada8k_pcie->flags);
+	if (gpio_is_valid(reset_gpio)) {
+		armada8k_pcie->reset_gpio = gpio_to_desc(reset_gpio);
+		armada8k_pcie_reset(armada8k_pcie);
 	}
 
 	pp = &armada8k_pcie->pp;
