@@ -84,6 +84,15 @@ struct armada_37xx_pmx_func {
 struct armada_37xx_pinctrl {
 	struct list_head		node;
 	unsigned int			sel_reg;
+	/* Used to preserve GPIO registers across suspend/resume. */
+	u32				io_conf_reg;
+	u32				io_conf_reg_hi;
+	u32				out_reg;
+	u32				out_reg_hi;
+	u32				irq_en_reg;
+	u32				irq_en_reg_hi;
+	u32				irq_pol_reg;
+	u32				irq_pol_reg_hi;
 	struct regmap			*regmap;
 	void __iomem			*base;
 	const struct armada_37xx_pin_data	*data;
@@ -1060,7 +1069,7 @@ static struct platform_driver armada_37xx_pinctrl_driver = {
 };
 
 /**
- * armada_3700_pinctrl_suspend - save pinctrl state for suspend
+ * armada_3700_pinctrl_suspend - save pinctrl/gpio state for suspend
  *
  * Save data for all pinctrl devices.
  */
@@ -1069,6 +1078,17 @@ static int armada_3700_pinctrl_suspend(void)
 	struct armada_37xx_pinctrl *info;
 
 	list_for_each_entry(info, &drvdata_list, node) {
+		/* save gpio state for suspend */
+		regmap_read(info->regmap, OUTPUT_EN, &info->io_conf_reg);
+		regmap_read(info->regmap, OUTPUT_EN + sizeof(u32), &info->io_conf_reg_hi);
+		regmap_read(info->regmap, OUTPUT_VAL, &info->out_reg);
+		regmap_read(info->regmap, OUTPUT_VAL + sizeof(u32), &info->out_reg_hi);
+		info->irq_en_reg = readl(info->base + IRQ_EN);
+		info->irq_en_reg_hi = readl(info->base + IRQ_EN + sizeof(u32));
+		info->irq_pol_reg = readl(info->base + IRQ_POL);
+		info->irq_pol_reg_hi = readl(info->base + IRQ_POL + sizeof(u32));
+
+		/* save pinctrl state for suspend */
 		regmap_read(info->regmap, SELECTION, &info->sel_reg);
 	}
 
@@ -1076,15 +1096,72 @@ static int armada_3700_pinctrl_suspend(void)
 }
 
 /**
- * armada_3700_pinctrl_resume - restore pinctrl state for suspend
+ * armada_3700_pinctrl_resume - restore pinctrl/gpio state for resume
  *
  * Restore data for all pinctrl devices.
  */
 static void armada_3700_pinctrl_resume(void)
 {
 	struct armada_37xx_pinctrl *info;
+	u32 i, mask, level;
+	u32 *polarity;
+	struct gpio_chip *gc;
+	struct irq_domain *d;
+	u32 virq, type;
 
 	list_for_each_entry(info, &drvdata_list, node) {
+		/* restore gpio state for resume */
+		regmap_update_bits(info->regmap, OUTPUT_EN, 0xffffffff, info->io_conf_reg);
+		regmap_update_bits(info->regmap, OUTPUT_EN + sizeof(u32), 0xffffffff, info->io_conf_reg_hi);
+		regmap_update_bits(info->regmap, OUTPUT_VAL, 0xffffffff, info->out_reg);
+		regmap_update_bits(info->regmap, OUTPUT_VAL + sizeof(u32), 0xffffffff, info->out_reg_hi);
+
+		/*
+		* For the gpios which are used for both-edge irqs, in system suspend
+		* their input levels may be changed but their polarities are not updated
+		* accordingly since interrupts are not handled in suspend; then in resume
+		* their polarities needs to be synchronized with their levels.
+		*/
+		gc = &info->gpio_chip;
+		d = gc->irqdomain;
+		for (i = 0; i < gc->ngpio; i++) {
+			if (i < GPIO_PER_REG) {
+				mask = info->irq_en_reg;
+				polarity = &info->irq_pol_reg;
+			} else {
+				mask = info->irq_en_reg_hi;
+				polarity = &info->irq_pol_reg_hi;
+			}
+
+			if (!(mask & BIT(i % GPIO_PER_REG)))
+				continue;
+
+			virq = irq_find_mapping(d, i);
+			type = irq_get_trigger_type(virq);
+			if ((type & IRQ_TYPE_SENSE_MASK) == IRQ_TYPE_EDGE_BOTH) {
+				regmap_read(info->regmap, INPUT_VAL + 4 * (i / GPIO_PER_REG), &level);
+				/*
+				 * For both-edge irqs, if its input level is high(1), its interrupt polarity should be
+				 * Detect falling edge(1); if its input level is low(0), its interrupt polarity should
+				 * be Detect rising edge(0).
+				 * Generally speaking, the value of polarity and input level should be same
+				 * for both-edge irqs.
+				 * If they are not same, then the pin's input level is changed in suspending,
+				 * gpio polarity should be synchronized with level in resuming.
+				 */
+				if ((*polarity ^ level) & BIT(i % GPIO_PER_REG)) {
+					/* Synchronize gpio polarity with level for both-edge irqs */
+					*polarity ^= BIT(i % GPIO_PER_REG);
+				}
+			}
+		}
+
+		writel(info->irq_en_reg, info->base + IRQ_EN);
+		writel(info->irq_en_reg_hi, info->base + IRQ_EN + sizeof(u32));
+		writel(info->irq_pol_reg, info->base + IRQ_POL);
+		writel(info->irq_pol_reg_hi, info->base + IRQ_POL + sizeof(u32));
+
+		/* restore pinctrl state for resume */
 		regmap_update_bits(info->regmap, SELECTION, 0xffffffff, info->sel_reg);
 	}
 }
