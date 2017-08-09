@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/syscore_ops.h>
 
 #include "../pinctrl-utils.h"
 
@@ -81,6 +82,8 @@ struct armada_37xx_pmx_func {
 };
 
 struct armada_37xx_pinctrl {
+	struct list_head		node;
+	unsigned int			sel_reg;
 	struct regmap			*regmap;
 	void __iomem			*base;
 	const struct armada_37xx_pin_data	*data;
@@ -148,6 +151,9 @@ struct armada_37xx_pinctrl {
 		.extra_npins = _nr2,			\
 		.funcs = {_f1, _f2}			\
 	}
+
+/* Global list of devices (struct armada_37xx_pinctrl) */
+static LIST_HEAD(drvdata_list);
 
 static struct armada_37xx_pin_group armada_37xx_nb_groups[] = {
 	PIN_GRP_GPIO("jtag", 20, 5, BIT(0), "jtag"),
@@ -1040,6 +1046,9 @@ static int __init armada_37xx_pinctrl_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, info);
 
+	/* Add to the global list */
+	list_add_tail(&info->node, &drvdata_list);
+
 	return 0;
 }
 
@@ -1050,5 +1059,52 @@ static struct platform_driver armada_37xx_pinctrl_driver = {
 	},
 };
 
+/**
+ * armada_3700_pinctrl_suspend - save pinctrl state for suspend
+ *
+ * Save data for all pinctrl devices.
+ */
+static int armada_3700_pinctrl_suspend(void)
+{
+	struct armada_37xx_pinctrl *info;
+
+	list_for_each_entry(info, &drvdata_list, node) {
+		regmap_read(info->regmap, SELECTION, &info->sel_reg);
+	}
+
+	return 0;
+}
+
+/**
+ * armada_3700_pinctrl_resume - restore pinctrl state for suspend
+ *
+ * Restore data for all pinctrl devices.
+ */
+static void armada_3700_pinctrl_resume(void)
+{
+	struct armada_37xx_pinctrl *info;
+
+	list_for_each_entry(info, &drvdata_list, node) {
+		regmap_update_bits(info->regmap, SELECTION, 0xffffffff, info->sel_reg);
+	}
+}
+
+static struct syscore_ops armada_3700_pinctrl_syscore_ops = {
+	.suspend = armada_3700_pinctrl_suspend,
+	.resume = armada_3700_pinctrl_resume,
+};
+
+static int __init armada_3700_pinctrl_pm_init(void)
+{
+	/*
+	 * Register syscore ops for save/restore of registers across suspend.
+	 * It's important to ensure that this driver is running at an earlier
+	 * initcall level than any arch-specific init calls.
+	 */
+	register_syscore_ops(&armada_3700_pinctrl_syscore_ops);
+	return 0;
+}
+
+postcore_initcall(armada_3700_pinctrl_pm_init);
 builtin_platform_driver_probe(armada_37xx_pinctrl_driver,
 			      armada_37xx_pinctrl_probe);
