@@ -750,7 +750,7 @@ enum mvpp2_prs_l3_cast {
 #define MVPP2_BM_COOKIE_POOL_OFFS	8
 #define MVPP2_BM_COOKIE_CPU_OFFS	24
 
-#define MVPP2_BM_SHORT_FRAME_SIZE		512
+#define MVPP2_BM_SHORT_FRAME_SIZE		1024
 #define MVPP2_BM_LONG_FRAME_SIZE		2048
 /* BM short pool packet size
  * These value assure that for SWF the total number
@@ -3974,7 +3974,12 @@ static int mvpp2_bm_pools_init(struct platform_device *pdev,
 		err = mvpp2_bm_pool_create(pdev, priv, bm_pool, size);
 		if (err)
 			goto err_unroll_pools;
-		mvpp2_bm_pool_bufsize_set(priv, bm_pool, 0);
+		bm_pool->pkt_size = mvpp2_pools[i].pkt_size;
+	bm_pool->frag_size =
+		SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(mvpp2_pools[i].pkt_size)) +
+			       MVPP2_SKB_SHINFO_SIZE;
+		mvpp2_bm_pool_bufsize_set(priv, bm_pool,
+					  MVPP2_RX_BUF_SIZE(bm_pool->pkt_size));
 	}
 	return 0;
 
@@ -4164,55 +4169,56 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
 	return i;
 }
 
+static int mvpp2_bm_buf_calc(enum mvpp2_bm_pool_log_num log_pool,
+			     u32 port_map)
+{
+	int num_ports = hweight_long(port_map);
+
+	return(num_ports * mvpp2_pools[log_pool].buf_num);
+}
+
 /* Notify the driver that BM pool is being used as specific type and return the
  * pool pointer on success
  */
 static struct mvpp2_bm_pool *
-mvpp2_bm_pool_use(struct mvpp2_port *port, int pool, int pkt_size)
+mvpp2_bm_pool_use(struct mvpp2_port *port, enum mvpp2_bm_pool_log_num pool_id,
+		  bool add_port)
 {
-	struct mvpp2_bm_pool *new_pool = &port->priv->bm_pools[pool];
-	int num;
+	int pkts_num, add_num, num;
+	struct mvpp2_bm_pool *pool = &port->priv->bm_pools[pool_id];
 
-	if (pool < MVPP2_BM_SHORT ||
-	    pool > MVPP2_BM_LONG) {
+	if (pool_id < MVPP2_BM_SHORT ||
+	    pool_id > MVPP2_BM_LONG) {
 		netdev_err(port->dev, "pool does not exist\n");
 		return NULL;
 	}
 
-	/* Allocate buffers in case BM pool is used as long pool, but packet
-	 * size doesn't match MTU or BM pool hasn't being used yet
-	 */
-	if (new_pool->pkt_size == 0) {
-		int pkts_num;
+	if (add_port)
+		pkts_num = mvpp2_bm_buf_calc(pool_id,
+					     pool->port_map |
+					     (1 << port->id));
+	else
+		pkts_num = mvpp2_bm_buf_calc(pool_id,
+					     pool->port_map &
+					     ~(1 << port->id));
 
-		/* Set default buffer number or free all the buffers in case
-		 * the pool is not empty
-		 */
-		pkts_num = new_pool->buf_num;
-		if (pkts_num == 0)
-			pkts_num = mvpp2_pools[pool].buf_num;
-		else
-			mvpp2_bm_bufs_free(port->dev->dev.parent,
-					   port->priv, new_pool, pkts_num);
+	add_num = pkts_num - pool->buf_num;
 
-		new_pool->pkt_size = pkt_size;
-		new_pool->frag_size =
-			SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(pkt_size)) +
-			MVPP2_SKB_SHINFO_SIZE;
-
-		/* Allocate buffers for this pool */
-		num = mvpp2_bm_bufs_add(port, new_pool, pkts_num);
-		if (num != pkts_num) {
+	/* Allocate buffers for this pool */
+	if (add_num > 0) {
+		num = mvpp2_bm_bufs_add(port, pool, add_num);
+		if (num != add_num) {
 			WARN(1, "pool %d: %d of %d allocated\n",
-			     new_pool->id, num, pkts_num);
+			     pool->id, num, pkts_num);
+			/* We need to undo the bufs_add() allocations */
 			return NULL;
 		}
+	} else if (add_num < 0) {
+		mvpp2_bm_bufs_free(port->dev->dev.parent, port->priv,
+				   pool, -add_num);
 	}
 
-	mvpp2_bm_pool_bufsize_set(port->priv, new_pool,
-				  MVPP2_RX_BUF_SIZE(new_pool->pkt_size));
-
-	return new_pool;
+	return pool;
 }
 
 /* Initialize pools for swf */
