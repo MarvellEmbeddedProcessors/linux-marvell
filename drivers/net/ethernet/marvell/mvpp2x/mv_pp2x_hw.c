@@ -1711,7 +1711,6 @@ static void mv_pp2x_prs_mac_init(struct mv_pp2x_hw *hw)
 	mv_pp2x_prs_mac_promisc_set(hw, 0, false);
 
 	mv_pp2x_prs_mac_multi_set(hw, 0, MVPP2_PE_MAC_MC_ALL, false);
-	mv_pp2x_prs_mac_multi_set(hw, 0, MVPP2_PE_MAC_MC_IP6, false);
 }
 
 /* Set default entries for various types of dsa packets */

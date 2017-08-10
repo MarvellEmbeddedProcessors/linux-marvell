@@ -4079,7 +4079,6 @@ static void mv_pp2x_set_rx_promisc(struct mv_pp2x_port *port)
 
 	/* Accept all: Multicast + Unicast */
 	mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_ALL, true);
-	mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_IP6, true);
 	/* Enter promisc mode */
 	mv_pp2x_prs_mac_promisc_set(hw, id, true);
 	/* Remove all port->id's mcast enries */
@@ -4096,8 +4095,6 @@ static void mv_pp2x_set_rx_allmulti(struct mv_pp2x_port *port)
 	/* Accept all multicast */
 	mv_pp2x_prs_mac_multi_set(hw, id,
 				  MVPP2_PE_MAC_MC_ALL, true);
-	mv_pp2x_prs_mac_multi_set(hw, id,
-				  MVPP2_PE_MAC_MC_IP6, true);
 	/* Remove all multicast filter entries from parser */
 	mv_pp2x_prs_mac_entry_del(port, MVPP2_PRS_MAC_MC, MVPP2_DEL_MAC_ALL);
 }
@@ -4168,8 +4165,6 @@ static void mv_pp2x_set_rx_mode(struct net_device *dev)
 			/* Reject other MC mac entries */
 			mv_pp2x_prs_mac_multi_set(hw, id,
 						  MVPP2_PE_MAC_MC_ALL, false);
-			mv_pp2x_prs_mac_multi_set(hw, id,
-						  MVPP2_PE_MAC_MC_IP6, false);
 		}
 	}
 }
