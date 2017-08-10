@@ -744,18 +744,19 @@ enum mvpp2_prs_l3_cast {
 #define MVPP2_BM_SHORT_BUF_NUM		2048
 #define MVPP2_BM_POOL_SIZE_MAX		(16*1024 - MVPP2_BM_POOL_PTR_ALIGN/4)
 #define MVPP2_BM_POOL_PTR_ALIGN		128
-#define MVPP2_BM_SWF_LONG_POOL(port)	((port > 2) ? 2 : port)
-#define MVPP2_BM_SWF_SHORT_POOL		3
 
 /* BM cookie (32 bits) definition */
 #define MVPP2_BM_COOKIE_POOL_OFFS	8
 #define MVPP2_BM_COOKIE_CPU_OFFS	24
 
+#define MVPP2_BM_SHORT_FRAME_SIZE		512
+#define MVPP2_BM_LONG_FRAME_SIZE		2048
 /* BM short pool packet size
  * These value assure that for SWF the total number
  * of bytes allocated for each buffer will be 512
  */
-#define MVPP2_BM_SHORT_PKT_SIZE		MVPP2_RX_MAX_PKT_SIZE(512)
+#define MVPP2_BM_SHORT_PKT_SIZE	MVPP2_RX_MAX_PKT_SIZE(MVPP2_BM_SHORT_FRAME_SIZE)
+#define MVPP2_BM_LONG_PKT_SIZE	MVPP2_RX_MAX_PKT_SIZE(MVPP2_BM_LONG_FRAME_SIZE)
 
 #define MVPP21_ADDR_SPACE_SZ		0
 #define MVPP22_ADDR_SPACE_SZ		SZ_64K
@@ -763,10 +764,10 @@ enum mvpp2_prs_l3_cast {
 #define MVPP2_MAX_THREADS		8
 #define MVPP2_MAX_QVECS			MVPP2_MAX_THREADS
 
-enum mvpp2_bm_type {
-	MVPP2_BM_FREE,
-	MVPP2_BM_SWF_LONG,
-	MVPP2_BM_SWF_SHORT
+enum mvpp2_bm_pool_log_num {
+	MVPP2_BM_SHORT,
+	MVPP2_BM_LONG,
+	MVPP2_BM_NUM_POOLS
 };
 
 /* Definitions */
@@ -1145,7 +1146,6 @@ struct mvpp2_cls_lookup_entry {
 struct mvpp2_bm_pool {
 	/* Pool number in the range 0-7 */
 	int id;
-	enum mvpp2_bm_type type;
 
 	/* Buffer Pointers Pool External (BPPE) size */
 	int size;
@@ -1168,6 +1168,12 @@ struct mvpp2_bm_pool {
 	u32 port_map;
 };
 
+struct mvpp2_pool_attributes {
+	char description[32];
+	int pkt_size;
+	int buf_num;
+};
+
 /* Queue modes */
 #define MVPP2_QDIST_SINGLE_MODE	0
 #define MVPP2_QDIST_MULTI_MODE	1
@@ -1176,6 +1182,17 @@ static int queue_mode = MVPP2_QDIST_SINGLE_MODE;
 
 module_param(queue_mode, int, 0444);
 MODULE_PARM_DESC(queue_mode, "Set queue_mode (single=0, multi=1)");
+
+struct mvpp2_pool_attributes mvpp2_pools[] = {
+	{
+		.description =  "short", /* pkt_size=MVPP2_BM_SHORT_PKT_SIZE */
+		.buf_num     =  MVPP2_BM_SHORT_BUF_NUM,
+	},
+	{
+		.description =  "long", /* pkt_size=MVPP2_BM_LONG_PKT_SIZE */
+		.buf_num     =  MVPP2_BM_LONG_BUF_NUM,
+	}
+};
 
 #define MVPP2_DRIVER_NAME "mvpp2"
 #define MVPP2_DRIVER_VERSION "1.0"
@@ -3807,7 +3824,6 @@ static int mvpp2_bm_pool_create(struct platform_device *pdev,
 	val |= MVPP2_BM_START_MASK;
 	mvpp2_write(priv, MVPP2_BM_POOL_CTRL_REG(bm_pool->id), val);
 
-	bm_pool->type = MVPP2_BM_FREE;
 	bm_pool->size = size;
 	bm_pool->pkt_size = 0;
 	bm_pool->buf_num = 0;
@@ -3917,7 +3933,7 @@ static int mvpp2_bm_pools_init(struct platform_device *pdev,
 
 	/* Create all pools with maximum size */
 	size = MVPP2_BM_POOL_SIZE_MAX;
-	for (i = 0; i < MVPP2_BM_POOLS_NUM; i++) {
+	for (i = 0; i < MVPP2_BM_NUM_POOLS; i++) {
 		bm_pool = &priv->bm_pools[i];
 		bm_pool->id = i;
 		err = mvpp2_bm_pool_create(pdev, priv, bm_pool, size);
@@ -3938,7 +3954,7 @@ static int mvpp2_bm_init(struct platform_device *pdev, struct mvpp2 *priv)
 {
 	int i, err;
 
-	for (i = 0; i < MVPP2_BM_POOLS_NUM; i++) {
+	for (i = 0; i < MVPP2_BM_NUM_POOLS; i++) {
 		/* Mask BM all interrupts */
 		mvpp2_write(priv, MVPP2_BM_INTR_MASK_REG(i), 0);
 		/* Clear BM cause register */
@@ -3946,7 +3962,7 @@ static int mvpp2_bm_init(struct platform_device *pdev, struct mvpp2 *priv)
 	}
 
 	/* Allocate and initialize BM pools */
-	priv->bm_pools = devm_kcalloc(&pdev->dev, MVPP2_BM_POOLS_NUM,
+	priv->bm_pools = devm_kcalloc(&pdev->dev, MVPP2_BM_NUM_POOLS,
 				      sizeof(*priv->bm_pools), GFP_KERNEL);
 	if (!priv->bm_pools)
 		return -ENOMEM;
@@ -3955,6 +3971,15 @@ static int mvpp2_bm_init(struct platform_device *pdev, struct mvpp2 *priv)
 	if (err < 0)
 		return err;
 	return 0;
+}
+
+static void mvpp2_set_bm_pool_packet_size(void)
+{
+	/* Compiler does not allow below Init in structure definition */
+	mvpp2_pools[MVPP2_BM_SHORT].pkt_size =
+		MVPP2_BM_SHORT_PKT_SIZE;
+	mvpp2_pools[MVPP2_BM_LONG].pkt_size =
+		MVPP2_BM_LONG_PKT_SIZE;
 }
 
 /* Attach long pool to rxq */
@@ -4095,13 +4120,11 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
 	bm_pool->buf_num += i;
 
 	netdev_dbg(port->dev,
-		   "%s pool %d: pkt_size=%4d, buf_size=%4d, total_size=%4d\n",
-		   bm_pool->type == MVPP2_BM_SWF_SHORT ? "short" : " long",
+		   "pool %d: pkt_size=%4d, buf_size=%4d, total_size=%4d\n",
 		   bm_pool->id, bm_pool->pkt_size, buf_size, total_size);
 
 	netdev_dbg(port->dev,
-		   "%s pool %d: %d of %d buffers added\n",
-		   bm_pool->type == MVPP2_BM_SWF_SHORT ? "short" : " long",
+		   "pool %d: %d of %d buffers added\n",
 		   bm_pool->id, i, buf_num);
 	return i;
 }
@@ -4110,25 +4133,21 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
  * pool pointer on success
  */
 static struct mvpp2_bm_pool *
-mvpp2_bm_pool_use(struct mvpp2_port *port, int pool, enum mvpp2_bm_type type,
-		  int pkt_size)
+mvpp2_bm_pool_use(struct mvpp2_port *port, int pool, int pkt_size)
 {
 	struct mvpp2_bm_pool *new_pool = &port->priv->bm_pools[pool];
 	int num;
 
-	if (new_pool->type != MVPP2_BM_FREE && new_pool->type != type) {
-		netdev_err(port->dev, "mixing pool types is forbidden\n");
+	if (pool < MVPP2_BM_SHORT ||
+	    pool > MVPP2_BM_LONG) {
+		netdev_err(port->dev, "pool does not exist\n");
 		return NULL;
 	}
-
-	if (new_pool->type == MVPP2_BM_FREE)
-		new_pool->type = type;
 
 	/* Allocate buffers in case BM pool is used as long pool, but packet
 	 * size doesn't match MTU or BM pool hasn't being used yet
 	 */
-	if (((type == MVPP2_BM_SWF_LONG) && (pkt_size > new_pool->pkt_size)) ||
-	    (new_pool->pkt_size == 0)) {
+	if (new_pool->pkt_size == 0) {
 		int pkts_num;
 
 		/* Set default buffer number or free all the buffers in case
@@ -4136,9 +4155,7 @@ mvpp2_bm_pool_use(struct mvpp2_port *port, int pool, enum mvpp2_bm_type type,
 		 */
 		pkts_num = new_pool->buf_num;
 		if (pkts_num == 0)
-			pkts_num = type == MVPP2_BM_SWF_LONG ?
-				   MVPP2_BM_LONG_BUF_NUM :
-				   MVPP2_BM_SHORT_BUF_NUM;
+			pkts_num = mvpp2_pools[pool].buf_num;
 		else
 			mvpp2_bm_bufs_free(port->dev->dev.parent,
 					   port->priv, new_pool);
@@ -4170,9 +4187,8 @@ static int mvpp2_swf_bm_pool_init(struct mvpp2_port *port)
 
 	if (!port->pool_long) {
 		port->pool_long =
-		       mvpp2_bm_pool_use(port, MVPP2_BM_SWF_LONG_POOL(port->id),
-					 MVPP2_BM_SWF_LONG,
-					 port->pkt_size);
+			mvpp2_bm_pool_use(port, MVPP2_BM_LONG,
+					  mvpp2_pools[MVPP2_BM_LONG].pkt_size);
 		if (!port->pool_long)
 			return -ENOMEM;
 
@@ -4184,9 +4200,8 @@ static int mvpp2_swf_bm_pool_init(struct mvpp2_port *port)
 
 	if (!port->pool_short) {
 		port->pool_short =
-			mvpp2_bm_pool_use(port, MVPP2_BM_SWF_SHORT_POOL,
-					  MVPP2_BM_SWF_SHORT,
-					  MVPP2_BM_SHORT_PKT_SIZE);
+			mvpp2_bm_pool_use(port, MVPP2_BM_SHORT,
+					  mvpp2_pools[MVPP2_BM_SHORT].pkt_size);
 		if (!port->pool_short)
 			return -ENOMEM;
 
@@ -4205,7 +4220,6 @@ static int mvpp2_bm_update_mtu(struct net_device *dev, int mtu)
 	struct mvpp2_port *port = netdev_priv(dev);
 	struct mvpp2_bm_pool *port_pool = port->pool_long;
 	int num, pkts_num = port_pool->buf_num;
-	int pkt_size = MVPP2_RX_PKT_SIZE(mtu);
 
 	/* Update BM pool with new buffer size */
 	mvpp2_bm_bufs_free(dev->dev.parent, port->priv, port_pool);
@@ -4214,18 +4228,12 @@ static int mvpp2_bm_update_mtu(struct net_device *dev, int mtu)
 		return -EIO;
 	}
 
-	port_pool->pkt_size = pkt_size;
-	port_pool->frag_size = SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(pkt_size)) +
-		MVPP2_SKB_SHINFO_SIZE;
 	num = mvpp2_bm_bufs_add(port, port_pool, pkts_num);
 	if (num != pkts_num) {
 		WARN(1, "pool %d: %d of %d allocated\n",
 		     port_pool->id, num, pkts_num);
 		return -EIO;
 	}
-
-	mvpp2_bm_pool_bufsize_set(port->priv, port_pool,
-				  MVPP2_RX_BUF_SIZE(port_pool->pkt_size));
 	dev->mtu = mtu;
 	netdev_update_features(dev);
 	return 0;
@@ -7829,6 +7837,7 @@ static int mvpp2_probe(struct platform_device *pdev)
 			 */
 			priv->sysctrl_base = NULL;
 	}
+	mvpp2_set_bm_pool_packet_size();
 
 	for (i = 0; i < MVPP2_MAX_THREADS; i++) {
 		u32 addr_space_sz;
@@ -7943,7 +7952,7 @@ static int mvpp2_remove(struct platform_device *pdev)
 		i++;
 	}
 
-	for (i = 0; i < MVPP2_BM_POOLS_NUM; i++) {
+	for (i = 0; i < MVPP2_BM_NUM_POOLS; i++) {
 		struct mvpp2_bm_pool *bm_pool = &priv->bm_pools[i];
 
 		mvpp2_bm_pool_destroy(pdev, priv, bm_pool);
