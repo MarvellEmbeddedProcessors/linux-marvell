@@ -994,18 +994,18 @@ static int advk_pcie_probe(struct platform_device *pdev)
 		return PTR_ERR(pcie->clk);
 	}
 
-	/* Config reset gpio for pcie */
+	/* Config reset gpio for pcie if there is valid gpio setting in DTS */
 	reset_gpio = of_get_named_gpio_flags(dn, "reset-gpios", 0, &pcie->flags);
-	if (reset_gpio != -EPROBE_DEFER) {
-		if (gpio_is_valid(reset_gpio)) {
-			pcie->reset_gpio = gpio_to_desc(reset_gpio);
-			ret = advk_pcie_clk_enable_then_reset(pcie);
-			if (ret)
-				return ret;
+	if (gpio_is_valid(reset_gpio)) {
+		pcie->reset_gpio = gpio_to_desc(reset_gpio);
+		ret = advk_pcie_clk_enable_then_reset(pcie);
+		if (ret)
+			return ret;
 
-			/* continue init flow after pcie reset */
-			goto after_pcie_reset;
-		}
+		/* continue init flow after pcie reset */
+		goto after_pcie_reset;
+	} else if (reset_gpio == -EPROBE_DEFER) {
+		return -EPROBE_DEFER;
 	}
 
 	ret = clk_prepare_enable(pcie->clk);
