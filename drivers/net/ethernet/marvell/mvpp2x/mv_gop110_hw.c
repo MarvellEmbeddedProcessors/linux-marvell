@@ -295,6 +295,88 @@ static void mv_gop110_gmac_sgmii2_5_cfg(struct gop_hw *gop, int mac_num)
 	/* configure GIG MAC to 1000Base-X mode connected to a
 	 * fiber transceiver
 	 */
+	val &= ~MV_GMAC_PORT_CTRL0_PORTTYPE_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL0_REG, val);
+
+	/* configure AN 0x9260 */
+	an = MV_GMAC_PORT_AUTO_NEG_CFG_SET_MII_SPEED_MASK  |
+		MV_GMAC_PORT_AUTO_NEG_CFG_SET_GMII_SPEED_MASK |
+		MV_GMAC_PORT_AUTO_NEG_CFG_ADV_PAUSE_MASK    |
+		MV_GMAC_PORT_AUTO_NEG_CFG_SET_FULL_DX_MASK  |
+		MV_GMAC_PORT_AUTO_NEG_CFG_CHOOSE_SAMPLE_TX_CONFIG_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_AUTO_NEG_CFG_REG, an);
+}
+
+static void mv_gop110_gmac_1000basex_cfg(struct gop_hw *gop, int mac_num)
+{
+	u32 val, thresh, an;
+
+	/* configure minimal level of the Tx FIFO before the lower
+	 * part starts to read a packet
+	 */
+	thresh = MV_SGMII_TX_FIFO_MIN_TH;
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_FIFO_CFG_1_REG);
+	U32_SET_FIELD(val, MV_GMAC_PORT_FIFO_CFG_1_TX_FIFO_MIN_TH_MASK,
+		      (thresh << MV_GMAC_PORT_FIFO_CFG_1_TX_FIFO_MIN_TH_OFFS));
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_FIFO_CFG_1_REG, val);
+
+	/* Disable bypass of sync module */
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL4_REG);
+	val |= MV_GMAC_PORT_CTRL4_SYNC_BYPASS_MASK;
+	/* configure DP clock select according to mode */
+	val &= ~MV_GMAC_PORT_CTRL4_DP_CLK_SEL_MASK;
+	/* configure QSGMII bypass according to mode */
+	val |= MV_GMAC_PORT_CTRL4_QSGMII_BYPASS_ACTIVE_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL4_REG, val);
+
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL2_REG);
+	val &= ~MV_GMAC_PORT_CTRL2_FC_MODE_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL2_REG, val);
+
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL0_REG);
+	/* configure GIG MAC to 1000BASEX mode */
+	val |= MV_GMAC_PORT_CTRL0_PORTTYPE_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL0_REG, val);
+
+	/* In 1000BaseX mode, we can't negotiate speed (it's
+	 * only 1000), and we do not want InBand autoneg
+	 * bypass enabled (link interrupt storm risk
+	 * otherwise).
+	 */
+	an = MV_GMAC_PORT_AUTO_NEG_CFG_EN_PCS_AN_MASK |
+		MV_GMAC_PORT_AUTO_NEG_CFG_SET_GMII_SPEED_MASK  |
+		MV_GMAC_PORT_AUTO_NEG_CFG_EN_FC_AN_MASK     |
+		MV_GMAC_PORT_AUTO_NEG_CFG_EN_FDX_AN_MASK    |
+		MV_GMAC_PORT_AUTO_NEG_CFG_CHOOSE_SAMPLE_TX_CONFIG_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_AUTO_NEG_CFG_REG, an);
+}
+
+static void mv_gop110_gmac_2500basex_cfg(struct gop_hw *gop, int mac_num)
+{
+	u32 val, thresh, an;
+
+	/* configure minimal level of the Tx FIFO before the lower
+	 * part starts to read a packet
+	 */
+	thresh = MV_SGMII2_5_TX_FIFO_MIN_TH;
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_FIFO_CFG_1_REG);
+	U32_SET_FIELD(val, MV_GMAC_PORT_FIFO_CFG_1_TX_FIFO_MIN_TH_MASK,
+		      (thresh << MV_GMAC_PORT_FIFO_CFG_1_TX_FIFO_MIN_TH_OFFS));
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_FIFO_CFG_1_REG, val);
+
+	/* Disable bypass of sync module */
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL4_REG);
+	val |= MV_GMAC_PORT_CTRL4_SYNC_BYPASS_MASK;
+	/* configure DP clock select according to mode */
+	val |= MV_GMAC_PORT_CTRL4_DP_CLK_SEL_MASK;
+	/* configure QSGMII bypass according to mode */
+	val |= MV_GMAC_PORT_CTRL4_QSGMII_BYPASS_ACTIVE_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL4_REG, val);
+
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL0_REG);
+	/* configure GIG MAC to 1000Base-X mode connected to a
+	 * fiber transceiver
+	 */
 	val |= MV_GMAC_PORT_CTRL0_PORTTYPE_MASK;
 	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL0_REG, val);
 
@@ -322,6 +404,12 @@ int mv_gop110_gmac_mode_cfg(struct gop_hw *gop, struct mv_mac_data *mac)
 			mv_gop110_gmac_sgmii2_5_cfg(gop, mac_num);
 		else
 			mv_gop110_gmac_sgmii_cfg(gop, mac_num);
+	break;
+	case PHY_INTERFACE_MODE_1000BASEX:
+		if (mac->speed == 2500)
+			mv_gop110_gmac_2500basex_cfg(gop, mac_num);
+		else
+			mv_gop110_gmac_1000basex_cfg(gop, mac_num);
 	break;
 	case PHY_INTERFACE_MODE_RGMII:
 		mv_gop110_gmac_rgmii_cfg(gop, mac_num);
@@ -931,6 +1019,24 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		mv_gop110_gmac_reset(gop, mac_num, UNRESET);
 		mv_gop110_force_link_mode_set(gop, mac, false, false);
 	break;
+	case PHY_INTERFACE_MODE_1000BASEX:
+		mv_gop110_force_link_mode_set(gop, mac, false, true);
+		mv_gop110_gmac_reset(gop, mac_num, RESET);
+		/* configure PCS */
+		mv_gop110_gpcs_mode_cfg(gop, mac_num, true);
+
+		/* configure MAC */
+		mv_gop110_gmac_mode_cfg(gop, mac);
+		/* select proper Mac mode */
+		mv_gop110_xlg_2_gig_mac_cfg(gop, mac_num);
+
+		/* set InBand AutoNeg */
+		mv_gop110_in_band_auto_neg(gop, mac_num, false);
+
+		/* mac unreset */
+		mv_gop110_gmac_reset(gop, mac_num, UNRESET);
+		mv_gop110_force_link_mode_set(gop, mac, false, false);
+	break;
 	case PHY_INTERFACE_MODE_XAUI:
 		num_of_act_lanes = 4;
 		mac_num = 0;
@@ -1015,6 +1121,7 @@ int mv_gop110_port_reset(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		/* set InBand AutoNeg */
 		mv_gop110_in_band_auto_neg(gop, mac_num, false);
 		/* mac unreset */
@@ -1060,6 +1167,7 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac, struct p
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_port_enable(gop, port_num);
 		mv_gop110_force_link_mode_set(gop, mac, false, false);
 		mv_gop110_gmac_reset(gop, port_num, UNRESET);
@@ -1088,6 +1196,7 @@ void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac, struct 
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_port_disable(gop, port_num);
 		mv_gop110_force_link_mode_set(gop, mac, false, true);
 		mv_gop110_gmac_reset(gop, port_num, RESET);
@@ -1115,8 +1224,10 @@ void mv_gop110_port_periodic_xon_set(struct gop_hw *gop,
 	int port_num = mac->gop_index;
 
 	switch (mac->phy_mode) {
+	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_port_periodic_xon_set(gop, port_num, enable);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
@@ -1140,6 +1251,7 @@ bool mv_gop110_port_is_link_up(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		return mv_gop110_gmac_link_status_get(gop, port_num);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
@@ -1165,6 +1277,7 @@ int mv_gop110_port_link_status(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_link_status(gop, port_num, pstatus);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
@@ -1233,6 +1346,7 @@ int mv_gop110_port_regs(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		pr_info("\n[gop GMAC #%d registers]\n", port_num);
 		mv_gop110_gmac_regs_dump(gop, port_num);
 	break;
@@ -1259,6 +1373,7 @@ int mv_gop110_port_events_mask(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_port_link_event_mask(gop, port_num);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
@@ -1283,6 +1398,7 @@ int mv_gop110_port_events_unmask(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_port_link_event_unmask(gop, port_num);
 		/* gige interrupt cause connected to CPU via XLG
 		 * external interrupt cause
@@ -1311,6 +1427,7 @@ int mv_gop110_port_events_clear(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_port_link_event_clear(gop, port_num);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
@@ -1351,6 +1468,8 @@ int mv_gop110_status_show(struct gop_hw *gop, struct mv_pp2x *pp2, int port_num)
 	case PHY_INTERFACE_MODE_QSGMII:
 		pr_info("Port mode               : QSGMII");
 	break;
+	case PHY_INTERFACE_MODE_1000BASEX:
+		pr_info("Port mode               : 1000BASEX");
 	case PHY_INTERFACE_MODE_XAUI:
 		pr_info("Port mode               : XAUI");
 	break;
@@ -1437,6 +1556,7 @@ int mv_gop110_speed_duplex_get(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_speed_duplex_get(gop, port_num, speed,
 						duplex);
 	break;
@@ -1466,6 +1586,7 @@ int mv_gop110_speed_duplex_set(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_gmac_speed_duplex_set(gop, port_num, speed, duplex);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
@@ -1489,6 +1610,7 @@ int mv_gop110_autoneg_restart(struct gop_hw *gop, struct mv_mac_data *mac)
 
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 	break;
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
@@ -1517,6 +1639,7 @@ int mv_gop110_fl_cfg(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		/* disable AN */
 		if (mac->speed == 2500)
 			mv_gop110_speed_duplex_set(gop, mac,
@@ -1553,6 +1676,7 @@ int mv_gop110_force_link_mode_set(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		/* force link */
 		mv_gop110_gmac_force_link_mode_set(gop, port_num,
 						   force_link_up,
@@ -1582,6 +1706,7 @@ int mv_gop110_force_link_mode_get(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		return mv_gop110_gmac_force_link_mode_get(gop, port_num,
 							  force_link_up,
 							  force_link_down);
@@ -1610,6 +1735,7 @@ int mv_gop110_loopback_set(struct gop_hw *gop, struct mv_mac_data *mac,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		/* set loopback */
 		if (lb)
 			type = MV_TX_2_RX_LB;

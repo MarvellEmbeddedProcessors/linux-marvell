@@ -3550,6 +3550,7 @@ static void mv_serdes_port_init(struct mv_pp2x_port *port)
 		break;
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		if (port->mac_data.flags & MV_EMAC_F_SGMII2_5)
 			mode = COMPHY_DEF(COMPHY_HS_SGMII_MODE, port->id,
 					  COMPHY_SPEED_3_125G, COMPHY_POLARITY_NO_INVERT);
@@ -3637,6 +3638,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 		case PHY_INTERFACE_MODE_RGMII:
 		case PHY_INTERFACE_MODE_SGMII:
 		case PHY_INTERFACE_MODE_QSGMII:
+		case PHY_INTERFACE_MODE_1000BASEX:
 			mv_gop110_gmac_max_rx_size_set(gop, mac_num,
 						       port->pkt_size);
 		break;
@@ -4677,6 +4679,7 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 
 		switch (phy_mode) {
 		case PHY_INTERFACE_MODE_SGMII:
+		case PHY_INTERFACE_MODE_1000BASEX:
 			speed = 0;
 			/* check phy speed */
 			of_property_read_u32(emac_node, "phy-speed", &speed);
@@ -4760,11 +4763,13 @@ static u32 mvp_pp2x_gop110_netc_cfg_create(struct mv_pp2x *priv)
 				val |= MV_NETC_GE_MAC0_RXAUI_L23;
 		}
 		if (mac->gop_index == 2) {
-			if (mac->phy_mode == PHY_INTERFACE_MODE_SGMII)
+			if (mac->phy_mode == PHY_INTERFACE_MODE_SGMII ||
+			    mac->phy_mode == PHY_INTERFACE_MODE_1000BASEX)
 				val |= MV_NETC_GE_MAC2_SGMII;
 		}
 		if (mac->gop_index == 3) {
-			if (mac->phy_mode == PHY_INTERFACE_MODE_SGMII)
+			if (mac->phy_mode == PHY_INTERFACE_MODE_SGMII ||
+			    mac->phy_mode == PHY_INTERFACE_MODE_1000BASEX)
 				val |= MV_NETC_GE_MAC3_SGMII;
 			else if (mac->phy_mode == PHY_INTERFACE_MODE_RGMII)
 				val |= MV_NETC_GE_MAC3_RGMII;
