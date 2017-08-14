@@ -907,8 +907,8 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		/* select proper Mac mode */
 		mv_gop110_xlg_2_gig_mac_cfg(gop, mac_num);
 
-		/* pcs unreset */
-		mv_gop110_gpcs_reset(gop, mac_num, UNRESET);
+		/* set InBand AutoNeg */
+		mv_gop110_in_band_auto_neg(gop, mac_num, true);
 		/* mac unreset */
 		mv_gop110_gmac_reset(gop, mac_num, UNRESET);
 		mv_gop110_force_link_mode_set(gop, mac, false, false);
@@ -925,8 +925,8 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		/* select proper Mac mode */
 		mv_gop110_xlg_2_gig_mac_cfg(gop, mac_num);
 
-		/* pcs unreset */
-		mv_gop110_gpcs_reset(gop, mac_num, UNRESET);
+		/* set InBand AutoNeg */
+		mv_gop110_in_band_auto_neg(gop, mac_num, true);
 		/* mac unreset */
 		mv_gop110_gmac_reset(gop, mac_num, UNRESET);
 		mv_gop110_force_link_mode_set(gop, mac, false, false);
@@ -1015,8 +1015,8 @@ int mv_gop110_port_reset(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
-		/* pcs unreset */
-		mv_gop110_gpcs_reset(gop, mac_num, RESET);
+		/* set InBand AutoNeg */
+		mv_gop110_in_band_auto_neg(gop, mac_num, false);
 		/* mac unreset */
 		mv_gop110_gmac_reset(gop, mac_num, RESET);
 	break;
@@ -1650,16 +1650,16 @@ int mv_gop110_gpcs_mode_cfg(struct gop_hw *gop, int pcs_num, bool en)
 }
 
 /* Set InBand AutoNeg configuration */
-int  mv_gop110_gpcs_reset(struct gop_hw *gop, int pcs_num, enum mv_reset act)
+int  mv_gop110_in_band_auto_neg(struct gop_hw *gop, int pcs_num, bool en)
 {
 	u32 reg_data;
 
 	reg_data = mv_gop110_gmac_read(gop, pcs_num, MV_GMAC_PORT_CTRL2_REG);
-	if (act == RESET)
-		U32_SET_FIELD(reg_data, MV_GMAC_PORT_CTRL2_SGMII_MODE_MASK, 0);
-	else
+	if (en)
 		U32_SET_FIELD(reg_data, MV_GMAC_PORT_CTRL2_SGMII_MODE_MASK,
 			      1 << MV_GMAC_PORT_CTRL2_SGMII_MODE_OFFS);
+	else
+		U32_SET_FIELD(reg_data, MV_GMAC_PORT_CTRL2_SGMII_MODE_MASK, 0);
 
 	mv_gop110_gmac_write(gop, pcs_num, MV_GMAC_PORT_CTRL2_REG, reg_data);
 	return 0;
