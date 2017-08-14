@@ -4668,6 +4668,8 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 		fixed_link_node = of_get_child_by_name(emac_node, "fixed-link");
 		port->mac_data.duplex = of_property_read_bool(fixed_link_node,
 				"full-duplex");
+		if (port->mac_data.speed == SPEED_2500)
+			port->mac_data.flags |= MV_EMAC_F_SGMII2_5;
 		if (of_property_read_u32(fixed_link_node, "speed",
 					 &port->mac_data.speed))
 			return -EINVAL;
