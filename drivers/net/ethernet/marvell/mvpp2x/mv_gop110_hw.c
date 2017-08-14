@@ -1631,24 +1631,7 @@ int mv_gop110_loopback_set(struct gop_hw *gop, struct mv_mac_data *mac,
 	return 0;
 }
 
-/**************************************************************************
-* mv_gop110_gpcs_mode_cfg
-*
-* DESCRIPTION:
-	Configure port to working with Gig PCS or don't.
-*
-* INPUTS:
-*       pcs_num   - physical PCS number
-*       en        - true to enable PCS
-*
-* OUTPUTS:
-*       None.
-*
-* RETURNS:
-*       0  - on success
-*       1  - on error
-*
-**************************************************************************/
+/* Set GPCS mode configuration */
 int mv_gop110_gpcs_mode_cfg(struct gop_hw *gop, int pcs_num, bool en)
 {
 	u32 val;
@@ -1666,24 +1649,7 @@ int mv_gop110_gpcs_mode_cfg(struct gop_hw *gop, int pcs_num, bool en)
 	return 0;
 }
 
-/**************************************************************************
-* mv_gop110_gpcs_reset
-*
-* DESCRIPTION:
-*       Set the selected PCS number to reset or exit from reset.
-*
-* INPUTS:
-*       pcs_num    - physical PCS number
-*       action    - reset / unreset
-*
-* OUTPUTS:
-*       None.
-*
-* RETURNS:
-*       0  - on success
-*       1  - on error
-*
-*************************************************************************/
+/* Set InBand AutoNeg configuration */
 int  mv_gop110_gpcs_reset(struct gop_hw *gop, int pcs_num, enum mv_reset act)
 {
 	u32 reg_data;
@@ -1699,9 +1665,7 @@ int  mv_gop110_gpcs_reset(struct gop_hw *gop, int pcs_num, enum mv_reset act)
 	return 0;
 }
 
-/**************************************************************************
-* mv_gop110_smi_init
-**************************************************************************/
+/* Init SMI interface */
 int mv_gop110_smi_init(struct gop_hw *gop)
 {
 	u32 val;
@@ -1714,9 +1678,7 @@ int mv_gop110_smi_init(struct gop_hw *gop)
 	return 0;
 }
 
-/**************************************************************************
-* mv_gop_phy_addr_cfg
-**************************************************************************/
+/* Set SMI PHY address */
 int mv_gop110_smi_phy_addr_cfg(struct gop_hw *gop, int port, int addr)
 {
 	mv_gop110_smi_write(gop, MV_SMI_PHY_ADDRESS_REG(port), addr);
