@@ -6900,6 +6900,11 @@ static int mvpp2_stop(struct net_device *dev)
 	mvpp2_shared_interrupt_mask_unmask(port, true);
 
 	mvpp2_irqs_deinit(port);
+
+	/* Free link IRQ */
+	if (port->priv->hw_version == MVPP22 && !port->phy_node && port->link_irq)
+		free_irq(port->link_irq, port);
+
 	if (!port->has_tx_irqs) {
 		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
