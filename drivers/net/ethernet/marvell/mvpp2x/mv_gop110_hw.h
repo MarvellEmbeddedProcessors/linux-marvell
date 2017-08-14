@@ -171,7 +171,7 @@ void mv_gop_reg_print(char *reg_name, u32 reg);
 
 /* Gig PCS Functions */
 int mv_gop110_gpcs_mode_cfg(struct gop_hw *gop, int pcs_num, bool en);
-int mv_gop110_gpcs_reset(struct gop_hw *gop, int pcs_num, enum mv_reset act);
+int mv_gop110_in_band_auto_neg(struct gop_hw *gop, int pcs_num, bool en);
 
 /* MPCS Functions */
 
