@@ -56,6 +56,11 @@
 
 	chosen { };
 
+	aliases {
+		ethernet0 = &emac0;
+		ethernet1 = &emac3;
+	};
+
 	ap806 {
 		config-space {
 			sdhci@6e0000 {

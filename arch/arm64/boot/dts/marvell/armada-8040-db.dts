@@ -57,6 +57,13 @@
 
 	chosen { };
 
+	aliases {
+		ethernet0 = &emac0;
+		ethernet1 = &emac3;
+		ethernet2 = &emac0_1;
+		ethernet3 = &emac2_1;
+	};
+
 	ap806 {
 		config-space {
 			serial@512000 {

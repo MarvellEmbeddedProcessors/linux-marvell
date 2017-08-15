@@ -54,6 +54,11 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
+	aliases {
+		ethernet0 = &emac2;
+		ethernet1 = &emac3;
+	};
+
 	chosen { };
 
 	ap806 {
