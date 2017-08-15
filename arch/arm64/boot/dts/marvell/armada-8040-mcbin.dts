@@ -56,6 +56,13 @@
 		reg = <0x0 0x0 0x0 0x80000000>;
 	};
 
+	aliases {
+		ethernet0 = &emac0;
+		ethernet1 = &emac0_1;
+		ethernet2 = &emac2_1;
+		ethernet3 = &emac3_1;
+	};
+
 	ap806 {
 		config-space {
 			serial@512000 {
