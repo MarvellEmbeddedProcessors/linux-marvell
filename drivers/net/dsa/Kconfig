@@ -28,4 +28,13 @@ config NET_DSA_BCM_SF2
 	  This enables support for the Broadcom Starfighter 2 Ethernet
 	  switch chips.
 
+config DSA_MVMDIO
+	tristate "Sysfs for soho switch register access"
+	depends on MVMDIO && MVXMDIO
+	---help---
+	This option adds the ability to read or write switch registers.
+	The files read,write,dump in /sys/devices/platform/dsa_mvmdio provides
+	register access to switch registers, internal phy registers and
+	external phy registers.
+
 endmenu
