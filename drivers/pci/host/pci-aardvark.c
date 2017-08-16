@@ -4,6 +4,8 @@
  *
  * Copyright (C) 2016 Marvell
  *
+ * Author: Hezi Shahmoon <hezi.shahmoon@marvell.com>
+ *
  * This file is licensed under the terms of the GNU General Public
  * License version 2.  This program is licensed "as is" without any
  * warranty of any kind, whether express or implied.
@@ -139,14 +141,24 @@
 #define CENTRAL_INT_BASE_ADDR			0x1b000
 #define HOST_CTRL_INT_STATUS_REG		(CENTRAL_INT_BASE_ADDR + 0x0)
 #define HOST_CTRL_INT_MASK_REG			(CENTRAL_INT_BASE_ADDR + 0x4)
+#define     PCIE_IRQ_CMDQ_INT			BIT(0)
 #define     PCIE_IRQ_MSI_STATUS_INT		BIT(1)
+#define     PCIE_IRQ_CMD_SENT_DONE		BIT(3)
 #define     PCIE_IRQ_DMA_INT			BIT(4)
+#define     PCIE_IRQ_IB_DXFERDONE		BIT(5)
 #define     PCIE_IRQ_OB_DXFERDONE		BIT(6)
 #define     PCIE_IRQ_OB_RXFERDONE		BIT(7)
+#define     PCIE_IRQ_COMPQ_INT			BIT(12)
+#define     PCIE_IRQ_DIR_RD_DDR_DET		BIT(13)
+#define     PCIE_IRQ_DIR_WR_DDR_DET		BIT(14)
 #define     PCIE_IRQ_CORE_INT			BIT(16)
 #define     PCIE_IRQ_CORE_INT_PIO		BIT(17)
 #define     PCIE_IRQ_DPMU_INT			BIT(18)
 #define     PCIE_IRQ_PCIE_MIS_INT		BIT(19)
+#define     PCIE_IRQ_MSI_INT1_DET		BIT(20)
+#define     PCIE_IRQ_MSI_INT2_DET		BIT(21)
+#define     PCIE_IRQ_RC_DBELL_DET		BIT(22)
+#define     PCIE_IRQ_EP_STATUS			BIT(23)
 #define     PCIE_IRQ_ALL_MASK			0xfff0fb
 #define     PCIE_IRQ_ENABLE_INTS_MASK		PCIE_IRQ_CORE_INT
 
@@ -264,9 +276,11 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
 
 	/* Set PCIe Device Control and Status 1 PF0 register */
 	reg = PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE |
-		(PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ << PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
+		(PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ <<
+		 PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
 		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE |
-		(PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ << PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT);
+		(PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ <<
+		 PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT);
 	advk_writel(pcie, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
 
 	/* Program PCIe Control 2 to disable strict ordering */
@@ -833,7 +847,6 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
 		default:
 			continue;
 		}
-
 		if (parent) {
 			err = devm_request_resource(dev, parent, res);
 			if (err)
@@ -886,10 +899,9 @@ static int advk_pcie_bus_configure_mps(struct pci_dev *dev, void *data)
 	return 0;
 }
 
-static void advk_pcie_configure_mps(struct advk_pcie *pcie)
+static void advk_pcie_configure_mps(struct pci_bus *bus, struct advk_pcie *pcie)
 {
 	u8 smpss = PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ;
-	struct pci_bus *bus = pcie->bus;
 	u32 reg;
 
 	/* Find the minimal supported MAX payload size */
@@ -978,7 +990,7 @@ static int advk_pcie_probe(struct platform_device *pdev)
 
 	pcie->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(pcie->clk)) {
-		dev_err(&pdev->dev, "Failed to obtain clock from DT\n");
+		dev_err(dev, "Failed to obtain clock from DT\n");
 		return PTR_ERR(pcie->clk);
 	}
 
@@ -998,7 +1010,7 @@ static int advk_pcie_probe(struct platform_device *pdev)
 
 	ret = clk_prepare_enable(pcie->clk);
 	if (ret) {
-		dev_err(&pdev->dev, "Failed to enable clock\n");
+		dev_err(dev, "Failed to enable clock\n");
 		return ret;
 	}
 after_pcie_reset:
@@ -1039,7 +1051,7 @@ after_pcie_reset:
 		pcie_bus_configure_settings(child);
 
 	/* Configure the MAX pay load size */
-	advk_pcie_configure_mps(pcie);
+	advk_pcie_configure_mps(bus, pcie);
 
 	pci_bus_add_devices(bus);
 	return 0;
@@ -1096,7 +1108,7 @@ static int advk_pcie_resume_noirq(struct device *dev)
 	advk_pcie_setup_hw(pcie);
 
 	/* Reconfigure the MAX pay load size */
-	advk_pcie_configure_mps(pcie);
+	advk_pcie_configure_mps(pcie->bus, pcie);
 
 	return 0;
 }
@@ -1122,7 +1134,3 @@ static struct platform_driver advk_pcie_driver = {
 	.probe = advk_pcie_probe,
 };
 module_platform_driver(advk_pcie_driver);
-
-MODULE_AUTHOR("Hezi Shahmoon <hezi.shahmoon@marvell.com>");
-MODULE_DESCRIPTION("Aardvark PCIe driver");
-MODULE_LICENSE("GPL v2");
