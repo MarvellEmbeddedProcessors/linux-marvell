@@ -512,6 +512,12 @@
 #define MVPP2_RX_FIFO_PORT_DATA_SIZE	0x2000
 #define MVPP2_RX_FIFO_PORT_ATTR_SIZE	0x80
 #define MVPP2_RX_FIFO_PORT_MIN_PKT	0x80
+#define MVPP2_RX_FIFO_DATA_SIZE_32KB	0x8000
+#define MVPP2_RX_FIFO_DATA_SIZE_8KB	0x2000
+#define MVPP2_RX_FIFO_DATA_SIZE_4KB	0x1000
+#define MVPP2_RX_FIFO_ATTR_SIZE_32KB	0x200
+#define MVPP2_RX_FIFO_ATTR_SIZE_8KB	0x80
+#define MVPP2_RX_FIFO_ATTR_SIZE_4KB	0x40
 
 /* RX buffer constants */
 #define MVPP2_SKB_SHINFO_SIZE \
@@ -7795,8 +7801,8 @@ static void mvpp2_conf_mbus_windows(const struct mbus_dram_target_info *dram,
 	mvpp2_write(priv, MVPP2_BASE_ADDR_ENABLE, win_enable);
 }
 
-/* Initialize Rx FIFO's */
-static void mvpp2_rx_fifo_init(struct mvpp2 *priv)
+/* Initialize PPv21 Rx FIFO's */
+static void mvpp21_rx_fifo_init(struct mvpp2 *priv)
 {
 	int port;
 
@@ -7805,6 +7811,40 @@ static void mvpp2_rx_fifo_init(struct mvpp2 *priv)
 			    MVPP2_RX_FIFO_PORT_DATA_SIZE);
 		mvpp2_write(priv, MVPP2_RX_ATTR_FIFO_SIZE_REG(port),
 			    MVPP2_RX_FIFO_PORT_ATTR_SIZE);
+	}
+
+	mvpp2_write(priv, MVPP2_RX_MIN_PKT_SIZE_REG,
+		    MVPP2_RX_FIFO_PORT_MIN_PKT);
+	mvpp2_write(priv, MVPP2_RX_FIFO_INIT_REG, 0x1);
+}
+
+/* Initialize PPv22 Rx FIFO's */
+static void mvpp22_rx_fifo_init(struct mvpp2 *priv)
+{
+	int port;
+
+	/* Port 0 maximum speed = 10Gb/s - required by spec RX FIFO size 32KB
+	 * Port 1 maximum speed = 2.5Gb/s - required by spec RX FIFO size 8KB
+	 * Port 2 maximum speed = 1Gb/s - required by spec RX FIFO size 4KB
+	 * Port 3 LoopBack port - required by spec RX FIFO size 4KB
+	 */
+	for (port = 0; port < MVPP2_MAX_PORTS; port++) {
+		if (port == 0) {
+			mvpp2_write(priv, MVPP2_RX_DATA_FIFO_SIZE_REG(port),
+				    MVPP2_RX_FIFO_DATA_SIZE_32KB);
+			mvpp2_write(priv, MVPP2_RX_ATTR_FIFO_SIZE_REG(port),
+				    MVPP2_RX_FIFO_ATTR_SIZE_32KB);
+		} else if (port == 1) {
+			mvpp2_write(priv, MVPP2_RX_DATA_FIFO_SIZE_REG(port),
+				    MVPP2_RX_FIFO_DATA_SIZE_8KB);
+			mvpp2_write(priv, MVPP2_RX_ATTR_FIFO_SIZE_REG(port),
+				    MVPP2_RX_FIFO_ATTR_SIZE_8KB);
+		} else {
+			mvpp2_write(priv, MVPP2_RX_DATA_FIFO_SIZE_REG(port),
+				    MVPP2_RX_FIFO_DATA_SIZE_4KB);
+			mvpp2_write(priv, MVPP2_RX_ATTR_FIFO_SIZE_REG(port),
+				    MVPP2_RX_FIFO_ATTR_SIZE_4KB);
+		}
 	}
 
 	mvpp2_write(priv, MVPP2_RX_MIN_PKT_SIZE_REG,
@@ -7908,7 +7948,10 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 	}
 
 	/* Rx Fifo Init */
-	mvpp2_rx_fifo_init(priv);
+	if (priv->hw_version == MVPP21)
+		mvpp21_rx_fifo_init(priv);
+	else
+		mvpp22_rx_fifo_init(priv);
 
 	if (priv->hw_version == MVPP21)
 		writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
