@@ -531,9 +531,8 @@ int mv_pp2x_prs_hw_read(struct mv_pp2x_hw *hw, struct mv_pp2x_prs_entry *pe);
 
 int mv_pp2x_prs_default_init(struct platform_device *pdev,
 			     struct mv_pp2x_hw *hw);
-void mv_pp2x_prs_mac_promisc_set(struct mv_pp2x_hw *hw, int port, bool add);
-void mv_pp2x_prs_mac_multi_set(struct mv_pp2x_hw *hw, int port, int index,
-			       bool add);
+void mv_pp2x_prs_mac_uc_promisc_set(struct mv_pp2x_hw *hw, int port, bool add);
+void mv_pp2x_prs_mac_mc_promisc_set(struct mv_pp2x_hw *hw, int port, bool add);
 int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_port *port,
 			      const u8 *da, bool add);
 int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, bool add);

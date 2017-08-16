@@ -4079,10 +4079,10 @@ static void mv_pp2x_set_rx_promisc(struct mv_pp2x_port *port)
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	int id = port->id;
 
-	/* Accept all: Multicast + Unicast */
-	mv_pp2x_prs_mac_multi_set(hw, id, MVPP2_PE_MAC_MC_ALL, true);
 	/* Enter promisc mode */
-	mv_pp2x_prs_mac_promisc_set(hw, id, true);
+	/* Accept all: Multicast + Unicast */
+	mv_pp2x_prs_mac_uc_promisc_set(hw, id, true);
+	mv_pp2x_prs_mac_mc_promisc_set(hw, id, true);
 	/* Remove all port->id's mcast enries */
 	mv_pp2x_prs_mac_entry_del(port, MVPP2_PRS_MAC_MC, MVPP2_DEL_MAC_ALL);
 	/* Remove all port->id's ucast enries except M2M entry */
@@ -4095,10 +4095,20 @@ static void mv_pp2x_set_rx_allmulti(struct mv_pp2x_port *port)
 	int id = port->id;
 
 	/* Accept all multicast */
-	mv_pp2x_prs_mac_multi_set(hw, id,
-				  MVPP2_PE_MAC_MC_ALL, true);
+	mv_pp2x_prs_mac_mc_promisc_set(hw, id, true);
 	/* Remove all multicast filter entries from parser */
 	mv_pp2x_prs_mac_entry_del(port, MVPP2_PRS_MAC_MC, MVPP2_DEL_MAC_ALL);
+}
+
+static void mv_pp2x_set_rx_uc_multi(struct mv_pp2x_port *port)
+{
+	struct mv_pp2x_hw *hw = &port->priv->hw;
+	int id = port->id;
+
+	/* Accept all unicast */
+	mv_pp2x_prs_mac_uc_promisc_set(hw, id, true);
+	/* Remove all unicast filter entries from parser */
+	mv_pp2x_prs_mac_entry_del(port, MVPP2_PRS_MAC_UC, MVPP2_DEL_MAC_ALL);
 }
 
 /* register unicast and multicast addresses */
@@ -4113,9 +4123,9 @@ static void mv_pp2x_set_rx_mode(struct net_device *dev)
 	if (dev->flags & IFF_PROMISC) {
 		mv_pp2x_set_rx_promisc(port);
 	} else {
-		/* Put dev into promisc if MAC num greater than uc filter max */
+		/* Put dev into UC promisc if MAC num greater than uc filter max */
 		if (netdev_uc_count(dev) > port->priv->pp2_cfg.uc_filter_max) {
-			mv_pp2x_set_rx_promisc(port);
+			mv_pp2x_set_rx_uc_multi(port);
 			return;
 		}
 		/* Remove old enries not in uc list except M2M entry */
@@ -4134,7 +4144,8 @@ static void mv_pp2x_set_rx_mode(struct net_device *dev)
 					   ha->addr[4], ha->addr[5]);
 		}
 		/* Leave promisc mode */
-		mv_pp2x_prs_mac_promisc_set(hw, id, false);
+		mv_pp2x_prs_mac_uc_promisc_set(hw, id, false);
+		mv_pp2x_prs_mac_mc_promisc_set(hw, id, false);
 
 		if (dev->flags & IFF_ALLMULTI) {
 			mv_pp2x_set_rx_allmulti(port);
@@ -4165,8 +4176,7 @@ static void mv_pp2x_set_rx_mode(struct net_device *dev)
 				}
 			}
 			/* Reject other MC mac entries */
-			mv_pp2x_prs_mac_multi_set(hw, id,
-						  MVPP2_PE_MAC_MC_ALL, false);
+			mv_pp2x_prs_mac_mc_promisc_set(hw, id, false);
 		}
 	}
 }
