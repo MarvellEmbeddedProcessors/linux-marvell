@@ -7552,7 +7552,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	unsigned int ntxqs, nrxqs;
 	bool has_tx_irqs;
 	u32 id;
-	int features;
+	u64 features;
 	int phy_mode;
 	int err, i, cpu;
 
@@ -7708,7 +7708,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 		}
 	}
 
-	features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
+	features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO | NETIF_F_RXCSUM;
 	dev->features = features;
 	dev->hw_features |= features | NETIF_F_GRO;
 
