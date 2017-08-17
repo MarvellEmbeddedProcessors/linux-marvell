@@ -1,0 +1,212 @@
+TEE demo
+========
+
+What is TEE?
+------------
+
+.. Note::
+   Definition of TEE - (C) GlobalPlatform - the TEE Standards maintainer
+
+The TEE is a secure area of the main processor in a smart phone (or any connected
+device). It ensures that sensitive data is stored, processed and protected in an
+isolated, trusted environment. The TEE's ability to offer isolated safe execution
+of authorized security software, known as 'trusted applications', enables it to
+provide end-to-end security by enforcing protected execution of authenticated
+code, confidentiality, authenticity, privacy, system integrity and data access
+rights. Comparative to other security environments on the device, the TEE also
+offers high processing speeds and a large amount of accessible memory.
+
+This document explains the way of setting up a demo with prorietary Marvell TEE
+implementation based on GlobalPlatform TEE standards.
+
+ATF + u-boot:
+-------------
+- Apply all ATF patches from the ATF tools/tee folder::
+
+     $ git am tools/tee/*
+
+
+- Obtain TEE binaries for the appropriate platform (A8K or A37xx) from Marvell Extranet.
+  The default binary name is "tee_tw.bin"
+
+- Export the TEE binary location::
+
+     $ export BL32=</path/to/tee_tw.bin>
+
+
+- Build ATF as usual from inside the u-boot folder with additiion of SPD loader type::
+
+     SPD=marvell_spd
+
+  The example below shows the build flow for Armada8040 DB platform::
+
+     $ cd </path/to/the/u-boot/folder>
+     $ export ATF_DIR=</path/to/the/atf/folder>
+     $ export DDR_DIR=</path/to/the/mv_ddr/folder>
+     $ make -C ${ATF_DIR} MV_DDR_PATH=${DDR_DIR} distclean
+     $ make -C ${ATF_DIR} MV_DDR_PATH=${DDR_DIR} USE_COHERENT_MEM=0 \
+     > LOG_LEVEL=20 PLAT=a80x0 SPD=marvell_spd all fip
+
+
+- Burn the flash image to target board and make sure the TEE binary is loaded.
+
+  Sample message log from ATF::
+
+     ...
+     NOTICE:  BL31: Built : 15:27:30, Aug 15 2017
+     tw: [K]sec-rgn size: ra = 0x00600000, rb = 0x00100000, rc = 0x00100000
+     tw: [K]Range Num0: Reg 0xf0020080 = 0x4400507
+     ...
+     tw: [K]TEE TW version 1.3.40, build time 17-07-21 15:30
+     tw: [K]proc log buf: 0xa280000, size: 0x7feca, ctl: a380000
+     ...
+
+
+Linux kernel:
+-------------
+
+- Apply all patches from tools/tee folder::
+
+     $ git am tools/tee/*.patch
+
+
+- Build kernel normaly::
+
+     $ export ARCH=arm64
+     $ export CROSS_COMILE=</path/to/aarch64-toolchain>
+     $ make mrproper && make mvebu_v8_lsp_defconfig && make
+
+- Copy the kernel driver file to the target root FS::
+
+     $ cp drivers/marvell/security/marvelltee/src/marvelltee.ko \
+     > <target/fs/root>
+
+- Copy binary libraries to the defailt /lib location on target FS::
+
+     $ cp </path/to/libmrvl_ss.so> </path/to/target/fs/lib/>
+     $ cp </path/to/libtee_client.so> </path/to/target/fs/lib/>
+
+- Copy the user space daemon and eteec_sstd_caxample binaries to the root FS::
+
+     $ cp </path/to/teec_sstd_ca> <target/fs/root>
+     $ cp </path/to/xor_client> <target/fs/root>
+     $ cp </path/to/SecureStorageSample> <target/fs/root>
+
+- Boot the target with newly created kernel image and DTB.
+  Insmod the marvell TEE driver::
+
+     $ cd root
+     $ insmod marvelltee.ko
+
+  Sample output::
+
+     [  422.365868] marvelltee marvelltee: Marvell TEE Drvier 1.1.14
+     [  422.371733] remap rb to 0xffffff8001100000
+     [  422.375881] remap rc to 0xffffff8001280000
+     [  422.380140] proc log buf: 0xffffff8001180000, size: 0x7feca, ctl: 0xffffff8001300000
+
+- Start the TEE daemon::
+
+     $ mkdir /root/testtee
+     $ ./teec_sstd_ca ./testtee &
+
+  Sample output::
+
+     INFO - SSTd_CA version is 1.0.7
+     INFO - SSTd_CA version is 1.0.7
+     INFO - libtee_client version is 1.0.6
+
+- Run XOR example::
+
+     $ ./xor_client
+
+  Sample output::
+
+     ###sample_test start: main
+     INFO - libtee_client version is 1.0.6
+     a = 0; b = 1; c = a ^ b: 1
+     ###sample_test end ###
+
+- Run secure storage example::
+
+     $ ./SecureStorageSample
+
+  Sample output::
+
+        ******************************************************
+        ** prepare write <sensitive_data> to secure storage **
+        ******************************************************
+        INFO - Mrvl-SS TEE version is 2.0.8
+         - libtee_client version is 1.0.6
+        MRVL_Secure_Storage: INFO - Sending OpenSession command to TEE.
+        tw: [K]INFO: Load and launch the SST service.
+        tw: [K]INFO: Checking the authentication, the connection method should be Marvell Secure Storage Library(SSL).
+        tw: [K]INFO: Pass authentication checking. The connection method is Marvell Secure Storage Library(SSL).
+        MRVL_Secure_Storage: INFO - Sending CloseSession command to TEE.
+        INFO - libtee_client version is 1.0.6
+        MRVL_Secure_Storage: INFO - Sending OpenSession command to TEE.
+        tw: [K]INFO: Load and launch the SST service.
+        tw: [K]INFO: Checking the authentication, the connection method should be Marvell Secure Storage Library(SSL).
+        tw: [K]INFO: Pass authentication checking. The connection method is Marvell Secure Storage Library(SSL).
+        MRVL_Secure_Storage: INFO - Sending CloseSession command to TEE.
+        INFO - libtee_client version is 1.0.6
+        MRVL_Secure_Storage: INFO - Sending OpenSession command to TEE.
+        tw: [K]INFO: Load and launch the SST service.
+        tw: [K]INFO: Checking the authentication, the connection method should be Marvell Secure Storage Library(SSL).
+        tw: [K]INFO: Pass authentication checking. The connection method is Marvell Secure Storage Library(SSL).
+        MRVL_Secure_Storage: INFO - Sending Secure Storage Write command to SST service in TEE with the user application password(UA-PW) and plain service key(PSK).
+        INFO: Send the inputs to TEE driver.
+        tw: [K]INFO: Generate the ss-credential based on user application password(UA-PW).
+        tw: [K]INFO: Call TEE to generate message digest of (PSK||ss-credential).
+        tw: [K]INFO: Generate the SKEK.
+        tw: [K]INFO: Use the RKEK to encrypt SKEK.
+        tw: [K]INFO: Generate the content encryption key(CEK).
+        tw: [K]INFO: Use the SKEK to encrypt the content encryption key(CEK).
+        tw: [K]INFO: Load SKEK WOF and CEK WOF, unwrap SKEK WOF to get SKEK, unwrap CEK WOF to get CEK.
+        tw: [K]INFO: Use CEK to encrypt the digest.
+        tw: [K]INFO: Use CEK to encrypt (PSK||ss-credential).
+        tw: [K]INFO: Construct secure storage data structure and send back to Secure Storage service.
+        tw: [K]INFO: SST service send secure storage data to SSL.
+        MRVL_Secure_Storage: INFO - Sending CloseSession command to TEE.
+        INFO - libtee_client version is 1.0.6
+        MRVL_Secure_Storage: INFO - Sending OpenSession command to TEE.
+        tw: [K]INFO: Load and launch the SST service.
+        tw: [K]INFO: Checking the authentication, the connection method should be Marvell Secure Storage Library(SSL).
+        tw: [K]INFO: Pass authentication checking. The connection method is Marvell Secure Storage Library(SSL).
+        MRVL_Secure_Storage: INFO - Sending CloseSession command to TEE.
+        MRVL_Secure_Storage: INFO - Construct secure storage image structure and send it back to user application.
+        INFO - libtee_client version is 1.0.6
+        MRVL_Secure_Storage: INFO - Sending OpenSession command to TEE.
+        tw: [K]INFO: Load and launch the SST service.
+        tw: [K]INFO: Checking the authentication, the connection method should be Marvell Secure Storage Library(SSL).
+        tw: [K]INFO: Pass authentication checking. The connection method is Marvell Secure Storage Library(SSL).
+        MRVL_Secure_Storage: INFO - Sending CloseSession command to TEE.
+        INFO - libtee_client version is 1.0.6
+        MRVL_Secure_Storage: INFO - Sending OpenSession command to TEE.
+        tw: [K]INFO: Load and launch the SST service.
+        tw: [K]INFO: Checking the authentication, the connection method should be Marvell Secure Storage Library(SSL).
+        tw: [K]INFO: Pass authentication checking. The connection method is Marvell Secure Storage Library(SSL).
+        MRVL_Secure_Storage: INFO - Sending CloseSession command to TEE.
+        INFO - libtee_client version is 1.0.6
+        MRVL_Secure_Storage: INFO - Sending OpenSession command to TEE.
+        tw: [K]INFO: Load and launch the SST service.
+        tw: [K]INFO: Checking the authentication, the connection method should be Marvell Secure Storage Library(SSL).
+        tw: [K]INFO: Pass authentication checking. The connection method is Marvell Secure Storage Library(SSL).
+        MRVL_Secure_Storage: INFO - Sending Secure Storage read command to SST service in TEE with user application password(UA-PW) and cipher service key(CSK).
+        INFO: Send the inputs to TEE driver.
+        tw: [K]INFO: Use the RKEK to decrypt the SKEK.
+        tw: [K]INFO: Use the SKEK TO decrypt the content encryption key(CEK).
+        tw: [K]INFO: Use CEK to decrypt the (PSK||ss-credential)'s hash value saved in Secure Storage.
+        tw: [K]INFO: Use CEK to decrypt the cipher service key(CSK).
+        tw: [K]INFO: Calculate the digest of (PSK||ss-credential).
+        tw: [K]INFO: Compare the hash value of (PSK||ss-credential) with the decrypted hash value.
+        tw: [K]INFO: Generate the ss-credential based on UA-PW.
+        tw: [K]INFO: Compare the ss-credential.
+        tw: [K]INFO: Send back to Secure Storage service.
+        tw: [K]INFO: SST service send the PSK to SSL.
+        MRVL_Secure_Storage: INFO - Sending CloseSession command to TEE.
+        MRVL_Secure_Storage: INFO - Send the PSK to user application.
+        ******************************************************
+        ** Read from Secure Storage, the result is sensitive_data**
+        ******************************************************
+

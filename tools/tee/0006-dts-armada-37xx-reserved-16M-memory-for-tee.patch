@@ -1,0 +1,43 @@
+From cbceb72183dd8e498dde211b84e11c7771bc1c8f Mon Sep 17 00:00:00 2001
+From: wangwen <wangwen@marvell.com>
+Date: Tue, 6 Jun 2017 15:37:12 +0800
+Subject: [PATCH 6/6] dts: armada-37xx: reserved 16M memory for tee
+
+Reserve 16M memory for security usage, start from
+0x4400000.
+
+Change-Id: I45cb562fefbc3ef212c2f663d7d844b9a59f8c9d
+Signed-off-by: wangwen <wangwen@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index a986731..6819c88 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -81,6 +81,21 @@
+ 			reg = <0 0x4000000 0 0x200000>;
+ 			no-map;
+ 		};
++
++		/* Reserve 16M memory for TEE code, data, communication and share memory with
++		 * Non-Trusted World
++		 *
++		 * For TEE code and data section, it will be configured unacceable
++		 * to Non-Trusted World by memory controller.
++		 *
++		 * The rest are either used for communication or shared memory between
++		 * Trusted-World and Non-trusted World, which is TEE implementation defined
++		 * and may be managed by the TEE driver.
++		 */
++		tee@4400000 {
++			reg = <0 0x4400000 0 0x1000000>;
++			no-map;
++		};
+ 	};
+ 
+ 	cpus {
+-- 
+2.7.4
+

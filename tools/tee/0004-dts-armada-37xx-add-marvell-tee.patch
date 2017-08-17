@@ -1,0 +1,28 @@
+From 50f014fa204499d545c179cf28deb22843b6a949 Mon Sep 17 00:00:00 2001
+From: wangwen <wangwen@marvell.com>
+Date: Tue, 6 Jun 2017 14:57:41 +0800
+Subject: [PATCH 4/6] dts: armada-37xx: add marvell tee
+
+Change-Id: I8bdc2beef138b308e798902918c45c68b9cd252c
+Signed-off-by: wangwen <wangwen@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index e6f170a..a986731 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -531,4 +531,9 @@
+ 			};
+ 		};
+ 	};
++
++	marvelltee {
++		compatible = "marvell,tee";
++		status = "okay";
++	};
+ };
+-- 
+2.7.4
+

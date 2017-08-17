@@ -1,0 +1,40 @@
+From 3d16252400449609bc11ed21e0d451ab751dde6e Mon Sep 17 00:00:00 2001
+From: Kevin Peng <kevinp@marvell.com>
+Date: Mon, 3 Jul 2017 16:50:22 +0800
+Subject: [PATCH 2/6] Documentation: DT bindings: add doc for marvell tee
+
+Change-Id: Ibb59eb17a166693ee28b965b6dc6876794d07739
+Signed-off-by: Kevin Peng <kevinp@marvell.com>
+---
+ .../devicetree/bindings/marvell/marvell,tee.txt       | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/marvell/marvell,tee.txt
+
+diff --git a/Documentation/devicetree/bindings/marvell/marvell,tee.txt b/Documentation/devicetree/bindings/marvell/marvell,tee.txt
+new file mode 100644
+index 0000000..9568811
+--- /dev/null
++++ b/Documentation/devicetree/bindings/marvell/marvell,tee.txt
+@@ -0,0 +1,19 @@
++Marvell TEE Device Tree bindings
++
++Marvell TEE is a piece of software using hardware features to provide a Trusted
++Execution Environment. The security can be provided with ARM TrustZone.
++
++Required properties:
++- compatible : shall be "marvell,tee"
++- status: shall be one of following:
++	"disabled"
++	"ok"
++
++Optioned properties:
++	None
++
++Example:
++	marvelltee {
++		compatible = "marvell,tee";
++		status = "ok";
++	};
+-- 
+2.7.4
+
