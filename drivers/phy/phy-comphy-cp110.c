@@ -123,6 +123,24 @@ static void mvebu_cp110_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 
 }
 
+/* Clear PIPE selector - avoid collision with prior u-boot configuration */
+void mvebu_cp110_comphy_clr_pipe_selector(struct mvebu_comphy_priv *priv,
+					  struct mvebu_comphy *comphy)
+{
+	u32 reg, mask, field;
+	u32 comphy_offset = COMMON_SELECTOR_COMPHYN_FIELD_WIDTH * comphy->index;
+
+	mask = COMMON_SELECTOR_COMPHY_MASK << comphy_offset;
+	reg = readl(priv->comphy_regs + COMMON_SELECTOR_PIPE_REG_OFFSET);
+	field = reg & mask;
+
+	if (field) {
+		reg &= ~mask;
+		writel(reg,
+		       priv->comphy_regs + COMMON_SELECTOR_PIPE_REG_OFFSET);
+	}
+}
+
 /* PIPE selector configures for PCIe, USB 3.0 Host, and USB 3.0 Device mode */
 void mvebu_cp110_comphy_set_pipe_selector(struct mvebu_comphy_priv *priv,
 					  struct mvebu_comphy *comphy)
@@ -1638,8 +1656,9 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 		break;
 	}
 
-	/* Clear comphy selector, can't rely on u-boot */
+	/* Clear comphy PHY and PIPE selector, can't rely on u-boot */
 	mvebu_cp110_comphy_clr_phy_selector(priv, comphy);
+	mvebu_cp110_comphy_clr_pipe_selector(priv, comphy);
 
 	spin_unlock(&priv->lock);
 
