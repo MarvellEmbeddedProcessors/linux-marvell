@@ -4183,7 +4183,6 @@ static void mv_pp2x_set_rx_mode(struct net_device *dev)
 
 static int mv_pp2x_set_mac_address(struct net_device *dev, void *p)
 {
-	struct mv_pp2x_port *port = netdev_priv(dev);
 	const struct sockaddr *addr = p;
 	int err;
 
@@ -4192,28 +4191,11 @@ static int mv_pp2x_set_mac_address(struct net_device *dev, void *p)
 		goto error;
 	}
 
-	if (!netif_running(dev)) {
-		err = mv_pp2x_prs_update_mac_da(dev, addr->sa_data);
-		if (!err)
-			return 0;
-		/* Reconfigure parser to accept the original MAC address */
-		err = mv_pp2x_prs_update_mac_da(dev, dev->dev_addr);
-		goto error;
-	}
-
-	mv_pp2x_stop_dev(port);
-
 	err = mv_pp2x_prs_update_mac_da(dev, addr->sa_data);
 	if (!err)
-		goto out_start;
-
-	/* Reconfigure parser accept the original MAC address */
+		return 0;
+	/* Reconfigure parser to accept the original MAC address */
 	err = mv_pp2x_prs_update_mac_da(dev, dev->dev_addr);
-	if (err)
-		goto error;
-out_start:
-	mv_pp2x_start_dev(port);
-	return 0;
 
 error:
 	netdev_err(dev, "fail to change MAC address\n");
