@@ -1,0 +1,29 @@
+From 05fb2f1dabda50fcae14a01096eea105e962b718 Mon Sep 17 00:00:00 2001
+From: Kevin Peng <kevinp@marvell.com>
+Date: Tue, 11 Apr 2017 15:45:24 +0800
+Subject: [PATCH 3/6] dtsi: armada-ap806: add mrvl tee
+
+Change-Id: I64912aa26241aff94f4c1775a46ce2754cb073fd
+Signed-off-by: Kevin Peng <kevinp@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index c0d7cff..636e572 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -491,5 +491,10 @@
+ 			};
+ 		};
+ 	};
++
++	marvelltee {
++		compatible = "marvell,tee";
++		status = "okay";
++	};
+ };
+ 
+-- 
+2.7.4
+
