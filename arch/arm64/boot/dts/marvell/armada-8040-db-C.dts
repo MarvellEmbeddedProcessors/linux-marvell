@@ -147,9 +147,6 @@
 					status = "okay";
 				};
 			};
-			eip197@800000 {
-				status = "okay";
-			};
 			comphy {
 				status = "okay";
 			};
@@ -240,9 +237,6 @@
 				pinctrl-0 = <&cps_tdm_pins>;
 				pinctrl-names = "default";
 				pclk-freq-mhz = <8>;
-				status = "okay";
-			};
-			eip197@800000 {
 				status = "okay";
 			};
 		};

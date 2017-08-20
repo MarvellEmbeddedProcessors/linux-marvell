@@ -148,9 +148,6 @@
 					status = "okay";
 				};
 			};
-			eip197@800000 {
-				status = "okay";
-			};
 			comphy {
 				status = "okay";
 			};
@@ -215,9 +212,6 @@
 				eth2_1: eth2@030000 {
 					status = "disabled";
 				};
-			};
-			eip197@800000 {
-				status = "disabled";
 			};
 			comphy {
 				status = "okay";
