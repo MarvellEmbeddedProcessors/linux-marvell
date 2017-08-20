@@ -201,9 +201,6 @@
 					status = "disabled";
 				};
 			};
-			eip197@800000 {
-				status = "disabled";
-			};
 			comphy {
 				status = "disabled";
 			};
@@ -213,9 +210,6 @@
 					marvell,pins = "mpp47";
 					marvell,function = "gpio";
 				};
-			};
-			eip197@800000 {
-				status = "okay";
 			};
 		};
 
@@ -316,9 +310,6 @@
 				pinctrl-names = "default";
 				pclk-freq-mhz = <8>;
 				status = "disabled";
-			};
-			eip197@800000 {
-				status = "okay";
 			};
 		};
 		pcie@0x640000 {

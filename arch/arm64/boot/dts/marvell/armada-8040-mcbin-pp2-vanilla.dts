@@ -202,9 +202,6 @@
 					status = "disabled";
 				};
 			};
-			eip197@800000 {
-				status = "okay";
-			};
 		};
 		pcie@0x600000 {
 			num-lanes = <4>;
@@ -322,9 +319,6 @@
 					gop-port-id = <3>;
 					status = "disabled";
 				};
-			};
-			eip197@800000 {
-				status = "okay";
 			};
 		};
 	};

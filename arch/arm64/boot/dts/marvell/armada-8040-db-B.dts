@@ -132,9 +132,6 @@
 					status = "okay";
 				};
 			};
-			eip197@800000 {
-				status = "okay";
-			};
 			comphy {
 				status = "okay";
 			};
@@ -215,9 +212,6 @@
 				status = "okay";
 				pinctrl-names = "default";
 				pinctrl-0 = <&cps_spi1_pins>;
-			};
-			eip197@800000 {
-				status = "okay";
 			};
 		};
 		pcie@0x600000 {

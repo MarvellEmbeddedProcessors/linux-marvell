@@ -207,9 +207,6 @@
 					status = "disabled";
 				};
 			};
-			eip197: eip197@800000 {
-				status = "okay";
-			};
 		};
 
 		pcie-ep@0x600000 {

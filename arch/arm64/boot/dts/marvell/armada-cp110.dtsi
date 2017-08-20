@@ -466,7 +466,7 @@ cpm_eip197: eip197@800000 {
 			  "ring2", "ring3", "eip_out";
 	clocks = <&cpm_syscon0 1 26>;
 	cell-index = <0>;
-	status = "disabled";
+	status = "okay";
 };
 
 comphy0: comphy {
