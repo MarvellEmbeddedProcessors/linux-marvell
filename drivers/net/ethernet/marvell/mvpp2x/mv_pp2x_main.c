@@ -872,6 +872,11 @@ static void mv_pp2x_defaults_set(struct mv_pp2x_port *port)
 		mv_pp2x_write(hw, MVPP2_RXQ_CONFIG_REG(queue), val);
 	}
 
+	/* Enable classifier high queue in forwarding port control*/
+	val = mv_pp2x_read(hw, MVPP2_CLS_SWFWD_PCTRL_REG);
+	val &= ~(MVPP2_CLS_SWFWD_PCTRL_MASK(port->id));
+	mv_pp2x_write(hw, MVPP2_CLS_SWFWD_PCTRL_REG, val);
+
 	/* At default, mask all interrupts to all present cpus */
 	mv_pp2x_port_interrupts_disable(port);
 }
