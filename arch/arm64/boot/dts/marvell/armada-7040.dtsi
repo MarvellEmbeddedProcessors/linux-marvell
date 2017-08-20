@@ -127,6 +127,13 @@
 			cp_xor1: cpxor1@6c0000 {
 				#stream-id-cells = <1>;
 			};
+			/* AXI bus of IHB1 is not connected in Armada-7040 package. */
+			axim-hb1-rd@3c8000 {
+				status = "disabled";
+			};
+			axim-hb1-wr@3c9000 {
+				status = "disabled";
+			};
 		};
 		pcie@0x600000 {
 			msi-parent = <&gic_v2m0>;
