@@ -793,16 +793,6 @@ elif [ "$PLATFORM" == "a388" ]; then
 
 	set +o verbose
 	echo -ne "[Done]\n"
-elif [ "$PLATFORM" == "a37xx" ]; then
-	set -o verbose
-
-	# SATA
-	echo 2 > /proc/irq/32/smp_affinity
-	# PCI-E SATA controller
-	echo 2  > /proc/irq/34/smp_affinity
-
-	set +o verbose
-	echo -ne "[Done]\n"
 elif [ "$PLATFORM" == "a8040" ]; then
 	set -o verbose
 
