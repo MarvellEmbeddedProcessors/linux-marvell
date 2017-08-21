@@ -202,8 +202,8 @@ static struct armada_37xx_pin_group armada_37xx_sb_groups[] = {
 	PIN_GRP_GPIO("ptp", 20, 3, BIT(11) | BIT(12) | BIT(13), "ptp"),
 	PIN_GRP("ptp_clk", 21, 1, BIT(6), "ptp", "mii"),
 	PIN_GRP("ptp_trig", 22, 1, BIT(7), "ptp", "mii"),
-	PIN_GRP_GPIO("mii", 23, 1, BIT(14), "mii"),
-	PIN_GRP("mii_col", 23, 1, BIT(8), "mii_col", "mii_err"),
+	PIN_GRP_GPIO_3("mii_col", 23, 1, BIT(8) | BIT(14), 0, BIT(8), BIT(14),
+		       "mii", "mii_err"),
 };
 
 const struct armada_37xx_pin_data armada_37xx_pin_nb = {
