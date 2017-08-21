@@ -74,15 +74,11 @@
 					spi-max-frequency = <20000000>;
 					partition@0 {
 						label = "boot";
-						reg = <0x0 0x200000>;
+						reg = <0x0 0x500000>;
 					};
-					partition@200000 {
-						label = "Filesystem";
-						reg = <0x200000 0xd00000>;
-					};
-					partition@d00000 {
-						label = "boot_2nd";
-						reg = <0xf00000 0x100000>;
+					partition@500000 {
+						label = "env";
+						reg = <0x500000 0xb00000>;
 					};
 				};
 			};
@@ -104,14 +100,6 @@
 				nand-ecc-strength = <4>;
 				nand-ecc-step-size = <512>;
 				status = "okay";
-				partition@0 {
-					label = "boot";
-					reg = <0 0x500000>;
-				};
-				partition@500000 {
-					label = "env";
-					reg = <0x500000 0x400000>;
-				};
 				partition@1000000 {
 					label = "rootfs";
 					reg = <0x1000000 0x1f800000>;
