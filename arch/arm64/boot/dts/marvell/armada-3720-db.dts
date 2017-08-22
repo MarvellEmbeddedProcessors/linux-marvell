@@ -200,6 +200,7 @@
 				bus-width = <4>;
 				cd-gpios = <&gpiosb 2 GPIO_ACTIVE_LOW>;
 				vqmmc-supply = <&vcc_sd_reg1>;
+				mmc-pwrseq = <&sd_pwrseq>;
 				marvell,pad-type = "sd";
 				status = "okay";
 
@@ -226,6 +227,11 @@
 				target-supply = <&reg_5v_sata>;
 				phys = <&a3700_comphy 2 COMPHY_SATA0>;
 				status = "okay";
+			};
+
+			sd_pwrseq: sd-pwrseq {
+				compatible = "mmc-pwrseq-a3700-sd";
+				pwren-gpios = <&expander0 4 GPIO_ACTIVE_HIGH>;
 			};
 
 			vcc_sd_reg1: regulator@0 {
