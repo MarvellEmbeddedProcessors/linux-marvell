@@ -31,6 +31,8 @@ struct mmc_pwrseq *mmc_pwrseq_simple_alloc(struct mmc_host *host,
 					   struct device *dev);
 struct mmc_pwrseq *mmc_pwrseq_emmc_alloc(struct mmc_host *host,
 					 struct device *dev);
+struct mmc_pwrseq *mmc_pwrseq_a3700_alloc(struct mmc_host *host,
+					 struct device *dev);
 
 #else
 
