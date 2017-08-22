@@ -1,0 +1,13 @@
+* Marvell armada3700 SD power sequence provider
+
+Required properties:
+- compatible: must be "mmc-pwrseq-a3700-sd".
+- pwren-gpios: contains a pwren GPIO specifier with the
+		   default active state
+
+Example:
+
+	sd_pwrseq: sd_pwrseq {
+		compatible = "mmc-pwrseq-a3700-sd";
+		pwren-gpios = <&expander0 4 GPIO_ACTIVE_HIGH>;
+	}
