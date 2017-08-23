@@ -125,8 +125,6 @@
 					status = "disabled";
 				};
 				sata-port@1 {
-					phys = <&comphy0 5 COMPHY_SATA1>;
-					phy-names = "comphy";
 					status = "okay";
 				};
 			};
@@ -249,13 +247,9 @@
 				status = "okay";
 
 				sata-port@0 {
-					phys = <&comphy1 1 COMPHY_SATA0>;
-					phy-names = "comphy";
 					status = "okay";
 				};
 				sata-port@1 {
-					phys = <&comphy1 3 COMPHY_SATA1>;
-					phy-names = "comphy";
 					status = "okay";
 				};
 			};
