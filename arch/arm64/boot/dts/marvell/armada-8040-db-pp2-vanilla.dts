@@ -87,13 +87,9 @@
 			sata@540000 {
 				status = "okay";
 				sata-port@0 {
-					phys = <&comphy0 1 COMPHY_SATA0>;
-					phy-names = "comphy";
 					status = "okay";
 				};
 				sata-port@1 {
-					phys = <&comphy0 3 COMPHY_SATA1>;
-					phy-names = "comphy";
 					status = "okay";
 				};
 			};
@@ -197,13 +193,9 @@
 			sata@540000 {
 				status = "okay";
 				sata-port@0 {
-					phys = <&comphy1 1 COMPHY_SATA0>;
-					phy-names = "comphy";
 					status = "okay";
 				};
 				sata-port@1 {
-					phys = <&comphy1 3 COMPHY_SATA1>;
-					phy-names = "comphy";
 					status = "okay";
 				};
 			};
