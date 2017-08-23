@@ -108,6 +108,8 @@ struct a3700_spi {
 	struct clk *clk;
 	unsigned int irq;
 	unsigned int flags;
+	unsigned int spi_cfg;
+	unsigned int spi_timing;
 	bool xmit_data;
 	const u8 *tx_buf;
 	u8 *rx_buf;
@@ -879,9 +881,73 @@ static int a3700_spi_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+static int a3700_spi_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct spi_master *master = platform_get_drvdata(pdev);
+	struct a3700_spi *spi = spi_master_get_devdata(master);
+	int ret;
+
+	ret = spi_master_suspend(master);
+	if (ret) {
+		dev_warn(&pdev->dev, "cannot suspend spi master\n");
+		return ret;
+	}
+
+	/* Store register value for SPI cfg(0x04) and timing(0x24) */
+	spi->spi_cfg = spireg_read(spi, A3700_SPI_IF_CFG_REG);
+	spi->spi_timing = spireg_read(spi, A3700_SPI_IF_TIME_REG);
+
+	/* Disable spi clock */
+	if (!IS_ERR(spi->clk))
+		clk_disable_unprepare(spi->clk);
+
+	return 0;
+}
+
+static int a3700_spi_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct spi_master *master = platform_get_drvdata(pdev);
+	struct a3700_spi *spi = spi_master_get_devdata(master);
+	int ret;
+
+	/* Enable spi clock */
+	if (!IS_ERR(spi->clk)) {
+		ret = clk_prepare_enable(spi->clk);
+		if (ret)
+			return ret;
+	}
+
+	/* Mask the interrupts and clear cause bits */
+	spireg_write(spi, A3700_SPI_INT_MASK_REG, 0);
+	spireg_write(spi, A3700_SPI_INT_STAT_REG, ~0U);
+
+	/* Restore cfg and time register */
+	spireg_write(spi, A3700_SPI_IF_TIME_REG, spi->spi_timing);
+	spi->spi_cfg &= ~(A3700_SPI_XFER_STOP | A3700_SPI_XFER_START | A3700_SPI_SRST);
+	spireg_write(spi, A3700_SPI_IF_CFG_REG, spi->spi_cfg);
+
+	ret = spi_master_resume(master);
+
+	return ret;
+}
+
+static const struct dev_pm_ops a3700_spi_pm_ops = {
+	.suspend = a3700_spi_suspend,
+	.resume = a3700_spi_resume,
+};
+
+#define A3700_SPI_PM_OPS (&a3700_spi_pm_ops)
+#else
+#define A3700_SPI_PM_OPS NULL
+#endif /* CONFIG_PM */
+
 static struct platform_driver a3700_spi_driver = {
 	.driver = {
 		.name	= DRIVER_NAME,
+		.pm	= A3700_SPI_PM_OPS,
 		.of_match_table = of_match_ptr(a3700_spi_dt_ids),
 	},
 	.probe		= a3700_spi_probe,
