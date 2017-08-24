@@ -1,0 +1,34 @@
+Marvell PHY or Switch Register Access Device Tree Bindings
+----------------------------------------------------------
+
+Required properties:
+- compatible	: Should be "marvell,dsa-mvmdio"
+- reg		: Contains single field, that is switch's smi address when the
+		  switch is in multichip addressing mode. It should be 0 when no
+		  switch is connected or switch is in single-chip addressing mode.
+- mii-bus	: handle to mdio node.
+- xmii-bus	: handle to xmdio node.
+
+Example:
+	mdio: mdio@12a200 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		ethernet-phy@0 {
+			reg = <0>;
+		};
+	};
+	xmdio: mdio@15b000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		ethernet-phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c45";
+			reg = <0>;
+		};
+	};
+	dsa_mvmdio {
+		compatible = "marvell,dsa-mvmdio";
+		status = "okay";
+		reg = <3>;
+		mii-bus = <&mdio>;
+		xmii-bus = <&xmdio>;
+	};
