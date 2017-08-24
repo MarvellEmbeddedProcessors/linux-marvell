@@ -4449,8 +4449,15 @@ static void mvpp22_gop_init_rgmii(struct mvpp2_port *port)
 	struct mvpp2 *priv = port->priv;
 	u32 val;
 
+	regmap_read(priv->sysctrl_base, GENCONF_PORT_CTRL0, &val);
+	val |= GENCONF_PORT_CTRL0_BUS_WIDTH_SELECT;
+	regmap_write(priv->sysctrl_base, GENCONF_PORT_CTRL0, val);
+
 	regmap_read(priv->sysctrl_base, GENCONF_CTRL0, &val);
-	val |= GENCONF_CTRL0_PORT1_RGMII;
+	if (port->gop_id == 2)
+		val |= GENCONF_CTRL0_PORT0_RGMII | GENCONF_CTRL0_PORT1_RGMII;
+	else if (port->gop_id == 3)
+		val |= GENCONF_CTRL0_PORT1_RGMII_MII;
 	regmap_write(priv->sysctrl_base, GENCONF_CTRL0, val);
 }
 
@@ -4514,9 +4521,13 @@ static int mvpp22_gop_init(struct mvpp2_port *port)
 
 	switch (port->phy_interface) {
 	case PHY_INTERFACE_MODE_RGMII:
-		if (port->gop_id != 3)
+	case PHY_INTERFACE_MODE_RGMII_ID:
+	case PHY_INTERFACE_MODE_RGMII_RXID:
+	case PHY_INTERFACE_MODE_RGMII_TXID:
+		if (port->gop_id == 0)
 			goto invalid_conf;
 		mvpp22_gop_init_rgmii(port);
+		break;
 	case PHY_INTERFACE_MODE_SGMII:
 		mvpp22_gop_init_sgmii(port);
 		break;
@@ -4530,8 +4541,8 @@ static int mvpp22_gop_init(struct mvpp2_port *port)
 	}
 
 	regmap_read(priv->sysctrl_base, GENCONF_PORT_CTRL1, &val);
-	val |= GENCONF_PORT_CTRL1_RESET(port->gop_id);
-	val |= GENCONF_PORT_CTRL1_EN(port->gop_id);
+	val |= GENCONF_PORT_CTRL1_RESET(port->gop_id) |
+	       GENCONF_PORT_CTRL1_EN(port->gop_id);
 	regmap_write(priv->sysctrl_base, GENCONF_PORT_CTRL1, val);
 
 	regmap_read(priv->sysctrl_base, GENCONF_PORT_CTRL0, &val);
@@ -4555,6 +4566,9 @@ static void mvpp22_gop_unmask_irq(struct mvpp2_port *port)
 	u32 val;
 
 	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID ||
 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
 		/* Enable the GMAC link status irq for this port */
 		val = readl(port->base + MVPP22_GMAC_INT_SUM_MASK);
@@ -4562,26 +4576,32 @@ static void mvpp22_gop_unmask_irq(struct mvpp2_port *port)
 		writel(val, port->base + MVPP22_GMAC_INT_SUM_MASK);
 	}
 
-	/* Enable the XLG/GIG irqs for this port */
-	val = readl(port->base + MVPP22_XLG_EXT_INT_MASK);
-	if (port->gop_id == 0 &&
-	    port->phy_interface == PHY_INTERFACE_MODE_SFI)
-		val |= MVPP22_XLG_EXT_INT_MASK_XLG;
-	else
-		val |= MVPP22_XLG_EXT_INT_MASK_GIG;
-	writel(val, port->base + MVPP22_XLG_EXT_INT_MASK);
+	if (port->gop_id == 0) {
+		/* Enable the XLG/GIG irqs for this port */
+		val = readl(port->base + MVPP22_XLG_EXT_INT_MASK);
+		if (port->phy_interface == PHY_INTERFACE_MODE_SFI)
+			val |= MVPP22_XLG_EXT_INT_MASK_XLG;
+		else
+			val |= MVPP22_XLG_EXT_INT_MASK_GIG;
+		writel(val, port->base + MVPP22_XLG_EXT_INT_MASK);
+	}
 }
 
 static void mvpp22_gop_mask_irq(struct mvpp2_port *port)
 {
 	u32 val;
 
-	val = readl(port->base + MVPP22_XLG_EXT_INT_MASK);
-	val &= ~(MVPP22_XLG_EXT_INT_MASK_XLG |
+	if (port->gop_id == 0) {
+		val = readl(port->base + MVPP22_XLG_EXT_INT_MASK);
+		val &= ~(MVPP22_XLG_EXT_INT_MASK_XLG |
 			 MVPP22_XLG_EXT_INT_MASK_GIG);
-	writel(val, port->base + MVPP22_XLG_EXT_INT_MASK);
+		writel(val, port->base + MVPP22_XLG_EXT_INT_MASK);
+	}
 
 	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID ||
 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
 		val = readl(port->base + MVPP22_GMAC_INT_SUM_MASK);
 		val &= ~MVPP22_GMAC_INT_SUM_MASK_LINK_STAT;
@@ -4594,15 +4614,20 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
 	u32 val;
 
 	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID ||
 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
 		val = readl(port->base + MVPP22_GMAC_INT_MASK);
 		val |= MVPP22_GMAC_INT_MASK_LINK_STAT;
 		writel(val, port->base + MVPP22_GMAC_INT_MASK);
 	}
 
-	val = readl(port->base + MVPP22_XLG_INT_MASK);
-	val |= MVPP22_XLG_INT_MASK_LINK;
-	writel(val, port->base + MVPP22_XLG_INT_MASK);
+	if (port->gop_id == 0) {
+		val = readl(port->base + MVPP22_XLG_INT_MASK);
+		val |= MVPP22_XLG_INT_MASK_LINK;
+		writel(val, port->base + MVPP22_XLG_INT_MASK);
+	}
 
 	mvpp22_gop_unmask_irq(port);
 }
@@ -4622,7 +4647,10 @@ static void mvpp2_port_mii_gmac_configure_mode(struct mvpp2_port *port)
 		val |= MVPP2_GMAC_DISABLE_PADDING;
 		val &= ~MVPP2_GMAC_FLOW_CTRL_MASK;
 		writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
-	} else if (port->phy_interface == PHY_INTERFACE_MODE_RGMII) {
+	} else if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID) {
 		val = readl(port->base + MVPP22_GMAC_CTRL_4_REG);
 		val |= MVPP22_CTRL4_EXT_PIN_GMII_SEL |
 		       MVPP22_CTRL4_SYNC_BYPASS_DIS |
@@ -4641,10 +4669,11 @@ static void mvpp2_port_mii_gmac_configure_mode(struct mvpp2_port *port)
 	writel(val, port->base + MVPP2_GMAC_CTRL_0_REG);
 
 	val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
-	val |= MVPP2_GMAC_IN_BAND_AUTONEG |
-	       MVPP2_GMAC_IN_BAND_AUTONEG_BYPASS |
+	val |= MVPP2_GMAC_IN_BAND_AUTONEG_BYPASS |
 	       MVPP2_GMAC_AN_SPEED_EN | MVPP2_GMAC_FLOW_CTRL_AUTONEG |
 	       MVPP2_GMAC_AN_DUPLEX_EN;
+	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII)
+		val |= MVPP2_GMAC_IN_BAND_AUTONEG;
 	writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 }
 
@@ -4654,6 +4683,7 @@ static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
 
 	/* Force link down */
 	val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
+	val &= ~MVPP2_GMAC_FORCE_LINK_PASS;
 	val |= MVPP2_GMAC_FORCE_LINK_DOWN;
 	writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 
@@ -4666,9 +4696,12 @@ static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
 	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
 	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
 		val |= MVPP2_GMAC_INBAND_AN_MASK | MVPP2_GMAC_PCS_ENABLE_MASK;
-	} else if (port->phy_interface == PHY_INTERFACE_MODE_RGMII) {
-		val |= MVPP2_GMAC_PORT_RGMII_MASK;
+	} else if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID) {
 		val &= ~MVPP2_GMAC_PCS_ENABLE_MASK;
+		val |= MVPP2_GMAC_PORT_RGMII_MASK;
 	}
 	writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
 
@@ -4687,8 +4720,12 @@ static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
 
 static void mvpp2_port_mii_xlg_configure(struct mvpp2_port *port)
 {
-	u32 val = readl(port->base + MVPP22_XLG_CTRL0_REG);
+	u32 val;
 
+	if (port->gop_id != 0)
+		return;
+
+	val = readl(port->base + MVPP22_XLG_CTRL0_REG);
 	val |= MVPP22_XLG_CTRL0_RX_FLOW_CTRL_EN;
 	writel(val, port->base + MVPP22_XLG_CTRL0_REG);
 
@@ -4723,6 +4760,9 @@ static void mvpp2_port_mii_set(struct mvpp2_port *port)
 		mvpp22_port_mii_set(port);
 
 	if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    port->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID ||
 	    port->phy_interface == PHY_INTERFACE_MODE_SGMII)
 		mvpp2_port_mii_gmac_configure(port);
 	else if (port->phy_interface == PHY_INTERFACE_MODE_SFI)
@@ -4756,14 +4796,6 @@ static void mvpp2_port_enable(struct mvpp2_port *port)
 		val |= MVPP2_GMAC_PORT_EN_MASK;
 		val |= MVPP2_GMAC_MIB_CNTR_EN_MASK;
 		writel(val, port->base + MVPP2_GMAC_CTRL_0_REG);
-
-		val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
-		val &= ~(MVPP2_GMAC_FORCE_LINK_DOWN);
-		writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
-
-		val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
-		val &= ~(MVPP2_GMAC_PORT_RESET_MASK);
-		writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
 	}
 }
 
@@ -4783,14 +4815,6 @@ static void mvpp2_port_disable(struct mvpp2_port *port)
 		val = readl(port->base + MVPP2_GMAC_CTRL_0_REG);
 		val &= ~(MVPP2_GMAC_PORT_EN_MASK);
 		writel(val, port->base + MVPP2_GMAC_CTRL_0_REG);
-
-		val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
-		val |= MVPP2_GMAC_FORCE_LINK_DOWN;
-		writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
-
-		val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
-		val |= MVPP2_GMAC_PORT_RESET_MASK;
-		writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
 	}
 }
 
@@ -4856,8 +4880,8 @@ static inline void mvpp2_xlg_max_rx_size_set(struct mvpp2_port *port)
 
 	val =  readl(port->base + MVPP22_XLG_CTRL1_REG);
 	val &= ~MVPP22_XLG_CTRL1_FRAMESIZELIMIT_MASK;
-	val |= (((port->pkt_size - MVPP2_MH_SIZE) / 2) <<
-		    MVPP22_XLG_CTRL1_FRAMESIZELIMIT);
+	val |= ((port->pkt_size - MVPP2_MH_SIZE) / 2) <<
+	       MVPP22_XLG_CTRL1_FRAMESIZELIMIT;
 	writel(val, port->base + MVPP22_XLG_CTRL1_REG);
 }
 
@@ -5918,6 +5942,9 @@ static irqreturn_t mvpp2_link_status_isr(int irq, void *dev_id)
 				link = true;
 		}
 	} else if (port->phy_interface == PHY_INTERFACE_MODE_RGMII ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_ID ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+		   port->phy_interface == PHY_INTERFACE_MODE_RGMII_TXID ||
 		   port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
 		val = readl(port->base + MVPP22_GMAC_INT_STAT);
 		if (val & MVPP22_GMAC_INT_STAT_LINK) {
@@ -6343,7 +6370,7 @@ static inline int mvpp2_tso_put_data(struct sk_buff *skb,
 	buf_dma_addr = dma_map_single(dev->dev.parent, tso->data, sz,
 				      DMA_TO_DEVICE);
 	if (unlikely(dma_mapping_error(dev->dev.parent, buf_dma_addr))) {
-		pr_err("dma mapping error\n");
+		mvpp2_txq_desc_put(txq);
 		return -ENOMEM;
 	}
 
@@ -6374,7 +6401,7 @@ static int mvpp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	struct mvpp2_port *port = netdev_priv(dev);
 	struct tso_t tso;
 	int hdr_sz = skb_transport_offset(skb) + tcp_hdrlen(skb);
-	int len, descs = 0;
+	int i, len, descs = 0;
 
 	/* Check number of available descriptors */
 	if (mvpp2_aggr_desc_num_check(port->priv, aggr_txq,
@@ -6404,13 +6431,22 @@ static int mvpp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			left -= sz;
 			descs++;
 
-			mvpp2_tso_put_data(skb, dev, &tso, txq, aggr_txq,
-					   txq_pcpu, sz, left, len == 0);
+			if (mvpp2_tso_put_data(skb, dev, &tso, txq, aggr_txq,
+					       txq_pcpu, sz, left, len == 0))
+				goto release;
 			tso_build_data(skb, &tso, sz);
 		}
 	}
 
 	return descs;
+
+release:
+	for (i = descs - 1; i >= 0; i--) {
+		struct mvpp2_tx_desc *tx_desc = txq->descs + i;
+
+		tx_desc_unmap_put(port, txq, tx_desc);
+	}
+	return 0;
 }
 
 /* Main tx processing */
@@ -6740,7 +6776,6 @@ static int mvpp2_phy_connect(struct mvpp2_port *port)
 {
 	struct mvpp2 *priv = port->priv;
 	struct phy_device *phy_dev;
-	u32 phy_addr;
 
 	/* No PHY is attached */
 	if (!port->phy_node)
@@ -6762,13 +6797,8 @@ static int mvpp2_phy_connect(struct mvpp2_port *port)
 	if (priv->hw_version != MVPP22)
 		return 0;
 
-	/* Set the SMI PHY address */
-	if (of_property_read_u32(port->phy_node, "reg", &phy_addr)) {
-		netdev_err(port->dev, "cannot find the PHY address\n");
-		return -EINVAL;
-	}
-
-	writel(phy_addr, priv->iface_base + MVPP22_SMI_PHY_ADDR(port->gop_id));
+	writel(phy_dev->mdio.addr,
+	       priv->iface_base + MVPP22_SMI_PHY_ADDR(port->gop_id));
 	return 0;
 }
 
@@ -6907,6 +6937,7 @@ static int mvpp2_stop(struct net_device *dev)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 	struct mvpp2_port_pcpu *port_pcpu;
+	struct mvpp2 *priv = port->priv;
 	int cpu;
 
 	mvpp2_stop_dev(port);
@@ -6915,12 +6946,11 @@ static int mvpp2_stop(struct net_device *dev)
 	on_each_cpu(mvpp2_interrupts_mask, port, 1);
 	mvpp2_shared_interrupt_mask_unmask(port, true);
 
-	mvpp2_irqs_deinit(port);
-
 	/* Free link IRQ */
-	if (port->priv->hw_version == MVPP22 && !port->phy_node && port->link_irq)
+	if (priv->hw_version == MVPP22 && !port->phy_node && port->link_irq)
 		free_irq(port->link_irq, port);
 
+	mvpp2_irqs_deinit(port);
 	if (!port->has_tx_irqs) {
 		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
@@ -7632,7 +7662,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 		port->base = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(port->base)) {
 			err = PTR_ERR(port->base);
-			goto err_deinit_qvecs;
+			goto err_free_irq;
 		}
 	} else {
 		if (of_property_read_u32(port_node, "gop-port-id",
@@ -7649,7 +7679,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	port->stats = netdev_alloc_pcpu_stats(struct mvpp2_pcpu_stats);
 	if (!port->stats) {
 		err = -ENOMEM;
-		goto err_deinit_qvecs;
+		goto err_free_irq;
 	}
 
 	port->dev = dev;
@@ -7749,6 +7779,9 @@ err_free_txq_pcpu:
 		free_percpu(port->txqs[i]->pcpu);
 err_free_stats:
 	free_percpu(port->stats);
+err_free_irq:
+	if (port->link_irq)
+		irq_dispose_mapping(port->link_irq);
 err_deinit_qvecs:
 	mvpp2_queue_vectors_deinit(port);
 err_free_netdev:
@@ -7770,6 +7803,8 @@ static void mvpp2_port_remove(struct mvpp2_port *port)
 	for (i = 0; i < port->ntxqs; i++)
 		free_percpu(port->txqs[i]->pcpu);
 	mvpp2_queue_vectors_deinit(port);
+	if (port->link_irq)
+		irq_dispose_mapping(port->link_irq);
 	free_netdev(port->dev);
 }
 
