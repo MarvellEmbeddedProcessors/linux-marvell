@@ -1,0 +1,75 @@
+Introduction
+============
+This driver dsa-mvmdio provides access to mdio bus from userspace to access
+switch registers through sysfs. This document explains the procedure to use
+this driver.
+
+A SOHO switch has three types of registers i.e. (i) switch registers like
+port register, global registers, (ii) internal phy registers and (iii) external
+phy registers. This driver will provide access the all the registers from user
+space.
+
+Apart from switch phy, regular phy connected to soc can also be accessed.
+
+Setup
+======
+The setup contains an armada SOC (A7k/8k/3700) is connected to a SOHO switch
+through mdio interface.
+
+To enable the driver a compilation flag NET_DSA_MVMDIO must be set in the defconfigfile.
+
+For device tree modificatoins, refer to Documentation/devicetree/bindings/net/dsa-mvmdio.txt
+
+Sysfs Interface
+================
+The Sysfs offers read write and dump features.
+- Read register  : /sys/devices/platform/dsa_mvmdio/read
+- Write register : /sys/devices/platform/dsa_mvmdio/write
+- Dump registers : /sys/devices/platform/dsa_mvmdio/dump
+- Print help     : /sys/devices/platform/dsa_mvmdio/help
+
+Updating values in these files from the userspace will read or modify the switch internal registers
+values. The purpose is to debug the switch functionality by read/write of registers.
+Note that sysfs assumes that SOHO switch driver flag (CONFIG_MV_SOHO_SWITCH=y) is
+enabled and mdio interface is working.
+
+Usage
+-----
+1. help - display all the available switch commands and their usage syntax.
+	# cd /sys/devices/platform/dsa_mvmdio
+	# cat help
+2. read - read register
+	# echo [type] [port] [xdev] [reg] > read
+3. write - write register
+	# echo [type] [port] [xdev] [reg] [val] > write
+
+Parameters in hexadecimal.
+- type :
+	0 – switch registers,
+	1 – switch internal phy registers,
+	2 – switch external phy registers,
+	3 – regular gigabit phy,
+	4 – extended phy i.e. 100G phy.
+- port :
+	- phy-id for phys.
+	- port address for switches. Port address is same as port number for peridot family
+	  otherwise port address is 0x10 + port number.
+	- For global 1 and global 2 registers of switch, it is device address. ie. 0X1b and 0x1c
+	  respectively.
+- xdev :
+	- device address for extended phy i.e. type = 4.
+	- 0 otherwise.
+- reg : register address
+- val : register value
+
+Examples:
+1. echo 0  1 0  3   > read  - read switch register.
+2. echo 0 1b 0 1c   > read  - read switch global1 register.
+3. echo 1  3 0  2   > read  - read internal phy register.
+4. echo 2  0 0  2   > read  - read external phy register.
+5. echo 3  1 0  2   > read  - read regular phy register, phyid=1.
+6. echo 4  0 7 3c   > read  - read xmdio phy, EEE advertisement register.
+7. echo 0  2 0  7 5 > write - write switch register, set vlan id.
+8. echo 1  3 0      > dump  - dump internal switch phy registers.
+9. echo 4  0 7      > dump  - dump xmdio phy registers for dev-addr = 7.
+Note: All values are in hexadecimal.
