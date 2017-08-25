@@ -63,6 +63,8 @@ contain the following properties.
                       used for MISO. Defaults to 1 if not present.
 - spi-1byte-cs     - (optional) Empty property indicating device requires
 		      toggling the CS for every 1 byte of data.
+- spi-3byte-addressing - (optional) Empty property indicating device
+		access to be done only in 3B addressing mode.
 
 Some SPI controllers and devices support Dual and Quad SPI transfer mode.
 It allows data in the SPI system to be transferred in 2 wires(DUAL) or 4 wires(QUAD).
