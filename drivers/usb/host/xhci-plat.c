@@ -318,6 +318,8 @@ static int xhci_plat_remove(struct platform_device *dev)
 	} else {
 		usb_remove_hcd(xhci->shared_hcd);
 		usb_phy_shutdown(hcd->usb_phy);
+		usb_put_phy(hcd->usb_phy);
+		hcd->usb_phy = NULL;
 
 		usb_remove_hcd(hcd);
 	}
