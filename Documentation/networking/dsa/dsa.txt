@@ -2,7 +2,7 @@ Distributed Switch Architecture
 ===============================
 
 Introduction
-============
+------------
 
 This document describes the Distributed Switch Architecture (DSA) subsystem
 design principles, limitations, interactions with other subsystems, and how to
@@ -10,7 +10,7 @@ develop drivers for this subsystem as well as a TODO for developers interested
 in joining the effort.
 
 Design principles
-=================
+-----------------
 
 The Distributed Switch Architecture is a subsystem which was primarily designed
 to support Marvell Ethernet switches (MV88E6xxx, a.k.a Linkstreet product line)
@@ -65,8 +65,7 @@ Note that DSA does not currently create network interfaces for the "cpu" and
   downstream, or the top-most upstream interface makes sense with that model
 
 Switch tagging protocols
-------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~
 DSA currently supports 4 different tagging protocols, and a tag-less mode as
 well. The different protocols are implemented in:
 
@@ -82,8 +81,7 @@ all contain something which:
 - provides a reason why this frame was forwarded to the management interface
 
 Master network devices
-----------------------
-
+~~~~~~~~~~~~~~~~~~~~~~
 Master network devices are regular, unmodified Linux network device drivers for
 the CPU/management Ethernet interface. Such a driver might occasionally need to
 know whether DSA is enabled (e.g.: to enable/disable specific offload features),
@@ -94,8 +92,7 @@ devices since they act as a pipe between the host processor and the hardware
 Ethernet switch.
 
 Networking stack hooks
-----------------------
-
+~~~~~~~~~~~~~~~~~~~~~~
 When a master netdev is used with DSA, a small hook is placed in in the
 networking stack is in order to have the DSA subsystem process the Ethernet
 switch specific tagging protocol. DSA accomplishes this by registering a
@@ -138,8 +135,7 @@ Past this point, the DSA slave network devices get delivered regular Ethernet
 frames that can be processed by the networking stack.
 
 Slave network devices
----------------------
-
+~~~~~~~~~~~~~~~~~~~~~
 Slave network devices created by DSA are stacked on top of their master network
 device, each of these network interfaces will be responsible for being a
 controlling and data-flowing end-point for each front-panel port of the switch.
@@ -166,30 +162,28 @@ Ethernet switch will be able to process these incoming frames from the
 management interface and delivers these frames to the physical switch port.
 
 Graphical representation
-------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~
 Summarized, this is basically how DSA looks like from a network device
-perspective:
+perspective::
 
 
-			|---------------------------
+			+--------------------------+
 			| CPU network device (eth0)|
-			----------------------------
-			| <tag added by switch     |
+			+--------------------------+
+			| <- tag added by switch   |
 			|                          |
 			|                          |
-			|        tag added by CPU> |
-		|--------------------------------------------|
+			|      tag added by CPU -> |
+		+-------+--------------------------+---------+
 		| Switch driver                              |
-		|--------------------------------------------|
-            ||        ||         ||
-		|-------|  |-------|  |-------|
+		+--++---------++---------++------------------+
+		   ||         ||         ||
+		+--++---+  +--++---+  +--++---+
 		| sw0p0 |  | sw0p1 |  | sw0p2 |
-		|-------|  |-------|  |-------|
+		+-------+  +-------+  +-------+
 
 Slave MDIO bus
---------------
-
+~~~~~~~~~~~~~~
 In order to be able to read to/from a switch PHY built into it, DSA creates a
 slave MDIO bus which allows a specific switch driver to divert and intercept
 MDIO reads/writes towards specific PHY addresses. In most MDIO-connected
@@ -204,8 +198,7 @@ internal or external MDIO devices this switch might be connected to: internal
 PHYs, external PHYs, or even external switches.
 
 Data structures
----------------
-
+~~~~~~~~~~~~~~~
 DSA data structures are defined in include/net/dsa.h as well as
 net/dsa/dsa_priv.h.
 
@@ -232,12 +225,12 @@ and a reference to the backing dsa_switch_driver
 dsa_switch_driver: structure referencing function pointers, see below for a full
 description.
 
+
 Design limitations
-==================
+------------------
 
-DSA is a platform device driver
--------------------------------
-
+DSA as a platform device driver
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 DSA is implemented as a DSA platform device driver which is convenient because
 it will register the entire DSA switch tree attached to a master network device
 in one-shot, facilitating the device creation and simplifying the device driver
@@ -249,16 +242,14 @@ model a bit, this comes however with a number of limitations:
 - supporting non-MDIO and non-MMIO (platform) switches is not possible
 
 Limits on the number of devices and ports
------------------------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 DSA currently limits the number of maximum switches within a tree to 4
 (DSA_MAX_SWITCHES), and the number of ports per switch to 12 (DSA_MAX_PORTS).
 These limits could be extended to support larger configurations would this need
 arise.
 
 Lack of CPU/DSA network devices
--------------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 DSA does not currently create slave network devices for the CPU or DSA ports, as
 described before. This might be an issue in the following cases:
 
@@ -272,8 +263,7 @@ described before. This might be an issue in the following cases:
   when using a cascaded setup
 
 Common pitfalls using DSA setups
---------------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Once a master network device is configured to use DSA (dev->dsa_ptr becomes
 non-NULL), and the switch behind it expects a tagging protocol, this network
 interface can only exclusively be used as a conduit interface. Sending packets
@@ -286,8 +276,9 @@ Slave network devices check that the master network device is UP before allowing
 you to administratively bring UP these slave network devices. A common
 configuration mistake is forgetting to bring UP the master network device first.
 
-Interactions with other subsystems
-==================================
+
+Interactions with Other Subsystems
+----------------------------------
 
 DSA currently leverages the following subsystems:
 
@@ -297,8 +288,7 @@ DSA currently leverages the following subsystems:
 - HWMON: drivers/hwmon/*
 
 MDIO/PHY library
-----------------
-
+~~~~~~~~~~~~~~~~
 Slave network devices exposed by DSA may or may not be interfacing with PHY
 devices (struct phy_device as defined in include/linux/phy.h), but the DSA
 subsystem deals with all possible combinations:
@@ -327,8 +317,7 @@ logic basically looks like this:
 
 
 SWITCHDEV
----------
-
+~~~~~~~~~
 DSA directly utilizes SWITCHDEV when interfacing with the bridge layer, and
 more specifically with its VLAN filtering portion when configuring VLANs on top
 of per-port slave network devices. Since DSA primarily deals with
@@ -341,8 +330,7 @@ As of today, the only SWITCHDEV objects supported by DSA are the FDB and VLAN
 objects.
 
 Device Tree
------------
-
+~~~~~~~~~~~
 DSA features a standardized binding which is documented in
 Documentation/devicetree/bindings/net/dsa/dsa.txt. PHY/MDIO library helper
 functions such as of_get_phy_mode(), of_phy_connect() are also used to query
@@ -354,8 +342,9 @@ HWMON
 Some switch drivers feature internal temperature sensors which are exposed as
 regular HWMON devices in /sys/class/hwmon/.
 
+
 Driver development
-==================
+------------------
 
 DSA switch drivers need to implement a dsa_switch_driver structure which will
 contain the various members described below.
@@ -367,8 +356,7 @@ Unless requested differently by setting the priv_size member accordingly, DSA
 does not allocate any driver private context space.
 
 Switch configuration
---------------------
-
+~~~~~~~~~~~~~~~~~~~~
 - priv_size: additional size needed by the switch driver for its private context
 
 - tag_protocol: this is to indicate what kind of tagging protocol is supported,
@@ -399,8 +387,7 @@ Switch configuration
   CPU/management interface as an optimization
 
 PHY devices and link management
--------------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 - get_phy_flags: Some switches are interfaced to various kinds of Ethernet PHYs,
   if the PHY library PHY driver needs to know about information it cannot obtain
   on its own (e.g.: coming from switch memory mapped registers), this function
@@ -434,8 +421,7 @@ PHY devices and link management
   information is obtained
 
 Ethtool operations
-------------------
-
+~~~~~~~~~~~~~~~~~~
 - get_strings: ethtool function used to query the driver's strings, will
   typically return statistics strings, private flags strings etc.
 
@@ -478,8 +464,7 @@ Ethtool operations
   pretty-print register values and registers
 
 Power management
-----------------
-
+~~~~~~~~~~~~~~~~
 - suspend: function invoked by the DSA platform device when the system goes to
   suspend, should quiesce all Ethernet switch activities, but keep ports
   participating in Wake-on-LAN active as well as additional wake-up logic if
@@ -502,8 +487,7 @@ Power management
   disabled while being a bridge member
 
 Hardware monitoring
--------------------
-
+~~~~~~~~~~~~~~~~~~~
 These callbacks are only available if CONFIG_NET_DSA_HWMON is enabled:
 
 - get_temp: this function queries the given switch for its temperature
@@ -519,8 +503,7 @@ These callbacks are only available if CONFIG_NET_DSA_HWMON is enabled:
 See Documentation/hwmon/sysfs-interface for details.
 
 Bridge layer
-------------
-
+~~~~~~~~~~~~
 - port_bridge_join: bridge layer function invoked when a given switch port is
   added to a bridge, this function should be doing the necessary at the switch
   level to permit the joining port from being added to the relevant logical
@@ -540,8 +523,7 @@ Bridge layer
   the relevant ageing based on the intersection results
 
 Bridge VLAN filtering
----------------------
-
+~~~~~~~~~~~~~~~~~~~~~
 - port_vlan_add: bridge layer function invoked when a VLAN is configured
   (tagged or untagged) for the given switch port
 
@@ -565,11 +547,12 @@ of DSA, would be the its port-based VLAN, used by the associated bridge device.
   the specified MAC address from the specified VLAN ID if it was mapped into
   this port forwarding database
 
+
 TODO
-====
+----
 
 The platform device problem
----------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 DSA is currently implemented as a platform device driver which is far from ideal
 as was discussed in this thread:
 
@@ -589,8 +572,7 @@ Attempts of reworking this has been done here:
 https://lwn.net/Articles/643149/
 
 Making SWITCHDEV and DSA converge towards an unified codebase
--------------------------------------------------------------
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 SWITCHDEV properly takes care of abstracting the networking stack with offload
 capable hardware, but does not enforce a strict switch device driver model. On
 the other DSA enforces a fairly strict device driver model, and deals with most
@@ -598,8 +580,7 @@ of the switch specific. At some point we should envision a merger between these
 two subsystems and get the best of both worlds.
 
 Other hanging fruits
---------------------
-
+~~~~~~~~~~~~~~~~~~~~
 - making the number of ports fully dynamic and not dependent on DSA_MAX_PORTS
 - allowing more than one CPU/management interface:
   http://comments.gmane.org/gmane.linux.network/365657
