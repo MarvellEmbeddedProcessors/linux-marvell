@@ -1,5 +1,5 @@
-Marvell TDM telephony user guide
-================================
+TDM Telephony
+==============
 
 Introduction
 ------------
@@ -9,6 +9,7 @@ There are 2 telephony controllers in Marvell SoCs:
 
 In order to use telephony drivers the following SW modules are required
 (Explanation will be provided later is this document):
+
 	- Linux Kernel Image with telephony support
 	- Linux Kernel device-tree with telephony support
 	- SLIC (Subscriber line interface card) Linux Kernel module
@@ -27,46 +28,60 @@ Refer to: Documentation/devicetree/bindings/telephony/mvebu-phone.txt
 
 SLIC
 ----
-There are pre-compiled Linux Kernel modules for supported SLIC devices
-located in the LSP release (rootfs/lib/modules/slic/):
-- Silabs SLICs:
-	- silabs-si3217x.ko
-	- silabs-si3226x.ko
-- Zarlink SLICs:
-	- zarlink-ve792.ko
-	- zarlink-ve880.ko
-	- zarlink-ve886.ko
-	- zarlink-ve888.ko
-	- zarlink-ve890.ko
+The LSP release contains pre-compiled Kernel modules for supported SLIC devices,
+located in: rootfs/lib/modules/slic/:
 
-The corresponding Kernel module should be inserted after boot using:
+	- Silabs SLICs:
+		- silabs-si3217x.ko
+		- silabs-si3226x.ko
+	- Zarlink SLICs:
+		- zarlink-ve792.ko
+		- zarlink-ve880.ko
+		- zarlink-ve886.ko
+		- zarlink-ve888.ko
+		- zarlink-ve890.ko
 
-	insmod <Kernel_module_name>
+The corresponding Kernel module should be inserted after boot using::
 
-For example: insmod silabs-si3226x.ko
+	> insmod <Kernel_module_name>
+
+For example::
+
+	> insmod silabs-si3226x.ko
+
 
 mv-voice-tool
 -------------
 User-space application which communicates via ioctl with the telephony driver.
 The application is located in the LSP release (rootfs/usr/local/voice-tool).
 mv-voice-tool must suit the SLIC which is used:
-	SLIC			|	mv-voice-tool
-	------------------------|------------------------
-	silabs-si3226x.ko	|	mv_voice_tool-si3217x
-	silabs-si3217x.ko	|	mv_voice_tool-si3217x
-	zarlink-ve792.ko	|	mv_voice_tool-ve792
-	zarlink-ve880.ko	|	mv_voice_tool-ve880
-	zarlink-ve886.ko	|	mv_voice_tool-ve886
-	zarlink-ve888.ko	|	mv_voice_tool-ve888
-	zarlink-ve890.ko	|	mv_voice_tool-ve890
 
-In order to run mv-voice tool, run the following command:
+	+-----------------------+-----------------------+
+	| SLIC			| mv-voice-tool		|
+	+=======================+=======================+
+	| silabs-si3226x.ko	| mv_voice_tool-si3217x	|
+	+-----------------------+-----------------------+
+	| silabs-si3217x.ko	| mv_voice_tool-si3217x	|
+	+-----------------------+-----------------------+
+	| zarlink-ve792.ko	| mv_voice_tool-ve792	|
+	+-----------------------+-----------------------+
+	| zarlink-ve880.ko	| mv_voice_tool-ve880	|
+	+-----------------------+-----------------------+
+	| zarlink-ve886.ko	| mv_voice_tool-ve886	|
+	+-----------------------+-----------------------+
+	| zarlink-ve888.ko	| mv_voice_tool-ve888	|
+	+-----------------------+-----------------------+
+	| zarlink-ve890.ko	| mv_voice_tool-ve890	|
+	+-----------------------+-----------------------+
 
-	./mv_voice_tool-<version>
 
-Example for connecting 2 phones using mv-voice-tool:
+In order to run mv-voice tool, run the following command::
 
-	# ./mv_voice_tool-si3226x
+	> ./mv_voice_tool-<version>
+
+Example for connecting 2 phones using mv-voice-tool::
+
+	> ./mv_voice_tool-si3226x
 
 	>>  Please enter total lines number: 2
 	>>  Please enter PCM sample size(1/2/4): 1
