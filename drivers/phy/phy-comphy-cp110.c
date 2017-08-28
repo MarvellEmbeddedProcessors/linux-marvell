@@ -1799,8 +1799,7 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 {
 	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
 	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
-	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
-	void __iomem *sd_ip_addr;
+	void __iomem *sd_ip_addr, *comphy_ip_addr;
 	u32 mask, data;
 
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
@@ -1812,28 +1811,25 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 
 	spin_lock(&priv->lock);
 
-	switch (mode) {
-	case(COMPHY_SGMII_MODE):
-	case(COMPHY_HS_SGMII_MODE):
-	case(COMPHY_RXAUI_MODE):
-	case(COMPHY_XFI_MODE):
-	case(COMPHY_SFI_MODE):
-		sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
+	sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
 
-		/* Hard reset the comphy */
-		mask = SD_EXTERNAL_CONFIG1_RESET_IN_MASK;
-		data = 0x0 << SD_EXTERNAL_CONFIG1_RESET_IN_OFFSET;
-		mask |= SD_EXTERNAL_CONFIG1_RESET_CORE_MASK;
-		data |= 0x0 << SD_EXTERNAL_CONFIG1_RESET_CORE_OFFSET;
-		mask |= SD_EXTERNAL_CONFIG1_RF_RESET_IN_MASK;
-		data |= 0x0 << SD_EXTERNAL_CONFIG1_RF_RESET_IN_OFFSET;
-		reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
-		break;
-	default:
-		dev_dbg(priv->dev, "comphy%d: power down is not implemented for 0x%x mode\n",
-			comphy->index, mode);
-		break;
-	}
+	/* Hard reset the comphy, for Ethernet modes and Sata */
+	mask = SD_EXTERNAL_CONFIG1_RESET_IN_MASK;
+	data = 0x0 << SD_EXTERNAL_CONFIG1_RESET_IN_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG1_RESET_CORE_MASK;
+	data |= 0x0 << SD_EXTERNAL_CONFIG1_RESET_CORE_OFFSET;
+	mask |= SD_EXTERNAL_CONFIG1_RF_RESET_IN_MASK;
+	data |= 0x0 << SD_EXTERNAL_CONFIG1_RF_RESET_IN_OFFSET;
+	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
+
+	comphy_ip_addr = COMPHY_ADDR(priv->comphy_regs, comphy->index);
+
+	/* Hard reset the comphy, for PCIe and usb3 */
+	mask = COMMON_PHY_CFG1_PWR_ON_RESET_MASK;
+	data = 0x0 << COMMON_PHY_CFG1_PWR_ON_RESET_OFFSET;
+	mask |= COMMON_PHY_CFG1_CORE_RSTN_MASK;
+	data |= 0x0 << COMMON_PHY_CFG1_CORE_RSTN_OFFSET;
+	reg_set(comphy_ip_addr + COMMON_PHY_CFG1_REG, data, mask);
 
 	/* Clear comphy PHY and PIPE selector, can't rely on u-boot */
 	mvebu_cp110_comphy_clr_phy_selector(priv, comphy);
