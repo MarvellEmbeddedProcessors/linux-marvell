@@ -32,6 +32,8 @@ struct mvebu_comphy_priv {
 		struct phy *phy;
 		int mode;
 		int index;
+		/* in case PCIe is in End point mode */
+		bool skip_pcie_power_off;
 		struct misc_info {
 			int pcie_width: 8;
 			int pcie_is_ep: 1;

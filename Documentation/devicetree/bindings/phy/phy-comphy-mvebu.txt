@@ -9,19 +9,22 @@ to support various modes:
 SATA, USB, PCIE, Network modes, etc.
 
 Required properties for comphy node:
-	- compatible:	Should be "marvell,cp110-comphy"
+	- compatible:		Should be "marvell,cp110-comphy"
 	- reg:			Address and length of register sets
-				    for each device in "reg-names"
-	- reg-names:	The names of the register addresses
-					corresponding to the registers filled in "reg".
-	- #phy-cells:	Standard property (Documentation: phy-bindings.txt)
-					Should be 2.
-	- dfx-reg:	Address and length of DFX register which is needed when PCIe
-			COMPHY initialization on CP110. It is optional, and should not
-			be modified if it exist.
-	- sar-data:	The phandle to Sample At Reset(SAR), which is needed when PCIe
-			COMPHY initialization on CP110. It is optional, and should not
-			be modified if it exist.
+				for each device in "reg-names"
+	- reg-names:		The names of the register addresses
+				corresponding to the registers filled in "reg".
+	- #phy-cells:		Standard property (Documentation: phy-bindings.txt)
+				Should be 2.
+	- dfx-reg:		Address and length of DFX register which is needed when PCIe
+				COMPHY initialization on CP110. It is optional, and should not
+				be modified if it exist.
+	- sar-data:		The phandle to Sample At Reset(SAR), which is needed when PCIe
+				COMPHY initialization on CP110. It is optional, and should not
+				be modified if it exist.
+	- skip_pcie_power_off:	This flag allows us to skip all pcie lanes shutdowns if needed.
+				e.g in case using PCIe as End point, thus link must be always kept alive.
+				It is optional property.
 	Example will be provided in the end of this file.
 
 Each device using Comphy should have handle with the following properties:
@@ -87,6 +90,7 @@ Comphy Node:
 		dfx-reg = <0x400280 4>;
 		#phy-cells = <2>;
 		sar-data = <&cpm_sar>;
+		skip_pcie_power_off; /* skip power off at pcie lanes*/
 		status = "okay";
 	};
 
