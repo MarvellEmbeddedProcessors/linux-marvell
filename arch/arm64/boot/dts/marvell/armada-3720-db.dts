@@ -133,7 +133,7 @@
 
 			eth0: ethernet@30000 {
 				pinctrl-names = "default";
-				pinctrl-0 = <&rgmii_pins>;
+				pinctrl-0 = <&rgmii_pins>, <&smi_pins>;
 				phy-mode = "rgmii-id";
 				phy = <&phy0>;
 				status = "okay";
