@@ -1805,6 +1805,11 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
+	if (comphy->skip_pcie_power_off) {
+		dev_dbg(priv->dev, "skip_pcie_power_off indicated, so avoid powering off lane\n");
+		goto exit;
+	}
+
 	spin_lock(&priv->lock);
 
 	switch (mode) {
@@ -1836,8 +1841,8 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 
 	spin_unlock(&priv->lock);
 
+exit:
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
-
 	return 0;
 }
 
