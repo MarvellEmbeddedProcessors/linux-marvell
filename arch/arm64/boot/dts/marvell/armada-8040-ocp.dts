@@ -94,6 +94,7 @@
 				};
 			};
 			comphy0: comphy {
+				skip_pcie_power_off;
 				status = "okay";
 			};
 			i2c@701000 {
