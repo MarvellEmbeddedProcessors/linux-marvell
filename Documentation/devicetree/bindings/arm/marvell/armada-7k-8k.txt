@@ -7,16 +7,16 @@ the following root node property:
  - compatible, with one of the following values:
 
 SoC:
-   - "marvell,armada7020", "marvell,ap806-dual", "marvell,ap806"
+   - "marvell,armada7020", "marvell,armada-ap806-dual", "marvell,armada-ap806"
       when the SoC being used is the Armada 7020
 
-   - "marvell,armada7040", "marvell,ap806-quad", "marvell,ap806"
+   - "marvell,armada7040", "marvell,armada-ap806-quad", "marvell,armada-ap806"
       when the SoC being used is the Armada 7040
 
-   - "marvell,armada8020", "marvell,ap806-dual", "marvell,ap806"
+   - "marvell,armada8020", "marvell,armada-ap806-dual", "marvell,armada-ap806"
       when the SoC being used is the Armada 8020
 
-   - "marvell,armada8040", "marvell,ap806-quad", "marvell,ap806"
+   - "marvell,armada8040", "marvell,armada-ap806-quad", "marvell,armada-ap806"
       when the SoC being used is the Armada 8040
 
 Boards:
@@ -77,4 +77,4 @@ Boards:
 Example:
 
 compatible = "marvell,armada7040-db-router", "marvell,armada7040-db-nand", "marvell,armada7040-db-all-pcie", "marvell,armada7040-pd",
-	     "marvell,armada7040-db", "marvell,armada7040", "marvell,ap806-quad", "marvell,ap806";
+	     "marvell,armada7040-db", "marvell,armada7040", "marvell,armada-ap806-quad", "marvell,armada-ap806";
