@@ -385,7 +385,6 @@ out_noaxbuf:
 	testmgr_free_buf(xbuf);
 out_noxbuf:
 	kfree(iv);
-	return;
 }
 
 static void test_hash_sg_init(struct scatterlist *sg)
