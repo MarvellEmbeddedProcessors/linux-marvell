@@ -298,12 +298,12 @@ enum mvneta_port_type {
 /* Max number of Rx descriptors */
 #define MVNETA_MAX_RXD 4096
 /* Default number of Rx descriptors */
-#define MVNETA_RXD_NUM 128
+#define MVNETA_RXD_NUM 512
 
 /* Max number of Tx descriptors */
 #define MVNETA_MAX_TXD 4096
 /* Default number of Tx descriptors */
-#define MVNETA_TXD_NUM 532
+#define MVNETA_TXD_NUM 1024
 
 /* Max number of allowed TCP segments for software TSO */
 #define MVNETA_MAX_TSO_SEGS 100
@@ -450,8 +450,6 @@ struct mvneta_port {
 #endif
 	u16 rx_offset_correction;
 
-	/* Timer to refill missed buffers */
-	struct timer_list   cleanup_timer;
 	unsigned long flags;
 };
 
@@ -483,7 +481,9 @@ struct mvneta_port {
 #define MVNETA_RXD_ERR_RESOURCE		(BIT(17) | BIT(18))
 #define MVNETA_RXD_ERR_CODE_MASK	(BIT(17) | BIT(18))
 #define MVNETA_RXD_L3_IP4		BIT(25)
-#define MVNETA_RXD_FIRST_LAST_DESC	(BIT(26) | BIT(27))
+#define MVNETA_RXD_LAST_DESC		BIT(26)
+#define MVNETA_RXD_FIRST_DESC		BIT(27)
+#define MVNETA_RXD_FIRST_LAST_DESC	(MVNETA_RXD_FIRST_DESC | MVNETA_RXD_LAST_DESC)
 #define MVNETA_RXD_L4_CSUM_OK		BIT(30)
 
 #if defined(__LITTLE_ENDIAN)
@@ -593,11 +593,6 @@ struct mvneta_rx_queue {
 	/* num of rx descriptors in the rx descriptor ring */
 	int size;
 
-	/* counter of times when mvneta_refill() failed */
-	atomic_t missed;
-	atomic_t refill_stop;
-	struct mvneta_rx_desc *missed_desc;
-
 	u32 pkts_coal;
 	u32 time_coal;
 
@@ -612,6 +607,18 @@ struct mvneta_rx_queue {
 
 	/* Index of the next RX DMA descriptor to process */
 	int next_desc_to_proc;
+
+	/* Index of first RX DMA descriptor to refill */
+	int first_to_refill;
+	u32 refill_num;
+
+	/* pointer to uncomplete skb buffer */
+	struct sk_buff *skb;
+	int left_size;
+
+	/* error counters */
+	u32 skb_alloc_err;
+	u32 refill_err;
 };
 
 #define MVNETA_TEST_LEN		ARRAY_SIZE(mvneta_gstrings_test)
@@ -637,6 +644,9 @@ static int rxq_def;
 
 #define MV_RX_COPYBREAK_DEF	(256)
 static int rx_copybreak __read_mostly = MV_RX_COPYBREAK_DEF;
+
+#define MV_RX_HEADER_SIZE_DEF	(128)
+static int rx_header_size __read_mostly = MV_RX_HEADER_SIZE_DEF;
 
 /* HW BM need that each port be identify by a unique ID */
 static int global_port_id;
@@ -1802,13 +1812,6 @@ static void mvneta_rx_error(struct mvneta_port *pp,
 {
 	u32 status = rx_desc->status;
 
-	if (!mvneta_rxq_desc_is_first_last(status)) {
-		netdev_err(pp->dev,
-			   "bad rx status %08x (buffer oversize), size=%d\n",
-			   status, rx_desc->data_size);
-		return;
-	}
-
 	switch (status & MVNETA_RXD_ERR_CODE_MASK) {
 	case MVNETA_RXD_ERR_CRC:
 		netdev_err(pp->dev, "bad rx status %08x (crc error), size=%d\n",
@@ -1901,53 +1904,45 @@ static void mvneta_txq_done(struct mvneta_port *pp,
 	}
 }
 
-void *mvneta_frag_alloc(unsigned int frag_size)
+inline struct page *mvneta_page_alloc(gfp_t gfp_mask)
 {
-	if (likely(frag_size <= PAGE_SIZE))
-		return netdev_alloc_frag(frag_size);
-	else
-		return kmalloc(frag_size, GFP_ATOMIC);
+	return __dev_alloc_page(gfp_mask);
 }
-EXPORT_SYMBOL_GPL(mvneta_frag_alloc);
 
-void mvneta_frag_free(unsigned int frag_size, void *data)
+inline void mvneta_page_free(void *data)
 {
-	if (likely(frag_size <= PAGE_SIZE))
-		skb_free_frag(data);
-	else
-		kfree(data);
+	__free_page(data);
 }
-EXPORT_SYMBOL_GPL(mvneta_frag_free);
 
 /* Refill processing for SW buffer management */
+/* Allocate page per descriptor */
 static inline int mvneta_rx_refill(struct mvneta_port *pp,
-			    struct mvneta_rx_desc *rx_desc)
+			    struct mvneta_rx_desc *rx_desc, gfp_t gfp_mask)
 {
 	dma_addr_t phys_addr;
-	void *data;
+	struct page *page;
 
-	data = mvneta_frag_alloc(pp->frag_size);
-	if (!data)
+	page = mvneta_page_alloc(gfp_mask);
+	if (!page)
 		return -ENOMEM;
 
 #ifdef CONFIG_64BIT
-	if (unlikely(pp->data_high != ((u64)data & 0xffffffff00000000))) {
-		mvneta_frag_free(pp->frag_size, data);
+	if (unlikely(pp->data_high != ((u64)page & 0xffffffff00000000))) {
+		mvneta_page_free(page);
 		return -ENOMEM;
 	}
 #endif
 
-	phys_addr = dma_map_single(pp->dev->dev.parent, data,
-				   MVNETA_RX_BUF_SIZE(pp->pkt_size),
-				   DMA_FROM_DEVICE);
+	/* map page for use */
+	phys_addr = dma_map_page(pp->dev->dev.parent, page, 0, PAGE_SIZE, DMA_FROM_DEVICE);
 	if (unlikely(dma_mapping_error(pp->dev->dev.parent, phys_addr))) {
-		mvneta_frag_free(pp->frag_size, data);
+		mvneta_page_free(page);
 		return -ENOMEM;
 	}
 
 	phys_addr += pp->rx_offset_correction;
 
-	mvneta_rx_desc_fill(rx_desc, phys_addr, (uintptr_t)data);
+	mvneta_rx_desc_fill(rx_desc, phys_addr, (uintptr_t)page);
 	return 0;
 }
 
@@ -1982,71 +1977,6 @@ static u32 mvneta_skb_tx_csum(struct mvneta_port *pp, struct sk_buff *skb)
 	return MVNETA_TX_L4_CSUM_NOT;
 }
 
-/* Add cleanup timer to refill missed buffer */
-static inline void mvneta_add_cleanup_timer(struct mvneta_port *pp)
-{
-	if (test_and_set_bit(MVNETA_PORT_F_CLEANUP_TIMER_BIT, &pp->flags) == 0) {
-		pp->cleanup_timer.expires = jiffies + ((HZ * 10) / 1000); /* ms */
-		add_timer_on(&pp->cleanup_timer, smp_processor_id());
-	}
-}
-
-/***********************************************************
- * mvneta_cleanup_timer_callback --			   *
- *   N msec periodic callback for error cleanup            *
- ***********************************************************/
-static void mvneta_cleanup_timer_callback(unsigned long data)
-{
-	struct mvneta_port *pp = (struct mvneta_port *)data;
-	struct mvneta_rx_desc *rx_desc;
-	int refill_num, queue, err;
-
-	clear_bit(MVNETA_PORT_F_CLEANUP_TIMER_BIT, &pp->flags);
-
-	if (!netif_running(pp->dev))
-		return;
-
-	/* alloc new skb with rxq_ctrl.missed, attach it with rxq_desc and valid the desc again */
-	for (queue = 0; queue < rxq_number; queue++) {
-		struct mvneta_rx_queue *rxq = &pp->rxqs[queue];
-
-		if (!atomic_read(&rxq->missed))
-			continue;
-
-		rx_desc = rxq->missed_desc;
-		refill_num = 0;
-
-		/* Allocate memory, refill */
-		while (atomic_read(&rxq->missed)) {
-			err = mvneta_rx_refill(pp, rx_desc);
-			if (err) {
-				/* update missed_desc and restart timer */
-				rxq->missed_desc = rx_desc;
-				mvneta_add_cleanup_timer(pp);
-				break;
-			}
-			atomic_dec(&rxq->missed);
-			/* Get pointer to next rx desc */
-			rx_desc = mvneta_rxq_next_desc_ptr(rxq, rx_desc);
-			refill_num++;
-		}
-
-		/* Update RxQ management counters */
-		if (refill_num) {
-			mvneta_rxq_desc_num_update(pp, rxq, 0, refill_num);
-
-			/* Update refill stop flag */
-			if (!atomic_read(&rxq->missed)) {
-				atomic_set(&rxq->refill_stop, 0);
-				/* enable copy a small frame through RX and not unmap the DMA region */
-				rx_copybreak = MV_RX_COPYBREAK_DEF;
-			}
-			pr_debug("%s: %d buffers refilled to rxq #%d - missed = %d\n",
-				 __func__, refill_num, rxq->id, atomic_read(&rxq->missed));
-		}
-	}
-}
-
 /* Drop packets received by the RXQ and free buffers */
 static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 				 struct mvneta_rx_queue *rxq)
@@ -2076,7 +2006,7 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
 		void *data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
 
-		if (!data)
+		if ((!data) || (!rx_desc->buf_phys_addr))
 			continue;
 #ifdef CONFIG_64BIT
 		/* In Neta HW only 32 bits data is supported, so in order to
@@ -2088,166 +2018,177 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
 #endif
 		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr - pp->rx_offset_correction,
 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
-		mvneta_frag_free(pp->frag_size, data);
+		mvneta_page_free(data);
 	}
 }
 
+static inline
+int mvneta_rx_refill_queue(struct mvneta_port *pp, struct mvneta_rx_queue *rxq)
+{
+	struct mvneta_rx_desc *rx_desc;
+	int curr_desc = rxq->first_to_refill;
+	int i;
+
+	for (i = 0; (i < rxq->refill_num) && (i < 64); i++) {
+		rx_desc = rxq->descs + curr_desc;
+		if (!(rx_desc->buf_phys_addr)) {
+			if (mvneta_rx_refill(pp, rx_desc, GFP_ATOMIC)) {
+				pr_err("Can't refill queue %d. Done %d from %d\n",
+				       rxq->id, i, rxq->refill_num);
+				rxq->refill_err++;
+				break;
+			}
+		}
+		curr_desc = MVNETA_QUEUE_NEXT_DESC(rxq, curr_desc);
+	}
+	rxq->refill_num -= i;
+	rxq->first_to_refill = curr_desc;
+
+	return i;
+}
+
 /* Main rx processing when using software buffer management */
-static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+static int mvneta_rx_swbm(struct mvneta_port *pp, int budget,
 			  struct mvneta_rx_queue *rxq,
 			  struct napi_struct *napi)
 {
 	struct net_device *dev = pp->dev;
-	int rx_done, rx_filled;
+	int rx_todo, rx_proc;
+	int refill = 0;
 	u32 rcvd_pkts = 0;
 	u32 rcvd_bytes = 0;
 
 	/* Get number of received packets */
-	rx_done = mvneta_rxq_busy_desc_num_get(pp, rxq);
-
-	if (rx_todo > rx_done)
-		rx_todo = rx_done;
-
-	rx_done = 0;
-	rx_filled = 0;
+	rx_todo = mvneta_rxq_busy_desc_num_get(pp, rxq);
+	rx_proc = 0;
 
 	/* Fairness NAPI loop */
-	while (rx_done < rx_todo) {
+	while ((rcvd_pkts < budget) && (rx_proc < rx_todo)) {
 		struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
-		struct sk_buff *skb;
 		unsigned char *data;
+		struct page *page;
 		dma_addr_t phys_addr;
 		u32 rx_status;
-		int rx_bytes, err;
+		int rx_bytes, skb_size, copy_size, frag_num, frag_size, frag_offset;
 
-		rx_done++;
-		rx_status = rx_desc->status;
-		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
 #ifdef CONFIG_64BIT
 		/* In Neta HW only 32 bits data is supported, so in order to
 		 * obtain whole 64 bits address from RX descriptor, we store the
 		 * upper 32 bits when allocating buffer, and put it back
 		 * when using buffer cookie for accessing packet in memory.
 		 */
-		data = (u8 *)(pp->data_high | (u64)rx_desc->buf_cookie);
+		page = (struct page *)(pp->data_high | (u64)rx_desc->buf_cookie);
 #else
-		data = (u8 *)rx_desc->buf_cookie;
+		page = (struct page *)rx_desc->buf_cookie;
 #endif
+		data = page_address(page);
+
 		/* Prefetch header */
-		prefetch(data + NET_SKB_PAD);
+		prefetch(data);
 
 		phys_addr = rx_desc->buf_phys_addr;
+		rx_status = rx_desc->status;
+		rx_proc++;
+		rxq->refill_num++;
 
-		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
-		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-			mvneta_rx_error(pp, rx_desc);
-
-err_drop_frame:
-			dev->stats.rx_errors++;
-			if (atomic_read(&rxq->refill_stop)) {
-				/* refill already stopped - free skb */
-				rx_desc->buf_cookie = 0;
-				atomic_inc(&rxq->missed);
-				dma_unmap_single(dev->dev.parent, phys_addr - pp->rx_offset_correction,
-						 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
-				mvneta_frag_free(pp->frag_size, data);
-			} else {
+		if (rx_status & MVNETA_RXD_FIRST_DESC) {
+			/* Check errors only for FIRST descriptor */
+			if (rx_status & MVNETA_RXD_ERR_SUMMARY) {
+				mvneta_rx_error(pp, rx_desc);
+				dev->stats.rx_errors++;
 				/* leave the descriptor untouched */
-				rx_filled++;
+				continue;
 			}
-			continue;
-		}
+			rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
 
-		if (rx_bytes <= rx_copybreak) {
-			/* better copy a small frame and not unmap the DMA region */
-			skb = napi_alloc_skb(napi, rx_bytes);
-			if (unlikely(!skb)) {
-				netdev_warn(dev, "rxq #%d - Can't allocate skb. rx_bytes = %d bytes\n",
-					    rxq->id, rx_bytes);
-				goto err_drop_frame;
+			/* Allocate small skb for each new packet */
+			skb_size = max(rx_copybreak, rx_header_size);
+			rxq->skb = __netdev_alloc_skb_ip_align(dev, skb_size, GFP_ATOMIC);
+			if (unlikely(!rxq->skb)) {
+				netdev_err(dev, "Canot allocate skb for packet on queue %d\n", rxq->id);
+				dev->stats.rx_dropped++;
+				rxq->skb_alloc_err++;
+				continue;
 			}
+			copy_size = min(skb_size, rx_bytes);
 
 			/* Copy data from buffer to SKB without Marvell header */
-			memcpy(skb->data,
-			       data + MVNETA_MH_SIZE + NET_SKB_PAD,
-			       rx_bytes);
+			memcpy(rxq->skb->data, data + MVNETA_MH_SIZE, copy_size);
+			skb_put(rxq->skb, copy_size);
+			rxq->left_size = rx_bytes - copy_size;
 
-			skb_put(skb, rx_bytes);
-			dma_sync_single_range_for_cpu(dev->dev.parent,
-						      phys_addr,
-						      NET_SKB_PAD - pp->rx_offset_correction,
-						      rx_bytes + MVNETA_MH_SIZE,
-						      DMA_FROM_DEVICE);
-
-			skb->protocol = eth_type_trans(skb, dev);
-			mvneta_rx_csum(pp, rx_status, skb);
-			if (dev->features & NETIF_F_GRO)
-				napi_gro_receive(napi, skb);
-			else
-				netif_receive_skb(skb);
-
-			rcvd_pkts++;
-			rcvd_bytes += rx_bytes;
-
-			/* leave the descriptor and buffer untouched */
-			rx_filled++;
-			continue;
-		}
-
-		skb = build_skb(data, pp->frag_size > PAGE_SIZE ? 0 : pp->frag_size);
-		if (unlikely(!skb)) {
-			netdev_warn(dev, "rxq #%d - Can't build skb. frag_size = %d bytes\n",
-				    rxq->id, pp->frag_size);
-			goto err_drop_frame;
-		}
-
-		dma_unmap_single(dev->dev.parent, phys_addr - pp->rx_offset_correction,
-				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
-
-		/* Refill processing */
-		if (!atomic_read(&rxq->refill_stop)) {
-			err = mvneta_rx_refill(pp, rx_desc);
-			if (err) {
-				/* set refill stop flag */
-				atomic_set(&rxq->refill_stop, 1);
-				netdev_dbg(dev, "Linux processing - Can't refill queue %d\n",
-					   rxq->id);
-				/* disable rx_copybreak mode */
-				/* to prevent hidden buffer refill and buffers disorder */
-				rx_copybreak = 0;
-				atomic_inc(&rxq->missed);
-
-				/* record the first rx desc refilled failure */
-				rx_desc->buf_cookie = 0;
-				rxq->missed_desc = rx_desc;
-
-				/* add cleanup timer */
-				mvneta_add_cleanup_timer(pp);
+			mvneta_rx_csum(pp, rx_status, rxq->skb);
+			if (rxq->left_size == 0) {
+				dma_sync_single_range_for_cpu(dev->dev.parent,
+							      phys_addr, 0,
+							      copy_size + MVNETA_MH_SIZE,
+							      DMA_FROM_DEVICE);
+				/* leave the descriptor and buffer untouched */
 			} else {
-				/* successful refill */
-				rx_filled++;
+				/* refill this descriptor with new buffer later */
+				rx_desc->buf_phys_addr = 0;
+
+				frag_num = 0;
+				frag_offset = copy_size + MVNETA_MH_SIZE;
+				frag_size = min(rxq->left_size, (int)(PAGE_SIZE - frag_offset));
+				skb_add_rx_frag(rxq->skb, frag_num, page, frag_offset, frag_size, PAGE_SIZE);
+				dma_unmap_single(dev->dev.parent, phys_addr, PAGE_SIZE, DMA_FROM_DEVICE);
+				rxq->left_size -= frag_size;
 			}
 		} else {
-			/* refill already stopped - only update missed counter */
-			rx_desc->buf_cookie = 0;
-			atomic_inc(&rxq->missed);
+			/* Middle or Last descriptor */
+			if (unlikely(!rxq->skb)) {
+				pr_debug("skb was not allocated. rx_status 0x%x\n", rx_status);
+				continue;
+			}
+			if (!rxq->left_size) {
+				/* last descriptor has only FCS and can be discarded */
+				dma_sync_single_range_for_cpu(dev->dev.parent,
+							      phys_addr, 0,
+							      ETH_FCS_LEN,
+							      DMA_FROM_DEVICE);
+				/* leave the descriptor and buffer untouched */
+			} else {
+				/* refill this descriptor with new buffer later */
+				rx_desc->buf_phys_addr = 0;
+
+				frag_num = skb_shinfo(rxq->skb)->nr_frags;
+				frag_offset = 0;
+				frag_size = min(rxq->left_size, (int)(PAGE_SIZE - frag_offset));
+				skb_add_rx_frag(rxq->skb, frag_num, page, frag_offset, frag_size, PAGE_SIZE);
+
+				dma_unmap_single(dev->dev.parent, phys_addr, PAGE_SIZE, DMA_FROM_DEVICE);
+
+				rxq->left_size -= frag_size;
+			}
+		} /* Middle or Last descriptor */
+
+		if (!(rx_status & MVNETA_RXD_LAST_DESC))
+			/* no last descriptor this time */
+			continue;
+
+		if (rxq->left_size) {
+			pr_err("get last desc, but left_size (%d) != 0\n", rxq->left_size);
+			dev_kfree_skb_any(rxq->skb);
+			rxq->left_size = 0;
+			rxq->skb = NULL;
+			continue;
 		}
 
 		rcvd_pkts++;
-		rcvd_bytes += rx_bytes;
+		rcvd_bytes += rxq->skb->len;
 
 		/* Linux processing */
-		skb_reserve(skb, MVNETA_MH_SIZE + NET_SKB_PAD);
-		skb_put(skb, rx_bytes);
-
-		skb->protocol = eth_type_trans(skb, dev);
-
-		mvneta_rx_csum(pp, rx_status, skb);
+		rxq->skb->protocol = eth_type_trans(rxq->skb, dev);
 
 		if (dev->features & NETIF_F_GRO)
-			napi_gro_receive(napi, skb);
+			napi_gro_receive(napi, rxq->skb);
 		else
-			netif_receive_skb(skb);
+			netif_receive_skb(rxq->skb);
+
+		/* clean uncomplete skb pointer in queue */
+		rxq->skb = NULL;
+		rxq->left_size = 0;
 	}
 
 	if (rcvd_pkts) {
@@ -2259,10 +2200,13 @@ err_drop_frame:
 		u64_stats_update_end(&stats->syncp);
 	}
 
-	/* Update rxq management counters */
-	mvneta_rxq_desc_num_update(pp, rxq, rx_done, rx_filled);
+	/* return some buffers to hardware queue, one at a time is too slow */
+	refill = mvneta_rx_refill_queue(pp, rxq);
 
-	return rx_done;
+	/* Update rxq management counters */
+	mvneta_rxq_desc_num_update(pp, rxq, rx_proc, refill);
+
+	return rcvd_pkts;
 }
 
 /* Main rx processing when using hardware buffer management */
@@ -3038,7 +2982,7 @@ static int mvneta_poll(struct napi_struct *napi, int budget)
 	return rx_done;
 }
 
-/* Handle rxq fill: allocates rxq skbs; called when initializing a port */
+/* Handle rxq fill; called when initializing a port */
 static int mvneta_rxq_fill(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
 			   int num)
 {
@@ -3046,7 +2990,7 @@ static int mvneta_rxq_fill(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
 
 	for (i = 0; i < num; i++) {
 		memset(rxq->descs + i, 0, sizeof(struct mvneta_rx_desc));
-		if (mvneta_rx_refill(pp, rxq->descs + i) != 0) {
+		if (mvneta_rx_refill(pp, rxq->descs + i, GFP_KERNEL) != 0) {
 			netdev_err(pp->dev, "%s:rxq %d, %d of %d buffs  filled\n",
 				__func__, rxq->id, i, num);
 			break;
@@ -3105,21 +3049,22 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
 	mvreg_write(pp, MVNETA_RXQ_BASE_ADDR_REG(rxq->id), rxq->descs_phys);
 	mvreg_write(pp, MVNETA_RXQ_SIZE_REG(rxq->id), rxq->size);
 
-	/* Set Offset */
-	mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
-
 	/* Set coalescing pkts and time */
 	mvneta_rx_pkts_coal_set(pp, rxq, rxq->pkts_coal);
 	mvneta_rx_time_coal_set(pp, rxq, rxq->time_coal);
 
 	if (!pp->bm_priv) {
-		/* Fill RXQ with buffers from RX pool */
-		mvneta_rxq_buf_size_set(pp, rxq,
-					MVNETA_RX_BUF_SIZE(pp->pkt_size));
+		/* Set Offset */
+		mvneta_rxq_offset_set(pp, rxq, 0);
+		mvneta_rxq_buf_size_set(pp, rxq, pp->frag_size);
 		mvneta_rxq_bm_disable(pp, rxq);
 		mvneta_rxq_fill(pp, rxq, rxq->size);
 	} else {
+		/* Set Offset */
+		mvneta_rxq_offset_set(pp, rxq, NET_SKB_PAD - pp->rx_offset_correction);
+
 		mvneta_rxq_bm_enable(pp, rxq);
+		/* Fill RXQ with buffers from RX pool */
 		mvneta_rxq_long_pool_set(pp, rxq);
 		mvneta_rxq_short_pool_set(pp, rxq);
 		mvneta_rxq_non_occup_desc_add(pp, rxq, rxq->size);
@@ -3134,6 +3079,9 @@ static void mvneta_rxq_deinit(struct mvneta_port *pp,
 {
 	mvneta_rxq_drop_pkts(pp, rxq);
 
+	if (rxq->skb)
+		dev_kfree_skb_any(rxq->skb);
+
 	if (rxq->descs)
 		dma_free_coherent(pp->dev->dev.parent,
 				  rxq->size * MVNETA_DESC_ALIGNED_SIZE,
@@ -3144,8 +3092,10 @@ static void mvneta_rxq_deinit(struct mvneta_port *pp,
 	rxq->last_desc         = 0;
 	rxq->next_desc_to_proc = 0;
 	rxq->descs_phys        = 0;
-	rxq->missed_desc       = NULL;
-	atomic_set(&rxq->missed, 0);
+	rxq->first_to_refill   = 0;
+	rxq->refill_num        = 0;
+	rxq->skb               = NULL;
+	rxq->left_size         = 0;
 }
 
 /* Create and initialize a tx queue */
@@ -3279,10 +3229,10 @@ static int mvneta_setup_rxqs(struct mvneta_port *pp)
 	 * Frags should be allocated from single 'memory' region, hence
 	 * common upper address half should be sufficient.
 	 */
-	data_tmp = mvneta_frag_alloc(pp->frag_size);
+	data_tmp = mvneta_page_alloc(GFP_KERNEL);
 	if (data_tmp) {
 		pp->data_high = (u64)data_tmp & 0xffffffff00000000;
-		mvneta_frag_free(pp->frag_size, data_tmp);
+		mvneta_page_free(data_tmp);
 	}
 #endif
 
@@ -3435,7 +3385,6 @@ static void mvneta_percpu_disable(void *arg)
 static int mvneta_change_mtu(struct net_device *dev, int mtu)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
-	int ret;
 
 	mtu = mvneta_check_mtu_valid(dev, mtu);
 	if (mtu < 0)
@@ -3448,35 +3397,21 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
 		return 0;
 	}
 
-	/* The interface is running, so we have to force a
-	 * reallocation of the queues
-	 */
-	mvneta_stop_dev(pp);
-	on_each_cpu(mvneta_percpu_disable, pp, true);
+	/* stop all RX and TX queues */
+	mvneta_port_down(pp);
+	netif_tx_stop_all_queues(pp->dev);
 
-	usleep_range(10, 20);
-	mvneta_cleanup_txqs(pp);
-	mvneta_cleanup_rxqs(pp);
+	/* stop the port activity */
+	mvneta_port_disable(pp);
 
 	pp->pkt_size = MVNETA_RX_PKT_SIZE(dev->mtu);
-	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
-	                SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+	mvneta_max_rx_size_set(pp, pp->pkt_size);
+	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
 
-	ret = mvneta_setup_rxqs(pp);
-	if (ret) {
-		netdev_err(dev, "unable to setup rxqs after MTU change\n");
-		return ret;
-	}
-
-	ret = mvneta_setup_txqs(pp);
-	if (ret) {
-		netdev_err(dev, "unable to setup txqs after MTU change\n");
-		return ret;
-	}
-
-	on_each_cpu(mvneta_percpu_enable, pp, true);
-	mvneta_start_dev(pp);
+	/* start the Rx/Tx activity */
 	mvneta_port_up(pp);
+	mvneta_port_enable(pp);
+	netif_tx_start_all_queues(pp->dev);
 
 	netdev_update_features(dev);
 
@@ -3799,8 +3734,7 @@ static int mvneta_open(struct net_device *dev)
 	}
 
 	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
-	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
-	                SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+	pp->frag_size = PAGE_SIZE;
 
 	ret = mvneta_setup_rxqs(pp);
 	if (ret)
@@ -4565,8 +4499,6 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
 		rxq->size = pp->rx_ring_size;
 		rxq->pkts_coal = MVNETA_RX_COAL_PKTS;
 		rxq->time_coal = MVNETA_RX_COAL_USEC;
-		atomic_set(&rxq->missed, 0);
-		atomic_set(&rxq->refill_stop, 0);
 	}
 
 	return 0;
@@ -4752,14 +4684,6 @@ static int mvneta_probe(struct platform_device *pdev)
 	pp->cpu_notifier.notifier_call = mvneta_percpu_notifier;
 
 	pp->rxq_def = rxq_def;
-
-	/* Set RX packet offset correction for platforms, whose NET_SKB_PAD,
-	 * exceeds 64B. It should be 64B for 64-bit platforms and 0B for
-	 * 32-bit ones.
-	 */
-	pp->rx_offset_correction =
-			  max(0, NET_SKB_PAD - MVNETA_RX_PKT_OFFSET_CORRECTION);
-
 	pp->indir[0] = rxq_def;
 
 	/* Get special SoC configurations */
@@ -4852,6 +4776,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	pp->id = global_port_id++;
+	pp->rx_offset_correction = 0; /* not relevant for SW BM */
 
 	/* Obtain access to BM resources if enabled and already initialized */
 	bm_node = of_parse_phandle(dn, "buffer-manager", 0);
@@ -4862,6 +4787,12 @@ static int mvneta_probe(struct platform_device *pdev)
 			dev_info(&pdev->dev, "use SW buffer management\n");
 			pp->bm_priv = NULL;
 		}
+		/* Set RX packet offset correction for platforms, whose NET_SKB_PAD,
+		 * exceeds 64B. It should be 64B for 64-bit platforms and 0B for
+		 * 32-bit ones.
+		 */
+		pp->rx_offset_correction =
+				  max(0, NET_SKB_PAD - MVNETA_RX_PKT_OFFSET_CORRECTION);
 	}
 
 	err = mvneta_init(&pdev->dev, pp);
@@ -4917,12 +4848,7 @@ static int mvneta_probe(struct platform_device *pdev)
 		put_device(&phy->mdio.dev);
 	}
 
-	if (!(pp->flags & MVNETA_PORT_F_IF_MUSDK)) {
-		/* Initialize cleanup */
-		init_timer(&pp->cleanup_timer);
-		pp->cleanup_timer.function = mvneta_cleanup_timer_callback;
-		pp->cleanup_timer.data = (unsigned long)pp;
-	} else
+	if (pp->flags & MVNETA_PORT_F_IF_MUSDK)
 		netdev_info(dev, "Port belong to User Space (MUSDK)\n");
 
 	if (!pp->use_inband_status) {
