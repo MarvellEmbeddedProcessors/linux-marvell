@@ -45,7 +45,7 @@
 
 #include <dt-bindings/interrupt-controller/mvebu-icu.h>
 
-#define ICU_MAX_IRQS		207
+#define ICU_MAX_IRQS		208
 #define ICU_MAX_SPI_IRQ_IN_GIC	128
 #define ICU_GIC_SPI_BASE0	64
 #define ICU_GIC_SPI_BASE1	288
