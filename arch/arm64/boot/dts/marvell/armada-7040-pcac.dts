@@ -91,6 +91,9 @@
 
 	cpn-110-master {
 		config-space {
+			comphy0: comphy {
+				status = "okay";
+			};
 			sata: sata@540000 {
 				status = "okay";
 				sata-port@0 {
