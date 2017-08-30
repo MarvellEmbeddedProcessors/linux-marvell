@@ -167,12 +167,6 @@
 		pcie@0x600000 {
 			num-lanes = <4>;
 			status = "okay";
-			phys = <&comphy0 0 COMPHY_PCIE0
-				&comphy0 1 COMPHY_PCIE0
-				&comphy0 2 COMPHY_PCIE0
-				&comphy0 3 COMPHY_PCIE0
-				>;
-			phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 			reset-gpios = <&cpm_gpio1 20 GPIO_ACTIVE_HIGH>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pcie_reset_pins>;
