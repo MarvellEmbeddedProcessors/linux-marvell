@@ -321,7 +321,7 @@ int set_cpu_coherent(void)
 
 int coherency_available(void)
 {
-	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
+	return false;
 }
 
 int __init coherency_init(void)
