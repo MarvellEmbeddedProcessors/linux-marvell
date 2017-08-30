@@ -151,17 +151,9 @@
 		pcie@0x600000 {
 			status = "okay";
 			num-lanes = <4>;
-			phys = <&comphy0 0 COMPHY_PCIE0
-				&comphy0 1 COMPHY_PCIE0
-				&comphy0 2 COMPHY_PCIE0
-				&comphy0 3 COMPHY_PCIE0
-				>;
-			phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 		};
 		pcie@0x640000 {
 			status = "okay";
-			phys = <&comphy0 5 COMPHY_PCIE2>;
-			phy-names = "pcie-phy0";
 		};
 	};
 	cpn-110-slave {
@@ -234,18 +226,12 @@
 		};
 		pcie@0x600000 {
 			status = "okay";
-			phys = <&comphy1 0 COMPHY_PCIE0>;
-			phy-names = "pcie-phy0";
 		};
 		pcie@0x620000 {
 			status = "okay";
-			phys = <&comphy1 4 COMPHY_PCIE1>;
-			phy-names = "pcie-phy0";
 		};
 		pcie@0x640000 {
 			status = "okay";
-			phys = <&comphy1 5 COMPHY_PCIE2>;
-			phy-names = "pcie-phy0";
 		};
 	};
 };
