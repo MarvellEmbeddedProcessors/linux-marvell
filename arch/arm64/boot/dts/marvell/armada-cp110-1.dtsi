@@ -393,6 +393,7 @@ comphy1: comphy {
 	dfx-reg = <0x400280 4>;
 	#phy-cells = <2>;
 	sar-data = <&cps_sar>;
+	skip_pcie_power_off;
 	status = "disabled";
 };
 
