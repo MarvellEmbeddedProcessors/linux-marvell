@@ -744,16 +744,15 @@ static int armada_cp110_pinctrl_suspend(void)
 {
 	struct mvebu_pinctrl_soc_info *soc;
 	void __iomem *mpp_base;
-	u32 reg_num, offset, i;
 
 	list_for_each_entry(soc, &drvdata_list, node) {
+		unsigned int offset, i = 0;
+
 		mpp_base = (soc->variant == V_ARMADA_80X0_CP1) ? cp1_mpp_base :
 								 cp0_mpp_base;
-		reg_num = soc->pm_save->length / sizeof(unsigned int);
-		for (i = 0; i < reg_num; i++) {
-			offset = i * sizeof(unsigned int);
-			soc->pm_save->regs[i] = readl(mpp_base + offset);
-		}
+		for (offset = 0; offset < soc->pm_save->length;
+		     offset += sizeof(unsigned int))
+			soc->pm_save->regs[i++] = readl(mpp_base + offset);
 	}
 
 	return 0;
@@ -764,16 +763,15 @@ static void armada_cp110_pinctrl_resume(void)
 {
 	struct mvebu_pinctrl_soc_info *soc;
 	void __iomem *mpp_base;
-	u32 reg_num, offset, i;
 
 	list_for_each_entry_reverse(soc, &drvdata_list, node) {
+		unsigned int offset, i = 0;
+
 		mpp_base = (soc->variant == V_ARMADA_80X0_CP1) ? cp1_mpp_base :
 								 cp0_mpp_base;
-		reg_num = soc->pm_save->length / sizeof(unsigned int);
-		for (i = 0; i < reg_num; i++) {
-			offset = i * sizeof(unsigned int);
-			writel(soc->pm_save->regs[i], mpp_base + offset);
-		}
+		for (offset = 0; offset < soc->pm_save->length;
+		     offset += sizeof(unsigned int))
+			writel(soc->pm_save->regs[i++], mpp_base + offset);
 	}
 }
 
