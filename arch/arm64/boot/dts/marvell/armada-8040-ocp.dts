@@ -146,6 +146,9 @@
 			status = "okay";
 		};
 
+		pcie-ep@0x600000 {
+			status = "okay";
+		};
 	};
 
 	cpn-110-slave {
