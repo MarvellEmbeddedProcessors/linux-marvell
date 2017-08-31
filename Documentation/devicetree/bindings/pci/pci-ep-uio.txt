@@ -1,0 +1,31 @@
+* PCI end point UIO driver
+
+This driver implements a generic UIO device that
+configures a PCIe end-point and exposes it's resources
+to user space
+
+Mandatory properties:
+
+- compatible:  marvell,pci-ep-uio
+- reg: a list of named memory spaces to configure to the BARs and host.
+       if the base address of a BAR equals 0, a RAM back-end will be
+       allocated for the BAR.
+- reg-names: accepts "bar0","bar1",.."bar5" and "host-map"
+- device-id: The device id to configure in the PCI header
+- class_code: The class code to configure in the PCI header
+- subclass_code: The sub class code to configure in the PCI header
+
+Example:
+The example below creates a NIC endpoint (class 0x2 sub-class 0x0) with
+a 1MB BAR-0 backed by RAM and maps 4GB of the host memory space
+at address 0x80_0000_0000
+
+pci-ep-uio {
+	compatible = "marvell,pci-ep-uio";
+	reg = <0 0 0 0x100000>, <0x80 0x00000000 0x1 0x000000000>;
+	reg-names = "bar0", "host-map";
+	device-id = <0x7080>;
+	class-code = <0x2>;
+	subclass-code = <0x0>;
+	status = "okay";
+};

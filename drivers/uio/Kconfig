@@ -155,4 +155,12 @@ config UIO_MF624
 
 	  If you compile this as a module, it will be called uio_mf624.
 
+config UIO_PCI_EP
+	tristate "PCI EP driver"
+	depends on PCI
+	help
+	  Userspace I/O interface for the resources of PCI EP Function.
+	  This driver configures the PCI EP according to  information
+	  received from device tree and exposes the EP
+	  resources (BARs, MSIs) to userspace
 endif
