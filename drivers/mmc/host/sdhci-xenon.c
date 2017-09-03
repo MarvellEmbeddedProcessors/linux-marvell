@@ -377,7 +377,9 @@ static int xenon_probe_dt(struct platform_device *pdev)
 	u32 sdhc_id, nr_sdhc;
 	u32 tuning_count;
 
-	/* Disable HS200 on Armada AP806 */
+	/* Disable HS200 on Armada AP806
+	 * Errata 3.5: HWE-7296210
+	 */
 	if (of_device_is_compatible(np, "marvell,armada-ap806-sdhci"))
 		host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
 
