@@ -24,9 +24,8 @@ For A8040 A1 revision SoC - Please use armada-8040-db configuration,
 			    Please use armada-8040-db-C configuration,
 			    Please use armada-8040-db-D configuration,
 			    Please use armada-8040-db-E configuration
-For A8040 A0 revision SoC - Please use armada-8040-db-A0 configuration
 
-|		| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
+|		| 1: A			| 2: B			| 3: C			| 4: D			| 5: E			|
 |---------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
 |Device tree	|armada-8040-db.dtb	|armada-8040-db-B.dtb	|armada-8040-db-C.dtb	|armada-8040-db-D.dtb	|armada-8040-db-E.dtb	|
 |CP0-SW1:1	| OFF			| OFF			| OFF			| OFF			| OFF			|
@@ -48,15 +47,15 @@ For A8040 A0 revision SoC - Please use armada-8040-db-A0 configuration
 
 DPR Setting
 ------------
-|						| 1: default (A)| 3: B			| 4: c				|
+|						| 1: A		| 2: B			| 3: C				|
 |-----------------------------------------------|---------------|-----------------------|-------------------------------|
 | Jumper-module (CON44): SLM1564		| DPR all = 1-2	| DPR all = 1-2		| DPR 96-108 = 2-3		|
 | Serdes CP0 site module (CON42): SLM1521	| DPR 2-5 = 1-2	| DPR 2-5 = 2-3		| DPR 2-5 = 1-2			|
 | Serdes CP1 site module (CON41): SLM1521	| DPR 2-5 = 1-2	| DPR 2-5 = 1-2		| DPR 2-5 = 1-2			|
-| DB8040					| 		|			|				|
+| DB8040					|		|			|				|
 |						|		|			| TDM module (CON51): SLM1448	|
 
-|						| 5: D				| 6: E					|
+|						| 4: D				| 5: E					|
 |-----------------------------------------------|-------------------------------|---------------------------------------|
 | Jumper-module (CON44): SLM1564		| DPR 96-108 = 2-3		| DPR 109-112 = 2-3, others = 1-2	|
 | Serdes CP0 site module (CON42): SLM1521	| DPR 2-5 = 1-2			| DPR 2-5 = 1-2				|
@@ -69,26 +68,26 @@ The tables below summarizes the interface configuration of each setup
 SerDes Configuration
 ------------------------
 
- CP0 Lane	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
-----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
- 0		| PCIe0 (x1)		| PCIe0 (x4)		| PCIe0 (x1)		| PCIe0 (x1)		| PCIe0 (x1)		|
- 1		| SATA0			| PCIe0 (x4)		| SATA0			| SATA0			| SATA0			|
- 2		| KR (10G)		| PCIe0 (x4)		| KR (10G)		| KR (10G)		| KR (10G)		|
- 3		| SATA1			| PCIe0 (x4)		| SATA1			| SATA1			| SATA1			|
- 4		| USB3_HOST1		| USB3_HOST1		| USB3_HOST1		| USB3_HOST1		| USB3_HOST1		|
- 5		| PCIe2 (x1)		| PCIe2 (x1)		| PCIe2 (x1)		| PCIe2 (x1)		| PCIe2 (x1)		|
+ CP0 Lane	| 1: A		| 2: B		| 3: C		| 4: D		| 5: E		|
+----------------|---------------|---------------|---------------|---------------|---------------|
+ 0		| PCIe0 (x1)	| PCIe0 (x4)	| PCIe0 (x1)	| PCIe0 (x1)	| PCIe0 (x1)	|
+ 1		| SATA0		| PCIe0 (x4)	| SATA0		| SATA0		| SATA0		|
+ 2		| SFI (10G)	| PCIe0 (x4)	| SFI (10G)	| SFI (10G)	| SFI (10G)	|
+ 3		| SATA1		| PCIe0 (x4)	| SATA1		| SATA1		| SATA1		|
+ 4		| USB3_HOST1	| USB3_HOST1	| USB3_HOST1	| USB3_HOST1	| USB3_HOST1	|
+ 5		| PCIe2 (x1)	| PCIe2 (x1)	| PCIe2 (x1)	| PCIe2 (x1)	| PCIe2 (x1)	|
 
 - USB2_H0 (UTMI only)
 - USB2_H1 (UTMI & USB3 SerDes)
 
- CP1 Lane	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
-----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
- 0		| PCIe0 (x1)		| PCIe0 (x1)		| PCIe0 (x1)		| PCIe0 (x1)		| PCIe0 (x1)		|
- 1		| SATA0			| USB3_HOST0		| SATA0			| SATA0			| SATA0			|
- 2		| KR (10G)		| SGMII0		| KR (10G)		| KR (10G)		| KR (10G)		|
- 3		| SATA1			| SATA1			| SATA1			| SATA1			| SATA1			|
- 4		| PCIe1 (x1)		| PCIe1 (x1)		| PCIe1 (x1)		| PCIe1 (x1)		| PCIe1 (x1)		|
- 5		| PCIe2 (x1)		| PCIe2 (x1)		| PCIe2 (x1)		| PCIe2 (x1)		| PCIe2 (x1)		|
+ CP1 Lane	| 1: A		| 2: B		| 3: C		| 4: D		| 5: E		|
+----------------|---------------|---------------|---------------|---------------|---------------|
+ 0		| PCIe0 (x1)	| PCIe0 (x1)	| PCIe0 (x1)	| PCIe0 (x1)	| PCIe0 (x1)	|
+ 1		| SATA0		| USB3_HOST0	| SATA0		| SATA0		| SATA0		|
+ 2		| SFI (10G)	| SGMII0	| SFI (10G)	| SFI (10G)	| SFI (10G)	|
+ 3		| SATA1		| SATA1		| SATA1		| SATA1		| SATA1		|
+ 4		| PCIe1 (x1)	| PCIe1 (x1)	| PCIe1 (x1)	| PCIe1 (x1)	| PCIe1 (x1)	|
+ 5		| PCIe2 (x1)	| PCIe2 (x1)	| PCIe2 (x1)	| PCIe2 (x1)	| PCIe2 (x1)	|
 
 - USB2_H0 (UTMI only)
 
@@ -96,47 +95,47 @@ SerDes Configuration
 Multi-purpose pin configurations
 --------------------------------
 
- AP806 pin	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
-----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
-    AP-SDIO	| [0-10]		| [0-10]		| [0-10]		| [0-10]		| N/C			|
-    I2C0	| N/C			| N/C			| N/C			| N/C			| N/C			|
-    AP-SPI0	| N/C			| N/C			| N/C			| N/C			| [0,3]			|
-    AP-UART0	| [11,19]		| [11,19]		| [11,19]		| [11,19]		| [11,19]		|
+ AP806 pin	| 1: A		| 2: B		| 3: C		| 4: D		| 5: E		|
+----------------|---------------|---------------|---------------|---------------|---------------|
+    AP-SDIO	| [0-10]	| [0-10]	| [0-10]	| [0-10]	| N/C		|
+    I2C0	| N/C		| N/C		| N/C		| N/C		| N/C		|
+    AP-SPI0	| N/C		| N/C		| N/C		| N/C		| [0,3]		|
+    AP-UART0	| [11,19]	| [11,19]	| [11,19]	| [11,19]	| [11,19]	|
 
- CP0 pin	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
-----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
-    CP0-SMI	| [32,34]		| [32,34]		| [32,34]		| [32,34]		| N/C			|
-    CP0-XSMI	| [42-43]		| [42-43]		| [42-43]		| [42-43]		| [42-43]		|
-    CP0-TWSI	| [37-38]		| [37-38]		| [37-38]		| [37-38]		| [37-38]		|
-    CP0-SATA1	| [40]			| [40]			| [40]			| [40]			| [40]			|
-    CP0-SATA0	| [41]			| [41]			| [41]			| [41]			| [41]			|
-    CP0-RGMII1	| [44-55]		| [44-55]		| [44-55]		| [44-55]		| N/C			|
-    CP0-SD	| [56-62]		| [56-62]		| [56-62]		| [56-62]		| [56-62]		|
-    CP0-PTP_CLK	| [39]			| [39]			| [39]			| [39]			| [39]			|
-    CP0-TWSI1	| N/C			| N/C			| N/C			| N/C			| [35-36]		|
-    CP0-UART1	| N/C			| N/C			| N/C			| N/C			| [47,49]		|
-    CP0-UART2	| N/C			| N/C			| N/C			| N/C			| [50-51]		|
+ CP0 pin	| 1: A		| 2: B		| 3: C		| 4: D		| 5: E		|
+----------------|---------------|---------------|---------------|---------------|---------------|
+    CP0-SMI	| [32,34]	| [32,34]	| [32,34]	| [32,34]	| N/C		|
+    CP0-XSMI	| [42-43]	| [42-43]	| [42-43]	| [42-43]	| [42-43]	|
+    CP0-TWSI	| [37-38]	| [37-38]	| [37-38]	| [37-38]	| [37-38]	|
+    CP0-SATA1	| [40]		| [40]		| [40]		| [40]		| [40]		|
+    CP0-SATA0	| [41]		| [41]		| [41]		| [41]		| [41]		|
+    CP0-RGMII1	| [44-55]	| [44-55]	| [44-55]	| [44-55]	| N/C		|
+    CP0-SD	| [56-62]	| [56-62]	| [56-62]	| [56-62]	| [56-62]	|
+    CP0-PTP_CLK	| [39]		| [39]		| [39]		| [39]		| [39]		|
+    CP0-TWSI1	| N/C		| N/C		| N/C		| N/C		| [35-36]	|
+    CP0-UART1	| N/C		| N/C		| N/C		| N/C		| [47,49]	|
+    CP0-UART2	| N/C		| N/C		| N/C		| N/C		| [50-51]	|
 
 GPIOS:
 	- 33: GPIO: GE_INT#/push button/Wake
-	- 35: MSS_GPIO[3]: MSS_PWDN (only in configuration 1,4,5,6)
-	- 36: MSS_GPIO[5]: MSS_VTT_EN (only in configuration 1,4,5,6)
+	- 35: MSS_GPIO[3]: MSS_PWDN (only in configuration 1,3,4,5)
+	- 36: MSS_GPIO[5]: MSS_VTT_EN (only in configuration 1,3,4,5)
 
- CP1 pin	| 1: default (A)	| 3: B			| 4: C			| 5: D			| 6: E			|
-----------------|-----------------------|-----------------------|-----------------------|-----------------------|-----------------------|
-    CP1-RGMII0	| [0-11]		| [0-11]		| N/C			| N/C			| [0-11]		|
-    CP1-SMI	| [27,31]		| [27,31]		| N/C			| N/C			| [27,31]		|
-    CP1-SPI1	| [13-16]		| [13-16]		| [13-16]		| N/C			| [13-16]		|
-    CP1-UART0	| [29-30]		| [29-30]		| [29-30]		| [29-30]		| [29-30]		|
-    CP1-SATA1	| [28]			| [28]			| [28]			| [28]			| [28]			|
-    CP1-SATA0	| N/C			| N/C			| [27]			| N/C			| N/C			|
-    CP1-AU	| N/C			| N/C			| N/C			| [0-5]			| N/C			|
-    CP1-NAND	| N/C			| N/C			| N/C			| [13,15-27]		| N/C			|
-    CP1-TDM	| N/C			| N/C			| [0-11]		| N/C			| N/C			|
+ CP1 pin	| 1: A		| 2: B		| 3: C		| 4: D		| 5: E		|
+----------------|---------------|---------------|---------------|---------------|---------------|
+    CP1-RGMII0	| [0-11]	| [0-11]	| N/C		| N/C		| [0-11]	|
+    CP1-SMI	| [27,31]	| [27,31]	| N/C		| N/C		| [27,31]	|
+    CP1-SPI1	| [13-16]	| [13-16]	| [13-16]	| N/C		| [13-16]	|
+    CP1-UART0	| [29-30]	| [29-30]	| [29-30]	| [29-30]	| [29-30]	|
+    CP1-SATA1	| [28]		| [28]		| [28]		| [28]		| [28]		|
+    CP1-SATA0	| N/C		| N/C		| [27]		| N/C		| N/C		|
+    CP1-AU	| N/C		| N/C		| N/C		| [0-5]		| N/C		|
+    CP1-NAND	| N/C		| N/C		| N/C		| [13,15-27]	| N/C		|
+    CP1-TDM	| N/C		| N/C		| [0-11]	| N/C		| N/C		|
 
 Network configuration
 ---------------------
-1: default (A):
+1: A:
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
@@ -144,28 +143,28 @@ Network configuration
  eth2		| 1	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
  eth3		| 1	| 1		| 2		| RGMII0			|
 
-3: B:
+2: B:
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 2		| 3		| RGMII1			|
  eth1		| 1	| 0		| 0		| SGMII				|
  eth2		| 1	| 1		| 2		| RGMII0			|
 
-4: C:
+3: C:
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
  eth1		| 0	| 2		| 3		| RGMII1			|
  eth2		| 1	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
 
-5: D:
+4: D:
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
  eth1		| 0	| 2		| 3		| RGMII1			|
  eth2		| 1	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
 
-6: E:
+5: E:
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
