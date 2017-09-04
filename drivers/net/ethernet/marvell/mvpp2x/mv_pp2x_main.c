@@ -1077,11 +1077,6 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 		txq_pcpu->tx_skb[txq_pcpu->txq_get_index] = 0;
 		txq_pcpu->data_size[txq_pcpu->txq_get_index] = 0;
 
-		if (unlikely(!buf_phys_addr)) {
-			mv_pp2x_txq_inc_get(txq_pcpu);
-			continue;
-		}
-
 		if (skb & MVPP2_ETH_SHADOW_EXT) {
 			/* Refill TSO external pool */
 			skb &= ~MVPP2_ETH_SHADOW_EXT;
@@ -4379,15 +4374,11 @@ u16 mv_pp2x_select_queue(struct net_device *dev, struct sk_buff *skb,
 			 void *accel_priv, select_queue_fallback_t fallback)
 
 {
-	int val;
-
 	/* If packet in coming from Rx -> RxQ = TxQ, callback function used for packets from CPU Tx */
 	if (skb->queue_mapping)
-		val = skb->queue_mapping - 1;
+		return ((skb->queue_mapping - 1) % mv_pp2x_txq_number) + (smp_processor_id() * mv_pp2x_txq_number);
 	else
-		val = fallback(dev, skb);
-
-	return (val % mv_pp2x_txq_number) + (smp_processor_id() * mv_pp2x_txq_number);
+		return mv_pp2x_txq_number * fallback(dev, skb);
 }
 
 /* Dummy netdev_ops for non-kernel (i.e. musdk) network devices */
@@ -5000,6 +4991,12 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	}
 	if (!dev)
 		return -ENOMEM;
+
+	/* Setup XPS mapping */
+	for_each_present_cpu(cpu) {
+		cpumask_set_cpu(cpu, &priv->aggr_txqs[cpu].affinity_mask);
+		netif_set_xps_queue(dev, &priv->aggr_txqs[cpu].affinity_mask, cpu);
+	}
 
 	/*Connect entities */
 	port = netdev_priv(dev);
