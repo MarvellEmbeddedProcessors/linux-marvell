@@ -393,6 +393,9 @@ struct mv_pp2x_aggr_tx_queue {
 
 	/* Index of the next Tx DMA descriptor to process */
 	int next_desc_to_proc;
+
+	/* XPS mask */
+	cpumask_t affinity_mask;
 };
 
 struct mv_pp2x_rx_queue {
