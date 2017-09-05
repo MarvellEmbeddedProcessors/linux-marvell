@@ -37,11 +37,12 @@
 #include <net/ipv6.h>
 #include <net/tso.h>
 
-/* RX Fifo Registers */
+/* Fifo Registers */
 #define MVPP2_RX_DATA_FIFO_SIZE_REG(port)	(0x00 + 4 * (port))
 #define MVPP2_RX_ATTR_FIFO_SIZE_REG(port)	(0x20 + 4 * (port))
 #define MVPP2_RX_MIN_PKT_SIZE_REG		0x60
 #define MVPP2_RX_FIFO_INIT_REG			0x64
+#define MVPP2_TX_FIFO_SIZE_REG(port)		(0x8860 + 4 * (port))
 
 /* RX DMA Top Registers */
 #define MVPP2_RX_CTRL_REG(port)			(0x140 + 4 * (port))
@@ -399,8 +400,6 @@
 #define MVPP22_SMI_MISC_CFG_REG			0x1204
 #define     MVPP22_SMI_POLLING_EN		BIT(10)
 
-#define MVPP22_SMI_PHY_ADDR(port)		(0x120c + (port) * 0x4)
-
 #define MVPP22_GMAC_BASE(port)		(0x7000 + (port) * 0x1000 + 0xe00)
 
 #define MVPP2_CAUSE_TXQ_SENT_DESC_ALL_MASK	0xff
@@ -483,9 +482,6 @@
 /* Maximum number of TXQs used by single port */
 #define MVPP2_MAX_TXQ			8
 
-#define MVPP2_MAX_TSO_SEGS		100
-#define MVPP2_MAX_SKB_DESCS		(MVPP2_MAX_TSO_SEGS * 2 + MAX_SKB_FRAGS)
-
 /* Dfault number of RXQs in use */
 #define MVPP2_DEFAULT_RXQ		4
 
@@ -508,15 +504,17 @@
 #define MVPP2_TX_DESC_ALIGN		(MVPP2_DESC_ALIGNED_SIZE - 1)
 
 /* RX FIFO constants */
-#define MVPP2_RX_FIFO_PORT_DATA_SIZE	0x2000
-#define MVPP2_RX_FIFO_PORT_ATTR_SIZE	0x80
-#define MVPP2_RX_FIFO_PORT_MIN_PKT	0x80
-#define MVPP2_RX_FIFO_DATA_SIZE_32KB	0x8000
-#define MVPP2_RX_FIFO_DATA_SIZE_8KB	0x2000
-#define MVPP2_RX_FIFO_DATA_SIZE_4KB	0x1000
-#define MVPP2_RX_FIFO_ATTR_SIZE_32KB	0x200
-#define MVPP2_RX_FIFO_ATTR_SIZE_8KB	0x80
-#define MVPP2_RX_FIFO_ATTR_SIZE_4KB	0x40
+#define MVPP2_RX_FIFO_PORT_DATA_SIZE_32KB	0x8000
+#define MVPP2_RX_FIFO_PORT_DATA_SIZE_8KB	0x2000
+#define MVPP2_RX_FIFO_PORT_DATA_SIZE_4KB	0x1000
+#define MVPP2_RX_FIFO_PORT_ATTR_SIZE_32KB	0x200
+#define MVPP2_RX_FIFO_PORT_ATTR_SIZE_8KB	0x80
+#define MVPP2_RX_FIFO_PORT_ATTR_SIZE_4KB	0x40
+#define MVPP2_RX_FIFO_PORT_MIN_PKT		0x80
+
+/* TX FIFO constants */
+#define MVPP2_TX_FIFO_DATA_SIZE_10KB		0xa
+#define MVPP2_TX_FIFO_DATA_SIZE_3KB		0x3
 
 /* RX buffer constants */
 #define MVPP2_SKB_SHINFO_SIZE \
@@ -1035,9 +1033,6 @@ struct mvpp2_txq_pcpu {
 	 * descriptor ring
 	 */
 	int count;
-
-	int wake_threshold;
-	int stop_threshold;
 
 	/* Number of Tx DMA descriptors reserved for each CPU */
 	int reserved_num;
@@ -5467,7 +5462,7 @@ static void mvpp2_txq_done(struct mvpp2_port *port, struct mvpp2_tx_queue *txq,
 	txq_pcpu->count -= tx_done;
 
 	if (netif_tx_queue_stopped(nq))
-		if (txq_pcpu->count >= txq_pcpu->wake_threshold)
+		if (txq_pcpu->size - txq_pcpu->count >= MAX_SKB_FRAGS + 1)
 			netif_tx_wake_queue(nq);
 }
 
@@ -5710,12 +5705,10 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
 		txq_pcpu->txq_put_index = 0;
 		txq_pcpu->txq_get_index = 0;
 
-		txq_pcpu->stop_threshold = txq->size - MVPP2_MAX_SKB_DESCS;
-		txq_pcpu->wake_threshold = txq_pcpu->stop_threshold / 2;
-
 		txq_pcpu->tso_headers =
 			dma_alloc_coherent(port->dev->dev.parent,
-					   MVPP2_AGGR_TXQ_SIZE * TSO_HEADER_SIZE,
+					   MVPP2_AGGR_TXQ_SIZE *
+					   TSO_HEADER_SIZE,
 					   &txq_pcpu->tso_headers_dma,
 					   GFP_KERNEL);
 		if (!txq_pcpu->tso_headers)
@@ -6405,10 +6398,8 @@ static int mvpp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	if (mvpp2_aggr_desc_num_check(port->priv, aggr_txq,
 				      tso_count_descs(skb)) ||
 	    mvpp2_txq_reserved_desc_num_proc(port->priv, txq, txq_pcpu,
-					     tso_count_descs(skb))) {
-		pr_err("Not enough available space\n");
+					     tso_count_descs(skb)))
 		return 0;
-	}
 
 	tso_start(skb, &tso);
 	len = skb->len - hdr_sz;
@@ -6530,7 +6521,7 @@ out:
 		wmb();
 		mvpp2_aggr_txq_pend_desc_add(port, frags);
 
-		if (txq_pcpu->count >= txq_pcpu->stop_threshold)
+		if (txq_pcpu->size - txq_pcpu->count < MAX_SKB_FRAGS + 1)
 			netif_tx_stop_queue(nq);
 
 		u64_stats_update_begin(&stats->syncp);
@@ -6795,8 +6786,6 @@ static int mvpp2_phy_connect(struct mvpp2_port *port)
 	if (priv->hw_version != MVPP22)
 		return 0;
 
-	writel(phy_dev->mdio.addr,
-	       priv->iface_base + MVPP22_SMI_PHY_ADDR(port->gop_id));
 	return 0;
 }
 
@@ -7758,7 +7747,6 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	}
 
 	dev->vlan_features |= features;
-	dev->gso_max_segs = MVPP2_MAX_TSO_SEGS;
 
 	err = register_netdev(dev);
 	if (err < 0) {
@@ -7846,9 +7834,9 @@ static void mvpp21_rx_fifo_init(struct mvpp2 *priv)
 
 	for (port = 0; port < MVPP2_MAX_PORTS; port++) {
 		mvpp2_write(priv, MVPP2_RX_DATA_FIFO_SIZE_REG(port),
-			    MVPP2_RX_FIFO_PORT_DATA_SIZE);
+			    MVPP2_RX_FIFO_PORT_DATA_SIZE_4KB);
 		mvpp2_write(priv, MVPP2_RX_ATTR_FIFO_SIZE_REG(port),
-			    MVPP2_RX_FIFO_PORT_ATTR_SIZE);
+			    MVPP2_RX_FIFO_PORT_ATTR_SIZE_4KB);
 	}
 
 	mvpp2_write(priv, MVPP2_RX_MIN_PKT_SIZE_REG,
@@ -7869,25 +7857,35 @@ static void mvpp22_rx_fifo_init(struct mvpp2 *priv)
 	for (port = 0; port < MVPP2_MAX_PORTS; port++) {
 		if (port == 0) {
 			mvpp2_write(priv, MVPP2_RX_DATA_FIFO_SIZE_REG(port),
-				    MVPP2_RX_FIFO_DATA_SIZE_32KB);
+				    MVPP2_RX_FIFO_PORT_DATA_SIZE_32KB);
 			mvpp2_write(priv, MVPP2_RX_ATTR_FIFO_SIZE_REG(port),
-				    MVPP2_RX_FIFO_ATTR_SIZE_32KB);
+				    MVPP2_RX_FIFO_PORT_ATTR_SIZE_32KB);
 		} else if (port == 1) {
 			mvpp2_write(priv, MVPP2_RX_DATA_FIFO_SIZE_REG(port),
-				    MVPP2_RX_FIFO_DATA_SIZE_8KB);
+				    MVPP2_RX_FIFO_PORT_DATA_SIZE_8KB);
 			mvpp2_write(priv, MVPP2_RX_ATTR_FIFO_SIZE_REG(port),
-				    MVPP2_RX_FIFO_ATTR_SIZE_8KB);
+				    MVPP2_RX_FIFO_PORT_ATTR_SIZE_8KB);
 		} else {
 			mvpp2_write(priv, MVPP2_RX_DATA_FIFO_SIZE_REG(port),
-				    MVPP2_RX_FIFO_DATA_SIZE_4KB);
+				    MVPP2_RX_FIFO_PORT_DATA_SIZE_4KB);
 			mvpp2_write(priv, MVPP2_RX_ATTR_FIFO_SIZE_REG(port),
-				    MVPP2_RX_FIFO_ATTR_SIZE_4KB);
+				    MVPP2_RX_FIFO_PORT_ATTR_SIZE_4KB);
 		}
 	}
 
 	mvpp2_write(priv, MVPP2_RX_MIN_PKT_SIZE_REG,
 		    MVPP2_RX_FIFO_PORT_MIN_PKT);
 	mvpp2_write(priv, MVPP2_RX_FIFO_INIT_REG, 0x1);
+}
+
+/* Initialize Tx FIFO's */
+static void mvpp2_tx_fifo_init(struct mvpp2 *priv)
+{
+	int port;
+
+	for (port = 0; port < MVPP2_MAX_PORTS; port++)
+		mvpp2_write(priv, MVPP2_TX_FIFO_SIZE_REG(port),
+			    MVPP2_TX_FIFO_DATA_SIZE_3KB);
 }
 
 static void mvpp2_axi_init(struct mvpp2 *priv)
@@ -7986,10 +7984,12 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 	}
 
 	/* Rx Fifo Init */
-	if (priv->hw_version == MVPP21)
+	if (priv->hw_version == MVPP21) {
 		mvpp21_rx_fifo_init(priv);
-	else
+	} else {
 		mvpp22_rx_fifo_init(priv);
+		mvpp2_tx_fifo_init(priv);
+	}
 
 	if (priv->hw_version == MVPP21)
 		writel(MVPP2_EXT_GLOBAL_CTRL_DEFAULT,
@@ -8105,19 +8105,31 @@ static int mvpp2_probe(struct platform_device *pdev)
 	priv->tclk = clk_get_rate(priv->pp_clk);
 
 	if (priv->hw_version == MVPP22) {
+		/* If dma_mask points to coherent_dma_mask, setting both will
+		 * override the value of the other. This is problematic as the
+		 * PPv2 driver uses a 32-bit-mask for coherent accesses (txq,
+		 * rxq, bm) and a 40-bit mask for all other accesses.
+		 */
+		if (pdev->dev.dma_mask == &pdev->dev.coherent_dma_mask) {
+			pdev->dev.dma_mask =
+				devm_kzalloc(&pdev->dev,
+					     sizeof(*pdev->dev.dma_mask),
+					     GFP_KERNEL);
+			if (!pdev->dev.dma_mask) {
+				err = -ENOMEM;
+				goto err_mg_clk;
+			}
+		}
+
+		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(40));
+		if (err)
+			goto err_mg_clk;
+
 		/* Sadly, the BM pools all share the same register to
 		 * store the high 32 bits of their address. So they
 		 * must all have the same high 32 bits, which forces
 		 * us to restrict coherent memory to DMA_BIT_MASK(32).
-		 * By default dma_mask and coherent_dma_mask point to
-		 * to same address. Need to allocate new dma_mask to
-		 * configure different dma and coherent_dma masks.
 		 */
-		pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask),
-					     GFP_KERNEL);
-		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(40));
-		if (err)
-			goto err_mg_clk;
 		err = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
 		if (err)
 			goto err_mg_clk;
