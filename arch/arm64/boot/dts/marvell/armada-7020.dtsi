@@ -53,7 +53,89 @@
 	compatible = "marvell,armada7020", "marvell,armada-ap806-dual",
 	             "marvell,armada-ap806";
 
+	aliases {
+		gpio1 = &cpm_gpio0;
+		gpio2 = &cpm_gpio1;
+		ethernet0 = &emac0;
+		ethernet1 = &emac2;
+		ethernet2 = &emac3;
+	};
+
+	ap806 {
+		config-space {
+			smmu: iommu@5000000 {
+				mmu-masters = <&usb3h0 0x483>,
+					      <&usb3h1 0x484>,
+					      <&sata 0x485>,
+					      <&cp_xor0 0x489>,
+					      <&cp_xor1 0x48a>;
+			};
+			pinctrl@6f4000 {
+				ap_emmc_pins: emmc-pins-0 {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+					"mpp3", "mpp4", "mpp5";
+					marvell,function = "sdio";
+				};
+			};
+		};
+	};
+
 	cpn-110-master {
+		config-space {
+			pinctrl@440000 {
+			compatible = "marvell,a70x0-pinctrl";
+				cpm_tdm_pins: tdm-pins {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+					"mpp3", "mpp4", "mpp5";
+					marvell,function = "tdm";
+				};
+				i2c0_pins: i2c-pins-0 {
+					marvell,pins = "mpp37", "mpp38";
+					marvell,function = "i2c0";
+				};
+				cpm_sdhci_pins: cpm-sdhi-pins {
+					marvell,pins = "mpp56", "mpp57", "mpp58",
+						       "mpp59", "mpp60", "mpp61";
+					marvell,function = "sdio";
+				};
+				/* following VBUS IN/OUT GPIO entries is not used
+				 * (for reference only) GPIO is not connected
+				 * in default A7040-DB board
+				 */
+				xhci0_vbus_pins: xhci0-vbus-pins {
+					marvell,pins = "mpp12";
+					marvell,function = "gpio";
+				};
+			};
+			rtc@284000 {
+				status = "okay";
+			};
+			ppv22@000000 {
+				dma-coherent;
+			};
+			sata: sata@540000 {
+				#stream-id-cells = <1>;
+			};
+			usb3h0: usb3@500000 {
+				#stream-id-cells = <1>;
+			};
+			usb3h1: usb3@510000 {
+				#stream-id-cells = <1>;
+			};
+			cp_xor0: cpxor0@6a0000 {
+				#stream-id-cells = <1>;
+			};
+			cp_xor1: cpxor1@6c0000 {
+				#stream-id-cells = <1>;
+			};
+			/* AXI bus of IHB1 is not connected in Armada-7040 package. */
+			axim-hb1-rd@3c8000 {
+				status = "disabled";
+			};
+			axim-hb1-wr@3c9000 {
+				status = "disabled";
+			};
+		};
 		pcie@0x600000 {
 			msi-parent = <&gic_v2m0>;
 		};

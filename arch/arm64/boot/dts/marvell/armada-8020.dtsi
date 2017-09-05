@@ -46,9 +46,163 @@
  */
 
 #include "armada-ap806-dual.dtsi"
+#include "armada-cp110-master.dtsi"
+#include "armada-cp110-slave.dtsi"
 
 / {
 	model = "Marvell Armada 8020";
 	compatible = "marvell,armada8020", "marvell,armada-ap806-dual",
 	             "marvell,armada-ap806";
+	aliases {
+		gpio0 = &cpm_gpio0;
+		gpio1 = &cpm_gpio1;
+		ethernet0 = &emac0;
+		ethernet1 = &emac2;
+		ethernet2 = &emac3;
+		ethernet3 = &emac0_1;
+		ethernet4 = &emac2_1;
+		ethernet5 = &emac3_1;
+	};
+
+	ap806 {
+		config-space {
+			/* Temp: disable all Coresight nodes */
+			etm0@c40000 {
+				status = "disabled";
+			};
+			etm1@d40000 {
+				status = "disabled";
+			};
+			etf0@809000 {
+				status = "disabled";
+			};
+			etf1@80a000 {
+				status = "disabled";
+			};
+			funnel@810000 {
+				status = "disabled";
+			};
+			etf5@811000 {
+				status = "disabled";
+			};
+			etr@812000 {
+				status = "disabled";
+			};
+			smmu: iommu@5000000 {
+				mmu-masters = <&usb3h0 0x483>,
+					      <&usb3h1 0x484>;
+			};
+			pinctrl@6f4000 {
+				ap_emmc_pins: emmc-pins-0 {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+					"mpp3", "mpp4", "mpp5", "mpp6", "mpp7",
+					"mpp8", "mpp9", "mpp10";
+					marvell,function = "sdio";
+				};
+				ap_spi0_pins: spi-pins-0 {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+					"mpp3";
+					marvell,function = "spi0";
+				};
+			};
+		};
+	};
+
+	cpn-110-master {
+		config-space {
+			ppv22@000000 {
+				dma-coherent;
+			};
+			pinctrl@440000 {
+				compatible = "marvell,a80x0-cp0-pinctrl";
+
+				cpm_i2c0_pins: i2c-pins-0 {
+					marvell,pins = "mpp37", "mpp38";
+					marvell,function = "i2c0";
+				};
+				cpm_i2c1_pins: i2c-pins-1 {
+					marvell,pins = "mpp35", "mpp36";
+					marvell,function = "i2c1";
+				};
+				cpm_ge2_rgmii_pins: ge-rgmii-pins-0 {
+					marvell,pins = "mpp44", "mpp45", "mpp46",
+						       "mpp47", "mpp48", "mpp49",
+						       "mpp50", "mpp51", "mpp52",
+						       "mpp53", "mpp54", "mpp55";
+					marvell,function = "ge1";
+				};
+				pca0_pins: pca0_pins {
+					marvell,pins = "mpp62";
+					marvell,function = "gpio";
+				};
+				cpm_sdhci_pins: cpm-sdhi-pins {
+					marvell,pins = "mpp56", "mpp57", "mpp58",
+						       "mpp59", "mpp60", "mpp61";
+					marvell,function = "sdio";
+				};
+			};
+			usb3h0: usb3@500000 {
+				#stream-id-cells = <1>;
+			};
+			usb3h1: usb3@510000 {
+				#stream-id-cells = <1>;
+			};
+		};
+		pcie@0x600000 {
+			msi-parent = <&gic_v2m0>;
+		};
+		pcie@0x620000 {
+			msi-parent = <&gic_v2m0>;
+		};
+		pcie@0x640000 {
+			msi-parent = <&gic_v2m0>;
+		};
+	};
+
+	cpn-110-slave {
+		config-space {
+			ppv22@000000 {
+				dma-coherent;
+			};
+			pinctrl@440000 {
+				compatible = "marvell,a80x0-cp1-pinctrl";
+
+				cps_ge1_rgmii_pins: ge-rgmii-pins-0 {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+						       "mpp3", "mpp4", "mpp5",
+						       "mpp6", "mpp7", "mpp8",
+						       "mpp9", "mpp10", "mpp11";
+					marvell,function = "ge0";
+				};
+				cps_tdm_pins: tdm-pins {
+					marvell,pins = "mpp0", "mpp1", "mpp2",
+						       "mpp3", "mpp4", "mpp5";
+					marvell,function = "tdm";
+				};
+				cps_spi0_pins: spi-pins-0 {
+					marvell,pins = "mpp7", "mpp8", "mpp9",
+						       "mpp10", "mpp11";
+					marvell,function = "spi0";
+				};
+				cps_spi1_pins: spi-pins-1 {
+					marvell,pins = "mpp13", "mpp14", "mpp15",
+						       "mpp16";
+					marvell,function = "spi1";
+				};
+			};
+			rtc@284000 {
+				status = "okay";
+			};
+		};
+		pcie@0x600000 {
+			msi-parent = <&gic_v2m0>;
+		};
+		pcie@0x620000 {
+			msi-parent = <&gic_v2m0>;
+		};
+		pcie@0x640000 {
+			msi-parent = <&gic_v2m0>;
+		};
+	};
+
 };
