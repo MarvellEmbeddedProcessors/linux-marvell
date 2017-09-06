@@ -130,17 +130,12 @@
 					reg = <0x21>;
 				};
 			};
-			usb3h0: usb3@500000 {
-				usb-phy = <&usb3h0_phy>;
+			usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&utmi0>,
-				       <&comphy0 1 COMPHY_USB3H0>;
+				phys = <&utmi1>,
+				       <&comphy0 4 COMPHY_USB3H1>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
-			};
-			usb3h1: usb3@510000 {
-				status = "disabled";
-				usb-phy = <&usb3h1_phy>;
 			};
 			spi@700680 {
 				status = "okay";
@@ -216,7 +211,7 @@
 				};
 			};
 
-			utmi0: utmi@580000 {
+			utmi1: utmi@581000 {
 				status = "okay";
 			};
 		};
@@ -224,31 +219,5 @@
 		pcie-ep@0x600000 {
 			status = "okay";
 		};
-	};
-	usb3h0_phy: usb3-h0-phy {
-		compatible = "usb-nop-xceiv";
-		vcc-supply = <&exp_usb3h0_vbus>;
-	};
-	usb3h1_phy: usb3-h1-phy {
-		compatible = "usb-nop-xceiv";
-		vcc-supply = <&exp_usb3h1_vbus>;
-	};
-	exp_usb3h0_vbus: usb3-0-vbus {
-		compatible = "regulator-fixed";
-		regulator-name = "usb3-0-vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		enable-active-high;
-		regulator-always-on;
-		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
-	};
-	exp_usb3h1_vbus: usb3-1-vbus {
-		compatible = "regulator-fixed";
-		regulator-name = "usb3-1-vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		enable-active-high;
-		regulator-always-on;
-		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
 	};
 };
