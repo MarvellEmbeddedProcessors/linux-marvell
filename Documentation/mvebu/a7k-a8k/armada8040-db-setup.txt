@@ -60,7 +60,7 @@ DPR Setting
 | Jumper-module (CON44): SLM1564		| DPR 96-108 = 2-3		| DPR 109-112 = 2-3, others = 1-2	|
 | Serdes CP0 site module (CON42): SLM1521	| DPR 2-5 = 1-2			| DPR 2-5 = 1-2				|
 | Serdes CP1 site module (CON41): SLM1521	| DPR 2-5 = 1-2			| DPR 2-5 = 1-2				|
-| DB8040					| DPR 76,87,87 = 2-3		| DPR 81 = 2-3, DPR 119,121,123-126 =1-2|
+| DB8040					| DPR 76,87,88 = 2-3		| DPR 81 = 2-3, DPR 119,121,123-126 =1-2|
 |						| Audio module (CON51): SLM1449	|					|
 
 The tables below summarizes the interface configuration of each setup
