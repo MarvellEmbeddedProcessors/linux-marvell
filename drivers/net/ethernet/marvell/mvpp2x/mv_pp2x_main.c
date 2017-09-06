@@ -79,7 +79,7 @@ u8 mv_pp2x_num_cos_queues = 1;
 u8 mv_pp2x_num_cos_queues = 4;
 #endif
 static u8 mv_pp2x_queue_mode = MVPP2_QDIST_SINGLE_MODE;
-static u8 rss_mode;
+static u8 rss_mode = MVPP2_RSS_5T; /* Set 5-tuple default RSS mode */
 static u8 default_cpu;
 static u8 cos_classifer;
 static u32 pri_map = 0x3210; /* As default, cos0--rxq0, cos1--rxq1,
