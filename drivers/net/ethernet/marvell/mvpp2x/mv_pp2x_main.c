@@ -1095,12 +1095,15 @@ static void mv_pp2x_txq_bufs_free(struct mv_pp2x_port *port,
 			skb &= ~MVPP2_ETH_SHADOW_REC;
 			skb_rec = (struct sk_buff *)skb;
 			bm_pool = &port->priv->bm_pools[MVPP2X_SKB_BPID_GET(skb_rec)];
-			/* Do not release buffer of recycled skb */
-			skb_rec->head = NULL;
 			cp_pcpu->in_use[bm_pool->id]--;
-
-			mv_pp2_skb_pool_put(port, (struct sk_buff *)skb, txq_pcpu->cpu);
-
+			/* Do not release buffer of recycled skb */
+			if (!skb_irq_freeable(skb_rec)) {
+				skb_rec->head = NULL;
+				dev_kfree_skb_any(skb_rec);
+			} else {
+				skb_rec->head = NULL;
+				mv_pp2_skb_pool_put(port, skb_rec, txq_pcpu->cpu);
+			}
 			mv_pp2x_txq_inc_get(txq_pcpu);
 			continue;
 		}
