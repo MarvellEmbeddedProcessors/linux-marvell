@@ -5159,7 +5159,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	mv_pp2x_check_queue_size_valid(port);
 
 	if (mv_pp2_num_cpu_irqs(port) < num_active_cpus() &&
-	    port->priv->pp2xdata->interrupt_tx_done) {
+	    port->priv->pp2xdata->interrupt_tx_done &&
+	    (!(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK)))) {
 		port->priv->pp2xdata->interrupt_tx_done = false;
 		dev_info(&pdev->dev, "mvpp2x: interrupt_tx_done override to false\n");
 	}
