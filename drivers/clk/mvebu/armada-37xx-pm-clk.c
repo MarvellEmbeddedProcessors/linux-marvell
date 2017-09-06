@@ -51,6 +51,8 @@
 #define  A3700_PM_NB_VDD_SEL_LX_OFF	(6)
 #define  A3700_PM_NB_VDD_SEL_LX_MASK	(0x3)
 #define  A3700_PM_NB_LX_CONFIG_SHIFT	(16)
+#define  A3700_PM_NB_AXI_SEL_LX_OFF	(3)
+#define  A3700_PM_NB_AXI_SEL_LX_MASK	(0x7)
 
 #define A3700_PM_NB_DYNAMIC_MODE_REG	(0x24 - A3700_PM_NB_CLK_SHIFT)
 #define  A3700_PM_NB_DFS_EN_OFF		(31)
@@ -92,6 +94,13 @@ enum armada_3700_dvfs_load_index {
 	DVFS_LOAD_MAX_NUM
 };
 
+/* AXI DIV selection */
+enum armada_3700_axi_div_select {
+	AXI_DIV_2 = 2,
+	AXI_DIV_4 = 4,
+	OTHERS_DIVS = 1
+};
+
 /*
  * struct armada_3700_clk_pm:
  * @max_cpu_freq: Max CPU frequency, kHz
@@ -116,12 +125,14 @@ struct armada_3700_clk_pm {
  * @max_cpu_freq: Max CPU frequency supported
  * @clk_sel: Clock source selection
  * @tbg_sel: TBG source selection
+ * @axi_sel: AXI DIV selection for each dvfs load level
  * @divder: Clock divider for each dvfs load level
  */
 struct armada_a3700_clk_pm_info {
 	u32 cpu_freq_max;/* KHz */
 	enum armada_3700_clk_select clk_sel;
 	enum armada_3700_tbg_select tbg_sel;
+	u8 axi_sel[DVFS_LOAD_MAX_NUM];
 	u8 divider[DVFS_LOAD_MAX_NUM];
 };
 
@@ -139,10 +150,18 @@ struct armada_a3700_clk_pm_info {
  *   600M                 600M              300M             240M            200M
  */
 static struct armada_a3700_clk_pm_info a3700_pm_info[] = {
-	{.cpu_freq_max = 1200, .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_B_S, .divider = {1, 2, 4, 6} },
-	{.cpu_freq_max = 1000, .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_B_S, .divider = {1, 2, 4, 5} },
-	{.cpu_freq_max = 800,  .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_A_P, .divider = {1, 2, 3, 4} },
-	{.cpu_freq_max = 600,  .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_A_P, .divider = {2, 4, 5, 6} },
+	{.cpu_freq_max = 1200, .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_B_S,
+		.axi_sel = {AXI_DIV_4, AXI_DIV_4, AXI_DIV_4, AXI_DIV_4},
+		.divider = {1, 2, 4, 6} },
+	{.cpu_freq_max = 1000, .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_B_S,
+		.axi_sel = {OTHERS_DIVS, OTHERS_DIVS, OTHERS_DIVS, OTHERS_DIVS},
+		.divider = {1, 2, 4, 5} },
+	{.cpu_freq_max = 800,  .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_A_P,
+		.axi_sel = {OTHERS_DIVS, OTHERS_DIVS, OTHERS_DIVS, OTHERS_DIVS},
+		.divider = {1, 2, 3, 4} },
+	{.cpu_freq_max = 600,  .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_A_P,
+		.axi_sel = {OTHERS_DIVS, OTHERS_DIVS, OTHERS_DIVS, OTHERS_DIVS},
+		.divider = {2, 4, 5, 6} },
 };
 
 static struct armada_a3700_clk_pm_info *armada_3700_clk_pm_info_get(u32 max_cpu_freq)
@@ -309,7 +328,7 @@ static int armada_3700_clk_pm_div_array_set(struct armada_3700_clk_pm *clk_pm_da
 	struct armada_a3700_clk_pm_info *clk_pm_info = NULL;
 	int load_level, shift;
 	u32 reg_val;
-	u8 clk_sel, tbg_sel, tbg_div, vdd_sel;
+	u8 clk_sel, tbg_sel, tbg_div, vdd_sel, axi_sel;
 
 	clk_pm_info = armada_3700_clk_pm_info_get(clk_pm_data->max_cpu_freq);
 	if (clk_pm_info == NULL)
@@ -334,6 +353,7 @@ static int armada_3700_clk_pm_div_array_set(struct armada_3700_clk_pm *clk_pm_da
 		tbg_sel = clk_pm_info->tbg_sel;
 		tbg_div = clk_pm_info->divider[load_level];
 		vdd_sel = load_level;
+		axi_sel = clk_pm_info->axi_sel[load_level];
 
 		reg_val = readl(reg_addr);
 
@@ -352,6 +372,10 @@ static int armada_3700_clk_pm_div_array_set(struct armada_3700_clk_pm *clk_pm_da
 		/* Set VDD divider */
 		reg_val &= ~(A3700_PM_NB_VDD_SEL_LX_MASK << (shift + A3700_PM_NB_VDD_SEL_LX_OFF));
 		reg_val |= (vdd_sel & A3700_PM_NB_VDD_SEL_LX_MASK) << (shift + A3700_PM_NB_VDD_SEL_LX_OFF);
+
+		/* Set AXI divider */
+		reg_val &= ~(A3700_PM_NB_AXI_SEL_LX_MASK << (shift + A3700_PM_NB_AXI_SEL_LX_OFF));
+		reg_val |= (axi_sel & A3700_PM_NB_AXI_SEL_LX_MASK) << (shift + A3700_PM_NB_AXI_SEL_LX_OFF);
 
 		writel(reg_val, reg_addr);
 	}
