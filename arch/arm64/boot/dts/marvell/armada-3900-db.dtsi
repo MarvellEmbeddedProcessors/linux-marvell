@@ -166,8 +166,8 @@
 				};
 				emac2: mac2 {
 					phy-mode = "sgmii";
-					phy-speed = <2500>;
-					phys = <&comphy0 3 COMPHY_HS_SGMII1>;
+					phy-speed = <1000>;
+					phys = <&comphy0 3 COMPHY_SGMII1>;
 					phy-names = "comphy";
 					phy = <&phy1>;
 				};
