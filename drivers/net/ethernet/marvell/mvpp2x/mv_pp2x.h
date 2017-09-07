@@ -225,13 +225,13 @@ enum mv_pp2x_cos_classifier {
 	MVPP2_COS_CLS_DSCP_VLAN
 };
 
-enum mv_pp2x_rss_nf_udp_mode {
-	MVPP2_RSS_NF_UDP_2T,	/* non-frag UDP packet hash value
-				* is calculated based on 2T
-				*/
-	MVPP2_RSS_NF_UDP_5T	/* non-frag UDP packet hash value
-				*is calculated based on 5T
-				*/
+enum mv_pp2x_rss_mode {
+	MVPP2_RSS_2T,	/* non-frag UDP&TCP packet hash value
+			 * is calculated based on 2T
+			 */
+	MVPP2_RSS_5T	/* non-frag UDP&TCP packet hash value
+			 * is calculated based on 5T
+			 */
 };
 
 struct gop_stat {
@@ -512,7 +512,7 @@ struct mv_pp2x_cos {
 };
 
 struct mv_pp2x_rss {
-	u8 rss_mode; /*UDP packet */
+	u8 rss_mode; /*UDP&TCP packets */
 	u8 dflt_cpu; /*non-IP packet */
 	u8 rss_en;
 };

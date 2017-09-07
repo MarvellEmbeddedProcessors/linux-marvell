@@ -121,7 +121,7 @@ module_param_named(queue_mode, mv_pp2x_queue_mode, byte, S_IRUGO);
 MODULE_PARM_DESC(queue_mode, "Set queue_mode (single=0, multi=1)");
 
 module_param(rss_mode, byte, S_IRUGO);
-MODULE_PARM_DESC(rss_mode, "Set rss_mode (UDP_2T=0, UDP_5T=1)");
+MODULE_PARM_DESC(rss_mode, "Set rss_mode (2T=0, 5T=1)");
 
 module_param(default_cpu, byte, S_IRUGO);
 MODULE_PARM_DESC(default_cpu, "Set default CPU for non RSS frames");
@@ -2319,8 +2319,8 @@ int mv_pp22_rss_mode_set(struct mv_pp2x_port *port, int rss_mode)
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -1;
 
-	if (rss_mode != MVPP2_RSS_NF_UDP_2T &&
-	    rss_mode != MVPP2_RSS_NF_UDP_5T) {
+	if (rss_mode != MVPP2_RSS_2T &&
+	    rss_mode != MVPP2_RSS_5T) {
 		pr_err("Invalid rss mode:%d\n", rss_mode);
 		return -EINVAL;
 	}
@@ -2355,7 +2355,7 @@ int mv_pp22_rss_mode_set(struct mv_pp2x_port *port, int rss_mode)
 			if (flow_info->flow_entry_dscp)
 				data[2] = flow_info->flow_entry_dscp;
 			/* Second, update port in original table with rss_mode*/
-			if (rss_mode == MVPP2_RSS_NF_UDP_2T)
+			if (rss_mode == MVPP2_RSS_2T)
 				flow_idx_rss = flow_info->flow_entry_rss1;
 			else
 				flow_idx_rss = flow_info->flow_entry_rss2;

@@ -784,7 +784,7 @@ static int mv_pp2x_get_rss_hash_opts(struct mv_pp2x_port *port,
 	case UDP_V4_FLOW:
 	case UDP_V6_FLOW:
 		nfc->data |= RXH_IP_SRC | RXH_IP_DST;
-		if (port->rss_cfg.rss_mode == MVPP2_RSS_NF_UDP_5T)
+		if (port->rss_cfg.rss_mode == MVPP2_RSS_5T)
 			nfc->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
 		break;
 	case IPV4_FLOW:
@@ -851,10 +851,10 @@ static int mv_pp2x_set_rss_hash_opt(struct mv_pp2x_port *port,
 			return -EINVAL;
 		switch (nfc->data & (RXH_L4_B_0_1 | RXH_L4_B_2_3)) {
 		case 0:
-			mv_pp22_rss_mode_set(port, MVPP2_RSS_NF_UDP_2T);
+			mv_pp22_rss_mode_set(port, MVPP2_RSS_2T);
 			break;
 		case (RXH_L4_B_0_1 | RXH_L4_B_2_3):
-			mv_pp22_rss_mode_set(port, MVPP2_RSS_NF_UDP_5T);
+			mv_pp22_rss_mode_set(port, MVPP2_RSS_5T);
 			break;
 		default:
 			return -EINVAL;
