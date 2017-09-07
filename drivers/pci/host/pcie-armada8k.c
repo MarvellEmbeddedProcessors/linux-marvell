@@ -72,6 +72,47 @@ struct armada8k_pcie {
 #define AX_USER_DOMAIN_MASK		0x3
 #define AX_USER_DOMAIN_OFFSET		4
 
+#define PCIE_LINK_CAPABILITY		0x7C
+
+#define PCIE_LINK_CONTROL_LINK_STATUS	0x80
+#define PCIE_CAP_LINK_TRAINING		BIT(27)
+
+#define PCIE_LINK_CTL_2			0xA0
+#define TARGET_LINK_SPEED_MASK		0xF
+#define LINK_SPEED_GEN_1		0x1
+#define LINK_SPEED_GEN_2		0x2
+#define LINK_SPEED_GEN_3		0x3
+
+#define PCIE_MSIX_CAP_ID_NEXT_CTRL_REG	0xB0
+#define PCIE_MSIX_CAP_NEXT_OFFSET_MASK	0xff00
+
+#define PCIE_SPCIE_CAP_HEADER_REG	0x158
+#define PCIE_SPCIE_NEXT_OFFSET_MASK	0xFFF00000
+#define PCIE_SPCIE_NEXT_OFFSET_OFFSET	20
+#define PCIE_SPCIE_NEXT_SKIP_SRIOV	0x1B8
+
+#define PCIE_LANE_EQ_CTRL01_REG		0x164
+#define PCIE_LANE_EQ_CTRL23_REG		0x168
+#define PCIE_LANE_EQ_SETTING		0x55555555
+
+#define PCIE_TPH_EXT_CAP_HDR_REG	0x1B8
+#define PCIE_TPH_REQ_NEXT_PTR_MASK	0xFFF00000
+#define PCIE_TPH_REQ_NEXT_PTR_OFFSET	20
+#define PCIE_TPH_REQ_NEXT_SKIP_SRIOV	0x24C
+
+#define PCIE_PORT_FORCE_OFF		0x708
+#define PCIE_FORCE_EN			BIT(15)
+
+#define PCIE_GEN3_EQ_CONTROL_OFF_REG	0x8A8
+#define PCIE_GEN3_EQ_PSET_REQ_VEC_MASK	0xFFFF00
+#define PCIE_GEN3_EQ_PSET_REQ_VEC_OFFSET 8
+#define PCIE_GEN3_EQ_PSET_4		0x10
+#define PCIE_GEN3_EQU_EVAL_2MS_DISABLE	BIT(5)
+
+#define PCIE_LINK_FLUSH_CONTROL_OFF_REG	0x8CC
+#define PCIE_AUTO_FLUSH_EN_MASK		0x1
+
+#define PCIE_LINK_UP_TIMEOUT_MS		100
 
 
 #define to_armada8k_pcie(x)	container_of(x, struct armada8k_pcie, pp)
@@ -91,11 +132,128 @@ static int armada8k_pcie_link_up(struct pcie_port *pp)
 	return 0;
 }
 
+static void armada8k_pcie_dw_configure(void __iomem *regs_base, u32 cap_speed)
+{
+	u32 reg;
+	/*
+	 * TODO (shadi@marvell.com, sr@denx.de):
+	 * Need to read the serdes speed from the dts and according to it
+	 * configure the PCIe gen
+	 */
+
+	/* Set link to GEN 3 */
+	reg = readl(regs_base + PCIE_LINK_CTL_2);
+	reg &= ~TARGET_LINK_SPEED_MASK;
+	reg |= cap_speed;
+	writel(reg, regs_base + PCIE_LINK_CTL_2);
+
+	reg = readl(regs_base + PCIE_LINK_CAPABILITY);
+	reg &= ~TARGET_LINK_SPEED_MASK;
+	reg |= cap_speed;
+	writel(reg, regs_base + PCIE_LINK_CAPABILITY);
+
+	reg = readl(regs_base + PCIE_GEN3_EQ_CONTROL_OFF_REG);
+	reg &= ~PCIE_GEN3_EQU_EVAL_2MS_DISABLE;
+	writel(reg, regs_base + PCIE_GEN3_EQ_CONTROL_OFF_REG);
+}
+
+static void armada8k_pcie_dw_mvebu_pcie_config(void __iomem *regs_base)
+{
+	u32 reg;
+
+	/*
+	 * Set the correct hints for lane equalization.
+	 *
+	 * These registers consist of the following fields:
+	 *	- Downstream Port Transmitter Preset - Used for equalization by
+	 *	  this port when the Port is operating as a downstream Port.
+	 *	- Downstream Port Receiver Preset Hint - May be used as a hint
+	 *	  for receiver equalization by this port when the Port is
+	 *	  operating as a downstream Port.
+	 *	- Upstream Port Transmitter Preset - Field contains the
+	 *	  transmit preset value sent or received during link
+	 *	  equalization.
+	 *	- Upstream Port Receiver Preset Hint - Field contains the
+	 *	  receiver preset hint value sent or received during link
+	 *	  equalization.
+	 *
+	 * The default values for this registers aren't optimal for our
+	 * hardware, so we set the optimal values according to HW measurements.
+	 */
+	writel(PCIE_LANE_EQ_SETTING, regs_base + PCIE_LANE_EQ_CTRL01_REG);
+	writel(PCIE_LANE_EQ_SETTING, regs_base + PCIE_LANE_EQ_CTRL23_REG);
+
+	/*
+	 * There is an issue in CPN110 that does not allow to
+	 * enable/disable the link and perform "hot reset" unless
+	 * the auto flush is disabled. So in order to enable the option
+	 * to perform hot reset and link disable/enable we need to set
+	 * auto flush to disable.
+	 */
+	reg = readl(regs_base + PCIE_LINK_FLUSH_CONTROL_OFF_REG);
+	reg &= ~PCIE_AUTO_FLUSH_EN_MASK;
+	writel(reg, regs_base + PCIE_LINK_FLUSH_CONTROL_OFF_REG);
+
+	/*
+	 * According to the electrical measurmentrs, the best preset that our
+	 * receiver can handle is preset4, so we are changing the vector of
+	 * presets to evaluate during the link equalization training to preset4.
+	 */
+	reg = readl(regs_base + PCIE_GEN3_EQ_CONTROL_OFF_REG);
+	reg &= ~PCIE_GEN3_EQ_PSET_REQ_VEC_MASK;
+	reg |= PCIE_GEN3_EQ_PSET_4 << PCIE_GEN3_EQ_PSET_REQ_VEC_OFFSET;
+	writel(reg, regs_base + PCIE_GEN3_EQ_CONTROL_OFF_REG);
+
+	/*
+	 * Remove VPD capability from the capability list,
+	 * since we don't support it.
+	 */
+	reg = readl(regs_base + PCIE_MSIX_CAP_ID_NEXT_CTRL_REG);
+	reg &= ~PCIE_MSIX_CAP_NEXT_OFFSET_MASK;
+	writel(reg, regs_base + PCIE_MSIX_CAP_ID_NEXT_CTRL_REG);
+
+	/*
+	 * The below two configurations are intended to remove SRIOV capability
+	 * from the capability list, since we don't support it.
+	 * The capability list is a linked list where each capability points
+	 * to the next capability, so in the SRIOV capability need to set the
+	 * previous capability to point to the next capability and this way
+	 * the SRIOV capability will be skipped.
+	 */
+	reg = readl(regs_base + PCIE_TPH_EXT_CAP_HDR_REG);
+	reg &= ~PCIE_TPH_REQ_NEXT_PTR_MASK;
+	reg |= PCIE_TPH_REQ_NEXT_SKIP_SRIOV << PCIE_TPH_REQ_NEXT_PTR_OFFSET;
+	writel(reg, regs_base + PCIE_TPH_EXT_CAP_HDR_REG);
+
+	reg = readl(regs_base + PCIE_SPCIE_CAP_HEADER_REG);
+	reg &= ~PCIE_SPCIE_NEXT_OFFSET_MASK;
+	reg |= PCIE_SPCIE_NEXT_SKIP_SRIOV << PCIE_SPCIE_NEXT_OFFSET_OFFSET;
+	writel(reg, regs_base + PCIE_SPCIE_CAP_HEADER_REG);
+}
+
+static int armada8k_pcie_wait_link_up(struct pcie_port *pp)
+{
+	unsigned long timeout;
+
+	timeout = jiffies + PCIE_LINK_UP_TIMEOUT_MS * HZ / 1000;
+	while (!armada8k_pcie_link_up(pp)) {
+		if (time_after(jiffies, timeout))
+			return 0;
+	}
+
+	/*
+	 * Link can be established in Gen 1. still need to wait
+	 * till MAC nagaotiation is completed
+	 */
+	udelay(100);
+
+	return 1;
+}
+
 static void armada8k_pcie_host_init(struct pcie_port *pp)
 {
 	struct armada8k_pcie *armada8k_pcie = to_armada8k_pcie(pp);
 	void __iomem *regs_base = armada8k_pcie->regs_base;
-	int timeout = 1000;
 	u32 reg;
 
 	if (!armada8k_pcie_link_up(pp)) {
@@ -134,6 +292,15 @@ static void armada8k_pcie_host_init(struct pcie_port *pp)
 	       PCIE_INT_C_ASSERT_MASK | PCIE_INT_D_ASSERT_MASK;
 	writel(reg, regs_base + PCIE_GLOBAL_INT_MASK1);
 
+	/* Configuration only when COMPHY independency on uboot */
+	if (armada8k_pcie->phy_count > 0) {
+		/* DW pre link configurations */
+		armada8k_pcie_dw_configure(pp->dbi_base, LINK_SPEED_GEN_3);
+
+		/* Mvebu pre link specific configuration */
+		armada8k_pcie_dw_mvebu_pcie_config(pp->dbi_base);
+	}
+
 	if (!armada8k_pcie_link_up(pp)) {
 		/* Configuration done. Start LTSSM */
 		reg = readl(regs_base + PCIE_GLOBAL_CONTROL);
@@ -141,15 +308,8 @@ static void armada8k_pcie_host_init(struct pcie_port *pp)
 		writel(reg, regs_base + PCIE_GLOBAL_CONTROL);
 	}
 
-	/* Wait until the link becomes active again */
-	while (timeout) {
-		if (armada8k_pcie_link_up(pp))
-			break;
-		udelay(1);
-		timeout--;
-	}
-
-	if (timeout == 0)
+	/* Check that link was established */
+	if (!armada8k_pcie_wait_link_up(pp))
 		dev_err(pp->dev, "Link not up after reconfiguration\n");
 }
 
