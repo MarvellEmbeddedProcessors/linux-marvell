@@ -6141,19 +6141,8 @@ static int mv_pp2x_port_resume(struct platform_device *pdev,
 			       struct device_node *port_node,
 			       struct mv_pp2x *priv, struct mv_pp2x_port *port)
 {
-	struct device_node *emac_node = NULL;
-	int i;
-
-	if (priv->pp2_version == PPV22 && !(port->flags & MVPP2_F_LOOPBACK)) {
-		emac_node = of_parse_phandle(port_node, "emac-data", 0);
-		port->mac_data.link_irq = irq_of_parse_and_map(emac_node, 0);
-	}
-
 	if (port->mac_data.phy_node)
 		mv_pp2x_phy_connect(port);
-
-	for (i = 0; i < port->num_irqs; i++)
-		port->of_irqs[i] = irq_of_parse_and_map(port_node, i);
 
 	mv_pp2x_port_hw_init(port);
 
@@ -6208,10 +6197,6 @@ static int mvpp2x_suspend(struct device *dev)
 		/* Stop interface if port is up */
 		if (netif_running(priv->port_list[i]->dev))
 			mv_pp2x_stop(priv->port_list[i]->dev);
-		/* Dispose all port IRQ's */
-		if (mac->link_irq != MVPP2_NO_LINK_IRQ)
-			irq_dispose_mapping(mac->link_irq);
-		mv_pp2x_port_irqs_dispose_mapping(priv->port_list[i]);
 
 		if (mac->phy_node)
 			mv_pp2x_phy_disconnect(priv->port_list[i]);
