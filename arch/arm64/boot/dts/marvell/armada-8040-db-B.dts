@@ -158,11 +158,12 @@
 	};
 	cpn-110-slave {
 		config-space {
-			/* usb3h0_1 is USB2 only (UTMI) */
 			usb3h0_1: usb3@500000 {
+				separated-phys-for-usb2-usb3;
+				phys = <&utmi0_1>,
+				       <&comphy1 1 COMPHY_USB3H0>;
+				phy-names = "usb2", "usb3";
 				status = "okay";
-				phys = <&utmi0_1>;
-				phy-names = "usb";
 			};
 			serial@702000 {
 				status = "okay";
