@@ -683,6 +683,7 @@ struct mv_pp2x_port {
 	struct mv_pp2x_rss rss_cfg;
 	struct notifier_block	port_hotplug_nb;
 	int use_interrupts;
+	bool interrupt_tx_done;
 };
 
 struct pp2x_hw_params {

@@ -660,7 +660,7 @@ static int mv_pp2x_ethtool_set_coalesce(struct net_device *dev,
 
 		txq->pkts_coal = c->tx_max_coalesced_frames;
 	}
-	if (port->priv->pp2xdata->interrupt_tx_done) {
+	if (port->interrupt_tx_done) {
 		mv_pp2x_tx_done_time_coal_set(port, port->tx_time_coal);
 		on_each_cpu(mv_pp2x_tx_done_pkts_coal_set, port, 1);
 	}

@@ -1651,7 +1651,7 @@ int mv_pp2x_setup_txqs(struct mv_pp2x_port *port)
 		if (err)
 			goto err_cleanup;
 	}
-	if (port->priv->pp2xdata->interrupt_tx_done) {
+	if (port->interrupt_tx_done) {
 		mv_pp2x_tx_done_time_coal_set(port, port->tx_time_coal);
 		on_each_cpu(mv_pp2x_tx_done_pkts_coal_set, port, 1);
 	}
@@ -3380,7 +3380,7 @@ out:
 	if ((port->flags & MVPP2_F_IFCAP_NETMAP))
 		return NETDEV_TX_OK;
 #endif
-	if (!port->priv->pp2xdata->interrupt_tx_done)
+	if (!port->interrupt_tx_done)
 		mv_pp2x_tx_done_post_proc(txq, txq_pcpu, port, frags);
 
 	return NETDEV_TX_OK;
@@ -4062,7 +4062,7 @@ int mv_pp2x_stop(struct net_device *dev)
 	if (port->priv->pp2_version == PPV22)
 		unregister_hotcpu_notifier(&port->port_hotplug_nb);
 	/* Cancel tx timers in case Tx done interrupts are disabled and if port is not in Netmap mode */
-	if (!(port->flags & MVPP2_F_IFCAP_NETMAP) && !port->priv->pp2xdata->interrupt_tx_done)  {
+	if (!(port->flags & MVPP2_F_IFCAP_NETMAP) && !port->interrupt_tx_done)  {
 		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 			hrtimer_cancel(&port_pcpu->tx_done_timer);
@@ -4552,7 +4552,7 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 		q_vec[cpu].sw_thread_id = sw_thread_index++;
 		q_vec[cpu].sw_thread_mask = (1 << q_vec[cpu].sw_thread_id);
 		q_vec[cpu].pending_cause_rx = 0;
-		if (port->priv->pp2xdata->interrupt_tx_done ||
+		if (port->interrupt_tx_done ||
 		    mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
 			q_vec[cpu].irq = port->of_irqs[irq_index++];
 		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
@@ -4944,7 +4944,7 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 							     IRQ_NO_BALANCING);
 			}
 		}
-		if (port->priv->pp2xdata->interrupt_tx_done)
+		if (port->interrupt_tx_done)
 			on_each_cpu_mask(&cpus_mask, mv_pp2x_tx_done_pkts_coal_set, port, 1);
 		break;
 	case CPU_DEAD:
@@ -5007,6 +5007,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	SET_NETDEV_DEV(dev, &pdev->dev);
 	port->priv = priv;
 	port->flags = 0;
+	port->interrupt_tx_done = port->priv->pp2xdata->interrupt_tx_done;
 
 	musdk_status = of_get_property(port_node, "musdk-status", &statlen);
 
@@ -5162,8 +5163,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	mv_pp2x_check_queue_size_valid(port);
 
 	if (mv_pp2_num_cpu_irqs(port) < num_active_cpus() &&
-	    port->priv->pp2xdata->interrupt_tx_done) {
-		port->priv->pp2xdata->interrupt_tx_done = false;
+	    port->interrupt_tx_done) {
+		port->interrupt_tx_done = false;
 		dev_info(&pdev->dev, "mvpp2x: interrupt_tx_done override to false\n");
 	}
 
@@ -5180,7 +5181,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		err = -ENOMEM;
 		goto err_free_txq_pcpu;
 	}
-	if ((!(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK))) && !port->priv->pp2xdata->interrupt_tx_done) {
+	if ((!(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK))) && !port->interrupt_tx_done) {
 		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 
