@@ -1,8 +1,10 @@
 * Marvell Sample at Reset Info
 
 Required properties:
-- compatible: Should be "marvell,sample-at-reset-ap806" or
-              "marvell,sample-at-reset-cp110".
+- compatible: Should be "marvell,sample-at-reset-ap806" fpr AP806, or
+              "marvell,a70x0-sample-at-reset" for CP0 on A7K,
+              or "marvell,a80x0-cp0-sample-at-reset" for CP0 on A8K,
+              or "marvell,a80x0-cp1-sample-at-reset" for CP1 on A8K.
 - reg: Should contain registers location and length.
 
 Example for AP806:
@@ -12,9 +14,9 @@ ap806_sar: sar@6f8200 {
 	status = "okay";
 };
 
-Example for CP110:
+Example for CP110 on A7K:
 cpm_sar: sar@400200 {
-	compatible = "marvell,sample-at-reset-cp110";
+	compatible = "marvell,a70x0-sample-at-reset";
 	reg = <0x400200 0x8>;
 	status = "okay";
 };

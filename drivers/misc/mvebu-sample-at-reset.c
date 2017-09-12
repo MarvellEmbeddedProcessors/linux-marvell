@@ -15,6 +15,7 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/mv_soc_info.h>
 #include <linux/mvebu-sample-at-reset.h>
@@ -23,6 +24,7 @@
 #define MHz (1000 * 1000)
 #define GHz (1000 * 1000 * 1000)
 
+#define SAR_STATUS_REG_NUM				(2)
 /* SAR AP806 registers */
 #define SAR_CLOCK_FREQ_MODE_OFFSET	0
 #define SAR_CLOCK_FREQ_MODE_MASK	(0x1f << SAR_CLOCK_FREQ_MODE_OFFSET)
@@ -100,6 +102,8 @@
 #define SAR_RST_XTAL_BYPASS_CP0_MASK		(0x1 << SAR_RST_XTAL_BYPASS_CP0_OFFSET)
 #define SAR_RST_POR_BYPASS_CP0_OFFSET		(23)
 #define SAR_RST_POR_BYPASS_CP0_MASK		(0x1 << SAR_RST_POR_BYPASS_CP0_OFFSET)
+#define SAR0_CP0_RELEVANT_NUM				(11)
+#define SAR0_CP1_RELEVANT_NUM				(4)
 
 #define CP110_SAR_1_REG				4
 #define SAR1_RST_POR_BYPASS_CP1_OFFSET		(0)
@@ -118,6 +122,8 @@
 #define SAR1_RST_RESERVED_CPX_MASK		(0x1 << SAR1_RST_RESERVED_CPX_OFFSET)
 #define SAR1_RST_XTAL_BYPASS_CP1_OFFSET		(7)
 #define SAR1_RST_XTAL_BYPASS_CP1_MASK		(0x1 << SAR1_RST_XTAL_BYPASS_CP1_OFFSET)
+#define SAR1_CP0_RELEVANT_NUM				(5)
+#define SAR1_CP1_RELEVANT_NUM				(4)
 
 #define MV_SAR_DRIVER_NAME "mv_sample_at_reset_info"
 
@@ -179,10 +185,15 @@ struct bootsrc_idx_info {
 	int index;
 };
 
+struct  sar_data {
+	struct sar_info         **info;
+	enum mvebu_sar_soc_opts sar_soc;
+};
+
 struct mv_sar_dev {
 	void __iomem            *base;
 	struct device           *dev;
-	enum mvebu_sar_soc_opts sar_soc;
+	struct sar_data         *data;
 	struct list_head        list;
 };
 
@@ -192,8 +203,8 @@ struct mv_sar_dev {
  */
 static struct list_head sar_list = LIST_HEAD_INIT(sar_list);
 
-/* ap806_sar_0: SAR info from AP806 SAR status0 register. */
-static struct sar_info ap806_sar_0[] = {
+/* ap806_sar_reg_0: SAR info from AP806 SAR status0 register. */
+static struct sar_info ap806_sar_reg_0[] = {
 	{"Clock Freq mode                 ", SAR_CLOCK_FREQ_MODE_OFFSET, SAR_CLOCK_FREQ_MODE_MASK },
 	{"Test mode enable                ", SAR_TEST_MODE_ENABLE_OFFSET, SAR_TEST_MODE_ENABLE_MASK },
 	{"Skip link i2c init              ", SAR_SKIP_LINK_I2C_INIT_OFFSET, SAR_SKIP_LINK_I2C_INIT_MASK },
@@ -212,8 +223,8 @@ static struct sar_info ap806_sar_0[] = {
 	{"",			-1,			-1},
 };
 
-/* ap806_sar_1: SAR info from AP806 SAR status1 register. */
-static struct sar_info ap806_sar_1[] = {
+/* ap806_sar_reg_1: SAR info from AP806 SAR status1 register. */
+static struct sar_info ap806_sar_reg_1[] = {
 	{"PIDI connect       ", SAR1_PIDI_CONNECT_OFFSET, SAR1_PIDI_CONNECT_MASK },
 	{"PLL0 Config        ", SAR1_PLL0_OFFSET, SAR1_PLL0_MASK },
 	{"PLL1 Config        ", SAR1_PLL1_OFFSET, SAR1_PLL1_MASK },
@@ -221,8 +232,13 @@ static struct sar_info ap806_sar_1[] = {
 	{"",			-1,			-1},
 };
 
-/* cp110_sar_0: SAR info from CP110 SAR status0 register. */
-static struct sar_info cp110_sar_0[] = {
+/* cp110_sar_reg_0: SAR info from CP110 SAR status0 register.
+ * The cp110 SAR fields are not only applied for local CP. For example:
+ * bit0 is used to indicate PCIE0 clock config on CP1
+ * bit2 is used to indicate PCIE0 clock config on CP0
+ * bits[12:10] are used to indicate clock frequency mode on AP
+ */
+static struct sar_info cp110_sar_reg_0[] = {
 	{"CP1 PCIE0 clock config   ", SAR_RST_PCIE0_CLOCK_CONFIG_CP1_OFFSET, SAR_RST_PCIE0_CLOCK_CONFIG_CP1_MASK},
 	{"CP1 PCIE1 clock config   ", SAR_RST_PCIE1_CLOCK_CONFIG_CP1_OFFSET, SAR_RST_PCIE1_CLOCK_CONFIG_CP1_MASK},
 	{"CP0 PCIE0 clock config   ", SAR_RST_PCIE0_CLOCK_CONFIG_CP0_OFFSET, SAR_RST_PCIE0_CLOCK_CONFIG_CP0_MASK},
@@ -243,8 +259,13 @@ static struct sar_info cp110_sar_0[] = {
 	{"",			-1,			-1},
 };
 
-/* cp110_sar_1: SAR info from CP110 SAR status1 register. */
-static struct sar_info cp110_sar_1[] = {
+/* cp110_sar_reg_1: SAR info from CP110 SAR status1 register.
+ * The cp110 SAR fields are also not only applied for local CP like cp110_sar_reg_0. For example:
+ * bit0 is used to indicate POR bypass on CP1
+ * bit1 is used to indicate SSCG disable on AP
+ * bit3 is used to indicate IHB init skip on CP0
+ */
+static struct sar_info cp110_sar_reg_1[] = {
 	{"CP1 POR Bypass           ", SAR1_RST_POR_BYPASS_CP1_OFFSET, SAR1_RST_POR_BYPASS_CP1_MASK},
 	{"AP SSCG Disable          ", SAR1_RST_SSCG_DISABLE_AP_OFFSET, SAR1_RST_SSCG_DISABLE_AP_MASK},
 	{"AP Reserved              ", SAR1_RST_RESERVED_AP_OFFSET, SAR1_RST_RESERVED_AP_MASK},
@@ -254,6 +275,53 @@ static struct sar_info cp110_sar_1[] = {
 	{"CPX Reserved             ", SAR1_RST_RESERVED_CPX_OFFSET, SAR1_RST_RESERVED_CPX_MASK },
 	{"CP1 XTAL Bypass          ", SAR1_RST_XTAL_BYPASS_CP1_OFFSET, SAR1_RST_XTAL_BYPASS_CP1_MASK },
 	{"",			-1,			-1},
+};
+
+/* cp0_sar: CP0 relevant SAR info entry in array of cp110_sar_reg_0 and cp110_sar_reg_1
+ * As description on array of cp110_sar_reg_0 and cp110_sar_reg_1 above, the SAR info
+ * fields belong to CP0 are selected and stored in the array cp0_sar.
+ */
+static struct sar_info *cp0_sar[SAR_STATUS_REG_NUM][SAR0_CP0_RELEVANT_NUM] = {
+	/* SAR status 0 */
+	{
+		&cp110_sar_reg_0[2],
+		&cp110_sar_reg_0[3],
+		&cp110_sar_reg_0[4],
+		&cp110_sar_reg_0[7],
+		&cp110_sar_reg_0[8],
+		&cp110_sar_reg_0[10],
+		&cp110_sar_reg_0[12],
+		&cp110_sar_reg_0[13],
+		&cp110_sar_reg_0[14],
+		&cp110_sar_reg_0[15],
+		&cp110_sar_reg_0[16],
+	},
+	/* SAR status 1 */
+	{
+		&cp110_sar_reg_1[3],
+		&cp110_sar_reg_1[4],
+		&cp110_sar_reg_1[5],
+		&cp110_sar_reg_1[6],
+	}
+};
+
+/* cp1_sar: CP1 relevant SAR info entry in array of cp110_sar_reg_0 and cp110_sar_reg_1 */
+static struct sar_info *cp1_sar[SAR_STATUS_REG_NUM][SAR1_CP0_RELEVANT_NUM] = {
+	/* SAR status 0 */
+	{
+		&cp110_sar_reg_0[0],
+		&cp110_sar_reg_0[1],
+		&cp110_sar_reg_0[6],
+		&cp110_sar_reg_0[7],
+		&cp110_sar_reg_0[11],
+	},
+	/* SAR status 1 */
+	{
+		&cp110_sar_reg_1[0],
+		&cp110_sar_reg_1[4],
+		&cp110_sar_reg_1[6],
+		&cp110_sar_reg_1[7],
+	}
 };
 
 static struct bootsrc_idx_info bootsrc_list[] = {
@@ -387,6 +455,7 @@ int mv_sar_value_get(struct device *dev,
 {
 	u32 reg, mode, clock_type, clock_freq_mode;
 	struct mv_sar_dev *sar_dev;
+	u32 mask, offset, index;
 
 	sar_dev = mv_sar_dev_find(dev);
 	if (!sar_dev)
@@ -395,7 +464,7 @@ int mv_sar_value_get(struct device *dev,
 	reg = readl(sar_dev->base);
 	val->raw_sar_val = reg;
 
-	if (sar_dev->sar_soc == SAR_SOC_AP806) {
+	if (sar_dev->data->sar_soc == SAR_SOC_AP806) {
 		switch (sar_opt) {
 		case(SAR_CPU_FREQ):
 			clock_type = AP806_CPU_CLOCK_ID;
@@ -419,12 +488,13 @@ int mv_sar_value_get(struct device *dev,
 		case SAR_BOOT_SRC:
 			return mv_cp110_sar_bootsrc_get(sar_dev, val);
 		case SAR_CP_PCIE0_CLK:
-			mode = (reg & SAR_RST_PCIE0_CLOCK_CONFIG_CP0_MASK) >>
-			       SAR_RST_PCIE0_CLOCK_CONFIG_CP0_OFFSET;
-			break;
 		case SAR_CP_PCIE1_CLK:
-			mode = (reg & SAR_RST_PCIE1_CLOCK_CONFIG_CP0_MASK) >>
-			       SAR_RST_PCIE1_CLOCK_CONFIG_CP0_OFFSET;
+			if (!sar_dev->data->info)
+				return -EINVAL;
+			index = (sar_opt == SAR_CP_PCIE0_CLK) ? 0 : 1;
+			mask = (*(sar_dev->data->info + index))->mask;
+			offset = (*(sar_dev->data->info + index))->offset;
+			mode = (reg & mask) >> offset;
 			break;
 		default:
 			dev_err(sar_dev->dev,
@@ -457,19 +527,19 @@ int mv_sar_dump(struct device *dev)
 	reg = readl(sar_dev->base);
 	dev_info(sar_dev->dev, "Sample at Reset register 0 [0x%08x]:\n", reg);
 	dev_info(sar_dev->dev, "----------------------------------\n");
-	sar = (sar_dev->sar_soc == SAR_SOC_AP806) ? ap806_sar_0 : cp110_sar_0;
+	sar = (sar_dev->data->sar_soc == SAR_SOC_AP806) ? ap806_sar_reg_0 : cp110_sar_reg_0;
 	while (sar->offset != -1) {
 		val = (reg & sar->mask) >> sar->offset;
 		dev_info(sar_dev->dev, "%s  0x%x\n", sar->name, val);
 		sar++;
 	}
 
-	sar1 = (sar_dev->sar_soc == SAR_SOC_AP806) ? AP806_SAR_1_REG :
+	sar1 = (sar_dev->data->sar_soc == SAR_SOC_AP806) ? AP806_SAR_1_REG :
 						     CP110_SAR_1_REG;
 	reg = readl(sar_dev->base + sar1);
 	dev_info(sar_dev->dev, "Sample at Reset register 1 [0x%08x]:\n", reg);
 	dev_info(sar_dev->dev, "----------------------------------\n");
-	sar = (sar_dev->sar_soc == SAR_SOC_AP806) ? ap806_sar_1 : cp110_sar_1;
+	sar = (sar_dev->data->sar_soc == SAR_SOC_AP806) ? ap806_sar_reg_1 : cp110_sar_reg_1;
 	while (sar->offset != -1) {
 		val = (reg & sar->mask) >> sar->offset;
 		dev_info(sar_dev->dev, "%s  0x%x\n", sar->name, val);
@@ -480,12 +550,53 @@ int mv_sar_dump(struct device *dev)
 }
 EXPORT_SYMBOL(mv_sar_dump);
 
+static struct sar_data a80x0_cp0_sar_data = {
+	.info = (struct sar_info **)cp0_sar,
+	.sar_soc = SAR_SOC_CP110,
+};
+
+static struct sar_data a80x0_cp1_sar_data = {
+	.info = (struct sar_info **)cp1_sar,
+	.sar_soc = SAR_SOC_CP110,
+};
+
+static struct sar_data ap806_sar_data = {
+	.info = NULL,
+	.sar_soc = SAR_SOC_AP806,
+};
+
+
+static const struct of_device_id mv_sar_match[] = {
+	{
+		.compatible = "marvell,sample-at-reset-ap806",
+		.data		= (void *)&ap806_sar_data,
+	},
+	{
+		.compatible = "marvell,a70x0-sample-at-reset",
+		.data		= (void *)&a80x0_cp0_sar_data,
+	},
+	{
+		.compatible = "marvell,a80x0-cp0-sample-at-reset",
+		.data		= (void *)&a80x0_cp0_sar_data
+	},
+	{
+		.compatible = "marvell,a80x0-cp1-sample-at-reset",
+		.data		= (void *)&a80x0_cp1_sar_data,
+	},
+	{ }
+};
+MODULE_DEVICE_TABLE(of, mv_sar_match);
+
 static int mv_sar_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	struct mv_sar_dev *sar;
-	int err;
 	struct device *dev = &pdev->dev;
+	const struct of_device_id *match =
+		of_match_device(mv_sar_match, &pdev->dev);
+
+	if (!match)
+		return -ENODEV;
 
 	sar = devm_kcalloc(dev, 1, sizeof(struct mv_sar_dev), GFP_KERNEL);
 	if (!sar)
@@ -494,17 +605,11 @@ static int mv_sar_probe(struct platform_device *pdev)
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res) {
 		sar->base = devm_ioremap_resource(&pdev->dev, res);
-		if (IS_ERR(sar->base)) {
-			err = PTR_ERR(sar->base);
-			return err;
-		}
+		if (IS_ERR(sar->base))
+			return PTR_ERR(sar->base);
 	}
 
-	if (of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,sample-at-reset-cp110"))
-		sar->sar_soc = SAR_SOC_CP110;
-	else
-		sar->sar_soc = SAR_SOC_AP806;
+	sar->data = (struct sar_data *)match->data;
 	sar->dev = &pdev->dev;
 
 	/* Add to sar list */
@@ -512,13 +617,6 @@ static int mv_sar_probe(struct platform_device *pdev)
 
 	return 0;
 }
-
-static const struct of_device_id mv_sar_match[] = {
-	{ .compatible = "marvell,sample-at-reset-ap806"},
-	{ .compatible = "marvell,sample-at-reset-cp110"},
-	{ }
-};
-MODULE_DEVICE_TABLE(of, mv_sar_match);
 
 static struct platform_driver mv_sar_driver = {
 	.probe = mv_sar_probe,
