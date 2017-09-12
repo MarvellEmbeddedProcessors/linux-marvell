@@ -899,10 +899,6 @@ static int a3700_spi_suspend(struct device *dev)
 	spi->spi_cfg = spireg_read(spi, A3700_SPI_IF_CFG_REG);
 	spi->spi_timing = spireg_read(spi, A3700_SPI_IF_TIME_REG);
 
-	/* Disable spi clock */
-	if (!IS_ERR(spi->clk))
-		clk_disable_unprepare(spi->clk);
-
 	return 0;
 }
 
@@ -912,13 +908,6 @@ static int a3700_spi_resume(struct device *dev)
 	struct spi_master *master = platform_get_drvdata(pdev);
 	struct a3700_spi *spi = spi_master_get_devdata(master);
 	int ret;
-
-	/* Enable spi clock */
-	if (!IS_ERR(spi->clk)) {
-		ret = clk_prepare_enable(spi->clk);
-		if (ret)
-			return ret;
-	}
 
 	/* Mask the interrupts and clear cause bits */
 	spireg_write(spi, A3700_SPI_INT_MASK_REG, 0);
