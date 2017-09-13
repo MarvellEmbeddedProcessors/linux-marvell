@@ -191,8 +191,6 @@
 		};
 		pcie@0x640000 {
 			status = "okay";
-			phys = <&comphy0 5 COMPHY_PCIE2>;
-			phy-names = "pcie-phy0";
 			ranges = <0x81000000 0 0xf7020000 0  0xf7020000 0 0x10000	/* downstream I/O */
 				  0x82000000 0 0xf8000000 0  0xf8000000 0 0xf00000>;	/* non-prefetchable memory */
 		};
