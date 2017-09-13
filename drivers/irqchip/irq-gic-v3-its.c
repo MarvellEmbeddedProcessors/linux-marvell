@@ -2208,8 +2208,8 @@ static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
 	return 0;
 }
 
-static void its_irq_domain_activate(struct irq_domain *domain,
-				    struct irq_data *d)
+static int its_irq_domain_activate(struct irq_domain *domain,
+				   struct irq_data *d, bool early)
 {
 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
 	u32 event = its_get_event_id(d);
@@ -2224,7 +2224,7 @@ static void its_irq_domain_activate(struct irq_domain *domain,
 	cpu = cpumask_first_and(cpu_mask, cpu_online_mask);
 	if (cpu >= nr_cpu_ids) {
 		if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144)
-			return;
+			return -EINVAL;
 
 		cpu = cpumask_first(cpu_online_mask);
 	}
@@ -2234,6 +2234,7 @@ static void its_irq_domain_activate(struct irq_domain *domain,
 
 	/* Map the GIC IRQ and event to the device */
 	its_send_mapti(its_dev, d->hwirq, event);
+	return 0;
 }
 
 static void its_irq_domain_deactivate(struct irq_domain *domain,
@@ -2707,8 +2708,8 @@ static int its_vpe_irq_domain_alloc(struct irq_domain *domain, unsigned int virq
 	return err;
 }
 
-static void its_vpe_irq_domain_activate(struct irq_domain *domain,
-					struct irq_data *d)
+static int its_vpe_irq_domain_activate(struct irq_domain *domain,
+				       struct irq_data *d, bool early)
 {
 	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
 
@@ -2716,6 +2717,7 @@ static void its_vpe_irq_domain_activate(struct irq_domain *domain,
 	vpe->col_idx = cpumask_first(cpu_online_mask);
 	its_send_vmapp(vpe, true);
 	its_send_vinvall(vpe);
+	return 0;
 }
 
 static void its_vpe_irq_domain_deactivate(struct irq_domain *domain,
