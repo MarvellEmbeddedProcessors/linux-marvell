@@ -229,7 +229,7 @@ static unsigned long armada_3700_clk_recalc_rate(struct clk_hw *hw, unsigned lon
 	unsigned long rate = 0;
 	struct armada_a3700_clk_pm_info *clk_pm_info = NULL;
 	struct armada_3700_clk_pm *clk = to_clk(hw);
-	int load_level = readl(clk->reg + A3700_PM_NB_CPU_LOAD_REG) * A3700_PM_NB_CPU_LOAD_MASK;
+	int load_level = readl(clk->reg + A3700_PM_NB_CPU_LOAD_REG) & A3700_PM_NB_CPU_LOAD_MASK;
 
 	if (armada3700_clk_pm_dvfs_is_enabled(clk)) {
 		clk_pm_info = armada_3700_clk_pm_info_get(clk->max_cpu_freq);
