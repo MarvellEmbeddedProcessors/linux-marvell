@@ -47,21 +47,21 @@ For A8040 A1 revision SoC - Please use armada-8040-db configuration,
 
 DPR Setting
 ------------
-|						| 1: A		| 2: B			| 3: C				|
-|-----------------------------------------------|---------------|-----------------------|-------------------------------|
-| Jumper-module (CON44): SLM1564		| DPR all = 1-2	| DPR all = 1-2		| DPR 96-108 = 2-3		|
-| Serdes CP0 site module (CON42): SLM1521	| DPR 2-5 = 1-2	| DPR 2-5 = 2-3		| DPR 2-5 = 1-2			|
-| Serdes CP1 site module (CON41): SLM1521	| DPR 2-5 = 1-2	| DPR 2-5 = 1-2		| DPR 2-5 = 1-2			|
-| DB8040					|		|			|				|
-|						|		|			| TDM module (CON51): SLM1448	|
+|						| 1: A		| 2: B			| 3: C						|
+|-----------------------------------------------|---------------|-----------------------|-----------------------------------------------|
+| Jumper-module (CON44): SLM1564		| DPR all = 1-2	| DPR all = 1-2		| DPR 96-101, 103-108 = 2-3, DPR 102 = 1-2	|
+| Serdes CP0 site module (CON42): SLM1521	| DPR 2-5 = 1-2	| DPR 2-5 = 2-3		| DPR 2-5 = 1-2					|
+| Serdes CP1 site module (CON41): SLM1521	| DPR 2-5 = 1-2	| DPR 2-5 = 1-2		| DPR 2-5 = 1-2					|
+| DB8040					|		|			| DPR 84 = 2-3					|
+|						|		|			| TDM module (CON51): SLM1448			|
 
-|						| 4: D				| 5: E					|
-|-----------------------------------------------|-------------------------------|---------------------------------------|
-| Jumper-module (CON44): SLM1564		| DPR 96-108 = 2-3		| DPR 109-112 = 2-3, others = 1-2	|
-| Serdes CP0 site module (CON42): SLM1521	| DPR 2-5 = 1-2			| DPR 2-5 = 1-2				|
-| Serdes CP1 site module (CON41): SLM1521	| DPR 2-5 = 1-2			| DPR 2-5 = 1-2				|
-| DB8040					| DPR 76,87,88 = 2-3		| DPR 81 = 2-3, DPR 119,121,123-126 =1-2|
-|						| Audio module (CON51): SLM1449	|					|
+|						| 4: D						| 5: E					|
+|-----------------------------------------------|-----------------------------------------------|---------------------------------------|
+| Jumper-module (CON44): SLM1564		| DPR 96-101,103-108 = 2-3, DPR 102 = 1-2	| DPR 109-112 = 2-3, others = 1-2	|
+| Serdes CP0 site module (CON42): SLM1521	| DPR 2-5 = 1-2					| DPR 2-5 = 1-2				|
+| Serdes CP1 site module (CON41): SLM1521	| DPR 2-5 = 1-2					| DPR 2-5 = 1-2				|
+| DB8040					| DPR 76 = 1-2, DPR 87-88 = 2-3			| DPR 81 = 2-3, DPR 23-26,119,121 =1-2	|
+|						| Audio module (CON51): SLM1449			|					|
 
 The tables below summarizes the interface configuration of each setup
 
