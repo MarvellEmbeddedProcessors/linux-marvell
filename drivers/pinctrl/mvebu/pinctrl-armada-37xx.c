@@ -1156,6 +1156,16 @@ static void armada_3700_pinctrl_resume(void)
 			}
 		}
 
+		/*
+		 * Ack to clear the GPIO interrupt status register, otherwise GPIO interrupt will
+		 * be triggered when re-config the GPIO interrupt enable and polarity registers.
+		 * That time the system infrastructure modules are already initialized including
+		 * GICv3, but the IO drivers are still not resumed, it will lead to unexpected system
+		 * stuck if gets IO interrupt that time.
+		 */
+		for (i = 0; i <= d->revmap_size / GPIO_PER_REG; i++)
+			writel(readl(info->base + IRQ_STATUS + 4 * i), info->base + IRQ_STATUS + 4 * i);
+
 		writel(info->irq_en_reg, info->base + IRQ_EN);
 		writel(info->irq_en_reg_hi, info->base + IRQ_EN + sizeof(u32));
 		writel(info->irq_pol_reg, info->base + IRQ_POL);
