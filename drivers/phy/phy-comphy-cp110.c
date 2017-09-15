@@ -796,12 +796,12 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 
 	/* enable PCIe X4 and X2 */
 	if (lane == COMPHY_LANE0) {
-		if (pcie_width == 4) {
+		if (pcie_width == PCIE_LNK_X4) {
 			data = 0x1 << COMMON_PHY_SD_CTRL1_PCIE_X4_EN_OFFSET;
 			mask = COMMON_PHY_SD_CTRL1_PCIE_X4_EN_MASK;
 			reg_set(priv->comphy_regs + COMMON_PHY_SD_CTRL1,
 				data, mask);
-		} else if (pcie_width == 2) {
+		} else if (pcie_width == PCIE_LNK_X2) {
 			data = 0x1 << COMMON_PHY_SD_CTRL1_PCIE_X2_EN_OFFSET;
 			mask = COMMON_PHY_SD_CTRL1_PCIE_X2_EN_MASK;
 			reg_set(priv->comphy_regs + COMMON_PHY_SD_CTRL1,
@@ -896,7 +896,7 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 	/* Set PLL ready delay for 0x2 */
 	data = 0x2 << HPIPE_CLK_SRC_LO_PLL_RDY_DL_OFFSET;
 	mask = HPIPE_CLK_SRC_LO_PLL_RDY_DL_MASK;
-	if (pcie_width != 1) {
+	if (pcie_width != PCIE_LNK_X1) {
 		data |= 0x1 << HPIPE_CLK_SRC_LO_BUNDLE_PERIOD_SEL_OFFSET;
 		mask |= HPIPE_CLK_SRC_LO_BUNDLE_PERIOD_SEL_MASK;
 		data |= 0x1 << HPIPE_CLK_SRC_LO_BUNDLE_PERIOD_SCALE_OFFSET;
@@ -907,7 +907,7 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 	/* Set PIPE mode interface to PCIe3 - 0x1  & set lane order */
 	data = 0x1 << HPIPE_CLK_SRC_HI_MODE_PIPE_OFFSET;
 	mask = HPIPE_CLK_SRC_HI_MODE_PIPE_MASK;
-	if (pcie_width != 1) {
+	if (pcie_width != PCIE_LNK_X1) {
 		mask |= HPIPE_CLK_SRC_HI_LANE_STRT_MASK;
 		mask |= HPIPE_CLK_SRC_HI_LANE_MASTER_MASK;
 		mask |= HPIPE_CLK_SRC_HI_LANE_BREAK_MASK;
@@ -969,7 +969,7 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 	reg_set(hpipe_addr + HPIPE_PWR_PLL_REG, data, mask);
 
 	/* ref clock alignment */
-	if (pcie_width != 1) {
+	if (pcie_width != PCIE_LNK_X1) {
 		mask = HPIPE_LANE_ALIGN_OFF_MASK;
 		data = 0x0 << HPIPE_LANE_ALIGN_OFF_OFFSET;
 		reg_set(hpipe_addr + HPIPE_LANE_ALIGN_REG, data, mask);
@@ -1170,13 +1170,16 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 	/* For PCIe X4 or X2:
 	 * release from reset only after finish to configure all lanes
 	 */
-	if ((pcie_width == 1) || (lane == (pcie_width - 1))) {
+	if ((pcie_width == PCIE_LNK_X1) || (lane == (pcie_width - 1))) {
 		u32 i, start_lane, end_lane;
 
-		if (pcie_width != 1) {
+		if (pcie_width != PCIE_LNK_X1) {
 			/* allows writing to all lanes in one write */
 			data = 0x0;
-			mask = COMMON_PHY_SD_CTRL1_COMPHY_0_4_PORT_MASK;
+			if (pcie_width == PCIE_LNK_X2)
+				mask = COMMON_PHY_SD_CTRL1_COMPHY_0_1_PORT_MASK;
+			else if (pcie_width == PCIE_LNK_X4)
+				mask = COMMON_PHY_SD_CTRL1_COMPHY_0_3_PORT_MASK;
 			reg_set(priv->comphy_regs + COMMON_PHY_SD_CTRL1,
 				data,
 				mask);
@@ -1203,9 +1206,16 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 				HPIPE_RST_CLK_CTRL_PIPE_RST_MASK);
 		}
 
-		if (pcie_width != 1) {
+		if (pcie_width != PCIE_LNK_X1) {
 			/* disable writing to all lanes with one write */
-			data = (COMPHY_LANE0 <<
+			if (pcie_width == PCIE_LNK_X2) {
+				data = (COMPHY_LANE0 <<
+				COMMON_PHY_SD_CTRL1_COMPHY_0_PORT_OFFSET) |
+				(COMPHY_LANE1 <<
+				COMMON_PHY_SD_CTRL1_COMPHY_1_PORT_OFFSET);
+				mask = COMMON_PHY_SD_CTRL1_COMPHY_0_1_PORT_MASK;
+			} else if (pcie_width == PCIE_LNK_X4) {
+				data = (COMPHY_LANE0 <<
 				COMMON_PHY_SD_CTRL1_COMPHY_0_PORT_OFFSET) |
 				(COMPHY_LANE1 <<
 				COMMON_PHY_SD_CTRL1_COMPHY_1_PORT_OFFSET) |
@@ -1213,7 +1223,8 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 				COMMON_PHY_SD_CTRL1_COMPHY_2_PORT_OFFSET) |
 				(COMPHY_LANE3 <<
 				COMMON_PHY_SD_CTRL1_COMPHY_3_PORT_OFFSET);
-			mask = COMMON_PHY_SD_CTRL1_COMPHY_0_4_PORT_MASK;
+				mask = COMMON_PHY_SD_CTRL1_COMPHY_0_3_PORT_MASK;
+			}
 			reg_set(priv->comphy_regs + COMMON_PHY_SD_CTRL1,
 				data, mask);
 		}
