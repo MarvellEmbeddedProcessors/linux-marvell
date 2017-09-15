@@ -37,6 +37,12 @@ struct armada8k_pcie {
 	enum of_gpio_flags	flags;
 };
 
+struct armada8k_pcie_rst {
+	bool			is_reseted;
+	struct gpio_desc	*gpio;
+	struct list_head	list;
+};
+
 #define PCIE_GLOBAL_CONTROL             0x0
 #define PCIE_APP_LTSSM_EN               (1 << 2)
 #define PCIE_DEVICE_TYPE_OFFSET         (4)
@@ -75,7 +81,7 @@ struct armada8k_pcie {
 #define PCIE_LINK_CAPABILITY		0x7C
 
 #define PCIE_LINK_CONTROL_LINK_STATUS	0x80
-#define PCIE_CAP_LINK_TRAINING		BIT(27)
+#define PCIE_LINK_TRAINING		BIT(27)
 
 #define PCIE_LINK_CTL_2			0xA0
 #define TARGET_LINK_SPEED_MASK		0xF
@@ -103,6 +109,9 @@ struct armada8k_pcie {
 #define PCIE_PORT_FORCE_OFF		0x708
 #define PCIE_FORCE_EN			BIT(15)
 
+#define PCIE_LINK_WIDTH_SPEED_CONTROL	0x80C
+#define PORT_LOGIC_SPEED_CHANGE		BIT(17)
+
 #define PCIE_GEN3_EQ_CONTROL_OFF_REG	0x8A8
 #define PCIE_GEN3_EQ_PSET_REQ_VEC_MASK	0xFFFF00
 #define PCIE_GEN3_EQ_PSET_REQ_VEC_OFFSET 8
@@ -112,10 +121,32 @@ struct armada8k_pcie {
 #define PCIE_LINK_FLUSH_CONTROL_OFF_REG	0x8CC
 #define PCIE_AUTO_FLUSH_EN_MASK		0x1
 
-#define PCIE_LINK_UP_TIMEOUT_MS		100
-
+#define PCIE_LINK_UP_TIMEOUT_MS		1000
+#define PCIE_SPEED_CHANGE_TIMEOUT_MS	300
 
 #define to_armada8k_pcie(x)	container_of(x, struct armada8k_pcie, pp)
+
+/*
+ * PCIe ports on CPx share the same reset GPIO on A8K/7K-DB.
+ * In future each PCIe port maybe have its own GPIO for EP reset, or some
+ * PCIe ports share one GPIO and other use another one, etc..
+ * So it is necessary to record the information of EP reset GPIO for each
+ * PCIe port. According to above case analysis, there maybe different count
+ * of GPIO in different cases, in order to support different cases, a global
+ * list is involved to store the reset GPIO descriptor and flag(to indicate
+ * reset has been implemented or not) accordingly, which will be shared by
+ * all PCIe ports on all CPs.
+ * For each PCIe port with EP reset connected to GPIO, the list will be
+ * traversed to try to find the same GPIO, if it is not found, the GPIO
+ * information will be allocated dynamicly and initialized and then reset EP;
+ * if it is found in the list, the flag will be checked, if the flag indicates
+ * EP reset already done, then skip repeated reset, or reset EP and set the
+ * flag.
+ * In suspend to RAM process, the list is also useful. When suspend the
+ * corresponding GPIO will be searched in list and the EP reset flag will be
+ * cleared if it is found. When resume the EP reset will be done like probe.
+ */
+static struct list_head a8k_rst_gpio_list = LIST_HEAD_INIT(a8k_rst_gpio_list);
 
 static int armada8k_pcie_link_up(struct pcie_port *pp)
 {
@@ -235,19 +266,24 @@ static int armada8k_pcie_wait_link_up(struct pcie_port *pp)
 {
 	unsigned long timeout;
 
+	/*
+	 * According to HW, taking Armada7k-PCAC board(as PCIe end-point card)
+	 * into consideration; it is suggested to set the max delay to 1000ms.
+	 */
 	timeout = jiffies + PCIE_LINK_UP_TIMEOUT_MS * HZ / 1000;
 	while (!armada8k_pcie_link_up(pp)) {
 		if (time_after(jiffies, timeout))
-			return 0;
+			return -1;
 	}
 
 	/*
-	 * Link can be established in Gen 1. still need to wait
-	 * till MAC nagaotiation is completed
+	 * Link can be established in Gen 1. It still need to wait
+	 * until MAC nagaotiation(speed changes) is completed.
+	 * 300ms delay is according to HW design guidelines.
 	 */
-	udelay(100);
+	mdelay(PCIE_SPEED_CHANGE_TIMEOUT_MS);
 
-	return 1;
+	return 0;
 }
 
 static void armada8k_pcie_host_init(struct pcie_port *pp)
@@ -255,13 +291,6 @@ static void armada8k_pcie_host_init(struct pcie_port *pp)
 	struct armada8k_pcie *armada8k_pcie = to_armada8k_pcie(pp);
 	void __iomem *regs_base = armada8k_pcie->regs_base;
 	u32 reg;
-
-	if (!armada8k_pcie_link_up(pp)) {
-		/* Disable LTSSM state machine to enable configuration */
-		reg = readl(regs_base + PCIE_GLOBAL_CONTROL);
-		reg &= ~(PCIE_APP_LTSSM_EN);
-		writel(reg, regs_base + PCIE_GLOBAL_CONTROL);
-	}
 
 	/* Set the device to root complex mode */
 	reg = readl(regs_base + PCIE_GLOBAL_CONTROL);
@@ -301,15 +330,17 @@ static void armada8k_pcie_host_init(struct pcie_port *pp)
 		armada8k_pcie_dw_mvebu_pcie_config(pp->dbi_base);
 	}
 
-	if (!armada8k_pcie_link_up(pp)) {
-		/* Configuration done. Start LTSSM */
-		reg = readl(regs_base + PCIE_GLOBAL_CONTROL);
-		reg |= PCIE_APP_LTSSM_EN;
-		writel(reg, regs_base + PCIE_GLOBAL_CONTROL);
-	}
+	/*
+	 * Configuration done. Start LTSSM.
+	 * If the link already established in bootloader, this step does not
+	 * take effect, so it is not necessary to check link status before it.
+	 */
+	reg = readl(regs_base + PCIE_GLOBAL_CONTROL);
+	reg |= PCIE_APP_LTSSM_EN;
+	writel(reg, regs_base + PCIE_GLOBAL_CONTROL);
 
 	/* Check that link was established */
-	if (!armada8k_pcie_wait_link_up(pp))
+	if (armada8k_pcie_wait_link_up(pp))
 		dev_err(pp->dev, "Link not up after reconfiguration\n");
 }
 
@@ -392,22 +423,66 @@ static int armada8k_add_pcie_port(struct pcie_port *pp,
 	return 0;
 }
 
+/* armada8k_pcie_rst_find
+ * The function traverses the PCIe reset GPIO list and find the node matches
+ * with input pointer of gpio descriptor
+ * Return: if there is match, return matched node device.
+ *         if there is no match, return NULL.
+ */
+static struct armada8k_pcie_rst *armada8k_pcie_rst_find(struct gpio_desc *gpio)
+{
+	struct list_head *curr;
+	struct armada8k_pcie_rst *node;
+
+	if (list_empty(&a8k_rst_gpio_list))
+		return NULL;
+
+	list_for_each(curr, &a8k_rst_gpio_list) {
+		node = list_entry(curr, struct armada8k_pcie_rst, list);
+		if (gpio == node->gpio)
+			return node;
+	}
+
+	return NULL;
+}
+
 /* armada8k_pcie_reset
  * The function implements the PCIe reset via GPIO.
- * First, pull down the GPIO used for PCIe reset, and wait 200ms;
- * Second, set the GPIO output value with setting from DTS, and wait
- * 200ms for taking effect.
- * Return: void, always success.
+ * First, pull down the GPIO used to assert EP, and wait 1ms;
+ * Second, set the GPIO output value with setting from DTS to deassert EP
+ * Return: 0: success; non-zero: failed.
  */
-static void armada8k_pcie_reset(struct armada8k_pcie *pcie)
+static int armada8k_pcie_reset(struct armada8k_pcie *pcie)
 {
-	/* Set the reset gpio to low first */
-	gpiod_direction_output(pcie->reset_gpio, 0);
-	/* After 200ms to reset pcie */
-	mdelay(200);
+	struct armada8k_pcie_rst *rst;
+
+	rst = armada8k_pcie_rst_find(pcie->reset_gpio);
+	/* Add to reset gpio list */
+	if (!rst) {
+		rst = devm_kzalloc(pcie->pp.dev,
+				   sizeof(struct armada8k_pcie_rst),
+				   GFP_KERNEL);
+		if (!rst)
+			return -ENOMEM;
+
+		rst->gpio = pcie->reset_gpio;
+
+		list_add(&rst->list, &a8k_rst_gpio_list);
+	}
+
+	if (rst->is_reseted == true)
+		return 0;
+
+	/* Assert EP */
+	gpiod_direction_output(pcie->reset_gpio,
+			       (pcie->flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0);
+	/* After 1ms to De-assert EP */
+	mdelay(1);
 	gpiod_direction_output(pcie->reset_gpio,
 			       (pcie->flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1);
-	mdelay(200);
+	rst->is_reseted = true;
+
+	return 0;
 }
 
 static int armada8k_pcie_probe(struct platform_device *pdev)
@@ -426,11 +501,31 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	if (!armada8k_pcie)
 		return -ENOMEM;
 
+	pp = &armada8k_pcie->pp;
+	pp->dev = dev;
+
 	armada8k_pcie->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(armada8k_pcie->clk))
 		return PTR_ERR(armada8k_pcie->clk);
 
 	clk_prepare_enable(armada8k_pcie->clk);
+
+	/* Config reset gpio for pcie if the reset connected to gpio */
+	reset_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
+					     "reset-gpios", 0,
+					     &armada8k_pcie->flags);
+	if (reset_gpio == -EPROBE_DEFER) {
+		ret = reset_gpio;
+		goto fail_free;
+	}
+	if (gpio_is_valid(reset_gpio)) {
+		armada8k_pcie->reset_gpio = gpio_to_desc(reset_gpio);
+		ret = armada8k_pcie_reset(armada8k_pcie);
+		if (ret) {
+			dev_err(dev, "Reset EP failed!\n");
+			goto fail_free;
+		}
+	}
 
 	/* Get PHY count according to phy name */
 	phy_count = of_property_count_strings(pdev->dev.of_node, "phy-names");
@@ -476,21 +571,6 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 		}
 	}
 
-	/* Config reset gpio for pcie if the reset connected to gpio */
-	reset_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
-					     "reset-gpios", 0,
-					     &armada8k_pcie->flags);
-	if (reset_gpio == -EPROBE_DEFER) {
-		ret = reset_gpio;
-		goto fail_free;
-	}
-	if (gpio_is_valid(reset_gpio)) {
-		armada8k_pcie->reset_gpio = gpio_to_desc(reset_gpio);
-		armada8k_pcie_reset(armada8k_pcie);
-	}
-
-	pp = &armada8k_pcie->pp;
-	pp->dev = dev;
 	armada8k_pcie->phys = phys;
 	armada8k_pcie->phy_count = phy_count;
 	platform_set_drvdata(pdev, armada8k_pcie);
@@ -530,6 +610,16 @@ static int armada8k_pcie_suspend_noirq(struct device *dev)
 	struct armada8k_pcie *pcie;
 
 	pcie = dev_get_drvdata(dev);
+
+	/* Clear EP reset flag if it is connected to GPIO */
+	if (pcie->reset_gpio) {
+		struct armada8k_pcie_rst *rst;
+
+		rst = armada8k_pcie_rst_find(pcie->reset_gpio);
+		if (!rst)
+			return -ENODEV;
+		rst->is_reseted = false;
+	}
 
 	/* Gating clock */
 	if (!IS_ERR(pcie->clk))
