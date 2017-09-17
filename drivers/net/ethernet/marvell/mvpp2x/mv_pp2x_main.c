@@ -5302,10 +5302,11 @@ static void mv_pp2x_port_remove(struct mv_pp2x_port *port)
 	netmap_detach(port->dev);
 #endif /* DEV_NETMAP */
 
-	if (port->mac_data.phy_node)
-		mv_pp2x_phy_disconnect(port);
-
 	unregister_netdev(port->dev);
+
+	if (port->mac_data.phy_node)
+		mv_pp2x_phy_disconnect(port); /* do after unregister netdev */
+
 	free_percpu(port->pcpu);
 	free_percpu(port->stats);
 	for (i = 0; i < port->num_tx_queues; i++)
