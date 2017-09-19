@@ -83,6 +83,7 @@ struct armada_thermal_priv {
 	void __iomem *dfx;
 	struct armada_thermal_data *data;
 	struct platform_device *pdev;
+	struct thermal_zone_device *thermal;
 };
 
 struct armada_thermal_data {
@@ -786,6 +787,7 @@ static int armada_thermal_probe(struct platform_device *pdev)
 			"Failed to register thermal zone device\n");
 		return PTR_ERR(thermal);
 	}
+	priv->thermal = thermal;
 
 	/* Register overheat interrupt */
 	irq = platform_get_irq(pdev, 0);
@@ -801,30 +803,27 @@ static int armada_thermal_probe(struct platform_device *pdev)
 		pr_debug("armada_thermal: no irq was assigned\n");
 	}
 
-	platform_set_drvdata(pdev, thermal);
+	platform_set_drvdata(pdev, priv);
 
 	return 0;
 }
 
 static int armada_thermal_exit(struct platform_device *pdev)
 {
-	struct thermal_zone_device *armada_thermal =
-		platform_get_drvdata(pdev);
+	struct armada_thermal_priv *priv = platform_get_drvdata(pdev);
 
 	if (of_device_is_compatible(pdev->dev.of_node,
 				    "marvell,armada-ap806-thermal"))
-		thermal_zone_of_sensor_unregister(&pdev->dev, armada_thermal);
+		thermal_zone_of_sensor_unregister(&pdev->dev, priv->thermal);
 	else
-		thermal_zone_device_unregister(armada_thermal);
+		thermal_zone_device_unregister(priv->thermal);
 
 	return 0;
 }
 
 static int armada_thermal_resume(struct platform_device *pdev)
 {
-	struct thermal_zone_device *thermal =
-		platform_get_drvdata(pdev);
-	struct armada_thermal_priv *priv = thermal->devdata;
+	struct armada_thermal_priv *priv = platform_get_drvdata(pdev);
 
 	priv->data->init_sensor(pdev, priv);
 
