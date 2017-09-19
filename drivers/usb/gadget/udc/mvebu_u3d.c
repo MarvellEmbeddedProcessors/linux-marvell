@@ -1420,7 +1420,14 @@ static int mvc2_pullup(struct usb_gadget *gadget, int is_on)
 	val |= MVCP_DMA_GLOBAL_CONFIG_RUN | MVCP_DMA_GLOBAL_CONFIG_INTCLR;
 	MV_CP_WRITE(val, MVCP_DMA_GLOBAL_CONFIG);
 
-	mvc2_init_interrupt(cp);
+	/* Don't call mvc2_init_interrupt in pull_down. So it will not re-enable
+	 * MVCP_REF_INTEN_USB2_CNT interrupt (this interrupt is enabled in mvc2_start).
+	 * The other interrupts in mvc2_init_interrupt are already enabled before
+	 * calling mvc2_init_interrupt, so we don't need to enbale these interrupt
+	 * again in pulldown.
+	 */
+	if (is_on)
+		mvc2_init_interrupt(cp);
 
 	if (is_on == 0)
 		stop_activity(cp, cp->driver);
