@@ -139,7 +139,7 @@ struct armada_a3700_clk_pm_info {
  *   600M                 600M              300M             240M            200M
  */
 static struct armada_a3700_clk_pm_info a3700_pm_info[] = {
-	{.cpu_freq_max = 1200, .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_A_P, .divider = {1, 2, 4, 6} },
+	{.cpu_freq_max = 1200, .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_B_S, .divider = {1, 2, 4, 6} },
 	{.cpu_freq_max = 1000, .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_B_S, .divider = {1, 2, 4, 5} },
 	{.cpu_freq_max = 800,  .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_A_P, .divider = {1, 2, 3, 4} },
 	{.cpu_freq_max = 600,  .clk_sel = CLK_SEL_TBG, .tbg_sel = TBG_A_P, .divider = {2, 4, 5, 6} },
