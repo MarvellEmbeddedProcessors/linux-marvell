@@ -125,7 +125,7 @@ A37x0
 	+---------------------------------------+-----------------------------------------------+
 	| Driver				| Binding file					|
 	+=======================================+===============================================+
-	| Marvell A37x0 Pinctrl driver		| pinctrl/marvell,armada-3700-pinctrl.txt	|
+	| Marvell A37x0 Pinctrl & GPIO driver	| pinctrl/marvell,armada-37xx-pinctrl.txt	|
 	+---------------------------------------+-----------------------------------------------+
 	| Marvell Neta Ethernet controller	| net/marvell-armada-370-neta.txt		|
 	+---------------------------------------+-----------------------------------------------+
@@ -135,13 +135,13 @@ A37x0
 	+---------------------------------------+-----------------------------------------------+
 	| Marvell A37x0 UART driver		| tty/serial/mvebu-uart.txt			|
 	+---------------------------------------+-----------------------------------------------+
-	| Marvell A37x0 Clock driver		| clock/mvebu-armada3700-clock.txt		|
-	+---------------------------------------+-----------------------------------------------+
-	| Marvell A37x0 GPIO driver		| gpio/gpio-armada-3700.txt			|
+	| Marvell A37x0 Clock driver		| clock/armada3700-periph-clock.txt		|
+	|                           		| clock/armada3700-tbg-clock.txt		|
+	|                           		| clock/armada3700-xtal-clock.txt		|
 	+---------------------------------------+-----------------------------------------------+
 	| Marvell A37x0 PCIe driver		| pci/aardvark-pci.txt				|
 	+---------------------------------------+-----------------------------------------------+
-	| Marvell A37x0 USB OTG PHY driver	| usb/armada3700-otg-phy.txt			|
+	| Marvell A37x0 USB PHY driver		| usb/armada3700-usb-phy.txt			|
 	+---------------------------------------+-----------------------------------------------+
 
 A39x
