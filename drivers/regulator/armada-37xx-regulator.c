@@ -160,6 +160,8 @@ static struct armada_3700_avs_vol_map avs_value_voltage_map[MAX_VMIN_OPTION] = {
 	{0x33, 1342}
 };
 
+#define ESPRESSOBIN_VDD_MIN	1108	/* Default VDD min in unit of mV */
+
 int armada3700_avs_enable(struct regulator_dev *rdev)
 {
 	struct armada_3700_avs *avs = container_of(rdev->desc, struct armada_3700_avs, desc);
@@ -274,6 +276,7 @@ static int armada_3700_avs_probe(struct platform_device *pdev)
 	struct regulator_config config = { };
 	struct regulator_dev *rdev;
 	u32 max_cpu_freq;
+	int idx;
 
 	avs = devm_kzalloc(&pdev->dev, sizeof(*avs), GFP_KERNEL);
 	if (!avs) {
@@ -315,6 +318,13 @@ static int armada_3700_avs_probe(struct platform_device *pdev)
 		avs->freq_level = CPU_FREQ_LEVEL_800MHZ;
 	} else if (max_cpu_freq == CPU_FREQ_1000MHZ) {
 		avs->freq_level = CPU_FREQ_LEVEL_1000MHZ;
+		/*
+		 * Overwrite the VDD values from load 1 to load 3 in 1000MHZ
+		 * for EspressoBin, otherwise the CPU gets stuck.
+		 */
+		if (of_device_is_compatible(np, "marvell,armada-3700-espressobin-avs"))
+			for (idx = VDD_SET1; idx <= VDD_SET3; idx++)
+				voltage_m_tbl[avs->freq_level][idx] = ESPRESSOBIN_VDD_MIN;
 	} else if (max_cpu_freq == CPU_FREQ_1200MHZ) {
 		avs->freq_level = CPU_FREQ_LEVEL_1200MHZ;
 	} else {
@@ -399,6 +409,7 @@ static const struct dev_pm_ops armada_3700_avs_pm_ops = {
 
 static const struct of_device_id armada3700_avs_of_match[] = {
 	{ .compatible = "marvell,armada-3700-avs", },
+	{ .compatible = "marvell,armada-3700-espressobin-avs", },
 	{}
 };
 

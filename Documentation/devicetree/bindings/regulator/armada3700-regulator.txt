@@ -1,7 +1,7 @@
 Marvell Armada 3700 voltage regulator by AVS
 
 Required properties:
-- compatible: must be "marvell,armada-3700-avs"
+- compatible: must be "marvell,armada-3700-avs" or "marvell,armada-3700-espressobin-avs"
 - reg: avs register address, which is used to control CPU voltage
 - clocks: CPU core clock to get the MAX CPU frequency
 - any required generic properties defined in regulator.txt
