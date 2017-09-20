@@ -73,6 +73,7 @@
 			};
 
 			reg_avs: avs@11500 {
+				compatible = "marvell,armada-3700-espressobin-avs";
 				status = "okay";
 			};
 
