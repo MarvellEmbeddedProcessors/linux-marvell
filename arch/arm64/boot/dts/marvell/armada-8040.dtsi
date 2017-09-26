@@ -228,6 +228,9 @@
 			cp0_usb3h1: usb3@510000 {
 				#stream-id-cells = <1>;
 			};
+			sar@400200 {
+				compatible = "marvell,a80x0-cp0-sample-at-reset";
+			};
 		};
 		axim-hb1-rd@3c8000 {
 			status = "disabled";
@@ -279,6 +282,9 @@
 			};
 			rtc@284000 {
 				status = "okay";
+			};
+			sar@400200 {
+				compatible = "marvell,a80x0-cp1-sample-at-reset";
 			};
 		};
 		axim-hb1-rd@3c8000 {

@@ -177,6 +177,9 @@
 			axim-hb1-wr@3c9000 {
 				status = "disabled";
 			};
+			sar@400200 {
+				compatible = "marvell,a70x0-sample-at-reset";
+			};
 		};
 		pcie0@600000 {
 			msi-parent = <&gic_v2m0>;
