@@ -6088,7 +6088,7 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 {
 	struct mv_pp2x *priv = platform_get_drvdata(pdev);
 	struct mv_pp2x_hw *hw = &priv->hw;
-	int i, num_of_ports, cpu;
+	int i, num_of_ports, cpu, num_of_pools;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 
 	if (priv->pp2_version == PPV22 && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
@@ -6111,7 +6111,9 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 		priv->num_ports--;
 	}
 
-	for (i = 0; i < priv->num_pools; i++) {
+	num_of_pools = priv->num_pools;
+
+	for (i = 0; i < num_of_pools; i++) {
 		struct mv_pp2x_bm_pool *bm_pool = &priv->bm_pools[i];
 
 		mv_pp2x_bm_pool_destroy(&pdev->dev, priv, bm_pool);
@@ -6188,7 +6190,7 @@ static int mv_pp2x_probe_after_suspend(struct device *dev)
 static int mvpp2x_suspend(struct device *dev)
 {
 	struct mv_pp2x *priv = dev_get_drvdata(dev);
-	int i, num_of_ports;
+	int i, num_of_ports, num_of_pools;
 	struct platform_device *pdev = priv->pdev;
 
 	num_of_ports = priv->num_ports;
@@ -6220,8 +6222,8 @@ static int mvpp2x_suspend(struct device *dev)
 	devm_kfree(&pdev->dev, priv->hw.cls_shadow);
 	devm_kfree(&pdev->dev, priv->hw.c2_shadow);
 	devm_kfree(&pdev->dev, priv->aggr_txqs);
-
-	for (i = 0; i < priv->num_pools; i++) {
+	num_of_pools = priv->num_pools;
+	for (i = 0; i < num_of_pools; i++) {
 		struct mv_pp2x_bm_pool *bm_pool = &priv->bm_pools[i];
 
 		mv_pp2x_bm_pool_destroy(dev, priv, bm_pool);
