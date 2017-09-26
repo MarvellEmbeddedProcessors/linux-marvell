@@ -811,7 +811,11 @@ static int armada_thermal_exit(struct platform_device *pdev)
 	struct thermal_zone_device *armada_thermal =
 		platform_get_drvdata(pdev);
 
-	thermal_zone_device_unregister(armada_thermal);
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-ap806-thermal"))
+		thermal_zone_of_sensor_unregister(&pdev->dev, armada_thermal);
+	else
+		thermal_zone_device_unregister(armada_thermal);
 
 	return 0;
 }
