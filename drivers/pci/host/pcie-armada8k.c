@@ -320,6 +320,10 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	reset_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
 					     "reset-gpios", 0,
 					     &armada8k_pcie->flags);
+	if (reset_gpio == -EPROBE_DEFER) {
+		ret = reset_gpio;
+		goto fail_free;
+	}
 	if (gpio_is_valid(reset_gpio)) {
 		armada8k_pcie->reset_gpio = gpio_to_desc(reset_gpio);
 		armada8k_pcie_reset(armada8k_pcie);
