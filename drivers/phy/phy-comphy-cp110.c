@@ -706,6 +706,10 @@ static int mvebu_cp110_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 	mask |= HPIPE_LANE_CFG4_SSC_CTRL_MASK;
 	data |= 0x1 << HPIPE_LANE_CFG4_SSC_CTRL_OFFSET;
 	reg_set(hpipe_addr + HPIPE_LANE_CFG4_REG, data, mask);
+	/* Confifure SSC amplitude */
+	mask = HPIPE_G2_TX_SSC_AMP_MASK;
+	data = 0x1f << HPIPE_G2_TX_SSC_AMP_OFFSET;
+	reg_set(hpipe_addr + HPIPE_G2_SET_2_REG, data, mask);
 	/* End of analog parameters */
 
 	dev_dbg(priv->dev, "stage: Comphy power up\n");
