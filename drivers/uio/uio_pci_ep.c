@@ -70,7 +70,7 @@ static int uio_pci_ep_probe(struct platform_device *pdev)
 	uio_pci->dev = dev;
 
 	/* store private data */
-	info->name = "uio-pci-ep";
+	info->name = "uio_pci_ep_0";
 	info->version = "1.0.0";
 
 	/* setup the PCI EP topology. This should eventually move to the PCI EP Function driver */
