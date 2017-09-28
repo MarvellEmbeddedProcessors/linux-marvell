@@ -56,12 +56,12 @@
 	aliases {
 		gpio0 = &cpm_gpio0;
 		gpio1 = &cpm_gpio1;
-		ethernet0 = &emac0;
-		ethernet1 = &emac2;
-		ethernet2 = &emac3;
-		ethernet3 = &emac0_1;
-		ethernet4 = &emac2_1;
-		ethernet5 = &emac3_1;
+		ethernet0 = &cpm_emac0;
+		ethernet1 = &cpm_emac2;
+		ethernet2 = &cpm_emac3;
+		ethernet3 = &cps_emac0;
+		ethernet4 = &cps_emac2;
+		ethernet5 = &cps_emac3;
 	};
 
 	ap806 {
@@ -101,8 +101,8 @@
 				status = "disabled";
 			};
 			smmu: iommu@5000000 {
-				mmu-masters = <&usb3h0 0x483>,
-					      <&usb3h1 0x484>;
+				mmu-masters = <&cpm_usb3h0 0x483>,
+					      <&cpm_usb3h1 0x484>;
 			};
 			pinctrl@6f4000 {
 				ap_emmc_pins: emmc-pins-0 {
@@ -154,20 +154,20 @@
 					marvell,function = "sdio";
 				};
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				#stream-id-cells = <1>;
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			msi-parent = <&gic_v2m0>;
 		};
-		pcie@0x620000 {
+		pcie1@0x620000 {
 			msi-parent = <&gic_v2m0>;
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			msi-parent = <&gic_v2m0>;
 		};
 	};
@@ -207,13 +207,13 @@
 				status = "okay";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			msi-parent = <&gic_v2m0>;
 		};
-		pcie@0x620000 {
+		pcie1@0x620000 {
 			msi-parent = <&gic_v2m0>;
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			msi-parent = <&gic_v2m0>;
 		};
 	};

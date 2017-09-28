@@ -78,7 +78,7 @@
 
 	cpn-110-master {
 		config-space {
-			i2c1: i2c@701000 {
+			cpm_i2c0: i2c@701000 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&i2c0_pins>;
 				eeprom@57 {
@@ -99,10 +99,10 @@
 					reg = <0x21>;
 				};
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				usb-phy = <&usb3h0_phy>;
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				usb-phy = <&usb3h1_phy>;
 			};
 			sdhci@780000 {

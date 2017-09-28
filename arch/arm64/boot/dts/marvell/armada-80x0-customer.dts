@@ -135,21 +135,21 @@
 
 				sata-port@0 {
 					/* UPDATE */
-					phys = <&comphy0 1 COMPHY_SATA0>;
+					phys = <&cpm_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
 				sata-port@1 {
 					/* UPDATE */
-					phys = <&comphy0 3 COMPHY_SATA1>;
+					phys = <&cpm_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				status = "disabled";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				status = "disabled";
 			};
 			sdhci@780000 {
@@ -159,11 +159,11 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				/* UPDATE */
-				phy2: ethernet-phy@2 {
+				cpm_phy2: ethernet-phy@2 {
 					reg = <0>;
 				};
 				/* UPDATE */
-				phy3: ethernet-phy@3 {
+				cpm_phy3: ethernet-phy@3 {
 					reg = <1>;
 				};
 			};
@@ -172,18 +172,18 @@
 					/* UPDATE */
 					phy-mode = "sfi"; /* lane-2 */
 					/* UPDATE */
-					phys = <&comphy0 2 COMPHY_SFI>;
+					phys = <&cpm_comphy 2 COMPHY_SFI>;
 					phy-names = "comphy";
 				};
 				emac2: mac2 {
 					/* UPDATE */
 					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&phy2>;
+					phy = <&cpm_phy2>;
 				};
 				emac3: mac3 {
 					/* UPDATE */
 					phy-mode = "rgmii"; /* rgmii-1 */
-					phy = <&phy3>;
+					phy = <&cpm_phy3>;
 				};
 			};
 			ppv22@000000 {
@@ -191,13 +191,13 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <&cpm_ge2_rgmii_pins>; /* RGMII mpps */
 
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					status = "disabled";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					status = "disabled";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
@@ -213,7 +213,7 @@
 			};
 		};
 
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "disabled";
 		};
 		reg_usb3h0_vbus: usb3-vbus0 {
@@ -239,7 +239,7 @@
 	};
 	cpn-110-slave {
 		config-space {
-			usb3h0_1: usb3@500000 {
+			cps_usb3h0: usb3@500000 {
 				status = "disabled";
 			};
 			sata@540000 {
@@ -247,13 +247,13 @@
 
 				sata-port@0 {
 					/* UPDATE */
-					phys = <&comphy1 1 COMPHY_SATA0>;
+					phys = <&cps_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
 				sata-port@1 {
 					/* UPDATE */
-					phys = <&comphy1 3 COMPHY_SATA1>;
+					phys = <&cps_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
@@ -262,23 +262,23 @@
 				/* UPDATE */
 				#address-cells = <1>;
 				#size-cells = <0>;
-				phy2_1: ethernet-phy@2 {
+				cps_phy2: ethernet-phy@2 {
 					reg = <0>;
 				};
 			};
 			gop {
-				emac0_1: mac0 {
+				cps_emac0: mac0 {
 					/* UPDATE */
 					phy-mode = "sfi"; /* lane-2 */
-					phys = <&comphy1 2 COMPHY_SFI>;
+					phys = <&cps_comphy 2 COMPHY_SFI>;
 					phy-names = "disabled";
 				};
-				emac2_1: mac2 {
+				cps_emac2: mac2 {
 					/* UPDATE */
 					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&phy2_1>;
+					phy = <&cps_phy2>;
 				};
-				emac3_1: mac3 {
+				cps_emac3: mac3 {
 					/* UPDATE */
 					phy-mode = "sgmii"; /* lane-4 */
 				};
@@ -288,13 +288,13 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <&cps_ge1_rgmii_pins>;
 
-				eth0_1: eth0@010000 {
+				cps_eth0: eth0@010000 {
 					status = "disabled";
 				};
-				eth1_1: eth1@020000 {
+				cps_eth1: eth1@020000 {
 					status = "disabled";
 				};
-				eth2_1: eth2@030000 {
+				cps_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
@@ -312,7 +312,7 @@
 				status = "disabled";
 			};
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "disabled";
 		};
 	};

@@ -85,29 +85,29 @@
 			serial@702300 {
 				status = "disabled";
 			};
-			sata: sata@540000 {
+			cpm_sata: sata@540000 {
 				status = "okay";
 
 				sata-port@0 {
 					status = "disabled";
 				};
 				sata-port@1 {
-					phys = <&comphy0 3 COMPHY_SATA1>;
+					phys = <&cpm_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "okay";
 				};
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&utmi0>,
-				       <&comphy0 1 COMPHY_USB3H0>;
+				phys = <&cpm_utmi0>,
+				       <&cpm_comphy 1 COMPHY_USB3H0>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&utmi1>,
-				       <&comphy0 4 COMPHY_USB3H1>;
+				phys = <&cpm_utmi1>,
+				       <&cpm_comphy 4 COMPHY_USB3H1>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
@@ -123,65 +123,65 @@
 			nand@720000 {
 				status = "okay";
 			};
-			i2c1: i2c@701000 {
+			cpm_i2c0: i2c@701000 {
 				status = "okay";
 				clock-frequency = <100000>;
 			};
-			i2c2: i2c@701100 {
+			cpm_i2c1: i2c@701100 {
 				status = "disabled";
 			};
 
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				phy2: ethernet-phy@2 {
+				cpm_phy2: ethernet-phy@2 {
 					reg = <0>;
 				};
-				phy3: ethernet-phy@3 {
+				cpm_phy3: ethernet-phy@3 {
 					reg = <1>;
 				};
 			};
 			gop {
-				emac0: mac0 {
+				cpm_emac0: mac0 {
 					phy-mode = "sfi"; /* lane-2 */
-					phys = <&comphy0 2 COMPHY_SFI>;
+					phys = <&cpm_comphy 2 COMPHY_SFI>;
 					phy-names = "comphy";
 				};
-				emac2: mac2 {
+				cpm_emac2: mac2 {
 					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&phy2>;
+					phy = <&cpm_phy2>;
 				};
-				emac3: mac3 {
+				cpm_emac3: mac3 {
 					phy-mode = "rgmii"; /* rgmii-1 */
-					phy = <&phy3>;
+					phy = <&cpm_phy3>;
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					status = "okay";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					status = "okay";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					status = "okay";
 				};
 			};
 			comphy {
 				status = "okay";
 			};
-			utmi0: utmi@580000 {
+			cpm_utmi0: utmi@580000 {
 				status = "okay";
 			};
-			utmi1: utmi@581000 {
+			cpm_utmi1: utmi@581000 {
 				status = "okay";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "okay";
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};

@@ -61,10 +61,10 @@
 			};
 		};
 
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			num-lanes = <2>;
-			phys = <&comphy0 0 COMPHY_PCIE0
-				&comphy0 1 COMPHY_PCIE0
+			phys = <&cpm_comphy 0 COMPHY_PCIE0
+				&cpm_comphy 1 COMPHY_PCIE0
 				>;
 			phy-names = "pcie-phy0", "pcie-phy1";
 

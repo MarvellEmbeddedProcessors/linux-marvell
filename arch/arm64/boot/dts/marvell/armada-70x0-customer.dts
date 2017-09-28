@@ -132,26 +132,26 @@
 			serial@702300 {
 				status = "disabled";
 			};
-			sata: sata@540000 {
+			cpm_sata: sata@540000 {
 				status = "disabled";
 
 				sata-port@0 {
 					/* UPDATE */
-					phys = <&comphy0 1 COMPHY_SATA0>;
+					phys = <&cpm_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
 				sata-port@1 {
 					/* UPDATE */
-					phys = <&comphy0 3 COMPHY_SATA1>;
+					phys = <&cpm_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				status = "disabled";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				status = "disabled";
 			};
 			u3d@520000 {
@@ -208,7 +208,7 @@
 					};
 				};
 			};
-			i2c1: i2c@701000 {
+			cpm_i2c0: i2c@701000 {
 				status = "disabled";
 				/* UPDATE */
 				clock-frequency = <100000>;
@@ -235,7 +235,7 @@
 					reg = <0x21>;
 				};
 			};
-			i2c2: i2c@701100 {
+			cpm_i2c1: i2c@701100 {
 				status = "disabled";
 			};
 
@@ -251,33 +251,33 @@
 				};
 			};
 			gop {
-				emac0: mac0 {
+				cpm_emac0: mac0 {
 					/* UPDATE */
 					phy-mode = "sgmii"; /* lane-2 */
-					phys = <&comphy0 2 COMPHY_SGMII0>;
+					phys = <&cpm_comphy 2 COMPHY_SGMII0>;
 					phy-names = "comphy";
 				};
-				emac2: mac2 {
+				cpm_emac2: mac2 {
 					/* UPDATE */
 					phy-mode = "sgmii"; /* lane-0 */
 					phy = <&phy2>;
-					phys = <&comphy0 0 COMPHY_SGMII1>;
+					phys = <&cpm_comphy 0 COMPHY_SGMII1>;
 					phy-names = "comphy";
 				};
-				emac3: mac3 {
+				cpm_emac3: mac3 {
 					/* UPDATE */
 					phy-mode = "rgmii"; /* rgmii-1 */
 					phy = <&phy3>;
 				};
 			};
 			ppv22@000000 {
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					status = "disabled";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					status = "disabled";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
@@ -285,15 +285,15 @@
 				status = "disabled";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "disabled";
 			/* UPDATE */
 			num-lanes = <4>;
 		};
-		pcie@0x620000 {
+		pcie1@0x620000 {
 			status = "disabled";
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "disabled";
 		};
 	};

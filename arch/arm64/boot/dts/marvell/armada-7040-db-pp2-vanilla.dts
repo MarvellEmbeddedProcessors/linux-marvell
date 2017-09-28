@@ -57,9 +57,9 @@
 	chosen { };
 
 	aliases {
-		ethernet0 = &eth0;
-		ethernet1 = &eth1;
-		ethernet2 = &eth2;
+		ethernet0 = &cpm_eth0;
+		ethernet1 = &cpm_eth1;
+		ethernet2 = &cpm_eth2;
 	};
 
 	ap806 {
@@ -92,7 +92,7 @@
 			serial@702300 {
 				status = "disabled";
 			};
-			sata: sata@540000 {
+			cpm_sata: sata@540000 {
 				status = "okay";
 
 				sata-port@0 {
@@ -102,10 +102,10 @@
 					status = "okay";
 				};
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				status = "okay";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				status = "okay";
 			};
 			u3d@520000 {
@@ -120,21 +120,21 @@
 			spi@700680 {
 				status = "okay";
 			};
-			i2c1: i2c@701000 {
+			cpm_i2c0: i2c@701000 {
 				status = "okay";
 				clock-frequency = <100000>;
 			};
-			i2c2: i2c@701100 {
+			cpm_i2c1: i2c@701100 {
 				status = "disabled";
 			};
 
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				phy2: ethernet-phy@2 {
+				cpm_phy2: ethernet-phy@2 {
 					reg = <0>;
 				};
-				phy3: ethernet-phy@3 {
+				cpm_phy3: ethernet-phy@3 {
 					reg = <1>;
 				};
 			};
@@ -145,7 +145,7 @@
 				clock-names = "pp_clk", "gop_clk", "mg_clk";
 				dma-coherent;
 				status = "okay";
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					phy-mode = "sfi";
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
@@ -160,7 +160,7 @@
 					gop-port-id = <0>;
 					status = "okay";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					phy-mode = "sgmii"; /* lane-0 */
 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
@@ -173,10 +173,10 @@
 					mac-address = [00 00 00 00 00 02];
 					port-id = <1>; /* pp2_port_id */
 					gop-port-id = <2>;
-					phy = <&phy2>;
+					phy = <&cpm_phy2>;
 					status = "okay";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					phy-mode = "rgmii-id"; /* rgmii-1 */
 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
@@ -189,7 +189,7 @@
 					mac-address = [00 00 00 00 00 03];
 					port-id = <2>; /* pp2_port_id */
 					gop-port-id = <3>;
-					phy = <&phy3>;
+					phy = <&cpm_phy3>;
 					status = "okay";
 				};
 			};
@@ -198,7 +198,7 @@
 			};
 		};
 
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};

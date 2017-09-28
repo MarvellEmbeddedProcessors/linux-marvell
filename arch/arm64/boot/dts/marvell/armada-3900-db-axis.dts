@@ -59,15 +59,15 @@
 					marvell,function = "gpio";
 				};
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&comphy0 1 COMPHY_USB3H0>;
+				phys = <&cpm_comphy 1 COMPHY_USB3H0>;
 				phy-names = "usb3";
 			};
 		};
 
-		pcie@0x600000 {
-			phys = <&comphy0 0 COMPHY_PCIE0>;
+		pcie0@0x600000 {
+			phys = <&cpm_comphy 0 COMPHY_PCIE0>;
 			phy-names = "pcie-phy0";
 		};
 	};

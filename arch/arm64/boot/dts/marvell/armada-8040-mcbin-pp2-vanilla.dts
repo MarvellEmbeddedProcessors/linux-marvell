@@ -52,10 +52,10 @@
 			"marvell,armada-ap806-quad", "marvell,armada-ap806";
 
 	aliases {
-		ethernet0 = &eth0;
-		ethernet1 = &eth0_1;
-		ethernet2 = &eth1_1;
-		ethernet3 = &eth2_1;
+		ethernet0 = &cpm_eth0;
+		ethernet1 = &cps_eth0;
+		ethernet2 = &cps_eth1;
+		ethernet3 = &cps_eth2;
 	};
 
 	memory@00000000 {
@@ -100,7 +100,7 @@
 					marvell,function = "gpio";
 				};
 			};
-			comphy0: comphy {
+			cpm_comphy: comphy {
 				status = "disabled";
 			};
 			sdhci@780000 {
@@ -112,13 +112,13 @@
 				pinctrl-0 = <&cpm_sdhci_pins>;
 				status = "okay";
 			};
-			i2c@701000 {
+			cpm_i2c0: i2c@701000 {
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&cpm_i2c0_pins>;
 				status = "okay";
 			};
-			sata@540000 {
+			cpm_sata: sata@540000 {
 				status = "okay";
 
 				sata-port@0 {
@@ -138,11 +138,11 @@
 			mdio@15b000 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				phy0: ethernet-phy@0 {
+				cpm_phy0: ethernet-phy@0 {
 					compatible = "ethernet-phy-ieee802.3-c45";
 					reg = <0>;
 				};
-				phy1: ethernet-phy@1 {
+				cpm_phy1: ethernet-phy@1 {
 					compatible = "ethernet-phy-ieee802.3-c45";
 					reg = <8>;
 				};
@@ -155,7 +155,7 @@
 				dma-coherent;
 				pinctrl-names = "default";
 				status = "okay";
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
@@ -168,10 +168,10 @@
 					port-id = <0>; /* pp2_port_id */
 					gop-port-id = <0>;
 					phy-mode = "sfi"; /* lane-2 */
-					phy = <&phy0>;
+					phy = <&cpm_phy0>;
 					status = "okay";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
@@ -185,7 +185,7 @@
 					gop-port-id = <2>;
 					status = "disabled";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
@@ -201,7 +201,7 @@
 				};
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			num-lanes = <4>;
 			status = "okay";
 			reset-gpios = <&cpm_gpio1 20 GPIO_ACTIVE_HIGH>;
@@ -232,18 +232,18 @@
 	cpn-110-slave {
 		config-space {
 			/delete-node/ppv22@000000;
-			comphy1: comphy {
+			cps_comphy1: comphy {
 				status = "disabled";
 			};
-			usb3h0_1: usb3@500000 {
-				usb-phy = <&usb3h0_phy>;
+			cps_usb3h0: usb3@500000 {
+				usb-phy = <&cps_usb3h0_phy>;
 				status = "okay";
 			};
-			usb3h0_phy: usb3_phy0 {
+			cps_usb3h0_phy: usb3_phy0 {
 				compatible = "usb-nop-xceiv";
 				vcc-supply = <&reg_usb3h0_vbus>;
 			};
-			sata@540000 {
+			cps_sata: sata@540000 {
 				status = "okay";
 
 				sata-port@0 {
@@ -261,9 +261,9 @@
 				dma-coherent;
 				pinctrl-names = "default";
 				status = "okay";
-				eth0_1: eth0@010000 {
+				cps_eth0: eth0@010000 {
 					phy-mode = "sfi";
-					phy = <&phy1>;
+					phy = <&cpm_phy1>;
 					port-id = <0>; /* pp2_port_id */
 					gop-port-id = <0>;
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
@@ -277,7 +277,7 @@
 					mac-address = [00 00 00 00 00 04];
 					status = "okay";
 				};
-				eth1_1: eth1@020000 {
+				cps_eth1: eth1@020000 {
 					phy-mode = "sgmii";
 					port-id = <1>; /* pp2_port_id */
 					phy = <&smi_phy0>;
@@ -293,7 +293,7 @@
 					mac-address = [00 00 00 00 00 05];
 					status = "okay";
 				};
-				eth2_1: eth2@030000 {
+				cps_eth2: eth2@030000 {
 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,

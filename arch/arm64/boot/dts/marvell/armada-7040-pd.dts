@@ -151,14 +151,14 @@
 			usb3h0: usb3@500000 {
 				separated-phys-for-usb2-usb3;
 				phys = <&utmi0>,
-				       <&comphy0 1 COMPHY_USB3H0>;
+				       <&cpm_comphy 1 COMPHY_USB3H0>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
 			usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
 				phys = <&utmi1>,
-				       <&comphy0 4 COMPHY_USB3H1>;
+				       <&cpm_comphy 4 COMPHY_USB3H1>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
@@ -270,7 +270,7 @@
 			};
 		};
 
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};

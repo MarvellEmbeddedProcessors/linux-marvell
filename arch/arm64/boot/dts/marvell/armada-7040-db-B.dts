@@ -55,8 +55,8 @@
 	#size-cells = <2>;
 
 	aliases {
-		ethernet0 = &emac2;
-		ethernet1 = &emac3;
+		ethernet0 = &cpm_emac2;
+		ethernet1 = &cpm_emac3;
 	};
 
 	chosen { };
@@ -90,7 +90,7 @@
 			serial@702300 {
 				status = "disabled";
 			};
-			sata: sata@540000 {
+			cpm_sata: sata@540000 {
 				status = "disabled";
 
 				sata-port@0 {
@@ -100,13 +100,13 @@
 					status = "disabled";
 				};
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				status = "disabled";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&utmi1>,
-				       <&comphy0 4 COMPHY_USB3H1>;
+				phys = <&cpm_utmi1>,
+				       <&cpm_comphy 4 COMPHY_USB3H1>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
@@ -133,34 +133,34 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				phy2: ethernet-phy@2 {
+				cpm_phy2: ethernet-phy@2 {
 					reg = <0>;
 				};
-				phy3: ethernet-phy@3 {
+				cpm_phy3: ethernet-phy@3 {
 					reg = <1>;
 				};
 			};
 			gop {
-				emac0: mac0 {
+				cpm_emac0: mac0 {
 					/*disabled*/
 				};
-				emac2: mac2 {
+				cpm_emac2: mac2 {
 					phy-mode = "rgmii"; /* rgmii-1 */
-					phy = <&phy2>;
+					phy = <&cpm_phy2>;
 				};
-				emac3: mac3 {
+				cpm_emac3: mac3 {
 					phy-mode = "rgmii"; /* rgmii-2 */
-					phy = <&phy3>;
+					phy = <&cpm_phy3>;
 				};
 			};
 			ppv22@000000 {
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					status = "disabled";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					status = "okay";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					status = "okay";
 				};
 			};
@@ -171,14 +171,14 @@
 				status = "okay";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "okay";
 			num-lanes = <4>;
 		};
-		pcie@0x620000 {
+		pcie1@0x620000 {
 			status = "disabled";
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};

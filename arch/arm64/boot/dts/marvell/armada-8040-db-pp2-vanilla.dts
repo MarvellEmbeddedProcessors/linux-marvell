@@ -58,10 +58,10 @@
 	chosen { };
 
 	aliases {
-		ethernet0 = &eth0;
-		ethernet1 = &eth2;
-		ethernet2 = &eth0_1;
-		ethernet3 = &eth1_1;
+		ethernet0 = &cpm_eth0;
+		ethernet1 = &cpm_eth2;
+		ethernet2 = &cps_eth0;
+		ethernet3 = &cps_eth1;
 	};
 
 	ap806 {
@@ -94,10 +94,10 @@
 				};
 			};
 			/* usb3h0 is USB2 only (UTMI) */
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				status = "okay";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				status = "okay";
 			};
 			sdhci@780000 {
@@ -112,7 +112,7 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				mdio0_phy1: ethernet-phy@1 {
+				cpm_phy1: ethernet-phy@1 {
 					reg = <1>;
 				};
 			};
@@ -125,7 +125,7 @@
 				pinctrl-0 = <&cps_ge1_rgmii_pins>;
 				dma-coherent;
 				status = "okay";
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
@@ -140,7 +140,7 @@
 					phy-mode = "sfi";
 					status = "okay";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
@@ -152,7 +152,7 @@
 				mac-address = [00 00 00 00 00 02];
 					status = "disabled";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
@@ -165,7 +165,7 @@
 					port-id = <2>; /* pp2_port_id */
 					gop-port-id = <3>;
 					phy-mode = "rgmii-id";
-					phy = <&mdio0_phy1>;
+					phy = <&cpm_phy1>;
 					status = "okay";
 				};
 			};
@@ -173,18 +173,18 @@
 				status = "disabled";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "okay";
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};
 	cpn-110-slave {
 		config-space {
 			/delete-node/ppv22@000000;
-			/* usb3h0_1 is USB2 only (UTMI) */
-			usb3h0_1: usb3@500000 {
+			/* cps_usb3h0 is USB2 only (UTMI) */
+			cps_usb3h0: usb3@500000 {
 				status = "okay";
 			};
 			serial@702000 {
@@ -202,7 +202,7 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				mdio1_phy1: ethernet-phy@1 {
+				cps_phy1: ethernet-phy@1 {
 					reg = <0>;
 				};
 			};
@@ -214,7 +214,7 @@
 				dma-coherent;
 				pinctrl-names = "default";
 				status = "okay";
-				eth0_1: eth0@010000 {
+				cps_eth0: eth0@010000 {
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
@@ -229,7 +229,7 @@
 					phy-mode = "sfi";
 					status = "okay";
 				};
-				eth1_1: eth1@020000 {
+				cps_eth1: eth1@020000 {
 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
@@ -242,10 +242,10 @@
 					port-id = <1>; /* pp2_port_id */
 					gop-port-id = <2>;
 					phy-mode = "rgmii-id";
-					phy = <&mdio1_phy1>;
+					phy = <&cps_phy1>;
 					status = "okay";
 				};
-				eth2_1: eth2@030000 {
+				cps_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
@@ -258,13 +258,13 @@
 				pinctrl-0 = <&cps_spi1_pins>;
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "okay";
 		};
-		pcie@0x620000 {
+		pcie1@0x620000 {
 			status = "okay";
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};

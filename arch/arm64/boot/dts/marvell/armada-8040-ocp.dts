@@ -57,8 +57,8 @@
 	};
 
 	aliases {
-		ethernet0 = &emac0_0;
-		ethernet1 = &emac0_1;
+		ethernet0 = &cpm_emac0;
+		ethernet1 = &cps_emac0;
 	};
 
 	ap806 {
@@ -93,7 +93,7 @@
 					marvell,function = "gpio";
 				};
 			};
-			comphy0: comphy {
+			cpm_comphy: comphy {
 				skip_pcie_power_off;
 				status = "okay";
 			};
@@ -104,22 +104,22 @@
 				status = "disabled";
 			};
 			gop {
-				emac0_0: mac0 {
-					phys = <&comphy0 4 COMPHY_SFI>;
+				cpm_emac0: mac0 {
+					phys = <&cpm_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy-mode = "sfi"; /* lane-4 */
 				};
-				emac2_0: mac2 {
+				cpm_emac2: mac2 {
 					phy-mode = "none";
 				};
-				emac3_0: mac3 {
+				cpm_emac3: mac3 {
 					phy-mode = "none";
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
-				eth0_0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					status = "okay";
 				};
 			};
@@ -153,44 +153,44 @@
 
 	cpn-110-slave {
 		config-space {
-			comphy1: comphy {
+			cps_comphy: comphy {
 				status = "okay";
 			};
-			usb3h0_1: usb3@500000 {
-				usb-phy = <&usb3h0_phy>;
+			cps_usb3h0: usb3@500000 {
+				usb-phy = <&cps_usb3h0_phy>;
 				separated-phys-for-usb2-usb3;
-				phys = <&utmi0_1>,
-				       <&comphy1 2 COMPHY_USB3H0>;
+				phys = <&cps_utmi0>,
+				       <&cps_comphy 2 COMPHY_USB3H0>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
-			usb3h0_phy: usb3_phy0 {
+			cps_usb3h0_phy: usb3_phy0 {
 				compatible = "usb-nop-xceiv";
 				vcc-supply = <&reg_usb3h0_vbus>;
 			};
 			gop {
-				emac0_1: mac0 {
-					phys = <&comphy0 4 COMPHY_SFI>;
+				cps_emac0: mac0 {
+					phys = <&cps_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy-mode = "sfi"; /* lane-4 */
 				};
-				emac2_1: mac2 {
+				cps_emac2: mac2 {
 					phy-mode = "none";
 				};
-				emac3_1: mac3 {
+				cps_emac3: mac3 {
 					phy-mode = "none";
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
-				eth0_1: eth0@010000 {
+				cps_eth0: eth0@010000 {
 					status = "okay";
 				};
-				eth1_1: eth1@020000 {
+				cps_eth1: eth1@020000 {
 					status = "disabled";
 				};
-				eth2_1: eth2@030000 {
+				cps_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};

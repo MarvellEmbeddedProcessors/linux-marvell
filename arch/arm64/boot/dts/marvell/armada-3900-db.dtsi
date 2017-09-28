@@ -91,12 +91,12 @@
 
 	cpn-110-master {
 		config-space {
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				status = "okay";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&comphy0 4 COMPHY_USB3H1>;
+				phys = <&cpm_comphy 4 COMPHY_USB3H1>;
 				phy-names = "usb3";
 				status = "okay";
 			};
@@ -121,7 +121,7 @@
 					reg = <0x20800000 0x1f800000>;
 				};
 			};
-			i2c1: i2c@701000 {
+			cpm_i2c0: i2c@701000 {
 				status = "disabled";
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
@@ -157,17 +157,17 @@
 				};
 			};
 			gop {
-				emac0: mac0 {
+				cpm_emac0: mac0 {
 					phy-mode = "sfi";
 					phy-speed = <5000>;
-					phys = <&comphy0 2 COMPHY_SFI>;
+					phys = <&cpm_comphy 2 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy = <&phy0>;
 				};
-				emac2: mac2 {
+				cpm_emac2: mac2 {
 					phy-mode = "sgmii";
 					phy-speed = <1000>;
-					phys = <&comphy0 3 COMPHY_SGMII1>;
+					phys = <&cpm_comphy 3 COMPHY_SGMII1>;
 					phy-names = "comphy";
 					phy = <&phy1>;
 				};
@@ -184,14 +184,14 @@
 				status = "okay";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "okay";
 			ranges = <0x81000000 0 0xf7000000 0  0xf7000000 0 0x10000	/* downstream I/O */
 				  0x82000000 0 0xf6000000 0  0xf6000000 0 0xf00000>;	/* non-prefetchable memory */
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
-			phys = <&comphy0 5 COMPHY_PCIE2>;
+			phys = <&cpm_comphy 5 COMPHY_PCIE2>;
 			phy-names = "pcie-phy0";
 			ranges = <0x81000000 0 0xf7020000 0  0xf7020000 0 0x10000	/* downstream I/O */
 				  0x82000000 0 0xf8000000 0  0xf8000000 0 0xf00000>;	/* non-prefetchable memory */

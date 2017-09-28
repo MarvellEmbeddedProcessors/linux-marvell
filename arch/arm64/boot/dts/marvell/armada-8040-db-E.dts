@@ -58,9 +58,9 @@
 	chosen { };
 
 	aliases {
-		ethernet0 = &emac0;
-		ethernet1 = &emac0_1;
-		ethernet2 = &emac2_1;
+		ethernet0 = &cpm_emac0;
+		ethernet1 = &cps_emac0;
+		ethernet2 = &cps_emac2;
 	};
 
 	ap806 {
@@ -87,12 +87,12 @@
 			sata@540000 {
 				status = "okay";
 				sata-port@0 {
-					phys = <&comphy0 1 COMPHY_SATA0>;
+					phys = <&cpm_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "okay";
 				};
 				sata-port@1 {
-					phys = <&comphy0 3 COMPHY_SATA1>;
+					phys = <&cpm_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "okay";
 				};
@@ -104,15 +104,15 @@
 				status = "okay";
 			};
 			/* usb3h0 is USB2 only (UTMI) */
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				status = "okay";
-				phys = <&utmi0>;
+				phys = <&cpm_utmi0>;
 				phy-names = "usb";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&utmi1>,
-				       <&comphy0 4 COMPHY_USB3H1>;
+				phys = <&cpm_utmi1>,
+				       <&cpm_comphy 4 COMPHY_USB3H1>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
@@ -134,7 +134,7 @@
 			gop {
 				emac0: mac0 {
 					phy-mode = "sfi"; /* lane-2 */
-					phys = <&comphy0 2 COMPHY_SFI>;
+					phys = <&cpm_comphy 2 COMPHY_SFI>;
 					phy-names = "comphy";
 				};
 				emac2: mac2 {
@@ -146,39 +146,39 @@
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					status = "okay";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					status = "disabled";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
 			comphy {
 				status = "okay";
 			};
-			utmi0: utmi@580000 {
+			cpm_utmi0: utmi@580000 {
 				status = "okay";
 			};
-			utmi1: utmi@581000 {
+			cpm_utmi1: utmi@581000 {
 				status = "okay";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "okay";
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};
 	cpn-110-slave {
 		config-space {
-			/* usb3h0_1 is USB2 only (UTMI) */
-			usb3h0_1: usb3@500000 {
+			/* cps_usb3h0 is USB2 only (UTMI) */
+			cps_usb3h0: usb3@500000 {
 				status = "okay";
-				phys = <&utmi0_1>;
+				phys = <&cps_utmi0>;
 				phy-names = "usb";
 			};
 			serial@702000 {
@@ -187,12 +187,12 @@
 			sata@540000 {
 				status = "okay";
 				sata-port@0 {
-					phys = <&comphy1 1 COMPHY_SATA0>;
+					phys = <&cps_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "okay";
 				};
 				sata-port@1 {
-					phys = <&comphy1 3 COMPHY_SATA1>;
+					phys = <&cps_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "okay";
 				};
@@ -200,21 +200,21 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				mdio1_phy1: ethernet-phy@1 {
+				cps_phy1: ethernet-phy@1 {
 					reg = <0>;
 				};
 			};
 			gop {
-				emac0_1: mac0 {
+				cps_emac0: mac0 {
 					phy-mode = "sfi"; /* lane-2 */
-					phys = <&comphy1 2 COMPHY_SFI>;
+					phys = <&cps_comphy 2 COMPHY_SFI>;
 					phy-names = "comphy";
 				};
-				emac2_1: mac2 {
+				cps_emac2: mac2 {
 					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&mdio1_phy1>;
+					phy = <&cps_phy1>;
 				};
-				emac3_1: mac3 {
+				cps_emac3: mac3 {
 					phy-mode = "none"; /* disabled */
 				};
 			};
@@ -223,35 +223,35 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <&cps_ge1_rgmii_pins>;
 
-				eth0_1: eth0@010000 {
+				cps_eth0: eth0@010000 {
 					status = "okay";
 				};
-				eth1_1: eth1@020000 {
+				cps_eth1: eth1@020000 {
 					status = "okay";
 				};
-				eth2_1: eth2@030000 {
+				cps_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
 			comphy {
 				status = "okay";
 			};
-			spi1: spi@700680 {
+			cps_spi1: spi@700680 {
 				status = "okay";
 				pinctrl-names = "default";
 				pinctrl-0 = <&cps_spi1_pins>;
 			};
-			utmi0_1: utmi@580000 {
+			cps_utmi0: utmi@580000 {
 				status = "okay";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "okay";
 		};
-		pcie@0x620000 {
+		pcie1@0x620000 {
 			status = "okay";
 		};
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};

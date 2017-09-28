@@ -57,10 +57,10 @@
 	};
 
 	aliases {
-		ethernet0 = &emac0;
-		ethernet1 = &emac0_1;
-		ethernet2 = &emac2_1;
-		ethernet3 = &emac3_1;
+		ethernet0 = &cpm_emac0;
+		ethernet1 = &cps_emac0;
+		ethernet2 = &cps_emac2;
+		ethernet3 = &cps_emac3;
 	};
 
 	ap806 {
@@ -99,7 +99,7 @@
 					marvell,function = "gpio";
 				};
 			};
-			comphy0: comphy {
+			cpm_comphy: comphy {
 				status = "okay";
 			};
 			sdhci@780000 {
@@ -124,7 +124,7 @@
 					status = "disabled";
 				};
 				sata-port@1 {
-					phys = <&comphy0 5 COMPHY_SATA1>;
+					phys = <&cpm_comphy 5 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "okay";
 				};
@@ -151,7 +151,7 @@
 			gop {
 				emac0_0: mac0 {
 					phy-mode = "sfi"; /* lane-4 */
-					phys = <&comphy0 4 COMPHY_SFI>;
+					phys = <&cpm_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy = <&phy0>;
 				};
@@ -164,7 +164,7 @@
 				};
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			num-lanes = <4>;
 			status = "okay";
 			reset-gpios = <&cpm_gpio1 20 GPIO_ACTIVE_HIGH>;
@@ -194,18 +194,18 @@
 
 	cpn-110-slave {
 		config-space {
-			comphy1: comphy {
+			cps_comphy: comphy {
 				status = "okay";
 			};
-			usb3h0_1: usb3@500000 {
-				usb-phy = <&usb3h0_phy>;
+			cps_usb3h0: usb3@500000 {
+				usb-phy = <&cps_usb3h0_phy>;
 				separated-phys-for-usb2-usb3;
-				phys = <&utmi0_1>,
-				       <&comphy1 2 COMPHY_USB3H0>;
+				phys = <&cps_utmi0>,
+				       <&cps_comphy 2 COMPHY_USB3H0>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
-			usb3h0_phy: usb3_phy0 {
+			cps_usb3h0_phy: usb3_phy0 {
 				compatible = "usb-nop-xceiv";
 				vcc-supply = <&reg_usb3h0_vbus>;
 			};
@@ -213,50 +213,50 @@
 				status = "okay";
 
 				sata-port@0 {
-					phys = <&comphy1 1 COMPHY_SATA0>;
+					phys = <&cps_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "okay";
 				};
 				sata-port@1 {
-					phys = <&comphy1 3 COMPHY_SATA1>;
+					phys = <&cps_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "okay";
 				};
 			};
 			gop {
-				emac0_1: mac0 {
+				cps_emac0: mac0 {
 					phy-mode = "sfi"; /* lane-4 */
-					phys = <&comphy1 4 COMPHY_SFI>;
+					phys = <&cps_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy = <&phy1>;
 				};
-				emac2_1: mac2 {
+				cps_emac2: mac2 {
 					phy-mode = "sgmii"; /* lane-0 */
-					phys = <&comphy1 0 COMPHY_SGMII1>;
+					phys = <&cps_comphy 0 COMPHY_SGMII1>;
 					phy-names = "comphy";
 					phy = <&smi_phy0>;
 				};
-				emac3_1: mac3 {
+				cps_emac3: mac3 {
 					phy-mode = "sgmii"; /* lane-5 */
 					phy-speed = <2500>;
-					phys = <&comphy1 5 COMPHY_HS_SGMII2>;
+					phys = <&cps_comphy 5 COMPHY_HS_SGMII2>;
 					phy-names = "comphy";
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
-				eth0_1: eth0@010000 {
+				cps_eth0: eth0@010000 {
 					status = "okay";
 				};
-				eth1_1: eth1@020000 {
+				cps_eth1: eth1@020000 {
 					status = "okay";
 				};
-				eth2_1: eth2@030000 {
+				cps_eth2: eth2@030000 {
 					status = "okay";
 				};
 			};
-			utmi0_1: utmi@580000 {
+			cps_utmi0: utmi@580000 {
 				status = "okay";
 			};
 		};

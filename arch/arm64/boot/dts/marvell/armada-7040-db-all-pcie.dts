@@ -85,13 +85,13 @@
 			serial@702300 {
 				status = "disabled";
 			};
-			sata: sata@540000 {
+			cpm_sata: sata@540000 {
 				status = "disabled";
 			};
-			usb3h0: usb3@500000 {
+			cpm_usb3h0: usb3@500000 {
 				status = "disabled";
 			};
-			usb3h1: usb3@510000 {
+			cpm_usb3h1: usb3@510000 {
 				status = "disabled";
 			};
 			u3d@520000 {
@@ -106,46 +106,46 @@
 			spi@700680 {
 				status = "okay";
 			};
-			i2c1: i2c@701000 {
+			cpm_i2c0: i2c@701000 {
 				status = "okay";
 				clock-frequency = <100000>;
 			};
-			i2c2: i2c@701100 {
+			cpm_i2c1: i2c@701100 {
 				status = "disabled";
 			};
 
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				phy2: ethernet-phy@2 {
+				cpm_phy2: ethernet-phy@2 {
 					reg = <0>;
 				};
-				phy3: ethernet-phy@3 {
+				cpm_phy3: ethernet-phy@3 {
 					reg = <1>;
 				};
 			};
 			gop {
-				emac0: mac0 {
+				cpm_emac0: mac0 {
 					phy-mode = "sgmii"; /* not connected */
 				};
-				emac2: mac2 {
+				cpm_emac2: mac2 {
 					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&phy2>;
+					phy = <&cpm_phy2>;
 				};
-				emac3: mac3 {
+				cpm_emac3: mac3 {
 					phy-mode = "rgmii"; /* rgmii-1 */
-					phy = <&phy3>;
+					phy = <&cpm_phy3>;
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <1>;
-				eth0: eth0@010000 {
+				cpm_eth0: eth0@010000 {
 					status = "disabled";
 				};
-				eth1: eth1@020000 {
+				cpm_eth1: eth1@020000 {
 					status = "okay";
 				};
-				eth2: eth2@030000 {
+				cpm_eth2: eth2@030000 {
 					status = "okay";
 				};
 			};
@@ -153,15 +153,15 @@
 				status = "okay";
 			};
 		};
-		pcie@0x600000 {
+		pcie0@0x600000 {
 			status = "okay";
 			num-lanes = <4>;
 		};
-		pcie@0x620000 {
+		pcie1@0x620000 {
 			status = "okay";
 		};
 
-		pcie@0x640000 {
+		pcie2@0x640000 {
 			status = "okay";
 		};
 	};
