@@ -257,7 +257,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	struct phy **phys = NULL;
 	struct device *dev = &pdev->dev;
 	struct resource *base;
-	int i, reset_gpio, phy_count = 0;
+	int reset_gpio, phy_count = 0, i = 0;
 	u32 command;
 	char phy_name[16];
 	int ret = 0;
@@ -283,7 +283,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 			snprintf(phy_name, sizeof(phy_name), "pcie-phy%d", i);
 			phys[i] = devm_phy_get(dev, phy_name);
 			if (IS_ERR(phys[i]))
-				goto err_phy;
+				goto fail_free;
 
 			/* Tell COMPHY the PCIE width based on phy command,
 			 * and in PHY command callback, the width will be
@@ -306,12 +306,12 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 
 			ret = phy_init(phys[i]);
 			if (ret < 0)
-				goto err_phy;
+				goto fail_free;
 
 			ret = phy_power_on(phys[i]);
 			if (ret < 0) {
 				phy_exit(phys[i]);
-				goto err_phy;
+				goto fail_free;
 			}
 		}
 	}
@@ -348,13 +348,12 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 		goto fail_free;
 	return 0;
 
-err_phy:
+fail_free:
 	while (--i >= 0) {
 		phy_power_off(phys[i]);
 		phy_exit(phys[i]);
 	}
 
-fail_free:
 	if (!IS_ERR(armada8k_pcie->clk))
 		clk_disable_unprepare(armada8k_pcie->clk);
 
