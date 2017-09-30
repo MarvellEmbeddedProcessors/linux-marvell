@@ -25,6 +25,13 @@
 #include "phy-comphy-mvebu.h"
 #include "phy-comphy-cp110.h"
 
+/* The same Units Soft Reset Config register are accessed in all PCIe ports
+ * initialization, so a spin lock is defined in case it may 2 CPUs reset PCIe
+ * MAC and need to access the register in the same time.
+ * The spin lock is shared by all CP110 units.
+ */
+static DEFINE_SPINLOCK(cp110_mac_reset_lock);
+
 /* Clear PHY selector - avoid collision with prior u-boot configuration */
 static void mvebu_cp110_comphy_clr_phy_selector(struct mvebu_comphy_priv *priv,
 						struct mvebu_comphy *comphy)
@@ -758,6 +765,29 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 	struct device_node *dn = pdev->dev.of_node;
 
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
+
+	/* PCIe reset release */
+	if (priv->pcie_reset_reg) {
+		u32 reg;
+
+		spin_lock(&cp110_mac_reset_lock);
+
+		reg = readl(priv->pcie_reset_reg);
+		switch (comphy->index) {
+		case COMPHY_LANE0:
+			reg |= PCIE_MAC_RESET_MASK_PORT0;
+			break;
+		case COMPHY_LANE4:
+			reg |= PCIE_MAC_RESET_MASK_PORT1;
+			break;
+		case COMPHY_LANE5:
+			reg |= PCIE_MAC_RESET_MASK_PORT2;
+			break;
+		}
+
+		writel(reg, priv->pcie_reset_reg);
+		spin_unlock(&cp110_mac_reset_lock);
+	}
 
 	/* Configure PIPE selector for PCIE */
 	mvebu_cp110_comphy_set_pipe_selector(priv, comphy);
@@ -1838,6 +1868,29 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
 
 	comphy_ip_addr = COMPHY_ADDR(priv->comphy_regs, comphy->index);
+
+	/* PCIe reset */
+	if (priv->pcie_reset_reg) {
+		u32 reg;
+
+		spin_lock(&cp110_mac_reset_lock);
+
+		reg = readl(priv->pcie_reset_reg);
+		switch (comphy->index) {
+		case COMPHY_LANE0:
+			reg &= ~PCIE_MAC_RESET_MASK_PORT0;
+			break;
+		case COMPHY_LANE4:
+			reg &= ~PCIE_MAC_RESET_MASK_PORT1;
+			break;
+		case COMPHY_LANE5:
+			reg &= ~PCIE_MAC_RESET_MASK_PORT2;
+			break;
+		}
+
+		writel(reg, priv->pcie_reset_reg);
+		spin_unlock(&cp110_mac_reset_lock);
+	}
 
 	/* Hard reset the comphy, for PCIe and usb3 */
 	mask = COMMON_PHY_CFG1_PWR_ON_RESET_MASK;

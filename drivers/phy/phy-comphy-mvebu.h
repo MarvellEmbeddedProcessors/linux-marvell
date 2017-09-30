@@ -26,6 +26,7 @@ struct mvebu_comphy_priv {
 	struct device *dev;
 	void __iomem *comphy_regs;
 	void __iomem *comphy_pipe_regs;
+	void __iomem *pcie_reset_reg;
 	spinlock_t lock;
 	const struct mvebu_comphy_soc_info *soc_info;
 	struct mvebu_comphy {

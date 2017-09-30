@@ -420,6 +420,11 @@ extern const struct mvebu_comphy_soc_info cp110_comphy;
 /* General defines */
 #define PLL_LOCK_TIMEOUT			15000
 
+/* RFU_0, Units Soft Reset Config */
+#define PCIE_MAC_RESET_MASK_PORT0		BIT(13)
+#define PCIE_MAC_RESET_MASK_PORT1		BIT(11)
+#define PCIE_MAC_RESET_MASK_PORT2		BIT(12)
+
 #include "phy-comphy-cp110-hpipe.h"
 
 #endif /* _COMPHY_CP110_H */

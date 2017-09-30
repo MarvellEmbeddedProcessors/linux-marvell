@@ -167,6 +167,13 @@ static int mvebu_comphy_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->comphy_pipe_regs))
 		return PTR_ERR(priv->comphy_pipe_regs);
 
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac_reset");
+	if (res) {
+		priv->pcie_reset_reg = devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(priv->pcie_reset_reg))
+			return PTR_ERR(priv->pcie_reset_reg);
+	}
+
 	/* check if skip_pcie_power_off flag exist */
 	skip_pcie_power_off = of_property_read_bool(pdev->dev.of_node,
 						    "skip_pcie_power_off");

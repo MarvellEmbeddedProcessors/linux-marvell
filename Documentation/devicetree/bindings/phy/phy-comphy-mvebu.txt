@@ -14,6 +14,11 @@ Required properties for comphy node:
 				for each device in "reg-names"
 	- reg-names:		The names of the register addresses
 				corresponding to the registers filled in "reg".
+				Currently there are 3 reg names:
+				"comphy": it is mandatory and indicates the comphy register property.
+				"serdes": it is mandatory and indicates the serdes register property.
+				"mac_reset": it is optional and is needed when comphy lanes are configured
+				as PCIe function. It is only for cp110 comphy.
 	- #phy-cells:		Standard property (Documentation: phy-bindings.txt)
 				Should be 2.
 	- dfx-reg:		Address and length of DFX register which is needed when PCIe
@@ -85,8 +90,8 @@ Comphy Node:
 ============
 	comphy0: comphy {
 		compatible = "marvell,cp110-comphy";
-		reg = <0x441000 0x100>, <0x120000 0x6000>;
-		reg-names = "comphy", "serdes";
+		reg = <0x441000 0x100>, <0x120000 0x6000>, <0x440268 0x4>;
+		reg-names = "comphy", "serdes", "mac_reset";
 		dfx-reg = <0x400280 4>;
 		#phy-cells = <2>;
 		sar-data = <&cpm_sar>;
@@ -96,8 +101,8 @@ Comphy Node:
 
 	comphy1: comphy {
 		compatible = "marvell,cp110-comphy";
-		reg = <0x441000 0x100>, <0x120000 0x6000>;
-		reg-names = "comphy", "serdes";
+		reg = <0x441000 0x100>, <0x120000 0x6000>, <0x440268 0x4>;
+		reg-names = "comphy", "serdes", "mac_reset";
 		dfx-reg = <0x400280 4>;
 		#phy-cells = <2>;
 		sar-data = <&cps_sar>;
