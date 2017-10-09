@@ -1,0 +1,19 @@
+This file describes the changes done to the uio_pdrv_genirq driver, along with
+the new device-tree properties required to control these features.
+
+Added properties:
+
+- uio-name: Holds the name of the created uio device.
+In case this property exists, then it will be used as the uio device name
+(/sys/class/uio/uioN/name), in case it's not defined, the driver will use
+the node's name as the uio device name.
+
+Example:
+	dma_xor@6a0000 {
+        	compatible = "marvell,mv-xor-v2";
+		reg = <0x6a0000 0x1000>,
+	              <0x6b0000 0x1000>;
+		musdk-mode;
+        	uio-name = "uio_dma_xor_4";
+	        status = "okay";
+	};

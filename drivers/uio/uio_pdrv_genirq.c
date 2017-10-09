@@ -118,7 +118,10 @@ static int uio_pdrv_genirq_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "unable to kmalloc\n");
 			return -ENOMEM;
 		}
-		uioinfo->name = pdev->dev.of_node->name;
+
+		if (of_property_read_string(pdev->dev.of_node, "uio-name",
+					&uioinfo->name) != 0)
+			uioinfo->name = pdev->dev.of_node->name;
 		uioinfo->version = "devicetree";
 		/* Multiple IRQs are not supported */
 	}
