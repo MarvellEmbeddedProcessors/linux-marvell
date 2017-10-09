@@ -10,6 +10,7 @@
  *     CP110_LABEL(usb0) -> cps_usb0
  */
 #define CP110_LABEL(name)	EVALUATOR(CP110_NAME, name)
+#define AP810_LABEL(name)	EVALUATOR(AP810_NAME, name)
 
 #define APPEND_NX(A, B)		A ##-## B
 #define APPEND(A, B)		APPEND_NX(A, B)
