@@ -891,6 +891,11 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	u32 dma_bus_width;
 
+	if (of_property_read_bool(pdev->dev.of_node, "musdk-mode")) {
+		dev_notice(&pdev->dev, "Marvell Version 2 XOR driver - MUSDK mode\n");
+		return -1;
+	}
+
 	dev_notice(&pdev->dev, "Marvell Version 2 XOR driver\n");
 
 	xor_dev = devm_kzalloc(&pdev->dev, sizeof(*xor_dev), GFP_KERNEL);
