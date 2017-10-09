@@ -164,7 +164,7 @@
 				};
 			};
 		};
-		pcie0@0x600000 {
+		pcie0@600000 {
 			num-lanes = <4>;
 			status = "okay";
 			reset-gpios = <&cpm_gpio1 20 GPIO_ACTIVE_HIGH>;

@@ -523,7 +523,7 @@ config-space {
 	};
 };
 
-CP110_LABEL(pcie_ep): pcie-ep@0x600000 {
+CP110_LABEL(pcie_ep): pcie-ep@600000 {
 	compatible = "marvell,armada8k-pcie-ep", "snps,dw-pcie";
 	reg = <0 CP110_PCIE_EP_REG0_BASE 0 0x4000>,
 		  <0 CP110_PCIE_EP_REG1_BASE 0 0x80000>,
@@ -533,7 +533,7 @@ CP110_LABEL(pcie_ep): pcie-ep@0x600000 {
 	status = "disabled";
 };
 
-CP110_LABEL(pcie0): pcie0@0x600000 {
+CP110_LABEL(pcie0): pcie0@600000 {
 	compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
 	reg = <0 CP110_PCIEx_REG0_BASE(0) 0 0x10000>,
 	      <0 CP110_PCIEx_REG1_BASE(0) 0 0x80000>;	/* Last 512KB of mem space */
@@ -558,7 +558,7 @@ CP110_LABEL(pcie0): pcie0@0x600000 {
 	status = "disabled";
 };
 
-CP110_LABEL(pcie1): pcie1@0x620000 {
+CP110_LABEL(pcie1): pcie1@620000 {
 	compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
 	reg = <0 CP110_PCIEx_REG0_BASE(1) 0 0x10000>,
 	      <0 CP110_PCIEx_REG1_BASE(1) 0 0x80000>;	/* Last 512KB of mem space */
@@ -584,7 +584,7 @@ CP110_LABEL(pcie1): pcie1@0x620000 {
 	status = "disabled";
 };
 
-CP110_LABEL(pcie2): pcie2@0x640000 {
+CP110_LABEL(pcie2): pcie2@640000 {
 	compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
 	reg = <0 CP110_PCIEx_REG0_BASE(2) 0 0x10000>,
 	      <0 CP110_PCIEx_REG1_BASE(2) 0 0x80000>;	/* Last 64KB of mem space */

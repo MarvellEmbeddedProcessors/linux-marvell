@@ -171,14 +171,14 @@
 				status = "okay";
 			};
 		};
-		pcie0@0x600000 {
+		pcie0@600000 {
 			status = "okay";
 			num-lanes = <4>;
 		};
-		pcie1@0x620000 {
+		pcie1@620000 {
 			status = "disabled";
 		};
-		pcie2@0x640000 {
+		pcie2@640000 {
 			status = "okay";
 		};
 	};

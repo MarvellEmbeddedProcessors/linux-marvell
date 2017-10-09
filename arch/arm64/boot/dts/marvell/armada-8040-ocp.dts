@@ -146,7 +146,7 @@
 			status = "okay";
 		};
 
-		pcie-ep@0x600000 {
+		pcie-ep@600000 {
 			status = "okay";
 		};
 	};
