@@ -1570,7 +1570,6 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
 			baser |= GITS_CBASER_nC;
 			writeq_relaxed(baser, its->base + GITS_CBASER);
 		}
-		pr_info("ITS: using cache flushing for cmd queue\n");
 		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
 	}
 
@@ -1590,6 +1589,9 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
 		baser |= GITS_CBASER_nCnB | GITS_CBASER_NonShareable;
 		writeq_relaxed(baser, its->base + GITS_CBASER);
 	}
+
+	if (its->flags & ITS_FLAGS_CMDQ_NEEDS_FLUSHING)
+		pr_info("ITS: using cache flushing for cmd queue\n");
 
 	writeq_relaxed(0, its->base + GITS_CWRITER);
 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
