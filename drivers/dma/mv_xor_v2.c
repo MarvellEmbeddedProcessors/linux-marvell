@@ -1063,6 +1063,8 @@ static int mv_xor_v2_remove(struct platform_device *pdev)
 
 	platform_msi_domain_free_irqs(&pdev->dev);
 
+	clk_disable_unprepare(xor_dev->clk);
+
 	return 0;
 }
 
