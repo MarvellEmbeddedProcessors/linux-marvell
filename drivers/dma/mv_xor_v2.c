@@ -888,7 +888,6 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	struct dma_device *dma_dev;
 	struct mv_xor_v2_sw_desc *sw_desc;
 	struct msi_desc *msi_desc;
-	struct device *dev = &pdev->dev;
 	u32 dma_bus_width;
 
 	if (of_property_read_bool(pdev->dev.of_node, "musdk-mode")) {
@@ -921,9 +920,6 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 			return ret;
 	} else if (PTR_ERR(xor_dev->clk) == -EPROBE_DEFER) {
 		return -EPROBE_DEFER;
-	} else {
-		dev_err(dev, "Failed to enable XOR clock.\n");
-		return PTR_ERR(xor_dev->clk);
 	}
 
 	ret = platform_msi_domain_alloc_irqs(&pdev->dev, 1,
