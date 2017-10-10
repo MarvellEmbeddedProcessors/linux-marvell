@@ -664,10 +664,12 @@ static struct pinctrl_gpio_range armada_cp110_1_mpp_gpio_ranges[] = {
 static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 {
 	struct mvebu_pinctrl_soc_info *soc;
-	struct mvebu_pinctrl_pm_save *pm_save;
 	const struct of_device_id *match =
 		of_match_device(armada_cp110_pinctrl_of_match, &pdev->dev);
 	struct resource *res;
+#ifdef CONFIG_PM
+	struct mvebu_pinctrl_pm_save *pm_save;
+#endif
 
 	if (!match)
 		return -ENODEV;

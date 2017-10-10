@@ -154,7 +154,9 @@ static int armada_ap806_pinctrl_probe(struct platform_device *pdev)
 	const struct of_device_id *match =
 		of_match_device(armada_ap806_pinctrl_of_match, &pdev->dev);
 	struct resource *res, *res_mmcio;
+#ifdef CONFIG_PM
 	struct mvebu_pinctrl_pm_save *pm_save;
+#endif
 
 	if (!match)
 		return -ENODEV;
