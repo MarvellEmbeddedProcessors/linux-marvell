@@ -2715,7 +2715,7 @@ int usb_add_hcd_with_phy_name(struct usb_hcd *hcd,
 				return retval;
 			}
 			hcd->usb_phy = phy;
-			hcd->remove_phy = 1;
+			hcd->remove_usb_phy = 1;
 		}
 	}
 
@@ -2917,7 +2917,7 @@ err_create_buf:
 		hcd->phy = NULL;
 	}
 err_phy:
-	if (hcd->remove_phy && hcd->usb_phy) {
+	if (hcd->remove_usb_phy && hcd->usb_phy) {
 		usb_phy_shutdown(hcd->usb_phy);
 		usb_put_phy(hcd->usb_phy);
 		hcd->usb_phy = NULL;
@@ -3017,7 +3017,7 @@ void usb_remove_hcd(struct usb_hcd *hcd)
 		phy_put(hcd->phy);
 		hcd->phy = NULL;
 	}
-	if (hcd->remove_phy && hcd->usb_phy) {
+	if (hcd->remove_usb_phy && hcd->usb_phy) {
 		usb_phy_shutdown(hcd->usb_phy);
 		usb_put_phy(hcd->usb_phy);
 		hcd->usb_phy = NULL;

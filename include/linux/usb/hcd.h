@@ -147,7 +147,8 @@ struct usb_hcd {
 	unsigned		rh_registered:1;/* is root hub registered? */
 	unsigned		rh_pollable:1;	/* may we poll the root hub? */
 	unsigned		msix_enabled:1;	/* driver has MSI-X enabled? */
-	unsigned		remove_phy:1;	/* auto-remove USB phy */
+	unsigned		remove_usb_phy:1;/* auto-remove USB phy */
+	unsigned		remove_phy:1;	/* auto-remove generic phy */
 
 	/* The next flag is a stopgap, to be removed when all the HCDs
 	 * support the new root-hub polling mechanism. */
