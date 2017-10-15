@@ -6229,6 +6229,8 @@ static int mvpp2x_suspend(struct device *dev)
 		mv_pp2x_bm_pool_destroy(dev, priv, bm_pool);
 	}
 
+	devm_kfree(&pdev->dev, priv->bm_pools);
+
 	return 0;
 }
 
