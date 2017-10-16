@@ -4129,26 +4129,25 @@ static void mv_pp2x_set_rx_mode(struct net_device *dev)
 		/* Put dev into UC promisc if MAC num greater than uc filter max */
 		if (netdev_uc_count(dev) > port->priv->pp2_cfg.uc_filter_max) {
 			mv_pp2x_set_rx_uc_multi(port);
-			return;
+		} else {
+			/* Remove old enries not in uc list except M2M entry */
+			mv_pp2x_prs_mac_entry_del(port,
+						  MVPP2_PRS_MAC_UC,
+						  MVPP2_DEL_MAC_NOT_IN_LIST);
+			/* Add all entries into to uc mac addr filter list */
+			netdev_for_each_uc_addr(ha, dev) {
+				err = mv_pp2x_prs_mac_da_accept(port,
+								ha->addr, true);
+				if (err)
+					netdev_err(dev,
+						   "[%2x:%2x:%2x:%2x:%2x:%x]add fail\n",
+						   ha->addr[0], ha->addr[1],
+						   ha->addr[2], ha->addr[3],
+						   ha->addr[4], ha->addr[5]);
+			}
+			/* Leave promisc mode */
+			mv_pp2x_prs_mac_uc_promisc_set(hw, id, false);
 		}
-		/* Remove old enries not in uc list except M2M entry */
-		mv_pp2x_prs_mac_entry_del(port,
-					  MVPP2_PRS_MAC_UC,
-					  MVPP2_DEL_MAC_NOT_IN_LIST);
-		/* Add all entries into to uc mac addr filter list */
-		netdev_for_each_uc_addr(ha, dev) {
-			err = mv_pp2x_prs_mac_da_accept(port,
-							ha->addr, true);
-			if (err)
-				netdev_err(dev,
-					   "[%2x:%2x:%2x:%2x:%2x:%x]add fail\n",
-					   ha->addr[0], ha->addr[1],
-					   ha->addr[2], ha->addr[3],
-					   ha->addr[4], ha->addr[5]);
-		}
-		/* Leave promisc mode */
-		mv_pp2x_prs_mac_uc_promisc_set(hw, id, false);
-		mv_pp2x_prs_mac_mc_promisc_set(hw, id, false);
 
 		if (dev->flags & IFF_ALLMULTI) {
 			mv_pp2x_set_rx_allmulti(port);
