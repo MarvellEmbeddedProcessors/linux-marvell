@@ -1033,10 +1033,6 @@ static void mv_pp2x_prs_dsa_tag_set(struct mv_pp2x_hw *hw, int port, bool add,
 		mv_pp2x_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_DSA);
 		pe.index = tid;
 
-		/* Shift 4 bytes if DSA tag or 8 bytes in case of EDSA tag*/
-		mv_pp2x_prs_sram_shift_set(&pe, shift,
-					   MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
-
 		/* Update shadow table */
 		mv_pp2x_prs_shadow_set(hw, pe.index, MVPP2_PRS_LU_DSA);
 
@@ -1045,12 +1041,26 @@ static void mv_pp2x_prs_dsa_tag_set(struct mv_pp2x_hw *hw, int port, bool add,
 			mv_pp2x_prs_tcam_data_byte_set(&pe, 0,
 						       MVPP2_PRS_TCAM_DSA_TAGGED_BIT,
 					MVPP2_PRS_TCAM_DSA_TAGGED_BIT);
-			/* Clear all ai bits for next iteration */
-			mv_pp2x_prs_sram_ai_update(&pe, 0,
-						   MVPP2_PRS_SRAM_AI_MASK);
-			/* If packet is tagged continue check vlans */
-			mv_pp2x_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_VLAN);
+
+			/* Set ai bits for next iteration */
+			if (extend)
+				mv_pp2x_prs_sram_ai_update(&pe, 1,
+							   MVPP2_PRS_SRAM_AI_MASK);
+			else
+				mv_pp2x_prs_sram_ai_update(&pe, 0,
+							   MVPP2_PRS_SRAM_AI_MASK);
+
+			/* Set result info bits to 'single vlan' */
+			mv_pp2x_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_SINGLE,
+						   MVPP2_PRS_RI_VLAN_MASK);
+
+			/* If packet is tagged continue check vid filtering */
+			mv_pp2x_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_VID);
 		} else {
+			/* Shift 4 bytes if DSA tag or 8 bytes in case of EDSA tag*/
+			mv_pp2x_prs_sram_shift_set(&pe, shift,
+						   MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+
 			/* Set result info bits to 'no vlans' */
 			mv_pp2x_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_NONE,
 						   MVPP2_PRS_RI_VLAN_MASK);
@@ -2080,8 +2090,15 @@ static void mv_pp2x_prs_vid_init(struct mv_pp2x_hw *hw)
 	pe.index = MVPP2_PE_VID_FLTR_DEFAULT;
 	mv_pp2x_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_VID);
 
+	mv_pp2x_prs_tcam_ai_update(&pe, 0,
+				   MVPP2_PRS_EDSA_VID_AI_BIT);
+
 	/* Skip VLAN header - Set offset to 4 bytes */
-	mv_pp2x_prs_sram_shift_set(&pe, MVPP2_VLAN_TAG_LEN, MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+	mv_pp2x_prs_sram_shift_set(&pe, MVPP2_VLAN_TAG_LEN,
+				   MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+
+	/* Clear all ai bits for next iteration */
+	mv_pp2x_prs_sram_ai_update(&pe, 0, MVPP2_PRS_SRAM_AI_MASK);
 
 	mv_pp2x_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_L2);
 
@@ -2091,6 +2108,33 @@ static void mv_pp2x_prs_vid_init(struct mv_pp2x_hw *hw)
 	/* Update shadow table and hw entry */
 	mv_pp2x_prs_shadow_set(hw, pe.index, MVPP2_PRS_LU_VID);
 	mv_pp2x_prs_hw_write(hw, &pe);
+
+	/* Set default vid entry for extended DSA*/
+	memset(&pe, 0, sizeof(struct mv_pp2x_prs_entry));
+
+	/* Set default vid  entry */
+	pe.index = MVPP2_PE_VID_EDSA_FLTR_DEFAULT;
+	mv_pp2x_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_VID);
+
+	mv_pp2x_prs_tcam_ai_update(&pe, MVPP2_PRS_EDSA_VID_AI_BIT,
+				   MVPP2_PRS_EDSA_VID_AI_BIT);
+
+	/* Skip VLAN header - Set offset to 8 bytes */
+	mv_pp2x_prs_sram_shift_set(&pe, MVPP2_VLAN_TAG_EDSA_LEN,
+				   MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+
+	/* Clear all ai bits for next iteration */
+	mv_pp2x_prs_sram_ai_update(&pe, 0, MVPP2_PRS_SRAM_AI_MASK);
+
+	mv_pp2x_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_L2);
+
+	/* Unmask all ports */
+	mv_pp2x_prs_tcam_port_map_set(&pe, MVPP2_PRS_PORT_MASK);
+
+	/* Update shadow table and hw entry */
+	mv_pp2x_prs_shadow_set(hw, pe.index, MVPP2_PRS_LU_VID);
+	mv_pp2x_prs_hw_write(hw, &pe);
+
 }
 
 /* Set entries for PPPoE ethertype */
@@ -2662,7 +2706,10 @@ void mv_pp2x_prs_mac_entry_del(struct mv_pp2x_port *port,
 }
 
 /* Write parser entry for default VID filtering */
-static int mv_pp2x_prs_vid_drop_entry_accept(struct net_device *dev, unsigned int tid, bool add)
+static int mv_pp2x_prs_vid_drop_entry_accept(struct net_device *dev,
+					     unsigned int tid,
+					     unsigned int shift,
+					     bool add)
 {
 	struct mv_pp2x_prs_entry *pe;
 	unsigned int pmap;
@@ -2706,10 +2753,13 @@ static int mv_pp2x_prs_vid_drop_entry_accept(struct net_device *dev, unsigned in
 	/* Continue - set next lookup */
 	mv_pp2x_prs_sram_next_lu_set(pe, MVPP2_PRS_LU_L2);
 
+	/* Skip VLAN header - Set offset to 4 or 8 bytes */
+	mv_pp2x_prs_sram_shift_set(pe, shift, MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+
 	mv_pp2x_prs_sram_ri_update(pe, MVPP2_PRS_RI_DROP_MASK, MVPP2_PRS_RI_DROP_MASK);
 
-	/* Skip VLAN header - Set offset to 4 bytes */
-	mv_pp2x_prs_sram_shift_set(pe, MVPP2_VLAN_TAG_LEN, MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+	/* Clear all ai bits for next iteration */
+	mv_pp2x_prs_sram_ai_update(pe, 0, MVPP2_PRS_SRAM_AI_MASK);
 
 	/* Update shadow table */
 	mv_pp2x_prs_shadow_set(hw, pe->index, MVPP2_PRS_LU_VID);
@@ -2780,6 +2830,7 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 	bool empty = false;
 	unsigned int pmap;
 	unsigned int mask = 0xfff;
+	unsigned int reg_val, shift;
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	unsigned int vid_start = MVPP2_PE_VID_FILT_RANGE_START + port->id * MVPP2_PRS_VLAN_FILT_MAX;
@@ -2791,6 +2842,13 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 		/*no need to add vid 0 to HW*/
 		return 0;
 
+	/* Check configured start header */
+	reg_val = mv_pp2x_read(hw, MVPP2_MH_REG(port->id));
+	if (reg_val & MVPP2_DSA_EXTENDED)
+		shift = MVPP2_VLAN_TAG_EDSA_LEN;
+	else
+		shift = MVPP2_VLAN_TAG_LEN;
+
 	/* No such entry */
 	if (!pe) {
 		if (!add)
@@ -2798,7 +2856,9 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 
 		empty = mv_pp2x_prs_tcam_vid_empty(hw, vid_start, vid_start + MVPP2_PRS_VLAN_FILT_MAX_ENTRY);
 		if (empty) {
-			rc = mv_pp2x_prs_vid_drop_entry_accept(dev, vid_start + MVPP2_PRS_VLAN_FILT_DFLT_ENTRY, true);
+			rc = mv_pp2x_prs_vid_drop_entry_accept(dev,
+							       vid_start + MVPP2_PRS_VLAN_FILT_DFLT_ENTRY,
+							       shift, true);
 			if (rc) {
 				netdev_err(dev, "failed to add default vid entry for non-match vlan packets (drop)\n");
 				return rc;
@@ -2837,7 +2897,9 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 		hw->prs_shadow[pe->index].valid = false;
 		empty = mv_pp2x_prs_tcam_vid_empty(hw, vid_start, vid_start + MVPP2_PRS_VLAN_FILT_MAX_ENTRY);
 		if (empty) {
-			rc = mv_pp2x_prs_vid_drop_entry_accept(dev, vid_start + MVPP2_PRS_VLAN_FILT_DFLT_ENTRY, false);
+			rc = mv_pp2x_prs_vid_drop_entry_accept(dev,
+							       vid_start + MVPP2_PRS_VLAN_FILT_DFLT_ENTRY,
+							       shift, false);
 			if (rc) {
 				netdev_err(dev, "failed to remove default vid for non-match vlan packets (drop)\n");
 				return rc;
@@ -2850,11 +2912,14 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 	/* Continue - set next lookup */
 	mv_pp2x_prs_sram_next_lu_set(pe, MVPP2_PRS_LU_L2);
 
+	/* Skip VLAN header - Set offset to 4 or 8 bytes */
+	mv_pp2x_prs_sram_shift_set(pe, shift, MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+
 	/* Set match on VID */
 	mv_pp2x_prs_match_vid(pe, MVPP2_PRS_VID_TCAM_BYTE, vid);
 
-	/* Skip VLAN header - Set offset to 4 bytes */
-	mv_pp2x_prs_sram_shift_set(pe, MVPP2_VLAN_TAG_LEN, MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+	/* Clear all ai bits for next iteration */
+	mv_pp2x_prs_sram_ai_update(pe, 0, MVPP2_PRS_SRAM_AI_MASK);
 
 	/* Update shadow table */
 	mv_pp2x_prs_shadow_set(hw, pe->index, MVPP2_PRS_LU_VID);
