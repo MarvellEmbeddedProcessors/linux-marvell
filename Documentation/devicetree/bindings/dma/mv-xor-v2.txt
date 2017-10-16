@@ -8,18 +8,8 @@ Required properties:
 - dma-bus-width: DMA address bus width
 - msi-parent: Phandle to the MSI-capable interrupt controller used for
   interrupts.
-- clocks: One or more clock gating clocks to be used to enable DMA engine
+- clocks: One ore more clock gating clocks to be used to enable DMA engine
   unit in the SoC.
-
-Optional properties:
-The below is relevant only if Marvell Userspace SDK (MUSDK) is in use:
-- musdk-mode (bool): Indicates whether the device is to be controlled by musdk framework.
-  In this case, the probe process of the device is skipped, in order not to create
-  a contention with the user-space drivers.
-  In some cases, when musdk mode is enabled, the device will be attached to a generic
-  uio instance, and this is why its not marked as "status=disabled".
-  For more info about attaching the device to generic-uio instance, see
-  Documentation/devicetree/bindings/uio/uio_pdrv_genirq.txt
 
 Example:
 
@@ -30,19 +20,5 @@ Example:
 		msi-parent = <&gic_odmi>;
 		clocks = <&gateclk 14>;
 		dma-coherent;
-		dma-width = <40>;
-	};
-
-
-	/* musdk-mode enabled example */
-	xor0@400000 {
-		compatible = "marvell,mv-xor-v2";
-		reg = <0x400000 0x1000>,
-		      <0x410000 0x1000>;
-		msi-parent = <&gic_odmi>;
-		clocks = <&gateclk 14>;
-		dma-coherent;
-		musdk-mode;
-		uio-name = "uio_dma_xor_0";
 		dma-width = <40>;
 	};
