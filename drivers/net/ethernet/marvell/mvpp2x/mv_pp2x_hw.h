@@ -293,6 +293,11 @@ static inline void mv_pp2x_bm_pool_put_virtual(struct mv_pp2x_hw *hw, u32 pool,
 					       dma_addr_t buf_phys_addr,
 					      u8 *buf_virt_addr, int cpu)
 {
+#if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT) && defined(CONFIG_PHYS_ADDR_T_64BIT)
+	mv_pp2x_relaxed_write(hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
+			      upper_32_bits(buf_phys_addr), cpu);
+#endif
+
 	mv_pp2x_relaxed_write(hw, MVPP2_BM_VIRT_RLS_REG,
 			      lower_32_bits((uintptr_t)buf_virt_addr), cpu);
 
