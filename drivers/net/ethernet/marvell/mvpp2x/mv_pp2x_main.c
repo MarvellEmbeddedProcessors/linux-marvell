@@ -5276,6 +5276,9 @@ skip_tso_buffers:
 	mv_pp2x_ptp_init(pdev, port, id);
 #endif
 
+	/* Populate network device of_node */
+	dev->dev.of_node = port_node;
+
 	return 0;
 	dev_err(&pdev->dev, "%s failed for port_id(%d)\n", __func__, id);
 
