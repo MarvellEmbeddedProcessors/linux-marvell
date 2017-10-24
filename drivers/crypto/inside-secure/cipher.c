@@ -28,7 +28,7 @@ struct safexcel_cipher_ctx {
 	unsigned int key_len;
 };
 
-struct safexcel_cipher_reqctx {
+struct safexcel_cipher_req {
 	enum safexcel_cipher_direction direction;
 	bool needs_inv;
 };
@@ -96,10 +96,10 @@ static int safexcel_context_control(struct safexcel_cipher_ctx *ctx,
 {
 	struct safexcel_crypto_priv *priv = ctx->priv;
 	struct ablkcipher_request *req = ablkcipher_request_cast(async);
-	struct safexcel_cipher_reqctx *rctx = ablkcipher_request_ctx(req);
+	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	int ctrl_size;
 
-	if (rctx->direction == SAFEXCEL_ENCRYPT)
+	if (sreq->direction == SAFEXCEL_ENCRYPT)
 		cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_CRYPTO_OUT;
 	else
 		cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_CRYPTO_IN;
@@ -359,7 +359,7 @@ static int safexcel_handle_result(struct safexcel_crypto_priv *priv, int ring,
 {
 
 	struct ablkcipher_request *req = ablkcipher_request_cast(async);
-	struct safexcel_cipher_reqctx *sreq = ablkcipher_request_ctx(req);
+	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	int err;
 
 	if (sreq->needs_inv) {
@@ -399,7 +399,7 @@ static int safexcel_send(struct crypto_async_request *async,
 			 int *commands, int *results)
 {
 	struct ablkcipher_request *req = ablkcipher_request_cast(async);
-	struct safexcel_cipher_reqctx *sreq = ablkcipher_request_ctx(req);
+	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	int ret;
 
 	if (sreq->needs_inv)
@@ -419,7 +419,7 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 	char __req_desc[sizeof(struct ablkcipher_request) +
 		tfm->crt_ablkcipher.reqsize] CRYPTO_MINALIGN_ATTR;
 	struct ablkcipher_request *req = (void *)__req_desc;
-	struct safexcel_cipher_reqctx *sreq = ablkcipher_request_ctx(req);
+	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	struct safexcel_inv_result result = { 0 };
 	int ret;
 
@@ -459,12 +459,12 @@ static int safexcel_aes(struct ablkcipher_request *req,
 			enum safexcel_cipher_direction dir, u32 mode)
 {
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
-	struct safexcel_cipher_reqctx *rctx = ablkcipher_request_ctx(req);
+	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	struct safexcel_crypto_priv *priv = ctx->priv;
 	int ret;
 
-	rctx->direction = dir;
-	rctx->needs_inv = false;
+	sreq->direction = dir;
+	sreq->needs_inv = false;
 	ctx->mode = mode;
 
 	/*
@@ -477,7 +477,7 @@ static int safexcel_aes(struct ablkcipher_request *req,
 	 */
 	if (ctx->base.ctxr) {
 		if (priv->eip_type == EIP197 && ctx->base.needs_inv) {
-			rctx->needs_inv = true;
+			sreq->needs_inv = true;
 			ctx->base.needs_inv = false;
 		}
 	} else {
@@ -521,7 +521,7 @@ static int safexcel_ablkcipher_cra_init(struct crypto_tfm *tfm)
 	ctx->base.send = safexcel_send;
 	ctx->base.handle_result = safexcel_handle_result;
 
-	tfm->crt_ablkcipher.reqsize = sizeof(struct safexcel_cipher_reqctx);
+	tfm->crt_ablkcipher.reqsize = sizeof(struct safexcel_cipher_req);
 
 	return 0;
 }
