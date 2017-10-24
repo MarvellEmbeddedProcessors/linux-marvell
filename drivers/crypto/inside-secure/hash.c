@@ -364,16 +364,17 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	}
 
 	ctx->base.ring = safexcel_select_ring(priv);
+	ring = ctx->base.ring;
 
-	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	enq_ret = ahash_enqueue_request(&priv->ring[ctx->base.ring].queue, areq);
-	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
+	spin_lock_bh(&priv->ring[ring].queue_lock);
+	enq_ret = ahash_enqueue_request(&priv->ring[ring].queue, areq);
+	spin_unlock_bh(&priv->ring[ring].queue_lock);
 
 	if (enq_ret != -EINPROGRESS)
 		*ret = enq_ret;
 
-	queue_work(priv->ring[ctx->base.ring].workqueue,
-		   &priv->ring[ctx->base.ring].work_data.work);
+	queue_work(priv->ring[ring].workqueue,
+		   &priv->ring[ring].work_data.work);
 
 	*should_complete = false;
 
@@ -445,6 +446,7 @@ static int safexcel_ahash_exit_inv(struct crypto_tfm *tfm)
 	AHASH_REQUEST_ON_STACK(req, __crypto_ahash_cast(tfm));
 	struct safexcel_ahash_req *sreq = ahash_request_ctx(req);
 	struct safexcel_inv_result result = { 0 };
+	int ring = ctx->base.ring;
 	int ret;
 
 	memset(req, 0, sizeof(struct ahash_request));
@@ -459,12 +461,12 @@ static int safexcel_ahash_exit_inv(struct crypto_tfm *tfm)
 	ctx->base.exit_inv = true;
 	sreq->needs_inv = true;
 
-	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	ret = ahash_enqueue_request(&priv->ring[ctx->base.ring].queue, req);
-	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
+	spin_lock_bh(&priv->ring[ring].queue_lock);
+	ret = ahash_enqueue_request(&priv->ring[ring].queue, req);
+	spin_unlock_bh(&priv->ring[ring].queue_lock);
 
-	queue_work(priv->ring[ctx->base.ring].workqueue,
-		   &priv->ring[ctx->base.ring].work_data.work);
+	queue_work(priv->ring[ring].workqueue,
+		   &priv->ring[ring].work_data.work);
 
 	wait_for_completion_interruptible(&result.completion);
 
@@ -483,7 +485,7 @@ static int safexcel_ahash_update(struct ahash_request *areq)
 	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
 	struct crypto_ahash *ahash = crypto_ahash_reqtfm(areq);
 	struct safexcel_crypto_priv *priv = ctx->priv;
-	int queued, len = req->len, ret;
+	int queued, len = req->len, ret, ring;
 	int cache_len = do_div(len, crypto_ahash_blocksize(ahash));
 
 	/*
@@ -590,12 +592,14 @@ static int safexcel_ahash_update(struct ahash_request *areq)
 			return -ENOMEM;
 	}
 
-	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	ret = ahash_enqueue_request(&priv->ring[ctx->base.ring].queue, areq);
-	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
+	ring = ctx->base.ring;
 
-	queue_work(priv->ring[ctx->base.ring].workqueue,
-		   &priv->ring[ctx->base.ring].work_data.work);
+	spin_lock_bh(&priv->ring[ring].queue_lock);
+	ret = ahash_enqueue_request(&priv->ring[ring].queue, areq);
+	spin_unlock_bh(&priv->ring[ring].queue_lock);
+
+	queue_work(priv->ring[ring].workqueue,
+		   &priv->ring[ring].work_data.work);
 
 	return ret;
 }

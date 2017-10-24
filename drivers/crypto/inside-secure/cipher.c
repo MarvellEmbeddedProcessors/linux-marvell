@@ -340,16 +340,17 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	}
 
 	ctx->base.ring = safexcel_select_ring(priv);
+	ring = ctx->base.ring;
 
-	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	enq_ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, req);
-	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
+	spin_lock_bh(&priv->ring[ring].queue_lock);
+	enq_ret = ablkcipher_enqueue_request(&priv->ring[ring].queue, req);
+	spin_unlock_bh(&priv->ring[ring].queue_lock);
 
 	if (enq_ret != -EINPROGRESS)
 		*ret = enq_ret;
 
-	queue_work(priv->ring[ctx->base.ring].workqueue,
-		   &priv->ring[ctx->base.ring].work_data.work);
+	queue_work(priv->ring[ring].workqueue,
+		   &priv->ring[ring].work_data.work);
 
 	*should_complete = false;
 
@@ -424,6 +425,7 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 	struct ablkcipher_request *req = (void *)__req_desc;
 	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	struct safexcel_inv_result result = { 0 };
+	int ring = ctx->base.ring;
 	int ret;
 
 	memset(req, 0, sizeof(struct ablkcipher_request));
@@ -438,12 +440,12 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 	ctx->base.exit_inv = true;
 	sreq->needs_inv = true;
 
-	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, req);
-	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
+	spin_lock_bh(&priv->ring[ring].queue_lock);
+	ret = ablkcipher_enqueue_request(&priv->ring[ring].queue, req);
+	spin_unlock_bh(&priv->ring[ring].queue_lock);
 
-	queue_work(priv->ring[ctx->base.ring].workqueue,
-		   &priv->ring[ctx->base.ring].work_data.work);
+	queue_work(priv->ring[ring].workqueue,
+		   &priv->ring[ring].work_data.work);
 
 	wait_for_completion_interruptible(&result.completion);
 
@@ -464,7 +466,7 @@ static int safexcel_aes(struct ablkcipher_request *req,
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
 	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	struct safexcel_crypto_priv *priv = ctx->priv;
-	int ret;
+	int ret, ring;
 
 	sreq->direction = dir;
 	sreq->needs_inv = false;
@@ -492,12 +494,14 @@ static int safexcel_aes(struct ablkcipher_request *req,
 			return -ENOMEM;
 	}
 
-	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, req);
-	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
+	ring = ctx->base.ring;
 
-	queue_work(priv->ring[ctx->base.ring].workqueue,
-		   &priv->ring[ctx->base.ring].work_data.work);
+	spin_lock_bh(&priv->ring[ring].queue_lock);
+	ret = ablkcipher_enqueue_request(&priv->ring[ring].queue, req);
+	spin_unlock_bh(&priv->ring[ring].queue_lock);
+
+	queue_work(priv->ring[ring].workqueue,
+		   &priv->ring[ring].work_data.work);
 
 	return ret;
 }
