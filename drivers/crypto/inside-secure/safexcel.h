@@ -657,6 +657,7 @@ struct safexcel_ahash_req {
 	bool last_req;
 	bool finish;
 	bool hmac;
+	bool needs_inv;
 
 	u8 state_sz;	/* expected sate size, only set once */
 	u32 state[SHA256_DIGEST_SIZE / sizeof(u32)];

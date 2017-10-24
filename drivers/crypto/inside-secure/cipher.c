@@ -30,6 +30,7 @@ struct safexcel_cipher_ctx {
 
 struct safexcel_cipher_reqctx {
 	enum safexcel_cipher_direction direction;
+	bool needs_inv;
 };
 
 /* Build cipher token */
@@ -130,7 +131,7 @@ static int safexcel_context_control(struct safexcel_cipher_ctx *ctx,
 }
 
 /* Handle a cipher result descriptor */
-static int safexcel_handle_result(struct safexcel_crypto_priv *priv, int ring,
+static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int ring,
 				  struct crypto_async_request *async,
 				  bool *should_complete, int *ret)
 {
@@ -263,7 +264,6 @@ static int safexcel_aes_send(struct crypto_async_request *async,
 		n_rdesc++;
 	}
 
-	ctx->base.handle_result = safexcel_handle_result;
 	request->req = &req->base;
 	list_add_tail(&request->list, &priv->ring[ring].list);
 
@@ -336,9 +336,7 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 		return ndesc;
 	}
 
-	ctx->base.needs_inv = false;
 	ctx->base.ring = safexcel_select_ring(priv);
-	ctx->base.send = safexcel_aes_send;
 
 	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
 	enq_ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, req);
@@ -355,6 +353,26 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	return ndesc;
 }
 
+static int safexcel_handle_result(struct safexcel_crypto_priv *priv, int ring,
+				  struct crypto_async_request *async,
+				  bool *should_complete, int *ret)
+{
+
+	struct ablkcipher_request *req = ablkcipher_request_cast(async);
+	struct safexcel_cipher_reqctx *sreq = ablkcipher_request_ctx(req);
+	int err;
+
+	if (sreq->needs_inv) {
+		sreq->needs_inv = false;
+		err = safexcel_handle_inv_result(priv, ring, async,
+						 should_complete, ret);
+	} else
+		err = safexcel_handle_req_result(priv, ring, async,
+						 should_complete, ret);
+
+	return err;
+}
+
 /* Send cipher invalidation command to the engine */
 static int safexcel_cipher_send_inv(struct crypto_async_request *async,
 				    int ring, struct safexcel_request *request,
@@ -364,8 +382,6 @@ static int safexcel_cipher_send_inv(struct crypto_async_request *async,
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
 	struct safexcel_crypto_priv *priv = ctx->priv;
 	int ret;
-
-	ctx->base.handle_result = safexcel_handle_inv_result;
 
 	ret = safexcel_invalidate_cache(async, &ctx->base, priv,
 					ctx->base.ctxr_dma, ring, request);
@@ -378,29 +394,49 @@ static int safexcel_cipher_send_inv(struct crypto_async_request *async,
 	return 0;
 }
 
+static int safexcel_send(struct crypto_async_request *async,
+			 int ring, struct safexcel_request *request,
+			 int *commands, int *results)
+{
+	struct ablkcipher_request *req = ablkcipher_request_cast(async);
+	struct safexcel_cipher_reqctx *sreq = ablkcipher_request_ctx(req);
+	int ret;
+
+	if (sreq->needs_inv)
+		ret = safexcel_cipher_send_inv(async, ring, request,
+					       commands, results);
+	else
+		ret = safexcel_aes_send(async, ring, request,
+					commands, results);
+	return ret;
+}
+
 /* Upon context exit, send invalidation command */
 static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 {
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
 	struct safexcel_crypto_priv *priv = ctx->priv;
-	struct ablkcipher_request req;
+	char __req_desc[sizeof(struct ablkcipher_request) +
+		tfm->crt_ablkcipher.reqsize] CRYPTO_MINALIGN_ATTR;
+	struct ablkcipher_request *req = (void *)__req_desc;
+	struct safexcel_cipher_reqctx *sreq = ablkcipher_request_ctx(req);
 	struct safexcel_inv_result result = { 0 };
 	int ret;
 
-	memset(&req, 0, sizeof(struct ablkcipher_request));
+	memset(req, 0, sizeof(struct ablkcipher_request));
 
 	/* create invalidation request */
 	init_completion(&result.completion);
-	ablkcipher_request_set_callback(&req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+	ablkcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
 					safexcel_inv_complete, &result);
 
-	ablkcipher_request_set_tfm(&req, __crypto_ablkcipher_cast(tfm));
-	ctx = crypto_tfm_ctx(req.base.tfm);
+	ablkcipher_request_set_tfm(req, __crypto_ablkcipher_cast(tfm));
+	ctx = crypto_tfm_ctx(req->base.tfm);
 	ctx->base.exit_inv = true;
-	ctx->base.send = safexcel_cipher_send_inv;
+	sreq->needs_inv = true;
 
 	spin_lock_bh(&priv->ring[ctx->base.ring].queue_lock);
-	ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, &req);
+	ret = ablkcipher_enqueue_request(&priv->ring[ctx->base.ring].queue, req);
 	spin_unlock_bh(&priv->ring[ctx->base.ring].queue_lock);
 
 	queue_work(priv->ring[ctx->base.ring].workqueue,
@@ -428,6 +464,7 @@ static int safexcel_aes(struct ablkcipher_request *req,
 	int ret;
 
 	rctx->direction = dir;
+	rctx->needs_inv = false;
 	ctx->mode = mode;
 
 	/*
@@ -439,11 +476,12 @@ static int safexcel_aes(struct ablkcipher_request *req,
 	 * If it's EIP97 with existing context, the send routine is already set.
 	 */
 	if (ctx->base.ctxr) {
-		if (priv->eip_type == EIP197 && ctx->base.needs_inv)
-			ctx->base.send = safexcel_cipher_send_inv;
+		if (priv->eip_type == EIP197 && ctx->base.needs_inv) {
+			rctx->needs_inv = true;
+			ctx->base.needs_inv = false;
+		}
 	} else {
 		ctx->base.ring = safexcel_select_ring(priv);
-		ctx->base.send = safexcel_aes_send;
 		ctx->base.ctxr = dma_pool_zalloc(priv->context_pool,
 						 EIP197_GFP_FLAGS(req->base),
 						 &ctx->base.ctxr_dma);
@@ -480,6 +518,8 @@ static int safexcel_ablkcipher_cra_init(struct crypto_tfm *tfm)
 		container_of(tfm->__crt_alg, struct safexcel_alg_template, alg.crypto);
 
 	ctx->priv = tmpl->priv;
+	ctx->base.send = safexcel_send;
+	ctx->base.handle_result = safexcel_handle_result;
 
 	tfm->crt_ablkcipher.reqsize = sizeof(struct safexcel_cipher_reqctx);
 
