@@ -74,10 +74,13 @@ static int safexcel_aes_setkey(struct crypto_ablkcipher *ctfm, const u8 *key,
 		return ret;
 	}
 
-	for (i = 0; i < len / sizeof(u32); i++) {
-		if (ctx->key[i] != cpu_to_le32(aes.key_enc[i])) {
-			ctx->base.needs_inv = true;
-			break;
+	/* if context exits and key changed, need to invalidate it */
+	if (ctx->base.ctxr_dma) {
+		for (i = 0; i < len / sizeof(u32); i++) {
+			if (ctx->key[i] != cpu_to_le32(aes.key_enc[i])) {
+				ctx->base.needs_inv = true;
+				break;
+			}
 		}
 	}
 
