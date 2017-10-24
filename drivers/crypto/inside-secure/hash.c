@@ -613,7 +613,7 @@ static int safexcel_ahash_final(struct ahash_request *areq)
 	 * Check if we need to invalidate the context,
 	 * this should be done only for EIP197 (no cache in EIP97).
 	 */
-	if (priv->eip_type == EIP197 && req->len &&
+	if (priv->eip_type == EIP197 && req->len && ctx->base.ctxr &&
 	    ctx->digest == CONTEXT_CONTROL_DIGEST_PRECOMPUTED)
 		ctx->base.needs_inv = safexcel_ahash_needs_inv_get(areq);
 
@@ -903,7 +903,7 @@ static int safexcel_hmac_sha1_setkey(struct crypto_ahash *tfm, const u8 *key,
 	 * For EIP197 we need to Check if the ipad/opad were changed,
 	 * if yes, need to invalidate the context.
 	 */
-	if (priv->eip_type == EIP197) {
+	if (priv->eip_type == EIP197 && ctx->base.ctxr) {
 		for (i = 0; i < ARRAY_SIZE(s0.state); i++) {
 			if (ctx->ipad[i] != le32_to_cpu(s0.state[i]) ||
 			    ctx->opad[i] != le32_to_cpu(s1.state[i])) {
