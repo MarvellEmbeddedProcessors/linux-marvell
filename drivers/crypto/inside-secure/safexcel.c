@@ -683,14 +683,15 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 	req = priv->ring[ring].req;
 	backlog = priv->ring[ring].backlog;
 
+	if (req)
+		goto handle_pending;
+
 	do {
 		/* get a new request if no ring saved req */
-		if (!req) {
-			spin_lock_bh(&priv->ring[ring].queue_lock);
-			backlog = crypto_get_backlog(&priv->ring[ring].queue);
-			req = crypto_dequeue_request(&priv->ring[ring].queue);
-			spin_unlock_bh(&priv->ring[ring].queue_lock);
-		}
+		spin_lock_bh(&priv->ring[ring].queue_lock);
+		backlog = crypto_get_backlog(&priv->ring[ring].queue);
+		req = crypto_dequeue_request(&priv->ring[ring].queue);
+		spin_unlock_bh(&priv->ring[ring].queue_lock);
 
 		/* no more requests, update ring saved req */
 		if (!req) {
@@ -700,6 +701,7 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 			goto finalize;
 		}
 
+handle_pending:
 		request = kzalloc(sizeof(*request), EIP197_GFP_FLAGS(*req));
 		if (!request)
 			goto resource_fail;
