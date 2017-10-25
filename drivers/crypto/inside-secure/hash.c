@@ -450,7 +450,6 @@ static int safexcel_ahash_exit_inv(struct crypto_tfm *tfm)
 	struct safexcel_ahash_req *sreq = ahash_request_ctx(req);
 	struct safexcel_inv_result result = { 0 };
 	int ring = ctx->base.ring;
-	int ret;
 
 	/* create invalidation request */
 	init_completion(&result.completion);
@@ -463,7 +462,7 @@ static int safexcel_ahash_exit_inv(struct crypto_tfm *tfm)
 	sreq->needs_inv = true;
 
 	spin_lock_bh(&priv->ring[ring].queue_lock);
-	ret = ahash_enqueue_request(&priv->ring[ring].queue, req);
+	ahash_enqueue_request(&priv->ring[ring].queue, req);
 	spin_unlock_bh(&priv->ring[ring].queue_lock);
 
 	queue_work(priv->ring[ring].workqueue,
@@ -477,7 +476,7 @@ static int safexcel_ahash_exit_inv(struct crypto_tfm *tfm)
 		return result.error;
 	}
 
-	return ret;
+	return 0;
 }
 
 static int safexcel_ahash_update(struct ahash_request *areq)
@@ -726,7 +725,7 @@ static void safexcel_ahash_cra_exit(struct crypto_tfm *tfm)
 	 */
 	if (priv->eip_type == EIP197) {
 		ret = safexcel_ahash_exit_inv(tfm);
-		if (ret != -EINPROGRESS)
+		if (ret)
 			dev_warn(priv->dev, "hash: invalidation error %d\n", ret);
 	} else {
 		dma_pool_free(priv->context_pool, ctx->base.ctxr,

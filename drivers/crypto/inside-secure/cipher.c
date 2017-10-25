@@ -429,7 +429,6 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	struct safexcel_inv_result result = { 0 };
 	int ring = ctx->base.ring;
-	int ret;
 
 	/* create invalidation request */
 	init_completion(&result.completion);
@@ -442,7 +441,7 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 	sreq->needs_inv = true;
 
 	spin_lock_bh(&priv->ring[ring].queue_lock);
-	ret = ablkcipher_enqueue_request(&priv->ring[ring].queue, req);
+	ablkcipher_enqueue_request(&priv->ring[ring].queue, req);
 	spin_unlock_bh(&priv->ring[ring].queue_lock);
 
 	queue_work(priv->ring[ring].workqueue,
@@ -457,7 +456,7 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm)
 		return result.error;
 	}
 
-	return ret;
+	return 0;
 }
 
 /* Encrypt/Decrypt operation - Insert request to Crypto API queue */
@@ -554,7 +553,7 @@ static void safexcel_ablkcipher_cra_exit(struct crypto_tfm *tfm)
 	 */
 	if (priv->eip_type == EIP197) {
 		ret = safexcel_cipher_exit_inv(tfm);
-		if (ret != -EINPROGRESS)
+		if (ret)
 			dev_warn(priv->dev, "cipher: invalidation error %d\n",
 				 ret);
 	} else {
