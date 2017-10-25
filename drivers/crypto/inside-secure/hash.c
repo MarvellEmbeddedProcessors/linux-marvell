@@ -821,7 +821,7 @@ static int safexcel_hmac_prepare_pad(struct ahash_request *areq, u8 *pad,
 	req->last_req = 1;
 	req->finish = finish;
 	ret = safexcel_ahash_update(areq);
-	if (ret && ret != -EINPROGRESS)
+	if (ret && ret != -EINPROGRESS && ret != -EBUSY)
 		return ret;
 
 	wait_for_completion_interruptible(&result.completion);
