@@ -740,7 +740,7 @@ finalize:
 		priv->ring[ring].busy = 1;
 
 		val = EIP197_HIA_RDR_THRESH_PKT_MODE |
-			EIP197_HIA_RDR_THRESH_PROC_PKT(min(priv->ring[ring].egress_cnt,
+			EIP197_HIA_RDR_THRESH_PROC_PKT(min_t(int, priv->ring[ring].egress_cnt,
 							   EIP197_MAX_BATCH_SZ));
 		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_THRESH);
 	}
@@ -946,7 +946,7 @@ more_results:
 	spin_lock_bh(&priv->ring[ring].egress_lock);
 
 	/* get the pending request count */
-	egress_cnt = min(priv->ring[ring].egress_cnt, EIP197_MAX_BATCH_SZ);
+	egress_cnt = min_t(int, priv->ring[ring].egress_cnt, EIP197_MAX_BATCH_SZ);
 
 	if (!egress_cnt) {
 		/* no more request in ring */
