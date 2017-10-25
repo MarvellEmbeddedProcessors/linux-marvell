@@ -278,6 +278,9 @@ send_command:
 
 	list_add_tail(&request->list, &priv->ring[ring].list);
 
+	/* update the ring request count */
+	priv->ring[ring].egress_cnt++;
+
 	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	req->len += areq->nbytes;

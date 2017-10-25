@@ -731,10 +731,7 @@ resource_fail:
 	priv->ring[ring].backlog = backlog;
 
 finalize:
-	spin_lock_bh(&priv->ring[ring].lock);
-
-	/* update the ring request count */
-	priv->ring[ring].egress_cnt += nreq;
+	spin_lock_bh(&priv->ring[ring].egress_lock);
 
 	if (!priv->ring[ring].busy && priv->ring[ring].egress_cnt) {
 		/* Configure when we want an interrupt */
@@ -746,7 +743,7 @@ finalize:
 		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) + EIP197_HIA_xDR_THRESH);
 	}
 
-	spin_unlock_bh(&priv->ring[ring].lock);
+	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	if (nreq) {
 		/* let the RDR know we have pending descriptors */
@@ -871,6 +868,9 @@ int safexcel_invalidate_cache(struct crypto_async_request *async,
 	request->req = async;
 	list_add_tail(&request->list, &priv->ring[ring].list);
 
+	/* update the ring request count */
+	priv->ring[ring].egress_cnt++;
+
 	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	return 0;
@@ -889,7 +889,7 @@ static void safexcel_handle_result_descriptor(struct safexcel_crypto_priv *priv,
 {
 	struct safexcel_request *sreq;
 	struct safexcel_context *ctx;
-	int ret, i, ndesc, ndesc_tot, nreq_cnt, nreq_tot;
+	int ret, i, ndesc, ndesc_tot, nreq_cnt;
 	u32 val, results;
 	bool should_complete;
 	int egress_cnt;
@@ -899,13 +899,13 @@ more_results:
 	results = (results >> EIP197_xDR_PROC_xD_PKT_OFFSET) & EIP197_xDR_PROC_xD_PKT_MASK;
 
 	nreq_cnt = 0;
-	nreq_tot = 0;
 	ndesc_tot = 0;
 
 	for (i = 0; i < results; i++) {
 		spin_lock_bh(&priv->ring[ring].egress_lock);
 		sreq = list_first_entry(&priv->ring[ring].list, struct safexcel_request, list);
 		list_del(&sreq->list);
+		priv->ring[ring].egress_cnt--;
 		spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 		ctx = crypto_tfm_ctx(sreq->req->tfm);
@@ -936,20 +936,13 @@ more_results:
 
 		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) +
 		       EIP197_HIA_xDR_PROC_COUNT);
-
-		nreq_tot += nreq_cnt;
 	}
-
-	spin_lock_bh(&priv->ring[ring].lock);
-
-	/* update the ring request count */
-	priv->ring[ring].egress_cnt -= nreq_tot;
 
 	/* more results ready in the ring? */
-	if (results == EIP197_xDR_PROC_xD_PKT_MASK) {
-		spin_unlock_bh(&priv->ring[ring].lock);
+	if (results == EIP197_xDR_PROC_xD_PKT_MASK)
 		goto more_results;
-	}
+
+	spin_lock_bh(&priv->ring[ring].egress_lock);
 
 	/* get the pending request count */
 	egress_cnt = min(priv->ring[ring].egress_cnt, EIP197_MAX_BATCH_SZ);
@@ -957,7 +950,7 @@ more_results:
 	if (!egress_cnt) {
 		/* no more request in ring */
 		priv->ring[ring].busy = 0;
-		spin_unlock_bh(&priv->ring[ring].lock);
+		spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 		return;
 	}
@@ -969,7 +962,7 @@ more_results:
 	writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(ring) +
 	       EIP197_HIA_xDR_THRESH);
 
-	spin_unlock_bh(&priv->ring[ring].lock);
+	spin_unlock_bh(&priv->ring[ring].egress_lock);
 }
 
 /* dequeue from Crypto API FIFO and insert requests into HW ring */
