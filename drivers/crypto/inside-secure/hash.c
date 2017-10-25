@@ -452,8 +452,6 @@ static int safexcel_ahash_exit_inv(struct crypto_tfm *tfm)
 	int ring = ctx->base.ring;
 	int ret;
 
-	memset(req, 0, sizeof(struct ahash_request));
-
 	/* create invalidation request */
 	init_completion(&result.completion);
 	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
