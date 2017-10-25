@@ -701,10 +701,8 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 		}
 
 		request = kzalloc(sizeof(*request), EIP197_GFP_FLAGS(*req));
-		if (!request) {
-			ret = -ENOMEM;
+		if (!request)
 			goto resource_fail;
-		}
 
 		ctx = crypto_tfm_ctx(req->tfm);
 		ret = ctx->send(req, ring, request, &commands, &results);
