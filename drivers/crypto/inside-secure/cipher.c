@@ -270,6 +270,9 @@ static int safexcel_aes_send(struct crypto_async_request *async,
 	request->req = &req->base;
 	list_add_tail(&request->list, &priv->ring[ring].list);
 
+	/* update the ring request count */
+	priv->ring[ring].egress_cnt++;
+
 	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	*commands = n_cdesc;
