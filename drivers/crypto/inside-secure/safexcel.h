@@ -626,7 +626,6 @@ struct safexcel_crypto_priv {
 
 		spinlock_t queue_lock;
 		struct crypto_queue queue;
-		bool need_dequeue;
 	} ring[EIP197_MAX_RINGS];
 
 	int id;
