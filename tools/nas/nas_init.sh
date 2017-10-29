@@ -614,6 +614,7 @@ else # RAID TOPOLOGY
 	echo 100000 > /sys/block/md0/md/sync_speed_min
 
 	echo $CPU_COUNT > /sys/block/md0/md/group_thread_cnt
+	echo          1 > /sys/block/md0/md/skip_copy
 
 	set +o verbose
 	echo -ne "[Done]\n"
