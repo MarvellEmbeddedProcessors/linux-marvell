@@ -91,7 +91,6 @@ static u16 tx_queue_size = MVPP2_MAX_TXD;
 static u16 buffer_scaling = 100;
 static u32 port_cpu_bind_map;
 static u8 first_bm_pool;
-static u8 first_addr_space;
 static u8 first_log_rxq_queue;
 static u8 uc_filter_max = 4;
 static u16 stats_delay_msec = STATS_DELAY;
@@ -176,9 +175,6 @@ MODULE_PARM_DESC(port_cpu_bind_map,
 
 module_param(first_bm_pool, byte, S_IRUGO);
 MODULE_PARM_DESC(first_bm_pool, "First used buffer pool (0-11)");
-
-module_param(first_addr_space, byte, S_IRUGO);
-MODULE_PARM_DESC(first_addr_space, "First used PPV22 address space (0-8)");
 
 module_param(first_log_rxq_queue, byte, S_IRUGO);
 MODULE_PARM_DESC(first_log_rxq_queue, "First logical rx_queue (0-31)");
@@ -1156,9 +1152,7 @@ static void mv_pp2x_txq_done(struct mv_pp2x_port *port,
 	}
 #endif /* DEV_NETMAP */
 
-	tx_done = mv_pp2x_txq_sent_desc_proc(port,
-					     QV_CPU_2_THR(txq_pcpu->cpu),
-					     txq->id);
+	tx_done = mv_pp2x_txq_sent_desc_proc(port, txq_pcpu->cpu, txq->id);
 	if (!tx_done)
 		return;
 
@@ -1606,8 +1600,7 @@ void mv_pp2x_cleanup_txqs(struct mv_pp2x_port *port)
 	if (port->priv->pp2_version == PPV22)
 		for_each_present_cpu(cpu)
 			for (queue = 0; queue < port->num_tx_queues; queue++)
-				mv_pp2x_txq_sent_desc_proc(port, QV_CPU_2_THR(cpu),
-							   port->txqs[queue]->id);
+				mv_pp2x_txq_sent_desc_proc(port, cpu, port->txqs[queue]->id);
 	else
 		on_each_cpu(mv_pp2x_txq_sent_counter_clear, port, 1);
 
@@ -1667,8 +1660,7 @@ int mv_pp2x_setup_txqs(struct mv_pp2x_port *port)
 	if (port->priv->pp2_version == PPV22)
 		for_each_present_cpu(cpu)
 			for (queue = 0; queue < port->num_tx_queues; queue++)
-				mv_pp2x_txq_sent_desc_proc(port, QV_CPU_2_THR(cpu),
-							   port->txqs[queue]->id);
+				mv_pp2x_txq_sent_desc_proc(port, cpu, port->txqs[queue]->id);
 	else
 		on_each_cpu(mv_pp2x_txq_sent_counter_clear, port, 1);
 
@@ -1729,7 +1721,7 @@ static irqreturn_t mv_pp2_link_change_isr(int irq, void *data)
 
 int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 {
-	int qvec_id, cpu, err;
+	int qvec_id, err;
 	struct queue_vector *qvec;
 
 	/* Rx/TX irq's */
@@ -1741,8 +1733,7 @@ int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 				  qvec->irq_name, qvec);
 		pr_debug("%s interrupt request\n", qvec->irq_name);
 		if (qvec->qv_type == MVPP2_PRIVATE) {
-			cpu = QV_THR_2_CPU(qvec->sw_thread_id);
-			irq_set_affinity_hint(qvec->irq, cpumask_of(cpu));
+			irq_set_affinity_hint(qvec->irq, cpumask_of(qvec->sw_thread_id));
 			if (port->priv->pp2_cfg.queue_mode ==
 				MVPP2_QDIST_MULTI_MODE)
 				irq_set_status_flags(qvec->irq,
@@ -3543,7 +3534,7 @@ static int mv_pp21_poll(struct napi_struct *napi, int budget)
 static int mv_pp22_poll(struct napi_struct *napi, int budget)
 {
 	u32 cause_rx_tx, cause_rx, cause_tx;
-	int rx_done = 0, cpu;
+	int rx_done = 0;
 	struct mv_pp2x_port *port = netdev_priv(napi->dev);
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	struct queue_vector *q_vec = container_of(napi,
@@ -3558,7 +3549,7 @@ static int mv_pp22_poll(struct napi_struct *napi, int budget)
 						  MVPP2_ISR_RX_TX_CAUSE_REG(port->id));
 	pr_debug("%s port_id(%d), q_vec(%d), cpuId(%d), sw_thread_id(%d), isr_tx_rx(0x%x)\n",
 		 __func__, port->id, (int)(q_vec - port->q_vector),
-		QV_THR_2_CPU(q_vec->sw_thread_id), q_vec->sw_thread_id, cause_rx_tx);
+		q_vec->sw_thread_id, q_vec->sw_thread_id, cause_rx_tx);
 
 	/*Process misc errors */
 	mv_pp2x_cause_misc_handle(port, hw, cause_rx_tx);
@@ -3566,10 +3557,8 @@ static int mv_pp22_poll(struct napi_struct *napi, int budget)
 	/* Release TX descriptors */
 	cause_tx = (cause_rx_tx & MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK) >>
 			MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET;
-	if (cause_tx) {
-		cpu = QV_THR_2_CPU(q_vec->sw_thread_id);
-		mv_pp2x_tx_done(port, cause_tx, cpu);
-	}
+	if (cause_tx)
+		mv_pp2x_tx_done(port, cause_tx, q_vec->sw_thread_id);
 
 	/* Process RX packets */
 	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
@@ -4606,7 +4595,7 @@ static int mv_pp2_num_cpu_irqs(struct mv_pp2x_port *port)
 static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 {
 	int cpu;
-	int sw_thread_index = first_addr_space, irq_index = first_addr_space;
+	int sw_thread_index = 0, irq_index = 0;
 	struct queue_vector *q_vec = &port->q_vector[0];
 	struct net_device  *net_dev = port->dev;
 
@@ -4674,7 +4663,7 @@ static void mv_pp2x_port_irq_names_update(struct mv_pp2x_port *port)
 		if (!q_vec[i].irq)
 			continue;
 		if (q_vec[i].qv_type == MVPP2_PRIVATE) {
-			cpu = QV_THR_2_CPU(q_vec[i].sw_thread_id);
+			cpu = q_vec[i].sw_thread_id;
 			snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s%d",
 				 str_common, "cpu", cpu);
 		} else {
@@ -5002,7 +4991,7 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 			qvec = &port->q_vector[qvec_id];
 			if (!qvec->irq)
 				continue;
-			if (qvec->qv_type == MVPP2_PRIVATE && QV_THR_2_CPU(qvec->sw_thread_id) == cpu) {
+			if (qvec->qv_type == MVPP2_PRIVATE && qvec->sw_thread_id == cpu) {
 				irq_set_affinity_hint(qvec->irq, cpumask_of(cpu));
 				on_each_cpu_mask(&cpus_mask, mv_pp2x_interrupts_unmask, port, 1);
 				if (port->priv->pp2_cfg.queue_mode ==
@@ -5614,7 +5603,7 @@ static int mv_pp2x_init_config(struct mv_pp2x_param_config *pp2_cfg,
 {
 	pp2_cfg->cell_index = cell_index;
 	pp2_cfg->first_bm_pool = first_bm_pool;
-	pp2_cfg->first_sw_thread = first_addr_space;
+	pp2_cfg->first_sw_thread = 0;
 	pp2_cfg->first_log_rxq = first_log_rxq_queue;
 	pp2_cfg->queue_mode = mv_pp2x_queue_mode;
 	pp2_cfg->rx_cpu_map = port_cpu_bind_map;
@@ -6047,8 +6036,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	for_each_present_cpu(cpu) {
 		hw->cpu_base[cpu] = hw->base;
 		if (priv->pp2xdata->multi_addr_space) {
-			hw->cpu_base[cpu] +=
-				(first_addr_space + i) * MVPP2_ADDR_SPACE_SIZE;
+			hw->cpu_base[cpu] += i * MVPP2_ADDR_SPACE_SIZE;
 			i++;
 		}
 	}

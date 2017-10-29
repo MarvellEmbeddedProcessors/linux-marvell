@@ -182,10 +182,6 @@
 #define RX_TRUE_SIZE(total_size)	roundup_pow_of_two(total_size)
 extern  u32 debug_param;
 
-/* Convert cpu_id to sw_thread_id */
-#define QV_THR_2_CPU(sw_thread_id)	(sw_thread_id - first_addr_space)
-#define QV_CPU_2_THR(cpu_id)		(first_addr_space + cpu_id)
-
 /* Used for define type of data saved in shadow: SKB or extended buffer or nothing */
 #define MVPP2_ETH_SHADOW_SKB		0x1
 #define MVPP2_ETH_SHADOW_EXT		0x2
