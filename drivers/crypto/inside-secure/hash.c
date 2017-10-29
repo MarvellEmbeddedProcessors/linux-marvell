@@ -337,7 +337,6 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	struct ahash_request *areq = ahash_request_cast(async);
 	struct crypto_ahash *ahash = crypto_ahash_reqtfm(areq);
 	struct safexcel_ahash_ctx *ctx = crypto_ahash_ctx(ahash);
-	int enq_ret;
 
 	*ret = 0;
 
@@ -370,11 +369,8 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	ring = ctx->base.ring;
 
 	spin_lock_bh(&priv->ring[ring].queue_lock);
-	enq_ret = ahash_enqueue_request(&priv->ring[ring].queue, areq);
+	ahash_enqueue_request(&priv->ring[ring].queue, areq);
 	spin_unlock_bh(&priv->ring[ring].queue_lock);
-
-	if (enq_ret != -EINPROGRESS)
-		*ret = enq_ret;
 
 	queue_work(priv->ring[ring].workqueue,
 		   &priv->ring[ring].work_data.work);

@@ -307,7 +307,7 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	struct ablkcipher_request *req = ablkcipher_request_cast(async);
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(req->base.tfm);
 	struct safexcel_result_desc *rdesc;
-	int ndesc = 0, enq_ret;
+	int ndesc = 0;
 
 	*ret = 0;
 
@@ -346,11 +346,8 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	ring = ctx->base.ring;
 
 	spin_lock_bh(&priv->ring[ring].queue_lock);
-	enq_ret = ablkcipher_enqueue_request(&priv->ring[ring].queue, req);
+	ablkcipher_enqueue_request(&priv->ring[ring].queue, req);
 	spin_unlock_bh(&priv->ring[ring].queue_lock);
-
-	if (enq_ret != -EINPROGRESS)
-		*ret = enq_ret;
 
 	queue_work(priv->ring[ring].workqueue,
 		   &priv->ring[ring].work_data.work);
