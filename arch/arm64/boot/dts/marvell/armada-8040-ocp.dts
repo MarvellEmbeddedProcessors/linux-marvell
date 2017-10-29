@@ -156,17 +156,19 @@
 			cps_comphy: comphy {
 				status = "okay";
 			};
+			/* cps_usb3h0 is USB2 only (UTMI) */
 			cps_usb3h0: usb3@500000 {
 				usb-phy = <&cps_usb3h0_phy>;
-				separated-phys-for-usb2-usb3;
-				phys = <&cps_utmi0>,
-				       <&cps_comphy 2 COMPHY_USB3H0>;
-				phy-names = "usb2", "usb3";
+				phys = <&cps_utmi0>;
+				phy-names = "usb2";
 				status = "okay";
 			};
 			cps_usb3h0_phy: usb3_phy0 {
 				compatible = "usb-nop-xceiv";
 				vcc-supply = <&reg_usb3h0_vbus>;
+			};
+			cps_utmi0: utmi@580000 {
+				status = "okay";
 			};
 			gop {
 				cps_emac0: mac0 {
