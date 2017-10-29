@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="6.2"
+VERSION="6.3"
 PREPARE_HDD="no"
 MKFS="no"
 HDD_NUM=""
