@@ -833,7 +833,6 @@ void safexcel_inv_complete(struct crypto_async_request *req, int error)
 
 /* Context cache invalidation */
 int safexcel_invalidate_cache(struct crypto_async_request *async,
-			      struct safexcel_context *ctx,
 			      struct safexcel_crypto_priv *priv,
 			      dma_addr_t ctxr_dma,
 			      int ring, struct safexcel_request *request)
