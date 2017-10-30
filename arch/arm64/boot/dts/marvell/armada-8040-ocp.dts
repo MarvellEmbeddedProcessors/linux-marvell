@@ -160,7 +160,7 @@
 			cps_usb3h0: usb3@500000 {
 				usb-phy = <&cps_usb3h0_phy>;
 				phys = <&cps_utmi0>;
-				phy-names = "usb2";
+				phy-names = "usb";
 				status = "okay";
 			};
 			cps_usb3h0_phy: usb3_phy0 {
