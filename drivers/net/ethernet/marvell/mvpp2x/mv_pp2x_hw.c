@@ -1997,8 +1997,8 @@ static int mv_pp2x_prs_etype_init(struct mv_pp2x_hw *hw)
 
 /* Configure vlan entries and detect up to 2 successive VLAN tags.
  * Possible options:
- * 0x8100, 0x88A8
- * 0x8100, 0x8100
+ * 0x88A8, 0x8100 (outer, inner)
+ * 0x8100, 0x8100 (outer, inner)
  * 0x8100
  * 0x88A8
  */
@@ -2013,8 +2013,8 @@ static int mv_pp2x_prs_vlan_init(struct platform_device *pdev,
 					    GFP_KERNEL);
 	if (!hw->prs_double_vlans)
 		return -ENOMEM;
-	/* Double VLAN: 0x8100, 0x88A8 */
-	err = mv_pp2x_prs_double_vlan_add(hw, ETH_P_8021Q, ETH_P_8021AD,
+	/* Double VLAN: 0x88A8, 0x8100 */
+	err = mv_pp2x_prs_double_vlan_add(hw, ETH_P_8021AD, ETH_P_8021Q,
 					  MVPP2_PRS_PORT_MASK);
 	if (err)
 		return err;
