@@ -84,6 +84,8 @@
 				bus-width = <4>;
 				no-1-8-v;
 				non-removable; /* For now, need to configure the GPIO for card detect */
+				pinctrl-names = "default";
+				pinctrl-0 = <&ap_emmc_pins>;
 				status = "okay";
 			};
 		};

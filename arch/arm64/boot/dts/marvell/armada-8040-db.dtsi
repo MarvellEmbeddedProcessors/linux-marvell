@@ -62,6 +62,8 @@
 				marvell,xenon-emmc;
 				bus-width = <8>;
 				non-removable;
+				pinctrl-names = "default";
+				pinctrl-0 = <&ap_emmc_pins>;
 			};
 			spi0: spi@510600 {
 				status = "disabled";
@@ -172,6 +174,7 @@
 			sdhci@780000 {
 				bus-width = <4>;
 				non-removable;
+				pinctrl-0 = <&cpm_sdhci_pins>;
 			};
 		};
 
