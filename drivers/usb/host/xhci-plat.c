@@ -123,6 +123,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	struct clk              *clk;
 	int			ret;
 	int			irq;
+	struct regulator	*current_limiter_regulator;
 
 	if (usb_disabled())
 		return -ENODEV;
@@ -211,6 +212,15 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		ret = usb_phy_init(hcd->usb_phy);
 		if (ret)
 			goto put_usb3_hcd;
+
+		current_limiter_regulator =
+			devm_regulator_get_optional((hcd->usb_phy)->dev,
+						    "current-limiter");
+		if (!IS_ERR(current_limiter_regulator)) {
+			if (regulator_enable(current_limiter_regulator))
+				dev_err(&pdev->dev,
+					"Failed to enable Current-limiter regulator\n");
+		}
 	}
 
 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)

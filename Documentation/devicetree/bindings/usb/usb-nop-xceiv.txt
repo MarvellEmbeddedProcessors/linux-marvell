@@ -15,6 +15,8 @@ Optional properties:
 
 - vcc-supply: phandle to the regulator that provides power to the PHY.
 
+- current-limiter-supply: phandle to the regulator that set the current limit to the PHY.
+
 - reset-gpios: Should specify the GPIO for reset.
 
 - vbus-detect-gpio: should specify the GPIO detecting a VBus insertion
@@ -30,6 +32,7 @@ Example:
 		clocks = <&osc 0>;
 		clock-names = "main_clk";
 		vcc-supply = <&hsusb1_vcc_regulator>;
+		current-limiter-supply = <&hsusb1_current_limiter_regulator>;
 		reset-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
 		vbus-detect-gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
 		vbus-regulator = <&vbus_regulator>;
