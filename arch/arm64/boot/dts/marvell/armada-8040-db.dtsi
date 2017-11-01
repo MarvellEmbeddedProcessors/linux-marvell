@@ -181,6 +181,7 @@
 		cp0_usb3h0_phy: cp0_usb3_phy0 {
 			compatible = "usb-nop-xceiv";
 			vcc-supply = <&cp0_reg_usb3h0_vbus>;
+			current-limiter-supply = <&cp0_reg_usb3h0_current_limiter>;
 		};
 
 		cp0_reg_usb3h0_vbus: cp0_usb3-vbus0 {
@@ -192,9 +193,17 @@
 			gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
 		};
 
+		cp0_reg_usb3h0_current_limiter: cp0_usb3-current-limiter0 {
+			compatible = "regulator-fixed";
+			regulator-name = "cp0-usb3-current-limiter-h0";
+			enable-active-high;
+			gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
+		};
+
 		cp0_usb3h1_phy: cp0_usb3_phy1 {
 			compatible = "usb-nop-xceiv";
 			vcc-supply = <&cp0_reg_usb3h1_vbus>;
+			current-limiter-supply = <&cp0_reg_usb3h1_current_limiter>;
 		};
 
 		cp0_reg_usb3h1_vbus: cp0_usb3-vbus1 {
@@ -204,6 +213,13 @@
 			regulator-max-microvolt = <5000000>;
 			enable-active-high;
 			gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
+		};
+
+		cp0_reg_usb3h1_current_limiter: cp0_usb3-current-limiter1 {
+			compatible = "regulator-fixed";
+			regulator-name = "cp0-usb3-current-limiter-h1";
+			enable-active-high;
+			gpio = <&expander0 5 GPIO_ACTIVE_HIGH>;
 		};
 	};
 
@@ -271,6 +287,7 @@
 		cp1_usb3h0_phy: cp1_usb3_phy0 {
 			compatible = "usb-nop-xceiv";
 			vcc-supply = <&cp1_reg_usb3h0_vbus>;
+			current-limiter-supply = <&cp1_reg_usb3h0_current_limiter>;
 		};
 
 		cp1_reg_usb3h0_vbus: cp1_usb3-vbus0 {
@@ -280,6 +297,13 @@
 			regulator-max-microvolt = <5000000>;
 			enable-active-high;
 			gpio = <&expander1 0 GPIO_ACTIVE_HIGH>;
+		};
+
+		cp1_reg_usb3h0_current_limiter: cp1_usb3-current-limiter0 {
+			compatible = "regulator-fixed";
+			regulator-name = "cp1-usb3-current-limiter-h0";
+			enable-active-high;
+			gpio = <&expander1 4 GPIO_ACTIVE_HIGH>;
 		};
 	};
 };
