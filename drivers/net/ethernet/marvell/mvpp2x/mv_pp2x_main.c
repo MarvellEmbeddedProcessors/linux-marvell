@@ -72,6 +72,8 @@
 #define MVPP2_ADDRESS 0xf2000000
 #define CPN110_ADDRESS_SPACE_SIZE (16 * 1024 * 1024)
 
+#define UIO_BASE_STRING "uio_pp_"
+
 /* Declaractions */
 #if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
 u8 mv_pp2x_num_cos_queues = 1;
@@ -5625,10 +5627,34 @@ static void mv_pp22_init_rxfhindir(struct mv_pp2x *pp2)
 		pp2->rx_indir_table[i] = i % online_cpus;
 }
 
+static int mv_pp22_uio_mem_map(struct mv_pp2x_uio *pp2x_uio, struct resource *res)
+{
+	struct uio_mem	*uio_mem = &pp2x_uio->u_info.mem[pp2x_uio->num_maps];
+
+	if (pp2x_uio->num_maps >= MAX_UIO_MAPS) {
+		pr_err("Too many UIO maps requests\n");
+		return -ENOSPC;
+	}
+
+	uio_mem->memtype = UIO_MEM_PHYS;
+	uio_mem->addr = res->start & PAGE_MASK;
+	uio_mem->size = PAGE_ALIGN(resource_size(res));
+	uio_mem->name = res->name;
+
+	pp2x_uio->num_maps++;
+
+	pr_debug("uio: addr(%llx) size(%llx) name(%s) map_num(%d)\n",
+		 uio_mem->addr, uio_mem->size, uio_mem->name,
+		 pp2x_uio->num_maps);
+
+	return 0;
+}
+
 static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 				     struct mv_pp2x *priv,	u32 *cell_index, int *port_count)
 {
 	struct mv_pp2x_hw *hw = &priv->hw;
+	struct mv_pp2x_uio *uio = &priv->uio;
 	static bool cell_index_dts_flag;
 	const struct of_device_id *match;
 	struct device_node *dn = pdev->dev.of_node;
@@ -5653,7 +5679,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 	 */
 	if (auto_cell_index && cell_index_dts_flag)
 		return -ENXIO;
-
 	/* PPV2 Address Space */
 	if (priv->pp2xdata->pp2x_ver == PPV21) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -5673,6 +5698,11 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		hw->base = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(hw->base))
 			return PTR_ERR(hw->base);
+		/* Map "pp" to uio */
+		err = mv_pp22_uio_mem_map(uio, res);
+		if (err)
+			return err;
+
 		/* xmib */
 		res = platform_get_resource_byname(pdev,
 						   IORESOURCE_MEM, "xmib");
@@ -5719,6 +5749,11 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 			return PTR_ERR(hw->gop.gop_110.mspg_base);
 		mspg_base = res->start;
 		mspg_end  = res->end;
+
+		/* Map "mspg" to uio */
+		err = mv_pp22_uio_mem_map(uio, res);
+		if (err)
+			return err;
 
 		/* xpcs */
 		res = platform_get_resource_byname(pdev,
@@ -6122,11 +6157,20 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, priv);
 
+	if (priv->pp2_version == PPV22) {
+		priv->uio.u_info.name = kasprintf(GFP_KERNEL, "%s%d", UIO_BASE_STRING, cell_index);
+		priv->uio.u_info.version = "0.1";
+		err = uio_register_device(&pdev->dev, &priv->uio.u_info);
+		if (err) {
+			dev_err(&pdev->dev, "Failed to register uio device\n");
+			goto err_clk;
+		}
+	}
 	priv->workqueue = create_singlethread_workqueue("mv_pp2x");
 
 	if (!priv->workqueue) {
 		err = -ENOMEM;
-		goto err_clk;
+		goto err_uio;
 	}
 
 	/* Only Mvpp22 support hot plug feature */
@@ -6134,13 +6178,14 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		priv->cp_hotplug_nb.notifier_call = mv_pp2x_cp_cpu_callback;
 		register_hotcpu_notifier(&priv->cp_hotplug_nb);
 	}
-
 	INIT_DELAYED_WORK(&priv->stats_task, mv_pp2x_get_device_stats);
 
 	queue_delayed_work(priv->workqueue, &priv->stats_task, stats_delay);
 	pr_debug("Platform Device Name : %s\n", kobject_name(&pdev->dev.kobj));
 	return 0;
-
+err_uio:
+	if (priv->pp2_version == PPV22)
+		uio_unregister_device(&priv->uio.u_info);
 err_clk:
 	clk_disable_unprepare(hw->gop_clk);
 	clk_disable_unprepare(hw->pp_clk);
@@ -6148,6 +6193,7 @@ err_clk:
 		clk_disable_unprepare(hw->gop_core_clk);
 		clk_disable_unprepare(hw->mg_clk);
 		clk_disable_unprepare(hw->mg_core_clk);
+		kfree(priv->uio.u_info.name);
 	}
 	if (probe_defer)
 		devm_kfree(&pdev->dev, priv);
@@ -6164,6 +6210,10 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 	if (priv->pp2_version == PPV22 && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
 		unregister_hotcpu_notifier(&priv->cp_hotplug_nb);
 
+	if (priv->pp2_version == PPV22) {
+		uio_unregister_device(&priv->uio.u_info);
+		kfree(priv->uio.u_info.name);
+	}
 	cancel_delayed_work(&priv->stats_task);
 	flush_workqueue(priv->workqueue);
 	destroy_workqueue(priv->workqueue);

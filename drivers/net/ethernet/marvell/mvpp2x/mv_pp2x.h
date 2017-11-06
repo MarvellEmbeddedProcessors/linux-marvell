@@ -22,6 +22,8 @@
 #include <linux/netdevice.h>
 #include <linux/string.h>
 #include <linux/log2.h>
+#include <linux/uio_driver.h>
+
 
 #include "mv_pp2x_hw_type.h"
 #include "mv_gop110_hw_type.h"
@@ -530,6 +532,11 @@ struct mv_pp2x_param_config {
 	u8 mc_filter_max; /* The multicast filter list max, multiple of 4 */
 };
 
+struct mv_pp2x_uio {
+	int num_maps;
+	struct uio_info u_info;
+};
+
 /* Shared Packet Processor resources */
 struct mv_pp2x {
 	enum mvppv2_version pp2_version; /* Redundant, consider to delete.
@@ -568,6 +575,8 @@ struct mv_pp2x {
 	struct delayed_work stats_task;
 	struct workqueue_struct *workqueue;
 	struct notifier_block	cp_hotplug_nb;
+	struct mv_pp2x_uio uio;
+
 };
 
 struct mv_pp2x_pcpu_stats {
