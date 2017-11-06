@@ -931,6 +931,7 @@ static int mv_pp2x_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 {
 	int i, err;
 	struct mv_pp2x_port *port = netdev_priv(dev);
+	u32 rx_indir_table_orig[MVPP22_RSS_TBL_LINE_NUM];
 
 	if (port->priv->pp2_version == PPV21)
 		return -EOPNOTSUPP;
@@ -952,12 +953,18 @@ static int mv_pp2x_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 	if (!indir)
 		return 0;
 
-	for (i = 0; i < ARRAY_SIZE(port->priv->rx_indir_table); i++)
+	for (i = 0; i < ARRAY_SIZE(port->priv->rx_indir_table); i++) {
+		rx_indir_table_orig[i] = port->priv->rx_indir_table[i];
 		port->priv->rx_indir_table[i] = indir[i];
+	}
 
 	err =  mv_pp22_rss_rxfh_indir_set(port);
 	if (err) {
 		netdev_err(dev, "fail to change rxfh indir table");
+		/* Rollback rx_indir_table */
+		for (i = 0; i < ARRAY_SIZE(port->priv->rx_indir_table); i++)
+			port->priv->rx_indir_table[i] = rx_indir_table_orig[i];
+		mv_pp22_rss_rxfh_indir_set(port);
 		return err;
 	}
 
