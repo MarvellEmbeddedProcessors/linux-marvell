@@ -773,6 +773,13 @@ static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 	}
 
 	if (new_long_pool != old_long_pool) {
+		/* Remove port from old short&long pool */
+		mv_pp2x_bm_pool_stop_use(port, old_long_pool);
+		old_long_port_pool->port_map &= ~(1 << port->id);
+
+		mv_pp2x_bm_pool_stop_use(port, old_short_pool);
+		old_short_port_pool->port_map &= ~(1 << port->id);
+
 		/* Add port to new short&long pool */
 		port->pool_long = mv_pp2x_bm_pool_use(port, new_long_pool);
 		if (!port->pool_long)
@@ -789,13 +796,6 @@ static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 		for (rxq = 0; rxq < port->num_rx_queues; rxq++)
 			port->priv->pp2xdata->mv_pp2x_rxq_short_pool_set(hw,
 			port->rxqs[rxq]->id, port->pool_short->id);
-
-		/* Remove port from old short&long pool */
-		mv_pp2x_bm_pool_stop_use(port, old_long_pool);
-		old_long_port_pool->port_map &= ~(1 << port->id);
-
-		mv_pp2x_bm_pool_stop_use(port, old_short_pool);
-		old_short_port_pool->port_map &= ~(1 << port->id);
 
 		/* Update L4 checksum when jumbo enable/disable on port */
 		if (new_long_pool == MVPP2_BM_SWF_JUMBO_POOL) {
