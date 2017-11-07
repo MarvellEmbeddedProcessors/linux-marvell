@@ -96,6 +96,8 @@ static u8 first_log_rxq_queue;
 static u8 uc_filter_max = 4;
 static u16 stats_delay_msec = STATS_DELAY;
 static u16 stats_delay;
+static int auto_cell_index;
+
 
 u32 debug_param;
 
@@ -5638,7 +5640,6 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 				     struct mv_pp2x *priv,	u32 *cell_index, int *port_count)
 {
 	struct mv_pp2x_hw *hw = &priv->hw;
-	static int auto_cell_index;
 	static bool cell_index_dts_flag;
 	const struct of_device_id *match;
 	struct device_node *dn = pdev->dev.of_node;
@@ -5658,7 +5659,9 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 	} else {
 		cell_index_dts_flag = true;
 	}
-
+	/* If cell_index is set by dts, and any previous device was set by
+	 * auto_index, then fail.
+	 */
 	if (auto_cell_index && cell_index_dts_flag)
 		return -ENXIO;
 
@@ -6005,6 +6008,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	struct device_node *dn = pdev->dev.of_node;
 	struct device_node *port_node;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
+	bool probe_defer = false;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(struct mv_pp2x), GFP_KERNEL);
 	if (!priv)
@@ -6016,6 +6020,12 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	if (err) {
 		if (err != -EPROBE_DEFER)
 			dev_err(&pdev->dev, "mvpp2: platform_data get failed\n");
+		else {
+			/* Rollback auto_cell_index if it was used */
+			if (auto_cell_index)
+				auto_cell_index--;
+			probe_defer = true;
+		}
 		goto err_clk;
 	}
 	priv->pp2_version = priv->pp2xdata->pp2x_ver;
@@ -6151,6 +6161,8 @@ err_clk:
 		clk_disable_unprepare(hw->mg_clk);
 		clk_disable_unprepare(hw->mg_core_clk);
 	}
+	if (probe_defer)
+		devm_kfree(&pdev->dev, priv);
 	return err;
 }
 
