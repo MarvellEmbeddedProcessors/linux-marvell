@@ -128,28 +128,28 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
 			sata@540000 {
 				status = "disabled";
 
 				sata-port@0 {
 					/* UPDATE */
-					phys = <&cpm_comphy 1 COMPHY_SATA0>;
+					phys = <&cp0_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
 				sata-port@1 {
 					/* UPDATE */
-					phys = <&cpm_comphy 3 COMPHY_SATA1>;
+					phys = <&cp0_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
 			};
-			cpm_usb3h0: usb3@500000 {
+			cp0_usb3h0: usb3@500000 {
 				status = "disabled";
 			};
-			cpm_usb3h1: usb3@510000 {
+			cp0_usb3h1: usb3@510000 {
 				status = "disabled";
 			};
 			sdhci@780000 {
@@ -159,11 +159,11 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				/* UPDATE */
-				cpm_phy2: ethernet-phy@2 {
+				cp0_phy2: ethernet-phy@2 {
 					reg = <0>;
 				};
 				/* UPDATE */
-				cpm_phy3: ethernet-phy@3 {
+				cp0_phy3: ethernet-phy@3 {
 					reg = <1>;
 				};
 			};
@@ -172,32 +172,32 @@
 					/* UPDATE */
 					phy-mode = "sfi"; /* lane-2 */
 					/* UPDATE */
-					phys = <&cpm_comphy 2 COMPHY_SFI>;
+					phys = <&cp0_comphy 2 COMPHY_SFI>;
 					phy-names = "comphy";
 				};
 				emac2: mac2 {
 					/* UPDATE */
 					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&cpm_phy2>;
+					phy = <&cp0_phy2>;
 				};
 				emac3: mac3 {
 					/* UPDATE */
 					phy-mode = "rgmii"; /* rgmii-1 */
-					phy = <&cpm_phy3>;
+					phy = <&cp0_phy3>;
 				};
 			};
 			ppv22@000000 {
 				/* UPDATE */
 				pinctrl-names = "default";
-				pinctrl-0 = <&cpm_ge2_rgmii_pins>; /* RGMII mpps */
+				pinctrl-0 = <&cp0_ge2_rgmii_pins>; /* RGMII mpps */
 
-				cpm_eth0: eth0@010000 {
+				cp0_eth0: eth0@010000 {
 					status = "disabled";
 				};
-				cpm_eth1: eth1@020000 {
+				cp0_eth1: eth1@020000 {
 					status = "disabled";
 				};
-				cpm_eth2: eth2@030000 {
+				cp0_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
@@ -224,7 +224,7 @@
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
 			enable-active-high;
-			gpio = <&cpm_gpio1 15 GPIO_ACTIVE_HIGH>;
+			gpio = <&cp0_gpio1 15 GPIO_ACTIVE_HIGH>;
 			status = "okay";
 		};
 		vccq_sdio_reg: regulator@1 {
@@ -237,9 +237,9 @@
 		};
 
 	};
-	cpn-110-slave {
+	cp110-1 {
 		config-space {
-			cps_usb3h0: usb3@500000 {
+			cp1_usb3h0: usb3@500000 {
 				status = "disabled";
 			};
 			sata@540000 {
@@ -247,13 +247,13 @@
 
 				sata-port@0 {
 					/* UPDATE */
-					phys = <&cps_comphy 1 COMPHY_SATA0>;
+					phys = <&cp1_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
 				sata-port@1 {
 					/* UPDATE */
-					phys = <&cps_comphy 3 COMPHY_SATA1>;
+					phys = <&cp1_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "disabled";
 				};
@@ -262,23 +262,23 @@
 				/* UPDATE */
 				#address-cells = <1>;
 				#size-cells = <0>;
-				cps_phy2: ethernet-phy@2 {
+				cp1_phy2: ethernet-phy@2 {
 					reg = <0>;
 				};
 			};
 			gop {
-				cps_emac0: mac0 {
+				cp1_emac0: mac0 {
 					/* UPDATE */
 					phy-mode = "sfi"; /* lane-2 */
-					phys = <&cps_comphy 2 COMPHY_SFI>;
+					phys = <&cp1_comphy 2 COMPHY_SFI>;
 					phy-names = "disabled";
 				};
-				cps_emac2: mac2 {
+				cp1_emac2: mac2 {
 					/* UPDATE */
 					phy-mode = "rgmii"; /* rgmii-0 */
-					phy = <&cps_phy2>;
+					phy = <&cp1_phy2>;
 				};
-				cps_emac3: mac3 {
+				cp1_emac3: mac3 {
 					/* UPDATE */
 					phy-mode = "sgmii"; /* lane-4 */
 				};
@@ -286,15 +286,15 @@
 			ppv22@000000 {
 				/* UPDATE */
 				pinctrl-names = "default";
-				pinctrl-0 = <&cps_ge1_rgmii_pins>;
+				pinctrl-0 = <&cp1_ge1_rgmii_pins>;
 
-				cps_eth0: eth0@010000 {
+				cp1_eth0: eth0@010000 {
 					status = "disabled";
 				};
-				cps_eth1: eth1@020000 {
+				cp1_eth1: eth1@020000 {
 					status = "disabled";
 				};
-				cps_eth2: eth2@030000 {
+				cp1_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
@@ -306,7 +306,7 @@
 			};
 			tdm@7a0000 {
 				/* UPDATE */
-				pinctrl-0 = <&cps_tdm_pins>;
+				pinctrl-0 = <&cp1_tdm_pins>;
 				pinctrl-names = "default";
 				pclk-freq-mhz = <8>;
 				status = "disabled";

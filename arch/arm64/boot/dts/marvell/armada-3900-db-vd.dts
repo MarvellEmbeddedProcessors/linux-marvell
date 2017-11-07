@@ -47,14 +47,14 @@
 	compatible = "marvell,armada3900-db-vd", "marvell,armada7040",
 		     "marvell,armada-ap806-quad", "marvell,armada-ap806";
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
 			pinctrl@440000 {
-				cpm_xhci0_vbus_pins: cpm-xhci0-vbus-pins {
+				cp0_xhci0_vbus_pins: cp0-xhci0-vbus-pins {
 					marvell,pins = "mpp44";
 					marvell,function = "gpio";
 				};
-				cpm_xhci1_vbus_pins: cpm-xhci1-vbus-pins {
+				cp0_xhci1_vbus_pins: cp0-xhci1-vbus-pins {
 					marvell,pins = "mpp45";
 					marvell,function = "gpio";
 				};
@@ -63,18 +63,18 @@
 
 		pcie0@600000 {
 			num-lanes = <2>;
-			phys = <&cpm_comphy 0 COMPHY_PCIE0
-				&cpm_comphy 1 COMPHY_PCIE0
+			phys = <&cp0_comphy 0 COMPHY_PCIE0
+				&cp0_comphy 1 COMPHY_PCIE0
 				>;
 			phy-names = "pcie-phy0", "pcie-phy1";
 
 		};
 	};
 
-	cpm_reg_usb3_vbus0: cpm_usb3_vbus@0 {
-		gpio = <&cpm_gpio1 12 GPIO_ACTIVE_HIGH>;
+	cp0_reg_usb3_vbus0: cp0_usb3_vbus@0 {
+		gpio = <&cp0_gpio1 12 GPIO_ACTIVE_HIGH>;
 	};
-	cpm_reg_usb3_vbus1: cpm_usb3_vbus@1 {
-		gpio = <&cpm_gpio1 13 GPIO_ACTIVE_HIGH>;
+	cp0_reg_usb3_vbus1: cp0_usb3_vbus@1 {
+		gpio = <&cp0_gpio1 13 GPIO_ACTIVE_HIGH>;
 	};
 };

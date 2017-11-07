@@ -57,8 +57,8 @@
 	};
 
 	aliases {
-		ethernet0 = &cpm_emac0;
-		ethernet1 = &cps_emac0;
+		ethernet0 = &cp0_emac0;
+		ethernet1 = &cp1_emac0;
 	};
 
 	ap806 {
@@ -85,7 +85,7 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
 			pinctrl@440000 {
 				xhci0_vbus_pins: xhci0-vbus-pins {
@@ -93,33 +93,33 @@
 					marvell,function = "gpio";
 				};
 			};
-			cpm_comphy: comphy {
+			cp0_comphy: comphy {
 				skip_pcie_power_off;
 				status = "okay";
 			};
 			i2c@701000 {
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
-				pinctrl-0 = <&cpm_i2c0_pins>;
+				pinctrl-0 = <&cp0_i2c0_pins>;
 				status = "disabled";
 			};
 			gop {
-				cpm_emac0: mac0 {
-					phys = <&cpm_comphy 4 COMPHY_SFI>;
+				cp0_emac0: mac0 {
+					phys = <&cp0_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy-mode = "sfi"; /* lane-4 */
 				};
-				cpm_emac2: mac2 {
+				cp0_emac2: mac2 {
 					phy-mode = "none";
 				};
-				cpm_emac3: mac3 {
+				cp0_emac3: mac3 {
 					phy-mode = "none";
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
-				cpm_eth0: eth0@010000 {
+				cp0_eth0: eth0@010000 {
 					status = "okay";
 				};
 			};
@@ -131,7 +131,7 @@
 				regulator-min-microvolt = <5000000>;
 				regulator-max-microvolt = <5000000>;
 				enable-active-high;
-				gpio = <&cpm_gpio1 15 GPIO_ACTIVE_HIGH>;
+				gpio = <&cp0_gpio1 15 GPIO_ACTIVE_HIGH>;
 				status = "okay";
 			};
 		};
@@ -151,48 +151,48 @@
 		};
 	};
 
-	cpn-110-slave {
+	cp110-1 {
 		config-space {
-			cps_comphy: comphy {
+			cp1_comphy: comphy {
 				status = "okay";
 			};
-			/* cps_usb3h0 is USB2 only (UTMI) */
-			cps_usb3h0: usb3@500000 {
-				usb-phy = <&cps_usb3h0_phy>;
-				phys = <&cps_utmi0>;
+			/* cp1_usb3h0 is USB2 only (UTMI) */
+			cp1_usb3h0: usb3@500000 {
+				usb-phy = <&cp1_usb3h0_phy>;
+				phys = <&cp1_utmi0>;
 				phy-names = "usb";
 				status = "okay";
 			};
-			cps_usb3h0_phy: usb3_phy0 {
+			cp1_usb3h0_phy: usb3_phy0 {
 				compatible = "usb-nop-xceiv";
 				vcc-supply = <&reg_usb3h0_vbus>;
 			};
-			cps_utmi0: utmi@580000 {
+			cp1_utmi0: utmi@580000 {
 				status = "okay";
 			};
 			gop {
-				cps_emac0: mac0 {
-					phys = <&cps_comphy 4 COMPHY_SFI>;
+				cp1_emac0: mac0 {
+					phys = <&cp1_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy-mode = "sfi"; /* lane-4 */
 				};
-				cps_emac2: mac2 {
+				cp1_emac2: mac2 {
 					phy-mode = "none";
 				};
-				cps_emac3: mac3 {
+				cp1_emac3: mac3 {
 					phy-mode = "none";
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
-				cps_eth0: eth0@010000 {
+				cp1_eth0: eth0@010000 {
 					status = "okay";
 				};
-				cps_eth1: eth1@020000 {
+				cp1_eth1: eth1@020000 {
 					status = "disabled";
 				};
-				cps_eth2: eth2@030000 {
+				cp1_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};

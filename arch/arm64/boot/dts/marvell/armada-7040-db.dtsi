@@ -76,9 +76,9 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
-			cpm_i2c0: i2c@701000 {
+			cp0_i2c0: i2c@701000 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&i2c0_pins>;
 				eeprom@57 {
@@ -99,15 +99,15 @@
 					reg = <0x21>;
 				};
 			};
-			cpm_usb3h0: usb3@500000 {
+			cp0_usb3h0: usb3@500000 {
 				usb-phy = <&usb3h0_phy>;
 			};
-			cpm_usb3h1: usb3@510000 {
+			cp0_usb3h1: usb3@510000 {
 				usb-phy = <&usb3h1_phy>;
 			};
 			sdhci@780000 {
 				pinctrl-names = "default";
-				pinctrl-0 = <&cpm_sdhci_pins>;
+				pinctrl-0 = <&cp0_sdhci_pins>;
 				bus-width = <4>;
 			};
 			spi@700680 {
@@ -194,7 +194,7 @@
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
 		enable-active-high;
-		gpio = <&cpm_gpio0 12 GPIO_ACTIVE_HIGH>;
+		gpio = <&cp0_gpio0 12 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
 };

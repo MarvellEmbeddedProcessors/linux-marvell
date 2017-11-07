@@ -89,27 +89,27 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
-			cpm_comphy: comphy {
+			cp0_comphy: comphy {
 				skip_pcie_power_off;
 				status = "okay";
 			};
-			cpm_sata: sata@540000 {
+			cp0_sata: sata@540000 {
 				status = "okay";
 				sata-port@0 {
 					status = "disabled";
 				};
 				sata-port@1 {
-					phys = <&cpm_comphy 5 COMPHY_SATA1>;
+					phys = <&cp0_comphy 5 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "okay";
 				};
 			};
-			cpm_i2c1: i2c@701100 {
+			cp0_i2c1: i2c@701100 {
 				status = "disabled";
 			};
-			cpm_i2c0: i2c@701000 {
+			cp0_i2c0: i2c@701000 {
 				status = "okay";
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
@@ -132,9 +132,9 @@
 					reg = <0x21>;
 				};
 			};
-			cpm_usb3h1: usb3@510000 {
+			cp0_usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&cpm_utmi1>;
+				phys = <&cp0_utmi1>;
 				phy-names = "usb2";
 				status = "okay";
 			};
@@ -182,39 +182,39 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				cpm_phy1: ethernet-phy@1 {
+				cp0_phy1: ethernet-phy@1 {
 					reg = <1>;
 				};
 			};
 
 			gop {
-				cpm_emac0: mac0 {
+				cp0_emac0: mac0 {
 					phy-mode = "sfi"; /* lane-4 */
-					phys = <&cpm_comphy 4 COMPHY_SFI>;
+					phys = <&cp0_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 				};
-				cpm_emac2: mac2 {
+				cp0_emac2: mac2 {
 					phy-mode = "rgmii"; /* lane-0 */
-					phy = <&cpm_phy1>;
+					phy = <&cp0_phy1>;
 				};
-				cpm_emac3: mac3 {
+				cp0_emac3: mac3 {
 					phy-mode = "none"; /* rgmii-1 */
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
-				cpm_eth0: eth0@010000 {
+				cp0_eth0: eth0@010000 {
 					status = "okay";
 				};
-				cpm_eth1: eth1@020000 {
+				cp0_eth1: eth1@020000 {
 					status = "okay";
 				};
-				cpm_eth2: eth2@030000 {
+				cp0_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
 
-			cpm_utmi1: utmi@581000 {
+			cp0_utmi1: utmi@581000 {
 				status = "okay";
 			};
 		};

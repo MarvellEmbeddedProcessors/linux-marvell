@@ -46,28 +46,28 @@
  */
 
 #include "armada-ap806-quad.dtsi"
-#include "armada-cp110-master.dtsi"
+#include "armada-cp110-0.dtsi"
 
 / {
 	model = "Marvell Armada 7040";
 	compatible = "marvell,armada7040", "marvell,armada-ap806-quad",
 	             "marvell,armada-ap806";
 	aliases {
-		gpio1 = &cpm_gpio0;
-		gpio2 = &cpm_gpio1;
-		ethernet0 = &cpm_emac0;
-		ethernet1 = &cpm_emac2;
-		ethernet2 = &cpm_emac3;
+		gpio1 = &cp0_gpio0;
+		gpio2 = &cp0_gpio1;
+		ethernet0 = &cp0_emac0;
+		ethernet1 = &cp0_emac2;
+		ethernet2 = &cp0_emac3;
 	};
 
 	ap806 {
 		config-space {
 			smmu: iommu@5000000 {
-				mmu-masters = <&cpm_usb3h0 0x483>,
-					      <&cpm_usb3h1 0x484>,
-					      <&cpm_sata 0x485>,
-					      <&cpm_xor0 0x489>,
-					      <&cpm_xor1 0x48a>;
+				mmu-masters = <&cp0_usb3h0 0x483>,
+					      <&cp0_usb3h1 0x484>,
+					      <&cp0_sata 0x485>,
+					      <&cp0_xor0 0x489>,
+					      <&cp0_xor1 0x48a>;
 			};
 			pinctrl@6f4000 {
 				ap_emmc_pins: emmc-pins-0 {
@@ -79,11 +79,11 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
 			pinctrl@440000 {
 			compatible = "marvell,a70x0-pinctrl";
-				cpm_tdm_pins: tdm-pins {
+				cp0_tdm_pins: tdm-pins {
 					marvell,pins = "mpp0", "mpp1", "mpp2",
 					"mpp3", "mpp4", "mpp5";
 					marvell,function = "tdm";
@@ -92,7 +92,7 @@
 					marvell,pins = "mpp37", "mpp38";
 					marvell,function = "i2c0";
 				};
-				cpm_sdhci_pins: cpm-sdhi-pins {
+				cp0_sdhci_pins: cp0-sdhi-pins {
 					marvell,pins = "mpp56", "mpp57", "mpp58",
 						       "mpp59", "mpp60", "mpp61";
 					marvell,function = "sdio";
@@ -112,19 +112,19 @@
 			ppv22@000000 {
 				dma-coherent;
 			};
-			cpm_sata: sata@540000 {
+			cp0_sata: sata@540000 {
 				#stream-id-cells = <1>;
 			};
-			cpm_usb3h0: usb3@500000 {
+			cp0_usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
 			};
-			cpm_usb3h1: usb3@510000 {
+			cp0_usb3h1: usb3@510000 {
 				#stream-id-cells = <1>;
 			};
-			cpm_xor0: dma_xor@6a0000 {
+			cp0_xor0: dma_xor@6a0000 {
 				#stream-id-cells = <1>;
 			};
-			cpm_xor1: dma_xor@6c0000 {
+			cp0_xor1: dma_xor@6c0000 {
 				#stream-id-cells = <1>;
 			};
 			/* AXI bus of IHB1 is not connected in Armada-7040 package. */

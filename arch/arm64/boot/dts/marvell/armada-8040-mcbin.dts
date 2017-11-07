@@ -57,10 +57,10 @@
 	};
 
 	aliases {
-		ethernet0 = &cpm_emac0;
-		ethernet1 = &cps_emac0;
-		ethernet2 = &cps_emac2;
-		ethernet3 = &cps_emac3;
+		ethernet0 = &cp0_emac0;
+		ethernet1 = &cp1_emac0;
+		ethernet2 = &cp1_emac2;
+		ethernet3 = &cp1_emac3;
 	};
 
 	ap806 {
@@ -87,7 +87,7 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
 			pinctrl@440000 {
 				xhci0_vbus_pins: xhci0-vbus-pins {
@@ -99,7 +99,7 @@
 					marvell,function = "gpio";
 				};
 			};
-			cpm_comphy: comphy {
+			cp0_comphy: comphy {
 				status = "okay";
 			};
 			sdhci@780000 {
@@ -108,13 +108,13 @@
 				no-1-8-v;
 				broken-cd;
 				pinctrl-names = "default";
-				pinctrl-0 = <&cpm_sdhci_pins>;
+				pinctrl-0 = <&cp0_sdhci_pins>;
 				status = "okay";
 			};
 			i2c@701000 {
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
-				pinctrl-0 = <&cpm_i2c0_pins>;
+				pinctrl-0 = <&cp0_i2c0_pins>;
 				status = "okay";
 			};
 			sata@540000 {
@@ -124,7 +124,7 @@
 					status = "disabled";
 				};
 				sata-port@1 {
-					phys = <&cpm_comphy 5 COMPHY_SATA1>;
+					phys = <&cp0_comphy 5 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "okay";
 				};
@@ -151,7 +151,7 @@
 			gop {
 				emac0_0: mac0 {
 					phy-mode = "sfi"; /* lane-4 */
-					phys = <&cpm_comphy 4 COMPHY_SFI>;
+					phys = <&cp0_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy = <&phy0>;
 				};
@@ -167,7 +167,7 @@
 		pcie0@600000 {
 			num-lanes = <4>;
 			status = "okay";
-			reset-gpios = <&cpm_gpio1 20 GPIO_ACTIVE_HIGH>;
+			reset-gpios = <&cp0_gpio1 20 GPIO_ACTIVE_HIGH>;
 			pinctrl-names = "default";
 			pinctrl-0 = <&pcie_reset_pins>;
 		};
@@ -179,7 +179,7 @@
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
 			enable-active-high;
-			gpio = <&cpm_gpio1 15 GPIO_ACTIVE_HIGH>;
+			gpio = <&cp0_gpio1 15 GPIO_ACTIVE_HIGH>;
 			status = "okay";
 		};
 		vccq_sdio_reg: regulator@1 {
@@ -192,20 +192,20 @@
 		};
 	};
 
-	cpn-110-slave {
+	cp110-1 {
 		config-space {
-			cps_comphy: comphy {
+			cp1_comphy: comphy {
 				status = "okay";
 			};
-			cps_usb3h0: usb3@500000 {
-				usb-phy = <&cps_usb3h0_phy>;
+			cp1_usb3h0: usb3@500000 {
+				usb-phy = <&cp1_usb3h0_phy>;
 				separated-phys-for-usb2-usb3;
-				phys = <&cps_utmi0>,
-				       <&cps_comphy 2 COMPHY_USB3H0>;
+				phys = <&cp1_utmi0>,
+				       <&cp1_comphy 2 COMPHY_USB3H0>;
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
-			cps_usb3h0_phy: usb3_phy0 {
+			cp1_usb3h0_phy: usb3_phy0 {
 				compatible = "usb-nop-xceiv";
 				vcc-supply = <&reg_usb3h0_vbus>;
 			};
@@ -213,50 +213,50 @@
 				status = "okay";
 
 				sata-port@0 {
-					phys = <&cps_comphy 1 COMPHY_SATA0>;
+					phys = <&cp1_comphy 1 COMPHY_SATA0>;
 					phy-names = "comphy";
 					status = "okay";
 				};
 				sata-port@1 {
-					phys = <&cps_comphy 3 COMPHY_SATA1>;
+					phys = <&cp1_comphy 3 COMPHY_SATA1>;
 					phy-names = "comphy";
 					status = "okay";
 				};
 			};
 			gop {
-				cps_emac0: mac0 {
+				cp1_emac0: mac0 {
 					phy-mode = "sfi"; /* lane-4 */
-					phys = <&cps_comphy 4 COMPHY_SFI>;
+					phys = <&cp1_comphy 4 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy = <&phy1>;
 				};
-				cps_emac2: mac2 {
+				cp1_emac2: mac2 {
 					phy-mode = "sgmii"; /* lane-0 */
-					phys = <&cps_comphy 0 COMPHY_SGMII1>;
+					phys = <&cp1_comphy 0 COMPHY_SGMII1>;
 					phy-names = "comphy";
 					phy = <&smi_phy0>;
 				};
-				cps_emac3: mac3 {
+				cp1_emac3: mac3 {
 					phy-mode = "sgmii"; /* lane-5 */
 					phy-speed = <2500>;
-					phys = <&cps_comphy 5 COMPHY_HS_SGMII2>;
+					phys = <&cp1_comphy 5 COMPHY_HS_SGMII2>;
 					phy-names = "comphy";
 				};
 			};
 			ppv22@000000 {
 				l4_chksum_jumbo_port = <0>;
 				pinctrl-names = "default";
-				cps_eth0: eth0@010000 {
+				cp1_eth0: eth0@010000 {
 					status = "okay";
 				};
-				cps_eth1: eth1@020000 {
+				cp1_eth1: eth1@020000 {
 					status = "okay";
 				};
-				cps_eth2: eth2@030000 {
+				cp1_eth2: eth2@030000 {
 					status = "okay";
 				};
 			};
-			cps_utmi0: utmi@580000 {
+			cp1_utmi0: utmi@580000 {
 				status = "okay";
 			};
 		};

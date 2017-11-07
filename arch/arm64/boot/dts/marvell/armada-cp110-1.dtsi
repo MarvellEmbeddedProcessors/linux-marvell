@@ -21,7 +21,7 @@
 
 #include <dt-bindings/phy/phy-comphy-mvebu.h>
 
-#define CP110_NAME		cps
+#define CP110_NAME		cp1
 #define CP110_BASE		0xf4000000
 #define CP110_PCIE_IO_BASE	0xfd000000
 #define CP110_PCIE_MEM_BASE	0xfa000000
@@ -29,11 +29,11 @@
 #define CP110_EIP197_INDEX	1
 
 / {
-	cpn-110-slave {
+	cp110-1 {
 		#address-cells = <2>;
 		#size-cells = <2>;
 		compatible = "simple-bus";
-		interrupt-parent = <&cps_icu>;
+		interrupt-parent = <&cp1_icu>;
 		ranges;
 
 		#include "armada-cp110.dtsi"
@@ -46,14 +46,14 @@
 #undef CP110_SPI_BUS_ID
 #undef CP110_EIP197_INDEX
 
-&cps_emac0 {
+&cp1_emac0 {
 	mac-address = [00 00 00 00 00 04];
 };
 
-&cps_emac2 {
+&cp1_emac2 {
 	mac-address = [00 00 00 00 00 05];
 };
 
-&cps_emac3 {
+&cp1_emac3 {
 	mac-address = [00 00 00 00 00 06];
 };

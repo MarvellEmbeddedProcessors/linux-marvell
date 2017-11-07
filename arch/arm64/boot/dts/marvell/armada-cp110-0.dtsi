@@ -14,14 +14,14 @@
 */
 
 /*
- * Device Tree file for Marvell Armada CPN-110 Master.
+ * Device Tree file for Marvell Armada CP110-0.
  */
 
 #include "armada-common.dtsi"
 
 #include <dt-bindings/phy/phy-comphy-mvebu.h>
 
-#define CP110_NAME		cpm
+#define CP110_NAME		cp0
 #define CP110_BASE		0xf2000000
 #define CP110_PCIE_IO_BASE	0xf9000000
 #define CP110_PCIE_MEM_BASE	0xf6000000
@@ -29,11 +29,11 @@
 #define CP110_EIP197_INDEX	0
 
 / {
-	cpn-110-master {
+	cp110-0 {
 		#address-cells = <2>;
 		#size-cells = <2>;
 		compatible = "simple-bus";
-		interrupt-parent = <&cpm_icu>;
+		interrupt-parent = <&cp0_icu>;
 		ranges;
 
 		#include "armada-cp110.dtsi"
@@ -46,7 +46,7 @@
 #undef CP110_SPI_BUS_ID
 #undef CP110_EIP197_INDEX
 
-&cpm_thermal {
+&cp0_thermal {
 	/* interrupt assignment by ICU supports single thermal sensor unit,
 	* currently cp0 thermal sensor irq only is enabled.
 	* To enable cp1 thermal sensor interrupt,
@@ -55,14 +55,14 @@
 	interrupts-extended = <&sei 37>;
 };
 
-&cpm_emac0 {
+&cp0_emac0 {
 	mac-address = [00 00 00 00 00 01];
 };
 
-&cpm_emac2 {
+&cp0_emac2 {
 	mac-address = [00 00 00 00 00 02];
 };
 
-&cpm_emac3 {
+&cp0_emac3 {
 	mac-address = [00 00 00 00 00 03];
 };

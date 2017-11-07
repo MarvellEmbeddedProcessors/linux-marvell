@@ -58,10 +58,10 @@
 	chosen { };
 
 	aliases {
-		ethernet0 = &cpm_eth0;
-		ethernet1 = &cpm_eth2;
-		ethernet2 = &cps_eth0;
-		ethernet3 = &cps_eth1;
+		ethernet0 = &cp0_eth0;
+		ethernet1 = &cp0_eth2;
+		ethernet2 = &cp1_eth0;
+		ethernet3 = &cp1_eth1;
 	};
 
 	ap806 {
@@ -81,7 +81,7 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
 			/delete-node/ppv22@000000;
 			sata@540000 {
@@ -94,10 +94,10 @@
 				};
 			};
 			/* usb3h0 is USB2 only (UTMI) */
-			cpm_usb3h0: usb3@500000 {
+			cp0_usb3h0: usb3@500000 {
 				status = "okay";
 			};
-			cpm_usb3h1: usb3@510000 {
+			cp0_usb3h1: usb3@510000 {
 				status = "okay";
 			};
 			sdhci@780000 {
@@ -106,26 +106,26 @@
 			i2c@701000 {
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
-				pinctrl-0 = <&cpm_i2c0_pins>;
+				pinctrl-0 = <&cp0_i2c0_pins>;
 				status = "okay";
 			};
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				cpm_phy1: ethernet-phy@1 {
+				cp0_phy1: ethernet-phy@1 {
 					reg = <1>;
 				};
 			};
 			ppv22_vanilla@000000 {
 				compatible = "marvell,armada-7k-pp22";
 				reg = <0x0 0x100000>, <0x129000 0xb000>;
-				clocks = <&cpm_syscon0 1 3>, <&cpm_syscon0 1 9>, <&cpm_syscon0 1 5>;
+				clocks = <&cp0_syscon0 1 3>, <&cp0_syscon0 1 9>, <&cp0_syscon0 1 5>;
 				clock-names = "pp_clk", "gop_clk", "mg_clk";
 				pinctrl-names = "default";
-				pinctrl-0 = <&cps_ge1_rgmii_pins>;
+				pinctrl-0 = <&cp1_ge1_rgmii_pins>;
 				dma-coherent;
 				status = "okay";
-				cpm_eth0: eth0@010000 {
+				cp0_eth0: eth0@010000 {
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
@@ -140,7 +140,7 @@
 					phy-mode = "sfi";
 					status = "okay";
 				};
-				cpm_eth1: eth1@020000 {
+				cp0_eth1: eth1@020000 {
 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
@@ -152,7 +152,7 @@
 				mac-address = [00 00 00 00 00 02];
 					status = "disabled";
 				};
-				cpm_eth2: eth2@030000 {
+				cp0_eth2: eth2@030000 {
 					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
@@ -165,7 +165,7 @@
 					port-id = <2>; /* pp2_port_id */
 					gop-port-id = <3>;
 					phy-mode = "rgmii-id";
-					phy = <&cpm_phy1>;
+					phy = <&cp0_phy1>;
 					status = "okay";
 				};
 			};
@@ -180,11 +180,11 @@
 			status = "okay";
 		};
 	};
-	cpn-110-slave {
+	cp110-1 {
 		config-space {
 			/delete-node/ppv22@000000;
-			/* cps_usb3h0 is USB2 only (UTMI) */
-			cps_usb3h0: usb3@500000 {
+			/* cp1_usb3h0 is USB2 only (UTMI) */
+			cp1_usb3h0: usb3@500000 {
 				status = "okay";
 			};
 			serial@702000 {
@@ -202,19 +202,19 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				cps_phy1: ethernet-phy@1 {
+				cp1_phy1: ethernet-phy@1 {
 					reg = <0>;
 				};
 			};
 			ppv22_vanilla@000000 {
 				compatible = "marvell,armada-7k-pp22";
 				reg = <0x0 0x100000>, <0x129000 0xb000>;
-				clocks = <&cps_syscon0 1 3>, <&cps_syscon0 1 9>, <&cps_syscon0 1 5>;
+				clocks = <&cp1_syscon0 1 3>, <&cp1_syscon0 1 9>, <&cp1_syscon0 1 5>;
 				clock-names = "pp_clk", "gop_clk", "mg_clk";
 				dma-coherent;
 				pinctrl-names = "default";
 				status = "okay";
-				cps_eth0: eth0@010000 {
+				cp1_eth0: eth0@010000 {
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
@@ -229,7 +229,7 @@
 					phy-mode = "sfi";
 					status = "okay";
 				};
-				cps_eth1: eth1@020000 {
+				cp1_eth1: eth1@020000 {
 					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
 						     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
@@ -242,10 +242,10 @@
 					port-id = <1>; /* pp2_port_id */
 					gop-port-id = <2>;
 					phy-mode = "rgmii-id";
-					phy = <&cps_phy1>;
+					phy = <&cp1_phy1>;
 					status = "okay";
 				};
-				cps_eth2: eth2@030000 {
+				cp1_eth2: eth2@030000 {
 					status = "disabled";
 				};
 			};
@@ -255,7 +255,7 @@
 			spi1: spi@700680 {
 				status = "okay";
 				pinctrl-names = "default";
-				pinctrl-0 = <&cps_spi1_pins>;
+				pinctrl-0 = <&cp1_spi1_pins>;
 			};
 		};
 		pcie0@600000 {

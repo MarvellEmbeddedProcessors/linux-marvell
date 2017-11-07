@@ -88,13 +88,13 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
 			i2c@701000 {
 				status = "okay";
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
-				pinctrl-0 = <&cpm_i2c0_pins>;
+				pinctrl-0 = <&cp0_i2c0_pins>;
 
 				/* U31 */
 				expander0: pca9555@21 {
@@ -108,7 +108,7 @@
 					 * Support USB-DEVICE with SD in 8040
 					 * To enable IO expander interrupts, SD/MMC on CP
 					 * Must be disabled in U-Boot & Linux
-					 * interrupt-parent = <&cpm_gpio1>;
+					 * interrupt-parent = <&cp0_gpio1>;
 					 * interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
 					 * interrupt-controller;
 					 * #interrupt-cells = <2>;
@@ -126,7 +126,7 @@
 					 * Support USB-DEVICE with SD in 8040
 					 * To enable IO expander interrupts, SD/MMC on CP
 					 * Must be disabled in U-Boot & Linux
-					 * interrupt-parent = <&cpm_gpio1>;
+					 * interrupt-parent = <&cp0_gpio1>;
 					 * interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
 					 * gpio-controller;
 					 * #gpio-cells = <2>;
@@ -162,12 +162,12 @@
 
 			/* CON9 */
 			usb3@500000 {
-				usb-phy = <&cpm_usb3h0_phy>;
+				usb-phy = <&cp0_usb3h0_phy>;
 			};
 
 			/* CON10 */
 			usb3@510000 {
-				usb-phy = <&cpm_usb3h1_phy>;
+				usb-phy = <&cp0_usb3h1_phy>;
 			};
 			sdhci@780000 {
 				bus-width = <4>;
@@ -175,28 +175,28 @@
 			};
 		};
 
-		cpm_usb3h0_phy: cpm_usb3_phy0 {
+		cp0_usb3h0_phy: cp0_usb3_phy0 {
 			compatible = "usb-nop-xceiv";
-			vcc-supply = <&cpm_reg_usb3h0_vbus>;
+			vcc-supply = <&cp0_reg_usb3h0_vbus>;
 		};
 
-		cpm_reg_usb3h0_vbus: cpm_usb3-vbus0 {
+		cp0_reg_usb3h0_vbus: cp0_usb3-vbus0 {
 			compatible = "regulator-fixed";
-			regulator-name = "cpm-usb3-vbus-h0";
+			regulator-name = "cp0-usb3-vbus-h0";
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
 			enable-active-high;
 			gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
 		};
 
-		cpm_usb3h1_phy: cpm_usb3_phy1 {
+		cp0_usb3h1_phy: cp0_usb3_phy1 {
 			compatible = "usb-nop-xceiv";
-			vcc-supply = <&cpm_reg_usb3h1_vbus>;
+			vcc-supply = <&cp0_reg_usb3h1_vbus>;
 		};
 
-		cpm_reg_usb3h1_vbus: cpm_usb3-vbus1 {
+		cp0_reg_usb3h1_vbus: cp0_usb3-vbus1 {
 			compatible = "regulator-fixed";
-			regulator-name = "cpm-usb3-vbus-h1";
+			regulator-name = "cp0-usb3-vbus-h1";
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
 			enable-active-high;
@@ -204,7 +204,7 @@
 		};
 	};
 
-	cpn-110-slave {
+	cp110-1 {
 		config-space {
 			i2c@701000 {
 				eeprom@57 {
@@ -221,7 +221,7 @@
 
 			/* CON9 */
 			usb3@500000 {
-				usb-phy = <&cps_usb3h0_phy>;
+				usb-phy = <&cp1_usb3h0_phy>;
 			};
 			nand@720000 {
 				nand-ecc-strength = <4>;
@@ -240,7 +240,7 @@
 					reg = <0x1000000 0x3f000000>;
 				};
 			};
-			cps_spi1: spi@700680 {
+			cp1_spi1: spi@700680 {
 				status = "disabled";
 				spi-flash@0 {
 					#address-cells = <0x1>;
@@ -265,14 +265,14 @@
 			};
 		};
 
-		cps_usb3h0_phy: cps_usb3_phy0 {
+		cp1_usb3h0_phy: cp1_usb3_phy0 {
 			compatible = "usb-nop-xceiv";
-			vcc-supply = <&cps_reg_usb3h0_vbus>;
+			vcc-supply = <&cp1_reg_usb3h0_vbus>;
 		};
 
-		cps_reg_usb3h0_vbus: cps_usb3-vbus0 {
+		cp1_reg_usb3h0_vbus: cp1_usb3-vbus0 {
 			compatible = "regulator-fixed";
-			regulator-name = "cps-usb3-vbus-h0";
+			regulator-name = "cp1-usb3-vbus-h0";
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
 			enable-active-high;

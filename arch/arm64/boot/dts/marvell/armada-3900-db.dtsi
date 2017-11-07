@@ -89,14 +89,14 @@
 		};
 	};
 
-	cpn-110-master {
+	cp110-0 {
 		config-space {
-			cpm_usb3h0: usb3@500000 {
+			cp0_usb3h0: usb3@500000 {
 				status = "okay";
 			};
-			cpm_usb3h1: usb3@510000 {
+			cp0_usb3h1: usb3@510000 {
 				separated-phys-for-usb2-usb3;
-				phys = <&cpm_comphy 4 COMPHY_USB3H1>;
+				phys = <&cp0_comphy 4 COMPHY_USB3H1>;
 				phy-names = "usb3";
 				status = "okay";
 			};
@@ -121,7 +121,7 @@
 					reg = <0x20800000 0x1f800000>;
 				};
 			};
-			cpm_i2c0: i2c@701000 {
+			cp0_i2c0: i2c@701000 {
 				status = "disabled";
 				clock-frequency = <100000>;
 				pinctrl-names = "default";
@@ -157,17 +157,17 @@
 				};
 			};
 			gop {
-				cpm_emac0: mac0 {
+				cp0_emac0: mac0 {
 					phy-mode = "sfi";
 					phy-speed = <5000>;
-					phys = <&cpm_comphy 2 COMPHY_SFI>;
+					phys = <&cp0_comphy 2 COMPHY_SFI>;
 					phy-names = "comphy";
 					phy = <&phy0>;
 				};
-				cpm_emac2: mac2 {
+				cp0_emac2: mac2 {
 					phy-mode = "sgmii";
 					phy-speed = <1000>;
-					phys = <&cpm_comphy 3 COMPHY_SGMII1>;
+					phys = <&cp0_comphy 3 COMPHY_SGMII1>;
 					phy-names = "comphy";
 					phy = <&phy1>;
 				};
@@ -191,7 +191,7 @@
 		};
 		pcie2@640000 {
 			status = "okay";
-			phys = <&cpm_comphy 5 COMPHY_PCIE2>;
+			phys = <&cp0_comphy 5 COMPHY_PCIE2>;
 			phy-names = "pcie-phy0";
 			ranges = <0x81000000 0 0xf7020000 0  0xf7020000 0 0x10000	/* downstream I/O */
 				  0x82000000 0 0xf8000000 0  0xf8000000 0 0xf00000>;	/* non-prefetchable memory */
@@ -201,27 +201,27 @@
 	/* USB3 VBus controller through GPIO */
 	usb3h0_phy: usb3-h0-phy {
 		compatible = "usb-nop-xceiv";
-		vcc-supply = <&cpm_reg_usb3_vbus0>;
+		vcc-supply = <&cp0_reg_usb3_vbus0>;
 	};
 	usb3h1_phy: usb3-h1-phy {
 		compatible = "usb-nop-xceiv";
-		vcc-supply = <&cpm_reg_usb3_vbus1>;
+		vcc-supply = <&cp0_reg_usb3_vbus1>;
 	};
-	cpm_reg_usb3_vbus0: cpm_usb3_vbus@0 {
+	cp0_reg_usb3_vbus0: cp0_usb3_vbus@0 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
-		pinctrl-0 = <&cpm_xhci0_vbus_pins>;
-		regulator-name = "cpm-xhci0-vbus";
+		pinctrl-0 = <&cp0_xhci0_vbus_pins>;
+		regulator-name = "cp0-xhci0-vbus";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
 		enable-active-high;
 		regulator-always-on;
 	};
-	cpm_reg_usb3_vbus1: cpm_usb3_vbus@1 {
+	cp0_reg_usb3_vbus1: cp0_usb3_vbus@1 {
 		compatible = "regulator-fixed";
 		pinctrl-names = "default";
-		pinctrl-0 = <&cpm_xhci1_vbus_pins>;
-		regulator-name = "cpm-xhci1-vbus";
+		pinctrl-0 = <&cp0_xhci1_vbus_pins>;
+		regulator-name = "cp0-xhci1-vbus";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
 		enable-active-high;
