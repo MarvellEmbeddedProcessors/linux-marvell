@@ -2289,7 +2289,7 @@ void mvc2_usb2_operation(struct mvc2 *cp, int op)
 
 void mvc2_connect(struct mvc2 *cp, int is_on)
 {
-	unsigned int val;
+	unsigned int val, timeout = 5000;
 
 	if (is_on) {
 		val = MV_CP_READ(cp->reg->global_control);
@@ -2305,6 +2305,23 @@ void mvc2_connect(struct mvc2 *cp, int is_on)
 		val = MV_CP_READ(cp->reg->global_control);
 		val &= ~MVCP_GLOBAL_CONTROL_SOFT_CONNECT;
 		MV_CP_WRITE(val, cp->reg->global_control);
+
+		/* Due to differences between USB IP version A0 and above,
+		 * Soft reset after soft disconnect is acceptable according to HW SPEC
+		 * of the IP (Soft reset won't clean the configuration of link layer).
+		 */
+		if (cp->mvc2_version == USB3_IP_VER_A0) {
+			val = MV_CP_READ(MVCP_SOFTWARE_RESET);
+			val |= MVCP_SOFTWARE_RESET_EN;
+			MV_CP_WRITE(val, MVCP_SOFTWARE_RESET);
+			/* Check soft reset is done or not for 5000 cycles time*/
+			while (timeout-- > 0) {
+				val = MV_CP_READ(MVCP_SOFTWARE_RESET);
+				if (!(val & MVCP_SOFTWARE_RESET_EN))
+					break;
+				cpu_relax();
+			}
+		}
 	}
 }
 

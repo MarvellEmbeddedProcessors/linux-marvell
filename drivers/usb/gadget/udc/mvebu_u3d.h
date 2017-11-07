@@ -73,6 +73,7 @@
 #define MVCP_POWER_MANAGEMENT_SOC       0xCC
 #define MVCP_LOW_POWER_STATUS           0xD0
 #define MVCP_SOFTWARE_RESET             0xD4
+	#define MVCP_SOFTWARE_RESET_EN		(0x1<<0)
 
 #define MVCP_TOP_INT_STATUS		0xD8
 	#define MVCP_TOP_INT_SS_EP		(0x1<<6)
