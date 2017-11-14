@@ -132,7 +132,8 @@ static void eip197_write_firmware(struct safexcel_crypto_priv *priv,
 
 static int eip197_load_firmwares(struct safexcel_crypto_priv *priv)
 {
-	const char *fw_name[] = {"ifpp.bin", "ipue.bin"};
+	static const char * const fw_name[] = {"eip197/197b/ifpp.bin",
+					       "eip197/197b/ipue.bin"};
 	const struct firmware *fw[FW_NB];
 	int i, j, ret = 0;
 	u32 val;
