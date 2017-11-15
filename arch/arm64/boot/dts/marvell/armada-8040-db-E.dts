@@ -181,9 +181,6 @@
 				phys = <&utmi0_1>;
 				phy-names = "usb";
 			};
-			serial@702000 {
-				status = "okay";
-			};
 			sata@540000 {
 				status = "okay";
 				sata-port@0 {
