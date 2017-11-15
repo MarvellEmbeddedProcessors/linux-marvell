@@ -165,9 +165,6 @@
 				phy-names = "usb2", "usb3";
 				status = "okay";
 			};
-			serial@702000 {
-				status = "okay";
-			};
 			sata@540000 {
 				status = "okay";
 				sata-port@1 {

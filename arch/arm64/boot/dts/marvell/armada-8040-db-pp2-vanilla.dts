@@ -187,9 +187,6 @@
 			cp1_usb3h0: usb3@500000 {
 				status = "okay";
 			};
-			serial@702000 {
-				status = "okay";
-			};
 			sata@540000 {
 				status = "okay";
 				sata-port@0 {
