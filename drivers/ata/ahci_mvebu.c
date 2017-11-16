@@ -18,6 +18,8 @@
 #include <linux/of_device.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
 #include "ahci.h"
 #include <linux/mv_soc_info.h>
 
@@ -48,6 +50,26 @@
 #define SATA_MBUS_SIZE_SELECT_REG		0x4
 #define SATA_MBUS_REGRET_EN_OFFSET		7
 #define SATA_MBUS_REGRET_EN_MASK		(0x1 << SATA_MBUS_REGRET_EN_OFFSET)
+
+/*
+ * MVEBU AHCI does not support Enclosure Management registers, so it can not
+ * control LED through Enclosure Management registers; but it can turn on/off
+ * LED though a GPIO.
+ * MVEBU AHCI implements software activity LED blinking under Enclosure
+ * Management framework by overwriting transmit_led_message callback function:
+ *     - after a EM message is parsed, MVEBU AHCI does not set EM registers but
+ *       set the GPIO state to turn on/off LED.
+ * The software activity LED blinking only works when the SATA disk is
+ * connected to the controller directly; it does not work when a PMP card is
+ * attached to the controller and disks are connected to the PMP card since
+ * in that case disks are not controlled by MVEBU AHCI controller but by PM
+ * card actually.
+ */
+struct ahci_mvebu_priv {
+	struct device		*dev;
+	u32			led_gpio;
+	enum of_gpio_flags	flags;
+};
 
 static void reg_set(void __iomem *addr, u32 data, u32 mask)
 {
@@ -271,11 +293,151 @@ static int ahci_mvebu_resume(struct platform_device *pdev)
 #define ahci_mvebu_resume NULL
 #endif
 
+static inline void ahci_mvebu_led_on(struct ahci_mvebu_priv *priv)
+{
+	gpio_set_value(priv->led_gpio,
+		       (priv->flags & OF_GPIO_ACTIVE_LOW) ? 0 : 1);
+}
+
+static inline void ahci_mvebu_led_off(struct ahci_mvebu_priv *priv)
+{
+	gpio_set_value(priv->led_gpio,
+		       (priv->flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0);
+}
+
+static ssize_t ahci_mvebu_transmit_led_message(struct ata_port *ap,
+					       u32 state,
+					       ssize_t size)
+{
+	struct ahci_host_priv *hpriv =  ap->host->private_data;
+	struct ahci_mvebu_priv *priv = hpriv->plat_data;
+	struct ahci_port_priv *pp = ap->private_data;
+	int pmp;
+	struct ahci_em_priv *emp;
+
+	dev_dbg(priv->dev, "Tx led message: state 0x%x\n", state);
+
+	/* get the slot number from the message */
+	pmp = (state & EM_MSG_LED_PMP_SLOT) >> 8;
+	if (pmp < EM_MAX_SLOTS)
+		emp = &pp->em_priv[pmp];
+	else
+		return -EINVAL;
+
+	if (!(hpriv->em_msg_type & EM_MSG_TYPE_LED))
+		return size;
+
+	if (state & EM_MSG_LED_VALUE_ON)
+		ahci_mvebu_led_on(priv);
+	else
+		ahci_mvebu_led_off(priv);
+
+	/* save off new led state for port/slot */
+	emp->led_state = state;
+
+	return size;
+}
+
+static int ahci_mvebu_init_em_led(struct platform_device *pdev,
+			     struct ahci_host_priv *hpriv)
+{
+	struct ahci_mvebu_priv *priv = NULL;
+	int rc;
+
+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	hpriv->plat_data = priv;
+	priv->dev = &pdev->dev;
+	priv->led_gpio = of_get_named_gpio_flags(pdev->dev.of_node,
+						 "marvell,led-gpio",
+						 0,
+						 &priv->flags);
+
+	if (gpio_is_valid(priv->led_gpio)) {
+		rc = gpio_request(priv->led_gpio, "Marvell AHCI LED");
+		if (rc)
+			dev_err(&pdev->dev,
+				"gpio_request %d failed: %d\n",
+				priv->led_gpio, rc);
+	} else if (priv->led_gpio == -EPROBE_DEFER) {
+		rc = -EPROBE_DEFER;
+	} else {
+		dev_err(&pdev->dev, "Failed to get <marvell,led-gpio>!\n");
+		rc = -ENODEV;
+	}
+	if (rc)
+		return rc;
+
+	/*
+	 * Set enclosure management location to be 0 although mvebu AHCI
+	 * overwrite transmit_led_message and will not use it.
+	 */
+	hpriv->em_loc = 0;
+	/*
+	 * Set enclosure management buffer size to be 4 bytes as standard
+	 * EM LED message size although mvebu AHCI overwrite
+	 * transmit_led_message and will not use it
+	 */
+	hpriv->em_buf_sz = 4;
+	/* Set enclosure management message type to support EM LED */
+	hpriv->em_msg_type = EM_MSG_TYPE_LED;
+
+	return 0;
+}
+
+/*
+ * This function is used to set LED blink policy and link flags by force for
+ * all ATA links connected to the AHCI controller to support software
+ * activity LED blinking since mvebu AHCI does not support Enclosure
+ * Management registers actually;
+ * ATA links are created with ATA host, so this function must be called
+ * after ahci_platform_init_host() which creates ATA host, ports and links.
+ */
+static void ahci_mvebu_set_em_blink_policy(struct platform_device *pdev,
+			      enum sw_activity blink_policy)
+{
+	/* Set LED blink policy for all connected ATA links */
+	struct ata_host *host = platform_get_drvdata(pdev);
+	struct ata_link *link;
+	int i;
+
+	for (i = 0; i < host->n_ports; i++) {
+		struct ata_port *ap = host->ports[i];
+		struct ahci_port_priv *pp = ap->private_data;
+
+		ata_for_each_link(link, ap, EDGE) {
+			struct ahci_em_priv *emp;
+
+			link->flags |= ATA_LFLAG_SW_ACTIVITY;
+			emp = &pp->em_priv[link->pmp];
+			emp->blink_policy = blink_policy;
+		}
+	}
+}
+
 static const struct ata_port_info ahci_mvebu_port_info = {
 	.flags	   = AHCI_FLAG_COMMON,
 	.pio_mask  = ATA_PIO4,
 	.udma_mask = ATA_UDMA6,
 	.port_ops  = &ahci_platform_ops,
+};
+
+/*
+ * The below ata port operations and port info are for Enclosure Management;
+ * for more detailed, please refer to explanation above struct ahci_mvebu_priv.
+ */
+struct ata_port_operations ahci_mvebu_em_ops = {
+	.inherits		= &ahci_platform_ops,
+	.transmit_led_message	= ahci_mvebu_transmit_led_message,
+};
+
+static const struct ata_port_info ahci_mvebu_em_port_info = {
+	.flags	   = AHCI_FLAG_COMMON | ATA_FLAG_EM | ATA_FLAG_SW_ACTIVITY,
+	.pio_mask  = ATA_PIO4,
+	.udma_mask = ATA_UDMA6,
+	.port_ops  = &ahci_mvebu_em_ops,
 };
 
 static struct scsi_host_template ahci_platform_sht = {
@@ -286,6 +448,8 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 {
 	struct ahci_host_priv *hpriv;
 	const struct mbus_dram_target_info *dram;
+	enum sw_activity	blink_policy = OFF;
+	const struct ata_port_info *port_info;
 	int rc;
 
 	hpriv = ahci_platform_get_resources(pdev);
@@ -330,10 +494,43 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
 				 &hpriv->comreset_u))
 		hpriv->comreset_u = 0;
 
-	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
+	of_property_read_u32(pdev->dev.of_node, "marvell,blink-policy",
+			     &blink_policy);
+	if (blink_policy != OFF) {
+		rc = ahci_mvebu_init_em_led(pdev, hpriv);
+		switch (rc) {
+		case 0:
+			port_info = &ahci_mvebu_em_port_info;
+			break;
+		case -EPROBE_DEFER:
+			dev_dbg(&pdev->dev, "LED GPIO not ready, retry\n");
+		case -ENOMEM:
+			/* Fatal error */
+			goto disable_resources;
+		default:
+			dev_info(&pdev->dev,
+				 "AHCI LED initialization failed!\n");
+			dev_info(&pdev->dev,
+				 "Turn back to work in no LED mode!\n");
+			port_info = &ahci_mvebu_port_info;
+		}
+	} else {
+		port_info = &ahci_mvebu_port_info;
+	}
+
+	rc = ahci_platform_init_host(pdev, hpriv, port_info,
 				     &ahci_platform_sht);
 	if (rc)
 		goto disable_resources;
+
+	if (blink_policy != OFF) {
+		/*
+		 * After ATA host and its ATA ports and links are created, set
+		 * LED blink policy by force for its all connected ATA links to
+		 * to support software activity LED blinking.
+		 */
+		ahci_mvebu_set_em_blink_policy(pdev, blink_policy);
+	}
 
 	return 0;
 
