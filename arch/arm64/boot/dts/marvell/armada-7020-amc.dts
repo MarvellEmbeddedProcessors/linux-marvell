@@ -111,7 +111,7 @@
 				clock-frequency = <100000>;
 			};
 
-			cp0_i2c1: i2c@701100 {
+			cp0_mss_i2c0: i2c@211000 {
 				status = "okay";
 				clock-frequency = <100000>;
 			};
