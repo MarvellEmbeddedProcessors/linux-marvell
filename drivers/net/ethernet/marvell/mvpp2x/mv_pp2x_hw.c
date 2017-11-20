@@ -4566,16 +4566,16 @@ int mv_pp2x_prs_sw_sram_offset_get(struct mv_pp2x_prs_entry *pe,
 		MVPP2_PRS_SRAM_UDF_OFFS)] >>
 		(MVPP2_PRS_SRAM_UDF_OFFS % 8)) & 0x7f;
 	*offset |= (pe->sram.byte[
-		    SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS) +
-		    SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS)] <<
+		    SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_UDF_OFFS +
+		    MVPP2_PRS_SRAM_UDF_BITS)] <<
 		    (8 - (MVPP2_PRS_SRAM_UDF_OFFS % 8))) & 0x80;
 
 	*op = (pe->sram.byte[SRAM_BIT_TO_BYTE(
 		MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS)] >>
 		(MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS % 8)) & 0x7;
-	*op |= (pe->sram.byte[HW_BYTE_OFFS(
-		SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS) +
-		SRAM_BIT_TO_BYTE(MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS))] <<
+	*op |= (pe->sram.byte[SRAM_BIT_TO_BYTE(
+		MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS +
+		MVPP2_PRS_SRAM_OP_SEL_SHIFT_BITS)] <<
 		(8 - (MVPP2_PRS_SRAM_OP_SEL_SHIFT_OFFS % 8))) & 0x18;
 
 	/* if signed bit is tes */
