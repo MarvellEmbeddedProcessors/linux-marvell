@@ -284,7 +284,7 @@ static int armada3700_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	struct armada_a3700_clk_pm_info *clk_pm_info = NULL;
 	struct armada_3700_clk_pm *clk = to_clk(hw);
 	unsigned int new_rate = rate / KHZ_TO_HZ;  /* KHz */
-	int divider, load_level;
+	int divider, load_level, cur_level;
 	u32 reg_val;
 
 	/* Calculate the clock divider */
@@ -302,6 +302,32 @@ static int armada3700_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 		if (load_level == DVFS_LOAD_MAX_NUM) {
 			dev_err(clk->dev, "invalid CPU new rate %d kHz\n", new_rate);
 			return -1;
+		}
+
+		/*
+		 * For CPU L0 frequency @ 1.2GHz, VDD voltage has a big step
+		 * in switching from L2/L3(200/300MHz) to it, which requires
+		 * the time for stabling VDD voltage. The VDD change latency
+		 * can not be covered by the relevant HW countdown register.
+		 * As a WA, the following procedure is suggested:
+		 * 1. First switch from L2/L3(200/300MHz) to L1(600MHZ);
+		 * 2. Sleep 20ms for stabling VDD voltage;
+		 * 3. Then switch from L1(600MHZ) to L0(1200Mhz).
+		 */
+		if (new_rate == 1200000) {
+			reg_val = readl(clk->reg + A3700_PM_NB_CPU_LOAD_REG);
+			cur_level = (reg_val & A3700_PM_NB_CPU_LOAD_MASK)
+				    >> A3700_PM_NB_CPU_LOAD_OFF;
+			if (cur_level > DVFS_LOAD_1) {
+				reg_val &= ~(A3700_PM_NB_CPU_LOAD_MASK
+					     << A3700_PM_NB_CPU_LOAD_OFF);
+				reg_val |= ((DVFS_LOAD_1
+					     & A3700_PM_NB_CPU_LOAD_MASK)
+					    << A3700_PM_NB_CPU_LOAD_OFF);
+				writel(reg_val,
+				       clk->reg + A3700_PM_NB_CPU_LOAD_REG);
+				msleep(20);
+			}
 		}
 	} else {
 		load_level = DVFS_LOAD_0;
