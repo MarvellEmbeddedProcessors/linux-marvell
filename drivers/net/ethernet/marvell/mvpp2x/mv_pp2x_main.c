@@ -3816,6 +3816,25 @@ void mv_pp2x_port_napi_disable(struct mv_pp2x_port *port)
 	}
 }
 
+static void mv_pp2x_port_napi_remove(struct mv_pp2x_port *port)
+{
+	int i, sub_vec_id;
+	struct queue_vector *qvec;
+
+	for (i = 0; i < port->num_qvector; i++) {
+		qvec = &port->q_vector[i];
+		if (!qvec->num_of_sub_vectors || mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
+			napi_hash_del(&qvec->sub_vec[0]->napi);
+			netif_napi_del(&qvec->sub_vec[0]->napi);
+		} else {
+			for (sub_vec_id = 0; sub_vec_id < qvec->num_of_sub_vectors; sub_vec_id++) {
+				napi_hash_del(&qvec->sub_vec[sub_vec_id]->napi);
+				netif_napi_del(&qvec->sub_vec[sub_vec_id]->napi);
+			}
+		}
+	}
+}
+
 static void mv_pp2x_port_irqs_dispose_mapping(struct mv_pp2x_port *port)
 {
 	int i;
@@ -5410,12 +5429,12 @@ static int mv_pp2x_port_init(struct mv_pp2x_port *port)
 	err = mv_pp2x_port_txqs_init(dev, port);
 
 	if (err)
-		goto err_free_percpu;
+		goto out;
 
 	/* Associate physical Rx queues to port and initialize.  */
 	err = mv_pp2x_port_rxqs_init(dev, port);
 	if (err)
-		goto err_free_percpu;
+		goto out;
 
 	/* Create Rx descriptor rings */
 	for (queue = 0; queue < port->num_rx_queues; queue++) {
@@ -5434,10 +5453,11 @@ static int mv_pp2x_port_init(struct mv_pp2x_port *port)
 
 	err = mv_pp2x_port_hw_init(port);
 	if (err)
-		goto err_free_percpu;
+		goto out;
 	return 0;
 
-err_free_percpu:
+out:
+	mv_pp2x_port_napi_remove(port);
 
 	return err;
 }
@@ -5929,7 +5949,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	dev_err(&pdev->dev, "%s failed for port_id(%d)\n", __func__, id);
 
 err_unreg_netdev:
-		unregister_netdev(dev);
+	unregister_netdev(dev);
 err_free_stats:
 	free_percpu(port->stats);
 err_free_irq:
@@ -5951,6 +5971,7 @@ static void mv_pp2x_port_remove(struct mv_pp2x_port *port)
 		kfree(port->uio.u_info.name);
 	}
 
+	mv_pp2x_port_napi_remove(port);
 	unregister_netdev(port->dev);
 
 	if (port->mac_data.phy_node)
