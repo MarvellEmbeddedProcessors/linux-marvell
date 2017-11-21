@@ -138,7 +138,7 @@
 
 		pci-ep-uio {
 			compatible = "marvell,pci-ep-uio";
-			reg = <0 0 0 0x100000>, <0x80 0x00000000 0x1 0x000000000>;
+			reg = <0 0 0 0x100000>, <0x80 0x00000000 0x8 0x000000000>;
 			reg-names = "bar0", "host-map";
 			device-id = <0x7080>;
 			class-code = <0x2>;
