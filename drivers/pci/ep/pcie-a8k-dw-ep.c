@@ -188,7 +188,7 @@ int a8k_pcie_ep_remap_host(void *ep_hdl, u32 func_id, u64 local_base, u64 host_b
 	struct a8k_pcie_ep *ep = (struct a8k_pcie_ep *)ep_hdl;
 	void __iomem *pl_regs = ep->pl_regs;
 	u32   v, region = 0;
-	int remain_size = size;
+	u64 remain_size = size;
 
 	/* ATU window size must be power of 2 */
 	if (!is_power_of_2(size))
