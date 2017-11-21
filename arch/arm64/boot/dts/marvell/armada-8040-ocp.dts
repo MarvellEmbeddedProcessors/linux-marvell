@@ -172,9 +172,9 @@
 			};
 			gop {
 				cp1_emac0: mac0 {
-					phys = <&cp1_comphy 4 COMPHY_SFI>;
+					phys = <&cp1_comphy 4 COMPHY_SGMII0>;
 					phy-names = "comphy";
-					phy-mode = "sfi"; /* lane-4 */
+					phy-mode = "sgmii"; /* lane-4 */
 				};
 				cp1_emac2: mac2 {
 					phy-mode = "none";
