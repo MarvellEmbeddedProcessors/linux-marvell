@@ -41,16 +41,19 @@
  */
 
 /*
- * Device Tree file for Marvell Armada 8040 Development board platform
+ * Device Tree file for Marvell Armada 8040 development board
+ * This file supports option default (A) configuration
+ * AP_UART,AP_eMMC,CP0_I2C,CP0_eMMC,CP0_RGMII1,CP1_SPI(Boot),CP1_RGMII0
  */
 
 #include <dt-bindings/gpio/gpio.h>
 #include "armada-8040.dtsi"
 
 / {
-	model = "Marvell Armada 8040 DB board";
-	compatible = "marvell,armada8040-db", "marvell,armada8040",
-		     "marvell,armada-ap806-quad", "marvell,armada-ap806";
+	model = "Marvell Armada 8040 development board default (A) setup";
+	compatible = "marvell,armada8040-db-default", "marvell,armada8040-db",
+		"marvell,armada8040", "marvell,armada-ap806-quad",
+		"marvell,armada-ap806";
 
 	chosen {
 		stdout-path = "serial0:115200n8";
@@ -116,33 +119,6 @@
 	clock-frequency = <100000>;
 };
 
-&spi0 {
-	status = "okay";
-
-	spi-flash@0 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		compatible = "jedec,spi-nor";
-		reg = <0>;
-		spi-max-frequency = <10000000>;
-
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			partition@0 {
-				label = "U-Boot";
-				reg = <0 0x200000>;
-			};
-			partition@400000 {
-				label = "Filesystem";
-				reg = <0x200000 0xce0000>;
-			};
-		};
-	};
-};
-
 /* Accessible over the mini-USB CON9 connector on the main board */
 &uart0 {
 	status = "okay";
@@ -150,14 +126,10 @@
 	pinctrl-names = "default";
 };
 
-/* CON6 on CP0 expansion */
-&cp0_pcie0 {
+&ap_sdhci0 {
 	status = "okay";
-};
-
-/* CON5 on CP0 expansion */
-&cp0_pcie2 {
-	status = "okay";
+	bus-width = <4>;
+	non-removable;
 };
 
 &cp0_i2c0 {
@@ -184,9 +156,32 @@
 
 };
 
-/* CON4 on CP0 expansion */
+&cp0_sdhci0 {
+	status = "okay";
+	bus-width = <8>;
+	non-removable;
+};
+
+/* CON6 on CP0 expansion */
+&cp0_pcie0 {
+	status = "okay";
+};
+
+/* CON5 on CP0 expansion */
+&cp0_pcie2 {
+	status = "okay";
+};
+
 &cp0_sata0 {
 	status = "okay";
+	/* CON2 on CP0 expansion */
+	sata-port@0 {
+		status = "okay";
+	};
+	/* CON4 on CP0 expansion */
+	sata-port@1 {
+		status = "okay";
+	};
 };
 
 /* CON9 on CP0 expansion */
@@ -224,26 +219,6 @@
 	phy-mode = "rgmii-id";
 };
 
-/* CON6 on CP1 expansion */
-&cp1_pcie0 {
-	status = "okay";
-};
-
-/* CON7 on CP1 expansion */
-&cp1_pcie1 {
-	status = "okay";
-};
-
-/* CON5 on CP1 expansion */
-&cp1_pcie2 {
-	status = "okay";
-};
-
-&cp1_i2c0 {
-	status = "okay";
-	clock-frequency = <100000>;
-};
-
 &cp1_spi1 {
 	status = "okay";
 
@@ -261,61 +236,47 @@
 
 			partition@0 {
 				label = "Boot";
-				reg = <0x0 0x200000>;
+				reg = <0x0 0x400000>;
 			};
-			partition@200000 {
+			partition@400000 {
 				label = "Filesystem";
-				reg = <0x200000 0xd00000>;
-			};
-			partition@f00000 {
-				label = "Boot_2nd";
-				reg = <0xf00000 0x100000>;
+				reg = <0x400000 0xc00000>;
 			};
 		};
 	};
 };
 
-/*
- * Proper NAND usage will require DPR-76 to be in position 1-2, which disables
- * MDIO signal of CP1.
- */
-&cp1_nand {
-	num-cs = <1>;
-	pinctrl-0 = <&nand_pins>, <&nand_rb>;
-	pinctrl-names = "default";
-	nand-ecc-strength = <4>;
-	nand-ecc-step-size = <512>;
-	marvell,nand-enable-arbiter;
-	marvell,system-controller = <&cp1_syscon0>;
-	nand-on-flash-bbt;
+/* CON6 on CP1 expansion */
+&cp1_pcie0 {
+	status = "okay";
+};
 
-	partition@0 {
-		label = "U-Boot";
-		reg = <0 0x200000>;
-	};
-	partition@200000 {
-		label = "Linux";
-		reg = <0x200000 0xe00000>;
-	};
-	partition@1000000 {
-		label = "Filesystem";
-		reg = <0x1000000 0x3f000000>;
-	};
+/* CON7 on CP1 expansion */
+&cp1_pcie1 {
+	status = "okay";
+};
+
+/* CON5 on CP1 expansion */
+&cp1_pcie2 {
+	status = "okay";
 };
 
 /* CON4 on CP1 expansion */
 &cp1_sata0 {
 	status = "okay";
+	/* CON2 on CP1 expansion */
+	sata-port@0 {
+		status = "okay";
+	};
+	/* CON4 on CP1 expansion */
+	sata-port@1 {
+		status = "okay";
+	};
 };
 
 /* CON9 on CP1 expansion */
 &cp1_usb3_0 {
 	usb-phy = <&cp1_usb3_0_phy>;
-	status = "okay";
-};
-
-/* CON10 on CP1 expansion */
-&cp1_usb3_1 {
 	status = "okay";
 };
 
@@ -340,16 +301,4 @@
 	status = "okay";
 	phy = <&phy0>;
 	phy-mode = "rgmii-id";
-};
-
-&ap_sdhci0 {
-	status = "okay";
-	bus-width = <4>;
-	non-removable;
-};
-
-&cp0_sdhci0 {
-	status = "okay";
-	bus-width = <8>;
-	non-removable;
 };
