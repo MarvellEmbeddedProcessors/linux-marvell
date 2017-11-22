@@ -226,6 +226,8 @@
 			sata@e0000 {
 				target-supply = <&reg_5v_sata>;
 				phys = <&a3700_comphy 2 COMPHY_SATA0>;
+				marvell,led-gpio = <&gpionb 11 GPIO_ACTIVE_LOW>;
+				marvell,blink-policy = <LEDS_AHCI_MVEBU_BLINK_OFF>;
 				status = "okay";
 			};
 

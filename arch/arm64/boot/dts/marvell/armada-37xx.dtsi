@@ -48,6 +48,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/phy/phy-utmi-mvebu.h>
 #include <dt-bindings/phy/phy-comphy-mvebu.h>
+#include <dt-bindings/leds/leds-ahci-mvebu.h>
 
 / {
 	model = "Marvell Armada 37xx SoC";
