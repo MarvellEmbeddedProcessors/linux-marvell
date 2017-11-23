@@ -56,6 +56,14 @@
 #define MAX_VMIN_OPTION			0x34
 #define MHZ_TO_HZ			1000000
 
+/*
+ * If L0 voltage is larger than 1000mv, then
+ * - L1 voltage is equal to L0 vlotage - 100mv
+ * - L2 & L3  voltage is equal to L0 vlotage - 150mv
+ * - L1 & L2 & L3 voltage must be larger than 1000mv
+ */
+#define MIN_VOLT_MV			1000
+
 enum armada_3700_avs_lp_mode {
 	LOW_VDD_MODE = 0,
 	HOLD_MODE,
@@ -88,7 +96,6 @@ struct armada_3700_avs {
 	struct regulator_desc desc;
 	void __iomem *base;
 	enum armada_3700_avs_lp_mode mode; /* low power mode */
-	enum armada_3700_cpu_freq freq_level;
 };
 
 struct armada_3700_avs_vol_map {
@@ -96,13 +103,8 @@ struct armada_3700_avs_vol_map {
 	u32 volt_m; /* The corresponding voltage(mv) to AVS value */
 };
 
-/* The VDD min for each CPU frequency, from HW designer */
-static int voltage_m_tbl[MAX_CPU_FREQ_LEVEL_NUM][VDD_SET_MAX] = {
-	{1108, 1050, 1050, 1050}, /* 600MHZ */
-	{1108, 1050, 1050, 1050}, /* 800MHZ */
-	{1155, 1050, 1050, 1050}, /* 1000MHZ */
-	{1202, 1108, 1050, 1050}, /* 1200MHZ */
-};
+/* The avs values of VDD sets */
+static int avs_val_tbl[VDD_SET_MAX];
 
 /* The corresponding relationship between avs value and volatge for each CPU frequency, from HW designer */
 static struct armada_3700_avs_vol_map avs_value_voltage_map[MAX_VMIN_OPTION] = {
@@ -204,20 +206,6 @@ static struct regulator_ops armada3700_regulator_ops = {
 	.is_enabled = armada3700_avs_is_enabled,
 };
 
-static u32 armada_3700_avs_vdd_min_get(u32 vlotage_m)
-{
-	int i;
-
-	for (i = 0; i < MAX_VMIN_OPTION; i++) {
-		if (avs_value_voltage_map[i].volt_m == vlotage_m)
-			break;
-	}
-	if (i == MAX_VMIN_OPTION)
-		return 0;
-
-	return avs_value_voltage_map[i].avs_val;
-}
-
 static int armada_3700_avs_vdd_load_set(struct armada_3700_avs *avs)
 {
 	u32 reg_val, vdd_min;
@@ -245,7 +233,7 @@ static int armada_3700_avs_vdd_load_set(struct armada_3700_avs *avs)
 
 	/* Set VDD for VSET 1, VSET 2 and VSET 3 */
 	for (i = VDD_SET1; i < VDD_SET_MAX; i++) {
-		vdd_min = armada_3700_avs_vdd_min_get(avs->desc.volt_table[i]);
+		vdd_min = avs_val_tbl[i];
 		if (vdd_min == 0) {
 			pr_err("Invlid vdd min value got\n");
 			return -1;
@@ -262,6 +250,91 @@ static int armada_3700_avs_vdd_load_set(struct armada_3700_avs *avs)
 	reg_val = readl(avs->base + A3700_AVS_CTRL_0);
 	reg_val |= AVS_ENABLE;
 	writel(reg_val, avs->base + A3700_AVS_CTRL_0);
+
+	return 0;
+}
+
+/*
+ * Find out the armada3700 supported avs value whose voltage value is
+ * the round-up closest to the target voltage value.
+ */
+static u32 armada_3700_avs_val_match(u32 target_vm)
+{
+	int i;
+
+	/* Find out the round-up closest supported voltage value */
+	for (i = 0; i < MAX_VMIN_OPTION; i++)
+		if (avs_value_voltage_map[i].volt_m >= target_vm)
+			break;
+
+	/*
+	 * If all supported voltages are smaller than target one,
+	 * choose the largest supported voltage
+	 */
+	if (i == MAX_VMIN_OPTION)
+		i = MAX_VMIN_OPTION - 1;
+
+	return avs_value_voltage_map[i].avs_val;
+}
+
+/*
+ * For armada 3700 soc,
+ * L0(VSET0) VDD avs value is set to SVC revision value or a default value when
+ * SVC is not supported, it can be read out from the register of AVS_CTRL_0
+ * and L0 voltage can be got from the mapping table of avs_value_voltage_map;
+ * L1 voltage should be about 100mv smaller than L0 voltage;
+ * L2 & L3 voltage should be about 150mv smaller than L0 voltage.
+ * This function calculates L1 & L2 & L3 avs values dynamically based on L0
+ * voltage and fill all avs values to the avs value table avs_val_tbl.
+ */
+static int armada_3700_avs_val_init(struct device *dev,
+				    struct armada_3700_avs *avs)
+{
+	u32 reg_val, l0_vdd_min, target_vm;
+	int i;
+
+	/* Read L0 VDD min value */
+	reg_val = readl(avs->base + A3700_AVS_CTRL_0);
+	l0_vdd_min = (reg_val & (AVS_VDD_MASK << AVS_LOW_VDD_LIMIT_OFFS))
+		     >> AVS_LOW_VDD_LIMIT_OFFS;
+
+	/* Find out L0 voltage value in mv unit */
+	for (i = 0; i < MAX_VMIN_OPTION; i++) {
+		if (avs_value_voltage_map[i].avs_val == l0_vdd_min)
+			break;
+	}
+	if (i == MAX_VMIN_OPTION) {
+		dev_err(dev, "L0 VDD MIN %d is not correct.\n", l0_vdd_min);
+		return -1;
+	}
+
+	avs_val_tbl[VDD_SET0] = avs_value_voltage_map[i].avs_val;
+	if (avs_value_voltage_map[i].volt_m <= MIN_VOLT_MV) {
+		/*
+		 * If L0 voltage is smaller than 1000mv, then all VDD sets
+		 * use L0 voltage;
+		 */
+		avs_val_tbl[VDD_SET1] = avs_val_tbl[VDD_SET2] =
+		avs_val_tbl[VDD_SET3] = MIN_VOLT_MV;
+		return 0;
+	}
+
+	/*
+	 * L1 voltage is equal to L0 vlotage - 100mv and it must be larger
+	 * than 1000mv
+	 */
+	target_vm = avs_value_voltage_map[i].volt_m - 100;
+	target_vm = target_vm > MIN_VOLT_MV ? target_vm : MIN_VOLT_MV;
+	avs_val_tbl[VDD_SET1] = armada_3700_avs_val_match(target_vm);
+
+	/*
+	 * L2 & L3  voltage is equal to L0 vlotage - 150mv and it must be larger
+	 * than 1000mv
+	 */
+	target_vm = avs_value_voltage_map[i].volt_m - 150;
+	target_vm = target_vm > MIN_VOLT_MV ? target_vm : MIN_VOLT_MV;
+	avs_val_tbl[VDD_SET2] = avs_val_tbl[VDD_SET3] =
+	armada_3700_avs_val_match(target_vm);
 
 	return 0;
 }
@@ -312,28 +385,39 @@ static int armada_3700_avs_probe(struct platform_device *pdev)
 	avs->desc.ops = &armada3700_regulator_ops;
 	avs->desc.type = REGULATOR_VOLTAGE;
 	avs->desc.owner = THIS_MODULE;
-	if (max_cpu_freq == CPU_FREQ_600MHZ) {
-		avs->freq_level = CPU_FREQ_LEVEL_600MHZ;
-	} else if (max_cpu_freq == CPU_FREQ_800MHZ) {
-		avs->freq_level = CPU_FREQ_LEVEL_800MHZ;
-	} else if (max_cpu_freq == CPU_FREQ_1000MHZ) {
-		avs->freq_level = CPU_FREQ_LEVEL_1000MHZ;
-		/*
-		 * Overwrite the VDD values from load 1 to load 3 in 1000MHZ
-		 * for EspressoBin, otherwise the CPU gets stuck.
-		 */
-		if (of_device_is_compatible(np, "marvell,armada-3700-espressobin-avs"))
+
+	switch (max_cpu_freq) {
+	case CPU_FREQ_1000MHZ:
+		if (of_device_is_compatible(np,
+			"marvell,armada-3700-espressobin-avs")) {
+			/* Read out L0 VDD min value */
+			u32 reg_val = readl(avs->base + A3700_AVS_CTRL_0);
+
+			reg_val &= (AVS_VDD_MASK << AVS_LOW_VDD_LIMIT_OFFS);
+			reg_val >>= AVS_LOW_VDD_LIMIT_OFFS;
+			avs_val_tbl[VDD_SET0] = reg_val;
+
+			/*
+			 * Fix the avs values from load 1 to load 3 in 1000MHZ
+			 * for EspressoBin, otherwise the CPU gets stuck.
+			 */
 			for (idx = VDD_SET1; idx <= VDD_SET3; idx++)
-				voltage_m_tbl[avs->freq_level][idx] = ESPRESSOBIN_VDD_MIN;
-	} else if (max_cpu_freq == CPU_FREQ_1200MHZ) {
-		avs->freq_level = CPU_FREQ_LEVEL_1200MHZ;
-	} else {
+				avs_val_tbl[idx] =
+				armada_3700_avs_val_match(
+				ESPRESSOBIN_VDD_MIN);
+			break;
+		}
+	case CPU_FREQ_600MHZ:
+	case CPU_FREQ_800MHZ:
+	case CPU_FREQ_1200MHZ:
+		armada_3700_avs_val_init(&pdev->dev, avs);
+		break;
+	default:
 		ret = -1;
 		dev_err(&pdev->dev, "Unsupported CPU frwquency %dMHZ\n",
 			max_cpu_freq);
 		goto free_avs;
 	}
-	avs->desc.volt_table = voltage_m_tbl[avs->freq_level];
 
 	ret = armada_3700_avs_vdd_load_set(avs);
 	if (ret)
