@@ -815,27 +815,6 @@ inline int safexcel_select_ring(struct safexcel_crypto_priv *priv)
 	return (atomic_inc_return(&priv->ring_used) % priv->config.rings);
 }
 
-/* Default IRQ handler */
-static irqreturn_t safexcel_irq_default(int irq, void *data)
-{
-	struct safexcel_crypto_priv *priv = data;
-
-	dev_err(priv->dev, "Got an interrupt handled by the default handler.\n");
-
-	return IRQ_NONE;
-}
-
-/* Global IRQ handler */
-static irqreturn_t safexcel_irq_global(int irq, void *data)
-{
-	struct safexcel_crypto_priv *priv = data;
-	u32 status = readl(EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ENABLED_STAT);
-
-	writel(status, EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
-
-	return IRQ_HANDLED;
-}
-
 /* Free crypto API result mapping */
 void safexcel_free_context(struct safexcel_crypto_priv *priv,
 				  struct crypto_async_request *req,
@@ -1108,28 +1087,6 @@ static irqreturn_t safexcel_irq_ring(int irq, void *data)
 	return rc;
 }
 
-/* Register gloabl interrupts */
-static int safexcel_request_irq(struct platform_device *pdev, const char *name,
-				irq_handler_t handler,
-				struct safexcel_crypto_priv *priv)
-{
-	int ret, irq = platform_get_irq_byname(pdev, name);
-
-	if (irq < 0) {
-		dev_err(&pdev->dev, "unable to get IRQ '%s'\n", name);
-		return irq;
-	}
-
-	ret = devm_request_irq(&pdev->dev, irq, handler, 0,
-			       dev_name(&pdev->dev), priv);
-	if (ret) {
-		dev_err(&pdev->dev, "unable to request IRQ %d\n", irq);
-		return ret;
-	}
-
-	return irq;
-}
-
 /* Register ring interrupts */
 static int safexcel_request_ring_irq(struct platform_device *pdev, const char *name,
 				     irq_handler_t irq_handler,
@@ -1317,14 +1274,6 @@ static int safexcel_probe(struct platform_device *pdev)
 	}
 
 	safexcel_configure(priv);
-
-	ret = safexcel_request_irq(pdev, "eip_out", safexcel_irq_global, priv);
-	if (ret < 0)
-		goto err_pool;
-
-	ret = safexcel_request_irq(pdev, "eip_addr", safexcel_irq_default, priv);
-	if (ret < 0)
-		goto err_pool;
 
 	for (i = 0; i < priv->config.rings; i++) {
 		char irq_name[6] = {0}; /* "ringX\0" */
