@@ -25,7 +25,7 @@
 static int eip_in_use = -1;
 
 /* Module param to save the assigned rings to the Kernel */
-static uint rings[MAX_EIP_ENGINE] = {RINGS_UNINITIALIZED, RINGS_UNINITIALIZED};
+static uint rings[MAX_EIP_DEVICE] = {RINGS_UNINITIALIZED, RINGS_UNINITIALIZED};
 
 /* Initialize pseudo random generator */
 static void eip197_prng_init(struct safexcel_crypto_priv *priv)

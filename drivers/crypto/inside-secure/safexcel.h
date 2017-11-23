@@ -25,8 +25,8 @@
 #define EIP197_HIA_VERSION_LE				0xca35
 #define EIP197_HIA_VERSION_BE				0x35ca
 
-/* Number of engines */
-#define MAX_EIP_ENGINE					2
+/* Number of eip devices */
+#define MAX_EIP_DEVICE					2
 
 #define RINGS_UNINITIALIZED				0xff
 
