@@ -15,8 +15,8 @@
 
 /* Initialize the ring descriptors */
 int safexcel_init_ring_descriptors(struct safexcel_crypto_priv *priv,
-				   struct safexcel_ring *cdr,
-				   struct safexcel_ring *rdr)
+				   struct safexcel_desc_ring *cdr,
+				   struct safexcel_desc_ring *rdr)
 {
 	cdr->offset = sizeof(u32) * priv->config.cd_offset;
 	cdr->base = dmam_alloc_coherent(priv->dev,
@@ -44,7 +44,7 @@ int safexcel_init_ring_descriptors(struct safexcel_crypto_priv *priv,
 
 /* Return the next available descriptor for use (command/result) */
 static void *safexcel_ring_next_wptr(struct safexcel_crypto_priv *priv,
-				     struct safexcel_ring *ring)
+				     struct safexcel_desc_ring *ring)
 {
 	void *ptr = ring->write;
 
@@ -61,7 +61,7 @@ static void *safexcel_ring_next_wptr(struct safexcel_crypto_priv *priv,
 
 /* Return the last used descriptor (command/result) */
 void *safexcel_ring_next_rptr(struct safexcel_crypto_priv *priv,
-			      struct safexcel_ring *ring)
+			      struct safexcel_desc_ring *ring)
 {
 	void *ptr = ring->read;
 
@@ -78,7 +78,7 @@ void *safexcel_ring_next_rptr(struct safexcel_crypto_priv *priv,
 
 /* Rollback descriptor allocation (in a case of insufficient resources) */
 void safexcel_ring_rollback_wptr(struct safexcel_crypto_priv *priv,
-				 struct safexcel_ring *ring)
+				 struct safexcel_desc_ring *ring)
 {
 	if (!ring->nr)
 		return;
