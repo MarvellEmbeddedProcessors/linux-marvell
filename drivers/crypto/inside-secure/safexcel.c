@@ -255,14 +255,20 @@ static int eip197_load_fw(struct device *dev, struct safexcel_crypto_priv *priv)
 	const u32		*fw_data;
 	int			i, ret, pe;
 	u32			fw_size, reg;
-	const char		*fw_name[MAX_FW_NR] = {"eip197/197b/ifpp.bin",
-						       "eip197/197b/ipue.bin"};
+	const char		*fw_file_name[MAX_FW_NR] = {"ifpp.bin",
+							    "ipue.bin"};
+	char			fw_base[13] = {0};	/* "eip197/197X/\0" */
+	char			fw_full_name[25] = {0};
+
+	snprintf(fw_base, 13, "eip197/197%s/",
+		 (priv->eip197_hw_ver == EIP197B) ? "b" : "d");
 
 	for (i = 0; i < MAX_FW_NR; i++) {
-		ret = request_firmware(&fw[i], fw_name[i], dev);
+		snprintf(fw_full_name, 21, "%s%s", fw_base, fw_file_name[i]);
+		ret = request_firmware(&fw[i], fw_full_name, dev);
 		if (ret) {
 			dev_err(dev, "request_firmware failed (fw: %s)\n",
-				fw_name[i]);
+				fw_full_name);
 			goto release_fw;
 		}
 	 }
