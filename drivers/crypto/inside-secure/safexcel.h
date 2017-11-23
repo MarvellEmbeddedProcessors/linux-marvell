@@ -115,16 +115,16 @@
 
 /* EIP-96 PRNG */
 /* Registers   */
-#define EIP197_PE_EIP96_PRNG_STAT			0x01040
-#define EIP197_PE_EIP96_PRNG_CTRL			0x01044
-#define EIP197_PE_EIP96_PRNG_SEED_L			0x01048
-#define EIP197_PE_EIP96_PRNG_SEED_H			0x0104c
-#define EIP197_PE_EIP96_PRNG_KEY_0_L			0x01050
-#define EIP197_PE_EIP96_PRNG_KEY_0_H			0x01054
-#define EIP197_PE_EIP96_PRNG_KEY_1_L			0x01058
-#define EIP197_PE_EIP96_PRNG_KEY_1_H			0x0105c
-#define EIP197_PE_EIP96_PRNG_LFSR_L			0x01070
-#define EIP197_PE_EIP96_PRNG_LFSR_H			0x01074
+#define EIP197_PE_EIP96_PRNG_STAT(n)			(0x01040 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_CTRL(n)			(0x01044 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_SEED_L(n)			(0x01048 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_SEED_H(n)			(0x0104c + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_KEY_0_L(n)			(0x01050 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_KEY_0_H(n)			(0x01054 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_KEY_1_L(n)			(0x01058 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_KEY_1_H(n)			(0x0105c + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_LFSR_L(n)			(0x01070 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_LFSR_H(n)			(0x01074 + (0x2000 * n))
 /* Register bits */
 #define EIP197_PE_EIP96_PRNG_EN				BIT(0)
 #define EIP197_PE_EIP96_PRNG_AUTO			BIT(1)
@@ -139,10 +139,11 @@
 #define EIP197_PE_EIP96_PRNG_LFSR_H_VAL			0xd008c4b4
 
 /* Firmware */
-#define EIP197_PE_ICE_SCRATCH_RAM(x)			(0x800 + (x * 4))
+#define EIP197_PE_ICE_SCRATCH_RAM(x, n)			((0x800 + (x * 4)) + \
+							 (0x2000 * n))
 #define EIP197_NUM_OF_SCRATCH_BLOCKS			32
 
-#define EIP197_PE_ICE_SCRATCH_CTRL_OFFSET		0xd04
+#define EIP197_PE_ICE_SCRATCH_CTRL_OFFSET(n)		(0xd04 + (0x2000 * n))
 #define EIP197_PE_ICE_SCRATCH_CTRL_DFLT			0x001f0200
 #define EIP197_PE_ICE_SCRATCH_CTRL_CHANGE_TIMER		BIT(2)
 #define EIP197_PE_ICE_SCRATCH_CTRL_TIMER_EN		BIT(3)
@@ -150,17 +151,17 @@
 #define EIP197_PE_ICE_SCRATCH_CTRL_SCRATCH_ACCESS_OFFSET	25
 #define EIP197_PE_ICE_SCRATCH_CTRL_SCRATCH_ACCESS_MASK	(GENMASK(28, 25))
 
-#define EIP197_PE_ICE_PUE_CTRL				0xc80
+#define EIP197_PE_ICE_PUE_CTRL(n)			(0xc80 + (0x2000 * n))
 #define EIP197_PE_ICE_PUE_CTRL_SW_RESET			BIT(0)
 #define EIP197_PE_ICE_PUE_CTRL_CLR_ECC_CORR		BIT(14)
 #define EIP197_PE_ICE_PUE_CTRL_CLR_ECC_NON_CORR		BIT(15)
 
-#define EIP197_PE_ICE_FPP_CTRL				0xd80
+#define EIP197_PE_ICE_FPP_CTRL(n)			(0xd80 + (0x2000 * n))
 #define EIP197_PE_ICE_FPP_CTRL_SW_RESET			BIT(0)
 #define EIP197_PE_ICE_FPP_CTRL_CLR_ECC_NON_CORR		BIT(14)
 #define EIP197_PE_ICE_FPP_CTRL_CLR_ECC_CORR		BIT(15)
 
-#define EIP197_PE_ICE_RAM_CTRL				0xff0
+#define EIP197_PE_ICE_RAM_CTRL(n)			(0xff0 + (0x2000 * n))
 #define EIP197_PE_ICE_RAM_CTRL_DFLT			0x00000000
 #define EIP197_PE_ICE_RAM_CTRL_PUE_PROG_EN		BIT(0)
 #define EIP197_PE_ICE_RAM_CTRL_FPP_PROG_EN		BIT(1)
@@ -267,15 +268,15 @@
 #define EIP197_HIA_AIC_R_ACK(r)			(0xe010 - EIP197_HIA_AIC_R_OFF(r))
 #define EIP197_HIA_AIC_R_ENABLE_CLR(r)		(0xe014 - EIP197_HIA_AIC_R_OFF(r))
 
-#define EIP197_HIA_RA_PE_CTRL			0x010
+#define EIP197_HIA_RA_PE_CTRL(n)		(0x010 + (8 * n))
 
-#define EIP197_HIA_DFE_CFG			0x000
-#define EIP197_HIA_DFE_THR_CTRL			0x000
-#define EIP197_HIA_DFE_THR_STAT			0x004
+#define EIP197_HIA_DFE_CFG(n)			(0x000 + (128 * n))
+#define EIP197_HIA_DFE_THR_CTRL(n)		(0x000 + (128 * n))
+#define EIP197_HIA_DFE_THR_STAT(n)		(0x004 + (128 * n))
 
-#define EIP197_HIA_DSE_CFG			0x000
-#define EIP197_HIA_DSE_THR_CTRL			0x000
-#define EIP197_HIA_DSE_THR_STAT			0x004
+#define EIP197_HIA_DSE_CFG(n)			(0x000 + (128 * n))
+#define EIP197_HIA_DSE_THR_CTRL(n)		(0x000 + (128 * n))
+#define EIP197_HIA_DSE_THR_STAT(n)		(0x004 + (128 * n))
 
 #define EIP197_HIA_AIC_G_ENABLE_CTRL		0xf808
 #define EIP197_HIA_AIC_G_ENABLED_STAT		0xf810
@@ -283,11 +284,11 @@
 #define EIP197_HIA_MST_CTRL			0xfff4
 #define EIP197_HIA_OPTIONS			0xfff8
 #define EIP197_HIA_VERSION			0xfffc
-#define EIP197_PE_IN_DBUF_THRES			0x0000
-#define EIP197_PE_IN_TBUF_THRES			0x0100
+#define EIP197_PE_IN_DBUF_THRES(n)		(0x0000 + (0x2000 * n))
+#define EIP197_PE_IN_TBUF_THRES(n)		(0x0100 + (0x2000 * n))
+#define EIP197_PE_OUT_DBUF_THRES(n)		(0x1c00 + (0x2000 * n))
 #define EIP197_FUNCTION_EN			0x1004
 #define EIP197_CONTEXT_CTRL			0x11008
-#define EIP197_PE_OUT_DBUF_THRES		0x1c00
 #define EIP197_OPTIONS				0x1fff8
 #define EIP197_IP_VERSION			0x1fffc
 #define EIP197_MST_CTRL				0xfff4
@@ -299,6 +300,9 @@
 #define EIP197_xDR_HDW_OFFSET			25
 #define EIP197_xDR_HDW_MASK			(GENMASK(27, 25))
 #define EIP197_N_RINGS_MASK			(GENMASK(3, 0))
+#define EIP197_N_PES_OFFSET			4
+#define EIP197_N_PES_MASK			(GENMASK(4, 0))
+#define EIP97_N_PES_MASK			(GENMASK(2, 0))
 
 /* EIP197_HIA_AIC_R_ENABLE_CTRL */
 #define EIP197_CDR_IRQ(n)			BIT((n) * 2)
@@ -528,6 +532,11 @@ enum safexcel_eip_type {
 	EIP97,
 };
 
+enum safexcel_eip197_hw {
+	EIP197B,
+	EIP197D,
+};
+
 struct safexcel_ring {
 	void *base;
 	void *base_end;
@@ -601,6 +610,8 @@ struct safexcel_crypto_priv {
 	struct device *dev;
 	struct clk *clk;
 	enum safexcel_eip_type eip_type;
+	int nr_pe;
+	enum safexcel_eip197_hw eip197_hw_ver;
 	struct safexcel_config config;
 
 	/* context DMA pool */
