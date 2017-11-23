@@ -41,16 +41,18 @@
  */
 
 /*
- * Device Tree file for Marvell Armada 7040 Development board platform
+ * Device Tree file for Marvell Armada 7040 development board
+ * This board file supports the default (A) configuration of the board
  */
 
 #include <dt-bindings/gpio/gpio.h>
 #include "armada-7040.dtsi"
 
 / {
-	model = "Marvell Armada 7040 DB board";
-	compatible = "marvell,armada7040-db", "marvell,armada7040",
-		     "marvell,armada-ap806-quad", "marvell,armada-ap806";
+	model = "Marvell Armada 7040 development board default (A) setup";
+	compatible = "marvell,armada7040-db-default", "marvell,armada7040-db",
+		     "marvell,armada7040", "marvell,armada-ap806-quad",
+		     "marvell,armada-ap806";
 
 	chosen {
 		stdout-path = "serial0:115200n8";
@@ -96,47 +98,17 @@
 	};
 };
 
-&i2c0 {
-	status = "okay";
-	clock-frequency = <100000>;
-};
-
-&spi0 {
-	status = "okay";
-
-	spi-flash@0 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		compatible = "jedec,spi-nor";
-		reg = <0>;
-		spi-max-frequency = <10000000>;
-
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			partition@0 {
-				label = "U-Boot";
-				reg = <0 0x200000>;
-			};
-			partition@400000 {
-				label = "Filesystem";
-				reg = <0x200000 0xce0000>;
-			};
-		};
-	};
-};
-
 &uart0 {
 	status = "okay";
 	pinctrl-0 = <&uart0_pins>;
 	pinctrl-names = "default";
 };
 
-
-&cp0_pcie2 {
+&ap_sdhci0 {
 	status = "okay";
+	bus-width = <4>;
+	no-1-8-v;
+	non-removable;
 };
 
 &cp0_i2c0 {
@@ -162,35 +134,9 @@
 	};
 };
 
-&cp0_nand {
-	/*
-	 * SPI on CPM and NAND have common pins on this board. We can
-	 * use only one at a time. To enable the NAND (whihch will
-	 * disable the SPI), the "status = "okay";" line have to be
-	 * added here.
-	 */
-	num-cs = <1>;
-	pinctrl-0 = <&nand_pins>, <&nand_rb>;
-	pinctrl-names = "default";
-	nand-ecc-strength = <4>;
-	nand-ecc-step-size = <512>;
-	marvell,nand-enable-arbiter;
-	nand-on-flash-bbt;
-
-	partition@0 {
-		label = "U-Boot";
-		reg = <0 0x200000>;
-	};
-	partition@200000 {
-		label = "Linux";
-		reg = <0x200000 0xe00000>;
-	};
-	partition@1000000 {
-		label = "Filesystem";
-		reg = <0x1000000 0x3f000000>;
-	};
+&cp0_i2c1 {
+	status = "okay";
 };
-
 
 &cp0_spi1 {
 	status = "okay";
@@ -209,19 +155,34 @@
 
 			partition@0 {
 				label = "U-Boot";
-				reg = <0x0 0x200000>;
+				reg = <0x0 0x400000>;
 			};
 
 			partition@400000 {
 				label = "Filesystem";
-				reg = <0x200000 0xe00000>;
+				reg = <0x400000 0xc00000>;
 			};
 		};
 	};
 };
 
+&cp0_sdhci0 {
+	status = "okay";
+	bus-width = <4>;
+	no-1-8-v;
+	non-removable;
+};
+
+&cp0_pcie2 {
+	status = "okay";
+};
+
 &cp0_sata0 {
 	status = "okay";
+
+	sata-port@1 {
+		status = "okay";
+	};
 };
 
 &cp0_usb3_0 {
@@ -232,20 +193,6 @@
 &cp0_usb3_1 {
 	usb-phy = <&cp0_usb3_1_phy>;
 	status = "okay";
-};
-
-&ap_sdhci0 {
-	status = "okay";
-	bus-width = <4>;
-	no-1-8-v;
-	non-removable;
-};
-
-&cp0_sdhci0 {
-	status = "okay";
-	bus-width = <4>;
-	no-1-8-v;
-	cd-gpios = <&expander0 12 GPIO_ACTIVE_LOW>;
 };
 
 &cp0_mdio {
@@ -268,7 +215,7 @@
 	/* Network PHY */
 	phy-mode = "10gbase-kr";
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp0_comphy2 0>;
+	phys = <&cp0_comphy2 2>;
 };
 
 &cp0_eth1 {
@@ -277,7 +224,7 @@
 	phy = <&phy0>;
 	phy-mode = "sgmii";
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp0_comphy0 1>;
+	phys = <&cp0_comphy0 0>;
 };
 
 &cp0_eth2 {
