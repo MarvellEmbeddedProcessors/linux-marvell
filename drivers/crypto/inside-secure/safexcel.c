@@ -458,6 +458,13 @@ static int eip_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
 		/* Configure DMA tx control */
 		val = EIP197_HIA_xDR_CFG_WR_CACHE(WR_CACHE_3BITS);
 		val |= EIP197_HIA_xDR_CFG_RD_CACHE(RD_CACHE_3BITS);
+
+		if (priv->eip_type == EIP197 &&
+		    priv->eip197_hw_ver == EIP197D) {
+			val |= EIP197_HIA_xDR_CFG_xD_PROT(AXI_NONE_SECURE_ACCESS);
+			val |= EIP197_HIA_xDR_CFG_DATA_PROT(AXI_NONE_SECURE_ACCESS);
+			val |= EIP197_HIA_xDR_CFG_ACD_PROT(AXI_NONE_SECURE_ACCESS);
+		}
 		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_DMA_CFG);
 
 		/* clear any pending interrupt */
@@ -499,6 +506,12 @@ static int eip_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
 		val = EIP197_HIA_xDR_CFG_WR_CACHE(WR_CACHE_3BITS);
 		val |= EIP197_HIA_xDR_CFG_RD_CACHE(RD_CACHE_3BITS);
 		val |= EIP197_HIA_xDR_WR_RES_BUF | EIP197_HIA_xDR_WR_CTRL_BUF;
+
+		if (priv->eip_type == EIP197 &&
+		    priv->eip197_hw_ver == EIP197D) {
+			val |= EIP197_HIA_xDR_CFG_xD_PROT(AXI_NONE_SECURE_ACCESS);
+			val |= EIP197_HIA_xDR_CFG_DATA_PROT(AXI_NONE_SECURE_ACCESS);
+		}
 		writel(val, EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_DMA_CFG);
 
 		/* clear any pending interrupt */
@@ -531,7 +544,12 @@ static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 	writel(val, EIP197_HIA_AIC(priv) + EIP197_HIA_MST_CTRL);
 
 	/* configure wr/rd cache values */
-	val = MST_CTRL_RD_CACHE(RD_CACHE_4BITS) | MST_CTRL_WD_CACHE(WR_CACHE_4BITS);
+	val = MST_CTRL_RD_CACHE(RD_CACHE_4BITS) |
+		MST_CTRL_WD_CACHE(WR_CACHE_4BITS);
+
+	if (priv->eip_type == EIP197 &&
+	    priv->eip197_hw_ver == EIP197D)
+		val |= MST_CTRL_SUPPORT_PROT(AXI_NONE_SECURE_ACCESS);
 	writel(val, EIP197_HIA_GEN_CFG(priv) + EIP197_MST_CTRL);
 
 	/*

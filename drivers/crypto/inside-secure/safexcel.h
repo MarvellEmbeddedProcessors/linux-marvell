@@ -46,6 +46,9 @@
 #define RD_CACHE_4BITS				(RD_CACHE_3BITS << 1 | 0x1)
 #define WR_CACHE_4BITS				(WR_CACHE_3BITS << 1 | 0x1)
 
+/* AXI protection fields */
+#define AXI_NONE_SECURE_ACCESS				BIT(1)
+
 /* EIP-197 Classification Engine */
 /* configuration parameters */
 /* classification */
@@ -165,6 +168,7 @@
 /* EIP197_MST_CTRL values */
 #define MST_CTRL_RD_CACHE(n)				(((n) & 0xf) << 0)
 #define MST_CTRL_WD_CACHE(n)				(((n) & 0xf) << 4)
+#define MST_CTRL_SUPPORT_PROT(n)			(((n) & 0xf) << 12)
 
 /* CDR/RDR register offsets */
 #define EIP197_HIA_xDR_OFF(r)				((r) * 0x1000)
@@ -194,6 +198,9 @@
 #define EIP197_HIA_xDR_WR_RES_BUF			BIT(22)
 #define EIP197_HIA_xDR_WR_CTRL_BUF			BIT(23)
 #define EIP197_HIA_xDR_WR_OWN_BUF			BIT(24)
+#define EIP197_HIA_xDR_CFG_xD_PROT(n)			(((n) & 0xf) << 4)
+#define EIP197_HIA_xDR_CFG_DATA_PROT(n)			(((n) & 0xf) << 12)
+#define EIP197_HIA_xDR_CFG_ACD_PROT(n)			(((n) & 0xf) << 20)
 #define EIP197_HIA_xDR_CFG_WR_CACHE(n)			(((n) & 0x7) << 25)
 #define EIP197_HIA_xDR_CFG_RD_CACHE(n)			(((n) & 0x7) << 29)
 
