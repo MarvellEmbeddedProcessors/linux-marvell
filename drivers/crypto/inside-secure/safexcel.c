@@ -1275,6 +1275,12 @@ static int safexcel_probe(struct platform_device *pdev)
 
 	safexcel_configure(priv);
 
+	priv->ring = devm_kzalloc(dev,
+				  (priv->config.rings * sizeof(*priv->ring)),
+				  GFP_KERNEL);
+	if (!priv->ring)
+		return -ENOMEM;
+
 	for (i = 0; i < priv->config.rings; i++) {
 		char irq_name[6] = {0}; /* "ringX\0" */
 		char wq_name[9] = {0}; /* "wq_ringX\0" */

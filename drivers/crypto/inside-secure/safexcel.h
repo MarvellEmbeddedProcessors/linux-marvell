@@ -30,13 +30,9 @@
 
 #define RINGS_UNINITIALIZED				0xff
 
-/* This could be retrieved from EIP97_HIA_OPTIONS */
-#define EIP97_MAX_RINGS					4
-
 /* Static configuration */
 #define EIP197_DEFAULT_RING_SIZE			300
 #define EIP197_MAX_TOKENS				5
-#define EIP197_MAX_RINGS				4
 
 #define EIP197_FETCH_COUNT				1
 #define EIP197_MAX_BATCH_SZ				32
@@ -537,7 +533,7 @@ enum safexcel_eip197_hw {
 	EIP197D,
 };
 
-struct safexcel_ring {
+struct safexcel_desc_ring {
 	void *base;
 	void *base_end;
 	dma_addr_t base_dma;
@@ -604,6 +600,27 @@ struct safexcel_work_data {
 	int ring;
 };
 
+struct safexcel_ring {
+	spinlock_t lock;
+	spinlock_t egress_lock;
+	int egress_cnt;
+
+	struct list_head list;
+	int busy;
+	struct crypto_async_request *req;
+	struct crypto_async_request *backlog;
+	struct workqueue_struct *workqueue;
+	struct safexcel_work_data work_data;
+
+	/* command/result rings */
+	struct safexcel_desc_ring cdr;
+	struct safexcel_desc_ring rdr;
+
+	spinlock_t queue_lock;
+	struct crypto_queue queue;
+};
+
+
 struct safexcel_crypto_priv {
 	void __iomem *base;
 	struct safexcel_unit_offset unit_off;
@@ -618,26 +635,7 @@ struct safexcel_crypto_priv {
 	struct dma_pool *context_pool;
 
 	atomic_t ring_used;
-
-	struct {
-		spinlock_t lock;
-		spinlock_t egress_lock;
-		int egress_cnt;
-
-		struct list_head list;
-		int busy;
-		struct crypto_async_request *req;
-		struct crypto_async_request *backlog;
-		struct workqueue_struct *workqueue;
-		struct safexcel_work_data work_data;
-
-		/* command/result rings */
-		struct safexcel_ring cdr;
-		struct safexcel_ring rdr;
-
-		spinlock_t queue_lock;
-		struct crypto_queue queue;
-	} ring[EIP197_MAX_RINGS];
+	struct safexcel_ring *ring;
 
 	int id;
 };
@@ -707,13 +705,13 @@ int safexcel_invalidate_cache(struct crypto_async_request *async,
 			      dma_addr_t ctxr_dma,
 			      int ring, struct safexcel_request *request);
 int safexcel_init_ring_descriptors(struct safexcel_crypto_priv *priv,
-				   struct safexcel_ring *cdr,
-				   struct safexcel_ring *rdr);
+				   struct safexcel_desc_ring *cdr,
+				   struct safexcel_desc_ring *rdr);
 int safexcel_select_ring(struct safexcel_crypto_priv *priv);
 void *safexcel_ring_next_rptr(struct safexcel_crypto_priv *priv,
-			      struct safexcel_ring *ring);
+			      struct safexcel_desc_ring *ring);
 void safexcel_ring_rollback_wptr(struct safexcel_crypto_priv *priv,
-				 struct safexcel_ring *ring);
+				 struct safexcel_desc_ring *ring);
 struct safexcel_command_desc *safexcel_add_cdesc(struct safexcel_crypto_priv *priv,
 						 int ring_id,
 						 bool first, bool last,
