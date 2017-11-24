@@ -21,13 +21,47 @@
 #include <linux/of_device.h>
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/syscore_ops.h>
+#include <linux/of_address.h>
 
 #include "pinctrl-mvebu.h"
+
+#define CP110_0_EMMC_CLK_PIN_ID		56
+#define CP110_0_EMMC_CLK_FUNC		14
+#define EMMC_PHY_CTRL_SDPHY_EN		BIT(0)
 
 /* Global list of devices (struct mvebu_pinctrl_soc_info) */
 static LIST_HEAD(drvdata_list);
 
 static void __iomem *cp0_mpp_base;
+static void __iomem *cp0_emmc_phy_ctrl_reg;
+
+/* armada_cp110_mpp_mmc_mux_set
+ * The function implements the generic configuration for eMMC PHY mux.
+ * Input parameters:
+ * - addr, the address of eMMC/SD PHY register;
+ * - is_mpp_mux, it is a bool. If set mux as MPP muxltiplexer, it is true;
+ * If set mux to SDIO/eMMC controller, it is false.
+ * Return: void, always success.
+ */
+static void armada_cp110_mpp_mmc_mux_set(void __iomem *addr, bool is_mpp_mux)
+{
+	u32 reg;
+
+	/*
+	 * eMMC/SD PHY register responsible for muxing between MPPs and SD/eMMC
+	 * controller:
+	 * - Bit0 enabled SDIO/eMMC PHY is used as a MPP muxltiplexer,
+	 * - Bit0 disabled SDIO/eMMC PHY is connected to SDIO/eMMC controller
+	 */
+	reg = readl(addr);
+
+	if (is_mpp_mux)
+		reg |= EMMC_PHY_CTRL_SDPHY_EN; /* set mux MPP muxltiplexer */
+	else
+		reg &= ~EMMC_PHY_CTRL_SDPHY_EN; /* set mux SDIO/eMMC controller */
+
+	writel(reg, addr);
+}
 
 static int armada_cp110_0_mpp_ctrl_get(unsigned pid, unsigned long *config)
 {
@@ -36,6 +70,21 @@ static int armada_cp110_0_mpp_ctrl_get(unsigned pid, unsigned long *config)
 
 static int armada_cp110_0_mpp_ctrl_set(unsigned pid, unsigned long config)
 {
+	/*
+	 * To enable SDIO/eMMC in CP110-0, need to configure PHY mux.
+	 * If pin function is set to eMMC/SD, then configure the eMMC/SD PHY
+	 * muxltiplexer register to be on SDIO/eMMC controller
+	 * If the MPP is configured to sdio, the pin0 as clk is mandatory,
+	 * to avoid config eMMC/SD PHY register repeatly, it is ok to set the
+	 * register only when MPP pin0(pid==56) is configured as "sdio"
+	 * (config == 14).
+	 */
+	if (cp0_emmc_phy_ctrl_reg && pid == CP110_0_EMMC_CLK_PIN_ID) {
+		bool is_mpp_mux = (config == CP110_0_EMMC_CLK_FUNC) ? false : true;
+
+		armada_cp110_mpp_mmc_mux_set(cp0_emmc_phy_ctrl_reg, is_mpp_mux);
+	}
+
 	return default_mpp_ctrl_set(cp0_mpp_base, pid, config);
 }
 
@@ -666,7 +715,7 @@ static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 	struct mvebu_pinctrl_soc_info *soc;
 	const struct of_device_id *match =
 		of_match_device(armada_cp110_pinctrl_of_match, &pdev->dev);
-	struct resource *res;
+	struct resource *res, *res_mmcio;
 #ifdef CONFIG_PM
 	struct mvebu_pinctrl_pm_save *pm_save;
 #endif
@@ -689,6 +738,19 @@ static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 		cp0_mpp_base = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(cp0_mpp_base))
 			return PTR_ERR(cp0_mpp_base);
+		/*
+		 * Get the eMMC PHY IO Control 0 Register base
+		 * Usage of this reg will be required in case MMC is enabled.
+		 */
+		res_mmcio = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mmcio");
+		if (res_mmcio) {
+			cp0_emmc_phy_ctrl_reg = devm_ioremap_resource(&pdev->dev,
+								      res_mmcio);
+			if (IS_ERR(cp0_emmc_phy_ctrl_reg))
+				return PTR_ERR(cp0_emmc_phy_ctrl_reg);
+		} else {
+			dev_warn(&pdev->dev, "CP0 mmcio reg not present in DT\n");
+		}
 		soc->controls = armada_cp110_0_mpp_controls;
 		soc->ncontrols = ARRAY_SIZE(armada_cp110_0_mpp_controls);
 		soc->gpioranges = armada_cp110_0_mpp_gpio_ranges;

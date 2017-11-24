@@ -10,7 +10,11 @@ Required properties:
 - compatible: "marvell,a70x0-pinctrl", "marvell,a80x0-cp0-pinctrl",
 	and "marvell,a80x0-cp1-pinctrl" depends on the specific	variant of the
 	SoC being use.
-- reg: register specifier of MPP registers
+- reg: register specifier of MPP registers, including eMMC PHY mux register with
+       name "mmcio" in property of reg-names.
+- reg-names: include the following entries:
+             "pinctrl": pinctrl registers, which is mandatory and must be first one.
+             "mmcio": eMMC PHY IO Control 0 Register, which is for eMMC PHY mux.
 
 Available MPP pins/groups and functions:
 Note: Brackets (x) are not part of the MPP name for the Marvell function and are
