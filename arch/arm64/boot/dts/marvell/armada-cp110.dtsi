@@ -101,7 +101,9 @@
 			};
 
 			CP110_LABEL(pinctrl): pinctrl@440000 {
-				reg = <0x440000 0x20>;
+				reg = <0x440000 0x20>, /* pinctrl regs */
+				      <0x440424 0x4>; /* eMMC PHY IO Control 0 Register */
+				reg-names = "pinctrl", "mmcio";
 			};
 
 			CP110_LABEL(gpio0): gpio@440100 {
