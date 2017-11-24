@@ -817,6 +817,10 @@ static int armada_cp110_pinctrl_suspend(void)
 		for (offset = 0; offset < soc->pm_save->length;
 		     offset += sizeof(unsigned int))
 			soc->pm_save->regs[i++] = readl(mpp_base + offset);
+
+		if ((soc->variant == V_ARMADA_80X0_CP0 ||
+			 soc->variant == V_ARMADA_70X0) && cp0_emmc_phy_ctrl_reg)
+			soc->pm_save->emmc_phy_ctrl = readl(cp0_emmc_phy_ctrl_reg);
 	}
 
 	return 0;
@@ -836,6 +840,10 @@ static void armada_cp110_pinctrl_resume(void)
 		for (offset = 0; offset < soc->pm_save->length;
 		     offset += sizeof(unsigned int))
 			writel(soc->pm_save->regs[i++], mpp_base + offset);
+
+		if ((soc->variant == V_ARMADA_80X0_CP0 ||
+			 soc->variant == V_ARMADA_70X0) && cp0_emmc_phy_ctrl_reg)
+			writel(soc->pm_save->emmc_phy_ctrl, cp0_emmc_phy_ctrl_reg);
 	}
 }
 
