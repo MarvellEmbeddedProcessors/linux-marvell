@@ -1689,6 +1689,38 @@ static void mv_pp2x_prs_mh_init(struct mv_pp2x_hw *hw)
 	mv_pp2x_prs_hw_write(hw, &pe);
 }
 
+/* Drop flow control pause frames */
+static void mv_pp2x_prs_drop_fc(struct mv_pp2x_hw *hw)
+{
+	struct mv_pp2x_prs_entry pe;
+	unsigned int len;
+	unsigned char da[ETH_ALEN] = {
+			0x01, 0x80, 0xC2, 0x00, 0x00, 0x01 };
+
+	memset(&pe, 0, sizeof(struct mv_pp2x_prs_entry));
+
+	/* For all ports - drop flow control frames */
+	pe.index = MVPP2_PE_FC_DROP;
+	mv_pp2x_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_MAC);
+
+	/* Set match on DA */
+	len = ETH_ALEN;
+	while (len--)
+		mv_pp2x_prs_tcam_data_byte_set(&pe, len, da[len], 0xff);
+
+	mv_pp2x_prs_sram_ri_update(&pe, MVPP2_PRS_RI_DROP_MASK,
+				   MVPP2_PRS_RI_DROP_MASK);
+	mv_pp2x_prs_sram_bits_set(&pe, MVPP2_PRS_SRAM_LU_GEN_BIT, 1);
+	mv_pp2x_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_FLOWS);
+
+	/* Unmask all ports */
+	mv_pp2x_prs_tcam_port_map_set(&pe, MVPP2_PRS_PORT_MASK);
+
+	/* Update shadow table and hw entry */
+	mv_pp2x_prs_shadow_set(hw, pe.index, MVPP2_PRS_LU_MAC);
+	mv_pp2x_prs_hw_write(hw, &pe);
+}
+
 /* Set default entires (place holder) for promiscuous, non-promiscuous and
  * multicast MAC addresses
  */
@@ -1715,6 +1747,7 @@ static void mv_pp2x_prs_mac_init(struct mv_pp2x_hw *hw)
 	mv_pp2x_prs_hw_write(hw, &pe);
 
 	/* place holders only - no ports */
+	mv_pp2x_prs_drop_fc(hw);
 	mv_pp2x_prs_mac_drop_all_set(hw, 0, false);
 	mv_pp2x_prs_mac_uc_promisc_set(hw, 0, false);
 	mv_pp2x_prs_mac_mc_promisc_set(hw, 0, false);
