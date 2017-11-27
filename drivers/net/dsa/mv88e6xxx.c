@@ -3641,7 +3641,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6390",
 		.num_databases = 4096,
 		.num_ports = 11,
-		.flags = MV88E6XXX_FLAGS_FAMILY_6390 | MV88E6XXX_FLAG_PHY_ADDR,
+		.flags = MV88E6XXX_FLAGS_FAMILY_6390,
 	},
 
 	[MV88E6290] = {
@@ -3650,7 +3650,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6290",
 		.num_databases = 4096,
 		.num_ports = 11,
-		.flags = MV88E6XXX_FLAGS_FAMILY_6390 | MV88E6XXX_FLAG_PHY_ADDR,
+		.flags = MV88E6XXX_FLAGS_FAMILY_6390,
 	},
 
 	[MV88E6190] = {
@@ -3659,7 +3659,7 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.name = "Marvell 88E6190",
 		.num_databases = 4096,
 		.num_ports = 11,
-		.flags = MV88E6XXX_FLAGS_FAMILY_6390 | MV88E6XXX_FLAG_PHY_ADDR,
+		.flags = MV88E6XXX_FLAGS_FAMILY_6390,
 	},
 };
 
