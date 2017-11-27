@@ -2765,7 +2765,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 		if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 		    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
 		    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps)) {
-			reg |= PORT_CONTROL_FRAME_ETHER_TYPE_DSA |
+			reg |= PORT_CONTROL_FRAME_MODE_DSA |
 				PORT_CONTROL_FORWARD_UNKNOWN |
 				PORT_CONTROL_FORWARD_UNKNOWN_MC;
 		}
@@ -2775,7 +2775,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 		    mv88e6xxx_6095_family(ps) || mv88e6xxx_6065_family(ps) ||
 		    mv88e6xxx_6185_family(ps) || mv88e6xxx_6320_family(ps) ||
 		    mv88e6xxx_6390_family(ps)) {
-				reg |= PORT_CONTROL_EGRESS_ADD_TAG;
+				reg |= PORT_CONTROL_EGRESS_UNMODIFIED;
 		}
 	}
 	if (dsa_is_dsa_port(ds, port)) {
@@ -3758,7 +3758,7 @@ static const char *mv88e6xxx_drv_probe(struct device *dsa_dev,
 }
 
 struct dsa_switch_driver mv88e6xxx_switch_driver = {
-	.tag_protocol		= DSA_TAG_PROTO_EDSA,
+	.tag_protocol		= DSA_TAG_PROTO_DSA,
 	.probe			= mv88e6xxx_drv_probe,
 	.setup			= mv88e6xxx_setup,
 	.set_addr		= mv88e6xxx_set_addr,
