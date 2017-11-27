@@ -12,6 +12,7 @@ config NET_DSA_MV88E6060
 config NET_DSA_MV88E6XXX
 	tristate "Marvell 88E6xxx Ethernet switch chip support"
 	depends on NET_DSA
+	select NET_DSA_TAG_DSA
 	select NET_DSA_TAG_EDSA
 	---help---
 	  This enables support for most of the Marvell 88E6xxx models of
