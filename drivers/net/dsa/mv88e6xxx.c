@@ -2985,13 +2985,44 @@ static int mv88e6xxx_setup_global(struct mv88e6xxx_priv_state *ps)
 
 	/* Configure the upstream port, and configure it as the port to which
 	 * ingress and egress and ARP monitor frames are to be sent.
+	 *
+	 * For 6390 family, cpu destination port, mirror destination, ingress and egress
+	 * destination ports are set indirectly using a pointer to respctive type of destination.
+	 * For other family of devices, it is set by directly writing to the register.
 	 */
-	reg = upstream_port << GLOBAL_MONITOR_CONTROL_INGRESS_SHIFT |
-		upstream_port << GLOBAL_MONITOR_CONTROL_EGRESS_SHIFT |
-		upstream_port << GLOBAL_MONITOR_CONTROL_ARP_SHIFT;
-	err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MONITOR_CONTROL, reg);
-	if (err)
-		return err;
+	if (mv88e6xxx_6390_family(ps)) {
+		/* Configure CPU destination port */
+		reg = GLOBAL_MMC_UPDATE | (GLOBAL_MMC_CPUDEST_PTR << GLOBAL_MMC_PTR_SHIFT) | upstream_port;
+		err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MONITOR_CONTROL, reg);
+		if (err)
+			return err;
+
+		/* Configure Mirror destination port */
+		reg = GLOBAL_MMC_UPDATE | (GLOBAL_MMC_MIRRORDEST_PTR << GLOBAL_MMC_PTR_SHIFT) | upstream_port;
+		err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MONITOR_CONTROL, reg);
+		if (err)
+			return err;
+
+		/* Configure Ingress Monitor destination port */
+		reg = GLOBAL_MMC_UPDATE | (GLOBAL_MMC_INGRESSDEST_PTR << GLOBAL_MMC_PTR_SHIFT) | upstream_port;
+		err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MONITOR_CONTROL, reg);
+		if (err)
+			return err;
+
+		/* Configure Egress Monitor destination port */
+		reg = GLOBAL_MMC_UPDATE | (GLOBAL_MMC_EGRESSDEST_PTR << GLOBAL_MMC_PTR_SHIFT) | upstream_port;
+		err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MONITOR_CONTROL, reg);
+		if (err)
+			return err;
+
+	} else {
+		reg = upstream_port << GLOBAL_MONITOR_CONTROL_INGRESS_SHIFT |
+			upstream_port << GLOBAL_MONITOR_CONTROL_EGRESS_SHIFT |
+			upstream_port << GLOBAL_MONITOR_CONTROL_ARP_SHIFT;
+		err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_MONITOR_CONTROL, reg);
+		if (err)
+			return err;
+	}
 
 	/* Disable remote management, and set the switch's DSA device number. */
 	err = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_CONTROL_2,
