@@ -1500,6 +1500,16 @@ static int _mv88e6xxx_vtu_stu_data_read(struct mv88e6xxx_priv_state *ps,
 	u16 regs[3];
 	int i;
 	int ret;
+	int member_tags_per_reg;
+	int member_tag_size;
+
+	if (mv88e6xxx_6390_family(ps)) {
+		member_tags_per_reg = 8;
+		member_tag_size = 2;
+	} else {
+		member_tags_per_reg = 4;
+		member_tag_size = 4;
+	}
 
 	for (i = 0; i < 3; ++i) {
 		ret = _mv88e6xxx_reg_read(ps, REG_GLOBAL,
@@ -1511,8 +1521,8 @@ static int _mv88e6xxx_vtu_stu_data_read(struct mv88e6xxx_priv_state *ps,
 	}
 
 	for (i = 0; i < ps->info->num_ports; ++i) {
-		unsigned int shift = (i % 4) * 4 + nibble_offset;
-		u16 reg = regs[i / 4];
+		unsigned int shift = (i % member_tags_per_reg) * member_tag_size + nibble_offset;
+		u16 reg = regs[i / member_tags_per_reg];
 
 		entry->data[i] = (reg >> shift) & GLOBAL_VTU_STU_DATA_MASK;
 	}
@@ -1539,12 +1549,22 @@ static int _mv88e6xxx_vtu_stu_data_write(struct mv88e6xxx_priv_state *ps,
 	u16 regs[3] = { 0 };
 	int i;
 	int ret;
+	int member_tags_per_reg;
+	int member_tag_size;
+
+	if (mv88e6xxx_6390_family(ps)) {
+		member_tags_per_reg = 8;
+		member_tag_size = 2;
+	} else {
+		member_tags_per_reg = 4;
+		member_tag_size = 4;
+	}
 
 	for (i = 0; i < ps->info->num_ports; ++i) {
-		unsigned int shift = (i % 4) * 4 + nibble_offset;
+		unsigned int shift = (i % member_tags_per_reg) * member_tag_size + nibble_offset;
 		u8 data = entry->data[i];
 
-		regs[i / 4] |= (data & GLOBAL_VTU_STU_DATA_MASK) << shift;
+		regs[i / member_tags_per_reg] |= (data & GLOBAL_VTU_STU_DATA_MASK) << shift;
 	}
 
 	for (i = 0; i < 3; ++i) {
