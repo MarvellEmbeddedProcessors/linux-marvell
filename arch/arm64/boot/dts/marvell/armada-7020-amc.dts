@@ -74,7 +74,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			pinctrl@440000 {
 				i2c1_pins: i2c-pins-1 {

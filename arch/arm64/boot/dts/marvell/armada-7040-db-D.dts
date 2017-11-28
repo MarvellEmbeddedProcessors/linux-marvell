@@ -76,7 +76,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			pinctrl@440000 {
 				compatible = "marvell,a70x0-pinctrl";

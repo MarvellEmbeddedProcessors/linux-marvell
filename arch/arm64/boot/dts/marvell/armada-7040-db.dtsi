@@ -76,7 +76,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			cp0_i2c0: i2c@701000 {
 				pinctrl-names = "default";

@@ -89,7 +89,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			pinctrl@440000 {
 				xhci0_vbus_pins: xhci0-vbus-pins {
@@ -194,7 +194,7 @@
 		};
 	};
 
-	cp110-1 {
+	cp1 {
 		config-space {
 			cp1_comphy: comphy {
 				status = "okay";

@@ -45,9 +45,77 @@
  * two CP110.
  */
 
+#include "armada-common.dtsi"
+#include <dt-bindings/phy/phy-comphy-mvebu.h>
+
 #include "armada-ap806-dual.dtsi"
-#include "armada-cp110-0.dtsi"
-#include "armada-cp110-1.dtsi"
+
+/* CP110-0 Settings */
+#define CP110_NAME		cp0
+#define CP110_NUM		0
+#define CP110_BASE              0xf2000000
+#define CP110_PCIE_MEM_BASE     0xf6000000
+#define CP110_PCIE_MEM_OFFSET	0x1000000
+#define CP110_PCIE_IO_BASE      0xf9000000
+
+#include "armada-cp110.dtsi"
+
+#undef CP110_NAME
+#undef CP110_NUM
+#undef CP110_BASE
+#undef CP110_PCIE_IO_BASE
+#undef CP110_PCIE_MEM_OFFSET
+#undef CP110_PCIE_MEM_BASE
+
+&cp0_thermal {
+	/* interrupt assignment by ICU supports single thermal sensor unit,
+	* currently cp0 thermal sensor irq only is enabled.
+	* To enable cp1 thermal sensor interrupt,
+	* first disable cp0 thermal sensor interrupt.
+	*/
+	interrupts-extended = <&sei 37>;
+};
+
+&cp0_emac0 {
+	mac-address = [00 00 00 00 00 01];
+};
+
+&cp0_emac2 {
+	mac-address = [00 00 00 00 00 02];
+};
+
+&cp0_emac3 {
+	mac-address = [00 00 00 00 00 03];
+};
+
+/* CP110-1 Settings */
+#define CP110_NAME		cp1
+#define CP110_NUM		1
+#define CP110_BASE              0xf4000000
+#define CP110_PCIE_MEM_BASE     0xfa000000
+#define CP110_PCIE_MEM_OFFSET	0x1000000
+#define CP110_PCIE_IO_BASE      0xfd000000
+
+#include "armada-cp110.dtsi"
+
+#undef CP110_NAME
+#undef CP110_NUM
+#undef CP110_BASE
+#undef CP110_PCIE_IO_BASE
+#undef CP110_PCIE_MEM_OFFSET
+#undef CP110_PCIE_MEM_BASE
+
+&cp1_emac0 {
+	mac-address = [00 00 00 00 00 04];
+};
+
+&cp1_emac2 {
+	mac-address = [00 00 00 00 00 05];
+};
+
+&cp1_emac3 {
+	mac-address = [00 00 00 00 00 06];
+};
 
 / {
 	model = "Marvell Armada 8020";

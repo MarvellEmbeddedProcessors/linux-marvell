@@ -80,7 +80,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			sata@540000 {
 				status = "okay";
@@ -170,7 +170,7 @@
 			status = "okay";
 		};
 	};
-	cp110-1 {
+	cp1 {
 		config-space {
 			/* cp1_usb3h0 is USB2 only (UTMI) */
 			cp1_usb3h0: usb3@500000 {

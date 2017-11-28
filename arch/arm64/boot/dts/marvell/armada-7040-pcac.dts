@@ -91,7 +91,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			cp0_comphy: comphy {
 				skip_pcie_power_off;

@@ -47,6 +47,15 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/gpio/gpio.h>
 
+/* General settings related tp AP, to be used in CP south-bridges connected to this AP */
+#define AP_ICU_SET_SPI_HIGH	0x0
+#define AP_ICU_SET_SPI_LOW	0xF03F0040
+#define AP_ICU_CLR_SPI_HIGH	0x0
+#define AP_ICU_CLR_SPI_LOW	0xF03F0048
+
+/* GIC-v2m in this AP is the XOR MSI parent for CPs south-bridges connected to this AP */
+#define XOR_MSI_PARENT(XOR_NUM) <&gic_v2m0>
+
 /dts-v1/;
 
 / {

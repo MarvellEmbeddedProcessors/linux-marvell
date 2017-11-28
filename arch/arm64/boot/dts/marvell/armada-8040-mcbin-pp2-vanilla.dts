@@ -87,7 +87,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			/delete-node/ppv22@000000;
 			pinctrl@440000 {
@@ -229,7 +229,7 @@
 		};
 	};
 
-	cp110-1 {
+	cp1 {
 		config-space {
 			/delete-node/ppv22@000000;
 			cp1_comphy1: comphy {

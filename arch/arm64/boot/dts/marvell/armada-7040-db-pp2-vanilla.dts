@@ -77,7 +77,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			/delete-node/ppv22@000000;
 			serial@702000 {

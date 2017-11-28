@@ -76,7 +76,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			serial@702000 {
 				status = "disabled";

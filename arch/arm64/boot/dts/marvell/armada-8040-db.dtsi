@@ -90,7 +90,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			i2c@701000 {
 				status = "okay";
@@ -207,7 +207,7 @@
 		};
 	};
 
-	cp110-1 {
+	cp1 {
 		config-space {
 			i2c@701000 {
 				eeprom@57 {

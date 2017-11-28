@@ -112,7 +112,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			pinctrl@440000 {
 				u3d_vbus_pins: pca0_pins {

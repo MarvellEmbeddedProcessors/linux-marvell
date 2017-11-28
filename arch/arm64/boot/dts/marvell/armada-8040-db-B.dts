@@ -80,7 +80,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			/* usb3h0 is USB2 only (UTMI) */
 			cp0_usb3h0: usb3@500000 {
@@ -156,7 +156,7 @@
 			status = "okay";
 		};
 	};
-	cp110-1 {
+	cp1 {
 		config-space {
 			cp1_usb3h0: usb3@500000 {
 				separated-phys-for-usb2-usb3;
