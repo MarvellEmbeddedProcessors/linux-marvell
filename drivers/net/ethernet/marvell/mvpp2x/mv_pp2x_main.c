@@ -5709,7 +5709,7 @@ static struct mv_pp2x_platform_data pp22_pdata = {
 	.multi_hw_instance = true,
 	.mv_pp2x_port_queue_vectors_init = mv_pp22_queue_vectors_init,
 	.mv_pp2x_port_isr_rx_group_cfg = mv_pp22_port_isr_rx_group_cfg,
-	.num_port_irq = 5,
+	.num_port_irq = 9,
 	.hw.desc_queue_addr_shift = MVPP22_DESC_ADDR_SHIFT,
 };
 

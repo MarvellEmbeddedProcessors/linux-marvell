@@ -473,32 +473,43 @@
 				clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 				status = "okay";
 				CP110_LABEL(eth0): eth0@010000 {
-					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
-							<ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
-							<ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
-							<ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
-							<ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
+					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 59 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 63 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 67 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 71 IRQ_TYPE_LEVEL_HIGH>;
 					port-id = <0>; /* pp2_port_id */
 					emac-data = <&CP110_LABEL(emac0)>;
 					status = "disabled";
 				};
 				CP110_LABEL(eth1): eth1@020000 {
-					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
-							<ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
-							<ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
-							<ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
-							<ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
+					interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 60 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 64 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 68 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 72 IRQ_TYPE_LEVEL_HIGH>;
 					port-id = <1>; /* pp2_port_id */
 					emac-data = <&CP110_LABEL(emac2)>;
 					status = "disabled";
 				};
 				CP110_LABEL(eth2): eth2@030000 {
-					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#0 Interrupt */
-							<ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#1 Interrupt */
-							<ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#2 Interrupt */
-							<ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>, /* TX CPU#3 Interrupt */
-							<ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>; /* RX Shared Interrupt */
-
+					interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 61 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 65 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 69 IRQ_TYPE_LEVEL_HIGH>,
+							<ICU_GRP_NSR 73 IRQ_TYPE_LEVEL_HIGH>;
 					port-id = <2>; /* pp2_port_id */
 					emac-data = <&CP110_LABEL(emac3)>;
 					status = "disabled";
