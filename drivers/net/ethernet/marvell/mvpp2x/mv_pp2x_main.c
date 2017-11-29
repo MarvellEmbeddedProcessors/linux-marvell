@@ -1209,7 +1209,7 @@ static int mv_pp2x_aggr_txq_init(struct platform_device *pdev,
 	dma_addr_t first_desc_phy;
 
 	/* Allocate memory for TX descriptors, ensure it can be 512B aligned. */
-	aggr_txq->desc_mem = dma_alloc_coherent(&pdev->dev,
+	aggr_txq->desc_mem = dma_zalloc_coherent(&pdev->dev,
 		MVPP2_DESCQ_MEM_SIZE(desc_num),
 		&aggr_txq->descs_phys, GFP_KERNEL);
 	if (!aggr_txq->desc_mem)
