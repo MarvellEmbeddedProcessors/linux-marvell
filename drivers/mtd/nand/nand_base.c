@@ -1940,7 +1940,7 @@ int nand_read_page_raw(struct mtd_info *mtd, struct nand_chip *chip,
 {
 	int ret;
 
-	ret = nand_read_data_op(chip, buf, mtd->writesize, false);
+	ret = nand_read_page_op(chip, page, 0, buf, mtd->writesize);
 	if (ret)
 		return ret;
 
@@ -1973,6 +1973,10 @@ static int nand_read_page_raw_syndrome(struct mtd_info *mtd,
 	int eccbytes = chip->ecc.bytes;
 	uint8_t *oob = chip->oob_poi;
 	int steps, size, ret;
+
+	ret = nand_read_page_op(chip, page, 0, NULL, 0);
+	if (ret)
+		return ret;
 
 	for (steps = chip->ecc.steps; steps > 0; steps--) {
 		ret = nand_read_data_op(chip, buf, eccsize, false);
@@ -2096,11 +2100,8 @@ static int nand_read_subpage(struct mtd_info *mtd, struct nand_chip *chip,
 
 	data_col_addr = start_step * chip->ecc.size;
 	/* If we read not a page aligned data */
-	if (data_col_addr != 0)
-		chip->cmdfunc(mtd, NAND_CMD_RNDOUT, data_col_addr, -1);
-
 	p = bufpoi + data_col_addr;
-	ret = nand_read_data_op(chip, p, datafrag_len, false);
+	ret = nand_read_page_op(chip, page, data_col_addr, p, datafrag_len);
 	if (ret)
 		return ret;
 
@@ -2197,6 +2198,10 @@ static int nand_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 	uint8_t *ecc_code = chip->buffers->ecccode;
 	unsigned int max_bitflips = 0;
+
+	ret = nand_read_page_op(chip, page, 0, NULL, 0);
+	if (ret)
+		return ret;
 
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		chip->ecc.hwctl(mtd, NAND_ECC_READ);
@@ -2334,6 +2339,10 @@ static int nand_read_page_syndrome(struct mtd_info *mtd, struct nand_chip *chip,
 	uint8_t *p = buf;
 	uint8_t *oob = chip->oob_poi;
 	unsigned int max_bitflips = 0;
+
+	ret = nand_read_page_op(chip, page, 0, NULL, 0);
+	if (ret)
+		return ret;
 
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		int stat;
@@ -2517,12 +2526,6 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 						 __func__, buf);
 
 read_retry:
-			if (nand_standard_page_accessors(&chip->ecc)) {
-				ret = nand_read_page_op(chip, page, 0, NULL, 0);
-				if (ret)
-					break;
-			}
-
 			/*
 			 * Now read the page into the buffer.  Absent an error,
 			 * the read methods return max bitflips per ecc step.
@@ -2981,7 +2984,7 @@ int nand_write_page_raw(struct mtd_info *mtd, struct nand_chip *chip,
 {
 	int ret;
 
-	ret = nand_write_data_op(chip, buf, mtd->writesize, false);
+	ret = nand_prog_page_begin_op(chip, page, 0, buf, mtd->writesize);
 	if (ret)
 		return ret;
 
@@ -2992,7 +2995,7 @@ int nand_write_page_raw(struct mtd_info *mtd, struct nand_chip *chip,
 			return ret;
 	}
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 EXPORT_SYMBOL(nand_write_page_raw);
 
@@ -3015,6 +3018,10 @@ static int nand_write_page_raw_syndrome(struct mtd_info *mtd,
 	int eccbytes = chip->ecc.bytes;
 	uint8_t *oob = chip->oob_poi;
 	int steps, size, ret;
+
+	ret = nand_prog_page_begin_op(chip, page, 0, NULL, 0);
+	if (ret)
+		return ret;
 
 	for (steps = chip->ecc.steps; steps > 0; steps--) {
 		ret = nand_write_data_op(chip, buf, eccsize, false);
@@ -3055,7 +3062,7 @@ static int nand_write_page_raw_syndrome(struct mtd_info *mtd,
 			return ret;
 	}
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 /**
  * nand_write_page_swecc - [REPLACEABLE] software ECC based page write function
@@ -3105,6 +3112,10 @@ static int nand_write_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 	uint8_t *ecc_calc = chip->buffers->ecccalc;
 	const uint8_t *p = buf;
 
+	ret = nand_prog_page_begin_op(chip, page, 0, NULL, 0);
+	if (ret)
+		return ret;
+
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		chip->ecc.hwctl(mtd, NAND_ECC_WRITE);
 
@@ -3124,7 +3135,7 @@ static int nand_write_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
 	if (ret)
 		return ret;
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 
@@ -3152,6 +3163,10 @@ static int nand_write_subpage_hwecc(struct mtd_info *mtd,
 	uint32_t end_step   = (offset + data_len - 1) / ecc_size;
 	int oob_bytes       = mtd->oobsize / ecc_steps;
 	int step, ret;
+
+	ret = nand_prog_page_begin_op(chip, page, 0, NULL, 0);
+	if (ret)
+		return ret;
 
 	for (step = 0; step < ecc_steps; step++) {
 		/* configure controller for WRITE access */
@@ -3191,7 +3206,7 @@ static int nand_write_subpage_hwecc(struct mtd_info *mtd,
 	if (ret)
 		return ret;
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 
@@ -3217,6 +3232,10 @@ static int nand_write_page_syndrome(struct mtd_info *mtd,
 	const uint8_t *p = buf;
 	uint8_t *oob = chip->oob_poi;
 	int ret;
+
+	ret = nand_prog_page_begin_op(chip, page, 0, NULL, 0);
+	if (ret)
+		return ret;
 
 	for (i = 0; eccsteps; eccsteps--, i += eccbytes, p += eccsize) {
 		chip->ecc.hwctl(mtd, NAND_ECC_WRITE);
@@ -3260,7 +3279,7 @@ static int nand_write_page_syndrome(struct mtd_info *mtd,
 			return ret;
 	}
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 /**
@@ -3286,12 +3305,6 @@ static int nand_write_page(struct mtd_info *mtd, struct nand_chip *chip,
 	else
 		subpage = 0;
 
-	if (nand_standard_page_accessors(&chip->ecc)) {
-		status = nand_prog_page_begin_op(chip, page, 0, NULL, 0);
-		if (status)
-			return status;
-	}
-
 	if (unlikely(raw))
 		status = chip->ecc.write_page_raw(mtd, chip, buf,
 						  oob_required, page);
@@ -3304,9 +3317,6 @@ static int nand_write_page(struct mtd_info *mtd, struct nand_chip *chip,
 
 	if (status < 0)
 		return status;
-
-	if (nand_standard_page_accessors(&chip->ecc))
-		return nand_prog_page_end_op(chip);
 
 	return 0;
 }
@@ -5293,26 +5303,6 @@ static bool nand_ecc_strength_good(struct mtd_info *mtd)
 	return corr >= ds_corr && ecc->strength >= chip->ecc_strength_ds;
 }
 
-static bool invalid_ecc_page_accessors(struct nand_chip *chip)
-{
-	struct nand_ecc_ctrl *ecc = &chip->ecc;
-
-	if (nand_standard_page_accessors(ecc))
-		return false;
-
-	/*
-	 * NAND_ECC_CUSTOM_PAGE_ACCESS flag is set, make sure the NAND
-	 * controller driver implements all the page accessors because
-	 * default helpers are not suitable when the core does not
-	 * send the READ0/PAGEPROG commands.
-	 */
-	return (!ecc->read_page || !ecc->write_page ||
-		!ecc->read_page_raw || !ecc->write_page_raw ||
-		(NAND_HAS_SUBPAGE_READ(chip) && !ecc->read_subpage) ||
-		(NAND_HAS_SUBPAGE_WRITE(chip) && !ecc->write_subpage &&
-		 ecc->hwctl && ecc->calculate));
-}
-
 /**
  * nand_scan_tail - [NAND Interface] Scan for the NAND device
  * @mtd: MTD device structure
@@ -5331,11 +5321,6 @@ int nand_scan_tail(struct mtd_info *mtd)
 	/* New bad blocks should be marked in OOB, flash-based BBT, or both */
 	if (WARN_ON((chip->bbt_options & NAND_BBT_NO_OOB_BBM) &&
 		   !(chip->bbt_options & NAND_BBT_USE_FLASH))) {
-		return -EINVAL;
-	}
-
-	if (invalid_ecc_page_accessors(chip)) {
-		pr_err("Invalid ECC page accessors setup\n");
 		return -EINVAL;
 	}
 

@@ -1633,6 +1633,7 @@ static int qcom_nandc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 	u8 *data_buf, *oob_buf = NULL;
 	int ret;
 
+	nand_read_page_op(chip, page, 0, NULL, 0);
 	data_buf = buf;
 	oob_buf = oob_required ? chip->oob_poi : NULL;
 
@@ -1658,6 +1659,7 @@ static int qcom_nandc_read_page_raw(struct mtd_info *mtd,
 	int i, ret;
 	int read_loc;
 
+	nand_read_page_op(chip, page, 0, NULL, 0);
 	data_buf = buf;
 	oob_buf = chip->oob_poi;
 
@@ -1758,6 +1760,8 @@ static int qcom_nandc_write_page(struct mtd_info *mtd, struct nand_chip *chip,
 	u8 *data_buf, *oob_buf;
 	int i, ret;
 
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
+
 	clear_read_regs(nandc);
 	clear_bam_transaction(nandc);
 
@@ -1810,6 +1814,9 @@ static int qcom_nandc_write_page(struct mtd_info *mtd, struct nand_chip *chip,
 
 	free_descs(nandc);
 
+	if (!ret)
+		ret = nand_prog_page_end_op(chip);
+
 	return ret;
 }
 
@@ -1824,6 +1831,7 @@ static int qcom_nandc_write_page_raw(struct mtd_info *mtd,
 	u8 *data_buf, *oob_buf;
 	int i, ret;
 
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
 	clear_read_regs(nandc);
 	clear_bam_transaction(nandc);
 
@@ -1877,6 +1885,9 @@ static int qcom_nandc_write_page_raw(struct mtd_info *mtd,
 		dev_err(nandc->dev, "failure to write raw page\n");
 
 	free_descs(nandc);
+
+	if (!ret)
+		ret = nand_prog_page_end_op(chip);
 
 	return ret;
 }
