@@ -45,6 +45,7 @@
  */
 
 #include "armada-common.dtsi"
+#include "armada-8kp.dtsi"
 #include "armada-ap810-ap0.dtsi"
 
 #define AP_NUM				0
@@ -53,6 +54,38 @@
 #define AP810_GIC_ITS_BASE		0xf040000
 #define AP810_EIP197_INDEX		0
 #include "armada-ap810-octa-core.dtsi"
+
+#define CP110_EIP197_INDEX	CP110_NUM
+
+/* AP0 CP0 IO
+ * 0x81_0000_0000 - 0x81_ffff_ffff - internal CFG (4GB)
+ * 0x82_0000_0000 - 0x83_ffff_ffff - PEX0 (8GB)
+ * 0x84_0000_0000 - 0x85_ffff_ffff - PEX1 (8GB)
+ * 0x86_0000_0000 - 0x87_ffff_ffff - PEX2 (8GB)
+ */
+#define CP110_NAME				cp0
+#define CP110_NUM				0
+
+#include "armada-cp110.dtsi"
+
+#undef CP110_NAME
+#undef CP110_NUM
+
+/* AP0 CP1 IO
+ * 0x88_0000_0000 - 0x88_ffff_ffff - internal CFG (4GB)
+ * 0x89_0000_0000 - 0x8a_ffff_ffff - PEX0 (8GB)
+ * 0x8b_0000_0000 - 0x8c_ffff_ffff - PEX1 (8GB)
+ * 0x8d_0000_0000 - 0x8e_ffff_ffff - PEX2 (8GB)
+ */
+#define CP110_NAME			cp1
+#define CP110_NUM			1
+
+#include "armada-cp110.dtsi"
+
+#undef CP110_NAME
+#undef CP110_NUM
+
+/* AP810 definitions are used in CP110 dtsi files, so un-define them after defining it's connected CPs */
 #undef AP_NUM
 #undef AP810_NAME
 #undef AP810_BASE
@@ -60,12 +93,48 @@
 #undef AP810_EIP197_INDEX
 
 / {
-	model = "Marvell 8080 board";
-	compatible = "marvell,armada-8080", "marvell,armada-ap810-octa",
+	model = "Marvell Armada-8082";
+	compatible = "marvell,armada-8082", "marvell,armada-ap810-octa",
 				"marvell,armada-ap810";
 
 	aliases {
 		serial0 = &ap0_uart0;
 		serial1 = &ap0_uart1;
+	};
+
+	/* Delete unsupported interfaces from CP nodes:
+	 *	1. AXI monitors in CP depend on syscon APB pclock from AP810, so disable all
+	 *	   monitors in CP at the moment, due to missing clock (syscon) driver in AP
+	 *	2. XOR in CP requires unique stream ID for it's MSI parent (AP810 GIC ITS,
+	 *	   but currently ATF set all CPs with the same stream ID.
+	 *	   Once ATF configures unique stream ID's per CP's interfaces, this should be
+	 *	   enabled
+	 */
+	cp0 {
+		config-space {
+			/delete-node/ axim-cp-rd@3c5000;
+			/delete-node/ axim-cp-rd@3c5000;
+			/delete-node/ axim-cp-wr@3c6000;
+			/delete-node/ axim-ppv2-rd@3c0000;
+			/delete-node/ axim-ppv2-wr@3c1000;
+			/delete-node/ axim-hb1-rd@3c8000;
+			/delete-node/ axim-hb1-wr@3c9000;
+			/delete-node/ dma_xor@6a0000;
+			/delete-node/ dma_xor@6c0000;
+		};
+
+	};
+	cp1 {
+		config-space {
+			/delete-node/ axim-cp-rd@3c5000;
+			/delete-node/ axim-cp-rd@3c5000;
+			/delete-node/ axim-cp-wr@3c6000;
+			/delete-node/ axim-ppv2-rd@3c0000;
+			/delete-node/ axim-ppv2-wr@3c1000;
+			/delete-node/ axim-hb1-rd@3c8000;
+			/delete-node/ axim-hb1-wr@3c9000;
+			/delete-node/ dma_xor@6a0000;
+			/delete-node/ dma_xor@6c0000;
+		};
 	};
 };

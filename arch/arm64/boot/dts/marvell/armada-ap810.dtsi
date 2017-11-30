@@ -51,9 +51,18 @@
  * the ITS node should be part of GIC generic node.
  * This node describe the ITS (Interrupt translation service)
  * of AP-x.
- * ITS does not have boadcast configuration (every ITS have his own)
+ * ITS does not have broadcast configuration (every ITS have his own)
  * interrupt and configuration.
  */
+
+/* General settings related to AP, to be used in CP south-bridges connected to this AP */
+#define AP810_GIC_BASE		0x3000000
+#define AP_ICU_SET_SPI_HIGH	((AP810_BASE >> 32) & 0xffffffff)
+#define AP_ICU_SET_SPI_LOW	((AP810_BASE & 0xffffffff) + AP810_GIC_BASE + 0x40)
+
+#define AP_ICU_CLR_SPI_HIGH	((AP810_BASE >> 32) & 0xffffffff)
+#define AP_ICU_CLR_SPI_LOW	((AP810_BASE & 0xffffffff) + AP810_GIC_BASE + 0x48)
+
 &gic{
 	AP810_LABEL(gic_its): interrupt-controller0@AP810_GIC_ITS_BASE {
 		compatible = "arm,gic-v3-its";
@@ -63,7 +72,19 @@
 	};
 };
 
+/* GIC ITS in this AP is MSI parent for XOR engines in CPs south-bridges connected to this AP  */
+#define XOR_MSI_PARENT(XOR_NUM) <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_CPx_XORx(XOR_NUM, CP110_NUM)>
+
 / {
+
+	thermal-zones {
+		cpu_thermal: cpu {
+			polling-delay-passive = <100>;
+			polling-delay = <1000>;
+			thermal-sensors = <&AP810_LABEL(thermal)>;
+		};
+	};
+
 	AP810_NAME {
 		#address-cells = <2>;
 		#size-cells = <2>;
@@ -130,6 +151,49 @@
 				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
 				reg-io-width = <1>;
 				status = "disabled";
+			};
+
+			AP810_LABEL(eip197): eip197@700000 {
+				compatible = "inside-secure,safexcel-eip197";
+				reg = <0x700000 0x200000>;
+				dma-coherent;
+				dma-bus-width = <40>;
+				interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "ring0", "ring1", "ring2",
+						"ring3", "ring4", "ring5",
+						"ring6", "ring7", "global";
+				cell-index = <AP810_EIP197_INDEX>;
+				status = "okay";
+			};
+
+			AP810_LABEL(sei): interrupt-controller@3f0200 {
+				compatible = "marvell,sei";
+				reg = <0x3f0200 0x30>;
+				#interrupt-cells = <1>;
+				#size-cells = <1>;
+				interrupt-controller;
+				interrupt-parent = <&gic>;
+				interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+			};
+
+			AP810_LABEL(thermal): thermal@6f808c {
+				compatible = "marvell,armada-ap806-thermal";
+				reg = <0x6f808C 0x4>,
+				      <0x6f8084 0x4>,
+				      <0x6f8100 0x20>;
+				interrupts-extended = <&AP810_LABEL(sei) 18>;
+				threshold = <100>;
+				hysteresis = <2>;
+				status = "okay";
+				#thermal-sensor-cells = <0>;
 			};
 		};
 	};

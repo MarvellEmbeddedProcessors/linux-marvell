@@ -41,67 +41,26 @@
  */
 
 /*
- * Device Tree file for Marvell Armada-8320 SoC, made of a quad AP810 OCTA.
+ * Device Tree file for Marvell Armada-8084 Development board platform
  */
 
-#include "armada-common.dtsi"
-#include "armada-ap810-ap0.dtsi"
-
-#define AP_NUM			0
-#define AP810_NAME		ap0
-#define AP810_BASE		0xe8000000
-#define AP810_GIC_ITS_BASE	0xf040000
-#define AP810_EIP197_INDEX	0
-#include "armada-ap810-octa-core.dtsi"
-#undef AP_NUM
-#undef AP810_NAME
-#undef AP810_BASE
-#undef AP810_GIC_ITS_BASE
-#undef AP810_EIP197_INDEX
-
-#define AP_NUM			1
-#define AP810_NAME		ap1
-#define AP810_BASE		0xe4000000
-#define AP810_GIC_ITS_BASE	0xb040000
-#define AP810_EIP197_INDEX	1
-#include "armada-ap810-octa-core.dtsi"
-#undef AP_NUM
-#undef AP810_NAME
-#undef AP810_BASE
-#undef AP810_GIC_ITS_BASE
-#undef AP810_EIP197_INDEX
-
-#define AP_NUM			2
-#define AP810_NAME		ap2
-#define AP810_BASE		0xe0000000
-#define AP810_GIC_ITS_BASE	0x7040000
-#define AP810_EIP197_INDEX	2
-#include "armada-ap810-octa-core.dtsi"
-#undef AP_NUM
-#undef AP810_NAME
-#undef AP810_BASE
-#undef AP810_GIC_ITS_BASE
-#undef AP810_EIP197_INDEX
-
-#define AP_NUM			3
-#define AP810_NAME		ap3
-#define AP810_BASE		0xdc000000
-#define AP810_GIC_ITS_BASE	0x3040000
-#define AP810_EIP197_INDEX	3
-#include "armada-ap810-octa-core.dtsi"
-#undef AP_NUM
-#undef AP810_NAME
-#undef AP810_BASE
-#undef AP810_GIC_ITS_BASE
-#undef AP810_EIP197_INDEX
+#include "armada-8084.dtsi"
 
 / {
-	model = "Marvell 8320 SoC";
-	compatible = "marvell,armada-8320", "marvell,armada-ap810-octa",
-				"marvell,armada-ap810";
+	model = "Marvell Armada-8084 DB board";
+	compatible = "marvell,armada-8084-db", "marvell,armada-8084",
+		     "marvell,armada-ap810-octa", "marvell,armada-ap810";
+};
 
-	aliases {
-		serial0 = &ap0_uart0;
-		serial1 = &ap0_uart1;
-	};
+&ap0_uart0 {
+	clock-frequency = <200000000>;
+	status = "okay";
+};
+
+&cp0_usb3h0 {
+	status = "okay";
+};
+
+&cp0_usb3h1 {
+	status = "okay";
 };
