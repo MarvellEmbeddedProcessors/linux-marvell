@@ -1,0 +1,63 @@
+* Marvell EBU AHCI SATA Controller
+
+Marvell EBU AHCI SATA Controller belongs to platform AHCI SATA
+Controller; for more detailed about platform AHCI, please refer
+to "ahci-platform.txt".
+
+Required properties:
+- compatible        : compatible string, one of:
+  - "marvell,armada-380-ahci"
+  - "marvell,armada-3700-ahci"
+  - "marvell,armada-cp110-ahci"
+- interrupts        : <interrupt mapping for SATA IRQ>
+- reg               : <registers mapping>
+
+Optional properties in addition to platform AHCI:
+- "marvell,led-gpio"          : the GPIO which controlls LED state
+- "marvell,blink-policy"      : LED blinking policy - 0 the LED is not activated on activity
+                                                      1 the LED blinks on every 10ms when activity is detected.
+                                                      2 the LED is on when idle, and blinks off every 10ms when activity is detected.
+LED Blinking:
+Marvell EBU AHCI SATA Controller supports software activity LED
+blinking through a GPIO with the optional properties of "marvell,led-gpio"
+and "marvell,blink-policy". The software activity LED blinking only
+works when the SATA disk is connected to the controller directly,
+so the 2 optional properties should not be set when a PMP card is
+attached to the controller and disks are connected to the PMP card.
+
+Example for armada 3720 DB:
+        sata@e0000 {
+		compatible = "marvell,armada-3700-ahci";
+		reg = <0xe0000 0x178>;
+		interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&nb_periph_clk 1>;
+		target-supply = <&reg_5v_sata>;
+		phys = <&a3700_comphy 2 COMPHY_SATA0>;
+		marvell,led-gpio = <&gpionb 11 GPIO_ACTIVE_LOW>;
+		marvell,blink-policy = <BLINK_OFF>;
+		status = "okay";
+	};
+
+Example for armada 8040 DB:
+	cp0_sata: sata@540000 {
+		compatible = "marvell,armada-cp110-ahci";
+		reg = <0x540000 0x30000>;
+		dma-coherent;
+		interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&cp0_syscon0 1 15>;
+		comreset_u = <0x17>;
+		comwake = <0x6>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		sata-port@0 {
+			reg = <0>;
+			phys = <&cp0_comphy 1 COMPHY_SATA0>;
+			phy-names = "comphy";
+		};
+		sata-port@1 {
+			reg = <1>;
+			phy-names = "comphy";
+			status = "okay";
+		};
+	};
