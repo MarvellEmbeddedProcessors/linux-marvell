@@ -233,6 +233,42 @@ release_fw:
 	return ret;
 }
 
+/* Reset the command descriptor rings */
+static void safexcel_hw_reset_cdesc_rings(struct safexcel_crypto_priv *priv)
+{
+	int i;
+
+	for (i = 0; i < priv->config.rings; i++) {
+		/* Reset ring base address */
+		writel(0x0,
+		       EIP197_HIA_CDR(priv, i) + EIP197_HIA_xDR_RING_BASE_ADDR_LO);
+		writel(0x0,
+		       EIP197_HIA_CDR(priv, i) + EIP197_HIA_xDR_RING_BASE_ADDR_HI);
+
+		/* clear any pending interrupt */
+		writel(GENMASK(5, 0),
+		       EIP197_HIA_CDR(priv, i) + EIP197_HIA_xDR_STAT);
+	}
+}
+
+/* Reset the result descriptor rings */
+static void safexcel_hw_reset_rdesc_rings(struct safexcel_crypto_priv *priv)
+{
+	int i;
+
+	for (i = 0; i < priv->config.rings; i++) {
+		/* Reset ring base address */
+		writel(0x0,
+		       EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_RING_BASE_ADDR_LO);
+		writel(0x0,
+		       EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_RING_BASE_ADDR_HI);
+
+		/* clear any pending interrupt */
+		writel(GENMASK(7, 0),
+		       EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_STAT);
+	}
+}
+
 static int safexcel_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
 {
 	u32 hdw, cd_size_rnd, val;
@@ -1190,6 +1226,9 @@ static int safexcel_remove(struct platform_device *pdev)
 
 	if (priv->id == eip_in_use)
 		safexcel_unregister_algorithms(priv);
+
+	safexcel_hw_reset_cdesc_rings(priv);
+	safexcel_hw_reset_rdesc_rings(priv);
 
 	clk_disable_unprepare(priv->clk);
 
