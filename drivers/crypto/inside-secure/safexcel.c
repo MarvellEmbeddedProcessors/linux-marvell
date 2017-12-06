@@ -381,6 +381,42 @@ static void eip_priv_unit_offset_init(struct safexcel_crypto_priv *priv)
 	}
 }
 
+/* Reset the command descriptor rings */
+static void eip_hw_reset_cdesc_rings(struct safexcel_crypto_priv *priv)
+{
+	int i;
+
+	for (i = 0; i < priv->config.rings; i++) {
+		/* Reset ring base address */
+		writel(0x0,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_RING_BASE_ADDR_LO);
+		writel(0x0,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_RING_BASE_ADDR_HI);
+
+		/* clear any pending interrupt */
+		writel(EIP197_CDR_INTR_MASK,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_CDR(i) + EIP197_HIA_xDR_STAT);
+	}
+}
+
+/* Reset the result descriptor rings */
+static void eip_hw_reset_rdesc_rings(struct safexcel_crypto_priv *priv)
+{
+	int i;
+
+	for (i = 0; i < priv->config.rings; i++) {
+		/* Reset ring base address */
+		writel(0x0,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_RING_BASE_ADDR_LO);
+		writel(0x0,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_RING_BASE_ADDR_HI);
+
+		/* clear any pending interrupt */
+		writel(EIP197_RDR_INTR_MASK,
+		       EIP197_HIA_AIC_xDR(priv) + EIP197_HIA_RDR(i) + EIP197_HIA_xDR_STAT);
+	}
+}
+
 /* Configure the command descriptor ring manager */
 static int eip_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
 {
@@ -1362,6 +1398,9 @@ static int safexcel_remove(struct platform_device *pdev)
 
 	if (priv->id == eip_in_use)
 		safexcel_unregister_algorithms(priv);
+
+	eip_hw_reset_cdesc_rings(priv);
+	eip_hw_reset_rdesc_rings(priv);
 
 	clk_disable_unprepare(priv->clk);
 
