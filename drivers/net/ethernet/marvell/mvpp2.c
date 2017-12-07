@@ -7342,6 +7342,19 @@ static void mvpp2_irqs_deinit(struct mvpp2_port *port)
 	}
 }
 
+static inline u32 mvpp22_rxfh_indir(struct mvpp2_port *port, u32 rxq)
+{
+	int nrxqs, cpus = num_present_cpus();
+
+	/* Number of RXQs per CPU */
+	nrxqs = port->nrxqs / cpus;
+
+	/* Indirection to better distribute the paquets on the CPUs when
+	 * configuring the RSS queues.
+	 */
+	return (rxq * nrxqs + rxq / cpus) % port->nrxqs;
+}
+
 static void mvpp22_rss_fill_table(struct mvpp2_port *port, u32 table)
 {
 	struct mvpp2 *priv = port->priv;
@@ -7352,7 +7365,8 @@ static void mvpp22_rss_fill_table(struct mvpp2_port *port, u32 table)
 			  MVPP22_RSS_INDEX_TABLE_ENTRY(i);
 		mvpp2_write(priv, MVPP22_RSS_INDEX, sel);
 
-		mvpp2_write(priv, MVPP22_RSS_TABLE_ENTRY, port->indir[i]);
+		mvpp2_write(priv, MVPP22_RSS_TABLE_ENTRY,
+			    mvpp22_rxfh_indir(port, port->indir[i]));
 	}
 }
 
