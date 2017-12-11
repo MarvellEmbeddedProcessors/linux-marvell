@@ -290,6 +290,9 @@ enum mvneta_port_type {
 
 #define MVNETA_TX_MTU_MAX		0x3ffff
 
+#define MVNETA_MTU_MIN			(0x40 + 4) /* 64 + 4 */
+#define MVNETA_MRU_MAX			0x4000     /* 16K */
+
 /* The RSS lookup table actually has 256 entries but we do not use
  * them yet
  */
@@ -317,6 +320,9 @@ enum mvneta_port_type {
 	ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
 	      ETH_HLEN + ETH_FCS_LEN,			     \
 	      MVNETA_CPU_D_CACHE_LINE_SIZE)
+
+#define MVNETA_MRU_TO_MTU(mru) \
+	(mru - (MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + ETH_HLEN + ETH_FCS_LEN))
 
 #define IS_TSO_HEADER(txq, addr) \
 	((addr >= txq->tso_hdrs_phys) && \
@@ -1583,7 +1589,6 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
 
 /* Set max sizes for tx queues */
 static void mvneta_txq_max_tx_size_set(struct mvneta_port *pp, int max_tx_size)
-
 {
 	u32 val, size, mtu;
 	int queue;
@@ -3342,21 +3347,24 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
 static int mvneta_check_mtu_valid(struct net_device *dev, int mtu)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
+	int max_mru;
 
-	if (mtu < 68) {
+	if (mtu < MVNETA_MTU_MIN) {
 		netdev_err(dev, "cannot change mtu to less than 68\n");
 		return -EINVAL;
 	}
 
-	if (pp->bm_priv) {
+	if (pp->bm_priv)
 		/* HWBM case. MTU can't be larger than buffers in Long pool */
-		if (MVNETA_RX_PKT_SIZE(mtu) > pp->pool_long->pkt_size) {
-			netdev_info(dev, "Illegal MTU value %d\n", mtu);
-			mtu = pp->pool_long->pkt_size -
-			      (MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + ETH_HLEN + ETH_FCS_LEN);
-			netdev_info(dev, "Round to %d to fit in buffer size %d\n",
-				    mtu, pp->pool_long->pkt_size);
-		}
+		max_mru = pp->pool_long->pkt_size;
+	else
+		max_mru = MVNETA_MRU_MAX;
+
+	if (MVNETA_RX_PKT_SIZE(mtu) > max_mru) {
+		netdev_info(dev, "Illegal MTU value %d\n", mtu);
+		mtu = MVNETA_MRU_TO_MTU(max_mru);
+		netdev_info(dev, "Round to %d to fit in %d\n",
+			    mtu, max_mru);
 	}
 
 	if (!IS_ALIGNED(MVNETA_RX_PKT_SIZE(mtu), 8)) {
@@ -3386,6 +3394,7 @@ static void mvneta_percpu_disable(void *arg)
 static int mvneta_change_mtu(struct net_device *dev, int mtu)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
+	int ret;
 
 	mtu = mvneta_check_mtu_valid(dev, mtu);
 	if (mtu < 0)
@@ -3398,21 +3407,33 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
 		return 0;
 	}
 
-	/* stop all RX and TX queues */
-	mvneta_port_down(pp);
-	netif_tx_stop_all_queues(pp->dev);
+	/* The interface is running, so we have to force a
+	 * reallocation of the queues
+	 */
+	mvneta_stop_dev(pp);
+	on_each_cpu(mvneta_percpu_disable, pp, true);
 
-	/* stop the port activity */
-	mvneta_port_disable(pp);
+	mvneta_cleanup_txqs(pp);
+	mvneta_cleanup_rxqs(pp);
 
 	pp->pkt_size = MVNETA_RX_PKT_SIZE(dev->mtu);
-	mvneta_max_rx_size_set(pp, pp->pkt_size);
-	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
+	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
+			SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
 
-	/* start the Rx/Tx activity */
-	mvneta_port_up(pp);
-	mvneta_port_enable(pp);
-	netif_tx_start_all_queues(pp->dev);
+	ret = mvneta_setup_rxqs(pp);
+	if (ret) {
+		netdev_err(dev, "unable to setup rxqs after MTU change\n");
+		return ret;
+	}
+
+	ret = mvneta_setup_txqs(pp);
+	if (ret) {
+		netdev_err(dev, "unable to setup txqs after MTU change\n");
+		return ret;
+	}
+
+	on_each_cpu(mvneta_percpu_enable, pp, true);
+	mvneta_start_dev(pp);
 
 	netdev_update_features(dev);
 
@@ -3427,7 +3448,7 @@ static netdev_features_t mvneta_fix_features(struct net_device *dev,
 	if (pp->tx_csum_limit && dev->mtu > pp->tx_csum_limit) {
 		features &= ~(NETIF_F_IP_CSUM | NETIF_F_TSO);
 		netdev_info(dev,
-			    "Disable IP checksum for MTU greater than %dB\n",
+			    "Disable L4 checksum for MTU greater than %dB\n",
 			    pp->tx_csum_limit);
 	}
 
@@ -3664,7 +3685,6 @@ static int mvneta_percpu_notifier(struct notifier_block *nfb,
 		/* Mask all ethernet port interrupts */
 		on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
 		napi_enable(&port->napi);
-
 
 		/* Enable per-CPU interrupts on the CPU that is
 		 * brought up.
