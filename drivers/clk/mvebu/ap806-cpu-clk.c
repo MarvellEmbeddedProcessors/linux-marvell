@@ -201,11 +201,12 @@ static int ap806_clk_probe(struct platform_device *pdev)
 		if (WARN_ON(err))
 			return err;
 
-		/* initialize only for 1st CPU of each cluster (CPU0, CPU2, ..) */
-		if (cpu & APN806_CPU1_MASK)
+		cluster_index = (cpu & APN806_CLUSTER_NUM_MASK) >> APN806_CLUSTER_NUM_OFFSET;
+
+		/* Initialize once for one cluster */
+		if (cluster_clks[cluster_index])
 			continue;
 
-		cluster_index = (cpu & APN806_CLUSTER_NUM_MASK) >> APN806_CLUSTER_NUM_OFFSET;
 		sprintf(clk_name, "cluster%d", cluster_index);
 		ap806_clk[cluster_index].parent_name = of_clk_get_parent_name(np, 0);
 		ap806_clk[cluster_index].clk_name = clk_name;
