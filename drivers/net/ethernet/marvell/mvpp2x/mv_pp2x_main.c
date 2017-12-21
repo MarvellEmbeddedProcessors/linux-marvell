@@ -5762,7 +5762,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 	struct device_node *dn = pdev->dev.of_node;
 	struct resource *res;
 	resource_size_t mspg_base, mspg_end;
-	u32	err;
+	int	err;
 
 	match = of_match_node(mv_pp2x_match_tbl, dn);
 	if (!match)
