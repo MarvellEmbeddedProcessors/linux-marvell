@@ -769,6 +769,9 @@ static u32 mv_pp2x_ethtool_get_rxfh_indir_size(struct net_device *dev)
 	if (port->priv->pp2_version == PPV21)
 		return -EOPNOTSUPP;
 
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		return -EOPNOTSUPP;
+
 	return ARRAY_SIZE(port->priv->rx_indir_table);
 }
 
@@ -808,6 +811,9 @@ static int mv_pp2x_ethtool_get_rxnfc(struct net_device *dev,
 		return -EOPNOTSUPP;
 
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+		return -EOPNOTSUPP;
+
+	if (port->flags & MVPP2_F_IF_MUSDK)
 		return -EOPNOTSUPP;
 
 	if (!port)
@@ -878,6 +884,9 @@ static int mv_pp2x_ethtool_set_rxnfc(struct net_device *dev, struct ethtool_rxnf
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
 		return -EOPNOTSUPP;
 
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		return -EOPNOTSUPP;
+
 	switch (cmd->cmd) {
 	case ETHTOOL_SRXFH:
 		ret =  mv_pp2x_set_rss_hash_opt(port, cmd);
@@ -900,6 +909,9 @@ static int mv_pp2x_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 
 	/* Single mode doesn't support RSS features */
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+		return -EOPNOTSUPP;
+
+	if (port->flags & MVPP2_F_IF_MUSDK)
 		return -EOPNOTSUPP;
 
 	if (hfunc)
@@ -925,6 +937,9 @@ static int mv_pp2x_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 
 	/* Single mode doesn't support RSS features */
 	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+		return -EOPNOTSUPP;
+
+	if (port->flags & MVPP2_F_IF_MUSDK)
 		return -EOPNOTSUPP;
 
 	/* We require at least one supported parameter to be changed
@@ -1191,34 +1206,4 @@ void mv_pp2x_set_ethtool_ops(struct net_device *netdev)
 	netdev->ethtool_ops = &mv_pp2x_eth_tool_ops;
 }
 
-/* Following eth_tool_ops is for musdk_ports, i.e. eth_ports that have the musdk-status property in their dts. */
-static const struct ethtool_ops mv_pp2x_non_kernel_eth_tool_ops = {
-	.get_link		= ethtool_op_get_link,
-	.get_settings		= mv_pp2x_ethtool_get_settings,
-	/*.set_settings		= mv_pp2x_ethtool_set_settings,*/
-	/*.set_coalesce		= mv_pp2x_ethtool_set_coalesce,*/
-	/*.get_coalesce		= mv_pp2x_ethtool_get_coalesce,*/
-	.nway_reset		= mv_pp2x_eth_tool_nway_reset,
-	.get_drvinfo		= mv_pp2x_ethtool_get_drvinfo,
-	.get_ethtool_stats	= mv_pp2x_eth_tool_get_ethtool_stats,
-	.get_sset_count		= mv_pp2x_eth_tool_get_sset_count,
-	.get_strings		= mv_pp2x_eth_tool_get_strings,
-	/*.get_ringparam	= mv_pp2x_ethtool_get_ringparam,*/
-	/*.set_ringparam	= mv_pp2x_ethtool_set_ringparam,*/
-	.get_pauseparam		= mv_pp2x_get_pauseparam,
-	.set_pauseparam		= mv_pp2x_set_pauseparam,
-	.get_rxfh_indir_size	= mv_pp2x_ethtool_get_rxfh_indir_size,
-	.get_rxnfc		= mv_pp2x_ethtool_get_rxnfc,
-	.set_rxnfc		= mv_pp2x_ethtool_set_rxnfc,
-	.get_rxfh		= mv_pp2x_ethtool_get_rxfh,
-	.set_rxfh		= mv_pp2x_ethtool_set_rxfh,
-	.get_regs_len           = mv_pp2x_ethtool_get_regs_len,
-	.get_regs		= mv_pp2x_ethtool_get_regs,
-	.self_test		= mv_pp2x_eth_tool_diag_test,
-};
-
-void mv_pp2x_set_non_kernel_ethtool_ops(struct net_device *netdev)
-{
-	netdev->ethtool_ops = &mv_pp2x_non_kernel_eth_tool_ops;
-}
 

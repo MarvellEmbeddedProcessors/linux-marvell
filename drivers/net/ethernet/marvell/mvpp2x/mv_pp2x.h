@@ -687,6 +687,7 @@ struct mv_pp2x_port {
 	struct mv_pp2x_cos cos_cfg;
 	struct mv_pp2x_rss rss_cfg;
 	struct notifier_block	port_hotplug_nb;
+	bool port_hotplugged;
 	bool use_interrupts; /* Used by Netmap */
 	bool interrupt_tx_done;
 };
