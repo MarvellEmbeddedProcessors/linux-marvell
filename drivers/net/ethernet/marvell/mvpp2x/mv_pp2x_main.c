@@ -72,7 +72,9 @@
 #define MVPP2_ADDRESS 0xf2000000
 #define CPN110_ADDRESS_SPACE_SIZE (16 * 1024 * 1024)
 
-#define UIO_BASE_STRING "uio_pp_"
+#define UIO_PP2_STRING  "uio_pp_%d"
+#define UIO_PORT_STRING "uio_pp_port_%d:%d"
+
 
 /* Declaractions */
 #if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
@@ -1706,8 +1708,7 @@ static irqreturn_t mv_pp2_link_change_isr(int irq, void *data)
 {
 	struct mv_pp2x_port *port = (struct mv_pp2x_port *)data;
 
-	pr_debug("%s cpu_id(%d) irq(%d) pp_port(%d)\n", __func__,
-		 smp_processor_id(), irq, port->id);
+	pr_debug("%s cpu_id(%d) irq(%d) pp_port(%d)\n", __func__, smp_processor_id(), irq, port->id);
 	if (port->priv->pp2_version == PPV22) {
 		/* mask all events from this mac */
 		mv_gop110_port_events_mask(&port->priv->hw.gop, &port->mac_data);
@@ -1786,7 +1787,6 @@ static void mv_pp22_dev_link_event(struct net_device *dev)
 	if (link_is_up) {
 		if (netif_carrier_ok(dev))
 			return;
-
 		netif_carrier_on(dev);
 		if (!(port->flags & MVPP2_F_IF_MUSDK))
 			netif_tx_wake_all_queues(dev);
@@ -4918,8 +4918,7 @@ static int mv_pp2x_port_init(struct mv_pp2x_port *port)
 	port->pkt_size = MVPP2_RX_PKT_SIZE(port->dev->mtu);
 
 	/* Configure queue_vectors */
-	if (!(port->flags & MVPP2_F_IF_MUSDK))
-		port->priv->pp2xdata->mv_pp2x_port_queue_vectors_init(port);
+	port->priv->pp2xdata->mv_pp2x_port_queue_vectors_init(port);
 
 	err = mv_pp2x_port_hw_init(port);
 	if (err)
@@ -4997,6 +4996,114 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 	return NOTIFY_OK;
 }
 
+static int mv_pp22_uio_mem_map(struct mv_pp2x_uio *pp2x_uio, struct resource *res)
+{
+	struct uio_mem	*uio_mem = &pp2x_uio->u_info.mem[pp2x_uio->num_maps];
+
+	if (pp2x_uio->num_maps >= MAX_UIO_MAPS) {
+		pr_err("Too many UIO maps requests\n");
+		return -ENOSPC;
+	}
+
+	uio_mem->memtype = UIO_MEM_PHYS;
+	uio_mem->addr = res->start & PAGE_MASK;
+	uio_mem->size = PAGE_ALIGN(resource_size(res));
+	uio_mem->name = res->name;
+
+	pp2x_uio->num_maps++;
+
+	pr_debug("uio: addr(%llx) size(%llx) name(%s) map_num(%d)\n",
+		 uio_mem->addr, uio_mem->size, uio_mem->name,
+		 pp2x_uio->num_maps);
+
+	return 0;
+}
+
+int mv_pp2x_port_musdk_set(void *netdev_priv)
+{
+	struct mv_pp2x_port *port = netdev_priv;
+	bool was_running = false;
+
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		return 0;
+
+	pr_debug("mv_pp2_uio_open %s\n", port->dev->name);
+
+	/* Close device before updates */
+	if (netif_running(port->dev)) {
+		rtnl_lock();
+		dev_close(port->dev);
+		was_running = true;
+	}
+	/* Backup num configured entities */
+	port->cfg_num_qvector   = port->num_qvector;
+	port->cfg_num_rx_queues = port->num_rx_queues;
+	port->cfg_num_tx_queues = port->num_tx_queues;
+
+	/* Set num configured entities to 0 */
+	port->num_qvector = 0;
+	port->num_rx_queues = 0;
+	port->num_tx_queues = 0;
+
+	port->flags |= MVPP2_F_IF_MUSDK;
+	if (was_running) {
+		dev_open(port->dev);
+		rtnl_unlock();
+	}
+	return 0;
+}
+EXPORT_SYMBOL(mv_pp2x_port_musdk_set);
+
+int mv_pp2x_port_musdk_clear(void *netdev_priv)
+{
+	struct mv_pp2x_port *port = netdev_priv;
+	bool was_running = false;
+
+	if (!(port->flags & MVPP2_F_IF_MUSDK))
+		return 0;
+
+	pr_debug("mv_pp2_uio_release %s\n", port->dev->name);
+
+	/* Close device before updates */
+	if (netif_running(port->dev)) {
+		rtnl_lock();
+		dev_close(port->dev);
+		was_running = true;
+	}
+
+	/* Set num configured entities back to configured values */
+	port->num_qvector   = port->cfg_num_qvector;
+	port->num_rx_queues = port->cfg_num_rx_queues;
+	port->num_tx_queues = port->cfg_num_tx_queues;
+
+	port->flags &= ~MVPP2_F_IF_MUSDK;
+
+	if (was_running) {
+		dev_open(port->dev);
+		rtnl_unlock();
+	}
+	return 0;
+}
+EXPORT_SYMBOL(mv_pp2x_port_musdk_clear);
+
+static int mv_pp2_uio_open(struct uio_info *info, struct inode *inode)
+{
+	int err;
+	struct mv_pp2x_port *port = info->priv;
+
+	err = mv_pp2x_port_musdk_set(port);
+	return err;
+}
+
+static int mv_pp2_uio_release(struct uio_info *info, struct inode *inode)
+{
+	int err;
+	struct mv_pp2x_port *port = info->priv;
+
+	err = mv_pp2x_port_musdk_clear(port);
+	return err;
+}
+
 /* Ports initialization */
 static int mv_pp2x_port_probe(struct platform_device *pdev,
 			      struct device_node *port_node,
@@ -5047,10 +5154,6 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	port->interrupt_tx_done = port->priv->pp2xdata->interrupt_tx_done;
 
 	musdk_status = of_get_property(port_node, "musdk-status", &statlen);
-
-	/* Set musdk_flag, only if status is "private", not if status is "shared" */
-	if (musdk_status && !strcmp(musdk_status, "private"))
-		port->flags |= MVPP2_F_IF_MUSDK;
 
 	mv_pp2x_port_init_config(port);
 
@@ -5133,9 +5236,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 
 	/* Tx/Rx Interrupt */
 	port_num_irq = mv_pp2x_of_irq_count(port_node);
-	if (port->flags & MVPP2_F_IF_MUSDK)
-		port_num_irq = 0;
-	if ((!(port->flags & MVPP2_F_IF_MUSDK)) && port_num_irq != priv->pp2xdata->num_port_irq) {
+	if (port_num_irq != priv->pp2xdata->num_port_irq) {
 		dev_err(&pdev->dev,
 			"port(%d)-number of irq's doesn't match hw\n", id);
 		goto err_free_netdev;
@@ -5158,13 +5259,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	dev->tx_queue_len = tx_queue_size;
 	dev->watchdog_timeo = 5 * HZ;
 
-	if (port->flags & MVPP2_F_IF_MUSDK) {
-		port->num_tx_queues = 0;
-		port->num_rx_queues = 0;
-	} else {
-		port->num_tx_queues = mv_pp2x_txq_number;
-		port->num_rx_queues = mv_pp2x_rxq_number;
-	}
+	port->num_tx_queues = mv_pp2x_txq_number;
+	port->num_rx_queues = mv_pp2x_rxq_number;
 	dev->netdev_ops = &mv_pp2x_netdev_ops;
 	mv_pp2x_set_ethtool_ops(dev);
 
@@ -5198,8 +5294,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	mv_pp2x_check_queue_size_valid(port);
 
 	if (mv_pp2_num_cpu_irqs(port) < num_active_cpus() &&
-	    port->interrupt_tx_done &&
-	    (!(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK)))) {
+	    port->interrupt_tx_done && (!(port->flags & MVPP2_F_LOOPBACK))) {
 		port->interrupt_tx_done = false;
 		dev_info(&pdev->dev, "mvpp2x: interrupt_tx_done override to false\n");
 	}
@@ -5221,7 +5316,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 		memset(port_pcpu, 0, sizeof(struct mv_pp2x_port_pcpu));
 	}
-	if ((!(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK))) && !port->interrupt_tx_done) {
+	if ((!(port->flags & MVPP2_F_LOOPBACK)) && !port->interrupt_tx_done) {
 		for_each_present_cpu(cpu) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 
@@ -5292,6 +5387,22 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		goto err_free_port_pcpu;
 	}
 
+	/* Register uio_device */
+	if (priv->pp2_version == PPV22) {
+		port->uio.u_info.name = kasprintf(GFP_KERNEL, UIO_PORT_STRING,
+						  priv->pp2_cfg.cell_index, port->id);
+		port->uio.u_info.version = "0.1";
+		port->uio.u_info.priv = port;
+		port->uio.u_info.open = mv_pp2_uio_open;
+		port->uio.u_info.release = mv_pp2_uio_release;
+
+		err = uio_register_device(&dev->dev, &port->uio.u_info);
+		if (err) {
+			dev_err(&dev->dev, "Failed to register uio device\n");
+			goto err_unreg_netdev;
+		}
+	}
+
 	/* Clear MIB and mvpp2 counters statistic */
 	mv_gop110_mib_counters_clear(&port->priv->hw.gop, port->mac_data.gop_index);
 	mv_pp2x_counters_stat_clear(port);
@@ -5319,6 +5430,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	return 0;
 	dev_err(&pdev->dev, "%s failed for port_id(%d)\n", __func__, id);
 
+err_unreg_netdev:
+	unregister_netdev(dev);
 err_free_port_pcpu:
 	free_percpu(port->pcpu);
 err_free_txq_pcpu:
@@ -5340,6 +5453,11 @@ static void mv_pp2x_port_remove(struct mv_pp2x_port *port)
 #ifdef DEV_NETMAP
 	netmap_detach(port->dev);
 #endif /* DEV_NETMAP */
+
+	if (port->priv->pp2_version == PPV22) {
+		uio_unregister_device(&port->uio.u_info);
+		kfree(port->uio.u_info.name);
+	}
 
 	unregister_netdev(port->dev);
 
@@ -5603,29 +5721,6 @@ static void mv_pp22_init_rxfhindir(struct mv_pp2x *pp2)
 
 	for (i = 0; i < MVPP22_RSS_TBL_LINE_NUM; i++)
 		pp2->rx_indir_table[i] = i % online_cpus;
-}
-
-static int mv_pp22_uio_mem_map(struct mv_pp2x_uio *pp2x_uio, struct resource *res)
-{
-	struct uio_mem	*uio_mem = &pp2x_uio->u_info.mem[pp2x_uio->num_maps];
-
-	if (pp2x_uio->num_maps >= MAX_UIO_MAPS) {
-		pr_err("Too many UIO maps requests\n");
-		return -ENOSPC;
-	}
-
-	uio_mem->memtype = UIO_MEM_PHYS;
-	uio_mem->addr = res->start & PAGE_MASK;
-	uio_mem->size = PAGE_ALIGN(resource_size(res));
-	uio_mem->name = res->name;
-
-	pp2x_uio->num_maps++;
-
-	pr_debug("uio: addr(%llx) size(%llx) name(%s) map_num(%d)\n",
-		 uio_mem->addr, uio_mem->size, uio_mem->name,
-		 pp2x_uio->num_maps);
-
-	return 0;
 }
 
 static int mv_pp2x_platform_data_get(struct platform_device *pdev,
@@ -6101,11 +6196,22 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		priv->num_rss_tables = mv_pp2x_queue_mode * mv_pp2x_num_cos_queues;
 	}
 
+	if (priv->pp2_version == PPV22) {
+		priv->uio.u_info.name = kasprintf(GFP_KERNEL, UIO_PP2_STRING, cell_index);
+		pr_debug("mv_pp2x_probe : %s\n", priv->uio.u_info.name);
+		priv->uio.u_info.version = "0.1";
+		err = uio_register_device(&pdev->dev, &priv->uio.u_info);
+		if (err) {
+			dev_err(&pdev->dev, "Failed to register uio device\n");
+			goto err_clk;
+		}
+	}
+
 	/* Initialize ports */
 	for_each_available_child_of_node(dn, port_node) {
 		err = mv_pp2x_port_probe(pdev, port_node, priv);
 		if (err < 0)
-			goto err_clk;
+			goto err_uio;
 	}
 	/* Init hrtimer for tx transmit procedure.
 	 * Instead of reg_write atfer each xmit callback, 50 microsecond
@@ -6135,15 +6241,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, priv);
 
-	if (priv->pp2_version == PPV22) {
-		priv->uio.u_info.name = kasprintf(GFP_KERNEL, "%s%d", UIO_BASE_STRING, cell_index);
-		priv->uio.u_info.version = "0.1";
-		err = uio_register_device(&pdev->dev, &priv->uio.u_info);
-		if (err) {
-			dev_err(&pdev->dev, "Failed to register uio device\n");
-			goto err_clk;
-		}
-	}
 	priv->workqueue = create_singlethread_workqueue("mv_pp2x");
 
 	if (!priv->workqueue) {

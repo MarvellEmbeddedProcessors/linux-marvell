@@ -628,6 +628,10 @@ struct queue_vector {
 
 struct mv_pp2x_ptp_desc; /* per-port private PTP descriptor */
 
+struct mv_pp2x_port_uio {
+	struct uio_info u_info;
+};
+
 struct mv_pp2x_port {
 	u8 id;
 
@@ -649,6 +653,11 @@ struct mv_pp2x_port {
 	u8 num_rx_queues;
 	/* port's  number of tx_queues */
 	u8 num_tx_queues;
+
+	/* port's configured number of rx_queues */
+	u8 cfg_num_rx_queues;
+	/* port's configured number of tx_queues */
+	u8 cfg_num_tx_queues;
 
 	struct mv_pp2x_rx_queue **rxqs; /*Each Port has up tp 32 rxq_queues.*/
 	struct mv_pp2x_tx_queue **txqs;
@@ -678,6 +687,10 @@ struct mv_pp2x_port {
 	int txq_stop_limit;
 
 	u32 num_qvector;
+
+	/* port's configured number of qvectors */
+	u32 cfg_num_qvector;
+
 	/* q_vector is the parameter that will be passed to
 	 * mv_pp2_isr(int irq, void *dev_id=q_vector)
 	 */
@@ -690,6 +703,8 @@ struct mv_pp2x_port {
 	bool port_hotplugged;
 	bool use_interrupts; /* Used by Netmap */
 	bool interrupt_tx_done;
+
+	struct mv_pp2x_port_uio uio;
 };
 
 struct pp2x_hw_params {
@@ -880,6 +895,8 @@ int mv_pp2x_txq_reserved_desc_num_proc(struct mv_pp2x *priv,
 				       struct mv_pp2x_tx_queue *txq,
 				       struct mv_pp2x_txq_pcpu *txq_pcpu,
 				       int num, int cpu);
+int mv_pp2x_port_musdk_set(void *netdev_priv);
+int mv_pp2x_port_musdk_clear(void *netdev_priv);
+
 
 #endif /*_MVPP2_H_*/
-
