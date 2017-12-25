@@ -49,8 +49,14 @@
 #define ICU_MAX_IRQS		208
 #define ICU_MAX_REGS		28
 #define ICU_MAX_SPI_IRQ_IN_GIC	128
-#define ICU_GIC_SPI_BASE0	64
-#define ICU_GIC_SPI_BASE1	288
+
+/* AP806 ICU entries from CP110 are divided to 2 groups */
+#define ICU_GIC_SPI_AP806_BASE0		64
+#define ICU_GIC_SPI_AP806_BASE0_SIZE	64
+#define ICU_GIC_SPI_AP806_BASE1		288
+
+/* AP810 ICU entries from CP110 are consecutive */
+#define ICU_GIC_SPI_AP810_BASE		92
 
 #define ICU_INT_ENABLE_OFFSET   (24)
 #define ICU_IS_EDGE_OFFSET      (28)
@@ -63,17 +69,31 @@
 
 #define ICU_INT_CFG(x)          (0x100 + 4 * x)
 
-#define ICU_GET_GIC_BASE_BY_IDX(x)	((x < ICU_GIC_SPI_BASE0) ? \
-					(ICU_GIC_SPI_BASE0) : (ICU_GIC_SPI_BASE1 - ICU_GIC_SPI_BASE0))
-#define ICU_GET_IDX_BY_GIC_BASE(x)	((x < ICU_GIC_SPI_BASE1) ? \
-					(x - ICU_GIC_SPI_BASE0) : (x - ICU_GIC_SPI_BASE1))
+#define ICU_GET_GIC_BASE_BY_IDX(x)	((x < ICU_GIC_SPI_AP806_BASE0_SIZE) ? \
+					(ICU_GIC_SPI_AP806_BASE0) : (ICU_GIC_SPI_AP806_BASE1 - ICU_GIC_SPI_AP806_BASE0))
+#define ICU_GET_IDX_BY_GIC_BASE(x)	((x < ICU_GIC_SPI_AP806_BASE1) ? \
+					(x - ICU_GIC_SPI_AP806_BASE0) : (x - ICU_GIC_SPI_AP806_BASE1))
 
-#define ICU_GET_GIC_IRQ(x)	(x + ((ICU_GET_GIC_BASE_BY_IDX(x)) - 32))
+/*
+ * AP806 ICU entries from CP110 are divided to 2 groups, while AP810 entries are consecutive,
+ * so for AP806 we need to differ between 1st and 2nd sets of interrupts (according to interrupt id),
+ * while for AP810 we just use the interrupt base
+ */
+#define ICU_GET_GIC_IRQ(cp110_ap, x)	((cp110_ap == CP110_AP810) ? \
+					(x + (ICU_GIC_SPI_AP810_BASE - 32)) : \
+					(x + ((ICU_GET_GIC_BASE_BY_IDX(x)) - 32)))
 
-#define ICU_GET_GIC_IDX(x)	(ICU_GET_IDX_BY_GIC_BASE(x))
+#define ICU_GET_GIC_IDX(cp110_ap, x)	((cp110_ap == CP110_AP810) ? \
+					(x - ICU_GIC_SPI_AP810_BASE) : \
+					(ICU_GET_IDX_BY_GIC_BASE(x)))
 
 #define ICU_SATA0_IRQ_INT		109
 #define ICU_SATA1_IRQ_INT		107
+
+enum cp110_ap {
+	CP110_AP806 = 1,
+	CP110_AP810,
+};
 
 struct mvebu_icu_irq_data {
 	struct list_head node;
@@ -83,6 +103,7 @@ struct mvebu_icu_irq_data {
 	u32 *icu_reg;
 	u32 *icu_cfg;
 	struct irq_domain *domain;
+	enum cp110_ap cp110_ap;
 };
 
 /* Global list of devices for suspend and resume (struct mvebu_icu_irq_data) */
@@ -95,7 +116,7 @@ static void mvebu_icu_irq_chip_eoi(struct irq_data *data)
 {
 	struct mvebu_icu_irq_data *icu = data->domain->host_data;
 	struct irq_data *irq_parent = data->parent_data;
-	int irq_msg_num = ICU_GET_GIC_IDX(irqd_to_hwirq(irq_parent));
+	int irq_msg_num = ICU_GET_GIC_IDX(icu->cp110_ap, irqd_to_hwirq(irq_parent));
 
 	if (!irqd_is_level_type(data)) {
 		/*
@@ -125,6 +146,7 @@ static int mvebu_icu_irq_parent_domain_alloc(struct irq_domain *domain,
 		unsigned int virq, unsigned int type, int *irq_msg_num)
 {
 	struct irq_fwspec fwspec;
+	struct mvebu_icu_irq_data *icu = domain->host_data;
 
 	if (!irq_domain_get_of_node(domain->parent)) {
 		pr_err("No parent node offset found\n");
@@ -150,7 +172,7 @@ static int mvebu_icu_irq_parent_domain_alloc(struct irq_domain *domain,
 	fwspec.fwnode = domain->parent->fwnode;
 	fwspec.param_count = 3;
 	fwspec.param[0] = 0; /* 0 = SPI interrupts */
-	fwspec.param[1] = ICU_GET_GIC_IRQ(*irq_msg_num);
+	fwspec.param[1] = ICU_GET_GIC_IRQ(icu->cp110_ap, *irq_msg_num);
 	fwspec.param[2] = type;
 
 	/* Allocate the IRQ in the parent */
@@ -215,6 +237,24 @@ static int mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int vi
 	}
 
 	/*
+	 * ICU interrupts in AP806 are written to GIC-P, by writing only source ID,
+	 * than the GIC-P remaps these interrupt IDs, according to AP806 GIC assignments:
+	 * - 0-31 : PPI/SGI
+	 * - 32-64: AP interrupts
+	 * So the remap was done internally by HW.
+	 *
+	 * For AP810, there is no GIC-P in between, and the ICU writes the message directly to
+	 * the GIC, so the differences are:
+	 * 1. AP810 GIC has 92 interrupt entries, pre-assigned to:
+	 * 0-31 : PPI/SGI
+	 * 32-92: AP interrupts
+	 * 2. ICU need to write message ID directly to GIC, hence it should also increase
+	 * the GIC entries ID by 92, by SW
+	 */
+	if (icu->cp110_ap == CP110_AP810)
+		irq_msg_num += ICU_GIC_SPI_AP810_BASE;
+
+	/*
 	 * Clear Non-Secure SPI in GICP,
 	 * in case it was asserted in bootloader.
 	 */
@@ -264,7 +304,7 @@ static void mvebu_icu_irq_domain_free(struct irq_domain *domain,
 	struct mvebu_icu_irq_data *icu = domain->host_data;
 	struct irq_data *irq = irq_get_irq_data(virq);
 	struct irq_data *irq_parent = irq->parent_data;
-	int irq_msg_num = ICU_GET_GIC_IDX(irqd_to_hwirq(irq_parent));
+	int irq_msg_num = ICU_GET_GIC_IDX(icu->cp110_ap, irqd_to_hwirq(irq_parent));
 
 	WARN_ON(nr_irqs != 1);
 
@@ -363,6 +403,15 @@ static int __init mvebu_icu_of_init(struct device_node *node, struct device_node
 		ret = -ENOMEM;
 		goto err_free_icu;
 	}
+
+	/*
+	 * identify if it's a CP110 connected to AP810 or CP110 connected to AP806,
+	 * since they differ in relevance to how they are connected to AP GIC entries
+	 */
+	if (of_machine_is_compatible("marvell,armada-ap810"))
+		icu->cp110_ap = CP110_AP810;
+	else
+		icu->cp110_ap = CP110_AP806;
 
 	/* Get the addresses of clear/set GICP SPI messages
 	** on the Host side (AP)
