@@ -3796,6 +3796,14 @@ static int mvneta_open(struct net_device *dev)
 	/* In default link is down */
 	netif_carrier_off(pp->dev);
 
+	if (!pp->use_inband_status) {
+		ret = mvneta_mdio_probe(pp);
+		if (ret < 0) {
+			netdev_err(dev, "cannot probe MDIO bus\n");
+			return 0;
+		}
+	}
+
 	mvneta_start_dev(pp);
 
 	return 0;
@@ -3830,6 +3838,9 @@ static int mvneta_stop(struct net_device *dev)
 		mvneta_stop_dev(pp);
 		free_irq(dev->irq, pp);
 	}
+
+	if (!pp->use_inband_status)
+		mvneta_mdio_remove(pp);
 
 	mvneta_cleanup_rxqs(pp);
 	mvneta_cleanup_txqs(pp);
@@ -4875,13 +4886,6 @@ static int mvneta_probe(struct platform_device *pdev)
 	if (pp->flags & MVNETA_PORT_F_IF_MUSDK)
 		netdev_info(dev, "Port belong to User Space (MUSDK)\n");
 
-	if (!pp->use_inband_status) {
-		err = mvneta_mdio_probe(pp);
-		if (err < 0) {
-			netdev_err(dev, "cannot probe MDIO bus\n");
-			goto err_netdev;
-		}
-	}
 	return 0;
 
 err_netdev:
@@ -4918,8 +4922,6 @@ static int mvneta_remove(struct platform_device *pdev)
 	struct net_device  *dev = platform_get_drvdata(pdev);
 	struct mvneta_port *pp = netdev_priv(dev);
 
-	if (!pp->use_inband_status)
-		mvneta_mdio_remove(pp);
 	unregister_netdev(dev);
 	clk_disable_unprepare(pp->clk);
 	free_percpu(pp->ports);
