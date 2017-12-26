@@ -155,6 +155,7 @@
 			};
 
 			comphy {
+				skip_pcie_power_off;
 				status = "okay";
 			};
 		};

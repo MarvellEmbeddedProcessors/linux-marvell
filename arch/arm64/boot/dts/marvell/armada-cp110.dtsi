@@ -550,7 +550,6 @@
 				dfx-reg = <0x400280 4>;
 				#phy-cells = <2>;
 				sar-data = <&CP110_LABEL(sar)>;
-				skip_pcie_power_off;
 				status = "disabled";
 			};
 

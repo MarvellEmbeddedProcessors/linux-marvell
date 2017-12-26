@@ -176,6 +176,9 @@
 				non-removable;
 				pinctrl-0 = <&cp0_sdhci_pins>;
 			};
+			cp0_comphy: comphy {
+				skip_pcie_power_off;
+			};
 		};
 
 		cp0_usb3h0_phy: cp0_usb3_phy0 {
@@ -277,6 +280,9 @@
 						reg = <0x400000 0xC00000>;
 					};
 				};
+			};
+			cp1_comphy: comphy {
+				skip_pcie_power_off;
 			};
 		};
 
