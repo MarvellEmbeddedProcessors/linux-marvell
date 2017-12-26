@@ -81,6 +81,10 @@ struct armada8k_pcie_rst {
 #define PCIE_LINK_CAPABILITY		0x7C
 
 #define PCIE_LINK_CONTROL_LINK_STATUS	0x80
+#define PCIE_LINK_SPEED_OFFSET	16
+#define PCIE_LINK_SPEED_MASK	(0xF << PCIE_LINK_SPEED_OFFSET)
+#define PCIE_LINK_WIDTH_OFFSET	20
+#define PCIE_LINK_WIDTH_MASK	(0xF << PCIE_LINK_WIDTH_OFFSET)
 #define PCIE_LINK_TRAINING		BIT(27)
 
 #define PCIE_LINK_CTL_2			0xA0
@@ -265,6 +269,7 @@ static void armada8k_pcie_dw_mvebu_pcie_config(void __iomem *regs_base)
 static int armada8k_pcie_wait_link_up(struct pcie_port *pp)
 {
 	unsigned long timeout;
+	u32 reg;
 
 	/*
 	 * According to HW, taking Armada7k-PCAC board(as PCIe end-point card)
@@ -282,6 +287,11 @@ static int armada8k_pcie_wait_link_up(struct pcie_port *pp)
 	 * 300ms delay is according to HW design guidelines.
 	 */
 	mdelay(PCIE_SPEED_CHANGE_TIMEOUT_MS);
+	/* To print the link information */
+	reg = readl(pp->dbi_base + PCIE_LINK_CONTROL_LINK_STATUS);
+	dev_info(pp->dev, "PCIe Link up: Gen%d-x%d\n",
+		(reg & PCIE_LINK_SPEED_MASK) >> PCIE_LINK_SPEED_OFFSET,
+		(reg & PCIE_LINK_WIDTH_MASK) >> PCIE_LINK_WIDTH_OFFSET);
 
 	return 0;
 }
