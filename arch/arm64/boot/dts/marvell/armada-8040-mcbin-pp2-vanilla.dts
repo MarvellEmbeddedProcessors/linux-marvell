@@ -205,6 +205,12 @@
 			num-lanes = <4>;
 			status = "okay";
 			reset-gpios = <&cp0_gpio1 20 GPIO_ACTIVE_HIGH>;
+			phys = <&cp0_comphy 0 COMPHY_PCIE0
+				&cp0_comphy 1 COMPHY_PCIE0
+				&cp0_comphy 2 COMPHY_PCIE0
+				&cp0_comphy 3 COMPHY_PCIE0
+				>;
+			phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 			pinctrl-names = "default";
 			pinctrl-0 = <&pcie_reset_pins>;
 		};
