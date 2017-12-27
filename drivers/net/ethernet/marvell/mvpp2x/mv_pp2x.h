@@ -548,8 +548,8 @@ struct mv_pp2x {
 	struct platform_device *pdev;
 
 	/* List of pointers to port structures */
-	u16 num_ports;
 	struct mv_pp2x_port **port_list;
+	u16 num_ports;
 
 	/* Aggregated TXQs */
 	u16 num_aggr_qs;
