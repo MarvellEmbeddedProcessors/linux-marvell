@@ -5439,13 +5439,27 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 		       hw->lms_base + MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG);
 	}
 
-	/* Allocate and initialize aggregated TXQs */
-	priv->aggr_txqs = devm_kcalloc(&pdev->dev, num_active_cpus(),
-				       sizeof(struct mv_pp2x_aggr_tx_queue),
-				       GFP_KERNEL);
-
+	/* Allocate and initialize aggregated TXQs
+	 * The aggr_txqs area should be aligned onto cache-line-size.
+	 * So allocate cache-line-size more than needed, round-up the pointer
+	 * but keep the offset between aligned and original pointers
+	 * for further usage in free(aligned - offset).
+	 * (offset is used instead of origin-ptr since it is more compact)
+	 */
+	val = sizeof(struct mv_pp2x_aggr_tx_queue) * num_active_cpus() +
+		MVPP2_CACHE_LINE_SIZE;
+	priv->aggr_txqs = devm_kcalloc(&pdev->dev, 1, val, GFP_KERNEL);
 	if (!priv->aggr_txqs)
 		return -ENOMEM;
+	val = (dma_addr_t)priv->aggr_txqs & MVPP2_CACHE_LINE_MASK;
+	if (!val) {
+		priv->aggr_txqs_align_offs = 0;
+	} else {
+		priv->aggr_txqs_align_offs = sizeof(struct mv_pp2x_aggr_tx_queue) - val;
+		priv->aggr_txqs = (void *)((u8 *)priv->aggr_txqs +
+			priv->aggr_txqs_align_offs);
+	}
+
 	priv->num_aggr_qs = num_active_cpus();
 
 	i = 0;
@@ -6236,7 +6250,8 @@ static int mvpp2x_suspend(struct device *dev)
 	devm_kfree(&pdev->dev, priv->hw.prs_shadow);
 	devm_kfree(&pdev->dev, priv->hw.cls_shadow);
 	devm_kfree(&pdev->dev, priv->hw.c2_shadow);
-	devm_kfree(&pdev->dev, priv->aggr_txqs);
+	/* aggr_txqs is aligned round-up; restore the original by -offset */
+	devm_kfree(&pdev->dev, ((u8 *)priv->aggr_txqs - priv->aggr_txqs_align_offs));
 
 	for (i = 0; i < priv->num_pools; i++) {
 		struct mv_pp2x_bm_pool *bm_pool = &priv->bm_pools[i];

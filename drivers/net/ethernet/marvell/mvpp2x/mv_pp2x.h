@@ -396,7 +396,7 @@ struct mv_pp2x_aggr_tx_queue {
 
 	/* XPS mask */
 	cpumask_t affinity_mask;
-};
+} __aligned(MVPP2_CACHE_LINE_SIZE);
 
 struct mv_pp2x_rx_queue {
 	/* RX queue number, in the range 0-31 for physical RXQs */
@@ -554,6 +554,7 @@ struct mv_pp2x {
 	/* Aggregated TXQs */
 	u16 num_aggr_qs;
 	struct mv_pp2x_aggr_tx_queue *aggr_txqs;
+	u16 aggr_txqs_align_offs;
 
 	/* BM pools */
 	u16 num_pools;
