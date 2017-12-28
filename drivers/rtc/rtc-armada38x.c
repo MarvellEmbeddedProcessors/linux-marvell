@@ -99,12 +99,16 @@ struct armada38x_rtc_data {
  * may fail. As a workaround, before writing to RTC
  * register, issue a dummy write of 0x0 twice to RTC Status
  * register.
+ * According to the datasheet, the RTC time register should be written
+ * twice to guarantee the write is performed correctly
  */
 
 static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
 {
 	writel(0, rtc->regs + RTC_STATUS);
 	writel(0, rtc->regs + RTC_STATUS);
+	writel(val, rtc->regs + offset);
+	udelay(5);
 	writel(val, rtc->regs + offset);
 	udelay(5);
 }
