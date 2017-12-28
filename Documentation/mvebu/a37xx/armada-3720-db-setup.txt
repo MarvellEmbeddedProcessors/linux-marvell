@@ -1,0 +1,66 @@
+Armada-3720 Development Board
+=============================
+
+The Armada-3720 Development Board (DB) is a configurable board designed to test
+several combinations of SOC configurations.
+linux supports a defined set of those configurations via different device tree files.
+
+This document describes the board modifications required to setup each configuration and the
+interfaces supported (or disabled in each one).
+
+To switch board configuration:
+1. Modify HW board settings according to the instructions in the "Board Setup Options" section below.
+2. Use appropriate Device Tree file for booting Linux.
+3. Same Device Tree selection is required also in U-Boot (to initialize requested comphy SerDes lanes).
+
+Board Setup Options
+-------------------
+
++---------------+---------------------------------------+---------------------------------------+---------------------------------------+
+| Connector	| Setup-A: Default			| Setup-B: SGMII1			| Setup-C: SGMII1-SFP2.5G		|
++===============+=======================================+=======================================+=======================================+
+| CON8		| eMMC_NAND module 	(SLM1506-v1)	| eMMC_NAND module 	(SLM1506-v1)	| eMMC_NAND module 	(SLM1506-v1)	|
++---------------+---------------------------------------+---------------------------------------+---------------------------------------+
+| CON15		| SDcard module		(SLM1505-v1)	| SDcard module		(SLM1505-v1)	| SDcard module		(SLM1505-v1)	|
++---------------+---------------------------------------+---------------------------------------+---------------------------------------+
+| CON17(PCIe)	| PCIe-mPCIe-Jumper: SLM-1496(Optional*)| PCIe-mPCIe-Jumper: SLM-1496(Optional*)| PCIe-mPCIe-Jumper: SLM-1496(Optional*)|
++---------------+---------------------------------------+---------------------------------------+---------------------------------------+
+| CON19		| SerDes-Jumper 	(SLM1502-v1)	| 88E1512 Module 	(SLM-1496-v1)	| 88F3720-2xSFP Module 	(SLM-1504-v1)	|
++---------------+---------------------------------------+---------------------------------------+---------------------------------------+
+| CON21		| 88E1512 Module 	(SLM-1496-v1)	| 88E1512 Module 	(SLM-1496-v1)	| 88E1512 Module 	(SLM-1496-v1)	|
++---------------+---------------------------------------+---------------------------------------+---------------------------------------+
+
+  * PCIe-mPCIe-Jumper is used to enable mini PCIe0 port (CON12)
+
+The table below summarizes the interface configuration of each setup.
+
++---------------+-------------------------------+-----------------------+-------------------------------+
+| DB File	| armada-3720-db-A		| armada-3720-db-B	| armada-3720-db-C		|
++===============+===============================+=======================+===============================+
+| Interface	| Setup-A: Default		| Setup-B: SGMII1	| Setup-C: SGMII1-SFP2.5G	|
++---------------+-------------------------------+-----------------------+-------------------------------+
+| SerDes PHY0	| USB3_H0			| SGMII1		| SGMII1-SFP2.5G		|
++---------------+-------------------------------+-----------------------+-------------------------------+
+| SerDes PHY1	| PCIe0				| PCIe0			| PCIe0				|
++---------------+-------------------------------+-----------------------+-------------------------------+
+| SerDes PHY2	| SATA				| SATA			| SATA				|
++---------------+-------------------------------+-----------------------+-------------------------------+
+| SATA		| CON6				| CON6			| CON6				|
++---------------+-------------------------------+-----------------------+-------------------------------+
+| PCIe		| CON12/17			| CON12/17		| CON12/17			|
++---------------+-------------------------------+-----------------------+-------------------------------+
+| USB3		| CON13				| N/A			| N/A				|
++---------------+-------------------------------+-----------------------+-------------------------------+
+| SGMII1	| N/A				| PHY1 (CON19)		| PHY1 (CON19)			|
++---------------+-------------------------------+-----------------------+-------------------------------+
+| RGMII		| PHY0 (CON21)			| PHY0 (CON21)		| PHY0 (CON21)			|
++---------------+-------------------------------+-----------------------+-------------------------------+
+
+GPIOS:
+	- NB GPIO 14: Wake from system suspend state
+	- NB GPIO 11: SATA LED blink
+	- SB GPIO 2: Wake from system suspend state
+
+Notes:
+	- The armada-3720-db-A.dts is still named armada-3720-db.dts.
+	  Because the armada-3720-db.dts is mainlined, the name must be kept.
