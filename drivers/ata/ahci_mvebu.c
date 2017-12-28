@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
+#include <linux/libata.h>
 #include "ahci.h"
 #include <linux/mv_soc_info.h>
 
@@ -417,6 +418,24 @@ static void ahci_mvebu_set_em_blink_policy(struct platform_device *pdev,
 	}
 }
 
+static void ahci_mvebu_postreset(struct ata_link *link, unsigned int *class)
+{
+	/*
+	 * ahci_platform_ops does not define postreset() but inherit it
+	 * from ahci_ops.
+	 */
+	ahci_ops.postreset(link, class);
+
+	/* Turn off LED when the ata link is not on line */
+	if (!ata_link_online(link)) {
+		struct ata_port *ap = link->ap;
+		struct ahci_host_priv *hpriv =  ap->host->private_data;
+		struct ahci_mvebu_priv *priv = hpriv->plat_data;
+
+		ahci_mvebu_led_off(priv);
+	}
+}
+
 static const struct ata_port_info ahci_mvebu_port_info = {
 	.flags	   = AHCI_FLAG_COMMON,
 	.pio_mask  = ATA_PIO4,
@@ -431,6 +450,7 @@ static const struct ata_port_info ahci_mvebu_port_info = {
 struct ata_port_operations ahci_mvebu_em_ops = {
 	.inherits		= &ahci_platform_ops,
 	.transmit_led_message	= ahci_mvebu_transmit_led_message,
+	.postreset		= ahci_mvebu_postreset,
 };
 
 static const struct ata_port_info ahci_mvebu_em_port_info = {
