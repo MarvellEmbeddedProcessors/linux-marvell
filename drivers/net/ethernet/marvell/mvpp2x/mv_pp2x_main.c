@@ -1965,7 +1965,7 @@ static void mv_pp2x_tx_timer_set(struct mv_pp2x_cp_pcpu *cp_pcpu)
 }
 
 /* Cancel transmit TX timer */
-static void mv_pp2x_tx_timer_kill(struct mv_pp2x_cp_pcpu *cp_pcpu)
+static inline void mv_pp2x_tx_timer_kill(struct mv_pp2x_cp_pcpu *cp_pcpu)
 {
 	if (cp_pcpu->tx_timer_scheduled) {
 		cp_pcpu->tx_timer_scheduled = false;
@@ -1991,6 +1991,17 @@ static void mv_pp2x_tx_proc_cb(unsigned long data)
 	/* Set the timer in case not all the packets were processed */
 	if (tx_todo)
 		mv_pp2x_timer_set(port_pcpu);
+}
+
+/* TX to HW the pendings in aggregated TXQ; kill deferring TX hrtimer */
+static inline void mv_pp2x_aggr_txq_pend_send(struct mv_pp2x_port *port,
+					      struct mv_pp2x_cp_pcpu *cp_pcpu,
+					      struct mv_pp2x_aggr_tx_queue *aggr_txq)
+{
+	mv_pp2x_tx_timer_kill(cp_pcpu);
+	aggr_txq->hw_count += aggr_txq->sw_count;
+	mv_pp2x_write(&port->priv->hw, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->sw_count);
+	aggr_txq->sw_count = 0;
 }
 
 /* Tasklet transmit procedure */
@@ -3106,10 +3117,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 
 	if (!skb->xmit_more) {
 		/* Transmit TCP segment with bulked descriptors and cancel tx hr timer if exist */
-		aggr_txq->hw_count += aggr_txq->sw_count;
-		mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count);
-		aggr_txq->sw_count = 0;
-		mv_pp2x_tx_timer_kill(cp_pcpu);
+		mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq);
 	}
 
 	txq_pcpu->reserved_num -= total_desc_num;
@@ -3344,14 +3352,10 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/* Start 50 microseconds timer to transmit */
 	if (!skb->xmit_more) {
-		if (skb->hash == MVPP2_UNIQUE_HASH) {
+		if (skb->hash == MVPP2_UNIQUE_HASH)
 			mv_pp2x_tx_timer_set(cp_pcpu);
-		} else {
-			mv_pp2x_tx_timer_kill(cp_pcpu);
-			aggr_txq->hw_count += aggr_txq->sw_count;
-			mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count);
-			aggr_txq->sw_count = 0;
-		}
+		else
+			mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq);
 	}
 
 out:
@@ -3364,12 +3368,8 @@ out:
 		u64_stats_update_end(&stats->syncp);
 	} else {
 		/* Transmit bulked descriptors*/
-		if (aggr_txq->sw_count > 0) {
-			mv_pp2x_tx_timer_kill(cp_pcpu);
-			aggr_txq->hw_count += aggr_txq->sw_count;
-			mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count);
-			aggr_txq->sw_count = 0;
-		}
+		if (aggr_txq->sw_count > 0)
+			mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq);
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
 	}
@@ -3700,18 +3700,36 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	}
 }
 
-/* Clear aggregated TXQ and kill transmit hrtimer */
-static void mv_pp2x_trans_aggr_txq(void *arg)
+/* Drain pending packets */
+static void mv_pp2x_send_pend_aggr_txq(void *arg)
 {
 	struct mv_pp2x_port *port = arg;
-	struct mv_pp2x_cp_pcpu *cp_pcpu = this_cpu_ptr(port->priv->pcpu);
-	int cpu = smp_processor_id();
-	struct mv_pp2x_aggr_tx_queue *aggr_txq = &port->priv->aggr_txqs[cpu];
+	struct mv_pp2x_aggr_tx_queue *aggr_txq =
+		&port->priv->aggr_txqs[smp_processor_id()];
+	int txq_id;
+	struct mv_pp2x_tx_queue *txq;
+	struct mv_pp2x_txq_pcpu *txq_pcpu;
+	struct mv_pp2x_cp_pcpu *cp_pcpu;
+	bool free_aggr = false;
 
-	mv_pp2x_tx_timer_kill(cp_pcpu);
-	aggr_txq->hw_count += aggr_txq->sw_count;
-	mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count);
-	aggr_txq->sw_count = 0;
+	for (txq_id = 0; txq_id < port->num_tx_queues; txq_id++) {
+		txq = port->txqs[txq_id];
+		txq_pcpu = this_cpu_ptr(txq->pcpu);
+		if (mv_pp2x_txq_free_count(txq_pcpu) != txq->size) {
+			free_aggr = true;
+			break;
+		}
+	}
+
+	if (!aggr_txq->sw_count || !free_aggr)
+		return; /* no pendings */
+
+	/* Schedule Drain over the same tasklet-context
+	 * which the regular TX is using (refer mv_pp2x_tx_send_proc_cb).
+	 * So the Drain from the stop_dev and TX are unpreemptive and correct.
+	 */
+	cp_pcpu = this_cpu_ptr(port->priv->pcpu);
+	tasklet_schedule(&cp_pcpu->tx_tasklet);
 }
 
 /* Set hw internals when stopping port */
@@ -3720,22 +3738,20 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 	struct gop_hw *gop = &port->priv->hw.gop;
 	struct mv_mac_data *mac = &port->mac_data;
 
-	/* Stop new packets from arriving to RXQs */
+	/* Stop new packets arriving from RX-interrupts and Linux-TX */
 	mv_pp2x_ingress_disable(port);
+	netif_carrier_off(port->dev);
+	msleep(20);
 
-	mdelay(10);
+	/* Drain pending aggregated TXQ on all CPUs */
+	on_each_cpu(mv_pp2x_send_pend_aggr_txq, port, 1);
+	msleep(200); /* yield and wait for tx-tasklet and HW idle */
 
 	/* Disable interrupts on all CPUs */
 	mv_pp2x_port_interrupts_disable(port);
 
-	/* Drain aggregated TXQ on all CPU's */
-	on_each_cpu(mv_pp2x_trans_aggr_txq, port, 1);
-
 	mv_pp2x_port_napi_disable(port);
-
-	netif_carrier_off(port->dev);
 	netif_tx_stop_all_queues(port->dev);
-
 	mv_pp2x_egress_disable(port);
 
 	if (port->comphy)
