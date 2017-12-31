@@ -185,7 +185,7 @@
 			};
 
 			AP810_LABEL(thermal): thermal@6f808c {
-				compatible = "marvell,armada-ap806-thermal";
+				compatible = "marvell,armada-ap810-thermal";
 				reg = <0x6f808C 0x4>,
 				      <0x6f8084 0x4>,
 				      <0x6f8100 0x20>;

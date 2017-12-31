@@ -682,6 +682,21 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.ops_of = &armada_ap806_ops,
 };
 
+static const struct armada_thermal_data armada_ap810_data = {
+	.is_valid = armada_is_valid,
+	.init_sensor = armada_ap806_init_sensor,
+	.temp_irq_handler = ap806_temp_irq_handler,
+	.is_valid_shift = 16,
+	.temp_shift = 0,
+	.temp_mask = 0x3ff,
+	.coef_b = 128900,
+	.coef_m = 394,
+	.coef_div = 1,
+	.inverted = true,
+	.dfx_interrupt = 1,
+	.ops_of = &armada_ap806_ops,
+};
+
 static const struct armada_thermal_data armada_cp110_data = {
 	.is_valid = armada_is_valid,
 	.init_sensor = cp110_init_sensor,
@@ -718,6 +733,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
 	{
 		.compatible = "marvell,armada-ap806-thermal",
 		.data       = &armada_ap806_data,
+	},
+	{
+		.compatible = "marvell,armada-ap810-thermal",
+		.data       = &armada_ap810_data,
 	},
 	{
 		.compatible = "marvell,armada-cp110-thermal",
@@ -776,7 +795,9 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	 * so it's binded differently from rest of thermal sensors supported by this driver.
 	 */
 	if (of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-ap806-thermal"))
+				    "marvell,armada-ap806-thermal") ||
+	    of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-ap810-thermal"))
 		thermal = thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &armada_ap806_ops);
 	else
 		thermal = thermal_zone_device_register("armada_thermal", 0, 0,
@@ -813,7 +834,9 @@ static int armada_thermal_exit(struct platform_device *pdev)
 	struct armada_thermal_priv *priv = platform_get_drvdata(pdev);
 
 	if (of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-ap806-thermal"))
+				    "marvell,armada-ap806-thermal") ||
+	    of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-ap810-thermal"))
 		thermal_zone_of_sensor_unregister(&pdev->dev, priv->thermal);
 	else
 		thermal_zone_device_unregister(priv->thermal);
