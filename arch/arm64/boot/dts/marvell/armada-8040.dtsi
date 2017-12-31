@@ -90,7 +90,7 @@
 
 /* CP110-1 Settings */
 #define CP110_NAME		cp1
-#define CP110_NUM		0
+#define CP110_NUM		1
 #define CP110_BASE              0xf4000000
 #define CP110_PCIE_MEM_BASE     0xfa000000
 #define CP110_PCIE_MEM_OFFSET	0x1000000
