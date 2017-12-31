@@ -166,9 +166,6 @@
 			rtc@284000 {
 				status = "okay";
 			};
-			ppv22@000000 {
-				dma-coherent;
-			};
 			cp0_sata: sata@540000 {
 				#stream-id-cells = <1>;
 			};

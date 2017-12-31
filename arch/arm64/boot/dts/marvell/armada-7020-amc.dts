@@ -145,7 +145,6 @@
 			};
 
 			ppv22@000000 {
-				dma-coherent;
 				cp0_eth0: eth0@010000 {
 					status = "okay";
 				};

@@ -472,6 +472,7 @@
 					<&CP110_LABEL(syscon0) 1 6>, <&CP110_LABEL(syscon0) 1 5>;
 				clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
 				status = "okay";
+				dma-coherent;
 				CP110_LABEL(eth0): eth0@010000 {
 					interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
 							<ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,

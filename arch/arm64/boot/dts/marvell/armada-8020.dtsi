@@ -191,9 +191,6 @@
 
 	cp110-0 {
 		config-space {
-			ppv22@000000 {
-				dma-coherent;
-			};
 			pinctrl@440000 {
 				compatible = "marvell,a80x0-cp0-pinctrl";
 
@@ -251,9 +248,6 @@
 
 	cp110-1 {
 		config-space {
-			ppv22@000000 {
-				dma-coherent;
-			};
 			pinctrl@440000 {
 				compatible = "marvell,a80x0-cp1-pinctrl";
 

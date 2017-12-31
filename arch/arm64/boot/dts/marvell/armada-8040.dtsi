@@ -204,9 +204,6 @@
 	cp0 {
 		config-space {
 			/* Temp: disable all Coresight nodes */
-			ppv22@000000 {
-				dma-coherent;
-			};
 			pinctrl@440000 {
 				compatible = "marvell,a80x0-cp0-pinctrl";
 
@@ -264,9 +261,6 @@
 	cp1 {
 		config-space {
 			/* Temp: disable all Coresight nodes */
-			ppv22@000000 {
-				dma-coherent;
-			};
 			pinctrl@440000 {
 				compatible = "marvell,a80x0-cp1-pinctrl";
 
