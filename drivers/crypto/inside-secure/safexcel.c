@@ -81,10 +81,7 @@ static int eip197_trc_cache_init(struct device *dev,
 	/* Calculate the maximum possible record count that
 	 * the Record Cache Data RAM can contain
 	 */
-	if (priv->eip197_hw_ver == EIP197B)
-		rc_record_cnt = EIP197B_TRC_RAM_WC / rc_rec_wc;
-	else
-		rc_record_cnt = EIP197D_TRC_RAM_WC / rc_rec_wc;
+	rc_record_cnt = EIP197_TRC_RAM_WC / rc_rec_wc;
 
 	/* rc_record_cnt is calculated using the configured RC Data RAM size. */
 
@@ -93,10 +90,7 @@ static int eip197_trc_cache_init(struct device *dev,
 	 */
 
 	/* set the configured RC Admin RAM size */
-	if (priv->eip197_hw_ver == EIP197B)
-		rc_admn_ram_wc = EIP197B_TRC_ADMIN_RAM_WC;
-	else
-		rc_admn_ram_wc = EIP197D_TRC_ADMIN_RAM_WC;
+	rc_admn_ram_wc = EIP197_TRC_ADMIN_RAM_WC;
 
 	/* Calculate the maximum possible record count that
 	 * the RC Hash Table (in Record Cache Administration RAM) can contain
