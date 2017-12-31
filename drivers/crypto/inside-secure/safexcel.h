@@ -65,8 +65,10 @@
 #define EIP197_RC_NULL					0x3FF
 #define EIP197_RC_HASH_TABLE_MASK			(GENMASK(29, 0))
 /* transformation */
-#define EIP197_TRC_ADMIN_RAM_WC				320
-#define EIP197_TRC_RAM_WC				3840
+#define EIP197B_TRC_ADMIN_RAM_WC			320
+#define EIP197B_TRC_RAM_WC				3840
+#define EIP197D_TRC_ADMIN_RAM_WC			640
+#define EIP197D_TRC_RAM_WC				7680
 
 /* Record administration */
 #define EIP197_RC_HASH_COLLISION_PREV			20
