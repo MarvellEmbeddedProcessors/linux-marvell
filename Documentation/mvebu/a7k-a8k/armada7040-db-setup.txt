@@ -69,7 +69,7 @@ SerDes Configuration
 | CP0 Lane 	| 	1: default (A)	|   2: B	| 3: C            | 4:D		  | 5:E		  |
 |---------------|-----------------------|---------------|-----------------|---------------|---------------|
 | 0		| SGMII2		| PICE0 (x4)	| PCIE0 (x1)      |  PCIE0 (x1)   | PCIE0 (x1)	  |
-| 1		| USB3_HOST0		| PCIE0 (x4)	| USB3_HOST0      |  USB3_DEVICE0 | SATA0	  |
+| 1		| USB3_HOST0		| PCIE0 (x4)	| SATA0		  |  USB3_DEVICE0 | SATA0	  |
 | 2		| SFI (10G)		| PCIE0 (x4)	| SFI (10G)       |  SFI (1G)  	  | SGMII0 (1G)   |
 | 3		| SATA1			| PCIE0 (x4)	| SATA1		  |  SATA1        | SATA1	  |
 | 4		| USB3_HOST1		| USB3_HOST1	| USB3_HOST1      |  USB3_HOST1   | USB_HOST1	  |
