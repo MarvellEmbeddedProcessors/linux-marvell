@@ -147,7 +147,7 @@ Network configuration
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 2		| 3		| RGMII1			|
- eth1		| 1	| 0		| 0		| SGMII				|
+ eth1		| 1	| 0		| 0		| SFI (10G Lane 2 connected to SFP)
  eth2		| 1	| 1		| 2		| RGMII0			|
 
 3: C:
@@ -162,13 +162,13 @@ Network configuration
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
  eth1		| 0	| 2		| 3		| RGMII1			|
- eth2		| 1	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
+ eth2		| 1	| 0		| 0		| SGMII0			|
 
 5: E:
  Interface	| CPN#	| PPv2 Port	| GMAC Port	| Board Interface		|
  ---------------|-------|---------------|---------------|-------------------------------|
  eth0		| 0	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
- eth1		| 1	| 0		| 0		| 10G (Lane 2 connected to SFP)	|
+ eth1		| 1	| 0		| 0		| 1000base-x HS_SGMII0, speed=2500
  eth2		| 1	| 1		| 2		| RGMII0			|
 
 Notes:
