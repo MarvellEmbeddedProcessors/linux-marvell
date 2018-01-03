@@ -4117,14 +4117,15 @@ static int  mvneta_config_rss(struct mvneta_port *pp)
 	on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
 
 	/* We have to synchronise on the napi of each CPU */
-	for_each_online_cpu(cpu) {
-		struct mvneta_pcpu_port *pcpu_port =
-			per_cpu_ptr(pp->ports, cpu);
+	if (netif_running(pp->dev)) {
+		for_each_online_cpu(cpu) {
+			struct mvneta_pcpu_port *pcpu_port =
+				per_cpu_ptr(pp->ports, cpu);
 
-		napi_synchronize(&pcpu_port->napi);
-		napi_disable(&pcpu_port->napi);
+			napi_synchronize(&pcpu_port->napi);
+			napi_disable(&pcpu_port->napi);
+		}
 	}
-
 	pp->rxq_def = pp->indir[0];
 
 	/* Update unicast mapping */
@@ -4140,11 +4141,13 @@ static int  mvneta_config_rss(struct mvneta_port *pp)
 	spin_unlock(&pp->lock);
 
 	/* We have to synchronise on the napi of each CPU */
-	for_each_online_cpu(cpu) {
-		struct mvneta_pcpu_port *pcpu_port =
-			per_cpu_ptr(pp->ports, cpu);
+	if (netif_running(pp->dev)) {
+		for_each_online_cpu(cpu) {
+			struct mvneta_pcpu_port *pcpu_port =
+				per_cpu_ptr(pp->ports, cpu);
 
-		napi_enable(&pcpu_port->napi);
+			napi_enable(&pcpu_port->napi);
+		}
 	}
 
 	netif_tx_start_all_queues(pp->dev);
