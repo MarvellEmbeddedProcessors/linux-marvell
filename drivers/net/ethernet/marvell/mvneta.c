@@ -4955,30 +4955,15 @@ static int mvneta_suspend(struct platform_device *pdev, pm_message_t state)
 
 	mvneta_ethtool_update_stats(pp);
 
-	if (!netif_running(dev))
-		goto phy_off;
-
+	if (netif_running(dev))
+		mvneta_stop(dev);
 	netif_device_detach(dev);
 
-	mvneta_stop_dev(pp);
-	if (!pp->neta_armada3700)
-		unregister_cpu_notifier(&pp->cpu_notifier);
-	mvneta_cleanup_rxqs(pp);
-	mvneta_cleanup_txqs(pp);
-
-phy_off:
-	if (!pp->use_inband_status)
-		mvneta_mdio_remove(pp);
 	/* turn off serdes */
 	if (pp->comphy) {
 		phy_power_off(pp->comphy);
 		phy_exit(pp->comphy);
 	}
-
-	/* Reset link status */
-	pp->link = 0;
-	pp->duplex = -1;
-	pp->speed = 0;
 
 	return 0;
 }
@@ -5003,13 +4988,12 @@ static int mvneta_resume(struct platform_device *pdev)
 			return -1;
 		}
 	}
-	if (!pp->use_inband_status) {
-		ret = mvneta_mdio_probe(pp);
-		if (ret < 0) {
-			netdev_err(dev, "cannot probe MDIO bus\n");
-			return -1;
-		}
-	}
+	mvneta_defaults_set(pp);
+
+	dram_target_info = mv_mbus_dram_info();
+	if (dram_target_info || pp->neta_armada3700)
+		mvneta_conf_mbus_windows(pp, dram_target_info);
+
 	if (pp->bm_priv) {
 		ret = mvneta_bm_port_init(pdev, pp);
 		if (ret < 0) {
@@ -5018,37 +5002,15 @@ static int mvneta_resume(struct platform_device *pdev)
 		}
 	}
 
-	mvneta_defaults_set(pp);
-
-	dram_target_info = mv_mbus_dram_info();
-	if (dram_target_info || pp->neta_armada3700)
-		mvneta_conf_mbus_windows(pp, dram_target_info);
-
-	if (!netif_running(dev))
-		return 0;
-
-	ret = mvneta_setup_rxqs(pp);
-	if (ret) {
-		netdev_err(dev, "unable to setup rxqs after resume\n");
-		return ret;
-	}
-
-	ret = mvneta_setup_txqs(pp);
-	if (ret) {
-		netdev_err(dev, "unable to setup txqs after resume\n");
-		return ret;
-	}
-
-	mvneta_set_rx_mode(dev);
-	if (!pp->neta_armada3700) {
-		mvneta_percpu_elect(pp);
-		register_cpu_notifier(&pp->cpu_notifier);
-	}
-
-	mvneta_start_dev(pp);
 	mvneta_port_power_up(pp, pp->phy_interface);
+	if (pp->use_inband_status)
+		mvneta_fixed_link_update(pp, dev->phydev);
 
 	netif_device_attach(dev);
+	if (netif_running(dev)) {
+		mvneta_open(dev);
+		mvneta_set_rx_mode(dev);
+	}
 
 	return 0;
 }
