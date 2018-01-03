@@ -272,6 +272,16 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
 				       pgd_t *merged_hyp_pgd,
 				       unsigned long hyp_idmap_start) { }
 
+static inline void *kvm_get_hyp_vector(void)
+{
+	return __kvm_hyp_vector;
+}
+
+static inline int kvm_map_vectors(void)
+{
+	return 0;
+}
+
 #endif	/* !__ASSEMBLY__ */
 
 #endif /* __ARM_KVM_MMU_H__ */
