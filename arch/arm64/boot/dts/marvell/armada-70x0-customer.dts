@@ -242,6 +242,7 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
+				status = "okay";
 				/* UPDATE */
 				phy2: ethernet-phy@2 {
 					reg = <0>;

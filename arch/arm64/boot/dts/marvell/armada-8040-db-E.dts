@@ -197,6 +197,7 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
+				status = "okay";
 				cp1_phy1: ethernet-phy@1 {
 					reg = <0>;
 				};

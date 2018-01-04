@@ -134,6 +134,7 @@
 			mdio@12a200 {
 				#address-cells = <1>;
 				#size-cells = <0>;
+				status = "okay";
 				smi_phy0: ethernet-phy@0 {
 					reg = <0>;
 				};
@@ -141,6 +142,7 @@
 			mdio@15b000 {
 				#address-cells = <1>;
 				#size-cells = <0>;
+				status = "okay";
 				phy0: ethernet-phy@0 {
 					compatible = "ethernet-phy-ieee802.3-c45";
 					reg = <0>;
