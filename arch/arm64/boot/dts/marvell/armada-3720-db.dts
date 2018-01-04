@@ -178,11 +178,18 @@
 
 			usb@5e000 {
 				status = "okay";
+				usb-phy = <&usb2_phy>;
 				phys = <&utmi_usb2>;
 				phy-names = "usb";
 			};
 
 			utmi_usb2: utmi@5f000 {
+				status = "okay";
+			};
+
+			usb2_phy: usb2-phy {
+				compatible = "usb-nop-xceiv";
+				vcc-supply = <&exp_usb2_vbus>;
 				status = "okay";
 			};
 
@@ -287,6 +294,16 @@
 			vin-supply = <&reg_sata>;
 		};
 
+	};
+
+	exp_usb2_vbus: usb2-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb2-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
 	};
 
 	exp_usb3_vbus: usb3-vbus {
