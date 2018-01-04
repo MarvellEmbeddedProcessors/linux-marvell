@@ -170,13 +170,13 @@
 			};
 		};
 
-		pcie0@640000 {
+		pcie0@600000 {
 			status = "okay";
 		};
 		pcie1@620000 {
 			status = "disabled";
 		};
-		pcie2@600000 {
+		pcie2@640000 {
 			status = "okay";
 		};
 	};
