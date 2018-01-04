@@ -136,7 +136,7 @@
 					reg = <0>;
 				};
 			};
-			mdio@15b000 {
+			mdio@12a600 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				status = "okay";
