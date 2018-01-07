@@ -286,6 +286,7 @@ int mv_pp2x_eth_tool_nway_reset(struct net_device *dev)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		err = mv_gop110_check_port_type(gop, mac->gop_index);
 		if (err) {
 			pr_err("GOP %d set to 1000Base-X\n", mac->gop_index);
@@ -329,6 +330,7 @@ static void mv_pp2x_get_pauseparam(struct net_device *dev,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		mv_gop110_port_link_status(gop,	mac, &status);
 		pause->autoneg =
 			(status.autoneg_fc ? AUTONEG_ENABLE : AUTONEG_DISABLE);
@@ -383,6 +385,7 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		if (mac->speed == SPEED_2500) {
 			err = mv_gop110_check_port_type(gop, gop_port);
 			if (err) {
@@ -588,6 +591,7 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		err = mv_pp2x_autoneg_gmac_check_valid(mac, gop, cmd, &status);
 		if (err < 0)
 			return err;
@@ -983,6 +987,7 @@ static int mv_pp2x_ethtool_get_regs_len(struct net_device *dev)
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		return MV_PP2_REGS_GMAC_LEN * sizeof(u32);
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
@@ -1018,6 +1023,7 @@ static void mv_pp2x_ethtool_get_regs(struct net_device *dev,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 		memset(p, 0, MV_PP2_REGS_GMAC_LEN * sizeof(u32));
 		mv_gop110_gmac_registers_dump(port, p);
 	break;
@@ -1162,6 +1168,7 @@ static void mv_pp2x_eth_tool_diag_test(struct net_device *netdev,
 	case PHY_INTERFACE_MODE_RGMII:
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
