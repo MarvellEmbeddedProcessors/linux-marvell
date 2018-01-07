@@ -4757,9 +4757,8 @@ static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
 		}
 	}
 	port->mac_data.phy_mode = phy_mode;
-	pr_debug("gop_mac(%d), phy_mode(%d) (%s)\n", id,  phy_mode,
-		 phy_modes(phy_mode));
-	pr_debug("gop_mac(%d), phy_speed(%d)\n", id,  port->mac_data.speed);
+	pr_info("gop_mac(%d), phy_mode(%d)=%s phy-speed=%d\n", id,  phy_mode,
+		phy_modes(phy_mode), port->mac_data.speed);
 
 	phy_node = of_parse_phandle(emac_node, "phy", 0);
 	if (phy_node) {
