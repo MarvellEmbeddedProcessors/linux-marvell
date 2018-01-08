@@ -4174,7 +4174,7 @@ static int mvneta_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 	if (!indir)
 		return 0;
 
-	memcpy(pp->indir, indir, MVNETA_RSS_LU_TABLE_SIZE);
+	memcpy(pp->indir, indir, sizeof(u32) * MVNETA_RSS_LU_TABLE_SIZE);
 
 	return mvneta_config_rss(pp);
 }
@@ -4194,7 +4194,7 @@ static int mvneta_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 	if (!indir)
 		return 0;
 
-	memcpy(indir, pp->indir, MVNETA_RSS_LU_TABLE_SIZE);
+	memcpy(indir, pp->indir, sizeof(u32) * MVNETA_RSS_LU_TABLE_SIZE);
 
 	return 0;
 }
