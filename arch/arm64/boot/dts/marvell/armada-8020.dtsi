@@ -228,6 +228,9 @@
 			sar@400200 {
 				compatible = "marvell,a80x0-cp0-sample-at-reset";
 			};
+			cp0_eip197: eip197@800000 {
+				status = "okay";
+			};
 		};
 		axim-hb1-rd@3c8000 {
 			status = "disabled";
@@ -279,6 +282,9 @@
 			};
 			sar@400200 {
 				compatible = "marvell,a80x0-cp1-sample-at-reset";
+			};
+			cp1_eip197: eip197@800000 {
+				status = "okay";
 			};
 		};
 		axim-hb1-rd@3c8000 {

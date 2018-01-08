@@ -542,7 +542,7 @@
 						"ring2", "ring3", "eip_out";
 				clocks = <&CP110_LABEL(syscon0) 1 26>;
 				cell-index = <CP110_EIP197_INDEX>;
-				status = "okay";
+				status = "disabled";
 			};
 
 			CP110_LABEL(comphy): comphy {

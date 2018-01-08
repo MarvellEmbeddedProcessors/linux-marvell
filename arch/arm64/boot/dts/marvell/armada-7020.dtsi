@@ -181,6 +181,9 @@
 			sar@400200 {
 				compatible = "marvell,a70x0-sample-at-reset";
 			};
+			cp0_eip197: eip197@800000 {
+				status = "okay";
+			};
 		};
 		pcie0@600000 {
 			msi-parent = <&gic_v2m0>;
