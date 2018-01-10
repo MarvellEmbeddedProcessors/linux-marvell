@@ -51,21 +51,27 @@
 #include "armada-ap806-quad.dtsi"
 
 /* CP110-0 Settings */
-#define CP110_NAME		cp0
-#define CP110_NUM		0
-#define CP110_BASE              0xf2000000
-#define CP110_PCIE_MEM_BASE     0xf6000000
-#define CP110_PCIE_MEM_OFFSET	0x1000000
-#define CP110_PCIE_IO_BASE      0xf9000000
+#define CP110_NAME				cp0
+#define CP110_NUM				0
+#define CP110_BASE				0xf2000000
+#define CP110_PCIE_MEM_SIZE			0xf00000
+#define CP110_PCIEx_CPU_IO_BASE(iface)		(0xf9000000 + (iface) *  0x10000)
+#define CP110_PCIEx_CPU_MEM_BASE(iface)		(0xf6000000 + (iface) *  0x1000000)
+#define CP110_PCIEx_BUS_IO_BASE(iface)		(CP110_PCIEx_CPU_IO_BASE(iface))
+#define CP110_PCIEx_BUS_MEM_BASE(iface)		(CP110_PCIEx_CPU_MEM_BASE(iface))
+#define CP110_PCIE_BUS_MEM_CFG			(0x82000000)
 
 #include "armada-cp110.dtsi"
 
 #undef CP110_NAME
 #undef CP110_NUM
 #undef CP110_BASE
-#undef CP110_PCIE_IO_BASE
-#undef CP110_PCIE_MEM_BASE
-#undef CP110_PCIE_MEM_OFFSET
+#undef CP110_PCIE_MEM_SIZE
+#undef CP110_PCIEx_CPU_IO_BASE
+#undef CP110_PCIEx_CPU_MEM_BASE
+#undef CP110_PCIEx_BUS_IO_BASE
+#undef CP110_PCIEx_BUS_MEM_BASE
+#undef CP110_PCIE_BUS_MEM_CFG
 
 &cp0_thermal {
 	/* interrupt assignment by ICU supports single thermal sensor unit,
@@ -89,21 +95,28 @@
 };
 
 /* CP110-1 Settings */
-#define CP110_NAME		cp1
-#define CP110_NUM		1
-#define CP110_BASE              0xf4000000
-#define CP110_PCIE_MEM_BASE     0xfa000000
-#define CP110_PCIE_MEM_OFFSET	0x1000000
-#define CP110_PCIE_IO_BASE      0xfd000000
+#define CP110_NAME				cp1
+#define CP110_NUM				1
+#define CP110_BASE				0xf4000000
+#define CP110_PCIE_MEM_SIZE			0xf00000
+#define CP110_PCIEx_CPU_IO_BASE(iface)		(0xfd000000 + (iface) *  0x10000)
+#define CP110_PCIEx_CPU_MEM_BASE(iface)		(0xfa000000 + (iface) *  0x1000000)
+#define CP110_PCIEx_BUS_IO_BASE(iface)		(CP110_PCIEx_CPU_IO_BASE(iface))
+#define CP110_PCIEx_BUS_MEM_BASE(iface)		(CP110_PCIEx_CPU_MEM_BASE(iface))
+#define CP110_PCIE_BUS_MEM_CFG			(0x82000000)
+
 
 #include "armada-cp110.dtsi"
 
 #undef CP110_NAME
 #undef CP110_NUM
 #undef CP110_BASE
-#undef CP110_PCIE_IO_BASE
-#undef CP110_PCIE_MEM_BASE
-#undef CP110_PCIE_MEM_OFFSET
+#undef CP110_PCIE_MEM_SIZE
+#undef CP110_PCIEx_CPU_IO_BASE
+#undef CP110_PCIEx_CPU_MEM_BASE
+#undef CP110_PCIEx_BUS_IO_BASE
+#undef CP110_PCIEx_BUS_MEM_BASE
+#undef CP110_PCIE_BUS_MEM_CFG
 
 &cp1_emac0 {
 	mac-address = [00 00 00 00 00 04];

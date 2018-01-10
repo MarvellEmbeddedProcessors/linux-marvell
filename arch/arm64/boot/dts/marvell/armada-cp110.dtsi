@@ -19,30 +19,16 @@
 #include <dt-bindings/interrupt-controller/mvebu-icu.h>
 #include <dt-bindings/phy/phy-utmi-mvebu.h>
 
-#define CP110_BASE_HIGH			((CP110_BASE >> 32) & 0xffffffff)
-#define CP110_BASE_LOW			(CP110_BASE & 0xffffffff)
+#define U64_TO_U32_H(addr)			(((addr) >> 32) & 0xffffffff)
+#define U64_TO_U32_L(addr)			((addr) & 0xffffffff)
 
-#define CP110_PCIEx_IO_BASE_H(iface)	((CP110_PCIE_IO_BASE >> 32) & 0xffffffff)
-#define CP110_PCIEx_IO_BASE_L(iface)	((CP110_PCIE_IO_BASE & 0xffffffff) + (iface *  0x10000))
+#define CP110_PCIEx_REG0_BASE(iface)		(CP110_BASE + 0x600000 + (iface) * 0x20000)
+#define CP110_PCIEx_REG1_BASE(iface)		(CP110_PCIEx_CPU_MEM_BASE(iface) + CP110_PCIE_MEM_SIZE)
 
-#define CP110_PCIEx_MEM_BASE_H(iface)	((CP110_PCIE_MEM_BASE >> 32) & 0xffffffff)
-#define CP110_PCIEx_MEM_BASE_L(iface)	((CP110_PCIE_MEM_BASE & 0xffffffff) + (iface *  CP110_PCIE_MEM_OFFSET))
+#define CP110_PCIE_EP_REG_BASE(num)		(CP110_BASE + 0x600000 + (num) * 0x4000)
 
-#define CP110_PCIEx_REG0_BASE_H(iface)	(CP110_BASE_HIGH)
-#define CP110_PCIEx_REG0_BASE_L(iface)	(CP110_BASE_LOW + 0x600000 + (iface * 0x20000))
-
-#define CP110_PCIEx_REG1_BASE_H(iface)	(CP110_PCIEx_MEM_BASE_H(iface))
-#define CP110_PCIEx_REG1_BASE_L(iface)	(CP110_PCIEx_MEM_BASE_L(iface) + 0xf00000)
-
-#define CP110_PCIE_EP_REG0_BASE_H	(CP110_BASE_HIGH)
-#define CP110_PCIE_EP_REG0_BASE_L	(CP110_BASE_LOW + 0x600000)
-#define CP110_PCIE_EP_REG1_BASE_H	(CP110_BASE_HIGH)
-#define CP110_PCIE_EP_REG1_BASE_L	(CP110_BASE_LOW + 0x608000)
-#define CP110_PCIE_EP_REG2_BASE_H	(CP110_BASE_HIGH)
-#define CP110_PCIE_EP_REG2_BASE_L	(CP110_BASE_LOW + 0x604000)
-
-#define CP110_EIP197_INDEX	CP110_NUM
-#define CP110_SPI_BUS_ID(n)	((CP110_NUM * 2) + (n))
+#define CP110_EIP197_INDEX			CP110_NUM
+#define CP110_SPI_BUS_ID(n)			((CP110_NUM * 2) + (n))
 
 / {
 	CP110_NAME {
@@ -56,7 +42,7 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 			compatible = "simple-bus";
-			ranges = <0x0 CP110_BASE_HIGH CP110_BASE_LOW 0x2000000>;
+			ranges = <0x0 U64_TO_U32_H(CP110_BASE) U64_TO_U32_L(CP110_BASE) 0x2000000>;
 
 			CP110_LABEL(syscon0): system-controller@440000 {
 				compatible = "marvell,cp110-system-controller0", "syscon";
@@ -565,9 +551,10 @@
 
 		CP110_LABEL(pcie_ep): pcie-ep@600000 {
 			compatible = "marvell,armada8k-pcie-ep", "snps,dw-pcie";
-			reg = <CP110_PCIE_EP_REG0_BASE_H CP110_PCIE_EP_REG0_BASE_L 0 0x4000>,
-			      <CP110_PCIE_EP_REG1_BASE_H CP110_PCIE_EP_REG1_BASE_L 0 0x80000>,
-			      <CP110_PCIE_EP_REG2_BASE_H CP110_PCIE_EP_REG2_BASE_L 0 0x1000>;
+			reg =
+			   <U64_TO_U32_H(CP110_PCIE_EP_REG_BASE(0)) U64_TO_U32_L(CP110_PCIE_EP_REG_BASE(0)) 0 0x4000>,
+			   <U64_TO_U32_H(CP110_PCIE_EP_REG_BASE(2)) U64_TO_U32_L(CP110_PCIE_EP_REG_BASE(2)) 0 0x80000>,
+			   <U64_TO_U32_H(CP110_PCIE_EP_REG_BASE(1)) U64_TO_U32_L(CP110_PCIE_EP_REG_BASE(1)) 0 0x1000>;
 			reg-names = "core", "lm", "shadow_core";
 			clocks = <&CP110_LABEL(syscon0) 1 13>;
 			status = "disabled";
@@ -575,8 +562,10 @@
 
 		CP110_LABEL(pcie0): pcie0@600000 {
 			compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
-			reg = <CP110_PCIEx_REG0_BASE_H(0) CP110_PCIEx_REG0_BASE_L(0) 0 0x10000>,
-			      <CP110_PCIEx_REG1_BASE_H(0) CP110_PCIEx_REG1_BASE_L(0) 0 0x80000>;	/* Last 512KB of mem space */
+			reg =
+			   <U64_TO_U32_H(CP110_PCIEx_REG0_BASE(0)) U64_TO_U32_L(CP110_PCIEx_REG0_BASE(0)) 0 0x10000>,
+			   /* Last 512KB of mem space */
+			   <U64_TO_U32_H(CP110_PCIEx_REG1_BASE(0)) U64_TO_U32_L(CP110_PCIEx_REG1_BASE(0)) 0 0x80000>;
 			reg-names = "ctrl", "config";
 			#address-cells = <3>;
 			#size-cells = <2>;
@@ -587,9 +576,14 @@
 			bus-range = <0 0xff>;
 			ranges =
 				/* downstream I/O */
-				<0x81000000 0 CP110_PCIEx_IO_BASE_L(0) CP110_PCIEx_IO_BASE_H(0) CP110_PCIEx_IO_BASE_L(0) 0 0x10000
+				<0x81000000 U64_TO_U32_H(CP110_PCIEx_BUS_IO_BASE(0))
+				U64_TO_U32_L(CP110_PCIEx_BUS_IO_BASE(0)) U64_TO_U32_H(CP110_PCIEx_CPU_IO_BASE(0))
+				U64_TO_U32_L(CP110_PCIEx_CPU_IO_BASE(0)) 0 0x10000
 				/* non-prefetchable memory */
-				 0x82000000 0 CP110_PCIEx_MEM_BASE_L(0) CP110_PCIEx_MEM_BASE_H(0) CP110_PCIEx_MEM_BASE_L(0) 0 0xf00000>;
+				CP110_PCIE_BUS_MEM_CFG U64_TO_U32_H(CP110_PCIEx_BUS_MEM_BASE(0))
+				U64_TO_U32_L(CP110_PCIEx_BUS_MEM_BASE(0)) U64_TO_U32_H(CP110_PCIEx_CPU_MEM_BASE(0))
+				U64_TO_U32_L(CP110_PCIEx_CPU_MEM_BASE(0)) U64_TO_U32_H(CP110_PCIE_MEM_SIZE)
+				U64_TO_U32_L(CP110_PCIE_MEM_SIZE)>;
 			interrupt-map-mask = <0 0 0 0>;
 			interrupt-map = <0 0 0 0 &CP110_LABEL(icu) ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
 			interrupts = <ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
@@ -600,8 +594,10 @@
 
 		CP110_LABEL(pcie1): pcie1@620000 {
 			compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
-			reg = <CP110_PCIEx_REG0_BASE_H(1) CP110_PCIEx_REG0_BASE_L(1) 0 0x10000>,
-			      <CP110_PCIEx_REG1_BASE_H(1) CP110_PCIEx_REG1_BASE_L(1) 0 0x80000>;	/* Last 512KB of mem space */
+			reg =
+			   <U64_TO_U32_H(CP110_PCIEx_REG0_BASE(1)) U64_TO_U32_L(CP110_PCIEx_REG0_BASE(1)) 0 0x10000>,
+			   /* Last 512KB of mem space */
+			   <U64_TO_U32_H(CP110_PCIEx_REG1_BASE(1)) U64_TO_U32_L(CP110_PCIEx_REG1_BASE(1)) 0 0x80000>;
 			reg-names = "ctrl", "config";
 			#address-cells = <3>;
 			#size-cells = <2>;
@@ -612,9 +608,14 @@
 			bus-range = <0 0xff>;
 			ranges =
 				/* downstream I/O */
-				<0x81000000 0 CP110_PCIEx_IO_BASE_L(1) CP110_PCIEx_IO_BASE_H(1) CP110_PCIEx_IO_BASE_L(1) 0 0x10000
+				<0x81000000 U64_TO_U32_H(CP110_PCIEx_BUS_IO_BASE(1))
+				U64_TO_U32_L(CP110_PCIEx_BUS_IO_BASE(1)) U64_TO_U32_H(CP110_PCIEx_CPU_IO_BASE(1))
+				U64_TO_U32_L(CP110_PCIEx_CPU_IO_BASE(1)) 0 0x10000
 				/* non-prefetchable memory */
-				 0x82000000 0 CP110_PCIEx_MEM_BASE_L(1) CP110_PCIEx_MEM_BASE_H(1) CP110_PCIEx_MEM_BASE_L(1) 0 0xf00000>;
+				CP110_PCIE_BUS_MEM_CFG U64_TO_U32_H(CP110_PCIEx_BUS_MEM_BASE(1))
+				U64_TO_U32_L(CP110_PCIEx_BUS_MEM_BASE(1)) U64_TO_U32_H(CP110_PCIEx_CPU_MEM_BASE(1))
+				U64_TO_U32_L(CP110_PCIEx_CPU_MEM_BASE(1)) U64_TO_U32_H(CP110_PCIE_MEM_SIZE)
+				U64_TO_U32_L(CP110_PCIE_MEM_SIZE)>;
 			interrupt-map-mask = <0 0 0 0>;
 			interrupt-map = <0 0 0 0 &CP110_LABEL(icu) ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
 			interrupts = <ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
@@ -626,8 +627,10 @@
 
 		CP110_LABEL(pcie2): pcie2@640000 {
 			compatible = "marvell,armada8k-pcie", "snps,dw-pcie";
-			reg = <CP110_PCIEx_REG0_BASE_H(2) CP110_PCIEx_REG0_BASE_L(2) 0 0x10000>,
-			      <CP110_PCIEx_REG1_BASE_H(2) CP110_PCIEx_REG1_BASE_L(2) 0 0x80000>;	/* Last 64KB of mem space */
+			reg =
+			   <U64_TO_U32_H(CP110_PCIEx_REG0_BASE(2)) U64_TO_U32_L(CP110_PCIEx_REG0_BASE(2)) 0 0x10000>,
+			   /* Last 64KB of mem space */
+			   <U64_TO_U32_H(CP110_PCIEx_REG1_BASE(2)) U64_TO_U32_L(CP110_PCIEx_REG1_BASE(2)) 0 0x80000>;
 			reg-names = "ctrl", "config";
 			#address-cells = <3>;
 			#size-cells = <2>;
@@ -638,9 +641,14 @@
 			bus-range = <0 0xff>;
 			ranges =
 				/* downstream I/O */
-				<0x81000000 0 CP110_PCIEx_IO_BASE_L(2) CP110_PCIEx_IO_BASE_H(2) CP110_PCIEx_IO_BASE_L(2) 0 0x10000
+				<0x81000000 U64_TO_U32_H(CP110_PCIEx_BUS_IO_BASE(2))
+				U64_TO_U32_L(CP110_PCIEx_BUS_IO_BASE(2)) U64_TO_U32_H(CP110_PCIEx_CPU_IO_BASE(2))
+				U64_TO_U32_L(CP110_PCIEx_CPU_IO_BASE(2)) 0 0x10000
 				/* non-prefetchable memory */
-				 0x82000000 0 CP110_PCIEx_MEM_BASE_L(2) CP110_PCIEx_MEM_BASE_H(2) CP110_PCIEx_MEM_BASE_L(2) 0 0xf00000>;
+				CP110_PCIE_BUS_MEM_CFG U64_TO_U32_H(CP110_PCIEx_BUS_MEM_BASE(2))
+				U64_TO_U32_L(CP110_PCIEx_BUS_MEM_BASE(2)) U64_TO_U32_H(CP110_PCIEx_CPU_MEM_BASE(2))
+				U64_TO_U32_L(CP110_PCIEx_CPU_MEM_BASE(2)) U64_TO_U32_H(CP110_PCIE_MEM_SIZE)
+				U64_TO_U32_L(CP110_PCIE_MEM_SIZE)>;
 			interrupt-map-mask = <0 0 0 0>;
 			interrupt-map = <0 0 0 0 &CP110_LABEL(icu) ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
 			interrupts = <ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
@@ -651,4 +659,3 @@
 		};
 	};
 };
-
