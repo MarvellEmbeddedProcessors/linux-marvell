@@ -9,6 +9,7 @@
  */
 
 #include <crypto/sha.h>
+#include <crypto/md5.h>
 #include <linux/dmapool.h>
 
 #include "safexcel.h"
@@ -49,6 +50,11 @@ struct safexcel_ahash_export_state {
 
 	u32 state[SHA256_DIGEST_SIZE / sizeof(u32)];
 	u8 cache[SHA256_BLOCK_SIZE];
+};
+
+static const u8 md5_zero_digest[MD5_DIGEST_SIZE] = {
+	0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04,
+	0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e,
 };
 
 static const u8 sha1_zero_digest[SHA1_DIGEST_SIZE] = {
@@ -97,7 +103,7 @@ static void safexcel_context_control(struct safexcel_ahash_ctx *ctx,
 				     unsigned int digestsize,
 				     unsigned int blocksize)
 {
-	int i;
+	int i, ctrl_size;
 
 	cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_HASH_OUT;
 	cdesc->control_data.control0 |= ctx->alg;
@@ -106,11 +112,16 @@ static void safexcel_context_control(struct safexcel_ahash_ctx *ctx,
 	if (ctx->digest == CONTEXT_CONTROL_DIGEST_PRECOMPUTED) {
 		if (req->processed) {
 			if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA1)
-				cdesc->control_data.control0 |= CONTEXT_CONTROL_SIZE(6);
+				ctrl_size = SHA1_DIGEST_SIZE / sizeof(u32);
 			else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA224 ||
 				 ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA256)
-				cdesc->control_data.control0 |= CONTEXT_CONTROL_SIZE(9);
+				ctrl_size = SHA256_DIGEST_SIZE / sizeof(u32);
+			else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_MD5)
+				ctrl_size = MD5_DIGEST_SIZE / sizeof(u32);
 
+			/* last word in context is the number of blocks */
+			ctrl_size += 1;
+			cdesc->control_data.control0 |= CONTEXT_CONTROL_SIZE(ctrl_size);
 			cdesc->control_data.control1 |= CONTEXT_CONTROL_DIGEST_CNT;
 		} else {
 			cdesc->control_data.control0 |= CONTEXT_CONTROL_RESTART_HASH;
@@ -672,6 +683,9 @@ static int safexcel_ahash_final(struct ahash_request *areq)
 		else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA256)
 			memcpy(areq->result, sha256_zero_digest,
 			       SHA256_DIGEST_SIZE);
+		else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_MD5)
+			memcpy(areq->result, md5_zero_digest,
+			       MD5_DIGEST_SIZE);
 
 		return 0;
 	}
@@ -1169,6 +1183,94 @@ struct safexcel_alg_template safexcel_alg_sha224 = {
 				.cra_flags = CRYPTO_ALG_ASYNC |
 					     CRYPTO_ALG_KERN_DRIVER_ONLY,
 				.cra_blocksize = SHA224_BLOCK_SIZE,
+				.cra_ctxsize = sizeof(struct safexcel_ahash_ctx),
+				.cra_init = safexcel_ahash_cra_init,
+				.cra_exit = safexcel_ahash_cra_exit,
+				.cra_module = THIS_MODULE,
+			},
+		},
+	},
+};
+
+static int safexcel_md5_init(struct ahash_request *areq)
+{
+	struct safexcel_ahash_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(areq));
+	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
+
+	memset(req, 0, sizeof(*req));
+
+	req->state[0] = MD5_H0;
+	req->state[1] = MD5_H1;
+	req->state[2] = MD5_H2;
+	req->state[3] = MD5_H3;
+
+	ctx->alg = CONTEXT_CONTROL_CRYPTO_ALG_MD5;
+	ctx->digest = CONTEXT_CONTROL_DIGEST_PRECOMPUTED;
+	req->state_sz = MD5_DIGEST_SIZE;
+
+	return 0;
+}
+
+static int safexcel_md5_digest(struct ahash_request *areq)
+{
+	int ret = safexcel_md5_init(areq);
+
+	if (ret)
+		return ret;
+
+	return safexcel_ahash_finup(areq);
+}
+
+static int safexcel_md5_export(struct ahash_request *areq, void *out)
+{
+	struct crypto_ahash *ahash = crypto_ahash_reqtfm(areq);
+	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
+	struct md5_state *out_state = out;
+	int len = req->len;
+	int cache_len = do_div(len, crypto_ahash_blocksize(ahash));
+
+	out_state->byte_count = req->len;
+	memcpy(out_state->hash, req->state, req->state_sz);
+	memset(out_state->block, 0, crypto_ahash_blocksize(ahash));
+	memcpy(out_state->block, req->cache, cache_len);
+
+	return 0;
+}
+
+static int safexcel_md5_import(struct ahash_request *areq, const void *in)
+{
+	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
+	const struct md5_state *in_state = in;
+
+	memset(req, 0, sizeof(*req));
+
+	req->len = in_state->byte_count;
+	memcpy(req->cache, in_state->block, in_state->byte_count);
+	memcpy(req->state, in_state->hash, req->state_sz);
+
+	return 0;
+}
+
+struct safexcel_alg_template safexcel_alg_md5 = {
+	.type = SAFEXCEL_ALG_TYPE_AHASH,
+	.alg.ahash = {
+		.init = safexcel_md5_init,
+		.update = safexcel_ahash_update,
+		.final = safexcel_ahash_final,
+		.finup = safexcel_ahash_finup,
+		.digest = safexcel_md5_digest,
+		.export = safexcel_md5_export,
+		.import = safexcel_md5_import,
+		.halg = {
+			.digestsize = MD5_DIGEST_SIZE,
+			.statesize = sizeof(struct md5_state),
+			.base = {
+				.cra_name = "md5",
+				.cra_driver_name = "safexcel-md5",
+				.cra_priority = 300,
+				.cra_flags = CRYPTO_ALG_ASYNC |
+					     CRYPTO_ALG_KERN_DRIVER_ONLY,
+				.cra_blocksize = MD5_HMAC_BLOCK_SIZE,
 				.cra_ctxsize = sizeof(struct safexcel_ahash_ctx),
 				.cra_init = safexcel_ahash_cra_init,
 				.cra_exit = safexcel_ahash_cra_exit,
