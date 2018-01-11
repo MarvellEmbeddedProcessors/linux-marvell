@@ -65,6 +65,7 @@ static int safexcel_aes_setkey(struct crypto_ablkcipher *ctfm, const u8 *key,
 {
 	struct crypto_tfm *tfm = crypto_ablkcipher_tfm(ctfm);
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
+	struct safexcel_crypto_priv *priv = ctx->priv;
 	struct crypto_aes_ctx aes;
 	int ret, i;
 
@@ -75,7 +76,7 @@ static int safexcel_aes_setkey(struct crypto_ablkcipher *ctfm, const u8 *key,
 	}
 
 	/* if context exits and key changed, need to invalidate it */
-	if (ctx->base.ctxr_dma) {
+	if (priv->eip_type == EIP197 && ctx->base.ctxr_dma) {
 		for (i = 0; i < len / sizeof(u32); i++) {
 			if (ctx->key[i] != cpu_to_le32(aes.key_enc[i])) {
 				ctx->base.needs_inv = true;
