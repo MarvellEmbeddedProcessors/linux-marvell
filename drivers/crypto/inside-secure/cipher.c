@@ -90,6 +90,7 @@ static int safexcel_aes_setkey(struct crypto_ablkcipher *ctfm, const u8 *key,
 
 	ctx->key_len = len;
 
+	memzero_explicit(&aes, sizeof(aes));
 	return 0;
 }
 
@@ -537,9 +538,13 @@ static void safexcel_ablkcipher_cra_exit(struct crypto_tfm *tfm)
 	struct safexcel_crypto_priv *priv = ctx->priv;
 	int ret;
 
+	memzero_explicit(ctx->key, ctx->key_len);
+
 	/* context not allocated, skip invalidation */
 	if (!ctx->base.ctxr)
 		return;
+
+	memzero_explicit(ctx->base.ctxr->data, ctx->key_len);
 
 	/*
 	 * EIP197 has internal cache which needs to be invalidated
