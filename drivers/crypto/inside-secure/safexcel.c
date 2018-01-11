@@ -69,8 +69,13 @@ static int eip197_trc_cache_init(struct device *dev,
 	    rc_ht_factor, rc_ht_entry_cnt, rc_admn_ram_wc,
 	    rc_admn_ram_entry_cnt;
 
-	rc_rec1_wc = EIP197_CS_TRC_REC_WC;
-	rc_rec2_wc = EIP197_CS_TRC_LG_REC_WC;
+	if (priv->eip197_hw_ver == EIP197B) {
+		rc_rec1_wc = EIP197B_CS_TRC_REC_WC;
+		rc_rec2_wc = EIP197B_CS_TRC_LG_REC_WC;
+	} else {
+		rc_rec1_wc = EIP197D_CS_TRC_REC_WC;
+		rc_rec2_wc = EIP197D_CS_TRC_LG_REC_WC;
+	}
 
 	/* Determine the RC record size to use */
 	if (rc_rec2_wc > rc_rec1_wc)
@@ -234,7 +239,7 @@ static int eip197_trc_cache_init(struct device *dev,
 	       priv->base + EIP197_TRC_FREECHAIN);
 
 	/* Set Hash Table start */
-	reg = ((EIP197_CS_TRC_REC_WC << EIP197_TRC_RECORD_SIZE2_OFFSET)		|
+	reg = ((rc_rec1_wc << EIP197_TRC_RECORD_SIZE2_OFFSET)		|
 		(EIP197_RC_DMA_WR_COMB_DLY << EIP197_TRC_DMA_WR_COMB_DLY_OFFSET)|
 		(rc_record_cnt & EIP197_TRC_HASH_TABLE_START_MASK));
 	writel(reg, priv->base + EIP197_TRC_PARAMS2);
