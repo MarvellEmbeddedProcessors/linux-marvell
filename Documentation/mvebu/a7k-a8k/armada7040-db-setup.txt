@@ -147,3 +147,7 @@ Network configuration
  eth0           | CP0   | eth0          | 0             | SGMII0 (1G)                   |
  eth1           | CP0   | eth1          | 2             | RGMII0                        |
  ----------------------------------------------------------------------------------------
+
+I2C IO expander0 GPIO pin configuration
+--------------------------------------
+PIN[15] - GPIO regulator of cp0-vccq-sd0
