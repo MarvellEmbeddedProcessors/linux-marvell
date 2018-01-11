@@ -164,8 +164,8 @@ static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int rin
 
 /* Send hash command to the engine */
 static int safexcel_ahash_send_req(struct crypto_async_request *async, int ring,
-				    struct safexcel_request *request, int *commands,
-				    int *results)
+				   struct safexcel_request *request,
+				   int *commands, int *results)
 {
 	struct ahash_request *areq = ahash_request_cast(async);
 	struct crypto_ahash *ahash = crypto_ahash_reqtfm(areq);
@@ -392,9 +392,10 @@ static int safexcel_handle_result(struct safexcel_crypto_priv *priv, int ring,
 		req->needs_inv = false;
 		err = safexcel_handle_inv_result(priv, ring, async,
 						 should_complete, ret);
-	} else
+	} else {
 		err = safexcel_handle_req_result(priv, ring, async,
 						 should_complete, ret);
+	}
 
 	return err;
 }
@@ -420,10 +421,9 @@ static int safexcel_ahash_send_inv(struct crypto_async_request *async,
 }
 
 static int safexcel_ahash_send(struct crypto_async_request *async,
-			 int ring, struct safexcel_request *request,
-			 int *commands, int *results)
+			       int ring, struct safexcel_request *request,
+			       int *commands, int *results)
 {
-
 	struct ahash_request *areq = ahash_request_cast(async);
 	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
 	int ret;
@@ -443,8 +443,8 @@ static int safexcel_ahash_exit_inv(struct crypto_tfm *tfm)
 	struct safexcel_ahash_ctx *ctx = crypto_tfm_ctx(tfm);
 	struct safexcel_crypto_priv *priv = ctx->priv;
 	AHASH_REQUEST_ON_STACK(req, __crypto_ahash_cast(tfm));
-	struct safexcel_ahash_req *sreq = ahash_request_ctx(req);
-	struct safexcel_inv_result result = { 0 };
+	struct safexcel_ahash_req *rctx = ahash_request_ctx(req);
+	struct safexcel_inv_result result = {};
 	int ring = ctx->base.ring;
 
 	/* create invalidation request */
@@ -455,7 +455,7 @@ static int safexcel_ahash_exit_inv(struct crypto_tfm *tfm)
 	ahash_request_set_tfm(req, __crypto_ahash_cast(tfm));
 	ctx = crypto_tfm_ctx(req->base.tfm);
 	ctx->base.exit_inv = true;
-	sreq->needs_inv = true;
+	rctx->needs_inv = true;
 
 	spin_lock_bh(&priv->ring[ring].queue_lock);
 	ahash_enqueue_request(&priv->ring[ring].queue, req);

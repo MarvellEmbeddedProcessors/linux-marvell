@@ -361,7 +361,6 @@ static int safexcel_handle_result(struct safexcel_crypto_priv *priv, int ring,
 				  struct crypto_async_request *async,
 				  bool *should_complete, int *ret)
 {
-
 	struct ablkcipher_request *req = ablkcipher_request_cast(async);
 	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	int err;
@@ -370,9 +369,10 @@ static int safexcel_handle_result(struct safexcel_crypto_priv *priv, int ring,
 		sreq->needs_inv = false;
 		err = safexcel_handle_inv_result(priv, ring, async,
 						 should_complete, ret);
-	} else
+	} else {
 		err = safexcel_handle_req_result(priv, ring, async,
 						 should_complete, ret);
+	}
 
 	return err;
 }
