@@ -52,8 +52,11 @@
 /* EIP-197 Classification Engine */
 /* configuration parameters */
 /* classification */
-#define EIP197_CS_TRC_REC_WC				59
-#define EIP197_CS_TRC_LG_REC_WC				73
+#define EIP197B_CS_TRC_REC_WC				59
+#define EIP197B_CS_TRC_LG_REC_WC			73
+#define EIP197D_CS_TRC_REC_WC				64
+#define EIP197D_CS_TRC_LG_REC_WC			80
+
 /* record cache */
 #define EIP197_RC_MAX_ENTRY_CNT				4096
 #define EIP197_RC_MIN_ENTRY_CNT				32
