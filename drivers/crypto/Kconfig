@@ -702,10 +702,11 @@ config CRYPTO_DEV_SAFEXCEL
 	select CRYPTO_SHA1
 	select CRYPTO_SHA256
 	select CRYPTO_SHA512
+	select CRYPTO_MD5
 	help
 	  This driver interfaces with the SafeXcel EIP-197 cryptographic engine
 	  designed by Inside Secure. Select this if you want to use CBC/ECB
-	  chain mode, AES cipher mode and SHA1/SHA224/SHA256/SHA512 hash
+	  chain mode, AES cipher mode and SHA1/SHA224/SHA256/SHA512/MD5 hash
 	  algorithms.
 
 config CRYPTO_DEV_ARTPEC6
