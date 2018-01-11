@@ -385,6 +385,8 @@ struct safexcel_context_record {
 #define CONTEXT_CONTROL_NO_FINISH_HASH		BIT(5)
 #define CONTEXT_CONTROL_SIZE(n)			((n) << 8)
 #define CONTEXT_CONTROL_KEY_EN			BIT(16)
+#define CONTEXT_CONTROL_CRYPTO_ALG_DES		(0x0 << 17)
+#define CONTEXT_CONTROL_CRYPTO_ALG_3DES		(0x2 << 17)
 #define CONTEXT_CONTROL_CRYPTO_ALG_AES128	(0x5 << 17)
 #define CONTEXT_CONTROL_CRYPTO_ALG_AES192	(0x6 << 17)
 #define CONTEXT_CONTROL_CRYPTO_ALG_AES256	(0x7 << 17)
@@ -509,6 +511,7 @@ struct safexcel_control_data_desc {
 #define EIP197_OPTION_64BIT_CTX		BIT(1)
 #define EIP197_OPTION_CTX_CTRL_IN_CMD	BIT(8)
 #define EIP197_OPTION_4_TOKEN_IV_CMD	(GENMASK(11, 9))
+#define EIP197_OPTION_2_TOKEN_IV_CMD	(GENMASK(11, 10))
 
 /* Basic Command Descriptor format */
 struct safexcel_command_desc {
@@ -725,6 +728,10 @@ void safexcel_inv_complete(struct crypto_async_request *req, int error);
 /* available algorithms */
 extern struct safexcel_alg_template safexcel_alg_ecb_aes;
 extern struct safexcel_alg_template safexcel_alg_cbc_aes;
+extern struct safexcel_alg_template safexcel_alg_cbc_des;
+extern struct safexcel_alg_template safexcel_alg_cbc_des3_ede;
+extern struct safexcel_alg_template safexcel_alg_ecb_des;
+extern struct safexcel_alg_template safexcel_alg_ecb_des3_ede;
 extern struct safexcel_alg_template safexcel_alg_sha1;
 extern struct safexcel_alg_template safexcel_alg_sha224;
 extern struct safexcel_alg_template safexcel_alg_sha256;

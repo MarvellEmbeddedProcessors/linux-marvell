@@ -1146,6 +1146,10 @@ static int safexcel_request_ring_irq(struct platform_device *pdev, const char *n
 static struct safexcel_alg_template *safexcel_algs[] = {
 	&safexcel_alg_ecb_aes,
 	&safexcel_alg_cbc_aes,
+	&safexcel_alg_cbc_des,
+	&safexcel_alg_cbc_des3_ede,
+	&safexcel_alg_ecb_des,
+	&safexcel_alg_ecb_des3_ede,
 	&safexcel_alg_sha1,
 	&safexcel_alg_sha224,
 	&safexcel_alg_sha256,
