@@ -24,6 +24,22 @@ struct safexcel_ahash_ctx {
 	u32 opad[SHA1_DIGEST_SIZE / sizeof(u32)];
 };
 
+/* Ahash structures */
+struct safexcel_ahash_req {
+	bool last_req;
+	bool finish;
+	bool hmac;
+	bool needs_inv;
+
+	u8 state_sz;	/* expected sate size, only set once */
+	u32 state[SHA256_DIGEST_SIZE / sizeof(u32)];
+
+	u64 len;
+
+	u8 cache[SHA256_BLOCK_SIZE] __aligned(sizeof(u32));
+	u8 cache_next[SHA256_BLOCK_SIZE] __aligned(sizeof(u32));
+};
+
 static const u8 sha1_zero_digest[SHA1_DIGEST_SIZE] = {
 	0xda, 0x39, 0xa3, 0xee, 0x5e, 0x6b, 0x4b, 0x0d, 0x32, 0x55,
 	0xbf, 0xef, 0x95, 0x60, 0x18, 0x90, 0xaf, 0xd8, 0x07, 0x09,
