@@ -850,9 +850,11 @@ void safexcel_free_context(struct safexcel_crypto_priv *priv,
 		dma_unmap_single(priv->dev, ctx->result_dma, result_sz,
 				 DMA_FROM_DEVICE);
 
-	if (ctx->cache_dma) {
+	if (ctx->cache) {
 		dma_unmap_single(priv->dev, ctx->cache_dma, ctx->cache_sz,
 				 DMA_TO_DEVICE);
+		kfree(ctx->cache);
+		ctx->cache = NULL;
 		ctx->cache_sz = 0;
 	}
 }
