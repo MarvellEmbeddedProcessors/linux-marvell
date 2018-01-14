@@ -135,7 +135,8 @@ static void safexcel_context_control(struct safexcel_ahash_ctx *ctx,
 		cdesc->control_data.control0 |= CONTEXT_CONTROL_SIZE(10);
 
 		memcpy(ctx->base.ctxr->data, ctx->ipad, digestsize);
-		memcpy(ctx->base.ctxr->data + 5, ctx->opad, digestsize);
+		memcpy(ctx->base.ctxr->data + digestsize / sizeof(u32),
+		       ctx->opad, digestsize);
 	}
 }
 
