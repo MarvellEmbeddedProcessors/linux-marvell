@@ -669,22 +669,6 @@ struct safexcel_context {
 	unsigned int cache_sz;
 };
 
-/* Ahash structures */
-struct safexcel_ahash_req {
-	bool last_req;
-	bool finish;
-	bool hmac;
-	bool needs_inv;
-
-	u8 state_sz;	/* expected sate size, only set once */
-	u32 state[SHA256_DIGEST_SIZE / sizeof(u32)];
-
-	u64 len;
-
-	u8 cache[SHA256_BLOCK_SIZE] __aligned(sizeof(u32));
-	u8 cache_next[SHA256_BLOCK_SIZE] __aligned(sizeof(u32));
-};
-
 /*
  * Template structure to describe the algorithms in order to register them.
  * It also has the purpose to contain our private structure and is actually
