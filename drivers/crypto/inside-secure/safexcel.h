@@ -665,6 +665,7 @@ struct safexcel_context {
 
 	/* Used for ahash requests */
 	dma_addr_t result_dma;
+	void *cache;
 	dma_addr_t cache_dma;
 	unsigned int cache_sz;
 };
