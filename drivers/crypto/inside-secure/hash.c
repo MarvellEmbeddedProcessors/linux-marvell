@@ -32,7 +32,7 @@ struct safexcel_ahash_req {
 	bool needs_inv;
 
 	u8 state_sz;	/* expected sate size, only set once */
-	u32 state[SHA256_DIGEST_SIZE / sizeof(u32)];
+	u32 state[SHA256_DIGEST_SIZE / sizeof(u32)] __aligned(sizeof(u32));
 
 	u64 len;
 
