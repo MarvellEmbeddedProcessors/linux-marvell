@@ -10,14 +10,18 @@
 
 #include <linux/clk.h>
 #include <linux/device.h>
+#include <linux/dma-mapping.h>
 #include <linux/dmapool.h>
+#include <linux/firmware.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
-#include <linux/firmware.h>
 #include <linux/workqueue.h>
+
+#include <crypto/internal/hash.h>
+#include <crypto/internal/skcipher.h>
 
 #include "safexcel.h"
 
