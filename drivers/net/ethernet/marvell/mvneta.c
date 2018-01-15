@@ -3751,8 +3751,14 @@ static int mvneta_open(struct net_device *dev)
 	int ret;
 
 	if (pp->flags & MVNETA_PORT_F_IF_MUSDK) {
-		if (!pp->use_inband_status)
+		if (!pp->use_inband_status) {
+			ret = mvneta_mdio_probe(pp);
+			if (ret < 0) {
+				netdev_err(dev, "cannot probe MDIO bus\n");
+				return 0;
+			}
 			phy_start(pp->phy_dev);
+		}
 		netdev_warn(dev, "skipping ndo_open as this port is User Space port\n");
 		return 0;
 	}
