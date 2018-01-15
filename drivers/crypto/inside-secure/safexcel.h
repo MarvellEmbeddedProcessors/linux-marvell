@@ -12,15 +12,7 @@
 #define __SAFEXCEL_H__
 
 #include <crypto/algapi.h>
-#include <crypto/hash.h>
-#include <crypto/aes.h>
 #include <crypto/internal/hash.h>
-#include <crypto/sha.h>
-#include <linux/device.h>
-#include <linux/clk.h>
-#include <linux/interrupt.h>
-#include <linux/spinlock.h>
-#include <linux/workqueue.h>
 
 #define EIP197_HIA_VERSION_LE			0xca35
 #define EIP197_HIA_VERSION_BE			0x35ca
