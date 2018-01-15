@@ -318,24 +318,21 @@ static int safexcel_ahash_send_req(struct crypto_async_request *async, int ring,
 
 send_command:
 	/* Setup the context options */
-	safexcel_context_control(ctx, req, first_cdesc,
-				 req->state_sz,
+	safexcel_context_control(ctx, req, first_cdesc, req->state_sz,
 				 crypto_ahash_blocksize(ahash));
 
 	/* Add the token */
 	safexcel_hash_token(first_cdesc, len, req->state_sz);
 
 	ctx->base.result_dma = dma_map_single(priv->dev, req->state,
-					      req->state_sz,
-					      DMA_FROM_DEVICE);
+					      req->state_sz, DMA_FROM_DEVICE);
 	if (dma_mapping_error(priv->dev, ctx->base.result_dma)) {
 		ret = -EINVAL;
 		goto cdesc_rollback;
 	}
 
 	/* Add a result descriptor */
-	rdesc = safexcel_add_rdesc(priv, ring, 1, 1,
-				   ctx->base.result_dma,
+	rdesc = safexcel_add_rdesc(priv, ring, 1, 1, ctx->base.result_dma,
 				   req->state_sz);
 	if (IS_ERR(rdesc)) {
 		ret = PTR_ERR(rdesc);

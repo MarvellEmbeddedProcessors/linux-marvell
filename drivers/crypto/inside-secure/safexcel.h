@@ -159,8 +159,6 @@
 #define EIP197_TRC_RECORD_SIZE_OFFSET			18
 #define EIP197_TRC_RECORD_SIZE_MASK			(GENMASK(8, 0))
 
-
-
 /* EIP197_TRC_PARAMS2 */
 #define EIP197_TRC_HASH_TABLE_START_MASK		(GENMASK(9, 0))
 #define EIP197_TRC_DMA_WR_COMB_DLY_OFFSET		10
@@ -626,11 +624,11 @@ struct safexcel_crypto_priv {
 	void __iomem *base;
 	struct device *dev;
 	struct clk *clk;
-	enum safexcel_eip_type eip_type;
 	int nr_pe;
-	enum safexcel_eip197_hw eip197_hw_ver;
 	struct safexcel_config config;
 
+	enum safexcel_eip_type eip_type;
+	enum safexcel_eip197_hw eip197_hw_ver;
 	struct safexcel_register_offsets offsets;
 
 	/* context DMA pool */

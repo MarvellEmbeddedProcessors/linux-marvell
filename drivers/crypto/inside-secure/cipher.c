@@ -164,8 +164,8 @@ static int safexcel_context_control(struct safexcel_cipher_ctx *ctx,
 
 /* Handle a cipher result descriptor */
 static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int ring,
-				  struct crypto_async_request *async,
-				  bool *should_complete, int *ret)
+				      struct crypto_async_request *async,
+				      bool *should_complete, int *ret)
 {
 	struct ablkcipher_request *req = ablkcipher_request_cast(async);
 	struct safexcel_result_desc *rdesc;
