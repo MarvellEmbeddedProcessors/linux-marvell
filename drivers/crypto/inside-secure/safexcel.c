@@ -532,9 +532,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 		val |= MST_CTRL_SUPPORT_PROT(AXI_NONE_SECURE_ACCESS);
 	writel(val, EIP197_HIA_GEN_CFG(priv) + EIP197_MST_CTRL);
 
-	/*
-	 * Interrupts reset
-	 */
+	/* Interrupts reset */
 
 	/* Disable all global interrupts */
 	writel(0, EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ENABLE_CTRL);
@@ -542,13 +540,9 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 	/* Clear any pending interrupt */
 	writel(EIP197_AIC_G_ACK_ALL_MASK, EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
 
-	/*
-	 * Processing Engine configuration
-	 */
+	/* Processing Engine configuration */
 	for (pe = 0; pe < priv->nr_pe; pe++) {
-		/*
-		 * Data Fetch Engine configuration
-		 */
+		/* Data Fetch Engine configuration */
 
 		/* Reset all DFE threads */
 		writel(EIP197_DxE_THR_CTRL_RESET_PE,
@@ -585,9 +579,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 			       EIP197_HIA_AIC(priv) + EIP197_HIA_RA_PE_CTRL(pe));
 		}
 
-		/*
-		 * Data Store Engine configuration
-		 */
+		/* Data Store Engine configuration */
 
 		/* Reset all DSE threads */
 		writel(EIP197_DxE_THR_CTRL_RESET_PE,
@@ -622,9 +614,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 		       EIP197_PE(priv) + EIP197_PE_OUT_DBUF_THRES(pe));
 	}
 
-	/*
-	 * Command Descriptor Rings prepare
-	 */
+	/* Command Descriptor Rings prepare */
 	for (i = 0; i < priv->config.hw_rings; i++) {
 		/* Clear interrupts for this ring */
 		writel(EIP197_HIA_AIC_R_ENABLE_CLR_ALL_MASK,
@@ -650,10 +640,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 		       EIP197_HIA_CDR(priv, i) + EIP197_HIA_xDR_RING_SIZE);
 	}
 
-	/*
-	 * Result Descriptor Ring prepare
-	 */
-
+	/* Result Descriptor Ring prepare */
 	for (i = 0; i < priv->config.hw_rings; i++) {
 		/* Disable external triggering*/
 		writel(0, EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_CFG);
@@ -671,7 +658,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 		writel(0,
 		       EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_PROC_PNTR);
 
-		/* ring size */
+		/* Ring size */
 		writel((EIP197_DEFAULT_RING_SIZE * priv->config.rd_offset) << 2,
 		       EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_RING_SIZE);
 	}
@@ -818,8 +805,8 @@ inline int safexcel_select_ring(struct safexcel_crypto_priv *priv)
 
 /* Free crypto API result mapping */
 void safexcel_free_context(struct safexcel_crypto_priv *priv,
-				  struct crypto_async_request *req,
-				  int result_sz)
+			   struct crypto_async_request *req,
+			   int result_sz)
 {
 	struct safexcel_context *ctx = crypto_tfm_ctx(req->tfm);
 
@@ -867,8 +854,8 @@ void safexcel_inv_complete(struct crypto_async_request *req, int error)
 /* Context cache invalidation */
 int safexcel_invalidate_cache(struct crypto_async_request *async,
 			      struct safexcel_crypto_priv *priv,
-			      dma_addr_t ctxr_dma,
-			      int ring, struct safexcel_request *request)
+			      dma_addr_t ctxr_dma, int ring,
+			      struct safexcel_request *request)
 {
 	struct safexcel_command_desc *cdesc;
 	struct safexcel_result_desc *rdesc;
@@ -1027,7 +1014,7 @@ static irqreturn_t safexcel_irq_ring(int irq, void *data)
 
 		if (unlikely(stat & EIP197_xDR_ERR)) {
 			/*
-			 * Fatal error, the CDR is unusable and must be
+			 * Fatal error, the RDR is unusable and must be
 			 * reinitialized. This should not happen under
 			 * normal circumstances.
 			 */
@@ -1404,6 +1391,7 @@ static const struct of_device_id safexcel_of_match_table[] = {
 		.compatible = "inside-secure,safexcel-eip197",
 		.data = (void *)EIP197,
 	},
+	{},
 };
 
 
@@ -1420,5 +1408,7 @@ module_param_array(rings, uint, NULL, 0);
 MODULE_PARM_DESC(rings, "number of rings to be used by the driver");
 
 MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
-MODULE_DESCRIPTION("Support for SafeXcel Cryptographic Engines EIP97/197");
+MODULE_AUTHOR("Ofer Heifetz <oferh@marvell.com>");
+MODULE_AUTHOR("Igal Liberman <igall@marvell.com>");
+MODULE_DESCRIPTION("Support for SafeXcel cryptographic engine EIP197");
 MODULE_LICENSE("GPL v2");
