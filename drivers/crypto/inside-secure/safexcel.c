@@ -375,7 +375,7 @@ release_fw:
 }
 
 /* Reset the command descriptor rings */
-static void eip_hw_reset_cdesc_rings(struct safexcel_crypto_priv *priv)
+static void safexcel_hw_reset_cdesc_rings(struct safexcel_crypto_priv *priv)
 {
 	int i;
 
@@ -393,7 +393,7 @@ static void eip_hw_reset_cdesc_rings(struct safexcel_crypto_priv *priv)
 }
 
 /* Reset the result descriptor rings */
-static void eip_hw_reset_rdesc_rings(struct safexcel_crypto_priv *priv)
+static void safexcel_hw_reset_rdesc_rings(struct safexcel_crypto_priv *priv)
 {
 	int i;
 
@@ -411,7 +411,7 @@ static void eip_hw_reset_rdesc_rings(struct safexcel_crypto_priv *priv)
 }
 
 /* Configure the command descriptor ring manager */
-static int eip_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
+static int safexcel_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
 {
 	u32 hdw, cd_size_rnd, val;
 	int i;
@@ -457,7 +457,7 @@ static int eip_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
 }
 
 /* Configure the result descriptor ring manager */
-static int eip_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
+static int safexcel_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
 {
 	u32 hdw, rd_size_rnd, val;
 	int i;
@@ -508,7 +508,7 @@ static int eip_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
 	return 0;
 }
 
-static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
+static int safexcel_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 {
 	u32 version, val;
 	int i, ret, pe;
@@ -613,7 +613,6 @@ static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 		 */
 		if (priv->eip_type == EIP197)
 			val |= EIP197_HIA_DSE_CFG_EN_SINGLE_WR;
-
 		writel(val, EIP197_HIA_DSE(priv) + EIP197_HIA_DSE_CFG(pe));
 
 		/* Leave the DSE threads reset state */
@@ -717,8 +716,8 @@ static int eip197_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
 		}
 	}
 
-	eip_hw_setup_cdesc_rings(priv);
-	eip_hw_setup_rdesc_rings(priv);
+	safexcel_hw_setup_cdesc_rings(priv);
+	safexcel_hw_setup_rdesc_rings(priv);
 
 	return 0;
 }
@@ -1372,7 +1371,7 @@ static int safexcel_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, priv);
 
-	ret = eip197_hw_init(dev, priv);
+	ret = safexcel_hw_init(dev, priv);
 	if (ret) {
 		dev_err(dev, "EIP h/w init failed (%d)\n", ret);
 		goto err_pool;
@@ -1413,8 +1412,8 @@ static int safexcel_remove(struct platform_device *pdev)
 	if (priv->id == eip_in_use)
 		safexcel_unregister_algorithms(priv);
 
-	eip_hw_reset_cdesc_rings(priv);
-	eip_hw_reset_rdesc_rings(priv);
+	safexcel_hw_reset_cdesc_rings(priv);
+	safexcel_hw_reset_rdesc_rings(priv);
 
 	clk_disable_unprepare(priv->clk);
 
