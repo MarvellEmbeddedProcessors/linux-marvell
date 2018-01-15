@@ -65,8 +65,7 @@ static void eip197_prng_init(struct safexcel_crypto_priv *priv, int pe)
 }
 
 /* Initialize transform record cache */
-static int eip197_trc_cache_init(struct device *dev,
-				 struct safexcel_crypto_priv *priv)
+static int eip197_trc_cache_init(struct safexcel_crypto_priv *priv)
 {
 	u32 i, reg, reg_addr, rc_rec_wc, rc_rec1_wc, rc_rec2_wc,
 	    rc_record_cnt, rc_ht_wc, rc_ht_byte_offset, rc_ht_sz,
@@ -264,7 +263,7 @@ static int eip197_trc_cache_init(struct device *dev,
 }
 
 /* Load EIP197 firmare into the engine */
-static int eip197_load_fw(struct device *dev, struct safexcel_crypto_priv *priv)
+static int eip197_load_fw(struct safexcel_crypto_priv *priv)
 {
 	const struct firmware	*fw[FW_NB] = {0};
 	const u32		*fw_data;
@@ -280,9 +279,9 @@ static int eip197_load_fw(struct device *dev, struct safexcel_crypto_priv *priv)
 
 	for (i = 0; i < FW_NB; i++) {
 		snprintf(fw_full_name, 21, "%s%s", fw_base, fw_file_name[i]);
-		ret = request_firmware(&fw[i], fw_full_name, dev);
+		ret = request_firmware(&fw[i], fw_full_name, priv->dev);
 		if (ret) {
-			dev_err(dev, "request_firmware failed (fw: %s)\n",
+			dev_err(priv->dev, "request_firmware failed (fw: %s)\n",
 				fw_full_name);
 			goto release_fw;
 		}
@@ -508,7 +507,7 @@ static int safexcel_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
 	return 0;
 }
 
-static int safexcel_hw_init(struct device *dev, struct safexcel_crypto_priv *priv)
+static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 {
 	u32 version, val;
 	int i, ret, pe;
@@ -702,16 +701,16 @@ static int safexcel_hw_init(struct device *dev, struct safexcel_crypto_priv *pri
 			eip197_prng_init(priv, pe);
 
 		/* init transform record cache */
-		ret = eip197_trc_cache_init(dev, priv);
+		ret = eip197_trc_cache_init(priv);
 		if (ret) {
-			dev_err(dev, "eip197_trc_cache_init failed\n");
+			dev_err(priv->dev, "eip197_trc_cache_init failed\n");
 			return ret;
 		}
 
 		/* Firmware load */
-		ret = eip197_load_fw(dev, priv);
+		ret = eip197_load_fw(priv);
 		if (ret) {
-			dev_err(dev, "eip197_load_fw failed\n");
+			dev_err(priv->dev, "eip197_load_fw failed\n");
 			return ret;
 		}
 	}
@@ -1371,9 +1370,9 @@ static int safexcel_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, priv);
 
-	ret = safexcel_hw_init(dev, priv);
+	ret = safexcel_hw_init(priv);
 	if (ret) {
-		dev_err(dev, "EIP h/w init failed (%d)\n", ret);
+		dev_err(priv->dev, "EIP h/w init failed (%d)\n", ret);
 		goto err_pool;
 	}
 
