@@ -22,8 +22,8 @@
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
-#define EIP197_HIA_VERSION_LE				0xca35
-#define EIP197_HIA_VERSION_BE				0x35ca
+#define EIP197_HIA_VERSION_LE			0xca35
+#define EIP197_HIA_VERSION_BE			0x35ca
 
 /* Number of eip devices */
 #define MAX_EIP_DEVICE					2
@@ -40,11 +40,93 @@
 #define EIP197_GFP_FLAGS(base)	((base).flags & CRYPTO_TFM_REQ_MAY_SLEEP ? \
 				 GFP_KERNEL : GFP_ATOMIC)
 
-/* READ and WRITE cache control */
-#define RD_CACHE_3BITS				0x5
-#define WR_CACHE_3BITS				0x3
-#define RD_CACHE_4BITS				(RD_CACHE_3BITS << 1 | 0x1)
-#define WR_CACHE_4BITS				(WR_CACHE_3BITS << 1 | 0x1)
+/* Register base offsets */
+#define EIP197_HIA_AIC(priv)		((priv)->base + (priv)->offsets.hia_aic)
+#define EIP197_HIA_AIC_G(priv)		((priv)->base + (priv)->offsets.hia_aic_g)
+#define EIP197_HIA_AIC_R(priv)		((priv)->base + (priv)->offsets.hia_aic_r)
+#define EIP197_HIA_AIC_xDR(priv)	((priv)->base + (priv)->offsets.hia_aic_xdr)
+#define EIP197_HIA_DFE(priv)		((priv)->base + (priv)->offsets.hia_dfe)
+#define EIP197_HIA_DFE_THR(priv)	((priv)->base + (priv)->offsets.hia_dfe_thr)
+#define EIP197_HIA_DSE(priv)		((priv)->base + (priv)->offsets.hia_dse)
+#define EIP197_HIA_DSE_THR(priv)	((priv)->base + (priv)->offsets.hia_dse_thr)
+#define EIP197_HIA_GEN_CFG(priv)	((priv)->base + (priv)->offsets.hia_gen_cfg)
+#define EIP197_PE(priv)			((priv)->base + (priv)->offsets.pe)
+
+/* EIP197 base offsets */
+#define EIP197_HIA_AIC_BASE		0x90000
+#define EIP197_HIA_AIC_G_BASE		0x90000
+#define EIP197_HIA_AIC_R_BASE		0x90800
+#define EIP197_HIA_AIC_xDR_BASE		0x80000
+#define EIP197_HIA_DFE_BASE		0x8c000
+#define EIP197_HIA_DFE_THR_BASE		0x8c040
+#define EIP197_HIA_DSE_BASE		0x8d000
+#define EIP197_HIA_DSE_THR_BASE		0x8d040
+#define EIP197_HIA_GEN_CFG_BASE		0xf0000
+#define EIP197_PE_BASE			0xa0000
+
+/* EIP97 base offsets */
+#define EIP97_HIA_AIC_BASE		0x0
+#define EIP97_HIA_AIC_G_BASE		0x0
+#define EIP97_HIA_AIC_R_BASE		0x0
+#define EIP97_HIA_AIC_xDR_BASE		0x0
+#define EIP97_HIA_DFE_BASE		0xf000
+#define EIP97_HIA_DFE_THR_BASE		0xf200
+#define EIP97_HIA_DSE_BASE		0xf400
+#define EIP97_HIA_DSE_THR_BASE		0xf600
+#define EIP97_HIA_GEN_CFG_BASE		0x10000
+#define EIP97_PE_BASE			0x10000
+
+/* CDR/RDR register offsets */
+#define EIP197_HIA_xDR_OFF(priv, r)		(EIP197_HIA_AIC_xDR(priv) + (r) * 0x1000)
+#define EIP197_HIA_CDR(priv, r)			(EIP197_HIA_xDR_OFF(priv, r))
+#define EIP197_HIA_RDR(priv, r)			(EIP197_HIA_xDR_OFF(priv, r) + 0x800)
+#define EIP197_HIA_xDR_RING_BASE_ADDR_LO	0x0000
+#define EIP197_HIA_xDR_RING_BASE_ADDR_HI	0x0004
+#define EIP197_HIA_xDR_RING_SIZE		0x0018
+#define EIP197_HIA_xDR_DESC_SIZE		0x001c
+#define EIP197_HIA_xDR_CFG			0x0020
+#define EIP197_HIA_xDR_DMA_CFG			0x0024
+#define EIP197_HIA_xDR_THRESH			0x0028
+#define EIP197_HIA_xDR_PREP_COUNT		0x002c
+#define EIP197_HIA_xDR_PROC_COUNT		0x0030
+#define EIP197_HIA_xDR_PREP_PNTR		0x0034
+#define EIP197_HIA_xDR_PROC_PNTR		0x0038
+#define EIP197_HIA_xDR_STAT			0x003c
+
+/* register offsets */
+#define EIP197_HIA_DFE_CFG(n)			(0x000 + (128 * n))
+#define EIP197_HIA_DFE_THR_CTRL(n)		(0x000 + (128 * n))
+#define EIP197_HIA_DFE_THR_STAT(n)		(0x004 + (128 * n))
+#define EIP197_HIA_DSE_CFG(n)			(0x000 + (128 * n))
+#define EIP197_HIA_DSE_THR_CTRL(n)		(0x000 + (128 * n))
+#define EIP197_HIA_DSE_THR_STAT(n)		(0x004 + (128 * n))
+#define EIP197_HIA_RA_PE_CTRL(n)		(0x010 + (8 * n))
+#define EIP197_HIA_RA_PE_STAT			0x0014
+#define EIP197_HIA_AIC_R_OFF(r)			((r) * 0x1000)
+#define EIP197_HIA_AIC_R_ENABLE_CTRL(r)		(0xe008 - EIP197_HIA_AIC_R_OFF(r))
+#define EIP197_HIA_AIC_R_ENABLED_STAT(r)	(0xe010 - EIP197_HIA_AIC_R_OFF(r))
+#define EIP197_HIA_AIC_R_ACK(r)			(0xe010 - EIP197_HIA_AIC_R_OFF(r))
+#define EIP197_HIA_AIC_R_ENABLE_CLR(r)		(0xe014 - EIP197_HIA_AIC_R_OFF(r))
+#define EIP197_HIA_AIC_G_ENABLE_CTRL		0xf808
+#define EIP197_HIA_AIC_G_ENABLED_STAT		0xf810
+#define EIP197_HIA_AIC_G_ACK			0xf810
+#define EIP197_HIA_MST_CTRL			0xfff4
+#define EIP197_HIA_OPTIONS			0xfff8
+#define EIP197_HIA_VERSION			0xfffc
+#define EIP197_PE_IN_DBUF_THRES(n)		(0x0000 + (0x2000 * n))
+#define EIP197_PE_IN_TBUF_THRES(n)		(0x0100 + (0x2000 * n))
+#define EIP197_PE_ICE_SCRATCH_RAM(x, n)		((0x800 + (x * 4)) + \
+						 (0x2000 * n))
+#define EIP197_PE_ICE_PUE_CTRL(n)		(0xc80 + (0x2000 * n))
+#define EIP197_PE_ICE_SCRATCH_CTRL		0x0d04
+#define EIP197_PE_ICE_FPP_CTRL(n)		(0xd80 + (0x2000 * n))
+#define EIP197_PE_ICE_RAM_CTRL(n)		(0xff0 + (0x2000 * n))
+#define EIP197_PE_EIP96_FUNCTION_EN		0x1004
+#define EIP197_PE_EIP96_CONTEXT_CTRL		0x1008
+#define EIP197_PE_EIP96_CONTEXT_STAT		0x100c
+#define EIP197_PE_OUT_DBUF_THRES(n)		(0x1c00 + (0x2000 * n))
+#define EIP197_PE_OUT_TBUF_THRES(n)		(0x1d00 + (0x2000 * n))
+#define EIP197_MST_CTRL				0xfff4
 
 /* AXI protection fields */
 #define AXI_NONE_SECURE_ACCESS				BIT(1)
@@ -96,22 +178,23 @@
 #define EIP197_TRC_TAIL_PTR_OFFSET			16
 #define EIP197_TRC_TAIL_PTR_MASK			(GENMASK(9, 0))
 
+#define EIP197_CLASSIFICATION_RAMS		0xe0000
+
 /* Transformation Record Cache address */
-#define EIP197_TRC_CTRL					0xf0800
-#define EIP197_TRC_LASTRES				0xf0804
-#define EIP197_TRC_REGINDEX				0xf0808
-#define EIP197_TRC_PARAMS				0xf0820
-#define EIP197_TRC_FREECHAIN				0xf0824
-#define EIP197_TRC_PARAMS2				0xf0828
-#define EIP197_TRC_ECCCTRL				0xf0830
-#define EIP197_TRC_ECCSTAT				0xf0834
-#define EIP197_TRC_ECCADMINSTAT				0xf0838
-#define EIP197_TRC_ECCDATASTAT				0xf083c
-#define EIP197_TRC_ECCDATA				0xf0840
+#define EIP197_TRC_CTRL				0xf0800
+#define EIP197_TRC_LASTRES			0xf0804
+#define EIP197_TRC_REGINDEX			0xf0808
+#define EIP197_TRC_PARAMS			0xf0820
+#define EIP197_TRC_FREECHAIN			0xf0824
+#define EIP197_TRC_PARAMS2			0xf0828
+#define EIP197_TRC_ECCCTRL			0xf0830
+#define EIP197_TRC_ECCSTAT			0xf0834
+#define EIP197_TRC_ECCADMINSTAT			0xf0838
+#define EIP197_TRC_ECCDATASTAT			0xf083c
+#define EIP197_TRC_ECCDATA			0xf0840
 
 /* Classification regs */
-#define EIP197_CS_RAM_CTRL				0xf7ff0
-#define EIP197_CLASSIF_RAM_ACCESS_SPACE			0xe0000
+#define EIP197_CS_RAM_CTRL			0xf7ff0
 
 #define EIP197_TRC_SW_RESET				(BIT(0))
 #define EIP197_TRC_ENABLE(c)				(BIT(4) << c)
@@ -143,8 +226,6 @@
 #define EIP197_PE_EIP96_PRNG_LFSR_H_VAL			0xd008c4b4
 
 /* Firmware */
-#define EIP197_PE_ICE_SCRATCH_RAM(x, n)			((0x800 + (x * 4)) + \
-							 (0x2000 * n))
 #define EIP197_NUM_OF_SCRATCH_BLOCKS			32
 
 #define EIP197_PE_ICE_SCRATCH_CTRL_OFFSET(n)		(0xd04 + (0x2000 * n))
@@ -155,42 +236,17 @@
 #define EIP197_PE_ICE_SCRATCH_CTRL_SCRATCH_ACCESS_OFFSET	25
 #define EIP197_PE_ICE_SCRATCH_CTRL_SCRATCH_ACCESS_MASK	(GENMASK(28, 25))
 
-#define EIP197_PE_ICE_PUE_CTRL(n)			(0xc80 + (0x2000 * n))
 #define EIP197_PE_ICE_PUE_CTRL_SW_RESET			BIT(0)
 #define EIP197_PE_ICE_PUE_CTRL_CLR_ECC_CORR		BIT(14)
 #define EIP197_PE_ICE_PUE_CTRL_CLR_ECC_NON_CORR		BIT(15)
 
-#define EIP197_PE_ICE_FPP_CTRL(n)			(0xd80 + (0x2000 * n))
 #define EIP197_PE_ICE_FPP_CTRL_SW_RESET			BIT(0)
 #define EIP197_PE_ICE_FPP_CTRL_CLR_ECC_NON_CORR		BIT(14)
 #define EIP197_PE_ICE_FPP_CTRL_CLR_ECC_CORR		BIT(15)
 
-#define EIP197_PE_ICE_RAM_CTRL(n)			(0xff0 + (0x2000 * n))
 #define EIP197_PE_ICE_RAM_CTRL_DFLT			0x00000000
 #define EIP197_PE_ICE_RAM_CTRL_PUE_PROG_EN		BIT(0)
 #define EIP197_PE_ICE_RAM_CTRL_FPP_PROG_EN		BIT(1)
-
-/* EIP197_MST_CTRL values */
-#define MST_CTRL_RD_CACHE(n)				(((n) & 0xf) << 0)
-#define MST_CTRL_WD_CACHE(n)				(((n) & 0xf) << 4)
-#define MST_CTRL_SUPPORT_PROT(n)			(((n) & 0xf) << 12)
-
-/* CDR/RDR register offsets */
-#define EIP197_HIA_xDR_OFF(r)				((r) * 0x1000)
-#define EIP197_HIA_CDR(r)				(EIP197_HIA_xDR_OFF(r))
-#define EIP197_HIA_RDR(r)				(0x800 + EIP197_HIA_xDR_OFF(r))
-#define EIP197_HIA_xDR_RING_BASE_ADDR_LO		0x0
-#define EIP197_HIA_xDR_RING_BASE_ADDR_HI		0x4
-#define EIP197_HIA_xDR_RING_SIZE			0x18
-#define EIP197_HIA_xDR_DESC_SIZE			0x1c
-#define EIP197_HIA_xDR_CFG				0x20
-#define EIP197_HIA_xDR_DMA_CFG				0x24
-#define EIP197_HIA_xDR_THRESH				0x28
-#define EIP197_HIA_xDR_PREP_COUNT			0x2c
-#define EIP197_HIA_xDR_PROC_COUNT			0x30
-#define EIP197_HIA_xDR_PREP_PNTR			0x34
-#define EIP197_HIA_xDR_PROC_PNTR			0x38
-#define EIP197_HIA_xDR_STAT				0x3c
 
 /* EIP197_HIA_xDR_DESC_SIZE */
 #define EIP197_xDR_DESC_MODE_64BIT			BIT(31)
@@ -246,61 +302,6 @@
 
 /* Register offsets */
 
-/* unit offsets */
-#define EIP197_HIA_AIC_ADDR				0x90000
-#define EIP197_HIA_AIC_G_ADDR				0x90000
-#define EIP197_HIA_AIC_R_ADDR				0x90800
-#define EIP197_HIA_AIC_xDR_ADDR				0x80000
-#define EIP197_HIA_AIC_DFE_ADDR				0x8c000
-#define EIP197_HIA_AIC_DFE_THRD_ADDR			0x8c040
-#define EIP197_HIA_AIC_DSE_ADDR				0x8d000
-#define EIP197_HIA_AIC_DSE_THRD_ADDR			0x8d040
-#define EIP197_HIA_PE_ADDR				0xa0000
-#define EIP197_CLASSIFICATION_RAMS			0xe0000
-#define EIP197_HIA_GC					0xf0000
-
-#define EIP97_HIA_AIC_ADDR				0x00000
-#define EIP97_HIA_AIC_G_ADDR				0x00000
-#define EIP97_HIA_AIC_R_ADDR				0x00000
-#define EIP97_HIA_AIC_xDR_ADDR				0x00000
-#define EIP97_HIA_AIC_DFE_ADDR				0x0f000
-#define EIP97_HIA_AIC_DFE_THRD_ADDR			0x0f200
-#define EIP97_HIA_AIC_DSE_ADDR				0x0f400
-#define EIP97_HIA_AIC_DSE_THRD_ADDR			0x0f600
-#define EIP97_HIA_PE_ADDR				0x10000
-#define EIP97_HIA_GC					0x10000
-
-#define EIP197_HIA_AIC_R_OFF(r)			((r) * 0x1000)
-#define EIP197_HIA_AIC_R_ENABLE_CTRL(r)		(0xe008 - EIP197_HIA_AIC_R_OFF(r))
-#define EIP197_HIA_AIC_R_ENABLED_STAT(r)	(0xe010 - EIP197_HIA_AIC_R_OFF(r))
-#define EIP197_HIA_AIC_R_ACK(r)			(0xe010 - EIP197_HIA_AIC_R_OFF(r))
-#define EIP197_HIA_AIC_R_ENABLE_CLR(r)		(0xe014 - EIP197_HIA_AIC_R_OFF(r))
-
-#define EIP197_HIA_RA_PE_CTRL(n)		(0x010 + (8 * n))
-
-#define EIP197_HIA_DFE_CFG(n)			(0x000 + (128 * n))
-#define EIP197_HIA_DFE_THR_CTRL(n)		(0x000 + (128 * n))
-#define EIP197_HIA_DFE_THR_STAT(n)		(0x004 + (128 * n))
-
-#define EIP197_HIA_DSE_CFG(n)			(0x000 + (128 * n))
-#define EIP197_HIA_DSE_THR_CTRL(n)		(0x000 + (128 * n))
-#define EIP197_HIA_DSE_THR_STAT(n)		(0x004 + (128 * n))
-
-#define EIP197_HIA_AIC_G_ENABLE_CTRL		0xf808
-#define EIP197_HIA_AIC_G_ENABLED_STAT		0xf810
-#define EIP197_HIA_AIC_G_ACK			0xf810
-#define EIP197_HIA_MST_CTRL			0xfff4
-#define EIP197_HIA_OPTIONS			0xfff8
-#define EIP197_HIA_VERSION			0xfffc
-#define EIP197_PE_IN_DBUF_THRES(n)		(0x0000 + (0x2000 * n))
-#define EIP197_PE_IN_TBUF_THRES(n)		(0x0100 + (0x2000 * n))
-#define EIP197_PE_OUT_DBUF_THRES(n)		(0x1c00 + (0x2000 * n))
-#define EIP197_FUNCTION_EN			0x1004
-#define EIP197_CONTEXT_CTRL			0x11008
-#define EIP197_OPTIONS				0x1fff8
-#define EIP197_IP_VERSION			0x1fffc
-#define EIP197_MST_CTRL				0xfff4
-
 /* EIP197_HIA_DSE_THR_STAT */
 #define EIP197_DSE_THR_RDR_ID_MASK		(GENMASK(15, 12))
 
@@ -320,13 +321,13 @@
 #define EIP197_HIA_DxE_CFG_MIN_DATA_SIZE(n)	((n) << 0)
 #define EIP197_HIA_DxE_CFG_DATA_CACHE_CTRL(n)	(((n) & 0x7) << 4)
 #define EIP197_HIA_DxE_CFG_MAX_DATA_SIZE(n)	((n) << 8)
+#define EIP197_HIA_DSE_CFG_ALLWAYS_BUFFERABLE	GENMASK(15, 14)
 #define EIP197_HIA_DxE_CFG_MIN_CTRL_SIZE(n)	((n) << 16)
 #define EIP197_HIA_DxE_CFG_CTRL_CACHE_CTRL(n)	(((n) & 0x7) << 20)
 #define EIP197_HIA_DxE_CFG_MAX_CTRL_SIZE(n)	((n) << 24)
 #define EIP197_HIA_DFE_CFG_DIS_DEBUG		(BIT(31) | BIT(29))
-#define EIP197_HIA_DSE_CFG_DIS_DEBUG		BIT(31)
-#define EIP197_HIA_DSE_CFG_ALLWAYS_BUFFERABLE	(GENMASK(15, 14))
 #define EIP197_HIA_DSE_CFG_EN_SINGLE_WR		BIT(29)
+#define EIP197_HIA_DSE_CFG_DIS_DEBUG		BIT(31)
 
 /* EIP197_HIA_DFE/DSE_THR_CTRL */
 #define EIP197_DxE_THR_CTRL_EN			BIT(30)
@@ -339,8 +340,15 @@
 #define EIP197_G_IRQ_PE(n)			BIT((n) + 20)
 
 /* EIP197_HIA_MST_CTRL */
-#define EIP197_HIA_SLAVE_BYTE_SWAP		BIT(24)
-#define EIP197_HIA_SLAVE_NO_BYTE_SWAP		BIT(25)
+#define RD_CACHE_3BITS				0x5
+#define WR_CACHE_3BITS				0x3
+#define RD_CACHE_4BITS				(RD_CACHE_3BITS << 1 | BIT(0))
+#define WR_CACHE_4BITS				(WR_CACHE_3BITS << 1 | BIT(0))
+#define EIP197_MST_CTRL_RD_CACHE(n)		(((n) & 0xf) << 0)
+#define EIP197_MST_CTRL_WD_CACHE(n)		(((n) & 0xf) << 4)
+#define MST_CTRL_SUPPORT_PROT(n)		(((n) & 0xf) << 12)
+#define EIP197_MST_CTRL_BYTE_SWAP		BIT(24)
+#define EIP197_MST_CTRL_NO_BYTE_SWAP		BIT(25)
 
 /* EIP197_PE_IN_DBUF/TBUF_THRES */
 #define EIP197_PE_IN_xBUF_THRES_MIN(n)		((n) << 8)
@@ -357,7 +365,7 @@
 /* EIP197_HIA_AIC_R_ENABLE_CLR */
 #define EIP197_HIA_AIC_R_ENABLE_CLR_ALL_MASK	(GENMASK(31, 0))
 
-/* EIP197_CONTEXT_CTRL */
+/* EIP197_PE_EIP96_CONTEXT_CTRL */
 #define EIP197_CONTEXT_SIZE(n)			(n)
 #define EIP197_ADDRESS_MODE			BIT(8)
 #define EIP197_CONTROL_MODE			BIT(9)
@@ -371,7 +379,7 @@ struct safexcel_context_record {
 } __packed;
 
 /* control0 */
-#define CONTEXT_CONTROL_TYPE_NULL_OUT		0
+#define CONTEXT_CONTROL_TYPE_NULL_OUT		0x0
 #define CONTEXT_CONTROL_TYPE_NULL_IN		0x1
 #define CONTEXT_CONTROL_TYPE_HASH_OUT		0x2
 #define CONTEXT_CONTROL_TYPE_HASH_IN		0x3
@@ -396,10 +404,8 @@ struct safexcel_context_record {
 #define CONTEXT_CONTROL_CRYPTO_ALG_SHA1		(0x2 << 23)
 #define CONTEXT_CONTROL_CRYPTO_ALG_SHA224	(0x4 << 23)
 #define CONTEXT_CONTROL_CRYPTO_ALG_SHA256	(0x3 << 23)
-
-#define CONTEXT_CONTROL_TYPE_AUTONOMUS_TOKEN	3
-#define CONTEXT_CONTROL_HW_SERVICES_OFFSET	24
-#define CONTEXT_CONTROL_INV_TR			0x6
+#define CONTEXT_CONTROL_INV_FR			(0x5 << 24)
+#define CONTEXT_CONTROL_INV_TR			(0x6 << 24)
 
 /* control1 */
 #define CONTEXT_CONTROL_CRYPTO_MODE_ECB		(0 << 0)
@@ -512,6 +518,7 @@ struct safexcel_control_data_desc {
 #define EIP197_OPTION_CTX_CTRL_IN_CMD	BIT(8)
 #define EIP197_OPTION_4_TOKEN_IV_CMD	(GENMASK(11, 9))
 #define EIP197_OPTION_2_TOKEN_IV_CMD	(GENMASK(11, 10))
+#define EIP197_TYPE_EXTENDED		0x3
 
 /* Basic Command Descriptor format */
 struct safexcel_command_desc {
@@ -534,19 +541,9 @@ struct safexcel_command_desc {
  */
 
 enum eip197_fw {
-	IFPP_FW = 0,
-	IPUE_FW,
-	MAX_FW_NR
-};
-
-enum safexcel_eip_type {
-	EIP197,
-	EIP97,
-};
-
-enum safexcel_eip197_hw {
-	EIP197B,
-	EIP197D,
+	FW_IFPP = 0,
+	FW_IPUE,
+	FW_NB
 };
 
 struct safexcel_desc_ring {
@@ -572,32 +569,6 @@ struct safexcel_request {
 	struct list_head list;
 	struct crypto_async_request *req;
 };
-
-/* internal unit register offset */
-struct safexcel_unit_offset {
-	u32 hia_aic;
-	u32 hia_aic_g;
-	u32 hia_aic_r;
-	u32 hia_xdr;
-	u32 hia_dfe;
-	u32 hia_dfe_thrd;
-	u32 hia_dse;
-	u32 hia_dse_thrd;
-	u32 hia_gen_cfg;
-	u32 pe;
-};
-
-#define EIP197_HIA_AIC(priv)		((priv)->base + (priv)->unit_off.hia_aic)
-#define EIP197_HIA_AIC_G(priv)		((priv)->base + (priv)->unit_off.hia_aic_g)
-#define EIP197_HIA_AIC_R(priv)		((priv)->base + (priv)->unit_off.hia_aic_r)
-#define EIP197_HIA_AIC_xDR(priv)	((priv)->base + (priv)->unit_off.hia_xdr)
-#define EIP197_HIA_DFE(priv)		((priv)->base + (priv)->unit_off.hia_dfe)
-#define EIP197_HIA_DFE_THRD(priv)	((priv)->base + (priv)->unit_off.hia_dfe_thrd)
-#define EIP197_HIA_DSE(priv)		((priv)->base + (priv)->unit_off.hia_dse)
-#define EIP197_HIA_DSE_THRD(priv)	((priv)->base + (priv)->unit_off.hia_dse_thrd)
-#define EIP197_HIA_GEN_CFG(priv)	((priv)->base + (priv)->unit_off.hia_gen_cfg)
-#define EIP197_PE(priv)			((priv)->base + (priv)->unit_off.pe)
-#define EIP197_RAM(priv)		((priv)->base + EIP197_CLASSIFICATION_RAMS)
 
 struct safexcel_config {
 	u32 rings;
@@ -636,16 +607,39 @@ struct safexcel_ring {
 	struct crypto_queue queue;
 };
 
+enum safexcel_eip_type {
+	EIP197,
+	EIP97,
+};
+
+enum safexcel_eip197_hw {
+	EIP197B,
+	EIP197D,
+};
+
+struct safexcel_register_offsets {
+	u32 hia_aic;
+	u32 hia_aic_g;
+	u32 hia_aic_r;
+	u32 hia_aic_xdr;
+	u32 hia_dfe;
+	u32 hia_dfe_thr;
+	u32 hia_dse;
+	u32 hia_dse_thr;
+	u32 hia_gen_cfg;
+	u32 pe;
+};
 
 struct safexcel_crypto_priv {
 	void __iomem *base;
-	struct safexcel_unit_offset unit_off;
 	struct device *dev;
 	struct clk *clk;
 	enum safexcel_eip_type eip_type;
 	int nr_pe;
 	enum safexcel_eip197_hw eip197_hw_ver;
 	struct safexcel_config config;
+
+	struct safexcel_register_offsets offsets;
 
 	/* context DMA pool */
 	struct dma_pool *context_pool;
