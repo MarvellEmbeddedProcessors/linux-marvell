@@ -103,7 +103,7 @@
 				compatible = "marvell,mv-xor-v2";
 				reg = <0x400000 0x1000>,
 				      <0x410000 0x1000>;
-				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_XORx(0, AP_NUM)>;
+				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_APx_XORx(0, AP_NUM)>;
 				dma-bus-width = <40>;
 				dma-coherent;
 			};
@@ -112,7 +112,7 @@
 				compatible = "marvell,mv-xor-v2";
 				reg = <0x420000 0x1000>,
 				      <0x430000 0x1000>;
-				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_XORx(1, AP_NUM)>;
+				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_APx_XORx(1, AP_NUM)>;
 				dma-bus-width = <40>;
 				dma-coherent;
 			};
@@ -121,7 +121,7 @@
 				compatible = "marvell,mv-xor-v2";
 				reg = <0x440000 0x1000>,
 				      <0x450000 0x1000>;
-				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_XORx(2, AP_NUM)>;
+				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_APx_XORx(2, AP_NUM)>;
 				dma-bus-width = <40>;
 				dma-coherent;
 			};
@@ -130,7 +130,7 @@
 				compatible = "marvell,mv-xor-v2";
 				reg = <0x460000 0x1000>,
 				      <0x470000 0x1000>;
-				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_XORx(3, AP_NUM)>;
+				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_APx_XORx(3, AP_NUM)>;
 				dma-bus-width = <40>;
 				dma-coherent;
 			};

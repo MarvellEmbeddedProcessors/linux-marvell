@@ -5,8 +5,8 @@
  */
 
 /* AP XOR stream IDs: 0xa0-0xaf */
-#define MVEBU_STREAM_ID_XOR0		0xa0
-#define MVEBU_STREAM_ID_XORx(x, ap)	(MVEBU_STREAM_ID_XOR0 + ap * 4 + x)
+#define MVEBU_STREAM_ID_AP0_XOR0	0xa0
+#define MVEBU_STREAM_ID_APx_XORx(x, ap)	(MVEBU_STREAM_ID_AP0_XOR0 + ap * 4 + x)
 
 /* CP(n) XOR0 stream ID: 0x89 + 11*n */
 #define MVEBU_STREAM_ID_CP0_XOR0	0x89
