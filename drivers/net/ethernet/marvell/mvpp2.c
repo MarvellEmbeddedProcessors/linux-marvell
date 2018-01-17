@@ -5224,11 +5224,10 @@ static int mvpp2_aggr_desc_num_check(struct mvpp2 *priv,
 		u32 val = mvpp2_read(priv, MVPP2_AGGR_TXQ_STATUS_REG(cpu));
 
 		aggr_txq->count = val & MVPP2_AGGR_TXQ_PENDING_MASK;
+
+		if ((aggr_txq->count + num) > MVPP2_AGGR_TXQ_SIZE)
+			return -ENOMEM;
 	}
-
-	if ((aggr_txq->count + num) > MVPP2_AGGR_TXQ_SIZE)
-		return -ENOMEM;
-
 	return 0;
 }
 
