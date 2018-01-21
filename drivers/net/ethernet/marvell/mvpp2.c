@@ -40,6 +40,10 @@
 #include <net/ipv6.h>
 #include <net/tso.h>
 
+#ifndef CACHE_LINE_MASK
+#define CACHE_LINE_MASK            (~(L1_CACHE_BYTES - 1))
+#endif
+
 /* Fifo Registers */
 #define MVPP2_RX_DATA_FIFO_SIZE_REG(port)	(0x00 + 4 * (port))
 #define MVPP2_RX_ATTR_FIFO_SIZE_REG(port)	(0x20 + 4 * (port))
@@ -1238,7 +1242,7 @@ struct mvpp2_tx_queue {
 
 	/* Index of the next Tx DMA descriptor to process */
 	int next_desc_to_proc;
-};
+} __aligned(L1_CACHE_BYTES);
 
 struct mvpp2_rx_queue {
 	/* RX queue number, in the range 0-31 for physical RXQs */
@@ -8744,6 +8748,7 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 	const struct mbus_dram_target_info *dram_target_info;
 	int err, i;
 	u32 val;
+	dma_addr_t p;
 
 	/* MBUS windows configuration */
 	dram_target_info = mv_mbus_dram_info();
@@ -8764,12 +8769,17 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 		writel(val, priv->iface_base + MVPP22_SMI_MISC_CFG_REG);
 	}
 
-	/* Allocate and initialize aggregated TXQs */
-	priv->aggr_txqs = devm_kcalloc(&pdev->dev, num_present_cpus(),
-				       sizeof(*priv->aggr_txqs),
+	/* Allocate and initialize aggregated TXQs
+	 * The aggr_txqs[per-cpu] entry should be aligned onto cache.
+	 * So allocate more than needed and round-up the pointer.
+	 */
+	val = sizeof(*priv->aggr_txqs) * num_active_cpus() + L1_CACHE_BYTES;
+	p = (dma_addr_t)devm_kcalloc(&pdev->dev, num_present_cpus(), val,
 				       GFP_KERNEL);
-	if (!priv->aggr_txqs)
+	if (!p)
 		return -ENOMEM;
+	p = (p + ~CACHE_LINE_MASK) & CACHE_LINE_MASK;
+	priv->aggr_txqs = (struct mvpp2_tx_queue *)p;
 
 	for_each_present_cpu(i) {
 		priv->aggr_txqs[i].id = i;
