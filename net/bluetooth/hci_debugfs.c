@@ -88,18 +88,6 @@ static int __name ## _show(struct seq_file *f, void *ptr)		      \
 	return 0;							      \
 }									      \
 									      \
-static int __name ## _open(struct inode *inode, struct file *file)	      \
-{									      \
-	return single_open(file, __name ## _show, inode->i_private);	      \
-}									      \
-									      \
-static const struct file_operations __name ## _fops = {			      \
-	.open		= __name ## _open,				      \
-	.read		= seq_read,					      \
-	.llseek		= seq_lseek,					      \
-	.release	= single_release,				      \
-}									      \
-
 static int features_show(struct seq_file *f, void *ptr)
 {
 	struct hci_dev *hdev = f->private;
