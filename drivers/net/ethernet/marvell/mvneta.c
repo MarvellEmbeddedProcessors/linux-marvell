@@ -3417,8 +3417,6 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
 	mvneta_cleanup_rxqs(pp);
 
 	pp->pkt_size = MVNETA_RX_PKT_SIZE(dev->mtu);
-	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
-			SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
 
 	ret = mvneta_setup_rxqs(pp);
 	if (ret) {
