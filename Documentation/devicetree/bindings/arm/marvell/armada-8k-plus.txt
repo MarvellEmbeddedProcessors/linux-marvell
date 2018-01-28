@@ -35,6 +35,10 @@ SoC:
    - "marvell,armada8162", "marvell,armada-cp110", "marvell,armada-ap810-octa",
      "marvell,armada-ap810"
       when the SoC being used is the Armada 8162: 16 cores with 2 CP south-bridges
+
+   - "marvell,armada8164", "marvell,armada-cp110", "marvell,armada-ap810-octa",
+     "marvell,armada-ap810"
+      when the SoC being used is the Armada 8164: 16 cores with 4 CP south-bridges
       (Should add "marvell,armada-cp110" if CP110 included in the SoC)
 
 Boards:
@@ -50,6 +54,8 @@ Boards:
       when the board being used is the Armada-8084 DB board
    - "marvell,armada-8162-db"
       when the board being used is the Armada-8162 DB board
+   - "marvell,armada-8164-db"
+      when the board being used is the Armada-8164 DB board
 
 Example:
 compatible = "marvell,armada-8080-pd", "marvell,armada-8080",

@@ -31,6 +31,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-80x0-customer.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8082-db.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8084-db.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8162-db.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8164-db.dtb
 dtb-$(CONFIG_ARCH_MVEBU_PD) += armada-8080-pd.dtb
 dtb-$(CONFIG_ARCH_MVEBU_PD) += armada-8160-pd.dtb
 dtb-$(CONFIG_ARCH_MVEBU_PD) += armada-8320-pd.dtb
