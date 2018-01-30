@@ -2665,6 +2665,7 @@ void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop
 	gop_statistics->late_collision += mv_gop110_mib_read64(gop, port,
 							MV_MIB_LATE_COLLISION);
 }
+EXPORT_SYMBOL(mv_gop110_mib_counters_stat_update);
 
 void mv_gop110_mib_counters_clear(struct gop_hw *gop, int port)
 {

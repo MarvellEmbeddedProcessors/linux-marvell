@@ -6572,6 +6572,7 @@ void mv_pp2x_counters_stat_update(struct mv_pp2x_port *port,
 	}
 	preempt_enable();
 }
+EXPORT_SYMBOL(mv_pp2x_counters_stat_update);
 
 /*  Clear Mvpp2x counter statistic */
 void mv_pp2x_counters_stat_clear(struct mv_pp2x_port *port)
