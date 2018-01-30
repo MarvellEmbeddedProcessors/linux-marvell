@@ -25,6 +25,7 @@
 #include <asm/cpufeature.h>
 #include <asm/mmu_context.h>
 #include <asm/tlbflush.h>
+#include <asm/alternative.h>
 
 static u32 asid_bits;
 static DEFINE_RAW_SPINLOCK(cpu_asid_lock);
@@ -183,6 +184,15 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
 
 switch_mm_fastpath:
 	cpu_switch_mm(mm->pgd, mm);
+}
+
+/* Errata workaround post TTBRx_EL1 update. */
+asmlinkage void post_ttbr_update_workaround(void)
+{
+	asm(ALTERNATIVE("nop; nop; nop",
+			"ic iallu; dsb nsh; isb",
+			ARM64_WORKAROUND_CAVIUM_27456,
+			CONFIG_CAVIUM_ERRATUM_27456));
 }
 
 static int asids_init(void)
