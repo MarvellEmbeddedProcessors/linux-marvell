@@ -1207,8 +1207,8 @@
 /* Maximum number of TXQs used by single port */
 #define MVPP2_MAX_TXQ			8
 
-/* Maximum number of RXQs used by single port */
-#define MVPP2_MAX_RXQ			8
+/* Maximum number of RXQs used by single port per CPU */
+#define MVPP2_MAX_RXQ_PER_CPU	8
 
 /* Dfault number of RXQs in use */
 #define MVPP2_DEFAULT_RXQ		4
