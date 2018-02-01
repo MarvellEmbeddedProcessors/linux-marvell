@@ -89,8 +89,6 @@ extern char __kvm_hyp_init_end[];
 extern char __kvm_hyp_exit[];
 extern char __kvm_hyp_exit_end[];
 
-extern char __kvm_hyp_vector[];
-
 extern char __kvm_hyp_code_start[];
 extern char __kvm_hyp_code_end[];
 
