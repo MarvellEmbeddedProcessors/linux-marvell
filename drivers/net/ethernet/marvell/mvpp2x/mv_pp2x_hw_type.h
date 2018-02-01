@@ -1213,9 +1213,6 @@
 /* Dfault number of RXQs in use */
 #define MVPP2_DEFAULT_RXQ		4
 
-/* Total number of RXQs available to all ports */
-#define MVPP2_RXQ_TOTAL_NUM		(MVPP2_MAX_PORTS * MVPP2_MAX_RXQ)
-
 #define MVPP2_TXQ_TOTAL_NUM		(128/*pon*/ + \
 					MVPP2_MAX_PORTS * MVPP2_MAX_TXQ/*eth*/)
 
