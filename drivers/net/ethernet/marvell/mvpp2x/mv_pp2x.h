@@ -176,7 +176,7 @@
 #define MVPP2_BM_SHORT_BUF_NUM		2048
 #define MVPP2_BM_LONG_BUF_NUM		1024
 #define MVPP2_BM_JUMBO_BUF_NUM		512
-#define MVPP2_BM_PER_CPU_THRESHOLD	(MVPP2_MAX_CPUS * 2)
+#define MVPP2_BM_PER_CPU_THRESHOLD(num_of_cpus)	(num_of_cpus * 2)
 
 #define MVPP2_ALL_BUFS			0
 
