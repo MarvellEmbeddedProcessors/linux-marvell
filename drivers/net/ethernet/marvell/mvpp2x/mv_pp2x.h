@@ -24,7 +24,6 @@
 #include <linux/log2.h>
 #include <linux/uio_driver.h>
 
-
 #include "mv_pp2x_hw_type.h"
 #include "mv_gop110_hw_type.h"
 
@@ -945,6 +944,5 @@ int mv_pp2x_txq_reserved_desc_num_proc(struct mv_pp2x *priv,
 				       int num, int cpu);
 int mv_pp2x_port_musdk_set(void *netdev_priv);
 int mv_pp2x_port_musdk_clear(void *netdev_priv);
-
 
 #endif /*_MVPP2_H_*/

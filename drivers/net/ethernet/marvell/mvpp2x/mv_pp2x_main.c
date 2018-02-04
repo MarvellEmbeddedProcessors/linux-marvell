@@ -75,7 +75,6 @@
 #define UIO_PP2_STRING  "uio_pp_%d"
 #define UIO_PORT_STRING "uio_pp_port_%d:%d"
 
-
 /* Declaractions */
 #if defined(CONFIG_NETMAP) || defined(CONFIG_NETMAP_MODULE)
 u8 mv_pp2x_num_cos_queues = 1;
@@ -104,7 +103,6 @@ static u8 uc_filter_max = 4;
 static u16 stats_delay_msec = STATS_DELAY;
 static u16 stats_delay;
 static int auto_cell_index;
-
 
 u32 debug_param;
 
@@ -1783,7 +1781,8 @@ static irqreturn_t mv_pp2_link_change_isr(int irq, void *data)
 {
 	struct mv_pp2x_port *port = (struct mv_pp2x_port *)data;
 
-	pr_debug("%s cpu_id(%d) irq(%d) pp_port(%d)\n", __func__, smp_processor_id(), irq, port->id);
+	pr_debug("%s cpu_id(%d) irq(%d) pp_port(%d)\n", __func__,
+		 smp_processor_id(), irq, port->id);
 	if (port->priv->pp2_version == PPV22) {
 		/* mask all events from this mac */
 		mv_gop110_port_events_mask(&port->priv->hw.gop, &port->mac_data);
@@ -2223,12 +2222,10 @@ static void mv_pp2x_width_calc(struct mv_pp2x_port *port, u32 *cpu_width,
 			*cpu_width = ilog2(roundup_pow_of_two(hot_cpus));
 		/* Calculate cos queue width */
 		if (cos_width)
-			*cos_width = ilog2(roundup_pow_of_two(
-				port->cos_cfg.num_cos_queues));
+			*cos_width = ilog2(roundup_pow_of_two(port->cos_cfg.num_cos_queues));
 		/* Calculate rx queue width on the port */
 		if (port_rxq_width)
-			*port_rxq_width = ilog2(roundup_pow_of_two(
-				pp2->pp2xdata->pp2x_max_port_rxqs));
+			*port_rxq_width = ilog2(roundup_pow_of_two(pp2->pp2xdata->pp2x_max_port_rxqs));
 	}
 }
 
@@ -2485,19 +2482,15 @@ int mv_pp22_rss_rxfh_indir_set(struct mv_pp2x_port *port)
 	rss_entry.sel = MVPP22_RSS_ACCESS_TBL;
 
 	for (rss_tbl = 0; rss_tbl < rss_tbl_needed; rss_tbl++) {
-		for (entry_idx = 0; entry_idx < MVPP22_RSS_TBL_LINE_NUM;
-			entry_idx++) {
+		for (entry_idx = 0; entry_idx < MVPP22_RSS_TBL_LINE_NUM; entry_idx++) {
 			rss_entry.u.entry.tbl_id = rss_tbl;
 			rss_entry.u.entry.tbl_line = entry_idx;
 			if (mv_pp22_cpu_id_from_indir_tbl_get(port->priv,
-							      port->priv->rx_indir_table[entry_idx],
-			     &cpu_id))
+							      port->priv->rx_indir_table[entry_idx], &cpu_id))
 				return -1;
 			/* Value of rss_tbl equals to cos queue */
-			rss_entry.u.entry.rxq = (cpu_id << cos_width) |
-				rss_tbl;
-			if (mv_pp22_rss_tbl_entry_set(
-				&port->priv->hw, &rss_entry))
+			rss_entry.u.entry.rxq = (cpu_id << cos_width) | rss_tbl;
+			if (mv_pp22_rss_tbl_entry_set(&port->priv->hw, &rss_entry))
 				return -1;
 		}
 	}
@@ -4631,7 +4624,6 @@ static int mv_pp2x_change_mtu(struct net_device *dev, int mtu)
 		return -EPERM;
 	}
 
-
 	mtu = mv_pp2x_check_mtu_valid(dev, mtu);
 	if (mtu < 0) {
 		err = mtu;
@@ -4818,7 +4810,6 @@ static const struct net_device_ops mv_pp2x_netdev_ops = {
 	.ndo_vlan_rx_add_vid	= mv_pp2x_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= mv_pp2x_rx_kill_vid,
 };
-
 
 /* Driver initialization */
 
@@ -6651,9 +6642,9 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	err = mv_pp2x_platform_data_get(pdev, priv, &cell_index, &port_count);
 	if (err) {
-		if (err != -EPROBE_DEFER)
+		if (err != -EPROBE_DEFER) {
 			dev_err(&pdev->dev, "mvpp2: platform_data get failed\n");
-		else {
+		} else {
 			/* Rollback auto_cell_index if it was used */
 			if (auto_cell_index)
 				auto_cell_index--;
@@ -6685,7 +6676,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 				i * MVPP2_ADDR_SPACE_SIZE;
 	}
 
-	/*Init PP2 Configuration */
+	/* Init PP2 Configuration */
 	err = mv_pp2x_init_config(&priv->pp2_cfg, cell_index);
 	priv->hw.mv_pp2x_no_single_mode = (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ? 0 : 1;
 

@@ -2167,7 +2167,6 @@ static void mv_pp2x_prs_vid_init(struct mv_pp2x_hw *hw)
 	/* Update shadow table and hw entry */
 	mv_pp2x_prs_shadow_set(hw, pe.index, MVPP2_PRS_LU_VID);
 	mv_pp2x_prs_hw_write(hw, &pe);
-
 }
 
 /* Set entries for PPPoE ethertype */
@@ -3987,8 +3986,10 @@ int mv_pp2x_aggr_desc_num_check(struct mv_pp2x *priv,
 {
 	if ((aggr_txq->sw_count + aggr_txq->hw_count + num) > aggr_txq->size) {
 		/* Update number of occupied aggregated Tx descriptors */
-		u32 val = mv_pp2x_relaxed_read(&priv->hw,
-				MVPP2_AGGR_TXQ_STATUS_REG(cpu), cpu);
+		u32 val;
+
+		val = mv_pp2x_relaxed_read(&priv->hw,
+					   MVPP2_AGGR_TXQ_STATUS_REG(cpu), cpu);
 
 		aggr_txq->hw_count = val & MVPP2_AGGR_TXQ_PENDING_MASK;
 

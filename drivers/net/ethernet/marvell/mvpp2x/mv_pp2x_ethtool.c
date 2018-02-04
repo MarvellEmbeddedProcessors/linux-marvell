@@ -1238,4 +1238,3 @@ void mv_pp2x_set_ethtool_ops(struct net_device *netdev)
 	netdev->ethtool_ops = &mv_pp2x_eth_tool_ops;
 }
 
-
