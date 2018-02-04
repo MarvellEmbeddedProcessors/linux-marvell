@@ -55,6 +55,18 @@
 		stdout-path = "serial0:115200n8";
 	};
 
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* global autoconfigured region for contiguous allocations */
+		ap1_mem: ap1-area@4230000000 {
+			compatible = "shared-dma-pool";
+			reusable;
+			reg = <0x42 0x30000000 0 0x10000000>;
+		};
+	};
 	aliases {
 		ethernet0 = &cp0_emac0;
 		ethernet1 = &cp0_emac2;
@@ -142,6 +154,7 @@
 &cp4_ppv22 {
 	l4_chksum_jumbo_port = <0>;
 	pinctrl-names = "default";
+	memory-region = <&ap1_mem>;
 };
 
 &cp4_eth0 {
