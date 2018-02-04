@@ -1190,6 +1190,23 @@ static void mv_pp2x_eth_tool_diag_test(struct net_device *netdev,
 	msleep_interruptible(4 * 1000);
 }
 
+static void mv_pp2x_get_channels(struct net_device *netdev,
+				 struct ethtool_channels *ch)
+{
+	struct mv_pp2x_port *port = netdev_priv(netdev);
+
+	if (port->priv->pp2_version == PPV21)
+		return;
+	/* Only multi queue mode support rx_count(# of Hot CPU's) and
+	 * other_count(# of adreess spaces used by cold CPU's)
+	 */
+	if (port->priv->pp2_cfg.queue_mode != MVPP2_QDIST_MULTI_MODE)
+		return;
+
+	ch->rx_count = port->priv->rx_count;
+	ch->other_count = port->priv->other_count;
+}
+
 static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_link		= ethtool_op_get_link,
 	.get_settings		= mv_pp2x_ethtool_get_settings,
@@ -1213,6 +1230,7 @@ static const struct ethtool_ops mv_pp2x_eth_tool_ops = {
 	.get_regs_len           = mv_pp2x_ethtool_get_regs_len,
 	.get_regs		= mv_pp2x_ethtool_get_regs,
 	.self_test		= mv_pp2x_eth_tool_diag_test,
+	.get_channels		= mv_pp2x_get_channels,
 };
 
 void mv_pp2x_set_ethtool_ops(struct net_device *netdev)
