@@ -157,6 +157,10 @@
 						   * Allocation would be limited by maximum number of hif's in
 						   * mvpp22 HW.
 						   */
+#define MVPP2_MAX_CPUS_IN_AP			8
+#define MVPP2_DEFAULT_RX_COUNT			8
+#define MVPP2_DEFAULT_OTHER_COUNT		1
+#define MVPP22_MAX_NUM_RXQ			32
 
 /* Coalescing */
 #define MVPP2_TXDONE_COAL_PKTS		32
@@ -187,6 +191,10 @@
 #define RX_TRUE_SIZE(total_size)	roundup_pow_of_two(total_size)
 extern  u32 debug_param;
 
+/* Convert cpu_id to sw_thread_id */
+#define QV_THR_2_MASTER_AP_CPU(ap_id, sw_thread_id)	((ap_id * MVPP2_MAX_CPUS_IN_AP) + sw_thread_id)
+#define QV_CPU_2_ADR_SP(cpu_id, num_of_aps)		(cpu_id / num_of_aps)
+
 /* Used for define type of data saved in shadow: SKB or extended buffer or nothing */
 #define MVPP2_ETH_SHADOW_SKB		0x1
 #define MVPP2_ETH_SHADOW_EXT		0x2
@@ -204,8 +212,9 @@ enum mvppv2_version {
 };
 
 enum mv_pp2x_queue_vector_type {
-	MVPP2_SHARED,
-	MVPP2_PRIVATE
+	MVPP2_RX_SHARED,
+	MVPP2_PRIVATE,
+	MVPP2_TX_SHARED
 };
 
 enum mv_pp2x_queue_distribution_mode {
@@ -305,6 +314,9 @@ struct mv_mac_data {
 #define MV_EMAC_F_PORT_UP	BIT(MV_EMAC_F_PORT_UP_BIT)
 #define MV_EMAC_F_5G		BIT(MV_EMAC_F_5G_BIT)
 
+#define MV_BM_LOCK			BIT(0)
+#define MV_AGGR_QUEUE_LOCK	BIT(1)
+
 #define MVPP2_NO_LINK_IRQ	0
 
 /* Per-CPU Tx queue control */
@@ -391,6 +403,9 @@ struct mv_pp2x_aggr_tx_queue {
 
 	/* Index of the last Tx DMA descriptor */
 	int last_desc;
+
+	/* AGGR TX queue lock */
+	spinlock_t spinlock;
 
 	/* Index of the next Tx DMA descriptor to process */
 	int next_desc_to_proc;
@@ -533,6 +548,10 @@ struct mv_pp2x_param_config {
 			*/
 	u8 uc_filter_max; /* The unicast filter list max, multiple of 4 */
 	u8 mc_filter_max; /* The multicast filter list max, multiple of 4 */
+
+	u8 num_of_ap; /* Num of AP's in system */
+	u8 spinlocks_bitmap; /* bitmap of required locks */
+	bool recycling; /* indicate if recycle enabled */
 };
 
 struct mv_pp2x_uio {
@@ -576,6 +595,11 @@ struct mv_pp2x {
 	u32 rx_indir_table[MVPP22_RSS_TBL_LINE_NUM];
 	u32 l4_chksum_jumbo_port;
 
+	u8 rx_count;
+	u8 other_count;
+	/* Spinlocks per hif to protect BM refill */
+	spinlock_t bm_spinlock[8];
+
 	struct delayed_work stats_task;
 	struct workqueue_struct *workqueue;
 	struct notifier_block	cp_hotplug_nb;
@@ -613,6 +637,15 @@ struct mv_pp2x_cp_pcpu {
 	bool tx_timer_scheduled;
 };
 
+struct sub_queue_vector {
+	struct napi_struct napi;
+	struct call_single_data csd;
+	u32 queue_mask;
+	u8 cpu_id;
+	struct queue_vector *parent;
+	u32 pending_cause_rx;
+};
+
 struct queue_vector {
 	u32 irq;
 	char irq_name[IRQ_NAME_SIZE];
@@ -627,7 +660,15 @@ struct queue_vector {
 	u32 pending_cause_rx; /* mask in absolute port_queues, not relative as
 			* in Ethernet Occupied Interrupt Cause (EthOccIC))
 			*/
+	u8 ap_id; /* ID of master AP */
+	struct sub_queue_vector **sub_vec;
+	u8 num_of_sub_vectors;
 	struct mv_pp2x_port *parent;
+
+	/* spinlock to protect queue_vector interrupt HW mask */
+	spinlock_t hw_mask_lock;
+	u32 queue_mask;
+	bool cold_cpu;
 };
 
 struct mv_pp2x_ptp_desc; /* per-port private PTP descriptor */
@@ -698,7 +739,10 @@ struct mv_pp2x_port {
 	/* q_vector is the parameter that will be passed to
 	 * mv_pp2_isr(int irq, void *dev_id=q_vector)
 	 */
-	struct queue_vector q_vector[MVPP2_MAX_ADDR_SPACES];
+
+	u8 ap_id;
+
+	struct queue_vector *q_vector;
 
 	struct mv_pp2x_ptp_desc *ptp_desc;
 	struct mv_pp2x_cos cos_cfg;

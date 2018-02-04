@@ -3970,13 +3970,6 @@ struct mv_pp2x_tx_desc *mv_pp2x_txq_prev_desc_get(
 	return (aggr_txq->first_desc + tx_desc);
 }
 
-/* Update HW with number of aggregated Tx descriptors to be sent */
-void mv_pp2x_aggr_txq_pend_desc_add(struct mv_pp2x_port *port, int pending)
-{
-	/* aggregated access - relevant TXQ number is written in TX desc */
-	mv_pp2x_write(&port->priv->hw, MVPP2_AGGR_TXQ_UPDATE_REG, pending);
-}
-
 int mv_pp2x_aggr_desc_num_read(struct mv_pp2x *priv, int cpu)
 {
 	u32 val = mv_pp2x_read(&priv->hw, MVPP2_AGGR_TXQ_STATUS_REG(cpu));
@@ -4136,7 +4129,15 @@ void mv_pp21_port_reset(struct mv_pp2x_port *port)
 void mv_pp2x_pool_refill(struct mv_pp2x *priv, u32 pool,
 			 dma_addr_t phys_addr, int cpu)
 {
+	unsigned long flags;
+
+	if (priv->pp2_cfg.spinlocks_bitmap & MV_BM_LOCK)
+		spin_lock_irqsave(&priv->bm_spinlock[cpu], flags);
+
 	mv_pp2x_bm_pool_put(&priv->hw, pool, phys_addr, cpu);
+
+	if (priv->pp2_cfg.spinlocks_bitmap & MV_BM_LOCK)
+		spin_unlock_irqrestore(&priv->bm_spinlock[cpu], flags);
 }
 
 void mv_pp2x_pool_refill_virtual(struct mv_pp2x *priv, u32 pool,

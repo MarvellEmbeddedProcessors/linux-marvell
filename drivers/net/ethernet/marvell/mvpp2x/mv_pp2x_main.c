@@ -82,6 +82,9 @@ u8 mv_pp2x_num_cos_queues = 1;
 #else
 u8 mv_pp2x_num_cos_queues = 4;
 #endif
+
+u8 mv_pp2x_rx_count = MVPP2_DEFAULT_RX_COUNT;
+
 static u8 mv_pp2x_queue_mode = MVPP2_QDIST_SINGLE_MODE;
 static u8 mv_pp2x_used_addr_spaces;
 static u8 rss_mode = MVPP2_RSS_5T; /* Set 5-tuple default RSS mode */
@@ -171,6 +174,9 @@ MODULE_PARM_DESC(long_pool, "Long pool size (0-8192), def=1024");
 
 module_param_named(jumbo_pool, mv_pp2x_pools[MVPP2_BM_SWF_JUMBO_POOL].buf_num, uint, S_IRUGO);
 MODULE_PARM_DESC(jumbo_pool, "Jumbo pool size (0-8192), def=512");
+
+module_param_named(rx_count, mv_pp2x_rx_count, byte, S_IRUGO);
+MODULE_PARM_DESC(rx_count, "Set rx_count 8 or 16, def = 8. Parameter configure number of HOT CPU's.");
 
 /*TODO:  Below module_params will not go to ML. Created for testing. */
 
@@ -583,7 +589,7 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 			struct mv_pp2x_bm_pool *bm_pool, int buf_num)
 {
-	int i, buf_size, total_size, cpu;
+	int i, buf_size, total_size;
 
 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
 	total_size = MVPP2_RX_TOTAL_SIZE(buf_size);
@@ -596,10 +602,8 @@ int mv_pp2x_bm_bufs_add(struct mv_pp2x_port *port,
 		return 0;
 	}
 
-	cpu = get_cpu();
 	for (i = 0; i < buf_num; i++)
-		mv_pp2x_rx_refill_new(port, bm_pool, (u32)bm_pool->id, 0, cpu);
-	put_cpu();
+		mv_pp2x_rx_refill_new(port, bm_pool, (u32)bm_pool->id, 0, 0);
 
 	/* Update BM driver with number of buffers added to pool */
 	bm_pool->buf_num += i;
@@ -1692,6 +1696,14 @@ void mv_pp2x_cleanup_irqs(struct mv_pp2x_port *port)
 		free_irq(port->mac_data.link_irq, port);
 }
 
+void mv_pp2x_interrupts_set_mask(struct queue_vector *q_vec, u32 queue_mask)
+{
+	struct mv_pp2x_port *port = q_vec->parent;
+
+	mv_pp22_thread_write(&port->priv->hw, q_vec->sw_thread_id, MVPP2_ISR_RX_TX_CAUSE_MASK_REG(port->id),
+			     queue_mask);
+}
+
 void mv_pp2x_tx_done_pkts_coal_set_all(struct mv_pp2x_port *port)
 {
 	int i;
@@ -1700,16 +1712,69 @@ void mv_pp2x_tx_done_pkts_coal_set_all(struct mv_pp2x_port *port)
 		mv_pp2x_tx_done_pkts_coal_set(port, i);
 }
 
+/**
+ * \brief wrapper for calling napi_schedule
+ * @param param parameters to pass to napi_schedule
+ *
+ * Used when scheduling on different CPUs
+ */
+static void napi_schedule_wrapper(void *param)
+{
+	struct napi_struct *napi = param;
+
+	napi_schedule(napi);
+}
+
 /* The callback for per-q_vector interrupt */
 static irqreturn_t mv_pp2x_isr(int irq, void *dev_id)
 {
 	struct queue_vector *q_vec = (struct queue_vector *)dev_id;
 
-	mv_pp2x_qvector_interrupt_disable(q_vec);
-	pr_debug("%s cpu_id(%d) port_id(%d) q_vec(%d), qv_type(%d)\n",
-		 __func__, smp_processor_id(), q_vec->parent->id,
-		(int)(q_vec - q_vec->parent->q_vector), q_vec->qv_type);
-	napi_schedule(&q_vec->napi);
+	/* In single mode only first sub queue vector do RX and TX done interrupt routine
+	 * so its save to disable Interrupt.
+	 * In multi queue mode only if CPU's share same interrupt, cause mask related to this
+	 * CPU queues and NAPI scheduled on this CPU.
+	 */
+	if (!q_vec->num_of_sub_vectors  || mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
+		mv_pp2x_qvector_interrupt_disable(q_vec);
+		napi_schedule(&q_vec->sub_vec[0]->napi);
+	} else {
+		u32 cause_rx_tx;
+		int i;
+		unsigned long flags;
+		struct mv_pp2x_port *port = q_vec->parent;
+
+		/* Check interrupt cause and which CPU should handle NAPI */
+		cause_rx_tx = mv_pp22_thread_relaxed_read(&port->priv->hw, q_vec->sw_thread_id,
+							  MVPP2_ISR_RX_TX_CAUSE_REG(port->id));
+		for (i = 0; i < q_vec->num_of_sub_vectors; i++) {
+			/* Find which sub queue vector should handle Interrupt cause and
+			 * remove this cause from queue vector cause.
+			 * It's done to protect scheduling of NAPI twice due to same cause.
+			 */
+			if ((cause_rx_tx & q_vec->sub_vec[i]->queue_mask) &&
+			    (q_vec->queue_mask & q_vec->sub_vec[i]->queue_mask)) {
+				spin_lock_irqsave(&q_vec->hw_mask_lock, flags);
+				/* HW_MASK shadow kept in SW, faster for Read-Modify-Write */
+				q_vec->queue_mask &= (~q_vec->sub_vec[i]->queue_mask);
+				mv_pp2x_interrupts_set_mask(q_vec, q_vec->queue_mask);
+				spin_unlock_irqrestore(&q_vec->hw_mask_lock, flags);
+			} else {
+					continue;
+			}
+
+			if (q_vec->sub_vec[i]->cpu_id == smp_processor_id()) {
+				napi_schedule(&q_vec->sub_vec[i]->napi);
+			} else {
+				struct call_single_data *csd = &q_vec->sub_vec[i]->csd;
+
+				csd->func = napi_schedule_wrapper;
+				csd->info = &q_vec->sub_vec[i]->napi;
+				csd->flags = 0;
+				smp_call_function_single_async(q_vec->sub_vec[i]->cpu_id, csd);
+			}
+		}
+	}
 
 	return IRQ_HANDLED;
 }
@@ -1732,9 +1797,22 @@ static irqreturn_t mv_pp2_link_change_isr(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+/* Routine configure irq's.
+ * Exist 3 type of irq's - MVPP2_PRIVATE, MVPP2_TX_SHARED and MVPP2_RX_SHARED
+ * MVPP2_PRIVATE - in multi queue mode used for TX done and RX
+ * CPU that use MVPP2_PRIVATE in multi queue mode called hot CPU's
+ * in single queue mode used only for TX done
+ * If there are 8 or less system, each cpu will has his own Interrupt.
+ * If there are more than 8 CPU's, number of CPU's will share same interrupt.
+ * MVPP2_RX_SHARED - exist only in single queue mode. In this mode all cpumask
+ * used. Interrupt could be handled by any CPU. RX routine always handled by single interrupt
+ * and single thread.
+ * MVPP2_TX_SHARED - exist only in multi queue mode. This interrupt handle TX done of cold CPU's
+ * IRQ balancing allowed only for single queue mode with in system with 8 or less CPU's.
+ */
 int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 {
-	int qvec_id, err;
+	int qvec_id, cpu, err;
 	struct queue_vector *qvec;
 
 	/* Rx/TX irq's */
@@ -1746,11 +1824,33 @@ int mv_pp2x_setup_irqs(struct net_device *dev, struct mv_pp2x_port *port)
 				  qvec->irq_name, qvec);
 		pr_debug("%s interrupt request\n", qvec->irq_name);
 		if (qvec->qv_type == MVPP2_PRIVATE) {
-			irq_set_affinity_hint(qvec->irq, cpumask_of(qvec->sw_thread_id));
-			if (port->priv->pp2_cfg.queue_mode ==
-				MVPP2_QDIST_MULTI_MODE)
-				irq_set_status_flags(qvec->irq,
-						     IRQ_NO_BALANCING);
+			if (!qvec->num_of_sub_vectors) {
+				cpu = QV_THR_2_MASTER_AP_CPU(qvec->ap_id, qvec->sw_thread_id);
+				irq_set_affinity_hint(qvec->irq, cpumask_of(cpu));
+			} else {
+				cpumask_t cpus;
+
+				cpumask_clear(&cpus);
+				if (port->priv->pp2_cfg.queue_mode ==
+							MVPP2_QDIST_MULTI_MODE)
+					for (cpu = 0; cpu < qvec->num_of_sub_vectors; cpu++)
+						cpumask_set_cpu(qvec->sub_vec[cpu]->cpu_id, &cpus);
+				else
+					for (cpu = 0; cpu < qvec->num_of_sub_vectors; cpu++)
+						cpumask_set_cpu(QV_THR_2_MASTER_AP_CPU(qvec->ap_id, cpu), &cpus);
+				irq_set_affinity_hint(qvec->irq, &cpus);
+			}
+			if ((port->priv->pp2_cfg.queue_mode ==
+				MVPP2_QDIST_MULTI_MODE) || qvec->num_of_sub_vectors)
+				irq_set_status_flags(qvec->irq, IRQ_NO_BALANCING);
+		} else if (qvec->qv_type == MVPP2_TX_SHARED) {
+			cpumask_t cpus;
+
+			cpumask_clear(&cpus);
+			for (cpu = port->priv->rx_count; cpu < num_active_cpus(); cpu++)
+				cpumask_set_cpu(cpu, &cpus);
+			irq_set_affinity_hint(qvec->irq, &cpus);
+			irq_set_status_flags(qvec->irq, IRQ_NO_BALANCING);
 		}
 		if (err) {
 			netdev_err(dev, "cannot request IRQ %d\n",
@@ -1980,35 +2080,71 @@ static inline void mv_pp2x_tx_timer_kill(struct mv_pp2x_cp_pcpu *cp_pcpu)
 	}
 }
 
+/* Singe mode: address_space equal to current CPU/number of AP's in system
+ * For example if its dual AP(16 CPU's) and current CPU = 13. address_space 6 would be used
+ * Multi mode: address_space for HOT CPU's equal to current CPU
+ * All cold CPU's share same address space for TX.
+ * So for cold CPU's address space equal to last address space used by HOT CPU's + 1.
+ * For example if its dual AP(16 CPU's), # of HOT CPU's = 8 and current CPU = 13.
+ * CPU would be indicated as cold_cpu=true and address_space = 8.
+ */
+static int mv_pp2x_check_address_space(struct mv_pp2x *priv, int cpu, bool *cold_cpu)
+{
+	int address_space;
+
+	if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
+		address_space = QV_CPU_2_ADR_SP(cpu, priv->pp2_cfg.num_of_ap);
+	} else if (cpu < priv->rx_count) {
+		address_space = QV_CPU_2_ADR_SP(cpu, (priv->rx_count / MVPP2_MAX_CPUS_IN_AP));
+	} else {
+		address_space = priv->rx_count;
+		if (cold_cpu)
+			*cold_cpu = true;
+	}
+
+	return address_space;
+}
+
 static void mv_pp2x_tx_proc_cb(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_pp2x_port_pcpu *port_pcpu;
 	unsigned int tx_todo, cause, cpu = smp_processor_id();
+	u8 address_space;
 
-	port_pcpu = port->pcpu[cpu];
+	address_space = mv_pp2x_check_address_space(port->priv, cpu, NULL);
+
+	port_pcpu = port->pcpu[address_space];
+
 	if (!netif_running(dev))
 		return;
 	port_pcpu->timer_scheduled = false;
 
 	/* Process all the Tx queues */
 	cause = (1 << mv_pp2x_txq_number) - 1;
-	tx_todo = mv_pp2x_tx_done(port, cause, smp_processor_id());
+	tx_todo = mv_pp2x_tx_done(port, cause, address_space);
 
 	/* Set the timer in case not all the packets were processed */
 	if (tx_todo)
 		mv_pp2x_timer_set(port_pcpu);
 }
 
+/* Update HW with number of aggregated Tx descriptors to be sent */
+void mv_pp2x_aggr_txq_pend_desc_add(struct mv_pp2x_port *port, int pending, int address_space)
+{
+	/* aggregated access - relevant TXQ number is written in TX desc */
+	mv_pp22_thread_write(&port->priv->hw, address_space, MVPP2_AGGR_TXQ_UPDATE_REG, pending);
+}
+
 /* TX to HW the pendings in aggregated TXQ; kill deferring TX hrtimer */
 static inline void mv_pp2x_aggr_txq_pend_send(struct mv_pp2x_port *port,
 					      struct mv_pp2x_cp_pcpu *cp_pcpu,
-					      struct mv_pp2x_aggr_tx_queue *aggr_txq)
+					      struct mv_pp2x_aggr_tx_queue *aggr_txq, int address_space)
 {
 	mv_pp2x_tx_timer_kill(cp_pcpu);
 	aggr_txq->hw_count += aggr_txq->sw_count;
-	mv_pp2x_write(&port->priv->hw, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->sw_count);
+	mv_pp2x_aggr_txq_pend_desc_add(port, aggr_txq->sw_count, address_space);
 	aggr_txq->sw_count = 0;
 }
 
@@ -2019,16 +2155,32 @@ static void mv_pp2x_tx_send_proc_cb(unsigned long data)
 	struct mv_pp2x_aggr_tx_queue *aggr_txq;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 	int cpu = smp_processor_id();
+	unsigned long flags;
+	u8 address_space;
+	bool cold_cpu = false;
 
-	cp_pcpu = priv->pcpu[cpu];
+	address_space = mv_pp2x_check_address_space(priv, cpu, &cold_cpu);
+
+	cp_pcpu = priv->pcpu[address_space];
 	cp_pcpu->tx_timer_scheduled = false;
 
 	aggr_txq = &priv->aggr_txqs[cpu];
 
 	if (likely(aggr_txq->sw_count > 0)) {
+		/* Check if current mode require Aggregate transmit lock or its cold CPU.
+		 * All cold CPU share same address space and we should protect Aggregate transmit update
+		 * procedure.
+		 */
+		if (priv->pp2_cfg.spinlocks_bitmap & MV_AGGR_QUEUE_LOCK || cold_cpu)
+			spin_lock_irqsave(&aggr_txq->spinlock, flags);
+
 		aggr_txq->hw_count += aggr_txq->sw_count;
-		mv_pp2x_write(&priv->hw, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->sw_count);
+
+		mv_pp22_thread_write(&priv->hw, address_space, MVPP2_AGGR_TXQ_UPDATE_REG, aggr_txq->sw_count);
 		aggr_txq->sw_count = 0;
+
+		if (priv->pp2_cfg.spinlocks_bitmap & MV_AGGR_QUEUE_LOCK || cold_cpu)
+			spin_unlock_irqrestore(&aggr_txq->spinlock, flags);
 	}
 }
 
@@ -2057,12 +2209,15 @@ static void mv_pp2x_width_calc(struct mv_pp2x_port *port, u32 *cpu_width,
 			       u32 *cos_width, u32 *port_rxq_width)
 {
 	struct mv_pp2x *pp2 = port->priv;
+	int hot_cpus = num_online_cpus();
+
+	if (hot_cpus > port->priv->rx_count)
+		hot_cpus = port->priv->rx_count;
 
 	if (pp2) {
 		/* Calculate CPU width */
 		if (cpu_width)
-			*cpu_width = ilog2(roundup_pow_of_two(
-				num_online_cpus()));
+			*cpu_width = ilog2(roundup_pow_of_two(hot_cpus));
 		/* Calculate cos queue width */
 		if (cos_width)
 			*cos_width = ilog2(roundup_pow_of_two(
@@ -2284,12 +2439,15 @@ static int mv_pp22_cpu_id_from_indir_tbl_get(struct mv_pp2x *pp2,
 {
 	int i;
 	int seq = 0;
+	unsigned long hot_cpu_mask = 0;
+
+	bitmap_set(&hot_cpu_mask, 0, min_t(u32, num_online_cpus(), mv_pp2x_rx_count));
 
 	if (!pp2 || !cpu_id || cpu_seq >= 16)
 		return -EINVAL;
 
 	for (i = 0; i < 16; i++) {
-		if ((*cpumask_bits(cpu_online_mask)) & (1 << i)) {
+		if (hot_cpu_mask & (1 << i)) {
 			if (seq == cpu_seq) {
 				*cpu_id = i;
 				return 0;
@@ -2631,7 +2789,7 @@ static void mv_pp2x_build_skb(struct sk_buff *skb, unsigned char *data,
 
 /* Main rx processing */
 static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
-		      int rx_todo, struct mv_pp2x_rx_queue *rxq)
+		      int rx_todo, struct mv_pp2x_rx_queue *rxq, int address_space)
 {
 	struct net_device *dev = port->dev;
 	int rx_received, rx_filled, i;
@@ -2641,7 +2799,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	u8  num_pool = MVPP2_BM_SWF_NUM_POOLS;
 	u8  first_bm_pool = port->priv->pp2_cfg.first_bm_pool;
 	int cpu = smp_processor_id();
-	struct mv_pp2x_cp_pcpu *cp_pcpu = port->priv->pcpu[cpu];
+	struct mv_pp2x_cp_pcpu *cp_pcpu = port->priv->pcpu[address_space];
 
 #ifdef DEV_NETMAP
 		if (port->flags & MVPP2_F_IFCAP_NETMAP) {
@@ -2713,14 +2871,14 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 err_drop_frame:
 			dev->stats.rx_errors++;
 			mv_pp2x_rx_error(port, rx_desc);
-			mv_pp2x_pool_refill(port->priv, pool, buf_phys_addr, cpu);
+			mv_pp2x_pool_refill(port->priv, pool, buf_phys_addr, address_space);
 			continue;
 		}
 		/* Try to get skb from CP skb pool
 		*  If get func return skb -> use mv_pp2x_build_skb to reset skb
 		*  else -> use regular build_skb callback
 		*/
-		skb = mv_pp2_skb_pool_get(port, cpu);
+		skb = mv_pp2_skb_pool_get(port, address_space);
 
 		if (skb)
 			mv_pp2x_build_skb(skb, data, bm_pool->frag_size > PAGE_SIZE ? 0 :
@@ -2779,7 +2937,7 @@ err_drop_frame:
 		refill_bm_pool = &port->priv->bm_pools[i];
 		while (likely(refill_array[i]--)) {
 			err = mv_pp2x_rx_refill_new(port, refill_bm_pool,
-						    refill_bm_pool->id, true, cpu);
+						    refill_bm_pool->id, port->priv->pp2_cfg.recycling, address_space);
 			if (unlikely(err)) {
 				netdev_err(port->dev, "failed to refill BM pools\n");
 				refill_array[i]++;
@@ -3045,7 +3203,7 @@ static inline int mv_pp2_tso_build_data_desc(struct mv_pp2x_port *port,
 /* send tso packet */
 static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 				struct mv_pp2x_tx_queue *txq,
-			 struct mv_pp2x_aggr_tx_queue *aggr_txq, int cpu)
+			 struct mv_pp2x_aggr_tx_queue *aggr_txq, int address_space)
 {
 	int frag = 0, i;
 	int total_len, hdr_len, size, frag_size, data_left;
@@ -3053,12 +3211,12 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	char *frag_ptr;
 	struct mv_pp2x_tx_desc *tx_desc;
 	struct mv_pp2x_port *port = netdev_priv(dev);
-	struct mv_pp2x_txq_pcpu *txq_pcpu = &txq->pcpu[cpu];
+	struct mv_pp2x_txq_pcpu *txq_pcpu = &txq->pcpu[address_space];
 	u16 ip_id, *mh = NULL;
 	u32 tcp_seq = 0;
 	skb_frag_t *skb_frag_ptr;
 	const struct tcphdr *th = tcp_hdr(skb);
-	struct mv_pp2x_cp_pcpu *cp_pcpu = port->priv->pcpu[cpu];
+	struct mv_pp2x_cp_pcpu *cp_pcpu = port->priv->pcpu[address_space];
 
 	if (unlikely(mv_pp2_tso_validate(skb, dev)))
 		return 0;
@@ -3067,9 +3225,9 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	max_desc_num = skb_shinfo(skb)->gso_segs * 2 + skb_shinfo(skb)->nr_frags;
 
 	/* Check number of available descriptors */
-	if (unlikely(mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, max_desc_num, cpu) ||
+	if (unlikely(mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, max_desc_num, address_space) ||
 		     mv_pp2x_tso_txq_reserved_desc_num_proc(port->priv, txq,
-							    txq_pcpu, max_desc_num, cpu))) {
+							    txq_pcpu, max_desc_num, address_space))) {
 		return 0;
 	}
 
@@ -3120,7 +3278,7 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 			goto out_no_tx_desc;
 		}
 
-		data = mv_pp2_extra_pool_get(port, cpu);
+		data = mv_pp2_extra_pool_get(port, address_space);
 		if (unlikely(!data)) {
 			pr_err("Can't allocate extra buffer for TSO\n");
 			goto out_no_tx_desc;
@@ -3184,10 +3342,9 @@ static inline int mv_pp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 
 	aggr_txq->sw_count += total_desc_num;
 
-	if (!skb->xmit_more) {
+	if (!skb->xmit_more)
 		/* Transmit TCP segment with bulked descriptors and cancel tx hr timer if exist */
-		mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq);
-	}
+		mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq, address_space);
 
 	txq_pcpu->reserved_num -= total_desc_num;
 
@@ -3211,7 +3368,7 @@ out_no_tx_desc:
 		data_size = txq_pcpu->data_size[txq_pcpu->txq_put_index];
 
 		mv_pp2x_txq_buf_free(port, (uintptr_t)shadow_skb, shadow_buf,
-				     data_size, cpu);
+				     data_size, address_space);
 
 		mv_pp2x_txq_prev_desc_get(aggr_txq);
 	}
@@ -3265,7 +3422,8 @@ static inline int mv_pp2x_skb_recycle_check(struct mv_pp2x *priv, struct sk_buff
 {
 	struct mv_pp2x_bm_pool *bm_pool;
 
-	if ((skb->hash == MVPP2_UNIQUE_HASH) && (MVPP2X_SKB_PP2_CELL_GET(skb) == priv->pp2_cfg.cell_index)) {
+	if ((skb->hash == MVPP2_UNIQUE_HASH) && (MVPP2X_SKB_PP2_CELL_GET(skb) == priv->pp2_cfg.cell_index) &&
+	    priv->pp2_cfg.recycling) {
 		bm_pool = mv_pp2x_skb_recycle_get_pool(priv, skb);
 		if (bm_pool)
 			if (mv_pp2x_skb_is_recycleable(skb, bm_pool->pkt_size) && (cp_pcpu->in_use[bm_pool->id] > 0))
@@ -3287,21 +3445,33 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	dma_addr_t buf_phys_addr;
 	int frags = 0, pool_id;
 	u16 txq_id;
-	u32 tx_cmd;
-	int cpu = smp_processor_id();
+	u32 tx_cmd, cpu = smp_processor_id();
+	int address_space;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 	u8 recycling;
+	unsigned long flags;
+	bool cold_cpu = false;
 
-	cp_pcpu = port->priv->pcpu[cpu];
+	address_space = mv_pp2x_check_address_space(port->priv, cpu, &cold_cpu);
+
+	cp_pcpu = port->priv->pcpu[address_space];
+
 	/* Set relevant physical TxQ and Linux netdev queue */
 	txq_id = skb_get_queue_mapping(skb) % mv_pp2x_txq_number;
 	txq = port->txqs[txq_id];
-	txq_pcpu = &txq->pcpu[cpu];
-	aggr_txq = &port->priv->aggr_txqs[cpu];
+	txq_pcpu = &txq->pcpu[address_space];
+	aggr_txq = &port->priv->aggr_txqs[address_space];
+
+	/* Check if current mode require Aggregate transmit lock or its cold CPU.
+	 * All cold CPU share same address space and we should protect Aggregate transmit update
+	 * procedure.
+	 */
+	if ((port->priv->pp2_cfg.spinlocks_bitmap & MV_AGGR_QUEUE_LOCK) || cold_cpu)
+		spin_lock_irqsave(&aggr_txq->spinlock, flags);
 
 	/* Prevent shadow_q override, stop tx_queue until tx_done is called*/
 	if (unlikely(mv_pp2x_txq_free_count(txq_pcpu) < port->txq_stop_limit)) {
-		if ((txq->log_id + (cpu * mv_pp2x_txq_number)) == skb_get_queue_mapping(skb)) {
+		if ((txq->log_id + (address_space * mv_pp2x_txq_number)) == skb_get_queue_mapping(skb)) {
 			nq = netdev_get_tx_queue(dev, skb_get_queue_mapping(skb));
 			netif_tx_stop_queue(nq);
 		}
@@ -3311,7 +3481,7 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/* GSO/TSO */
 	if (skb_is_gso(skb)) {
-		frags = mv_pp2_tx_tso(skb, dev, txq, aggr_txq, cpu);
+		frags = mv_pp2_tx_tso(skb, dev, txq, aggr_txq, address_space);
 		goto out;
 	}
 
@@ -3319,9 +3489,9 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 	pr_debug("txq_id=%d, frags=%d\n", txq_id, frags);
 
 	/* Check number of available descriptors */
-	if (unlikely(mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, frags, cpu) ||
+	if (unlikely(mv_pp2x_aggr_desc_num_check(port->priv, aggr_txq, frags, address_space) ||
 		     mv_pp2x_txq_reserved_desc_num_proc(port->priv, txq,
-							txq_pcpu, frags, cpu))) {
+							txq_pcpu, frags, address_space))) {
 		frags = 0;
 		goto out;
 	}
@@ -3421,10 +3591,10 @@ static int mv_pp2x_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/* Start 50 microseconds timer to transmit */
 	if (!skb->xmit_more) {
-		if (skb->hash == MVPP2_UNIQUE_HASH)
+		if (skb->hash == MVPP2_UNIQUE_HASH && port->priv->pp2_cfg.recycling)
 			mv_pp2x_tx_timer_set(cp_pcpu);
 		else
-			mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq);
+			mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq, address_space);
 	}
 
 out:
@@ -3438,7 +3608,7 @@ out:
 	} else {
 		/* Transmit bulked descriptors*/
 		if (aggr_txq->sw_count > 0)
-			mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq);
+			mv_pp2x_aggr_txq_pend_send(port, cp_pcpu, aggr_txq, address_space);
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any(skb);
 	}
@@ -3450,12 +3620,15 @@ out:
 		return NETDEV_TX_OK;
 #endif
 	if (!port->interrupt_tx_done)
-		mv_pp2x_tx_done_post_proc(txq, txq_pcpu, port, frags, cpu);
+		mv_pp2x_tx_done_post_proc(txq, txq_pcpu, port, frags, address_space);
+
+	if ((port->priv->pp2_cfg.spinlocks_bitmap & MV_AGGR_QUEUE_LOCK)  || cold_cpu)
+		spin_unlock_irqrestore(&aggr_txq->spinlock, flags);
 
 	return NETDEV_TX_OK;
 }
 
-static inline void mv_pp2x_cause_misc_handle(struct mv_pp2x_port *port,
+static inline void mv_pp21_cause_misc_handle(struct mv_pp2x_port *port,
 					     struct mv_pp2x_hw *hw, u32 cause_rx_tx)
 {
 	u32 cause_misc = cause_rx_tx & MVPP2_CAUSE_MISC_SUM_MASK;
@@ -3470,9 +3643,24 @@ static inline void mv_pp2x_cause_misc_handle(struct mv_pp2x_port *port,
 	}
 }
 
+static inline void mv_pp22_cause_misc_handle(struct mv_pp2x_port *port,
+					     struct mv_pp2x_hw *hw, u32 cause_rx_tx, u16 sw_thread_id)
+{
+	u32 cause_misc = cause_rx_tx & MVPP2_CAUSE_MISC_SUM_MASK;
+
+	if (cause_misc) {
+		mv_pp2x_cause_error(port->dev, cause_misc);
+
+		/* Clear the cause register */
+		mv_pp22_thread_write(hw, sw_thread_id, MVPP2_ISR_MISC_CAUSE_REG, 0);
+		mv_pp22_thread_write(hw, sw_thread_id, MVPP2_ISR_RX_TX_CAUSE_REG(port->id),
+				     cause_rx_tx & ~MVPP2_CAUSE_MISC_SUM_MASK);
+	}
+}
+
 static inline int mv_pp2x_cause_rx_handle(struct mv_pp2x_port *port,
-					  struct queue_vector *q_vec, struct napi_struct *napi,
-		int budget, u32 cause_rx)
+					  struct queue_vector *q_vec, struct sub_queue_vector *sub_q_vec,
+					  struct napi_struct *napi, int budget, u32 cause_rx)
 {
 	int rx_done = 0, count = 0;
 	struct mv_pp2x_rx_queue *rxq;
@@ -3482,7 +3670,7 @@ static inline int mv_pp2x_cause_rx_handle(struct mv_pp2x_port *port,
 		if (!rxq)
 			break;
 
-		count = mv_pp2x_rx(port, &q_vec->napi, budget, rxq);
+		count = mv_pp2x_rx(port, napi, budget, rxq, q_vec->sw_thread_id);
 		rx_done += count;
 		budget -= count;
 		if (budget > 0) {
@@ -3497,7 +3685,7 @@ static inline int mv_pp2x_cause_rx_handle(struct mv_pp2x_port *port,
 #ifdef DEV_NETMAP
 	if ((port->flags & MVPP2_F_IFCAP_NETMAP)) {
 		napi_complete(napi);
-		q_vec->pending_cause_rx = 0;
+		sub_q_vec->pending_cause_rx = 0;
 		return rx_done;
 	}
 #endif
@@ -3505,9 +3693,18 @@ static inline int mv_pp2x_cause_rx_handle(struct mv_pp2x_port *port,
 	if (budget > 0) {
 		cause_rx = 0;
 		napi_complete(napi);
-		mv_pp2x_qvector_interrupt_enable(q_vec);
+		if (!q_vec->num_of_sub_vectors  || mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
+			mv_pp2x_qvector_interrupt_enable(q_vec);
+		} else {
+			unsigned long flags;
+
+			spin_lock_irqsave(&q_vec->hw_mask_lock, flags);
+			q_vec->queue_mask |= sub_q_vec->queue_mask;
+			mv_pp2x_interrupts_set_mask(q_vec, q_vec->queue_mask);
+			spin_unlock_irqrestore(&q_vec->hw_mask_lock, flags);
+		}
 	}
-	q_vec->pending_cause_rx = cause_rx;
+	sub_q_vec->pending_cause_rx = cause_rx;
 
 	return rx_done;
 }
@@ -3536,13 +3733,13 @@ static int mv_pp21_poll(struct napi_struct *napi, int budget)
 	cause_rx_tx &= ~MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
 
 	/*Process misc errors */
-	mv_pp2x_cause_misc_handle(port, hw, cause_rx_tx);
+	mv_pp21_cause_misc_handle(port, hw, cause_rx_tx);
 
 	/* Process RX packets */
 	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 	cause_rx |= q_vec->pending_cause_rx;
-
-	rx_done = mv_pp2x_cause_rx_handle(port, q_vec, napi, budget, cause_rx);
+	/* FIXME: Mvpp21 support */
+	rx_done = mv_pp2x_cause_rx_handle(port, q_vec, (struct sub_queue_vector *)NULL, napi, budget, cause_rx);
 
 	return rx_done;
 }
@@ -3553,8 +3750,11 @@ static int mv_pp22_poll(struct napi_struct *napi, int budget)
 	int rx_done = 0;
 	struct mv_pp2x_port *port = netdev_priv(napi->dev);
 	struct mv_pp2x_hw *hw = &port->priv->hw;
-	struct queue_vector *q_vec = container_of(napi,
-			struct queue_vector, napi);
+
+	struct sub_queue_vector *sub_q_vec = container_of(napi,
+			struct sub_queue_vector, napi);
+
+	struct queue_vector *q_vec = sub_q_vec->parent;
 
 	/* Rx/Tx cause register
 	 * Each CPU has its own Tx cause register
@@ -3563,13 +3763,12 @@ static int mv_pp22_poll(struct napi_struct *napi, int budget)
 	/*The read is in the q_vector's sw_thread_id  address_space */
 	cause_rx_tx = mv_pp22_thread_relaxed_read(hw, q_vec->sw_thread_id,
 						  MVPP2_ISR_RX_TX_CAUSE_REG(port->id));
-	pr_debug("%s port_id(%d), q_vec(%d), cpuId(%d), sw_thread_id(%d), isr_tx_rx(0x%x)\n",
-		 __func__, port->id, (int)(q_vec - port->q_vector),
-		q_vec->sw_thread_id, q_vec->sw_thread_id, cause_rx_tx);
+	pr_debug("%s port_id(%d), cpuId(%d), sw_thread_id(%d), isr_tx_rx(0x%x)\n",
+		 __func__, port->id, q_vec->sw_thread_id, q_vec->sw_thread_id, cause_rx_tx);
 
 	/*Process misc errors */
-	mv_pp2x_cause_misc_handle(port, hw, cause_rx_tx);
-
+	cause_rx_tx &= sub_q_vec->queue_mask;
+	mv_pp22_cause_misc_handle(port, hw, cause_rx_tx, q_vec->sw_thread_id);
 	/* Release TX descriptors */
 	cause_tx = (cause_rx_tx & MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK) >>
 			MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET;
@@ -3580,27 +3779,41 @@ static int mv_pp22_poll(struct napi_struct *napi, int budget)
 	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 	/*Convert queues from subgroup-relative to port-relative */
 	cause_rx <<= q_vec->first_rx_queue;
-	cause_rx |= q_vec->pending_cause_rx;
+	cause_rx |= sub_q_vec->pending_cause_rx;
 
-	rx_done = mv_pp2x_cause_rx_handle(port, q_vec, napi, budget, cause_rx);
+	rx_done = mv_pp2x_cause_rx_handle(port, q_vec, sub_q_vec, napi, budget, cause_rx);
 
 	return rx_done;
 }
 
 void mv_pp2x_port_napi_enable(struct mv_pp2x_port *port)
 {
-	int i;
+	int i, sub_vec_id;
+	struct queue_vector *qvec;
 
-	for (i = 0; i < port->num_qvector; i++)
-		napi_enable(&port->q_vector[i].napi);
+	for (i = 0; i < port->num_qvector; i++) {
+		qvec = &port->q_vector[i];
+		if (!qvec->num_of_sub_vectors  || mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE)
+			napi_enable(&qvec->sub_vec[0]->napi);
+		else
+			for (sub_vec_id = 0; sub_vec_id < qvec->num_of_sub_vectors; sub_vec_id++)
+				napi_enable(&qvec->sub_vec[sub_vec_id]->napi);
+	}
 }
 
 void mv_pp2x_port_napi_disable(struct mv_pp2x_port *port)
 {
-	int i;
+	int i, sub_vec_id;
+	struct queue_vector *qvec;
 
-	for (i = 0; i < port->num_qvector; i++)
-		napi_disable(&port->q_vector[i].napi);
+	for (i = 0; i < port->num_qvector; i++) {
+		qvec = &port->q_vector[i];
+		if (!qvec->num_of_sub_vectors  || mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE)
+			napi_disable(&qvec->sub_vec[0]->napi);
+		else
+			for (sub_vec_id = 0; sub_vec_id < qvec->num_of_sub_vectors; sub_vec_id++)
+				napi_disable(&qvec->sub_vec[sub_vec_id]->napi);
+	}
 }
 
 static void mv_pp2x_port_irqs_dispose_mapping(struct mv_pp2x_port *port)
@@ -3771,17 +3984,38 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 static void mv_pp2x_send_pend_aggr_txq(void *arg)
 {
 	struct mv_pp2x_port *port = arg;
-	struct mv_pp2x_aggr_tx_queue *aggr_txq =
-		&port->priv->aggr_txqs[smp_processor_id()];
-	int txq_id;
+	struct mv_pp2x_aggr_tx_queue *aggr_txq;
+	int txq_id, address_space;
 	struct mv_pp2x_tx_queue *txq;
 	struct mv_pp2x_txq_pcpu *txq_pcpu;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 	bool free_aggr = false;
 
+	/* To avoid scheduling of pending packets on same address_space twice:
+	 * Single mode only fist of all vectors related to this sub vec will drain pending packets
+	 * Milti mode: hot CPU's - only fist of all vectors related to this sub vec will drain pending packets
+	 * cold CPU's - only fist cold CPU will drain pending packets.
+	 */
+	if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
+		address_space = QV_CPU_2_ADR_SP(smp_processor_id(), port->priv->pp2_cfg.num_of_ap);
+		if ((address_space * port->priv->pp2_cfg.num_of_ap) != smp_processor_id())
+			return;
+	} else if (smp_processor_id() < port->priv->rx_count) {
+		address_space = QV_CPU_2_ADR_SP(smp_processor_id(), (port->priv->rx_count / MVPP2_MAX_CPUS_IN_AP));
+		if ((address_space * (port->priv->rx_count / MVPP2_MAX_CPUS_IN_AP)) != smp_processor_id())
+			return;
+	} else {
+		/* Only first cold CPU will drain aggregated queue */
+		address_space = port->priv->rx_count;
+		if (smp_processor_id() != address_space)
+			return;
+	}
+
+	aggr_txq = &port->priv->aggr_txqs[address_space];
+
 	for (txq_id = 0; txq_id < port->num_tx_queues; txq_id++) {
 		txq = port->txqs[txq_id];
-		txq_pcpu = &txq->pcpu[smp_processor_id()];
+		txq_pcpu = &txq->pcpu[address_space];
 		if (mv_pp2x_txq_free_count(txq_pcpu) != txq->size) {
 			free_aggr = true;
 			break;
@@ -3795,7 +4029,7 @@ static void mv_pp2x_send_pend_aggr_txq(void *arg)
 	 * which the regular TX is using (refer mv_pp2x_tx_send_proc_cb).
 	 * So the Drain from the stop_dev and TX are unpreemptive and correct.
 	 */
-	cp_pcpu = port->priv->pcpu[smp_processor_id()];
+	cp_pcpu = port->priv->pcpu[address_space];
 	tasklet_schedule(&cp_pcpu->tx_tasklet);
 }
 
@@ -4070,6 +4304,77 @@ int mv_pp2x_open_cls(struct net_device *dev)
 	return 0;
 }
 
+/* Mask the current CPU's Rx/Tx interrupts */
+static inline void mv_pp21_interrupts_mask(void *arg)
+{
+	struct mv_pp2x_port *port = arg;
+
+	mv_pp2x_write(&port->priv->hw, MVPP2_ISR_RX_TX_MASK_REG(port->id), 0);
+}
+
+/* Unmask the current CPU's Rx/Tx interrupts */
+static inline void mv_pp21_interrupts_unmask(void *arg)
+{
+	struct mv_pp2x_port *port = arg;
+	u32 val;
+
+	val = MVPP2_CAUSE_MISC_SUM_MASK | MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	/* Don't unmask Tx done interrupts for ports working in Netmap mode*/
+	if (!(port->flags & MVPP2_F_IFCAP_NETMAP) && port->priv->pp2xdata->interrupt_tx_done)
+		val |= MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
+
+	mv_pp2x_write(&port->priv->hw, MVPP2_ISR_RX_TX_MASK_REG(port->id), val);
+}
+
+/* Mask the private Rx/Tx interrupts */
+static inline void mv_pp22_private_interrupt_mask(struct mv_pp2x_port *port, int address_space)
+{
+	mv_pp2x_relaxed_write(&port->priv->hw, MVPP2_ISR_RX_TX_MASK_REG(port->id), 0, address_space);
+}
+
+/* Unmask he private Rx/Tx interrupts */
+static inline void mv_pp22_private_interrupt_unmask(struct mv_pp2x_port *port, int address_space)
+{
+	u32 val;
+
+	val = MVPP2_CAUSE_MISC_SUM_MASK | MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	/* Don't unmask Tx done interrupts for ports working in Netmap mode*/
+	if (!(port->flags & MVPP2_F_IFCAP_NETMAP) && port->priv->pp2xdata->interrupt_tx_done)
+		val |= MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
+
+	mv_pp2x_relaxed_write(&port->priv->hw, MVPP2_ISR_RX_TX_MASK_REG(port->id), val, address_space);
+}
+
+/* Mask shared and private Rx/Tx interrupts */
+static inline void mv_pp22_interrupts_mask(struct mv_pp2x_port *port)
+{
+	struct queue_vector *q_vec = &port->q_vector[0];
+	int i;
+
+	for (i = 0; i < port->num_qvector; i++) {
+		if (q_vec[i].qv_type == MVPP2_RX_SHARED)
+			mv_pp22_thread_write(&port->priv->hw, q_vec[i].sw_thread_id,
+					     MVPP2_ISR_RX_TX_MASK_REG(port->id), 0);
+		else
+			mv_pp22_private_interrupt_mask(port, q_vec[i].sw_thread_id);
+	}
+}
+
+/* Unmask shared and private Rx/Tx interrupts */
+static inline void mv_pp22_interrupts_unmask(struct mv_pp2x_port *port)
+{
+	struct queue_vector *q_vec = &port->q_vector[0];
+	int i;
+
+	for (i = 0; i < port->num_qvector; i++) {
+		if (q_vec[i].qv_type == MVPP2_RX_SHARED)
+			mv_pp22_thread_write(&port->priv->hw, q_vec[i].sw_thread_id,
+					     MVPP2_ISR_RX_TX_MASK_REG(port->id), MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK);
+		else
+			mv_pp22_private_interrupt_unmask(port, q_vec[i].sw_thread_id);
+	}
+}
+
 int mv_pp2x_open(struct net_device *dev)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
@@ -4105,10 +4410,11 @@ int mv_pp2x_open(struct net_device *dev)
 
 	if (!(port->flags & MVPP2_F_IF_MUSDK)) {
 		/* Unmask interrupts on all CPUs */
-		on_each_cpu(mv_pp2x_interrupts_unmask, port, 1);
-
-		/* Unmask shared interrupts */
-		mv_pp2x_shared_thread_interrupts_unmask(port);
+		if (port->priv->pp2_version == PPV21)
+			on_each_cpu(mv_pp21_interrupts_unmask, port, 1);
+		else
+			/* Unmask shared and private interrupts */
+			mv_pp22_interrupts_unmask(port);
 
 		/* Port is init in uboot */
 	}
@@ -4144,10 +4450,11 @@ int mv_pp2x_stop(struct net_device *dev)
 
 	if (!(port->flags & MVPP2_F_IF_MUSDK)) {
 		/* Mask interrupts on all CPUs */
-		on_each_cpu(mv_pp2x_interrupts_mask, port, 1);
-
-		/* Mask shared interrupts */
-		mv_pp2x_shared_thread_interrupts_mask(port);
+	if (port->priv->pp2_version == PPV21)
+		on_each_cpu(mv_pp21_interrupts_mask, port, 1);
+	else
+		/* Mask shared and private interrupts */
+		mv_pp22_interrupts_mask(port);
 	}
 	mv_pp2x_cleanup_irqs(port);
 
@@ -4583,7 +4890,7 @@ static void mv_pp21_port_queue_vectors_init(struct mv_pp2x_port *port)
 	q_vec[0].num_rx_queues = port->num_rx_queues;
 	q_vec[0].parent = port;
 	q_vec[0].pending_cause_rx = 0;
-	q_vec[0].qv_type = MVPP2_SHARED;
+	q_vec[0].qv_type = MVPP2_RX_SHARED;
 	q_vec[0].sw_thread_id = 0;
 	q_vec[0].sw_thread_mask = *cpumask_bits(cpu_online_mask);
 	q_vec[0].irq = port->of_irqs[0];
@@ -4593,62 +4900,210 @@ static void mv_pp21_port_queue_vectors_init(struct mv_pp2x_port *port)
 	port->num_qvector = 1;
 }
 
-static int mv_pp2_num_cpu_irqs(struct mv_pp2x_port *port)
+/* Routine calculate number of private queue vectors */
+static int mv_pp22_get_num_private_queue_vectors(struct mv_pp2x_port *port)
 {
-	int cpu_avail_irq;
+	if (num_active_cpus() > MVPP2_MAX_CPUS_IN_AP || num_active_cpus() > port->priv->rx_count)
+		return min_t(u32, MVPP2_MAX_CPUS_IN_AP, port->priv->rx_count);
 
-	cpu_avail_irq = port->num_irqs -
-		((mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) ? 1 : 0);
-	if (cpu_avail_irq < 0)
-		return 0;
-	return min((num_active_cpus()), ((unsigned int)cpu_avail_irq));
+	return num_active_cpus();
 }
 
+/* Routine allocate hif(address space) for Kernel */
+static void mv_pp22_allocate_hif_for_kernel(struct mv_pp2x_hw *hw, int hif_num)
+{
+	int val;
+
+	val = mv_pp2x_read(hw, MVPP22_HIF_ALLOCATION_REG);
+	val |= BIT(hif_num);
+	mv_pp2x_write(hw, MVPP22_HIF_ALLOCATION_REG, val);
+}
+
+/* Routine calculate number of used sub_vector */
+static struct sub_queue_vector *mv_pp22_allocate_sub_vector(struct mv_pp2x_port *port, struct queue_vector *q_vec,
+							    u32 queue_mask)
+{
+	struct sub_queue_vector *sub_q_vec;
+
+	sub_q_vec = devm_kzalloc(port->dev->dev.parent, sizeof(*sub_q_vec), GFP_KERNEL);
+	netif_napi_add(port->dev, &sub_q_vec->napi, mv_pp22_poll, NAPI_POLL_WEIGHT);
+	napi_hash_add(&sub_q_vec->napi);
+	sub_q_vec->parent = q_vec;
+	sub_q_vec->queue_mask = queue_mask;
+
+	return sub_q_vec;
+}
+
+/* Routine calculate number of used sub_vector */
+static int mv_pp22_calculate_num_sub_vector(struct mv_pp2x_port *port)
+{
+	int num_of_sub_vectors = 0, cold_cpu_address_spaces = 0;
+	int num_rx_queues = mv_pp2x_num_cos_queues * num_of_sub_vectors;
+
+	/* Logic: If system has more than 8 CPU's, more than 1 of sub queue vector should be used
+	 * for same interrupt and address space, number of sub queue vector = # of active CPU's / 8.
+	 * Procedure also check if in multi queue mode exist cold CPU's.
+	 */
+	if (num_active_cpus() > MVPP2_MAX_CPUS_IN_AP) {
+		num_of_sub_vectors = num_active_cpus() / MVPP2_MAX_CPUS_IN_AP;
+		if (port->priv->rx_count < num_active_cpus() && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
+			num_of_sub_vectors = ((port->priv->rx_count / MVPP2_MAX_CPUS_IN_AP) > 1) ?
+				(port->priv->rx_count / MVPP2_MAX_CPUS_IN_AP) : 0;
+			cold_cpu_address_spaces = port->priv->other_count;
+			if (num_rx_queues > MVPP22_MAX_NUM_RXQ)
+				WARN(1, "Number of requested RXQ's greater than amount of phys RXQ's\n");
+		} else {
+			port->priv->other_count = 0;
+		}
+	}
+
+	port->priv->other_count = cold_cpu_address_spaces;
+
+	return num_of_sub_vectors;
+}
+
+/* This procedure allocated queue vectors and sub queue vectors per driver configurations.
+ * For multi queue mode:
+ * If more than 8 CPU's in system and # of HOT CPU's above 8. More than one sub vector would be
+ * allocated per queue vector. Also for Cold CPU's MVPP2_TX_SHARED interrupt would be allocated.
+ * For example: If system has 16 CPU's and 8 Hot CPU's, then there would be 8 cold CPU's.
+ * For single queue mode:
+ * If more than 8 CPU's in system -> More than one sub vector would be allocated per queue vector
+ * for TX done procedure. All RX will be handled by same MVPP2_RX_SHARED interrupt and on address space.
+ */
 static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 {
-	int cpu;
-	int sw_thread_index = 0, irq_index = 0;
-	struct queue_vector *q_vec = &port->q_vector[0];
-	struct net_device  *net_dev = port->dev;
+	int address_space = 0, num_private_q_vec, num_of_sub_vectors, i, num_rx_queues;
+	int sw_thread_index = 0, irq_index = 0, cpu_ap_ofset = 0;
+	struct queue_vector *q_vec;
+	struct sub_queue_vector *sub_q_vec;
+	unsigned long queue_mask = 0;
+
+	bitmap_set(&queue_mask, 0, mv_pp2x_num_cos_queues);
+
+	port->q_vector = devm_kcalloc(port->dev->dev.parent, MVPP2_MAX_ADDR_SPACES,
+		sizeof(struct queue_vector), GFP_KERNEL);
+	q_vec = port->q_vector;
 
 	/* Each cpu has queue_vector for private tx_done counters and/or
-	 *  private rx_queues
+	 * private rx_queues
 	 */
-	for (cpu = 0; cpu < num_active_cpus(); cpu++) {
-		q_vec[cpu].parent = port;
-		q_vec[cpu].qv_type = MVPP2_PRIVATE;
-		q_vec[cpu].sw_thread_id = sw_thread_index++;
-		q_vec[cpu].sw_thread_mask = (1 << q_vec[cpu].sw_thread_id);
-		q_vec[cpu].pending_cause_rx = 0;
-		if (port->interrupt_tx_done ||
-		    mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
-			q_vec[cpu].irq = port->of_irqs[irq_index++];
-		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
-			       NAPI_POLL_WEIGHT);
-		napi_hash_add(&q_vec[cpu].napi);
+	num_private_q_vec = mv_pp22_get_num_private_queue_vectors(port);
+
+	/* Calculate number of sub queue vectors */
+	num_of_sub_vectors = mv_pp22_calculate_num_sub_vector(port);
+
+	for (address_space = 0; address_space < num_private_q_vec; address_space++) {
+		q_vec[address_space].parent = port;
+		q_vec[address_space].qv_type = MVPP2_PRIVATE;
+		q_vec[address_space].sw_thread_id = sw_thread_index++;
+		mv_pp22_allocate_hif_for_kernel(&port->priv->hw, q_vec[address_space].sw_thread_id);
+		q_vec[address_space].sw_thread_mask = (1 << q_vec[address_space].sw_thread_id);
+		q_vec[address_space].pending_cause_rx = 0;
+		q_vec[address_space].num_of_sub_vectors = num_of_sub_vectors;
+		/* TODO: AP ID should be static varible */
+		q_vec[address_space].ap_id = 0;
+		q_vec[address_space].queue_mask = 0;
+		q_vec[address_space].cold_cpu = false;
+		if (port->interrupt_tx_done || mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
+			q_vec[address_space].irq = port->of_irqs[irq_index++];
+
 		if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
-			q_vec[cpu].num_rx_queues = mv_pp2x_num_cos_queues;
-			q_vec[cpu].first_rx_queue = cpu * mv_pp2x_num_cos_queues;
+			/* Check if there singe CPU per queue vector or # of sub vectors should be allocated
+			 * for one queue vector.
+			 */
+			if (!num_of_sub_vectors) {
+				q_vec[address_space].num_rx_queues = mv_pp2x_num_cos_queues;
+				q_vec[address_space].first_rx_queue = address_space * mv_pp2x_num_cos_queues;
+
+				q_vec[address_space].sub_vec = devm_kcalloc(port->dev->dev.parent, 1,
+					sizeof(*q_vec[address_space].sub_vec), GFP_KERNEL);
+				sub_q_vec = mv_pp22_allocate_sub_vector(port, &q_vec[address_space], queue_mask);
+				sub_q_vec->queue_mask |= (queue_mask << MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET);
+				q_vec[address_space].queue_mask = sub_q_vec->queue_mask;
+				q_vec[address_space].sub_vec[0] = sub_q_vec;
+			} else {
+				/* Calculate CPU AP offset. AP0: CPU 0-7, AP1 CPU 8-15 and etc */
+				cpu_ap_ofset = q_vec[address_space].ap_id * MVPP2_MAX_CPUS_IN_AP;
+				num_rx_queues = mv_pp2x_num_cos_queues * num_of_sub_vectors;
+				q_vec[address_space].sub_vec = devm_kcalloc(port->dev->dev.parent, num_of_sub_vectors,
+					sizeof(*q_vec[address_space].sub_vec), GFP_KERNEL);
+				for (i = 0; i < num_of_sub_vectors; i++) {
+					sub_q_vec = mv_pp22_allocate_sub_vector(port, &q_vec[address_space],
+										(queue_mask) <<
+										(i * mv_pp2x_num_cos_queues));
+					sub_q_vec->cpu_id = (address_space + cpu_ap_ofset) * num_of_sub_vectors + i;
+					q_vec[address_space].queue_mask |= sub_q_vec->queue_mask;
+					/* Only first sub_q_vec will handle TX done */
+					if (i == 0) {
+						sub_q_vec->queue_mask |=
+							(queue_mask << MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET);
+						q_vec[address_space].queue_mask |=
+							(queue_mask << MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET);
+					}
+					q_vec[address_space].sub_vec[i] = sub_q_vec;
+				}
+				q_vec[address_space].num_rx_queues = num_rx_queues;
+				q_vec[address_space].first_rx_queue = address_space * num_rx_queues;
+			}
 		} else {
-			q_vec[cpu].first_rx_queue = 0;
-			q_vec[cpu].num_rx_queues = 0;
+			/* For single queue mode only sub vector will handle TX done for all CPU's in queue vector */
+			q_vec[address_space].first_rx_queue = 0;
+			q_vec[address_space].num_rx_queues = 0;
+			q_vec[address_space].sub_vec = devm_kcalloc(port->dev->dev.parent, 1,
+								    sizeof(*q_vec[address_space].sub_vec), GFP_KERNEL);
+			q_vec[address_space].queue_mask = (queue_mask << MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET);
+			sub_q_vec = mv_pp22_allocate_sub_vector(port, &q_vec[address_space],
+								q_vec[address_space].queue_mask);
+			q_vec[address_space].sub_vec[0] = sub_q_vec;
 		}
 		port->num_qvector++;
 	}
-	/*Additional queue_vector for Shared RX */
-	if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
-		q_vec[cpu].parent = port;
-		q_vec[cpu].qv_type = MVPP2_SHARED;
-		q_vec[cpu].sw_thread_id = irq_index;
-		q_vec[cpu].sw_thread_mask = (1 << q_vec[cpu].sw_thread_id);
-		q_vec[cpu].pending_cause_rx = 0;
-		q_vec[cpu].irq = port->of_irqs[irq_index];
-		netif_napi_add(net_dev, &q_vec[cpu].napi, mv_pp22_poll,
-			       NAPI_POLL_WEIGHT);
-		napi_hash_add(&q_vec[cpu].napi);
-		q_vec[cpu].first_rx_queue = 0;
-		q_vec[cpu].num_rx_queues = port->num_rx_queues;
 
+	if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
+		/* Additional queue_vector's for TX Shared queue vectors */
+		for (i = address_space; i < (num_private_q_vec + port->priv->other_count); i++) {
+			q_vec[address_space].parent = port;
+			q_vec[address_space].qv_type = MVPP2_TX_SHARED;
+			q_vec[address_space].sw_thread_id = sw_thread_index++;
+			mv_pp22_allocate_hif_for_kernel(&port->priv->hw, q_vec[address_space].sw_thread_id);
+			q_vec[address_space].sw_thread_mask = (1 << q_vec[address_space].sw_thread_id);
+			q_vec[address_space].pending_cause_rx = 0;
+			q_vec[address_space].num_of_sub_vectors = num_of_sub_vectors;
+			/* TODO: AP ID should be static varible */
+			q_vec[address_space].ap_id = 0;
+			q_vec[address_space].first_rx_queue = 0;
+			q_vec[address_space].num_rx_queues = 0;
+			q_vec[address_space].irq = port->of_irqs[irq_index];
+			q_vec[address_space].sub_vec = devm_kcalloc(port->dev->dev.parent, 1,
+								    sizeof(*q_vec[address_space].sub_vec), GFP_KERNEL);
+			q_vec[address_space].queue_mask = (queue_mask << MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET);
+			sub_q_vec = mv_pp22_allocate_sub_vector(port, &q_vec[address_space],
+								q_vec[address_space].queue_mask);
+			q_vec[address_space].sub_vec[0] = sub_q_vec;
+			q_vec[address_space].cold_cpu = true;
+			port->num_qvector++;
+		}
+	} else {
+		/* Additional queue_vector for Shared RX or Single resource mode */
+		q_vec[address_space].parent = port;
+		q_vec[address_space].sw_thread_id = irq_index;
+		mv_pp22_allocate_hif_for_kernel(&port->priv->hw, q_vec[address_space].sw_thread_id);
+		q_vec[address_space].pending_cause_rx = 0;
+		q_vec[address_space].sub_vec = devm_kcalloc(port->dev->dev.parent, 1,
+								sizeof(*q_vec[address_space].sub_vec), GFP_KERNEL);
+		q_vec[address_space].sw_thread_mask = (1 << q_vec[address_space].sw_thread_id);
+		q_vec[address_space].irq = port->of_irqs[irq_index];
+
+		q_vec[address_space].qv_type = MVPP2_RX_SHARED;
+
+		sub_q_vec = mv_pp22_allocate_sub_vector(port, &q_vec[address_space], queue_mask);
+		q_vec[address_space].queue_mask = sub_q_vec->queue_mask;
+		q_vec[address_space].sub_vec[0] = sub_q_vec;
+		q_vec[address_space].first_rx_queue = 0;
+		q_vec[address_space].num_rx_queues = port->num_rx_queues;
+		q_vec[address_space].cold_cpu = false;
+		q_vec[address_space].ap_id = 0;
 		port->num_qvector++;
 	}
 }
@@ -4675,9 +5130,17 @@ static void mv_pp2x_port_irq_names_update(struct mv_pp2x_port *port)
 		if (!q_vec[i].irq)
 			continue;
 		if (q_vec[i].qv_type == MVPP2_PRIVATE) {
-			cpu = q_vec[i].sw_thread_id;
-			snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s%d",
-				 str_common, "cpu", cpu);
+			if (!q_vec[i].num_of_sub_vectors) {
+				cpu = QV_THR_2_MASTER_AP_CPU(q_vec[i].ap_id, q_vec[i].sw_thread_id);
+				snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s%d",
+					 str_common, "cpu", cpu);
+			} else {
+				snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s_%d",
+					 str_common, "sw_thread", q_vec[i].sw_thread_id);
+			}
+		} else if (q_vec[i].qv_type == MVPP2_TX_SHARED) {
+			snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s",
+				 str_common, "tx_shared");
 		} else {
 			snprintf(q_vec[i].irq_name, IRQ_NAME_SIZE, "%s.%s",
 				 str_common, "rx_shared");
@@ -4972,6 +5435,8 @@ static void mv_pp2x_port_init_config(struct mv_pp2x_port *port)
 	/* RSS is disabled as default, it can be update when running */
 	port->rss_cfg.rss_en = 0;
 	port->rss_cfg.rss_mode = rss_mode;
+	port->priv->rx_count = mv_pp2x_rx_count;
+	port->priv->other_count = MVPP2_DEFAULT_OTHER_COUNT;
 }
 
 /* Routine called by port CPU hot plug notifier. If port up callback set irq affinity for private interrupts,
@@ -4983,7 +5448,6 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 	unsigned int cpu = (unsigned long)hcpu;
 	int qvec_id;
 	struct queue_vector *qvec;
-	cpumask_t cpus_mask;
 	struct mv_pp2x_port *port = container_of(nfb, struct mv_pp2x_port, port_hotplug_nb);
 	struct mv_pp2x_aggr_tx_queue *aggr_txq;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
@@ -4991,18 +5455,17 @@ static int mv_pp2x_port_cpu_callback(struct notifier_block *nfb,
 	switch (action) {
 	case CPU_ONLINE:
 	case CPU_ONLINE_FROZEN:
-		cpumask_set_cpu(cpu, &cpus_mask);
 		for (qvec_id = 0; qvec_id < port->num_qvector; qvec_id++) {
 			qvec = &port->q_vector[qvec_id];
 			if (!qvec->irq)
 				continue;
-			if (qvec->qv_type == MVPP2_PRIVATE && qvec->sw_thread_id == cpu) {
+			if (qvec->qv_type == MVPP2_PRIVATE &&
+			    (QV_THR_2_MASTER_AP_CPU(qvec->ap_id, qvec->sw_thread_id) == cpu)) {
 				irq_set_affinity_hint(qvec->irq, cpumask_of(cpu));
-				on_each_cpu_mask(&cpus_mask, mv_pp2x_interrupts_unmask, port, 1);
-				if (port->priv->pp2_cfg.queue_mode ==
-					MVPP2_QDIST_MULTI_MODE)
-					irq_set_status_flags(qvec->irq,
-							     IRQ_NO_BALANCING);
+				mv_pp22_private_interrupt_unmask(port, cpu);
+				if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_MULTI_MODE)
+					irq_set_status_flags(qvec->irq, IRQ_NO_BALANCING);
+				/* FIXME: A810 support*/
 			}
 		}
 		if (port->interrupt_tx_done)
@@ -5165,10 +5628,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		return -ENOMEM;
 
 	/* Setup XPS mapping */
-	for_each_present_cpu(cpu) {
-		cpumask_set_cpu(cpu, &priv->aggr_txqs[cpu].affinity_mask);
-		netif_set_xps_queue(dev, &priv->aggr_txqs[cpu].affinity_mask, cpu);
-	}
+	for (cpu = 0; cpu < num_online_cpus(); cpu++)
+		netif_set_xps_queue(dev, cpumask_of(cpu), cpu);
 
 	/*Connect entities */
 	port = netdev_priv(dev);
@@ -5317,12 +5778,6 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	port->rx_ring_size = rx_queue_size;
 
 	mv_pp2x_check_queue_size_valid(port);
-
-	if (mv_pp2_num_cpu_irqs(port) < num_active_cpus() &&
-	    port->interrupt_tx_done && (!(port->flags & MVPP2_F_LOOPBACK))) {
-		port->interrupt_tx_done = false;
-		dev_info(&pdev->dev, "mvpp2x: interrupt_tx_done override to false\n");
-	}
 
 	err = mv_pp2x_port_init(port);
 	if (err < 0) {
@@ -5617,7 +6072,7 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	 * for further usage in free(aligned - offset).
 	 * (offset is used instead of origin-ptr since it is more compact)
 	 */
-	val = sizeof(struct mv_pp2x_aggr_tx_queue) * num_active_cpus() +
+	val = sizeof(struct mv_pp2x_aggr_tx_queue) * mv_pp2x_used_addr_spaces +
 		MVPP2_CACHE_LINE_SIZE;
 	priv->aggr_txqs = devm_kcalloc(&pdev->dev, 1, val, GFP_KERNEL);
 	if (!priv->aggr_txqs)
@@ -5735,7 +6190,32 @@ static int mv_pp2x_init_config(struct mv_pp2x_param_config *pp2_cfg,
 	pp2_cfg->queue_mode = mv_pp2x_queue_mode;
 	pp2_cfg->rx_cpu_map = port_cpu_bind_map;
 	pp2_cfg->uc_filter_max = uc_filter_max;
+	pp2_cfg->recycling = true;
 	pp2_cfg->mc_filter_max = MVPP2_PRS_MAC_UC_MC_FILT_MAX - uc_filter_max;
+	/* FIXME: Hardcoded no locks for MVPP2_QDIST_MULTI_MODE, to run 2APhase, need to change define.
+	 * In 2APhase ethtool would be added.
+	 * Add locks required during data path.
+	 * In single queue mode aggregated queue should be locked if more than one AP's exist.
+	 * Multi AP system has more than 8 CPU's, and mvpp22 HW has only 9 address spaces(9 physical aggregated queues)
+	 * In multi queue mode aggregated queue and BM refill should be locked if rx_count less than number
+	 * of address spaces - 1.
+	 * Same as for physical aggregated queues, mvpp22 HW has only 9 copy's of buffer manager refill register.
+	 * So in this case BM refill procedure should be protected.
+	 * In single resource mode aggregated queue always should be locked, since single address spaces used by kernel.
+	 */
+	if (((num_active_cpus() > MVPP2_MAX_CPUS_IN_AP) && ((pp2_cfg->queue_mode == MVPP2_QDIST_SINGLE_MODE) ||
+							    (mv_pp2x_rx_count > (MVPP2_MAX_ADDR_SPACES - 1))))) {
+		pp2_cfg->spinlocks_bitmap |= MV_AGGR_QUEUE_LOCK;
+
+		if (pp2_cfg->queue_mode == MVPP2_QDIST_MULTI_MODE) {
+			pp2_cfg->spinlocks_bitmap |= MV_BM_LOCK;
+			pp2_cfg->recycling = false;
+		}
+	}
+
+	/* Calculate number of AP in system */
+	pp2_cfg->num_of_ap = ((num_present_cpus() / MVPP2_MAX_CPUS_IN_AP) > 1) ?
+						(num_present_cpus() / MVPP2_MAX_CPUS_IN_AP) : 1;
 
 	return 0;
 }
@@ -5743,13 +6223,13 @@ static int mv_pp2x_init_config(struct mv_pp2x_param_config *pp2_cfg,
 static void mv_pp22_init_rxfhindir(struct mv_pp2x *pp2)
 {
 	int i;
-	int online_cpus = num_online_cpus();
+	int hot_cpus = num_online_cpus();
 
-	if (!online_cpus)
-		return;
+	if (hot_cpus > mv_pp2x_rx_count)
+		hot_cpus = mv_pp2x_rx_count;
 
 	for (i = 0; i < MVPP22_RSS_TBL_LINE_NUM; i++)
-		pp2->rx_indir_table[i] = i % online_cpus;
+		pp2->rx_indir_table[i] = i % hot_cpus;
 }
 
 static int mv_pp2x_platform_data_get(struct platform_device *pdev,
@@ -6171,13 +6651,11 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	}
 
 	/* Save cpu_present_mask + populate the per_cpu address space */
-	i = 0;
-	for_each_present_cpu(cpu) {
-		hw->cpu_base[cpu] = hw->base;
-		if (priv->pp2xdata->multi_addr_space) {
-			hw->cpu_base[cpu] += i * MVPP2_ADDR_SPACE_SIZE;
-			i++;
-		}
+	for (i = 0; i < MVPP2_MAX_ADDR_SPACES; i++) {
+		hw->cpu_base[i] = hw->base;
+		if (priv->pp2xdata->multi_addr_space)
+			hw->cpu_base[i] +=
+				i * MVPP2_ADDR_SPACE_SIZE;
 	}
 
 	/*Init PP2 Configuration */
@@ -6517,10 +6995,13 @@ static int mv_pp2x_rxq_number_get(void)
 {
 	int rx_queue_num;
 
-	if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE)
-		rx_queue_num = mv_pp2x_num_cos_queues;
+	if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
+		if (mv_pp2x_num_cos_queues * num_active_cpus() > MVPP22_MAX_NUM_RXQ)
+			rx_queue_num = MVPP22_MAX_NUM_RXQ;
+		else
+			rx_queue_num = mv_pp2x_num_cos_queues * mv_pp2x_rx_count;
 	else
-		rx_queue_num = mv_pp2x_num_cos_queues * num_active_cpus();
+		rx_queue_num = mv_pp2x_num_cos_queues;
 
 	return rx_queue_num;
 }
