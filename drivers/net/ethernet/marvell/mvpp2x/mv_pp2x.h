@@ -152,8 +152,11 @@
 
 /* Various constants */
 #define MVPP2_MAX_SW_THREADS	4
-#define MVPP2_MAX_CPUS		4
-#define MVPP2_MAX_SHARED	1
+#define MVPP2_MAX_ADDR_SPACES			9 /* MVpp22 HW has 9 hif's(address spaces)
+						   * Aggr/RX/TX queues, queue vectors and other per hif stuff
+						   * Allocation would be limited by maximum number of hif's in
+						   * mvpp22 HW.
+						   */
 
 /* Coalescing */
 #define MVPP2_TXDONE_COAL_PKTS		32
@@ -340,7 +343,7 @@ struct mv_pp2x_tx_queue {
 	int size;
 
 	/* Per-CPU control of physical Tx queues */
-	struct mv_pp2x_txq_pcpu __percpu *pcpu;
+	struct mv_pp2x_txq_pcpu *pcpu;
 
 	u32 pkts_coal;
 
@@ -468,7 +471,7 @@ struct mv_pp2x_hw {
 				 *devm_ioremap_resource().
 				 */
 	void __iomem *lms_base;
-	void __iomem *cpu_base[MVPP2_MAX_CPUS];
+	void __iomem *cpu_base[MVPP2_MAX_ADDR_SPACES];
 
 	phys_addr_t phys_addr_start;
 	phys_addr_t phys_addr_end;
@@ -564,7 +567,7 @@ struct mv_pp2x {
 	struct mv_pp2x_bm_pool *bm_pools;
 
 	/* Per-CPU CP control */
-	struct mv_pp2x_cp_pcpu __percpu *pcpu;
+	struct mv_pp2x_cp_pcpu **pcpu;
 
 	/* RX flow hash indir'n table, in pp22, the table contains the
 	* CPU idx according to weight
@@ -669,7 +672,7 @@ struct mv_pp2x_port {
 			*/
 
 	/* Per-CPU port control */
-	struct mv_pp2x_port_pcpu __percpu *pcpu;
+	struct mv_pp2x_port_pcpu **pcpu;
 	/* Flags */
 	u64 flags;
 
@@ -695,7 +698,7 @@ struct mv_pp2x_port {
 	/* q_vector is the parameter that will be passed to
 	 * mv_pp2_isr(int irq, void *dev_id=q_vector)
 	 */
-	struct queue_vector q_vector[MVPP2_MAX_CPUS + MVPP2_MAX_SHARED];
+	struct queue_vector q_vector[MVPP2_MAX_ADDR_SPACES];
 
 	struct mv_pp2x_ptp_desc *ptp_desc;
 	struct mv_pp2x_cos cos_cfg;

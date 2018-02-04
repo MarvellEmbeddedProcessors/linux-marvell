@@ -666,7 +666,7 @@ static int mv_pp2x_ethtool_set_coalesce(struct net_device *dev,
 	}
 	if (port->interrupt_tx_done) {
 		mv_pp2x_tx_done_time_coal_set(port, port->tx_time_coal);
-		on_each_cpu(mv_pp2x_tx_done_pkts_coal_set, port, 1);
+		mv_pp2x_tx_done_pkts_coal_set_all(port);
 	}
 
 	return 0;

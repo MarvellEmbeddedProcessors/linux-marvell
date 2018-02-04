@@ -3801,9 +3801,8 @@ void mv_pp2x_rx_time_coal_set(struct mv_pp2x_port *port,
 }
 
 /* Set threshold for TX_DONE pkts coalescing */
-void mv_pp2x_tx_done_pkts_coal_set(void *arg)
+void mv_pp2x_tx_done_pkts_coal_set(struct mv_pp2x_port *port, int address_space)
 {
-	struct mv_pp2x_port *port = arg;
 	int queue;
 	u32 val;
 
@@ -3814,8 +3813,9 @@ void mv_pp2x_tx_done_pkts_coal_set(void *arg)
 			txq->pkts_coal = MVPP2_MAX_TRANSMITTED_THRESH;
 		val = (txq->pkts_coal << MVPP2_TRANSMITTED_THRESH_OFFSET) &
 		       MVPP2_TRANSMITTED_THRESH_MASK;
-		mv_pp2x_write(&port->priv->hw, MVPP2_TXQ_NUM_REG, txq->id);
-		mv_pp2x_write(&port->priv->hw, MVPP2_TXQ_THRESH_REG, val);
+
+		mv_pp2x_relaxed_write(&port->priv->hw, MVPP2_TXQ_NUM_REG, txq->id, address_space);
+		mv_pp2x_relaxed_write(&port->priv->hw, MVPP2_TXQ_THRESH_REG, val, address_space);
 	}
 }
 
