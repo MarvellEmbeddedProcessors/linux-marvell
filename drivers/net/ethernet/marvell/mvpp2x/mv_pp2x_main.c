@@ -49,6 +49,10 @@
 #include <net/busy_poll.h>
 #include <asm/cacheflush.h>
 #include <linux/dma-mapping.h>
+#include <linux/cma.h>
+#include <linux/dma-contiguous.h>
+#include <linux/of_reserved_mem.h>
+
 #include <dt-bindings/phy/phy-comphy-mvebu.h>
 
 #include "mv_pp2x.h"
@@ -6633,6 +6637,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	struct device_node *port_node;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 	bool probe_defer = false;
+	phys_addr_t cma_addr;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(struct mv_pp2x), GFP_KERNEL);
 	if (!priv)
@@ -6653,6 +6658,13 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		goto err_clk;
 	}
 	priv->pp2_version = priv->pp2xdata->pp2x_ver;
+	/* Retrieve dts defined cma-area (shared-dma-pool).
+	 * Enables allocating cma_memory on DRAM that is physically close to the PPV2 device.
+	 */
+	of_reserved_mem_device_init(&pdev->dev);
+	cma_addr = cma_get_base(dev_get_cma_area(&pdev->dev));
+	dev_info(&pdev->dev, "cma_area base %pa size %ld MB\n", &cma_addr,
+		 cma_get_size(dev_get_cma_area(&pdev->dev)) / SZ_1M);
 
 	mv_pp2x_used_addr_spaces = (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ? 1 : MVPP2_MAX_ADDR_SPACES;
 
@@ -6661,7 +6673,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
 		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(40));
 		if (err == 0)
-			dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+			dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(40));
 		if (err) {
 			dev_err(&pdev->dev, "mvpp2: cannot set dma_mask\n");
 			goto err_clk;
