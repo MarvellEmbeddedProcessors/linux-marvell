@@ -37,6 +37,7 @@ static inline void mv_pp2x_relaxed_write(struct mv_pp2x_hw *hw, u32 offset, u32 
 {
 	void *reg_ptr;
 
+	cpu = hw->mv_pp2x_no_single_mode * cpu;
 	reg_ptr = hw->cpu_base[cpu] + offset;
 
 	writel_relaxed(data, reg_ptr);
@@ -56,8 +57,11 @@ static inline u32 mv_pp2x_read(struct mv_pp2x_hw *hw, u32 offset)
 static inline u32 mv_pp2x_relaxed_read(struct mv_pp2x_hw *hw, u32 offset, int cpu)
 {
 	u32 val;
-	void *reg_ptr = hw->cpu_base[cpu] + offset;
+	void *reg_ptr;
 
+	cpu = hw->mv_pp2x_no_single_mode * cpu;
+
+	reg_ptr = hw->cpu_base[cpu] + offset;
 	val = readl_relaxed(reg_ptr);
 	return val;
 }

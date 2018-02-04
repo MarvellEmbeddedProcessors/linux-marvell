@@ -2087,12 +2087,15 @@ static inline void mv_pp2x_tx_timer_kill(struct mv_pp2x_cp_pcpu *cp_pcpu)
  * So for cold CPU's address space equal to last address space used by HOT CPU's + 1.
  * For example if its dual AP(16 CPU's), # of HOT CPU's = 8 and current CPU = 13.
  * CPU would be indicated as cold_cpu=true and address_space = 8.
+ * Single resource mode use only first address space.
  */
 static int mv_pp2x_check_address_space(struct mv_pp2x *priv, int cpu, bool *cold_cpu)
 {
 	int address_space;
 
-	if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
+	if (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) {
+		address_space = 0;
+	} else if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
 		address_space = QV_CPU_2_ADR_SP(cpu, priv->pp2_cfg.num_of_ap);
 	} else if (cpu < priv->rx_count) {
 		address_space = QV_CPU_2_ADR_SP(cpu, (priv->rx_count / MVPP2_MAX_CPUS_IN_AP));
@@ -2469,7 +2472,7 @@ int mv_pp22_rss_rxfh_indir_set(struct mv_pp2x_port *port)
 	u32 cos_width = 0, cpu_width = 0, cpu_id = 0;
 	int rss_tbl_needed = port->cos_cfg.num_cos_queues;
 
-	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+	if (port->priv->pp2_cfg.queue_mode != MVPP2_QDIST_MULTI_MODE)
 		return -1;
 
 	memset(&rss_entry, 0, sizeof(struct mv_pp22_rss_entry));
@@ -2554,7 +2557,7 @@ int mv_pp22_rss_mode_set(struct mv_pp2x_port *port, int rss_mode)
 		return err;
 	}
 
-	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+	if (port->priv->pp2_cfg.queue_mode != MVPP2_QDIST_MULTI_MODE)
 		return -1;
 
 	if (rss_mode != MVPP2_RSS_2T &&
@@ -2630,7 +2633,7 @@ int mv_pp22_rss_default_cpu_set(struct mv_pp2x_port *port, int default_cpu)
 	u32 cpu_width = 0, cos_width = 0;
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 
-	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+	if (port->priv->pp2_cfg.queue_mode != MVPP2_QDIST_MULTI_MODE)
 		return -1;
 
 	if (!(*cpumask_bits(cpu_online_mask) & (1 << default_cpu))) {
@@ -3995,8 +3998,14 @@ static void mv_pp2x_send_pend_aggr_txq(void *arg)
 	 * Single mode only fist of all vectors related to this sub vec will drain pending packets
 	 * Milti mode: hot CPU's - only fist of all vectors related to this sub vec will drain pending packets
 	 * cold CPU's - only fist cold CPU will drain pending packets.
+	 * Single resource mode: Only CPU 0 will drain pending packets.
 	 */
-	if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
+	if (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) {
+		/* Only CPU0 will drain aggregated queue */
+		if (smp_processor_id())
+			return;
+		address_space = 0;
+	} else if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
 		address_space = QV_CPU_2_ADR_SP(smp_processor_id(), port->priv->pp2_cfg.num_of_ap);
 		if ((address_space * port->priv->pp2_cfg.num_of_ap) != smp_processor_id())
 			return;
@@ -4970,6 +4979,7 @@ static int mv_pp22_calculate_num_sub_vector(struct mv_pp2x_port *port)
  * For single queue mode:
  * If more than 8 CPU's in system -> More than one sub vector would be allocated per queue vector
  * for TX done procedure. All RX will be handled by same MVPP2_RX_SHARED interrupt and on address space.
+ * Single resource mode: Single queue vector, address space and MVPP2_PRIVATE Interrupt allocated.
  */
 static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 {
@@ -4984,6 +4994,12 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 	port->q_vector = devm_kcalloc(port->dev->dev.parent, MVPP2_MAX_ADDR_SPACES,
 		sizeof(struct queue_vector), GFP_KERNEL);
 	q_vec = port->q_vector;
+
+	/* For single resource mode skip sub vector allocation.
+	 * In this mode single queue vector, address space and Interrupt used.
+	 */
+	if (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE)
+		goto last_queue_vector;
 
 	/* Each cpu has queue_vector for private tx_done counters and/or
 	 * private rx_queues
@@ -5060,6 +5076,7 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 		port->num_qvector++;
 	}
 
+last_queue_vector:
 	if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
 		/* Additional queue_vector's for TX Shared queue vectors */
 		for (i = address_space; i < (num_private_q_vec + port->priv->other_count); i++) {
@@ -5096,7 +5113,15 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 		q_vec[address_space].irq = port->of_irqs[irq_index];
 
 		q_vec[address_space].qv_type = MVPP2_RX_SHARED;
-
+		/* Add TX done queue mask for single resource mode(should handle both TX done and RX)
+		 * and set MVPP2_PRIVATE interrupt type(used by singe CPU 0)
+		 */
+		if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE) {
+			q_vec[address_space].qv_type = MVPP2_RX_SHARED;
+		} else {
+			q_vec[address_space].qv_type = MVPP2_PRIVATE;
+			queue_mask |= (queue_mask << MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET);
+		}
 		sub_q_vec = mv_pp22_allocate_sub_vector(port, &q_vec[address_space], queue_mask);
 		q_vec[address_space].queue_mask = sub_q_vec->queue_mask;
 		q_vec[address_space].sub_vec[0] = sub_q_vec;
@@ -6202,9 +6227,11 @@ static int mv_pp2x_init_config(struct mv_pp2x_param_config *pp2_cfg,
 	 * Same as for physical aggregated queues, mvpp22 HW has only 9 copy's of buffer manager refill register.
 	 * So in this case BM refill procedure should be protected.
 	 * In single resource mode aggregated queue always should be locked, since single address spaces used by kernel.
+	 * Singe thread deal with RX, so there is no need in BM lock.
 	 */
 	if (((num_active_cpus() > MVPP2_MAX_CPUS_IN_AP) && ((pp2_cfg->queue_mode == MVPP2_QDIST_SINGLE_MODE) ||
-							    (mv_pp2x_rx_count > (MVPP2_MAX_ADDR_SPACES - 1))))) {
+							    (mv_pp2x_rx_count > (MVPP2_MAX_ADDR_SPACES - 1)))) ||
+							    (pp2_cfg->queue_mode == MVPP2_SINGLE_RESOURCE_MODE)) {
 		pp2_cfg->spinlocks_bitmap |= MV_AGGR_QUEUE_LOCK;
 
 		if (pp2_cfg->queue_mode == MVPP2_QDIST_MULTI_MODE) {
@@ -6636,7 +6663,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	}
 	priv->pp2_version = priv->pp2xdata->pp2x_ver;
 
-	mv_pp2x_used_addr_spaces = MVPP2_MAX_ADDR_SPACES;
+	mv_pp2x_used_addr_spaces = (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ? 1 : MVPP2_MAX_ADDR_SPACES;
 
 	/* DMA Configruation */
 	if (priv->pp2_version == PPV22) {
@@ -6660,6 +6687,8 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	/*Init PP2 Configuration */
 	err = mv_pp2x_init_config(&priv->pp2_cfg, cell_index);
+	priv->hw.mv_pp2x_no_single_mode = (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ? 0 : 1;
+
 	if (err < 0) {
 		dev_err(&pdev->dev, "invalid driver parameters configured\n");
 		goto err_clk;
@@ -6704,7 +6733,10 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	/* Init PP22 rxfhindir table evenly in probe */
 	if (priv->pp2_version == PPV22) {
 		mv_pp22_init_rxfhindir(priv);
-		priv->num_rss_tables = mv_pp2x_queue_mode * mv_pp2x_num_cos_queues;
+		if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
+			priv->num_rss_tables = mv_pp2x_num_cos_queues;
+		else
+			priv->num_rss_tables = 0;
 	}
 
 	if (priv->pp2_version == PPV22) {

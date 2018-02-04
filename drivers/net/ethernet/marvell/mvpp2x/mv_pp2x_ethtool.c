@@ -814,7 +814,7 @@ static int mv_pp2x_ethtool_get_rxnfc(struct net_device *dev,
 	if (port->priv->pp2_version == PPV21)
 		return -EOPNOTSUPP;
 
-	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+	if (port->priv->pp2_cfg.queue_mode != MVPP2_QDIST_MULTI_MODE)
 		return -EOPNOTSUPP;
 
 	if (port->flags & MVPP2_F_IF_MUSDK)
@@ -885,7 +885,7 @@ static int mv_pp2x_ethtool_set_rxnfc(struct net_device *dev, struct ethtool_rxnf
 		return -EOPNOTSUPP;
 
 	/* Single mode doesn't support RSS features */
-	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+	if (port->priv->pp2_cfg.queue_mode != MVPP2_QDIST_MULTI_MODE)
 		return -EOPNOTSUPP;
 
 	if (port->flags & MVPP2_F_IF_MUSDK)
@@ -912,7 +912,7 @@ static int mv_pp2x_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 		return -EOPNOTSUPP;
 
 	/* Single mode doesn't support RSS features */
-	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+	if (port->priv->pp2_cfg.queue_mode != MVPP2_QDIST_MULTI_MODE)
 		return -EOPNOTSUPP;
 
 	if (port->flags & MVPP2_F_IF_MUSDK)
@@ -941,7 +941,7 @@ static int mv_pp2x_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 		return -EOPNOTSUPP;
 
 	/* Single mode doesn't support RSS features */
-	if (port->priv->pp2_cfg.queue_mode == MVPP2_QDIST_SINGLE_MODE)
+	if (port->priv->pp2_cfg.queue_mode != MVPP2_QDIST_MULTI_MODE)
 		return -EOPNOTSUPP;
 
 	if (port->flags & MVPP2_F_IF_MUSDK)

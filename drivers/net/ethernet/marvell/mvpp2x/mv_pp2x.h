@@ -224,7 +224,8 @@ enum mv_pp2x_queue_distribution_mode {
 	 * configured on the additional interrupt.
 	 */
 	MVPP2_QDIST_SINGLE_MODE,
-	MVPP2_QDIST_MULTI_MODE	/* PPv2.2 only requires N interrupts */
+	MVPP2_QDIST_MULTI_MODE,	/* PPv2.2 only requires N interrupts */
+	MVPP2_SINGLE_RESOURCE_MODE
 };
 
 enum mv_pp2x_cos_classifier {
@@ -515,6 +516,8 @@ struct mv_pp2x_hw {
 	struct mv_pp2x_cls_shadow *cls_shadow;
 	/* C2 shadow info */
 	struct mv_pp2x_c2_shadow *c2_shadow;
+
+	bool mv_pp2x_no_single_mode;
 };
 
 struct mv_pp2x_cos {
