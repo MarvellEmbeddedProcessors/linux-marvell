@@ -229,6 +229,11 @@ static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,
 
 	val = mv_pp2x_read(hw, MVPP2_BM_POOL_CTRL_REG(pool));
 	val |= MVPP2_BM_START_MASK;
+	val &= ~MVPP2_BM_LOW_THRESH_MASK;
+	val &= ~MVPP2_BM_HIGH_THRESH_MASK;
+	val |= MVPP2_BM_LOW_THRESH_VALUE(MVPP2_BM_BPPI_LOW_THRESH);
+	val |= MVPP2_BM_HIGH_THRESH_VALUE(MVPP2_BM_BPPI_HIGH_THRESH);
+
 	mv_pp2x_write(hw, MVPP2_BM_POOL_CTRL_REG(pool), val);
 }
 
