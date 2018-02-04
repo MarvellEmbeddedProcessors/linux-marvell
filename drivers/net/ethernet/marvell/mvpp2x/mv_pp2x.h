@@ -379,9 +379,6 @@ struct mv_pp2x_tx_queue {
 };
 
 struct mv_pp2x_aggr_tx_queue {
-	/* Physical number of this Tx queue */
-	u8 id;
-
 	/* Number of Tx DMA descriptors in the descriptor ring */
 	int size;
 
@@ -391,16 +388,11 @@ struct mv_pp2x_aggr_tx_queue {
 	/* Number of currently used Tx DMA descriptor in the descriptor ring used by HW */
 	int hw_count;
 
-	/* Virtual pointer to address of the Aggr_Tx DMA descriptors
-	* memory_allocation
-	*/
-	void *desc_mem;
+	/* Index of the next Tx DMA descriptor to process */
+	int next_desc_to_proc;
 
 	/* Virtual pointer to address of the Aggr_Tx DMA descriptors array */
 	struct mv_pp2x_tx_desc *first_desc;
-
-	/* DMA address of the Tx DMA descriptors array */
-	dma_addr_t descs_phys;
 
 	/* Index of the last Tx DMA descriptor */
 	int last_desc;
@@ -408,11 +400,16 @@ struct mv_pp2x_aggr_tx_queue {
 	/* AGGR TX queue lock */
 	spinlock_t spinlock;
 
-	/* Index of the next Tx DMA descriptor to process */
-	int next_desc_to_proc;
+	/* DMA address of the Tx DMA descriptors array */
+	dma_addr_t descs_phys;
 
-	/* XPS mask */
-	cpumask_t affinity_mask;
+	/* Virtual pointer to address of the Aggr_Tx DMA descriptors
+	* memory_allocation
+	*/
+	void *desc_mem;
+
+	/* Physical number of this Tx queue */
+	u8 id;
 } __aligned(MVPP2_CACHE_LINE_SIZE);
 
 struct mv_pp2x_rx_queue {
