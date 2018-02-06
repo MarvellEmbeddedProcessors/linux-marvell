@@ -5585,7 +5585,6 @@ EXPORT_SYMBOL(mv_pp2x_port_musdk_set);
 int mv_pp2x_port_musdk_clear(void *netdev_priv)
 {
 	struct mv_pp2x_port *port = netdev_priv;
-	bool was_running = false;
 
 	if (!(port->flags & MVPP2_F_IF_MUSDK))
 		return 0;
@@ -5596,7 +5595,7 @@ int mv_pp2x_port_musdk_clear(void *netdev_priv)
 	if (netif_running(port->dev)) {
 		rtnl_lock();
 		dev_close(port->dev);
-		was_running = true;
+		rtnl_unlock();
 	}
 
 	/* Set num configured entities back to configured values */
@@ -5605,11 +5604,6 @@ int mv_pp2x_port_musdk_clear(void *netdev_priv)
 	port->num_tx_queues = port->cfg_num_tx_queues;
 
 	port->flags &= ~MVPP2_F_IF_MUSDK;
-
-	if (was_running) {
-		dev_open(port->dev);
-		rtnl_unlock();
-	}
 	return 0;
 }
 EXPORT_SYMBOL(mv_pp2x_port_musdk_clear);
