@@ -189,7 +189,7 @@
 		};
 	};
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			pinctrl@440000 {
 				compatible = "marvell,a80x0-cp0-pinctrl";
@@ -246,7 +246,7 @@
 		};
 	};
 
-	cp110-1 {
+	cp1 {
 		config-space {
 			pinctrl@440000 {
 				compatible = "marvell,a80x0-cp1-pinctrl";

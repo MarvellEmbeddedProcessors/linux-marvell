@@ -47,7 +47,7 @@
 	compatible = "marvell,armada3900-db-vd", "marvell,armada7040",
 		     "marvell,armada-ap806-quad", "marvell,armada-ap806";
 
-	cp110-0 {
+	cp0 {
 		config-space {
 			pinctrl@440000 {
 				cp0_xhci0_vbus_pins: cp0-xhci0-vbus-pins {
