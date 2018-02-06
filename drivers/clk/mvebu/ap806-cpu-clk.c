@@ -156,7 +156,7 @@ static int ap806_clk_probe(struct platform_device *pdev)
 	struct ap806_clk *ap806_clk;
 	struct clk *max_cpu_clk;
 	struct device_node *dn, *np = pdev->dev.of_node;
-	int ret, nclusters = 0, ncpus = 0, cluster_index = 0;
+	int ret, nclusters = 0, cluster_index = 0;
 	struct regmap *reg;
 
 	/* set initial CPU frequency as maximum possible frequency */
@@ -172,14 +172,32 @@ static int ap806_clk_probe(struct platform_device *pdev)
 		return PTR_ERR(reg);
 	}
 
-	for_each_node_by_type(dn, "cpu")
-		ncpus++;
+	/*
+	 * AP806 has 4 cpus and DFS for AP806 is controlled per cluster
+	 * (2 CPUs per cluster), cpu0 and cpu1 are fixed to cluster0 while
+	 * cpu2 and cpu3 are fixed to cluster1 whether they are enabled or not.
+	 * Since cpu0 is the boot cpu, then cluster0 must exist.
+	 * If cpu2 or cpu3 is enabled, cluster1 will exist and the cluster
+	 * number is 2; otherwise the cluster number is 1.
+	 */
+	nclusters = 1;
+	for_each_node_by_type(dn, "cpu") {
+		int cpu, err;
+
+		err = of_property_read_u32(dn, "reg", &cpu);
+		if (WARN_ON(err))
+			return err;
+
+		/* If cpu2 or cpu3 is enabled */
+		if ((cpu & APN806_CLUSTER_NUM_MASK)) {
+			nclusters = 2;
+			break;
+		}
+	}
 
 	/* DFS for AP806 is controlled per cluster (2 CPUs per cluster),
 	 * so allocate structs per cluster
 	 */
-	nclusters = ncpus / AP806_CPUS_PER_CLUSTER;
-
 	ap806_clk = devm_kzalloc(dev, nclusters * sizeof(*ap806_clk), GFP_KERNEL);
 	if (WARN_ON(!ap806_clk))
 		return -ENOMEM;
