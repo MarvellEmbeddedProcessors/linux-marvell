@@ -4264,10 +4264,6 @@ int mv_pp2x_open_cls(struct net_device *dev)
 		return err;
 	}
 
-	/* For musdk ports do not updated classifier/rss, only parser. */
-	if (port->flags & MVPP2_F_IF_MUSDK)
-		return 0;
-
 	err = mv_pp2x_update_flow_info(hw);
 	if (err) {
 		netdev_err(port->dev, "cannot update flow info\n");
@@ -4450,9 +4446,11 @@ int mv_pp2x_open(struct net_device *dev)
 	/* Before rxq and port init, all ingress packets should be blocked
 	 *  in classifier
 	 */
-	err = mv_pp2x_open_cls(dev);
-	if (err)
-		goto err_free_all;
+	if (!(port->flags & MVPP2_F_IF_MUSDK)) {
+		err = mv_pp2x_open_cls(dev);
+		if (err)
+			goto err_free_all;
+	}
 
 	return 0;
 
@@ -5572,6 +5570,9 @@ int mv_pp2x_port_musdk_set(void *netdev_priv)
 	port->num_qvector = 0;
 	port->num_rx_queues = 0;
 	port->num_tx_queues = 0;
+
+	/* For MUSDK port, run cls_open once */
+	mv_pp2x_open_cls(port->dev);
 
 	port->flags |= MVPP2_F_IF_MUSDK;
 	if (was_running) {
