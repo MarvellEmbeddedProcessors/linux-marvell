@@ -88,7 +88,7 @@ u8 mv_pp2x_num_cos_queues = 4;
 
 u8 mv_pp2x_rx_count = MVPP2_DEFAULT_RX_COUNT;
 
-static u8 mv_pp2x_queue_mode = MVPP2_QDIST_SINGLE_MODE;
+static u8 mv_pp2x_queue_mode = MVPP2_QDIST_MULTI_MODE;
 static u8 mv_pp2x_used_addr_spaces;
 static u8 rss_mode = MVPP2_RSS_5T; /* Set 5-tuple default RSS mode */
 static u8 default_cpu;
