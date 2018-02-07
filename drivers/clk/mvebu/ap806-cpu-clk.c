@@ -209,7 +209,7 @@ static int ap806_clk_probe(struct platform_device *pdev)
 	for_each_node_by_type(dn, "cpu") {
 		struct clk_init_data init;
 		struct clk *clk;
-		char *clk_name = devm_kzalloc(dev, 5, GFP_KERNEL);
+		char *clk_name = devm_kzalloc(dev, 9, GFP_KERNEL);
 		int cpu, err;
 
 		if (WARN_ON(!clk_name))
