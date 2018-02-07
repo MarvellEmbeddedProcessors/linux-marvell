@@ -5548,7 +5548,6 @@ static int mv_pp22_uio_mem_map(struct mv_pp2x_uio *pp2x_uio, struct resource *re
 int mv_pp2x_port_musdk_set(void *netdev_priv)
 {
 	struct mv_pp2x_port *port = netdev_priv;
-	bool was_running = false;
 
 	if (port->flags & MVPP2_F_IF_MUSDK)
 		return 0;
@@ -5559,7 +5558,7 @@ int mv_pp2x_port_musdk_set(void *netdev_priv)
 	if (netif_running(port->dev)) {
 		rtnl_lock();
 		dev_close(port->dev);
-		was_running = true;
+		rtnl_unlock();
 	}
 	/* Backup num configured entities */
 	port->cfg_num_qvector   = port->num_qvector;
@@ -5575,10 +5574,6 @@ int mv_pp2x_port_musdk_set(void *netdev_priv)
 	mv_pp2x_open_cls(port->dev);
 
 	port->flags |= MVPP2_F_IF_MUSDK;
-	if (was_running) {
-		dev_open(port->dev);
-		rtnl_unlock();
-	}
 	return 0;
 }
 EXPORT_SYMBOL(mv_pp2x_port_musdk_set);
