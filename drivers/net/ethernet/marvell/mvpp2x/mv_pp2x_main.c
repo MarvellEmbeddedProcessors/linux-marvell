@@ -6652,7 +6652,6 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	struct device_node *port_node;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 	bool probe_defer = false;
-	phys_addr_t cma_addr;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(struct mv_pp2x), GFP_KERNEL);
 	if (!priv)
@@ -6673,13 +6672,21 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		goto err_clk;
 	}
 	priv->pp2_version = priv->pp2xdata->pp2x_ver;
+
 	/* Retrieve dts defined cma-area (shared-dma-pool).
 	 * Enables allocating cma_memory on DRAM that is physically close to the PPV2 device.
 	 */
 	of_reserved_mem_device_init(&pdev->dev);
-	cma_addr = cma_get_base(dev_get_cma_area(&pdev->dev));
-	dev_info(&pdev->dev, "cma_area base %pa size %ld MB\n", &cma_addr,
-		 cma_get_size(dev_get_cma_area(&pdev->dev)) / SZ_1M);
+#if !defined MODULE
+	/* cma_get_base/dev_get_cma_area are Not exported by Kernel */
+	{
+		phys_addr_t cma_addr;
+
+		cma_addr = cma_get_base(dev_get_cma_area(&pdev->dev));
+		dev_info(&pdev->dev, "cma_area base %pa size %ld MB\n", &cma_addr,
+			 cma_get_size(dev_get_cma_area(&pdev->dev)) / SZ_1M);
+	}
+#endif
 
 	mv_pp2x_used_addr_spaces = (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ? 1 : MVPP2_MAX_ADDR_SPACES;
 
