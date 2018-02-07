@@ -2144,9 +2144,9 @@ void mv_pp2x_aggr_txq_pend_desc_add(struct mv_pp2x_port *port, int pending, int 
 }
 
 /* TX to HW the pendings in aggregated TXQ; kill deferring TX hrtimer */
-static inline void mv_pp2x_aggr_txq_pend_send(struct mv_pp2x_port *port,
-					      struct mv_pp2x_cp_pcpu *cp_pcpu,
-					      struct mv_pp2x_aggr_tx_queue *aggr_txq, int address_space)
+void mv_pp2x_aggr_txq_pend_send(struct mv_pp2x_port *port,
+				struct mv_pp2x_cp_pcpu *cp_pcpu,
+				struct mv_pp2x_aggr_tx_queue *aggr_txq, int address_space)
 {
 	mv_pp2x_tx_timer_kill(cp_pcpu);
 	aggr_txq->hw_count += aggr_txq->sw_count;

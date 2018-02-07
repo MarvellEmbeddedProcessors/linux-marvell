@@ -755,5 +755,7 @@ int mvcpn110_mac_hw_init(struct mv_pp2x_port *port);
 void mv_pp2x_counters_stat_update(struct mv_pp2x_port *port,
 				  struct gop_stat *gop_statistics);
 void mv_pp2x_counters_stat_clear(struct mv_pp2x_port *port);
-
+void mv_pp2x_aggr_txq_pend_send(struct mv_pp2x_port *port,
+				struct mv_pp2x_cp_pcpu *cp_pcpu,
+				struct mv_pp2x_aggr_tx_queue *aggr_txq, int address_space);
 #endif /* _MVPP2_HW_H_ */
