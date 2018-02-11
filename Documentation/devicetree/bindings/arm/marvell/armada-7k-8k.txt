@@ -77,6 +77,9 @@ Boards:
    - "marvell,armada8040-mcbin"
       when the board being used is the MACCHIATOBin community board
 
+   - "marvell,armada8040-mcbin-single-shot"
+      when the board being used is the MACCHIATOBin single shot community board
+
    - "marvell,armada8040-ocp"
       when the board being used is the OCP board
 
