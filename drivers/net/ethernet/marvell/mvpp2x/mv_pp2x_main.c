@@ -7052,7 +7052,7 @@ static int mv_pp2x_rxq_number_get(void)
 		if (mv_pp2x_num_cos_queues * num_active_cpus() > MVPP22_MAX_NUM_RXQ)
 			rx_queue_num = MVPP22_MAX_NUM_RXQ;
 		else
-			rx_queue_num = mv_pp2x_num_cos_queues * mv_pp2x_rx_count;
+			rx_queue_num = mv_pp2x_num_cos_queues * num_active_cpus();
 	else
 		rx_queue_num = mv_pp2x_num_cos_queues;
 
