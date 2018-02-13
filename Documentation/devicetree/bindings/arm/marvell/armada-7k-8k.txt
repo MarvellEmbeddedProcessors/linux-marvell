@@ -29,6 +29,9 @@ Boards:
    - "marvell,armada7020-amc"
       when the board being used is the Armada 7020 AMC board
 
+   - "marvell,armada7020-comexpress"
+      when the board being used is the Armada 7020 COMEXPRESS board
+
    - "marvell,armada7040-db-default", "marvell,armada7040-db"
       when the board being used is the Armada 7040 Development board
 
