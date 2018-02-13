@@ -251,7 +251,7 @@ static void ap806_temp_set_threshold(struct platform_device *pdev,
 	reg |= (temp << EXT_TSEN_THRESH_OFFSET);
 
 	/* Set Hysteresis */
-	reg &= ~(EXT_TSEN_THRESH_HYST_MASK << TSEN_THRESH_HYST_OFFSET);
+	reg &= ~(EXT_TSEN_THRESH_HYST_MASK << EXT_TSEN_THRESH_HYST_OFFSET);
 	reg |= (hyst << EXT_TSEN_THRESH_HYST_OFFSET);
 
 	writel(reg, priv->control + TSEN_CONTROL_MSB_OFFSET);
