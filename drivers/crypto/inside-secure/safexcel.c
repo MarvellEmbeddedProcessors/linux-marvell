@@ -805,14 +805,9 @@ inline int safexcel_select_ring(struct safexcel_crypto_priv *priv)
 
 /* Free crypto API result mapping */
 void safexcel_free_context(struct safexcel_crypto_priv *priv,
-			   struct crypto_async_request *req,
-			   int result_sz)
+			   struct crypto_async_request *req)
 {
 	struct safexcel_context *ctx = crypto_tfm_ctx(req->tfm);
-
-	if (ctx->result_dma)
-		dma_unmap_single(priv->dev, ctx->result_dma, result_sz,
-				 DMA_FROM_DEVICE);
 
 	if (ctx->cache) {
 		dma_unmap_single(priv->dev, ctx->cache_dma, ctx->cache_sz,
