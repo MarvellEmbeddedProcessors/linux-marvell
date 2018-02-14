@@ -86,6 +86,7 @@
 	             "marvell,armada-ap806";
 
 	aliases {
+		gpio0 = &gpio0;
 		gpio1 = &cp0_gpio0;
 		gpio2 = &cp0_gpio1;
 	};
