@@ -54,6 +54,7 @@
 	             "marvell,armada-ap806";
 
 	aliases {
+		gpio0 = &gpio0;
 		gpio1 = &cpm_gpio0;
 		gpio2 = &cpm_gpio1;
 		ethernet0 = &emac0;
