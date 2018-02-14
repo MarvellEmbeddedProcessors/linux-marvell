@@ -349,10 +349,7 @@
 				#gpio-cells = <2>;
 				interrupt-controller;
 				#interrupt-cells = <2>;
-				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
-					<GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
-					<GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
-					<GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			sd_mmc_reg0: regulator@0 {
