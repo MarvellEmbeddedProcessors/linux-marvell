@@ -4,15 +4,19 @@ Required properties:
 
 - compatible : Should be "marvell,orion-gpio", "marvell,mv78200-gpio"
   or "marvell,armadaxp-gpio". "marvell,orion-gpio" should be used for
-  Orion, Kirkwood, Dove, Discovery (except MV78200) and Armada
-  370. "marvell,mv78200-gpio" should be used for the Discovery
-  MV78200. "marvel,armadaxp-gpio" should be used for all Armada XP
-  SoCs (MV78230, MV78260, MV78460).
+  Orion, Kirkwood, Dove, Discovery (except MV78200), Armada 370, and
+  Armada 7k&8k AP/CP. "marvell,mv78200-gpio" should be used for the
+  Discovery MV78200. "marvel,armadaxp-gpio" should be used for all
+  Armada XP SoCs (MV78230, MV78260, MV78460).
 
-- reg: Address and length of the register set for the device. Only one
-  entry is expected, except for the "marvell,armadaxp-gpio" variant
-  for which two entries are expected: one for the general registers,
-  one for the per-cpu registers.
+- reg: Address and length of the register sets for the device.
+  - For "marvell,mv78200-gpio" compatible, one entry for the general registers;
+  - For "marvell,armadaxp-gpio" compatible, two entries are expected:
+    one for the general registers, one for the per-cpu registers.
+  - For "marvell,orion-gpio" compatible, reg can be one entry or two entries:
+    for Armada 7k&8k AP GPIO controllers, reg has two entries: one for the general
+    registers, one for soc interrupt registers;
+    for other controllers, reg has one entry for the general registers.
 
 - interrupts: The list of interrupts that are used for all the pins
   managed by this GPIO bank. There can be more than one interrupt

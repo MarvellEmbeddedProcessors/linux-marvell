@@ -62,6 +62,20 @@
 #define GPIO_EDGE_MASK_MV78200_OFF(cpu)	  ((cpu) ? 0x30 : 0x18)
 #define GPIO_LEVEL_MASK_MV78200_OFF(cpu)  ((cpu) ? 0x34 : 0x1C)
 
+/*
+ * For Armada 7k & 8k, AP806 gpio interrupt is also managed by SoC interrupt
+ * registers besides its own gpio interrupt registers;
+ * Each SoC interrupt register bit manages 8 GPIOs: [0] - GPIO0-7 interrupt,
+ * [1] - GPIO8-15 interrupt, [2] - GPIO16-19 interrupt(AP806 has 20 GPIOs)
+ * and [31:3] - Reserved.
+ * SoC interrupt cause register type is RW0C;
+ * SoC interrupt mask register is active low (0 = Interrupt mask and
+ * 1 = Interrupt enable);
+ */
+#define SOC_INT_CAUSE_OFF	0x0000
+#define SOC_INT_MASK_OFF	0x0004
+#define SOC_INT_1BIT_GPIOS	8
+
 /* The Armada XP has per-CPU registers for interrupt cause, interrupt
  * mask and interrupt level mask. Those are relative to the
  * percpu_membase. */
@@ -80,6 +94,7 @@ struct mvebu_gpio_chip {
 	spinlock_t	   lock;
 	void __iomem	  *membase;
 	void __iomem	  *percpu_membase;
+	void __iomem	  *soc_int_base;
 	int		   irqbase;
 	struct irq_domain *domain;
 	int		   soc_variant;
@@ -303,6 +318,10 @@ static void mvebu_gpio_irq_ack(struct irq_data *d)
 
 	irq_gc_lock(gc);
 	writel_relaxed(mask, mvebu_gpioreg_edge_cause(mvchip));
+	if (mvchip->soc_int_base) {
+		mask = ~(1 << ((d->irq - gc->irq_base) / SOC_INT_1BIT_GPIOS));
+		writel_relaxed(mask, mvchip->soc_int_base + SOC_INT_CAUSE_OFF);
+	}
 	irq_gc_unlock(gc);
 }
 
@@ -317,6 +336,20 @@ static void mvebu_gpio_edge_irq_mask(struct irq_data *d)
 	ct->mask_cache_priv &= ~mask;
 
 	writel_relaxed(ct->mask_cache_priv, mvebu_gpioreg_edge_mask(mvchip));
+	if (mvchip->soc_int_base) {
+		u32 soc_int_bit = (d->irq - gc->irq_base) / SOC_INT_1BIT_GPIOS;
+		u32 reg = readl(mvchip->soc_int_base + SOC_INT_MASK_OFF);
+
+		/*
+		 * Each SoC interrupt register bit manages 8 GPIOs and is
+		 * active low. So when the 8 GPIOs' interrupts are all masked,
+		 * clear the SoC interrupt bit to mask it.
+		 */
+		if (!(ct->mask_cache_priv & (0xff << soc_int_bit))) {
+			reg &= ~(1 << soc_int_bit);
+			writel(reg, mvchip->soc_int_base + SOC_INT_MASK_OFF);
+		}
+	}
 	irq_gc_unlock(gc);
 }
 
@@ -331,6 +364,20 @@ static void mvebu_gpio_edge_irq_unmask(struct irq_data *d)
 	irq_gc_lock(gc);
 	ct->mask_cache_priv |= mask;
 	writel_relaxed(ct->mask_cache_priv, mvebu_gpioreg_edge_mask(mvchip));
+	if (mvchip->soc_int_base) {
+		u32 soc_int_bit = (d->irq - gc->irq_base) / SOC_INT_1BIT_GPIOS;
+		u32 reg = readl(mvchip->soc_int_base + SOC_INT_MASK_OFF);
+
+		/*
+		 * Each SoC interrupt register bit manages 8 GPIOs and is
+		 * active low. So when other 7 GPIOs' interrupts are not
+		 * unmasked, set the SoC interrupt bit to unmask it.
+		 */
+		if ((ct->mask_cache_priv & (0xff << soc_int_bit)) == mask) {
+			reg |= (1 << soc_int_bit);
+			writel(reg, mvchip->soc_int_base + SOC_INT_MASK_OFF);
+		}
+	}
 	irq_gc_unlock(gc);
 }
 
@@ -733,6 +780,18 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
 							       res);
 		if (IS_ERR(mvchip->percpu_membase))
 			return PTR_ERR(mvchip->percpu_membase);
+	}
+
+	if (soc_variant == MVEBU_GPIO_SOC_VARIANT_ORION) {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+		if (res) {
+			mvchip->soc_int_base =
+				devm_ioremap_resource(&pdev->dev, res);
+
+			if (IS_ERR(mvchip->soc_int_base))
+				return PTR_ERR(mvchip->soc_int_base);
+
+		}
 	}
 
 	/*
