@@ -342,7 +342,8 @@
 
 			gpio0: gpio@6F5040 {
 				compatible = "marvell,orion-gpio";
-				reg = <0x6F5040 0x40>;
+				reg = <0x6F5040 0x40>, /* gpio interrupt regs */
+				      <0x6F4328 0x8>; /* soc interrupt regs */
 				ngpios = <20>;
 				gpio-controller;
 				#gpio-cells = <2>;
