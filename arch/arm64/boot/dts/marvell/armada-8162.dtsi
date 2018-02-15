@@ -130,10 +130,6 @@
 	/* Delete unsupported interfaces from CP nodes:
 	 *	1. AXI monitors in CP depend on syscon APB pclock from AP810, so disable all
 	 *	   monitors in CP at the moment, due to missing clock (syscon) driver in AP
-	 *	2. XOR in CP requires unique stream ID for it's MSI parent (AP810 GIC ITS,
-	 *	   but currently ATF set all CPs with the same stream ID.
-	 *	   Once ATF configures unique stream ID's per CP's interfaces, this should be
-	 *	   enabled
 	 */
 	cp0 {
 		config-space {
@@ -144,8 +140,6 @@
 			/delete-node/ axim-ppv2-wr@3c1000;
 			/delete-node/ axim-hb1-rd@3c8000;
 			/delete-node/ axim-hb1-wr@3c9000;
-			/delete-node/ dma_xor@6a0000;
-			/delete-node/ dma_xor@6c0000;
 		};
 
 	};
@@ -158,8 +152,6 @@
 			/delete-node/ axim-ppv2-wr@3c1000;
 			/delete-node/ axim-hb1-rd@3c8000;
 			/delete-node/ axim-hb1-wr@3c9000;
-			/delete-node/ dma_xor@6a0000;
-			/delete-node/ dma_xor@6c0000;
 		};
 	};
 };
