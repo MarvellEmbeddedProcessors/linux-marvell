@@ -112,9 +112,6 @@
 	aliases {
 		gpio1 = &cp0_gpio0;
 		gpio2 = &cp0_gpio1;
-		ethernet0 = &cp0_emac0;
-		ethernet1 = &cp0_emac2;
-		ethernet2 = &cp0_emac3;
 	};
 
 	ap806 {
