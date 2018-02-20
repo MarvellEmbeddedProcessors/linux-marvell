@@ -823,15 +823,13 @@ static void mv_pp2x_prs_sram_offset_set(struct mv_pp2x_prs_entry *pe,
 static struct mv_pp2x_prs_entry *mv_pp2x_prs_flow_find(struct mv_pp2x_hw *hw,
 						       int flow,
 						       unsigned int ri,
-						       unsigned int ri_mask)
+						       unsigned int ri_mask,
+						       struct mv_pp2x_prs_entry *pe)
 {
-	struct mv_pp2x_prs_entry *pe;
 	int tid;
 	unsigned int dword, enable;
 
-	pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-	if (!pe)
-		return NULL;
+	memset(pe, 0, sizeof(*pe));
 	mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_FLOWS);
 
 	/* Go through the all entires with MVPP2_PRS_LU_FLOWS */
@@ -858,8 +856,6 @@ static struct mv_pp2x_prs_entry *mv_pp2x_prs_flow_find(struct mv_pp2x_hw *hw,
 		if ((bits & MVPP2_PRS_FLOW_ID_MASK) == flow)
 			return pe;
 	}
-	kfree(pe);
-
 	return NULL;
 }
 
@@ -1150,14 +1146,12 @@ static void mv_pp2x_prs_dsa_tag_ethertype_set(struct mv_pp2x_hw *hw, int port,
 /* Search for existing single/triple vlan entry */
 static struct mv_pp2x_prs_entry *mv_pp2x_prs_vlan_find(struct mv_pp2x_hw *hw,
 						       unsigned short tpid,
-						       int ai)
+						       int ai,
+						       struct mv_pp2x_prs_entry *pe)
 {
-	struct mv_pp2x_prs_entry *pe;
 	int tid;
 
-	pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-	if (!pe)
-		return NULL;
+	memset(pe, 0, sizeof(*pe));
 	mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_VLAN);
 
 	/* Go through the all entries with MVPP2_PRS_LU_VLAN */
@@ -1193,8 +1187,6 @@ static struct mv_pp2x_prs_entry *mv_pp2x_prs_vlan_find(struct mv_pp2x_hw *hw,
 		    ri_bits == MVPP2_PRS_RI_VLAN_TRIPLE)
 			return pe;
 	}
-	kfree(pe);
-
 	return NULL;
 }
 
@@ -1203,10 +1195,10 @@ static int mv_pp2x_prs_vlan_add(struct mv_pp2x_hw *hw, unsigned short tpid,
 				int ai, unsigned int port_map)
 {
 	struct mv_pp2x_prs_entry *pe;
+	struct mv_pp2x_prs_entry l_pe;
 	int tid_aux, tid;
-	int ret = 0;
 
-	pe = mv_pp2x_prs_vlan_find(hw, tpid, ai);
+	pe = mv_pp2x_prs_vlan_find(hw, tpid, ai, &l_pe);
 
 	if (!pe) {
 		/* Create new tcam entry */
@@ -1215,9 +1207,8 @@ static int mv_pp2x_prs_vlan_add(struct mv_pp2x_hw *hw, unsigned short tpid,
 		if (tid < 0)
 			return tid;
 
-		pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-		if (!pe)
-			return -ENOMEM;
+		pe = &l_pe;
+		memset(pe, 0, sizeof(*pe));
 
 		/* Get last double vlan tid */
 		for (tid_aux = MVPP2_PE_LAST_FREE_TID;
@@ -1235,11 +1226,9 @@ static int mv_pp2x_prs_vlan_add(struct mv_pp2x_hw *hw, unsigned short tpid,
 			    MVPP2_PRS_RI_VLAN_DOUBLE)
 				break;
 		}
-
-		if (tid <= tid_aux) {
-			ret = -EINVAL;
-			goto error;
-		}
+		/* New-single should be after double/aux */
+		if (tid <= tid_aux)
+			return -EINVAL;
 
 		memset(pe, 0, sizeof(struct mv_pp2x_prs_entry));
 		mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_VLAN);
@@ -1270,11 +1259,7 @@ static int mv_pp2x_prs_vlan_add(struct mv_pp2x_hw *hw, unsigned short tpid,
 	mv_pp2x_prs_tcam_port_map_set(pe, port_map);
 
 	mv_pp2x_prs_hw_write(hw, pe);
-
-error:
-	kfree(pe);
-
-	return ret;
+	return 0;
 }
 
 /* Get first free double vlan ai number */
@@ -1291,15 +1276,14 @@ static int mv_pp2x_prs_double_vlan_ai_free_get(struct mv_pp2x_hw *hw)
 }
 
 /* Search for existing double vlan entry */
-static struct mv_pp2x_prs_entry *mv_pp2x_prs_double_vlan_find(
-	struct mv_pp2x_hw *hw, unsigned short tpid1, unsigned short tpid2)
+static struct mv_pp2x_prs_entry *mv_pp2x_prs_double_vlan_find(struct mv_pp2x_hw *hw,
+							      unsigned short tpid1,
+							      unsigned short tpid2,
+							      struct mv_pp2x_prs_entry *pe)
 {
-	struct mv_pp2x_prs_entry *pe;
 	int tid;
 
-	pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-	if (!pe)
-		return NULL;
+	memset(pe, 0, sizeof(*pe));
 	mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_VLAN);
 
 	/* Go through the all entries with MVPP2_PRS_LU_VLAN */
@@ -1325,8 +1309,6 @@ static struct mv_pp2x_prs_entry *mv_pp2x_prs_double_vlan_find(
 		if (ri_mask == MVPP2_PRS_RI_VLAN_DOUBLE)
 			return pe;
 	}
-	kfree(pe);
-
 	return NULL;
 }
 
@@ -1337,9 +1319,10 @@ static int mv_pp2x_prs_double_vlan_add(struct mv_pp2x_hw *hw,
 				       unsigned int port_map)
 {
 	struct mv_pp2x_prs_entry *pe;
-	int tid_aux, tid, ai, ret = 0;
+	struct mv_pp2x_prs_entry l_pe;
+	int tid_aux, tid, ai;
 
-	pe = mv_pp2x_prs_double_vlan_find(hw, tpid1, tpid2);
+	pe = mv_pp2x_prs_double_vlan_find(hw, tpid1, tpid2, &l_pe);
 
 	if (!pe) {
 		/* Create new tcam entry */
@@ -1348,16 +1331,13 @@ static int mv_pp2x_prs_double_vlan_add(struct mv_pp2x_hw *hw,
 		if (tid < 0)
 			return tid;
 
-		pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-		if (!pe)
-			return -ENOMEM;
+		pe = &l_pe;
+		memset(pe, 0, sizeof(*pe));
 
 		/* Set ai value for new double vlan entry */
 		ai = mv_pp2x_prs_double_vlan_ai_free_get(hw);
-		if (ai < 0) {
-			ret = ai;
-			goto error;
-		}
+		if (ai < 0)
+			return ai;
 
 		/* Get first single/triple vlan tid */
 		for (tid_aux = MVPP2_PE_FIRST_FREE_TID;
@@ -1376,11 +1356,9 @@ static int mv_pp2x_prs_double_vlan_add(struct mv_pp2x_hw *hw,
 			    ri_bits == MVPP2_PRS_RI_VLAN_TRIPLE)
 				break;
 		}
-
-		if (tid >= tid_aux) {
-			ret = -ERANGE;
-			goto error;
-		}
+		/* New-double should be before single/aux */
+		if (tid >= tid_aux)
+			return -ERANGE;
 
 		memset(pe, 0, sizeof(struct mv_pp2x_prs_entry));
 		mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_VLAN);
@@ -1406,10 +1384,7 @@ static int mv_pp2x_prs_double_vlan_add(struct mv_pp2x_hw *hw,
 	/* Update ports' mask */
 	mv_pp2x_prs_tcam_port_map_set(pe, port_map);
 	mv_pp2x_prs_hw_write(hw, pe);
-
-error:
-	kfree(pe);
-	return ret;
+	return 0;
 }
 
 /* IPv4 header parsing for fragmentation and L4 offset */
@@ -2499,14 +2474,12 @@ static bool mv_pp2x_prs_mac_range_equals(struct mv_pp2x_prs_entry *pe,
 /* Find tcam entry with matched pair <MAC DA, port> */
 static struct mv_pp2x_prs_entry *
 mv_pp2x_prs_mac_da_range_find(struct mv_pp2x_hw *hw, int pmap, const u8 *da,
-			      unsigned char *mask, int udf_type)
+			      unsigned char *mask, int udf_type,
+			      struct mv_pp2x_prs_entry *pe)
 {
-	struct mv_pp2x_prs_entry *pe;
 	int tid;
 
-	pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-	if (!pe)
-		return NULL;
+	memset(pe, 0, sizeof(*pe));
 	mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_MAC);
 
 	/* Go through the all entires with MVPP2_PRS_LU_MAC */
@@ -2526,8 +2499,6 @@ mv_pp2x_prs_mac_da_range_find(struct mv_pp2x_hw *hw, int pmap, const u8 *da,
 		if (mv_pp2x_prs_mac_range_equals(pe, da, mask))
 			return pe;
 	}
-	kfree(pe);
-
 	return NULL;
 }
 
@@ -2535,14 +2506,14 @@ mv_pp2x_prs_mac_da_range_find(struct mv_pp2x_hw *hw, int pmap, const u8 *da,
 int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_port *port, const u8 *da, bool add)
 {
 	struct mv_pp2x_prs_entry *pe;
+	struct mv_pp2x_prs_entry l_pe;
 	unsigned int pmap, len, ri, tid;
 	unsigned char mask[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 
 	/* Scan TCAM and see if entry with this <MAC DA, port> already exist */
 	pe = mv_pp2x_prs_mac_da_range_find(hw, (1 << port->id), da, mask,
-					   MVPP2_PRS_UDF_MAC_DEF);
-
+					   MVPP2_PRS_UDF_MAC_DEF, &l_pe);
 	/* No such entry */
 	if (!pe) {
 		if (!add)
@@ -2555,9 +2526,9 @@ int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_port *port, const u8 *da, bool add)
 		if (tid < 0)
 			return tid;
 
-		pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-		if (!pe)
-			return -1;
+		pe = &l_pe;
+		memset(pe, 0, sizeof(*pe));
+
 		mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_MAC);
 		pe->index = tid;
 
@@ -2571,13 +2542,10 @@ int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_port *port, const u8 *da, bool add)
 	/* Invalidate the entry if no ports are left enabled */
 	pmap = mv_pp2x_prs_tcam_port_map_get(pe);
 	if (pmap == 0) {
-		if (add) {
-			kfree(pe);
+		if (add)
 			return -1;
-		}
 		mv_pp2x_prs_hw_inv(hw, pe->index);
 		hw->prs_shadow[pe->index].valid = false;
-		kfree(pe);
 		return 0;
 	}
 
@@ -2613,8 +2581,6 @@ int mv_pp2x_prs_mac_da_accept(struct mv_pp2x_port *port, const u8 *da, bool add)
 	hw->prs_shadow[pe->index].udf = MVPP2_PRS_UDF_MAC_DEF;
 	mv_pp2x_prs_shadow_set(hw, pe->index, MVPP2_PRS_LU_MAC);
 	mv_pp2x_prs_hw_write(hw, pe);
-
-	kfree(pe);
 
 	return 0;
 }
@@ -2744,13 +2710,13 @@ static int mv_pp2x_prs_vid_drop_entry_accept(struct net_device *dev,
 					     bool add)
 {
 	struct mv_pp2x_prs_entry *pe;
+	struct mv_pp2x_prs_entry l_pe;
 	unsigned int pmap;
 	struct mv_pp2x_port *port = netdev_priv(dev);
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 
-	pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-	if (!pe)
-		return -ENOMEM;
+	pe = &l_pe;
+	memset(pe, 0, sizeof(*pe));
 	pe->index = tid;
 
 	if (add) {
@@ -2772,13 +2738,10 @@ static int mv_pp2x_prs_vid_drop_entry_accept(struct net_device *dev,
 	/* Invalidate the entry if no ports are left enabled */
 	pmap = mv_pp2x_prs_tcam_port_map_get(pe);
 	if (pmap == 0) {
-		if (add) {
-			kfree(pe);
+		if (add)
 			return -EPERM;
-		}
 		mv_pp2x_prs_hw_inv(hw, pe->index);
 		hw->prs_shadow[pe->index].valid = false;
-		kfree(pe);
 		return 0;
 	}
 
@@ -2796,7 +2759,6 @@ static int mv_pp2x_prs_vid_drop_entry_accept(struct net_device *dev,
 	/* Update shadow table */
 	mv_pp2x_prs_shadow_set(hw, pe->index, MVPP2_PRS_LU_VID);
 	mv_pp2x_prs_hw_write(hw, pe);
-	kfree(pe);
 	return 0;
 }
 
@@ -2817,16 +2779,14 @@ static bool mv_pp2x_prs_tcam_vid_empty(struct mv_pp2x_hw *hw, unsigned char star
 
 /* Find tcam entry with matched pair <vid,port> */
 static struct mv_pp2x_prs_entry *
-mv_pp2x_prs_vid_range_find(struct mv_pp2x_hw *hw, int pmap, u16 vid, u16 mask)
+mv_pp2x_prs_vid_range_find(struct mv_pp2x_hw *hw, int pmap, u16 vid, u16 mask,
+			   struct mv_pp2x_prs_entry *pe)
 {
-	struct mv_pp2x_prs_entry *pe;
 	unsigned char byte[2], enable[2];
 	u16 rvid, rmask;
 	int tid;
 
-	pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-	if (!pe)
-		return NULL;
+	memset(pe, 0, sizeof(*pe));
 	mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_VID);
 
 	/* Go through the all entires with MVPP2_PRS_LU_VID */
@@ -2848,8 +2808,6 @@ mv_pp2x_prs_vid_range_find(struct mv_pp2x_hw *hw, int pmap, u16 vid, u16 mask)
 
 		return pe;
 	}
-	kfree(pe);
-
 	return NULL;
 }
 
@@ -2857,6 +2815,7 @@ mv_pp2x_prs_vid_range_find(struct mv_pp2x_hw *hw, int pmap, u16 vid, u16 mask)
 int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, bool add)
 {
 	struct mv_pp2x_prs_entry *pe;
+	struct mv_pp2x_prs_entry l_pe;
 	int tid;
 	int rc;
 	bool empty = false;
@@ -2868,7 +2827,7 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 	unsigned int vid_start = MVPP2_PE_VID_FILT_RANGE_START + port->id * MVPP2_PRS_VLAN_FILT_MAX;
 
 	/* Scan TCAM and see if entry with this <vid,port> already exist */
-	pe = mv_pp2x_prs_vid_range_find(hw, (1 << port->id), vid, mask);
+	pe = mv_pp2x_prs_vid_range_find(hw, (1 << port->id), vid, mask, &l_pe);
 
 	if (vid == 0)
 		/*no need to add vid 0 to HW*/
@@ -2904,9 +2863,8 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 		if (tid < 0)
 			return tid;
 
-		pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-		if (!pe)
-			return -ENOMEM;
+		pe = &l_pe;
+		memset(pe, 0, sizeof(*pe));
 
 		mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_VID);
 		pe->index = tid;
@@ -2921,10 +2879,8 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 	/* Invalidate the entry if no ports are left enabled */
 	pmap = mv_pp2x_prs_tcam_port_map_get(pe);
 	if (pmap == 0) {
-		if (add) {
-			kfree(pe);
+		if (add)
 			return -EPERM;
-		}
 		mv_pp2x_prs_hw_inv(hw, pe->index);
 		hw->prs_shadow[pe->index].valid = false;
 		empty = mv_pp2x_prs_tcam_vid_empty(hw, vid_start, vid_start + MVPP2_PRS_VLAN_FILT_MAX_ENTRY);
@@ -2937,7 +2893,6 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 				return rc;
 			}
 		}
-		kfree(pe);
 		return 0;
 	}
 
@@ -2956,7 +2911,6 @@ int mv_pp2x_prs_vid_entry_accept(struct net_device *dev, u16 proto, u16 vid, boo
 	/* Update shadow table */
 	mv_pp2x_prs_shadow_set(hw, pe->index, MVPP2_PRS_LU_VID);
 	mv_pp2x_prs_hw_write(hw, pe);
-	kfree(pe);
 
 	return 0;
 }
@@ -3015,10 +2969,11 @@ int mv_pp2x_prs_tag_mode_set(struct mv_pp2x_hw *hw, int port, int type)
 int mv_pp2x_prs_def_flow(struct mv_pp2x_port *port)
 {
 	struct mv_pp2x_prs_entry *pe;
+	struct mv_pp2x_prs_entry l_pe;
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	int tid;
 
-	pe = mv_pp2x_prs_flow_find(hw, port->id, 0, 0);
+	pe = mv_pp2x_prs_flow_find(hw, port->id, 0, 0, &l_pe);
 
 	/* Such entry not exist */
 	if (!pe) {
@@ -3029,9 +2984,8 @@ int mv_pp2x_prs_def_flow(struct mv_pp2x_port *port)
 		if (tid < 0)
 			return tid;
 
-		pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-		if (!pe)
-			return -ENOMEM;
+		pe = &l_pe;
+		memset(pe, 0, sizeof(*pe));
 
 		mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_FLOWS);
 		pe->index = tid;
@@ -3047,8 +3001,6 @@ int mv_pp2x_prs_def_flow(struct mv_pp2x_port *port)
 
 	mv_pp2x_prs_tcam_port_map_set(pe, (1 << port->id));
 	mv_pp2x_prs_hw_write(hw, pe);
-	kfree(pe);
-
 	return 0;
 }
 
@@ -3057,26 +3009,24 @@ int mv_pp2x_prs_flow_id_gen(struct mv_pp2x_port *port, u32 flow_id,
 			    u32 res, u32 res_mask)
 {
 	struct mv_pp2x_prs_entry *pe;
+	struct mv_pp2x_prs_entry l_pe;
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	int tid;
 	unsigned int pmap = 0;
 
-	pe = mv_pp2x_prs_flow_find(hw, flow_id, res, res_mask);
+	pe = mv_pp2x_prs_flow_find(hw, flow_id, res, res_mask, &l_pe);
 
 	/* Such entry not exist */
 	if (!pe) {
-		pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-		if (!pe)
-			return -ENOMEM;
+		pe = &l_pe;
+		memset(pe, 0, sizeof(*pe));
 
 		/* Go through the all entires from last to first */
 		tid = mv_pp2x_prs_tcam_first_free(hw,
 						  MVPP2_PE_LAST_FREE_TID,
-			MVPP2_PE_FIRST_FREE_TID);
-		if (tid < 0) {
-			kfree(pe);
+						  MVPP2_PE_FIRST_FREE_TID);
+		if (tid < 0)
 			return tid;
-		}
 
 		mv_pp2x_prs_tcam_lu_set(pe, MVPP2_PRS_LU_FLOWS);
 		pe->index = tid;
@@ -3095,7 +3045,6 @@ int mv_pp2x_prs_flow_id_gen(struct mv_pp2x_port *port, u32 flow_id,
 
 	mv_pp2x_prs_tcam_port_map_set(pe, (1 << port->id) | pmap);
 	mv_pp2x_prs_hw_write(hw, pe);
-	kfree(pe);
 
 	return 0;
 }
