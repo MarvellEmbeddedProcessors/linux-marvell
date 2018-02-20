@@ -16,6 +16,9 @@ Optional properties:
 - tx-csum-limit: maximum mtu supported by port that allow TX checksum.
   Value is presented in bytes. If not used, by default 1600B is set for
   "marvell,armada-370-neta" and 9800B for others.
+- managed: string, specifies the PHY management type. Supported values are:
+  "auto", "in-band-status". "auto" is the default, it uses MDIO for
+  management if fixed-link is not specified.
 
 Optional properties (valid only for Armada XP/38x/3700):
 
@@ -65,3 +68,21 @@ Example with serdes PHY:
 	phys = <&a3700_comphy 1 COMPHY_SGMII1>;
 	phy-names = "comphy";
 };
+
+Example with in-band PHY (presented on MDIO bus):
+	eth1: ethernet@40000 {
+	...
+	phy-mode = "sgmii";
+	phy = <&phy1>;
+	...
+	managed = "in-band-status";
+};
+
+Example with in-band PHY (not presented on MDIO bus):
+	eth1: ethernet@40000 {
+	...
+	phy-mode = "sgmii";
+	...
+	managed = "in-band-status";
+};
+

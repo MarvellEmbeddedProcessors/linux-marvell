@@ -1355,7 +1355,7 @@ static void mvneta_mac_config(struct mvneta_port *pp)
 			/* SGMII mode receives the state from the PHY */
 			new_ctrl2 |= MVNETA_GMAC2_SGMII_INBAND_AN_MODE;
 			new_clk |= MVNETA_GMAC_1MS_CLOCK_ENABLE;
-			/* SGMII aoto-nego clock */
+			/* SGMII auto-nego clock */
 			new_an |= MVNETA_GMAC_INBAND_AN_ENABLE |
 				   MVNETA_GMAC_INBAND_AN_BYPASS_EN |
 				   MVNETA_GMAC_AN_SPEED_EN |
@@ -2882,11 +2882,30 @@ static irqreturn_t mvneta_percpu_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static const char *phy_speed_to_str(int speed)
+{
+	switch (speed) {
+	case SPEED_10:
+		return "10Mbps";
+	case SPEED_100:
+		return "100Mbps";
+	case SPEED_1000:
+		return "1Gbps";
+	case SPEED_2500:
+		return "2.5Gbps";
+	case SPEED_10000:
+		return "10Gbps";
+	case SPEED_UNKNOWN:
+		return "Unknown";
+	default:
+		return "Unsupported (update phy.c)";
+	}
+}
+
 static int mvneta_fixed_link_update(struct mvneta_port *pp,
 				    struct phy_device *phy)
 {
 	struct fixed_phy_status status;
-	struct fixed_phy_status changed = {};
 	u32 gmac_stat = mvreg_read(pp, MVNETA_GMAC_STATUS);
 
 	status.link = !!(gmac_stat & MVNETA_GMAC_LINK_UP);
@@ -2897,10 +2916,33 @@ static int mvneta_fixed_link_update(struct mvneta_port *pp,
 	else
 		status.speed = SPEED_10;
 	status.duplex = !!(gmac_stat & MVNETA_GMAC_FULL_DUPLEX);
-	changed.link = 1;
-	changed.speed = 1;
-	changed.duplex = 1;
-	fixed_phy_update_state(phy, &status, &changed);
+
+	phy->speed = status.speed;
+	phy->duplex = status.duplex;
+	phy->link = status.link;
+
+	if (pp->link != status.link) {
+		pp->link = status.link;
+		if (!status.link) {
+			pp->duplex = -1;
+			pp->speed = 0;
+
+			mvneta_port_down(pp);
+			netif_carrier_off(pp->dev);
+			netdev_info(pp->dev, "Link is Down\n");
+		} else {
+			pp->speed = status.speed;
+			pp->duplex = status.duplex;
+
+			mvneta_port_up(pp);
+			netif_carrier_on(pp->dev);
+			netdev_info(pp->dev,
+				    "Link is Up - %s/%s - flow control off\n",
+				    phy_speed_to_str(status.speed),
+				    (status.duplex == DUPLEX_FULL) ? "Full" : "Half");
+		}
+	}
+
 	return 0;
 }
 
@@ -3562,11 +3604,21 @@ static int mvneta_mdio_probe(struct mvneta_port *pp)
 {
 	struct phy_device *phy_dev;
 
-	phy_dev = of_phy_connect(pp->dev, pp->phy_node, mvneta_adjust_link, 0,
-				 pp->phy_interface);
-	if (!phy_dev) {
-		netdev_err(pp->dev, "could not find the PHY\n");
-		return -ENODEV;
+	if (!pp->use_inband_status) {
+		phy_dev = of_phy_connect(pp->dev, pp->phy_node, mvneta_adjust_link, 0,
+					 pp->phy_interface);
+		if (!phy_dev) {
+			netdev_err(pp->dev, "could not find the PHY\n");
+			return -ENODEV;
+		}
+	} else {
+		phy_dev = pp->phy_dev;
+		/* for in-band PHY presented on SMI bus, run auto negotiation */
+		if (pp->phy_node) {
+			phy_init_hw(phy_dev);
+			phy_start_aneg(phy_dev);
+			mvneta_fixed_link_update(pp, phy_dev);
+		}
 	}
 
 	/* Neta does not support 1000baseT_Half */
@@ -3583,7 +3635,8 @@ static int mvneta_mdio_probe(struct mvneta_port *pp)
 
 static void mvneta_mdio_remove(struct mvneta_port *pp)
 {
-	phy_disconnect(pp->phy_dev);
+	if (!pp->use_inband_status)
+		phy_disconnect(pp->phy_dev);
 	pp->phy_dev = NULL;
 }
 
@@ -3749,14 +3802,13 @@ static int mvneta_open(struct net_device *dev)
 	int ret;
 
 	if (pp->flags & MVNETA_PORT_F_IF_MUSDK) {
-		if (!pp->use_inband_status) {
-			ret = mvneta_mdio_probe(pp);
-			if (ret < 0) {
-				netdev_err(dev, "cannot probe MDIO bus\n");
-				return 0;
-			}
-			phy_start(pp->phy_dev);
+		ret = mvneta_mdio_probe(pp);
+		if (ret < 0) {
+			netdev_err(dev, "cannot probe MDIO bus\n");
+			return 0;
 		}
+		if (!pp->use_inband_status)
+			phy_start(pp->phy_dev);
 		netdev_warn(dev, "skipping ndo_open as this port is User Space port\n");
 		return 0;
 	}
@@ -3800,12 +3852,10 @@ static int mvneta_open(struct net_device *dev)
 	/* In default link is down */
 	netif_carrier_off(pp->dev);
 
-	if (!pp->use_inband_status) {
-		ret = mvneta_mdio_probe(pp);
-		if (ret < 0) {
-			netdev_err(dev, "cannot probe MDIO bus\n");
-			return 0;
-		}
+	ret = mvneta_mdio_probe(pp);
+	if (ret < 0) {
+		netdev_err(dev, "cannot probe MDIO bus\n");
+		return 0;
 	}
 
 	mvneta_start_dev(pp);
@@ -3843,8 +3893,7 @@ static int mvneta_stop(struct net_device *dev)
 		free_irq(dev->irq, pp);
 	}
 
-	if (!pp->use_inband_status)
-		mvneta_mdio_remove(pp);
+	mvneta_mdio_remove(pp);
 
 	mvneta_cleanup_rxqs(pp);
 	mvneta_cleanup_txqs(pp);
@@ -4673,17 +4722,6 @@ static int mvneta_probe(struct platform_device *pdev)
 			err = -ENODEV;
 			goto err_free_irq;
 		}
-
-		err = of_phy_register_fixed_link(dn);
-		if (err < 0) {
-			dev_err(&pdev->dev, "cannot register fixed PHY\n");
-			goto err_free_irq;
-		}
-
-		/* In the case of a fixed PHY, the DT node associated
-		 * to the PHY is the Ethernet MAC DT node.
-		 */
-		phy_node = of_node_get(dn);
 	}
 
 	phy_mode = of_get_phy_mode(dn);
@@ -4883,9 +4921,32 @@ static int mvneta_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, pp->dev);
 
 	if (pp->use_inband_status) {
-		struct phy_device *phy = of_phy_find_device(dn);
+		struct phy_device *phy;
 
-		mvneta_fixed_link_update(pp, phy);
+		if (!pp->phy_node) {
+			struct fixed_phy_status fphy_status = {
+				.link = 1,
+				.speed = SPEED_1000,
+				.duplex = DUPLEX_FULL,
+			};
+
+			phy = fixed_phy_register(PHY_POLL, &fphy_status, -1, NULL);
+			if (!phy || IS_ERR(phy)) {
+				netdev_err(dev, "Failed to register fixed PHY device\n");
+				return -ENODEV;
+			}
+		} else {
+			phy = of_phy_find_device(pp->phy_node);
+			if (!phy || IS_ERR(phy)) {
+				netdev_err(dev, "Failed to find PHY device\n");
+				return -ENODEV;
+			}
+			phy_attach_direct(pp->dev, phy, 0, pp->phy_interface);
+		}
+		pp->phy_dev = phy;
+		pp->link    = 0;
+		pp->duplex  = 0;
+		pp->speed   = 0;
 
 		put_device(&phy->mdio.dev);
 	}
@@ -4915,7 +4976,8 @@ err_exit_phy:
 	if (!IS_ERR(pp->comphy))
 		phy_exit(pp->comphy);
 err_put_phy_node:
-	of_node_put(phy_node);
+	if (pp->phy_node)
+		of_node_put(phy_node);
 err_free_irq:
 	irq_dispose_mapping(dev->irq);
 err_free_netdev:
@@ -4934,7 +4996,10 @@ static int mvneta_remove(struct platform_device *pdev)
 	free_percpu(pp->ports);
 	free_percpu(pp->stats);
 	irq_dispose_mapping(dev->irq);
-	of_node_put(pp->phy_node);
+	if (pp->use_inband_status && pp->phy_node)
+		phy_detach(pp->phy_dev);
+	if (pp->phy_node)
+		of_node_put(pp->phy_node);
 	free_netdev(dev);
 
 	if (pp->bm_priv) {
@@ -5007,8 +5072,6 @@ static int mvneta_resume(struct platform_device *pdev)
 	}
 
 	mvneta_port_power_up(pp, pp->phy_interface);
-	if (pp->use_inband_status)
-		mvneta_fixed_link_update(pp, dev->phydev);
 
 	netif_device_attach(dev);
 	if (netif_running(dev)) {
