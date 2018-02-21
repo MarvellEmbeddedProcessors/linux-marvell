@@ -2867,7 +2867,7 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		 * comprised by the RX descriptor.
 		 */
 		if (unlikely(rx_status & MVPP2_RXD_ERR_SUMMARY)) {
-			netdev_warn(port->dev, "MVPP2_RXD_ERR_SUMMARY\n");
+			pr_err_ratelimited("netdev: %s MVPP2_RXD_ERR_SUMMARY\n", port->dev->name);
 err_drop_frame:
 			dev->stats.rx_errors++;
 			mv_pp2x_rx_error(port, rx_desc);

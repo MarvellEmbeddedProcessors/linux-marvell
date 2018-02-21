@@ -3684,19 +3684,16 @@ void mv_pp2x_rx_error(struct mv_pp2x_port *port,
 
 	switch (status & MVPP2_RXD_ERR_CODE_MASK) {
 	case MVPP2_RXD_ERR_CRC:
-		netdev_err(port->dev,
-			   "bad rx status %08x (crc error), size=%d\n",
-			   status, rx_desc->data_size);
+		pr_err_ratelimited("netdev: %s bad rx status %08x (crc error), size=%d\n",
+				   port->dev->name, status, rx_desc->data_size);
 		break;
 	case MVPP2_RXD_ERR_OVERRUN:
-		netdev_err(port->dev,
-			   "bad rx status %08x (overrun error), size=%d\n",
-			   status, rx_desc->data_size);
+		pr_err_ratelimited("netdev: %s bad rx status %08x (overrun error), size=%d\n",
+				   port->dev->name, status, rx_desc->data_size);
 		break;
 	case MVPP2_RXD_ERR_RESOURCE:
-		netdev_err(port->dev,
-			   "bad rx status %08x (resource error), size=%d\n",
-			   status, rx_desc->data_size);
+		pr_err_ratelimited("netdev: %s bad rx status %08x (resource error), size=%d\n",
+				   port->dev->name, status, rx_desc->data_size);
 		break;
 	}
 }
