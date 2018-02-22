@@ -42,9 +42,11 @@
 
 /*
  * Device Tree file for MACCHIATOBin SingleShot Armada 8040 community board platform
+ * Difference from MACCHIATOBin DoubleShot:
+ * MacchiatoBin single shot doesn't have two 3310 PHY's connected to port 0 on each CP
  */
 
-#include "armada-8040.dtsi"
+#include "armada-8040-mcbin.dts"
 
 / {
 	model = "Marvell 8040 MACHIATOBin SingleShot";
@@ -52,208 +54,23 @@
 		     "marvell,armada8040", "marvell,armada-ap806-quad",
 		     "marvell,armada-ap806";
 
-	memory@00000000 {
-		device_type = "memory";
-		reg = <0x0 0x0 0x0 0x80000000>;
-	};
-
-	aliases {
-		ethernet0 = &cp0_emac0;
-		ethernet1 = &cp1_emac0;
-		ethernet2 = &cp1_emac2;
-		ethernet3 = &cp1_emac3;
-	};
-
-	ap806 {
-		config-space {
-			serial@512000 {
-				status = "okay";
-			};
-			sdhci@6e0000 {
-				vqmmc-supply = <&vccq_mmc_reg>;
-				bus-width = <8>;
-				no-1-8-v;
-				non-removable;
-				marvell,xenon-emmc;
-				pinctrl-names = "default";
-				pinctrl-0 = <&ap_emmc_pins>;
-				status = "okay";
-			};
-			vccq_mmc_reg: regulator@0 {
-				compatible = "regulator-fixed";
-				regulator-name = "vccq-mmc-reg";
-				regulator-min-microvolt = <3300000>;
-				regulator-max-microvolt = <3300000>;
-				regulator-always-on;
-				status = "okay";
-			};
-		};
-	};
-
 	cp0 {
 		config-space {
-			pinctrl@440000 {
-				xhci0_vbus_pins: xhci0-vbus-pins {
-					marvell,pins = "mpp47";
-					marvell,function = "gpio";
-				};
-				pcie_reset_pins: pcie-reset-pins {
-					marvell,pins = "mpp52";
-					marvell,function = "gpio";
-				};
-			};
-			cp0_comphy: comphy {
-				status = "okay";
-			};
-			sdhci@780000 {
-				vqmmc-supply = <&vccq_sdio_reg>;
-				bus-width = <4>;
-				no-1-8-v;
-				broken-cd;
-				pinctrl-names = "default";
-				pinctrl-0 = <&cp0_sdhci_pins>;
-				status = "okay";
-			};
-			i2c@701000 {
-				clock-frequency = <100000>;
-				pinctrl-names = "default";
-				pinctrl-0 = <&cp0_i2c0_pins>;
-				status = "okay";
-			};
-			sata@540000 {
-				status = "okay";
-
-				sata-port@0 {
-					status = "disabled";
-				};
-				sata-port@1 {
-					phys = <&cp0_comphy 5 COMPHY_SATA1>;
-					phy-names = "comphy";
-					status = "okay";
-				};
-			};
-			mdio@12a200 {
-				#address-cells = <1>;
-				#size-cells = <0>;
-				status = "okay";
-				smi_phy0: ethernet-phy@0 {
-					reg = <0>;
-				};
-			};
+			/delete-node/mdio@15b000;
 			gop {
 				emac0_0: mac0 {
-					phy-mode = "sfi"; /* lane-4 */
-					phys = <&cp0_comphy 4 COMPHY_SFI>;
-					phy-names = "comphy";
+					/delete-property/phy;
 				};
 			};
-			ppv22@000000 {
-				l4_chksum_jumbo_port = <0>;
-				pinctrl-names = "default";
-				eth0_0: eth0@010000 {
-					status = "okay";
-				};
-			};
-		};
-		pcie0@600000 {
-			num-lanes = <4>;
-			status = "okay";
-			reset-gpios = <&cp0_gpio1 20 GPIO_ACTIVE_HIGH>;
-			phys = <&cp0_comphy 0 COMPHY_PCIE0
-				&cp0_comphy 1 COMPHY_PCIE0
-				&cp0_comphy 2 COMPHY_PCIE0
-				&cp0_comphy 3 COMPHY_PCIE0
-				>;
-			phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
-			pinctrl-names = "default";
-			pinctrl-0 = <&pcie_reset_pins>;
-		};
-		reg_usb3h0_vbus: usb3-vbus0 {
-			compatible = "regulator-fixed";
-			pinctrl-names = "default";
-			pinctrl-0 = <&xhci0_vbus_pins>;
-			regulator-name = "reg-usb3h0-vbus";
-			regulator-min-microvolt = <5000000>;
-			regulator-max-microvolt = <5000000>;
-			enable-active-high;
-			gpio = <&cp0_gpio1 15 GPIO_ACTIVE_HIGH>;
-			status = "okay";
-		};
-		vccq_sdio_reg: regulator@1 {
-			compatible = "regulator-fixed";
-			regulator-name = "vccq-sdio-reg";
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3300000>;
-			regulator-always-on;
-			status = "okay";
 		};
 	};
 
 	cp1 {
 		config-space {
-			cp1_comphy: comphy {
-				status = "okay";
-			};
-			cp1_usb3h0: usb3@500000 {
-				usb-phy = <&cp1_usb3h0_phy>;
-				separated-phys-for-usb2-usb3;
-				phys = <&cp1_utmi0>,
-				       <&cp1_comphy 2 COMPHY_USB3H0>;
-				phy-names = "usb2", "usb3";
-				status = "okay";
-			};
-			cp1_usb3h0_phy: usb3_phy0 {
-				compatible = "usb-nop-xceiv";
-				vcc-supply = <&reg_usb3h0_vbus>;
-			};
-			sata@540000 {
-				status = "okay";
-
-				sata-port@0 {
-					phys = <&cp1_comphy 1 COMPHY_SATA0>;
-					phy-names = "comphy";
-					status = "okay";
-				};
-				sata-port@1 {
-					phys = <&cp1_comphy 3 COMPHY_SATA1>;
-					phy-names = "comphy";
-					status = "okay";
-				};
-			};
 			gop {
 				cp1_emac0: mac0 {
-					phy-mode = "sfi"; /* lane-4 */
-					phys = <&cp1_comphy 4 COMPHY_SFI>;
-					phy-names = "comphy";
+					/delete-property/phy;
 				};
-				cp1_emac2: mac2 {
-					phy-mode = "sgmii"; /* lane-0 */
-					phys = <&cp1_comphy 0 COMPHY_SGMII1>;
-					phy-names = "comphy";
-					phy = <&smi_phy0>;
-				};
-				cp1_emac3: mac3 {
-					phy-mode = "1000base-x"; /* lane-5 */
-					phy-speed = <2500>;
-					phys = <&cp1_comphy 5 COMPHY_HS_SGMII2>;
-					phy-names = "comphy";
-				};
-			};
-			ppv22@000000 {
-				l4_chksum_jumbo_port = <0>;
-				pinctrl-names = "default";
-				cp1_eth0: eth0@010000 {
-					status = "okay";
-				};
-				cp1_eth1: eth1@020000 {
-					status = "okay";
-				};
-				cp1_eth2: eth2@030000 {
-					status = "okay";
-				};
-			};
-			cp1_utmi0: utmi@580000 {
-				status = "okay";
 			};
 		};
 	};
