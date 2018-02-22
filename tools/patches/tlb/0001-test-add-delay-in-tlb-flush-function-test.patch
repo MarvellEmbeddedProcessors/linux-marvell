@@ -1,0 +1,36 @@
+From 3a10f7bb353da0ed864fcda94f08be454cd83af6 Mon Sep 17 00:00:00 2001
+From: Hanna Hawa <hannah@marvell.com>
+Date: Mon, 19 Feb 2018 10:33:37 +0200
+Subject: [PATCH 1/1] test: add delay in tlb flush function (test)
+
+Change-Id: I146d701837533ef39bca5ab404d77210f0f8dd13
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
+---
+ arch/arm64/include/asm/tlbflush.h | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index b460ae2..66bf376 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -21,6 +21,7 @@
+
+ #ifndef __ASSEMBLY__
+
++#include <linux/delay.h>
+ #include <linux/sched.h>
+ #include <asm/cputype.h>
+
+@@ -125,6 +126,9 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 			asm("tlbi vale1is, %0" : : "r"(addr));
+ 		else
+ 			asm("tlbi vae1is, %0" : : "r"(addr));
++
++		/* Delay for tests */
++		ndelay(250);
+ 	}
+ 	dsb(ish);
+ }
+--
+1.9.1
+
