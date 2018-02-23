@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/workqueue.h>
 
+#include <crypto/internal/aead.h>
 #include <crypto/internal/hash.h>
 #include <crypto/internal/skcipher.h>
 
@@ -1074,6 +1075,7 @@ static struct safexcel_alg_template *safexcel_algs[] = {
 	&safexcel_alg_hmac_sha256,
 	&safexcel_alg_md5,
 	&safexcel_alg_hmac_md5,
+	&safexcel_alg_authenc_hmac_sha256_cbc_aes,
 };
 
 /* Register the supported hash and cipher algorithms */
@@ -1086,6 +1088,8 @@ static int safexcel_register_algorithms(struct safexcel_crypto_priv *priv)
 
 		if (safexcel_algs[i]->type == SAFEXCEL_ALG_TYPE_CIPHER)
 			ret = crypto_register_alg(&safexcel_algs[i]->alg.crypto);
+		else if (safexcel_algs[i]->type == SAFEXCEL_ALG_TYPE_AEAD)
+			ret = crypto_register_aead(&safexcel_algs[i]->alg.aead);
 		else
 			ret = crypto_register_ahash(&safexcel_algs[i]->alg.ahash);
 
@@ -1099,6 +1103,8 @@ fail:
 	for (j = i; j < 0; j--) {
 		if (safexcel_algs[j]->type == SAFEXCEL_ALG_TYPE_CIPHER)
 			crypto_unregister_alg(&safexcel_algs[j]->alg.crypto);
+		else if (safexcel_algs[j]->type == SAFEXCEL_ALG_TYPE_AEAD)
+			crypto_unregister_aead(&safexcel_algs[j]->alg.aead);
 		else
 			crypto_unregister_ahash(&safexcel_algs[j]->alg.ahash);
 	}
@@ -1114,6 +1120,8 @@ static void safexcel_unregister_algorithms(struct safexcel_crypto_priv *priv)
 	for (i = 0; i < ARRAY_SIZE(safexcel_algs); i++) {
 		if (safexcel_algs[i]->type == SAFEXCEL_ALG_TYPE_CIPHER)
 			crypto_unregister_alg(&safexcel_algs[i]->alg.crypto);
+		else if (safexcel_algs[i]->type == SAFEXCEL_ALG_TYPE_AEAD)
+			crypto_unregister_aead(&safexcel_algs[i]->alg.aead);
 		else
 			crypto_unregister_ahash(&safexcel_algs[i]->alg.ahash);
 	}

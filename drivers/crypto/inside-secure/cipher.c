@@ -8,9 +8,13 @@
  * warranty of any kind, whether express or implied.
  */
 
+#include <crypto/aead.h>
 #include <crypto/aes.h>
+#include <crypto/authenc.h>
+#include <crypto/sha.h>
 #include <crypto/des.h>
 #include <linux/dmapool.h>
+#include <crypto/internal/aead.h>
 
 #include "safexcel.h"
 
@@ -30,10 +34,18 @@ struct safexcel_cipher_ctx {
 	struct safexcel_crypto_priv *priv;
 
 	u32 mode;
+	bool aead;
+
 	enum safexcel_cipher_algo algo;
 
 	__le32 key[8];
 	unsigned int key_len;
+
+	/* All the below is AEAD specific */
+	u32 alg;
+	u32 state_sz;
+	u32 ipad[SHA256_DIGEST_SIZE / sizeof(u32)];
+	u32 opad[SHA256_DIGEST_SIZE / sizeof(u32)];
 };
 
 struct safexcel_cipher_req {
@@ -82,6 +94,62 @@ static void safexcel_ablkcipher_token(struct safexcel_cipher_ctx *ctx, u8 *iv,
 				EIP197_TOKEN_INS_TYPE_OUTPUT;
 }
 
+static void safexcel_aead_token(struct safexcel_cipher_ctx *ctx, u8 *iv,
+				struct safexcel_command_desc *cdesc,
+				enum safexcel_cipher_direction direction,
+				u32 cryptlen, u32 assoclen, u32 digestsize)
+{
+	struct safexcel_token *token;
+	unsigned offset = 0;
+
+	if (ctx->mode == CONTEXT_CONTROL_CRYPTO_MODE_CBC) {
+		offset = AES_BLOCK_SIZE / sizeof(u32);
+		memcpy(cdesc->control_data.token, iv, AES_BLOCK_SIZE);
+
+		cdesc->control_data.options |= EIP197_OPTION_4_TOKEN_IV_CMD;
+	}
+
+	token = (struct safexcel_token *)(cdesc->control_data.token + offset);
+
+	if (direction == SAFEXCEL_DECRYPT)
+		cryptlen -= digestsize;
+
+	token[0].opcode = EIP197_TOKEN_OPCODE_DIRECTION;
+	token[0].packet_length = assoclen;
+	token[0].instructions = EIP197_TOKEN_INS_TYPE_HASH |
+				EIP197_TOKEN_INS_TYPE_OUTPUT;
+
+	token[1].opcode = EIP197_TOKEN_OPCODE_DIRECTION;
+	token[1].packet_length = cryptlen;
+	token[1].stat = EIP197_TOKEN_STAT_LAST_HASH;
+	token[1].instructions = EIP197_TOKEN_INS_LAST |
+				EIP197_TOKEN_INS_TYPE_CRYTO |
+				EIP197_TOKEN_INS_TYPE_HASH |
+				EIP197_TOKEN_INS_TYPE_OUTPUT;
+
+	if (direction == SAFEXCEL_ENCRYPT) {
+		token[2].opcode = EIP197_TOKEN_OPCODE_INSERT;
+		token[2].packet_length = digestsize;
+		token[2].stat = EIP197_TOKEN_STAT_LAST_HASH |
+				EIP197_TOKEN_STAT_LAST_PACKET;
+		token[2].instructions = EIP197_TOKEN_INS_TYPE_OUTPUT |
+					EIP197_TOKEN_INS_INSERT_HASH_DIGEST;
+	} else {
+		token[2].opcode = EIP197_TOKEN_OPCODE_RETRIEVE;
+		token[2].packet_length = digestsize;
+		token[2].stat = EIP197_TOKEN_STAT_LAST_HASH |
+				EIP197_TOKEN_STAT_LAST_PACKET;
+		token[2].instructions = EIP197_TOKEN_INS_INSERT_HASH_DIGEST;
+
+		token[3].opcode = EIP197_TOKEN_OPCODE_VERIFY;
+		token[3].packet_length = digestsize |
+					 EIP197_TOKEN_HASH_RESULT_VERIFY;
+		token[3].stat = EIP197_TOKEN_STAT_LAST_HASH |
+				EIP197_TOKEN_STAT_LAST_PACKET;
+		token[3].instructions = EIP197_TOKEN_INS_TYPE_OUTPUT;
+	}
+}
+
 static int safexcel_ablkcipher_aes_setkey(struct crypto_ablkcipher *ctfm,
 			       const u8 *key, unsigned int len)
 {
@@ -116,6 +184,55 @@ static int safexcel_ablkcipher_aes_setkey(struct crypto_ablkcipher *ctfm,
 	return 0;
 }
 
+static int safexcel_aead_aes_setkey(struct crypto_aead *ctfm, const u8 *key,
+				    unsigned int len)
+{
+	struct crypto_tfm *tfm = crypto_aead_tfm(ctfm);
+	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
+	struct safexcel_ahash_export_state istate, ostate;
+	struct safexcel_crypto_priv *priv = ctx->priv;
+	struct crypto_authenc_keys keys;
+
+	if (crypto_authenc_extractkeys(&keys, key, len) != 0)
+		goto badkey;
+
+	if (keys.enckeylen > sizeof(ctx->key))
+		goto badkey;
+
+	/* Encryption key */
+	if (priv->eip_type == EIP197 && ctx->base.ctxr_dma &&
+	    memcmp(ctx->key, keys.enckey, keys.enckeylen))
+		ctx->base.needs_inv = true;
+
+	/* Auth key */
+	if (safexcel_hmac_setkey("safexcel-sha256", keys.authkey,
+				 keys.authkeylen, &istate, &ostate))
+		goto badkey;
+
+	crypto_aead_set_flags(ctfm, crypto_aead_get_flags(ctfm) &
+				    CRYPTO_TFM_RES_MASK);
+
+	if (priv->eip_type == EIP197 && ctx->base.ctxr_dma &&
+	    (memcmp(ctx->ipad, istate.state, ctx->state_sz) ||
+	     memcmp(ctx->opad, ostate.state, ctx->state_sz)))
+		ctx->base.needs_inv = true;
+
+	/* Now copy the keys into the context */
+	memcpy(ctx->key, keys.enckey, keys.enckeylen);
+	ctx->key_len = keys.enckeylen;
+
+	memcpy(ctx->ipad, &istate.state, ctx->state_sz);
+	memcpy(ctx->opad, &ostate.state, ctx->state_sz);
+
+	memzero_explicit(&keys, sizeof(keys));
+	return 0;
+
+badkey:
+	crypto_aead_set_flags(ctfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
+	memzero_explicit(&keys, sizeof(keys));
+	return -EINVAL;
+}
+
 /* Build cipher context control data */
 static int safexcel_context_control(struct safexcel_cipher_ctx *ctx,
 				    struct crypto_async_request *async,
@@ -123,18 +240,30 @@ static int safexcel_context_control(struct safexcel_cipher_ctx *ctx,
 				    struct safexcel_command_desc *cdesc)
 {
 	struct safexcel_crypto_priv *priv = ctx->priv;
-	int ctrl_size = ctx->key_len / sizeof(u32);
+	int ctrl_size;
 
-	cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_CRYPTO_OUT;
+	if (ctx->aead) {
+		if (sreq->direction == SAFEXCEL_ENCRYPT)
+			cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_ENCRYPT_HASH_OUT;
+		else
+			cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_HASH_DECRYPT_IN;
+	} else {
+		cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_CRYPTO_OUT;
 
-	/* The decryption control type is a combination of the encryption type
-	 * and CONTEXT_CONTROL_TYPE_NULL_IN, for all types.
-	 */
-	if (sreq->direction == SAFEXCEL_DECRYPT)
-		cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_NULL_IN;
+		/* The decryption control type is a combination of the
+		 * encryption type and CONTEXT_CONTROL_TYPE_NULL_IN, for all
+		 * types.
+		 */
+		if (sreq->direction == SAFEXCEL_DECRYPT)
+			cdesc->control_data.control0 |= CONTEXT_CONTROL_TYPE_NULL_IN;
+	}
 
 	cdesc->control_data.control0 |= CONTEXT_CONTROL_KEY_EN;
 	cdesc->control_data.control1 |= ctx->mode;
+
+	if (ctx->aead)
+		cdesc->control_data.control0 |= CONTEXT_CONTROL_DIGEST_HMAC |
+						ctx->alg;
 
 	if (ctx->algo == SAFEXCEL_AES) {
 		switch (ctx->key_len) {
@@ -158,6 +287,10 @@ static int safexcel_context_control(struct safexcel_cipher_ctx *ctx,
 		cdesc->control_data.control0 |= CONTEXT_CONTROL_CRYPTO_ALG_3DES;
 	}
 
+	ctrl_size = ctx->key_len / sizeof(u32);
+	if (ctx->aead)
+		/* Take in account the ipad+opad digests */
+		ctrl_size += ctx->state_sz / sizeof(u32) * 2;
 	cdesc->control_data.control0 |= CONTEXT_CONTROL_SIZE(ctrl_size);
 
 	return 0;
@@ -239,35 +372,43 @@ static int safexcel_send_req(struct crypto_async_request *base, int ring,
 	struct safexcel_command_desc *cdesc;
 	struct safexcel_result_desc *rdesc, *first_rdesc;
 	struct scatterlist *sg;
-	int nr_src, nr_dst, n_cdesc = 0, n_rdesc = 0, queued = cryptlen;
+	unsigned int totlen = cryptlen + assoclen;
+	int nr_src, nr_dst, n_cdesc = 0, n_rdesc = 0, queued = totlen;
 	int i, ret = 0;
 
 	if (src == dst) {
 		nr_src = dma_map_sg(priv->dev, src,
-				    sg_nents_for_len(src, cryptlen),
+				    sg_nents_for_len(src, totlen),
 				    DMA_BIDIRECTIONAL);
 		nr_dst = nr_src;
 		if (!nr_src)
 			return -EINVAL;
 	} else {
 		nr_src = dma_map_sg(priv->dev, src,
-				    sg_nents_for_len(src, cryptlen),
+				    sg_nents_for_len(src, totlen),
 				    DMA_TO_DEVICE);
 		if (!nr_src)
 			return -EINVAL;
 
 		nr_dst = dma_map_sg(priv->dev, dst,
-				    sg_nents_for_len(dst, cryptlen),
+				    sg_nents_for_len(dst, totlen),
 				    DMA_FROM_DEVICE);
 		if (!nr_dst) {
 			dma_unmap_sg(priv->dev, src,
-				     sg_nents_for_len(src, cryptlen),
+				     sg_nents_for_len(src, totlen),
 				     DMA_TO_DEVICE);
 			return -EINVAL;
 		}
 	}
 
 	memcpy(ctx->base.ctxr->data, ctx->key, ctx->key_len);
+
+	if (ctx->aead) {
+		memcpy(ctx->base.ctxr->data + ctx->key_len / sizeof(u32),
+		       ctx->ipad, ctx->state_sz);
+		memcpy(ctx->base.ctxr->data + (ctx->key_len + ctx->state_sz) / sizeof(u32),
+		       ctx->opad, ctx->state_sz);
+	}
 
 	/* command descriptors */
 	for_each_sg(src, sg, nr_src, i) {
@@ -278,7 +419,7 @@ static int safexcel_send_req(struct crypto_async_request *base, int ring,
 			len = queued;
 
 		cdesc = safexcel_add_cdesc(priv, ring, !n_cdesc, !(queued - len),
-					   sg_dma_address(sg), len, cryptlen,
+					   sg_dma_address(sg), len, totlen,
 					   ctx->base.ctxr_dma);
 
 		if (IS_ERR(cdesc)) {
@@ -290,7 +431,13 @@ static int safexcel_send_req(struct crypto_async_request *base, int ring,
 
 		if (n_cdesc == 1) {
 			safexcel_context_control(ctx, base, sreq, cdesc);
-			safexcel_ablkcipher_token(ctx, iv, cdesc, cryptlen);
+			if (ctx->aead)
+				safexcel_aead_token(ctx, iv, cdesc,
+						    sreq->direction, cryptlen,
+						    assoclen, digestsize);
+			else
+				safexcel_ablkcipher_token(ctx, iv, cdesc,
+							  cryptlen);
 		}
 
 		queued -= len;
@@ -333,14 +480,14 @@ cdesc_rollback:
 
 	if (src == dst) {
 		dma_unmap_sg(priv->dev, src,
-			     sg_nents_for_len(src, cryptlen),
+			     sg_nents_for_len(src, totlen),
 			     DMA_BIDIRECTIONAL);
 	} else {
 		dma_unmap_sg(priv->dev, src,
-			     sg_nents_for_len(src, cryptlen),
+			     sg_nents_for_len(src, totlen),
 			     DMA_TO_DEVICE);
 		dma_unmap_sg(priv->dev, dst,
-			     sg_nents_for_len(dst, cryptlen),
+			     sg_nents_for_len(dst, totlen),
 			     DMA_FROM_DEVICE);
 	}
 
@@ -425,6 +572,30 @@ static int safexcel_ablkcipher_handle_result(struct safexcel_crypto_priv *priv,
 	return err;
 }
 
+static int safexcel_aead_handle_result(struct safexcel_crypto_priv *priv,
+				       int ring,
+				       struct crypto_async_request *async,
+				       bool *should_complete, int *ret)
+{
+	struct aead_request *req = aead_request_cast(async);
+	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
+	struct safexcel_cipher_req *sreq = aead_request_ctx(req);
+	int err;
+
+	if (sreq->needs_inv) {
+		sreq->needs_inv = false;
+		err = safexcel_handle_inv_result(priv, ring, async,
+						 should_complete, ret);
+	} else {
+		err = safexcel_handle_req_result(priv, ring, async, req->src,
+						 req->dst,
+						 req->cryptlen + crypto_aead_authsize(tfm),
+						 sreq, should_complete, ret);
+	}
+
+	return err;
+}
+
 /* Send cipher invalidation command to the engine */
 static int safexcel_cipher_send_inv(struct crypto_async_request *base,
 				    int ring, int *commands, int *results)
@@ -455,6 +626,25 @@ static int safexcel_ablkcipher_send(struct crypto_async_request *async, int ring
 	else
 		ret = safexcel_send_req(async, ring, sreq, req->src,
 					req->dst, req->nbytes, 0, 0, req->info,
+					commands, results);
+	return ret;
+}
+
+static int safexcel_aead_send(struct crypto_async_request *async, int ring,
+			      int *commands, int *results)
+{
+	struct aead_request *req = aead_request_cast(async);
+	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
+	struct safexcel_cipher_req *sreq = aead_request_ctx(req);
+	int ret;
+
+	if (sreq->needs_inv)
+		ret = safexcel_cipher_send_inv(async, ring, commands,
+					       results);
+	else
+		ret = safexcel_send_req(async, ring, sreq, req->src,
+					req->dst, req->cryptlen, req->assoclen,
+					crypto_aead_authsize(tfm), req->iv,
 					commands, results);
 	return ret;
 }
@@ -493,6 +683,21 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm,
 	}
 
 	return 0;
+}
+
+static int safexcel_aead_exit_inv(struct crypto_tfm *tfm)
+{
+	EIP197_REQUEST_ON_STACK(req, aead, EIP197_AEAD_REQ_SIZE);
+	struct safexcel_cipher_req *sreq = aead_request_ctx(req);
+	struct safexcel_inv_result result = {};
+
+	memset(req, 0, sizeof(struct aead_request));
+
+	aead_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+				  safexcel_inv_complete, &result);
+	aead_request_set_tfm(req, __crypto_aead_cast(tfm));
+
+	return safexcel_cipher_exit_inv(tfm, &req->base, sreq, &result);
 }
 
 static int safexcel_ablkcipher_exit_inv(struct crypto_tfm *tfm)
@@ -624,6 +829,26 @@ static void safexcel_ablkcipher_cra_exit(struct crypto_tfm *tfm)
 		ret = safexcel_ablkcipher_exit_inv(tfm);
 		if (ret)
 			dev_warn(priv->dev, "ablkcipher: invalidation error %d\n",
+				 ret);
+	} else {
+		dma_pool_free(priv->context_pool, ctx->base.ctxr,
+			      ctx->base.ctxr_dma);
+	}
+}
+
+static void safexcel_aead_cra_exit(struct crypto_tfm *tfm)
+{
+	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
+	struct safexcel_crypto_priv *priv = ctx->priv;
+	int ret;
+
+	if (safexcel_cipher_cra_exit(tfm))
+		return;
+
+	if (priv->eip_type == EIP197) {
+		ret = safexcel_aead_exit_inv(tfm);
+		if (ret)
+			dev_warn(priv->dev, "aead: invalidation error %d\n",
 				 ret);
 	} else {
 		dma_pool_free(priv->context_pool, ctx->base.ctxr,
@@ -932,3 +1157,72 @@ struct safexcel_alg_template safexcel_alg_ecb_des3_ede = {
 	},
 };
 
+static int safexcel_aead_encrypt(struct aead_request *req)
+{
+	struct safexcel_cipher_req *creq = aead_request_ctx(req);
+
+	return safexcel_queue_req(&req->base, creq, SAFEXCEL_ENCRYPT,
+				  CONTEXT_CONTROL_CRYPTO_MODE_CBC,
+				  SAFEXCEL_AES);
+}
+
+static int safexcel_aead_decrypt(struct aead_request *req)
+{
+	struct safexcel_cipher_req *creq = aead_request_ctx(req);
+
+	return safexcel_queue_req(&req->base, creq, SAFEXCEL_DECRYPT,
+				  CONTEXT_CONTROL_CRYPTO_MODE_CBC,
+				  SAFEXCEL_AES);
+}
+
+static int safexcel_aead_cra_init(struct crypto_tfm *tfm)
+{
+	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
+	struct safexcel_alg_template *tmpl =
+		container_of(tfm->__crt_alg, struct safexcel_alg_template,
+			     alg.aead.base);
+
+	crypto_aead_set_reqsize(__crypto_aead_cast(tfm),
+				sizeof(struct safexcel_cipher_req));
+
+	ctx->priv = tmpl->priv;
+
+	ctx->aead = true;
+	ctx->base.send = safexcel_aead_send;
+	ctx->base.handle_result = safexcel_aead_handle_result;
+	return 0;
+}
+
+static int safexcel_aead_sha256_cra_init(struct crypto_tfm *tfm)
+{
+	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(tfm);
+
+	safexcel_aead_cra_init(tfm);
+	ctx->alg = CONTEXT_CONTROL_CRYPTO_ALG_SHA256;
+	ctx->state_sz = SHA256_DIGEST_SIZE;
+	return 0;
+}
+
+struct safexcel_alg_template safexcel_alg_authenc_hmac_sha256_cbc_aes = {
+	.type = SAFEXCEL_ALG_TYPE_AEAD,
+	.alg.aead = {
+		.setkey = safexcel_aead_aes_setkey,
+		.encrypt = safexcel_aead_encrypt,
+		.decrypt = safexcel_aead_decrypt,
+		.ivsize = AES_BLOCK_SIZE,
+		.maxauthsize = SHA256_DIGEST_SIZE,
+		.base = {
+			.cra_name = "authenc(hmac(sha256),cbc(aes))",
+			.cra_driver_name = "safexcel-authenc-hmac-sha256-cbc-aes",
+			.cra_priority = 300,
+			.cra_flags = CRYPTO_ALG_TYPE_AEAD | CRYPTO_ALG_ASYNC |
+				     CRYPTO_ALG_KERN_DRIVER_ONLY,
+			.cra_blocksize = AES_BLOCK_SIZE,
+			.cra_ctxsize = sizeof(struct safexcel_cipher_ctx),
+			.cra_alignmask = 0,
+			.cra_init = safexcel_aead_sha256_cra_init,
+			.cra_exit = safexcel_aead_cra_exit,
+			.cra_module = THIS_MODULE,
+		},
+	},
+};

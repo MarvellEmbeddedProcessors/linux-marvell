@@ -11,7 +11,9 @@
 #ifndef __SAFEXCEL_H__
 #define __SAFEXCEL_H__
 
+#include <crypto/aead.h>
 #include <crypto/algapi.h>
+#include <crypto/sha.h>
 #include <crypto/internal/hash.h>
 
 #define EIP197_HIA_VERSION_LE			0xca35
@@ -24,7 +26,7 @@
 
 /* Static configuration */
 #define EIP197_DEFAULT_RING_SIZE			300
-#define EIP197_MAX_TOKENS				5
+#define EIP197_MAX_TOKENS				8
 
 #define EIP197_FETCH_COUNT				1
 #define EIP197_MAX_BATCH_SZ				32
@@ -34,6 +36,8 @@
 
 /* Custom on-stack requests (for invalidation) */
 #define EIP197_ABLKCIPHER_REQ_SIZE	(sizeof(struct ablkcipher_request) + \
+					sizeof(struct safexcel_cipher_req))
+#define EIP197_AEAD_REQ_SIZE            (sizeof(struct aead_request) + \
 					sizeof(struct safexcel_cipher_req))
 #define EIP197_AHASH_REQ_SIZE		(sizeof(struct ahash_request) + \
 					sizeof(struct safexcel_ahash_req))
@@ -376,7 +380,7 @@ struct safexcel_context_record {
 	u32 control0;
 	u32 control1;
 
-	__le32 data[12];
+	__le32 data[24];
 } __packed;
 
 /* control0 */
@@ -467,11 +471,14 @@ struct safexcel_token {
 	u8 opcode:4;
 } __packed;
 
+#define EIP197_TOKEN_HASH_RESULT_VERIFY		BIT(16)
 #define EIP197_TOKEN_STAT_LAST_HASH		BIT(0)
 #define EIP197_TOKEN_STAT_LAST_PACKET		BIT(1)
 #define EIP197_TOKEN_OPCODE_DIRECTION		0x0
 #define EIP197_TOKEN_OPCODE_INSERT		0x2
 #define EIP197_TOKEN_OPCODE_NOOP		EIP197_TOKEN_OPCODE_INSERT
+#define EIP197_TOKEN_OPCODE_RETRIEVE		0x4
+#define EIP197_TOKEN_OPCODE_VERIFY		0xd
 #define EIP197_TOKEN_OPCODE_BYPASS		GENMASK(3, 0)
 
 static inline void eip197_noop_token(struct safexcel_token *token)
@@ -562,6 +569,7 @@ struct safexcel_desc_ring {
 
 enum safexcel_alg_type {
 	SAFEXCEL_ALG_TYPE_CIPHER,
+	SAFEXCEL_ALG_TYPE_AEAD,
 	SAFEXCEL_ALG_TYPE_AHASH,
 };
 
@@ -664,6 +672,16 @@ struct safexcel_context {
 	bool exit_inv;
 };
 
+struct safexcel_ahash_export_state {
+	u64 len;
+	u64 processed;
+
+	u32 digest;
+
+	u32 state[SHA256_DIGEST_SIZE / sizeof(u32)];
+	u8 cache[SHA256_BLOCK_SIZE];
+};
+
 /*
  * Template structure to describe the algorithms in order to register them.
  * It also has the purpose to contain our private structure and is actually
@@ -674,6 +692,7 @@ struct safexcel_alg_template {
 	enum safexcel_alg_type type;
 	union {
 		struct crypto_alg crypto;
+		struct aead_alg aead;
 		struct ahash_alg ahash;
 	} alg;
 };
@@ -720,6 +739,8 @@ void safexcel_rdr_req_set(struct safexcel_crypto_priv *priv,
 inline struct crypto_async_request *
 	safexcel_rdr_req_get(struct safexcel_crypto_priv *priv, int ring);
 void safexcel_inv_complete(struct crypto_async_request *req, int error);
+int safexcel_hmac_setkey(const char *alg, const u8 *key, unsigned int keylen,
+			 void *istate, void *ostate);
 
 /* available algorithms */
 extern struct safexcel_alg_template safexcel_alg_ecb_aes;
@@ -736,4 +757,6 @@ extern struct safexcel_alg_template safexcel_alg_hmac_sha224;
 extern struct safexcel_alg_template safexcel_alg_hmac_sha256;
 extern struct safexcel_alg_template safexcel_alg_md5;
 extern struct safexcel_alg_template safexcel_alg_hmac_md5;
+extern struct safexcel_alg_template safexcel_alg_authenc_hmac_sha256_cbc_aes;
+
 #endif
