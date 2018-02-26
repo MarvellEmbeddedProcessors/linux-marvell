@@ -70,6 +70,22 @@
 	};
 };
 
+&ap0_xor0 {
+	status = "disabled";
+};
+
+&ap0_xor1 {
+	status = "disabled";
+};
+
+&ap1_xor0 {
+	status = "disabled";
+};
+
+&ap1_xor1 {
+	status = "disabled";
+};
+
 &cp0_mdio0 {
 	status = "okay";
 	mdio0_phy0: ethernet-phy@0 {
