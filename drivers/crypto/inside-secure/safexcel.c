@@ -309,6 +309,10 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 	else if (((version >> 16) & 0xffff) == EIP197_HIA_VERSION_LE)
 		val |= (EIP197_MST_CTRL_NO_BYTE_SWAP >> 24);
 
+	/* For EIP197 set maximum number of TX commands to 2^5 = 32 */
+	if (priv->version == EIP197)
+		val |= EIP197_MST_CTRL_TX_MAX_CMD(5);
+
 	writel(val, EIP197_HIA_AIC(priv) + EIP197_HIA_MST_CTRL);
 
 	/* Configure wr/rd cache values */

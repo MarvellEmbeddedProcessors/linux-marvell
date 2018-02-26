@@ -223,6 +223,7 @@
 #define MST_CTRL_SUPPORT_PROT(n)		(((n) & 0xf) << 12)
 #define EIP197_MST_CTRL_BYTE_SWAP		BIT(24)
 #define EIP197_MST_CTRL_NO_BYTE_SWAP		BIT(25)
+#define EIP197_MST_CTRL_TX_MAX_CMD(n)		(((n) & 0xF) << 20)
 
 /* EIP197_PE_IN_DBUF/TBUF_THRES */
 #define EIP197_PE_IN_xBUF_THRES_MIN(n)		((n) << 8)
