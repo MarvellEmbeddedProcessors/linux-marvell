@@ -803,21 +803,6 @@ inline int safexcel_select_ring(struct safexcel_crypto_priv *priv)
 	return (atomic_inc_return(&priv->ring_used) % priv->config.rings);
 }
 
-/* Free crypto API result mapping */
-void safexcel_free_context(struct safexcel_crypto_priv *priv,
-			   struct crypto_async_request *req)
-{
-	struct safexcel_context *ctx = crypto_tfm_ctx(req->tfm);
-
-	if (ctx->cache) {
-		dma_unmap_single(priv->dev, ctx->cache_dma, ctx->cache_sz,
-				 DMA_TO_DEVICE);
-		kfree(ctx->cache);
-		ctx->cache = NULL;
-		ctx->cache_sz = 0;
-	}
-}
-
 /* Acknoledge and release the used descriptors */
 void safexcel_complete(struct safexcel_crypto_priv *priv, int ring)
 {
