@@ -29,6 +29,11 @@
 			reg = <0 0x4000000 0 0x200000>;
 			no-map;
 		};
+
+		maintenance-area@8000000 {
+			reg = <0 0x8000000 0 0x100000>;
+			no-map;
+		};
 	};
 
 	config-space {
