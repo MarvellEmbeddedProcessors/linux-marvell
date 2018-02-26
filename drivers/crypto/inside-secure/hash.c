@@ -331,8 +331,8 @@ send_command:
 	/* Add the token */
 	safexcel_hash_token(first_cdesc, len, req->state_sz);
 
-	req->result_dma = dma_map_single(priv->dev, req->state,
-					      req->state_sz, DMA_FROM_DEVICE);
+	req->result_dma = dma_map_single(priv->dev, req->state, req->state_sz,
+					 DMA_FROM_DEVICE);
 	if (dma_mapping_error(priv->dev, req->result_dma)) {
 		ret = -EINVAL;
 		goto cdesc_rollback;
