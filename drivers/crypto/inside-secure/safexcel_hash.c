@@ -282,7 +282,7 @@ static int safexcel_ahash_send_req(struct crypto_async_request *async, int ring,
 					   sglen, len, ctx->base.ctxr_dma);
 		if (IS_ERR(cdesc)) {
 			ret = PTR_ERR(cdesc);
-			goto cdesc_rollback;
+			goto unmap_sg;
 		}
 		n_cdesc++;
 
@@ -306,7 +306,7 @@ send_command:
 					 DMA_FROM_DEVICE);
 	if (dma_mapping_error(priv->dev, req->result_dma)) {
 		ret = -EINVAL;
-		goto cdesc_rollback;
+		goto unmap_sg;
 	}
 
 	/* Add a result descriptor */
@@ -327,6 +327,9 @@ send_command:
 	return 0;
 
 unmap_result:
+	dma_unmap_single(priv->dev, req->result_dma, req->state_sz,
+			 DMA_FROM_DEVICE);
+unmap_sg:
 	dma_unmap_sg(priv->dev, areq->src, req->nents, DMA_TO_DEVICE);
 cdesc_rollback:
 	for (i = 0; i < n_cdesc; i++)
