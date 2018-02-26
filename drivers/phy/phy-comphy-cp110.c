@@ -100,7 +100,7 @@ static void mvebu_cp110_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 		case(4):
 			 /* For comphy 4:
 			  * 0x1 = SGMII/HS-SGMII Port2
-			  * 0x2 = SGMII/HS-SGMII Port1: XFI/SFI, RXAUI_Lane0
+			  * 0x2 = SGMII/HS-SGMII Port0: XFI/SFI, RXAUI_Lane0
 			  *
 			  * We want to check if SGMII1/HS_SGMII1 is the requested mode in order to
 			  * determine which value should be set (all other modes use the same value)
@@ -2064,7 +2064,7 @@ const struct mvebu_comphy_soc_info cp110_comphy = {
 		{COMPHY_UNUSED, COMPHY_SGMII1, COMPHY_HS_SGMII1, COMPHY_RXAUI1,
 		 COMPHY_SATA1, COMPHY_USB3H1, COMPHY_PCIE0},
 		/* Lane 4 */
-		{COMPHY_UNUSED, COMPHY_SGMII1, COMPHY_HS_SGMII1, COMPHY_SGMII2,
+		{COMPHY_UNUSED, COMPHY_SGMII0, COMPHY_HS_SGMII0, COMPHY_SGMII2,
 		 COMPHY_HS_SGMII2, COMPHY_RXAUI0, COMPHY_XFI, COMPHY_SFI,
 		 COMPHY_USB3H1, COMPHY_USB3D0, COMPHY_PCIE1},
 		/* Lane 5 */
