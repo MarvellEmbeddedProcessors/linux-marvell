@@ -61,6 +61,22 @@
 	};
 };
 
+&ap0_xor0 {
+	status = "disabled";
+};
+
+&ap0_xor1 {
+	status = "disabled";
+};
+
+&ap0_xor2 {
+	status = "disabled";
+};
+
+&ap0_xor3 {
+	status = "disabled";
+};
+
 &cp0_sata0 {
 	status = "okay";
 	sata-port@1 {
