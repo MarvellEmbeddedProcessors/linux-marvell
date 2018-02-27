@@ -61,15 +61,11 @@
 		ranges;
 
 		/* global autoconfigured region for contiguous allocations */
-
-	/*
-	 * Temporarily disable CMA on AP1, until DRAM on AP1 is supported
 		ap1_mem: ap1-area@4230000000 {
 			compatible = "shared-dma-pool";
 			reusable;
 			reg = <0x42 0x30000000 0 0x10000000>;
 		};
-	*/
 	};
 	aliases {
 		ethernet0 = &cp0_emac0;
@@ -166,8 +162,7 @@
 &cp4_ppv22 {
 	l4_chksum_jumbo_port = <0>;
 	pinctrl-names = "default";
-	/* memory-region = <&ap1_mem>; */
-
+	memory-region = <&ap1_mem>;
 };
 
 &cp4_eth0 {
