@@ -86,6 +86,7 @@ config MVPP2
 	depends on ARCH_MVEBU || COMPILE_TEST
 	depends on HAS_DMA
 	select MVMDIO
+	select PHYLINK
 	select UIO
 	---help---
 	  This driver supports the network interface units in the
