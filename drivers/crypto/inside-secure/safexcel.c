@@ -847,6 +847,7 @@ static struct safexcel_alg_template *safexcel_algs[] = {
 	&safexcel_alg_hmac_sha1,
 	&safexcel_alg_hmac_sha224,
 	&safexcel_alg_hmac_sha256,
+	&safexcel_alg_hmac_sha512,
 	&safexcel_alg_md5,
 	&safexcel_alg_hmac_md5,
 	&safexcel_alg_authenc_hmac_sha1_cbc_aes,
