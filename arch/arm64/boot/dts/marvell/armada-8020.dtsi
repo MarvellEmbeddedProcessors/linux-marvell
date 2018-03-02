@@ -108,7 +108,7 @@
 	             "marvell,armada-ap806";
 	aliases {
 		gpio0 = &gpio0;
-		gpio1 = &cp0_gpio0;
+		gpio1 = &cp1_gpio0;
 		gpio2 = &cp0_gpio1;
 	};
 
@@ -186,6 +186,9 @@
 					marvell,function = "sdio";
 				};
 			};
+			cp0_gpio1: gpio@440140 {
+				gpiobase = <52>;
+			};
 			cp0_usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
 			};
@@ -243,6 +246,9 @@
 						       "mpp16";
 					marvell,function = "spi1";
 				};
+			};
+			cp1_gpio0: gpio@440100 {
+				gpiobase = <20>;
 			};
 			rtc@284000 {
 				status = "okay";
