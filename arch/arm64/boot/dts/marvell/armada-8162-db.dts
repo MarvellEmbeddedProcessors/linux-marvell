@@ -61,10 +61,10 @@
 		ranges;
 
 		/* global autoconfigured region for contiguous allocations */
-		ap1_mem: ap1-area@4230000000 {
+		ap1_mem: ap1-area@41f0000000 {
 			compatible = "shared-dma-pool";
 			reusable;
-			reg = <0x42 0x30000000 0 0x10000000>;
+			reg = <0x41 0xf0000000 0 0x10000000>;
 		};
 	};
 	aliases {
