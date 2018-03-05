@@ -3736,7 +3736,7 @@ static int mv_pp21_poll(struct napi_struct *napi, int budget)
 	mv_pp21_cause_misc_handle(port, hw, cause_rx_tx);
 
 	/* Process RX packets */
-	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	cause_rx = cause_rx_tx & MVPP21_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 	cause_rx |= q_vec->pending_cause_rx;
 	/* FIXME: Mvpp21 support */
 	rx_done = mv_pp2x_cause_rx_handle(port, q_vec, (struct sub_queue_vector *)NULL, napi, budget, cause_rx);
@@ -3776,7 +3776,7 @@ static int mv_pp22_poll(struct napi_struct *napi, int budget)
 		mv_pp2x_tx_done(port, cause_tx, q_vec->sw_thread_id);
 
 	/* Process RX packets */
-	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	cause_rx = cause_rx_tx & MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 	/*Convert queues from subgroup-relative to port-relative */
 	cause_rx <<= q_vec->first_rx_queue;
 	cause_rx |= sub_q_vec->pending_cause_rx;
@@ -4339,7 +4339,7 @@ static inline void mv_pp21_interrupts_unmask(void *arg)
 	struct mv_pp2x_port *port = arg;
 	u32 val;
 
-	val = MVPP2_CAUSE_MISC_SUM_MASK | MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	val = MVPP2_CAUSE_MISC_SUM_MASK | MVPP21_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 	/* Don't unmask Tx done interrupts for ports working in Netmap mode*/
 	if (!(port->flags & MVPP2_F_IFCAP_NETMAP) && port->priv->pp2xdata->interrupt_tx_done)
 		val |= MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
@@ -4358,7 +4358,7 @@ static inline void mv_pp22_private_interrupt_unmask(struct mv_pp2x_port *port, i
 {
 	u32 val;
 
-	val = MVPP2_CAUSE_MISC_SUM_MASK | MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	val = MVPP2_CAUSE_MISC_SUM_MASK | MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 	/* Don't unmask Tx done interrupts for ports working in Netmap mode*/
 	if (!(port->flags & MVPP2_F_IFCAP_NETMAP) && port->priv->pp2xdata->interrupt_tx_done)
 		val |= MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
@@ -4390,7 +4390,7 @@ static inline void mv_pp22_interrupts_unmask(struct mv_pp2x_port *port)
 	for (i = 0; i < port->num_qvector; i++) {
 		if (q_vec[i].qv_type == MVPP2_RX_SHARED)
 			mv_pp22_thread_write(&port->priv->hw, q_vec[i].sw_thread_id,
-					     MVPP2_ISR_RX_TX_MASK_REG(port->id), MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK);
+					     MVPP2_ISR_RX_TX_MASK_REG(port->id), MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK);
 		else
 			mv_pp22_private_interrupt_unmask(port, q_vec[i].sw_thread_id);
 	}
