@@ -1,0 +1,118 @@
+From 59c5911c18f94d92036860e00450c5c9e8307b91 Mon Sep 17 00:00:00 2001
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Date: Thu, 23 Jun 2016 12:11:17 -0700
+Subject: [PATCH 2/5] locking: avoid passing around 'thread_info' in mutex
+ debugging code
+
+None of the code actually wants a thread_info, it all wants a
+task_struct, and it's just converting back and forth between the two
+("ti->task" to get the task_struct from the thread_info, and
+"task_thread_info(task)" to go the other way).
+
+No semantic change.
+
+Change-Id: I0b2d804e889cc2745e619e213866c47b5bc02034
+Acked-by: Peter Zijlstra <peterz@infradead.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ kernel/locking/mutex-debug.c | 12 ++++++------
+ kernel/locking/mutex-debug.h |  4 ++--
+ kernel/locking/mutex.c       |  6 +++---
+ kernel/locking/mutex.h       |  2 +-
+ 4 files changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/kernel/locking/mutex-debug.c b/kernel/locking/mutex-debug.c
+index 3ef3736..9c951fa 100644
+--- a/kernel/locking/mutex-debug.c
++++ b/kernel/locking/mutex-debug.c
+@@ -49,21 +49,21 @@ void debug_mutex_free_waiter(struct mutex_waiter *waiter)
+ }
+ 
+ void debug_mutex_add_waiter(struct mutex *lock, struct mutex_waiter *waiter,
+-			    struct thread_info *ti)
++			    struct task_struct *task)
+ {
+ 	SMP_DEBUG_LOCKS_WARN_ON(!spin_is_locked(&lock->wait_lock));
+ 
+ 	/* Mark the current thread as blocked on the lock: */
+-	ti->task->blocked_on = waiter;
++	task->blocked_on = waiter;
+ }
+ 
+ void mutex_remove_waiter(struct mutex *lock, struct mutex_waiter *waiter,
+-			 struct thread_info *ti)
++			 struct task_struct *task)
+ {
+ 	DEBUG_LOCKS_WARN_ON(list_empty(&waiter->list));
+-	DEBUG_LOCKS_WARN_ON(waiter->task != ti->task);
+-	DEBUG_LOCKS_WARN_ON(ti->task->blocked_on != waiter);
+-	ti->task->blocked_on = NULL;
++	DEBUG_LOCKS_WARN_ON(waiter->task != task);
++	DEBUG_LOCKS_WARN_ON(task->blocked_on != waiter);
++	task->blocked_on = NULL;
+ 
+ 	list_del_init(&waiter->list);
+ 	waiter->task = NULL;
+diff --git a/kernel/locking/mutex-debug.h b/kernel/locking/mutex-debug.h
+index 0799fd3..d06ae3b 100644
+--- a/kernel/locking/mutex-debug.h
++++ b/kernel/locking/mutex-debug.h
+@@ -20,9 +20,9 @@ extern void debug_mutex_wake_waiter(struct mutex *lock,
+ extern void debug_mutex_free_waiter(struct mutex_waiter *waiter);
+ extern void debug_mutex_add_waiter(struct mutex *lock,
+ 				   struct mutex_waiter *waiter,
+-				   struct thread_info *ti);
++				   struct task_struct *task);
+ extern void mutex_remove_waiter(struct mutex *lock, struct mutex_waiter *waiter,
+-				struct thread_info *ti);
++				struct task_struct *task);
+ extern void debug_mutex_unlock(struct mutex *lock);
+ extern void debug_mutex_init(struct mutex *lock, const char *name,
+ 			     struct lock_class_key *key);
+diff --git a/kernel/locking/mutex.c b/kernel/locking/mutex.c
+index 79d2d76..a70b90d 100644
+--- a/kernel/locking/mutex.c
++++ b/kernel/locking/mutex.c
+@@ -537,7 +537,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
+ 		goto skip_wait;
+ 
+ 	debug_mutex_lock_common(lock, &waiter);
+-	debug_mutex_add_waiter(lock, &waiter, task_thread_info(task));
++	debug_mutex_add_waiter(lock, &waiter, task);
+ 
+ 	/* add waiting tasks to the end of the waitqueue (FIFO): */
+ 	list_add_tail(&waiter.list, &lock->wait_list);
+@@ -584,7 +584,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
+ 	}
+ 	__set_task_state(task, TASK_RUNNING);
+ 
+-	mutex_remove_waiter(lock, &waiter, current_thread_info());
++	mutex_remove_waiter(lock, &waiter, task);
+ 	/* set it to 0 if there are no waiters left: */
+ 	if (likely(list_empty(&lock->wait_list)))
+ 		atomic_set(&lock->count, 0);
+@@ -605,7 +605,7 @@ skip_wait:
+ 	return 0;
+ 
+ err:
+-	mutex_remove_waiter(lock, &waiter, task_thread_info(task));
++	mutex_remove_waiter(lock, &waiter, task);
+ 	spin_unlock_mutex(&lock->wait_lock, flags);
+ 	debug_mutex_free_waiter(&waiter);
+ 	mutex_release(&lock->dep_map, 1, ip);
+diff --git a/kernel/locking/mutex.h b/kernel/locking/mutex.h
+index 5cda397..a68bae5 100644
+--- a/kernel/locking/mutex.h
++++ b/kernel/locking/mutex.h
+@@ -13,7 +13,7 @@
+ 		do { spin_lock(lock); (void)(flags); } while (0)
+ #define spin_unlock_mutex(lock, flags) \
+ 		do { spin_unlock(lock); (void)(flags); } while (0)
+-#define mutex_remove_waiter(lock, waiter, ti) \
++#define mutex_remove_waiter(lock, waiter, task) \
+ 		__list_del((waiter)->list.prev, (waiter)->list.next)
+ 
+ #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
+-- 
+2.7.4
+
