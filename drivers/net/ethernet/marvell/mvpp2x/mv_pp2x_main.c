@@ -759,6 +759,7 @@ static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 	int pkt_size = MVPP2_RX_PKT_SIZE(mtu);
 
 	old_long_pool = old_long_port_pool->log_id;
+	old_short_pool = old_short_port_pool->log_id;
 
 	/* If port MTU is higher than 1518B:
 	* HW Long pool - SW Jumbo pool, HW Short pool - SW Short pool
