@@ -3575,26 +3575,29 @@ static void mvneta_adjust_link(struct net_device *ndev)
 	}
 
 	if (status_change) {
-		if (phydev->link) {
-			if (!pp->use_inband_status) {
-				u32 val = mvreg_read(pp,
-						  MVNETA_GMAC_AUTONEG_CONFIG);
-				val &= ~MVNETA_GMAC_FORCE_LINK_DOWN;
-				val |= MVNETA_GMAC_FORCE_LINK_PASS;
-				mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG,
-					    val);
+		/* nothing to do if port belongs to User Space */
+		if (!(pp->flags & MVNETA_PORT_F_IF_MUSDK)) {
+			if (phydev->link) {
+				if (!pp->use_inband_status) {
+					u32 val = mvreg_read(pp,
+							  MVNETA_GMAC_AUTONEG_CONFIG);
+					val &= ~MVNETA_GMAC_FORCE_LINK_DOWN;
+					val |= MVNETA_GMAC_FORCE_LINK_PASS;
+					mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG,
+						    val);
+				}
+				mvneta_port_up(pp);
+			} else {
+				if (!pp->use_inband_status) {
+					u32 val = mvreg_read(pp,
+							  MVNETA_GMAC_AUTONEG_CONFIG);
+					val &= ~MVNETA_GMAC_FORCE_LINK_PASS;
+					val |= MVNETA_GMAC_FORCE_LINK_DOWN;
+					mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG,
+						    val);
+				}
+				mvneta_port_down(pp);
 			}
-			mvneta_port_up(pp);
-		} else {
-			if (!pp->use_inband_status) {
-				u32 val = mvreg_read(pp,
-						  MVNETA_GMAC_AUTONEG_CONFIG);
-				val &= ~MVNETA_GMAC_FORCE_LINK_PASS;
-				val |= MVNETA_GMAC_FORCE_LINK_DOWN;
-				mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG,
-					    val);
-			}
-			mvneta_port_down(pp);
 		}
 		phy_print_status(phydev);
 	}
