@@ -1703,7 +1703,7 @@ void mv_pp2x_interrupts_set_mask(struct queue_vector *q_vec, u32 queue_mask)
 {
 	struct mv_pp2x_port *port = q_vec->parent;
 
-	mv_pp22_thread_write(&port->priv->hw, q_vec->sw_thread_id, MVPP2_ISR_RX_TX_CAUSE_MASK_REG(port->id),
+	mv_pp22_thread_write(&port->priv->hw, q_vec->sw_thread_id, MVPP2_ISR_RX_TX_MASK_REG(port->id),
 			     queue_mask);
 }
 
