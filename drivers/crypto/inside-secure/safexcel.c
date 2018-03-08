@@ -831,6 +831,7 @@ static struct safexcel_alg_template *safexcel_algs[] = {
 	&safexcel_alg_hmac_sha1,
 	&safexcel_alg_hmac_sha256,
 	&safexcel_alg_md5,
+	&safexcel_alg_hmac_md5,
 };
 
 static int safexcel_register_algorithms(struct safexcel_crypto_priv *priv)
