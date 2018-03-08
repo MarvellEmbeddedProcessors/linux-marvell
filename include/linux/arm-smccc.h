@@ -57,9 +57,6 @@
 #define ARM_SMCCC_OWNER_TRUSTED_OS	50
 #define ARM_SMCCC_OWNER_TRUSTED_OS_END	63
 
-#ifndef __ASSEMBLY__
-#include <linux/linkage.h>
-#include <linux/types.h>
 #define ARM_SMCCC_QUIRK_NONE		0
 #define ARM_SMCCC_QUIRK_QCOM_A6		1 /* Save/restore register a6 */
 
@@ -81,6 +78,9 @@
 			   ARM_SMCCC_SMC_32,				\
 			   0, 0x8000)
 
+#ifndef __ASSEMBLY__
+#include <linux/linkage.h>
+#include <linux/types.h>
 /**
  * struct arm_smccc_res - Result from SMC/HVC call
  * @a0-a3 result values from registers 0 to 3
