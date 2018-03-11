@@ -581,6 +581,9 @@
 #define     MVPP22_XLG_CTRL4_FWD_FC		BIT(5)
 #define     MVPP22_XLG_CTRL4_FWD_PFC		BIT(6)
 #define     MVPP22_XLG_CTRL4_MACMODSELECT_GMAC	BIT(12)
+/* Check of 3 consecutive IDLEs for 10G link up indication */
+#define     MVPP22_XLG_CTRL4_EN_IDLE_CHECK	BIT(14)
+
 
 /* SMI registers. PPv2.2 only, relative to priv->iface_base. */
 #define MVPP22_SMI_MISC_CFG_REG			0x1204
@@ -7935,6 +7938,17 @@ static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
 	writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 }
 
+static void mvpp2_xlg_port_reset(struct mvpp2_port *port, bool active)
+{
+	u32 val = readl(port->base + MVPP22_XLG_CTRL0_REG);
+
+	if (active)
+		val &= ~MVPP22_XLG_CTRL0_MAC_RESET_DIS;
+	else
+		val |= MVPP22_XLG_CTRL0_MAC_RESET_DIS;
+	writel(val, port->base + MVPP22_XLG_CTRL0_REG);
+}
+
 static void mvpp2_port_mii_xlg_configure(struct mvpp2_port *port)
 {
 	u32 val;
@@ -7942,13 +7956,17 @@ static void mvpp2_port_mii_xlg_configure(struct mvpp2_port *port)
 	if (port->gop_id != 0)
 		return;
 
+	/* Be sure to make configuration under reset */
+	mvpp2_xlg_port_reset(port, true);
+
 	val = readl(port->base + MVPP22_XLG_CTRL0_REG);
 	val |= MVPP22_XLG_CTRL0_RX_FLOW_CTRL_EN;
 	writel(val, port->base + MVPP22_XLG_CTRL0_REG);
 
 	val = readl(port->base + MVPP22_XLG_CTRL4_REG);
 	val &= ~MVPP22_XLG_CTRL4_MACMODSELECT_GMAC;
-	val |= MVPP22_XLG_CTRL4_FWD_FC | MVPP22_XLG_CTRL4_FWD_PFC;
+	val |= MVPP22_XLG_CTRL4_FWD_FC | MVPP22_XLG_CTRL4_FWD_PFC |
+		MVPP22_XLG_CTRL4_EN_IDLE_CHECK;
 	writel(val, port->base + MVPP22_XLG_CTRL4_REG);
 }
 
@@ -8021,10 +8039,11 @@ static void mvpp2_port_disable(struct mvpp2_port *port)
 	if (port->gop_id == 0 &&
 	    (port->phy_interface == PHY_INTERFACE_MODE_XAUI ||
 	     port->phy_interface == PHY_INTERFACE_MODE_10GKR)) {
+		/* Disable & Reset should be done separately */
 		val = readl(port->base + MVPP22_XLG_CTRL0_REG);
-		val &= ~(MVPP22_XLG_CTRL0_PORT_EN |
-			 MVPP22_XLG_CTRL0_MAC_RESET_DIS);
+		val &= ~MVPP22_XLG_CTRL0_PORT_EN;
 		writel(val, port->base + MVPP22_XLG_CTRL0_REG);
+		mvpp2_xlg_port_reset(port, true);
 	} else {
 		val = readl(port->base + MVPP2_GMAC_CTRL_0_REG);
 		val &= ~(MVPP2_GMAC_PORT_EN_MASK);
