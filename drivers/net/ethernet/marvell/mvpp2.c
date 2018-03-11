@@ -594,6 +594,8 @@
 #define     MVPP22_XLG_CTRL4_FWD_FC		BIT(5)
 #define     MVPP22_XLG_CTRL4_FWD_PFC		BIT(6)
 #define     MVPP22_XLG_CTRL4_MACMODSELECT_GMAC	BIT(12)
+/* Check of 3 consecutive IDLEs for XLG link up indication */
+#define     MVPP22_XLG_CTRL4_EN_IDLE_CHECK	BIT(14)
 
 /* SMI registers. PPv2.2 only, relative to priv->iface_base. */
 #define MVPP22_SMI_MISC_CFG_REG			0x1204
@@ -7873,6 +7875,23 @@ static int mvpp22_comphy_init(struct mvpp2_port *port)
 	return phy_power_on(port->comphy);
 }
 
+static void mvpp2_xlg_port_reset(struct mvpp2_port *port, bool active)
+{
+	u32 val;
+	bool orig_active;
+
+	val = readl(port->base + MVPP22_XLG_CTRL0_REG);
+	/* Reset is active when RESET_DISable bit is zero */
+	orig_active = !(val & MVPP22_XLG_CTRL0_MAC_RESET_DIS);
+	if (orig_active != active) {
+		if (active)
+			val &= ~MVPP22_XLG_CTRL0_MAC_RESET_DIS;
+		else
+			val |= MVPP22_XLG_CTRL0_MAC_RESET_DIS;
+		writel(val, port->base + MVPP22_XLG_CTRL0_REG);
+	}
+}
+
 static void mvpp2_port_enable(struct mvpp2_port *port)
 {
 	u32 val;
@@ -7902,10 +7921,11 @@ static void mvpp2_port_disable(struct mvpp2_port *port)
 	if (port->gop_id == 0 &&
 	    (port->phy_interface == PHY_INTERFACE_MODE_XAUI ||
 	     port->phy_interface == PHY_INTERFACE_MODE_10GKR)) {
+		/* Disable & Reset should be done separately */
 		val = readl(port->base + MVPP22_XLG_CTRL0_REG);
-		val &= ~(MVPP22_XLG_CTRL0_PORT_EN |
-			 MVPP22_XLG_CTRL0_MAC_RESET_DIS);
+		val &= ~MVPP22_XLG_CTRL0_PORT_EN;
 		writel(val, port->base + MVPP22_XLG_CTRL0_REG);
+		mvpp2_xlg_port_reset(port, true);
 	} else {
 		val = readl(port->base + MVPP2_GMAC_CTRL_0_REG);
 		val &= ~(MVPP2_GMAC_PORT_EN_MASK);
@@ -11645,6 +11665,7 @@ static void mvpp2_xlg_config(struct mvpp2_port *port, unsigned int mode,
 
 	ctrl4 &= ~MVPP22_XLG_CTRL4_MACMODSELECT_GMAC;
 	ctrl4 |= MVPP22_XLG_CTRL4_FWD_FC | MVPP22_XLG_CTRL4_FWD_PFC;
+	ctrl4 |= MVPP22_XLG_CTRL4_EN_IDLE_CHECK;
 
 	writel(ctrl0, port->base + MVPP22_XLG_CTRL0_REG);
 	writel(ctrl4, port->base + MVPP22_XLG_CTRL4_REG);
