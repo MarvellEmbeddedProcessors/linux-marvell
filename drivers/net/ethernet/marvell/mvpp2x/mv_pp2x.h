@@ -672,8 +672,20 @@ struct queue_vector {
 
 struct mv_pp2x_ptp_desc; /* per-port private PTP descriptor */
 
+struct uio_queue_vector {
+	u32 irq;
+	char irq_name[IRQ_NAME_SIZE];
+	u16 sw_thread_id;
+	u8 first_rx_queue; /* Relative to port */
+	u8 num_rx_queues;
+	u32 queue_mask; /* Bits are not relative to interrupt, b0-b31=q0-q31 */
+	struct mv_pp2x_port *parent;
+};
+
 struct mv_pp2x_port_uio {
 	struct uio_info u_info;
+	u32 num_qvector;
+	struct uio_queue_vector q_vector[MVPP2_MAX_ADDR_SPACES];
 };
 
 struct mv_pp2x_port {

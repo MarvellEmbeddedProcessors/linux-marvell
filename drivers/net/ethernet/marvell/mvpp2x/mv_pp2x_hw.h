@@ -295,6 +295,18 @@ static inline void mv_pp2x_port_interrupts_enable(struct mv_pp2x_port *port)
 		      MVPP2_ISR_ENABLE_INTERRUPT(sw_thread_mask));
 }
 
+static inline void mv_pp22_port_uio_interrupts_enable(struct mv_pp2x_port *port)
+{
+	int sw_thread_mask = 0, i;
+	struct uio_queue_vector  *q_vec = &port->uio.q_vector[0];
+
+	for (i = 0; i < port->uio.num_qvector; i++)
+		sw_thread_mask |= (1 << q_vec[i].sw_thread_id);
+
+	mv_pp2x_write(&port->priv->hw, MVPP2_ISR_ENABLE_REG(port->id),
+		      MVPP2_ISR_ENABLE_INTERRUPT(sw_thread_mask));
+}
+
 static inline void mv_pp2x_port_interrupts_disable(struct mv_pp2x_port *port)
 {
 	int sw_thread_mask = 0, i;
@@ -302,6 +314,18 @@ static inline void mv_pp2x_port_interrupts_disable(struct mv_pp2x_port *port)
 
 	for (i = 0; i < port->num_qvector; i++)
 		sw_thread_mask |= q_vec[i].sw_thread_mask;
+
+	mv_pp2x_write(&port->priv->hw, MVPP2_ISR_ENABLE_REG(port->id),
+		      MVPP2_ISR_DISABLE_INTERRUPT(sw_thread_mask));
+}
+
+static inline void mv_pp22_port_uio_interrupts_disable(struct mv_pp2x_port *port)
+{
+	int sw_thread_mask = 0, i;
+	struct uio_queue_vector  *q_vec = &port->uio.q_vector[0];
+
+	for (i = 0; i < port->uio.num_qvector; i++)
+		sw_thread_mask |= (1 << q_vec[i].sw_thread_id);
 
 	mv_pp2x_write(&port->priv->hw, MVPP2_ISR_ENABLE_REG(port->id),
 		      MVPP2_ISR_DISABLE_INTERRUPT(sw_thread_mask));

@@ -1699,6 +1699,15 @@ void mv_pp2x_cleanup_irqs(struct mv_pp2x_port *port)
 		free_irq(port->mac_data.link_irq, port);
 }
 
+void mv_pp22_cleanup_uio_irqs(struct mv_pp2x_port *port)
+{
+	int qvec;
+
+	/* Rx irq's */
+	for (qvec = 0; qvec < port->uio.num_qvector; qvec++)
+		free_irq(port->uio.q_vector[qvec].irq, &port->uio.q_vector[qvec]);
+}
+
 void mv_pp2x_interrupts_set_mask(struct queue_vector *q_vec, u32 queue_mask)
 {
 	struct mv_pp2x_port *port = q_vec->parent;
@@ -1726,6 +1735,31 @@ static void napi_schedule_wrapper(void *param)
 	struct napi_struct *napi = param;
 
 	napi_schedule(napi);
+}
+
+static irqreturn_t mv_pp22_uio_isr(int irq, void *dev_id)
+{
+	u32 cause_rx, cause_rx_tx_mask;
+	struct uio_queue_vector *q_vec = (struct uio_queue_vector *)dev_id;
+	struct mv_pp2x_port *port = q_vec->parent;
+
+	cause_rx = mv_pp22_thread_relaxed_read(&port->priv->hw, q_vec->sw_thread_id,
+					       MVPP2_ISR_RX_TX_CAUSE_REG(port->id));
+	cause_rx &= MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+
+	cause_rx_tx_mask = mv_pp22_thread_relaxed_read(&port->priv->hw, q_vec->sw_thread_id,
+						       MVPP2_ISR_RX_TX_MASK_REG(port->id));
+
+	/* Mask any raised queues mutual to cause, and the q_vec's mask */
+	cause_rx &= (q_vec->queue_mask >> q_vec->first_rx_queue);
+	cause_rx_tx_mask &= ~cause_rx;
+
+	pr_debug("irq:%s cause_rx:0x%x, cause_rx_tx_mask:0x%x\n", q_vec->irq_name, cause_rx, cause_rx_tx_mask);
+	mv_pp22_thread_write(&port->priv->hw, q_vec->sw_thread_id,
+			     MVPP2_ISR_RX_TX_MASK_REG(port->id), cause_rx_tx_mask);
+	uio_event_notify(&q_vec->parent->uio.u_info);
+
+	return IRQ_HANDLED;
 }
 
 /* The callback for per-q_vector interrupt */
@@ -1801,6 +1835,30 @@ static irqreturn_t mv_pp2_link_change_isr(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+int mv_pp22_setup_uio_irqs(struct net_device *dev, struct mv_pp2x_port *port)
+{
+	int qvec_id, err;
+	struct uio_queue_vector *qvec;
+
+	for (qvec_id = 0; qvec_id < port->uio.num_qvector; qvec_id++) {
+		qvec = &port->uio.q_vector[qvec_id];
+		if (!qvec->irq)
+			continue;
+		err = request_irq(qvec->irq, mv_pp22_uio_isr, 0,
+				  qvec->irq_name, qvec);
+		pr_debug("%s interrupt request\n", qvec->irq_name);
+		if (err) {
+			netdev_err(dev, "cannot request IRQ %d\n",
+				   qvec->irq);
+			goto err_cleanup;
+		}
+	}
+	return 0;
+
+err_cleanup:
+	mv_pp2x_cleanup_irqs(port);
+	return err;
+}
 /* Routine configure irq's.
  * Exist 3 type of irq's - MVPP2_PRIVATE, MVPP2_TX_SHARED and MVPP2_RX_SHARED
  * MVPP2_PRIVATE - in multi queue mode used for TX done and RX
@@ -3963,6 +4021,8 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 
 	/* Enable RX/TX interrupts on all CPUs */
 	mv_pp2x_port_interrupts_enable(port);
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		mv_pp22_port_uio_interrupts_enable(port);
 
 	if (port->comphy) {
 		mv_gop110_port_disable(gop, mac, port->comphy);
@@ -4076,6 +4136,8 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 
 	/* Disable interrupts on all CPUs */
 	mv_pp2x_port_interrupts_disable(port);
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		mv_pp22_port_uio_interrupts_disable(port);
 
 	mv_pp2x_port_napi_disable(port);
 	netif_tx_stop_all_queues(port->dev);
@@ -4420,6 +4482,13 @@ int mv_pp2x_open(struct net_device *dev)
 		netdev_err(port->dev, "cannot allocate irq's\n");
 		goto err_cleanup_txqs;
 	}
+	if (port->flags & MVPP2_F_IF_MUSDK) {
+		err = mv_pp22_setup_uio_irqs(dev, port);
+		if (err) {
+			netdev_err(port->dev, "cannot allocate uio irq's\n");
+			goto err_free_all;
+		}
+	}
 
 	/* Only Mvpp22 support hot plug feature */
 	if (port->priv->pp2_version == PPV22  && !(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK))) {
@@ -4457,6 +4526,8 @@ int mv_pp2x_open(struct net_device *dev)
 
 err_free_all:
 	mv_pp2x_cleanup_irqs(port);
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		mv_pp22_cleanup_uio_irqs(port);
 err_cleanup_txqs:
 	mv_pp2x_cleanup_txqs(port);
 err_cleanup_rxqs:
@@ -4481,6 +4552,9 @@ int mv_pp2x_stop(struct net_device *dev)
 		mv_pp22_interrupts_mask(port);
 	}
 	mv_pp2x_cleanup_irqs(port);
+
+	if (port->flags & MVPP2_F_IF_MUSDK)
+		mv_pp22_cleanup_uio_irqs(port);
 
 	if (port->port_hotplugged)
 		unregister_hotcpu_notifier(&port->port_hotplug_nb);
@@ -4956,6 +5030,50 @@ static struct sub_queue_vector *mv_pp22_allocate_sub_vector(struct mv_pp2x_port 
 	return sub_q_vec;
 }
 
+static void mv_pp22_uio_queue_vectors_init(struct mv_pp2x_port *port)
+{
+	struct net_device  *net_dev = port->dev;
+	struct device *parent_dev;
+	int i, cur_num_rxqs;
+	char str_common[32];
+	struct uio_queue_vector *q_vector;
+	u32 cur_int_rx_mask, uio_rxq_mask;
+
+	/* Allocate all rx_qs for UIO */
+#define	UIO_NUM_RXQS	(MVPP22_MAX_NUM_RXQ)
+
+	uio_rxq_mask = GENMASK((UIO_NUM_RXQS - 1), 0);
+
+	pr_debug("(%s) %s uio_rxq_mask:0x%x\n", __func__, port->dev->name, uio_rxq_mask);
+
+	parent_dev = net_dev->dev.parent;
+
+	snprintf(str_common, sizeof(str_common), "%s.%s", dev_name(parent_dev), net_dev->name);
+
+	/* Check all existing interrupts */
+	q_vector = &port->uio.q_vector[0];
+	for (cur_num_rxqs = 0, i = 0; uio_rxq_mask != 0; i++) {
+		q_vector->irq = port->of_irqs[i];
+		q_vector->sw_thread_id = i;
+		q_vector->parent = port;
+
+		q_vector->first_rx_queue = cur_num_rxqs;
+		cur_int_rx_mask = MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK << q_vector->first_rx_queue;
+		q_vector->queue_mask = uio_rxq_mask & cur_int_rx_mask;
+		q_vector->num_rx_queues = hweight32(q_vector->queue_mask);
+		cur_num_rxqs += q_vector->num_rx_queues;
+		uio_rxq_mask &= ~(q_vector->queue_mask);
+
+		snprintf(q_vector->irq_name, IRQ_NAME_SIZE, "%s.%s%d", str_common, "uio_int", i);
+
+		pr_debug("%s, first_q:%d, num_qs:%d, q_mask:0x%x\n", q_vector->irq_name,
+			 q_vector->first_rx_queue, q_vector->num_rx_queues, q_vector->queue_mask);
+
+		q_vector++;
+		port->uio.num_qvector++;
+	}
+}
+
 /* Routine calculate number of used sub_vector */
 static int mv_pp22_calculate_num_sub_vector(struct mv_pp2x_port *port)
 {
@@ -5209,6 +5327,27 @@ static void mv_pp22_port_isr_rx_group_cfg(struct mv_pp2x_port *port)
 					   port->q_vector[i].num_rx_queues);
 
 		sw_thr_mask |= (1 << port->q_vector[i].sw_thread_id);
+	}
+	for (i = 0; i < MVPP2_MAX_ADDR_SPACES; i++)
+		if ((sw_thr_mask & BIT(i)) == 0)
+			mv_pp22_isr_rx_group_write(hw, port->id, i, 0, 0);
+}
+
+static void mv_pp22_port_uio_isr_rx_group_cfg(struct mv_pp2x_port *port)
+{
+	int i;
+	struct mv_pp2x_hw *hw = &port->priv->hw;
+	u32 sw_thr_mask = 0;
+
+	for (i = 0; i < port->uio.num_qvector; i++) {
+		if (port->uio.q_vector[i].num_rx_queues == 0)
+			continue;
+		mv_pp22_isr_rx_group_write(hw, port->id,
+					   port->uio.q_vector[i].sw_thread_id,
+					   port->uio.q_vector[i].first_rx_queue,
+					   port->uio.q_vector[i].num_rx_queues);
+
+		sw_thr_mask |= (1 << port->uio.q_vector[i].sw_thread_id);
 	}
 	for (i = 0; i < MVPP2_MAX_ADDR_SPACES; i++)
 		if ((sw_thr_mask & BIT(i)) == 0)
@@ -5579,7 +5718,11 @@ int mv_pp2x_port_musdk_set(void *netdev_priv)
 	/* For MUSDK port, run cls_open once */
 	mv_pp2x_open_cls(port->dev);
 
+	/* Reconfigure rxq_groups */
+	mv_pp22_port_uio_isr_rx_group_cfg(port);
+
 	port->flags |= MVPP2_F_IF_MUSDK;
+
 	return 0;
 }
 EXPORT_SYMBOL(mv_pp2x_port_musdk_set);
@@ -5587,6 +5730,7 @@ EXPORT_SYMBOL(mv_pp2x_port_musdk_set);
 int mv_pp2x_port_musdk_clear(void *netdev_priv)
 {
 	struct mv_pp2x_port *port = netdev_priv;
+	int i;
 
 	if (!(port->flags & MVPP2_F_IF_MUSDK))
 		return 0;
@@ -5599,11 +5743,22 @@ int mv_pp2x_port_musdk_clear(void *netdev_priv)
 		dev_close(port->dev);
 		rtnl_unlock();
 	}
+	/* Disable Interrupts separately here.
+	 * interrupt_mask/unmask is not included in mv_pp2x_open()/mv_pp2x_close(),
+	 * since it needs to be driven in synch w/ Userspace.
+	 * mv_pp22_port_uio_interrupts_disable() is performed mv_pp2x_open()/mv_pp2x_close(),
+	 * so the rx/tx interrupts are disabled during close() in any case.
+	 */
+	for (i = 0; i < port->uio.num_qvector; i++)
+		mv_pp22_private_interrupt_mask(port, port->uio.q_vector[i].sw_thread_id);
 
 	/* Set num configured entities back to configured values */
 	port->num_qvector   = port->cfg_num_qvector;
 	port->num_rx_queues = port->cfg_num_rx_queues;
 	port->num_tx_queues = port->cfg_num_tx_queues;
+
+	/* Reconfigure Rx queue group interrupt for this port */
+	port->priv->pp2xdata->mv_pp2x_port_isr_rx_group_cfg(port);
 
 	port->flags &= ~MVPP2_F_IF_MUSDK;
 	return 0;
@@ -5908,6 +6063,10 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		port->uio.u_info.priv = port;
 		port->uio.u_info.open = mv_pp22_uio_open;
 		port->uio.u_info.release = mv_pp22_uio_release;
+		port->uio.u_info.irq = UIO_IRQ_CUSTOM;
+
+		/* Init uio_interrupts once */
+		mv_pp22_uio_queue_vectors_init(port);
 
 		err = uio_register_device(&dev->dev, &port->uio.u_info);
 		if (err) {
