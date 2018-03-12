@@ -5197,17 +5197,22 @@ static void mv_pp21x_port_isr_rx_group_cfg(struct mv_pp2x_port *port)
 static void mv_pp22_port_isr_rx_group_cfg(struct mv_pp2x_port *port)
 {
 	int i;
-/*	u8 cur_rx_queue; */
 	struct mv_pp2x_hw *hw = &port->priv->hw;
+	u32 sw_thr_mask = 0;
 
 	for (i = 0; i < port->num_qvector; i++) {
-		if (port->q_vector[i].num_rx_queues != 0) {
-			mv_pp22_isr_rx_group_write(hw, port->id,
-						   port->q_vector[i].sw_thread_id,
-				port->q_vector[i].first_rx_queue,
-				port->q_vector[i].num_rx_queues);
-		}
+		if (port->q_vector[i].num_rx_queues == 0)
+			continue;
+		mv_pp22_isr_rx_group_write(hw, port->id,
+					   port->q_vector[i].sw_thread_id,
+					   port->q_vector[i].first_rx_queue,
+					   port->q_vector[i].num_rx_queues);
+
+		sw_thr_mask |= (1 << port->q_vector[i].sw_thread_id);
 	}
+	for (i = 0; i < MVPP2_MAX_ADDR_SPACES; i++)
+		if ((sw_thr_mask & BIT(i)) == 0)
+			mv_pp22_isr_rx_group_write(hw, port->id, i, 0, 0);
 }
 
 static int mv_pp2_init_emac_data(struct mv_pp2x_port *port,
