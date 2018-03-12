@@ -5553,7 +5553,7 @@ int mv_pp2x_port_musdk_set(void *netdev_priv)
 	if (port->flags & MVPP2_F_IF_MUSDK)
 		return 0;
 
-	pr_debug("mv_pp2_uio_open %s\n", port->dev->name);
+	pr_debug("mv_pp22_uio_open %s\n", port->dev->name);
 
 	/* Close device before updates */
 	if (netif_running(port->dev)) {
@@ -5586,7 +5586,7 @@ int mv_pp2x_port_musdk_clear(void *netdev_priv)
 	if (!(port->flags & MVPP2_F_IF_MUSDK))
 		return 0;
 
-	pr_debug("mv_pp2_uio_release %s\n", port->dev->name);
+	pr_debug("mv_pp22_uio_release %s\n", port->dev->name);
 
 	/* Close device before updates */
 	if (netif_running(port->dev)) {
@@ -5605,7 +5605,7 @@ int mv_pp2x_port_musdk_clear(void *netdev_priv)
 }
 EXPORT_SYMBOL(mv_pp2x_port_musdk_clear);
 
-static int mv_pp2_uio_open(struct uio_info *info, struct inode *inode)
+static int mv_pp22_uio_open(struct uio_info *info, struct inode *inode)
 {
 	int err;
 	struct mv_pp2x_port *port = info->priv;
@@ -5614,7 +5614,7 @@ static int mv_pp2_uio_open(struct uio_info *info, struct inode *inode)
 	return err;
 }
 
-static int mv_pp2_uio_release(struct uio_info *info, struct inode *inode)
+static int mv_pp22_uio_release(struct uio_info *info, struct inode *inode)
 {
 	int err;
 	struct mv_pp2x_port *port = info->priv;
@@ -5898,12 +5898,11 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 
 	/* Register uio_device */
 	if (priv->pp2_version == PPV22) {
-		port->uio.u_info.name = kasprintf(GFP_KERNEL, UIO_PORT_STRING,
-						  priv->pp2_cfg.cell_index, port->id);
+		port->uio.u_info.name = kasprintf(GFP_KERNEL, UIO_PORT_STRING, priv->pp2_cfg.cell_index, port->id);
 		port->uio.u_info.version = "0.1";
 		port->uio.u_info.priv = port;
-		port->uio.u_info.open = mv_pp2_uio_open;
-		port->uio.u_info.release = mv_pp2_uio_release;
+		port->uio.u_info.open = mv_pp22_uio_open;
+		port->uio.u_info.release = mv_pp22_uio_release;
 
 		err = uio_register_device(&dev->dev, &port->uio.u_info);
 		if (err) {
