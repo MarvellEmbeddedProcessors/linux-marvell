@@ -211,6 +211,8 @@
 &cp0_eth0 {
 	status = "okay";
 	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy2 0>;
 };
 
 &cp0_eth2 {
@@ -295,6 +297,8 @@
 &cp1_eth0 {
 	status = "okay";
 	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp1_comphy2 0>;
 };
 
 &cp1_eth1 {
