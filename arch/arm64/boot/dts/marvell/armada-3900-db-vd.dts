@@ -49,6 +49,12 @@
 
 	cp0 {
 		config-space {
+			serial@702000 {
+				status = "okay";
+			};
+			serial@702100 {
+				status = "okay";
+			};
 			pinctrl@440000 {
 				cp0_xhci0_vbus_pins: cp0-xhci0-vbus-pins {
 					marvell,pins = "mpp44";

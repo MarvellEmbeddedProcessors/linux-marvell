@@ -49,6 +49,9 @@
 
 	cp0 {
 		config-space {
+			serial@702000 {
+				status = "okay";
+			};
 			serial@702100 {
 				status = "okay";
 			};
