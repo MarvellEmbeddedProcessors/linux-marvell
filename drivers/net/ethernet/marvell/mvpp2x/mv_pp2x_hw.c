@@ -6492,6 +6492,9 @@ void mv_pp2x_counters_stat_update(struct mv_pp2x_port *port,
 {
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	int val, queue;
+	unsigned long flags;
+
+	spin_lock_irqsave(&port->mac_data.stats_spinlock, flags);
 
 	val = mv_pp2x_read(hw, MV_PP2_OVERRUN_DROP_REG(port->id));
 	gop_statistics->rx_ppv2_overrun += val;
@@ -6502,7 +6505,6 @@ void mv_pp2x_counters_stat_update(struct mv_pp2x_port *port,
 	gop_statistics->rx_cls_drop += val;
 	gop_statistics->rx_hw_drop += val;
 
-	preempt_disable();
 	for (queue = port->first_rxq; queue < (port->first_rxq +
 			port->num_rx_queues); queue++) {
 		mv_pp2x_write(hw, MVPP2_CNT_IDX_REG, queue);
@@ -6518,7 +6520,8 @@ void mv_pp2x_counters_stat_update(struct mv_pp2x_port *port,
 		gop_statistics->rx_bm_drop += val;
 		gop_statistics->rx_hw_drop += val;
 	}
-	preempt_enable();
+
+	spin_unlock_irqrestore(&port->mac_data.stats_spinlock, flags);
 }
 EXPORT_SYMBOL(mv_pp2x_counters_stat_update);
 
