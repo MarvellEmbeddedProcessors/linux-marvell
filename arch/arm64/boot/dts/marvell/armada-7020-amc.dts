@@ -85,10 +85,8 @@
 			};
 
 			cp0_usb3h0: usb3@500000 {
-				separated-phys-for-usb2-usb3;
-				phys = <&cp0_utmi0>,
-				       <&cp0_comphy 1 COMPHY_USB3H0>;
-				phy-names = "usb2", "usb3";
+				phys = <&cp0_utmi0>;
+				phy-names = "usb";
 				status = "okay";
 			};
 
@@ -156,6 +154,10 @@
 
 			comphy {
 				skip_pcie_power_off;
+				status = "okay";
+			};
+
+			cp0_utmi0: utmi@580000 {
 				status = "okay";
 			};
 		};
