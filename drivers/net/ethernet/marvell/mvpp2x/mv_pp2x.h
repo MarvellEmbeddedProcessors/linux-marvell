@@ -289,6 +289,9 @@ struct mv_mac_data {
 	u32			link;
 	u32			duplex;
 	u32			speed;
+
+	/* Protect gop_statistics update by concurrent workqueue and ethtool */
+	spinlock_t		stats_spinlock;
 };
 
 /* Masks used for pp3_emac flags */

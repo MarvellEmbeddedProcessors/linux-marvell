@@ -2565,7 +2565,16 @@ EXPORT_SYMBOL(mv_gop110_mib_counters_show);
 
 void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop_stat *gop_statistics)
 {
+	struct	mv_pp2x_hw *hw;
+	struct mv_pp2x *pp2;
+	struct mv_pp2x_port *pp_port;
+	unsigned long flags;
 	u64 val;
+
+	hw = container_of(gop, struct mv_pp2x_hw, gop);
+	pp2 = container_of(hw, struct mv_pp2x, hw);
+	pp_port = mv_pp2x_port_struct_get_by_gop_index(pp2, port);
+	spin_lock_irqsave(&pp_port->mac_data.stats_spinlock, flags);
 
 	gop_statistics->rx_byte += mv_gop110_mib_read64(gop, port,
 							MV_MIB_GOOD_OCTETS_RECEIVED_LOW);
@@ -2664,6 +2673,8 @@ void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop
 	/* This counter must be read last. Read it clear all the counters */
 	gop_statistics->late_collision += mv_gop110_mib_read64(gop, port,
 							MV_MIB_LATE_COLLISION);
+
+	spin_unlock_irqrestore(&pp_port->mac_data.stats_spinlock, flags);
 }
 
 void mv_gop110_mib_counters_clear(struct gop_hw *gop, int port)
