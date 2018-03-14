@@ -160,14 +160,24 @@ static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int rin
 			break;
 		}
 
-		if (rdesc->result_data.error_code) {
+		ndesc++;
+
+		if (likely(!rdesc->result_data.error_code) ||
+		    unlikely(*ret == -EIO)) {
+			continue;
+		} else if (rdesc->result_data.error_code & 0x407f) {
+			/* Fatal error (bits 0-7, 14) */
 			dev_err(priv->dev,
 				"cipher: result: result descriptor error (%d)\n",
 				rdesc->result_data.error_code);
 			*ret = -EIO;
+		} else if (rdesc->result_data.error_code == BIT(9)) {
+			/* Authentication failed */
+			*ret = -EBADMSG;
+		} else {
+			/* All other non-fatal errors */
+			*ret = -EINVAL;
 		}
-
-		ndesc++;
 	} while (!rdesc->last_seg);
 
 	safexcel_complete(priv, ring);
