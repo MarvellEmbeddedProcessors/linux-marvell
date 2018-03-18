@@ -22,7 +22,7 @@
 	};
 };
 
-&uart0_ap0 {
+&ap0_uart0 {
 	clock-frequency = <384000>;
 	status = "okay";
 };

@@ -16,8 +16,8 @@
 	#size-cells = <2>;
 
 	aliases {
-		serial0 = &uart0_ap0;
-		serial1 = &uart1_ap0;
+		serial0 = &ap0_uart0;
+		serial1 = &ap0_uart1;
 	};
 
 	psci {
@@ -54,7 +54,7 @@
 				      <0x00d0000 0x1000>,	/* GICH */
 				      <0x00e0000 0x2000>;	/* GICV */
 
-				gic_its_ap0: interrupt-controller@3040000 {
+				ap0_gic_its: interrupt-controller@3040000 {
 					compatible = "arm,gic-v3-its";
 					msi-controller;
 					#msi-cells = <1>;
@@ -70,39 +70,39 @@
 					     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
 			};
 
-			xor@400000 {
+			ap0_xor@400000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x400000 0x1000>,
 				      <0x410000 0x1000>;
-				msi-parent = <&gic_its_ap0 0xa0>;
+				msi-parent = <&ap0_gic_its 0xa0>;
 				dma-coherent;
 			};
 
-			xor@420000 {
+			ap0_xor@420000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x420000 0x1000>,
 				      <0x430000 0x1000>;
-				msi-parent = <&gic_its_ap0 0xa1>;
+				msi-parent = <&ap0_gic_its 0xa1>;
 				dma-coherent;
 			};
 
-			xor@440000 {
+			ap0_xor@440000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x440000 0x1000>,
 				      <0x450000 0x1000>;
-				msi-parent = <&gic_its_ap0 0xa2>;
+				msi-parent = <&ap0_gic_its 0xa2>;
 				dma-coherent;
 			};
 
-			xor@460000 {
+			ap0_xor@460000 {
 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
 				reg = <0x460000 0x1000>,
 				      <0x470000 0x1000>;
-				msi-parent = <&gic_its_ap0 0xa3>;
+				msi-parent = <&ap0_gic_its 0xa3>;
 				dma-coherent;
 			};
 
-			uart0_ap0: serial@512000 {
+			ap0_uart0: serial@512000 {
 				compatible = "snps,dw-apb-uart";
 				reg = <0x512000 0x100>;
 				reg-shift = <2>;
@@ -111,7 +111,7 @@
 				status = "disabled";
 			};
 
-			uart1_ap0: serial@512100 {
+			ap0_uart1: serial@512100 {
 				compatible = "snps,dw-apb-uart";
 				reg = <0x512100 0x100>;
 				reg-shift = <2>;
