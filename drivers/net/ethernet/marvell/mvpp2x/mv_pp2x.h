@@ -57,7 +57,7 @@
 
 #define IRQ_NAME_SIZE (36)
 
-#define STATS_DELAY	250
+#define STATS_DELAY	1000 /*mSec*/
 
 #define TSO_TXQ_LIMIT 100
 #define TXQ_LIMIT (MAX_SKB_FRAGS + 2)
