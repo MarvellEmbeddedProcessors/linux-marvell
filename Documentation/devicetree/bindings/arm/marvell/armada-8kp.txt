@@ -11,5 +11,5 @@ the following root node property:
 
 Example:
 
-compatible = "marvell,armada-8080-db", "marvell,armada-8080",
+compatible = "marvell,armada-8080-pd", "marvell,armada-8080",
 	     "marvell,armada-ap810-octa", "marvell,armada-ap810"
