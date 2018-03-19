@@ -215,7 +215,7 @@
 	/* Network PHY */
 	phy-mode = "10gbase-kr";
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp0_comphy2 2>;
+	phys = <&cp0_comphy2 0>;
 };
 
 &cp0_eth1 {
@@ -224,7 +224,7 @@
 	phy = <&phy0>;
 	phy-mode = "sgmii";
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp0_comphy0 0>;
+	phys = <&cp0_comphy0 1>;
 };
 
 &cp0_eth2 {
