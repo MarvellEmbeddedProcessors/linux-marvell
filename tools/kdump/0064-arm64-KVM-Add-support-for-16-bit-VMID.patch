@@ -1,7 +1,7 @@
-From e147800059292d7b73b75ae811f0dae694706743 Mon Sep 17 00:00:00 2001
+From 21d6c59d8274517bceb4fe194e1b554c22ba0c0b Mon Sep 17 00:00:00 2001
 From: Vladimir Murzin <vladimir.murzin@arm.com>
 Date: Mon, 16 Nov 2015 11:28:18 +0000
-Subject: [PATCH 064/123] arm64: KVM: Add support for 16-bit VMID
+Subject: [PATCH 064/124] arm64: KVM: Add support for 16-bit VMID
 
 The ARMv8.1 architecture extension allows to choose between 8-bit and
 16-bit of VMID, so use this capability for KVM.
@@ -25,7 +25,7 @@ Conflicts:
  6 files changed, 32 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index 01d4d7a..e22089f 100644
+index 3ea154e..a3f0b3d 100644
 --- a/arch/arm/include/asm/kvm_arm.h
 +++ b/arch/arm/include/asm/kvm_arm.h
 @@ -164,7 +164,7 @@
@@ -38,10 +38,10 @@ index 01d4d7a..e22089f 100644
  /* Hyp Syndrome Register (HSR) bits */
  #define HSR_EC_SHIFT	(26)
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 405aa18..9203c21 100644
+index 23d5cad..c2ce496 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -279,6 +279,11 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+@@ -272,6 +272,11 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
  				       pgd_t *merged_hyp_pgd,
  				       unsigned long hyp_idmap_start) { }
  
@@ -93,7 +93,7 @@ index 449e312..0178376 100644
  
  	return 0;
 diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 2d960f85..3776db0 100644
+index ef8e13d3..58a6c6f 100644
 --- a/arch/arm64/include/asm/kvm_arm.h
 +++ b/arch/arm64/include/asm/kvm_arm.h
 @@ -123,6 +123,7 @@
@@ -104,9 +104,9 @@ index 2d960f85..3776db0 100644
  
  /*
   * We configure the Stage-2 page tables to always restrict the IPA space to be
-@@ -167,7 +168,7 @@
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
- #define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+@@ -166,7 +167,7 @@
+ 
+ #define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_X)
  #define VTTBR_VMID_SHIFT  (UL(48))
 -#define VTTBR_VMID_MASK	  (UL(0xFF) << VTTBR_VMID_SHIFT)
 +#define VTTBR_VMID_MASK(size) (_AT(u64, (1 << size) - 1) << VTTBR_VMID_SHIFT)
@@ -114,7 +114,7 @@ index 2d960f85..3776db0 100644
  /* Hyp System Trap Register */
  #define HSTR_EL2_T(x)	(1 << x)
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 54cba80..0bf8b43 100644
+index 1e8c3b0..dba65b4 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
 @@ -20,6 +20,7 @@
@@ -125,7 +125,7 @@ index 54cba80..0bf8b43 100644
  
  /*
   * As we only have the TTBR0_EL2 register, we cannot express
-@@ -301,5 +302,12 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+@@ -300,5 +301,12 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
  	merged_hyp_pgd[idmap_idx] = __pgd(__pa(boot_hyp_pgd) | PMD_TYPE_TABLE);
  }
  
@@ -158,5 +158,5 @@ index 84c338f..d073b5a 100644
  	msr	vtcr_el2, x4
  
 -- 
-1.8.3.1
+2.7.4
 

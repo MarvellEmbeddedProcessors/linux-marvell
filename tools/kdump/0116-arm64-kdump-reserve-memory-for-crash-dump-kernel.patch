@@ -1,7 +1,7 @@
-From 43cfbb60b5b043957939633c9dea195c310140f2 Mon Sep 17 00:00:00 2001
+From 53daa6c7994a722d3a772dc34da0d39bac52abe5 Mon Sep 17 00:00:00 2001
 From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Date: Wed, 19 Aug 2015 12:07:21 +0900
-Subject: [PATCH 116/123] arm64: kdump: reserve memory for crash dump kernel
+Subject: [PATCH 116/124] arm64: kdump: reserve memory for crash dump kernel
 
 "crashkernel=" kernel parameter specifies the size (and optionally
 the start address) of the system ram used by crash dump kernel.
@@ -20,8 +20,8 @@ Reviewed-by: James Morse <james.morse@arm.com>
 (cherry picked from commit 68eb94cc6f71c8dea69b000986c33bc4884c1c27)
 ---
  arch/arm64/kernel/setup.c |   7 ++-
- arch/arm64/mm/init.c      | 110 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+), 1 deletion(-)
+ arch/arm64/mm/init.c      | 111 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 117 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
 index ad29060..e641a52 100644
@@ -49,7 +49,7 @@ index ad29060..e641a52 100644
  
  #ifdef CONFIG_BLK_DEV_INITRD
 diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 007ee97..38d3a56 100644
+index 27037b4..ac5a6d1 100644
 --- a/arch/arm64/mm/init.c
 +++ b/arch/arm64/mm/init.c
 @@ -29,11 +29,13 @@
@@ -178,10 +178,12 @@ index 007ee97..38d3a56 100644
  /*
   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
   * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -213,6 +320,9 @@ void __init arm64_memblock_init(void)
+@@ -213,7 +320,11 @@ void __init arm64_memblock_init(void)
  		arm64_dma_phys_limit = max_zone_dma_phys();
  	else
  		arm64_dma_phys_limit = PHYS_MASK + 1;
++
+ 	high_memory = __va(memblock_end_of_DRAM() - 1) + 1;
 +
 +	reserve_crashkernel();
 +
@@ -189,5 +191,5 @@ index 007ee97..38d3a56 100644
  
  	memblock_allow_resize();
 -- 
-1.8.3.1
+2.7.4
 
