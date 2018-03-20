@@ -17,9 +17,9 @@
 			"marvell,armada-ap806";
 
 	cp0 {
-		config-space@f2000000 {
-			cp0_ethernet: ethernet@0 {
-				cp0_eth0: eth0 {
+		config-space {
+			ethernet@0 {
+				eth0 {
 					/delete-property/phy;
 				};
 			};
@@ -28,9 +28,9 @@
 	};
 
 	cp1 {
-		config-space@f4000000 {
-			cp1_ethernet: ethernet@0 {
-				cp1_eth0: eth0 {
+		config-space {
+			ethernet@0 {
+				eth0 {
 					/delete-property/phy;
 				};
 			};
@@ -38,4 +38,3 @@
 		};
 	};
 };
-
