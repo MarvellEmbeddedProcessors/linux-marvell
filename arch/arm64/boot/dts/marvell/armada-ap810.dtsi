@@ -1,0 +1,152 @@
+/*
+ * Copyright (C) 2018 Marvell Technology Group Ltd.
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPLv2 or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This library is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This library is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ * Device Tree file for Marvell Armada AP810.
+ */
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/soc/ap810-stream-id.h>
+#include "armada-common.dtsi"
+
+/* For every AP810, include ITS unit (part of GICv3),
+ * the ITS node should be part of GIC generic node.
+ * This node describe the ITS (Interrupt translation service)
+ * of AP-x.
+ * ITS does not have broadcast configuration (every ITS have his own)
+ * interrupt and configuration.
+ */
+
+/* General settings related to AP, to be used in CP south-bridges connected to this AP */
+#define AP810_GIC_BASE		0x3000000
+#define AP_ICU_SET_SPI_HIGH	((AP810_BASE >> 32) & 0xffffffff)
+#define AP_ICU_SET_SPI_LOW	((AP810_BASE & 0xffffffff) + AP810_GIC_BASE + 0x40)
+
+#define AP_ICU_CLR_SPI_HIGH	((AP810_BASE >> 32) & 0xffffffff)
+#define AP_ICU_CLR_SPI_LOW	((AP810_BASE & 0xffffffff) + AP810_GIC_BASE + 0x48)
+
+&gic{
+	AP810_LABEL(gic_its): interrupt-controller@AP810_GIC_ITS_BASE {
+		compatible = "arm,gic-v3-its";
+		msi-controller;
+		#msi-cells = <1>;
+		reg = <AP810_GIC_ITS_BASE 0x20000>;
+	};
+};
+
+/* GIC ITS in this AP is MSI parent for XOR engines in CPs south-bridges connected to this AP  */
+#define XOR_MSI_PARENT(XOR_NUM) <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_CP_XORx(XOR_NUM)>
+
+/ {
+	AP810_NAME {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		compatible = "simple-bus";
+		interrupt-parent = <&gic>;
+		ranges;
+
+		config-space {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "simple-bus";
+			ranges = <0x0 0x0 AP810_BASE 0x4000000>;
+			interrupt-parent = <&gic>;
+
+			AP810_LABEL(gicp): gicp@3000040 {
+				compatible = "marvell,ap806-gicp";
+				reg = <0x3000040 0x10>;
+				marvell,spi-ranges = <92 64>, <156 64>;
+				msi-controller;
+			};
+
+			AP810_LABEL(xor0): xor0@400000 {
+				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+				reg = <0x400000 0x1000>,
+				      <0x410000 0x1000>;
+				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_APx_XORx(0, AP_NUM)>;
+				dma-coherent;
+			};
+
+			AP810_LABEL(xor1): xor1@420000 {
+				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+				reg = <0x420000 0x1000>,
+				      <0x430000 0x1000>;
+				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_APx_XORx(1, AP_NUM)>;
+				dma-coherent;
+			};
+
+			AP810_LABEL(xor2): xor2@440000 {
+				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+				reg = <0x440000 0x1000>,
+				      <0x450000 0x1000>;
+				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_APx_XORx(2, AP_NUM)>;
+				dma-coherent;
+			};
+
+			AP810_LABEL(xor3): xor3@460000 {
+				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
+				reg = <0x460000 0x1000>,
+				      <0x470000 0x1000>;
+				msi-parent = <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_APx_XORx(3, AP_NUM)>;
+				dma-coherent;
+			};
+
+			AP810_LABEL(uart0): serial0@512000 {
+				compatible = "snps,dw-apb-uart";
+				reg = <0x512000 0x100>;
+				reg-shift = <2>;
+				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+				reg-io-width = <1>;
+				status = "disabled";
+			};
+
+			AP810_LABEL(uart1): serial1@512100 {
+				compatible = "snps,dw-apb-uart";
+				reg = <0x512100 0x100>;
+				reg-shift = <2>;
+				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+				reg-io-width = <1>;
+				status = "disabled";
+			};
+		};
+	};
+};
