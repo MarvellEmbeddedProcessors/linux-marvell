@@ -36,10 +36,7 @@ struct mvebu_comphy_priv {
 		int index;
 		/* in case PCIe is in End point mode */
 		bool skip_pcie_power_off;
-		struct misc_info {
-			int pcie_width: 8;
-			int pcie_is_ep: 1;
-		} misc;
+		uint8_t pcie_width;
 	} lanes[MVEBU_COMPHY_MAX_CNT];
 };
 

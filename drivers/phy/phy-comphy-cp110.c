@@ -302,7 +302,6 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 	u32 mask, data, pcie_width;
 	unsigned int lane = comphy->index;
 	void __iomem *addr;
-	bool is_end_point;
 	u32 clk_dir;
 	struct sar_val sar;
 	struct device_node *sar_node;
@@ -367,12 +366,10 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 
 	clk_dir = sar.clk_direction;
 
-	is_end_point = priv->lanes[comphy->index].misc.pcie_is_ep;
-	pcie_width = priv->lanes[lane].misc.pcie_width;
+	pcie_width = priv->lanes[lane].pcie_width;
 
 	dev_dbg(priv->dev, "On lane %d\n", lane);
 	dev_dbg(priv->dev, "PCIe clock direction = %x\n", clk_dir);
-	dev_dbg(priv->dev, "PCIe RC    = %d\n", !is_end_point);
 	dev_dbg(priv->dev, "PCIe Width = %d\n", pcie_width);
 
 	/* enable PCIe X4 and X2 */
@@ -738,13 +735,6 @@ static int mvebu_cp110_comphy_pcie_power_on(struct mvebu_comphy_priv *priv,
 	mask |= HPIPE_LANE_CFG_FOM_PRESET_VECTOR_MASK;
 	data |= 0x2 << HPIPE_LANE_CFG_FOM_PRESET_VECTOR_OFFSET;
 	reg_set(hpipe_addr + HPIPE_LANE_EQ_REMOTE_SETTING_REG, data, mask);
-
-	if (!is_end_point) {
-		/* Set phy in root complex mode */
-		mask = HPIPE_CFG_PHY_RC_EP_MASK;
-		data = 0x1 << HPIPE_CFG_PHY_RC_EP_OFFSET;
-		reg_set(hpipe_addr + HPIPE_LANE_EQU_CONFIG_0_REG, data, mask);
-	}
 
 	dev_dbg(priv->dev, "stage: Comphy power up\n");
 
@@ -1167,13 +1157,8 @@ static int mvebu_cp110_comphy_send_command(struct phy *phy, u32 command)
 		     pcie_width > PCIE_LNK_X1) ||
 		    (pcie_width == PCIE_LNK_WIDTH_UNKNOWN))
 			return -EIO;
-		priv->lanes[comphy->index].misc.pcie_width = pcie_width;
+		priv->lanes[comphy->index].pcie_width = pcie_width;
 		break;
-	/* The following command is to indicate the PCIe works in endpoint mode
-	 * which is from PCIe host driver.
-	 */
-	case COMPHY_COMMAND_PCIE_IS_EP:
-		priv->lanes[comphy->index].misc.pcie_is_ep = true;
 	case(COMPHY_COMMAND_SFI_RX_TRAINING):
 		switch (COMPHY_GET_MODE(priv->lanes[comphy->index].mode)) {
 		case (COMPHY_XFI_MODE):
