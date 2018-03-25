@@ -54,6 +54,24 @@
 		reg = <0x0 0x0 0x0 0x80000000>;
 	};
 
+	/delete-node/opp_table0;
+	/delete-node/opp_table1;
+
+	cpus {
+		/delete-node/idle_states;
+		cpu@000 {
+			/delete-property/operating-points-v2;
+		};
+		cpu@001 {
+			/delete-property/operating-points-v2;
+		};
+		cpu@100 {
+			/delete-property/operating-points-v2;
+		};
+		cpu@101 {
+			/delete-property/operating-points-v2;
+		};
+	};
 	ap806 {
 		config-space {
 			serial@512000 {
