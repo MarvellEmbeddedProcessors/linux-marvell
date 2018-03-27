@@ -1,0 +1,134 @@
+/*
+ * Copyright (C) 2017 Marvell Technology Group Ltd.
+ *
+ * This file is dual-licensed: you can use it either under the terms
+ * of the GPLv2 or the X11 license, at your option. Note that this dual
+ * licensing only applies to this file, and not this project as a
+ * whole.
+ *
+ *  a) This library is free software; you can redistribute it and/or
+ *     modify it under the terms of the GNU General Public License as
+ *     published by the Free Software Foundation; either version 2 of the
+ *     License, or (at your option) any later version.
+ *
+ *     This library is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ * Or, alternatively,
+ *
+ *  b) Permission is hereby granted, free of charge, to any person
+ *     obtaining a copy of this software and associated documentation
+ *     files (the "Software"), to deal in the Software without
+ *     restriction, including without limitation the rights to use,
+ *     copy, modify, merge, publish, distribute, sublicense, and/or
+ *     sell copies of the Software, and to permit persons to whom the
+ *     Software is furnished to do so, subject to the following
+ *     conditions:
+ *
+ *     The above copyright notice and this permission notice shall be
+ *     included in all copies or substantial portions of the Software.
+ *
+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *     OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ * Device Tree file for Marvell Armada-8080 SoC, made of an AP810 OCTA.
+ */
+
+#include "armada-common.dtsi"
+#include "armada-8kp.dtsi"
+#include "armada-ap810-ap0.dtsi"
+
+#define AP_NUM					0
+#define AP810_BASE				0xe8000000
+#define AP810_GIC_ITS_BASE			0xf040000
+
+#include "armada-ap810-octa-core.dtsi"
+
+#define CP110_EIP197_INDEX	CP110_NUM
+
+/* AP0 CP0 IO
+ * 0x81_0000_0000 - 0x81_ffff_ffff - internal CFG (4GB)
+ * 0x82_0000_0000 - 0x83_ffff_ffff - PEX0 (8GB)
+ * 0x84_0000_0000 - 0x85_ffff_ffff - PEX1 (8GB)
+ * 0x86_0000_0000 - 0x87_ffff_ffff - PEX2 (8GB)
+ */
+#define CP110_NUM				0
+
+#include "armada-cp110.dtsi"
+
+#undef CP110_NUM
+
+/* AP0 CP1 IO
+ * 0x88_0000_0000 - 0x88_ffff_ffff - internal CFG (4GB)
+ * 0x89_0000_0000 - 0x8a_ffff_ffff - PEX0 (8GB)
+ * 0x8b_0000_0000 - 0x8c_ffff_ffff - PEX1 (8GB)
+ * 0x8d_0000_0000 - 0x8e_ffff_ffff - PEX2 (8GB)
+ */
+#define CP110_NUM				1
+
+#include "armada-cp110.dtsi"
+
+#undef CP110_NUM
+
+/* AP810 definitions are used in CP110 dtsi files, so un-define them after defining it's connected CPs */
+#undef AP_NUM
+#undef AP810_BASE
+#undef AP810_GIC_ITS_BASE
+
+/ {
+	model = "Marvell Armada-8082";
+	compatible = "marvell,armada-8082", "marvell,armada-ap810-octa",
+				"marvell,armada-ap810";
+
+	aliases {
+		serial0 = &ap0_uart0;
+		serial1 = &ap0_uart1;
+	};
+
+	/* Delete unsupported interfaces from CP nodes:
+	 *	1. GPIO in CP requires a pinctrl driver support,
+	 *	   which is currently not suitable for AP810.
+	 */
+	cp0 {
+		config-space {
+			system-controller@440000 {
+				/delete-node/ gpio@100;
+				/delete-node/ gpio@140;
+			};
+		};
+	};
+	cp1 {
+		config-space {
+			system-controller@440000 {
+				/delete-node/ gpio@100;
+				/delete-node/ gpio@140;
+			};
+		};
+	};
+};
+
+&cp0_icu {
+	msi-parent = <&ap0_gicp>;
+};
+
+&cp0_crypto {
+	status = "disabled";
+};
+
+&cp1_icu {
+	msi-parent = <&ap0_gicp>;
+};
+
+&cp1_crypto {
+	status = "disabled";
+};

@@ -1,15 +1,65 @@
-Marvell Armada 8KPlus Platforms Device Tree Bindings
-----------------------------------------------------
+Marvell Armada 8K Plus Platforms Device Tree Bindings
+-----------------------------------------------------
 
-Boards using a SoC of the Marvell Armada 8KP families must carry
+Armada-8k-plus family will include several SoCs:
+Armada-8XXY:	XX - number of cores in the SoC (e.g. 08, 16, 32)
+		Y - number of CP-110 in the SoC (e.g. 1, 2, 4)
+For example:
+	Armada-8080: will include AP110 only with 8 cores
+	Armada-8162: will include dual AP110 with 16 cores & 2 CP110
+	Armada-8328: will include quad AP110 with 32 cores & 8 CP110
+
+Boards using a SoC of the Marvell 8K Plus families must carry
 the following root node property:
 
  - compatible, with one of the following values:
 
-   - "marvell,armada-8080", "marvell,armada-ap810-octa", "marvell,armada-ap810"
-     when the SoC being used is the Armada 8080
+SoC:
+   - "marvell,armada8080", "marvell,armada-ap810-octa", "marvell,armada-ap810"
+      when the SoC being used is the Armada 8080
+
+   - "marvell,armada8160", "marvell,armada-ap810-octa", "marvell,armada-ap810"
+      when the SoC being used is the Armada 8160
+
+   - "marvell,armada8320", "marvell,armada-ap810-octa", "marvell,armada-ap810"
+      when the SoC being used is the Armada 8320
+
+   - "marvell,armada8082", "marvell,armada-cp110", "marvell,armada-ap810-octa",
+     "marvell,armada-ap810"
+      when the SoC being used is the Armada 8082: 8 cores with 2 CP south-bridges
+
+   - "marvell,armada8084", "marvell,armada-cp110", "marvell,armada-ap810-octa",
+     "marvell,armada-ap810"
+      when the SoC being used is the Armada 8084: 8 cores with 4 CP south-bridges
+
+   - "marvell,armada8162", "marvell,armada-cp110", "marvell,armada-ap810-octa",
+     "marvell,armada-ap810"
+      when the SoC being used is the Armada 8162: 16 cores with 2 CP south-bridges
+
+   - "marvell,armada8164", "marvell,armada-cp110", "marvell,armada-ap810-octa",
+     "marvell,armada-ap810"
+      when the SoC being used is the Armada 8164: 16 cores with 4 CP south-bridges
+      (Should add "marvell,armada-cp110" if CP110 included in the SoC)
+
+Boards:
+   - "marvell,armada-8080-pd"
+      when the board being used is the Armada-8080 emulator
+   - "marvell,armada-8160-pd"
+      when the board being used is the Armada-8160 emulator
+   - "marvell,armada-8320-pd"
+      when the board being used is the Armada-8320 emulator
+   - "marvell,armada-8082-db"
+      when the board being used is the Armada-8082 DB board
+   - "marvell,armada-8084-db"
+      when the board being used is the Armada-8084 DB board
+   - "marvell,armada-8162-db"
+      when the board being used is the Armada-8162 DB board
+   - "marvell,armada-8164-db"
+      when the board being used is the Armada-8164 DB board
 
 Example:
-
 compatible = "marvell,armada-8080-pd", "marvell,armada-8080",
-	     "marvell,armada-ap810-octa", "marvell,armada-ap810"
+             "marvell,armada-ap810-octa", "marvell,armada-ap810";
+
+compatible = "marvell,armada-8084-db", "marvell,armada-8084",
+	     "marvell,armada-ap810-octa", "marvell,armada-ap810";

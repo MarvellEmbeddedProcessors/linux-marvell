@@ -1,0 +1,22 @@
+/*
+ * Copyright (C) 2018 Marvell International Ltd.
+ *
+ * SPDX-License-Identifier:    GPL-2.0
+ * https://spdx.org/licenses
+ */
+/* Common definitions used by Armada 8Kp DTs */
+
+/* This defines used to calculate the base address of each CP */
+#define CP110_BASE_OFFSET			(0x8100000000)
+#define AP810_SPACE_SIZE			(0x1d00000000)
+#define CP110_SPACE_SIZE			(0x0700000000)
+#define CP110_BASE				((AP_NUM * AP810_SPACE_SIZE) +	\
+						CP110_BASE_OFFSET +		\
+						((CP110_NUM % 4) * CP110_SPACE_SIZE))
+
+#define CP110_PCIE_MEM_SIZE			(0xfff00000)
+#define CP110_PCIEx_CPU_IO_BASE(iface)		(CP110_BASE + 0x01fffe0000 + (iface) * 0x0200000000)
+#define CP110_PCIEx_CPU_MEM_BASE(iface)		(CP110_BASE + 0x0100000000 + (iface) * 0x0200000000)
+#define CP110_PCIEx_BUS_IO_BASE(iface)		(CP110_PCIEx_CPU_IO_BASE(iface) - CP110_PCIEx_CPU_MEM_BASE(iface))
+#define CP110_PCIEx_BUS_MEM_BASE(iface)		(0x0)
+#define CP110_PCIE_BUS_MEM_CFG			(0x83000000)
