@@ -119,7 +119,7 @@ struct armada8k_pcie_rst {
 #define PCIE_GEN3_EQ_CONTROL_OFF_REG	0x8A8
 #define PCIE_GEN3_EQ_PSET_REQ_VEC_MASK	0xFFFF00
 #define PCIE_GEN3_EQ_PSET_REQ_VEC_OFFSET 8
-#define PCIE_GEN3_EQ_PSET_4		0x10
+#define PCIE_GEN3_EQ_PSET_3_8		0x1f8
 #define PCIE_GEN3_EQU_EVAL_2MS_DISABLE	BIT(5)
 
 #define PCIE_LINK_FLUSH_CONTROL_OFF_REG	0x8CC
@@ -231,12 +231,12 @@ static void armada8k_pcie_dw_mvebu_pcie_config(void __iomem *regs_base)
 
 	/*
 	 * According to the electrical measurmentrs, the best preset that our
-	 * receiver can handle is preset4, so we are changing the vector of
-	 * presets to evaluate during the link equalization training to preset4.
+	 * receiver are preset3 to preset8, so we are changing the vector of
+	 * presets to evaluate during the link equalization training to preset3-8.
 	 */
 	reg = readl(regs_base + PCIE_GEN3_EQ_CONTROL_OFF_REG);
 	reg &= ~PCIE_GEN3_EQ_PSET_REQ_VEC_MASK;
-	reg |= PCIE_GEN3_EQ_PSET_4 << PCIE_GEN3_EQ_PSET_REQ_VEC_OFFSET;
+	reg |= PCIE_GEN3_EQ_PSET_3_8 << PCIE_GEN3_EQ_PSET_REQ_VEC_OFFSET;
 	writel(reg, regs_base + PCIE_GEN3_EQ_CONTROL_OFF_REG);
 
 	/*
