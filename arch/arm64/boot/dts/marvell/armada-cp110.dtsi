@@ -15,6 +15,8 @@
 #define CP110_PCIEx_REG0_BASE(iface)		(CP110_BASE + 0x600000 + (iface) * 0x20000)
 #define CP110_PCIEx_REG1_BASE(iface)		(CP110_PCIEx_CPU_MEM_BASE(iface) + CP110_PCIE_MEM_SIZE)
 
+#define CP110_SPI_BUS_ID(n)			((CP110_NUM * 2) + (n))
+
 / {
 	/*
 	 * The contents of the node are defined below, in order to
@@ -285,6 +287,7 @@
 			reg = <0x700600 0x50>;
 			#address-cells = <0x1>;
 			#size-cells = <0x0>;
+			cell-index = <CP110_SPI_BUS_ID(1)>;
 			clock-names = "core", "axi";
 			clocks = <&CP110_LABEL(clk) 1 21>,
 				 <&CP110_LABEL(clk) 1 17>;
@@ -296,6 +299,7 @@
 			reg = <0x700680 0x50>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			cell-index = <CP110_SPI_BUS_ID(2)>;
 			clock-names = "core", "axi";
 			clocks = <&CP110_LABEL(clk) 1 21>,
 				 <&CP110_LABEL(clk) 1 17>;

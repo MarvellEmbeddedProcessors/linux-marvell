@@ -11,6 +11,12 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-mcbin.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-mcbin-single-shot.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8080-pd.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8082-db.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8084-db.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8160-pd.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8162-db.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8164-db.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8320-pd.dtb
 
 always		:= $(dtb-y)
 subdir-y	:= $(dts-dirs)
