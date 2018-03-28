@@ -1,7 +1,7 @@
-From e7aea7fc28fb820c5d847d86f96c2fa56ca8c067 Mon Sep 17 00:00:00 2001
+From 4146c31a440343806f6aa98e22c2fae49cbd8624 Mon Sep 17 00:00:00 2001
 From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 Date: Thu, 29 Sep 2016 17:47:39 -0400
-Subject: [PATCH 004/123] arm64: Kprobes with single stepping support
+Subject: [PATCH 004/119] arm64: Kprobes with single stepping support
 
 commit 2dd0e8d2d2a157dbc83295a78336c2217110f2f8 upstream.
 
@@ -83,10 +83,10 @@ Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
  create mode 100644 arch/arm64/kernel/probes/kprobes.c
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0290331..e6370c4 100644
+index 53f34fc..b1c5079 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -78,6 +78,7 @@ config ARM64
+@@ -80,6 +80,7 @@ config ARM64
  	select HAVE_REGS_AND_STACK_ACCESS_API
  	select HAVE_RCU_TABLE_FREE
  	select HAVE_SYSCALL_TRACEPOINTS
@@ -265,7 +265,7 @@ index cfe2b37..1528d52e 100644
  
  #endif /* __ASSEMBLY__ */
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index fed7fc5..cfa290b 100644
+index 8f6c1e3..85f6924 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
 @@ -41,7 +41,7 @@ arm64-obj-$(CONFIG_PCI)			+= pci.o
@@ -1055,7 +1055,7 @@ index 71426a78..bc6b631 100644
  			IDMAP_TEXT
  			*(.fixup)
 diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 247bae7..e19cd15 100644
+index 8648541..db48499 100644
 --- a/arch/arm64/mm/fault.c
 +++ b/arch/arm64/mm/fault.c
 @@ -43,6 +43,28 @@
@@ -1097,7 +1097,7 @@ index 247bae7..e19cd15 100644
  	tsk = current;
  	mm  = tsk->mm;
  
-@@ -606,6 +631,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+@@ -609,6 +634,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
  
  	return 0;
  }
@@ -1106,5 +1106,5 @@ index 247bae7..e19cd15 100644
  #ifdef CONFIG_ARM64_PAN
  int cpu_enable_pan(void *__unused)
 -- 
-1.8.3.1
+2.7.4
 

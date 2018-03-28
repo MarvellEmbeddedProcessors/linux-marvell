@@ -1,7 +1,7 @@
-From d3bf1306c7f53b22f289f4e2fef44311ed70e40b Mon Sep 17 00:00:00 2001
+From d3d16b73ef8ea2fac75637376bcc56e1968d9ae7 Mon Sep 17 00:00:00 2001
 From: Pratyush Anand <panand@redhat.com>
 Date: Fri, 8 Jul 2016 12:35:49 -0400
-Subject: [PATCH 005/123] arm64: Blacklist non-kprobe-able symbol
+Subject: [PATCH 005/119] arm64: Blacklist non-kprobe-able symbol
 
 commit 44b53f67c99d0fc53af3066a05d9e7ca5080a850 upstream.
 
@@ -20,23 +20,25 @@ Signed-off-by: David A. Long <dave.long@linaro.org>
  4 files changed, 31 insertions(+)
 
 diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 3b6d8cc..fbec403 100644
+index 6bdce9d..481a08c 100644
 --- a/arch/arm64/kernel/arm64ksyms.c
 +++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -26,6 +26,7 @@
- #include <linux/syscalls.h>
+@@ -27,6 +27,7 @@
  #include <linux/uaccess.h>
  #include <linux/io.h>
+ #include <linux/arm-smccc.h>
 +#include <linux/kprobes.h>
  
  #include <asm/checksum.h>
  
-@@ -67,4 +68,5 @@ EXPORT_SYMBOL(test_and_change_bit);
+@@ -68,6 +69,7 @@ EXPORT_SYMBOL(test_and_change_bit);
  
  #ifdef CONFIG_FUNCTION_TRACER
  EXPORT_SYMBOL(_mcount);
 +NOKPROBE_SYMBOL(_mcount);
  #endif
+ 
+    /* arm-smccc */
 diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
 index 17a4d37..6de6d9f 100644
 --- a/arch/arm64/kernel/debug-monitors.c
@@ -172,7 +174,7 @@ index 17a4d37..6de6d9f 100644
  }
 +NOKPROBE_SYMBOL(user_disable_single_step);
 diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index b45c95d..367a954 100644
+index eeebfc3..22543cb 100644
 --- a/arch/arm64/kernel/hw_breakpoint.c
 +++ b/arch/arm64/kernel/hw_breakpoint.c
 @@ -24,6 +24,7 @@
@@ -183,7 +185,7 @@ index b45c95d..367a954 100644
  #include <linux/perf_event.h>
  #include <linux/ptrace.h>
  #include <linux/smp.h>
-@@ -127,6 +128,7 @@ static u64 read_wb_reg(int reg, int n)
+@@ -128,6 +129,7 @@ static u64 read_wb_reg(int reg, int n)
  
  	return val;
  }
@@ -191,7 +193,7 @@ index b45c95d..367a954 100644
  
  static void write_wb_reg(int reg, int n, u64 val)
  {
-@@ -140,6 +142,7 @@ static void write_wb_reg(int reg, int n, u64 val)
+@@ -141,6 +143,7 @@ static void write_wb_reg(int reg, int n, u64 val)
  	}
  	isb();
  }
@@ -199,7 +201,7 @@ index b45c95d..367a954 100644
  
  /*
   * Convert a breakpoint privilege level to the corresponding exception
-@@ -157,6 +160,7 @@ static enum dbg_active_el debug_exception_level(int privilege)
+@@ -158,6 +161,7 @@ static enum dbg_active_el debug_exception_level(int privilege)
  		return -EINVAL;
  	}
  }
@@ -207,7 +209,7 @@ index b45c95d..367a954 100644
  
  enum hw_breakpoint_ops {
  	HW_BREAKPOINT_INSTALL,
-@@ -575,6 +579,7 @@ static void toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
+@@ -576,6 +580,7 @@ static void toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
  		write_wb_reg(reg, i, ctrl);
  	}
  }
@@ -215,7 +217,7 @@ index b45c95d..367a954 100644
  
  /*
   * Debug exception handlers.
-@@ -654,6 +659,7 @@ unlock:
+@@ -655,6 +660,7 @@ unlock:
  
  	return 0;
  }
@@ -223,7 +225,7 @@ index b45c95d..367a954 100644
  
  static int watchpoint_handler(unsigned long addr, unsigned int esr,
  			      struct pt_regs *regs)
-@@ -756,6 +762,7 @@ unlock:
+@@ -757,6 +763,7 @@ unlock:
  
  	return 0;
  }
@@ -231,7 +233,7 @@ index b45c95d..367a954 100644
  
  /*
   * Handle single-step exception.
-@@ -813,6 +820,7 @@ int reinstall_suspended_bps(struct pt_regs *regs)
+@@ -814,6 +821,7 @@ int reinstall_suspended_bps(struct pt_regs *regs)
  
  	return !handled_exception;
  }
@@ -275,5 +277,5 @@ index bcac81e..814d0c5 100644
  static struct break_hook kgdb_brkpt_hook = {
  	.esr_mask	= 0xffffffff,
 -- 
-1.8.3.1
+2.7.4
 
