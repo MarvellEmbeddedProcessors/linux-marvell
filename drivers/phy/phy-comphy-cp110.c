@@ -33,82 +33,6 @@
 #define COMPHY_FW_PCIE_FORMAT(pcie_width, mode)	\
 			      (((pcie_width) << COMPHY_PCI_WIDTH_OFFSET) | mode)
 
-/* PHY selector configures SATA and Network modes */
-static void mvebu_cp110_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
-						struct mvebu_comphy *comphy)
-{
-	u32 reg, mask;
-	u32 comphy_offset = COMMON_SELECTOR_COMPHYN_FIELD_WIDTH * comphy->index;
-	int mode;
-
-	/* Comphy mode (compound of the IO mode and id) is stored during
-	 * the execution of mvebu_comphy_of_xlate.
-	 * Here, only the IO mode is required to distinguish between SATA and
-	 * network modes.
-	 */
-	mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
-
-	mask = COMMON_SELECTOR_COMPHY_MASK << comphy_offset;
-	reg = readl(priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
-	reg &= ~mask;
-
-	/* SATA port 0/1 require the same configuration */
-	if (mode == COMPHY_SATA_MODE) {
-		/* SATA selector values is always 4 */
-		reg |= COMMON_SELECTOR_COMPHYN_SATA << comphy_offset;
-	} else {
-		switch (comphy->index) {
-		case(0):
-		case(1):
-		case(2):
-			/* For comphy 0,1, and 2:
-			 *	Network selector value is always 1.
-			 */
-			reg |= COMMON_SELECTOR_COMPHY0_1_2_NETWORK << comphy_offset;
-			break;
-		case(3):
-			/* For comphy 3:
-			 * 0x1 = RXAUI_Lane1
-			 * 0x2 = SGMII/HS-SGMII Port1
-			 */
-			if (mode == COMPHY_RXAUI_MODE)
-				reg |= COMMON_SELECTOR_COMPHY3_RXAUI << comphy_offset;
-			else
-				reg |= COMMON_SELECTOR_COMPHY3_SGMII << comphy_offset;
-			break;
-		case(4):
-			 /* For comphy 4:
-			  * 0x1 = SGMII/HS-SGMII Port2
-			  * 0x2 = SGMII/HS-SGMII Port0: XFI/SFI, RXAUI_Lane0
-			  *
-			  * We want to check if SGMII1/HS_SGMII1 is the requested mode in order to
-			  * determine which value should be set (all other modes use the same value)
-			  * so we need to strip the mode, and check the ID because we might handle
-			  * SGMII0/HS_SGMII0 too.
-			  */
-			if ((mode == COMPHY_SGMII_MODE || mode == COMPHY_HS_SGMII_MODE) &&
-			    COMPHY_GET_ID(priv->lanes[comphy->index].mode) == 2)
-				reg |= COMMON_SELECTOR_COMPHY4_SGMII2 << comphy_offset;
-			else
-				reg |= COMMON_SELECTOR_COMPHY4_ALL_OTHERS << comphy_offset;
-			break;
-		case(5):
-			/* For comphy 5:
-			 * 0x1 = SGMII/HS-SGMII Port2
-			 * 0x2 = RXAUI Lane1
-			 */
-			if (mode == COMPHY_RXAUI_MODE)
-				reg |= COMMON_SELECTOR_COMPHY5_RXAUI << comphy_offset;
-			else
-				reg |= COMMON_SELECTOR_COMPHY5_SGMII << comphy_offset;
-			break;
-		}
-	}
-
-	writel(reg, priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
-
-}
-
 /* PIPE selector configures for PCIe, USB 3.0 Host, and USB 3.0 Device mode */
 void mvebu_cp110_comphy_set_pipe_selector(struct mvebu_comphy_priv *priv,
 					  struct mvebu_comphy *comphy)
@@ -289,21 +213,6 @@ static int mvebu_cp110_comphy_usb3_power_on(struct mvebu_comphy_priv *priv,
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
 
 	return ret;
-}
-
-static int mvebu_cp110_comphy_rxaui_power_on(struct mvebu_comphy_priv *priv,
-					     struct mvebu_comphy *comphy)
-{
-	dev_dbg(priv->dev, "%s: Enter\n", __func__);
-
-	dev_err(priv->dev, "RXAUI mode is not implemented\n");
-
-	/* configure phy selector for RXAUI */
-	mvebu_cp110_comphy_set_phy_selector(priv, comphy);
-
-	dev_dbg(priv->dev, "%s: Exit\n", __func__);
-
-	return -ENOTSUPP;
 }
 
 /* This function performs RX training for one Feed Forward Equalization (FFE)
@@ -507,6 +416,7 @@ static int mvebu_cp110_comphy_power_on(struct phy *phy)
 	case (COMPHY_HS_SGMII_MODE):
 	case (COMPHY_XFI_MODE):
 	case (COMPHY_SFI_MODE):
+	case (COMPHY_RXAUI_MODE):
 		err = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->cp_phys,
 				 comphy->index, comphy->mode);
 		dev_dbg(priv->dev, "%s: smc returned %d\n", __func__, err);
@@ -523,10 +433,6 @@ static int mvebu_cp110_comphy_power_on(struct phy *phy)
 				 COMPHY_FW_PCIE_FORMAT(comphy->pcie_width,
 						       comphy->mode));
 		dev_dbg(priv->dev, "%s: smc returned %d\n", __func__, err);
-		break;
-
-	case (COMPHY_RXAUI_MODE):
-		err = mvebu_cp110_comphy_rxaui_power_on(priv, comphy);
 		break;
 
 	default:
@@ -586,6 +492,7 @@ static int mvebu_cp110_comphy_digital_reset(struct mvebu_comphy *comphy,
 	case (COMPHY_HS_SGMII_MODE):
 	case (COMPHY_XFI_MODE):
 	case (COMPHY_SFI_MODE):
+	case (COMPHY_RXAUI_MODE):
 		mask = SD_EXTERNAL_CONFIG1_RF_RESET_IN_MASK;
 		data = ((command == COMPHY_COMMAND_DIGITAL_PWR_OFF) ? 0x0 : 0x1) <<
 			SD_EXTERNAL_CONFIG1_RF_RESET_IN_OFFSET;
