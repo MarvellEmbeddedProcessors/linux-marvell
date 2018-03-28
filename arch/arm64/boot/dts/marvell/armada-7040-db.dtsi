@@ -61,14 +61,6 @@
 
 	ap806 {
 		config-space {
-			sd_mmc_reg0: regulator@0 {
-				gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
-				gpios-states = <0>;
-				states = <1800000 0x1
-					3300000 0x0>;
-				enable-active-high;
-				status = "disabled";
-			};
 			sdhci@6e0000 {
 				bus-width = <4>;
 				no-1-8-v;
@@ -236,5 +228,19 @@
 		states = <1800000 0x1
 			  3300000 0x0>;
 		enable-active-high;
+	};
+	/* Regulator for SDIO@AP */
+	sd_mmc_reg0: regulator@0 {
+		compatible = "regulator-gpio";
+		regulator-name = "sd-mmc-gpio-supply";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+		gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
+		gpios-states = <0>;
+		states = <1800000 0x1
+			  3300000 0x0>;
+		enable-active-high;
+		status = "disabled";
 	};
 };
