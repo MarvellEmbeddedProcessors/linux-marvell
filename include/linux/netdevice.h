@@ -57,6 +57,7 @@ struct device;
 struct phy_device;
 struct dsa_switch_tree;
 
+struct sfp_bus;
 /* 802.11 specific */
 struct wireless_dev;
 /* 802.15.4 specific */
@@ -1617,6 +1618,7 @@ enum netdev_priv_flags {
  *	@priomap:	XXX: need comments on this one
  *	@phydev:	Physical device may attach itself
  *			for hardware timestamping
+ *	@sfp_bus:	attached &struct sfp_bus structure.
  *
  *	@qdisc_tx_busylock: lockdep class annotating Qdisc->busylock spinlock
  *	@qdisc_running_key: lockdep class annotating Qdisc->running seqcount
@@ -1895,6 +1897,7 @@ struct net_device {
 	struct netprio_map __rcu *priomap;
 #endif
 	struct phy_device	*phydev;
+	struct sfp_bus		*sfp_bus;
 	struct lock_class_key	*qdisc_tx_busylock;
 	struct lock_class_key	*qdisc_running_key;
 	bool			proto_down;
