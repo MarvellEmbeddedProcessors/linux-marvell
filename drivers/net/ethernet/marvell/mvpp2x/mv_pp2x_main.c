@@ -1859,6 +1859,7 @@ err_cleanup:
 	mv_pp2x_cleanup_irqs(port);
 	return err;
 }
+
 /* Routine configure irq's.
  * Exist 3 type of irq's - MVPP2_PRIVATE, MVPP2_TX_SHARED and MVPP2_RX_SHARED
  * MVPP2_PRIVATE - in multi queue mode used for TX done and RX
@@ -2050,7 +2051,8 @@ static void mv_pp22_link_event(struct net_device *dev)
 		if ((port->mac_data.speed != phydev->speed) ||
 		    (port->mac_data.duplex != phydev->duplex)) {
 			if (port->comphy)
-				mv_gop110_update_comphy(port, phydev->speed);
+				if (phy_get_mode(port->comphy[0]) != COMPHY_RXAUI0)
+					mv_gop110_update_comphy(port, phydev->speed);
 			port->mac_data.duplex = phydev->duplex;
 			port->mac_data.speed  = phydev->speed;
 		}
@@ -2072,7 +2074,7 @@ static void mv_pp22_link_event(struct net_device *dev)
 			mv_gop110_port_events_mask(&port->priv->hw.gop,
 						   &port->mac_data);
 			mv_gop110_port_enable(&port->priv->hw.gop,
-					      &port->mac_data, port->comphy);
+					      &port->mac_data, port);
 			mv_pp2x_egress_enable(port);
 			mv_pp2x_ingress_enable(port);
 			netif_carrier_on(dev);
@@ -2088,7 +2090,7 @@ static void mv_pp22_link_event(struct net_device *dev)
 			mv_gop110_port_events_mask(&port->priv->hw.gop,
 						   &port->mac_data);
 			mv_gop110_port_disable(&port->priv->hw.gop,
-					       &port->mac_data, port->comphy);
+					       &port->mac_data, port);
 			netif_carrier_off(dev);
 			netif_tx_stop_all_queues(dev);
 			port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
@@ -3904,7 +3906,7 @@ static void mv_pp2x_port_irqs_dispose_mapping(struct mv_pp2x_port *port)
 
 static void mv_serdes_port_init(struct mv_pp2x_port *port)
 {
-	int mode;
+	int mode, i;
 
 	switch (port->mac_data.phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
@@ -3918,13 +3920,15 @@ static void mv_serdes_port_init(struct mv_pp2x_port *port)
 		else
 			mode = COMPHY_DEF(COMPHY_SGMII_MODE, port->id,
 					  COMPHY_SPEED_1_25G, COMPHY_POLARITY_NO_INVERT);
-		phy_set_mode(port->comphy, mode);
+		phy_set_mode(port->comphy[0], mode);
 	break;
 	case PHY_INTERFACE_MODE_XAUI:
 	case PHY_INTERFACE_MODE_RXAUI:
-		mode = COMPHY_DEF(COMPHY_RXAUI_MODE, port->id,
-				  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
-		phy_set_mode(port->comphy, mode);
+		for (i = 0; i < port->num_serdes_lanes; i++) {
+			mode = COMPHY_DEF(COMPHY_RXAUI_MODE, i,
+					  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
+			phy_set_mode(port->comphy[i], mode);
+		}
 	break;
 	case PHY_INTERFACE_MODE_KR:
 	case PHY_INTERFACE_MODE_SFI:
@@ -3934,7 +3938,7 @@ static void mv_serdes_port_init(struct mv_pp2x_port *port)
 		else
 			mode = COMPHY_DEF(COMPHY_SFI_MODE, port->id,
 					  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
-		phy_set_mode(port->comphy, mode);
+		phy_set_mode(port->comphy[0], mode);
 	break;
 	case PHY_INTERFACE_MODE_XFI:
 		if (port->mac_data.flags & MV_EMAC_F_5G)
@@ -3944,7 +3948,7 @@ static void mv_serdes_port_init(struct mv_pp2x_port *port)
 			mode = COMPHY_DEF(COMPHY_XFI_MODE, port->id,
 					  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
 
-		phy_set_mode(port->comphy, mode);
+		phy_set_mode(port->comphy[0], mode);
 	break;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, port->mac_data.phy_mode);
@@ -3982,6 +3986,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	struct gop_hw *gop = &port->priv->hw.gop;
 	struct mv_mac_data *mac = &port->mac_data;
 	int mac_num = port->mac_data.gop_index;
+	int i;
 #ifdef DEV_NETMAP
 	if (port->flags & MVPP2_F_IFCAP_NETMAP) {
 		if (mv_pp2x_netmap_rxq_init_buffers(port))
@@ -4025,8 +4030,9 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 		mv_pp22_port_uio_interrupts_enable(port);
 
 	if (port->comphy) {
-		mv_gop110_port_disable(gop, mac, port->comphy);
-		phy_power_on(port->comphy);
+		mv_gop110_port_disable(gop, mac, port);
+		for (i = 0; i < port->num_serdes_lanes; i++)
+			phy_power_on(port->comphy[i]);
 		}
 
 	if (port->priv->pp2_version == PPV21) {
@@ -4034,7 +4040,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	} else {
 		if (!(port->flags & MVPP2_F_LOOPBACK)) {
 			mv_gop110_port_events_mask(gop, mac);
-			mv_gop110_port_enable(gop, mac, port->comphy);
+			mv_gop110_port_enable(gop, mac, port);
 		}
 	}
 
@@ -4124,6 +4130,7 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 {
 	struct gop_hw *gop = &port->priv->hw.gop;
 	struct mv_mac_data *mac = &port->mac_data;
+	int i;
 
 	/* Stop new packets arriving from RX-interrupts and Linux-TX */
 	mv_pp2x_ingress_disable(port);
@@ -4144,14 +4151,15 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 	mv_pp2x_egress_disable(port);
 
 	if (port->comphy)
-		phy_power_off(port->comphy);
+		for (i = 0; i < port->num_serdes_lanes; i++)
+			phy_power_off(port->comphy[i]);
 
 	if (port->priv->pp2_version == PPV21) {
 		mv_pp21_port_disable(port);
 	} else {
 		if (!(port->flags & MVPP2_F_LOOPBACK)) {
 			mv_gop110_port_events_mask(gop, mac);
-			mv_gop110_port_disable(gop, mac, port->comphy);
+			mv_gop110_port_disable(gop, mac, port);
 			port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
 			port->mac_data.flags &= ~MV_EMAC_F_PORT_UP;
 		}
@@ -5462,10 +5470,14 @@ static u32 mvp_pp2x_gop110_netc_cfg_create(struct mv_pp2x *priv)
 		port = priv->port_list[i];
 		mac = &port->mac_data;
 		if (mac->gop_index == 0) {
-			if (mac->phy_mode == PHY_INTERFACE_MODE_XAUI)
+			if (mac->phy_mode == PHY_INTERFACE_MODE_XAUI) {
 				val |= MV_NETC_GE_MAC0_XAUI;
-			else if (mac->phy_mode == PHY_INTERFACE_MODE_RXAUI)
-				val |= MV_NETC_GE_MAC0_RXAUI_L23;
+			} else if (mac->phy_mode == PHY_INTERFACE_MODE_RXAUI) {
+				if ((port->comphy[0]->id % MAX_NUM_SERDES_LANES) == COMPHY4_RXAUI_LANE0)
+					val |= MV_NETC_GE_MAC0_RXAUI_L45;
+				else
+					val |= MV_NETC_GE_MAC0_RXAUI_L23;
+			}
 		}
 		if (mac->gop_index == 2) {
 			if (mac->phy_mode == PHY_INTERFACE_MODE_SGMII ||
@@ -5532,7 +5544,7 @@ static int mv_pp2x_port_hw_init(struct mv_pp2x_port *port)
 		mv_pp21_port_disable(port);
 	else
 		if (!(port->flags & MVPP2_F_LOOPBACK))
-			mv_gop110_port_disable(gop, mac, port->comphy);
+			mv_gop110_port_disable(gop, mac, port);
 
 	/* Configure Rx queue group interrupt for this port */
 	priv->pp2xdata->mv_pp2x_port_isr_rx_group_cfg(port);
@@ -5804,9 +5816,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	unsigned int *port_irqs;
 	int port_num_irq;
 	int phy_mode;
-	struct phy *comphy = NULL;
+	struct phy **comphy = NULL;
 	const char *musdk_status;
-	int statlen;
+	int statlen, serdes_lanes_count;
 
 	if (of_property_read_bool(port_node, "marvell,loopback")) {
 		dev = alloc_netdev_mqs(sizeof(struct mv_pp2x_port), "pp2_lpbk%d", NET_NAME_UNKNOWN,
@@ -5873,10 +5885,27 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			if (mv_pp2_init_emac_data(port, emac_node))
 				goto err_free_netdev;
 
-			comphy = devm_of_phy_get(&pdev->dev, emac_node, "comphy");
+			serdes_lanes_count = of_property_count_strings(emac_node, "phy-names");
 
-			if (!IS_ERR(comphy))
-				port->comphy = comphy;
+			port->comphy = NULL;
+
+			if (serdes_lanes_count > 0) {
+				bool serdes_error = false;
+
+				comphy = devm_kzalloc(&pdev->dev, sizeof(*comphy) * serdes_lanes_count, GFP_KERNEL);
+
+				for (i = 0; i < serdes_lanes_count; i++) {
+					comphy[i] = devm_of_phy_get_by_index(&pdev->dev, emac_node, i);
+
+					if (IS_ERR(comphy[i]))
+						serdes_error = true;
+				}
+
+				if (!serdes_error)
+					port->comphy = comphy;
+			}
+
+			port->num_serdes_lanes = serdes_lanes_count;
 		} else {
 			port->mac_data.link_irq = MVPP2_NO_LINK_IRQ;
 		}
@@ -7163,7 +7192,7 @@ static int mvpp2x_suspend(struct device *dev)
 static int mvpp2x_resume(struct device *dev)
 {
 	struct mv_pp2x *priv;
-	int i, num_of_ports, err;
+	int i, j, num_of_ports, err;
 
 	err = mv_pp2x_probe_after_suspend(dev);
 	if (err < 0)
@@ -7174,7 +7203,8 @@ static int mvpp2x_resume(struct device *dev)
 
 	for (i = 0; i < num_of_ports; i++) {
 		if (priv->port_list[i]->comphy)
-			phy_init(priv->port_list[i]->comphy);
+			for (j = 0; j < priv->port_list[i]->num_serdes_lanes; j++)
+				phy_init(priv->port_list[i]->comphy[j]);
 		/* Start interface if port was up before suspend */
 		if (netif_running(priv->port_list[i]->dev))
 			mv_pp2x_open(priv->port_list[i]->dev);

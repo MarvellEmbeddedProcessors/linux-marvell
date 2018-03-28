@@ -582,9 +582,14 @@ static int mv_pp2x_ethtool_set_settings(struct net_device *dev,
 	}
 
 	if (port->comphy) {
-		err = mv_gop110_update_comphy(port, (u32)cmd->speed);
-		if (err < 0)
-			return err;
+		if (phy_get_mode(port->comphy[0]) != COMPHY_RXAUI0) {
+			err = mv_gop110_update_comphy(port, (u32)cmd->speed);
+			if (err < 0)
+				return err;
+		} else if (cmd->speed != SPEED_10000) {
+			pr_err("RXAUI port cannot change speed\n");
+			return -1;
+		}
 	}
 
 	switch (mac->phy_mode) {

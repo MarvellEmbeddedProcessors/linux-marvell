@@ -744,7 +744,8 @@ struct mv_pp2x_port {
 					*/
 	struct mv_pp2x_bm_pool *pool_short; /* Pointer to the short pool_id */
 
-	struct phy *comphy; /* comphy handler */
+	struct phy **comphy; /* comphy handler */
+	int num_serdes_lanes; /* number of lanes allocated by port */
 	int txq_stop_limit;
 
 	u32 num_qvector;

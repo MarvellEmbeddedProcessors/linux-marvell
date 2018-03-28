@@ -952,6 +952,19 @@ int mv_gop110_gmac_port_autoneg_restart(struct gop_hw *gop, int mac_num)
 	return 0;
 }
 
+void mv_gop110_mac_xpcs(struct gop_hw *gop, int mac_num)
+{
+	u32 reg_val;
+
+	reg_val = mv_gop110_xlg_mac_read(gop, mac_num,
+					 MV_XLG_PORT_MAC_CTRL4_REG);
+
+	reg_val |= MV_XLG_MAC_CTRL4_USE_XPCS_MASK;
+
+	mv_gop110_xlg_mac_write(gop, mac_num,
+				MV_XLG_PORT_MAC_CTRL4_REG, reg_val);
+}
+
 /*************************************************************************
 * mv_port_init
 *
@@ -1053,6 +1066,10 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_RXAUI:
 		num_of_act_lanes = 2;
 		mac_num = 0;
+
+		/* configure XPCS in MAC */
+		mv_gop110_mac_xpcs(gop, mac_num);
+
 		/* configure PCS */
 		mv_gop110_xpcs_mode(gop, num_of_act_lanes);
 		/* configure MAC */
@@ -1159,9 +1176,10 @@ int mv_gop110_port_reset(struct gop_hw *gop, struct mv_mac_data *mac)
 }
 
 /*-------------------------------------------------------------------*/
-void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac, struct phy *comphy)
+void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac, struct mv_pp2x_port *port)
 {
 	int port_num = mac->gop_index;
+	int i;
 
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
@@ -1172,13 +1190,21 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac, struct p
 		mv_gop110_force_link_mode_set(gop, mac, false, false);
 		mv_gop110_gmac_reset(gop, port_num, UNRESET);
 	break;
-	case PHY_INTERFACE_MODE_XAUI:
-	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
 	case PHY_INTERFACE_MODE_SFI:
 	case PHY_INTERFACE_MODE_XFI:
-		phy_send_command(comphy, COMPHY_COMMAND_DIGITAL_PWR_ON);
+		if (port->comphy)
+			phy_send_command(port->comphy[0], COMPHY_COMMAND_DIGITAL_PWR_ON);
 		mv_gop110_mpcs_clock_reset(gop,  UNRESET);
+		mv_gop110_xlg_mac_reset(gop, port_num, UNRESET);
+		mv_gop110_xlg_mac_port_enable(gop, port_num);
+	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+		if (port->comphy)
+			for (i = 0; i < port->num_serdes_lanes; i++)
+				phy_send_command(port->comphy[i], COMPHY_COMMAND_DIGITAL_PWR_ON);
+		mv_gop110_xpcs_reset(gop, UNRESET);
 		mv_gop110_xlg_mac_reset(gop, port_num, UNRESET);
 		mv_gop110_xlg_mac_port_enable(gop, port_num);
 	break;
@@ -1188,9 +1214,10 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac, struct p
 	}
 }
 
-void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac, struct phy *comphy)
+void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac, struct mv_pp2x_port *port)
 {
 	int port_num = mac->gop_index;
+	int i;
 
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
@@ -1201,16 +1228,25 @@ void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac, struct 
 		mv_gop110_force_link_mode_set(gop, mac, false, true);
 		mv_gop110_gmac_reset(gop, port_num, RESET);
 	break;
-	case PHY_INTERFACE_MODE_XAUI:
-	case PHY_INTERFACE_MODE_RXAUI:
 	case PHY_INTERFACE_MODE_KR:
 	case PHY_INTERFACE_MODE_SFI:
 	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_port_disable(gop, port_num);
 		mv_gop110_xlg_mac_reset(gop, port_num, RESET);
 		mv_gop110_mpcs_clock_reset(gop,  RESET);
-		phy_send_command(comphy, COMPHY_COMMAND_DIGITAL_PWR_OFF);
+		if (port->comphy)
+			phy_send_command(port->comphy[0], COMPHY_COMMAND_DIGITAL_PWR_OFF);
 	break;
+	case PHY_INTERFACE_MODE_XAUI:
+	case PHY_INTERFACE_MODE_RXAUI:
+		mv_gop110_xlg_mac_port_disable(gop, port_num);
+		mv_gop110_xlg_mac_reset(gop, port_num, RESET);
+		mv_gop110_xpcs_reset(gop,  RESET);
+		if (port->comphy)
+			for (i = 0; i < port->num_serdes_lanes; i++)
+				phy_send_command(port->comphy[i], COMPHY_COMMAND_DIGITAL_PWR_OFF);
+	break;
+
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, mac->phy_mode);
 		return;
@@ -3370,7 +3406,7 @@ int mv_gop110_update_comphy(struct mv_pp2x_port *port, u32 speed)
 			return comphy_new_mode;
 	}
 
-	comphy_old_mode = phy_get_mode(port->comphy);
+	comphy_old_mode = phy_get_mode(port->comphy[0]);
 
 	if (comphy_old_mode == comphy_new_mode)
 		return 0;
@@ -3384,13 +3420,13 @@ int mv_gop110_update_comphy(struct mv_pp2x_port *port, u32 speed)
 	if (mac->flags & MV_EMAC_F_PORT_UP) {
 		netif_carrier_off(port->dev);
 		mv_gop110_port_events_mask(gop, mac);
-		mv_gop110_port_disable(gop, mac, port->comphy);
-		phy_power_off(port->comphy);
+		mv_gop110_port_disable(gop, mac, port);
+		phy_power_off(port->comphy[0]);
 	}
 
-	err = phy_set_mode(port->comphy, comphy_new_mode);
+	err = phy_set_mode(port->comphy[0], comphy_new_mode);
 	if (err < 0) {
-		phy_set_mode(port->comphy, comphy_old_mode);
+		phy_set_mode(port->comphy[0], comphy_old_mode);
 		pr_err("Port ID %d: err %d COMPHY lane is busy\n", err, port->id);
 		goto out;
 	}
@@ -3408,10 +3444,10 @@ int mv_gop110_update_comphy(struct mv_pp2x_port *port, u32 speed)
 out:
 	/* Turn ON port */
 	if (mac->flags & MV_EMAC_F_PORT_UP) {
-		mv_gop110_port_disable(gop, mac, port->comphy);
-		phy_power_on(port->comphy);
+		mv_gop110_port_disable(gop, mac, port);
+		phy_power_on(port->comphy[0]);
 		mv_gop110_port_events_unmask(gop, mac);
-		mv_gop110_port_enable(gop, mac, port->comphy);
+		mv_gop110_port_enable(gop, mac, port);
 		netif_carrier_on(port->dev);
 	}
 
