@@ -1,0 +1,27 @@
+From c4c5b612c47c778535b1d0b6ac6c1420d3c0436f Mon Sep 17 00:00:00 2001
+From: Hanna Hawa <hannah@marvell.com>
+Date: Wed, 11 Apr 2018 16:32:04 +0300
+Subject: [PATCH 1/1] test: add tlb keyword for linux version
+
+Change-Id: I0acc86127ba7f6eed3e5b523dcc0d2bb7c26eac0
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
+---
+ init/version.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/init/version.c b/init/version.c
+index 09b3efe5..80fb31a 100644
+--- a/init/version.c
++++ b/init/version.c
+@@ -44,7 +44,7 @@ EXPORT_SYMBOL_GPL(init_uts_ns);
+ 
+ /* FIXED STRINGS! Don't touch! */
+ const char linux_banner[] =
+-	"Linux version " UTS_RELEASE " " BUILD_TAG "unlock (" LINUX_COMPILE_BY "@"
++	"Linux version " UTS_RELEASE " " BUILD_TAG "unlock/tlb (" LINUX_COMPILE_BY "@"
+ 	LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION "\n";
+ 
+ const char linux_proc_banner[] =
+-- 
+1.9.1
+

@@ -1,0 +1,43 @@
+From 26cbb878058c7f70dc8c86c1f5f3cb1cc278738b Mon Sep 17 00:00:00 2001
+From: Hanna Hawa <hannah@marvell.com>
+Date: Tue, 27 Mar 2018 14:34:38 +0300
+Subject: [PATCH 1/1] test: add delay for spin/mutex unlock function for test
+
+Change-Id: I11d57c6e0d780fbfcb9c020bab9ef42f2ece96a6
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
+---
+ include/linux/spinlock.h | 3 +++
+ kernel/locking/mutex.c   | 3 +++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/include/linux/spinlock.h b/include/linux/spinlock.h
+index 47dd0ce..d2880b0e 100644
+--- a/include/linux/spinlock.h
++++ b/include/linux/spinlock.h
+@@ -344,6 +344,9 @@ do {									\
+ 
+ static __always_inline void spin_unlock(spinlock_t *lock)
+ {
++	volatile int j;
++
++	for (j = 0; j < 1000; j++);
+ 	raw_spin_unlock(&lock->rlock);
+ }
+ 
+diff --git a/kernel/locking/mutex.c b/kernel/locking/mutex.c
+index 79d2d76..85798a5 100644
+--- a/kernel/locking/mutex.c
++++ b/kernel/locking/mutex.c
+@@ -422,6 +422,9 @@ void __sched __mutex_unlock_slowpath(atomic_t *lock_count);
+  */
+ void __sched mutex_unlock(struct mutex *lock)
+ {
++	volatile int j;
++
++	for (j = 0; j < 1000; j++);
+ 	/*
+ 	 * The unlocking fastpath is the 0->1 transition from 'locked'
+ 	 * into 'unlocked' state:
+-- 
+1.9.1
+
