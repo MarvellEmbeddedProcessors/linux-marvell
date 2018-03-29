@@ -872,7 +872,10 @@ enum mvpp2_prs_l3_cast {
 #define MVPP21_ADDR_SPACE_SZ		0
 #define MVPP22_ADDR_SPACE_SZ		SZ_64K
 
-#define MVPP2_MAX_THREADS		8
+/* pp22 HW has 9 hif's(Host Interfaces) and can support up to 9
+ * SW threads.
+ */
+#define MVPP2_MAX_THREADS		9
 #define MVPP2_MAX_QVECS			MVPP2_MAX_THREADS
 
 enum mvpp2_bm_pool_log_num {
@@ -8072,7 +8075,7 @@ static int mvpp2_multi_queue_vectors_init(struct mvpp2_port *port,
 		v->sw_thread_id = i;
 		v->sw_thread_mask = BIT(i);
 
-		snprintf(irqname, sizeof(irqname), "tx-cpu%d", i);
+		snprintf(irqname, sizeof(irqname), "hif%d", i);
 
 		if (queue_mode == MVPP2_QDIST_MULTI_MODE) {
 			v->first_rxq = i * MVPP2_DEFAULT_RXQ;
@@ -8082,7 +8085,6 @@ static int mvpp2_multi_queue_vectors_init(struct mvpp2_port *port,
 			v->first_rxq = 0;
 			v->nrxqs = port->nrxqs;
 			v->type = MVPP2_QUEUE_VECTOR_SHARED;
-			strncpy(irqname, "rx-shared", sizeof(irqname));
 		}
 
 		if (port_node)
@@ -8275,23 +8277,24 @@ err_free_percpu:
 	return err;
 }
 
-/* Checks if the port DT description has the TX interrupts
- * described. On PPv2.1, there are no such interrupts. On PPv2.2,
- * there are available, but we need to keep support for old DTs.
+/* Checks if the port DT description has more then 1 interrupt
+ * described. On PPv2.1, there are single interrupts. On PPv2.2,
+ * there are available up tp 9 interrupts, but we need to keep
+ * support for old DTs.
  */
-static bool mvpp2_port_has_tx_irqs(struct mvpp2 *priv,
-				   struct device_node *port_node)
+static bool mvpp2_check_if_multi_irq(struct mvpp2 *priv,
+				     struct device_node *port_node)
 {
-	char *irqs[5] = { "rx-shared", "tx-cpu0", "tx-cpu1",
-			  "tx-cpu2", "tx-cpu3" };
+	char irq_name[16];
 	int ret, i;
 
 	if (priv->hw_version == MVPP21)
 		return false;
 
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < MVPP2_MAX_THREADS; i++) {
+		snprintf(irq_name, sizeof(irq_name), "hif%d", i);
 		ret = of_property_match_string(port_node, "interrupt-names",
-					       irqs[i]);
+					       irq_name);
 		if (ret < 0)
 			return false;
 	}
@@ -8347,7 +8350,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	int err, i, cpu;
 
 	if (port_node) {
-		has_tx_irqs = mvpp2_port_has_tx_irqs(priv, port_node);
+		has_tx_irqs = mvpp2_check_if_multi_irq(priv, port_node);
 	} else {
 		has_tx_irqs = true;
 		queue_mode = MVPP2_QDIST_MULTI_MODE;
