@@ -410,7 +410,7 @@
 #define MVPP22_XLG_CTRL3_REG			0x11c
 #define     MVPP22_XLG_CTRL3_MACMODESELECT_MASK	(7 << 13)
 #define     MVPP22_XLG_CTRL3_MACMODESELECT_GMAC	(0 << 13)
-#define     MVPP22_XLG_CTRL3_MACMODESELECT_10G	(1 << 13)
+#define     MVPP22_XLG_CTRL3_MACMODESELECT_10G	BIT(13)
 #define MVPP22_XLG_EXT_INT_MASK			0x15c
 #define     MVPP22_XLG_EXT_INT_MASK_XLG		BIT(1)
 #define     MVPP22_XLG_EXT_INT_MASK_GIG		BIT(2)
@@ -507,8 +507,9 @@
 #define MVPP2_MAX_TXQ			8
 
 /* MVPP2_MAX_TSO_SEGS is the maximum number of fragments to allow in the GSO
- * skb. As we need a maxium of two descriptors per fragments (1 header, 1 data),
- * multiply this value by two to count the maximum number of skb descs needed.
+ * skb. As we need a maximum of two descriptors per fragments
+ * (1 header, 1 data), multiply this value by two to count the maximum number
+ * of skb descs needed.
  */
 #define MVPP2_MAX_TSO_SEGS		100
 #define MVPP2_MAX_SKB_DESCS		(MVPP2_MAX_TSO_SEGS * 2 + MAX_SKB_FRAGS)
@@ -849,7 +850,8 @@ enum mvpp2_prs_l3_cast {
 #define MVPP2_BM_JUMBO_BUF_NUM		512
 #define MVPP2_BM_LONG_BUF_NUM		1024
 #define MVPP2_BM_SHORT_BUF_NUM		2048
-#define MVPP2_BM_POOL_SIZE_MAX		(16*1024 - MVPP2_BM_POOL_PTR_ALIGN/4)
+#define MVPP2_BM_POOL_SIZE_MAX		(16 * 1024 -	\
+					MVPP2_BM_POOL_PTR_ALIGN / 4)
 #define MVPP2_BM_POOL_PTR_ALIGN		128
 
 /* BM cookie (32 bits) definition */
@@ -1620,8 +1622,10 @@ static int mvpp2_prs_hw_read(struct mvpp2 *priv, struct mvpp2_prs_entry *pe)
 	/* Write tcam index - indirect access */
 	mvpp2_write(priv, MVPP2_PRS_TCAM_IDX_REG, pe->index);
 
-	pe->tcam.word[MVPP2_PRS_TCAM_INV_WORD] = mvpp2_read(priv,
-			      MVPP2_PRS_TCAM_DATA_REG(MVPP2_PRS_TCAM_INV_WORD));
+	pe->tcam.word[MVPP2_PRS_TCAM_INV_WORD] =
+		mvpp2_read(priv,
+			   MVPP2_PRS_TCAM_DATA_REG(MVPP2_PRS_TCAM_INV_WORD));
+
 	if (pe->tcam.word[MVPP2_PRS_TCAM_INV_WORD] & MVPP2_PRS_TCAM_INV_MASK)
 		return MVPP2_PRS_TCAM_ENTRY_INVALID;
 
@@ -1739,7 +1743,6 @@ static void mvpp2_prs_tcam_ai_update(struct mvpp2_prs_entry *pe,
 	int i, ai_idx = MVPP2_PRS_TCAM_AI_BYTE;
 
 	for (i = 0; i < MVPP2_PRS_AI_BITS; i++) {
-
 		if (!(enable & BIT(i)))
 			continue;
 
@@ -1823,7 +1826,6 @@ static void mvpp2_prs_sram_ai_update(struct mvpp2_prs_entry *pe,
 	int ai_off = MVPP2_PRS_SRAM_AI_OFFS;
 
 	for (i = 0; i < MVPP2_PRS_SRAM_AI_CTRL_BITS; i++) {
-
 		if (!(mask & BIT(i)))
 			continue;
 
@@ -2112,23 +2114,23 @@ static void mvpp2_prs_dsa_tag_set(struct mvpp2 *priv, int port, bool add,
 		if (tagged) {
 			/* Set tagged bit in DSA tag */
 			mvpp2_prs_tcam_data_byte_set(&pe, 0,
-					     MVPP2_PRS_TCAM_DSA_TAGGED_BIT,
-					     MVPP2_PRS_TCAM_DSA_TAGGED_BIT);
+						     MVPP2_PRS_TCAM_DSA_TAGGED_BIT,
+						     MVPP2_PRS_TCAM_DSA_TAGGED_BIT);
 
 			/* Set ai bits for next iteration */
 			if (extend)
 				mvpp2_prs_sram_ai_update(&pe, 1,
-							MVPP2_PRS_SRAM_AI_MASK);
+							 MVPP2_PRS_SRAM_AI_MASK);
 			else
 				mvpp2_prs_sram_ai_update(&pe, 0,
-							MVPP2_PRS_SRAM_AI_MASK);
+							 MVPP2_PRS_SRAM_AI_MASK);
 
 			/* If packet is tagged continue check vid filtering */
 			mvpp2_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_VID);
 		} else {
 			/* Shift 4 bytes for DSA tag or 8 bytes for EDSA tag*/
 			mvpp2_prs_sram_shift_set(&pe, shift,
-					MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+						 MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
 
 			/* Set result info bits to 'no vlans' */
 			mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_NONE,
@@ -2381,8 +2383,8 @@ static struct mvpp2_prs_entry *mvpp2_prs_double_vlan_find(struct mvpp2 *priv,
 		pe->index = tid;
 		mvpp2_prs_hw_read(priv, pe);
 
-		match = mvpp2_prs_tcam_data_cmp(pe, 0, swab16(tpid1))
-			&& mvpp2_prs_tcam_data_cmp(pe, 4, swab16(tpid2));
+		match = mvpp2_prs_tcam_data_cmp(pe, 0, swab16(tpid1)) &&
+			mvpp2_prs_tcam_data_cmp(pe, 4, swab16(tpid2));
 
 		if (!match)
 			continue;
@@ -2409,7 +2411,7 @@ static int mvpp2_prs_double_vlan_add(struct mvpp2 *priv, unsigned short tpid1,
 	if (!pe) {
 		/* Create new tcam entry */
 		tid = mvpp2_prs_tcam_first_free(priv, MVPP2_PE_FIRST_FREE_TID,
-				MVPP2_PE_LAST_FREE_TID);
+						MVPP2_PE_LAST_FREE_TID);
 		if (tid < 0)
 			return tid;
 
@@ -2483,8 +2485,8 @@ static int mvpp2_prs_ip4_proto(struct mvpp2 *priv, unsigned short proto,
 	struct mvpp2_prs_entry pe;
 	int tid;
 
-	if ((proto != IPPROTO_TCP) && (proto != IPPROTO_UDP) &&
-	    (proto != IPPROTO_IGMP))
+	if (proto != IPPROTO_TCP && proto != IPPROTO_UDP &&
+	    proto != IPPROTO_IGMP)
 		return -EINVAL;
 
 	/* Not fragmented packet */
@@ -2605,8 +2607,8 @@ static int mvpp2_prs_ip6_proto(struct mvpp2 *priv, unsigned short proto,
 	struct mvpp2_prs_entry pe;
 	int tid;
 
-	if ((proto != IPPROTO_TCP) && (proto != IPPROTO_UDP) &&
-	    (proto != IPPROTO_ICMPV6) && (proto != IPPROTO_IPIP))
+	if (proto != IPPROTO_TCP && proto != IPPROTO_UDP &&
+	    proto != IPPROTO_ICMPV6 && proto != IPPROTO_IPIP)
 		return -EINVAL;
 
 	tid = mvpp2_prs_tcam_first_free(priv, MVPP2_PE_FIRST_FREE_TID,
@@ -3816,8 +3818,8 @@ mvpp2_prs_mac_da_range_find(struct mvpp2 *priv, int pmap, const u8 *da,
 		unsigned int entry_pmap;
 
 		if (!priv->prs_shadow[tid].valid ||
-		    (priv->prs_shadow[tid].lu != MVPP2_PRS_LU_MAC) ||
-		    (priv->prs_shadow[tid].udf != udf_type))
+		    priv->prs_shadow[tid].lu != MVPP2_PRS_LU_MAC ||
+		    priv->prs_shadow[tid].udf != udf_type)
 			continue;
 
 		pe->index = tid;
@@ -3958,8 +3960,8 @@ static void mvpp2_prs_mac_del_all(struct mvpp2_port *port)
 		unsigned char da[ETH_ALEN], da_mask[ETH_ALEN];
 
 		if (!priv->prs_shadow[tid].valid ||
-		    (priv->prs_shadow[tid].lu != MVPP2_PRS_LU_MAC) ||
-		    (priv->prs_shadow[tid].udf != MVPP2_PRS_UDF_MAC_DEF))
+		    priv->prs_shadow[tid].lu != MVPP2_PRS_LU_MAC ||
+		    priv->prs_shadow[tid].udf != MVPP2_PRS_UDF_MAC_DEF)
 			continue;
 
 		pe.index = tid;
@@ -4031,7 +4033,7 @@ static int mvpp2_prs_tag_mode_set(struct mvpp2 *priv, int port, int type)
 		break;
 
 	default:
-		if ((type < 0) || (type > MVPP2_TAG_TYPE_EDSA))
+		if (type < 0 || type > MVPP2_TAG_TYPE_EDSA)
 			return -EINVAL;
 	}
 
@@ -4965,7 +4967,7 @@ static void mvpp22_gop_mask_irq(struct mvpp2_port *port)
 	if (port->gop_id == 0) {
 		val = readl(port->base + MVPP22_XLG_EXT_INT_MASK);
 		val &= ~(MVPP22_XLG_EXT_INT_MASK_XLG |
-		         MVPP22_XLG_EXT_INT_MASK_GIG);
+			 MVPP22_XLG_EXT_INT_MASK_GIG);
 		writel(val, port->base + MVPP22_XLG_EXT_INT_MASK);
 	}
 
@@ -5073,11 +5075,10 @@ static void mvpp2_port_mii_gmac_configure(struct mvpp2_port *port)
 
 	/* Configure the PCS and in-band AN */
 	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG);
-	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-	        val |= MVPP2_GMAC_INBAND_AN_MASK | MVPP2_GMAC_PCS_ENABLE_MASK;
-	} else if (phy_interface_mode_is_rgmii(port->phy_interface)) {
+	if (port->phy_interface == PHY_INTERFACE_MODE_SGMII)
+		val |= MVPP2_GMAC_INBAND_AN_MASK | MVPP2_GMAC_PCS_ENABLE_MASK;
+	else if (phy_interface_mode_is_rgmii(port->phy_interface))
 		val &= ~MVPP2_GMAC_PCS_ENABLE_MASK;
-	}
 	writel(val, port->base + MVPP2_GMAC_CTRL_2_REG);
 
 	mvpp2_port_mii_gmac_configure_mode(port);
@@ -5606,7 +5607,6 @@ static void mvpp2_aggr_txq_pend_desc_add(struct mvpp2_port *port, int pending)
 			   MVPP2_AGGR_TXQ_UPDATE_REG, pending);
 }
 
-
 /* Check if there are enough free descriptors in aggregated txq.
  * If not, update the number of occupied descriptors and repeat the check.
  *
@@ -5619,7 +5619,8 @@ static int mvpp2_aggr_desc_num_check(struct mvpp2 *priv,
 	if ((aggr_txq->count + num) > MVPP2_AGGR_TXQ_SIZE) {
 		/* Update number of occupied aggregated Tx descriptors */
 		int cpu = smp_processor_id();
-		u32 val = mvpp2_read_relaxed(priv, MVPP2_AGGR_TXQ_STATUS_REG(cpu));
+		u32 val = mvpp2_read_relaxed(priv,
+					     MVPP2_AGGR_TXQ_STATUS_REG(cpu));
 
 		aggr_txq->count = val & MVPP2_AGGR_TXQ_PENDING_MASK;
 
@@ -5685,7 +5686,7 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2 *priv,
 
 	txq_pcpu->reserved_num += mvpp2_txq_alloc_reserved_desc(priv, txq, req);
 
-	/* OK, the descriptor cound has been updated: check again. */
+	/* OK, the descriptor could has been updated: check again. */
 	if (txq_pcpu->reserved_num < num)
 		return -ENOMEM;
 	return 0;
@@ -6002,8 +6003,9 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
 
 	/* Allocate memory for TX descriptors */
 	aggr_txq->descs = dma_zalloc_coherent(&pdev->dev,
-				MVPP2_AGGR_TXQ_SIZE * MVPP2_DESC_ALIGNED_SIZE,
-				&aggr_txq->descs_dma, GFP_KERNEL);
+					      MVPP2_AGGR_TXQ_SIZE
+					      * MVPP2_DESC_ALIGNED_SIZE,
+					      &aggr_txq->descs_dma, GFP_KERNEL);
 	if (!aggr_txq->descs)
 		return -ENOMEM;
 
@@ -6143,7 +6145,7 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
 
 	/* Allocate memory for Tx descriptors */
 	txq->descs = dma_alloc_coherent(port->dev->dev.parent,
-				txq->size * MVPP2_DESC_ALIGNED_SIZE,
+					txq->size * MVPP2_DESC_ALIGNED_SIZE,
 				&txq->descs_dma, GFP_KERNEL);
 	if (!txq->descs)
 		return -ENOMEM;
@@ -6167,7 +6169,7 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
 	/* Calculate base address in prefetch buffer. We reserve 16 descriptors
 	 * for each existing TXQ.
 	 * TCONTS for PON port must be continuous from 0 to MVPP2_MAX_TCONT
-	 * GBE ports assumed to be continious from 0 to MVPP2_MAX_PORTS
+	 * GBE ports assumed to be continuous from 0 to MVPP2_MAX_PORTS
 	 */
 	desc_per_txq = 16;
 	desc = (port->id * MVPP2_MAX_TXQ * desc_per_txq) +
@@ -6498,25 +6500,25 @@ static void mvpp2_link_event(struct net_device *dev)
 
 	if (phydev->link) {
 		if (port->phy_interface != phydev->interface && port->comphy) {
-	                /* disable current port for reconfiguration */
-	                mvpp2_interrupts_disable(port);
-	                netif_carrier_off(port->dev);
-	                mvpp2_port_disable(port);
+			/* disable current port for reconfiguration */
+			mvpp2_interrupts_disable(port);
+			netif_carrier_off(port->dev);
+			mvpp2_port_disable(port);
 			phy_power_off(port->comphy);
 
-	                /* comphy reconfiguration */
-	                port->phy_interface = phydev->interface;
-	                mvpp22_comphy_init(port);
+			/* comphy reconfiguration */
+			port->phy_interface = phydev->interface;
+			mvpp22_comphy_init(port);
 
-	                /* gop/mac reconfiguration */
-	                mvpp22_gop_init(port);
-	                mvpp2_port_mii_set(port);
+			/* gop/mac reconfiguration */
+			mvpp22_gop_init(port);
+			mvpp2_port_mii_set(port);
 
-	                link_reconfigured = true;
+			link_reconfigured = true;
 		}
 
-		if ((port->speed != phydev->speed) ||
-		    (port->duplex != phydev->duplex)) {
+		if (port->speed != phydev->speed ||
+		    port->duplex != phydev->duplex) {
 			mvpp2_gmac_set_autoneg(port, phydev);
 
 			port->duplex = phydev->duplex;
@@ -6832,8 +6834,8 @@ static int mvpp2_tx_frag_process(struct mvpp2_port *port, struct sk_buff *skb,
 		mvpp2_txdesc_size_set(port, tx_desc, frag->size);
 
 		buf_dma_addr = dma_map_single(port->dev->dev.parent, addr,
-					       frag->size,
-					       DMA_TO_DEVICE);
+					      frag->size,
+					      DMA_TO_DEVICE);
 		if (dma_mapping_error(port->dev->dev.parent, buf_dma_addr)) {
 			mvpp2_txq_desc_put(txq);
 			goto cleanup;
@@ -6959,6 +6961,7 @@ static int mvpp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 
 		while (left > 0) {
 			int sz = min_t(int, tso.size, left);
+
 			left -= sz;
 			descs++;
 
@@ -6974,6 +6977,7 @@ static int mvpp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 release:
 	for (i = descs - 1; i >= 0; i--) {
 		struct mvpp2_tx_desc *tx_desc = txq->descs + i;
+
 		tx_desc_unmap_put(port, txq, tx_desc);
 	}
 	return 0;
@@ -8162,8 +8166,8 @@ static int mvpp2_port_init(struct mvpp2_port *port)
 	    MVPP2_MAX_PORTS * priv->max_port_rxqs)
 		return -EINVAL;
 
-	if (port->nrxqs % 4 || (port->nrxqs > priv->max_port_rxqs) ||
-	    (port->ntxqs > MVPP2_MAX_TXQ))
+	if (port->nrxqs % 4 || port->nrxqs > priv->max_port_rxqs ||
+	    port->ntxqs > MVPP2_MAX_TXQ)
 		return -EINVAL;
 
 	/* Disable port */
