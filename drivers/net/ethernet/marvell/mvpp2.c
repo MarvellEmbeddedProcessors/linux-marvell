@@ -7102,7 +7102,70 @@ static inline void mvpp2_cause_error(struct net_device *dev, int cause)
 		netdev_err(dev, "tx fifo underrun error\n");
 }
 
-static int mvpp2_poll(struct napi_struct *napi, int budget)
+static int mvpp21_poll(struct napi_struct *napi, int budget)
+{
+	u32 cause, cause_rx, cause_misc;
+	int rx_done = 0;
+	struct mvpp2_port *port = netdev_priv(napi->dev);
+	struct mvpp2_queue_vector *qv;
+	int cpu = smp_processor_id();
+
+	qv = container_of(napi, struct mvpp2_queue_vector, napi);
+
+	/* Bits 0-15: each bit indicates received packets on the Rx queue
+	 * (bit 0 is for Rx queue 0).
+	 *
+	 * Each CPU has its own Rx cause register
+	 */
+	cause = mvpp2_percpu_read_relaxed(port->priv, qv->sw_thread_id,
+					  MVPP2_ISR_RX_TX_CAUSE_REG(port->id));
+
+	cause_misc = cause & MVPP2_CAUSE_MISC_SUM_MASK;
+	if (cause_misc) {
+		mvpp2_cause_error(port->dev, cause_misc);
+
+		/* Clear the cause register */
+		mvpp2_write(port->priv, MVPP2_ISR_MISC_CAUSE_REG, 0);
+		mvpp2_percpu_write(port->priv, cpu,
+				   MVPP2_ISR_RX_TX_CAUSE_REG(port->id),
+				   cause & ~MVPP2_CAUSE_MISC_SUM_MASK);
+	}
+
+	/* Process RX packets */
+	cause_rx = cause & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	cause_rx <<= qv->first_rxq;
+	cause_rx |= qv->pending_cause_rx;
+	while (cause_rx && budget > 0) {
+		int count;
+		struct mvpp2_rx_queue *rxq;
+
+		rxq = mvpp2_get_rx_queue(port, cause_rx);
+		if (!rxq)
+			break;
+
+		count = mvpp2_rx(port, napi, budget, rxq);
+		rx_done += count;
+		budget -= count;
+		if (budget > 0) {
+			/* Clear the bit associated to this Rx queue
+			 * so that next iteration will continue from
+			 * the next Rx queue.
+			 */
+			cause_rx &= ~(1 << rxq->logic_rxq);
+		}
+	}
+
+	if (budget > 0) {
+		cause_rx = 0;
+		napi_complete_done(napi, rx_done);
+
+		mvpp2_qvec_interrupt_enable(qv);
+	}
+	qv->pending_cause_rx = cause_rx;
+	return rx_done;
+}
+
+static int mvpp22_poll(struct napi_struct *napi, int budget)
 {
 	u32 cause_rx_tx, cause_rx, cause_tx, cause_misc;
 	int rx_done = 0;
@@ -8047,7 +8110,7 @@ static int mvpp2_simple_queue_vectors_init(struct mvpp2_port *port,
 	v->irq = irq_of_parse_and_map(port_node, 0);
 	if (v->irq <= 0)
 		return -EINVAL;
-	netif_napi_add(port->dev, &v->napi, mvpp2_poll,
+	netif_napi_add(port->dev, &v->napi, mvpp21_poll,
 		       NAPI_POLL_WEIGHT);
 
 	port->nqvecs = 1;
@@ -8096,7 +8159,7 @@ static int mvpp2_multi_queue_vectors_init(struct mvpp2_port *port,
 			goto err;
 		}
 
-		netif_napi_add(port->dev, &v->napi, mvpp2_poll,
+		netif_napi_add(port->dev, &v->napi, mvpp22_poll,
 			       NAPI_POLL_WEIGHT);
 	}
 
