@@ -236,7 +236,8 @@
 #define     MVPP2_ISR_ENABLE_INTERRUPT(mask)	((mask) & 0xffff)
 #define     MVPP2_ISR_DISABLE_INTERRUPT(mask)	(((mask) << 16) & 0xffff0000)
 #define MVPP2_ISR_RX_TX_CAUSE_REG(port)		(0x5480 + 4 * (port))
-#define     MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK	0xffff
+#define     MVPP21_CAUSE_RXQ_OCCUP_DESC_ALL_MASK	0xffff
+#define     MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK	0xff
 #define     MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK	0xff0000
 #define     MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET	16
 #define     MVPP2_CAUSE_RX_FIFO_OVERRUN_MASK	BIT(24)
@@ -4787,8 +4788,13 @@ static void mvpp2_interrupts_unmask(void *arg)
 	struct mvpp2_port *port = arg;
 	u32 val;
 
-	val = MVPP2_CAUSE_MISC_SUM_MASK |
-		MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	val = MVPP2_CAUSE_MISC_SUM_MASK;
+
+	if (port->priv->hw_version != MVPP22)
+		val |= MVPP21_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	else
+		val |= MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+
 	if (port->has_tx_irqs)
 		val |= MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
 
@@ -4808,7 +4814,7 @@ mvpp2_shared_interrupt_mask_unmask(struct mvpp2_port *port, bool mask)
 	if (mask)
 		val = 0;
 	else
-		val = MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+		val = MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 
 	for (i = 0; i < port->nqvecs; i++) {
 		struct mvpp2_queue_vector *v = port->qvecs + i;
@@ -7132,7 +7138,7 @@ static int mvpp21_poll(struct napi_struct *napi, int budget)
 	}
 
 	/* Process RX packets */
-	cause_rx = cause & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	cause_rx = cause & MVPP21_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 	cause_rx <<= qv->first_rxq;
 	cause_rx |= qv->pending_cause_rx;
 	while (cause_rx && budget > 0) {
@@ -7177,7 +7183,7 @@ static int mvpp22_poll(struct napi_struct *napi, int budget)
 
 	/* Rx/Tx cause register
 	 *
-	 * Bits 0-15: each bit indicates received packets on the Rx queue
+	 * Bits 0-7: each bit indicates received packets on the Rx queue
 	 * (bit 0 is for Rx queue 0).
 	 *
 	 * Bits 16-23: each bit indicates transmitted packets on the Tx queue
@@ -7206,7 +7212,7 @@ static int mvpp22_poll(struct napi_struct *napi, int budget)
 	}
 
 	/* Process RX packets */
-	cause_rx = cause_rx_tx & MVPP2_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
+	cause_rx = cause_rx_tx & MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK;
 	cause_rx <<= qv->first_rxq;
 	cause_rx |= qv->pending_cause_rx;
 	while (cause_rx && budget > 0) {
