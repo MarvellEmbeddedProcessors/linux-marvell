@@ -99,6 +99,21 @@
 		gpio2 = &cp0_gpio1;
 	};
 
+	cpus {
+		cpu0: cpu@000 {
+			cpu-idle-states = <&CPU_SLEEP_0>;
+		};
+		cpu1: cpu@001 {
+			cpu-idle-states = <&CPU_SLEEP_0>;
+		};
+		cpu2: cpu@100 {
+			cpu-idle-states = <&CPU_SLEEP_0>;
+		};
+		cpu3: cpu@101 {
+			cpu-idle-states = <&CPU_SLEEP_0>;
+		};
+	};
+
 	ap806 {
 		config-space {
 			smmu: iommu@5000000 {

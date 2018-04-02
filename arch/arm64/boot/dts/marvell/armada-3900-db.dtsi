@@ -61,15 +61,19 @@
 		/delete-node/idle_states;
 		cpu@000 {
 			/delete-property/operating-points-v2;
+			/delete-property/cpu-idle-states;
 		};
 		cpu@001 {
 			/delete-property/operating-points-v2;
+			/delete-property/cpu-idle-states;
 		};
 		cpu@100 {
 			/delete-property/operating-points-v2;
+			/delete-property/cpu-idle-states;
 		};
 		cpu@101 {
 			/delete-property/operating-points-v2;
+			/delete-property/cpu-idle-states;
 		};
 	};
 	ap806 {
