@@ -900,7 +900,7 @@ static int spinand_probe(struct spi_device *spi_nand)
 	chip->read_byte	= spinand_read_byte;
 	chip->cmdfunc	= spinand_cmdfunc;
 	chip->waitfunc	= spinand_wait;
-	chip->options	|= NAND_CACHEPRG;
+	chip->options	|= (NAND_CACHEPRG | NAND_NO_SUBPAGE_WRITE);
 	chip->select_chip = spinand_select_chip;
 
 	mtd = devm_kzalloc(&spi_nand->dev, sizeof(struct mtd_info), GFP_KERNEL);
