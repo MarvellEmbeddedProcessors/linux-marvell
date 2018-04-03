@@ -30,6 +30,7 @@
 #define MV_SIP_COMPHY_POWER_OFF	0x82000002
 #define MV_SIP_COMPHY_PLL_LOCK	0x82000003
 #define MV_SIP_COMPHY_XFI_TRAIN	0x82000004
+#define MV_SIP_COMPHY_DIG_RESET	0x82000005
 
 #define COMPHY_FW_PCIE_FORMAT(pcie_width, mode)	\
 			      (((pcie_width) << COMPHY_PCI_WIDTH_OFFSET) | mode)
@@ -115,50 +116,24 @@ exit:
 	return err;
 }
 
-/*
- * This function allows to reset the digital synchronizers between
- * the MAC and the PHY, it is required when the MAC changes its state.
- */
-static int mvebu_cp110_comphy_digital_reset(struct mvebu_comphy *comphy,
-					     struct mvebu_comphy_priv *priv,
-					     u32 command)
-{
-	int mode = COMPHY_GET_MODE(priv->lanes[comphy->index].mode);
-	void __iomem *sd_ip_addr;
-	u32 mask, data;
-
-	sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
-
-	switch (mode) {
-	case (COMPHY_SGMII_MODE):
-	case (COMPHY_HS_SGMII_MODE):
-	case (COMPHY_XFI_MODE):
-	case (COMPHY_SFI_MODE):
-	case (COMPHY_RXAUI_MODE):
-		mask = SD_EXTERNAL_CONFIG1_RF_RESET_IN_MASK;
-		data = ((command == COMPHY_COMMAND_DIGITAL_PWR_OFF) ? 0x0 : 0x1) <<
-			SD_EXTERNAL_CONFIG1_RF_RESET_IN_OFFSET;
-		reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
-		break;
-	default:
-		dev_err(priv->dev, "comphy%d: COMPHY_COMMAND_DIGITAL_PWR_ON/OFF is not supported\n",
-			comphy->index);
-			return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int mvebu_cp110_comphy_send_command(struct phy *phy, u32 command)
 {
 	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
 	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
 	int ret = 0, pcie_width;
+	struct arm_smccc_res res;
 
 	switch (command) {
 	case(COMPHY_COMMAND_DIGITAL_PWR_OFF):
 	case(COMPHY_COMMAND_DIGITAL_PWR_ON):
-		ret = mvebu_cp110_comphy_digital_reset(comphy, priv, command);
+		arm_smccc_smc(MV_SIP_COMPHY_DIG_RESET,
+			      (unsigned long)priv->cp_phys, comphy->index,
+			      comphy->mode, command, 0, 0, 0, &res);
+
+		ret = res.a0;
+		if (ret < 0)
+			dev_err(priv->dev, "%s: smc returned %d\n",
+				__func__, ret);
 		break;
 	/* The following commands are for PCIe width, currently the A8K supports
 	 * width of X1, X2 and X4. The command is from PCIe host driver before
