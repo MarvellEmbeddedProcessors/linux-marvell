@@ -7,6 +7,8 @@
 #define to_mvebu_comphy_priv(lane) \
 	container_of((lane), struct mvebu_comphy_priv, lanes[(lane)->index])
 
+extern const struct mvebu_comphy_soc_info cp110_comphy;
+
 enum {
 	COMPHY_LANE0 = 0,
 	COMPHY_LANE1,
@@ -91,6 +93,12 @@ static inline u32 __maybe_unused polling_with_timeout(void __iomem *addr,
 /* Function declaration */
 int mvebu_comphy_set_mode(struct phy *phy, enum phy_mode mode);
 enum phy_mode mvebu_comphy_get_mode(struct phy *phy);
+
+/* Comphy registers */
+#define COMMON_SELECTOR_PIPE_REG_OFFSET		0x144
+#define COMMON_SELECTOR_COMPHY_MASK		0xf
+#define COMMON_SELECTOR_COMPHYN_FIELD_WIDTH	4
+#define COMMON_SELECTOR_PIPE_COMPHY_PCIE	0x4
 
 #endif /* _COMPHY_MVEBU_H */
 

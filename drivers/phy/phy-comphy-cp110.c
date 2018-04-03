@@ -24,7 +24,6 @@
 #include <linux/pci.h>
 
 #include "phy-comphy-mvebu.h"
-#include "phy-comphy-cp110.h"
 
 #define MV_SIP_COMPHY_POWER_ON	0x82000001
 #define MV_SIP_COMPHY_POWER_OFF	0x82000002

@@ -20,7 +20,6 @@
 #include <dt-bindings/phy/phy-comphy-mvebu.h>
 
 #include "phy-comphy-mvebu.h"
-#include "phy-comphy-cp110.h"
 #include "phy-comphy-a3700.h"
 
 /* mvebu_comphy_set_mode: shared by all SoCs */
