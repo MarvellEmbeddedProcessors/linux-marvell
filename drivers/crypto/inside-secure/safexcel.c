@@ -267,7 +267,7 @@ static int eip197_load_fw(struct safexcel_crypto_priv *priv)
 {
 	const struct firmware	*fw[FW_NB] = {0};
 	const u32		*fw_data;
-	int			i, j, ret = 0, pe;
+	int			i, j, fw_i, ret = 0, pe;
 	u32			fw_size, reg;
 	const char		*fw_file_name[FW_NB] = {"ifpp.bin",
 							    "ipue.bin"};
@@ -277,9 +277,9 @@ static int eip197_load_fw(struct safexcel_crypto_priv *priv)
 	snprintf(fw_base, 13, "eip197/197%s/",
 		 (priv->eip197_hw_ver == EIP197B ) ? "b" : "d");
 
-	for (i = 0; i < FW_NB; i++) {
-		snprintf(fw_full_name, 21, "%s%s", fw_base, fw_file_name[i]);
-		ret = request_firmware(&fw[i], fw_full_name, priv->dev);
+	for (fw_i = 0; fw_i < FW_NB; fw_i++) {
+		snprintf(fw_full_name, 21, "%s%s", fw_base, fw_file_name[fw_i]);
+		ret = request_firmware(&fw[fw_i], fw_full_name, priv->dev);
 		if (ret) {
 			dev_err(priv->dev, "request_firmware failed (fw: %s)\n",
 				fw_full_name);
@@ -367,7 +367,7 @@ static int eip197_load_fw(struct safexcel_crypto_priv *priv)
 	}
 
 release_fw:
-	for (j = 0; j < i; j++)
+	for (j = 0; j < fw_i; j++)
 		release_firmware(fw[j]);
 
 	return ret;
