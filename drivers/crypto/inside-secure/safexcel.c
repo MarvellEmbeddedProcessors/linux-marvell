@@ -717,10 +717,10 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 {
 	struct crypto_async_request *req, *backlog;
 	struct safexcel_context *ctx;
-	struct safexcel_request *request;
 	int ret, nreq = 0;
 	int cdesc = 0, rdesc = 0;
 	int commands, results;
+	int egress_cnt;
 	u32 val;
 
 	req = priv->ring[ring].req;
@@ -745,16 +745,10 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 		}
 
 handle_pending:
-		request = kzalloc(sizeof(*request), EIP197_GFP_FLAGS(*req));
-		if (!request)
-			goto resource_fail;
-
 		ctx = crypto_tfm_ctx(req->tfm);
-		ret = ctx->send(req, ring, request, &commands, &results);
-		if (ret) {
-			kfree(request);
+		ret = ctx->send(req, ring, &commands, &results);
+		if (ret)
 			goto resource_fail;
-		}
 
 		if (backlog)
 			backlog->complete(backlog, -EINPROGRESS);
@@ -776,19 +770,21 @@ resource_fail:
 	priv->ring[ring].backlog = backlog;
 
 finalize:
-	spin_lock_bh(&priv->ring[ring].egress_lock);
+	spin_lock_bh(&priv->ring[ring].lock);
 
-	if (!priv->ring[ring].busy && priv->ring[ring].egress_cnt) {
+	egress_cnt = atomic_read(&priv->ring[ring].egress_cnt);
+
+	if (!priv->ring[ring].busy && egress_cnt) {
 		/* Configure when we want an interrupt */
 		priv->ring[ring].busy = 1;
 
 		val = EIP197_HIA_RDR_THRESH_PKT_MODE |
-			EIP197_HIA_RDR_THRESH_PROC_PKT(min_t(int, priv->ring[ring].egress_cnt,
+			EIP197_HIA_RDR_THRESH_PROC_PKT(min_t(int, egress_cnt,
 							   EIP197_MAX_BATCH_SZ));
-		writel(val, EIP197_HIA_RDR(priv, ring) + EIP197_HIA_xDR_THRESH);
+		writel_relaxed(val, EIP197_HIA_RDR(priv, ring) + EIP197_HIA_xDR_THRESH);
 	}
 
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
+	spin_unlock_bh(&priv->ring[ring].lock);
 
 	if (nreq) {
 		/* let the RDR know we have pending descriptors */
@@ -835,23 +831,38 @@ void safexcel_inv_complete(struct crypto_async_request *req, int error)
 	complete(&result->completion);
 }
 
+inline void safexcel_rdr_req_set(struct safexcel_crypto_priv *priv,
+				 int ring,
+				 struct safexcel_result_desc *rdesc,
+				 struct crypto_async_request *req)
+{
+	int i = safexcel_ring_rdr_rdesc_index(priv, ring, rdesc);
+
+	priv->ring[ring].rdr_req[i] = req;
+}
+
+inline struct crypto_async_request *
+safexcel_rdr_req_get(struct safexcel_crypto_priv *priv, int ring)
+{
+	int i = safexcel_ring_first_rdr_index(priv, ring);
+
+	return priv->ring[ring].rdr_req[i];
+}
+
 /* Context cache invalidation */
 int safexcel_invalidate_cache(struct crypto_async_request *async,
 			      struct safexcel_crypto_priv *priv,
-			      dma_addr_t ctxr_dma, int ring,
-			      struct safexcel_request *request)
+			      dma_addr_t ctxr_dma, int ring)
 {
 	struct safexcel_command_desc *cdesc;
 	struct safexcel_result_desc *rdesc;
 	int ret;
 
-	spin_lock_bh(&priv->ring[ring].egress_lock);
-
 	/* Prepare command descriptor */
 	cdesc = safexcel_add_cdesc(priv, ring, true, true, 0, 0, 0, ctxr_dma);
 	if (IS_ERR(cdesc)) {
 		ret = PTR_ERR(cdesc);
-		goto unlock;
+		return ret;
 	}
 
 	cdesc->control_data.type = EIP197_TYPE_EXTENDED;
@@ -867,21 +878,16 @@ int safexcel_invalidate_cache(struct crypto_async_request *async,
 		goto cdesc_rollback;
 	}
 
-	request->req = async;
-	list_add_tail(&request->list, &priv->ring[ring].list);
+	safexcel_rdr_req_set(priv, ring, rdesc, async);
 
 	/* update the ring request count */
-	priv->ring[ring].egress_cnt++;
-
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
+	atomic_inc(&priv->ring[ring].egress_cnt);
 
 	return 0;
 
 cdesc_rollback:
 	safexcel_ring_rollback_wptr(priv, &priv->ring[ring].cdr);
 
-unlock:
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
 	return ret;
 }
 
@@ -889,7 +895,7 @@ unlock:
 static void safexcel_handle_result_descriptor(struct safexcel_crypto_priv *priv,
 					      int ring)
 {
-	struct safexcel_request *sreq;
+	struct crypto_async_request *req;
 	struct safexcel_context *ctx;
 	int ret, i, ndesc, ndesc_tot, nreq_cnt;
 	u32 val, results;
@@ -904,17 +910,12 @@ more_results:
 	ndesc_tot = 0;
 
 	for (i = 0; i < results; i++) {
-		spin_lock_bh(&priv->ring[ring].egress_lock);
-		sreq = list_first_entry(&priv->ring[ring].list, struct safexcel_request, list);
-		list_del(&sreq->list);
-		priv->ring[ring].egress_cnt--;
-		spin_unlock_bh(&priv->ring[ring].egress_lock);
+		req = safexcel_rdr_req_get(priv, ring);
 
-		ctx = crypto_tfm_ctx(sreq->req->tfm);
-		ndesc = ctx->handle_result(priv, ring, sreq->req,
+		ctx = crypto_tfm_ctx(req->tfm);
+		ndesc = ctx->handle_result(priv, ring, req,
 					   &should_complete, &ret);
 		if (ndesc < 0) {
-			kfree(sreq);
 			dev_err(priv->dev, "failed to handle result (%d)", ndesc);
 			return;
 		}
@@ -924,14 +925,14 @@ more_results:
 
 		if (should_complete) {
 			local_bh_disable();
-			sreq->req->complete(sreq->req, ret);
+			req->complete(req, ret);
 			local_bh_enable();
 		}
-
-		kfree(sreq);
 	}
 
 	if (nreq_cnt) {
+		atomic_sub(nreq_cnt, &priv->ring[ring].egress_cnt);
+
 		/* decrement the handled results */
 		val = EIP197_xDR_PROC_xD_PKT(nreq_cnt) |
 			EIP197_xDR_PROC_xD_COUNT(ndesc_tot * priv->config.rd_offset);
@@ -944,15 +945,16 @@ more_results:
 	if (results == EIP197_xDR_PROC_xD_PKT_MASK)
 		goto more_results;
 
-	spin_lock_bh(&priv->ring[ring].egress_lock);
+	spin_lock_bh(&priv->ring[ring].lock);
 
 	/* get the pending request count */
-	egress_cnt = min_t(int, priv->ring[ring].egress_cnt, EIP197_MAX_BATCH_SZ);
+	egress_cnt = min_t(int, atomic_read(&priv->ring[ring].egress_cnt),
+			   EIP197_MAX_BATCH_SZ);
 
 	if (!egress_cnt) {
 		/* no more request in ring */
 		priv->ring[ring].busy = 0;
-		spin_unlock_bh(&priv->ring[ring].egress_lock);
+		spin_unlock_bh(&priv->ring[ring].lock);
 
 		return;
 	}
@@ -964,7 +966,7 @@ more_results:
 	writel(val, EIP197_HIA_RDR(priv, ring) +
 	       EIP197_HIA_xDR_THRESH);
 
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
+	spin_unlock_bh(&priv->ring[ring].lock);
 }
 
 /* dequeue from Crypto API FIFO and insert requests into HW ring */
@@ -1274,6 +1276,14 @@ static int safexcel_probe(struct platform_device *pdev)
 		if (ret)
 			goto err_clk;
 
+		priv->ring[i].rdr_req = devm_kzalloc(dev,
+			sizeof(priv->ring[i].rdr_req) * EIP197_DEFAULT_RING_SIZE,
+			GFP_KERNEL);
+		if (!priv->ring[i].rdr_req) {
+			ret = -ENOMEM;
+			goto err_clk;
+		}
+
 		ring_irq = devm_kzalloc(dev, sizeof(*ring_irq), GFP_KERNEL);
 		if (!ring_irq) {
 			ret = -ENOMEM;
@@ -1303,15 +1313,13 @@ static int safexcel_probe(struct platform_device *pdev)
 			goto err_clk;
 		}
 
-		priv->ring[i].egress_cnt = 0;
+		atomic_set(&priv->ring[i].egress_cnt, 0);
 		priv->ring[i].busy = 0;
 
 		crypto_init_queue(&priv->ring[i].queue,
 				  EIP197_DEFAULT_RING_SIZE);
 
-		INIT_LIST_HEAD(&priv->ring[i].list);
 		spin_lock_init(&priv->ring[i].lock);
-		spin_lock_init(&priv->ring[i].egress_lock);
 		spin_lock_init(&priv->ring[i].queue_lock);
 	}
 
