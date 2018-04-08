@@ -150,7 +150,6 @@ static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int rin
 
 	*ret = 0;
 
-	spin_lock_bh(&priv->ring[ring].egress_lock);
 	do {
 		rdesc = safexcel_ring_next_rptr(priv, &priv->ring[ring].rdr);
 		if (IS_ERR(rdesc)) {
@@ -181,7 +180,6 @@ static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int rin
 	} while (!rdesc->last_seg);
 
 	safexcel_complete(priv, ring);
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	if (src == dst) {
 		dma_unmap_sg(priv->dev, src,
@@ -202,7 +200,6 @@ static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int rin
 }
 
 static int safexcel_aes_send(struct crypto_async_request *base, int ring,
-			     struct safexcel_request *request,
 			     struct safexcel_cipher_req *sreq,
 			     struct scatterlist *src, struct scatterlist *dst,
 			     unsigned int cryptlen, u8 *iv, int *commands,
@@ -211,7 +208,7 @@ static int safexcel_aes_send(struct crypto_async_request *base, int ring,
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(base->tfm);
 	struct safexcel_crypto_priv *priv = ctx->priv;
 	struct safexcel_command_desc *cdesc;
-	struct safexcel_result_desc *rdesc;
+	struct safexcel_result_desc *rdesc, *first_rdesc;
 	struct scatterlist *sg;
 	int nr_src, nr_dst, n_cdesc = 0, n_rdesc = 0, queued = cryptlen;
 	int i, ret = 0;
@@ -242,8 +239,6 @@ static int safexcel_aes_send(struct crypto_async_request *base, int ring,
 	}
 
 	memcpy(ctx->base.ctxr->data, ctx->key, ctx->key_len);
-
-	spin_lock_bh(&priv->ring[ring].egress_lock);
 
 	/* command descriptors */
 	for_each_sg(src, sg, nr_src, i) {
@@ -285,12 +280,12 @@ static int safexcel_aes_send(struct crypto_async_request *base, int ring,
 			ret = PTR_ERR(rdesc);
 			goto rdesc_rollback;
 		}
+		if (first)
+			first_rdesc = rdesc;
 		n_rdesc++;
 	}
 
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
-
-	request->req = base;
+	safexcel_rdr_req_set(priv, ring, first_rdesc, base);
 
 	*commands = n_cdesc;
 	*results = n_rdesc;
@@ -302,8 +297,6 @@ rdesc_rollback:
 cdesc_rollback:
 	for (i = 0; i < n_cdesc; i++)
 		safexcel_ring_rollback_wptr(priv, &priv->ring[ring].cdr);
-
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	if (src == dst) {
 		dma_unmap_sg(priv->dev, src,
@@ -332,7 +325,6 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 
 	*ret = 0;
 
-	spin_lock_bh(&priv->ring[ring].egress_lock);
 	do {
 		rdesc = safexcel_ring_next_rptr(priv, &priv->ring[ring].rdr);
 		if (IS_ERR(rdesc)) {
@@ -352,7 +344,6 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	} while (!rdesc->last_seg);
 
 	safexcel_complete(priv, ring);
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	if (ctx->base.exit_inv) {
 		dma_pool_free(priv->context_pool, ctx->base.ctxr,
@@ -404,15 +395,13 @@ static int safexcel_skcipher_handle_result(struct safexcel_crypto_priv *priv,
 }
 
 static int safexcel_cipher_send_inv(struct crypto_async_request *base,
-				    int ring, struct safexcel_request *request,
-				    int *commands, int *results)
+				    int ring, int *commands, int *results)
 {
 	struct safexcel_cipher_ctx *ctx = crypto_tfm_ctx(base->tfm);
 	struct safexcel_crypto_priv *priv = ctx->priv;
 	int ret;
 
-	ret = safexcel_invalidate_cache(base, priv, ctx->base.ctxr_dma, ring,
-					request);
+	ret = safexcel_invalidate_cache(base, priv, ctx->base.ctxr_dma, ring);
 	if (unlikely(ret))
 		return ret;
 
@@ -423,7 +412,6 @@ static int safexcel_cipher_send_inv(struct crypto_async_request *base,
 }
 
 static int safexcel_skcipher_send(struct crypto_async_request *async, int ring,
-				  struct safexcel_request *request,
 				  int *commands, int *results)
 {
 	struct skcipher_request *req = skcipher_request_cast(async);
@@ -435,10 +423,9 @@ static int safexcel_skcipher_send(struct crypto_async_request *async, int ring,
 	BUG_ON(priv->version == EIP97 && sreq->needs_inv);
 
 	if (sreq->needs_inv)
-		ret = safexcel_cipher_send_inv(async, ring, request, commands,
-					       results);
+		ret = safexcel_cipher_send_inv(async, ring, commands, results);
 	else
-		ret = safexcel_aes_send(async, ring, request, sreq, req->src,
+		ret = safexcel_aes_send(async, ring, sreq, req->src,
 					req->dst, req->cryptlen, req->iv,
 					commands, results);
 	return ret;

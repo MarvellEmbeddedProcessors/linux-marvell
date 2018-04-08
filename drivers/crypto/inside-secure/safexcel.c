@@ -511,7 +511,6 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 {
 	struct crypto_async_request *req, *backlog;
 	struct safexcel_context *ctx;
-	struct safexcel_request *request;
 	int ret, nreq = 0, cdesc = 0, rdesc = 0, commands, results;
 
 	/* If a request wasn't properly dequeued because of a lack of resources,
@@ -535,16 +534,10 @@ void safexcel_dequeue(struct safexcel_crypto_priv *priv, int ring)
 		}
 
 handle_req:
-		request = kzalloc(sizeof(*request), EIP197_GFP_FLAGS(*req));
-		if (!request)
-			goto request_failed;
-
 		ctx = crypto_tfm_ctx(req->tfm);
-		ret = ctx->send(req, ring, request, &commands, &results);
-		if (ret) {
-			kfree(request);
+		ret = ctx->send(req, ring, &commands, &results);
+		if (ret)
 			goto request_failed;
-		}
 
 		if (backlog)
 			backlog->complete(backlog, -EINPROGRESS);
@@ -553,14 +546,8 @@ handle_req:
 		 * to the engine because the input data was cached, continue to
 		 * dequeue other requests as this is valid and not an error.
 		 */
-		if (!commands && !results) {
-			kfree(request);
+		if (!commands && !results)
 			continue;
-		}
-
-		spin_lock_bh(&priv->ring[ring].egress_lock);
-		list_add_tail(&request->list, &priv->ring[ring].list);
-		spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 		cdesc += commands;
 		rdesc += results;
@@ -578,7 +565,7 @@ finalize:
 	if (!nreq)
 		return;
 
-	spin_lock_bh(&priv->ring[ring].egress_lock);
+	spin_lock_bh(&priv->ring[ring].lock);
 
 	priv->ring[ring].requests += nreq;
 
@@ -587,7 +574,7 @@ finalize:
 		priv->ring[ring].busy = true;
 	}
 
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
+	spin_unlock_bh(&priv->ring[ring].lock);
 
 	/* let the RDR know we have pending descriptors */
 	writel((rdesc * priv->config.rd_offset) << 2,
@@ -596,6 +583,24 @@ finalize:
 	/* let the CDR know we have pending descriptors */
 	writel((cdesc * priv->config.cd_offset) << 2,
 	       EIP197_HIA_CDR(priv, ring) + EIP197_HIA_xDR_PREP_COUNT);
+}
+
+inline void safexcel_rdr_req_set(struct safexcel_crypto_priv *priv,
+				 int ring,
+				 struct safexcel_result_desc *rdesc,
+				 struct crypto_async_request *req)
+{
+	int i = safexcel_ring_rdr_rdesc_index(priv, ring, rdesc);
+
+	priv->ring[ring].rdr_req[i] = req;
+}
+
+inline struct crypto_async_request *
+safexcel_rdr_req_get(struct safexcel_crypto_priv *priv, int ring)
+{
+	int i = safexcel_ring_first_rdr_index(priv, ring);
+
+	return priv->ring[ring].rdr_req[i];
 }
 
 void safexcel_complete(struct safexcel_crypto_priv *priv, int ring)
@@ -626,21 +631,16 @@ void safexcel_inv_complete(struct crypto_async_request *req, int error)
 
 int safexcel_invalidate_cache(struct crypto_async_request *async,
 			      struct safexcel_crypto_priv *priv,
-			      dma_addr_t ctxr_dma, int ring,
-			      struct safexcel_request *request)
+			      dma_addr_t ctxr_dma, int ring)
 {
 	struct safexcel_command_desc *cdesc;
 	struct safexcel_result_desc *rdesc;
 	int ret = 0;
 
-	spin_lock_bh(&priv->ring[ring].egress_lock);
-
 	/* Prepare command descriptor */
 	cdesc = safexcel_add_cdesc(priv, ring, true, true, 0, 0, 0, ctxr_dma);
-	if (IS_ERR(cdesc)) {
-		ret = PTR_ERR(cdesc);
-		goto unlock;
-	}
+	if (IS_ERR(cdesc))
+		return PTR_ERR(cdesc);
 
 	cdesc->control_data.type = EIP197_TYPE_EXTENDED;
 	cdesc->control_data.options = 0;
@@ -655,21 +655,20 @@ int safexcel_invalidate_cache(struct crypto_async_request *async,
 		goto cdesc_rollback;
 	}
 
-	request->req = async;
-	goto unlock;
+	safexcel_rdr_req_set(priv, ring, rdesc, async);
+
+	return ret;
 
 cdesc_rollback:
 	safexcel_ring_rollback_wptr(priv, &priv->ring[ring].cdr);
 
-unlock:
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
 	return ret;
 }
 
 static inline void safexcel_handle_result_descriptor(struct safexcel_crypto_priv *priv,
 						     int ring)
 {
-	struct safexcel_request *sreq;
+	struct crypto_async_request *req;
 	struct safexcel_context *ctx;
 	int ret, i, nreq, ndesc, tot_descs, handled = 0;
 	bool should_complete;
@@ -684,28 +683,22 @@ handle_results:
 		goto requests_left;
 
 	for (i = 0; i < nreq; i++) {
-		spin_lock_bh(&priv->ring[ring].egress_lock);
-		sreq = list_first_entry(&priv->ring[ring].list,
-					struct safexcel_request, list);
-		list_del(&sreq->list);
-		spin_unlock_bh(&priv->ring[ring].egress_lock);
+		req = safexcel_rdr_req_get(priv, ring);
 
-		ctx = crypto_tfm_ctx(sreq->req->tfm);
-		ndesc = ctx->handle_result(priv, ring, sreq->req,
+		ctx = crypto_tfm_ctx(req->tfm);
+		ndesc = ctx->handle_result(priv, ring, req,
 					   &should_complete, &ret);
 		if (ndesc < 0) {
-			kfree(sreq);
 			dev_err(priv->dev, "failed to handle result (%d)", ndesc);
 			goto acknowledge;
 		}
 
 		if (should_complete) {
 			local_bh_disable();
-			sreq->req->complete(sreq->req, ret);
+			req->complete(req, ret);
 			local_bh_enable();
 		}
 
-		kfree(sreq);
 		tot_descs += ndesc;
 		handled++;
 	}
@@ -724,7 +717,7 @@ acknowledge:
 		goto handle_results;
 
 requests_left:
-	spin_lock_bh(&priv->ring[ring].egress_lock);
+	spin_lock_bh(&priv->ring[ring].lock);
 
 	priv->ring[ring].requests -= handled;
 	safexcel_try_push_requests(priv, ring);
@@ -732,7 +725,7 @@ requests_left:
 	if (!priv->ring[ring].requests)
 		priv->ring[ring].busy = false;
 
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
+	spin_unlock_bh(&priv->ring[ring].lock);
 }
 
 static void safexcel_dequeue_work(struct work_struct *work)
@@ -1026,6 +1019,14 @@ static int safexcel_probe(struct platform_device *pdev)
 		if (ret)
 			goto err_clk;
 
+		priv->ring[i].rdr_req = devm_kzalloc(dev,
+			sizeof(priv->ring[i].rdr_req) * EIP197_DEFAULT_RING_SIZE,
+			GFP_KERNEL);
+		if (!priv->ring[i].rdr_req) {
+			ret = -ENOMEM;
+			goto err_clk;
+		}
+
 		ring_irq = devm_kzalloc(dev, sizeof(*ring_irq), GFP_KERNEL);
 		if (!ring_irq) {
 			ret = -ENOMEM;
@@ -1059,11 +1060,9 @@ static int safexcel_probe(struct platform_device *pdev)
 		priv->ring[i].busy = false;
 
 		crypto_init_queue(&priv->ring[i].queue,
-				  EIP197_DEFAULT_RING_SIZE);
+				  EIP197_DEFAULT_RING_SIZE - 1);
 
-		INIT_LIST_HEAD(&priv->ring[i].list);
 		spin_lock_init(&priv->ring[i].lock);
-		spin_lock_init(&priv->ring[i].egress_lock);
 		spin_lock_init(&priv->ring[i].queue_lock);
 	}
 

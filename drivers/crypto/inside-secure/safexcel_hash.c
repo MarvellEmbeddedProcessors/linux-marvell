@@ -143,7 +143,6 @@ static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int rin
 
 	*ret = 0;
 
-	spin_lock_bh(&priv->ring[ring].egress_lock);
 	rdesc = safexcel_ring_next_rptr(priv, &priv->ring[ring].rdr);
 	if (IS_ERR(rdesc)) {
 		dev_err(priv->dev,
@@ -157,7 +156,6 @@ static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int rin
 	}
 
 	safexcel_complete(priv, ring);
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	if (sreq->nents) {
 		dma_unmap_sg(priv->dev, areq->src, sreq->nents, DMA_TO_DEVICE);
@@ -190,7 +188,6 @@ static int safexcel_handle_req_result(struct safexcel_crypto_priv *priv, int rin
 }
 
 static int safexcel_ahash_send_req(struct crypto_async_request *async, int ring,
-				   struct safexcel_request *request,
 				   int *commands, int *results)
 {
 	struct ahash_request *areq = ahash_request_cast(async);
@@ -235,8 +232,6 @@ static int safexcel_ahash_send_req(struct crypto_async_request *async, int ring,
 			}
 		}
 	}
-
-	spin_lock_bh(&priv->ring[ring].egress_lock);
 
 	/* Add a command descriptor for the cached data, if any */
 	if (cache_len) {
@@ -317,10 +312,9 @@ send_command:
 		goto unmap_result;
 	}
 
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
+	safexcel_rdr_req_set(priv, ring, rdesc, &areq->base);
 
 	req->processed += len;
-	request->req = &areq->base;
 
 	*commands = n_cdesc;
 	*results = 1;
@@ -341,7 +335,6 @@ unmap_cache:
 		req->cache_sz = 0;
 	}
 
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
 	return ret;
 }
 
@@ -377,7 +370,6 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 
 	*ret = 0;
 
-	spin_lock_bh(&priv->ring[ring].egress_lock);
 	rdesc = safexcel_ring_next_rptr(priv, &priv->ring[ring].rdr);
 	if (IS_ERR(rdesc)) {
 		dev_err(priv->dev,
@@ -391,7 +383,6 @@ static int safexcel_handle_inv_result(struct safexcel_crypto_priv *priv,
 	}
 
 	safexcel_complete(priv, ring);
-	spin_unlock_bh(&priv->ring[ring].egress_lock);
 
 	if (ctx->base.exit_inv) {
 		dma_pool_free(priv->context_pool, ctx->base.ctxr,
@@ -442,15 +433,14 @@ static int safexcel_handle_result(struct safexcel_crypto_priv *priv, int ring,
 }
 
 static int safexcel_ahash_send_inv(struct crypto_async_request *async,
-				   int ring, struct safexcel_request *request,
-				   int *commands, int *results)
+				   int ring, int *commands, int *results)
 {
 	struct ahash_request *areq = ahash_request_cast(async);
 	struct safexcel_ahash_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(areq));
 	int ret;
 
 	ret = safexcel_invalidate_cache(async, ctx->priv,
-					ctx->base.ctxr_dma, ring, request);
+					ctx->base.ctxr_dma, ring);
 	if (unlikely(ret))
 		return ret;
 
@@ -461,19 +451,16 @@ static int safexcel_ahash_send_inv(struct crypto_async_request *async,
 }
 
 static int safexcel_ahash_send(struct crypto_async_request *async,
-			       int ring, struct safexcel_request *request,
-			       int *commands, int *results)
+			       int ring, int *commands, int *results)
 {
 	struct ahash_request *areq = ahash_request_cast(async);
 	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
 	int ret;
 
 	if (req->needs_inv)
-		ret = safexcel_ahash_send_inv(async, ring, request,
-					      commands, results);
+		ret = safexcel_ahash_send_inv(async, ring, commands, results);
 	else
-		ret = safexcel_ahash_send_req(async, ring, request,
-					      commands, results);
+		ret = safexcel_ahash_send_req(async, ring, commands, results);
 	return ret;
 }
 
