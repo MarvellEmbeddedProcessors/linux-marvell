@@ -304,10 +304,9 @@ static int safexcel_ahash_send_req(struct crypto_async_request *async, int ring,
 		cdesc = safexcel_add_cdesc(priv, ring, !n_cdesc,
 					   !(queued - sglen), sg_dma_address(sg),
 					   sglen, len, ctx->base.ctxr_dma);
-
 		if (IS_ERR(cdesc)) {
 			ret = PTR_ERR(cdesc);
-			goto cdesc_rollback;
+			goto unmap_sg;
 		}
 		n_cdesc++;
 
@@ -331,7 +330,7 @@ send_command:
 					 DMA_FROM_DEVICE);
 	if (dma_mapping_error(priv->dev, req->result_dma)) {
 		ret = -EINVAL;
-		goto cdesc_rollback;
+		goto unmap_sg;
 	}
 
 	/* Add a result descriptor */
@@ -339,7 +338,7 @@ send_command:
 				   req->state_sz);
 	if (IS_ERR(rdesc)) {
 		ret = PTR_ERR(rdesc);
-		goto rdesc_rollback;
+		goto unmap_result;
 	}
 
 	safexcel_rdr_req_set(priv, ring, rdesc, &areq->base);
@@ -353,15 +352,12 @@ send_command:
 	*results = 1;
 	return 0;
 
-rdesc_rollback:
+unmap_result:
 	dma_unmap_single(priv->dev, req->result_dma, req->state_sz,
 			 DMA_FROM_DEVICE);
-	req->result_dma = 0;
-
+unmap_sg:
+	dma_unmap_sg(priv->dev, areq->src, req->nents, DMA_TO_DEVICE);
 cdesc_rollback:
-	if (req->nents)
-		dma_unmap_sg(priv->dev, areq->src, req->nents, DMA_TO_DEVICE);
-
 	for (i = 0; i < n_cdesc; i++)
 		safexcel_ring_rollback_wptr(priv, &priv->ring[ring].cdr);
 unmap_cache:
