@@ -2649,7 +2649,7 @@ void mv_gop110_mib_counters_stat_update(struct gop_hw *gop, int port, struct gop
 	gop_statistics->rx_total_err += val;
 
 	val = mv_gop110_mib_read64(gop, port, MV_MIB_MAC_RECEIVE_ERROR);
-	gop_statistics->rx_jabber += val;
+	gop_statistics->rx_mac_err += val;
 	gop_statistics->rx_sw_drop += val;
 	gop_statistics->rx_total_err += val;
 
