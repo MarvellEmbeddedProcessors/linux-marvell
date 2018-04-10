@@ -148,6 +148,11 @@ struct aead_alg {
 	struct crypto_alg base;
 };
 
+#define AEAD_REQUEST_ON_STACK(name, tfm) \
+	char __##name##_desc[sizeof(struct aead_request) + \
+		crypto_aead_reqsize(tfm)] CRYPTO_MINALIGN_ATTR; \
+	struct aead_request *name = (void *)__##name##_desc
+
 struct crypto_aead {
 	unsigned int authsize;
 	unsigned int reqsize;
