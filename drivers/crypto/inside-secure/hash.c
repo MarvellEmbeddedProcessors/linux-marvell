@@ -81,6 +81,15 @@ static const u8 sha256_zero_digest[SHA256_DIGEST_SIZE] = {
 	0x1b, 0x78, 0x52, 0xb8, 0x55
 };
 
+static const u8 sha384_zero_digest[SHA384_DIGEST_SIZE] = {
+	0x38, 0xb0, 0x60, 0xa7, 0x51, 0xac, 0x96, 0x38,
+	0x4c, 0xd9, 0x32, 0x7e, 0xb1, 0xb1, 0xe3, 0x6a,
+	0x21, 0xfd, 0xb7, 0x11, 0x14, 0xbe, 0x07, 0x43,
+	0x4c, 0x0c, 0xc7, 0xbf, 0x63, 0xf6, 0xe1, 0xda,
+	0x27, 0x4e, 0xde, 0xbf, 0xe7, 0x6f, 0x65, 0xfb,
+	0xd5, 0x1a, 0xd2, 0xf1, 0x48, 0x98, 0xb9, 0x5b
+};
+
 static const u8 sha512_zero_digest[SHA512_DIGEST_SIZE] = {
 	0xcf, 0x83, 0xe1, 0x35, 0x7e, 0xef, 0xb8, 0xbd,
 	0xf1, 0x54, 0x28, 0x50, 0xd6, 0x6d, 0x80, 0x07,
@@ -132,7 +141,8 @@ static void safexcel_context_control(struct safexcel_ahash_ctx *ctx,
 			else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA224 ||
 				 ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA256)
 				ctrl_size = SHA256_DIGEST_SIZE / sizeof(u32);
-			else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA512)
+			else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA384 ||
+				 ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA512)
 				ctrl_size = SHA512_DIGEST_SIZE / sizeof(u32);
 			else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_MD5)
 				ctrl_size = MD5_DIGEST_SIZE / sizeof(u32);
@@ -703,6 +713,9 @@ static int safexcel_ahash_final(struct ahash_request *areq)
 		else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA256)
 			memcpy(areq->result, sha256_zero_digest,
 			       SHA256_DIGEST_SIZE);
+		else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA384)
+			memcpy(areq->result, sha384_zero_digest,
+			       SHA512_DIGEST_SIZE);
 		else if (ctx->alg == CONTEXT_CONTROL_CRYPTO_ALG_SHA512)
 			memcpy(areq->result, sha512_zero_digest,
 			       SHA512_DIGEST_SIZE);
@@ -1334,6 +1347,76 @@ struct safexcel_alg_template safexcel_alg_hmac_sha256 = {
 				.cra_flags = CRYPTO_ALG_ASYNC |
 					     CRYPTO_ALG_KERN_DRIVER_ONLY,
 				.cra_blocksize = SHA256_BLOCK_SIZE,
+				.cra_ctxsize = sizeof(struct safexcel_ahash_ctx),
+				.cra_init = safexcel_ahash_cra_init,
+				.cra_exit = safexcel_ahash_cra_exit,
+				.cra_module = THIS_MODULE,
+			},
+		},
+	},
+};
+
+static int safexcel_sha384_init(struct ahash_request *areq)
+{
+	struct safexcel_ahash_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(areq));
+	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
+
+	memset(req, 0, sizeof(*req));
+
+	req->state[0] = lower_32_bits(SHA384_H0);
+	req->state[1] = upper_32_bits(SHA384_H0);
+	req->state[2] = lower_32_bits(SHA384_H1);
+	req->state[3] = upper_32_bits(SHA384_H1);
+	req->state[4] = lower_32_bits(SHA384_H2);
+	req->state[5] = upper_32_bits(SHA384_H2);
+	req->state[6] = lower_32_bits(SHA384_H3);
+	req->state[7] = upper_32_bits(SHA384_H3);
+	req->state[8] = lower_32_bits(SHA384_H4);
+	req->state[9] = upper_32_bits(SHA384_H4);
+	req->state[10] = lower_32_bits(SHA384_H5);
+	req->state[11] = upper_32_bits(SHA384_H5);
+	req->state[12] = lower_32_bits(SHA384_H6);
+	req->state[13] = upper_32_bits(SHA384_H6);
+	req->state[14] = lower_32_bits(SHA384_H7);
+	req->state[15] = upper_32_bits(SHA384_H7);
+
+	ctx->alg = CONTEXT_CONTROL_CRYPTO_ALG_SHA384;
+	req->digest = CONTEXT_CONTROL_DIGEST_PRECOMPUTED;
+	req->state_sz = SHA512_DIGEST_SIZE;
+
+	return 0;
+}
+
+static int safexcel_sha384_digest(struct ahash_request *areq)
+{
+	int ret = safexcel_sha384_init(areq);
+
+	if (ret)
+		return ret;
+
+	return safexcel_ahash_finup(areq);
+}
+
+struct safexcel_alg_template safexcel_alg_sha384 = {
+	.type = SAFEXCEL_ALG_TYPE_AHASH,
+	.alg.ahash = {
+		.init = safexcel_sha384_init,
+		.update = safexcel_ahash_update,
+		.final = safexcel_ahash_final,
+		.finup = safexcel_ahash_finup,
+		.digest = safexcel_sha384_digest,
+		.export = safexcel_ahash_export,
+		.import = safexcel_ahash_import,
+		.halg = {
+			.digestsize = SHA384_DIGEST_SIZE,
+			.statesize = sizeof(struct safexcel_ahash_export_state),
+			.base = {
+				.cra_name = "sha384",
+				.cra_driver_name = "safexcel-sha384",
+				.cra_priority = 300,
+				.cra_flags = CRYPTO_ALG_ASYNC |
+					     CRYPTO_ALG_KERN_DRIVER_ONLY,
+				.cra_blocksize = SHA384_BLOCK_SIZE,
 				.cra_ctxsize = sizeof(struct safexcel_ahash_ctx),
 				.cra_init = safexcel_ahash_cra_init,
 				.cra_exit = safexcel_ahash_cra_exit,
