@@ -380,7 +380,7 @@ struct safexcel_context_record {
 	u32 control0;
 	u32 control1;
 
-	__le32 data[24];
+	__le32 data[40];
 } __packed;
 
 /* control0 */
@@ -761,6 +761,7 @@ extern struct safexcel_alg_template safexcel_alg_sha512;
 extern struct safexcel_alg_template safexcel_alg_hmac_sha1;
 extern struct safexcel_alg_template safexcel_alg_hmac_sha224;
 extern struct safexcel_alg_template safexcel_alg_hmac_sha256;
+extern struct safexcel_alg_template safexcel_alg_hmac_sha512;
 extern struct safexcel_alg_template safexcel_alg_md5;
 extern struct safexcel_alg_template safexcel_alg_hmac_md5;
 extern struct safexcel_alg_template safexcel_alg_authenc_hmac_sha1_cbc_aes;
