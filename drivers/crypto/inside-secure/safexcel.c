@@ -1080,6 +1080,7 @@ static struct safexcel_alg_template *safexcel_algs[] = {
 	&safexcel_alg_authenc_hmac_sha1_cbc_aes,
 	&safexcel_alg_authenc_hmac_sha224_cbc_aes,
 	&safexcel_alg_authenc_hmac_sha256_cbc_aes,
+	&safexcel_alg_authenc_hmac_sha512_cbc_aes,
 };
 
 /* Register the supported hash and cipher algorithms */
