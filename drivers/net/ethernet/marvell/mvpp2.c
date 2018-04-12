@@ -70,6 +70,7 @@
 #define     MVPP2_RXQ_PACKET_OFFSET_OFFS	28
 #define     MVPP2_RXQ_PACKET_OFFSET_MASK	0x70000000
 #define     MVPP2_RXQ_DISABLE_MASK		BIT(31)
+#define MVPP2_RXQ_MAX_NUM			128
 
 /* Top Registers */
 #define MVPP2_MH_REG(port)			(0x5040 + 4 * (port))
@@ -6188,6 +6189,19 @@ static void mvpp2_rxq_deinit(struct mvpp2_port *port,
 	put_cpu();
 }
 
+/* Disable all rx/ingress queues, called by mvpp2_init */
+static void mvpp2_rxq_disable_all(struct mvpp2 *priv)
+{
+	int i;
+	u32 val;
+
+	for (i = 0; i < MVPP2_RXQ_MAX_NUM; i++) {
+		val = mvpp2_read(priv, MVPP2_RXQ_CONFIG_REG(i));
+		val |= MVPP2_RXQ_DISABLE_MASK;
+		mvpp2_write(priv, MVPP2_RXQ_CONFIG_REG(i), val);
+	}
+}
+
 /* Create and initialize a Tx queue */
 static int mvpp2_txq_init(struct mvpp2_port *port,
 			  struct mvpp2_tx_queue *txq)
@@ -8947,17 +8961,18 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 	/* Buffer Manager initialization */
 	err = mvpp2_bm_init(pdev, priv);
 	if (err < 0)
-		return err;
+		goto end;
 
-	/* Parser default initialization */
+	/* Parser/ClassifierS default initialization */
 	err = mvpp2_prs_default_init(pdev, priv);
 	if (err < 0)
-		return err;
-
-	/* Classifier default initialization */
+		goto end;
 	mvpp2_cls_init(priv);
 
-	return 0;
+	/* Disable all existing ingress queues */
+	mvpp2_rxq_disable_all(priv);
+end:
+	return err;
 }
 
 static int mvpp2_probe(struct platform_device *pdev)
