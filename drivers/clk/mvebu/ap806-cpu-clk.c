@@ -37,6 +37,7 @@
  * @divider_reg: Full Integer Ratio from PLL-out frequency to CPU clock frequency
  * @force_reg: Request to force new ratio regardless of relation to other clocks
  * @ratio_reg: Central request to switch ratios
+ * @divider_ratio: cpu divider has two channels with ratio
  */
 struct cpu_dfs_regs {
 	unsigned int divider_reg;
@@ -46,6 +47,7 @@ struct cpu_dfs_regs {
 	unsigned int cluster_offset;
 	unsigned int force_mask;
 	int divider_offset;
+	int divider_ratio;
 	int ratio_offset;
 };
 
@@ -56,10 +58,26 @@ struct cpu_dfs_regs {
 
 #define AP806_CA72MP2_0_PLL_CR_CLUSTER_OFFSET		0x14
 #define AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET		0
+#define AP806_PLL_CR_CPU_CLK_DIV_RATIO			0
 #define AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_MASK		(0x3f << AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET)
 #define AP806_PLL_CR_0_CPU_CLK_RELOAD_FORCE_OFFSET	24
 #define AP806_PLL_CR_0_CPU_CLK_RELOAD_FORCE_MASK	(0x1 << AP806_PLL_CR_0_CPU_CLK_RELOAD_FORCE_OFFSET)
 #define AP806_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET	16
+
+/* AP807 CPU DFS register mapping*/
+#define AP807_CA72MP2_0_PLL_CR_0_REG_OFFSET		0x78
+#define AP807_CA72MP2_0_PLL_CR_1_REG_OFFSET		0x7c
+#define AP807_CA72MP2_0_PLL_CR_2_REG_OFFSET		0x7c
+
+#define AP807_CA72MP2_0_PLL_CR_CLUSTER_OFFSET		0x8
+#define AP807_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET		18
+#define AP807_PLL_CR_0_CPU_CLK_DIV_RATIO_MASK		(0x3f << AP807_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET)
+#define AP807_PLL_CR_1_CPU_CLK_DIV_RATIO_OFFSET         12
+#define AP807_PLL_CR_1_CPU_CLK_DIV_RATIO_MASK		(0x3f << AP807_PLL_CR_1_CPU_CLK_DIV_RATIO_OFFSET)
+#define AP807_PLL_CR_CPU_CLK_DIV_RATIO			3
+#define AP807_PLL_CR_0_CPU_CLK_RELOAD_FORCE_OFFSET	0
+#define AP807_PLL_CR_0_CPU_CLK_RELOAD_FORCE_MASK	(0x3 << AP807_PLL_CR_0_CPU_CLK_RELOAD_FORCE_OFFSET)
+#define AP807_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET	6
 
 #define to_clk(hw) container_of(hw, struct ap806_clk, hw)
 
@@ -72,9 +90,22 @@ struct cpu_dfs_regs ap806_dfs_regs = {
 	AP806_CA72MP2_0_PLL_CR_CLUSTER_OFFSET,
 	AP806_PLL_CR_0_CPU_CLK_RELOAD_FORCE_MASK,
 	AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET,
+	AP806_PLL_CR_CPU_CLK_DIV_RATIO,
 	AP806_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET
 };
 
+/* AP807 CPU DFS register mapping */
+struct cpu_dfs_regs ap807_dfs_regs = {
+	AP807_CA72MP2_0_PLL_CR_0_REG_OFFSET,
+	AP807_CA72MP2_0_PLL_CR_1_REG_OFFSET,
+	AP807_CA72MP2_0_PLL_CR_2_REG_OFFSET,
+	AP807_PLL_CR_0_CPU_CLK_DIV_RATIO_MASK,
+	AP807_CA72MP2_0_PLL_CR_CLUSTER_OFFSET,
+	AP807_PLL_CR_0_CPU_CLK_RELOAD_FORCE_MASK,
+	AP807_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET,
+	AP807_PLL_CR_CPU_CLK_DIV_RATIO,
+	AP807_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET
+};
 /*
  * struct ap806_clk: CPU cluster clock controller instance
  * @max_cpu_freq: Max CPU frequency - Sample at rest boot configuration
@@ -153,6 +184,13 @@ static int ap806_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	regmap_read(clk->pll_cr_base, cpu_clkdiv_reg, &reg);
 	reg &= ~(clk->pll_regs->divider_mask);
 	reg |= (divider << clk->pll_regs->divider_offset);
+
+	/* AP807 cpu divider has two channels with ratio 1:3 */
+	if (clk->pll_regs->divider_ratio) {
+		reg &= ~(AP807_PLL_CR_1_CPU_CLK_DIV_RATIO_MASK);
+		reg |= ((divider * clk->pll_regs->divider_ratio) <<
+				AP807_PLL_CR_1_CPU_CLK_DIV_RATIO_OFFSET);
+	}
 	regmap_write(clk->pll_cr_base, cpu_clkdiv_reg, reg);
 
 	/* 2. Set Reload force */
@@ -202,6 +240,7 @@ static const struct clk_ops ap806_clk_ops = {
 
 static const struct of_device_id ap806_clk_of_match[] = {
 	{ .compatible = "marvell,ap806-cpu-clk", },
+	{ .compatible = "marvell,ap807-cpu-clk", },
 	{}
 };
 
@@ -289,10 +328,13 @@ static int ap806_clk_probe(struct platform_device *pdev)
 		ap806_clk[cluster_index].hw.init = &init;
 		ap806_clk[cluster_index].dev = dev;
 
-		if (!of_match_device(ap806_clk_of_match, dev))
-			return -ENODEV;
+		if (of_device_is_compatible(pdev->dev.of_node,
+					"marvell,ap806-cpu-clk"))
+			ap806_clk[cluster_index].pll_regs = &ap806_dfs_regs;
+		else if (of_device_is_compatible(pdev->dev.of_node,
+					"marvell,ap807-cpu-clk"))
+			ap806_clk[cluster_index].pll_regs = &ap807_dfs_regs;
 
-		ap806_clk[cluster_index].pll_regs = &ap806_dfs_regs;
 		init.name = ap806_clk[cluster_index].clk_name;
 		init.ops = &ap806_clk_ops;
 		init.num_parents = 0;

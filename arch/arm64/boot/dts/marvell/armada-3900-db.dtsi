@@ -59,25 +59,18 @@
 		ethernet1 = &cp0_emac2;
 	};
 
-	/delete-node/opp_table0;
-	/delete-node/opp_table1;
-
 	cpus {
 		/delete-node/idle_states;
 		cpu@000 {
-			/delete-property/operating-points-v2;
 			/delete-property/cpu-idle-states;
 		};
 		cpu@001 {
-			/delete-property/operating-points-v2;
 			/delete-property/cpu-idle-states;
 		};
 		cpu@100 {
-			/delete-property/operating-points-v2;
 			/delete-property/cpu-idle-states;
 		};
 		cpu@101 {
-			/delete-property/operating-points-v2;
 			/delete-property/cpu-idle-states;
 		};
 	};
@@ -111,6 +104,9 @@
 			};
 			thermal: thermal@6f808c {
 				compatible = "marvell,armada-ap807-thermal";
+			};
+			ap806_clock: ap806_clock@6f8200 {
+				compatible = "marvell,ap807-cpu-clk", "syscon";
 			};
 		};
 	};

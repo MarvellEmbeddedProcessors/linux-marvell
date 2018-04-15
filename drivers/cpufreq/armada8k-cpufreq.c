@@ -31,8 +31,12 @@ static int __init armada8k_cpufreq_driver_init(void)
 	unsigned int cur_frequency;
 
 	node = of_find_compatible_node(NULL, NULL, "marvell,ap806-cpu-clk");
+	if (!node)
+		node = of_find_compatible_node(NULL, NULL, "marvell,ap807-cpu-clk");
+
 	if (!node || !of_device_is_available(node))
 		return -ENODEV;
+
 
 	/*
 	 * For each CPU, this loop registers the operating points
