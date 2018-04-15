@@ -59,6 +59,10 @@
 		device_type = "memory";
 		reg = <0x0 0x0 0x0 0x80000000>;
 	};
+
+	reserved-memory {
+		/delete-node/maintenance-area@8000000;
+	};
 };
 
 &ap0_uart0 {
