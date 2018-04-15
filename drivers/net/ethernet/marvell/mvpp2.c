@@ -4109,6 +4109,11 @@ static int mvpp2_prs_def_flow(struct mvpp2_port *port)
 }
 
 /* Classifier configuration routines */
+static u8 mvpp2_cpu2rxq(struct mvpp2_port *port)
+{
+	return 0;
+}
+
 
 /* Update classification flow table registers */
 static void mvpp2_cls_flow_write(struct mvpp2 *priv,
@@ -4202,6 +4207,61 @@ static void mvpp2_cls_oversize_rxq_set(struct mvpp2_port *port)
 	val = mvpp2_read(port->priv, MVPP2_CLS_SWFWD_PCTRL_REG);
 	val |= MVPP2_CLS_SWFWD_PCTRL_MASK(port->id);
 	mvpp2_write(port->priv, MVPP2_CLS_SWFWD_PCTRL_REG, val);
+}
+
+/* Config cos classifier:
+ * 0: cos based on vlan pri;
+ * 1: cos based on dscp;
+ * 2: cos based on vlan for tagged packets,
+ *		and based on dscp for untagged IP packets;
+ * 3: cos based on dscp for IP packets, and based on vlan for non-IP packets
+ */
+static int mvpp2_cos_classifier_set(struct mvpp2_port *port,
+				    int cos_mode)
+				    //enum mvpp2_cos_classifier cos_mode)
+{
+	return 0;
+}
+
+static void mvpp22_rss_c2_enable(struct mvpp2_port *port, bool en)
+{
+}
+
+int mvpp2_update_flow_info(struct mvpp2 *priv)
+{
+	return 0;
+}
+
+/* C2 rule set */
+static int mvpp2_cls_c2_rule_set(struct mvpp2_port *port, u8 start_queue)
+{
+	return 0;
+}
+
+/* Update RSS hash mode for non-fragemnted UDP packet per port */
+static int mvpp22_rss_udp_mode_set(struct mvpp2_port *port, int rss_mode)
+{
+	return 0;
+}
+
+/* Update the default CPU to handle the non-IP packets */
+static int mvpp22_rss_default_cpu_set(struct mvpp2_port *port, int default_cpu)
+{
+	return 0;
+}
+
+static int mvpp22_rss_enable(struct mvpp2_port *port, bool en, bool set)
+{
+	int ret = 0;
+
+	if (!ret)
+		return ret;
+	if (en)
+		ret = mvpp22_rss_default_cpu_set(port, 0);
+	else
+		mvpp22_rss_c2_enable(port, en);
+	ret = mvpp2_cls_c2_rule_set(port, mvpp2_cpu2rxq(port));
+	return ret;
 }
 
 static void *mvpp2_frag_alloc(const struct mvpp2_bm_pool *pool)
@@ -7514,6 +7574,12 @@ static bool mvpp22_rss_is_supported(void)
 	return (queue_mode == MVPP2_QDIST_MULTI_MODE);
 }
 
+/* Allocate a rss table for each phisical rxq having same cos priority */
+static int mvpp22_rss_rxq_set(struct mvpp2_port *port)
+{
+	return 0;
+}
+
 static inline u32 mvpp22_rxfh_indir(struct mvpp2_port *port, u32 rxq)
 {
 	int nrxqs, cpus = num_present_cpus();
@@ -7527,10 +7593,15 @@ static inline u32 mvpp22_rxfh_indir(struct mvpp2_port *port, u32 rxq)
 	return (rxq * nrxqs + rxq / cpus) % port->nrxqs;
 }
 
-static void mvpp22_rss_fill_table(struct mvpp2_port *port, u32 table)
+static void mvpp22_rss_rxfh_indir_init(struct mvpp2 *priv)
+{
+}
+
+static int mvpp22_rss_rxfh_indir_set(struct mvpp2_port *port)
 {
 	struct mvpp2 *priv = port->priv;
 	int i;
+	u32 table = 0;
 
 	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++) {
 		u32 sel = MVPP22_RSS_INDEX_TABLE(table) |
@@ -7540,12 +7611,13 @@ static void mvpp22_rss_fill_table(struct mvpp2_port *port, u32 table)
 		mvpp2_write(priv, MVPP22_RSS_TABLE_ENTRY,
 			    mvpp22_rxfh_indir(port, port->indir[i]));
 	}
+	return 0;
 }
 
-static void mvpp22_init_rss(struct mvpp2_port *port)
+static int mvpp22_init_rss(struct mvpp2_port *port)
 {
 	struct mvpp2 *priv = port->priv;
-	int i;
+	int i, err;
 
 	/* Set the table width: replace the whole classifier Rx queue number
 	 * with the ones configured in RSS table entries.
@@ -7568,15 +7640,27 @@ static void mvpp22_init_rss(struct mvpp2_port *port)
 	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++)
 		port->indir[i] = ethtool_rxfh_indir_default(i, port->nrxqs);
 
-	mvpp22_rss_fill_table(port, 0);
+	err = mvpp22_rss_udp_mode_set(port, 0);
+	if (err) {
+		netdev_err(port->dev, "cannot set rss mode\n");
+		return err;
+	}
+	err = mvpp22_rss_rxfh_indir_set(port);
+	if (err) {
+		netdev_err(port->dev, "cannot init rss rxfh indir\n");
+		return err;
+	}
+	err = mvpp22_rss_enable(port, 0, false);
+
+	return err;
 }
 
-static int mvpp2_open(struct net_device *dev)
+static int mvpp2_open_prs_cls_rss(struct net_device *dev)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
-	struct mvpp2 *priv = port->priv;
 	unsigned char mac_bcast[ETH_ALEN] = {
 			0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	struct mvpp2 *priv = port->priv;
 	int err;
 
 	err = mvpp2_prs_mac_da_accept(port, mac_bcast, true);
@@ -7589,7 +7673,7 @@ static int mvpp2_open(struct net_device *dev)
 		netdev_err(dev, "mvpp2_prs_mac_da_accept own addr failed\n");
 		return err;
 	}
-	err = mvpp2_prs_tag_mode_set(port->priv, port->id, MVPP2_TAG_TYPE_MH);
+	err = mvpp2_prs_tag_mode_set(priv, port->id, MVPP2_TAG_TYPE_MH);
 	if (err) {
 		netdev_err(dev, "mvpp2_prs_tag_mode_set failed\n");
 		return err;
@@ -7599,6 +7683,45 @@ static int mvpp2_open(struct net_device *dev)
 		netdev_err(dev, "mvpp2_prs_def_flow failed\n");
 		return err;
 	}
+	err = mvpp2_update_flow_info(priv);
+	if (err) {
+		netdev_err(port->dev, "cannot update flow info\n");
+		return err;
+	}
+
+	/* Set CoS classifier */
+	err = mvpp2_cos_classifier_set(port, 0/*cos_classifier value*/);
+	if (err) {
+		netdev_err(port->dev, "cannot set cos classifier\n");
+		return err;
+	}
+
+	/* Init C2 rules */
+	err = mvpp2_cls_c2_rule_set(port, mvpp2_cpu2rxq(port));
+	if (err) {
+		netdev_err(port->dev, "cannot init C2 rules\n");
+		return err;
+	}
+
+	if (priv->hw_version == MVPP21)
+		return 0;
+
+	/* Assign rss table for rxq belong to this port */
+	mvpp22_rss_rxq_set(port);
+
+	if (!mvpp22_rss_is_supported())
+		return 0;
+
+	err = mvpp22_init_rss(port);
+
+	return err;
+}
+
+static int mvpp2_open(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	struct mvpp2 *priv = port->priv;
+	int err;
 
 	/* Allocate the Rx/Tx queues */
 	err = mvpp2_setup_rxqs(port);
@@ -7644,12 +7767,13 @@ static int mvpp2_open(struct net_device *dev)
 
 	mvpp2_start_dev(port);
 
-	if (mvpp22_rss_is_supported())
-		mvpp22_init_rss(port);
-
 	/* Start hardware statistics gathering */
 	queue_delayed_work(priv->stats_queue, &port->stats_work,
 			   MVPP2_MIB_COUNTERS_STATS_DELAY);
+
+	err = mvpp2_open_prs_cls_rss(dev);
+	if (err < 0)
+		goto err_free_link_irq;
 
 	return 0;
 
@@ -8134,7 +8258,7 @@ static int mvpp2_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 	if (indir) {
 		memcpy(port->indir, indir,
 		       ARRAY_SIZE(port->indir) * sizeof(port->indir[0]));
-		mvpp22_rss_fill_table(port, 0);
+		mvpp22_rss_rxfh_indir_set(port);
 	}
 
 	return 0;
@@ -9158,6 +9282,9 @@ static int mvpp2_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to initialize controller\n");
 		goto err_mem_device;
 	}
+
+	if (priv->hw_version != MVPP21)
+		mvpp22_rss_rxfh_indir_init(priv);
 
 	/* Initialize ports */
 	fwnode_for_each_available_child_node(fwnode, port_fwnode) {
