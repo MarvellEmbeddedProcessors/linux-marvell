@@ -32,16 +32,48 @@
 
 #define KHZ_TO_HZ			1000
 
-/* CPU DFS register mapping*/
-#define CA72MP2_0_PLL_CR_0_REG_OFFSET(cluster_index)	(0x78 + cluster_index * 0x14)
-#define CA72MP2_0_PLL_CR_1_REG_OFFSET(cluster_index)	(0x80 + cluster_index * 0x14)
-#define CA72MP2_0_PLL_CR_2_REG_OFFSET(cluster_index)	(0x84 + cluster_index * 0x14)
+/*
+ * struct cpu_dfs_regs: CPU DFS register mapping
+ * @divider_reg: Full Integer Ratio from PLL-out frequency to CPU clock frequency
+ * @force_reg: Request to force new ratio regardless of relation to other clocks
+ * @ratio_reg: Central request to switch ratios
+ */
+struct cpu_dfs_regs {
+	unsigned int divider_reg;
+	unsigned int force_reg;
+	unsigned int ratio_reg;
+	unsigned int divider_mask;
+	unsigned int cluster_offset;
+	unsigned int force_mask;
+	int divider_offset;
+	int ratio_offset;
+};
 
-#define PLL_CR_0_CPU_CLK_DIV_RATIO_MASK		0x3f
-#define PLL_CR_0_CPU_CLK_RELOAD_FORCE_OFFSET	24
-#define PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET	16
+/* AP806 CPU DFS register mapping*/
+#define AP806_CA72MP2_0_PLL_CR_0_REG_OFFSET		0x78
+#define AP806_CA72MP2_0_PLL_CR_1_REG_OFFSET		0x80
+#define AP806_CA72MP2_0_PLL_CR_2_REG_OFFSET		0x84
+
+#define AP806_CA72MP2_0_PLL_CR_CLUSTER_OFFSET		0x14
+#define AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET		0
+#define AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_MASK		(0x3f << AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET)
+#define AP806_PLL_CR_0_CPU_CLK_RELOAD_FORCE_OFFSET	24
+#define AP806_PLL_CR_0_CPU_CLK_RELOAD_FORCE_MASK	(0x1 << AP806_PLL_CR_0_CPU_CLK_RELOAD_FORCE_OFFSET)
+#define AP806_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET	16
 
 #define to_clk(hw) container_of(hw, struct ap806_clk, hw)
+
+/* AP806 CPU DFS register mapping */
+struct cpu_dfs_regs ap806_dfs_regs = {
+	AP806_CA72MP2_0_PLL_CR_0_REG_OFFSET,
+	AP806_CA72MP2_0_PLL_CR_1_REG_OFFSET,
+	AP806_CA72MP2_0_PLL_CR_2_REG_OFFSET,
+	AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_MASK,
+	AP806_CA72MP2_0_PLL_CR_CLUSTER_OFFSET,
+	AP806_PLL_CR_0_CPU_CLK_RELOAD_FORCE_MASK,
+	AP806_PLL_CR_0_CPU_CLK_DIV_RATIO_OFFSET,
+	AP806_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET
+};
 
 /*
  * struct ap806_clk: CPU cluster clock controller instance
@@ -50,6 +82,7 @@
  * @clk_name: Cluster clock controller name
  * @parent_name: Cluster clock controller parent name
  * @hw: HW specific structure of Cluster clock controller
+ * @pll_regs: CPU DFS register mapping
  * @pll_cr_base: CA72MP2 Register base (Device Sample at Reset register)
  */
 struct ap806_clk {
@@ -63,6 +96,8 @@ struct ap806_clk {
 	struct clk_hw hw;
 
 	struct regmap *pll_cr_base;
+
+	struct cpu_dfs_regs *pll_regs;
 };
 
 static struct clk **cluster_clks;
@@ -74,6 +109,9 @@ static unsigned long ap806_clk_recalc_rate(struct clk_hw *hw, unsigned long pare
 	struct ap806_clk *clk = to_clk(hw);
 	int cpu_clkdiv_ratio;
 
+	unsigned int cpu_clkdiv_reg = clk->pll_regs->divider_reg +
+		(clk->cluster * clk->pll_regs->cluster_offset);
+
 	/* AP806 supports 2 Clusters */
 	if (clk->cluster != AP806_CPU_CLUSTER0 && clk->cluster != AP806_CPU_CLUSTER1) {
 		dev_err(clk->dev, "%s: un-supported clock cluster id %d\n",
@@ -81,8 +119,9 @@ static unsigned long ap806_clk_recalc_rate(struct clk_hw *hw, unsigned long pare
 		return -EINVAL;
 	}
 
-	regmap_read(clk->pll_cr_base, CA72MP2_0_PLL_CR_0_REG_OFFSET(clk->cluster), &cpu_clkdiv_ratio);
-	rate = clk->max_cpu_freq / (cpu_clkdiv_ratio & PLL_CR_0_CPU_CLK_DIV_RATIO_MASK);
+	regmap_read(clk->pll_cr_base, cpu_clkdiv_reg, &cpu_clkdiv_ratio);
+	rate = clk->max_cpu_freq / ((cpu_clkdiv_ratio & clk->pll_regs->divider_mask)
+			>> clk->pll_regs->divider_offset);
 	rate *= KHZ_TO_HZ;	/* convert from kHz to Hz */
 
 	return rate;
@@ -94,6 +133,14 @@ static int ap806_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	struct ap806_clk *clk = to_clk(hw);
 	unsigned long new_rate = rate / KHZ_TO_HZ;  /* kHz */
 	int reg, divider = clk->max_cpu_freq / new_rate;
+	unsigned int cpu_clkdiv_reg, cpu_force_reg, cpu_ratio_reg;
+
+	cpu_clkdiv_reg = clk->pll_regs->divider_reg +
+		(clk->cluster * clk->pll_regs->cluster_offset);
+	cpu_force_reg = clk->pll_regs->force_reg +
+		(clk->cluster * clk->pll_regs->cluster_offset);
+	cpu_ratio_reg = clk->pll_regs->ratio_reg +
+		(clk->cluster * clk->pll_regs->cluster_offset);
 
 	/* AP806 supports 2 Clusters */
 	if (clk->cluster != AP806_CPU_CLUSTER0 && clk->cluster != AP806_CPU_CLUSTER1) {
@@ -103,25 +150,28 @@ static int ap806_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	}
 
 	/* 1. Set CPU divider */
-	regmap_write(clk->pll_cr_base, CA72MP2_0_PLL_CR_0_REG_OFFSET(clk->cluster), divider);
+	regmap_read(clk->pll_cr_base, cpu_clkdiv_reg, &reg);
+	reg &= ~(clk->pll_regs->divider_mask);
+	reg |= (divider << clk->pll_regs->divider_offset);
+	regmap_write(clk->pll_cr_base, cpu_clkdiv_reg, reg);
 
 	/* 2. Set Reload force */
-	regmap_read(clk->pll_cr_base, CA72MP2_0_PLL_CR_1_REG_OFFSET(clk->cluster), &reg);
-	reg |= 0x1 << PLL_CR_0_CPU_CLK_RELOAD_FORCE_OFFSET;
-	regmap_write(clk->pll_cr_base, CA72MP2_0_PLL_CR_1_REG_OFFSET(clk->cluster), reg);
+	regmap_read(clk->pll_cr_base, cpu_force_reg, &reg);
+	reg |= clk->pll_regs->force_mask;
+	regmap_write(clk->pll_cr_base, cpu_force_reg, reg);
 
 	/* 3. Set Reload ratio */
-	regmap_read(clk->pll_cr_base, CA72MP2_0_PLL_CR_2_REG_OFFSET(clk->cluster), &reg);
-	reg |= 0x1 << PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET;
-	regmap_write(clk->pll_cr_base, CA72MP2_0_PLL_CR_2_REG_OFFSET(clk->cluster), reg);
+	regmap_read(clk->pll_cr_base, cpu_ratio_reg, &reg);
+	reg |= 0x1 << clk->pll_regs->ratio_offset;
+	regmap_write(clk->pll_cr_base, cpu_ratio_reg, reg);
 
 	/* 4. Wait for stabilizing CPU Clock */
 	ndelay(100);
 
 	/* 5. Clear Reload ratio */
-	regmap_read(clk->pll_cr_base, CA72MP2_0_PLL_CR_2_REG_OFFSET(clk->cluster), &reg);
-	reg &= ~0x1 << PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET;
-	regmap_write(clk->pll_cr_base, CA72MP2_0_PLL_CR_2_REG_OFFSET(clk->cluster), reg);
+	regmap_read(clk->pll_cr_base, cpu_ratio_reg, &reg);
+	reg &= ~(0x1 << clk->pll_regs->ratio_offset);
+	regmap_write(clk->pll_cr_base, cpu_ratio_reg, reg);
 
 	return 0;
 }
@@ -148,6 +198,11 @@ static const struct clk_ops ap806_clk_ops = {
 	.recalc_rate	= ap806_clk_recalc_rate,
 	.round_rate	= ap806_clk_round_rate,
 	.set_rate	= ap806_clk_set_rate,
+};
+
+static const struct of_device_id ap806_clk_of_match[] = {
+	{ .compatible = "marvell,ap806-cpu-clk", },
+	{}
 };
 
 static int ap806_clk_probe(struct platform_device *pdev)
@@ -233,6 +288,11 @@ static int ap806_clk_probe(struct platform_device *pdev)
 		ap806_clk[cluster_index].max_cpu_freq = clk_get_rate(max_cpu_clk) / 1000; /* Mhz */
 		ap806_clk[cluster_index].hw.init = &init;
 		ap806_clk[cluster_index].dev = dev;
+
+		if (!of_match_device(ap806_clk_of_match, dev))
+			return -ENODEV;
+
+		ap806_clk[cluster_index].pll_regs = &ap806_dfs_regs;
 		init.name = ap806_clk[cluster_index].clk_name;
 		init.ops = &ap806_clk_ops;
 		init.num_parents = 0;
@@ -256,11 +316,6 @@ static int ap806_clk_probe(struct platform_device *pdev)
 
 	return 0;
 }
-
-static const struct of_device_id ap806_clk_of_match[] = {
-	{ .compatible = "marvell,ap806-cpu-clk", },
-	{}
-};
 
 static struct platform_driver ap806_clk_driver = {
 	.driver	= {
