@@ -34,7 +34,6 @@
 
 #define pr_fmt(fmt) "mvebu-icu: " fmt
 
-#include <linux/cpu_pm.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/irqchip/chained_irq.h>
@@ -43,6 +42,7 @@
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
 #include <linux/irqchip.h>
+#include <linux/syscore_ops.h>
 
 #include <dt-bindings/interrupt-controller/mvebu-icu.h>
 
@@ -325,7 +325,7 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
 
 #ifdef CONFIG_PM_SLEEP
 /* Save ICU generic registers and all ICU interrupt registers */
-static void mvebu_icu_save(void)
+static int mvebu_icu_save(void)
 {
 	int reg;
 	int irq;
@@ -338,6 +338,8 @@ static void mvebu_icu_save(void)
 		for (irq = 0; irq < ICU_MAX_IRQS; irq++)
 			icu->icu_cfg[irq] = readl(icu->base + ICU_INT_CFG(irq));
 	}
+
+	return 0;
 }
 
 /* Restore ICU generic registers and all ICU interrupt registers */
@@ -356,30 +358,16 @@ static void mvebu_icu_restore(void)
 	}
 }
 
-static int mvebu_icu_notifier(struct notifier_block *self, unsigned long cmd, void *v)
-{
-	switch (cmd) {
-	case CPU_PM_ENTER:
-		mvebu_icu_save();
-		break;
-	case CPU_PM_ENTER_FAILED:
-	case CPU_PM_EXIT:
-		mvebu_icu_restore();
-		break;
-	default:
-		break;
-	}
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block mvebu_icu_notifier_block = {
-	.notifier_call = mvebu_icu_notifier,
+static struct syscore_ops mvebu_icu_syscore_ops = {
+	.suspend	= mvebu_icu_save,
+	.resume		= mvebu_icu_restore,
 };
 
 static int __init mvebu_icu_pm_init(void)
 {
-	return cpu_pm_register_notifier(&mvebu_icu_notifier_block);
+	register_syscore_ops(&mvebu_icu_syscore_ops);
+
+	return 0;
 }
 arch_initcall(mvebu_icu_pm_init);
 #endif
