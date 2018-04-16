@@ -1321,7 +1321,7 @@ struct mvpp2_cos {
 
 struct mvpp2_rss {
 	/* MVPP22 2-tuple hash generated upon IPsrc+IPdst */
-	enum { MVPP22_RSS_UDP_5T, MVPP22_RSS_UDP_2T } rss_mode;
+	enum { MVPP22_RSS_5T, MVPP22_RSS_2T } rss_mode;
 	u8 dflt_cpu; /*non-IP packet */
 	u8 rss_en;
 };
@@ -2100,6 +2100,42 @@ static u8 used_hifs;
 
 module_param(queue_mode, int, 0444);
 MODULE_PARM_DESC(queue_mode, "Set queue_mode (single=0, multi=1)");
+
+static short num_cos_queues = 4;
+module_param(num_cos_queues, short, 0444);
+MODULE_PARM_DESC(num_cos_queues, "num_cos_queues 1 or 4");
+
+static bool rss_mode;
+module_param(rss_mode, bool, 0444);
+MODULE_PARM_DESC(rss_mode, "true or false - for 2 or 5 hash tuples");
+
+static short default_cpu;
+module_param(default_cpu, short, 0444);
+MODULE_PARM_DESC(default_cpu, "run on cpu-N when RSS disabled");
+
+static long pri_map = 0x3210;
+module_param(pri_map, long, 0444);
+MODULE_PARM_DESC(pri_map, "0x3210:: cos0:rxq0, cos1:rxq1, cos2:rxq2, cos3:rxq3");
+
+static short default_cos = 3;
+module_param(default_cos, short, 0444);
+MODULE_PARM_DESC(default_cos, "CoS value for non-IP packet");
+
+/* Bind/Map port-id into CPUno written in appropriated port-id-nibble */
+static long rx_cpu_map;
+module_param(rx_cpu_map, long, 0444);
+MODULE_PARM_DESC(rx_cpu_map, "map Port(nibble-shift) into CPUno(nibble-value)");
+
+static u8 cos_classifier;
+/* END ---------- MODULE Extra-params ---------- */
+
+/* High-level User-Interface COS config-parameters */
+#define MVPP2_COS_PARAM_MAX_STRLEN	48
+#define MVPP2_CFG_PARAM_BUF_SIZE	PAGE_SIZE
+
+enum { MVPP2_COS_MODE, MVPP2_COS_DFLT, MVPP2_COS2RXQ };
+
+static const char * const mvpp2_param[] = {"cos_mode", "cos_dflt", "cos2rxq"};
 
 #define MVPP2_DRIVER_NAME "mvpp2"
 #define MVPP2_DRIVER_VERSION "1.0"
@@ -9497,6 +9533,22 @@ static void mvpp2_rx_irqs_setup(struct mvpp2_port *port)
 	}
 }
 
+static void mvpp2_port_init_params(struct mvpp2_port *port)
+{
+	/* CoS init config */
+	port->cos_cfg.cos_classifier = cos_classifier;
+	port->cos_cfg.default_cos = default_cos;
+	port->cos_cfg.num_cos_queues = num_cos_queues;
+	port->cos_cfg.pri_map = pri_map;
+
+	/* RSS init config */
+	port->rss_cfg.dflt_cpu = default_cpu;
+	/* RSS is disabled as default, it can be update when running */
+	port->rss_cfg.rss_en = 0;
+	port->rss_cfg.rss_mode = rss_mode ?
+				MVPP22_RSS_2T : MVPP22_RSS_5T;
+}
+
 /* Initialize port HW */
 static int mvpp2_port_init(struct mvpp2_port *port)
 {
@@ -9832,6 +9884,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	port->rx_ring_size = MVPP2_MAX_RXD_DFLT;
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
+	mvpp2_port_init_params(port);
 	err = mvpp2_port_init(port);
 	if (err < 0) {
 		dev_err(&pdev->dev, "failed to init port %d\n", id);
