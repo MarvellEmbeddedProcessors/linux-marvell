@@ -162,6 +162,8 @@ static int mvebu_comphy_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->comphy_regs))
 		return PTR_ERR(priv->comphy_regs);
 
+	priv->cp_phys = (void *)res->start;
+
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "serdes");
 	priv->comphy_pipe_regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(priv->comphy_pipe_regs))
