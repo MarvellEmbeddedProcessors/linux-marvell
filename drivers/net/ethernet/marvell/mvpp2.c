@@ -100,9 +100,6 @@
 #define    MVPP22_RSS_IDX_ENTRY_NUM_OFF		0
 #define    MVPP22_RSS_IDX_TBL_NUM_OFF		8
 #define    MVPP22_RSS_IDX_RXQ_NUM_OFF		16
-#define     MVPP22_RSS_IDX_TABLE_ENTRY(idx)	(idx)
-#define     MVPP22_RSS_IDX_TABLE(idx)		((idx) << 8)
-#define     MVPP22_RSS_IDX_QUEUE(idx)		((idx) << 16)
 #define MVPP22_RSS_RXQ2RSS_TBL_REG		0x1504
 #define    MVPP22_RSS_RXQ2RSS_TBL_POINT_OFF	0
 #define    MVPP22_RSS_RXQ2RSS_TBL_POINT_MASK	0x7
@@ -1224,8 +1221,6 @@ struct mvpp2_prs_flow_id {
 #define MVPP2_CLS_FLOWS_TBL_DATA_WORDS	3
 #define MVPP2_CLS_FLOWS_TBL_SWAP_IDX	(MVPP2_FLOW_TBL_SIZE - 5)
 #define MVPP2_CLS_LKP_TBL_SIZE		64
-#define MVPP2_CLS_FLOWS_TBL_SIZE	MVPP2_FLOW_TBL_SIZE
-#define MVPP2_CLS_RX_QUEUES		256
 
 /* RSS constants */
 #define MVPP22_RSS_TABLE_ENTRIES	32
@@ -6719,45 +6714,291 @@ static void mvpp2_cls_c2_pbit_tbl_queue_set(struct mvpp2 *priv,
  *		and based on dscp for untagged IP packets;
  * 3: cos based on dscp for IP packets, and based on vlan for non-IP packets
  */
-static int mvpp2_cos_classifier_set(struct mvpp2_port *port,
-				    int cos_mode)
-				    //enum mvpp2_cos_classifier cos_mode)
+static int mvpp2_cos_classifier_set(struct mvpp2_port *port, u8 cos_mode)
 {
+	int index, flow_idx, lkpid, fe_idx, i, flow_entry_rss;
+	struct mvpp2 *priv = port->priv;
+	struct mvpp2_cls_flow_info *flow_info;
+	u32 *p_fe;
+
+	index = 0;
+	while (index < (MVPP2_PRS_FL_LAST - MVPP2_PRS_FL_START)) {
+		lkpid = index + MVPP2_PRS_FL_START;
+		flow_info = &priv->cls_shadow->flow_info[index++];
+
+		/* Prepare a temp table for the lkpid and swap into */
+		if (mvpp2_cls_flow_swap(priv, lkpid, &flow_idx, true))
+			return -EAGAIN;
+
+		/* First, remove the port from original table */
+		flow_idx = MVPP2_FLOW_TBL_SIZE;
+		for (i = MVPP2_COS_TYPE_NUM - 1; i >= 0; i--) {
+			if (!flow_info->flow_entry[i])
+				continue;
+			mvpp2_cls_flow_port_del(priv, flow_info->flow_entry[i],
+						port->id);
+			/* Keep min-index for Swap-back/restore step */
+			flow_idx =
+				min(flow_idx, (int)flow_info->flow_entry[i]);
+		}
+
+		/* Second, set/add the port in original table */
+		fe_idx = -1;
+		p_fe = flow_info->flow_entry;
+		if (mvpp2_prs_flow_id_attr_get(lkpid) &
+		    MVPP2_PRS_FL_ATTR_VLAN_BIT) {
+			if (cos_mode == MVPP2_COS_CLS_VLAN ||
+			    cos_mode == MVPP2_COS_CLS_VLAN_DSCP ||
+			    (cos_mode == MVPP2_COS_CLS_DSCP_VLAN &&
+			     lkpid == MVPP2_PRS_FL_NON_IP_TAG))
+				fe_idx = p_fe[MVPP2_COS_TYPE_VLAN];
+			/* Hanlde NON-IP tagged packet */
+			else if (cos_mode == MVPP2_COS_CLS_DSCP &&
+				 lkpid == MVPP2_PRS_FL_NON_IP_TAG)
+				fe_idx = p_fe[MVPP2_COS_TYPE_DFLT];
+			else if (cos_mode == MVPP2_COS_CLS_DSCP ||
+				 cos_mode == MVPP2_COS_CLS_DSCP_VLAN)
+				fe_idx = p_fe[MVPP2_COS_TYPE_DSCP];
+		} else {
+			if (lkpid == MVPP2_PRS_FL_NON_IP_UNTAG ||
+			    cos_mode == MVPP2_COS_CLS_VLAN)
+				fe_idx = p_fe[MVPP2_COS_TYPE_DFLT];
+			else if (cos_mode == MVPP2_COS_CLS_DSCP ||
+				 cos_mode == MVPP2_COS_CLS_VLAN_DSCP ||
+				 cos_mode == MVPP2_COS_CLS_DSCP_VLAN)
+				fe_idx = p_fe[MVPP2_COS_TYPE_DSCP];
+		}
+		if (fe_idx >= 0)
+			mvpp2_cls_flow_port_add(priv, fe_idx, port->id);
+
+		/* Third, restore lookup table */
+		flow_entry_rss = flow_info->flow_entry_rss1;
+		if (flow_entry_rss)
+			flow_idx = min(flow_idx, flow_entry_rss);
+		flow_entry_rss = flow_info->flow_entry_rss2;
+		if (flow_entry_rss)
+			flow_idx = min(flow_idx, flow_entry_rss);
+		mvpp2_cls_flow_swap(priv, lkpid, &flow_idx, false);
+	}
+
+	/* Update it in priv */
+	port->cos_cfg.cos_classifier = cos_mode;
+
 	return 0;
 }
 
 static void mvpp22_rss_c2_enable(struct mvpp2_port *port, bool en)
 {
+	int lkp_type;
+	u32 idx[MVPP2_CLS_LKP_MAX];
+	struct mvpp2_c2_rule_idx *rule_idx;
+	struct mvpp2 *priv = port->priv;
+	int reg_val;
+
+	rule_idx = &port->priv->c2_shadow->rule_idx_info[port->id];
+
+	/* Get the C2 index from shadow */
+	idx[MVPP2_CLS_LKP_VLAN_PRI] = rule_idx->vlan_pri_idx;
+	idx[MVPP2_CLS_LKP_DSCP_PRI] = rule_idx->dscp_pri_idx;
+	idx[MVPP2_CLS_LKP_DEFAULT] = rule_idx->default_rule_idx;
+
+	/* MVPP2_CLS_LKP_HASH has no corresponding C2 rule, skip it */
+	for (lkp_type = MVPP2_CLS_LKP_VLAN_PRI; lkp_type < MVPP2_CLS_LKP_MAX;
+	     lkp_type++) {
+		/* write index reg */
+		mvpp2_write(priv, MVPP2_CLS2_TCAM_IDX_REG, idx[lkp_type]);
+		/* Update rss_attr in reg CLSC2_ATTR2 */
+		reg_val = mvpp2_read(priv, MVPP2_CLS2_ACT_DUP_ATTR_REG);
+		if (en)
+			reg_val |= MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_MASK;
+		else
+			reg_val &= ~MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_MASK;
+		mvpp2_write(priv, MVPP2_CLS2_ACT_DUP_ATTR_REG, reg_val);
+	}
 }
 
 int mvpp2_update_flow_info(struct mvpp2 *priv)
 {
+	struct mvpp2_cls_flow_info *flow_info;
+	struct mvpp2_cls_lookup_entry le;
+	struct mvpp2_cls_flow_entry fe;
+	int flow_index, lkp_type, prio, is_last, engine, update_rss2;
+	int i, j, cos_type;
+
+	for (i = 0; i < (MVPP2_PRS_FL_LAST - MVPP2_PRS_FL_START); i++) {
+		is_last = 0;
+		update_rss2 = 0;
+		flow_info = &priv->cls_shadow->flow_info[i];
+		mvpp2_cls_lookup_read(priv, MVPP2_PRS_FL_START + i, 0, &le);
+		mvpp2_cls_sw_lkp_flow_get(&le, &flow_index);
+
+		for (j = 0; is_last == 0; j++) {
+			mvpp2_cls_flow_read(priv, flow_index + j, &fe);
+			mvpp2_cls_sw_flow_engine_get(&fe, &engine, &is_last);
+			mvpp2_cls_sw_flow_extra_get(&fe, &lkp_type, &prio);
+
+			if (lkp_type == MVPP2_CLS_LKP_HASH) {
+				if (!update_rss2) {
+					flow_info->flow_entry_rss1 =
+								flow_index + j;
+					update_rss2 = 1;
+				} else {
+					flow_info->flow_entry_rss2 =
+								flow_index + j;
+				}
+				continue;
+			}
+
+			cos_type = MVPP2_COS_TYPE_DFLT;
+			if (lkp_type == MVPP2_CLS_LKP_VLAN_PRI)
+				cos_type = MVPP2_COS_TYPE_VLAN;
+			else if (lkp_type == MVPP2_CLS_LKP_DSCP_PRI)
+				cos_type = MVPP2_COS_TYPE_DSCP;
+			flow_info->flow_entry[cos_type] = flow_index + j;
+		}
+	}
 	return 0;
 }
 
 /* Update RSS hash mode for non-fragemnted UDP packet per port */
 static int mvpp22_rss_udp_mode_set(struct mvpp2_port *port, int rss_mode)
 {
+	int index, flow_idx, flow_idx_rss, lkpid, lkpid_attr;
+	int data[MVPP2_COS_TYPE_NUM], j;
+	struct mvpp2 *priv = port->priv;
+	struct mvpp2_cls_flow_info *flow_info;
+	int err;
+
+	err = mvpp2_update_flow_info(priv);
+	if (err) {
+		netdev_err(port->dev, "cannot update flow info\n");
+		return err;
+	}
+
+	if (rss_mode != MVPP22_RSS_2T &&
+	    rss_mode != MVPP22_RSS_5T) {
+		pr_err("Invalid rss mode:%d\n", rss_mode);
+		return -EINVAL;
+	}
+
+	index = 0;
+	while (index < (MVPP2_PRS_FL_LAST - MVPP2_PRS_FL_START)) {
+		lkpid = index + MVPP2_PRS_FL_START;
+		flow_info = &priv->cls_shadow->flow_info[index++];
+		data[0] = MVPP2_FLOW_TBL_SIZE;
+		data[1] = MVPP2_FLOW_TBL_SIZE;
+		data[2] = MVPP2_FLOW_TBL_SIZE;
+		/* Get lookup ID attribute */
+		lkpid_attr = mvpp2_prs_flow_id_attr_get(lkpid);
+		/* Only non-frag TCP & UDP can set rss mode */
+		if ((lkpid_attr &
+		     (MVPP2_PRS_FL_ATTR_TCP_BIT | MVPP2_PRS_FL_ATTR_UDP_BIT)) &&
+		    !(lkpid_attr & MVPP2_PRS_FL_ATTR_FRAG_BIT)) {
+			/* Prepare a temp table for the lkpid and swap into */
+			if (mvpp2_cls_flow_swap(priv, lkpid, &flow_idx, true))
+				return -EAGAIN;
+
+			/* First, remove the port from original table */
+			mvpp2_cls_flow_port_del(priv,
+						flow_info->flow_entry_rss1,
+						port->id);
+			mvpp2_cls_flow_port_del(priv,
+						flow_info->flow_entry_rss2,
+						port->id);
+
+			/* Second, update port's original table */
+			if (rss_mode == MVPP22_RSS_2T)
+				flow_idx_rss = flow_info->flow_entry_rss1;
+			else
+				flow_idx_rss = flow_info->flow_entry_rss2;
+
+			mvpp2_cls_flow_port_add(priv, flow_idx_rss, port->id);
+
+			/*Find the ptr of flow table as min flow index */
+			for (j = 0; j < MVPP2_COS_TYPE_NUM; j++) {
+				if (!flow_info->flow_entry[j])
+					continue;
+				data[j] = flow_info->flow_entry[j];
+			}
+			flow_idx_rss = min(flow_info->flow_entry_rss1,
+					   flow_info->flow_entry_rss2);
+			flow_idx = min(min(data[0], data[1]),
+				       min(data[2], flow_idx_rss));
+			/*Third, restore lookup table */
+			mvpp2_cls_flow_swap(priv, lkpid, &flow_idx, false);
+
+		} else if (flow_info->flow_entry_rss1) {
+			flow_idx_rss = flow_info->flow_entry_rss1;
+			mvpp2_cls_flow_port_add(priv, flow_idx_rss, port->id);
+		}
+	}
+	/* Record it in priv */
+	port->rss_cfg.rss_mode = rss_mode;
+
 	return 0;
 }
 
 /* Update the default CPU to handle the non-IP packets */
 static int mvpp22_rss_default_cpu_set(struct mvpp2_port *port, int default_cpu)
 {
+	u8 index, queue, q_cpu_mask;
+	u32 cpu_width, cos_width;
+	struct mvpp2 *priv = port->priv;
+
+	if (!(*cpumask_bits(cpu_online_mask) & (1 << default_cpu)))
+		return -EINVAL;
+
+	/* Calculate width */
+	mvpp2_width_calc(port, &cpu_width, &cos_width);
+	q_cpu_mask = (1 << cpu_width) - 1;
+
+	/* Update LSB[cpu_width + cos_width - 1 : cos_width]
+	 * of queue (queue high and low) on c2 rule.
+	 */
+	index = priv->c2_shadow->rule_idx_info[port->id].default_rule_idx;
+	queue = mvpp2_cls_c2_rule_queue_get(priv, index);
+	queue &= ~(q_cpu_mask << cos_width);
+	queue |= (default_cpu << cos_width);
+	mvpp2_cls_c2_rule_queue_set(priv, index, queue);
+
+	/* Update LSB[cpu_width + cos_width - 1 : cos_width]
+	 * of queue on pbit table, table id equals to port id
+	 */
+	for (index = 0; index < MVPP2_QOS_TBL_LINE_NUM_PRI; index++) {
+		queue = mvpp2_cls_c2_pbit_tbl_queue_get(priv, port->id, index);
+		queue &= ~(q_cpu_mask << cos_width);
+		queue |= (default_cpu << cos_width);
+		mvpp2_cls_c2_pbit_tbl_queue_set(priv, port->id, index, queue);
+	}
+	/* Update default cpu in cfg */
+	port->rss_cfg.dflt_cpu = default_cpu;
+
 	return 0;
 }
 
-static int mvpp22_rss_enable(struct mvpp2_port *port, bool en, bool set)
+static int mvpp22_rss_enable(struct mvpp2_port *port, bool en, bool from_open)
 {
-	int ret = 0;
+	int ret;
 
-	if (!ret)
-		return ret;
-	if (en)
-		ret = mvpp22_rss_default_cpu_set(port, 0);
-	else
+	if (from_open) {
+		if (!en)
+			return 0; /* mvpp2_cls_c2_rule_set already done */
+	} else {
+		if (port->rss_cfg.rss_en == en)
+			return 0;
 		mvpp22_rss_c2_enable(port, en);
-	ret = mvpp2_cls_c2_rule_set(port, mvpp2_cpu2rxq(port));
+		port->rss_cfg.rss_en = en;
+	}
+
+	if (en)
+		ret = mvpp22_rss_default_cpu_set(port, port->rss_cfg.dflt_cpu);
+	else
+		ret = mvpp2_cls_c2_rule_set(port, mvpp2_cpu2rxq(port));
+	if (ret) {
+		port->rss_cfg.rss_en = !en;
+		netdev_err(port->dev, "RSS %s failed on port(%d)\n",
+			   en ? "enable" : "disable", port->id);
+	}
 	return ret;
 }
 
@@ -10074,6 +10315,30 @@ static bool mvpp22_rss_is_supported(void)
 /* Allocate a rss table for each phisical rxq having same cos priority */
 static int mvpp22_rss_rxq_set(struct mvpp2_port *port)
 {
+	u32 cpu_width, cos_width, cos_mask;
+	unsigned int reg_val;
+	int rxq, rxq_idx, tbl_ptr, err;
+
+	/* Calculate width */
+	err = mvpp2_width_calc(port, &cpu_width, &cos_width);
+	if (err)
+		return err;
+	cos_mask = ((1 << cos_width) - 1);
+
+	for (rxq = 0; rxq < port->nrxqs; rxq++) {
+		rxq_idx = port->rxqs[rxq]->id;
+		tbl_ptr = rxq_idx & cos_mask;
+
+		/* rss_tbl_entry_set - access by Pointer */
+		/* Write index */
+		reg_val = rxq_idx << MVPP22_RSS_IDX_RXQ_NUM_OFF;
+		mvpp2_write(port->priv, MVPP22_RSS_IDX_REG, reg_val);
+		/* Write entry */
+		reg_val &= (~MVPP22_RSS_RXQ2RSS_TBL_POINT_MASK);
+		reg_val |= tbl_ptr << MVPP22_RSS_RXQ2RSS_TBL_POINT_OFF;
+		mvpp2_write(port->priv, MVPP22_RSS_RXQ2RSS_TBL_REG, reg_val);
+	}
+
 	return 0;
 }
 
@@ -10092,61 +10357,62 @@ static inline u32 mvpp22_rxfh_indir(struct mvpp2_port *port, u32 rxq)
 
 static void mvpp22_rss_rxfh_indir_init(struct mvpp2 *priv)
 {
+	int i;
+
+	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++)
+		priv->indir[i] = i % num_online_cpus();
 }
 
+/* Translate CPU sequence number to real CPU ID */
+static int mvpp22_cpu_id_from_indir_get(struct mvpp2_port *port, int entry)
+{
+	u32 i, seq = 0;
+	u32 cpu_seq = port->priv->indir[entry];
+
+	for (i = 0; i < num_present_cpus(); i++) {
+		if ((*cpumask_bits(cpu_online_mask)) & (1 << i)) {
+			if (i == cpu_seq)
+				return i;
+			seq++;
+		}
+	}
+	return -1;
+}
+
+/*  Set the RSS table according to CPU weight from ethtool */
 static int mvpp22_rss_rxfh_indir_set(struct mvpp2_port *port)
 {
-	struct mvpp2 *priv = port->priv;
-	int i;
-	u32 table = 0;
+	int tbl_id, entry, width, rxq;
+	u32 cos_width, cpu_width, cpu_id;
+	int num_cos_queues = port->cos_cfg.num_cos_queues;
+	u32 reg_val;
 
-	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++) {
-		u32 sel = MVPP22_RSS_IDX_TABLE(table) |
-			  MVPP22_RSS_IDX_TABLE_ENTRY(i);
-		mvpp2_write(priv, MVPP22_RSS_IDX_REG, sel);
+	/* Calculate cpu and cos width */
+	mvpp2_width_calc(port, &cpu_width, &cos_width);
+	width = cos_width + cpu_width;
 
-		mvpp2_write(priv, MVPP22_RSS_TBL_ENTRY_REG,
-			    mvpp22_rxfh_indir(port, port->indir[i]));
+	for (tbl_id = 0; tbl_id < num_cos_queues; tbl_id++) {
+		for (entry = 0; entry < MVPP22_RSS_TABLE_ENTRIES; entry++) {
+			cpu_id = mvpp22_cpu_id_from_indir_get(port, entry);
+			if (cpu_id < 0)
+				return -EINVAL;
+			/* rss_tbl_entry_set - access by Entry */
+			/* Write index */
+			reg_val = (entry << MVPP22_RSS_IDX_ENTRY_NUM_OFF |
+				   tbl_id << MVPP22_RSS_IDX_TBL_NUM_OFF);
+			mvpp2_write(port->priv, MVPP22_RSS_IDX_REG, reg_val);
+			/* Write entry */
+			reg_val &= ~MVPP22_RSS_TBL_ENTRY_MASK;
+			rxq = (cpu_id << cos_width) | tbl_id;
+			reg_val |= (rxq << MVPP22_RSS_TBL_ENTRY_OFF);
+			mvpp2_write(port->priv, MVPP22_RSS_TBL_ENTRY_REG,
+				    reg_val);
+			reg_val &= ~MVPP22_RSS_WIDTH_MASK;
+			reg_val |= (width << MVPP22_RSS_WIDTH_OFF);
+			mvpp2_write(port->priv, MVPP22_RSS_WIDTH_REG, reg_val);
+		}
 	}
 	return 0;
-}
-
-static int mvpp22_init_rss(struct mvpp2_port *port)
-{
-	struct mvpp2 *priv = port->priv;
-	int i, err;
-
-	/* Set the table width: replace the whole classifier Rx queue number
-	 * with the ones configured in RSS table entries.
-	 */
-	mvpp2_write(priv, MVPP22_RSS_IDX_REG, MVPP22_RSS_IDX_TABLE(0));
-	mvpp2_write(priv, MVPP22_RSS_WIDTH_REG, 8);
-
-	/* Loop through the classifier Rx Queues and map them to a RSS table.
-	 * Map them all to the first table (0) by default.
-	 */
-	for (i = 0; i < MVPP2_CLS_RX_QUEUES; i++)
-		mvpp2_write(priv, MVPP22_RSS_IDX_REG, MVPP22_RSS_IDX_QUEUE(i));
-
-	/* Configure the first table to evenly distribute the packets across
-	 * real Rx Queues. The table entries map a hash to a port Rx Queue.
-	 */
-	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++)
-		port->indir[i] = ethtool_rxfh_indir_default(i, port->nrxqs);
-
-	err = mvpp22_rss_udp_mode_set(port, 0);
-	if (err) {
-		netdev_err(port->dev, "cannot set rss mode\n");
-		return err;
-	}
-	err = mvpp22_rss_rxfh_indir_set(port);
-	if (err) {
-		netdev_err(port->dev, "cannot init rss rxfh indir\n");
-		return err;
-	}
-	err = mvpp22_rss_enable(port, 0, false);
-
-	return err;
 }
 
 static int mvpp2_open_prs_cls_rss(struct net_device *dev)
@@ -10184,7 +10450,7 @@ static int mvpp2_open_prs_cls_rss(struct net_device *dev)
 	}
 
 	/* Set CoS classifier */
-	err = mvpp2_cos_classifier_set(port, 0/*cos_classifier value*/);
+	err = mvpp2_cos_classifier_set(port, port->cos_cfg.cos_classifier);
 	if (err) {
 		netdev_err(port->dev, "cannot set cos classifier\n");
 		return err;
@@ -10206,7 +10472,18 @@ static int mvpp2_open_prs_cls_rss(struct net_device *dev)
 	if (!mvpp22_rss_is_supported())
 		return 0;
 
-	err = mvpp22_init_rss(port);
+	/* RSS start */
+	err = mvpp22_rss_udp_mode_set(port, port->rss_cfg.rss_mode);
+	if (err) {
+		netdev_err(port->dev, "cannot set rss mode\n");
+		return err;
+	}
+	err = mvpp22_rss_rxfh_indir_set(port);
+	if (err) {
+		netdev_err(port->dev, "cannot init rss rxfh indir\n");
+		return err;
+	}
+	err = mvpp22_rss_enable(port, port->rss_cfg.rss_en, true);
 
 	return err;
 }
@@ -11611,6 +11888,9 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 	err = mvpp2_cls_init(pdev, priv);
 	if (err < 0)
 		goto end;
+	err = mvpp2_c2_init(pdev, priv);
+	if (err < 0)
+		goto end;
 
 	/* Disable all existing ingress queues */
 	mvpp2_rxq_disable_all(priv);
@@ -11939,22 +12219,3 @@ module_platform_driver(mvpp2_driver);
 MODULE_DESCRIPTION("Marvell PPv2 Ethernet Driver - www.marvell.com");
 MODULE_AUTHOR("Marcin Wojtas <mw@semihalf.com>");
 MODULE_LICENSE("GPL v2");
-
-/* Temporary, avoiding compile warning "defined but not used" */
-void mvpp2_defined_but_not_used(void)
-{
-	void *p;
-
-	p = (void *)mvpp2_width_calc;
-	p = (void *)mvpp2_cls_sw_lkp_flow_get;
-	p = (void *)mvpp2_cls_sw_flow_engine_get;
-	p = (void *)mvpp2_cls_sw_flow_extra_get;
-	p = (void *)mvpp2_cls_flow_port_add;
-	p = (void *)mvpp2_cls_flow_port_del;
-	p = (void *)mvpp2_cls_flow_swap;
-	p = (void *)mvpp2_c2_init;
-	p = (void *)mvpp2_cls_c2_rule_queue_get;
-	p = (void *)mvpp2_cls_c2_rule_queue_set;
-	p = (void *)mvpp2_cls_c2_pbit_tbl_queue_get;
-	p = (void *)mvpp2_cls_c2_pbit_tbl_queue_set;
-}
