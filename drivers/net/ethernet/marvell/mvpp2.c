@@ -96,14 +96,22 @@
 #define     MVPP2_PRS_TCAM_EN_MASK		BIT(0)
 
 /* RSS Registers */
-#define MVPP22_RSS_INDEX			0x1500
-#define     MVPP22_RSS_INDEX_TABLE_ENTRY(idx)	(idx)
-#define     MVPP22_RSS_INDEX_TABLE(idx)		((idx) << 8)
-#define     MVPP22_RSS_INDEX_QUEUE(idx)		((idx) << 16)
-#define MVPP22_RSS_TABLE_ENTRY			0x1508
-#define MVPP22_RSS_TABLE			0x1510
-#define     MVPP22_RSS_TABLE_POINTER(p)		(p)
-#define MVPP22_RSS_WIDTH			0x150c
+#define MVPP22_RSS_IDX_REG			0x1500
+#define    MVPP22_RSS_IDX_ENTRY_NUM_OFF		0
+#define    MVPP22_RSS_IDX_TBL_NUM_OFF		8
+#define    MVPP22_RSS_IDX_RXQ_NUM_OFF		16
+#define     MVPP22_RSS_IDX_TABLE_ENTRY(idx)	(idx)
+#define     MVPP22_RSS_IDX_TABLE(idx)		((idx) << 8)
+#define     MVPP22_RSS_IDX_QUEUE(idx)		((idx) << 16)
+#define MVPP22_RSS_RXQ2RSS_TBL_REG		0x1504
+#define    MVPP22_RSS_RXQ2RSS_TBL_POINT_OFF	0
+#define    MVPP22_RSS_RXQ2RSS_TBL_POINT_MASK	0x7
+#define MVPP22_RSS_TBL_ENTRY_REG		0x1508
+#define    MVPP22_RSS_TBL_ENTRY_OFF		0
+#define    MVPP22_RSS_TBL_ENTRY_MASK		0xff
+#define MVPP22_RSS_WIDTH_REG			0x150c
+#define    MVPP22_RSS_WIDTH_OFF			0
+#define    MVPP22_RSS_WIDTH_MASK		0xf
 
 /* Classifier Registers */
 #define MVPP2_CLS_MODE_REG			0x1800
@@ -125,6 +133,162 @@
 #define MVPP2_CLS_SWFWD_P2HQ_REG(port)		(0x19b0 + ((port) * 4))
 #define MVPP2_CLS_SWFWD_PCTRL_REG		0x19d0
 #define     MVPP2_CLS_SWFWD_PCTRL_MASK(port)	(1 << (port))
+
+/* Classifier C2 Engine Registers */
+#define MVPP2_CLS2_TCAM_IDX_REG			0x1B00
+#define MVPP2_CLS2_TCAM_DATA_REG(idx)		(0x1B10 + (idx) * 4)
+#define MVPP2_CLS2_TCAM_INV_REG			0x1B24
+#define MVPP2_CLS2_TCAM_INV_INVALID_OFF		31
+#define MVPP2_CLS2_TCAM_INV_INVALID_MASK	BIT(31)
+#define MVPP2_CLS2_ACT_DATA_REG			0x1B30
+#define MVPP2_CLS2_ACT_DATA_TBL_ID_OFF		0
+#define MVPP2_CLS2_ACT_DATA_TBL_ID_MASK		0x3F
+#define MVPP2_CLS2_ACT_DATA_TBL_SEL_OFF		6
+#define MVPP2_CLS2_ACT_DATA_TBL_SEL_MASK	BIT(6)
+#define MVPP2_CLS2_ACT_DATA_TBL_PRI_DSCP_OFF	7
+#define MVPP2_CLS2_ACT_DATA_TBL_PRI_DSCP_MASK	BIT(7)
+#define MVPP2_CLS2_ACT_DATA_TBL_GEM_ID_OFF	8
+#define MVPP2_CLS2_ACT_DATA_TBL_GEM_ID_MASK	BIT(8)
+#define MVPP2_CLS2_ACT_DATA_TBL_LOW_Q_OFF	9
+#define MVPP2_CLS2_ACT_DATA_TBL_LOW_Q_MASK	BIT(9)
+#define MVPP2_CLS2_ACT_DATA_TBL_HIGH_Q_OFF	10
+#define MVPP2_CLS2_ACT_DATA_TBL_HIGH_Q_MASK	BIT(10)
+#define MVPP2_CLS2_ACT_DATA_TBL_COLOR_OFF	11
+#define MVPP2_CLS2_ACT_DATA_TBL_COLOR_MASK	BIT(11)
+#define MVPP2_CLS2_DSCP_PRI_INDEX_REG		0x1B40
+#define MVPP2_CLS2_DSCP_PRI_INDEX_LINE_OFF	0
+#define MVPP2_CLS2_DSCP_PRI_INDEX_LINE_BITS	6
+#define MVPP2_CLS2_DSCP_PRI_INDEX_LINE_MASK	0x0000003f
+#define MVPP2_CLS2_DSCP_PRI_INDEX_SEL_OFF	6
+#define MVPP2_CLS2_DSCP_PRI_INDEX_SEL_MASK	BIT(6)
+#define MVPP2_CLS2_DSCP_PRI_INDEX_TBL_ID_OFF	8
+#define MVPP2_CLS2_DSCP_PRI_INDEX_TBL_ID_BITS	6
+#define MVPP2_CLS2_DSCP_PRI_INDEX_TBL_ID_MASK	0x00003f00
+#define MVPP2_CLS2_QOS_TBL_REG			0x1B44
+#define MVPP2_CLS2_QOS_TBL_PRI_OFF		0
+#define MVPP2_CLS2_QOS_TBL_PRI_BITS		3
+#define MVPP2_CLS2_QOS_TBL_PRI_MASK		0x00000007
+#define MVPP2_CLS2_QOS_TBL_DSCP_OFF		3
+#define MVPP2_CLS2_QOS_TBL_DSCP_BITS		6
+#define MVPP2_CLS2_QOS_TBL_DSCP_MASK		0x000001f8
+#define MVPP2_CLS2_QOS_TBL_COLOR_OFF		9
+#define MVPP2_CLS2_QOS_TBL_COLOR_BITS		3
+#define MVPP2_CLS2_QOS_TBL_COLOR_MASK		0x00000e00
+#define MVPP2_CLS2_QOS_TBL_GEMPORT_OFF		12
+#define MVPP2_CLS2_QOS_TBL_GEMPORT_BITS		12
+#define MVPP2_CLS2_QOS_TBL_GEMPORT_MASK		0x00fff000
+#define MVPP2_CLS2_QOS_TBL_QUEUENUM_OFF		24
+#define MVPP2_CLS2_QOS_TBL_QUEUENUM_BITS	8
+#define MVPP2_CLS2_QOS_TBL_QUEUENUM_MASK	0xff000000
+#define MVPP2_CLS2_HIT_CTR_REG			0x1B50
+#define MVPP2_CLS2_HIT_CTR_OFF			0
+#define MVPP2_CLS2_HIT_CTR_BITS			32
+#define MVPP2_CLS2_HIT_CTR_MASK			0xffffffff
+#define MVPP2_CLS2_HIT_CTR_CLR_REG		0x1B54
+#define MVPP2_CLS2_HIT_CTR_CLR_CLR_OFF		0
+#define MVPP2_CLS2_HIT_CTR_CLR_CLR_MASK		BIT(0)
+#define MVPP2_CLS2_HIT_CTR_CLR_DONE_OFF		1
+#define MVPP2_CLS2_HIT_CTR_CLR_DONE_MASK	BIT(1)
+#define MVPP2_CLS2_ACT_REG			0x1B60
+#define MVPP2_CLS2_ACT_COLOR_OFF		0
+#define MVPP2_CLS2_ACT_COLOR_BITS		3
+#define MVPP2_CLS2_ACT_COLOR_MASK		0x00000007
+#define MVPP2_CLS2_ACT_PRI_OFF			3
+#define MVPP2_CLS2_ACT_PRI_BITS			2
+#define MVPP2_CLS2_ACT_PRI_MASK			0x00000018
+#define MVPP2_CLS2_ACT_DSCP_OFF			5
+#define MVPP2_CLS2_ACT_DSCP_BITS		2
+#define MVPP2_CLS2_ACT_DSCP_MASK		0x00000060
+#define MVPP2_CLS2_ACT_GEM_OFF			7
+#define MVPP2_CLS2_ACT_GEM_BITS			2
+#define MVPP2_CLS2_ACT_GEM_MASK			0x00000180
+#define MVPP2_CLS2_ACT_QL_OFF			9
+#define MVPP2_CLS2_ACT_QL_BITS			2
+#define MVPP2_CLS2_ACT_QL_MASK			0x00000600
+#define MVPP2_CLS2_ACT_QH_OFF			11
+#define MVPP2_CLS2_ACT_QH_BITS			2
+#define MVPP2_CLS2_ACT_QH_MASK			0x00001800
+#define MVPP2_CLS2_ACT_FRWD_OFF			13
+#define MVPP2_CLS2_ACT_FRWD_BITS		3
+#define MVPP2_CLS2_ACT_FRWD_MASK		0x0000e000
+#define MVPP2_CLS2_ACT_PLCR_OFF			16
+#define MVPP2_CLS2_ACT_PLCR_BITS		2
+#define MVPP2_CLS2_ACT_PLCR_MASK		0x00030000
+#define MVPP2_CLS2_ACT_FLD_EN_OFF		18
+#define MVPP2_CLS2_ACT_FLD_EN_BITS		1
+#define MVPP2_CLS2_ACT_FLD_EN_MASK		0x00040000
+#define MVPP2_CLS2_ACT_RSS_OFF			19
+#define MVPP2_CLS2_ACT_RSS_BITS			2
+#define MVPP2_CLS2_ACT_RSS_MASK			0x00180000
+#define MVPP2_CLS2_ACT_QOS_ATTR_REG		0x1B64
+#define MVPP2_CLS2_ACT_QOS_ATTR_PRI_OFF		0
+#define MVPP2_CLS2_ACT_QOS_ATTR_PRI_BITS	3
+#define MVPP2_CLS2_ACT_QOS_ATTR_PRI_MASK	0x00000007
+#define MVPP2_CLS2_ACT_QOS_ATTR_PRI_MAX		\
+				((1 << MVPP2_CLS2_ACT_QOS_ATTR_PRI_BITS) - 1)
+#define MVPP2_CLS2_ACT_QOS_ATTR_DSCP_OFF	3
+#define MVPP2_CLS2_ACT_QOS_ATTR_DSCP_BITS	6
+#define MVPP2_CLS2_ACT_QOS_ATTR_DSCP_MASK	0x000001f8
+#define MVPP2_CLS2_ACT_QOS_ATTR_DSCP_MAX	\
+				((1 << MVPP2_CLS2_ACT_QOS_ATTR_DSCP_BITS) - 1)
+#define MVPP2_CLS2_ACT_QOS_ATTR_GEM_OFF		9
+#define MVPP2_CLS2_ACT_QOS_ATTR_GEM_BITS	12
+#define MVPP2_CLS2_ACT_QOS_ATTR_GEM_MASK	0x001ffe00
+#define MVPP2_CLS2_ACT_QOS_ATTR_GEM_MAX		\
+				((1 << MVPP2_CLS2_ACT_QOS_ATTR_GEM_BITS) - 1)
+#define MVPP2_CLS2_ACT_QOS_ATTR_QL_OFF		21
+#define MVPP2_CLS2_ACT_QOS_ATTR_QL_BITS		3
+#define MVPP2_CLS2_ACT_QOS_ATTR_QL_MASK		0x00e00000
+#define MVPP2_CLS2_ACT_QOS_ATTR_QH_OFF		24
+#define MVPP2_CLS2_ACT_QOS_ATTR_QH_BITS		5
+#define MVPP2_CLS2_ACT_QOS_ATTR_QH_MASK		0x1f000000
+#define MVPP2_CLS2_ACT_HWF_ATTR_REG		0x1B68
+#define MVPP2_CLS2_ACT_HWF_ATTR_DPTR_OFF	1
+#define MVPP2_CLS2_ACT_HWF_ATTR_DPTR_BITS	15
+#define MVPP2_CLS2_ACT_HWF_ATTR_DPTR_MASK	0x0000fffe
+#define MVPP2_CLS2_ACT_HWF_ATTR_DPTR_MAX	\
+				((1 << MVPP2_CLS2_ACT_HWF_ATTR_DPTR_BITS) - 1)
+#define MVPP2_CLS2_ACT_HWF_ATTR_IPTR_OFF	16
+#define MVPP2_CLS2_ACT_HWF_ATTR_IPTR_BITS	8
+#define MVPP2_CLS2_ACT_HWF_ATTR_IPTR_MASK	0x00ff0000
+#define MVPP2_CLS2_ACT_HWF_ATTR_IPTR_MAX	\
+				((1 << MVPP2_CLS2_ACT_HWF_ATTR_IPTR_BITS) - 1)
+#define MVPP2_CLS2_ACT_HWF_ATTR_L4CHK_OFF	24
+#define MVPP2_CLS2_ACT_HWF_ATTR_L4CHK_BITS	1
+#define MVPP2_CLS2_ACT_HWF_ATTR_L4CHK_MASK	0x01000000
+#define MVPP2_CLS2_ACT_HWF_ATTR_MTUIDX_OFF	25
+#define MVPP2_CLS2_ACT_HWF_ATTR_MTUIDX_BITS	4
+#define MVPP2_CLS2_ACT_HWF_ATTR_MTUIDX_MASK	0x1e000000
+#define MVPP2_CLS2_ACT_DUP_ATTR_REG		0x1B6C
+#define MVPP2_CLS2_ACT_DUP_ATTR_DUPID_OFF	0
+#define MVPP2_CLS2_ACT_DUP_ATTR_DUPID_BITS	8
+#define MVPP2_CLS2_ACT_DUP_ATTR_DUPID_MASK	0x000000ff
+#define MVPP2_CLS2_ACT_DUP_ATTR_DUPCNT_OFF	8
+#define MVPP2_CLS2_ACT_DUP_ATTR_DUPCNT_BITS	4
+#define MVPP2_CLS2_ACT_DUP_ATTR_DUPCNT_MASK	0x00000f00
+#define MVPP2_CLS2_ACT_DUP_ATTR_PLCRID_OFF	24
+#define MVPP2_CLS2_ACT_DUP_ATTR_PLCRID_BITS	5
+#define MVPP2_CLS2_ACT_DUP_ATTR_PLCRID_MASK	0x1f000000
+#define MVPP2_CLS2_ACT_DUP_ATTR_PLCRBK_OFF	29
+#define MVPP2_CLS2_ACT_DUP_ATTR_PLCRBK_BITS	1
+#define MVPP2_CLS2_ACT_DUP_ATTR_PLCRBK_MASK	0x20000000
+#define MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_OFF	30
+#define MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_BITS	1
+#define MVPP2_CLS2_ACT_DUP_ATTR_RSSEN_MASK	0x40000000
+#define MVPP2_CLS2_TCAM_CFG0_REG		0x1b80
+#define MVPP2_CLS2_TCAM_CFG0_EN_OFF		0
+#define MVPP2_CLS2_TCAM_CFG0_EN_MASK		0x00000001
+#define MVPP2_CLS2_TCAM_CFG0_SIZE_OFF		1
+#define MVPP2_CLS2_TCAM_CFG0_SIZE_MASK		0x0000001e
+#define MVPP2_CLS2_TCAM_CTRL_REG		0x1B90
+#define MVPP2_CLS2_TCAM_CTRL_EN_OFF		0
+#define MVPP2_CLS2_TCAM_CTRL_EN_MASK		0x0000001
+
+/* Classifier C2 QOS Table (DSCP/PRI Table) */
+#define MVPP2_QOS_TBL_LINE_NUM_PRI		8
+#define MVPP2_QOS_TBL_NUM_PRI			64
+#define MVPP2_QOS_TBL_LINE_NUM_DSCP		64
+#define MVPP2_QOS_TBL_NUM_DSCP			8
 
 /* Descriptor Manager Top Registers */
 #define MVPP2_RXQ_NUM_REG			0x2040
@@ -775,6 +939,7 @@ enum mvpp2_tag_type {
 #define MVPP2_PRS_RI_L3_BCAST			(BIT(15) | BIT(16))
 #define MVPP2_PRS_RI_IP_FRAG_MASK		0x20000
 #define MVPP2_PRS_RI_IP_FRAG_TRUE		BIT(17)
+#define MVPP2_PRS_RI_IP_FRAG_FALSE		0
 #define MVPP2_PRS_RI_UDF3_MASK			0x300000
 #define MVPP2_PRS_RI_UDF3_RX_SPECIAL		BIT(21)
 #define MVPP2_PRS_RI_L4_PROTO_MASK		0x1c00000
@@ -801,6 +966,117 @@ enum mvpp2_tag_type {
 #define MVPP2_PRS_UNTAGGED		false
 #define MVPP2_PRS_EDSA			true
 #define MVPP2_PRS_DSA			false
+
+/* lkpid table structure	*/
+#define MVPP2_FLOWID_RXQ_OFFS		0
+#define MVPP2_FLOWID_RXQ_MASK		0xff
+
+#define MVPP2_FLOWID_FLOW		16
+#define MVPP2_FLOWID_FLOW_BITS		9
+#define MVPP2_FLOWID_FLOW_MASK		(((1 << \
+			MVPP2_FLOWID_FLOW_BITS) - 1) << MVPP2_FLOWID_FLOW)
+
+#define MVPP2_FLOWID_EN_OFFS		25 /*one bit */
+#define MVPP2_FLOWID_EN_MASK		BIT(MVPP2_FLOWID_EN_OFFS)
+
+/* flow table structure */
+#define MVPP2_FLOW_TBL_SIZE		512
+/*-------------------------  DWORD 0  --------------------------------- */
+#define MVPP2_FLOW_LAST			0
+#define MVPP2_FLOW_LAST_MASK		1 /*one bit*/
+
+#define MVPP2_FLOW_ENGINE		1
+#define MVPP2_FLOW_ENGINE_BITS		3
+#define MVPP2_FLOW_ENGINE_MASK		(((1 << \
+			MVPP2_FLOW_ENGINE_BITS) - 1) << MVPP2_FLOW_ENGINE)
+#define MVPP2_FLOW_ENGINE_MAX		7 /* valid value 1 - 7 */
+
+#define MVPP2_FLOW_PORT_ID		4
+#define MVPP2_FLOW_PORT_ID_BITS		8
+#define MVPP2_FLOW_PORT_ID_MASK		(((1 << \
+			MVPP2_FLOW_PORT_ID_BITS) - 1) << MVPP2_FLOW_PORT_ID)
+#define MVPP2_FLOW_PORT_ID_MAX		((1 << MVPP2_FLOW_PORT_ID_BITS) - 1)
+
+#define MVPP2_FLOW_PORT_TYPE		12
+#define MVPP2_FLOW_PORT_TYPE_BITS	2
+#define MVPP2_FLOW_PORT_TYPE_MASK	(((1 << \
+		MVPP2_FLOW_PORT_TYPE_BITS) - 1) << MVPP2_FLOW_PORT_TYPE)
+#define MVPP2_FLOW_PORT_TYPE_MAX	2 /* valid value 0 - 2 */
+
+#define MVPP2_FLOW_PPPOE		14
+#define MVPP2_FLOW_PPPOE_BITS		2
+#define MVPP2_FLOW_PPPOE_MASK		(((1 << \
+			MVPP2_FLOW_PPPOE_BITS) - 1) << MVPP2_FLOW_PPPOE)
+#define MVPP2_FLOW_PPPOE_MAX		2 /* valid value 0 - 2 */
+
+#define MVPP2_FLOW_VLAN			16
+#define MVPP2_FLOW_VLAN_BITS		3
+#define MVPP2_FLOW_VLAN_MASK		(((1 << \
+			MVPP2_FLOW_VLAN_BITS) - 1) << MVPP2_FLOW_VLAN)
+#define MVPP2_FLOW_VLAN_MAX		((1 << MVPP2_FLOW_VLAN_BITS) - 1)
+
+#define MVPP2_FLOW_MACME		19
+#define MVPP2_FLOW_MACME_BITS		2
+#define MVPP2_FLOW_MACME_MASK		(((1 << \
+			MVPP2_FLOW_MACME_BITS) - 1) << MVPP2_FLOW_MACME)
+#define MVPP2_FLOW_MACME_MAX		2 /* valid value 0 - 2 */
+
+#define MVPP2_FLOW_UDF7			21
+#define MVPP2_FLOW_UDF7_BITS		2
+#define MVPP2_FLOW_UDF7_MASK		(((1 << \
+			MVPP2_FLOW_UDF7_BITS) - 1) << MVPP2_FLOW_UDF7)
+#define MVPP2_FLOW_UDF7_MAX		((1 << MVPP2_FLOW_UDF7_BITS) - 1)
+
+#define MVPP2_FLOW_PORT_ID_SEL		23
+#define MVPP2_FLOW_PORT_ID_SEL_MASK	BIT(MVPP2_FLOW_PORT_ID_SEL)
+
+/*-----------------------  DWORD 1  ------------------------------------ */
+
+#define MVPP2_FLOW_FIELDS_NUM		0
+#define MVPP2_FLOW_FIELDS_NUM_BITS	3
+#define MVPP2_FLOW_FIELDS_NUM_MASK	(((1 << \
+		MVPP2_FLOW_FIELDS_NUM_BITS) - 1) << MVPP2_FLOW_FIELDS_NUM)
+#define MVPP2_FLOW_FIELDS_NUM_MAX	4 /*valid vaue 0 - 4 */
+
+#define MVPP2_FLOW_LKP_TYPE		3
+#define MVPP2_FLOW_LKP_TYPE_BITS	6
+#define MVPP2_FLOW_LKP_TYPE_MASK	(((1 << \
+		MVPP2_FLOW_LKP_TYPE_BITS) - 1) << MVPP2_FLOW_LKP_TYPE)
+#define MVPP2_FLOW_LKP_TYPE_MAX		((1 << MVPP2_FLOW_LKP_TYPE_BITS) - 1)
+
+#define MVPP2_FLOW_FIELD_PRIO		9
+#define MVPP2_FLOW_FIELD_PRIO_BITS	6
+#define MVPP2_FLOW_FIELD_PRIO_MASK	(((1 << \
+		MVPP2_FLOW_FIELD_PRIO_BITS) - 1) << MVPP2_FLOW_FIELD_PRIO)
+#define MVPP2_FLOW_FIELD_PRIO_MAX	((1 << MVPP2_FLOW_FIELD_PRIO_BITS) - 1)
+
+#define MVPP2_FLOW_SEQ_CTRL		15
+#define MVPP2_FLOW_SEQ_CTRL_BITS	3
+#define MVPP2_FLOW_SEQ_CTRL_MASK	(((1 << \
+		MVPP2_FLOW_SEQ_CTRL_BITS) - 1) << MVPP2_FLOW_SEQ_CTRL)
+#define MVPP2_FLOW_SEQ_CTRL_MAX		4
+
+/*-------------------------  DWORD 2  ---------------------------------- */
+#define MVPP2_FLOW_FIELD0_ID		0
+#define MVPP2_FLOW_FIELD1_ID		6
+#define MVPP2_FLOW_FIELD2_ID		12
+#define MVPP2_FLOW_FIELD3_ID		18
+
+#define MVPP2_FLOW_FIELD_ID_BITS	6
+#define MVPP2_FLOW_FIELD_ID(num)	(MVPP2_FLOW_FIELD0_ID + \
+					(MVPP2_FLOW_FIELD_ID_BITS * (num)))
+#define MVPP2_FLOW_FIELD_MASK(num)	(((1 << \
+	MVPP2_FLOW_FIELD_ID_BITS) - 1) << (MVPP2_FLOW_FIELD_ID_BITS * (num)))
+#define MVPP2_FLOW_FIELD_MAX		((1 << MVPP2_FLOW_FIELD_ID_BITS) - 1)
+
+/* lookup id attribute define */
+#define MVPP2_PRS_FL_ATTR_VLAN_BIT	BIT(0)
+#define MVPP2_PRS_FL_ATTR_IP4_BIT	BIT(1)
+#define MVPP2_PRS_FL_ATTR_IP6_BIT	BIT(2)
+#define MVPP2_PRS_FL_ATTR_ARP_BIT	BIT(3)
+#define MVPP2_PRS_FL_ATTR_FRAG_BIT	BIT(4)
+#define MVPP2_PRS_FL_ATTR_TCP_BIT	BIT(5)
+#define MVPP2_PRS_FL_ATTR_UDP_BIT	BIT(6)
 
 /* MAC entries, shadow udf */
 enum mvpp2_prs_udf {
@@ -839,10 +1115,116 @@ enum mvpp2_prs_l3_cast {
 	MVPP2_PRS_L3_BROAD_CAST
 };
 
+/* Packet flow ID */
+enum mvpp2_prs_flow {
+	MVPP2_PRS_FL_START = 8,
+	MVPP2_PRS_FL_IP4_TCP_NF_UNTAG = MVPP2_PRS_FL_START,
+	MVPP2_PRS_FL_IP4_UDP_NF_UNTAG,
+	MVPP2_PRS_FL_IP4_TCP_NF_TAG,
+	MVPP2_PRS_FL_IP4_UDP_NF_TAG,
+	MVPP2_PRS_FL_IP6_TCP_NF_UNTAG,
+	MVPP2_PRS_FL_IP6_UDP_NF_UNTAG,
+	MVPP2_PRS_FL_IP6_TCP_NF_TAG,
+	MVPP2_PRS_FL_IP6_UDP_NF_TAG,
+	MVPP2_PRS_FL_IP4_TCP_FRAG_UNTAG,
+	MVPP2_PRS_FL_IP4_UDP_FRAG_UNTAG,
+	MVPP2_PRS_FL_IP4_TCP_FRAG_TAG,
+	MVPP2_PRS_FL_IP4_UDP_FRAG_TAG,
+	MVPP2_PRS_FL_IP6_TCP_FRAG_UNTAG,
+	MVPP2_PRS_FL_IP6_UDP_FRAG_UNTAG,
+	MVPP2_PRS_FL_IP6_TCP_FRAG_TAG,
+	MVPP2_PRS_FL_IP6_UDP_FRAG_TAG,
+	MVPP2_PRS_FL_IP4_UNTAG, /* non-TCP, non-UDP, same for below */
+	MVPP2_PRS_FL_IP4_TAG,
+	MVPP2_PRS_FL_IP6_UNTAG,
+	MVPP2_PRS_FL_IP6_TAG,
+	MVPP2_PRS_FL_NON_IP_UNTAG,
+	MVPP2_PRS_FL_NON_IP_TAG,
+	MVPP2_PRS_FL_LAST,
+	MVPP2_PRS_FL_TCAM_NUM = 52,
+};
+
+enum mvpp2_cls_engine_num {
+	MVPP2_CLS_ENGINE_C2 = 1,
+	MVPP2_CLS_ENGINE_C3A,
+	MVPP2_CLS_ENGINE_C3B,
+	MVPP2_CLS_ENGINE_C4,
+	MVPP2_CLS_ENGINE_C3HA = 6,
+	MVPP2_CLS_ENGINE_C3HB,
+};
+
+enum mvpp2_cls_lkp_type {
+	MVPP2_CLS_LKP_HASH = 0,
+	MVPP2_CLS_LKP_VLAN_PRI,
+	MVPP2_CLS_LKP_DSCP_PRI,
+	MVPP2_CLS_LKP_DEFAULT,
+	MVPP2_CLS_LKP_MAX,
+};
+
+enum mvpp2_cls_fl_pri {
+	MVPP2_CLS_FL_COS_PRI = 0,
+	MVPP2_CLS_FL_RSS_PRI,
+};
+
+enum mvpp2_cls_filed_id {
+	MVPP2_CLS_FIELD_IP4SA = 0x10,
+	MVPP2_CLS_FIELD_IP4DA = 0x11,
+	MVPP2_CLS_FIELD_IP6SA = 0x17,
+	MVPP2_CLS_FIELD_IP6DA = 0x1A,
+	MVPP2_CLS_FIELD_L4SIP = 0x1D,
+	MVPP2_CLS_FIELD_L4DIP = 0x1E,
+};
+
+enum mvpp2_cos_type {
+	MVPP2_COS_TYPE_DFLT,
+	MVPP2_COS_TYPE_VLAN,
+	MVPP2_COS_TYPE_DSCP,
+	MVPP2_COS_TYPE_NUM
+};
+
+enum mvpp2_cos_classifier {
+	MVPP2_COS_CLS_VLAN, /* CoS based on VLAN pri */
+	MVPP2_COS_CLS_DSCP,
+	MVPP2_COS_CLS_VLAN_DSCP, /* CoS based on VLAN pri, */
+				/*if untagged and IP, then based on DSCP */
+	MVPP2_COS_CLS_DSCP_VLAN,
+	MVPP2_COS_CLS_INVALID
+};
+
+/* Structure dexcribe RXQ and corresponding rss table */
+struct mvpp22_rss_tbl_ptr {
+	u8 rxq_idx;
+	u8 rss_tbl_ptr;
+};
+
+/* Normal RSS entry */
+struct mvpp22_rss_tbl_entry {
+	u8 tbl_id;
+	u8 tbl_line;
+	u8 width;
+	u8 rxq;
+};
+
+enum mvpp2_mac_del_option {
+	MVPP2_DEL_MAC_ALL = 0,
+	MVPP2_DEL_MAC_NOT_IN_LIST,
+};
+
+struct mvpp2_prs_result_info {
+	u32 ri;
+	u32 ri_mask;
+};
+
+struct mvpp2_prs_flow_id {
+	u32 flow_id;
+	struct mvpp2_prs_result_info prs_result;
+};
+
 /* Classifier constants */
-#define MVPP2_CLS_FLOWS_TBL_SIZE	512
 #define MVPP2_CLS_FLOWS_TBL_DATA_WORDS	3
+#define MVPP2_CLS_FLOWS_TBL_SWAP_IDX	(MVPP2_FLOW_TBL_SIZE - 5)
 #define MVPP2_CLS_LKP_TBL_SIZE		64
+#define MVPP2_CLS_FLOWS_TBL_SIZE	MVPP2_FLOW_TBL_SIZE
 #define MVPP2_CLS_RX_QUEUES		256
 
 /* RSS constants */
@@ -929,6 +1311,20 @@ static struct {
 #define MVPP2_MIB_COUNTERS_STATS_DELAY		(1 * HZ)
 
 /* Definitions */
+struct mvpp2_cos {
+	u8 cos_classifier;	/* CoS based on VLAN or DSCP */
+	u8 num_cos_queues;	/* number of queue to do CoS */
+	u8 default_cos;		/* Default CoS value for non-IP or non-VLAN */
+	u8 reserved;
+	u32 pri_map;	/* each nibble maps a cos_value(0~7) to a queue */
+};
+
+struct mvpp2_rss {
+	/* MVPP22 2-tuple hash generated upon IPsrc+IPdst */
+	enum { MVPP22_RSS_UDP_5T, MVPP22_RSS_UDP_2T } rss_mode;
+	u8 dflt_cpu; /*non-IP packet */
+	u8 rss_en;
+};
 
 /* Shared Packet Processor resources */
 struct mvpp2 {
@@ -968,10 +1364,16 @@ struct mvpp2 {
 	/* BM pools */
 	struct mvpp2_bm_pool *bm_pools;
 
+	/* RSS indirection table */
+	u32 indir[MVPP22_RSS_TABLE_ENTRIES];
 	/* PRS shadow table */
 	struct mvpp2_prs_shadow *prs_shadow;
 	/* PRS auxiliary table for double vlan entries control */
 	bool *prs_double_vlans;
+	/* CLS shadow info for update in running time */
+	struct mvpp2_cls_shadow *cls_shadow;
+	/* C2 shadow info */
+	struct mvpp2_c2_shadow *c2_shadow;
 
 	/* Tclk value */
 	u32 tclk;
@@ -1078,7 +1480,10 @@ struct mvpp2_port {
 
 	u32 tx_time_coal;
 
-	/* RSS indirection table */
+	struct mvpp2_rss	rss_cfg;
+	struct mvpp2_cos	cos_cfg;
+
+	/* RSS indirection table - to be OBSOLETE */
 	u32 indir[MVPP22_RSS_TABLE_ENTRIES];
 };
 
@@ -1116,6 +1521,82 @@ struct mvpp2_port {
 
 #define MV_BM_LOCK			BIT(0)
 #define MV_AGGR_QUEUE_LOCK	BIT(1)
+
+/* Sub fields of "parserInfo" field */
+#define MVPP2_RXD_LKP_ID_OFFS		0
+#define MVPP2_RXD_LKP_ID_BITS		6
+#define MVPP2_RXD_LKP_ID_MASK		(((1 << \
+		MVPP2_RXD_LKP_ID_BITS) - 1) << MVPP2_RXD_LKP_ID_OFFS)
+#define MVPP2_RXD_CPU_CODE_OFFS		6
+#define MVPP2_RXD_CPU_CODE_BITS		3
+#define MVPP2_RXD_CPU_CODE_MASK		(((1 << \
+		MVPP2_RXD_CPU_CODE_BITS) - 1) << MVPP2_RXD_CPU_CODE_OFFS)
+#define MVPP2_RXD_PPPOE_BIT		9
+#define MVPP2_RXD_PPPOE_MASK		BIT(MVPP2_RXD_PPPOE_BIT)
+#define MVPP2_RXD_L3_CAST_OFFS		10
+#define MVPP2_RXD_L3_CAST_BITS		2
+#define MVPP2_RXD_L3_CAST_MASK		(((1 << \
+		MVPP2_RXD_L3_CAST_BITS) - 1) << MVPP2_RXD_L3_CAST_OFFS)
+#define MVPP2_RXD_L2_CAST_OFFS		12
+#define MVPP2_RXD_L2_CAST_BITS		2
+#define MVPP2_RXD_L2_CAST_MASK		(((1 << \
+		MVPP2_RXD_L2_CAST_BITS) - 1) << MVPP2_RXD_L2_CAST_OFFS)
+#define MVPP2_RXD_VLAN_INFO_OFFS	14
+#define MVPP2_RXD_VLAN_INFO_BITS	2
+#define MVPP2_RXD_VLAN_INFO_MASK	(((1 << \
+		MVPP2_RXD_VLAN_INFO_BITS) - 1) << MVPP2_RXD_VLAN_INFO_OFFS)
+/* Bits of "bmQset" field */
+#define MVPP2_RXD_BUFF_QSET_NUM_OFFS	0
+#define MVPP2_RXD_BUFF_QSET_NUM_MASK	(0x7f << MVPP2_RXD_BUFF_QSET_NUM_OFFS)
+#define MVPP2_RXD_BUFF_TYPE_OFFS	7
+#define MVPP2_RXD_BUFF_TYPE_MASK	(0x1 << MVPP2_RXD_BUFF_TYPE_OFFS)
+/* Bits of "status" field */
+#define MVPP2_RXD_L3_OFFSET_OFFS	0
+#define MVPP2_RXD_L3_OFFSET_MASK	(0x7F << MVPP2_RXD_L3_OFFSET_OFFS)
+#define MVPP2_RXD_IP_HLEN_OFFS		8
+#define MVPP2_RXD_IP_HLEN_MASK		(0x1F << MVPP2_RXD_IP_HLEN_OFFS)
+#define MVPP2_RXD_ES_BIT		15
+#define MVPP2_RXD_ES_MASK		BIT(MVPP2_RXD_ES_BIT)
+#define MVPP2_RXD_HWF_SYNC_BIT		21
+#define MVPP2_RXD_HWF_SYNC_MASK		BIT(MVPP2_RXD_HWF_SYNC_BIT)
+#define MVPP2_RXD_L4_CHK_OK_BIT		22
+#define MVPP2_RXD_L4_CHK_OK_MASK	BIT(MVPP2_RXD_L4_CHK_OK_BIT)
+#define MVPP2_RXD_IP_FRAG_BIT		23
+#define MVPP2_RXD_IP_FRAG_MASK		BIT(MVPP2_RXD_IP_FRAG_BIT)
+#define MVPP2_RXD_IP4_HEADER_ERR_BIT	24
+#define MVPP2_RXD_IP4_HEADER_ERR_MASK	BIT(MVPP2_RXD_IP4_HEADER_ERR_BIT)
+#define MVPP2_RXD_L4_OFFS		25
+#define MVPP2_RXD_L4_MASK		(7 << MVPP2_RXD_L4_OFFS)
+/* Value 0 - N/A, 3-7 - User Defined */
+#define MVPP2_RXD_L3_OFFS		28
+#define MVPP2_RXD_L3_MASK		(7 << MVPP2_RXD_L3_OFFS)
+/* Value 0 - N/A, 6-7 - User Defined */
+#define MVPP2_RXD_L3_IP4_OPT		(2 << MVPP2_RXD_L3_OFFS)
+#define MVPP2_RXD_L3_IP4_OTHER		(3 << MVPP2_RXD_L3_OFFS)
+#define MVPP2_RXD_L3_IP6_EXT		(5 << MVPP2_RXD_L3_OFFS)
+#define MVPP2_RXD_BUF_HDR_BIT		31
+#define MVPP2_RXD_BUF_HDR_MASK		BIT(MVPP2_RXD_BUF_HDR_BIT)
+/* status field MACROs */
+#define MVPP2_RXD_L3_IS_IP4(status)		(((status) & \
+				MVPP2_RXD_L3_MASK) == MVPP2_RXD_L3_IP4)
+#define MVPP2_RXD_L3_IS_IP4_OPT(status)		(((status) & \
+				MVPP2_RXD_L3_MASK) == MVPP2_RXD_L3_IP4_OPT)
+#define MVPP2_RXD_L3_IS_IP4_OTHER(status)	(((status) & \
+				MVPP2_RXD_L3_MASK) == MVPP2_RXD_L3_IP4_OTHER)
+#define MVPP2_RXD_L3_IS_IP6(status)		(((status) & \
+				MVPP2_RXD_L3_MASK) == MVPP2_RXD_L3_IP6)
+#define MVPP2_RXD_L3_IS_IP6_EXT(status)		(((status) & \
+				MVPP2_RXD_L3_MASK) == MVPP2_RXD_L3_IP6_EXT)
+#define MVPP2_RXD_L4_IS_UDP(status)		(((status) & \
+				MVPP2_RXD_L4_MASK) == MVPP2_RXD_L4_UDP)
+#define MVPP2_RXD_L4_IS_TCP(status)		(((status) & \
+				MVPP2_RXD_L4_MASK) == MVPP2_RXD_L4_TCP)
+#define MVPP2_RXD_IP4_HDR_ERR(status)		((status) & \
+				MVPP2_RXD_IP4_HEADER_ERR_MASK)
+#define MVPP2_RXD_IP4_FRG(status)		((status) & \
+				MVPP2_RXD_IP_FRAG_MASK)
+#define MVPP2_RXD_L4_CHK_OK(status)		((status) & \
+				MVPP2_RXD_L4_CHK_OK_MASK)
 
 /* HW TX descriptor for PPv2.1 */
 struct mvpp21_tx_desc {
@@ -1330,6 +1811,251 @@ struct mvpp2_cls_lookup_entry {
 	u32 lkpid;
 	u32 way;
 	u32 data;
+};
+
+struct mvpp2_cls_flow_info {
+	u32 lkpid;
+
+	/* The flow table entry index of CoS Dflt/Vlan/Dscp rule */
+	u32 flow_entry[MVPP2_COS_TYPE_NUM];
+
+	/* The flow table entry index of RSS rule */
+	u32 flow_entry_rss1;
+	/* The flow table entry index of RSS rule for UDP packet to
+	 * update hash mode
+	 */
+	u32 flow_entry_rss2;
+};
+
+struct mvpp2_cls_shadow {
+	struct mvpp2_cls_flow_info *flow_info;
+	u32 flow_free_start; /* The start of free entry index in flow table */
+	u32 flow_swap_area;
+};
+
+/* Classifier engine2 and QoS structure */
+
+/* C2  constants */
+#define MVPP2_CLS_C2_TCAM_SIZE			256
+#define MVPP2_CLS_C2_TCAM_WORDS			5
+#define MVPP2_CLS_C2_TCAM_DATA_BYTES		10
+#define MVPP2_CLS_C2_SRAM_WORDS			5
+/*                   HEK: advanced Header Extracted Key capability */
+#define MVPP2_CLS_C2_HEK_LKP_TYPE_OFFS		0
+#define MVPP2_CLS_C2_HEK_LKP_TYPE_BITS		6
+#define MVPP2_CLS_C2_HEK_LKP_TYPE_MASK		(0x3F << \
+					MVPP2_CLS_C2_HEK_LKP_TYPE_OFFS)
+#define MVPP2_CLS_C2_HEK_PORT_TYPE_OFFS		6
+#define MVPP2_CLS_C2_HEK_PORT_TYPE_BITS		2
+#define MVPP2_CLS_C2_HEK_PORT_TYPE_MASK		(0x3 << \
+					MVPP2_CLS_C2_HEK_PORT_TYPE_OFFS)
+#define MVPP2_CLS_C2_QOS_DSCP_TBL_SIZE		64
+#define MVPP2_CLS_C2_QOS_PRIO_TBL_SIZE		8
+#define MVPP2_CLS_C2_QOS_DSCP_TBL_NUM		8
+#define MVPP2_CLS_C2_QOS_PRIO_TBL_NUM		64
+
+struct mvpp2_cls_c2_entry {
+	u32          index;
+	bool         inv;
+	union {
+		u32	words[MVPP2_CLS_C2_TCAM_WORDS];
+		u8	bytes[MVPP2_CLS_C2_TCAM_WORDS * 4];
+	} tcam;
+	union {
+		u32	words[MVPP2_CLS_C2_SRAM_WORDS];
+		struct {
+			u32 action_tbl; /* 0x1B30 */
+			u32 actions;    /* 0x1B60 */
+			u32 qos_attr;   /* 0x1B64*/
+			u32 hwf_attr;   /* 0x1B68 */
+			u32 rss_attr;   /* 0x1B6C */
+			u32 seq_attr;   /* 0x1B70 */
+		} regs;
+	} sram;
+};
+
+enum mvpp2_cls2_hek_offs {
+	MVPP2_CLS_C2_HEK_OFF_BYTE0 = 0,
+	MVPP2_CLS_C2_HEK_OFF_BYTE1,
+	MVPP2_CLS_C2_HEK_OFF_BYTE2,
+	MVPP2_CLS_C2_HEK_OFF_BYTE3,
+	MVPP2_CLS_C2_HEK_OFF_BYTE4,
+	MVPP2_CLS_C2_HEK_OFF_BYTE5,
+	MVPP2_CLS_C2_HEK_OFF_BYTE6,
+	MVPP2_CLS_C2_HEK_OFF_BYTE7,
+	MVPP2_CLS_C2_HEK_OFF_LKP_PORT_TYPE,
+	MVPP2_CLS_C2_HEK_OFF_PORT_ID,
+	MVPP2_CLS_C2_HEK_OFF_MAX
+};
+
+struct mvpp2_cls_c2_qos_entry {
+	u32 tbl_id;
+	u32 tbl_sel;
+	u32 tbl_line;
+	u32 data;
+};
+
+enum mvpp2_src_port_type {
+	MVPP2_SRC_PORT_TYPE_PHY,
+	MVPP2_SRC_PORT_TYPE_UNI,
+	MVPP2_SRC_PORT_TYPE_VIR
+};
+
+struct mvpp2_src_port {
+	enum mvpp2_src_port_type	port_type;
+	u32				port_value;
+	u32				port_mask;
+};
+
+enum mvpp2_qos_tbl_sel {
+	MVPP2_QOS_TBL_SEL_PRI = 0,
+	MVPP2_QOS_TBL_SEL_DSCP,
+};
+
+enum mvpp2_qos_src_tbl {
+	MVPP2_QOS_SRC_ACTION_TBL = 0,
+	MVPP2_QOS_SRC_DSCP_PBIT_TBL,
+};
+
+struct mvpp2_engine_qos_info {
+	/* dscp pri table or none */
+	enum mvpp2_qos_tbl_sel	qos_tbl_type;
+	/* dscp or pri table index */
+	u32				qos_tbl_index;
+	/* policer id, 0xffff do not assign policer */
+	u16				policer_id;
+	/* pri/dscp comes from qos or act tbl */
+	enum mvpp2_qos_src_tbl	pri_dscp_src;
+	/* gemport comes from qos or act tbl */
+	enum mvpp2_qos_src_tbl	gemport_src;
+	enum mvpp2_qos_src_tbl	q_low_src;
+	enum mvpp2_qos_src_tbl	q_high_src;
+	enum mvpp2_qos_src_tbl	color_src;
+};
+
+enum mvpp2_color_action_type {
+	/* Do not update color */
+	MVPP2_COLOR_ACTION_TYPE_NO_UPDT = 0,
+	/* Do not update color and lock */
+	MVPP2_COLOR_ACTION_TYPE_NO_UPDT_LOCK,
+	/* Update to green */
+	MVPP2_COLOR_ACTION_TYPE_GREEN,
+	/* Update to green and lock */
+	MVPP2_COLOR_ACTION_TYPE_GREEN_LOCK,
+	/* Update to yellow */
+	MVPP2_COLOR_ACTION_TYPE_YELLOW,
+	/* Update to yellow */
+	MVPP2_COLOR_ACTION_TYPE_YELLOW_LOCK,
+	/* Update to red */
+	MVPP2_COLOR_ACTION_TYPE_RED,
+	/* Update to red and lock */
+	MVPP2_COLOR_ACTION_TYPE_RED_LOCK,
+};
+
+enum mvpp2_general_action_type {
+	/* The field will be not updated */
+	MVPP2_ACTION_TYPE_NO_UPDT,
+	/* The field will be not updated and lock */
+	MVPP2_ACTION_TYPE_NO_UPDT_LOCK,
+	/* The field will be updated */
+	MVPP2_ACTION_TYPE_UPDT,
+	/* The field will be updated and lock */
+	MVPP2_ACTION_TYPE_UPDT_LOCK,
+};
+
+enum mvpp2_flowid_action_type {
+	/* FlowID is disable */
+	MVPP2_ACTION_FLOWID_DISABLE = 0,
+	/* FlowID is enable */
+	MVPP2_ACTION_FLOWID_ENABLE,
+};
+
+enum mvpp2_frwd_action_type {
+	/* The decision will be not updated */
+	MVPP2_FRWD_ACTION_TYPE_NO_UPDT,
+	/* The decision is not updated, and following no change to it */
+	MVPP2_FRWD_ACTION_TYPE_NO_UPDT_LOCK,
+	/* The packet to CPU (Software Forwarding) */
+	MVPP2_FRWD_ACTION_TYPE_SWF,
+	 /* The packet to CPU, and following no change to it */
+	MVPP2_FRWD_ACTION_TYPE_SWF_LOCK,
+	/* The packet to one transmit port (Hardware Forwarding) */
+	MVPP2_FRWD_ACTION_TYPE_HWF,
+	/* The packet to one tx port, and following no change to it */
+	MVPP2_FRWD_ACTION_TYPE_HWF_LOCK,
+	/* The pkt to one tx port, and maybe internal packets is used */
+	MVPP2_FRWD_ACTION_TYPE_HWF_LOW_LATENCY,
+	/* Same to above, but following no change to it*/
+	MVPP2_FRWD_ACTION_TYPE_HWF_LOW_LATENCY_LOCK,
+};
+
+struct mvpp2_engine_pkt_action {
+	enum mvpp2_color_action_type		color_act;
+	enum mvpp2_general_action_type	pri_act;
+	enum mvpp2_general_action_type	dscp_act;
+	enum mvpp2_general_action_type	gemp_act;
+	enum mvpp2_general_action_type	q_low_act;
+	enum mvpp2_general_action_type	q_high_act;
+	enum mvpp2_general_action_type	rss_act;
+	enum mvpp2_flowid_action_type		flowid_act;
+	enum mvpp2_frwd_action_type		frwd_act;
+};
+
+struct mvpp2_qos_value {
+	u16		pri;
+	u16		dscp;
+	u16		gemp;
+	u16		q_low;
+	u16		q_high;
+};
+
+struct mvpp2_engine_pkt_mod {
+	u32		mod_cmd_idx;
+	u32		mod_data_idx;
+	u32		l4_chksum_update_flag;
+};
+
+struct mvpp2_duplicate_info {
+	/* pkt duplication flow id */
+	u32		flow_id;
+	/* pkt duplication count */
+	u32		flow_cnt;
+};
+
+/* The logic C2 entry, easy to understand and use */
+struct mvpp2_c2_add_entry {
+	struct mvpp2_src_port		port;
+	u8				lkp_type;
+	u8				lkp_type_mask;
+	/* priority in this look_type */
+	u32				priority;
+	/* all the qos input */
+	struct mvpp2_engine_qos_info	qos_info;
+	/* update&lock info */
+	struct mvpp2_engine_pkt_action	action;
+	/* pri/dscp/gemport/qLow/qHigh */
+	struct mvpp2_qos_value		qos_value;
+	/* PMT cmd_idx and data_idx */
+	struct mvpp2_engine_pkt_mod	pkt_mod;
+	/* RSS enable or disable */
+	int				rss_en;
+	/* pkt duplication flow info */
+	struct mvpp2_duplicate_info	flow_info;
+};
+
+struct mvpp2_c2_rule_idx {
+	/* The TCAM rule index for VLAN pri check with QoS pbit table */
+	u32 vlan_pri_idx;
+	/* The TCAM rule index for DSCP check with QoS dscp table */
+	u32 dscp_pri_idx;
+	/* The default rule for flow untagged and non-IP */
+	u32 default_rule_idx;
+};
+
+struct mvpp2_c2_shadow {
+	int c2_tcam_free_start;
+	/* Per src port */
+	struct mvpp2_c2_rule_idx rule_idx_info[8];
 };
 
 struct mvpp2_bm_pool {
@@ -7604,11 +8330,11 @@ static int mvpp22_rss_rxfh_indir_set(struct mvpp2_port *port)
 	u32 table = 0;
 
 	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++) {
-		u32 sel = MVPP22_RSS_INDEX_TABLE(table) |
-			  MVPP22_RSS_INDEX_TABLE_ENTRY(i);
-		mvpp2_write(priv, MVPP22_RSS_INDEX, sel);
+		u32 sel = MVPP22_RSS_IDX_TABLE(table) |
+			  MVPP22_RSS_IDX_TABLE_ENTRY(i);
+		mvpp2_write(priv, MVPP22_RSS_IDX_REG, sel);
 
-		mvpp2_write(priv, MVPP22_RSS_TABLE_ENTRY,
+		mvpp2_write(priv, MVPP22_RSS_TBL_ENTRY_REG,
 			    mvpp22_rxfh_indir(port, port->indir[i]));
 	}
 	return 0;
@@ -7622,17 +8348,14 @@ static int mvpp22_init_rss(struct mvpp2_port *port)
 	/* Set the table width: replace the whole classifier Rx queue number
 	 * with the ones configured in RSS table entries.
 	 */
-	mvpp2_write(priv, MVPP22_RSS_INDEX, MVPP22_RSS_INDEX_TABLE(0));
-	mvpp2_write(priv, MVPP22_RSS_WIDTH, 8);
+	mvpp2_write(priv, MVPP22_RSS_IDX_REG, MVPP22_RSS_IDX_TABLE(0));
+	mvpp2_write(priv, MVPP22_RSS_WIDTH_REG, 8);
 
 	/* Loop through the classifier Rx Queues and map them to a RSS table.
 	 * Map them all to the first table (0) by default.
 	 */
-	for (i = 0; i < MVPP2_CLS_RX_QUEUES; i++) {
-		mvpp2_write(priv, MVPP22_RSS_INDEX, MVPP22_RSS_INDEX_QUEUE(i));
-		mvpp2_write(priv, MVPP22_RSS_TABLE,
-			    MVPP22_RSS_TABLE_POINTER(0));
-	}
+	for (i = 0; i < MVPP2_CLS_RX_QUEUES; i++)
+		mvpp2_write(priv, MVPP22_RSS_IDX_REG, MVPP22_RSS_IDX_QUEUE(i));
 
 	/* Configure the first table to evenly distribute the packets across
 	 * real Rx Queues. The table entries map a hash to a port Rx Queue.
