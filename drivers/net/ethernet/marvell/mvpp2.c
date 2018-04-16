@@ -1477,9 +1477,6 @@ struct mvpp2_port {
 
 	struct mvpp2_rss	rss_cfg;
 	struct mvpp2_cos	cos_cfg;
-
-	/* RSS indirection table - to be OBSOLETE */
-	u32 indir[MVPP22_RSS_TABLE_ENTRIES];
 };
 
 /* The mvpp2_tx_desc and mvpp2_rx_desc structures describe the
@@ -10831,6 +10828,12 @@ static int mvpp2_set_features(struct net_device *dev,
 		}
 	}
 
+	if (changed & NETIF_F_RXHASH) {
+		if (!mvpp22_rss_is_supported())
+			return -EOPNOTSUPP;
+		mvpp22_rss_enable(port, !!(features & NETIF_F_RXHASH), false);
+	}
+
 	return 0;
 }
 
@@ -10964,46 +10967,136 @@ err_out:
 	return err;
 }
 
-static int mvpp2_ethtool_get_rxnfc(struct net_device *dev,
-				   struct ethtool_rxnfc *info, u32 *rules)
+static u32 mvpp2_ethtool_get_rxfh_indir_size(struct net_device *dev)
 {
-	struct mvpp2_port *port = netdev_priv(dev);
-	struct mvpp2 *priv = port->priv;
+	return mvpp22_rss_is_supported() ?
+		MVPP22_RSS_TABLE_ENTRIES : 0;
+}
 
-	if (priv->hw_version != MVPP22)
-		return -EOPNOTSUPP;
-
+static int mvpp22_get_rss_hash_opts(struct mvpp2_port *port,
+				    struct ethtool_rxnfc *info)
+{
 	switch (info->cmd) {
-	case ETHTOOL_GRXRINGS:
-		info->data = port->nrxqs;
+	case IPV4_FLOW:
+	case IPV6_FLOW:
+		info->data = RXH_IP_SRC | RXH_IP_DST;
+		break;
+	case TCP_V4_FLOW:
+	case TCP_V6_FLOW:
+		info->data = RXH_IP_SRC | RXH_IP_DST | RXH_L4_B_0_1 |
+			     RXH_L4_B_2_3;
+		break;
+	case UDP_V4_FLOW:
+	case UDP_V6_FLOW:
+		info->data = RXH_IP_SRC | RXH_IP_DST;
+		if (port->rss_cfg.rss_mode == MVPP22_RSS_5T)
+			info->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
 		break;
 	default:
-		return -ENOTSUPP;
+		return -EOPNOTSUPP;
 	}
 
 	return 0;
 }
 
-static u32 mvpp2_ethtool_get_rxfh_indir_size(struct net_device *dev)
+static int mvpp22_set_rss_hash_opts(struct mvpp2_port *port,
+				    struct ethtool_rxnfc *info)
+{
+	u32 mask;
+	int rss_mode;
+
+	mask = RXH_IP_SRC | RXH_IP_DST | RXH_L4_B_0_1 | RXH_L4_B_2_3;
+	if (info->data & ~mask)
+		return -EINVAL;
+
+	switch (info->flow_type) {
+	case IPV4_FLOW:
+	case IPV6_FLOW:
+		mask = RXH_IP_SRC | RXH_IP_DST;
+		if ((info->data & mask) != mask)
+			return -EINVAL;
+		break;
+	case TCP_V4_FLOW:
+	case TCP_V6_FLOW:
+		if ((info->data & mask) != mask)
+			return -EOPNOTSUPP;
+		break;
+	case UDP_V4_FLOW:
+	case UDP_V6_FLOW:
+		mask = RXH_IP_SRC | RXH_IP_DST;
+		if ((info->data & mask) != mask)
+			return -EOPNOTSUPP;
+
+		mask = RXH_L4_B_0_1 | RXH_L4_B_2_3;
+
+		if ((info->data & mask) != mask)
+			rss_mode = MVPP22_RSS_5T;
+		else if (!(info->data & mask))
+			rss_mode = MVPP22_RSS_2T;
+		else
+			return -EOPNOTSUPP;
+
+		mvpp22_rss_udp_mode_set(port, rss_mode);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static int mvpp2_ethtool_get_rxnfc(struct net_device *dev,
+				   struct ethtool_rxnfc *info, u32 *rules)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
-	struct mvpp2 *priv = port->priv;
+	int ret = 0;
 
-	return (priv->hw_version != MVPP22) ? 0 : MVPP22_RSS_TABLE_ENTRIES;
+	if (!mvpp22_rss_is_supported())
+		return -EOPNOTSUPP;
+
+	switch (info->cmd) {
+	case ETHTOOL_GRXRINGS:
+		info->data = mvpp2_ethtool_get_rxfh_indir_size(dev);
+		break;
+	case ETHTOOL_GRXFH:
+		ret = mvpp22_get_rss_hash_opts(port, info);
+		break;
+	default:
+		return -ENOTSUPP;
+	}
+	return ret;
+}
+
+static int mvpp2_ethtool_set_rxnfc(struct net_device *dev,
+				   struct ethtool_rxnfc *info)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	int ret = 0;
+
+	if (!mvpp22_rss_is_supported())
+		return -EOPNOTSUPP;
+
+	switch (info->cmd) {
+	case ETHTOOL_SRXFH:
+		ret = mvpp22_set_rss_hash_opts(port, info);
+		break;
+	default:
+		return -ENOTSUPP;
+	}
+	return ret;
 }
 
 static int mvpp2_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 				  u8 *hfunc)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
-	struct mvpp2 *priv = port->priv;
 
-	if (priv->hw_version != MVPP22)
+	if (!mvpp22_rss_is_supported())
 		return -EOPNOTSUPP;
 
 	if (indir)
-		memcpy(indir, port->indir,
-		       ARRAY_SIZE(port->indir) * sizeof(port->indir[0]));
+		memcpy(indir, port->priv->indir, sizeof(port->priv->indir[0]) *
+		       mvpp2_ethtool_get_rxfh_indir_size(dev));
 
 	if (hfunc)
 		*hfunc = ETH_RSS_HASH_TOP;
@@ -11015,24 +11108,36 @@ static int mvpp2_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 				  const u8 *key, const u8 hfunc)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
-	struct mvpp2 *priv = port->priv;
+	int ret, size, i;
+	u32 indir_orig[MVPP22_RSS_TABLE_ENTRIES];
 
-	if (priv->hw_version != MVPP22)
+	if (!mvpp22_rss_is_supported())
 		return -EOPNOTSUPP;
 
 	if (hfunc != ETH_RSS_HASH_NO_CHANGE && hfunc != ETH_RSS_HASH_TOP)
 		return -ENOTSUPP;
-
-	if (key)
+	if (key || !indir)
 		return -ENOTSUPP;
 
-	if (indir) {
-		memcpy(port->indir, indir,
-		       ARRAY_SIZE(port->indir) * sizeof(port->indir[0]));
+	size = sizeof(*indir) * MVPP22_RSS_TABLE_ENTRIES;
+
+	/* Check input.
+	 * For example, "weight 0 0 0 0 1" may have "4" inside of indir
+	 */
+	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++)
+		if (indir[i] >= num_online_cpus())
+			return -EINVAL;
+
+	memcpy(indir_orig, port->priv->indir, size);
+	memcpy(port->priv->indir, indir, size);
+	ret = mvpp22_rss_rxfh_indir_set(port);
+	if (ret) {
+		netdev_err(dev, "fail to change rxfh indir table");
+		/* Rollback to original indir[] table */
+		memcpy(port->priv->indir, indir_orig, size);
 		mvpp22_rss_rxfh_indir_set(port);
 	}
-
-	return 0;
+	return ret;
 }
 
 /* Device ops */
@@ -11065,6 +11170,7 @@ static const struct ethtool_ops mvpp2_eth_tool_ops = {
 	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
 	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
 	.get_rxnfc		= mvpp2_ethtool_get_rxnfc,
+	.set_rxnfc		= mvpp2_ethtool_set_rxnfc,
 	.get_rxfh_indir_size	= mvpp2_ethtool_get_rxfh_indir_size,
 	.get_rxfh		= mvpp2_ethtool_get_rxfh,
 	.set_rxfh		= mvpp2_ethtool_set_rxfh,
@@ -11608,6 +11714,9 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	dev->min_mtu = ETH_MIN_MTU;
 	/* 9704 == 9728 - 20 and rounding to 8 */
 	dev->max_mtu = MVPP2_BM_JUMBO_PKT_SIZE;
+
+	if (mvpp22_rss_is_supported())
+		dev->hw_features |= NETIF_F_RXHASH;
 
 	err = register_netdev(dev);
 	if (err < 0) {
