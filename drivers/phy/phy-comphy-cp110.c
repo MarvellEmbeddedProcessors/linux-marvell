@@ -33,28 +33,8 @@
  */
 static DEFINE_SPINLOCK(cp110_mac_reset_lock);
 
-/* Clear PHY selector - avoid collision with prior u-boot configuration */
-static void mvebu_cp110_comphy_clr_phy_selector(struct mvebu_comphy_priv *priv,
-						struct mvebu_comphy *comphy)
-{
-	u32 reg, mask, field;
-	u32 comphy_offset = COMMON_SELECTOR_COMPHYN_FIELD_WIDTH * comphy->index;
-
-	mask = COMMON_SELECTOR_COMPHY_MASK << comphy_offset;
-	reg = readl(priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
-	field = reg & mask;
-
-	/* Clear comphy selector - if it was set by u-boot.
-	 * (might be that this comphy was configured as PCIe/USB,
-	 * in such case, no need to clear comphy selector because PCIe/USB
-	 * are controlled by hpipe selector.
-	 */
-	if (field) {
-		reg &= ~mask;
-		writel(reg, priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
-	}
-}
 #define MV_SIP_COMPHY_POWER_ON	0x82000001
+#define MV_SIP_COMPHY_POWER_OFF	0x82000002
 #define MV_SIP_COMPHY_PLL_LOCK	0x82000003
 
 /* PHY selector configures SATA and Network modes */
@@ -131,24 +111,6 @@ static void mvebu_cp110_comphy_set_phy_selector(struct mvebu_comphy_priv *priv,
 
 	writel(reg, priv->comphy_regs + COMMON_SELECTOR_PHY_REG_OFFSET);
 
-}
-
-/* Clear PIPE selector - avoid collision with prior u-boot configuration */
-void mvebu_cp110_comphy_clr_pipe_selector(struct mvebu_comphy_priv *priv,
-					  struct mvebu_comphy *comphy)
-{
-	u32 reg, mask, field;
-	u32 comphy_offset = COMMON_SELECTOR_COMPHYN_FIELD_WIDTH * comphy->index;
-
-	mask = COMMON_SELECTOR_COMPHY_MASK << comphy_offset;
-	reg = readl(priv->comphy_regs + COMMON_SELECTOR_PIPE_REG_OFFSET);
-	field = reg & mask;
-
-	if (field) {
-		reg &= ~mask;
-		writel(reg,
-		       priv->comphy_regs + COMMON_SELECTOR_PIPE_REG_OFFSET);
-	}
 }
 
 /* PIPE selector configures for PCIe, USB 3.0 Host, and USB 3.0 Device mode */
@@ -1121,8 +1083,7 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 {
 	struct mvebu_comphy *comphy = phy_get_drvdata(phy);
 	struct mvebu_comphy_priv *priv = to_mvebu_comphy_priv(comphy);
-	void __iomem *sd_ip_addr, *comphy_ip_addr;
-	u32 mask, data;
+	int err;
 
 	dev_dbg(priv->dev, "%s: Enter\n", __func__);
 
@@ -1133,58 +1094,13 @@ static int mvebu_cp110_comphy_power_off(struct phy *phy)
 
 	spin_lock(&priv->lock);
 
-	sd_ip_addr = SD_ADDR(priv->comphy_pipe_regs, comphy->index);
-
-	/* Hard reset the comphy, for Ethernet modes and Sata */
-	mask = SD_EXTERNAL_CONFIG1_RESET_IN_MASK;
-	data = 0x0 << SD_EXTERNAL_CONFIG1_RESET_IN_OFFSET;
-	mask |= SD_EXTERNAL_CONFIG1_RESET_CORE_MASK;
-	data |= 0x0 << SD_EXTERNAL_CONFIG1_RESET_CORE_OFFSET;
-	mask |= SD_EXTERNAL_CONFIG1_RF_RESET_IN_MASK;
-	data |= 0x0 << SD_EXTERNAL_CONFIG1_RF_RESET_IN_OFFSET;
-	reg_set(sd_ip_addr + SD_EXTERNAL_CONFIG1_REG, data, mask);
-
-	comphy_ip_addr = COMPHY_ADDR(priv->comphy_regs, comphy->index);
-
-	/* PCIe reset */
-	if (priv->pcie_reset_reg) {
-		u32 reg;
-
-		spin_lock(&cp110_mac_reset_lock);
-
-		reg = readl(priv->pcie_reset_reg);
-		switch (comphy->index) {
-		case COMPHY_LANE0:
-			reg &= ~PCIE_MAC_RESET_MASK_PORT0;
-			break;
-		case COMPHY_LANE4:
-			reg &= ~PCIE_MAC_RESET_MASK_PORT1;
-			break;
-		case COMPHY_LANE5:
-			reg &= ~PCIE_MAC_RESET_MASK_PORT2;
-			break;
-		}
-
-		writel(reg, priv->pcie_reset_reg);
-		spin_unlock(&cp110_mac_reset_lock);
-	}
-
-	/* Hard reset the comphy, for PCIe and usb3 */
-	mask = COMMON_PHY_CFG1_PWR_ON_RESET_MASK;
-	data = 0x0 << COMMON_PHY_CFG1_PWR_ON_RESET_OFFSET;
-	mask |= COMMON_PHY_CFG1_CORE_RSTN_MASK;
-	data |= 0x0 << COMMON_PHY_CFG1_CORE_RSTN_OFFSET;
-	reg_set(comphy_ip_addr + COMMON_PHY_CFG1_REG, data, mask);
-
-	/* Clear comphy PHY and PIPE selector, can't rely on u-boot */
-	mvebu_cp110_comphy_clr_phy_selector(priv, comphy);
-	mvebu_cp110_comphy_clr_pipe_selector(priv, comphy);
-
+	err = comphy_smc(MV_SIP_COMPHY_POWER_OFF, priv->cp_phys, comphy->index,
+					       priv->lanes[comphy->index].mode);
 	spin_unlock(&priv->lock);
 
 exit:
 	dev_dbg(priv->dev, "%s: Exit\n", __func__);
-	return 0;
+	return err;
 }
 
 /*
