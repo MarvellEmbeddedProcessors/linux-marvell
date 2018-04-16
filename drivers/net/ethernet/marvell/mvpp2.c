@@ -2377,8 +2377,7 @@ static inline int mvpp2_txq_phys(int port, int txq)
 }
 
 /* Flow ID definition array */
-/* static  -- temporary disable static to avoid compile-WARNING */
-struct mvpp2_prs_flow_id
+static struct mvpp2_prs_flow_id
 	mvpp2_prs_flow_id_array[MVPP2_PRS_FL_TCAM_NUM] = {
 	/***********#Flow ID#**************#Result Info#************/
 	{MVPP2_PRS_FL_IP4_TCP_NF_UNTAG, {MVPP2_PRS_RI_VLAN_NONE |
@@ -2926,6 +2925,40 @@ static void mvpp2_prs_sram_bits_clear(struct mvpp2_prs_entry *pe, int bit_num,
 	pe->sram.byte[MVPP2_BIT_TO_BYTE(bit_num)] &= ~(val << (bit_num % 8));
 }
 
+/* Set dword of data and its enable bits in tcam sw entry */
+static void mvpp2_prs_tcam_data_dword_set(struct mvpp2_prs_entry *pe,
+					  unsigned int offs,
+					  unsigned int word,
+					  unsigned int enable)
+{
+	int index, offset;
+	unsigned char byte, byte_mask;
+
+	for (index = 0; index < 4; index++) {
+		offset = (offs * 4) + index;
+		byte = ((unsigned char *)&word)[index];
+		byte_mask = ((unsigned char *)&enable)[index];
+		mvpp2_prs_tcam_data_byte_set(pe, offset, byte, byte_mask);
+	}
+}
+
+/* Get dword of data and its enable bits from tcam sw entry */
+static void mvpp2_prs_tcam_data_dword_get(struct mvpp2_prs_entry *pe,
+					  unsigned int offs,
+					  unsigned int *word,
+					  unsigned int *enable)
+{
+	int index, offset;
+	unsigned char byte, mask;
+
+	for (index = 0; index < 4; index++) {
+		offset = (offs * 4) + index;
+		mvpp2_prs_tcam_data_byte_get(pe, offset,  &byte, &mask);
+		((unsigned char *)word)[index] = byte;
+		((unsigned char *)enable)[index] = mask;
+	}
+}
+
 /* Update ri bits in sram sw entry */
 static void mvpp2_prs_sram_ri_update(struct mvpp2_prs_entry *pe,
 				     unsigned int bits, unsigned int mask)
@@ -3077,12 +3110,14 @@ static void mvpp2_prs_sram_offset_set(struct mvpp2_prs_entry *pe,
 }
 
 /* Find parser flow entry */
-static struct mvpp2_prs_entry *mvpp2_prs_flow_find(struct mvpp2 *priv, int flow)
+static struct mvpp2_prs_entry *mvpp2_prs_flow_find(struct mvpp2 *priv, int flow,
+						   u32 ri, u32 ri_mask)
 {
 	struct mvpp2_prs_entry *pe;
 	int tid;
+	unsigned int dword, enable;
 
-	pe = kzalloc(sizeof(*pe), GFP_KERNEL);
+	pe = kzalloc(sizeof(*pe), GFP_ATOMIC);
 	if (!pe)
 		return NULL;
 	mvpp2_prs_tcam_lu_set(pe, MVPP2_PRS_LU_FLOWS);
@@ -3097,6 +3132,14 @@ static struct mvpp2_prs_entry *mvpp2_prs_flow_find(struct mvpp2 *priv, int flow)
 
 		pe->index = tid;
 		mvpp2_prs_hw_read(priv, pe);
+
+		/* Check result info, because there maybe several
+		 * TCAM lines to generate the same flow
+		 */
+		mvpp2_prs_tcam_data_dword_get(pe, 0, &dword, &enable);
+		if (dword != ri || enable != ri_mask)
+			continue;
+
 		bits = mvpp2_prs_sram_ai_get(pe);
 
 		/* Sram store classification lookup ID in AI bits [5:0] */
@@ -3813,6 +3856,70 @@ static int mvpp2_prs_ip6_cast(struct mvpp2 *priv, unsigned short l3_cast)
 	mvpp2_prs_shadow_set(priv, pe.index, MVPP2_PRS_LU_IP6);
 	mvpp2_prs_hw_write(priv, &pe);
 
+	return 0;
+}
+
+/* Set prs dedicated flow for the port */
+static int mvpp2_prs_flow_id_set(struct mvpp2_port *port, u32 flow_id,
+				 u32 ri, u32 ri_mask)
+{
+	struct mvpp2_prs_entry *pe;
+	struct mvpp2 *priv = port->priv;
+	int tid;
+	unsigned int pmap = 0;
+
+	pe = mvpp2_prs_flow_find(priv, flow_id, ri, ri_mask);
+
+	/* Such entry not exist */
+	if (!pe) {
+		/* Go through the all entires from last to first */
+		tid = mvpp2_prs_tcam_first_free(priv,
+						MVPP2_PE_LAST_FREE_TID,
+						MVPP2_PE_FIRST_FREE_TID);
+		if (tid < 0)
+			return tid;
+
+		pe = kzalloc(sizeof(*pe), GFP_ATOMIC);
+		if (!pe)
+			return -ENOMEM;
+
+		mvpp2_prs_tcam_lu_set(pe, MVPP2_PRS_LU_FLOWS);
+		pe->index = tid;
+
+		mvpp2_prs_sram_ai_update(pe, flow_id, MVPP2_PRS_FLOW_ID_MASK);
+		mvpp2_prs_sram_bits_set(pe, MVPP2_PRS_SRAM_LU_DONE_BIT, 1);
+
+		/* Update shadow table */
+		mvpp2_prs_shadow_set(priv, pe->index, MVPP2_PRS_LU_FLOWS);
+
+		/* Update result data and mask */
+		mvpp2_prs_tcam_data_dword_set(pe, 0, ri, ri_mask);
+	} else {
+		pmap = mvpp2_prs_tcam_port_map_get(pe);
+	}
+
+	mvpp2_prs_tcam_port_map_set(pe, (1 << port->id) | pmap);
+	mvpp2_prs_hw_write(priv, pe);
+	kfree(pe);
+
+	return 0;
+}
+
+/* Set prs flow for the port */
+static int mvpp2_prs_def_flow(struct mvpp2_port *port)
+{
+	int index, ret;
+	struct mvpp2_prs_flow_id *entry;
+
+	for (index = 0; index < MVPP2_PRS_FL_TCAM_NUM; index++) {
+		entry = &mvpp2_prs_flow_id_array[index];
+		ret = mvpp2_prs_flow_id_set(port,
+					    entry->flow_id,
+					    entry->prs_result.ri,
+					    entry->prs_result.ri_mask);
+		if (ret)
+			return ret;
+	}
 	return 0;
 }
 
@@ -5171,45 +5278,6 @@ static int mvpp2_prs_tag_mode_set(struct mvpp2 *priv, int port, int type)
 		if (type < 0 || type > MVPP2_TAG_TYPE_EDSA)
 			return -EINVAL;
 	}
-
-	return 0;
-}
-
-/* Set prs flow for the port */
-static int mvpp2_prs_def_flow(struct mvpp2_port *port)
-{
-	struct mvpp2_prs_entry *pe;
-	int tid;
-
-	pe = mvpp2_prs_flow_find(port->priv, port->id);
-
-	/* Such entry not exist */
-	if (!pe) {
-		/* Go through the all entires from last to first */
-		tid = mvpp2_prs_tcam_first_free(port->priv,
-						MVPP2_PE_LAST_FREE_TID,
-					       MVPP2_PE_FIRST_FREE_TID);
-		if (tid < 0)
-			return tid;
-
-		pe = kzalloc(sizeof(*pe), GFP_KERNEL);
-		if (!pe)
-			return -ENOMEM;
-
-		mvpp2_prs_tcam_lu_set(pe, MVPP2_PRS_LU_FLOWS);
-		pe->index = tid;
-
-		/* Set flow ID*/
-		mvpp2_prs_sram_ai_update(pe, port->id, MVPP2_PRS_FLOW_ID_MASK);
-		mvpp2_prs_sram_bits_set(pe, MVPP2_PRS_SRAM_LU_DONE_BIT, 1);
-
-		/* Update shadow table */
-		mvpp2_prs_shadow_set(port->priv, pe->index, MVPP2_PRS_LU_FLOWS);
-	}
-
-	mvpp2_prs_tcam_port_map_set(pe, (1 << port->id));
-	mvpp2_prs_hw_write(port->priv, pe);
-	kfree(pe);
 
 	return 0;
 }
