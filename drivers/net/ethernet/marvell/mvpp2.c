@@ -2087,7 +2087,7 @@ enum mv_pp2_queue_distribution_mode {
 	MVPP2_SINGLE_RESOURCE_MODE
 };
 
-static int queue_mode = MVPP2_QDIST_SINGLE_MODE;
+static int queue_mode = MVPP2_QDIST_MULTI_MODE;
 static u8 used_hifs;
 
 module_param(queue_mode, int, 0444);
