@@ -200,6 +200,60 @@ static const struct dw_pcie_ops dw_pcie_ops = {
 	.link_up = armada8k_pcie_link_up,
 };
 
+static int armada8k_phy_config(struct platform_device *pdev,
+			       struct armada8k_pcie *pcie)
+{
+	struct phy *comphy;
+	char phy_name[10];
+	int err, phy_count;
+	char i;
+
+	phy_count = of_property_count_strings(pdev->dev.of_node, "phy-names");
+
+	if (phy_count <= 0)
+		return 0;
+
+	dev_err(&pdev->dev, "after phy count");
+	for (i = 0; i < phy_count; i++) {
+		snprintf(phy_name, sizeof(phy_name), "pcie-phy%d", i);
+		comphy = devm_phy_get(&pdev->dev, phy_name);
+		if (IS_ERR(comphy))
+			dev_err(&pdev->dev, "Failed to get phy %d\n", i);
+
+		switch (phy_count) {
+		case PCIE_LNK_X1:
+		case PCIE_LNK_X2:
+		case PCIE_LNK_X4:
+			phy_set_bus_width(comphy, phy_count);
+			break;
+		default:
+			dev_err(&pdev->dev, "wrong pcie width %d", phy_count);
+			return -EINVAL;
+		}
+
+		err = phy_set_mode(comphy, PHY_MODE_PCIE);
+		if (err) {
+			dev_err(&pdev->dev, "failed to set comphy\n");
+			return err;
+		}
+
+		err = phy_init(comphy);
+		if (err < 0) {
+			dev_err(&pdev->dev, "phy init failed %d", phy_count);
+			return err;
+		}
+
+		err = phy_power_on(comphy);
+		if (err < 0) {
+			dev_err(&pdev->dev, "phy init failed %d", phy_count);
+			phy_exit(comphy);
+			return err;
+		}
+	}
+
+	return err;
+}
+
 static int armada8k_pcie_probe(struct platform_device *pdev)
 {
 	struct dw_pcie *pci;
@@ -235,6 +289,12 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	if (IS_ERR(pci->dbi_base)) {
 		dev_err(dev, "couldn't remap regs base %p\n", base);
 		ret = PTR_ERR(pci->dbi_base);
+		goto fail;
+	}
+
+	ret = armada8k_phy_config(pdev, pcie);
+	if (ret < 0) {
+		dev_err(dev, "PHYs config failed: %d\n", ret);
 		goto fail;
 	}
 
