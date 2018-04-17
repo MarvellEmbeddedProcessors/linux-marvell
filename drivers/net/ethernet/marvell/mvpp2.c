@@ -10341,7 +10341,7 @@ static int mvpp22_rss_rxq_set(struct mvpp2_port *port)
 
 static inline u32 mvpp22_rxfh_indir(struct mvpp2_port *port, u32 rxq)
 {
-	int nrxqs, cpus = num_present_cpus();
+	int nrxqs, cpus = used_hifs;
 
 	/* Number of RXQs per CPU */
 	nrxqs = port->nrxqs / cpus;
@@ -10366,7 +10366,7 @@ static int mvpp22_cpu_id_from_indir_get(struct mvpp2_port *port, int entry)
 	u32 i, seq = 0;
 	u32 cpu_seq = port->priv->indir[entry];
 
-	for (i = 0; i < num_present_cpus(); i++) {
+	for (i = 0; i < used_hifs; i++) {
 		if ((*cpumask_bits(cpu_online_mask)) & (1 << i)) {
 			if (i == cpu_seq)
 				return i;
