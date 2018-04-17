@@ -449,6 +449,11 @@ static bool mv88e6xxx_6352_family(struct mv88e6xxx_priv_state *ps)
 	return ps->info->family == MV88E6XXX_FAMILY_6352;
 }
 
+static bool mv88e6xxx_6341_family(struct mv88e6xxx_priv_state *ps)
+{
+	return ps->info->family == MV88E6XXX_FAMILY_6341;
+}
+
 static bool mv88e6xxx_6390_family(struct mv88e6xxx_priv_state *ps)
 {
 	return ps->info->family == MV88E6XXX_FAMILY_6390;
@@ -464,7 +469,7 @@ static bool mv88e6xxx_has_fid_reg(struct mv88e6xxx_priv_state *ps)
 	/* Does the device have dedicated FID registers for ATU and VTU ops? */
 	if (mv88e6xxx_6097_family(ps) || mv88e6xxx_6165_family(ps) ||
 	    mv88e6xxx_6351_family(ps) || mv88e6xxx_6352_family(ps) ||
-	    mv88e6xxx_6390_family(ps))
+	    mv88e6xxx_6341_family(ps) || mv88e6xxx_6390_family(ps))
 		return true;
 
 	return false;
@@ -523,7 +528,8 @@ static void mv88e6xxx_adjust_link(struct dsa_switch *ds, int port,
 		reg |= PORT_PCS_CTRL_DUPLEX_FULL;
 
 	if ((mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
-	     mv88e6xxx_6390_family(ps)) && (port >= ps->info->num_ports - 2)) {
+	     mv88e6xxx_6341_family(ps) || mv88e6xxx_6390_family(ps)) &&
+	    (port >= ps->info->num_ports - 2)) {
 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID)
 			reg |= PORT_PCS_CTRL_RGMII_DELAY_RXCLK;
 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID)
@@ -558,7 +564,7 @@ static int _mv88e6xxx_stats_snapshot(struct mv88e6xxx_priv_state *ps,
 	int ret;
 
 	if (mv88e6xxx_6320_family(ps) || mv88e6xxx_6352_family(ps) ||
-	    mv88e6xxx_6390_family(ps))
+	    mv88e6xxx_6341_family(ps) || mv88e6xxx_6390_family(ps))
 		port = (port + 1) << 5;
 
 	/* Snapshot the hardware statistics counters for this port. */
@@ -684,6 +690,7 @@ static bool mv88e6xxx_has_stat(struct mv88e6xxx_priv_state *ps,
 			mv88e6xxx_6165_family(ps) ||
 			mv88e6xxx_6351_family(ps) ||
 			mv88e6xxx_6352_family(ps) ||
+			mv88e6xxx_6341_family(ps) ||
 			mv88e6xxx_6390_family(ps);
 	}
 	return false;
@@ -1967,7 +1974,7 @@ static int _mv88e6xxx_vtu_new(struct mv88e6xxx_priv_state *ps, u16 vid,
 
 	if (mv88e6xxx_6097_family(ps) || mv88e6xxx_6165_family(ps) ||
 	    mv88e6xxx_6351_family(ps) || mv88e6xxx_6352_family(ps) ||
-	    mv88e6xxx_6390_family(ps)) {
+	    mv88e6xxx_6341_family(ps) || mv88e6xxx_6390_family(ps)) {
 		struct mv88e6xxx_vtu_stu_entry vstp;
 
 		/* Adding a VTU entry requires a valid STU entry. As VSTP is not
@@ -2702,7 +2709,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 	    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
 	    mv88e6xxx_6185_family(ps) || mv88e6xxx_6095_family(ps) ||
 	    mv88e6xxx_6065_family(ps) || mv88e6xxx_6320_family(ps) ||
-	    mv88e6xxx_6390_family(ps)) {
+	    mv88e6xxx_6341_family(ps) || mv88e6xxx_6390_family(ps)) {
 		/* MAC Forcing register: don't force link, speed,
 		 * duplex or flow control state to any particular
 		 * values on physical ports, but force the CPU port
@@ -2716,7 +2723,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 				PORT_PCS_CTRL_LINK_UP |
 				PORT_PCS_CTRL_DUPLEX_FULL |
 				PORT_PCS_CTRL_FORCE_DUPLEX;
-			if (mv88e6xxx_6352_family(ps)) {
+			if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6341_family(ps)) {
 				/* configure RGMII Delay on cpu / dsa port */
 				reg |= PORT_PCS_CTRL_FORCE_SPEED |
 					PORT_PCS_CTRL_RGMII_DELAY_TXCLK |
@@ -2755,7 +2762,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 	    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
 	    mv88e6xxx_6095_family(ps) || mv88e6xxx_6065_family(ps) ||
 	    mv88e6xxx_6185_family(ps) || mv88e6xxx_6320_family(ps) ||
-	    mv88e6xxx_6390_family(ps))
+	    mv88e6xxx_6341_family(ps) || mv88e6xxx_6390_family(ps))
 		reg = PORT_CONTROL_IGMP_MLD_SNOOP |
 		PORT_CONTROL_USE_TAG | PORT_CONTROL_USE_IP |
 		PORT_CONTROL_STATE_FORWARDING;
@@ -2764,7 +2771,8 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 			reg |= PORT_CONTROL_DSA_TAG;
 		if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 		    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
-		    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps)) {
+		    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps) ||
+		    mv88e6xxx_6341_family(ps)) {
 			reg |= PORT_CONTROL_FRAME_MODE_DSA |
 				PORT_CONTROL_FORWARD_UNKNOWN |
 				PORT_CONTROL_FORWARD_UNKNOWN_MC;
@@ -2774,7 +2782,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 		    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
 		    mv88e6xxx_6095_family(ps) || mv88e6xxx_6065_family(ps) ||
 		    mv88e6xxx_6185_family(ps) || mv88e6xxx_6320_family(ps) ||
-		    mv88e6xxx_6390_family(ps)) {
+		    mv88e6xxx_6390_family(ps) || mv88e6xxx_6341_family(ps)) {
 				reg |= PORT_CONTROL_EGRESS_UNMODIFIED;
 		}
 	}
@@ -2783,7 +2791,8 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 			reg |= PORT_CONTROL_DSA_TAG;
 		if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 		    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
-		    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps)) {
+		    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps) ||
+		    mv88e6xxx_6341_family(ps)) {
 			reg |= PORT_CONTROL_FRAME_MODE_DSA;
 		}
 
@@ -2801,7 +2810,8 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 	/* If this port is connected to a SerDes, make sure the SerDes is not
 	 * powered down.
 	 */
-	if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6390_family(ps)) {
+	if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6390_family(ps) ||
+	    mv88e6xxx_6341_family(ps)) {
 		ret = _mv88e6xxx_reg_read(ps, REG_PORT(port), PORT_STATUS);
 		if (ret < 0)
 			return ret;
@@ -2825,12 +2835,13 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 	if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 	    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
 	    mv88e6xxx_6095_family(ps) || mv88e6xxx_6320_family(ps) ||
-	    mv88e6xxx_6185_family(ps) || mv88e6xxx_6390_family(ps))
+	    mv88e6xxx_6185_family(ps) || mv88e6xxx_6390_family(ps) ||
+	    mv88e6xxx_6341_family(ps))
 		reg = PORT_CONTROL_2_MAP_DA;
 
 	if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 	    mv88e6xxx_6165_family(ps) || mv88e6xxx_6320_family(ps) ||
-	    mv88e6xxx_6390_family(ps))
+	    mv88e6xxx_6390_family(ps) || mv88e6xxx_6341_family(ps))
 		reg |= PORT_CONTROL_2_JUMBO_10240;
 
 	if (mv88e6xxx_6095_family(ps) || mv88e6xxx_6185_family(ps)) {
@@ -2874,7 +2885,8 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 
 	if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 	    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
-	    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps)) {
+	    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps) ||
+	    mv88e6xxx_6341_family(ps)) {
 		/* Do not limit the period of time that this port can
 		 * be paused for by the remote end or the period of
 		 * time that this port can pause the remote end.
@@ -2925,7 +2937,8 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 	if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 	    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
 	    mv88e6xxx_6185_family(ps) || mv88e6xxx_6095_family(ps) ||
-	    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps)) {
+	    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps) ||
+	    mv88e6xxx_6341_family(ps)) {
 		/* Rate Control: disable ingress rate limiting. */
 		ret = _mv88e6xxx_reg_write(ps, REG_PORT(port),
 					   PORT_RATE_CONTROL, 0x0001);
@@ -3128,7 +3141,8 @@ static int mv88e6xxx_setup_global(struct mv88e6xxx_priv_state *ps)
 
 	if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 	    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
-	    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps)) {
+	    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps) ||
+	    mv88e6xxx_6341_family(ps)) {
 		/* Send all frames with destination addresses matching
 		 * 01:80:c2:00:00:2x to the CPU port.
 		 */
@@ -3158,7 +3172,8 @@ static int mv88e6xxx_setup_global(struct mv88e6xxx_priv_state *ps)
 	if (mv88e6xxx_6352_family(ps) || mv88e6xxx_6351_family(ps) ||
 	    mv88e6xxx_6165_family(ps) || mv88e6xxx_6097_family(ps) ||
 	    mv88e6xxx_6185_family(ps) || mv88e6xxx_6095_family(ps) ||
-	    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps)) {
+	    mv88e6xxx_6320_family(ps) || mv88e6xxx_6390_family(ps) ||
+	    mv88e6xxx_6341_family(ps)) {
 		/* Disable ingress rate limiting by resetting all
 		 * ingress rate limit registers to their initial
 		 * state.
@@ -3441,7 +3456,7 @@ static int mv88e6xxx_get_temp(struct dsa_switch *ds, int *temp)
 		return -EOPNOTSUPP;
 
 	if (mv88e6xxx_6320_family(ps) || mv88e6xxx_6352_family(ps) ||
-	    mv88e6xxx_6390_family(ps))
+	    mv88e6xxx_6390_family(ps) || mv88e6xxx_6341_family(ps))
 		return mv88e63xx_get_temp(ds, temp);
 
 	return mv88e61xx_get_temp(ds, temp);
@@ -3660,11 +3675,19 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 	},
 	[MV88E6341] = {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
-		.family = MV88E6XXX_FAMILY_6352,
+		.family = MV88E6XXX_FAMILY_6341,
 		.name = "Marvell 88E6341",
 		.num_databases = 4096,
 		.num_ports = 6,
-		.flags = MV88E6XXX_FLAGS_FAMILY_6352 | MV88E6XXX_FLAG_PHY_ADDR,
+		.flags = MV88E6XXX_FLAGS_FAMILY_6341 | MV88E6XXX_FLAG_PHY_ADDR,
+	},
+	[MV88E6141] = {
+		.prod_num = PORT_SWITCH_ID_PROD_NUM_6141,
+		.family = MV88E6XXX_FAMILY_6341,
+		.name = "Marvell 88E6141",
+		.num_databases = 4096,
+		.num_ports = 6,
+		.flags = MV88E6XXX_FLAGS_FAMILY_6341 | MV88E6XXX_FLAG_PHY_ADDR,
 	},
 	[MV88E6390] = {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6390,
