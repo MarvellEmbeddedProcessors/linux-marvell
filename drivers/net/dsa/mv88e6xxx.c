@@ -3865,7 +3865,13 @@ int mv88e6xxx_probe(struct mdio_device *mdiodev)
 
 	ds->drv = &mv88e6xxx_switch_driver;
 
+	/* Read switch ID at port 0. Default port address REG_PORT(0) is 0x10 for
+	 *  legacy devices and 0 for Peridot/PeridotX. On failure check whether the
+	 *  device is Peridot/PeridotX by reading at port address 0
+	 */
 	id = mv88e6xxx_reg_read(ps, REG_PORT(0), PORT_SWITCH_ID);
+	if (id == 0xFFFF)
+		id = mv88e6xxx_reg_read(ps, 0, PORT_SWITCH_ID);
 	if (id < 0)
 		return id;
 
