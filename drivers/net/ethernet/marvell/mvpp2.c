@@ -9009,6 +9009,7 @@ static int mvpp2_probe(struct platform_device *pdev)
 		priv->lms_base = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(priv->lms_base))
 			return PTR_ERR(priv->lms_base);
+		queue_mode = MVPP2_QDIST_SINGLE_MODE;
 	} else {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 		if (has_acpi_companion(&pdev->dev)) {
