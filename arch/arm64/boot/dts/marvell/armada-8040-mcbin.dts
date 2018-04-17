@@ -184,6 +184,14 @@
 	num-lanes = <4>;
 	num-viewport = <8>;
 	reset-gpio = <&cp0_gpio1 20 GPIO_ACTIVE_LOW>;
+
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy0 0
+		&cp0_comphy1 0
+		&cp0_comphy2 0
+		&cp0_comphy3 0>;
+	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
+
 	status = "okay";
 };
 
