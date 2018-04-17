@@ -2832,7 +2832,9 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_priv_state *ps, int port)
 		ret &= PORT_STATUS_CMODE_MASK;
 		if ((ret == PORT_STATUS_CMODE_100BASE_X) ||
 		    (ret == PORT_STATUS_CMODE_1000BASE_X) ||
-		    (ret == PORT_STATUS_CMODE_SGMII)) {
+		    (ret == PORT_STATUS_CMODE_SGMII) ||
+		    (ret == PORT_STATUS_CMODE_2500BASE_X) ||
+		    (ret == PORT_STATUS_CMODE_RXAUI)) {
 			ret = mv88e6xxx_power_on_serdes(ps);
 			if (ret < 0)
 				return ret;
@@ -3703,6 +3705,14 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.num_ports = 6,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6341 | MV88E6XXX_FLAG_PHY_ADDR,
 	},
+	[MV88E6390X] = {
+		.prod_num = PORT_SWITCH_ID_PROD_NUM_6390X,
+		.family = MV88E6XXX_FAMILY_6390,
+		.name = "Marvell 88E6390X",
+		.num_databases = 4096,
+		.num_ports = 11,
+		.flags = MV88E6XXX_FLAGS_FAMILY_6390,
+	},
 	[MV88E6390] = {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6390,
 		.family = MV88E6XXX_FAMILY_6390,
@@ -3711,7 +3721,6 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.num_ports = 11,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6390,
 	},
-
 	[MV88E6290] = {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6290,
 		.family = MV88E6XXX_FAMILY_6390,
@@ -3720,7 +3729,6 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
 		.num_ports = 11,
 		.flags = MV88E6XXX_FLAGS_FAMILY_6390,
 	},
-
 	[MV88E6190] = {
 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6190,
 		.family = MV88E6XXX_FAMILY_6390,
@@ -3865,7 +3873,8 @@ int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	rev = id & 0x000f;
 	if ((prod_num == PORT_SWITCH_ID_PROD_NUM_6190) ||
 	    (prod_num == PORT_SWITCH_ID_PROD_NUM_6290) ||
-	    (prod_num == PORT_SWITCH_ID_PROD_NUM_6390))
+	    (prod_num == PORT_SWITCH_ID_PROD_NUM_6390) ||
+	    (prod_num == PORT_SWITCH_ID_PROD_NUM_6390X))
 		REG_PORT_BASE = REG_PORT_BASE_PERIDOT;
 
 	ps->info = mv88e6xxx_lookup_info(prod_num, mv88e6xxx_table,
