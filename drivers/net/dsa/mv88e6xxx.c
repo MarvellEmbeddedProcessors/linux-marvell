@@ -562,15 +562,22 @@ static int _mv88e6xxx_stats_snapshot(struct mv88e6xxx_priv_state *ps,
 				     int port)
 {
 	int ret;
+	unsigned int counter_type;
 
 	if (mv88e6xxx_6320_family(ps) || mv88e6xxx_6352_family(ps) ||
 	    mv88e6xxx_6341_family(ps) || mv88e6xxx_6390_family(ps))
 		port = (port + 1) << 5;
 
+	/* Read Mac counters by default instead of policy counters */
+	if (mv88e6xxx_6390_family(ps) || mv88e6xxx_6341_family(ps))
+		counter_type = GLOBAL_STATS_OP_MAC_RX_TX;
+	else
+		counter_type = GLOBAL_STATS_OP_HIST_RX_TX;
+
 	/* Snapshot the hardware statistics counters for this port. */
 	ret = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_STATS_OP,
 				   GLOBAL_STATS_OP_CAPTURE_PORT |
-				   GLOBAL_STATS_OP_HIST_RX_TX | port);
+				   counter_type | port);
 	if (ret < 0)
 		return ret;
 
@@ -587,12 +594,19 @@ static void _mv88e6xxx_stats_read(struct mv88e6xxx_priv_state *ps,
 {
 	u32 _val;
 	int ret;
+	unsigned int counter_type;
 
 	*val = 0;
 
+	/* Read Mac counters by default instead of policy counters */
+	if (mv88e6xxx_6390_family(ps) || mv88e6xxx_6341_family(ps))
+		counter_type = GLOBAL_STATS_OP_MAC_RX_TX;
+	else
+		counter_type = GLOBAL_STATS_OP_HIST_RX_TX;
+
 	ret = _mv88e6xxx_reg_write(ps, REG_GLOBAL, GLOBAL_STATS_OP,
 				   GLOBAL_STATS_OP_READ_CAPTURED |
-				   GLOBAL_STATS_OP_HIST_RX_TX | stat);
+				   counter_type | stat);
 	if (ret < 0)
 		return;
 
