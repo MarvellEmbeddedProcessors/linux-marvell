@@ -140,7 +140,7 @@
 				mmu-masters = <&usb3h0 0x483>,
 					      <&usb3h1 0x484>;
 			};
-			pinctrl@6f4000 {
+			pinctrl0: pinctrl@6f4000 {
 				ap_emmc_pins: emmc-pins-0 {
 					marvell,pins = "mpp0", "mpp1", "mpp2",
 					"mpp3", "mpp4", "mpp5", "mpp6", "mpp7",
@@ -152,6 +152,9 @@
 					"mpp3";
 					marvell,function = "spi0";
 				};
+			};
+			gpio0: gpio@6F5040 {
+				gpio-ranges = <&pinctrl0 0 0 20>;
 			};
 		};
 	};
@@ -188,6 +191,7 @@
 			};
 			cp0_gpio1: gpio@440140 {
 				gpiobase = <52>;
+				gpio-ranges = <&cp0_pinctrl 0 32 31>;
 			};
 			cp0_usb3h0: usb3@500000 {
 				#stream-id-cells = <1>;
@@ -249,6 +253,7 @@
 			};
 			cp1_gpio0: gpio@440100 {
 				gpiobase = <20>;
+				gpio-ranges = <&cp1_pinctrl 0 0 32>;
 			};
 			rtc@284000 {
 				status = "okay";
