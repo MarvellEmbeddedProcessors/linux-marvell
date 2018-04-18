@@ -701,15 +701,6 @@ static struct mvebu_mpp_ctrl armada_cp110_1_mpp_controls[] = {
 	MPP_FUNC_CTRL(0, 62, NULL, armada_cp110_1_mpp_ctrl),
 };
 
-static struct pinctrl_gpio_range armada_cp110_0_mpp_gpio_ranges[] = {
-	MPP_GPIO_RANGE(0, 0, 20, 32),
-	MPP_GPIO_RANGE(1, 32, 52, 31),
-};
-
-static struct pinctrl_gpio_range armada_cp110_1_mpp_gpio_ranges[] = {
-	MPP_GPIO_RANGE(0, 0, 20, 32),
-};
-
 static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 {
 	struct mvebu_pinctrl_soc_info *soc;
@@ -753,8 +744,6 @@ static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 		}
 		soc->controls = armada_cp110_0_mpp_controls;
 		soc->ncontrols = ARRAY_SIZE(armada_cp110_0_mpp_controls);
-		soc->gpioranges = armada_cp110_0_mpp_gpio_ranges;
-		soc->ngpioranges = ARRAY_SIZE(armada_cp110_0_mpp_gpio_ranges);
 		soc->modes = armada_cp110_mpp_modes;
 		soc->nmodes = armada_cp110_0_mpp_controls[0].npins;
 		break;
@@ -764,8 +753,6 @@ static int armada_cp110_pinctrl_probe(struct platform_device *pdev)
 			return PTR_ERR(cp1_mpp_base);
 		soc->controls = armada_cp110_1_mpp_controls;
 		soc->ncontrols = ARRAY_SIZE(armada_cp110_1_mpp_controls);
-		soc->gpioranges = armada_cp110_1_mpp_gpio_ranges;
-		soc->ngpioranges = ARRAY_SIZE(armada_cp110_1_mpp_gpio_ranges);
 		soc->modes = armada_cp110_mpp_modes;
 		soc->nmodes = armada_cp110_1_mpp_controls[0].npins;
 		break;

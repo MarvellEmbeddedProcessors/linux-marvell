@@ -144,10 +144,6 @@ static struct mvebu_mpp_ctrl armada_ap806_mpp_controls[] = {
 	MPP_FUNC_CTRL(0, 19, NULL, armada_ap806_mpp_ctrl),
 };
 
-static struct pinctrl_gpio_range armada_ap806_mpp_gpio_ranges[] = {
-	MPP_GPIO_RANGE(0,   0,  0, 20),
-};
-
 static int armada_ap806_pinctrl_probe(struct platform_device *pdev)
 {
 	struct mvebu_pinctrl_soc_info *soc = &armada_ap806_pinctrl_info;
@@ -182,8 +178,6 @@ static int armada_ap806_pinctrl_probe(struct platform_device *pdev)
 	soc->variant = 0; /* no variants for Armada AP806 */
 	soc->controls = armada_ap806_mpp_controls;
 	soc->ncontrols = ARRAY_SIZE(armada_ap806_mpp_controls);
-	soc->gpioranges = armada_ap806_mpp_gpio_ranges;
-	soc->ngpioranges = ARRAY_SIZE(armada_ap806_mpp_gpio_ranges);
 	soc->modes = armada_ap806_mpp_modes;
 	soc->nmodes = armada_ap806_mpp_controls[0].npins;
 
