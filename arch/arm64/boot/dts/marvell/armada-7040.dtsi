@@ -163,6 +163,12 @@
 			rtc@284000 {
 				status = "okay";
 			};
+			cp0_gpio0: gpio@440100{
+				gpiobase = <20>;
+			};
+			cp0_gpio1: gpio@440140{
+				gpiobase = <52>;
+			};
 			cp0_sata: sata@540000 {
 				#stream-id-cells = <1>;
 			};
