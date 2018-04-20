@@ -184,6 +184,9 @@
 &cp0_usb3_1 {
 	usb-phy = <&cp0_usb3_1_phy>;
 	status = "okay";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy4 1>;
+	phy-names = "usb";
 };
 
 &cp0_mdio {
