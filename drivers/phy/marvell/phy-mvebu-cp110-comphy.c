@@ -85,11 +85,13 @@ static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
 	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_2500SGMII),
 	MVEBU_COMPHY_CONF(1, 0, PHY_MODE_PCIE),
 	MVEBU_COMPHY_CONF(1, 0, PHY_MODE_SATA),
+	MVEBU_COMPHY_CONF(1, 0, PHY_MODE_USB_HOST),
 	/* lane 2 */
 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SGMII),
 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_2500SGMII),
 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_10GKR),
 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_PCIE),
+	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_USB_HOST),
 	/* lane 3 */
 	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_SGMII),
 	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_2500SGMII),
@@ -101,6 +103,7 @@ static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
 	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_10GKR),
 	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_SGMII),
 	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_PCIE),
+	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_USB_HOST),
 	/* lane 5 */
 	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_SGMII),
 	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_2500SGMII),
@@ -179,6 +182,11 @@ static int mvebu_comphy_power_on(struct phy *phy)
 		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
 				 COMPHY_FW_MODE_FORMAT(COMPHY_SATA_MODE));
+		break;
+	case PHY_MODE_USB_HOST:
+		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
+				 lane->id,
+				 COMPHY_FW_MODE_FORMAT(COMPHY_USB3H_MODE));
 		break;
 	default:
 		return -ENOTSUPP;
