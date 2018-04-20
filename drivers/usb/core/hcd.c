@@ -2773,6 +2773,12 @@ int usb_add_hcd(struct usb_hcd *hcd,
 				phy_put(phy);
 				goto err_phy;
 			}
+			retval = phy_set_mode(phy, PHY_MODE_USB_HOST);
+			if (retval) {
+				phy_exit(phy);
+				phy_put(phy);
+				goto err_phy;
+			}
 			retval = phy_power_on(phy);
 			if (retval) {
 				phy_exit(phy);
