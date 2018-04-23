@@ -3563,7 +3563,7 @@ int mv_pp2x_cls_init(struct platform_device *pdev, struct mv_pp2x_hw *hw)
 	mv_pp2x_write(hw, MVPP2_CLS_MODE_REG, MVPP2_CLS_MODE_ACTIVE_MASK);
 
 	/* Clear classifier flow table */
-	memset(&fe.data, 0, MVPP2_CLS_FLOWS_TBL_DATA_WORDS);
+	memset(&fe.data, 0, sizeof(fe.data));
 	for (index = 0; index < MVPP2_CLS_FLOWS_TBL_SIZE; index++) {
 		fe.index = index;
 		mv_pp2x_cls_flow_write(hw, &fe);
