@@ -1,7 +1,7 @@
-From 3df3e0fb4303d859dca694a484804f11b9f0d2a9 Mon Sep 17 00:00:00 2001
+From df47afb98530351834bbea1d44631541414799f8 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Wed, 28 Oct 2015 08:45:37 +0000
-Subject: [PATCH 040/119] arm64: KVM: Add patchable function selector
+Subject: [PATCH 040/120] arm64: KVM: Add patchable function selector
 
 KVM so far relies on code patching, and is likely to use it more
 in the future. The main issue is that our alternative system works

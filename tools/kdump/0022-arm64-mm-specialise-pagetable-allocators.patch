@@ -1,7 +1,7 @@
-From 0ed165265787532e4a9692d28762e17dfadaa0b4 Mon Sep 17 00:00:00 2001
+From 07aa5c63bac280eca1abc8f5491cbc56a7ca48c7 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Mon, 25 Jan 2016 11:44:56 +0000
-Subject: [PATCH 022/119] arm64: mm: specialise pagetable allocators
+Subject: [PATCH 022/120] arm64: mm: specialise pagetable allocators
 
 We pass a size parameter to early_alloc and late_alloc, but these are
 only ever used to allocate single pages. In late_alloc we always

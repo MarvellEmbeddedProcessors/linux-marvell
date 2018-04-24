@@ -1,7 +1,7 @@
-From 55fbc147d0f00d8f7961c5136d232d82162da19e Mon Sep 17 00:00:00 2001
+From 63fcdf79c1218b2dfc4c15a7c91c1a7f4930414d Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Sun, 25 Oct 2015 15:21:52 +0000
-Subject: [PATCH 045/119] arm64: KVM: Add panic handling
+Subject: [PATCH 045/120] arm64: KVM: Add panic handling
 
 Add the panic handler, together with the small bits of assembly
 code to call the kernel's panic implementation.

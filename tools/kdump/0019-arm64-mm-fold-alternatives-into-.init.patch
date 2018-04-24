@@ -1,7 +1,7 @@
-From dc1b6740e4912fa9fa646534ab3047f762e7ce18 Mon Sep 17 00:00:00 2001
+From cc5a35a5362e6bda3cf1dcd81244107362d9b0a4 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Wed, 9 Dec 2015 12:44:38 +0000
-Subject: [PATCH 019/119] arm64: mm: fold alternatives into .init
+Subject: [PATCH 019/120] arm64: mm: fold alternatives into .init
 
 Currently we treat the alternatives separately from other data that's
 only used during initialisation, using separate .altinstructions and

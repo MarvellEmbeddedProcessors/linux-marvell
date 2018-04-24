@@ -1,7 +1,7 @@
-From e4cb8b706e34c24c43bb28c12e5a5803cd44e6b3 Mon Sep 17 00:00:00 2001
+From 05f7077afc79aebada7aa58bf13d334324c31773 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Mon, 25 Jan 2016 11:45:00 +0000
-Subject: [PATCH 027/119] arm64: add function to install the idmap
+Subject: [PATCH 027/120] arm64: add function to install the idmap
 
 In some cases (e.g. when making invasive changes to the kernel page
 tables) we will need to execute code from the idmap.

@@ -1,7 +1,7 @@
-From 5ea823cd9ed0b3f27642b0918002b63306cd9580 Mon Sep 17 00:00:00 2001
+From a7dced82ab9b570541587a7fd552a5399840af1e Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Mon, 19 Oct 2015 16:32:20 +0100
-Subject: [PATCH 035/119] arm64: KVM: Implement timer save/restore
+Subject: [PATCH 035/120] arm64: KVM: Implement timer save/restore
 
 Implement the timer save restore as a direct translation of
 the assembly code version.

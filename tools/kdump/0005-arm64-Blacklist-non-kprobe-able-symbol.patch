@@ -1,7 +1,7 @@
-From d3d16b73ef8ea2fac75637376bcc56e1968d9ae7 Mon Sep 17 00:00:00 2001
+From e00288f8b514d25bace25132d789fd84f9251078 Mon Sep 17 00:00:00 2001
 From: Pratyush Anand <panand@redhat.com>
 Date: Fri, 8 Jul 2016 12:35:49 -0400
-Subject: [PATCH 005/119] arm64: Blacklist non-kprobe-able symbol
+Subject: [PATCH 005/120] arm64: Blacklist non-kprobe-able symbol
 
 commit 44b53f67c99d0fc53af3066a05d9e7ca5080a850 upstream.
 

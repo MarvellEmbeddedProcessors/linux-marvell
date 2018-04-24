@@ -1,7 +1,7 @@
-From d0b11cb97e26a68718326929be12a31b8967250b Mon Sep 17 00:00:00 2001
+From 696e503430d74cbd5dded9daa65c3b1fe4ba65a6 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Wed, 6 Jan 2016 11:05:27 +0000
-Subject: [PATCH 023/119] arm64: head.S: use memset to clear BSS
+Subject: [PATCH 023/120] arm64: head.S: use memset to clear BSS
 
 Currently we use an open-coded memzero to clear the BSS. As it is a
 trivial implementation, it is sub-optimal.

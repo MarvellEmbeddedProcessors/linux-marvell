@@ -1,7 +1,7 @@
-From 37e12c021245d37d6654427d45429634fbec2c13 Mon Sep 17 00:00:00 2001
+From 7b68fdfd45f9783170bdb75e6f79df9d92ed3df3 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Mon, 25 Jan 2016 11:44:55 +0000
-Subject: [PATCH 020/119] asm-generic: Fix local variable shadow in
+Subject: [PATCH 020/120] asm-generic: Fix local variable shadow in
  __set_fixmap_offset
 
 Currently __set_fixmap_offset is a macro function which has a local

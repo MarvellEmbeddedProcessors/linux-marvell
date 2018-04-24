@@ -1,7 +1,7 @@
-From 6ecf0509211cfc06abb023f68838c3b3c8ab15b7 Mon Sep 17 00:00:00 2001
+From 5a5334af993132d7a5e5e3b8d0eb29ab1f463d54 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Thu, 21 Jul 2016 09:44:17 +0100
-Subject: [PATCH 013/119] arm64: kprobes: Cleanup jprobe_return
+Subject: [PATCH 013/120] arm64: kprobes: Cleanup jprobe_return
 
 commit 3b7d14e9f3f1efd4c4348800e977fd1ce4ca660e upstream.
 

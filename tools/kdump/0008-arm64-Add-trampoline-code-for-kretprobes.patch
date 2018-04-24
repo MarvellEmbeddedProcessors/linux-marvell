@@ -1,7 +1,7 @@
-From d6361dea22c1de9c66b86fd1534b706fb54c5629 Mon Sep 17 00:00:00 2001
+From 9d8f6c4ed0f845e68b66076798dcb9850b7e845e Mon Sep 17 00:00:00 2001
 From: William Cohen <wcohen@redhat.com>
 Date: Fri, 8 Jul 2016 12:35:52 -0400
-Subject: [PATCH 008/119] arm64: Add trampoline code for kretprobes
+Subject: [PATCH 008/120] arm64: Add trampoline code for kretprobes
 
 commit da6a91252ad98d49b49e83b76c1f032cdf6e5258 upstream.
 

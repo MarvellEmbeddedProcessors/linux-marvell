@@ -1,7 +1,7 @@
-From d5ba219807d61adb6e54b12802a78ccfa0241ce2 Mon Sep 17 00:00:00 2001
+From 0a9ddee730a91f6398ed64b6a8a37d7cc0afddf0 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Mon, 19 Oct 2015 15:50:37 +0100
-Subject: [PATCH 034/119] arm64: KVM: Implement vgic-v2 save/restore
+Subject: [PATCH 034/120] arm64: KVM: Implement vgic-v2 save/restore
 
 Implement the vgic-v2 save restore (mostly) as a direct translation
 of the assembly code version.

@@ -1,7 +1,7 @@
-From 4a358b71e2482838be454d52960a3e1bd64c558e Mon Sep 17 00:00:00 2001
+From c249d35e0fc4e89b2605047254b51547e956baa9 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Wed, 9 Dec 2015 12:44:36 +0000
-Subject: [PATCH 021/119] arm64: mm: remove pointless PAGE_MASKing
+Subject: [PATCH 021/120] arm64: mm: remove pointless PAGE_MASKing
 
 As pgd_offset{,_k} shift the input address by PGDIR_SHIFT, the sub-page
 bits will always be shifted out. There is no need to apply PAGE_MASK

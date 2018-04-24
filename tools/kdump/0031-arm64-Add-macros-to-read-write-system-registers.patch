@@ -1,7 +1,7 @@
-From 4dedef5eff188e614ed8542ec042babfa646a361 Mon Sep 17 00:00:00 2001
+From bebbe2a710e9db4b5bf3059595dda19a6a936922 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Thu, 5 Nov 2015 15:09:17 +0000
-Subject: [PATCH 031/119] arm64: Add macros to read/write system registers
+Subject: [PATCH 031/120] arm64: Add macros to read/write system registers
 
 Rather than crafting custom macros for reading/writing each system
 register provide generics accessors, read_sysreg and write_sysreg, for
@@ -19,7 +19,7 @@ Signed-off-by: Alex Shi <alex.shi@linaro.org>
  1 file changed, 21 insertions(+)
 
 diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index d48ab5b..4aeebec 100644
+index 8373fa1..e67e6ae 100644
 --- a/arch/arm64/include/asm/sysreg.h
 +++ b/arch/arm64/include/asm/sysreg.h
 @@ -20,6 +20,8 @@
@@ -31,7 +31,7 @@ index d48ab5b..4aeebec 100644
  #include <asm/opcodes.h>
  
  /*
-@@ -208,6 +210,8 @@
+@@ -209,6 +211,8 @@
  
  #else
  
@@ -40,7 +40,7 @@ index d48ab5b..4aeebec 100644
  asm(
  "	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
  "	.equ	__reg_num_x\\num, \\num\n"
-@@ -232,6 +236,23 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+@@ -233,6 +237,23 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
  	val |= set;
  	asm volatile("msr sctlr_el1, %0" : : "r" (val));
  }

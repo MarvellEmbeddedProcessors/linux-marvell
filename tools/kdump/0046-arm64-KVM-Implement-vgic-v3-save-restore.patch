@@ -1,7 +1,7 @@
-From df5b6b781be573efedc5e8d8fd2589ad249a1284 Mon Sep 17 00:00:00 2001
+From d892b1688fb241d51aafffe126034570af38d7d0 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Mon, 19 Oct 2015 15:50:58 +0100
-Subject: [PATCH 046/119] arm64: KVM: Implement vgic-v3 save/restore
+Subject: [PATCH 046/120] arm64: KVM: Implement vgic-v3 save/restore
 
 Implement the vgic-v3 save restore as a direct translation of
 the assembly code version.

@@ -1,7 +1,7 @@
-From 107ddb986bea5f67b2c3891180084fde4f0495df Mon Sep 17 00:00:00 2001
+From be22d205adf2e12bc86ee2a1783d23f579d35046 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Mon, 25 Jan 2016 11:44:57 +0000
-Subject: [PATCH 024/119] arm64: mm: place empty_zero_page in bss
+Subject: [PATCH 024/120] arm64: mm: place empty_zero_page in bss
 
 Currently the zero page is set up in paging_init, and thus we cannot use
 the zero page earlier. We use the zero page as a reserved TTBR value

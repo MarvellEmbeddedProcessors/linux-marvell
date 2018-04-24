@@ -1,7 +1,7 @@
-From 8ed670cc56abe67a1dea5c51c4e6528354c6e680 Mon Sep 17 00:00:00 2001
+From e3b345f0e72ac873b980d1c032644bad5f6e578f Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Mon, 25 Jan 2016 11:44:58 +0000
-Subject: [PATCH 025/119] arm64: unify idmap removal
+Subject: [PATCH 025/120] arm64: unify idmap removal
 
 We currently open-code the removal of the idmap and restoration of the
 current task's MMU state in a few places.

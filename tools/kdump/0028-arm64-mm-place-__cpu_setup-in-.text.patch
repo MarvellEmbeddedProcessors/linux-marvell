@@ -1,7 +1,7 @@
-From ef8a8188ce095cff8b166ba4b37cdc82ca43baf3 Mon Sep 17 00:00:00 2001
+From 0e61a99132f2fd24918edd16a53d56a2c7488da1 Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Fri, 11 Dec 2015 11:04:31 +0000
-Subject: [PATCH 028/119] arm64: mm: place __cpu_setup in .text
+Subject: [PATCH 028/120] arm64: mm: place __cpu_setup in .text
 
 We drop __cpu_setup in .text.init, which ends up being part of .text.
 The .text.init section was a legacy section name which has been unused
@@ -20,17 +20,19 @@ Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 (cherry picked from commit f00083cae331e5d3eecade6b4fdc35d0825e73ef)
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Change-Id: I6950bdb9c4a77251c64d500ceb02de0aea981547
 ---
  arch/arm64/mm/proc.S | 2 --
  1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 18201e9..3a44efb 100644
+index dc678ae..6d82f47 100644
 --- a/arch/arm64/mm/proc.S
 +++ b/arch/arm64/mm/proc.S
-@@ -152,8 +152,6 @@ alternative_else
- alternative_endif
- ENDPROC(cpu_do_switch_mm)
+@@ -144,8 +144,6 @@ ENDPROC(cpu_do_switch_mm)
+ 
+ 	.pushsection ".idmap.text", "ax"
  
 -	.section ".text.init", #alloc, #execinstr
 -

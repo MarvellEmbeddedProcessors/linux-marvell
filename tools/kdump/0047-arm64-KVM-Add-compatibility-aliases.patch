@@ -1,7 +1,7 @@
-From 7c834c8e0c7a77f6a736865862d216543b469328 Mon Sep 17 00:00:00 2001
+From 26723a6c4c203c7e6df179e155336244ba82ab27 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Sun, 25 Oct 2015 13:58:00 +0000
-Subject: [PATCH 047/119] arm64: KVM: Add compatibility aliases
+Subject: [PATCH 047/120] arm64: KVM: Add compatibility aliases
 
 So far, we've implemented the new world switch with a completely
 different namespace, so that we could have both implementation

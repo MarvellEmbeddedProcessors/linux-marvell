@@ -1,7 +1,7 @@
-From cbaae815d8f93a8f8b525a806d63a8719dc9619f Mon Sep 17 00:00:00 2001
+From c8d6460bb19b16ee0c9faf04d1ee19f6eae6fdf4 Mon Sep 17 00:00:00 2001
 From: Will Deacon <will.deacon@arm.com>
 Date: Tue, 19 Jul 2016 15:07:39 +0100
-Subject: [PATCH 011/119] arm64: kprobes: WARN if attempting to step with
+Subject: [PATCH 011/120] arm64: kprobes: WARN if attempting to step with
  PSTATE.D=1
 
 commit 44bd887ce10eb8061f6a137f8a73f823957edd82 upstream.

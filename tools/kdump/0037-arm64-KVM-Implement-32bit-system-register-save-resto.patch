@@ -1,7 +1,7 @@
-From 3d22b295566744a75e051c17672eeef45077e164 Mon Sep 17 00:00:00 2001
+From 1a8f866e776ce2a2dd5a34de6b264573e85eccd5 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Mon, 19 Oct 2015 19:28:29 +0100
-Subject: [PATCH 037/119] arm64: KVM: Implement 32bit system register
+Subject: [PATCH 037/120] arm64: KVM: Implement 32bit system register
  save/restore
 
 Implement the 32bit system register save/restore as a direct

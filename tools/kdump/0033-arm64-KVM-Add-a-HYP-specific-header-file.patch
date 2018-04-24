@@ -1,7 +1,7 @@
-From 22b7ff21005af270508b1fbea3dbb3096ef52065 Mon Sep 17 00:00:00 2001
+From 860ebe46a72d1a183a89ee87bcb0afcca4764d1c Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Wed, 21 Oct 2015 10:09:49 +0100
-Subject: [PATCH 033/119] arm64: KVM: Add a HYP-specific header file
+Subject: [PATCH 033/120] arm64: KVM: Add a HYP-specific header file
 
 In order to expose the various EL2 services that are private to
 the hypervisor, add a new hyp.h file.

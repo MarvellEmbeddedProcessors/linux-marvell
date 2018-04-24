@@ -1,7 +1,7 @@
-From b855073ad1c1ea417a73a05acba3bbb4f50f0a20 Mon Sep 17 00:00:00 2001
+From 6bfc59180526a1cf4d46a8f7538aef7dbf7fa607 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Sun, 25 Oct 2015 08:01:56 +0000
-Subject: [PATCH 044/119] arm64: KVM: HYP mode entry points
+Subject: [PATCH 044/120] arm64: KVM: HYP mode entry points
 
 Add the entry points for HYP mode (both for hypercalls and
 exception handling).

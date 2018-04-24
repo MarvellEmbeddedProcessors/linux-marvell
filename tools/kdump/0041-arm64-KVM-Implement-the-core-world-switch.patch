@@ -1,7 +1,7 @@
-From 29181f63ef34e885727a7aabc3779a24fa8e6933 Mon Sep 17 00:00:00 2001
+From 2cf6bf7f2ef352d329dc416cf0b3336fc2898a39 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Wed, 21 Oct 2015 09:57:10 +0100
-Subject: [PATCH 041/119] arm64: KVM: Implement the core world switch
+Subject: [PATCH 041/120] arm64: KVM: Implement the core world switch
 
 Implement the core of the world switch in C. Not everything is there
 yet, and there is nothing to re-enter the world switch either.

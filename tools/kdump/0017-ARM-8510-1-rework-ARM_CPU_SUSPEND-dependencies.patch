@@ -1,7 +1,7 @@
-From 066891b36ba32910633d05a8ba4229b49de16f6a Mon Sep 17 00:00:00 2001
+From 77cf91c9e0360731c3119bcec3058ce80c972fbf Mon Sep 17 00:00:00 2001
 From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Date: Mon, 1 Feb 2016 18:01:29 +0100
-Subject: [PATCH 017/119] ARM: 8510/1: rework ARM_CPU_SUSPEND dependencies
+Subject: [PATCH 017/120] ARM: 8510/1: rework ARM_CPU_SUSPEND dependencies
 
 The code enabled by the ARM_CPU_SUSPEND config option is used by
 kernel subsystems for purposes that go beyond system suspend so its

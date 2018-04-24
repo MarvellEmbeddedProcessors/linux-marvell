@@ -1,7 +1,7 @@
-From 6dade948a5fb38b8d08a5cc5957f50026f2a7f17 Mon Sep 17 00:00:00 2001
+From 418c1ac5931605b61410cfccb42fc5907193ea24 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Thu, 29 Jan 2015 13:52:12 +0000
-Subject: [PATCH 052/119] arm64: KVM: VHE: Patch out use of HVC
+Subject: [PATCH 052/120] arm64: KVM: VHE: Patch out use of HVC
 
 With VHE, the host never issues an HVC instruction to get into the
 KVM code, as we can simply branch there.
@@ -18,11 +18,11 @@ Signed-off-by: Alex Shi <alex.shi@linaro.org>
  2 files changed, 38 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 0ccdcbb..0689a74 100644
+index 5a1749e..61b7716e 100644
 --- a/arch/arm64/kvm/hyp.S
 +++ b/arch/arm64/kvm/hyp.S
-@@ -17,7 +17,9 @@
- 
+@@ -18,7 +18,9 @@
+ #include <linux/arm-smccc.h>
  #include <linux/linkage.h>
  
 +#include <asm/alternative.h>
@@ -31,7 +31,7 @@ index 0ccdcbb..0689a74 100644
  
  /*
   * u64 kvm_call_hyp(void *hypfn, ...);
-@@ -38,6 +40,11 @@
+@@ -39,6 +41,11 @@
   * arch/arm64/kernel/hyp_stub.S.
   */
  ENTRY(kvm_call_hyp)

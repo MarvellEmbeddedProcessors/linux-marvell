@@ -1,7 +1,7 @@
-From c6d0d1ebed42584ba342e1c876335ffab32b562b Mon Sep 17 00:00:00 2001
+From 340250d3af613aa9dea6c320345856ed2d78c77c Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Mon, 19 Oct 2015 21:02:46 +0100
-Subject: [PATCH 038/119] arm64: KVM: Implement debug save/restore
+Subject: [PATCH 038/120] arm64: KVM: Implement debug save/restore
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit

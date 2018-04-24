@@ -1,7 +1,7 @@
-From 82b30fb7c8cde278ea6cc6fb0ec2a8608ea949ac Mon Sep 17 00:00:00 2001
+From 4db1c7e3a00f1810a806acc1db4d334fffb41779 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Thu, 22 Oct 2015 08:32:18 +0100
-Subject: [PATCH 039/119] arm64: KVM: Implement guest entry
+Subject: [PATCH 039/120] arm64: KVM: Implement guest entry
 
 Contrary to the previous patch, the guest entry is fairly different
 from its assembly counterpart, mostly because it is only concerned

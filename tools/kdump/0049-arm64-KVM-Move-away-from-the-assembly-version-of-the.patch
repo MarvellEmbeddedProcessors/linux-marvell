@@ -1,7 +1,7 @@
-From 6702eeee35dfaf8f2b769a056843cb74b15c73fa Mon Sep 17 00:00:00 2001
+From cea7ad64cdc66e009799c323a968e0f8dde1f6fb Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Sun, 25 Oct 2015 15:51:41 +0000
-Subject: [PATCH 049/119] arm64: KVM: Move away from the assembly version of
+Subject: [PATCH 049/120] arm64: KVM: Move away from the assembly version of
  the world switch
 
 This is it. We remove all of the code that has now been rewritten.
@@ -10,12 +10,14 @@ Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 (cherry picked from commit 1ea66d27e7b01086669ff2abdc3ac89dc90eae51)
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Change-Id: Ie0c21256e3eba1dd5d8adc7573ac3507381bd83f
 ---
  arch/arm64/kvm/Makefile         |    2 -
- arch/arm64/kvm/hyp.S            | 1081 +--------------------------------------
+ arch/arm64/kvm/hyp.S            | 1096 +--------------------------------------
  arch/arm64/kvm/vgic-v2-switch.S |  134 -----
  arch/arm64/kvm/vgic-v3-switch.S |  269 ----------
- 4 files changed, 1 insertion(+), 1485 deletions(-)
+ 4 files changed, 1 insertion(+), 1500 deletions(-)
  delete mode 100644 arch/arm64/kvm/vgic-v2-switch.S
  delete mode 100644 arch/arm64/kvm/vgic-v3-switch.S
 
@@ -33,11 +35,11 @@ index d31e4e5..caee9ee 100644
 -kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
 diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 86c2898..0ccdcbb 100644
+index 525da44..5a1749e 100644
 --- a/arch/arm64/kvm/hyp.S
 +++ b/arch/arm64/kvm/hyp.S
-@@ -17,910 +17,7 @@
- 
+@@ -18,910 +18,7 @@
+ #include <linux/arm-smccc.h>
  #include <linux/linkage.h>
  
 -#include <asm/alternative.h>
@@ -947,7 +949,7 @@ index 86c2898..0ccdcbb 100644
  
  /*
   * u64 kvm_call_hyp(void *hypfn, ...);
-@@ -934,7 +31,7 @@ __hyp_panic_str:
+@@ -935,7 +32,7 @@ __hyp_panic_str:
   * passed as x0, x1, and x2 (a maximum of 3 arguments in addition to the
   * function pointer can be passed).  The function being called must be mapped
   * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
@@ -956,7 +958,7 @@ index 86c2898..0ccdcbb 100644
   *
   * A function pointer with a value of 0 has a special meaning, and is
   * used to implement __hyp_get_vectors in the same way as in
-@@ -944,179 +41,3 @@ ENTRY(kvm_call_hyp)
+@@ -945,194 +42,3 @@ ENTRY(kvm_call_hyp)
  	hvc	#0
  	ret
  ENDPROC(kvm_call_hyp)
@@ -990,10 +992,11 @@ index 86c2898..0ccdcbb 100644
 -	lsr	x2, x1, #ESR_ELx_EC_SHIFT
 -
 -	cmp	x2, #ESR_ELx_EC_HVC64
+-	ccmp	x2, #ESR_ELx_EC_HVC32, #4, ne
 -	b.ne	el1_trap
 -
--	mrs	x3, vttbr_el2			// If vttbr is valid, the 64bit guest
--	cbnz	x3, el1_trap			// called HVC
+-	mrs	x3, vttbr_el2		// If vttbr is valid, the guest
+-	cbnz	x3, el1_hvc_guest	// called HVC
 -
 -	/* Here, we're pretty sure the host called HVC. */
 -	pop	x2, x3
@@ -1018,6 +1021,20 @@ index 86c2898..0ccdcbb 100644
 -
 -	pop	lr, xzr
 -2:	eret
+-
+-el1_hvc_guest:
+-	/*
+-	 * Fastest possible path for ARM_SMCCC_ARCH_WORKAROUND_1.
+-	 * The workaround has already been applied on the host,
+-	 * so let's quickly get back to the guest. We don't bother
+-	 * restoring x3, as it can be clobbered anyway.
+-	 */
+-	ldr	x3, [sp]				// Guest's x0
+-	eor	w3, w3, #ARM_SMCCC_ARCH_WORKAROUND_1
+-	cbnz	w3, el1_trap
+-	mov	x0, x3
+-	add	sp, sp, #16
+-	eret
 -
 -el1_trap:
 -	/*

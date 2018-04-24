@@ -1,7 +1,7 @@
-From 96ab714243d622bce2a469ee701aa797038aa3e4 Mon Sep 17 00:00:00 2001
+From 75c3106b18141279551aa80a8b10a8e16a2766d0 Mon Sep 17 00:00:00 2001
 From: "David A. Long" <dave.long@linaro.org>
 Date: Fri, 8 Jul 2016 12:35:46 -0400
-Subject: [PATCH 002/119] arm64: Add more test functions to insn.c
+Subject: [PATCH 002/120] arm64: Add more test functions to insn.c
 
 commit d59bee887231191c80f2ee674d7ec19179eb40ec upstream.
 

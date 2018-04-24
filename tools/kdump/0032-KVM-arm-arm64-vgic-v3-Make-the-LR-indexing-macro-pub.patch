@@ -1,7 +1,7 @@
-From 5ebaf6ab9c87e3edb37ac731ce6f1c4b6d1302cd Mon Sep 17 00:00:00 2001
+From e3a90a82c155e0c562d1aca705d0c030244af752 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 1 Dec 2015 13:48:56 +0000
-Subject: [PATCH 032/119] KVM: arm/arm64: vgic-v3: Make the LR indexing macro
+Subject: [PATCH 032/120] KVM: arm/arm64: vgic-v3: Make the LR indexing macro
  public
 
 We store GICv3 LRs in reverse order so that the CPU can save/restore

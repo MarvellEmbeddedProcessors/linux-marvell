@@ -1,7 +1,7 @@
-From dcd8db38deb922eef2d42e3b805b8e286e551e7e Mon Sep 17 00:00:00 2001
+From b058fc0eeb2c470931c12f6b55afca6756eaa431 Mon Sep 17 00:00:00 2001
 From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Date: Mon, 1 Feb 2016 18:01:30 +0100
-Subject: [PATCH 018/119] ARM: 8511/1: ARM64: kernel: PSCI: move PSCI idle
+Subject: [PATCH 018/120] ARM: 8511/1: ARM64: kernel: PSCI: move PSCI idle
  management code to drivers/firmware
 
 ARM64 PSCI kernel interfaces that initialize idle states and implement
@@ -37,6 +37,8 @@ Cc: Jisheng Zhang <jszhang@marvell.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 (cherry picked from commit 8b6f2499ac45d5a0ab2e4b6f9613ab3f60416be1)
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Change-Id: I5c558d7449908ffe832f46733e3748b00f406b61
 ---
  arch/arm/Kconfig         |   2 +-
  arch/arm64/kernel/psci.c |  99 +-------------------------------------
@@ -185,7 +187,7 @@ index f67f35b..42816be 100644
  	.cpu_init	= cpu_psci_cpu_init,
  	.cpu_prepare	= cpu_psci_cpu_prepare,
 diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index b38305b..0ab477ba 100644
+index 0a915a0..9412191 100644
 --- a/drivers/firmware/psci.c
 +++ b/drivers/firmware/psci.c
 @@ -14,6 +14,7 @@
@@ -209,7 +211,7 @@ index b38305b..0ab477ba 100644
  #include <asm/cputype.h>
  #include <asm/system_misc.h>
  #include <asm/smp_plat.h>
-@@ -244,6 +247,123 @@ static int __init psci_features(u32 psci_func_id)
+@@ -263,6 +266,123 @@ static int __init psci_features(u32 psci_func_id)
  			      psci_func_id, 0, 0);
  }
  
@@ -334,19 +336,19 @@ index b38305b..0ab477ba 100644
  {
  	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
 diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 12c4865..393efe2 100644
+index e5c3277..5d8d05a 100644
 --- a/include/linux/psci.h
 +++ b/include/linux/psci.h
-@@ -24,6 +24,9 @@ bool psci_tos_resident_on(int cpu);
- bool psci_power_state_loses_context(u32 state);
- bool psci_power_state_is_valid(u32 state);
+@@ -35,6 +35,9 @@ enum smccc_version {
+ 	SMCCC_VERSION_1_1,
+ };
  
 +int psci_cpu_init_idle(unsigned int cpu);
 +int psci_cpu_suspend_enter(unsigned long index);
 +
  struct psci_operations {
+ 	u32 (*get_version)(void);
  	int (*cpu_suspend)(u32 state, unsigned long entry_point);
- 	int (*cpu_off)(u32 state);
 -- 
 2.7.4
 

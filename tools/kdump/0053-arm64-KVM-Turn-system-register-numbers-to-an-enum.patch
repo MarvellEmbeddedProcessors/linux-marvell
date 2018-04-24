@@ -1,7 +1,7 @@
-From 5c183cecf325f344e3b896ed9cea138801b6f5b0 Mon Sep 17 00:00:00 2001
+From e78f2101781c6fd17d54b2a6937d20ac7ecb491f Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Sun, 25 Oct 2015 19:57:11 +0000
-Subject: [PATCH 053/119] arm64: KVM: Turn system register numbers to an enum
+Subject: [PATCH 053/120] arm64: KVM: Turn system register numbers to an enum
 
 Having the system register numbers as #defines has been a pain
 since day one, as the ordering is pretty fragile, and moving
@@ -129,7 +129,7 @@ index 25a4021..3066328 100644
  #include <asm/ptrace.h>
  #include <asm/cputype.h>
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index a35ce72..975db14 100644
+index ae0de3a..d481336 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
 @@ -25,7 +25,6 @@
@@ -264,11 +264,11 @@ index 3039f08..e5ee888 100644
  #include <asm/kvm_coproc.h>
  
 diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 5295aef..b58bf03 100644
+index 0316918..1da1bfd 100644
 --- a/arch/arm64/kvm/handle_exit.c
 +++ b/arch/arm64/kvm/handle_exit.c
-@@ -23,6 +23,7 @@
- #include <linux/kvm_host.h>
+@@ -25,6 +25,7 @@
+ #include <kvm/arm_psci.h>
  
  #include <asm/esr.h>
 +#include <asm/kvm_asm.h>

@@ -1,7 +1,7 @@
-From 25bd03c12c7d7f547a16c64dd42649bfe1f4e1ab Mon Sep 17 00:00:00 2001
+From 7d6cefa1d92a17f9ba3e3055162becdd0b18b0b2 Mon Sep 17 00:00:00 2001
 From: Ashok Kumar <ashoks@broadcom.com>
 Date: Thu, 17 Dec 2015 01:38:32 -0800
-Subject: [PATCH 030/119] arm64: Use PoU cache instr for I/D coherency
+Subject: [PATCH 030/120] arm64: Use PoU cache instr for I/D coherency
 
 In systems with three levels of cache(PoU at L1 and PoC at L3),
 PoC cache flush instructions flushes L2 and L3 caches which could affect

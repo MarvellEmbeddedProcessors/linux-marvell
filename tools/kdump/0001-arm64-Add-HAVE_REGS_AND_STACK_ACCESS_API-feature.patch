@@ -1,7 +1,7 @@
-From d4d95c6a20f099734fb072b4bde46788aad8d653 Mon Sep 17 00:00:00 2001
+From 75927411cc57abc7ee9b25a377d760fd78e105ed Mon Sep 17 00:00:00 2001
 From: "David A. Long" <dave.long@linaro.org>
 Date: Wed, 28 Sep 2016 15:30:52 -0400
-Subject: [PATCH 001/119] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+Subject: [PATCH 001/120] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
 
 commit 0a8ea52c3eb157dd65e224fc95b7c9c99fcba9f7 upstream.
 
@@ -35,7 +35,7 @@ index 51622ba..d3c0c23 100644
  extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
  					       unsigned int n);
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index ac55743..53f34fc 100644
+index 71d6486..e2df102 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
 @@ -77,6 +77,7 @@ config ARM64

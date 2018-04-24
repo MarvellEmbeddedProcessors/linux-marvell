@@ -1,7 +1,7 @@
-From 6aafc3515e9d1968d8ecd186fb5eb6b77f6e3a43 Mon Sep 17 00:00:00 2001
+From cdb2d045ee6cd2db255b4c589d2d7adca716a375 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 27 Oct 2015 12:18:48 +0000
-Subject: [PATCH 048/119] arm64: KVM: Map the kernel RO section into HYP
+Subject: [PATCH 048/120] arm64: KVM: Map the kernel RO section into HYP
 
 In order to run C code in HYP, we must make sure that the kernel's
 RO section is mapped into HYP (otherwise things break badly).
@@ -10,23 +10,17 @@ Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 (cherry picked from commit 910917bb7db070cc67557a6b3c8fcceaa5c398a7)
 Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Change-Id: I833a82465d59aaa4266b729ad74551f6541cb06d
 ---
- arch/arm/kvm/arm.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/kvm/arm.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index d7bef21..449e312 100644
+index d77d29a..ba7fe24 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -44,6 +44,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_psci.h>
-+#include <asm/sections.h>
- 
- #ifdef REQUIRES_VIRT
- __asm__(".arch_extension	virt");
-@@ -1065,6 +1066,12 @@ static int init_hyp_mode(void)
+@@ -1066,6 +1066,12 @@ static int init_hyp_mode(void)
  		goto out_free_mappings;
  	}
  
@@ -36,9 +30,9 @@ index d7bef21..449e312 100644
 +		goto out_free_mappings;
 +	}
 +
- 	/*
- 	 * Map the Hyp stack pages
- 	 */
+ 	err = kvm_map_vectors();
+ 	if (err) {
+ 		kvm_err("Cannot map vectors\n");
 -- 
 2.7.4
 

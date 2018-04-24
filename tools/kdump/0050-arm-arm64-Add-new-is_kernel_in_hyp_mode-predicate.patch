@@ -1,7 +1,7 @@
-From 150eafe8fa9177e0122892fdc9cd5d9bcfacddef Mon Sep 17 00:00:00 2001
+From 47debbae4cba808c22c28a60783173b762e58e73 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Mon, 9 Jun 2014 19:47:09 +0100
-Subject: [PATCH 050/119] arm/arm64: Add new is_kernel_in_hyp_mode predicate
+Subject: [PATCH 050/120] arm/arm64: Add new is_kernel_in_hyp_mode predicate
 
 With ARMv8.1 VHE extension, it will be possible to run the kernel
 at EL2 (aka HYP mode). In order for the kernel to easily find out

@@ -1,7 +1,7 @@
-From 6ddafed52699db5da1fe5c5e841fe0d95952266b Mon Sep 17 00:00:00 2001
+From 299c9357a2aecdff9590d42eeb8390243207a8fb Mon Sep 17 00:00:00 2001
 From: Arnd Bergmann <arnd@arndb.de>
 Date: Thu, 19 Nov 2015 15:49:23 +0100
-Subject: [PATCH 016/119] ARM: 8458/1: bL_switcher: add GIC dependency
+Subject: [PATCH 016/120] ARM: 8458/1: bL_switcher: add GIC dependency
 
 It is not possible to build the bL_switcher code if the GIC
 driver is disabled, because it relies on calling into some

@@ -1,7 +1,7 @@
-From 6112fbf11fa59c1378beb1213bd4f19769847014 Mon Sep 17 00:00:00 2001
+From fb5fc6620f74d536bd6738a02c079b6b92b5ac0c Mon Sep 17 00:00:00 2001
 From: Mark Rutland <mark.rutland@arm.com>
 Date: Mon, 25 Jan 2016 11:44:59 +0000
-Subject: [PATCH 026/119] arm64: unmap idmap earlier
+Subject: [PATCH 026/120] arm64: unmap idmap earlier
 
 During boot we leave the idmap in place until paging_init, as we
 previously had to wait for the zero page to become allocated and

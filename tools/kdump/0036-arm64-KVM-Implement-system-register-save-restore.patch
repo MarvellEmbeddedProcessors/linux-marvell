@@ -1,7 +1,7 @@
-From 7883b8056f236954e599413a6479dd5338ca554c Mon Sep 17 00:00:00 2001
+From e54abc9563a88b750f8cf8c6703136bd7c545511 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Mon, 19 Oct 2015 18:02:48 +0100
-Subject: [PATCH 036/119] arm64: KVM: Implement system register save/restore
+Subject: [PATCH 036/120] arm64: KVM: Implement system register save/restore
 
 Implement the system register save/restore as a direct translation of
 the assembly code version.
