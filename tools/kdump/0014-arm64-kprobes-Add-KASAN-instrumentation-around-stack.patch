@@ -1,7 +1,7 @@
-From 66bd115d97975967a9006eccd41b5eb5fcb8951b Mon Sep 17 00:00:00 2001
+From 57df366a583bb17740665a55c2e6636a93d0d9d1 Mon Sep 17 00:00:00 2001
 From: Catalin Marinas <catalin.marinas@arm.com>
 Date: Thu, 21 Jul 2016 10:54:54 +0100
-Subject: [PATCH 014/123] arm64: kprobes: Add KASAN instrumentation around
+Subject: [PATCH 014/120] arm64: kprobes: Add KASAN instrumentation around
  stack accesses
 
 commit f7e35c5ba4322838ce84b23a2f1a6d6b7f0b57ec upstream.
@@ -70,5 +70,5 @@ index 2354554..6487b62 100644
  	return 1;
  }
 -- 
-1.8.3.1
+2.7.4
 

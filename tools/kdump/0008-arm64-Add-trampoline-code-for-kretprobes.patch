@@ -1,7 +1,7 @@
-From e0f735f1df6c7aaf434751457a5e4b0a61fed376 Mon Sep 17 00:00:00 2001
+From df064f869364afa4ac52565e01c1b14fd91d032d Mon Sep 17 00:00:00 2001
 From: William Cohen <wcohen@redhat.com>
 Date: Fri, 8 Jul 2016 12:35:52 -0400
-Subject: [PATCH 008/123] arm64: Add trampoline code for kretprobes
+Subject: [PATCH 008/120] arm64: Add trampoline code for kretprobes
 
 commit da6a91252ad98d49b49e83b76c1f032cdf6e5258 upstream.
 
@@ -40,10 +40,10 @@ index 79c9511..61b4915 100644
  
  #endif /* _ARM_KPROBES_H */
 diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 087cf9a..dd292519 100644
+index 7c4146a..2a948bf 100644
 --- a/arch/arm64/kernel/asm-offsets.c
 +++ b/arch/arm64/kernel/asm-offsets.c
-@@ -49,6 +49,17 @@ int main(void)
+@@ -50,6 +50,17 @@ int main(void)
    DEFINE(S_X5,			offsetof(struct pt_regs, regs[5]));
    DEFINE(S_X6,			offsetof(struct pt_regs, regs[6]));
    DEFINE(S_X7,			offsetof(struct pt_regs, regs[7]));
@@ -173,5 +173,5 @@ index 0000000..5d6e7f1
 +
 +ENDPROC(kretprobe_trampoline)
 -- 
-1.8.3.1
+2.7.4
 

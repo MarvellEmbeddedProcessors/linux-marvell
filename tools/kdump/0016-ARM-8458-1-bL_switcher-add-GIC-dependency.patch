@@ -1,7 +1,7 @@
-From ee504c1c0fa5e539684bc644c3025df51c52ce11 Mon Sep 17 00:00:00 2001
+From 4ab75abdda4390d283552280cb4fe6c10fe428e9 Mon Sep 17 00:00:00 2001
 From: Arnd Bergmann <arnd@arndb.de>
 Date: Thu, 19 Nov 2015 15:49:23 +0100
-Subject: [PATCH 016/123] ARM: 8458/1: bL_switcher: add GIC dependency
+Subject: [PATCH 016/120] ARM: 8458/1: bL_switcher: add GIC dependency
 
 It is not possible to build the bL_switcher code if the GIC
 driver is disabled, because it relies on calling into some
@@ -31,10 +31,10 @@ Signed-off-by: Alex Shi <alex.shi@linaro.org>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 34e1569..ceee970 100644
+index 2687c93..63fcaac 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1422,7 +1422,7 @@ config BIG_LITTLE
+@@ -1423,7 +1423,7 @@ config BIG_LITTLE
  
  config BL_SWITCHER
  	bool "big.LITTLE switcher support"
@@ -44,5 +44,5 @@ index 34e1569..ceee970 100644
  	select CPU_PM
  	help
 -- 
-1.8.3.1
+2.7.4
 

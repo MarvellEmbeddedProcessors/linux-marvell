@@ -1,0 +1,30 @@
+From 22c2159563b1149a9c38fc1ebf964bd396408612 Mon Sep 17 00:00:00 2001
+From: Grzegorz Jaszczyk <jaz@semihalf.com>
+Date: Tue, 24 Apr 2018 10:23:29 +0200
+Subject: [PATCH 054/120] arm64: KVM: include missing header with
+ __kvm_hyp_vector declaration
+
+After kdump related patch apply the __kvm_hyp_vector declaration was
+missing due to bug in included files hierarchy.
+
+Change-Id: I1256054e2456ff35e55773384eaa24a9789897a6
+Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+---
+ arch/arm64/include/asm/kvm_mmu.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 3842b76..691b69e 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -304,6 +304,7 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+ 
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ #include <asm/mmu.h>
++#include <asm/kvm_asm.h>
+ 
+ static inline void *kvm_get_hyp_vector(void)
+ {
+-- 
+2.7.4
+

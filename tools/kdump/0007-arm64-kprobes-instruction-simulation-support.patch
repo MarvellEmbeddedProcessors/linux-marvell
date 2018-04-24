@@ -1,7 +1,7 @@
-From bad1d25486643b5d5636076cf5c4b6b3bce1db2f Mon Sep 17 00:00:00 2001
+From d1aa8ce9fa1eb0ae229bb749e967ad7dd452ad70 Mon Sep 17 00:00:00 2001
 From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 Date: Fri, 8 Jul 2016 12:35:51 -0400
-Subject: [PATCH 007/123] arm64: kprobes instruction simulation support
+Subject: [PATCH 007/120] arm64: kprobes instruction simulation support
 
 commit 39a67d49ba353630d144a8eb775500c041c89e7a upstream.
 
@@ -509,5 +509,5 @@ index 0000000..050bde6
 +
 +#endif /* _ARM_KERNEL_KPROBES_SIMULATE_INSN_H */
 -- 
-1.8.3.1
+2.7.4
 

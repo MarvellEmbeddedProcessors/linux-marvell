@@ -1,7 +1,7 @@
-From d3bf1306c7f53b22f289f4e2fef44311ed70e40b Mon Sep 17 00:00:00 2001
+From 8d60820b8377a73db9028309c69ea894c7e0213c Mon Sep 17 00:00:00 2001
 From: Pratyush Anand <panand@redhat.com>
 Date: Fri, 8 Jul 2016 12:35:49 -0400
-Subject: [PATCH 005/123] arm64: Blacklist non-kprobe-able symbol
+Subject: [PATCH 005/120] arm64: Blacklist non-kprobe-able symbol
 
 commit 44b53f67c99d0fc53af3066a05d9e7ca5080a850 upstream.
 
@@ -20,23 +20,25 @@ Signed-off-by: David A. Long <dave.long@linaro.org>
  4 files changed, 31 insertions(+)
 
 diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 3b6d8cc..fbec403 100644
+index 678f30b0..b96ff1a 100644
 --- a/arch/arm64/kernel/arm64ksyms.c
 +++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -26,6 +26,7 @@
- #include <linux/syscalls.h>
+@@ -27,6 +27,7 @@
  #include <linux/uaccess.h>
  #include <linux/io.h>
+ #include <linux/arm-smccc.h>
 +#include <linux/kprobes.h>
  
  #include <asm/checksum.h>
  
-@@ -67,4 +68,5 @@ EXPORT_SYMBOL(test_and_change_bit);
+@@ -68,6 +69,7 @@ EXPORT_SYMBOL(test_and_change_bit);
  
  #ifdef CONFIG_FUNCTION_TRACER
  EXPORT_SYMBOL(_mcount);
 +NOKPROBE_SYMBOL(_mcount);
  #endif
+ 
+ 	/* arm-smccc */
 diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
 index 17a4d37..6de6d9f 100644
 --- a/arch/arm64/kernel/debug-monitors.c
@@ -275,5 +277,5 @@ index bcac81e..814d0c5 100644
  static struct break_hook kgdb_brkpt_hook = {
  	.esr_mask	= 0xffffffff,
 -- 
-1.8.3.1
+2.7.4
 

@@ -1,7 +1,7 @@
-From ea920fcbe7d09b39f6e0ed80f8c2d5a7b89ec734 Mon Sep 17 00:00:00 2001
+From f65e7ca9aa2daa054796d2cb9c698723e729d3c4 Mon Sep 17 00:00:00 2001
 From: "David A. Long" <dave.long@linaro.org>
 Date: Wed, 10 Aug 2016 16:44:51 -0400
-Subject: [PATCH 015/123] arm64: Remove stack duplicating code from jprobes
+Subject: [PATCH 015/120] arm64: Remove stack duplicating code from jprobes
 
 commit ad05711cec12131e1277ce749a99d08ecf233aa7 upstream.
 
@@ -100,5 +100,5 @@ index 6487b62..1ee93c7 100644
  	return 1;
  }
 -- 
-1.8.3.1
+2.7.4
 

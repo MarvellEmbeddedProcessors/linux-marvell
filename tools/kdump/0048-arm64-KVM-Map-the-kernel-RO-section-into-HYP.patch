@@ -1,0 +1,38 @@
+From bb9cc0d31ae3e074c8f12e1d95a0853a85521f4c Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Tue, 27 Oct 2015 12:18:48 +0000
+Subject: [PATCH 048/120] arm64: KVM: Map the kernel RO section into HYP
+
+In order to run C code in HYP, we must make sure that the kernel's
+RO section is mapped into HYP (otherwise things break badly).
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+(cherry picked from commit 910917bb7db070cc67557a6b3c8fcceaa5c398a7)
+Signed-off-by: Alex Shi <alex.shi@linaro.org>
+
+Change-Id: I833a82465d59aaa4266b729ad74551f6541cb06d
+---
+ arch/arm/kvm/arm.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index d77d29a..ba7fe24 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1066,6 +1066,12 @@ static int init_hyp_mode(void)
+ 		goto out_free_mappings;
+ 	}
+ 
++	err = create_hyp_mappings(__start_rodata, __end_rodata);
++	if (err) {
++		kvm_err("Cannot map rodata section\n");
++		goto out_free_mappings;
++	}
++
+ 	err = kvm_map_vectors();
+ 	if (err) {
+ 		kvm_err("Cannot map vectors\n");
+-- 
+2.7.4
+

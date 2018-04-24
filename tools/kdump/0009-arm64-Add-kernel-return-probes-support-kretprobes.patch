@@ -1,7 +1,7 @@
-From ae5c49e1570bebeef750c1020d4199b23380fb39 Mon Sep 17 00:00:00 2001
+From e3ba1b21fa97ad557f6f5b31e7cfedde40196b60 Mon Sep 17 00:00:00 2001
 From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 Date: Fri, 8 Jul 2016 12:35:53 -0400
-Subject: [PATCH 009/123] arm64: Add kernel return probes support (kretprobes)
+Subject: [PATCH 009/120] arm64: Add kernel return probes support (kretprobes)
 
 commit fcfd708b8cf86b8c1ca6ce014d50287f61c0eb88 upstream.
 
@@ -20,10 +20,10 @@ Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
  2 files changed, 90 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e6370c4..7a2b7a2 100644
+index 93e89ed..f17e268 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -79,6 +79,7 @@ config ARM64
+@@ -80,6 +80,7 @@ config ARM64
  	select HAVE_RCU_TABLE_FREE
  	select HAVE_SYSCALL_TRACEPOINTS
  	select HAVE_KPROBES
@@ -133,5 +133,5 @@ index 5619041..f1498b3 100644
  
  int __init arch_init_kprobes(void)
 -- 
-1.8.3.1
+2.7.4
 

@@ -1,7 +1,7 @@
-From e662feff3c13d70a5ce737b3c0738b0815d86bea Mon Sep 17 00:00:00 2001
+From def8306ee9d792e16b4eec644537aa1816aa66fd Mon Sep 17 00:00:00 2001
 From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Date: Mon, 1 Feb 2016 18:01:29 +0100
-Subject: [PATCH 017/123] ARM: 8510/1: rework ARM_CPU_SUSPEND dependencies
+Subject: [PATCH 017/120] ARM: 8510/1: rework ARM_CPU_SUSPEND dependencies
 
 The code enabled by the ARM_CPU_SUSPEND config option is used by
 kernel subsystems for purposes that go beyond system suspend so its
@@ -25,10 +25,10 @@ Signed-off-by: Alex Shi <alex.shi@linaro.org>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ceee970..20ae5d2 100644
+index 63fcaac..2d5eebb 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1423,7 +1423,6 @@ config BIG_LITTLE
+@@ -1424,7 +1424,6 @@ config BIG_LITTLE
  config BL_SWITCHER
  	bool "big.LITTLE switcher support"
  	depends on BIG_LITTLE && MCPM && HOTPLUG_CPU && ARM_GIC
@@ -36,7 +36,7 @@ index ceee970..20ae5d2 100644
  	select CPU_PM
  	help
  	  The big.LITTLE "switcher" provides the core functionality to
-@@ -2140,7 +2139,8 @@ config ARCH_SUSPEND_POSSIBLE
+@@ -2141,7 +2140,8 @@ config ARCH_SUSPEND_POSSIBLE
  	def_bool y
  
  config ARM_CPU_SUSPEND
@@ -47,5 +47,5 @@ index ceee970..20ae5d2 100644
  config ARCH_HIBERNATION_POSSIBLE
  	bool
 -- 
-1.8.3.1
+2.7.4
 

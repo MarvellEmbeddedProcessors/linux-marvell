@@ -1,7 +1,7 @@
-From 8caaa405b29a1b6bedf7653a2b0d2124d5f3cf63 Mon Sep 17 00:00:00 2001
+From bb6e3ff046c2765bdd04158c20f6b8c67c64c048 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Thu, 29 Sep 2016 18:18:23 -0400
-Subject: [PATCH 012/123] arm64: kprobes: Fix overflow when saving stack
+Subject: [PATCH 012/120] arm64: kprobes: Fix overflow when saving stack
 
 commit ab4c1325d4bf111a590a1f773e3d93bde7f40201 upstream.
 
@@ -74,5 +74,5 @@ index a9b274c..b118974 100644
  	return 1;
  }
 -- 
-1.8.3.1
+2.7.4
 

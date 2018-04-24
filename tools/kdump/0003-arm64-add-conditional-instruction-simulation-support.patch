@@ -1,7 +1,7 @@
-From 8813d2a42d0f06384a0dfb6a750b7876b5e18b3d Mon Sep 17 00:00:00 2001
+From e3c933344f87ca21edc6b2bd2ac53893f639d820 Mon Sep 17 00:00:00 2001
 From: "David A. Long" <dave.long@linaro.org>
 Date: Thu, 29 Sep 2016 17:28:13 -0400
-Subject: [PATCH 003/123] arm64: add conditional instruction simulation support
+Subject: [PATCH 003/120] arm64: add conditional instruction simulation support
 
 commit 2af3ec08b414ceb9c32fad2bb0f87252f3f18de8 upstream.
 
@@ -38,7 +38,7 @@ index 497f7a2..a44abbd 100644
  
  #endif	/* __ASM_INSN_H */
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 474691f..fed7fc5 100644
+index 9f276e8..e112edc 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
 @@ -26,8 +26,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
@@ -202,5 +202,5 @@ index f8e05b6..b438070 100644
 +	__check_gt, __check_le, __check_al, __check_al
 +};
 -- 
-1.8.3.1
+2.7.4
 

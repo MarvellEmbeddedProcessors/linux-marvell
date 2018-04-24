@@ -1,7 +1,7 @@
-From aedefb3b52a0cfe1e34102b75e6415042c597751 Mon Sep 17 00:00:00 2001
+From 424591e36d017a202cfa097b7496838e0785f3d0 Mon Sep 17 00:00:00 2001
 From: Will Deacon <will.deacon@arm.com>
 Date: Tue, 19 Jul 2016 15:07:39 +0100
-Subject: [PATCH 011/123] arm64: kprobes: WARN if attempting to step with
+Subject: [PATCH 011/120] arm64: kprobes: WARN if attempting to step with
  PSTATE.D=1
 
 commit 44bd887ce10eb8061f6a137f8a73f823957edd82 upstream.
@@ -33,5 +33,5 @@ index f1498b3..a9b274c 100644
  		/* IRQs and single stepping do not mix well. */
  		kprobes_save_local_irqflag(kcb, regs);
 -- 
-1.8.3.1
+2.7.4
 

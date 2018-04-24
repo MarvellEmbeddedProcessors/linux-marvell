@@ -1,7 +1,7 @@
-From e7aea7fc28fb820c5d847d86f96c2fa56ca8c067 Mon Sep 17 00:00:00 2001
+From d856ceaa781eb156d8372cb7d295dcc8a7444d7d Mon Sep 17 00:00:00 2001
 From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 Date: Thu, 29 Sep 2016 17:47:39 -0400
-Subject: [PATCH 004/123] arm64: Kprobes with single stepping support
+Subject: [PATCH 004/120] arm64: Kprobes with single stepping support
 
 commit 2dd0e8d2d2a157dbc83295a78336c2217110f2f8 upstream.
 
@@ -54,6 +54,7 @@ include/asm-generic/ptrace.h.
 Thanks to Steve Capper and Pratyush Anand for several suggested
 Changes.
 
+Change-Id: I32329804f5600e23439da471ccdf0679ea72c9ac
 Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 Signed-off-by: David A. Long <dave.long@linaro.org>
 Signed-off-by: Pratyush Anand <panand@redhat.com>
@@ -83,10 +84,10 @@ Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
  create mode 100644 arch/arm64/kernel/probes/kprobes.c
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0290331..e6370c4 100644
+index f91adf4..93e89ed 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -78,6 +78,7 @@ config ARM64
+@@ -79,6 +79,7 @@ config ARM64
  	select HAVE_REGS_AND_STACK_ACCESS_API
  	select HAVE_RCU_TABLE_FREE
  	select HAVE_SYSCALL_TRACEPOINTS
@@ -265,12 +266,12 @@ index cfe2b37..1528d52e 100644
  
  #endif /* __ASSEMBLY__ */
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index fed7fc5..cfa290b 100644
+index e112edc..2a19417 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -41,7 +41,7 @@ arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+@@ -45,7 +45,7 @@ ifeq ($(CONFIG_KVM),y)
+ arm64-obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR)	+= bpi.o
+ endif
  
 -obj-y					+= $(arm64-obj-y) vdso/
 +obj-y					+= $(arm64-obj-y) vdso/ probes/
@@ -1055,7 +1056,7 @@ index 71426a78..bc6b631 100644
  			IDMAP_TEXT
  			*(.fixup)
 diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 247bae7..e19cd15 100644
+index 7de7d90..6137f09 100644
 --- a/arch/arm64/mm/fault.c
 +++ b/arch/arm64/mm/fault.c
 @@ -43,6 +43,28 @@
@@ -1097,7 +1098,7 @@ index 247bae7..e19cd15 100644
  	tsk = current;
  	mm  = tsk->mm;
  
-@@ -606,6 +631,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+@@ -638,6 +663,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
  
  	return 0;
  }
@@ -1106,5 +1107,5 @@ index 247bae7..e19cd15 100644
  #ifdef CONFIG_ARM64_PAN
  int cpu_enable_pan(void *__unused)
 -- 
-1.8.3.1
+2.7.4
 

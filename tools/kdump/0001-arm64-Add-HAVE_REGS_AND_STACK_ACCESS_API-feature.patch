@@ -1,7 +1,7 @@
-From cb9f9305b6f6c5f216e57fe38589be55ca586134 Mon Sep 17 00:00:00 2001
+From 261a786debb62c7ac913087698edf9523d4d51d2 Mon Sep 17 00:00:00 2001
 From: "David A. Long" <dave.long@linaro.org>
 Date: Wed, 28 Sep 2016 15:30:52 -0400
-Subject: [PATCH 001/123] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+Subject: [PATCH 001/120] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
 
 commit 0a8ea52c3eb157dd65e224fc95b7c9c99fcba9f7 upstream.
 
@@ -35,10 +35,10 @@ index 51622ba..d3c0c23 100644
  extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
  					       unsigned int n);
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d9de79c..0290331 100644
+index 59a550b..f91adf4 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -75,6 +75,7 @@ config ARM64
+@@ -76,6 +76,7 @@ config ARM64
  	select HAVE_PERF_EVENTS
  	select HAVE_PERF_REGS
  	select HAVE_PERF_USER_STACK_DUMP
@@ -223,5 +223,5 @@ index 55909b2..c5ef059 100644
   * TODO: does not yet catch signals sent when the child dies.
   * in exit.c or in signal.c.
 -- 
-1.8.3.1
+2.7.4
 
