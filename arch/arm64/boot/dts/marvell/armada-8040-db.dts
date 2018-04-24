@@ -114,11 +114,6 @@
 	};
 };
 
-&i2c0 {
-	status = "okay";
-	clock-frequency = <100000>;
-};
-
 /* Accessible over the mini-USB CON9 connector on the main board */
 &uart0 {
 	status = "okay";
