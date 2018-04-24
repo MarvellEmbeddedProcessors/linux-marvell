@@ -10323,9 +10323,10 @@ static void mvpp2_irqs_deinit(struct mvpp2_port *port)
 	}
 }
 
-static bool mvpp22_rss_is_supported(void)
+static bool mvpp22_rss_is_supported(struct mvpp2_port *port)
 {
-	return (queue_mode == MVPP2_QDIST_MULTI_MODE);
+	return (queue_mode == MVPP2_QDIST_MULTI_MODE) &&
+		!(port->flags & MVPP2_F_LOOPBACK);
 }
 
 /* Allocate a rss table for each phisical rxq having same cos priority */
@@ -10485,7 +10486,7 @@ static int mvpp2_open_prs_cls_rss(struct net_device *dev)
 	/* Assign rss table for rxq belong to this port */
 	mvpp22_rss_rxq_set(port);
 
-	if (!mvpp22_rss_is_supported())
+	if (!mvpp22_rss_is_supported(port))
 		return 0;
 
 	/* RSS start */
@@ -10848,7 +10849,7 @@ static int mvpp2_set_features(struct net_device *dev,
 	}
 
 	if (changed & NETIF_F_RXHASH) {
-		if (!mvpp22_rss_is_supported())
+		if (!mvpp22_rss_is_supported(port))
 			return -EOPNOTSUPP;
 		mvpp22_rss_enable(port, !!(features & NETIF_F_RXHASH), false);
 	}
@@ -10988,7 +10989,9 @@ err_out:
 
 static u32 mvpp2_ethtool_get_rxfh_indir_size(struct net_device *dev)
 {
-	return mvpp22_rss_is_supported() ?
+	struct mvpp2_port *port = netdev_priv(dev);
+
+	return mvpp22_rss_is_supported(port) ?
 		MVPP22_RSS_TABLE_ENTRIES : 0;
 }
 
@@ -11070,7 +11073,7 @@ static int mvpp2_ethtool_get_rxnfc(struct net_device *dev,
 	struct mvpp2_port *port = netdev_priv(dev);
 	int ret = 0;
 
-	if (!mvpp22_rss_is_supported())
+	if (!mvpp22_rss_is_supported(port))
 		return -EOPNOTSUPP;
 
 	switch (info->cmd) {
@@ -11092,7 +11095,7 @@ static int mvpp2_ethtool_set_rxnfc(struct net_device *dev,
 	struct mvpp2_port *port = netdev_priv(dev);
 	int ret = 0;
 
-	if (!mvpp22_rss_is_supported())
+	if (!mvpp22_rss_is_supported(port))
 		return -EOPNOTSUPP;
 
 	switch (info->cmd) {
@@ -11110,7 +11113,7 @@ static int mvpp2_ethtool_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 
-	if (!mvpp22_rss_is_supported())
+	if (!mvpp22_rss_is_supported(port))
 		return -EOPNOTSUPP;
 
 	if (indir)
@@ -11130,7 +11133,7 @@ static int mvpp2_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 	int ret, size, i;
 	u32 indir_orig[MVPP22_RSS_TABLE_ENTRIES];
 
-	if (!mvpp22_rss_is_supported())
+	if (!mvpp22_rss_is_supported(port))
 		return -EOPNOTSUPP;
 
 	if (hfunc != ETH_RSS_HASH_NO_CHANGE && hfunc != ETH_RSS_HASH_TOP)
@@ -11734,7 +11737,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	/* 9704 == 9728 - 20 and rounding to 8 */
 	dev->max_mtu = MVPP2_BM_JUMBO_PKT_SIZE;
 
-	if (mvpp22_rss_is_supported())
+	if (mvpp22_rss_is_supported(port))
 		dev->hw_features |= NETIF_F_RXHASH;
 
 	err = register_netdev(dev);
