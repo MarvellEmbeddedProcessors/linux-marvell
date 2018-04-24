@@ -60,7 +60,8 @@
 #define   PIO_COMPLETION_STATUS_UR		1
 #define   PIO_COMPLETION_STATUS_CRS		2
 #define   PIO_COMPLETION_STATUS_CA		4
-#define   PIO_NON_POSTED_REQ			BIT(0)
+#define   PIO_NON_POSTED_REQ			BIT(10)
+#define   PIO_ERR_STATUS			BIT(11)
 #define PIO_ADDR_LS				(PIO_BASE_ADDR + 0x8)
 #define PIO_ADDR_MS				(PIO_BASE_ADDR + 0xc)
 #define PIO_WR_DATA				(PIO_BASE_ADDR + 0x10)
@@ -186,6 +187,9 @@
 
 #define LEGACY_IRQ_NUM			4
 #define MSI_IRQ_NUM			32
+
+#define CFG_RD_UR_VAL			0xFFFFFFFF
+#define CFG_RD_CRS_VAL			0xFFFF0001
 
 struct advk_pcie {
 	struct platform_device *pdev;
@@ -362,7 +366,16 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
 	advk_writel(pcie, reg, PCIE_CORE_CMD_STATUS_REG);
 }
 
-static void advk_pcie_check_pio_status(struct advk_pcie *pcie)
+/**
+ * advk_pcie_check_pio_status() - Validate PIO status and get the read result
+ *
+ * @pcie: Pointer to the PCI bus
+ * @read: Read from or write to configuration space - true(read) false(write)
+ * @read_val: Pointer to the read result, only valid when read is true
+ *
+ */
+static int advk_pcie_check_pio_status(struct advk_pcie *pcie,
+						 bool read, u32 *read_val)
 {
 	struct device *dev = &pcie->pdev->dev;
 	u32 reg;
@@ -373,15 +386,50 @@ static void advk_pcie_check_pio_status(struct advk_pcie *pcie)
 	status = (reg & PIO_COMPLETION_STATUS_MASK) >>
 		PIO_COMPLETION_STATUS_SHIFT;
 
-	if (!status)
-		return;
-
+	/*
+	 * According to HW spec, the PIO status check sequence as below:
+	 * 1) even if COMPLETION_STATUS(bit9:7) indicates successful,
+	 *    it still needs to check Error Status(bit11), only when this bit
+	 *    indicates no error happen, the operation is successful.
+	 * 2) value Unsupported Request(1) of COMPLETION_STATUS(bit9:7) only
+	 *    means a PIO write error, and for PIO read it is successful with
+	 *    a read value of 0xFFFFFFFF.
+	 * 3) value Completion Retry Status(CRS) of COMPLETION_STATUS(bit9:7)
+	 *    only means a PIO write error, and for PIO read it is successful
+	 *    with a read value of 0xFFFF0001.
+	 * 4) value Completer Abort (CA) of COMPLETION_STATUS(bit9:7) means
+	 *    error for both PIO read and PIO write operation.
+	 * 5) other errors are indicated as 'unknown'.
+	 */
 	switch (status) {
+	case PIO_COMPLETION_STATUS_OK:
+		if (reg & PIO_ERR_STATUS) {
+			strcomp_status = "COMP_ERR";
+			break;
+		}
+		/* Get the read result */
+		if (read)
+			*read_val = advk_readl(pcie, PIO_RD_DATA);
+		/* No error */
+		strcomp_status = NULL;
+		break;
 	case PIO_COMPLETION_STATUS_UR:
-		strcomp_status = "UR";
+		if (read) {
+			/* For reading, UR is not an error status. */
+			*read_val = CFG_RD_UR_VAL;
+			strcomp_status = NULL;
+		} else {
+			strcomp_status = "UR";
+		}
 		break;
 	case PIO_COMPLETION_STATUS_CRS:
-		strcomp_status = "CRS";
+		if (read) {
+			/* For reading, CRS is not an error status. */
+			*read_val = CFG_RD_CRS_VAL;
+			strcomp_status = NULL;
+		} else {
+			strcomp_status = "CRS";
+		}
 		break;
 	case PIO_COMPLETION_STATUS_CA:
 		strcomp_status = "CA";
@@ -391,6 +439,9 @@ static void advk_pcie_check_pio_status(struct advk_pcie *pcie)
 		break;
 	}
 
+	if (!strcomp_status)
+		return 0;
+
 	if (reg & PIO_NON_POSTED_REQ)
 		str_posted = "Non-posted";
 	else
@@ -398,6 +449,8 @@ static void advk_pcie_check_pio_status(struct advk_pcie *pcie)
 
 	dev_err(dev, "%s PIO Response Status: %s, %#x @ %#x\n",
 		str_posted, strcomp_status, reg, advk_readl(pcie, PIO_ADDR_LS));
+
+	return -EFAULT;
 }
 
 static int advk_pcie_wait_pio(struct advk_pcie *pcie)
@@ -460,10 +513,11 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
 	if (ret < 0)
 		return PCIBIOS_SET_FAILED;
 
-	advk_pcie_check_pio_status(pcie);
+	/* Check PIO status and get the read result */
+	ret = advk_pcie_check_pio_status(pcie, true, val);
+	if (ret)
+		return ret;
 
-	/* Get the read result */
-	*val = advk_readl(pcie, PIO_RD_DATA);
 	if (size == 1)
 		*val = (*val >> (8 * (where & 3))) & 0xff;
 	else if (size == 2)
@@ -523,7 +577,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
 	if (ret < 0)
 		return PCIBIOS_SET_FAILED;
 
-	advk_pcie_check_pio_status(pcie);
+	advk_pcie_check_pio_status(pcie, false, &reg);
 
 	return PCIBIOS_SUCCESSFUL;
 }
