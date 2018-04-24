@@ -81,11 +81,6 @@
 	};
 };
 
-&i2c0 {
-	status = "okay";
-	clock-frequency = <100000>;
-};
-
 &spi0 {
 	status = "okay";
 
