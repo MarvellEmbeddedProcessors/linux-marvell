@@ -295,10 +295,10 @@ static int mvebu_comphy_probe(struct platform_device *pdev)
 		phy_set_drvdata(phy, lane);
 
 		/*
-		 * Once all modes are supported in this driver we should call
-		 * mvebu_comphy_power_off(phy) here to avoid relying on the
-		 * bootloader/firmware configuration.
+		 * To avoid relying on the bootloader/firmware configuration,
+		 * power off all comphys.
 		 */
+		mvebu_comphy_power_off(phy);
 	}
 
 	dev_set_drvdata(&pdev->dev, priv);
