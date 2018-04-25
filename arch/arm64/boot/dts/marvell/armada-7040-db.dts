@@ -201,6 +201,12 @@
 
 &cp0_sata0 {
 	status = "okay";
+
+	sata-port@1 {
+		status = "okay";
+		/* Generic PHY, providing serdes lanes */
+		phys = <&cp0_comphy3 1>;
+	};
 };
 
 &cp0_usb3_0 {
