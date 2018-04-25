@@ -184,6 +184,8 @@
 
 	sata-port@1 {
 		status = "okay";
+		/* Generic PHY, providing serdes lanes */
+		phys = <&cp0_comphy3 1>;
 	};
 };
 
