@@ -240,8 +240,14 @@
 		};
 	};
 
+#define CP110_NUM				1
+#define SPI_DIRECT_BASE				(0xf9000000)
 	cp1 {
 		config-space {
+			ranges = /* internal regs */
+				 <0x0 U64_TO_U32_H(CP110_BASE) U64_TO_U32_L(CP110_BASE) 0x2000000>,
+				 /* SPI1-DEV0 */
+				 <0x2000000 U64_TO_U32_H(SPI_DIRECT_BASE) U64_TO_U32_L(SPI_DIRECT_BASE) 0x1000000>;
 			i2c@701000 {
 				eeprom@57 {
 					compatible = "at24,24c64";
@@ -277,6 +283,8 @@
 				};
 			};
 			cp1_spi1: spi@700680 {
+				reg = <0x700680 0x50>,		/* control */
+				      <0x2000000 0x1000000>;	/* CS0 */
 				status = "disabled";
 				spi-flash@0 {
 					#address-cells = <0x1>;
@@ -322,4 +330,5 @@
 			gpio = <&expander1 4 GPIO_ACTIVE_HIGH>;
 		};
 	};
+#undef CP110_NUM
 };

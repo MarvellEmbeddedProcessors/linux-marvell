@@ -46,6 +46,9 @@
 
 #include "armada-7040.dtsi"
 
+#define CP110_NUM				0
+#define SPI_DIRECT_BASE				(0xf9000000)
+
 / {
 	model = "Marvell Armada 7040 DB board";
 	compatible = "marvell,armada7040-db", "marvell,armada7040",
@@ -78,6 +81,10 @@
 
 	cp0 {
 		config-space {
+			ranges = /* internal regs */
+				 <0x0 U64_TO_U32_H(CP110_BASE) U64_TO_U32_L(CP110_BASE) 0x2000000>,
+				 /* SPI1-DEV0 */
+				 <0x2000000 U64_TO_U32_H(SPI_DIRECT_BASE) U64_TO_U32_L(SPI_DIRECT_BASE) 0x1000000>;
 			cp0_i2c0: i2c@701000 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&i2c0_pins>;
@@ -112,6 +119,8 @@
 				vqmmc-supply = <&cp0_vccq_sd0_reg>;
 			};
 			spi@700680 {
+				reg = <0x700680 0x50>,		/* control */
+				      <0x2000000 0x1000000>;	/* CS0 */
 				spi-flash@0 {
 					#address-cells = <0x1>;
 					#size-cells = <0x1>;
