@@ -39,6 +39,7 @@
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <net/tso.h>
+#include <linux/uio_driver.h>
 
 #ifndef CACHE_LINE_MASK
 #define CACHE_LINE_MASK            (~(L1_CACHE_BYTES - 1))
@@ -1387,6 +1388,9 @@ struct mvpp2 {
 	struct workqueue_struct *stats_queue;
 
 	bool custom_dma_mask;
+
+	/* UIO private storage, allocated/used by UIO map operations */
+	void *uio;
 };
 
 struct mvpp2_pcpu_stats {
@@ -12019,6 +12023,149 @@ end:
 	return err;
 }
 
+/* mvpp22_uio_map_operation:
+ *  PP2 register-space mapping over UIO-device for User-Space applications.
+ *  Each PP2/CP110, defined in DTS and probed, has its own mapping and UIO-dev.
+ *
+ * Operations executed by this procedure are:
+ * - Add resource (reg-address) mapping from probe to mvpp2_uio storage.
+ * - Register (create) UIO device with parameters from mvpp2_uio storage.
+ * - Unregister registered UIO on MVPP2-module removing
+ *
+ * PARAMETERS:
+ *    platform_device  *pdev,   - PP2
+ *    mvpp2            *priv,   - private of PP2
+ *    resource         *res,    - register space addresses
+ *    char   *resource-name     - res/area name to be seen in UIO
+ *
+ * If res==NULL the operation is either UIO register or unregister,
+ *                         => If priv==NULL - "register" operation.
+ * If resource is provided - this is Add resorce operation,
+ *              on first "Add" the mvpp2_uio storage is allocated.
+ * NOTEs:
+ * Requires "uio" pointer in "struct mvpp2 *priv", allocates
+ *   "struct mvpp2_uio" storage and bind it to this pointer.
+ * On probe the pdev and priv are still not bind each to other,
+ *   so both are needed as input-parameters.
+ * The uio_register cannot be done from probe since the PP2 platform dev is
+ *   not fully initialised and device_add() fails on pdev->dev->class->p.
+ *   Defer the uio registration over work queue.
+ * Return Error handling:
+ *   Don't abort the caller-probe but continue, so Kernel netdev would
+ *   work properly although User-space wouldn't.
+ */
+static void mvpp22_uio_register_wq(struct work_struct *work);
+
+static int mvpp22_uio_map_operation(struct platform_device *pdev,
+				    struct mvpp2 *priv,
+				    struct resource *res,
+				    char *name)
+{
+	const char *name_pref = "mvpp2_";
+	const int max_name_len = 31;
+	const char *pdev_full_name;
+	char *p;
+	struct delayed_work *del_work;
+	struct uio_mem *mem;
+	int err = 0;
+
+	struct mvpp2_uio {
+		struct uio_info uio_info;
+		int num_maps;
+		int reference; /* registered counter */
+		char name_buf[max_name_len + 1];
+		struct platform_device *pdev;
+		struct workqueue_struct *aux_queue;
+		struct delayed_work aux_work;
+	} *uio;
+
+	/* If no "priv" (and no resource) provided - this is registration op */
+	if (!priv) {
+		del_work = (struct delayed_work *)pdev;
+		uio = container_of(del_work, struct mvpp2_uio, aux_work);
+		goto register_dev;
+	}
+
+	uio = priv->uio;
+
+	/* If no "res" (but priv) provided - this is unregister operation */
+	if (!res)
+		goto unregister_dev;
+
+	/* Map-resource adding into private storage operation */
+	if (!uio) {
+		uio = devm_kzalloc(&pdev->dev, sizeof(*uio), GFP_KERNEL);
+		err = uio ? 0 : -ENOMEM;
+		if (err)
+			goto err;
+		priv->uio = uio;
+		uio->pdev = pdev;
+		/* Construct brief name from full /name/x/y */
+		pdev_full_name = of_node_full_name(pdev->dev.of_node);
+		pdev_full_name++;
+		scnprintf(uio->name_buf, max_name_len, "%s%s",
+			  name_pref, pdev_full_name);
+		uio->name_buf[max_name_len] = 0;
+		p = strchr(uio->name_buf, '/');
+		if (p)
+			*p = 0;
+		uio->uio_info.name = uio->name_buf;
+		uio->uio_info.version = "1.0";
+		uio->uio_info.priv = uio;
+
+		/* pdev->dev->class->p not initialized yet.
+		 * Defer uio_register over work queue.
+		 */
+		uio->aux_queue = create_singlethread_workqueue(uio->name_buf);
+		if (!uio->aux_queue)
+			return 0;
+		INIT_DELAYED_WORK(&uio->aux_work, mvpp22_uio_register_wq);
+		queue_delayed_work(uio->aux_queue, &uio->aux_work, HZ / 8);
+	}
+	if (uio->num_maps == MAX_UIO_MAPS) {
+		err = MAX_UIO_MAPS; /* Positive Error value in err-message */
+		goto err;
+	}
+	mem = &uio->uio_info.mem[uio->num_maps++];
+	mem->memtype = UIO_MEM_PHYS;
+	mem->addr = res->start & PAGE_MASK;
+	mem->size = PAGE_ALIGN(resource_size(res));
+	mem->name = name;
+	/* End map-resource adding */
+	return 0;
+
+register_dev:
+	if (uio->reference)
+		return 0;
+	err = uio_register_device(&uio->pdev->dev, &uio->uio_info);
+	if (err)
+		goto err;
+	uio->reference++;
+	return 0;
+
+unregister_dev:
+	if (!uio)
+		return 0;
+	if (uio->aux_queue) {
+		flush_workqueue(uio->aux_queue);
+		destroy_workqueue(uio->aux_queue);
+	}
+	if (uio->reference)
+		uio_unregister_device(&uio->uio_info);
+	return 0;
+
+err:
+	dev_err(&pdev->dev, "uio error=%d\n", err);
+	return err;
+}
+
+static void mvpp22_uio_register_wq(struct work_struct *work)
+{
+	struct delayed_work *del_work = to_delayed_work(work);
+
+	mvpp22_uio_map_operation((void *)del_work, NULL, NULL, NULL);
+}
+
 static int mvpp2_probe(struct platform_device *pdev)
 {
 	const struct acpi_device_id *acpi_id;
@@ -12055,6 +12202,8 @@ static int mvpp2_probe(struct platform_device *pdev)
 			return PTR_ERR(priv->lms_base);
 		queue_mode = MVPP2_QDIST_SINGLE_MODE;
 	} else {
+		mvpp22_uio_map_operation(pdev, priv, res, "pp");
+
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 		if (has_acpi_companion(&pdev->dev)) {
 			/* In case the MDIO memory region is declared in
@@ -12070,6 +12219,8 @@ static int mvpp2_probe(struct platform_device *pdev)
 		priv->iface_base = devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(priv->iface_base))
 			return PTR_ERR(priv->iface_base);
+
+		mvpp22_uio_map_operation(pdev, priv, res, "mspg");
 	}
 
 	used_hifs = (queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ?
@@ -12268,6 +12419,9 @@ static int mvpp2_remove(struct platform_device *pdev)
 
 	flush_workqueue(priv->stats_queue);
 	destroy_workqueue(priv->stats_queue);
+
+	if (priv->hw_version != MVPP21)
+		mvpp22_uio_map_operation(pdev, priv, NULL, NULL);
 
 	fwnode_for_each_available_child_node(fwnode, port_fwnode) {
 		if (priv->port_list[i]) {
