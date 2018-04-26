@@ -742,6 +742,7 @@
 
 /* Port flags */
 #define MVPP2_F_LOOPBACK		BIT(0)
+#define MVPP22_F_IF_MUSDK		BIT(2) /* musdk port */
 
 /* Marvell tag types */
 enum mvpp2_tag_type {
@@ -1484,6 +1485,9 @@ struct mvpp2_port {
 
 	struct mvpp2_rss	rss_cfg;
 	struct mvpp2_cos	cos_cfg;
+
+	/* UIO private storage, allocated/used by User/Kernel mode toggling */
+	void *uio_cfg;
 };
 
 /* The mvpp2_tx_desc and mvpp2_rx_desc structures describe the
@@ -7617,6 +7621,9 @@ static void mvpp2_interrupts_unmask(void *arg)
 	if (queue_mode == MVPP2_SINGLE_RESOURCE_MODE && smp_processor_id() != 0)
 		return;
 
+	if (port->flags & MVPP22_F_IF_MUSDK)
+		return;
+
 	val = MVPP2_CAUSE_MISC_SUM_MASK;
 
 	if (port->priv->hw_version != MVPP22)
@@ -8132,15 +8139,26 @@ static const struct mvpp2_ethtool_counter mvpp2_ethtool_regs[] = {
 	{ MVPP2_MIB_LATE_COLLISION, "late_collision" },
 };
 
+static const char mvpp22_priv_flags_strings[][ETH_GSTRING_LEN] = {
+	"musdk",
+};
+
+#define MVPP22_F_IF_MUSDK_PRIV	BIT(0)
+
 static void mvpp2_ethtool_get_strings(struct net_device *netdev, u32 sset,
 				      u8 *data)
 {
-	if (sset == ETH_SS_STATS) {
-		int i;
+	int i;
 
+	switch (sset) {
+	case ETH_SS_STATS:
 		for (i = 0; i < ARRAY_SIZE(mvpp2_ethtool_regs); i++)
 			memcpy(data + i * ETH_GSTRING_LEN,
 			       &mvpp2_ethtool_regs[i].string, ETH_GSTRING_LEN);
+		break;
+	case ETH_SS_PRIV_FLAGS:
+		memcpy(data, mvpp22_priv_flags_strings,
+		       ARRAY_SIZE(mvpp22_priv_flags_strings) * ETH_GSTRING_LEN);
 	}
 }
 
@@ -8186,9 +8204,15 @@ static void mvpp2_ethtool_get_stats(struct net_device *dev,
 
 static int mvpp2_ethtool_get_sset_count(struct net_device *dev, int sset)
 {
-	if (sset == ETH_SS_STATS)
-		return ARRAY_SIZE(mvpp2_ethtool_regs);
+	struct mvpp2_port *port = netdev_priv(dev);
 
+	switch (sset) {
+	case ETH_SS_STATS:
+		return ARRAY_SIZE(mvpp2_ethtool_regs);
+	case ETH_SS_PRIV_FLAGS:
+		return (port->priv->hw_version == MVPP21) ?
+			0 : ARRAY_SIZE(mvpp22_priv_flags_strings);
+	}
 	return -EOPNOTSUPP;
 }
 
@@ -9322,7 +9346,8 @@ static irqreturn_t mvpp2_link_status_isr(int irq, void *dev_id)
 		mvpp2_egress_enable(port);
 		mvpp2_ingress_enable(port);
 		netif_carrier_on(dev);
-		netif_tx_wake_all_queues(dev);
+		if (!(port->flags & MVPP22_F_IF_MUSDK))
+			netif_tx_wake_all_queues(dev);
 	} else {
 		netif_tx_stop_all_queues(dev);
 		netif_carrier_off(dev);
@@ -9424,7 +9449,8 @@ static void mvpp2_link_event(struct net_device *dev)
 			mvpp2_egress_enable(port);
 			mvpp2_ingress_enable(port);
 			netif_carrier_on(dev);
-			netif_tx_wake_all_queues(dev);
+			if (!(port->flags & MVPP22_F_IF_MUSDK))
+				netif_tx_wake_all_queues(dev);
 		} else {
 			port->duplex = -1;
 			port->speed = 0;
@@ -10154,7 +10180,9 @@ static void mvpp2_start_dev(struct mvpp2_port *port)
 	mvpp2_port_enable(port);
 	if (ndev->phydev)
 		phy_start(ndev->phydev);
-	netif_tx_start_all_queues(port->dev);
+
+	if (!(port->flags & MVPP22_F_IF_MUSDK))
+		netif_tx_start_all_queues(port->dev);
 }
 
 /* Set hw internals when stopping port */
@@ -10319,8 +10347,13 @@ static void mvpp2_irqs_deinit(struct mvpp2_port *port)
 
 static bool mvpp22_rss_is_supported(struct mvpp2_port *port)
 {
+	/* RSS Feature is supported only for
+	 *  static configuration Queue-Multi-Mode and
+	 *  dynamic regular Kernel-mode port configuration
+	 */
 	return (queue_mode == MVPP2_QDIST_MULTI_MODE) &&
-		!(port->flags & MVPP2_F_LOOPBACK);
+		!(port->flags & MVPP2_F_LOOPBACK) &&
+		!(port->flags & MVPP22_F_IF_MUSDK);
 }
 
 /* Allocate a rss table for each phisical rxq having same cos priority */
@@ -10553,6 +10586,9 @@ static int mvpp2_open(struct net_device *dev)
 	queue_delayed_work(priv->stats_queue, &port->stats_work,
 			   MVPP2_MIB_COUNTERS_STATS_DELAY);
 
+	if (port->flags & MVPP22_F_IF_MUSDK)
+		return 0;
+	/* For MUSDK prs/cls/rss should be open ONCE only on MUSDK-enabling */
 	err = mvpp2_open_prs_cls_rss(dev);
 	if (err < 0)
 		goto err_free_link_irq;
@@ -10711,6 +10747,11 @@ static int mvpp2_change_mtu(struct net_device *dev, int mtu)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 	int err;
+
+	if (port->flags & MVPP22_F_IF_MUSDK) {
+		netdev_err(dev, "MTU can not be modified for port in MUSDK mode\n");
+		return -EPERM;
+	}
 
 	if (!IS_ALIGNED(MVPP2_RX_PKT_SIZE(mtu), 8)) {
 		netdev_info(dev, "illegal MTU value %d, round to %d\n", mtu,
@@ -10902,12 +10943,16 @@ static int mvpp2_ethtool_get_coalesce(struct net_device *dev,
 static void mvpp2_ethtool_get_drvinfo(struct net_device *dev,
 				      struct ethtool_drvinfo *drvinfo)
 {
+	struct mvpp2_port *port = netdev_priv(dev);
+
 	strlcpy(drvinfo->driver, MVPP2_DRIVER_NAME,
 		sizeof(drvinfo->driver));
 	strlcpy(drvinfo->version, MVPP2_DRIVER_VERSION,
 		sizeof(drvinfo->version));
 	strlcpy(drvinfo->bus_info, dev_name(&dev->dev),
 		sizeof(drvinfo->bus_info));
+	drvinfo->n_priv_flags = (port->priv->hw_version == MVPP21) ?
+			0 : ARRAY_SIZE(mvpp22_priv_flags_strings);
 }
 
 static void mvpp2_ethtool_get_ringparam(struct net_device *dev,
@@ -11156,6 +11201,126 @@ static int mvpp2_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 	return ret;
 }
 
+static u32 mvpp22_get_priv_flags(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	u32 priv_flags = 0;
+
+	if (port->flags & MVPP22_F_IF_MUSDK)
+		priv_flags |= MVPP22_F_IF_MUSDK_PRIV;
+	return priv_flags;
+}
+
+static int mvpp2_port_musdk_cfg(struct net_device *dev, bool ena, u8 *rss_en)
+{
+	struct mvpp2_port_uio_cfg {
+		unsigned int nqvecs;
+		unsigned int nrxqs;
+		unsigned int ntxqs;
+		int mtu;
+		bool rxhash_en;
+		u8 rss_en;
+	} *uio;
+
+	struct mvpp2_port *port = netdev_priv(dev);
+
+	if (ena) {
+		/* Disable Queues and IntVec allocations for MUSDK,
+		 * but save original values.
+		 */
+		uio = kzalloc(sizeof(*uio), GFP_KERNEL);
+		if (!uio)
+			return -ENOMEM;
+		port->uio_cfg = (void *)uio;
+		uio->nqvecs = port->nqvecs;
+		uio->nrxqs  = port->nrxqs;
+		uio->ntxqs = port->ntxqs;
+		uio->mtu = dev->mtu;
+		uio->rss_en = *rss_en;
+		uio->rxhash_en = !!(dev->hw_features & NETIF_F_RXHASH);
+
+		port->nqvecs = 0;
+		port->nrxqs  = 0;
+		port->ntxqs  = 0;
+		if (uio->rxhash_en) {
+			dev->hw_features &= ~NETIF_F_RXHASH;
+			netdev_update_features(dev);
+		}
+	} else {
+		/* Back to Kernel mode */
+		uio = port->uio_cfg;
+		port->nqvecs = uio->nqvecs;
+		port->nrxqs  = uio->nrxqs;
+		port->ntxqs  = uio->ntxqs;
+		*rss_en = uio->rss_en;
+		if (uio->rxhash_en) {
+			dev->hw_features |= NETIF_F_RXHASH;
+			netdev_update_features(dev);
+		}
+		kfree(uio);
+		port->uio_cfg = NULL;
+	}
+	return 0;
+}
+
+static int mvpp2_port_musdk_set(struct net_device *dev, bool ena)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	bool running = netif_running(dev);
+	int err, warn0, warn1;
+	u8 rss_en;
+
+	/* This procedure is called by ethtool change or by Module-remove.
+	 * For "remove" do anything only if we are in musdk-mode
+	 * and toggling back to Kernel-mode is really required.
+	 */
+	if (!ena && !port->uio_cfg)
+		return 0;
+
+	if (running)
+		mvpp2_stop(dev);
+
+	if (ena) {
+		rss_en = port->rss_cfg.rss_en;
+		warn0 = mvpp22_rss_enable(port, false, false);
+		warn1 = mvpp2_open_prs_cls_rss(dev);
+		err = mvpp2_port_musdk_cfg(dev, ena, &rss_en);
+		port->flags |= MVPP22_F_IF_MUSDK;
+	} else {
+		mvpp2_port_musdk_cfg(dev, ena, &rss_en);
+		port->flags &= ~MVPP22_F_IF_MUSDK;
+		warn0 = mvpp22_rss_enable(port, rss_en, false);
+		warn1 = 0;
+		err = 0;
+	}
+
+	if (err || warn0 || warn1) {
+		netdev_err(dev, "musdk set=%d: error=%d warn0=%d warn1=%d\n",
+			   ena, err, warn0, warn1);
+		if (err)
+			return err;
+		/* print Error message but continue */
+	}
+
+	if (running)
+		mvpp2_open(dev);
+	return 0;
+}
+
+static int mvpp22_set_priv_flags(struct net_device *dev, u32 priv_flags)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	bool f_old, f_new;
+	int err = 0;
+
+	f_old = port->flags & MVPP22_F_IF_MUSDK;
+	f_new = priv_flags & MVPP22_F_IF_MUSDK_PRIV;
+	if (f_old != f_new)
+		err = mvpp2_port_musdk_set(dev, f_new);
+
+	return err;
+}
+
 /* Device ops */
 
 static const struct net_device_ops mvpp2_netdev_ops = {
@@ -11190,6 +11355,8 @@ static const struct ethtool_ops mvpp2_eth_tool_ops = {
 	.get_rxfh_indir_size	= mvpp2_ethtool_get_rxfh_indir_size,
 	.get_rxfh		= mvpp2_ethtool_get_rxfh,
 	.set_rxfh		= mvpp2_ethtool_set_rxfh,
+	.get_priv_flags		= mvpp22_get_priv_flags,
+	.set_priv_flags		= mvpp22_set_priv_flags,
 };
 
 /* Used for PPv2.1, PPv2.2 with the old Device Tree binding that
@@ -11768,6 +11935,7 @@ static void mvpp2_port_remove(struct mvpp2_port *port)
 {
 	int i;
 
+	mvpp2_port_musdk_set(port->dev, false);
 	unregister_netdev(port->dev);
 	of_node_put(port->phy_node);
 	free_percpu(port->pcpu);
