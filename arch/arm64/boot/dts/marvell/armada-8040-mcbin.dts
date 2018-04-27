@@ -396,4 +396,6 @@
 	/* CPS Lane 2 - CON7 */
 	usb-phy = <&usb3h0_phy>;
 	status = "okay";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp1_comphy2 0>;
 };
