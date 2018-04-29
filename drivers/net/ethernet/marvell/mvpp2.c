@@ -2739,13 +2739,17 @@ static int mvpp2_prs_hw_write(struct mvpp2 *priv, struct mvpp2_prs_entry *pe)
 	return 0;
 }
 
-/* Read tcam entry from hw */
-static int mvpp2_prs_hw_read(struct mvpp2 *priv, struct mvpp2_prs_entry *pe)
+/* Initialize tcam entry from hw */
+static int mvpp2_prs_init_from_hw(struct mvpp2 *priv,
+				  struct mvpp2_prs_entry *pe, int tid)
 {
 	int i;
 
 	if (pe->index > MVPP2_PRS_TCAM_SRAM_SIZE - 1)
 		return -EINVAL;
+
+	memset(pe, 0, sizeof(*pe));
+	pe->index = tid;
 
 	/* Write tcam index - indirect access */
 	mvpp2_write(priv, MVPP2_PRS_TCAM_IDX_REG, pe->index);
@@ -3124,8 +3128,7 @@ static struct mvpp2_prs_entry *mvpp2_prs_flow_find(struct mvpp2 *priv, int flow,
 		    priv->prs_shadow[tid].lu != MVPP2_PRS_LU_FLOWS)
 			continue;
 
-		pe->index = tid;
-		mvpp2_prs_hw_read(priv, pe);
+		mvpp2_prs_init_from_hw(priv, pe, tid);
 
 		/* Check result info, because there maybe several
 		 * TCAM lines to generate the same flow
@@ -3172,8 +3175,7 @@ static void mvpp2_prs_mac_drop_all_set(struct mvpp2 *priv, int port, bool add)
 
 	if (priv->prs_shadow[MVPP2_PE_DROP_ALL].valid) {
 		/* Entry exist - update port only */
-		pe.index = MVPP2_PE_DROP_ALL;
-		mvpp2_prs_hw_read(priv, &pe);
+		mvpp2_prs_init_from_hw(priv, &pe, MVPP2_PE_DROP_ALL);
 	} else {
 		/* Entry doesn't exist - create new */
 		memset(&pe, 0, sizeof(pe));
@@ -3221,8 +3223,7 @@ static void mvpp2_prs_mac_promisc_set(struct mvpp2 *priv, int port,
 
 	/* promiscuous mode - Accept unknown unicast or multicast packets */
 	if (priv->prs_shadow[tid].valid) {
-		pe.index = tid;
-		mvpp2_prs_hw_read(priv, &pe);
+		mvpp2_prs_init_from_hw(priv, &pe, tid);
 	} else {
 		memset(&pe, 0, sizeof(pe));
 		mvpp2_prs_tcam_lu_set(&pe, MVPP2_PRS_LU_MAC);
@@ -3272,8 +3273,7 @@ static void mvpp2_prs_dsa_tag_set(struct mvpp2 *priv, int port, bool add,
 
 	if (priv->prs_shadow[tid].valid) {
 		/* Entry exist - update port only */
-		pe.index = tid;
-		mvpp2_prs_hw_read(priv, &pe);
+		mvpp2_prs_init_from_hw(priv, &pe, tid);
 	} else {
 		/* Entry doesn't exist - create new */
 		memset(&pe, 0, sizeof(pe));
@@ -3341,8 +3341,7 @@ static void mvpp2_prs_dsa_tag_ethertype_set(struct mvpp2 *priv, int port,
 
 	if (priv->prs_shadow[tid].valid) {
 		/* Entry exist - update port only */
-		pe.index = tid;
-		mvpp2_prs_hw_read(priv, &pe);
+		mvpp2_prs_init_from_hw(priv, &pe, tid);
 	} else {
 		/* Entry doesn't exist - create new */
 		memset(&pe, 0, sizeof(pe));
@@ -3411,9 +3410,7 @@ static struct mvpp2_prs_entry *mvpp2_prs_vlan_find(struct mvpp2 *priv,
 		    priv->prs_shadow[tid].lu != MVPP2_PRS_LU_VLAN)
 			continue;
 
-		pe->index = tid;
-
-		mvpp2_prs_hw_read(priv, pe);
+		mvpp2_prs_init_from_hw(priv, pe, tid);
 		match = mvpp2_prs_tcam_data_cmp(pe, 0, swab16(tpid));
 		if (!match)
 			continue;
@@ -3469,8 +3466,7 @@ static int mvpp2_prs_vlan_add(struct mvpp2 *priv, unsigned short tpid, int ai,
 			    priv->prs_shadow[tid_aux].lu != MVPP2_PRS_LU_VLAN)
 				continue;
 
-			pe->index = tid_aux;
-			mvpp2_prs_hw_read(priv, pe);
+			mvpp2_prs_init_from_hw(priv, pe, tid_aux);
 			ri_bits = mvpp2_prs_sram_ri_get(pe);
 			if ((ri_bits & MVPP2_PRS_RI_VLAN_MASK) ==
 			    MVPP2_PRS_RI_VLAN_DOUBLE)
@@ -3552,8 +3548,7 @@ static struct mvpp2_prs_entry *mvpp2_prs_double_vlan_find(struct mvpp2 *priv,
 		    priv->prs_shadow[tid].lu != MVPP2_PRS_LU_VLAN)
 			continue;
 
-		pe->index = tid;
-		mvpp2_prs_hw_read(priv, pe);
+		mvpp2_prs_init_from_hw(priv, pe, tid);
 
 		match = mvpp2_prs_tcam_data_cmp(pe, 0, swab16(tpid1)) &&
 			mvpp2_prs_tcam_data_cmp(pe, 4, swab16(tpid2));
@@ -3607,8 +3602,7 @@ static int mvpp2_prs_double_vlan_add(struct mvpp2 *priv, unsigned short tpid1,
 			    priv->prs_shadow[tid_aux].lu != MVPP2_PRS_LU_VLAN)
 				continue;
 
-			pe->index = tid_aux;
-			mvpp2_prs_hw_read(priv, pe);
+			mvpp2_prs_init_from_hw(priv, pe, tid_aux);
 			ri_bits = mvpp2_prs_sram_ri_get(pe);
 			ri_bits &= MVPP2_PRS_RI_VLAN_MASK;
 			if (ri_bits == MVPP2_PRS_RI_VLAN_SINGLE ||
@@ -4873,9 +4867,7 @@ static int mvpp2_prs_vid_range_find(struct mvpp2 *priv, int pmap, u16 vid,
 		    priv->prs_shadow[tid].lu != MVPP2_PRS_LU_VID)
 			continue;
 
-		pe.index = tid;
-
-		mvpp2_prs_hw_read(priv, &pe);
+		mvpp2_prs_init_from_hw(priv, &pe, tid);
 		mvpp2_prs_tcam_data_byte_get(&pe, 2, &byte[0], &enable[0]);
 		mvpp2_prs_tcam_data_byte_get(&pe, 3, &byte[1], &enable[1]);
 
@@ -4929,7 +4921,7 @@ static int mvpp2_prs_vid_entry_add(struct mvpp2_port *port, u16 vid)
 		/* Mask all ports */
 		mvpp2_prs_tcam_port_map_set(&pe, 0);
 	} else {
-		mvpp2_prs_hw_read(priv, &pe);
+		mvpp2_prs_init_from_hw(priv, &pe, tid);
 	}
 
 	/* Enable the current port */
@@ -5153,8 +5145,7 @@ mvpp2_prs_mac_da_range_find(struct mvpp2 *priv, int pmap, const u8 *da,
 		    priv->prs_shadow[tid].udf != udf_type)
 			continue;
 
-		pe->index = tid;
-		mvpp2_prs_hw_read(priv, pe);
+		mvpp2_prs_init_from_hw(priv, pe, tid);
 		entry_pmap = mvpp2_prs_tcam_port_map_get(pe);
 
 		if (mvpp2_prs_mac_range_equals(pe, da, mask) &&
@@ -5295,8 +5286,7 @@ static void mvpp2_prs_mac_del_all(struct mvpp2_port *port)
 		    priv->prs_shadow[tid].udf != MVPP2_PRS_UDF_MAC_DEF)
 			continue;
 
-		pe.index = tid;
-		mvpp2_prs_hw_read(priv, &pe);
+		mvpp2_prs_init_from_hw(priv, &pe, tid);
 
 		pmap = mvpp2_prs_tcam_port_map_get(&pe);
 
