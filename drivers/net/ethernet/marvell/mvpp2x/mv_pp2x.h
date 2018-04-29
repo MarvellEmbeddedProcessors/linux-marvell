@@ -172,8 +172,10 @@
 
 /* BM constants */
 #define MVPP2_BM_POOLS_NUM		16
-#define MVPP2_BM_POOLS_MAX_ALLOC_NUM	4 /* Max num of allowed BM pools
+#define MVPP2_BM_POOLS_MAX_ALLOC_NUM	9 /* Max num of allowed BM pools
 					   * allocations
+					   * 0-2 pools used by Kernel
+					   * 3-8 pools used by Netmap
 					   */
 #define MVPP2_BM_POOL_SIZE_MAX		(16 * 1024 - \
 					MVPP2_BM_POOL_PTR_ALIGN / 4)
