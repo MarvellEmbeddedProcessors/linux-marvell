@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Makefile for Marvell PP2 device driver "Extra" features
+#
+# "Extra" module may be built in 2 ways:
+# - In Kernel build (CONFIG_MVPP2_DBGFS =y|m) from Root-directory
+# - As external .KO module in THIS directory by simple #make
+# The module's up-directory should contain ../mvpp2.c file
+# which is copied and patched into mvpp2_def.h file.
+
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+THIS_PATH := $(patsubst %/,%,$(dir $(mkfile_path)))
+PATCH_STR := MVPP2_C_TO_INCLUDE
+
+ifeq ($(CURDIR), $(PWD))
+ifneq ($(CURDIR), $(THIS_PATH))
+ BUILT_IN_KDIR := y
+endif
+endif
+
+ifdef BUILT_IN_KDIR
+  KDIR = $(CURDIR)
+  # Kernel-build calls this Makefile "all" target, doesn't pass "all:",
+  # so the mvpp2_def.h is forced on first pass:
+  # - Work in SHELL-CALL-command in THIS_PATH
+  #    (the original work-directory restored when SHELL exited)
+  # - Copy mvpp2.c but only when it is newer than the destination
+  # - If diff is Empty,
+  #    then the mvpp2_def.h is just copied and should be patched
+  #    else no action needed, the "patch.new.tmp" contains UPDATED PATCH.
+  #---------------------------------------------------------------------
+  define create_def_h
+    cd $(THIS_PATH) ;\
+    cp -u ../mvpp2.c mvpp2_def.h ;\
+    diff -u ../mvpp2.c mvpp2_def.h > $(PATCH_STR)_patch.new.tmp ;\
+    if [ ! -s $(PATCH_STR)_patch.new.tmp ] ; then
+      patch -N mvpp2_def.h $(PATCH_STR)_patch 1> /dev/null ; \
+      rm -f $(PATCH_STR)_patch.new.tmp mvpp2_def.h.orig ;
+    fi
+  endef
+  #---------------------------------------------------------------------
+  $(shell `$(call create_def_h)`)
+else
+  ifndef KDIR
+  $(error KDIR path must be defined in export-environment)
+  endif
+  CONFIG_MVPP2_DBGFS := m
+endif
+
+obj-$(CONFIG_MVPP2_DBGFS) := mvpp2_dbgfs.o
+M:=$(THIS_PATH)
+ccflags-y := -I$(M) -I${KDIR}/include
+mvpp2_dbgfs-y := mvpp2_dbgfs_main.o
+
+
+#------------------------------------------------------------------------
+# Rules not-passed in Kernel-build, but only when #make in THIS directory
+all: mvpp2_def.h
+	@make -C ${KDIR} M=$(M) modules
+
+clean:
+	@make -C ${KDIR} SUBDIRS=$(M) clean
+	@rm -f mvpp2_def.h *.orig *.rej
+
+mvpp2_def.h: ../mvpp2.c
+	@cp -pf ../mvpp2.c mvpp2_def.h
+	@patch -N mvpp2_def.h $(PATCH_STR)_patch 1> /dev/null
+	@rm -f mvpp2_def.h.orig

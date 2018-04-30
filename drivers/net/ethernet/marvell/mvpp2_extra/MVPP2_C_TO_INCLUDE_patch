@@ -1,0 +1,17 @@
+--- ../mvpp2.c	2018-04-22 09:58:49.000000000 +0300
++++ mvpp2_def.h	2018-04-22 14:10:57.000000000 +0300
+@@ -2078,6 +2078,8 @@
+ 	u32 port_map;
+ };
+
++#ifdef MVPP2_C_TO_INCLUDE
++
+ #define IS_TSO_HEADER(txq_pcpu, addr) \
+ 	((addr) >= (txq_pcpu)->tso_headers_dma && \
+ 	 (addr) < (txq_pcpu)->tso_headers_dma + \
+@@ -12349,3 +12351,5 @@
+ MODULE_DESCRIPTION("Marvell PPv2 Ethernet Driver - www.marvell.com");
+ MODULE_AUTHOR("Marcin Wojtas <mw@semihalf.com>");
+ MODULE_LICENSE("GPL v2");
++
++#endif /* MVPP2_C_TO_INCLUDE */
