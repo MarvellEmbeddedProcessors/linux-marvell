@@ -1,0 +1,57 @@
+From c67de01c236d611af36548182b5facc595063c2f Mon Sep 17 00:00:00 2001
+From: Hanna Hawa <hannah@marvell.com>
+Date: Tue, 1 May 2018 17:50:28 +0300
+Subject: [PATCH 1/2] test: add delay for spin/mutex unlock function for test
+
+Change-Id: Ib488758a5d4b3da75078bee7e62522b5c0e8f144
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
+---
+ include/linux/spinlock.h | 3 +++
+ init/version.c           | 2 +-
+ kernel/locking/mutex.c   | 3 +++
+ 3 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/spinlock.h b/include/linux/spinlock.h
+index 341e1a1..fca19ff 100644
+--- a/include/linux/spinlock.h
++++ b/include/linux/spinlock.h
+@@ -354,6 +354,9 @@ static __always_inline void spin_lock_irq(spinlock_t *lock)
+ 
+ static __always_inline void spin_unlock(spinlock_t *lock)
+ {
++	volatile int j;
++
++	for (j = 0; j < 1000; j++);
+ 	raw_spin_unlock(&lock->rlock);
+ }
+ 
+diff --git a/init/version.c b/init/version.c
+index 5606341..9e46b91 100644
+--- a/init/version.c
++++ b/init/version.c
+@@ -42,7 +42,7 @@ struct uts_namespace init_uts_ns = {
+ 
+ /* FIXED STRINGS! Don't touch! */
+ const char linux_banner[] =
+-	"Linux version " UTS_RELEASE " (" LINUX_COMPILE_BY "@"
++	"Linux version " UTS_RELEASE " unlock (" LINUX_COMPILE_BY "@"
+ 	LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION "\n";
+ 
+ const char linux_proc_banner[] =
+diff --git a/kernel/locking/mutex.c b/kernel/locking/mutex.c
+index 858a075..73b7454 100644
+--- a/kernel/locking/mutex.c
++++ b/kernel/locking/mutex.c
+@@ -607,6 +607,9 @@ static inline int mutex_can_spin_on_owner(struct mutex *lock)
+  */
+ void __sched mutex_unlock(struct mutex *lock)
+ {
++	volatile int j;
++
++	for (j = 0; j < 1000; j++);
+ #ifndef CONFIG_DEBUG_LOCK_ALLOC
+ 	if (__mutex_unlock_fast(lock))
+ 		return;
+-- 
+1.9.1
+

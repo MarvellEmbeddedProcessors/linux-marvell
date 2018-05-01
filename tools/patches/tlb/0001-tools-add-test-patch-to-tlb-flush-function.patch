@@ -1,0 +1,49 @@
+From a6cb2839ee35b60db3433261719ece85831a87e9 Mon Sep 17 00:00:00 2001
+From: Hanna Hawa <hannah@marvell.com>
+Date: Tue, 1 May 2018 17:51:13 +0300
+Subject: [PATCH 2/2] tools: add test patch to tlb flush function
+
+Change-Id: I347ebf8fe0f96c080d9e13fbd50d319484664624
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
+---
+ arch/arm64/include/asm/tlbflush.h | 3 +++
+ init/version.c                    | 2 +-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 9e82dd7..7644e49 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -21,6 +21,7 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#include <linux/delay.h>
+ #include <linux/sched.h>
+ #include <asm/cputype.h>
+ #include <asm/mmu.h>
+@@ -166,6 +167,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 			__tlbi(vae1is, addr);
+ 			__tlbi_user(vae1is, addr);
+ 		}
++		/* Delay for tests */
++		ndelay(250);
+ 	}
+ 	dsb(ish);
+ }
+diff --git a/init/version.c b/init/version.c
+index 9e46b91..fde4b23 100644
+--- a/init/version.c
++++ b/init/version.c
+@@ -42,7 +42,7 @@ struct uts_namespace init_uts_ns = {
+ 
+ /* FIXED STRINGS! Don't touch! */
+ const char linux_banner[] =
+-	"Linux version " UTS_RELEASE " unlock (" LINUX_COMPILE_BY "@"
++	"Linux version " UTS_RELEASE " unlock/tlb (" LINUX_COMPILE_BY "@"
+ 	LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION "\n";
+ 
+ const char linux_proc_banner[] =
+-- 
+1.9.1
+
