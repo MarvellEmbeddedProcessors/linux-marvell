@@ -4424,9 +4424,21 @@ static inline void mv_pp22_interrupts_unmask(struct mv_pp2x_port *port)
 int mv_pp2x_open(struct net_device *dev)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
-	int err;
+	struct mv_pp2x_port_pcpu *port_pcpu;
+	int err, cpu;
 
 	set_device_base_address(dev);
+
+	/* Init tx-done Tasklets & timers (if decided/initialized in probe) */
+	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
+		port_pcpu = port->pcpu[cpu];
+
+		if (!port_pcpu->tx_done_timer.function)
+			continue;
+		port_pcpu->timer_scheduled = false;
+		tasklet_init(&port_pcpu->tx_done_tasklet,
+			     mv_pp2x_tx_proc_cb, (unsigned long)dev);
+	}
 
 	/* Allocate the Rx/Tx queues */
 	err = mv_pp2x_setup_rxqs(port);
@@ -4521,14 +4533,12 @@ int mv_pp2x_stop(struct net_device *dev)
 	if (port->port_hotplugged)
 		unregister_hotcpu_notifier(&port->port_hotplug_nb);
 
-	/* Cancel tx timers in case Tx done interrupts are disabled and if port is not in Netmap mode */
+	/* Cancel tx-done timers (if decided/initialized in probe) */
 	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
 		port_pcpu = port->pcpu[cpu];
-
-		if (port_pcpu->tx_done_timer.function) {
-			hrtimer_cancel(&port_pcpu->tx_done_timer);
-			port_pcpu->timer_scheduled = false;
-		}
+		if (!port_pcpu->tx_done_timer.function)
+			continue;
+		hrtimer_cancel(&port_pcpu->tx_done_timer);
 		if (port_pcpu->tx_done_tasklet.func)
 			tasklet_kill(&port_pcpu->tx_done_tasklet);
 	}
@@ -5955,15 +5965,14 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
 		port_pcpu = devm_kcalloc(&pdev->dev, 1, sizeof(*port_pcpu), GFP_KERNEL);
 		port->pcpu[cpu] = port_pcpu;
-		if (((port->flags & MVPP2_F_LOOPBACK)) && port->interrupt_tx_done)
+
+		/* Use tx-done per-cpu timers if not in Interrupt-mode */
+		if (((port->flags & MVPP2_F_LOOPBACK)) || port->interrupt_tx_done)
 			continue;
 		hrtimer_init(&port_pcpu->tx_done_timer, CLOCK_MONOTONIC,
 			     HRTIMER_MODE_REL_PINNED);
 		port_pcpu->tx_done_timer.function = mv_pp2x_hr_timer_cb;
 		port_pcpu->timer_scheduled = false;
-
-		tasklet_init(&port_pcpu->tx_done_tasklet,
-			     mv_pp2x_tx_proc_cb, (unsigned long)dev);
 	}
 
 	/* Init pool of external buffers for TSO, fragmentation, etc */
