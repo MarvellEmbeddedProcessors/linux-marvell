@@ -3058,12 +3058,11 @@ static inline void mv_pp2x_tx_done_post_proc(struct mv_pp2x_tx_queue *txq,
 	int txq_count = mv_pp2x_txq_count(txq_pcpu);
 
 	/* Finalize TX processing */
-	if (txq_count >= txq->pkts_coal)
+	if (txq_count >= txq->pkts_coal) {
 		mv_pp2x_txq_done(port, txq, txq_pcpu);
-
-	/* Recalc after tx_done */
-	txq_count = mv_pp2x_txq_count(txq_pcpu);
-
+		/* Recalc after tx_done */
+		txq_count = mv_pp2x_txq_count(txq_pcpu);
+	}
 	/* Set the timer in case not all frags were processed */
 	if (txq_count <= frags && txq_count > 0) {
 		struct mv_pp2x_port_pcpu *port_pcpu = port->pcpu[address_space];
