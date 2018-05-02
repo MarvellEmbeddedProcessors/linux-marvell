@@ -298,11 +298,17 @@ static void sfp_set_state(struct sfp *sfp, unsigned int state)
 
 static int sfp_read(struct sfp *sfp, bool a2, u8 addr, void *buf, size_t len)
 {
+	if (!sfp->read)
+		return -EOPNOTSUPP;
+
 	return sfp->read(sfp, a2, addr, buf, len);
 }
 
 static int sfp_write(struct sfp *sfp, bool a2, u8 addr, void *buf, size_t len)
 {
+	if (!sfp->write)
+		return -EOPNOTSUPP;
+
 	return sfp->write(sfp, a2, addr, buf, len);
 }
 
@@ -533,6 +539,8 @@ static int sfp_sm_mod_hpower(struct sfp *sfp)
 		return 0;
 
 	err = sfp_read(sfp, true, SFP_EXT_STATUS, &val, sizeof(val));
+	if (err == -EOPNOTSUPP)
+		goto err;
 	if (err != sizeof(val)) {
 		dev_err(sfp->dev, "Failed to read EEPROM: %d\n", err);
 		err = -EAGAIN;
@@ -542,6 +550,8 @@ static int sfp_sm_mod_hpower(struct sfp *sfp)
 	val |= BIT(0);
 
 	err = sfp_write(sfp, true, SFP_EXT_STATUS, &val, sizeof(val));
+	if (err == -EOPNOTSUPP)
+		goto err;
 	if (err != sizeof(val)) {
 		dev_err(sfp->dev, "Failed to write EEPROM: %d\n", err);
 		err = -EAGAIN;
@@ -565,6 +575,8 @@ static int sfp_sm_mod_probe(struct sfp *sfp)
 	int ret;
 
 	ret = sfp_read(sfp, false, 0, &id, sizeof(id));
+	if (ret == -EOPNOTSUPP)
+		return ret;
 	if (ret < 0) {
 		dev_err(sfp->dev, "failed to read EEPROM: %d\n", ret);
 		return -EAGAIN;
