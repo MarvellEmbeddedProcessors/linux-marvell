@@ -3055,6 +3055,7 @@ static inline void mv_pp2x_tx_done_post_proc(struct mv_pp2x_tx_queue *txq,
 					     struct mv_pp2x_txq_pcpu *txq_pcpu, struct mv_pp2x_port *port,
 					     int frags, int address_space)
 {
+	/* get number of sent frames but not handled as tx-done */
 	int txq_count = mv_pp2x_txq_count(txq_pcpu);
 
 	/* Finalize TX processing */
@@ -3063,8 +3064,8 @@ static inline void mv_pp2x_tx_done_post_proc(struct mv_pp2x_tx_queue *txq,
 		/* Recalc after tx_done */
 		txq_count = mv_pp2x_txq_count(txq_pcpu);
 	}
-	/* Set the timer in case not all frags were processed */
-	if (txq_count <= frags && txq_count > 0) {
+	if (txq_count) {
+		/* Some frames present. Start timer to handle tx-done later */
 		struct mv_pp2x_port_pcpu *port_pcpu = port->pcpu[address_space];
 
 		mv_pp2x_timer_set(port_pcpu);
