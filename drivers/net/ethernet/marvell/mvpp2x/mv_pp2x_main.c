@@ -107,6 +107,7 @@ static u8 uc_filter_max = 4;
 static u16 stats_delay_msec = STATS_DELAY;
 static u16 stats_delay;
 static int auto_cell_index;
+static u8 txdone_tmr;
 
 u32 debug_param;
 
@@ -180,8 +181,10 @@ MODULE_PARM_DESC(jumbo_pool, "Jumbo pool size (0-8192), def=512");
 module_param_named(rx_count, mv_pp2x_rx_count, byte, S_IRUGO);
 MODULE_PARM_DESC(rx_count, "Set rx_count 8 or 16, def = 8. Parameter configure number of HOT CPU's.");
 
-/*TODO:  Below module_params will not go to ML. Created for testing. */
+module_param(txdone_tmr, byte, S_IRUGO);
+MODULE_PARM_DESC(txdone_tmr, "TX-done handling by 0:interrupt(default) or by 1:timer");
 
+/* BEGIN: module_params for testing only */
 module_param(port_cpu_bind_map, uint, S_IRUGO);
 MODULE_PARM_DESC(port_cpu_bind_map,
 		 "Set default port-to-cpu binding, nibble for each port. Relevant when queue_mode=multi-mode & rss is disabled");
@@ -191,6 +194,7 @@ MODULE_PARM_DESC(first_bm_pool, "First used buffer pool (0-11)");
 
 module_param(first_log_rxq_queue, byte, S_IRUGO);
 MODULE_PARM_DESC(first_log_rxq_queue, "First logical rx_queue (0-31)");
+/* END: module_params for testing only */
 
 void set_device_base_address(struct net_device *dev)
 {
@@ -5789,6 +5793,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	port->priv = priv;
 	port->flags = 0;
 	port->interrupt_tx_done = port->priv->pp2xdata->interrupt_tx_done;
+	if (txdone_tmr)
+		port->priv->pp2xdata->interrupt_tx_done = false;
 
 	musdk_status = of_get_property(port_node, "musdk-status", &statlen);
 
