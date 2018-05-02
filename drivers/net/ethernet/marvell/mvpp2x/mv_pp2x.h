@@ -163,7 +163,7 @@
 
 /* Coalescing */
 #define MVPP2_TXDONE_COAL_PKTS		32
-#define MVPP2_TXDONE_HRTIMER_PERIOD_NS	(100/*uSec*/ * 1000UL)
+#define MVPP2_TXDONE_HRTIMER_USEC	100UL
 #define MVPP2_TX_HRTIMER_PERIOD_NS	50000UL
 #define MVPP2_TXDONE_COAL_USEC		1000
 
@@ -631,6 +631,7 @@ struct mv_pp2x_pcpu_stats {
 struct mv_pp2x_port_pcpu {
 	struct hrtimer tx_done_timer;
 	bool timer_scheduled;
+	ktime_t tx_time_coal_hrtmr;
 	/* Tasklet for egress finalization */
 	struct tasklet_struct tx_done_tasklet;
 	int ext_buf_size;

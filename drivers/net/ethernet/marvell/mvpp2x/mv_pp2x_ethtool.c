@@ -672,6 +672,15 @@ static int mv_pp2x_ethtool_set_coalesce(struct net_device *dev,
 	if (port->interrupt_tx_done) {
 		mv_pp2x_tx_done_time_coal_set(port, port->tx_time_coal);
 		mv_pp2x_tx_done_pkts_coal_set_all(port);
+	} else {
+		int cpu;
+		struct mv_pp2x_port_pcpu *port_pcpu;
+
+		for_each_present_cpu(cpu) {
+			port_pcpu = port->pcpu[cpu];
+			port_pcpu->tx_time_coal_hrtmr =
+				ktime_set(0, port->tx_time_coal * NSEC_PER_USEC);
+		}
 	}
 
 	return 0;

@@ -2070,12 +2070,10 @@ void mv_pp2_link_change_tasklet(unsigned long data)
 
 static void mv_pp2x_timer_set(struct mv_pp2x_port_pcpu *port_pcpu)
 {
-	ktime_t interval;
-
 	if (!port_pcpu->timer_scheduled) {
 		port_pcpu->timer_scheduled = true;
-		interval = ktime_set(0, MVPP2_TXDONE_HRTIMER_PERIOD_NS);
-		hrtimer_start(&port_pcpu->tx_done_timer, interval,
+		hrtimer_start(&port_pcpu->tx_done_timer,
+			      port_pcpu->tx_time_coal_hrtmr,
 			      HRTIMER_MODE_REL_PINNED);
 	}
 }
@@ -4881,7 +4879,16 @@ static int  mv_pp2x_port_txqs_init(struct device *dev,
 	int queue, cpu;
 	struct mv_pp2x_txq_pcpu *txq_pcpu;
 
-	port->tx_time_coal = MVPP2_TXDONE_COAL_USEC;
+	if (port->priv->pp2xdata->interrupt_tx_done) {
+		/* PP2 HW-unit's timer */
+		port->tx_time_coal = MVPP2_TXDONE_COAL_USEC;
+	} else {
+		/* High Resolutun linux timer */
+		if (port->id == 0) /* Fast 10G port */
+			port->tx_time_coal = MVPP2_TXDONE_HRTIMER_USEC;
+		else
+			port->tx_time_coal = MVPP2_TXDONE_HRTIMER_USEC * 4;
+	}
 
 	for (queue = 0; queue < port->num_tx_queues; queue++) {
 		int queue_phy_id = mv_pp2x_txq_phys(port->id, queue);
@@ -5979,6 +5986,8 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			     HRTIMER_MODE_REL_PINNED);
 		port_pcpu->tx_done_timer.function = mv_pp2x_hr_timer_cb;
 		port_pcpu->timer_scheduled = false;
+		port_pcpu->tx_time_coal_hrtmr =
+			ktime_set(0, port->tx_time_coal * NSEC_PER_USEC);
 	}
 
 	/* Init pool of external buffers for TSO, fragmentation, etc */
