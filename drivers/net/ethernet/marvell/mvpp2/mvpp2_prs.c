@@ -526,12 +526,8 @@ static void mvpp2_prs_dsa_tag_set(struct mvpp2 *priv, int port, bool add,
 					     MVPP2_PRS_TCAM_DSA_TAGGED_BIT);
 
 			/* Set ai bits for next iteration */
-			if (extend)
-				mvpp2_prs_sram_ai_update(&pe, 1,
-							MVPP2_PRS_SRAM_AI_MASK);
-			else
-				mvpp2_prs_sram_ai_update(&pe, 0,
-							MVPP2_PRS_SRAM_AI_MASK);
+			mvpp2_prs_sram_ai_update(&pe, extend,
+						 MVPP2_PRS_SRAM_AI_MASK);
 
 			/* Set result info bits to 'single vlan' */
 			mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_SINGLE,
