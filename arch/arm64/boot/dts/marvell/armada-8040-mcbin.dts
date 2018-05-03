@@ -121,7 +121,7 @@
 	no-sdio;
 	non-removable;
 	status = "okay";
-	vqmmc-supply = <&v_vddo_h>;
+	vqmmc-supply = <&v_3_3>;
 };
 
 &cp0_i2c0 {
