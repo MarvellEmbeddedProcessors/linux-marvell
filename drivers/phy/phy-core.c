@@ -402,6 +402,7 @@ int phy_is_pll_locked(struct phy *phy)
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(phy_is_pll_locked);
 
 /**
  * _of_phy_get() - lookup and obtain a reference to a phy by phandle

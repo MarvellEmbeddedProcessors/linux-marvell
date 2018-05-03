@@ -639,6 +639,11 @@ endif
 # Tell gcc to never replace conditional load with a non-conditional one
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
 
+# Stop gcc from converting switches into a form that defeats dead code
+# elimination and can subsequently lead to calls to intentionally
+# undefined functions appearing in the final link.
+KBUILD_CFLAGS	+= $(call cc-option,--param=max-fsm-thread-path-insns=1)
+
 ifdef CONFIG_READABLE_ASM
 # Disable optimizations that make assembler listings hard to read.
 # reorder blocks reorders the control in the function
