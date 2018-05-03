@@ -48,6 +48,7 @@ enum {
 
 	SFP_DEV_DOWN = 0,
 	SFP_DEV_UP,
+	SFP_DEV_UNKNOWN,
 
 	SFP_S_DOWN = 0,
 	SFP_S_INIT,
@@ -737,6 +738,15 @@ static void sfp_sm_event(struct sfp *sfp, unsigned int event)
 			sfp->sm_dev_state = SFP_DEV_DOWN;
 		}
 		break;
+
+	case SFP_DEV_UNKNOWN:
+		/* We can't know the state of the SFP link. Report the
+		 * link as being up as its status has to be guessed by
+		 * other layers.
+		 */
+		if (event != SFP_E_DEV_UP)
+			sfp_link_up(sfp->sfp_bus);
+		break;
 	}
 
 	/* Some events are global */
@@ -1076,6 +1086,12 @@ static int sfp_probe(struct platform_device *pdev)
 
 	if (poll)
 		mod_delayed_work(system_wq, &sfp->poll, poll_jiffies);
+
+	/* We won't be able to know the state of the SFP link, report it as
+	 * unknown.
+	 */
+	if (!sfp->gpio[GPIO_MODDEF0] && !sfp->gpio[GPIO_LOS])
+		sfp->sm_dev_state = SFP_DEV_UNKNOWN;
 
 	return 0;
 }
