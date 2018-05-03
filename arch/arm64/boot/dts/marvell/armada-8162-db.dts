@@ -88,6 +88,13 @@
 	status = "disabled";
 };
 
+&cp0_sdhci {
+	status = "okay";
+	bus-width = <4>;
+	no-1-8-v;
+	non-removable;
+};
+
 &cp0_mdio0 {
 	status = "okay";
 	mdio0_phy0: ethernet-phy@0 {

@@ -86,6 +86,13 @@
 	status = "disabled";
 };
 
+&cp0_sdhci {
+	status = "okay";
+	bus-width = <4>;
+	no-1-8-v;
+	non-removable;
+};
+
 &cp0_sata {
 	status = "okay";
 	sata-port@1 {
