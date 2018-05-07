@@ -11784,7 +11784,8 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 
 		mvpp2_egress_enable(port);
 		mvpp2_ingress_enable(port);
-		netif_tx_wake_all_queues(dev);
+		if (!(port->flags & MVPP22_F_IF_MUSDK))
+			netif_tx_wake_all_queues(dev);
 	}
 }
 
@@ -11807,7 +11808,8 @@ static void mvpp2_mac_link_up(struct net_device *dev, unsigned int mode,
 
 	mvpp2_egress_enable(port);
 	mvpp2_ingress_enable(port);
-	netif_tx_wake_all_queues(dev);
+	if (!(port->flags & MVPP22_F_IF_MUSDK))
+		netif_tx_wake_all_queues(dev);
 }
 
 static void mvpp2_mac_link_down(struct net_device *dev, unsigned int mode,
