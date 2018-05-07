@@ -139,6 +139,17 @@
 	msi-parent =<&ap0_gic_its>;
 };
 
+&cp2_ethernet {
+	status = "okay";
+};
+
+&cp2_eth0 {
+	status = "okay";
+	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp2_comphy4 0>;
+};
+
 &cp3_sata0 {
 	status = "okay";
 	sata-port@1 {
@@ -157,4 +168,15 @@
 
 &cp3_pcie2 {
 	msi-parent =<&ap0_gic_its>;
+};
+
+&cp3_ethernet {
+	status = "okay";
+};
+
+&cp3_eth0 {
+	status = "okay";
+	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp3_comphy4 0>;
 };
