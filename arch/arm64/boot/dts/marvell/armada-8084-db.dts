@@ -202,7 +202,7 @@
 	status = "okay";
 	phy-mode = "10gbase-kr";
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp1_comphy4 0>;
+	phys = <&cp2_comphy4 0>;
 };
 
 &cp3_sata0 {
@@ -233,5 +233,5 @@
 	status = "okay";
 	phy-mode = "10gbase-kr";
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp1_comphy4 0>;
+	phys = <&cp3_comphy4 0>;
 };
