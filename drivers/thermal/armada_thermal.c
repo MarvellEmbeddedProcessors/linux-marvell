@@ -690,6 +690,22 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.of_sensor = true,
 };
 
+static const struct armada_thermal_data armada_ap807_data = {
+	.is_valid = armada_is_valid,
+	.init_sensor = armada_ap806_init_sensor,
+	.temp_irq_handler = ap806_temp_irq_handler,
+	.is_valid_shift = 16,
+	.temp_shift = 0,
+	.temp_mask = 0x3ff,
+	.coef_b = 128900,
+	.coef_m = 394,
+	.coef_div = 1,
+	.inverted = true,
+	.dfx_interrupt = 1,
+	.of_sensor = true,
+	.ops_of = &armada_ap806_ops,
+};
+
 static const struct armada_thermal_data armada_ap810_data = {
 	.is_valid = armada_is_valid,
 	.init_sensor = armada_ap806_init_sensor,
@@ -743,6 +759,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
 	{
 		.compatible = "marvell,armada-ap806-thermal",
 		.data       = &armada_ap806_data,
+	},
+	{
+		.compatible = "marvell,armada-ap807-thermal",
+		.data       = &armada_ap807_data,
 	},
 	{
 		.compatible = "marvell,armada-ap810-thermal",
