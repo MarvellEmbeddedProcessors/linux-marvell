@@ -556,7 +556,6 @@
 				dfx-reg = <0x400280 4>;
 				#phy-cells = <2>;
 				sar-data = <&CP110_LABEL(sar)>;
-				status = "disabled";
 			};
 
 			CP110_LABEL(sar): sar@400200 {
