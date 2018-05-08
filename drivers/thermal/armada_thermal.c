@@ -116,6 +116,9 @@ struct armada_thermal_data {
 
 	/* for handling DT based thermal zones */
 	struct thermal_zone_of_device_ops *ops_of;
+
+	/* register as a sensor of a Device Tree thermal zone */
+	bool of_sensor;
 };
 
 inline unsigned int tsen_thresh_val_calc(unsigned int celsius_temp,
@@ -626,6 +629,7 @@ static const struct armada_thermal_data armadaxp_data = {
 	.coef_m = 10000000UL,
 	.coef_div = 13825,
 	.ops = &armada_ops,
+	.of_sensor = false,
 };
 
 static const struct armada_thermal_data armada370_data = {
@@ -638,6 +642,7 @@ static const struct armada_thermal_data armada370_data = {
 	.coef_m = 10000000UL,
 	.coef_div = 13825,
 	.ops = &armada_ops,
+	.of_sensor = false,
 };
 
 static const struct armada_thermal_data armada375_data = {
@@ -650,6 +655,7 @@ static const struct armada_thermal_data armada375_data = {
 	.coef_m = 10000000UL,
 	.coef_div = 13616,
 	.ops = &armada_ops,
+	.of_sensor = false,
 };
 
 static const struct armada_thermal_data armada380_data = {
@@ -665,6 +671,7 @@ static const struct armada_thermal_data armada380_data = {
 	.inverted = true,
 	.dfx_interrupt = 1,
 	.ops = &armada_ops,
+	.of_sensor = false,
 };
 
 static const struct armada_thermal_data armada_ap806_data = {
@@ -680,6 +687,7 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.inverted = true,
 	.dfx_interrupt = 1,
 	.ops_of = &armada_ap806_ops,
+	.of_sensor = true,
 };
 
 static const struct armada_thermal_data armada_ap810_data = {
@@ -695,6 +703,7 @@ static const struct armada_thermal_data armada_ap810_data = {
 	.inverted = true,
 	.dfx_interrupt = 1,
 	.ops_of = &armada_ap806_ops,
+	.of_sensor = true,
 };
 
 static const struct armada_thermal_data armada_cp110_data = {
@@ -710,6 +719,7 @@ static const struct armada_thermal_data armada_cp110_data = {
 	.inverted = true,
 	.dfx_interrupt = 1,
 	.ops = &armada_cp110_ops,
+	.of_sensor = false,
 };
 
 
@@ -791,14 +801,11 @@ static int armada_thermal_probe(struct platform_device *pdev)
 	priv->data->init_sensor(pdev, priv);
 
 	/*
-	 * AP806 thermal sensor registers as a sensor of a Device Tree thermal zone,
+	 * registers as a sensor of a Device Tree thermal zone,
 	 * so it's binded differently from rest of thermal sensors supported by this driver.
 	 */
-	if (of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-ap806-thermal") ||
-	    of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-ap810-thermal"))
-		thermal = thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &armada_ap806_ops);
+	if (priv->data->of_sensor)
+		thermal = thermal_zone_of_sensor_register(&pdev->dev, 0, priv, priv->data->ops_of);
 	else
 		thermal = thermal_zone_device_register("armada_thermal", 0, 0,
 						       priv, priv->data->ops, NULL, 0, 0);
@@ -833,10 +840,7 @@ static int armada_thermal_exit(struct platform_device *pdev)
 {
 	struct armada_thermal_priv *priv = platform_get_drvdata(pdev);
 
-	if (of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-ap806-thermal") ||
-	    of_device_is_compatible(pdev->dev.of_node,
-				    "marvell,armada-ap810-thermal"))
+	if (priv->data->of_sensor)
 		thermal_zone_of_sensor_unregister(&pdev->dev, priv->thermal);
 	else
 		thermal_zone_device_unregister(priv->thermal);
