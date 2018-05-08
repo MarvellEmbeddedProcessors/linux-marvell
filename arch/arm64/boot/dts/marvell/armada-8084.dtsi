@@ -45,6 +45,7 @@
  */
 
 #include "armada-common.dtsi"
+#include <dt-bindings/phy/phy-comphy-mvebu.h>
 #include "armada-8kp.dtsi"
 #include "armada-ap810-ap0.dtsi"
 
