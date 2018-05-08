@@ -11766,8 +11766,13 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 		return;
 	}
 
+	/* phylink state-machine depends upon netif_carrier_ok. Don't change it
+	 * here, the phylink would set it correctly and call mac_link_up/down.
+	 * For quick-stop switch off TX queues instead of the carrier.
+	 */
+	netif_tx_stop_all_queues(port->dev);
+
 	/* Make sure the port is disabled when reconfiguring the mode */
-	netif_carrier_off(port->dev);
 	mvpp2_port_disable(port);
 
 	if (port->priv->hw_version == MVPP22 &&
@@ -11797,7 +11802,6 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 
 		mvpp2_egress_enable(port);
 		mvpp2_ingress_enable(port);
-		netif_carrier_on(dev);
 		netif_tx_wake_all_queues(dev);
 	}
 }
@@ -11812,7 +11816,8 @@ static void mvpp2_mac_link_up(struct net_device *dev, unsigned int mode,
 	    interface != PHY_INTERFACE_MODE_10GKR) {
 		val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 		val &= ~MVPP2_GMAC_FORCE_LINK_DOWN;
-		val |= MVPP2_GMAC_FORCE_LINK_PASS;
+		if (phy_interface_mode_is_rgmii(port->phy_interface))
+			val |= MVPP2_GMAC_FORCE_LINK_PASS;
 		writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 	}
 
