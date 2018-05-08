@@ -155,9 +155,7 @@
 					status = "okay";
 				};
 			};
-			comphy {
-				status = "okay";
-			};
+
 			cp0_utmi0: utmi@580000 {
 				status = "okay";
 			};
@@ -224,9 +222,7 @@
 					status = "disabled";
 				};
 			};
-			comphy {
-				status = "okay";
-			};
+
 			cp1_utmi0: utmi@580000 {
 				status = "okay";
 			};

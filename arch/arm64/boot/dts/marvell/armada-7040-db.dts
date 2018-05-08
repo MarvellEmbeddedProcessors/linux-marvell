@@ -170,9 +170,6 @@
 					status = "okay";
 				};
 			};
-			comphy {
-				status = "okay";
-			};
 			cp0_utmi0: utmi@580000 {
 				status = "okay";
 			};

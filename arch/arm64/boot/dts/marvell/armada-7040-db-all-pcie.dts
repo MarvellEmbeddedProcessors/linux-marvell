@@ -149,9 +149,7 @@
 					status = "okay";
 				};
 			};
-			comphy {
-				status = "okay";
-			};
+
 		};
 		pcie0@600000 {
 			status = "okay";

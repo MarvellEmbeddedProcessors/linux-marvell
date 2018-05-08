@@ -97,7 +97,6 @@
 			};
 			cp0_comphy: comphy {
 				skip_pcie_power_off;
-				status = "okay";
 			};
 			i2c@701000 {
 				clock-frequency = <100000>;
@@ -155,9 +154,6 @@
 
 	cp1 {
 		config-space {
-			cp1_comphy: comphy {
-				status = "okay";
-			};
 			/* cp1_usb3h0 is USB2 only (UTMI) */
 			cp1_usb3h0: usb3@500000 {
 				usb-phy = <&cp1_usb3h0_phy>;

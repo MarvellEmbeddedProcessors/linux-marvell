@@ -87,7 +87,6 @@
 		config-space {
 			cp0_comphy: comphy {
 				skip_pcie_power_off;
-				status = "okay";
 			};
 			cp0_sata: sata@540000 {
 				status = "okay";

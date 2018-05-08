@@ -154,7 +154,6 @@
 
 			comphy {
 				skip_pcie_power_off;
-				status = "okay";
 			};
 
 			cp0_utmi0: utmi@580000 {

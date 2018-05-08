@@ -101,9 +101,6 @@
 					marvell,function = "gpio";
 				};
 			};
-			cp0_comphy: comphy {
-				status = "okay";
-			};
 			sdhci@780000 {
 				vqmmc-supply = <&vccq_sdio_reg>;
 				bus-width = <4>;
@@ -204,9 +201,6 @@
 
 	cp1 {
 		config-space {
-			cp1_comphy: comphy {
-				status = "okay";
-			};
 			cp1_usb3h0: usb3@500000 {
 				usb-phy = <&cp1_usb3h0_phy>;
 				separated-phys-for-usb2-usb3;
