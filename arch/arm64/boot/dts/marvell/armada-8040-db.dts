@@ -322,3 +322,11 @@
 	phy = <&phy0>;
 	phy-mode = "rgmii-id";
 };
+
+&cp0_crypto {
+	status = "okay";
+};
+
+&cp1_crypto {
+	status = "okay";
+};
