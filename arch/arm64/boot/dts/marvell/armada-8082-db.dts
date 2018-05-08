@@ -88,12 +88,24 @@
 	sata-port@1 {
 		reg = <1>;
 		status = "okay";
+
+		/* Generic PHY, providing serdes lanes */
+		phys = <&cp0_comphy 5 COMPHY_SATA1>;
+		phy-names = "comphy";
 	};
 };
 
 &cp0_pcie0 {
 	num-lanes = <4>;
 	status = "okay";
+
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy 0 COMPHY_PCIE0
+		&cp0_comphy 1 COMPHY_PCIE0
+		&cp0_comphy 2 COMPHY_PCIE0
+		&cp0_comphy 3 COMPHY_PCIE0
+		>;
+	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 };
 
 &cp0_mdio0 {
@@ -117,7 +129,11 @@
 };
 
 &cp0_emac0 {
-	phy-mode = "sfi"; /* lane-2 */
+	phy-mode = "sfi";
+
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy 4 COMPHY_SFI>;
+	phy-names = "comphy";
 };
 
 &cp0_ppv22 {
@@ -148,11 +164,23 @@
 &cp1_pcie0 {
 	num-lanes = <4>;
 	status = "okay";
+
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp1_comphy 0 COMPHY_PCIE0
+		&cp1_comphy 1 COMPHY_PCIE0
+		&cp1_comphy 2 COMPHY_PCIE0
+		&cp1_comphy 3 COMPHY_PCIE0
+		>;
+	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 };
 
 
 &cp1_emac0 {
-	phy-mode = "sfi"; /* lane-2 */
+	phy-mode = "sfi";
+
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp1_comphy 4 COMPHY_SFI>;
+	phy-names = "comphy";
 };
 
 &cp1_ppv22 {
