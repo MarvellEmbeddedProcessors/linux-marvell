@@ -179,6 +179,10 @@
 	};
 };
 
+&crypto {
+	status = "okay";
+};
+
 &eth0 {
 	phy-mode = "rgmii-id";
 	status = "okay";

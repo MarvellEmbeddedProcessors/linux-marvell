@@ -163,6 +163,10 @@
 	};
 };
 
+&crypto {
+	status = "okay";
+};
+
 /* CON15(V2.0)/CON17(V1.4) : PCIe / CON15(V2.0)/CON12(V1.4) :mini-PCIe */
 &pcie0 {
 	status = "okay";
