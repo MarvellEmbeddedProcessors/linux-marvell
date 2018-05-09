@@ -130,6 +130,9 @@
 #define EIP197_PE_OUT_TBUF_THRES(n)		(0x1d00 + (0x2000 * (n)))
 #define EIP197_MST_CTRL				0xfff4
 
+/* AXI protection fields */
+#define AXI_NONE_SECURE_ACCESS				BIT(1)
+
 /* EIP197-specific registers, no indirection */
 #define EIP197_CLASSIFICATION_RAMS		0xe0000
 #define EIP197_TRC_CTRL				0xf0800
@@ -152,6 +155,9 @@
 #define EIP197_HIA_xDR_WR_RES_BUF		BIT(22)
 #define EIP197_HIA_xDR_WR_CTRL_BUF		BIT(23)
 #define EIP197_HIA_xDR_WR_OWN_BUF		BIT(24)
+#define EIP197_HIA_xDR_CFG_xD_PROT(n)		(((n) & 0xf) << 4)
+#define EIP197_HIA_xDR_CFG_DATA_PROT(n)		(((n) & 0xf) << 12)
+#define EIP197_HIA_xDR_CFG_ACD_PROT(n)		(((n) & 0xf) << 20)
 #define EIP197_HIA_xDR_CFG_WR_CACHE(n)		(((n) & 0x7) << 25)
 #define EIP197_HIA_xDR_CFG_RD_CACHE(n)		(((n) & 0x7) << 29)
 
@@ -225,6 +231,7 @@
 #define WR_CACHE_4BITS				(WR_CACHE_3BITS << 1 | BIT(0))
 #define EIP197_MST_CTRL_RD_CACHE(n)		(((n) & 0xf) << 0)
 #define EIP197_MST_CTRL_WD_CACHE(n)		(((n) & 0xf) << 4)
+#define EIP197_MST_CTRL_SUPPORT_PROT(n)		(((n) & 0xf) << 12)
 #define EIP197_MST_CTRL_TX_MAX_CMD(n)		(((n) & 0xf) << 20)
 #define EIP197_MST_CTRL_BYTE_SWAP		BIT(24)
 #define EIP197_MST_CTRL_NO_BYTE_SWAP		BIT(25)

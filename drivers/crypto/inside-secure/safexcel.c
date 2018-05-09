@@ -220,6 +220,8 @@ static int safexcel_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
 	cd_size_rnd = (priv->config.cd_size + (BIT(hdw) - 1)) >> hdw;
 
 	for (i = 0; i < priv->config.rings; i++) {
+		int axi_access = AXI_NONE_SECURE_ACCESS;
+
 		/* ring base address */
 		writel(lower_32_bits(priv->ring[i].cdr.base_dma),
 		       EIP197_HIA_CDR(priv, i) + EIP197_HIA_xDR_RING_BASE_ADDR_LO);
@@ -236,6 +238,12 @@ static int safexcel_hw_setup_cdesc_rings(struct safexcel_crypto_priv *priv)
 		/* Configure DMA tx control */
 		val = EIP197_HIA_xDR_CFG_WR_CACHE(WR_CACHE_3BITS);
 		val |= EIP197_HIA_xDR_CFG_RD_CACHE(RD_CACHE_3BITS);
+
+		if (priv->version == EIP197D) {
+			val |= EIP197_HIA_xDR_CFG_xD_PROT(axi_access);
+			val |= EIP197_HIA_xDR_CFG_DATA_PROT(axi_access);
+			val |= EIP197_HIA_xDR_CFG_ACD_PROT(axi_access);
+		}
 		writel(val, EIP197_HIA_CDR(priv, i) + EIP197_HIA_xDR_DMA_CFG);
 
 		/* clear any pending interrupt */
@@ -258,6 +266,8 @@ static int safexcel_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
 	rd_size_rnd = (priv->config.rd_size + (BIT(hdw) - 1)) >> hdw;
 
 	for (i = 0; i < priv->config.rings; i++) {
+		int axi_access = AXI_NONE_SECURE_ACCESS;
+
 		/* ring base address */
 		writel(lower_32_bits(priv->ring[i].rdr.base_dma),
 		       EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_RING_BASE_ADDR_LO);
@@ -276,6 +286,12 @@ static int safexcel_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
 		val = EIP197_HIA_xDR_CFG_WR_CACHE(WR_CACHE_3BITS);
 		val |= EIP197_HIA_xDR_CFG_RD_CACHE(RD_CACHE_3BITS);
 		val |= EIP197_HIA_xDR_WR_RES_BUF | EIP197_HIA_xDR_WR_CTRL_BUF;
+
+		if (priv->version == EIP197D) {
+			val |= EIP197_HIA_xDR_CFG_xD_PROT(axi_access);
+			val |= EIP197_HIA_xDR_CFG_DATA_PROT(axi_access);
+		}
+
 		writel(val,
 		       EIP197_HIA_RDR(priv, i) + EIP197_HIA_xDR_DMA_CFG);
 
@@ -313,9 +329,12 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 	writel(val, EIP197_HIA_AIC(priv) + EIP197_HIA_MST_CTRL);
 
 	/* Configure wr/rd cache values */
-	writel(EIP197_MST_CTRL_RD_CACHE(RD_CACHE_4BITS) |
-	       EIP197_MST_CTRL_WD_CACHE(WR_CACHE_4BITS),
-	       EIP197_HIA_GEN_CFG(priv) + EIP197_MST_CTRL);
+	val = EIP197_MST_CTRL_RD_CACHE(RD_CACHE_4BITS) |
+		EIP197_MST_CTRL_WD_CACHE(WR_CACHE_4BITS);
+
+	if (priv->version == EIP197D)
+		val |= EIP197_MST_CTRL_SUPPORT_PROT(AXI_NONE_SECURE_ACCESS);
+	writel(val, EIP197_HIA_GEN_CFG(priv) + EIP197_MST_CTRL);
 
 	/* Interrupts reset */
 
