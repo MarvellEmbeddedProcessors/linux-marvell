@@ -104,6 +104,9 @@
 					};
 				};
 			};
+			thermal: thermal@6f808c {
+				compatible = "marvell,armada-ap807-thermal";
+			};
 		};
 	};
 
