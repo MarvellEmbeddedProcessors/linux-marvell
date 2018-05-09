@@ -101,6 +101,15 @@
 				};
 			};
 
+			AP810_LABEL(sdhci0): sdhci@6e0000 {
+				compatible = "marvell,armada-ap810-sdhci";
+				reg = <0x6e0000 0x300>;
+				interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+				clock-names = "core";
+				clocks = <&AP810_LABEL(clk) 7>;
+				status = "disabled";
+			};
+
 			AP810_LABEL(gicp): gicp@3000040 {
 				compatible = "marvell,ap806-gicp";
 				reg = <0x3000040 0x10>;
