@@ -11675,6 +11675,7 @@ static void mvpp2_gmac_config(struct mvpp2_port *port, unsigned int mode,
 			      const struct phylink_link_state *state)
 {
 	u32 an, ctrl0, ctrl2, ctrl4;
+	bool mode_basex;
 
 	an = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 	ctrl0 = readl(port->base + MVPP2_GMAC_CTRL_0_REG);
@@ -11698,8 +11699,10 @@ static void mvpp2_gmac_config(struct mvpp2_port *port, unsigned int mode,
 	ctrl0 &= ~MVPP2_GMAC_PORT_TYPE_MASK;
 	ctrl2 &= ~(MVPP2_GMAC_PORT_RESET_MASK | MVPP2_GMAC_PCS_ENABLE_MASK);
 
-	if (state->interface == PHY_INTERFACE_MODE_1000BASEX ||
-	    state->interface == PHY_INTERFACE_MODE_2500BASEX) {
+	mode_basex = state->interface == PHY_INTERFACE_MODE_1000BASEX ||
+			state->interface == PHY_INTERFACE_MODE_2500BASEX;
+
+	if (mode_basex) {
 		/* 1000BaseX and 2500BaseX ports cannot negotiate speed nor can
 		 * they negotiate duplex: they are always operating with a fixed
 		 * speed of 1000/2500Mbps in full duplex, so force 1000/2500
@@ -11708,7 +11711,7 @@ static void mvpp2_gmac_config(struct mvpp2_port *port, unsigned int mode,
 		ctrl0 |= MVPP2_GMAC_PORT_TYPE_MASK;
 		an |= MVPP2_GMAC_CONFIG_GMII_SPEED |
 		      MVPP2_GMAC_CONFIG_FULL_DUPLEX;
-	} else {
+	} else if (!phy_interface_mode_is_rgmii(state->interface)) {
 		an |= MVPP2_GMAC_AN_SPEED_EN | MVPP2_GMAC_FLOW_CTRL_AUTONEG;
 	}
 
@@ -11719,9 +11722,7 @@ static void mvpp2_gmac_config(struct mvpp2_port *port, unsigned int mode,
 	if (phylink_test(state->advertising, Asym_Pause))
 		an |= MVPP2_GMAC_FC_ADV_ASM_EN;
 
-	if (state->interface == PHY_INTERFACE_MODE_SGMII ||
-	    state->interface == PHY_INTERFACE_MODE_1000BASEX ||
-	    state->interface == PHY_INTERFACE_MODE_2500BASEX) {
+	if (mode_basex || state->interface == PHY_INTERFACE_MODE_SGMII) {
 		an |= MVPP2_GMAC_IN_BAND_AUTONEG;
 		ctrl2 |= MVPP2_GMAC_INBAND_AN_MASK | MVPP2_GMAC_PCS_ENABLE_MASK;
 
@@ -11735,13 +11736,17 @@ static void mvpp2_gmac_config(struct mvpp2_port *port, unsigned int mode,
 			ctrl4 |= MVPP22_CTRL4_TX_FC_EN;
 		if (state->pause & MLO_PAUSE_RX)
 			ctrl4 |= MVPP22_CTRL4_RX_FC_EN;
-	} else if (phy_interface_mode_is_rgmii(state->interface)) {
+	}
+
+	if (phy_interface_mode_is_rgmii(state->interface)) {
 		an |= MVPP2_GMAC_IN_BAND_AUTONEG_BYPASS;
 
+		if (state->duplex)
+			an |= MVPP2_GMAC_CONFIG_FULL_DUPLEX;
 		if (state->speed == SPEED_1000)
-			an |= MVPP2_GMAC_STATUS0_GMII_SPEED;
+			an |= MVPP2_GMAC_CONFIG_GMII_SPEED;
 		else if (state->speed == SPEED_100)
-			an |= MVPP2_GMAC_STATUS0_MII_SPEED;
+			an |= MVPP2_GMAC_CONFIG_MII_SPEED;
 
 		ctrl4 &= ~MVPP22_CTRL4_DP_CLK_SEL;
 		ctrl4 |= MVPP22_CTRL4_EXT_PIN_GMII_SEL |
