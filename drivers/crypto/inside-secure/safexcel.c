@@ -132,18 +132,23 @@ static void eip197_write_firmware(struct safexcel_crypto_priv *priv,
 
 static int eip197_load_firmwares(struct safexcel_crypto_priv *priv)
 {
-	static const char * const fw_name[] = {"eip197/197b/ifpp.bin",
-					       "eip197/197b/ipue.bin"};
+	static const char * const fw_file_name[] = {"ifpp.bin", "ipue.bin"};
+	char fw_base[13] = {0};	/* "eip197/197X/\0" */
+	char fw_full_name[25] = {0};
 	const struct firmware *fw[FW_NB];
 	int i, j, ret = 0, pe;
 	u32 val;
 
+	snprintf(fw_base, 13, "eip197/197%s/",
+		 (priv->hw_ver == EIP197B) ? "b" : "d");
+
 	for (i = 0; i < FW_NB; i++) {
-		ret = request_firmware(&fw[i], fw_name[i], priv->dev);
+		snprintf(fw_full_name, 21, "%s%s", fw_base, fw_file_name[i]);
+		ret = request_firmware(&fw[i], fw_full_name, priv->dev);
 		if (ret) {
 			dev_err(priv->dev,
 				"Failed to request firmware %s (%d)\n",
-				fw_name[i], ret);
+				fw_full_name, ret);
 			goto release_fw;
 		}
 	 }
