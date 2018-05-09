@@ -91,6 +91,16 @@
 			ranges = <0x0 0x0 AP810_BASE 0x4000000>;
 			interrupt-parent = <&gic>;
 
+			AP810_LABEL(syscon): system-controller@6f4000 {
+				compatible = "syscon", "simple-mfd";
+				reg = <0x6f4000 0x2000>;
+
+				AP810_LABEL(clk): clock {
+					compatible = "marvell,ap810-clock";
+					#clock-cells = <1>;
+				};
+			};
+
 			AP810_LABEL(gicp): gicp@3000040 {
 				compatible = "marvell,ap806-gicp";
 				reg = <0x3000040 0x10>;
