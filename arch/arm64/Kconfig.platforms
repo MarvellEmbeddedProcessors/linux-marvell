@@ -119,6 +119,7 @@ config ARCH_MESON
 config ARCH_MVEBU
 	bool "Marvell EBU SoC Family"
 	select ARMADA_AP806_SYSCON
+	select ARMADA_AP810_SYSCON
 	select ARMADA_CP110_SYSCON
 	select ARMADA_37XX_CLK
 	select GPIOLIB

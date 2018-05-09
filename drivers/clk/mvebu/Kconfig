@@ -35,6 +35,9 @@ config ARMADA_XP_CLK
 config ARMADA_AP806_SYSCON
 	bool
 
+config ARMADA_AP810_SYSCON
+	bool
+
 config ARMADA_CP110_SYSCON
 	bool
 
