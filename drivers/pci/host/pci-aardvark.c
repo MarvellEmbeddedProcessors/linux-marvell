@@ -381,8 +381,6 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
 
 	/* Set PCIe Device Control and Status 1 PF0 register */
 	reg = PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE |
-		(PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ <<
-		 PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
 		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE |
 		(PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ <<
 		 PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT);
@@ -1156,58 +1154,6 @@ out_release_res:
 	return err;
 }
 
-static int advk_pcie_find_smpss(struct pci_dev *dev, void *data)
-{
-	u8 *smpss = data;
-
-	if (!dev)
-		return 0;
-
-	if (!pci_is_pcie(dev))
-		return 0;
-
-	if (*smpss > dev->pcie_mpss)
-		*smpss = dev->pcie_mpss;
-
-	return 0;
-}
-
-static int advk_pcie_bus_configure_mps(struct pci_dev *dev, void *data)
-{
-	int mps;
-
-	if (!dev)
-		return 0;
-
-	if (!pci_is_pcie(dev))
-		return 0;
-
-	mps = PCIE_CORE_MPS_UNIT_BYTE << *(u8 *)data;
-	pcie_set_mps(dev, mps);
-
-	return 0;
-}
-
-static void advk_pcie_configure_mps(struct pci_bus *bus, struct advk_pcie *pcie)
-{
-	u8 smpss = PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ;
-	u32 reg;
-
-	/* Find the minimal supported MAX payload size */
-	advk_pcie_find_smpss(bus->self, &smpss);
-	pci_walk_bus(bus, advk_pcie_find_smpss, &smpss);
-
-	/* Configure RC MAX payload size */
-	reg = advk_readl(pcie, PCIE_CORE_DEV_CTRL_STATS_REG);
-	reg &= ~PCI_EXP_DEVCTL_PAYLOAD;
-	reg |= smpss << PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT;
-	advk_writel(pcie, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
-
-	/* Configure device MAX payload size */
-	advk_pcie_bus_configure_mps(bus->self, &smpss);
-	pci_walk_bus(bus, advk_pcie_bus_configure_mps, &smpss);
-}
-
 static int advk_pcie_clk_enable_then_reset(struct advk_pcie *pcie)
 {
 	int ret;
@@ -1345,9 +1291,6 @@ after_pcie_reset:
 			pcie_bus_configure_settings(child);
 	}
 
-	/* Configure the MAX pay load size */
-	advk_pcie_configure_mps(bus, pcie);
-
 	pci_bus_add_devices(bus);
 	return 0;
 
@@ -1401,9 +1344,6 @@ static int advk_pcie_resume_noirq(struct device *dev)
 	}
 
 	advk_pcie_setup_hw(pcie);
-
-	/* Reconfigure the MAX pay load size */
-	advk_pcie_configure_mps(pcie->bus, pcie);
 
 	return 0;
 }
