@@ -8320,6 +8320,9 @@ static void mvpp2_egress_enable(struct mvpp2_port *port)
 	int queue;
 	int tx_port_num = mvpp2_egress_port(port);
 
+	if (port->flags && MVPP22_F_IF_MUSDK)
+		return;
+
 	/* Enable all initialized TXs. */
 	qmap = 0;
 	for (queue = 0; queue < port->ntxqs; queue++) {
@@ -8341,6 +8344,9 @@ static void mvpp2_egress_disable(struct mvpp2_port *port)
 	u32 reg_data;
 	int delay;
 	int tx_port_num = mvpp2_egress_port(port);
+
+	if (port->flags && MVPP22_F_IF_MUSDK)
+		return;
 
 	/* Issue stop command for active channels only */
 	mvpp2_write(port->priv, MVPP2_TXP_SCHED_PORT_INDEX_REG, tx_port_num);
