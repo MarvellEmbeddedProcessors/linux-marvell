@@ -176,22 +176,22 @@ int mv_gop110_in_band_auto_neg(struct gop_hw *gop, int pcs_num, bool en);
 
 /* MPCS Functions */
 
-static inline u32 mv_gop110_mpcs_global_read(struct gop_hw *gop, u32 offset)
+static inline u32 mv_gop110_mpcs_global_read(struct gop_hw *gop, int mac_num, u32 offset)
 {
-	return mv_gop_gen_read(gop->gop_110.mspg_base, offset);
+	return mv_gop_gen_read(gop->gop_110.mspg.base,  mac_num * gop->gop_110.mspg.obj_size + offset);
 }
 
-static inline void mv_gop110_mpcs_global_write(struct gop_hw *gop, u32 offset,
+static inline void mv_gop110_mpcs_global_write(struct gop_hw *gop, int mac_num, u32 offset,
 					       u32 data)
 {
-	mv_gop_gen_write(gop->gop_110.mspg_base, offset, data);
+	mv_gop_gen_write(gop->gop_110.mspg.base,  mac_num * gop->gop_110.mspg.obj_size + offset, data);
 }
 
-static inline void mv_gop110_mpcs_global_print(struct gop_hw *gop,
+static inline void mv_gop110_mpcs_global_print(struct gop_hw *gop, int mac_num,
 					       char *reg_name, u32 reg)
 {
 	pr_info("  %-32s: 0x%x = 0x%08x\n", reg_name, reg,
-		mv_gop110_mpcs_global_read(gop, reg));
+		mv_gop110_mpcs_global_read(gop, mac_num, reg));
 }
 
 /* XPCS Functions */
@@ -238,8 +238,8 @@ void mv_gop110_xpcs_gl_regs_dump(struct gop_hw *gop);
 void mv_gop110_xpcs_lane_regs_dump(struct gop_hw *gop, int lane);
 int mv_gop110_xpcs_reset(struct gop_hw *gop, enum mv_reset reset);
 int mv_gop110_xpcs_mode(struct gop_hw *gop, int num_of_lanes);
-int mv_gop110_mpcs_mode(struct gop_hw *gop);
-void mv_gop110_mpcs_clock_reset(struct gop_hw *gop,  enum mv_reset reset);
+int mv_gop110_mpcs_mode(struct gop_hw *gop, int mac_num);
+void mv_gop110_mpcs_clock_reset(struct gop_hw *gop, int mac_num, enum mv_reset reset);
 
 /* XLG MAC Functions */
 static inline u32 mv_gop110_xlg_mac_read(struct gop_hw *gop, int mac_num,

@@ -39,7 +39,7 @@ void mv_gop110_register_bases_dump(struct gop_hw *gop)
 	pr_info("  %-32s: 0x%p\n", "XMIB", gop->gop_110.xmib.base);
 	pr_info("  %-32s: 0x%p\n", "SMI", gop->gop_110.smi_base);
 	pr_info("  %-32s: 0x%p\n", "XSMI", gop->gop_110.xsmi_base);
-	pr_info("  %-32s: 0x%p\n", "MSPG", gop->gop_110.mspg_base);
+	pr_info("  %-32s: 0x%p\n", "MSPG", gop->gop_110.mspg.base);
 	pr_info("  %-32s: 0x%p\n", "XPCS", gop->gop_110.xpcs_base);
 	pr_info("  %-32s: 0x%p\n", "PTP", gop->gop_110.ptp.base);
 	pr_info("  %-32s: 0x%p\n", "RFU1", gop->gop_110.rfu1_base);
@@ -1086,9 +1086,8 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_XFI:
 
 		num_of_act_lanes = 2;
-		mac_num = 0;
 		/* configure MPCS */
-		mv_gop110_mpcs_mode(gop);
+		mv_gop110_mpcs_mode(gop, mac_num);
 		/* configure MAC */
 		mv_gop110_xlg_mac_mode_cfg(gop, mac_num, num_of_act_lanes);
 
@@ -1189,7 +1188,7 @@ void mv_gop110_port_enable(struct gop_hw *gop, struct mv_mac_data *mac, struct m
 	case PHY_INTERFACE_MODE_XFI:
 		if (port->comphy)
 			phy_send_command(port->comphy[0], COMPHY_COMMAND_DIGITAL_PWR_ON);
-		mv_gop110_mpcs_clock_reset(gop,  UNRESET);
+		mv_gop110_mpcs_clock_reset(gop, port_num, UNRESET);
 		mv_gop110_xlg_mac_reset(gop, port_num, UNRESET);
 		mv_gop110_xlg_mac_port_enable(gop, port_num);
 	break;
@@ -1227,7 +1226,7 @@ void mv_gop110_port_disable(struct gop_hw *gop, struct mv_mac_data *mac, struct 
 	case PHY_INTERFACE_MODE_XFI:
 		mv_gop110_xlg_mac_port_disable(gop, port_num);
 		mv_gop110_xlg_mac_reset(gop, port_num, RESET);
-		mv_gop110_mpcs_clock_reset(gop,  RESET);
+		mv_gop110_mpcs_clock_reset(gop, port_num, RESET);
 		if (port->comphy)
 			phy_send_command(port->comphy[0], COMPHY_COMMAND_DIGITAL_PWR_OFF);
 	break;
@@ -2448,26 +2447,26 @@ int mv_gop110_xpcs_mode(struct gop_hw *gop, int num_of_lanes)
 	return 0;
 }
 
-int mv_gop110_mpcs_mode(struct gop_hw *gop)
+int mv_gop110_mpcs_mode(struct gop_hw *gop, int mac_num)
 {
 	u32 reg_addr;
 	u32 val;
 
 	/* configure PCS40G COMMON CONTROL */
 	reg_addr = PCS40G_COMMON_CONTROL;
-	val = mv_gop110_mpcs_global_read(gop, reg_addr);
+	val = mv_gop110_mpcs_global_read(gop, mac_num, reg_addr);
 	U32_SET_FIELD(val, FORWARD_ERROR_CORRECTION_MASK,
 		      0 << FORWARD_ERROR_CORRECTION_OFFSET);
 
-	mv_gop110_mpcs_global_write(gop, reg_addr, val);
+	mv_gop110_mpcs_global_write(gop, mac_num, reg_addr, val);
 
 	/* configure PCS CLOCK RESET */
 	reg_addr = PCS_CLOCK_RESET;
-	val = mv_gop110_mpcs_global_read(gop, reg_addr);
+	val = mv_gop110_mpcs_global_read(gop, mac_num, reg_addr);
 	U32_SET_FIELD(val, CLK_DIVISION_RATIO_MASK,
 		      1 << CLK_DIVISION_RATIO_OFFSET);
 
-	mv_gop110_mpcs_global_write(gop, reg_addr, val);
+	mv_gop110_mpcs_global_write(gop, mac_num, reg_addr, val);
 
 	U32_SET_FIELD(val, CLK_DIV_PHASE_SET_MASK,
 		      0 << CLK_DIV_PHASE_SET_OFFSET);
@@ -2475,12 +2474,12 @@ int mv_gop110_mpcs_mode(struct gop_hw *gop)
 	U32_SET_FIELD(val, RX_SD_CLK_RESET_MASK, 1 << RX_SD_CLK_RESET_OFFSET);
 	U32_SET_FIELD(val, TX_SD_CLK_RESET_MASK, 1 << TX_SD_CLK_RESET_OFFSET);
 
-	mv_gop110_mpcs_global_write(gop, reg_addr, val);
+	mv_gop110_mpcs_global_write(gop, mac_num, reg_addr, val);
 
 	return 0;
 }
 
-void mv_gop110_mpcs_clock_reset(struct gop_hw *gop, enum mv_reset reset)
+void mv_gop110_mpcs_clock_reset(struct gop_hw *gop, int mac_num, enum mv_reset reset)
 {
 	u32 val, reg_addr, val1;
 
@@ -2491,13 +2490,13 @@ void mv_gop110_mpcs_clock_reset(struct gop_hw *gop, enum mv_reset reset)
 
 	/* configure PCS CLOCK RESET */
 	reg_addr = PCS_CLOCK_RESET;
-	val = mv_gop110_mpcs_global_read(gop, reg_addr);
+	val = mv_gop110_mpcs_global_read(gop, mac_num, reg_addr);
 
 	U32_SET_FIELD(val, MAC_CLK_RESET_MASK, val1 << MAC_CLK_RESET_OFFSET);
 	U32_SET_FIELD(val, RX_SD_CLK_RESET_MASK, val1 << RX_SD_CLK_RESET_OFFSET);
 	U32_SET_FIELD(val, TX_SD_CLK_RESET_MASK, val1 << TX_SD_CLK_RESET_OFFSET);
 
-	mv_gop110_mpcs_global_write(gop, reg_addr, val);
+	mv_gop110_mpcs_global_write(gop, mac_num, reg_addr, val);
 }
 
 u64 mv_gop110_mib_read64(struct gop_hw *gop, int port, unsigned int offset)
@@ -3367,10 +3366,10 @@ static void mv_gop110_set_new_phy_mode(u32 speed, struct mv_mac_data *mac)
 
 static int mv_gop110_get_new_comphy_mode(u32 speed, int port_id)
 {
-	if (speed == SPEED_10000 && port_id == 0)
+	if (speed == SPEED_10000 && (port_id == 0 || port_id == 1))
 		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
 				  COMPHY_SPEED_10_3125G, COMPHY_POLARITY_NO_INVERT);
-	else if (speed == SPEED_5000 && port_id == 0)
+	else if (speed == SPEED_5000 && (port_id == 0 || port_id == 1))
 		return COMPHY_DEF(COMPHY_SFI_MODE, port_id,
 				  COMPHY_SPEED_5_15625G, COMPHY_POLARITY_NO_INVERT);
 	else if (speed == SPEED_2500)

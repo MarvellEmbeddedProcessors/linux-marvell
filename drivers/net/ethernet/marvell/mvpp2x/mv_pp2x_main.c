@@ -6553,10 +6553,11 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		/* MSPG - base register */
 		res = platform_get_resource_byname(pdev,
 						   IORESOURCE_MEM, "mspg");
-		hw->gop.gop_110.mspg_base =
+		hw->gop.gop_110.mspg.base =
 			devm_ioremap_resource(&pdev->dev, res);
-		if (IS_ERR(hw->gop.gop_110.mspg_base))
-			return PTR_ERR(hw->gop.gop_110.mspg_base);
+		if (IS_ERR(hw->gop.gop_110.mspg.base))
+			return PTR_ERR(hw->gop.gop_110.mspg.base);
+		hw->gop.gop_110.mspg.obj_size = 0x1000;
 		mspg_base = res->start;
 		mspg_end  = res->end;
 
@@ -6571,11 +6572,11 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if ((res->start <= mspg_base) || (res->end >= mspg_end))
 			return -ENXIO;
 		hw->gop.gop_110.xpcs_base =
-			(void *)(hw->gop.gop_110.mspg_base +
+			(void *)(hw->gop.gop_110.mspg.base +
 				(res->start - mspg_base));
 
 		hw->gop.gop_110.ptp.base =
-			(void *)(hw->gop.gop_110.mspg_base + 0x0800);
+			(void *)(hw->gop.gop_110.mspg.base + 0x0800);
 		hw->gop.gop_110.ptp.obj_size = 0x1000;
 		/* MSPG - gmac */
 		res = platform_get_resource_byname(pdev,
@@ -6583,7 +6584,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if ((res->start <= mspg_base) || (res->end >= mspg_end))
 			return -ENXIO;
 		hw->gop.gop_110.gmac.base =
-			(void *)(hw->gop.gop_110.mspg_base +
+			(void *)(hw->gop.gop_110.mspg.base +
 			(res->start - mspg_base));
 		hw->gop.gop_110.gmac.obj_size = 0x1000;
 
@@ -6593,7 +6594,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if ((res->start <= mspg_base) || (res->end >= mspg_end))
 			return -ENXIO;
 		hw->gop.gop_110.fca.base =
-			(void *)(hw->gop.gop_110.mspg_base +
+			(void *)(hw->gop.gop_110.mspg.base +
 			(res->start - mspg_base));
 		hw->gop.gop_110.fca.obj_size = 0x1000;
 
@@ -6603,7 +6604,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if ((res->start <= mspg_base) || (res->end >= mspg_end))
 			return -ENXIO;
 		hw->gop.gop_110.xlg_mac.base =
-			(void *)(hw->gop.gop_110.mspg_base +
+			(void *)(hw->gop.gop_110.mspg.base +
 			(res->start - mspg_base));
 		hw->gop.gop_110.xlg_mac.obj_size = 0x1000;
 
