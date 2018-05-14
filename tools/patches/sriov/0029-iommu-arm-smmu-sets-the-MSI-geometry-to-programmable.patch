@@ -1,0 +1,60 @@
+From db9ab60468ef0c9733aff87e03f37b57c35c6f14 Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Tue, 1 Mar 2016 17:09:57 +0000
+Subject: [PATCH 29/57] iommu/arm-smmu: sets the MSI geometry to programmable
+
+On ARM, MSI write transactions from device upstream to the smmu
+are conveyed through the iommu. Therefore target physical addresses
+must be mapped and DOMAIN_ATTR_MSI_GEOMETRY advertises a programmable
+MSI IOVA region.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/iommu/arm-smmu-v3.c | 2 ++
+ drivers/iommu/arm-smmu.c    | 3 +++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index be1935e..78171e3 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1382,6 +1382,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ {
+ 	struct arm_smmu_domain *smmu_domain;
++	struct iommu_domain_msi_geometry msi_geometry = {0, 0, true};
+ 
+ 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+ 		return NULL;
+@@ -1400,6 +1401,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 		kfree(smmu_domain);
+ 		return NULL;
+ 	}
++	smmu_domain->domain.msi_geometry = msi_geometry;
+ 
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 4228983..5301cb0 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -883,6 +883,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ {
+ 	struct arm_smmu_domain *smmu_domain;
++	struct iommu_domain_msi_geometry msi_geometry = {0, 0, true};
+ 
+ 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+ 		return NULL;
+@@ -901,6 +902,8 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 		return NULL;
+ 	}
+ 
++	smmu_domain->domain.msi_geometry = msi_geometry;
++
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
+ 
+-- 
+2.7.4
+

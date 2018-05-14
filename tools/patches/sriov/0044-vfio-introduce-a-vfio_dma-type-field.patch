@@ -1,0 +1,48 @@
+From 19bb859b2c7052c39e67423b0a220ab742bb7d9f Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Tue, 12 Jan 2016 10:59:40 +0100
+Subject: [PATCH 44/57] vfio: introduce a vfio_dma type field
+
+We introduce a vfio_dma type since we will need to discriminate
+different types of dma slots:
+- VFIO_IOVA_USER: IOVA region used to map user vaddr
+- VFIO_IOVA_RESERVED: IOVA region reserved to map host device PA such
+  as MSI doorbells
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/vfio_iommu_type1.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 2fa2806..bb3cc8c 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -53,6 +53,16 @@ module_param_named(disable_hugepages,
+ MODULE_PARM_DESC(disable_hugepages,
+ 		 "Disable VFIO IOMMU support for IOMMU hugepages.");
+ 
++enum vfio_iova_type {
++	VFIO_IOVA_USER = 0,	/* standard IOVA used to map user vaddr */
++	/*
++	 * IOVA reserved to map special host physical addresses,
++	 * MSI frames for instance
++	 */
++	VFIO_IOVA_RESERVED,
++	VFIO_IOVA_ANY,		/* matches any IOVA type */
++};
++
+ struct vfio_iommu {
+ 	struct list_head	domain_list;
+ 	struct mutex		lock;
+@@ -75,6 +85,7 @@ struct vfio_dma {
+ 	unsigned long		vaddr;		/* Process virtual addr */
+ 	size_t			size;		/* Map size (bytes) */
+ 	int			prot;		/* IOMMU_READ/WRITE */
++	enum vfio_iova_type	type;		/* type of IOVA */
+ };
+ 
+ struct vfio_group {
+-- 
+2.7.4
+

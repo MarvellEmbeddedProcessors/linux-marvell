@@ -1,0 +1,35 @@
+From 91ec660ef4334f0d56904e322738c29be601990e Mon Sep 17 00:00:00 2001
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Fri, 6 Nov 2015 18:32:41 +0100
+Subject: [PATCH 01/57] iommu/arm-smmu: Delete an unnecessary check before
+ free_io_pgtable_ops()
+
+The free_io_pgtable_ops() function tests whether its argument is NULL
+and then returns immediately. Thus the test around the call is not needed.
+
+This issue was detected by using the Coccinelle software.
+
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 04bf77b..1a7fcd9 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -944,9 +944,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+ 		free_irq(irq, domain);
+ 	}
+ 
+-	if (smmu_domain->pgtbl_ops)
+-		free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+-
++	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+ 	__arm_smmu_free_bitmap(smmu->context_map, cfg->cbndx);
+ }
+ 
+-- 
+2.7.4
+

@@ -1,0 +1,80 @@
+From 8c922879a491baf63fcc2095af1ffb29325fec1f Mon Sep 17 00:00:00 2001
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Mon, 7 Dec 2015 18:18:52 +0000
+Subject: [PATCH 04/57] iommu/arm-smmu: Invalidate TLBs properly
+
+When invalidating an IOVA range potentially spanning multiple pages,
+such as when removing an entire intermediate-level table, we currently
+only issue an invalidation for the first IOVA of that range. Since the
+architecture specifies that address-based TLB maintenance operations
+target a single entry, an SMMU could feasibly retain live entries for
+subsequent pages within that unmapped range, which is not good.
+
+Make sure we hit every possible entry by iterating over the whole range
+at the granularity provided by the pagetable implementation.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+[will: added missing semicolons...]
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c |  5 ++++-
+ drivers/iommu/arm-smmu.c    | 16 +++++++++++++---
+ 2 files changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index d8c0265..0114b4c 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1351,7 +1351,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
+ 	}
+ 
+-	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
++	do {
++		arm_smmu_cmdq_issue_cmd(smmu, &cmd);
++		cmd.tlbi.addr += granule;
++	} while (size -= granule);
+ }
+ 
+ static struct iommu_gather_ops arm_smmu_gather_ops = {
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index a31f926..8b3607c1 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -596,12 +596,18 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 		if (!IS_ENABLED(CONFIG_64BIT) || smmu->version == ARM_SMMU_V1) {
+ 			iova &= ~12UL;
+ 			iova |= ARM_SMMU_CB_ASID(cfg);
+-			writel_relaxed(iova, reg);
++			do {
++				writel_relaxed(iova, reg);
++				iova += granule;
++			} while (size -= granule);
+ #ifdef CONFIG_64BIT
+ 		} else {
+ 			iova >>= 12;
+ 			iova |= (u64)ARM_SMMU_CB_ASID(cfg) << 48;
+-			writeq_relaxed(iova, reg);
++			do {
++				writeq_relaxed(iova, reg);
++				iova += granule >> 12;
++			} while (size -= granule);
+ #endif
+ 		}
+ #ifdef CONFIG_64BIT
+@@ -609,7 +615,11 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 		reg = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+ 		reg += leaf ? ARM_SMMU_CB_S2_TLBIIPAS2L :
+ 			      ARM_SMMU_CB_S2_TLBIIPAS2;
+-		writeq_relaxed(iova >> 12, reg);
++		iova >>= 12;
++		do {
++			writeq_relaxed(iova, reg);
++			iova += granule >> 12;
++		} while (size -= granule);
+ #endif
+ 	} else {
+ 		reg = ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_TLBIVMID;
+-- 
+2.7.4
+

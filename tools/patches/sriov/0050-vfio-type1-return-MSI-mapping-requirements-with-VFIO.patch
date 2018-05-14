@@ -1,0 +1,88 @@
+From af09f6f0819651d4cf72a18a9f6e8b592d6464c4 Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Tue, 12 Jan 2016 10:58:58 +0100
+Subject: [PATCH 50/57] vfio/type1: return MSI mapping requirements with
+ VFIO_IOMMU_GET_INFO
+
+This patch allows the user-space to know whether MSI addresses need to
+be mapped in the IOMMU. The user-space uses VFIO_IOMMU_GET_INFO ioctl and
+IOMMU_INFO_REQUIRE_MSI_MAP gets set if they need to.
+
+The computation of the number of IOVA pages to be provided by the user
+space will be implemented in a separate patch using capability chains.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/vfio_iommu_type1.c | 26 ++++++++++++++++++++++++++
+ include/uapi/linux/vfio.h       |  4 ++++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 02f4842..83622ae0 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -287,6 +287,29 @@ static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
+ }
+ 
+ /*
++ * vfio_domains_require_msi_mapping: return whether MSI doorbells must be
++ * iommu mapped
++ *
++ * returns true if msi mapping is requested
++ */
++static bool vfio_domains_require_msi_mapping(struct vfio_iommu *iommu)
++{
++	struct iommu_domain_msi_geometry msi_geometry;
++	struct vfio_domain *d;
++	bool flag;
++
++	mutex_lock(&iommu->lock);
++	/* All domains have same require_msi_map property, pick first */
++	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
++	iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_GEOMETRY,
++			      &msi_geometry);
++	flag = msi_geometry.programmable;
++
++	mutex_unlock(&iommu->lock);
++
++	return flag;
++}
++/*
+  * Attempt to pin pages.  We really don't want to track all the pfns and
+  * the iommu can only map chunks of consecutive pfns anyway, so get the
+  * first page and all consecutive pages with the same locking.
+@@ -1150,6 +1173,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+ 
+ 		info.flags = 0;
+ 
++		if (vfio_domains_require_msi_mapping(iommu))
++			info.flags |= VFIO_IOMMU_INFO_REQUIRE_MSI_MAP;
++
+ 		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
+ 
+ 		return copy_to_user((void __user *)arg, &info, minsz) ?
+diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+index edec7ad..4e2e9c1 100644
+--- a/include/uapi/linux/vfio.h
++++ b/include/uapi/linux/vfio.h
+@@ -393,6 +393,7 @@ struct vfio_iommu_type1_info {
+ 	__u32	argsz;
+ 	__u32	flags;
+ #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
++#define VFIO_IOMMU_INFO_REQUIRE_MSI_MAP (1 << 1)/* MSI must be mapped */
+ 	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
+ };
+ 
+@@ -408,6 +409,9 @@ struct vfio_iommu_type1_info {
+  * IOVA region that will be used on some platforms to map the host MSI frames.
+  * In that specific case, vaddr is ignored. Once registered, an MSI reserved
+  * IOVA region stays until the container is closed.
++ * The requirement for provisioning such reserved IOVA range can be checked by
++ * calling VFIO_IOMMU_GET_INFO and testing the VFIO_IOMMU_INFO_REQUIRE_MSI_MAP
++ * flag.
+  */
+ struct vfio_iommu_type1_dma_map {
+ 	__u32	argsz;
+-- 
+2.7.4
+

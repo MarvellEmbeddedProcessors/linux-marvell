@@ -1,0 +1,39 @@
+From 03ccdf71a99466dbe1eaf0e83974311f0dd6b2b6 Mon Sep 17 00:00:00 2001
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Mon, 22 Feb 2016 19:30:43 +0000
+Subject: [PATCH 13/57] arm64/dma-mapping: Extend DMA ops workaround to PCI
+ devices
+
+PCI devices now suffer the same hiccup as platform devices, in that they
+get their DMA ops configured before they have been added to their bus,
+and thus before we know whether they have successfully registered with
+an IOMMU or not. Until the necessary driver core changes to reorder
+calls during device creation have been worked out, extend our delayed
+notifier trick onto the PCI bus so as to avoid broken DMA ops for IOMMUs
+there.
+
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/mm/dma-mapping.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 354144e..de698d4 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -933,6 +933,10 @@ static int __init __iommu_dma_init(void)
+ 		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
+ 	if (!ret)
+ 		ret = register_iommu_dma_ops_notifier(&amba_bustype);
++#ifdef CONFIG_PCI
++	if (!ret)
++		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
++#endif
+ 
+ 	/* handle devices queued before this arch_initcall */
+ 	if (!ret)
+-- 
+2.7.4
+

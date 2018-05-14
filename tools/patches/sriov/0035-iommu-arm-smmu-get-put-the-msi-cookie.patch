@@ -1,0 +1,111 @@
+From d517e062b7ee54e5730e869bbbd46d19371159ea Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Mon, 25 Apr 2016 15:11:32 +0000
+Subject: [PATCH 35/57] iommu/arm-smmu: get/put the msi cookie
+
+For IOMMU_DOMAIN_UNMANAGED type we now also get the msi
+cookie in both arm-smmu and arm-smmu-v3. This initializes
+resources for MSI doorbell mapping.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/iommu/arm-smmu-v3.c | 16 ++++++++++++----
+ drivers/iommu/arm-smmu.c    | 15 +++++++++++----
+ 2 files changed, 23 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 78171e3..6b13893 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -22,6 +22,7 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
++#include <linux/msi-iommu.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+ #include <linux/iommu.h>
+@@ -1397,15 +1398,21 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 		return NULL;
+ 
+ 	if (type == IOMMU_DOMAIN_DMA &&
+-	    iommu_get_dma_cookie(&smmu_domain->domain)) {
+-		kfree(smmu_domain);
+-		return NULL;
+-	}
++	    iommu_get_dma_cookie(&smmu_domain->domain))
++		goto err;
++
++	if (type == IOMMU_DOMAIN_UNMANAGED &&
++		iommu_get_msi_cookie(&smmu_domain->domain))
++		goto err;
++
+ 	smmu_domain->domain.msi_geometry = msi_geometry;
+ 
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
+ 	return &smmu_domain->domain;
++err:
++	kfree(smmu_domain);
++	return NULL;
+ }
+ 
+ static int arm_smmu_bitmap_alloc(unsigned long *map, int span)
+@@ -1431,6 +1438,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 
++	iommu_put_msi_cookie(domain);
+ 	iommu_put_dma_cookie(domain);
+ 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+ 
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 5301cb0..bdc7757 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -30,6 +30,7 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
++#include <linux/msi-iommu.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+@@ -897,10 +898,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 		return NULL;
+ 
+ 	if (type == IOMMU_DOMAIN_DMA &&
+-	    iommu_get_dma_cookie(&smmu_domain->domain)) {
+-		kfree(smmu_domain);
+-		return NULL;
+-	}
++	    iommu_get_dma_cookie(&smmu_domain->domain))
++		goto err;
++
++	if (type == IOMMU_DOMAIN_UNMANAGED &&
++		iommu_get_msi_cookie(&smmu_domain->domain))
++		goto err;
+ 
+ 	smmu_domain->domain.msi_geometry = msi_geometry;
+ 
+@@ -908,6 +911,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
+ 
+ 	return &smmu_domain->domain;
++err:
++	kfree(smmu_domain);
++	return NULL;
+ }
+ 
+ static void arm_smmu_domain_free(struct iommu_domain *domain)
+@@ -918,6 +924,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 	 * Free the domain resources. We assume that all devices have
+ 	 * already been detached.
+ 	 */
++	iommu_put_msi_cookie(domain);
+ 	iommu_put_dma_cookie(domain);
+ 	arm_smmu_destroy_domain_context(domain);
+ 	kfree(smmu_domain);
+-- 
+2.7.4
+

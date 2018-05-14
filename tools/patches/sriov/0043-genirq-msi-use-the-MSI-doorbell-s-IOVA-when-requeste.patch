@@ -1,0 +1,40 @@
+From 7b0689919a487693199d2cb850ff2b2414566112 Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Tue, 1 Mar 2016 16:44:17 +0000
+Subject: [PATCH 43/57] genirq/msi: use the MSI doorbell's IOVA when requested
+
+On MSI message composition we now use the MSI doorbell's IOVA in
+place of the doorbell's PA in case the device is upstream to an
+IOMMU that requires MSI addresses to be mapped. The doorbell's
+allocation and mapping happened on an early stage (pci_enable_msi).
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ kernel/irq/msi.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index f3193ce..193413a 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -64,8 +64,16 @@ static int msi_compose(struct irq_data *irq_data,
+ 
+ 	if (erase)
+ 		memset(msg, 0, sizeof(*msg));
+-	else
++	else {
++		struct device *dev;
++
+ 		ret = irq_chip_compose_msi_msg(irq_data, msg);
++		if (ret)
++			return ret;
++
++		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
++		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
++	}
+ 
+ 	return ret;
+ }
+-- 
+2.7.4
+

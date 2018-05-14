@@ -1,0 +1,111 @@
+From 5d3d098a74027a16c6347c9fa48c11bec01b5871 Mon Sep 17 00:00:00 2001
+From: Peng Fan <van.freenix@gmail.com>
+Date: Fri, 20 Nov 2015 16:56:18 +0800
+Subject: [PATCH 02/57] iommu/arm-smmu: Correct group reference count
+
+The basic flow for add a device:
+ arm_smmu_add_device
+        |->iommu_group_get_for_dev
+            |->iommu_group_get
+                     return group;  (1)
+            |->ops->device_group : Init/increase reference count to/by 1.
+            |->iommu_group_add_device : Increase reference count by 1.
+		     return group   (2)
+        |->return 0;
+
+Since we are adding one device, the flow is (2) and the group reference
+count will be increased by 2. So, we need to add iommu_group_put at the
+end of arm_smmu_add_device to decrease the count by 1.
+
+Also take the failure path into consideration when fail to add a device.
+
+Signed-off-by: Peng Fan <van.freenix@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 18 +++++++++++-------
+ drivers/iommu/arm-smmu.c    |  1 +
+ 2 files changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 347aaaa..f0f4fc3 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1803,13 +1803,13 @@ static int arm_smmu_add_device(struct device *dev)
+ 		smmu = arm_smmu_get_for_pci_dev(pdev);
+ 		if (!smmu) {
+ 			ret = -ENOENT;
+-			goto out_put_group;
++			goto out_remove_dev;
+ 		}
+ 
+ 		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+ 		if (!smmu_group) {
+ 			ret = -ENOMEM;
+-			goto out_put_group;
++			goto out_remove_dev;
+ 		}
+ 
+ 		smmu_group->ste.valid	= true;
+@@ -1825,20 +1825,20 @@ static int arm_smmu_add_device(struct device *dev)
+ 	for (i = 0; i < smmu_group->num_sids; ++i) {
+ 		/* If we already know about this SID, then we're done */
+ 		if (smmu_group->sids[i] == sid)
+-			return 0;
++			goto out_put_group;
+ 	}
+ 
+ 	/* Check the SID is in range of the SMMU and our stream table */
+ 	if (!arm_smmu_sid_in_range(smmu, sid)) {
+ 		ret = -ERANGE;
+-		goto out_put_group;
++		goto out_remove_dev;
+ 	}
+ 
+ 	/* Ensure l2 strtab is initialised */
+ 	if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
+ 		ret = arm_smmu_init_l2_strtab(smmu, sid);
+ 		if (ret)
+-			goto out_put_group;
++			goto out_remove_dev;
+ 	}
+ 
+ 	/* Resize the SID array for the group */
+@@ -1848,16 +1848,20 @@ static int arm_smmu_add_device(struct device *dev)
+ 	if (!sids) {
+ 		smmu_group->num_sids--;
+ 		ret = -ENOMEM;
+-		goto out_put_group;
++		goto out_remove_dev;
+ 	}
+ 
+ 	/* Add the new SID */
+ 	sids[smmu_group->num_sids - 1] = sid;
+ 	smmu_group->sids = sids;
+-	return 0;
+ 
+ out_put_group:
+ 	iommu_group_put(group);
++	return 0;
++
++out_remove_dev:
++	iommu_group_remove_device(dev);
++	iommu_group_put(group);
+ 	return ret;
+ }
+ 
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 1a7fcd9..446ade2 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1354,6 +1354,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 	if (IS_ERR(group))
+ 		return PTR_ERR(group);
+ 
++	iommu_group_put(group);
+ 	return 0;
+ }
+ 
+-- 
+2.7.4
+

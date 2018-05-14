@@ -1,0 +1,42 @@
+From fb34b0c7bae36894a793ba9a3dfe930917a40711 Mon Sep 17 00:00:00 2001
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Mon, 22 Feb 2016 12:02:13 +0000
+Subject: [PATCH 25/57] iommu/io-pgtable-arm: Support IOMMU_MMIO flag
+
+Teach the LPAE format to create Device mappings when asked.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/io-pgtable-arm.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 5b8aa2a..3a30353 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -361,7 +361,10 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
+ 		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+ 			pte |= ARM_LPAE_PTE_AP_RDONLY;
+ 
+-		if (prot & IOMMU_CACHE)
++		if (prot & IOMMU_MMIO)
++			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
++				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
++		else if (prot & IOMMU_CACHE)
+ 			pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
+ 				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
+ 	} else {
+@@ -370,7 +373,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
+ 			pte |= ARM_LPAE_PTE_HAP_READ;
+ 		if (prot & IOMMU_WRITE)
+ 			pte |= ARM_LPAE_PTE_HAP_WRITE;
+-		if (prot & IOMMU_CACHE)
++		if (prot & IOMMU_MMIO)
++			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
++		else if (prot & IOMMU_CACHE)
+ 			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
+ 		else
+ 			pte |= ARM_LPAE_PTE_MEMATTR_NC;
+-- 
+2.7.4
+

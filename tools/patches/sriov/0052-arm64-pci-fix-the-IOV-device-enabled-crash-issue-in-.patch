@@ -1,0 +1,47 @@
+From 43003156552f0a5db8d314815059740252ee0179 Mon Sep 17 00:00:00 2001
+From: Hanna Hawa <hannah@marvell.com>
+Date: Thu, 3 May 2018 16:30:01 +0300
+Subject: [PATCH 52/57] arm64:pci: fix the IOV device enabled crash issue in
+ designwarelogin
+
+When echo a number to /sys/bus/pci/devices/xxx/sriov_numvfs to enable the
+VF devices. A crash log occurred. This found to be access the IOV devices
+config space failure issue.
+
+The read/write config space from host would judge the pcie device plugin
+or not by:
+
+if (bus->primary == pp->root_bus_nr && dev > 0)
+    return 0;
+
+Although all pcie devices for dev(coming from the device and function
+number) is zero. But the dev is not zero for VF. So remove the
+condition.
+
+Change-Id: I7152c9bddcb9155b81ccf07278375dbeeb657110
+Signed-off-by: Po Liu <po.liu@nxp.com>
+---
+ drivers/pci/host/pcie-designware.c | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 66275dd..ffd63db 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -643,13 +643,6 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
+ 	if (bus->number == pp->root_bus_nr && dev > 0)
+ 		return 0;
+ 
+-	/*
+-	 * do not read more than one device on the bus directly attached
+-	 * to RC's (Virtual Bridge's) DS side.
+-	 */
+-	if (bus->primary == pp->root_bus_nr && dev > 0)
+-		return 0;
+-
+ 	return 1;
+ }
+ 
+-- 
+2.7.4
+

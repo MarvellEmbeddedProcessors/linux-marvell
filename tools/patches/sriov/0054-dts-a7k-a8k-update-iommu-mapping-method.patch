@@ -1,0 +1,204 @@
+From 32a55d2b82f6c55ef15a42cef0eb1173579c595d Mon Sep 17 00:00:00 2001
+From: David Sniatkiwicz <davidsn@marvell.com>
+Date: Tue, 5 Jun 2018 13:57:00 +0300
+Subject: [PATCH 54/57] dts: a7k/a8k: update iommu mapping method
+
+This patch updates deprecated "mmu-masters" property to "iommus" property.
+
+Change-Id: I0ae5039064a2f42c20401ad9f7d4d1cfca36c9f7
+Signed-off-by: David Sniatkiwicz <davidsn@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/armada-7020.dtsi  | 11 +++--------
+ arch/arm64/boot/dts/marvell/armada-7040.dtsi  | 11 +++--------
+ arch/arm64/boot/dts/marvell/armada-8020.dtsi  | 20 ++++++--------------
+ arch/arm64/boot/dts/marvell/armada-8040.dtsi  | 20 ++++++--------------
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi |  1 +
+ 5 files changed, 19 insertions(+), 44 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-7020.dtsi b/arch/arm64/boot/dts/marvell/armada-7020.dtsi
+index b14ddf7..238b7a1 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7020.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-7020.dtsi
+@@ -93,11 +93,6 @@
+ 
+ 	ap806 {
+ 		config-space {
+-			smmu: iommu@5000000 {
+-				mmu-masters = <&cp0_usb3h0 0x440>,
+-					      <&cp0_usb3h1 0x441>,
+-					      <&cp0_sata 0x444>;
+-			};
+ 			pinctrl0: pinctrl@6f4000 {
+ 				ap_emmc_pins: emmc-pins-0 {
+ 					marvell,pins = "mpp0", "mpp1", "mpp2",
+@@ -150,13 +145,13 @@
+ 				gpio-ranges = <&cp0_pinctrl 0 32 31>;
+ 			};
+ 			cp0_sata: sata@540000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x444>;
+ 			};
+ 			cp0_usb3h0: usb3@500000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x440>;
+ 			};
+ 			cp0_usb3h1: usb3@510000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x441>;
+ 			};
+ 			/* AXI bus of IHB1 is not connected in Armada-7040 package. */
+ 			axim-hb1-rd@3c8000 {
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040.dtsi b/arch/arm64/boot/dts/marvell/armada-7040.dtsi
+index 3dfefcd..e98497e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-7040.dtsi
+@@ -116,11 +116,6 @@
+ 
+ 	ap806 {
+ 		config-space {
+-			smmu: iommu@5000000 {
+-				mmu-masters = <&cp0_usb3h0 0x440>,
+-					      <&cp0_usb3h1 0x441>,
+-					      <&cp0_sata 0x444>;
+-			};
+ 			pinctrl0: pinctrl@6f4000 {
+ 				ap_emmc_pins: emmc-pins-0 {
+ 					marvell,pins = "mpp0", "mpp1", "mpp2",
+@@ -173,13 +168,13 @@
+ 				gpio-ranges = <&cp0_pinctrl 0 32 31>;
+ 			};
+ 			cp0_sata: sata@540000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x444>;
+ 			};
+ 			cp0_usb3h0: usb3@500000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x440>;
+ 			};
+ 			cp0_usb3h1: usb3@510000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x441>;
+ 			};
+ 			/* AXI bus of IHB1 is not connected in Armada-7040 package. */
+ 			axim-hb1-rd@3c8000 {
+diff --git a/arch/arm64/boot/dts/marvell/armada-8020.dtsi b/arch/arm64/boot/dts/marvell/armada-8020.dtsi
+index 2ebd25d..6f42458 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8020.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-8020.dtsi
+@@ -136,14 +136,6 @@
+ 			etr@812000 {
+ 				status = "disabled";
+ 			};
+-			smmu: iommu@5000000 {
+-				mmu-masters = <&cp0_usb3h0 0x440>,
+-					      <&cp0_usb3h1 0x441>,
+-					      <&cp0_sata 0x444>,
+-					      <&cp1_usb3h0 0x450>,
+-					      <&cp1_usb3h1 0x451>,
+-					      <&cp1_sata 0x454>;
+-			};
+ 			pinctrl0: pinctrl@6f4000 {
+ 				ap_emmc_pins: emmc-pins-0 {
+ 					marvell,pins = "mpp0", "mpp1", "mpp2",
+@@ -198,13 +190,13 @@
+ 				gpio-ranges = <&cp0_pinctrl 0 32 31>;
+ 			};
+ 			cp0_usb3h0: usb3@500000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x440>;
+ 			};
+ 			cp0_usb3h1: usb3@510000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x441>;
+ 			};
+ 			cp0_sata: sata@540000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x444>;
+ 			};
+ 			sar@400200 {
+ 				compatible = "marvell,a80x0-cp0-sample-at-reset";
+@@ -263,13 +255,13 @@
+ 				gpio-ranges = <&cp1_pinctrl 0 0 32>;
+ 			};
+ 			cp1_usb3h0: usb3@500000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x450>;
+ 			};
+ 			cp1_usb3h1: usb3@510000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x451>;
+ 			};
+ 			cp1_sata: sata@540000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x454>;
+ 			};
+ 			rtc@284000 {
+ 				status = "okay";
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040.dtsi b/arch/arm64/boot/dts/marvell/armada-8040.dtsi
+index b9d90ff..2d24ef0 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-8040.dtsi
+@@ -147,14 +147,6 @@
+ 			etr@812000 {
+ 				status = "disabled";
+ 			};
+-			smmu: iommu@5000000 {
+-				mmu-masters = <&cp0_usb3h0 0x440>,
+-					      <&cp0_usb3h1 0x441>,
+-					      <&cp0_sata 0x444>,
+-					      <&cp1_usb3h0 0x450>,
+-					      <&cp1_usb3h1 0x451>,
+-					      <&cp1_sata 0x454>;
+-			};
+ 			pinctrl0: pinctrl@6f4000 {
+ 				ap_emmc_pins: emmc-pins-0 {
+ 					marvell,pins = "mpp0", "mpp1", "mpp2",
+@@ -210,13 +202,13 @@
+ 				gpio-ranges = <&cp0_pinctrl 0 32 31>;
+ 			};
+ 			cp0_usb3h0: usb3@500000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x440>;
+ 			};
+ 			cp0_usb3h1: usb3@510000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x441>;
+ 			};
+ 			cp0_sata: sata@540000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x444>;
+ 			};
+ 			sar@400200 {
+ 				compatible = "marvell,a80x0-cp0-sample-at-reset";
+@@ -275,13 +267,13 @@
+ 				gpio-ranges = <&cp1_pinctrl 0 0 32>;
+ 			};
+ 			cp1_usb3h0: usb3@500000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x450>;
+ 			};
+ 			cp1_usb3h1: usb3@510000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x451>;
+ 			};
+ 			cp1_sata: sata@540000 {
+-				#stream-id-cells = <1>;
++				iommus = <&smmu 0x454>;
+ 			};
+ 			rtc@284000 {
+ 				status = "okay";
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index b67e853..d707511 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -251,6 +251,7 @@
+ 				compatible = "arm,mmu-500";
+ 				reg = <0x100000 0x100000>;
+ 				dma-coherent;
++				#iommu-cells = <1>;
+ 				#global-interrupts = <1>;
+ 				interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+-- 
+2.7.4
+

@@ -1,0 +1,45 @@
+From 0ecc83acc1bcd6f21364051d4a32e8d93eed6ef6 Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Wed, 20 Jan 2016 12:06:09 +0000
+Subject: [PATCH 46/57] vfio/type1: bypass unmap/unpin and replay for
+ VFIO_IOVA_RESERVED slots
+
+Before allowing the end-user to create VFIO_IOVA_RESERVED dma slots,
+let's implement the expected behavior for removal and replay. As opposed
+to user dma slots, IOVAs are not systematically bound to PAs and PAs are
+not pinned. VFIO just initializes the IOVA "aperture". IOVAs are allocated
+outside of the VFIO framework, typically the MSI layer which is
+responsible to free and unmap them. The MSI mapping resources are freeed
+by the IOMMU driver on domain destruction.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/vfio_iommu_type1.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 5b24818..f3b7f80 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -375,7 +375,7 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ 	struct vfio_domain *domain, *d;
+ 	long unlocked = 0;
+ 
+-	if (!dma->size)
++	if (!dma->size || dma->type != VFIO_IOVA_USER)
+ 		return;
+ 	/*
+ 	 * We use the IOMMU to track the physical addresses, otherwise we'd
+@@ -711,6 +711,9 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
+ 		dma = rb_entry(n, struct vfio_dma, node);
+ 		iova = dma->iova;
+ 
++		if (dma->type == VFIO_IOVA_RESERVED)
++			continue;
++
+ 		while (iova < dma->iova + dma->size) {
+ 			phys_addr_t phys = iommu_iova_to_phys(d->domain, iova);
+ 			size_t size;
+-- 
+2.7.4
+

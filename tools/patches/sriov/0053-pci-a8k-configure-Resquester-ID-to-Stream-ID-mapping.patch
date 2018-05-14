@@ -1,0 +1,60 @@
+From 1fde7f69b837ab5983f08778690364027bb2e684 Mon Sep 17 00:00:00 2001
+From: Hanna Hawa <hannah@marvell.com>
+Date: Thu, 3 May 2018 16:32:48 +0300
+Subject: [PATCH 53/57] pci: a8k: configure Resquester-ID to Stream-ID mapping
+
+When a PCI devices access the A8K internal bus it is assigned a
+Stream-ID (SID) that identifies it in the System MMU (MMU-500). This
+SID is calculated based on the PCI Requester-ID, a 16 bit value
+composed of bus[15:8] device[7:3] and function[2:0]. Since the PCIe
+Stream-ID is limited to 7 bits, a translation must take place.
+
+This patch configures the SID mapping register to perform the
+following mapping:
+SID[7]   = 1. fixed prefix bit
+SID[6:5] = bus[1:0]
+SID[4:3] = device[1:0]
+SID[2:0] = function[2:0]
+
+The prefix is added to avoid a SID = 0 for bus = device = func = 0.
+SID 0 is used by several units that wish to bypass the IOMMU like
+the ICU so we need to avoid that.
+
+Change-Id: I41df96818c4bb9ba505bc67ac9e8a803556dec1f
+Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+---
+ drivers/pci/host/pcie-armada8k.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/pci/host/pcie-armada8k.c b/drivers/pci/host/pcie-armada8k.c
+index 114e2b4..8e2c609 100644
+--- a/drivers/pci/host/pcie-armada8k.c
++++ b/drivers/pci/host/pcie-armada8k.c
+@@ -128,6 +128,14 @@ struct armada8k_pcie_rst {
+ #define PCIE_LINK_UP_TIMEOUT_MS		1000
+ #define PCIE_SPEED_CHANGE_TIMEOUT_MS	300
+ 
++#define PCIE_STREAM_ID			0x64
++#define STREAM_ID_BUS_BITS		2
++#define STREAM_ID_DEV_BITS		2
++#define STREAM_ID_FUNC_BITS		3
++#define STREAM_ID_PREFIX		0x80
++#define PCIE_STREAM_ID_CFG		(STREAM_ID_PREFIX << 12 | STREAM_ID_BUS_BITS << 8 | \
++					STREAM_ID_DEV_BITS << 4 | STREAM_ID_FUNC_BITS)
++
+ #define to_armada8k_pcie(x)	container_of(x, struct armada8k_pcie, pp)
+ 
+ /*
+@@ -323,6 +331,9 @@ static void armada8k_pcie_host_init(struct pcie_port *pp)
+ 	reg |= DOMAIN_OUTER_SHAREABLE << AX_USER_DOMAIN_OFFSET;
+ 	writel(reg, regs_base + PCIE_AWUSER);
+ 
++	/* Setup Requester-ID to Stream-ID mapping */
++	writel(PCIE_STREAM_ID_CFG, regs_base + PCIE_STREAM_ID);
++
+ 	dw_pcie_setup_rc(pp);
+ 
+ 	/* Enable INT A-D interrupts */
+-- 
+2.7.4
+

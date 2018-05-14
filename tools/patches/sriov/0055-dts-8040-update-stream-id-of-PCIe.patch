@@ -1,0 +1,31 @@
+From b1b4b6d356bbe155c331a007d38ae51870ba2c0f Mon Sep 17 00:00:00 2001
+From: David Sniatkiwicz <davidsn@marvell.com>
+Date: Tue, 29 May 2018 12:25:32 +0300
+Subject: [PATCH 55/57] dts: 8040: update stream-id of PCIe
+
+Change-Id: I2cfd76ad9a507218b203a1733d21378db197d2b8
+Signed-off-by: Hanna Hawa <hannah@marvell.com>
+Signed-off-by: David Sniatkiwicz <davidsn@marvell.com>
+---
+ arch/arm64/boot/dts/marvell/armada-8040.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040.dtsi b/arch/arm64/boot/dts/marvell/armada-8040.dtsi
+index 2d24ef0..e3330be 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-8040.dtsi
+@@ -224,6 +224,11 @@
+ 			status = "disabled";
+ 		};
+ 		pcie0@600000 {
++			iommu-map =
++				<0x0   &smmu 0x480 0x20>,
++				<0x100 &smmu 0x4a0 0x20>,
++				<0x200 &smmu 0x4c0 0x20>;
++			iommu-map-mask = <0x031f>;
+ 			msi-parent = <&gic_v2m0>;
+ 		};
+ 		pcie1@620000 {
+-- 
+2.7.4
+

@@ -1,0 +1,60 @@
+From c2c6fc3891396dcc7628d983696e6b9887293eb4 Mon Sep 17 00:00:00 2001
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Tue, 26 Jan 2016 18:06:34 +0000
+Subject: [PATCH 05/57] iommu/arm-smmu: Treat all device transactions as
+ unprivileged
+
+The IOMMU API has no concept of privilege so assumes all devices and
+mappings are equal, and indeed most non-CPU master devices on an AMBA
+interconnect make little use of the attribute bits on the bus thus by
+default perform unprivileged data accesses.
+
+Some devices, however, believe themselves more equal than others, such
+as programmable DMA controllers whose 'master' thread issues bus
+transactions marked as privileged instruction fetches, while the data
+accesses of its channel threads (under the control of Linux, at least)
+are marked as unprivileged. This poses a problem for implementing the
+DMA API on an IOMMU conforming to ARM VMSAv8, under which a page that is
+unprivileged-writeable is also implicitly privileged-execute-never.
+Given that, there is no one set of attributes with which iommu_map() can
+implement, say, dma_alloc_coherent() that will allow every possible type
+of access without something running into unexecepted permission faults.
+
+Fortunately the SMMU architecture provides a means to mitigate such
+issues by overriding the incoming attributes of a transaction; make use
+of that to strip the privileged/unprivileged status off incoming
+transactions, leaving just the instruction/data dichotomy which the
+IOMMU API does at least understand; Four states good, two states better.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 8b3607c1..2332f20 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -166,6 +166,9 @@
+ #define S2CR_TYPE_BYPASS		(1 << S2CR_TYPE_SHIFT)
+ #define S2CR_TYPE_FAULT			(2 << S2CR_TYPE_SHIFT)
+ 
++#define S2CR_PRIVCFG_SHIFT		24
++#define S2CR_PRIVCFG_UNPRIV		(2 << S2CR_PRIVCFG_SHIFT)
++
+ /* Context bank attribute registers */
+ #define ARM_SMMU_GR1_CBAR(n)		(0x0 + ((n) << 2))
+ #define CBAR_VMID_SHIFT			0
+@@ -1082,7 +1085,7 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+ 		u32 idx, s2cr;
+ 
+ 		idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
+-		s2cr = S2CR_TYPE_TRANS |
++		s2cr = S2CR_TYPE_TRANS | S2CR_PRIVCFG_UNPRIV |
+ 		       (smmu_domain->cfg.cbndx << S2CR_CBNDX_SHIFT);
+ 		writel_relaxed(s2cr, gr0_base + ARM_SMMU_GR0_S2CR(idx));
+ 	}
+-- 
+2.7.4
+

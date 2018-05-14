@@ -1,0 +1,26 @@
+From 7a96c0b8f538f981eb63f971be8997baf2adf06c Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Thu, 11 Feb 2016 13:49:30 +0000
+Subject: [PATCH 38/57] genirq/msi: export msi_get_domain_info
+
+We plan to use msi_get_domain_info in VFIO module so let's export it.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ kernel/irq/msi.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index cd60090..740e8e1 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -354,5 +354,6 @@ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
+ {
+ 	return (struct msi_domain_info *)domain->host_data;
+ }
++EXPORT_SYMBOL_GPL(msi_get_domain_info);
+ 
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
+-- 
+2.7.4
+

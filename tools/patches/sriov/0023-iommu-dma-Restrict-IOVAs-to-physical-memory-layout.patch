@@ -1,0 +1,64 @@
+From 877dc7fd34e110b74e96946aa891fb9993af2b1b Mon Sep 17 00:00:00 2001
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Fri, 18 Sep 2015 18:02:27 +0100
+Subject: [PATCH 23/57] iommu/dma: Restrict IOVAs to physical memory layout
+
+Certain peripherals may be bestowed with knowledge of the physical
+memory map of the system in which they live, and refuse to handle
+addresses that they do not think are memory, which causes issues when
+remapping to arbitrary IOVAs. Sidestep the issue by restricting IOVA
+domains to only allocate addresses within ranges which match the
+physical memory layout.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/dma-iommu.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index e0fa9a5..2b0e5d6 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -26,6 +26,7 @@
+ #include <linux/huge_mm.h>
+ #include <linux/iommu.h>
+ #include <linux/iova.h>
++#include <linux/memblock.h>
+ #include <linux/mm.h>
+ #include <linux/scatterlist.h>
+ #include <linux/vmalloc.h>
+@@ -148,6 +149,23 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
+ }
+ EXPORT_SYMBOL(iommu_put_dma_cookie);
+ 
++static void iova_match_mem(struct iova_domain *iovad)
++{
++	struct memblock_region *reg;
++	unsigned long blk, base = iovad->start_pfn;
++	unsigned long shift = iova_shift(iovad);
++
++	for_each_memblock(memory, reg) {
++		blk = (reg->base + iova_mask(iovad)) >> shift;
++		if (blk > base)
++			reserve_iova(iovad, base, blk - 1);
++		base = (reg->base + reg->size) >> shift;
++	}
++	blk = -1UL >> shift;
++	if (blk > base)
++		reserve_iova(iovad, base, blk);
++}
++
+ /**
+  * iommu_dma_init_domain - Initialise a DMA mapping domain
+  * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
+@@ -197,6 +215,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size
+ 		iovad->dma_32bit_pfn = end_pfn;
+ 	} else {
+ 		init_iova_domain(iovad, 1UL << order, base_pfn, end_pfn);
++		iova_match_mem(iovad);
+ 
+ 		if (IS_ENABLED(CONFIG_DEBUG_FS)) {
+ 			char str[32];
+-- 
+2.7.4
+

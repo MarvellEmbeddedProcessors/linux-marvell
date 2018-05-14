@@ -1,0 +1,77 @@
+From 1161d4f782b3ae05ba846da22c529f39adb440cb Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Mon, 25 Apr 2016 11:43:28 +0000
+Subject: [PATCH 33/57] iommu/msi-iommu: iommu_msi_domain
+
+This function checks whether
+- the device belongs to a non default iommu domain
+- this iommu domain requires the MSI address to be mapped.
+
+If those conditions are met, the function returns the iommu domain
+to be used for mapping the MSI doorbell; else it returns NULL.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
+ include/linux/msi-iommu.h | 14 ++++++++++++++
+ 2 files changed, 31 insertions(+)
+
+diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
+index 203e86e..023ff17 100644
+--- a/drivers/iommu/msi-iommu.c
++++ b/drivers/iommu/msi-iommu.c
+@@ -243,3 +243,20 @@ unlock:
+ 	}
+ }
+ EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
++
++struct iommu_domain *iommu_msi_domain(struct device *dev)
++{
++	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
++	struct iommu_domain_msi_geometry msi_geometry;
++
++	if (!d || (d->type == IOMMU_DOMAIN_DMA))
++		return NULL;
++
++	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
++	if (!msi_geometry.programmable)
++		return NULL;
++
++	return d;
++}
++EXPORT_SYMBOL_GPL(iommu_msi_domain);
++
+diff --git a/include/linux/msi-iommu.h b/include/linux/msi-iommu.h
+index 1cd115f..114bd69 100644
+--- a/include/linux/msi-iommu.h
++++ b/include/linux/msi-iommu.h
+@@ -81,6 +81,15 @@ int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
+  */
+ void iommu_msi_put_doorbell_iova(struct iommu_domain *domain, phys_addr_t addr);
+ 
++/**
++ * iommu_msi_domain: in case the device is upstream to an IOMMU and this IOMMU
++ * translates the MSI transaction, returns the iommu domain the MSI doorbell
++ * address must be mapped in; else returns NULL.
++ *
++ * @dev: device handle
++ */
++struct iommu_domain *iommu_msi_domain(struct device *dev);
++
+ #else
+ 
+ static inline int
+@@ -100,5 +109,10 @@ static inline int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
+ static inline void iommu_msi_put_doorbell_iova(struct iommu_domain *domain,
+ 					       phys_addr_t addr) {}
+ 
++static inline struct iommu_domain *iommu_msi_domain(struct device *dev)
++{
++	return NULL;
++}
++
+ #endif	/* CONFIG_IOMMU_MSI */
+ #endif	/* __MSI_IOMMU_H */
+-- 
+2.7.4
+

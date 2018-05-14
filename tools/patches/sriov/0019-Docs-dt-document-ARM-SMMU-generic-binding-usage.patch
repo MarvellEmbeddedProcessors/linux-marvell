@@ -1,0 +1,79 @@
+From ef359f77f91091e10373751b85466902976200fd Mon Sep 17 00:00:00 2001
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Fri, 26 Feb 2016 18:53:23 +0000
+Subject: [PATCH 19/57] Docs: dt: document ARM SMMU generic binding usage
+
+Document how the generic "iommus" binding should be used to describe ARM
+SMMU stream IDs instead of the old "mmu-masters" binding.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ .../devicetree/bindings/iommu/arm,smmu.txt         | 38 ++++++++++++++--------
+ 1 file changed, 24 insertions(+), 14 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index 7180745..a213f74 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -34,12 +34,11 @@ conditions.
+                   interrupt per context bank. In the case of a single,
+                   combined interrupt, it must be listed multiple times.
+ 
+-- mmu-masters   : A list of phandles to device nodes representing bus
+-                  masters for which the SMMU can provide a translation
+-                  and their corresponding StreamIDs (see example below).
+-                  Each device node linked from this list must have a
+-                  "#stream-id-cells" property, indicating the number of
+-                  StreamIDs associated with it.
++- #iommu-cells  : See Documentation/devicetree/bindings/iommu/iommu.txt
++                  for details. Should be 1, where each "iommus" entry on
++                  the device represents a distinct stream ID emitted by
++                  that device into the relevant SMMU. Cells beyond 1 are
++                  reserved for future use.
+ 
+ ** System MMU optional properties:
+ 
+@@ -55,9 +54,19 @@ conditions.
+                   aliases of secure registers have to be used during
+                   SMMU configuration.
+ 
+-Example:
++** Deprecated properties:
++
++- mmu-masters (deprecated in favour of the generic "iommus" binding) :
++                  A list of phandles to device nodes representing bus
++                  masters for which the SMMU can provide a translation
++                  and their corresponding StreamIDs (see example below).
++                  Each device node linked from this list must have a
++                  "#stream-id-cells" property, indicating the number of
++                  StreamIDs associated with it.
++
++** Example:
+ 
+-        smmu {
++        smmu1: iommu {
+                 compatible = "arm,smmu-v1";
+                 reg = <0xba5e0000 0x10000>;
+                 #global-interrupts = <2>;
+@@ -67,11 +76,12 @@ Example:
+                              <0 35 4>,
+                              <0 36 4>,
+                              <0 37 4>;
++                #iommu-cells = <1>;
++        };
+ 
+-                /*
+-                 * Two DMA controllers, the first with two StreamIDs (0xd01d
+-                 * and 0xd01e) and the second with only one (0xd11c).
+-                 */
+-                mmu-masters = <&dma0 0xd01d 0xd01e>,
+-                              <&dma1 0xd11c>;
++        /* device with two stream IDs, 0 and 7 */
++        master {
++                iommus = <&smmu1 0>,
++                         <&smmu1 7>;
+         };
++
+-- 
+2.7.4
+

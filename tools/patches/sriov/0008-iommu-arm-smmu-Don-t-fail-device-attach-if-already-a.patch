@@ -1,0 +1,168 @@
+From f43935c6ab7f680c4af3006b8da37b7aa5095085 Mon Sep 17 00:00:00 2001
+From: Will Deacon <will.deacon@arm.com>
+Date: Wed, 17 Feb 2016 17:41:57 +0000
+Subject: [PATCH 08/57] iommu/arm-smmu: Don't fail device attach if already
+ attached to a domain
+
+The ARM SMMU attach_dev implementations returns -EEXIST if the device
+being attached is already attached to a domain. This doesn't play nicely
+with the default domain, resulting in splats such as:
+
+  WARNING: at drivers/iommu/iommu.c:1257
+  Modules linked in:
+
+  CPU: 3 PID: 1939 Comm: virtio-net-tx Tainted: G S              4.5.0-rc4+ #1
+  Hardware name: FVP Base (DT)
+  task: ffffffc87a9d0000 ti: ffffffc07a278000 task.ti: ffffffc07a278000
+  PC is at __iommu_detach_group+0x68/0xe8
+  LR is at __iommu_detach_group+0x48/0xe8
+
+This patch fixes the problem by forcefully detaching the device from
+its old domain, if present, when attaching to a new one. The unused
+->detach_dev callback is also removed the iommu_ops structures.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 33 ++++++++++++---------------------
+ drivers/iommu/arm-smmu.c    | 33 ++++++++++++++-------------------
+ 2 files changed, 26 insertions(+), 40 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index ade6b4e..27854ad5 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1625,6 +1625,17 @@ static int arm_smmu_install_ste_for_group(struct arm_smmu_group *smmu_group)
+ 	return 0;
+ }
+ 
++static void arm_smmu_detach_dev(struct device *dev)
++{
++	struct arm_smmu_group *smmu_group = arm_smmu_group_get(dev);
++
++	smmu_group->ste.bypass = true;
++	if (IS_ERR_VALUE(arm_smmu_install_ste_for_group(smmu_group)))
++		dev_warn(dev, "failed to install bypass STE\n");
++
++	smmu_group->domain = NULL;
++}
++
+ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ {
+ 	int ret = 0;
+@@ -1637,7 +1648,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 
+ 	/* Already attached to a different domain? */
+ 	if (smmu_group->domain && smmu_group->domain != smmu_domain)
+-		return -EEXIST;
++		arm_smmu_detach_dev(dev);
+ 
+ 	smmu = smmu_group->smmu;
+ 	mutex_lock(&smmu_domain->init_mutex);
+@@ -1674,25 +1685,6 @@ out_unlock:
+ 	return ret;
+ }
+ 
+-static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
+-{
+-	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+-	struct arm_smmu_group *smmu_group = arm_smmu_group_get(dev);
+-
+-	BUG_ON(!smmu_domain);
+-	BUG_ON(!smmu_group);
+-
+-	mutex_lock(&smmu_domain->init_mutex);
+-	BUG_ON(smmu_group->domain != smmu_domain);
+-
+-	smmu_group->ste.bypass = true;
+-	if (IS_ERR_VALUE(arm_smmu_install_ste_for_group(smmu_group)))
+-		dev_warn(dev, "failed to install bypass STE\n");
+-
+-	smmu_group->domain = NULL;
+-	mutex_unlock(&smmu_domain->init_mutex);
+-}
+-
+ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+ 			phys_addr_t paddr, size_t size, int prot)
+ {
+@@ -1930,7 +1922,6 @@ static struct iommu_ops arm_smmu_ops = {
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+ 	.domain_free		= arm_smmu_domain_free,
+ 	.attach_dev		= arm_smmu_attach_dev,
+-	.detach_dev		= arm_smmu_detach_dev,
+ 	.map			= arm_smmu_map,
+ 	.unmap			= arm_smmu_unmap,
+ 	.map_sg			= default_iommu_map_sg,
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 7d53057..f20aacd 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1130,6 +1130,16 @@ static void arm_smmu_domain_remove_master(struct arm_smmu_domain *smmu_domain,
+ 	arm_smmu_master_free_smrs(smmu, cfg);
+ }
+ 
++static void arm_smmu_detach_dev(struct device *dev,
++				struct arm_smmu_master_cfg *cfg)
++{
++	struct iommu_domain *domain = dev->archdata.iommu;
++	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
++
++	dev->archdata.iommu = NULL;
++	arm_smmu_domain_remove_master(smmu_domain, cfg);
++}
++
+ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ {
+ 	int ret;
+@@ -1143,11 +1153,6 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 		return -ENXIO;
+ 	}
+ 
+-	if (dev->archdata.iommu) {
+-		dev_err(dev, "already attached to IOMMU domain\n");
+-		return -EEXIST;
+-	}
+-
+ 	/* Ensure that the domain is finalised */
+ 	ret = arm_smmu_init_domain_context(domain, smmu);
+ 	if (IS_ERR_VALUE(ret))
+@@ -1169,25 +1174,16 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	if (!cfg)
+ 		return -ENODEV;
+ 
++	/* Detach the dev from its current domain */
++	if (dev->archdata.iommu)
++		arm_smmu_detach_dev(dev, cfg);
++
+ 	ret = arm_smmu_domain_add_master(smmu_domain, cfg);
+ 	if (!ret)
+ 		dev->archdata.iommu = domain;
+ 	return ret;
+ }
+ 
+-static void arm_smmu_detach_dev(struct iommu_domain *domain, struct device *dev)
+-{
+-	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+-	struct arm_smmu_master_cfg *cfg;
+-
+-	cfg = find_smmu_master_cfg(dev);
+-	if (!cfg)
+-		return;
+-
+-	dev->archdata.iommu = NULL;
+-	arm_smmu_domain_remove_master(smmu_domain, cfg);
+-}
+-
+ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+ 			phys_addr_t paddr, size_t size, int prot)
+ {
+@@ -1463,7 +1459,6 @@ static struct iommu_ops arm_smmu_ops = {
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+ 	.domain_free		= arm_smmu_domain_free,
+ 	.attach_dev		= arm_smmu_attach_dev,
+-	.detach_dev		= arm_smmu_detach_dev,
+ 	.map			= arm_smmu_map,
+ 	.unmap			= arm_smmu_unmap,
+ 	.map_sg			= default_iommu_map_sg,
+-- 
+2.7.4
+

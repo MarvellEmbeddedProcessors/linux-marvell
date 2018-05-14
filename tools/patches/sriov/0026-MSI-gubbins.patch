@@ -1,0 +1,139 @@
+From feb87c5e8fc52dd069c63c3fe7288d85d2d3ccb7 Mon Sep 17 00:00:00 2001
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Wed, 16 Sep 2015 15:14:09 +0100
+Subject: [PATCH 26/57] MSI gubbins
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/dma-iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/dma-iommu.h | 12 ++++++++++++
+ kernel/irq/chip.c         |  6 ++++--
+ 3 files changed, 56 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 2b0e5d6..c0430d7 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -631,3 +631,43 @@ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ {
+ 	return dma_addr == DMA_ERROR_CODE;
+ }
++
++/*
++ * TODO:
++ * - Consider always reserving some IOVA space for MSI mappings, because this
++ *   will BUG() if it ever returns failure. How much?
++ * - What if the device ever gets removed from this domain?
++ * - Can we avoid mapping the same doorbell page multiple times, and look up
++ *   and return an existing IOVA instead?
++ */
++int iommu_dma_map_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
++{
++	struct device *dev = msi_desc_to_dev(desc);
++	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
++	struct iova_domain *iovad = NULL;
++	struct iova *iova;
++	phys_addr_t msi_addr;
++	dma_addr_t dma_addr;
++
++	if (domain)
++		iovad = domain->iova_cookie;
++	if (!iovad)
++		return 0;
++
++	msi_addr = (phys_addr_t)((u64)msg->address_hi << 32 | msg->address_lo);
++	iova = __alloc_iova(iovad, 1, dma_get_mask(dev), dev);
++	if (!iova)
++		return -ENOSPC;
++
++	dma_addr = iova_dma_addr(iovad, iova);
++	if (iommu_map(domain, dma_addr, msi_addr & ~iova_mask(iovad),
++			iova_size(iova) << iova_shift(iovad), IOMMU_WRITE | IOMMU_MMIO)) {
++		__free_iova(iovad, iova);
++		return -ENOSPC;
++	}
++
++	msg->address_hi = (u32)((u64)dma_addr >> 32);
++	msg->address_lo = (u32)dma_addr + iova_offset(iovad, msi_addr);
++
++	return 0;
++}
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index fc48103..5841046 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -21,6 +21,8 @@
+ 
+ #ifdef CONFIG_IOMMU_DMA
+ #include <linux/iommu.h>
++#include <linux/irq.h>
++#include <linux/msi.h>
+ 
+ int iommu_dma_init(void);
+ 
+@@ -62,9 +64,14 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+ int iommu_dma_supported(struct device *dev, u64 mask);
+ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+ 
++/* The DMA API isn't _quite_ the whole story, though... */
++int iommu_dma_map_msi_msg(struct msi_desc *desc, struct msi_msg *msg);
++
+ #else
+ 
+ struct iommu_domain;
++struct msi_desc;
++struct msi_msg;
+ 
+ static inline int iommu_dma_init(void)
+ {
+@@ -80,6 +87,11 @@ static inline void iommu_put_dma_cookie(struct iommu_domain *domain)
+ {
+ }
+ 
++static inline int iommu_dma_map_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
++{
++	return 0;
++}
++
+ #endif	/* CONFIG_IOMMU_DMA */
+ #endif	/* __KERNEL__ */
+ #endif	/* __DMA_IOMMU_H */
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index e4453d9..0b2e5bb 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -16,6 +16,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel_stat.h>
+ #include <linux/irqdomain.h>
++#include <linux/dma-iommu.h>
+ 
+ #include <trace/events/irq.h>
+ 
+@@ -1064,7 +1065,7 @@ int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
+ #endif
+ 
+ /**
+- * irq_chip_compose_msi_msg - Componse msi message for a irq chip
++ * irq_chip_compose_msi_msg - Compose msi message for an irq chip
+  * @data:	Pointer to interrupt specific data
+  * @msg:	Pointer to the MSI message
+  *
+@@ -1075,6 +1076,7 @@ int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
+ int irq_chip_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+ {
+ 	struct irq_data *pos = NULL;
++	struct msi_desc *msi_desc = irq_data_get_msi_desc(data);
+ 
+ #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+ 	for (; data; data = data->parent_data)
+@@ -1086,5 +1088,5 @@ int irq_chip_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+ 
+ 	pos->chip->irq_compose_msi_msg(pos, msg);
+ 
+-	return 0;
++	return iommu_dma_map_msi_msg(msi_desc, msg);
+ }
+-- 
+2.7.4
+

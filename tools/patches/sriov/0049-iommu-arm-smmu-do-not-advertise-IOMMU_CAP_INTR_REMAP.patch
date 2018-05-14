@@ -1,0 +1,53 @@
+From 95bacb4ea2c803436ffabc25fd83d37038351ad0 Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Wed, 10 Feb 2016 16:42:46 +0000
+Subject: [PATCH 49/57] iommu/arm-smmu: do not advertise IOMMU_CAP_INTR_REMAP
+
+Do not advertise IOMMU_CAP_INTR_REMAP for arm-smmu(-v3). Indeed the
+irq_remapping capability is abstracted on irqchip side for ARM as
+opposed to Intel IOMMU featuring IRQ remapping HW.
+
+So to check IRQ remapping capability, the msi domain needs to be
+checked instead.
+
+This commit needs to be applied after "vfio/type1: also check IRQ
+remapping capability at msi domain" else the legacy interrupt
+assignment gets broken with arm-smmu.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/iommu/arm-smmu-v3.c | 3 ++-
+ drivers/iommu/arm-smmu.c    | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 6b13893..dad0467 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1372,7 +1372,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+ 	case IOMMU_CAP_CACHE_COHERENCY:
+ 		return true;
+ 	case IOMMU_CAP_INTR_REMAP:
+-		return true; /* MSIs are just memory writes */
++		/* interrupt translation handled at MSI controller level */
++		return false;
+ 	case IOMMU_CAP_NOEXEC:
+ 		return true;
+ 	default:
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index bdc7757..63385a7 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1206,7 +1206,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+ 		 */
+ 		return true;
+ 	case IOMMU_CAP_INTR_REMAP:
+-		return true; /* MSIs are just memory writes */
++		/* interrupt translation handled at MSI controller level */
++		return false;
+ 	case IOMMU_CAP_NOEXEC:
+ 		return true;
+ 	default:
+-- 
+2.7.4
+

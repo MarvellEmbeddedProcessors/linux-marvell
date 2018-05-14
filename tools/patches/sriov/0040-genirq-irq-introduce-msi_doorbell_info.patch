@@ -1,0 +1,69 @@
+From 6dc6f148cbe1f95e0f349f313e8fc96843304e15 Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Fri, 15 Apr 2016 15:58:24 +0000
+Subject: [PATCH 40/57] genirq/irq: introduce msi_doorbell_info
+
+The purpose is to be able to retrieve the MSI doorbells of an irqchip.
+This is now needed since on some platforms those doorbells must be
+iommu mapped (in case the MSIs transit through an IOMMU that do not
+bypass those transactions).
+
+The assumption is there is a maximum of one doorbell region per cpu.
+
+A doorbell region is characterized by its physical address base, size and
+IOMMU protection flag. Those 2 last characteristics are shared among all
+doorbells.
+
+irq_chip msi_doorbell_info callback enables to retrieve the doorbells of
+the irqchip.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ include/linux/irq.h | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index f7cade00..466d128 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -304,6 +304,19 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+ 	return d->hwirq;
+ }
+ 
++/*
++ * Describe all the MSI doorbell regions for an irqchip.
++ * A single doorbell region per cpu is assumed.
++ * In case a single doorbell is supported for the whole irqchip,
++ * the region is described in as cpu #0's one
++ */
++struct irq_chip_msi_doorbell_info {
++	phys_addr_t __percpu *percpu_doorbells; /* per cpu base address */
++	size_t size;				/* size of a each doorbell */
++	int prot;				/* iommu protection flag */
++	int nb_doorbells;
++};
++
+ /**
+  * struct irq_chip - hardware interrupt chip descriptor
+  *
+@@ -341,6 +354,7 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+  * @irq_get_irqchip_state:	return the internal state of an interrupt
+  * @irq_set_irqchip_state:	set the internal state of a interrupt
+  * @irq_set_vcpu_affinity:	optional to target a vCPU in a virtual machine
++ * @msi_doorbell_info:	return the MSI doorbell info
+  * @flags:		chip specific flags
+  */
+ struct irq_chip {
+@@ -384,7 +398,8 @@ struct irq_chip {
+ 	int		(*irq_set_irqchip_state)(struct irq_data *data, enum irqchip_irq_state which, bool state);
+ 
+ 	int		(*irq_set_vcpu_affinity)(struct irq_data *data, void *vcpu_info);
+-
++	struct irq_chip_msi_doorbell_info *(*msi_doorbell_info)(
++							struct irq_data *data);
+ 	unsigned long	flags;
+ };
+ 
+-- 
+2.7.4
+

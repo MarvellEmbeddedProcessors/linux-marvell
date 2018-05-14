@@ -1,0 +1,28 @@
+From 0fc45ab54d216b3260c1abd1637761714583367b Mon Sep 17 00:00:00 2001
+From: Eric Auger <eric.auger@linaro.org>
+Date: Wed, 24 Feb 2016 12:35:11 +0000
+Subject: [PATCH 30/57] iommu: introduce an msi cookie
+
+This opaque pointer will enable to store information about msi
+iommu mappings.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ include/linux/iommu.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index e6e9e91..9c2fa17 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -91,6 +91,7 @@ struct iommu_domain {
+ 	struct iommu_domain_geometry geometry;
+ 	struct iommu_domain_msi_geometry msi_geometry;
+ 	void *iova_cookie;
++	void *msi_cookie;
+ };
+ 
+ enum iommu_cap {
+-- 
+2.7.4
+

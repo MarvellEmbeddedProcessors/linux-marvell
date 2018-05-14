@@ -1,0 +1,37 @@
+From ba686395d766d9f40e9381e400ebf0a3297c4963 Mon Sep 17 00:00:00 2001
+From: Yehuda Yitschak <yehuday@marvell.com>
+Date: Tue, 10 May 2016 13:14:29 +0300
+Subject: [PATCH 51/57] iommu: dma: create S1 mapping for MSI only for DMA
+ domain
+
+The IOMMU DMA domain handles devices on the host OS that are attached
+to an IOMMU. When an MSI message is requested by the device an IOMMU
+mapping for that message needs to be created.
+However this should only happen if the device belongs to the
+IOMMU_DMA_DOMAIN. if not the translation is handled by other subsystems
+such the VFIO subsystem.
+To avoid collisions this patch ensures the MSI re-mapping happens only
+for IOMMU DMA devices
+
+Change-Id: I58e1b9e12ff98231cd15262f595823d861594184
+Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+---
+ drivers/iommu/dma-iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 3e0b2fd..cfc473c 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -655,7 +655,7 @@ int iommu_dma_map_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
+ 
+ 	if (domain)
+ 		iovad = domain->iova_cookie;
+-	if (!iovad)
++	if (!iovad || domain->type != IOMMU_DOMAIN_DMA)
+ 		return 0;
+ 
+ 	msi_addr = (phys_addr_t)((u64)msg->address_hi << 32 | msg->address_lo);
+-- 
+2.7.4
+

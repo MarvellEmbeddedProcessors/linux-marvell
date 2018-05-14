@@ -1,0 +1,202 @@
+From 8837424e6ea82426aa587838ad02d453a16ba58b Mon Sep 17 00:00:00 2001
+From: Robin Murphy <robin.murphy@arm.com>
+Date: Fri, 11 Sep 2015 12:22:19 +0100
+Subject: [PATCH 22/57] iommu/dma: Add DMA domain debug info
+
+Dump IOVA usage via sysfs
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/dma-iommu.c | 94 ++++++++++++++++++++++++++++++++++++++++++++---
+ drivers/iommu/iova.c      |  2 +-
+ include/linux/iova.h      |  1 +
+ 3 files changed, 91 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 347a3c1..e0fa9a5 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -19,6 +19,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/gfp.h>
+@@ -29,11 +30,83 @@
+ #include <linux/scatterlist.h>
+ #include <linux/vmalloc.h>
+ 
++static struct dentry *dbgfs_dir;
++static atomic_t domain_count;
++
+ int iommu_dma_init(void)
+ {
++	dbgfs_dir = debugfs_create_dir("dma-domains", NULL);
+ 	return iova_cache_get();
+ }
+ 
++struct iommu_dma_domain {
++	struct iommu_domain *domain;
++	struct iova_domain *iovad;
++	struct kref kref;
++};
++
++static int iommu_dma_debug_show(struct seq_file *m, void *p)
++{
++	struct iommu_domain *dom = m->private;
++	struct iova_domain *iovad = dom->iova_cookie;
++	unsigned long shift = iova_shift(iovad);
++	unsigned long pfn_lo = iovad->start_pfn;
++	unsigned long pfn_hi = iovad->dma_32bit_pfn + 1;
++	struct rb_node *node;
++
++	seq_puts(m, "--------------------------\n");
++	seq_printf(m, "  %p\n", dom);
++	seq_puts(m, "--------------------------\n");
++
++	for (node = rb_last(&iovad->rbroot); ; node = rb_prev(node)) {
++		struct iova *iova = container_of(node, struct iova, node);
++		struct device *dev;
++
++		if (node)
++			pfn_lo = iova->pfn_hi + 1;
++
++		if (pfn_hi > pfn_lo)
++			seq_printf(m, "%08lx - %08lx unallocated\n",
++					pfn_lo << shift,
++					(pfn_hi << shift) - 1);
++		pfn_hi = pfn_lo;
++		if (!node)
++			break;
++
++		pfn_lo = iova->pfn_lo;
++		dev = iova->client;
++		if (dev) {
++			phys_addr_t phys = iommu_iova_to_phys(dom, pfn_lo << shift);
++
++			seq_printf(m, "%08lx - %08lx (%lx): %p (%s)\n",
++					pfn_lo << shift,
++					(pfn_hi << shift) - 1,
++					(pfn_hi - pfn_lo) << shift,
++					phys_to_virt(phys),
++					dev_name(dev));
++		} else if (pfn_hi < iovad->dma_32bit_pfn) {
++			seq_printf(m, "%08lx - %08lx reserved\n",
++					pfn_lo << shift,
++					(pfn_hi << shift) - 1);
++		}
++		pfn_hi = min(pfn_lo, iovad->dma_32bit_pfn + 1);
++	}
++
++	return 0;
++}
++
++static int iommu_debug_dma_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, iommu_dma_debug_show, inode->i_private);
++}
++
++static const struct file_operations iommu_dma_debug_fops = {
++	.llseek = seq_lseek,
++	.read = seq_read,
++	.open = iommu_debug_dma_open,
++	.release = single_release,
++};
++
+ /**
+  * iommu_get_dma_cookie - Acquire DMA-API resources for a domain
+  * @domain: IOMMU domain to prepare for DMA-API usage
+@@ -124,6 +197,13 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size
+ 		iovad->dma_32bit_pfn = end_pfn;
+ 	} else {
+ 		init_iova_domain(iovad, 1UL << order, base_pfn, end_pfn);
++
++		if (IS_ENABLED(CONFIG_DEBUG_FS)) {
++			char str[32];
++
++			snprintf(str, 32, "%d", atomic_inc_return(&domain_count));
++			debugfs_create_file(str, 0400, dbgfs_dir, domain, &iommu_dma_debug_fops);
++		}
+ 	}
+ 	return 0;
+ }
+@@ -153,16 +233,20 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
+ }
+ 
+ static struct iova *__alloc_iova(struct iova_domain *iovad, size_t size,
+-		dma_addr_t dma_limit)
++		dma_addr_t dma_limit, struct device *dev)
+ {
+ 	unsigned long shift = iova_shift(iovad);
+ 	unsigned long length = iova_align(iovad, size) >> shift;
++	struct iova *iova;
+ 
+ 	/*
+ 	 * Enforce size-alignment to be safe - there could perhaps be an
+ 	 * attribute to control this per-device, or at least per-domain...
+ 	 */
+-	return alloc_iova(iovad, length, dma_limit >> shift, true);
++	iova = alloc_iova(iovad, length, dma_limit >> shift, true);
++	if (iova)
++		iova->client = dev;
++	return iova;
+ }
+ 
+ /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
+@@ -297,7 +381,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size,
+ 	if (!pages)
+ 		return NULL;
+ 
+-	iova = __alloc_iova(iovad, size, dev->coherent_dma_mask);
++	iova = __alloc_iova(iovad, size, dev->coherent_dma_mask, dev);
+ 	if (!iova)
+ 		goto out_free_pages;
+ 
+@@ -369,7 +453,7 @@ dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
+ 	phys_addr_t phys = page_to_phys(page) + offset;
+ 	size_t iova_off = iova_offset(iovad, phys);
+ 	size_t len = iova_align(iovad, size + iova_off);
+-	struct iova *iova = __alloc_iova(iovad, len, dma_get_mask(dev));
++	struct iova *iova = __alloc_iova(iovad, len, dma_get_mask(dev), dev);
+ 
+ 	if (!iova)
+ 		return DMA_ERROR_CODE;
+@@ -483,7 +567,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 		prev = s;
+ 	}
+ 
+-	iova = __alloc_iova(iovad, iova_len, dma_get_mask(dev));
++	iova = __alloc_iova(iovad, iova_len, dma_get_mask(dev), dev);
+ 	if (!iova)
+ 		goto out_restore_sg;
+ 
+diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
+index fa0adef..1ff41d5 100644
+--- a/drivers/iommu/iova.c
++++ b/drivers/iommu/iova.c
+@@ -211,7 +211,7 @@ static DEFINE_MUTEX(iova_cache_mutex);
+ 
+ struct iova *alloc_iova_mem(void)
+ {
+-	return kmem_cache_alloc(iova_cache, GFP_ATOMIC);
++	return kmem_cache_zalloc(iova_cache, GFP_ATOMIC);
+ }
+ EXPORT_SYMBOL(alloc_iova_mem);
+ 
+diff --git a/include/linux/iova.h b/include/linux/iova.h
+index 92f7177..c3f98ff 100644
+--- a/include/linux/iova.h
++++ b/include/linux/iova.h
+@@ -21,6 +21,7 @@ struct iova {
+ 	struct rb_node	node;
+ 	unsigned long	pfn_hi; /* IOMMU dish out addr hi */
+ 	unsigned long	pfn_lo; /* IOMMU dish out addr lo */
++	struct device	*client;
+ };
+ 
+ /* holds all the iova translations for a domain */
+-- 
+2.7.4
+
