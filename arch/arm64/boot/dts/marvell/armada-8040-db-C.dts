@@ -128,7 +128,7 @@
 			gop {
 				cp0_emac0: mac0 {
 					phy-mode = "sfi"; /* lane-2 */
-					phys = <&cp0_comphy 2 COMPHY_SFI>;
+					phys = <&cp0_comphy 2 COMPHY_SFI0>;
 					phy-names = "comphy";
 				};
 				cp0_emac2: mac2 {
@@ -193,7 +193,7 @@
 			gop {
 				cp1_emac0: mac0 {
 					phy-mode = "sfi"; /* lane-2 */
-					phys = <&cp1_comphy 2 COMPHY_SFI>;
+					phys = <&cp1_comphy 2 COMPHY_SFI0>;
 					phy-names = "comphy";
 				};
 				cp1_emac2: mac2 {

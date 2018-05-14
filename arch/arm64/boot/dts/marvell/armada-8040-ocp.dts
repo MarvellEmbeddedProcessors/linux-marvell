@@ -106,7 +106,7 @@
 			};
 			gop {
 				cp0_emac0: mac0 {
-					phys = <&cp0_comphy 4 COMPHY_SFI>;
+					phys = <&cp0_comphy 4 COMPHY_SFI0>;
 					phy-names = "comphy";
 					phy-mode = "sfi"; /* lane-4 */
 				};

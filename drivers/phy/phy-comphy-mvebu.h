@@ -2,7 +2,7 @@
 #define _COMPHY_MVEBU_H
 
 #define MVEBU_COMPHY_MAX_CNT	6
-#define MVEBU_COMPHY_FUNC_MAX	11
+#define MVEBU_COMPHY_FUNC_MAX	13
 
 #define to_mvebu_comphy_priv(lane) \
 	container_of((lane), struct mvebu_comphy_priv, lanes[(lane)->index])

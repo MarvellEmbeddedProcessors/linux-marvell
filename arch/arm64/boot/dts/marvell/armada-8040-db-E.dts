@@ -134,7 +134,7 @@
 			gop {
 				emac0: mac0 {
 					phy-mode = "sfi"; /* lane-2 */
-					phys = <&cp0_comphy 2 COMPHY_SFI>;
+					phys = <&cp0_comphy 2 COMPHY_SFI0>;
 					phy-names = "comphy";
 				};
 				emac2: mac2 {

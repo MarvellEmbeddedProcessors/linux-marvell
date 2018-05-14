@@ -138,7 +138,7 @@
 	phy-mode = "sfi";
 
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp0_comphy 4 COMPHY_SFI>;
+	phys = <&cp0_comphy 4 COMPHY_SFI0>;
 	phy-names = "comphy";
 };
 
@@ -188,7 +188,7 @@
 	phy-mode = "sfi"; /* lane-2 */
 
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp1_comphy 4 COMPHY_SFI>;
+	phys = <&cp1_comphy 4 COMPHY_SFI0>;
 	phy-names = "comphy";
 };
 
@@ -229,7 +229,7 @@
 	phy-mode = "sfi";
 
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp2_comphy 4 COMPHY_SFI>;
+	phys = <&cp2_comphy 4 COMPHY_SFI0>;
 	phy-names = "comphy";
 };
 
@@ -246,7 +246,7 @@
 	phy-mode = "sfi";
 
 	/* Generic PHY, providing serdes lanes */
-	phys = <&cp3_comphy 4 COMPHY_SFI>;
+	phys = <&cp3_comphy 4 COMPHY_SFI0>;
 	phy-names = "comphy";
 };
 
