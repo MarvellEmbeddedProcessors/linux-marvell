@@ -176,6 +176,7 @@ struct mv_xor_v2_device {
 	int desc_size;
 	unsigned int npendings;
 	int hw_queue_idx;
+	struct msi_desc *msi_desc;
 };
 
 /**
@@ -927,12 +928,12 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 				   &dma_bus_width);
 	if (ret) {
 		dev_err(&pdev->dev, "Failed to read dma-bus-width property\n");
-		goto disable_clk;
+		goto free_msi_domain;
 	}
 
 	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(dma_bus_width));
 	if (ret)
-		goto disable_clk;
+		goto free_msi_domain;
 
 	msi_desc = first_msi_entry(&pdev->dev);
 	if (!msi_desc)
@@ -950,6 +951,7 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	xor_dev->desc_size = mv_xor_v2_set_desc_size(xor_dev);
 	xor_dev->npendings = 0;
 	xor_dev->hw_queue_idx = 0;
+	xor_dev->msi_desc = msi_desc;
 
 	dma_cookie_init(&xor_dev->dmachan);
 
@@ -1039,6 +1041,8 @@ free_hw_desq:
 			  xor_dev->desc_size * MV_XOR_V2_MAX_DESC_NUM,
 			  xor_dev->hw_desq_virt, xor_dev->hw_desq);
 free_msi_irqs:
+	devm_free_irq(&pdev->dev, xor_dev->msi_desc->irq, xor_dev);
+free_msi_domain:
 	platform_msi_domain_free_irqs(&pdev->dev);
 disable_clk:
 	if (!IS_ERR(xor_dev->clk))
@@ -1055,6 +1059,8 @@ static int mv_xor_v2_remove(struct platform_device *pdev)
 	dma_free_coherent(&pdev->dev,
 			  xor_dev->desc_size * MV_XOR_V2_MAX_DESC_NUM,
 			  xor_dev->hw_desq_virt, xor_dev->hw_desq);
+
+	devm_free_irq(&pdev->dev, xor_dev->msi_desc->irq, xor_dev);
 
 	platform_msi_domain_free_irqs(&pdev->dev);
 
