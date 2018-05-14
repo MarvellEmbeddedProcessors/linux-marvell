@@ -48,7 +48,8 @@ emac required properties:
 - phy-speed: For 2.5Gbits SGMII port 2500 phy-speed should be set.
 	     For 5Gbits XSI/SFI port 5000 phy-speed should be set(used only for 2.5Gbits and 5Gbits)
 - phy-names: Used in MAC's connected to comphy. See phy-mvebu-comphy.txt in the phy directory
-- phys: Used in MAC's connected to comphy. Comphy index, see  phy-mvebu-comphy.txt in the phy directory
+- phys: Used in MAC's connected to comphy. Comphy index, see phy-comphy-mvebu.txt in the phy directory.
+        To support multi lane technology(RXAUI, XAUI) phys should be set for each lane(see Example).
 
 emac optional properties:
 ========================
@@ -62,8 +63,9 @@ gop {
 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;  /* Link IRQ */
 		mac-address = [00 00 00 00 00 01];
 		port-id = <0>; /* gop_port_id */
-                phy-mode = "sgmii"; /* lane-2 */
-		phys = <&comphy0 2 COMPHY_SGMII>;
+                phy-mode = "rxaui"; /* lane-4 and lane-5 */
+		phys = <&comphy1 4 COMPHY_RXAUI0>,
+-		       <&comphy1 5 COMPHY_RXAUI1>;
 		phy-names = "comphy";
         };
 	emac2: mac2 {
