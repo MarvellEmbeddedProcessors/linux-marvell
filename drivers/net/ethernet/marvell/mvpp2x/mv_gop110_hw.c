@@ -1087,14 +1087,10 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 
 		num_of_act_lanes = 2;
 		mac_num = 0;
-		/* configure PCS */
-		mv_gop110_xpcs_mode(gop, num_of_act_lanes);
+		/* configure MPCS */
 		mv_gop110_mpcs_mode(gop);
 		/* configure MAC */
 		mv_gop110_xlg_mac_mode_cfg(gop, mac_num, num_of_act_lanes);
-
-		/* pcs unreset */
-		mv_gop110_xpcs_reset(gop, UNRESET);
 
 		/* mac unreset */
 		mv_gop110_xlg_mac_reset(gop, mac_num, UNRESET);
@@ -1160,8 +1156,6 @@ int mv_gop110_port_reset(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_KR:
 	case PHY_INTERFACE_MODE_SFI:
 	case PHY_INTERFACE_MODE_XFI:
-		/* pcs unreset */
-		mv_gop110_xpcs_reset(gop, RESET);
 		/* mac unreset */
 		mv_gop110_xlg_mac_reset(gop, mac_num, RESET);
 	break;
