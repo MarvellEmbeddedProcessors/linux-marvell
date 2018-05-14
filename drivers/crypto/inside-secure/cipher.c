@@ -497,9 +497,7 @@ static int safexcel_cipher_exit_inv(struct crypto_tfm *tfm,
 
 static int safexcel_ablkcipher_exit_inv(struct crypto_tfm *tfm)
 {
-	char __req_desc[sizeof(struct ablkcipher_request) +
-			tfm->crt_ablkcipher.reqsize] CRYPTO_MINALIGN_ATTR;
-	struct ablkcipher_request *req = (void *)__req_desc;
+	EIP197_REQUEST_ON_STACK(req, ablkcipher, EIP197_ABLKCIPHER_REQ_SIZE);
 	struct safexcel_cipher_req *sreq = ablkcipher_request_ctx(req);
 	struct safexcel_inv_result result = {};
 
