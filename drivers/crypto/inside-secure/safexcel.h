@@ -599,8 +599,8 @@ struct safexcel_ring {
 };
 
 enum safexcel_eip_type {
-	EIP197,
 	EIP97,
+	EIP197,
 };
 
 enum safexcel_eip197_hw {
