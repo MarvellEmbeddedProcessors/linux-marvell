@@ -663,7 +663,7 @@ static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_use_internal(
 
 	add_num = pkts_num - pool->buf_num;
 
-	/* Allocate buffers for this pool */
+	/* Allocate buffers for this pool, or free or do nothing */
 	if (add_num > 0) {
 		num = mv_pp2x_bm_bufs_add(port, pool, add_num);
 		if (num != add_num) {
@@ -686,25 +686,23 @@ static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_use(
 	return mv_pp2x_bm_pool_use_internal(port, log_pool, true);
 }
 
-static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_stop_use(
-			struct mv_pp2x_port *port,
-			enum mv_pp2x_bm_pool_log_num log_pool)
-{
-	return mv_pp2x_bm_pool_use_internal(port, log_pool, false);
-}
-
 int mv_pp2x_swf_bm_pool_assign(struct mv_pp2x_port *port, u32 rxq,
 			       u32 long_id, u32 short_id)
 {
+	void (*cb_long_set)(struct mv_pp2x_hw *, int, int);
+	void (*cb_shrt_set)(struct mv_pp2x_hw *, int, int);
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 
 	if (rxq >= port->num_rx_queues)
 		return -ENOMEM;
 
-	port->priv->pp2xdata->mv_pp2x_rxq_long_pool_set(hw,
-		port->rxqs[rxq]->id, long_id);
-	port->priv->pp2xdata->mv_pp2x_rxq_short_pool_set(hw,
-		port->rxqs[rxq]->id, short_id);
+	cb_long_set = port->priv->pp2xdata->mv_pp2x_rxq_long_pool_set;
+	cb_shrt_set = port->priv->pp2xdata->mv_pp2x_rxq_short_pool_set;
+
+	if (long_id < MVPP2_BM_POOLS_NUM)
+		cb_long_set(hw, port->rxqs[rxq]->id, long_id);
+	if (short_id < MVPP2_BM_POOLS_NUM)
+		cb_shrt_set(hw, port->rxqs[rxq]->id, short_id);
 	return 0;
 }
 
@@ -712,119 +710,75 @@ int mv_pp2x_swf_bm_pool_assign(struct mv_pp2x_port *port, u32 rxq,
 static int mv_pp2x_swf_bm_pool_init(struct mv_pp2x_port *port)
 {
 	int rxq;
-	enum mv_pp2x_bm_pool_log_num long_log_pool, short_log_pool;
-	struct mv_pp2x_hw *hw = &port->priv->hw;
+	int sw_num_pools; /* Short+Long or Short+Long+Jumbo */
+	enum mv_pp2x_bm_pool_log_num	slj; /* sw ShortLongJumbo id */
+	struct mv_pp2x_bm_pool *pools[MVPP2_BM_SWF_NUM_POOLS];
 
 	/* If port pkt_size is higher than 1518B:
-	* HW Long pool - SW Jumbo pool, HW Short pool - SW Short pool
-	* esle: HW Long pool - SW Long pool, HW Short pool - SW Short pool
+	*       HW long pool is SWF_JUMBO, HW short pool is SWF_LONG
+	* else: HW long pool is SWF_LONG,  HW short pool is SWF_SHORT
 	*/
+	sw_num_pools = (port->pkt_size > MVPP2_BM_LONG_PKT_SIZE) ?
+			MVPP2_BM_SWF_NUM_POOLS : (MVPP2_BM_SWF_NUM_POOLS - 1);
+
+	for (slj = 0; slj < sw_num_pools; slj++) {
+		/* Allocate S,L(J) pools and/or return pointerS */
+		pools[slj] = mv_pp2x_bm_pool_use(port, slj);
+		if (!pools[slj])
+			return -ENOMEM;
+		pools[slj]->port_map |= (1 << port->id);
+	}
+
 	if (port->pkt_size > MVPP2_BM_LONG_PKT_SIZE) {
-		long_log_pool = MVPP2_BM_SWF_JUMBO_POOL;
-		short_log_pool = MVPP2_BM_SWF_LONG_POOL;
+		port->pool_long = pools[MVPP2_BM_SWF_JUMBO_POOL];
+		port->pool_short = pools[MVPP2_BM_SWF_LONG_POOL];
 	} else {
-		long_log_pool = MVPP2_BM_SWF_LONG_POOL;
-		short_log_pool = MVPP2_BM_SWF_SHORT_POOL;
+		port->pool_long = pools[MVPP2_BM_SWF_LONG_POOL];
+		port->pool_short = pools[MVPP2_BM_SWF_SHORT_POOL];
 	}
 
-	if (!port->pool_long) {
-		port->pool_long =
-		       mv_pp2x_bm_pool_use(port, long_log_pool);
-		if (!port->pool_long)
-			return -ENOMEM;
-		port->pool_long->port_map |= (1 << port->id);
-
-		for (rxq = 0; rxq < port->num_rx_queues; rxq++) {
-			port->priv->pp2xdata->mv_pp2x_rxq_long_pool_set(hw,
-				port->rxqs[rxq]->id, port->pool_long->id);
-		}
-	}
-
-	if (!port->pool_short) {
-		port->pool_short =
-			mv_pp2x_bm_pool_use(port, short_log_pool);
-		if (!port->pool_short)
-			return -ENOMEM;
-
-		port->pool_short->port_map |= (1 << port->id);
-
-		for (rxq = 0; rxq < port->num_rx_queues; rxq++)
-			port->priv->pp2xdata->mv_pp2x_rxq_short_pool_set(hw,
-			port->rxqs[rxq]->id, port->pool_short->id);
-	}
-
+	/* Assign new short&long pools to BM hw per RXQs */
+	for (rxq = 0; rxq < port->num_rx_queues; rxq++)
+		mv_pp2x_swf_bm_pool_assign(port, rxq,
+					   port->pool_long->id,
+					   port->pool_short->id);
 	return 0;
 }
 
 static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
-	struct mv_pp2x_bm_pool *old_long_port_pool = port->pool_long;
-	struct mv_pp2x_bm_pool *old_short_port_pool = port->pool_short;
-	struct mv_pp2x_hw *hw = &port->priv->hw;
-	enum mv_pp2x_bm_pool_log_num new_long_pool, old_long_pool;
-	enum mv_pp2x_bm_pool_log_num new_short_pool, old_short_pool;
-	int rxq;
-	int pkt_size = MVPP2_RX_PKT_SIZE(mtu);
+	enum mv_pp2x_bm_pool_log_num	new_pool_long;
+	const netdev_features_t netif_f_ip_csum =
+			NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
 
-	old_long_pool = old_long_port_pool->log_id;
-	old_short_pool = old_short_port_pool->log_id;
+	if (port->pkt_size > MVPP2_BM_LONG_PKT_SIZE)
+		new_pool_long = MVPP2_BM_SWF_JUMBO_POOL;
+	else
+		new_pool_long = MVPP2_BM_SWF_LONG_POOL;
 
-	/* If port MTU is higher than 1518B:
-	* HW Long pool - SW Jumbo pool, HW Short pool - SW Short pool
-	* esle: HW Long pool - SW Long pool, HW Short pool - SW Short pool
-	*/
-	if (pkt_size > MVPP2_BM_LONG_PKT_SIZE) {
-		new_long_pool = MVPP2_BM_SWF_JUMBO_POOL;
-		new_short_pool = MVPP2_BM_SWF_LONG_POOL;
+	if (new_pool_long == port->pool_long->log_id)
+		return 0;
+
+	/* TO or FROM jumbo transition required. Call for
+	 * bm_pool_init() checks S/L/J pool allocations and sets
+	 * correct pool_short/pool_long pointers upon pkt_size.
+	 *
+	 * The BM-HW could still use old pool and buffers set,
+	 * so don't unmap ports from pools and don't free pool-buffers.
+	 */
+	if (mv_pp2x_swf_bm_pool_init(port))
+		return -ENOMEM;
+
+	/* Update L4 checksum when jumbo enable/disable on port */
+	if ((new_pool_long == MVPP2_BM_SWF_JUMBO_POOL) &&
+	    (port->id != port->priv->l4_chksum_jumbo_port)) {
+		dev->features &= ~netif_f_ip_csum;
+		dev->hw_features &= ~netif_f_ip_csum;
 	} else {
-		new_long_pool = MVPP2_BM_SWF_LONG_POOL;
-		new_short_pool = MVPP2_BM_SWF_SHORT_POOL;
+		dev->features |= netif_f_ip_csum;
+		dev->hw_features |= netif_f_ip_csum;
 	}
-
-	if (new_long_pool != old_long_pool) {
-		/* Remove port from old short&long pool */
-		mv_pp2x_bm_pool_stop_use(port, old_long_pool);
-		old_long_port_pool->port_map &= ~(1 << port->id);
-
-		mv_pp2x_bm_pool_stop_use(port, old_short_pool);
-		old_short_port_pool->port_map &= ~(1 << port->id);
-
-		/* Add port to new short&long pool */
-		port->pool_long = mv_pp2x_bm_pool_use(port, new_long_pool);
-		if (!port->pool_long)
-			return -ENOMEM;
-		port->pool_long->port_map |= (1 << port->id);
-		for (rxq = 0; rxq < port->num_rx_queues; rxq++)
-			port->priv->pp2xdata->mv_pp2x_rxq_long_pool_set(hw,
-			port->rxqs[rxq]->id, port->pool_long->id);
-
-		port->pool_short = mv_pp2x_bm_pool_use(port, new_short_pool);
-		if (!port->pool_short)
-			return -ENOMEM;
-		port->pool_short->port_map |= (1 << port->id);
-		for (rxq = 0; rxq < port->num_rx_queues; rxq++)
-			port->priv->pp2xdata->mv_pp2x_rxq_short_pool_set(hw,
-			port->rxqs[rxq]->id, port->pool_short->id);
-
-		/* Update L4 checksum when jumbo enable/disable on port */
-		if (new_long_pool == MVPP2_BM_SWF_JUMBO_POOL) {
-			if (port->id != port->priv->l4_chksum_jumbo_port) {
-				dev->features &=
-					~(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
-				dev->hw_features &=
-					~(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
-				}
-		} else {
-			dev->features |=
-				(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
-			dev->hw_features |=
-				(NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM);
-		}
-	}
-
-	dev->mtu = mtu;
-
 	dev->wanted_features = dev->features;
 	netdev_update_features(dev);
 	return 0;
@@ -4729,42 +4683,24 @@ static int mv_pp2x_change_mtu(struct net_device *dev, int mtu)
 	}
 
 	mtu = mv_pp2x_check_mtu_valid(dev, mtu);
-	if (mtu < 0) {
-		err = mtu;
-		goto error;
-	}
+	if (mtu < 0)
+		return -EINVAL;
 
-	if (!netif_running(dev)) {
-		err = mv_pp2x_bm_update_mtu(dev, mtu);
-		if (!err) {
-			port->pkt_size =  MVPP2_RX_PKT_SIZE(mtu);
-			return 0;
-		}
+	if (netif_running(dev))
+		mv_pp2x_stop_dev(port);
 
-		/* Reconfigure BM to the original MTU */
-		err = mv_pp2x_bm_update_mtu(dev, dev->mtu);
-		goto error;
-	}
-
-	mv_pp2x_stop_dev(port);
-
+	/* Set new pkt_size before bm-update */
+	port->pkt_size = MVPP2_RX_PKT_SIZE(mtu);
 	err = mv_pp2x_bm_update_mtu(dev, mtu);
 	if (!err) {
-		port->pkt_size =  MVPP2_RX_PKT_SIZE(mtu);
-		goto out_start;
+		dev->mtu = mtu;
+	} else {
+		/* Keep original MTU and restore original pkt_size */
+		port->pkt_size = MVPP2_RX_PKT_SIZE(mtu);
+		netdev_err(dev, "fail to change MTU\n");
 	}
-
-	/* Reconfigure BM to the original MTU */
-	err = mv_pp2x_bm_update_mtu(dev, dev->mtu);
-	if (err)
-		goto error;
-
-out_start:
-	mv_pp2x_start_dev(port);
-	return 0;
-
-error:
-	netdev_err(dev, "fail to change MTU\n");
+	if (netif_running(dev))
+		mv_pp2x_start_dev(port);
 	return err;
 }
 
