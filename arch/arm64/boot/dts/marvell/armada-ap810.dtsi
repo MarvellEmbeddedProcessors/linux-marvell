@@ -147,6 +147,27 @@
 				reg-io-width = <1>;
 				status = "disabled";
 			};
+
+			AP810_LABEL(crypto): crypto@700000 {
+				compatible = "inside-secure,safexcel-eip197";
+				reg = <0x700000 0x200000>;
+				dma-coherent;
+				dma-bus-width = <40>;
+				interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "ring0", "ring1", "ring2",
+						"ring3", "ring4", "ring5",
+						"ring6", "ring7", "global";
+				cell-index = <AP810_EIP197_INDEX>;
+				status = "okay";
+			};
 		};
 	};
 };

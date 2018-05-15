@@ -51,6 +51,7 @@
 #define AP_NUM				0
 #define AP810_BASE			0xe8000000
 #define AP810_GIC_ITS_BASE		0xf040000
+#define AP810_EIP197_INDEX		0
 #include "armada-ap810-octa-core.dtsi"
 /* CP110-0 Settings */
 #define CP110_NUM		0
@@ -74,6 +75,7 @@
 #undef AP_NUM
 #undef AP810_BASE
 #undef AP810_GIC_ITS_BASE
+#undef AP810_EIP197_INDEX
 
 #define AP_NUM				1
 #define AP810_BASE			0xe4000000
@@ -82,6 +84,7 @@
  *(0xe4000000+0x3040000) = (0xdc000000+0xb040000) = 0xe7040000
  */
 #define AP810_GIC_ITS_BASE		0xb040000
+#define AP810_EIP197_INDEX		1
 #include "armada-ap810-octa-core.dtsi"
 
 /* CP110-0 Settings */
