@@ -319,6 +319,7 @@
 				interrupt-names = "mem", "ring0", "ring1",
 						  "ring2", "ring3", "eip";
 				clocks = <&nb_periph_clk 15>;
+				cell-index = <0>;
 			};
 
 			sdhci1: sdhci@d0000 {
