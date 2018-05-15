@@ -1,0 +1,138 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Device Tree file for Marvell Armada 7040 development board platform
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include "armada-7040.dtsi"
+
+/ {
+	model = "Marvell Armada 7040 development board";
+	compatible = "marvell,armada7040-db", "marvell,armada7040",
+			"marvell,armada-ap806-quad", "marvell,armada-ap806";
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb3h0-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
+	};
+
+	cp0_reg_usb3_1_vbus: cp0-usb3-1-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb3h1-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
+	};
+
+	cp0_usb3_0_phy: cp0-usb3-0-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp0_reg_usb3_0_vbus>;
+	};
+
+	cp0_usb3_1_phy: cp0-usb3-1-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp0_reg_usb3_1_vbus>;
+	};
+};
+
+&uart0 {
+	status = "okay";
+	pinctrl-0 = <&uart0_pins>;
+	pinctrl-names = "default";
+};
+
+&ap_sdhci0 {
+	bus-width = <4>;
+	no-1-8-v;
+	non-removable;
+};
+
+&cp0_i2c0 {
+	expander0: pca9555@21 {
+		compatible = "nxp,pca9555";
+		pinctrl-names = "default";
+		gpio-controller;
+		#gpio-cells = <2>;
+		reg = <0x21>;
+	};
+};
+
+&cp0_nand_controller {
+	nand-ecc-strength = <4>;
+	nand-ecc-step-size = <512>;
+	num-cs = <1>;
+	nand-on-flash-bbt;
+
+	status = "disabled";
+	partition@0 {
+		label = "U-Boot";
+		reg = <0 0x200000>;
+	};
+	partition@200000 {
+		label = "Linux";
+		reg = <0x200000 0xd00000>;
+	};
+	partition@1000000 {
+		label = "Filesystem";
+		reg = <0x1000000 0x3f000000>;
+	};
+};
+
+&cp0_spi1 {
+	spi-flash@0 {
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		compatible = "jedec,spi-nor";
+		reg = <0x0>;
+		spi-max-frequency = <20000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "U-Boot";
+				reg = <0x0 0x400000>;
+			};
+
+			partition@400000 {
+				label = "Filesystem";
+				reg = <0x400000 0xc00000>;
+			};
+		};
+	};
+};
+
+&cp0_sdhci0 {
+	status = "okay";
+	bus-width = <4>;
+	no-1-8-v;
+	non-removable;
+};
+
+&cp0_usb3_0 {
+	usb-phy = <&cp0_usb3_0_phy>;
+	status = "disabled";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy1 0>;
+	phy-names = "usb";
+};
+
+&cp0_usb3_1 {
+	usb-phy = <&cp0_usb3_1_phy>;
+	status = "disabled";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy4 1>;
+	phy-names = "usb";
+};

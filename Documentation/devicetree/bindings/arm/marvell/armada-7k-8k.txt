@@ -22,6 +22,18 @@ Boards:
    - "marvell,armada7040-db-default", "marvell,armada7040-db"
       when the board being used is the Armada 7040 Development board
 
+   - "marvell,armada7040-db-B", "marvell,armada7040-db"
+      when the board being used is the Armada 7040 Development board with Setup B
+
+   - "marvell,armada7040-db-C", "marvell,armada7040-db"
+      when the board being used is the Armada 7040 Development board with Setup C
+
+   - "marvell,armada7040-db-D", "marvell,armada7040-db"
+      when the board being used is the Armada 7040 Development board with Setup D
+
+   - "marvell,armada7040-db-E", "marvell,armada7040-db"
+      when the board being used is the Armada 7040 Development board with Setup E
+
    - "marvell,armada8040-db-default", "marvell,armada8040-db"
       when the board being used is the Armada 8040 Development board
 
