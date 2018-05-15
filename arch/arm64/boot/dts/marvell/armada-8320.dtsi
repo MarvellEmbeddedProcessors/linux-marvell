@@ -49,34 +49,42 @@
 #define AP_NUM			0
 #define AP810_BASE		0xe8000000
 #define AP810_GIC_ITS_BASE	0xf040000
+#define AP810_EIP197_INDEX	0
 #include "armada-ap810-octa-core.dtsi"
 #undef AP_NUM
 #undef AP810_BASE
 #undef AP810_GIC_ITS_BASE
+#undef AP810_EIP197_INDEX
 
 #define AP_NUM			1
 #define AP810_BASE		0xe4000000
 #define AP810_GIC_ITS_BASE	0xb040000
+#define AP810_EIP197_INDEX	1
 #include "armada-ap810-octa-core.dtsi"
 #undef AP_NUM
 #undef AP810_BASE
 #undef AP810_GIC_ITS_BASE
+#undef AP810_EIP197_INDEX
 
 #define AP_NUM			2
 #define AP810_BASE		0xe0000000
 #define AP810_GIC_ITS_BASE	0x7040000
+#define AP810_EIP197_INDEX	2
 #include "armada-ap810-octa-core.dtsi"
 #undef AP_NUM
 #undef AP810_BASE
 #undef AP810_GIC_ITS_BASE
+#undef AP810_EIP197_INDEX
 
 #define AP_NUM			3
 #define AP810_BASE		0xdc000000
 #define AP810_GIC_ITS_BASE	0x3040000
+#define AP810_EIP197_INDEX	3
 #include "armada-ap810-octa-core.dtsi"
 #undef AP_NUM
 #undef AP810_BASE
 #undef AP810_GIC_ITS_BASE
+#undef AP810_EIP197_INDEX
 
 / {
 	model = "Marvell 8320 SoC";

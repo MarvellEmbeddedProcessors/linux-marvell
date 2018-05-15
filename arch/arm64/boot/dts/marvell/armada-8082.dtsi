@@ -51,7 +51,7 @@
 #define AP_NUM					0
 #define AP810_BASE				0xe8000000
 #define AP810_GIC_ITS_BASE			0xf040000
-
+#define AP810_EIP197_INDEX		0
 #include "armada-ap810-octa-core.dtsi"
 
 #define CP110_EIP197_INDEX	CP110_NUM
@@ -84,6 +84,7 @@
 #undef AP_NUM
 #undef AP810_BASE
 #undef AP810_GIC_ITS_BASE
+#undef AP810_EIP197_INDEX
 
 / {
 	model = "Marvell Armada-8082";
