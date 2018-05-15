@@ -660,7 +660,7 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	ret = of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
+	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff, &res,
 						    &iobase);
 	if (ret)
 		return ret;
