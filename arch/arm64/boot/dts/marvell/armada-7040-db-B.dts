@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Device Tree file for Marvell Armada 7040 development board
+ * This board file supports the B configuration of the board
+ */
+
+#include "armada-7040-db.dtsi"
+
+/ {
+	model = "Marvell Armada 7040 development board B setup";
+	compatible = "marvell,armada7040-db-B", "marvell,armada7040-db",
+		     "marvell,armada7040", "marvell,armada-ap806-quad",
+		     "marvell,armada-ap806";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	aliases {
+		ethernet0 = &cp0_eth1;
+		ethernet1 = &cp0_eth2;
+	};
+};
+
+&ap_sdhci0 {
+	status = "okay";
+};
+
+&cp0_i2c0 {
+	status = "okay";
+	clock-frequency = <100000>;
+};
+
+&cp0_spi1 {
+	status = "okay";
+};
+
+&cp0_pcie0 {
+	status = "okay";
+	num-lanes = <4>;
+	phys = <&cp0_comphy0 0>;
+	phy-names = "pcie-phy0";
+};
+
+&cp0_pcie2 {
+	status = "okay";
+	phys = <&cp0_comphy5 2>;
+	phy-names = "pcie-phy0";
+};
+
+&cp0_usb3_1 {
+	status = "okay";
+};
+
+&cp0_mdio {
+	status = "okay";
+
+	cp0_phy2: ethernet-phy@2 {
+		reg = <0>;
+	};
+	cp0_phy3: ethernet-phy@3 {
+		reg = <1>;
+	};
+};
+
+&cp0_ethernet {
+	status = "okay";
+};
+
+&cp0_eth1 {
+	status = "okay";
+	phy = <&cp0_phy2>;
+	phy-mode = "rgmii-id";
+};
+
+&cp0_eth2 {
+	status = "okay";
+	phy = <&cp0_phy3>;
+	phy-mode = "rgmii-id";
+};
