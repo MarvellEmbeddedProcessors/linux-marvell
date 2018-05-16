@@ -6795,6 +6795,14 @@ void mv_pp22_set_net_comp(struct mv_pp2x *priv)
 {
 	u32 net_comp_config;
 
+	/* Reset Netcomplex to default value */
+	mv_gop110_rfu1_write(&priv->hw.gop, MV_NETCOMP_PORTS_CONTROL_0,
+			     MV_NETCOMP_PORTS_CONTROL_0_DEF_VAL);
+	mv_gop110_rfu1_write(&priv->hw.gop, MV_NETCOMP_PORTS_CONTROL_1,
+			     MV_NETCOMP_PORTS_CONTROL_1_DEF_VAL);
+	mv_gop110_rfu1_write(&priv->hw.gop, MV_NETCOMP_CONTROL_0,
+			     MV_NETCOMP_CONTROL_0_DEF_VAL);
+
 	net_comp_config = mvp_pp2x_gop110_netc_cfg_create(priv);
 	mv_gop110_netc_init(&priv->hw.gop, net_comp_config, MV_NETC_FIRST_PHASE);
 	mv_gop110_netc_init(&priv->hw.gop, net_comp_config, MV_NETC_SECOND_PHASE);
