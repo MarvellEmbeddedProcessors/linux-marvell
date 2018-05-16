@@ -598,7 +598,7 @@ struct safexcel_ring {
 	struct crypto_queue queue;
 };
 
-enum safexcel_eip_type {
+enum safexcel_eip_version {
 	EIP97,
 	EIP197,
 };
@@ -606,6 +606,13 @@ enum safexcel_eip_type {
 enum safexcel_eip197_hw {
 	EIP197B,
 	EIP197D,
+};
+
+struct safexcel_data {
+	enum safexcel_eip_version version;
+	enum safexcel_eip197_hw eip197_hw;
+	struct safexcel_alg_template **algs;
+	int nalgs;
 };
 
 struct safexcel_register_offsets {
@@ -628,8 +635,7 @@ struct safexcel_crypto_priv {
 	int nr_pe;
 	struct safexcel_config config;
 
-	enum safexcel_eip_type eip_type;
-	enum safexcel_eip197_hw eip197_hw_ver;
+	struct safexcel_data *data;
 	struct safexcel_register_offsets offsets;
 
 	/* context DMA pool */

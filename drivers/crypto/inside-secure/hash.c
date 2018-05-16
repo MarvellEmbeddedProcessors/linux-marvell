@@ -585,7 +585,7 @@ static int safexcel_ahash_enqueue(struct ahash_request *areq)
 	 * If it's EIP97 with existing context, the send routine is already set.
 	 */
 	if (ctx->base.ctxr) {
-		if (priv->eip_type == EIP197 &&
+		if (priv->data->version == EIP197 &&
 		    !ctx->base.needs_inv && req->processed &&
 		    req->digest == CONTEXT_CONTROL_DIGEST_PRECOMPUTED)
 			/* We're still setting needs_inv here, even though it is
@@ -791,7 +791,7 @@ static void safexcel_ahash_cra_exit(struct crypto_tfm *tfm)
 	 * EIP97 doesn't have internal cache, so no need to invalidate
 	 * it and we can just release the dma pool.
 	 */
-	if (priv->eip_type == EIP197) {
+	if (priv->data->version == EIP197) {
 		ret = safexcel_ahash_exit_inv(tfm);
 		if (ret)
 			dev_warn(priv->dev, "hash: invalidation error %d\n", ret);
@@ -1011,7 +1011,7 @@ static int safexcel_hmac_alg_setkey(struct crypto_ahash *tfm, const u8 *key,
 	if (ret)
 		return ret;
 
-	if (priv->eip_type == EIP197 && ctx->base.ctxr) {
+	if (priv->data->version == EIP197 && ctx->base.ctxr) {
 		for (i = 0; i < state_sz / sizeof(u32); i++) {
 			if (ctx->ipad[i] != le32_to_cpu(istate.state[i]) ||
 			    ctx->opad[i] != le32_to_cpu(ostate.state[i])) {
