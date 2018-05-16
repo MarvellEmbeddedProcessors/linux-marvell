@@ -16,7 +16,7 @@
 #include <linux/slab.h>
 #include <linux/hdreg.h>
 #include <linux/mtd/mtd.h>
-#include <linux/mtd/nand.h>
+#include <linux/mtd/rawnand.h>
 #include <linux/mtd/blktrans.h>
 
 struct ssfdcr_record {
@@ -380,8 +380,7 @@ static int ssfdcr_readsect(struct mtd_blktrans_dev *dev,
 		" block_addr=%d\n", logic_sect_no, sectors_per_block, offset,
 		block_address);
 
-	if (block_address >= ssfdc->map_len)
-		BUG();
+	BUG_ON(block_address >= ssfdc->map_len);
 
 	block_address = ssfdc->logic_block_map[block_address];
 
