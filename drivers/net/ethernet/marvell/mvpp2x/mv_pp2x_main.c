@@ -5483,6 +5483,8 @@ static u32 mvp_pp2x_gop110_netc_cfg_create(struct mv_pp2x *priv)
 			if (mac->phy_mode == PHY_INTERFACE_MODE_SGMII ||
 			    mac->phy_mode == PHY_INTERFACE_MODE_1000BASEX)
 				val |= MV_NETC_GE_MAC2_SGMII;
+			else if (mac->phy_mode == PHY_INTERFACE_MODE_RGMII)
+				val |= MV_NETC_GE_MAC2_RGMII;
 		}
 		if (mac->gop_index == 3) {
 			if (mac->phy_mode == PHY_INTERFACE_MODE_SGMII ||

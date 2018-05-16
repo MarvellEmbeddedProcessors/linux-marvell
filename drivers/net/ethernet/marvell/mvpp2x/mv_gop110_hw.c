@@ -3009,8 +3009,9 @@ int mv_gop110_netc_init(struct gop_hw *gop,
 
 	if (c & MV_NETC_GE_MAC2_SGMII)
 		mv_gop110_netc_mac_to_sgmii(gop, 2, phase);
-	else
+	else if (c & MV_NETC_GE_MAC2_RGMII)
 		mv_gop110_netc_mac_to_xgmii(gop, 2, phase);
+
 	if (c & MV_NETC_GE_MAC3_SGMII) {
 		mv_gop110_netc_mac_to_sgmii(gop, 3, phase);
 	} else {

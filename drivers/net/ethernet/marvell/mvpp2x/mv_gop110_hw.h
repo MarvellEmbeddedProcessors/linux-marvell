@@ -80,8 +80,9 @@ enum mv_netc_topology {
 	MV_NETC_GE_MAC0_RXAUI_L45	=	BIT(1),
 	MV_NETC_GE_MAC0_XAUI		=	BIT(2),
 	MV_NETC_GE_MAC2_SGMII		=	BIT(3),
-	MV_NETC_GE_MAC3_SGMII		=	BIT(4),
-	MV_NETC_GE_MAC3_RGMII		=	BIT(5),
+	MV_NETC_GE_MAC2_RGMII		=	BIT(4),
+	MV_NETC_GE_MAC3_SGMII		=	BIT(5),
+	MV_NETC_GE_MAC3_RGMII		=	BIT(6),
 };
 
 enum mv_netc_phase {
