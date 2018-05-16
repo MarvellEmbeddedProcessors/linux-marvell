@@ -6520,7 +6520,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 			devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(hw->gop.gop_110.xmib.base))
 			return PTR_ERR(hw->gop.gop_110.xmib.base);
-		hw->gop.gop_110.xmib.obj_size = 0x0100;
+		hw->gop.gop_110.xmib.obj_size = MVPP22_MIB_PORT_OFFS;
 
 		/* skipped led */
 
@@ -6557,7 +6557,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 			devm_ioremap_resource(&pdev->dev, res);
 		if (IS_ERR(hw->gop.gop_110.mspg.base))
 			return PTR_ERR(hw->gop.gop_110.mspg.base);
-		hw->gop.gop_110.mspg.obj_size = 0x1000;
+		hw->gop.gop_110.mspg.obj_size = MVPP22_GOP_PORT_OFFS;
 		mspg_base = res->start;
 		mspg_end  = res->end;
 
@@ -6576,8 +6576,8 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 				(res->start - mspg_base));
 
 		hw->gop.gop_110.ptp.base =
-			(void *)(hw->gop.gop_110.mspg.base + 0x0800);
-		hw->gop.gop_110.ptp.obj_size = 0x1000;
+			(void *)(hw->gop.gop_110.mspg.base + MVPP22_PTP_BASE_OFFS);
+		hw->gop.gop_110.ptp.obj_size = MVPP22_GOP_PORT_OFFS;
 		/* MSPG - gmac */
 		res = platform_get_resource_byname(pdev,
 						   IORESOURCE_MEM, "gmac");
@@ -6586,7 +6586,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		hw->gop.gop_110.gmac.base =
 			(void *)(hw->gop.gop_110.mspg.base +
 			(res->start - mspg_base));
-		hw->gop.gop_110.gmac.obj_size = 0x1000;
+		hw->gop.gop_110.gmac.obj_size = MVPP22_GOP_PORT_OFFS;
 
 		/* FCA - flow control*/
 		res = platform_get_resource_byname(pdev,
@@ -6596,7 +6596,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		hw->gop.gop_110.fca.base =
 			(void *)(hw->gop.gop_110.mspg.base +
 			(res->start - mspg_base));
-		hw->gop.gop_110.fca.obj_size = 0x1000;
+		hw->gop.gop_110.fca.obj_size = MVPP22_GOP_PORT_OFFS;
 
 		/* MSPG - xlg */
 		res = platform_get_resource_byname(pdev,
@@ -6606,7 +6606,7 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		hw->gop.gop_110.xlg_mac.base =
 			(void *)(hw->gop.gop_110.mspg.base +
 			(res->start - mspg_base));
-		hw->gop.gop_110.xlg_mac.obj_size = 0x1000;
+		hw->gop.gop_110.xlg_mac.obj_size = MVPP22_GOP_PORT_OFFS;
 
 		/* Jumbo L4_checksum port */
 		if (of_property_read_u32(dn, "l4_chksum_jumbo_port",
