@@ -761,6 +761,7 @@
 /* Port flags */
 #define MVPP2_F_LOOPBACK		BIT(0)
 #define MVPP22_F_IF_MUSDK		BIT(2) /* musdk port */
+#define MVPP2_F_IF_TX_ON		BIT(3)
 
 /* Marvell tag types */
 enum mvpp2_tag_type {
@@ -8549,6 +8550,55 @@ static void mvpp2_txq_sent_counter_clear(void *arg)
 	}
 }
 
+/* Avoid wrong tx_done calling for netif_tx_wake at time of
+ * dev-stop or linkDown processing by flag MVPP2_F_IF_TX_ON.
+ * Set/clear it on each cpu.
+ */
+static inline bool mvpp2_tx_stopped(struct mvpp2_port *port)
+{
+	return (port->flags & MVPP2_F_IF_TX_ON);
+}
+
+static void mvpp2_txqs_on(void *arg)
+{
+	((struct mvpp2_port *)arg)->flags |= MVPP2_F_IF_TX_ON;
+}
+
+static void mvpp2_txqs_off(void *arg)
+{
+	((struct mvpp2_port *)arg)->flags &= ~MVPP2_F_IF_TX_ON;
+}
+
+static void mvpp2_tx_start_all_queues(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+
+	if (port->flags & MVPP22_F_IF_MUSDK)
+		return;
+	on_each_cpu(mvpp2_txqs_on, port, 1);
+	netif_tx_start_all_queues(dev);
+}
+
+static void mvpp2_tx_wake_all_queues(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+
+	if (port->flags & MVPP22_F_IF_MUSDK)
+		return;
+	on_each_cpu(mvpp2_txqs_on, port, 1);
+	netif_tx_wake_all_queues(dev);
+}
+
+static void mvpp2_tx_stop_all_queues(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+
+	if (port->flags & MVPP22_F_IF_MUSDK)
+		return;
+	on_each_cpu(mvpp2_txqs_off, port, 1);
+	netif_tx_stop_all_queues(dev);
+}
+
 /* Set max sizes for Tx queues */
 static void mvpp2_txp_max_tx_size_set(struct mvpp2_port *port)
 {
@@ -8744,9 +8794,9 @@ static void mvpp2_txq_done(struct mvpp2_port *port, struct mvpp2_tx_queue *txq,
 
 	txq_pcpu->count -= tx_done;
 
-	if (netif_tx_queue_stopped(nq))
-		if (txq_pcpu->count <= txq_pcpu->wake_threshold)
-			netif_tx_wake_queue(nq);
+	if (netif_tx_queue_stopped(nq) && !mvpp2_tx_stopped(port) &&
+	    txq_pcpu->count <= txq_pcpu->wake_threshold)
+		netif_tx_wake_queue(nq);
 }
 
 static unsigned int mvpp2_tx_done(struct mvpp2_port *port, u32 cause,
@@ -9247,10 +9297,9 @@ static irqreturn_t mvpp2_link_status_isr(int irq, void *dev_id)
 		mvpp2_egress_enable(port);
 		mvpp2_ingress_enable(port);
 		netif_carrier_on(dev);
-		if (!(port->flags & MVPP22_F_IF_MUSDK))
-			netif_tx_wake_all_queues(dev);
+		mvpp2_tx_wake_all_queues(dev);
 	} else {
-		netif_tx_stop_all_queues(dev);
+		mvpp2_tx_stop_all_queues(dev);
 		netif_carrier_off(dev);
 		mvpp2_ingress_disable(port);
 		mvpp2_egress_disable(port);
@@ -10008,8 +10057,7 @@ static void mvpp2_start_dev(struct mvpp2_port *port)
 		mvpp2_mac_config(port->dev, MLO_AN_INBAND, &state);
 	}
 
-	if (!(port->flags & MVPP22_F_IF_MUSDK))
-		netif_tx_start_all_queues(port->dev);
+	mvpp2_tx_start_all_queues(port->dev);
 }
 
 /* Set hw internals when stopping port */
@@ -11765,7 +11813,7 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 	 */
 	if (state->link && netif_carrier_ok(dev) && port->has_phy)
 		return; /* already in UP */
-	netif_tx_stop_all_queues(port->dev);
+	mvpp2_tx_stop_all_queues(port->dev);
 
 	/* Make sure the port is disabled when reconfiguring the mode */
 	mvpp2_port_disable(port);
@@ -11797,8 +11845,7 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 
 		mvpp2_egress_enable(port);
 		mvpp2_ingress_enable(port);
-		if (!(port->flags & MVPP22_F_IF_MUSDK))
-			netif_tx_wake_all_queues(dev);
+		mvpp2_tx_wake_all_queues(dev);
 	}
 }
 
@@ -11821,8 +11868,7 @@ static void mvpp2_mac_link_up(struct net_device *dev, unsigned int mode,
 
 	mvpp2_egress_enable(port);
 	mvpp2_ingress_enable(port);
-	if (!(port->flags & MVPP22_F_IF_MUSDK))
-		netif_tx_wake_all_queues(dev);
+	mvpp2_tx_wake_all_queues(dev);
 }
 
 static void mvpp2_mac_link_down(struct net_device *dev, unsigned int mode,
@@ -11839,7 +11885,7 @@ static void mvpp2_mac_link_down(struct net_device *dev, unsigned int mode,
 		writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 	}
 
-	netif_tx_stop_all_queues(dev);
+	mvpp2_tx_stop_all_queues(dev);
 	mvpp2_egress_disable(port);
 	mvpp2_ingress_disable(port);
 
