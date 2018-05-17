@@ -94,8 +94,7 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 	    get_capacity(req->rq_disk))
 		return -EIO;
 
-	switch (req_op(req)) {
-	case REQ_OP_DISCARD:
+	if (req->cmd_flags & REQ_DISCARD)
 		return tr->discard(dev, block, nsect);
 	case REQ_OP_READ:
 		for (; nsect > 0; nsect--, block++, buf += tr->blksize)
