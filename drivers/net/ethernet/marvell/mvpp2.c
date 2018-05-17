@@ -11763,6 +11763,8 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 	 * here, the phylink would set it correctly and call mac_link_up/down.
 	 * For quick-stop switch off TX queues instead of the carrier.
 	 */
+	if (state->link && netif_carrier_ok(dev) && port->has_phy)
+		return; /* already in UP */
 	netif_tx_stop_all_queues(port->dev);
 
 	/* Make sure the port is disabled when reconfiguring the mode */
