@@ -684,13 +684,17 @@
 /* Maximum number of TXQs used by single port */
 #define MVPP2_MAX_TXQ			8
 
-/* MVPP2_MAX_TSO_SEGS is the maximum number of fragments to allow in the GSO
- * skb. As we need a maximum of two descriptors per fragments
- * (1 header, 1 data), multiply this value by two to count the maximum number
- * of skb descs needed.
+/* SKB/TSO/TX-ring-size/pause-wakeup constatnts depend upon the
+ *  MAX_TSO_SEGS - the max number of fragments to allow in the GSO skb.
+ *  Min-Min requirement for it = maxPacket(64kB)/stdMTU(1500)=44 fragments.
+ * MAX_SKB_DESCS: we need 2 descriptors per TSO fragment (1 header, 1 data).
+ * TX stop activation threshold (e.g. Queue is full) is MAX_SKB_DESCS
+ * TX stop-to-wake hysteresis is half of MAX_SKB_DESCS (~ 1 TSO stream)
+ * The Tx ring size cannot be smaller than TSO_SEGS + HYSTERESIS + SKBs
  */
-#define MVPP2_MAX_TSO_SEGS		100
-#define MVPP2_MAX_SKB_DESCS		(MVPP2_MAX_TSO_SEGS * 2 + MAX_SKB_FRAGS)
+#define MVPP2_MAX_TSO_SEGS		44
+#define MVPP2_MAX_SKB_DESCS	(MVPP2_MAX_TSO_SEGS * 2 + MAX_SKB_FRAGS)
+#define MVPP2_TX_PAUSE_HYSTERESIS	(MVPP2_MAX_SKB_DESCS / 2)
 
 /* Dfault number of RXQs in use */
 #define MVPP2_DEFAULT_RXQ		4
@@ -702,6 +706,9 @@
 /* Max number of Tx descriptors */
 #define MVPP2_MAX_TXD_MAX		2048
 #define MVPP2_MAX_TXD_DFLT		1024
+#define MVPP2_MIN_TXD		ALIGN(MVPP2_MAX_TSO_SEGS + \
+				      MVPP2_MAX_SKB_DESCS + \
+				      MVPP2_TX_PAUSE_HYSTERESIS, 32)
 
 /* Amount of Tx descriptors that can be reserved at once by CPU */
 #define MVPP2_CPU_DESC_CHUNK		64
@@ -8991,7 +8998,8 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
 		txq_pcpu->tso_headers = NULL;
 
 		txq_pcpu->stop_threshold = txq->size - MVPP2_MAX_SKB_DESCS;
-		txq_pcpu->wake_threshold = txq_pcpu->stop_threshold - 100;
+		txq_pcpu->wake_threshold = txq_pcpu->stop_threshold -
+						MVPP2_TX_PAUSE_HYSTERESIS;
 
 		txq_pcpu->tso_headers =
 			dma_alloc_coherent(port->dev->dev.parent,
@@ -10033,11 +10041,8 @@ static int mvpp2_check_ringparam_valid(struct net_device *dev,
 	else if (!IS_ALIGNED(ring->tx_pending, 32))
 		new_tx_pending = ALIGN(ring->tx_pending, 32);
 
-	/* The Tx ring size cannot be smaller than the minimum number of
-	 * descriptors needed for TSO.
-	 */
-	if (new_tx_pending < MVPP2_MAX_SKB_DESCS)
-		new_tx_pending = ALIGN(MVPP2_MAX_SKB_DESCS, 32);
+	if (new_tx_pending < MVPP2_MIN_TXD)
+		new_tx_pending = MVPP2_MIN_TXD;
 
 	if (ring->rx_pending != new_rx_pending) {
 		netdev_info(dev, "illegal Rx ring size value %d, round to %d\n",
