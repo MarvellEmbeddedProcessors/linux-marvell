@@ -73,7 +73,7 @@ static void blktrans_dev_put(struct mtd_blktrans_dev *dev)
 }
 
 
-static blk_status_t do_blktrans_request(struct mtd_blktrans_ops *tr,
+static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 			       struct mtd_blktrans_dev *dev,
 			       struct request *req)
 {
@@ -84,38 +84,33 @@ static blk_status_t do_blktrans_request(struct mtd_blktrans_ops *tr,
 	nsect = blk_rq_cur_bytes(req) >> tr->blkshift;
 	buf = bio_data(req->bio);
 
-	if (req_op(req) == REQ_OP_FLUSH) {
-		if (tr->flush(dev))
-			return BLK_STS_IOERR;
-		return BLK_STS_OK;
-	}
+	if (req_op(req) == REQ_OP_FLUSH)
+		return tr->flush(dev);
 
 	if (blk_rq_pos(req) + blk_rq_cur_sectors(req) >
 	    get_capacity(req->rq_disk))
-		return BLK_STS_IOERR;
+		return -EIO;
 
 	switch (req_op(req)) {
 	case REQ_OP_DISCARD:
-		if (tr->discard(dev, block, nsect))
-			return BLK_STS_IOERR;
-		return BLK_STS_OK;
+		return tr->discard(dev, block, nsect);
 	case REQ_OP_READ:
 		for (; nsect > 0; nsect--, block++, buf += tr->blksize)
 			if (tr->readsect(dev, block, buf))
-				return BLK_STS_IOERR;
+				return -EIO;
 		rq_flush_dcache_pages(req);
-		return BLK_STS_OK;
+		return 0;
 	case REQ_OP_WRITE:
 		if (!tr->writesect)
-			return BLK_STS_IOERR;
+			return -EIO;
 
 		rq_flush_dcache_pages(req);
 		for (; nsect > 0; nsect--, block++, buf += tr->blksize)
 			if (tr->writesect(dev, block, buf))
-				return BLK_STS_IOERR;
-		return BLK_STS_OK;
+				return -EIO;
+		return 0;
 	default:
-		return BLK_STS_IOERR;
+		return -EIO;
 	}
 }
 
@@ -137,7 +132,7 @@ static void mtd_blktrans_work(struct work_struct *work)
 	spin_lock_irq(rq->queue_lock);
 
 	while (1) {
-		blk_status_t res;
+		int res;
 
 		dev->bg_stop = false;
 		if (!req && !(req = blk_fetch_request(rq))) {
@@ -183,7 +178,7 @@ static void mtd_blktrans_request(struct request_queue *rq)
 
 	if (!dev)
 		while ((req = blk_fetch_request(rq)) != NULL)
-			__blk_end_request_all(req, BLK_STS_IOERR);
+			__blk_end_request_all(req, -ENODEV);
 	else
 		queue_work(dev->wq, &dev->work);
 }

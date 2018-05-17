@@ -315,7 +315,7 @@ static void ubiblock_do_work(struct work_struct *work)
 	ret = ubiblock_read(pdu);
 	rq_flush_dcache_pages(req);
 
-	blk_mq_end_request(req, errno_to_blk_status(ret));
+	blk_mq_end_request(req, ret);
 }
 
 static blk_status_t ubiblock_queue_rq(struct blk_mq_hw_ctx *hctx,
