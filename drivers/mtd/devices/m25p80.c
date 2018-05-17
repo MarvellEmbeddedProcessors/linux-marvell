@@ -154,27 +154,6 @@ static ssize_t m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
 	/* convert the dummy cycles to the number of bytes */
 	dummy = (dummy * addr_nbits) / 8;
 
-	if (spi_flash_read_supported(spi)) {
-		struct spi_flash_read_message msg;
-
-		memset(&msg, 0, sizeof(msg));
-
-		msg.buf = buf;
-		msg.from = from;
-		msg.len = len;
-		msg.read_opcode = nor->read_opcode;
-		msg.addr_width = nor->addr_width;
-		msg.dummy_bytes = dummy;
-		msg.opcode_nbits = inst_nbits;
-		msg.addr_nbits = addr_nbits;
-		msg.data_nbits = data_nbits;
-
-		ret = spi_flash_read(spi, &msg);
-		if (ret < 0)
-			return ret;
-		return msg.retlen;
-	}
-
 	spi_message_init(&m);
 	memset(t, 0, (sizeof t));
 
