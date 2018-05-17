@@ -10065,6 +10065,19 @@ static void mvpp2_stop_dev(struct mvpp2_port *port)
 {
 	int i;
 
+	/* Under active traffic the BM/RX and TX PP2-HW could be non-empty.
+	 * Stop asap new packets ariving from both RX and TX directions,
+	 * but do NOT disable egress free/send-out and interrupts tx-done,
+	 * yeild the context for gracefull finishing (msleep, not mdelay).
+	 * This sequence especially important for scenarious with further
+	 * queue-cleanup -- ifconfig-down and ethtool-ring-size
+	 */
+	mvpp2_tx_stop_all_queues(port->dev);
+	mvpp2_ingress_disable(port);
+	msleep(40);
+
+	mvpp2_egress_disable(port);
+
 	/* Disable interrupts on all CPUs */
 	mvpp2_interrupts_disable(port);
 
