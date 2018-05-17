@@ -325,15 +325,16 @@ static blk_status_t ubiblock_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct ubiblock *dev = hctx->queue->queuedata;
 	struct ubiblock_pdu *pdu = blk_mq_rq_to_pdu(req);
 
-	switch (req_op(req)) {
-	case REQ_OP_READ:
-		ubi_sgl_init(&pdu->usgl);
-		queue_work(dev->wq, &pdu->work);
-		return BLK_STS_OK;
-	default:
-		return BLK_STS_IOERR;
-	}
+	if (req->cmd_type != REQ_TYPE_FS)
+		return BLK_MQ_RQ_QUEUE_ERROR;
 
+	if (rq_data_dir(req) != READ)
+		return BLK_MQ_RQ_QUEUE_ERROR; /* Write not implemented */
+
+	ubi_sgl_init(&pdu->usgl);
+	queue_work(dev->wq, &pdu->work);
+
+	return BLK_MQ_RQ_QUEUE_OK;
 }
 
 static int ubiblock_init_request(struct blk_mq_tag_set *set,

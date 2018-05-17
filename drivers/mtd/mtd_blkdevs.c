@@ -96,13 +96,14 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 
 	if (req->cmd_flags & REQ_DISCARD)
 		return tr->discard(dev, block, nsect);
-	case REQ_OP_READ:
+
+	if (rq_data_dir(req) == READ) {
 		for (; nsect > 0; nsect--, block++, buf += tr->blksize)
 			if (tr->readsect(dev, block, buf))
 				return -EIO;
 		rq_flush_dcache_pages(req);
 		return 0;
-	case REQ_OP_WRITE:
+	} else {
 		if (!tr->writesect)
 			return -EIO;
 
@@ -111,8 +112,6 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 			if (tr->writesect(dev, block, buf))
 				return -EIO;
 		return 0;
-	default:
-		return -EIO;
 	}
 }
 
