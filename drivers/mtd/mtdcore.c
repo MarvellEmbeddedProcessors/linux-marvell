@@ -46,7 +46,7 @@
 
 #include "mtdcore.h"
 
-struct backing_dev_info *mtd_bdi;
+static struct backing_dev_info *mtd_bdi;
 
 #ifdef CONFIG_PM_SLEEP
 
@@ -498,8 +498,10 @@ int add_mtd_device(struct mtd_info *mtd)
 	 * mtd_device_parse_register() multiple times on the same master MTD,
 	 * especially with CONFIG_MTD_PARTITIONED_MASTER=y.
 	 */
-	if (WARN_ONCE(mtd->dev.type, "MTD already registered\n"))
+	if (WARN_ONCE(mtd->backing_dev_info, "MTD already registered\n"))
 		return -EEXIST;
+
+	mtd->backing_dev_info = mtd_bdi;
 
 	BUG_ON(mtd->writesize == 0);
 
@@ -1845,18 +1847,13 @@ static struct backing_dev_info * __init mtd_bdi_init(char *name)
 	struct backing_dev_info *bdi;
 	int ret;
 
-	bdi = bdi_alloc(GFP_KERNEL);
+	bdi = kzalloc(sizeof(*bdi), GFP_KERNEL);
 	if (!bdi)
 		return ERR_PTR(-ENOMEM);
 
-	bdi->name = name;
-	/*
-	 * We put '-0' suffix to the name to get the same name format as we
-	 * used to get. Since this is called only once, we get a unique name. 
-	 */
-	ret = bdi_register(bdi, "%.28s-0", name);
+	ret = bdi_setup_and_register(bdi, name);
 	if (ret)
-		bdi_put(bdi);
+		kfree(bdi);
 
 	return ret ? ERR_PTR(ret) : bdi;
 }
@@ -1890,7 +1887,8 @@ static int __init init_mtd(void)
 out_procfs:
 	if (proc_mtd)
 		remove_proc_entry("mtd", NULL);
-	bdi_put(mtd_bdi);
+	bdi_destroy(mtd_bdi);
+	kfree(mtd_bdi);
 err_bdi:
 	class_unregister(&mtd_class);
 err_reg:
@@ -1905,7 +1903,8 @@ static void __exit cleanup_mtd(void)
 	if (proc_mtd)
 		remove_proc_entry("mtd", NULL);
 	class_unregister(&mtd_class);
-	bdi_put(mtd_bdi);
+	bdi_destroy(mtd_bdi);
+	kfree(mtd_bdi);
 	idr_destroy(&mtd_idr);
 }
 
