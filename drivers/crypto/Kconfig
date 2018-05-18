@@ -704,6 +704,7 @@ config CRYPTO_DEV_SAFEXCEL
 	select CRYPTO_SHA256
 	select CRYPTO_SHA512
 	select CRYPTO_MD5
+	select CRYPTO_DES
 	help
 	  This driver interfaces with the SafeXcel EIP-197 cryptographic engine
 	  designed by Inside Secure. Select this if you want to use CBC/ECB
