@@ -39,7 +39,6 @@
 #include <linux/gfp.h>
 #include <linux/slab.h>
 #include <linux/reboot.h>
-#include <linux/leds.h>
 #include <linux/debugfs.h>
 
 #include <linux/mtd/mtd.h>
@@ -963,7 +962,6 @@ int mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 	if (!instr->len)
 		return 0;
 
-	ledtrig_mtd_activity();
 	return mtd->_erase(mtd, instr);
 }
 EXPORT_SYMBOL_GPL(mtd_erase);
@@ -1034,7 +1032,6 @@ int mtd_read(struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen,
 	if (!len)
 		return 0;
 
-	ledtrig_mtd_activity();
 	/*
 	 * In the absence of an error, drivers return a non-negative integer
 	 * representing the maximum number of bitflips that were corrected on
@@ -1073,7 +1070,6 @@ int mtd_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen,
 		return -EROFS;
 	if (!len)
 		return 0;
-	ledtrig_mtd_activity();
 
 	if (!mtd->_write) {
 		struct mtd_oob_ops ops = {
@@ -1158,7 +1154,6 @@ int mtd_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 	if (ret_code)
 		return ret_code;
 
-	ledtrig_mtd_activity();
 	/*
 	 * In cases where ops->datbuf != NULL, mtd->_read_oob() has semantics
 	 * similar to mtd->_read(), returning a non-negative integer
@@ -1189,7 +1184,6 @@ int mtd_write_oob(struct mtd_info *mtd, loff_t to,
 	if (ret)
 		return ret;
 
-	ledtrig_mtd_activity();
 	return mtd->_write_oob(mtd, to, ops);
 }
 EXPORT_SYMBOL_GPL(mtd_write_oob);
