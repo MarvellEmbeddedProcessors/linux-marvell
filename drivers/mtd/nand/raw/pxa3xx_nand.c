@@ -223,7 +223,7 @@ struct pxa3xx_nand_info {
 	dma_addr_t 		data_buff_phys;
 	int 			data_dma_ch;
 
-	struct pxa3xx_nand_host *host[NUM_CHIP_SELECT];
+	struct pxa3xx_nand_host *host;
 	unsigned int		state;
 
 	/*
@@ -941,7 +941,7 @@ static void set_command_address(struct pxa3xx_nand_info *info,
 
 static void prepare_start_command(struct pxa3xx_nand_info *info, int command)
 {
-	struct pxa3xx_nand_host *host = info->host[info->cs];
+	struct pxa3xx_nand_host *host = info->host;
 	struct mtd_info *mtd = nand_to_mtd(&host->chip);
 
 	/* reset data and oob column point to handle data */
@@ -995,7 +995,7 @@ static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
 	struct pxa3xx_nand_host *host;
 	struct mtd_info *mtd;
 
-	host = info->host[info->cs];
+	host = info->host;
 	mtd = nand_to_mtd(&host->chip);
 	addr_cycle = 0;
 	exec_cmd = 1;
@@ -1467,7 +1467,7 @@ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
 
 static int pxa3xx_nand_config_ident(struct pxa3xx_nand_info *info)
 {
-	struct pxa3xx_nand_host *host = info->host[info->cs];
+	struct pxa3xx_nand_host *host = info->host;
 	const struct nand_sdr_timings *timings;
 
 	/* Configure default flash values */
@@ -1488,7 +1488,7 @@ static int pxa3xx_nand_config_ident(struct pxa3xx_nand_info *info)
 
 static void pxa3xx_nand_config_tail(struct pxa3xx_nand_info *info)
 {
-	struct pxa3xx_nand_host *host = info->host[info->cs];
+	struct pxa3xx_nand_host *host = info->host;
 	struct nand_chip *chip = &host->chip;
 	struct mtd_info *mtd = nand_to_mtd(chip);
 
@@ -1782,49 +1782,42 @@ static int alloc_nand_resource(struct platform_device *pdev)
 	struct nand_chip *chip = NULL;
 	struct mtd_info *mtd;
 	struct resource *r;
-	int ret, irq, cs;
+	int ret, irq;
 
 	pdata = dev_get_platdata(&pdev->dev);
-	if (pdata->num_cs <= 0) {
-		dev_err(&pdev->dev, "invalid number of chip selects\n");
-		return -ENODEV;
-	}
 
-	info = devm_kzalloc(&pdev->dev,
-			    sizeof(*info) + sizeof(*host) * pdata->num_cs,
+	info = devm_kzalloc(&pdev->dev, sizeof(*info) + sizeof(*host),
 			    GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
 	info->pdev = pdev;
 	info->variant = pxa3xx_nand_get_variant(pdev);
-	for (cs = 0; cs < pdata->num_cs; cs++) {
-		host = (void *)&info[1] + sizeof(*host) * cs;
-		chip = &host->chip;
-		nand_set_controller_data(chip, host);
-		mtd = nand_to_mtd(chip);
-		info->host[cs] = host;
-		host->cs = cs;
-		host->info_data = info;
-		mtd->dev.parent = &pdev->dev;
-		/* FIXME: all chips use the same device tree partitions */
-		nand_set_flash_node(chip, np);
+	host = (void *)&info[1];
+	chip = &host->chip;
+	nand_set_controller_data(chip, host);
+	mtd = nand_to_mtd(chip);
+	info->host = host;
+	host->cs = 0;
+	host->info_data = info;
+	mtd->dev.parent = &pdev->dev;
+	/* FIXME: all chips use the same device tree partitions */
+	nand_set_flash_node(chip, np);
 
-		nand_set_controller_data(chip, host);
-		chip->ecc.read_page	= pxa3xx_nand_read_page_hwecc;
-		chip->ecc.write_page	= pxa3xx_nand_write_page_hwecc;
-		chip->controller        = &info->controller;
-		chip->waitfunc		= pxa3xx_nand_waitfunc;
-		chip->select_chip	= pxa3xx_nand_select_chip;
-		chip->read_word		= pxa3xx_nand_read_word;
-		chip->read_byte		= pxa3xx_nand_read_byte;
-		chip->read_buf		= pxa3xx_nand_read_buf;
-		chip->write_buf		= pxa3xx_nand_write_buf;
-		chip->options		|= NAND_NO_SUBPAGE_WRITE;
-		chip->cmdfunc		= nand_cmdfunc;
-		chip->set_features	= nand_get_set_features_notsupp;
-		chip->get_features	= nand_get_set_features_notsupp;
-	}
+	nand_set_controller_data(chip, host);
+	chip->ecc.read_page	= pxa3xx_nand_read_page_hwecc;
+	chip->ecc.write_page	= pxa3xx_nand_write_page_hwecc;
+	chip->controller        = &info->controller;
+	chip->waitfunc		= pxa3xx_nand_waitfunc;
+	chip->select_chip	= pxa3xx_nand_select_chip;
+	chip->read_word		= pxa3xx_nand_read_word;
+	chip->read_byte		= pxa3xx_nand_read_byte;
+	chip->read_buf		= pxa3xx_nand_read_buf;
+	chip->write_buf		= pxa3xx_nand_write_buf;
+	chip->options		|= NAND_NO_SUBPAGE_WRITE;
+	chip->cmdfunc		= nand_cmdfunc;
+	chip->set_features	= nand_get_set_features_notsupp;
+	chip->get_features	= nand_get_set_features_notsupp;
 
 	nand_hw_control_init(chip->controller);
 	info->clk = devm_clk_get(&pdev->dev, NULL);
@@ -1899,7 +1892,7 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
 {
 	struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
 	struct pxa3xx_nand_platform_data *pdata;
-	int irq, cs;
+	int irq;
 
 	if (!info)
 		return 0;
@@ -1923,8 +1916,8 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
 		    NFCV1_NDCR_ARB_CNTL);
 	clk_disable_unprepare(info->clk);
 
-	for (cs = 0; cs < pdata->num_cs; cs++)
-		nand_release(nand_to_mtd(&info->host[cs]->chip));
+	nand_release(nand_to_mtd(&info->host->chip));
+
 	return 0;
 }
 
@@ -1962,7 +1955,6 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
 
 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
 		pdata->keep_config = 1;
-	of_property_read_u32(np, "num-cs", &pdata->num_cs);
 
 	pdev->dev.platform_data = pdata;
 
@@ -1973,7 +1965,8 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
 {
 	struct pxa3xx_nand_platform_data *pdata;
 	struct pxa3xx_nand_info *info;
-	int ret, cs, probe_success, dma_available;
+	struct mtd_info *mtd;
+	int ret, probe_success, dma_available;
 
 	dma_available = IS_ENABLED(CONFIG_ARM) &&
 		(IS_ENABLED(CONFIG_ARCH_PXA) || IS_ENABLED(CONFIG_ARCH_MMP));
@@ -1999,35 +1992,30 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
 
 	info = platform_get_drvdata(pdev);
 	probe_success = 0;
-	for (cs = 0; cs < pdata->num_cs; cs++) {
-		struct mtd_info *mtd = nand_to_mtd(&info->host[cs]->chip);
+	mtd = nand_to_mtd(&info->host->chip);
 
-		/*
-		 * The mtd name matches the one used in 'mtdparts' kernel
-		 * parameter. This name cannot be changed or otherwise
-		 * user's mtd partitions configuration would get broken.
-		 */
-		mtd->name = "pxa3xx_nand-0";
-		info->cs = cs;
-		ret = pxa3xx_nand_scan(mtd);
-		if (ret) {
-			dev_warn(&pdev->dev, "failed to scan nand at cs %d\n",
-				cs);
-			continue;
-		}
-
-		ret = mtd_device_register(mtd, pdata->parts[cs],
-					  pdata->nr_parts[cs]);
-		if (!ret)
-			probe_success = 1;
+	/*
+	 * The mtd name matches the one used in 'mtdparts' kernel
+	 * parameter. This name cannot be changed or otherwise
+	 * user's mtd partitions configuration would get broken.
+	 */
+	mtd->name = "pxa3xx_nand-0";
+	info->cs = 0;
+	ret = pxa3xx_nand_scan(mtd);
+	if (ret) {
+		dev_warn(&pdev->dev, "failed to scan nand at cs 0\n");
+		goto remove_nand;
 	}
 
-	if (!probe_success) {
-		pxa3xx_nand_remove(pdev);
-		return -ENODEV;
-	}
+	ret = mtd_device_register(mtd, pdata->parts, pdata->nr_parts);
+	if (ret)
+		goto remove_nand;
 
 	return 0;
+
+remove_nand:
+	pxa3xx_nand_remove(pdev);
+	return -ENODEV;
 }
 
 #ifdef CONFIG_PM
