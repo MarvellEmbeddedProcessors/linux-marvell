@@ -26,10 +26,13 @@
 #include <linux/of_gpio.h>
 
 /* PCIe core registers */
+#define PCIE_CORE_DEV_ID_REG					0x0
 #define PCIE_CORE_CMD_STATUS_REG				0x4
 #define     PCIE_CORE_CMD_IO_ACCESS_EN				BIT(0)
 #define     PCIE_CORE_CMD_MEM_ACCESS_EN				BIT(1)
 #define     PCIE_CORE_CMD_MEM_IO_REQ_EN				BIT(2)
+#define PCIE_CORE_DEV_REV_REG					0x8
+#define PCIE_CORE_PCIEXP_CAP					0xc0
 #define PCIE_CORE_DEV_CTRL_STATS_REG				0xc8
 #define     PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE	(0 << 4)
 #define     PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT	5
@@ -47,6 +50,29 @@
 #define     PCIE_CORE_ERR_CAPCTL_ECRC_CHK_TX_EN			BIT(6)
 #define     PCIE_CORE_ERR_CAPCTL_ECRC_CHCK			BIT(7)
 #define     PCIE_CORE_ERR_CAPCTL_ECRC_CHCK_RCV			BIT(8)
+#define     PCIE_CORE_INT_A_ASSERT_ENABLE			1
+#define     PCIE_CORE_INT_B_ASSERT_ENABLE			2
+#define     PCIE_CORE_INT_C_ASSERT_ENABLE			3
+#define     PCIE_CORE_INT_D_ASSERT_ENABLE			4
+
+enum {
+	PCISWCAP = PCI_BRIDGE_CONTROL + 2,
+	PCISWCAP_EXP_LIST_ID	= PCISWCAP + PCI_CAP_LIST_ID,
+	PCISWCAP_EXP_DEVCAP	= PCISWCAP + PCI_EXP_DEVCAP,
+	PCISWCAP_EXP_DEVCTL	= PCISWCAP + PCI_EXP_DEVCTL,
+	PCISWCAP_EXP_LNKCAP	= PCISWCAP + PCI_EXP_LNKCAP,
+	PCISWCAP_EXP_LNKCTL	= PCISWCAP + PCI_EXP_LNKCTL,
+	PCISWCAP_EXP_SLTCAP	= PCISWCAP + PCI_EXP_SLTCAP,
+	PCISWCAP_EXP_SLTCTL	= PCISWCAP + PCI_EXP_SLTCTL,
+	PCISWCAP_EXP_RTCTL	= PCISWCAP + PCI_EXP_RTCTL,
+	PCISWCAP_EXP_RTSTA	= PCISWCAP + PCI_EXP_RTSTA,
+	PCISWCAP_EXP_DEVCAP2	= PCISWCAP + PCI_EXP_DEVCAP2,
+	PCISWCAP_EXP_DEVCTL2	= PCISWCAP + PCI_EXP_DEVCTL2,
+	PCISWCAP_EXP_LNKCAP2	= PCISWCAP + PCI_EXP_LNKCAP2,
+	PCISWCAP_EXP_LNKCTL2	= PCISWCAP + PCI_EXP_LNKCTL2,
+	PCISWCAP_EXP_SLTCAP2	= PCISWCAP + PCI_EXP_SLTCAP2,
+	PCISWCAP_EXP_SLTCTL2	= PCISWCAP + PCI_EXP_SLTCTL2,
+};
 
 /* PIO registers base address and register offsets */
 #define PIO_BASE_ADDR				0x4000
@@ -104,7 +130,9 @@
 #define     PCIE_PHY_CTRL_OFF			16
 #define     PCIE_PHY_BUF_CTRL_OFF		0
 #define     PCIE_PHY_BUF_CTRL_INIT_VAL		0x1342
+#define PCIE_MSG_LOG				(CONTROL_BASE_ADDR + 0x30)
 #define PCIE_ISR0_REG				(CONTROL_BASE_ADDR + 0x40)
+#define PCIE_MSG_PM_PME_MASK			BIT(7)
 #define PCIE_ISR0_MASK_REG			(CONTROL_BASE_ADDR + 0x44)
 #define     PCIE_ISR0_MSI_INT_PENDING		BIT(24)
 #define     PCIE_ISR0_INTX_ASSERT(val)		BIT(16 + (val))
@@ -191,6 +219,43 @@
 #define CFG_RD_UR_VAL			0xFFFFFFFF
 #define CFG_RD_CRS_VAL			0xFFFF0001
 
+/* PCI configuration space of a PCI-to-PCI bridge. */
+struct advk_sw_pci_bridge {
+	u16 vendor;
+	u16 device;
+	u16 command;
+	u16 status;
+	u8 revision;
+	u8 interface;
+	u16 class;
+	u8 cache_line_size;
+	u8 latency_timer;
+	u8 header_type;
+	u8 bist;
+	u32 bar[2];
+	u8 primary_bus;
+	u8 secondary_bus;
+	u8 subordinate_bus;
+	u8 secondary_latency_timer;
+	u8 iobase;
+	u8 iolimit;
+	u16 secondary_status;
+	u16 membase;
+	u16 memlimit;
+	u16 pref_mem_base;
+	u16 pref_mem_limit;
+	u32 pref_base_upper32;
+	u32 pref_limit_upper32;
+	u16 io_base_upper16;
+	u16 io_limit_upper16;
+	u8 capablities_pointer;
+	u8 reserve[3];
+	u32 romaddr;
+	u8 intline;
+	u8 intpin;
+	u16 bridgectrl;
+};
+
 struct advk_pcie {
 	struct platform_device *pdev;
 	struct pci_bus *bus;
@@ -212,6 +277,7 @@ struct advk_pcie {
 	struct gpio_desc *reset_gpio;
 	enum of_gpio_flags flags;
 	struct clk *clk;
+	struct advk_sw_pci_bridge bridge;
 };
 
 static inline void advk_writel(struct advk_pcie *pcie, u32 val, u64 reg)
@@ -222,6 +288,41 @@ static inline void advk_writel(struct advk_pcie *pcie, u32 val, u64 reg)
 static inline u32 advk_readl(struct advk_pcie *pcie, u64 reg)
 {
 	return readl(pcie->base + reg);
+}
+
+/*
+ * Initialize the configuration space of the PCI-to-PCI bridge
+ * associated with the given PCIe interface.
+ */
+static void advk_sw_pci_bridge_init(struct advk_pcie *pcie)
+{
+	struct advk_sw_pci_bridge *bridge = &pcie->bridge;
+
+	memset(bridge, 0, sizeof(struct advk_sw_pci_bridge));
+
+	bridge->class = PCI_CLASS_BRIDGE_PCI;
+	bridge->vendor = PCI_VENDOR_ID_MARVELL_EXT;
+	bridge->device = advk_readl(pcie, PCIE_CORE_DEV_ID_REG) >> 16;
+	bridge->vendor = advk_readl(pcie, PCIE_CORE_DEV_ID_REG) & 0xffff;
+	bridge->revision = advk_readl(pcie, PCIE_CORE_DEV_REV_REG) & 0xff;
+	bridge->header_type = PCI_HEADER_TYPE_BRIDGE;
+	bridge->cache_line_size = 0x10;
+
+	/* Support 32 bits I/O addressing */
+	bridge->iobase = PCI_IO_RANGE_TYPE_32;
+	bridge->iolimit = PCI_IO_RANGE_TYPE_32;
+
+	/* Support 64 bits memory pref */
+	bridge->pref_mem_base = PCI_PREF_RANGE_TYPE_64;
+	bridge->pref_mem_limit = PCI_PREF_RANGE_TYPE_64;
+
+	/* Support interrupt A for MSI feature and SERR */
+	bridge->intpin = PCIE_CORE_INT_A_ASSERT_ENABLE;
+	bridge->bridgectrl = PCI_BRIDGE_CTL_SERR;
+
+	/* Add capabilities */
+	bridge->status = PCI_STATUS_CAP_LIST;
+	bridge->capablities_pointer = PCISWCAP;
 }
 
 static int advk_pcie_link_up(struct advk_pcie *pcie)
@@ -473,6 +574,63 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
 	return -ETIMEDOUT;
 }
 
+static int advk_sw_pci_bridge_read(struct advk_pcie *pcie,
+				   int where, int size, u32 *value)
+{
+	struct advk_sw_pci_bridge *bridge = &pcie->bridge;
+
+	u32 reg = where & (~0x3);
+
+	switch (reg) {
+	case PCI_VENDOR_ID ... PCI_INTERRUPT_LINE:
+		*value = *((u32 *)bridge + reg / 4);
+		break;
+
+	case PCISWCAP_EXP_SLTCTL:
+		*value = PCI_EXP_SLTSTA_PDS << 16;
+		break;
+
+	/* only support PME interrput now */
+	case PCISWCAP_EXP_RTCTL:
+		*value = (advk_readl(pcie, PCIE_ISR0_MASK_REG) & PCIE_MSG_PM_PME_MASK) ?
+			0 : PCI_EXP_RTCTL_PMEIE;
+		break;
+
+	case PCISWCAP_EXP_RTSTA:
+		*value = !!(advk_readl(pcie, PCIE_ISR0_REG) & PCIE_MSG_PM_PME_MASK) << 16 |
+			(advk_readl(pcie, PCIE_MSG_LOG) >> 16);
+		break;
+
+	case PCISWCAP_EXP_LIST_ID:
+	case PCISWCAP_EXP_DEVCAP:
+	case PCISWCAP_EXP_DEVCTL:
+	case PCISWCAP_EXP_LNKCAP:
+	case PCISWCAP_EXP_LNKCTL:
+		*value = advk_readl(pcie, PCIE_CORE_PCIEXP_CAP + reg - PCISWCAP_EXP_LIST_ID);
+		break;
+
+	/* PCIe requires the v2 fields to be hard-wired to zero */
+	case PCISWCAP_EXP_SLTCAP:
+	case PCISWCAP_EXP_DEVCAP2:
+	case PCISWCAP_EXP_DEVCTL2:
+	case PCISWCAP_EXP_LNKCAP2:
+	case PCISWCAP_EXP_LNKCTL2:
+	case PCISWCAP_EXP_SLTCAP2:
+	case PCISWCAP_EXP_SLTCTL2:
+	default:
+		*value = 0;
+		break;
+	}
+
+	if (size == 1)
+		*value = (*value >> (8 * (where & 3))) & 0xff;
+	else if (size == 2)
+		*value = (*value >> (8 * (where & 3))) & 0xffff;
+	else if (size != 4)
+		return PCIBIOS_BAD_REGISTER_NUMBER;
+
+	return PCIBIOS_SUCCESSFUL;
+}
 static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
 			     int where, int size, u32 *val)
 {
@@ -485,6 +643,9 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 
+	if (bus->number == pcie->root_bus_nr)
+		return advk_sw_pci_bridge_read(pcie, where, size, val);
+
 	/* Start PIO */
 	advk_writel(pcie, 0, PIO_START);
 	advk_writel(pcie, 1, PIO_ISR);
@@ -492,7 +653,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
 	/* Program the control register */
 	reg = advk_readl(pcie, PIO_CTRL);
 	reg &= ~PIO_CTRL_TYPE_MASK;
-	if (bus->number ==  pcie->root_bus_nr)
+	if (bus->primary ==  pcie->root_bus_nr)
 		reg |= PCIE_CONFIG_RD_TYPE0;
 	else
 		reg |= PCIE_CONFIG_RD_TYPE1;
@@ -526,6 +687,77 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
 	return PCIBIOS_SUCCESSFUL;
 }
 
+static void  __advk_sw_pci_bridge_write(struct advk_pcie *pcie,
+					int reg, u32 value)
+{
+	struct advk_sw_pci_bridge *bridge = &pcie->bridge;
+
+	switch (reg) {
+	case PCI_COMMAND:
+	case PCI_PRIMARY_BUS ... PCI_IO_BASE_UPPER16:
+		*((u32 *)bridge + reg / 4) = value;
+		break;
+
+	case PCISWCAP_EXP_DEVCTL:
+	case PCISWCAP_EXP_LNKCTL:
+		advk_writel(pcie, value, PCIE_CORE_PCIEXP_CAP + reg -
+			    PCISWCAP_EXP_LIST_ID);
+		break;
+
+	/* only support PME interrput now */
+	case PCISWCAP_EXP_RTCTL:
+		{
+			u32 reg_val;
+
+			reg_val = advk_readl(pcie, PCIE_ISR0_MASK_REG);
+			if (value & PCI_EXP_RTCTL_PMEIE)
+				reg_val &= ~PCIE_MSG_PM_PME_MASK;
+			else
+				reg_val |= PCIE_MSG_PM_PME_MASK;
+
+			advk_writel(pcie, reg_val, PCIE_ISR0_MASK_REG);
+			break;
+		}
+
+	case PCISWCAP_EXP_RTSTA:
+		{
+			if (value & PCI_EXP_RTSTA_PME)
+				advk_writel(pcie, PCIE_MSG_PM_PME_MASK, PCIE_ISR0_REG);
+		}
+		break;
+
+	default:
+		break;
+
+	}
+}
+
+/* Write to the PCI-to-PCI bridge configuration space */
+static int advk_sw_pci_bridge_write(struct advk_pcie *pcie,
+				    unsigned int where, int size, u32 value)
+{
+	u32 reg = where & (~0x3);
+	u32 mask, temp;
+	int err;
+
+	if (size == 4)
+		mask = 0xffffffff;
+	else if (size == 2)
+		mask = 0xffff << ((where & 0x3) * 8);
+	else if (size == 1)
+		mask = 0xff << ((where & 0x3) * 8);
+	else
+		return PCIBIOS_BAD_REGISTER_NUMBER;
+
+	err = advk_sw_pci_bridge_read(pcie, reg, 4, &temp);
+
+	temp &= ~mask;
+	temp |= (value << ((where & 0x3) * 8)) & mask;
+	__advk_sw_pci_bridge_write(pcie, reg, temp);
+
+	return PCIBIOS_SUCCESSFUL;
+}
+
 static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
 				int where, int size, u32 val)
 {
@@ -538,6 +770,9 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
 	if ((bus->number == pcie->root_bus_nr) && (PCI_SLOT(devfn) != 0))
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
+	if (bus->number == pcie->root_bus_nr)
+		return advk_sw_pci_bridge_write(pcie, where, size, val);
+
 	if (where % size)
 		return PCIBIOS_SET_FAILED;
 
@@ -548,7 +783,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
 	/* Program the control register */
 	reg = advk_readl(pcie, PIO_CTRL);
 	reg &= ~PIO_CTRL_TYPE_MASK;
-	if (bus->number == pcie->root_bus_nr)
+	if (bus->primary == pcie->root_bus_nr)
 		reg |= PCIE_CONFIG_WR_TYPE0;
 	else
 		reg |= PCIE_CONFIG_WR_TYPE1;
@@ -1075,6 +1310,8 @@ after_pcie_reset:
 	}
 
 	advk_pcie_setup_hw(pcie);
+
+	advk_sw_pci_bridge_init(pcie);
 
 	ret = advk_pcie_init_irq_domain(pcie);
 	if (ret) {
