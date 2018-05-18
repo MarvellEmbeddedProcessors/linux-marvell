@@ -1468,14 +1468,12 @@ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
 static int pxa3xx_nand_config_ident(struct pxa3xx_nand_info *info)
 {
 	struct pxa3xx_nand_host *host = info->host[info->cs];
-	struct platform_device *pdev = info->pdev;
-	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	const struct nand_sdr_timings *timings;
 
 	/* Configure default flash values */
 	info->chunk_size = PAGE_CHUNK_SIZE;
 	info->reg_ndcr = 0x0; /* enable all interrupts */
-	info->reg_ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
+	info->reg_ndcr |= NDCR_ND_ARB_EN;
 	info->reg_ndcr |= NDCR_RD_ID_CNT(READ_ID_BYTES);
 	info->reg_ndcr |= NDCR_SPARE_EN;
 
@@ -1501,15 +1499,13 @@ static void pxa3xx_nand_config_tail(struct pxa3xx_nand_info *info)
 
 static void pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
 {
-	struct platform_device *pdev = info->pdev;
-	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	uint32_t ndcr = nand_readl(info, NDCR);
 
 	/* Set an initial chunk size */
 	info->chunk_size = ndcr & NDCR_PAGE_SZ ? 2048 : 512;
 	info->reg_ndcr = ndcr &
 		~(NDCR_INT_MASK | NDCR_ND_ARB_EN | NFCV1_NDCR_ARB_CNTL);
-	info->reg_ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
+	info->reg_ndcr |= NDCR_ND_ARB_EN;
 	info->ndtr0cs0 = nand_readl(info, NDTR0CS0);
 	info->ndtr1cs0 = nand_readl(info, NDTR1CS0);
 }
@@ -1964,8 +1960,6 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
 	if (!pdata)
 		return -ENOMEM;
 
-	if (of_get_property(np, "marvell,nand-enable-arbiter", NULL))
-		pdata->enable_arbiter = 1;
 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
 		pdata->keep_config = 1;
 	of_property_read_u32(np, "num-cs", &pdata->num_cs);
