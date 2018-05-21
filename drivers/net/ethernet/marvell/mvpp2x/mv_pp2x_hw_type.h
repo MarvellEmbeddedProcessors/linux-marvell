@@ -173,6 +173,11 @@
 #define MVPP2_DSA_NON_EXTENDED			(0x1 << MVPP2_DSA_EN_OFFS)
 #define MVPP2_DSA_EXTENDED			(0x2 << MVPP2_DSA_EN_OFFS)
 
+#define MVPP2_VER_ID_REG			0x50b0
+
+#define MVPP2_VER_PP22				0x10
+#define MVPP2_VER_PP23				0x11
+
 /* Parser Registers */
 #define MVPP2_PRS_INIT_LOOKUP_REG		0x1000
 #define MVPP2_PRS_PORT_LU_MAX			0xf

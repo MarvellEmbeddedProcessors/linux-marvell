@@ -209,7 +209,8 @@ extern  u32 debug_param;
 
 enum mvppv2_version {
 	PPV21 = 21,
-	PPV22
+	PPV22,
+	PPV23
 };
 
 enum mv_pp2x_queue_vector_type {

@@ -6397,7 +6397,7 @@ int mv_pp22_rss_rxq_set(struct mv_pp2x_port *port, u32 cos_width)
 	struct mv_pp22_rss_entry rss_entry;
 	int cos_mask = ((1 << cos_width) - 1);
 
-	if (port->priv->pp2_version != PPV22)
+	if (port->priv->pp2_version == PPV21)
 		return 0;
 
 	memset(&rss_entry, 0, sizeof(struct mv_pp22_rss_entry));

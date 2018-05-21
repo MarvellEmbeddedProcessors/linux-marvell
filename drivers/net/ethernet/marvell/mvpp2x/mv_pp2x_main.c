@@ -570,10 +570,10 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	if (!priv->bm_pools)
 		return -ENOMEM;
 
-	/* On PPV22 high virtual and physical address buffer manager register should be
+	/* On PPV22&23 high virtual and physical address buffer manager register should be
 	 * initialized to 0 to avoid writing to the random addresses an 32 Bit systems.
 	 */
-	if (priv->pp2_version == PPV22) {
+	if (priv->pp2_version != PPV21) {
 		for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
 			/* Reset the BM virtual and physical address high register */
 			mv_pp2x_relaxed_write(&priv->hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
@@ -1605,12 +1605,12 @@ void mv_pp2x_cleanup_txqs(struct mv_pp2x_port *port)
 		mv_pp2x_txq_deinit(port, txq);
 	}
 
-	/* Mvpp21 and Mvpp22 has different per cpu register access.
+	/* Mvpp21 and Mvpp22&23 has different per cpu register access.
 	* Mvpp21 - to access CPUx should run on CPUx
-	* Mvpp22 - CPUy can access CPUx from CPUx address space
+	* Mvpp22&23 - CPUy can access CPUx from CPUx address space
 	* If added to support CPU hot plug feature supported only by Mvpp22
 	*/
-	if (port->priv->pp2_version == PPV22)
+	if (port->priv->pp2_version != PPV21)
 		for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++)
 			for (queue = 0; queue < port->num_tx_queues; queue++)
 				mv_pp2x_txq_sent_desc_proc(port, cpu, port->txqs[queue]->id);
@@ -1664,13 +1664,13 @@ int mv_pp2x_setup_txqs(struct mv_pp2x_port *port)
 		mv_pp2x_tx_done_pkts_coal_set_all(port);
 	}
 
-	/* Mvpp21 and Mvpp22 has different per cpu register access.
+	/* Mvpp21 and Mvpp22&23 has different per cpu register access.
 	* Mvpp21 - to access CPUx should run on CPUx
-	* Mvpp22 - CPUy can access CPUx from CPUx address space
+	* Mvpp22&23 - CPUy can access CPUx from CPUx address space
 	* If added to support CPU hot plug feature supported only by Mvpp22
 	*/
 
-	if (port->priv->pp2_version == PPV22)
+	if (port->priv->pp2_version != PPV21)
 		for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++)
 			for (queue = 0; queue < port->num_tx_queues; queue++)
 				mv_pp2x_txq_sent_desc_proc(port, cpu, port->txqs[queue]->id);
@@ -1695,7 +1695,7 @@ void mv_pp2x_cleanup_irqs(struct mv_pp2x_port *port)
 	}
 
 	/* Link irq */
-	if (port->priv->pp2_version == PPV22)
+	if (port->priv->pp2_version != PPV21)
 		free_irq(port->mac_data.link_irq, port);
 }
 
@@ -1822,7 +1822,7 @@ static irqreturn_t mv_pp2_link_change_isr(int irq, void *data)
 
 	pr_debug("%s cpu_id(%d) irq(%d) pp_port(%d)\n", __func__,
 		 smp_processor_id(), irq, port->id);
-	if (port->priv->pp2_version == PPV22) {
+	if (port->priv->pp2_version != PPV21) {
 		/* mask all events from this mac */
 		mv_gop110_port_events_mask(&port->priv->hw.gop, &port->mac_data);
 		/* read cause register to clear event */
@@ -4060,7 +4060,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	mv_pp2x_egress_enable(port);
 	mv_pp2x_ingress_enable(port);
 	/* Unmask link_event */
-	if (port->priv->pp2_version == PPV22 && !(port->flags & MVPP2_F_LOOPBACK)) {
+	if (port->priv->pp2_version != PPV21 && !(port->flags & MVPP2_F_LOOPBACK)) {
 		mv_gop110_port_events_unmask(gop, mac);
 		port->mac_data.flags |= MV_EMAC_F_PORT_UP;
 	}
@@ -4498,8 +4498,8 @@ int mv_pp2x_open(struct net_device *dev)
 		}
 	}
 
-	/* Only Mvpp22 support hot plug feature */
-	if (port->priv->pp2_version == PPV22  && !(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK))) {
+	/* Only Mvpp22&23 support hot plug feature */
+	if (port->priv->pp2_version != PPV21  && !(port->flags & (MVPP2_F_IF_MUSDK | MVPP2_F_LOOPBACK))) {
 		register_hotcpu_notifier(&port->port_hotplug_nb);
 		port->port_hotplugged = true;
 	}
@@ -4517,7 +4517,7 @@ int mv_pp2x_open(struct net_device *dev)
 
 		/* Port is init in uboot */
 	}
-	if ((port->priv->pp2_version == PPV22) && !(port->flags & MVPP2_F_LOOPBACK))
+	if ((port->priv->pp2_version != PPV21) && !(port->flags & MVPP2_F_LOOPBACK))
 		mvcpn110_mac_hw_init(port);
 	mv_pp2x_start_dev(port);
 
@@ -6088,7 +6088,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	}
 
 	/* Register uio_device */
-	if (priv->pp2_version == PPV22) {
+	if (priv->pp2_version != PPV21) {
 		port->uio.u_info.name = kasprintf(GFP_KERNEL, UIO_PORT_STRING, priv->pp2_cfg.cell_index, port->id);
 		port->uio.u_info.version = "0.1";
 		port->uio.u_info.priv = port;
@@ -6112,7 +6112,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 
 	mv_pp2x_port_irq_names_update(port);
 
-	if (priv->pp2_version == PPV22)
+	if (priv->pp2_version != PPV21)
 		port->port_hotplug_nb.notifier_call = mv_pp2x_port_cpu_callback;
 
 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
@@ -6151,7 +6151,7 @@ static void mv_pp2x_port_remove(struct mv_pp2x_port *port)
 	netmap_detach(port->dev);
 #endif /* DEV_NETMAP */
 
-	if (port->priv->pp2_version == PPV22) {
+	if (port->priv->pp2_version != PPV21) {
 		uio_unregister_device(&port->uio.u_info);
 		kfree(port->uio.u_info.name);
 	}
@@ -6241,7 +6241,7 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	if (dram_target_info)
 		mv_pp2x_conf_mbus_windows(dram_target_info, hw);
 
-	if (priv->pp2_version == PPV22) {
+	if (priv->pp2_version != PPV21) {
 		mv_pp2x_write(hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG, 0x0);
 		/*AXI Bridge Configuration */
 		/* BM */
@@ -6355,7 +6355,7 @@ static int mv_pp2x_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	if (err < 0)
 		return err;
 
-	if (pp2_ver == PPV22) {
+	if (pp2_ver != PPV21) {
 		for (i = 0; i < 128; i++) {
 			val = mv_pp2x_read(hw, MVPP2_RXQ_CONFIG_REG(i));
 			val |= MVPP2_RXQ_DISABLE_MASK;
@@ -6891,7 +6891,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	mv_pp2x_used_addr_spaces = (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ? 1 : MVPP2_MAX_ADDR_SPACES;
 
 	/* DMA Configruation */
-	if (priv->pp2_version == PPV22) {
+	if (priv->pp2_version != PPV21) {
 		pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
 		err = dma_set_mask(&pdev->dev, DMA_BIT_MASK(40));
 		if (err == 0)
@@ -6908,6 +6908,14 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		if (priv->pp2xdata->multi_addr_space)
 			hw->cpu_base[i] +=
 				i * MVPP2_ADDR_SPACE_SIZE;
+	}
+
+	/* Differ between PPv22 and PPv23 */
+	if (priv->pp2_version != PPV21) {
+		if (mv_pp2x_read(hw, MVPP2_VER_ID_REG) == MVPP2_VER_PP23) {
+			priv->pp2_version = PPV23;
+			priv->pp2xdata->pp2x_ver = PPV23;
+		}
 	}
 
 	/* Init PP2 Configuration */
@@ -6955,8 +6963,8 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 				     sizeof(struct mv_pp2x_skb_struct) * MVPP2_SKB_NUM, GFP_ATOMIC);
 	}
 
-	/* Init PP22 rxfhindir table evenly in probe */
-	if (priv->pp2_version == PPV22) {
+	/* Init PP22&23 rxfhindir table evenly in probe */
+	if (priv->pp2_version != PPV21) {
 		mv_pp22_init_rxfhindir(priv);
 		if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
 			priv->num_rss_tables = mv_pp2x_num_cos_queues;
@@ -6964,7 +6972,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 			priv->num_rss_tables = 0;
 	}
 
-	if (priv->pp2_version == PPV22) {
+	if (priv->pp2_version != PPV21) {
 		priv->uio.u_info.name = kasprintf(GFP_KERNEL, UIO_PP2_STRING, cell_index);
 		pr_debug("mv_pp2x_probe : %s\n", priv->uio.u_info.name);
 		priv->uio.u_info.version = "0.1";
@@ -6998,7 +7006,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 			     mv_pp2x_tx_send_proc_cb, (unsigned long)priv);
 	}
 
-	if (priv->pp2_version == PPV22) {
+	if (priv->pp2_version != PPV21) {
 		/* Init tx&rx fifo for each port */
 		mv_pp22_tx_fifo_init(priv);
 		mv_pp22_rx_fifo_init(priv);
@@ -7016,8 +7024,8 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		goto err_uio;
 	}
 
-	/* Only Mvpp22 support hot plug feature */
-	if (priv->pp2_version == PPV22 && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
+	/* Only Mvpp22&23 support hot plug feature */
+	if (priv->pp2_version != PPV21 && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE) {
 		priv->cp_hotplug_nb.notifier_call = mv_pp2x_cp_cpu_callback;
 		register_hotcpu_notifier(&priv->cp_hotplug_nb);
 	}
@@ -7027,12 +7035,12 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	pr_debug("Platform Device Name : %s\n", kobject_name(&pdev->dev.kobj));
 	return 0;
 err_uio:
-	if (priv->pp2_version == PPV22)
+	if (priv->pp2_version != PPV21)
 		uio_unregister_device(&priv->uio.u_info);
 err_clk:
 	clk_disable_unprepare(hw->gop_clk);
 	clk_disable_unprepare(hw->pp_clk);
-	if (priv->pp2_version == PPV22)  {
+	if (priv->pp2_version != PPV21)  {
 		clk_disable_unprepare(hw->gop_core_clk);
 		clk_disable_unprepare(hw->mg_clk);
 		clk_disable_unprepare(hw->mg_core_clk);
@@ -7050,10 +7058,10 @@ static int mv_pp2x_remove(struct platform_device *pdev)
 	int i, num_of_ports, num_of_pools;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 
-	if (priv->pp2_version == PPV22 && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
+	if (priv->pp2_version != PPV21 && mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
 		unregister_hotcpu_notifier(&priv->cp_hotplug_nb);
 
-	if (priv->pp2_version == PPV22) {
+	if (priv->pp2_version != PPV21) {
 		uio_unregister_device(&priv->uio.u_info);
 		kfree(priv->uio.u_info.name);
 	}
@@ -7137,7 +7145,7 @@ static int mv_pp2x_probe_after_suspend(struct device *dev)
 		i++;
 	}
 
-	if (priv->pp2_version == PPV22) {
+	if (priv->pp2_version != PPV21) {
 		/* Init tx&rx fifo for each port */
 		mv_pp22_tx_fifo_init(priv);
 		mv_pp22_rx_fifo_init(priv);
