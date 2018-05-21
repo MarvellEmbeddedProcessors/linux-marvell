@@ -35,13 +35,17 @@ static uint rings[MAX_EIP_DEVICE] = {RINGS_UNINITIALIZED, RINGS_UNINITIALIZED};
 /* Initialize pseudo random generator */
 static void eip197_prng_init(struct safexcel_crypto_priv *priv, int pe)
 {
+	u64 seed;
+
+	get_random_bytes(&seed, sizeof(seed));
+
 	/* disable PRNG and set to manual mode */
 	writel(0, EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_CTRL(pe));
 
 	/* Write seed data */
-	writel(EIP197_PE_EIP96_PRNG_SEED_L_VAL,
+	writel(lower_32_bits(seed),
 	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_SEED_L(pe));
-	writel(EIP197_PE_EIP96_PRNG_SEED_H_VAL,
+	writel(upper_32_bits(seed),
 	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_SEED_H(pe));
 
 	/* Write key data */
