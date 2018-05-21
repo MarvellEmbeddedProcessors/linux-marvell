@@ -6915,6 +6915,9 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		if (mv_pp2x_read(hw, MVPP2_VER_ID_REG) == MVPP2_VER_PP23) {
 			priv->pp2_version = PPV23;
 			priv->pp2xdata->pp2x_ver = PPV23;
+			hw->gop.gop_110.cp_version = MV_CP115;
+		} else {
+			hw->gop.gop_110.cp_version = MV_CP110;
 		}
 	}
 

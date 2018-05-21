@@ -213,6 +213,12 @@ enum mvppv2_version {
 	PPV23
 };
 
+/* Communication Processor version enum */
+enum mv_cp_version {
+	MV_CP110,
+	MV_CP115
+};
+
 enum mv_pp2x_queue_vector_type {
 	MVPP2_RX_SHARED,
 	MVPP2_PRIVATE,
@@ -462,6 +468,7 @@ struct mv_mac_unit_desc {
 };
 
 struct cpn110_gop_hw {
+	enum mv_cp_version cp_version;
 	struct mv_mac_unit_desc gmac;
 	struct mv_mac_unit_desc xlg_mac;
 	struct mv_mac_unit_desc xmib;
