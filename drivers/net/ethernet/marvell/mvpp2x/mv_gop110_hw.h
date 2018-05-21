@@ -290,6 +290,7 @@ int mv_gop110_xlg_mac_reset(struct gop_hw *gop, int mac_num,
 			    enum mv_reset reset);
 int mv_gop110_xlg_mac_mode_cfg(struct gop_hw *gop, int mac_num,
 			       int num_of_act_lanes);
+void mv_gop110_xlg_mac_1G_cfg(struct gop_hw *gop, int mac_num);
 int mv_gop110_xlg_mac_loopback_cfg(struct gop_hw *gop, int mac_num,
 				   enum mv_lb_type type);
 

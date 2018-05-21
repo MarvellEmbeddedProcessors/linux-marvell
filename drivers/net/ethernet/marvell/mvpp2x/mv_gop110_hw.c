@@ -997,6 +997,7 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 	}
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
+		mv_gop110_xlg_mac_1G_cfg(gop, mac_num);
 		mv_gop110_force_link_mode_set(gop, mac, false, true);
 		mv_gop110_gmac_reset(gop, mac_num, RESET);
 		/* configure PCS */
@@ -1016,6 +1017,7 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 	break;
 	case PHY_INTERFACE_MODE_SGMII:
 	case PHY_INTERFACE_MODE_QSGMII:
+		mv_gop110_xlg_mac_1G_cfg(gop, mac_num);
 		mv_gop110_force_link_mode_set(gop, mac, false, true);
 		mv_gop110_gmac_reset(gop, mac_num, RESET);
 		/* configure PCS */
@@ -1033,6 +1035,7 @@ int mv_gop110_port_init(struct gop_hw *gop, struct mv_mac_data *mac)
 		mv_gop110_force_link_mode_set(gop, mac, false, false);
 	break;
 	case PHY_INTERFACE_MODE_1000BASEX:
+		mv_gop110_xlg_mac_1G_cfg(gop, mac_num);
 		mv_gop110_force_link_mode_set(gop, mac, false, true);
 		mv_gop110_gmac_reset(gop, mac_num, RESET);
 		/* configure PCS */
@@ -1919,6 +1922,23 @@ int mv_gop110_xlg_mac_reset(struct gop_hw *gop, int mac_num,
 	mv_gop110_xlg_mac_write(gop, mac_num, reg_addr, val);
 
 	return 0;
+}
+
+/* Set the internal mux's to the GMAC mode */
+void mv_gop110_xlg_mac_1G_cfg(struct gop_hw *gop, int mac_num)
+{
+	u32 val;
+
+	/* In CP110 only GoP 0 has XLG config
+	 * In CP115 GoP 0 and GoP 2 has XLG config
+	 */
+	if (!(mac_num == 0) && !(mac_num == 2 && gop->gop_110.cp_version == MV_CP115))
+		return;
+
+	val = mv_gop110_xlg_mac_read(gop, mac_num, MV_XLG_PORT_MAC_CTRL4_REG);
+	U32_SET_FIELD(val, MV_XLG_MAC_CTRL4_MAC_MODE_DMA_1G_MASK, 1 <<
+					MV_XLG_MAC_CTRL4_MAC_MODE_DMA_1G_OFFS);
+	mv_gop110_xlg_mac_write(gop, mac_num, MV_XLG_PORT_MAC_CTRL4_REG, val);
 }
 
 /* Set the internal mux's to the required MAC in the GOP */
