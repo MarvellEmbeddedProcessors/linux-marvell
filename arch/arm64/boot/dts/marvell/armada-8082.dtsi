@@ -94,6 +94,7 @@
 	aliases {
 		serial0 = &ap0_uart0;
 		serial1 = &ap0_uart1;
+		spi0 = &ap0_spi0;
 	};
 
 	/* Delete unsupported interfaces from CP nodes:
