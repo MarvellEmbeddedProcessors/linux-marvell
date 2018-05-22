@@ -57,6 +57,37 @@
 	status = "okay";
 };
 
+&ap0_spi0 {
+	spi-flash@0 {
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		compatible = "jedec,spi-nor";
+		reg = <0x0>;
+		spi-max-frequency = <20000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0 0x400000>;
+				read-only;
+			};
+			partition@400000 {
+				label = "filesystem";
+				reg = <0x400000 0xbf0000>;
+			};
+			partition@bf0000 {
+				label = "ext-bootrom";
+				reg = <0xff0000 0x10000>;
+				read-only;
+			};
+		};
+	};
+};
+
 &cp0_usb3_0 {
 	status = "okay";
 };

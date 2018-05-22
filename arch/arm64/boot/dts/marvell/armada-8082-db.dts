@@ -65,7 +65,12 @@
 		ethernet1 = &cp0_eth1;
 		ethernet2 = &cp0_eth2;
 		ethernet3 = &cp1_eth0;
+		spi0 = &ap0_spi0;
 	};
+};
+
+&ap0_spi0 {
+	status = "okay";
 };
 
 &ap0_xor0 {
