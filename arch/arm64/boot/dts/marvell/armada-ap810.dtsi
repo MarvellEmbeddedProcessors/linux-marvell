@@ -110,6 +110,16 @@
 				status = "disabled";
 			};
 
+			AP810_LABEL(spi0): spi@510600 {
+				compatible = "marvell,armada-380-spi";
+				reg = <0x510600 0x50>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&AP810_LABEL(clk) 6>;
+				status = "disabled";
+			};
+
 			AP810_LABEL(gicp): gicp@3000040 {
 				compatible = "marvell,ap806-gicp";
 				reg = <0x3000040 0x10>;
