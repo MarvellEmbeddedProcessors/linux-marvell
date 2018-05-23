@@ -352,9 +352,9 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 
 		/* DMA transfer size to use */
 		val = EIP197_HIA_DFE_CFG_DIS_DEBUG;
-		val |= EIP197_HIA_DxE_CFG_MIN_DATA_SIZE(5) |
+		val |= EIP197_HIA_DxE_CFG_MIN_DATA_SIZE(6) |
 		       EIP197_HIA_DxE_CFG_MAX_DATA_SIZE(9);
-		val |= EIP197_HIA_DxE_CFG_MIN_CTRL_SIZE(5) |
+		val |= EIP197_HIA_DxE_CFG_MIN_CTRL_SIZE(6) |
 		       EIP197_HIA_DxE_CFG_MAX_CTRL_SIZE(7);
 		val |= EIP197_HIA_DxE_CFG_DATA_CACHE_CTRL(RD_CACHE_3BITS);
 		val |= EIP197_HIA_DxE_CFG_CTRL_CACHE_CTRL(RD_CACHE_3BITS);
@@ -365,10 +365,10 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 		       EIP197_HIA_DFE_THR(priv) + EIP197_HIA_DFE_THR_CTRL(pe));
 
 		/* Configure the processing engine thresholds */
-		writel(EIP197_PE_IN_xBUF_THRES_MIN(5) |
+		writel(EIP197_PE_IN_xBUF_THRES_MIN(6) |
 		       EIP197_PE_IN_xBUF_THRES_MAX(9),
 		       EIP197_PE(priv) + EIP197_PE_IN_DBUF_THRES(pe));
-		writel(EIP197_PE_IN_xBUF_THRES_MIN(5) |
+		writel(EIP197_PE_IN_xBUF_THRES_MIN(6) |
 		       EIP197_PE_IN_xBUF_THRES_MAX(7),
 		       EIP197_PE(priv) + EIP197_PE_IN_TBUF_THRES(pe));
 
