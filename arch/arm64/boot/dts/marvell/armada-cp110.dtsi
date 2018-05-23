@@ -469,9 +469,10 @@
 					<0x130600 0x200>,  /* FCA - flow control regs*/
 					<0x130e00 0x100>,  /* MSPG - GMAC regs */
 					<0x130f00 0x100>,  /* MSPG - XLG MAC regs */
-					<0x441100 0x100>;  /* RFU-1 Regs */
+					<0x441100 0x100>,  /* RFU-1 Regs */
+					<0x220000 0x800>;  /* CM3 SRAM */
 				reg-names = "pp", "xmib", "led", "smi", "tai", "xsmi", "mg", "mspg", "xpcs",
-						"fca", "gmac", "xlg", "rfu1";
+						"fca", "gmac", "xlg", "rfu1", "cm3";
 				clocks = <&CP110_LABEL(syscon0) 1 3>, <&CP110_LABEL(syscon0) 1 18>, <&CP110_LABEL(syscon0) 1 9>,
 					<&CP110_LABEL(syscon0) 1 6>, <&CP110_LABEL(syscon0) 1 5>;
 				clock-names = "pp_clk", "gop_core_clk", "gop_clk", "mg_core_clk", "mg_clk";
