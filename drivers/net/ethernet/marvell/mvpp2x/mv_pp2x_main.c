@@ -1205,6 +1205,22 @@ static int mv_pp2x_aggr_txq_init(struct platform_device *pdev,
 	return 0;
 }
 
+/* Routine set the number of non-occupied descriptors threshold that change
+ * interrupt error cause polled by FW Flow Control
+ */
+void mv_pp2x_set_rxq_free_tresh(struct mv_pp2x_port *port,
+				struct mv_pp2x_rx_queue *rxq)
+{
+	u32 val;
+
+	mv_pp2x_write(&port->priv->hw, MVPP2_RXQ_NUM_REG, rxq->id);
+
+	val = mv_pp2x_read(&port->priv->hw, MVPP2_RXQ_THRESH_REG);
+	val &= ~MVPP2_NON_OCCUPIED_THRESH_MASK;
+	val |= MSS_CP_CM3_THRESHOLD_STOP << MVPP2_NON_OCCUPIED_THRESH_OFFSET;
+	mv_pp2x_write(&port->priv->hw, MVPP2_RXQ_THRESH_REG, val);
+}
+
 /* Create a specified Rx queue */
 static int mv_pp2x_rxq_init(struct mv_pp2x_port *port,
 			    struct mv_pp2x_rx_queue *rxq)
@@ -1244,6 +1260,9 @@ static int mv_pp2x_rxq_init(struct mv_pp2x_port *port,
 	/* Set coalescing pkts and time */
 	mv_pp2x_rx_pkts_coal_set(port, rxq);
 	mv_pp2x_rx_time_coal_set(port, rxq);
+
+	/* Set the number of non occupied descriptors threshold */
+	mv_pp2x_set_rxq_free_tresh(port, rxq);
 
 	/* Add number of descriptors ready for receiving packets */
 	mv_pp2x_rxq_status_update(port, rxq->id, 0, rxq->size);
@@ -4388,6 +4407,7 @@ static inline void mv_pp21_interrupts_unmask(void *arg)
 static inline void mv_pp22_private_interrupt_mask(struct mv_pp2x_port *port, int address_space)
 {
 	mv_pp2x_relaxed_write(&port->priv->hw, MVPP2_ISR_RX_TX_MASK_REG(port->id), 0, address_space);
+	mv_pp2x_relaxed_write(&port->priv->hw, MV_PP22_ISR_RX_ERR_MASK_REG(port->id), 0, address_space);
 }
 
 /* Unmask he private Rx/Tx interrupts */
@@ -4401,6 +4421,8 @@ static inline void mv_pp22_private_interrupt_unmask(struct mv_pp2x_port *port, i
 		val |= MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
 
 	mv_pp2x_relaxed_write(&port->priv->hw, MVPP2_ISR_RX_TX_MASK_REG(port->id), val, address_space);
+	mv_pp2x_relaxed_write(&port->priv->hw, MV_PP22_ISR_RX_ERR_MASK_REG(port->id),
+			      MV_PP22_ISR_RX_ERR_CAUSE_NONOCC_MASK, address_space);
 }
 
 /* Mask shared and private Rx/Tx interrupts */
@@ -4410,11 +4432,15 @@ static inline void mv_pp22_interrupts_mask(struct mv_pp2x_port *port)
 	int i;
 
 	for (i = 0; i < port->num_qvector; i++) {
-		if (q_vec[i].qv_type == MVPP2_RX_SHARED)
+		if (q_vec[i].qv_type == MVPP2_RX_SHARED) {
 			mv_pp22_thread_write(&port->priv->hw, q_vec[i].sw_thread_id,
 					     MVPP2_ISR_RX_TX_MASK_REG(port->id), 0);
-		else
+			mv_pp22_thread_write(&port->priv->hw,
+					     q_vec[i].sw_thread_id,
+					     MV_PP22_ISR_RX_ERR_MASK_REG(port->id), 0);
+		} else {
 			mv_pp22_private_interrupt_mask(port, q_vec[i].sw_thread_id);
+		}
 	}
 }
 
@@ -4425,11 +4451,16 @@ static inline void mv_pp22_interrupts_unmask(struct mv_pp2x_port *port)
 	int i;
 
 	for (i = 0; i < port->num_qvector; i++) {
-		if (q_vec[i].qv_type == MVPP2_RX_SHARED)
+		if (q_vec[i].qv_type == MVPP2_RX_SHARED) {
 			mv_pp22_thread_write(&port->priv->hw, q_vec[i].sw_thread_id,
 					     MVPP2_ISR_RX_TX_MASK_REG(port->id), MVPP22_CAUSE_RXQ_OCCUP_DESC_ALL_MASK);
-		else
+			mv_pp22_thread_write(&port->priv->hw,
+					     q_vec[i].sw_thread_id,
+					     MV_PP22_ISR_RX_ERR_MASK_REG(port->id),
+					     MV_PP22_ISR_RX_ERR_CAUSE_NONOCC_MASK);
+		} else {
 			mv_pp22_private_interrupt_unmask(port, q_vec[i].sw_thread_id);
+		}
 	}
 }
 
