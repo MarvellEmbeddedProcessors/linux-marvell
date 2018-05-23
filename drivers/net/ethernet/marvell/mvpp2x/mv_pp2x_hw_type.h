@@ -1234,7 +1234,7 @@
 					MVPP2_MAX_PORTS * MVPP2_MAX_TXQ/*eth*/)
 
 /* Max number of Rx descriptors */
-#define MVPP2_MAX_RXD			1024
+#define MVPP2_MAX_RXD			1280
 
 /* Max number of Tx descriptors */
 #define MVPP2_MAX_TXD			2048
