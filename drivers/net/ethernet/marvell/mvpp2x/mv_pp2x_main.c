@@ -3916,6 +3916,7 @@ int mvcpn110_mac_hw_init(struct mv_pp2x_port *port)
 	struct gop_hw *gop = &port->priv->hw.gop;
 	struct mv_mac_data *mac = &port->mac_data;
 	int gop_port = mac->gop_index;
+	u64 timer;
 
 	if (mac->flags & MV_EMAC_F_INIT)
 		return 0;
@@ -3925,6 +3926,13 @@ int mvcpn110_mac_hw_init(struct mv_pp2x_port *port)
 
 	if (port->comphy)
 		mv_serdes_port_init(port);
+
+	/* Set Flow Control timer x10 faster than pause quanta to ensure that link
+	 * partner won't send taffic if port in XOFF mode.
+	 */
+	timer = (port->priv->hw.tclk / (USEC_PER_SEC * 10)) * FLOW_CONTROL_QUANTA;
+
+	mv_gop110_fca_set_periodic_timer(gop, mac->gop_index, timer);
 
 	mv_gop110_port_init(gop, mac);
 

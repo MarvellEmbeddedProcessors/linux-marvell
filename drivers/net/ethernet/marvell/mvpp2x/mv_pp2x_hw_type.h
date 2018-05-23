@@ -47,6 +47,8 @@
 #define MAX_NUM_SERDES_LANES	6
 #define COMPHY4_RXAUI_LANE0	4
 
+/* MSS Flow control */
+#define FLOW_CONTROL_QUANTA		0xFFFF
 #define MVPP21_DESC_ADDR_SHIFT		0 /*Applies to RXQ, AGGR_TXQ*/
 #define MVPP22_DESC_ADDR_SHIFT		(9 - 1) /*Applies to RXQ, AGGR_TXQ*/
 

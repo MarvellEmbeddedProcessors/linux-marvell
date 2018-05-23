@@ -3117,7 +3117,6 @@ void mv_gop110_fca_set_periodic_timer(struct gop_hw *gop, int mac_num, u64 timer
 {
 	u32 lsb, msb;
 
-	mv_gop110_fca_send_periodic(gop, mac_num, false);
 	mv_gop110_fca_enable_periodic(gop, mac_num, false);
 
 	lsb = lower_32_bits(timer);
@@ -3125,7 +3124,6 @@ void mv_gop110_fca_set_periodic_timer(struct gop_hw *gop, int mac_num, u64 timer
 
 	mv_gop110_fca_set_timer(gop, mac_num, lsb, msb);
 
-	mv_gop110_fca_send_periodic(gop, mac_num, true);
 	mv_gop110_fca_enable_periodic(gop, mac_num, true);
 }
 EXPORT_SYMBOL(mv_gop110_fca_set_periodic_timer);
