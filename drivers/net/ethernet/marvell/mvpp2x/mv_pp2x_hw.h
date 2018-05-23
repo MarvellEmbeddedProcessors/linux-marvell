@@ -25,6 +25,20 @@
 
 #include <linux/platform_device.h>
 
+static inline void mv_pp2x_cm3_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
+{
+	void *reg_ptr = hw->gop.gop_110.cm3_base + offset;
+
+	writel(data, reg_ptr);
+}
+
+static inline u32 mv_pp2x_cm3_read(struct mv_pp2x_hw *hw, u32 offset)
+{
+	void *reg_ptr = hw->gop.gop_110.cm3_base + offset;
+
+	return readl(reg_ptr);
+}
+
 static inline void mv_pp2x_write(struct mv_pp2x_hw *hw, u32 offset, u32 data)
 {
 	void *reg_ptr = hw->cpu_base[0] + offset;

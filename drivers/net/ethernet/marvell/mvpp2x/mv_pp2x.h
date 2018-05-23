@@ -480,6 +480,7 @@ struct cpn110_gop_hw {
 	void __iomem *xsmi_base;
 	void __iomem *xpcs_base;
 	void __iomem *rfu1_base;
+	void __iomem *cm3_base;
 
 };
 

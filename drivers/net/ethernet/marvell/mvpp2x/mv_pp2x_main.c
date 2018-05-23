@@ -6541,6 +6541,13 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if (IS_ERR(hw->gop.gop_110.rfu1_base))
 			return PTR_ERR(hw->gop.gop_110.rfu1_base);
 
+		res = platform_get_resource_byname(pdev,
+						   IORESOURCE_MEM, "cm3");
+		hw->gop.gop_110.cm3_base =
+			devm_ioremap_resource(&pdev->dev, res);
+		if (IS_ERR(hw->gop.gop_110.cm3_base))
+			return PTR_ERR(hw->gop.gop_110.cm3_base);
+
 		/* skipped tai */
 
 		/* xsmi  */
