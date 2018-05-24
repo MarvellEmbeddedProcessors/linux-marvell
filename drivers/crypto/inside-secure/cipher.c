@@ -98,7 +98,7 @@ static int safexcel_ablkcipher_aes_setkey(struct crypto_ablkcipher *ctfm,
 	}
 
 	/* if context exits and key changed, need to invalidate it */
-	if (priv->data->version == EIP197 && ctx->base.ctxr_dma) {
+	if (priv->eip_type == EIP197 && ctx->base.ctxr_dma) {
 		for (i = 0; i < len / sizeof(u32); i++) {
 			if (ctx->key[i] != cpu_to_le32(aes.key_enc[i])) {
 				ctx->base.needs_inv = true;
@@ -536,7 +536,7 @@ static int safexcel_queue_req(struct crypto_async_request *base,
 	 * If it's EIP97 with existing context, the send routine is already set.
 	 */
 	if (ctx->base.ctxr) {
-		if (priv->data->version == EIP197 && ctx->base.needs_inv) {
+		if (priv->eip_type == EIP197 && ctx->base.needs_inv) {
 			sreq->needs_inv = true;
 			ctx->base.needs_inv = false;
 		}
@@ -622,7 +622,7 @@ static void safexcel_ablkcipher_cra_exit(struct crypto_tfm *tfm)
 	 * EIP97 doesn't have internal cache, so no need to invalidate
 	 * it and we can just release the dma pool.
 	 */
-	if (priv->data->version == EIP197) {
+	if (priv->eip_type == EIP197) {
 		ret = safexcel_ablkcipher_exit_inv(tfm);
 		if (ret)
 			dev_warn(priv->dev, "ablkcipher: invalidation error %d\n",
