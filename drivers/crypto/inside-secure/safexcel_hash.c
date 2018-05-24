@@ -1267,36 +1267,6 @@ static int safexcel_md5_digest(struct ahash_request *areq)
 	return safexcel_ahash_finup(areq);
 }
 
-static int safexcel_md5_export(struct ahash_request *areq, void *out)
-{
-	struct crypto_ahash *ahash = crypto_ahash_reqtfm(areq);
-	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
-	struct md5_state *out_state = out;
-	int len = req->len;
-	int cache_len = do_div(len, crypto_ahash_blocksize(ahash));
-
-	out_state->byte_count = req->len;
-	memcpy(out_state->hash, req->state, req->state_sz);
-	memset(out_state->block, 0, crypto_ahash_blocksize(ahash));
-	memcpy(out_state->block, req->cache, cache_len);
-
-	return 0;
-}
-
-static int safexcel_md5_import(struct ahash_request *areq, const void *in)
-{
-	struct safexcel_ahash_req *req = ahash_request_ctx(areq);
-	const struct md5_state *in_state = in;
-
-	memset(req, 0, sizeof(*req));
-
-	req->len = in_state->byte_count;
-	memcpy(req->cache, in_state->block, in_state->byte_count);
-	memcpy(req->state, in_state->hash, req->state_sz);
-
-	return 0;
-}
-
 struct safexcel_alg_template safexcel_alg_md5 = {
 	.type = SAFEXCEL_ALG_TYPE_AHASH,
 	.alg.ahash = {
@@ -1305,11 +1275,11 @@ struct safexcel_alg_template safexcel_alg_md5 = {
 		.final = safexcel_ahash_final,
 		.finup = safexcel_ahash_finup,
 		.digest = safexcel_md5_digest,
-		.export = safexcel_md5_export,
-		.import = safexcel_md5_import,
+		.export = safexcel_ahash_export,
+		.import = safexcel_ahash_import,
 		.halg = {
 			.digestsize = MD5_DIGEST_SIZE,
-			.statesize = sizeof(struct md5_state),
+			.statesize = sizeof(struct safexcel_ahash_export_state),
 			.base = {
 				.cra_name = "md5",
 				.cra_driver_name = "safexcel-md5",
