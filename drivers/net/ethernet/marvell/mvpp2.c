@@ -3945,7 +3945,7 @@ static int mvpp2_width_calc(struct mvpp2_port *port,
 {
 	u32 rxq_width;
 
-	*cpu_width = ilog2(roundup_pow_of_two(num_online_cpus()));
+	*cpu_width = ilog2(roundup_pow_of_two(used_hifs));
 	*cos_width = ilog2(roundup_pow_of_two(port->cos_cfg.num_cos_queues));
 	rxq_width = ilog2(roundup_pow_of_two(port->nrxqs));
 	if (*cpu_width + *cos_width > rxq_width) {
@@ -10244,7 +10244,7 @@ static void mvpp22_rss_rxfh_indir_init(struct mvpp2 *priv)
 	int i;
 
 	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++)
-		priv->indir[i] = i % num_online_cpus();
+		priv->indir[i] = i % used_hifs;
 }
 
 /* Translate CPU sequence number to real CPU ID */
@@ -11030,7 +11030,7 @@ static int mvpp2_ethtool_set_rxfh(struct net_device *dev, const u32 *indir,
 	 * For example, "weight 0 0 0 0 1" may have "4" inside of indir
 	 */
 	for (i = 0; i < MVPP22_RSS_TABLE_ENTRIES; i++)
-		if (indir[i] >= num_online_cpus())
+		if (indir[i] >= used_hifs)
 			return -EINVAL;
 
 	memcpy(indir_orig, port->priv->indir, size);
@@ -12387,7 +12387,7 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 	 * The aggr_txqs[per-cpu] entry should be aligned onto cache.
 	 * So allocate more than needed and round-up the pointer.
 	 */
-	val = sizeof(*priv->aggr_txqs) * num_active_cpus() + L1_CACHE_BYTES;
+	val = sizeof(*priv->aggr_txqs) * used_hifs + L1_CACHE_BYTES;
 	p = (dma_addr_t)devm_kcalloc(&pdev->dev, used_hifs, val,
 				       GFP_KERNEL);
 	if (!p)
