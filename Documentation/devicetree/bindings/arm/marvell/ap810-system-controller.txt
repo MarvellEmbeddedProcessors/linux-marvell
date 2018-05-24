@@ -1,0 +1,104 @@
+Marvell Armada AP810 System Controller
+======================================
+
+The AP810 is one of the two core HW blocks of the Marvell Armada 8K+
+SoCs. It contains a system controller, which provides a number
+registers giving access to numerous features: clocks, pin-muxing and
+many other SoC configuration items. This DT binding allows to describe
+this system controller.
+
+For the top level node:
+ - compatible: must be: "syscon", "simple-mfd";
+ - reg: register area of the AP810 system controller
+
+Clocks:
+-------
+
+The Device Tree node representing the AP810 system controller provides
+a number of clocks:
+
+ - 0: clock of CPU clusters 0 and 1
+ - 1: clock of CPU clusters 2 and 3
+ - 2: ring PLL used for Aurora 2 fabric
+ - 3: DMA clock used for DMA0 - DMA3 engines
+ - 4: EIP197 clock produced by IO PLL for driving EIP197d engine
+ - 5: fixed PLL at 1200 Mhz
+ - 6: MSS clock, derived from the fixed PLL used by SPI, UART, I2C and timers
+ - 7: SDIO clock for eMMC/SD interface
+
+Required properties:
+
+ - compatible: must be: "marvell,ap810-clock"
+ - #clock-cells: must be set to 1
+
+Pinctrl:
+--------
+
+For common binding part and usage, refer to
+Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt.
+
+Required properties:
+- compatible must be "marvell,ap810-pinctrl",
+
+Available mpp pins/groups and functions:
+Note: brackets (x) are not part of the mpp name for marvell,function and given
+only for more detailed description in this document.
+
+name	pins	functions
+================================================================================
+mpp0	0	gpio, sdio(clk), i2c1(sda)
+mpp1	1	gpio, sdio(cmd), i2c1(sck)
+mpp2	2	gpio, sdio(d0),  uart1(rxd)
+mpp3	3	gpio, sdio(d1)
+mpp4	4	gpio, sdio(d2),  uart1(txd)
+mpp5	5	gpio, sdio(d3)
+mpp6	6	gpio, sdio(ds),  spi0(cs1n)
+mpp7	7	gpio, sdio(d4),  spi0(clk)
+mpp8	8	gpio, sdio(d5),  spi0(miso)
+mpp9	9	gpio, sdio(d6),  spi0(mosi)
+mpp10	10	gpio, sdio(d7),  spi0(cs0n)
+mpp11	11	gpio, uart0(txd)
+mpp12	12	gpio, sdio(pw_off), sdio(hw_rst)
+mpp13	13	gpio, mss_gpio
+mpp14	14	gpio, mss_gpio, sdio(v18_en)
+mpp15	15	gpio, mss_gpio
+mpp16	16	gpio, mss_gpio
+mpp17	17	gpio, mss_gpio
+mpp18	18	gpio, mss_gpio, i2c0(sda)
+mpp19	19	gpio, mss_gpio, i2c0(sck), sdio(pw_off)
+mpp20	20	gpio, mss_gpio, uart0(rxd)
+
+GPIO:
+-----
+For common binding part and usage, refer to
+Documentation/devicetree/bindings/gpio/gpio-mvebu.txt.
+
+Required properties:
+
+- compatible: "marvell,armada-8kp-gpio"
+
+- offset: offset address inside the syscon block
+
+Example:
+ap_syscon: system-controller@6f4000 {
+	compatible = "syscon", "simple-mfd";
+	reg = <0x6f4000 0x2000>;
+
+	ap_clk: clock {
+		compatible = "marvell,ap810-clock";
+		#clock-cells = <1>;
+	};
+
+	ap_pinctrl: pinctrl {
+		compatible = "marvell,ap810-pinctrl";
+	};
+
+	ap_gpio: gpio {
+		compatible = "marvell,armada-8kp-gpio";
+		offset = <0x1040>;
+		ngpios = <20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		gpio-ranges = <&ap_pinctrl 0 0 20>;
+	};
+};
