@@ -360,7 +360,15 @@
 
 &ap_sdhci0 {
 	status = "okay";
-	bus-width = <4>;
+	bus-width = <8>;
+	/* The below property should be added to boards with AP806-B0
+	 * for enabling HS400 speed mode. Otherwise the device highest
+	 * speed mode will be HS200.
+	 * Should not be added to boards with earlier release of AP806
+	 * since it will cause SDHCI driver to fail upon initialization.
+	 *
+	 * mmc-hs400-1_8v;
+	 */
 	non-removable;
 };
 

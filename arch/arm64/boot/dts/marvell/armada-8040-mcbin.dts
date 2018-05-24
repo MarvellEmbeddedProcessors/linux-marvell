@@ -111,11 +111,6 @@
 
 &ap_sdhci0 {
 	bus-width = <8>;
-	/*
-	 * Not stable in HS modes - phy needs "more calibration", so add
-	 * the "slow-mode" and disable SDR104, SDR50 and DDR50 modes.
-	 */
-	marvell,xenon-phy-slow-mode;
 	no-1-8-v;
 	no-sd;
 	no-sdio;

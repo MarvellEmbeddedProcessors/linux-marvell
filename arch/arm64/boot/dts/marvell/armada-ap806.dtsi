@@ -218,7 +218,6 @@
 				clock-names = "core";
 				clocks = <&ap_clk 4>;
 				dma-coherent;
-				marvell,xenon-phy-slow-mode;
 				status = "disabled";
 			};
 
