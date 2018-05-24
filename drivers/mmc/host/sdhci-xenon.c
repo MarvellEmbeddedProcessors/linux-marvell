@@ -17,6 +17,7 @@
 #include <linux/delay.h>
 #include <linux/ktime.h>
 #include <linux/module.h>
+#include <linux/mv_soc_info.h>
 #include <linux/of.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
@@ -406,9 +407,12 @@ static int xenon_probe_dt(struct platform_device *pdev)
 	u32 sdhc_id, nr_sdhc;
 	u32 tuning_count;
 
-	/* Disable HS200 on Armada AP806 */
-	if (of_device_is_compatible(np, "marvell,armada-ap806-sdhci"))
+	/* Disable HS200 on Armada AP806 A0 and A1, but not B0 */
+	if (of_device_is_compatible(np, "marvell,armada-ap806-sdhci") &&
+	    mv_soc_info_get_ap_revision() < APN806_REV_ID_B0) {
+		dev_err(mmc_dev(mmc), "AP SDHC is running in slow mode\n");
 		host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
+	}
 
 	sdhc_id = 0x0;
 	if (!of_property_read_u32(np, "marvell,xenon-sdhc-id", &sdhc_id)) {

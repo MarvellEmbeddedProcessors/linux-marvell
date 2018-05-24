@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/ktime.h>
+#include <linux/mv_soc_info.h>
 #include <linux/of_address.h>
 
 #include "sdhci-pltfm.h"
@@ -695,7 +696,12 @@ static int xenon_emmc_phy_parse_param_dt(struct sdhci_host *host,
 	u32 value;
 
 	params->slow_mode = false;
-	if (of_property_read_bool(np, "marvell,xenon-phy-slow-mode"))
+	/* Activate slow mode unconditionally for AP806 A0 and A1, but not B0.
+	 * For any revision honor the explicit request for the slow mode
+	 */
+	if ((of_device_is_compatible(np, "marvell,armada-ap806-sdhci") &&
+	    mv_soc_info_get_ap_revision() < APN806_REV_ID_B0) ||
+	    of_property_read_bool(np, "marvell,xenon-phy-slow-mode"))
 		params->slow_mode = true;
 
 	params->znr = XENON_ZNR_DEF_VALUE;
