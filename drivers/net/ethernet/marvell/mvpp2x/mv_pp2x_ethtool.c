@@ -70,6 +70,30 @@ static const char mv_pp2x_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"rx_total_err",	"rx_sw_drop", "rx_hw_drop", "tx_crc_sent",
 	"tx_drop", "collision",	"late_collision", "frames_64", "frames_65_to_127",
 	"frames_128_to_255", "frames_256_to_511", "frames_512_to_1023", "frames_1024_to_max",
+	"rx_fullq_drop_q0", "rx_fullq_drop_q1", "rx_fullq_drop_q2", "rx_fullq_drop_q3",
+	"rx_fullq_drop_q4", "rx_fullq_drop_q5", "rx_fullq_drop_q6", "rx_fullq_drop_q7",
+	"rx_fullq_drop_q8", "rx_fullq_drop_q9", "rx_fullq_drop_q10", "rx_fullq_drop_q11",
+	"rx_fullq_drop_q12", "rx_fullq_drop_q13", "rx_fullq_drop_q14", "rx_fullq_drop_q15",
+	"rx_fullq_drop_q16", "rx_fullq_drop_q17", "rx_fullq_drop_q18", "rx_fullq_drop_q19",
+	"rx_full_drop_q20", "rx_fullq_drop_q21", "rx_fullq_drop_q22", "rx_fullq_drop_q23",
+	"rx_fullq_drop_q24", "rx_fullq_drop_q25", "rx_fullq_drop_q26", "rx_fullq_drop_q27",
+	"rx_fullq_drop_q28", "rx_fullq_drop_q29", "rx_fullq_drop_q30", "rx_fullq_drop_q31",
+	"rx_earlyq_drop_q0", "rx_earlyq_drop_q1", "rx_earlyq_drop_q2", "rx_earlyq_drop_q3",
+	"rx_earlyq_drop_q4", "rx_earlyq_drop_q5", "rx_earlyq_drop_q6", "rx_earlyq_drop_q7",
+	"rx_earlyq_drop_q8", "rx_earlyq_drop_q9", "rx_earlyq_drop_q10", "rx_earlyq_drop_q11",
+	"rx_earlyq_drop_q12", "rx_earlyq_drop_q13", "rx_earlyq_drop_q14", "rx_earlyq_drop_q15",
+	"rx_earlyq_drop_q16", "rx_earlyq_drop_q17", "rx_earlyq_drop_q18", "rx_earlyq_drop_q19",
+	"rx_earlyq_drop_q20", "rx_earlyq_drop_q21", "rx_earlyq_drop_q22", "rx_earlyq_drop_q23",
+	"rx_earlyq_drop_q24", "rx_earlyq_drop_q25", "rx_earlyq_drop_q26", "rx_earlyq_drop_q27",
+	"rx_earlyq_drop_q28", "rx_earlyq_drop_q29", "rx_earlyq_drop_q30", "rx_earlyq_drop_q31",
+	"rx_bm_dropq_q0", "rx_bm_dropq_q1", "rx_bm_dropq_q2", "rx_bm_dropq_q3",
+	"rx_bm_dropq_q4", "rx_bm_dropq_q5", "rx_bm_dropq_q6", "rx_bm_dropq_q7",
+	"rx_bm_dropq_q8", "rx_bm_dropq_q9", "rx_bm_dropq_q10", "rx_bm_dropq_q11",
+	"rx_bm_dropq_q12", "rx_bm_dropq_q13", "rx_bm_dropq_q14", "rx_bm_dropq_q15",
+	"rx_bm_dropq_q16", "rx_bm_dropq_q17", "rx_bm_dropq_q18", "rx_bm_dropq_q19",
+	"rx_bm_dropq_q20", "rx_bm_dropq_q21", "rx_bm_dropq_q22", "rx_bm_dropq_q23",
+	"rx_bm_dropq_q24", "rx_bm_dropq_q25", "rx_bm_dropq_q26", "rx_bm_dropq_q27",
+	"rx_bm_dropq_q28", "rx_bm_dropq_q29", "rx_bm_dropq_q30", "rx_bm_dropq_q31",
 };
 
 int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
@@ -192,7 +216,7 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 	struct gop_hw *gop = &port->priv->hw.gop;
 	int gop_port = mac->gop_index;
 	struct gop_stat	*gop_statistics = &mac->gop_statistics;
-	int i = 0;
+	int queue_num, i = 0;
 
 	if (port->priv->pp2_version == PPV21)
 		return;
@@ -237,6 +261,15 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 	data[i++] = gop_statistics->frames_256_to_511;
 	data[i++] = gop_statistics->frames_512_to_1023;
 	data[i++] = gop_statistics->frames_1024_to_max;
+	for (queue_num = 0; queue_num < MVPP22_MAX_NUM_RXQ; queue_num++)
+		data[i++] = gop_statistics->rx_perq_fullq_drop[queue_num];
+
+	for (queue_num = 0; queue_num < MVPP22_MAX_NUM_RXQ; queue_num++)
+		data[i++] = gop_statistics->rx_perq_early_drop[queue_num];
+
+	for (queue_num = 0; queue_num < MVPP22_MAX_NUM_RXQ; queue_num++)
+		data[i++] = gop_statistics->rx_perq_bm_drop[queue_num];
+
 }
 
 static void mv_pp2x_eth_tool_get_strings(struct net_device *dev,

@@ -6493,6 +6493,7 @@ void mv_pp2x_counters_stat_update(struct mv_pp2x_port *port,
 	struct mv_pp2x_hw *hw = &port->priv->hw;
 	int val, queue;
 	unsigned long flags;
+	int num_of_queue_on_port;
 
 	spin_lock_irqsave(&port->mac_data.stats_spinlock, flags);
 
@@ -6507,18 +6508,22 @@ void mv_pp2x_counters_stat_update(struct mv_pp2x_port *port,
 
 	for (queue = port->first_rxq; queue < (port->first_rxq +
 			port->num_rx_queues); queue++) {
+		num_of_queue_on_port = queue % MVPP22_MAX_NUM_RXQ;
 		mv_pp2x_write(hw, MVPP2_CNT_IDX_REG, queue);
 		val = mv_pp2x_read(hw, MVPP2_RX_PKT_FULLQ_DROP_REG);
 		gop_statistics->rx_fullq_drop += val;
 		gop_statistics->rx_hw_drop += val;
+		gop_statistics->rx_perq_fullq_drop[num_of_queue_on_port] += val;
 
 		val = mv_pp2x_read(hw, MVPP2_RX_PKT_EARLY_DROP_REG);
 		gop_statistics->rx_early_drop += val;
 		gop_statistics->rx_hw_drop += val;
+		gop_statistics->rx_perq_early_drop[num_of_queue_on_port] += val;
 
 		val = mv_pp2x_read(hw, MVPP2_RX_PKT_BM_DROP_REG);
 		gop_statistics->rx_bm_drop += val;
 		gop_statistics->rx_hw_drop += val;
+		gop_statistics->rx_perq_bm_drop[num_of_queue_on_port] += val;
 	}
 
 	spin_unlock_irqrestore(&port->mac_data.stats_spinlock, flags);

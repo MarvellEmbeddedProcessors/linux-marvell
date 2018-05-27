@@ -278,6 +278,9 @@ struct gop_stat {
 	u64 rx_total_err;
 	u64 rx_hw_drop;
 	u64 rx_sw_drop;
+	u64 rx_perq_fullq_drop[MVPP22_MAX_NUM_RXQ];
+	u64 rx_perq_early_drop[MVPP22_MAX_NUM_RXQ];
+	u64 rx_perq_bm_drop[MVPP22_MAX_NUM_RXQ];
 	u64 tx_byte;
 	u64 tx_unicast;
 	u64 tx_mcast;
