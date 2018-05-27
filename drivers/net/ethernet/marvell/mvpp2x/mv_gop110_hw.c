@@ -3441,7 +3441,7 @@ int mv_gop110_update_comphy(struct mv_pp2x_port *port, u32 speed)
 	err = phy_set_mode(port->comphy[0], comphy_new_mode);
 	if (err < 0) {
 		phy_set_mode(port->comphy[0], comphy_old_mode);
-		pr_err("Port ID %d: err %d COMPHY lane is busy\n", err, port->id);
+		pr_err("Port ID %d: err %d COMPHY lane is busy\n", port->id, err);
 		goto out;
 	}
 
