@@ -940,6 +940,10 @@ int mv_pp2x_bm_pool_destroy(struct device *dev, struct mv_pp2x *priv,
 			    struct mv_pp2x_bm_pool *bm_pool);
 int mv_pp2x_swf_bm_pool_assign(struct mv_pp2x_port *port, u32 rxq,
 			       u32 long_id, u32 short_id);
+void mv_pp2x_bm_pool_update_fc(struct mv_pp2x_port *port, struct mv_pp2x_bm_pool *pool,
+			       int add_num);
+void mv_pp2x_rxq_disable_fc(struct mv_pp2x_port *port);
+void mv_pp2x_rxq_enable_fc(struct mv_pp2x_port *port);
 int mv_pp2x_open(struct net_device *dev);
 int mv_pp2x_stop(struct net_device *dev);
 void mv_pp2x_txq_inc_put(enum mvppv2_version pp2_ver,

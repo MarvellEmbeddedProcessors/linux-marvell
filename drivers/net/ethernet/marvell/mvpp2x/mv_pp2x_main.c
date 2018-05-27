@@ -638,6 +638,53 @@ static int mv_pp2x_bm_buf_calc(enum mv_pp2x_bm_pool_log_num log_pool,
 	return(num_ports * mv_pp2x_pool_buf_num_get(log_pool));
 }
 
+/* Routine disable/enable flow control for BM pool conditon */
+void mv_pp2x_bm_pool_update_fc(struct mv_pp2x_port *port, struct mv_pp2x_bm_pool *pool, int en)
+{
+	int val, cm3_state;
+
+	/* Remove Flow control enable bit to prevent race between FW and Kernel
+	 * If Flow control were enabled, it would be re-enabled.
+	 */
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_FC_COM_REG);
+	cm3_state = (val & FLOW_CONTROL_ENABLE_BIT);
+	val &= ~FLOW_CONTROL_ENABLE_BIT;
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
+
+	/* Check if BM pool should be enabled/disable */
+	if (en > 0) {
+		/* Set BM pool start and stop thresholds per port */
+		val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_CM3_BUF_POOL_BASE + pool->id * MSS_CP_CM3_BUF_POOL_OFFS);
+		val |= (0x1 << (port->id + MSS_CP_CM3_BUF_POOL_PORTS_OFFS));
+		val &= ~MSS_CP_CM3_BUF_POOL_START_MASK;
+		val |= (MSS_CP_CM3_THRESHOLD_START << MSS_CP_CM3_BUF_POOL_START_OFFS);
+		val &= ~MSS_CP_CM3_BUF_POOL_STOP_MASK;
+		val |= MSS_CP_CM3_THRESHOLD_STOP;
+		mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_CM3_BUF_POOL_BASE + pool->id *
+						MSS_CP_CM3_BUF_POOL_OFFS, val);
+	} else if (en < 0) {
+		/* Remove BM pool from the port */
+		val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_CM3_BUF_POOL_BASE + pool->id * MSS_CP_CM3_BUF_POOL_OFFS);
+		val &= ~(0x1 << (port->id + MSS_CP_CM3_BUF_POOL_PORTS_OFFS));
+
+		/* Zero BM pool start and stop thresholds to disable pool flow control
+		 * if pool empty (not used by any port)
+		 */
+		if (!pool->buf_num) {
+			val &= ~MSS_CP_CM3_BUF_POOL_START_MASK;
+			val &= ~MSS_CP_CM3_BUF_POOL_STOP_MASK;
+		}
+
+		mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_CM3_BUF_POOL_BASE + pool->id * MSS_CP_CM3_BUF_POOL_OFFS, val);
+	}
+
+	/* Notify Firmware that Flow control config space ready for update */
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_FC_COM_REG);
+	val |= FLOW_CONTROL_UPDATE_COMMAND_BIT;
+	val |= cm3_state;
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
+}
+
 /* Notify the driver that BM pool is being used as specific type and return the
  * pool pointer on success
  */
@@ -1596,6 +1643,114 @@ void mv_pp2x_cleanup_txqs(struct mv_pp2x_port *port)
 
 	val &= ~MVPP2_TX_PORT_FLUSH_MASK(port->id);
 	mv_pp2x_write(hw, MVPP2_TX_PORT_FLUSH_REG, val);
+}
+
+/* Routine calculate single queue shares address space */
+static int mv_pp22_calc_shared_addr_space(struct mv_pp2x_port *port)
+{
+	/* If number of CPU's greater or higher than number of CPU's, return last address space */
+	if (num_active_cpus() >= MVPP2_MAX_ADDR_SPACES)
+		return MVPP2_MAX_ADDR_SPACES - 1;
+
+	return num_active_cpus();
+}
+
+/* Routine enable flow control for RXQs conditon */
+void mv_pp2x_rxq_enable_fc(struct mv_pp2x_port *port)
+{
+	int val, cm3_state, host_id, queue;
+
+	/* Remove Flow control enable bit to prevent race between FW and Kernel
+	 * If Flow control were enabled, it would be re-enabled.
+	 */
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_FC_COM_REG);
+	cm3_state = (val & FLOW_CONTROL_ENABLE_BIT);
+	val &= ~FLOW_CONTROL_ENABLE_BIT;
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
+
+	/* Set same Flow control for all RXQs */
+	for (queue = 0; queue < port->num_rx_queues; queue++) {
+		/* Set stop and start Flow control RXQ thresholds */
+		val = MSS_CP_CM3_THRESHOLD_START;
+		val |= (MSS_CP_CM3_THRESHOLD_STOP << MSS_CP_CM3_RXQ_TRESH_STOP_OFFS);
+		mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_CM3_RXQ_TRESH_BASE + ((queue + port->first_rxq)
+						* MSS_CP_CM3_RXQ_TRESH_OFFS), val);
+
+		val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_CM3_RXQ_ASS_REG(queue, port->first_rxq));
+		/* Set RXQ port ID */
+		val &= ~(MSS_CP_CM3_RXQ_ASS_PORTID_MASK << (((queue + port->first_rxq) % MSS_CP_CM3_RXQ_ASS_PER_REG)
+			* MSS_CP_CM3_RXQ_ASS_PER_OFFS));
+		val |= (port->id << (((queue + port->first_rxq) % MSS_CP_CM3_RXQ_ASS_PER_REG)
+			* MSS_CP_CM3_RXQ_ASS_PER_OFFS));
+		val &= ~(MSS_CP_CM3_RXQ_ASS_HOSTID_MASK << (((queue + port->first_rxq) % MSS_CP_CM3_RXQ_ASS_PER_REG)
+			* MSS_CP_CM3_RXQ_ASS_PER_OFFS + MSS_CP_CM3_RXQ_ASS_HOSTID_OFFS));
+
+		/* Calculate RXQ host ID:
+		 * In Single queue mode: Host ID equal to Host ID used for shared RX interrupt
+		 * In Multi queue mode: Host ID equal to number of RXQ ID / number of CoS queues
+		 * In Single resource mode: Host ID always equal to 0
+		 */
+		if (mv_pp2x_queue_mode == MVPP2_QDIST_SINGLE_MODE)
+			host_id = mv_pp22_calc_shared_addr_space(port);
+		else if (mv_pp2x_queue_mode == MVPP2_QDIST_MULTI_MODE)
+			host_id = queue / mv_pp2x_num_cos_queues;
+		else
+			host_id = 0;
+
+		/* Set RXQ host ID */
+		val |= (host_id << (((queue + port->first_rxq) % MSS_CP_CM3_RXQ_ASS_PER_REG)
+			* MSS_CP_CM3_RXQ_ASS_PER_OFFS + MSS_CP_CM3_RXQ_ASS_HOSTID_OFFS));
+
+		mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_CM3_RXQ_ASS_REG(queue, port->first_rxq), val);
+	}
+
+	/* Notify Firmware that Flow control config space ready for update */
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_FC_COM_REG);
+	val |= FLOW_CONTROL_UPDATE_COMMAND_BIT;
+	val |= cm3_state;
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
+}
+
+/* Routine disable flow control for RXQs conditon */
+void mv_pp2x_rxq_disable_fc(struct mv_pp2x_port *port)
+{
+	int val, cm3_state, queue;
+
+	/* Remove Flow control enable bit to prevent race between FW and Kernel
+	 * If Flow control were enabled, it would be re-enabled.
+	 */
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_FC_COM_REG);
+	cm3_state = (val & FLOW_CONTROL_ENABLE_BIT);
+	val &= ~FLOW_CONTROL_ENABLE_BIT;
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
+
+	/* Disable Flow control for all RXQs */
+	for (queue = 0; queue < port->num_rx_queues; queue++) {
+		/* Set threshold 0 to disable Flow control */
+		val = 0;
+		val |= (0 << MSS_CP_CM3_RXQ_TRESH_STOP_OFFS);
+		mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_CM3_RXQ_TRESH_BASE + ((queue + port->first_rxq)
+							* MSS_CP_CM3_RXQ_TRESH_OFFS), val);
+
+		val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_CM3_RXQ_ASS_REG(queue, port->first_rxq));
+
+		val &= ~(MSS_CP_CM3_RXQ_ASS_PORTID_MASK << (((queue + port->first_rxq) % MSS_CP_CM3_RXQ_ASS_PER_REG)
+				* MSS_CP_CM3_RXQ_ASS_PER_OFFS));
+		val |= (0 << (((queue + port->first_rxq) % MSS_CP_CM3_RXQ_ASS_PER_REG) * MSS_CP_CM3_RXQ_ASS_PER_OFFS));
+		val &= ~(MSS_CP_CM3_RXQ_ASS_HOSTID_MASK << (((queue + port->first_rxq) % MSS_CP_CM3_RXQ_ASS_PER_REG)
+			* MSS_CP_CM3_RXQ_ASS_PER_OFFS + MSS_CP_CM3_RXQ_ASS_HOSTID_OFFS));
+
+		val |= (0 << (((queue + port->first_rxq) % MSS_CP_CM3_RXQ_ASS_PER_REG) * MSS_CP_CM3_RXQ_ASS_PER_OFFS
+						+ MSS_CP_CM3_RXQ_ASS_HOSTID_OFFS));
+
+		mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_CM3_RXQ_ASS_REG(queue, port->first_rxq), val);
+	}
+
+	/* Notify Firmware that Flow control config space ready for update */
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_FC_COM_REG);
+	val |= FLOW_CONTROL_UPDATE_COMMAND_BIT;
+	val |= cm3_state;
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
 }
 
 /* Cleanup all Rx queues */
