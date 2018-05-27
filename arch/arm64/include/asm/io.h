@@ -55,10 +55,20 @@ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
 }
 
 #define __raw_writeq __raw_writeq
+#ifdef CONFIG_MMIO_64BIT
 static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
 {
 	asm volatile("str %x0, [%1]" : : "rZ" (val), "r" (addr));
 }
+#else
+static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+{
+	u8 *low = (u8 *)addr;
+	u8 *high = low + 4;
+	asm volatile("str %w0, [%1]" : : "rZ" (val & U32_MAX), "r" (low));
+	asm volatile("str %w0, [%1]" : : "rZ" (val >> 32), "r" (high));
+}
+#endif
 
 #define __raw_readb __raw_readb
 static inline u8 __raw_readb(const volatile void __iomem *addr)
@@ -95,6 +105,7 @@ static inline u32 __raw_readl(const volatile void __iomem *addr)
 }
 
 #define __raw_readq __raw_readq
+#ifdef CONFIG_MMIO_64BIT
 static inline u64 __raw_readq(const volatile void __iomem *addr)
 {
 	u64 val;
@@ -104,6 +115,29 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
 		     : "=r" (val) : "r" (addr));
 	return val;
 }
+#else
+static inline u64 __raw_readq(const volatile void __iomem *addr)
+{
+	u64 val = 0;
+	u32 temp;
+	u8 *low = (u8 *)addr;
+	u8 *high = low + 4;
+
+	asm volatile(ALTERNATIVE("ldr %w0, [%1]",
+				 "ldar %w0, [%1]",
+				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
+		     : "=r" (temp) : "r" (high));
+	val = temp;
+	val = val << 32;
+	asm volatile(ALTERNATIVE("ldr %w0, [%1]",
+				 "ldar %w0, [%1]",
+				 ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE)
+		     : "=r" (temp) : "r" (low));
+	val |= temp;
+
+	return val;
+}
+#endif
 
 /* IO barriers */
 #define __iormb()		rmb()
