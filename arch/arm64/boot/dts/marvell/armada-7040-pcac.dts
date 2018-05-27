@@ -60,6 +60,11 @@
 
 	chosen { };
 
+	aliases {
+		ethernet0 = &cp0_emac0;
+		ethernet1 = &cp0_emac2;
+	};
+
 	ap806 {
 		config-space {
 			spi0: spi@510600 {

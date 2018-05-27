@@ -54,6 +54,11 @@
 		reg = <0x0 0x0 0x0 0x80000000>;
 	};
 
+	aliases {
+		ethernet0 = &cp0_emac0;
+		ethernet1 = &cp0_emac2;
+	};
+
 	/delete-node/opp_table0;
 	/delete-node/opp_table1;
 
