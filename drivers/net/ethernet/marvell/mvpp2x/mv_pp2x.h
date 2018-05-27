@@ -164,6 +164,7 @@
 /* Coalescing */
 #define MVPP2_TXDONE_COAL_PKTS		32
 #define MVPP2_TXDONE_HRTIMER_USEC	100UL
+#define MVPP2_GUARD_TXDONE_HRTIMER_USEC	(10 * USEC_PER_MSEC)
 #define MVPP2_TX_HRTIMER_PERIOD_NS	50000UL
 #define MVPP2_TXDONE_COAL_USEC		1000
 
@@ -642,13 +643,21 @@ struct mv_pp2x_pcpu_stats {
 /* Per-CPU port control */
 struct mv_pp2x_port_pcpu {
 	struct hrtimer tx_done_timer;
+	/* _scheduled: hrtimer already running OR not to be started */
 	bool timer_scheduled;
+	bool guard_timer_scheduled;
 	ktime_t tx_time_coal_hrtmr;
 	/* Tasklet for egress finalization */
 	struct tasklet_struct tx_done_tasklet;
 	int ext_buf_size;
 	struct list_head ext_buf_port_list;
 	struct mv_pp2x_ext_buf_pool *ext_buf_pool;
+
+	/* tx-done guard timer fields */
+	struct mv_pp2x_port *port; /* reference to get from tx_done_timer */
+	bool tx_done_passed;	/* tx-done passed since last guard-check */
+	u8 txq_coal_is_zero_map; /* map tx queues (max=8) forced coal=Zero */
+	u8 txq_busy_suspect_map; /* map suspect txq to be forced */
 };
 
 /* Per-CPU CP control */
