@@ -631,6 +631,12 @@ config CPU_BIG_ENDIAN
        help
          Say Y if you plan on running a kernel in big-endian mode.
 
+config MMIO_64BIT
+	bool "64BIT MMIO Access"
+	default n
+	help
+	  Say Y if you your platform supports 64bit MMIO access.
+
 config SCHED_MC
 	bool "Multi-core scheduler support"
 	help
