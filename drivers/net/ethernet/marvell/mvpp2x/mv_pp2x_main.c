@@ -7028,7 +7028,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	struct mv_pp2x *priv;
 	struct mv_pp2x_hw *hw;
 	int port_count = 0, cpu;
-	int i, err;
+	int i, err, val;
 	u32 cell_index = 0;
 	struct device_node *dn = pdev->dev.of_node;
 	struct device_node *port_node;
@@ -7217,6 +7217,14 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&priv->stats_task, mv_pp2x_get_device_stats);
 
 	queue_delayed_work(priv->workqueue, &priv->stats_task, stats_delay);
+
+	/* Enable global flow control.
+	 * In this stage global flow control enabled, but still disabled per port.
+	 */
+	val = mv_pp2x_cm3_read(hw, MSS_CP_FC_COM_REG);
+	val |= FLOW_CONTROL_ENABLE_BIT;
+	mv_pp2x_cm3_write(hw, MSS_CP_FC_COM_REG, val);
+
 	pr_debug("Platform Device Name : %s\n", kobject_name(&pdev->dev.kobj));
 	return 0;
 err_uio:
