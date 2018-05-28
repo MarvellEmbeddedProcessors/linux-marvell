@@ -4225,6 +4225,8 @@ static int mv_pp2x_phy_connect(struct mv_pp2x_port *port)
 		return -ENODEV;
 	}
 	phy_dev->supported &= PHY_GBIT_FEATURES;
+	phy_dev->supported &= ~SUPPORTED_1000baseT_Half; /* 1G-Half not supported */
+
 	phy_dev->advertising = phy_dev->supported;
 
 	port->mac_data.phy_dev = phy_dev;
