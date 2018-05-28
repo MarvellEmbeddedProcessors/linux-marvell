@@ -780,6 +780,7 @@ struct mv_pp2x_port {
 	bool interrupt_tx_done;
 
 	struct mv_pp2x_port_uio uio;
+	bool flow_control;
 };
 
 struct pp2x_hw_params {

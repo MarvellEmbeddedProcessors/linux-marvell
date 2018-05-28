@@ -1768,6 +1768,9 @@ void mv_pp2x_cleanup_rxqs(struct mv_pp2x_port *port)
 {
 	int queue;
 
+	if (port->flow_control)
+		mv_pp2x_rxq_disable_fc(port);
+
 	for (queue = 0; queue < port->num_rx_queues; queue++)
 		mv_pp2x_rxq_deinit(port, port->rxqs[queue]);
 }
@@ -1782,6 +1785,9 @@ int mv_pp2x_setup_rxqs(struct mv_pp2x_port *port)
 		if (err)
 			goto err_cleanup;
 	}
+
+	if (port->flow_control)
+		mv_pp2x_rxq_enable_fc(port);
 	return 0;
 
 err_cleanup:
@@ -6010,6 +6016,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		port->priv->pp2xdata->interrupt_tx_done = false;
 
 	musdk_status = of_get_property(port_node, "musdk-status", &statlen);
+
+	/* Disable Flow control by default */
+	port->flow_control = false;
 
 	mv_pp2x_port_init_config(port);
 
