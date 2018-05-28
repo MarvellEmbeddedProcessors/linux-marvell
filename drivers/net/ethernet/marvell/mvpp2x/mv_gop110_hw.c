@@ -810,13 +810,11 @@ int mv_gop110_gmac_fc_set(struct gop_hw *gop, int mac_num, enum mv_port_fc fc)
 		break;
 
 	case MV_PORT_FC_ENABLE:
-		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_FC_AN_MASK;
 		fc_en |= MV_GMAC_PORT_CTRL4_FC_EN_RX_MASK;
 		fc_en |= MV_GMAC_PORT_CTRL4_FC_EN_TX_MASK;
 		break;
 
 	case MV_PORT_FC_TX_ENABLE:
-		reg_val &= ~MV_GMAC_PORT_AUTO_NEG_CFG_EN_FC_AN_MASK;
 		fc_en |= MV_GMAC_PORT_CTRL4_FC_EN_TX_MASK;
 		break;
 
