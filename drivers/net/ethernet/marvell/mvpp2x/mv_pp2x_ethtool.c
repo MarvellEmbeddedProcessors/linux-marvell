@@ -318,7 +318,6 @@ static void mv_pp2x_get_pauseparam(struct net_device *dev,
 	struct mv_port_link_status status;
 	struct mv_mac_data *mac = &port->mac_data;
 	struct gop_hw *gop = &port->priv->hw.gop;
-	int gop_port = mac->gop_index;
 	phy_interface_t phy_mode;
 
 	if (port->priv->pp2_version == PPV21)
@@ -348,16 +347,12 @@ static void mv_pp2x_get_pauseparam(struct net_device *dev,
 		return;
 	}
 
-	if (status.rx_fc == MV_PORT_FC_ACTIVE || status.rx_fc == MV_PORT_FC_ENABLE)
+	if (status.rx_fc == MV_PORT_FC_ACTIVE || status.rx_fc == MV_PORT_FC_ENABLE) {
 		pause->rx_pause = 1;
 
-	if (mv_gop110_check_fca_tx_state(gop, gop_port)) {
-		pause->tx_pause = 1;
-		return;
+		if (port->flow_control)
+			pause->tx_pause = 1;
 	}
-
-	if (status.tx_fc == MV_PORT_FC_ACTIVE || status.tx_fc == MV_PORT_FC_ENABLE)
-		pause->tx_pause = 1;
 }
 
 /* Set pause fc settings for ethtools */
@@ -399,12 +394,9 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 		if (pause->autoneg) {
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_AN_SYM);
 			mv_gop110_autoneg_restart(gop, mac);
-			mv_gop110_fca_send_periodic(gop, gop_port, false);
-			}
-		else	{
+		} else {
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_AN_NO);
-			mv_gop110_fca_send_periodic(gop, gop_port, true);
-			}
+		}
 
 		if (pause->rx_pause)
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_RX_ENABLE);
@@ -412,13 +404,14 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_RX_DISABLE);
 
 		if (pause->tx_pause) {
+			port->flow_control = true;
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_TX_ENABLE);
-			mv_gop110_fca_tx_enable(gop, gop_port, false);
-			}
-		else	{
+			mv_pp2x_rxq_enable_fc(port);
+		} else {
+			port->flow_control = false;
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_TX_DISABLE);
-			mv_gop110_fca_tx_enable(gop, gop_port, true);
-			}
+			mv_pp2x_rxq_disable_fc(port);
+		}
 
 		mv_gop110_force_link_mode_set(gop, mac, false, false);
 	break;
@@ -437,11 +430,14 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_RX_DISABLE);
 
 		if (pause->tx_pause) {
-			mv_gop110_fca_tx_enable(gop, gop_port, false);
+			port->flow_control = true;
+			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_TX_ENABLE);
+			mv_pp2x_rxq_enable_fc(port);
 		} else	{
+			port->flow_control = false;
 			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_TX_DISABLE);
-			mv_gop110_fca_tx_enable(gop, gop_port, true);
-			}
+			mv_pp2x_rxq_disable_fc(port);
+		}
 	break;
 	default:
 		pr_err("%s: Wrong port mode (%d)", __func__, phy_mode);
