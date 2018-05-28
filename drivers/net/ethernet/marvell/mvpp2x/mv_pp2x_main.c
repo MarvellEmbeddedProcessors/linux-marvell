@@ -89,6 +89,7 @@ u8 mv_pp2x_num_cos_queues = 4;
 u8 mv_pp2x_rx_count = MVPP2_DEFAULT_RX_COUNT;
 
 static u8 mv_pp2x_queue_mode = MVPP2_QDIST_MULTI_MODE;
+static u8 mv_bm_underrun_protect = MVPP23_BM_UNPR_EN;
 static u8 mv_pp2x_used_addr_spaces;
 static u8 rss_mode = MVPP2_RSS_5T; /* Set 5-tuple default RSS mode */
 static u8 default_cpu;
@@ -183,6 +184,9 @@ MODULE_PARM_DESC(rx_count, "Set rx_count 8 or 16, def = 8. Parameter configure n
 
 module_param(txdone_tmr, byte, S_IRUGO);
 MODULE_PARM_DESC(txdone_tmr, "TX-done handling by 0:interrupt(default) or by 1:timer");
+
+module_param_named(bm_underrun_protect, mv_bm_underrun_protect, byte, S_IRUGO);
+MODULE_PARM_DESC(bm_underrun_protect, "Set BM underrun protect feature (0-1), def=1");
 
 /* BEGIN: module_params for testing only */
 module_param(port_cpu_bind_map, uint, S_IRUGO);
@@ -554,6 +558,16 @@ err_unroll_pools:
 	return err;
 }
 
+/* Routine enable PPv23 8 pool mode */
+static void mv_pp23_bm_set_8pool_mode(struct mv_pp2x *priv)
+{
+	int val;
+
+	val = mv_pp2x_read(&priv->hw, MVPP22_BM_POOL_BASE_ADDR_HIGH_REG);
+	val |= MVPP23_BM_8POOL_MODE;
+	mv_pp2x_write(&priv->hw, MVPP22_BM_POOL_BASE_ADDR_HIGH_REG, val);
+}
+
 static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 {
 	int i, err, cpu;
@@ -583,6 +597,13 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 			mv_pp2x_relaxed_write(&priv->hw, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
 					      0, cpu);
 		}
+	}
+
+	if (priv->pp2_version == PPV23 && mv_bm_underrun_protect == MVPP23_BM_UNPR_EN) {
+		priv->hw.mv_bm_underrun_protect = true;
+		mv_pp23_bm_set_8pool_mode(priv);
+	} else {
+		priv->hw.mv_bm_underrun_protect = false;
 	}
 
 	err = mv_pp2x_bm_pools_init(pdev, priv, first_pool, num_pools);

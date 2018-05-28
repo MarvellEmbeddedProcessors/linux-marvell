@@ -186,6 +186,9 @@
 #define MVPP2_BM_JUMBO_BUF_NUM		512
 #define MVPP2_BM_PER_CPU_THRESHOLD(num_of_cpus)	(num_of_cpus * 2)
 
+#define MVPP23_BM_UNPR_DIS	0
+#define MVPP23_BM_UNPR_EN	1
+
 #define MVPP2_ALL_BUFS			0
 
 #define RX_TOTAL_SIZE(buf_size)		((buf_size) + MV_ETH_SKB_SHINFO_SIZE)
@@ -528,6 +531,8 @@ struct mv_pp2x_hw {
 	struct mv_pp2x_c2_shadow *c2_shadow;
 
 	bool mv_pp2x_no_single_mode;
+	/* PPv23 BM underrun protect feature */
+	bool mv_bm_underrun_protect;
 };
 
 struct mv_pp2x_cos {

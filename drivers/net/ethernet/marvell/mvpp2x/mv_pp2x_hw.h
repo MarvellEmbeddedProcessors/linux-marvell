@@ -226,18 +226,18 @@ static inline dma_addr_t mv_pp2x_bm_phys_addr_get(struct mv_pp2x_hw *hw, u32 poo
 	return val;
 }
 
-static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,
-					     u32 pool,
-						      dma_addr_t pool_addr,
-						      int size)
+static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw, u32 pool,
+					     dma_addr_t pool_addr, int size)
 {
 	u32 val;
 
 	mv_pp2x_write(hw, MVPP2_BM_POOL_BASE_ADDR_REG(pool),
 		      lower_32_bits(pool_addr));
 #if defined(CONFIG_ARCH_DMA_ADDR_T_64BIT) && defined(CONFIG_PHYS_ADDR_T_64BIT)
-	mv_pp2x_write(hw, MVPP22_BM_POOL_BASE_ADDR_HIGH_REG,
-		      (upper_32_bits(pool_addr) & MVPP22_ADDR_HIGH_MASK));
+	val = mv_pp2x_read(hw, MVPP22_BM_POOL_BASE_ADDR_HIGH_REG);
+	val &= ~MVPP22_BM_POOL_BASE_ADDR_HIGH_MASK;
+	val |= (upper_32_bits(pool_addr) & MVPP22_ADDR_HIGH_MASK);
+	mv_pp2x_write(hw, MVPP22_BM_POOL_BASE_ADDR_HIGH_REG, val);
 #endif
 	mv_pp2x_write(hw, MVPP2_BM_POOL_SIZE_REG(pool), size);
 
@@ -245,8 +245,15 @@ static inline void mv_pp2x_bm_hw_pool_create(struct mv_pp2x_hw *hw,
 	val |= MVPP2_BM_START_MASK;
 	val &= ~MVPP2_BM_LOW_THRESH_MASK;
 	val &= ~MVPP2_BM_HIGH_THRESH_MASK;
-	val |= MVPP2_BM_LOW_THRESH_VALUE(MVPP2_BM_BPPI_LOW_THRESH);
-	val |= MVPP2_BM_HIGH_THRESH_VALUE(MVPP2_BM_BPPI_HIGH_THRESH);
+
+	/* Set 8 Pools BPPI threshold if BM underrun protection feature were enabled */
+	if (hw->mv_bm_underrun_protect) {
+		val |= MVPP2_BM_LOW_THRESH_VALUE(MVPP23_BM_BPPI_8POOL_LOW_THRESH);
+		val |= MVPP2_BM_HIGH_THRESH_VALUE(MVPP23_BM_BPPI_8POOL_HIGH_THRESH);
+	} else {
+		val |= MVPP2_BM_LOW_THRESH_VALUE(MVPP2_BM_BPPI_LOW_THRESH);
+		val |= MVPP2_BM_HIGH_THRESH_VALUE(MVPP2_BM_BPPI_HIGH_THRESH);
+	}
 
 	mv_pp2x_write(hw, MVPP2_BM_POOL_CTRL_REG(pool), val);
 }
