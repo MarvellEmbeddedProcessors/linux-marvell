@@ -92,6 +92,10 @@
 	non-removable;
 };
 
+&cp0_i2c0 {
+	status = "okay";
+};
+
 &cp0_sata0 {
 	status = "okay";
 	sata-port@1 {
