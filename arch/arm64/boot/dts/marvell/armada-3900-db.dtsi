@@ -117,15 +117,6 @@
 
 	cp0 {
 		config-space {
-			cp0_usb3h0: usb3@500000 {
-				status = "okay";
-			};
-			cp0_usb3h1: usb3@510000 {
-				separated-phys-for-usb2-usb3;
-				phys = <&cp0_comphy 4 COMPHY_USB3H1>;
-				phy-names = "usb3";
-				status = "okay";
-			};
 			nand@720000 {
 				nand-ecc-strength = <4>;
 				nand-ecc-step-size = <512>;
@@ -171,7 +162,6 @@
 				phy1: ethernet-phy@1 {
 					compatible = "ethernet-phy-ieee802.3-c45";
 					reg = <1>;
-					max-speed = <2500>;
 					marvell,c45-reg-init = <1 0xc000 0xfffe 0x1>; /* setup lane swap */
 				};
 			};
@@ -184,9 +174,6 @@
 					phy = <&phy0>;
 				};
 				cp0_emac2: mac2 {
-					phy-mode = "sgmii";
-					phy-speed = <1000>;
-					phys = <&cp0_comphy 3 COMPHY_SGMII1>;
 					phy-names = "comphy";
 					phy = <&phy1>;
 				};

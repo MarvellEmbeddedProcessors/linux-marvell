@@ -73,6 +73,25 @@
 				separated-phys-for-usb2-usb3;
 				phys = <&cp0_comphy 1 COMPHY_USB3H0>;
 				phy-names = "usb3";
+				status = "okay";
+			};
+			cp0_usb3h1: usb3@510000 {
+				separated-phys-for-usb2-usb3;
+				phys = <&cp0_comphy 4 COMPHY_USB3H1>;
+				phy-names = "usb3";
+				status = "okay";
+			};
+			mdio@12a600 {
+				phy1: ethernet-phy@1 {
+					max-speed = <2500>;
+				};
+			};
+			gop {
+				cp0_emac2: mac2 {
+					phy-mode = "sgmii";
+					phy-speed = <1000>;
+					phys = <&cp0_comphy 3 COMPHY_SGMII1>;
+				};
 			};
 		};
 
