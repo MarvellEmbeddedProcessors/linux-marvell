@@ -274,7 +274,7 @@ static int safexcel_hw_setup_rdesc_rings(struct safexcel_crypto_priv *priv)
 		/* Configure DMA tx control */
 		val = EIP197_HIA_xDR_CFG_WR_CACHE(WR_CACHE_3BITS);
 		val |= EIP197_HIA_xDR_CFG_RD_CACHE(RD_CACHE_3BITS);
-		val |= EIP197_HIA_xDR_WR_RES_BUF | EIP197_HIA_xDR_WR_CTRL_BUG;
+		val |= EIP197_HIA_xDR_WR_RES_BUF | EIP197_HIA_xDR_WR_CTRL_BUF;
 
 		if (priv->version == EIP197 &&
 		    priv->hw_ver == EIP197D) {
@@ -397,7 +397,7 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 		val |= EIP197_HIA_DxE_CFG_MIN_DATA_SIZE(7) |
 		       EIP197_HIA_DxE_CFG_MAX_DATA_SIZE(8);
 		val |= EIP197_HIA_DxE_CFG_DATA_CACHE_CTRL(WR_CACHE_3BITS);
-		val |= EIP197_HIA_DSE_CFG_ALLWAYS_BUFFERABLE;
+		val |= EIP197_HIA_DSE_CFG_ALWAYS_BUFFERABLE;
 		/* FIXME: instability issues can occur for EIP97 but disabling
 		 * it impact performances.
 		 */
