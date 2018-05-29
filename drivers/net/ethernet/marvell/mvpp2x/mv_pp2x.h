@@ -985,5 +985,6 @@ int mv_pp2x_txq_reserved_desc_num_proc(struct mv_pp2x *priv,
 				       int num, int cpu);
 int mv_pp2x_port_musdk_set(void *netdev_priv);
 int mv_pp2x_port_musdk_clear(void *netdev_priv);
+void mv_pp23_rx_fifo_fc_en(struct mv_pp2x *priv, int port, bool en);
 
 #endif /*_MVPP2_H_*/

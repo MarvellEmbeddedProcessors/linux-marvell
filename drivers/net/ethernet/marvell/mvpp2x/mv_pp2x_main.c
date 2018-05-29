@@ -6913,6 +6913,52 @@ static void mv_pp22_rx_fifo_init(struct mv_pp2x *priv)
 	mv_pp2x_write(&priv->hw, MVPP2_RX_FIFO_INIT_REG, 0x1);
 }
 
+/* Configure Rx FIFO Flow control thresholds */
+static void mv_pp23_rx_fifo_fc_set_tresh(struct mv_pp2x *priv)
+{
+	int port, val;
+
+	/* Port 0 maximum speed -10Gb/s port - required by spec RX FIFO threshold 9KB
+	 * Port 1 maximum speed -5Gb/s port - required by spec RX FIFO threshold 4KB
+	 * Port 2 maximum speed -1Gb/s port - required by spec RX FIFO threshold 2KB
+	 */
+
+	/* Without loopback port */
+	for (port = 0; port < (MVPP2_MAX_PORTS - 1); port++) {
+		if (port == 0) {
+			val = (MVPP23_PORT0_FIFO_THRESHOLD / MVPP2_RX_FLOW_CONTROL_TRSH_UNIT)
+				<< MVPP2_RX_FLOW_CONTROL_TRSH_OFFS;
+			val &= MVPP2_RX_FLOW_CONTROL_TRSH_MASK;
+			mv_pp2x_write(&priv->hw, MVPP2_RX_FLOW_CONTROL_REG(port), val);
+		} else if (port == 1) {
+			val = (MVPP23_PORT1_FIFO_THRESHOLD / MVPP2_RX_FLOW_CONTROL_TRSH_UNIT)
+				<< MVPP2_RX_FLOW_CONTROL_TRSH_OFFS;
+			val &= MVPP2_RX_FLOW_CONTROL_TRSH_MASK;
+			mv_pp2x_write(&priv->hw, MVPP2_RX_FLOW_CONTROL_REG(port), val);
+		} else {
+			val = (MVPP23_PORT2_FIFO_THRESHOLD / MVPP2_RX_FLOW_CONTROL_TRSH_UNIT)
+				<< MVPP2_RX_FLOW_CONTROL_TRSH_OFFS;
+			val &= MVPP2_RX_FLOW_CONTROL_TRSH_MASK;
+			mv_pp2x_write(&priv->hw, MVPP2_RX_FLOW_CONTROL_REG(port), val);
+		}
+	}
+}
+
+/* Configure Rx FIFO Flow control thresholds */
+void mv_pp23_rx_fifo_fc_en(struct mv_pp2x *priv, int port, bool en)
+{
+	int val;
+
+	val = mv_pp2x_read(&priv->hw, MVPP2_RX_FLOW_CONTROL_REG(port));
+
+	if (en)
+		val |= MVPP2_RX_FLOW_CONTROL_EN;
+	else
+		val &= ~MVPP2_RX_FLOW_CONTROL_EN;
+
+	mv_pp2x_write(&priv->hw, MVPP2_RX_FLOW_CONTROL_REG(port), val);
+}
+
 /* Initialize Tx FIFO's */
 static void mv_pp22_tx_fifo_init(struct mv_pp2x *priv)
 {
@@ -7233,6 +7279,8 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		mv_pp22_tx_fifo_init(priv);
 		mv_pp22_rx_fifo_init(priv);
 		mv_pp22_set_net_comp(priv);
+		if (priv->pp2_version == PPV23)
+			mv_pp23_rx_fifo_fc_set_tresh(priv);
 	} else {
 		mv_pp21_fifo_init(priv);
 	}
@@ -7384,6 +7432,8 @@ static int mv_pp2x_probe_after_suspend(struct device *dev)
 		mv_pp22_tx_fifo_init(priv);
 		mv_pp22_rx_fifo_init(priv);
 		mv_pp22_set_net_comp(priv);
+		if (priv->pp2_version == PPV23)
+			mv_pp23_rx_fifo_fc_set_tresh(priv);
 	} else {
 		mv_pp21_fifo_init(priv);
 	}

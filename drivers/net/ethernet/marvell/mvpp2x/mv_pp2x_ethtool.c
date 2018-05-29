@@ -407,10 +407,14 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 			port->flow_control = true;
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_TX_ENABLE);
 			mv_pp2x_rxq_enable_fc(port);
+			if (port->priv->pp2_version == PPV23)
+				mv_pp23_rx_fifo_fc_en(port->priv, port->id, true);
 		} else {
 			port->flow_control = false;
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_TX_DISABLE);
 			mv_pp2x_rxq_disable_fc(port);
+			if (port->priv->pp2_version == PPV23)
+				mv_pp23_rx_fifo_fc_en(port->priv, port->id, false);
 		}
 
 		mv_gop110_force_link_mode_set(gop, mac, false, false);
@@ -433,10 +437,14 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 			port->flow_control = true;
 			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_TX_ENABLE);
 			mv_pp2x_rxq_enable_fc(port);
+			if (port->priv->pp2_version == PPV23)
+				mv_pp23_rx_fifo_fc_en(port->priv, port->id, true);
 		} else	{
 			port->flow_control = false;
 			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_TX_DISABLE);
 			mv_pp2x_rxq_disable_fc(port);
+			if (port->priv->pp2_version == PPV23)
+				mv_pp23_rx_fifo_fc_en(port->priv, port->id, false);
 		}
 	break;
 	default:
