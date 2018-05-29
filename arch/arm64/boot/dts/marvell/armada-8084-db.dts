@@ -116,6 +116,10 @@
 	};
 };
 
+&cp0_i2c0 {
+	status = "okay";
+};
+
 &cp0_emac2 {
 	phy-mode = "rgmii"; /* rgmii-0 */
 	phy = <&mdio0_phy0>;
