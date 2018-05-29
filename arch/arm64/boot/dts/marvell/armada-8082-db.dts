@@ -130,6 +130,10 @@
 	};
 };
 
+&cp0_i2c0 {
+	status = "okay";
+};
+
 &cp0_ethernet {
 	status = "okay";
 };
