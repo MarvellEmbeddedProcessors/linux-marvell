@@ -26,74 +26,80 @@
 #include "dmaengine.h"
 
 /* DMA Engine Registers */
-#define DMA_DESQ_BALR_OFF	0x000
-#define DMA_DESQ_BAHR_OFF	0x004
-#define DMA_DESQ_SIZE_OFF	0x008
-#define DMA_DESQ_DONE_OFF	0x00C
-#define   DMA_DESQ_DONE_PENDING_MASK		0x7FFF
-#define   DMA_DESQ_DONE_PENDING_SHIFT		0
-#define   DMA_DESQ_DONE_READ_PTR_MASK		0x1FFF
-#define   DMA_DESQ_DONE_READ_PTR_SHIFT		16
-#define DMA_DESQ_ARATTR_OFF 	0x010
-#define   DMA_DESQ_ATTR_CACHE_MASK		0x3F3F
-#define   DMA_DESQ_ATTR_OUTER_SHAREABLE		0x202
-#define   DMA_DESQ_ATTR_CACHEABLE		0x3C3C
-#define DMA_IMSG_CDAT_OFF	0x014
-#define DMA_IMSG_THRD_OFF	0x018
-#define   DMA_IMSG_THRD_MASK			0x7FFF
-#define   DMA_IMSG_THRD_SHIFT			0x0
-#define   DMA_IMSG_TIMER_MASK			0x1
-#define   DMA_IMSG_TIMER_SHIFT			18
-#define DMA_DESQ_AWATTR_OFF	0x01C
-  /* Same flags as DMA_DESQ_ARATTR_OFF */
-#define DMA_DESQ_ALLOC_OFF	0x04C
-#define   DMA_DESQ_ALLOC_WRPTR_MASK		0xFFFF
-#define   DMA_DESQ_ALLOC_WRPTR_SHIFT		16
-#define DMA_IMSG_BALR_OFF	0x050
-#define DMA_IMSG_BAHR_OFF	0x054
-#define DMA_DESQ_CTRL_OFF	0x100
-#define	  DMA_DESQ_CTRL_32B			1
-#define   DMA_DESQ_CTRL_128B			7
-#define DMA_DESQ_STOP_OFF	0x800
-#define DMA_DESQ_DEALLOC_OFF	0x804
-#define DMA_DESQ_ADD_OFF	0x808
-#define DMA_IMSG_TMOT		0x810
-#define   DMA_IMSG_TIMER_THRD_MASK		0x1FFF
-#define   DMA_IMSG_TIMER_THRD_SHIFT		0x0
+#define MV_XOR_V2_DMA_DESQ_BALR_OFF			0x000
+#define MV_XOR_V2_DMA_DESQ_BAHR_OFF			0x004
+#define MV_XOR_V2_DMA_DESQ_SIZE_OFF			0x008
+#define MV_XOR_V2_DMA_DESQ_DONE_OFF			0x00C
+#define   MV_XOR_V2_DMA_DESQ_DONE_PENDING_MASK		0x7FFF
+#define   MV_XOR_V2_DMA_DESQ_DONE_PENDING_SHIFT		0
+#define   MV_XOR_V2_DMA_DESQ_DONE_READ_PTR_MASK		0x1FFF
+#define   MV_XOR_V2_DMA_DESQ_DONE_READ_PTR_SHIFT	16
+#define MV_XOR_V2_DMA_DESQ_ARATTR_OFF			0x010
+#define   MV_XOR_V2_DMA_DESQ_ATTR_CACHE_MASK		0x3F3F
+#define   MV_XOR_V2_DMA_DESQ_ATTR_OUTER_SHAREABLE	0x202
+#define   MV_XOR_V2_DMA_DESQ_ATTR_CACHEABLE		0x3C3C
+#define MV_XOR_V2_DMA_IMSG_CDAT_OFF			0x014
+#define MV_XOR_V2_DMA_IMSG_THRD_OFF			0x018
+#define   MV_XOR_V2_DMA_IMSG_THRD_MASK			0x7FFF
+#define   MV_XOR_V2_DMA_IMSG_THRD_SHIFT			0x0
+#define   MV_XOR_V2_DMA_IMSG_TIMER_EN			BIT(18)
+#define MV_XOR_V2_DMA_DESQ_AWATTR_OFF			0x01C
+  /* Same flags as MV_XOR_V2_DMA_DESQ_ARATTR_OFF */
+#define MV_XOR_V2_DMA_DESQ_ALLOC_OFF			0x04C
+#define   MV_XOR_V2_DMA_DESQ_ALLOC_WRPTR_MASK		0xFFFF
+#define   MV_XOR_V2_DMA_DESQ_ALLOC_WRPTR_SHIFT		16
+#define MV_XOR_V2_DMA_IMSG_BALR_OFF			0x050
+#define MV_XOR_V2_DMA_IMSG_BAHR_OFF			0x054
+#define MV_XOR_V2_DMA_DESQ_CTRL_OFF			0x100
+#define	  MV_XOR_V2_DMA_DESQ_CTRL_32B			1
+#define   MV_XOR_V2_DMA_DESQ_CTRL_128B			7
+#define MV_XOR_V2_DMA_DESQ_STOP_OFF			0x800
+#define MV_XOR_V2_DMA_DESQ_DEALLOC_OFF			0x804
+#define MV_XOR_V2_DMA_DESQ_ADD_OFF			0x808
+#define MV_XOR_V2_DMA_IMSG_TMOT				0x810
+#define   MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK		0x1FFF
+#define   MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT		0
 
 /* XOR Global registers */
-#define GLOB_BW_CTRL		0x4
-#define   GLOB_BW_CTRL_NUM_OSTD_RD_SHIFT	0
-#define   GLOB_BW_CTRL_NUM_OSTD_RD_VAL		64
-#define   GLOB_BW_CTRL_NUM_OSTD_WR_SHIFT	8
-#define   GLOB_BW_CTRL_NUM_OSTD_WR_VAL		8
-#define   GLOB_BW_CTRL_RD_BURST_LEN_SHIFT	12
-#define   GLOB_BW_CTRL_RD_BURST_LEN_VAL		4
-#define   GLOB_BW_CTRL_WR_BURST_LEN_SHIFT	16
-#define   GLOB_BW_CTRL_WR_BURST_LEN_VAL      	4
-#define GLOB_PAUSE		0x014
-#define   GLOB_PAUSE_AXI_TIME_DIS_VAL		0x8
-#define GLOB_SYS_INT_CAUSE	0x200
-#define GLOB_SYS_INT_MASK	0x204
-#define GLOB_MEM_INT_CAUSE	0x220
-#define GLOB_MEM_INT_MASK	0x224
+#define MV_XOR_V2_GLOB_BW_CTRL				0x4
+#define   MV_XOR_V2_GLOB_BW_CTRL_NUM_OSTD_RD_SHIFT	0
+#define   MV_XOR_V2_GLOB_BW_CTRL_NUM_OSTD_RD_VAL	64
+#define   MV_XOR_V2_GLOB_BW_CTRL_NUM_OSTD_WR_SHIFT	8
+#define   MV_XOR_V2_GLOB_BW_CTRL_NUM_OSTD_WR_VAL	8
+#define   MV_XOR_V2_GLOB_BW_CTRL_RD_BURST_LEN_SHIFT	12
+#define   MV_XOR_V2_GLOB_BW_CTRL_RD_BURST_LEN_VAL	4
+#define   MV_XOR_V2_GLOB_BW_CTRL_WR_BURST_LEN_SHIFT	16
+#define	  MV_XOR_V2_GLOB_BW_CTRL_WR_BURST_LEN_VAL	4
+#define MV_XOR_V2_GLOB_PAUSE				0x014
+#define   MV_XOR_V2_GLOB_PAUSE_AXI_TIME_DIS_VAL		0x8
+#define MV_XOR_V2_GLOB_SYS_INT_CAUSE			0x200
+#define MV_XOR_V2_GLOB_SYS_INT_MASK			0x204
+#define MV_XOR_V2_GLOB_MEM_INT_CAUSE			0x220
+#define MV_XOR_V2_GLOB_MEM_INT_MASK			0x224
 
-#define MV_XOR_V2_MIN_DESC_SIZE		32
-#define MV_XOR_V2_EXT_DESC_SIZE		128
+#define MV_XOR_V2_MIN_DESC_SIZE				32
+#define MV_XOR_V2_EXT_DESC_SIZE				128
 
-#define MV_XOR_V2_DESC_RESERVED_SIZE	12
-#define MV_XOR_V2_DESC_BUFF_D_ADDR_SIZE	12
+#define MV_XOR_V2_DESC_RESERVED_SIZE			12
+#define MV_XOR_V2_DESC_BUFF_D_ADDR_SIZE			12
 
-#define MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF 8
+#define MV_XOR_V2_CMD_LINE_NUM_MAX_D_BUF		8
 
-/* descriptors queue size */
-#define MV_XOR_V2_MAX_DESC_NUM	1024
+/*
+ * Descriptors queue size. With 32 bytes descriptors, up to 2^14
+ * descriptors are allowed, with 128 bytes descriptors, up to 2^12
+ * descriptors are allowed. This driver uses 128 bytes descriptors,
+ * but experimentation has shown that a set of 1024 descriptors is
+ * sufficient to reach a good level of performance.
+ */
+#define MV_XOR_V2_DESC_NUM				1024
 
-/* Threshold values for descriptors and timeout
-** got this values after runnig benchmarks with RAID5
-*/
-#define MV_XOR_DONE_IMSG_THRD	0x14
-#define MV_XOR_TIMER_THRD	0xB0
+/*
+ * Threshold values for descriptors and timeout, determined by
+ * experimentation as giving a good level of performance.
+ */
+#define MV_XOR_V2_DONE_IMSG_THRD  0x14
+#define MV_XOR_V2_TIMER_THRD      0xB0
 
 /**
  * struct mv_xor_v2_descriptor - DMA HW descriptor
@@ -115,9 +121,9 @@ struct mv_xor_v2_descriptor {
 	u32 desc_ctrl;
 
 	/* Definitions for desc_ctrl */
-#define DESC_NUM_ACTIVE_D_BUF_SHIFT 	22
-#define DESC_OP_MODE_SHIFT  		28
-#define DESC_OP_MODE_NOP 		0	/* Idle operation */
+#define DESC_NUM_ACTIVE_D_BUF_SHIFT	22
+#define DESC_OP_MODE_SHIFT		28
+#define DESC_OP_MODE_NOP		0	/* Idle operation */
 #define DESC_OP_MODE_MEMCPY		1	/* Pure-DMA operation */
 #define DESC_OP_MODE_MEMSET		2	/* Mem-Fill operation */
 #define DESC_OP_MODE_MEMINIT		3	/* Mem-Init operation */
@@ -241,7 +247,7 @@ static void mv_xor_v2_add_desc_to_desq(struct mv_xor_v2_device *xor_dev,
 				       int num_of_desc)
 {
 	/* write the number of new descriptors in the DESQ. */
-	writel(num_of_desc, xor_dev->dma_base + DMA_DESQ_ADD_OFF);
+	writel(num_of_desc, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_ADD_OFF);
 }
 
 /*
@@ -251,7 +257,7 @@ static void mv_xor_v2_free_desc_from_desq(struct mv_xor_v2_device *xor_dev,
 					  int num_of_desc)
 {
 	/* write the number of new descriptors in the DESQ. */
-	writel(num_of_desc, xor_dev->dma_base + DMA_DESQ_DEALLOC_OFF);
+	writel(num_of_desc, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_DEALLOC_OFF);
 }
 
 /*
@@ -260,8 +266,8 @@ static void mv_xor_v2_free_desc_from_desq(struct mv_xor_v2_device *xor_dev,
  */
 static int mv_xor_v2_set_desc_size(struct mv_xor_v2_device *xor_dev)
 {
-	writel(DMA_DESQ_CTRL_128B,
-	       xor_dev->dma_base + DMA_DESQ_CTRL_OFF);
+	writel(MV_XOR_V2_DMA_DESQ_CTRL_128B,
+	       xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_CTRL_OFF);
 
 	return MV_XOR_V2_EXT_DESC_SIZE;
 }
@@ -291,20 +297,19 @@ void mv_xor_v2_enable_imsg_thrd(struct mv_xor_v2_device *xor_dev)
 {
 	u32 reg;
 
-	reg = readl(xor_dev->dma_base + DMA_IMSG_THRD_OFF);
-	/* Configure threshold for IMSG */
-	reg &= (~DMA_IMSG_THRD_MASK << DMA_IMSG_THRD_SHIFT);
-	reg |= (MV_XOR_DONE_IMSG_THRD << DMA_IMSG_THRD_SHIFT);
-	/* Enable IMSG-timer */
-	reg &= ~(DMA_IMSG_TIMER_MASK << DMA_IMSG_TIMER_SHIFT);
-	reg |= (0x1 << DMA_IMSG_TIMER_SHIFT);
-	writel(reg, xor_dev->dma_base + DMA_IMSG_THRD_OFF);
+	/* Configure threshold of number of descriptors, and enable timer */
+	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
+	reg &= (~MV_XOR_V2_DMA_IMSG_THRD_MASK << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
+	reg |= (MV_XOR_V2_DONE_IMSG_THRD << MV_XOR_V2_DMA_IMSG_THRD_SHIFT);
+	reg |= MV_XOR_V2_DMA_IMSG_TIMER_EN;
+	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
 
 	/* Configure Timer Threshold */
-	reg = readl(xor_dev->dma_base + DMA_IMSG_TMOT);
-	reg &= (~DMA_IMSG_TIMER_THRD_MASK << DMA_IMSG_TIMER_THRD_SHIFT);
-	reg |= (MV_XOR_TIMER_THRD << DMA_IMSG_TIMER_THRD_SHIFT);
-	writel(reg, xor_dev->dma_base + DMA_IMSG_TMOT);
+	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
+	reg &= (~MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK <<
+		MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
+	reg |= (MV_XOR_V2_TIMER_THRD << MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
+	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
 }
 
 static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
@@ -346,7 +351,7 @@ mv_xor_v2_tx_submit(struct dma_async_tx_descriptor *tx)
 	 * Increase the push index for the HW queue and check if reach
 	 * the end of HW buffer
 	 */
-	if (++xor_dev->hw_queue_idx >= MV_XOR_V2_MAX_DESC_NUM)
+	if (++xor_dev->hw_queue_idx >= MV_XOR_V2_DESC_NUM)
 		xor_dev->hw_queue_idx = 0;
 
 	memcpy(dest_hw_desc, &sw_desc->hw_desc, xor_dev->desc_size);
@@ -689,15 +694,15 @@ int mv_xor_v2_get_pending_params(struct mv_xor_v2_device *xor_dev,
 {
 	u32 reg;
 
-	reg = readl(xor_dev->dma_base + DMA_DESQ_DONE_OFF);
+	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_DONE_OFF);
 
 	/* get the next pending descriptor index */
-	*pending_ptr = ((reg >> DMA_DESQ_DONE_READ_PTR_SHIFT) &
-			DMA_DESQ_DONE_READ_PTR_MASK);
+	*pending_ptr = ((reg >> MV_XOR_V2_DMA_DESQ_DONE_READ_PTR_SHIFT) &
+			MV_XOR_V2_DMA_DESQ_DONE_READ_PTR_MASK);
 
 	/* get the number of descriptors pending handle */
-	return ((reg >> DMA_DESQ_DONE_PENDING_SHIFT) &
-		DMA_DESQ_DONE_PENDING_MASK);
+	return ((reg >> MV_XOR_V2_DMA_DESQ_DONE_PENDING_SHIFT) &
+		MV_XOR_V2_DMA_DESQ_DONE_PENDING_MASK);
 }
 
 /*
@@ -730,7 +735,7 @@ static void mv_xor_v2_tasklet(unsigned long data)
 	/* loop over free descriptors */
 	for (i = 0; i < num_of_pending; i++) {
 
-		if (pending_ptr >= MV_XOR_V2_MAX_DESC_NUM)
+		if (pending_ptr >= MV_XOR_V2_DESC_NUM)
 			pending_ptr = 0;
 
 		next_pending_hw_desc = (struct mv_xor_v2_descriptor *)
@@ -792,9 +797,12 @@ static void mv_xor_v2_set_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
 {
 	struct mv_xor_v2_device *xor_dev = dev_get_drvdata(desc->dev);
 
-	writel(msg->address_lo, xor_dev->dma_base + DMA_IMSG_BALR_OFF);
-	writel(msg->address_hi & 0xFFFF, xor_dev->dma_base + DMA_IMSG_BAHR_OFF);
-	writel(msg->data, xor_dev->dma_base + DMA_IMSG_CDAT_OFF);
+	writel(msg->address_lo,
+	       xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_BALR_OFF);
+	writel(msg->address_hi & 0xFFFF,
+	       xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_BAHR_OFF);
+	writel(msg->data,
+	       xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_CDAT_OFF);
 }
 
 static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
@@ -802,13 +810,14 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 	u32 reg;
 
 	/* write the DESQ size to the DMA engine */
-	writel(MV_XOR_V2_MAX_DESC_NUM, xor_dev->dma_base + DMA_DESQ_SIZE_OFF);
+	writel(MV_XOR_V2_DESC_NUM,
+	       xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_SIZE_OFF);
 
 	/* write the DESQ address to the DMA enngine*/
 	writel(xor_dev->hw_desq & 0xFFFFFFFF,
-	       xor_dev->dma_base + DMA_DESQ_BALR_OFF);
+	       xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_BALR_OFF);
 	writel((xor_dev->hw_desq & 0xFFFF00000000) >> 32,
-	       xor_dev->dma_base + DMA_DESQ_BAHR_OFF);
+	       xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_BAHR_OFF);
 
 	/*
 	 * This is a temporary solution, until we activate the
@@ -819,15 +828,17 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 	 *  - Enable cacheable - Bufferable, Modifiable, Other Allocate
 	 *    and Allocate
 	 */
-	reg = readl(xor_dev->dma_base + DMA_DESQ_ARATTR_OFF);
-	reg &= ~DMA_DESQ_ATTR_CACHE_MASK;
-	reg |= DMA_DESQ_ATTR_OUTER_SHAREABLE | DMA_DESQ_ATTR_CACHEABLE;
-	writel(reg, xor_dev->dma_base + DMA_DESQ_ARATTR_OFF);
+	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_ARATTR_OFF);
+	reg &= ~MV_XOR_V2_DMA_DESQ_ATTR_CACHE_MASK;
+	reg |= MV_XOR_V2_DMA_DESQ_ATTR_OUTER_SHAREABLE |
+		MV_XOR_V2_DMA_DESQ_ATTR_CACHEABLE;
+	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_ARATTR_OFF);
 
-	reg = readl(xor_dev->dma_base + DMA_DESQ_AWATTR_OFF);
-	reg &= ~DMA_DESQ_ATTR_CACHE_MASK;
-	reg |= DMA_DESQ_ATTR_OUTER_SHAREABLE | DMA_DESQ_ATTR_CACHEABLE;
-	writel(reg, xor_dev->dma_base + DMA_DESQ_AWATTR_OFF);
+	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_AWATTR_OFF);
+	reg &= ~MV_XOR_V2_DMA_DESQ_ATTR_CACHE_MASK;
+	reg |= MV_XOR_V2_DMA_DESQ_ATTR_OUTER_SHAREABLE |
+		MV_XOR_V2_DMA_DESQ_ATTR_CACHEABLE;
+	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_AWATTR_OFF);
 
 	/* BW CTRL - set values to optimize the XOR performance:
 	 *
@@ -836,19 +847,23 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 	 * -  Limit the number of outstanding write & read data
 	 *    (OBB/IBB) requests to the maximal value.
 	*/
-	reg = (GLOB_BW_CTRL_NUM_OSTD_RD_VAL << GLOB_BW_CTRL_NUM_OSTD_RD_SHIFT) |
-		(GLOB_BW_CTRL_NUM_OSTD_WR_VAL << GLOB_BW_CTRL_NUM_OSTD_WR_SHIFT) |
-		(GLOB_BW_CTRL_RD_BURST_LEN_VAL << GLOB_BW_CTRL_RD_BURST_LEN_SHIFT) |
-		(GLOB_BW_CTRL_WR_BURST_LEN_VAL << GLOB_BW_CTRL_WR_BURST_LEN_SHIFT);
-	writel(reg, xor_dev->glob_base + GLOB_BW_CTRL);
+	reg = ((MV_XOR_V2_GLOB_BW_CTRL_NUM_OSTD_RD_VAL <<
+		MV_XOR_V2_GLOB_BW_CTRL_NUM_OSTD_RD_SHIFT) |
+	       (MV_XOR_V2_GLOB_BW_CTRL_NUM_OSTD_WR_VAL  <<
+		MV_XOR_V2_GLOB_BW_CTRL_NUM_OSTD_WR_SHIFT) |
+	       (MV_XOR_V2_GLOB_BW_CTRL_RD_BURST_LEN_VAL <<
+		MV_XOR_V2_GLOB_BW_CTRL_RD_BURST_LEN_SHIFT) |
+	       (MV_XOR_V2_GLOB_BW_CTRL_WR_BURST_LEN_VAL <<
+		MV_XOR_V2_GLOB_BW_CTRL_WR_BURST_LEN_SHIFT));
+	writel(reg, xor_dev->glob_base + MV_XOR_V2_GLOB_BW_CTRL);
 
 	/* Disable the AXI timer feature */
-	reg = readl(xor_dev->glob_base + GLOB_PAUSE);
-	reg |= GLOB_PAUSE_AXI_TIME_DIS_VAL;
-	writel(reg, xor_dev->glob_base + GLOB_PAUSE);
+	reg = readl(xor_dev->glob_base + MV_XOR_V2_GLOB_PAUSE);
+	reg |= MV_XOR_V2_GLOB_PAUSE_AXI_TIME_DIS_VAL;
+	writel(reg, xor_dev->glob_base + MV_XOR_V2_GLOB_PAUSE);
 
 	/* enable the DMA engine */
-	writel(0, xor_dev->dma_base + DMA_DESQ_STOP_OFF);
+	writel(0, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
 
 	return 0;
 }
@@ -860,7 +875,7 @@ static int mv_xor_v2_suspend(struct platform_device *dev, pm_message_t state)
 	dev_dbg(xor_dev->dmadev.dev, "%s %d\n", __func__, __LINE__);
 
 	/* Set this bit to disable to stop the XOR unit. */
-	writel(0x1, xor_dev->dma_base + DMA_DESQ_STOP_OFF);
+	writel(0x1, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
 
 	return 0;
 }
@@ -962,7 +977,7 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	 */
 	xor_dev->hw_desq_virt =
 		dma_alloc_coherent(&pdev->dev,
-				   xor_dev->desc_size * MV_XOR_V2_MAX_DESC_NUM,
+				   xor_dev->desc_size * MV_XOR_V2_DESC_NUM,
 				   &xor_dev->hw_desq, GFP_KERNEL);
 	if (!xor_dev->hw_desq_virt) {
 		ret = -ENOMEM;
@@ -971,7 +986,7 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 
 	/* alloc memory for the SW descriptors */
 	xor_dev->sw_desq = devm_kzalloc(&pdev->dev, sizeof(*sw_desc) *
-					MV_XOR_V2_MAX_DESC_NUM, GFP_KERNEL);
+					MV_XOR_V2_DESC_NUM, GFP_KERNEL);
 	if (!xor_dev->sw_desq) {
 		ret = -ENOMEM;
 		goto free_hw_desq;
@@ -987,7 +1002,7 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&xor_dev->alloc_sw_desc);
 
 	/* add all SW descriptors to the free list */
-	for (i = 0; i < MV_XOR_V2_MAX_DESC_NUM; i++) {
+	for (i = 0; i < MV_XOR_V2_DESC_NUM; i++) {
 		xor_dev->sw_desq[i].idx = i;
 		list_add(&xor_dev->sw_desq[i].node,
 			 &xor_dev->free_sw_desc);
@@ -1038,7 +1053,7 @@ static int mv_xor_v2_probe(struct platform_device *pdev)
 
 free_hw_desq:
 	dma_free_coherent(&pdev->dev,
-			  xor_dev->desc_size * MV_XOR_V2_MAX_DESC_NUM,
+			  xor_dev->desc_size * MV_XOR_V2_DESC_NUM,
 			  xor_dev->hw_desq_virt, xor_dev->hw_desq);
 free_msi_irqs:
 	devm_free_irq(&pdev->dev, xor_dev->msi_desc->irq, xor_dev);
@@ -1057,7 +1072,7 @@ static int mv_xor_v2_remove(struct platform_device *pdev)
 	dma_async_device_unregister(&xor_dev->dmadev);
 
 	dma_free_coherent(&pdev->dev,
-			  xor_dev->desc_size * MV_XOR_V2_MAX_DESC_NUM,
+			  xor_dev->desc_size * MV_XOR_V2_DESC_NUM,
 			  xor_dev->hw_desq_virt, xor_dev->hw_desq);
 
 	devm_free_irq(&pdev->dev, xor_dev->msi_desc->irq, xor_dev);
