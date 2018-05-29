@@ -95,7 +95,7 @@ static void armada8k_pcie_host_init(struct pcie_port *pp)
 {
 	struct armada8k_pcie *armada8k_pcie = to_armada8k_pcie(pp);
 	void __iomem *regs_base = armada8k_pcie->regs_base;
-	int timeout = 1000;
+	int timeout = 10000;
 	u32 reg;
 
 	if (!armada8k_pcie_link_up(pp)) {
