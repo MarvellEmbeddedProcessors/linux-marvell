@@ -148,6 +148,28 @@
 #define EIP197_TRC_ECCDATA			0xf0840
 #define EIP197_CS_RAM_CTRL			0xf7ff0
 
+/* EIP-96 PRNG */
+/* Registers   */
+#define EIP197_PE_EIP96_PRNG_CTRL(n)			(0x01044 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_SEED_L(n)			(0x01048 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_SEED_H(n)			(0x0104c + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_KEY_0_L(n)			(0x01050 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_KEY_0_H(n)			(0x01054 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_KEY_1_L(n)			(0x01058 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_KEY_1_H(n)			(0x0105c + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_LFSR_L(n)			(0x01070 + (0x2000 * n))
+#define EIP197_PE_EIP96_PRNG_LFSR_H(n)			(0x01074 + (0x2000 * n))
+/* Register bits */
+#define EIP197_PE_EIP96_PRNG_EN				BIT(0)
+#define EIP197_PE_EIP96_PRNG_AUTO			BIT(1)
+/* Default values */
+#define EIP197_PE_EIP96_PRNG_KEY_0_L_VAL		0xaee75681
+#define EIP197_PE_EIP96_PRNG_KEY_0_H_VAL		0x0f27c239
+#define EIP197_PE_EIP96_PRNG_KEY_1_L_VAL		0x79947198
+#define EIP197_PE_EIP96_PRNG_KEY_1_H_VAL		0xe2991275
+#define EIP197_PE_EIP96_PRNG_LFSR_L_VAL			0x21ac3c7c
+#define EIP197_PE_EIP96_PRNG_LFSR_H_VAL			0xd008c4b4
+
 /* EIP197_HIA_xDR_DESC_SIZE */
 #define EIP197_xDR_DESC_MODE_64BIT		BIT(31)
 

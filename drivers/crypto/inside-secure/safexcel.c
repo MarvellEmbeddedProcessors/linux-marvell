@@ -29,6 +29,43 @@ static int eip_in_use = -1;
 /* Module param to save the assigned rings to the Kernel */
 static uint rings[MAX_EIP_DEVICE] = {RINGS_UNINITIALIZED, RINGS_UNINITIALIZED};
 
+/* Initialize pseudo random generator */
+static void eip197_prng_init(struct safexcel_crypto_priv *priv, int pe)
+{
+	u64 seed;
+
+	get_random_bytes(&seed, sizeof(seed));
+
+	/* disable PRNG and set to manual mode */
+	writel(0, EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_CTRL(pe));
+
+	/* Write seed data */
+	writel(lower_32_bits(seed),
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_SEED_L(pe));
+	writel(upper_32_bits(seed),
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_SEED_H(pe));
+
+	/* Write key data */
+	writel(EIP197_PE_EIP96_PRNG_KEY_0_L_VAL,
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_KEY_0_L(pe));
+	writel(EIP197_PE_EIP96_PRNG_KEY_0_H_VAL,
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_KEY_0_H(pe));
+	writel(EIP197_PE_EIP96_PRNG_KEY_1_L_VAL,
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_KEY_1_L(pe));
+	writel(EIP197_PE_EIP96_PRNG_KEY_1_H_VAL,
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_KEY_1_H(pe));
+
+	/* Write LFSR data */
+	writel(EIP197_PE_EIP96_PRNG_LFSR_L_VAL,
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_LFSR_L(pe));
+	writel(EIP197_PE_EIP96_PRNG_LFSR_H_VAL,
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_LFSR_H(pe));
+
+	/* enable PRNG and set to auto mode */
+	writel(EIP197_PE_EIP96_PRNG_EN | EIP197_PE_EIP96_PRNG_AUTO,
+	       EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_CTRL(pe));
+}
+
 static void eip197_trc_cache_init(struct safexcel_crypto_priv *priv)
 {
 	u32 val, htable_offset;
@@ -496,6 +533,10 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 	writel(GENMASK(30, 20), EIP197_HIA_AIC_G(priv) + EIP197_HIA_AIC_G_ACK);
 
 	if (priv->version == EIP197B || priv->version == EIP197D) {
+		/* init PRNG */
+		for (pe = 0; pe < priv->config.pes; pe++)
+			eip197_prng_init(priv, pe);
+
 		eip197_trc_cache_init(priv);
 
 		ret = eip197_load_firmwares(priv);
