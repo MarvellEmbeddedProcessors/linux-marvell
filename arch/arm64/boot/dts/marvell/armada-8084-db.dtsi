@@ -64,3 +64,20 @@
 &cp0_usb3h1 {
 	status = "okay";
 };
+
+&cp0_comphy {
+	skip_pcie_power_off;
+};
+
+&cp1_comphy {
+	skip_pcie_power_off;
+};
+
+&cp2_comphy {
+	skip_pcie_power_off;
+};
+
+&cp3_comphy {
+	skip_pcie_power_off;
+};
+

@@ -104,14 +104,6 @@
 &cp0_pcie0 {
 	num-lanes = <4>;
 	status = "okay";
-
-	/* Generic PHY, providing serdes lanes */
-	phys = <&cp0_comphy 0 COMPHY_PCIE0
-		&cp0_comphy 1 COMPHY_PCIE0
-		&cp0_comphy 2 COMPHY_PCIE0
-		&cp0_comphy 3 COMPHY_PCIE0
-		>;
-	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 };
 
 &cp0_mdio0 {
@@ -174,14 +166,6 @@
 &cp1_pcie0 {
 	num-lanes = <4>;
 	status = "okay";
-
-	/* Generic PHY, providing serdes lanes */
-	phys = <&cp1_comphy 0 COMPHY_PCIE0
-		&cp1_comphy 1 COMPHY_PCIE0
-		&cp1_comphy 2 COMPHY_PCIE0
-		&cp1_comphy 3 COMPHY_PCIE0
-		>;
-	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 };
 
 &cp1_emac0 {
