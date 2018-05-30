@@ -67,6 +67,16 @@ struct armada8k_pcie {
 #define AX_USER_DOMAIN_MASK		0x3
 #define AX_USER_DOMAIN_SHIFT		4
 
+#define PCIE_STREAM_ID			(PCIE_VENDOR_REGS_OFFSET + 0x64)
+#define STREAM_ID_BUS_BITS		2
+#define STREAM_ID_DEV_BITS		2
+#define STREAM_ID_FUNC_BITS		3
+#define STREAM_ID_PREFIX		0x80
+#define PCIE_STREAM_ID_CFG		(STREAM_ID_PREFIX << 12 | \
+					STREAM_ID_BUS_BITS << 8 | \
+					STREAM_ID_DEV_BITS << 4 | \
+					STREAM_ID_FUNC_BITS)
+
 #define to_armada8k_pcie(x)	dev_get_drvdata((x)->dev)
 
 static int armada8k_pcie_link_up(struct dw_pcie *pci)
@@ -87,6 +97,9 @@ static void armada8k_pcie_establish_link(struct armada8k_pcie *pcie)
 {
 	struct dw_pcie *pci = pcie->pci;
 	u32 reg;
+
+	/* Setup Requester-ID to Stream-ID mapping */
+	dw_pcie_writel_dbi(pci, PCIE_STREAM_ID, PCIE_STREAM_ID_CFG);
 
 	if (!dw_pcie_link_up(pci)) {
 		/* Disable LTSSM state machine to enable configuration */
