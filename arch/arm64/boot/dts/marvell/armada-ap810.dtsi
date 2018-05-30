@@ -120,6 +120,91 @@
 				status = "disabled";
 			};
 
+			AP810_LABEL(smmu): iommu@3800000 {
+				compatible = "arm,mmu-500";
+				reg = <0x3800000 0x800000>;
+				dma-coherent;
+				#iommu-cells = <1>;
+				#global-interrupts = <1>;
+				interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+				/* SMMU in AP810 have 64 context banks, for
+				 * each of the 64 contexts, a context interrupt
+				 * is generated. This interrupt indicates that
+				 * a translation of an incoming transaction,
+				 * which was mapped to the specific context
+				 * bank, was resolved with one of the
+				 * following faults:
+				 *   - Translation fault
+				 *   - Permission fault
+				 *   - External fault
+				 *   - Address size fault
+				 */
+					<GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
+			};
+
 			/* TODO: this node is not correct - we should
 			 * remove this node, the ICU should send message
 			 * to the GICv3, there's no GICP in AP810.
