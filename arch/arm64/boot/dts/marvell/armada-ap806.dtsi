@@ -182,6 +182,23 @@
 				interrupts = <17>;
 			};
 
+			smmu: iommu@5000000 {
+				compatible = "arm,mmu-500";
+				reg = <0x100000 0x100000>;
+				dma-coherent;
+				#iommu-cells = <1>;
+				#global-interrupts = <1>;
+				interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+			};
+
 			odmi: odmi@300000 {
 				compatible = "marvell,odmi-controller";
 				interrupt-controller;
