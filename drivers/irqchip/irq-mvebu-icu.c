@@ -37,7 +37,7 @@
 #define ICU_SATA1_ICU_ID	107
 
 /* AP810 ICU entries from CP110 are consecutive */
-#define ICU_GIC_SPI_AP810_BASE		92
+#define ICU_GIC_SPI_AP810_BASE		160
 
 struct mvebu_icu {
 	struct irq_chip irq_chip;

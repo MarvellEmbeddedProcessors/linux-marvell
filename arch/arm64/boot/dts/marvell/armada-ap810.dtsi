@@ -120,10 +120,14 @@
 				status = "disabled";
 			};
 
+			/* TODO: this node is not correct - we should
+			 * remove this node, the ICU should send message
+			 * to the GICv3, there's no GICP in AP810.
+			 */
 			AP810_LABEL(gicp): gicp@3000040 {
 				compatible = "marvell,ap806-gicp";
 				reg = <0x3000040 0x10>;
-				marvell,spi-ranges = <92 64>, <156 64>;
+				marvell,spi-ranges = <160 128>;
 				msi-controller;
 			};
 
