@@ -1,0 +1,170 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Device Tree file for Marvell Armada 8040 development board
+ * This file supports option C configuration
+ * AP_UART,AP_eMMC-8b,TDM,CP0_SDIO-4b,CP0_I2C,CP0_eMMC,CP0_RGMII1,
+ * CP1_SPI(Boot),CP1_RGMII0
+ */
+
+#include "armada-8040-db.dtsi"
+
+/ {
+	model = "Marvell Armada 8040 development board C setup";
+	compatible = "marvell,armada8040-db-C", "marvell,armada8040-db",
+		"marvell,armada8040", "marvell,armada-ap806-quad",
+		"marvell,armada-ap806";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	aliases {
+		ethernet0 = &cp0_eth0;
+		ethernet1 = &cp0_eth2;
+		ethernet2 = &cp1_eth0;
+	};
+};
+
+&ap_sdhci0 {
+	status = "okay";
+};
+
+&cp0_sdhci0 {
+	status = "okay";
+};
+
+/* CON6 on CP0 expansion */
+&cp0_pcie0 {
+	status = "okay";
+	phys = <&cp0_comphy0 0>;
+	phy-names = "pcie-phy0";
+};
+
+/* CON5 on CP0 expansion */
+&cp0_pcie2 {
+	status = "okay";
+	phys = <&cp0_comphy5 2>;
+	phy-names = "pcie-phy0";
+};
+
+&cp0_sata0 {
+	status = "okay";
+	/* CON2 on CP0 expansion */
+	sata-port@0 {
+		status = "okay";
+		/* Generic PHY, providing serdes lanes */
+		phys = <&cp0_comphy1 0>;
+	};
+	/* CON4 on CP0 expansion */
+	sata-port@1 {
+		status = "okay";
+		/* Generic PHY, providing serdes lanes */
+		phys = <&cp0_comphy3 1>;
+	};
+};
+
+/* CON9 on CP0 expansion */
+&cp0_usb3_0 {
+	status = "okay";
+};
+
+/* CON10 on CP0 expansion */
+&cp0_usb3_1 {
+	status = "okay";
+};
+
+&cp0_mdio {
+	status = "okay";
+
+	phy1: ethernet-phy@1 {
+		reg = <1>;
+	};
+};
+
+&cp0_ethernet {
+	status = "okay";
+};
+
+&cp0_eth0 {
+	status = "okay";
+	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy2 0>;
+	managed = "in-band-status";
+	sfp = <&sfp_eth0>;
+};
+
+&cp0_eth2 {
+	status = "okay";
+	phy = <&phy1>;
+	phy-mode = "rgmii-id";
+};
+
+&cp1_spi1 {
+	status = "okay";
+};
+
+/* CON6 on CP1 expansion */
+&cp1_pcie0 {
+	status = "okay";
+	phys = <&cp1_comphy0 0>;
+	phy-names = "pcie-phy0";
+};
+
+/* CON7 on CP1 expansion */
+&cp1_pcie1 {
+	status = "okay";
+	phys = <&cp1_comphy4 1>;
+	phy-names = "pcie-phy0";
+};
+
+/* CON5 on CP1 expansion */
+&cp1_pcie2 {
+	status = "okay";
+	phys = <&cp1_comphy5 2>;
+	phy-names = "pcie-phy0";
+};
+
+/* CON4 on CP1 expansion */
+&cp1_sata0 {
+	status = "okay";
+	/* CON2 on CP1 expansion */
+	sata-port@0 {
+		status = "okay";
+		/* Generic PHY, providing serdes lanes */
+		phys = <&cp1_comphy1 0>;
+	};
+	/* CON4 on CP1 expansion */
+	sata-port@1 {
+		status = "okay";
+		/* Generic PHY, providing serdes lanes */
+		phys = <&cp1_comphy3 1>;
+	};
+};
+
+/* CON9 on CP1 expansion */
+&cp1_usb3_0 {
+	usb-phy = <&cp1_usb3_0_phy>;
+	status = "okay";
+};
+
+&cp1_ethernet {
+	status = "okay";
+};
+
+&cp1_eth0 {
+	status = "okay";
+	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp1_comphy2 0>;
+	managed = "in-band-status";
+	sfp = <&sfp_eth1>;
+};
+
+&cp0_crypto {
+	status = "okay";
+};
+
+&cp1_crypto {
+	status = "okay";
+};
