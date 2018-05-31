@@ -93,7 +93,7 @@ static void axim_enable_channel(struct axim_drvdata *axim, int chan_nr)
 	writel(AXI_CHAN_ATTR(chan->domain, chan->cache, chan->qos, chan->prot),
 			axim->base + AXI_MON_CH_REF_ATTR(chan_nr));
 	writel(AXI_CHAN_ATTR(chan->domain_mask, chan->cache_mask, chan->qos_mask, chan->prot_mask),
-			axim->base + AXI_MON_CH_REF_ATTR(chan_nr));
+			axim->base + AXI_MON_CH_USE_ATTR(chan_nr));
 
 	reload = (chan->event_mode == AXIM_EVENT_MODE_OVERFLOW) ? (U32_MAX - (chan->event_thresh - 1)) : 0;
 	writel(reload, axim->base + AXI_MON_CH_RLD(chan_nr));
@@ -136,7 +136,7 @@ static void axim_reset_channel(struct axim_drvdata *axim, int chan_nr)
 	writel(0, axim->base + AXI_MON_CH_REF_ID(chan_nr));
 	writel(0, axim->base + AXI_MON_CH_USE_ID(chan_nr));
 	writel(0, axim->base + AXI_MON_CH_REF_ATTR(chan_nr));
-	writel(0, axim->base + AXI_MON_CH_REF_ATTR(chan_nr));
+	writel(0, axim->base + AXI_MON_CH_USE_ATTR(chan_nr));
 	writel(0, axim->base + AXI_MON_CH_COMP_MIN(chan_nr));
 	writel(0, axim->base + AXI_MON_CH_COMP_MAX(chan_nr));
 	writel(0, axim->base + AXI_MON_CH_COMP_CTL(chan_nr));
