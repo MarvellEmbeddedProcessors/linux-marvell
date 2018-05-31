@@ -451,6 +451,21 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 	return 0;
 }
 
+/* function differ between 2500 and 1000 speeds */
+int mv_pp2x_get_gmii_speed(struct mv_pp2x_port *port)
+{
+	int comphy_mode;
+	int port_speed = SPEED_1000;
+
+	if (port->comphy) {
+		comphy_mode = COMPHY_GET_MODE(phy_get_mode(port->comphy[0]));
+		if (comphy_mode == COMPHY_HS_SGMII_MODE)
+			port_speed = SPEED_2500;
+	}
+
+	return port_speed;
+}
+
 /* Get settings (phy address, speed) for ethtools */
 static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 					struct ethtool_cmd *cmd)
@@ -480,7 +495,7 @@ static int mv_pp2x_ethtool_get_settings(struct net_device *dev,
 				cmd->speed = SPEED_10000;
 				break;
 			case MV_PORT_SPEED_1000:
-				cmd->speed = SPEED_1000;
+				cmd->speed = mv_pp2x_get_gmii_speed(port);
 				break;
 			case MV_PORT_SPEED_100:
 				cmd->speed = SPEED_100;
