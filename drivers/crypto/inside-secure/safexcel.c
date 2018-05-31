@@ -270,25 +270,28 @@ static int eip197_trc_cache_init(struct safexcel_crypto_priv *priv)
 /* Load EIP197 firmare into the engine */
 static int eip197_load_fw(struct safexcel_crypto_priv *priv)
 {
-	const struct firmware	*fw[FW_NB] = {0};
+	static const char * const fw_name[] = {"ifpp.bin", "ipue.bin"};
+	const struct firmware *fw[FW_NB];
+	char fw_path[31];
 	const u32		*fw_data;
 	int			i, j, fw_i, ret = 0, pe;
 	u32			fw_size, reg;
-	const char		*fw_file_name[FW_NB] = {"ifpp.bin",
-							    "ipue.bin"};
-	char			fw_base[13] = {0};	/* "eip197/197X/\0" */
-	char			fw_full_name[25] = {0};
-
-	snprintf(fw_base, 13, "eip197/197%s/",
-		 (priv->eip197_hw_ver == EIP197B) ? "b" : "d");
 
 	for (fw_i = 0; fw_i < FW_NB; fw_i++) {
-		snprintf(fw_full_name, 21, "%s%s", fw_base, fw_file_name[fw_i]);
-		ret = request_firmware(&fw[fw_i], fw_full_name, priv->dev);
+		snprintf(fw_path, 31, "inside-secure/eip197%s/%s",
+			 (priv->eip197_hw_ver == EIP197B) ? "b" : "d",
+			 fw_name[fw_i]);
+		ret = request_firmware(&fw[fw_i], fw_path, priv->dev);
 		if (ret) {
-			dev_err(priv->dev, "request_firmware failed (fw: %s)\n",
-				fw_full_name);
-			goto release_fw;
+			/* Fallback to the old firmware location. */
+			ret = request_firmware(&fw[fw_i], fw_name[fw_i],
+					       priv->dev);
+			if (ret) {
+				dev_err(priv->dev,
+					"Failed to request firmware %s (%d)\n",
+					fw_name[fw_i], ret);
+				goto release_fw;
+			}
 		}
 	 }
 
