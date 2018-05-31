@@ -12538,7 +12538,7 @@ static int mvpp22_uio_map_operation(struct platform_device *pdev,
 		if (!uio->aux_queue)
 			return 0;
 		INIT_DELAYED_WORK(&uio->aux_work, mvpp22_uio_register_wq);
-		queue_delayed_work(uio->aux_queue, &uio->aux_work, HZ / 8);
+		queue_delayed_work(uio->aux_queue, &uio->aux_work, HZ / 2);
 	}
 	if (uio->num_maps == MAX_UIO_MAPS) {
 		err = MAX_UIO_MAPS; /* Positive Error value in err-message */
