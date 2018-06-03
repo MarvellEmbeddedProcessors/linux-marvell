@@ -76,6 +76,14 @@
 		ethernet2 = &cp0_eth2;
 		ethernet3 = &cp1_eth0;
 	};
+
+	sfp_eth0: sfp-eth0 {
+		compatible = "sff,sfp";
+	};
+
+	sfp_eth1: sfp-eth1 {
+		compatible = "sff,sfp";
+	};
 };
 
 &ap0_sdhci0 {
@@ -152,6 +160,8 @@
 	phy-mode = "10gbase-kr";
 	/* Generic PHY, providing serdes lanes */
 	phys = <&cp0_comphy4 0>;
+	managed = "in-band-status";
+	sfp = <&sfp_eth0>;
 };
 
 &cp0_eth1 {
@@ -205,4 +215,6 @@
 	phy-mode = "10gbase-kr";
 	/* Generic PHY, providing serdes lanes */
 	phys = <&cp1_comphy4 0>;
+	managed = "in-band-status";
+	sfp = <&sfp_eth1>;
 };
