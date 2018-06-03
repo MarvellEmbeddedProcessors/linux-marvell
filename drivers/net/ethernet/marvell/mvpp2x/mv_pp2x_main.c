@@ -2944,46 +2944,6 @@ static u32 mv_pp2x_skb_tx_csum(struct mv_pp2x_port *port, struct sk_buff *skb)
 	return MVPP2_TXD_L4_CSUM_NOT | MVPP2_TXD_IP_CSUM_DISABLE;
 }
 
-static void mv_pp2x_buff_hdr_rx(struct mv_pp2x_port *port,
-				struct mv_pp2x_rx_desc *rx_desc, int cpu)
-{
-	struct mv_pp2x_buff_hdr *buff_hdr;
-	struct sk_buff *skb;
-	u32 rx_status = rx_desc->status;
-	u32 buff_phys_addr;
-	u32 buff_virt_addr;
-	u32 buff_phys_addr_next;
-	u32 buff_virt_addr_next;
-	int mc_id;
-	int pool_id;
-
-	pool_id = (rx_status & MVPP2_RXD_BM_POOL_ID_MASK) >>
-		   MVPP2_RXD_BM_POOL_ID_OFFS;
-	/*TODO : YuvalC, this is just workaround to compile.
-	* Need to handle mv_pp2x_buff_hdr_rx().
-	*/
-	buff_phys_addr = rx_desc->u.pp21.buf_phys_addr;
-	buff_virt_addr = rx_desc->u.pp21.buf_cookie;
-
-	do {
-		skb = (struct sk_buff *)(u64)buff_virt_addr;
-		buff_hdr = (struct mv_pp2x_buff_hdr *)skb->head;
-
-		mc_id = MVPP2_B_HDR_INFO_MC_ID(buff_hdr->info);
-
-		buff_phys_addr_next = buff_hdr->next_buff_phys_addr;
-		buff_virt_addr_next = buff_hdr->next_buff_virt_addr;
-
-		/* Release buffer */
-		mv_pp2x_bm_pool_mc_put(port, pool_id, buff_phys_addr,
-				       buff_virt_addr, mc_id, cpu);
-
-		buff_phys_addr = buff_phys_addr_next;
-		buff_virt_addr = buff_virt_addr_next;
-
-	} while (!MVPP2_B_HDR_INFO_IS_LAST(buff_hdr->info));
-}
-
 static void mv_pp2x_set_skb_hash(struct mv_pp2x_rx_desc *rx_desc, u32 rx_status,
 				 struct sk_buff *skb)
 {
@@ -3041,7 +3001,6 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 	u32 refill_array[MVPP2_BM_POOLS_NUM] = {0};
 	u8  num_pool = MVPP2_BM_SWF_NUM_POOLS;
 	u8  first_bm_pool = port->priv->pp2_cfg.first_bm_pool;
-	int cpu = smp_processor_id();
 	struct mv_pp2x_cp_pcpu *cp_pcpu = port->priv->pcpu[address_space];
 
 #ifdef DEV_NETMAP
@@ -3085,11 +3044,6 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 
 		pool = MVPP2_RX_DESC_POOL(rx_desc);
 		bm_pool = &port->priv->bm_pools[pool - first_bm_pool];
-		/* Check if buffer header is used */
-		if (unlikely(rx_status & MVPP2_RXD_BUF_HDR)) {
-			mv_pp2x_buff_hdr_rx(port, rx_desc, cpu);
-			continue;
-		}
 
 		if (port->priv->pp2_version == PPV21)
 			buf_phys_addr = mv_pp21_rxdesc_phys_addr_get(rx_desc);
@@ -3110,7 +3064,6 @@ static int mv_pp2x_rx(struct mv_pp2x_port *port, struct napi_struct *napi,
 		 * comprised by the RX descriptor.
 		 */
 		if (unlikely(rx_status & MVPP2_RXD_ERR_SUMMARY)) {
-			pr_err_ratelimited("netdev: %s MVPP2_RXD_ERR_SUMMARY\n", port->dev->name);
 err_drop_frame:
 			dev->stats.rx_errors++;
 			mv_pp2x_rx_error(port, rx_desc);
