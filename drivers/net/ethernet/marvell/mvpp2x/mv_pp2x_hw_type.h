@@ -22,6 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/skbuff.h>
 #include <linux/bitops.h>
+#include <linux/if_vlan.h>
 
 #define CREATE_MASK(pos, len)		GENMASK((pos) + (len) - 1, (pos))
 #define CREATE_MASK_ULL(pos, len)	GENMASK_ULL((pos) + (len) - 1, (pos))
@@ -83,6 +84,65 @@
 
 #define MSS_CP_CM3_THRESHOLD_STOP	768
 #define MSS_CP_CM3_THRESHOLD_START	1024
+
+/* MSS Dying Gasp */
+#define BYTE_MASK		0xFF
+#define BITS_PER_BYTE		8
+#define BYTES_IN_PP_REG		4
+#define BYTES_IN_GOP_REG	2
+
+#define MSS_CP_DG_BASE			0x400
+
+#define MSS_CP_DG_CON_REG		MSS_CP_DG_BASE
+#define MSS_CP_DG_UPD_COM		BIT(31)
+
+#define MSS_CP_DG_CON_PORT_OFFS		0x4
+#define MSS_CP_DG_CON_OFFS		0x4
+#define MSS_CP_DG_PACK_CON_REG(port)	(MSS_CP_DG_BASE + port * MSS_CP_DG_CON_PORT_OFFS + \
+					MSS_CP_DG_CON_OFFS)
+
+#define MSS_CP_DG_PH_OFFS		0x10
+#define MSS_CP_DG_PH_PORT_OFFS		0x10
+#define MSS_CP_DG_DA_MAC_LOW_REG(port)	(MSS_CP_DG_BASE + MSS_CP_DG_PH_OFFS + \
+					port * MSS_CP_DG_PH_PORT_OFFS)
+#define MSS_CP_DG_SA_LOW_OFFS			0x4
+#define MSS_CP_DG_DA_LOW_MASK			0xFFFF
+#define MSS_CP_DG_DA_HIGH_SA_LOW_MAC_REG(port)	(MSS_CP_DG_BASE + MSS_CP_DG_PH_OFFS + \
+						port * MSS_CP_DG_PH_PORT_OFFS + \
+						MSS_CP_DG_SA_LOW_OFFS)
+#define MSS_CP_DG_SA_HIGH_OFFS		0x8
+#define MSS_CP_DG_SA_HIGH_MASK_OFFS	16
+#define MSS_CP_DG_SA_HIGH_MASK		(0xFFFF << MSS_CP_DG_SA_HIGH_MASK_OFFS)
+#define MSS_CP_DG_SA_HIGH_MAC_REG(port)	(MSS_CP_DG_BASE + MSS_CP_DG_PH_OFFS + \
+					port * MSS_CP_DG_PH_PORT_OFFS + \
+					MSS_CP_DG_SA_HIGH_OFFS)
+
+#define MSS_CP_DG_MAC_ETH_T_VLAN_OFFS		0xC
+#define MSS_CP_DG_MAC_ETH_T_MASK		0xFFFF
+#define MSS_CP_DG_MAC_VLAN_MASK_OFFS		16
+#define MSS_CP_DG_MAC_VLAN_MASK			(0xFFFF << MSS_CP_DG_MAC_VLAN_MASK_OFFS)
+
+#define MSS_CP_DG_MAC_ETH_T_VLAN_REG(port)	(MSS_CP_DG_BASE + MSS_CP_DG_PH_OFFS + \
+						port * MSS_CP_DG_PH_PORT_OFFS + \
+						MSS_CP_DG_MAC_ETH_T_VLAN_OFFS)
+#define MSS_CP_DG_MAC_VLAN_OFFS		0xE
+#define MSS_CP_DG_MAC_VLAN_REG(port)	(MSS_CP_DG_BASE + MSS_CP_DG_PH_OFFS + \
+					port * MSS_CP_DG_PH_PORT_OFFS + MSS_CP_DG_MAC_VLAN_OFFS)
+
+#define MSS_CP_DG_DP_OFFS		0x40
+#define MSS_CP_DG_DP_PORT_OFFS		0x40
+#define MSS_CP_DG_REG_SIZE_BYTES	0x4
+
+#define MSS_CP_DG_DATA_PATTERN_REG(port, reg_i)	(MSS_CP_DG_BASE + MSS_CP_DG_DP_OFFS + \
+						port * MSS_CP_DG_DP_PORT_OFFS + \
+						reg_i * MSS_CP_DG_REG_SIZE_BYTES)
+
+#define MSS_CP_DG_MAX_PACK_OFFS		16
+
+#define MSS_CP_DG_DP_MAX_SIZE		64
+#define MSS_CP_DG_PACK_MAX_SIZE		(MSS_CP_DG_DP_MAX_SIZE + VLAN_HLEN + ETH_HLEN)
+#define MSS_CP_DG_MAX_PACK_COUNT	0x1FFF
+#define MSS_CP_DG_MAX_TIMEOUT		5000
 
 /* RX FIFO tresholld in 1KB granularity */
 #define MVPP23_PORT0_FIFO_THRESHOLD	(9 * 1024)

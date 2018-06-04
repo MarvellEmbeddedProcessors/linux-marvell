@@ -803,4 +803,14 @@ void mv_pp2x_counters_stat_clear(struct mv_pp2x_port *port);
 void mv_pp2x_aggr_txq_pend_send(struct mv_pp2x_port *port,
 				struct mv_pp2x_cp_pcpu *cp_pcpu,
 				struct mv_pp2x_aggr_tx_queue *aggr_txq, int address_space);
+
+/* Interface to CM3 processor for Dying Gasp feature */
+void mv_pp2x_dying_gasp_set_dst_mac(struct mv_pp2x_port *port, unsigned char *mac_addr);
+void mv_pp2x_dying_gasp_set_src_mac(struct mv_pp2x_port *port, unsigned char *mac_addr);
+void mv_pp2x_dying_gasp_set_ether_type(struct mv_pp2x_port *port, u32 ether_type);
+void mv_pp2x_dying_gasp_set_vlan(struct mv_pp2x_port *port, u32 vlan);
+void mv_pp2x_dying_gasp_set_data_patern(struct mv_pp2x_port *port, unsigned char *data, int data_size);
+void mv_pp2x_dying_gasp_set_packet_control(struct mv_pp2x_port *port, int packets_count, int packet_size);
+void mv_pp2x_dying_gasp_control(struct mv_pp2x_port *port, bool en);
+
 #endif /* _MVPP2_HW_H_ */

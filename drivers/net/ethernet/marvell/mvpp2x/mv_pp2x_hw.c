@@ -6549,3 +6549,211 @@ void mv_pp2x_counters_stat_clear(struct mv_pp2x_port *port)
 	}
 	preempt_enable();
 }
+
+/* Routine check if FW is busy */
+int mv_pp2x_dying_gasp_conf_busy(struct mv_pp2x_port *port)
+{
+	int val, timeout = 0;
+
+	/* Check that update command wasn't set.
+	 * If update command was set, wait for firmware dying gasp update done.
+	 */
+	while (timeout < MSS_CP_DG_MAX_TIMEOUT) {
+		val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_DG_CON_REG);
+
+		if (!(val & MSS_CP_DG_UPD_COM))
+			return 0;
+		usleep_range(10, 20);
+		timeout++;
+	}
+
+	return -EBUSY;
+}
+
+/* Routine notify FW about dying gasp configuration update */
+void mv_pp2x_dying_gasp_update_notify(struct mv_pp2x_port *port)
+{
+	int val;
+
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_DG_CON_REG);
+	val |= MSS_CP_DG_UPD_COM;
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_CON_REG, val);
+}
+
+/* Routine to set dying gasp packet destination MAC address */
+void mv_pp2x_dying_gasp_set_dst_mac(struct mv_pp2x_port *port, unsigned char *mac_addr)
+{
+	int len;
+	u32 val;
+	u32 mac_low = 0, mac_high = 0;
+
+	if (mv_pp2x_dying_gasp_conf_busy(port)) {
+		pr_warn("Port (%d): Dying gasp config is busy\n", port->id);
+		return;
+	}
+
+	/* Set DA MAC, see Dying Gasp programing model */
+	for (len = 0; len < ETH_ALEN; len++) {
+		if (len < BYTES_IN_PP_REG)
+			mac_low |= (((u32)mac_addr[len] & BYTE_MASK) << (len * BITS_PER_BYTE));
+		else
+			mac_high |= (((u32)mac_addr[len] & BYTE_MASK) << ((len - BYTES_IN_PP_REG) * BITS_PER_BYTE));
+	}
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_DA_MAC_LOW_REG(port->id), mac_low);
+
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_DG_DA_HIGH_SA_LOW_MAC_REG(port->id));
+	val &= ~MSS_CP_DG_DA_LOW_MASK;
+	val |= mac_high;
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_DA_HIGH_SA_LOW_MAC_REG(port->id), val);
+
+	mv_pp2x_dying_gasp_update_notify(port);
+}
+
+/* Routine to set dying gasp packet source MAC address */
+void mv_pp2x_dying_gasp_set_src_mac(struct mv_pp2x_port *port, unsigned char *mac_addr)
+{
+	int len;
+	u32 val;
+	u32 mac_low = 0, mac_high = 0;
+
+	if (mv_pp2x_dying_gasp_conf_busy(port)) {
+		WARN(1, "Port (%d): Dying gasp config is busy\n", port->id);
+		return;
+	}
+
+	/* Set SA MAC, see Dying Gasp programing model */
+	for (len = 0; len < ETH_ALEN; len++) {
+		if (len < BYTES_IN_GOP_REG)
+			mac_low |= (((u32)mac_addr[len] & BYTE_MASK) << ((len + BYTES_IN_PP_REG) * BITS_PER_BYTE));
+		else
+			mac_high |= (((u32)mac_addr[len] & BYTE_MASK) << ((len - BYTES_IN_GOP_REG) * BITS_PER_BYTE));
+	}
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_SA_HIGH_MAC_REG(port->id), mac_high);
+
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_DG_DA_HIGH_SA_LOW_MAC_REG(port->id));
+	val &= ~MSS_CP_DG_SA_HIGH_MASK;
+	val |= (mac_low << MSS_CP_DG_SA_HIGH_MASK_OFFS);
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_DA_HIGH_SA_LOW_MAC_REG(port->id), val);
+
+	mv_pp2x_dying_gasp_update_notify(port);
+}
+
+/* Routine to set dying gasp packet EtherType */
+void mv_pp2x_dying_gasp_set_ether_type(struct mv_pp2x_port *port, u32 ether_type)
+{
+	u32 val;
+
+	if (mv_pp2x_dying_gasp_conf_busy(port)) {
+		WARN(1, "Port (%d): Dying gasp config is busy\n", port->id);
+		return;
+	}
+
+	val  = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_DG_MAC_ETH_T_VLAN_REG(port->id));
+	val &= ~MSS_CP_DG_MAC_ETH_T_MASK;
+	val |= (ether_type & MSS_CP_DG_MAC_ETH_T_MASK);
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_MAC_ETH_T_VLAN_REG(port->id), val);
+
+	mv_pp2x_dying_gasp_update_notify(port);
+}
+
+/* Routine to set dying gasp packet VLAN */
+void mv_pp2x_dying_gasp_set_vlan(struct mv_pp2x_port *port, u32 vlan)
+{
+	u32 val;
+
+	if (mv_pp2x_dying_gasp_conf_busy(port)) {
+		WARN(1, "Port (%d): Dying gasp config is busy\n", port->id);
+		return;
+	}
+
+	val  = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_DG_MAC_ETH_T_VLAN_REG(port->id));
+	val &= ~MSS_CP_DG_MAC_VLAN_MASK;
+	val |= ((vlan << MSS_CP_DG_MAC_VLAN_MASK_OFFS) & MSS_CP_DG_MAC_VLAN_MASK);
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_MAC_ETH_T_VLAN_REG(port->id), val);
+
+	mv_pp2x_dying_gasp_update_notify(port);
+}
+
+/* Routine to set dying gasp packet data patern */
+void mv_pp2x_dying_gasp_set_data_patern(struct mv_pp2x_port *port, unsigned char *data, int data_size)
+{
+	int i, j, val;
+
+	if (mv_pp2x_dying_gasp_conf_busy(port)) {
+		WARN(1, "Port (%d): Dying gasp config is busy\n", port->id);
+		return;
+	}
+
+	if (data_size > MSS_CP_DG_DP_MAX_SIZE) {
+		WARN(1, "Port (%d): Dying gasp maximum data patern size is %d bytes\n",
+		     port->id, MSS_CP_DG_DP_MAX_SIZE);
+		data_size = MSS_CP_DG_DP_MAX_SIZE;
+	}
+
+	for (i = 0; i < (data_size / BYTES_IN_PP_REG); i++) {
+		val = 0;
+		for (j = 0; j < BYTES_IN_PP_REG; j++)
+			val |= ((data[i * BYTES_IN_PP_REG + j] & BYTE_MASK) << BITS_PER_BYTE * j);
+		mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_DATA_PATTERN_REG(port->id, i), val);
+	}
+
+	if (data_size % BYTES_IN_PP_REG) {
+		val = 0;
+		for (j = 0; j < (data_size % BYTES_IN_PP_REG); j++)
+			val |= ((data[i * BYTES_IN_PP_REG + j] & BYTE_MASK) << BITS_PER_BYTE * j);
+		mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_DATA_PATTERN_REG(port->id, i), val);
+	}
+
+	mv_pp2x_dying_gasp_update_notify(port);
+}
+
+/* Routine to set dying gasp packet size and number packets transmitted during dying gasp event */
+void mv_pp2x_dying_gasp_set_packet_control(struct mv_pp2x_port *port, int packets_count, int packet_size)
+{
+	int val;
+
+	if (packet_size > MSS_CP_DG_PACK_MAX_SIZE) {
+		WARN(1, "Port (%d): Dying gasp maximum packet size is %d bytes\n",
+		     port->id, MSS_CP_DG_PACK_MAX_SIZE);
+		packet_size = MSS_CP_DG_PACK_MAX_SIZE;
+	}
+
+	if (packets_count > MSS_CP_DG_MAX_PACK_COUNT) {
+		WARN(1, "Port (%d): Dying gasp maximum packet count is %d packets\n",
+		     port->id, MSS_CP_DG_MAX_PACK_COUNT);
+		packets_count = MSS_CP_DG_MAX_PACK_COUNT;
+	}
+
+	if (mv_pp2x_dying_gasp_conf_busy(port)) {
+		WARN(1, "Port (%d): Dying gasp config is busy\n", port->id);
+		return;
+	}
+
+	val = (packets_count << MSS_CP_DG_MAX_PACK_OFFS) | packet_size;
+
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_PACK_CON_REG(port->id), val);
+
+	mv_pp2x_dying_gasp_update_notify(port);
+}
+
+/* Routine to enable/disable dying gasp per port */
+void mv_pp2x_dying_gasp_control(struct mv_pp2x_port *port, bool en)
+{
+	int val;
+
+	if (mv_pp2x_dying_gasp_conf_busy(port)) {
+		WARN(1, "Port (%d): Dying gasp config is busy\n", port->id);
+		return;
+	}
+
+	val = mv_pp2x_cm3_read(&port->priv->hw, MSS_CP_DG_CON_REG);
+
+	if (en)
+		val |= (1 << port->id);
+	else
+		val &= ~(1 << port->id);
+
+	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_DG_CON_REG, val);
+
+	mv_pp2x_dying_gasp_update_notify(port);
+}
