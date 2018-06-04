@@ -12,11 +12,11 @@ mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 THIS_PATH := $(patsubst %/,%,$(dir $(mkfile_path)))
 PATCH_STR := MVPP2_C_TO_INCLUDE
 
-#ifeq ($(CURDIR), $(PWD))          # use to build Module
-#ifneq ($(CURDIR), $(THIS_PATH))   # use to build Module
+ifeq ($(CURDIR), $(PWD))          # use to build Module
+ifneq ($(CURDIR), $(THIS_PATH))   # use to build Module
  BUILD_WITH_KERNEL := y
-#endif                             # use to build Module
-#endif                             # use to build Module
+endif                             # use to build Module
+endif                             # use to build Module
 
 ifdef BUILD_WITH_KERNEL
   KDIR = $(CURDIR)
