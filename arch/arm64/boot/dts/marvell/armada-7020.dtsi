@@ -94,11 +94,9 @@
 	ap806 {
 		config-space {
 			smmu: iommu@5000000 {
-				mmu-masters = <&cp0_usb3h0 0x483>,
-					      <&cp0_usb3h1 0x484>,
-					      <&cp0_sata 0x485>,
-					      <&cp0_xor0 0x489>,
-					      <&cp0_xor1 0x48a>;
+				mmu-masters = <&cp0_usb3h0 0x440>,
+					      <&cp0_usb3h1 0x441>,
+					      <&cp0_sata 0x444>;
 			};
 			pinctrl0: pinctrl@6f4000 {
 				ap_emmc_pins: emmc-pins-0 {
@@ -158,12 +156,6 @@
 				#stream-id-cells = <1>;
 			};
 			cp0_usb3h1: usb3@510000 {
-				#stream-id-cells = <1>;
-			};
-			cp0_xor0: dma_xor@6a0000 {
-				#stream-id-cells = <1>;
-			};
-			cp0_xor1: dma_xor@6c0000 {
 				#stream-id-cells = <1>;
 			};
 			/* AXI bus of IHB1 is not connected in Armada-7040 package. */

@@ -148,8 +148,12 @@
 				status = "disabled";
 			};
 			smmu: iommu@5000000 {
-				mmu-masters = <&cp0_usb3h0 0x483>,
-					      <&cp0_usb3h1 0x484>;
+				mmu-masters = <&cp0_usb3h0 0x440>,
+					      <&cp0_usb3h1 0x441>,
+					      <&cp0_sata 0x444>,
+					      <&cp1_usb3h0 0x450>,
+					      <&cp1_usb3h1 0x451>,
+					      <&cp1_sata 0x454>;
 			};
 			pinctrl0: pinctrl@6f4000 {
 				ap_emmc_pins: emmc-pins-0 {
@@ -211,6 +215,9 @@
 			cp0_usb3h1: usb3@510000 {
 				#stream-id-cells = <1>;
 			};
+			cp0_sata: sata@540000 {
+				#stream-id-cells = <1>;
+			};
 			sar@400200 {
 				compatible = "marvell,a80x0-cp0-sample-at-reset";
 			};
@@ -266,6 +273,15 @@
 			cp1_gpio0: gpio@440100 {
 				gpiobase = <20>;
 				gpio-ranges = <&cp1_pinctrl 0 0 32>;
+			};
+			cp1_usb3h0: usb3@500000 {
+				#stream-id-cells = <1>;
+			};
+			cp1_usb3h1: usb3@510000 {
+				#stream-id-cells = <1>;
+			};
+			cp1_sata: sata@540000 {
+				#stream-id-cells = <1>;
 			};
 			rtc@284000 {
 				status = "okay";
