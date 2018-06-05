@@ -6758,6 +6758,11 @@ static int mv_pp2x_platform_data_get(struct platform_device *pdev,
 		if (IS_ERR(hw->gop.gop_110.cm3_base))
 			return PTR_ERR(hw->gop.gop_110.cm3_base);
 
+		/* Map "cm3" to uio */
+		err = mv_pp22_uio_mem_map(uio, res);
+		if (err)
+			return err;
+
 		/* skipped tai */
 
 		/* xsmi  */
