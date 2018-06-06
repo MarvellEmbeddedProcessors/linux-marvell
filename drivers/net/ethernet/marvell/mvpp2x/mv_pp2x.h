@@ -613,6 +613,9 @@ struct mv_pp2x {
 	/* Spinlocks per hif to protect BM refill */
 	spinlock_t bm_spinlock[8];
 
+	/* Spinlocks for CM3 shared memory configuration */
+	spinlock_t mss_spinlock;
+
 	struct delayed_work stats_task;
 	struct workqueue_struct *workqueue;
 	struct notifier_block	cp_hotplug_nb;

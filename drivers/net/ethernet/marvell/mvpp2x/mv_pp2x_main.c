@@ -642,6 +642,9 @@ static int mv_pp2x_bm_buf_calc(enum mv_pp2x_bm_pool_log_num log_pool,
 void mv_pp2x_bm_pool_update_fc(struct mv_pp2x_port *port, struct mv_pp2x_bm_pool *pool, int en)
 {
 	int val, cm3_state;
+	unsigned long flags;
+
+	spin_lock_irqsave(&port->priv->mss_spinlock, flags);
 
 	/* Remove Flow control enable bit to prevent race between FW and Kernel
 	 * If Flow control were enabled, it would be re-enabled.
@@ -683,6 +686,8 @@ void mv_pp2x_bm_pool_update_fc(struct mv_pp2x_port *port, struct mv_pp2x_bm_pool
 	val |= FLOW_CONTROL_UPDATE_COMMAND_BIT;
 	val |= cm3_state;
 	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
+
+	spin_unlock_irqrestore(&port->priv->mss_spinlock, flags);
 }
 
 /* Notify the driver that BM pool is being used as specific type and return the
@@ -1669,6 +1674,9 @@ static int mv_pp22_calc_shared_addr_space(struct mv_pp2x_port *port)
 void mv_pp2x_rxq_enable_fc(struct mv_pp2x_port *port)
 {
 	int val, cm3_state, host_id, queue;
+	unsigned long flags;
+
+	spin_lock_irqsave(&port->priv->mss_spinlock, flags);
 
 	/* Remove Flow control enable bit to prevent race between FW and Kernel
 	 * If Flow control were enabled, it would be re-enabled.
@@ -1719,12 +1727,17 @@ void mv_pp2x_rxq_enable_fc(struct mv_pp2x_port *port)
 	val |= FLOW_CONTROL_UPDATE_COMMAND_BIT;
 	val |= cm3_state;
 	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
+
+	spin_unlock_irqrestore(&port->priv->mss_spinlock, flags);
 }
 
 /* Routine disable flow control for RXQs conditon */
 void mv_pp2x_rxq_disable_fc(struct mv_pp2x_port *port)
 {
 	int val, cm3_state, queue;
+	unsigned long flags;
+
+	spin_lock_irqsave(&port->priv->mss_spinlock, flags);
 
 	/* Remove Flow control enable bit to prevent race between FW and Kernel
 	 * If Flow control were enabled, it would be re-enabled.
@@ -1761,6 +1774,8 @@ void mv_pp2x_rxq_disable_fc(struct mv_pp2x_port *port)
 	val |= FLOW_CONTROL_UPDATE_COMMAND_BIT;
 	val |= cm3_state;
 	mv_pp2x_cm3_write(&port->priv->hw, MSS_CP_FC_COM_REG, val);
+
+	spin_unlock_irqrestore(&port->priv->mss_spinlock, flags);
 }
 
 /* Cleanup all Rx queues */
@@ -7034,6 +7049,7 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 	struct device_node *port_node;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 	bool probe_defer = false;
+	unsigned long flags;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(struct mv_pp2x), GFP_KERNEL);
 	if (!priv)
@@ -7218,12 +7234,16 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 
 	queue_delayed_work(priv->workqueue, &priv->stats_task, stats_delay);
 
+	spin_lock_irqsave(&priv->mss_spinlock, flags);
+
 	/* Enable global flow control.
 	 * In this stage global flow control enabled, but still disabled per port.
 	 */
 	val = mv_pp2x_cm3_read(hw, MSS_CP_FC_COM_REG);
 	val |= FLOW_CONTROL_ENABLE_BIT;
 	mv_pp2x_cm3_write(hw, MSS_CP_FC_COM_REG, val);
+
+	spin_unlock_irqrestore(&priv->mss_spinlock, flags);
 
 	pr_debug("Platform Device Name : %s\n", kobject_name(&pdev->dev.kobj));
 	return 0;
