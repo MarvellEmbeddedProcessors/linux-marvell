@@ -24,6 +24,7 @@
 #include <linux/device.h>
 #include <linux/of.h>
 #include <linux/clk.h>
+#include <linux/phy/phy.h>
 
 #include "vfio_platform_private.h"
 
@@ -36,7 +37,9 @@
 int vfio_platform_ahci_reset(struct vfio_platform_device *vdev)
 {
 	struct device_node *np = vdev->device->of_node;
+	struct device_node *child;
 	struct clk *clk;
+	struct phy *phy;
 	int ret, i;
 
 	for (i = 0; i < MAX_AHCI_CLOCKS; i++) {
@@ -45,6 +48,17 @@ int vfio_platform_ahci_reset(struct vfio_platform_device *vdev)
 			ret = clk_prepare_enable(clk);
 			if (ret)
 				return -ENODEV;
+		}
+	}
+
+	for_each_child_of_node(np, child) {
+		if (child->name && (of_node_cmp(child->name, "sata-port") == 0)) {
+			phy = of_phy_get(child, "comphy");
+			if (!IS_ERR(phy)) {
+				ret = phy_power_on(phy);
+				if (ret)
+					return -ENODEV;
+			}
 		}
 	}
 
