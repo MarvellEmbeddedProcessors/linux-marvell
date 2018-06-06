@@ -12816,8 +12816,10 @@ err_port_probe:
 err_mem_device:
 	of_reserved_mem_device_release(&pdev->dev);
 err_dma_mask:
-	if (priv->custom_dma_mask)
+	if (priv->custom_dma_mask) {
 		kfree(pdev->dev.dma_mask);
+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+	}
 err_mg_clk:
 	clk_disable_unprepare(priv->axi_clk);
 	if (priv->hw_version != MVPP21)
@@ -12865,8 +12867,10 @@ static int mvpp2_remove(struct platform_device *pdev)
 				  aggr_txq->descs_dma);
 	}
 
-	if (priv->custom_dma_mask)
+	if (priv->custom_dma_mask) {
 		kfree(pdev->dev.dma_mask);
+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+	}
 
 	if (is_acpi_node(port_fwnode))
 		return 0;
