@@ -808,17 +808,44 @@ enum mvpp2_tag_type {
 #define MVPP2_PRS_AI_BITS			8
 #define MVPP2_PRS_PORT_MASK			0xff
 #define MVPP2_PRS_LU_MASK			0xf
-#define MVPP2_PRS_TCAM_DATA_BYTE(offs)		\
-				    (((offs) - ((offs) % 2)) * 2 + ((offs) % 2))
-#define MVPP2_PRS_TCAM_DATA_BYTE_EN(offs)	\
-					      (((offs) * 2) - ((offs) % 2)  + 2)
 #define MVPP2_PRS_TCAM_AI_BYTE			16
 #define MVPP2_PRS_TCAM_PORT_BYTE		17
 #define MVPP2_PRS_TCAM_LU_BYTE			20
 #define MVPP2_PRS_TCAM_EN_OFFS(offs)		((offs) + 2)
 #define MVPP2_PRS_TCAM_INV_WORD			5
+#define MVPP2_PRS_VID_TCAM_BYTE			2
 
-#define MVPP2_PRS_VID_TCAM_BYTE         2
+/* PRS TCAM and SRAM have HW-entry 160 bit
+ * TCAM configurator uses 4byte-word with 2 bytes of data and 2 bytes of mask.
+ * Little/Big Endian (LE/BE) word operations need converter for data-byte-array
+ * into offset for 4 bytes register having LE "native" ordering.
+ * MACROs have ambiguty so use inline procedures
+ */
+static inline int mvpp2_offs_endian(const int offs)
+{
+#if defined(__BIG_ENDIAN)
+	/* Byte-offset to access u8/u32 Register space:
+	 *    Input  native/LE: 0  1  2  3
+	 *    Output BE offset: 3  2  1  0
+	 */
+	return ((offs & ~0x3) + (3 - (offs % 4)));
+#else
+	return offs;
+#endif
+}
+
+static inline int tcam_data_byte_offs_le(int offs)
+			{ return ((offs - (offs % 2)) * 2 + (offs % 2)); }
+static inline int tcam_data_mask_offs_le(int offs)
+			{ return ((offs * 2) - (offs % 2) + 2); }
+
+#define MVPP2_PRS_TCAM_DATA_BYTE(offs)		\
+			(mvpp2_offs_endian(tcam_data_byte_offs_le(offs)))
+#define MVPP2_PRS_TCAM_DATA_BYTE_EN(offs)	\
+			(mvpp2_offs_endian(tcam_data_mask_offs_le(offs)))
+
+#define MVPP2_SRAM_BIT_TO_BYTE(_bit_)	mvpp2_offs_endian((_bit_) / 8)
+
 
 /* TCAM range for unicast and multicast filtering. We have 25 entries per port,
  * with 4 dedicated to UC filtering and the rest to multicast filtering.
@@ -1656,7 +1683,7 @@ struct mvpp22_tx_desc {
 	u8  packet_offset;
 	u8  phys_txq;
 	u16 data_size;
-	u64 reserved1;
+	u64 desc_misc;		/* multi-purpose (ptp, ...) */;
 	u64 buf_dma_addr_ptp;
 	u64 buf_cookie_misc;
 };
@@ -1666,8 +1693,9 @@ struct mvpp22_rx_desc {
 	u32 status;
 	u16 reserved1;
 	u16 data_size;
-	u32 reserved2;
-	u32 reserved3;
+	u16 reserved2;		/* gem_port_id (for future use, PON)	*/
+	u16 reserved3;		/* csum_l4 (for future use, PnC)	*/
+	u32 timestamp;		/* ptp */
 	u64 buf_dma_addr_key_hash;
 	u64 buf_cookie_misc;
 };
@@ -2378,6 +2406,60 @@ static void mvpp2_txq_inc_get(struct mvpp2_txq_pcpu *txq_pcpu)
 		txq_pcpu->txq_get_index = 0;
 }
 
+static inline void mvpp2_rx_desc_endian(int hw_version,
+					struct mvpp2_rx_desc *rx_desc)
+{
+#if defined(__BIG_ENDIAN)
+	if (hw_version == MVPP21) {
+		cpu_to_le32s(&rx_desc->pp21.status);
+		cpu_to_le16s(&rx_desc->pp21.reserved1);
+		cpu_to_le16s(&rx_desc->pp21.data_size);
+		cpu_to_le32s(&rx_desc->pp21.buf_dma_addr);
+		cpu_to_le32s(&rx_desc->pp21.buf_cookie);
+		cpu_to_le16s(&rx_desc->pp21.reserved2);
+		cpu_to_le16s(&rx_desc->pp21.reserved3);
+		/* No swap needed for 2 BYTE-fields reserved4/5 */
+		cpu_to_le16s(&rx_desc->pp21.reserved6);
+		cpu_to_le32s(&rx_desc->pp21.reserved7);
+		cpu_to_le32s(&rx_desc->pp21.reserved8);
+	} else {
+		cpu_to_le32s(&rx_desc->pp22.status);
+		cpu_to_le16s(&rx_desc->pp22.reserved1);
+		cpu_to_le16s(&rx_desc->pp22.data_size);
+		cpu_to_le16s(&rx_desc->pp22.reserved2);
+		cpu_to_le16s(&rx_desc->pp22.reserved3);
+		cpu_to_le32s(&rx_desc->pp22.timestamp);
+		cpu_to_le64s(&rx_desc->pp22.buf_dma_addr_key_hash);
+		cpu_to_le64s(&rx_desc->pp22.buf_cookie_misc);
+	}
+#endif
+}
+
+static inline void mvpp2_tx_desc_endian(int hw_version,
+					struct mvpp2_tx_desc *tx_desc)
+{
+#if defined(__BIG_ENDIAN)
+	if (hw_version == MVPP21) {
+		cpu_to_le32s(&tx_desc->pp21.command);
+		/* No swap needed for 2 BYTE-fields packet_offset/phys_txq */
+		cpu_to_le16s(&tx_desc->pp21.data_size);
+		cpu_to_le32s(&tx_desc->pp21.buf_dma_addr);
+		cpu_to_le32s(&tx_desc->pp21.buf_cookie);
+		cpu_to_le32s(&tx_desc->pp21.reserved1[0]);
+		cpu_to_le32s(&tx_desc->pp21.reserved1[1]);
+		cpu_to_le32s(&tx_desc->pp21.reserved1[2]);
+		cpu_to_le32s(&tx_desc->pp21.reserved2);
+	} else {
+		cpu_to_le32s(&tx_desc->pp22.command);
+		/* No swap needed for 2 BYTE-fields packet_offset/phys_txq */
+		cpu_to_le16s(&tx_desc->pp22.data_size);
+		cpu_to_le64s(&tx_desc->pp22.desc_misc);
+		cpu_to_le64s(&tx_desc->pp22.buf_dma_addr_ptp);
+		cpu_to_le64s(&tx_desc->pp22.buf_cookie_misc);
+	}
+#endif
+}
+
 static void mvpp2_txq_inc_put(struct mvpp2_port *port,
 			      struct mvpp2_txq_pcpu *txq_pcpu,
 			      struct sk_buff *skb,
@@ -2392,6 +2474,8 @@ static void mvpp2_txq_inc_put(struct mvpp2_port *port,
 	txq_pcpu->txq_put_index++;
 	if (txq_pcpu->txq_put_index == txq_pcpu->size)
 		txq_pcpu->txq_put_index = 0;
+
+	mvpp2_tx_desc_endian(port->priv->hw_version, tx_desc);
 }
 
 /* Get number of physical egress port */
@@ -2834,42 +2918,45 @@ static void mvpp2_prs_shadow_ri_set(struct mvpp2 *priv, int index,
 /* Update lookup field in tcam sw entry */
 static void mvpp2_prs_tcam_lu_set(struct mvpp2_prs_entry *pe, unsigned int lu)
 {
-	int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_LU_BYTE);
+	const int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_LU_BYTE);
 
-	pe->tcam.byte[MVPP2_PRS_TCAM_LU_BYTE] = lu;
-	pe->tcam.byte[enable_off] = MVPP2_PRS_LU_MASK;
+	pe->tcam.byte[mvpp2_offs_endian(MVPP2_PRS_TCAM_LU_BYTE)] = lu;
+	pe->tcam.byte[mvpp2_offs_endian(enable_off)] = MVPP2_PRS_LU_MASK;
 }
 
 /* Update mask for single port in tcam sw entry */
 static void mvpp2_prs_tcam_port_set(struct mvpp2_prs_entry *pe,
 				    unsigned int port, bool add)
 {
-	int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
+	const int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
 
 	if (add)
-		pe->tcam.byte[enable_off] &= ~(1 << port);
+		pe->tcam.byte[mvpp2_offs_endian(enable_off)] &= ~(1 << port);
 	else
-		pe->tcam.byte[enable_off] |= 1 << port;
+		pe->tcam.byte[mvpp2_offs_endian(enable_off)] |= 1 << port;
 }
 
 /* Update port map in tcam sw entry */
 static void mvpp2_prs_tcam_port_map_set(struct mvpp2_prs_entry *pe,
 					unsigned int ports)
 {
-	unsigned char port_mask = MVPP2_PRS_PORT_MASK;
-	int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
+	const int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
 
-	pe->tcam.byte[MVPP2_PRS_TCAM_PORT_BYTE] = 0;
-	pe->tcam.byte[enable_off] &= ~port_mask;
-	pe->tcam.byte[enable_off] |= ~ports & MVPP2_PRS_PORT_MASK;
+	pe->tcam.byte[mvpp2_offs_endian(MVPP2_PRS_TCAM_PORT_BYTE)] = 0;
+	pe->tcam.byte[mvpp2_offs_endian(enable_off)] &=
+						(u8)(~MVPP2_PRS_PORT_MASK);
+	pe->tcam.byte[mvpp2_offs_endian(enable_off)] |=
+						~ports & MVPP2_PRS_PORT_MASK;
 }
 
 /* Obtain port map from tcam sw entry */
 static unsigned int mvpp2_prs_tcam_port_map_get(struct mvpp2_prs_entry *pe)
 {
-	int enable_off = MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
+	const int enable_off =
+			MVPP2_PRS_TCAM_EN_OFFS(MVPP2_PRS_TCAM_PORT_BYTE);
+	int endian_enable_off = mvpp2_offs_endian(enable_off);
 
-	return ~(pe->tcam.byte[enable_off]) & MVPP2_PRS_PORT_MASK;
+	return ~pe->tcam.byte[endian_enable_off] & MVPP2_PRS_PORT_MASK;
 }
 
 /* Set byte of data and its enable bits in tcam sw entry */
@@ -2894,38 +2981,38 @@ static void mvpp2_prs_tcam_data_byte_get(struct mvpp2_prs_entry *pe,
 static bool mvpp2_prs_tcam_data_cmp(struct mvpp2_prs_entry *pe, int offs,
 				    u16 data)
 {
-	int off = MVPP2_PRS_TCAM_DATA_BYTE(offs);
 	u16 tcam_data;
 
-	tcam_data = (pe->tcam.byte[off + 1] << 8) | pe->tcam.byte[off];
-	if (tcam_data != data)
-		return false;
-	return true;
+	tcam_data = pe->tcam.byte[MVPP2_PRS_TCAM_DATA_BYTE(offs)] << 8;
+	tcam_data |= pe->tcam.byte[MVPP2_PRS_TCAM_DATA_BYTE(offs + 1)];
+	return (tcam_data == data);
 }
 
 /* Update ai bits in tcam sw entry */
 static void mvpp2_prs_tcam_ai_update(struct mvpp2_prs_entry *pe,
 				     unsigned int bits, unsigned int enable)
 {
-	int i, ai_idx = MVPP2_PRS_TCAM_AI_BYTE;
+	const int ai_idx = MVPP2_PRS_TCAM_AI_BYTE;
+	int i, offs;
 
 	for (i = 0; i < MVPP2_PRS_AI_BITS; i++) {
 		if (!(enable & BIT(i)))
 			continue;
 
+		offs = mvpp2_offs_endian(ai_idx);
 		if (bits & BIT(i))
-			pe->tcam.byte[ai_idx] |= 1 << i;
+			pe->tcam.byte[offs] |= 1 << i;
 		else
-			pe->tcam.byte[ai_idx] &= ~(1 << i);
+			pe->tcam.byte[offs] &= ~(1 << i);
 	}
-
-	pe->tcam.byte[MVPP2_PRS_TCAM_EN_OFFS(ai_idx)] |= enable;
+	offs = mvpp2_offs_endian(MVPP2_PRS_TCAM_EN_OFFS(ai_idx));
+	pe->tcam.byte[offs] |= enable;
 }
 
 /* Get ai bits from tcam sw entry */
 static int mvpp2_prs_tcam_ai_get(struct mvpp2_prs_entry *pe)
 {
-	return pe->tcam.byte[MVPP2_PRS_TCAM_AI_BYTE];
+	return pe->tcam.byte[mvpp2_offs_endian(MVPP2_PRS_TCAM_AI_BYTE)];
 }
 
 /* Set ethertype in tcam sw entry */
@@ -3434,7 +3521,7 @@ static int mvpp2_prs_vlan_find(struct mvpp2 *priv, unsigned short tpid, int ai)
 			continue;
 
 		mvpp2_prs_init_from_hw(priv, &pe, tid);
-		match = mvpp2_prs_tcam_data_cmp(&pe, 0, swab16(tpid));
+		match = mvpp2_prs_tcam_data_cmp(&pe, 0, tpid);
 		if (!match)
 			continue;
 
@@ -3562,8 +3649,8 @@ static int mvpp2_prs_double_vlan_find(struct mvpp2 *priv, unsigned short tpid1,
 
 		mvpp2_prs_init_from_hw(priv, &pe, tid);
 
-		match = mvpp2_prs_tcam_data_cmp(&pe, 0, swab16(tpid1)) &&
-			mvpp2_prs_tcam_data_cmp(&pe, 4, swab16(tpid2));
+		match = mvpp2_prs_tcam_data_cmp(&pe, 0, tpid1) &&
+			mvpp2_prs_tcam_data_cmp(&pe, 4, tpid2);
 
 		if (!match)
 			continue;
@@ -8490,7 +8577,7 @@ static u32 mvpp2_txq_desc_csum(int l3_offs, int l3_proto,
 	command |= (ip_hdr_len << MVPP2_TXD_IP_HLEN_SHIFT);
 	command |= MVPP2_TXD_IP_CSUM_DISABLE;
 
-	if (l3_proto == swab16(ETH_P_IP)) {
+	if (l3_proto == htons(ETH_P_IP)) {
 		command &= ~MVPP2_TXD_IP_CSUM_DISABLE;	/* enable IPv4 csum */
 		command &= ~MVPP2_TXD_L3_IP6;		/* enable IPv4 */
 	} else {
@@ -8921,9 +9008,11 @@ static void mvpp2_rxq_drop_pkts(struct mvpp2_port *port,
 
 	for (i = 0; i < rx_received; i++) {
 		struct mvpp2_rx_desc *rx_desc = mvpp2_rxq_next_desc_get(rxq);
-		u32 status = mvpp2_rxdesc_status_get(port, rx_desc);
+		u32 status;
 		int pool;
 
+		mvpp2_rx_desc_endian(port->priv->hw_version, rx_desc);
+		status = mvpp2_rxdesc_status_get(port, rx_desc);
 		pool = (status & MVPP2_RXD_BM_POOL_ID_MASK) >>
 			MVPP2_RXD_BM_POOL_ID_OFFS;
 
@@ -9478,6 +9567,7 @@ static int mvpp2_rx(struct mvpp2_port *port, struct napi_struct *napi,
 		void *data;
 
 		rx_done++;
+		mvpp2_rx_desc_endian(port->priv->hw_version, rx_desc);
 		rx_status = mvpp2_rxdesc_status_get(port, rx_desc);
 		rx_bytes = mvpp2_rxdesc_size_get(port, rx_desc);
 		rx_bytes -= MVPP2_MH_SIZE;
