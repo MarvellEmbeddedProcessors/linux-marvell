@@ -26,7 +26,7 @@
 #include "mv_pp2x_hw_type.h"
 #include "mv_gop110_hw_type.h"
 
-#define MVPP2_DRIVER_NAME "mvpp2"
+#define MVPP2_DRIVER_NAME "mvpp2x"
 #define MVPP2_DRIVER_VERSION "1.0"
 
 #define MVPP2X_SKB_MAGIC_MASK		0xFFFFFFC0
