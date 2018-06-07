@@ -1106,6 +1106,49 @@ int mv_pp2x_tso_txq_reserved_desc_num_proc(
 	return 0;
 }
 
+/* Avoid wrong tx_done calling for netif_tx_wake at time of
+ * dev-stop or linkDown processing by flag MVPP2_F_IF_TX_ON.
+ * Set/clear it on each cpu.
+ */
+static void __mv_pp2x_txqs_on(void *arg)
+{
+	((struct mv_pp2x_port *)arg)->flags |= MVPP2_F_IF_TX_ON;
+}
+
+static void __mv_pp2x_txqs_off(void *arg)
+{
+	((struct mv_pp2x_port *)arg)->flags &= ~MVPP2_F_IF_TX_ON;
+}
+
+static inline bool mv_pp2x_tx_stopped(struct mv_pp2x_port *port)
+{
+	return (port->flags & MVPP2_F_IF_TX_ON);
+}
+
+static void mv_pp2x_tx_start_all_queues(struct net_device *dev)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+
+	on_each_cpu(__mv_pp2x_txqs_on, port, 1);
+	netif_tx_start_all_queues(dev);
+}
+
+static void mv_pp2x_tx_wake_all_queues(struct net_device *dev)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+
+	on_each_cpu(__mv_pp2x_txqs_on, port, 1);
+	netif_tx_wake_all_queues(dev);
+}
+
+static void mv_pp2x_tx_stop_all_queues(struct net_device *dev)
+{
+	struct mv_pp2x_port *port = netdev_priv(dev);
+
+	on_each_cpu(__mv_pp2x_txqs_off, port, 1);
+	netif_tx_stop_all_queues(dev);
+}
+
 /* Release the last allocated Tx descriptor. Useful to handle DMA
  * mapping failures in the Tx path.
  */
@@ -1211,7 +1254,7 @@ static void mv_pp2x_txq_done(struct mv_pp2x_port *port,
 
 	mv_pp2x_txq_bufs_free(port, txq_pcpu, tx_done);
 
-	if (netif_tx_queue_stopped(nq))
+	if (netif_tx_queue_stopped(nq) && !mv_pp2x_tx_stopped(port))
 		if (mv_pp2x_txq_free_count(txq_pcpu) >= port->txq_stop_limit)
 			netif_tx_wake_queue(nq);
 }
@@ -2146,14 +2189,14 @@ static void mv_pp22_dev_link_event(struct net_device *dev)
 			return;
 		netif_carrier_on(dev);
 		if (!(port->flags & MVPP2_F_IF_MUSDK))
-			netif_tx_wake_all_queues(dev);
+			mv_pp2x_tx_wake_all_queues(dev);
 		netdev_info(dev, "link up\n");
 		port->mac_data.flags |= MV_EMAC_F_LINK_UP;
 	} else {
 		if (!netif_carrier_ok(dev))
 			return;
 		netif_carrier_off(dev);
-		netif_tx_stop_all_queues(dev);
+		mv_pp2x_tx_stop_all_queues(dev);
 		netdev_info(dev, "link down\n");
 		port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
 	}
@@ -2263,7 +2306,7 @@ static void mv_pp22_link_event(struct net_device *dev)
 			mv_pp2x_ingress_enable(port);
 			netif_carrier_on(dev);
 			if (!(port->flags & MVPP2_F_IF_MUSDK))
-				netif_tx_wake_all_queues(dev);
+				mv_pp2x_tx_wake_all_queues(dev);
 			mv_gop110_port_events_unmask(&port->priv->hw.gop,
 						     &port->mac_data);
 			port->mac_data.flags |= MV_EMAC_F_LINK_UP;
@@ -2276,7 +2319,7 @@ static void mv_pp22_link_event(struct net_device *dev)
 			mv_gop110_port_disable(&port->priv->hw.gop,
 					       &port->mac_data, port);
 			netif_carrier_off(dev);
-			netif_tx_stop_all_queues(dev);
+			mv_pp2x_tx_stop_all_queues(dev);
 			port->mac_data.flags &= ~MV_EMAC_F_LINK_UP;
 			netdev_info(dev, "link down\n");
 		}
@@ -4198,7 +4241,7 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 	}
 
 	if (port->mac_data.phy_dev && !(port->flags & MVPP2_F_IF_MUSDK))
-		netif_tx_start_all_queues(port->dev);
+		mv_pp2x_tx_start_all_queues(port->dev);
 
 	mv_pp2x_egress_enable(port);
 	mv_pp2x_ingress_enable(port);
@@ -4277,12 +4320,12 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 
 	/* Stop new packets arriving from RX-interrupts and Linux-TX */
 	mv_pp2x_ingress_disable(port);
-	netif_carrier_off(port->dev);
-	msleep(20);
+	mv_pp2x_tx_stop_all_queues(port->dev);
 
 	/* Drain pending aggregated TXQ on all CPUs */
 	on_each_cpu(mv_pp2x_send_pend_aggr_txq, port, 1);
 	msleep(200); /* yield and wait for tx-tasklet and HW idle */
+	netif_carrier_off(port->dev);
 
 	/* Disable interrupts on all CPUs */
 	mv_pp2x_port_interrupts_disable(port);
@@ -4290,7 +4333,6 @@ void mv_pp2x_stop_dev(struct mv_pp2x_port *port)
 		mv_pp22_port_uio_interrupts_disable(port);
 
 	mv_pp2x_port_napi_disable(port);
-	netif_tx_stop_all_queues(port->dev);
 	mv_pp2x_egress_disable(port);
 
 	if (port->comphy)

@@ -1355,6 +1355,8 @@
 #define MVPP2_F_LOOPBACK		BIT(0) /* Loopback port */
 #define MVPP2_F_IFCAP_NETMAP		BIT(1) /* netmap port */
 #define MVPP2_F_IF_MUSDK		BIT(2) /* musdk port */
+/* BIT(3) reserved for MVPP2_F_IF_MUSDK_DOWN */
+#define MVPP2_F_IF_TX_ON		BIT(4) /* TX enabled in device-start */
 
 /* Marvell tag types */
 enum mv_pp2x_tag_type {
