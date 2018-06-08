@@ -290,41 +290,6 @@ static inline u32 advk_readl(struct advk_pcie *pcie, u64 reg)
 	return readl(pcie->base + reg);
 }
 
-/*
- * Initialize the configuration space of the PCI-to-PCI bridge
- * associated with the given PCIe interface.
- */
-static void advk_sw_pci_bridge_init(struct advk_pcie *pcie)
-{
-	struct advk_sw_pci_bridge *bridge = &pcie->bridge;
-
-	memset(bridge, 0, sizeof(struct advk_sw_pci_bridge));
-
-	bridge->class = PCI_CLASS_BRIDGE_PCI;
-	bridge->vendor = PCI_VENDOR_ID_MARVELL_EXT;
-	bridge->device = advk_readl(pcie, PCIE_CORE_DEV_ID_REG) >> 16;
-	bridge->vendor = advk_readl(pcie, PCIE_CORE_DEV_ID_REG) & 0xffff;
-	bridge->revision = advk_readl(pcie, PCIE_CORE_DEV_REV_REG) & 0xff;
-	bridge->header_type = PCI_HEADER_TYPE_BRIDGE;
-	bridge->cache_line_size = 0x10;
-
-	/* Support 32 bits I/O addressing */
-	bridge->iobase = PCI_IO_RANGE_TYPE_32;
-	bridge->iolimit = PCI_IO_RANGE_TYPE_32;
-
-	/* Support 64 bits memory pref */
-	bridge->pref_mem_base = PCI_PREF_RANGE_TYPE_64;
-	bridge->pref_mem_limit = PCI_PREF_RANGE_TYPE_64;
-
-	/* Support interrupt A for MSI feature and SERR */
-	bridge->intpin = PCIE_CORE_INT_A_ASSERT_ENABLE;
-	bridge->bridgectrl = PCI_BRIDGE_CTL_SERR;
-
-	/* Add capabilities */
-	bridge->status = PCI_STATUS_CAP_LIST;
-	bridge->capablities_pointer = PCISWCAP;
-}
-
 static int advk_pcie_link_up(struct advk_pcie *pcie)
 {
 	u32 val, ltssm_state;
@@ -691,8 +656,7 @@ static void  __advk_sw_pci_bridge_write(struct advk_pcie *pcie,
 	struct advk_sw_pci_bridge *bridge = &pcie->bridge;
 
 	switch (reg) {
-	case PCI_COMMAND:
-	case PCI_PRIMARY_BUS ... PCI_IO_BASE_UPPER16:
+	case PCI_VENDOR_ID ... PCI_INTERRUPT_LINE:
 		*((u32 *)bridge + reg / 4) = value;
 		break;
 
@@ -754,6 +718,48 @@ static int advk_sw_pci_bridge_write(struct advk_pcie *pcie,
 	__advk_sw_pci_bridge_write(pcie, reg, temp);
 
 	return PCIBIOS_SUCCESSFUL;
+}
+
+/*
+ * Initialize the configuration space of the PCI-to-PCI bridge
+ * associated with the given PCIe interface.
+ */
+static void advk_sw_pci_bridge_init(struct advk_pcie *pcie)
+{
+	/* PCI class header type init setting */
+	advk_sw_pci_bridge_write(pcie, PCI_CLASS_DEVICE, 2,
+				 PCI_CLASS_BRIDGE_PCI);
+	advk_sw_pci_bridge_write(pcie, PCI_VENDOR_ID, 2,
+				 PCI_VENDOR_ID_MARVELL_EXT);
+	advk_sw_pci_bridge_write(pcie, PCI_DEVICE_ID, 2,
+				 advk_readl(pcie, PCIE_CORE_DEV_ID_REG) >> 16);
+
+	advk_sw_pci_bridge_write(pcie, PCI_REVISION_ID, 1,
+				 advk_readl(pcie, PCIE_CORE_DEV_REV_REG) & 0xff);
+
+	advk_sw_pci_bridge_write(pcie, PCI_HEADER_TYPE, 1,
+				 PCI_HEADER_TYPE_BRIDGE);
+	advk_sw_pci_bridge_write(pcie, PCI_CACHE_LINE_SIZE, 1, 0x10);
+
+	/* Support 32 bits I/O addressing */
+	advk_sw_pci_bridge_write(pcie, PCI_IO_BASE, 1, PCI_IO_RANGE_TYPE_32);
+	advk_sw_pci_bridge_write(pcie, PCI_IO_LIMIT, 1, PCI_IO_RANGE_TYPE_32);
+
+	/* Support 64 bits memory pref */
+	advk_sw_pci_bridge_write(pcie, PCI_MEMORY_BASE, 2,
+				 PCI_PREF_RANGE_TYPE_64);
+	advk_sw_pci_bridge_write(pcie, PCI_MEMORY_LIMIT, 2,
+				 PCI_PREF_RANGE_TYPE_64);
+
+	/* Support interrupt A for MSI feature and SERR */
+	advk_sw_pci_bridge_write(pcie, PCI_INTERRUPT_PIN, 1,
+				 PCIE_CORE_INT_A_ASSERT_ENABLE);
+	advk_sw_pci_bridge_write(pcie, PCI_BRIDGE_CONTROL, 2,
+				 PCI_BRIDGE_CTL_SERR);
+
+	/* Add capabilities */
+	advk_sw_pci_bridge_write(pcie, PCI_STATUS, 2, PCI_STATUS_CAP_LIST);
+	advk_sw_pci_bridge_write(pcie, PCI_CAPABILITY_LIST, 1, PCISWCAP);
 }
 
 static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
