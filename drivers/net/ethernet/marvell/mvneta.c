@@ -3611,21 +3611,21 @@ static int mvneta_mdio_probe(struct mvneta_port *pp)
 			netdev_err(pp->dev, "could not find the PHY\n");
 			return -ENODEV;
 		}
+		pp->phy_dev = phy_dev;
 	} else {
 		phy_dev = pp->phy_dev;
 		/* for in-band PHY presented on SMI bus, run auto negotiation */
 		if (pp->phy_node) {
 			phy_init_hw(phy_dev);
 			phy_start_aneg(phy_dev);
-			mvneta_fixed_link_update(pp, phy_dev);
 		}
+		mvneta_fixed_link_update(pp, phy_dev);
 	}
 
 	/* Neta does not support 1000baseT_Half */
 	phy_dev->supported &= (PHY_GBIT_FEATURES & (~SUPPORTED_1000baseT_Half));
 	phy_dev->advertising = phy_dev->supported;
 
-	pp->phy_dev = phy_dev;
 	pp->link    = 0;
 	pp->duplex  = 0;
 	pp->speed   = 0;
