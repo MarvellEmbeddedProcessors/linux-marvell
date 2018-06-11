@@ -74,7 +74,8 @@
 };
 
 /* GIC ITS in this AP is MSI parent for XOR engines in CPs south-bridges connected to this AP  */
-#define XOR_MSI_PARENT(XOR_NUM) <&AP810_LABEL(gic_its) MVEBU_STREAM_ID_CP_XORx(XOR_NUM)>
+#define XOR_MSI_PARENT(XOR_NUM) <&AP810_LABEL(gic_its) \
+				MVEBU_STREAM_ID_CPx_XORx(CP110_NUM, XOR_NUM)>
 
 / {
 	AP810_NAME {
