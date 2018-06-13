@@ -61,6 +61,22 @@
 		ethernet1 = &cp1_emac0;
 	};
 
+	cpus {
+		/delete-node/idle_states;
+		cpu@000 {
+			/delete-property/cpu-idle-states;
+		};
+		cpu@001 {
+			/delete-property/cpu-idle-states;
+		};
+		cpu@100 {
+			/delete-property/cpu-idle-states;
+		};
+		cpu@101 {
+			/delete-property/cpu-idle-states;
+		};
+	};
+
 	ap806 {
 		config-space {
 			serial@512000 {

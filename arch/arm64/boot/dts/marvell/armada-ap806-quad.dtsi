@@ -62,7 +62,7 @@
 			operating-points-v2 = <&cluster0_opp>;
 			#cooling-cells = <2>; /* min followed by max */
 			enable-method = "psci";
-			cpu-idle-states;
+			cpu-idle-states = <&CPU_SLEEP_0>;
 		};
 		cpu1: cpu@001 {
 			device_type = "cpu";
@@ -71,7 +71,7 @@
 			clocks = <&ap806_clock 0>;
 			operating-points-v2 = <&cluster0_opp>;
 			enable-method = "psci";
-			cpu-idle-states;
+			cpu-idle-states = <&CPU_SLEEP_0>;
 		};
 		cpu2: cpu@100 {
 			device_type = "cpu";
@@ -81,7 +81,7 @@
 			operating-points-v2 = <&cluster1_opp>;
 			#cooling-cells = <2>; /* min followed by max */
 			enable-method = "psci";
-			cpu-idle-states;
+			cpu-idle-states = <&CPU_SLEEP_0>;
 		};
 		cpu3: cpu@101 {
 			device_type = "cpu";
@@ -90,7 +90,7 @@
 			clocks = <&ap806_clock 1>;
 			operating-points-v2 = <&cluster1_opp>;
 			enable-method = "psci";
-			cpu-idle-states;
+			cpu-idle-states = <&CPU_SLEEP_0>;
 		};
 	};
 
