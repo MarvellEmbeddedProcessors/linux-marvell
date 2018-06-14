@@ -1,0 +1,114 @@
+AXI Monitor
+===========
+
+   Author:   Yehuda Yitschak <yehuday@marvell.com>
+   Date:     April 6th, 2016
+
+Introduction
+------------
+
+The AXI monitor (AXIM) is a HW bus monitor that enables detecting specific
+transactions on the AXI bus and use them for trace and debug purposes.
+It is very useful for debugging DMA accesses from HW devices but it can
+also be used to analyze the load on the DRAM interface or other system buses.
+
+The AXIM uses up to 12 comparators, called channels, to detect bus events.
+An events occur when a transaction matching the channel's filter is detected.
+A Channel event can have several outcomes. It can merely increment the channel's
+event counter, it can trigger an STM trace, cross trigger a CTI block, or
+increment profiling counters which can measure latency or transaction sizes.
+The profiling counters can also be independently traced to the STM.
+
+An AXIM monitors a single direction bus, meaning a read channel or write channel.
+A typical AXIM connection may look like this.
+
+								|-------
+								|       |
+					--------    -------->| CTI |
+		AXI channel (rd/wr) |      |    |      |     |
+		----------------------->| AXIM | ---|   -------
+					|      |    |      -------      -------
+					--------    |      |     |      |     |
+							-------->| STM |----->| ETF |
+									 |     |      |     |
+								 -------      -------
+
+The AXI monitor has several revisions with different feature set:
+
+Rev 1:
+   * Event detection and filtering
+   * Cross triggering CTI on event
+Rev 2
+   * Profiling of transaction variables
+   * Tracing detected events and profiling counters
+
+Acronyms
+--------
+- STM:	System trace Macrocell
+- CTI:	Cross Trigger Interface
+
+Device Tree Bindings
+----------------------
+
+See Documentation/devicetree/bindings/arm/coresight.txt for details.
+
+How to use
+----------
+
+Debug mode
+----------
+To detect specific transactions the AXIM channel filters must be configured
+The channel filters are set by specific sysfs file in the AXIM folder
+Then the entire monitor needs to be enabled.
+Finally the event counters can be read by another sysfs file
+
+For example to detect transaction between physical address 0x0 and 0x1000
+
+    /* Set the required channel */
+    root:/# echo 0x0 > sys/bus/coresight/devices/f0840000.axim/curr_chan
+
+    /* Set the filters */
+    root:/# echo 0x0 > sys/bus/coresight/devices/f0840000.axim/channel/addr_start
+    root:/# echo 0x1000 > sys/bus/coresight/devices/f0840000.axim/channel/addr_end
+
+    /* enable the channel and the monitor*/
+    root:/# echo 0x1 > sys/bus/coresight/devices/f0840000.axim/channel/enable
+    root:/# echo 0x1 > sys/bus/coresight/devices/f0840000.axim/channel/mon_enable
+
+    /* read the channel counter */
+    root:/# cat sys/bus/coresight/devices/f0840000.axim/channel/counter
+    /* or read all channel counter */
+    root:/# cat sys/bus/coresight/devices/f0840000.axim/counters
+
+Another example is detecting all non secure shareable device accesses:
+
+    /* Set the required channel */
+    root:/# echo 0x1 > sys/bus/coresight/devices/f0850000.axim/curr_chan
+
+    /* Set the filters */
+    root:/# echo 0x2 > sys/bus/coresight/devices/f0850000.axim/channel/domain
+    root:/# echo 0x3 > sys/bus/coresight/devices/f0850000.axim/channel/domain_mask
+    root:/# echo 0x2 > sys/bus/coresight/devices/f0850000.axim/channel/prot
+    root:/# echo 0x2 > sys/bus/coresight/devices/f0850000.axim/channel/prot_mask
+
+    /* enable the channel and the monitor*/
+    root:/# echo 0x1 > sys/bus/coresight/devices/f0850000.axim/channel/enable
+    root:/# echo 0x1 > sys/bus/coresight/devices/f0850000.axim/channel/mon_enable
+
+    /* read the channel counter */
+    root:/# cat sys/bus/coresight/devices/f0850000.axim/channel/counter
+    /* or read all channel counter */
+    root:/# cat sys/bus/coresight/devices/f0850000.axim/counters
+
+The specific sysfs files and their functions are documented under:
+Documentation/ABI/testing/sysfs-bus-coresight-devices-axim
+
+NOTE
+----
+CPU or device accesses may not map the same to AXI bus transactions.
+For example when a CPU accesses a non 64byte aligned address (e.g 0x10), the L2 may
+issue a cache line prefetch to the aligned address (0x0). Therefore it is advised
+to use addresses which are 64 byte aligned. Also some transaction may be served by
+caches which are not visible to specific AXI monitor in use. Therefore it is important
+to understand the transaction characteristics for correct filtering.
+

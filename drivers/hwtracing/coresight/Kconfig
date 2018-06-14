@@ -103,4 +103,14 @@ config CORESIGHT_CPU_DEBUG
 	  properly, please refer Documentation/trace/coresight-cpu-debug.txt
 	  for detailed description and the example for usage.
 
+config CORESIGHT_SOURCE_AXIM
+	bool "CoreSight Marvell AXI Monitor driver"
+	depends on ARM64
+	select CORESIGHT_LINKS_AND_SINKS
+	help
+	  This driver provides support for the Coresight compatible AXI bus
+	  monitoring and profiling HW. This is primarily useful
+	  for debug and profiling of AXI bus transactions. Depending on the
+	  implemented version data capturing may also be available.
+
 endif
