@@ -6165,10 +6165,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	mv_pp2x_check_queue_size_valid(port);
 
 	err = mv_pp2x_port_init(port);
-	if (err < 0) {
-		dev_err(&pdev->dev, "failed to init port %d\n", id);
+	if (err < 0)
 		goto err_free_stats;
-	}
+
 	if (port->priv->pp2_version == PPV21)
 		mv_pp21_port_power_up(port);
 
@@ -6295,7 +6294,6 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	dev->dev.of_node = port_node;
 
 	return 0;
-	dev_err(&pdev->dev, "%s failed for port_id(%d)\n", __func__, id);
 
 err_unreg_netdev:
 	unregister_netdev(dev);
@@ -6305,6 +6303,10 @@ err_free_irq:
 	mv_pp2x_port_irqs_dispose_mapping(port);
 err_free_netdev:
 	free_netdev(dev);
+
+	if (err)
+		dev_err(&pdev->dev, "failed to init port %d, err=%d\n", id, err);
+
 	return err;
 }
 
