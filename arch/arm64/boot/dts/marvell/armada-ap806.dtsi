@@ -199,6 +199,43 @@
 					   <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
+			axim-ddr-rd@840000 {
+				compatible = "marvell,coresight-axim", "arm,primecell";
+				reg = <0x840000 0x1000>;
+				clocks = <&ap_clk 3>, <&ap_clk 5>;
+				clock-names = "apb_pclk", "hclk";
+				bus-width = <40>;
+				port@0 { };
+			};
+
+			axim-ddr-wr@841000 {
+				compatible = "marvell,coresight-axim", "arm,primecell";
+				reg = <0x841000 0x1000>;
+				clocks = <&ap_clk 3>, <&ap_clk 5>;
+				clock-names = "apb_pclk", "hclk";
+				bus-width = <40>;
+				port@0 { };
+			};
+
+			axim-sb-rd@848000 {
+				compatible = "marvell,coresight-axim", "arm,primecell";
+				reg = <0x848000 0x1000>;
+				clocks = <&ap_clk 3>, <&ap_clk 5>;
+				clock-names = "apb_pclk", "hclk";
+				bus-width = <40>;
+				port@0 { };
+			};
+
+			axim-sb-wr@849000 {
+				compatible = "marvell,coresight-axim", "arm,primecell";
+				reg = <0x849000 0x1000>;
+				clocks = <&ap_clk 3>, <&ap_clk 5>;
+				clock-names = "apb_pclk", "hclk";
+				bus-width = <40>;
+				port@0 { };
+			};
+
+
 			odmi: odmi@300000 {
 				compatible = "marvell,odmi-controller";
 				interrupt-controller;
