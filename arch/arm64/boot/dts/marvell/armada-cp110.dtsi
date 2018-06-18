@@ -182,6 +182,60 @@
 			interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
+		CP110_LABEL(axim_cp_rd): axim-cp-rd@3c5000 {
+			compatible = "marvell,coresight-axim", "arm,primecell";
+			reg = <0x3c5000 0x1000>;
+			clocks = <&CP110_LABEL(clk) 1 3>;
+			clock-names = "apb_pclk";
+			bus-width = <40>;
+			port@0 { };
+		};
+
+		CP110_LABEL(axim_cp_wr): axim-cp-wr@3c6000 {
+			compatible = "marvell,coresight-axim", "arm,primecell";
+			reg = <0x3c6000 0x1000>;
+			clocks = <&CP110_LABEL(clk) 1 3>;
+			clock-names = "apb_pclk";
+			bus-width = <40>;
+			port@0 { };
+		};
+
+		CP110_LABEL(axim_ppv2_rd): axim-ppv2-rd@3c0000 {
+			compatible = "marvell,coresight-axim", "arm,primecell";
+			reg = <0x3c0000 0x1000>;
+			clocks = <&CP110_LABEL(clk) 1 3>;
+			clock-names = "apb_pclk";
+			bus-width = <40>;
+			port@0 { };
+		};
+
+		CP110_LABEL(axim_ppv2_wr): axim-ppv2-wr@3c1000 {
+			compatible = "marvell,coresight-axim", "arm,primecell";
+			reg = <0x3c1000 0x1000>;
+			clocks = <&CP110_LABEL(clk) 1 3>;
+			clock-names = "apb_pclk";
+			bus-width = <40>;
+			port@0 { };
+		};
+
+		CP110_LABEL(axim_hb1_rd): axim-hb1-rd@3c8000 {
+			compatible = "marvell,coresight-axim", "arm,primecell";
+			reg = <0x3c8000 0x1000>;
+			clocks = <&CP110_LABEL(clk) 1 3>;
+			clock-names = "apb_pclk";
+			bus-width = <40>;
+			port@0 { };
+		};
+
+		CP110_LABEL(axim_hb1_wr): axim-hb1-wr@3c9000 {
+			compatible = "marvell,coresight-axim", "arm,primecell";
+			reg = <0x3c9000 0x1000>;
+			clocks = <&CP110_LABEL(clk) 1 3>;
+			clock-names = "apb_pclk";
+			bus-width = <40>;
+			port@0 { };
+		};
+
 		CP110_LABEL(thermal): thermal@400078 {
 			compatible = "marvell,armada-cp110-thermal";
 			reg = <0x400078 0x4>,
