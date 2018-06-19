@@ -700,8 +700,8 @@
 #define MVPP2_DEFAULT_RXQ		4
 
 /* Max number of Rx descriptors */
-#define MVPP2_MAX_RXD_MAX		1024
-#define MVPP2_MAX_RXD_DFLT		128
+#define MVPP2_MAX_RXD_MAX		1280
+#define MVPP2_MAX_RXD_DFLT		MVPP2_MAX_RXD_MAX
 
 /* Max number of Tx descriptors */
 #define MVPP2_MAX_TXD_MAX		2048
