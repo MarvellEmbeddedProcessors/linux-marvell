@@ -7359,30 +7359,25 @@ static void mvpp2_rxq_short_pool_set(struct mvpp2_port *port,
 	mvpp2_write(port->priv, MVPP2_RXQ_CONFIG_REG(prxq), val);
 }
 
-static void *mvpp2_buf_alloc(struct mvpp2_port *port,
-			     struct mvpp2_bm_pool *bm_pool,
-			     dma_addr_t *buf_dma_addr,
-			     phys_addr_t *buf_phys_addr,
-			     gfp_t gfp_mask)
+static dma_addr_t mvpp2_buf_alloc(struct mvpp2_port *port,
+				  struct mvpp2_bm_pool *bm_pool,
+				  gfp_t gfp_mask)
 {
 	dma_addr_t dma_addr;
 	void *data;
 
 	data = mvpp2_frag_alloc(bm_pool);
 	if (!data)
-		return NULL;
+		return (dma_addr_t)data;
 
 	dma_addr = dma_map_single(port->dev->dev.parent, data,
 				  MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
 				  DMA_FROM_DEVICE);
 	if (unlikely(dma_mapping_error(port->dev->dev.parent, dma_addr))) {
 		mvpp2_frag_free(bm_pool, data);
-		return NULL;
+		dma_addr = 0;
 	}
-	*buf_dma_addr = dma_addr;
-	*buf_phys_addr = virt_to_phys(data);
-
-	return data;
+	return dma_addr;
 }
 
 /* Release buffer to BM */
@@ -7420,8 +7415,6 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
 {
 	int i, buf_size, total_size;
 	dma_addr_t dma_addr;
-	phys_addr_t phys_addr;
-	void *buf;
 
 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
 	total_size = MVPP2_RX_TOTAL_SIZE(buf_size);
@@ -7435,9 +7428,8 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
 	}
 
 	for (i = 0; i < buf_num; i++) {
-		buf = mvpp2_buf_alloc(port, bm_pool, &dma_addr,
-				      &phys_addr, GFP_KERNEL);
-		if (!buf)
+		dma_addr = mvpp2_buf_alloc(port, bm_pool, GFP_KERNEL);
+		if (!dma_addr)
 			break;
 
 		mvpp2_bm_pool_put(port, bm_pool->id, dma_addr);
@@ -9459,18 +9451,13 @@ static void mvpp2_rx_csum(struct mvpp2_port *port, u32 status,
 	skb->ip_summed = CHECKSUM_NONE;
 }
 
-/* Reuse skb if possible, or allocate a new skb and add it to BM pool */
+/* Allocate a new skb and add it to BM pool */
 static int mvpp2_rx_refill(struct mvpp2_port *port,
 			   struct mvpp2_bm_pool *bm_pool, int pool)
 {
-	dma_addr_t dma_addr;
-	phys_addr_t phys_addr;
-	void *buf;
+	dma_addr_t dma_addr = mvpp2_buf_alloc(port, bm_pool, GFP_ATOMIC);
 
-	/* No recycle or too many buffers are in use, so allocate a new skb */
-	buf = mvpp2_buf_alloc(port, bm_pool, &dma_addr, &phys_addr,
-			      GFP_ATOMIC);
-	if (!buf)
+	if (!dma_addr)
 		return -ENOMEM;
 
 	mvpp2_bm_pool_put(port, pool, dma_addr);
