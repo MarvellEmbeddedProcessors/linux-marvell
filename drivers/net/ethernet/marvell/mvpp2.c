@@ -2372,15 +2372,6 @@ static dma_addr_t mvpp2_rxdesc_dma_addr_get(struct mvpp2_port *port,
 		return rx_desc->pp22.buf_dma_addr_key_hash & GENMASK_ULL(39, 0);
 }
 
-static unsigned long mvpp2_rxdesc_cookie_get(struct mvpp2_port *port,
-					     struct mvpp2_rx_desc *rx_desc)
-{
-	if (port->priv->hw_version == MVPP21)
-		return rx_desc->pp21.buf_cookie;
-	else
-		return rx_desc->pp22.buf_cookie_misc & GENMASK_ULL(39, 0);
-}
-
 static size_t mvpp2_rxdesc_size_get(struct mvpp2_port *port,
 				    struct mvpp2_rx_desc *rx_desc)
 {
@@ -7169,23 +7160,16 @@ static void mvpp2_bm_bufs_get_addrs(struct device *dev, struct mvpp2 *priv,
 
 	*dma_addr = mvpp2_percpu_read(priv, cpu,
 				      MVPP2_BM_PHY_ALLOC_REG(bm_pool->id));
-	*phys_addr = mvpp2_percpu_read(priv, cpu, MVPP2_BM_VIRT_ALLOC_REG);
 
-	if (priv->hw_version != MVPP21) {
+	if (priv->hw_version != MVPP21 && sizeof(dma_addr_t) == 8) {
 		u32 val;
-		u32 dma_addr_highbits, phys_addr_highbits;
+		u32 dma_addr_highbits;
 
 		val = mvpp2_percpu_read(priv, cpu, MVPP22_BM_ADDR_HIGH_ALLOC);
 		dma_addr_highbits = (val & MVPP22_BM_ADDR_HIGH_PHYS_MASK);
-		phys_addr_highbits = (val & MVPP22_BM_ADDR_HIGH_VIRT_MASK) >>
-			MVPP22_BM_ADDR_HIGH_VIRT_SHIFT;
-
-		if (sizeof(dma_addr_t) == 8)
-			*dma_addr |= (u64)dma_addr_highbits << 32;
-
-		if (sizeof(phys_addr_t) == 8)
-			*phys_addr |= (u64)phys_addr_highbits << 32;
+		*dma_addr |= (u64)dma_addr_highbits << 32;
 	}
+	*phys_addr = dma_to_phys(dev, *dma_addr);
 
 	put_cpu();
 }
@@ -7403,8 +7387,7 @@ static void *mvpp2_buf_alloc(struct mvpp2_port *port,
 
 /* Release buffer to BM */
 static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
-				     dma_addr_t buf_dma_addr,
-				     phys_addr_t buf_phys_addr)
+				     dma_addr_t buf_dma_addr)
 {
 	int sw_thread = mvpp2_check_sw_thread(smp_processor_id());
 	unsigned long flags = 0;
@@ -7412,29 +7395,17 @@ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
 	if (port->priv->spinlocks_bitmap & MV_BM_LOCK)
 		spin_lock_irqsave(&port->priv->bm_spinlock[sw_thread], flags);
 
-	if (port->priv->hw_version != MVPP21) {
-		u32 val = 0;
-
-		if (sizeof(dma_addr_t) == 8)
-			val |= upper_32_bits(buf_dma_addr) &
+	/* MVPP2_BM_VIRT_RLS_REG is not interpreted by HW, and simply
+	 * returned in the "cookie" field of the RX descriptor.
+	 * For performance reasons don't store VA|PA and don't use "cookie".
+	 * VA/PA obtained faster from dma_to_phys(dma-addr) and phys_to_virt.
+	 */
+	if (port->priv->hw_version != MVPP21 && sizeof(dma_addr_t) == 8) {
+		u32 val = upper_32_bits(buf_dma_addr) &
 				MVPP22_BM_ADDR_HIGH_PHYS_RLS_MASK;
-
-		if (sizeof(phys_addr_t) == 8)
-			val |= (upper_32_bits(buf_phys_addr)
-				<< MVPP22_BM_ADDR_HIGH_VIRT_RLS_SHIFT) &
-				MVPP22_BM_ADDR_HIGH_VIRT_RLS_MASK;
-
 		mvpp2_percpu_write_relaxed(port->priv, sw_thread,
 					   MVPP22_BM_ADDR_HIGH_RLS_REG, val);
 	}
-
-	/* MVPP2_BM_VIRT_RLS_REG is not interpreted by HW, and simply
-	 * returned in the "cookie" field of the RX
-	 * descriptor. Instead of storing the virtual address, we
-	 * store the physical address
-	 */
-	mvpp2_percpu_write_relaxed(port->priv, sw_thread,
-				   MVPP2_BM_VIRT_RLS_REG, buf_phys_addr);
 	mvpp2_percpu_write_relaxed(port->priv, sw_thread,
 				   MVPP2_BM_PHY_RLS_REG(pool), buf_dma_addr);
 
@@ -7469,8 +7440,7 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
 		if (!buf)
 			break;
 
-		mvpp2_bm_pool_put(port, bm_pool->id, dma_addr,
-				  phys_addr);
+		mvpp2_bm_pool_put(port, bm_pool->id, dma_addr);
 	}
 
 	/* Update BM driver with number of buffers added to pool */
@@ -9017,8 +8987,7 @@ static void mvpp2_rxq_drop_pkts(struct mvpp2_port *port,
 			MVPP2_RXD_BM_POOL_ID_OFFS;
 
 		mvpp2_bm_pool_put(port, pool,
-				  mvpp2_rxdesc_dma_addr_get(port, rx_desc),
-				  mvpp2_rxdesc_cookie_get(port, rx_desc));
+				  mvpp2_rxdesc_dma_addr_get(port, rx_desc));
 	}
 	mvpp2_rxq_status_update(port, rxq->id, rx_received, rx_received);
 }
@@ -9504,7 +9473,7 @@ static int mvpp2_rx_refill(struct mvpp2_port *port,
 	if (!buf)
 		return -ENOMEM;
 
-	mvpp2_bm_pool_put(port, pool, dma_addr, phys_addr);
+	mvpp2_bm_pool_put(port, pool, dma_addr);
 
 	return 0;
 }
@@ -9572,7 +9541,7 @@ static int mvpp2_rx(struct mvpp2_port *port, struct napi_struct *napi,
 		rx_bytes = mvpp2_rxdesc_size_get(port, rx_desc);
 		rx_bytes -= MVPP2_MH_SIZE;
 		dma_addr = mvpp2_rxdesc_dma_addr_get(port, rx_desc);
-		phys_addr = mvpp2_rxdesc_cookie_get(port, rx_desc);
+		phys_addr = dma_to_phys(port->dev->dev.parent, dma_addr);
 		data = (void *)phys_to_virt(phys_addr);
 
 		pool = (rx_status & MVPP2_RXD_BM_POOL_ID_MASK) >>
@@ -9589,7 +9558,7 @@ err_drop_frame:
 			dev->stats.rx_errors++;
 			mvpp2_rx_error(port, rx_desc);
 			/* Return the buffer to the pool */
-			mvpp2_bm_pool_put(port, pool, dma_addr, phys_addr);
+			mvpp2_bm_pool_put(port, pool, dma_addr);
 			continue;
 		}
 
