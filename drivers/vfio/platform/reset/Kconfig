@@ -13,3 +13,11 @@ config VFIO_PLATFORM_AMDXGBE_RESET
 	  Enables the VFIO platform driver to handle reset for AMD XGBE
 
 	  If you don't know what to do here, say N.
+
+config VFIO_PLATFORM_XHCI_RESET
+	tristate "VFIO support for USB XHCI reset"
+	depends on VFIO_PLATFORM
+	help
+	  Enables the VFIO platform driver to handle reset for USB XHCI
+
+	  If you don't know what to do here, say N.
