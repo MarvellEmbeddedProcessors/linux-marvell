@@ -589,9 +589,6 @@ struct mvneta_rx_queue {
 	/* num of rx descriptors in the rx descriptor ring */
 	int size;
 
-	/* counter of times when mvneta_refill() failed */
-	int missed;
-
 	u32 pkts_coal;
 	u32 time_coal;
 
@@ -609,6 +606,10 @@ struct mvneta_rx_queue {
 
 	/* Index of the next RX DMA descriptor to process */
 	int next_desc_to_proc;
+
+	/* error counters */
+	u32 skb_alloc_err;
+	u32 refill_err;
 };
 
 static enum cpuhp_state online_hpstate;
@@ -1948,9 +1949,13 @@ err_drop_frame:
 		if (rx_bytes <= rx_copybreak) {
 		/* better copy a small frame and not unmap the DMA region */
 			skb = netdev_alloc_skb_ip_align(dev, rx_bytes);
-			if (unlikely(!skb))
+			if (unlikely(!skb)) {
+				netdev_err(dev,
+					   "Can't allocate skb on queue %d\n",
+					   rxq->id);
+				rxq->skb_alloc_err++;
 				goto err_drop_frame;
-
+			}
 			dma_sync_single_range_for_cpu(dev->dev.parent,
 						      phys_addr,
 						      MVNETA_MH_SIZE + NET_SKB_PAD,
@@ -1974,7 +1979,7 @@ err_drop_frame:
 		err = mvneta_rx_refill(pp, rx_desc, rxq);
 		if (err) {
 			netdev_err(dev, "Linux processing - Can't refill\n");
-			rxq->missed++;
+			rxq->refill_err++;
 			goto err_drop_frame;
 		}
 
@@ -2104,7 +2109,7 @@ err_drop_frame:
 		err = hwbm_pool_refill(&bm_pool->hwbm_pool, GFP_ATOMIC);
 		if (err) {
 			netdev_err(dev, "Linux processing - Can't refill\n");
-			rxq->missed++;
+			rxq->refill_err++;
 			goto err_drop_frame_ret_pool;
 		}
 
