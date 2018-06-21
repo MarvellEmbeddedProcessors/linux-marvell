@@ -686,15 +686,18 @@
 
 /* SKB/TSO/TX-ring-size/pause-wakeup constatnts depend upon the
  *  MAX_TSO_SEGS - the max number of fragments to allow in the GSO skb.
- *  Min-Min requirement for it = maxPacket(64kB)/stdMTU(1500)=44 fragments.
- * MAX_SKB_DESCS: we need 2 descriptors per TSO fragment (1 header, 1 data).
+ *  Min-Min requirement for it = maxPacket(64kB)/stdMTU(1500)=44 fragments
+ *  and MVPP2_MAX_TSO_SEGS=max(MVPP2_MAX_TSO_SEGS, MAX_SKB_FRAGS).
+ * MAX_SKB_DESCS: we need 2 descriptors per TSO fragment (1 header, 1 data)
+ *  + per-cpu-reservation MVPP2_CPU_DESC_CHUNK*CPUs for optimization.
  * TX stop activation threshold (e.g. Queue is full) is MAX_SKB_DESCS
- * TX stop-to-wake hysteresis is half of MAX_SKB_DESCS (~ 1 TSO stream)
+ * TX stop-to-wake hysteresis is MAX_TSO_SEGS
  * The Tx ring size cannot be smaller than TSO_SEGS + HYSTERESIS + SKBs
  */
 #define MVPP2_MAX_TSO_SEGS		44
-#define MVPP2_MAX_SKB_DESCS	(MVPP2_MAX_TSO_SEGS * 2 + MAX_SKB_FRAGS)
-#define MVPP2_TX_PAUSE_HYSTERESIS	(MVPP2_MAX_SKB_DESCS / 2)
+#define MVPP2_MAX_SKB_DESCS(hifs)	(MVPP2_MAX_TSO_SEGS * 2 + \
+					MVPP2_CPU_DESC_CHUNK * hifs)
+#define MVPP2_TX_PAUSE_HYSTERESIS	MVPP2_MAX_TSO_SEGS
 
 /* Dfault number of RXQs in use */
 #define MVPP2_DEFAULT_RXQ		4
@@ -706,8 +709,8 @@
 /* Max number of Tx descriptors */
 #define MVPP2_MAX_TXD_MAX		2048
 #define MVPP2_MAX_TXD_DFLT		1024
-#define MVPP2_MIN_TXD		ALIGN(MVPP2_MAX_TSO_SEGS + \
-				      MVPP2_MAX_SKB_DESCS + \
+#define MVPP2_MIN_TXD(hifs)	ALIGN(MVPP2_MAX_TSO_SEGS + \
+				      MVPP2_MAX_SKB_DESCS(hifs) + \
 				      MVPP2_TX_PAUSE_HYSTERESIS, 32)
 
 /* Amount of Tx descriptors that can be reserved at once by CPU */
@@ -8484,6 +8487,7 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2 *priv,
 					    int num)
 {
 	int req, cpu, desc_count;
+	struct mvpp2_txq_pcpu *txq_pcpu_aux;
 
 	if (txq_pcpu->reserved_num >= num)
 		return 0;
@@ -8491,28 +8495,25 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2 *priv,
 	/* Not enough descriptors reserved! Update the reserved descriptor
 	 * count and check again.
 	 */
-
-	desc_count = 0;
-	/* Compute total of used descriptors */
-	for (cpu = 0; cpu < used_hifs; cpu++) {
-		struct mvpp2_txq_pcpu *txq_pcpu_aux;
-
-		txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu);
-		desc_count += txq_pcpu_aux->count;
-		desc_count += txq_pcpu_aux->reserved_num;
+	if (num <= MAX_SKB_FRAGS) {
+		req = MVPP2_CPU_DESC_CHUNK;
+	} else {
+		/* Compute total of used descriptors */
+		desc_count = 0;
+		for (cpu = 0; cpu < used_hifs; cpu++) {
+			txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu);
+			desc_count += txq_pcpu_aux->reserved_num;
+		}
+		req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
+		/* Check the reservation is possible */
+		if ((desc_count + req) > txq->size)
+			return -ENOMEM;
 	}
-
-	req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
-	desc_count += req;
-
-	if (desc_count >
-	   (txq->size - (used_hifs * MVPP2_CPU_DESC_CHUNK)))
-		return -ENOMEM;
 
 	txq_pcpu->reserved_num += mvpp2_txq_alloc_reserved_desc(priv, txq, req,
 								txq_pcpu->cpu);
 
-	/* OK, the descriptor could has been updated: check again. */
+	/* Check the resulting reservation is enough */
 	if (txq_pcpu->reserved_num < num)
 		return -ENOMEM;
 	return 0;
@@ -9146,7 +9147,8 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
 		txq_pcpu->txq_get_index = 0;
 		txq_pcpu->tso_headers = NULL;
 
-		txq_pcpu->stop_threshold = txq->size - MVPP2_MAX_SKB_DESCS;
+		txq_pcpu->stop_threshold = txq->size -
+						MVPP2_MAX_SKB_DESCS(used_hifs);
 		txq_pcpu->wake_threshold = txq_pcpu->stop_threshold -
 						MVPP2_TX_PAUSE_HYSTERESIS;
 
@@ -10198,8 +10200,8 @@ static int mvpp2_check_ringparam_valid(struct net_device *dev,
 	else if (!IS_ALIGNED(ring->tx_pending, 32))
 		new_tx_pending = ALIGN(ring->tx_pending, 32);
 
-	if (new_tx_pending < MVPP2_MIN_TXD)
-		new_tx_pending = MVPP2_MIN_TXD;
+	if (new_tx_pending < MVPP2_MIN_TXD(used_hifs))
+		new_tx_pending = MVPP2_MIN_TXD(used_hifs);
 
 	if (ring->rx_pending != new_rx_pending) {
 		netdev_info(dev, "illegal Rx ring size value %d, round to %d\n",
