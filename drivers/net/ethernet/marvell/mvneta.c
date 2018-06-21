@@ -4529,6 +4529,12 @@ static int mvneta_probe(struct platform_device *pdev)
 
 	/* Obtain access to BM resources if enabled and already initialized */
 	bm_node = of_parse_phandle(dn, "buffer-manager", 0);
+	if (bm_node && pp->neta_armada3700) {
+		dev_warn(&pdev->dev,
+			 "Armada3700 doesn't support HW buffer management\n");
+		dev_info(&pdev->dev, "use SW buffer management\n");
+		bm_node = NULL;
+	}
 	if (bm_node && bm_node->data) {
 		pp->bm_priv = bm_node->data;
 		err = mvneta_bm_port_init(pdev, pp);
