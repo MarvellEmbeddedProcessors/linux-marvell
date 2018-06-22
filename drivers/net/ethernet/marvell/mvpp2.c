@@ -12711,7 +12711,8 @@ static int mvpp2_probe(struct platform_device *pdev)
 			return PTR_ERR(priv->lms_base);
 		queue_mode = MVPP2_QDIST_SINGLE_MODE;
 	} else {
-		mvpp22_uio_map_operation(pdev, priv, res, "pp");
+		if (!has_acpi_companion(&pdev->dev))
+			mvpp22_uio_map_operation(pdev, priv, res, "pp");
 
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 		if (has_acpi_companion(&pdev->dev)) {
@@ -12729,7 +12730,8 @@ static int mvpp2_probe(struct platform_device *pdev)
 		if (IS_ERR(priv->iface_base))
 			return PTR_ERR(priv->iface_base);
 
-		mvpp22_uio_map_operation(pdev, priv, res, "mspg");
+		if (!has_acpi_companion(&pdev->dev))
+			mvpp22_uio_map_operation(pdev, priv, res, "mspg");
 	}
 
 	used_hifs = (queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ?
