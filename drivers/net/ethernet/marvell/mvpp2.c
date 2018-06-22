@@ -12037,7 +12037,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	else
 		has_tx_irqs = true;
 
-	if (!mvpp2_check_if_multi_irq(priv, port_node) &&
+	if (port_node && !mvpp2_check_if_multi_irq(priv, port_node) &&
 	    queue_mode == MVPP2_QDIST_MULTI_MODE) {
 		dev_err(&pdev->dev, "missing IRQ's to support multi queue mode\n");
 		return -EINVAL;
