@@ -400,13 +400,13 @@ int mv_gop110_gmac_mode_cfg(struct gop_hw *gop, struct mv_mac_data *mac)
 	/* Set TX FIFO thresholds */
 	switch (mac->phy_mode) {
 	case PHY_INTERFACE_MODE_SGMII:
-		if (mac->speed == 2500)
+		if (mac->flags & MV_EMAC_F_SGMII2_5)
 			mv_gop110_gmac_sgmii2_5_cfg(gop, mac_num);
 		else
 			mv_gop110_gmac_sgmii_cfg(gop, mac_num);
 	break;
 	case PHY_INTERFACE_MODE_1000BASEX:
-		if (mac->speed == 2500)
+		if (mac->flags & MV_EMAC_F_SGMII2_5)
 			mv_gop110_gmac_2500basex_cfg(gop, mac_num);
 		else
 			mv_gop110_gmac_1000basex_cfg(gop, mac_num);
@@ -1525,7 +1525,7 @@ int mv_gop110_status_show(struct gop_hw *gop, struct mv_pp2x *pp2, int port_num)
 	pr_info("\n");
 
 	if ((mac->phy_mode == PHY_INTERFACE_MODE_SGMII) &&
-	    (mac->speed == 2500) &&
+	    (mac->flags & MV_EMAC_F_SGMII2_5) &&
 	    (port_status.speed == MV_PORT_SPEED_1000))
 		port_status.speed = MV_PORT_SPEED_2500;
 
@@ -1671,7 +1671,7 @@ int mv_gop110_fl_cfg(struct gop_hw *gop, struct mv_mac_data *mac)
 	case PHY_INTERFACE_MODE_QSGMII:
 	case PHY_INTERFACE_MODE_1000BASEX:
 		/* disable AN */
-		if (mac->speed == 2500)
+		if (mac->flags & MV_EMAC_F_SGMII2_5)
 			mv_gop110_speed_duplex_set(gop, mac,
 						   MV_PORT_SPEED_2500,
 						   MV_PORT_DUPLEX_FULL);
