@@ -12691,7 +12691,7 @@ static int mvpp2_probe(struct platform_device *pdev)
 	}
 
 	used_hifs = (queue_mode == MVPP2_SINGLE_RESOURCE_MODE) ?
-		    1 : num_present_cpus();
+		    1 : num_online_cpus();
 
 	if (priv->hw_version != MVPP21 && dev_of_node(&pdev->dev)) {
 		priv->sysctrl_base =
