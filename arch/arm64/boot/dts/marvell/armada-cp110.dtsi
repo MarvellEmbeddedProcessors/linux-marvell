@@ -33,7 +33,7 @@
 	interrupt-parent = <&CP110_LABEL(icu)>;
 	ranges;
 
-	config-space {
+	CP110_LABEL(config_space): config-space {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible = "simple-bus";
