@@ -158,7 +158,16 @@
 	phy-names = "usb";
 };
 
+&cp1_config_space {
+	ranges = /* internal regs */
+		 <0x0 0x0 0xf4000000 0x2000000>,
+		 /* SPI1-DEV0 */
+		 <0x2000000 0 0xf9000000 0x1000000>;
+};
+
 &cp1_spi1 {
+	reg = <0x700680 0x50>,          /* control */
+	      <0x2000000 0x1000000>;    /* CS0 */
 	status = "disabled";
 
 	spi-flash@0 {
