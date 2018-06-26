@@ -8431,8 +8431,8 @@ static void mvpp2_aggr_txq_pend_desc_add(struct mvpp2_port *port, int pending,
 					 int sw_thread)
 {
 	/* aggregated access - relevant TXQ number is written in TX desc */
-	mvpp2_percpu_write(port->priv, sw_thread,
-			   MVPP2_AGGR_TXQ_UPDATE_REG, pending);
+	writel(pending,
+	       port->priv->swth_base[sw_thread] + MVPP2_AGGR_TXQ_UPDATE_REG);
 }
 
 /* Check if there are enough free descriptors in aggregated txq.
