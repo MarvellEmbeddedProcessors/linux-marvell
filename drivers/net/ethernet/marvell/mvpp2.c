@@ -9310,7 +9310,7 @@ err_cleanup:
 static int mvpp2_setup_txqs(struct mvpp2_port *port)
 {
 	struct mvpp2_tx_queue *txq;
-	int queue, err;
+	int queue, err, cpu;
 
 	for (queue = 0; queue < port->ntxqs; queue++) {
 		txq = port->txqs[queue];
@@ -9318,6 +9318,10 @@ static int mvpp2_setup_txqs(struct mvpp2_port *port)
 		if (err)
 			goto err_cleanup;
 	}
+
+	/* XPS mapping queues to 0..N cpus (may be less than ntxqs) */
+	for (cpu = 0; cpu < used_hifs; cpu++)
+		netif_set_xps_queue(port->dev, cpumask_of(cpu), cpu);
 
 	if (port->has_tx_irqs) {
 		mvpp2_tx_time_coal_set(port);
