@@ -473,6 +473,7 @@
 #define     MVPP2_TXP_SCHED_ENQ_MASK		0xff
 #define     MVPP2_TXP_SCHED_DISQ_OFFSET		8
 #define MVPP2_TXP_SCHED_CMD_1_REG		0x8010
+#define MVPP2_TXP_SCHED_FIXED_PRIO_REG		0x8014
 #define MVPP2_TXP_SCHED_PERIOD_REG		0x8018
 #define MVPP2_TXP_SCHED_MTU_REG			0x801c
 #define     MVPP2_TXP_MTU_MAX			0x7FFFF
@@ -8224,6 +8225,9 @@ static void mvpp2_defaults_set(struct mvpp2_port *port)
 	mvpp2_write(port->priv, MVPP2_TXP_SCHED_PORT_INDEX_REG,
 		    tx_port_num);
 	mvpp2_write(port->priv, MVPP2_TXP_SCHED_CMD_1_REG, 0);
+
+	/* Set TX-Queues to Round-Robin vs hw-default Fixed-Priority=0xFF */
+	mvpp2_write(port->priv, MVPP2_TXP_SCHED_FIXED_PRIO_REG, 0);
 
 	/* Close bandwidth for all queues */
 	for (queue = 0; queue < MVPP2_MAX_TXQ; queue++) {
