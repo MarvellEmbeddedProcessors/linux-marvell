@@ -619,7 +619,7 @@ struct mv_pp2x {
 	u8 rx_count;
 	u8 other_count;
 	/* Spinlocks per hif to protect BM refill */
-	spinlock_t bm_spinlock[8];
+	spinlock_t bm_spinlock[MVPP2_BM_POOLS_MAX_ALLOC_NUM];
 
 	/* Spinlocks for CM3 shared memory configuration */
 	spinlock_t mss_spinlock;
