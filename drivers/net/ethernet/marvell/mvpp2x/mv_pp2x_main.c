@@ -609,6 +609,12 @@ static int mv_pp2x_bm_init(struct platform_device *pdev, struct mv_pp2x *priv)
 	err = mv_pp2x_bm_pools_init(pdev, priv, first_pool, num_pools);
 	if (err < 0)
 		return err;
+
+	/* Init bm locks if needed */
+	if (priv->pp2_cfg.spinlocks_bitmap & MV_BM_LOCK)
+		for (i = 0; i < MVPP2_BM_POOLS_MAX_ALLOC_NUM; i++)
+			spin_lock_init(&priv->bm_spinlock[i]);
+
 	return 0;
 }
 
@@ -1327,6 +1333,10 @@ static int mv_pp2x_aggr_txq_init(struct platform_device *pdev,
 		      first_desc_phy >>
 		      priv->pp2xdata->hw.desc_queue_addr_shift);
 	mv_pp2x_write(hw, MVPP2_AGGR_TXQ_DESC_SIZE_REG(cpu), desc_num);
+
+	/* Init aggregated locks if needed */
+	if (priv->pp2_cfg.spinlocks_bitmap & MV_AGGR_QUEUE_LOCK)
+		spin_lock_init(&aggr_txq->spinlock);
 
 	return 0;
 }
@@ -5334,6 +5344,10 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 		sizeof(struct queue_vector), GFP_KERNEL);
 	q_vec = port->q_vector;
 
+	/* Init q_vec locks */
+	for (address_space = 0; address_space < MVPP2_MAX_ADDR_SPACES; address_space++)
+		spin_lock_init(&q_vec[address_space].hw_mask_lock);
+
 	/* For single resource mode skip sub vector allocation.
 	 * In this mode single queue vector, address space and Interrupt used.
 	 */
@@ -6320,6 +6334,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 	if (priv->pp2_version != PPV21)
 		port->port_hotplug_nb.notifier_call = mv_pp2x_port_cpu_callback;
 
+	/* Init statistic lock */
+	spin_lock_init(&port->mac_data.stats_spinlock);
+
 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
 
 	priv->port_list[priv->num_ports] = port;
@@ -7196,6 +7213,9 @@ static int mv_pp2x_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "invalid driver parameters configured\n");
 		goto err_clk;
 	}
+
+	/* Init mss lock */
+	spin_lock_init(&priv->mss_spinlock);
 
 	/* Initialize network controller */
 	err = mv_pp2x_init(pdev, priv);
