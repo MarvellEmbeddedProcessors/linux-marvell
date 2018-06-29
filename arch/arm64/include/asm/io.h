@@ -63,8 +63,14 @@ static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
 #else
 static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
 {
-	u8 *low = (u8 *)addr;
-	u8 *high = low + 4;
+	u32 *low, *high;
+
+	low = high = (u32 *)addr;
+#ifdef CONFIG_CPU_BIG_ENDIAN
+	low++;
+#else
+	high++;
+#endif
 	asm volatile("str %w0, [%1]" : : "rZ" (val & U32_MAX), "r" (low));
 	asm volatile("str %w0, [%1]" : : "rZ" (val >> 32), "r" (high));
 }
@@ -120,8 +126,14 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
 {
 	u64 val = 0;
 	u32 temp;
-	u8 *low = (u8 *)addr;
-	u8 *high = low + 4;
+	u32 *low, *high;
+
+	low = high = (u32 *)addr;
+#ifdef CONFIG_CPU_BIG_ENDIAN
+	low++;
+#else
+	high++;
+#endif
 
 	asm volatile(ALTERNATIVE("ldr %w0, [%1]",
 				 "ldar %w0, [%1]",
