@@ -230,6 +230,26 @@
 			};
 		};
 
+		CP110_LABEL(serial0): serial@702000 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x702000 0x100>;
+			reg-shift = <2>;
+			interrupts = <ICU_GRP_NSR 122 IRQ_TYPE_LEVEL_HIGH>;
+			reg-io-width = <1>;
+			clocks = <&CP110_LABEL(syscon0) 0  3>;
+			status = "disabled";
+		};
+
+		CP110_LABEL(serial1): serial@702100 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x702100 0x100>;
+			reg-shift = <2>;
+			interrupts = <ICU_GRP_NSR 123 IRQ_TYPE_LEVEL_HIGH>;
+			reg-io-width = <1>;
+			clocks = <&CP110_LABEL(syscon0) 0  3>;
+			status = "disabled";
+		};
+
 		CP110_LABEL(usb3_0): usb3@500000 {
 			compatible = "marvell,armada-8k-xhci",
 			"generic-xhci";
