@@ -46,6 +46,7 @@
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/soc/ap810-stream-id.h>
+#include <dt-bindings/gpio/gpio.h>
 
 /* For every AP810, include ITS unit (part of GICv3),
  * the ITS node should be part of GIC generic node.

@@ -50,6 +50,50 @@
 	model = "Marvell Armada-8082 DB board";
 	compatible = "marvell,armada-8082-db", "marvell,armada-8082",
 		     "marvell,armada-ap810-octa", "marvell,armada-ap810";
+
+	cp0_usb3h0_phy: cp0_usb3_phy0 {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp0_reg_usb3h0_vbus>;
+		current-limiter-supply = <&cp0_reg_usb3h0_current_limiter>;
+	};
+
+	cp0_reg_usb3h0_vbus: cp0_usb3-vbus0 {
+		compatible = "regulator-fixed";
+		regulator-name = "cp0-usb3-vbus-h0";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
+	};
+
+	cp0_reg_usb3h0_current_limiter: cp0_usb3-current-limiter0 {
+		compatible = "regulator-fixed";
+		regulator-name = "cp0-usb3-current-limiter-h0";
+		enable-active-high;
+		gpio = <&expander0 4 GPIO_ACTIVE_HIGH>;
+	};
+
+	cp0_usb3h1_phy: cp0_usb3_phy1 {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp0_reg_usb3h1_vbus>;
+		current-limiter-supply = <&cp0_reg_usb3h1_current_limiter>;
+	};
+
+	cp0_reg_usb3h1_vbus: cp0_usb3-vbus1 {
+		compatible = "regulator-fixed";
+		regulator-name = "cp0-usb3-vbus-h1";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
+	};
+
+	cp0_reg_usb3h1_current_limiter: cp0_usb3-current-limiter1 {
+		compatible = "regulator-fixed";
+		regulator-name = "cp0-usb3-current-limiter-h1";
+		enable-active-high;
+		gpio = <&expander0 5 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &ap0_uart0 {
@@ -57,12 +101,25 @@
 	status = "okay";
 };
 
+&cp0_i2c0 {
+	/* U31 */
+	expander0: pca9555 {
+		compatible = "nxp,pca9555";
+		pinctrl-names = "default";
+		gpio-controller;
+		#gpio-cells = <2>;
+		reg = <0x21>;
+	};
+};
+
 &cp0_usb3h0 {
 	status = "okay";
+	usb-phy = <&cp0_usb3h0_phy>;
 };
 
 &cp0_usb3h1 {
 	status = "okay";
+	usb-phy = <&cp0_usb3h1_phy>;
 };
 
 &cp0_comphy {
