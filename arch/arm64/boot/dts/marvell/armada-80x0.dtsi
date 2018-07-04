@@ -75,6 +75,12 @@
 &cp0_syscon0 {
 	cp0_pinctrl: pinctrl {
 		compatible = "marvell,armada-8k-cpm-pinctrl";
+
+		sdhci_pins: sdhi-pins {
+			marvell,pins = "mpp56", "mpp57", "mpp58",
+				       "mpp59", "mpp60", "mpp61", "mpp62";
+			marvell,function = "sdio";
+		};
 	};
 };
 
