@@ -875,6 +875,9 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 	reg |= MV_XOR_V2_GLOB_PAUSE_AXI_TIME_DIS_VAL;
 	writel(reg, xor_dev->glob_base + MV_XOR_V2_GLOB_PAUSE);
 
+	/* Clear all previous interrupt indications */
+	writel(0, xor_dev->glob_base + MV_XOR_V2_GLOB_SYS_INT_CAUSE);
+
 	/* enable the DMA engine */
 	writel(0, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
 
