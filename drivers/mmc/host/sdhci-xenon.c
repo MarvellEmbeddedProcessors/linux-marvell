@@ -245,6 +245,7 @@ static const struct sdhci_ops sdhci_xenon_ops = {
 	.reset			= xenon_reset,
 	.set_uhs_signaling	= xenon_set_uhs_signaling,
 	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
+	.voltage_switch		= xenon_voltage_switch,
 };
 
 static const struct sdhci_pltfm_data sdhci_xenon_pdata = {
