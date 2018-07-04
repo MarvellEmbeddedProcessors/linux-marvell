@@ -34,6 +34,19 @@
 		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
 	};
 
+	cp0_vccq_sd0_reg: cp0_vccq_sd0 {
+		compatible = "regulator-gpio";
+		regulator-name = "cp0-vccq-sd0";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+		gpios = <&expander0 15 GPIO_ACTIVE_HIGH>;
+		gpios-states = <0>;
+		states = <1800000 0x1
+			  3300000 0x0>;
+		enable-active-high;
+	};
+
 	cp0_usb3_0_phy: cp0-usb3-0-phy {
 		compatible = "usb-nop-xceiv";
 		vcc-supply = <&cp0_reg_usb3_0_vbus>;
@@ -46,7 +59,6 @@
 };
 
 &uart0 {
-	status = "okay";
 	pinctrl-0 = <&uart0_pins>;
 	pinctrl-names = "default";
 };
@@ -115,9 +127,10 @@
 };
 
 &cp0_sdhci0 {
-	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdhci_pins>;
 	bus-width = <4>;
-	no-1-8-v;
+	vqmmc-supply = <&cp0_vccq_sd0_reg>;
 	non-removable;
 };
 

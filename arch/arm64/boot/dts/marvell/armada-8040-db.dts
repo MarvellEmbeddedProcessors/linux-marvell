@@ -169,8 +169,6 @@
 
 &cp0_sdhci0 {
 	status = "okay";
-	bus-width = <8>;
-	non-removable;
 };
 
 /* CON6 on CP0 expansion */
