@@ -231,6 +231,12 @@ static void xenon_set_power(struct sdhci_host *host, unsigned char mode,
 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
 }
 
+static void xenon_voltage_switch(struct sdhci_host *host)
+{
+	/* Wait for 5ms after set 1.8V signal enable bit */
+	usleep_range(5000, 5500);
+}
+
 static const struct sdhci_ops sdhci_xenon_ops = {
 	.set_clock		= sdhci_set_clock,
 	.set_power		= xenon_set_power,
@@ -238,6 +244,7 @@ static const struct sdhci_ops sdhci_xenon_ops = {
 	.reset			= xenon_reset,
 	.set_uhs_signaling	= xenon_set_uhs_signaling,
 	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
+	.voltage_switch		= xenon_voltage_switch,
 };
 
 static const struct sdhci_pltfm_data sdhci_xenon_pdata = {
