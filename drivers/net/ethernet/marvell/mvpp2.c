@@ -9550,6 +9550,64 @@ static u32 mvpp2_skb_tx_csum(struct mvpp2_port *port, struct sk_buff *skb)
 	return MVPP2_TXD_L4_CSUM_NOT | MVPP2_TXD_IP_CSUM_DISABLE;
 }
 
+static inline void mvpp2_skb_set_extra(struct sk_buff *skb,
+				       struct napi_struct *napi,
+				       u32 status,
+				       u8 rxq_id,
+				       struct mvpp2_bm_pool *bm_pool)
+{
+	/* Set hash, queue_mapping, napi, bm-pool-id ... */
+}
+
+/* This is "fast inline" clone of __build_skb+build_skb,
+ * and also with setting mv-extra information
+ */
+static inline
+struct sk_buff *mvpp2_build_skb(void *data, unsigned int frag_size,
+				struct napi_struct *napi,
+				struct mvpp2_port *port,
+				u32 rx_status,
+				u8 rxq_id,
+				struct mvpp2_bm_pool *bm_pool,
+				int *refill_needed)
+{
+	struct skb_shared_info *shinfo;
+	struct sk_buff *skb;
+	unsigned int size = frag_size ? : ksize(data);
+
+	skb = kmem_cache_alloc(skbuff_head_cache, GFP_ATOMIC);
+	if (!skb)
+		return NULL;
+
+	size -= SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+	memset(skb, 0, offsetof(struct sk_buff, tail));
+	skb->truesize = SKB_TRUESIZE(size);
+	refcount_set(&skb->users, 1);
+	skb->head = data;
+	skb->data = data;
+	skb_reset_tail_pointer(skb);
+	skb->end = skb->tail + size;
+	skb->mac_header = (typeof(skb->mac_header))~0U;
+	skb->transport_header = (typeof(skb->transport_header))~0U;
+
+	/* make sure we initialize shinfo sequentially */
+	shinfo = skb_shinfo(skb);
+	memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
+	atomic_set(&shinfo->dataref, 1);
+
+	/* From build_skb wrapper */
+	if (frag_size) {
+		skb->head_frag = 1;
+		if (page_is_pfmemalloc(virt_to_head_page(data)))
+			skb->pfmemalloc = 1;
+	}
+
+	mvpp2_skb_set_extra(skb, napi, rx_status, rxq_id, bm_pool);
+
+	return skb;
+}
+
 /* Main rx processing */
 static int mvpp2_rx(struct mvpp2_port *port, struct napi_struct *napi,
 		    int rx_todo, struct mvpp2_rx_queue *rxq)
@@ -9613,7 +9671,9 @@ err_drop_frame:
 		dma_unmap_single(dev->dev.parent, dma_addr,
 				 bm_pool->buf_size, DMA_FROM_DEVICE);
 
-		skb = build_skb(data, frag_size);
+		skb = mvpp2_build_skb(data, frag_size,
+				      napi, port, rx_status, rxq->id,
+				      bm_pool, &rx_received);
 		if (!skb) {
 			netdev_warn(port->dev, "skb build failed\n");
 			goto err_drop_frame;
