@@ -651,6 +651,7 @@
 #define MVPP2_TXDONE_COAL_USEC		1000
 #define MVPP2_RX_COAL_PKTS		32
 #define MVPP2_RX_COAL_USEC		64
+#define MVPP2_TX_BULK_TIME		(50 * NSEC_PER_USEC)
 
 /* The two bytes Marvell header. Either contains a special value used
  * by Marvell switches when a specific hardware mode is enabled (not
@@ -1455,9 +1456,15 @@ struct mvpp2_pcpu_stats {
 
 /* Per-CPU port control */
 struct mvpp2_port_pcpu {
+	/* Timer & Tasklet for bulk-tx optimization */
+	struct hrtimer bulk_timer;
+	bool bulk_timer_scheduled;
+	bool bulk_timer_restart_req;
+	struct tasklet_struct bulk_tasklet;
+
+	/* Timer & Tasklet for egress finalization */
 	struct hrtimer tx_done_timer;
 	bool tx_done_timer_scheduled;
-	/* Tasklet for egress finalization */
 	struct tasklet_struct tx_done_tasklet;
 };
 
@@ -1780,6 +1787,7 @@ struct mvpp2_tx_queue {
 
 	/* Number of currently used Tx DMA descriptor in the descriptor ring */
 	int count;
+	int pending;
 
 	/* Per-CPU control of physical Tx queues */
 	struct mvpp2_txq_pcpu __percpu *pcpu;
@@ -9505,6 +9513,84 @@ static enum hrtimer_restart mvpp2_hr_timer_cb(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
+/* Bulk-timer could be started/restarted by XMIT, timer-cb or Tasklet.
+ *  XMIT calls bulk-restart() which is CONDITIONAL (restart vs request).
+ *  Timer-cb has own condition-logic, calls hrtimer_forward().
+ *  Tasklet has own condition-logic, calls unconditional bulk-start().
+ *  The flags scheduled::restart_req are used in the state-logic.
+ */
+static inline void mvpp2_bulk_timer_restart(struct mvpp2_port_pcpu *port_pcpu)
+{
+	if (!port_pcpu->bulk_timer_scheduled) {
+		port_pcpu->bulk_timer_scheduled = true;
+		hrtimer_start(&port_pcpu->bulk_timer, MVPP2_TX_BULK_TIME,
+			      HRTIMER_MODE_REL_PINNED);
+	} else {
+		port_pcpu->bulk_timer_restart_req = true;
+	}
+}
+
+static void mvpp2_bulk_timer_start(struct mvpp2_port_pcpu *port_pcpu)
+{
+	port_pcpu->bulk_timer_scheduled = true;
+	port_pcpu->bulk_timer_restart_req = false;
+	hrtimer_start(&port_pcpu->bulk_timer, MVPP2_TX_BULK_TIME,
+		      HRTIMER_MODE_REL_PINNED);
+}
+
+static enum hrtimer_restart mvpp2_bulk_timer_cb(struct hrtimer *timer)
+{
+	/* ISR context */
+	struct mvpp2_port_pcpu *port_pcpu =
+		container_of(timer, struct mvpp2_port_pcpu, bulk_timer);
+
+	if (!port_pcpu->bulk_timer_scheduled) {
+		/* All pending are already flushed by xmit */
+		return HRTIMER_NORESTART;
+	}
+	if (port_pcpu->bulk_timer_restart_req) {
+		/* Not flushed but restart requested by xmit */
+		port_pcpu->bulk_timer_scheduled = true;
+		port_pcpu->bulk_timer_restart_req = false;
+		hrtimer_forward_now(timer, MVPP2_TX_BULK_TIME);
+		return HRTIMER_RESTART;
+	}
+	/* Expired and need the flush for pending */
+	tasklet_schedule(&port_pcpu->bulk_tasklet);
+	return HRTIMER_NORESTART;
+}
+
+static void mvpp2_bulk_tasklet_cb(unsigned long data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct mvpp2_port *port = netdev_priv(dev);
+	struct mvpp2_port_pcpu *port_pcpu;
+	struct mvpp2_tx_queue *aggr_txq;
+	int frags;
+	int sw_thread = mvpp2_check_sw_thread(smp_processor_id());
+
+	port_pcpu = per_cpu_ptr(port->pcpu, sw_thread);
+
+	if (!port_pcpu->bulk_timer_scheduled) {
+		/* Flushed by xmit-softirq since timer-irq */
+		return;
+	}
+	port_pcpu->bulk_timer_scheduled = false;
+	if (port_pcpu->bulk_timer_restart_req) {
+		/* Restart requested by xmit-softirq since timer-irq */
+		mvpp2_bulk_timer_start(port_pcpu);
+		return;
+	}
+
+	/* Full time expired. Flush pending packets here */
+	aggr_txq = &port->priv->aggr_txqs[sw_thread];
+	frags = aggr_txq->pending;
+	if (!frags)
+		return; /* Flushed by xmit */
+	aggr_txq->pending -= frags;
+	mvpp2_aggr_txq_pend_desc_add(port, frags, sw_thread);
+}
+
 /* Main RX/TX processing routines */
 
 /* Display more error info */
@@ -10804,8 +10890,9 @@ static int mvpp2_open(struct net_device *dev)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 	struct mvpp2 *priv = port->priv;
+	struct mvpp2_port_pcpu *port_pcpu;
 	bool valid_link = false;
-	int err;
+	int err, cpu;
 
 	/* Allocate the Rx/Tx queues */
 	err = mvpp2_setup_rxqs(port);
@@ -10868,6 +10955,13 @@ static int mvpp2_open(struct net_device *dev)
 		goto err_free_irq;
 	}
 
+	/* Init bulk-transmit timer */
+	for (cpu = 0; cpu < used_hifs; cpu++) {
+		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+		port_pcpu->bulk_timer_scheduled = false;
+		port_pcpu->bulk_timer_restart_req = false;
+	}
+
 	/* Unmask interrupts on all CPUs */
 	on_each_cpu(mvpp2_interrupts_unmask, port, 1);
 	mvpp2_shared_interrupt_mask_unmask(port, false);
@@ -10919,6 +11013,7 @@ static int mvpp2_stop(struct net_device *dev)
 		free_irq(port->link_irq, port);
 
 	mvpp2_irqs_deinit(port);
+
 	if (!port->has_tx_irqs) {
 		for (cpu = 0; cpu < used_hifs; cpu++) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
@@ -10928,6 +11023,13 @@ static int mvpp2_stop(struct net_device *dev)
 			tasklet_kill(&port_pcpu->tx_done_tasklet);
 		}
 	}
+	/* Cancel bulk tasklet and timer */
+	for (cpu = 0; cpu < used_hifs; cpu++) {
+		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+		hrtimer_cancel(&port_pcpu->bulk_timer);
+		tasklet_kill(&port_pcpu->bulk_tasklet);
+	}
+
 	mvpp2_txqs_on_tasklet_kill(port);
 	mvpp2_cleanup_rxqs(port);
 	mvpp2_cleanup_txqs(port);
@@ -12530,6 +12632,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 		goto err_free_txq_pcpu;
 	}
 
+	/* Init tx-done timer and tasklet */
 	if (!port->has_tx_irqs) {
 		for (cpu = 0; cpu < used_hifs; cpu++) {
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
@@ -12543,6 +12646,15 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 				     mvpp2_tx_proc_cb,
 				     (unsigned long)dev);
 		}
+	}
+	/* Init bulk timer and tasklet */
+	for (cpu = 0; cpu < used_hifs; cpu++) {
+		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+		hrtimer_init(&port_pcpu->bulk_timer,
+			     CLOCK_MONOTONIC, HRTIMER_MODE_REL_PINNED);
+		port_pcpu->bulk_timer.function = mvpp2_bulk_timer_cb;
+		tasklet_init(&port_pcpu->bulk_tasklet,
+			     mvpp2_bulk_tasklet_cb, (unsigned long)dev);
 	}
 
 	features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
