@@ -40,6 +40,7 @@
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <net/tso.h>
+#include <net/busy_poll.h>
 #include <linux/uio_driver.h>
 
 #ifndef CACHE_LINE_MASK
@@ -2201,6 +2202,10 @@ static u8 cos_classifier;
 enum { MVPP2_COS_MODE, MVPP2_COS_DFLT, MVPP2_COS2RXQ };
 
 static const char * const mvpp2_param[] = {"cos_mode", "cos_dflt", "cos2rxq"};
+
+/* RX-TX fast-forwarding path optimization */
+#define MVPP2_RXTX_HASH			0xbac0
+#define MVPP2_RXTX_HASH_BMID_MASK	0xf
 
 #define MVPP2_DRIVER_NAME "mvpp2"
 #define MVPP2_DRIVER_VERSION "1.0"
@@ -9556,7 +9561,16 @@ static inline void mvpp2_skb_set_extra(struct sk_buff *skb,
 				       u8 rxq_id,
 				       struct mvpp2_bm_pool *bm_pool)
 {
-	/* Set hash, queue_mapping, napi, bm-pool-id ... */
+	u32 hash;
+	enum pkt_hash_types hash_type;
+
+	/* Improve performance and set identification for RX-TX fast-forward */
+	hash = MVPP2_RXTX_HASH | bm_pool->id;
+	hash_type = (status & (MVPP2_RXD_L4_UDP | MVPP2_RXD_L4_TCP)) ?
+		PKT_HASH_TYPE_L4 : PKT_HASH_TYPE_L3;
+	skb_set_hash(skb, hash, hash_type);
+	skb_mark_napi_id(skb, napi);
+	skb_record_rx_queue(skb, (u16)rxq_id);
 }
 
 /* This is "fast inline" clone of __build_skb+build_skb,
