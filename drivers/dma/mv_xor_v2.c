@@ -289,6 +289,19 @@ void mv_xor_v2_free_chan_resources(struct dma_chan *chan)
 	/* nothing to be done here */
 }
 
+static inline
+void mv_xor_v2_timer_thrd_config(struct mv_xor_v2_device *xor_dev, u32 thrd)
+{
+	u32 reg;
+
+	/* Configure Timer Threshold */
+	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
+	reg &= (~MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK <<
+		MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
+	reg |= (thrd << MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
+	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
+}
+
 /*
  * Set the IMSG threshold
  */
@@ -304,17 +317,15 @@ void mv_xor_v2_enable_imsg_thrd(struct mv_xor_v2_device *xor_dev)
 	reg |= MV_XOR_V2_DMA_IMSG_TIMER_EN;
 	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_THRD_OFF);
 
-	/* Configure Timer Threshold */
-	reg = readl(xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
-	reg &= (~MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK <<
-		MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
-	reg |= (MV_XOR_V2_TIMER_THRD << MV_XOR_V2_DMA_IMSG_TIMER_THRD_SHIFT);
-	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_IMSG_TMOT);
+	mv_xor_v2_timer_thrd_config(xor_dev, MV_XOR_V2_TIMER_THRD);
 }
 
 static irqreturn_t mv_xor_v2_interrupt_handler(int irq, void *data)
 {
 	struct mv_xor_v2_device *xor_dev = data;
+
+	/* Set timer threshold to be on maximum time that pass between interrupts */
+	mv_xor_v2_timer_thrd_config(xor_dev, MV_XOR_V2_DMA_IMSG_TIMER_THRD_MASK);
 
 	/* schedule a tasklet to handle descriptors callbacks */
 	tasklet_schedule(&xor_dev->irq_tasklet);
@@ -787,6 +798,8 @@ static void mv_xor_v2_tasklet(unsigned long data)
 	if (num_of_pending != 0) {
 		/* free the descriptors */
 		mv_xor_v2_free_desc_from_desq(xor_dev, num_of_pending);
+		/* Re-config timer threshold */
+		mv_xor_v2_timer_thrd_config(xor_dev, MV_XOR_V2_TIMER_THRD);
 	}
 }
 
