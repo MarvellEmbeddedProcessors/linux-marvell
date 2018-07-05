@@ -10322,14 +10322,28 @@ out:
 	if (frags > 0) {
 		struct mvpp2_pcpu_stats *stats = this_cpu_ptr(port->stats);
 		struct netdev_queue *nq = netdev_get_tx_queue(dev, txq_id);
+		bool deferred_tx;
+		struct mvpp2_port_pcpu *port_pcpu;
 
 		txq_pcpu->reserved_num -= frags;
 		txq_pcpu->count += frags;
 		aggr_txq->count += frags;
 
-		/* Enable transmit */
-		wmb();
-		mvpp2_aggr_txq_pend_desc_add(port, frags, sw_thread);
+		/* Enable transmit; may be deferred with Bulk-timer */
+		port_pcpu = per_cpu_ptr(port->pcpu, sw_thread);
+		deferred_tx = (frags == 1) &&
+			(aggr_txq->pending < (txq->done_pkts_coal / 2));
+
+		if (deferred_tx) {
+			aggr_txq->pending += frags;
+			mvpp2_bulk_timer_restart(port_pcpu);
+		} else {
+			port_pcpu->bulk_timer_scheduled = false;
+			port_pcpu->bulk_timer_restart_req = false;
+			frags += aggr_txq->pending;
+			aggr_txq->pending = 0;
+			mvpp2_aggr_txq_pend_desc_add(port, frags, sw_thread);
+		}
 
 		if (txq_pcpu->count >= txq_pcpu->stop_threshold)
 			netif_tx_stop_queue(nq);
