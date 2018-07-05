@@ -54,6 +54,8 @@
 #define	  MV_XOR_V2_DMA_DESQ_CTRL_32B			1
 #define   MV_XOR_V2_DMA_DESQ_CTRL_128B			7
 #define MV_XOR_V2_DMA_DESQ_STOP_OFF			0x800
+#define   MV_XOR_V2_DMA_DESQ_STOP_QUEUE_DISABLE		BIT(0)
+#define   MV_XOR_V2_DMA_DESQ_STOP_QUEUE_RESET		BIT(1)
 #define MV_XOR_V2_DMA_DESQ_DEALLOC_OFF			0x804
 #define MV_XOR_V2_DMA_DESQ_ADD_OFF			0x808
 #define MV_XOR_V2_DMA_IMSG_TMOT				0x810
@@ -878,7 +880,13 @@ static int mv_xor_v2_descq_init(struct mv_xor_v2_device *xor_dev)
 	/* Clear all previous interrupt indications */
 	writel(0, xor_dev->glob_base + MV_XOR_V2_GLOB_SYS_INT_CAUSE);
 
-	/* enable the DMA engine */
+	/* Reset the DMA state machine, and enable the DMA engine */
+	writel(MV_XOR_V2_DMA_DESQ_STOP_QUEUE_DISABLE,
+		xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
+	reg = MV_XOR_V2_DMA_DESQ_STOP_QUEUE_DISABLE |
+		MV_XOR_V2_DMA_DESQ_STOP_QUEUE_RESET;
+	/* Set QueueDisable & QueueReset */
+	writel(reg, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
 	writel(0, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
 
 	return 0;
@@ -891,7 +899,8 @@ static int mv_xor_v2_suspend(struct platform_device *dev, pm_message_t state)
 	dev_dbg(xor_dev->dmadev.dev, "%s %d\n", __func__, __LINE__);
 
 	/* Set this bit to disable to stop the XOR unit. */
-	writel(0x1, xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
+	writel(MV_XOR_V2_DMA_DESQ_STOP_QUEUE_DISABLE,
+		xor_dev->dma_base + MV_XOR_V2_DMA_DESQ_STOP_OFF);
 
 	return 0;
 }
