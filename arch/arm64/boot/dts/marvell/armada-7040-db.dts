@@ -6,7 +6,7 @@
  */
 
 #include <dt-bindings/gpio/gpio.h>
-#include "armada-7040.dtsi"
+#include "armada-7040-db.dtsi"
 
 / {
 	model = "Marvell Armada 7040 DB board";
@@ -17,43 +17,10 @@
 		stdout-path = "serial0:115200n8";
 	};
 
-	memory@0 {
-		device_type = "memory";
-		reg = <0x0 0x0 0x0 0x80000000>;
-	};
-
 	aliases {
 		ethernet0 = &cp0_eth0;
 		ethernet1 = &cp0_eth1;
 		ethernet2 = &cp0_eth2;
-	};
-
-	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
-		compatible = "regulator-fixed";
-		regulator-name = "usb3h0-vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		enable-active-high;
-		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
-	};
-
-	cp0_reg_usb3_1_vbus: cp0-usb3-1-vbus {
-		compatible = "regulator-fixed";
-		regulator-name = "usb3h1-vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		enable-active-high;
-		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
-	};
-
-	cp0_usb3_0_phy: cp0-usb3-0-phy {
-		compatible = "usb-nop-xceiv";
-		vcc-supply = <&cp0_reg_usb3_0_vbus>;
-	};
-
-	cp0_usb3_1_phy: cp0-usb3-1-phy {
-		compatible = "usb-nop-xceiv";
-		vcc-supply = <&cp0_reg_usb3_1_vbus>;
 	};
 
 	sfp_eth0: sfp-eth0 {
@@ -95,8 +62,6 @@
 
 &uart0 {
 	status = "okay";
-	pinctrl-0 = <&uart0_pins>;
-	pinctrl-names = "default";
 };
 
 
@@ -173,30 +138,6 @@
 
 &cp0_spi1 {
 	status = "okay";
-
-	spi-flash@0 {
-		#address-cells = <0x1>;
-		#size-cells = <0x1>;
-		compatible = "jedec,spi-nor";
-		reg = <0x0>;
-		spi-max-frequency = <20000000>;
-
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			partition@0 {
-				label = "U-Boot";
-				reg = <0x0 0x200000>;
-			};
-
-			partition@400000 {
-				label = "Filesystem";
-				reg = <0x200000 0xe00000>;
-			};
-		};
-	};
 };
 
 &cp0_sata0 {
@@ -210,32 +151,19 @@
 };
 
 &cp0_usb3_0 {
-	usb-phy = <&cp0_usb3_0_phy>;
 	status = "okay";
-	/* Generic PHY, providing serdes lanes */
-	phys = <&cp0_comphy1 0>;
-	phy-names = "usb";
 };
 
 &cp0_usb3_1 {
-	usb-phy = <&cp0_usb3_1_phy>;
 	status = "okay";
-	/* Generic PHY, providing serdes lanes */
-	phys = <&cp0_comphy4 1>;
-	phy-names = "usb";
 };
 
 &ap_sdhci0 {
 	status = "okay";
-	bus-width = <4>;
-	no-1-8-v;
-	non-removable;
 };
 
 &cp0_sdhci0 {
 	status = "okay";
-	bus-width = <4>;
-	no-1-8-v;
 	cd-gpios = <&expander0 12 GPIO_ACTIVE_LOW>;
 };
 
