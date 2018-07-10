@@ -283,8 +283,7 @@
 		};
 
 		CP110_LABEL(usb3_0): usb3@500000 {
-			compatible = "marvell,armada-8k-xhci",
-			"generic-xhci";
+			compatible = "generic-xhci";
 			reg = <0x500000 0x4000>;
 			dma-coherent;
 			interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
@@ -295,8 +294,7 @@
 		};
 
 		CP110_LABEL(usb3_1): usb3@510000 {
-			compatible = "marvell,armada-8k-xhci",
-			"generic-xhci";
+			compatible = "generic-xhci";
 			reg = <0x510000 0x4000>;
 			dma-coherent;
 			interrupts = <ICU_GRP_NSR 105 IRQ_TYPE_LEVEL_HIGH>;
