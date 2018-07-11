@@ -2505,6 +2505,62 @@ static enum hrtimer_restart mv_pp2x_tx_hr_timer_cb(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 
+static void mv_pp2x_tx_done_start(struct mv_pp2x_port *port, bool start)
+{
+	struct mv_pp2x_port_pcpu *port_pcpu;
+	int cpu;
+
+	if (port->flags & MVPP2_F_LOOPBACK || port->interrupt_tx_done)
+		return;
+
+	if (!start)
+		goto stop;
+
+	/* open(): start tx-done timers and tasklets */
+	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
+		port_pcpu = port->pcpu[cpu];
+		port_pcpu->timer_scheduled = false;
+		tasklet_init(&port_pcpu->tx_done_tasklet,
+			     mv_pp2x_tx_done_tasklet_cb, (unsigned long)port);
+	}
+	return;
+stop:
+	/* Kill tx-done timers and tasklets */
+	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
+		port_pcpu = port->pcpu[cpu];
+		hrtimer_cancel(&port_pcpu->tx_done_timer);
+		tasklet_kill(&port_pcpu->tx_done_tasklet);
+	}
+}
+
+static int mv_pp2x_tx_done_init(struct platform_device *pdev,
+				struct mv_pp2x_port *port)
+{
+	struct mv_pp2x_port_pcpu *port_pcpu;
+	int cpu;
+
+	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
+		port_pcpu = devm_kcalloc(&pdev->dev, 1, sizeof(*port_pcpu), GFP_KERNEL);
+		if (!port_pcpu)
+			return -ENOMEM;
+		port->pcpu[cpu] = port_pcpu;
+	}
+
+	if (port->flags & MVPP2_F_LOOPBACK || port->interrupt_tx_done)
+		return 0;
+
+	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
+		port_pcpu = port->pcpu[cpu];
+		port_pcpu->tx_time_coal_hrtmr =
+			ktime_set(0, port->tx_time_coal * NSEC_PER_USEC);
+		hrtimer_init(&port_pcpu->tx_done_timer, CLOCK_MONOTONIC,
+			     HRTIMER_MODE_REL_PINNED);
+		port_pcpu->tx_done_timer.function = mv_pp2x_tx_done_timer_cb;
+	}
+
+	return 0;
+}
+
 /* The function calculate the width, such as cpu width, cos queue width */
 static void mv_pp2x_width_calc(struct mv_pp2x_port *port, u32 *cpu_width,
 			       u32 *cos_width, u32 *port_rxq_width)
@@ -4686,21 +4742,9 @@ static inline void mv_pp22_interrupts_unmask(struct mv_pp2x_port *port)
 int mv_pp2x_open(struct net_device *dev)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
-	struct mv_pp2x_port_pcpu *port_pcpu;
-	int err, cpu;
+	int err;
 
 	set_device_base_address(dev);
-
-	/* Init tx-done Tasklets & timers (if decided/initialized in probe) */
-	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
-		port_pcpu = port->pcpu[cpu];
-
-		if (!port_pcpu->tx_done_timer.function)
-			continue;
-		port_pcpu->timer_scheduled = false;
-		tasklet_init(&port_pcpu->tx_done_tasklet,
-			     mv_pp2x_tx_done_tasklet_cb, (unsigned long)port);
-	}
 
 	/* Allocate the Rx/Tx queues */
 	err = mv_pp2x_setup_rxqs(port);
@@ -4747,6 +4791,9 @@ int mv_pp2x_open(struct net_device *dev)
 	}
 	if ((port->priv->pp2_version != PPV21) && !(port->flags & MVPP2_F_LOOPBACK))
 		mvcpn110_mac_hw_init(port);
+
+	mv_pp2x_tx_done_start(port, true);
+
 	mv_pp2x_start_dev(port);
 
 	/* Before rxq and port init, all ingress packets should be blocked
@@ -4774,8 +4821,6 @@ err_cleanup_rxqs:
 int mv_pp2x_stop(struct net_device *dev)
 {
 	struct mv_pp2x_port *port = netdev_priv(dev);
-	struct mv_pp2x_port_pcpu *port_pcpu;
-	int cpu;
 
 	mv_pp2x_stop_dev(port);
 
@@ -4795,15 +4840,7 @@ int mv_pp2x_stop(struct net_device *dev)
 	if (port->port_hotplugged)
 		unregister_hotcpu_notifier(&port->port_hotplug_nb);
 
-	/* Cancel tx-done timers (if decided/initialized in probe) */
-	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
-		port_pcpu = port->pcpu[cpu];
-		if (!port_pcpu->tx_done_timer.function)
-			continue;
-		hrtimer_cancel(&port_pcpu->tx_done_timer);
-		if (port_pcpu->tx_done_tasklet.func)
-			tasklet_kill(&port_pcpu->tx_done_tasklet);
-	}
+	mv_pp2x_tx_done_start(port, false);
 
 	mv_pp2x_cleanup_rxqs(port);
 	mv_pp2x_cleanup_txqs(port);
@@ -6241,20 +6278,9 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 		goto err_free_stats;
 	}
 
-	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
-		port_pcpu = devm_kcalloc(&pdev->dev, 1, sizeof(*port_pcpu), GFP_KERNEL);
-		port->pcpu[cpu] = port_pcpu;
-
-		/* Use tx-done per-cpu timers if not in Interrupt-mode */
-		if (((port->flags & MVPP2_F_LOOPBACK)) || port->interrupt_tx_done)
-			continue;
-		hrtimer_init(&port_pcpu->tx_done_timer, CLOCK_MONOTONIC,
-			     HRTIMER_MODE_REL_PINNED);
-		port_pcpu->tx_done_timer.function = mv_pp2x_tx_done_timer_cb;
-		port_pcpu->timer_scheduled = false;
-		port_pcpu->tx_time_coal_hrtmr =
-			ktime_set(0, port->tx_time_coal * NSEC_PER_USEC);
-	}
+	err = mv_pp2x_tx_done_init(pdev, port);
+	if (err)
+		goto err_free_stats;
 
 	/* Init pool of external buffers for TSO, fragmentation, etc */
 	for (cpu = 0; cpu < mv_pp2x_used_addr_spaces; cpu++) {
