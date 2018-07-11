@@ -269,7 +269,6 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 
 	for (queue_num = 0; queue_num < MVPP22_MAX_NUM_RXQ; queue_num++)
 		data[i++] = gop_statistics->rx_perq_bm_drop[queue_num];
-
 }
 
 static void mv_pp2x_eth_tool_get_strings(struct net_device *dev,
@@ -437,6 +436,12 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_RX_DISABLE);
 
 		if (pause->tx_pause) {
+			if (port->rx_ring_size < MSS_CP_CM3_THRESHOLD_START) {
+				pr_err("TX FC cannot be supported. ");
+				pr_err("Ring size is less than %d\n", MSS_CP_CM3_THRESHOLD_START);
+				mv_gop110_force_link_mode_set(gop, mac, false, false);
+				return -EINVAL;
+			}
 			port->flow_control = true;
 			mv_gop110_gmac_fc_set(gop, gop_port, MV_PORT_FC_TX_ENABLE);
 			mv_pp2x_rxq_enable_fc(port);
@@ -467,6 +472,11 @@ static int mv_pp2x_set_pauseparam(struct net_device *dev,
 			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_RX_DISABLE);
 
 		if (pause->tx_pause) {
+			if (port->rx_ring_size < MSS_CP_CM3_THRESHOLD_START) {
+				pr_err("TX FC cannot be supported. ");
+				pr_err("Ring size is less than %d\n", MSS_CP_CM3_THRESHOLD_START);
+				return -EINVAL;
+			}
 			port->flow_control = true;
 			mv_gop110_xlg_mac_fc_set(gop, gop_port, MV_PORT_FC_TX_ENABLE);
 			mv_pp2x_rxq_enable_fc(port);
@@ -790,6 +800,15 @@ static int mv_pp2x_ethtool_set_ringparam(struct net_device *dev,
 		port->rx_ring_size = ring->rx_pending;
 		port->tx_ring_size = ring->tx_pending;
 		return 0;
+	}
+
+	if ((port->rx_ring_size < MSS_CP_CM3_THRESHOLD_START) && port->flow_control) {
+		pr_warn("TX FC disabled. Ring size is less than %d\n", MSS_CP_CM3_THRESHOLD_START);
+		port->flow_control = false;
+		mv_gop110_gmac_fc_set(&port->priv->hw.gop, port->mac_data.gop_index, MV_PORT_FC_TX_DISABLE);
+		mv_pp2x_rxq_disable_fc(port);
+		if (port->priv->pp2_version == PPV23)
+			mv_pp23_rx_fifo_fc_en(port->priv, port->id, false);
 	}
 
 	/* The interface is running, so we have to force a
