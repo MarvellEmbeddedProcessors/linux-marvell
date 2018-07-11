@@ -2409,8 +2409,7 @@ static int mv_pp2x_check_address_space(struct mv_pp2x *priv, int cpu, bool *cold
 
 static void mv_pp2x_tx_done_tasklet_cb(unsigned long data)
 {
-	struct net_device *dev = (struct net_device *)data;
-	struct mv_pp2x_port *port = netdev_priv(dev);
+	struct mv_pp2x_port *port = (void *)data;
 	struct mv_pp2x_port_pcpu *port_pcpu;
 	unsigned int tx_todo, cause, cpu = smp_processor_id();
 	u8 address_space;
@@ -2419,7 +2418,7 @@ static void mv_pp2x_tx_done_tasklet_cb(unsigned long data)
 
 	port_pcpu = port->pcpu[address_space];
 
-	if (!netif_running(dev))
+	if (!netif_running(port->dev))
 		return;
 	port_pcpu->timer_scheduled = false;
 
@@ -4700,7 +4699,7 @@ int mv_pp2x_open(struct net_device *dev)
 			continue;
 		port_pcpu->timer_scheduled = false;
 		tasklet_init(&port_pcpu->tx_done_tasklet,
-			     mv_pp2x_tx_done_tasklet_cb, (unsigned long)dev);
+			     mv_pp2x_tx_done_tasklet_cb, (unsigned long)port);
 	}
 
 	/* Allocate the Rx/Tx queues */
