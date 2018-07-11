@@ -614,6 +614,7 @@ void mv_pp2x_rx_pkts_coal_set(struct mv_pp2x_port *port,
 			      struct mv_pp2x_rx_queue *rxq);
 void mv_pp2x_rx_time_coal_set(struct mv_pp2x_port *port,
 			      struct mv_pp2x_rx_queue *rxq);
+void mv_pp2x_tx_done_pkts_coal_set_val(struct mv_pp2x_port *port, int address_space, u32 val);
 void mv_pp2x_tx_done_pkts_coal_set(struct mv_pp2x_port *port, int address_space);
 void mv_pp2x_tx_done_pkts_coal_set_all(struct mv_pp2x_port *port);
 void mv_pp2x_cause_error(struct net_device *dev, int cause);

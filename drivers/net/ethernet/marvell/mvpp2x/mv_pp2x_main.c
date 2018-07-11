@@ -1897,8 +1897,8 @@ int mv_pp2x_setup_txqs(struct mv_pp2x_port *port)
 			goto err_cleanup;
 	}
 	if (port->interrupt_tx_done) {
+		/* Set time-coalescing. The pkts_coal is set by start_dev */
 		mv_pp2x_tx_done_time_coal_set(port, port->tx_time_coal);
-		mv_pp2x_tx_done_pkts_coal_set_all(port);
 	}
 
 	/* Mvpp21 and Mvpp22&23 has different per cpu register access.
@@ -4193,6 +4193,10 @@ void mv_pp2x_start_dev(struct mv_pp2x_port *port)
 				 __func__);
 	}
 #endif /* DEV_NETMAP */
+
+	if (port->interrupt_tx_done) /* set ZERO by stop_dev(), set CFG here */
+		mv_pp2x_tx_done_pkts_coal_set_all(port);
+
 	if (port->priv->pp2_version == PPV21) {
 		mv_pp21_gmac_max_rx_size_set(port);
 	} else {
@@ -4272,6 +4276,10 @@ static void mv_pp2x_send_pend_aggr_txq(void *arg)
 	struct mv_pp2x_txq_pcpu *txq_pcpu;
 	struct mv_pp2x_cp_pcpu *cp_pcpu;
 	bool free_aggr = false;
+
+	/* Flush coalesced tx-done packets for handling */
+	if (port->interrupt_tx_done)
+		mv_pp2x_tx_done_pkts_coal_set_val(port, smp_processor_id(), 0);
 
 	/* To avoid scheduling of pending packets on same address_space twice:
 	 * Single mode only fist of all vectors related to this sub vec will drain pending packets

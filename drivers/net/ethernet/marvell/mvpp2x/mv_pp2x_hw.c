@@ -3745,7 +3745,20 @@ void mv_pp2x_rx_time_coal_set(struct mv_pp2x_port *port,
 		      MVPP2_ISR_RX_THRESHOLD_REG(rxq->id), val);
 }
 
-/* Set threshold for TX_DONE pkts coalescing */
+/* Set given value of threshold for TX_DONE pkts coalescing */
+void mv_pp2x_tx_done_pkts_coal_set_val(struct mv_pp2x_port *port, int address_space, u32 val)
+{
+	struct mv_pp2x_tx_queue *txq;
+	int queue;
+
+	for (queue = 0; queue < port->num_tx_queues; queue++) {
+		txq = port->txqs[queue];
+		mv_pp2x_relaxed_write(&port->priv->hw, MVPP2_TXQ_NUM_REG, txq->id, address_space);
+		mv_pp2x_relaxed_write(&port->priv->hw, MVPP2_TXQ_THRESH_REG, val, address_space);
+	}
+}
+
+/* Set pre-configured threshold for TX_DONE pkts coalescing */
 void mv_pp2x_tx_done_pkts_coal_set(struct mv_pp2x_port *port, int address_space)
 {
 	int queue;
