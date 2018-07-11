@@ -2347,7 +2347,7 @@ void mv_pp2_link_change_tasklet(unsigned long data)
 	mv_gop110_port_events_unmask(&port->priv->hw.gop, &port->mac_data);
 }
 
-static void mv_pp2x_timer_set(struct mv_pp2x_port_pcpu *port_pcpu)
+static void mv_pp2x_tx_done_timer_set(struct mv_pp2x_port_pcpu *port_pcpu)
 {
 	if (!port_pcpu->timer_scheduled) {
 		port_pcpu->timer_scheduled = true;
@@ -2357,7 +2357,7 @@ static void mv_pp2x_timer_set(struct mv_pp2x_port_pcpu *port_pcpu)
 	}
 }
 
-/* Set transmit TX timer */
+/* Set BULK transmit TX timer */
 static void mv_pp2x_tx_timer_set(struct mv_pp2x_cp_pcpu *cp_pcpu)
 {
 	ktime_t interval;
@@ -2370,7 +2370,7 @@ static void mv_pp2x_tx_timer_set(struct mv_pp2x_cp_pcpu *cp_pcpu)
 	}
 }
 
-/* Cancel transmit TX timer */
+/* Cancel BULK transmit TX timer */
 static inline void mv_pp2x_tx_timer_kill(struct mv_pp2x_cp_pcpu *cp_pcpu)
 {
 	if (cp_pcpu->tx_timer_scheduled) {
@@ -2407,7 +2407,7 @@ static int mv_pp2x_check_address_space(struct mv_pp2x *priv, int cpu, bool *cold
 	return address_space;
 }
 
-static void mv_pp2x_tx_proc_cb(unsigned long data)
+static void mv_pp2x_tx_done_tasklet_cb(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct mv_pp2x_port *port = netdev_priv(dev);
@@ -2429,7 +2429,7 @@ static void mv_pp2x_tx_proc_cb(unsigned long data)
 
 	/* Set the timer in case not all the packets were processed */
 	if (tx_todo)
-		mv_pp2x_timer_set(port_pcpu);
+		mv_pp2x_tx_done_timer_set(port_pcpu);
 }
 
 /* Update HW with number of aggregated Tx descriptors to be sent */
@@ -2486,7 +2486,7 @@ static void mv_pp2x_tx_send_proc_cb(unsigned long data)
 	}
 }
 
-static enum hrtimer_restart mv_pp2x_hr_timer_cb(struct hrtimer *timer)
+static enum hrtimer_restart mv_pp2x_tx_done_timer_cb(struct hrtimer *timer)
 {
 	struct mv_pp2x_port_pcpu *port_pcpu = container_of(timer,
 			 struct mv_pp2x_port_pcpu, tx_done_timer);
@@ -3300,7 +3300,7 @@ static inline void mv_pp2x_tx_done_post_proc(struct mv_pp2x_tx_queue *txq,
 		/* Some frames present. Start timer to handle tx-done later */
 		struct mv_pp2x_port_pcpu *port_pcpu = port->pcpu[address_space];
 
-		mv_pp2x_timer_set(port_pcpu);
+		mv_pp2x_tx_done_timer_set(port_pcpu);
 	}
 }
 
@@ -4700,7 +4700,7 @@ int mv_pp2x_open(struct net_device *dev)
 			continue;
 		port_pcpu->timer_scheduled = false;
 		tasklet_init(&port_pcpu->tx_done_tasklet,
-			     mv_pp2x_tx_proc_cb, (unsigned long)dev);
+			     mv_pp2x_tx_done_tasklet_cb, (unsigned long)dev);
 	}
 
 	/* Allocate the Rx/Tx queues */
@@ -6251,7 +6251,7 @@ static int mv_pp2x_port_probe(struct platform_device *pdev,
 			continue;
 		hrtimer_init(&port_pcpu->tx_done_timer, CLOCK_MONOTONIC,
 			     HRTIMER_MODE_REL_PINNED);
-		port_pcpu->tx_done_timer.function = mv_pp2x_hr_timer_cb;
+		port_pcpu->tx_done_timer.function = mv_pp2x_tx_done_timer_cb;
 		port_pcpu->timer_scheduled = false;
 		port_pcpu->tx_time_coal_hrtmr =
 			ktime_set(0, port->tx_time_coal * NSEC_PER_USEC);
