@@ -291,6 +291,10 @@ static void mv_gop110_gmac_sgmii2_5_cfg(struct gop_hw *gop, int mac_num)
 	val |= MV_GMAC_PORT_CTRL4_QSGMII_BYPASS_ACTIVE_MASK;
 	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL4_REG, val);
 
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL2_REG);
+	val &= ~MV_GMAC_PORT_CTRL2_FC_MODE_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL2_REG, val);
+
 	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL0_REG);
 	/* configure GIG MAC to 1000Base-X mode connected to a
 	 * fiber transceiver
@@ -372,6 +376,10 @@ static void mv_gop110_gmac_2500basex_cfg(struct gop_hw *gop, int mac_num)
 	/* configure QSGMII bypass according to mode */
 	val |= MV_GMAC_PORT_CTRL4_QSGMII_BYPASS_ACTIVE_MASK;
 	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL4_REG, val);
+
+	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL2_REG);
+	val &= ~MV_GMAC_PORT_CTRL2_FC_MODE_MASK;
+	mv_gop110_gmac_write(gop, mac_num, MV_GMAC_PORT_CTRL2_REG, val);
 
 	val = mv_gop110_gmac_read(gop, mac_num, MV_GMAC_PORT_CTRL0_REG);
 	/* configure GIG MAC to 1000Base-X mode connected to a
