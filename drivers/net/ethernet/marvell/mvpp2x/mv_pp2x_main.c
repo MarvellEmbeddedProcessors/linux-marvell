@@ -1128,7 +1128,7 @@ static void __mv_pp2x_txqs_off(void *arg)
 
 static inline bool mv_pp2x_tx_stopped(struct mv_pp2x_port *port)
 {
-	return (port->flags & MVPP2_F_IF_TX_ON);
+	return !(port->flags & MVPP2_F_IF_TX_ON);
 }
 
 static void mv_pp2x_tx_start_all_queues(struct net_device *dev)
