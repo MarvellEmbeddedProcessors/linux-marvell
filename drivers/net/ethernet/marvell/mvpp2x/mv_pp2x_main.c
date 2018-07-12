@@ -3342,8 +3342,14 @@ static inline void mv_pp2x_tx_done_post_proc(struct mv_pp2x_tx_queue *txq,
 					     struct mv_pp2x_txq_pcpu *txq_pcpu, struct mv_pp2x_port *port,
 					     int frags, int address_space)
 {
+	int txq_count;
+
+	/* This TX-DONE post-processing is actual for SW hrtimer only */
+	if (port->interrupt_tx_done)
+		return;
+
 	/* get number of sent frames but not handled as tx-done */
-	int txq_count = mv_pp2x_txq_count(txq_pcpu);
+	txq_count = mv_pp2x_txq_count(txq_pcpu);
 
 	/* Finalize TX processing */
 	if (txq_count >= txq->pkts_coal) {
@@ -3923,8 +3929,7 @@ out:
 	if ((port->flags & MVPP2_F_IFCAP_NETMAP))
 		return NETDEV_TX_OK;
 #endif
-	if (!port->interrupt_tx_done)
-		mv_pp2x_tx_done_post_proc(txq, txq_pcpu, port, frags, address_space);
+	mv_pp2x_tx_done_post_proc(txq, txq_pcpu, port, frags, address_space);
 
 	if ((port->priv->pp2_cfg.spinlocks_bitmap & MV_AGGR_QUEUE_LOCK)  || cold_cpu)
 		spin_unlock_irqrestore(&aggr_txq->spinlock, flags);
