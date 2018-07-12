@@ -29,6 +29,7 @@ static int __init armada8k_cpufreq_driver_init(void)
 	struct device_node *node;
 	int cpu;
 	unsigned int cur_frequency;
+	struct dev_pm_opp *opp;
 
 	node = of_find_compatible_node(NULL, NULL, "marvell,ap806-cpu-clk");
 	if (!node)
@@ -36,7 +37,6 @@ static int __init armada8k_cpufreq_driver_init(void)
 
 	if (!node || !of_device_is_available(node))
 		return -ENODEV;
-
 
 	/*
 	 * For each CPU, this loop registers the operating points
@@ -86,6 +86,37 @@ static int __init armada8k_cpufreq_driver_init(void)
 	}
 
 	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+
+	/*
+	 * If hot-unplugging both CPUs of cluster, and enabling back the 2nd
+	 * CPU of cluster (before enabling the 1st CPU), then it doesn't register
+	 * the static shared OPP entry from device tree.
+	 * To overcome this (and to ensure 100Mhz will always be available) we test
+	 * the existence of this entry per each CPU, and if missing, add it manually here.
+	 *
+	 * Note:
+	 * Device tree must include OPPv2 table with at least one entry.
+	 * If device tree describes a table with shared OPP entries
+	 * ("opp-shared" marks DFS is shared between 2 CPUs of same cluster),
+	 * then it's only added as shared, when the 1st CPU of each cluster is
+	 * booted/plugged 1st (only then, the shared table is registered).
+	 */
+	for_each_possible_cpu(cpu) {
+		struct device *cpu_dev;
+
+		cpu_dev = get_cpu_device(cpu);
+		if (!cpu_dev) {
+			dev_err(cpu_dev, "Cannot get CPU %d\n", cpu);
+			continue;
+		}
+
+		rcu_read_lock();
+		opp = dev_pm_opp_find_freq_exact(cpu_dev, 100000000, true);
+		rcu_read_unlock();
+
+		if (IS_ERR(opp))
+			dev_pm_opp_add(cpu_dev, 100000000, 0);
+	}
 
 	return PTR_ERR_OR_ZERO(pdev);
 }
