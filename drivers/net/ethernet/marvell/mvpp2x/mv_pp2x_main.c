@@ -1292,10 +1292,12 @@ static void mv_pp2x_tx_done_guard_force_irq(struct mv_pp2x_port *port,
 		qmask = 1 << q;
 		if (!(xor & qmask))
 			continue;
-		if (to_zero_map & qmask)
+		if (to_zero_map & qmask) {
+			port->tx_guard_trigger++;
 			val = 0; /* Set ZERO forcing the Interrupt */
-		else
+		} else {
 			val = coal; /* Set/restore configured threshold */
+		}
 		mv_pp22_thread_write(hw, address_space, MVPP2_TXQ_NUM_REG, port->txqs[q]->id);
 		mv_pp22_thread_write(hw, address_space, MVPP2_TXQ_THRESH_REG, val);
 	}

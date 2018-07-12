@@ -94,6 +94,7 @@ static const char mv_pp2x_gstrings_stats[][ETH_GSTRING_LEN] = {
 	"rx_bm_dropq_q20", "rx_bm_dropq_q21", "rx_bm_dropq_q22", "rx_bm_dropq_q23",
 	"rx_bm_dropq_q24", "rx_bm_dropq_q25", "rx_bm_dropq_q26", "rx_bm_dropq_q27",
 	"rx_bm_dropq_q28", "rx_bm_dropq_q29", "rx_bm_dropq_q30", "rx_bm_dropq_q31",
+	"tx-guard-trigger",
 };
 
 int mv_pp2x_check_speed_duplex_valid(struct ethtool_cmd *cmd,
@@ -269,6 +270,7 @@ static void mv_pp2x_eth_tool_get_ethtool_stats(struct net_device *dev,
 
 	for (queue_num = 0; queue_num < MVPP22_MAX_NUM_RXQ; queue_num++)
 		data[i++] = gop_statistics->rx_perq_bm_drop[queue_num];
+	data[i++] = port->tx_guard_trigger;
 }
 
 static void mv_pp2x_eth_tool_get_strings(struct net_device *dev,
