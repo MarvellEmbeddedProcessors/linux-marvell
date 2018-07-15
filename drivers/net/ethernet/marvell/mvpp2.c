@@ -1362,6 +1362,18 @@ static struct {
 
 #define MVPP2_MIB_COUNTERS_STATS_DELAY		(1 * HZ)
 
+/* Other counters */
+#define MVPP2_OVERRUN_DROP_REG(port)		(0x7000 + 4 * (port))
+#define MVPP2_CLS_DROP_REG(port)		(0x7020 + 4 * (port))
+#define MVPP2_CNT_IDX_REG			0x7040
+#define MVPP2_TX_PKT_FULLQ_DROP_REG		0x7200
+#define MVPP2_TX_PKT_EARLY_DROP_REG		0x7204
+#define MVPP2_TX_PKT_BM_DROP_REG		0x7208
+#define MVPP2_TX_PKT_BM_MC_DROP_REG		0x720c
+#define MVPP2_RX_PKT_FULLQ_DROP_REG		0x7220
+#define MVPP2_RX_PKT_EARLY_DROP_REG		0x7224
+#define MVPP2_RX_PKT_BM_DROP_REG		0x7228
+
 /* Definitions */
 struct mvpp2_cos {
 	u8 cos_classifier;	/* CoS based on VLAN or DSCP */
@@ -8134,6 +8146,14 @@ static const struct mvpp2_ethtool_counter mvpp2_ethtool_regs[] = {
 	{ MVPP2_MIB_BAD_CRC_EVENT, "bad_crc_event" },
 	{ MVPP2_MIB_COLLISION, "collision" },
 	{ MVPP2_MIB_LATE_COLLISION, "late_collision" },
+
+	/* Extend counters */
+#define MVPP2_FIRST_CNT		MVPP2_OVERRUN_DROP_REG(0)
+	{ MVPP2_OVERRUN_DROP_REG(0),	" rx_ppv2_overrun" },
+	{ MVPP2_CLS_DROP_REG(0),	" rx_cls_drop    " },
+	{ MVPP2_RX_PKT_FULLQ_DROP_REG,	" rx_fullq_drop  " },
+	{ MVPP2_RX_PKT_EARLY_DROP_REG,	" rx_early_drop  " },
+	{ MVPP2_RX_PKT_BM_DROP_REG,	" rx_bm_drop     " },
 };
 
 static const char mvpp22_priv_flags_strings[][ETH_GSTRING_LEN] = {
@@ -8142,14 +8162,84 @@ static const char mvpp22_priv_flags_strings[][ETH_GSTRING_LEN] = {
 
 #define MVPP22_F_IF_MUSDK_PRIV	BIT(0)
 
+static void mvpp2_ethtool_get_cntr_sizes(struct mvpp2_port *port,
+					 int *total_size, int *mib_size)
+{
+	int i = 0;
+
+	*total_size = ARRAY_SIZE(mvpp2_ethtool_regs);
+	while (i < *total_size) {
+		if (mvpp2_ethtool_regs[i].offset == MVPP2_FIRST_CNT)
+			break;
+		i++;
+	}
+	*mib_size = i;
+}
+
+/* hw_get_stats - update the ethtool_stats accumulator from HW-registers
+ * The HW-registers/counters are cleared on read.
+ */
+static void mvpp2_hw_get_stats(struct mvpp2_port *port, u64 *pstats)
+{
+	int i, array_size, mib_size, queue;
+	unsigned int reg_offs;
+	u64 *ptmp;
+
+	mvpp2_ethtool_get_cntr_sizes(port, &array_size, &mib_size);
+
+	for (i = 0; i < mib_size; i++)
+		*pstats++ += mvpp2_read_count(port, &mvpp2_ethtool_regs[i]);
+
+	/* Extend counters */
+	*pstats++ += mvpp2_read(port->priv, MVPP2_OVERRUN_DROP_REG(port->id));
+	*pstats++ += mvpp2_read(port->priv, MVPP2_CLS_DROP_REG(port->id));
+	ptmp = pstats;
+	queue = port->first_rxq;
+	while (queue < (port->first_rxq + port->nrxqs)) {
+		mvpp2_write(port->priv, MVPP2_CNT_IDX_REG, queue++);
+		pstats = ptmp;
+		i = mib_size + 2;
+		while (i < array_size) {
+			reg_offs = mvpp2_ethtool_regs[i++].offset;
+			*pstats++ += mvpp2_read(port->priv, reg_offs);
+		}
+	}
+}
+
+static void mvpp2_hw_clear_stats(struct mvpp2_port *port)
+{
+	int i, array_size, mib_size, queue;
+	unsigned int reg_offs;
+
+	mvpp2_ethtool_get_cntr_sizes(port, &array_size, &mib_size);
+
+	for (i = 0; i < mib_size; i++)
+		mvpp2_read_count(port, &mvpp2_ethtool_regs[i]);
+
+	/* Extend counters */
+	mvpp2_read(port->priv, MVPP2_OVERRUN_DROP_REG(port->id));
+	mvpp2_read(port->priv, MVPP2_CLS_DROP_REG(port->id));
+	queue = port->first_rxq;
+	while (queue < (port->first_rxq + port->nrxqs)) {
+		mvpp2_write(port->priv, MVPP2_CNT_IDX_REG, queue++);
+		i = mib_size + 2;
+		while (i < array_size) {
+			reg_offs = mvpp2_ethtool_regs[i++].offset;
+			mvpp2_read(port->priv, reg_offs);
+		}
+	}
+}
+
 static void mvpp2_ethtool_get_strings(struct net_device *netdev, u32 sset,
 				      u8 *data)
 {
-	int i;
+	int i, array_size, mib_size;
+	struct mvpp2_port *port = netdev_priv(netdev);
 
 	switch (sset) {
 	case ETH_SS_STATS:
-		for (i = 0; i < ARRAY_SIZE(mvpp2_ethtool_regs); i++)
+		mvpp2_ethtool_get_cntr_sizes(port, &array_size, &mib_size);
+		for (i = 0; i < array_size; i++)
 			memcpy(data + i * ETH_GSTRING_LEN,
 			       &mvpp2_ethtool_regs[i].string, ETH_GSTRING_LEN);
 		break;
@@ -8164,23 +8254,13 @@ static void mvpp2_gather_hw_statistics(struct work_struct *work)
 	struct delayed_work *del_work = to_delayed_work(work);
 	struct mvpp2_port *port = container_of(del_work, struct mvpp2_port,
 					       stats_work);
-	u64 *pstats;
-	int i;
 
+	/* Update the statistic buffer by q-work only, not by ethtool-S */
 	mutex_lock(&port->gather_stats_lock);
-
-	pstats = port->ethtool_stats;
-	for (i = 0; i < ARRAY_SIZE(mvpp2_ethtool_regs); i++)
-		*pstats++ += mvpp2_read_count(port, &mvpp2_ethtool_regs[i]);
-
-	/* No need to read again the counters right after this function if it
-	 * was called asynchronously by the user (ie. use of ethtool).
-	 */
-	cancel_delayed_work(&port->stats_work);
+	mvpp2_hw_get_stats(port, port->ethtool_stats);
+	mutex_unlock(&port->gather_stats_lock);
 	queue_delayed_work(port->priv->stats_queue, &port->stats_work,
 			   MVPP2_MIB_COUNTERS_STATS_DELAY);
-
-	mutex_unlock(&port->gather_stats_lock);
 }
 
 static void mvpp2_ethtool_get_stats(struct net_device *dev,
@@ -8188,11 +8268,9 @@ static void mvpp2_ethtool_get_stats(struct net_device *dev,
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 
-	/* Update statistics for the given port, then take the lock to avoid
-	 * concurrent accesses on the ethtool_stats structure during its copy.
+	/* Use statistic already accumulated in ethtool_stats by q-work
+	 * and copy under mutex-lock it into given ethtool-data-buffer.
 	 */
-	mvpp2_gather_hw_statistics(&port->stats_work.work);
-
 	mutex_lock(&port->gather_stats_lock);
 	memcpy(data, port->ethtool_stats,
 	       sizeof(u64) * ARRAY_SIZE(mvpp2_ethtool_regs));
@@ -8202,10 +8280,13 @@ static void mvpp2_ethtool_get_stats(struct net_device *dev,
 static int mvpp2_ethtool_get_sset_count(struct net_device *dev, int sset)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
+	int array_size, mib_size;
 
 	switch (sset) {
 	case ETH_SS_STATS:
-		return ARRAY_SIZE(mvpp2_ethtool_regs);
+		mvpp2_ethtool_get_cntr_sizes(port, &array_size, &mib_size);
+		return array_size;
+
 	case ETH_SS_PRIV_FLAGS:
 		return (port->priv->hw_version == MVPP21) ?
 			0 : ARRAY_SIZE(mvpp22_priv_flags_strings);
@@ -8216,11 +8297,9 @@ static int mvpp2_ethtool_get_sset_count(struct net_device *dev, int sset)
 static void mvpp2_port_reset(struct mvpp2_port *port)
 {
 	u32 val;
-	unsigned int i;
 
 	/* Read the GOP statistics to reset the hardware counters */
-	for (i = 0; i < ARRAY_SIZE(mvpp2_ethtool_regs); i++)
-		mvpp2_read_count(port, &mvpp2_ethtool_regs[i]);
+	mvpp2_hw_clear_stats(port);
 
 	val = readl(port->base + MVPP2_GMAC_CTRL_2_REG) &
 		    ~MVPP2_GMAC_PORT_RESET_MASK;
