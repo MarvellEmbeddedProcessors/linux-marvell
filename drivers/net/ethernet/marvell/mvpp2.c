@@ -1352,7 +1352,7 @@ static struct {
 #define MVPP2_MIB_FC_RCVD			0x58
 #define MVPP2_MIB_RX_FIFO_OVERRUN		0x5c
 #define MVPP2_MIB_UNDERSIZE_RCVD		0x60
-#define MVPP2_MIB_FRAGMENTS_RCVD		0x64
+#define MVPP2_MIB_FRAGMENTS_ERR_RCVD		0x64
 #define MVPP2_MIB_OVERSIZE_RCVD			0x68
 #define MVPP2_MIB_JABBER_RCVD			0x6c
 #define MVPP2_MIB_MAC_RCV_ERROR			0x70
@@ -8127,7 +8127,7 @@ static const struct mvpp2_ethtool_counter mvpp2_ethtool_regs[] = {
 	{ MVPP2_MIB_FC_RCVD, "fc_received" },
 	{ MVPP2_MIB_RX_FIFO_OVERRUN, "rx_fifo_overrun" },
 	{ MVPP2_MIB_UNDERSIZE_RCVD, "undersize_received" },
-	{ MVPP2_MIB_FRAGMENTS_RCVD, "fragments_received" },
+	{ MVPP2_MIB_FRAGMENTS_ERR_RCVD, "fragments_err_received" },
 	{ MVPP2_MIB_OVERSIZE_RCVD, "oversize_received" },
 	{ MVPP2_MIB_JABBER_RCVD, "jabber_received" },
 	{ MVPP2_MIB_MAC_RCV_ERROR, "mac_receive_error" },
