@@ -8812,22 +8812,52 @@ static void mvpp2_rx_pkts_coal_set(struct mvpp2_port *port,
 	put_cpu();
 }
 
-static void mvpp2_tx_pkts_coal_set(struct mvpp2_port *port,
-				   struct mvpp2_tx_queue *txq)
+/* Set pkts-coalescing HW with a given or configured VALUE for all TXQs */
+static void mvpp2_tx_pkts_coal_set_util(struct mvpp2_port *port,
+					int hif, u32 val)
 {
-	int hif;
-	u32 val;
+	int num_hifs, queue;
+	struct mvpp2_tx_queue *txq;
 
-	if (txq->done_pkts_coal > MVPP2_TXQ_THRESH_MASK)
-		txq->done_pkts_coal = MVPP2_TXQ_THRESH_MASK;
-
-	val = (txq->done_pkts_coal << MVPP2_TXQ_THRESH_OFFSET);
-	/* Should be set for every used Hw-InterFace/sw_thread */
-	for (hif = 0; hif < used_hifs; hif++) {
-		mvpp2_percpu_write(port->priv, hif, MVPP2_TXQ_NUM_REG,
-				   txq->id);
-		mvpp2_percpu_write(port->priv, hif, MVPP2_TXQ_THRESH_REG, val);
+	if (hif < 0) {
+		/* For all HIFs */
+		hif = 0;
+		num_hifs = used_hifs;
+	} else if (hif < used_hifs) {
+		/* For a given hif only */
+		num_hifs = hif + 1;
+	} else {
+		/* used_hifs < hif < num_possible_cpus */
+		return;
 	}
+
+	/* Not VALUE not specified, use configuration */
+	if (val == -1) {
+		txq = port->txqs[0];
+		val = txq->done_pkts_coal;
+	}
+	for (queue = 0; queue < port->ntxqs; queue++) {
+		txq = port->txqs[queue];
+		for (hif = 0; hif < num_hifs; hif++) {
+			mvpp2_percpu_write(port->priv, hif,
+					   MVPP2_TXQ_NUM_REG, txq->id);
+			mvpp2_percpu_write(port->priv, hif,
+					   MVPP2_TXQ_THRESH_REG, val);
+		}
+	}
+}
+
+static void mvpp2_tx_pkts_coal_set_zero_pcpu(void *arg)
+{
+	struct mvpp2_port *port = arg;
+
+	mvpp2_tx_pkts_coal_set_util(port, smp_processor_id(), 0);
+}
+
+static void mvpp2_tx_pkts_coal_set(struct mvpp2_port *port)
+{
+	/* Download registers of all CPUs with Configured value */
+	mvpp2_tx_pkts_coal_set_util(port, -1, -1);
 }
 
 static u32 mvpp2_usec_to_cycles(u32 usec, unsigned long clk_hz)
@@ -9380,11 +9410,8 @@ static int mvpp2_setup_txqs(struct mvpp2_port *port)
 		netif_set_xps_queue(port->dev, cpumask_of(cpu), cpu);
 
 	if (port->has_tx_irqs) {
+		/* Download time-coal. The pkts-coal done in start_dev */
 		mvpp2_tx_time_coal_set(port);
-		for (queue = 0; queue < port->ntxqs; queue++) {
-			txq = port->txqs[queue];
-			mvpp2_tx_pkts_coal_set(port, txq);
-		}
 	}
 
 	on_each_cpu(mvpp2_txq_sent_counter_clear, port, 1);
@@ -10562,6 +10589,10 @@ static void mvpp2_start_dev(struct mvpp2_port *port)
 
 	mvpp2_txp_max_tx_size_set(port);
 
+	/* stop_dev() sets Coal to ZERO. Care to restore it now */
+	if (port->has_tx_irqs)
+		mvpp2_tx_pkts_coal_set(port);
+
 	for (i = 0; i < port->nqvecs; i++)
 		napi_enable(&port->qvecs[i].napi);
 
@@ -10599,9 +10630,13 @@ static void mvpp2_stop_dev(struct mvpp2_port *port)
 	 * yeild the context for gracefull finishing (msleep, not mdelay).
 	 * This sequence especially important for scenarious with further
 	 * queue-cleanup -- ifconfig-down and ethtool-ring-size
+	 * Flush all tx-done by forcing pkts-coal to ZERO
 	 */
 	mvpp2_tx_stop_all_queues(port->dev);
 	mvpp2_ingress_disable(port);
+	if (port->has_tx_irqs)
+		on_each_cpu(mvpp2_tx_pkts_coal_set_zero_pcpu, port, 1);
+
 	msleep(40);
 
 	mvpp2_egress_disable(port);
@@ -11294,6 +11329,7 @@ static int mvpp2_ethtool_set_coalesce(struct net_device *dev,
 				      struct ethtool_coalesce *c)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
+	struct mvpp2_tx_queue *txq;
 	int queue;
 
 	for (queue = 0; queue < port->nrxqs; queue++) {
@@ -11305,18 +11341,22 @@ static int mvpp2_ethtool_set_coalesce(struct net_device *dev,
 		mvpp2_rx_time_coal_set(port, rxq);
 	}
 
-	if (port->has_tx_irqs) {
+	/* Set TX time and pkts coalescing configuration */
+	if (port->has_tx_irqs)
 		port->tx_time_coal = c->tx_coalesce_usecs;
-		mvpp2_tx_time_coal_set(port);
-	}
 
 	for (queue = 0; queue < port->ntxqs; queue++) {
-		struct mvpp2_tx_queue *txq = port->txqs[queue];
-
+		txq = port->txqs[queue];
 		txq->done_pkts_coal = c->tx_max_coalesced_frames;
+		if (port->has_tx_irqs &&
+		    txq->done_pkts_coal > MVPP2_TXQ_THRESH_MASK)
+			txq->done_pkts_coal = MVPP2_TXQ_THRESH_MASK;
+	}
 
-		if (port->has_tx_irqs)
-			mvpp2_tx_pkts_coal_set(port, txq);
+	if (port->has_tx_irqs) {
+		/* Download configured values into MVPP2 HW */
+		mvpp2_tx_time_coal_set(port);
+		mvpp2_tx_pkts_coal_set(port);
 	}
 
 	return 0;
