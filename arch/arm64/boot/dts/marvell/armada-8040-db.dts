@@ -6,7 +6,7 @@
  */
 
 #include <dt-bindings/gpio/gpio.h>
-#include "armada-8040.dtsi"
+#include "armada-8040-db.dtsi"
 
 / {
 	model = "Marvell Armada 8040 DB board";
