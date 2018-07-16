@@ -33,6 +33,10 @@
 	status = "okay";
 };
 
+&cp0_i2c0 {
+	status = "okay";
+};
+
 &cp0_sdhci0 {
 	status = "okay";
 };
