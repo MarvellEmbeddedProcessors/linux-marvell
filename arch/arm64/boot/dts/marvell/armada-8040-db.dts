@@ -28,57 +28,6 @@
 		ethernet2 = &cp1_eth0;
 		ethernet3 = &cp1_eth1;
 	};
-
-	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
-		compatible = "regulator-fixed";
-		regulator-name = "cp0-usb3h0-vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		enable-active-high;
-		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
-	};
-
-	cp0_reg_usb3_1_vbus: cp0-usb3-1-vbus {
-		compatible = "regulator-fixed";
-		regulator-name = "cp0-usb3h1-vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		enable-active-high;
-		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
-	};
-
-	cp0_usb3_0_phy: cp0-usb3-0-phy {
-		compatible = "usb-nop-xceiv";
-		vcc-supply = <&cp0_reg_usb3_0_vbus>;
-	};
-
-	cp0_usb3_1_phy: cp0-usb3-1-phy {
-		compatible = "usb-nop-xceiv";
-		vcc-supply = <&cp0_reg_usb3_1_vbus>;
-	};
-
-	cp1_reg_usb3_0_vbus: cp1-usb3-0-vbus {
-		compatible = "regulator-fixed";
-		regulator-name = "cp1-usb3h0-vbus";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		enable-active-high;
-		gpio = <&expander1 0 GPIO_ACTIVE_HIGH>;
-	};
-
-	cp1_usb3_0_phy: cp1-usb3-0-phy {
-		compatible = "usb-nop-xceiv";
-		vcc-supply = <&cp1_reg_usb3_0_vbus>;
-	};
-
-
-	sfp_eth0: sfp-eth0 {
-		compatible = "sff,sfp";
-	};
-
-	sfp_eth1: sfp-eth1 {
-		compatible = "sff,sfp";
-	};
 };
 
 &spi0 {
@@ -111,8 +60,6 @@
 /* Accessible over the mini-USB CON9 connector on the main board */
 &uart0 {
 	status = "okay";
-	pinctrl-0 = <&uart0_pins>;
-	pinctrl-names = "default";
 };
 
 /* CON6 on CP0 expansion */
@@ -131,26 +78,6 @@
 
 &cp0_i2c0 {
 	status = "okay";
-	clock-frequency = <100000>;
-
-	/* U31 */
-	expander0: pca9555@21 {
-		compatible = "nxp,pca9555";
-		pinctrl-names = "default";
-		gpio-controller;
-		#gpio-cells = <2>;
-		reg = <0x21>;
-	};
-
-	/* U25 */
-	expander1: pca9555@25 {
-		compatible = "nxp,pca9555";
-		pinctrl-names = "default";
-		gpio-controller;
-		#gpio-cells = <2>;
-		reg = <0x25>;
-	};
-
 };
 
 &cp0_sata0 {
@@ -171,13 +98,11 @@
 
 /* CON9 on CP0 expansion */
 &cp0_usb3_0 {
-	usb-phy = <&cp0_usb3_0_phy>;
 	status = "okay";
 };
 
 /* CON10 on CP0 expansion */
 &cp0_usb3_1 {
-	usb-phy = <&cp0_usb3_1_phy>;
 	status = "okay";
 	/* Generic PHY, providing serdes lanes */
 	phys = <&cp0_comphy4 1>;
@@ -239,33 +164,6 @@
 
 &cp1_spi1 {
 	status = "okay";
-
-	spi-flash@0 {
-		#address-cells = <0x1>;
-		#size-cells = <0x1>;
-		compatible = "jedec,spi-nor";
-		reg = <0x0>;
-		spi-max-frequency = <20000000>;
-
-		partitions {
-			compatible = "fixed-partitions";
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			partition@0 {
-				label = "Boot";
-				reg = <0x0 0x200000>;
-			};
-			partition@200000 {
-				label = "Filesystem";
-				reg = <0x200000 0xd00000>;
-			};
-			partition@f00000 {
-				label = "Boot_2nd";
-				reg = <0xf00000 0x100000>;
-			};
-		};
-	};
 };
 
 /*
@@ -322,7 +220,6 @@
 
 /* CON9 on CP1 expansion */
 &cp1_usb3_0 {
-	usb-phy = <&cp1_usb3_0_phy>;
 	status = "okay";
 };
 
