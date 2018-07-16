@@ -24,6 +24,10 @@
 	};
 };
 
+&uart0 {
+	status = "okay";
+};
+
 &ap_sdhci0 {
 	status = "okay";
 };
