@@ -60,6 +60,27 @@
 			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
 
 		internal-regs {
+			spi1: spi@10680 {
+				pinctrl-names = "default";
+				pinctrl-0 = <&spi1_pins>;
+				status = "okay";
+
+				spi-flash@1 {
+					#address-cells = <1>;
+					#size-cells = <1>;
+					compatible = "jedec,spi-nor";
+					reg = <0>; /* Chip select 0 */
+					spi-max-frequency = <108000000>;
+					partition@0 {
+						label = "uboot";
+						reg = <0 0x400000>;
+					};
+					partition@400000 {
+						label = "rootfs";
+						reg = <0x400000 0xc00000>;
+					};
+				};
+			};
 
 			flash@d0000 {
 				status = "okay";
