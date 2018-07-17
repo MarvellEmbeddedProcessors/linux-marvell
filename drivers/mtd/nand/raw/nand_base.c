@@ -4997,8 +4997,8 @@ static void nand_set_defaults(struct nand_chip *chip)
 		chip->scan_bbt = nand_default_bbt;
 
 	if (!chip->controller) {
-		chip->controller = &chip->hwcontrol;
-		nand_hw_control_init(chip->controller);
+		chip->controller = &chip->dummy_controller;
+		nand_controller_init(chip->controller);
 	}
 
 	if (!chip->buf_align)
