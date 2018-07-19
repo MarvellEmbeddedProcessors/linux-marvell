@@ -26,3 +26,36 @@ Example:
 
 compatible = "marvell,msys-ac3-db", "marvell,msys-ac3",
 		     "marvell,msys", "marvell,armada-370-xp";
+
+Boards using the Marvell Msys Bobcat2 SoC shall have the following property:
+
+Required root node property:
+
+compatible: must contain "marvell,msys-bc2"
+
+Example:
+
+compatible = "marvell,msys-bc2-db", "marvell,msys-bc2",
+		     "marvell,msys", "marvell,armada-370-xp";
+
+Boards using the Marvell Msys BobK SoC shall have the following property:
+
+Required root node property:
+
+compatible: must contain one of
+	"marvell,msys-bobk-caelum", "marvell,msys-bobk-cetus",
+	"marvell,msys-bobk-lewis", "marvell,msys-bobk-cygnus"
+
+Example:
+
+compatible = "marvell,msys-bobk-caelum-db", "marvell,msys-bobk-caelum",
+		     "marvell,msys", "marvell,armada-370-xp";
+
+compatible = "marvell,msys-bobk-cetus-db", "marvell,msys-bobk-cetus",
+		     "marvell,msys", "marvell,armada-370-xp";
+
+compatible = "marvell,msys-bobk-lewis-rd", "marvell,msys-bobk-lewis",
+		     "marvell,msys", "marvell,armada-370-xp";
+
+compatible = "marvell,msys-bobk-cygnus-rd", "marvell,msys-bobk-cygnus",
+		     "marvell,msys", "marvell,armada-370-xp";
