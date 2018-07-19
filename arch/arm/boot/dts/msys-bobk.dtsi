@@ -1,0 +1,30 @@
+/*
+ * Device Tree file for Marvell BobK
+ *
+ * Copyright (C) 2015 Marvell
+ *
+ * This file is licensed under the terms of the GNU General Public
+ * License version 2.  This program is licensed "as is" without any
+ * warranty of any kind, whether express or implied.
+ */
+
+#include "msys.dtsi"
+
+/ {
+	model = "Marvell Msys BobK SoC";
+	compatible = "marvell,msys", "marvell,msys-bobk",
+		     "marvell,armada-370-xp";
+
+	soc {
+		internal-regs {
+			pinctrl@18000 {
+				compatible = "marvell,bobk-pinctrl";
+			};
+		};
+		prestera {
+			pinctrl-names = "default";
+			pinctrl-0 = <&pp_pin>;
+			interrupts = <33>;
+		};
+	};
+};
