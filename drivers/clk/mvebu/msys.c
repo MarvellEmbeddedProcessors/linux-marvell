@@ -18,8 +18,38 @@
 #include <linux/of.h>
 #include "common.h"
 
-
-/* For Msys AlleyCat3 Sample At Reset the CPU, DDR and Main PLL clocks are all
+/* For Msys BobCat2 Sample At Reset the CPU, DDR and Main PLL clocks are all
+ * defined in the same time
+ *
+ * SAR1[20:18]   : CPU frequency    DDR frequency   MPLL frequency
+ *               0  =  400 MHz      400 MHz         800 MHz
+ *               2  =  667 MHz      667 MHz         2000 MHz
+ *               3  =  800 MHz      800 MHz         1600 MHz
+ *               others reserved.
+ *
+ * For Msys Cetus Sample At Reset the CPU, DDR and Main PLL clocks are all
+ * defined in the same time
+ *
+ * SAR1[20:18]   : CPU frequency    DDR frequency   MPLL frequency
+ *               0  =  400 MHz      400 MHz         400 MHz
+ *               1  =  1000MHz      667 MHz         2000 MHz
+ *               2  =  667 MHz      667 MHz         2000 MHz
+ *               3  =  800 MHz      800 MHz         800 MHz
+ *               4  =  1200MHz      800 MHz         2400 MHz
+ *               5  =  800 MHz      400 MHz         800 MHz
+ *               others reserved.
+ *
+ * For Msys Caelum Sample At Reset the CPU, DDR and Main PLL clocks are all
+ * defined in the same time
+ *
+ * SAR1[20:18]   : CPU frequency    DDR frequency   MPLL frequency
+ *               0  =  400 MHz      400 MHz         400 MHz
+ *               2  =  667 MHz      667 MHz         2000 MHz
+ *               3  =  800 MHz      800 MHz         800 MHz
+ *               5  =  800 MHz      400 MHz         800 MHz
+ *               others reserved.
+ *
+ * For Msys AlleyCat3 Sample At Reset the CPU, DDR and Main PLL clocks are all
  * defined in the same time
  *
  * SAR1[20:18]   : CPU frequency    DDR frequency   MPLL frequency
@@ -39,6 +69,34 @@ static u32 __init msys_get_tclk_freq(void __iomem *sar)
 	return 200000000;
 }
 
+static const u32 msys_bc2_cpu_frequencies[] __initconst = {
+	400000000,
+	0,
+	667000000,
+	800000000,
+	0, 0, 0, 0,
+};
+
+static const u32 msys_cetus_cpu_frequencies[] __initconst = {
+	400000000,
+	1000000000,
+	667000000,
+	800000000,
+	1200000000,
+	800000000,
+	0, 0,
+};
+
+static const u32 msys_caelum_cpu_frequencies[] __initconst = {
+	400000000,
+	0,
+	667000000,
+	800000000,
+	0,
+	800000000,
+	0, 0,
+};
+
 static const u32 msys_ac3_cpu_frequencies[] __initconst = {
 	0,
 	667000000,
@@ -57,7 +115,17 @@ static u32 __init msys_get_cpu_freq(void __iomem *sar)
 	cpu_freq_select = ((readl(sar) >> SAR1_MSYS_CPU_DDR_MPLL_FREQ_OPT) &
 			   SAR1_MSYS_CPU_DDR_MPLL_FREQ_OPT_MASK);
 
-	if (of_machine_is_compatible("marvell,msys-ac3"))
+	if (of_machine_is_compatible("marvell,msys-bc2"))
+		cpu_freq = msys_bc2_cpu_frequencies[cpu_freq_select];
+	else if (of_machine_is_compatible("marvell,msys-bobk-cetus") ||
+		 of_machine_is_compatible("marvell,msys-bobk-lewis"))
+		/* cetus and lewis have same cpu frequencies */
+		cpu_freq = msys_cetus_cpu_frequencies[cpu_freq_select];
+	else if (of_machine_is_compatible("marvell,msys-bobk-caelum") ||
+		 of_machine_is_compatible("marvell,msys-bobk-cygnus"))
+		/* caelum and cygnus have same cpu frequencies */
+		cpu_freq = msys_caelum_cpu_frequencies[cpu_freq_select];
+	else if (of_machine_is_compatible("marvell,msys-ac3"))
 		cpu_freq = msys_ac3_cpu_frequencies[cpu_freq_select];
 
 	if (!cpu_freq)
@@ -71,6 +139,36 @@ enum {MSYS_CPU_TO_DDR, MSYS_CPU_TO_MPLL};
 static const struct coreclk_ratio msys_core_ratios[] __initconst = {
 	{ .id = MSYS_CPU_TO_DDR, .name = "ddrclk" },
 	{ .id = MSYS_CPU_TO_MPLL, .name = "mpll" },
+};
+
+static const int __initconst msys_bc2_cpu_mpll_ratios[8][2] = {
+	{2, 1}, {0, 1}, {3, 1}, {2, 1},
+	{0, 1}, {0, 1}, {0, 1}, {0, 1},
+};
+
+static const int __initconst msys_bc2_cpu_ddr_ratios[8][2] = {
+	{1, 1}, {0, 1}, {1, 1}, {1, 1},
+	{0, 1}, {0, 1}, {0, 1}, {0, 1},
+};
+
+static const int __initconst msys_cetus_cpu_mpll_ratios[8][2] = {
+	{1, 1}, {2, 1}, {3, 1}, {1, 1},
+	{2, 1}, {1, 1}, {0, 1}, {0, 1},
+};
+
+static const int __initconst msys_cetus_cpu_ddr_ratios[8][2] = {
+	{1, 1}, {2, 3}, {1, 1}, {1, 1},
+	{2, 3}, {1, 2}, {0, 1}, {0, 1},
+};
+
+static const int __initconst msys_caelum_cpu_mpll_ratios[8][2] = {
+	{1, 1}, {0, 1}, {3, 1}, {1, 1},
+	{0, 1}, {1, 1}, {0, 1}, {0, 1},
+};
+
+static const int __initconst msys_caelum_cpu_ddr_ratios[8][2] = {
+	{1, 1}, {0, 1}, {1, 1}, {1, 1},
+	{0, 1}, {1, 2}, {0, 1}, {0, 1},
 };
 
 static const int __initconst msys_ac3_cpu_mpll_ratios[8][2] = {
@@ -91,13 +189,39 @@ static void __init msys_get_clk_ratio(
 
 	switch (id) {
 	case MSYS_CPU_TO_DDR:
-		if (of_machine_is_compatible("marvell,msys-ac3")) {
+		if (of_machine_is_compatible("marvell,msys-bc2")) {
+			*mult = msys_bc2_cpu_ddr_ratios[opt][0];
+			*div = msys_bc2_cpu_ddr_ratios[opt][1];
+		} else if (of_machine_is_compatible("marvell,msys-bobk-cetus") ||
+			   of_machine_is_compatible("marvell,msys-bobk-lewis")) {
+			/* cetus and lewis have same cpu ddr ratios */
+			*mult = msys_cetus_cpu_ddr_ratios[opt][0];
+			*div = msys_cetus_cpu_ddr_ratios[opt][1];
+		} else if (of_machine_is_compatible("marvell,msys-bobk-caelum") ||
+			   of_machine_is_compatible("marvell,msys-bobk-cygnus")) {
+			/* caelum and cygnus have same cpu ddr ratios */
+			*mult = msys_caelum_cpu_ddr_ratios[opt][0];
+			*div = msys_caelum_cpu_ddr_ratios[opt][1];
+		} else if (of_machine_is_compatible("marvell,msys-ac3")) {
 			*mult = msys_ac3_cpu_ddr_ratios[opt][0];
 			*div = msys_ac3_cpu_ddr_ratios[opt][1];
 		}
 		break;
 	case MSYS_CPU_TO_MPLL:
-		if (of_machine_is_compatible("marvell,msys-ac3")) {
+		if (of_machine_is_compatible("marvell,msys-bc2")) {
+			*mult = msys_bc2_cpu_mpll_ratios[opt][0];
+			*div = msys_bc2_cpu_mpll_ratios[opt][1];
+		} else if (of_machine_is_compatible("marvell,msys-bobk-cetus") ||
+			   of_machine_is_compatible("marvell,msys-bobk-lewis")) {
+			/* cetus and lewis have same cpu mpll ratios */
+			*mult = msys_cetus_cpu_mpll_ratios[opt][0];
+			*div = msys_cetus_cpu_mpll_ratios[opt][1];
+		} else if (of_machine_is_compatible("marvell,msys-bobk-caelum") ||
+			   of_machine_is_compatible("marvell,msys-bobk-cygnus")) {
+			/* caelum and cygnus have same cpu mpll ratios */
+			*mult = msys_caelum_cpu_mpll_ratios[opt][0];
+			*div = msys_caelum_cpu_mpll_ratios[opt][1];
+		} else if (of_machine_is_compatible("marvell,msys-ac3")) {
 			*mult = msys_ac3_cpu_mpll_ratios[opt][0];
 			*div = msys_ac3_cpu_mpll_ratios[opt][1];
 		}
@@ -112,7 +236,6 @@ static const struct coreclk_soc_desc msys_core_clocks = {
 	.ratios = msys_core_ratios,
 	.num_ratios = ARRAY_SIZE(msys_core_ratios),
 };
-
 
 /*
  * Clock Gating Control
