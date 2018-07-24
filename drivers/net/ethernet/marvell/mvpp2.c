@@ -1456,7 +1456,7 @@ struct mvpp2_pcpu_stats {
 /* Per-CPU port control */
 struct mvpp2_port_pcpu {
 	struct hrtimer tx_done_timer;
-	bool timer_scheduled;
+	bool tx_done_timer_scheduled;
 	/* Tasklet for egress finalization */
 	struct tasklet_struct tx_done_tasklet;
 };
@@ -9464,8 +9464,8 @@ static void mvpp2_timer_set(struct mvpp2_port_pcpu *port_pcpu)
 {
 	ktime_t interval;
 
-	if (!port_pcpu->timer_scheduled) {
-		port_pcpu->timer_scheduled = true;
+	if (!port_pcpu->tx_done_timer_scheduled) {
+		port_pcpu->tx_done_timer_scheduled = true;
 		interval = MVPP2_TXDONE_HRTIMER_PERIOD_NS;
 		hrtimer_start(&port_pcpu->tx_done_timer, interval,
 			      HRTIMER_MODE_REL_PINNED);
@@ -9483,7 +9483,7 @@ static void mvpp2_tx_proc_cb(unsigned long data)
 	if (!netif_running(dev))
 		return;
 	port_pcpu = per_cpu_ptr(port->pcpu, sw_thread);
-	port_pcpu->timer_scheduled = false;
+	port_pcpu->tx_done_timer_scheduled = false;
 
 	/* Process all the Tx queues */
 	cause = (1 << port->ntxqs) - 1;
@@ -10924,7 +10924,7 @@ static int mvpp2_stop(struct net_device *dev)
 			port_pcpu = per_cpu_ptr(port->pcpu, cpu);
 
 			hrtimer_cancel(&port_pcpu->tx_done_timer);
-			port_pcpu->timer_scheduled = false;
+			port_pcpu->tx_done_timer_scheduled = false;
 			tasklet_kill(&port_pcpu->tx_done_tasklet);
 		}
 	}
@@ -12537,7 +12537,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 			hrtimer_init(&port_pcpu->tx_done_timer, CLOCK_MONOTONIC,
 				     HRTIMER_MODE_REL_PINNED);
 			port_pcpu->tx_done_timer.function = mvpp2_hr_timer_cb;
-			port_pcpu->timer_scheduled = false;
+			port_pcpu->tx_done_timer_scheduled = false;
 
 			tasklet_init(&port_pcpu->tx_done_tasklet,
 				     mvpp2_tx_proc_cb,
