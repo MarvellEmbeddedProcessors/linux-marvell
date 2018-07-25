@@ -458,6 +458,7 @@ struct mvneta_port {
 	u32 indir[MVNETA_RSS_LU_TABLE_SIZE];
 
 	/* Flags for special SoC configurations */
+	bool musdk_port;
 	bool neta_armada3700;
 	u16 rx_offset_correction;
 	const struct mbus_dram_target_info *dram_target_info;
@@ -2416,6 +2417,9 @@ static netdev_tx_t mvneta_tx(struct sk_buff *skb, struct net_device *dev)
 	int frags = 0;
 	u32 tx_cmd;
 
+	if (pp->musdk_port)
+		return NETDEV_TX_OK;
+
 	if (!netif_running(dev))
 		goto out;
 
@@ -3287,6 +3291,11 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
 	struct mvneta_port *pp = netdev_priv(dev);
 	int ret;
 
+	if (pp->musdk_port) {
+		netdev_warn(dev, "ndo_change_mtu not supported on MUSDK port\n");
+		return 0;
+	}
+
 	if (!IS_ALIGNED(MVNETA_RX_PKT_SIZE(mtu), 8)) {
 		netdev_info(dev, "Illegal MTU value %d, rounding to %d\n",
 			    mtu, ALIGN(MVNETA_RX_PKT_SIZE(mtu), 8));
@@ -3608,7 +3617,8 @@ static void mvneta_mac_link_down(struct net_device *ndev, unsigned int mode,
 	struct mvneta_port *pp = netdev_priv(ndev);
 	u32 val;
 
-	mvneta_port_down(pp);
+	if (!pp->musdk_port)
+		mvneta_port_down(pp);
 
 	if (!phylink_autoneg_inband(mode)) {
 		val = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
@@ -3635,7 +3645,8 @@ static void mvneta_mac_link_up(struct net_device *ndev, unsigned int mode,
 		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
 	}
 
-	mvneta_port_up(pp);
+	if (!pp->musdk_port)
+		mvneta_port_up(pp);
 
 	if (phy && pp->eee_enabled) {
 		pp->eee_active = phy_init_eee(phy, 0) >= 0;
@@ -3827,6 +3838,17 @@ static int mvneta_open(struct net_device *dev)
 	struct mvneta_port *pp = netdev_priv(dev);
 	int ret;
 
+	if (pp->musdk_port) {
+		ret = mvneta_mdio_probe(pp);
+		if (ret < 0) {
+			netdev_err(dev, "cannot probe MDIO bus\n");
+			return 0;
+		}
+		phylink_start(pp->phylink);
+		netdev_warn(dev, "skipping ndo_open as this port is User Space port\n");
+		return 0;
+	}
+
 	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
 	pp->frag_size = PAGE_SIZE;
 
@@ -3910,6 +3932,11 @@ err_cleanup_rxqs:
 static int mvneta_stop(struct net_device *dev)
 {
 	struct mvneta_port *pp = netdev_priv(dev);
+
+	if (pp->musdk_port) {
+		netdev_warn(dev, "ndo_stop not supported on MUSDK port\n");
+		return 0;
+	}
 
 	if (!pp->neta_armada3700) {
 		/* Inform that we are stopping so we don't want to setup the
@@ -4501,6 +4528,8 @@ static int mvneta_probe(struct platform_device *pdev)
 	int phy_mode;
 	int err;
 	int cpu;
+	const char *musdk_status;
+	int statlen;
 
 	dev = alloc_etherdev_mqs(sizeof(struct mvneta_port), txq_number, rxq_number);
 	if (!dev)
@@ -4575,6 +4604,13 @@ static int mvneta_probe(struct platform_device *pdev)
 		err = PTR_ERR(pp->base);
 		goto err_clk;
 	}
+
+	/* check MUSDK port status */
+	musdk_status = of_get_property(dn, "musdk-status", &statlen);
+
+	/* Set musdk_flag, only if status is "private" */
+	if (musdk_status && !strcmp(musdk_status, "private"))
+		pp->musdk_port = true;
 
 	/* Alloc per-cpu port structure */
 	pp->ports = alloc_percpu(struct mvneta_pcpu_port);
@@ -4674,16 +4710,19 @@ static int mvneta_probe(struct platform_device *pdev)
 	/* Armada3700 network controller does not support per-cpu
 	 * operation, so only single NAPI should be initialized.
 	 */
-	if (pp->neta_armada3700) {
-		netif_napi_add(dev, &pp->napi, mvneta_poll, NAPI_POLL_WEIGHT);
-	} else {
-		for_each_present_cpu(cpu) {
-			struct mvneta_pcpu_port *port =
-				per_cpu_ptr(pp->ports, cpu);
-
-			netif_napi_add(dev, &port->napi, mvneta_poll,
+	if (!pp->musdk_port) {
+		if (pp->neta_armada3700) {
+			netif_napi_add(dev, &pp->napi, mvneta_poll,
 				       NAPI_POLL_WEIGHT);
-			port->pp = pp;
+		} else {
+			for_each_present_cpu(cpu) {
+				struct mvneta_pcpu_port *port =
+					per_cpu_ptr(pp->ports, cpu);
+
+				netif_napi_add(dev, &port->napi, mvneta_poll,
+					       NAPI_POLL_WEIGHT);
+				port->pp = pp;
+			}
 		}
 	}
 
@@ -4708,6 +4747,9 @@ static int mvneta_probe(struct platform_device *pdev)
 		    dev->dev_addr);
 
 	platform_set_drvdata(pdev, pp->dev);
+
+	if (pp->musdk_port)
+		netdev_info(dev, "Port belong to User Space (MUSDK)\n");
 
 	return 0;
 
