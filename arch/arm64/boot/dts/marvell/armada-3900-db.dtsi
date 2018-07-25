@@ -186,6 +186,12 @@
 			comphy {
 				skip_pcie_power_off;
 			};
+			cp0_utmi0: utmi@580000 {
+				status = "okay";
+			};
+			cp0_utmi1: utmi@581000 {
+				status = "okay";
+			};
 		};
 		pcie0@600000 {
 			status = "okay";
