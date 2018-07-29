@@ -759,7 +759,6 @@ static struct mv_pp2x_bm_pool *mv_pp2x_bm_pool_use_internal(
 		mv_pp2x_bm_bufs_free(port->dev->dev.parent, port->priv, pool, -add_num);
 	}
 
-	mv_pp2x_bm_pool_update_fc(port, pool, add_num);
 
 	return pool;
 }
@@ -855,12 +854,14 @@ static int mv_pp2x_bm_update_mtu(struct net_device *dev, int mtu)
 	if (mv_pp2x_swf_bm_pool_init(port))
 		return -ENOMEM;
 
-	if (port->pkt_size > MVPP2_BM_LONG_PKT_SIZE) {
-		mv_pp2x_bm_pool_update_fc(port, &port->priv->bm_pools[MVPP2_BM_SWF_JUMBO_POOL], 1);
-		mv_pp2x_bm_pool_update_fc(port, &port->priv->bm_pools[MVPP2_BM_SWF_SHORT_POOL], -1);
-	} else {
-		mv_pp2x_bm_pool_update_fc(port, &port->priv->bm_pools[MVPP2_BM_SWF_JUMBO_POOL], -1);
-		mv_pp2x_bm_pool_update_fc(port, &port->priv->bm_pools[MVPP2_BM_SWF_SHORT_POOL], 1);
+	if (port->flow_control) {
+		if (port->pkt_size > MVPP2_BM_LONG_PKT_SIZE) {
+			mv_pp2x_bm_pool_update_fc(port, &port->priv->bm_pools[MVPP2_BM_SWF_JUMBO_POOL], 1);
+			mv_pp2x_bm_pool_update_fc(port, &port->priv->bm_pools[MVPP2_BM_SWF_SHORT_POOL], -1);
+		} else {
+			mv_pp2x_bm_pool_update_fc(port, &port->priv->bm_pools[MVPP2_BM_SWF_JUMBO_POOL], -1);
+			mv_pp2x_bm_pool_update_fc(port, &port->priv->bm_pools[MVPP2_BM_SWF_SHORT_POOL], 1);
+		}
 	}
 
 	/* Update L4 checksum when jumbo enable/disable on port */
