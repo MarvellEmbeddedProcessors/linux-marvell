@@ -4706,7 +4706,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	int err;
 	int cpu;
 	const char *musdk_status;
-	int statlen;
+	int statlen, use_inband_status;
 
 	dev = alloc_etherdev_mqs(sizeof(struct mvneta_port), txq_number, rxq_number);
 	if (!dev)
@@ -4718,12 +4718,27 @@ static int mvneta_probe(struct platform_device *pdev)
 		goto err_free_netdev;
 	}
 
+	err = of_property_read_string(dn, "managed", &managed);
+	use_inband_status = (err == 0 &&
+				 strcmp(managed, "in-band-status") == 0);
+
 	phy_node = of_parse_phandle(dn, "phy", 0);
 	if (!phy_node) {
 		if (!of_phy_is_fixed_link(dn)) {
 			dev_err(&pdev->dev, "no PHY specified\n");
 			err = -ENODEV;
 			goto err_free_irq;
+		}
+		if (!use_inband_status) {
+			err = of_phy_register_fixed_link(dn);
+			if (err < 0) {
+				dev_err(&pdev->dev, "cannot register fixed PHY\n");
+				goto err_free_irq;
+			}
+			/* In the case of a fixed PHY, the DT node associated
+			 * to the PHY is the Ethernet MAC DT node.
+			 */
+			phy_node = of_node_get(dn);
 		}
 	}
 
@@ -4760,9 +4775,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	} else
 		pp->comphy = NULL;
 
-	err = of_property_read_string(dn, "managed", &managed);
-	pp->use_inband_status = (err == 0 &&
-				 strcmp(managed, "in-band-status") == 0);
+	pp->use_inband_status = use_inband_status;
 
 	pp->cpu_notifier.notifier_call = mvneta_percpu_notifier;
 
@@ -4927,11 +4940,7 @@ static int mvneta_probe(struct platform_device *pdev)
 		struct phy_device *phy;
 
 		if (!pp->phy_node) {
-			struct fixed_phy_status fphy_status = {
-				.link = 1,
-				.speed = SPEED_1000,
-				.duplex = DUPLEX_FULL,
-			};
+			struct fixed_phy_status fphy_status = {};
 
 			phy = fixed_phy_register(PHY_POLL, &fphy_status, -1, NULL);
 			if (!phy || IS_ERR(phy)) {
