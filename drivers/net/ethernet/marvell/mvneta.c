@@ -2116,7 +2116,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int budget,
 				rxq->skb_alloc_err++;
 				continue;
 			}
-			copy_size = min(skb_size, rx_bytes);
+			if (skb_size > rx_bytes)
+				copy_size = rx_bytes;
+			else
+				copy_size = rx_header_size;
 
 			/* Copy data from buffer to SKB without Marvell header */
 			memcpy(rxq->skb->data, data + MVNETA_MH_SIZE, copy_size);
