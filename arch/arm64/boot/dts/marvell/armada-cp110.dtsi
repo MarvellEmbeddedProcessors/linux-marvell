@@ -327,7 +327,10 @@
 				marvell,nand-enable-arbiter;
 				nand-on-flash-bbt;
 				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
-				clocks = <&CP110_LABEL(syscon0) 1 2>;
+				clock-names = "core", "reg", "device_bus";
+				clocks = <&CP110_LABEL(syscon0) 1 2>,
+					 <&CP110_LABEL(syscon0) 1 17>,
+					 <&CP110_LABEL(syscon0) 1 21>;
 				nand-ecc-strength = <4>;
 				nand-ecc-step-size = <512>;
 				status = "disabled";
