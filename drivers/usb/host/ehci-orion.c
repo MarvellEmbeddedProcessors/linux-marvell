@@ -74,8 +74,10 @@ static const char hcd_name[] = "ehci-orion";
 
 static struct hc_driver __read_mostly ehci_orion_hc_driver;
 
+#ifdef CONFIG_PM
 static u32 usb_save[(USB_IPG - USB_CAUSE) +
 		    (USB_PHY_TST_GRP_CTRL - USB_PHY_PWR_CTRL)];
+#endif
 
 /*
  * Implement Orion USB controller specification guidelines
@@ -362,6 +364,7 @@ static int ehci_orion_drv_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
 static int ehci_orion_drv_suspend(struct platform_device *pdev,
 				  pm_message_t state)
 {
@@ -454,6 +457,11 @@ static int ehci_orion_drv_resume(struct platform_device *pdev)
 
 	return 0;
 }
+#else
+#define ehci_orion_drv_suspend	NULL
+#define ehci_orion_drv_resume	NULL
+#endif
+
 
 static void ehci_orion_drv_shutdown(struct platform_device *pdev)
 {
