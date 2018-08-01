@@ -30,18 +30,22 @@
 #define MVPP2_DRIVER_NAME "mvpp2"
 #define MVPP2_DRIVER_VERSION "1.0"
 
+/* SKB magic, used for skb recycle, generated as:
+ *  address[31 : 6] of skb or skb->head (skb and kmalloc aligned >=128B)
+ *  CP110 pp2-cell-id in bits[5,4,3] + BM pool-Id in bits[2,1,0] (3 bits in BM-HW-descriptor)
+ */
 #define MVPP2X_SKB_MAGIC_MASK		0xFFFFFFC0
-#define MVPP2X_SKB_MAGIC_SKB_OFFS	3
-#define MVPP2X_SKB_PP2_CELL_OFFS	4
-#define MVPP2X_CB_REC_OFFS			5
-#define MVPP2X_SKB_BPID_MASK		0xF
-#define MVPP2X_SKB_CELL_MASK		0x3
+#define MVPP2X_SKB_PP2_CELL_OFFS	3
+#define MVPP2X_SKB_BPID_MASK		0x7 /* 3bits */
+#define MVPP2X_SKB_CELL_MASK		0x7 /* 3bits */
 
-/* SKB magic, mainly used for skb recycle, here it is the address[34 : 8] of skb */
-#define MVPP2X_SKB_MAGIC(skb)   (((unsigned int)(((u64)skb) >> \
-				MVPP2X_SKB_MAGIC_SKB_OFFS)) & MVPP2X_SKB_MAGIC_MASK)
-/* Cb to store magic and bpid, IPv6 TCP will consume the most cb[] with 44 bytes, so the last 5 bytes is safe to use */
-#define MVPP2X_SKB_CB(skb)                          (*(unsigned int *)(&skb->cb[sizeof(skb->cb) - MVPP2X_CB_REC_OFFS]))
+#define MVPP2X_SKB_MAGIC(skb)	((unsigned int)(((u64)skb) & MVPP2X_SKB_MAGIC_MASK))
+
+/* Cb to store magic with bpid in last 4 bytes out of cb[48].
+ * IPv6 TCP consumes the most 44 bytes, so the last are safe to use.
+ */
+#define MVPP2X_SKB_CB(skb)	(*(unsigned int *)(&skb->cb[sizeof(skb->cb) - sizeof(int)]))
+
 /* Set magic and bpid, magic[31:5], pp2_id[5:4], source pool[3:0] */
 #define MVPP2X_SKB_MAGIC_BPID_SET(skb, magic_bpid)  (MVPP2X_SKB_CB(skb) = magic_bpid)
 /* Get bpid */

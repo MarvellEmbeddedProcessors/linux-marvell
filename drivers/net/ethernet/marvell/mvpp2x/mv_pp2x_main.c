@@ -3396,8 +3396,8 @@ err_drop_frame:
 			mv_pp2x_rx_csum(port, rx_status, skb);
 		/* Store skb magic id sequence for recycling  */
 		MVPP2X_SKB_MAGIC_BPID_SET(skb, (MVPP2X_SKB_MAGIC(skb) |
-					(port->priv->pp2_cfg.cell_index << 4) |
-							pool));
+					 (port->priv->pp2_cfg.cell_index << MVPP2X_SKB_PP2_CELL_OFFS) |
+					 pool));
 
 		skb_record_rx_queue(skb, (u16)rxq->log_id);
 		mv_pp2x_set_skb_hash(rx_desc, rx_status, skb);
