@@ -78,11 +78,11 @@
 						#size-cells = <1>;
 						partition@0 {
 							label = "bootloader";
-							reg = <0x0 0x400000>;
+							reg = <0x0 0x3f0000>;
 						};
-						partition@400000  {
-							label = "Filesystem";
-							reg = <0x400000 0xc00000>;
+						partition@3f0000 {
+							label = "U-boot Env";
+							reg = <0x3f0000 0x10000>;
 						};
 					};
 				};
