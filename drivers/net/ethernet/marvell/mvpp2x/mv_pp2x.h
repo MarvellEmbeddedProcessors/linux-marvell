@@ -31,7 +31,7 @@
 #define MVPP2_DRIVER_VERSION "1.0"
 
 /* SKB magic, used for skb recycle, generated as:
- *  address[31 : 6] of skb or skb->head (skb and kmalloc aligned >=128B)
+ *  address[31 : 6] of skb->head (kmalloc aligned >=128B)
  *  CP110 pp2-cell-id in bits[5,4,3] + BM pool-Id in bits[2,1,0] (3 bits in BM-HW-descriptor)
  */
 #define MVPP2X_SKB_MAGIC_MASK		0xFFFFFFC0
@@ -39,7 +39,8 @@
 #define MVPP2X_SKB_BPID_MASK		0x7 /* 3bits */
 #define MVPP2X_SKB_CELL_MASK		0x7 /* 3bits */
 
-#define MVPP2X_SKB_MAGIC(skb)	((unsigned int)(((u64)skb) & MVPP2X_SKB_MAGIC_MASK))
+/* TX-check that RXed data-buffer(skb->head) is not replaced by NET-stack */
+#define MVPP2X_SKB_MAGIC(skb)	((unsigned int)(((u64)skb->head) & MVPP2X_SKB_MAGIC_MASK))
 
 /* Cb to store magic with bpid in last 4 bytes out of cb[48].
  * IPv6 TCP consumes the most 44 bytes, so the last are safe to use.
