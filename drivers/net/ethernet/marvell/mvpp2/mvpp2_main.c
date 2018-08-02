@@ -57,7 +57,17 @@ static struct {
 
 /* RX-TX fast-forwarding path optimization */
 #define MVPP2_RXTX_HASH			0xbac0
+#define MVPP2_RXTX_HASH_CONST_MASK	0xfff0
 #define MVPP2_RXTX_HASH_BMID_MASK	0xf
+/* HashBits[31..16] contain skb->head[22..7], the head is aligned and [6..0]=0
+ * This hash permits to detect 2 non-recyclable cases:
+ * - new skb with old hash inside
+ * - same skb but NET-stack has replaced the data-buffer with another one
+ */
+#define MVPP2_RXTX_HASH_GENER(skb, bm_pool_id) \
+	(((u32)(phys_addr_t)skb->head << 9) | MVPP2_RXTX_HASH | bm_pool_id)
+#define MVPP2_RXTX_HASH_IS_OK(skb, hash) \
+	(MVPP2_RXTX_HASH_GENER(skb, 0) == (hash & ~MVPP2_RXTX_HASH_BMID_MASK))
 
 /* The recycle pool size should be "effectively big" but limited (to eliminate
  * memory-wasting on TX-pick). It should be >8 (Net-stack-forwarding-buffer)
@@ -2972,13 +2982,13 @@ static int mvpp2_recycle_get_bm_id(struct sk_buff *skb)
 	/* Keep checking ordering for performance */
 	hash = skb_get_hash_raw(skb);
 	/* Check hash */
-	if ((hash & ~MVPP2_RXTX_HASH_BMID_MASK) != MVPP2_RXTX_HASH)
+	if (!MVPP2_RXTX_HASH_IS_OK(skb, hash))
 		return -1;
 	/* Check if skb could be free */
 	if (skb_shared(skb) || skb_cloned(skb))
 		return -1;
 	/* Get bm-pool-id */
-	hash &= ~MVPP2_RXTX_HASH;
+	hash &= MVPP2_RXTX_HASH_BMID_MASK;
 	if (hash >= MVPP2_BM_POOLS_NUM)
 		return -1;
 
@@ -3091,7 +3101,7 @@ static inline void mvpp2_skb_set_extra(struct sk_buff *skb,
 	enum pkt_hash_types hash_type;
 
 	/* Improve performance and set identification for RX-TX fast-forward */
-	hash = MVPP2_RXTX_HASH | bm_pool->id;
+	hash = MVPP2_RXTX_HASH_GENER(skb, bm_pool->id);
 	hash_type = (status & (MVPP2_RXD_L4_UDP | MVPP2_RXD_L4_TCP)) ?
 		PKT_HASH_TYPE_L4 : PKT_HASH_TYPE_L3;
 	skb_set_hash(skb, hash, hash_type);
