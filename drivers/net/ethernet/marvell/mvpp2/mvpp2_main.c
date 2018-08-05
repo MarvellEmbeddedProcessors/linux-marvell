@@ -2871,8 +2871,7 @@ err_drop_frame:
 		u64_stats_update_end(&stats->syncp);
 	}
 
-	/* Update Rx queue management counters */
-	wmb();
+	/* Update HW Rx queue management counters with RX-done */
 	mvpp2_rxq_status_update(port, rxq->id, rx_done, rx_done);
 
 	return rx_todo;
