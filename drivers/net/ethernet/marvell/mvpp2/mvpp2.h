@@ -655,7 +655,7 @@ enum mvpp2_prs_l3_cast {
 #define MVPP2_BM_COOKIE_POOL_OFFS	8
 #define MVPP2_BM_COOKIE_CPU_OFFS	24
 
-#define MVPP2_BM_SHORT_FRAME_SIZE		512
+#define MVPP2_BM_SHORT_FRAME_SIZE		1024
 #define MVPP2_BM_LONG_FRAME_SIZE		2048
 #define MVPP2_BM_JUMBO_FRAME_SIZE		10240
 /* BM short pool packet size
