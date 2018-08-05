@@ -53,7 +53,7 @@
 		internal-regs {
 			eth1: ethernet@40000 {
 				phy-mode = "sgmii";
-				phys = <&a3700_comphy 0 COMPHY_SGMII1>;
+				phys = <&a3700_comphy 0 COMPHY_HS_SGMII1>;
 				phy-names = "comphy";
 				status = "okay";
 				fixed-link {
