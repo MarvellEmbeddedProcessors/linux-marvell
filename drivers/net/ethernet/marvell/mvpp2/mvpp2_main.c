@@ -3320,7 +3320,16 @@ static void mvpp2_stop_dev(struct mvpp2_port *port)
 {
 	int i;
 
+	/* Stop-dev called by ifconfig but also by ethtool-features.
+	 * Under active traffic the BM/RX and TX PP2-HW could be non-empty.
+	 * Stop asap new packets ariving from both RX and TX directions,
+	 * but do NOT disable egress free/send-out and interrupts tx-done,
+	 * yeild and msleep this context for gracefull finishing.
+	 */
 	mvpp2_tx_stop_all_queues(port->dev);
+	mvpp2_ingress_disable(port);
+	msleep(40);
+	mvpp2_egress_disable(port);
 
 	/* Disable interrupts on all threads */
 	mvpp2_interrupts_disable(port);
