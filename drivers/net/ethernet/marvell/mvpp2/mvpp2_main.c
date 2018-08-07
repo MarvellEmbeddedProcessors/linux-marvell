@@ -2267,8 +2267,10 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
 		txq_pcpu->txq_get_index = 0;
 		txq_pcpu->tso_headers = NULL;
 
-		txq_pcpu->stop_threshold = txq->size - MVPP2_MAX_SKB_DESCS;
-		txq_pcpu->wake_threshold = txq_pcpu->stop_threshold / 2;
+		txq_pcpu->stop_threshold = txq->size -
+				MVPP2_MAX_SKB_DESCS(num_present_cpus());
+		txq_pcpu->wake_threshold = txq_pcpu->stop_threshold -
+						MVPP2_TX_PAUSE_HYSTERESIS;
 
 		txq_pcpu->tso_headers =
 			dma_alloc_coherent(port->dev->dev.parent,
@@ -3255,11 +3257,8 @@ static int mvpp2_check_ringparam_valid(struct net_device *dev,
 	else if (!IS_ALIGNED(ring->tx_pending, 32))
 		new_tx_pending = ALIGN(ring->tx_pending, 32);
 
-	/* The Tx ring size cannot be smaller than the minimum number of
-	 * descriptors needed for TSO.
-	 */
-	if (new_tx_pending < MVPP2_MAX_SKB_DESCS)
-		new_tx_pending = ALIGN(MVPP2_MAX_SKB_DESCS, 32);
+	if (new_tx_pending < MVPP2_MIN_TXD(num_present_cpus()))
+		new_tx_pending = MVPP2_MIN_TXD(num_present_cpus());
 
 	if (ring->rx_pending != new_rx_pending) {
 		netdev_info(dev, "illegal Rx ring size value %d, round to %d\n",

@@ -546,23 +546,35 @@
 /* Maximum number of TXQs used by single port */
 #define MVPP2_MAX_TXQ			8
 
-/* MVPP2_MAX_TSO_SEGS is the maximum number of fragments to allow in the GSO
- * skb. As we need a maxium of two descriptors per fragments (1 header, 1 data),
- * multiply this value by two to count the maximum number of skb descs needed.
+/* SKB/TSO/TX-ring-size/pause-wakeup constatnts depend upon the
+ *  MAX_TSO_SEGS - the max number of fragments to allow in the GSO skb.
+ *  Min-Min requirement for it = maxPacket(64kB)/stdMTU(1500)=44 fragments
+ *  and MVPP2_MAX_TSO_SEGS=max(MVPP2_MAX_TSO_SEGS, MAX_SKB_FRAGS).
+ * MAX_SKB_DESCS: we need 2 descriptors per TSO fragment (1 header, 1 data)
+ *  + per-cpu-reservation MVPP2_CPU_DESC_CHUNK*CPUs for optimization.
+ * TX stop activation threshold (e.g. Queue is full) is MAX_SKB_DESCS
+ * TX stop-to-wake hysteresis is MAX_TSO_SEGS
+ * The Tx ring size cannot be smaller than TSO_SEGS + HYSTERESIS + SKBs
+ * The numbers depend upon num cpus (online) used by the driver
  */
-#define MVPP2_MAX_TSO_SEGS		300
-#define MVPP2_MAX_SKB_DESCS		(MVPP2_MAX_TSO_SEGS * 2 + MAX_SKB_FRAGS)
+#define MVPP2_MAX_TSO_SEGS		44
+#define MVPP2_MAX_SKB_DESCS(ncpus)	(MVPP2_MAX_TSO_SEGS * 2 + \
+					MVPP2_CPU_DESC_CHUNK * ncpus)
+#define MVPP2_TX_PAUSE_HYSTERESIS	(MVPP2_MAX_TSO_SEGS * 2)
 
 /* Dfault number of RXQs in use */
 #define MVPP2_DEFAULT_RXQ		1
 
 /* Max number of Rx descriptors */
 #define MVPP2_MAX_RXD_MAX		1024
-#define MVPP2_MAX_RXD_DFLT		128
+#define MVPP2_MAX_RXD_DFLT		MVPP2_MAX_RXD_MAX
 
 /* Max number of Tx descriptors */
 #define MVPP2_MAX_TXD_MAX		2048
 #define MVPP2_MAX_TXD_DFLT		1024
+#define MVPP2_MIN_TXD(ncpus)	ALIGN(MVPP2_MAX_TSO_SEGS + \
+				      MVPP2_MAX_SKB_DESCS(ncpus) + \
+				      MVPP2_TX_PAUSE_HYSTERESIS, 32)
 
 /* Amount of Tx descriptors that can be reserved at once by CPU */
 #define MVPP2_CPU_DESC_CHUNK		64
