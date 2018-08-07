@@ -2836,6 +2836,7 @@ err_drop_frame:
 		else
 			frag_size = bm_pool->frag_size;
 
+		prefetch(data + NET_SKB_PAD); /* packet header */
 		skb = build_skb(data, frag_size);
 		if (!skb) {
 			netdev_warn(port->dev, "skb build failed\n");
