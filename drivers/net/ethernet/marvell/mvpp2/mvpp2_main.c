@@ -2716,6 +2716,10 @@ err_drop_frame:
 			frag_size = bm_pool->frag_size;
 
 		prefetch(data + NET_SKB_PAD); /* packet header */
+
+		dma_unmap_single(dev->dev.parent, dma_addr,
+				 bm_pool->buf_size, DMA_FROM_DEVICE);
+
 		skb = build_skb(data, frag_size);
 		if (!skb) {
 			netdev_warn(port->dev, "skb build failed\n");
@@ -2727,9 +2731,6 @@ err_drop_frame:
 			netdev_err(port->dev, "failed to refill BM pools\n");
 			goto err_drop_frame;
 		}
-
-		dma_unmap_single(dev->dev.parent, dma_addr,
-				 bm_pool->buf_size, DMA_FROM_DEVICE);
 
 		rcvd_pkts++;
 		rcvd_bytes += rx_bytes;
