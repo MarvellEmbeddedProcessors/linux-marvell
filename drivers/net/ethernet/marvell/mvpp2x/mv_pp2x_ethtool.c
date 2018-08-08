@@ -812,7 +812,7 @@ static int mv_pp2x_ethtool_set_ringparam(struct net_device *dev,
 		return 0;
 	}
 
-	if ((port->rx_ring_size < MSS_CP_CM3_THRESHOLD_START) && port->flow_control) {
+	if ((ring->rx_pending < MSS_CP_CM3_THRESHOLD_START) && port->flow_control) {
 		pr_warn("TX FC disabled. Ring size is less than %d\n", MSS_CP_CM3_THRESHOLD_START);
 		port->flow_control = false;
 		mv_gop110_gmac_fc_set(&port->priv->hw.gop, port->mac_data.gop_index, MV_PORT_FC_TX_DISABLE);
