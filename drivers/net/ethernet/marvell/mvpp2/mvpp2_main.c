@@ -5350,10 +5350,29 @@ static int mvpp2_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	priv->custom_dma_mask = false;
 	if (priv->hw_version != MVPP21) {
+		/* If dma_mask points to coherent_dma_mask, setting both will
+		 * override the value of the other. This is problematic as the
+		 * PPv2 driver uses a 32-bit-mask for coherent accesses (txq,
+		 * rxq, bm) and a 40-bit mask for all other accesses.
+		 */
+		if (pdev->dev.dma_mask == &pdev->dev.coherent_dma_mask) {
+			pdev->dev.dma_mask =
+				kzalloc(sizeof(*pdev->dev.dma_mask),
+					GFP_KERNEL);
+			if (!pdev->dev.dma_mask) {
+				err = -ENOMEM;
+				goto err_mg_clk;
+			}
+
+			priv->custom_dma_mask = true;
+		}
+
 		err = dma_set_mask(&pdev->dev, MVPP2_DESC_DMA_MASK);
 		if (err)
-			goto err_axi_clk;
+			goto err_dma_mask;
+
 		/* Sadly, the BM pools all share the same register to
 		 * store the high 32 bits of their address. So they
 		 * must all have the same high 32 bits, which forces
@@ -5361,7 +5380,7 @@ static int mvpp2_probe(struct platform_device *pdev)
 		 */
 		err = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
 		if (err)
-			goto err_axi_clk;
+			goto err_dma_mask;
 	}
 
 	/* Initialize network controller */
@@ -5410,6 +5429,11 @@ err_port_probe:
 		if (priv->port_list[i])
 			mvpp2_port_remove(priv->port_list[i]);
 		i++;
+	}
+err_dma_mask:
+	if (priv->custom_dma_mask) {
+		kfree(pdev->dev.dma_mask);
+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
 	}
 err_axi_clk:
 	clk_disable_unprepare(priv->axi_clk);
@@ -5460,6 +5484,11 @@ static int mvpp2_remove(struct platform_device *pdev)
 				  MVPP2_AGGR_TXQ_SIZE * MVPP2_DESC_ALIGNED_SIZE,
 				  aggr_txq->descs,
 				  aggr_txq->descs_dma);
+	}
+
+	if (priv->custom_dma_mask) {
+		kfree(pdev->dev.dma_mask);
+		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
 	}
 
 	if (is_acpi_node(port_fwnode))

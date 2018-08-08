@@ -772,6 +772,8 @@ struct mvpp2 {
 
 	/* Debugfs root entry */
 	struct dentry *dbgfs_dir;
+
+	bool custom_dma_mask;
 };
 
 struct mvpp2_pcpu_stats {
