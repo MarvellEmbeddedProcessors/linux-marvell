@@ -2428,6 +2428,10 @@ static int mvpp2_setup_txqs(struct mvpp2_port *port)
 		netif_set_xps_queue(port->dev, cpumask_of(cpu), queue);
 	}
 
+	/* XPS mapping queues to 0..N cpus (may be less than ntxqs) */
+	for_each_online_cpu(cpu)
+		netif_set_xps_queue(port->dev, cpumask_of(cpu), cpu);
+
 	if (port->has_tx_irqs) {
 		mvpp2_tx_time_coal_set(port);
 		for (queue = 0; queue < port->ntxqs; queue++) {
