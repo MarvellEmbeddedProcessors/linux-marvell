@@ -59,6 +59,42 @@ static struct {
 #define MVPP2_RXTX_HASH			0xbac0
 #define MVPP2_RXTX_HASH_BMID_MASK	0xf
 
+/* The recycle pool size should be "effectively big" but limited (to eliminate
+ * memory-wasting on TX-pick). It should be >8 (Net-stack-forwarding-buffer)
+ * and >pkt-coalescing. For "effective" >=NAPI_POLL_WEIGHT.
+ * For 4 ports we need more buffers but not x4, statistically it is enough x3.
+ * SKB-pool is shared for Small/Large/Jumbo buffers so we need more SKBs,
+ * statistically it is enough x5.
+ */
+#define MVPP2_RECYCLE_FULL	(NAPI_POLL_WEIGHT * 3)
+#define MVPP2_RECYCLE_FULL_SKB	(NAPI_POLL_WEIGHT * 5)
+
+struct mvpp2_recycle_pool {
+	void *pbuf[MVPP2_RECYCLE_FULL_SKB];
+};
+
+struct mvpp2_recycle_pcpu {
+	/* All pool-indexes are in 1 cache-line */
+	short int idx[MVPP2_BM_POOLS_NUM + 1];
+	/* BM/SKB-buffer pools */
+	struct mvpp2_recycle_pool pool[MVPP2_BM_POOLS_NUM + 1];
+} __aligned(L1_CACHE_BYTES);
+
+struct mvpp2_share {
+	struct mvpp2_recycle_pcpu *recycle;
+	void *recycle_base;
+
+	/* Run-time Debug disable capability */
+	bool recycle_dis;
+
+	/* Counters set by Probe/Init/Open */
+	int num_open_ports;
+};
+
+struct mvpp2_share mvpp2_share;
+
+static void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu);
+
 /* The prototype is added here to be used in start_dev when using ACPI. This
  * will be removed once phylink is used for all modes (dt+ACPI).
  */
@@ -1957,9 +1993,12 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *port,
 		struct mvpp2_txq_pcpu_buf *tx_buf =
 			txq_pcpu->buffs + txq_pcpu->txq_get_index;
 
-		if (!IS_TSO_HEADER(txq_pcpu, tx_buf->dma))
+		if (!IS_TSO_HEADER(txq_pcpu, tx_buf->dma)) {
 			dma_unmap_single(port->dev->dev.parent, tx_buf->dma,
 					 tx_buf->size, DMA_TO_DEVICE);
+			mvpp2_recycle_put(txq_pcpu);
+			/* sets tx_buf->skb=NULL if put to recycle */
+		}
 		if (tx_buf->skb)
 			dev_kfree_skb_any(tx_buf->skb);
 
@@ -2663,6 +2702,222 @@ static u32 mvpp2_skb_tx_csum(struct mvpp2_port *port, struct sk_buff *skb)
 	return MVPP2_TXD_L4_CSUM_NOT | MVPP2_TXD_IP_CSUM_DISABLE;
 }
 
+/* Global may be called by debugfs */
+void mvpp2_recycle_dis_cfg(bool disable)
+{
+	mvpp2_share.recycle_dis = disable;
+}
+
+void mvpp2_recycle_stats(void)
+{
+	int cpu;
+	enum mvpp2_bm_pool_log_num pl_id;
+	struct mvpp2_recycle_pcpu *pcpu;
+
+	pr_info("Recycle-stats: %d open ports (on all CP110s)\n",
+		mvpp2_share.num_open_ports);
+	if (!mvpp2_share.recycle_base)
+		return;
+	pcpu = mvpp2_share.recycle;
+	for_each_online_cpu(cpu) {
+		for (pl_id = 0; pl_id < MVPP2_BM_POOLS_NUM; pl_id++) {
+			pr_info("| cpu[%d].pool_%d: idx=%d\n",
+				cpu, pl_id, pcpu->idx[pl_id]);
+		}
+		pr_info("| ___[%d].skb_____idx=%d__\n",
+			cpu, pcpu->idx[MVPP2_BM_POOLS_NUM]);
+		pcpu++;
+	}
+}
+
+static int mvpp2_recycle_open(void)
+{
+	int cpu, pl_id, size;
+	struct mvpp2_recycle_pcpu *pcpu;
+	phys_addr_t addr;
+
+	mvpp2_share.num_open_ports++;
+	wmb(); /* for num_open_ports */
+
+	if (mvpp2_share.recycle_base)
+		return 0;
+
+	/* Allocate pool-tree */
+	size = sizeof(*pcpu) * num_online_cpus() + L1_CACHE_BYTES;
+	mvpp2_share.recycle_base = kzalloc(size, GFP_KERNEL);
+	if (!mvpp2_share.recycle_base)
+		goto err;
+	/* Use Address aligned to L1_CACHE_BYTES */
+	addr = (phys_addr_t)mvpp2_share.recycle_base + (L1_CACHE_BYTES - 1);
+	addr &= ~(L1_CACHE_BYTES - 1);
+	mvpp2_share.recycle = (void *)addr;
+
+	pcpu = mvpp2_share.recycle;
+	for_each_online_cpu(cpu) {
+		for (pl_id = 0; pl_id <= MVPP2_BM_POOLS_NUM; pl_id++)
+			pcpu->idx[pl_id] = -1;
+		pcpu++;
+	}
+	return 0;
+err:
+	pr_err("mvpp2 error: cannot allocate recycle pool\n");
+	return -ENOMEM;
+}
+
+static void mvpp2_recycle_close(void)
+{
+	int cpu, pl_id, i;
+	struct mvpp2_recycle_pcpu *pcpu;
+	struct mvpp2_recycle_pool *pool;
+
+	mvpp2_share.num_open_ports--;
+	wmb(); /* for num_open_ports */
+
+	/* Do nothing if recycle is not used at all or in use by port/ports */
+	if (mvpp2_share.num_open_ports || !mvpp2_share.recycle_base)
+		return;
+
+	/* Usable (recycle_base!=NULL), but last port gone down
+	 * Let's free all accumulated buffers.
+	 */
+	pcpu = mvpp2_share.recycle;
+	for_each_online_cpu(cpu) {
+		for (pl_id = 0; pl_id <= MVPP2_BM_POOLS_NUM; pl_id++) {
+			pool = &pcpu->pool[pl_id];
+			for (i = 0; i <= pcpu->idx[pl_id]; i++) {
+				if (!pool->pbuf[i])
+					continue;
+				if (pl_id < MVPP2_BM_POOLS_NUM)
+					kfree(pool->pbuf[i]);
+				else
+					kmem_cache_free(skbuff_head_cache,
+							pool->pbuf[i]);
+			}
+		}
+		pcpu++;
+	}
+	kfree(mvpp2_share.recycle_base);
+	mvpp2_share.recycle_base = NULL;
+}
+
+static int mvpp2_recycle_get_bm_id(struct sk_buff *skb)
+{
+	u32 hash;
+
+	/* Keep checking ordering for performance */
+	if (!skb)
+		return -1;
+	hash = skb_get_hash_raw(skb);
+	/* Check hash */
+	if ((hash & ~MVPP2_RXTX_HASH_BMID_MASK) != MVPP2_RXTX_HASH)
+		return -1;
+	/* Check if skb could be free */
+	if (skb_shared(skb) || skb_cloned(skb))
+		return -1;
+	/* Get bm-pool-id */
+	hash &= ~MVPP2_RXTX_HASH;
+	if (hash >= MVPP2_BM_POOLS_NUM)
+		return -1;
+
+	return (int)hash;
+}
+
+static void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu)
+{
+	struct mvpp2_recycle_pcpu *pcpu;
+	struct mvpp2_recycle_pool *pool;
+	short int idx, pool_id;
+	struct mvpp2_txq_pcpu_buf *tx_buf =
+			txq_pcpu->buffs + txq_pcpu->txq_get_index;
+	struct sk_buff *skb = tx_buf->skb;
+
+	pool_id = mvpp2_recycle_get_bm_id(skb);
+	if (pool_id < 0)
+		return; /* non-recyclable */
+
+	/* This skb could be destroyed. Put into recycle */
+	pcpu = mvpp2_share.recycle + txq_pcpu->thread;
+	idx = pcpu->idx[pool_id];
+	if (idx < (MVPP2_RECYCLE_FULL - 1)) {
+		pool = &pcpu->pool[pool_id];
+		pool->pbuf[++idx] = skb->head; /* pre-increment */
+		pcpu->idx[pool_id] = idx;
+		skb->head = NULL;
+	}
+	idx = pcpu->idx[MVPP2_BM_POOLS_NUM];
+	if (idx < (MVPP2_RECYCLE_FULL_SKB - 1)) {
+		pool = &pcpu->pool[MVPP2_BM_POOLS_NUM];
+		pool->pbuf[++idx] = skb;
+		pcpu->idx[MVPP2_BM_POOLS_NUM] = idx;
+		if (skb->head) {
+			if (skb->head_frag) /* frag_size > PAGE_SIZE */
+				kfree(skb->head);
+			else
+				skb_free_frag(skb->head);
+		}
+		tx_buf->skb = NULL;
+	}
+}
+
+static struct sk_buff *mvpp2_recycle_get(struct mvpp2_port *port,
+					 int *refill_needed,
+					 struct mvpp2_bm_pool *bm_pool)
+{
+	int cpu;
+	struct mvpp2_recycle_pcpu *pcpu;
+	struct mvpp2_recycle_pool *pool;
+	short int idx;
+	void *frag;
+	struct sk_buff *skb;
+	dma_addr_t dma_addr;
+
+	if (unlikely(mvpp2_share.recycle_dis))
+		goto end;
+
+	cpu = smp_processor_id();
+	pcpu = mvpp2_share.recycle + cpu;
+
+	/* GET bm buffer */
+	idx = pcpu->idx[bm_pool->id];
+	pool = &pcpu->pool[bm_pool->id];
+
+	if (idx >= 0) {
+		frag = pool->pbuf[idx];
+		pcpu->idx[bm_pool->id]--; /* post-decrement */
+	} else {
+		/* Allocate 2 buffers, put 1, use another now */
+		pcpu->idx[bm_pool->id] = 0;
+		pool->pbuf[0] = mvpp2_frag_alloc(bm_pool);
+		frag = NULL;
+	}
+	if (!frag)
+		frag = mvpp2_frag_alloc(bm_pool);
+
+	/* refill the buffer into BM */
+	dma_addr = dma_map_single(port->dev->dev.parent, frag,
+				  MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
+				  DMA_FROM_DEVICE);
+	if (unlikely(dma_mapping_error(port->dev->dev.parent, dma_addr))) {
+		pcpu->idx[bm_pool->id]++; /* Return back to recycle */
+		netdev_err(port->dev, "failed to refill BM pool-%d (%d:%p)\n",
+			   bm_pool->id, pcpu->idx[bm_pool->id], frag);
+	} else {
+		mvpp2_bm_pool_put(port, bm_pool->id, dma_addr);
+		*refill_needed = 0;
+	}
+
+	/* GET skb buffer */
+	idx = pcpu->idx[MVPP2_BM_POOLS_NUM];
+	if (idx >= 0) {
+		pool = &pcpu->pool[MVPP2_BM_POOLS_NUM];
+		skb = pool->pbuf[idx];
+		pcpu->idx[MVPP2_BM_POOLS_NUM]--;
+		return skb;
+	}
+end:
+	return kmem_cache_alloc(skbuff_head_cache, GFP_ATOMIC);
+}
+
 static inline void mvpp2_skb_set_extra(struct sk_buff *skb,
 				       struct napi_struct *napi,
 				       u32 status,
@@ -2697,7 +2952,7 @@ struct sk_buff *mvpp2_build_skb(void *data, unsigned int frag_size,
 	struct sk_buff *skb;
 	unsigned int size = frag_size ? : ksize(data);
 
-	skb = kmem_cache_alloc(skbuff_head_cache, GFP_ATOMIC);
+	skb = mvpp2_recycle_get(port, refill_needed, bm_pool);
 	if (!skb)
 		return NULL;
 
@@ -2800,12 +3055,15 @@ err_drop_frame:
 			goto err_drop_frame;
 		}
 
+		if (!rx_received)
+			goto refill_done; /* done by build-skb */
+
 		err = mvpp2_rx_refill(port, bm_pool, pool);
 		if (err) {
 			netdev_err(port->dev, "failed to refill BM pools\n");
 			goto err_drop_frame;
 		}
-
+refill_done:
 		rcvd_pkts++;
 		rcvd_bytes += rx_bytes;
 
@@ -3462,6 +3720,9 @@ static int mvpp2_open(struct net_device *dev)
 		goto err_cleanup_rxqs;
 	}
 
+	/* Recycle buffer pool for performance optimization */
+	mvpp2_recycle_open();
+
 	err = mvpp2_irqs_init(port);
 	if (err) {
 		netdev_err(port->dev, "cannot init IRQs\n");
@@ -3560,6 +3821,8 @@ static int mvpp2_stop(struct net_device *dev)
 	mvpp2_cleanup_txqs(port);
 
 	cancel_delayed_work_sync(&port->stats_work);
+
+	mvpp2_recycle_close();
 
 	return 0;
 }
