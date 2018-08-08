@@ -2283,6 +2283,19 @@ static void mvpp2_rxq_deinit(struct mvpp2_port *port,
 	put_cpu();
 }
 
+/* Disable all rx/ingress queues, called by mvpp2_init */
+static void mvpp2_rxq_disable_all(struct mvpp2 *priv)
+{
+	int i;
+	u32 val;
+
+	for (i = 0; i < MVPP2_RXQ_MAX_NUM; i++) {
+		val = mvpp2_read(priv, MVPP2_RXQ_CONFIG_REG(i));
+		val |= MVPP2_RXQ_DISABLE_MASK;
+		mvpp2_write(priv, MVPP2_RXQ_CONFIG_REG(i), val);
+	}
+}
+
 /* Create and initialize a Tx queue */
 static int mvpp2_txq_init(struct mvpp2_port *port,
 			  struct mvpp2_tx_queue *txq)
@@ -5303,6 +5316,9 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 
 	/* Classifier default initialization */
 	mvpp2_cls_init(priv);
+
+	/* Disable all ingress queues */
+	mvpp2_rxq_disable_all(priv);
 
 	return 0;
 }

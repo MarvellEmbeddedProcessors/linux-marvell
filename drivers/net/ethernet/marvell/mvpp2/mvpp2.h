@@ -45,6 +45,8 @@
 #define     MVPP2_RXQ_PACKET_OFFSET_OFFS	28
 #define     MVPP2_RXQ_PACKET_OFFSET_MASK	0x70000000
 #define     MVPP2_RXQ_DISABLE_MASK		BIT(31)
+/* Total max number of hw RX queues */
+#define MVPP2_RXQ_MAX_NUM			128
 
 /* Top Registers */
 #define MVPP2_MH_REG(port)			(0x5040 + 4 * (port))
