@@ -37,6 +37,7 @@
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <net/tso.h>
+#include <net/busy_poll.h>
 
 #include "mvpp2.h"
 #include "mvpp2_prs.h"
@@ -53,6 +54,10 @@ static struct {
 	int pkt_size;
 	int buf_num;
 } mvpp2_pools[MVPP2_BM_POOLS_NUM];
+
+/* RX-TX fast-forwarding path optimization */
+#define MVPP2_RXTX_HASH			0xbac0
+#define MVPP2_RXTX_HASH_BMID_MASK	0xf
 
 /* The prototype is added here to be used in start_dev when using ACPI. This
  * will be removed once phylink is used for all modes (dt+ACPI).
@@ -2664,7 +2669,16 @@ static inline void mvpp2_skb_set_extra(struct sk_buff *skb,
 				       u8 rxq_id,
 				       struct mvpp2_bm_pool *bm_pool)
 {
-	/* Set hash, queue_mapping, napi, bm-pool-id ... */
+	u32 hash;
+	enum pkt_hash_types hash_type;
+
+	/* Improve performance and set identification for RX-TX fast-forward */
+	hash = MVPP2_RXTX_HASH | bm_pool->id;
+	hash_type = (status & (MVPP2_RXD_L4_UDP | MVPP2_RXD_L4_TCP)) ?
+		PKT_HASH_TYPE_L4 : PKT_HASH_TYPE_L3;
+	skb_set_hash(skb, hash, hash_type);
+	skb_mark_napi_id(skb, napi);
+	skb_record_rx_queue(skb, (u16)rxq_id);
 }
 
 /* This is "fast inline" clone of __build_skb+build_skb,
