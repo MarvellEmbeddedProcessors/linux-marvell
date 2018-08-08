@@ -3513,7 +3513,8 @@ static int mvpp2_open(struct net_device *dev)
 		valid = true;
 	}
 
-	if (priv->hw_version != MVPP21 && port->link_irq && !port->phylink) {
+	if (priv->hw_version != MVPP21 && port->link_irq &&
+	    (!port->phylink || !port->has_phy)) {
 		mvpp2_txqs_on_tasklet_init(port);
 		err = request_irq(port->link_irq, mvpp2_link_status_isr, 0,
 				  dev->name, port);
