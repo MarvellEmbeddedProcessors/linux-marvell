@@ -8909,15 +8909,16 @@ static void mvpp2_tx_pkts_coal_set_util(struct mvpp2_port *port,
 	/* Not VALUE not specified, use configuration */
 	if (val == -1) {
 		txq = port->txqs[0];
-		val = txq->done_pkts_coal;
+		val = (txq->done_pkts_coal << MVPP2_TXQ_THRESH_OFFSET);
 	}
 	for (queue = 0; queue < port->ntxqs; queue++) {
 		txq = port->txqs[queue];
-		for (hif = 0; hif < num_hifs; hif++) {
+		while (hif < num_hifs) {
 			mvpp2_percpu_write(port->priv, hif,
 					   MVPP2_TXQ_NUM_REG, txq->id);
 			mvpp2_percpu_write(port->priv, hif,
 					   MVPP2_TXQ_THRESH_REG, val);
+			hif++;
 		}
 	}
 }
