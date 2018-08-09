@@ -803,7 +803,7 @@ struct mvpp2_pcpu_stats {
 /* Per-CPU port control */
 struct mvpp2_port_pcpu {
 	struct hrtimer tx_done_timer;
-	bool timer_scheduled;
+	bool tx_done_timer_scheduled;
 	/* Tasklet for egress finalization */
 	struct tasklet_struct tx_done_tasklet;
 };
