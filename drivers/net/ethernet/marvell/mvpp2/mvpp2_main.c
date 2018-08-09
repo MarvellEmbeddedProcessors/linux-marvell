@@ -25,6 +25,7 @@
 #include <linux/of_net.h>
 #include <linux/of_address.h>
 #include <linux/of_device.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/phy.h>
 #include <linux/phylink.h>
 #include <linux/phy/phy.h>
@@ -5382,6 +5383,13 @@ static int mvpp2_probe(struct platform_device *pdev)
 		if (err)
 			goto err_dma_mask;
 	}
+
+	/* Assign the reserved memory region to the device for DMA allocations,
+	 * if a memory-region phandle is found.
+	 */
+	if (dev_of_node(&pdev->dev))
+		of_reserved_mem_device_init_by_idx(&pdev->dev,
+						   pdev->dev.of_node, 0);
 
 	/* Initialize network controller */
 	err = mvpp2_init(pdev, priv);
