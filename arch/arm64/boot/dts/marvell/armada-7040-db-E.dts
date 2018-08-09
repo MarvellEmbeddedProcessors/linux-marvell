@@ -22,6 +22,10 @@
 	};
 };
 
+&uart0 {
+	status = "okay";
+};
+
 &cp0_i2c0 {
 	status = "okay";
 	clock-frequency = <100000>;
