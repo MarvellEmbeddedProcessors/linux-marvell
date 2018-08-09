@@ -3429,14 +3429,27 @@ out:
 	if (frags > 0) {
 		struct mvpp2_pcpu_stats *stats = per_cpu_ptr(port->stats, thread);
 		struct netdev_queue *nq = netdev_get_tx_queue(dev, txq_id);
+		struct mvpp2_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
+		bool deferred_tx;
 
 		txq_pcpu->reserved_num -= frags;
 		txq_pcpu->count += frags;
 		aggr_txq->count += frags;
 
-		/* Enable transmit */
-		wmb();
-		mvpp2_aggr_txq_pend_desc_add(port, frags);
+		/* Enable transmit; may be deferred with Bulk-timer */
+		deferred_tx = (frags == 1) &&
+			(aggr_txq->pending < (txq->done_pkts_coal / 2));
+
+		if (deferred_tx) {
+			aggr_txq->pending += frags;
+			mvpp2_bulk_timer_restart(port_pcpu);
+		} else {
+			port_pcpu->bulk_timer_scheduled = false;
+			port_pcpu->bulk_timer_restart_req = false;
+			frags += aggr_txq->pending;
+			aggr_txq->pending = 0;
+			mvpp2_aggr_txq_pend_desc_add(port, frags);
+		}
 
 		if (txq_pcpu->count >= txq_pcpu->stop_threshold)
 			netif_tx_stop_queue(nq);
@@ -3883,6 +3896,7 @@ static int mvpp2_stop(struct net_device *dev)
 	struct mvpp2_port *port = netdev_priv(dev);
 	struct mvpp2_port_pcpu *port_pcpu;
 	unsigned int thread;
+	int cpu;
 
 	mvpp2_stop_dev(port);
 
@@ -5146,6 +5160,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	int features;
 	int phy_mode;
 	int err, i;
+	int cpu;
 
 	has_tx_irqs = mvpp2_port_has_irqs(priv, port_node, &flags);
 	if (!has_tx_irqs && queue_mode == MVPP2_QDIST_MULTI_MODE) {
