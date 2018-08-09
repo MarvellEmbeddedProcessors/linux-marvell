@@ -513,6 +513,7 @@
 #define MVPP2_TXDONE_COAL_USEC		1000
 #define MVPP2_RX_COAL_PKTS		32
 #define MVPP2_RX_COAL_USEC		64
+#define MVPP2_TX_BULK_TIME		(50 * NSEC_PER_USEC)
 
 /* The two bytes Marvell header. Either contains a special value used
  * by Marvell switches when a specific hardware mode is enabled (not
@@ -802,9 +803,15 @@ struct mvpp2_pcpu_stats {
 
 /* Per-CPU port control */
 struct mvpp2_port_pcpu {
+	/* Timer & Tasklet for bulk-tx optimization */
+	struct hrtimer bulk_timer;
+	bool bulk_timer_scheduled;
+	bool bulk_timer_restart_req;
+	struct tasklet_struct bulk_tasklet;
+
+	/* Timer & Tasklet for egress finalization */
 	struct hrtimer tx_done_timer;
 	bool tx_done_timer_scheduled;
-	/* Tasklet for egress finalization */
 	struct tasklet_struct tx_done_tasklet;
 };
 
@@ -1050,6 +1057,7 @@ struct mvpp2_tx_queue {
 
 	/* Number of currently used Tx DMA descriptor in the descriptor ring */
 	int count;
+	int pending;
 
 	/* Per-CPU control of physical Tx queues */
 	struct mvpp2_txq_pcpu __percpu *pcpu;
