@@ -1127,6 +1127,7 @@ struct mvpp2_bm_pool {
 	((addr) >= (txq_pcpu)->tso_headers_dma && \
 	 (addr) < (txq_pcpu)->tso_headers_dma + \
 	 (txq_pcpu)->size * TSO_HEADER_SIZE)
+#define TSO_HEADER_MARK		((void *)BIT(0))
 
 #define MVPP2_DRIVER_NAME "mvpp2"
 #define MVPP2_DRIVER_VERSION "1.0"

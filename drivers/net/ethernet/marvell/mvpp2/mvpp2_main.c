@@ -93,7 +93,8 @@ struct mvpp2_share {
 
 struct mvpp2_share mvpp2_share;
 
-static void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu);
+static inline void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu,
+				     struct mvpp2_txq_pcpu_buf *tx_buf);
 
 /* The prototype is added here to be used in start_dev when using ACPI. This
  * will be removed once phylink is used for all modes (dt+ACPI).
@@ -228,12 +229,12 @@ static void mvpp2_txq_inc_get(struct mvpp2_txq_pcpu *txq_pcpu)
 
 static void mvpp2_txq_inc_put(struct mvpp2_port *port,
 			      struct mvpp2_txq_pcpu *txq_pcpu,
-			      struct sk_buff *skb,
+			      void *skb_or_tso_mark,
 			      struct mvpp2_tx_desc *tx_desc)
 {
 	struct mvpp2_txq_pcpu_buf *tx_buf =
 		txq_pcpu->buffs + txq_pcpu->txq_put_index;
-	tx_buf->skb = skb;
+	tx_buf->skb = (struct sk_buff *)skb_or_tso_mark;
 	tx_buf->size = mvpp2_txdesc_size_get(port, tx_desc);
 	tx_buf->dma = mvpp2_txdesc_dma_addr_get(port, tx_desc) +
 		mvpp2_txdesc_offset_get(port, tx_desc);
@@ -1993,14 +1994,18 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *port,
 		struct mvpp2_txq_pcpu_buf *tx_buf =
 			txq_pcpu->buffs + txq_pcpu->txq_get_index;
 
-		if (!IS_TSO_HEADER(txq_pcpu, tx_buf->dma)) {
+		if (!tx_buf->skb) {
 			dma_unmap_single(port->dev->dev.parent, tx_buf->dma,
 					 tx_buf->size, DMA_TO_DEVICE);
-			mvpp2_recycle_put(txq_pcpu);
+		} else if (tx_buf->skb != TSO_HEADER_MARK) {
+			dma_unmap_single(port->dev->dev.parent, tx_buf->dma,
+					 tx_buf->size, DMA_TO_DEVICE);
+			mvpp2_recycle_put(txq_pcpu, tx_buf);
 			/* sets tx_buf->skb=NULL if put to recycle */
+			if (tx_buf->skb)
+				dev_kfree_skb_any(tx_buf->skb);
 		}
-		if (tx_buf->skb)
-			dev_kfree_skb_any(tx_buf->skb);
+		/* else: no action, tx_buf->skb always overwritten in xmit */
 
 		mvpp2_txq_inc_get(txq_pcpu);
 	}
@@ -2805,8 +2810,6 @@ static int mvpp2_recycle_get_bm_id(struct sk_buff *skb)
 	u32 hash;
 
 	/* Keep checking ordering for performance */
-	if (!skb)
-		return -1;
 	hash = skb_get_hash_raw(skb);
 	/* Check hash */
 	if ((hash & ~MVPP2_RXTX_HASH_BMID_MASK) != MVPP2_RXTX_HASH)
@@ -2822,15 +2825,15 @@ static int mvpp2_recycle_get_bm_id(struct sk_buff *skb)
 	return (int)hash;
 }
 
-static void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu)
+static inline void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu,
+				     struct mvpp2_txq_pcpu_buf *tx_buf)
 {
 	struct mvpp2_recycle_pcpu *pcpu;
 	struct mvpp2_recycle_pool *pool;
 	short int idx, pool_id;
-	struct mvpp2_txq_pcpu_buf *tx_buf =
-			txq_pcpu->buffs + txq_pcpu->txq_get_index;
 	struct sk_buff *skb = tx_buf->skb;
 
+	/* tx_buf->skb is not NULL */
 	pool_id = mvpp2_recycle_get_bm_id(skb);
 	if (pool_id < 0)
 		return; /* non-recyclable */
@@ -3181,7 +3184,7 @@ static inline void mvpp2_tso_put_hdr(struct sk_buff *skb,
 	mvpp2_txdesc_cmd_set(port, tx_desc, mvpp2_skb_tx_csum(port, skb) |
 					    MVPP2_TXD_F_DESC |
 					    MVPP2_TXD_PADDING_DISABLE);
-	mvpp2_txq_inc_put(port, txq_pcpu, NULL, tx_desc);
+	mvpp2_txq_inc_put(port, txq_pcpu, TSO_HEADER_MARK, tx_desc);
 }
 
 static inline int mvpp2_tso_put_data(struct sk_buff *skb,
