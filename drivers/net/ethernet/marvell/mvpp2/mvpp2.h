@@ -725,6 +725,18 @@ enum mvpp2_prs_l3_cast {
 
 #define MVPP2_MIB_COUNTERS_STATS_DELAY		(1 * HZ)
 
+/* Other counters */
+#define MVPP2_OVERRUN_DROP_REG(port)		(0x7000 + 4 * (port))
+#define MVPP2_CLS_DROP_REG(port)		(0x7020 + 4 * (port))
+#define MVPP2_CNT_IDX_REG			0x7040
+#define MVPP2_TX_PKT_FULLQ_DROP_REG		0x7200
+#define MVPP2_TX_PKT_EARLY_DROP_REG		0x7204
+#define MVPP2_TX_PKT_BM_DROP_REG		0x7208
+#define MVPP2_TX_PKT_BM_MC_DROP_REG		0x720c
+#define MVPP2_RX_PKT_FULLQ_DROP_REG		0x7220
+#define MVPP2_RX_PKT_EARLY_DROP_REG		0x7224
+#define MVPP2_RX_PKT_BM_DROP_REG		0x7228
+
 #define MVPP2_DESC_DMA_MASK	DMA_BIT_MASK(40)
 
 /* Definitions */
