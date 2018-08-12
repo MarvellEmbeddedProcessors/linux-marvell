@@ -2402,8 +2402,15 @@ static void mv_pp2x_tx_done_timer_set(struct mv_pp2x_port_pcpu *port_pcpu)
 static inline void mv_pp2x_tx_done_guard_timer_set(struct mv_pp2x_port *port,
 						   int address_space)
 {
-	struct mv_pp2x_port_pcpu *port_pcpu = port->pcpu[address_space];
+	struct mv_pp2x_port_pcpu *port_pcpu;
 
+	if (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE) {
+		/* Only CPU0 will drain aggregated queue, no guard for other CPUs */
+		if (smp_processor_id())
+			return;
+	}
+
+	port_pcpu = port->pcpu[address_space];
 	if (!port_pcpu->guard_timer_scheduled) {
 		port_pcpu->guard_timer_scheduled = true;
 		hrtimer_start(&port_pcpu->tx_done_timer,
