@@ -5564,7 +5564,7 @@ static int mv_pp22_calculate_num_sub_vector(struct mv_pp2x_port *port)
  */
 static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 {
-	int address_space = 0, num_private_q_vec, num_of_sub_vectors, i, num_rx_queues;
+	int address_space, num_private_q_vec, num_of_sub_vectors, i, num_rx_queues;
 	int sw_thread_index = 0, irq_index = 0, cpu_ap_ofset = 0;
 	struct queue_vector *q_vec;
 	struct sub_queue_vector *sub_q_vec;
@@ -5583,6 +5583,7 @@ static void mv_pp22_queue_vectors_init(struct mv_pp2x_port *port)
 	/* For single resource mode skip sub vector allocation.
 	 * In this mode single queue vector, address space and Interrupt used.
 	 */
+	address_space = 0;
 	if (mv_pp2x_queue_mode == MVPP2_SINGLE_RESOURCE_MODE)
 		goto last_queue_vector;
 
