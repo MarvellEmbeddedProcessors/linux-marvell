@@ -381,12 +381,11 @@ static void mv_pp2x_get_pauseparam(struct net_device *dev,
 		return;
 	}
 
-	if (status.rx_fc == MV_PORT_FC_ACTIVE || status.rx_fc == MV_PORT_FC_ENABLE) {
+	if (status.rx_fc == MV_PORT_FC_ACTIVE || status.rx_fc == MV_PORT_FC_ENABLE)
 		pause->rx_pause = 1;
 
-		if (port->flow_control)
-			pause->tx_pause = 1;
-	}
+	if (port->flow_control  && (status.tx_fc == MV_PORT_FC_ENABLE || status.tx_fc == MV_PORT_FC_ACTIVE))
+		pause->tx_pause = 1;
 }
 
 /* Set pause fc settings for ethtools */
