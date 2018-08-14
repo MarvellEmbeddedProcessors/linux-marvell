@@ -297,10 +297,14 @@
 #define MVNETA_RSS_LU_TABLE_SIZE	1
 
 /* Max number of Rx descriptors */
-#define MVNETA_MAX_RXD 512
+#define MVNETA_MAX_RXD 4096
+/* Default number of Rx descriptors */
+#define MVNETA_RXD_NUM 512
 
 /* Max number of Tx descriptors */
-#define MVNETA_MAX_TXD 1024
+#define MVNETA_MAX_TXD 4096
+/* Default number of Tx descriptors */
+#define MVNETA_TXD_NUM 1024
 
 /* Max number of allowed TCP segments for software TSO */
 #define MVNETA_MAX_TSO_SEGS 100
@@ -4468,7 +4472,7 @@ static int mvneta_probe(struct platform_device *pdev)
 		goto err_free_irq;
 	}
 
-	dev->tx_queue_len = MVNETA_MAX_TXD;
+	dev->tx_queue_len = MVNETA_TXD_NUM;
 	dev->watchdog_timeo = 5 * HZ;
 	dev->netdev_ops = &mvneta_netdev_ops;
 
@@ -4561,8 +4565,8 @@ static int mvneta_probe(struct platform_device *pdev)
 	if (pp->dram_target_info || pp->neta_armada3700)
 		mvneta_conf_mbus_windows(pp, pp->dram_target_info);
 
-	pp->tx_ring_size = MVNETA_MAX_TXD;
-	pp->rx_ring_size = MVNETA_MAX_RXD;
+	pp->tx_ring_size = MVNETA_TXD_NUM;
+	pp->rx_ring_size = MVNETA_RXD_NUM;
 
 	pp->dev = dev;
 	SET_NETDEV_DEV(dev, &pdev->dev);
