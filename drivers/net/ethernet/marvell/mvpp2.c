@@ -8623,24 +8623,21 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2 *priv,
 	/* Not enough descriptors reserved! Update the reserved descriptor
 	 * count and check again.
 	 */
-	if (num <= MAX_SKB_FRAGS) {
-		req = MVPP2_CPU_DESC_CHUNK;
-	} else {
-		/* Compute total of used descriptors */
-		desc_count = 0;
-		for (cpu = 0; cpu < used_hifs; cpu++) {
-			txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu);
-			desc_count += txq_pcpu_aux->reserved_num;
-		}
-		req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
-		/* Check the reservation is possible */
-		if ((desc_count + req) > txq->size)
-			return -ENOMEM;
+	/* Count total used descriptors (already reserved + waiting
+	 * for transmit) and check limit before going with HW reservation.
+	 */
+	desc_count = 0;
+	for (cpu = 0; cpu < used_hifs; cpu++) {
+		txq_pcpu_aux = per_cpu_ptr(txq->pcpu, cpu);
+		desc_count += txq_pcpu_aux->reserved_num;
+		desc_count += txq_pcpu_aux->count;
 	}
+	req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
+	if ((desc_count + req) > txq->size)
+		return -ENOMEM; /* drop the packet */
 
 	txq_pcpu->reserved_num += mvpp2_txq_alloc_reserved_desc(priv, txq, req,
 								txq_pcpu->cpu);
-
 	/* Check the resulting reservation is enough */
 	if (txq_pcpu->reserved_num < num)
 		return -ENOMEM;
