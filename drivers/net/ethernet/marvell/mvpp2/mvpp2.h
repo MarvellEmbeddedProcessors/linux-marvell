@@ -574,7 +574,7 @@
 
 /* Max number of Tx descriptors */
 #define MVPP2_MAX_TXD_MAX		2048
-#define MVPP2_MAX_TXD_DFLT		1024
+#define MVPP2_MAX_TXD_DFLT		MVPP2_MAX_TXD_MAX
 #define MVPP2_MIN_TXD(ncpus)	ALIGN(MVPP2_MAX_TSO_SEGS + \
 				      MVPP2_MAX_SKB_DESCS(ncpus) + \
 				      MVPP2_TX_PAUSE_HYSTERESIS, 32)
@@ -583,7 +583,7 @@
 #define MVPP2_CPU_DESC_CHUNK		64
 
 /* Max number of Tx descriptors in each aggregated queue */
-#define MVPP2_AGGR_TXQ_SIZE		256
+#define MVPP2_AGGR_TXQ_SIZE		512
 
 /* Descriptor aligned size */
 #define MVPP2_DESC_ALIGNED_SIZE		32
