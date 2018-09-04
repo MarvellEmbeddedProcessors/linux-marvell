@@ -107,6 +107,7 @@ static void mvpp2_tx_done_guard_force_irq(struct mvpp2_port *port,
 					  int sw_thread, u8 to_zero_map);
 static inline void mvpp2_tx_done_guard_timer_set(struct mvpp2_port *port,
 						 int sw_thread);
+static u32 mvpp2_tx_done_guard_get_stats(struct mvpp2_port *port, int cpu);
 
 /* The prototype is added here to be used in start_dev when using ACPI. This
  * will be removed once phylink is used for all modes (dt+ACPI).
@@ -1268,6 +1269,14 @@ static const struct mvpp2_ethtool_counter mvpp2_ethtool_regs[] = {
 	{ MVPP2_RX_PKT_FULLQ_DROP_REG,	" rx_fullq_drop  " },
 	{ MVPP2_RX_PKT_EARLY_DROP_REG,	" rx_early_drop  " },
 	{ MVPP2_RX_PKT_BM_DROP_REG,	" rx_bm_drop     " },
+
+	/* Extend SW counters (not registers) */
+#define MVPP2_FIRST_CNT_SW		0xf000
+#define MVPP2_TX_GUARD_CNT(cpu)	(MVPP2_FIRST_CNT_SW + cpu)
+	{ MVPP2_TX_GUARD_CNT(0),	"tx-guard-cpu0 " },
+	{ MVPP2_TX_GUARD_CNT(1),	"tx-guard-cpu1 " },
+	{ MVPP2_TX_GUARD_CNT(2),	"tx-guard-cpu2 " },
+	{ MVPP2_TX_GUARD_CNT(3),	"tx-guard-cpu3 " },
 };
 
 static int mvpp2_ethtool_get_mib_cntr_size(void)
@@ -1286,7 +1295,7 @@ static int mvpp2_ethtool_get_mib_cntr_size(void)
  */
 static void mvpp2_hw_get_stats(struct mvpp2_port *port, u64 *pstats)
 {
-	int i, mib_size, queue;
+	int i, mib_size, queue, cpu;
 	unsigned int reg_offs;
 	u64 *ptmp;
 
@@ -1295,7 +1304,7 @@ static void mvpp2_hw_get_stats(struct mvpp2_port *port, u64 *pstats)
 	for (i = 0; i < mib_size; i++)
 		*pstats++ += mvpp2_read_count(port, &mvpp2_ethtool_regs[i]);
 
-	/* Extend counters */
+	/* Extend HW counters */
 	*pstats++ += mvpp2_read(port->priv, MVPP2_OVERRUN_DROP_REG(port->id));
 	*pstats++ += mvpp2_read(port->priv, MVPP2_CLS_DROP_REG(port->id));
 	ptmp = pstats;
@@ -1306,9 +1315,15 @@ static void mvpp2_hw_get_stats(struct mvpp2_port *port, u64 *pstats)
 		i = mib_size + 2;
 		while (i < ARRAY_SIZE(mvpp2_ethtool_regs)) {
 			reg_offs = mvpp2_ethtool_regs[i++].offset;
+			if (reg_offs == MVPP2_FIRST_CNT_SW)
+				break;
 			*pstats++ += mvpp2_read(port->priv, reg_offs);
 		}
 	}
+
+	/* Extend SW counters (i=MVPP2_FIRST_CNT_SW) */
+	for (cpu = 0; cpu < 4; cpu++)
+		*pstats++ = mvpp2_tx_done_guard_get_stats(port, cpu);
 }
 
 static void mvpp2_hw_clear_stats(struct mvpp2_port *port)
@@ -1330,9 +1345,13 @@ static void mvpp2_hw_clear_stats(struct mvpp2_port *port)
 		i = mib_size + 2;
 		while (i < ARRAY_SIZE(mvpp2_ethtool_regs)) {
 			reg_offs = mvpp2_ethtool_regs[i++].offset;
+			if (reg_offs == MVPP2_FIRST_CNT_SW)
+				break;
 			mvpp2_read(port->priv, reg_offs);
 		}
 	}
+	/* Extend SW counters (i=MVPP2_FIRST_CNT_SW) */
+	/* no clear */
 }
 
 static void mvpp2_ethtool_get_strings(struct net_device *netdev, u32 sset,
@@ -2927,6 +2946,11 @@ static void mvpp2_tx_done_guard_tasklet_cb(unsigned long data)
 		      MVPP2_GUARD_TXDONE_HRTIMER_NS,
 		      HRTIMER_MODE_REL_PINNED);
 	put_cpu();
+}
+
+static u32 mvpp2_tx_done_guard_get_stats(struct mvpp2_port *port, int cpu)
+{
+	return per_cpu_ptr(port->pcpu, cpu)->tx_guard_cntr;
 }
 
 static void mvpp2_tx_done_init_on_open(struct mvpp2_port *port, bool open)
