@@ -94,12 +94,9 @@ struct mvpp2_share {
 	struct mvpp2_recycle_pcpu *recycle;
 	void *recycle_base;
 
-	/* Run-time Debug disable capability */
-	bool recycle_dis;
-
 	/* Counters set by Probe/Init/Open */
 	int num_open_ports;
-};
+} __aligned(L1_CACHE_BYTES);
 
 struct mvpp2_share mvpp2_share;
 
@@ -2869,12 +2866,6 @@ static u32 mvpp2_skb_tx_csum(struct mvpp2_port *port, struct sk_buff *skb)
 	return MVPP2_TXD_L4_CSUM_NOT | MVPP2_TXD_IP_CSUM_DISABLE;
 }
 
-/* Global may be called by debugfs */
-void mvpp2_recycle_dis_cfg(bool disable)
-{
-	mvpp2_share.recycle_dis = disable;
-}
-
 void mvpp2_recycle_stats(void)
 {
 	int cpu;
@@ -3036,9 +3027,6 @@ static struct sk_buff *mvpp2_recycle_get(struct mvpp2_port *port,
 	struct sk_buff *skb;
 	dma_addr_t dma_addr;
 
-	if (unlikely(mvpp2_share.recycle_dis))
-		goto end;
-
 	cpu = smp_processor_id();
 	pcpu = mvpp2_share.recycle + cpu;
 
@@ -3079,7 +3067,7 @@ static struct sk_buff *mvpp2_recycle_get(struct mvpp2_port *port,
 		pcpu->idx[MVPP2_BM_POOLS_NUM]--;
 		return skb;
 	}
-end:
+
 	return kmem_cache_alloc(skbuff_head_cache, GFP_ATOMIC);
 }
 
