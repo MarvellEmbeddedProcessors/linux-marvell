@@ -9,15 +9,16 @@
  */
 
 #include <linux/delay.h>
+#include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/kernel.h>
-#include <linux/pci.h>
-#include <linux/init.h>
-#include <linux/platform_device.h>
 #include <linux/of_address.h>
 #include <linux/of_pci.h>
+#include <linux/pci.h>
+#include <linux/phy/phy.h>
+#include <linux/platform_device.h>
 
 #include "../pci.h"
 
@@ -838,6 +839,38 @@ out_release_res:
 	return err;
 }
 
+static int advk_phy_config(struct platform_device *pdev)
+{
+	struct phy *comphy;
+	int err;
+
+	comphy = devm_of_phy_get(&pdev->dev, pdev->dev.of_node, NULL);
+	if (IS_ERR(comphy))
+		/* Skip phy initialization and continue normally */
+		return 0;
+
+	err = phy_set_mode(comphy, PHY_MODE_PCIE);
+	if (err) {
+		dev_err(&pdev->dev, "failed to set comphy\n");
+		return err;
+	}
+
+	err = phy_init(comphy);
+	if (err < 0) {
+		dev_err(&pdev->dev, "phy init failed\n");
+		return err;
+	}
+
+	err = phy_power_on(comphy);
+	if (err < 0) {
+		dev_err(&pdev->dev, "phy power on failed\n");
+		phy_exit(comphy);
+		return err;
+	}
+
+	return err;
+}
+
 static int advk_pcie_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -857,6 +890,12 @@ static int advk_pcie_probe(struct platform_device *pdev)
 	pcie->base = devm_ioremap_resource(dev, res);
 	if (IS_ERR(pcie->base))
 		return PTR_ERR(pcie->base);
+
+	ret = advk_phy_config(pdev);
+	if (ret < 0) {
+		dev_err(dev, "PHYs config failed: %d\n", ret);
+		return ret;
+	}
 
 	irq = platform_get_irq(pdev, 0);
 	ret = devm_request_irq(dev, irq, advk_pcie_irq_handler,
