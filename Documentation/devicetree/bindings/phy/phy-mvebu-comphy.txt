@@ -9,6 +9,7 @@ Required properties:
 
 - compatible: should be "marvell,comphy-cp110"
 - reg: should contain the comphy register location and length.
+- reg-names: must contain names corresponding to the comphy register ranges.
 - marvell,system-controller: should contain a phandle to the
                              system controller node.
 - #address-cells: should be 1.
@@ -27,6 +28,7 @@ Example:
 	cpm_comphy: phy@120000 {
 		compatible = "marvell,comphy-cp110";
 		reg = <0x120000 0x6000>;
+		reg-names = "comphy";
 		marvell,system-controller = <&cpm_syscon0>;
 		#address-cells = <1>;
 		#size-cells = <0>;

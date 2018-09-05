@@ -112,6 +112,7 @@
 		CP110_LABEL(comphy): phy@120000 {
 			compatible = "marvell,comphy-cp110";
 			reg = <0x120000 0x6000>;
+			reg-names = "comphy";
 			marvell,system-controller = <&CP110_LABEL(syscon0)>;
 			#address-cells = <1>;
 			#size-cells = <0>;
