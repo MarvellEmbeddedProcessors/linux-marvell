@@ -129,11 +129,15 @@
 /* CON15(V2.0)/CON17(V1.4) : PCIe / CON15(V2.0)/CON12(V1.4) :mini-PCIe */
 &pcie0 {
 	status = "okay";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&a3700_comphy1 0>;
 };
 
 /* CON3 */
 &sata {
 	status = "okay";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&a3700_comphy2 0>;
 };
 
 &sdhci0 {
@@ -214,4 +218,7 @@
 &usb3 {
 	status = "okay";
 	usb-phy = <&usb3_phy>;
+	/* Generic PHY, providing serdes lanes */
+	phys = <&a3700_comphy0 0>;
+	phy-names = "usb";
 };
