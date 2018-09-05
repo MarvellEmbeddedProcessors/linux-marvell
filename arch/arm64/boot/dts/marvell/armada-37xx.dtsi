@@ -164,6 +164,31 @@
 				#clock-cells = <1>;
 			};
 
+			a3700_comphy: comphy@18300 {
+				compatible = "marvell,comphy-a3700";
+				reg = <0x18300 0x300>, <0x1f000 0x1000>,
+				      <0x5c000 0x1000>, <0xe0178 0x8>;
+				reg-names = "comphy", "serdes",
+					    "usb3_gbe1_phy", "indirect_ahci";
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				a3700_comphy0: phy@0 {
+					reg = <0>;
+					#phy-cells = <1>;
+				};
+
+				a3700_comphy1: phy@1 {
+					reg = <1>;
+					#phy-cells = <1>;
+				};
+
+				a3700_comphy2: phy@2 {
+					reg = <2>;
+					#phy-cells = <1>;
+				};
+			};
+
 			tbg: tbg@13200 {
 				compatible = "marvell,armada-3700-tbg-clock";
 				reg = <0x13200 0x100>;
