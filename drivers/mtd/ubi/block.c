@@ -318,7 +318,7 @@ static void ubiblock_do_work(struct work_struct *work)
 	blk_mq_end_request(req, ret);
 }
 
-static blk_status_t ubiblock_queue_rq(struct blk_mq_hw_ctx *hctx,
+static int ubiblock_queue_rq(struct blk_mq_hw_ctx *hctx,
 			     const struct blk_mq_queue_data *bd)
 {
 	struct request *req = bd->rq;
@@ -337,9 +337,9 @@ static blk_status_t ubiblock_queue_rq(struct blk_mq_hw_ctx *hctx,
 	return BLK_MQ_RQ_QUEUE_OK;
 }
 
-static int ubiblock_init_request(struct blk_mq_tag_set *set,
+static int ubiblock_init_request(void *data,
 		struct request *req, unsigned int hctx_idx,
-		unsigned int numa_node)
+		unsigned int rq_idx, unsigned int numa_node)
 {
 	struct ubiblock_pdu *pdu = blk_mq_rq_to_pdu(req);
 
@@ -349,9 +349,10 @@ static int ubiblock_init_request(struct blk_mq_tag_set *set,
 	return 0;
 }
 
-static const struct blk_mq_ops ubiblock_mq_ops = {
+static struct blk_mq_ops ubiblock_mq_ops = {
 	.queue_rq       = ubiblock_queue_rq,
 	.init_request	= ubiblock_init_request,
+	.map_queue	= blk_mq_map_queue
 };
 
 int ubiblock_create(struct ubi_volume_info *vi)
@@ -414,7 +415,7 @@ int ubiblock_create(struct ubi_volume_info *vi)
 
 	ret = blk_mq_alloc_tag_set(&dev->tag_set);
 	if (ret) {
-		dev_err(disk_to_dev(dev->gd), "blk_mq_alloc_tag_set failed");
+		dev_err(disk_to_dev(gd), "blk_mq_alloc_tag_set failed");
 		goto out_remove_minor;
 	}
 
