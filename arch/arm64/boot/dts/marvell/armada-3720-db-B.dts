@@ -10,4 +10,6 @@
  */
 &eth1 {
 	status = "okay";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&a3700_comphy0 1>;
 };
