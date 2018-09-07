@@ -77,6 +77,30 @@ static unsigned long cp110_comphy_smc(unsigned long function_id,
 	return res.a0;
 }
 
+static unsigned long a3700_comphy_smc(unsigned long function_id,
+				      phys_addr_t comphy_phys_addr,
+				      unsigned long lane, unsigned long mode)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(function_id, lane, mode, 0, 0, 0, 0, 0, &res);
+	return res.a0;
+}
+
+static const struct mvebu_comhy_conf mvebu_comphy_a3700_modes[] = {
+	/* lane 0 */
+	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII),
+	MVEBU_COMPHY_CONF(0, 0, PHY_MODE_USB_HOST),
+	MVEBU_COMPHY_CONF(0, 0, PHY_MODE_USB_DEVICE),
+	/* lane 1 */
+	MVEBU_COMPHY_CONF(1, 0, PHY_MODE_PCIE),
+	MVEBU_COMPHY_CONF(1, 0, PHY_MODE_SGMII),
+	/* lane 2 */
+	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SATA),
+	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_USB_HOST),
+	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_USB_DEVICE),
+};
+
 static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
 	/* lane 0 */
 	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII),
@@ -135,6 +159,14 @@ struct mvebu_comphy_lane {
 	unsigned id;
 	enum phy_mode mode;
 	int port;
+};
+
+static const struct mvebu_comphy_data a3700_data = {
+	.comphy_smc = a3700_comphy_smc,
+	.modes = mvebu_comphy_a3700_modes,
+	.modes_size = ARRAY_SIZE(mvebu_comphy_a3700_modes),
+	.lanes = 3,
+	.ports = 2,
 };
 
 static const struct mvebu_comphy_data cp110_data = {
@@ -381,6 +413,10 @@ static const struct of_device_id mvebu_comphy_of_match_table[] = {
 	{
 		.compatible = "marvell,comphy-cp110",
 		.data = &cp110_data,
+	},
+	{
+		.compatible = "marvell,comphy-a3700",
+		.data = &a3700_data,
 	},
 	{ },
 };
