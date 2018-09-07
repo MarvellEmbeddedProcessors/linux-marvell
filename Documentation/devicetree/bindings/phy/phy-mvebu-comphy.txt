@@ -1,17 +1,25 @@
 mvebu comphy driver
 -------------------
 
-A comphy controller can be found on Marvell Armada 7k/8k on the CP110. It
-provides a number of shared PHYs used by various interfaces (network, sata,
-usb, PCIe...).
+A comphy controller can be found on Marvell Armada 7k/8k on the CP110 or on
+Marvell Armada 37xx SoC. It provides a number of shared PHYs used by various
+interfaces (network, SATA, USB, PCIe...).
 
 Required properties:
 
-- compatible: should be "marvell,comphy-cp110"
+- compatible: should be one of:
+	"marvell,comphy-cp110"
+	"marvell,comphy-a3700"
 - reg: should contain the comphy register location and length.
+       In case of "comphy-a3700" address space is divided into four ranges:
+       - South Bridge PHY Configuration Registers
+       - PCIe and GbE 0 PHY Registers
+       - USB3 and GbE 1 PHY Registers
+       - AHCI vendor specific indirect Registers
 - reg-names: must contain names corresponding to the comphy register ranges.
 - marvell,system-controller: should contain a phandle to the
-                             system controller node.
+			     system controller node (not relevant for
+			     "comphy-a3700").
 - #address-cells: should be 1.
 - #size-cells: should be 0.
 
@@ -23,7 +31,7 @@ Required properties (child nodes):
 - #phy-cells : from the generic phy bindings, must be 1. Defines the
                input port to use for a given comphy lane.
 
-Example:
+Example for marvell,comphy-cp110:
 
 	CP110_LABEL(comphy): phy@120000 {
 		compatible = "marvell,comphy-cp110";
@@ -40,6 +48,33 @@ Example:
 
 		CP110_LABEL(comphy1): phy@1 {
 			reg = <1>;
+			#phy-cells = <1>;
+		};
+	};
+
+Example for marvell,comphy-a3700:
+
+	a3700_comphy: comphy@18300 {
+		compatible = "marvell,comphy-a3700";
+		reg = <0x18300 0x300>, <0x1f000 0x1000>,
+		      <0x5c000 0x1000>, <0xe0178 0x8>;
+		reg-names = "comphy", "serdes",
+			    "usb3_gbe1_phy", "indirect_ahci";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		a3700_comphy0: phy@0 {
+			reg = <0>;
+			#phy-cells = <1>;
+		};
+
+		a3700_comphy1: phy@1 {
+			reg = <1>;
+			#phy-cells = <1>;
+		};
+
+		a3700_comphy2: phy@2 {
+			reg = <2>;
 			#phy-cells = <1>;
 		};
 	};
