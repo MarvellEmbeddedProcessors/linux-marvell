@@ -29,6 +29,7 @@
 #include <linux/of_net.h>
 #include <linux/phy.h>
 #include <linux/phylink.h>
+#include <linux/phy/phy.h>
 #include <linux/platform_device.h>
 #include <linux/skbuff.h>
 #include <net/hwbm.h>
@@ -441,6 +442,7 @@ struct mvneta_port {
 	struct device_node *dn;
 	unsigned int tx_csum_limit;
 	struct phylink *phylink;
+	struct phy *comphy;
 
 	struct mvneta_bm *bm_priv;
 	struct mvneta_bm_pool *pool_long;
@@ -3155,12 +3157,51 @@ static int mvneta_setup_txqs(struct mvneta_port *pp)
 	return 0;
 }
 
+/* Sets the PHY mode of the COMPHY (which configures the serdes lanes).
+ *
+ * The PHY mode used by the mvneta driver comes from the network subsystem,
+ * while the one given to the COMPHY comes from the generic PHY subsystem. Hence
+ * they differ.
+ *
+ * The COMPHY configures the serdes lanes regardless of the actual use of the
+ * lanes by the physical layer. This is why configurations like
+ * "mvneta (1000BaseX) - COMPHY (SGMII)" are valid.
+ */
+static int mvneta_comphy_init(struct mvneta_port *pp)
+{
+	enum phy_mode mode;
+	int ret;
+
+	if (!pp->comphy)
+		return 0;
+
+	switch (pp->phy_interface) {
+	case PHY_INTERFACE_MODE_SGMII:
+	case PHY_INTERFACE_MODE_1000BASEX:
+		mode = PHY_MODE_SGMII;
+		break;
+	case PHY_INTERFACE_MODE_2500BASEX:
+		mode = PHY_MODE_2500SGMII;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ret = phy_set_mode(pp->comphy, mode);
+	if (ret)
+		return ret;
+
+	return phy_power_on(pp->comphy);
+}
+
 static void mvneta_start_dev(struct mvneta_port *pp)
 {
 	int cpu;
 
 	mvneta_max_rx_size_set(pp, pp->pkt_size);
 	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
+
+	mvneta_comphy_init(pp);
 
 	/* start the Rx/Tx activity */
 	mvneta_port_enable(pp);
@@ -3221,6 +3262,9 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
 
 	mvneta_tx_reset(pp);
 	mvneta_rx_reset(pp);
+
+	if (pp->comphy)
+		phy_power_off(pp->comphy);
 }
 
 static void mvneta_percpu_enable(void *arg)
@@ -3432,11 +3476,20 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
 	const struct phylink_link_state *state)
 {
 	struct mvneta_port *pp = netdev_priv(ndev);
-	u32 new_ctrl0, gmac_ctrl0 = mvreg_read(pp, MVNETA_GMAC_CTRL_0);
-	u32 new_ctrl2, gmac_ctrl2 = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
-	u32 new_ctrl4, gmac_ctrl4 = mvreg_read(pp, MVNETA_GMAC_CTRL_4);
-	u32 new_clk, gmac_clk = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
-	u32 new_an, gmac_an = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
+	u32 new_ctrl0, gmac_ctrl0, new_ctrl2, gmac_ctrl2, new_clk, gmac_clk;
+	u32 new_an, gmac_an, gmac_ctrl4, new_ctrl4;
+
+	/* Reconfigure the serdes lanes */
+	if (pp->comphy)
+		phy_power_off(pp->comphy);
+
+	mvneta_comphy_init(pp);
+
+	gmac_ctrl0 = mvreg_read(pp, MVNETA_GMAC_CTRL_0);
+	gmac_ctrl2 = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
+	gmac_ctrl4 = mvreg_read(pp, MVNETA_GMAC_CTRL_4);
+	gmac_clk = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
+	gmac_an = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
 
 	new_ctrl0 = gmac_ctrl0 & ~MVNETA_GMAC0_PORT_1000BASE_X;
 	new_ctrl2 = gmac_ctrl2 & ~(MVNETA_GMAC2_INBAND_AN_ENABLE |
@@ -4434,6 +4487,7 @@ static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
 /* Device initialization routine */
 static int mvneta_probe(struct platform_device *pdev)
 {
+	struct phy *comphy = NULL;
 	struct resource *res;
 	struct device_node *dn = pdev->dev.of_node;
 	struct device_node *bm_node;
@@ -4465,6 +4519,15 @@ static int mvneta_probe(struct platform_device *pdev)
 		goto err_free_irq;
 	}
 
+	comphy = devm_of_phy_get(&pdev->dev, dn, NULL);
+	if (IS_ERR(comphy)) {
+		if (PTR_ERR(comphy) == -EPROBE_DEFER) {
+			err = -EPROBE_DEFER;
+			goto err_free_irq;
+		}
+		comphy = NULL;
+	}
+
 	phylink = phylink_create(dev, pdev->dev.fwnode, phy_mode,
 				 &mvneta_phylink_ops);
 	if (IS_ERR(phylink)) {
@@ -4482,6 +4545,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	spin_lock_init(&pp->lock);
 	pp->phylink = phylink;
 	pp->phy_interface = phy_mode;
+	pp->comphy = comphy;
 	pp->dn = dn;
 
 	pp->rxq_def = rxq_def;
