@@ -10,11 +10,9 @@
 #include <linux/iopoll.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
-
-#define MVEBU_COMPHY_LANES	6
-#define MVEBU_COMPHY_PORTS	3
 
 struct mvebu_comhy_conf {
 	enum phy_mode mode;
@@ -34,8 +32,6 @@ struct mvebu_comhy_conf {
 #define MV_SIP_COMPHY_POWER_ON	0x82000001
 #define MV_SIP_COMPHY_POWER_OFF	0x82000002
 #define MV_SIP_COMPHY_PLL_LOCK	0x82000003
-#define MV_SIP_COMPHY_XFI_TRAIN	0x82000004
-#define MV_SIP_COMPHY_DIG_RESET	0x82000005
 
 #define COMPHY_FW_MODE_FORMAT(mode)		((mode) << 12)
 #define COMPHY_FW_NET_FORMAT(mode, idx, speeds)	\
@@ -67,9 +63,12 @@ struct mvebu_comhy_conf {
 
 #define COMPHY_FW_NOT_SUPPORTED		(-1)
 
-static unsigned long comphy_smc(unsigned long function_id,
-				phys_addr_t comphy_phys_addr,
-				unsigned long lane, unsigned long mode)
+typedef unsigned long (comphy_fn)(unsigned long, phys_addr_t,
+				  unsigned long, unsigned long);
+
+static unsigned long cp110_comphy_smc(unsigned long function_id,
+				      phys_addr_t comphy_phys_addr,
+				      unsigned long lane, unsigned long mode)
 {
 	struct arm_smccc_res res;
 
@@ -117,9 +116,18 @@ static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
 	MVEBU_COMPHY_CONF(5, 1, PHY_MODE_SATA),
 };
 
+struct mvebu_comphy_data {
+	comphy_fn *comphy_smc;
+	const struct mvebu_comhy_conf *modes;
+	size_t modes_size;
+	u8 lanes;
+	u8 ports;
+};
+
 struct mvebu_comphy_priv {
 	phys_addr_t phys;
 	struct device *dev;
+	const struct mvebu_comphy_data *data;
 };
 
 struct mvebu_comphy_lane {
@@ -129,18 +137,29 @@ struct mvebu_comphy_lane {
 	int port;
 };
 
-static int mvebu_is_comphy_mode_valid(int lane, int port, enum phy_mode mode)
-{
-	int i, n = ARRAY_SIZE(mvebu_comphy_cp110_modes);
+static const struct mvebu_comphy_data cp110_data = {
+	.comphy_smc = cp110_comphy_smc,
+	.modes = mvebu_comphy_cp110_modes,
+	.modes_size = ARRAY_SIZE(mvebu_comphy_cp110_modes),
+	.lanes = 6,
+	.ports = 3,
+};
 
-	for (i = 0; i < n; i++) {
-		if (mvebu_comphy_cp110_modes[i].lane == lane &&
-		    mvebu_comphy_cp110_modes[i].port == port &&
-		    mvebu_comphy_cp110_modes[i].mode == mode)
+static int mvebu_is_comphy_mode_valid(struct mvebu_comphy_lane *lane,
+				      enum phy_mode mode)
+{
+	const struct mvebu_comphy_data *data = lane->priv->data;
+	const struct mvebu_comhy_conf *modes = data->modes;
+	int i;
+
+	for (i = 0; i < data->modes_size; i++) {
+		if (modes[i].lane == lane->id &&
+		    modes[i].port == lane->port &&
+		    modes[i].mode == mode)
 			break;
 	}
 
-	if (i == n)
+	if (i == data->modes_size)
 		return -EINVAL;
 
 	return 0;
@@ -150,11 +169,12 @@ static int mvebu_comphy_power_on(struct phy *phy)
 {
 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
 	struct mvebu_comphy_priv *priv = lane->priv;
+	const struct mvebu_comphy_data *data = priv->data;
 	int ret;
 
 	switch (lane->mode) {
 	case PHY_MODE_SGMII:
-		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
+		ret = data->comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
 				 COMPHY_FW_NET_FORMAT(COMPHY_SGMII_MODE,
 						      lane->port,
@@ -162,7 +182,7 @@ static int mvebu_comphy_power_on(struct phy *phy)
 
 		break;
 	case PHY_MODE_2500SGMII:
-		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
+		ret = data->comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
 				 COMPHY_FW_NET_FORMAT(COMPHY_HS_SGMII_MODE,
 						      lane->port,
@@ -170,14 +190,14 @@ static int mvebu_comphy_power_on(struct phy *phy)
 
 		break;
 	case PHY_MODE_10GKR:
-		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
+		ret = data->comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
 				 COMPHY_FW_NET_FORMAT(COMPHY_XFI_MODE,
 						      lane->port,
 						      COMPHY_SPEED_10_3125G));
 		break;
 	case PHY_MODE_PCIE:
-		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
+		ret = data->comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
 				 COMPHY_FW_PCIE_FORMAT(phy->attrs.bus_width,
 						       COMPHY_PCIE_MODE,
@@ -185,12 +205,12 @@ static int mvebu_comphy_power_on(struct phy *phy)
 						       COMPHY_SPEED_5G));
 		break;
 	case PHY_MODE_SATA:
-		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
+		ret = data->comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
 				 COMPHY_FW_MODE_FORMAT(COMPHY_SATA_MODE));
 		break;
 	case PHY_MODE_USB_HOST:
-		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
+		ret = data->comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
 				 COMPHY_FW_MODE_FORMAT(COMPHY_USB3H_MODE));
 		break;
@@ -207,7 +227,7 @@ static int mvebu_comphy_set_mode(struct phy *phy, enum phy_mode mode)
 {
 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
 
-	if (mvebu_is_comphy_mode_valid(lane->id, lane->port, mode) < 0)
+	if (mvebu_is_comphy_mode_valid(lane, mode) < 0)
 		return -EINVAL;
 
 	lane->mode = mode;
@@ -218,8 +238,10 @@ static int mvebu_comphy_power_off(struct phy *phy)
 {
 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
 	struct mvebu_comphy_priv *priv = lane->priv;
+	const struct mvebu_comphy_data *data = priv->data;
 
-	return comphy_smc(MV_SIP_COMPHY_POWER_OFF, priv->phys, lane->id, 0);
+	return data->comphy_smc(MV_SIP_COMPHY_POWER_OFF, priv->phys,
+				lane->id, 0);
 }
 
 static const struct phy_ops mvebu_comphy_ops = {
@@ -237,9 +259,12 @@ static struct phy *mvebu_comphy_xlate(struct device *dev,
 				      struct of_phandle_args *args)
 {
 	struct mvebu_comphy_lane *lane;
+	struct mvebu_comphy_priv *priv;
 	struct phy *phy;
 
-	if (WARN_ON(args->args[0] >= MVEBU_COMPHY_PORTS))
+	priv = dev_get_drvdata(dev);
+
+	if (WARN_ON(args->args[0] >= priv->data->ports))
 		return ERR_PTR(-EINVAL);
 
 	phy = of_phy_simple_xlate(dev, args);
@@ -257,17 +282,40 @@ static struct phy *mvebu_comphy_xlate(struct device *dev,
 static int mvebu_comphy_probe(struct platform_device *pdev)
 {
 	struct mvebu_comphy_priv *priv;
+	const struct mvebu_comphy_data *data;
 	struct phy_provider *provider;
 	struct device_node *child;
 	struct resource *res;
+	int i;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
+	data = of_device_get_match_data(&pdev->dev);
+	priv->data = data;
+
 	priv->dev = &pdev->dev;
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	priv->phys = res->start;
+
+	/*
+	 * Request all resources declared in dts for this driver, even if they
+	 * are not used explicit by this driver. This will prevent other Linux
+	 * drivers from accessing comphy register range, and therefore prevent
+	 * concurrent access with FW, which handles comphy initialization via RT
+	 * services.
+	 */
+	for (i = 0; i < pdev->num_resources; i++) {
+		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+
+		if (i == 0)
+			priv->phys = res->start;
+
+		if (!devm_request_mem_region(&pdev->dev, res->start,
+					     resource_size(res), res->name)) {
+			dev_err(&pdev->dev, "resource %s busy\n", res->name);
+			return -EBUSY;
+		}
+	}
 
 	for_each_available_child_of_node(pdev->dev.of_node, child) {
 		struct mvebu_comphy_lane *lane;
@@ -282,7 +330,7 @@ static int mvebu_comphy_probe(struct platform_device *pdev)
 			continue;
 		}
 
-		if (val >= MVEBU_COMPHY_LANES) {
+		if (val >= data->lanes) {
 			dev_err(&pdev->dev, "invalid 'reg' property\n");
 			continue;
 		}
@@ -330,7 +378,10 @@ static int mvebu_comphy_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id mvebu_comphy_of_match_table[] = {
-	{ .compatible = "marvell,comphy-cp110" },
+	{
+		.compatible = "marvell,comphy-cp110",
+		.data = &cp110_data,
+	},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, mvebu_comphy_of_match_table);
