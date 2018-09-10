@@ -103,7 +103,6 @@
 		&cp0_comphy1 0
 		&cp0_comphy2 0
 		&cp0_comphy3 0>;
-	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 };
 
 &cp0_i2c0 {
@@ -136,7 +135,6 @@
 		&cp4_comphy1 0
 		&cp4_comphy2 0
 		&cp4_comphy3 0>;
-	phy-names = "pcie-phy0", "pcie-phy1", "pcie-phy2", "pcie-phy3";
 };
 
 &cp4_pcie1 {

@@ -75,13 +75,11 @@
 &cp0_pcie0 {
 	status = "okay";
 	phys = <&cp0_comphy0 0>;
-	phy-names = "pcie-phy0";
 };
 
 &cp0_pcie2 {
 	status = "okay";
 	phys = <&cp0_comphy5 2>;
-	phy-names = "pcie-phy0";
 };
 
 &cp0_sata0 {
