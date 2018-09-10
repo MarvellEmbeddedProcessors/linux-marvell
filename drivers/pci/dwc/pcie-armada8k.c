@@ -217,21 +217,22 @@ static int armada8k_phy_config(struct platform_device *pdev,
 			       struct armada8k_pcie *pcie)
 {
 	struct phy *comphy;
-	char phy_name[10];
 	int err, phy_count;
 	char i;
 
-	phy_count = of_property_count_strings(pdev->dev.of_node, "phy-names");
+	phy_count = of_count_phandle_with_args(pdev->dev.of_node, "phys",
+					       "#phy-cells");
 
 	if (phy_count <= 0)
 		return 0;
 
-	dev_err(&pdev->dev, "after phy count");
 	for (i = 0; i < phy_count; i++) {
-		snprintf(phy_name, sizeof(phy_name), "pcie-phy%d", i);
-		comphy = devm_phy_get(&pdev->dev, phy_name);
-		if (IS_ERR(comphy))
+		comphy = devm_of_phy_get_by_index(&pdev->dev,
+						  pdev->dev.of_node, i);
+		if (IS_ERR(comphy)) {
 			dev_err(&pdev->dev, "Failed to get phy %d\n", i);
+			return PTR_ERR(comphy);
+		}
 
 		switch (phy_count) {
 		case PCIE_LNK_X1:
