@@ -38,11 +38,11 @@ struct mvebu_comhy_conf {
 #define MV_SIP_COMPHY_DIG_RESET	0x82000005
 
 #define COMPHY_FW_MODE_FORMAT(mode)		((mode) << 12)
-#define COMPHY_FW_FORMAT(mode, idx, speeds)	\
-			(((mode) << 12) | ((idx) << 8) | ((speeds) << 2))
+#define COMPHY_FW_NET_FORMAT(mode, idx, speeds)	\
+		(COMPHY_FW_MODE_FORMAT(mode) | ((idx) << 8) | ((speeds) << 2))
 
 #define COMPHY_FW_PCIE_FORMAT(pcie_width, mode, idx, speeds)	\
-		    (((pcie_width) << 18) | COMPHY_FW_FORMAT(mode, idx, speeds))
+		(((pcie_width) << 18) | COMPHY_FW_NET_FORMAT(mode, idx, speeds))
 
 #define COMPHY_SATA_MODE	0x1
 #define COMPHY_SGMII_MODE	0x2	/* SGMII 1G */
@@ -66,7 +66,8 @@ struct mvebu_comhy_conf {
 #define COMPHY_SPEED_MAX		0x3F
 
 static unsigned long comphy_smc(unsigned long function_id,
-	   phys_addr_t comphy_phys_addr, unsigned long lane, unsigned long mode)
+				phys_addr_t comphy_phys_addr,
+				unsigned long lane, unsigned long mode)
 {
 	struct arm_smccc_res res;
 
@@ -153,25 +154,25 @@ static int mvebu_comphy_power_on(struct phy *phy)
 	case PHY_MODE_SGMII:
 		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
-				 COMPHY_FW_FORMAT(COMPHY_SGMII_MODE,
-						  lane->port,
-						  COMPHY_SPEED_1_25G));
+				 COMPHY_FW_NET_FORMAT(COMPHY_SGMII_MODE,
+						      lane->port,
+						      COMPHY_SPEED_1_25G));
 
 		break;
 	case PHY_MODE_2500SGMII:
 		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
-				 COMPHY_FW_FORMAT(COMPHY_HS_SGMII_MODE,
-						  lane->port,
-						  COMPHY_SPEED_3_125G));
+				 COMPHY_FW_NET_FORMAT(COMPHY_HS_SGMII_MODE,
+						      lane->port,
+						      COMPHY_SPEED_3_125G));
 
 		break;
 	case PHY_MODE_10GKR:
 		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
 				 lane->id,
-				 COMPHY_FW_FORMAT(COMPHY_XFI_MODE,
-						  lane->port,
-						  COMPHY_SPEED_10_3125G));
+				 COMPHY_FW_NET_FORMAT(COMPHY_XFI_MODE,
+						      lane->port,
+						      COMPHY_SPEED_10_3125G));
 		break;
 	case PHY_MODE_PCIE:
 		ret = comphy_smc(MV_SIP_COMPHY_POWER_ON, priv->phys,
@@ -215,11 +216,8 @@ static int mvebu_comphy_power_off(struct phy *phy)
 {
 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
 	struct mvebu_comphy_priv *priv = lane->priv;
-	int ret;
 
-	ret = comphy_smc(MV_SIP_COMPHY_POWER_OFF, priv->phys, lane->id, 0);
-
-	return ret;
+	return comphy_smc(MV_SIP_COMPHY_POWER_OFF, priv->phys, lane->id, 0);
 }
 
 static const struct phy_ops mvebu_comphy_ops = {
