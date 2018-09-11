@@ -65,6 +65,8 @@ struct mvebu_comhy_conf {
 #define COMPHY_SPEED_10_3125G		6 /* XFI 10G */
 #define COMPHY_SPEED_MAX		0x3F
 
+#define COMPHY_FW_NOT_SUPPORTED		(-1)
+
 static unsigned long comphy_smc(unsigned long function_id,
 				phys_addr_t comphy_phys_addr,
 				unsigned long lane, unsigned long mode)
@@ -227,6 +229,10 @@ static const struct phy_ops mvebu_comphy_ops = {
 	.owner		= THIS_MODULE,
 };
 
+static const struct phy_ops mvebu_comphy_ops_depricated = {
+	.owner		= THIS_MODULE,
+};
+
 static struct phy *mvebu_comphy_xlate(struct device *dev,
 				      struct of_phandle_args *args)
 {
@@ -299,7 +305,22 @@ static int mvebu_comphy_probe(struct platform_device *pdev)
 		 * To avoid relying on the bootloader/firmware configuration,
 		 * power off all comphys.
 		 */
-		mvebu_comphy_power_off(phy);
+		ret = mvebu_comphy_power_off(phy);
+		if (ret == COMPHY_FW_NOT_SUPPORTED) {
+			dev_warn(&pdev->dev, "RELYING ON BOTLOADER SETTINGS\n");
+			dev_WARN(&pdev->dev, "firmware updated needed\n");
+
+			/*
+			 * If comphy power off fails it means that the
+			 * deprecated firmware is used and we should rely on
+			 * bootloader settings, therefore we are switching to
+			 * empty ops.
+			 */
+			phy_destroy(phy);
+			phy = devm_phy_create(&pdev->dev, child,
+					      &mvebu_comphy_ops_depricated);
+			phy_set_drvdata(phy, lane);
+		}
 	}
 
 	dev_set_drvdata(&pdev->dev, priv);
