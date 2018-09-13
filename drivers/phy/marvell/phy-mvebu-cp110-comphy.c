@@ -251,7 +251,7 @@ static const struct phy_ops mvebu_comphy_ops = {
 	.owner		= THIS_MODULE,
 };
 
-static const struct phy_ops mvebu_comphy_ops_depricated = {
+static const struct phy_ops mvebu_comphy_ops_deprecated = {
 	.owner		= THIS_MODULE,
 };
 
@@ -366,7 +366,7 @@ static int mvebu_comphy_probe(struct platform_device *pdev)
 			 */
 			phy_destroy(phy);
 			phy = devm_phy_create(&pdev->dev, child,
-					      &mvebu_comphy_ops_depricated);
+					      &mvebu_comphy_ops_deprecated);
 			phy_set_drvdata(phy, lane);
 		}
 	}
