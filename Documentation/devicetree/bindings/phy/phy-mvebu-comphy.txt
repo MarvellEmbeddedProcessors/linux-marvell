@@ -25,20 +25,20 @@ Required properties (child nodes):
 
 Example:
 
-	cpm_comphy: phy@120000 {
+	CP110_LABEL(comphy): phy@120000 {
 		compatible = "marvell,comphy-cp110";
 		reg = <0x120000 0x6000>;
 		reg-names = "comphy";
-		marvell,system-controller = <&cpm_syscon0>;
+		marvell,system-controller = <&CP110_LABEL(syscon0)>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		cpm_comphy0: phy@0 {
+		CP110_LABEL(comphy0): phy@0 {
 			reg = <0>;
 			#phy-cells = <1>;
 		};
 
-		cpm_comphy1: phy@1 {
+		CP110_LABEL(comphy1): phy@1 {
 			reg = <1>;
 			#phy-cells = <1>;
 		};
