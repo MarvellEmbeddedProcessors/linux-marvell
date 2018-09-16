@@ -90,6 +90,7 @@ static unsigned long a3700_comphy_smc(unsigned long function_id,
 static const struct mvebu_comhy_conf mvebu_comphy_a3700_modes[] = {
 	/* lane 0 */
 	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII),
+	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII),
 	MVEBU_COMPHY_CONF(0, 0, PHY_MODE_USB_HOST),
 	MVEBU_COMPHY_CONF(0, 0, PHY_MODE_USB_DEVICE),
 	/* lane 1 */

@@ -3169,7 +3169,8 @@ static int mvneta_setup_txqs(struct mvneta_port *pp)
  *
  * The COMPHY configures the serdes lanes regardless of the actual use of the
  * lanes by the physical layer. This is why configurations like
- * "mvneta (1000BaseX) - COMPHY (SGMII)" are valid.
+ * "mvneta (1000BaseX) - COMPHY (SGMII)" or
+ * "mvneta (2500BaseX) - COMPHY (2500SGMII)" are valid.
  */
 static int mvneta_comphy_init(struct mvneta_port *pp)
 {
@@ -3523,6 +3524,7 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
 
 	if (state->interface == PHY_INTERFACE_MODE_QSGMII ||
 	    state->interface == PHY_INTERFACE_MODE_SGMII ||
+	    state->interface == PHY_INTERFACE_MODE_2500BASEX ||
 	    phy_interface_mode_is_8023z(state->interface))
 		new_ctrl2 |= MVNETA_GMAC2_PCS_ENABLE;
 
@@ -4500,7 +4502,8 @@ static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
 	if (phy_mode == PHY_INTERFACE_MODE_QSGMII)
 		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_QSGMII_SERDES_PROTO);
 	else if (phy_mode == PHY_INTERFACE_MODE_SGMII ||
-		 phy_mode == PHY_INTERFACE_MODE_1000BASEX)
+		 phy_mode == PHY_INTERFACE_MODE_1000BASEX ||
+		 phy_mode == PHY_INTERFACE_MODE_2500BASEX)
 		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
 	else if (!phy_interface_mode_is_rgmii(phy_mode))
 		return -EINVAL;
