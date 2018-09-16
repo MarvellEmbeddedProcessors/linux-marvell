@@ -1,0 +1,157 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Device Tree file for Marvell Armada 7040 development board platform
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include "armada-3900.dtsi"
+
+/ {
+	model = "Marvell Armada 3900";
+	compatible = "marvell,armada3900", "marvell,armada-ap807-quad",
+		     "marvell,armada-ap807";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	/* USB3 VBus controller through GPIO */
+	cp0_usb3_0_phy: cp0-usb3-0-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp0_reg_usb3_0_vbus>;
+	};
+	cp0_usb3_1_phy: cp0-usb3-1-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp0_reg_usb3_1_vbus>;
+	};
+	cp0_reg_usb3_0_vbus: cp0_usb3_vbus@0 {
+		compatible = "regulator-fixed";
+		gpio = <&cp0_gpio1 12 GPIO_ACTIVE_HIGH>;
+		regulator-name = "cp0-xhci0-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+	};
+	cp0_reg_usb3_1_vbus: cp0_usb3_vbus@1 {
+		compatible = "regulator-fixed";
+		gpio = <&cp0_gpio1 13 GPIO_ACTIVE_HIGH>;
+		regulator-name = "cp0-xhci1-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+	};
+};
+
+&uart0 {
+	pinctrl-0 = <&uart0_pins>;
+	pinctrl-names = "default";
+};
+
+&spi0 {
+	spi-flash@0 {
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		compatible = "jedec,spi-nor";
+		reg = <0x0>;
+		spi-max-frequency = <50000000>;
+		partition@0 {
+			label = "boot";
+			reg = <0x0 0x500000>;
+		};
+		partition@500000 {
+			label = "env";
+			reg = <0x500000 0xb00000>;
+		};
+	};
+};
+
+&cp0_config_space {
+	ranges = /* internal regs */
+		 <0x0 0x0 0xf2000000 0x2000000>,
+		 /* SPI1-DEV0 */
+		 <0x2000000 0 0xf9000000 0x1000000>;
+};
+
+&cp0_i2c0 {
+	status = "disabled";
+	clock-frequency = <100000>;
+
+	eeprom@57 {
+		compatible = "atmel,24c64";
+		reg = <0x57>;
+		pagesize = <32>;
+	};
+
+	eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+		pagesize = <32>;
+	};
+};
+
+&cp0_nand_controller {
+	nand@0 {
+		reg = <0>;
+		label = "main-storage";
+		nand-rb = <0>;
+		nand-ecc-mode = "hw";
+		marvell,nand-keep-config;
+		nand-on-flash-bbt;
+		nand-ecc-strength = <8>;
+		nand-ecc-step-size = <512>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "U-Boot";
+				reg = <0 0x400000>;
+			};
+			partition@1000000 {
+				label = "rootfs";
+				reg = <0x1000000 0x1f800000>;
+			};
+			partition@20800000 {
+				label = "alt_rootfs";
+				reg = <0x20800000 0x1f800000>;
+			};
+		};
+	};
+};
+
+&cp0_usb3_0 {
+	status = "disabled";
+	usb-phy = <&cp0_usb3_0_phy>;
+	phys = <&cp0_comphy1 0>;
+	phy-names = "usb";
+};
+
+&cp0_usb3_1 {
+	status = "disabled";
+	usb-phy = <&cp0_usb3_1_phy>;
+	phys = <&cp0_comphy4 1>;
+	phy-names = "usb";
+};
+
+&cp0_pcie0 {
+	ranges = <0x81000000 0 0xf7000000 0  0xf7000000 0 0x10000
+		  0x82000000 0 0xc0000000 0  0xc0000000 0 0x20000000>;
+	phys = <&cp0_comphy0 0>;
+	phy-names = "pcie-phy0";
+};
+
+&cp0_pcie2 {
+	ranges = <0x81000000 0 0xf7020000 0  0xf7020000 0 0x10000
+		  0x82000000 0 0xf8000000 0  0xf8000000 0 0xf00000>;
+	phys = <&cp0_comphy5 2>;
+	phy-names = "pcie-phy2";
+};
+
+
