@@ -8,6 +8,7 @@
 /* This file enables eth1 to work on SERDES SGMII1 interface and
  * use SMI to do PHY polling, meanwhile eth0 still works on RGMII mode.
  */
+/* Gigabit module on CON18(V2.0)/CON20(V1.4) */
 &eth1 {
 	status = "okay";
 	/* Generic PHY, providing serdes lanes */

@@ -5,23 +5,13 @@
  */
 
 #include "armada-3720-db.dts"
-/* This file enables eth1 to work in SGMII mode with 1g or 2.5g fixed-link,
+/* This file enables eth1 to work in SGMII mode with 1g or 2.5g,
  * eth0 still works in RGMII mode.
  */
 &eth1 {
 	status = "okay";
-	fixed-link {
-		/*
-		 * Here "speed" is set to 1000, GBE MAC is running in 1G mode,
-		 * but the actual MAC speed may be 1 Gbps or 2.5 Gbps,
-		 * it's up to the corresponding SERDES speed in u-boot fdt
-		 * comphy node.
-		 * If SERDES speed is set to 3.125G in u-boot, it implies sgmii
-		 * 2.5 Gbps;
-		 * if SERDES speed is set to 1.25G in u-boot, it implies sgmii 1
-		 * Gbps.
-		 */
-		speed = <1000>;
-		full-duplex;
-	};
+	phy-mode = "2500base-x";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&a3700_comphy0 1>;
+	managed = "in-band-status";
 };
