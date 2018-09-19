@@ -3893,9 +3893,6 @@ static int mvneta_open(struct net_device *dev)
 			goto err_free_online_hp;
 	}
 
-	/* In default link is down */
-	netif_carrier_off(pp->dev);
-
 	ret = mvneta_mdio_probe(pp);
 	if (ret < 0) {
 		netdev_err(dev, "cannot probe MDIO bus\n");
