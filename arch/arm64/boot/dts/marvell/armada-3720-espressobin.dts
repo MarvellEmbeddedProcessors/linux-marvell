@@ -46,11 +46,15 @@
 /* J9 */
 &pcie0 {
 	status = "okay";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&a3700_comphy1 0>;
 };
 
 /* J6 */
 &sata {
 	status = "okay";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&a3700_comphy2 0>;
 };
 
 /* J1 */
@@ -110,6 +114,9 @@
 /* J7 */
 &usb3 {
 	status = "okay";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&a3700_comphy0 0>;
+	phy-names = "usb";
 };
 
 /* J8 */
