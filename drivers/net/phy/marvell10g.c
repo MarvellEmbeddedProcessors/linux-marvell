@@ -24,6 +24,7 @@
 #include <linux/ctype.h>
 #include <linux/hwmon.h>
 #include <linux/marvell_phy.h>
+#include <linux/of.h>
 #include <linux/phy.h>
 
 enum {
@@ -35,6 +36,8 @@ enum {
 	MV_PCS_PAIRSWAP_MASK	= 0x0003,
 	MV_PCS_PAIRSWAP_AB	= 0x0002,
 	MV_PCS_PAIRSWAP_NONE	= 0x0003,
+
+	MV_PMAPMD_XG_EXT	= 0xc000,
 
 	/* These registers appear at 0x800X and 0xa00X - the 0xa00X control
 	 * registers appear to set themselves to the 0x800X when AN is
@@ -56,6 +59,8 @@ struct mv3310_priv {
 	struct device *hwmon_dev;
 	char *hwmon_name;
 };
+
+#define MV_PMAPMD_XG_EXT_SWAP_PAIRS	BIT(0)
 
 static int mv3310_modify(struct phy_device *phydev, int devad, u16 reg,
 			 u16 mask, u16 bits)
@@ -239,6 +244,26 @@ static int mv3310_probe(struct phy_device *phydev)
 	return 0;
 }
 
+#ifdef CONFIG_OF_MDIO
+static void mv3310_of_config_init(struct phy_device *phydev)
+{
+	struct device_node *of_node = phydev->mdio.dev.of_node;
+
+	if (!of_node)
+		return;
+
+	if (of_property_read_bool(of_node, "enet-phy-lane-swap")) {
+		mv3310_modify(phydev, MDIO_MMD_PMAPMD, MV_PMAPMD_XG_EXT,
+			      MV_PMAPMD_XG_EXT_SWAP_PAIRS,
+			      MV_PMAPMD_XG_EXT_SWAP_PAIRS);
+	}
+}
+#else
+static void mv3310_of_config_init(struct phy_device *phydev)
+{
+}
+#endif
+
 static int mv3310_suspend(struct phy_device *phydev)
 {
 	return 0;
@@ -261,6 +286,8 @@ static int mv3310_config_init(struct phy_device *phydev)
 	    phydev->interface != PHY_INTERFACE_MODE_RXAUI &&
 	    phydev->interface != PHY_INTERFACE_MODE_10GKR)
 		return -ENODEV;
+
+	mv3310_of_config_init(phydev);
 
 	__set_bit(ETHTOOL_LINK_MODE_Pause_BIT, supported);
 	__set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, supported);
