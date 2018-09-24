@@ -56,6 +56,11 @@
 	chosen {
 		stdout-path = "serial0:115200n8";
 	};
+
+	aliases {
+		ethernet0 = &cp0_eth0;
+		ethernet1 = &cp0_eth1;
+	};
 };
 
 &uart0 {
@@ -106,5 +111,44 @@
 	status = "okay";
 };
 
+&cp0_mdio {
+	status = "okay";
+};
 
+&cp0_xmdio {
+	status = "okay";
 
+	phy0: ethernet-phy@0 {
+		compatible = "ethernet-phy-ieee802.3-c45";
+		reg = <0>;
+		enet-phy-lane-swap;
+	};
+
+	phy1: ethernet-phy@1 {
+		compatible = "ethernet-phy-ieee802.3-c45";
+		reg = <1>;
+		enet-phy-lane-swap;
+	};
+};
+
+&cp0_ethernet {
+	status = "okay";
+};
+
+&cp0_eth0 {
+	status = "okay";
+	/* Network PHY */
+	phy = <&phy0>;
+	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy2 0>;
+};
+
+&cp0_eth1 {
+	status = "okay";
+	/* Network PHY */
+	phy = <&phy1>;
+	phy-mode = "10gbase-kr";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy4 1>;
+};
