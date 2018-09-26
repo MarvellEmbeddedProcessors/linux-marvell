@@ -1913,22 +1913,42 @@ static void mvpp2_rx_pkts_coal_set(struct mvpp2_port *port,
 	put_cpu();
 }
 
-static void mvpp2_tx_pkts_coal_set(struct mvpp2_port *port,
-				   struct mvpp2_tx_queue *txq)
+/* Set pkts-coalescing HW with ZERO or configured VALUE
+ * The same should be set for all TXQs and all for all CPUs.
+ * Setting ZERO causes for immediate flush into tx-done handler.
+ */
+static inline void mvpp2_tx_pkts_coal_set_txqs(struct mvpp2_port *port,
+					       int cpu, u32 val)
 {
-	int thread;
-	u32 val;
+	struct mvpp2_tx_queue *txq;
+	int queue;
 
-	if (txq->done_pkts_coal > MVPP2_TXQ_THRESH_MASK)
-		txq->done_pkts_coal = MVPP2_TXQ_THRESH_MASK;
+	val <<= MVPP2_TXQ_THRESH_OFFSET;
 
-	val = (txq->done_pkts_coal << MVPP2_TXQ_THRESH_OFFSET);
-	/* PKT-coalescing registers are per-queue + per-thread */
-	for (thread = 0; thread < MVPP2_MAX_THREADS; thread++) {
-		mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_NUM_REG,
+	for (queue = 0; queue < port->ntxqs; queue++) {
+		txq = port->txqs[queue];
+		mvpp2_thread_write(port->priv, cpu, MVPP2_TXQ_NUM_REG,
 				   txq->id);
-		mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_THRESH_REG, val);
+		mvpp2_thread_write(port->priv, cpu, MVPP2_TXQ_THRESH_REG, val);
 	}
+}
+
+static void mvpp2_tx_pkts_coal_set(struct mvpp2_port *port)
+{
+	struct mvpp2_tx_queue *txq = port->txqs[0];
+	u32 cfg_val = txq->done_pkts_coal;
+	int cpu;
+
+	for_each_present_cpu(cpu)
+		mvpp2_tx_pkts_coal_set_txqs(port, cpu, cfg_val);
+}
+
+/* Set ZERO value on on_each_cpu IRQ-context for 1 cpu only */
+static void mvpp2_tx_pkts_coal_set_zero_pcpu(void *arg)
+{
+	struct mvpp2_port *port = arg;
+
+	mvpp2_tx_pkts_coal_set_txqs(port, smp_processor_id(), 0);
 }
 
 static u32 mvpp2_usec_to_cycles(u32 usec, unsigned long clk_hz)
@@ -2482,11 +2502,8 @@ static int mvpp2_setup_txqs(struct mvpp2_port *port)
 		netif_set_xps_queue(port->dev, cpumask_of(cpu), cpu);
 
 	if (port->has_tx_irqs) {
+		/* Download time-coal. The pkts-coal done in start_dev */
 		mvpp2_tx_time_coal_set(port);
-		for (queue = 0; queue < port->ntxqs; queue++) {
-			txq = port->txqs[queue];
-			mvpp2_tx_pkts_coal_set(port, txq);
-		}
 	}
 
 	on_each_cpu(mvpp2_txq_sent_counter_clear, port, 1);
@@ -3607,6 +3624,10 @@ static void mvpp2_start_dev(struct mvpp2_port *port)
 
 	mvpp2_txp_max_tx_size_set(port);
 
+	/* stop_dev() sets Coal to ZERO. Care to restore it now */
+	if (port->has_tx_irqs)
+		mvpp2_tx_pkts_coal_set(port);
+
 	for (i = 0; i < port->nqvecs; i++)
 		napi_enable(&port->qvecs[i].napi);
 
@@ -3644,9 +3665,13 @@ static void mvpp2_stop_dev(struct mvpp2_port *port)
 	 * Stop asap new packets ariving from both RX and TX directions,
 	 * but do NOT disable egress free/send-out and interrupts tx-done,
 	 * yeild and msleep this context for gracefull finishing.
+	 * Flush all tx-done by forcing pkts-coal to ZERO
 	 */
 	mvpp2_tx_stop_all_queues(port->dev);
 	mvpp2_ingress_disable(port);
+	if (port->has_tx_irqs)
+		on_each_cpu(mvpp2_tx_pkts_coal_set_zero_pcpu, port, 1);
+
 	msleep(40);
 	mvpp2_egress_disable(port);
 
@@ -4172,6 +4197,7 @@ static int mvpp2_ethtool_set_coalesce(struct net_device *dev,
 				      struct ethtool_coalesce *c)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
+	struct mvpp2_tx_queue *txq;
 	int queue;
 
 	for (queue = 0; queue < port->nrxqs; queue++) {
@@ -4183,18 +4209,22 @@ static int mvpp2_ethtool_set_coalesce(struct net_device *dev,
 		mvpp2_rx_time_coal_set(port, rxq);
 	}
 
-	if (port->has_tx_irqs) {
+	/* Set TX time and pkts coalescing configuration */
+	if (port->has_tx_irqs)
 		port->tx_time_coal = c->tx_coalesce_usecs;
-		mvpp2_tx_time_coal_set(port);
-	}
 
 	for (queue = 0; queue < port->ntxqs; queue++) {
-		struct mvpp2_tx_queue *txq = port->txqs[queue];
-
+		txq = port->txqs[queue];
 		txq->done_pkts_coal = c->tx_max_coalesced_frames;
+		if (port->has_tx_irqs &&
+		    txq->done_pkts_coal > MVPP2_TXQ_THRESH_MASK)
+			txq->done_pkts_coal = MVPP2_TXQ_THRESH_MASK;
+	}
 
-		if (port->has_tx_irqs)
-			mvpp2_tx_pkts_coal_set(port, txq);
+	if (port->has_tx_irqs) {
+		/* Download configured values into MVPP2 HW */
+		mvpp2_tx_time_coal_set(port);
+		mvpp2_tx_pkts_coal_set(port);
 	}
 
 	return 0;
