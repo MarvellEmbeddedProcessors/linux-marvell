@@ -1956,18 +1956,18 @@ static void mvpp2_rx_pkts_coal_set(struct mvpp2_port *port,
 static void mvpp2_tx_pkts_coal_set(struct mvpp2_port *port,
 				   struct mvpp2_tx_queue *txq)
 {
-	int cpu;
+	int thread;
 	u32 val;
 
 	if (txq->done_pkts_coal > MVPP2_TXQ_THRESH_MASK)
 		txq->done_pkts_coal = MVPP2_TXQ_THRESH_MASK;
 
 	val = (txq->done_pkts_coal << MVPP2_TXQ_THRESH_OFFSET);
-	/* PKT-coalescing registers are per-queue + per-cpu */
-	for_each_present_cpu(cpu) {
-		mvpp2_percpu_write(port->priv, cpu, MVPP2_TXQ_NUM_REG,
+	/* PKT-coalescing registers are per-queue + per-thread */
+	for (thread = 0; thread < MVPP2_MAX_THREADS; thread++) {
+		mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_NUM_REG,
 				   txq->id);
-		mvpp2_percpu_write(port->priv, cpu, MVPP2_TXQ_THRESH_REG, val);
+		mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_THRESH_REG, val);
 	}
 }
 
