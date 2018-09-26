@@ -15,6 +15,10 @@
 #include <linux/phy.h>
 #include <linux/phylink.h>
 
+#ifndef CACHE_LINE_MASK
+#define CACHE_LINE_MASK            (~(L1_CACHE_BYTES - 1))
+#endif
+
 /* Fifo Registers */
 #define MVPP2_RX_DATA_FIFO_SIZE_REG(port)	(0x00 + 4 * (port))
 #define MVPP2_RX_ATTR_FIFO_SIZE_REG(port)	(0x20 + 4 * (port))
@@ -1042,7 +1046,7 @@ struct mvpp2_tx_queue {
 
 	/* Index of the next Tx DMA descriptor to process */
 	int next_desc_to_proc;
-};
+} __aligned(L1_CACHE_BYTES);
 
 struct mvpp2_rx_queue {
 	/* RX queue number, in the range 0-31 for physical RXQs */

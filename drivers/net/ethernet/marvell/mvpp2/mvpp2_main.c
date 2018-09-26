@@ -5126,6 +5126,7 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 	const struct mbus_dram_target_info *dram_target_info;
 	int err, i;
 	u32 val;
+	dma_addr_t p;
 
 	/* MBUS windows configuration */
 	dram_target_info = mv_mbus_dram_info();
@@ -5146,12 +5147,16 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
 		writel(val, priv->iface_base + MVPP22_SMI_MISC_CFG_REG);
 	}
 
-	/* Allocate and initialize aggregated TXQs */
-	priv->aggr_txqs = devm_kcalloc(&pdev->dev, MVPP2_MAX_THREADS,
-				       sizeof(*priv->aggr_txqs),
-				       GFP_KERNEL);
-	if (!priv->aggr_txqs)
+	/* Allocate and initialize aggregated TXQs
+	 * The aggr_txqs[per-cpu] entry should be aligned onto cache.
+	 * So allocate more than needed and round-up the pointer.
+	 */
+	val = sizeof(*priv->aggr_txqs) * MVPP2_MAX_THREADS + L1_CACHE_BYTES;
+	p = (dma_addr_t)devm_kzalloc(&pdev->dev, val, GFP_KERNEL);
+	if (!p)
 		return -ENOMEM;
+	p = (p + ~CACHE_LINE_MASK) & CACHE_LINE_MASK;
+	priv->aggr_txqs = (struct mvpp2_tx_queue *)p;
 
 	for (i = 0; i < MVPP2_MAX_THREADS; i++) {
 		priv->aggr_txqs[i].id = i;
