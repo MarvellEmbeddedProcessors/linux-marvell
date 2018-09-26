@@ -632,6 +632,8 @@
 /* Port flags */
 #define MVPP2_F_LOOPBACK		BIT(0)
 #define MVPP2_F_DT_COMPAT		BIT(1)
+/* BIT(1 and 2) are reserved */
+#define MVPP2_F_IF_TX_ON		BIT(3)
 
 /* Marvell tag types */
 enum mvpp2_tag_type {
@@ -887,6 +889,9 @@ struct mvpp2_port {
 
 	/* RSS indirection table */
 	u32 indir[MVPP22_RSS_TABLE_ENTRIES];
+
+	/* Coherency-update for TX-ON from link_status_irq */
+	struct tasklet_struct txqs_on_tasklet;
 };
 
 /* The mvpp2_tx_desc and mvpp2_rx_desc structures describe the

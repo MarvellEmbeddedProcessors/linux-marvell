@@ -1831,6 +1831,98 @@ static void mvpp2_txq_sent_counter_clear(void *arg)
 	}
 }
 
+/* Avoid wrong tx_done calling for netif_tx_wake at time of
+ * dev-stop or linkDown processing by flag MVPP2_F_IF_TX_ON.
+ * Set/clear it on each cpu.
+ */
+static inline bool mvpp2_tx_stopped(struct mvpp2_port *port)
+{
+	return !(port->flags & MVPP2_F_IF_TX_ON);
+}
+
+static void mvpp2_txqs_on(void *arg)
+{
+	((struct mvpp2_port *)arg)->flags |= MVPP2_F_IF_TX_ON;
+}
+
+static void mvpp2_txqs_off(void *arg)
+{
+	((struct mvpp2_port *)arg)->flags &= ~MVPP2_F_IF_TX_ON;
+}
+
+static void mvpp2_txqs_on_tasklet_cb(unsigned long data)
+{
+	/* Activated/runs on 1 cpu only (with link_status_irq)
+	 * to update/guarantee TX_ON coherency on other cpus
+	 */
+	struct mvpp2_port *port = (struct mvpp2_port *)data;
+
+	if (mvpp2_tx_stopped(port))
+		on_each_cpu(mvpp2_txqs_off, port, 1);
+	else
+		on_each_cpu(mvpp2_txqs_on, port, 1);
+}
+
+static void mvpp2_txqs_on_tasklet_init(struct mvpp2_port *port)
+{
+	/* Init called only for port with link_status_isr */
+	tasklet_init(&port->txqs_on_tasklet,
+		     mvpp2_txqs_on_tasklet_cb,
+		     (unsigned long)port);
+}
+
+static void mvpp2_txqs_on_tasklet_kill(struct mvpp2_port *port)
+{
+	if (port->txqs_on_tasklet.func)
+		tasklet_kill(&port->txqs_on_tasklet);
+}
+
+/* Use mvpp2 APIs instead of netif_TX_ALL:
+ *  netif_tx_start_all_queues -> mvpp2_tx_start_all_queues
+ *  netif_tx_wake_all_queues  -> mvpp2_tx_wake_all_queues
+ *  netif_tx_stop_all_queues  -> mvpp2_tx_stop_all_queues
+ * But keep using per-queue APIs netif_tx_wake_queue,
+ *  netif_tx_stop_queue and netif_tx_queue_stopped.
+ */
+static void mvpp2_tx_start_all_queues(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+
+	/* Never called from IRQ. Update all cpus directly */
+	on_each_cpu(mvpp2_txqs_on, port, 1);
+	netif_tx_start_all_queues(dev);
+}
+
+static void mvpp2_tx_wake_all_queues(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+
+	if (irqs_disabled()) {
+		/* Link-status IRQ context (also ACPI).
+		 * Set for THIS cpu, update other cpus over tasklet
+		 */
+		mvpp2_txqs_on((void *)port);
+		tasklet_schedule(&port->txqs_on_tasklet);
+	} else {
+		on_each_cpu(mvpp2_txqs_on, port, 1);
+	}
+	netif_tx_wake_all_queues(dev);
+}
+
+static void mvpp2_tx_stop_all_queues(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+
+	if (irqs_disabled()) {
+		/* IRQ context. Set for THIS, update other cpus over tasklet */
+		mvpp2_txqs_off((void *)port);
+		tasklet_schedule(&port->txqs_on_tasklet);
+	} else {
+		on_each_cpu(mvpp2_txqs_off, port, 1);
+	}
+	netif_tx_stop_all_queues(dev);
+}
+
 /* Set max sizes for Tx queues */
 static void mvpp2_txp_max_tx_size_set(struct mvpp2_port *port)
 {
@@ -2022,9 +2114,9 @@ static void mvpp2_txq_done(struct mvpp2_port *port, struct mvpp2_tx_queue *txq,
 
 	txq_pcpu->count -= tx_done;
 
-	if (netif_tx_queue_stopped(nq))
-		if (txq_pcpu->count <= txq_pcpu->wake_threshold)
-			netif_tx_wake_queue(nq);
+	if (netif_tx_queue_stopped(nq) && !mvpp2_tx_stopped(port) &&
+	    txq_pcpu->count <= txq_pcpu->wake_threshold)
+		netif_tx_wake_queue(nq);
 }
 
 static unsigned int mvpp2_tx_done(struct mvpp2_port *port, u32 cause,
@@ -2517,9 +2609,9 @@ static irqreturn_t mvpp2_link_status_isr(int irq, void *dev_id)
 		mvpp2_egress_enable(port);
 		mvpp2_ingress_enable(port);
 		netif_carrier_on(dev);
-		netif_tx_wake_all_queues(dev);
+		mvpp2_tx_wake_all_queues(dev);
 	} else {
-		netif_tx_stop_all_queues(dev);
+		mvpp2_tx_stop_all_queues(dev);
 		netif_carrier_off(dev);
 		mvpp2_ingress_disable(port);
 		mvpp2_egress_disable(port);
@@ -3220,13 +3312,15 @@ static void mvpp2_start_dev(struct mvpp2_port *port)
 				  NULL);
 	}
 
-	netif_tx_start_all_queues(port->dev);
+	mvpp2_tx_start_all_queues(port->dev);
 }
 
 /* Set hw internals when stopping port */
 static void mvpp2_stop_dev(struct mvpp2_port *port)
 {
 	int i;
+
+	mvpp2_tx_stop_all_queues(port->dev);
 
 	/* Disable interrupts on all threads */
 	mvpp2_interrupts_disable(port);
@@ -3411,6 +3505,7 @@ static int mvpp2_open(struct net_device *dev)
 	}
 
 	if (priv->hw_version != MVPP21 && port->link_irq && !port->phylink) {
+		mvpp2_txqs_on_tasklet_init(port);
 		err = request_irq(port->link_irq, mvpp2_link_status_isr, 0,
 				  dev->name, port);
 		if (err) {
@@ -3483,6 +3578,7 @@ static int mvpp2_stop(struct net_device *dev)
 			tasklet_kill(&port_pcpu->tx_done_tasklet);
 		}
 	}
+	mvpp2_txqs_on_tasklet_kill(port);
 	mvpp2_cleanup_rxqs(port);
 	mvpp2_cleanup_txqs(port);
 
@@ -4605,6 +4701,8 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 		return;
 	}
 
+	mvpp2_tx_stop_all_queues(port->dev);
+
 	/* Make sure the port is disabled when reconfiguring the mode */
 	mvpp2_port_disable(port);
 
@@ -4630,6 +4728,7 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 		mvpp2_port_loopback_set(port, state);
 
 	mvpp2_port_enable(port);
+	mvpp2_tx_wake_all_queues(dev);
 }
 
 static void mvpp2_mac_link_up(struct net_device *dev, unsigned int mode,
@@ -4651,7 +4750,7 @@ static void mvpp2_mac_link_up(struct net_device *dev, unsigned int mode,
 
 	mvpp2_egress_enable(port);
 	mvpp2_ingress_enable(port);
-	netif_tx_wake_all_queues(dev);
+	mvpp2_tx_wake_all_queues(dev);
 }
 
 static void mvpp2_mac_link_down(struct net_device *dev, unsigned int mode,
@@ -4668,7 +4767,7 @@ static void mvpp2_mac_link_down(struct net_device *dev, unsigned int mode,
 		writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 	}
 
-	netif_tx_stop_all_queues(dev);
+	mvpp2_tx_stop_all_queues(dev);
 	mvpp2_egress_disable(port);
 	mvpp2_ingress_disable(port);
 
