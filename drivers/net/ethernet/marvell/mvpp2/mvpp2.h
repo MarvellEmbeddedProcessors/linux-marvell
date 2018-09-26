@@ -1131,8 +1131,93 @@ struct mvpp2_bm_pool {
 #define MVPP2_DRIVER_NAME "mvpp2"
 #define MVPP2_DRIVER_VERSION "1.0"
 
-void mvpp2_write(struct mvpp2 *priv, u32 offset, u32 data);
-u32 mvpp2_read(struct mvpp2 *priv, u32 offset);
+/* Run-time critical Utility/helper methods */
+static inline
+void mvpp2_write(struct mvpp2 *priv, u32 offset, u32 data)
+{
+	writel(data, priv->swth_base[0] + offset);
+}
+
+static inline
+u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
+{
+	return readl(priv->swth_base[0] + offset);
+}
+
+static inline
+u32 mvpp2_read_relaxed(struct mvpp2 *priv, u32 offset)
+{
+	return readl_relaxed(priv->swth_base[0] + offset);
+}
+
+static inline
+u32 mvpp2_cpu_to_thread(struct mvpp2 *priv, int cpu)
+{
+	return cpu % priv->nthreads;
+}
+
+/* These accessors should be used to access:
+ *
+ * - per-thread registers, where each thread has its own copy of the
+ *   register.
+ *
+ *   MVPP2_BM_VIRT_ALLOC_REG
+ *   MVPP2_BM_ADDR_HIGH_ALLOC
+ *   MVPP22_BM_ADDR_HIGH_RLS_REG
+ *   MVPP2_BM_VIRT_RLS_REG
+ *   MVPP2_ISR_RX_TX_CAUSE_REG
+ *   MVPP2_ISR_RX_TX_MASK_REG
+ *   MVPP2_TXQ_NUM_REG
+ *   MVPP2_AGGR_TXQ_UPDATE_REG
+ *   MVPP2_TXQ_RSVD_REQ_REG
+ *   MVPP2_TXQ_RSVD_RSLT_REG
+ *   MVPP2_TXQ_SENT_REG
+ *   MVPP2_RXQ_NUM_REG
+ *
+ * - global registers that must be accessed through a specific thread
+ *   window, because they are related to an access to a per-thread
+ *   register
+ *
+ *   MVPP2_BM_PHY_ALLOC_REG    (related to MVPP2_BM_VIRT_ALLOC_REG)
+ *   MVPP2_BM_PHY_RLS_REG      (related to MVPP2_BM_VIRT_RLS_REG)
+ *   MVPP2_RXQ_THRESH_REG      (related to MVPP2_RXQ_NUM_REG)
+ *   MVPP2_RXQ_DESC_ADDR_REG   (related to MVPP2_RXQ_NUM_REG)
+ *   MVPP2_RXQ_DESC_SIZE_REG   (related to MVPP2_RXQ_NUM_REG)
+ *   MVPP2_RXQ_INDEX_REG       (related to MVPP2_RXQ_NUM_REG)
+ *   MVPP2_TXQ_PENDING_REG     (related to MVPP2_TXQ_NUM_REG)
+ *   MVPP2_TXQ_DESC_ADDR_REG   (related to MVPP2_TXQ_NUM_REG)
+ *   MVPP2_TXQ_DESC_SIZE_REG   (related to MVPP2_TXQ_NUM_REG)
+ *   MVPP2_TXQ_INDEX_REG       (related to MVPP2_TXQ_NUM_REG)
+ *   MVPP2_TXQ_PENDING_REG     (related to MVPP2_TXQ_NUM_REG)
+ *   MVPP2_TXQ_PREF_BUF_REG    (related to MVPP2_TXQ_NUM_REG)
+ *   MVPP2_TXQ_PREF_BUF_REG    (related to MVPP2_TXQ_NUM_REG)
+ */
+static inline
+void mvpp2_thread_write(struct mvpp2 *priv, unsigned int thread,
+			u32 offset, u32 data)
+{
+	writel(data, priv->swth_base[thread] + offset);
+}
+
+static inline
+u32 mvpp2_thread_read(struct mvpp2 *priv, unsigned int thread, u32 offset)
+{
+	return readl(priv->swth_base[thread] + offset);
+}
+
+static inline
+void mvpp2_thread_write_relaxed(struct mvpp2 *priv, unsigned int thread,
+				u32 offset, u32 data)
+{
+	writel_relaxed(data, priv->swth_base[thread] + offset);
+}
+
+static inline
+u32 mvpp2_thread_read_relaxed(struct mvpp2 *priv, unsigned int thread,
+			      u32 offset)
+{
+	return readl_relaxed(priv->swth_base[thread] + offset);
+}
 
 void mvpp2_dbgfs_init(struct mvpp2 *priv, const char *name);
 
