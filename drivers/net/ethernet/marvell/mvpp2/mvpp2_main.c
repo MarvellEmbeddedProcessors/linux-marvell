@@ -1702,8 +1702,7 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2_port *port,
 					    int num)
 {
 	unsigned int thread;
-	struct netdev_queue *nq;
-	int req, desc_count, total;
+	int req, desc_count;
 	struct mvpp2_txq_pcpu *txq_pcpu_aux;
 
 	if (txq_pcpu->reserved_num >= num)
@@ -1712,31 +1711,24 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2_port *port,
 	/* Not enough descriptors reserved! Update the reserved descriptor
 	 * count and check again.
 	 */
-	/* Count total used descriptors (already reserved + waiting
-	 * for transmit) and check limit before going with HW reservation.
-	 */
-	desc_count = 0;
-	for (thread = 0; thread < port->priv->nthreads; thread++) {
-		txq_pcpu_aux = per_cpu_ptr(txq->pcpu, thread);
-		desc_count += txq_pcpu_aux->count;
-		desc_count += txq_pcpu_aux->reserved_num;
-	}
-	req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
-
-	total = desc_count + req;
-	if (likely((total + MVPP2_CPU_DESC_CHUNK) <= txq->size)) {
-		; /* goto reserve_in_hw */
-	} else if (total <= txq->size) {
-		 /* Pause the TX-Queue but continue with this packet */
-		nq = netdev_get_tx_queue(port->dev, txq->log_id);
-		netif_tx_stop_queue(nq);
+	if (num <= MAX_SKB_FRAGS) {
+		req = MVPP2_CPU_DESC_CHUNK;
 	} else {
-		return -ENOMEM; /* drop the packet */
+		/* Compute total of used descriptors */
+		desc_count = 0;
+		for (thread = 0; thread < port->priv->nthreads; thread++) {
+			txq_pcpu_aux = per_cpu_ptr(txq->pcpu, thread);
+			desc_count += txq_pcpu_aux->reserved_num;
+		}
+		req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
+		/* Check the reservation is possible */
+		if ((desc_count + req) > txq->size)
+			return -ENOMEM;
 	}
 
 	txq_pcpu->reserved_num += mvpp2_txq_alloc_reserved_desc(port, txq, req);
 
-	/* OK, the descriptor could have been updated: check again. */
+	/* Check the resulting reservation is enough */
 	if (txq_pcpu->reserved_num < num)
 		return -ENOMEM;
 	return 0;
