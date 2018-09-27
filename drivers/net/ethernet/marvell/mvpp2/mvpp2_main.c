@@ -5186,6 +5186,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	unsigned int ntxqs, nrxqs, thread;
 	unsigned long flags = 0;
 	bool has_tx_irqs;
+	dma_addr_t p;
 	u32 id;
 	int features;
 	int phy_mode;
@@ -5309,13 +5310,16 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 		goto err_free_irq;
 	}
 
-	port->ethtool_stats = devm_kcalloc(&pdev->dev,
-					   ARRAY_SIZE(mvpp2_ethtool_regs),
-					   sizeof(u64), GFP_KERNEL);
-	if (!port->ethtool_stats) {
+	p = (dma_addr_t)devm_kcalloc(&pdev->dev,
+				     ARRAY_SIZE(mvpp2_ethtool_regs) +
+				     L1_CACHE_BYTES,
+				     sizeof(u64), GFP_KERNEL);
+	if (!p) {
 		err = -ENOMEM;
 		goto err_free_stats;
 	}
+	p = (p + ~CACHE_LINE_MASK) & CACHE_LINE_MASK;
+	port->ethtool_stats = (void *)p;
 
 	mutex_init(&port->gather_stats_lock);
 	INIT_DELAYED_WORK(&port->stats_work, mvpp2_gather_hw_statistics);
