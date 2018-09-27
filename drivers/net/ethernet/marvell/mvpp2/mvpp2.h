@@ -510,6 +510,7 @@
 /* Coalescing */
 #define MVPP2_TXDONE_COAL_PKTS_THRESH	32
 #define MVPP2_TXDONE_HRTIMER_PERIOD_NS	1000000UL
+#define MVPP2_GUARD_TXDONE_HRTIMER_NS	(10 * NSEC_PER_MSEC)
 #define MVPP2_TXDONE_COAL_USEC		1000
 #define MVPP2_RX_COAL_PKTS		32
 #define MVPP2_RX_COAL_USEC		64
@@ -824,7 +825,15 @@ struct mvpp2_port_pcpu {
 	/* Timer & Tasklet for egress finalization */
 	struct hrtimer tx_done_timer;
 	bool tx_done_timer_scheduled;
+	bool guard_timer_scheduled;
 	struct tasklet_struct tx_done_tasklet;
+
+	/* tx-done guard timer fields */
+	struct mvpp2_port *port; /* reference to get from tx_done_timer */
+	bool tx_done_passed;	/* tx-done passed since last guard-check */
+	u8 txq_coal_is_zero_map; /* map tx queues (max=8) forced coal=Zero */
+	u8 txq_busy_suspect_map; /* map suspect txq to be forced */
+	u32 tx_guard_cntr;	/* statistic */
 };
 
 struct mvpp2_queue_vector {

@@ -103,6 +103,11 @@ struct mvpp2_share mvpp2_share;
 static inline void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu,
 				     struct mvpp2_txq_pcpu_buf *tx_buf);
 
+static void mvpp2_tx_done_guard_force_irq(struct mvpp2_port *port,
+					  int sw_thread, u8 to_zero_map);
+static inline void mvpp2_tx_done_guard_timer_set(struct mvpp2_port *port,
+						 int sw_thread);
+
 /* The prototype is added here to be used in start_dev when using ACPI. This
  * will be removed once phylink is used for all modes (dt+ACPI).
  */
@@ -1639,9 +1644,13 @@ mvpp2_txq_next_desc_get(struct mvpp2_tx_queue *txq)
  */
 static void mvpp2_aggr_txq_pend_desc_add(struct mvpp2_port *port, int pending)
 {
+	int cpu = smp_processor_id();
+
+	mvpp2_tx_done_guard_timer_set(port, cpu);
+
 	/* aggregated access - relevant TXQ number is written in TX desc */
 	mvpp2_thread_write(port->priv,
-			   mvpp2_cpu_to_thread(port->priv, smp_processor_id()),
+			   mvpp2_cpu_to_thread(port->priv, cpu),
 			   MVPP2_AGGR_TXQ_UPDATE_REG, pending);
 }
 
@@ -2139,6 +2148,9 @@ static unsigned int mvpp2_tx_done(struct mvpp2_port *port, u32 cause,
 	struct mvpp2_tx_queue *txq;
 	struct mvpp2_txq_pcpu *txq_pcpu;
 	unsigned int tx_todo = 0;
+
+	/* Set/Restore "no-force" */
+	mvpp2_tx_done_guard_force_irq(port, thread, 0);
 
 	while (cause) {
 		txq = mvpp2_get_tx_queue(port, cause);
@@ -2774,6 +2786,220 @@ static void mvpp2_bulk_tasklet_cb(unsigned long data)
 		return; /* Flushed by xmit */
 	aggr_txq->pending -= frags;
 	mvpp2_aggr_txq_pend_desc_add(port, frags);
+}
+
+/* Guard timer, tasklet, fixer utilities */
+
+/* The Guard fixer, called for 2 opposite actions:
+ *  Activate fix by set frame-coalescing to Zero (according to_zero_map)
+ *     which forces the tx-done IRQ. Called by guard tasklet.
+ *  Deactivate fixer ~ restore the coal-configration (to_zero_map=0)
+ *    when/by tx-done activated.
+ */
+static void mvpp2_tx_done_guard_force_irq(struct mvpp2_port *port,
+					  int sw_thread, u8 to_zero_map)
+{
+	int q;
+	u32 val, coal, qmask, xor;
+	struct mvpp2_port_pcpu *port_pcpu = per_cpu_ptr(port->pcpu, sw_thread);
+
+	if (port_pcpu->txq_coal_is_zero_map == to_zero_map)
+		return; /* all current & requested are already the same */
+
+	xor = port_pcpu->txq_coal_is_zero_map ^ to_zero_map;
+	/* Configuration num-of-frames coalescing is the same for all queues */
+	coal = port->txqs[0]->done_pkts_coal << MVPP2_TXQ_THRESH_OFFSET;
+
+	for (q = 0; q < port->ntxqs; q++) {
+		qmask = 1 << q;
+		if (!(xor & qmask))
+			continue;
+		if (to_zero_map & qmask)
+			val = 0; /* Set ZERO forcing the Interrupt */
+		else
+			val = coal; /* Set/restore configured threshold */
+		mvpp2_thread_write(port->priv, sw_thread,
+				   MVPP2_TXQ_NUM_REG, port->txqs[q]->id);
+		mvpp2_thread_write(port->priv, sw_thread,
+				   MVPP2_TXQ_THRESH_REG, val);
+	}
+	port_pcpu->txq_coal_is_zero_map = to_zero_map;
+}
+
+static inline void mvpp2_tx_done_guard_timer_set(struct mvpp2_port *port,
+						 int sw_thread)
+{
+	struct mvpp2_port_pcpu *port_pcpu = per_cpu_ptr(port->pcpu,
+							sw_thread);
+
+	if (!port_pcpu->guard_timer_scheduled) {
+		port_pcpu->guard_timer_scheduled = true;
+		hrtimer_start(&port_pcpu->tx_done_timer,
+			      MVPP2_GUARD_TXDONE_HRTIMER_NS,
+			      HRTIMER_MODE_REL_PINNED);
+	}
+}
+
+/* Guard timer and tasklet callbacks making check logic upon flags
+ *    guard_timer_scheduled, tx_done_passed,
+ *    txq_coal_is_zero_map, txq_busy_suspect_map
+ */
+static enum hrtimer_restart mvpp2_guard_timer_cb(struct hrtimer *timer)
+{
+	struct mvpp2_port_pcpu *port_pcpu = container_of(timer,
+			 struct mvpp2_port_pcpu, tx_done_timer);
+	struct mvpp2_port *port = port_pcpu->port;
+	struct mvpp2_tx_queue *txq;
+	struct mvpp2_txq_pcpu *txq_pcpu;
+	u8 txq_nonempty_map = 0;
+	int q, cpu;
+	ktime_t time;
+
+	if (port_pcpu->tx_done_passed) {
+		/* ok, tx-done was active since last checking */
+		port_pcpu->tx_done_passed = false;
+		time = MVPP2_GUARD_TXDONE_HRTIMER_NS; /* regular long */
+		goto timer_restart;
+	}
+
+	cpu = smp_processor_id(); /* timer is per-cpu */
+
+	for (q = 0; q < port->ntxqs; q++) {
+		txq = port->txqs[q];
+		txq_pcpu = per_cpu_ptr(txq->pcpu, cpu);
+		if (txq_pcpu->count)
+			txq_nonempty_map |= 1 << q;
+	}
+
+	if (!txq_nonempty_map || mvpp2_tx_stopped(port)) {
+		/* All queues are empty, guard-timer may be stopped now
+		 * It would be started again on new transmit.
+		 */
+		port_pcpu->guard_timer_scheduled = false;
+		return HRTIMER_NORESTART;
+	}
+
+	if (port_pcpu->txq_busy_suspect_map) {
+		/* Second-hit ~~ tx-done is really stalled.
+		 * Activate the tasklet to fix.
+		 * Keep guard_timer_scheduled=TRUE
+		 */
+		tasklet_schedule(&port_pcpu->tx_done_tasklet);
+		return HRTIMER_NORESTART;
+	}
+
+	/* First-hit ~~ tx-done seems stalled. Schedule re-check with SHORT time
+	 * bigger a bit than HW-coal-time-usec (1024=2^10 vs NSEC_PER_USEC)
+	 */
+	time = ktime_set(0, port->tx_time_coal << 10);
+	port_pcpu->txq_busy_suspect_map |= txq_nonempty_map;
+
+timer_restart:
+	/* Keep guard_timer_scheduled=TRUE but set new expiration time */
+	hrtimer_forward_now(timer, time);
+	return HRTIMER_RESTART;
+}
+
+static void mvpp2_tx_done_guard_tasklet_cb(unsigned long data)
+{
+	struct mvpp2_port *port = (void *)data;
+	struct mvpp2_port_pcpu *port_pcpu;
+	int cpu;
+
+	 /* stop_dev() has permanent setting for coal=0 */
+	if (mvpp2_tx_stopped(port))
+		return;
+
+	cpu = get_cpu();
+	port_pcpu = per_cpu_ptr(port->pcpu, cpu); /* tasklet is per-cpu */
+
+	if (port_pcpu->tx_done_passed) {
+		port_pcpu->tx_done_passed = false;
+	} else { /* Force IRQ */
+		mvpp2_tx_done_guard_force_irq(port, cpu,
+					      port_pcpu->txq_busy_suspect_map);
+		port_pcpu->tx_guard_cntr++;
+	}
+	port_pcpu->txq_busy_suspect_map = 0;
+
+	/* guard_timer_scheduled is already TRUE, just start the timer */
+	hrtimer_start(&port_pcpu->tx_done_timer,
+		      MVPP2_GUARD_TXDONE_HRTIMER_NS,
+		      HRTIMER_MODE_REL_PINNED);
+	put_cpu();
+}
+
+static void mvpp2_tx_done_init_on_open(struct mvpp2_port *port, bool open)
+{
+	struct mvpp2_port_pcpu *port_pcpu;
+	int cpu;
+
+	if (port->flags & MVPP2_F_LOOPBACK)
+		return;
+
+	if (!open)
+		goto close;
+
+	/* Init tx-done tasklets and variables */
+	for_each_present_cpu(cpu) {
+		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+
+		/* Timer works in tx-done or Guard mode. To eliminate per-packet
+		 * mode checking each mode has own "_scheduled" flag.
+		 * Set scheduled=FALSE for active mode and TRUE for inactive, so
+		 * timer would never be started in inactive mode.
+		 */
+		if (port->has_tx_irqs) { /* guard-mode */
+			port_pcpu->txq_coal_is_zero_map = 0;
+			port_pcpu->txq_busy_suspect_map = 0;
+			port_pcpu->tx_done_passed = false;
+
+			/* "true" is never started */
+			port_pcpu->tx_done_timer_scheduled = true;
+			port_pcpu->guard_timer_scheduled = false;
+			tasklet_init(&port_pcpu->tx_done_tasklet,
+				     mvpp2_tx_done_guard_tasklet_cb,
+				     (unsigned long)port);
+		} else {
+			port_pcpu->tx_done_timer_scheduled = false;
+			/* "true" is never started */
+			port_pcpu->guard_timer_scheduled = true;
+			tasklet_init(&port_pcpu->tx_done_tasklet,
+				     mvpp2_tx_done_proc_cb,
+				     (unsigned long)port);
+		}
+	}
+	return;
+close:
+	/* Kill tx-done timers and tasklets */
+	for_each_present_cpu(cpu) {
+		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+		/* Say "scheduled=true" is never started on XMIT */
+		port_pcpu->tx_done_timer_scheduled = true;
+		port_pcpu->guard_timer_scheduled = true;
+		hrtimer_cancel(&port_pcpu->tx_done_timer);
+		tasklet_kill(&port_pcpu->tx_done_tasklet);
+	}
+}
+
+static void mvpp2_tx_done_init_on_probe(struct platform_device *pdev,
+					struct mvpp2_port *port)
+{
+	struct mvpp2_port_pcpu *port_pcpu;
+	int cpu;
+	bool guard_mode = port->has_tx_irqs;
+
+	if (port->flags & MVPP2_F_LOOPBACK)
+		return;
+
+	for_each_present_cpu(cpu) {
+		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
+		port_pcpu->port = port;
+		hrtimer_init(&port_pcpu->tx_done_timer, CLOCK_MONOTONIC,
+			     HRTIMER_MODE_REL_PINNED);
+		port_pcpu->tx_done_timer.function = (guard_mode) ?
+				mvpp2_guard_timer_cb : mvpp2_tx_done_timer_cb;
+	}
 }
 
 /* Main RX/TX processing routines */
@@ -3605,6 +3831,8 @@ static int mvpp2_poll(struct napi_struct *napi, int budget)
 	if (port->has_tx_irqs) {
 		cause_tx = cause_rx_tx & MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_MASK;
 		if (cause_tx) {
+			per_cpu_ptr(port->pcpu,
+				    qv->sw_thread_id)->tx_done_passed =	true;
 			cause_tx >>= MVPP2_CAUSE_TXQ_OCCUP_DESC_ALL_OFFSET;
 			mvpp2_tx_done(port, cause_tx, qv->sw_thread_id);
 		}
@@ -3959,6 +4187,8 @@ static int mvpp2_open(struct net_device *dev)
 	on_each_cpu(mvpp2_interrupts_unmask, port, 1);
 	mvpp2_shared_interrupt_mask_unmask(port, false);
 
+	mvpp2_tx_done_init_on_open(port, true);
+
 	mvpp2_start_dev(port);
 
 	/* Start hardware statistics gathering */
@@ -4010,7 +4240,7 @@ static int mvpp2_stop(struct net_device *dev)
 		hrtimer_cancel(&port_pcpu->bulk_timer);
 		tasklet_kill(&port_pcpu->bulk_tasklet);
 	}
-
+	mvpp2_tx_done_init_on_open(port, false);
 	mvpp2_txqs_on_tasklet_kill(port);
 	mvpp2_cleanup_rxqs(port);
 	mvpp2_cleanup_txqs(port);
@@ -5243,7 +5473,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	struct resource *res;
 	struct phylink *phylink;
 	char *mac_from = "";
-	unsigned int ntxqs, nrxqs, thread;
+	unsigned int ntxqs, nrxqs;
 	unsigned long flags = 0;
 	bool has_tx_irqs;
 	dma_addr_t p;
@@ -5406,22 +5636,9 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 		goto err_free_txq_pcpu;
 	}
 
-	/* Init tx-done timer and tasklet */
-	if (!port->has_tx_irqs) {
-		for (thread = 0; thread < priv->nthreads; thread++) {
-			port_pcpu = per_cpu_ptr(port->pcpu, thread);
+	/* Init tx-done/guard timer and tasklet */
+	 mvpp2_tx_done_init_on_probe(pdev, port);
 
-			hrtimer_init(&port_pcpu->tx_done_timer, CLOCK_MONOTONIC,
-				     HRTIMER_MODE_REL_PINNED);
-			port_pcpu->tx_done_timer.function =
-							mvpp2_tx_done_timer_cb;
-			port_pcpu->tx_done_timer_scheduled = false;
-
-			tasklet_init(&port_pcpu->tx_done_tasklet,
-				     mvpp2_tx_done_proc_cb,
-				     (unsigned long)dev);
-		}
-	}
 	/* Init bulk timer and tasklet */
 	for_each_present_cpu(cpu) {
 		port_pcpu = per_cpu_ptr(port->pcpu, cpu);
