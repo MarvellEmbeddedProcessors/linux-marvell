@@ -1691,8 +1691,10 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2_port *port,
 					    struct mvpp2_txq_pcpu *txq_pcpu,
 					    int num)
 {
-	int req, desc_count;
 	unsigned int thread;
+	struct netdev_queue *nq;
+	int req, desc_count, total;
+	struct mvpp2_txq_pcpu *txq_pcpu_aux;
 
 	if (txq_pcpu->reserved_num >= num)
 		return 0;
@@ -1700,23 +1702,27 @@ static int mvpp2_txq_reserved_desc_num_proc(struct mvpp2_port *port,
 	/* Not enough descriptors reserved! Update the reserved descriptor
 	 * count and check again.
 	 */
-
+	/* Count total used descriptors (already reserved + waiting
+	 * for transmit) and check limit before going with HW reservation.
+	 */
 	desc_count = 0;
-	/* Compute total of used descriptors */
 	for (thread = 0; thread < port->priv->nthreads; thread++) {
-		struct mvpp2_txq_pcpu *txq_pcpu_aux;
-
 		txq_pcpu_aux = per_cpu_ptr(txq->pcpu, thread);
 		desc_count += txq_pcpu_aux->count;
 		desc_count += txq_pcpu_aux->reserved_num;
 	}
-
 	req = max(MVPP2_CPU_DESC_CHUNK, num - txq_pcpu->reserved_num);
-	desc_count += req;
 
-	if (desc_count >
-	   (txq->size - (MVPP2_MAX_THREADS * MVPP2_CPU_DESC_CHUNK)))
-		return -ENOMEM;
+	total = desc_count + req;
+	if (likely((total + MVPP2_CPU_DESC_CHUNK) <= txq->size)) {
+		; /* goto reserve_in_hw */
+	} else if (total <= txq->size) {
+		 /* Pause the TX-Queue but continue with this packet */
+		nq = netdev_get_tx_queue(port->dev, txq->log_id);
+		netif_tx_stop_queue(nq);
+	} else {
+		return -ENOMEM; /* drop the packet */
+	}
 
 	txq_pcpu->reserved_num += mvpp2_txq_alloc_reserved_desc(port, txq, req);
 
@@ -3504,8 +3510,8 @@ static netdev_tx_t mvpp2_tx(struct sk_buff *skb, struct net_device *dev)
 out:
 	if (frags > 0) {
 		struct mvpp2_pcpu_stats *stats = per_cpu_ptr(port->stats, thread);
-		struct netdev_queue *nq = netdev_get_tx_queue(dev, txq_id);
 		struct mvpp2_port_pcpu *port_pcpu = this_cpu_ptr(port->pcpu);
+		struct netdev_queue *nq;
 		bool deferred_tx;
 
 		txq_pcpu->reserved_num -= frags;
@@ -3527,9 +3533,10 @@ out:
 			mvpp2_aggr_txq_pend_desc_add(port, frags);
 		}
 
-		if (txq_pcpu->count >= txq_pcpu->stop_threshold)
+		if (unlikely(txq_pcpu->count >= txq_pcpu->stop_threshold)) {
+			nq = netdev_get_tx_queue(dev, txq_id);
 			netif_tx_stop_queue(nq);
-
+		}
 		u64_stats_update_begin(&stats->syncp);
 		stats->tx_packets++;
 		stats->tx_bytes += skb->len;
