@@ -636,6 +636,7 @@
 /* Port flags */
 #define MVPP2_F_LOOPBACK		BIT(0)
 #define MVPP2_F_DT_COMPAT		BIT(1)
+#define MVPP22_F_IF_MUSDK		BIT(2) /* musdk port */
 /* BIT(1 and 2) are reserved */
 #define MVPP2_F_IF_TX_ON		BIT(3)
 
@@ -919,6 +920,9 @@ struct mvpp2_port {
 
 	/* RSS indirection table */
 	u32 indir[MVPP22_RSS_TABLE_ENTRIES];
+
+	/* us private storage, allocated/used by User/Kernel mode toggling */
+	void *us_cfg;
 
 	/* Coherency-update for TX-ON from link_status_irq */
 	struct tasklet_struct txqs_on_tasklet;
