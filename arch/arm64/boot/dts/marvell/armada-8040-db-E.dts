@@ -97,11 +97,11 @@
 	};
 };
 
-&cp0_serial0 {
+&cp0_uart0 {
 	status = "okay";
 };
 
-&cp0_serial1 {
+&cp0_uart1 {
 	status = "okay";
 };
 

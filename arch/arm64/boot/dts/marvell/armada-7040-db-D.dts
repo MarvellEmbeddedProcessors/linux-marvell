@@ -68,7 +68,7 @@
 	};
 };
 
-&cp0_nand {
+&cp0_nand_controller {
 	status = "okay";
 };
 

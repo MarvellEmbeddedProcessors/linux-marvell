@@ -106,7 +106,7 @@
 };
 
 
-&cp1_nand {
+&cp1_nand_controller {
 	status = "okay";
 };
 
