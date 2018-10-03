@@ -3451,7 +3451,9 @@ static int mvneta_mac_link_state(struct net_device *ndev,
 
 	gmac_stat = mvreg_read(pp, MVNETA_GMAC_STATUS);
 
-	if (gmac_stat & MVNETA_GMAC_SPEED_1000)
+	if (pp->phy_interface == PHY_INTERFACE_MODE_2500BASEX)
+		state->speed = SPEED_2500;
+	else if (gmac_stat & MVNETA_GMAC_SPEED_1000)
 		state->speed = SPEED_1000;
 	else if (gmac_stat & MVNETA_GMAC_SPEED_100)
 		state->speed = SPEED_100;
@@ -3983,6 +3985,19 @@ mvneta_ethtool_set_link_ksettings(struct net_device *ndev,
 				  const struct ethtool_link_ksettings *cmd)
 {
 	struct mvneta_port *pp = netdev_priv(ndev);
+
+	if (!pp->phylink)
+		return -1;
+
+	phylink_stop(pp->phylink);
+
+	if (cmd->base.speed == 1000)
+		pp->phy_interface = PHY_INTERFACE_MODE_SGMII;
+
+	if (cmd->base.speed == 2500)
+		pp->phy_interface = PHY_INTERFACE_MODE_2500BASEX;
+
+	phylink_start(pp->phylink);
 
 	return phylink_ethtool_ksettings_set(pp->phylink, cmd);
 }
