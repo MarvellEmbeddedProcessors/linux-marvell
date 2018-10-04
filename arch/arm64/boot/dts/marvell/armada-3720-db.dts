@@ -78,13 +78,6 @@
 	status = "okay";
 };
 
-/* Gigabit module on CON18(V2.0)/CON20(V1.4) */
-&eth1 {
-	phy-mode = "sgmii";
-	phy = <&phy1>;
-	status = "okay";
-};
-
 &i2c0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c1_pins>;
@@ -115,14 +108,11 @@
 	};
 };
 
+/* Gigabit module on CON19(V2.0)/CON21(V1.4) only */
 &mdio {
 	status = "okay";
 	phy0: ethernet-phy@0 {
 		reg = <0>;
-	};
-
-	phy1: ethernet-phy@1 {
-		reg = <1>;
 	};
 };
 

@@ -12,4 +12,13 @@
 	status = "okay";
 	/* Generic PHY, providing serdes lanes */
 	phys = <&a3700_comphy0 1>;
+	phy-mode = "sgmii";
+	phy = <&phy1>;
+};
+
+&mdio {
+	status = "okay";
+	phy1: ethernet-phy@1 {
+		reg = <1>;
+	};
 };
