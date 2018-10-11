@@ -1,0 +1,8 @@
+# MISC MVEBU
+
+config MVEBU_SOC_INFO
+	bool "Marvell Aramda-8K SoC information driver"
+	depends on ARCH_MVEBU
+	default y
+	help
+	  Marvell A8K SoC information driver
