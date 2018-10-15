@@ -1103,8 +1103,18 @@ struct mvpp2_tx_queue {
 } __aligned(L1_CACHE_BYTES);
 
 struct mvpp2_rx_queue {
+	/* Virtual address of the RX DMA descriptors array */
+	struct mvpp2_rx_desc *descs;
+
+	/* Index of the next-to-process and last RX DMA descriptor */
+	int next_desc_to_proc;
+	int last_desc;
+
 	/* RX queue number, in the range 0-31 for physical RXQs */
 	u8 id;
+
+	/* Port's logic RXQ number to which physical RXQ is mapped */
+	u8 logic_rxq;
 
 	/* Num of rx descriptors in the rx descriptor ring */
 	int size;
@@ -1112,24 +1122,13 @@ struct mvpp2_rx_queue {
 	u32 pkts_coal;
 	u32 time_coal;
 
-	/* Virtual address of the RX DMA descriptors array */
-	struct mvpp2_rx_desc *descs;
-
 	/* DMA address of the RX DMA descriptors array */
 	dma_addr_t descs_dma;
-
-	/* Index of the last RX DMA descriptor */
-	int last_desc;
-
-	/* Index of the next RX DMA descriptor to process */
-	int next_desc_to_proc;
 
 	/* ID of port to which physical RXQ is mapped */
 	int port;
 
-	/* Port's logic RXQ number to which physical RXQ is mapped */
-	int logic_rxq;
-};
+} __aligned(L1_CACHE_BYTES);
 
 struct mvpp2_bm_pool {
 	/* Pool number in the range 0-7 */
