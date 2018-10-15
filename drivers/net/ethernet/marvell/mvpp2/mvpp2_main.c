@@ -3481,9 +3481,11 @@ err_drop_frame:
 			frag_size = bm_pool->frag_size;
 
 		/* _sync_ for coherency (_unmap_ is asynchroneous) */
-		dma_sync_single_for_cpu(dev->dev.parent, dma_addr,
-					MVPP2_RX_BUF_SIZE(rx_bytes),
-					DMA_FROM_DEVICE);
+		if (rx_todo == 1)
+			dma_sync_single_for_cpu(dev->dev.parent, dma_addr,
+						MVPP2_RX_BUF_SIZE(rx_bytes),
+						DMA_FROM_DEVICE);
+
 		prefetch(data + NET_SKB_PAD); /* packet header */
 
 		dma_unmap_single(dev->dev.parent, dma_addr,
