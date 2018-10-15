@@ -3429,8 +3429,9 @@ static int mvpp2_rx(struct mvpp2_port *port, struct napi_struct *napi,
 	struct net_device *dev = port->dev;
 	int rx_received;
 	int rx_done = 0;
-	u32 rcvd_pkts = 0;
+	u32 rcvd_pkts = 0, i = 0;
 	u32 rcvd_bytes = 0;
+	struct sk_buff *skb_all[rx_todo];
 
 	/* Get number of received packets and clamp the to-do */
 	rx_received = mvpp2_rxq_received(port, rxq->id);
@@ -3505,16 +3506,17 @@ err_drop_frame:
 			goto err_drop_frame;
 		}
 refill_done:
-		rcvd_pkts++;
-		rcvd_bytes += rx_bytes;
-
 		skb_reserve(skb, MVPP2_MH_SIZE + NET_SKB_PAD);
 		skb_put(skb, rx_bytes);
 		skb->protocol = eth_type_trans(skb, dev);
 		mvpp2_rx_csum(port, rx_status, skb);
 
-		napi_gro_receive(napi, skb);
+		skb_all[rcvd_pkts++] = skb;
+		rcvd_bytes += rx_bytes;
 	}
+
+	while (i < rcvd_pkts)
+		napi_gro_receive(napi, skb_all[i++]);
 
 	if (rcvd_pkts) {
 		struct mvpp2_pcpu_stats *stats = this_cpu_ptr(port->stats);
