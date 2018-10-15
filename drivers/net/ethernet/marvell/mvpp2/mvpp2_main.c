@@ -2278,6 +2278,7 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
 		return -ENOMEM;
 
 	rxq->last_desc = rxq->size - 1;
+	rxq->rx_pending = 0;
 
 	/* Zero occupied and non-occupied counters - direct access */
 	mvpp2_write(port->priv, MVPP2_RXQ_STATUS_REG(rxq->id), 0);
@@ -2313,6 +2314,7 @@ static void mvpp2_rxq_drop_pkts(struct mvpp2_port *port,
 {
 	int rx_received, i;
 
+	rxq->rx_pending = 0;
 	rx_received = mvpp2_rxq_received(port, rxq->id);
 	if (!rx_received)
 		return;
@@ -3433,10 +3435,19 @@ static int mvpp2_rx(struct mvpp2_port *port, struct napi_struct *napi,
 	u32 rcvd_bytes = 0;
 	struct sk_buff *skb_all[rx_todo];
 
-	/* Get number of received packets and clamp the to-do */
-	rx_received = mvpp2_rxq_received(port, rxq->id);
-	if (rx_todo > rx_received)
-		rx_todo = rx_received;
+	if (rxq->rx_pending >= rx_todo) {
+		rx_received = rx_todo;
+		rxq->rx_pending -= rx_todo;
+	} else {
+		/* Get number of received packets and clamp the to-do */
+		rx_received = mvpp2_rxq_received(port, rxq->id);
+		if (rx_received < rx_todo) {
+			rx_todo = rx_received;
+			rxq->rx_pending = 0;
+		} else {
+			rxq->rx_pending = rx_received - rx_todo;
+		}
+	}
 
 	while (rx_done < rx_todo) {
 		struct mvpp2_rx_desc *rx_desc = mvpp2_rxq_next_desc_get(rxq);

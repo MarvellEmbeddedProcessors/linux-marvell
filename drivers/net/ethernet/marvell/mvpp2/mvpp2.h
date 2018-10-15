@@ -1116,6 +1116,9 @@ struct mvpp2_rx_queue {
 	/* Port's logic RXQ number to which physical RXQ is mapped */
 	u8 logic_rxq;
 
+	/* Num of RXed packets seen in HW but meanwhile not handled by SW */
+	u16 rx_pending;
+
 	/* Num of rx descriptors in the rx descriptor ring */
 	int size;
 
