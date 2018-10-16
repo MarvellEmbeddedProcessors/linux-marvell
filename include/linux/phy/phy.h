@@ -34,6 +34,7 @@ enum phy_mode {
 	PHY_MODE_UFS_HS_B,
 	PHY_MODE_PCIE,
 	PHY_MODE_SATA,
+	PHY_MODE_RXAUI,
 };
 
 /**
