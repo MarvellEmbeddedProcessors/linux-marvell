@@ -59,15 +59,21 @@ static struct {
 #define MVPP2_RXTX_HASH			0xbac0
 #define MVPP2_RXTX_HASH_CONST_MASK	0xfff0
 #define MVPP2_RXTX_HASH_BMID_MASK	0xf
-/* HashBits[31..16] contain skb->head[22..7], the head is aligned and [6..0]=0
+/* HashBits[31..16] contain skb->head[22..7], the head is aligned and [6..0]=0,
+ * so skb->head is shifted left for (16-7) bits.
  * This hash permits to detect 2 non-recyclable cases:
  * - new skb with old hash inside
  * - same skb but NET-stack has replaced the data-buffer with another one
  */
+#define MVPP2_HEAD_HASH_SHIFT	(16 - 7)
 #define MVPP2_RXTX_HASH_GENER(skb, bm_pool_id) \
-	(((u32)(phys_addr_t)skb->head << 9) | MVPP2_RXTX_HASH | bm_pool_id)
+	(((u32)(phys_addr_t)skb->head << MVPP2_HEAD_HASH_SHIFT) | \
+					MVPP2_RXTX_HASH | bm_pool_id)
 #define MVPP2_RXTX_HASH_IS_OK(skb, hash) \
 	(MVPP2_RXTX_HASH_GENER(skb, 0) == (hash & ~MVPP2_RXTX_HASH_BMID_MASK))
+#define MVPP2_RXTX_HASH_IS_OK_TX(skb, hash) \
+	(((((u32)(phys_addr_t)skb->head << MVPP2_HEAD_HASH_SHIFT) | \
+			MVPP2_RXTX_HASH) ^ hash) <= MVPP2_RXTX_HASH_BMID_MASK)
 
 /* The recycle pool size should be "effectively big" but limited (to eliminate
  * memory-wasting on TX-pick). It should be >8 (Net-stack-forwarding-buffer)
@@ -3804,8 +3810,9 @@ out:
 		txq_pcpu->count += frags;
 		aggr_txq->count += frags;
 
-		/* Enable transmit; may be deferred with Bulk-timer */
+		/* Enable transmit; RX-to-TX may be deferred with Bulk-timer */
 		deferred_tx = (frags == 1) &&
+			MVPP2_RXTX_HASH_IS_OK_TX(skb, skb_get_hash_raw(skb)) &&
 			(aggr_txq->pending < (txq->done_pkts_coal / 2));
 
 		if (deferred_tx) {
