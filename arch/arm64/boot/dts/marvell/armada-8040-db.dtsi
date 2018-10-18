@@ -53,6 +53,25 @@
 		gpio = <&expander1 0 GPIO_ACTIVE_HIGH>;
 	};
 
+	cp1_reg_usb3_1_vbus: cp1-usb3-1-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "cp1-usb3h1-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		gpio = <&expander1 1 GPIO_ACTIVE_HIGH>;
+	};
+
+	cp1_usb3_0_phy: cp1-usb3-0-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp1_reg_usb3_0_vbus>;
+	};
+
+	cp1_usb3_1_phy: cp1-usb3-1-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp1_reg_usb3_1_vbus>;
+	};
+
 	cp0_vccq_sd0_reg: cp0_vccq_sd0 {
 		compatible = "regulator-gpio";
 		regulator-name = "cp0-vccq-sd0";
@@ -64,11 +83,6 @@
 		states = <1800000 0x1
 			  3300000 0x0>;
 		enable-active-high;
-	};
-
-	cp1_usb3_0_phy: cp1-usb3-0-phy {
-		compatible = "usb-nop-xceiv";
-		vcc-supply = <&cp1_reg_usb3_0_vbus>;
 	};
 
 	sfp_eth0: sfp-eth0 {
@@ -215,4 +229,9 @@
 /* CON9 on CP1 expansion */
 &cp1_usb3_0 {
 	usb-phy = <&cp1_usb3_0_phy>;
+};
+
+/* CON10 on CP0 expansion */
+&cp1_usb3_1 {
+	usb-phy = <&cp1_usb3_1_phy>;
 };
