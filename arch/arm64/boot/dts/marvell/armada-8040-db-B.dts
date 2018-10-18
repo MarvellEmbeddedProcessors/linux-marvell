@@ -44,7 +44,11 @@
 &cp0_pcie0 {
 	num-lanes = <4>;
 	status = "okay";
-	phys = <&cp0_comphy0 0>;
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cp0_comphy0 0
+		&cp0_comphy1 0
+		&cp0_comphy2 0
+		&cp0_comphy3 0>;
 };
 
 /* CON5 on CP0 expansion */
