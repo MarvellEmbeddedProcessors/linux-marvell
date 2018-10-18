@@ -95,6 +95,9 @@
 };
 
 &cp0_nand_controller {
+	pinctrl-names = "default";
+	pinctrl-0 = <&nand_pins &nand_rb>;
+
 	nand@0 {
 		reg = <0>;
 		label = "main-storage";
