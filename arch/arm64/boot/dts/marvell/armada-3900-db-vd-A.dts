@@ -66,8 +66,12 @@
 	status = "okay";
 };
 
+/*
+ * cp0_spi1 and cp0_nand_controller have common pins on this board. Hence,
+ * only one can be used at a time.
+ */
 &cp0_spi1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &cp0_sdhci0 {
@@ -78,6 +82,10 @@
 	status = "okay";
 };
 
+/*
+ * cp0_spi1 and cp0_nand_controller have common pins on this board. Hence,
+ * only one can be used at a time.
+ */
 &cp0_nand_controller {
 	status = "okay";
 };
