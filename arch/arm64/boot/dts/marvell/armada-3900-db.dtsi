@@ -29,7 +29,7 @@
 	};
 	cp0_reg_usb3_0_vbus: cp0_usb3_vbus@0 {
 		compatible = "regulator-fixed";
-		gpio = <&cp0_gpio1 12 GPIO_ACTIVE_HIGH>;
+		gpio = <&cp0_gpio2 12 GPIO_ACTIVE_HIGH>;
 		regulator-name = "cp0-xhci0-vbus";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
@@ -38,7 +38,7 @@
 	};
 	cp0_reg_usb3_1_vbus: cp0_usb3_vbus@1 {
 		compatible = "regulator-fixed";
-		gpio = <&cp0_gpio1 13 GPIO_ACTIVE_HIGH>;
+		gpio = <&cp0_gpio2 13 GPIO_ACTIVE_HIGH>;
 		regulator-name = "cp0-xhci1-vbus";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
