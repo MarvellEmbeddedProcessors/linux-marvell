@@ -100,7 +100,6 @@
 		label = "main-storage";
 		nand-rb = <0>;
 		nand-ecc-mode = "hw";
-		marvell,nand-keep-config;
 		nand-on-flash-bbt;
 		nand-ecc-strength = <8>;
 		nand-ecc-step-size = <512>;
