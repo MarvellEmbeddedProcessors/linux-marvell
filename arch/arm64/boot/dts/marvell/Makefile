@@ -19,6 +19,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db-C.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db-D.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db-E.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db-G.dtb
+dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db-H.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-mcbin.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-mcbin-single-shot.dtb
 dtb-$(CONFIG_ARCH_MVEBU) += armada-8080-pd.dtb
