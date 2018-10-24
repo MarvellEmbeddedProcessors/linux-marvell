@@ -138,8 +138,6 @@
 &cp0_usb3_1 {
 	status = "disabled";
 	usb-phy = <&cp0_usb3_1_phy>;
-	phys = <&cp0_comphy4 1>;
-	phy-names = "usb";
 };
 
 &cp0_pcie0 {

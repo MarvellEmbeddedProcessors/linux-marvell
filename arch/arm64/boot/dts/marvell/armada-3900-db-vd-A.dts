@@ -95,7 +95,7 @@
 };
 
 &cp0_usb3_1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &cp0_pcie0 {
