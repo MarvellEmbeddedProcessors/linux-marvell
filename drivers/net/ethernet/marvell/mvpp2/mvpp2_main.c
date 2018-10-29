@@ -3298,10 +3298,10 @@ static inline void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu,
 		pool->pbuf[++idx] = skb;
 		pcpu->idx[MVPP2_BM_POOLS_NUM] = idx;
 		if (skb->head) {
-			if (skb->head_frag) /* frag_size > PAGE_SIZE */
-				kfree(skb->head);
-			else
+			if (pool_id < MVPP2_BM_JUMBO)
 				skb_free_frag(skb->head);
+			else
+				kfree(skb->head);
 		}
 		tx_buf->skb = NULL;
 	}
