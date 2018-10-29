@@ -40,6 +40,17 @@ config PHY_XGENE
 	help
 	  This option enables support for APM X-Gene SoC multi-purpose PHY.
 
+config PHY_MVEBU_UTMI
+	def_bool y
+	depends on ARCH_MVEBU
+	depends on OF
+	select GENERIC_PHY
+	help
+	  Enable this to support Marvell utmi phy driver. The utmi driver
+	  supports Armada-3700 and CP110. This driver is responsible for
+	  configuring PHY accordingly.
+
+
 source "drivers/phy/allwinner/Kconfig"
 source "drivers/phy/amlogic/Kconfig"
 source "drivers/phy/broadcom/Kconfig"
