@@ -85,6 +85,11 @@
 	phy-mode = "rgmii-id";
 };
 
+&cp1_i2c0 {
+	status = "okay";
+	clock-frequency = <100000>;
+};
+
 &cp1_spi1 {
 	status = "okay";
 };
