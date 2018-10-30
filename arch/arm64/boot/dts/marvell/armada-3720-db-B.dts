@@ -23,3 +23,7 @@
 		reg = <1>;
 	};
 };
+
+&usb3 {
+	status = "disabled";
+};
