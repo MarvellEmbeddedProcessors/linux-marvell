@@ -44,6 +44,21 @@
 		vcc-supply = <&exp_usb3_vbus>;
 	};
 
+	exp_usb2_vbus: usb2-vbus {
+		compatible = "regulator-fixed";
+		regulator-name = "usb2-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+		regulator-always-on;
+		gpio = <&gpio_exp 0 GPIO_ACTIVE_HIGH>;
+	};
+
+	usb2_phy: usb2-phy {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&exp_usb2_vbus>;
+	};
+
 	vcc_sd_reg1: regulator {
 		compatible = "regulator-gpio";
 		regulator-name = "vcc_sd1";
@@ -201,6 +216,13 @@
 
 /* CON27(V2.0)/CON29(V1.4) */
 &usb2 {
+	status = "okay";
+	usb-phy = <&usb2_phy>;
+	phys = <&utmi_usb2>;
+	phy-names = "usb";
+};
+
+&utmi_usb2 {
 	status = "okay";
 };
 

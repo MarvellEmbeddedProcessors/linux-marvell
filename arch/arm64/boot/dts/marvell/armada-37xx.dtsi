@@ -9,6 +9,7 @@
  */
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/phy/phy-utmi-mvebu.h>
 
 / {
 	model = "Marvell Armada 37xx SoC";
@@ -330,6 +331,14 @@
 				compatible = "marvell,armada-3700-ehci";
 				reg = <0x5e000 0x1000>;
 				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+				status = "disabled";
+			};
+
+			utmi_usb2: utmi@5f000 {
+				compatible = "marvell,armada-3700-utmi-phy";
+				reg = <0x5f000 0x1000>;
+				utmi-port = <UTMI_PHY_TO_USB2_HOST0>;
+				#phy-cells = <0>;
 				status = "disabled";
 			};
 
