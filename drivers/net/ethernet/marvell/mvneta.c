@@ -4450,7 +4450,7 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
 		rxq->time_coal = MVNETA_RX_COAL_USEC;
 		rxq->buf_virt_addr
 			= devm_kmalloc_array(pp->dev->dev.parent,
-					     rxq->size,
+					     MVNETA_MAX_RXD,
 					     sizeof(*rxq->buf_virt_addr),
 					     GFP_KERNEL);
 		if (!rxq->buf_virt_addr)
