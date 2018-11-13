@@ -2158,7 +2158,6 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *port,
 				dev_kfree_skb_any(tx_buf->skb);
 		}
 		/* else: no action, tx_buf->skb always overwritten in xmit */
-
 		mvpp2_txq_inc_get(txq_pcpu);
 	}
 }
@@ -3684,14 +3683,17 @@ static int mvpp2_tx_tso(struct sk_buff *skb, struct net_device *dev,
 	struct mvpp2_port *port = netdev_priv(dev);
 	struct tso_t tso;
 	int hdr_sz = skb_transport_offset(skb) + tcp_hdrlen(skb);
-	int i, len, descs = 0;
+	int i, len, descs = tso_count_descs(skb);
 
-	/* Check number of available descriptors */
-	if (mvpp2_aggr_desc_num_check(port, aggr_txq, tso_count_descs(skb)) ||
-	    mvpp2_txq_reserved_desc_num_proc(port, txq, txq_pcpu,
-					     tso_count_descs(skb)))
+	/* Check enough free-space in txq and
+	 * number of available aggr/reserved descriptors
+	 */
+	if (((txq_pcpu->size - txq_pcpu->count) < descs) ||
+	    mvpp2_aggr_desc_num_check(port, aggr_txq, descs) ||
+	    mvpp2_txq_reserved_desc_num_proc(port, txq, txq_pcpu, descs))
 		return 0;
 
+	descs = 0; /* real descs <= tso_count_descs() */
 	tso_start(skb, &tso);
 	len = skb->len - hdr_sz;
 	while (len > 0) {
@@ -3757,8 +3759,11 @@ static netdev_tx_t mvpp2_tx(struct sk_buff *skb, struct net_device *dev)
 	}
 	frags = skb_shinfo(skb)->nr_frags + 1;
 
-	/* Check number of available descriptors */
-	if (mvpp2_aggr_desc_num_check(port, aggr_txq, frags) ||
+	/* Check enough free-space in txq and
+	 * number of available aggr/reserved descriptors
+	 */
+	if (((txq_pcpu->size - txq_pcpu->count) < frags) ||
+	    mvpp2_aggr_desc_num_check(port, aggr_txq, frags) ||
 	    mvpp2_txq_reserved_desc_num_proc(port, txq, txq_pcpu, frags)) {
 		frags = 0;
 		goto out;
