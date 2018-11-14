@@ -2620,22 +2620,14 @@ err_cleanup:
 static int mvpp2_setup_txqs(struct mvpp2_port *port)
 {
 	struct mvpp2_tx_queue *txq;
-	int queue, err, cpu;
+	int queue, err;
 
 	for (queue = 0; queue < port->ntxqs; queue++) {
 		txq = port->txqs[queue];
 		err = mvpp2_txq_init(port, txq);
 		if (err)
 			goto err_cleanup;
-
-		/* Assign this queue to a CPU */
-		cpu = queue % num_present_cpus();
-		netif_set_xps_queue(port->dev, cpumask_of(cpu), queue);
 	}
-
-	/* XPS mapping queues to 0..N cpus (may be less than ntxqs) */
-	for_each_online_cpu(cpu)
-		netif_set_xps_queue(port->dev, cpumask_of(cpu), cpu);
 
 	if (port->has_tx_irqs) {
 		/* Download time-coal. The pkts-coal done in start_dev */
@@ -5702,6 +5694,10 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	dev = alloc_etherdev_mqs(sizeof(*port), ntxqs, nrxqs);
 	if (!dev)
 		return -ENOMEM;
+
+	/* XPS mapping queues to 0..N cpus (may be less than ntxqs) */
+	for_each_online_cpu(cpu)
+		netif_set_xps_queue(dev, cpumask_of(cpu), cpu);
 
 	phy_mode = fwnode_get_phy_mode(port_fwnode);
 	if (phy_mode < 0) {
