@@ -1052,8 +1052,10 @@ struct mvpp2_txq_pcpu {
 	 */
 	int count;
 
-	int wake_threshold;
-	int stop_threshold;
+	u16 wake_threshold;
+	u16 stop_threshold;
+	/* TXQ-number above stop_threshold to be wake-up */
+	u16 stopped_on_txq_id;
 
 	/* Number of Tx DMA descriptors reserved for each CPU */
 	int reserved_num;

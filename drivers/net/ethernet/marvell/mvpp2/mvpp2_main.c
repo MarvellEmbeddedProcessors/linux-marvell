@@ -2195,9 +2195,15 @@ static void mvpp2_txq_done(struct mvpp2_port *port, struct mvpp2_tx_queue *txq,
 
 	txq_pcpu->count -= tx_done;
 
-	if (netif_tx_queue_stopped(nq) && !mvpp2_tx_stopped(port) &&
-	    txq_pcpu->count <= txq_pcpu->wake_threshold)
-		netif_tx_wake_queue(nq);
+	if (netif_tx_queue_stopped(nq) && !mvpp2_tx_stopped(port)) {
+		/* Wake if netif_tx_queue_stopped on same txq->log_id */
+		if (txq_pcpu->stopped_on_txq_id == txq->log_id &&
+		    txq_pcpu->count <= txq_pcpu->wake_threshold) {
+			txq_pcpu->stopped_on_txq_id = MVPP2_MAX_TXQ;
+			nq = netdev_get_tx_queue(port->dev, txq->log_id);
+			netif_tx_wake_queue(nq);
+		}
+	}
 }
 
 static unsigned int mvpp2_tx_done(struct mvpp2_port *port, u32 cause,
@@ -2462,6 +2468,7 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
 				MVPP2_MAX_SKB_DESCS(num_present_cpus());
 		txq_pcpu->wake_threshold = txq_pcpu->stop_threshold -
 						MVPP2_TX_PAUSE_HYSTERESIS;
+		txq_pcpu->stopped_on_txq_id = MVPP2_MAX_TXQ;
 
 		txq_pcpu->tso_headers =
 			dma_alloc_coherent(port->dev->dev.parent,
@@ -3825,7 +3832,13 @@ out:
 
 		if (unlikely(txq_pcpu->count >= txq_pcpu->stop_threshold)) {
 			nq = netdev_get_tx_queue(dev, txq_id);
-			netif_tx_stop_queue(nq);
+			/* txq_id may differ from thread/cpu and come from more
+			 * than one txq_pcpu. Save only the first for wakeup.
+			 */
+			if (unlikely(!netif_tx_queue_stopped(nq))) {
+				txq_pcpu->stopped_on_txq_id = txq_id;
+				netif_tx_stop_queue(nq);
+			}
 		}
 		u64_stats_update_begin(&stats->syncp);
 		stats->tx_packets++;
