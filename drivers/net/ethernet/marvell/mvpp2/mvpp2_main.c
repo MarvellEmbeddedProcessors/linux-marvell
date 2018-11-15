@@ -3823,9 +3823,7 @@ out:
 			mvpp2_aggr_txq_pend_desc_add(port, frags);
 		}
 
-		if (unlikely(txq_pcpu->count >= txq_pcpu->stop_threshold) &&
-		    thread == txq_id) {
-			/* Don't stop TXQ not related to this cpu/thread */
+		if (unlikely(txq_pcpu->count >= txq_pcpu->stop_threshold)) {
 			nq = netdev_get_tx_queue(dev, txq_id);
 			netif_tx_stop_queue(nq);
 		}
