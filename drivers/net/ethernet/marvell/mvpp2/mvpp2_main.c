@@ -2536,6 +2536,11 @@ static void mvpp2_txq_clean(struct mvpp2_port *port, struct mvpp2_tx_queue *txq)
 	val |= MVPP2_TXQ_DRAIN_EN_MASK;
 	mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_PREF_BUF_REG, val);
 
+	/* Temporarily enable egress for the port.
+	 * It is required for releasing all remaining packets.
+	 */
+	mvpp2_egress_enable(port);
+
 	/* The napi queue has been stopped so wait for all packets
 	 * to be transmitted.
 	 */
@@ -2554,6 +2559,8 @@ static void mvpp2_txq_clean(struct mvpp2_port *port, struct mvpp2_tx_queue *txq)
 					    MVPP2_TXQ_PENDING_REG);
 		pending &= MVPP2_TXQ_PENDING_MASK;
 	} while (pending);
+
+	mvpp2_egress_disable(port);
 
 	val &= ~MVPP2_TXQ_DRAIN_EN_MASK;
 	mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_PREF_BUF_REG, val);
