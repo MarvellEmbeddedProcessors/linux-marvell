@@ -436,6 +436,14 @@ static void mvpp2_cls_flow_last_set(struct mvpp2_cls_flow_entry *fe,
 	fe->data[0] |= !!is_last;
 }
 
+static void mvpp2_cls_flow_lkp_type_set(struct mvpp2_cls_flow_entry *fe,
+					int lkp_type)
+{
+	fe->data[1] &= ~MVPP2_CLS_FLOW_TBL1_LKP_TYPE(
+			MVPP2_CLS_FLOW_TBL1_LKP_TYPE_MASK);
+	fe->data[1] |= MVPP2_CLS_FLOW_TBL1_LKP_TYPE(lkp_type);
+}
+
 static void mvpp2_cls_flow_pri_set(struct mvpp2_cls_flow_entry *fe, int prio)
 {
 	fe->data[1] &= ~MVPP2_CLS_FLOW_TBL1_PRIO(MVPP2_CLS_FLOW_TBL1_PRIO_MASK);
@@ -493,7 +501,7 @@ static void mvpp2_cls_flow_init(struct mvpp2 *priv, struct mvpp2_cls_flow *flow)
 	mvpp2_cls_flow_port_id_sel(&fe, true);
 	mvpp2_cls_flow_last_set(&fe, 0);
 	mvpp2_cls_flow_pri_set(&fe, 0);
-
+	mvpp2_cls_flow_lkp_type_set(&fe, MVPP2_CLS_LKP_DEFAULT);
 
 	/* Add all ports */
 	for (i = 0; i < MVPP2_MAX_PORTS; i++)
@@ -510,6 +518,7 @@ static void mvpp2_cls_flow_init(struct mvpp2 *priv, struct mvpp2_cls_flow *flow)
 		mvpp2_cls_flow_port_id_sel(&fe, true);
 		mvpp2_cls_flow_pri_set(&fe, i + 1);
 		mvpp2_cls_flow_port_add(&fe, BIT(i));
+		mvpp2_cls_flow_lkp_type_set(&fe, MVPP2_CLS_LKP_HASH);
 
 		mvpp2_cls_flow_write(priv, &fe);
 	}
@@ -783,6 +792,10 @@ static void mvpp2_port_c2_cls_init(struct mvpp2_port *port)
 	pmap = BIT(port->id);
 	c2.tcam[4] = MVPP22_CLS_C2_PORT_ID(pmap);
 	c2.tcam[4] |= MVPP22_CLS_C2_TCAM_EN(MVPP22_CLS_C2_PORT_ID(pmap));
+
+	/* Set lkp_type */
+	c2.tcam[4] |= MVPP22_CLS_C2_LKP_TYPE(MVPP2_CLS_LKP_DEFAULT);
+	c2.tcam[4] |= MVPP22_CLS_C2_TCAM_EN(MVPP22_CLS_C2_LKP_TYPE_MASK);
 
 	/* Update RSS status after matching this entry */
 	c2.act = MVPP22_CLS_C2_ACT_RSS_EN(MVPP22_C2_UPD_LOCK);

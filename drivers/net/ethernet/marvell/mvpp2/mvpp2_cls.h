@@ -71,6 +71,11 @@ enum mvpp2_cls_field_id {
 	MVPP22_CLS_FIELD_L4DIP = 0x1e,
 };
 
+enum mvpp2_cls_lkp_type {
+	MVPP2_CLS_LKP_HASH = 0,
+	MVPP2_CLS_LKP_DEFAULT,
+	MVPP2_CLS_LKP_MAX,
+};
 enum mvpp2_cls_flow_seq {
 	MVPP2_CLS_FLOW_SEQ_NORMAL = 0,
 	MVPP2_CLS_FLOW_SEQ_FIRST1,
