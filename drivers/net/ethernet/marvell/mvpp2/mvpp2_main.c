@@ -687,8 +687,9 @@ mvpp2_bm_pool_use(struct mvpp2_port *port, unsigned pool, int pkt_size)
 
 		new_pool->pkt_size = pkt_size;
 		new_pool->frag_size =
-			SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(pkt_size)) +
-			MVPP2_SKB_SHINFO_SIZE;
+			SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(pkt_size +
+						MVPP2_VLAN_TAG_EDSA_LEN)) +
+						MVPP2_SKB_SHINFO_SIZE;
 
 		/* Allocate buffers for this pool */
 		num = mvpp2_bm_bufs_add(port, new_pool, pkts_num);
