@@ -436,6 +436,11 @@ static void mvpp2_cls_flow_last_set(struct mvpp2_cls_flow_entry *fe,
 	fe->data[0] |= !!is_last;
 }
 
+static bool mvpp2_cls_flow_last_get(struct mvpp2_cls_flow_entry *fe)
+{
+	return (fe->data[0] & MVPP2_CLS_FLOW_TBL0_LAST);
+}
+
 static void mvpp2_cls_flow_lkp_type_set(struct mvpp2_cls_flow_entry *fe,
 					int lkp_type)
 {
@@ -454,6 +459,11 @@ static void mvpp2_cls_flow_port_add(struct mvpp2_cls_flow_entry *fe,
 				    u32 port)
 {
 	fe->data[0] |= MVPP2_CLS_FLOW_TBL0_PORT_ID(port);
+}
+
+static int mvpp2_cls_flow_port_get(struct mvpp2_cls_flow_entry *fe)
+{
+	return ((fe->data[0] >> 4) & MVPP2_CLS_FLOW_TBL0_PORT_ID_MASK);
 }
 
 /* Initialize the parser entry for the given flow */
@@ -512,7 +522,7 @@ static void mvpp2_cls_flow_init(struct mvpp2 *priv, struct mvpp2_cls_flow *flow)
 	/* C3Hx lookups */
 	for (i = 0; i < MVPP2_MAX_PORTS; i++) {
 		memset(&fe, 0, sizeof(fe));
-		fe.index = MVPP2_PORT_FLOW_HASH_ENTRY(i, flow->flow_id);
+		fe.index = MVPP2_PORT_FLOW_INDEX(i, flow->flow_id);
 
 		mvpp2_cls_flow_eng_set(&fe, MVPP22_CLS_ENGINE_C3HA);
 		mvpp2_cls_flow_port_id_sel(&fe, true);
@@ -596,6 +606,34 @@ struct mvpp2_cls_flow *mvpp2_cls_flow_get(int flow)
 	return &cls_flows[flow];
 }
 
+int mvpp2_cls_flow_hash_find(struct mvpp2_port *port,
+			     struct mvpp2_cls_flow *flow,
+			     struct mvpp2_cls_flow_entry *fe,
+			     int *flow_index)
+{
+	int engine, is_last, flow_offset, port_bm, idx = 0;
+
+	flow_offset = 0;
+	while (!is_last) {
+		idx = MVPP2_PORT_FLOW_INDEX(flow_offset, flow->flow_id);
+		mvpp2_cls_flow_read(port->priv, idx, fe);
+		engine = mvpp2_cls_flow_eng_get(fe);
+		port_bm = mvpp2_cls_flow_port_get(fe);
+		is_last = mvpp2_cls_flow_last_get(fe);
+		if ((engine == MVPP22_CLS_ENGINE_C3HA ||
+		     engine == MVPP22_CLS_ENGINE_C3HB) &&
+		    (port_bm & BIT(port->id)))
+			break;
+		flow_offset++;
+	}
+
+	*flow_index = idx;
+	if (is_last)
+		return -EINVAL;
+
+	return 0;
+}
+
 /* Set the hash generation options for the given traffic flow.
  * One traffic flow (in the ethtool sense) has multiple classification flows,
  * to handle specific cases such as fragmentation, or the presence of a
@@ -623,8 +661,8 @@ static int mvpp2_port_rss_hash_opts_set(struct mvpp2_port *port, int flow_type,
 		if (flow->flow_type != flow_type)
 			continue;
 
-		flow_index = MVPP2_PORT_FLOW_HASH_ENTRY(port->id,
-							flow->flow_id);
+		if (mvpp2_cls_flow_hash_find(port, flow, &fe, &flow_index))
+			return -EINVAL;
 
 		mvpp2_cls_flow_read(port->priv, flow_index, &fe);
 
@@ -712,8 +750,8 @@ static u16 mvpp2_port_rss_hash_opts_get(struct mvpp2_port *port, int flow_type)
 		if (flow->flow_type != flow_type)
 			continue;
 
-		flow_index = MVPP2_PORT_FLOW_HASH_ENTRY(port->id,
-							flow->flow_id);
+		if (mvpp2_cls_flow_hash_find(port, flow, &fe, &flow_index))
+			return 0;
 
 		mvpp2_cls_flow_read(port->priv, flow_index, &fe);
 

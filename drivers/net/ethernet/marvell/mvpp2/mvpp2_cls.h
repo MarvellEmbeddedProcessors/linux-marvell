@@ -186,8 +186,8 @@ struct mvpp2_cls_flow {
 #define MVPP2_ENTRIES_PER_FLOW			(MVPP2_MAX_PORTS + 1)
 #define MVPP2_FLOW_C2_ENTRY(id)			((((id) - MVPP2_FL_START) * \
 						 MVPP2_ENTRIES_PER_FLOW) + 1)
-#define MVPP2_PORT_FLOW_HASH_ENTRY(port, id)	(MVPP2_FLOW_C2_ENTRY(id) + \
-						 1 + (port))
+#define MVPP2_PORT_FLOW_INDEX(offset, id)	(MVPP2_FLOW_C2_ENTRY(id) + \
+						 1 + (offset))
 
 struct mvpp2_cls_flow_entry {
 	u32 index;
@@ -236,5 +236,10 @@ u32 mvpp2_cls_c2_hit_count(struct mvpp2 *priv, int c2_index);
 
 void mvpp2_cls_c2_read(struct mvpp2 *priv, int index,
 		       struct mvpp2_cls_c2_entry *c2);
+
+int mvpp2_cls_flow_hash_find(struct mvpp2_port *port,
+			     struct mvpp2_cls_flow *flow,
+			     struct mvpp2_cls_flow_entry *fe,
+			     int *flow_index);
 
 #endif
