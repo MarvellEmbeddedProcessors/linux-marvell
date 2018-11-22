@@ -1,0 +1,18 @@
+#
+# SPDX-License-Identifier:           GPL-2.0
+# https://spdx.org/licenses
+# Copyright (C) 2018 Marvell International Ltd.
+#
+linux414_armv7le
+linux414_armv7be
+
+linux414_armv8le
+linux414_armv8le_palladium
+linux414_armv8le_mainline
+linux414_armv8le_net_bm
+linux414_armv8le_net_bm_nat
+linux414_armv8le_strongswan_ipsec
+linux414_armv8le_virt
+
+linux414_armv8be
+linux414_armv8be_mainline
