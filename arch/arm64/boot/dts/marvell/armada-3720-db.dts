@@ -59,9 +59,9 @@
 		vcc-supply = <&exp_usb2_vbus>;
 	};
 
-	vcc_sd_reg1: regulator {
+	vcc_sd_reg0: regulator {
 		compatible = "regulator-gpio";
-		regulator-name = "vcc_sd1";
+		regulator-name = "vcc_sd0";
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <3300000>;
 		regulator-boot-on;
@@ -73,9 +73,9 @@
 		enable-active-high;
 	};
 
-	vcc_sd_reg2: regulator-vmcc {
+	vcc_sd_reg1: regulator-vmcc {
 		compatible = "regulator-fixed";
-		regulator-name = "vcc_sd2";
+		regulator-name = "vcc_sd1";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		regulator-boot-on;
@@ -145,7 +145,7 @@
 	phys = <&a3700_comphy2 0>;
 };
 
-&sdhci0 {
+&sdhci1 {
 	non-removable;
 	bus-width = <8>;
 	mmc-ddr-1_8v;
@@ -155,13 +155,13 @@
 };
 
 /* SD slot module on CON14(V2.0)/CON15(V1.4) */
-&sdhci1 {
+&sdhci0 {
 	wp-inverted;
 	cd-gpios = <&gpiosb 2 GPIO_ACTIVE_LOW>;
 	bus-width = <4>;
 	marvell,pad-type = "sd";
-	vqmmc-supply = <&vcc_sd_reg1>;
-	vmmc-supply = <&vcc_sd_reg2>;
+	vqmmc-supply = <&vcc_sd_reg0>;
+	vmmc-supply = <&vcc_sd_reg1>;
 	status = "okay";
 };
 

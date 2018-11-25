@@ -17,7 +17,8 @@
 
 / {
 	model = "Globalscale Marvell ESPRESSOBin Board";
-	compatible = "globalscale,espressobin", "marvell,armada3720", "marvell,armada3710";
+	compatible = "globalscale,espressobin",
+		     "marvell,armada3720", "marvell,armada3710";
 
 	chosen {
 		stdout-path = "serial0:115200n8";
@@ -28,9 +29,9 @@
 		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
 	};
 
-	vcc_sd_reg1: regulator {
+	vcc_sd_reg0: regulator {
 		compatible = "regulator-gpio";
-		regulator-name = "vcc_sd1";
+		regulator-name = "vcc_sd0";
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <3300000>;
 		regulator-boot-on;
@@ -58,12 +59,14 @@
 };
 
 /* J1 */
-&sdhci1 {
+&sdhci0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdio_pins>;
 	wp-inverted;
 	bus-width = <4>;
 	cd-gpios = <&gpionb 3 GPIO_ACTIVE_LOW>;
 	marvell,pad-type = "sd";
-	vqmmc-supply = <&vcc_sd_reg1>;
+	vqmmc-supply = <&vcc_sd_reg0>;
 	status = "okay";
 };
 

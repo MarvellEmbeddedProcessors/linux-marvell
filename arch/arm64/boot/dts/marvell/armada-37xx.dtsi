@@ -261,6 +261,11 @@
 					groups = "uart2";
 					function = "uart";
 				};
+
+				mmc_pins: mmc-pins {
+					groups = "emmc_nb";
+					function = "emmc";
+				};
 			};
 
 			nb_pm: syscon@14000 {
@@ -291,6 +296,11 @@
 				rgmii_pins: mii-pins {
 					groups = "rgmii";
 					function = "mii";
+				};
+
+				sdio_pins: sdio-pins {
+					groups = "sdio_sb";
+					function = "sdio";
 				};
 
 			};
@@ -370,7 +380,7 @@
 				cell-index = <0>;
 			};
 
-			sdhci1: sdhci@d0000 {
+			sdhci0: sdhci@d0000 {
 				compatible = "marvell,armada-3700-sdhci",
 					     "marvell,sdhci-xenon";
 				reg = <0xd0000 0x300>,
@@ -381,7 +391,7 @@
 				status = "disabled";
 			};
 
-			sdhci0: sdhci@d8000 {
+			sdhci1: sdhci@d8000 {
 				compatible = "marvell,armada-3700-sdhci",
 					     "marvell,sdhci-xenon";
 				reg = <0xd8000 0x300>,
