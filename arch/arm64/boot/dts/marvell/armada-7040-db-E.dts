@@ -100,3 +100,6 @@
 	phy-mode = "rgmii-id";
 };
 
+&cp0_crypto {
+	status = "okay";
+};

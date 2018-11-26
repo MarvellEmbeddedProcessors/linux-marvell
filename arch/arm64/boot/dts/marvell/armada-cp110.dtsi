@@ -498,6 +498,7 @@
 				 <&CP110_LABEL(clk) 1 17>;
 			cell-index = <CP110_EIP197_INDEX>;
 			dma-coherent;
+			status = "disabled";
 		};
 	};
 

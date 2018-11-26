@@ -214,3 +214,11 @@
 &cp0_sdhci0 {
 	status = "okay";
 };
+
+&cp0_crypto {
+	status = "okay";
+};
+
+&cp1_crypto {
+	status = "okay";
+};

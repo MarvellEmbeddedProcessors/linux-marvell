@@ -148,3 +148,7 @@
 	/* Generic PHY, providing serdes lanes */
 	phys = <&cp0_comphy4 1>;
 };
+
+&cp0_crypto {
+	status = "okay";
+};
