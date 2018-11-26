@@ -3621,8 +3621,10 @@ static void mvneta_mac_link_down(struct net_device *ndev, unsigned int mode,
 	struct mvneta_port *pp = netdev_priv(ndev);
 	u32 val;
 
-	if (!pp->musdk_port)
-		mvneta_port_down(pp);
+	if (pp->musdk_port)
+		return;
+
+	mvneta_port_down(pp);
 
 	if (!phylink_autoneg_inband(mode)) {
 		val = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
