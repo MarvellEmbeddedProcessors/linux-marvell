@@ -3266,7 +3266,8 @@ static int mvpp2_recycle_get_bm_id(struct sk_buff *skb)
 	if (!MVPP2_RXTX_HASH_IS_OK(skb, hash))
 		return -1;
 	/* Check if skb could be free */
-	if (skb_shared(skb) || skb_cloned(skb))
+	/* Use skb->cloned but not skb_cloned(), skb_header_cloned() */
+	if (skb_shared(skb) || skb->cloned)
 		return -1;
 	/* WA: don't put to recycle the buffer with fully consumed headroom */
 	if (skb_headroom(skb) <= MVPP2_MH_SIZE)
