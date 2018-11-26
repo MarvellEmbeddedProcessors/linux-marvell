@@ -620,9 +620,10 @@
 #define MVPP2_SKB_SHINFO_SIZE \
 	SKB_DATA_ALIGN(sizeof(struct skb_shared_info))
 
+#define MVPP2_MTU_OVERHEAD_SIZE \
+	(MVPP2_MH_SIZE + MVPP2_VLAN_TAG_LEN + ETH_HLEN + ETH_FCS_LEN)
 #define MVPP2_RX_PKT_SIZE(mtu) \
-	ALIGN((mtu) + MVPP2_MH_SIZE + MVPP2_VLAN_TAG_LEN + \
-	      ETH_HLEN + ETH_FCS_LEN, cache_line_size())
+	ALIGN((mtu) + MVPP2_MTU_OVERHEAD_SIZE, cache_line_size())
 
 #define MVPP2_RX_BUF_SIZE(pkt_size)	((pkt_size) + NET_SKB_PAD)
 #define MVPP2_RX_MAX_PKT_SIZE(total_size) \

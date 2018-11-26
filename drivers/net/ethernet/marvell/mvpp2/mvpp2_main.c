@@ -5896,8 +5896,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 
 	/* MTU range: 68 - 9704 */
 	dev->min_mtu = ETH_MIN_MTU;
-	/* 9704 == 9728 - 20 and rounding to 8 */
-	dev->max_mtu = MVPP2_BM_JUMBO_PKT_SIZE;
+	/* 9704 == 9728 - 24 (no rounding for MTU but for frag_size) */
+	dev->max_mtu = MVPP2_BM_JUMBO_PKT_SIZE - MVPP2_MTU_OVERHEAD_SIZE;
 	dev->dev.of_node = port_node;
 
 	/* Phylink isn't used w/ ACPI as of now */
