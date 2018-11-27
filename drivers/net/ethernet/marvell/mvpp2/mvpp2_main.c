@@ -620,11 +620,8 @@ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
 static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
 			     struct mvpp2_bm_pool *bm_pool, int buf_num)
 {
-	int i, buf_size, total_size;
+	int i;
 	dma_addr_t dma_addr;
-
-	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
-	total_size = MVPP2_RX_TOTAL_SIZE(buf_size);
 
 	if (buf_num < 0 ||
 	    (buf_num + bm_pool->buf_num > bm_pool->size)) {
@@ -647,7 +644,9 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
 
 	netdev_dbg(port->dev,
 		   "pool %d: pkt_size=%4d, buf_size=%4d, total_size=%4d\n",
-		   bm_pool->id, bm_pool->pkt_size, buf_size, total_size);
+		   bm_pool->id, bm_pool->pkt_size,
+		   MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
+		   bm_pool->frag_size);
 
 	netdev_dbg(port->dev,
 		   "pool %d: %d of %d buffers added\n",
