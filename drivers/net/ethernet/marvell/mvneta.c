@@ -3135,7 +3135,6 @@ static int mvneta_setup_rxqs(struct mvneta_port *pp)
 		if (err) {
 			netdev_err(pp->dev, "%s: can't create rxq=%d\n",
 				   __func__, queue);
-			mvneta_cleanup_rxqs(pp);
 			return err;
 		}
 	}
