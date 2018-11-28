@@ -3311,7 +3311,7 @@ static inline void mvpp2_recycle_put(struct mvpp2_port *port,
 		pool->pbuf[++idx] = skb;
 		pcpu->idx[MVPP2_BM_POOLS_NUM] = idx;
 		if (skb->head) {
-			if (pool_id < MVPP2_BM_JUMBO)
+			if (bm_pool->frag_size <= PAGE_SIZE)
 				skb_free_frag(skb->head);
 			else
 				kfree(skb->head);
