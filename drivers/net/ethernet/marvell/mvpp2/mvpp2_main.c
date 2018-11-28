@@ -3269,6 +3269,9 @@ static int mvpp2_recycle_get_bm_id(struct sk_buff *skb)
 	/* Use skb->cloned but not skb_cloned(), skb_header_cloned() */
 	if (skb_shared(skb) || skb->cloned)
 		return -1;
+	if (skb_shinfo(skb)->tx_flags & SKBTX_DEV_ZEROCOPY)
+		return -1;
+
 	/* Get bm-pool-id */
 	hash &= MVPP2_RXTX_HASH_BMID_MASK;
 	if (hash >= MVPP2_BM_POOLS_NUM)
