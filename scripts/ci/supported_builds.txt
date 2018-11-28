@@ -16,3 +16,16 @@ linux414_armv8le_virt
 
 linux414_armv8be
 linux414_armv8be_mainline
+
+linux414_armv8le_musdk
+linux414_armv8le_musdk_nosam
+linux414_armv8le_musdk_ks
+linux414_armv8be_musdk
+linux414_armv8le_dpdk
+linux414_armv8le_musdk_prv
+linux414_armv8le_dpdk_prv
+linux414_armv8le_vpp
+linux414_armv8le_odp_musdk_a3k
+linux414_armv8le_odp_dpdk_musdk_a3k
+linux414_armv8le_odp_dpdk_musdk_nosam_a3k
+		    

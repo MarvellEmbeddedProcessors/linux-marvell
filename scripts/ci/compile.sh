@@ -109,6 +109,16 @@ case $build_name in
 
 	linux414_armv8le_strongswan_ipsec )
 		kernel_config=$(perl -pe "$make_config" tools/configs/strongswan-ipsec); ;;
+
+ 	*_armv8le_*musdk*|*_armv8le_dpdk*|*_armv8le_vpp )
+		kernel_config="""./scripts/config --file arch/$arch/configs/$defconfig --set-val CONFIG_MVPP2X y ;
+		                 ./scripts/config --file arch/$arch/configs/$defconfig --set-val CONFIG_UIO y"; ;;
+
+	*_armv8be_musdk* )
+		kernel_config="""./scripts/config --file arch/$arch/configs/$defconfig --set-val CONFIG_CPU_BIG_ENDIAN y ;
+		                 ./scripts/config --file arch/$arch/configs/$defconfig --set-val CONFIG_MVPP2X y ;
+ 		                 ./scripts/config --file arch/$arch/configs/$defconfig --set-val CONFIG_UIO y"; ;;
+
 esac
 ###############################################################################
 
