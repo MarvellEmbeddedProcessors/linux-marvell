@@ -106,7 +106,8 @@ struct mvpp2_share {
 
 struct mvpp2_share mvpp2_share;
 
-static inline void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu,
+static inline void mvpp2_recycle_put(struct mvpp2_port *port,
+				     struct mvpp2_txq_pcpu *txq_pcpu,
 				     struct mvpp2_txq_pcpu_buf *tx_buf);
 
 static void mvpp2_tx_done_guard_force_irq(struct mvpp2_port *port,
@@ -2152,7 +2153,7 @@ static void mvpp2_txq_bufs_free(struct mvpp2_port *port,
 		} else if (tx_buf->skb != TSO_HEADER_MARK) {
 			dma_unmap_single(port->dev->dev.parent, tx_buf->dma,
 					 tx_buf->size, DMA_TO_DEVICE);
-			mvpp2_recycle_put(txq_pcpu, tx_buf);
+			mvpp2_recycle_put(port, txq_pcpu, tx_buf);
 			/* sets tx_buf->skb=NULL if put to recycle */
 			if (tx_buf->skb)
 				dev_kfree_skb_any(tx_buf->skb);
@@ -3276,18 +3277,24 @@ static int mvpp2_recycle_get_bm_id(struct sk_buff *skb)
 	return (int)hash;
 }
 
-static inline void mvpp2_recycle_put(struct mvpp2_txq_pcpu *txq_pcpu,
+static inline void mvpp2_recycle_put(struct mvpp2_port *port,
+				     struct mvpp2_txq_pcpu *txq_pcpu,
 				     struct mvpp2_txq_pcpu_buf *tx_buf)
 {
 	struct mvpp2_recycle_pcpu *pcpu;
 	struct mvpp2_recycle_pool *pool;
 	short int idx, pool_id;
 	struct sk_buff *skb = tx_buf->skb;
+	struct mvpp2_bm_pool *bm_pool;
 
 	/* tx_buf->skb is not NULL */
 	pool_id = mvpp2_recycle_get_bm_id(skb);
 	if (pool_id < 0)
 		return; /* non-recyclable */
+
+	bm_pool = &port->priv->bm_pools[pool_id];
+	if (skb_end_offset(skb) < (bm_pool->frag_size - MVPP2_SKB_SHINFO_SIZE))
+		return; /* shrank -> non-recyclable */
 
 	/* This skb could be destroyed. Put into recycle */
 	pcpu = mvpp2_share.recycle + txq_pcpu->thread;
