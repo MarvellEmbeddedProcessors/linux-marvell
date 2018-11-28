@@ -121,6 +121,12 @@
 		compatible = "dallas,ds1337";
 		reg = <0x68>;
 	};
+
+	eeprom@57 {
+		compatible = "atmel,24c64";
+		reg = <0x57>;
+		pagesize = <32>;
+	};
 };
 
 /* Gigabit module on CON19(V2.0)/CON21(V1.4) only */
