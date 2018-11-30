@@ -3269,6 +3269,9 @@ static int mvpp2_recycle_get_bm_id(struct sk_buff *skb)
 	/* Use skb->cloned but not skb_cloned(), skb_header_cloned() */
 	if (skb_shared(skb) || skb->cloned)
 		return -1;
+	/* ipsec: sp/secpath, _skb_refdst ... */
+	if (!skb_irq_freeable(skb))
+		return -1;
 	if (skb_shinfo(skb)->tx_flags & SKBTX_DEV_ZEROCOPY)
 		return -1;
 
