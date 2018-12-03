@@ -5604,6 +5604,10 @@ static void mvpp2_mac_config(struct net_device *dev, unsigned int mode,
 		return;
 	}
 
+	/* Mac-config is called on UP-request. Don't repeat if already UP */
+	if (state->link && netif_carrier_ok(dev) && port->has_phy)
+		return;
+
 	mvpp2_tx_stop_all_queues(port->dev);
 
 	/* Make sure the port is disabled when reconfiguring the mode */
