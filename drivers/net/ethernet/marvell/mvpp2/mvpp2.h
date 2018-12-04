@@ -132,6 +132,8 @@
 #define MVPP22_CLS_C2_TCAM_DATA3		0x1b1c
 #define MVPP22_CLS_C2_TCAM_DATA4		0x1b20
 #define     MVPP22_CLS_C2_PORT_ID(port)		((port) << 8)
+#define MVPP2_CLS2_TCAM_INV_REG			0x1b24
+#define     MVPP2_CLS2_TCAM_INV_INVALID		31
 #define     MVPP22_CLS_C2_LKP_TYPE(type)	(type)
 #define     MVPP22_CLS_C2_LKP_TYPE_MASK		(0x3f)
 #define MVPP22_CLS_C2_HIT_CTR			0x1b50

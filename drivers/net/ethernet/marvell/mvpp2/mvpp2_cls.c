@@ -555,6 +555,20 @@ static int mvpp2_flow_add_hek_field(struct mvpp2_cls_flow_entry *fe,
 	return 0;
 }
 
+static void mvpp2_cls_c2_inv_set(struct mvpp2 *priv,
+				 int index)
+{
+	/* write index reg */
+	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_IDX, index);
+
+	/* set invalid bit */
+	mvpp2_write(priv, MVPP2_CLS2_TCAM_INV_REG,
+		    (1 << MVPP2_CLS2_TCAM_INV_INVALID));
+
+	/* trigger */
+	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA4, 0);
+}
+
 static int mvpp2_flow_set_hek_fields(struct mvpp2_cls_flow_entry *fe,
 				     unsigned long hash_opts)
 {
@@ -782,19 +796,23 @@ static void mvpp2_cls_c2_write(struct mvpp2 *priv,
 {
 	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_IDX, c2->index);
 
-	/* Write TCAM */
-	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA0, c2->tcam[0]);
-	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA1, c2->tcam[1]);
-	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA2, c2->tcam[2]);
-	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA3, c2->tcam[3]);
-	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA4, c2->tcam[4]);
-
 	mvpp2_write(priv, MVPP22_CLS_C2_ACT, c2->act);
 
 	mvpp2_write(priv, MVPP22_CLS_C2_ATTR0, c2->attr[0]);
 	mvpp2_write(priv, MVPP22_CLS_C2_ATTR1, c2->attr[1]);
 	mvpp2_write(priv, MVPP22_CLS_C2_ATTR2, c2->attr[2]);
 	mvpp2_write(priv, MVPP22_CLS_C2_ATTR3, c2->attr[3]);
+
+	/* write valid bit*/
+	mvpp2_write(priv, MVPP2_CLS2_TCAM_INV_REG,
+		    (0 << MVPP2_CLS2_TCAM_INV_INVALID));
+
+	/* Write TCAM */
+	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA0, c2->tcam[0]);
+	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA1, c2->tcam[1]);
+	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA2, c2->tcam[2]);
+	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA3, c2->tcam[3]);
+	mvpp2_write(priv, MVPP22_CLS_C2_TCAM_DATA4, c2->tcam[4]);
 }
 
 void mvpp2_cls_c2_read(struct mvpp2 *priv, int index,
@@ -860,6 +878,15 @@ static void mvpp2_port_c2_cls_init(struct mvpp2_port *port)
 	mvpp2_cls_c2_write(port->priv, &c2);
 }
 
+static void mvpp2_cls_c2_init(struct mvpp2 *priv)
+{
+	int index;
+
+	/* Invalidate all C2 entries */
+	for (index = 0; index < MVPP22_CLS_C2_MAX_ENTRIES; index++)
+		mvpp2_cls_c2_inv_set(priv, index);
+}
+
 /* Classifier default initialization */
 void mvpp2_cls_init(struct mvpp2 *priv)
 {
@@ -889,6 +916,9 @@ void mvpp2_cls_init(struct mvpp2 *priv)
 	}
 
 	mvpp2_cls_port_init_flows(priv);
+
+	/* Initialize C2 */
+	mvpp2_cls_c2_init(priv);
 }
 
 void mvpp2_cls_port_config(struct mvpp2_port *port)

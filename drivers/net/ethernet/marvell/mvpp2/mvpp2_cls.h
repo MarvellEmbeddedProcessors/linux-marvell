@@ -116,6 +116,7 @@ struct mvpp2_cls_c2_entry {
 };
 
 /* Classifier C2 engine entries */
+#define MVPP22_CLS_C2_MAX_ENTRIES	256
 #define MVPP22_CLS_C2_RSS_ENTRY(port)	(port)
 #define MVPP22_CLS_C2_N_ENTRIES		MVPP2_MAX_PORTS
 
