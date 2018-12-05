@@ -871,16 +871,16 @@ static void mvpp2_port_c2_cls_init(struct mvpp2_port *port)
 	c2.attr[0] = MVPP22_CLS_C2_ATTR0_QHIGH(qh) |
 		      MVPP22_CLS_C2_ATTR0_QLOW(ql);
 
-	/* Toggle C2 from Built-In Self-Test mode to Functional mode */
-	mvpp2_write(port->priv, MVPP2_CLS2_TCAM_CTRL_REG,
-		    MVPP2_CLS2_TCAM_CTRL_BYPASS_FIFO_STAGES);
-
 	mvpp2_cls_c2_write(port->priv, &c2);
 }
 
 static void mvpp2_cls_c2_init(struct mvpp2 *priv)
 {
 	int index;
+
+	/* Toggle C2 from Built-In Self-Test mode to Functional mode */
+	mvpp2_write(priv, MVPP2_CLS2_TCAM_CTRL_REG,
+		    MVPP2_CLS2_TCAM_CTRL_BYPASS_FIFO_STAGES);
 
 	/* Invalidate all C2 entries */
 	for (index = 0; index < MVPP22_CLS_C2_MAX_ENTRIES; index++)
