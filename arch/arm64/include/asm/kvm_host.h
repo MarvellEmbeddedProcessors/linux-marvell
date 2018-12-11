@@ -419,6 +419,7 @@ enum vcpu_sysreg {
 	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
 	OSLSR_EL1,	/* OS Lock Status Register */
 	DISR_EL1,	/* Deferred Interrupt Status Register */
+	MPAM1_EL1,	/* Memory Parititioning And Monitoring register */
 
 	/* Performance Monitors Registers */
 	PMCR_EL0,	/* Control Register */
@@ -1486,4 +1487,6 @@ void kvm_set_vm_id_reg(struct kvm *kvm, u32 reg, u64 val);
 	(system_supports_fpmr() &&			\
 	 kvm_has_feat((k), ID_AA64PFR2_EL1, FPMR, IMP))
 
+#define kvm_has_mpam(k)				\
+	(kvm_has_feat((k), ID_AA64PFR0_EL1, MPAM, 1))
 #endif /* __ARM64_KVM_HOST_H__ */
