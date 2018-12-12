@@ -628,7 +628,7 @@ int mvpp2_cls_flow_hash_find(struct mvpp2_port *port,
 	int engine, is_last, flow_offset, port_bm, idx = 0;
 
 	flow_offset = 0;
-	while (!is_last) {
+	do {
 		idx = MVPP2_PORT_FLOW_INDEX(flow_offset, flow->flow_id);
 		mvpp2_cls_flow_read(port->priv, idx, fe);
 		engine = mvpp2_cls_flow_eng_get(fe);
@@ -639,7 +639,7 @@ int mvpp2_cls_flow_hash_find(struct mvpp2_port *port,
 		    (port_bm & BIT(port->id)))
 			break;
 		flow_offset++;
-	}
+	} while (!is_last);
 
 	*flow_index = idx;
 	if (is_last)
