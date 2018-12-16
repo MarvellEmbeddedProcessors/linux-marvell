@@ -653,6 +653,8 @@ static int global_port_id;
 #define MVNETA_DRIVER_NAME "mvneta"
 #define MVNETA_DRIVER_VERSION "1.0"
 
+#define MVNETA_MUSDK_QUEUE_MASK		1
+
 /* Utility/helper methods */
 
 /* Write helper method */
@@ -1149,21 +1151,30 @@ static void mvneta_port_up(struct mvneta_port *pp)
 	u32 q_map;
 
 	/* Enable all initialized TXs. */
-	q_map = 0;
-	for (queue = 0; queue < txq_number; queue++) {
-		struct mvneta_tx_queue *txq = &pp->txqs[queue];
-		if (txq->descs)
-			q_map |= (1 << queue);
+	if (pp->musdk_port) {
+		q_map = MVNETA_MUSDK_QUEUE_MASK;
+	} else {
+		q_map = 0;
+		for (queue = 0; queue < txq_number; queue++) {
+			struct mvneta_tx_queue *txq = &pp->txqs[queue];
+
+			if (txq->descs)
+				q_map |= (1 << queue);
+		}
 	}
 	mvreg_write(pp, MVNETA_TXQ_CMD, q_map);
 
-	q_map = 0;
-	/* Enable all initialized RXQs. */
-	for (queue = 0; queue < rxq_number; queue++) {
-		struct mvneta_rx_queue *rxq = &pp->rxqs[queue];
+	if (pp->musdk_port) {
+		q_map = MVNETA_MUSDK_QUEUE_MASK;
+	} else {
+		q_map = 0;
+		/* Enable all initialized RXQs. */
+		for (queue = 0; queue < rxq_number; queue++) {
+			struct mvneta_rx_queue *rxq = &pp->rxqs[queue];
 
-		if (rxq->descs)
-			q_map |= (1 << queue);
+			if (rxq->descs)
+				q_map |= (1 << queue);
+		}
 	}
 	mvreg_write(pp, MVNETA_RXQ_CMD, q_map);
 }
@@ -1176,7 +1187,6 @@ static void mvneta_port_down(struct mvneta_port *pp)
 
 	/* Stop Rx port activity. Check port Rx activity. */
 	val = mvreg_read(pp, MVNETA_RXQ_CMD) & MVNETA_RXQ_ENABLE_MASK;
-
 	/* Issue stop command for active channels only */
 	if (val != 0)
 		mvreg_write(pp, MVNETA_RXQ_CMD,
@@ -1200,7 +1210,6 @@ static void mvneta_port_down(struct mvneta_port *pp)
 	 * command for active channels only
 	 */
 	val = (mvreg_read(pp, MVNETA_TXQ_CMD)) & MVNETA_TXQ_ENABLE_MASK;
-
 	if (val != 0)
 		mvreg_write(pp, MVNETA_TXQ_CMD,
 			    (val << MVNETA_TXQ_DISABLE_SHIFT));
@@ -1218,7 +1227,6 @@ static void mvneta_port_down(struct mvneta_port *pp)
 
 		/* Check TX Command reg that all Txqs are stopped */
 		val = mvreg_read(pp, MVNETA_TXQ_CMD);
-
 	} while (val & MVNETA_TXQ_ENABLE_MASK);
 
 	/* Double check to verify that TX FIFO is empty */
@@ -3621,9 +3629,6 @@ static void mvneta_mac_link_down(struct net_device *ndev, unsigned int mode,
 	struct mvneta_port *pp = netdev_priv(ndev);
 	u32 val;
 
-	if (pp->musdk_port)
-		return;
-
 	mvneta_port_down(pp);
 
 	if (!phylink_autoneg_inband(mode)) {
@@ -3651,8 +3656,7 @@ static void mvneta_mac_link_up(struct net_device *ndev, unsigned int mode,
 		mvreg_write(pp, MVNETA_GMAC_AUTONEG_CONFIG, val);
 	}
 
-	if (!pp->musdk_port)
-		mvneta_port_up(pp);
+	mvneta_port_up(pp);
 
 	if (phy && pp->eee_enabled) {
 		pp->eee_active = phy_init_eee(phy, 0) >= 0;
