@@ -32,4 +32,9 @@ linux414_armv8le_odp_musdk_giu
 linux414_armv8le_odp_musdk_a3k
 linux414_armv8le_odp_dpdk_musdk_a3k
 linux414_armv8le_odp_dpdk_musdk_nosam_a3k
-		    
+linux414_armv8le_dpdk_a3k
+linux414_armv8le_dpdk_a3k_prv
+linux414_armv8le_odp_dpdk_musdk
+linux414_armv8le_odp_dpdk_musdk_prv
+linux414_armv8le_musaf
+
