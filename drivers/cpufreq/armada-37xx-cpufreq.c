@@ -167,6 +167,11 @@ static void __init armada37xx_cpufreq_dvfs_setup(struct regmap *base,
 	 * we need to use the clock framework
 	 */
 	parent = clk_get_parent(clk);
+	
+	/* Unset parent clock */
+	clk_set_parent(clk, NULL);
+	
+	/* set old parent; this triggers setting needed values for right CPU clock in hardware regs */
 	clk_set_parent(clk, parent);
 }
 
@@ -360,6 +365,7 @@ static int __init armada37xx_cpufreq_driver_init(void)
 	struct platform_device *pdev;
 	unsigned long freq;
 	unsigned int cur_frequency;
+	unsigned int base_frequency;
 	struct regmap *nb_pm_base, *avs_base;
 	struct device *cpu_dev;
 	int load_lvl, ret;
@@ -412,6 +418,9 @@ static int __init armada37xx_cpufreq_driver_init(void)
 		clk_put(clk);
 		return -EINVAL;
 	}
+	
+	/* Get base CPU frequency without divider */
+	base_frequency = cur_frequency * dvfs->divider[ARMADA_37XX_DVFS_LOAD_0];
 
 	armada37xx_cpufreq_state = kmalloc(sizeof(*armada37xx_cpufreq_state),
 					   GFP_KERNEL);
@@ -431,7 +440,7 @@ static int __init armada37xx_cpufreq_driver_init(void)
 	for (load_lvl = ARMADA_37XX_DVFS_LOAD_0; load_lvl < LOAD_LEVEL_NR;
 	     load_lvl++) {
 		unsigned long u_volt = avs_map[dvfs->avs[load_lvl]] * 1000;
-		freq = cur_frequency / dvfs->divider[load_lvl];
+		freq = base_frequency / dvfs->divider[load_lvl];
 		ret = dev_pm_opp_add(cpu_dev, freq, u_volt);
 		if (ret)
 			goto remove_opp;
