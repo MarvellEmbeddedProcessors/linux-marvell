@@ -827,7 +827,7 @@ static inline bool system_supports_tlb_range(void)
 	return cpus_have_const_cap(ARM64_HAS_TLB_RANGE);
 }
 
-static inline bool cpus_support_mpam(void)
+static __always_inline bool cpus_support_mpam(void)
 {
 	return alternative_has_cap_unlikely(ARM64_MPAM);
 }
