@@ -274,8 +274,8 @@ struct cgx_lnk_sts {
 #define CMDLINKCHANGE_LINKUP	BIT_ULL(8)
 #define CMDLINKCHANGE_FULLDPLX	BIT_ULL(9)
 #define CMDLINKCHANGE_SPEED	GENMASK_ULL(13, 10)
-#define CMDSETFEC			GENMASK_ULL(9, 8)
 
+#define CMDSETFEC			GENMASK_ULL(9, 8)
 
 /* command argument to be passed for cmd ID - CGX_CMD_SET_PHY_MOD_TYPE */
 #define CMDSETPHYMODTYPE	GENMASK_ULL(8, 8)
@@ -297,4 +297,5 @@ struct cgx_lnk_sts {
 
 /* LINK_BRING_UP command timeout */
 #define LINKCFG_TIMEOUT		GENMASK_ULL(21, 8)
+
 #endif /* __CGX_FW_INTF_H__ */
