@@ -873,6 +873,23 @@ static void scmi_perf_domain_init_fc(const struct scmi_protocol_handle *ph,
 	dom->fc_info = fc;
 }
 
+static uint32_t roundoff_to_nearest_100(uint32_t freq)
+{
+	uint32_t quotient, remainder;
+	uint32_t freq_mhz;
+
+	freq_mhz = (freq / 1000000);
+	quotient = freq_mhz / 100;
+	remainder = freq_mhz % 100;
+
+	if (remainder >= 50)
+		freq_mhz = quotient * 100 + 100;
+	else
+		freq_mhz = quotient * 100;
+
+	return freq_mhz * 1000000;
+}
+
 static int scmi_dvfs_device_opps_add(const struct scmi_protocol_handle *ph,
 				     struct device *dev, u32 domain)
 {
@@ -897,6 +914,11 @@ static int scmi_dvfs_device_opps_add(const struct scmi_protocol_handle *ph,
 		data.level = dom->opp[idx].perf;
 		data.freq = freq;
 
+		/*
+		 * marvell specific: need to round off to nearest hundered
+		 * if the calcuated frequency is not a multiple of 100 in MHz
+		 */
+		data.freq = roundoff_to_nearest_100(freq);
 		ret = dev_pm_opp_add_dynamic(dev, &data);
 		if (ret) {
 			dev_warn(dev, "[%d][%s]: Failed to add OPP[%d] %lu\n",
@@ -984,7 +1006,8 @@ static int scmi_dvfs_freq_get(const struct scmi_protocol_handle *ph, u32 domain,
 		return ret;
 
 	if (!dom->level_indexing_mode) {
-		*freq = level * dom->mult_factor;
+		/* Note domain is validated implicitly by scmi_perf_level_get */
+		*freq = roundoff_to_nearest_100(level * dom->mult_factor);
 	} else {
 		struct scmi_opp *opp;
 
