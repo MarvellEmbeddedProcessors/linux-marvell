@@ -4,4 +4,4 @@ obj-y 		+= hw-access/
 obj-y		+= octeontx2-serdes/
 obj-y           += octeontx2-pcicons/
 obj-$(CONFIG_MARVELL_CN10K_SERDES_DIAGNOSTICS) += cn10k_serdes_diag.o
-obj-y		+= octeontx_info.o
+obj-$(CONFIG_OCTEONTX_INFO) += octeontx_info.o

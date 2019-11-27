@@ -82,4 +82,12 @@ config MARVELL_CN10K_SERDES_DIAGNOSTICS
 	  interface for performing PRBS, setting Loopback mode or
 	  reading/writing Tx/Rx tuning parameters.
 
+config OCTEONTX_INFO
+	tristate "OcteonTX Info driver"
+	depends on PROC_FS
+	help
+	  provides procfs interface to board information like board name, board revision
+	  mac addresses, board serial number and more. These are boards housing Marvell
+	  OcteonTX family chipsets.
+
 endmenu
