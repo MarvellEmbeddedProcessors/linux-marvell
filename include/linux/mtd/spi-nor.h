@@ -420,6 +420,7 @@ struct spi_nor {
 	} dirmap;
 
 	void *priv;
+	bool pstore;
 };
 
 static inline void spi_nor_set_flash_node(struct spi_nor *nor,
