@@ -836,6 +836,7 @@ static int rvu_nix_get_bpid(struct rvu *rvu, struct nix_bp_cfg_req *req,
 			sdp_chan_base = pfvf->rx_chan_base - hw->sdp_chan_base;
 
 		bpid = bp->cgx_bpid_cnt + req->chan_base + sdp_chan_base;
+
 		if (req->bpid_per_chan)
 			bpid += chan_id;
 
