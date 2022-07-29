@@ -7,6 +7,7 @@
 
 #include <linux/args.h>
 #include <linux/init.h>
+#include <linux/errno.h>
 #include <uapi/linux/const.h>
 
 /*
@@ -185,6 +186,25 @@
 			   ARM_SMCCC_OWNER_STANDARD,		\
 			   0x53)
 
+/* Errata Management calls (defined by ARM DEN0100) */
+#define ARM_SMCCC_EM_VERSION					\
+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
+			   ARM_SMCCC_SMC_32,			\
+			   ARM_SMCCC_OWNER_STANDARD,		\
+			   0xF0)
+
+#define ARM_SMCCC_EM_FEATURES					\
+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
+			   ARM_SMCCC_SMC_32,			\
+			   ARM_SMCCC_OWNER_STANDARD,		\
+			   0xF1)
+
+#define ARM_SMCCC_EM_CPU_ERRATUM_FEATURES			\
+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
+			   ARM_SMCCC_SMC_32,			\
+			   ARM_SMCCC_OWNER_STANDARD,		\
+			   0xF2)
+
 /*
  * Return codes defined in ARM DEN 0070A
  * ARM DEN 0070A is now merged/consolidated into ARM DEN 0028 C
@@ -193,6 +213,15 @@
 #define SMCCC_RET_NOT_SUPPORTED			-1
 #define SMCCC_RET_NOT_REQUIRED			-2
 #define SMCCC_RET_INVALID_PARAMETER		-3
+
+/*
+ * Return codes defined in ARM DEN 0100
+ */
+#define	SMCCC_EM_RET_HIGHER_EL_MITIGATION	3
+#define	SMCCC_EM_RET_NOT_AFFECTED		2
+#define	SMCCC_EM_RET_AFFECTED			1
+#define	SMCCC_EM_RET_INVALID_PARAMTER		-2
+#define	SMCCC_EM_RET_UNKNOWN			-3
 
 #ifndef __ASSEMBLY__
 
@@ -246,6 +275,20 @@ s32 arm_smccc_get_soc_id_version(void);
  * When ARM_SMCCC_ARCH_SOC_ID is not present, returns SMCCC_RET_NOT_SUPPORTED.
  */
 s32 arm_smccc_get_soc_id_revision(void);
+
+#ifdef CONFIG_ARM_SMCCC_EM
+int arm_smccc_em_cpu_features(u32 erratum_id);
+int __init arm_smccc_em_init(void);
+#else
+static inline int arm_smccc_em_cpu_features(u32 erratum_id)
+{
+	return  -EOPNOTSUPP;
+}
+static inline int __init arm_smccc_em_init(void)
+{
+	return  -EOPNOTSUPP;
+}
+#endif /* !CONFIG_ARM_SMCCC_EM */
 
 /**
  * struct arm_smccc_res - Result from SMC/HVC call
