@@ -23,3 +23,11 @@ config ARM_SMCCC_SOC_ID
 	help
 	  Include support for the SoC bus on the ARM SMCCC firmware based
 	  platforms providing some sysfs information about the SoC variant.
+
+config ARM_SMCCC_EM
+	bool "Errata discovery by ARM SMCCC"
+	depends on HAVE_ARM_SMCCC_DISCOVERY
+	default y
+	help
+	  Include support for querying firmware via SMCCC to determine whether
+	  the CPU is affected by a specific erratum.

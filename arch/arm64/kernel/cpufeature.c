@@ -62,6 +62,7 @@
 
 #define pr_fmt(fmt) "CPU features: " fmt
 
+#include <linux/arm-smccc.h>
 #include <linux/bsearch.h>
 #include <linux/cpumask.h>
 #include <linux/crash_dump.h>
