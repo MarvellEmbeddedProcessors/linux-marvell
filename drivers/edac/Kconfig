@@ -561,4 +561,14 @@ config EDAC_NPCM
 	  error detection (in-line ECC in which a section 1/8th of the memory
 	  device used to store data is used for ECC storage).
 
+config EDAC_OCTEONTX
+	bool "Marvell OcteonTX2 and CN10K SoC EDAC"
+	depends on ARM_SDE_INTERFACE
+	help
+	  Support for error detection and correction on the
+	  Marvell OcteonTX2 and CN10K SoCs.
+	  This driver will allow SECDED errors notify and report in
+	  the firmware first model and reported via SDEI callbacks.
+	  EDAC Driver report Single Bit Errors and Double Bit Errors.
+
 endif # EDAC
