@@ -24,6 +24,7 @@
 #include "coresight-etm-perf.h"
 #include "coresight-priv.h"
 #include "coresight-syscfg.h"
+#include "coresight-tmc.h"
 
 static DEFINE_MUTEX(coresight_mutex);
 static DEFINE_PER_CPU(struct coresight_device *, csdev_sink);
@@ -1122,6 +1123,7 @@ int coresight_enable(struct coresight_device *csdev)
 	int cpu, ret = 0;
 	struct coresight_device *sink;
 	struct list_head *path;
+	struct tmc_drvdata *drvdata;
 	enum coresight_dev_subtype_source subtype;
 	u32 hash;
 
@@ -1156,6 +1158,9 @@ int coresight_enable(struct coresight_device *csdev)
 		ret = PTR_ERR(path);
 		goto out;
 	}
+
+	drvdata = dev_get_drvdata(sink->dev.parent);
+	drvdata->etm_source = csdev;
 
 	ret = coresight_enable_path(path, CS_MODE_SYSFS, NULL);
 	if (ret)
