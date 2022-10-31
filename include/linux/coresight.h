@@ -328,6 +328,7 @@ enum cs_mode {
 	CS_MODE_DISABLED,
 	CS_MODE_SYSFS,
 	CS_MODE_PERF,
+	CS_MODE_READ_PREVBOOT,
 };
 
 #define source_ops(csdev)	csdev->ops->source_ops
