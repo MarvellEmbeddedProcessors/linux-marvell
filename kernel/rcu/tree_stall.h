@@ -16,6 +16,11 @@
 //
 // Controlling CPU stall warnings, including delay calculation.
 
+void __weak print_arch_cpu_state(int cpu)
+{
+	/* Nothing to do */
+}
+
 /* panic() on RCU Stall sysctl. */
 int sysctl_panic_on_rcu_stall __read_mostly;
 int sysctl_max_rcu_stall_to_panic __read_mostly;
@@ -527,6 +532,7 @@ static void print_cpu_stall_info(int cpu)
 	       falsepositive ? " (false positive?)" : "");
 
 	print_cpu_stat_info(cpu);
+	print_arch_cpu_state(cpu);
 }
 
 /* Complain about starvation of grace-period kthread.  */
