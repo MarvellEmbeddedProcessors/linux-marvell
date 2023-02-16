@@ -27,6 +27,7 @@ extern const struct device_type coresight_dev_type[];
 #define CORESIGHT_LSR		0xfb4
 #define CORESIGHT_DEVARCH	0xfbc
 #define CORESIGHT_AUTHSTATUS	0xfb8
+#define CORESIGHT_DEVID1	0xfc4
 #define CORESIGHT_DEVID		0xfc8
 #define CORESIGHT_DEVTYPE	0xfcc
 
