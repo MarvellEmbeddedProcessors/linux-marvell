@@ -2,3 +2,4 @@
 obj-y           += octeontx2-sdp/
 obj-y 		+= hw-access/
 obj-y		+= octeontx2-dpi/
+obj-y		+= ptm-ep/
