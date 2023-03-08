@@ -2140,6 +2140,14 @@ static int spi_nor_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
 	size_t page_offset, page_remain, i;
 	ssize_t ret;
 
+	if (nor->controller_ops &&  nor->controller_ops->prepare) {
+		ret = nor->controller_ops->prepare(nor);
+		if (ret) {
+			dev_err(nor->dev, "failed in the preparation.\n");
+			return ret;
+		}
+	}
+
 	nor->pstore = 1;
 	for (i = 0; i < len; ) {
 		ssize_t written;
@@ -2151,15 +2159,25 @@ static int spi_nor_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
 		page_remain = min_t(size_t,
 				    nor->info->page_size - page_offset, len - i);
 
+		ret = spi_nor_write_enable(nor);
+		if (ret)
+			return ret;
+
 		ret = spi_nor_write_data(nor, addr, page_remain, buf + i);
 		if (ret < 0)
 			return ret;
 
 		written = ret;
 
+		while (!spi_nor_ready(nor))
+			;
+
 		*retlen += written;
 		i += written;
 	}
+
+	if (nor->controller_ops && nor->controller_ops->unprepare)
+		nor->controller_ops->unprepare(nor);
 
 	return 0;
 }
