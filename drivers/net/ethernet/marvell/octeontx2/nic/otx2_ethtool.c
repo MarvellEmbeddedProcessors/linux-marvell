@@ -1176,8 +1176,8 @@ static void otx2_get_link_mode_info(u64 link_mode_bmap,
 {
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(otx2_link_modes) = { 0, };
 	/* CGX link modes to Ethtool link mode mapping */
-	const int cgx_link_mode[42] = {
-		0, /*SGMII Mode */
+	const int cgx_link_mode[51] = {
+		0, /* SGMII  Mode */
 		ETHTOOL_LINK_MODE_1000baseX_Full_BIT,
 		ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
 		ETHTOOL_LINK_MODE_10000baseSR_Full_BIT,
@@ -1208,17 +1208,26 @@ static void otx2_get_link_mode_info(u64 link_mode_bmap,
 		ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT,
 		ETHTOOL_LINK_MODE_50000baseCR_Full_BIT,
 		ETHTOOL_LINK_MODE_50000baseKR_Full_BIT,
-		ETHTOOL_LINK_MODE_50000baseSR2_Full_BIT,
-		ETHTOOL_LINK_MODE_50000baseDR_Full_BIT,
-		ETHTOOL_LINK_MODE_50000baseCR2_Full_BIT,
-		ETHTOOL_LINK_MODE_50000baseKR2_Full_BIT,
 		ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT,
 		ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT,
 		ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT,
 		ETHTOOL_LINK_MODE_100000baseKR2_Full_BIT,
 		ETHTOOL_LINK_MODE_1000baseKX_Full_BIT,
 		ETHTOOL_LINK_MODE_56000baseCR4_Full_BIT,
-		ETHTOOL_LINK_MODE_56000baseSR4_Full_BIT
+		ETHTOOL_LINK_MODE_56000baseSR4_Full_BIT,
+		0,
+		0,
+		0,
+		0,
+		ETHTOOL_LINK_MODE_2500baseX_Full_BIT,
+		ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
+		ETHTOOL_LINK_MODE_100baseT1_Full_BIT,
+		ETHTOOL_LINK_MODE_1000baseT1_Full_BIT,
+		ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
+		ETHTOOL_LINK_MODE_200000baseCR4_Full_BIT,
+		ETHTOOL_LINK_MODE_10000baseCR_Full_BIT,
+		ETHTOOL_LINK_MODE_10000baseER_Full_BIT,
+		ETHTOOL_LINK_MODE_200000baseDR4_Full_BIT,
 	};
 	u8 bit;
 
