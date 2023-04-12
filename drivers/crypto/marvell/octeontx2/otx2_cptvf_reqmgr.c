@@ -281,6 +281,8 @@ static int cpt_process_ccode(struct otx2_cptlfs_info *lfs,
 				 info->req->areq->tfm->__crt_alg->cra_name,
 				 info->req->areq->tfm->__crt_alg->cra_driver_name);
 			otx2_cpt_dump_sg_list(pdev, info->req);
+			if (uc_ccode == 0x4C)
+				*res_code = -EBADMSG;
 			break;
 		}
 		/* Request has been processed with success */
