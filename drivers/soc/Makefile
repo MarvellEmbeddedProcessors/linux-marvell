@@ -19,6 +19,7 @@ obj-y				+= ixp4xx/
 obj-$(CONFIG_SOC_XWAY)		+= lantiq/
 obj-$(CONFIG_LITEX_SOC_CONTROLLER) += litex/
 obj-y				+= loongson/
+obj-y				+= marvell/
 obj-y				+= mediatek/
 obj-y				+= microchip/
 obj-y				+= nuvoton/
