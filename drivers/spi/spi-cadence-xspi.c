@@ -1090,6 +1090,12 @@ static int cdns_xspi_transfer_one_message_b0(struct spi_controller *controller,
 	int cs = spi_get_chipselect(spi, 0);
 	int cs_change = 0;
 
+	if (cdns_xspi_wait_for_controller_idle(cdns_xspi) < 0)
+		return -EIO;
+
+	writel(FIELD_PREP(CDNS_XSPI_CTRL_WORK_MODE, CDNS_XSPI_WORK_MODE_STIG),
+	       cdns_xspi->iobase + CDNS_XSPI_CTRL_CONFIG_REG);
+
 	/* Enable xfer state machine */
 	if (!cdns_xspi->xfer_in_progress) {
 		u32 xfer_control = readl(cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
