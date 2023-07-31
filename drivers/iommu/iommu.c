@@ -3554,3 +3554,79 @@ void iommu_free_global_pasid(ioasid_t pasid)
 	ida_free(&iommu_global_pasid_ida, pasid);
 }
 EXPORT_SYMBOL_GPL(iommu_free_global_pasid);
+
+/*
+ * iommu_group_set_qos_params() - Set the QoS parameters for a group
+ * @group: the iommu group.
+ * @partition: the partition label all traffic from the group should use.
+ * @perf_mon_grp: the performance label all traffic from the group should use.
+ *
+ * Return: 0 on success, or an error.
+ */
+int iommu_group_set_qos_params(struct iommu_group *group,
+			       u16 partition, u8 perf_mon_grp)
+{
+	const struct iommu_ops *ops;
+	struct group_device *device;
+	int ret;
+
+	mutex_lock(&group->mutex);
+	device = list_first_entry_or_null(&group->devices, typeof(*device),
+					  list);
+	if (!device) {
+		ret = -ENODEV;
+		goto out_unlock;
+	}
+
+	ops = dev_iommu_ops(device->dev);
+	if (!ops->set_group_qos_params) {
+		ret = -EOPNOTSUPP;
+		goto out_unlock;
+	}
+
+	ret = ops->set_group_qos_params(group, partition, perf_mon_grp);
+
+out_unlock:
+	mutex_unlock(&group->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_group_set_qos_params);
+
+/*
+ * iommu_group_get_qos_params() - Get the QoS parameters for a group
+ * @group: the iommu group.
+ * @partition: the partition label all traffic from the group uses.
+ * @perf_mon_grp: the performance label all traffic from the group uses.
+ *
+ * Return: 0 on success, or an error.
+ */
+int iommu_group_get_qos_params(struct iommu_group *group,
+			       u16 *partition, u8 *perf_mon_grp)
+{
+	const struct iommu_ops *ops;
+	struct group_device *device;
+	int ret;
+
+	mutex_lock(&group->mutex);
+	device = list_first_entry_or_null(&group->devices, typeof(*device),
+					  list);
+	if (!device) {
+		ret = -ENODEV;
+		goto out_unlock;
+	}
+
+	ops = dev_iommu_ops(device->dev);
+	if (!ops->get_group_qos_params) {
+		ret = -EOPNOTSUPP;
+		goto out_unlock;
+	}
+
+	ret = ops->get_group_qos_params(group, partition, perf_mon_grp);
+
+out_unlock:
+	mutex_unlock(&group->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_group_get_qos_params);
