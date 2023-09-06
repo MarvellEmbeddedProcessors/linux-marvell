@@ -6556,6 +6556,27 @@ int rvu_mbox_handler_nix_bandprof_get_hwinfo(struct rvu *rvu, struct msg_req *re
 	return 0;
 }
 
+bool rvu_nix_is_ptp_tx_enabled(struct rvu *rvu, u16 pcifunc)
+{
+	struct rvu_hwinfo *hw = rvu->hw;
+	struct rvu_block *block;
+	int blkaddr;
+	int nixlf;
+	u64 cfg;
+
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, pcifunc);
+	if (blkaddr < 0)
+		return NIX_AF_ERR_AF_LF_INVALID;
+
+	block = &hw->block[blkaddr];
+	nixlf = rvu_get_lf(rvu, block, pcifunc, 0);
+	if (nixlf < 0)
+		return NIX_AF_ERR_AF_LF_INVALID;
+
+	cfg = rvu_read64(rvu, blkaddr, NIX_AF_LFX_TX_CFG(nixlf));
+	return (cfg & BIT_ULL(32));
+}
+
 int rvu_mbox_handler_nix_rx_sw_sync(struct rvu *rvu, struct msg_req *req,
 				    struct msg_rsp *rsp)
 {
@@ -7151,25 +7172,4 @@ int rvu_nix_tl1_xoff_clear(struct rvu *rvu, u16 pcifunc)
 	nix_clear_tx_xoff(rvu, blkaddr, NIX_TXSCH_LVL_TL1,
 			  nix_get_tx_link(rvu, pcifunc));
 	return 0;
-}
-
-bool rvu_nix_is_ptp_tx_enabled(struct rvu *rvu, u16 pcifunc)
-{
-	struct rvu_hwinfo *hw = rvu->hw;
-	struct rvu_block *block;
-	int blkaddr;
-	int nixlf;
-	u64 cfg;
-
-	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, pcifunc);
-	if (blkaddr < 0)
-		return NIX_AF_ERR_AF_LF_INVALID;
-
-	block = &hw->block[blkaddr];
-	nixlf = rvu_get_lf(rvu, block, pcifunc, 0);
-	if (nixlf < 0)
-		return NIX_AF_ERR_AF_LF_INVALID;
-
-	cfg = rvu_read64(rvu, blkaddr, NIX_AF_LFX_TX_CFG(nixlf));
-	return (cfg & BIT_ULL(32));
 }

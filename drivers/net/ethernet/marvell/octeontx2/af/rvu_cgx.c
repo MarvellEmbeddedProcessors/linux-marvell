@@ -966,7 +966,6 @@ int rvu_mbox_handler_cgx_ptp_rx_enable(struct rvu *rvu, struct msg_req *req,
 	if (rvu_cgx_is_higig2_enabled(rvu, pf))
 		return NIX_AF_ERR_PTP_CONFIG_FAIL;
 
-
 	return rvu_cgx_ptp_rx_cfg(rvu, req->hdr.pcifunc, true);
 }
 
