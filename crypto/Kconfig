@@ -1296,6 +1296,97 @@ config CRYPTO_JITTERENTROPY
 
 	  See https://www.chronox.de/jent/
 
+choice
+	prompt "CPU Jitter RNG Memory Size"
+	default CRYPTO_JITTERENTROPY_MEMSIZE_2
+	depends on CRYPTO_JITTERENTROPY
+	help
+	  The Jitter RNG measures the execution time of memory accesses.
+	  Multiple consecutive memory accesses are performed. If the memory
+	  size fits into a cache (e.g. L1), only the memory access timing
+	  to that cache is measured. The closer the cache is to the CPU
+	  the less variations are measured and thus the less entropy is
+	  obtained. Thus, if the memory size fits into the L1 cache, the
+	  obtained entropy is less than if the memory size fits within
+	  L1 + L2, which in turn is less if the memory fits into
+	  L1 + L2 + L3. Thus, by selecting a different memory size,
+	  the entropy rate produced by the Jitter RNG can be modified.
+
+        config CRYPTO_JITTERENTROPY_MEMSIZE_2
+               bool "2048 Bytes (default)"
+        help
+          Select this option to allocate 2048 bytes of memory for the Jitter RNG
+          (Jitterentropy) entropy pool. This is the default memory size used by
+          the Jitterentropy noise source, which gathers entropy based on CPU timing
+          variations. The allocated memory is used internally by the entropy
+          collection algorithm to store timing data and maintain the state of
+          the noise source.
+          This setting is one of several mutually exclusive memory size options
+          used to configure the Jitterentropy RNG. Choosing a different memory
+          size may impact entropy quality or performance depending on the system
+          architecture and CPU behavior.
+          Only one of the CRYPTO_JITTERENTROPY_MEMSIZE_* options should be
+          selected. If unsure, choose this default (2048 Bytes).
+
+
+       config CRYPTO_JITTERENTROPY_MEMSIZE_128
+               bool "128 kBytes"
+        help
+          Enable this option to set the internal memory buffer size of
+          the Jitter RNG (jitterentropy) to 128 kilobytes. The Jitter RNG is a
+          cryptographically secure random number generator based on CPU execution
+          time jitter. The memory size configured here determines the entropy pool
+          size used during random number generation. A larger buffer (such as 128
+          kB) can improve the quality and throughput of entropy collection,
+          especially on high-performance systems, but it also increases memory
+          usage. This option is one of several predefined memory size choices;
+          only one should be selected at a time. Choose this size if your platform
+          can afford the memory overhead and benefits from enhanced entropy
+          accumulation
+
+       config CRYPTO_JITTERENTROPY_MEMSIZE_1024
+               bool "1024 kBytes"
+        help
+          Select this to allocate 1024 kBytes (1 MB) for the Jitterentropy
+          RNG entropy pool. Jitterentropy is a noise-based cryptographic
+          random number generator used in the kernel for entropy collection.
+          Larger buffers improve entropy quality and resistance to side-channel
+          attacks, enhancing randomness for high-security needs. Enable this
+          if your system has enough memory and needs better randomness for
+          high-security or high-throughput environments. This option is mutually
+          exclusive with other CRYPTO_JITTERENTROPY_MEMSIZE_* settings; only
+          one memory size can be selected.
+
+
+       config CRYPTO_JITTERENTROPY_MEMSIZE_8192
+               bool "8192 kBytes"
+        help
+          Select this to set the Jitterentropy RNG memory buffer to 8192
+          kBytes (8 MB). Jitterentropy is a noise-based cryptographic random
+          number generator that uses CPU execution time jitter for entropy.
+          An 8 MB buffer maximizes entropy quality and throughput, ideal for
+          high-performance or high-security cryptographic workloads. Enable
+          this only on systems with ample RAM, as it has a significant memory
+          cost. This option is mutually exclusive with other
+          CRYPTO_JITTERENTROPY_MEMSIZE_* settings; only one memory size can
+          be selected.
+
+endchoice
+
+config CRYPTO_JITTERENTROPY_MEMORY_BLOCKS
+	int
+	default 64 if CRYPTO_JITTERENTROPY_MEMSIZE_2
+	default 512 if CRYPTO_JITTERENTROPY_MEMSIZE_128
+	default 1024 if CRYPTO_JITTERENTROPY_MEMSIZE_1024
+	default 4096 if CRYPTO_JITTERENTROPY_MEMSIZE_8192
+
+config CRYPTO_JITTERENTROPY_MEMORY_BLOCKSIZE
+	int
+	default 32 if CRYPTO_JITTERENTROPY_MEMSIZE_2
+	default 256 if CRYPTO_JITTERENTROPY_MEMSIZE_128
+	default 1024 if CRYPTO_JITTERENTROPY_MEMSIZE_1024
+	default 2048 if CRYPTO_JITTERENTROPY_MEMSIZE_8192
+
 config CRYPTO_JITTERENTROPY_TESTINTERFACE
 	bool "CPU Jitter RNG Test Interface"
 	depends on CRYPTO_JITTERENTROPY
