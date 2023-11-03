@@ -207,4 +207,6 @@ static inline bool cpu_mitigations_auto_nosmt(void)
 }
 #endif
 
+extern void print_arch_cpu_state(int cpu);
+
 #endif /* _LINUX_CPU_H_ */
