@@ -180,6 +180,13 @@ static int scmi_clk_is_enabled(struct clk_hw *hw)
 	return __scmi_clk_is_enabled(hw, NOT_ATOMIC);
 }
 
+static int scmi_clk_get_available_rates(struct clk_hw *hw, u64 *rate)
+{
+	struct scmi_clk *clk = to_scmi_clk(hw);
+
+	return scmi_proto_clk_ops->available_rates(clk->ph, clk->id, rate);
+}
+
 static int scmi_clk_get_duty_cycle(struct clk_hw *hw, struct clk_duty *duty)
 {
 	int ret;

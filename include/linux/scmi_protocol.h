@@ -122,6 +122,8 @@ struct scmi_clk_proto_ops {
 			      u32 oem_val, bool atomic);
 	int (*parent_get)(const struct scmi_protocol_handle *ph, u32 clk_id, u32 *parent_id);
 	int (*parent_set)(const struct scmi_protocol_handle *ph, u32 clk_id, u32 parent_id);
+	int (*available_rates)(const struct scmi_protocol_handle *ph, u32 clk_id,
+			       u64 *rates);
 };
 
 struct scmi_perf_domain_info {
