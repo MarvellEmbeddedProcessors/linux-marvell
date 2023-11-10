@@ -13646,6 +13646,7 @@ F:	net/mctp/
 
 MAILBOX MARVELL MHU DRIVER
 M:	Wojciech Bartczak <wbartczak@marvell.com>
+M:	Piyush Malgujar <pmalgujar@marvell.com>
 S:	Maintained
 F:	drivers/mailbox/mvl_mhu.c
 
