@@ -115,4 +115,14 @@ config MARVELL_CN10K_EINJ
 	  called cn10k-einj.
 	  Unless testing, say N here.
 
+config MRVL_SWUP
+        tristate "Marvell firmware secure update"
+        depends on ARM64
+        help
+          Provide debugfs interface for firmware update.
+          Supported on cnXX family.
+          Currently supported operations:
+            -> TIM Version check
+            -> TIM Hash verification
+            -> TIM firmware update
 endmenu
