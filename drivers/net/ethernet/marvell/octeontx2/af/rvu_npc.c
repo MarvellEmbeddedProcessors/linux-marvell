@@ -1994,7 +1994,7 @@ free_entry_map:
 free_bmap_reverse:
 	kfree(mcam->bmap_reverse);
 free_bmap:
-	kfree(mcam->counters.bmap);
+	kfree(mcam->bmap);
 
 	return -ENOMEM;
 }
