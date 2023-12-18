@@ -36,3 +36,4 @@ obj-y				+= qcom/
 obj-y				+= smccc/
 obj-y				+= tegra/
 obj-y				+= xilinx/
+obj-$(CONFIG_MARVELL_UB)        += octeontx2/
