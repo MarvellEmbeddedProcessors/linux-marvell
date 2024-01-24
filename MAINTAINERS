@@ -12648,6 +12648,12 @@ M:	Piyush Malgujar <pmalgujar@marvell.com>
 S:	Maintained
 F:	drivers/firmware/octeontx2/memtest.c
 
+MAILBOX MARVELL MAC MANAGEMENT DRIVER
+M:	Wojciech Bartczak <wbartczak@marvell.com>
+M:	Piyush Malgujar <pmalgujar@marvell.com>
+S:	Maintained
+F:	drivers/firmware/octeontx2/mac_mgmt.c
+
 MAPLE TREE
 M:	Liam R. Howlett <Liam.Howlett@oracle.com>
 L:	maple-tree@lists.infradead.org
