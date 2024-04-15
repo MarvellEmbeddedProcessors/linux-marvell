@@ -279,6 +279,7 @@ struct rvu_pfvf {
 	unsigned long flags;
 	struct  sdp_node_info *sdp_info;
 	u8	tl1_rr_prio; /* RR PRIORITY set by PF */
+	u8	esw_rules; /* Rules installed by ESW */
 };
 
 enum rvu_pfvf_flags {
