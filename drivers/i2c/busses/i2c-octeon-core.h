@@ -237,6 +237,7 @@ static inline void octeon_i2c_write_int(struct octeon_i2c *i2c, u64 data)
 
 #define IS_LS_FREQ(twsi_freq)	((twsi_freq) <= 400000)
 #define PCI_SUBSYS_DEVID_9XXX	0xB
+#define PCI_SUBSYS_DEVID_CN20X 0xC
 #define PCI_SUBSYS_MASK		GENMASK(15, 12)
 /**
  * octeon_i2c_is_otx2 - check for chip ID
@@ -248,7 +249,8 @@ static inline bool octeon_i2c_is_otx2(struct pci_dev *pdev)
 {
 	u32 chip_id = FIELD_GET(PCI_SUBSYS_MASK, pdev->subsystem_device);
 
-	return (chip_id == PCI_SUBSYS_DEVID_9XXX);
+	return (chip_id == PCI_SUBSYS_DEVID_9XXX ||
+		chip_id == PCI_SUBSYS_DEVID_CN20X);
 }
 
 /* Prototypes */
