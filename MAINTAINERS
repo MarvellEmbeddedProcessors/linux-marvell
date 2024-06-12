@@ -265,7 +265,7 @@ ACER ASPIRE 1 EMBEDDED CONTROLLER DRIVER
 M:	Nikita Travkin <nikita@trvn.ru>
 S:	Maintained
 F:	Documentation/devicetree/bindings/platform/acer,aspire1-ec.yaml
-F:	drivers/platform/arm64/acer-aspire1-ec.c
+F:	drivers/platform/arm64/ec/acer-aspire1-ec.c
 
 ACER ASPIRE ONE TEMPERATURE AND FAN DRIVER
 M:	Peter Kaestle <peter@piie.net>
@@ -3013,7 +3013,7 @@ F:	drivers/mmc/host/sdhci-of-arasan.c
 N:	zynq
 N:	xilinx
 
-ARM64 PLATFORM DRIVERS
+ARM64 EC PLATFORM DRIVERS
 M:	Hans de Goede <hdegoede@redhat.com>
 M:	Ilpo Järvinen <ilpo.jarvinen@linux.intel.com>
 R:	Bryan O'Donoghue <bryan.odonoghue@linaro.org>
@@ -3021,7 +3021,7 @@ L:	platform-driver-x86@vger.kernel.org
 S:	Maintained
 Q:	https://patchwork.kernel.org/project/platform-driver-x86/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/pdx86/platform-drivers-x86.git
-F:	drivers/platform/arm64/
+F:	drivers/platform/arm64/ec
 
 ARM64 PORT (AARCH64 ARCHITECTURE)
 M:	Catalin Marinas <catalin.marinas@arm.com>
