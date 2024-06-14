@@ -1120,6 +1120,7 @@ int otx2_register_mbox_intr(struct otx2_nic *pf, bool probe_af)
 
 	return 0;
 }
+EXPORT_SYMBOL(otx2_register_mbox_intr);
 
 void otx2_pfaf_mbox_destroy(struct otx2_nic *pf)
 {
@@ -1185,6 +1186,7 @@ exit:
 	otx2_pfaf_mbox_destroy(pf);
 	return err;
 }
+EXPORT_SYMBOL(otx2_pfaf_mbox_init);
 
 static int otx2_cgx_config_linkevents(struct otx2_nic *pf, bool enable)
 {
@@ -1864,7 +1866,7 @@ int otx2_alloc_queue_mem(struct otx2_nic *pf)
 {
 	struct otx2_qset *qset = &pf->qset;
 	struct otx2_cq_poll *cq_poll;
-
+	int err = -ENOMEM;
 
 	/* RQ and SQs are mapped to different CQs,
 	 * so find out max CQ IRQs (i.e CINTs) needed.
@@ -1877,7 +1879,7 @@ int otx2_alloc_queue_mem(struct otx2_nic *pf)
 
 	qset->napi = kcalloc(pf->hw.cint_cnt, sizeof(*cq_poll), GFP_KERNEL);
 	if (!qset->napi)
-		return -ENOMEM;
+		return err;
 
 	/* CQ size of RQ */
 	qset->rqe_cnt = qset->rqe_cnt ? qset->rqe_cnt : Q_COUNT(Q_SIZE_256);
@@ -1903,7 +1905,7 @@ int otx2_alloc_queue_mem(struct otx2_nic *pf)
 
 err_free_mem:
 	otx2_free_queue_mem(qset);
-	return -ENOMEM;
+	return err;
 }
 EXPORT_SYMBOL(otx2_alloc_queue_mem);
 
@@ -2962,6 +2964,7 @@ int otx2_check_pf_usable(struct otx2_nic *nic)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(otx2_check_pf_usable);
 
 int otx2_realloc_msix_vectors(struct otx2_nic *pf)
 {
