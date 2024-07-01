@@ -1143,7 +1143,7 @@ struct phy_driver {
 				  unsigned long *rules);
 
 };
-#define to_phy_driver(d) container_of(to_mdio_common_driver(d),		\
+#define to_phy_driver(d) container_of_const(to_mdio_common_driver(d),		\
 				      struct phy_driver, mdiodrv)
 
 #define PHY_ANY_ID "MATCH ANY PHY"

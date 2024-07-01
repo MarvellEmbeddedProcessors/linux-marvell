@@ -269,7 +269,7 @@ long nvdimm_clear_poison(struct device *dev, phys_addr_t phys,
 }
 EXPORT_SYMBOL_GPL(nvdimm_clear_poison);
 
-static int nvdimm_bus_match(struct device *dev, struct device_driver *drv);
+static int nvdimm_bus_match(struct device *dev, const struct device_driver *drv);
 
 static struct bus_type nvdimm_bus_type = {
 	.name = "nd",
@@ -465,9 +465,9 @@ static struct nd_device_driver nd_bus_driver = {
 	},
 };
 
-static int nvdimm_bus_match(struct device *dev, struct device_driver *drv)
+static int nvdimm_bus_match(struct device *dev, const struct device_driver *drv)
 {
-	struct nd_device_driver *nd_drv = to_nd_device_driver(drv);
+	const struct nd_device_driver *nd_drv = to_nd_device_driver(drv);
 
 	if (is_nvdimm_bus(dev) && nd_drv == &nd_bus_driver)
 		return true;

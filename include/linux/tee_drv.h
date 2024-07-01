@@ -491,7 +491,7 @@ struct tee_client_driver {
 };
 
 #define to_tee_client_driver(d) \
-		container_of(d, struct tee_client_driver, driver)
+		container_of_const(d, struct tee_client_driver, driver)
 
 /**
  * teedev_open() - Open a struct tee_device

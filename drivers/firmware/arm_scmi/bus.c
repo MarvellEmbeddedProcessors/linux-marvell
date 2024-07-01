@@ -187,7 +187,7 @@ static void scmi_protocol_device_unrequest(const struct scmi_device_id *id_table
 }
 
 static const struct scmi_device_id *
-scmi_dev_match_id(struct scmi_device *scmi_dev, struct scmi_driver *scmi_drv)
+scmi_dev_match_id(struct scmi_device *scmi_dev, const struct scmi_driver *scmi_drv)
 {
 	const struct scmi_device_id *id = scmi_drv->id_table;
 
@@ -205,9 +205,9 @@ scmi_dev_match_id(struct scmi_device *scmi_dev, struct scmi_driver *scmi_drv)
 	return NULL;
 }
 
-static int scmi_dev_match(struct device *dev, struct device_driver *drv)
+static int scmi_dev_match(struct device *dev, const struct device_driver *drv)
 {
-	struct scmi_driver *scmi_drv = to_scmi_driver(drv);
+	const struct scmi_driver *scmi_drv = to_scmi_driver(drv);
 	struct scmi_device *scmi_dev = to_scmi_dev(dev);
 	const struct scmi_device_id *id;
 

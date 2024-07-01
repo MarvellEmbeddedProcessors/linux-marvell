@@ -774,6 +774,7 @@ static inline struct wmi_driver *drv_to_wdrv(struct device_driver *drv)
 {
 	return container_of(drv, struct wmi_driver, driver);
 }
+#define drv_to_wdrv(__drv)	container_of_const(__drv, struct wmi_driver, driver)
 
 /*
  * sysfs interface
@@ -891,9 +892,9 @@ static void wmi_dev_release(struct device *dev)
 	kfree(wblock);
 }
 
-static int wmi_dev_match(struct device *dev, struct device_driver *driver)
+static int wmi_dev_match(struct device *dev, const struct device_driver *driver)
 {
-	struct wmi_driver *wmi_driver = drv_to_wdrv(driver);
+	const struct wmi_driver *wmi_driver = drv_to_wdrv(driver);
 	struct wmi_block *wblock = dev_to_wblock(dev);
 	const struct wmi_device_id *id = wmi_driver->id_table;
 
