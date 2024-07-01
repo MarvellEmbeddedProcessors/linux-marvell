@@ -2201,7 +2201,7 @@ static int rdtgroup_create_info_dir(struct kernfs_node *parent_kn)
 	}
 
 	for_each_mon_capable_rdt_resource(r) {
-		fflags =  fflags_from_resource(r) | RFTYPE_MON_INFO;
+		fflags = fflags_from_resource(r) | RFTYPE_MON_INFO;
 		sprintf(name, "%s_MON", r->name);
 		ret = rdtgroup_mkdir_info_resdir(r, name, fflags);
 		if (ret)
