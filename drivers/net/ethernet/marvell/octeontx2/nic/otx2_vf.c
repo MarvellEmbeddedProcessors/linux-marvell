@@ -782,6 +782,9 @@ static int otx2vf_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Set interface mode as Default */
 	vf->ethtool_flags |= OTX2_PRIV_FLAG_DEF_MODE;
+	vf->af_xdp_zc_qidx = bitmap_zalloc(qcount, GFP_KERNEL);
+	if (!vf->af_xdp_zc_qidx)
+		goto err_shutdown_tc;
 
 #ifdef CONFIG_DCB
 	/* Priority flow control is not supported for LBK and SDP vf(s) */
