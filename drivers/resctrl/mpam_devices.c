@@ -684,6 +684,12 @@ static const struct mpam_quirk mpam_quirks[] = {
 	.iidr_mask  = IIDR_MATCH_ONE,
 	.workaround = T241_FORCE_MBW_MIN_TO_ONE,
 	},
+	{
+	/* NVIDIA t241 erratum T241-MPAM-6 */
+	.iidr       = IIDR_PROD(0x241) | IIDR_VAR(0) | IIDR_REV(0) | IIDR_IMP(0x36b),
+	.iidr_mask  = IIDR_MATCH_ONE,
+	.workaround = T241_MBW_COUNTER_SCALE_64,
+	},
 	{ NULL }, /* Sentinel */
 };
 
@@ -1245,13 +1251,20 @@ static void __ris_msmon_read(void *arg)
 			now = FIELD_GET(MSMON___VALUE, now);
 		}
 
+		if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc))
+			now *= 64;
+
 		if (nrdy)
 			break;
 
 		mbwu_state = &ris->mbwu_state[ctx->mon];
 
-		if (overflow)
-			mbwu_state->correction += mpam_msmon_overflow_val(m->type);
+		if (overflow) {
+			u64 overflow_val = mpam_msmon_overflow_val(m->type);
+			if (mpam_has_quirk(T241_MBW_COUNTER_SCALE_64, msc))
+				overflow_val *= 64;
+			mbwu_state->correction += overflow_val;
+		}
 
 		/*
 		 * Include bandwidth consumed before the last hardware reset and
