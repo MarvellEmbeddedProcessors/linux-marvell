@@ -320,6 +320,7 @@ struct rvu_pfvf {
 	struct  sdp_node_info *sdp_info;
 	u8	tl1_rr_prio; /* RR PRIORITY set by PF */
 	u8	esw_rules; /* Rules installed by ESW */
+	u8	hw_prio;   /* Hw priority of default rules */
 };
 
 enum rvu_pfvf_flags {
