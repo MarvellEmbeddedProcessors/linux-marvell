@@ -3063,6 +3063,8 @@ int rvu_mbox_handler_npc_mcam_read_entry(struct rvu *rvu,
 	u16 pcifunc = req->hdr.pcifunc;
 	int blkaddr, rc;
 
+	req->entry = npc_cn20k_vidx2idx(req->entry);
+
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 	if (blkaddr < 0)
 		return NPC_MCAM_INVALID_REQ;
@@ -3093,6 +3095,8 @@ int rvu_mbox_handler_npc_mcam_write_entry(struct rvu *rvu,
 	u16 pcifunc = req->hdr.pcifunc;
 	int blkaddr, rc;
 	u8 nix_intf;
+
+	req->entry = npc_cn20k_vidx2idx(req->entry);
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 	if (blkaddr < 0)
@@ -3149,6 +3153,8 @@ int rvu_mbox_handler_npc_mcam_ena_entry(struct rvu *rvu,
 	u16 pcifunc = req->hdr.pcifunc;
 	int blkaddr, rc;
 
+	req->entry = npc_cn20k_vidx2idx(req->entry);
+
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 	if (blkaddr < 0)
 		return NPC_MCAM_INVALID_REQ;
@@ -3171,6 +3177,8 @@ int rvu_mbox_handler_npc_mcam_dis_entry(struct rvu *rvu,
 	struct npc_mcam *mcam = &rvu->hw->mcam;
 	u16 pcifunc = req->hdr.pcifunc;
 	int blkaddr, rc;
+
+	req->entry = npc_cn20k_vidx2idx(req->entry);
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 	if (blkaddr < 0)
@@ -3206,8 +3214,8 @@ int rvu_mbox_handler_npc_mcam_shift_entry(struct rvu *rvu,
 
 	mutex_lock(&mcam->lock);
 	for (index = 0; index < req->shift_count; index++) {
-		old_entry = req->curr_entry[index];
-		new_entry = req->new_entry[index];
+		old_entry = npc_cn20k_vidx2idx(req->curr_entry[index]);
+		new_entry = npc_cn20k_vidx2idx(req->new_entry[index]);
 
 		/* Check if both old and new entries are valid and
 		 * does belong to this PFFUNC or not.
@@ -3249,7 +3257,7 @@ int rvu_mbox_handler_npc_mcam_shift_entry(struct rvu *rvu,
 	/* If shift has failed then report the failed index */
 	if (index != req->shift_count) {
 		rc = NPC_MCAM_PERM_DENIED;
-		rsp->failed_entry_idx = index;
+		rsp->failed_entry_idx = npc_cn20k_idx2vidx(index);
 	}
 
 	mutex_unlock(&mcam->lock);
@@ -3549,6 +3557,7 @@ int rvu_mbox_handler_npc_mcam_alloc_and_write_entry(struct rvu *rvu,
 	entry_req.ref_prio = req->ref_prio;
 	entry_req.ref_entry = req->ref_entry;
 	entry_req.count = 1;
+	entry_req.virt = req->virt;
 
 	rc = rvu_mbox_handler_npc_mcam_alloc_entry(rvu,
 						   &entry_req, &entry_rsp);
@@ -3558,7 +3567,7 @@ int rvu_mbox_handler_npc_mcam_alloc_and_write_entry(struct rvu *rvu,
 	if (!entry_rsp.count)
 		return NPC_MCAM_ALLOC_FAILED;
 
-	entry = entry_rsp.entry;
+	entry = npc_cn20k_vidx2idx(entry_rsp.entry);
 
 	if (!req->alloc_cntr)
 		goto write_entry;
@@ -3825,6 +3834,8 @@ int rvu_mbox_handler_npc_mcam_entry_stats(struct rvu *rvu,
 	int blkaddr;
 	u64 regval;
 	u32 bank;
+
+	req->entry = npc_cn20k_vidx2idx(req->entry);
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 	if (blkaddr < 0)
