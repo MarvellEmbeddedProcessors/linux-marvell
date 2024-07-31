@@ -501,6 +501,8 @@ struct rvu_irq_data {
 	u64 intr_status;
 	void (*rvu_queue_work_hdlr)(struct mbox_wq_info *mw, int first,
 				    int mdevs, u64 intr);
+	void (*afvf_queue_work_hdlr)(struct mbox_wq_info *mw, int first,
+				     int mdevs, u64 intr);
 	struct	rvu *rvu;
 	int vec_num;
 	int start;
@@ -509,6 +511,7 @@ struct rvu_irq_data {
 
 struct mbox_ops {
 	irqreturn_t (*pf_intr_handler)(int irq, void *rvu_irq);
+	irqreturn_t (*afvf_intr_handler)(int irq, void *rvu_irq);
 };
 
 struct channel_fwdata {
