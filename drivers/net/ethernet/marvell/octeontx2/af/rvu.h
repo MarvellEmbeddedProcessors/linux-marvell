@@ -697,8 +697,8 @@ struct rvu {
 	struct list_head	rep_evtq_head;
 	/* Representor event lock */
 	spinlock_t		rep_evtq_lock;
-
-	struct ng_rvu           *ng_rvu;
+	struct ng_rvu		*ng_rvu;
+	int			ml_pf_num;
 };
 
 static inline void rvu_write64(struct rvu *rvu, u64 block, u64 offset, u64 val)
@@ -1341,4 +1341,8 @@ int rvu_rep_pf_init(struct rvu *rvu);
 int rvu_rep_install_mcam_rules(struct rvu *rvu);
 void rvu_rep_update_rules(struct rvu *rvu, u16 pcifunc, bool ena);
 int rvu_rep_notify_pfvf_state(struct rvu *rvu, u16 pcifunc, bool enable);
+
+void rvu_reset_blk_lfcfg(struct rvu *rvu, struct rvu_block *block);
+void rvu_scan_block(struct rvu *rvu, struct rvu_block *block);
+
 #endif /* RVU_H */
