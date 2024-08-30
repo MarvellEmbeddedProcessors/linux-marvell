@@ -1307,6 +1307,11 @@ static int otx2_get_link_ksettings(struct net_device *netdev,
 						     supported,
 						     Autoneg);
 
+	if (rsp->fwdata.advertised_an)
+		ethtool_link_ksettings_add_link_mode(cmd,
+						     advertising,
+						     Autoneg);
+
 	otx2_get_link_mode_info(rsp->fwdata.advertised_link_modes,
 				OTX2_MODE_ADVERTISED, cmd);
 	otx2_get_fec_info(rsp->fwdata.advertised_fec,
@@ -1332,18 +1337,18 @@ static int otx2_set_link_ksettings(struct net_device *netdev,
 	memset(&cur_ks, 0, sizeof(struct ethtool_link_ksettings));
 
 	if (!ethtool_validate_speed(cmd->base.speed) ||
-			!ethtool_validate_duplex(cmd->base.duplex))
+	    !ethtool_validate_duplex(cmd->base.duplex))
 		return -EINVAL;
 
 	if (cmd->base.autoneg != AUTONEG_ENABLE &&
-			cmd->base.autoneg != AUTONEG_DISABLE)
+	    cmd->base.autoneg != AUTONEG_DISABLE)
 		return -EINVAL;
 
 	otx2_get_link_ksettings(netdev, &cur_ks);
 
 	/* Check requested modes against supported modes by hardware */
 	if (!linkmode_subset(cmd->link_modes.advertising,
-				cur_ks.link_modes.supported))
+			     cur_ks.link_modes.supported))
 		return -EINVAL;
 
 	mutex_lock(&mbox->lock);
@@ -1366,18 +1371,18 @@ static int otx2_set_link_ksettings(struct net_device *netdev,
 	linkmode_set_bit(ETHTOOL_LINK_MODE_FEC_RS_BIT, mask);
 
 	linkmode_copy(req->args.advertising,
-			cmd->link_modes.advertising);
+		      cmd->link_modes.advertising);
 	linkmode_andnot(req->args.advertising,
 			req->args.advertising, mask);
 
 	/* inform AF that we need parse this differently */
 	if (bitmap_weight(req->args.advertising,
-				__ETHTOOL_LINK_MODE_MASK_NBITS) >= 2)
+			  __ETHTOOL_LINK_MODE_MASK_NBITS) >= 2)
 		req->args.multimode = true;
 
 	if (!otx2_sync_mbox_msg(&pf->mbox)) {
 		rsp = (struct cgx_set_link_mode_rsp *)
-			otx2_mbox_get_rsp(&pf->mbox.mbox, 0, &req->hdr);
+		      otx2_mbox_get_rsp(&pf->mbox.mbox, 0, &req->hdr);
 		err = rsp->status;
 	}
 end:
