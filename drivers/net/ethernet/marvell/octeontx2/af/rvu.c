@@ -714,6 +714,38 @@ check_pf:
 		 pf, nvecs, min_vecs);
 }
 
+static int rvu_get_af_msix_int_vec_count(struct rvu *rvu)
+{
+	int count = RVU_AF_INT_VEC_CNT + RVU_PF_INT_VEC_CNT;
+
+	/* NIXx have 2 NDC Block */
+	if (is_block_implemented(rvu->hw, BLKADDR_NIX0))
+		count += NIX_AF_INT_VEC_CNT + (NDC_AF_INT_VEC_CNT * 2);
+
+	if (is_block_implemented(rvu->hw, BLKADDR_NIX1))
+		count += NIX_AF_INT_VEC_CNT + (NDC_AF_INT_VEC_CNT * 2);
+
+	/* NPA have 1 NDC Block */
+	if (is_block_implemented(rvu->hw, BLKADDR_NPA))
+		count += NPA_AF_INT_VEC_CNT + NDC_AF_INT_VEC_CNT;
+
+	if (is_block_implemented(rvu->hw, BLKADDR_CPT0)) {
+		if (is_rvu_otx2(rvu))
+			count += CPT_AF_INT_VEC_CNT;
+		else
+			count += CPT_AF_INT_VEC_CNT + 1;
+	}
+
+	if (is_block_implemented(rvu->hw, BLKADDR_CPT1)) {
+		if (is_rvu_otx2(rvu))
+			count += CPT_AF_INT_VEC_CNT;
+		else
+			count += CPT_AF_INT_VEC_CNT + 1;
+	}
+
+	return count;
+}
+
 static int rvu_setup_msix_resources(struct rvu *rvu)
 {
 	struct altaf_intr_notify *altaf_intr_data;
@@ -723,6 +755,7 @@ static int rvu_setup_msix_resources(struct rvu *rvu)
 	struct rvu_pfvf *pfvf;
 	int nvecs, offset;
 	dma_addr_t iova;
+	int af_int_count;
 
 	for (pf = 0; pf < hw->total_pfs; pf++) {
 		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_CFG(pf));
@@ -752,8 +785,13 @@ static int rvu_setup_msix_resources(struct rvu *rvu)
 		/* For PF0 (AF) firmware will set msix vector offsets for
 		 * AF, block AF and PF0_INT vectors, so jump to VFs.
 		 */
-		if (!pf)
+		if (!pf) {
+			/* Set AF, PF_AF and Block_AF interrupts as allocated */
+			af_int_count = rvu_get_af_msix_int_vec_count(rvu);
+			offset = rvu_alloc_rsrc_contig(&pfvf->msix,
+						       af_int_count);
 			goto setup_vfmsix;
+		}
 
 		/* Set MSIX offset for PF's 'RVU_PF_INT_VEC' vectors.
 		 * These are allocated on driver init and never freed,
@@ -857,6 +895,7 @@ static void rvu_free_hw_resources(struct rvu *rvu)
 	rvu_npc_freemem(rvu);
 	rvu_nix_freemem(rvu);
 	rvu_sso_freemem(rvu);
+	rvu_cpt_freemem(rvu);
 
 	/* Free block LF bitmaps */
 	for (id = 0; id < BLK_COUNT; id++) {

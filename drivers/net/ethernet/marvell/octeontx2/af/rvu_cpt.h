@@ -8,6 +8,8 @@
 #ifndef RVU_CPT_H
 #define RVU_CPT_H
 
+#include <linux/types.h>
+
 #define CPT_AF_MAX_RXC_QUEUES	16
 #define CPT_AF_MAX_CTX_ILEN	GENMASK(2, 0)
 #define CPT_AF_NIX_QUEUE	GENMASK_ULL(7, 4)
@@ -128,10 +130,101 @@ union otx2_cpt_af_exe_cfg_cmd {
 #define MAX_IE  GENMASK_ULL(31, 16)
 #define MAX_SE  GENMASK_ULL(15, 0)
 
+/* CPT instruction size in bytes */
+#define RVU_CPT_INST_SIZE	64
+
+/* CPT instruction (CPT_INST_S) queue length */
+#define RVU_CPT_INST_QLEN	8200
+
+/* CPT instruction queue size passed to HW is in units of
+ * 40*CPT_INST_S messages.
+ */
+#define RVU_CPT_SIZE_DIV40 (RVU_CPT_INST_QLEN / 40)
+
+/* CPT instruction and pending queues length in CPT_INST_S messages */
+#define RVU_CPT_INST_QLEN_MSGS	((RVU_CPT_SIZE_DIV40 - 1) * 40)
+
+/* CPT needs 320 free entries */
+#define RVU_CPT_INST_QLEN_EXTRA_BYTES	(320 * RVU_CPT_INST_SIZE)
+#define RVU_CPT_EXTRA_SIZE_DIV40	(320 / 40)
+
+/* CPT instruction queue length in bytes */
+#define RVU_CPT_INST_QLEN_BYTES                                               \
+		((RVU_CPT_SIZE_DIV40 * 40 * RVU_CPT_INST_SIZE) +             \
+		RVU_CPT_INST_QLEN_EXTRA_BYTES)
+
+/* CPT instruction group queue length in bytes */
+#define RVU_CPT_INST_GRP_QLEN_BYTES                                           \
+		((RVU_CPT_SIZE_DIV40 + RVU_CPT_EXTRA_SIZE_DIV40) * 16)
+
+/* CPT FC length in bytes */
+#define RVU_CPT_Q_FC_LEN 128
+
+/* CPT LF_Q_SIZE Register */
+#define CPT_LF_Q_SIZE_DIV40 GENMASK_ULL(14, 0)
+
+/* CPT invalid engine group num */
+#define OTX2_CPT_INVALID_CRYPTO_ENG_GRP 0xFF
+
+/* Fastpath ipsec opcode with inplace processing */
+#define OTX2_CPT_INLINE_RX_OPCODE (0x26 | (1 << 6))
+#define CN10K_CPT_INLINE_RX_OPCODE (0x29 | (1 << 6))
+
+/* CPT LMTST */
+#define LMT_LINE_SIZE   128 /* LMT line size in bytes */
+#define LMT_BURST_SIZE  32  /* 32 LMTST lines for burst */
+
+/* Calculate CPT register offset */
+#define CPT_RVU_FUNC_ADDR_S(blk, slot, offs) \
+		(((blk) << 20) | ((slot) << 12) | (offs))
+
+struct rvu_cpt_eng_grp {
+	u8 eng_type;
+	u8 grp_num;
+};
+
+struct rvu_cpt_rx_inline_lf_cfg {
+	u16 sso_pf_func;
+	u16 param1;
+	u16 param2;
+	u16 opcode;
+	u32 credit;
+	u32 credit_th;
+	u16 bpid;
+	u32 reserved;
+	u8 ctx_ilen_valid : 1;
+	u8 ctx_ilen : 7;
+};
+
+struct rvu_cpt_inst_queue {
+	u8 *vaddr;
+	u8 *real_vaddr;
+	dma_addr_t dma_addr;
+	dma_addr_t real_dma_addr;
+	u32 size;
+};
+
 struct rvu_cpt {
 	/* PCIFUNC to CPT RX Queue map */
 	u16                     cptpfvf_map[CPT_AF_MAX_RXC_QUEUES];
 	DECLARE_BITMAP(cpt_rx_queue_bitmap, CPT_AF_MAX_RXC_QUEUES);
+
+	struct rvu_cpt_eng_grp eng_grp[OTX2_CPT_MAX_ENG_TYPES];
+
+	/* RX inline ipsec lock */
+	struct mutex lock;
+	bool rx_initialized;
+	u16 msix_offset;
+	u8 inline_ipsec_egrp;
+	struct rvu_cpt_inst_queue cpt0_iq;
+	struct rvu_cpt_inst_queue cpt1_iq;
+	struct rvu_cpt_rx_inline_lf_cfg rx_cfg;
+
+	/* CPT LMTST */
+	void *lmt_base;
+	u64 lmt_addr;
+	size_t lmt_size;
+	dma_addr_t lmt_iova;
 };
 
 void rvu_cn20k_cpt_init(struct rvu *rvu);
@@ -144,4 +237,17 @@ int cpt_cn20k_ctx_flush(struct rvu *rvu, int blkaddr, u16 pcifunc);
 int cpt_cn20k_re_flt_init(struct rvu *rvu);
 void cpt_cn20k_re_flt_destroy(void);
 bool cpt_cn20k_re_flt_handler(int eng, struct rvu *rvu);
+
+static inline void otx2_cpt_write64(void __iomem *reg_base, u64 blk, u64 slot,
+				    u64 offs, u64 val)
+{
+	writeq_relaxed(val, reg_base + CPT_RVU_FUNC_ADDR_S(blk, slot, offs));
+}
+
+static inline u64 otx2_cpt_read64(void __iomem *reg_base, u64 blk, u64 slot,
+				  u64 offs)
+{
+	return readq_relaxed(reg_base + CPT_RVU_FUNC_ADDR_S(blk, slot, offs));
+}
+
 #endif /* RVU_CPT_H */

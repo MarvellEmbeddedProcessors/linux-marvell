@@ -12,6 +12,8 @@
 #include "mbox.h"
 #include "rvu.h"
 #include "cn20k/reg.h"
+#include "rvu_cpt.h"
+#include <linux/soc/marvell/octeontx2/asm.h>
 
 /* CPT PF device id */
 #define	PCI_PF_DEVID_OTX2_CPT_PF 0xFD
@@ -22,6 +24,10 @@
 
 /* Default CPT_AF_RXC_CFG1:max_rxc_icb_cnt */
 #define CPT_DFLT_MAX_RXC_ICB_CNT  0xC0ULL
+
+/* CPT LMTST */
+#define LMT_LINE_SIZE   128 /* LMT line size in bytes */
+#define LMT_BURST_SIZE  32  /* 32 LMTST lines for burst */
 
 #define cpt_get_eng_sts(e_min, e_max, rsp, etype)                   \
 ({                                                                  \
@@ -796,6 +802,27 @@ static int cpt_inline_ipsec_cfg_outbound(struct rvu *rvu, int blkaddr, u8 cptlf,
 	return 0;
 }
 
+int rvu_mbox_handler_cpt_set_eng_grp_num(struct rvu *rvu,
+					 struct cpt_set_egrp_num *req,
+					 struct msg_rsp *rsp)
+{
+	struct rvu_cpt *rvu_cpt = &rvu->cpt;
+	u8 eng_type = req->eng_type;
+
+	if (!eng_type || eng_type >= OTX2_CPT_MAX_ENG_TYPES)
+		return -EINVAL;
+
+	if (req->set) {
+		rvu_cpt->eng_grp[eng_type].grp_num = req->eng_grp_num;
+		rvu_cpt->eng_grp[eng_type].eng_type = eng_type;
+	} else {
+		rvu_cpt->eng_grp[eng_type].grp_num = 0;
+		rvu_cpt->eng_grp[eng_type].eng_type = 0;
+	}
+
+	return 0;
+}
+
 int rvu_mbox_handler_cpt_inline_ipsec_cfg(struct rvu *rvu,
 					  struct cpt_inline_ipsec_cfg_msg *req,
 					  struct msg_rsp *rsp)
@@ -1141,6 +1168,33 @@ int rvu_mbox_handler_cpt_ctx_cache_sync(struct rvu *rvu, struct msg_req *req,
 	return rvu_cpt_ctx_flush(rvu, req->hdr.pcifunc);
 }
 
+static int cpt_rx_ipsec_lf_reset(struct rvu *rvu, int blkaddr, int slot)
+{
+	struct rvu_block *block;
+	u16 pcifunc = 0;
+	int cptlf, ret;
+	u64 ctl, ctl2;
+
+	block = &rvu->hw->block[blkaddr];
+
+	cptlf = rvu_get_lf(rvu, block, pcifunc, slot);
+	if (cptlf < 0)
+		return CPT_AF_ERR_LF_INVALID;
+
+	ctl = rvu_read64(rvu, blkaddr, CPT_AF_LFX_CTL(cptlf));
+	ctl2 = rvu_read64(rvu, blkaddr, CPT_AF_LFX_CTL2(cptlf));
+
+	ret = rvu_lf_reset(rvu, block, cptlf);
+	if (ret)
+		dev_err(rvu->dev, "Failed to reset blkaddr %d LF%d\n",
+			block->addr, cptlf);
+
+	rvu_write64(rvu, blkaddr, CPT_AF_LFX_CTL(cptlf), ctl);
+	rvu_write64(rvu, blkaddr, CPT_AF_LFX_CTL2(cptlf), ctl2);
+
+	return 0;
+}
+
 int rvu_mbox_handler_cpt_lf_reset(struct rvu *rvu, struct cpt_lf_rst_req *req,
 				  struct msg_rsp *rsp)
 {
@@ -1268,6 +1322,72 @@ static void cpt_rxc_teardown(struct rvu *rvu, u16 pcifunc, int blkaddr,
 #define DQPTR      GENMASK_ULL(19, 0)
 #define NQPTR      GENMASK_ULL(51, 32)
 
+static void cpt_rx_ipsec_lf_enable_iqueue(struct rvu *rvu, int blkaddr,
+					  int slot)
+{
+	u64 val;
+
+	/* Set Execution Enable of instruction queue */
+	val = otx2_cpt_read64(rvu->pfreg_base, blkaddr, slot, CPT_LF_INPROG);
+	val |= BIT_ULL(16);
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot, CPT_LF_INPROG, val);
+
+	/* Set iqueue's enqueuing */
+	val = otx2_cpt_read64(rvu->pfreg_base, blkaddr, slot, CPT_LF_CTL);
+	val |= BIT_ULL(0);
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot, CPT_LF_CTL, val);
+}
+
+static void cpt_rx_ipsec_lf_disable_iqueue(struct rvu *rvu, int blkaddr,
+					   int slot)
+{
+	int timeout = 1000000;
+	u64 inprog, inst_ptr;
+	u64 qsize, pending;
+	int i = 0;
+
+	/* Disable instructions enqueuing */
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot, CPT_LF_CTL, 0x0);
+
+	inprog = otx2_cpt_read64(rvu->pfreg_base, blkaddr, slot, CPT_LF_INPROG);
+	inprog |= BIT_ULL(16);
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot, CPT_LF_INPROG, inprog);
+
+	qsize = otx2_cpt_read64(rvu->pfreg_base, blkaddr, slot, CPT_LF_Q_SIZE)
+		 & 0x7FFF;
+	do {
+		inst_ptr = otx2_cpt_read64(rvu->pfreg_base, blkaddr, slot,
+					   CPT_LF_Q_INST_PTR);
+		pending = (FIELD_GET(XQ_XOR, inst_ptr) * qsize * 40) +
+			  FIELD_GET(NQPTR, inst_ptr) -
+			  FIELD_GET(DQPTR, inst_ptr);
+		udelay(1);
+		timeout--;
+	} while ((pending != 0) && (timeout != 0));
+
+	if (timeout == 0)
+		dev_warn(rvu->dev, "TIMEOUT: CPT poll on pending instructions\n");
+
+	timeout = 1000000;
+	/* Wait for CPT queue to become execution-quiescent */
+	do {
+		inprog = otx2_cpt_read64(rvu->pfreg_base, blkaddr, slot,
+					 CPT_LF_INPROG);
+		if ((FIELD_GET(INFLIGHT, inprog) == 0) &&
+		    (FIELD_GET(GRB_CNT, inprog) == 0)) {
+			i++;
+		} else {
+			i = 0;
+			timeout--;
+		}
+	} while ((timeout != 0) && (i < 10));
+
+	if (timeout == 0)
+		dev_warn(rvu->dev, "TIMEOUT: CPT poll on inflight count\n");
+	/* Wait for 2 us to flush all queue writes to memory */
+	udelay(2);
+}
+
 static void cpt_lf_disable_iqueue(struct rvu *rvu, int blkaddr, int slot)
 {
 	int timeout = 1000000;
@@ -1344,6 +1464,25 @@ int rvu_cpt_lf_teardown(struct rvu *rvu, u16 pcifunc, int blkaddr, int lf,
 	return 0;
 }
 
+static void cn10k_cpt_inst_flush(struct rvu *rvu, u64 *inst, u64 size)
+{
+	u64 val = 0, tar_addr = 0;
+	void __iomem *io_addr;
+	u64 blkaddr = BLKADDR_CPT0;
+
+	io_addr	= rvu->pfreg_base + CPT_RVU_FUNC_ADDR_S(blkaddr, 0, CPT_LF_NQX);
+
+	/* Target address for LMTST flush tells HW how many 128bit
+	 * words are present.
+	 * tar_addr[6:4] size of first LMTST - 1 in units of 128b.
+	 */
+	tar_addr |= (__force u64)io_addr | (((size / 16) - 1) & 0x7) << 4;
+	dma_wmb();
+	memcpy((u64 *)rvu->cpt.lmt_addr, inst, size);
+	cn10k_lmt_flush(val, tar_addr);
+	dma_wmb();
+}
+
 #define CPT_RES_LEN    16
 #define CPT_SE_IE_EGRP 1ULL
 
@@ -1351,14 +1490,12 @@ static int cpt_inline_inb_lf_cmd_send(struct rvu *rvu, int blkaddr,
 				      int nix_blkaddr)
 {
 	int cpt_pf_num = rvu->cpt_pf_num, num_lfs;
-	struct cpt_inst_lmtst_req *req;
 	dma_addr_t res_daddr;
 	int timeout = 3000;
 	u16 pcifunc;
 	u8 cpt_idx;
-	u64 *inst;
+	u64 inst[8];
 	u16 *res;
-	int rc;
 
 	pcifunc = (cpt_pf_num & RVU_PFVF_FUNC_MASK) << RVU_PFVF_FUNC_SHIFT;
 	num_lfs = rvu_get_rsrc_mapcount(rvu_get_pfvf(rvu, pcifunc),
@@ -1374,24 +1511,11 @@ static int cpt_inline_inb_lf_cmd_send(struct rvu *rvu, int blkaddr,
 				   DMA_BIDIRECTIONAL);
 	if (dma_mapping_error(rvu->dev, res_daddr)) {
 		dev_err(rvu->dev, "DMA mapping failed for CPT result\n");
-		rc = -EFAULT;
-		goto res_free;
+		kfree(res);
+		return -EFAULT;
 	}
 	*res = 0xFFFF;
 
-	/* Send mbox message to CPT PF */
-	req = (struct cpt_inst_lmtst_req *)
-	       otx2_mbox_alloc_msg_rsp(&rvu->afpf_wq_info.mbox_up,
-				       cpt_pf_num, sizeof(*req),
-				       sizeof(struct msg_rsp));
-	if (!req) {
-		rc = -ENOMEM;
-		goto res_daddr_unmap;
-	}
-	req->hdr.sig = OTX2_MBOX_REQ_SIG;
-	req->hdr.id = MBOX_MSG_CPT_INST_LMTST;
-
-	inst = req->inst;
 	/* Prepare CPT_INST_S */
 	inst[0] = 0;
 	inst[1] = res_daddr;
@@ -1412,11 +1536,8 @@ static int cpt_inline_inb_lf_cmd_send(struct rvu *rvu, int blkaddr,
 	rvu_write64(rvu, nix_blkaddr, NIX_AF_RX_CPTX_CREDIT(cpt_idx),
 		    BIT_ULL(22) - 1);
 
-	otx2_mbox_msg_send(&rvu->afpf_wq_info.mbox_up, cpt_pf_num);
-	rc = otx2_mbox_wait_for_rsp(&rvu->afpf_wq_info.mbox_up, cpt_pf_num);
-	if (rc)
-		dev_warn(rvu->dev, "notification to pf %d failed\n",
-			 cpt_pf_num);
+	cn10k_cpt_inst_flush(rvu, inst, 64);
+
 	/* Wait for CPT instruction to be completed */
 	do {
 		mdelay(1);
@@ -1429,11 +1550,8 @@ static int cpt_inline_inb_lf_cmd_send(struct rvu *rvu, int blkaddr,
 	if (timeout == 0)
 		dev_warn(rvu->dev, "Poll for result hits hard loop counter\n");
 
-res_daddr_unmap:
 	dma_unmap_single(rvu->dev, res_daddr, CPT_RES_LEN, DMA_BIDIRECTIONAL);
-res_free:
 	kfree(res);
-
 	return 0;
 }
 
@@ -1479,9 +1597,13 @@ int rvu_cpt_ctx_flush(struct rvu *rvu, u16 pcifunc)
 	max_ctx_entries = (reg >> 48) & 0xFFF;
 
 	mutex_lock(&rvu->rsrc_lock);
-	/* Enable BAR2 ALIAS for this pcifunc. */
-	reg = BIT_ULL(16) | pcifunc;
-	rvu_bar2_sel_write64(rvu, blkaddr, CPT_AF_BAR2_SEL, reg);
+
+	num_lfs = rvu_get_rsrc_mapcount(rvu_get_pfvf(rvu, pcifunc),
+					blkaddr);
+	if (num_lfs == 0) {
+		dev_warn(rvu->dev, "CPT LF is not configured\n");
+		goto unlock;
+	}
 
 	for (i = 0; i < max_ctx_entries; i++) {
 		cam_data = rvu_read64(rvu, blkaddr, CPT_AF_CTX_CAM_DATA(i));
@@ -1489,14 +1611,516 @@ int rvu_cpt_ctx_flush(struct rvu *rvu, u16 pcifunc)
 		if ((FIELD_GET(CTX_CAM_PF_FUNC, cam_data) == pcifunc) &&
 		    FIELD_GET(CTX_CAM_CPTR, cam_data)) {
 			reg = BIT_ULL(46) | FIELD_GET(CTX_CAM_CPTR, cam_data);
-			rvu_write64(rvu, blkaddr,
-				    CPT_AF_BAR2_ALIASX(slot, CPT_LF_CTX_FLUSH),
-				    reg);
+			otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot,
+					 CPT_LF_CTX_FLUSH, reg);
 		}
 	}
-	rvu_bar2_sel_write64(rvu, blkaddr, CPT_AF_BAR2_SEL, 0);
-	mutex_unlock(&rvu->rsrc_lock);
 
+unlock:
+	mutex_unlock(&rvu->rsrc_lock);
+	return 0;
+}
+
+static irqreturn_t rvu_cpt_rx_ipsec_misc_intr_handler(int irq, void *ptr)
+{
+	struct rvu_block *block = ptr;
+	struct rvu *rvu = block->rvu;
+	int blkaddr = block->addr;
+	struct device *dev = rvu->dev;
+	int slot = 0;
+	u64 val;
+
+	val = otx2_cpt_read64(rvu->pfreg_base, blkaddr, slot, CPT_LF_MISC_INT);
+
+	if (val & (1 << 6)) {
+		dev_err(dev, "Memory error detected while executing CPT_INST_S, LF %d.\n",
+			slot);
+	} else if (val & (1 << 5)) {
+		dev_err(dev, "HW error from an engine executing CPT_INST_S, LF %d.",
+			slot);
+	} else if (val & (1 << 3)) {
+		dev_err(dev, "SMMU fault while writing CPT_RES_S to CPT_INST_S[RES_ADDR], LF %d.\n",
+			slot);
+	} else if (val & (1 << 2)) {
+		dev_err(dev, "Memory error when accessing instruction memory queue CPT_LF_Q_BASE[ADDR].\n");
+	} else if (val & (1 << 1)) {
+		dev_err(dev, "Error enqueuing an instruction received at CPT_LF_NQ.\n");
+	} else {
+		dev_err(dev, "Unhandled interrupt in CPT LF %d\n", slot);
+		return IRQ_NONE;
+	}
+
+	/* Acknowledge interrupts */
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot, CPT_LF_MISC_INT,
+			 val & CPT_LF_MISC_INT_MASK);
+
+	return IRQ_HANDLED;
+}
+
+static int rvu_cpt_rx_inline_setup_irq(struct rvu *rvu, int blkaddr, int slot)
+{
+	struct rvu_hwinfo *hw = rvu->hw;
+	struct rvu_block *block;
+	struct rvu_pfvf *pfvf;
+	u16 msix_offset;
+	int pcifunc = 0;
+	int ret, cptlf;
+
+	pfvf = rvu_get_pfvf(rvu, pcifunc);
+	if (!pfvf->msix.bmap)
+		return -ENODEV;
+
+	block = &hw->block[blkaddr];
+	cptlf = rvu_get_lf(rvu, block, pcifunc, slot);
+	if (cptlf < 0)
+		return CPT_AF_ERR_LF_INVALID;
+
+	msix_offset = rvu_get_msix_offset(rvu, pfvf, blkaddr, cptlf);
+	if (msix_offset == MSIX_VECTOR_INVALID)
+		return -ENODEV;
+
+	ret = rvu_cpt_do_register_interrupt(block, msix_offset,
+					    rvu_cpt_rx_ipsec_misc_intr_handler,
+					    "CPTLF RX IPSEC MISC");
+	if (ret)
+		return ret;
+
+	/* Enable All Misc interrupts */
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot,
+			 CPT_LF_MISC_INT_ENA_W1S, CPT_LF_MISC_INT_MASK);
+
+	rvu->cpt.msix_offset = msix_offset;
+	return 0;
+}
+
+static void rvu_cpt_rx_inline_cleanup_irq(struct rvu *rvu, int blkaddr,
+					  int slot)
+{
+	struct rvu_hwinfo *hw = rvu->hw;
+	struct rvu_block *block;
+
+	/* Disable All Misc interrupts */
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot,
+			 CPT_LF_MISC_INT_ENA_W1C, CPT_LF_MISC_INT_MASK);
+
+	block = &hw->block[blkaddr];
+	free_irq(pci_irq_vector(rvu->pdev, rvu->cpt.msix_offset), block);
+}
+
+static int rvu_rx_attach_cptlf(struct rvu *rvu, int blkaddr)
+{
+	struct rsrc_attach attach;
+
+	memset(&attach, 0, sizeof(struct rsrc_attach));
+	attach.hdr.id = MBOX_MSG_ATTACH_RESOURCES;
+	attach.hdr.sig = OTX2_MBOX_REQ_SIG;
+	attach.hdr.ver = OTX2_MBOX_VERSION;
+	attach.hdr.pcifunc = 0;
+	attach.modify = 1;
+	attach.cptlfs = 1;
+	attach.cpt_blkaddr = blkaddr;
+
+	return rvu_mbox_handler_attach_resources(rvu, &attach, NULL);
+}
+
+static int rvu_rx_detach_cptlf(struct rvu *rvu)
+{
+	struct rsrc_detach detach;
+
+	memset(&detach, 0, sizeof(struct rsrc_detach));
+	detach.hdr.id = MBOX_MSG_ATTACH_RESOURCES;
+	detach.hdr.sig = OTX2_MBOX_REQ_SIG;
+	detach.hdr.ver = OTX2_MBOX_VERSION;
+	detach.hdr.pcifunc = 0;
+	detach.partial = 1;
+	detach.cptlfs = 1;
+
+	return rvu_mbox_handler_detach_resources(rvu, &detach, NULL);
+}
+
+/* Allocate memory for CPT outbound Instruction queue.
+ * Instruction queue memory format is:
+ *      -----------------------------
+ *     | Instruction Group memory    |
+ *     |  (CPT_LF_Q_SIZE[SIZE_DIV40] |
+ *     |   x 16 Bytes)               |
+ *     |                             |
+ *      ----------------------------- <-- CPT_LF_Q_BASE[ADDR]
+ *     | Flow Control (128 Bytes)    |
+ *     |                             |
+ *      -----------------------------
+ *     |  Instruction Memory         |
+ *     |  (CPT_LF_Q_SIZE[SIZE_DIV40] |
+ *     |   × 40 × 64 bytes)          |
+ *     |                             |
+ *      -----------------------------
+ */
+static int rvu_rx_cpt_iq_alloc(struct rvu *rvu, struct rvu_cpt_inst_queue *iq)
+{
+	iq->size = RVU_CPT_INST_QLEN_BYTES + RVU_CPT_Q_FC_LEN +
+		    RVU_CPT_INST_GRP_QLEN_BYTES + OTX2_ALIGN;
+
+	iq->real_vaddr = dma_alloc_coherent(rvu->dev, iq->size,
+					    &iq->real_dma_addr, GFP_KERNEL);
+	if (!iq->real_vaddr)
+		return -ENOMEM;
+
+	/* iq->vaddr/dma_addr points to Flow Control location */
+	iq->vaddr = iq->real_vaddr + RVU_CPT_INST_GRP_QLEN_BYTES;
+	iq->dma_addr = iq->real_dma_addr + RVU_CPT_INST_GRP_QLEN_BYTES;
+
+	/* Align pointers */
+	iq->vaddr = PTR_ALIGN(iq->vaddr, OTX2_ALIGN);
+	iq->dma_addr = PTR_ALIGN(iq->dma_addr, OTX2_ALIGN);
+	return 0;
+}
+
+static void rvu_rx_cpt_iq_free(struct rvu *rvu, int blkaddr)
+{
+	struct rvu_cpt_inst_queue *iq;
+
+	if (blkaddr == BLKADDR_CPT0)
+		iq = &rvu->cpt.cpt0_iq;
+	else
+		iq = &rvu->cpt.cpt1_iq;
+
+	if (!iq->real_vaddr)
+		dma_free_coherent(rvu->dev, iq->size, iq->real_vaddr,
+				  iq->real_dma_addr);
+
+	iq->real_vaddr = NULL;
+	iq->vaddr = NULL;
+}
+
+static int rvu_rx_cpt_set_grp_pri_ilen(struct rvu *rvu, int blkaddr, int cptlf)
+{
+	u64 reg_val;
+
+	reg_val = rvu_read64(rvu, blkaddr, CPT_AF_LFX_CTL(cptlf));
+	/* Set High priority */
+	reg_val |= 1;
+	/* Set engine group */
+	reg_val |= ((1ULL << rvu->cpt.inline_ipsec_egrp) << 48);
+	/* Set ilen if valid */
+	if (rvu->cpt.rx_cfg.ctx_ilen_valid)
+		reg_val |= rvu->cpt.rx_cfg.ctx_ilen  << 17;
+
+	rvu_write64(rvu, blkaddr, CPT_AF_LFX_CTL(cptlf), reg_val);
+	return 0;
+}
+
+static int rvu_cpt_rx_inline_cptlf_init(struct rvu *rvu, int blkaddr, int slot)
+{
+	struct rvu_cpt_inst_queue *iq;
+	struct rvu_block *block;
+	int pcifunc = 0;
+	int cptlf;
+	int err;
+	u64 val;
+
+	/* Attach cptlf with AF for inline inbound ipsec */
+	err = rvu_rx_attach_cptlf(rvu, blkaddr);
+	if (err)
+		return err;
+
+	block = &rvu->hw->block[blkaddr];
+	cptlf = rvu_get_lf(rvu, block, pcifunc, slot);
+	if (cptlf < 0) {
+		err = CPT_AF_ERR_LF_INVALID;
+		goto detach_cptlf;
+	}
+
+	if (blkaddr == BLKADDR_CPT0)
+		iq = &rvu->cpt.cpt0_iq;
+	else
+		iq = &rvu->cpt.cpt1_iq;
+
+	/* Allocate CPT instruction queue */
+	err = rvu_rx_cpt_iq_alloc(rvu, iq);
+	if (err)
+		goto detach_cptlf;
+
+	/* reset CPT LF */
+	cpt_rx_ipsec_lf_reset(rvu, blkaddr, slot);
+
+	/* Disable IQ */
+	cpt_rx_ipsec_lf_disable_iqueue(rvu, blkaddr, slot);
+
+	/* Set IQ base address */
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot, CPT_LF_Q_BASE,
+			 iq->dma_addr);
+	/* Set IQ size */
+	val = FIELD_PREP(CPT_LF_Q_SIZE_DIV40, RVU_CPT_SIZE_DIV40 +
+			 RVU_CPT_EXTRA_SIZE_DIV40);
+	otx2_cpt_write64(rvu->pfreg_base, blkaddr, slot, CPT_LF_Q_SIZE, val);
+
+	/* Enable IQ */
+	cpt_rx_ipsec_lf_enable_iqueue(rvu, blkaddr, slot);
+
+	/* Set High priority */
+	rvu_rx_cpt_set_grp_pri_ilen(rvu, blkaddr, cptlf);
+
+	return 0;
+detach_cptlf:
+	rvu_rx_detach_cptlf(rvu);
+	return err;
+}
+
+static void rvu_cpt_rx_inline_cptlf_clean(struct rvu *rvu, int blkaddr,
+					  int slot)
+{
+	/* Disable IQ */
+	cpt_rx_ipsec_lf_disable_iqueue(rvu, blkaddr, slot);
+
+	/* Free Instruction Queue */
+	rvu_rx_cpt_iq_free(rvu, blkaddr);
+
+	/* Detach CPTLF */
+	rvu_rx_detach_cptlf(rvu);
+}
+
+static void rvu_cpt_save_rx_inline_lf_cfg(struct rvu *rvu,
+					  struct cpt_rx_inline_lf_cfg_msg *req)
+{
+	rvu->cpt.rx_cfg.sso_pf_func = req->sso_pf_func;
+	rvu->cpt.rx_cfg.param1 = req->param1;
+	rvu->cpt.rx_cfg.param2 = req->param2;
+	rvu->cpt.rx_cfg.opcode = req->opcode;
+	rvu->cpt.rx_cfg.credit = req->credit;
+	rvu->cpt.rx_cfg.credit_th = req->credit_th;
+	rvu->cpt.rx_cfg.bpid = req->bpid;
+	rvu->cpt.rx_cfg.ctx_ilen_valid = req->ctx_ilen_valid;
+	rvu->cpt.rx_cfg.ctx_ilen = req->ctx_ilen;
+}
+
+static void
+rvu_show_diff_cpt_rx_inline_lf_cfg(struct rvu *rvu,
+				   struct cpt_rx_inline_lf_cfg_msg *req)
+{
+	struct device *dev = rvu->dev;
+
+	if (rvu->cpt.rx_cfg.sso_pf_func != req->sso_pf_func)
+		dev_info(dev, "Mismatch RX inline config sso_pf_func Req %x Prog %x\n",
+			 req->sso_pf_func, rvu->cpt.rx_cfg.sso_pf_func);
+	if (rvu->cpt.rx_cfg.param1 != req->param1)
+		dev_info(dev, "Mismatch RX inline config param1 Req %x Prog %x\n",
+			 req->param1, rvu->cpt.rx_cfg.param1);
+	if (rvu->cpt.rx_cfg.param2 != req->param2)
+		dev_info(dev, "Mismatch RX inline config param2 Req %x Prog %x\n",
+			 req->param2, rvu->cpt.rx_cfg.param2);
+	if (rvu->cpt.rx_cfg.opcode != req->opcode)
+		dev_info(dev, "Mismatch RX inline config opcode Req %x Prog %x\n",
+			 req->opcode, rvu->cpt.rx_cfg.opcode);
+	if (rvu->cpt.rx_cfg.credit != req->credit)
+		dev_info(dev, "Mismatch RX inline config credit Req %x Prog %x\n",
+			 req->credit, rvu->cpt.rx_cfg.credit);
+	if (rvu->cpt.rx_cfg.credit_th != req->credit_th)
+		dev_info(dev, "Mismatch RX inline config credit_th Req %x Prog %x\n",
+			 req->credit_th, rvu->cpt.rx_cfg.credit_th);
+	if (rvu->cpt.rx_cfg.bpid != req->bpid)
+		dev_info(dev, "Mismatch RX inline config bpid Req %x Prog %x\n",
+			 req->bpid, rvu->cpt.rx_cfg.bpid);
+	if (rvu->cpt.rx_cfg.ctx_ilen != req->ctx_ilen)
+		dev_info(dev, "Mismatch RX inline config ctx_ilen Req %x Prog %x\n",
+			 req->ctx_ilen, rvu->cpt.rx_cfg.ctx_ilen);
+	if (rvu->cpt.rx_cfg.ctx_ilen_valid != req->ctx_ilen_valid)
+		dev_info(dev, "Mismatch RX inline config ctx_ilen_valid Req %x Prog %x\n",
+			 req->ctx_ilen_valid,
+			 rvu->cpt.rx_cfg.ctx_ilen_valid);
+}
+
+static void rvu_cpt_rx_inline_nix_cfg(struct rvu *rvu)
+{
+	struct nix_inline_ipsec_cfg nix_cfg;
+
+	nix_cfg.enable = 1;
+	nix_cfg.credit_th = rvu->cpt.rx_cfg.credit_th;
+	nix_cfg.bpid = rvu->cpt.rx_cfg.bpid;
+	if (!rvu->cpt.rx_cfg.credit || rvu->cpt.rx_cfg.credit >
+	    RVU_CPT_INST_QLEN_MSGS)
+		nix_cfg.cpt_credit = RVU_CPT_INST_QLEN_MSGS - 1;
+	else
+		nix_cfg.cpt_credit = rvu->cpt.rx_cfg.credit - 1;
+
+	nix_cfg.gen_cfg.egrp = rvu->cpt.inline_ipsec_egrp;
+	if (rvu->cpt.rx_cfg.opcode) {
+		nix_cfg.gen_cfg.opcode = rvu->cpt.rx_cfg.opcode;
+	} else {
+		if (is_rvu_otx2(rvu))
+			nix_cfg.gen_cfg.opcode = OTX2_CPT_INLINE_RX_OPCODE;
+		else
+			nix_cfg.gen_cfg.opcode = CN10K_CPT_INLINE_RX_OPCODE;
+	}
+
+	nix_cfg.gen_cfg.param1 = rvu->cpt.rx_cfg.param1;
+	nix_cfg.gen_cfg.param2 = rvu->cpt.rx_cfg.param2;
+	nix_cfg.inst_qsel.cpt_pf_func = rvu_get_pf(0);
+	nix_cfg.inst_qsel.cpt_slot = 0;
+
+	nix_inline_ipsec_cfg(rvu, &nix_cfg, BLKADDR_NIX0);
+
+	if (is_block_implemented(rvu->hw, BLKADDR_CPT1))
+		nix_inline_ipsec_cfg(rvu, &nix_cfg, BLKADDR_NIX1);
+}
+
+static int rvu_cpt_rx_inline_ipsec_cfg(struct rvu *rvu)
+{
+	struct rvu_block *block;
+	struct cpt_inline_ipsec_cfg_msg req;
+	u16 pcifunc  = 0;
+	int cptlf;
+	int err;
+
+	memset(&req, 0, sizeof(struct cpt_inline_ipsec_cfg_msg));
+	req.sso_pf_func_ovrd = 0; // Add sysfs interface to set this
+	req.sso_pf_func = rvu->cpt.rx_cfg.sso_pf_func;
+	req.enable = 1;
+
+	block = &rvu->hw->block[BLKADDR_CPT0];
+	cptlf = rvu_get_lf(rvu, block, pcifunc, 0);
+	if (cptlf < 0)
+		return CPT_AF_ERR_LF_INVALID;
+
+	err = cpt_inline_ipsec_cfg_inbound(rvu, BLKADDR_CPT0, cptlf, &req);
+	if (err)
+		return err;
+
+	if (!is_block_implemented(rvu->hw, BLKADDR_CPT1))
+		return 0;
+
+	block = &rvu->hw->block[BLKADDR_CPT1];
+	cptlf = rvu_get_lf(rvu, block, pcifunc, 0);
+	if (cptlf < 0)
+		return CPT_AF_ERR_LF_INVALID;
+
+	return cpt_inline_ipsec_cfg_inbound(rvu, BLKADDR_CPT1, cptlf, &req);
+}
+
+static int rvu_cpt_rx_inline_cptlf_setup(struct rvu *rvu, int blkaddr, int slot)
+{
+	int err;
+
+	err = rvu_cpt_rx_inline_cptlf_init(rvu, blkaddr, slot);
+	if (err) {
+		dev_err(rvu->dev,
+			"CPTLF configuration failed for RX inline ipsec\n");
+		return err;
+	}
+
+	err = rvu_cpt_rx_inline_setup_irq(rvu, blkaddr, slot);
+	if (err) {
+		dev_err(rvu->dev,
+			"CPTLF Interrupt setup failed for RX inline ipsec\n");
+		rvu_cpt_rx_inline_cptlf_clean(rvu, blkaddr, slot);
+		return err;
+	}
+	return 0;
+}
+
+static void rvu_rx_cptlf_cleanup(struct rvu *rvu, int blkaddr, int slot)
+{
+	/* IRQ cleanup */
+	rvu_cpt_rx_inline_cleanup_irq(rvu, blkaddr, slot);
+
+	/* CPTLF cleanup */
+	rvu_cpt_rx_inline_cptlf_clean(rvu, blkaddr, slot);
+}
+
+int rvu_mbox_handler_cpt_rx_inline_lf_cfg(struct rvu *rvu,
+					  struct cpt_rx_inline_lf_cfg_msg *req,
+					  struct msg_rsp *rsp)
+{
+	u8 egrp = OTX2_CPT_INVALID_CRYPTO_ENG_GRP;
+	int err;
+	int i;
+
+	mutex_lock(&rvu->cpt.lock);
+	if (rvu->cpt.rx_initialized) {
+		dev_info(rvu->dev, "Inline RX CPT already initialized\n");
+		rvu_show_diff_cpt_rx_inline_lf_cfg(rvu, req);
+		err = 0;
+		goto unlock;
+	}
+
+	/* Get Inline Ipsec Engine Group */
+	for (i = 0; i < OTX2_CPT_MAX_ENG_TYPES; i++) {
+		if (rvu->cpt.eng_grp[i].eng_type == OTX2_CPT_IE_TYPES) {
+			egrp = rvu->cpt.eng_grp[i].grp_num;
+			break;
+		}
+	}
+
+	if (egrp == OTX2_CPT_INVALID_CRYPTO_ENG_GRP) {
+		dev_err(rvu->dev,
+			"Engine group for inline ipsec not available\n");
+		err = -ENODEV;
+		goto unlock;
+	}
+	rvu->cpt.inline_ipsec_egrp = egrp;
+
+	rvu_cpt_save_rx_inline_lf_cfg(rvu, req);
+
+	err = rvu_cpt_rx_inline_cptlf_setup(rvu, BLKADDR_CPT0, 0);
+	if (err)
+		goto unlock;
+
+	if (is_block_implemented(rvu->hw, BLKADDR_CPT1)) {
+		err = rvu_cpt_rx_inline_cptlf_setup(rvu, BLKADDR_CPT1, 0);
+		if (err)
+			goto cptlf_cleanup;
+	}
+
+	rvu_cpt_rx_inline_nix_cfg(rvu);
+
+	err = rvu_cpt_rx_inline_ipsec_cfg(rvu);
+	if (err)
+		goto cptlf1_cleanup;
+
+	rvu->cpt.rx_initialized = true;
+	mutex_unlock(&rvu->cpt.lock);
+	return 0;
+
+cptlf1_cleanup:
+	rvu_rx_cptlf_cleanup(rvu, BLKADDR_CPT1, 0);
+cptlf_cleanup:
+	rvu_rx_cptlf_cleanup(rvu, BLKADDR_CPT0, 0);
+unlock:
+	mutex_unlock(&rvu->cpt.lock);
+	return err;
+}
+
+static int rvu_cpt_lmt_init(struct rvu *rvu)
+{
+	struct lmtst_tbl_setup_req req;
+	dma_addr_t iova;
+	void *base;
+	int size;
+	int err;
+
+	if (is_rvu_otx2(rvu))
+		return 0;
+
+	memset(&req, 0, sizeof(struct lmtst_tbl_setup_req));
+
+	size = LMT_LINE_SIZE * LMT_BURST_SIZE + OTX2_ALIGN;
+	base = dma_alloc_attrs(rvu->dev, size, &iova, GFP_ATOMIC,
+			       DMA_ATTR_FORCE_CONTIGUOUS);
+	if (!base)
+		return -ENOMEM;
+
+	req.lmt_iova = ALIGN(iova, OTX2_ALIGN);
+	req.use_local_lmt_region = true;
+	err = rvu_mbox_handler_lmtst_tbl_setup(rvu, &req, NULL);
+	if (err) {
+		dma_free_attrs(rvu->dev, size, base, iova,
+			       DMA_ATTR_FORCE_CONTIGUOUS);
+		return err;
+	}
+
+	rvu->cpt.lmt_addr = (__force u64)PTR_ALIGN(base, OTX2_ALIGN);
+	rvu->cpt.lmt_base = base;
+	rvu->cpt.lmt_size = size;
+	rvu->cpt.lmt_iova = iova;
 	return 0;
 }
 
@@ -1506,6 +2130,7 @@ int rvu_cpt_init(struct rvu *rvu)
 {
 	struct rvu_hwinfo *hw = rvu->hw;
 	u64 reg_val;
+	int ret;
 
 	/* Retrieve CPT PF number */
 	rvu->cpt_pf_num = get_cpt_pf_num(rvu);
@@ -1529,5 +2154,21 @@ int rvu_cpt_init(struct rvu *rvu)
 
 	spin_lock_init(&rvu->cpt_intr_lock);
 
+	ret = rvu_cpt_lmt_init(rvu);
+	if (ret)
+		return ret;
+
+	mutex_init(&rvu->cpt.lock);
 	return 0;
+}
+
+void rvu_cpt_freemem(struct rvu *rvu)
+{
+	if (is_rvu_otx2(rvu))
+		return;
+
+	if (rvu->cpt.lmt_base)
+		dma_free_attrs(rvu->dev, rvu->cpt.lmt_size,
+			       rvu->cpt.lmt_base, rvu->cpt.lmt_iova,
+			       DMA_ATTR_FORCE_CONTIGUOUS);
 }

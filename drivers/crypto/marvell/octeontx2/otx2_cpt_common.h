@@ -31,16 +31,7 @@
 
 #define BAD_OTX2_CPT_ENG_TYPE OTX2_CPT_MAX_ENG_TYPES
 
-enum otx2_cpt_eng_type {
-	OTX2_CPT_AE_TYPES = 1,
-	OTX2_CPT_SE_TYPES = 2,
-	OTX2_CPT_IE_TYPES = 3,
-	OTX2_CPT_RE_TYPES = 4,
-	OTX2_CPT_MAX_ENG_TYPES,
-};
-
 /* Take mbox id from end of CPT mbox range in AF (range 0xA00 - 0xBFF) */
-#define MBOX_MSG_RX_INLINE_IPSEC_LF_CFG 0xBFE
 #define MBOX_MSG_GET_ENG_GRP_NUM        0xBFF
 #define MBOX_MSG_GET_CAPS               0xBFD
 #define MBOX_MSG_GET_KVF_LIMITS         0xBFC
@@ -128,20 +119,6 @@ struct otx2_cpt_caps_rsp {
 	u8 cpt_revision;
 	union otx2_cpt_eng_caps eng_caps[OTX2_CPT_MAX_ENG_TYPES];
 };
-
-static inline void otx2_cpt_write64(void __iomem *reg_base, u64 blk, u64 slot,
-				    u64 offs, u64 val)
-{
-	writeq_relaxed(val, reg_base +
-		       OTX2_CPT_RVU_FUNC_ADDR_S(blk, slot, offs));
-}
-
-static inline u64 otx2_cpt_read64(void __iomem *reg_base, u64 blk, u64 slot,
-				  u64 offs)
-{
-	return readq_relaxed(reg_base +
-			     OTX2_CPT_RVU_FUNC_ADDR_S(blk, slot, offs));
-}
 
 static inline bool is_dev_otx2(struct pci_dev *pdev)
 {

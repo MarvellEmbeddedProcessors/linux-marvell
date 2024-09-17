@@ -875,9 +875,15 @@
 
 #define CPT_LF_CTL                      0x10
 #define CPT_LF_INPROG                   0x40
+#define CPT_LF_MISC_INT                 0xb0
+#define CPT_LF_MISC_INT_ENA_W1S         0xb0
+#define CPT_LF_MISC_INT_ENA_W1C         0xb0
+#define CPT_LF_MISC_INT_MASK            0x6e
+#define CPT_LF_Q_BASE                   0xf0
 #define CPT_LF_Q_SIZE                   0x100
 #define CPT_LF_Q_INST_PTR               0x110
 #define CPT_LF_Q_GRP_PTR                0x120
+#define CPT_LF_NQX                      0x400
 #define CPT_LF_CTX_FLUSH                0x510
 
 #define CPT_AF_LF_CTL2_SHIFT		3

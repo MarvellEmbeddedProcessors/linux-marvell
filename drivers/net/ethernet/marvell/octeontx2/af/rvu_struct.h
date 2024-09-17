@@ -144,6 +144,12 @@ enum tim_af_int_vec_e {
 	TIM_AF_INT_VEC_CNT      = 0x5,
 };
 
+/* NDC Admin function Interrupt Vector Enumeration */
+enum ndc_af_int_vec_e {
+	NDC_AF_INT_VEC_INTR	= 0x0,
+	NDC_AF_INT_VEC_CNT	= 0x1,
+};
+
 /**
  * RVU PF Interrupt Vector Enumeration
  */

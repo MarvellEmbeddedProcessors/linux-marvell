@@ -1437,6 +1437,7 @@ int rvu_cpt_lf_teardown(struct rvu *rvu, u16 pcifunc, int blkaddr, int lf,
 int rvu_cpt_ctx_flush(struct rvu *rvu, u16 pcifunc);
 int rvu_cpt_init(struct rvu *rvu);
 u32 rvu_get_cpt_chan_mask(struct rvu *rvu);
+void rvu_cpt_freemem(struct rvu *rvu);
 
 #define NDC_AF_BANK_MASK       GENMASK_ULL(7, 0)
 #define NDC_AF_BANK_LINE_MASK  GENMASK_ULL(31, 16)
@@ -1450,6 +1451,8 @@ void rvu_afvf_queue_flr_work(struct rvu *rvu, int start_vf, int numvfs);
 /* CN10K NIX */
 void rvu_nix_block_cn10k_init(struct rvu *rvu, struct nix_hw *nix_hw);
 int nix_get_tx_link(struct rvu *rvu, u16 pcifunc);
+void nix_inline_ipsec_cfg(struct rvu *rvu, struct nix_inline_ipsec_cfg *req,
+			  int blkaddr);
 
 /* CN10K RVU - LMT*/
 void rvu_reset_lmt_map_tbl(struct rvu *rvu, u16 pcifunc);
@@ -1498,6 +1501,8 @@ int rvu_mcs_flr_handler(struct rvu *rvu, u16 pcifunc);
 void rvu_mcs_ptp_cfg(struct rvu *rvu, u8 rpm_id, u8 lmac_id, bool ena);
 void rvu_mcs_exit(struct rvu *rvu);
 void rvu_mcs_dsa_cfg(struct rvu *rvu, u8 rpm_id, u8 lmac_id, int len, bool ena);
+u16 rvu_get_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
+			int blkaddr, int lf);
 
 /* Representor APIs */
 int rvu_rep_pf_init(struct rvu *rvu);

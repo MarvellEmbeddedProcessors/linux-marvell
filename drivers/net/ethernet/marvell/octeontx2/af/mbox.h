@@ -313,8 +313,12 @@ M(CPT_RX_INLINE_QALLOC, 0xA0A, cpt_rx_inline_qalloc, msg_req,		\
 			       cpt_rx_inline_qalloc_rsp)		\
 M(CPT_RX_INL_QUEUE_CFG,	0xA0B, cpt_rx_inl_queue_cfg,			\
 			       cpt_rx_inline_qcfg_req, msg_rsp)		\
+M(CPT_SET_ENG_GRP_NUM,  0xA0C, cpt_set_eng_grp_num, cpt_set_egrp_num,   \
+				msg_rsp)				\
 M(CPT_SET_QUEQE_PRI,    0xBFB, cpt_set_que_pri, cpt_queue_pri_req_msg,	\
 			       msg_rsp)					\
+M(CPT_RX_INLINE_LF_CFG, 0xBFE, cpt_rx_inline_lf_cfg, cpt_rx_inline_lf_cfg_msg, \
+				msg_rsp) \
 /* SDP mbox IDs (range 0x1000 - 0x11FF) */				\
 M(SET_SDP_CHAN_INFO, 0x1000, set_sdp_chan_info, sdp_chan_info_msg, msg_rsp) \
 M(GET_SDP_CHAN_INFO, 0x1001, get_sdp_chan_info, msg_req, sdp_get_chan_info_msg) \
@@ -3138,6 +3142,35 @@ struct cpt_flt_eng_info_rsp {
 	u64 flt_eng_map[CPT_AF_MAX_FLT_INT_VECS];
 	u64 rcvrd_eng_map[CPT_AF_MAX_FLT_INT_VECS];
 	u64 rsvd;
+};
+
+enum otx2_cpt_eng_type {
+	OTX2_CPT_AE_TYPES = 1,
+	OTX2_CPT_SE_TYPES = 2,
+	OTX2_CPT_IE_TYPES = 3,
+	OTX2_CPT_RE_TYPES = 4,
+	OTX2_CPT_MAX_ENG_TYPES,
+};
+
+struct cpt_rx_inline_lf_cfg_msg {
+	struct mbox_msghdr hdr;
+	u16 sso_pf_func;
+	u16 param1;
+	u16 param2;
+	u16 opcode;
+	u32 credit;
+	u32 credit_th;
+	u16 bpid;
+	u32 reserved;
+	u8 ctx_ilen_valid : 1;
+	u8 ctx_ilen : 7;
+};
+
+struct cpt_set_egrp_num {
+	struct mbox_msghdr hdr;
+	bool set;
+	u8 eng_type;
+	u8 eng_grp_num;
 };
 
 struct sdp_node_info {
