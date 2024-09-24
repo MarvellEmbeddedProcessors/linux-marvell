@@ -49,6 +49,9 @@
 #define RVU_PFVF_FUNC_MASK	rvu_pcifunc_func_mask
 
 #ifdef CONFIG_DEBUG_FS
+
+#define RVU_AFPF           25
+
 struct dump_ctx {
 	int	lf;
 	int	id;
@@ -492,6 +495,16 @@ struct mbox_wq_info {
 	struct rvu_work *mbox_wrk_up;
 
 	struct workqueue_struct *mbox_wq;
+};
+
+struct rvu_irq_data {
+	u64 intr_status;
+	void (*rvu_queue_work_hdlr)(struct mbox_wq_info *mw, int first,
+				    int mdevs, u64 intr);
+	struct	rvu *rvu;
+	int vec_num;
+	int start;
+	int mdevs;
 };
 
 struct mbox_ops {
@@ -1120,7 +1133,8 @@ int rvu_nix_mcast_update_mcam_entry(struct rvu *rvu, u16 pcifunc,
 int rvu_nix_tl1_xoff_wait_for_link_credits(struct rvu *rvu, u16 pcifunc);
 int rvu_nix_tl1_xoff_clear(struct rvu *rvu, u16 pcifunc);
 void rvu_nix_flr_free_bpids(struct rvu *rvu, u16 pcifunc);
-
+int rvu_alloc_cint_qint_mem(struct rvu *rvu, struct rvu_pfvf *pfvf,
+			    int blkaddr, int nixlf);
 /* NPC APIs */
 void rvu_npc_freemem(struct rvu *rvu);
 int rvu_npc_get_pkind(struct rvu *rvu, u16 pf);
