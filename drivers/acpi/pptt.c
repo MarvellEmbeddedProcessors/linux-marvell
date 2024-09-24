@@ -19,8 +19,13 @@
 
 #include <linux/acpi.h>
 #include <linux/cacheinfo.h>
+#include <linux/debugfs.h>
 #include <linux/sort.h>
 #include <acpi/processor.h>
+
+#include "internal.h"
+
+static struct dentry *pptt_debugfs;
 
 typedef int (*acpi_pptt_cpu_callback_t)(struct acpi_pptt_processor *, void *);
 
@@ -608,6 +613,21 @@ static u32 pptt_get_original_repainted_cache_id(u32 repainted_cache_id)
 	return 0xbadc0de;
 }
 
+static int pptt_repainted_show(struct seq_file *s, void *unused)
+{
+	int i;
+
+	for (i = 0; i < num_repainted_cache_ids; i++)
+	{
+		seq_printf(s, "pptt:0x%x = sysfs:0x%x\n", repainted_cache_ids[i].orig,
+			   repainted_cache_ids[i].new);
+	}
+
+	return 0;
+}
+
+DEFINE_SHOW_ATTRIBUTE(pptt_repainted);
+
 /**
  * update_cache_properties() - Update cacheinfo for the given processor
  * @this_leaf: Kernel cache info structure being updated
@@ -707,6 +727,21 @@ static void cache_setup_acpi_repaint_cache_ids(struct acpi_table_header *table)
 	}
 	spin_unlock(&setup_done_lock);
 }
+
+/* cache_setup_acpi_repaint_cache_ids() runs too early for debugfs */
+static int cache_setup_acpi_repaint_cache_ids_debugfs(void)
+{
+	if (!repainted_cache_ids)
+		return 0;
+
+	pptt_debugfs = debugfs_create_dir("pptt", acpi_debugfs_dir);
+	if (pptt_debugfs)
+		debugfs_create_file("cache_ids", 0440, pptt_debugfs, NULL,
+				    &pptt_repainted_fops);
+
+	return 0;
+}
+subsys_initcall(cache_setup_acpi_repaint_cache_ids_debugfs);
 
 static void cache_setup_acpi_cpu(struct acpi_table_header *table,
 				 unsigned int cpu)
