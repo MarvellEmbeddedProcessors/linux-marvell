@@ -1980,6 +1980,9 @@ int rvu_mbox_handler_npc_mcam_get_hit_status(struct rvu *rvu,
 	int blkaddr;
 	bool clear;
 
+	if (is_cn20k(rvu->pdev))
+		return NPC_MCAM_INVALID_REQ;
+
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 	if (blkaddr < 0)
 		return NPC_MCAM_INVALID_REQ;
@@ -2010,7 +2013,7 @@ int rvu_mbox_handler_npc_mcam_get_hit_status(struct rvu *rvu,
 			if (bank == bank_end && hit_start > hit_end)
 				return 0;
 
-			bitmap = npc_cn20k_vidx2idx(req->mcam_ids[arr_idx]);
+			bitmap = req->mcam_ids[arr_idx];
 			if (bitmap) {
 				val = rvu_read64(rvu, blkaddr,
 						 NPC_AF_MCAM_BANKX_HITX(bank, hit_start));
