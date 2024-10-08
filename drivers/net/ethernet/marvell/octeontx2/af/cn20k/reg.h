@@ -93,4 +93,7 @@
 #define NPC_AF_KPMX_PASS2_OFFSET(a)	(0x190000ull | (a) << 3)
 #define NPC_AF_MCAM_SECTIONX_CFG_EXT(a)	(0xC000000ull | (a) << 3)
 
+#define NIX_AF_LSO_ALT_FLAGS_CFG(a)	(0x4B00 | (a) << 3)
+#define NIX_AF_LSO_ALT_FLAGS_CFG1(a)	(0x4B20 | (a) << 3)
+
 #endif /* RVU_MBOX_REG_H */
