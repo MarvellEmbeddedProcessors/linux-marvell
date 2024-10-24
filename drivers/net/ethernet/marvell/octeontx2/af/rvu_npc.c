@@ -1129,9 +1129,11 @@ static void npc_enadis_default_entries(struct rvu *rvu, u16 pcifunc,
 		return;
 
 	/* Ucast MCAM match entry of this PF/VF */
-	index = npc_get_nixlf_mcam_index(mcam, pcifunc,
-					 nixlf, NIXLF_UCAST_ENTRY);
-	npc_enable_mcam_entry(rvu, mcam, blkaddr, index, enable);
+	if (!is_rep_dev(rvu, pcifunc)) {
+		index = npc_get_nixlf_mcam_index(mcam, pcifunc,
+						 nixlf, NIXLF_UCAST_ENTRY);
+		npc_enable_mcam_entry(rvu, mcam, blkaddr, index, enable);
+	}
 
 	/* Nothing to do for VFs, on platforms where pkt replication
 	 * is not supported

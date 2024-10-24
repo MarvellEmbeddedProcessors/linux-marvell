@@ -559,6 +559,7 @@ do {									       \
 	NPC_SCAN_HDR(NPC_SMAC, NPC_LID_LA, la_ltype, la_start + 6, 6);
 	/* PF_FUNC is 2 bytes at 0th byte of NPC_LT_LA_IH_NIX_ETHER */
 	NPC_SCAN_HDR(NPC_PF_FUNC, NPC_LID_LA, NPC_LT_LA_IH_NIX_ETHER, 0, 2);
+	NPC_SCAN_HDR(NPC_SQ_ID, NPC_LID_LA, NPC_LT_LA_IH_NIX_ETHER, 2, 3);
 }
 
 static void npc_set_features(struct rvu *rvu, int blkaddr, u8 intf)
@@ -1220,11 +1221,14 @@ static int npc_update_tx_entry(struct rvu *rvu, struct rvu_pfvf *pfvf,
 	/* If AF is installing then do not care about
 	 * PF_FUNC in Send Descriptor
 	 */
-	if (is_pffunc_af(req->hdr.pcifunc))
+	if (is_pffunc_af(req->hdr.pcifunc) && !rvu->rep_mode)
 		mask = 0;
 
 	npc_update_entry(rvu, NPC_PF_FUNC, entry, (__force u16)htons(target),
 			 0, mask, 0, NIX_INTF_TX);
+
+	npc_update_entry(rvu, NPC_SQ_ID, entry, (__force u16)htonl(req->packet.sq_id),
+			 0, req->mask.sq_id, 0, NIX_INTF_TX);
 
 	*(u64 *)&action = 0x00;
 	action.op = req->op;
