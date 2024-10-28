@@ -204,6 +204,12 @@ static inline void might_fault(void) { }
 
 void do_exit(long error_code) __noreturn;
 
+#ifdef CONFIG_MRVL_OCTEONTX_EL0_INTR
+struct task_struct;
+int task_cleanup_handler_add(void (*handler)(struct task_struct *));
+int task_cleanup_handler_remove(void (*handler)(struct task_struct *));
+#endif
+
 extern int get_option(char **str, int *pint);
 extern char *get_options(const char *str, int nints, int *ints);
 extern unsigned long long memparse(const char *ptr, char **retptr);
