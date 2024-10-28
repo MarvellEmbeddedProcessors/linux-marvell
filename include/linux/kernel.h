@@ -165,6 +165,12 @@ static inline void might_fault(void) { }
 
 void do_exit(long error_code) __noreturn;
 
+#ifdef CONFIG_MRVL_OCTEONTX_EL0_INTR
+struct task_struct;
+int task_cleanup_handler_add(void (*handler)(struct task_struct *));
+int task_cleanup_handler_remove(void (*handler)(struct task_struct *));
+#endif
+
 extern int core_kernel_text(unsigned long addr);
 extern int __kernel_text_address(unsigned long addr);
 extern int kernel_text_address(unsigned long addr);
