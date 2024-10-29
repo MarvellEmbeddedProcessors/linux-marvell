@@ -187,11 +187,11 @@ static void identify(struct ssopf_vf *vf, u16 domain_id, u16 subdomain_id)
 	writeq_relaxed(reg, vf->domain.reg_base + SSO_VF_VHGRPX_AQ_THR(0));
 }
 
-int ssopf_master_send_message(struct mbox_hdr *hdr,
-			      union mbox_data *req,
-			      union mbox_data *resp,
-			      void *master_data,
-			      void *add_data)
+static int ssopf_master_send_message(struct mbox_hdr *hdr,
+				     union mbox_data *req,
+				     union mbox_data *resp,
+				     void *master_data,
+				     void *add_data)
 {
 	struct ssopf *sso = master_data;
 	int ret;
@@ -553,7 +553,7 @@ static int sso_pf_get_vf_count(u32 id)
 	return sso->total_vfs;
 }
 
-int sso_reset_domain(u32 id, u16 domain_id)
+static int sso_reset_domain(u32 id, u16 domain_id)
 {
 	struct ssopf *sso = NULL;
 	struct ssopf *curr;

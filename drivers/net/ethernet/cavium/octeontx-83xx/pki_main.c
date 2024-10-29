@@ -523,7 +523,7 @@ static int pki_receive_message(u32 id, u16 domain_id,
 	return 0;
 }
 
-int pki_reset_domain(u32 id, u16 domain_id)
+static int pki_reset_domain(u32 id, u16 domain_id)
 {
 	int i;
 	struct pkipf_vf *vf = NULL;
@@ -567,7 +567,7 @@ int pki_reset_domain(u32 id, u16 domain_id)
 /* Add a new port to PKI
  * return PKIND on success, -ERR on failure
  */
-int pki_add_bgx_port(u32 id, u16 domain_id, struct octtx_bgx_port *port)
+static int pki_add_bgx_port(u32 id, u16 domain_id, struct octtx_bgx_port *port)
 {
 	struct pkipf_vf *vf = NULL;
 	int pkind;
@@ -586,7 +586,7 @@ int pki_add_bgx_port(u32 id, u16 domain_id, struct octtx_bgx_port *port)
 	return pkind;
 }
 
-int pki_add_lbk_port(u32 id, u16 domain_id, struct octtx_lbk_port *port)
+static int pki_add_lbk_port(u32 id, u16 domain_id, struct octtx_lbk_port *port)
 {
 	struct pkipf_vf *vf = NULL;
 	int pkind;
@@ -606,7 +606,7 @@ int pki_add_lbk_port(u32 id, u16 domain_id, struct octtx_lbk_port *port)
 	return pkind;
 }
 
-int pki_add_sdp_port(u32 id, u16 domain_id, struct octtx_sdp_port *port)
+static int pki_add_sdp_port(u32 id, u16 domain_id, struct octtx_sdp_port *port)
 {
 	struct pkipf_vf *vf = NULL;
 	int pkind;
@@ -625,7 +625,7 @@ int pki_add_sdp_port(u32 id, u16 domain_id, struct octtx_sdp_port *port)
 	return pkind;
 }
 
-int pki_get_bgx_port_stats(struct octtx_bgx_port *port)
+static int pki_get_bgx_port_stats(struct octtx_bgx_port *port)
 {
 	struct pki_t *pki;
 	u64 reg;

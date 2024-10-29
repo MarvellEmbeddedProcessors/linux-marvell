@@ -440,7 +440,7 @@ static struct attribute_group octtx_attr_group = {
 	.attrs = octtx_attrs,
 };
 
-int octtx_sysfs_init(struct device *octtx_device)
+static int octtx_sysfs_init(struct device *octtx_device)
 {
 	int ret;
 
@@ -452,7 +452,7 @@ int octtx_sysfs_init(struct device *octtx_device)
 	return 0;
 }
 
-void octtx_sysfs_remove(struct device *octtx_device)
+static void octtx_sysfs_remove(struct device *octtx_device)
 {
 	sysfs_remove_group(&octtx_device->kobj, &octtx_attr_group);
 }
@@ -1372,7 +1372,7 @@ static void octtx_vf_reset_domain(struct octtx_domain *domain,
 	*mask &= ~domain->vf_mask[cop];
 }
 
-void octtx_reset_domain(struct work_struct *work)
+static void octtx_reset_domain(struct work_struct *work)
 {
 	struct octtx_domain *domain;
 	u64 vf_mask[OCTTX_COPROCESSOR_CNT];
@@ -1499,7 +1499,7 @@ static long octtx_dev_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	return 0;
 }
 
-void cleanup_el3_irqs(struct task_struct *task)
+static void cleanup_el3_irqs(struct task_struct *task)
 {
 	int i;
 

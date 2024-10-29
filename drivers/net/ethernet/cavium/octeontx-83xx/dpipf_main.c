@@ -347,7 +347,7 @@ static int dpi_pf_get_vf_count(u32 id)
 	return ret;
 }
 
-int dpi_reset_domain(u32 id, u16 domain_id)
+static int dpi_reset_domain(u32 id, u16 domain_id)
 {
 	struct dpipf *dpi = NULL;
 	struct dpipf *curr;
@@ -567,7 +567,7 @@ static int dpi_sriov_configure(struct pci_dev *pdev, int numvfs)
 	return ret;
 }
 
-int dpi_dma_engine_get_num(void)
+static int dpi_dma_engine_get_num(void)
 {
 	return DPI_MAX_ENGINES;
 }
@@ -823,7 +823,7 @@ int dpi_reg_dump(struct dpipf *dpi, u16 domain_id,
 	return 0;
 }
 
-int dpi_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+static int dpi_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct device *dev = &pdev->dev;
 	struct dpipf *dpi;

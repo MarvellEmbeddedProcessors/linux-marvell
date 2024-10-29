@@ -583,7 +583,7 @@ static int fpa_pf_get_vf_count(u32 id)
 	return fpa->total_vfs;
 }
 
-int fpa_reset_domain(u32 id, u16 domain_id)
+static int fpa_reset_domain(u32 id, u16 domain_id)
 {
 	struct fpapf *fpa = NULL;
 	struct fpapf *curr;

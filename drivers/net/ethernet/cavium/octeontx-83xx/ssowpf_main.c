@@ -295,7 +295,7 @@ static int ssow_pf_get_vf_count(u32 id)
 	return ssow->total_vfs;
 }
 
-void ssow_clear_nosched(u32 id, struct ssowpf_vf *vf, u64 grp_mask)
+static void ssow_clear_nosched(u32 id, struct ssowpf_vf *vf, u64 grp_mask)
 {
 	u64 reg;
 	u64 grp;
@@ -381,7 +381,7 @@ static int __get_sso_group_pend(u32 id, u64 grp_mask)
 	return count;
 }
 
-int ssow_reset_domain(u32 id, u16 domain_id, u64 grp_mask)
+static int ssow_reset_domain(u32 id, u16 domain_id, u64 grp_mask)
 {
 	struct ssowpf *ssow = NULL;
 	struct ssowpf *curr;

@@ -121,11 +121,11 @@ static int pko_get_lbk_mac(int lbk)
 	return (lbk) ? 1 : 0;
 }
 
-int pkopf_master_send_message(struct mbox_hdr *hdr,
-			      union mbox_data *req,
-			      union mbox_data *resp,
-			      void *master_data,
-			      void *add_data)
+static int pkopf_master_send_message(struct mbox_hdr *hdr,
+				     union mbox_data *req,
+				     union mbox_data *resp,
+				     void *master_data,
+				     void *add_data)
 {
 	struct pkopf *pko = master_data;
 	int ret;
@@ -663,7 +663,7 @@ static inline uint64_t reg_ldadd_u64(void *addr, int64_t off)
 	return old_val;
 }
 
-int pko_reset_domain(u32 id, u16 domain_id)
+static int pko_reset_domain(u32 id, u16 domain_id)
 {
 	struct pkopf *pko = NULL;
 	struct pkopf *curr;

@@ -1182,7 +1182,7 @@ int bgx_port_mtu_set(struct octtx_bgx_port *port, u16 mtu)
 	return 0;
 }
 
-int bgx_get_port_stats(struct octtx_bgx_port *port)
+static int bgx_get_port_stats(struct octtx_bgx_port *port)
 {
 	struct bgxpf *bgx;
 	u64 reg;
