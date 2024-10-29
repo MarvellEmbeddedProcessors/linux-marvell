@@ -23,6 +23,9 @@
 #define TAD_PRF_PARTID_NS	BIT(10)
 #define TAD_MAX_COUNTERS	8
 
+#define TAD_UNSUPP_PARTID	0x100
+#define TAD_ALLOC_ANY		0x1c
+
 #define to_tad_pmu(p) (container_of(p, struct tad_pmu, pmu))
 
 struct tad_region {
@@ -42,6 +45,7 @@ struct tad_pmu {
 
 struct tad_pmu_ops {
 	void (*start_counter)(struct tad_pmu *pmu, struct perf_event *event);
+	void (*stop_counter)(struct tad_pmu *pmu, u32 counter_idx);
 };
 
 enum mrvl_tad_pmu_version {
@@ -114,6 +118,40 @@ static void tad_pmu_v2_start_counter(struct tad_pmu *pmu,
 	}
 }
 
+static void tad_pmu_stop_counter(struct tad_pmu *tad_pmu, u32 counter_idx)
+{
+	u64 reg_val;
+	int i;
+
+	/* Write with unsupported partid before stopping the counter*/
+	reg_val = TAD_PRF_MATCH_PARTID | TAD_PRF_PARTID_NS |
+		  (TAD_UNSUPP_PARTID << 11) | TAD_ALLOC_ANY;
+
+	/* TAD()_PFC() stop counting on the write
+	 * which sets TAD()_PRF()[CNTSEL] == 0
+	 */
+	for (i = 0; i < tad_pmu->region_cnt; i++) {
+		writeq(reg_val, tad_pmu->regions[i].base +
+			       TAD_PRF(counter_idx));
+
+		writeq(0, tad_pmu->regions[i].base +
+			       TAD_PRF(counter_idx));
+	}
+}
+
+static void tad_pmu_v2_stop_counter(struct tad_pmu *tad_pmu, u32 counter_idx)
+{
+	int i;
+
+	/* TAD()_PFC() stop counting on the write
+	 * which sets TAD()_PRF()[CNTSEL] == 0
+	 */
+	for (i = 0; i < tad_pmu->region_cnt; i++) {
+		writeq(0, tad_pmu->regions[i].base +
+			       TAD_PRF(counter_idx));
+	}
+}
+
 static void tad_pmu_event_counter_read(struct perf_event *event)
 {
 	struct tad_pmu *tad_pmu = to_tad_pmu(event->pmu);
@@ -137,15 +175,8 @@ static void tad_pmu_event_counter_stop(struct perf_event *event, int flags)
 	struct tad_pmu *tad_pmu = to_tad_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
 	u32 counter_idx = hwc->idx;
-	int i;
 
-	/* TAD()_PFC() stop counting on the write
-	 * which sets TAD()_PRF()[CNTSEL] == 0
-	 */
-	for (i = 0; i < tad_pmu->region_cnt; i++) {
-		writeq_relaxed(0, tad_pmu->regions[i].base +
-			       TAD_PRF(counter_idx));
-	}
+	tad_pmu->ops->stop_counter(tad_pmu, counter_idx);
 
 	tad_pmu_event_counter_read(event);
 	hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
@@ -350,10 +381,12 @@ static const struct attribute_group *ody_tad_pmu_attr_groups[] = {
 
 static const struct tad_pmu_ops tad_pmu_ops = {
 	.start_counter = tad_pmu_start_counter,
+	.stop_counter = tad_pmu_stop_counter,
 };
 
 static const struct tad_pmu_ops tad_pmu_v2_ops = {
 	.start_counter = tad_pmu_v2_start_counter,
+	.stop_counter = tad_pmu_v2_stop_counter,
 };
 
 static int tad_pmu_probe(struct platform_device *pdev)
