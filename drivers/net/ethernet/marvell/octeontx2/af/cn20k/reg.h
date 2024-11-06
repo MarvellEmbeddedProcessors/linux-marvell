@@ -134,7 +134,7 @@
 #define NPC_AF_CN20K_MCAMEX_BANKX_ACTIONX_EXT(a, b, c) ({		   \
 	u64 offset;							   \
 									   \
-	offset = (0x8000060ull | (a) << 8 | (b) << 22 | (c) << 3);	   \
+	offset = (0xA000060ull | (a) << 8 | (b) << 22 | (c) << 3);	   \
 	offset; })
 
 #define NPC_AF_INTFX_MISS_ACTX(a, b)	(0x1a00000 | (a) << 6 | (b) << 4)
