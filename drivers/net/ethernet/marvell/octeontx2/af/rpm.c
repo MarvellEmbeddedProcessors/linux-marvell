@@ -37,7 +37,8 @@ static struct mac_ops		rpm_mac_ops   = {
 	.mac_tx_enable =		rpm_lmac_tx_enable,
 	.pfc_config =                   rpm_lmac_pfc_config,
 	.mac_get_pfc_frm_cfg   =        rpm_lmac_get_pfc_frm_cfg,
-	.mac_reset   =			rpm_lmac_reset,
+	.mac_reset			 =	  rpm_lmac_reset,
+	.get_dmacflt_dropped_pktcnt      =        rpm_get_dmacflt_dropped_pktcnt,
 	.mac_stats_reset		 =	  rpm_stats_reset,
 };
 
@@ -71,6 +72,7 @@ static struct mac_ops		rpm2_mac_ops   = {
 	.pfc_config =                   rpm_lmac_pfc_config,
 	.mac_get_pfc_frm_cfg   =        rpm_lmac_get_pfc_frm_cfg,
 	.mac_reset   =			rpm_lmac_reset,
+	.get_dmacflt_dropped_pktcnt =   rpm_get_dmacflt_dropped_pktcnt,
 	.mac_stats_reset	    =	rpm_stats_reset,
 };
 
@@ -443,6 +445,20 @@ int rpm_get_tx_stats(void *rpmd, int lmac_id, int idx, u64 *tx_stat)
 
 	mutex_unlock(&rpm->lock);
 	return 0;
+}
+
+u64 rpm_get_dmacflt_dropped_pktcnt(void *rpmd, int lmac_id)
+{
+	rpm_t *rpm = rpmd;
+	u64 dmac_flt_stat;
+
+	if (!is_lmac_valid(rpm, lmac_id))
+		return 0;
+
+	dmac_flt_stat = is_dev_rpm2(rpm) ? RPM2_CMRX_RX_STAT2 :
+			RPMX_CMRX_RX_STAT2;
+
+	return rpm_read(rpm, lmac_id, dmac_flt_stat);
 }
 
 int rpm_stats_reset(void *rpmd, int lmac_id)
