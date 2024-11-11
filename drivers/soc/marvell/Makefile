@@ -1,3 +1,4 @@
 # SPDX-License-Identifier: GPL-2.0
 obj-y 		+= hw-access/
 obj-y		+= octeontx2-serdes/
+obj-$(CONFIG_MARVELL_CN10K_SERDES_DIAGNOSTICS) += cn10k_serdes_diag.o
