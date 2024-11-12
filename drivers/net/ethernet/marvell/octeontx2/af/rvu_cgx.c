@@ -1287,6 +1287,7 @@ int rvu_mbox_handler_cgx_set_link_mode(struct rvu *rvu,
 				       struct cgx_set_link_mode_rsp *rsp)
 {
 	int pf = rvu_get_pf(req->hdr.pcifunc);
+	struct cgx_lmac_fwdata_s *linkmodes;
 	u8 cgx_idx, lmac;
 	void *cgxd;
 	int err;
@@ -1296,6 +1297,10 @@ int rvu_mbox_handler_cgx_set_link_mode(struct rvu *rvu,
 
 	rvu_get_cgx_lmac_id(rvu->pf2cgxlmac_map[pf], &cgx_idx, &lmac);
 	cgxd = rvu_cgx_pdata(cgx_idx, rvu);
+	if (rvu->hw->lmac_per_cgx == CGX_LMACS_USX)
+		linkmodes = &rvu->fwdata->cgx_fw_data_usx[cgx_idx][lmac];
+	else
+		linkmodes = &rvu->fwdata->cgx_fw_data[cgx_idx][lmac];
 
 	err = rvu_nix_tl1_xoff_wait_for_link_credits(rvu, req->hdr.pcifunc);
 	if (err)
@@ -1303,7 +1308,8 @@ int rvu_mbox_handler_cgx_set_link_mode(struct rvu *rvu,
 			 "tl1 sw_xoff/link_credit_poll unsuccessful, cgx=%d lmac=%d\n",
 			 cgx_idx, lmac);
 
-	rsp->status = cgx_set_link_mode(cgxd, req->args, cgx_idx, lmac);
+	rsp->status = cgx_set_link_mode(cgxd, req->args, linkmodes,
+					cgx_idx, lmac);
 	return 0;
 }
 
