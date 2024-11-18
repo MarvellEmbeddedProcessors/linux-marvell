@@ -821,6 +821,7 @@ static ssize_t rdtgroup_tasks_write(struct kernfs_open_file *of,
 		is_iommu = string_is_iommu_group(pid_str, &iommu_group_id);
 		if (is_iommu) {
 			ret = rdtgroup_move_iommu(iommu_group_id, rdtgrp, of);
+			goto unlock;
 		}
 
 		if (kstrtoint(pid_str, 0, &pid)) {
