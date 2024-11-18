@@ -215,7 +215,7 @@ u8 cgx_lmac_get_p2x(int cgx_id, int lmac_id)
 	return (cfg & CMR_P2X_SEL_MASK) >> CMR_P2X_SEL_SHIFT;
 }
 
-u8 cgx_get_nix_resetbit(struct cgx *cgx)
+static u8 cgx_get_nix_resetbit(struct cgx *cgx)
 {
 	int first_lmac;
 	u8 p2x;
@@ -483,11 +483,18 @@ int cgx_lmac_addr_max_entries_get(u8 cgx_id, u8 lmac_id)
 u64 cgx_lmac_addr_get(u8 cgx_id, u8 lmac_id)
 {
 	struct cgx *cgx_dev = cgx_get_pdata(cgx_id);
-	struct lmac *lmac = lmac_pdata(lmac_id, cgx_dev);
 	struct mac_ops *mac_ops;
+	struct lmac *lmac;
 	int index;
 	u64 cfg;
 	int id;
+
+	if (!cgx_dev)
+		return 0;
+
+	lmac = lmac_pdata(lmac_id, cgx_dev);
+	if (!lmac)
+		return 0;
 
 	mac_ops = cgx_dev->mac_ops;
 
@@ -1984,7 +1991,7 @@ static int cgx_lmac_init(struct cgx *cgx)
 {
 	u8 max_dmac_filters;
 	struct lmac *lmac;
-	u64 lmac_list;
+	u64 lmac_list = 0;
 	int i, err;
 	int filter;
 
@@ -2134,7 +2141,7 @@ static u8 cgx_get_rxid_mapoffset(struct cgx *cgx)
 		return 0x60;
 }
 
-void cgx_x2p_reset(void *cgxd, bool enable)
+static void cgx_x2p_reset(void *cgxd, bool enable)
 {
 	struct cgx *cgx = cgxd;
 	int lmac_id;
@@ -2156,7 +2163,7 @@ void cgx_x2p_reset(void *cgxd, bool enable)
 	}
 }
 
-int cgx_enadis_rx(void *cgxd, int lmac_id, bool enable)
+static int cgx_enadis_rx(void *cgxd, int lmac_id, bool enable)
 {
 	struct cgx *cgx = cgxd;
 	u64 cfg;
