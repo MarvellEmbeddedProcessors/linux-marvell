@@ -637,6 +637,8 @@ static int cpt_rsa_init_tfm(struct crypto_akcipher *tfm)
 	struct pci_dev *pdev;
 	int ret, cpu_num;
 
+	akcipher_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
+
 	ctx->key_sz = 0;
 	ret = otx2_cpt_dev_get(&pdev, &cpu_num);
 	if (ret)
@@ -653,6 +655,8 @@ static int cpt_rsa_pkcs1_init_tfm(struct crypto_akcipher *tfm)
 	struct cpt_asym_ctx *ctx = akcipher_tfm_ctx(tfm);
 	struct pci_dev *pdev;
 	int ret, cpu_num;
+
+	akcipher_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
 
 	ctx->key_sz = 0;
 	ctx->rsa.pkcs1 = true;
@@ -928,6 +932,8 @@ static int cpt_ecdh_nist_p192_init_tfm(struct crypto_kpp *tfm)
 {
 	struct cpt_asym_ctx *ctx = kpp_tfm_ctx(tfm);
 
+	kpp_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
+
 	ctx->ecdh.curve_id = ECC_CURVE_NIST_P192;
 
 	return cpt_ecdh_ctx_init(ctx);
@@ -937,6 +943,8 @@ static int cpt_ecdh_nist_p256_init_tfm(struct crypto_kpp *tfm)
 {
 	struct cpt_asym_ctx *ctx = kpp_tfm_ctx(tfm);
 
+	kpp_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
+
 	ctx->ecdh.curve_id = ECC_CURVE_NIST_P256;
 
 	return cpt_ecdh_ctx_init(ctx);
@@ -945,6 +953,8 @@ static int cpt_ecdh_nist_p256_init_tfm(struct crypto_kpp *tfm)
 static int cpt_ecdh_nist_p384_init_tfm(struct crypto_kpp *tfm)
 {
 	struct cpt_asym_ctx *ctx = kpp_tfm_ctx(tfm);
+
+	kpp_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
 
 	ctx->ecdh.curve_id = ECC_CURVE_NIST_P384;
 
@@ -1118,6 +1128,8 @@ static int cpt_dh_init_tfm(struct crypto_kpp *tfm)
 {
 	struct cpt_asym_ctx *ctx = kpp_tfm_ctx(tfm);
 
+	kpp_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
+
 	return cpt_ecdh_ctx_init(ctx);
 }
 
@@ -1139,7 +1151,6 @@ static struct akcipher_alg cpt_rsa_algs[] = {
 	.max_size = cpt_rsa_max_size,
 	.init = cpt_rsa_init_tfm,
 	.exit = cpt_rsa_exit_tfm,
-	.reqsize = sizeof(struct cpt_asym_req_ctx),
 	.base = {
 		.cra_ctxsize = sizeof(struct cpt_asym_ctx),
 		.cra_priority = 4001,
@@ -1158,7 +1169,6 @@ static struct akcipher_alg cpt_rsa_algs[] = {
 	.max_size = cpt_rsa_pkcs1_max_size,
 	.init = cpt_rsa_pkcs1_init_tfm,
 	.exit = cpt_rsa_exit_tfm,
-	.reqsize = sizeof(struct cpt_asym_req_ctx),
 	.base = {
 		.cra_ctxsize = sizeof(struct cpt_asym_ctx),
 		.cra_priority = 4001,
@@ -1177,7 +1187,6 @@ static struct kpp_alg cpt_ecdh_curves[] = {
 		.max_size = cpt_ecdh_max_size,
 		.init = cpt_ecdh_nist_p192_init_tfm,
 		.exit = cpt_ecdh_exit_tfm,
-		.reqsize = sizeof(struct cpt_asym_req_ctx),
 		.base = {
 			.cra_ctxsize = sizeof(struct cpt_asym_ctx),
 			.cra_priority = 4001,
@@ -1192,7 +1201,6 @@ static struct kpp_alg cpt_ecdh_curves[] = {
 		.max_size = cpt_ecdh_max_size,
 		.init = cpt_ecdh_nist_p256_init_tfm,
 		.exit = cpt_ecdh_exit_tfm,
-		.reqsize = sizeof(struct cpt_asym_req_ctx),
 		.base = {
 			.cra_ctxsize = sizeof(struct cpt_asym_ctx),
 			.cra_priority = 4001,
@@ -1207,7 +1215,6 @@ static struct kpp_alg cpt_ecdh_curves[] = {
 		.max_size = cpt_ecdh_max_size,
 		.init = cpt_ecdh_nist_p384_init_tfm,
 		.exit = cpt_ecdh_exit_tfm,
-		.reqsize = sizeof(struct cpt_asym_req_ctx),
 		.base = {
 			.cra_ctxsize = sizeof(struct cpt_asym_ctx),
 			.cra_priority = 4001,
@@ -1225,7 +1232,6 @@ static struct kpp_alg cpt_dh = {
 	.max_size = cpt_dh_max_size,
 	.init = cpt_dh_init_tfm,
 	.exit = cpt_dh_exit_tfm,
-	.reqsize = sizeof(struct cpt_asym_req_ctx),
 	.base = {
 		.cra_ctxsize = sizeof(struct cpt_asym_ctx),
 		.cra_priority = 4001,

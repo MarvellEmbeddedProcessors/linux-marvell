@@ -505,6 +505,8 @@ static int cpt_ecdsa_nist_p384_init_tfm(struct crypto_akcipher *tfm)
 	struct pci_dev *pdev;
 	int ret, cpu_num;
 
+	akcipher_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
+
 	ret = otx2_cpt_dev_get(&pdev, &cpu_num);
 	if (ret)
 		return ret;
@@ -525,6 +527,8 @@ static int cpt_ecdsa_nist_p256_init_tfm(struct crypto_akcipher *tfm)
 	struct pci_dev *pdev;
 	int ret, cpu_num;
 
+	akcipher_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
+
 	ret = otx2_cpt_dev_get(&pdev, &cpu_num);
 	if (ret)
 		return ret;
@@ -544,6 +548,8 @@ static int cpt_ecdsa_nist_p192_init_tfm(struct crypto_akcipher *tfm)
 	struct cpt_asym_ctx *ctx = akcipher_tfm_ctx(tfm);
 	struct pci_dev *pdev;
 	int ret, cpu_num;
+
+	akcipher_set_reqsize(tfm, sizeof(struct cpt_asym_req_ctx));
 
 	ret = otx2_cpt_dev_get(&pdev, &cpu_num);
 	if (ret)
@@ -567,7 +573,6 @@ static struct akcipher_alg cpt_ecdsa_nist_p384 = {
 	.max_size = cpt_ecdsa_max_size,
 	.init = cpt_ecdsa_nist_p384_init_tfm,
 	.exit = cpt_ecdsa_exit_tfm,
-	.reqsize = sizeof(struct cpt_asym_req_ctx),
 	.base = {
 		.cra_name = "ecdsa-nist-p384",
 		.cra_driver_name = "cpt-ecdsa-nist-p384",
@@ -585,7 +590,6 @@ static struct akcipher_alg cpt_ecdsa_nist_p256 = {
 	.max_size = cpt_ecdsa_max_size,
 	.init = cpt_ecdsa_nist_p256_init_tfm,
 	.exit = cpt_ecdsa_exit_tfm,
-	.reqsize = sizeof(struct cpt_asym_req_ctx),
 	.base = {
 		.cra_name = "ecdsa-nist-p256",
 		.cra_driver_name = "cpt-ecdsa-nist-p256",
@@ -603,7 +607,6 @@ static struct akcipher_alg cpt_ecdsa_nist_p192 = {
 	.max_size = cpt_ecdsa_max_size,
 	.init = cpt_ecdsa_nist_p192_init_tfm,
 	.exit = cpt_ecdsa_exit_tfm,
-	.reqsize = sizeof(struct cpt_asym_req_ctx),
 	.base = {
 		.cra_name = "ecdsa-nist-p192",
 		.cra_driver_name = "cpt-ecdsa-nist-p192",
