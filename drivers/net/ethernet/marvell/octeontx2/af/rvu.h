@@ -789,6 +789,16 @@ static inline bool is_cn10kb(struct rvu *rvu)
 	return false;
 }
 
+static inline bool is_cnf10kb_a0(struct rvu *rvu)
+{
+	struct pci_dev *pdev = rvu->pdev;
+
+	if (pdev->subsystem_device == PCI_SUBSYS_DEVID_CNF10K_B &&
+	    (pdev->revision & 0x0F) == 0x0)
+		return true;
+	return false;
+}
+
 static inline bool is_cnf10ka_a1(struct rvu *rvu)
 {
 	struct pci_dev *pdev = rvu->pdev;
@@ -843,7 +853,6 @@ static inline bool is_rvu_nix_spi_to_sa_en(struct rvu *rvu)
 
 	return false;
 }
-
 
 static inline u16 rvu_nix_chan_cgx(struct rvu *rvu, u8 cgxid,
 				   u8 lmacid, u8 chan)
@@ -1026,6 +1035,7 @@ int rvu_sso_cleanup_xaq_aura(struct rvu *rvu, u16 pcifunc, int hwgrp);
 int rvu_sso_poll_aura_cnt(struct rvu *rvu, int npa_blkaddr, int aura);
 void rvu_sso_deinit_xaq_aura(struct rvu *rvu, int blkaddr, int npa_blkaddr,
 			     int aura, int lf);
+void rvu_sso_xaq_aura_write(struct rvu *rvu, int lf, u64 val);
 
 /* NPA APIs */
 int rvu_npa_init(struct rvu *rvu);
