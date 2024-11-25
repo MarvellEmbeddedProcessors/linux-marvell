@@ -1265,7 +1265,7 @@ static int rvu_ree_mbox_handler(struct otx2_mbox *mbox, int devid,
 		if (rsp && err)						\
 			rsp->hdr.rc = err;				\
 									\
-		trace_otx2_msg_process(mbox->pdev, _id, err);		\
+		trace_otx2_msg_process(mbox->pdev, _id, err, req->pcifunc);	\
 		return rsp ? err : -ENOMEM;				\
 	}								\
 	}
