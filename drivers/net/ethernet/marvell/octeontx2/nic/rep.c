@@ -693,6 +693,10 @@ static int rvu_rep_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_release_regions;
 
 	priv->iommu_domain = iommu_get_domain_for_dev(dev);
+	if (priv->iommu_domain)
+		priv->iommu_domain_type =
+			((struct iommu_domain *)priv->iommu_domain)->type;
+
 
 	err = rvu_get_rep_cnt(priv);
 	if (err)
