@@ -23,14 +23,8 @@
 #include <linux/limits.h>
 #include <linux/log2.h>
 #include <linux/mtd/spi-nor.h>
-
-#include <soc/marvell/octeontx/octeontx_smc.h>
-#include <linux/gpio.h>
-
-#if IS_ENABLED(CONFIG_SPI_CADENCE_HW_WO)
 #include <linux/debugfs.h>
 struct dentry *mrvl_spi_debug_root;
-#endif
 
 #define CDNS_XSPI_MAGIC_NUM_VALUE	0x6522
 #define CDNS_XSPI_MAX_BANKS		8
@@ -261,27 +255,8 @@ struct dentry *mrvl_spi_debug_root;
 #define XFER_QWORD_COUNT 32
 #define XFER_QWORD_BYTECOUNT 8
 
-#define SPI1_CLK 38
-#define SPI1_CS0 40
-#define SPI1_CS1 41
-#define SPI1_IO0 30
-#define SPI1_IO1 31
-
-#define SPI0_CLK 24
-#define SPI0_CS0 26
-#define SPI0_CS1 27
-#define SPI0_IO0 16
-#define SPI0_IO1 17
-
-#define GPIO_OFFSET 436
-
-#define CHANGE_GPIO_SMC_ID 0xc2000b14
-#define SPI_GPIO(x) (x+GPIO_OFFSET)
-
 #define SPI0_SOC1_BASE 0x8040
-#define SPI1_SOC1_BASE 0x8050
 #define SPI0_SOC2_BASE 0xCF10
-#define SPI1_SOC2_BASE 0xCF11
 
 #define SPI_NOT_CLAIMED				0x00
 #define SPI_AP_NS_OWN				0x02
@@ -344,7 +319,6 @@ struct cdns_xspi_dev {
 	int write_len;
 	int xspi_id;
 	bool wo_mode;
-	int cs_defined;
 #endif
 };
 
@@ -468,125 +442,6 @@ static int lock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 	pr_err("Flash arbitration failed, lock is owned by: %d\n", val);
 	return -1;
 }
-
-static int gpio_as_sw(struct cdns_xspi_dev *cdns_xspi)
-{
-	struct arm_smccc_res res;
-
-	arm_smccc_smc(CHANGE_GPIO_SMC_ID, cdns_xspi->xspi_id,
-		      0, 0, 0, 0, 0, 0, &res);
-
-	if (res.a0 == 1)
-		return 1;
-
-	return 0;
-}
-
-static void gpio_as_spi(struct cdns_xspi_dev *cdns_xspi)
-{
-	struct arm_smccc_res res;
-
-	arm_smccc_smc(CHANGE_GPIO_SMC_ID, cdns_xspi->xspi_id,
-		      1, 0, 0, 0, 0, 0, &res);
-}
-
-static void set_gpio_mode(struct cdns_xspi_dev *cdns_xspi)
-{
-	if (cdns_xspi->xspi_id == 1) {
-		gpio_direction_output(SPI_GPIO(SPI1_CLK), 1);
-		gpio_direction_output(SPI_GPIO(SPI1_CS1), 1);
-		gpio_direction_output(SPI_GPIO(SPI1_CS0), 1);
-		gpio_direction_output(SPI_GPIO(SPI1_IO0), 1);
-		gpio_direction_input(SPI_GPIO(SPI1_IO1));
-	} else {
-		gpio_direction_output(SPI_GPIO(SPI0_CLK), 1);
-		gpio_direction_output(SPI_GPIO(SPI0_CS1), 1);
-		gpio_direction_output(SPI_GPIO(SPI0_CS0), 1);
-		gpio_direction_output(SPI_GPIO(SPI0_IO0), 1);
-		gpio_direction_input(SPI_GPIO(SPI0_IO1));
-	}
-}
-
-static void spi_gpio_prepare(struct cdns_xspi_dev *cdns_xspi)
-{
-	int ret = 0;
-	char namestr[32];
-	int pin;
-
-	gpio_as_sw(cdns_xspi);
-
-	sprintf(namestr, "spi%d_clk", cdns_xspi->xspi_id);
-	pin = cdns_xspi->xspi_id == 0 ? (SPI_GPIO(SPI0_CLK)) : (SPI_GPIO(SPI1_CLK));
-	ret = gpio_request(pin, namestr);
-	gpio_export(pin, false);
-
-	if (cdns_xspi->cs_defined & BIT(0)) {
-		sprintf(namestr, "spi%d_cs0", cdns_xspi->xspi_id);
-		pin = cdns_xspi->xspi_id == 0 ? (SPI_GPIO(SPI0_CS0)) : (SPI_GPIO(SPI1_CS0));
-		ret = gpio_request(pin, namestr);
-		gpio_export(pin, false);
-	}
-
-	if (cdns_xspi->cs_defined & BIT(1)) {
-		sprintf(namestr, "spi%d_cs1", cdns_xspi->xspi_id);
-		pin = cdns_xspi->xspi_id == 0 ? (SPI_GPIO(SPI0_CS1)) : (SPI_GPIO(SPI1_CS1));
-		ret = gpio_request(pin, namestr);
-		gpio_export(pin, false);
-	}
-
-	sprintf(namestr, "spi%d_io0", cdns_xspi->xspi_id);
-	pin = cdns_xspi->xspi_id == 0 ? (SPI_GPIO(SPI0_IO0)) : (SPI_GPIO(SPI1_IO0));
-	ret = gpio_request(pin, namestr);
-	gpio_export(pin, false);
-
-	sprintf(namestr, "spi%d_io1", cdns_xspi->xspi_id);
-	pin = cdns_xspi->xspi_id == 0 ? (SPI_GPIO(SPI0_IO1)) : (SPI_GPIO(SPI1_IO1));
-	ret = gpio_request(pin, namestr);
-	gpio_export(pin, false);
-
-	gpio_as_spi(cdns_xspi);
-}
-
-static void setsck(struct spi_device *dev, int is_on);
-static void setmosi(struct spi_device *dev, int is_on);
-static int getmiso(struct spi_device *dev);
-static void spidelay(unsigned int d);
-
-static void setsck(struct spi_device *dev, int is_on)
-{
-	struct cdns_xspi_dev *cdns_xspi = (struct cdns_xspi_dev *)dev;
-	int pin = cdns_xspi->xspi_id == 0 ? (SPI_GPIO(SPI0_CLK)) : (SPI_GPIO(SPI1_CLK));
-
-	if (is_on)
-		gpio_set_value_cansleep(pin, 1);
-	else
-		gpio_set_value_cansleep(pin, 0);
-}
-static void setmosi(struct spi_device *dev, int is_on)
-{
-	struct cdns_xspi_dev *cdns_xspi = (struct cdns_xspi_dev *)dev;
-	int pin = cdns_xspi->xspi_id == 0 ? (SPI_GPIO(SPI0_IO0)) : (SPI_GPIO(SPI1_IO0));
-
-	if (is_on)
-		gpio_set_value_cansleep(pin, 1);
-	else
-		gpio_set_value_cansleep(pin, 0);
-}
-static int getmiso(struct spi_device *dev)
-{
-	struct cdns_xspi_dev *cdns_xspi = (struct cdns_xspi_dev *)dev;
-	int pin = cdns_xspi->xspi_id == 0 ? (SPI_GPIO(SPI0_IO1)) : (SPI_GPIO(SPI1_IO1));
-	int val = gpio_get_value_cansleep(pin);
-
-	return val;
-}
-static void spidelay(unsigned int d)
-{
-	do {} while (0);
-}
-
-#include "spi-bitbang-txrx.h"
-
 
 static bool cdns_xspi_reset_dll(struct cdns_xspi_dev *cdns_xspi)
 {
@@ -912,10 +767,6 @@ static int cdns_xspi_send_stig_command(struct cdns_xspi_dev *cdns_xspi,
 		pr_err("Failed to lock SPI bus\n");
 		return -EIO;
 	}
-#if !IS_ENABLED(CONFIG_SPI_CADENCE_HW_WO)
-	if (cdns_xspi->wo_mode)
-		gpio_as_spi(cdns_xspi);
-#endif
 #endif
 	ret = cdns_xspi_wait_for_controller_idle(cdns_xspi);
 	if (ret < 0) {
@@ -1189,7 +1040,6 @@ static int cdns_xspi_of_get_plat_data(struct platform_device *pdev)
 			fwnode_handle_put(fwnode_child);
 			return -ENXIO;
 		}
-		cdns_xspi->cs_defined |= BIT(cs);
 	}
 
 	return 0;
@@ -1428,39 +1278,6 @@ int cdns_xspi_transfer_one_message(struct spi_controller *host,
 	return 0;
 }
 
-static int spi_swap(int val, int len)
-{
-	uint8_t *buf8 = (uint8_t *) &val;
-	uint8_t temp;
-	int *intswapped = (int *)buf8;
-
-
-	if (len == 4) {
-		temp = buf8[0];
-		buf8[0] = buf8[3];
-		buf8[3] = temp;
-		temp = buf8[1];
-		buf8[1] = buf8[2];
-		buf8[2] = temp;
-	}
-
-	if (len == 3) {
-		temp = buf8[0];
-		buf8[0] = buf8[2];
-		buf8[2] = temp;
-	}
-
-	if (len == 2) {
-		temp = buf8[0];
-		buf8[0] = buf8[1];
-		buf8[1] = temp;
-	}
-
-
-	return *intswapped;
-}
-
-#if IS_ENABLED(CONFIG_SPI_CADENCE_HW_WO)
 static int handle_tx_rx(struct cdns_xspi_dev *cdns_xspi, void *tx_buf,
 			void *rx_buf, int write_len, int len)
 {
@@ -1520,79 +1337,26 @@ static int handle_tx_rx(struct cdns_xspi_dev *cdns_xspi, void *tx_buf,
 
 	return 0;
 }
-#endif
 
-static int cdns_xspi_transfer_one_message_wo(struct spi_controller *master,
+static int cdns_xspi_transfer_one_message_wo(struct spi_controller *host,
 					   struct spi_message *m)
 {
-	struct cdns_xspi_dev *cdns_xspi = spi_master_get_devdata(master);
+	struct cdns_xspi_dev *cdns_xspi = spi_controller_get_devdata(host);
 	struct spi_device *spi = m->spi;
 	struct spi_transfer *t = NULL;
 	int cs = spi->chip_select;
 
-#if IS_ENABLED(CONFIG_SPI_CADENCE_HW_WO)
 	cdns_xspi->cur_cs = cs;
 
 	list_for_each_entry(t, &m->transfers, transfer_list) {
 		handle_tx_rx(cdns_xspi, (void *)t->tx_buf, t->rx_buf, cdns_xspi->write_len, t->len);
 	}
-
-#else
-	int cs_change = 0;
-
-	if (gpio_as_sw(cdns_xspi) == 1)
-		set_gpio_mode(cdns_xspi);
-
-	if (cs == 1)
-		gpio_set_value_cansleep(SPI_GPIO(SPI1_CS1), 0);
-	else
-		gpio_set_value_cansleep(SPI_GPIO(SPI1_CS0), 0);
-
-	list_for_each_entry(t, &m->transfers, transfer_list) {
-		int *txbuf = (int *) t->tx_buf;
-		int *rxbuf = (int *) t->rx_buf;
-		int txbuf_swap = 0;
-		int rxbuf_swap = 0;
-		int transfer_len;
-
-		while (t->len) {
-			transfer_len = t->len > 4 ? 4 : t->len;
-			if (txbuf) {
-				txbuf_swap = spi_swap(*txbuf, transfer_len);
-				txbuf += 1;
-			}
-			rxbuf_swap = bitbang_txrx_be_cpha0(
-						(struct spi_device *)cdns_xspi,
-						100, 0, 0, txbuf_swap,
-						transfer_len*8);
-			m->actual_length +=  transfer_len;
-			t->len -= transfer_len;
-			if (rxbuf) {
-				*rxbuf = spi_swap(rxbuf_swap, transfer_len);
-				rxbuf++;
-			}
-			cs_change = t->cs_change;
-		}
-	}
-
-	if (!cs_change) {
-		if (cs == 1)
-			gpio_set_value_cansleep(SPI_GPIO(SPI1_CS1), 1);
-		else
-			gpio_set_value_cansleep(SPI_GPIO(SPI1_CS0), 1);
-
-		/* Transfer compleded, switch GPIOs back to SPI mode */
-		/* For some reason quick changing GPIO function can cause issues */
-		//gpio_as_spi();
-	}
-#endif
 	m->status = 0;
-	spi_finalize_current_message(master);
+	spi_finalize_current_message(host);
 
 	return 0;
 }
 
-#if IS_ENABLED(CONFIG_SPI_CADENCE_HW_WO)
 static struct cdns_xspi_dev *cdns_xspi_debug;
 int mrvl_spi_open(struct inode *i, struct file *f)
 {
@@ -1638,7 +1402,6 @@ static int mrvl_spi_setup_debugfs(struct cdns_xspi_dev *cdns_xspi)
 	return 0;
 }
 #endif
-#endif
 
 static int cdns_xspi_probe(struct platform_device *pdev)
 {
@@ -1669,9 +1432,6 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 	cdns_xspi->pdev = pdev;
 	cdns_xspi->dev = &pdev->dev;
 	cdns_xspi->cur_cs = 0;
-#if IS_ENABLED(CONFIG_SPI_CADENCE_MRVL_XSPI)
-	cdns_xspi->cs_defined = 0;
-#endif
 
 	init_completion(&cdns_xspi->cmd_complete);
 	init_completion(&cdns_xspi->auto_cmd_complete);
@@ -1766,15 +1526,8 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 	}
 
 	dev_info(dev, "Successfully registered SPI host\n");
-#if IS_ENABLED(CONFIG_SPI_CADENCE_MRVL_XSPI)
-	if (cdns_xspi->wo_mode) {
-#if IS_ENABLED(CONFIG_SPI_CADENCE_HW_WO)
+	if (cdns_xspi->wo_mode)
 		mrvl_spi_setup_debugfs(cdns_xspi);
-#else
-		spi_gpio_prepare(cdns_xspi);
-#endif
-	}
-#endif
 
 	return 0;
 }
