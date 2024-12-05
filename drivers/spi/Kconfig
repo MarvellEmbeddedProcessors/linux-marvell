@@ -270,7 +270,6 @@ config SPI_CADENCE_XSPI
 config SPI_CADENCE_MRVL_XSPI
 	tristate "Marvell mods for XSPI controller"
 	depends on SPI_CADENCE_XSPI
-	depends on GPIOLIB
 
 	help
 	  Enable support for Marvell XSPI modifications
@@ -280,19 +279,6 @@ config SPI_CADENCE_MRVL_XSPI
 	  PHY config support or non-memory SPI capabilities.
 	  Enable that option if you want to enable these features.
 
-	  Based on HW support, xfer workaround may be needed for earlier
-	  revisions of silicon.
-	  Default workaround is based on GPIO.
-	  xfer can be emulated via SW based GPIO - that option can
-	  operate in full-duplex mode, but it will be slow
-	  Switch GPIO to SW control, and bitbang all requested data.
-	  Uses Software based SPI with dedicated SPI_0 or SPI_1 pins.
-
-config SPI_CADENCE_HW_WO
-	bool "Cadence XSPI controller HW xfer workaround"
-	depends on SPI_CADENCE_MRVL_XSPI
-	depends on DEBUG_FS
-	help
 	  Enable HW based workaround for Cadence xSPI controller
 
 	  Without full-duplex mode, HW workaround can do only write or
