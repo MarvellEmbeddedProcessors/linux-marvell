@@ -883,7 +883,8 @@ static inline bool is_cgx_mapped_to_nix(unsigned short id, u8 cgx_id)
 
 	return !(cgx_id && !(id == PCI_SUBSYS_DEVID_96XX ||
 			     id == PCI_SUBSYS_DEVID_98XX ||
-			     id == PCI_SUBSYS_DEVID_CN10K_A));
+			     id == PCI_SUBSYS_DEVID_CN10K_A ||
+			     id == PCI_SUBSYS_DEVID_CN10K_B));
 }
 
 static inline bool is_cnf10ka_a0(struct rvu *rvu)
