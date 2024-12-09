@@ -194,7 +194,7 @@ static void sdp_afpf_mbox_handler_up(struct work_struct *work)
 		msg = (struct mbox_msghdr *)(mdev->mbase + mbox->rx_start +
 					     offset);
 
-		if ((msg->pcifunc >> RVU_PFVF_PF_SHIFT) != sdp->pf ||
+		if ((msg->pcifunc >> RVU_OTX2_PFVF_PF_SHIFT) != sdp->pf ||
 		    (msg->pcifunc & RVU_PFVF_FUNC_MASK) <= sdp->num_vfs)
 			err = -EINVAL;
 		else {
@@ -310,8 +310,8 @@ static void sdp_afpf_mbox_handler(struct work_struct *work)
 
 			switch (msg->id) {
 			case MBOX_MSG_READY:
-				sdp->pf = (msg->pcifunc >> RVU_PFVF_PF_SHIFT) &
-					 RVU_PFVF_PF_MASK;
+				sdp->pf = (msg->pcifunc >> RVU_OTX2_PFVF_PF_SHIFT) &
+					 RVU_OTX2_PFVF_PF_MASK;
 				break;
 			case MBOX_MSG_FREE_RSRC_CNT:
 				rsp = (struct free_rsrcs_rsp *)msg;
@@ -494,7 +494,7 @@ static void sdp_pfvf_mbox_handler_up(struct work_struct *work)
 		}
 
 		/* override message value with actual values */
-		msg->pcifunc = (sdp->pf << RVU_PFVF_PF_SHIFT) | vf->vf_id;
+		msg->pcifunc = (sdp->pf << RVU_OTX2_PFVF_PF_SHIFT) | vf->vf_id;
 
 		fwd = otx2_mbox_alloc_msg(af_mbx, 0, size);
 		if (!fwd) {
@@ -542,7 +542,7 @@ static void sdp_pfvf_mbox_handler(struct work_struct *work)
 					     offset);
 
 		/* Set which VF sent this message based on mbox IRQ */
-		msg->pcifunc = ((u16)sdp->pf << RVU_PFVF_PF_SHIFT) |
+		msg->pcifunc = ((u16)sdp->pf << RVU_OTX2_PFVF_PF_SHIFT) |
 				((vf->vf_id + 1) & RVU_PFVF_FUNC_MASK);
 		err = handle_vf_req(sdp, vf, msg, msg->next_msgoff - offset);
 		if (err)
@@ -859,7 +859,7 @@ static void sdp_send_flr_msg(struct sdp_dev *sdp, struct rvu_vf *vf)
 {
 	int res, pcifunc;
 
-	pcifunc = (vf->sdp->pf << RVU_PFVF_PF_SHIFT) |
+	pcifunc = (vf->sdp->pf << RVU_OTX2_PFVF_PF_SHIFT) |
 		((vf->vf_id + 1) & RVU_PFVF_FUNC_MASK);
 
 	if (send_flr_msg(&sdp->afpf_mbox, 0, pcifunc) != 0) {
