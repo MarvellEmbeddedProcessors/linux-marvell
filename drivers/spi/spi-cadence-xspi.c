@@ -352,13 +352,13 @@ const int cdns_xspi_clk_div_list[] = {
 	-1	//End of list
 };
 
-int xspi_unlock(atomic_t *lock)
+static int xspi_unlock(atomic_t *lock)
 {
 	atomic_fetch_dec(lock);
 	return 0;
 }
 
-int xspi_trylock(atomic_t *lock)
+static int xspi_trylock(atomic_t *lock)
 {
 	int timeout = 0xFF;
 
@@ -728,7 +728,7 @@ static void cdns_xspi_sdma_handle(struct cdns_xspi_dev *cdns_xspi)
 	}
 }
 
-bool cdns_xspi_stig_ready(struct cdns_xspi_dev *cdns_xspi, bool sleep)
+static bool cdns_xspi_stig_ready(struct cdns_xspi_dev *cdns_xspi, bool sleep)
 {
 	u32 ctrl_stat;
 
@@ -740,7 +740,7 @@ bool cdns_xspi_stig_ready(struct cdns_xspi_dev *cdns_xspi, bool sleep)
 		sleep ? CDNS_XSPI_POLL_TIMEOUT_US : 0);
 }
 
-bool cdns_xspi_sdma_ready(struct cdns_xspi_dev *cdns_xspi, bool sleep)
+static bool cdns_xspi_sdma_ready(struct cdns_xspi_dev *cdns_xspi, bool sleep)
 {
 	u32 ctrl_stat;
 
@@ -1111,7 +1111,7 @@ static int cdns_xspi_prepare_generic(int cs, const void *dout, int len, int glue
 	return 0;
 }
 
-unsigned char reverse_bits(unsigned char num)
+static unsigned char reverse_bits(unsigned char num)
 {
 	unsigned int count = sizeof(num) * 8 - 1;
 	unsigned int reverse_num = num;
@@ -1173,8 +1173,8 @@ static int cdns_xspi_prepare_transfer(int cs, int dir, int len, u32 *cmd_regs)
 	return 0;
 }
 
-int cdns_xspi_transfer_one_message(struct spi_controller *host,
-				   struct spi_message *m)
+static int cdns_xspi_transfer_one_message(struct spi_controller *host,
+					  struct spi_message *m)
 {
 	struct cdns_xspi_dev *cdns_xspi = spi_master_get_devdata(host);
 	struct spi_device *spi = m->spi;
@@ -1358,12 +1358,13 @@ static int cdns_xspi_transfer_one_message_wo(struct spi_controller *host,
 }
 
 static struct cdns_xspi_dev *cdns_xspi_debug;
-int mrvl_spi_open(struct inode *i, struct file *f)
+static int mrvl_spi_open(struct inode *i, struct file *f)
 {
 	cdns_xspi_debug = i->i_private;
 	return 0;
 }
-ssize_t mrvl_spi_wl_write(struct file *f, const char __user *user_buf, size_t size, loff_t *l)
+static ssize_t mrvl_spi_wl_write(struct file *f, const char __user *user_buf,
+				 size_t size, loff_t *l)
 {
 	char buf[20] = {0};
 	long val;
@@ -1389,15 +1390,14 @@ static const struct file_operations mrvl_spi_wl_fops = {
 
 static int mrvl_spi_setup_debugfs(struct cdns_xspi_dev *cdns_xspi)
 {
-	struct dentry *pfile;
 	char file_name[30];
 
 	if (mrvl_spi_debug_root == NULL)
 		mrvl_spi_debug_root = debugfs_create_dir("cn10k_spi", NULL);
 
 	sprintf(file_name, "SPI_%d_WriteLength", cdns_xspi->xspi_id);
-	pfile = debugfs_create_file(file_name, 0644, mrvl_spi_debug_root, cdns_xspi,
-				    &mrvl_spi_wl_fops);
+	debugfs_create_file(file_name, 0644, mrvl_spi_debug_root, cdns_xspi,
+			    &mrvl_spi_wl_fops);
 
 	return 0;
 }
