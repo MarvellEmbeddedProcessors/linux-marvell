@@ -98,14 +98,12 @@ static irqreturn_t pem_rst_perst_handler(int irq, struct uio_info *uio_info)
 
 static int register_perst_uio_dev(struct platform_device *pdev, struct mv_pem_ep *pem_ep)
 {
-	struct device_node *of_node;
 	struct uio_info *uio_info;
 	struct device *dev;
 	int irq, ret;
 	u64 regval;
 
 	dev = &pdev->dev;
-	of_node = dev->of_node;
 
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
