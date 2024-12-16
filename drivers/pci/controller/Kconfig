@@ -274,6 +274,17 @@ config PCI_RCAR_GEN2
 	  There are 3 internal PCI controllers available with a single
 	  built-in EHCI/OHCI host controller present on each one.
 
+config PCIE_MARVELL_CNXK_EP
+	tristate "Marvell CNXK PEM EP driver"
+	depends on ARM64 && UIO
+	default m
+	help
+	  This driver configures the PEM when OcteonTx2 and CN10K SoCs are  in PCIe
+	  EndPoint mode. Also it programs the indexed BAR4 regions for mailbox
+	  communication with host.
+
+	  To compile this as a module choose M here.
+
 config PCIE_ROCKCHIP
 	bool
 	depends on PCI
