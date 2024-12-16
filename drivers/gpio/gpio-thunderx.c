@@ -501,6 +501,12 @@ static int thunderx_gpio_probe(struct pci_dev *pdev,
 		goto out;
 	}
 
+	err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(48));
+	if (err) {
+		dev_err(dev, "DMA mask config failed, abort\n");
+		goto out;
+	}
+
 	if (pdev->subsystem_device == 0xa10a) {
 		/* CN88XX has no GPIO_CONST register*/
 		ngpio = 50;
