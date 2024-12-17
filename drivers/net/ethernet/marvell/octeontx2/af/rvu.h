@@ -501,6 +501,8 @@ struct rvu_hwinfo {
 	struct sso_rsrc  sso;
 	struct tim_rsrc  tim;
 	struct ree_rsrc *ree;
+	struct dpi_rsrc *dpi;
+	struct dpi_rsrc *dpi1;
 };
 
 struct mbox_wq_info {

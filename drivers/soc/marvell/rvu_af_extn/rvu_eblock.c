@@ -409,4 +409,5 @@ void rvu_eblock_module_exit(void)
 	 */
 	ree_eb_module_exit();
 	ml_eb_module_exit();
+	dpi_eb_module_exit();
 }
