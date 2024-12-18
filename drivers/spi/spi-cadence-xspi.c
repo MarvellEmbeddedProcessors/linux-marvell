@@ -261,7 +261,7 @@ struct dentry *mrvl_spi_debug_root;
 #define SPI_NOT_CLAIMED				0x00
 #define SPI_AP_NS_OWN				0x02
 #define CDNS_XSPI_PHY_CTB_RFILE_PHY_GPIO_CTRL_1	0x8c
-#define SPI_LOCK_TIMEOUT			100 /* 1 second timeout */
+#define SPI_LOCK_TIMEOUT			20 /* 200ms timeout */
 #define	SPI_LOCK_CHECK_TIMEOUT			10
 #define SPI_LOCK_SLEEP_DURATION_MS		10
 #endif
