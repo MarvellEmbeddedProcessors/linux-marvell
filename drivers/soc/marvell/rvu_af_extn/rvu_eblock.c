@@ -366,7 +366,7 @@ void rvu_eblock_unregister_driver(struct rvu_eblock_driver_ops *ops)
 
 	/* Detach all eblock instances before we unregister */
 	for_each_eblock_dev(eblock) {
-		if (ops == eblock->driver->ops) {
+		if (eblock->driver && ops == eblock->driver->ops) {
 			if (!driver)
 				driver = eblock->driver;
 			else
@@ -375,8 +375,12 @@ void rvu_eblock_unregister_driver(struct rvu_eblock_driver_ops *ops)
 		}
 	}
 
-	list_del(&driver->node);
+	if (driver)
+		list_del(&driver->node);
 	mutex_unlock(&eb_bus.lock);
+
+	if (!driver)
+		return;
 
 	WARN_ON(!refcount_sub_and_test(1, &driver->rcount));
 	kfree(driver);
