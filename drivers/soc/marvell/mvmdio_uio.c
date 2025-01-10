@@ -22,27 +22,43 @@
 #define MAX_MDIO_BUS 8
 
 static inline int mvmdio_read(struct mii_bus *bus, int bus_id,
-			int phy_addr, u32 reg)
+			int phy_addr, int c45, int dev_ad, u32 reg)
 {
 	int ret;
 
-	ret = __mdiobus_read(bus, phy_addr, reg);
-	if (ret < 0) {
-		pr_err("smi read failed: bus:%d, phy:0x%x, reg:0x%x\n",
-			bus_id, phy_addr, reg);
+	if (c45) {
+		ret = __mdiobus_c45_read(bus, phy_addr, dev_ad, reg);
+		if (ret < 0) {
+			pr_err("smi read failed: bus:%d, phy:0x%x, dev_ad:0x%x, reg:0x%x\n",
+				bus_id, phy_addr, dev_ad, reg);
+		}
+	} else {
+		ret = __mdiobus_read(bus, phy_addr, reg);
+		if (ret < 0) {
+			pr_err("smi read failed: bus:%d, phy:0x%x, reg:0x%x\n",
+				bus_id, phy_addr, reg);
+		}
 	}
 	return ret;
 }
 
 static inline int mvmdio_write(struct mii_bus *bus, int bus_id,
-			int phy_addr, u32 reg, u16 data)
+			int phy_addr, int c45, int dev_ad, u32 reg, u16 data)
 {
 	int ret;
 
-	ret = __mdiobus_write(bus, phy_addr, reg, data);
-	if (ret < 0) {
-		pr_err("smi write failed: bus:%d, phy:0x%x, reg:0x%x, data=0x%hx\n",
-			bus_id, phy_addr, reg, data);
+	if (c45) {
+		ret = __mdiobus_c45_write(bus, phy_addr, dev_ad, reg, data);
+		if (ret < 0) {
+			pr_err("smi write failed: bus:%d, phy:0x%x, dev_ad:0x%x, reg:0x%x, data=0x%x\n",
+				bus_id, phy_addr, dev_ad, reg, data);
+		}
+	} else {
+		ret = __mdiobus_write(bus, phy_addr, reg, data);
+		if (ret < 0) {
+			pr_err("smi write failed: bus:%d, phy:0x%x, reg:0x%x, data=0x%x\n",
+				bus_id, phy_addr, reg, data);
+		}
 	}
 	return ret;
 }
@@ -55,6 +71,8 @@ static int paged_access;
 struct mii_data {
 	int bus_id;
 	int phy_id;
+	int c45;
+	int dev_ad;
 	int reg;
 	u16 data;
 };
@@ -103,8 +121,8 @@ static ssize_t mv_mdio_device_read(struct file *file,
 
 	if (page != -1) {
 		/* Save the current page number */
-		ret = mvmdio_read(bus, mii.md.bus_id,
-			mii.md.phy_id, mii.page_reg);
+		ret = mvmdio_read(bus, mii.md.bus_id, mii.md.phy_id,
+			mii.md.c45, mii.md.dev_ad, mii.page_reg);
 		if (ret < 0)
 			goto mdio_failed;
 
@@ -112,14 +130,14 @@ static ssize_t mv_mdio_device_read(struct file *file,
 
 		/* Set a new page number */
 		ret = mvmdio_write(bus, mii.md.bus_id, mii.md.phy_id,
-			mii.page_reg, page);
+			mii.md.c45, mii.md.dev_ad, mii.page_reg, page);
 		if (ret < 0)
 			goto mdio_failed;
 	}
 
 	/* Read the target register */
-	ret = mvmdio_read(bus, mii.md.bus_id,
-			mii.md.phy_id, mii.md.reg);
+	ret = mvmdio_read(bus, mii.md.bus_id, mii.md.phy_id,
+			mii.md.c45, mii.md.dev_ad, mii.md.reg);
 	if (ret < 0)
 		goto mdio_failed;
 
@@ -128,7 +146,7 @@ static ssize_t mv_mdio_device_read(struct file *file,
 	if (page != -1) {
 		/* Restore the previous page number */
 		ret = mvmdio_write(bus, mii.md.bus_id, mii.md.phy_id,
-			mii.page_reg, prev_page);
+			mii.md.c45, mii.md.dev_ad, mii.page_reg, prev_page);
 		if (ret < 0)
 			goto mdio_failed;
 	}
@@ -180,8 +198,8 @@ static ssize_t mv_mdio_device_write(struct file *file,
 
 	if (page != -1) {
 		/* Save the current page number */
-		ret = mvmdio_read(bus, mii.md.bus_id,
-			mii.md.phy_id, mii.page_reg);
+		ret = mvmdio_read(bus, mii.md.bus_id, mii.md.phy_id,
+			mii.md.c45, mii.md.dev_ad, mii.page_reg);
 		if (ret < 0)
 			goto mdio_failed;
 
@@ -189,21 +207,21 @@ static ssize_t mv_mdio_device_write(struct file *file,
 
 		/* Set a new page number */
 		ret = mvmdio_write(bus, mii.md.bus_id, mii.md.phy_id,
-			mii.page_reg, page);
+			mii.md.c45, mii.md.dev_ad, mii.page_reg, page);
 		if (ret < 0)
 			goto mdio_failed;
 	}
 
 	/* Write the target register */
-	ret = mvmdio_write(bus, mii.md.bus_id,
-		mii.md.phy_id, mii.md.reg, mii.md.data);
+	ret = mvmdio_write(bus, mii.md.bus_id, mii.md.phy_id,
+		mii.md.c45, mii.md.dev_ad, mii.md.reg, mii.md.data);
 	if (ret < 0)
 		goto mdio_failed;
 
 	if (page != -1) {
 		/* Restore the previous page number */
 		ret = mvmdio_write(bus, mii.md.bus_id, mii.md.phy_id,
-			mii.page_reg, prev_page);
+			mii.md.c45, mii.md.dev_ad, mii.page_reg, prev_page);
 		if (ret < 0)
 			goto mdio_failed;
 	}
@@ -273,12 +291,11 @@ static int __init mv_mdio_device_init(void)
 
 	major = ret;
 
-	mv_cl = class_create(THIS_MODULE, MVMDIO_CLASS_NAME);
+	mv_cl = class_create(MVMDIO_CLASS_NAME);
 	if (IS_ERR(mv_cl)) {
 		ret = PTR_ERR(mv_cl);
 		goto error_class;
 	}
-
 	mvmdio_dev = device_create(mv_cl, NULL,
 		MKDEV(major, 0), NULL, MVMDIO_DEV_NAME);
 
