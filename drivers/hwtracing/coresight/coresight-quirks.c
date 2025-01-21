@@ -69,11 +69,20 @@ bool coresight_etm_has_hw_sync(void)
 }
 
 /* ETM quirks on OcteonTX */
-u32 coresight_get_etm_quirks(unsigned int id)
+u32 coresight_get_etm_quirks(void)
 {
 	u32 quirks = 0; /* reset */
 
-	if (id == OCTEONTX_CN9XXX_ETM)
+	if (midr_is_cpu_model_range(read_cpuid_id(),
+				    MIDR_OCTX2_96XX,
+				    MIDR_CPU_VAR_REV(0, 0),
+				    MIDR_CPU_VAR_REV(MIDR_REVISION_MASK,
+						     MIDR_REVISION_MASK)) ||
+	    midr_is_cpu_model_range(read_cpuid_id(),
+				    MIDR_OCTX2_95XX,
+				    MIDR_CPU_VAR_REV(0, 0),
+				    MIDR_CPU_VAR_REV(MIDR_REVISION_MASK,
+						     MIDR_REVISION_MASK)))
 		quirks |= CORESIGHT_QUIRK_ETM_TREAT_ETMv43;
 
 	if (!coresight_etm_has_hw_sync())
@@ -147,7 +156,7 @@ u32 coresight_get_etr_quirks(unsigned int id)
 	if (id == OCTEONTX_CN9XXX_ETR) {
 		quirks |= CORESIGHT_QUIRK_ETR_SECURE_BUFF |
 			  CORESIGHT_QUIRK_ETR_FORCE_64B_DBA_RW;
-		quirks |= coresight_get_etm_quirks(OCTEONTX_CN9XXX_ETM);
+		quirks |= coresight_get_etm_quirks();
 	}
 
 	return quirks;
