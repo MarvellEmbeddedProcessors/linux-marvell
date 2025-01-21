@@ -2181,7 +2181,7 @@ static int etm4_probe(struct device *dev)
 
 	/* Enable fixes for Silicon issues */
 	drvdata->etm_quirks =
-		coresight_get_etm_quirks(coresight_get_pid(&access));
+		coresight_get_etm_quirks();
 
 	return etm4_add_coresight_dev(&init_arg);
 }

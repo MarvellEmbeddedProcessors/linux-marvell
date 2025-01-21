@@ -55,7 +55,7 @@ enum hw_state {
 	USR_START,
 };
 
-u32 coresight_get_etm_quirks(unsigned int id);
+u32 coresight_get_etm_quirks(void);
 u32 coresight_get_etr_quirks(unsigned int id);
 int coresight_get_etm_sync_mode(void);
 
