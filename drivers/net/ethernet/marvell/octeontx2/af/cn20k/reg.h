@@ -96,6 +96,8 @@ static inline u64 pf_to_bitoff(u8 pf)
 
 #define NIX_GINT_INT                           (0x200)
 #define NIX_GINT_INT_W1S                       (0x208)
+
+#define ALTAF_FLR				BIT_ULL(0)
 #define ALTAF_RDY				BIT_ULL(1)
 
 /* NPC registers */
