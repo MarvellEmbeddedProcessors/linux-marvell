@@ -2381,6 +2381,24 @@ int rvu_mbox_handler_ndc_sync_op(struct rvu *rvu,
 	return 0;
 }
 
+static void rvu_notify_fw(struct rvu *rvu, u16 pcifunc)
+{
+	int pf, vf;
+
+	if (is_rvu_otx2(rvu) || is_cn20k(rvu->pdev))
+		return;
+
+	pf = rvu_get_pf(pcifunc);
+	set_bit(pf, rvu->fwdata->fw_intr_info.flr_pf_bmap);
+	if (pcifunc & RVU_PFVF_FUNC_MASK) {
+		vf = pcifunc & RVU_PFVF_FUNC_MASK;
+		set_bit(vf, rvu->fwdata->fw_intr_info.flr_vf_bmap);
+	}
+
+	rvu_write64(rvu, BLKADDR_NIX0, AF_BAR2_ALIASX(0, NIX_GINT_INT_W1S), 0x1);
+	usleep_range(5000, 6000);
+}
+
 static int rvu_process_mbox_msg(struct otx2_mbox *mbox, int devid,
 				struct mbox_msghdr *req)
 {
@@ -3153,6 +3171,14 @@ static void rvu_blklf_teardown(struct rvu *rvu, u16 pcifunc, u8 blkaddr)
 	if (!num_lfs)
 		return;
 
+	/* Single flr notification to firmware to process teardown of all the blocks
+	 * that firmware handles.
+	 */
+	if (block->addr == BLKADDR_SSOW) {
+		rvu_notify_fw(rvu, pcifunc);
+		return;
+	}
+
 	if (block->addr == BLKADDR_SSOW)
 		rvu_sso_hw_flr(rvu, pcifunc);
 
@@ -3746,8 +3772,9 @@ static int rvu_flr_init(struct rvu *rvu)
 			    cfg | BIT_ULL(22));
 	}
 
-	rvu->flr_wq = alloc_ordered_workqueue("rvu_afpf_flr",
-					      WQ_HIGHPRI | WQ_MEM_RECLAIM);
+	rvu->flr_wq = alloc_workqueue("rvu_afpf_flr",
+				      WQ_HIGHPRI | WQ_MEM_RECLAIM, 0);
+
 	if (!rvu->flr_wq)
 		return -ENOMEM;
 
