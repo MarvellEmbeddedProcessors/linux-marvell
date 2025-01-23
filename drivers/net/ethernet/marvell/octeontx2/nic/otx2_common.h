@@ -35,6 +35,7 @@
 #include "rep.h"
 #include "cn20k.h"
 #include "cn10k_ipsec.h"
+#include <rvu_eb_sdp.h>
 
 /* IPv4 flag more fragment bit */
 #define IPV4_FLAG_MORE				0x20
@@ -498,6 +499,11 @@ struct pf_irq_data {
 	int mdevs;
 };
 
+struct sdp_vf_cfg {
+	u16 sq2chan_map[SDP_MAX_RINGS_PER_VF];
+	u16 nr_rings;
+};
+
 struct otx2_nic {
 	void __iomem		*reg_base;
 	struct net_device	*netdev;
@@ -632,6 +638,8 @@ struct otx2_nic {
 	struct cn10k_ipsec	ipsec;
 	/* af_xdp zero-copy support */
 	unsigned long		*af_xdp_zc_qidx;
+
+	struct sdp_vf_cfg	sdp_cfg;
 };
 
 static inline bool is_otx2_lbkvf(struct pci_dev *pdev)
