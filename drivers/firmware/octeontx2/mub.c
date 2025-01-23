@@ -49,7 +49,7 @@ static bool is_platform_asim(void)
  */
 static u64 mub_properties;
 
-static ssize_t compatibility_show(struct bus_type *bus, char *buf)
+static ssize_t compatibility_show(const struct bus_type *bus, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%#016llx\n", mub_properties);
 }
