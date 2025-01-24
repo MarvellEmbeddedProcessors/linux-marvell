@@ -7,5 +7,6 @@ obj-y		+= octeontx2-serdes/
 obj-y		+= octeontx2-pcicons/
 obj-$(CONFIG_MRVL_SWUP) += mrvl-swup/
 obj-$(CONFIG_MARVELL_CN10K_SERDES_DIAGNOSTICS) += cn10k_serdes_diag.o
+obj-$(CONFIG_MARVELL_CN10K_EINJ) += cn10k-einj.o
 obj-$(CONFIG_OCTEONTX_INFO) += octeontx_info.o
 obj-$(CONFIG_MRVL_PHY_DIAGNOSTICS) += phy_diag.o
