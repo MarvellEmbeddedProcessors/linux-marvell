@@ -90,7 +90,7 @@ static void cpt_hash_callback(int status, void *arg1, void *arg2)
 		otx2_cpt_info_destroy(pdev, inst_info);
 	}
 	if (areq)
-		areq->complete(areq, status);
+		crypto_request_complete(areq, status);
 }
 
 static inline void create_hash_ctx_hdr(struct otx2_cpt_req_info *req_info, struct cpt_hmac_ctx *ctx,

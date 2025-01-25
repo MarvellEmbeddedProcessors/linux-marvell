@@ -75,7 +75,7 @@ free:
 		otx2_cpt_info_destroy(pdev, inst_info);
 	}
 	if (areq)
-		areq->complete(areq, status);
+		crypto_request_complete(areq, status);
 }
 
 static void cpt_ecdh_callback(int status, void *arg1, void *arg2)
@@ -108,7 +108,7 @@ static void cpt_ecdh_callback(int status, void *arg1, void *arg2)
 		otx2_cpt_info_destroy(pdev, inst_info);
 	}
 	if (areq)
-		areq->complete(areq, status);
+		crypto_request_complete(areq, status);
 }
 
 static void cpt_dh_callback(int status, void *arg1, void *arg2)
@@ -135,7 +135,7 @@ static void cpt_dh_callback(int status, void *arg1, void *arg2)
 		otx2_cpt_info_destroy(pdev, inst_info);
 	}
 	if (areq)
-		areq->complete(areq, status);
+		crypto_request_complete(areq, status);
 }
 
 static void cpt_rsa_drop_leading_zeros(const char **ptr, size_t *len)

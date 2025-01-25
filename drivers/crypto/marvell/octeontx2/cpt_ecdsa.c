@@ -43,7 +43,7 @@ static void cpt_ecdsa_callback(int status, void *arg1, void *arg2)
 		otx2_cpt_info_destroy(pdev, inst_info);
 	}
 	if (areq)
-		areq->complete(areq, status);
+		crypto_request_complete(areq, status);
 }
 
 static struct crypto_rng *cpt_rfc6979_alloc_rng(struct ecc_ctx *ctx,
