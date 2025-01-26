@@ -1025,7 +1025,7 @@ static int otx2_cpt_aead_gcm_aes_setkey(struct crypto_aead *cipher,
 					const unsigned char *key,
 					unsigned int keylen)
 {
-	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx(cipher);
+	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(cipher);
 
 	switch (keylen) {
 	case AES_KEYSIZE_128:
@@ -1710,7 +1710,7 @@ static struct aead_alg otx2_cpt_aeads[] = { {
 		.cra_driver_name = "cpt_gcm_aes",
 		.cra_blocksize = 1,
 		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
-		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx),
+		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx) + CRYPTO_DMA_PADDING,
 		.cra_priority = 4001,
 		.cra_alignmask = 0,
 		.cra_module = THIS_MODULE,
