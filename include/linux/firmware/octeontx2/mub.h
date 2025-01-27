@@ -19,6 +19,7 @@ struct mub_device {
 #define MUB_SOC_TYPE_ASIM	0x0001
 #define MUB_SOC_TYPE_9X		0x0002
 #define MUB_SOC_TYPE_10X	0x0004
+#define MUB_SOC_TYPE_20X	0x0008
 
 	int id;
 	struct device dev;

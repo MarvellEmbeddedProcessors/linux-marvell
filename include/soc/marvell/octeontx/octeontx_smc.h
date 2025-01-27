@@ -23,13 +23,14 @@
  * The call verifies ATF instance running on the system.
  *
  * @return
- *	0 (T9x) and 2 (cn10k) on success
+ *	0 (T9x) and 2 (cn10k) and 3 (cn20k) on success
  *	error code on failure
  *
  */
 static inline int octeontx_soc_check_smc(void)
 {
 #define CPU_MODEL_CN10KX_PART	0xd49
+#define CPU_MODEL_CN20KX_PART	0xd8e
 
 	const int octeontx_svc_uuid[] = {
 		0x6ff498cf,
@@ -48,6 +49,9 @@ static inline int octeontx_soc_check_smc(void)
 
 	if (MIDR_PARTNUM(read_cpuid_id()) == CPU_MODEL_CN10KX_PART)
 		return 2;
+
+	if (MIDR_PARTNUM(read_cpuid_id()) == CPU_MODEL_CN20KX_PART)
+		return 3;
 
 	return 0;
 }
@@ -120,6 +124,13 @@ static inline bool is_soc_cnf10ka_ax(void)
 		return true;
 
 	return false;
+}
+
+static inline bool is_soc_cn20kx(void)
+{
+	if (MIDR_PARTNUM(read_cpuid_id()) == CPU_MODEL_CN20KX_PART)
+		return 1;
+	return 0;
 }
 
 #endif /* _SOC_MRVL_OCTEONTX_SMC_H */
