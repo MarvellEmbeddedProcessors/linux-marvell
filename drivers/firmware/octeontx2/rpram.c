@@ -181,7 +181,8 @@ static int __init rpram_init(void)
 	info->new_size = info->size;
 
 	info->dev = mub_device_register("rpram",
-					MUB_SOC_TYPE_10X | MUB_SOC_TYPE_ASIM,
+					MUB_SOC_TYPE_10X | MUB_SOC_TYPE_ASIM |
+					MUB_SOC_TYPE_20X,
 					rpram_attrs_groups);
 	if (IS_ERR(info->dev))
 		return PTR_ERR(info->dev);

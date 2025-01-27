@@ -70,6 +70,8 @@ static void detect_platform(void)
 		mub_properties |= MUB_SOC_TYPE_ASIM;
 	if (is_soc_cn10kx())
 		mub_properties |= MUB_SOC_TYPE_10X;
+	else if (is_soc_cn20kx())
+		mub_properties |= MUB_SOC_TYPE_20X;
 	else if (is_soc_cn9x())
 		mub_properties |= MUB_SOC_TYPE_9X;
 }
