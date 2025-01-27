@@ -63,7 +63,7 @@ static int __init mub_gen_init(void)
 	int ret, value;
 
 	value = octeontx_soc_check_smc();
-	if (value != 0 && value != 2) {
+	if (value != 0 && value != 2 && value != 3) {
 		pr_err("Firmware is not compatible with MUB\n");
 		return -EOPNOTSUPP;
 	}

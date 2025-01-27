@@ -137,9 +137,9 @@ static inline bool is_soc_cn10kb(void)
 
 static inline bool is_soc_cn20kx(void)
 {
-       if (MIDR_PARTNUM(read_cpuid_id()) == CPU_MODEL_CN20KX_PART)
-               return 1;
-       return 0;
+	if (MIDR_PARTNUM(read_cpuid_id()) == CPU_MODEL_CN20KX_PART)
+		return 1;
+	return 0;
 }
 
 #endif /* _SOC_MRVL_OCTEONTX_SMC_H */
