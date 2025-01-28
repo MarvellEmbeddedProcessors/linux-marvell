@@ -116,6 +116,9 @@ struct otx2_snd_queue {
 	u16			sqb_count;
 	u64			*sqb_ptrs;
 	struct xsk_buff_pool    *xsk_pool;
+	/* SQE ring and CPT response queue for Inline IPSEC */
+	struct qmem		*sqe_ring;
+	struct qmem		*cpt_resp;
 } ____cacheline_aligned_in_smp;
 
 enum cq_type {
