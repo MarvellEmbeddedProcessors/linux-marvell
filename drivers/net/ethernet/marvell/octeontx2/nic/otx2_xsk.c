@@ -139,20 +139,27 @@ int otx2_xsk_pool_enable(struct otx2_nic *pf, struct xsk_buff_pool *pool, u16 qi
 int otx2_xsk_pool_disable(struct otx2_nic *pf, u16 qidx)
 {
 	struct net_device *netdev = pf->netdev;
-	struct xsk_buff_pool *pool;
+	struct xsk_buff_pool *xsk_pool;
 	struct otx2_snd_queue *sq;
+	struct otx2_pool *pool;
 
-	pool = xsk_get_pool_from_qid(netdev, qidx);
-	if (!pool)
+	xsk_pool = xsk_get_pool_from_qid(netdev, qidx);
+	if (!xsk_pool)
 		return -EINVAL;
 
 	sq = &pf->qset.sq[qidx + pf->hw.tx_queues];
 	sq->xsk_pool = NULL;
-	otx2_clean_up_rq(pf, qidx);
-	clear_bit(qidx, pf->af_xdp_zc_qidx);
-	xsk_pool_dma_unmap(pool, DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING);
-	/* Reconfigure RSS table as 'qidx' now need to be part of RSS now */
-	otx2_set_rss_table(pf, DEFAULT_RSS_CONTEXT_GROUP);
+	pool = &pf->qset.pool[qidx];
+	if (pool->xsk_pool) {
+		otx2_clean_up_rq(pf, qidx);
+		clear_bit(qidx, pf->af_xdp_zc_qidx);
+		xsk_pool_dma_unmap(xsk_pool,
+				   DMA_ATTR_SKIP_CPU_SYNC |
+				   DMA_ATTR_WEAK_ORDERING);
+		pool->xsk_pool = NULL;
+		/* Reconfigure RSS table as 'qidx' now need to be part of RSS now */
+		otx2_set_rss_table(pf, DEFAULT_RSS_CONTEXT_GROUP);
+	}
 
 	return 0;
 }

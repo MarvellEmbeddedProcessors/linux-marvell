@@ -1315,6 +1315,7 @@ void otx2_free_bufs(struct otx2_nic *pfvf, struct otx2_pool *pool,
 void otx2_free_aura_ptr(struct otx2_nic *pfvf, int type)
 {
 	int pool_id, pool_start = 0, pool_end = 0, size = 0;
+	struct xsk_buff_pool *xsk_pool;
 	struct otx2_pool *pool;
 	u64 iova;
 	int idx;
@@ -1342,13 +1343,25 @@ void otx2_free_aura_ptr(struct otx2_nic *pfvf, int type)
 
 			iova = otx2_aura_allocptr(pfvf, pool_id);
 		}
-	}
 
-	for (idx = 0 ; idx < pool->xdp_cnt; idx++) {
-		if (!pool->xdp[idx])
-			continue;
+		/* Free RQB xsk buffer pointers */
+		if (type == AURA_NIX_RQ && pool->xsk_pool) {
+			for (idx = 0 ; idx < pool->xdp_cnt; idx++) {
+				if (!pool->xdp[idx])
+					continue;
 
-		xsk_buff_free(pool->xdp[idx]);
+				xsk_buff_free(pool->xdp[idx]);
+				pool->xdp[idx] = NULL;
+			}
+
+			clear_bit(pool_id, pfvf->af_xdp_zc_qidx);
+			xsk_pool = xsk_get_pool_from_qid(pfvf->netdev, pool_id);
+			if (xsk_pool)
+				xsk_pool_dma_unmap(xsk_pool,
+						   DMA_ATTR_SKIP_CPU_SYNC |
+						   DMA_ATTR_WEAK_ORDERING);
+			pool->xsk_pool = NULL;
+		}
 	}
 }
 

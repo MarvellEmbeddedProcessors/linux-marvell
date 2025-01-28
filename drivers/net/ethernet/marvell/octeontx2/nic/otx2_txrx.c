@@ -1313,7 +1313,7 @@ void otx2_cleanup_rx_cqes(struct otx2_nic *pfvf, struct otx2_cq_queue *cq, int q
 	pool = &pfvf->qset.pool[pool_id];
 
 	if (pfvf->xdp_prog) {
-		if (pool->page_pool)
+		if (pool->page_pool || pool->xsk_pool)
 			xdp_rxq_info_unreg_mem_model(&cq->xdp_rxq);
 
 		xdp_rxq_info_unreg(&cq->xdp_rxq);
