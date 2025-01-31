@@ -416,7 +416,12 @@ static int lock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 			mdelay(SPI_LOCK_SLEEP_DURATION_MS);
 			continue;
 		}
-		pr_err("Flash arbitration failed, lock is owned by: %d\n", lock->owner);
+		if (lock->owner > 2) {
+			pr_err("SPI bus lock %d failed, lock is owned by: (atf_support: 0x%x) 0x%x 0x%x\n",
+			cdns_xspi->xspi_id, lock->atf_support, lock->owner,
+			(int)atomic_read(&lock->lock));
+		} else
+			pr_err("Flash arbitration failed, lock is owned by: %d\n", lock->owner);
 		return -1;
 	}
 
