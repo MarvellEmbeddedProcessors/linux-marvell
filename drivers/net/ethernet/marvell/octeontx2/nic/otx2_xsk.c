@@ -208,6 +208,7 @@ void otx2_zc_napi_handler(struct otx2_nic *pfvf, struct xsk_buff_pool *pool,
 {
 	struct xdp_desc *xdp_desc = pool->tx_descs;
 	int err, i, work_done = 0, batch;
+	struct xdp_frame xdpf = {0};
 
 	budget = min(budget, otx2_read_free_sqe(pfvf, queue));
 	batch = xsk_tx_peek_release_desc_batch(pool, budget);
@@ -216,9 +217,8 @@ void otx2_zc_napi_handler(struct otx2_nic *pfvf, struct xsk_buff_pool *pool,
 
 	for (i = 0; i < batch; i++) {
 		dma_addr_t dma_addr;
-
 		dma_addr = xsk_buff_raw_get_dma(pool, xdp_desc[i].addr);
-		err = otx2_xdp_sq_append_pkt(pfvf, dma_addr, xdp_desc[i].len,
+		err = otx2_xdp_sq_append_pkt(pfvf, &xdpf, dma_addr, xdp_desc[i].len,
 					     queue, OTX2_AF_XDP_FRAME);
 		if (!err) {
 			netdev_err(pfvf->netdev, "AF_XDP: Unable to transfer packet err%d\n", err);
