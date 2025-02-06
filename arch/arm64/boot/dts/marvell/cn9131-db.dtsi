@@ -113,7 +113,7 @@
 	pinctrl-0 = <&cp1_pcie_reset_pins>;
 	num-lanes = <2>;
 	num-viewport = <8>;
-	marvell,reset-gpio = <&cp1_gpio1 0 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&cp1_gpio1 0 GPIO_ACTIVE_LOW>;
 	status = "okay";
 	/* Generic PHY, providing serdes lanes */
 	phys = <&cp1_comphy0 0
