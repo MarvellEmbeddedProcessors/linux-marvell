@@ -404,7 +404,7 @@ static int lock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 	if (cdns_xspi->lockbase) {
 		while (timeout-- >= 0) {
 			if (xspi_trylock(&lock->lock) != 0) {
-				mdelay(SPI_LOCK_SLEEP_DURATION_MS);
+				msleep(SPI_LOCK_SLEEP_DURATION_MS);
 				continue;
 			}
 			if (lock->owner == 0 || lock->owner == SPI_AP_NS_OWN) {
@@ -413,7 +413,7 @@ static int lock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 				return 0;
 			}
 			xspi_unlock(&lock->lock);
-			mdelay(SPI_LOCK_SLEEP_DURATION_MS);
+			msleep(SPI_LOCK_SLEEP_DURATION_MS);
 			continue;
 		}
 		if (lock->owner > 2) {
@@ -442,7 +442,7 @@ static int lock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 			if (check == 0)
 				return 0; // got a lock
 		}
-		mdelay(SPI_LOCK_SLEEP_DURATION_MS);
+		msleep(SPI_LOCK_SLEEP_DURATION_MS);
 	}
 	pr_err("Flash arbitration failed, lock is owned by: %d\n", val);
 	return -1;
