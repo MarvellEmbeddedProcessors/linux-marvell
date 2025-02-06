@@ -320,6 +320,8 @@ struct cdns_xspi_dev {
 	int xspi_id;
 	bool wo_mode;
 #endif
+	spinlock_t lock;
+	unsigned long flags;
 };
 
 #if IS_ENABLED(CONFIG_SPI_CADENCE_MRVL_XSPI)
@@ -377,7 +379,11 @@ static int unlock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 
 	if (cdns_xspi->lockbase) {
 		if (lock->owner == SPI_AP_NS_OWN) {
-			lock->owner = 0;
+			spin_lock_irqsave(&cdns_xspi->lock, cdns_xspi->flags);
+			WRITE_ONCE(lock->owner, 0);
+			/* To ensure lock->owner will be visible to other CPU */
+			smp_wmb();
+			spin_unlock_irqrestore(&cdns_xspi->lock, cdns_xspi->flags);
 			return 0;
 		}
 	} else {
@@ -407,8 +413,20 @@ static int lock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
 				msleep(SPI_LOCK_SLEEP_DURATION_MS);
 				continue;
 			}
+
+			/* The spi_lock is shared between different SW modules
+			 * who run on different CPU cores at different EL.
+			 * Memory barriers are used to synchronize data and visible
+			 * to all CPU cores.
+			 */
+			/* To ensure latest value of lock->owner read before compare */
+			smp_rmb();
 			if (lock->owner == 0 || lock->owner == SPI_AP_NS_OWN) {
-				lock->owner = SPI_AP_NS_OWN;
+				spin_lock_irqsave(&cdns_xspi->lock, cdns_xspi->flags);
+				WRITE_ONCE(lock->owner, SPI_AP_NS_OWN);
+				/* To ensure lock->owner will be visible to other CPU */
+				smp_wmb();
+				spin_unlock_irqrestore(&cdns_xspi->lock, cdns_xspi->flags);
 				xspi_unlock(&lock->lock);
 				return 0;
 			}
@@ -1486,6 +1504,7 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 	} else {
 		struct spi_lock *lock = (struct spi_lock *)cdns_xspi->lockbase;
 
+		spin_lock_init(&cdns_xspi->lock);
 		lock->k_support = 0x01;
 	}
 
