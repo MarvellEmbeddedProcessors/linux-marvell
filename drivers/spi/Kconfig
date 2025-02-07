@@ -264,28 +264,30 @@ config SPI_CADENCE_MRVL_XSPI
 	  PHY config support or non-memory SPI capabilities.
 	  Enable that option if you want to enable these features.
 
-	  Based on HW support, xfer workaround may be needed for earlier
-	  revisions of silicon.
-	  Default workaround is based on GPIO.
-	  xfer can be emulated via SW based GPIO - that option can
-	  operate in full-duplex mode, but it will be slow
-	  Switch GPIO to SW control, and bitbang all requested data.
-	  Uses Software based SPI with dedicated SPI_0 or SPI_1 pins.
+	  Some I/O operations may require a workaround in order to perform
+	  write followed by read operations.  The driver will automatically
+	  detect whether this can be performed in hardware or software if
+	  the workaround is enabled.
 
-config SPI_CADENCE_HW_WO
-	bool "Cadence XSPI controller HW xfer workaround"
+
+config SPI_CADENCE_IO_WO
+	bool "Cadence XSPI controller xfer workaround"
 	depends on SPI_CADENCE_MRVL_XSPI
 	depends on DEBUG_FS
+	default y
 	help
-	  Enable HW based workaround for Cadence xSPI controller
+	  Enable workaround for Cadence xSPI controller
 
-	  Without full-duplex mode, HW workaround can do only write or
+	  Without full-duplex mode, the workaround can do only write or
 	  write then read operation
 
-	  HW workaround uses specific xspi commands to create requested
+	  The workaround uses specific xspi commands to create requested
 	  waveform. Workaround is not supporting full duplex mode.
 	  Workaround will use combination of generic instruction and
-	  data transfer STIG commands.
+	  data transfer STIG commands.  Early silicon will use a software
+	  approach whereas newer hardware will use a hardware approach.
+
+	  If unsure, select y.
 
 config SPI_CLPS711X
 	tristate "CLPS711X host SPI controller"
