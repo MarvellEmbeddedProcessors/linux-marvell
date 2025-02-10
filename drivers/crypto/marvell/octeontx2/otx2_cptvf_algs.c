@@ -734,7 +734,7 @@ static int otx2_cpt_aead_ecb_null_sha512_init(struct crypto_aead *tfm)
 
 static int otx2_cpt_aead_rfc4106_gcm_aes_init(struct crypto_aead *tfm)
 {
-	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx(tfm);
+	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(tfm);
 
 	ctx->is_rfc4106_gcm = true;
 	return cpt_aead_init(tfm, OTX2_CPT_AES_GCM, OTX2_CPT_MAC_NULL);
@@ -790,7 +790,7 @@ static int otx2_cpt_aead_gcm_set_authsize(struct crypto_aead *tfm,
 static int otx2_cpt_aead_ccm_set_authsize(struct crypto_aead *tfm,
 					  unsigned int authsize)
 {
-	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx(tfm);
+	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(tfm);
 
 	switch (authsize) {
 	case 4:
@@ -1729,7 +1729,7 @@ static struct aead_alg otx2_cpt_aeads[] = { {
 		.cra_driver_name = "cpt_ccm_aes",
 		.cra_blocksize = 1,
 		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
-		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx),
+		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx) + CRYPTO_DMA_PADDING,
 		.cra_priority = 4001,
 		.cra_alignmask = 0,
 		.cra_module = THIS_MODULE,
