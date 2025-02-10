@@ -779,6 +779,7 @@ int cn10k_ipsec_ethtool_init(struct net_device *netdev, bool enable)
 
 	return cn10k_outb_cpt_clean(pf);
 }
+EXPORT_SYMBOL(cn10k_ipsec_ethtool_init);
 
 int cn10k_ipsec_init(struct net_device *netdev)
 {
