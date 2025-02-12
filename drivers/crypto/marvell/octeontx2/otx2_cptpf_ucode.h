@@ -42,12 +42,22 @@ enum otx2_cpt_ucode_type {
 				   * Hash + HMAC + FlexiCrypto + RNG +
 				   * Full Feature IPSec + AirCrypto + Kasumi
 				   */
+	OTX2_CPT_SE_UC_TYPE4 = 40,/*
+				   * Non IPsec SE image. Similar to 20, but
+				   * without Air Crypto and Fast Path IPsec.
+				   * Supports Key Wrap mechanisms in addition
+				   */
 	OTX2_CPT_IE_UC_TYPE1 = 30, /* IE-MAIN - combination of 31 and 32 */
 	OTX2_CPT_IE_UC_TYPE2 = 31, /* Fast Path IPSec */
 	OTX2_CPT_IE_UC_TYPE3 = 32, /*
 				    * Hash + HMAC + FlexiCrypto + RNG +
 				    * Full Future IPSec
 				    */
+	OTX2_CPT_IE_UC_TYPE4 = 50, /*
+				    * Non IPsec IE image. Similar to 30, but
+				    * without Fast Path IPsec.
+				    */
+
 };
 
 struct otx2_cpt_bitmap {
