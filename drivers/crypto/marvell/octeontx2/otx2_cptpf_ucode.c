@@ -169,11 +169,11 @@ static int get_ucode_type(struct device *dev,
 	nn = ucode_hdr->ver_num.nn;
 	if (strnstr(tmp_ver_str, "se-", OTX2_CPT_UCODE_VER_STR_SZ) &&
 	    (nn == OTX2_CPT_SE_UC_TYPE1 || nn == OTX2_CPT_SE_UC_TYPE2 ||
-	     nn == OTX2_CPT_SE_UC_TYPE3))
+	     nn == OTX2_CPT_SE_UC_TYPE3 || nn == OTX2_CPT_SE_UC_TYPE4))
 		val |= 1 << OTX2_CPT_SE_TYPES;
 	if (strnstr(tmp_ver_str, "ie-", OTX2_CPT_UCODE_VER_STR_SZ) &&
 	    (nn == OTX2_CPT_IE_UC_TYPE1 || nn == OTX2_CPT_IE_UC_TYPE2 ||
-	     nn == OTX2_CPT_IE_UC_TYPE3))
+	     nn == OTX2_CPT_IE_UC_TYPE3 || nn == OTX2_CPT_IE_UC_TYPE4))
 		val |= 1 << OTX2_CPT_IE_TYPES;
 	if (strnstr(tmp_ver_str, "ae", OTX2_CPT_UCODE_VER_STR_SZ) &&
 	    nn == OTX2_CPT_AE_UC_TYPE)
