@@ -537,19 +537,6 @@ struct channel_fwdata {
 	u8 reserved[RVU_CHANL_INFO_RESERVED];
 };
 
-/**
- * @flr_pf_bmap	: Bitmap to represent PF for which interrupt is triggered.
- *			Set by kernel and cleared by firmware.
- * @flr_vf_bmap	: Bitmap to represent VF for which interrupt is triggered.
- *			Set by kernel and cleared by firmware.
- * @reserved	: Reserved for future use.
- */
-struct fw_intr_notify {
-	unsigned long flr_pf_bmap[2];
-	unsigned long flr_vf_bmap[2];
-	unsigned long reserved[8];
-};
-
 struct rvu_fwdata {
 #define RVU_FWDATA_HEADER_MAGIC	0xCFDA	/* Custom Firmware Data*/
 #define RVU_FWDATA_VERSION	0x0001
@@ -569,8 +556,7 @@ struct rvu_fwdata {
 	u32 ptp_ext_clk_rate;
 	u32 ptp_ext_tstamp;
 	struct channel_fwdata channel_data;
-	struct fw_intr_notify fw_intr_info;
-#define FWDATA_RESERVED_MEM 946
+#define FWDATA_RESERVED_MEM 958
 	u64 reserved[FWDATA_RESERVED_MEM];
 #define CGX_MAX         9
 #define CGX_LMACS_MAX   4
