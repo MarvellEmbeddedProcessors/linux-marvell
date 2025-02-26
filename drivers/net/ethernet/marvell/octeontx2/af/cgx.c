@@ -67,7 +67,12 @@ static int cgx_fwi_link_change(struct cgx *cgx, int lmac_id, bool en);
 /* Supported devices */
 static const struct pci_device_id cgx_id_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_CGX) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_CN10K_RPM) },
+	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_CN10K_RPM,
+	  PCI_ANY_ID, PCI_SUBSYS_DEVID_CN10K_A) },
+	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_CN10K_RPM,
+	  PCI_ANY_ID, PCI_SUBSYS_DEVID_CNF10K_A) },
+	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_CN10K_RPM,
+	  PCI_ANY_ID, PCI_SUBSYS_DEVID_CNF10K_B) },
 	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_CN10KB_RPM,
 	  PCI_ANY_ID, PCI_SUBSYS_DEVID_CN10K_B) },
 	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_CN10KB_RPM,
@@ -2279,12 +2284,6 @@ static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			dev_err(dev, "Unable to set CGX id\n");
 			return err;
 		}
-	}
-
-	 /* Skip probe if CGX is not mapped to NIX */
-	if (!is_cn20k(pdev) && !is_cgx_mapped_to_nix(pdev->subsystem_device, cgx->cgx_id)) {
-		dev_notice(dev, "CGX %d not mapped to NIX, skipping probe\n", cgx->cgx_id);
-		goto err_release_regions;
 	}
 
 	cgx->lmac_count = cgx->mac_ops->get_nr_lmacs(cgx);
