@@ -892,6 +892,20 @@ static inline bool is_cnf10ka_a0(struct rvu *rvu)
 	return false;
 }
 
+static inline bool is_cgx_mapped_to_nix(unsigned short id, u8 cgx_id)
+{
+	/* On CNF10KA and CNF10KB silicons only two CGX blocks are connected
+	 * to NIX.
+	 */
+	if (id == PCI_SUBSYS_DEVID_CNF10K_A || id == PCI_SUBSYS_DEVID_CNF10K_B)
+		return cgx_id <= 1;
+
+	return !(cgx_id && !(id == PCI_SUBSYS_DEVID_96XX ||
+			     id == PCI_SUBSYS_DEVID_98XX ||
+			     id == PCI_SUBSYS_DEVID_CN10K_A ||
+			     id == PCI_SUBSYS_DEVID_CN10K_B));
+}
+
 static inline bool is_rvu_npc_hash_extract_en(struct rvu *rvu)
 {
 	u64 npc_const3;
