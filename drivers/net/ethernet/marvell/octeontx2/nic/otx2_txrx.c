@@ -123,17 +123,14 @@ static void otx2_xdp_snd_pkt_handler(struct otx2_nic *pfvf,
 
 	sg = &sq->sg[snd_comp->sqe_id];
 
-	iova = sg->dma_addr[0] - OTX2_HEAD_ROOM;
+	iova = sg->dma_addr[0];
 	pa = otx2_iova_to_phys(pfvf->iommu_domain, iova);
 	page = virt_to_page(phys_to_virt(pa));
-	if (sg->flags & XDP_REDIRECT)
+	if (sg->flags & OTX2_XDP_REDIRECT)
 		otx2_dma_unmap_page(pfvf, sg->dma_addr[0], sg->size[0], DMA_TO_DEVICE);
 
-	if (page->pp) {
-		page_pool_recycle_direct(page->pp, page);
-		return;
-	}
-	put_page(page);
+	xdp_return_frame((struct xdp_frame *)sg->skb);
+	sg->skb = (u64)NULL;
 }
 
 static void otx2_snd_pkt_handler(struct otx2_nic *pfvf,
@@ -1402,8 +1399,9 @@ void otx2_free_pending_sqe(struct otx2_nic *pfvf)
 	}
 }
 
-static void otx2_xdp_sqe_add_sg(struct otx2_snd_queue *sq, u64 dma_addr,
-				int len, int *offset, u16 flags)
+static void otx2_xdp_sqe_add_sg(struct otx2_snd_queue *sq,
+				struct xdp_frame *xdpf,
+				u64 dma_addr, int len, int *offset, u16 flags)
 {
 	struct nix_sqe_sg_s *sg = NULL;
 	u64 *iova = NULL;
@@ -1421,9 +1419,11 @@ static void otx2_xdp_sqe_add_sg(struct otx2_snd_queue *sq, u64 dma_addr,
 	sq->sg[sq->head].size[0] = len;
 	sq->sg[sq->head].num_segs = 1;
 	sq->sg[sq->head].flags = flags;
+	sq->sg[sq->head].skb = (u64)xdpf;
 }
 
-bool otx2_xdp_sq_append_pkt(struct otx2_nic *pfvf, u64 iova, int len,
+bool otx2_xdp_sq_append_pkt(struct otx2_nic *pfvf, struct xdp_frame *xdpf,
+			    u64 iova, int len,
 			    u16 qidx, u16 flags)
 {
 	struct nix_sqe_hdr_s *sqe_hdr;
@@ -1450,7 +1450,7 @@ bool otx2_xdp_sq_append_pkt(struct otx2_nic *pfvf, u64 iova, int len,
 
 	offset = sizeof(*sqe_hdr);
 
-	otx2_xdp_sqe_add_sg(sq, iova, len, &offset, flags);
+	otx2_xdp_sqe_add_sg(sq, xdpf, iova, len, &offset, flags);
 	sqe_hdr->sizem1 = (offset / 16) - 1;
 	pfvf->hw_ops->sqe_flush(pfvf, sq, offset, qidx);
 
@@ -1464,13 +1464,15 @@ static bool otx2_xdp_rcv_pkt_handler(struct otx2_nic *pfvf,
 				     bool *need_xdp_flush)
 {
 	unsigned char *hard_start;
+	int err, len, offset = 0;
 	struct otx2_pool *pool;
+	struct xdp_frame *xdpf;
 	int qidx = cq->cq_idx;
 	struct xdp_buff xdp;
 	struct page *page;
+	void *orig_data;
 	u64 iova, pa;
 	u32 act;
-	int err;
 
 	pool = &pfvf->qset.pool[qidx];
 	iova = cqe->sg.seg_addr - OTX2_HEAD_ROOM;
@@ -1483,7 +1485,14 @@ static bool otx2_xdp_rcv_pkt_handler(struct otx2_nic *pfvf,
 	xdp_prepare_buff(&xdp, hard_start, OTX2_HEAD_ROOM,
 			 cqe->sg.seg_size, false);
 
+	orig_data = xdp.data;
 	act = bpf_prog_run_xdp(prog, &xdp);
+
+	if (orig_data != xdp.data) {
+		offset = orig_data - xdp.data;
+		iova = cqe->sg.seg_addr - offset;
+	}
+	len = xdp.data_end - xdp.data;
 
 	switch (act) {
 	case XDP_PASS:
@@ -1491,8 +1500,9 @@ static bool otx2_xdp_rcv_pkt_handler(struct otx2_nic *pfvf,
 	case XDP_TX:
 		qidx += pfvf->hw.tx_queues;
 		cq->pool_ptrs++;
-		return otx2_xdp_sq_append_pkt(pfvf, cqe->sg.seg_addr,
-					      cqe->sg.seg_size, qidx, XDP_TX);
+		xdpf = xdp_convert_buff_to_frame(&xdp);
+		return otx2_xdp_sq_append_pkt(pfvf, xdpf, iova,
+					      len, qidx, OTX2_XDP_TX);
 	case XDP_REDIRECT:
 		cq->pool_ptrs++;
 		err = xdp_do_redirect(pfvf->netdev, &xdp, prog);
@@ -1501,14 +1511,9 @@ static bool otx2_xdp_rcv_pkt_handler(struct otx2_nic *pfvf,
 			*need_xdp_flush = true;
 			return true;
 		}
-		if (page->pp) {
-			page_pool_recycle_direct(pool->page_pool, page);
-			return false;
-		}
-
 		otx2_dma_unmap_page(pfvf, iova, pfvf->rbsize,
 				    DMA_FROM_DEVICE);
-		put_page(page);
+		xdp_return_frame(xdpf);
 		break;
 	default:
 		bpf_warn_invalid_xdp_action(pfvf->netdev, prog, act);
