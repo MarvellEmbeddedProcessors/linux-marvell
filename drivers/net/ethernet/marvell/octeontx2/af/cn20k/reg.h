@@ -23,11 +23,7 @@ static inline u64 pf_to_bitoff(u8 pf)
 /* Mbox Registers */
 /* RVU AF BAR0 Mbox registers for AF => PFx */
 #define RVU_MBOX_AF_PFX_ADDR(a)			(0x5000 | (a) << 4)
-#define RVU_MBOX_AF_PFX_CFG(a)			(0x6000 | (a) << 4)
-#define RVU_AF_BAR2_SEL				(0x9000000)
-#define RVU_AF_BAR2_PFID			(0x16400)
-#define NIX_CINTX_INT_W1S(a)			(0xd30 | (a) << 12)
-#define NIX_QINTX_CNT(a)			(0xc00 | (a) << 12)
+#define RVU_AF_AFPF_MBOX_CFG			(0xc70)
 #define RVU_MBOX_AF_AFPFX_TRIGX(a)		(0x9000 | (a) << 3)
 #define RVU_MBOX_AF_PFAF_INT(a)			(0x2980 | (a) << 6)
 #define RVU_MBOX_AF_PFAF_INT_W1S(a)		(0x2988 | (a) << 6)
@@ -38,15 +34,15 @@ static inline u64 pf_to_bitoff(u8 pf)
 #define RVU_MBOX_AF_PFAF1_INT_ENA_W1S(a)	(0x29B0 | (a) << 6)
 #define RVU_MBOX_AF_PFAF1_INT_ENA_W1C(a)	(0x29B8 | (a) << 6)
 
-#define RVU_AF_PFFLR_INTX(a)                    (0x27a0 + 0x40 * (a))
-#define RVU_AF_PFFLR_INT_W1SX(a)                (0x27a8 + 0x40 * (a))
-#define RVU_AF_PFFLR_INT_ENA_W1SX(a)            (0x27b0 + 0x40 * (a))
-#define RVU_AF_PFFLR_INT_ENA_W1CX(a)            (0x27b8 + 0x40 * (a))
-#define RVU_AF_PFME_INTX(a)                     (0x28c0 + 0x20 * (a))
-#define RVU_AF_PFME_INT_W1SX(a)                 (0x28c8 + 0x20 * (a))
-#define RVU_AF_PFME_INT_ENA_W1SX(a)             (0x28d0 + 0x20 * (a))
-#define RVU_AF_PFME_INT_ENA_W1CX(a)             (0x28d8 + 0x20 * (a))
-#define RVU_AF_PFTRPENDX(a)                     (0x2810 + 0x8 * (a))
+#define RVU_AF_PFFLR_INTX(a)                    (0x27a0 | (a) << 6)
+#define RVU_AF_PFFLR_INT_W1SX(a)                (0x27a8 | (a) << 6)
+#define RVU_AF_PFFLR_INT_ENA_W1SX(a)            (0x27b0 | (a) << 6)
+#define RVU_AF_PFFLR_INT_ENA_W1CX(a)            (0x27b8 | (a) << 6)
+#define RVU_AF_PFME_INTX(a)                     (0x28c0 | (a) << 5)
+#define RVU_AF_PFME_INT_W1SX(a)                 (0x28c8 | (a) << 5)
+#define RVU_AF_PFME_INT_ENA_W1SX(a)             (0x28d0 | (a) << 5)
+#define RVU_AF_PFME_INT_ENA_W1CX(a)             (0x28d8 | (a) << 5)
+#define RVU_AF_PFTRPENDX(a)                     (0x2810 | (a) << 3)
 
 /* RVU PF => AF mbox registers */
 #define RVU_MBOX_PF_PFAF_TRIGX(a)		(0xC00 | (a) << 3)
@@ -59,7 +55,6 @@ static inline u64 pf_to_bitoff(u8 pf)
 #define RVU_MBOX_AF_VFAF_INT_W1S(a)		(0x3008 | (a) << 6)
 #define RVU_MBOX_AF_VFAF_INT_ENA_W1S(a)		(0x3010 | (a) << 6)
 #define RVU_MBOX_AF_VFAF_INT_ENA_W1C(a)		(0x3018 | (a) << 6)
-#define RVU_MBOX_AF_VFAF_INT_ENA_W1C(a)		(0x3018 | (a) << 6)
 #define RVU_MBOX_AF_VFAF1_INT(a)		(0x3020 | (a) << 6)
 #define RVU_MBOX_AF_VFAF1_INT_W1S(a)		(0x3028 | (a) << 6)
 #define RVU_MBOX_AF_VFAF1_IN_ENA_W1S(a)		(0x3030 | (a) << 6)
@@ -67,7 +62,7 @@ static inline u64 pf_to_bitoff(u8 pf)
 
 #define RVU_MBOX_AF_AFVFX_TRIG(a, b)		(0x10000 | (a) << 4 | (b) << 3)
 #define RVU_MBOX_AF_VFX_ADDR(a)			(0x20000 | (a) << 4)
-#define RVU_MBOX_AF_VFX_CFG(a)			(0x28000 | (a) << 4)
+#define RVU_MBOX_AF_VF_CFG			(0x20010)
 
 #define RVU_MBOX_PF_VFX_PFVF_TRIGX(a)		(0x2000 | (a) << 3)
 
@@ -83,7 +78,7 @@ static inline u64 pf_to_bitoff(u8 pf)
 
 #define RVU_MBOX_PF_VF_ADDR			(0xC40)
 #define RVU_MBOX_PF_LMTLINE_ADDR		(0xC48)
-#define RVU_MBOX_PF_VF_CFG			(0xC60)
+#define RVU_PF_PFVF_MBOX_CFG			(0xC60)
 
 #define RVU_MBOX_VF_VFPF_TRIGX(a)		(0x3000 | (a) << 3)
 #define RVU_MBOX_VF_INT				(0x20)
@@ -92,6 +87,11 @@ static inline u64 pf_to_bitoff(u8 pf)
 #define RVU_MBOX_VF_INT_ENA_W1C			(0x38)
 
 #define RVU_MBOX_VF_VFAF_TRIGX(a)		(0x2000 | (a) << 3)
+
+#define RVU_AF_BAR2_SEL				(0x9000000)
+#define RVU_AF_BAR2_PFID			(0x16400)
+#define NIX_CINTX_INT_W1S(a)			(0xd30 | (a) << 12)
+#define NIX_QINTX_CNT(a)			(0xc00 | (a) << 12)
 
 /* NPC registers */
 #define NPC_AF_INTFX_EXTRACTORX_CFG(a, b) \
