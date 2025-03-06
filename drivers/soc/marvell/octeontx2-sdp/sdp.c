@@ -679,6 +679,35 @@ static irqreturn_t sdp_pf_vf_flr_intr(int irq, void *arg)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t sdp_pf_vf_me_intr(int irq, void *arg)
+{
+	struct sdp_dev *sdp = (struct sdp_dev *)arg;
+	struct rvu_vf *vf_ptr;
+	int vf, i;
+	u64 intr;
+
+	/* Check on which VF the interrupt occurred and process accordingly */
+	for (i = 0; i < 2; i++) {
+		/* Read the interrupt bits */
+		intr = sdp_read64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFME_INTX(i));
+
+		for (vf = i * 64; vf < sdp->num_vfs; vf++) {
+			vf_ptr = &sdp->vf_info[vf];
+			if (intr & (1ULL << vf_ptr->intr_idx)) {
+				/* Clear the interrupts */
+				sdp_write64(sdp, BLKADDR_RVUM, 0,
+					    RVU_PF_VFME_INTX(i),
+					    BIT_ULL(vf_ptr->intr_idx));
+				sdp_write64(sdp, BLKADDR_RVUM, 0,
+					    RVU_PF_VFTRPENDX(vf_ptr->vf_id / 64),
+					    BIT_ULL(vf_ptr->intr_idx));
+			}
+		}
+	}
+
+	return IRQ_HANDLED;
+}
+
 static int sdp_register_flr_irq(struct pci_dev *pdev)
 {
 	struct sdp_dev *sdp;
@@ -705,6 +734,22 @@ static int sdp_register_flr_irq(struct pci_dev *pdev)
 		sdp->irq_allocated[vec + i] = true;
 	}
 
+	/* Register for VF ME interrupts */
+	for (vec = RVU_PF_INT_VEC_VFME0, i = 0;
+	     vec + i <= RVU_PF_INT_VEC_VFME1; i++) {
+		sprintf(&sdp->irq_names[(vec + i) * NAME_SIZE],
+			"SDP_PF%02d_VF_ME%d", pdev->bus->number, i);
+		err = request_irq(pci_irq_vector(pdev, vec + i),
+				  sdp_pf_vf_me_intr, 0,
+				  &sdp->irq_names[(vec + i) * NAME_SIZE], sdp);
+		if (err) {
+			dev_err(&pdev->dev,
+				"request_irq() failed for PFVF ME intr %d\n",
+				vec);
+			goto reg_fail;
+		}
+	}
+
 	return 0;
 
 reg_fail:
@@ -725,18 +770,26 @@ static void enable_vf_flr_int(struct pci_dev *pdev)
 			    ~0x0ULL);
 		sdp_write64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFFLR_INTX(idx),
 			    ~0x0ULL);
+		sdp_write64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFME_INTX(idx),
+			    ~0x0ULL);
 	}
 
 	/* Enable for FLR interrupts for VFs */
 	if (sdp->num_vfs > 64) {
 		sdp_write64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFFLR_INT_ENA_W1SX(0),
 			    GENMASK_ULL(63, 0));
+		sdp_write64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFME_INT_ENA_W1SX(0),
+			    GENMASK_ULL(63, 0));
 		ena_bits = (sdp->num_vfs - 64) - 1;
 		sdp_write64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFFLR_INT_ENA_W1SX(1),
-			   GENMASK_ULL(ena_bits, 0));
+			    GENMASK_ULL(ena_bits, 0));
+		sdp_write64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFME_INT_ENA_W1SX(1),
+			    GENMASK_ULL(ena_bits, 0));
 	} else {
 		ena_bits = sdp->num_vfs - 1;
 		sdp_write64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFFLR_INT_ENA_W1SX(0),
+			    GENMASK_ULL(ena_bits, 0));
+		sdp_write64(sdp, BLKADDR_RVUM, 0, RVU_PF_VFME_INT_ENA_W1SX(0),
 			    GENMASK_ULL(ena_bits, 0));
 	}
 }
