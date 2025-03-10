@@ -1699,6 +1699,7 @@ fail:
 	mutex_unlock(&mbox->lock);
 	return 0;
 }
+EXPORT_SYMBOL(cn10k_mcs_init);
 
 void cn10k_mcs_free(struct otx2_nic *pfvf)
 {
@@ -1715,3 +1716,4 @@ void cn10k_mcs_free(struct otx2_nic *pfvf)
 	kfree(pfvf->macsec_cfg);
 	pfvf->macsec_cfg = NULL;
 }
+EXPORT_SYMBOL(cn10k_mcs_free);
