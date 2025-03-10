@@ -48,6 +48,9 @@
 #define PCI_SUBSYS_DEVID_CN10K_A_RVU_PFVF	0xB900
 #define PCI_SUBSYS_DEVID_CN10K_B_RVU_PFVF	0xBD00
 
+#define PCI_DEVID_RVU_BPHY_NIX_PF		0xA0EE
+#define PCI_DEVID_RVU_BPHY_NIX_VF		0xA0EF
+
 /* PCI BAR nos */
 #define PCI_CFG_REG_BAR_NUM                     2
 #define PCI_MBOX_BAR_NUM                        4
@@ -708,7 +711,7 @@ static inline void otx2_setup_dev_hw_settings(struct otx2_nic *pfvf)
 	if (is_96xx_B0(pfvf->pdev))
 		__clear_bit(HW_TSO, &hw->cap_flag);
 
-	if (!is_dev_otx2(pfvf->pdev)) {
+	if (!is_dev_otx2(pfvf->pdev) || is_cnf20ka(pfvf->pdev)) {
 		__set_bit(CN10K_MBOX, &hw->cap_flag);
 		__set_bit(CN10K_LMTST, &hw->cap_flag);
 		__set_bit(CN10K_RPM, &hw->cap_flag);

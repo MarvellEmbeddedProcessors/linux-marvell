@@ -62,3 +62,16 @@ config RVU_ESWITCH
 	help
 	  This driver supports Marvell's RVU E-Switch that
 	  provides internal SRIOV packet steering and switching.
+
+config OCTEONTX2_BPHY_PF
+	tristate "Marvell OcteonTX2 BPHY PF driver"
+	select OCTEONTX2_MBOX
+	select NET_DEVLINK
+	select PAGE_POOL
+	depends on (64BIT && COMPILE_TEST) || ARM64
+	select DIMLIB
+	depends on PCI
+	depends on PTP_1588_CLOCK_OPTIONAL
+	depends on MACSEC || !MACSEC
+	help
+	  This driver supports Marvell's OcteonTX2 BPHY physical function.
