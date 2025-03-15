@@ -195,6 +195,110 @@ static int cn20k_cpt_dl_cq_set(struct devlink *dl, u32 id,
 				     reg_val, BLKADDR_CPT0);
 }
 
+static int cn20k_cpt_dl_get_psp_timer_jitter_correct(struct devlink *dl, u32 id,
+						     struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptpf_dev *cptpf = cpt_dl->cptpf;
+	struct pci_dev *pdev = cptpf->pdev;
+	u64 reg_val = 0;
+	int ret = 0;
+
+	ret = otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTX_PSP_TIMER_CTL,
+				   &reg_val, BLKADDR_CPT0);
+	if (ret)
+		return ret;
+	ctx->val.vu8 = FIELD_GET(PSP_TIMER_JITTER_CORRECT_MASK, reg_val);
+	return 0;
+}
+
+static int cn20k_cpt_dl_set_psp_timer_jitter_correct(struct devlink *dl, u32 id,
+						     struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptpf_dev *cptpf = cpt_dl->cptpf;
+	struct pci_dev *pdev = cptpf->pdev;
+	u64 reg_val = 0;
+	int ret = 0;
+
+	ret = otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTX_PSP_TIMER_CTL,
+				   &reg_val, BLKADDR_CPT0);
+	if (ret)
+		return ret;
+
+	reg_val &= ~PSP_TIMER_JITTER_CORRECT_MASK;
+	reg_val |= FIELD_PREP(PSP_TIMER_JITTER_CORRECT_MASK, (u64)ctx->val.vu8);
+	return otx2_cpt_write_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTX_PSP_TIMER_CTL,
+				     reg_val, BLKADDR_CPT0);
+}
+
+static int cn20k_cpt_dl_validate_psp_timer_jitter_correct(struct devlink *devlink, u32 id,
+							  union devlink_param_value val,
+							  struct netlink_ext_ack *extack)
+{
+	return (val.vu8 > 1) ? -EINVAL : 0;
+}
+
+static int cn20k_cpt_dl_get_psp_timer_add_value(struct devlink *dl, u32 id,
+						struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptpf_dev *cptpf = cpt_dl->cptpf;
+	struct pci_dev *pdev = cptpf->pdev;
+	u64 reg_val = 0;
+	int ret = 0;
+
+	ret = otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTX_PSP_TIMER_CTL,
+				   &reg_val, BLKADDR_CPT0);
+	if (ret)
+		return ret;
+
+	reg_val &= PSP_TIMER_ADD_VALUE_MASK;
+	snprintf(ctx->val.vstr, sizeof(ctx->val.vstr), "%llu", reg_val);
+	return 0;
+}
+
+static int cn20k_cpt_dl_set_psp_timer_add_value(struct devlink *dl, u32 id,
+						struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptpf_dev *cptpf = cpt_dl->cptpf;
+	struct pci_dev *pdev = cptpf->pdev;
+	u64 reg_val = 0, usrval = 0;
+	int ret = 0;
+
+	ret = otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTX_PSP_TIMER_CTL,
+				   &reg_val, BLKADDR_CPT0);
+	if (ret)
+		return ret;
+
+	ret = kstrtoull(ctx->val.vstr, 0, &usrval);
+
+	reg_val &= ~PSP_TIMER_ADD_VALUE_MASK;
+	reg_val |= FIELD_PREP(PSP_TIMER_ADD_VALUE_MASK, usrval);
+	return otx2_cpt_write_af_reg(&cptpf->afpf_mbox, pdev, CPT_AF_CTX_PSP_TIMER_CTL,
+				     reg_val, BLKADDR_CPT0);
+}
+
+#define PSP_TIMER_MAX_ADD_VALUE PSP_TIMER_ADD_VALUE_MASK
+
+static int cn20k_cpt_dl_validate_psp_timer_add_value(struct devlink *devlink, u32 id,
+						     union devlink_param_value val,
+						     struct netlink_ext_ack *extack)
+{
+	u64 usrval = 0;
+
+	if (kstrtoull(val.vstr, 0, &usrval))
+		return -EINVAL;
+
+	if (usrval > PSP_TIMER_MAX_ADD_VALUE)
+		return -EINVAL;
+
+	return 0;
+}
+
+#undef PSP_TIMER_MAX_ADD_VALUE
+
 static const struct devlink_param otx2_cpt_dl_params[] = {
 	DEVLINK_PARAM_DRIVER(OTX2_CPT_DEVLINK_PARAM_ID_EGRP_CREATE,
 			     "egrp_create", DEVLINK_PARAM_TYPE_STRING,
@@ -237,6 +341,18 @@ static const struct devlink_param cn20k_cpt_dl_params[] = {
 			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
 			     cn20k_cpt_dl_cq_get, cn20k_cpt_dl_cq_set,
 			     NULL),
+	DEVLINK_PARAM_DRIVER(CN20K_CPT_DEVLINK_PARAM_ID_PSP_TIMER_JITTER_CORRECT,
+			     "psp_timer_jitter_correct", DEVLINK_PARAM_TYPE_U8,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     cn20k_cpt_dl_get_psp_timer_jitter_correct,
+			     cn20k_cpt_dl_set_psp_timer_jitter_correct,
+			     cn20k_cpt_dl_validate_psp_timer_jitter_correct),
+	DEVLINK_PARAM_DRIVER(CN20K_CPT_DEVLINK_PARAM_ID_PSP_TIMER_ADD_VALUE,
+			     "psp_timer_add_value", DEVLINK_PARAM_TYPE_STRING,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     cn20k_cpt_dl_get_psp_timer_add_value,
+			     cn20k_cpt_dl_set_psp_timer_add_value,
+			     cn20k_cpt_dl_validate_psp_timer_add_value),
 };
 
 static int otx2_cpt_dl_info_firmware_version_put(struct devlink_info_req *req,
