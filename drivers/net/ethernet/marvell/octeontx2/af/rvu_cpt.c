@@ -844,6 +844,7 @@ static bool is_valid_offset(struct rvu *rvu, struct cpt_rd_wr_reg_msg *req)
 		case CPT_AF_BLK_RST:
 		case CPT_AF_CONSTANTS1:
 		case CPT_AF_CTX_FLUSH_TIMER:
+		case CPT_AF_CTX_PSP_TIMER_CTL:
 		case CPT_AF_RXC_CFG1:
 			return true;
 		}
