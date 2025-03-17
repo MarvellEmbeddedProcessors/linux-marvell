@@ -101,6 +101,7 @@ static int rvu_eb_device_attach(struct rvu_eb_device *eblock,
 	err = driver->ops->setup(eblock->hw_block, eblock->priv_data);
 	if (err)
 		goto remove;
+
 	err = driver->ops->init(eblock->hw_block, eblock->priv_data);
 	if (err)
 		goto free;
@@ -166,6 +167,8 @@ static inline bool is_eblock(int blkaddr)
 	case BLKADDR_ML:
 	case BLKADDR_DPI0:
 	case BLKADDR_DPI1:
+	case BLKADDR_RFOE0:
+	case BLKADDR_RFOE1:
 		return true;
 	default:
 		return false;
@@ -234,9 +237,11 @@ static int rvu_eb_attach_all(void)
 
 	for_each_eblock_dev(eblock) {
 		hwblock = eblock->hw_block;
+
 		/* Driver binded devices indicate initialized devices */
 		if (eblock->driver)
 			continue;
+
 		rvu_eb_device_attach(eblock, hwblock->rvu, hwblock->addr);
 	}
 
@@ -399,6 +404,7 @@ void rvu_eblock_module_init(void)
 	ree_eb_module_init();
 	ml_eb_module_init();
 	dpi_eb_module_init();
+	cplt_eb_module_init();
 }
 
 void rvu_eblock_module_exit(void)
@@ -410,4 +416,5 @@ void rvu_eblock_module_exit(void)
 	ree_eb_module_exit();
 	ml_eb_module_exit();
 	dpi_eb_module_exit();
+	cplt_eb_module_exit();
 }
