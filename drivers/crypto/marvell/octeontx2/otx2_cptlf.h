@@ -464,17 +464,20 @@ static inline void otx2_cptlf_enable_iqueues(struct otx2_cptlfs_info *lfs)
 
 static inline void otx2_cpt_fill_inst(union otx2_cpt_inst_s *cptinst,
 				      struct otx2_cpt_iq_command *iq_cmd,
-				      u64 comp_baddr)
+				      u64 comp_baddr, bool cq)
 {
 	cptinst->u[0] = 0x0;
 	cptinst->s.doneint = true;
-	cptinst->s.res_addr = comp_baddr;
 	cptinst->u[2] = 0x0;
 	cptinst->u[3] = 0x0;
 	cptinst->s.ei0 = iq_cmd->cmd.u;
 	cptinst->s.ei1 = iq_cmd->dptr;
 	cptinst->s.ei2 = iq_cmd->rptr;
 	cptinst->s.ei3 = iq_cmd->cptr.u;
+	if (cq)
+		cptinst->s.cq_ena  = 1;
+	else
+		cptinst->s.res_addr = comp_baddr;
 }
 
 /*
