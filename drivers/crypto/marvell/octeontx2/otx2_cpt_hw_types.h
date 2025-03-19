@@ -237,7 +237,9 @@ union otx2_cpt_inst_s {
 		u64 doneint:1;
 		u64 nixtx_addr:60;
 		/* Word 1 */
-		u64 res_addr;
+		u64 res_addr:59;
+		u64 meta_sz:4; /* CN20K specific */
+		u64 cq_ena:1; /*  CN20K specific */
 		/* Word 2 */
 		u64 tag:32;
 		u64 tt:2;

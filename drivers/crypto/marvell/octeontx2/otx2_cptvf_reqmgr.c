@@ -173,7 +173,8 @@ static int process_request(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
 	iq_cmd.cptr.s.grp = ctrl->s.grp;
 
 	/* Fill in the CPT_INST_S type command for HW interpretation */
-	otx2_cpt_fill_inst(&cptinst, &iq_cmd, info->comp_baddr);
+	otx2_cpt_fill_inst(&cptinst, &iq_cmd, info->comp_baddr,
+			   lf->lfs->cq_ena);
 
 	/* Print debug info if enabled */
 	if (ctrl->s.dma_mode == OTX2_CPT_DMA_MODE_SG)
