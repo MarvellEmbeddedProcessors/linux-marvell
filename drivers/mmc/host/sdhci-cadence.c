@@ -36,6 +36,10 @@
 #define SDHCI_CDNS_TUNE_STEP		6
 #define SDHCI_CDNS_TUNE_ITERATIONS	40
 #define SDHCI_CDNS_SD6_DEFAULT_DELAY_ELEMENT	8
+#define DEFAULT_READ_DQS_CMD_DELAY	64
+#define DEFAULT_CLK_WRDQS_DELAY		0
+#define DEFAULT_CLK_WR_DELAY		0
+#define DEFAULT_READ_DQS_DELAY		64
 
 #define SDHCI_CDNS_HRS00			0x00
 #define SDHCI_CDNS_HRS00_SWR			BIT(0)
@@ -486,6 +490,8 @@ static void (*init_timings[])(struct sdhci_cdns_sd6_phy_timings*, int) = {
 };
 
 static u32 read_dqs_cmd_delay, clk_wrdqs_delay, clk_wr_delay, read_dqs_delay;
+static u32 read_dqs_cmd_delay_hs400, read_dqs_delay_hs400;
+static u32 clk_wrdqs_delay_hs400, clk_wr_delay_hs400;
 
 static u32 sdhci_cdns_sd6_get_mode(struct sdhci_host *host, unsigned int timing);
 
@@ -757,6 +763,18 @@ static void sdhci_cdns_sd6_phy_calc_out(struct sdhci_cdns_sd6_phy *phy,
 		phy->settings.sdhc_wrdata0_sdclk_dly = wr0_sdclk_dly;
 		phy->settings.sdhc_wrdata1_sdclk_dly = wr1_sdclk_dly;
 	}
+
+	if ((phy->mode == MMC_TIMING_MMC_HS400) && cmd_not_dat) {
+		phy->settings.cp_clk_wrdqs_delay =
+			clk_wrdqs_delay_hs400 ? clk_wrdqs_delay_hs400 : clk_wr_delay;
+		DEBUG_DRV("%s:cp_clk_wrdqs_delay %d clk_wrdqs_delay_hs400 %d\n",
+			  __func__, phy->settings.cp_clk_wrdqs_delay, clk_wrdqs_delay_hs400);
+	} else if ((phy->mode == MMC_TIMING_MMC_HS400) && !cmd_not_dat) {
+		phy->settings.cp_clk_wr_delay =
+			clk_wr_delay_hs400 ? clk_wr_delay_hs400 : clk_wr_delay;
+		DEBUG_DRV("%s:cp_clk_wr_delay %d  clk_wr_delay_hs400 %d\n",
+			  __func__, phy->settings.cp_clk_wr_delay, clk_wr_delay_hs400);
+	}
 }
 
 static void sdhci_cdns_sd6_phy_calc_cmd_out(struct sdhci_cdns_sd6_phy *phy)
@@ -778,7 +796,7 @@ static void sdhci_cdns_sd6_phy_calc_cmd_in(struct sdhci_cdns_sd6_phy *phy)
 
 	if (phy->strobe_cmd) {
 		phy->settings.cp_use_phony_dqs_cmd = 0;
-		phy->settings.cp_read_dqs_cmd_delay = 64;
+		phy->settings.cp_read_dqs_cmd_delay = read_dqs_cmd_delay_hs400;
 	} else {
 		phy->settings.cp_use_phony_dqs_cmd = 1;
 		phy->settings.cp_read_dqs_cmd_delay = 0;
@@ -796,7 +814,7 @@ static void sdhci_cdns_sd6_phy_calc_dat_in(struct sdhci_cdns_sd6_phy *phy)
 
 	if (phy->strobe_dat) {
 		phy->settings.cp_use_phony_dqs = 0;
-		phy->settings.cp_read_dqs_delay = 64;
+		phy->settings.cp_read_dqs_delay = read_dqs_delay_hs400;
 	} else {
 		phy->settings.cp_use_phony_dqs = 1;
 		phy->settings.cp_read_dqs_delay = 0;
@@ -1312,6 +1330,35 @@ static int sdhci_cdns_sd6_get_delay_params(struct device *dev, struct sdhci_cdns
 				       &phy->settings.cp_read_dqs_cmd_delay);
 	if (ret)
 		phy->settings.cp_read_dqs_cmd_delay = DEFAULT_CMD_DELAY;
+
+	ret = device_property_read_u32(dev, "cdns,read_dqs_delay",
+				       &phy->settings.cp_read_dqs_delay);
+	if (ret)
+		phy->settings.cp_read_dqs_delay = DEFAULT_CMD_DELAY;
+
+	ret = device_property_read_u32(dev, "cdns,read_dqs_cmd_delay_hs400",
+				       &read_dqs_cmd_delay_hs400);
+	DEBUG_DRV("read_dqs_cmd_delay_hs400 %d\n", read_dqs_cmd_delay_hs400);
+	if (ret)
+		read_dqs_cmd_delay_hs400 = DEFAULT_READ_DQS_CMD_DELAY;
+
+	ret = device_property_read_u32(dev, "cdns,clk_wrdqs_delay_hs400",
+				       &clk_wrdqs_delay_hs400);
+	DEBUG_DRV("clk_wrdqs_delay_hs400 %d\n", clk_wrdqs_delay_hs400);
+	if (ret)
+		clk_wrdqs_delay_hs400 = DEFAULT_CLK_WRDQS_DELAY;
+
+	ret = device_property_read_u32(dev, "cdns,clk_wr_delay_hs400",
+				       &clk_wr_delay_hs400);
+	DEBUG_DRV("clk_wr_delay_hs400 %d\n", clk_wr_delay_hs400);
+	if (ret)
+		clk_wr_delay_hs400 = DEFAULT_CLK_WR_DELAY;
+
+	ret = device_property_read_u32(dev, "cdns,read_dqs_delay_hs400",
+				       &read_dqs_delay_hs400);
+	DEBUG_DRV("read_dqs_delay_hs400 %d\n", read_dqs_delay_hs400);
+	if (ret)
+		read_dqs_delay_hs400 = DEFAULT_READ_DQS_DELAY;
 
 	ret = device_property_read_u32(dev, "cdns,tune_val_start", &tune_val_start);
 	if (ret)
