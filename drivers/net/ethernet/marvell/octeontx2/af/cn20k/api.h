@@ -39,4 +39,9 @@ void cn20k_disable_flr_me(struct rvu *rvu);
 int rvu_cn20k_set_channels_base(struct rvu *rvu);
 void rvu_cn20k_cpt_chan_cfg(struct rvu *rvu);
 void rvu_cn20k_lbk_set_channels(struct rvu *rvu);
+
+int npa_cn20k_dpc_alloc(struct rvu *rvu, struct npa_cn20k_dpc_alloc_req *req,
+			struct npa_cn20k_dpc_alloc_rsp *rsp);
+int npa_cn20k_dpc_free(struct rvu *rvu, struct npa_cn20k_dpc_free_req *req);
+void npa_cn20k_dpc_free_all(struct rvu *rvu, u16 pcifunc);
 #endif /* CN20K_API_H */

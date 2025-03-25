@@ -693,6 +693,9 @@ struct rvu {
 
 	struct rvu_cpt		cpt;
 
+	/* NPA */
+	struct rsrc_bmap	npa_dpc;
+
 	struct mutex		mbox_lock; /* Serialize mbox up and down msgs */
 	u16			rep_pcifunc;
 	int			rep_cnt;
