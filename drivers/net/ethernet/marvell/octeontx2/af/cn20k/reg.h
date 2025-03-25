@@ -194,4 +194,15 @@ static inline u64 pf_to_bitoff(u8 pf)
 #define CN20K_LBK_LINK_CFG_RANGE_MASK		GENMASK_ULL(19, 16)
 #define CN20K_LBK_LINK_CFG_BASE_MASK		GENMASK_ULL(7, 0)
 #define CN20K_MAX_LBK_CHANS			128
+
+/* NPA Registers */
+#define NPA_AF_DPCX_CFG(a)		(0x800 | (a) << 6)
+/* a: counter index, b: register index */
+#define NPA_AF_DPCX_LF_ENAX(a, b)	(0x830 | (a) << 6 | (b) << 3)
+/* a: counter index, b: register index */
+#define NPA_AF_DPC_PERMITX(a, b)	(0x1000 | (a) << 4 | (b) << 3)
+
+#define NPA_DPC_MAX			32
+#define NPA_DPC_LFS_PER_REG		64
+
 #endif /* RVU_MBOX_REG_H */
