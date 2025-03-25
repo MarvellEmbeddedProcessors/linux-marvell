@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell pcie end point.
+
+properties:
+  compatible: should be "marvell,armada-pcie-ep", "snps,dw-pcie".
+  reg: reg address
+  reg-name: reg name
+  clocks: supported clock.
+
+examples:
+  - |
+    cp0_pcie_ep: pcie-ep@600000 {
+                compatible = "marvell,armada-pcie-ep", "snps,dw-pcie";
+                reg = <0 (0xf2000000 + 0x600000 + (0) * 0x4000) 0 0x4000>,
+                        <0 (0xf2000000 + 0x600000 + (2) * 0x4000) 0 0x80000>,
+                        <0 (0xf2000000 + 0x600000 + (1) * 0x4000) 0 0x1000>;
+                reg-names = "core", "lm", "shadow_core";
+                clocks = <&cp0_clk 1 13>;
+                status = "disabled";
+    };

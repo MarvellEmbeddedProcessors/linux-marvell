@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell mvmdio-uio, xmvmdio.
+
+properties:
+  compatible: should be "marvell,mvmdio-uio".
+  mii-bus: These are generic properties that can apply to any MDIO bus.
+
+examples:
+  - |
+    cp0_mdio_uio: mdio_uio {
+                compatible = "marvell,mvmdio-uio";
+                mii-bus = <&cp0_mdio>;
+                status = "disabled";
+    };
+    cp0_xmdio_uio: xmdio_uio{
+                compatible = "marvell,mvmdio-uio";
+                mii-bus = <&cp0_xmdio>;
+                status = "disabled";
+    };
