@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell, add dma dma_xor to cp.
+
+properties:
+  compatible: should be "marvell,mv-xor-v2-copy-offload".
+  reg: reg address
+  msi-parent: describes the MSI controller node.
+  clocks: Desired operating frequency.
+  dma-coherent: true
+
+examples:
+  -  |
+     dma_xor0: dma-xor@400000 {
+                compatible = "marvell,mv-xor-v2-copy-offload";
+                reg = <0x400000 0x1000>,
+                        <0x410000 0x1000>;
+                msi-parent = <&gic_v2m0>;
+                clocks = <&ap_clk 3>;
+                dma-coherent;
+                status = "disabled";
+    };
+    dma_xor1: dma-xor@420000 {
+                compatible = "marvell,mv-xor-v2-copy-offload";
+                reg = <0x420000 0x1000>,
+                        <0x430000 0x1000>;
+                msi-parent = <&gic_v2m0>;
+                clocks = <&ap_clk 3>;
+                dma-coherent;
+                status = "disabled";
+    };

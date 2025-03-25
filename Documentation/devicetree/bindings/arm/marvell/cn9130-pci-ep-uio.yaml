@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell pci endpoint UIO
+
+properties:
+  compatible: should be "marvell,pci-ep-uio"
+  reg: reg address
+  reg-name: reg name
+
+examples:
+  - |
+    cp0_pci_ep_uio: pci-ep-uio {
+                compatible = "marvell,pci-ep-uio";
+                reg = <0x00 0x00000000 0x0 0x00100000>,
+                        <0x00 0x3f000000 0x0 0x01000000>,
+                        <0x00 0xf0000000 0x0 0x01000000>,
+                        <0x80 0x00000000 0x8 0x00000000>;
+                reg-names = "bar0", "bar2", "bar4", "host-map";
+                status = "disabled";
+    };

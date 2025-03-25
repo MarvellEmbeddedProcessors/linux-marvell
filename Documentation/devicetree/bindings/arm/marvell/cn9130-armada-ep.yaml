@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+
+title: Marvell armada-ep.
+
+properties:
+  compatible: should be "marvell,armada-ep".
+  msi-parent: identifies the node as an MSI controller.
+
+examples:
+  - |
+    cp0_armada_ep:armada-ep {
+                compatible = "marvell,armada-ep";
+                msi-parent = <&gic_v2m0>;
+                status = "disabled";
+    };
