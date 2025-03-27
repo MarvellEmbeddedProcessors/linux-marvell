@@ -267,11 +267,8 @@ static int __init otx_ctr_dev_init(void)
 
 	bphy_pdev = pci_get_device(OTX2_BPHY_PCI_VENDOR_ID,
 				   OTX2_BPHY_PCI_DEVICE_ID, NULL);
-	if (!bphy_pdev) {
-		pr_info("Couldn't find BPHY device %x\n",
-			OTX2_BPHY_PCI_DEVICE_ID);
-		return 0;
-	}
+	if (!bphy_pdev)
+		return -ENODEV;
 
 	/* create a character device */
 	err = alloc_chrdev_region(&otx_dev, 1, 1, DEVICE_NAME);
