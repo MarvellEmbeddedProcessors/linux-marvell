@@ -34,6 +34,7 @@
 #include <linux/ktime.h>
 #include <linux/regmap.h>
 #include <uapi/linux/ppp_defs.h>
+#include <net/dsa.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <net/tso.h>
@@ -4816,7 +4817,7 @@ static int mvpp2_open(struct net_device *dev)
 	if (port->flags & MVPP22_F_IF_MUSDK)
 		goto skip_musdk_parser;
 
-	err = mvpp2_prs_tag_mode_set(port->priv, port->id, MVPP2_TAG_TYPE_MH);
+	err = mvpp2_prs_tag_mode_set(port->priv, port->id, port->tag_type);
 	if (err) {
 		netdev_err(dev, "mvpp2_prs_tag_mode_set failed\n");
 		return err;
@@ -6849,6 +6850,53 @@ static bool mvpp2_use_acpi_compat_mode(struct fwnode_handle *port_fwnode)
 		!fwnode_get_named_child_node(port_fwnode, "fixed-link"));
 }
 
+static void mvpp2_port_enable_non_extended_dsa(struct mvpp2_port *port)
+{
+	struct mvpp2 *priv = port->priv;
+	u32 reg;
+
+	/* For switch port enable non-extended DSA tags and
+	 * make sure the extended DSA tag and Marvell Header
+	 * are disabled as those three options cannot coexist.
+	 */
+	reg = mvpp2_read(priv, MVPP2_MH_REG(port->id));
+	reg &= ~MVPP2_MH;
+	reg &= ~MVPP2_DSA_EXTENDED;
+	reg |= MVPP2_DSA_NON_EXTENDED;
+	mvpp2_write(priv, MVPP2_MH_REG(port->id), reg);
+}
+
+static int mvpp2_netdevice_event(struct notifier_block *nb,
+				 unsigned long event, void *ptr)
+{
+	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+	struct netdev_notifier_changeupper_info *info = ptr;
+	struct mvpp2_port *port;
+
+	port = container_of(nb, struct mvpp2_port, netdev_notifier);
+	if (port->dev != dev)
+		return NOTIFY_DONE;
+
+	switch (event) {
+	case NETDEV_CHANGEUPPER:
+		if (!dsa_slave_dev_check(info->upper_dev))
+			return NOTIFY_DONE;
+
+		if (info->linking) {
+			netdev_dbg(dev, "Registering DSA port %s\n",
+				   info->upper_dev->name);
+			port->tag_type = MVPP2_TAG_TYPE_DSA;
+			mvpp2_port_enable_non_extended_dsa(port);
+		}
+		break;
+	default:
+		/* We don't care about other events */
+		return NOTIFY_DONE;
+	}
+
+	return NOTIFY_DONE;
+}
+
 /* Ports initialization */
 static int mvpp2_port_probe(struct platform_device *pdev,
 			    struct fwnode_handle *port_fwnode,
@@ -7161,10 +7209,20 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 			phy_power_off(port->comphy);
 	}
 
+	port->tag_type = MVPP2_TAG_TYPE_MH;
+
+	/* Register DSA notifier */
+	port->netdev_notifier.notifier_call = mvpp2_netdevice_event;
+	err = register_netdevice_notifier(&port->netdev_notifier);
+	if (err) {
+		dev_err(&pdev->dev, "failed to register DSA notifier\n");
+		goto err_phylink;
+	}
+
 	err = register_netdev(dev);
 	if (err < 0) {
 		dev_err(&pdev->dev, "failed to register netdev\n");
-		goto err_phylink;
+		goto err_dsa_notifier;
 	}
 	netdev_info(dev, "Using %s mac address %pM\n", mac_from, dev->dev_addr);
 
@@ -7172,6 +7230,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 
 	return 0;
 
+err_dsa_notifier:
+	unregister_netdevice_notifier(&port->netdev_notifier);
 err_phylink:
 	if (port->phylink)
 		phylink_destroy(port->phylink);
@@ -7199,6 +7259,7 @@ static void mvpp2_port_remove(struct mvpp2_port *port)
 
 	mvpp2_port_musdk_set(port->dev, false);
 	unregister_netdev(port->dev);
+	unregister_netdevice_notifier(&port->netdev_notifier);
 	if (port->phylink)
 		phylink_destroy(port->phylink);
 	free_percpu(port->pcpu);
