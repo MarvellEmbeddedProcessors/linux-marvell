@@ -52,7 +52,7 @@
 		(0x20000ull | (u64)(a) << 5 | (u64)(b) << 3)
 #define DPI_AF_LFX_RANGE_ENDX(a, b)	\
 		(0x22000ull | (u64)(a) << 5 | (u64)(b) << 3)
-#define DPI_AF_BAR2_ALIASX(a)		(0x9100000ull | (u64)(a) << 3)
+#define DPI_AF_BAR2_ALIASX(a, b)	(0x9100000ull | (a) << 12 | (b))
 #define DPI_MAX_LF			256
 #define DPI_MAX_CHAN_TBL		256
 #define DPI_RD_FIFO_MAX_TH		32
@@ -82,8 +82,7 @@
 
 #define DPI_AF_EPFX_VF_STATX(a, b)	(0xc00ull | (0x20 * (a)) | ((b) << 3))
 
-#define DPI_LF_RINGX_CFG(a, b)		\
-		(0x20ull | (u64)(a) << 20 | (u64)(b) << 3)
+#define DPI_LF_RINGX_CFG(x)             ((0x20ull | (u64)(x) << 3))
 #define DPI_AF_CONST			(0x1038ull)
 
 /* DPI Channel table structure */
@@ -334,6 +333,7 @@ struct dpi_lf_chan_cfg_req {
 	u64 def_config; /* DPI_CHANNEL_TABLE_S value */
 	u32 dpi_blkaddr;
 	u16 lf_slot;
+	u16 ring_idx;
 };
 
 struct dpi_lf_chan_tbl_alloc_req {

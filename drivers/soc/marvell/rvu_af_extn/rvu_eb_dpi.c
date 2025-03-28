@@ -137,18 +137,24 @@ static int validate_and_get_dpi_blkaddr(int req_blkaddr)
 static void dpi_lf_disable_iqueue(struct rvu *rvu, int blkaddr, int slot)
 {
 	/* Disable instructions enqueuing */
-	rvupf_write64(rvu, DPI_LF_RINGX_CFG(blkaddr, 0), 0);
-	rvupf_write64(rvu, DPI_LF_RINGX_CFG(blkaddr, 1), 0);
+	rvu_write64(rvu, blkaddr, DPI_AF_BAR2_ALIASX(slot, DPI_LF_RINGX_CFG(0)),
+		    0x0ULL);
+	rvu_write64(rvu, blkaddr, DPI_AF_BAR2_ALIASX(slot, DPI_LF_RINGX_CFG(1)),
+		    0x0ULL);
 }
 
 int rvu_dpi_lf_teardown(struct rvu *rvu, u16 pcifunc, int blkaddr, int lf,
 			int slot)
 {
-	mutex_lock(&rvu->dpi_rsrc_lock);
+	mutex_lock(&rvu->alias_lock);
+
+	/* Enable BAR2 ALIAS for this pcifunc. */
+	rvu_bar2_sel_write64(rvu, blkaddr, DPI_AF_BAR2_SEL, BIT_ULL(16) | pcifunc);
 
 	dpi_lf_disable_iqueue(rvu, blkaddr, slot);
 
-	mutex_unlock(&rvu->dpi_rsrc_lock);
+	rvu_bar2_sel_write64(rvu, blkaddr, DPI_AF_BAR2_SEL, 0);
+	mutex_unlock(&rvu->alias_lock);
 
 	return 0;
 }
@@ -381,10 +387,10 @@ static int dpi_detach_rsrcs(struct rvu *rvu, struct dpi_rsrc_detach_req *detach,
 				continue;
 		}
 
-		rvu_detach_block(rvu, pcifunc, block->type);
-
 		req.hdr.pcifunc = detach->hdr.pcifunc;
 		dpi_lf_free(rvu, &req, blkid);
+
+		rvu_detach_block(rvu, pcifunc, block->type);
 	}
 
 	mutex_unlock(&rvu->dpi_rsrc_lock);
@@ -645,7 +651,7 @@ int rvu_mbox_handler_dpi_lf_chan_cfg(struct rvu *rvu,
 		return DPI_AF_ERR_PARAM;
 
 	/* Default chan config when DPI_AF_CHAN_LF()_CFG[ENA] is zero */
-	rvu_write64(rvu, req->dpi_blkaddr, DPI_AF_LFX_RINGX_CHAN_CFG(dpilf, 0),
+	rvu_write64(rvu, req->dpi_blkaddr, DPI_AF_LFX_RINGX_CHAN_CFG(dpilf, req->ring_idx),
 		    req->def_config);
 
 	return 0;
