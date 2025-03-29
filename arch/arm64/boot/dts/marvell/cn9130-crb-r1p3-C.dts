@@ -5,6 +5,11 @@
  */
 
 #include "cn9130-crb-C.dts"
+#include "cn9130-crb-dsa.dtsi"
+
+/ {
+	model = "Marvell Armada CN9130-CRB-C (DSA)";
+};
 
 &cp0_spi1 {
 	pinctrl-0 = <&cp0_spi0_pins>;

@@ -1,0 +1,144 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2025 Marvell International Ltd.
+ *
+ * Device tree for the DSA switch on CN9130-CRB boards.
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	sfp: sfp {
+		compatible = "sff,sfp";
+		i2c-bus = <&cp0_i2c1>;
+		mod-def0-gpios = <&expander0 3 GPIO_ACTIVE_LOW>;
+		los-gpios = <&expander0 15 GPIO_ACTIVE_HIGH>;
+		tx-disable-gpios = <&expander0 2 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpios = <&cp0_gpio1 24 GPIO_ACTIVE_HIGH>;
+		maximum-power-milliwatt = <3000>;
+		status = "okay";
+	};
+};
+
+&cp0_mdio {
+	switch6: switch0@6 {
+		/* Actual device is MV88E6393X */
+		compatible = "marvell,mv88e6190";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <6>;
+		interrupt-parent = <&cp0_gpio1>;
+		interrupts = <28 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+
+		dsa,member = <0 0>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@1 {
+				reg = <1>;
+				label = "wan1";
+				phy-handle = <&switch0phy1>;
+			};
+
+			port@2 {
+				reg = <2>;
+				label = "lan2";
+				phy-handle = <&switch0phy2>;
+			};
+
+			port@3 {
+				reg = <3>;
+				label = "lan3";
+				phy-handle = <&switch0phy3>;
+			};
+
+			port@4 {
+				reg = <4>;
+				label = "lan4";
+				phy-handle = <&switch0phy4>;
+			};
+
+			port@5 {
+				reg = <5>;
+				label = "lan5";
+				phy-handle = <&switch0phy5>;
+			};
+
+			port@6 {
+				reg = <6>;
+				label = "lan6";
+				phy-handle = <&switch0phy6>;
+			};
+
+			port@7 {
+				reg = <7>;
+				label = "lan7";
+				phy-handle = <&switch0phy7>;
+			};
+
+			port@8 {
+				reg = <8>;
+				label = "lan8";
+				phy-handle = <&switch0phy8>;
+			};
+
+			port@9 {
+				reg = <9>;
+				label = "wanp9";
+				phy-mode = "10gbase-r";
+				sfp = <&sfp>;
+				managed = "in-band-status";
+			};
+
+			port@a {
+				reg = <10>;
+				label = "cpu";
+				ethernet = <&cp0_eth0>;
+				phy-mode = "10gbase-r";
+				managed = "in-band-status";
+			};
+
+		};
+
+		mdio {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			switch0phy1: switch0phy1@1 {
+				reg = <0x1>;
+			};
+
+			switch0phy2: switch0phy2@2 {
+				reg = <0x2>;
+			};
+
+			switch0phy3: switch0phy3@3 {
+				reg = <0x3>;
+			};
+
+			switch0phy4: switch0phy4@4 {
+				reg = <0x4>;
+			};
+
+			switch0phy5: switch0phy5@5 {
+				reg = <0x5>;
+			};
+
+			switch0phy6: switch0phy6@6 {
+				reg = <0x6>;
+			};
+
+			switch0phy7: switch0phy7@7 {
+				reg = <0x7>;
+			};
+
+			switch0phy8: switch0phy8@8 {
+				reg = <0x8>;
+			};
+		};
+	};
+};
