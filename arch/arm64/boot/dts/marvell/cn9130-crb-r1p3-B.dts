@@ -10,7 +10,3 @@
 / {
 	model = "Marvell Armada CN9130-CRB-B (DSA)";
 };
-
-&cp0_spi1 {
-	pinctrl-0 = <&cp0_spi0_pins>;
-};
