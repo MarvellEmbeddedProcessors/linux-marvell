@@ -203,6 +203,28 @@
 				dma-coherent;
 			};
 
+			dma_xor0: dma-xor@400000 {
+				compatible = "marvell,mv-xor-v2-copy-offload";
+				reg = <0x400000 0x1000>,
+				      <0x410000 0x1000>;
+				msi-parent = <&gic_v2m0>;
+				clocks = <&ap_clk 3>;
+				dma-coherent;
+				iommus = <&smmu 0x1>;
+				status = "disabled";
+			};
+
+			dma_xor1: dma-xor@420000 {
+				compatible = "marvell,mv-xor-v2-copy-offload";
+				reg = <0x420000 0x1000>,
+				      <0x430000 0x1000>;
+				msi-parent = <&gic_v2m0>;
+				clocks = <&ap_clk 3>;
+				dma-coherent;
+				iommus = <&smmu 0x2>;
+				status = "disabled";
+			};
+
 			uio_xor0: uio-xor0 {
 				compatible = "marvell,uio-xor-v2";
 				xor_access = <&xor0>;

@@ -12,6 +12,7 @@
 #include "armada-common.dtsi"
 
 #define CP11X_PCIEx_CONF_BASE(iface)	(CP11X_PCIEx_MEM_BASE(iface) + CP11X_PCIEx_MEM_SIZE(iface))
+#define CP11X_PCIEx_EP_REG_BASE(iface)	(ADDRESSIFY(CP11X_BASE) + 0x600000 + (iface) * 0x4000)
 
 / {
 	/*
@@ -193,6 +194,18 @@
 			reg = <0x12a600 0x10>;
 			clocks = <&CP11X_LABEL(clk) 1 5>,
 				 <&CP11X_LABEL(clk) 1 6>, <&CP11X_LABEL(clk) 1 18>;
+			status = "disabled";
+		};
+
+		CP11X_LABEL(mdio_uio): mdio_uio {
+			compatible = "marvell,mvmdio-uio";
+			mii-bus = <&CP11X_LABEL(mdio)>;
+			status = "disabled";
+		};
+
+		CP11X_LABEL(xmdio_uio): xmdio_uio {
+			compatible = "marvell,mvmdio-uio";
+			mii-bus = <&CP11X_LABEL(xmdio)>;
 			status = "disabled";
 		};
 
@@ -548,6 +561,32 @@
 			compatible = "marvell,uio-sam";
 			eip_access = <&CP11X_LABEL(crypto)>;
 		};
+	};
+
+	CP11X_LABEL(armada_ep):armada-ep {
+		compatible = "marvell,armada-ep";
+		msi-parent = <&gic_v2m0>;
+		status = "disabled";
+	};
+
+	CP11X_LABEL(pcie_ep): pcie-ep@600000 {
+		compatible = "marvell,armada-pcie-ep", "snps,dw-pcie";
+		reg =	<0 CP11X_PCIEx_EP_REG_BASE(0) 0 0x4000>,
+			<0 CP11X_PCIEx_EP_REG_BASE(2) 0 0x80000>,
+			<0 CP11X_PCIEx_EP_REG_BASE(1) 0 0x1000>;
+		reg-names = "core", "lm", "shadow_core";
+		clocks = <&CP11X_LABEL(clk) 1 13>;
+		status = "disabled";
+	};
+
+	CP11X_LABEL(pci_ep_uio): pci-ep-uio {
+		compatible = "marvell,pci-ep-uio";
+		reg = <0x00 0x00000000 0x0 0x00100000>,
+		      <0x00 0x3f000000 0x0 0x01000000>,
+		      <0x00 0xf0000000 0x0 0x01000000>,
+		      <0x80 0x00000000 0x8 0x00000000>;
+		reg-names = "bar0", "bar2", "bar4", "host-map";
+		status = "disabled";
 	};
 
 	CP11X_LABEL(pcie0): pcie@CP11X_PCIE0_BASE {
