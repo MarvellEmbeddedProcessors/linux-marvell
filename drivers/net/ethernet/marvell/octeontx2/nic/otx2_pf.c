@@ -1624,14 +1624,15 @@ static void otx2_free_sq_res(struct otx2_nic *pf)
 	otx2_ctx_disable(&pf->mbox, NIX_AQ_CTYPE_SQ, false);
 	/* Free SQB pointers */
 	otx2_sq_free_sqbs(pf);
+
+	cn10k_ipsec_send_queues_cleanup(pf);
+
 	for (qidx = 0; qidx < otx2_get_total_tx_queues(pf); qidx++) {
 		sq = &qset->sq[qidx];
 		/* Skip freeing Qos queues if they are not initialized */
 		if (!sq->sqe)
 			continue;
 		qmem_free(pf->dev, sq->sqe);
-		qmem_free(pf->dev, sq->sqe_ring);
-		qmem_free(pf->dev, sq->cpt_resp);
 		qmem_free(pf->dev, sq->tso_hdrs);
 		qmem_free(pf->dev, sq->timestamps);
 		kfree(sq->sg);
@@ -1748,6 +1749,13 @@ int otx2_init_hw_resources(struct otx2_nic *pf)
 		goto err_free_txsch;
 	}
 
+	err = cn10k_ipsec_send_queues_init(pf);
+	if (err) {
+		dev_err(pf->dev, "Failed to config IPsec queues\n");
+		mutex_unlock(&mbox->lock);
+		goto err_free_nix_queues;
+	}
+
 	for (lvl = 0; lvl < NIX_TXSCH_LVL_CNT; lvl++) {
 		int idx;
 
@@ -1756,7 +1764,7 @@ int otx2_init_hw_resources(struct otx2_nic *pf)
 			if (err) {
 				dev_err(pf->dev, "Failed to config TXSCH\n");
 				mutex_unlock(&mbox->lock);
-				goto err_free_nix_queues;
+				goto err_free_ipsec_queues;
 			}
 		}
 	}
@@ -1767,7 +1775,7 @@ int otx2_init_hw_resources(struct otx2_nic *pf)
 		if (err) {
 			dev_err(pf->dev, "Failed to config PFC TXSCH\n");
 			mutex_unlock(&mbox->lock);
-			goto err_free_nix_queues;
+			goto err_free_ipsec_queues;
 		}
 	}
 #endif
@@ -1775,6 +1783,8 @@ int otx2_init_hw_resources(struct otx2_nic *pf)
 	mutex_unlock(&mbox->lock);
 	return err;
 
+err_free_ipsec_queues:
+	cn10k_ipsec_send_queues_cleanup(pf);
 err_free_nix_queues:
 	otx2_free_sq_res(pf);
 	otx2_free_cq_res(pf);
