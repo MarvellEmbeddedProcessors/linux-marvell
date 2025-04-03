@@ -68,6 +68,9 @@ irqreturn_t cn20k_vfaf_mbox_intr_handler(int irq, void *vf_irq);
 irqreturn_t cn20k_pfvf_mbox_intr_handler(int irq, void *pf_irq);
 irqreturn_t otx2_pfvf_mbox_intr_handler(int irq, void *pf_irq);
 
+/* Number of segments per SG structure */
+#define MAX_SEGS_PER_SG 3
+
 enum arua_mapped_qtypes {
 	AURA_NIX_RQ,
 	AURA_NIX_SQ,
