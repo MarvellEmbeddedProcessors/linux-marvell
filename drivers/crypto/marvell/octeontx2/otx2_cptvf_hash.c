@@ -86,8 +86,8 @@ static void cpt_hash_callback(int status, void *arg1, void *arg2)
 			dma_unmap_single(&pdev->dev, req->dptr_dma, ctx->digest_size,
 					 DMA_BIDIRECTIONAL);
 
-		kfree(req_info);
 		otx2_cpt_info_destroy(pdev, inst_info);
+		kfree(req_info);
 	}
 	if (areq)
 		crypto_request_complete(areq, status);
