@@ -1246,6 +1246,8 @@ static void otx2_get_link_mode_info(u64 link_mode_bmap,
 		ETHTOOL_LINK_MODE_10000baseCR_Full_BIT,
 		ETHTOOL_LINK_MODE_10000baseER_Full_BIT,
 		ETHTOOL_LINK_MODE_200000baseDR4_Full_BIT,
+		ETHTOOL_LINK_MODE_TP_BIT,
+		ETHTOOL_LINK_MODE_FIBRE_BIT
 	};
 	u8 bit;
 
