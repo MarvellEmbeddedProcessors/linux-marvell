@@ -117,7 +117,9 @@ enum CGX_MODE_ {
 	ETH_MODE_10G_SXGMII_BIT,
 	ETH_MODE_10G_DXGMII_BIT,
 	ETH_MODE_10G_QXGMII_BIT,
-	CGX_MODE_MAX /* = 51 */
+	ETH_MODE_TP_BIT,
+	ETH_MODE_FIBER_BIT,
+	CGX_MODE_MAX /* = 53 */
 };
 /* REQUEST ID types. Input to firmware */
 enum cgx_cmd_id {
