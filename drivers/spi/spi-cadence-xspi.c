@@ -272,6 +272,13 @@
 #define MRVL_XSPI_POLL_TIMEOUT_US	1000
 #define MRVL_XSPI_POLL_DELAY_US		10
 
+/* Controller access arbitration registers */
+#define CDNS_XSPI_OWNERX(owner)		(0x2040 + 8 * ((owner) & 0x7))
+#define OWNER_KERNEL			5
+#define REQ_DEVICE			BIT(0)
+#define REQ_GRANTED			BIT(8)
+#define SPI_LOCK_TIMEOUT_IN_MS		200
+
 /* Macros for calculating data bits in generic command
  * Up to 10 bytes can be fit into cmd_registers
  * least significant is placed in cmd_reg[1]
@@ -384,6 +391,31 @@ static void cdns_xspi_reset_dll(struct cdns_xspi_dev *cdns_xspi)
 	dll_cntrl |= CDNS_XSPI_DLL_RST_N;
 	writel(dll_cntrl, cdns_xspi->iobase +
 			  CDNS_XSPI_RF_MINICTRL_REGS_DLL_PHY_CTRL);
+}
+
+static int unlock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
+{
+	u64 ctrl_owner = readq(cdns_xspi->auxbase + CDNS_XSPI_OWNERX(OWNER_KERNEL));
+
+	writeq(ctrl_owner & ~REQ_DEVICE, cdns_xspi->auxbase + CDNS_XSPI_OWNERX(OWNER_KERNEL));
+	return 0;
+}
+
+static int lock_spi_bus(struct cdns_xspi_dev *cdns_xspi)
+{
+	u64 ctrl_owner = readq(cdns_xspi->auxbase + CDNS_XSPI_OWNERX(OWNER_KERNEL));
+
+	if (ctrl_owner & REQ_DEVICE)
+		return 0;
+
+	writeq(ctrl_owner | REQ_DEVICE, cdns_xspi->auxbase + CDNS_XSPI_OWNERX(OWNER_KERNEL));
+	return readq_relaxed_poll_timeout(cdns_xspi->auxbase +
+		CDNS_XSPI_OWNERX(OWNER_KERNEL),
+		ctrl_owner, ((ctrl_owner & REQ_GRANTED) == 0), 1000 * 10,
+		1000 * SPI_LOCK_TIMEOUT_IN_MS);
+
+	pr_err("Timeout. Flash arbitration failed.\n");
+	return -1;
 }
 
 static bool cdns_xspi_is_dll_locked(struct cdns_xspi_dev *cdns_xspi)
@@ -676,6 +708,13 @@ static int cdns_xspi_send_stig_command(struct cdns_xspi_dev *cdns_xspi,
 	int ret;
 	int dummybytes = op->dummy.nbytes;
 
+	if (cdns_xspi->driver_data->mrvl_hw_overlay) {
+		if (lock_spi_bus(cdns_xspi) != 0) {
+			pr_err("Failed to lock SPI bus\n");
+			return -EIO;
+		}
+	}
+
 	ret = cdns_xspi_wait_for_controller_idle(cdns_xspi);
 	if (ret < 0)
 		return -EIO;
@@ -727,6 +766,9 @@ static int cdns_xspi_send_stig_command(struct cdns_xspi_dev *cdns_xspi,
 	cmd_status = cdns_xspi_check_command_status(cdns_xspi);
 	if (cmd_status)
 		return -EPROTO;
+
+	if (cdns_xspi->driver_data->mrvl_hw_overlay)
+		unlock_spi_bus(cdns_xspi);
 
 	return 0;
 }
