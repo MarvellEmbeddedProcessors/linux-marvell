@@ -92,6 +92,10 @@ static inline u64 pf_to_bitoff(u8 pf)
 #define RVU_AF_BAR2_PFID			(0x16400)
 #define NIX_CINTX_INT_W1S(a)			(0xd30 | (a) << 12)
 #define NIX_QINTX_CNT(a)			(0xc00 | (a) << 12)
+#define NIX_GINT_INT				(0x200)
+#define NIX_GINT_INT_W1S			(0x208)
+
+#define ALTAF_RDY				BIT_ULL(1)
 
 /* NPC registers */
 #define NPC_AF_INTFX_EXTRACTORX_CFG(a, b) \
