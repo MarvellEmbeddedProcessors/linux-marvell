@@ -2465,7 +2465,7 @@ static void __rvu_mbox_handler(struct rvu_work *mwork, int type, bool poll)
 
 	offset = mbox->rx_start + ALIGN(sizeof(*req_hdr), MBOX_MSG_ALIGN);
 
-	if (req_hdr->sig) {
+	if (req_hdr->sig && rvu->altaf_ready) {
 		req_hdr->opt_msg = mw->mbox_wrk[devid].num_msgs;
 		rvu_write64(rvu, BLKADDR_NIX0, RVU_AF_BAR2_SEL,
 			    RVU_AF_BAR2_PFID);

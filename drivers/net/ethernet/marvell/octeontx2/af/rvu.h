@@ -698,6 +698,7 @@ struct rvu {
 
 	struct mutex		mbox_lock; /* Serialize mbox up and down msgs */
 	u16			rep_pcifunc;
+	bool			altaf_ready;
 	int			rep_cnt;
 	u16			*rep2pfvf_map;
 	u8			rep_mode;
