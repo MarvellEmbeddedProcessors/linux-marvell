@@ -1273,11 +1273,18 @@ static const struct of_device_id cdns_xspi_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, cdns_xspi_of_match);
 
+static const struct acpi_device_id cdns_xspi_acpi_match[] = {
+	{"marvell,xspi-nor", 0},
+	{},
+};
+MODULE_DEVICE_TABLE(acpi, cdns_xspi_acpi_match);
+
 static struct platform_driver cdns_xspi_platform_driver = {
 	.probe          = cdns_xspi_probe,
 	.driver = {
 		.name = CDNS_XSPI_NAME,
 		.of_match_table = cdns_xspi_of_match,
+		.acpi_match_table = cdns_xspi_acpi_match,
 	},
 };
 
