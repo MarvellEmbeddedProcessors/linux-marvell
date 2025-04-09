@@ -327,10 +327,6 @@ static struct cdns_xspi_driver_data marvell_driver_data = {
 	.rfile_phy_dll_slave_ctrl = MARVELL_RFILE_PHY_DLL_SLAVE_CTRL,
 };
 
-static struct cdns_xspi_driver_data cdns_driver_data = {
-	.mrvl_hw_overlay = false,
-};
-
 static const int cdns_mrvl_xspi_clk_div_list[] = {
 	4,	//0x0 = Divide by 4.   SPI clock is 200 MHz.
 	6,	//0x1 = Divide by 6.   SPI clock is 133.33 MHz.
@@ -1270,11 +1266,7 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 
 static const struct of_device_id cdns_xspi_of_match[] = {
 	{
-		.compatible = "cdns,xspi-nor",
-		.data = &cdns_driver_data,
-	},
-	{
-		.compatible = "marvell,cn10-xspi-nor",
+		.compatible = "marvell,xspi-nor",
 		.data = &marvell_driver_data,
 	},
 	{ /* end of table */}
