@@ -542,12 +542,16 @@ struct channel_fwdata {
  *			Set by kernel and cleared by firmware.
  * @flr_vf_bmap	: Bitmap to represent VF for which interrupt is triggered.
  *			Set by kernel and cleared by firmware.
+ * @gint_paddr  : Firmware updates alternative AF NIX_AF_GINT_INT_W1S physical address.
+ * @gint_iova_addr: Kernel writes mapped alternative AF NIX_AF_GINT_INT_W1S IOVA address.
  * @reserved	: Reserved for future use.
  */
 struct altaf_intr_notify {
 	unsigned long flr_pf_bmap[2];
 	unsigned long flr_vf_bmap[2];
-	unsigned long reserved[8];
+	unsigned long gint_paddr;
+	unsigned long gint_iova_addr;
+	unsigned long reserved[6];
 };
 
 struct rvu_fwdata {
