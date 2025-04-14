@@ -12,6 +12,8 @@ static const struct flash_info fujitsu_nor_parts[] = {
 	/* Fujitsu */
 	{ "mb85rs1mt", INFO(0x047f27, 0, 128 * 1024, 1)
 		FLAGS(SPI_NOR_NO_ERASE) },
+	{ "mb85rs4mly", INFO(0x047f49, 0, 512 * 1024, 1)
+		FLAGS(SPI_NOR_NO_ERASE) },
 };
 
 const struct spi_nor_manufacturer spi_nor_fujitsu = {
