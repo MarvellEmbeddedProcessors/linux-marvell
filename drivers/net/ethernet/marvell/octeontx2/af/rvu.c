@@ -2740,12 +2740,6 @@ static int rvu_mbox_init(struct rvu *rvu, struct mbox_wq_info *mw,
 	if (!pf_bmap)
 		return -ENOMEM;
 
-	ng_rvu_mbox = kzalloc(sizeof(*ng_rvu_mbox), GFP_KERNEL);
-	if (!ng_rvu_mbox) {
-		err = -ENOMEM;
-		goto free_bitmap;
-	}
-
 	/* RVU VFs */
 	if (type == TYPE_AFVF)
 		bitmap_set(pf_bmap, 0, num);
@@ -2759,9 +2753,17 @@ static int rvu_mbox_init(struct rvu *rvu, struct mbox_wq_info *mw,
 		}
 	}
 
-	rvu->ng_rvu = ng_rvu_mbox;
+	if (!rvu->ng_rvu) {
+		ng_rvu_mbox = kzalloc(sizeof(*ng_rvu_mbox), GFP_KERNEL);
+		if (!ng_rvu_mbox) {
+			err = -ENOMEM;
+			goto free_bitmap;
+		}
 
-	rvu->ng_rvu->rvu_mbox_ops = &rvu_mbox_ops;
+		rvu->ng_rvu = ng_rvu_mbox;
+
+		rvu->ng_rvu->rvu_mbox_ops = &rvu_mbox_ops;
+	}
 
 	err = cn20k_rvu_mbox_init(rvu, type, num);
 	if (err)
