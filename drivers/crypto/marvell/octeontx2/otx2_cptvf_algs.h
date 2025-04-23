@@ -47,6 +47,7 @@ enum otx2_cpt_cipher_type {
 	OTX2_CPT_AES_CTR  = 0x6,
 	OTX2_CPT_AES_GCM  = 0x7,
 	OTX2_CPT_AES_XTS  = 0x8,
+	OTX2_CPT_CHACHA20 = 0x9,
 	OTX2_CPT_AES_CCM  = 0xA
 };
 
@@ -58,7 +59,8 @@ enum otx2_cpt_mac_type {
 	OTX2_CPT_SHA256   = 0x4,
 	OTX2_CPT_SHA384   = 0x5,
 	OTX2_CPT_SHA512   = 0x6,
-	OTX2_CPT_GMAC     = 0x7
+	OTX2_CPT_GMAC     = 0x7,
+	OTX2_CPT_POLY1305 = 0x8
 };
 
 enum otx2_cpt_aes_key_len {
@@ -186,6 +188,7 @@ struct otx2_cpt_aead_ctx {
 	u8 is_trunc_hmac;
 	u8 enc_align_len;
 	bool is_rfc4106_gcm;
+	bool is_chacha20_poly1305_esp;
 };
 int otx2_cpt_crypto_init(struct pci_dev *pdev, struct module *mod,
 			 int num_queues, int num_devices);
