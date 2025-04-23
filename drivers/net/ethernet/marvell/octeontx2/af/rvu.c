@@ -315,6 +315,9 @@ int rvu_get_blkaddr(struct rvu *rvu, int blktype, u16 pcifunc)
 	case BLKTYPE_ML:
 		blkaddr = BLKADDR_ML;
 		goto exit;
+	case BLKTYPE_PSW:
+		blkaddr = BLKADDR_PSW;
+		goto exit;
 	}
 
 	/* Check if this is a RVU PF or VF */
@@ -469,6 +472,9 @@ void rvu_update_rsrc_map(struct rvu *rvu, struct rvu_pfvf *pfvf,
 	case BLKADDR_ML:
 		attach ? pfvf->mllfs++ : pfvf->mllfs--;
 		num_lfs = pfvf->mllfs;
+		break;
+	case BLKADDR_PSW:
+		attach ? pfvf->pswlfs++ : pfvf->pswlfs--;
 		break;
 	}
 
@@ -1446,6 +1452,8 @@ u16 rvu_get_rsrc_mapcount(struct rvu_pfvf *pfvf, int blkaddr)
 		return pfvf->dpi1_lfs;
 	case BLKADDR_ML:
 		return pfvf->mllfs;
+	case BLKADDR_PSW:
+		return pfvf->pswlfs;
 	}
 	return 0;
 }
