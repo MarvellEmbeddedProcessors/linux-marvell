@@ -226,11 +226,16 @@ static bool otx2_skb_add_frag(struct otx2_nic *pfvf, struct sk_buff *skb,
 		off += pfvf->xtra_hdr;
 	}
 
+	if (parse->chan & 0x800)
+		off = 0;
+
 	page = virt_to_page(va);
 	if (likely(skb_shinfo(skb)->nr_frags < MAX_SKB_FRAGS)) {
 		skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, page,
 				va - page_address(page) + off,
 				len - off, pfvf->rbsize);
+		if (parse->chan & 0x800)
+			return false;
 		return true;
 	}
 
@@ -357,6 +362,8 @@ static void otx2_rcv_pkt_handler(struct otx2_nic *pfvf,
 				 struct nix_cqe_rx_s *cqe, bool *need_xdp_flush)
 {
 	struct nix_rx_parse_s *parse = &cqe->parse;
+	struct nix_wqe_rx_s *orig_pkt_wqe = NULL;
+	u32 desc_sizem1 = parse->desc_sizem1;
 	struct nix_rx_sg_s *sg = &cqe->sg;
 	struct sk_buff *skb = NULL;
 	u64 *word = (u64 *)parse;
@@ -383,8 +390,30 @@ static void otx2_rcv_pkt_handler(struct otx2_nic *pfvf,
 	if (unlikely(!skb))
 		return;
 
+	if (parse->chan & 0x800) {
+		orig_pkt_wqe = cn10k_ipsec_process_cpt_metapkt(pfvf, skb, sg->seg_addr);
+		if (!orig_pkt_wqe) {
+			netdev_err(pfvf->netdev, "Invalid WQE in CPT metapacket\n");
+			napi_free_frags(napi);
+			cq->pool_ptrs++;
+			return;
+		}
+		/* Return metapacket buffer back to pool since it's no longer needed */
+		otx2_free_rcv_seg(pfvf, cqe, parse->pb_aura);
+
+		/* Update the count of inbound SPB buffers */
+		atomic_inc(&pfvf->ipsec.inb_spb_count[parse->pb_aura -
+						      pfvf->ipsec.inb_ipsec_spb_pool]);
+
+		/* Switch *sg to the orig_pkt_wqe's *sg which has the actual
+		 * complete decrypted packet by CPT.
+		 */
+		sg = &orig_pkt_wqe->sg;
+		desc_sizem1 = orig_pkt_wqe->parse.desc_sizem1;
+	}
+
 	start = (void *)sg;
-	end = start + ((cqe->parse.desc_sizem1 + 1) * 16);
+	end = start + ((desc_sizem1 + 1) * 16);
 	while (start < end) {
 		sg = (struct nix_rx_sg_s *)start;
 		seg_addr = &sg->seg_addr;

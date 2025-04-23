@@ -1694,6 +1694,14 @@ int otx2_init_hw_resources(struct otx2_nic *pf)
 	hw->sqpool_cnt = otx2_get_total_tx_queues(pf);
 	hw->pool_cnt = hw->rqpool_cnt + hw->sqpool_cnt;
 
+	/* Create an additional LPB pool for 1st pass IPsec packets and
+	 * one SPB pool per RX queue for storing 2nd pass meta-IPsec packets.
+	 */
+	pf->ipsec.inb_ipsec_spb_pool = hw->pool_cnt;
+	hw->pool_cnt += hw->rx_queues;
+	pf->ipsec.inb_ipsec_pool = hw->pool_cnt;
+	hw->pool_cnt++;
+
 	if (!otx2_rep_dev(pf->pdev)) {
 		/* Maximum hardware supported transmit length */
 		pf->tx_max_pktlen = pf->netdev->max_mtu + OTX2_ETH_HLEN;
@@ -1878,12 +1886,17 @@ void otx2_free_hw_resources(struct otx2_nic *pf)
 
 	/* Free RQ buffer pointers*/
 	otx2_free_aura_ptr(pf, AURA_NIX_RQ);
+	cn10k_ipsec_free_aura_ptrs(pf);
 
 	otx2_free_cq_res(pf);
 
 	/* Free all ingress bandwidth profiles allocated */
 	if (!otx2_rep_dev(pf->pdev))
 		cn10k_free_all_ipolicers(pf);
+
+	/* Delete Inbound IPSec flows if any SA's are installed */
+	if (!list_empty(&pf->ipsec.inb_sw_ctx_list))
+		cn10k_ipsec_inb_disable_flows(pf);
 
 	mutex_lock(&mbox->lock);
 	/* Reset NIX LF */
@@ -2250,6 +2263,10 @@ int otx2_open(struct net_device *netdev)
 		goto err_tx_stop_queues;
 
 	otx2_do_set_rx_mode(pf);
+
+	/* Re-initialize IPsec flows if any previously installed */
+	if (!list_empty(&pf->ipsec.inb_sw_ctx_list))
+		cn10k_ipsec_ethtool_init(netdev, true);
 
 	return 0;
 
@@ -3196,6 +3213,10 @@ int otx2_realloc_msix_vectors(struct otx2_nic *pf)
 	 */
 	num_vec = hw->nix_msixoff;
 	num_vec += NIX_LF_POISON_VEC + 1;
+
+	/* Update number of vectors to include NPA */
+	if (hw->nix_msixoff < hw->npa_msixoff)
+		num_vec = hw->npa_msixoff;
 
 	otx2_disable_mbox_intr(pf);
 	pci_free_irq_vectors(hw->pdev);

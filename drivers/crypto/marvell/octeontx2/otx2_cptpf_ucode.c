@@ -1587,7 +1587,7 @@ static int otx2_cpt_set_eng_grp_num(struct otx2_cptpf_dev *cptpf,
 	memset(req, 0, sizeof(*req));
 	req->hdr.id = MBOX_MSG_CPT_SET_ENG_GRP_NUM;
 	req->hdr.sig = OTX2_MBOX_REQ_SIG;
-	req->hdr.pcifunc = OTX2_CPT_RVU_PFFUNC(cptpf->pf_id, 0);
+	req->hdr.pcifunc = OTX2_CPT_RVU_PFFUNC(pdev, cptpf->pf_id, 0);
 	req->set = set;
 	req->eng_type = eng_type;
 	req->eng_grp_num = otx2_cpt_get_eng_grp(&cptpf->eng_grps, eng_type);

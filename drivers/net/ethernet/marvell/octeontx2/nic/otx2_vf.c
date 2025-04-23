@@ -660,6 +660,12 @@ static void otx2vf_reset_task(struct work_struct *work)
 static int otx2vf_set_features(struct net_device *netdev,
 			       netdev_features_t features)
 {
+	netdev_features_t changed = features ^ netdev->features;
+
+	if (changed & NETIF_F_HW_ESP)
+		return cn10k_ipsec_ethtool_init(netdev,
+						features & NETIF_F_HW_ESP);
+
 	return otx2_handle_ntuple_tc_features(netdev, features);
 }
 
@@ -708,6 +714,10 @@ static int otx2vf_realloc_msix_vectors(struct otx2_nic *vf)
 
 	num_vec = hw->nix_msixoff;
 	num_vec += NIX_LF_POISON_VEC + 1;
+
+	/* Update number of vectors to include NPA */
+	if (hw->nix_msixoff < hw->npa_msixoff)
+		num_vec = hw->npa_msixoff;
 
 	otx2vf_disable_mbox_intr(vf);
 	pci_free_irq_vectors(hw->pdev);

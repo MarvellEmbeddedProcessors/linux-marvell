@@ -749,6 +749,7 @@ static int cpt_inline_ipsec_cfg_inbound(struct rvu *rvu, int blkaddr, u8 cptlf,
 	if (!is_rvu_otx2(rvu)) {
 		val = (ilog2(NIX_CHAN_CPT_X2P_MASK + 1) << 16);
 		val |= (u64)rvu->hw->cpt_chan_base;
+		val |= 0x2 << 20;
 
 		rvu_write64(rvu, blkaddr, CPT_AF_X2PX_LINK_CFG(0), val);
 		rvu_write64(rvu, blkaddr, CPT_AF_X2PX_LINK_CFG(1), val);
@@ -1954,7 +1955,7 @@ static void rvu_cpt_rx_inline_nix_cfg(struct rvu *rvu)
 
 	nix_cfg.gen_cfg.param1 = rvu->cpt.rx_cfg.param1;
 	nix_cfg.gen_cfg.param2 = rvu->cpt.rx_cfg.param2;
-	nix_cfg.inst_qsel.cpt_pf_func = rvu_get_pf(0);
+	nix_cfg.inst_qsel.cpt_pf_func = rvu_get_pf(rvu->pdev, 0);
 	nix_cfg.inst_qsel.cpt_slot = 0;
 
 	nix_inline_ipsec_cfg(rvu, &nix_cfg, BLKADDR_NIX0);
