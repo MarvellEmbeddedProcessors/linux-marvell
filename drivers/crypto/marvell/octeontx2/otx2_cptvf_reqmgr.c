@@ -158,6 +158,12 @@ static int process_request(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
 	info->time_in = jiffies;
 	info->req = req;
 
+	if (lf->lfs->cq_ena) {
+		result = (union otx2_cpt_res_s *)c20k_cptlf_cq_s(lf);
+		result->s.compcode = OTX2_CPT_COMPLETION_CODE_INIT;
+		pentry->completion_addr = result;
+	}
+
 	/* Fill in the command */
 	iq_cmd.cmd.u = 0;
 	iq_cmd.cmd.s.opcode = cpu_to_be16(cpt_req->opcode.flags);

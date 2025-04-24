@@ -65,6 +65,7 @@
 #define CN20K_CPT_CQ_TOTAL_ENTRIES	0xFFFFF
 #define CN20K_CPT_CQ_SIZE		CN20K_CPT_CQ_TOTAL_ENTRIES * \
 				sizeof(((union otx2_cpt_res_s *)0)->cn20k)
+#define CN20K_CPT_CQ_ENTRY_SZ		32
 
 enum otx2_cptlf_state {
 	OTX2_CPTLF_IN_RESET,
@@ -600,6 +601,19 @@ static inline void cn20k_setup_completion_queues(struct otx2_cptlfs_info
         cn20k_cptlf_set_cqueues_base_addr(lfs);
         cn20k_cptlf_set_cqueues_size(lfs);
         cn20k_cptlf_enable_cqueues(lfs);
+}
+
+static inline uintptr_t c20k_cptlf_cq_s(struct otx2_cptlf_info *lf)
+{
+	u64 cq_ptr_reg;
+	u32 cq_idx;
+
+	cq_ptr_reg = otx2_cpt_read64(lf->lfs->reg_base, lf->lfs->blkaddr,
+				     lf->slot, CN20K_CPT_LF_CQ_PTR);
+	cq_idx = FIELD_GET(CN20K_CPT_LF_CQ_NQ_PTR_MASK, cq_ptr_reg);
+
+	return (uintptr_t)(lf->cqueue.vaddr + cq_idx
+			   * CN20K_CPT_CQ_ENTRY_SZ);
 }
 
 int otx2_cptlf_init(struct otx2_cptlfs_info *lfs, u8 eng_grp_msk, u8 pri,
