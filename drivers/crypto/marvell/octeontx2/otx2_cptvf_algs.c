@@ -10,6 +10,7 @@
 #include <crypto/sha2.h>
 #include <crypto/xts.h>
 #include <crypto/gcm.h>
+#include <crypto/ctr.h>
 #include <crypto/scatterwalk.h>
 #include <linux/sort.h>
 #include <linux/module.h>
@@ -275,7 +276,15 @@ static inline int create_ctx_hdr(struct skcipher_request *req, u32 enc,
 	else
 		memcpy(fctx->enc.encr_key, ctx->enc_key, ctx->key_len);
 
-	memcpy(fctx->enc.encr_iv, req->iv, crypto_skcipher_ivsize(stfm));
+	if (ctx->cipher_type == OTX2_CPT_AES_CTR) {
+		/* Copy salt to context */
+		memcpy(fctx->enc.encr_iv, ctx->enc_key + ctx->key_len,
+		       CTR_RFC3686_NONCE_SIZE);
+		memcpy(fctx->enc.encr_iv + CTR_RFC3686_NONCE_SIZE, req->iv,
+		       crypto_skcipher_ivsize(stfm));
+	} else {
+		memcpy(fctx->enc.encr_iv, req->iv, crypto_skcipher_ivsize(stfm));
+	}
 
 	cpu_to_be64s(&fctx->enc.enc_ctrl.u);
 
@@ -523,6 +532,40 @@ static int otx2_cpt_skcipher_ecb_des3_setkey(struct crypto_skcipher *tfm,
 					     const u8 *key, u32 keylen)
 {
 	return cpt_des_setkey(tfm, key, keylen, OTX2_CPT_DES3_ECB);
+}
+
+static int otx2_cpt_skcipher_rfc3686_ctr_aes_setkey(struct crypto_skcipher *tfm,
+						    const u8 *key, u32 keylen)
+{
+	struct otx2_cpt_enc_ctx *ctx = crypto_skcipher_ctx(tfm);
+
+	/*
+	 * For aes ctr we expect to get encryption key (16, 24, 32 bytes)
+	 * and salt (4 bytes)
+	 */
+	switch (keylen) {
+	case AES_KEYSIZE_128 + CTR_RFC3686_NONCE_SIZE:
+		ctx->key_type = OTX2_CPT_AES_128_BIT;
+		ctx->key_len = AES_KEYSIZE_128;
+		break;
+	case AES_KEYSIZE_192 + CTR_RFC3686_NONCE_SIZE:
+		ctx->key_type = OTX2_CPT_AES_192_BIT;
+		ctx->key_len = AES_KEYSIZE_192;
+		break;
+	case AES_KEYSIZE_256 + CTR_RFC3686_NONCE_SIZE:
+		ctx->key_type = OTX2_CPT_AES_256_BIT;
+		ctx->key_len = AES_KEYSIZE_256;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	ctx->enc_align_len = 1;
+	ctx->cipher_type = OTX2_CPT_AES_CTR;
+	/* Store encryption key and salt */
+	memcpy(ctx->enc_key, key, keylen);
+
+	return crypto_skcipher_setkey(ctx->fbk_cipher, key, keylen);
 }
 
 static int cpt_skcipher_fallback_init(struct otx2_cpt_enc_ctx *ctx,
@@ -1464,6 +1507,24 @@ static struct skcipher_alg otx2_cpt_skciphers[] = { {
 	.min_keysize = 2 * AES_MIN_KEY_SIZE,
 	.max_keysize = 2 * AES_MAX_KEY_SIZE,
 	.setkey = otx2_cpt_skcipher_xts_setkey,
+	.encrypt = otx2_cpt_skcipher_encrypt,
+	.decrypt = otx2_cpt_skcipher_decrypt,
+}, {
+	.base.cra_name = "rfc3686(ctr(aes))",
+	.base.cra_driver_name = "cpt_rfc3686_ctr_aes",
+	.base.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+	.base.cra_blocksize = 1,
+	.base.cra_ctxsize = sizeof(struct otx2_cpt_enc_ctx),
+	.base.cra_alignmask = 0,
+	.base.cra_priority = 4001,
+	.base.cra_module = THIS_MODULE,
+
+	.init = otx2_cpt_enc_dec_init,
+	.exit = otx2_cpt_skcipher_exit,
+	.ivsize = CTR_RFC3686_IV_SIZE,
+	.min_keysize = AES_MIN_KEY_SIZE + CTR_RFC3686_NONCE_SIZE,
+	.max_keysize = AES_MAX_KEY_SIZE + CTR_RFC3686_NONCE_SIZE,
+	.setkey = otx2_cpt_skcipher_rfc3686_ctr_aes_setkey,
 	.encrypt = otx2_cpt_skcipher_encrypt,
 	.decrypt = otx2_cpt_skcipher_decrypt,
 }, {
