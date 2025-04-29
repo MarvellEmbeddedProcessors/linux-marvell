@@ -58,9 +58,25 @@
 /* Maximum LFs supported in OcteonTX2 for CPT */
 #define OTX2_CPT_MAX_LFS_NUM    64
 
+/* CPT completion queue alignment */
+#define CN20K_CPT_CQ_ALIGNMENT	32
+
+/* CQ entries can be 1 MB, CPTX_LF_CQ_PTR[count], 19:0 */
+#define CN20K_CPT_CQ_TOTAL_ENTRIES	0xFFFFF
+#define CN20K_CPT_CQ_SIZE		CN20K_CPT_CQ_TOTAL_ENTRIES * \
+				sizeof(((union otx2_cpt_res_s *)0)->cn20k)
+
 enum otx2_cptlf_state {
 	OTX2_CPTLF_IN_RESET,
 	OTX2_CPTLF_STARTED,
+};
+
+struct cn20k_cpt_completion_queue {
+	u8 *unalign_vaddr;
+	u8 *vaddr;
+	dma_addr_t unalign_dma_addr;
+	dma_addr_t dma_addr;
+	u32 size;
 };
 
 struct otx2_cpt_inst_queue {
@@ -88,6 +104,7 @@ struct otx2_cptlf_info {
 	u8 is_irq_reg[OTX2_CPT_LF_MSIX_VECTORS];  /* Is interrupt registered */
 	u8 slot;                                /* Slot number of this LF */
 
+	struct cn20k_cpt_completion_queue cqueue; /* Completion queue */
 	struct otx2_cpt_inst_queue iqueue;/* Instruction queue */
 	struct otx2_cpt_pending_queue pqueue; /* Pending queue */
 	struct otx2_cptlf_wqe *wqe;       /* Tasklet work info */
@@ -130,6 +147,7 @@ struct otx2_cptlfs_info {
 	int global_slot;        /* Global slot across the blocks */
 	u8 ctx_ilen;
 	u8 ctx_ilen_ovrd;
+	bool cq_ena;
 };
 
 static inline void otx2_cpt_free_instruction_queues(
@@ -184,6 +202,94 @@ static inline int otx2_cpt_alloc_instruction_queues(
 error:
 	otx2_cpt_free_instruction_queues(lfs);
 	return ret;
+}
+
+static inline void cn20k_cpt_free_completion_queues(struct otx2_cptlfs_info *lfs)
+{
+	struct cn20k_cpt_completion_queue *cq;
+	int i;
+
+	for (i = 0; i < lfs->lfs_num; i++) {
+		cq = &lfs->lf[i].cqueue;
+		if (cq->vaddr)
+			dma_free_coherent(&lfs->pdev->dev,
+					  cq->size,
+					  cq->unalign_vaddr,
+					  cq->unalign_dma_addr);
+		cq->unalign_dma_addr = 0;
+		cq->dma_addr = 0;
+		cq->unalign_vaddr = NULL;
+		cq->vaddr = NULL;
+	}
+}
+
+static inline int cn20k_cpt_alloc_completion_queues(struct otx2_cptlfs_info
+						    *lfs)
+{
+	struct cn20k_cpt_completion_queue *cq;
+	int ret = 0, i;
+
+	if (!lfs->lfs_num)
+		return -EINVAL;
+
+	for (i = 0; i < lfs->lfs_num; i++) {
+		cq = &lfs->lf[i].cqueue;
+		cq->size =  CN20K_CPT_CQ_SIZE + CN20K_CPT_CQ_ALIGNMENT;
+		cq->unalign_vaddr = dma_alloc_coherent(&lfs->pdev->dev,
+						       cq->size,
+						       &cq->unalign_dma_addr,
+						       GFP_KERNEL);
+		if (!cq->unalign_vaddr) {
+			ret = -ENOMEM;
+			goto error;
+		}
+		/* Align the physical address to the nearest 32-byte boundary */
+		cq->dma_addr = ALIGN(cq->unalign_dma_addr,
+				     CN20K_CPT_CQ_ALIGNMENT);
+		/* Adjust the virtual address to match the aligned physical address */
+		cq->vaddr = cq->unalign_vaddr + (cq->dma_addr - cq->unalign_dma_addr);
+	}
+	return 0;
+
+error:
+	cn20k_cpt_free_completion_queues(lfs);
+	return ret;
+}
+
+static inline void cn20k_cptlf_do_disable_cqueue(struct otx2_cptlf_info *lf)
+{
+	void __iomem *reg_base = lf->lfs->reg_base;
+	struct pci_dev *pdev = lf->lfs->pdev;
+	u8 blkaddr = lf->lfs->blkaddr;
+	int timeout = 1000000;
+	u64 num_cq_entry, reg_val;
+	u64 slot = lf->slot;
+
+	 /* Disable CQ enqueuing */
+	reg_val = otx2_cpt_read64(reg_base, blkaddr, slot, CN20K_CPT_LF_CQ_CTL);
+	reg_val &= ~0x1;
+	otx2_cpt_write64(reg_base, blkaddr, slot, CN20K_CPT_LF_CQ_CTL, reg_val);
+
+	do {
+		num_cq_entry = otx2_cpt_read64(reg_base, blkaddr, slot,
+					       CN20K_CPT_LF_CQ_PTR)
+					       & CN20K_CPT_LF_CQ_CNT_MASK;
+		udelay(1);
+		timeout--;
+	} while ((num_cq_entry != 0) && (timeout != 0));
+
+	if (timeout == 0)
+		dev_warn(&pdev->dev, "TIMEOUT: CPT poll on pending CQ entry\n");
+
+}
+
+static inline void cn20k_cptlf_disable_cqueues(
+					struct otx2_cptlfs_info *lfs)
+{
+	int slot;
+
+	for (slot = 0; slot < lfs->lfs_num; slot++)
+		cn20k_cptlf_do_disable_cqueue(&lfs->lf[slot]);
 }
 
 static inline void otx2_cptlf_set_iqueues_base_addr(
@@ -431,6 +537,66 @@ static inline void otx2_cptlf_set_dev_info(struct otx2_cptlfs_info *lfs,
 	lfs->reg_base = reg_base;
 	lfs->mbox = mbox;
 	lfs->blkaddr = blkaddr;
+}
+
+static inline void cn20k_cptlf_set_cqueues_base_addr(
+					struct otx2_cptlfs_info *lfs)
+{
+	union cn20k_cptx_lf_q_base lf_q_base;
+	int slot;
+
+	for (slot = 0; slot < lfs->lfs_num; slot++) {
+		lf_q_base.u = lfs->lf[slot].cqueue.dma_addr;
+		otx2_cpt_write64(lfs->reg_base, lfs->blkaddr, slot,
+				 CN20K_CPT_LF_CQ_BASE, lf_q_base.u);
+	}
+}
+
+static inline void cn20k_cptlf_set_cqueues_size(struct otx2_cptlfs_info
+						*lfs)
+{
+	int slot;
+
+	for (slot = 0; slot < lfs->lfs_num; slot++) {
+		union cn20k_cptx_lf_cq_size lf_cq_size = { .u = 0x0 };
+
+		lf_cq_size.s.size = CN20K_CPT_CQ_SIZE & 0xFFFFF;
+		otx2_cpt_write64(lfs->lf[slot].lfs->reg_base,
+				 lfs->lf[slot].lfs->blkaddr,
+				 lfs->lf[slot].slot,
+				 CN20K_CPT_LF_CQ_SIZE, lf_cq_size.u);
+	}
+}
+
+static inline void cn20k_cptlf_enable_cqueue_enq(struct otx2_cptlf_info
+						 *lf)
+{
+	u8 blkaddr = lf->lfs->blkaddr;
+	union cn20k_cptx_lf_ctl lf_ctl;
+
+	lf_ctl.u = otx2_cpt_read64(lf->lfs->reg_base, blkaddr, lf->slot,
+				   CN20K_CPT_LF_CQ_CTL);
+	lf_ctl.s.ena = 0x1;
+	lf_ctl.s.cq_all = 0x1;
+	lf_ctl.s.dq_notify_ena = 0x1;
+	otx2_cpt_write64(lf->lfs->reg_base, blkaddr, lf->slot,
+			 CN20K_CPT_LF_CQ_CTL, lf_ctl.u);
+}
+
+static inline void cn20k_cptlf_enable_cqueues(struct otx2_cptlfs_info *lfs)
+{
+	int slot;
+
+	for (slot = 0; slot < lfs->lfs_num; slot++)
+		cn20k_cptlf_enable_cqueue_enq(&lfs->lf[slot]);
+}
+
+static inline void cn20k_setup_completion_queues(struct otx2_cptlfs_info
+						 *lfs)
+{
+        cn20k_cptlf_set_cqueues_base_addr(lfs);
+        cn20k_cptlf_set_cqueues_size(lfs);
+        cn20k_cptlf_enable_cqueues(lfs);
 }
 
 int otx2_cptlf_init(struct otx2_cptlfs_info *lfs, u8 eng_grp_msk, u8 pri,

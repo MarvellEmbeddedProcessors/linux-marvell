@@ -395,7 +395,7 @@ cn10k_sgv2_info_create(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
 	/* Allocate extra memory for SG and response address alignment */
 	total_mem_len = ALIGN(info_len, OTX2_CPT_DPTR_RPTR_ALIGN) + sg_len;
 	total_mem_len = ALIGN(total_mem_len, OTX2_CPT_RES_ADDR_ALIGN) +
-			 sizeof(union otx2_cpt_res_s);
+			 cpt_res_s_sz(pdev);
 
 	info = kzalloc(total_mem_len, gfp);
 	if (unlikely(!info))
@@ -500,7 +500,7 @@ otx2_sg_info_create(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
 	/* Allocate extra memory for SG and response address alignment */
 	total_mem_len = ALIGN(info_len, OTX2_CPT_DPTR_RPTR_ALIGN) + dlen;
 	total_mem_len = ALIGN(total_mem_len, OTX2_CPT_RES_ADDR_ALIGN) +
-			 sizeof(union otx2_cpt_res_s);
+			 cpt_res_s_sz(pdev);
 
 	info = kzalloc(total_mem_len, gfp);
 	if (unlikely(!info))
@@ -577,7 +577,7 @@ static inline struct otx2_cpt_inst_info *otx2_cpt_info_create(struct pci_dev *pd
 
 	/* Allocate extra memory for SG and response address alignment */
 	total_mem_len = ALIGN(info_len, OTX2_CPT_RES_ADDR_ALIGN) +
-			 sizeof(union otx2_cpt_res_s);
+			 cpt_res_s_sz(pdev);
 
 	info = kzalloc(total_mem_len, gfp);
 	if (unlikely(!info))

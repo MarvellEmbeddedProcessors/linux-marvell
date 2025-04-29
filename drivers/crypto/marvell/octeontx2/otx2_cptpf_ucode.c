@@ -1965,7 +1965,7 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 	if (ret)
 		goto delete_grps;
 
-	len = LOADFVC_RLEN + sizeof(union otx2_cpt_res_s) +
+	len = LOADFVC_RLEN + cpt_res_s_sz(pdev) +
 	       OTX2_CPT_RES_ADDR_ALIGN;
 
 	rptr = kzalloc(len, GFP_KERNEL);

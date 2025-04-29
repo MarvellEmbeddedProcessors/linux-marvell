@@ -262,6 +262,11 @@ static void cptvf_lf_shutdown(struct otx2_cptlfs_info *lfs)
 
 	/* Remove interrupts affinity */
 	otx2_cptlf_free_irqs_affinity(lfs);
+	/* Disable and Free completion queues */
+	if (lfs->cq_ena) {
+		cn20k_cptlf_disable_cqueues(lfs);
+		cn20k_cpt_free_completion_queues(lfs);
+	}
 	/* Disable instruction queue */
 	otx2_cptlf_disable_iqueues(lfs);
 	/* Unregister crypto algorithms */

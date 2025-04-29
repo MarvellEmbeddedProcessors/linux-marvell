@@ -28,6 +28,16 @@ struct cn10k_cpt_errata_ctx {
 	u64 cptr_dma;
 };
 
+static inline u8 cn20k_cpt_get_compcode(union otx2_cpt_res_s *result)
+{
+	return ((struct cn20k_cpt_cq_res_s *)result)->compcode;
+}
+
+static inline u8 cn20k_cpt_get_uc_compcode(union otx2_cpt_res_s *result)
+{
+	return ((struct cn20k_cpt_cq_res_s *)result)->uc_compcode;
+}
+
 static inline u8 cn10k_cpt_get_compcode(union otx2_cpt_res_s *result)
 {
 	return ((struct cn10k_cpt_res_s *)result)->compcode;

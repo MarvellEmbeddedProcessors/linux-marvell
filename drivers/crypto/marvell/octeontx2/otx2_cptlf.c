@@ -134,6 +134,10 @@ static void cptlf_hw_init(struct otx2_cptlfs_info *lfs)
 
 	/* Enable instruction queues */
 	otx2_cptlf_enable_iqueues(lfs);
+
+	/* Set-up completion queue */
+	if (lfs->cq_ena)
+		cn20k_setup_completion_queues(lfs);
 }
 
 static void cptlf_hw_cleanup(struct otx2_cptlfs_info *lfs)
@@ -446,6 +450,15 @@ int otx2_cptlf_init(struct otx2_cptlfs_info *lfs, u8 eng_grp_mask, u8 pri,
 			"Allocating instruction queues failed\n");
 		goto detach_rsrcs;
 	}
+
+	if (lfs->cq_ena) {
+		ret = cn20k_cpt_alloc_completion_queues(lfs);
+		if (ret) {
+			dev_err(&lfs->pdev->dev,
+				"Allocating completion queues failed\n");
+			goto detach_rsrcs;
+		}
+	}
 	cptlf_hw_init(lfs);
 	/*
 	 * Allow each LF to execute requests destined to any of 8 engine
@@ -469,6 +482,10 @@ int otx2_cptlf_init(struct otx2_cptlfs_info *lfs, u8 eng_grp_mask, u8 pri,
 	return 0;
 
 free_iq:
+	if (lfs->cq_ena) {
+		cn20k_cptlf_disable_cqueues(lfs);
+		cn20k_cpt_free_completion_queues(lfs);
+	}
 	cptlf_hw_cleanup(lfs);
 	otx2_cpt_free_instruction_queues(lfs);
 detach_rsrcs:
@@ -481,6 +498,11 @@ EXPORT_SYMBOL_NS_GPL(otx2_cptlf_init, CRYPTO_DEV_OCTEONTX2_CPT);
 
 void otx2_cptlf_shutdown(struct otx2_cptlfs_info *lfs)
 {
+	/* Free completion queues */
+	if (lfs->cq_ena) {
+		cn20k_cptlf_disable_cqueues(lfs);
+		cn20k_cpt_free_completion_queues(lfs);
+	}
 	/* Cleanup LFs hardware side */
 	cptlf_hw_cleanup(lfs);
 	/* Free instruction queues */

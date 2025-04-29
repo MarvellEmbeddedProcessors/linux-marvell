@@ -215,6 +215,14 @@ static inline bool cpt_feature_rxc_icb_cnt(struct pci_dev *pdev)
 	return false;
 }
 
+static size_t cpt_res_s_sz(struct pci_dev *pdev)
+{
+	if (is_cn20k(pdev))
+		return sizeof(((union otx2_cpt_res_s *)0)->cn20k);
+	else
+		return sizeof(((union otx2_cpt_res_s *)0)->cn10k);
+}
+
 int otx2_cpt_send_ready_msg(struct otx2_mbox *mbox, struct pci_dev *pdev);
 int otx2_cpt_send_mbox_msg(struct otx2_mbox *mbox, struct pci_dev *pdev);
 void otx2_cpt_sync_mbox_bbuf(struct otx2_mbox *mbox, int devid);
