@@ -6850,6 +6850,7 @@ static bool mvpp2_use_acpi_compat_mode(struct fwnode_handle *port_fwnode)
 		!fwnode_get_named_child_node(port_fwnode, "fixed-link"));
 }
 
+#if IS_REACHABLE(CONFIG_NET_DSA)
 static void mvpp2_port_enable_non_extended_dsa(struct mvpp2_port *port)
 {
 	struct mvpp2 *priv = port->priv;
@@ -6865,10 +6866,12 @@ static void mvpp2_port_enable_non_extended_dsa(struct mvpp2_port *port)
 	reg |= MVPP2_DSA_NON_EXTENDED;
 	mvpp2_write(priv, MVPP2_MH_REG(port->id), reg);
 }
+#endif
 
 static int mvpp2_netdevice_event(struct notifier_block *nb,
 				 unsigned long event, void *ptr)
 {
+#if IS_REACHABLE(CONFIG_NET_DSA)
 	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
 	struct netdev_notifier_changeupper_info *info = ptr;
 	struct mvpp2_port *port;
@@ -6893,7 +6896,7 @@ static int mvpp2_netdevice_event(struct notifier_block *nb,
 		/* We don't care about other events */
 		return NOTIFY_DONE;
 	}
-
+#endif
 	return NOTIFY_DONE;
 }
 
