@@ -717,6 +717,7 @@ static int cpt_aead_init(struct crypto_aead *atfm, u8 cipher_type, u8 mac_type)
 		break;
 	case OTX2_CPT_AES_GCM:
 	case OTX2_CPT_AES_CCM:
+	case OTX2_CPT_AES_CTR:
 	case OTX2_CPT_CIPHER_NULL:
 		ctx->enc_align_len = 1;
 		break;
@@ -794,6 +795,26 @@ static int otx2_cpt_aead_gcm_aes_init(struct crypto_aead *tfm)
 static int otx2_cpt_aead_ccm_aes_init(struct crypto_aead *tfm)
 {
 	return cpt_aead_init(tfm, OTX2_CPT_AES_CCM, OTX2_CPT_MAC_NULL);
+}
+
+static int otx2_cpt_aead_rfc3686_ctr_aes_sha1_init(struct crypto_aead *tfm)
+{
+	return cpt_aead_init(tfm, OTX2_CPT_AES_CTR, OTX2_CPT_SHA1);
+}
+
+static int otx2_cpt_aead_rfc3686_ctr_aes_sha256_init(struct crypto_aead *tfm)
+{
+	return cpt_aead_init(tfm, OTX2_CPT_AES_CTR, OTX2_CPT_SHA256);
+}
+
+static int otx2_cpt_aead_rfc3686_ctr_aes_sha384_init(struct crypto_aead *tfm)
+{
+	return cpt_aead_init(tfm, OTX2_CPT_AES_CTR, OTX2_CPT_SHA384);
+}
+
+static int otx2_cpt_aead_rfc3686_ctr_aes_sha512_init(struct crypto_aead *tfm)
+{
+	return cpt_aead_init(tfm, OTX2_CPT_AES_CTR, OTX2_CPT_SHA512);
 }
 
 static void otx2_cpt_aead_exit(struct crypto_aead *tfm)
@@ -1030,6 +1051,46 @@ static int otx2_cpt_aead_cbc_aes_sha_setkey(struct crypto_aead *cipher,
 	return aead_hmac_init(cipher, &authenc_keys);
 }
 
+static int otx2_cpt_aead_rfc3686_ctr_aes_sha_setkey(struct crypto_aead *cipher,
+						    const unsigned char *key,
+						    unsigned int keylen)
+{
+	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(cipher);
+	struct crypto_authenc_keys authenc_keys;
+	int ret;
+
+	ret = crypto_authenc_extractkeys(&authenc_keys, key, keylen);
+	if (ret)
+		return ret;
+
+	if (ctx->cipher_type == OTX2_CPT_CIPHER_NULL)
+		return authenc_keys.enckeylen ? -EINVAL : 0;
+
+	switch (authenc_keys.enckeylen) {
+	case AES_KEYSIZE_128 + CTR_RFC3686_NONCE_SIZE:
+		ctx->key_type = OTX2_CPT_AES_128_BIT;
+		ctx->enc_key_len = AES_KEYSIZE_128;
+		break;
+	case AES_KEYSIZE_192 + CTR_RFC3686_NONCE_SIZE:
+		ctx->key_type = OTX2_CPT_AES_192_BIT;
+		ctx->enc_key_len = AES_KEYSIZE_192;
+		break;
+	case AES_KEYSIZE_256 + CTR_RFC3686_NONCE_SIZE:
+		ctx->key_type = OTX2_CPT_AES_256_BIT;
+		ctx->enc_key_len = AES_KEYSIZE_256;
+		break;
+	default:
+		/* Invalid key length */
+		return -EINVAL;
+	}
+
+	memcpy(ctx->key, authenc_keys.authkey, authenc_keys.authkeylen);
+	memcpy(ctx->key + authenc_keys.authkeylen, authenc_keys.enckey,
+	       authenc_keys.enckeylen);
+
+	return aead_hmac_init(cipher, &authenc_keys);
+}
+
 static int otx2_cpt_aead_ecb_null_sha_setkey(struct crypto_aead *cipher,
 					     const unsigned char *key,
 					     unsigned int keylen)
@@ -1116,6 +1177,32 @@ static inline int create_aead_ctx_hdr(struct aead_request *req, u32 enc,
 	rctx->ctrl_word.e.enc_data_offset = req->assoclen;
 
 	switch (ctx->cipher_type) {
+	case OTX2_CPT_AES_CTR:
+		if (req->assoclen > 248 || !IS_ALIGNED(req->assoclen, 8))
+			return -EINVAL;
+
+		fctx->enc.enc_ctrl.e.iv_source = OTX2_CPT_FROM_CPTR;
+		/* Copy encryption key to context */
+		memcpy(fctx->enc.encr_key, ctx->key + ctx->auth_key_len,
+		       ctx->enc_key_len);
+		/* Copy salt to context */
+		memcpy(fctx->enc.encr_iv, ctx->key + ctx->auth_key_len +
+		       ctx->enc_key_len, CTR_RFC3686_NONCE_SIZE);
+		/* Copy IV to context */
+		memcpy(fctx->enc.encr_iv + CTR_RFC3686_NONCE_SIZE, req->iv,
+		       crypto_aead_ivsize(tfm));
+
+		ds = crypto_shash_digestsize(ctx->hashalg);
+		if (ctx->mac_type == OTX2_CPT_SHA384)
+			ds = SHA512_DIGEST_SIZE;
+		if (ctx->ipad)
+			memcpy(fctx->hmac.e.ipad, ctx->ipad, ds);
+		if (ctx->opad)
+			memcpy(fctx->hmac.e.opad, ctx->opad, ds);
+		fctx->enc.enc_ctrl.e.enc_cipher = ctx->cipher_type;
+		fctx->enc.enc_ctrl.e.mac_type = ctx->mac_type;
+		break;
+
 	case OTX2_CPT_AES_CBC:
 		if (req->assoclen > 248 || !IS_ALIGNED(req->assoclen, 8))
 			return -EINVAL;
@@ -1602,6 +1689,86 @@ static struct skcipher_alg otx2_cpt_skciphers[] = { {
 } };
 
 static struct aead_alg otx2_cpt_aeads[] = { {
+	.base = {
+		.cra_name = "authenc(hmac(sha1),rfc3686(ctr(aes)))",
+		.cra_driver_name = "cpt_hmac_sha1_rfc3686_ctr_aes",
+		.cra_blocksize = 1,
+		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx) +
+				CRYPTO_DMA_PADDING,
+		.cra_priority = 4001,
+		.cra_alignmask = 0,
+		.cra_module = THIS_MODULE,
+	},
+	.init = otx2_cpt_aead_rfc3686_ctr_aes_sha1_init,
+	.exit = otx2_cpt_aead_exit,
+	.setkey = otx2_cpt_aead_rfc3686_ctr_aes_sha_setkey,
+	.setauthsize = otx2_cpt_aead_set_authsize,
+	.encrypt = otx2_cpt_aead_encrypt,
+	.decrypt = otx2_cpt_aead_decrypt,
+	.ivsize = CTR_RFC3686_IV_SIZE,
+	.maxauthsize = SHA1_DIGEST_SIZE,
+}, {
+	.base = {
+		.cra_name = "authenc(hmac(sha256),rfc3686(ctr(aes)))",
+		.cra_driver_name = "cpt_hmac_sha256_rfc3686_ctr_aes",
+		.cra_blocksize = 1,
+		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx) +
+				CRYPTO_DMA_PADDING,
+		.cra_priority = 4001,
+		.cra_alignmask = 0,
+		.cra_module = THIS_MODULE,
+	},
+	.init = otx2_cpt_aead_rfc3686_ctr_aes_sha256_init,
+	.exit = otx2_cpt_aead_exit,
+	.setkey = otx2_cpt_aead_rfc3686_ctr_aes_sha_setkey,
+	.setauthsize = otx2_cpt_aead_set_authsize,
+	.encrypt = otx2_cpt_aead_encrypt,
+	.decrypt = otx2_cpt_aead_decrypt,
+	.ivsize = CTR_RFC3686_IV_SIZE,
+	.maxauthsize = SHA256_DIGEST_SIZE,
+}, {
+	.base = {
+		.cra_name = "authenc(hmac(sha384),rfc3686(ctr(aes)))",
+		.cra_driver_name = "cpt_hmac_sha384_rfc3686_ctr_aes",
+		.cra_blocksize = 1,
+		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx) +
+				CRYPTO_DMA_PADDING,
+		.cra_priority = 4001,
+		.cra_alignmask = 0,
+		.cra_module = THIS_MODULE,
+	},
+	.init = otx2_cpt_aead_rfc3686_ctr_aes_sha384_init,
+	.exit = otx2_cpt_aead_exit,
+	.setkey = otx2_cpt_aead_rfc3686_ctr_aes_sha_setkey,
+	.setauthsize = otx2_cpt_aead_set_authsize,
+	.encrypt = otx2_cpt_aead_encrypt,
+	.decrypt = otx2_cpt_aead_decrypt,
+	.ivsize = CTR_RFC3686_IV_SIZE,
+	.maxauthsize = SHA384_DIGEST_SIZE,
+}, {
+	.base = {
+		.cra_name = "authenc(hmac(sha512),rfc3686(ctr(aes)))",
+		.cra_driver_name = "cpt_hmac_sha512_rfc3686_ctr_aes",
+		.cra_blocksize = 1,
+		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx) +
+				CRYPTO_DMA_PADDING,
+		.cra_priority = 4001,
+		.cra_alignmask = 0,
+		.cra_module = THIS_MODULE,
+	},
+	.init = otx2_cpt_aead_rfc3686_ctr_aes_sha512_init,
+	.exit = otx2_cpt_aead_exit,
+	.setkey = otx2_cpt_aead_rfc3686_ctr_aes_sha_setkey,
+	.setauthsize = otx2_cpt_aead_set_authsize,
+	.encrypt = otx2_cpt_aead_encrypt,
+	.decrypt = otx2_cpt_aead_decrypt,
+	.ivsize = CTR_RFC3686_IV_SIZE,
+	.maxauthsize = SHA512_DIGEST_SIZE,
+}, {
 	.base = {
 		.cra_name = "authenc(hmac(sha1),cbc(aes))",
 		.cra_driver_name = "cpt_hmac_sha1_cbc_aes",
