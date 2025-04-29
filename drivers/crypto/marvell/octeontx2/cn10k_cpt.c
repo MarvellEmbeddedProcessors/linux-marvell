@@ -25,6 +25,13 @@ static struct cpt_hw_ops cn10k_hw_ops = {
 	.cpt_sg_info_create = otx2_sg_info_create,
 };
 
+static struct cpt_hw_ops cn20k_hw_ops = {
+	.send_cmd = cn10k_cpt_send_cmd,
+	.cpt_get_compcode = cn20k_cpt_get_compcode,
+	.cpt_get_uc_compcode = cn20k_cpt_get_uc_compcode,
+	.cpt_sg_info_create = otx2_sg_info_create,
+};
+
 static void cn10k_cpt_send_cmd(union otx2_cpt_inst_s *cptinst, u32 insts_num,
 			       struct otx2_cptlf_info *lf)
 {
@@ -215,7 +222,9 @@ EXPORT_SYMBOL_NS_GPL(cn10k_cpt_ctx_flush, CRYPTO_DEV_OCTEONTX2_CPT);
 
 void cptvf_hw_ops_get(struct otx2_cptvf_dev *cptvf)
 {
-	if (test_bit(CN10K_LMTST, &cptvf->cap_flag))
+	if (is_cn20k(cptvf->pdev))
+		cptvf->lfs.ops = &cn20k_hw_ops;
+	else if (test_bit(CN10K_LMTST, &cptvf->cap_flag))
 		cptvf->lfs.ops = &cn10k_hw_ops;
 	else
 		cptvf->lfs.ops = &otx2_hw_ops;

@@ -398,7 +398,7 @@ cn10k_sgv2_info_create(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
 	total_mem_len += (ARCH_DMA_MINALIGN - 1) &
 			  ~(OTX2_CPT_DPTR_RPTR_ALIGN - 1);
 	total_mem_len += ALIGN(sg_len, OTX2_CPT_RES_ADDR_ALIGN);
-	total_mem_len += sizeof(union otx2_cpt_res_s);
+	total_mem_len += cpt_res_s_sz(pdev);
 
 	info = kzalloc(total_mem_len, gfp);
 	if (unlikely(!info))
@@ -507,7 +507,7 @@ otx2_sg_info_create(struct pci_dev *pdev, struct otx2_cpt_req_info *req,
 	total_mem_len += (ARCH_DMA_MINALIGN - 1) &
 			  ~(OTX2_CPT_DPTR_RPTR_ALIGN - 1);
 	total_mem_len += ALIGN(dlen, OTX2_CPT_RES_ADDR_ALIGN);
-	total_mem_len += sizeof(union otx2_cpt_res_s);
+	total_mem_len += cpt_res_s_sz(pdev);
 
 	info = kzalloc(total_mem_len, gfp);
 	if (unlikely(!info))
@@ -570,7 +570,7 @@ static inline struct otx2_cpt_inst_info *otx2_cpt_info_create(struct pci_dev *pd
 	u32 info_len;
 
 	info_len = ALIGN(sizeof(*info), align);
-	total_mem_len = info_len + sizeof(union otx2_cpt_res_s);
+	total_mem_len = info_len + cpt_res_s_sz(pdev);
 
 	info = kzalloc(total_mem_len, gfp);
 	if (unlikely(!info))

@@ -2047,7 +2047,7 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 
 	/* Allocate extra memory for "rptr" and "result" pointer alignment */
 	len = LOADFVC_RLEN + ARCH_DMA_MINALIGN +
-	       sizeof(union otx2_cpt_res_s) + OTX2_CPT_RES_ADDR_ALIGN;
+		cpt_res_s_sz(pdev) + OTX2_CPT_RES_ADDR_ALIGN;
 
 	base = kzalloc(len, GFP_KERNEL);
 	if (!base) {

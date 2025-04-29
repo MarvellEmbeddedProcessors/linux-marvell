@@ -110,6 +110,18 @@
 #define OTX2_CPT_LMT_LFBASE             BIT_ULL(OTX2_CPT_RVU_FUNC_BLKADDR_SHIFT)
 #define OTX2_CPT_LMT_LF_LMTLINEX(a)     (OTX2_CPT_LMT_LFBASE | 0x000 | \
 					 (a) << 12)
+
+/* CN20K CPT LF registers */
+#define CN20K_CPT_LF_CQ_BASE		0x200
+#define CN20K_CPT_LF_CQ_ADDR_MASK	GENMASK(52, 7)
+#define CN20K_CPT_LF_CQ_SIZE		0x210
+#define CN20K_CPT_LF_CQ_SIZE_MASK	GENMASK(19, 0)
+#define CN20K_CPT_LF_CQ_PTR		0x220
+#define CN20K_CPT_LF_CQ_NQ_PTR_MASK	GENMASK(51, 32)
+#define CN20K_CPT_LF_CQ_CNT_MASK	GENMASK(19, 0)
+#define CN20K_CPT_LF_CQ_CTL		0x230
+#define CN20K_CPT_LF_CQ_ENTRY_SZ_MASK	GENMASK(17, 16)
+
 /* RVU VF registers */
 #define OTX2_RVU_VF_INT                 (0x20)
 #define OTX2_RVU_VF_INT_W1S             (0x28)
@@ -273,7 +285,7 @@ union otx2_cpt_inst_s {
  *
  */
 union otx2_cpt_res_s {
-	u64 u[2];
+	u64 u[3];
 
 	struct cn9k_cpt_res_s {
 		u64 compcode:8;
@@ -291,6 +303,19 @@ union otx2_cpt_res_s {
 		u64 spi:32;
 		u64 esn;
 	} cn10k;
+
+	struct cn20k_cpt_cq_res_s {
+		u64 compcode:7;
+		u64 doneint:1;
+		u64 uc_compcode:8;
+		u64 rlen:16;
+		u64 spi:32;
+		u64 esn;
+		u64 fmt:2;
+		u64 rsvd_130_143:14;
+		u64 rsvd_144_191:48;
+		u64 rsvd_255_192;
+	} cn20k;
 };
 
 /*
@@ -477,6 +502,41 @@ union otx2_cptx_af_lf_ctrl {
 		u64 reserved_17_47:28;
 		u64 grp:8;
 		u64 reserved_56_63:8;
+	} s;
+};
+
+union cn20k_cptx_lf_q_base {
+	u64 u;
+	struct cn20k_cptx_lf_q_base_s {
+		u64 reserved_0_6:7;
+		u64 addr:46;
+		u64 reserved_53_63:11;
+	} s;
+};
+
+union cn20k_cptx_lf_cq_size {
+	u64 u;
+	struct cn20k_cptx_lf_cq_size_s {
+		u64 size:20;
+		u64 reserved_20_63:44;
+	} s;
+};
+
+union cn20k_cptx_lf_ctl {
+	u64 u;
+	struct cn20k_cptx_lf_ctl_s {
+		u64 ena:1;
+		u64 fc_ena:1;
+		u64 fc_up_crossing:1;
+		u64 reserved_3:1;
+		u64 fc_hyst_bits:4;
+		u64 reserved_8_15:8;
+		u64 entry_size:2;
+		u64 reserved_18_23:6;
+		u64 dq_notify_ena:1;
+		u64 cq_all:1;
+		u64 reserved_26_43:18;
+		u64 busy_count:20;
 	} s;
 };
 
