@@ -909,31 +909,9 @@ static int aead_hmac_init(struct crypto_aead *cipher,
 			goto calc_fail;
 
 		authkeylen = ds;
-	} else
-		memcpy(ctx->key, keys->authkey, authkeylen);
-
-	ctx->enc_key_len = keys->enckeylen;
-	ctx->auth_key_len = authkeylen;
-
-	if (ctx->cipher_type == OTX2_CPT_CIPHER_NULL)
-		return keys->enckeylen ? -EINVAL : 0;
-
-	switch (keys->enckeylen) {
-	case AES_KEYSIZE_128:
-		ctx->key_type = OTX2_CPT_AES_128_BIT;
-		break;
-	case AES_KEYSIZE_192:
-		ctx->key_type = OTX2_CPT_AES_192_BIT;
-		break;
-	case AES_KEYSIZE_256:
-		ctx->key_type = OTX2_CPT_AES_256_BIT;
-		break;
-	default:
-		/* Invalid key length */
-		return -EINVAL;
 	}
 
-	memcpy(ctx->key + authkeylen, keys->enckey, keys->enckeylen);
+	ctx->auth_key_len = authkeylen;
 
 	ipad = ctx->ipad;
 	opad = ctx->opad;
@@ -974,10 +952,39 @@ static int otx2_cpt_aead_cbc_aes_sha_setkey(struct crypto_aead *cipher,
 					    const unsigned char *key,
 					    unsigned int keylen)
 {
+	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(cipher);
 	struct crypto_authenc_keys authenc_keys;
+	int ret;
 
-	return crypto_authenc_extractkeys(&authenc_keys, key, keylen) ?:
-	       aead_hmac_init(cipher, &authenc_keys);
+	ret = crypto_authenc_extractkeys(&authenc_keys, key, keylen);
+	if (ret)
+		return ret;
+
+	if (ctx->cipher_type == OTX2_CPT_CIPHER_NULL)
+		return authenc_keys.enckeylen ? -EINVAL : 0;
+
+	switch (authenc_keys.enckeylen) {
+	case AES_KEYSIZE_128:
+		ctx->key_type = OTX2_CPT_AES_128_BIT;
+		break;
+	case AES_KEYSIZE_192:
+		ctx->key_type = OTX2_CPT_AES_192_BIT;
+		break;
+	case AES_KEYSIZE_256:
+		ctx->key_type = OTX2_CPT_AES_256_BIT;
+		break;
+	default:
+		/* Invalid key length */
+		return -EINVAL;
+	}
+
+	ctx->enc_key_len = authenc_keys.enckeylen;
+
+	memcpy(ctx->key, authenc_keys.authkey, authenc_keys.authkeylen);
+	memcpy(ctx->key + authenc_keys.authkeylen, authenc_keys.enckey,
+	       authenc_keys.enckeylen);
+
+	return aead_hmac_init(cipher, &authenc_keys);
 }
 
 static int otx2_cpt_aead_ecb_null_sha_setkey(struct crypto_aead *cipher,
