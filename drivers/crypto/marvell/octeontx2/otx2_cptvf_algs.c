@@ -11,6 +11,8 @@
 #include <crypto/xts.h>
 #include <crypto/gcm.h>
 #include <crypto/ctr.h>
+#include <crypto/chacha.h>
+#include <crypto/poly1305.h>
 #include <crypto/scatterwalk.h>
 #include <linux/sort.h>
 #include <linux/module.h>
@@ -670,6 +672,10 @@ static int cpt_aead_init(struct crypto_aead *atfm, u8 cipher_type, u8 mac_type)
 	case OTX2_CPT_SHA512:
 		ctx->hashalg = crypto_alloc_shash("sha512", 0, 0);
 		break;
+
+	case OTX2_CPT_POLY1305:
+		ctx->hashalg = crypto_alloc_shash("poly1305", 0, 0);
+		break;
 	}
 
 	if (IS_ERR(ctx->hashalg))
@@ -719,6 +725,7 @@ static int cpt_aead_init(struct crypto_aead *atfm, u8 cipher_type, u8 mac_type)
 	case OTX2_CPT_AES_CCM:
 	case OTX2_CPT_AES_CTR:
 	case OTX2_CPT_CIPHER_NULL:
+	case OTX2_CPT_CHACHA20:
 		ctx->enc_align_len = 1;
 		break;
 	}
@@ -817,6 +824,22 @@ static int otx2_cpt_aead_rfc3686_ctr_aes_sha512_init(struct crypto_aead *tfm)
 	return cpt_aead_init(tfm, OTX2_CPT_AES_CTR, OTX2_CPT_SHA512);
 }
 
+static int otx2_cpt_aead_rfc7539_chacha20_poly1305_esp_init(struct crypto_aead *tfm)
+{
+	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(tfm);
+
+	ctx->is_chacha20_poly1305_esp = true;
+	return cpt_aead_init(tfm, OTX2_CPT_CHACHA20, OTX2_CPT_POLY1305);
+}
+
+static int otx2_cpt_aead_rfc7539_chacha20_poly1305_init(struct crypto_aead *tfm)
+{
+	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(tfm);
+
+	ctx->is_chacha20_poly1305_esp = false;
+	return cpt_aead_init(tfm, OTX2_CPT_CHACHA20, OTX2_CPT_POLY1305);
+}
+
 static void otx2_cpt_aead_exit(struct crypto_aead *tfm)
 {
 	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(tfm);
@@ -880,6 +903,18 @@ static int otx2_cpt_aead_ccm_set_authsize(struct crypto_aead *tfm,
 static int otx2_cpt_aead_set_authsize(struct crypto_aead *tfm,
 				      unsigned int authsize)
 {
+	tfm->authsize = authsize;
+
+	return 0;
+}
+
+static int
+otx2_cpt_aead_rfc7539_chacha20_poly1305_set_authsize(struct crypto_aead *tfm,
+						     unsigned int authsize)
+{
+	if (authsize != POLY1305_DIGEST_SIZE)
+		return -EINVAL;
+
 	tfm->authsize = authsize;
 
 	return 0;
@@ -1162,6 +1197,27 @@ static int otx2_cpt_aead_gcm_aes_setkey(struct crypto_aead *cipher,
 	return crypto_aead_setkey(ctx->fbk_cipher, key, keylen);
 }
 
+static int
+otx2_cpt_aead_rfc7539_chacha20_poly1305_setkey(struct crypto_aead *cipher,
+					       const unsigned char *key,
+					       unsigned int keylen)
+{
+	struct otx2_cpt_aead_ctx *ctx = crypto_aead_ctx_dma(cipher);
+	unsigned int ivsize = crypto_aead_ivsize(cipher);
+	unsigned int saltlen = CHACHAPOLY_IV_SIZE - ivsize;
+
+	if (keylen != CHACHA_KEY_SIZE + saltlen)
+		return -EINVAL;
+
+	ctx->key_type = OTX2_CPT_AES_256_BIT;
+	ctx->enc_key_len = keylen - saltlen;
+
+	/* Store encryption key */
+	memcpy(ctx->key, key, keylen);
+
+	return crypto_aead_setkey(ctx->fbk_cipher, key, keylen);
+}
+
 static inline int create_aead_ctx_hdr(struct aead_request *req, u32 enc,
 				      u32 *argcnt)
 {
@@ -1177,6 +1233,33 @@ static inline int create_aead_ctx_hdr(struct aead_request *req, u32 enc,
 	rctx->ctrl_word.e.enc_data_offset = req->assoclen;
 
 	switch (ctx->cipher_type) {
+	case OTX2_CPT_CHACHA20:
+		if (ctx->is_chacha20_poly1305_esp &&
+		    crypto_ipsec_check_assoclen(req->assoclen))
+			return -EINVAL;
+		else if (req->assoclen > 512)
+			return -EINVAL;
+
+		fctx->enc.enc_ctrl.e.enc_cipher = ctx->cipher_type;
+		fctx->enc.enc_ctrl.e.mac_type = ctx->mac_type;
+
+		/* Copy encryption key to context */
+		memcpy(fctx->enc.encr_key, ctx->key, ctx->enc_key_len);
+		if (ctx->is_chacha20_poly1305_esp) {
+			/* Copy salt to context */
+			memcpy(fctx->enc.encr_iv, ctx->key + ctx->enc_key_len, 4);
+
+			fctx->enc.enc_ctrl.e.iv_source = OTX2_CPT_FROM_DPTR;
+			rctx->ctrl_word.e.iv_offset = req->assoclen - AES_GCM_IV_OFFSET;
+		} else {
+			fctx->enc.enc_ctrl.e.iv_source = OTX2_CPT_FROM_CPTR;
+			memcpy(fctx->enc.encr_iv, req->iv, crypto_aead_ivsize(tfm));
+			/* 12-byte IV */
+			minor_op = 1 << 5;
+		}
+
+		break;
+
 	case OTX2_CPT_AES_CTR:
 		if (req->assoclen > 248 || !IS_ALIGNED(req->assoclen, 8))
 			return -EINVAL;
@@ -1977,6 +2060,46 @@ static struct aead_alg otx2_cpt_aeads[] = { {
 	.decrypt = otx2_cpt_aead_decrypt,
 	.ivsize = AES_BLOCK_SIZE,
 	.maxauthsize = AES_BLOCK_SIZE,
+}, {
+	.base = {
+		.cra_name = "rfc7539esp(chacha20,poly1305)",
+		.cra_driver_name = "cpt_rfc7539_esp_chacha20_poly1305",
+		.cra_blocksize = 1,
+		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx) +
+				CRYPTO_DMA_PADDING,
+		.cra_priority = 4001,
+		.cra_alignmask = 0,
+		.cra_module = THIS_MODULE,
+	},
+	.init = otx2_cpt_aead_rfc7539_chacha20_poly1305_esp_init,
+	.exit = otx2_cpt_aead_exit,
+	.setkey = otx2_cpt_aead_rfc7539_chacha20_poly1305_setkey,
+	.setauthsize = otx2_cpt_aead_rfc7539_chacha20_poly1305_set_authsize,
+	.encrypt = otx2_cpt_aead_encrypt,
+	.decrypt = otx2_cpt_aead_decrypt,
+	.ivsize = 8,
+	.maxauthsize = POLY1305_DIGEST_SIZE,
+}, {
+	.base = {
+		.cra_name = "rfc7539(chacha20,poly1305)",
+		.cra_driver_name = "cpt_rfc7539_chacha20_poly1305",
+		.cra_blocksize = 1,
+		.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+		.cra_ctxsize = sizeof(struct otx2_cpt_aead_ctx) +
+				CRYPTO_DMA_PADDING,
+		.cra_priority = 4001,
+		.cra_alignmask = 0,
+		.cra_module = THIS_MODULE,
+	},
+	.init = otx2_cpt_aead_rfc7539_chacha20_poly1305_init,
+	.exit = otx2_cpt_aead_exit,
+	.setkey = otx2_cpt_aead_rfc7539_chacha20_poly1305_setkey,
+	.setauthsize = otx2_cpt_aead_rfc7539_chacha20_poly1305_set_authsize,
+	.encrypt = otx2_cpt_aead_encrypt,
+	.decrypt = otx2_cpt_aead_decrypt,
+	.ivsize = CHACHAPOLY_IV_SIZE,
+	.maxauthsize = POLY1305_DIGEST_SIZE,
 } };
 
 static inline int cpt_register_algs(void)
