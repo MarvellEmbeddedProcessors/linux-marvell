@@ -516,6 +516,7 @@ void rvu_rep_destroy(struct otx2_nic *priv)
 	rvu_eswitch_config(priv, false);
 	priv->flags |= OTX2_FLAG_INTF_DOWN;
 	rvu_rep_free_cq_rsrc(priv);
+	priv->flags &= ~OTX2_FLAG_REP_MODE_ENABLED;
 	for (rep_id = 0; rep_id < priv->rep_cnt; rep_id++) {
 		rep = priv->reps[rep_id];
 		unregister_netdev(rep->netdev);
@@ -595,6 +596,7 @@ int rvu_rep_create(struct otx2_nic *priv, struct netlink_ext_ack *extack)
 		goto exit;
 
 	rvu_eswitch_config(priv, true);
+	priv->flags |= OTX2_FLAG_REP_MODE_ENABLED;
 	return 0;
 exit:
 	while (--rep_id >= 0) {
@@ -680,7 +682,6 @@ static int rvu_rep_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	priv->pdev = pdev;
 	priv->dev = dev;
 	priv->flags |= OTX2_FLAG_INTF_DOWN;
-	priv->flags |= OTX2_FLAG_REP_MODE_ENABLED;
 
 	hw = &priv->hw;
 	hw->pdev = pdev;

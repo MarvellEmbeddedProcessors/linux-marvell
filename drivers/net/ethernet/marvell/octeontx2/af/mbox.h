@@ -1773,8 +1773,8 @@ struct nix_tl1_rr_prio_req {
 
 struct nix_stats_req {
 	struct mbox_msghdr hdr;
-	u8 reset;
 	u16 pcifunc;
+	u8 reset;
 	u64 rsvd;
 };
 
