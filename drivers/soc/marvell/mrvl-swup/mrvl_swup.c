@@ -113,7 +113,7 @@ static void prepare_names(struct smc_version_info *info, uint32_t objects)
 			if (tmp == NULL) {
 				pr_info("incorrect object selected!\n");
 			} else {
-				memcpy(info->objects[obj_count].name, tmp, VER_MAX_NAME_LENGTH);
+				strscpy(info->objects[obj_count].name, tmp, VER_MAX_NAME_LENGTH);
 				obj_count++;
 			}
 		}
