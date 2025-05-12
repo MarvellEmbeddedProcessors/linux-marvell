@@ -291,7 +291,7 @@ static void cgx_notify_pfs(struct cgx_link_event *event, struct rvu *rvu)
 
 		/* clear TL1 sw_xoff */
 		if (linfo->link_up) {
-			err = rvu_nix_tl1_xoff_clear(rvu, pfid << 10);
+			err = rvu_nix_tl1_xoff_clear(rvu, pfid << RVU_PFVF_PF_SHIFT);
 			if (err)
 				dev_warn(rvu->dev,
 					 "tl1 sw_xoff clear unsuccessful, cgx=%d lmac=%d\n",
