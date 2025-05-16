@@ -1810,6 +1810,7 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 
 static const struct acpi_device_id cdns_xspi_acpi_match[] = {
 	{"cdns,xspi-nor", 0},
+	{"marvell,xspi-nor", 0},
 	{},
 };
 MODULE_DEVICE_TABLE(acpi, cdns_xspi_acpi_match);
@@ -1818,6 +1819,9 @@ MODULE_DEVICE_TABLE(acpi, cdns_xspi_acpi_match);
 static const struct of_device_id cdns_xspi_of_match[] = {
 	{
 		.compatible = "cdns,xspi-nor",
+	},
+	{
+		.compatible = "marvell,xspi-nor",
 	},
 	{ /* end of table */}
 };
