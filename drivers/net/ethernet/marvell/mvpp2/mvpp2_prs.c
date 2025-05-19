@@ -312,6 +312,8 @@ static void mvpp2_prs_sram_shift_set(struct mvpp2_prs_entry *pe, int shift,
 	}
 
 	/* Set value */
+	pe->sram[MVPP2_BIT_TO_WORD(MVPP2_PRS_SRAM_SHIFT_OFFS)] &=
+		~MVPP2_PRS_SRAM_SHIFT_MASK;
 	pe->sram[MVPP2_BIT_TO_WORD(MVPP2_PRS_SRAM_SHIFT_OFFS)] |=
 		shift & MVPP2_PRS_SRAM_SHIFT_MASK;
 
@@ -524,14 +526,14 @@ void mvpp2_prs_mac_promisc_set(struct mvpp2 *priv, int port,
 
 /* Set entry for dsa packets */
 static void mvpp2_prs_dsa_tag_set(struct mvpp2 *priv, int port, bool add,
-				  bool tagged, bool extend)
+				  bool tagged, u8 extend)
 {
 	struct mvpp2_prs_entry pe;
 	int tid, shift;
 
 	if (extend) {
 		tid = tagged ? MVPP2_PE_EDSA_TAGGED : MVPP2_PE_EDSA_UNTAGGED;
-		shift = 8;
+		shift = extend;
 	} else {
 		tid = tagged ? MVPP2_PE_DSA_TAGGED : MVPP2_PE_DSA_UNTAGGED;
 		shift = 4;
@@ -556,12 +558,8 @@ static void mvpp2_prs_dsa_tag_set(struct mvpp2 *priv, int port, bool add,
 					     MVPP2_PRS_TCAM_DSA_TAGGED_BIT);
 
 			/* Set ai bits for next iteration */
-			if (extend)
-				mvpp2_prs_sram_ai_update(&pe, 1,
-							MVPP2_PRS_SRAM_AI_MASK);
-			else
-				mvpp2_prs_sram_ai_update(&pe, 0,
-							MVPP2_PRS_SRAM_AI_MASK);
+			mvpp2_prs_sram_ai_update(&pe, 0,
+						 MVPP2_PRS_SRAM_AI_MASK);
 
 			/* Set result info bits to 'single vlan' */
 			mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_SINGLE,
@@ -581,6 +579,38 @@ static void mvpp2_prs_dsa_tag_set(struct mvpp2 *priv, int port, bool add,
 
 		/* Mask all ports */
 		mvpp2_prs_tcam_port_map_set(&pe, 0);
+	}
+
+	if (extend > 0) {
+		if (extend == MVPP2_EBRIDGE_DSA_LEN) {
+			mvpp2_prs_sram_shift_set(&pe, shift,
+						 MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+			mvpp2_prs_sram_ai_update(&pe,
+						 MVPP2_PRS_EDSA_16B_AI_BIT,
+						 MVPP2_PRS_SRAM_AI_MASK);
+			mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_NONE,
+						 MVPP2_PRS_RI_VLAN_MASK);
+			mvpp2_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_VLAN);
+		} else {
+			if (tagged) {
+				mvpp2_prs_sram_shift_set(&pe, 0,
+							 MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+				mvpp2_prs_sram_ai_update(&pe,
+							 MVPP2_PRS_EDSA_VID_AI_BIT,
+							 MVPP2_PRS_SRAM_AI_MASK);
+				mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_SINGLE,
+							 MVPP2_PRS_RI_VLAN_MASK);
+				mvpp2_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_VID);
+			} else {
+				mvpp2_prs_sram_shift_set(&pe, shift,
+							 MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+				mvpp2_prs_sram_ai_update(&pe, 0,
+							 MVPP2_PRS_SRAM_AI_MASK);
+				mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_NONE,
+							 MVPP2_PRS_RI_VLAN_MASK);
+				mvpp2_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_L2);
+			}
+		}
 	}
 
 	/* Update port mask */
@@ -742,20 +772,32 @@ static int mvpp2_prs_vlan_add(struct mvpp2 *priv, unsigned short tpid, int ai,
 
 		mvpp2_prs_match_etype(&pe, 0, tpid);
 
-		/* VLAN tag detected, proceed with VID filtering */
-		mvpp2_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_VID);
+		if ((ai & MVPP2_PRS_EDSA_16B_AI_BIT) == 0) {
+			/* VLAN tag detected, proceed with VID filtering */
+			mvpp2_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_VID);
+
+			if (ai == MVPP2_PRS_SINGLE_VLAN_AI) {
+				mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_SINGLE,
+							 MVPP2_PRS_RI_VLAN_MASK);
+			} else {
+				ai |= MVPP2_PRS_DBL_VLAN_AI_BIT;
+				mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_TRIPLE,
+							 MVPP2_PRS_RI_VLAN_MASK);
+			}
+		} else {
+			/* ebridge DSA tag detected, skip VID filtering */
+			mvpp2_prs_sram_next_lu_set(&pe, MVPP2_PRS_LU_L2);
+			/* Shift 4 bytes for single VLAN */
+			mvpp2_prs_sram_shift_set(&pe, MVPP2_VLAN_TAG_LEN,
+						 MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
+			/* Ignore VLAN tags for ebridge DSA packets */
+			mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_NONE,
+						 MVPP2_PRS_RI_VLAN_MASK);
+		}
 
 		/* Clear all ai bits for next iteration */
 		mvpp2_prs_sram_ai_update(&pe, 0, MVPP2_PRS_SRAM_AI_MASK);
 
-		if (ai == MVPP2_PRS_SINGLE_VLAN_AI) {
-			mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_SINGLE,
-						 MVPP2_PRS_RI_VLAN_MASK);
-		} else {
-			ai |= MVPP2_PRS_DBL_VLAN_AI_BIT;
-			mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_VLAN_TRIPLE,
-						 MVPP2_PRS_RI_VLAN_MASK);
-		}
 		mvpp2_prs_tcam_ai_update(&pe, ai, MVPP2_PRS_SRAM_AI_MASK);
 
 		mvpp2_prs_shadow_set(priv, pe.index, MVPP2_PRS_LU_VLAN);
@@ -1224,33 +1266,33 @@ static void mvpp2_prs_dsa_init(struct mvpp2 *priv)
 
 	/* None tagged EDSA entry - place holder */
 	mvpp2_prs_dsa_tag_set(priv, 0, false, MVPP2_PRS_UNTAGGED,
-			      MVPP2_PRS_EDSA);
+			      MVPP2_EXTENDED_DSA_LEN);
 
 	/* Tagged EDSA entry - place holder */
-	mvpp2_prs_dsa_tag_set(priv, 0, false, MVPP2_PRS_TAGGED, MVPP2_PRS_EDSA);
+	mvpp2_prs_dsa_tag_set(priv, 0, false, MVPP2_PRS_TAGGED,
+			      MVPP2_EXTENDED_DSA_LEN);
 
 	/* None tagged DSA entry - place holder */
-	mvpp2_prs_dsa_tag_set(priv, 0, false, MVPP2_PRS_UNTAGGED,
-			      MVPP2_PRS_DSA);
+	mvpp2_prs_dsa_tag_set(priv, 0, false, MVPP2_PRS_UNTAGGED, 0);
 
 	/* Tagged DSA entry - place holder */
-	mvpp2_prs_dsa_tag_set(priv, 0, false, MVPP2_PRS_TAGGED, MVPP2_PRS_DSA);
+	mvpp2_prs_dsa_tag_set(priv, 0, false, MVPP2_PRS_TAGGED, 0);
 
 	/* None tagged EDSA ethertype entry - place holder*/
 	mvpp2_prs_dsa_tag_ethertype_set(priv, 0, false,
-					MVPP2_PRS_UNTAGGED, MVPP2_PRS_EDSA);
+					MVPP2_PRS_UNTAGGED, MVPP2_EXTENDED_DSA_LEN);
 
 	/* Tagged EDSA ethertype entry - place holder*/
 	mvpp2_prs_dsa_tag_ethertype_set(priv, 0, false,
-					MVPP2_PRS_TAGGED, MVPP2_PRS_EDSA);
+					MVPP2_PRS_TAGGED, MVPP2_EXTENDED_DSA_LEN);
 
 	/* None tagged DSA ethertype entry */
 	mvpp2_prs_dsa_tag_ethertype_set(priv, 0, true,
-					MVPP2_PRS_UNTAGGED, MVPP2_PRS_DSA);
+					MVPP2_PRS_UNTAGGED, 0);
 
 	/* Tagged DSA ethertype entry */
 	mvpp2_prs_dsa_tag_ethertype_set(priv, 0, true,
-					MVPP2_PRS_TAGGED, MVPP2_PRS_DSA);
+					MVPP2_PRS_TAGGED, 0);
 
 	/* Set default entry, in case DSA or EDSA tag not found */
 	memset(&pe, 0, sizeof(pe));
@@ -1311,7 +1353,7 @@ static void mvpp2_prs_vid_init(struct mvpp2 *priv)
 				 MVPP2_PRS_EDSA_VID_AI_BIT);
 
 	/* Skip VLAN header - Set offset to 8 bytes */
-	mvpp2_prs_sram_shift_set(&pe, MVPP2_VLAN_TAG_EDSA_LEN,
+	mvpp2_prs_sram_shift_set(&pe, MVPP2_EXTENDED_DSA_LEN,
 				 MVPP2_PRS_SRAM_OP_SEL_SHIFT_ADD);
 
 	/* Clear all ai bits for next iteration */
@@ -1559,6 +1601,12 @@ static int mvpp2_prs_vlan_init(struct platform_device *pdev, struct mvpp2 *priv)
 
 	/* Single VLAN: 0x8100 */
 	err = mvpp2_prs_vlan_add(priv, ETH_P_8021Q, MVPP2_PRS_SINGLE_VLAN_AI,
+				 MVPP2_PRS_PORT_MASK);
+	if (err)
+		return err;
+
+	/* Single VLAN: 0x8100 for ebridge DSA */
+	err = mvpp2_prs_vlan_add(priv, ETH_P_8021Q, MVPP2_PRS_EDSA_16B_AI_BIT,
 				 MVPP2_PRS_PORT_MASK);
 	if (err)
 		return err;
@@ -1975,7 +2023,7 @@ int mvpp2_prs_vid_entry_add(struct mvpp2_port *port, u16 vid)
 
 	reg_val = mvpp2_read(priv, MVPP2_MH_REG(port->id));
 	if (reg_val & MVPP2_DSA_EXTENDED)
-		shift = MVPP2_VLAN_TAG_EDSA_LEN;
+		shift = MVPP2_EXTENDED_DSA_LEN;
 	else
 		shift = MVPP2_VLAN_TAG_LEN;
 
@@ -2083,7 +2131,7 @@ void mvpp2_prs_vid_enable_filtering(struct mvpp2_port *port)
 
 	reg_val = mvpp2_read(priv, MVPP2_MH_REG(port->id));
 	if (reg_val & MVPP2_DSA_EXTENDED)
-		shift = MVPP2_VLAN_TAG_EDSA_LEN;
+		shift = MVPP2_EXTENDED_DSA_LEN;
 	else
 		shift = MVPP2_VLAN_TAG_LEN;
 
@@ -2379,46 +2427,46 @@ void mvpp2_prs_mac_del_all(struct mvpp2_port *port)
 	}
 }
 
-int mvpp2_prs_tag_mode_set(struct mvpp2 *priv, int port, int type)
+int mvpp2_prs_tag_mode_set(struct mvpp2 *priv, int port, int type, u8 edsa_len)
 {
 	switch (type) {
 	case MVPP2_TAG_TYPE_EDSA:
 		/* Add port to EDSA entries */
 		mvpp2_prs_dsa_tag_set(priv, port, true,
-				      MVPP2_PRS_TAGGED, MVPP2_PRS_EDSA);
+				      MVPP2_PRS_TAGGED, edsa_len);
 		mvpp2_prs_dsa_tag_set(priv, port, true,
-				      MVPP2_PRS_UNTAGGED, MVPP2_PRS_EDSA);
+				      MVPP2_PRS_UNTAGGED, edsa_len);
 		/* Remove port from DSA entries */
 		mvpp2_prs_dsa_tag_set(priv, port, false,
-				      MVPP2_PRS_TAGGED, MVPP2_PRS_DSA);
+				      MVPP2_PRS_TAGGED, 0);
 		mvpp2_prs_dsa_tag_set(priv, port, false,
-				      MVPP2_PRS_UNTAGGED, MVPP2_PRS_DSA);
+				      MVPP2_PRS_UNTAGGED, 0);
 		break;
 
 	case MVPP2_TAG_TYPE_DSA:
 		/* Add port to DSA entries */
 		mvpp2_prs_dsa_tag_set(priv, port, true,
-				      MVPP2_PRS_TAGGED, MVPP2_PRS_DSA);
+				      MVPP2_PRS_TAGGED, 0);
 		mvpp2_prs_dsa_tag_set(priv, port, true,
-				      MVPP2_PRS_UNTAGGED, MVPP2_PRS_DSA);
+				      MVPP2_PRS_UNTAGGED, 0);
 		/* Remove port from EDSA entries */
 		mvpp2_prs_dsa_tag_set(priv, port, false,
-				      MVPP2_PRS_TAGGED, MVPP2_PRS_EDSA);
+				      MVPP2_PRS_TAGGED, MVPP2_EXTENDED_DSA_LEN);
 		mvpp2_prs_dsa_tag_set(priv, port, false,
-				      MVPP2_PRS_UNTAGGED, MVPP2_PRS_EDSA);
+				      MVPP2_PRS_UNTAGGED, MVPP2_EXTENDED_DSA_LEN);
 		break;
 
 	case MVPP2_TAG_TYPE_MH:
 	case MVPP2_TAG_TYPE_NONE:
 		/* Remove port form EDSA and DSA entries */
 		mvpp2_prs_dsa_tag_set(priv, port, false,
-				      MVPP2_PRS_TAGGED, MVPP2_PRS_DSA);
+				      MVPP2_PRS_TAGGED, 0);
 		mvpp2_prs_dsa_tag_set(priv, port, false,
-				      MVPP2_PRS_UNTAGGED, MVPP2_PRS_DSA);
+				      MVPP2_PRS_UNTAGGED, 0);
 		mvpp2_prs_dsa_tag_set(priv, port, false,
-				      MVPP2_PRS_TAGGED, MVPP2_PRS_EDSA);
+				      MVPP2_PRS_TAGGED, MVPP2_EXTENDED_DSA_LEN);
 		mvpp2_prs_dsa_tag_set(priv, port, false,
-				      MVPP2_PRS_UNTAGGED, MVPP2_PRS_EDSA);
+				      MVPP2_PRS_UNTAGGED, MVPP2_EXTENDED_DSA_LEN);
 		break;
 
 	default:

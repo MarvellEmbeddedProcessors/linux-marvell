@@ -1955,9 +1955,11 @@ static const char mvpp22_priv_flags_strings[][ETH_GSTRING_LEN] = {
 #define MVPP22_F_IF_MUSDK_PRIV			BIT(0)
 #define MVPP22_F_IF_DSA_TAG_PRIV		BIT(1)
 #define MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV	BIT(2)
+#define MVPP22_F_IF_EBRIDGE_DSA_TAG_PRIV	BIT(3)
 
 #define MVPP2_F_DSA_TAGS_PRIV_MASK	(MVPP22_F_IF_DSA_TAG_PRIV | \
-					 MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV)
+					 MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV | \
+					 MVPP22_F_IF_EBRIDGE_DSA_TAG_PRIV)
 
 #define MVPP2_N_ETHTOOL_STATS(ntxqs, nrxqs)	(ARRAY_SIZE(mvpp2_ethtool_mib_regs) + \
 						 ARRAY_SIZE(mvpp2_ethtool_port_regs) + \
@@ -4825,7 +4827,7 @@ static int mvpp2_open(struct net_device *dev)
 		return err;
 	}
 
-	err = mvpp2_prs_tag_mode_set(port->priv, port->id, port->tag_type);
+	err = mvpp2_prs_tag_mode_set(port->priv, port->id, port->tag_type, port->edsa_len);
 	if (err) {
 		netdev_err(dev, "mvpp2_prs_tag_mode_set failed\n");
 		return err;
@@ -5806,7 +5808,10 @@ static u32 mvpp22_get_priv_flags(struct net_device *dev)
 		priv_flags |= MVPP22_F_IF_DSA_TAG_PRIV;
 		break;
 	case MVPP2_TAG_TYPE_EDSA:
-		priv_flags |= MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV;
+		if (port->edsa_len == MVPP2_EXTENDED_DSA_LEN)
+			priv_flags |= MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV;
+		else
+			priv_flags |= MVPP22_F_IF_EBRIDGE_DSA_TAG_PRIV;
 		break;
 	default:
 		break;
@@ -5925,16 +5930,24 @@ static int mvpp22_set_priv_flags_dsa_tag(struct net_device *dev, u32 new_flags, 
 	if (!!(new_flags ^ old_flags)) {
 		if (new_flags & MVPP22_F_IF_DSA_TAG_PRIV) {
 			port->tag_type = MVPP2_TAG_TYPE_DSA;
+			port->edsa_len = 0;
 			mvpp2_port_enable_non_extended_dsa(port);
 		} else if (new_flags & MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV) {
 			port->tag_type = MVPP2_TAG_TYPE_EDSA;
+			port->edsa_len = MVPP2_EXTENDED_DSA_LEN;
 			mvpp2_port_enable_extended_dsa(port);
+		} else if (new_flags & MVPP22_F_IF_EBRIDGE_DSA_TAG_PRIV) {
+			port->tag_type = MVPP2_TAG_TYPE_EDSA;
+			port->edsa_len = MVPP2_EBRIDGE_DSA_LEN;
+			/* Pre-classifier doesn't support eBridge DSA, just disable it */
+			mvpp2_port_disable_dsa(port);
 		} else {
 			port->tag_type = MVPP2_TAG_TYPE_NONE;
+			port->edsa_len = 0;
 			mvpp2_port_disable_dsa(port);
 		}
 
-		err = mvpp2_prs_tag_mode_set(port->priv, port->id, port->tag_type);
+		err = mvpp2_prs_tag_mode_set(port->priv, port->id, port->tag_type, port->edsa_len);
 	}
 
 	return err;
@@ -6973,6 +6986,7 @@ static int mvpp2_netdevice_event(struct notifier_block *nb,
 			netdev_dbg(dev, "Registering DSA port %s\n",
 				   info->upper_dev->name);
 			port->tag_type = MVPP2_TAG_TYPE_DSA;
+			port->edsa_len = 0;
 			mvpp2_port_enable_non_extended_dsa(port);
 		}
 		break;
@@ -7297,6 +7311,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	}
 
 	port->tag_type = MVPP2_TAG_TYPE_MH;
+	port->edsa_len = 0;
 
 	/* Register DSA notifier */
 	port->netdev_notifier.notifier_call = mvpp2_netdevice_event;

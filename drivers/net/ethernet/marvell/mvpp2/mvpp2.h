@@ -700,7 +700,8 @@
 #define MVPP2_ETH_TYPE_LEN		2
 #define MVPP2_PPPOE_HDR_SIZE		8
 #define MVPP2_VLAN_TAG_LEN		4
-#define MVPP2_VLAN_TAG_EDSA_LEN		8
+#define MVPP2_EXTENDED_DSA_LEN		8
+#define MVPP2_EBRIDGE_DSA_LEN		16
 
 /* Lbtd 802.3 type */
 #define MVPP2_IP_LBDT_TYPE		0xfffa
@@ -1279,6 +1280,7 @@ struct mvpp2_port {
 	bool tx_fc;
 
 	enum mvpp2_tag_type tag_type;
+	u8 edsa_len;
 
 	/* Notifier required when the port is connected to the switch */
 	struct notifier_block netdev_notifier;

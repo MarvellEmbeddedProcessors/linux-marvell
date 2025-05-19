@@ -237,12 +237,11 @@
 #define MVPP2_PRS_SINGLE_VLAN_AI		0
 #define MVPP2_PRS_DBL_VLAN_AI_BIT		BIT(7)
 #define MVPP2_PRS_EDSA_VID_AI_BIT		BIT(0)
+#define MVPP2_PRS_EDSA_16B_AI_BIT		BIT(4)
 
 /* DSA/EDSA type */
 #define MVPP2_PRS_TAGGED		true
 #define MVPP2_PRS_UNTAGGED		false
-#define MVPP2_PRS_EDSA			true
-#define MVPP2_PRS_DSA			false
 
 /* MAC entries, shadow udf */
 enum mvpp2_prs_udf {
@@ -307,7 +306,7 @@ void mvpp2_prs_tcam_data_byte_get(struct mvpp2_prs_entry *pe,
 
 int mvpp2_prs_mac_da_accept(struct mvpp2_port *port, const u8 *da, bool add);
 
-int mvpp2_prs_tag_mode_set(struct mvpp2 *priv, int port, int type);
+int mvpp2_prs_tag_mode_set(struct mvpp2 *priv, int port, int type, u8 edsa_len);
 
 int mvpp2_prs_add_flow(struct mvpp2 *priv, int flow, u32 ri, u32 ri_mask);
 
