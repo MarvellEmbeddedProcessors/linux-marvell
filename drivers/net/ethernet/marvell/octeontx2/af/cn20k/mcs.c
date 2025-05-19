@@ -27,9 +27,72 @@ static void cn20k_mcs_set_hw_capabilities(struct mcs *mcs)
 
 static void cn20k_mcs_parser_cfg(struct mcs *mcs)
 {
-	/* Default configuration is enough for parsing basic  IEEE 802.1AE-2006
-	 * frames
-	 */
+	u64 reg, val;
+
+	/* VLAN CTag */
+	/* vlan_en | vlan_type | vlan_index | vlan_size | is_vlan */
+	val = BIT_ULL(0) | (0x8100ull & 0xFFFF) << 1 | BIT_ULL(17) | 0x4 << 20 | BIT_ULL(24);
+	/* RX */
+	reg = MCSX_PEX_RX_SLAVE_VLAN_CFGX(0);
+	mcs_reg_write(mcs, reg, val);
+
+	/* TX */
+	reg = MCSX_PEX_TX_SLAVE_VLAN_CFGX(0);
+	mcs_reg_write(mcs, reg, val);
+
+	/* VLAN STag */
+	val = BIT_ULL(0) | (0x88a8ull & 0xFFFF) << 1 | BIT_ULL(18) | 0x4 << 20 | BIT_ULL(24);
+	/* RX */
+	reg = MCSX_PEX_RX_SLAVE_VLAN_CFGX(1);
+	mcs_reg_write(mcs, reg, val);
+
+	/* TX */
+	reg = MCSX_PEX_TX_SLAVE_VLAN_CFGX(1);
+	mcs_reg_write(mcs, reg, val);
+
+	/* Extract vlan tag after custom tag */
+	mcs_reg_write(mcs, MCSX_PEX_RX_SLAVE_PEX_CFG, BIT_ULL(0));
+	mcs_reg_write(mcs, MCSX_PEX_TX_SLAVE_PEX_CFG, BIT_ULL(0));
+
+	/* TCP enable */
+	val = mcs_reg_read(mcs, MCSX_PEX_RX_SLAVE_TCP_CFG);
+	val |= BIT_ULL(0);
+	mcs_reg_write(mcs, MCSX_PEX_RX_SLAVE_TCP_CFG, val);
+
+	/* UDP enable */
+	val = mcs_reg_read(mcs, MCSX_PEX_RX_SLAVE_UDP_CFG);
+	val |= BIT_ULL(0);
+	mcs_reg_write(mcs, MCSX_PEX_RX_SLAVE_UDP_CFG, val);
+
+	/* IPv4 */
+	val = mcs_reg_read(mcs, MCSX_PEX_RX_SLAVE_IPV4_CFG);
+	val |= BIT_ULL(0);
+	mcs_reg_write(mcs, MCSX_PEX_RX_SLAVE_IPV4_CFG, val);
+
+	/* IPv6*/
+	val = mcs_reg_read(mcs, MCSX_PEX_RX_SLAVE_IPV6_CFG);
+	val |= BIT_ULL(0);
+	mcs_reg_write(mcs, MCSX_PEX_RX_SLAVE_IPV6_CFG, val);
+
+	/* TCP enable */
+	val = mcs_reg_read(mcs, MCSX_PEX_TX_SLAVE_TCP_CFG);
+	val |= BIT_ULL(0);
+	mcs_reg_write(mcs, MCSX_PEX_TX_SLAVE_TCP_CFG, val);
+
+	/* UDP enable */
+	val = mcs_reg_read(mcs, MCSX_PEX_TX_SLAVE_UDP_CFG);
+	val |= BIT_ULL(0);
+	mcs_reg_write(mcs, MCSX_PEX_TX_SLAVE_UDP_CFG, val);
+
+	/* IPv4 */
+	val = mcs_reg_read(mcs, MCSX_PEX_TX_SLAVE_IPV4_CFG);
+	val |= BIT_ULL(0);
+	mcs_reg_write(mcs, MCSX_PEX_TX_SLAVE_IPV4_CFG, val);
+
+	/* IPv6*/
+	val = mcs_reg_read(mcs, MCSX_PEX_TX_SLAVE_IPV6_CFG);
+	val |= BIT_ULL(0);
+	mcs_reg_write(mcs, MCSX_PEX_TX_SLAVE_IPV6_CFG, val);
 }
 
 static void cn20k_mcs_set_external_bypass(struct mcs *mcs, bool state)
