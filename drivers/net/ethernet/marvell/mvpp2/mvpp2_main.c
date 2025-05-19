@@ -61,6 +61,10 @@ static struct {
  */
 static void mvpp2_acpi_start(struct mvpp2_port *port);
 
+static void mvpp2_port_enable_non_extended_dsa(struct mvpp2_port *port);
+static void mvpp2_port_enable_extended_dsa(struct mvpp2_port *port);
+static void mvpp2_port_disable_dsa(struct mvpp2_port *port);
+
 /* Queue modes */
 #define MVPP2_QDIST_SINGLE_MODE	0
 #define MVPP2_QDIST_MULTI_MODE	1
@@ -1944,9 +1948,16 @@ static const struct mvpp2_ethtool_counter mvpp2_ethtool_xdp[] = {
 
 static const char mvpp22_priv_flags_strings[][ETH_GSTRING_LEN] = {
 	"musdk",
+	"dsa-tagged",
+	"extended-dsa-tagged",
 };
 
-#define MVPP22_F_IF_MUSDK_PRIV	BIT(0)
+#define MVPP22_F_IF_MUSDK_PRIV			BIT(0)
+#define MVPP22_F_IF_DSA_TAG_PRIV		BIT(1)
+#define MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV	BIT(2)
+
+#define MVPP2_F_DSA_TAGS_PRIV_MASK	(MVPP22_F_IF_DSA_TAG_PRIV | \
+					 MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV)
 
 #define MVPP2_N_ETHTOOL_STATS(ntxqs, nrxqs)	(ARRAY_SIZE(mvpp2_ethtool_mib_regs) + \
 						 ARRAY_SIZE(mvpp2_ethtool_port_regs) + \
@@ -5790,6 +5801,16 @@ static u32 mvpp22_get_priv_flags(struct net_device *dev)
 
 	if (port->flags & MVPP22_F_IF_MUSDK)
 		priv_flags |= MVPP22_F_IF_MUSDK_PRIV;
+	switch (port->tag_type) {
+	case MVPP2_TAG_TYPE_DSA:
+		priv_flags |= MVPP22_F_IF_DSA_TAG_PRIV;
+		break;
+	case MVPP2_TAG_TYPE_EDSA:
+		priv_flags |= MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV;
+		break;
+	default:
+		break;
+	}
 	return priv_flags;
 }
 
@@ -5890,19 +5911,59 @@ static int mvpp2_port_musdk_set(struct net_device *dev, bool ena)
 	return 0;
 }
 
+static int mvpp22_set_priv_flags_dsa_tag(struct net_device *dev, u32 new_flags, u32 old_flags)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	unsigned long mask = new_flags;
+	int err = 0;
+
+	if (bitmap_weight(&mask, 32) > 1) {
+		netdev_err(dev, "Only one DSA tag type can be set\n");
+		return -EINVAL;
+	}
+
+	if (!!(new_flags ^ old_flags)) {
+		if (new_flags & MVPP22_F_IF_DSA_TAG_PRIV) {
+			port->tag_type = MVPP2_TAG_TYPE_DSA;
+			mvpp2_port_enable_non_extended_dsa(port);
+		} else if (new_flags & MVPP22_F_IF_EXTENDED_DSA_TAG_PRIV) {
+			port->tag_type = MVPP2_TAG_TYPE_EDSA;
+			mvpp2_port_enable_extended_dsa(port);
+		} else {
+			port->tag_type = MVPP2_TAG_TYPE_NONE;
+			mvpp2_port_disable_dsa(port);
+		}
+
+		err = mvpp2_prs_tag_mode_set(port->priv, port->id, port->tag_type);
+	}
+
+	return err;
+}
+
 static int mvpp22_set_priv_flags(struct net_device *dev, u32 priv_flags)
 {
 	struct mvpp2_port *port = netdev_priv(dev);
 	bool f_old, f_new;
+	u32 dsa_old, dsa_new;
 	int err = 0;
 
 	f_old = port->flags & MVPP22_F_IF_MUSDK;
 	f_new = priv_flags & MVPP22_F_IF_MUSDK_PRIV;
-	if (f_old != f_new)
+	if (f_old != f_new) {
 		err = mvpp2_port_musdk_set(dev, f_new);
+		if (err)
+			return err;
+	}
+
+	dsa_old = mvpp22_get_priv_flags(dev) & MVPP2_F_DSA_TAGS_PRIV_MASK;
+	dsa_new = priv_flags & MVPP2_F_DSA_TAGS_PRIV_MASK;
+	err = mvpp22_set_priv_flags_dsa_tag(dev, dsa_new, dsa_old);
+	if (err)
+		return err;
 
 	return err;
 }
+
 /* Device ops */
 
 static const struct net_device_ops mvpp2_netdev_ops = {
@@ -6851,7 +6912,6 @@ static bool mvpp2_use_acpi_compat_mode(struct fwnode_handle *port_fwnode)
 		!fwnode_get_named_child_node(port_fwnode, "fixed-link"));
 }
 
-#if IS_REACHABLE(CONFIG_NET_DSA)
 static void mvpp2_port_enable_non_extended_dsa(struct mvpp2_port *port)
 {
 	struct mvpp2 *priv = port->priv;
@@ -6867,7 +6927,30 @@ static void mvpp2_port_enable_non_extended_dsa(struct mvpp2_port *port)
 	reg |= MVPP2_DSA_NON_EXTENDED;
 	mvpp2_write(priv, MVPP2_MH_REG(port->id), reg);
 }
-#endif
+
+static void mvpp2_port_enable_extended_dsa(struct mvpp2_port *port)
+{
+	struct mvpp2 *priv = port->priv;
+	u32 reg;
+
+	reg = mvpp2_read(priv, MVPP2_MH_REG(port->id));
+	reg &= ~MVPP2_MH;
+	reg &= ~MVPP2_DSA_NON_EXTENDED;
+	reg |= MVPP2_DSA_EXTENDED;
+	mvpp2_write(priv, MVPP2_MH_REG(port->id), reg);
+}
+
+static void mvpp2_port_disable_dsa(struct mvpp2_port *port)
+{
+	struct mvpp2 *priv = port->priv;
+	u32 reg;
+
+	reg = mvpp2_read(priv, MVPP2_MH_REG(port->id));
+	reg &= ~MVPP2_MH;
+	reg &= ~MVPP2_DSA_NON_EXTENDED;
+	reg &= ~MVPP2_DSA_EXTENDED;
+	mvpp2_write(priv, MVPP2_MH_REG(port->id), reg);
+}
 
 static int mvpp2_netdevice_event(struct notifier_block *nb,
 				 unsigned long event, void *ptr)
