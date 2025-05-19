@@ -4814,14 +4814,15 @@ static int mvpp2_open(struct net_device *dev)
 		return err;
 	}
 
-	if (port->flags & MVPP22_F_IF_MUSDK)
-		goto skip_musdk_parser;
-
 	err = mvpp2_prs_tag_mode_set(port->priv, port->id, port->tag_type);
 	if (err) {
 		netdev_err(dev, "mvpp2_prs_tag_mode_set failed\n");
 		return err;
 	}
+
+	if (port->flags & MVPP22_F_IF_MUSDK)
+		goto skip_musdk_parser;
+
 	err = mvpp2_prs_def_flow(port);
 	if (err) {
 		netdev_err(dev, "mvpp2_prs_def_flow failed\n");
