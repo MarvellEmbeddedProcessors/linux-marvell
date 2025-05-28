@@ -286,4 +286,15 @@ struct psw_mbox_msix_cfg_req {
 	u16 rsvd[2];
 };
 
+/* PSW debugfs context structure */
+struct psw_dbg_ctx {
+	struct rvu *rvu;
+	struct dentry *psw;
+	int blkaddr;
+	u16 qid;
+	bool inb;
+};
+
+void rvu_psw_dbg_init(struct rvu *rvu, struct psw_dbg_ctx *dbg_ctx, int blkaddr);
+
 #endif /* __RVU_PSW_MBOX_H__ */
