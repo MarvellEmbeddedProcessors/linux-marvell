@@ -72,12 +72,13 @@ static int cn20k_aura_aq_init(struct otx2_nic *pfvf, int aura_id,
 		 */
 		if (pfvf->nix_blkaddr == BLKADDR_NIX1)
 			aq->aura.bp_ena = 1;
-#ifdef CONFIG_DCB
-		aq->aura.bpid = pfvf->bpid[pfvf->queue_to_pfc_map[aura_id]];
-#else
-		aq->aura.bpid = pfvf->bpid[0];
-#endif
 
+		aq->aura.bpid = pfvf->bpid[0];
+
+#ifdef CONFIG_DCB
+		if (pfvf->queue_to_pfc_map)
+			aq->aura.bpid = pfvf->bpid[pfvf->queue_to_pfc_map[aura_id]];
+#endif
 		/* Set backpressure level for RQ's Aura */
 		aq->aura.bp = RQ_BP_LVL_AURA;
 	}
