@@ -845,9 +845,11 @@ int cn10k_ipsec_ethtool_init(struct net_device *netdev, bool enable)
 
 	/* Initialize CPT for outbound ipsec offload */
 	if (enable) {
-		err = cn10k_ipsec_init_send_queues(pf);
-		if (err)
-			return err;
+		if (netif_running(netdev)) {
+			err = cn10k_ipsec_init_send_queues(pf);
+			if (err)
+				return err;
+		}
 
 		return cn10k_outb_cpt_init(netdev);
 	}
@@ -859,7 +861,9 @@ int cn10k_ipsec_ethtool_init(struct net_device *netdev, bool enable)
 	}
 
 	/* Cleanup IPsec SQs and CPT */
-	cn10k_ipsec_cleanup_send_queues(pf);
+	if (netif_running(netdev))
+		cn10k_ipsec_cleanup_send_queues(pf);
+
 	return cn10k_outb_cpt_clean(pf);
 }
 EXPORT_SYMBOL(cn10k_ipsec_ethtool_init);
