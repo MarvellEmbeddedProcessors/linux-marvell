@@ -1315,14 +1315,12 @@ static inline int create_aead_ctx_hdr(struct aead_request *req, u32 enc,
 
 	rctx->ctrl_word.e.enc_data_offset = req->assoclen;
 
+	/* Support association length up to 1024-Bytes */
+	if (req->assoclen > 1024)
+		return -EINVAL;
+
 	switch (ctx->cipher_type) {
 	case OTX2_CPT_CHACHA20:
-		if (ctx->is_chacha20_poly1305_esp &&
-		    crypto_ipsec_check_assoclen(req->assoclen))
-			return -EINVAL;
-		else if (req->assoclen > 512)
-			return -EINVAL;
-
 		fctx->enc.enc_ctrl.e.enc_cipher = ctx->cipher_type;
 		fctx->enc.enc_ctrl.e.mac_type = ctx->mac_type;
 
@@ -1344,7 +1342,7 @@ static inline int create_aead_ctx_hdr(struct aead_request *req, u32 enc,
 		break;
 
 	case OTX2_CPT_AES_CTR:
-		if (req->assoclen > 248 || !IS_ALIGNED(req->assoclen, 8))
+		if (is_dev_otx2(ctx->pdev) && !IS_ALIGNED(req->assoclen, 8))
 			return -EINVAL;
 
 		fctx->enc.enc_ctrl.e.iv_source = OTX2_CPT_FROM_CPTR;
@@ -1370,7 +1368,7 @@ static inline int create_aead_ctx_hdr(struct aead_request *req, u32 enc,
 		break;
 
 	case OTX2_CPT_AES_CBC:
-		if (req->assoclen > 248 || !IS_ALIGNED(req->assoclen, 8))
+		if (is_dev_otx2(ctx->pdev) && !IS_ALIGNED(req->assoclen, 8))
 			return -EINVAL;
 
 		fctx->enc.enc_ctrl.e.iv_source = OTX2_CPT_FROM_CPTR;
@@ -1393,8 +1391,6 @@ static inline int create_aead_ctx_hdr(struct aead_request *req, u32 enc,
 
 	case OTX2_CPT_AES_GCM:
 		if (ctx->is_rfc4106_gcm && crypto_ipsec_check_assoclen(req->assoclen))
-			return -EINVAL;
-		else if (req->cryptlen && req->assoclen > 512)
 			return -EINVAL;
 
 		/* Copy encryption key to context */
@@ -1423,8 +1419,6 @@ static inline int create_aead_ctx_hdr(struct aead_request *req, u32 enc,
 		rc = crypto_ccm_check_iv(req->iv);
 		if (rc)
 			return rc;
-		if (req->assoclen > 1024)
-			return -EINVAL;
 
 		/* Copy encryption key to context */
 		memcpy(fctx->enc.encr_key, ctx->key, ctx->enc_key_len);
