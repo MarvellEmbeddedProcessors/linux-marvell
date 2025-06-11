@@ -1194,7 +1194,7 @@ static void otx2_get_link_mode_info(u64 link_mode_bmap,
 {
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(otx2_link_modes) = { 0, };
 	/* CGX link modes to Ethtool link mode mapping */
-	const int cgx_link_mode[51] = {
+	const int cgx_link_mode[CGX_MODE_MAX] = {
 		0, /* SGMII  Mode */
 		ETHTOOL_LINK_MODE_1000baseX_Full_BIT,
 		ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
