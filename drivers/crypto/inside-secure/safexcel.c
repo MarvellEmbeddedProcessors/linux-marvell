@@ -28,6 +28,43 @@ static u32 max_rings = EIP197_MAX_RINGS;
 module_param(max_rings, uint, 0644);
 MODULE_PARM_DESC(max_rings, "Maximum number of rings to use.");
 
+/* Initialize pseudo random generator */
+static void eip197_prng_init(struct safexcel_crypto_priv *priv, int pe)
+{
+	u64 seed;
+
+	get_random_bytes(&seed, sizeof(seed));
+
+	/* disable PRNG and set to manual mode */
+	writel(0, EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_CTRL(pe));
+
+	/* Write seed data */
+	writel(lower_32_bits(seed),
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_SEED_L(pe));
+	writel(upper_32_bits(seed),
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_SEED_H(pe));
+
+	/* Write key data */
+	writel(EIP197_PE_EIP96_PRNG_KEY_0_L_VAL,
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_KEY_0_L(pe));
+	writel(EIP197_PE_EIP96_PRNG_KEY_0_H_VAL,
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_KEY_0_H(pe));
+	writel(EIP197_PE_EIP96_PRNG_KEY_1_L_VAL,
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_KEY_1_L(pe));
+	writel(EIP197_PE_EIP96_PRNG_KEY_1_H_VAL,
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_KEY_1_H(pe));
+
+	/* Write LFSR data */
+	writel(EIP197_PE_EIP96_PRNG_LFSR_L_VAL,
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_LFSR_L(pe));
+	writel(EIP197_PE_EIP96_PRNG_LFSR_H_VAL,
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_LFSR_H(pe));
+
+	/* enable PRNG and set to auto mode */
+	writel(EIP197_PE_EIP96_PRNG_EN | EIP197_PE_EIP96_PRNG_AUTO,
+			EIP197_PE(priv) + EIP197_PE_EIP96_PRNG_CTRL(pe));
+}
+
 static void eip197_trc_cache_setupvirt(struct safexcel_crypto_priv *priv)
 {
 	int i;
@@ -786,6 +823,10 @@ static int safexcel_hw_init(struct safexcel_crypto_priv *priv)
 		writel(EIP197_PE_EIP96_TOKEN_CTRL2_CTX_DONE,
 		       EIP197_PE(priv) + EIP197_PE_EIP96_TOKEN_CTRL2(0));
 	} else if (priv->flags & SAFEXCEL_HW_EIP197) {
+		/* init PRNG */
+		for (pe = 0; pe < priv->config.pes; pe++)
+			eip197_prng_init(priv, pe);
+
 		ret = eip197_trc_cache_init(priv);
 		if (ret)
 			return ret;
