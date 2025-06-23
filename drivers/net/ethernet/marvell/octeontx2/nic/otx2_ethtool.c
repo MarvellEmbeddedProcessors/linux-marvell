@@ -1649,7 +1649,7 @@ static int otx2_set_priv_flags(struct net_device *netdev, u32 new_flags)
 }
 
 static void otx2_self_test(struct net_device *netdev,
-		    struct ethtool_test *test, u64 *data)
+			   struct ethtool_test *test, u64 *data)
 {
 	struct otx2_nic *pfvf = netdev_priv(netdev);
 	int rc;
