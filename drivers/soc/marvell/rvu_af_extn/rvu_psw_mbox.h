@@ -40,6 +40,9 @@ enum {
 #undef M
 };
 
+#define MBOX_EBLOCK_UP_PSW_MESSAGES					\
+M(PSW_HOST_FLR_NOTIFY,	0xF00, psw_host_flr_notify, psw_host_flr_info, msg_rsp)
+
 /* PSW mailbox error codes
  * Range 1301 - 1400.
  */
@@ -264,6 +267,13 @@ struct psw_tst_modify_entry_req {
 	/* Timer select table entry ID incase of MODIFY and REMOVE */
 	u16 tst_id;
 	u32 rsvd1;
+	u64 rsvd2;
+};
+
+struct psw_host_flr_info {
+	struct mbox_msghdr hdr;
+	u16 epffunc;
+	u16 rsvd1[3];
 	u64 rsvd2;
 };
 
