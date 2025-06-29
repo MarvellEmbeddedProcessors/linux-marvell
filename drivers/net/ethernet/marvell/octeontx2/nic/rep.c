@@ -452,6 +452,7 @@ void rvu_rep_destroy(struct otx2_nic *priv)
 	kfree(priv->reps);
 	rvu_rep_rsrc_free(priv);
 }
+EXPORT_SYMBOL(rvu_rep_destroy);
 
 int rvu_rep_create(struct otx2_nic *priv, struct netlink_ext_ack *extack)
 {
@@ -528,6 +529,7 @@ exit:
 	rvu_rep_rsrc_free(priv);
 	return err;
 }
+EXPORT_SYMBOL(rvu_rep_create);
 
 
 static int rvu_get_rep_cnt(struct otx2_nic *priv)
