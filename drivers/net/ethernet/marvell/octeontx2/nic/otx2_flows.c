@@ -473,6 +473,7 @@ int otx2_mcam_flow_init(struct otx2_nic *pf)
 
 	return 0;
 }
+EXPORT_SYMBOL(otx2_mcam_flow_init);
 
 void otx2_mcam_flow_del(struct otx2_nic *pf)
 {
@@ -541,6 +542,7 @@ int otx2_add_macfilter(struct net_device *netdev, const u8 *mac)
 
 	return otx2_do_add_macfilter(pf, mac);
 }
+EXPORT_SYMBOL(otx2_add_macfilter);
 
 static bool otx2_get_mcamentry_for_mac(struct otx2_nic *pf, const u8 *mac,
 				       int *mcam_entry)
@@ -583,6 +585,7 @@ int otx2_del_macfilter(struct net_device *netdev, const u8 *mac)
 
 	return err;
 }
+EXPORT_SYMBOL(otx2_del_macfilter);
 
 static struct otx2_flow *otx2_find_flow(struct otx2_nic *pfvf, u32 location)
 {
@@ -642,6 +645,7 @@ int otx2_get_flow(struct otx2_nic *pfvf, struct ethtool_rxnfc *nfc,
 
 	return -ENOENT;
 }
+EXPORT_SYMBOL(otx2_get_flow);
 
 int otx2_get_all_flows(struct otx2_nic *pfvf, struct ethtool_rxnfc *nfc,
 		       u32 *rule_locs)
@@ -662,6 +666,7 @@ int otx2_get_all_flows(struct otx2_nic *pfvf, struct ethtool_rxnfc *nfc,
 
 	return err;
 }
+EXPORT_SYMBOL(otx2_get_all_flows);
 
 static void otx2_prepare_fdsa_flow_request(struct npc_install_flow_req *req,
 					   bool is_vlan)
@@ -1485,6 +1490,7 @@ bypass_queue_check:
 			    "Make sure that VF's queue number is within its queue limit\n");
 	return 0;
 }
+EXPORT_SYMBOL(otx2_add_flow);
 
 static int otx2_remove_flow_msg(struct otx2_nic *pfvf, u16 entry, bool all)
 {
@@ -1589,6 +1595,7 @@ int otx2_remove_flow(struct otx2_nic *pfvf, u32 location)
 
 	return 0;
 }
+EXPORT_SYMBOL(otx2_remove_flow);
 
 void otx2_rss_ctx_flow_del(struct otx2_nic *pfvf, int ctx_id)
 {
@@ -1605,6 +1612,7 @@ void otx2_rss_ctx_flow_del(struct otx2_nic *pfvf, int ctx_id)
 				    flow->location, err);
 	}
 }
+EXPORT_SYMBOL(otx2_rss_ctx_flow_del);
 
 int otx2_destroy_ntuple_flows(struct otx2_nic *pfvf)
 {
@@ -1784,6 +1792,7 @@ int otx2_enable_rxvlan(struct otx2_nic *pf, bool enable)
 	mutex_unlock(&pf->mbox.lock);
 	return rsp_hdr->rc;
 }
+EXPORT_SYMBOL(otx2_enable_rxvlan);
 
 void otx2_dmacflt_reinstall_flows(struct otx2_nic *pf)
 {

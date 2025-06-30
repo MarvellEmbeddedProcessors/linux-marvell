@@ -308,6 +308,7 @@ unlock:
 	mutex_unlock(&pfvf->mbox.lock);
 	return err;
 }
+EXPORT_SYMBOL(otx2_config_priority_flow_ctrl);
 
 void otx2_update_bpid_in_rqctx(struct otx2_nic *pfvf, int vlan_prio, int qidx,
 			       bool pfc_enable)
@@ -459,3 +460,4 @@ int otx2_dcbnl_set_ops(struct net_device *dev)
 
 	return 0;
 }
+EXPORT_SYMBOL(otx2_dcbnl_set_ops);

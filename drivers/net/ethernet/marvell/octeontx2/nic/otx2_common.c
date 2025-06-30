@@ -66,6 +66,7 @@ void otx2_update_lmac_stats(struct otx2_nic *pfvf)
 	otx2_sync_mbox_msg(&pfvf->mbox);
 	mutex_unlock(&pfvf->mbox.lock);
 }
+EXPORT_SYMBOL(otx2_update_lmac_stats);
 
 void otx2_update_lmac_fec_stats(struct otx2_nic *pfvf)
 {
@@ -79,6 +80,7 @@ void otx2_update_lmac_fec_stats(struct otx2_nic *pfvf)
 		otx2_sync_mbox_msg(&pfvf->mbox);
 	mutex_unlock(&pfvf->mbox.lock);
 }
+EXPORT_SYMBOL(otx2_update_lmac_fec_stats);
 
 int otx2_update_rq_stats(struct otx2_nic *pfvf, int qidx)
 {
@@ -90,6 +92,7 @@ int otx2_update_rq_stats(struct otx2_nic *pfvf, int qidx)
 	otx2_nix_rq_op_stats(&rq->stats, pfvf, qidx);
 	return 1;
 }
+EXPORT_SYMBOL(otx2_update_rq_stats);
 
 int otx2_update_sq_stats(struct otx2_nic *pfvf, int qidx)
 {
@@ -106,6 +109,7 @@ int otx2_update_sq_stats(struct otx2_nic *pfvf, int qidx)
 	otx2_nix_sq_op_stats(&sq->stats, pfvf, qidx);
 	return 1;
 }
+EXPORT_SYMBOL(otx2_update_sq_stats);
 
 void otx2_get_dev_stats(struct otx2_nic *pfvf)
 {
@@ -129,6 +133,7 @@ void otx2_get_dev_stats(struct otx2_nic *pfvf)
 			       dev_stats->tx_mcast_frames +
 			       dev_stats->tx_ucast_frames;
 }
+EXPORT_SYMBOL(otx2_get_dev_stats);
 
 void otx2_get_stats64(struct net_device *netdev,
 		      struct rtnl_link_stats64 *stats)
@@ -342,6 +347,7 @@ fail:
 	mutex_unlock(&pfvf->mbox.lock);
 	return err;
 }
+EXPORT_SYMBOL(otx2_set_flowkey_cfg);
 
 int otx2_set_rss_table(struct otx2_nic *pfvf, int ctx_id)
 {
@@ -388,6 +394,7 @@ int otx2_set_rss_table(struct otx2_nic *pfvf, int ctx_id)
 	mutex_unlock(&mbox->lock);
 	return err;
 }
+EXPORT_SYMBOL(otx2_set_rss_table);
 
 void otx2_set_rss_key(struct otx2_nic *pfvf)
 {
@@ -411,6 +418,7 @@ void otx2_set_rss_key(struct otx2_nic *pfvf)
 		otx2_write64(pfvf, NIX_LF_RX_SECRETX(idx), *key++);
 	}
 }
+EXPORT_SYMBOL(otx2_set_rss_key);
 
 int otx2_rss_init(struct otx2_nic *pfvf)
 {
@@ -559,6 +567,7 @@ void otx2_config_irq_coalescing(struct otx2_nic *pfvf, int qidx)
 		     ((u64)pfvf->hw.cq_qcount_wait << 32) |
 		     (pfvf->hw.cq_ecount_wait - 1));
 }
+EXPORT_SYMBOL(otx2_config_irq_coalescing);
 
 static int otx2_alloc_pool_buf(struct otx2_nic *pfvf, struct otx2_pool *pool,
 			       dma_addr_t *dma)
@@ -2109,6 +2118,7 @@ fail:
 	mutex_unlock(&mbox->lock);
 	return ret;
 }
+EXPORT_SYMBOL(otx2_set_hw_capabilities);
 
 #define M(_name, _id, _fn_name, _req_type, _rsp_type)			\
 int __weak								\

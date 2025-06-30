@@ -51,8 +51,8 @@
 int rvu_cn20k_set_channels_base(struct rvu *rvu)
 {
 	struct rvu_hwinfo *hw = rvu->hw;
-	int blkaddr, num_xcb, xcb_lmacs;
 	u64 nix_const, nix_const3;
+	int blkaddr, num_xcb;
 	int rpm_usx_cnt;
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, 0);
@@ -83,7 +83,6 @@ int rvu_cn20k_set_channels_base(struct rvu *rvu)
 	 */
 	num_xcb = (nix_const3 >> 48) & 0xFULL;
 	if (num_xcb) {
-		xcb_lmacs = (nix_const3 >> 52) & 0xFULL;
 		hw->cplt_links = (nix_const3 >> 56) & 0x1FULL;
 		hw->cgx_links += hw->cplt_links;
 	}
