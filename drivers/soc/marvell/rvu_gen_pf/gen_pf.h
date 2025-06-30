@@ -56,6 +56,13 @@ struct gen_pf_hw {
 	unsigned long		cap_flag;
 };
 
+struct gen_pf_vf_config {
+	struct gen_pf_dev *pf;
+#define GEN_PF_MAX_REQ_SIZE	256
+	u8 cfg_buff[GEN_PF_MAX_REQ_SIZE];
+	struct delayed_work vf_work;
+};
+
 struct gen_pf_dev {
 	struct pci_dev		*pdev;
 	struct device		*dev;
@@ -79,6 +86,7 @@ struct gen_pf_dev {
 	int			pf;
 	u16			pcifunc; /* RVU PF_FUNC */
 	u8			total_vfs;
+	struct gen_pf_vf_config	*vf_configs;
 };
 
 /* Mbox APIs */
