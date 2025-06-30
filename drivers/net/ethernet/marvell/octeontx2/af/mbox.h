@@ -51,6 +51,8 @@
 #define MBOX_DIR_PFAF_UP	5  /* PF replies to AF */
 #define MBOX_DIR_PFVF_UP	6  /* PF sends messages to VF */
 #define MBOX_DIR_VFPF_UP	7  /* VF replies to PF */
+#define MBOX_DIR_AFEPF		8  /* AF replies to EPF */
+#define MBOX_DIR_AFEPF_UP	9  /* AF sends messages EPF */
 
 /* Number of Queue priority bits implemented */
 #define CN10K_NUM_PRI_BITS 1
@@ -72,6 +74,7 @@ enum {
 enum {
 	TYPE_AFVF,
 	TYPE_AFPF,
+	TYPE_AFEPF,
 };
 
 struct otx2_mbox_dev {
