@@ -3,3 +3,4 @@
 #
 obj-$(CONFIG_MARVELL_OCTEON_RVU_GEN_PF) += gen_pf.o
 ccflags-y += -I$(srctree)/drivers/net/ethernet/marvell/octeontx2/af
+ccflags-y += -I$(srctree)/drivers/soc/marvell/rvu_af_extn
