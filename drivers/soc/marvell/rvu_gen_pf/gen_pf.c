@@ -15,6 +15,7 @@
 #include "gen_pf.h"
 #include <rvu_trace.h>
 #include <rvu.h>
+#include <rvu_eb_sdp.h>
 
  /* PCI BAR nos */
 #define PCI_CFG_REG_BAR_NUM		2
@@ -30,6 +31,8 @@ static const struct pci_device_id rvu_gen_pf_id_table[] = {
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Marvell Octeon RVU Generic PF Driver");
 MODULE_DEVICE_TABLE(pci, rvu_gen_pf_id_table);
+
+static void gen_pf_vf_task(struct work_struct *work);
 
 inline int rvu_get_pf(u16 pcifunc)
 {
@@ -374,6 +377,135 @@ static void rvu_gen_pf_process_pfaf_mbox_msg(struct gen_pf_dev *pfdev,
 	}
 }
 
+static void gen_pf_vf_task(struct work_struct *work)
+{
+	struct gen_pf_vf_config *config;
+	struct mbox_msghdr *msghdr;
+	struct delayed_work *dwork;
+	struct gen_pf_dev *pf;
+	int vf_idx;
+
+	config = container_of(work, struct gen_pf_vf_config, vf_work.work);
+	vf_idx = config - config->pf->vf_configs;
+	pf = config->pf;
+
+	mutex_lock(&pf->mbox.lock);
+
+	dwork = &config->vf_work;
+
+	if (!otx2_mbox_wait_for_zero(&pf->mbox_pfvf[0].mbox_up, vf_idx)) {
+		schedule_delayed_work(dwork, msecs_to_jiffies(100));
+		mutex_unlock(&pf->mbox.lock);
+		return;
+	}
+
+	memcpy(msghdr, config->cfg_buff, sizeof(*msghdr));
+
+	switch (msghdr->id) {
+#define M(_name, _id, _fn_name, _req_type, _rsp_type)			\
+	case _id: {							\
+		struct _req_type *req;					\
+									\
+		msghdr = otx2_mbox_alloc_msg_rsp(&pf->mbox_pfvf[0].mbox_up, \
+						 vf_idx, sizeof(*req),	\
+						 sizeof(struct msg_rsp)); \
+		if (!msghdr) {						\
+			dev_err(pf->dev,				\
+				"Failed to create VF%d creation event\n", \
+				vf_idx);				\
+			mutex_unlock(&pf->mbox.lock);			\
+			return;						\
+		}							\
+									\
+		WARN_ON(sizeof(*req) > sizeof(config->cfg_buff));	\
+		memcpy(msghdr, config->cfg_buff, sizeof(*req));		\
+									\
+		req = (struct _req_type *)msghdr;			\
+		req->hdr.id = _id;					\
+		req->hdr.sig = OTX2_MBOX_REQ_SIG;			\
+		req->hdr.pcifunc = pf->pcifunc;				\
+	}								\
+		break;
+MBOX_EBLOCK_UP_SDP_MESSAGES
+#undef M
+	default:
+		dev_err(pf->dev, "Invalid VF UP message ID %d\n", msghdr->id);
+		mutex_unlock(&pf->mbox.lock);
+		return;
+	}
+
+	otx2_mbox_wait_for_zero(&pf->mbox_pfvf[0].mbox_up, vf_idx);
+
+	rvu_gen_pf_sync_mbox_up_msg(&pf->mbox_pfvf[0], vf_idx);
+
+	mutex_unlock(&pf->mbox.lock);
+}
+
+static int rvu_gen_pf_process_mbox_msg_up(struct gen_pf_dev *pf,
+					  struct mbox_msghdr *msg)
+{
+	struct gen_pf_vf_config *config;
+	struct delayed_work *dwork;
+	int vf;
+
+	/* Check if valid, if not reply with a invalid msg */
+	if (msg->sig != OTX2_MBOX_REQ_SIG) {
+		otx2_reply_invalid_msg(&pf->mbox.mbox_up, 0, 0, msg->id);
+		return -ENODEV;
+	}
+
+	switch (msg->id) {
+#define M(_name, _id, _fn_name, _req_type, _rsp_type)			\
+	case _id: {							\
+		struct _req_type *req;					\
+		struct _rsp_type *rsp;					\
+									\
+		rsp = (struct _rsp_type *)otx2_mbox_alloc_msg(		\
+			&pf->mbox.mbox_up, 0,				\
+			sizeof(struct _rsp_type));			\
+		if (!rsp)						\
+			return -ENOMEM;					\
+									\
+		rsp->hdr.id = _id;					\
+		rsp->hdr.sig = OTX2_MBOX_RSP_SIG;			\
+		rsp->hdr.pcifunc = pf->pcifunc;				\
+		rsp->hdr.rc = 0;					\
+									\
+		for_each_set_bit(vf, &req->vf_bmap1,			\
+				 sizeof(unsigned long) * BITS_PER_BYTE) { \
+			config = &pf->vf_configs[vf];			\
+			dwork = &config->vf_work;			\
+									\
+			WARN_ON(sizeof(req) > sizeof(config->cfg_buff)); \
+			memcpy(config->cfg_buff, req, sizeof(*req));	\
+									\
+			schedule_delayed_work(dwork, msecs_to_jiffies(100)); \
+		}							\
+									\
+		for_each_set_bit(vf, &req->vf_bmap2,			\
+				 sizeof(unsigned long) * BITS_PER_BYTE) { \
+			config = &pf->vf_configs[vf + 64];		\
+			dwork = &config->vf_work;			\
+									\
+			WARN_ON(sizeof(*req) > sizeof(config->cfg_buff)); \
+			memcpy(config->cfg_buff, req, sizeof(*req));	\
+									\
+			schedule_delayed_work(dwork, msecs_to_jiffies(100)); \
+		}							\
+									\
+		return 0;						\
+	}
+MBOX_EBLOCK_UP_SDP_MESSAGES
+#undef M
+		break;
+	default:
+		otx2_reply_invalid_msg(&pf->mbox.mbox_up, 0, 0, msg->id);
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
 static void rvu_gen_pf_pfaf_mbox_up_handler(struct work_struct *work)
 {
 	struct mbox *af_mbox = container_of(work, struct mbox, mbox_up_wrk);
@@ -394,6 +526,9 @@ static void rvu_gen_pf_pfaf_mbox_up_handler(struct work_struct *work)
 		msg = (struct mbox_msghdr *)(mdev->mbase + offset);
 
 		devid = msg->pcifunc & RVU_PFVF_FUNC_MASK;
+		/* Skip processing VF's messages */
+		if (!devid)
+			rvu_gen_pf_process_mbox_msg_up(pfdev, msg);
 		offset = mbox->rx_start + msg->next_msgoff;
 	}
 	/* Forward to VF iff VFs are really present */
@@ -1149,6 +1284,36 @@ static int rvu_gen_pf_flr_init(struct gen_pf_dev *pfdev, int num_vfs)
 	return 0;
 }
 
+static int rvu_gen_pf_vfcfg_init(struct gen_pf_dev *pf)
+{
+	int i;
+
+	pf->vf_configs = devm_kcalloc(pf->dev, pf->total_vfs,
+				      sizeof(struct gen_pf_vf_config),
+				      GFP_KERNEL);
+	if (!pf->vf_configs)
+		return -ENOMEM;
+
+	for (i = 0; i < pf->total_vfs; i++) {
+		pf->vf_configs[i].pf = pf;
+		INIT_DELAYED_WORK(&pf->vf_configs[i].vf_work,
+				  gen_pf_vf_task);
+	}
+
+	return 0;
+}
+
+static void rvu_gen_pf_vfcfg_cleanup(struct gen_pf_dev *pf)
+{
+	int i;
+
+	if (!pf->vf_configs)
+		return;
+
+	for (i = 0; i < pf->total_vfs; i++)
+		cancel_delayed_work_sync(&pf->vf_configs[i].vf_work);
+}
+
 static int rvu_gen_pf_sriov_enable(struct pci_dev *pdev, int numvfs)
 {
 	struct gen_pf_dev *pfdev = pci_get_drvdata(pdev);
@@ -1217,10 +1382,20 @@ static void rvu_gen_pf_remove(struct pci_dev *pdev)
 {
 	struct gen_pf_dev *pfdev = pci_get_drvdata(pdev);
 
+	rvu_gen_pf_vfcfg_cleanup(pfdev);
 	rvu_gen_pf_sriov_disable(pfdev->pdev);
 	pci_set_drvdata(pdev, NULL);
 
 	pci_release_regions(pdev);
+}
+
+static int rvu_gen_pf_sdp_init(struct gen_pf_dev *pf)
+{
+	/* Firmware sets the total VFs such that it includes max VFs of a PF
+	 * and one extra VF since VF0 of PF serve IO for EPFs on host.
+	 */
+	return rvu_gen_pf_sriov_enable(pf->pdev,
+				       pci_sriov_get_totalvfs(pf->pdev));
 }
 
 static int rvu_gen_pf_probe(struct pci_dev *pdev, const struct pci_device_id *id)
@@ -1292,6 +1467,12 @@ static int rvu_gen_pf_probe(struct pci_dev *pdev, const struct pci_device_id *id
 	err = rvu_gen_pf_register_mbox_intr(pfdev);
 	if (err)
 		goto err_mbox_destroy;
+
+	err = rvu_gen_pf_vfcfg_init(pfdev);
+	if (err)
+		goto err_mbox_destroy;
+
+	rvu_gen_pf_sdp_init(pfdev);
 
 	return 0;
 
