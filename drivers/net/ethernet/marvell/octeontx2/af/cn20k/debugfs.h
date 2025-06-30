@@ -29,4 +29,6 @@ void print_npa_cn20k_halo_ctx(struct seq_file *m,
 
 int npc_cn20k_debugfs_init(struct rvu *rvu);
 void npc_cn20k_debugfs_deinit(struct rvu *rvu);
+void rvu_dbg_sdp_init(struct rvu *rvu);
+
 #endif
