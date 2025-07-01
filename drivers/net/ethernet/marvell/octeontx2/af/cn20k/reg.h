@@ -207,4 +207,7 @@ static inline u64 pf_to_bitoff(u8 pf)
 #define NPA_DPC_MAX			32
 #define NPA_DPC_LFS_PER_REG		64
 
+/* SDP Regsiters */
+#define SDP_AF_BLK_RST				0xc000030
+
 #endif /* RVU_MBOX_REG_H */
