@@ -69,6 +69,7 @@ struct octtx_brd_info {
 	struct octeontx_info_mac_addr mac_addrs[MAX_MACS];
 	struct octtx_fw_info *fw_info;
 	const char *sdk_version;
+	const char *uuid;
 };
 
 static struct proc_dir_entry *ent;
@@ -125,6 +126,10 @@ static int oct_brd_proc_show(struct seq_file *seq, void *v)
 			   brd.reset_count_mcp_wdog);
 		seq_printf(seq, "ecp_wdog_reset_count: %s\n",
 			   brd.reset_count_ecp_wdog);
+	}
+
+	if (is_soc_cn20kx()) {
+		seq_printf(seq, "uuid: %s\n", brd.uuid);
 	}
 
 	while (fw_info) {
@@ -470,6 +475,18 @@ static int __init octtx_info_init(void)
 				ret = octtx_parse_firmware_layout(np);
 				if (ret)
 					pr_err("Error parsing firmware-layout\n");
+			}
+		}
+
+		/* Parse elements related to CN20KX */
+		if (is_soc_cn20kx()) {
+			ret = of_property_read_string(np,
+					"CHIP-UNIQUE-ID",
+					&brd.uuid);
+			if (ret) {
+				pr_warn("CHIP UNIQUE ID not available\n");
+				/* Default name is "NULL" */
+				brd.uuid = null_string;
 			}
 		}
 
