@@ -125,7 +125,7 @@ const struct hw_csr_lookup_tbl lkp_tbl[] = {
 #define HW_ACCESS_CGX_INFO_IOCTL	_IO(HW_ACCESS_TYPE, 4)
 #define HW_ACCESS_LINK_INFO_IOCTL	_IO(HW_ACCESS_TYPE, 5)
 
-#define MAX_ALPHA	32
+#define MAX_ALPHA	127
 #define MAX_BETA	129
 
 static struct class *hw_reg_class;
