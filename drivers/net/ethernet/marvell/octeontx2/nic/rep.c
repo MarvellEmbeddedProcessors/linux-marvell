@@ -14,6 +14,7 @@
 #include "cn10k.h"
 #include "otx2_reg.h"
 #include "rep.h"
+#include "switch/sw_nb.h"
 
 #define DRV_NAME	"rvu_rep"
 #define DRV_STRING	"Marvell RVU Representor Driver"
@@ -138,6 +139,7 @@ static int rvu_rep_devlink_port_register(struct rep_dev *rep)
 	}
 
 	rvu_rep_devlink_set_switch_id(priv, &attrs.switch_id);
+
 	devlink_port_attrs_set(&rep->dl_port, &attrs);
 
 	err = devl_port_register_with_ops(dl, &rep->dl_port, rep->rep_id,
@@ -287,7 +289,10 @@ static void rvu_rep_get_stats64(struct net_device *dev,
 
 static int rvu_eswitch_config(struct otx2_nic *priv, u8 ena)
 {
+	struct devlink_port_attrs attrs = {};
 	struct esw_cfg_req *req;
+
+	rvu_rep_devlink_set_switch_id(priv, &attrs.switch_id);
 
 	mutex_lock(&priv->mbox.lock);
 	req = otx2_mbox_alloc_msg_esw_cfg(&priv->mbox);
@@ -296,8 +301,14 @@ static int rvu_eswitch_config(struct otx2_nic *priv, u8 ena)
 		return -ENOMEM;
 	}
 	req->ena = ena;
+	memcpy(req->switch_id, attrs.switch_id.id, attrs.switch_id.id_len);
 	otx2_sync_mbox_msg(&priv->mbox);
 	mutex_unlock(&priv->mbox.lock);
+
+#if IS_ENABLED(CONFIG_OCTEONTX_SWITCH)
+	ena ? sw_nb_register() : sw_nb_unregister();
+#endif
+
 	return 0;
 }
 
@@ -697,7 +708,6 @@ static int rvu_rep_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (priv->iommu_domain)
 		priv->iommu_domain_type =
 			((struct iommu_domain *)priv->iommu_domain)->type;
-
 
 	err = rvu_get_rep_cnt(priv);
 	if (err)
