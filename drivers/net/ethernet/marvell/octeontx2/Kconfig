@@ -41,6 +41,38 @@ config OCTEONTX2_PF
 	help
 	  This driver supports Marvell's OcteonTX2 NIC physical function.
 
+config OCTEONTX_PAN
+	tristate "Marvell OcteonTX2 PAN driver"
+	select OCTEONTX2_MBOX
+	select NET_DEVLINK
+	select PAGE_POOL
+	select OCTEONTX2_PF
+	select OCTEONTX_SWITCH
+	select RVU_ESWITCH
+	depends on (64BIT && COMPILE_TEST) || ARM64
+	select DIMLIB
+	depends on PCI
+	depends on PTP_1588_CLOCK_OPTIONAL
+	help
+	  This driver supports Marvell's OcteonTX2 PAN driver.
+
+if OCTEONTX_PAN
+
+config OCTEONTX_PAN_TX_COMPLETION
+	tristate "Enable TX completion for PAN SQs"
+	default n
+	help
+	 This option enable TX completion for pan SQ.
+
+config OCTEONTX_PAN_POLLING_MODE
+	tristate "Enable PAN polling mode"
+	default n
+	depends on !OCTEONTX_PAN_TX_COMPLETION
+	help
+	 This option enable PAN polling mode for PAN
+	 drivers.
+endif
+
 config OCTEONTX2_VF
 	tristate "Marvell OcteonTX2 NIC Virtual Function driver"
 	depends on OCTEONTX2_PF
@@ -76,3 +108,21 @@ config OCTEONTX2_BPHY_PF
 	depends on MACSEC || !MACSEC
 	help
 	  This driver supports Marvell's OcteonTX2 BPHY physical function.
+
+config OCTEONTX_SWITCH
+	tristate "Marvell OcteonTX2 switch driver"
+	select OCTEONTX2_MBOX
+	select NET_DEVLINK
+	default n
+	select PAGE_POOL
+	depends on (64BIT && COMPILE_TEST) || ARM64
+	select DIMLIB
+	depends on PCI
+	depends on PTP_1588_CLOCK_OPTIONAL
+	help
+	  This driver supports Marvell's OcteonTX2 switch driver.
+	  HW switch driver should register itself with this driver to
+	  send offload notification to HW.
+
+	  Marvell HW switch driver should be loaded after this module
+	  is loaded
