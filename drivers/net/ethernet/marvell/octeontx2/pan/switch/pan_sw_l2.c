@@ -45,17 +45,28 @@ __pan_sw_l2_mac_table_del_entry(struct pan_sw_l2_offl_node *node)
 	hash_del(&node->hnode);
 }
 
-struct pan_sw_l2_offl_node *pan_sw_l2_mac_tbl_lookup(const u8 *mac)
+struct pan_sw_l2_offl_node *__pan_sw_l2_mac_tbl_lookup(const u8 *mac)
 {
 	struct pan_sw_l2_offl_node *entry = NULL;
 	unsigned int hash = pan_sw_l2_mac_hash(mac);
 
-	spin_lock(&l2_offl_lock);
+	rcu_read_lock();
 	hash_for_each_possible(mac_h_tbl, entry, hnode, hash)
 		if (ether_addr_equal(entry->mac, mac))
 			break;
-	spin_unlock(&l2_offl_lock);
+	rcu_read_unlock();
 	return entry;
+}
+
+struct pan_sw_l2_offl_node *pan_sw_l2_mac_tbl_lookup(const u8 *mac)
+{
+	struct pan_sw_l2_offl_node *node;
+
+	spin_lock(&l2_offl_lock);
+	node  = __pan_sw_l2_mac_tbl_lookup(mac);
+	spin_unlock(&l2_offl_lock);
+
+	return node;
 }
 
 static int pan_sw_l2_hw_remove_dmac_flow(u16 mcam_idx)

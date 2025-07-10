@@ -36,7 +36,8 @@ struct pan_rvu_gbl_t {
 	u16 sdp_cnt;
 	u16 sqoff2pcifunc[256 + 32];
 	struct matchid_bmap rsrc;
-	struct xarray chan2pfunc;
+	struct xarray chan2dev;
+	struct xarray pfunc2dev;
 };
 
 struct pan_rvu_cq_info {

@@ -33,10 +33,17 @@ int otx2_mbox_up_handler_af2swdev_notify(struct otx2_nic *pf,
 					 struct af2swdev_notify_req *req,
 					 struct msg_rsp *rsp)
 {
+	int err;
+
 	if (req->flags & FDB_ADD)
-		pan_sw_l2_offl(pf, 0x1234, req->port_id, req->mac);
+		err = pan_sw_l2_offl(pf, 0x1234, req->port_id, req->mac);
 	else if (req->flags & FDB_DEL)
-		pan_sw_l2_de_offl(pf, 0x1234, req->port_id, req->mac);
+		err = pan_sw_l2_de_offl(pf, 0x1234, req->port_id, req->mac);
+	else if (req->flags & FIB_CMD)
+		err = pan_sw_l3_process(pf, 0x1234, req->cnt, req->entry);
+	if (err)
+		pr_debug("%s:%d Error happened while pushing rule to PAN\n",
+			 __func__, __LINE__);
 
 	return 0;
 }
@@ -61,11 +68,13 @@ static void pan_sw_debugfs_remove(void)
 int pan_sw_init(void)
 {
 	pan_sw_l2_init();
+	pan_sw_l3_init();
 	return 0;
 }
 
 void pan_sw_deinit(void)
 {
+	pan_sw_l3_deinit();
 	pan_sw_l2_deinit();
 	pan_sw_debugfs_remove();
 }

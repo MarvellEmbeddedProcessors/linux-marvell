@@ -22,6 +22,7 @@
 #include "pan_test.h"
 #include "pan_sw.h"
 #include "pan_sw_l2.h"
+#include "pan_sw_l3.h"
 #include "hw/otx2_cmn.h"
 
 #endif // PAN_CMN_H_

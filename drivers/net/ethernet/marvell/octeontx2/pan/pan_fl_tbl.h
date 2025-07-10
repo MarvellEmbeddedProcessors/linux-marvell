@@ -18,6 +18,8 @@ typedef int (*tbl_node_cb)(struct pan_tuple *tuple, struct sk_buff *skb,
 
 struct pan_fl_tbl_opaque {
 	/* all other fields should be inside this */
+	u8 eg_mac[ETH_ALEN];
+	struct rcu_head rcu;
 };
 
 enum pan_fl_tbl_act {
@@ -26,6 +28,9 @@ enum pan_fl_tbl_act {
 	PAN_FL_TBL_ACT_TLS_ENC = BIT_ULL(2),
 	PAN_FL_TBL_ACT_TLS_DEC = BIT_ULL(3),
 	PAN_FL_TBL_ACT_L2_FWD = BIT_ULL(4),
+	PAN_FL_TBL_ACT_L3_FWD = BIT_ULL(5),
+	PAN_FL_TBL_ACT_L3_BR_FWD = BIT_ULL(6),
+	PAN_FL_TBL_ACT_EXP = BIT_ULL(7),
 	PAN_FL_TBL_ACT_MAX,
 };
 

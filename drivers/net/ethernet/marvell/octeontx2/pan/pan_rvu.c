@@ -451,14 +451,14 @@ static bool pan_rvu_buf_xmit(struct pan_fl_tbl_res *res,
 			     struct nix_cqe_rx_s *cqe,
 			     int num_sgs, int len,
 			     struct pan_tuple_hdr *hdr,
-			     struct otx2_nic *rxpfvf)
+			     struct otx2_nic *rxpfvf,
+			     u16 off)
 {
 	struct nix_sqe_hdr_s *sqe_hdr;
 	int offset, free_desc_or_sqe;
 	struct nix_sqe_ext_s *ext;
 	struct otx2_snd_queue *sq;
 	int sq_idx;
-	int off;
 
 	/* TODO: fix Dont allow to cross for now */
 	if (cq->cq_idx >= rxpfvf->hw.cint_cnt) {
@@ -466,7 +466,6 @@ static bool pan_rvu_buf_xmit(struct pan_fl_tbl_res *res,
 		return -EINVAL;
 	}
 
-	off = res->pcifuncoff;
 	sq_idx = cq->cq_idx * pan_rvu_gbl.sqs_per_core + off;
 
 	if (unlikely(sq_idx > pan_rvu_gbl.sqs_usable)) {
@@ -576,7 +575,8 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 			 struct pan_rvu_cq_info *cq_info,
 			 struct otx2_cq_queue *cq,
 			 struct nix_cqe_rx_s *cqe,
-			 struct pan_fl_tbl_res *res)
+			 struct pan_fl_tbl_res *res,
+			 enum pan_fl_tbl_act act)
 {
 	struct nix_rx_parse_s *parse = &cqe->parse;
 	struct pan_sw_l2_offl_node *node;
@@ -639,14 +639,19 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 	eth = (const struct ethhdr *)skb->data;
 
 	/* TODO: Improve on ~7 mask */
-	netdev = xa_load(&pan_rvu_gbl.chan2pfunc, parse->chan & ~0x7);
+	netdev = xa_load(&pan_rvu_gbl.chan2dev, parse->chan & ~0x7);
 	if (netdev) {
 		skb->protocol = eth_type_trans(skb, netdev);
 		skb->dev = netdev;
+	} else {
+		skb->dev = pfvf->netdev;
 	}
 
-	if (res->act & PAN_FL_TBL_ACT_L2_FWD) {
-		node = pan_sw_l2_mac_tbl_lookup(eth->h_source);
+	if (act & PAN_FL_TBL_ACT_EXP)
+		return netif_receive_skb(skb);
+
+	if (act & PAN_FL_TBL_ACT_L2_FWD) {
+		node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
 		if (node) {
 			pan_tuple_hash_set(&tuple, node->match_id);
 			tuple.flags |= PAN_TUPLE_FLAG_L3_PROTO_V4;
@@ -675,6 +680,88 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 	return -1;
 }
 
+static int
+pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
+		       struct pan_rvu_cq_info *cq_info,
+		       struct otx2_cq_queue *cq,
+		       struct nix_cqe_rx_s *cqe,
+		       struct pan_fl_tbl_res *res,
+		       u16 *xmit_pcifunc_off)
+{
+	struct nix_rx_parse_s *parse = &cqe->parse;
+	struct pan_sw_l2_offl_node *l2_node;
+	struct nix_rx_sg_s *sg = &cqe->sg;
+	struct net_device *dev, *in_dev;
+	struct pan_tuple tuple = {};
+	struct pan_fl_tbl_res *pres;
+	struct neighbour *neigh;
+	struct iphdr *iphdr;
+	struct ethhdr *eth;
+	bool br_routing;
+	u64 *seg_addr;
+	u16 *seg_size;
+	u16 pcifunc;
+	void *start;
+	void *va;
+
+	if (unlikely(parse->errlev || parse->errcode)) {
+		if (dup_check_rcv_errors(pfvf, cqe, cq->cq_idx))
+			return -EFAULT;
+	}
+
+	start = (void *)sg;
+	sg = (struct nix_rx_sg_s *)start;
+	seg_addr = &sg->seg_addr;
+	seg_size = (void *)sg;
+
+	pcifunc = pan_rvu_gbl.sqoff2pcifunc[res->pcifuncoff];
+	dev = xa_load(&pan_rvu_gbl.pfunc2dev, pcifunc);
+	if (likely(!dev))
+		return -ENOENT;
+
+	br_routing = !!(res->act & PAN_FL_TBL_ACT_L3_BR_FWD);
+	if (unlikely(br_routing))
+		dev = netdev_master_upper_dev_get_rcu(dev);
+
+	va = phys_to_virt(otx2_iova_to_phys(pfvf->iommu_domain, *seg_addr));
+
+	eth = (struct ethhdr *)va;
+	iphdr = (struct iphdr *)(va + ETH_HLEN);
+
+	in_dev = xa_load(&pan_rvu_gbl.chan2dev, parse->chan & ~0x7);
+	if (in_dev) {
+		if (unlikely(netif_is_bridge_port(in_dev))) {
+			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
+			if (!l2_node)
+				return -ENOENT;
+
+			tuple.flags |= PAN_TUPLE_FLAG_L3_PROTO_V4;
+			pan_tuple_hash_set(&tuple, l2_node->match_id);
+			__pan_fl_tbl_offl_lookup_n_res(&tuple, &pres);
+		}
+	}
+
+	neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
+	if (unlikely(!neigh))
+		return -ENOENT;
+
+	if (unlikely(br_routing)) {
+		l2_node = __pan_sw_l2_mac_tbl_lookup(neigh->ha);
+		if (!l2_node)
+			return -ENOENT;
+	}
+
+	ether_addr_copy(eth->h_source, res->opq->eg_mac);
+	ether_addr_copy(eth->h_dest, neigh->ha);
+
+	if (likely(!br_routing))
+		return 0;
+
+	pcifunc = l2_node->port_id;
+	*xmit_pcifunc_off = pan_rvu_pcifunc2_sq_off(pcifunc);
+	return 0;
+}
+
 static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 				struct pan_rvu_cq_info *cq_info,
 				struct otx2_cq_queue *cq,
@@ -684,6 +771,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 	struct pan_tuple_hdr hdr = { 0 };
 	struct pan_tuple tuple = { 0 };
 	struct pan_fl_tbl_res *res;
+	u16 xmit_pcifunc_off;
 	int len, ret;
 	int num_sgs;
 
@@ -705,7 +793,8 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 #if IS_ENABLED(CONFIG_OCTEONTX_PAN_POLLING_MODE)
 			local_bh_disable();
 #endif
-			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res);
+			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, res->act);
+
 #if IS_ENABLED(CONFIG_OCTEONTX_PAN_POLLING_MODE)
 			local_bh_enable();
 #endif
@@ -717,26 +806,54 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 
 		if (__pan_fl_tbl_offl_lookup_n_res(&tuple, &res)) {
 			/* Send packet to stack thru pan device */
-			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res);
+			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, res->act);
 			return;
 		}
 
 		ret = pan_rvu_find_nsgs_n_len(cqe, &num_sgs, &len);
 		if (ret) {
 			pr_err("Failed to find nums_sgs and len\n");
-			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res);
+			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, res->act);
 			return;
 		}
 	}
 
 	if (unlikely(res->pcifuncoff == -1)) {
 		pr_debug("Tuple matched; but no pcifunc configured\n");
-		pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res);
+		pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, res->act);
 		return;
 	}
 
 	/* Last byte of match id is connection id */
 	switch (res->act) {
+	case PAN_FL_TBL_ACT_EXP:
+		pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, PAN_FL_TBL_ACT_EXP);
+		return;
+
+	case PAN_FL_TBL_ACT_L3_FWD:
+		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, NULL);
+
+		/* Incase of error reinject the packet back to stack */
+		if (ret) {
+			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res,
+						 PAN_FL_TBL_ACT_EXP);
+			return;
+		}
+
+		xmit_pcifunc_off = res->pcifuncoff;
+		break;
+
+	case PAN_FL_TBL_ACT_L3_BR_FWD:
+		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, &xmit_pcifunc_off);
+
+		/* Incase of error reinject the packet back to stack */
+		if (ret) {
+			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res,
+						 PAN_FL_TBL_ACT_EXP);
+			return;
+		}
+		break;
+
 	case PAN_FL_TBL_ACT_L2_FWD:
 
 		/* Say  x86-A (mac: X) ---------> eth0 DUT(pan) eth1---------> x86-B(MAC: Y)
@@ -751,11 +868,15 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		 * fdb learning by bridge.
 		 */
 		if (res->dir == FLOW_OFFLOAD_DIR_ORIGINAL) {
-			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res);
+			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, res->act);
 			return;
 		}
+
+		xmit_pcifunc_off = res->pcifuncoff;
 		break;
+
 	default:
+		xmit_pcifunc_off = res->pcifuncoff;
 		break;
 	}
 
@@ -764,7 +885,8 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 	cq->pool_ptrs += num_sgs;
 #endif
 
-	ret = pan_rvu_buf_xmit(res, cq, cqe, num_sgs, len, &hdr, pfvf);
+	ret = pan_rvu_buf_xmit(res, cq, cqe, num_sgs, len, &hdr,
+			       pfvf, xmit_pcifunc_off);
 	if (!ret)
 		return;
 }
@@ -1496,8 +1618,11 @@ static int pan_rvu_open(struct net_device *netdev)
 		dev = __pan_rvu_get_kernel_netdev_by_pcifunc(info->pcifunc);
 		if (!dev)
 			continue;
-		xa_store(&pan_rvu_gbl.chan2pfunc,
+		xa_store(&pan_rvu_gbl.chan2dev,
 			 info->rx_chan_base, dev, GFP_KERNEL);
+
+		xa_store(&pan_rvu_gbl.pfunc2dev,
+			 info->pcifunc, dev, GFP_KERNEL);
 	}
 	kfree(info);
 
@@ -2264,13 +2389,16 @@ int pan_rvu_init(void)
 
 #endif
 	otx2_cmn_fops_arr_add(PCI_DEVID_PAN_RVU, &pan_cmn_fops);
-	xa_init(&pan_rvu_gbl.chan2pfunc);
+	xa_init(&pan_rvu_gbl.chan2dev);
+	xa_init(&pan_rvu_gbl.pfunc2dev);
 	return pci_register_driver(&pan_rvu_driver);
 }
 
 void pan_rvu_deinit(void)
 {
 	xa_destroy(&pan_rvu_gbl.pcifunc2sqoff);
+	xa_destroy(&pan_rvu_gbl.pfunc2dev);
+	xa_destroy(&pan_rvu_gbl.chan2dev);
 	pci_unregister_driver(&pan_rvu_driver);
 	otx2_cmn_fops_arr_del(PCI_DEVID_PAN_RVU);
 }

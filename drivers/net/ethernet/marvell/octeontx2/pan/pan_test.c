@@ -13,12 +13,14 @@
 #include <linux/errno.h>
 #include <net/ip.h>
 #include <linux/ipv6.h>
+#include <linux/ip.h>
 
 #include "rvu.h"
 #include "pan_tuple.h"
 #include "pan_fl_tbl.h"
 #include "pan_rvu.h"
 #include "pan_test.h"
+#include "switch/pan_sw_l3.h"
 
 static struct pan_fl_tbl_node tn;
 static struct pan_tuple *tuple;
@@ -305,8 +307,8 @@ static struct sk_buff *pan_test_v4_skb_build(void)
 	skb_set_network_header(skb, skb->len);
 	iph = skb_put(skb, sizeof(struct iphdr));
 	iph->protocol = IPPROTO_UDP;
-	iph->saddr = in_aton("192.168.8.100");
-	iph->daddr = in_aton("192.168.8.200");
+	iph->saddr = in_aton("192.168.9.1");
+	iph->daddr = in_aton("192.168.9.100");
 	iph->version = 0x4;
 	iph->frag_off = 0;
 	iph->ihl = 0x5;
@@ -381,6 +383,8 @@ enum {
 				BIT_ULL(opt_dev),
 	pan_test_cmd_egress_inject_hook = BIT_ULL(opt_cmd_egress) | BIT_ULL(opt_inject) |
 				BIT_ULL(opt_dev) | BIT_ULL(opt_hooknum),
+
+	pan_test_cmd_egress_pkt = BIT_ULL(opt_cmd_egress) | BIT_ULL(opt_v4),
 	pan_test_cmd_egress_reg = BIT_ULL(opt_cmd_egress) | BIT_ULL(opt_reg),
 	pan_test_cmd_lookup_perf = BIT_ULL(opt_lookup_perf) | BIT_ULL(opt_tbl_sz) |
 					BIT_ULL(opt_lookup_sz),
@@ -544,10 +548,12 @@ static int pan_test_cmd_parse(char *options, u64 *res,
 			break;
 
 		case opt_v4:
+			cmd |= BIT_ULL(token);
 			type = PKT_TYPE_V4;
 			break;
 
 		case opt_v6:
+			cmd |= BIT_ULL(token);
 			type = PKT_TYPE_V6;
 			break;
 
@@ -705,6 +711,9 @@ static int pan_test_cmd_execute(u64 cmd, struct pan_test_cmd_params *params)
 	ktime_t start, end, diff;
 	struct net_device *dev;
 	struct pan_tuple *t[10];
+	struct net_device *xdev;
+	struct iphdr *iph;
+	struct sk_buff *skb;
 	int max, min;
 	int fail_cnt = 0;
 	u16 pcifunc;
@@ -766,6 +775,24 @@ static int pan_test_cmd_execute(u64 cmd, struct pan_test_cmd_params *params)
 		pcifunc = pan_priv->pcifunc;
 
 		pan_test_modify_cam_action(pcifunc, params->mcam_idx, params->qidx);
+		break;
+
+	case pan_test_cmd_egress_pkt:
+		skb = pan_test_v4_skb_build();
+		skb_pull_inline(skb, ETH_HLEN);
+		iph = (struct iphdr *)skb->data;
+		skb_push(skb, ETH_HLEN);
+
+		pr_err("Looking for route for packet dest=%#x, src=%#x\n",
+		       iph->daddr, iph->saddr);
+		xdev = pan_sw_l3_route_lookup(iph->daddr);
+		if (xdev) {
+			skb->dev = xdev;
+			dev_queue_xmit(skb);
+			pr_err("Sending packt thru %s\n", xdev->name);
+		} else {
+			dev_kfree_skb_any(skb);
+		}
 		break;
 
 	case pan_test_cmd_egress_reg:
