@@ -6497,3 +6497,21 @@ static void quirk_cavium_xcp0_bar_fixup(struct pci_dev *dev)
 	}
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa067, quirk_cavium_xcp0_bar_fixup);
+
+/* Marvell bphy (0xa089) device allocates 512GB of BAR0 space, which uses
+ * a significant amount of memory when mapped with vfio-pci at a 4K page size.
+ * Reduce it's size to 129GB, as no hardware resources are mapped beyond this limit.
+ */
+
+#define CAVIUM_BPHY_BAR0_SIZE 0x2040000000ULL /* 129GB */
+
+static void quirk_cavium_bphy_bar0_fixup(struct pci_dev *dev)
+{
+	struct resource *r = &dev->resource[0];
+
+	if ((r->flags & IORESOURCE_MEM) && (resource_size(r) > CAVIUM_BPHY_BAR0_SIZE)) {
+		r->end = r->start + CAVIUM_BPHY_BAR0_SIZE - 1;
+		pci_info(dev, "Fixup bphy bar0 %llx - %llx\n", r->start, r->end);
+	}
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_CAVIUM, 0xa089, quirk_cavium_bphy_bar0_fixup);
