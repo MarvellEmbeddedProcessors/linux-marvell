@@ -179,7 +179,8 @@ static int pem_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct device *dev = &pdev->dev;
 	struct pem_ctlr *pem;
-	int err;
+	struct pci_dev *root_port;
+	int err, rc_domain;
 
 	pem = devm_kzalloc(dev, sizeof(struct pem_ctlr), GFP_KERNEL);
 	if (pem == NULL)
@@ -210,6 +211,18 @@ static int pem_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto bar0_map_failed;
 	}
 	pem->index = ((u64)pci_resource_start(pdev, 0) >> ID_SHIFT) & 0xf;
+
+	rc_domain = pem->index + DOMAIN_OFFSET;
+
+	root_port = pci_get_domain_bus_and_slot(rc_domain, 0, 0);
+	if (!root_port) {
+		dev_err(&pdev->dev, "failed to get root port\n");
+		goto bar0_map_failed;
+	}
+	if (!root_port->is_hotplug_bridge) {
+		dev_info(&pdev->dev, "Hot-plug disabled skip registration\n");
+		goto bar0_map_failed;
+	}
 
 	err = pem_register_interrupts(pdev);
 	if (err < 0) {
