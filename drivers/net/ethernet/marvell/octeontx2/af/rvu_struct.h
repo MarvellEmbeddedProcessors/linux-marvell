@@ -409,6 +409,8 @@ struct nix_cq_ctx_s {
 	u64 qsize		: 4;
 	u64 cq_err_int		: 8;
 	u64 cq_err_int_ena	: 8;
+	/* Ensure all context sizes are minimum 128 bytes */
+	u64 padding[12];
 };
 
 /* CN10K NIX Receive queue context structure */
@@ -714,7 +716,8 @@ struct nix_sq_ctx_s {
 struct nix_rsse_s {
 	uint32_t rq			: 20;
 	uint32_t reserved_20_31		: 12;
-
+	/* Ensure all context sizes are minimum 128 bytes */
+	u64 padding[15];
 };
 
 /* NIX receive multicast/mirror entry structure */
@@ -726,6 +729,8 @@ struct nix_rx_mce_s {
 	uint64_t rsvd_31_24 : 8;
 	uint64_t pf_func    : 16;
 	uint64_t next       : 16;
+	/* Ensure all context sizes are minimum 128 bytes */
+	u64 padding[15];
 };
 
 enum nix_band_prof_layers {
