@@ -1162,10 +1162,9 @@ int mcs_get_blkcnt(void)
 	if (!pci_dev_present(mcs_id_table))
 		return 0;
 
-	list_for_each_entry(mcs, &mcs_list, mcs_list) {
-		mcs->mcs_id = mcs_cnt;
+	list_for_each_entry(mcs, &mcs_list, mcs_list)
 		mcs_cnt++;
-	}
+
 	return mcs_cnt;
 }
 
