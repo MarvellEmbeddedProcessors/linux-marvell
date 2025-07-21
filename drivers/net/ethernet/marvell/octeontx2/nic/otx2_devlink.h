@@ -11,6 +11,7 @@
 struct otx2_devlink {
 	struct devlink *dl;
 	struct otx2_nic *pfvf;
+	u32 link_mode;
 };
 
 /* Devlink APIs */

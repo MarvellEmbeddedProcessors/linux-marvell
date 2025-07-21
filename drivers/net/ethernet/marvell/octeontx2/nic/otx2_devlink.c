@@ -5,6 +5,10 @@
  */
 
 #include "otx2_common.h"
+#include <linux/linkmode.h>
+#include "cgx_fw_if.h"
+
+#define OTX2_MODE_ADVERTISED	1
 
 /* Devlink Params APIs */
 static int otx2_dl_mcam_count_validate(struct devlink *devlink, u32 id,
@@ -354,6 +358,101 @@ static int otx2_dl_mac_stats_reset_set(struct devlink *devlink, u32 id,
 	return 0;
 }
 
+static int otx2_dl_link_mode_get(struct devlink *devlink,
+				 u32 id, struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_devlink *otx2_dl = devlink_priv(devlink);
+
+	ctx->val.vu32 = otx2_dl->link_mode;
+	return 0;
+}
+
+static int otx2_dl_link_mode_set(struct devlink *devlink,
+				 u32 id, struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_devlink *otx2_dl = devlink_priv(devlink);
+	struct ethtool_link_ksettings cur_ks, new_ks;
+	struct otx2_nic *pfvf = otx2_dl->pfvf;
+	struct cgx_set_link_mode_req *req;
+	u64 mode, first_bit;
+	int err;
+
+	otx2_dl->link_mode = ctx->val.vu32;
+	mode = BIT(ctx->val.vu32);
+
+	linkmode_zero(new_ks.link_modes.advertising);
+
+	/* Retrieve current link settings */
+	otx2_get_link_ksettings(pfvf->netdev, &cur_ks);
+
+	/* Map the new mode to ethtool link_ksettings */
+	otx2_get_link_mode_info(mode, OTX2_MODE_ADVERTISED, &new_ks);
+
+	/* Send mailbox to AF */
+	mutex_lock(&pfvf->mbox.lock);
+
+	req = otx2_mbox_alloc_msg_cgx_set_link_mode(&pfvf->mbox);
+
+	if (!req) {
+		mutex_unlock(&pfvf->mbox.lock);
+		return -ENOMEM;
+	}
+
+	req->args.speed = cur_ks.base.speed;
+	req->args.duplex = cur_ks.base.duplex ^ 0x1;
+	req->args.an = cur_ks.base.autoneg;
+
+	linkmode_zero(req->args.advertising);
+
+	/* for some modes such as ETH_MODE_SGMII_10M_BIT, ETH_MODE_SGMII_100M_BIT,
+	 * CGX_MODE_SGMII setting only half bit mode instead of
+	 * both half and full bit
+	 */
+	first_bit = find_first_bit(new_ks.link_modes.advertising,
+				   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	linkmode_set_bit(first_bit, req->args.advertising);
+
+	err = otx2_sync_mbox_msg(&pfvf->mbox);
+	mutex_unlock(&pfvf->mbox.lock);
+
+	return err;
+}
+
+static int otx2_dl_link_mode_validate(struct devlink *devlink,
+				      u32 id,
+				      union devlink_param_value val,
+				      struct netlink_ext_ack *extack)
+{
+	struct otx2_devlink *otx2_dl = devlink_priv(devlink);
+	struct ethtool_link_ksettings cur_ks, new_ks;
+	struct otx2_nic *pfvf = otx2_dl->pfvf;
+	u32 bit = val.vu32;
+	u64 mode;
+
+	if (bit >= CGX_MODE_MAX) {
+		pr_warn("Invalid link mode bit: %u\n", bit);
+		return -EINVAL;
+	}
+
+	if (otx2_get_link_ksettings(pfvf->netdev, &cur_ks)) {
+		pr_warn("Failed to get link ksettings\n");
+		return -EIO;
+	}
+
+	mode = BIT(val.vu32);
+
+	linkmode_zero(new_ks.link_modes.advertising);
+	otx2_get_link_mode_info(mode, OTX2_MODE_ADVERTISED, &new_ks);
+
+	/* Check requested mode against supported modes */
+	if (!linkmode_subset(new_ks.link_modes.advertising, cur_ks.link_modes.supported)) {
+		pr_warn("Requested mode not supported by hardware: %u\n", bit);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 enum otx2_dl_param_id {
 	OTX2_DEVLINK_PARAM_ID_BASE = DEVLINK_PARAM_GENERIC_ID_MAX,
 	OTX2_DEVLINK_PARAM_ID_MCAM_COUNT,
@@ -363,6 +462,7 @@ enum otx2_dl_param_id {
 	OTX2_DEVLINK_PARAM_ID_UCAST_FLT_CNT,
 	OTX2_DEVLINK_PARAM_ID_SERDES_LINK,
 	 OTX2_DEVLINK_PARAM_ID_MAC_STATS_RST,
+	OTX2_DEVLINK_PARAM_ID_LINK_MODE,
 };
 
 static const struct devlink_param otx2_dl_params[] = {
@@ -402,6 +502,11 @@ static const struct devlink_param otx2_dl_params[] = {
 			     otx2_dl_mac_stats_reset_get,
 			     otx2_dl_mac_stats_reset_set,
 			     NULL),
+	DEVLINK_PARAM_DRIVER(OTX2_DEVLINK_PARAM_ID_LINK_MODE,
+			     "link_mode", DEVLINK_PARAM_TYPE_U32,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     otx2_dl_link_mode_get, otx2_dl_link_mode_set,
+			     otx2_dl_link_mode_validate),
 };
 
 #ifdef CONFIG_RVU_ESWITCH
