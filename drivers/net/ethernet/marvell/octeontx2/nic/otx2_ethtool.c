@@ -1187,10 +1187,10 @@ static void otx2_get_fec_info(u64 index, int req_mode,
 			    otx2_fec_modes);
 }
 
-static void otx2_get_link_mode_info(u64 link_mode_bmap,
-				    bool req_mode,
-				    struct ethtool_link_ksettings
-				    *link_ksettings)
+void otx2_get_link_mode_info(u64 link_mode_bmap,
+			     bool req_mode,
+			     struct ethtool_link_ksettings
+			     *link_ksettings)
 {
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(otx2_link_modes) = { 0, };
 	/* CGX link modes to Ethtool link mode mapping */
@@ -1314,8 +1314,8 @@ static int otx2_get_module_eeprom(struct net_device *netdev,
 	return 0;
 }
 
-static int otx2_get_link_ksettings(struct net_device *netdev,
-				   struct ethtool_link_ksettings *cmd)
+int otx2_get_link_ksettings(struct net_device *netdev,
+			    struct ethtool_link_ksettings *cmd)
 {
 	struct otx2_nic *pfvf = netdev_priv(netdev);
 	struct cgx_fw_data *rsp = NULL;
