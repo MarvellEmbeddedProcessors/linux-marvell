@@ -18,6 +18,7 @@ rvu_af-y := cgx.o rvu.o rvu_cgx.o rvu_npa.o rvu_nix.o rvu_nix_spi.o \
 		  cn20k/mbox_init.o cn20k/npc.o cn20k/nix.o cn20k/debugfs.o \
 		  cn20k/cpt.o cn20k/npa.o cn20k/link.o cn20k/rvum.o \
 		  cn20k/mcs.o rvu_switch.o switch/rvu_sw.o switch/rvu_sw_l2.o \
+		  switch/rvu_sw_l3.o \
 		  $(EB_DIR)/rvu_eblock.o \
 		  $(EB_DIR)/rvu_eb_ree.o \
 		  $(EB_DIR)/rvu_eb_ml.o	\
