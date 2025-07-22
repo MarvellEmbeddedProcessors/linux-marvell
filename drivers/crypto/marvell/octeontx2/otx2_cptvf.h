@@ -35,6 +35,9 @@ struct otx2_cptvf_dev {
 	void *bbuf_base;
 	unsigned long cap_flag;
 	u64 eng_caps[OTX2_CPT_MAX_ENG_TYPES];
+
+	/* Devlink */
+	struct devlink *dl;
 };
 
 irqreturn_t otx2_cptvf_pfvf_mbox_intr(int irq, void *arg);

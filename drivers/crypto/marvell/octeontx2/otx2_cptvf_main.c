@@ -2,6 +2,7 @@
 /* Copyright (C) 2020 Marvell. */
 
 #include "otx2_cpt_common.h"
+#include "otx2_cpt_devlink.h"
 #include "otx2_cptvf.h"
 #include "otx2_cptlf.h"
 #include "otx2_cptvf_algs.h"
@@ -451,6 +452,11 @@ static int otx2_cptvf_probe(struct pci_dev *pdev,
 	if (ret)
 		goto free_lmtst;
 
+	ret = otx2_cptvf_register_dl(cptvf);
+	if (ret)
+		dev_err(&pdev->dev, "Couldn't register devlink %x\n",
+			ret);
+
 	return 0;
 
 free_lmtst:
@@ -478,6 +484,8 @@ static void otx2_cptvf_remove(struct pci_dev *pdev)
 	cptvf_disable_pfvf_mbox_intrs(cptvf);
 	/* Destroy PF-VF mbox */
 	cptvf_pfvf_mbox_destroy(cptvf);
+	/* Devlink unregistered from cptvf */
+	otx2_cptvf_unregister_dl(cptvf);
 	/* Free LMTST memory */
 	cn10k_cpt_lmtst_free(pdev, &cptvf->lfs);
 	pci_set_drvdata(pdev, NULL);

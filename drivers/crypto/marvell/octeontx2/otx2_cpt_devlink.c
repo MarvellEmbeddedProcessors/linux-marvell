@@ -3,6 +3,21 @@
 
 #include "otx2_cpt_devlink.h"
 
+static int cn20k_cpt_get_cq_enable(struct devlink *dl, u32 id,
+				   struct devlink_param_gset_ctx *ctx)
+{
+	/* Placeholder: to be implemented later */
+	return 0;
+}
+
+static int cn20k_cpt_set_cq_enable(struct devlink *dl, u32 id,
+				   struct devlink_param_gset_ctx *ctx,
+				   struct netlink_ext_ack *extack)
+{
+	/* Placeholder: to be implemented later */
+	return 0;
+}
+
 static int otx2_cpt_dl_egrp_create(struct devlink *dl, u32 id,
 				   struct devlink_param_gset_ctx *ctx,
 				   struct netlink_ext_ack *extack)
@@ -481,6 +496,15 @@ static const struct devlink_param cn20k_cpt_dl_params[] = {
 			     cn20k_cpt_dl_check_pdb_config_value),
 };
 
+/* VF specific devlink parameters */
+static const struct devlink_param cn20k_cptvf_dl_params[] = {
+	DEVLINK_PARAM_DRIVER(CN20K_CPT_DEVLINK_PARAM_ID_CPT_CQ_ENA,
+			     "enable_cpt_cq", DEVLINK_PARAM_TYPE_BOOL,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     cn20k_cpt_get_cq_enable, cn20k_cpt_set_cq_enable,
+			     NULL),
+};
+
 static int otx2_cpt_dl_info_firmware_version_put(struct devlink_info_req *req,
 						 struct otx2_cpt_eng_grp_info grp[],
 						 const char *ver_name, int eng_type)
@@ -520,9 +544,69 @@ static int otx2_cpt_devlink_info_get(struct devlink *dl,
 						    "fw.ie", OTX2_CPT_IE_TYPES);
 }
 
+static int otx2_cptvf_devlink_info_get(struct devlink *dl,
+				       struct devlink_info_req *req,
+				       struct netlink_ext_ack *extack)
+{
+	return devlink_info_serial_number_put(req, "rvu_cptvf");
+}
+
+static const struct devlink_ops otx2_cptvf_devlink_ops = {
+	.info_get = otx2_cptvf_devlink_info_get,
+};
+
 static const struct devlink_ops otx2_cpt_devlink_ops = {
 	.info_get = otx2_cpt_devlink_info_get,
 };
+
+int otx2_cptvf_register_dl(struct otx2_cptvf_dev *cptvf)
+{
+	struct device *dev = &cptvf->pdev->dev;
+	struct otx2_cptvf_devlink *cpt_dl;
+	struct devlink *dl;
+	int ret;
+
+	dl = devlink_alloc(&otx2_cptvf_devlink_ops,
+			   sizeof(struct otx2_cptvf_devlink), dev);
+	if (!dl) {
+		dev_warn(dev, "devlink_alloc failed\n");
+		return -ENOMEM;
+	}
+
+	cpt_dl = devlink_priv(dl);
+	cpt_dl->dl = dl;
+	cpt_dl->cptvf = cptvf;
+	cptvf->dl = dl;
+	if (is_cn20k(cptvf->pdev)) {
+		unsigned int psize = ARRAY_SIZE(cn20k_cptvf_dl_params);
+		ret = devlink_params_register(dl, cn20k_cptvf_dl_params,
+					      psize);
+		if (ret) {
+			dev_err(dev, "devlink params register failed with error %d",
+				ret);
+			devlink_free(dl);
+			return ret;
+		}
+	}
+	devlink_register(dl);
+
+	return 0;
+}
+
+void otx2_cptvf_unregister_dl(struct otx2_cptvf_dev *cptvf)
+{
+	int psize = ARRAY_SIZE(cn20k_cptvf_dl_params);
+	struct devlink *dl = cptvf->dl;
+
+	if (!dl)
+		return;
+
+	devlink_unregister(dl);
+	if (is_cn20k(cptvf->pdev))
+		devlink_params_unregister(dl, cn20k_cptvf_dl_params,
+					  psize);
+	devlink_free(dl);
+}
 
 int otx2_cpt_register_dl(struct otx2_cptpf_dev *cptpf)
 {
