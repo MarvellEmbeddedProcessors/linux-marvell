@@ -7,6 +7,7 @@
 
 #include "otx2_cpt_common.h"
 #include "otx2_cptpf.h"
+#include "otx2_cptvf.h"
 
 #define RES_META_OFFSET_MASK GENMASK(36, 32)
 #define PSP_TIMER_ADD_VALUE_MASK GENMASK(62, 0)
@@ -19,6 +20,11 @@ struct otx2_cpt_devlink {
 	struct otx2_cptpf_dev *cptpf;
 	u8 uc_compcode;
 	u8 egrp;
+};
+
+struct otx2_cptvf_devlink {
+	struct devlink *dl;
+	struct otx2_cptvf_dev *cptvf;
 };
 
 enum otx2_cpt_dl_param_id {
@@ -34,10 +40,13 @@ enum otx2_cpt_dl_param_id {
 	CN20K_CPT_DEVLINK_PARAM_ID_PSP_TIMER_ADD_VALUE,
 	CN20K_CPT_DEVLINK_PARAM_ID_PDB_CONFIG_EGRP,
 	CN20K_CPT_DEVLINK_PARAM_ID_PDB_CONFIG_VALUE,
+	CN20K_CPT_DEVLINK_PARAM_ID_CPT_CQ_ENA,
 };
 
 /* Devlink APIs */
 int otx2_cpt_register_dl(struct otx2_cptpf_dev *cptpf);
+int otx2_cptvf_register_dl(struct otx2_cptvf_dev *cptvf);
 void otx2_cpt_unregister_dl(struct otx2_cptpf_dev *cptpf);
+void otx2_cptvf_unregister_dl(struct otx2_cptvf_dev *cptvf);
 
 #endif /* __OTX2_CPT_DEVLINK_H */
