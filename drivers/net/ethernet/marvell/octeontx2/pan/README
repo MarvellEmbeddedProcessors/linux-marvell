@@ -1,0 +1,62 @@
+
+1. Kernel Config
+CONFIG_OCTEONTX_PAN=m
+
+2. How to Build
+make ARCH=arm64 CROSS_COMPILE=aarch64-marvell-linux-gnu- modules  -j16 V=s
+
+3. L2 offload
+                         cn10k
+ |-------|         |--------------|                |-------
+ | x86   |---------|sdp1-0   eth0 |----------------| x86  |
+ |       |         |      br0     |                |      |
+ ---------         |--------------                 --------
+ 192.168.9.200                                     192.168.9.100
+
+3.a) configuration
+
+insmod ./pcie-marvell-cnxk-ep.ko
+sleep 1
+./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
+sleep 1
+brctl addbr br0
+ifconfig sdp1-0 up
+ifconfig eth0 up
+brctl addif br0 eth0
+brctl addif br0 sdp1-0
+insmod ./pan.ko
+sleep 2
+ifconfig pan up
+sleep 1
+devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
+sleep 1
+ifconfig br0 up
+mount -t debugfs none /sys/kernel/debug/
+
+4.  L3 offload
+
+                         cn10k
+ |-------|         |------------------------ |                |-------
+ | x86   |---------|sdp1-0           eth0    |----------------| x86  |
+ |       |         |192.168.11.1  192.168.9.1|                |      |
+ ---------         |-------------------------                 --------
+ 192.168.11.200                                            192.168.9.100
+
+4.a) configuration
+insmod ./pcie-marvell-cnxk-ep.ko
+sleep 1
+./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
+sleep 1
+ifconfig sdp1-0 192.168.11.1 up
+ifconfig eth0 192.168.9.1 up
+insmod ./pan.ko
+sleep 2
+ifconfig pan up
+sleep 1
+devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
+sleep 1
+mount -t debugfs none /sys/kernel/debug/
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+5. Debugfs
+/sys/kernel/debug/cn10k/pan/
