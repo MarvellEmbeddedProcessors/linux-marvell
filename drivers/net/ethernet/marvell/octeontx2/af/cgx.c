@@ -1499,6 +1499,24 @@ static void otx2_map_ethtool_link_modes(u64 bitmask,
 		set_mod_args(args, 2500, 0, 1,
 			     BIT_ULL(ETH_MODE_10G_QXGMII_BIT));
 		break;
+	case ETHTOOL_LINK_MODE_100000baseSR_Full_BIT:
+		set_mod_args(args, 100, 1, 1, BIT_ULL(ETH_MODE_100GAUI_1_C2C_BIT));
+		break;
+	case ETHTOOL_LINK_MODE_100000baseLR_ER_FR_Full_BIT:
+		set_mod_args(args, 100, 1, 1, BIT_ULL(ETH_MODE_100GAUI_1_C2M_BIT));
+		break;
+	case ETHTOOL_LINK_MODE_200000baseSR2_Full_BIT:
+		set_mod_args(args, 200, 1, 1, BIT_ULL(ETH_MODE_200GAUI_2_C2C_BIT));
+		break;
+	case ETHTOOL_LINK_MODE_200000baseLR2_ER2_FR2_Full_BIT:
+		set_mod_args(args, 200, 1, 1, BIT_ULL(ETH_MODE_200GAUI_2_C2M_BIT));
+		break;
+	case ETHTOOL_LINK_MODE_200000baseSR4_Full_BIT:
+		set_mod_args(args, 200, 1, 1, BIT_ULL(ETH_MODE_200GAUI_4_C2C_BIT));
+		break;
+	case ETHTOOL_LINK_MODE_200000baseLR4_ER4_FR4_Full_BIT:
+		set_mod_args(args, 200, 1, 1, BIT_ULL(ETH_MODE_200GAUI_4_C2M_BIT));
+		break;
 	default:
 		set_mod_args(args, 0, 1, 0, BIT_ULL(CGX_MODE_MAX));
 		break;
