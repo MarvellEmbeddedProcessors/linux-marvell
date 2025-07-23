@@ -636,6 +636,8 @@ int pan_fl_tbl_del(struct pan_tuple *tuple)
 
 	free_percpu(node->hits);
 
+	res = &node->res;
+
 	if (res->pair) {
 		rpair = res->pair;
 		rpair->pair = NULL;
