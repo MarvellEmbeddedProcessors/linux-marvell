@@ -15,6 +15,7 @@
 #include "otx2_struct.h"
 #include "hw/otx2_cmn.h"
 #include "cn10k.h"
+#include "pan_cpt.h"
 
 static struct xarray oxt2_cmn_init_fops_arr;
 
@@ -353,6 +354,13 @@ int dup_rq_init(struct otx2_nic *pfvf, u16 qidx, u16 lpb_aura)
 {
 	struct otx2_qset *qset = &pfvf->qset;
 	struct nix_aq_enq_req *aq;
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
+	int err;
+
+	err = pan_cpt_alloc(pfvf, qidx);
+	if (err)
+		return err;
+#endif
 
 	/* Get memory to put this msg */
 	aq = otx2_mbox_alloc_msg_nix_aq_enq(&pfvf->mbox);

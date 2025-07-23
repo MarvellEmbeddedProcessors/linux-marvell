@@ -71,6 +71,12 @@ config OCTEONTX_PAN_POLLING_MODE
 	help
 	 This option enable PAN polling mode for PAN
 	 drivers.
+
+config OCTEONTX_PAN_KTLS_TX
+	tristate "Enable KTLS Tx offload"
+	default y
+	help
+	 This option enable KTLS Tx side offload.
 endif
 
 config OCTEONTX2_VF

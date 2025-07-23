@@ -13,6 +13,7 @@
 #include "otx2_reg.h"
 #include "otx2_struct.h"
 #include "pan_tuple.h"
+#include "ktls/pan_ktls.h"
 #include "pan_fl_tbl.h"
 #include "pan_parse_buf.h"
 #include "pan_rvu.h"
@@ -24,5 +25,7 @@
 #include "pan_sw_l2.h"
 #include "pan_sw_l3.h"
 #include "hw/otx2_cmn.h"
+#include "pan_mbox.h"
+#include "pan_cpt.h"
 
 #endif // PAN_CMN_H_

@@ -25,7 +25,7 @@
 #include "cn10k.h"
 #include "qos.h"
 #include <rvu_trace.h>
-#include "hw/otx2_cmn.h"
+#include "pan_cmn.h"
 
 int otx2_mbox_up_handler_af2swdev_notify(struct otx2_nic *pf,
 					 struct af2swdev_notify_req *req,

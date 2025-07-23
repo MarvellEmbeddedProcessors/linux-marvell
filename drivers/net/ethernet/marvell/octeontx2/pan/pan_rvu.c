@@ -875,6 +875,17 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		xmit_pcifunc_off = res->pcifuncoff;
 		break;
 
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
+	case PAN_FL_TBL_ACT_TLS_ENC:
+		/* pcifunc for eth0 from /sys/kernel/debug/cn10k/pan/info is
+		 * 0x400
+		 */
+		res->pcifuncoff = pan_rvu_pcifunc2_sq_off(0x400);
+		pan_tls_encrypt(pfvf, res, parse->match_id & 0xFF,
+				cq, cqe, &tuple, &hdr, &len);
+		xmit_pcifunc_off = res->pcifuncoff;
+		break;
+#endif
 	default:
 		xmit_pcifunc_off = res->pcifuncoff;
 		break;
@@ -1409,21 +1420,16 @@ static int pan_rvu_cq_info_init(struct net_device *netdev)
 	return 0;
 }
 
-int pan_rvu_alloc_mcam_entry(void)
+int pan_rvu_alloc_mcam_entry(struct otx2_nic *pan_nic, u16 *mcam_entry)
 {
 	struct npc_mcam_alloc_entry_req *req;
 	struct npc_mcam_alloc_entry_rsp *rsp;
 	struct otx2_flow_config *flow_cfg;
-	struct otx2_nic *pan;
 
-	pan = pci_get_drvdata(pci_get_device(PCI_VENDOR_ID_CAVIUM,
-					     PCI_DEVID_PAN_RVU, NULL));
-	if (!pan)
-		return -ENODEV;
-	flow_cfg = pan->flow_cfg;
+	flow_cfg = pan_nic->flow_cfg;
 
-	mutex_lock(&pan->mbox.lock);
-	req = otx2_mbox_alloc_msg_npc_mcam_alloc_entry(&pan->mbox);
+	mutex_lock(&pan_nic->mbox.lock);
+	req = otx2_mbox_alloc_msg_npc_mcam_alloc_entry(&pan_nic->mbox);
 	if (!req)
 		goto exit;
 
@@ -1431,17 +1437,17 @@ int pan_rvu_alloc_mcam_entry(void)
 	req->count = 1;
 
 	/* Send message to AF */
-	if (otx2_sync_mbox_msg(&pan->mbox))
+	if (otx2_sync_mbox_msg(&pan_nic->mbox))
 		goto exit;
 	rsp = (struct npc_mcam_alloc_entry_rsp *)otx2_mbox_get_rsp
-		(&pan->mbox.mbox, 0, &req->hdr);
+		(&pan_nic->mbox.mbox, 0, &req->hdr);
 	flow_cfg->flow_ent[flow_cfg->max_flows++] = rsp->entry_list[0];
-
-	mutex_unlock(&pan->mbox.lock);
+	*mcam_entry = rsp->entry_list[0];
+	mutex_unlock(&pan_nic->mbox.lock);
 	return 0;
 
 exit:
-	mutex_unlock(&pan->mbox.lock);
+	mutex_unlock(&pan_nic->mbox.lock);
 	return -ENOSPC;
 }
 
@@ -1493,16 +1499,12 @@ void pan_free_matchid(struct matchid_bmap *rsrc, int id)
 	__clear_bit(id, rsrc->bmap);
 }
 
-int pan_rvu_install_flow(struct pan_tuple *tuple)
+int pan_rvu_free_mcam_entry(u16 entry)
 {
-	u8 pan_mac_mask[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-	struct npc_install_flow_req *req;
+	struct npc_mcam_free_entry_req *req;
 	struct otx2_flow_config *flow_cfg;
-	u32 pan_ipv4_mask = (BIT(32) - 1);
-	u16 pan_port_mask = (BIT(16) - 1);
-	struct flow_msg *pkt, *pmask;
 	struct otx2_nic *pan;
-	int index, err;
+	int err;
 
 	pan = pci_get_drvdata(pci_get_device(PCI_VENDOR_ID_CAVIUM,
 					     PCI_DEVID_PAN_RVU, NULL));
@@ -1510,12 +1512,72 @@ int pan_rvu_install_flow(struct pan_tuple *tuple)
 		return -ENODEV;
 
 	flow_cfg = pan->flow_cfg;
-	index = flow_cfg->flow_ent[flow_cfg->max_flows - 1]; //point to latest mcam index
 	mutex_lock(&pan->mbox.lock);
-
-	req = otx2_mbox_alloc_msg_npc_install_flow(&pan->mbox);
+	req = otx2_mbox_alloc_msg_npc_mcam_free_entry(&pan->mbox);
 	if (!req) {
 		mutex_unlock(&pan->mbox.lock);
+		return -ENOMEM;
+	}
+
+	req->entry = entry;
+
+	/* Send message to AF */
+	err = otx2_sync_mbox_msg(&pan->mbox);
+	mutex_unlock(&pan->mbox.lock);
+
+	if (err)
+		return err;
+
+	if (flow_cfg->max_flows > 0)
+		flow_cfg->max_flows--;
+
+	return 0;
+}
+
+int pan_rvu_delete_flow(u16 entry)
+{
+	struct npc_delete_flow_req *req;
+	struct otx2_nic *pan;
+	int err;
+
+	pan = pci_get_drvdata(pci_get_device(PCI_VENDOR_ID_CAVIUM,
+					     PCI_DEVID_PAN_RVU, NULL));
+	if (!pan)
+		return -ENODEV;
+
+	mutex_lock(&pan->mbox.lock);
+	req = otx2_mbox_alloc_msg_npc_delete_flow(&pan->mbox);
+	if (!req) {
+		mutex_unlock(&pan->mbox.lock);
+		return -ENOMEM;
+	}
+
+	req->entry = entry;
+
+	/* Send message to AF */
+	err = otx2_sync_mbox_msg(&pan->mbox);
+	mutex_unlock(&pan->mbox.lock);
+
+	return err;
+}
+
+int pan_rvu_install_flow(struct otx2_nic *pan_nic, struct pan_tuple *tuple)
+{
+	u8 pan_mac_mask[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	struct npc_install_flow_req *req;
+	struct otx2_flow_config *flow_cfg;
+	u32 pan_ipv4_mask = (BIT(32) - 1);
+	u16 pan_port_mask = (BIT(16) - 1);
+	struct flow_msg *pkt, *pmask;
+	int index, err;
+
+	flow_cfg = pan_nic->flow_cfg;
+	index = flow_cfg->flow_ent[flow_cfg->max_flows - 1]; //point to latest mcam index
+	mutex_lock(&pan_nic->mbox.lock);
+
+	req = otx2_mbox_alloc_msg_npc_install_flow(&pan_nic->mbox);
+	if (!req) {
+		mutex_unlock(&pan_nic->mbox.lock);
 		return -ENOMEM;
 	}
 
@@ -1577,10 +1639,12 @@ int pan_rvu_install_flow(struct pan_tuple *tuple)
 	req->set_cntr = 1;
 	req->op = NIX_RX_ACTIONOP_UCAST;
 	req->match_id = tuple->hash;
-	req->channel = 0x100;
+	req->channel = 0x80;
+	req->chan_mask = 0x80;
+	req->set_chanmask = 1;
 	req->index = 1;
-	err = otx2_sync_mbox_msg(&pan->mbox);
-	mutex_unlock(&pan->mbox.lock);
+	err = otx2_sync_mbox_msg(&pan_nic->mbox);
+	mutex_unlock(&pan_nic->mbox.lock);
 	return err;
 }
 
@@ -1947,7 +2011,7 @@ static int pan_rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	err = dup_attach_npa_nix(otx2_nic);
 	if (err) {
 		dev_err(dev, "Failed to attach npa nix\n");
-		goto err_disable_mbox_intr;
+		goto err_host_mbox_destroy;
 	}
 
 	err = dup_realloc_msix_vectors(otx2_nic);
@@ -2010,15 +2074,29 @@ static int pan_rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_free_netdev;
 	}
 
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
+	err = pan_ktls_hw_init(otx2_nic);
+	if (err) {
+		dev_err(dev, "Failed to init KTLS\n");
+		goto err_free_netdev;
+	}
+#endif
+
 	err = pan_switch_up_event_notify(otx2_nic);
 	if (err) {
+		/*TODO: Handle tls deinit() */
 		dev_err(dev, "Failed to send swdev up notification to AF\n");
-		goto err_free_netdev;
+		goto err_ktls_deinit;
 	}
 
 	dev_info(dev, "Pan probe called successfully, pci_func of PAN=0x%x\n", otx2_nic->pcifunc);
 
 	return 0;
+
+err_ktls_deinit:
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
+	pan_ktls_hw_exit();
+#endif
 
 err_free_netdev:
 	free_netdev(netdev);
@@ -2032,7 +2110,9 @@ err_detach_rsrc:
 	if (test_bit(CN10K_LMTST, &otx2_nic->hw.cap_flag))
 		qmem_free(otx2_nic->dev, otx2_nic->dync_lmt);
 	dup_detach_resources(&otx2_nic->mbox);
-err_disable_mbox_intr:
+
+err_host_mbox_destroy:
+	pan_mbox_host_destroy();
 	dup_disable_mbox_intr(otx2_nic);
 
 err_mbox_destroy:
@@ -2075,6 +2155,8 @@ static void pan_rvu_remove(struct pci_dev *pdev)
 	dup_detach_resources(&priv->mbox);
 	dup_disable_mbox_intr(priv);
 	dup_pfaf_mbox_destroy(priv);
+	pan_mbox_disable_host_intr(priv);
+	pan_mbox_host_destroy();
 	pci_free_irq_vectors(priv->pdev);
 	devm_kfree(dev, priv->hw.irq_name);
 	devm_kfree(dev, priv->hw.affinity_mask);

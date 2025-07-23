@@ -673,6 +673,14 @@ err:
 	return err;
 }
 
+int pan_fl_tbl_del_by_handle(u64 handle)
+{
+	struct pan_tuple *tuple;
+
+	tuple = (struct pan_tuple *)handle;
+	return pan_fl_tbl_del(tuple);
+}
+
 int pan_fl_tbl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res, u64 *handle)
 {
 	struct pan_fl_tbl_node *node, *tmp;

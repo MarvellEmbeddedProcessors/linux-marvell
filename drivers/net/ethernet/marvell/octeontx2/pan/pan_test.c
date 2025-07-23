@@ -16,10 +16,7 @@
 #include <linux/ip.h>
 
 #include "rvu.h"
-#include "pan_tuple.h"
-#include "pan_fl_tbl.h"
-#include "pan_rvu.h"
-#include "pan_test.h"
+#include "pan_cmn.h"
 #include "switch/pan_sw_l3.h"
 
 static struct pan_fl_tbl_node tn;

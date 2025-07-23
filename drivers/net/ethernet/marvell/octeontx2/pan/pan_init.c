@@ -50,7 +50,20 @@ static int __init pan_init(void)
 		goto err6;
 	}
 
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
+	rc = pan_ktls_init();
+	if (rc) {
+		pr_err("PAN ktls initialization failed\n");
+		goto err7;
+	}
+#endif
+
 	return 0;
+
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
+err7:
+#endif
+	pan_sw_deinit();
 
 err6:
 	pan_tl_deinit();

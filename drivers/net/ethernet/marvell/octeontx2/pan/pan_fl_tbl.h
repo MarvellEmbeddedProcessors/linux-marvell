@@ -7,6 +7,8 @@
 #ifndef PAN_FL_TBL_H_
 #define PAN_FL_TBL_H_
 
+#include "pan_cmn.h"
+
 enum pan_fl_tbl_type {
 	PAN_FL_TBL_TYPE_IPV4,
 	PAN_FL_TBL_TYPE_IPV6,
@@ -20,6 +22,7 @@ struct pan_fl_tbl_opaque {
 	/* all other fields should be inside this */
 	u8 eg_mac[ETH_ALEN];
 	struct rcu_head rcu;
+	struct pan_ktls_ctx ctx;
 };
 
 enum pan_fl_tbl_act {
@@ -74,6 +77,7 @@ void pan_fl_tbl_deinit(void);
 int pan_fl_tbl_init(void);
 int pan_fl_tbl_del(struct pan_tuple *tuple);
 int pan_fl_tbl_offl_del(struct pan_tuple *tuple);
+int pan_fl_tbl_del_by_handle(u64 handle);
 
 int pan_fl_tbl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res, u64 *handle);
 int pan_fl_tbl_offl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res);

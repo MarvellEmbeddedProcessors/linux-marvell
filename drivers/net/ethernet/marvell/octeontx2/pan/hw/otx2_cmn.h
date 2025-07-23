@@ -1,3 +1,7 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+#ifndef __OTX2_CMN_H__
+#define __OTX2_CMN_H__
+
 /* otx2_common.c */
 
 int dup_rq_init(struct otx2_nic *pfvf, u16 qidx, u16 lpb_aura);
@@ -54,7 +58,6 @@ void dup_free_hw_resources(struct otx2_nic *pf);
 void dup_disable_mbox_intr(struct otx2_nic *pf);
 void dup_pfaf_mbox_destroy(struct otx2_nic *pf);
 void dup_otx2_free_aura_ptr(struct otx2_nic *pfvf, int type);
-
 /* otx2_txrx.c */
 
 struct nix_cqe_rx_s;
@@ -121,3 +124,5 @@ struct otx2_cmn_fops {
 struct otx2_cmn_fops *otx2_cmn_fops_arr_lookup(int pci_dev_id);
 void otx2_cmn_fops_arr_add(int pci_dev_id, struct otx2_cmn_fops *ops);
 void otx2_cmn_fops_arr_del(int pci_dev_id);
+
+#endif /* __OTX2_CMN_H__ */
