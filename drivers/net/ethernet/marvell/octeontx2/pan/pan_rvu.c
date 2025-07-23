@@ -2164,7 +2164,8 @@ static int pan_rvu_cq_init(struct otx2_nic *pfvf, u16 qidx, u16 __maybe_unused u
 			/* Enable receive CQ backpressure */
 			aq->cq.bp_ena = 1;
 #ifdef CONFIG_DCB
-			aq->cq.bpid = pfvf->bpid[pfvf->queue_to_pfc_map[qidx]];
+			if (pfvf->queue_to_pfc_map)
+				aq->cq.bpid = pfvf->bpid[pfvf->queue_to_pfc_map[qidx]];
 #else
 			aq->cq.bpid = pfvf->bpid[0];
 #endif

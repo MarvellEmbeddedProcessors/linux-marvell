@@ -698,7 +698,8 @@ static int dup_aura_init(struct otx2_nic *pfvf, int aura_id,
 		if (pfvf->nix_blkaddr == BLKADDR_NIX1)
 			aq->aura.bp_ena = 1;
 #ifdef CONFIG_DCB
-		aq->aura.nix0_bpid = pfvf->bpid[pfvf->queue_to_pfc_map[aura_id]];
+		if (pfvf->queue_to_pfc_map)
+			aq->aura.nix0_bpid = pfvf->bpid[pfvf->queue_to_pfc_map[aura_id]];
 #else
 		aq->aura.nix0_bpid = pfvf->bpid[0];
 #endif
