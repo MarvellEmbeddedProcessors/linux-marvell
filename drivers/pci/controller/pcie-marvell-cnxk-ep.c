@@ -185,6 +185,15 @@ static int pem_ep_bar_setup(struct mv_pem_ep *pem_ep)
 	val |= PEM_BAR4_INDEX_ADDR_V;
 	pem_ep_reg_write(pem_ep, PEM_BAR4_INDEX(PEM_BAR4_INDEX_PTP), val);
 
+	/* SDP to PAN mailbox */
+	val = PEM_BAR4_INDEX_ADDR_IDX(0x85a200000000 >> 22);
+	val |= PEM_BAR4_INDEX_ADDR_V;
+	pem_ep_reg_write(pem_ep, PEM_BAR4_INDEX(9), val);
+
+	val = PEM_BAR4_INDEX_ADDR_IDX(0x9ff360000 >> 22);
+	val |= PEM_BAR4_INDEX_ADDR_V;
+	pem_ep_reg_write(pem_ep, PEM_BAR4_INDEX(10), val);
+
 	/* Clear the PEMX_DIS_PORT[DIS_PORT] */
 	pem_ep_reg_write(pem_ep, PEM_DIS_PORT, 1);
 
