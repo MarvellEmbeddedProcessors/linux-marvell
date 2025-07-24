@@ -6,7 +6,12 @@
 static int cn20k_cpt_get_cq_enable(struct devlink *dl, u32 id,
 				   struct devlink_param_gset_ctx *ctx)
 {
-	/* Placeholder: to be implemented later */
+	struct otx2_cptvf_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptvf_dev *cptvf = cpt_dl->cptvf;
+	struct otx2_cptlfs_info *lfs = &cptvf->lfs;
+
+	ctx->val.vbool = lfs->cq_ena;
+
 	return 0;
 }
 
@@ -14,7 +19,26 @@ static int cn20k_cpt_set_cq_enable(struct devlink *dl, u32 id,
 				   struct devlink_param_gset_ctx *ctx,
 				   struct netlink_ext_ack *extack)
 {
-	/* Placeholder: to be implemented later */
+	struct otx2_cptvf_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptvf_dev *cptvf = cpt_dl->cptvf;
+	struct otx2_cptlfs_info *lfs = &cptvf->lfs;
+	int ret;
+
+	if (ctx->val.vbool && !lfs->cq_ena) {
+		ret = cn20k_cpt_alloc_completion_queues(lfs);
+		if (ret) {
+			dev_err(&lfs->pdev->dev,
+				"Allocating completion queues failed\n");
+			return ret;
+		}
+		cn20k_setup_completion_queues(lfs);
+		lfs->cq_ena = ctx->val.vbool;
+	} else if (!ctx->val.vbool && lfs->cq_ena){
+		cn20k_cptlf_disable_cqueues(lfs);
+		cn20k_cpt_free_completion_queues(lfs);
+		lfs->cq_ena = ctx->val.vbool;
+	}
+
 	return 0;
 }
 
