@@ -66,5 +66,6 @@ int pan_sw_init(void)
 
 void pan_sw_deinit(void)
 {
+	pan_sw_l2_deinit();
 	pan_sw_debugfs_remove();
 }
