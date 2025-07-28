@@ -17,6 +17,7 @@
 #include <linux/of_device.h>
 
 #include "../hotplug/pciehp.h"
+#include "../pci.h"
 
 #define DRV_NAME	"octeon-pem"
 #define DRV_VERSION	"1.0"
@@ -87,6 +88,8 @@ static void pem_recover_rc_link(struct work_struct *ws)
 	dev_dbg(&pem_dev->dev, "PEM%d Disable interrupt\n", pem->index);
 
 	pci_lock_rescan_remove();
+
+	pci_walk_bus(root_port->subordinate, pci_dev_set_disconnected, NULL);
 
 	/* Clean-up device and RC bridge */
 	pci_stop_and_remove_bus_device(root_port);
