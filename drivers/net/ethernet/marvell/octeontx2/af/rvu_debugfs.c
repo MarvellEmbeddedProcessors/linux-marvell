@@ -461,6 +461,9 @@ static void rvu_dbg_mcs_init(struct rvu *rvu)
 		debugfs_create_file("port", 0600, rvu->rvu_dbg.mcs_rx, mcs,
 				    &rvu_dbg_mcs_rx_port_stats_fops);
 
+		if (is_cn20k(rvu->pdev))
+			rvu_cn20ka_handle_port_mapped_stats(rvu, mcs, MCS_RX);
+
 		rvu->rvu_dbg.mcs_tx = debugfs_create_dir("tx_stats", rvu->rvu_dbg.mcs);
 
 		debugfs_create_file("flowid", 0600, rvu->rvu_dbg.mcs_tx, mcs,
@@ -474,6 +477,9 @@ static void rvu_dbg_mcs_init(struct rvu *rvu)
 
 		debugfs_create_file("port", 0600, rvu->rvu_dbg.mcs_tx, mcs,
 				    &rvu_dbg_mcs_tx_port_stats_fops);
+
+		if (is_cn20k(rvu->pdev))
+			rvu_cn20ka_handle_port_mapped_stats(rvu, mcs, MCS_TX);
 	}
 
 	kfree(dname);
