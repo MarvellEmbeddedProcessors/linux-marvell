@@ -73,7 +73,8 @@ struct queue_stats {
 
 struct otx2_rcv_queue {
 	struct queue_stats	stats;
-};
+	struct qmem		*cpt_resp;
+} ____cacheline_aligned_in_smp;
 
 struct sg_list {
 	u16	num_segs;
