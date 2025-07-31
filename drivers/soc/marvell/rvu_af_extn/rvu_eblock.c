@@ -305,6 +305,9 @@ static void *rvu_eb_get_mbox_handler(int _id)
 
 	for_each_eblock_drv(driver) {
 		op = driver->ops->mbox_op;
+		if (!op)
+			continue;
+
 		if (_id >= op->start && _id <= op->end)
 			return op->handler;
 	}
