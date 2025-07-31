@@ -1665,6 +1665,9 @@ static void print_tm_tree(struct seq_file *m, struct nix_aq_enq_rsp *rsp, u64 sq
 	int blkaddr;
 	u64 cfg;
 
+	if (!sq_ctx->ena)
+		return;
+
 	blkaddr = nix_hw->blkaddr;
 	schq = sq_ctx->smq;
 
