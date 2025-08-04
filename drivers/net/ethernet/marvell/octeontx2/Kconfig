@@ -76,3 +76,10 @@ config OCTEONTX2_BPHY_PF
 	depends on MACSEC || !MACSEC
 	help
 	  This driver supports Marvell's OcteonTX2 BPHY physical function.
+
+config OCTEONTX2_BPHY_CNF20K_CPRI_PF
+    tristate "Marvell OcteonTX2 BPHY CNF20K CPRI PF driver"
+    default y
+    help
+      This driver supports Marvell's OcteonTX2 BPHY CNF20K CPRI Physical Function.
+      This option is enabled by default.
