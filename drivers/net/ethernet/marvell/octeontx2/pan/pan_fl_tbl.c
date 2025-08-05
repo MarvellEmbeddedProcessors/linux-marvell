@@ -599,6 +599,10 @@ int pan_fl_tbl_offl_del(struct pan_tuple *tuple)
 	}
 
 	tuple->flags &= ~PAN_TUPLE_FLAG_HASH;
+
+	if (res->opq)
+		kfree_rcu(res->opq, rcu);
+
 	kvfree_rcu(node, rcu);
 
 err:
