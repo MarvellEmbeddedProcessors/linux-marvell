@@ -311,6 +311,9 @@ int pan_sw_l3_hw_install_flow(struct pan_sw_l3_offl_node *node)
 	int bits, err;
 	u32 mask;
 
+	if (node->mcam_idx == -1)
+		return 0;
+
 	mutex_lock(&otx2_nic->mbox.lock);
 
 	req = otx2_mbox_alloc_msg_npc_install_flow(&otx2_nic->mbox);
@@ -386,42 +389,38 @@ static void pan_sw_l3_node_dump(struct pan_sw_l3_offl_node *node)
 		 entry->gw, entry->mac, entry->nud_state);
 }
 
-static atomic64_t cnt_reshuffle;
-static bool reshuffle_task_running;
-static u64 lreq_cnt;
-static u64 done_cnt;
+static struct workqueue_struct *pan_sw_l3_fib_wq;
+static void pan_sw_l3_fib_work_handler(struct work_struct *work);
+static DECLARE_DELAYED_WORK(pan_sw_l3_fib_work, pan_sw_l3_fib_work_handler);
 
-static struct workqueue_struct *pan_reshuffle_wq;
-static void pan_sw_l3_mcam_reshuffle(struct work_struct *work);
-static DECLARE_DELAYED_WORK(pan_sw_l3_fib_reshuffle_work, pan_sw_l3_mcam_reshuffle);
-static void pan_sw_l3_mcam_reshuffle(struct work_struct *work)
+struct pan_sw_l3_ev {
+	struct list_head list;
+	struct otx2_nic *otx2_nic;
+	int cnt;
+	struct fib_entry fe[];
+};
+
+static LIST_HEAD(pan_sw_l3_ev_lh);
+static int pan_sw_l3_ev_process(bool *);
+
+static void pan_sw_l3_fib_work_handler(struct work_struct *work)
 {
 	struct pan_sw_l3_offl_tnode *tnode;
 	struct pan_sw_l3_offl_node *node, nnode;
 	struct fib_entry entry;
 	int num_routes;
 	int *marr, *carr;
+	bool reshuffle;
 	int smidx, scidx;
-	u64 req_cnt;
 	int bitnr;
 	int emidx;
 	int err;
 
-	req_cnt = atomic64_read(&cnt_reshuffle);
-	if (req_cnt > lreq_cnt) {
-		lreq_cnt = req_cnt;
-		queue_delayed_work(pan_reshuffle_wq, &pan_sw_l3_fib_reshuffle_work,
-				   msecs_to_jiffies(100));
+	if (pan_sw_l3_ev_process(&reshuffle))
 		return;
-	}
 
-	if (req_cnt == done_cnt) {
-		queue_delayed_work(pan_reshuffle_wq, &pan_sw_l3_fib_reshuffle_work,
-				   msecs_to_jiffies(3000));
+	if (!reshuffle)
 		return;
-	}
-
-	done_cnt = req_cnt;
 
 	spin_lock(&offl_l3_lock);
 	pan_sw_l3_fl_tbl_del_all(root);
@@ -459,6 +458,7 @@ static void pan_sw_l3_mcam_reshuffle(struct work_struct *work)
 			}
 
 			node->mcam_idx = marr[emidx];
+
 			node->cntr_idx = carr[scidx];
 			emidx--;
 			scidx++;
@@ -485,13 +485,18 @@ static void pan_sw_l3_mcam_reshuffle(struct work_struct *work)
 	kfree(carr);
 	kfree(marr);
 
-	queue_delayed_work(pan_reshuffle_wq, &pan_sw_l3_fib_reshuffle_work,
-			   msecs_to_jiffies(1000));
+	spin_lock(&offl_l3_lock);
+	if (!list_empty(&pan_sw_l3_ev_lh))
+		queue_delayed_work(pan_sw_l3_fib_wq, &pan_sw_l3_fib_work,
+				   msecs_to_jiffies(100));
+	spin_unlock(&offl_l3_lock);
+
 }
 
 static void
 pan_sw_l3_fib_h_tbl_add_entry(struct pan_sw_l3_offl_tnode *tnode)
 {
+	struct hlist_node *p, *n, *s = NULL;
 	struct fib_entry *fe;
 	unsigned int hash;
 
@@ -499,7 +504,16 @@ pan_sw_l3_fib_h_tbl_add_entry(struct pan_sw_l3_offl_tnode *tnode)
 	hash = fe->gw_valid ? fe->gw : fe->dst;
 
 	hash_add(fib_h_tbl, &tnode->hnode, hash);
-	hlist_add_head(&tnode->hnode2, &fib_hnodes[fe->dst_len]);
+
+	if (hlist_empty(&fib_hnodes[fe->dst_len])) {
+		hlist_add_head(&tnode->hnode2, &fib_hnodes[fe->dst_len]);
+	} else {
+		hlist_for_each_safe(p, n, &fib_hnodes[fe->dst_len])
+			s = p;
+
+		hlist_add_behind(&tnode->hnode2, s);
+	}
+
 	set_bit(fe->dst_len, &valid_route);
 	cnt_routes++;
 }
@@ -507,12 +521,15 @@ pan_sw_l3_fib_h_tbl_add_entry(struct pan_sw_l3_offl_tnode *tnode)
 static void
 pan_sw_l3_fib_h_tbl_del_entry(struct pan_sw_l3_offl_tnode *tnode)
 {
+	struct fib_entry *fe;
 	int dst_len;
 
 	hash_del(&tnode->hnode);
 	hlist_del_init(&tnode->hnode2);
 
 	if (tnode->node) {
+		fe = tnode->node->entry;
+
 		dst_len = tnode->node->entry->dst_len;
 		if (hlist_empty(&fib_hnodes[dst_len]))
 			clear_bit(dst_len, &valid_route);
@@ -620,6 +637,8 @@ pan_sw_l3_tnode_alloc(struct otx2_nic *pf,
 
 	tnode->node = kcalloc(1, sizeof(*tnode->node), GFP_KERNEL);
 	INIT_HLIST_NODE(&tnode->lh);
+	INIT_HLIST_NODE(&tnode->hnode);
+	INIT_HLIST_NODE(&tnode->hnode2);
 	node = tnode->node;
 
 	node->port_id = entry->port_id;
@@ -938,6 +957,9 @@ static int pan_sw_l3_remove_one_hw_n_fl_entry(int mcam_idx, int match_id)
 		return err;
 	}
 
+	if (mcam_idx == -1)
+		return 0;
+
 	mutex_lock(&otx2_nic->mbox.lock);
 	req = otx2_mbox_alloc_msg_npc_delete_flow(&otx2_nic->mbox);
 	if (!req) {
@@ -955,14 +977,43 @@ static int pan_sw_l3_remove_one_hw_n_fl_entry(int mcam_idx, int match_id)
 	return 0;
 }
 
-int pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
-		      u16 cnt, struct fib_entry *entry)
+int pan_sw_l3_ev_enq(struct otx2_nic *otx2_nic, int cnt, struct fib_entry *fe)
+{
+	struct pan_sw_l3_ev *ev;
+	int sz = sizeof(*ev) + cnt * sizeof(*fe);
+
+	ev = kcalloc(1, sz, GFP_KERNEL);
+	if (!ev)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&ev->list);
+
+	for (int i = 0; i < cnt; i++)
+		ev->fe[i] = *(fe + i);
+
+	ev->otx2_nic = otx2_nic;
+	ev->cnt = cnt;
+	spin_lock(&offl_l3_lock);
+	list_add_tail(&ev->list, &pan_sw_l3_ev_lh);
+	spin_unlock(&offl_l3_lock);
+
+	queue_delayed_work(pan_sw_l3_fib_wq, &pan_sw_l3_fib_work,
+			   msecs_to_jiffies(100));
+	return 0;
+}
+
+static int
+pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
+		  u16 cnt, struct fib_entry *entry,
+		  bool *reshuffle)
 {
 	struct pan_sw_l3_offl_tnode *tnode, *tmp;
 	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	int mcam_idx, match_id;
 	int err;
 	int i;
+
+	*reshuffle = false;
 
 	for (i = 0; i < cnt; i++, entry++) {
 		switch (entry->cmd) {
@@ -997,10 +1048,10 @@ int pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 			pan_sw_l3_route_add(tnode);
 
 			spin_unlock(&offl_l3_lock);
-			atomic64_inc(&cnt_reshuffle);
 			pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x got added\n",
 				 __func__, __LINE__,
 				 entry->dst, entry->dst_len, entry->gw);
+			*reshuffle = true;
 			break;
 
 		case OTX2_DEV_DOWN:
@@ -1025,11 +1076,10 @@ int pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 					       __func__, __LINE__, mcam_idx, match_id);
 			}
 
-			atomic64_inc(&cnt_reshuffle);
-
 			pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x got deleted err=%d\n",
 				 __func__, __LINE__,
 				 entry->dst, entry->dst_len, entry->gw, err);
+			*reshuffle = true;
 			break;
 
 		case OTX2_NEIGH_UPDATE:
@@ -1040,11 +1090,30 @@ int pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 		}
 	}
 
-	if (!reshuffle_task_running) {
-		reshuffle_task_running = true;
-		pan_reshuffle_wq = alloc_workqueue("pan_reshuffle", 0, 0);
-		queue_delayed_work(pan_reshuffle_wq, &pan_sw_l3_fib_reshuffle_work,
-				   msecs_to_jiffies(1000));
+	return 0;
+}
+
+static int pan_sw_l3_ev_process(bool *reshuffle)
+{
+	struct pan_sw_l3_ev *ev;
+	struct list_head local_lh;
+
+	INIT_LIST_HEAD(&local_lh);
+
+	spin_lock(&offl_l3_lock);
+	list_splice_init(&pan_sw_l3_ev_lh, &local_lh);
+	spin_unlock(&offl_l3_lock);
+
+	if (list_empty(&local_lh))
+		return -EFAULT;
+
+	while (!list_empty(&local_lh)) {
+		ev = list_first_entry_or_null(&local_lh, struct pan_sw_l3_ev,
+					      list);
+		list_del_init(&ev->list);
+		pan_sw_l3_process(ev->otx2_nic, 0x12345, ev->cnt,
+				  ev->fe, reshuffle);
+		kfree(ev);
 	}
 	return 0;
 }
@@ -1055,15 +1124,15 @@ static void pan_sw_l3_fib_entry_dump(struct pan_sw_l3_offl_node *node,
 	struct fib_entry *entry = node->entry;
 
 	if (entry->gw_valid) {
-		seq_printf(m, "0.0.0.0\t\t%d\t%#x\t%pM\t%#x\t%d\t\t%d\n",
-			   entry->dst_len, entry->gw, entry->mac, node->port_id,
+		seq_printf(m, "0.0.0.0\t\t%d\t%pI4h\t%pM\t%#x\t%d\t\t%d\n",
+			   entry->dst_len, &entry->gw, entry->mac, node->port_id,
 			   node->match_id, node->mcam_idx);
 
 		return;
 	}
 
-	seq_printf(m, "%#x\t%d\t0.0.0.0\t\t%pM\t%#x\t%d\t\t%d\n",
-		   entry->dst, entry->dst_len, entry->mac, node->port_id,
+	seq_printf(m, "%pI4h\t%d\t0.0.0.0\t\t%pM\t%#x\t%d\t\t%d\n",
+		   &entry->dst, entry->dst_len, entry->mac, node->port_id,
 		   node->match_id, node->mcam_idx);
 }
 
@@ -1142,7 +1211,7 @@ int pan_sw_l3_init(void)
 	struct net_device *dev;
 	int i;
 
-	pan_reshuffle_wq = alloc_workqueue("pan_reshuffle_wq", 0, 0);
+	pan_sw_l3_fib_wq = alloc_workqueue("pan_sw_l3_fib_wq", 0, 0);
 
 	dev = dev_get_by_name(&init_net, PAN_DEV_NAME);
 	if (!dev) {
@@ -1163,7 +1232,7 @@ int pan_sw_l3_init(void)
 
 void pan_sw_l3_deinit(void)
 {
-	cancel_delayed_work_sync(&pan_sw_l3_fib_reshuffle_work);
+	cancel_delayed_work_sync(&pan_sw_l3_fib_work);
 	spin_lock(&offl_l3_lock);
 	pan_sw_l3_fl_tbl_del_all(root);
 	spin_unlock(&offl_l3_lock);

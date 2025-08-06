@@ -25,7 +25,6 @@ int pan_sw_l3_init(void);
 
 struct net_device *
 pan_sw_l3_route_lookup(u32 dst);
+int pan_sw_l3_ev_enq(struct otx2_nic *otx2_nic, int cnt, struct fib_entry *fe);
 
-int pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
-		      u16 cnt, struct fib_entry *entry);
 #endif //PAN_SWITCH_H_
