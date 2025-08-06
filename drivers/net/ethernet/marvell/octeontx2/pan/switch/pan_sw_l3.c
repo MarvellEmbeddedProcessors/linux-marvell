@@ -84,8 +84,6 @@ fail_mbox_sync:
 
 static int pan_sw_l3_fl_tbl_del_one_entry(struct pan_sw_l3_offl_node *node)
 {
-	struct pan_rvu_gbl_t *pan_rvu_gbl;
-	struct pan_tuple tuple = { 0 };
 	int err;
 
 	if (!node)
@@ -94,15 +92,15 @@ static int pan_sw_l3_fl_tbl_del_one_entry(struct pan_sw_l3_offl_node *node)
 	if (!node->tuple_installed)
 		return 0;
 
-	pan_tuple_hash_set(&tuple, node->match_id);
-	err = pan_fl_tbl_offl_del(&tuple);
+	pan_tuple_hash_set(&node->tuple, node->match_id);
+	err = pan_fl_tbl_offl_del(&node->tuple);
 	if (err) {
-		pr_err("%s:%d Failed to del tbl flow\n", __func__, __LINE__);
+		pr_err("%s:%d Failed to del tbl flow match_id %d\n",
+		       __func__, __LINE__, node->match_id);
 		return err;
 	}
+	node->tuple_installed = 0;
 
-	pan_rvu_gbl = pan_rvu_get_gbl();
-	pan_free_matchid(&pan_rvu_gbl->rsrc, node->match_id);
 	return 0;
 }
 
@@ -236,6 +234,9 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 	u16 pcifunc;
 	int err;
 
+	if (node->tuple_installed)
+		return 0;
+
 	tuple = &node->tuple;
 	tuple->flags = PAN_TUPLE_FLAG_L3_PROTO_V4;
 
@@ -276,7 +277,6 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 	res.dir = FLOW_OFFLOAD_DIR_ORIGINAL;
 
 	pan_tuple_hash_set(tuple, node->match_id);
-	tuple->hash = node->match_id;
 
 	if (entry->mac_valid)
 		ether_addr_copy(tuple->dmac, entry->mac);
@@ -291,7 +291,7 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 		 entry->mac, pcifunc, res.pcifuncoff);
 
 	/* MAC addr copied won't affect hash */
-	err = pan_fl_tbl_add(tuple, &res, NULL);
+	err = pan_fl_tbl_offl_add(tuple, &res);
 	if (err) {
 		pr_err("%s:%d Failed to add tbl flow\n", __func__, __LINE__);
 		return err;
@@ -469,6 +469,7 @@ static void pan_sw_l3_mcam_reshuffle(struct work_struct *work)
 			entry = *node->entry;
 			nnode.entry = &entry;
 
+			node->tuple_installed = 1;
 			spin_unlock(&offl_l3_lock);
 
 			pan_sw_l3_flow_tbl_entry_add(&nnode);
@@ -734,7 +735,10 @@ static int
 pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id)
 {
 	struct pan_sw_l3_offl_tnode *tn, *walk, *p, *next;
+	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	u32 sbit, cnt, dst;
+
+	pan_rvu_gbl = pan_rvu_get_gbl();
 
 	pr_debug("%s:%d route DEL request for  dst=%#x dst_len=%d got Added\n",
 		 __func__, __LINE__, entry->dst, entry->dst_len);
@@ -754,6 +758,8 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id)
 		*mcam_idx = tn->node->mcam_idx;
 
 		kfree(tn->node->entry);
+		pan_free_matchid(&pan_rvu_gbl->rsrc, tn->node->match_id);
+
 		kfree(tn->node);
 		tn->node = NULL;
 
@@ -790,6 +796,16 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id)
 		return -EFAULT;
 	}
 
+	tn = pan_sw_l3_fib_h_tbl_lookup(entry);
+	if (!tn) {
+		pr_err("%s:%d Could not find entry->gw=%#x in tree\n",
+		       __func__, __LINE__, entry->gw);
+		return -ESRCH;
+	}
+
+	pan_sw_l3_fib_h_tbl_del_entry(tn);
+	hlist_del_init(&tn->lh);
+
 	sbit = 31;
 	cnt = entry->dst_len;
 	dst = entry->dst;
@@ -825,11 +841,12 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id)
 	*mcam_idx = walk->node->mcam_idx;
 
 	entry = walk->node->entry;
-	pr_err("%s:%d Deleting dst=%#x dst_len=%d\n",
-	       __func__, __LINE__,
-	       entry->dst, entry->dst_len);
+	pr_debug("%s:%d Deleting dst=%#x dst_len=%d\n",
+		 __func__, __LINE__,
+		 entry->dst, entry->dst_len);
 
 	kfree(entry);
+	pan_free_matchid(&pan_rvu_gbl->rsrc, walk->node->match_id);
 	kfree(walk->node);
 	walk->node = NULL;
 
@@ -910,7 +927,6 @@ pan_sw_l3_route_lookup(u32 dst)
 static int pan_sw_l3_remove_one_hw_n_fl_entry(int mcam_idx, int match_id)
 {
 	struct npc_delete_flow_req *req;
-	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	struct pan_tuple tuple = { 0 };
 	int err;
 
@@ -921,9 +937,6 @@ static int pan_sw_l3_remove_one_hw_n_fl_entry(int mcam_idx, int match_id)
 		       __func__, __LINE__, mcam_idx, match_id);
 		return err;
 	}
-
-	pan_rvu_gbl = pan_rvu_get_gbl();
-	pan_free_matchid(&pan_rvu_gbl->rsrc, match_id);
 
 	mutex_lock(&otx2_nic->mbox.lock);
 	req = otx2_mbox_alloc_msg_npc_delete_flow(&otx2_nic->mbox);
@@ -946,6 +959,7 @@ int pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 		      u16 cnt, struct fib_entry *entry)
 {
 	struct pan_sw_l3_offl_tnode *tnode, *tmp;
+	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	int mcam_idx, match_id;
 	int err;
 	int i;
@@ -972,6 +986,9 @@ int pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 
 				spin_unlock(&offl_l3_lock);
 				kfree(tnode->node->entry);
+
+				pan_rvu_gbl = pan_rvu_get_gbl();
+				pan_free_matchid(&pan_rvu_gbl->rsrc, tnode->node->match_id);
 				kfree(tnode->node);
 				kfree(tnode);
 				continue;
