@@ -420,8 +420,9 @@ done:
 	schedule_delayed_work(&pan_sw_l2_dwq, msecs_to_jiffies(10000));
 }
 
-int pan_sw_l2_de_offl(struct otx2_nic *pf, u32 switch_id,
-		      unsigned int port_id, u8 *mac)
+static int
+pan_sw_l2_de_offl_ev_enq(struct otx2_nic *pf, u32 switch_id,
+			 unsigned int port_id, u8 *mac)
 {
 	struct pan_sw_l2_offl_node *entry, *tmp;
 	int found = false;
@@ -457,8 +458,9 @@ int pan_sw_l2_de_offl(struct otx2_nic *pf, u32 switch_id,
 	return -ESRCH;
 }
 
-int pan_sw_l2_offl(struct otx2_nic *pf, u32 switch_id,
-		   unsigned int port_id, u8 *mac)
+static int
+pan_sw_l2_offl_ev_enq(struct otx2_nic *pf, u32 switch_id,
+		      unsigned int port_id, u8 *mac)
 {
 	struct pan_sw_l2_offl_node *node;
 
@@ -480,6 +482,15 @@ int pan_sw_l2_offl(struct otx2_nic *pf, u32 switch_id,
 	spin_unlock(&l2_offl_lock);
 
 	return 0;
+}
+
+int pan_sw_l2_ev_enq(struct otx2_nic *pf, u32 switch_id,
+		     unsigned int port_id, u8 *mac, u64 flags)
+{
+	if (flags & FDB_ADD)
+		return pan_sw_l2_offl_ev_enq(pf, switch_id, port_id, mac);
+
+	return pan_sw_l2_de_offl_ev_enq(pf, switch_id, port_id, mac);
 }
 
 static int pan_sw_l2_show(struct seq_file *m, void *v)

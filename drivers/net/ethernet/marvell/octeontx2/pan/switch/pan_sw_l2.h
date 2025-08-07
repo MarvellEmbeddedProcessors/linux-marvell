@@ -34,11 +34,8 @@ struct pan_sw_l2_offl_node {
 void pan_sw_l2_deinit(void);
 int pan_sw_l2_init(void);
 
-int pan_sw_l2_de_offl(struct otx2_nic *pf, u32 switch_id,
-		      unsigned int port_id, u8 *mac);
-
-int pan_sw_l2_offl(struct otx2_nic *pf, u32 switch_id,
-		   unsigned int port_id, u8 *mac);
+int pan_sw_l2_ev_enq(struct otx2_nic *pf, u32 switch_id,
+		     unsigned int port_id, u8 *mac, u64 flags);
 
 struct pan_sw_l2_offl_node *pan_sw_l2_mac_tbl_lookup(const u8 *mac);
 struct pan_sw_l2_offl_node *__pan_sw_l2_mac_tbl_lookup(const u8 *mac);

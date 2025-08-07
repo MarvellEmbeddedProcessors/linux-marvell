@@ -158,12 +158,12 @@ int otx2_mbox_up_handler_af2swdev_notify(struct otx2_nic *pf,
 
 	pan_sw_event_log(req);
 
-	if (req->flags & FDB_ADD)
-		err = pan_sw_l2_offl(pf, 0x1234, req->port_id, req->mac);
-	else if (req->flags & FDB_DEL)
-		err = pan_sw_l2_de_offl(pf, 0x1234, req->port_id, req->mac);
+	if (req->flags & (FDB_ADD | FDB_DEL))
+		err = pan_sw_l2_ev_enq(pf, 0x1234, req->port_id,
+				       req->mac, req->flags);
 	else if (req->flags & FIB_CMD)
 		err = pan_sw_l3_ev_enq(pf, req->cnt, req->entry);
+
 	if (err)
 		pr_debug("%s:%d Error happened while pushing rule to PAN\n",
 			 __func__, __LINE__);
