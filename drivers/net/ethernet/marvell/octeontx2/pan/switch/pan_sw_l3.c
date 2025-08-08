@@ -41,46 +41,6 @@ struct pan_sw_l3_offl_tnode  {
 
 static unsigned long valid_route;
 static int cnt_routes;
-static int fmcam_idx = -1;
-
-static int mcam_cnt;
-
-static int *pan_sw_l3_hw_alloc_cntr(int count)
-{
-	struct npc_mcam_alloc_counter_req *cntr_req;
-	struct npc_mcam_alloc_counter_rsp *cntr_rsp;
-	int *arr, i;
-	int idx;
-
-	mutex_lock(&otx2_nic->mbox.lock);
-
-	cntr_req = otx2_mbox_alloc_msg_npc_mcam_alloc_counter(&otx2_nic->mbox);
-	if (!cntr_req) {
-		mutex_unlock(&otx2_nic->mbox.lock);
-		pr_err("%s:%d Allocation req for cntr failed\n", __func__, __LINE__);
-		return NULL;
-	}
-
-	cntr_req->contig = true;
-	cntr_req->count = count;
-
-	if (otx2_sync_mbox_msg(&otx2_nic->mbox))
-		goto fail_mbox_sync;
-
-	cntr_rsp = (struct npc_mcam_alloc_counter_rsp *)
-			otx2_mbox_get_rsp(&otx2_nic->mbox.mbox, 0, &cntr_req->hdr);
-	idx = cntr_rsp->cntr;
-	arr = kcalloc(count, sizeof(int), GFP_KERNEL);
-	for (i = 0; i < count; i++)
-		arr[i] = idx++;
-
-	mutex_unlock(&otx2_nic->mbox.lock);
-	return arr;
-
-fail_mbox_sync:
-	mutex_unlock(&otx2_nic->mbox.lock);
-	return NULL;
-}
 
 static int pan_sw_l3_fl_tbl_del_one_entry(struct pan_sw_l3_offl_node *node)
 {
@@ -127,38 +87,31 @@ pan_sw_l3_fl_tbl_del_all(struct pan_sw_l3_offl_tnode *walk)
 		pan_sw_l3_fl_tbl_del_one_entry(pos->node);
 }
 
-static int pan_sw_l3_hw_npc_del_flows(void)
+static int pan_sw_l3_hw_npc_del_flows(int *marr, int *cnt)
 {
-	struct npc_delete_flow_req *req;
+	struct npc_flow_del_n_free_req *req;
 	int err;
 
-	if (fmcam_idx == -1) {
-		pr_debug("%s:%d Error fcam_idx\n",
-			 __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	if (!mcam_cnt) {
-		pr_debug("%s:%d No mcam allocated yet\n",
-			 __func__, __LINE__);
-		return -EINVAL;
-	}
+	if (!*cnt)
+		return 0;
 
 	mutex_lock(&otx2_nic->mbox.lock);
-	req = otx2_mbox_alloc_msg_npc_delete_flow(&otx2_nic->mbox);
+	req = otx2_mbox_alloc_msg_npc_flow_del_n_free(&otx2_nic->mbox);
 	if (!req) {
 		mutex_unlock(&otx2_nic->mbox.lock);
 		return -ENOMEM;
 	}
 
-	req->start = fmcam_idx;
-	req->end = fmcam_idx + mcam_cnt - 1;
-	fmcam_idx = -1;
-	mcam_cnt = 0;
+	req->cnt = *cnt;
+
+	for (int i = 0; i < *cnt; i++)
+		req->entry[i] = marr[i];
 
 	/* Send message to AF */
 	err = otx2_sync_mbox_msg(&otx2_nic->mbox);
 	mutex_unlock(&otx2_nic->mbox.lock);
+
+	*cnt = 0;
 
 	return 0;
 }
@@ -170,12 +123,6 @@ static int *pan_sw_l3_hw_alloc_mcam(u16 cnt)
 	struct otx2_flow_config *flow_cfg;
 	int *arr, i;
 	int entry;
-
-	if (fmcam_idx != -1) {
-		pr_err("%s:%d Error fcam_idx=%d\n",
-		       __func__, __LINE__, fmcam_idx);
-		return NULL;
-	}
 
 	flow_cfg = otx2_nic->flow_cfg;
 
@@ -206,11 +153,6 @@ static int *pan_sw_l3_hw_alloc_mcam(u16 cnt)
 	entry = rsp->entry;
 	for (i = 0; i < cnt; i++)
 		arr[i] = entry++;
-
-	if (fmcam_idx == -1)
-		fmcam_idx = arr[0];
-
-	mcam_cnt = cnt;
 
 	mutex_unlock(&otx2_nic->mbox.lock);
 
@@ -348,7 +290,6 @@ int pan_sw_l3_hw_install_flow(struct pan_sw_l3_offl_node *node)
 	req->entry = node->mcam_idx;
 	req->intf = NIX_INTF_RX;
 	req->set_cntr = 1;
-	req->cntr_val = node->cntr_idx;
 	req->op = NIX_RX_ACTIONOP_RSS;
 	req->match_id = node->match_id;
 	req->channel = 0;
@@ -380,8 +321,8 @@ static void pan_sw_l3_node_dump(struct pan_sw_l3_offl_node *node)
 {
 	struct fib_entry *entry = node->entry;
 
-	pr_debug("%s:%d port_id=%#x mcam_idx=%d match_id=%d cntr_idx=%d\n",
-		 __func__, __LINE__, node->port_id, node->mcam_idx, node->match_id, node->cntr_idx);
+	pr_debug("%s:%d port_id=%#x mcam_idx=%d match_id=%d\n",
+		 __func__, __LINE__, node->port_id, node->mcam_idx, node->match_id);
 	pr_debug("%s:%d cmd=%s gw_valid=%d mac_valid=%d dst=%#x len=%d gw=%#x mac=%pM nud_state=%#x\n",
 		 __func__, __LINE__,
 		 sw_nb_get_cmd2str(entry->cmd),
@@ -403,15 +344,16 @@ struct pan_sw_l3_ev {
 static LIST_HEAD(pan_sw_l3_ev_lh);
 static int pan_sw_l3_ev_process(bool *);
 
+static int *marr;
+static int lcnt;
 static void pan_sw_l3_fib_work_handler(struct work_struct *work)
 {
 	struct pan_sw_l3_offl_tnode *tnode;
 	struct pan_sw_l3_offl_node *node, nnode;
 	struct fib_entry entry;
 	int num_routes;
-	int *marr, *carr;
 	bool reshuffle;
-	int smidx, scidx;
+	int smidx;
 	int bitnr;
 	int emidx;
 	int err;
@@ -427,17 +369,18 @@ static void pan_sw_l3_fib_work_handler(struct work_struct *work)
 	num_routes = cnt_routes;
 	spin_unlock(&offl_l3_lock);
 
-	pan_sw_l3_hw_npc_del_flows();
-	if (!cnt_routes)
+	pan_sw_l3_hw_npc_del_flows(marr, &lcnt);
+	kfree(marr);
+	marr = NULL;
+
+	if (!num_routes)
 		return;
 
+	lcnt = num_routes;
 	marr = pan_sw_l3_hw_alloc_mcam(num_routes);
-	carr = pan_sw_l3_hw_alloc_cntr(num_routes);
 
 	smidx = 0;
-	emidx = mcam_cnt - 1;
-
-	scidx = 0;
+	emidx = num_routes - 1;
 
 	spin_lock(&offl_l3_lock);
 	for_each_set_bit(bitnr, &valid_route, 33) {
@@ -459,9 +402,7 @@ static void pan_sw_l3_fib_work_handler(struct work_struct *work)
 
 			node->mcam_idx = marr[emidx];
 
-			node->cntr_idx = carr[scidx];
 			emidx--;
-			scidx++;
 
 			pan_sw_l3_node_dump(node);
 
@@ -482,8 +423,6 @@ static void pan_sw_l3_fib_work_handler(struct work_struct *work)
 		}
 	}
 	spin_unlock(&offl_l3_lock);
-	kfree(carr);
-	kfree(marr);
 
 	spin_lock(&offl_l3_lock);
 	if (!list_empty(&pan_sw_l3_ev_lh))
@@ -685,8 +624,8 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 			hlist_del_init(&root->lh);
 			kfree(root);
 
-			pr_err("%s:%d First node exist, but a new gw=%#x got populated there\n",
-			       __func__, __LINE__, entry->gw);
+			pr_debug("%s:%d First node exist, but a new gw=%#x got populated there\n",
+				 __func__, __LINE__, entry->gw);
 
 			root = tnode;
 			hlist_add_head(&tnode->lh, &fib_root_lh);
@@ -701,8 +640,8 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 		root->r = NULL;
 		root = tnode;
 
-		pr_err("%s:%d new gw=%#x got Added\n",
-		       __func__, __LINE__, entry->gw);
+		pr_debug("%s:%d new gw=%#x got Added\n",
+			 __func__, __LINE__, entry->gw);
 
 		return 0;
 	}
@@ -943,36 +882,18 @@ pan_sw_l3_route_lookup(u32 dst)
 	return dev;
 }
 
-static int pan_sw_l3_remove_one_hw_n_fl_entry(int mcam_idx, int match_id)
+static int pan_sw_l3_remove_one_fl_tb_entry(int mcam_idx, int match_id)
 {
-	struct npc_delete_flow_req *req;
 	struct pan_tuple tuple = { 0 };
 	int err;
 
 	pan_tuple_hash_set(&tuple, match_id);
 	err = pan_fl_tbl_offl_del(&tuple);
 	if (err) {
-		pr_err("%s:%d Failed to del tbl flow mcam=%d match_id=%d\n",
-		       __func__, __LINE__, mcam_idx, match_id);
+		pr_debug("%s:%d Failed to del tbl flow mcam=%d match_id=%d\n",
+			 __func__, __LINE__, mcam_idx, match_id);
 		return err;
 	}
-
-	if (mcam_idx == -1)
-		return 0;
-
-	mutex_lock(&otx2_nic->mbox.lock);
-	req = otx2_mbox_alloc_msg_npc_delete_flow(&otx2_nic->mbox);
-	if (!req) {
-		mutex_unlock(&otx2_nic->mbox.lock);
-		pr_err("%s:%d Failed to del tbl flow mcam=%d match_id=%d\n",
-		       __func__, __LINE__, mcam_idx, match_id);
-		return -ENOMEM;
-	}
-
-	req->entry = mcam_idx;
-	/* Send message to AF */
-	err = otx2_sync_mbox_msg(&otx2_nic->mbox);
-	mutex_unlock(&otx2_nic->mbox.lock);
 
 	return 0;
 }
@@ -1069,11 +990,12 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 			spin_lock(&offl_l3_lock);
 			err = pan_sw_l3_route_del(entry, &mcam_idx, &match_id);
 			spin_unlock(&offl_l3_lock);
+
 			if (!err) {
-				err = pan_sw_l3_remove_one_hw_n_fl_entry(mcam_idx, match_id);
+				err = pan_sw_l3_remove_one_fl_tb_entry(mcam_idx, match_id);
 				if (err)
-					pr_err("%s:%d err in removing mcam=%d match_id=%d\n",
-					       __func__, __LINE__, mcam_idx, match_id);
+					pr_debug("%s:%d err in removing mcam=%d match_id=%d\n",
+						 __func__, __LINE__, mcam_idx, match_id);
 			}
 
 			pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x got deleted err=%d\n",
@@ -1236,5 +1158,5 @@ void pan_sw_l3_deinit(void)
 	spin_lock(&offl_l3_lock);
 	pan_sw_l3_fl_tbl_del_all(root);
 	spin_unlock(&offl_l3_lock);
-	pan_sw_l3_hw_npc_del_flows();
+	pan_sw_l3_hw_npc_del_flows(marr, &lcnt);
 }

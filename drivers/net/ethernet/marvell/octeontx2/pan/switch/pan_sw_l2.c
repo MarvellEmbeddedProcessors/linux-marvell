@@ -71,17 +71,18 @@ struct pan_sw_l2_offl_node *pan_sw_l2_mac_tbl_lookup(const u8 *mac)
 
 static int pan_sw_l2_hw_remove_dmac_flow(u16 mcam_idx)
 {
-	struct npc_delete_flow_req *req;
+	struct npc_flow_del_n_free_req *req;
 	int err;
 
 	mutex_lock(&otx2_nic->mbox.lock);
-	req = otx2_mbox_alloc_msg_npc_delete_flow(&otx2_nic->mbox);
+	req = otx2_mbox_alloc_msg_npc_flow_del_n_free(&otx2_nic->mbox);
 	if (!req) {
 		mutex_unlock(&otx2_nic->mbox.lock);
 		return -ENOMEM;
 	}
 
-	req->entry = mcam_idx;
+	req->cnt = 1;
+	req->entry[0] = mcam_idx;
 
 	/* Send message to AF */
 	err = otx2_sync_mbox_msg(&otx2_nic->mbox);

@@ -14,7 +14,6 @@ struct pan_sw_l3_offl_node {
 	unsigned long jiffies;
 	u16 mcam_idx;
 	u16 match_id;
-	u16 cntr_idx;
 	u64 tuple_installed :1;
 	struct pan_tuple tuple;
 	struct fib_entry *entry;
