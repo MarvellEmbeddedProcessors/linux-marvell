@@ -92,7 +92,7 @@ static int pan_sw_l2_hw_remove_dmac_flow(u16 mcam_idx)
 }
 
 static int pan_sw_l2_hw_install_dmac_flow(u16 mcam_idx, u8 *mac_addr,
-					  u16 cntr, u16 match_id)
+					  u16 match_id)
 {
 	u8 mac_mask[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	struct npc_install_flow_req *req;
@@ -117,7 +117,6 @@ static int pan_sw_l2_hw_install_dmac_flow(u16 mcam_idx, u8 *mac_addr,
 	req->entry = mcam_idx;
 	req->intf = NIX_INTF_RX;
 	req->set_cntr = 1;
-	req->cntr_val = cntr;
 	req->op = NIX_RX_ACTIONOP_RSS;
 	req->match_id = match_id;
 	req->channel = 0;
@@ -133,39 +132,6 @@ static int pan_sw_l2_hw_install_dmac_flow(u16 mcam_idx, u8 *mac_addr,
 fail_flow:
 	mutex_unlock(&otx2_nic->mbox.lock);
 	return err;
-}
-
-static int pan_sw_l2_hw_alloc_dmac_counter(u16 *cntr)
-{
-	struct npc_mcam_alloc_counter_req *cntr_req;
-	struct npc_mcam_alloc_counter_rsp *cntr_rsp;
-
-	mutex_lock(&otx2_nic->mbox.lock);
-
-	cntr_req = otx2_mbox_alloc_msg_npc_mcam_alloc_counter(&otx2_nic->mbox);
-	if (!cntr_req) {
-		mutex_unlock(&otx2_nic->mbox.lock);
-		pr_err("Allocation req for cntr failed\n");
-		return -EFAULT;
-	}
-
-	cntr_req->contig = true;
-	cntr_req->count = 1;
-
-	if (otx2_sync_mbox_msg(&otx2_nic->mbox))
-		goto fail_mbox_sync;
-
-	cntr_rsp = (struct npc_mcam_alloc_counter_rsp *)
-			otx2_mbox_get_rsp(&otx2_nic->mbox.mbox, 0, &cntr_req->hdr);
-
-	*cntr = cntr_rsp->cntr;
-	mutex_unlock(&otx2_nic->mbox.lock);
-
-	return 0;
-
-fail_mbox_sync:
-	mutex_unlock(&otx2_nic->mbox.lock);
-	return -EFAULT;
 }
 
 static int pan_sw_l2_hw_alloc_dmac_flow(u16 *mcam_idx)
@@ -270,16 +236,10 @@ static int pan_sw_l2_add_flow_tbl(struct pan_sw_l2_offl_node *node)
 }
 
 static int pan_sw_l2_offl_hw(struct pan_sw_l2_offl_node *node,
-			     u16 *mcam_idx, u16 *cntr)
+			     u16 *mcam_idx)
 {
 	/* TODO: error handling */
 	int ret;
-
-	ret = pan_sw_l2_hw_alloc_dmac_counter(cntr);
-	if (ret) {
-		pr_err("Error to alloc counter for mac=%pM\n", node->mac);
-		return -EFAULT;
-	}
 
 	ret = pan_sw_l2_hw_alloc_dmac_flow(mcam_idx);
 	if (ret) {
@@ -287,7 +247,7 @@ static int pan_sw_l2_offl_hw(struct pan_sw_l2_offl_node *node,
 		return -EFAULT;
 	}
 
-	ret = pan_sw_l2_hw_install_dmac_flow(*mcam_idx, node->mac, *cntr, node->match_id);
+	ret = pan_sw_l2_hw_install_dmac_flow(*mcam_idx, node->mac, node->match_id);
 	if (ret) {
 		pr_err("Fail to install flow for mac=%pM\n", node->mac);
 		node->state = SWITCH_L2_OFFL_STATE_FAIL;
@@ -305,7 +265,6 @@ static void pan_sw_l2_dwork(struct work_struct *dwork)
 	struct otx2_nic *pan;
 	unsigned long timeout;
 	unsigned long long hits;
-	u16 cntr;
 	int ret;
 	u16 mcam_idx;
 	int iter = 3;
@@ -354,7 +313,7 @@ static void pan_sw_l2_dwork(struct work_struct *dwork)
 				break;
 			}
 
-			ret = pan_sw_l2_offl_hw(node, &mcam_idx, &cntr);
+			ret = pan_sw_l2_offl_hw(node, &mcam_idx);
 			if (ret) {
 				node->state = SWITCH_L2_OFFL_STATE_FAIL;
 				break;
