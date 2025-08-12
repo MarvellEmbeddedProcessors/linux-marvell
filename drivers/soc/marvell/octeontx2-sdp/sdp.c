@@ -748,6 +748,7 @@ static int sdp_register_flr_irq(struct pci_dev *pdev)
 				vec);
 			goto reg_fail;
 		}
+		sdp->irq_allocated[vec + i] = true;
 	}
 
 	return 0;
