@@ -166,9 +166,9 @@ fail_alloc_entry:
 
 static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 {
+	struct pan_fl_tbl_opaque opq = { 0 };
 	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	struct pan_fl_tbl_res res = { 0 };
-	struct pan_fl_tbl_opaque *opq;
 	struct net_device *netdev;
 	struct pan_tuple *tuple;
 	struct fib_entry *entry;
@@ -194,17 +194,10 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 
 	netdev = xa_load(&pan_rvu_gbl->pfunc2dev, pcifunc);
 	if (netdev && !entry->host) {
-		opq = kcalloc(1, sizeof(*opq), GFP_KERNEL);
-		if (!opq) {
-			pr_err("%s:%d Error to alloc opq obj port_id = %#x\n",
-			       __func__, __LINE__, node->port_id);
-			return -EFAULT;
-		}
-
-		res.opq = opq;
+		res.opq = &opq;
 		for_each_dev_addr(netdev, ha) {
 			/* TODO: what if there are More than one mac address */
-			ether_addr_copy(opq->eg_mac, ha->addr);
+			ether_addr_copy(opq.eg_mac, ha->addr);
 			break;
 		}
 	}

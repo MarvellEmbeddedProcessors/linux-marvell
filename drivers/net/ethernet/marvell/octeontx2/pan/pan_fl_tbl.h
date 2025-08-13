@@ -20,9 +20,11 @@ typedef int (*tbl_node_cb)(struct pan_tuple *tuple, struct sk_buff *skb,
 
 struct pan_fl_tbl_opaque {
 	/* all other fields should be inside this */
-	u8 eg_mac[ETH_ALEN];
+	union {
+		u8 eg_mac[ETH_ALEN];
+		struct pan_ktls_ctx ctx;
+	};
 	struct rcu_head rcu;
-	struct pan_ktls_ctx ctx;
 };
 
 enum pan_fl_tbl_act {

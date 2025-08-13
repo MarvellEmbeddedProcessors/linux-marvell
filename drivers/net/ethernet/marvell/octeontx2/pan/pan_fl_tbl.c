@@ -683,6 +683,7 @@ int pan_fl_tbl_del_by_handle(u64 handle)
 
 int pan_fl_tbl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res, u64 *handle)
 {
+	struct pan_fl_tbl_opaque *opq = NULL;
 	struct pan_fl_tbl_node *node, *tmp;
 	struct pan_fl_tbl_rdx_node *rdx;
 	enum pan_fl_tbl_type type;
@@ -699,6 +700,13 @@ int pan_fl_tbl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res, u64 *han
 		return -ENOMEM;
 	}
 
+	if (res->opq) {
+		opq = kcalloc(1, sizeof(*opq), GFP_KERNEL);
+		if (!opq)
+			return -EFAULT;
+		*opq = *res->opq;
+	}
+
 	rcu_read_lock_bh();
 
 	type =  pan_fl_tbl_find_type(tuple);
@@ -711,6 +719,7 @@ int pan_fl_tbl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res, u64 *han
 
 	node->tuple = *tuple;
 	node->res = *res;
+	node->res.opq = opq;
 
 	spin_lock(&rdx->lock);
 	tmp = rhashtable_lookup_fast(&rdx->ht, tuple, rdx->rht_params);
@@ -743,6 +752,7 @@ int pan_fl_tbl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res, u64 *han
 err:
 	rcu_read_unlock_bh();
 	free_percpu(node->hits);
+	kfree(node->res.opq);
 	node->hits = NULL;
 	kvfree(node);
 	return err;
@@ -750,6 +760,7 @@ err:
 
 int pan_fl_tbl_offl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res)
 {
+	struct pan_fl_tbl_opaque *opq = NULL;
 	struct pan_fl_tbl_node *node, *tmp;
 	struct pan_fl_tbl_rdx_node *rdx;
 	int err = 0;
@@ -762,6 +773,13 @@ int pan_fl_tbl_offl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res)
 	if (!node->hits) {
 		kvfree(node);
 		return -ENOMEM;
+	}
+
+	if (res->opq) {
+		opq = kcalloc(1, sizeof(*opq), GFP_KERNEL);
+		if (!opq)
+			return -ENOMEM;
+		*opq = *res->opq;
 	}
 
 	rcu_read_lock_bh();
@@ -777,6 +795,7 @@ int pan_fl_tbl_offl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res)
 
 	node->tuple = *tuple;
 	node->res = *res;
+	node->res.opq = opq;
 
 	spin_lock(&rdx->lock);
 	tmp = rhashtable_lookup_fast(&rdx->ht, tuple, rht_offl_params);
@@ -806,6 +825,7 @@ int pan_fl_tbl_offl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res)
 err:
 	rcu_read_unlock_bh();
 	free_percpu(node->hits);
+	kfree(node->res.opq);
 	node->hits = NULL;
 	kvfree(node);
 	return err;
