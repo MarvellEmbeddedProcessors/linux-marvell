@@ -806,6 +806,13 @@ int sdhci_suspend_host(struct sdhci_host *host);
 int sdhci_resume_host(struct sdhci_host *host);
 int sdhci_runtime_suspend_host(struct sdhci_host *host);
 int sdhci_runtime_resume_host(struct sdhci_host *host, int soft_reset);
+#else
+static inline bool sdhci_enable_irq_wakeups(struct sdhci_host *host) { return false; }
+static inline void sdhci_disable_irq_wakeups(struct sdhci_host *host) {}
+static inline int sdhci_suspend_host(struct sdhci_host *host) { return -EOPNOTSUPP; }
+static inline int sdhci_resume_host(struct sdhci_host *host) { return -EOPNOTSUPP; }
+static inline int sdhci_runtime_suspend_host(struct sdhci_host *host) { return 0; }
+static inline int sdhci_runtime_resume_host(struct sdhci_host *host, int soft_reset) { return 0; }
 #endif
 
 void sdhci_cqe_enable(struct mmc_host *mmc);
