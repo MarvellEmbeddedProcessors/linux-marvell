@@ -150,11 +150,15 @@ u16 pan_sw_get_pcifunc(unsigned int port_id)
 	return FIELD_GET(GENMASK_ULL(15, 0), port_id);
 }
 
+static bool sw_mode = true;
 int otx2_mbox_up_handler_af2swdev_notify(struct otx2_nic *pf,
 					 struct af2swdev_notify_req *req,
 					 struct msg_rsp *rsp)
 {
 	int err;
+
+	if (!sw_mode)
+		return 0;
 
 	pan_sw_event_log(req);
 
@@ -170,6 +174,28 @@ int otx2_mbox_up_handler_af2swdev_notify(struct otx2_nic *pf,
 
 	return 0;
 }
+
+static int pan_sw_simple_llu_get(void *data, u64 *val)
+{
+	*val = !!sw_mode;
+	return 0;
+}
+
+void pan_sw_deinit(void);
+static int pan_sw_simple_llu_set(void *data, u64 val)
+{
+	if (val != 0) {
+		pr_err("Only disabling (0) is allowed\n");
+		return -EINVAL;
+	}
+
+	pan_sw_deinit();
+	sw_mode = false;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(pan_sw_simple_llu_fops, pan_sw_simple_llu_get,
+			pan_sw_simple_llu_set, "%llu\n");
 
 static void pan_sw_debugfs_create(void)
 {
@@ -187,23 +213,15 @@ static void pan_sw_debugfs_create(void)
 
 	file = debugfs_create_file("sw_events", 0400, pdir, NULL,
 				   &pan_sw_debugfs_fops);
+
+	file = debugfs_create_file("sw_mode", 0600, pdir, "sw_mode",
+				   &pan_sw_simple_llu_fops);
+
 }
 
 static void pan_sw_debugfs_remove(void)
 {
-	struct dentry *parent, *pdir;
-
-	parent = debugfs_lookup("cn10k", NULL);
-	if (!parent) {
-		pr_err("Could not find dir cn10ka in debugfs\n");
-		return;
-	}
-
-	pdir = debugfs_lookup("pan", parent);
-	if (!pdir)
-		return;
-
-	debugfs_remove_recursive(pdir);
+	pan_dbgfs_rm_file("sw_events");
 }
 
 int pan_sw_init(void)
@@ -217,6 +235,9 @@ int pan_sw_init(void)
 
 void pan_sw_deinit(void)
 {
+	if (!sw_mode)
+		return;
+
 	pan_sw_l3_deinit();
 	pan_sw_l2_deinit();
 	pan_sw_debugfs_remove();

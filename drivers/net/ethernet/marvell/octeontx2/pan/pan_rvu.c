@@ -656,8 +656,8 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 			pan_tuple_hash_set(&tuple, node->match_id);
 			tuple.flags |= PAN_TUPLE_FLAG_L3_PROTO_V4;
 			if (!__pan_fl_tbl_offl_lookup_n_res(&tuple, &pres)) {
-				pres->dir = FLOW_OFFLOAD_DIR_REPLY;
-				res->dir = FLOW_OFFLOAD_DIR_REPLY;
+				pres->dir = IP_CT_DIR_REPLY;
+				res->dir = IP_CT_DIR_REPLY;
 
 				res->pair = pres;
 				pres->pair = res;
@@ -867,7 +867,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		 * Avoid this situation by reinjecting the packet back to stack and feciliate
 		 * fdb learning by bridge.
 		 */
-		if (res->dir == FLOW_OFFLOAD_DIR_ORIGINAL) {
+		if (res->dir == IP_CT_DIR_ORIGINAL) {
 			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, res->act);
 			return;
 		}

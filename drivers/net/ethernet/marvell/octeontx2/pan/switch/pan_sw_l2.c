@@ -214,7 +214,7 @@ static int pan_sw_l2_add_flow_tbl(struct pan_sw_l2_offl_node *node)
 
 	res.act = PAN_FL_TBL_ACT_L2_FWD;
 	res.pcifuncoff = pan_rvu_pcifunc2_sq_off(pcifunc);
-	res.dir = FLOW_OFFLOAD_DIR_ORIGINAL;
+	res.dir = IP_CT_DIR_ORIGINAL;
 
 	pan_tuple_hash_set(tuple, npc_matchid);
 	tuple->hash = npc_matchid;
@@ -475,26 +475,15 @@ DEFINE_SHOW_ATTRIBUTE(pan_sw_l2);
 
 static void pan_sw_l2_debugfs_remove(void)
 {
+	pan_dbgfs_rm_file("switch");
 }
 
 static int pan_sw_l2_debugfs_add(void)
 {
-	struct dentry *parent, *pdir;
+	struct dentry *pdir;
 	struct dentry *file;
 
-	parent = debugfs_lookup("cn10k", NULL);
-	if (!parent)
-		parent = debugfs_lookup("octeontx2", NULL);
-
-	if (!parent) {
-		pr_err("Could not find dir cn10ka or octeontx2 in debugfs\n");
-		return -ESRCH;
-	}
-
-	pdir = debugfs_lookup("pan", parent);
-	if (!pdir)
-		pdir = debugfs_create_dir("pan", parent);
-
+	pdir = pan_dbgfs_dir();
 	if (!pdir) {
 		pr_err("Could not create pan directory\n");
 		return -ESRCH;

@@ -76,11 +76,6 @@ enum pan_tuple_flag {
 #define PAN_TUPLE_FLAGS_L4_UDP (PAN_TUPLE_FLAGS_L4 | \
 			PAN_TUPLE_FLAG_L4_PROTO_UDP)
 
-enum pan_tuple_dir {
-	FLOW_OFFLOAD_DIR_ORIGINAL = IP_CT_DIR_ORIGINAL,
-	FLOW_OFFLOAD_DIR_REPLY = IP_CT_DIR_REPLY,
-};
-
 struct pan_tuple_hdr {
 	u8 *l2hdr;
 	u8 *l3hdr;

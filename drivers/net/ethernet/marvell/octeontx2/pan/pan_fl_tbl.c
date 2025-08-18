@@ -450,7 +450,7 @@ static int pr_debugfs_show(struct seq_file *m, void *v)
 		pan_tuple_dump2sysfs(m, &node->tuple, total);
 
 		len += snprintf(buf + len, sizeof(buf) - len, "(%s),",
-				(node->res.dir & FLOW_OFFLOAD_DIR_REPLY) ?
+				(node->res.dir & IP_CT_DIR_REPLY) ?
 				"BIDI" : "UNIDI");
 
 		pcifunc = gbl->sqoff2pcifunc[node->res.pcifuncoff];
@@ -489,22 +489,7 @@ DEFINE_SHOW_ATTRIBUTE(pr_debugfs);
 
 static void pan_fl_tbl_debugfs_deinit(void)
 {
-	struct dentry *parent;
-
-	parent = debugfs_lookup("cn10k", NULL);
-	if (!parent)
-		parent = debugfs_lookup("octeontx2", NULL);
-
-	if (!parent) {
-		pr_err("Could not find dir cn10ka or octeontx2 in debugfs\n");
-		return;
-	}
-
-	parent = debugfs_lookup("pan", parent);
-	if (!parent)
-		return;
-
-	debugfs_remove_recursive(parent);
+	pan_dbgfs_rm_full_dir();
 }
 
 static int pan_fl_tbl_debugfs_init(void)
@@ -512,16 +497,7 @@ static int pan_fl_tbl_debugfs_init(void)
 	struct dentry *parent;
 	struct dentry *file;
 
-	parent = debugfs_lookup("cn10k", NULL);
-	if (!parent)
-		parent = debugfs_lookup("octeontx2", NULL);
-
-	if (!parent) {
-		pr_err("Could not find dir cn10ka or octeontx2 in debugfs\n");
-		return -ESRCH;
-	}
-
-	parent = debugfs_create_dir("pan", parent);
+	parent = pan_dbgfs_dir();
 	if (!parent) {
 		pr_err("Could not create dir pan\n");
 		return -ESRCH;
@@ -581,10 +557,10 @@ int pan_fl_tbl_offl_del(struct pan_tuple *tuple)
 	if (res->pair) {
 		rpair = res->pair;
 		rpair->pair = NULL;
-		rpair->dir = FLOW_OFFLOAD_DIR_ORIGINAL;
+		rpair->dir = IP_CT_DIR_ORIGINAL;
 
 		res->pair = NULL;
-		res->dir = FLOW_OFFLOAD_DIR_ORIGINAL;
+		res->dir = IP_CT_DIR_ORIGINAL;
 	}
 
 	err = rhashtable_remove_fast(&rdx->ht, &node->rh_node,
@@ -645,10 +621,10 @@ int pan_fl_tbl_del(struct pan_tuple *tuple)
 	if (res->pair) {
 		rpair = res->pair;
 		rpair->pair = NULL;
-		rpair->dir = FLOW_OFFLOAD_DIR_ORIGINAL;
+		rpair->dir = IP_CT_DIR_ORIGINAL;
 
 		res->pair = NULL;
-		res->dir = FLOW_OFFLOAD_DIR_ORIGINAL;
+		res->dir = IP_CT_DIR_ORIGINAL;
 	}
 
 	err = rhashtable_remove_fast(&rdx->ht, &node->rh_node,

@@ -949,36 +949,9 @@ int pan_test_rx_sock(struct socket *sock, struct sockaddr_in *addr,
 	return sz;
 }
 
-static struct dentry *pan_test_debugfs_dir(void)
-{
-	struct dentry *parent;
-
-	parent = debugfs_lookup("cn10k", NULL);
-	if (!parent)
-		parent = debugfs_lookup("octeontx2", NULL);
-
-	if (!parent) {
-		pr_err("%s", "Could not find dir cn10ka or octeontx2 in debugfs\n");
-		return NULL;
-	}
-
-	/* pan fl tbl would be initialized before pan rvu */
-	parent = debugfs_lookup("pan", parent);
-	if (!parent)
-		return NULL;
-
-	return parent;
-}
-
 void pan_test_deinit(void)
 {
-	struct dentry *parent;
-
-	parent = pan_test_debugfs_dir();
-	if (!parent)
-		return;
-
-	debugfs_remove(parent);
+	pan_dbgfs_rm_sub_dir("test");
 }
 
 int pan_test_init(void)
@@ -991,16 +964,7 @@ int pan_test_init(void)
 	tuple = &tn.tuple;
 	tuple->flags = PAN_TUPLE_FLAG_L3_PROTO_V4;
 
-	parent = debugfs_lookup("cn10k", NULL);
-	if (!parent)
-		parent = debugfs_lookup("octeontx2", NULL);
-
-	if (!parent) {
-		pr_err("%s", "Could not find dir cn10ka or octeontx2 in debugfs\n");
-		return -ESRCH;
-	}
-
-	parent = debugfs_lookup("pan", parent);
+	parent = pan_dbgfs_dir();
 	if (!parent) {
 		pr_err("Could not find pan debugfs directory\n");
 		return -ESRCH;

@@ -27,5 +27,6 @@
 #include "hw/otx2_cmn.h"
 #include "pan_mbox.h"
 #include "pan_cpt.h"
+#include "pan_dbgfs.h"
 
 #endif // PAN_CMN_H_

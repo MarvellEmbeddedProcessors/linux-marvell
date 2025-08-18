@@ -31,27 +31,6 @@ static char *pan_stats_fld_name[PAN_STATS_FLD_MAX] = {
 	[PAN_STATS_FLD_EXP_PKTS] = "EXCEPTION PKTS\t",		// Exception packets
 };
 
-static struct dentry *pan_stats_debugfs_dir(void)
-{
-	struct dentry *parent;
-
-	parent = debugfs_lookup("cn10k", NULL);
-	if (!parent)
-		parent = debugfs_lookup("octeontx2", NULL);
-
-	if (!parent) {
-		pr_err("%s", "Could not find dir cn10ka or octeontx2 in debugfs\n");
-		return NULL;
-	}
-
-	/* pan fl tbl would be initialized before pan rvu */
-	parent = debugfs_lookup("pan", parent);
-	if (!parent)
-		return NULL;
-
-	return parent;
-}
-
 static int pan_stats_dp_dbg_show(struct seq_file *s, void *file)
 {
 	struct pan_stats *stats, tot = { 0 };
@@ -240,20 +219,14 @@ static const struct file_operations pan_stats_sq_dbg_ops = {
 
 void pan_stats_deinit(void)
 {
-	struct dentry *parent;
-
-	parent = pan_stats_debugfs_dir();
-	if (!parent)
-		return;
-
-	debugfs_remove(parent);
+	pan_dbgfs_rm_full_dir();
 }
 
 int pan_stats_init(void)
 {
 	struct dentry *parent, *file;
 
-	parent = pan_stats_debugfs_dir();
+	parent = pan_dbgfs_dir();
 	if (!parent)
 		return -ESRCH;
 

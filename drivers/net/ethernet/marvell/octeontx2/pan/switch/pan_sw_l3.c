@@ -16,6 +16,7 @@
 #include <linux/netdevice.h>
 #include <net/switchdev.h>
 #include <linux/hashtable.h>
+#include <linux/debugfs.h>
 
 #include "pan_cmn.h"
 #include "../nic/switch/sw_nb.h"
@@ -62,6 +63,45 @@ static int pan_sw_l3_fl_tbl_del_one_entry(struct pan_sw_l3_offl_node *node)
 	node->tuple_installed = 0;
 
 	return 0;
+}
+
+static int
+pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id);
+
+static void
+pan_sw_l3_fl_tbl_del_n_free_all(struct pan_sw_l3_offl_tnode *walk)
+{
+	struct pan_sw_l3_offl_tnode *pos;
+	struct pan_sw_l3_offl_node *node;
+	int mcam_idx, match_id;
+
+	if (!walk)
+		return;
+
+	pan_sw_l3_fl_tbl_del_n_free_all(walk->l);
+	pan_sw_l3_fl_tbl_del_n_free_all(walk->r);
+
+	if (!walk->node)
+		return;
+
+	if (walk != root) {
+		node = walk->node;
+		if (!node)
+			return;
+
+		pan_sw_l3_fl_tbl_del_one_entry(node);
+		pan_sw_l3_route_del(node->entry, &mcam_idx, &match_id);
+		return;
+	}
+
+	hlist_for_each_entry(pos, &fib_root_lh, lh) {
+		node = pos->node;
+		if (!node)
+			continue;
+
+		pan_sw_l3_fl_tbl_del_one_entry(node);
+		pan_sw_l3_route_del(node->entry, &mcam_idx, &match_id);
+	}
 }
 
 static void
@@ -209,7 +249,7 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 
 	res.pcifuncoff = pan_rvu_pcifunc2_sq_off(pcifunc);
 
-	res.dir = FLOW_OFFLOAD_DIR_ORIGINAL;
+	res.dir = IP_CT_DIR_ORIGINAL;
 
 	pan_tuple_hash_set(tuple, node->match_id);
 
@@ -1089,22 +1129,10 @@ DEFINE_SHOW_ATTRIBUTE(pan_sw_l3);
 
 static int pan_sw_l3_debugfs_add(void)
 {
-	struct dentry *parent, *pdir;
+	struct dentry *pdir;
 	struct dentry *file;
 
-	parent = debugfs_lookup("cn10k", NULL);
-	if (!parent)
-		parent = debugfs_lookup("octeontx2", NULL);
-
-	if (!parent) {
-		pr_err("Could not find dir cn10ka or octeontx2 in debugfs\n");
-		return -ESRCH;
-	}
-
-	pdir = debugfs_lookup("pan", parent);
-	if (!pdir)
-		pdir = debugfs_create_dir("pan", parent);
-
+	pdir = pan_dbgfs_dir();
 	if (!pdir) {
 		pr_err("Could not create pan directory\n");
 		return -ESRCH;
@@ -1118,6 +1146,11 @@ static int pan_sw_l3_debugfs_add(void)
 	}
 
 	return 0;
+}
+
+static void pan_sw_l3_debugfs_remove(void)
+{
+	pan_dbgfs_rm_file("route");
 }
 
 int pan_sw_l3_init(void)
@@ -1147,9 +1180,10 @@ int pan_sw_l3_init(void)
 
 void pan_sw_l3_deinit(void)
 {
+	pan_sw_l3_debugfs_remove();
 	cancel_delayed_work_sync(&pan_sw_l3_fib_work);
 	spin_lock(&offl_l3_lock);
-	pan_sw_l3_fl_tbl_del_all(root);
+	pan_sw_l3_fl_tbl_del_n_free_all(root);
 	spin_unlock(&offl_l3_lock);
 	pan_sw_l3_hw_npc_del_flows(marr, &lcnt);
 }

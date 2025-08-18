@@ -42,7 +42,7 @@ enum pan_fl_tbl_act {
 struct pan_fl_tbl_res {
 	enum pan_fl_tbl_act act;
 	u16 pcifuncoff;
-	enum pan_tuple_dir dir;
+	u8 dir;
 	struct pan_fl_tbl_res *pair;
 	struct pan_fl_tbl_opaque *opq;
 	/* Don't add any fields to this structure.
