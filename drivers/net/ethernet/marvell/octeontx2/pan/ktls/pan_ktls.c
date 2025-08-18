@@ -542,18 +542,7 @@ void pan_ktls_hw_exit(void)
 
 int pan_ktls_init(void)
 {
-	struct pan_rvu_dev_priv *pan_priv;
-	struct net_device *dev;
-
-	dev = dev_get_by_name(&init_net, PAN_DEV_NAME);
-	if (!dev) {
-		pr_err("Could not find PAN device\n");
-		return -EFAULT;
-	}
-
-	dev_put(dev);
-	pan_priv = netdev_priv(dev);
-	pan_nic = pan_priv->otx2_nic;
+	pan_nic = pan_rvu_get_pan_nic();
 	return 0;
 }
 

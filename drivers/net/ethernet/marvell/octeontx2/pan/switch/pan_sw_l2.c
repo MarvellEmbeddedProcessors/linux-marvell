@@ -501,18 +501,7 @@ static int pan_sw_l2_debugfs_add(void)
 
 int pan_sw_l2_init(void)
 {
-	struct pan_rvu_dev_priv *pan_priv;
-	struct net_device *dev;
-
-	dev = dev_get_by_name(&init_net, PAN_DEV_NAME);
-	if (!dev) {
-		pr_err("Could not find PAN device\n");
-		return -EFAULT;
-	}
-	dev_put(dev);
-
-	pan_priv = netdev_priv(dev);
-	otx2_nic = pan_priv->otx2_nic;
+	otx2_nic = pan_rvu_get_pan_nic();
 
 	hash_init(mac_h_tbl);
 

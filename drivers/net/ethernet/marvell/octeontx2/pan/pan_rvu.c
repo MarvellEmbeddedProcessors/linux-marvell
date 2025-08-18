@@ -30,6 +30,26 @@ MODULE_DEVICE_TABLE(pci, pan_rvu_id_table);
 
 static struct pan_rvu_gbl_t pan_rvu_gbl;
 
+struct otx2_nic *pan_rvu_get_pan_nic(void)
+{
+	struct pan_rvu_dev_priv *pan_priv;
+	struct net_device *dev;
+
+	if (pan_rvu_gbl.pan_nic)
+		return pan_rvu_gbl.pan_nic;
+
+	dev = dev_get_by_name(&init_net, PAN_DEV_NAME);
+	if (!dev) {
+		pr_err("Could not find PAN device\n");
+		return NULL;
+	}
+	dev_put(dev);
+
+	pan_priv = netdev_priv(dev);
+	pan_rvu_gbl.pan_nic = pan_priv->otx2_nic;
+	return pan_rvu_gbl.pan_nic;
+}
+
 static void pan_rvu_gbl_init(void)
 {
 	int i;

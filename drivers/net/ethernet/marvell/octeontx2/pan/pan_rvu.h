@@ -38,6 +38,7 @@ struct pan_rvu_gbl_t {
 	struct matchid_bmap rsrc;
 	struct xarray chan2dev;
 	struct xarray pfunc2dev;
+	struct otx2_nic *pan_nic;
 };
 
 struct pan_rvu_cq_info {
@@ -76,5 +77,6 @@ int pan_alloc_matchid(struct matchid_bmap *rsrc);
 void pan_free_matchid(struct matchid_bmap *rsrc, int id);
 int pan_rvu_free_mcam_entry(u16 entry);
 int pan_rvu_delete_flow(u16 entry);
+struct otx2_nic *pan_rvu_get_pan_nic(void);
 
 #endif // PAN_RVU_H_
