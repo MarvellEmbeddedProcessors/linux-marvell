@@ -3,7 +3,10 @@ Introduction
 PAN accelerates packets between any two linux RVU interfaces.
 PAN supports acceleraton of both L2 and L3 traffic. Please ensure
 that all interfaces in network topology are cavium devices for
-PAN to accelerate
+PAN to accelerate. Below shows various topologies that can be
+accelerated with PAN.
+note: We used sdp1-0 and eth0 in example configuration. User is
+free to choose any cavium netdevices.
 
 1. Kernel Config
 CONFIG_OCTEONTX_PAN=m
@@ -11,7 +14,8 @@ CONFIG_OCTEONTX_PAN=m
 2. How to Build
 make ARCH=arm64 CROSS_COMPILE=aarch64-marvell-linux-gnu- modules  -j16 V=s
 
-3. L2 offload
+3. L2 offload - Linux bridge FDB based.
+
                          cn10k
  |-------|         |--------------|                |-------
  | x86   |---------|sdp1-0   eth0 |----------------| x86  |
@@ -22,24 +26,29 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-marvell-linux-gnu- modules  -j16 V=s
 3.a) configuration
 
 insmod ./pcie-marvell-cnxk-ep.ko
-sleep 1
+
 ./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
-sleep 1
+
 brctl addbr br0
 ifconfig sdp1-0 up
 ifconfig eth0 up
 brctl addif br0 eth0
 brctl addif br0 sdp1-0
 insmod ./pan.ko
-sleep 2
+
 ifconfig pan up
-sleep 1
+
 devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
-sleep 1
+
 ifconfig br0 up
 mount -t debugfs none /sys/kernel/debug/
 
-4.  L3 offload
+4.  L3 offload - Route Table based
+
+pros:
+Less number of NPC mcam rules used.
+cons:
+No masquerade support)
 
 4.1 Simple routing
 
@@ -52,17 +61,17 @@ mount -t debugfs none /sys/kernel/debug/
 
 4.1.a) configuration
 insmod ./pcie-marvell-cnxk-ep.ko
-sleep 1
+
 ./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
-sleep 1
+
 ifconfig sdp1-0 192.168.11.1 up
 ifconfig eth0 192.168.9.1 up
 insmod ./pan.ko
-sleep 2
+
 ifconfig pan up
-sleep 1
+
 devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
-sleep 1
+
 mount -t debugfs none /sys/kernel/debug/
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
@@ -78,19 +87,19 @@ echo 1 > /proc/sys/net/ipv4/ip_forward
 4.2.a configuration
 
 insmod ./pcie-marvell-cnxk-ep.ko
-sleep 1
+
 ./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
-sleep 1
+
 ifconfig sdp1-0 192.168.11.1 up
 brctl addbr br0
 brctl addif br0 eth0
 ifconfig eth0 up
 insmod ./pan.ko
-sleep 2
+
 ifconfig pan up
-sleep 1
+
 devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
-sleep 1
+
 mount -t debugfs none /sys/kernel/debug/
 echo 1 > /proc/sys/net/ipv4/ip_forward
 ifconfig br0 192.168.9.1 up
@@ -107,9 +116,9 @@ ifconfig br0 192.168.9.1 up
 4.2.a configuration
 
 insmod ./pcie-marvell-cnxk-ep.ko
-sleep 1
+
 ./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
-sleep 1
+
 brctl addbr br0
 brctl addif br0 eth0
 ifconfig eth0 up
@@ -118,17 +127,172 @@ brctl addbr br1
 brctl addif br1 sdp1-0
 ifconfig sdp1-0 up
 insmod ./pan.ko
-sleep 2
+
 ifconfig pan up
-sleep 1
 
 ifconfig br0 192.168.9.1 up
 ifconfig br1 192.168.11.1 up
 
 devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
-sleep 1
+
 mount -t debugfs none /sys/kernel/debug/
 echo 1 > /proc/sys/net/ipv4/ip_forward
 
+5. L3 support - Flow based (https://docs.kernel.org/networking/nf_flowtable.html)
+pros:
+Various masquerading can be supported. Currently only SNAT and DNAT for ipv4 is supported.
+cons:
+NF table offload configuration should be enabled in Kernel.
+Each flow creates two mcam entries. one for original direction and other for reply.
+We need to disable route Table based flow offload by writing 0 to a sysfs entry, as below.
+echo 0 > /sys/kernel/debug/cn10k/pan/sw_mode
+
+5.a) Simple routing
+                         cn10k
+ |-------|         |------------------------ |                |-------
+ | x86   |---------|sdp1-0           eth0    |----------------| x86  |
+ |       |         |192.168.11.1  192.168.9.1|                |      |
+ ---------         |-------------------------                 --------
+ 192.168.11.200                                            192.168.9.100
+
+insmod ./pcie-marvell-cnxk-ep.ko
+
+./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
+
+ifconfig sdp1-0 192.168.11.1 up
+ifconfig eth0 192.168.9.1 up
+insmod ./pan.ko
+
+ifconfig pan up
+
+devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
+
+mount -t debugfs none /sys/kernel/debug/
+echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 0 > /sys/kernel/debug/cn10k/pan/sw_mode
+nft -f ./route.nft
+
+++++++++ ./route.nft ++++
+table inet x {
+
+     flowtable f {
+        hook ingress priority 0
+        devices = { eth0, sdp1-0 }
+        flags offload;
+     }
+
+    chain forward {
+        type filter hook forward priority 0; policy accept;
+        ct state { established, related } flow add @f
+    }
+}
++++++++++++++++++++++++++
+
+5.b)  ROUTE + BRIDGE
+
+                         cn10k
+ |-------|         |------------------------ |                |-------
+ | x86   |---------|sdp1-0          br0 (eth0)|----------------| x86  |
+ |       |         |192.168.11.1  192.168.9.1|                |      |
+ ---------         |-------------------------                 --------
+ 192.168.11.200                                            192.168.9.100
+
+insmod ./pcie-marvell-cnxk-ep.ko
+
+./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
+
+ifconfig sdp1-0 192.168.11.1 up
+ifconfig eth0 up
+brctl addbr br0
+brctl addif br0 eth0
+insmod ./pan.ko
+
+ifconfig pan up
+ifconfig br0 192.168.9.1 up
+
+devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
+
+mount -t debugfs none /sys/kernel/debug/
+echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 0 > /sys/kernel/debug/cn10k/pan/sw_mode
+nft -f ./route.nft
+
+++++++++ ./route.nft ++++
+table inet x {
+
+     flowtable f {
+        hook ingress priority 0
+        devices = { eth0, sdp1-0 }
+        flags offload;
+     }
+
+    chain forward {
+        type filter hook forward priority 0; policy accept;
+        ct state { established, related } flow add @f
+    }
+}
++++++++++++++++++++++++++
+
+5.c ROUTE + BRIDGE + SNAT
+
+                         cn10k
+ |-------|         |------------------------ |                |-------
+ | x86   |---------|sdp1-0          br0 (eth0)|----------------| x86  |
+ |       |         |192.168.11.1  192.168.9.1|                |      |
+ ---------         |-------------------------                 --------
+ 192.168.11.200                                            192.168.9.100
+
+insmod ./pcie-marvell-cnxk-ep.ko
+
+./octep_cp_agent ./cn106xx.cfg 2>&1 > /tmp/octep-cp-log.txt &
+
+ifconfig sdp1-0 192.168.11.1 up
+ifconfig eth0 up
+brctl addbr br0
+brctl addif br0 eth0
+insmod ./pan.ko
+
+ifconfig pan up
+ifconfig br0 192.168.9.1 up
+
+devlink dev eswitch set pci/0002:1c:00.0 mode switchdev
+
+mount -t debugfs none /sys/kernel/debug/
+echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 0 > /sys/kernel/debug/cn10k/pan/sw_mode
+nft -f ./route_nat.nft
+
++++++++ route_nat.nft +++++++++++++
+
+table ip nat {
+     flowtable f {
+        hook ingress priority 0
+        devices = { eth0, sdp1-0  }
+        flags offload;
+     }
+
+     chain postrouting {
+             type nat hook postrouting priority srcnat; policy accept;
+             oifname "br0" snat to 192.168.9.1
+     }
+
+   chain forward {
+        type filter hook forward priority 0; policy accept;
+        ct state { established, related } flow add @f
+    }
+
+}
+
 5. Debugfs
 /sys/kernel/debug/cn10k/pan/
+
+a) info : shows various netdevices that can participate PAN offload
+b) route : Shows route table applicable for PAN.
+c) stats : PAN statistics
+d) sw_events : Shows 32 offload (L2, L3) events sent to switchdev
+	       in sequence.
+e)sw_mode : echo 0 to this file to switch from route table based L3 forwarding
+	    to flow based L3 forwarding.
+f)switch : Shows L2 offload MAC information.
+g) test  : Unit test folder for some of the APIs
+h) v4_fl_tbl : Shows L2 and L3 offloaded flow tuple and its hit count

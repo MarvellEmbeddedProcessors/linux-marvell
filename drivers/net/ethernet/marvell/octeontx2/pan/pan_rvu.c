@@ -557,7 +557,7 @@ static bool pan_rvu_buf_xmit(struct pan_fl_tbl_res *res,
 	/* TODO: change CHECKSUM_NONE to proper value */
 
 	/* Packet is parsed and modified. Recalculate Checksum */
-	if (unlikely(hdr->flags & PAN_TUPLE_FLAG_L4_PROTO_TCP)) {
+	if (unlikely(hdr->flags & PAN_TUPLE_FLAG_L4_PROTO)) {
 		sqe_hdr->ol3ptr = hdr->l3hdr - hdr->l2hdr;
 		sqe_hdr->ol4ptr = hdr->l4hdr - hdr->l2hdr;
 		sqe_hdr->ol3type = NIX_SENDL3TYPE_IP4_CKSUM;
@@ -701,6 +701,119 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 }
 
 static int
+pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
+			  struct pan_rvu_cq_info *cq_info,
+			  struct otx2_cq_queue *cq,
+			  struct nix_cqe_rx_s *cqe,
+			  struct pan_fl_tbl_res *res,
+			  struct pan_tuple_hdr *hdr,
+			  u16 *xmit_pcifunc_off)
+{
+	struct nix_rx_parse_s *parse = &cqe->parse;
+	struct pan_sw_l2_offl_node *l2_node;
+	struct nix_rx_sg_s *sg = &cqe->sg;
+	struct net_device *dev, *in_dev;
+	struct pan_tuple tuple = {};
+	struct pan_fl_tbl_res *pres;
+	struct neighbour *neigh;
+	struct iphdr *iphdr;
+	struct ethhdr *eth;
+	bool br_routing;
+	u64 *seg_addr;
+	u16 *seg_size;
+	u16 pcifunc;
+	void *start;
+	void *va;
+	u8 *dmac;
+
+	if (unlikely(parse->errlev || parse->errcode)) {
+		if (dup_check_rcv_errors(pfvf, cqe, cq->cq_idx))
+			return -EFAULT;
+	}
+
+	start = (void *)sg;
+	sg = (struct nix_rx_sg_s *)start;
+	seg_addr = &sg->seg_addr;
+	seg_size = (void *)sg;
+
+	pcifunc = pan_rvu_gbl.sqoff2pcifunc[res->pcifuncoff];
+	dev = xa_load(&pan_rvu_gbl.pfunc2dev, pcifunc);
+	if (likely(!dev))
+		return -ENOENT;
+
+	br_routing = !!(res->act & (PAN_FL_TBL_ACT_L3_BR_SNAT | PAN_FL_TBL_ACT_L3_BR_DNAT));
+	if (br_routing)
+		dev = netdev_master_upper_dev_get_rcu(dev);
+
+	va = phys_to_virt(otx2_iova_to_phys(pfvf->iommu_domain, *seg_addr));
+
+	eth = (struct ethhdr *)va;
+	iphdr = (struct iphdr *)(va + ETH_HLEN);
+
+	in_dev = xa_load(&pan_rvu_gbl.chan2dev, parse->chan & ~0x7);
+	if (in_dev) {
+		if (unlikely(netif_is_bridge_port(in_dev))) {
+			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
+			if (!l2_node)
+				return -ENOENT;
+
+			tuple.flags |= PAN_TUPLE_FLAG_L3_PROTO_V4;
+			pan_tuple_hash_set(&tuple, l2_node->match_id);
+			__pan_fl_tbl_offl_lookup_n_res(&tuple, &pres);
+		}
+	}
+
+	if (res->opq->eg_dmac_is_set) {
+		dmac = res->opq->eg_dmac;
+	} else {
+		if (res->act & PAN_FL_TBL_ACT_L3_DNAT) {
+			neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)res->opq->eg_sip);
+			if (unlikely(!neigh))
+				return -ENOENT;
+		} else {
+			neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
+			if (unlikely(!neigh))
+				return -ENOENT;
+		}
+
+		dmac = neigh->ha;
+		if (res->opq->eg_dmac_can_set) {
+			ether_addr_copy(res->opq->eg_dmac, dmac);
+			res->opq->eg_dmac_is_set = 1;
+		}
+	}
+
+	if (unlikely(br_routing)) {
+		l2_node = __pan_sw_l2_mac_tbl_lookup(dmac);
+		if (!l2_node)
+			return -ENOENT;
+	}
+
+	if (res->act & (PAN_FL_TBL_ACT_L3_SNAT | PAN_FL_TBL_ACT_L3_BR_SNAT))
+		iphdr->saddr = res->opq->eg_sip;
+	else if (res->act & (PAN_FL_TBL_ACT_L3_DNAT | PAN_FL_TBL_ACT_L3_BR_SNAT))
+		iphdr->daddr = res->opq->eg_sip;
+
+	ether_addr_copy(eth->h_source, res->opq->eg_smac);
+	ether_addr_copy(eth->h_dest, dmac);
+
+	hdr->flags = PAN_TUPLE_FLAG_L4_PROTO;
+	hdr->l4hdr = (u8 *)iphdr + iphdr->ihl * 4;
+	hdr->l3hdr = (u8 *)iphdr;
+	hdr->l2hdr = (u8 *)eth;
+
+	if (likely(!br_routing)) {
+		*xmit_pcifunc_off = res->pcifuncoff;
+		return 0;
+	}
+
+	pcifunc = l2_node->port_id;
+	*xmit_pcifunc_off = pan_rvu_pcifunc2_sq_off(pcifunc);
+
+	return 0;
+}
+
+static int
 pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 		       struct pan_rvu_cq_info *cq_info,
 		       struct otx2_cq_queue *cq,
@@ -723,6 +836,7 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 	u16 pcifunc;
 	void *start;
 	void *va;
+	u8 *dmac;
 
 	if (unlikely(parse->errlev || parse->errcode)) {
 		if (dup_check_rcv_errors(pfvf, cqe, cq->cq_idx))
@@ -740,7 +854,7 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 		return -ENOENT;
 
 	br_routing = !!(res->act & PAN_FL_TBL_ACT_L3_BR_FWD);
-	if (unlikely(br_routing))
+	if (br_routing)
 		dev = netdev_master_upper_dev_get_rcu(dev);
 
 	va = phys_to_virt(otx2_iova_to_phys(pfvf->iommu_domain, *seg_addr));
@@ -761,21 +875,33 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 		}
 	}
 
-	neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
-	if (unlikely(!neigh))
-		return -ENOENT;
+	if (res->opq->eg_dmac_is_set) {
+		dmac = res->opq->eg_dmac;
+	} else {
+		neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
+		if (unlikely(!neigh))
+			return -ENOENT;
+
+		dmac = neigh->ha;
+		if (res->opq->eg_dmac_can_set) {
+			ether_addr_copy(res->opq->eg_dmac, dmac);
+			res->opq->eg_dmac_is_set = 1;
+		}
+	}
 
 	if (unlikely(br_routing)) {
-		l2_node = __pan_sw_l2_mac_tbl_lookup(neigh->ha);
+		l2_node = __pan_sw_l2_mac_tbl_lookup(dmac);
 		if (!l2_node)
 			return -ENOENT;
 	}
 
-	ether_addr_copy(eth->h_source, res->opq->eg_mac);
-	ether_addr_copy(eth->h_dest, neigh->ha);
+	ether_addr_copy(eth->h_source, res->opq->eg_smac);
+	ether_addr_copy(eth->h_dest, dmac);
 
-	if (likely(!br_routing))
+	if (likely(!br_routing)) {
+		*xmit_pcifunc_off = res->pcifuncoff;
 		return 0;
+	}
 
 	pcifunc = l2_node->port_id;
 	*xmit_pcifunc_off = pan_rvu_pcifunc2_sq_off(pcifunc);
@@ -850,8 +976,12 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, PAN_FL_TBL_ACT_EXP);
 		return;
 
-	case PAN_FL_TBL_ACT_L3_FWD:
-		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, NULL);
+	case PAN_FL_TBL_ACT_L3_SNAT:
+	case PAN_FL_TBL_ACT_L3_DNAT:
+	case PAN_FL_TBL_ACT_L3_BR_SNAT:
+	case PAN_FL_TBL_ACT_L3_BR_DNAT:
+		ret = pan_rvu_rewrite_l2_l3_hdr(pfvf, cq_info, cq, cqe, res, &hdr,
+						&xmit_pcifunc_off);
 
 		/* Incase of error reinject the packet back to stack */
 		if (ret) {
@@ -860,10 +990,11 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 			return;
 		}
 
-		xmit_pcifunc_off = res->pcifuncoff;
+		pan_stats_inc(PAN_STATS_FLD_NAT_PKTS);
 		break;
 
 	case PAN_FL_TBL_ACT_L3_BR_FWD:
+	case PAN_FL_TBL_ACT_L3_FWD:
 		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, &xmit_pcifunc_off);
 
 		/* Incase of error reinject the packet back to stack */
@@ -872,6 +1003,8 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 						 PAN_FL_TBL_ACT_EXP);
 			return;
 		}
+
+		pan_stats_inc(PAN_STATS_FLD_ROUTE_PKTS);
 		break;
 
 	case PAN_FL_TBL_ACT_L2_FWD:
@@ -893,6 +1026,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		}
 
 		xmit_pcifunc_off = res->pcifuncoff;
+		pan_stats_inc(PAN_STATS_FLD_BR_PKTS);
 		break;
 
 #if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)

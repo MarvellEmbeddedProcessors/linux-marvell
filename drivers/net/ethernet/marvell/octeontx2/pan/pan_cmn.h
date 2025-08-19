@@ -28,5 +28,6 @@
 #include "pan_mbox.h"
 #include "pan_cpt.h"
 #include "pan_dbgfs.h"
+#include "pan_sw_fl.h"
 
 #endif // PAN_CMN_H_

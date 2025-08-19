@@ -21,21 +21,28 @@ typedef int (*tbl_node_cb)(struct pan_tuple *tuple, struct sk_buff *skb,
 struct pan_fl_tbl_opaque {
 	/* all other fields should be inside this */
 	union {
-		u8 eg_mac[ETH_ALEN];
 		struct pan_ktls_ctx ctx;
 	};
+
+	u64 eg_dmac_can_set : 1;
+	u64 eg_dmac_is_set : 1;
+	u8 eg_smac[ETH_ALEN];
+	u8 eg_dmac[ETH_ALEN];
+	u32 eg_sip;
 	struct rcu_head rcu;
 };
 
 enum pan_fl_tbl_act {
-	PAN_FL_TBL_ACT_FWD = BIT_ULL(0),
-	PAN_FL_TBL_ACT_DROP = BIT_ULL(1),
-	PAN_FL_TBL_ACT_TLS_ENC = BIT_ULL(2),
-	PAN_FL_TBL_ACT_TLS_DEC = BIT_ULL(3),
-	PAN_FL_TBL_ACT_L2_FWD = BIT_ULL(4),
-	PAN_FL_TBL_ACT_L3_FWD = BIT_ULL(5),
-	PAN_FL_TBL_ACT_L3_BR_FWD = BIT_ULL(6),
-	PAN_FL_TBL_ACT_EXP = BIT_ULL(7),
+	PAN_FL_TBL_ACT_TLS_ENC = BIT_ULL(0),
+	PAN_FL_TBL_ACT_TLS_DEC = BIT_ULL(1),
+	PAN_FL_TBL_ACT_L2_FWD = BIT_ULL(2),
+	PAN_FL_TBL_ACT_L3_FWD = BIT_ULL(3),
+	PAN_FL_TBL_ACT_L3_BR_FWD = BIT_ULL(4),
+	PAN_FL_TBL_ACT_EXP = BIT_ULL(5),
+	PAN_FL_TBL_ACT_L3_SNAT = BIT_ULL(6),
+	PAN_FL_TBL_ACT_L3_DNAT = BIT_ULL(7),
+	PAN_FL_TBL_ACT_L3_BR_SNAT = BIT_ULL(8),
+	PAN_FL_TBL_ACT_L3_BR_DNAT = BIT_ULL(9),
 	PAN_FL_TBL_ACT_MAX,
 };
 

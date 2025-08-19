@@ -29,6 +29,9 @@ static char *pan_stats_fld_name[PAN_STATS_FLD_MAX] = {
 	[PAN_STATS_FLD_TX_CQ_PKTS] = "TX CQ PKTS\t",		// SQ processed pkts
 	[PAN_STATS_FLD_INVAL_SQ] = "INVALID SQ\t",		// Invalid SQ
 	[PAN_STATS_FLD_EXP_PKTS] = "EXCEPTION PKTS\t",		// Exception packets
+	[PAN_STATS_FLD_NAT_PKTS] = "NAT PKTS\t",		// Nated
+	[PAN_STATS_FLD_ROUTE_PKTS] = "L3 FLOW PKTS\t",		// l3
+	[PAN_STATS_FLD_BR_PKTS] = "L2 FLOW PKTs\t",		// l2
 };
 
 static int pan_stats_dp_dbg_show(struct seq_file *s, void *file)

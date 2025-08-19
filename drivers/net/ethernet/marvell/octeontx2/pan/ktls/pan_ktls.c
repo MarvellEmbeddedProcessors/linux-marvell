@@ -337,21 +337,15 @@ static int pan_ktls_conn_add(struct pan_ktls_add_conn_req *req)
 	struct pan_tuple tuple = { .flags = PAN_TUPLE_FLAG_L3_PROTO_V4, };
 	struct pan_ktls_npc_info *info;
 	struct pan_ktls_mbox_ctx *ctx;
-	struct pan_fl_tbl_res *res;
+	struct pan_fl_tbl_res *res, res_obj = { 0 };
+	struct pan_fl_tbl_opaque opq_obj = { 0 };
 	int err;
 
 	if (req->conn_id >= CN10K_CPT_MAX_KTLS_CTX)
 		return -EINVAL;
 
-	res = kvzalloc(sizeof(*res), GFP_KERNEL_ACCOUNT);
-	if (!res)
-		return -ENOMEM;
-
-	res->opq = kvzalloc(sizeof(*res->opq), GFP_KERNEL_ACCOUNT);
-	if (!res->opq) {
-		kfree(res);
-		return -ENOMEM;
-	}
+	res = &res_obj;
+	res->opq = &opq_obj;
 
 	/* Required for MCAM entry */
 	tuple.src_ip4.s_addr = req->src_ip;

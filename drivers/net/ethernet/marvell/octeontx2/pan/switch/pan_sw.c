@@ -30,6 +30,8 @@ static DEFINE_MUTEX(ev_lk);
 static char *pan_sw_event_cmd2str[] = {
 	[FDB_ADD] = "FDB ADD",
 	[FDB_DEL] = "FDB DEL",
+	[FL_ADD] = "FL ADD",
+	[FL_DEL] = "FL DEL",
 	[FIB_CMD] = "FIB CMD",
 };
 
@@ -40,6 +42,7 @@ struct pan_sw_event {
 	union {
 		struct fib_entry fe;
 		u8 mac[16];
+		struct fl_tuple tuple;
 	};
 };
 
@@ -75,7 +78,9 @@ static int pan_sw_debugfs_show(struct seq_file *m, void *v)
 {
 	struct pan_sw_event *ev;
 	struct fib_entry *fe;
+	struct fl_tuple *t;
 	int idx;
+	char *str_prot = NULL;
 
 	mutex_lock(&ev_lk);
 	idx = ev_cnt;
@@ -86,10 +91,25 @@ static int pan_sw_debugfs_show(struct seq_file *m, void *v)
 			continue;
 
 		ev = ev_arr[idx];
-		if (ev->cmd != FIB_CMD) {
+		if (ev->cmd == FDB_ADD || ev->cmd == FDB_DEL) {
 			seq_printf(m, "%lu %s\t", ev->jiffies,
 				   pan_sw_event_cmd2str[ev->cmd]);
 			seq_printf(m, "mac=%pM\n", ev->mac);
+			continue;
+		}
+
+		if (ev->cmd == FL_ADD || ev->cmd == FL_DEL) {
+			t = &ev->tuple;
+
+			if (t->proto == 6)
+				str_prot = "TCP";
+			else if (t->proto == 17)
+				str_prot = "UDP";
+
+			seq_printf(m, "%pI4(%u) to %pI4(%u)  %s %s\n",
+				   &t->ip4src, t->sport, &t->ip4dst, t->dport,
+				   (t->eth_type == htonl(0x86dd)) ? "IPv6" : "IPv4",
+				   str_prot);
 			continue;
 		}
 
@@ -114,14 +134,32 @@ static void pan_sw_event_log(struct af2swdev_notify_req *req)
 		cmd = FDB_ADD;
 	else if (req->flags & FDB_DEL)
 		cmd = FDB_DEL;
-	else
+	else if (req->flags & FIB_CMD)
 		cmd = FIB_CMD;
+	else if (req->flags & FL_ADD)
+		cmd = FL_ADD;
+	else if (req->flags & FL_DEL)
+		cmd = FL_DEL;
 
 	if (cmd == FDB_ADD || cmd == FDB_DEL) {
 		ev = kcalloc(1, sizeof(*ev), GFP_KERNEL);
 		ev->cmd = cmd;
 		ev->jiffies = jiffies;
 		ether_addr_copy(ev->mac, req->mac);
+
+		mutex_lock(&ev_lk);
+		idx = __pan_sw_event_get_slot();
+		ev_arr[idx] = ev;
+		mutex_unlock(&ev_lk);
+
+		return;
+	}
+
+	if (cmd == FL_ADD || cmd == FL_DEL) {
+		ev = kcalloc(1, sizeof(*ev), GFP_KERNEL);
+		ev->cmd = cmd;
+		ev->jiffies = jiffies;
+		ev->tuple = req->tuple;
 
 		mutex_lock(&ev_lk);
 		idx = __pan_sw_event_get_slot();
@@ -157,21 +195,34 @@ int otx2_mbox_up_handler_af2swdev_notify(struct otx2_nic *pf,
 {
 	int err;
 
-	if (!sw_mode)
-		return 0;
-
 	pan_sw_event_log(req);
 
-	if (req->flags & (FDB_ADD | FDB_DEL))
+	if (req->flags & (FDB_ADD | FDB_DEL)) {
 		err = pan_sw_l2_ev_enq(pf, 0x1234, req->port_id,
 				       req->mac, req->flags);
-	else if (req->flags & FIB_CMD)
+		goto done;
+	}
+
+	if (!sw_mode) {
+		if (req->flags & (FL_ADD | FL_DEL)) {
+			err = pan_sw_fl_ev_enq(pf, 0x1234, req->port_id,
+					       &req->tuple, req->flags,
+					       req->cookie);
+			goto done;
+		}
+		return 0;
+	}
+
+	if (req->flags & FIB_CMD) {
 		err = pan_sw_l3_ev_enq(pf, req->cnt, req->entry);
+		goto done;
+	}
+
+done:
 
 	if (err)
 		pr_debug("%s:%d Error happened while pushing rule to PAN\n",
 			 __func__, __LINE__);
-
 	return 0;
 }
 
@@ -181,7 +232,11 @@ static int pan_sw_simple_llu_get(void *data, u64 *val)
 	return 0;
 }
 
-void pan_sw_deinit(void);
+static void pan_sw_l3_fib_disable(void)
+{
+	pan_sw_l3_deinit();
+}
+
 static int pan_sw_simple_llu_set(void *data, u64 val)
 {
 	if (val != 0) {
@@ -189,7 +244,7 @@ static int pan_sw_simple_llu_set(void *data, u64 val)
 		return -EINVAL;
 	}
 
-	pan_sw_deinit();
+	pan_sw_l3_fib_disable();
 	sw_mode = false;
 	return 0;
 }
@@ -214,7 +269,7 @@ static void pan_sw_debugfs_create(void)
 	file = debugfs_create_file("sw_events", 0400, pdir, NULL,
 				   &pan_sw_debugfs_fops);
 
-	file = debugfs_create_file("sw_mode", 0600, pdir, "sw_mode",
+	file = debugfs_create_file("sw_mode", 0600, pdir, "l3_rtable_dis",
 				   &pan_sw_simple_llu_fops);
 
 }
@@ -222,12 +277,14 @@ static void pan_sw_debugfs_create(void)
 static void pan_sw_debugfs_remove(void)
 {
 	pan_dbgfs_rm_file("sw_events");
+	pan_dbgfs_rm_file("sw_mode");
 }
 
 int pan_sw_init(void)
 {
 	pan_sw_l2_init();
 	pan_sw_l3_init();
+	pan_sw_fl_init();
 	pan_sw_debugfs_create();
 
 	return 0;
@@ -235,10 +292,10 @@ int pan_sw_init(void)
 
 void pan_sw_deinit(void)
 {
-	if (!sw_mode)
-		return;
+	pan_sw_fl_deinit();
+	if (sw_mode)
+		pan_sw_l3_deinit();
 
-	pan_sw_l3_deinit();
 	pan_sw_l2_deinit();
 	pan_sw_debugfs_remove();
 	pan_sw_event_slots_free();

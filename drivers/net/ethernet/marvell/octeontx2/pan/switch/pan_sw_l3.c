@@ -237,7 +237,7 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 		res.opq = &opq;
 		for_each_dev_addr(netdev, ha) {
 			/* TODO: what if there are More than one mac address */
-			ether_addr_copy(opq.eg_mac, ha->addr);
+			ether_addr_copy(opq.eg_smac, ha->addr);
 			break;
 		}
 	}
