@@ -870,6 +870,9 @@ static bool is_valid_offset(struct rvu *rvu, struct cpt_rd_wr_reg_msg *req)
 		if ((offset & 0xFF00) == CPT_AF_UCCX_CTL(0))
 			return true;
 
+		if ((offset & 0xFFF00) == CPT_AF_GRPX_THR(0, rvu->pdev))
+			return true;
+
 		switch (offset & 0xFF000) {
 		case CPT_AF_EXEX_STS(0):
 		case CPT_AF_EXEX_CTL(0):
