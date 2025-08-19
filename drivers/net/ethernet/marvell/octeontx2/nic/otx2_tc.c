@@ -20,6 +20,7 @@
 #include "cn10k.h"
 #include "otx2_common.h"
 #include "qos.h"
+#include "switch/sw_fl.h"
 
 #define CN10K_MAX_BURST_MANTISSA	0x7FFFULL
 #define CN10K_MAX_BURST_SIZE		8453888ULL
@@ -1223,7 +1224,6 @@ static int otx2_tc_del_flow(struct otx2_nic *nic,
 		mutex_unlock(&nic->mbox.lock);
 	}
 
-
 free_mcam_flow:
 	otx2_del_mcam_flow_entry(nic, flow_node->entry, NULL);
 	otx2_tc_update_mcam_table(nic, flow_cfg, flow_node, false);
@@ -1593,11 +1593,19 @@ static int otx2_setup_tc_block(struct net_device *netdev,
 int otx2_setup_tc(struct net_device *netdev, enum tc_setup_type type,
 		  void *type_data)
 {
+	struct otx2_nic *nic = netdev_priv(netdev);
+
 	switch (type) {
 	case TC_SETUP_BLOCK:
 		return otx2_setup_tc_block(netdev, type_data);
 	case TC_SETUP_QDISC_HTB:
 		return otx2_setup_tc_htb(netdev, type_data);
+
+	case TC_SETUP_FT:
+		return flow_block_cb_setup_simple(type_data,
+						  &otx2_block_cb_list,
+						  sw_fl_setup_ft_block_ingress_cb,
+						  nic, nic, true);
 	default:
 		return -EOPNOTSUPP;
 	}
