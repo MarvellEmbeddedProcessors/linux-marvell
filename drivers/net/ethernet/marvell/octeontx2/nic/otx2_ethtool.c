@@ -1314,11 +1314,43 @@ static int otx2_get_module_eeprom(struct net_device *netdev,
 	return 0;
 }
 
-int otx2_get_link_ksettings(struct net_device *netdev,
-			    struct ethtool_link_ksettings *cmd)
+int __otx2_get_link_ksettings(struct net_device *netdev,
+			      struct ethtool_link_ksettings *cmd,
+			      bool ieee_mode)
 {
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(ieee_mask) = { 0, };
 	struct otx2_nic *pfvf = netdev_priv(netdev);
 	struct cgx_fw_data *rsp = NULL;
+	int i;
+
+	/* list of supported ieee modes */
+	static const int ieee_modes[] = {
+			ETHTOOL_LINK_MODE_10baseT_Full_BIT,
+			ETHTOOL_LINK_MODE_100baseT_Full_BIT,
+			ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
+			ETHTOOL_LINK_MODE_10000baseKR_Full_BIT,
+			ETHTOOL_LINK_MODE_10000baseR_FEC_BIT,
+			ETHTOOL_LINK_MODE_10000baseLR_Full_BIT,
+			ETHTOOL_LINK_MODE_40000baseCR4_Full_BIT,
+			ETHTOOL_LINK_MODE_40000baseKR4_Full_BIT,
+			ETHTOOL_LINK_MODE_40000baseLR4_Full_BIT,
+			ETHTOOL_LINK_MODE_40000baseSR4_Full_BIT,
+			ETHTOOL_LINK_MODE_25000baseCR_Full_BIT,
+			ETHTOOL_LINK_MODE_25000baseKR_Full_BIT,
+			ETHTOOL_LINK_MODE_25000baseSR_Full_BIT,
+			ETHTOOL_LINK_MODE_50000baseSR_Full_BIT,
+			ETHTOOL_LINK_MODE_50000baseLR_ER_FR_Full_BIT,
+			ETHTOOL_LINK_MODE_50000baseSR2_Full_BIT,
+			ETHTOOL_LINK_MODE_100000baseCR2_Full_BIT,
+			ETHTOOL_LINK_MODE_100000baseKR2_Full_BIT,
+			ETHTOOL_LINK_MODE_100000baseSR2_Full_BIT,
+			ETHTOOL_LINK_MODE_100000baseLR2_ER2_FR2_Full_BIT,
+			ETHTOOL_LINK_MODE_100000baseCR4_Full_BIT,
+			ETHTOOL_LINK_MODE_100000baseKR4_Full_BIT,
+			ETHTOOL_LINK_MODE_100000baseSR4_Full_BIT,
+			ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT,
+			ETHTOOL_LINK_MODE_1000baseKX_Full_BIT
+	};
 
 	cmd->base.duplex  = pfvf->linfo.full_duplex;
 	cmd->base.speed   = pfvf->linfo.speed;
@@ -1347,8 +1379,24 @@ int otx2_get_link_ksettings(struct net_device *netdev,
 	otx2_get_fec_info(rsp->fwdata.supported_fec,
 			  OTX2_MODE_SUPPORTED, cmd);
 
+	if (ieee_mode) {
+		for (i = 0; i < ARRAY_SIZE(ieee_modes); i++)
+			linkmode_set_bit(ieee_modes[i], ieee_mask);
+
+		/* mask the non ieee modes */
+		linkmode_and(cmd->link_modes.supported,
+			     cmd->link_modes.supported,
+			     ieee_mask);
+	}
+
 	cmd->base.port = rsp->fwdata.port;
 	return 0;
+}
+
+int otx2_get_link_ksettings(struct net_device *netdev,
+			    struct ethtool_link_ksettings *cmd)
+{
+	return __otx2_get_link_ksettings(netdev, cmd, true);
 }
 
 static int otx2_set_link_ksettings(struct net_device *netdev,
