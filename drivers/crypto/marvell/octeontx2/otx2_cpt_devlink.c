@@ -299,6 +299,110 @@ static int cn20k_cpt_dl_validate_psp_timer_add_value(struct devlink *devlink, u3
 
 #undef PSP_TIMER_MAX_ADD_VALUE
 
+static int cn20k_cpt_dl_check_pdb_config_egrp(struct devlink *devlink, u32 id,
+					      union devlink_param_value val,
+					      struct netlink_ext_ack *extack)
+{
+	/* valid engine group [0-7] */
+	if (val.vu8 > 0x7)
+		return -EINVAL;
+	return 0;
+}
+
+static int cn20k_cpt_dl_get_pdb_config_egrp(struct devlink *dl, u32 id,
+					    struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+
+	ctx->val.vu8 = cpt_dl->egrp;
+	return 0;
+}
+
+static int cn20k_cpt_dl_set_pdb_config_egrp(struct devlink *dl, u32 id,
+					    struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+
+	cpt_dl->egrp = ctx->val.vu8;
+	return 0;
+}
+
+#define DL_PDB_PKT_MAX_MASK 0x3F00
+#define DL_PDB_GRP_THR_MASK 0x00FF
+
+static int cn20k_cpt_dl_check_pdb_config_value(struct devlink *devlink, u32 id,
+					       union devlink_param_value val,
+					       struct netlink_ext_ack *extack)
+{
+	u8 pdb_pkt_max = FIELD_GET(DL_PDB_PKT_MAX_MASK, val.vu16);
+
+	if (pdb_pkt_max > 0x3F)
+		return -EINVAL;
+	return 0;
+}
+
+static int cn20k_cpt_dl_get_pdb_config_value(struct devlink *dl, u32 id,
+					     struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptpf_dev *cptpf = cpt_dl->cptpf;
+	struct pci_dev *pdev = cptpf->pdev;
+	u8 pdb_pkt_max;
+	u8 pdb_grp_thr;
+	u64 reg_val;
+	int ret;
+
+	ret = otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev,
+				   CPT_AF_GRPX_THR(cpt_dl->egrp, pdev),
+				   &reg_val, BLKADDR_CPT0);
+	if (ret)
+		return ret;
+
+	pdb_pkt_max = FIELD_GET(PDB_PKT_MAX_MASK, reg_val);
+	pdb_grp_thr = FIELD_GET(PDB_GRP_THR_MASK, reg_val);
+
+	/* pdb_config_value 16 Bits:
+	 *  [7:0]   -> pdb_grp_thr (Max group-level data, KB, 0–255)
+	 *  [13:8]  -> pdb_pkt_max (Max per-packet data, KB, 0–63)
+	 *  [15:14] -> Reserved
+	 */
+	ctx->val.vu16 = FIELD_PREP(DL_PDB_GRP_THR_MASK, pdb_grp_thr);
+	ctx->val.vu16 |= FIELD_PREP(DL_PDB_PKT_MAX_MASK, pdb_pkt_max);
+
+	return 0;
+}
+
+static int cn20k_cpt_dl_set_pdb_config_value(struct devlink *dl, u32 id,
+					     struct devlink_param_gset_ctx *ctx)
+{
+	struct otx2_cpt_devlink *cpt_dl = devlink_priv(dl);
+	struct otx2_cptpf_dev *cptpf = cpt_dl->cptpf;
+	struct pci_dev *pdev = cptpf->pdev;
+	u8 pdb_pkt_max;
+	u8 pdb_grp_thr;
+	u64 reg_val;
+	int ret;
+
+	/* [0:7] bits */
+	pdb_grp_thr = FIELD_GET(DL_PDB_GRP_THR_MASK, ctx->val.vu16);
+	/* [13:8] bits */
+	pdb_pkt_max = FIELD_GET(DL_PDB_PKT_MAX_MASK, ctx->val.vu16);
+
+	ret = otx2_cpt_read_af_reg(&cptpf->afpf_mbox, pdev,
+				   CPT_AF_GRPX_THR(cpt_dl->egrp, pdev),
+				   &reg_val, BLKADDR_CPT0);
+	if (ret)
+		return ret;
+
+	reg_val &= ~PDB_PKT_MAX_MASK;
+	reg_val |= FIELD_PREP(PDB_PKT_MAX_MASK, (u64)pdb_pkt_max);
+	reg_val &= ~PDB_GRP_THR_MASK;
+	reg_val |= FIELD_PREP(PDB_GRP_THR_MASK, (u64)pdb_grp_thr);
+	return otx2_cpt_write_af_reg(&cptpf->afpf_mbox, pdev,
+				     CPT_AF_GRPX_THR(cpt_dl->egrp, pdev),
+				     reg_val, BLKADDR_CPT0);
+}
+
 static const struct devlink_param otx2_cpt_dl_params[] = {
 	DEVLINK_PARAM_DRIVER(OTX2_CPT_DEVLINK_PARAM_ID_EGRP_CREATE,
 			     "egrp_create", DEVLINK_PARAM_TYPE_STRING,
@@ -353,6 +457,18 @@ static const struct devlink_param cn20k_cpt_dl_params[] = {
 			     cn20k_cpt_dl_get_psp_timer_add_value,
 			     cn20k_cpt_dl_set_psp_timer_add_value,
 			     cn20k_cpt_dl_validate_psp_timer_add_value),
+	DEVLINK_PARAM_DRIVER(CN20K_CPT_DEVLINK_PARAM_ID_PDB_CONFIG_EGRP,
+			     "pdb_config_egrp", DEVLINK_PARAM_TYPE_U8,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     cn20k_cpt_dl_get_pdb_config_egrp,
+			     cn20k_cpt_dl_set_pdb_config_egrp,
+			     cn20k_cpt_dl_check_pdb_config_egrp),
+	DEVLINK_PARAM_DRIVER(CN20K_CPT_DEVLINK_PARAM_ID_PDB_CONFIG_VALUE,
+			     "pdb_config_value", DEVLINK_PARAM_TYPE_U16,
+			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
+			     cn20k_cpt_dl_get_pdb_config_value,
+			     cn20k_cpt_dl_set_pdb_config_value,
+			     cn20k_cpt_dl_check_pdb_config_value),
 };
 
 static int otx2_cpt_dl_info_firmware_version_put(struct devlink_info_req *req,
