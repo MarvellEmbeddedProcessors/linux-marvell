@@ -277,7 +277,7 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 	return 0;
 }
 
-int pan_sw_l3_hw_install_flow(struct pan_sw_l3_offl_node *node)
+static int pan_sw_l3_hw_install_flow(struct pan_sw_l3_offl_node *node)
 {
 	u8 mac_mask[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	struct npc_install_flow_req *req;
@@ -509,7 +509,7 @@ pan_sw_l3_fib_h_tbl_del_entry(struct pan_sw_l3_offl_tnode *tnode)
 	}
 }
 
-struct pan_sw_l3_offl_tnode *
+static struct pan_sw_l3_offl_tnode *
 pan_sw_l3_fib_h_tbl_lookup(struct fib_entry *entry)
 {
 	unsigned int hash = entry->gw_valid ? entry->gw : entry->dst;
@@ -592,7 +592,7 @@ pan_sw_l3_neigh_update(struct fib_entry *entry)
 	return 0;
 }
 
-struct pan_sw_l3_offl_tnode *
+static struct pan_sw_l3_offl_tnode *
 pan_sw_l3_tnode_alloc(struct otx2_nic *pf,
 		      u32 switch_id,
 		      struct fib_entry *entry)
