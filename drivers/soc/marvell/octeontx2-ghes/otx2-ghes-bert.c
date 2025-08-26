@@ -88,6 +88,7 @@ static void __init otx2_bert_print_all(struct acpi_bert_region *region, unsigned
 	struct acpi_hest_generic_status *estatus = (struct acpi_hest_generic_status *)region;
 	struct acpi_hest_generic_data *gdata;
 	struct cper_sec_mem_err *mem_err;
+	struct cper_sec_proc_arm *core_err;
 	int remain = region_len;
 	u32 estatus_len = 0;
 	int sec_no = 0;
@@ -188,6 +189,12 @@ static void __init otx2_bert_print_all(struct acpi_bert_region *region, unsigned
 					n += scnprintf(msg + n, sizeof(msg) - n,
 						"target_id:0x%016llx ", mem_err->target_id);
 				pr_info("%s%s\n", pfx, buff);
+			} else if (guid_equal(sec_type, &CPER_SEC_PROC_ARM)) {
+				core_err = (struct cper_sec_proc_arm *)(gdata + 1);
+
+				pr_info("%ssection_type: ARM processor error\n", pfx);
+				if (gdata->error_data_length >= sizeof(*core_err))
+					cper_print_proc_arm(pfx, core_err);
 			}
 		}
 
@@ -293,7 +300,7 @@ static int __init ghes_bert_init(void)
 	struct otx2_ghes_err_ring *err_ring;
 	void __iomem *blk;
 	uint8_t *buff;
-	int len = 0;
+	u64 len = 0;
 	int ret = -ENODEV;
 
 	ret = ghes_bed_of_match_resource(&bed_src);
@@ -312,7 +319,7 @@ static int __init ghes_bert_init(void)
 	if (is_soc_cn9x())
 		len = sizeof(struct bed_bert_mem_entry) * err_ring->size;
 	else if (is_soc_cn10kx())
-		len = sizeof(struct bed_bert_mem_entry);
+		len = bed_src.estatus_sz;
 
 	buff = kzalloc(len, GFP_KERNEL);
 	if (!buff) {

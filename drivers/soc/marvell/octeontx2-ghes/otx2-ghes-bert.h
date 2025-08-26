@@ -22,10 +22,18 @@ struct mrvl_bed_source {
 	void __iomem         *ring_va;
 };
 
+struct processor_error {
+	struct cper_sec_proc_arm desc;
+	struct cper_arm_err_info info;
+};
+
 struct bed_bert_mem_entry {
 	struct acpi_bert_region       bert;
 	struct acpi_hest_generic_data gen_data;
-	struct cper_sec_mem_err       mem_err;
+	union {
+		struct processor_error  core;
+		struct cper_sec_mem_err mem_err;
+	};
 };
 
 struct otx2_ghes_err_ring {
