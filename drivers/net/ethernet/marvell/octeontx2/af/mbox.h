@@ -2540,6 +2540,7 @@ enum tim_af_status {
 	TIM_AF_INVALID_GRP_ENA_VALUE		= -822,
 	TIM_AF_INVALID_FLW_CTRL_ENA_VALUE	= -823,
 	TIM_AF_INTERVAL_EXT_NOT_SUPPORTED	= -824,
+	TIM_AF_INVALID_PRIORITY_VALUE		= -825,
 };
 
 enum tim_clk_srcs {
@@ -2585,7 +2586,9 @@ struct tim_config_req {
 	u32	chunksize;
 	u32	interval_lo;   /* Cycles between traversal */
 	u8	gpioedge;
-	u8	rsvd[3];
+	u8	priority : 1;
+	u8	rsvd8	 : 7;
+	u8	rsvd[2];
 	u32	interval_hi;
 	u64	intervalns; /* Nanoseconds between traversal */
 	u64	clockfreq;
