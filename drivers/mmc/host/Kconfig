@@ -1113,8 +1113,9 @@ config MMC_SDHCI_EXTERNAL_DMA
 	bool
 
 config MMC_SDHCI_TIMEOUT
-	int
-	default 1 if MMC_SDHCI_CADENCE
+	int "SDHCI timeout"
+	range 2 10
+	default 2 if MMC_SDHCI_CADENCE
 	default 10
 	depends on MMC_SDHCI
 	help
