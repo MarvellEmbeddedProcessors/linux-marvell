@@ -132,3 +132,12 @@ config OCTEONTX_SWITCH
 
 	  Marvell HW switch driver should be loaded after this module
 	  is loaded
+
+config OCTEONTX2_BPHY_CNF20K_CPRI_PF
+       tristate "Marvell OcteonTX2 BPHY CNF20K CPRI PF driver"
+       default y
+       help
+         This driver supports Marvell's OcteonTX2 BPHY CNF20K CPRI
+         Physical Function.The PF driver is responsible for initializing
+         the cpri netdev for CNF20K.
+         This option is enabled by default.
