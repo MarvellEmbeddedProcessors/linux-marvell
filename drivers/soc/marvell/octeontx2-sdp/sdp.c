@@ -47,6 +47,47 @@ static u64 sdp_read64(struct sdp_dev *rvu, u64 b, u64 s, u64 o)
 	return readq(rvu->bar2 + ((b << 20) | (s << 12) | o));
 }
 
+/* Due to a hardware errata on the Octeon platform, the hardware may assert
+ * XOFF state on SDP channels during a reset. As a workaround, the driver
+ * needs to broadcast an XON message after programming the SDP_LINK_CFG csr.
+ */
+void sdp_nix_bcast_xon(struct rvu *rvu, int blkaddr)
+{
+	u64 cfg;
+
+	cfg = rvupf_read64(rvu, RVU_PF_BLOCK_ADDRX_DISC(blkaddr));
+	/* Check if block is implemented or not */
+	if (cfg & BIT_ULL(11)) {
+		cfg = rvu_read64(rvu, blkaddr, NIX_AF_RX_CHANX_CFG(0));
+		rvu_write64(rvu, blkaddr, NIX_AF_RX_CHANX_CFG(0), cfg);
+	}
+}
+
+static void sdp_req_chan_bcast(struct sdp_dev *sdp)
+{
+	struct pci_dev *pdev = NULL;
+	struct rvu *rvu;
+
+	pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM,
+			      PCI_DEVID_OCTEONTX2_RVU_AF, pdev);
+	if (!pdev)
+		goto err;
+
+	rvu = pci_get_drvdata(pdev);
+	if (!rvu) {
+		pci_dev_put(pdev);
+		goto err;
+	}
+
+	sdp_nix_bcast_xon(rvu, BLKADDR_NIX0);
+	sdp_nix_bcast_xon(rvu, BLKADDR_NIX1);
+
+	pci_dev_put(pdev);
+err:
+	dev_warn(&sdp->pdev->dev,
+		 "Failed to broadcast XON on SDP channel\n");
+}
+
 static inline bool is_cn10k_sdp(struct sdp_dev *sdp)
 {
 	if (sdp->pdev->subsystem_device >= PCI_SUBSYS_DEVID_CN10K_A)
@@ -1740,6 +1781,7 @@ static int sdp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	list_add(&sdp->list, &sdp_dev_lst_head);
 	spin_unlock(&sdp_lst_lock);
 
+	sdp_req_chan_bcast(sdp);
 	return 0;
 
 get_chan_info_failed:
