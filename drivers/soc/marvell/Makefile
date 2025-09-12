@@ -13,3 +13,4 @@ obj-y += ptm-ep/
 obj-$(CONFIG_MRVL_PHY_DIAGNOSTICS) += phy_diag.o
 obj-$(CONFIG_MVMDIO_UIO) += mvmdio_uio.o
 obj-$(CONFIG_MARVELL_FWLOG) += fwlog.o
+obj-$(CONFIG_MARVELL_OCTEON_RVU_GEN_PF) += rvu_gen_pf/
