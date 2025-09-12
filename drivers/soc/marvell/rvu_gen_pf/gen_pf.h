@@ -58,7 +58,7 @@ struct gen_pf_hw {
 
 struct gen_pf_vf_config {
 	struct gen_pf_dev *pf;
-#define GEN_PF_MAX_REQ_SIZE	256
+#define GEN_PF_MAX_REQ_SIZE	512
 	u8 cfg_buff[GEN_PF_MAX_REQ_SIZE];
 	struct delayed_work vf_work;
 };
@@ -123,6 +123,7 @@ static struct _req_type __maybe_unused					\
 *gen_pf_mbox_alloc_msg_ ## _fn_name(struct mbox *mbox)			\
 {									\
 	struct _req_type *req;						\
+	u16 pcifunc = mbox->pfvf->pcifunc;				\
 	u16 id = _id;							\
 									\
 	req = (struct _req_type *)otx2_mbox_alloc_msg_rsp(		\
@@ -132,7 +133,8 @@ static struct _req_type __maybe_unused					\
 		return NULL;						\
 	req->hdr.sig = OTX2_MBOX_REQ_SIG;				\
 	req->hdr.id = id;						\
-	trace_otx2_msg_alloc(mbox->mbox.pdev, id, sizeof(*req));	\
+	req->hdr.pcifunc = pcifunc;					\
+	trace_otx2_msg_alloc(mbox->mbox.pdev, id, sizeof(*req), pcifunc); \
 	return req;							\
 }
 

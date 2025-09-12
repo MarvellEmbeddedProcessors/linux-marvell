@@ -165,4 +165,16 @@ config MRVL_SWUP
             -> TIM Version check
             -> TIM Hash verification
             -> TIM firmware update
+
+config MARVELL_OCTEON_RVU_GEN_PF
+	tristate "Marvell Octeon RVU Generic PF Driver"
+	depends on ARM64 && PCI && OCTEONTX2_AF
+	default y
+	help
+	 This driver is used to create and destroy PCIe SRIOV VFs of the
+	 RVU PFs that doesn't need to support any I/O functionality. It also
+	 enables VFs to communicate with RVU admin function (AF) & handles
+	 PCIe FLR for VFs.
+
+	 Say ‘Yes’ to this driver if you have such a RVU PF device.
 endmenu

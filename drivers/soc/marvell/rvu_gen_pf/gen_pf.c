@@ -34,11 +34,6 @@ MODULE_DEVICE_TABLE(pci, rvu_gen_pf_id_table);
 
 static void gen_pf_vf_task(struct work_struct *work);
 
-inline int rvu_get_pf(u16 pcifunc)
-{
-	return (pcifunc >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
-}
-
 static int rvu_gen_pf_check_pf_usable(struct gen_pf_dev *pfdev)
 {
 	u64 rev;
@@ -248,6 +243,9 @@ static irqreturn_t rvu_gen_pf_cn20k_pfaf_mbox_intr_handler(int irq, void *pf_irq
 		hdr = (struct mbox_hdr *)(mdev->mbase + mbox->rx_start);
 		if (hdr->num_msgs)
 			queue_work(pfdev->mbox_wq, &mw->mbox_up_wrk);
+
+		trace_otx2_msg_interrupt(pfdev->pdev, "UP message from AF to PF",
+					 BIT_ULL(0));
 	}
 
 	if (intr & BIT_ULL(1)) {
@@ -258,6 +256,9 @@ static irqreturn_t rvu_gen_pf_cn20k_pfaf_mbox_intr_handler(int irq, void *pf_irq
 		hdr = (struct mbox_hdr *)(mdev->mbase + mbox->rx_start);
 		if (hdr->num_msgs)
 			queue_work(pfdev->mbox_wq, &mw->mbox_wrk);
+
+		trace_otx2_msg_interrupt(pfdev->pdev, "DOWN reply from AF to PF",
+					 BIT_ULL(0));
 	}
 	return IRQ_HANDLED;
 }
@@ -288,14 +289,14 @@ static int rvu_gen_pf_register_mbox_intr(struct gen_pf_dev *pfdev)
 	if (!is_cn20k(pfdev->pdev)) {
 		irq_name = &pfdev->irq_name[RVU_PF_INT_VEC_AFPF_MBOX * NAME_SIZE];
 		snprintf(irq_name, NAME_SIZE, "GENPF%d AFPF Mbox",
-			 rvu_get_pf(pfdev->pcifunc));
+			 rvu_get_pf(pfdev->pdev, pfdev->pcifunc));
 		err = request_irq(pci_irq_vector(pfdev->pdev, RVU_PF_INT_VEC_AFPF_MBOX),
 				  rvu_gen_pf_pfaf_mbox_intr_handler, 0, irq_name, pfdev);
 	} else {
 		irq_name = &pfdev->irq_name[RVU_MBOX_PF_INT_VEC_AFPF_MBOX *
 						NAME_SIZE];
 		snprintf(irq_name, NAME_SIZE, "GENPF%d AFPF Mbox",
-			 rvu_get_pf(pfdev->pcifunc));
+			 rvu_get_pf(pfdev->pdev, pfdev->pcifunc));
 		err = request_irq(pci_irq_vector(pfdev->pdev, RVU_MBOX_PF_INT_VEC_AFPF_MBOX),
 				  rvu_gen_pf_cn20k_pfaf_mbox_intr_handler, 0, irq_name, pfdev);
 	}
@@ -351,6 +352,8 @@ static void rvu_gen_pf_pfaf_mbox_destroy(struct gen_pf_dev *pfdev)
 static void rvu_gen_pf_process_pfaf_mbox_msg(struct gen_pf_dev *pfdev,
 					     struct mbox_msghdr *msg)
 {
+	int devid;
+
 	if (msg->id >= MBOX_MSG_MAX) {
 		dev_err(pfdev->dev,
 			"Mbox msg with unknown ID 0x%x\n", msg->id);
@@ -363,6 +366,11 @@ static void rvu_gen_pf_process_pfaf_mbox_msg(struct gen_pf_dev *pfdev,
 			 msg->sig, msg->id);
 		return;
 	}
+
+	/* message response heading VF */
+	devid = msg->pcifunc & RVU_PFVF_FUNC_MASK;
+	if (devid)
+		return;
 
 	switch (msg->id) {
 	case MBOX_MSG_READY:
@@ -382,6 +390,7 @@ static void gen_pf_vf_task(struct work_struct *work)
 	struct gen_pf_vf_config *config;
 	struct mbox_msghdr *msghdr;
 	struct delayed_work *dwork;
+	struct mbox_msghdr msg;
 	struct gen_pf_dev *pf;
 	int vf_idx;
 
@@ -399,9 +408,9 @@ static void gen_pf_vf_task(struct work_struct *work)
 		return;
 	}
 
-	memcpy(msghdr, config->cfg_buff, sizeof(*msghdr));
+	memcpy(&msg, config->cfg_buff, sizeof(struct mbox_msghdr));
 
-	switch (msghdr->id) {
+	switch (msg.id) {
 #define M(_name, _id, _fn_name, _req_type, _rsp_type)			\
 	case _id: {							\
 		struct _req_type *req;					\
@@ -457,7 +466,7 @@ static int rvu_gen_pf_process_mbox_msg_up(struct gen_pf_dev *pf,
 	switch (msg->id) {
 #define M(_name, _id, _fn_name, _req_type, _rsp_type)			\
 	case _id: {							\
-		struct _req_type *req;					\
+		struct _req_type *req = (struct _req_type *)msg;	\
 		struct _rsp_type *rsp;					\
 									\
 		rsp = (struct _rsp_type *)otx2_mbox_alloc_msg(		\
@@ -479,7 +488,8 @@ static int rvu_gen_pf_process_mbox_msg_up(struct gen_pf_dev *pf,
 			WARN_ON(sizeof(req) > sizeof(config->cfg_buff)); \
 			memcpy(config->cfg_buff, req, sizeof(*req));	\
 									\
-			schedule_delayed_work(dwork, msecs_to_jiffies(100)); \
+			INIT_DELAYED_WORK(dwork, gen_pf_vf_task);	\
+			schedule_delayed_work(dwork, msecs_to_jiffies(10)); \
 		}							\
 									\
 		for_each_set_bit(vf, &req->vf_bmap2,			\
@@ -490,7 +500,8 @@ static int rvu_gen_pf_process_mbox_msg_up(struct gen_pf_dev *pf,
 			WARN_ON(sizeof(*req) > sizeof(config->cfg_buff)); \
 			memcpy(config->cfg_buff, req, sizeof(*req));	\
 									\
-			schedule_delayed_work(dwork, msecs_to_jiffies(100)); \
+			INIT_DELAYED_WORK(dwork, gen_pf_vf_task);	\
+			schedule_delayed_work(dwork, msecs_to_jiffies(10)); \
 		}							\
 									\
 		return 0;						\
@@ -521,6 +532,10 @@ static void rvu_gen_pf_pfaf_mbox_up_handler(struct work_struct *work)
 	num_msgs = rsp_hdr->num_msgs;
 
 	offset = mbox->rx_start + ALIGN(sizeof(*rsp_hdr), MBOX_MSG_ALIGN);
+
+	trace_otx2_msg_status(pfdev->pdev,
+			      "PF-AF up queue handler(notification)",
+			      num_msgs);
 
 	for (id = 0; id < num_msgs; id++) {
 		msg = (struct mbox_msghdr *)(mdev->mbase + offset);
@@ -648,6 +663,10 @@ static void rvu_gen_pf_pfvf_mbox_handler(struct work_struct *work)
 
 	offset = ALIGN(sizeof(*req_hdr), MBOX_MSG_ALIGN);
 
+	trace_otx2_msg_status(pfdev->pdev,
+			      "PF-VF down queue handler(forwarding)",
+			      vf_mbox->num_msgs);
+
 	for (id = 0; id < vf_mbox->num_msgs; id++) {
 		msg = (struct mbox_msghdr *)(mdev->mbase + mbox->rx_start +
 					     offset);
@@ -672,6 +691,55 @@ inval_msg:
 
 	otx2_reply_invalid_msg(mbox, vf_idx, 0, msg->id);
 	otx2_mbox_msg_send(mbox, vf_idx);
+}
+
+static void rvu_gen_pf_pfvf_mbox_up_handler(struct work_struct *work)
+{
+	struct mbox *vf_mbox = container_of(work, struct mbox, mbox_up_wrk);
+	struct gen_pf_dev *pfdev = vf_mbox->pfvf;
+	struct otx2_mbox_dev *mdev;
+	struct mbox_hdr *rsp_hdr;
+	struct mbox_msghdr *msg;
+	struct otx2_mbox *mbox;
+	int offset, id, vf_idx;
+
+	vf_idx = vf_mbox - pfdev->mbox_pfvf;
+	mbox = &pfdev->mbox_pfvf[0].mbox_up;
+	mdev = &mbox->dev[vf_idx];
+
+	rsp_hdr = (struct mbox_hdr *)(mdev->mbase + mbox->rx_start);
+	offset = mbox->rx_start + ALIGN(sizeof(*rsp_hdr), MBOX_MSG_ALIGN);
+
+	trace_otx2_msg_status(pfdev->pdev, "PF-VF up queue handler(response)",
+			      vf_mbox->up_num_msgs);
+
+	for (id = 0; id < vf_mbox->up_num_msgs; id++) {
+		msg = mdev->mbase + offset;
+
+		if (msg->id >= MBOX_MSG_MAX) {
+			dev_err(pfdev->dev,
+				"Mbox msg with unknown ID 0x%x\n", msg->id);
+			goto end;
+		}
+
+		if (msg->sig != OTX2_MBOX_RSP_SIG) {
+			dev_err(pfdev->dev,
+				"Mbox msg with wrong signature %x, ID 0x%x\n",
+				msg->sig, msg->id);
+			goto end;
+		}
+
+		if (msg->rc)
+			dev_err(pfdev->dev,
+				"Mbox msg response has err %d, ID 0x%x\n",
+				msg->rc, msg->id);
+
+end:
+		offset = mbox->rx_start + msg->next_msgoff;
+		if (mdev->msgs_acked == (vf_mbox->up_num_msgs - 1))
+			__otx2_mbox_reset(mbox, vf_idx);
+		mdev->msgs_acked++;
+	}
 }
 
 static void *rvu_gen_pf_cn20k_pfvf_mbox_alloc(struct gen_pf_dev *pfdev, int numvfs)
@@ -752,6 +820,7 @@ static int rvu_gen_pf_pfvf_mbox_init(struct gen_pf_dev *pfdev, int numvfs)
 	for (vf = 0; vf < numvfs; vf++) {
 		mbox->pfvf = pfdev;
 		INIT_WORK(&mbox->mbox_wrk, rvu_gen_pf_pfvf_mbox_handler);
+		INIT_WORK(&mbox->mbox_up_wrk, rvu_gen_pf_pfvf_mbox_up_handler);
 		mbox++;
 	}
 
@@ -799,7 +868,7 @@ static void rvu_gen_pf_enable_pfvf_mbox_intr(struct gen_pf_dev *pfdev, int numvf
 	}
 }
 
-void rvu_gen_pf_cn20k_disable_pfvf_mbox_intr(struct gen_pf_dev *pfdev, int numvfs)
+static void rvu_gen_pf_cn20k_disable_pfvf_mbox_intr(struct gen_pf_dev *pfdev, int numvfs)
 {
 	int vector = 0, intr_vec; // vec = 0;
 
@@ -897,7 +966,8 @@ static void rvu_gen_pf_flr_wq_destroy(struct gen_pf_dev *pfdev)
 	devm_kfree(pfdev->dev, pfdev->flr_wrk);
 }
 
-void rvu_gen_pf_cn20k_enable_pfvf_mbox_intr(struct gen_pf_dev *pfdev, int numvfs)
+static void rvu_gen_pf_cn20k_enable_pfvf_mbox_intr(struct gen_pf_dev *pfdev,
+						   int numvfs)
 {
 	/* Clear PF <=> VF mailbox IRQ */
 	writeq(~0ull, pfdev->reg_base + RVU_MBOX_PF_VFPF_INTX(0));
@@ -915,7 +985,7 @@ void rvu_gen_pf_cn20k_enable_pfvf_mbox_intr(struct gen_pf_dev *pfdev, int numvfs
 	}
 }
 
-irqreturn_t rvu_gen_pf_cn20k_pfvf_mbox_intr(int irq, void *pf_irq)
+static irqreturn_t rvu_gen_pf_cn20k_pfvf_mbox_intr(int irq, void *pf_irq)
 {
 	struct gen_pf_irq_data *irq_data = (struct gen_pf_irq_data *)(pf_irq);
 	struct gen_pf_dev *pfdev = irq_data->pf;
@@ -967,8 +1037,8 @@ static irqreturn_t rvu_gen_pf_pfvf_mbox_intr_handler(int irq, void *pf_irq)
 	return IRQ_HANDLED;
 }
 
-int rvu_gen_pf_cn20k_register_pfvf_mbox_intr(struct gen_pf_dev *pfdev,
-					     int num_vfs)
+static int rvu_gen_pf_cn20k_register_pfvf_mbox_intr(struct gen_pf_dev *pfdev,
+						    int num_vfs)
 {
 	struct gen_pf_irq_data *irq_data = &pfdev->irq_data[0];
 	int intr_vec, ret, vec = 0;
@@ -1039,7 +1109,7 @@ static int rvu_gen_pf_register_pfvf_mbox_intr(struct gen_pf_dev *pfdev, int numv
 	irq_name = &pfdev->irq_name[RVU_PF_INT_VEC_VFPF_MBOX0 * NAME_SIZE];
 	if (pfdev->pcifunc)
 		snprintf(irq_name, NAME_SIZE,
-			 "GENPF %d_VF Mbox0", rvu_get_pf(pfdev->pcifunc));
+			 "GENPF %d_VF Mbox0", rvu_get_pf(pfdev->pdev, pfdev->pcifunc));
 	else
 		snprintf(irq_name, NAME_SIZE, "GENPF_PF_VF Mbox0");
 	if (is_cn20k(pfdev->pdev)) {
@@ -1060,7 +1130,7 @@ static int rvu_gen_pf_register_pfvf_mbox_intr(struct gen_pf_dev *pfdev, int numv
 		irq_name = &pfdev->irq_name[RVU_PF_INT_VEC_VFPF_MBOX1 * NAME_SIZE];
 		if (pfdev->pcifunc)
 			snprintf(irq_name, NAME_SIZE,
-				 "Generic RVUPF%d_VF Mbox1", rvu_get_pf(pfdev->pcifunc));
+				 "Generic RVUPF%d_VF Mbox1", rvu_get_pf(pfdev->pdev, pfdev->pcifunc));
 		else
 			snprintf(irq_name, NAME_SIZE, "Generic RVUPF_VF Mbox1");
 		err = request_irq(pci_irq_vector(pfdev->pdev,
@@ -1171,7 +1241,7 @@ static int rvu_gen_pf_register_flr_me_intr(struct gen_pf_dev *pfdev, int numvfs)
 
 	/* Register ME interrupt handler*/
 	irq_name = &pfdev->irq_name[RVU_PF_INT_VEC_VFME0 * NAME_SIZE];
-	snprintf(irq_name, NAME_SIZE, "Generic RVUPF%d_ME0", rvu_get_pf(pfdev->pcifunc));
+	snprintf(irq_name, NAME_SIZE, "Generic RVUPF%d_ME0", rvu_get_pf(pfdev->pdev, pfdev->pcifunc));
 	ret = request_irq(pci_irq_vector(pfdev->pdev, RVU_PF_INT_VEC_VFME0),
 			  rvu_gen_pf_me_intr_handler, 0, irq_name, pfdev);
 
@@ -1182,7 +1252,7 @@ static int rvu_gen_pf_register_flr_me_intr(struct gen_pf_dev *pfdev, int numvfs)
 
 	/* Register FLR interrupt handler */
 	irq_name = &pfdev->irq_name[RVU_PF_INT_VEC_VFFLR0 * NAME_SIZE];
-	snprintf(irq_name, NAME_SIZE, "Generic RVUPF%d_FLR0", rvu_get_pf(pfdev->pcifunc));
+	snprintf(irq_name, NAME_SIZE, "Generic RVUPF%d_FLR0", rvu_get_pf(pfdev->pdev, pfdev->pcifunc));
 	ret = request_irq(pci_irq_vector(pfdev->pdev, RVU_PF_INT_VEC_VFFLR0),
 			  rvu_gen_pf_flr_intr_handler, 0, irq_name, pfdev);
 	if (ret) {
@@ -1194,7 +1264,7 @@ static int rvu_gen_pf_register_flr_me_intr(struct gen_pf_dev *pfdev, int numvfs)
 	if (numvfs > 64) {
 		irq_name = &pfdev->irq_name[RVU_PF_INT_VEC_VFME1 * NAME_SIZE];
 		snprintf(irq_name, NAME_SIZE, "Generic RVUPF%d_ME1",
-			 rvu_get_pf(pfdev->pcifunc));
+			 rvu_get_pf(pfdev->pdev, pfdev->pcifunc));
 		ret = request_irq(pci_irq_vector
 				  (pfdev->pdev, RVU_PF_INT_VEC_VFME1),
 				  rvu_gen_pf_me_intr_handler, 0, irq_name, pfdev);
@@ -1204,7 +1274,7 @@ static int rvu_gen_pf_register_flr_me_intr(struct gen_pf_dev *pfdev, int numvfs)
 		}
 		irq_name = &pfdev->irq_name[RVU_PF_INT_VEC_VFFLR1 * NAME_SIZE];
 		snprintf(irq_name, NAME_SIZE, "Generic RVUPF%d_FLR1",
-			 rvu_get_pf(pfdev->pcifunc));
+			 rvu_get_pf(pfdev->pdev, pfdev->pcifunc));
 		ret = request_irq(pci_irq_vector
 				(pfdev->pdev, RVU_PF_INT_VEC_VFFLR1),
 				rvu_gen_pf_flr_intr_handler, 0, irq_name, pfdev);
@@ -1378,9 +1448,36 @@ static int rvu_gen_pf_sriov_configure(struct pci_dev *pdev, int numvfs)
 	return rvu_gen_pf_sriov_enable(pdev, numvfs);
 }
 
+static void rvu_gen_pf_stop_up_msgs(struct gen_pf_dev *pf)
+{
+	struct msg_req *req;
+	int err;
+
+	mutex_lock(&pf->mbox.lock);
+
+	req = gen_pf_mbox_alloc_msg_start_up_msgs(&pf->mbox);
+	if (!req) {
+		dev_err(pf->dev, "Failed to allocate message\n");
+		mutex_unlock(&pf->mbox.lock);
+		return;
+	}
+
+	err = rvu_gen_pf_sync_mbox_msg(&pf->mbox);
+	if (err) {
+		dev_err(pf->dev, "Failed to stop UP messages(%d)\n",
+			err);
+		mutex_unlock(&pf->mbox.lock);
+		return;
+	}
+
+	mutex_unlock(&pf->mbox.lock);
+}
+
 static void rvu_gen_pf_remove(struct pci_dev *pdev)
 {
 	struct gen_pf_dev *pfdev = pci_get_drvdata(pdev);
+
+	rvu_gen_pf_stop_up_msgs(pfdev);
 
 	rvu_gen_pf_vfcfg_cleanup(pfdev);
 	rvu_gen_pf_sriov_disable(pfdev->pdev);
@@ -1389,8 +1486,30 @@ static void rvu_gen_pf_remove(struct pci_dev *pdev)
 	pci_release_regions(pdev);
 }
 
-static int rvu_gen_pf_sdp_init(struct gen_pf_dev *pf)
+static int rvu_gen_pf_start_up_msgs(struct gen_pf_dev *pf)
 {
+	struct msg_req *req;
+	int err;
+
+	mutex_lock(&pf->mbox.lock);
+
+	req = gen_pf_mbox_alloc_msg_start_up_msgs(&pf->mbox);
+	if (!req) {
+		dev_err(pf->dev, "Failed to allocate message\n");
+		mutex_unlock(&pf->mbox.lock);
+		return -ENOMEM;
+	}
+
+	err = rvu_gen_pf_sync_mbox_msg(&pf->mbox);
+	if (err) {
+		dev_err(pf->dev, "Failed to register for UP messages(%d)\n",
+			err);
+		mutex_unlock(&pf->mbox.lock);
+		return err;
+	}
+
+	mutex_unlock(&pf->mbox.lock);
+
 	/* Firmware sets the total VFs such that it includes max VFs of a PF
 	 * and one extra VF since VF0 of PF serve IO for EPFs on host.
 	 */
@@ -1472,7 +1591,7 @@ static int rvu_gen_pf_probe(struct pci_dev *pdev, const struct pci_device_id *id
 	if (err)
 		goto err_mbox_destroy;
 
-	rvu_gen_pf_sdp_init(pfdev);
+	rvu_gen_pf_start_up_msgs(pfdev);
 
 	return 0;
 
