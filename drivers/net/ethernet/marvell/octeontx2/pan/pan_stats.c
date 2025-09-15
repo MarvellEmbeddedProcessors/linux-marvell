@@ -17,21 +17,23 @@
 static DEFINE_PER_CPU(struct pan_stats, pan_stats);
 
 static char *pan_stats_fld_name[PAN_STATS_FLD_MAX] = {
-	[PAN_STATS_FLD_IN_NON_SG_PKTS] = "IN_NORM\t\t",	// "ingress non sg pkts",
-	[PAN_STATS_FLD_IN_SG_PKTS] = "IN_SG\t\t",		// "ingress sg pkt",
-	[PAN_STATS_FLD_OUT_NON_SG_PKTS] = "OUT_NORM\t",	// "egress non sg pkts",
-	[PAN_STATS_FLD_OUT_SG_PKTS] = "OUT_SG\t\t",		// "egress sg pkts",
+	[PAN_STATS_FLD_IN_NON_SG_PKTS] = "IN NORM\t\t",	// "ingress non sg pkts",
+	[PAN_STATS_FLD_IN_SG_PKTS] = "IN SG\t\t",		// "ingress sg pkt",
+	[PAN_STATS_FLD_OUT_NON_SG_PKTS] = "OUT NORM\t",	// "egress non sg pkts",
+	[PAN_STATS_FLD_OUT_SG_PKTS] = "OUT SG\t\t",		// "egress sg pkts",
 	[PAN_STATS_FLD_DROP_PKTS] =  "DROPPED\t\t",		//"dropped pkts",
-	[PAN_STATS_FLD_INTR] = "INTR_CNT\t",		// "interrupt cnt"
-	[PAN_STATS_FLD_TX_DESC] =  "TX_DESC\t\t",		// "Not enough TX desc to send pkt",
+	[PAN_STATS_FLD_INTR] = "INTR CNT\t",		// "interrupt cnt"
+	[PAN_STATS_FLD_TX_DESC] =  "TX DESC\t\t",		// "Not enough TX desc to send pkt",
 	[PAN_STATS_FLD_SQE_THRESH] = "SQE_THRESH\t",	// Hit SQE thresh
 	[PAN_STATS_FLD_RX_CQ_PKTS] = "RX CQ PKTS\t",		// CQ processed pkts
 	[PAN_STATS_FLD_TX_CQ_PKTS] = "TX CQ PKTS\t",		// SQ processed pkts
-	[PAN_STATS_FLD_INVAL_SQ] = "INVALID SQ\t",		// Invalid SQ
+	[PAN_STATS_FLD_INVAL_SQ] = "INVAL SQ\t",		// Invalid SQ
 	[PAN_STATS_FLD_EXP_PKTS] = "EXCEPTION PKTS\t",		// Exception packets
 	[PAN_STATS_FLD_NAT_PKTS] = "NAT PKTS\t",		// Nated
 	[PAN_STATS_FLD_ROUTE_PKTS] = "L3 FLOW PKTS\t",		// l3
 	[PAN_STATS_FLD_BR_PKTS] = "L2 FLOW PKTs\t",		// l2
+	[PAN_STATS_FLD_IN_VLAN_ROUTE_PKTS] = "IN VLAN L3 PKTS\t",	// vlan routing.
+	[PAN_STATS_FLD_OUT_VLAN_ROUTE_PKTS] = "OUT VLAN L3 PKTS\t",	// vlan routing.
 };
 
 static int pan_stats_dp_dbg_show(struct seq_file *s, void *file)

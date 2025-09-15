@@ -28,6 +28,7 @@ struct pan_fl_tbl_opaque {
 	u64 eg_dmac_is_set : 1;
 	u8 eg_smac[ETH_ALEN];
 	u8 eg_dmac[ETH_ALEN];
+	u16 vlan_tag;
 	u32 eg_sip;
 	struct rcu_head rcu;
 };
@@ -43,6 +44,8 @@ enum pan_fl_tbl_act {
 	PAN_FL_TBL_ACT_L3_DNAT = BIT_ULL(7),
 	PAN_FL_TBL_ACT_L3_BR_SNAT = BIT_ULL(8),
 	PAN_FL_TBL_ACT_L3_BR_DNAT = BIT_ULL(9),
+	PAN_FL_TBL_ACT_L3_VLAN_FWD = BIT_ULL(10),
+	PAN_FL_TBL_ACT_L3_BR_VLAN_FWD = BIT_ULL(11),
 	PAN_FL_TBL_ACT_MAX,
 };
 

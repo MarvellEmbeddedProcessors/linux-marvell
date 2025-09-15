@@ -232,6 +232,9 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 
 	entry = node->entry;
 
+	if (entry->vlan_valid)
+		opq.vlan_tag = entry->vlan_tag;
+
 	netdev = xa_load(&pan_rvu_gbl->pfunc2dev, pcifunc);
 	if (netdev && !entry->host) {
 		res.opq = &opq;
@@ -242,10 +245,15 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 		}
 	}
 
-	if (entry->host)
+	if (entry->host) {
 		res.act = PAN_FL_TBL_ACT_EXP;
-	else
-		res.act = entry->bridge ? PAN_FL_TBL_ACT_L3_BR_FWD : PAN_FL_TBL_ACT_L3_FWD;
+	} else if (entry->bridge) {
+		res.act = entry->vlan_valid ? PAN_FL_TBL_ACT_L3_BR_VLAN_FWD :
+			PAN_FL_TBL_ACT_L3_BR_FWD;
+	} else {
+		res.act = entry->vlan_valid ? PAN_FL_TBL_ACT_L3_VLAN_FWD :
+			PAN_FL_TBL_ACT_L3_FWD;
+	}
 
 	res.pcifuncoff = pan_rvu_pcifunc2_sq_off(pcifunc);
 
@@ -338,6 +346,7 @@ static int pan_sw_l3_hw_install_flow(struct pan_sw_l3_offl_node *node)
 
 fail_flow:
 	mutex_unlock(&otx2_nic->mbox.lock);
+
 	return err;
 }
 

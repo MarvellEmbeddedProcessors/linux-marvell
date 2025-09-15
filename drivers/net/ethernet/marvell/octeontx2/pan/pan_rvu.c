@@ -353,6 +353,7 @@ struct pan_rvu_sg_data {
 	struct otx2_nic *pfvf;
 	struct otx2_nic *rxpfvf;
 	int cq_idx;
+	u16 *data_off;
 };
 
 enum {
@@ -369,8 +370,10 @@ static int pan_rvu_rx2tx_sg_map_iter(u64 rx_sg_addr, u16 rx_sg_sz, bool is_last,
 	u64 *iova = NULL;
 	u16 *sg_lens = NULL;
 	int *offset = arg->offset;
+	int data_off;
 
 	sq->sg[sq->head].num_segs = 0;
+	data_off = arg->data_off[seg];
 
 	if ((seg & (MAX_SEGS_PER_SG - 1)) == 0) {
 		sg = (struct nix_sqe_sg_s *)(sq->sqe_base + *offset);
@@ -388,13 +391,13 @@ static int pan_rvu_rx2tx_sg_map_iter(u64 rx_sg_addr, u16 rx_sg_sz, bool is_last,
 			*offset += sizeof(*sg) + sizeof(u64);
 	}
 
-	sg_lens[seg] = rx_sg_sz;
+	sg_lens[seg] = rx_sg_sz - data_off;
 	sg->segs++;
-	*iova++ = rx_sg_addr;
+	*iova++ = rx_sg_addr + data_off;
 
 	/* Save DMA mapping info for later unmapping */
-	sq->sg[sq->head].dma_addr[seg] = rx_sg_addr;
-	sq->sg[sq->head].size[seg] = rx_sg_sz;
+	sq->sg[sq->head].dma_addr[seg] = rx_sg_addr + data_off;
+	sq->sg[sq->head].size[seg] = rx_sg_sz - data_off;
 	sq->sg[sq->head].num_segs++;
 
 	/* TODO: intoduce a field to skip skb freeing */
@@ -417,7 +420,7 @@ static int pan_rvu_rx2tx_sg_map_iter(u64 rx_sg_addr, u16 rx_sg_sz, bool is_last,
 static bool pan_rvu_rx2tx_sg_map(struct otx2_nic *rxpfvf, struct otx2_snd_queue *sq,
 				 struct nix_sqe_hdr_s *sqe_hdr,
 				 struct nix_cqe_rx_s *cqe, int qidx, int num_sgs,
-				 int *offset, int len)
+				 int *offset, int len, u16 *data_off)
 {
 	struct pan_rvu_sg_data data = {
 		.sq = sq,
@@ -426,6 +429,7 @@ static bool pan_rvu_rx2tx_sg_map(struct otx2_nic *rxpfvf, struct otx2_snd_queue 
 		.rxpfvf = rxpfvf,
 		.len = len,
 		.cq_idx = qidx,
+		.data_off = data_off,
 	};
 
 	/* TODO: handle error case */
@@ -472,7 +476,7 @@ static bool pan_rvu_buf_xmit(struct pan_fl_tbl_res *res,
 			     int num_sgs, int len,
 			     struct pan_tuple_hdr *hdr,
 			     struct otx2_nic *rxpfvf,
-			     u16 off)
+			     u16 off, u16 *data_off)
 {
 	struct nix_sqe_hdr_s *sqe_hdr;
 	int offset, free_desc_or_sqe;
@@ -569,9 +573,16 @@ static bool pan_rvu_buf_xmit(struct pan_fl_tbl_res *res,
 	ext = (struct nix_sqe_ext_s *)(sq->sqe_base + sizeof(*sqe_hdr));
 	ext->subdc = NIX_SUBDC_EXT;
 
+	if (unlikely(res->act & (PAN_FL_TBL_ACT_L3_VLAN_FWD |
+		     PAN_FL_TBL_ACT_L3_BR_VLAN_FWD))) {
+		ext->vlan1_ins_ena = 1;
+		ext->vlan1_ins_ptr = ETH_HLEN - ETH_TLEN;
+		ext->vlan1_ins_tci = res->opq->vlan_tag;
+	}
+
 	/* Add SG subdesc with data frags */
 	if (!pan_rvu_rx2tx_sg_map(rxpfvf, sq, sqe_hdr, cqe, cq->cq_idx,
-				  num_sgs, &offset, len)) {
+				  num_sgs, &offset, len, data_off)) {
 		/* TODO: handle unmap incase of error */
 		smp_mb();
 
@@ -819,6 +830,7 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 		       struct otx2_cq_queue *cq,
 		       struct nix_cqe_rx_s *cqe,
 		       struct pan_fl_tbl_res *res,
+		       u16 *data_off,
 		       u16 *xmit_pcifunc_off)
 {
 	struct nix_rx_parse_s *parse = &cqe->parse;
@@ -829,7 +841,10 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 	struct pan_fl_tbl_res *pres;
 	struct neighbour *neigh;
 	struct iphdr *iphdr;
+	struct vlan_ethhdr *vhdr;
 	struct ethhdr *eth;
+	bool vlan_routing;
+	bool in_pkt_vlan;
 	bool br_routing;
 	u64 *seg_addr;
 	u16 *seg_size;
@@ -837,6 +852,7 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 	void *start;
 	void *va;
 	u8 *dmac;
+	u16 vprot;
 
 	if (unlikely(parse->errlev || parse->errcode)) {
 		if (dup_check_rcv_errors(pfvf, cqe, cq->cq_idx))
@@ -853,17 +869,20 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 	if (likely(!dev))
 		return -ENOENT;
 
-	br_routing = !!(res->act & PAN_FL_TBL_ACT_L3_BR_FWD);
-	if (br_routing)
-		dev = netdev_master_upper_dev_get_rcu(dev);
-
 	va = phys_to_virt(otx2_iova_to_phys(pfvf->iommu_domain, *seg_addr));
 
 	eth = (struct ethhdr *)va;
-	iphdr = (struct iphdr *)(va + ETH_HLEN);
+	in_pkt_vlan = !!(eth->h_proto == htons(ETH_P_8021Q));
+	if (unlikely(in_pkt_vlan)) {
+		vhdr = (struct vlan_ethhdr *)((void *)eth);
+		vprot = vhdr->h_vlan_encapsulated_proto;
+		iphdr = (struct iphdr *)((void *)eth + VLAN_ETH_HLEN);
+	} else {
+		iphdr = (struct iphdr *)((void *)eth + ETH_HLEN);
+	}
 
 	in_dev = xa_load(&pan_rvu_gbl.chan2dev, parse->chan & ~0x7);
-	if (in_dev) {
+	if (likely(in_dev)) {
 		if (unlikely(netif_is_bridge_port(in_dev))) {
 			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
 			if (!l2_node)
@@ -875,9 +894,19 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 		}
 	}
 
+	br_routing = !!(res->act & PAN_FL_TBL_ACT_L3_BR_FWD);
+	vlan_routing = !!(res->act & PAN_FL_TBL_ACT_L3_VLAN_FWD);
+
 	if (res->opq->eg_dmac_is_set) {
 		dmac = res->opq->eg_dmac;
 	} else {
+		if (unlikely((br_routing)))
+			dev = netdev_master_upper_dev_get_rcu(dev);
+
+		if (unlikely(vlan_routing))
+			dev = __vlan_find_dev_deep_rcu(dev, htons(ETH_P_8021Q),
+						       res->opq->vlan_tag);
+
 		neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
 		if (unlikely(!neigh))
 			return -ENOENT;
@@ -893,6 +922,13 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 		l2_node = __pan_sw_l2_mac_tbl_lookup(dmac);
 		if (!l2_node)
 			return -ENOENT;
+	}
+
+	if (unlikely(in_pkt_vlan)) {
+		eth = (struct ethhdr *)((void *)va + VLAN_ETH_HLEN - ETH_HLEN);
+		eth->h_proto = vprot;
+		data_off[0] = VLAN_ETH_HLEN - ETH_HLEN;
+		pan_stats_inc(PAN_STATS_FLD_IN_VLAN_ROUTE_PKTS);
 	}
 
 	ether_addr_copy(eth->h_source, res->opq->eg_smac);
@@ -913,6 +949,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 				struct otx2_cq_queue *cq,
 				struct nix_cqe_rx_s *cqe)
 {
+	u16 data_off[MAX_SEGS_PER_SG] = { [0 ... MAX_SEGS_PER_SG - 1] = 0 };
 	struct nix_rx_parse_s *parse = &cqe->parse;
 	struct pan_tuple_hdr hdr = { 0 };
 	struct pan_tuple tuple = { 0 };
@@ -993,9 +1030,14 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		pan_stats_inc(PAN_STATS_FLD_NAT_PKTS);
 		break;
 
+	case PAN_FL_TBL_ACT_L3_VLAN_FWD:
+	case PAN_FL_TBL_ACT_L3_BR_VLAN_FWD:
+		pan_stats_inc(PAN_STATS_FLD_OUT_VLAN_ROUTE_PKTS);
+		fallthrough;
 	case PAN_FL_TBL_ACT_L3_BR_FWD:
 	case PAN_FL_TBL_ACT_L3_FWD:
-		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, &xmit_pcifunc_off);
+		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, data_off,
+					     &xmit_pcifunc_off);
 
 		/* Incase of error reinject the packet back to stack */
 		if (ret) {
@@ -1051,7 +1093,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 #endif
 
 	ret = pan_rvu_buf_xmit(res, cq, cqe, num_sgs, len, &hdr,
-			       pfvf, xmit_pcifunc_off);
+			       pfvf, xmit_pcifunc_off, data_off);
 	if (!ret)
 		return;
 }
