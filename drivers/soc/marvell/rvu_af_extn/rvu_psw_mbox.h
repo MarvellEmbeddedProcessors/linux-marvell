@@ -39,6 +39,7 @@ M(PSW_TST_MODIFY_ENTRY, 0x120E, psw_tst_modify_entry, psw_tst_modify_entry_req, 
 M(PSW_MBOX_MSIX_CFG,    0x120F, psw_mbox_msix_cfg, psw_mbox_msix_cfg_req, \
 				msg_rsp)				\
 M(PSW_EPFVF_MSIX_WRITE, 0x1210, psw_epfvf_msix_write, psw_epfvf_msix_write_req, msg_rsp) \
+M(PSW_FLR_DONE,         0x1211, psw_flr_done, psw_flr_done_req, msg_rsp) \
 
 
 /* PSW mailbox error codes
@@ -291,6 +292,13 @@ struct psw_epfvf_msix_write_req {
 	u8 rsvd[7];
 };
 
+struct psw_flr_done_req {
+	struct mbox_msghdr hdr;
+	u16 evf_id;  /* Host VF ID */
+	u16 rsvd1[3];
+	u64 rsvd2;
+};
+
 /* PSW debugfs context structure */
 struct psw_dbg_ctx {
 	struct rvu *rvu;
@@ -298,6 +306,29 @@ struct psw_dbg_ctx {
 	int blkaddr;
 	u16 qid;
 	bool inb;
+};
+
+/* PCP mailbox messages */
+enum pcp_mbox_msg_id {
+	PCP_MBOX_CONFIG_READ_MSG_ID = 0x1,
+	PCP_MBOX_CONFIG_WRITE_MSG_ID,
+	PCP_MBOX_FLR_DONE_MSG_ID,
+};
+
+struct pcp_mbox_hdr {
+#define PCP_MBOX_VERSION 0x1
+	u16 version; /* MBOX version */
+	u16 signature; /* Signature */
+	u16 mbox_msg_id; /* MBOX message id PCP_MBOX_* */
+	u16 rc; /* Return code */
+	u64 rsvd;
+};
+
+struct pcp_mbox_flr_done_req {
+	struct pcp_mbox_hdr hdr;
+	u16 pemid;
+	u16 epf;
+	u8 evf;
 };
 
 #define M(_name, _id, _fn, _req_t, _rsp_t)                              \
