@@ -900,6 +900,9 @@ int rvu_mbox_handler_psw_tpt_cfg(struct rvu *rvu, struct psw_tpt_cfg_req *req,
 	struct psw_rsrc *psw = rvu->hw->psw;
 	int blkaddr = BLKADDR_PSW, ret;
 
+	if (!psw->pst_base_addr)
+		return 0;
+
 	switch (req->op) {
 	case PSW_TPT_ENTRY_ADD:
 		return psw_tpt_entry_add(rvu, psw, blkaddr, req, rsp);
@@ -923,6 +926,9 @@ int rvu_mbox_handler_psw_tst_add_entry(struct rvu *rvu,
 	int blkaddr = BLKADDR_PSW, ret;
 	u16 tst_id;
 	u64 reg;
+
+	if (!psw->pst_base_addr)
+		return 0;
 
 	tst_id = rvu_alloc_rsrc(&psw->tst_t);
 	if (tst_id < 0)
@@ -951,6 +957,9 @@ int rvu_mbox_handler_psw_tst_modify_entry(struct rvu *rvu,
 	struct psw_rsrc *psw = rvu->hw->psw;
 	int blkaddr = BLKADDR_PSW, ret;
 	u64 reg;
+
+	if (!psw->pst_base_addr)
+		return 0;
 
 	if (req->tst_id >= psw->tst_t.max)
 		return PSW_AF_ERR_PARAM;
@@ -1369,6 +1378,9 @@ static void psw_epfvf_teardown(struct rvu *rvu, int blkaddr, u16 epffunc, u8 epf
 
 		mutex_unlock(&rvu->rsrc_lock);
 	}
+	if (!rvu->fwdata)
+		goto skip_tsp;
+
 	/* Disable structure polling for this epffunc */
 	for (i = 0; i < psw->tst_t.max; i++) {
 		addr = psw->pst_base_addr;
@@ -1383,6 +1395,7 @@ static void psw_epfvf_teardown(struct rvu *rvu, int blkaddr, u16 epffunc, u8 epf
 			rvu_free_rsrc(&psw->tst_t, i);
 		}
 	}
+skip_tsp:
 	/* Clear this epffunc pcie config and lf mapping */
 	if (evf_id == 0) {
 		rvu_write64(rvu, blkaddr, PSW_AF_EPFX_PCIE_CFG(epf), 0ULL);
@@ -1596,6 +1609,8 @@ static void psw_tsp_free(struct rvu *rvu, struct psw_rsrc *psw)
 {
 	u32 pst_sz;
 
+	if (!rvu->fwdata)
+		return;
 	pst_sz = psw->tst_t.max * PSW_PST_ENTRY_SZ;
 	dma_unmap_single(rvu->dev, psw->pst_dma_addr, pst_sz,
 			 DMA_BIDIRECTIONAL);
@@ -1690,6 +1705,10 @@ static int psw_tsp_setup(struct rvu *rvu, int blkaddr)
 	u64 reg;
 	int ret;
 
+	if (!rvu->fwdata) {
+		dev_info(rvu->dev, "sclk is not available, skipping psw tsp setup\n");
+		return 0;
+	}
 	psw->tpt_t.max = FIELD_GET(CONST2_NUM_TPT, psw->const2);
 	ret = rvu_alloc_bitmap(&psw->tpt_t);
 	if (ret)
