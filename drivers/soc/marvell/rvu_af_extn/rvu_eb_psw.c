@@ -163,6 +163,9 @@ MBOX_EBLOCK_UP_PSW_MESSAGES
 #define ANQ_DESC_ADDR     GENMASK_ULL(63, 32)
 
 
+#define PCP_MBOX_ADDR_OFFSET 0x208
+#define PCP_MBOX_PCI_DEV_ID 0xA063
+
 struct gid_key {
 	u16 epffunc;
 	u16 rid;
@@ -199,6 +202,9 @@ struct psw_rsrc {
 
 	struct rvu_work notif_work;
 	struct workqueue_struct *notif_wq;
+
+	void *pcp_mbox_addr;
+	struct page *pcp_mbox_page;
 };
 
 struct psw_drvdata {
@@ -825,6 +831,52 @@ err:
 	mutex_unlock(&rvu->rsrc_lock);
 
 	return ret;
+}
+
+int rvu_mbox_handler_psw_flr_done(struct rvu *rvu, struct psw_flr_done_req *req,
+				  struct msg_rsp *rsp)
+{
+	struct pcp_mbox_flr_done_req *pcp_req;
+	struct psw_rsrc *psw = rvu->hw->psw;
+	struct pci_dev *pcp_pdev = NULL;
+	int timeout = 2000;
+	u8 pf, epf;
+	u32 cfg_w;
+
+	pf = rvu_get_pf(req->hdr.pcifunc);
+	epf = psw->pf2epf_map[pf];
+
+	pcp_req = (struct pcp_mbox_flr_done_req *)psw->pcp_mbox_addr;
+	pcp_req->hdr.version = PCP_MBOX_VERSION;
+	pcp_req->hdr.signature = 0x1221;
+	pcp_req->hdr.mbox_msg_id = PCP_MBOX_FLR_DONE_MSG_ID;
+	pcp_req->hdr.rc = 0xffff;
+
+	pcp_req->pemid = PSW_PEM_ID(epf);
+	pcp_req->epf = PSW_PEM_EPF(epf);
+	if (!req->evf_id)
+		pcp_req->evf = 0xFF;
+	else
+		pcp_req->evf = req->evf_id - 1;
+
+	pcp_pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, PCP_MBOX_PCI_DEV_ID, pcp_pdev);
+	if (!pcp_pdev) {
+		dev_err(rvu->dev, "No device found to communicate with the PCP firmware\n");
+		return -ENODEV;
+	}
+	pci_read_config_dword(pcp_pdev, PCP_MBOX_ADDR_OFFSET, &cfg_w);
+
+	while (pcp_req->hdr.rc == 0xffff && timeout) {
+		udelay(1);
+		timeout--;
+	}
+	if (timeout == 0) {
+		dev_warn(rvu->dev, "TIMEOUT: Poll for PCP FLR Done mailbox response\n");
+		return -EIO;
+	}
+	pci_dev_put(pcp_pdev);
+
+	return 0;
 }
 
 int rvu_mbox_handler_psw_epfvf_msix_write(struct rvu *rvu, struct psw_epfvf_msix_write_req *req,
@@ -1626,6 +1678,38 @@ free_bmap:
 	return ret;
 }
 
+static int pcp_mbox_setup(struct rvu *rvu, struct psw_rsrc *psw)
+{
+	struct pci_dev *pcp_pdev = NULL;
+	u64 *pcp_mbox_addr, phys_addr;
+	struct page *pages;
+
+	pages = alloc_page(GFP_KERNEL);
+	if (!pages)
+		return -ENOMEM;
+
+	pcp_mbox_addr = (u64 *)page_address(pages);
+	phys_addr = virt_to_phys(pcp_mbox_addr);
+
+	/* Flush cache to ensure memory write */
+	flush_dcache_page(pages);
+
+	pcp_pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, PCP_MBOX_PCI_DEV_ID, pcp_pdev);
+	if (!pcp_pdev) {
+		dev_err(rvu->dev, "No device found to communicate with the PCP firmware\n");
+		__free_page(pages);
+		return -EINVAL;
+	}
+	pci_write_config_dword(pcp_pdev, PCP_MBOX_ADDR_OFFSET, phys_addr & GENMASK_ULL(31, 0));
+	pci_write_config_dword(pcp_pdev, PCP_MBOX_ADDR_OFFSET + 4, phys_addr >> 32);
+	pci_dev_put(pcp_pdev);
+
+	psw->pcp_mbox_addr = pcp_mbox_addr;
+	psw->pcp_mbox_page = pages;
+
+	return 0;
+}
+
 static int
 psw_af_api_notif_q_init(struct rvu *rvu, struct psw_rsrc *psw, int blkaddr)
 {
@@ -1879,8 +1963,15 @@ static int rvu_psw_init_block(struct rvu_block *block, void *data)
 	ret = psw_af_api_notif_q_init(rvu, psw, BLKADDR_PSW);
 	if (ret)
 		goto tsp_free;
+
+	ret = pcp_mbox_setup(rvu, psw);
+	if (ret)
+		goto notif_q_fini;
+
 	return 0;
 
+notif_q_fini:
+	psw_af_api_notif_q_fini(rvu, psw, BLKADDR_PSW);
 tsp_free:
 	psw_tsp_free(rvu, psw);
 fid_free:
