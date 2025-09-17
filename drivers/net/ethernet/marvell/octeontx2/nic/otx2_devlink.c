@@ -543,9 +543,9 @@ static int otx2_devlink_eswitch_mode_set(struct devlink *devlink, u16 mode,
 		devl_lock(devlink);
 		break;
 	case DEVLINK_ESWITCH_MODE_SWITCHDEV:
-		devl_unlock(devlink);
+		//devl_unlock(devlink);
 		ret = rvu_rep_create(pfvf, extack);
-		devl_lock(devlink);
+		//devl_lock(devlink);
 		break;
 	default:
 		return -EINVAL;
