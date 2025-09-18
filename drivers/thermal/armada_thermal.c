@@ -60,6 +60,9 @@
 #define STATUS_POLL_TIMEOUT_US		100000
 #define OVERHEAT_INT_POLL_DELAY_MS	1000
 
+/* Thermal sensor flags */
+#define RESET_ON_CHANNEL_SELECTION	BIT(0)
+
 struct armada_thermal_data;
 
 /* Marvell EBU Thermal Sensor Dev Structure */
@@ -109,6 +112,8 @@ struct armada_thermal_data {
 
 	/* One sensor is in the thermal IC, the others are in the CPUs if any */
 	unsigned int cpu_nr;
+
+	unsigned int flags;
 };
 
 struct armada_drvdata {
@@ -354,10 +359,21 @@ static int armada_select_channel(struct armada_thermal_priv *priv, int channel)
 	if (priv->current_channel == channel)
 		return 0;
 
-	/* Stop the measurements */
-	regmap_read(priv->syscon, data->syscon_control0_off, &ctrl0);
-	ctrl0 &= ~CONTROL0_TSEN_START;
-	regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
+	if (priv->data->flags & RESET_ON_CHANNEL_SELECTION) {
+		/* Disable TSEN */
+		regmap_read(priv->syscon, data->syscon_control0_off, &ctrl0);
+		ctrl0 &= ~(CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE);
+		regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
+
+		armada_ap80x_tsenor_reset(priv);
+
+		regmap_read(priv->syscon, data->syscon_control0_off, &ctrl0);
+	} else {
+		/* Stop the measurements */
+		regmap_read(priv->syscon, data->syscon_control0_off, &ctrl0);
+		ctrl0 &= ~CONTROL0_TSEN_START;
+		regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
+	}
 
 	/* Reset the mode, internal sensor will be automatically selected */
 	ctrl0 &= ~(CONTROL0_TSEN_MODE_MASK << CONTROL0_TSEN_MODE_SHIFT);
@@ -376,6 +392,8 @@ static int armada_select_channel(struct armada_thermal_priv *priv, int channel)
 	regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
 	priv->current_channel = channel;
 
+	if (priv->data->flags & RESET_ON_CHANNEL_SELECTION)
+		ctrl0 |= CONTROL0_TSEN_ENABLE;
 	/* Re-start the measurements */
 	ctrl0 |= CONTROL0_TSEN_START;
 	regmap_write(priv->syscon, data->syscon_control0_off, ctrl0);
@@ -660,6 +678,7 @@ static const struct armada_thermal_data armada_ap806_data = {
 	.dfx_server_irq_mask_off = 0x104,
 	.dfx_server_irq_en = BIT(1),
 	.cpu_nr = 4,
+	.flags = RESET_ON_CHANNEL_SELECTION,
 };
 
 static const struct armada_thermal_data armada_ap807_data = {
@@ -684,6 +703,7 @@ static const struct armada_thermal_data armada_ap807_data = {
 	.dfx_server_irq_mask_off = 0x104,
 	.dfx_server_irq_en = BIT(1),
 	.cpu_nr = 4,
+	.flags = RESET_ON_CHANNEL_SELECTION,
 };
 
 static const struct armada_thermal_data armada_cp110_data = {
