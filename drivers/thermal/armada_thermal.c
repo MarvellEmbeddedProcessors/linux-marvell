@@ -231,22 +231,47 @@ static void armada380_init(struct platform_device *pdev,
 	regmap_write(priv->syscon, data->syscon_control0_off, reg);
 }
 
+static void armada_ap80x_tsenor_reset(struct armada_thermal_priv *priv)
+{
+	struct armada_thermal_data *data = priv->data;
+	u32 reg;
+
+	/* Put TSEN in reset */
+	regmap_read(priv->syscon, data->syscon_control0_off, &reg);
+	reg |= CONTROL0_TSEN_RESET;
+	regmap_write(priv->syscon, data->syscon_control0_off, reg);
+
+	udelay(5);
+
+	/* De-assert reset */
+	reg &= ~CONTROL0_TSEN_RESET;
+	regmap_write(priv->syscon, data->syscon_control0_off, reg);
+}
+
 static void armada_ap80x_init(struct platform_device *pdev,
 			      struct armada_thermal_priv *priv)
 {
 	struct armada_thermal_data *data = priv->data;
 	u32 reg;
 
+	/* Disable TSEN */
 	regmap_read(priv->syscon, data->syscon_control0_off, &reg);
-	reg &= ~CONTROL0_TSEN_RESET;
-	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
+	reg &= ~(CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE);
+	regmap_write(priv->syscon, data->syscon_control0_off, reg);
 
+	/* Reset TSEN */
+	armada_ap80x_tsenor_reset(priv);
+
+	regmap_read(priv->syscon, data->syscon_control0_off, &reg);
 	/* Sample every ~2ms */
 	reg |= CONTROL0_TSEN_OSR_MAX << CONTROL0_TSEN_OSR_SHIFT;
 
-	/* Enable average (2 samples by default) */
-	reg &= ~CONTROL0_TSEN_AVG_BYPASS;
+	/* Disable average (2 samples by default) */
+	reg |= CONTROL0_TSEN_AVG_BYPASS;
+	regmap_write(priv->syscon, data->syscon_control0_off, reg);
 
+	/* Enable TSEN */
+	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
 	regmap_write(priv->syscon, data->syscon_control0_off, reg);
 }
 
