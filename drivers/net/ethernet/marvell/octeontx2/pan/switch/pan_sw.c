@@ -171,6 +171,9 @@ static void pan_sw_event_log(struct af2swdev_notify_req *req)
 
 	fe = req->entry;
 	for (int i = 0; i < req->cnt; i++, fe++) {
+		if (fe->cmd == OTX2_NEIGH_UPDATE)
+			continue;
+
 		ev = kcalloc(1, sizeof(*ev), GFP_KERNEL);
 		ev->cmd = cmd;
 		ev->fe = *fe;
