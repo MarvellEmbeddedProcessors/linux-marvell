@@ -136,6 +136,105 @@ struct otx2_nic *pan_rvu_get_otx2_nic(struct net_device *dev)
 	return netdev_priv(dev);
 }
 
+/* No locking needed as this table is populated at init
+ * time.
+ */
+static DEFINE_HASHTABLE(mac2dev_tbl, 8);
+
+struct pan_rvu_mac2dev_node {
+	struct hlist_node hnode;
+	u8 mac[6];
+	struct net_device *dev;
+};
+
+static inline unsigned int pan_rvu_mac_hash(const u8 *mac)
+{
+	return *(mac + 2);
+}
+
+static void
+pan_rvu_mac_table_add_entry(struct net_device *dev)
+{
+	struct pan_rvu_mac2dev_node *node;
+	struct netdev_hw_addr *dev_addr;
+	unsigned int hash;
+
+	node = kcalloc(1, sizeof(*node), GFP_KERNEL);
+
+	for_each_dev_addr(dev, dev_addr) {
+		ether_addr_copy(node->mac, dev_addr->addr);
+		break;
+	}
+	node->dev = dev;
+	hash = pan_rvu_mac_hash(node->mac);
+
+	hash_add(mac2dev_tbl, &node->hnode, hash);
+}
+
+static struct net_device *pan_rvu_mac_tbl_lookup(const u8 *mac)
+{
+	struct pan_rvu_mac2dev_node *entry = NULL;
+	unsigned int hash = pan_rvu_mac_hash(mac);
+
+	hash_for_each_possible(mac2dev_tbl, entry, hnode, hash)
+		if (ether_addr_equal(entry->mac, mac))
+			return entry->dev;
+
+	return NULL;
+}
+
+static struct net_device *
+pan_rvu_find_in_dev(const u8 *dmac, const u8 *smac, u16 chan)
+{
+	struct pan_sw_l2_offl_node *node;
+	struct net_device *dev;
+	u16 pcifunc;
+
+	dev = pan_rvu_mac_tbl_lookup(dmac);
+	if (dev)
+		return dev;
+
+	dev = xa_load(&pan_rvu_gbl.chan2dev, chan & ~0x7);
+	if (!netif_is_bridge_port(dev))
+		return dev;
+
+	node = __pan_sw_l2_mac_tbl_lookup(smac);
+	pcifunc = pan_sw_get_pcifunc(node->port_id);
+
+	return xa_load(&pan_rvu_gbl.pfunc2dev, pcifunc);
+}
+
+static void pan_rvu_mac2dev_map_destroy(void)
+{
+	struct pan_rvu_mac2dev_node *node;
+	struct hlist_node *tnode;
+	int i;
+
+	hash_for_each_safe(mac2dev_tbl, i, tnode, node, hnode) {
+		hash_del(&node->hnode);
+		kfree(node);
+	}
+}
+
+static void pan_rvu_mac2dev_map_create(void)
+{
+	struct net_device *dev = NULL;
+	struct net *net;
+
+	for_each_net(net) {
+		for_each_netdev(net, dev) {
+			if (netif_is_any_bridge_master(dev) ||
+			    netif_is_team_master(dev) ||
+			    netif_is_lag_master(dev) ||
+			    is_vlan_dev(dev)) {
+				continue;
+			}
+
+			pan_rvu_mac_table_add_entry(dev);
+		}
+	}
+}
+
 struct net_device *
 __pan_rvu_get_kernel_netdev_by_pcifunc(u16 pcifunc)
 {
@@ -669,8 +768,7 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 
 	eth = (const struct ethhdr *)skb->data;
 
-	/* TODO: Improve on ~7 mask */
-	netdev = xa_load(&pan_rvu_gbl.chan2dev, parse->chan & ~0x7);
+	netdev = pan_rvu_find_in_dev(eth->h_dest, eth->h_source, parse->chan);
 	if (netdev) {
 		skb->protocol = eth_type_trans(skb, netdev);
 		skb->dev = netdev;
@@ -761,7 +859,7 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 	eth = (struct ethhdr *)va;
 	iphdr = (struct iphdr *)(va + ETH_HLEN);
 
-	in_dev = xa_load(&pan_rvu_gbl.chan2dev, parse->chan & ~0x7);
+	in_dev = pan_rvu_find_in_dev(eth->h_dest, eth->h_source, parse->chan);
 	if (in_dev) {
 		if (unlikely(netif_is_bridge_port(in_dev))) {
 			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
@@ -881,7 +979,7 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 		iphdr = (struct iphdr *)((void *)eth + ETH_HLEN);
 	}
 
-	in_dev = xa_load(&pan_rvu_gbl.chan2dev, parse->chan & ~0x7);
+	in_dev = pan_rvu_find_in_dev(eth->h_dest, eth->h_source, parse->chan);
 	if (likely(in_dev)) {
 		if (unlikely(netif_is_bridge_port(in_dev))) {
 			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
@@ -1878,6 +1976,7 @@ static int pan_rvu_open(struct net_device *netdev)
 		dev = __pan_rvu_get_kernel_netdev_by_pcifunc(info->pcifunc);
 		if (!dev)
 			continue;
+
 		xa_store(&pan_rvu_gbl.chan2dev,
 			 info->rx_chan_base, dev, GFP_KERNEL);
 
@@ -2659,6 +2758,7 @@ int pan_rvu_init(void)
 #if IS_ENABLED(CONFIG_OCTEONTX_PAN_POLLING_MODE)
 	struct pan_rvu_rx_thread_s *p;
 	int cpu;
+	hash_init(mac2dev_tbl);
 
 	for_each_possible_cpu(cpu) {
 		p = &per_cpu(pan_rvu_rx_thread_per_cpu, cpu);
@@ -2667,14 +2767,16 @@ int pan_rvu_init(void)
 	}
 
 #endif
+	pan_rvu_mac2dev_map_create();
 	otx2_cmn_fops_arr_add(PCI_DEVID_PAN_RVU, &pan_cmn_fops);
-	xa_init(&pan_rvu_gbl.chan2dev);
 	xa_init(&pan_rvu_gbl.pfunc2dev);
+	xa_init(&pan_rvu_gbl.chan2dev);
 	return pci_register_driver(&pan_rvu_driver);
 }
 
 void pan_rvu_deinit(void)
 {
+	pan_rvu_mac2dev_map_destroy();
 	xa_destroy(&pan_rvu_gbl.pcifunc2sqoff);
 	xa_destroy(&pan_rvu_gbl.pfunc2dev);
 	xa_destroy(&pan_rvu_gbl.chan2dev);
