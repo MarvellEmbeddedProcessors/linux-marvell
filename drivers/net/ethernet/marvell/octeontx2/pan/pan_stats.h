@@ -32,10 +32,24 @@ struct pan_stats {
 	u64 fld[PAN_STATS_FLD_MAX];
 };
 
+enum pan_stats_exp_fld {
+	PAN_STAT_EXP_FLD_NO_SIP_NEIGH,
+	PAN_STAT_EXP_FLD_NO_DIP_NEIGH,
+	PAN_STAT_EXP_FLD_NO_DEV,
+	PAN_STAT_EXP_FLD_NO_IN_L2,
+	PAN_STAT_EXP_FLD_NO_OUT_L2,
+	PAN_STATS_EXP_FLD_MAX,
+};
+
+struct pan_stats_exp {
+	atomic_t fld[PAN_STATS_EXP_FLD_MAX];
+};
+
 void pan_stats_inc(enum pan_stats_fld fld);
 void pan_stats_add(enum pan_stats_fld fld, u32 cnt);
 u64 pan_stats_get(enum pan_stats_fld fld, int cpu);
 int pan_stats_init(void);
 void pan_stats_deinit(void);
+void pan_stats_exp_inc(enum pan_stats_exp_fld fld);
 
 #endif // End of PAN_STATS_H_

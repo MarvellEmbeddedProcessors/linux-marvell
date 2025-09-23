@@ -474,7 +474,7 @@ static int pan_rvu_rx2tx_sg_map_iter(u64 rx_sg_addr, u16 rx_sg_sz, bool is_last,
 	sq->sg[sq->head].num_segs = 0;
 	data_off = arg->data_off[seg];
 
-	if ((seg & (MAX_SEGS_PER_SG - 1)) == 0) {
+	if (likely(((seg & (MAX_SEGS_PER_SG - 1)) == 0))) {
 		sg = (struct nix_sqe_sg_s *)(sq->sqe_base + *offset);
 		sg->ld_type = NIX_SEND_LDTYPE_LDD;
 		sg->subdc = NIX_SUBDC_SG;
@@ -494,6 +494,7 @@ static int pan_rvu_rx2tx_sg_map_iter(u64 rx_sg_addr, u16 rx_sg_sz, bool is_last,
 	sg->segs++;
 	*iova++ = rx_sg_addr + data_off;
 
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_TX_COMPLETION)
 	/* Save DMA mapping info for later unmapping */
 	sq->sg[sq->head].dma_addr[seg] = rx_sg_addr + data_off;
 	sq->sg[sq->head].size[seg] = rx_sg_sz - data_off;
@@ -501,17 +502,14 @@ static int pan_rvu_rx2tx_sg_map_iter(u64 rx_sg_addr, u16 rx_sg_sz, bool is_last,
 
 	/* TODO: intoduce a field to skip skb freeing */
 	sq->sg[sq->head].skb = 0;
-#if IS_ENABLED(CONFIG_OCTEONTX_PAN_TX_COMPLETION)
 	sq->sg[sq->head].cq_idx = arg->cq_idx;
-#endif
 
 	if (likely(is_last)) {
-#if IS_ENABLED(CONFIG_OCTEONTX_PAN_TX_COMPLETION)
 		sq->sg[sq->head].flags = SG_LIST_FLAG_LAST_FRAG;
-#endif
 		sq->sg[sq->head].len = arg->len;
 	}
 
+#endif
 	return true;
 }
 
@@ -723,11 +721,6 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 	u16 *seg_size;
 	int seg;
 
-	if (unlikely(parse->errlev || parse->errcode)) {
-		if (dup_check_rcv_errors(pfvf, cqe, cq->cq_idx))
-			return -EFAULT;
-	}
-
 	skb = alloc_skb(MAX_HEADER, GFP_ATOMIC);
 	if (unlikely(!skb))
 		return -ENOMEM;
@@ -835,11 +828,6 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 	void *va;
 	u8 *dmac;
 
-	if (unlikely(parse->errlev || parse->errcode)) {
-		if (dup_check_rcv_errors(pfvf, cqe, cq->cq_idx))
-			return -EFAULT;
-	}
-
 	start = (void *)sg;
 	sg = (struct nix_rx_sg_s *)start;
 	seg_addr = &sg->seg_addr;
@@ -863,8 +851,10 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 	if (in_dev) {
 		if (unlikely(netif_is_bridge_port(in_dev))) {
 			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
-			if (!l2_node)
+			if (!l2_node) {
+				pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_IN_L2);
 				return -ENOENT;
+			}
 
 			tuple.flags |= PAN_TUPLE_FLAG_L3_PROTO_V4;
 			pan_tuple_hash_set(&tuple, l2_node->match_id);
@@ -877,12 +867,16 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 	} else {
 		if (res->act & PAN_FL_TBL_ACT_L3_DNAT) {
 			neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)res->opq->eg_sip);
-			if (unlikely(!neigh))
+			if (unlikely(!neigh)) {
+				pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_SIP_NEIGH);
 				return -ENOENT;
+			}
 		} else {
 			neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
-			if (unlikely(!neigh))
+			if (unlikely(!neigh)) {
+				pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_DIP_NEIGH);
 				return -ENOENT;
+			}
 		}
 
 		dmac = neigh->ha;
@@ -894,8 +888,10 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 
 	if (unlikely(br_routing)) {
 		l2_node = __pan_sw_l2_mac_tbl_lookup(dmac);
-		if (!l2_node)
+		if (!l2_node) {
+			pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_OUT_L2);
 			return -ENOENT;
+		}
 	}
 
 	if (res->act & (PAN_FL_TBL_ACT_L3_SNAT | PAN_FL_TBL_ACT_L3_BR_SNAT))
@@ -952,11 +948,6 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 	u8 *dmac;
 	u16 vprot;
 
-	if (unlikely(parse->errlev || parse->errcode)) {
-		if (dup_check_rcv_errors(pfvf, cqe, cq->cq_idx))
-			return -EFAULT;
-	}
-
 	start = (void *)sg;
 	sg = (struct nix_rx_sg_s *)start;
 	seg_addr = &sg->seg_addr;
@@ -964,8 +955,12 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 
 	pcifunc = pan_rvu_gbl.sqoff2pcifunc[res->pcifuncoff];
 	dev = xa_load(&pan_rvu_gbl.pfunc2dev, pcifunc);
-	if (likely(!dev))
+	if (unlikely(!dev)) {
+		pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_DEV);
+		pr_debug("%s:%d Could not find outdev for pcifunc=%#x, exception\n",
+			 __func__, __LINE__, pcifunc);
 		return -ENOENT;
+	}
 
 	va = phys_to_virt(otx2_iova_to_phys(pfvf->iommu_domain, *seg_addr));
 
@@ -983,8 +978,12 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 	if (likely(in_dev)) {
 		if (unlikely(netif_is_bridge_port(in_dev))) {
 			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
-			if (!l2_node)
+			if (!l2_node) {
+				pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_IN_L2);
+				pr_debug("%s:%d Could not find l2_node for src mac=%pM, exception\n",
+					 __func__, __LINE__, eth->h_source);
 				return -ENOENT;
+			}
 
 			tuple.flags |= PAN_TUPLE_FLAG_L3_PROTO_V4;
 			pan_tuple_hash_set(&tuple, l2_node->match_id);
@@ -1005,9 +1004,18 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 			dev = __vlan_find_dev_deep_rcu(dev, htons(ETH_P_8021Q),
 						       res->opq->vlan_tag);
 
+		if (unlikely(!dev)) {
+			pr_debug("%s:%d Failed to find out dev\n", __func__, __LINE__);
+			return -EINVAL;
+		}
+
 		neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
-		if (unlikely(!neigh))
+		if (unlikely(!neigh)) {
+			pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_DIP_NEIGH);
+			pr_debug("%s:%d neigh dest failed destip=%pI4 dev=%s\n",
+				 __func__, __LINE__, &iphdr->daddr, dev->name);
 			return -ENOENT;
+		}
 
 		dmac = neigh->ha;
 		if (res->opq->eg_dmac_can_set) {
@@ -1018,8 +1026,10 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 
 	if (unlikely(br_routing)) {
 		l2_node = __pan_sw_l2_mac_tbl_lookup(dmac);
-		if (!l2_node)
+		if (!l2_node) {
+			pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_OUT_L2);
 			return -ENOENT;
+		}
 	}
 
 	if (unlikely(in_pkt_vlan)) {
@@ -1130,8 +1140,19 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 
 	case PAN_FL_TBL_ACT_L3_VLAN_FWD:
 	case PAN_FL_TBL_ACT_L3_BR_VLAN_FWD:
+		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, data_off,
+					     &xmit_pcifunc_off);
+
+		/* Incase of error reinject the packet back to stack */
+		if (ret) {
+			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res,
+						 PAN_FL_TBL_ACT_EXP);
+			return;
+		}
+
 		pan_stats_inc(PAN_STATS_FLD_OUT_VLAN_ROUTE_PKTS);
-		fallthrough;
+		break;
+
 	case PAN_FL_TBL_ACT_L3_BR_FWD:
 	case PAN_FL_TBL_ACT_L3_FWD:
 		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, data_off,

@@ -14,6 +14,42 @@
 
 #include "pan_cmn.h"
 
+static struct pan_stats_exp stats_exp;
+
+static char *pan_stats_exp_fld_name[PAN_STATS_EXP_FLD_MAX] = {
+	[PAN_STAT_EXP_FLD_NO_SIP_NEIGH] = "No neigh for sip :",
+	[PAN_STAT_EXP_FLD_NO_DIP_NEIGH] = "No neigh for dip :",
+	[PAN_STAT_EXP_FLD_NO_DEV]	= "netdev not found  :",
+	[PAN_STAT_EXP_FLD_NO_IN_L2]	= "No l2 src entry in flow table :",
+	[PAN_STAT_EXP_FLD_NO_OUT_L2]	= "No l2 dest entry in flow table :",
+};
+
+static int pan_stats_exp_dbg_show(struct seq_file *s, void *file)
+{
+	for (int i = 0; i < PAN_STATS_EXP_FLD_MAX; i++) {
+		seq_printf(s, "%s", pan_stats_exp_fld_name[i]);
+		seq_printf(s, "%u\n", atomic_read(&stats_exp.fld[i]));
+	}
+	return 0;
+}
+
+static int pan_stats_exp_dbg_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, pan_stats_exp_dbg_show, inode->i_private);
+}
+
+static const struct file_operations pan_stats_exp_dbg_ops = {
+	.open		= pan_stats_exp_dbg_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+void pan_stats_exp_inc(enum pan_stats_exp_fld fld)
+{
+	atomic_inc(&stats_exp.fld[fld]);
+}
+
 static DEFINE_PER_CPU(struct pan_stats, pan_stats);
 
 static char *pan_stats_fld_name[PAN_STATS_FLD_MAX] = {
@@ -33,7 +69,7 @@ static char *pan_stats_fld_name[PAN_STATS_FLD_MAX] = {
 	[PAN_STATS_FLD_ROUTE_PKTS] = "L3 FLOW PKTS\t",		// l3
 	[PAN_STATS_FLD_BR_PKTS] = "L2 FLOW PKTs\t",		// l2
 	[PAN_STATS_FLD_IN_VLAN_ROUTE_PKTS] = "IN VLAN L3 PKTS\t",	// vlan routing.
-	[PAN_STATS_FLD_OUT_VLAN_ROUTE_PKTS] = "OUT VLAN L3 PKTS\t",	// vlan routing.
+	[PAN_STATS_FLD_OUT_VLAN_ROUTE_PKTS] = "OUT VLAN L3 PKTS",	// vlan routing.
 };
 
 static int pan_stats_dp_dbg_show(struct seq_file *s, void *file)
@@ -240,6 +276,12 @@ int pan_stats_init(void)
 
 	if (!file)
 		pr_err("%s", "Debugfs creation failed for pan stats\n");
+
+	file = debugfs_create_file("exp", 0600, parent, NULL,
+				   &pan_stats_exp_dbg_ops);
+
+	if (!file)
+		pr_err("%s", "Debugfs exp stats creation failed\n");
 
 	file = debugfs_create_file("info", 0600, parent, NULL,
 				   &pan_stats_info_dbg_ops);

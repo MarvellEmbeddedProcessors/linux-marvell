@@ -18,6 +18,21 @@
 
 static RADIX_TREE(tbls_rdx_tree_h, GFP_KERNEL);
 
+static const char *pan_fl_act2str[__builtin_ctz(PAN_FL_TBL_ACT_MAX & ~1ULL) + 1] = {
+	[__builtin_ctz(PAN_FL_TBL_ACT_TLS_ENC)] = "tls en",
+	[__builtin_ctz(PAN_FL_TBL_ACT_TLS_DEC)] = "tls dec",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L2_FWD)] =  "l2 fwd",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_FWD)] =  "l3 fwd",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_BR_FWD)] =  "l3 fwd",
+	[__builtin_ctz(PAN_FL_TBL_ACT_EXP)]	 = "exp",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_SNAT)] = "l3 snat",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_DNAT)] = "l3 dnat",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_BR_SNAT)] = "l3 snat",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_BR_DNAT)] = "l3 dnat",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_VLAN_FWD)] = "l3 vlan",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_BR_VLAN_FWD)] = "l3 vlan",
+};
+
 static struct pan_fl_tbl_rdx_node *
 pan_rdxn[PAN_FL_TBL_TYPE_MAX];
 
@@ -403,6 +418,7 @@ static int pr_debugfs_show(struct seq_file *m, void *v)
 	struct pan_fl_tbl_rdx_node *rdx;
 	struct pan_fl_tbl_node *node;
 	struct rhashtable_iter hti;
+	struct pan_fl_tbl_res *res;
 	struct pan_rvu_gbl_t *gbl;
 	struct rhash_head *pos;
 	int total = 0;
@@ -449,11 +465,20 @@ static int pr_debugfs_show(struct seq_file *m, void *v)
 
 		pan_tuple_dump2sysfs(m, &node->tuple, total);
 
-		len += snprintf(buf + len, sizeof(buf) - len, "(%s),",
-				(node->res.dir & IP_CT_DIR_REPLY) ?
-				"BIDI" : "UNIDI");
+		res = &node->res;
+		if (res->act & PAN_FL_TBL_ACT_L2_FWD)
+			len += snprintf(buf + len, sizeof(buf) - len, "(%s),",
+					(res->dir & IP_CT_DIR_REPLY) ?
+					"BIDI" : "UNIDI");
 
-		pcifunc = gbl->sqoff2pcifunc[node->res.pcifuncoff];
+		len += snprintf(buf + len, sizeof(buf) - len, "(act=%s)",
+				pan_fl_act2str[__ffs(res->act)]);
+
+		if (res->opq && res->opq->vlan_tag)
+			len += snprintf(buf + len, sizeof(buf) - len, "(vtag=%d)",
+					res->opq->vlan_tag);
+
+		pcifunc = gbl->sqoff2pcifunc[res->pcifuncoff];
 		len += snprintf(buf + len, sizeof(buf) - len,
 				"(pcifunc %#x),", pcifunc);
 
