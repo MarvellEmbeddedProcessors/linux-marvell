@@ -31,6 +31,10 @@ static const char *pan_fl_act2str[__builtin_ctz(PAN_FL_TBL_ACT_MAX & ~1ULL) + 1]
 	[__builtin_ctz(PAN_FL_TBL_ACT_L3_BR_DNAT)] = "l3 dnat",
 	[__builtin_ctz(PAN_FL_TBL_ACT_L3_VLAN_FWD)] = "l3 vlan",
 	[__builtin_ctz(PAN_FL_TBL_ACT_L3_BR_VLAN_FWD)] = "l3 vlan",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_SNAPT)] = "l3 snapt",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_BR_SNAPT)] = "l3 snapt",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_DNAPT)] = "l3 dnapt",
+	[__builtin_ctz(PAN_FL_TBL_ACT_L3_BR_DNAPT)] = "l3 dnapt",
 };
 
 static struct pan_fl_tbl_rdx_node *

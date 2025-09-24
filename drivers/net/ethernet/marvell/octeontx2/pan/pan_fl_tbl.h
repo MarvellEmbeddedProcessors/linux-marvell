@@ -24,12 +24,16 @@ struct pan_fl_tbl_opaque {
 		struct pan_ktls_ctx ctx;
 	};
 
-	u64 eg_dmac_can_set : 1;
 	u64 eg_dmac_is_set : 1;
+	u64 eg_dmac_can_set : 1;
+	u64 eg_dip_is_set : 1;
 	u8 eg_smac[ETH_ALEN];
 	u8 eg_dmac[ETH_ALEN];
 	u16 vlan_tag;
 	u32 eg_sip;
+	u32 eg_dip;
+	u16 eg_sport;
+	u16 eg_dport;
 	struct rcu_head rcu;
 };
 
@@ -46,13 +50,18 @@ enum pan_fl_tbl_act {
 	PAN_FL_TBL_ACT_L3_BR_DNAT = BIT_ULL(9),
 	PAN_FL_TBL_ACT_L3_VLAN_FWD = BIT_ULL(10),
 	PAN_FL_TBL_ACT_L3_BR_VLAN_FWD = BIT_ULL(11),
+	PAN_FL_TBL_ACT_L3_SNAPT = BIT_ULL(12),
+	PAN_FL_TBL_ACT_L3_DNAPT = BIT_ULL(13),
+	PAN_FL_TBL_ACT_L3_BR_SNAPT = BIT_ULL(14),
+	PAN_FL_TBL_ACT_L3_BR_DNAPT = BIT_ULL(15),
 	PAN_FL_TBL_ACT_MAX,
 };
 
 struct pan_fl_tbl_res {
 	enum pan_fl_tbl_act act;
 	u16 pcifuncoff;
-	u8 dir;
+	u64 dir : 1;
+	u64 uni_di : 1;
 	struct pan_fl_tbl_res *pair;
 	struct pan_fl_tbl_opaque *opq;
 	/* Don't add any fields to this structure.

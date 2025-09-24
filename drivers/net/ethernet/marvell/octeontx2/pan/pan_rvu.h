@@ -39,6 +39,8 @@ struct pan_rvu_gbl_t {
 	struct matchid_bmap rsrc;
 	struct xarray pfunc2dev;
 	struct otx2_nic *pan_nic;
+	u64 npc_rx_features;
+	u64 npc_tx_features;
 };
 
 struct pan_rvu_cq_info {

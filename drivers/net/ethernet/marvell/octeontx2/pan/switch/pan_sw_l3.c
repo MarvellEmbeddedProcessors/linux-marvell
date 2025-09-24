@@ -65,21 +65,45 @@ static int pan_sw_l3_fl_tbl_del_one_entry(struct pan_sw_l3_offl_node *node)
 	return 0;
 }
 
+static void pan_sw_l3_walk_n_free_empty_tnode(struct pan_sw_l3_offl_tnode *walk)
+{
+	if (!walk)
+		return;
+
+	pan_sw_l3_walk_n_free_empty_tnode(walk->l);
+	pan_sw_l3_walk_n_free_empty_tnode(walk->r);
+	if (walk == root)
+		root = NULL;
+
+	kfree(walk);
+}
+
 static int
-pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id);
+pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool *me_deleted);
 
 static void
-pan_sw_l3_fl_tbl_del_n_free_all(struct pan_sw_l3_offl_tnode *walk)
+pan_sw_l3_fl_tbl_del_n_free_all(struct pan_sw_l3_offl_tnode *walk, bool *me_deleted)
 {
-	struct pan_sw_l3_offl_tnode *pos;
+	struct pan_sw_l3_offl_tnode *pos, *r;
 	struct pan_sw_l3_offl_node *node;
 	int mcam_idx, match_id;
 
 	if (!walk)
 		return;
 
-	pan_sw_l3_fl_tbl_del_n_free_all(walk->l);
-	pan_sw_l3_fl_tbl_del_n_free_all(walk->r);
+	r = walk->r;
+
+	*me_deleted = false;
+	pan_sw_l3_fl_tbl_del_n_free_all(walk->l, me_deleted);
+
+	if (*me_deleted && r)
+		r->p = NULL;
+
+	*me_deleted = false;
+	pan_sw_l3_fl_tbl_del_n_free_all(r, me_deleted);
+
+	if (*me_deleted)
+		return;
 
 	if (!walk->node)
 		return;
@@ -90,7 +114,7 @@ pan_sw_l3_fl_tbl_del_n_free_all(struct pan_sw_l3_offl_tnode *walk)
 			return;
 
 		pan_sw_l3_fl_tbl_del_one_entry(node);
-		pan_sw_l3_route_del(node->entry, &mcam_idx, &match_id);
+		pan_sw_l3_route_del(node->entry, &mcam_idx, &match_id, me_deleted);
 		return;
 	}
 
@@ -100,7 +124,7 @@ pan_sw_l3_fl_tbl_del_n_free_all(struct pan_sw_l3_offl_tnode *walk)
 			continue;
 
 		pan_sw_l3_fl_tbl_del_one_entry(node);
-		pan_sw_l3_route_del(node->entry, &mcam_idx, &match_id);
+		pan_sw_l3_route_del(node->entry, &mcam_idx, &match_id, me_deleted);
 	}
 }
 
@@ -732,7 +756,7 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 }
 
 static int
-pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id)
+pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool *me_deleted)
 {
 	struct pan_sw_l3_offl_tnode *tn, *walk, *p, *next;
 	struct pan_rvu_gbl_t *pan_rvu_gbl;
@@ -742,6 +766,8 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id)
 
 	pr_debug("%s:%d route DEL request for  dst=%#x dst_len=%d got Added\n",
 		 __func__, __LINE__, entry->dst, entry->dst_len);
+
+	*me_deleted = false;
 
 	if (entry->gw_valid) {
 		tn = pan_sw_l3_fib_h_tbl_lookup(entry);
@@ -850,19 +876,18 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id)
 	kfree(walk->node);
 	walk->node = NULL;
 
-	while (walk) {
+	if (!walk->node && !walk->l && !walk->r) {
 		p = walk->p;
-		if (!walk->node && !walk->l && !walk->r) {
-			if (p) {
-				if (p->l == walk)
-					p->l = NULL;
-				else
-					p->r = NULL;
-			}
-
-			kfree(walk);
+		if (p) {
+			if (p->l == walk)
+				p->l = NULL;
+			else
+				p->r = NULL;
 		}
-		walk = p;
+		walk->p = NULL;
+		if (me_deleted)
+			*me_deleted = true;
+		kfree(walk);
 	}
 
 	return 0;
@@ -973,6 +998,7 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 	struct pan_sw_l3_offl_tnode *tnode, *tmp;
 	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	int mcam_idx, match_id;
+	bool me_deleted;
 	int err;
 	int i;
 
@@ -1030,7 +1056,7 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 			}
 
 			spin_lock(&offl_l3_lock);
-			err = pan_sw_l3_route_del(entry, &mcam_idx, &match_id);
+			err = pan_sw_l3_route_del(entry, &mcam_idx, &match_id, &me_deleted);
 			spin_unlock(&offl_l3_lock);
 
 			if (!err) {
@@ -1179,10 +1205,13 @@ int pan_sw_l3_init(void)
 
 void pan_sw_l3_deinit(void)
 {
+	bool me_deleted = false;
+
 	pan_sw_l3_debugfs_remove();
 	cancel_delayed_work_sync(&pan_sw_l3_fib_work);
 	spin_lock(&offl_l3_lock);
-	pan_sw_l3_fl_tbl_del_n_free_all(root);
+	pan_sw_l3_fl_tbl_del_n_free_all(root, &me_deleted);
+	pan_sw_l3_walk_n_free_empty_tnode(root);
 	spin_unlock(&offl_l3_lock);
 	pan_sw_l3_hw_npc_del_flows(marr, &lcnt);
 }

@@ -22,6 +22,7 @@ static char *pan_stats_exp_fld_name[PAN_STATS_EXP_FLD_MAX] = {
 	[PAN_STAT_EXP_FLD_NO_DEV]	= "netdev not found  :",
 	[PAN_STAT_EXP_FLD_NO_IN_L2]	= "No l2 src entry in flow table :",
 	[PAN_STAT_EXP_FLD_NO_OUT_L2]	= "No l2 dest entry in flow table :",
+	[PAN_STAT_EXP_FLD_INVAL_ACT]	= "Invalid action :",
 };
 
 static int pan_stats_exp_dbg_show(struct seq_file *s, void *file)
@@ -66,6 +67,7 @@ static char *pan_stats_fld_name[PAN_STATS_FLD_MAX] = {
 	[PAN_STATS_FLD_INVAL_SQ] = "INVAL SQ\t",		// Invalid SQ
 	[PAN_STATS_FLD_EXP_PKTS] = "EXCEPTION PKTS\t",		// Exception packets
 	[PAN_STATS_FLD_NAT_PKTS] = "NAT PKTS\t",		// Nated
+	[PAN_STATS_FLD_NAPT_PKTS] = "NAPT PKTS\t",		// Napted
 	[PAN_STATS_FLD_ROUTE_PKTS] = "L3 FLOW PKTS\t",		// l3
 	[PAN_STATS_FLD_BR_PKTS] = "L2 FLOW PKTs\t",		// l2
 	[PAN_STATS_FLD_IN_VLAN_ROUTE_PKTS] = "IN VLAN L3 PKTS\t",	// vlan routing.

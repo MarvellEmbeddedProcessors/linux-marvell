@@ -803,13 +803,13 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 }
 
 static int
-pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
-			  struct pan_rvu_cq_info *cq_info,
-			  struct otx2_cq_queue *cq,
-			  struct nix_cqe_rx_s *cqe,
-			  struct pan_fl_tbl_res *res,
-			  struct pan_tuple_hdr *hdr,
-			  u16 *xmit_pcifunc_off)
+pan_rvu_modify_l2_l3_l4_hdr(struct otx2_nic *pfvf,
+			    struct pan_rvu_cq_info *cq_info,
+			    struct otx2_cq_queue *cq,
+			    struct nix_cqe_rx_s *cqe,
+			    struct pan_fl_tbl_res *res,
+			    struct pan_tuple_hdr *hdr,
+			    u16 *xmit_pcifunc_off)
 {
 	struct nix_rx_parse_s *parse = &cqe->parse;
 	struct pan_sw_l2_offl_node *l2_node;
@@ -821,6 +821,7 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 	struct iphdr *iphdr;
 	struct ethhdr *eth;
 	bool br_routing;
+	u16 *sport, *dport;
 	u64 *seg_addr;
 	u16 *seg_size;
 	u16 pcifunc;
@@ -865,18 +866,17 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 	if (res->opq->eg_dmac_is_set) {
 		dmac = res->opq->eg_dmac;
 	} else {
-		if (res->act & PAN_FL_TBL_ACT_L3_DNAT) {
-			neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)res->opq->eg_sip);
-			if (unlikely(!neigh)) {
-				pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_SIP_NEIGH);
-				return -ENOENT;
-			}
+		if (res->dir == IP_CT_DIR_ORIGINAL) {
+			neigh = __ipv4_neigh_lookup_noref(dev,
+							  (__force u32)iphdr->daddr);
 		} else {
-			neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
-			if (unlikely(!neigh)) {
-				pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_DIP_NEIGH);
-				return -ENOENT;
-			}
+			neigh = __ipv4_neigh_lookup_noref(dev,
+							  (__force u32)res->opq->eg_dip);
+		}
+
+		if (unlikely(!neigh)) {
+			pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_DIP_NEIGH);
+			return -ENOENT;
 		}
 
 		dmac = neigh->ha;
@@ -894,18 +894,32 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 		}
 	}
 
-	if (res->act & (PAN_FL_TBL_ACT_L3_SNAT | PAN_FL_TBL_ACT_L3_BR_SNAT))
-		iphdr->saddr = res->opq->eg_sip;
-	else if (res->act & (PAN_FL_TBL_ACT_L3_DNAT | PAN_FL_TBL_ACT_L3_BR_SNAT))
-		iphdr->daddr = res->opq->eg_sip;
-
-	ether_addr_copy(eth->h_source, res->opq->eg_smac);
-	ether_addr_copy(eth->h_dest, dmac);
-
 	hdr->flags = PAN_TUPLE_FLAG_L4_PROTO;
 	hdr->l4hdr = (u8 *)iphdr + iphdr->ihl * 4;
 	hdr->l3hdr = (u8 *)iphdr;
 	hdr->l2hdr = (u8 *)eth;
+	sport = (u16 *)hdr->l4hdr;
+	dport = sport + 1;
+
+	if (res->act & (PAN_FL_TBL_ACT_L3_SNAT | PAN_FL_TBL_ACT_L3_BR_SNAT |
+			PAN_FL_TBL_ACT_L3_SNAPT |
+			PAN_FL_TBL_ACT_L3_BR_SNAPT)) {
+		if (res->dir == IP_CT_DIR_ORIGINAL)
+			iphdr->saddr = res->opq->eg_sip;
+		else
+			iphdr->daddr = res->opq->eg_dip;
+	}
+
+	if (unlikely((res->act & (PAN_FL_TBL_ACT_L3_SNAPT |
+				  PAN_FL_TBL_ACT_L3_BR_SNAPT)))) {
+		if (res->dir == IP_CT_DIR_ORIGINAL)
+			*sport |= htons(res->opq->eg_sport);
+		else
+			*dport |= htons(res->opq->eg_dport);
+	}
+
+	ether_addr_copy(eth->h_source, res->opq->eg_smac);
+	ether_addr_copy(eth->h_dest, dmac);
 
 	if (likely(!br_routing)) {
 		*xmit_pcifunc_off = res->pcifuncoff;
@@ -919,13 +933,13 @@ pan_rvu_rewrite_l2_l3_hdr(struct otx2_nic *pfvf,
 }
 
 static int
-pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
-		       struct pan_rvu_cq_info *cq_info,
-		       struct otx2_cq_queue *cq,
-		       struct nix_cqe_rx_s *cqe,
-		       struct pan_fl_tbl_res *res,
-		       u16 *data_off,
-		       u16 *xmit_pcifunc_off)
+pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
+		      struct pan_rvu_cq_info *cq_info,
+		      struct otx2_cq_queue *cq,
+		      struct nix_cqe_rx_s *cqe,
+		      struct pan_fl_tbl_res *res,
+		      u16 *data_off,
+		      u16 *xmit_pcifunc_off)
 {
 	struct nix_rx_parse_s *parse = &cqe->parse;
 	struct pan_sw_l2_offl_node *l2_node;
@@ -1018,10 +1032,6 @@ pan_rvu_rewrite_l2_hdr(struct otx2_nic *pfvf,
 		}
 
 		dmac = neigh->ha;
-		if (res->opq->eg_dmac_can_set) {
-			ether_addr_copy(res->opq->eg_dmac, dmac);
-			res->opq->eg_dmac_is_set = 1;
-		}
 	}
 
 	if (unlikely(br_routing)) {
@@ -1117,6 +1127,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 
 	/* Last byte of match id is connection id */
 	switch (res->act) {
+	case PAN_FL_TBL_ACT_L3_SNAPT:
 	case PAN_FL_TBL_ACT_EXP:
 		pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, PAN_FL_TBL_ACT_EXP);
 		return;
@@ -1125,8 +1136,8 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 	case PAN_FL_TBL_ACT_L3_DNAT:
 	case PAN_FL_TBL_ACT_L3_BR_SNAT:
 	case PAN_FL_TBL_ACT_L3_BR_DNAT:
-		ret = pan_rvu_rewrite_l2_l3_hdr(pfvf, cq_info, cq, cqe, res, &hdr,
-						&xmit_pcifunc_off);
+		ret = pan_rvu_modify_l2_l3_l4_hdr(pfvf, cq_info, cq, cqe, res, &hdr,
+						  &xmit_pcifunc_off);
 
 		/* Incase of error reinject the packet back to stack */
 		if (ret) {
@@ -1140,8 +1151,8 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 
 	case PAN_FL_TBL_ACT_L3_VLAN_FWD:
 	case PAN_FL_TBL_ACT_L3_BR_VLAN_FWD:
-		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, data_off,
-					     &xmit_pcifunc_off);
+		ret = pan_rvu_modify_l2_hdr(pfvf, cq_info, cq, cqe, res, data_off,
+					    &xmit_pcifunc_off);
 
 		/* Incase of error reinject the packet back to stack */
 		if (ret) {
@@ -1155,8 +1166,8 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 
 	case PAN_FL_TBL_ACT_L3_BR_FWD:
 	case PAN_FL_TBL_ACT_L3_FWD:
-		ret = pan_rvu_rewrite_l2_hdr(pfvf, cq_info, cq, cqe, res, data_off,
-					     &xmit_pcifunc_off);
+		ret = pan_rvu_modify_l2_hdr(pfvf, cq_info, cq, cqe, res, data_off,
+					    &xmit_pcifunc_off);
 
 		/* Incase of error reinject the packet back to stack */
 		if (ret) {
@@ -1181,7 +1192,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		 * Avoid this situation by reinjecting the packet back to stack and feciliate
 		 * fdb learning by bridge.
 		 */
-		if (res->dir == IP_CT_DIR_ORIGINAL) {
+		if (!res->uni_di && res->dir == IP_CT_DIR_ORIGINAL) {
 			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res, res->act);
 			return;
 		}
@@ -1202,6 +1213,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		break;
 #endif
 	default:
+		pan_stats_exp_inc(PAN_STAT_EXP_FLD_NO_OUT_L2);
 		xmit_pcifunc_off = res->pcifuncoff;
 		break;
 	}
@@ -1901,7 +1913,7 @@ int pan_rvu_install_flow(struct otx2_nic *pan_nic, struct pan_tuple *tuple)
 
 	if (!is_zero_ether_addr(tuple->dmac)) {
 		ether_addr_copy(pkt->dmac, tuple->dmac);
-		ether_addr_copy(pkt->dmac, pan_mac_mask);
+		ether_addr_copy(pmask->dmac, pan_mac_mask);
 		req->features |= BIT_ULL(NPC_DMAC);
 	}
 
@@ -1963,6 +1975,29 @@ int pan_rvu_install_flow(struct otx2_nic *pan_nic, struct pan_tuple *tuple)
 	return err;
 }
 
+static void pan_rvu_get_mcam_features(struct otx2_nic *pan_nic)
+{
+	struct npc_mcam_get_features_rsp *rsp;
+	struct msg_req *req;
+
+	mutex_lock(&pan_nic->mbox.lock);
+	req = otx2_mbox_alloc_msg_npc_mcam_get_features(&pan_nic->mbox);
+	if (!req)
+		goto exit;
+
+	if (otx2_sync_mbox_msg(&pan_nic->mbox))
+		goto exit;
+
+	rsp = (struct npc_mcam_get_features_rsp *)otx2_mbox_get_rsp
+		(&pan_nic->mbox.mbox, 0, &req->hdr);
+
+	pan_rvu_gbl.npc_rx_features = rsp->rx_features;
+	pan_rvu_gbl.npc_tx_features = rsp->tx_features;
+
+exit:
+	mutex_unlock(&pan_nic->mbox.lock);
+}
+
 static int pan_rvu_open(struct net_device *netdev)
 {
 	struct pan_rvu_dev_priv *pan_priv;
@@ -1986,6 +2021,8 @@ static int pan_rvu_open(struct net_device *netdev)
 
 	pan_priv = netdev_priv(netdev);
 	otx2_nic = pan_priv->otx2_nic;
+
+	pan_rvu_get_mcam_features(otx2_nic);
 
 	err = pan_rvu_get_iface_info(info, &cnt, false);
 	if (err) {
