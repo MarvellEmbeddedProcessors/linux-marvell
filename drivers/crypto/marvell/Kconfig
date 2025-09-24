@@ -59,3 +59,15 @@ config CRYPTO_DEV_OCTEONTX2_CPT
 	help
 		This driver allows you to utilize the Marvell Cryptographic
 		Accelerator Unit(CPT) found in OcteonTX2 series of processors.
+
+config CRYPTO_DEV_OCTEONTX2_ZIP
+	tristate "Marvell OcteonTX2 ZIP driver"
+	depends on ARCH_THUNDER2 || COMPILE_TEST
+	depends on PCI_MSI && 64BIT
+	depends on NET_VENDOR_MARVELL
+	select OCTEONTX2_MBOX
+	select NET_DEVLINK
+        help
+          Enable support for Marvell OcteonTX2 ZIP Driver.
+          This driver provides hardware compression/decompression support
+          using ZIP block found in OcteonTX2 series of processors.
