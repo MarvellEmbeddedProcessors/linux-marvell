@@ -220,7 +220,7 @@ static int pem_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	root_port = pci_get_domain_bus_and_slot(rc_domain, 0, 0);
 	if (!root_port) {
-		dev_err(&pdev->dev, "failed to get root port\n");
+		dev_info(&pdev->dev, "Root port not found, skip probe\n");
 		goto bar0_map_failed;
 	}
 	if (!root_port->is_hotplug_bridge) {
