@@ -1092,12 +1092,6 @@ static inline int otx2_tc_flower_rule_cnt(struct otx2_nic *pfvf)
 	return pfvf->flow_cfg->nr_flows;
 }
 
-int otx2_get_link_ksettings(struct net_device *netdev,
-			    struct ethtool_link_ksettings *cmd);
-
-void otx2_get_link_mode_info(u64 link_mode_bmap, bool req_mode,
-			     struct ethtool_link_ksettings *link_ksettings);
-
 /* MSI-X APIs */
 void otx2_free_cints(struct otx2_nic *pfvf, int n);
 void otx2_set_cints_affinity(struct otx2_nic *pfvf);
