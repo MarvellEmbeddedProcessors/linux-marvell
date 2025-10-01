@@ -1084,9 +1084,6 @@ static inline int otx2_tc_flower_rule_cnt(struct otx2_nic *pfvf)
 
 int otx2_get_link_ksettings(struct net_device *netdev,
 			    struct ethtool_link_ksettings *cmd);
-int __otx2_get_link_ksettings(struct net_device *netdev,
-			      struct ethtool_link_ksettings *cmd,
-			      bool ieee_only);
 
 void otx2_get_link_mode_info(u64 link_mode_bmap, bool req_mode,
 			     struct ethtool_link_ksettings *link_ksettings);

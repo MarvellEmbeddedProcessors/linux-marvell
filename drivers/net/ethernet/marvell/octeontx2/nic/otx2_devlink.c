@@ -383,7 +383,7 @@ static int otx2_dl_link_mode_set(struct devlink *devlink,
 	linkmode_zero(new_ks.link_modes.advertising);
 
 	/* Retrieve current link settings */
-	__otx2_get_link_ksettings(pfvf->netdev, &cur_ks, false);
+	otx2_get_link_ksettings(pfvf->netdev, &cur_ks);
 
 	/* Map the new mode to ethtool link_ksettings */
 	otx2_get_link_mode_info(mode, OTX2_MODE_ADVERTISED, &new_ks);
@@ -434,7 +434,7 @@ static int otx2_dl_link_mode_validate(struct devlink *devlink,
 		return -EINVAL;
 	}
 
-	if (__otx2_get_link_ksettings(pfvf->netdev, &cur_ks, false)) {
+	if (otx2_get_link_ksettings(pfvf->netdev, &cur_ks)) {
 		pr_warn("Failed to get link ksettings\n");
 		return -EIO;
 	}
