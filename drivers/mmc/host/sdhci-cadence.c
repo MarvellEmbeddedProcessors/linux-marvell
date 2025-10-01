@@ -1772,6 +1772,9 @@ static void sdhci_cdns_sd6_set_clock(struct sdhci_host *host,
 	struct sdhci_cdns_priv *priv = sdhci_cdns_priv(host);
 	struct sdhci_cdns_sd6_phy *phy = priv->phy;
 
+	if (clock == 0)
+		return sdhci_set_clock(host, clock);
+
 	phy->t_sdclk = DIV_ROUND_DOWN_ULL(1e12, clock);
 
 	pr_debug("%s %d %d\n", __func__, phy->mode, clock);
