@@ -14,22 +14,26 @@
 
 #include "pan_cmn.h"
 
-static struct pan_stats_exp stats_exp;
+static struct pan_stats_gen stats_gen;
 
-static char *pan_stats_exp_fld_name[PAN_STATS_EXP_FLD_MAX] = {
-	[PAN_STAT_EXP_FLD_NO_SIP_NEIGH] = "No neigh for sip :",
-	[PAN_STAT_EXP_FLD_NO_DIP_NEIGH] = "No neigh for dip :",
-	[PAN_STAT_EXP_FLD_NO_DEV]	= "netdev not found  :",
-	[PAN_STAT_EXP_FLD_NO_IN_L2]	= "No l2 src entry in flow table :",
-	[PAN_STAT_EXP_FLD_NO_OUT_L2]	= "No l2 dest entry in flow table :",
-	[PAN_STAT_EXP_FLD_INVAL_ACT]	= "Invalid action :",
+static char *pan_stats_gen_fld_name[PAN_STATS_GEN_FLD_MAX] = {
+	[PAN_STAT_GEN_FLD_NO_SIP_NEIGH]		= "No neigh for sip :",
+	[PAN_STAT_GEN_FLD_NO_DIP_NEIGH]		= "No neigh for dip :",
+	[PAN_STAT_GEN_FLD_NO_DEV]		= "netdev not found  :",
+	[PAN_STAT_GEN_FLD_NO_IN_L2]		= "No l2 src entry in flow table :",
+	[PAN_STAT_GEN_FLD_NO_OUT_L2]		= "No l2 dest entry in flow table :",
+	[PAN_STAT_GEN_FLD_INVAL_ACT]		= "Invalid action :",
+	[PAN_STAT_GEN_FLD_INVAL_DMAC]		= "Invalid dmac :",
+	[PAN_STAT_GEN_FL_ADD_FAIL_FEATURE_INVALID]	= "Invalid features :",
+	[PAN_STAT_GEN_FL_ADD_MORE_THAN_TWO]		= "Adding more than two flows :",
+	[PAN_STAT_GEN_FL_ADD_FAIL_WRONG_PROTO]	= "Wrong ether type :",
 };
 
 static int pan_stats_exp_dbg_show(struct seq_file *s, void *file)
 {
-	for (int i = 0; i < PAN_STATS_EXP_FLD_MAX; i++) {
-		seq_printf(s, "%s", pan_stats_exp_fld_name[i]);
-		seq_printf(s, "%u\n", atomic_read(&stats_exp.fld[i]));
+	for (int i = 0; i < PAN_STATS_GEN_FLD_MAX; i++) {
+		seq_printf(s, "%s", pan_stats_gen_fld_name[i]);
+		seq_printf(s, "%u\n", atomic_read(&stats_gen.fld[i]));
 	}
 	return 0;
 }
@@ -46,9 +50,9 @@ static const struct file_operations pan_stats_exp_dbg_ops = {
 	.release	= single_release,
 };
 
-void pan_stats_exp_inc(enum pan_stats_exp_fld fld)
+void pan_stats_gen_inc(enum pan_stats_gen_fld fld)
 {
-	atomic_inc(&stats_exp.fld[fld]);
+	atomic_inc(&stats_gen.fld[fld]);
 }
 
 static DEFINE_PER_CPU(struct pan_stats, pan_stats);

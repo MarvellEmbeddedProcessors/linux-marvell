@@ -34,6 +34,7 @@ struct pan_sw_fl {
 	u64				features;
 	struct rcu_head			rcu;
 	bool				uni_di;
+	u8				cnt;
 };
 
 static struct pan_sw_fl *
@@ -97,6 +98,7 @@ struct pan_sw_fl_stats_node {
 	u16 mcam_idx[2];
 	bool disabled;
 	bool uni_di;
+	u8 cnt;
 };
 
 static LIST_HEAD(pan_sw_fl_stats_lh);
@@ -115,6 +117,7 @@ pan_sw_fl_stats_add_node(unsigned long cookie, u16 mcam_idx[2], bool uni_di)
 	snode->mcam_idx[0] = mcam_idx[0];
 	snode->mcam_idx[1] = mcam_idx[1];
 	snode->uni_di = uni_di;
+	snode->cnt = 1;
 	INIT_LIST_HEAD(&snode->list);
 
 	mutex_lock(&pan_sw_fl_stats_lock);
@@ -122,6 +125,25 @@ pan_sw_fl_stats_add_node(unsigned long cookie, u16 mcam_idx[2], bool uni_di)
 	mutex_unlock(&pan_sw_fl_stats_lock);
 
 	return 0;
+}
+
+static int
+pan_sw_fl_stats_node_inc_fl_cnt(unsigned long cookie)
+{
+	struct pan_sw_fl_stats_node *snode;
+
+	mutex_lock(&pan_sw_fl_stats_lock);
+	list_for_each_entry(snode, &pan_sw_fl_stats_lh, list) {
+		if (snode->cookie != cookie)
+			continue;
+
+		snode->cnt++;
+		mutex_unlock(&pan_sw_fl_stats_lock);
+		return 0;
+	}
+	mutex_unlock(&pan_sw_fl_stats_lock);
+
+	return -ESRCH;
 }
 
 static int
@@ -174,6 +196,7 @@ static int pan_sw_fl_del(unsigned long cookie)
 	struct pan_sw_fl *fl;
 	bool uni_di;
 	int err;
+	int cnt;
 
 	mutex_lock(&pan_sw_fl_lock);
 	fl = __pan_sw_fl_entry_by_cookie(cookie);
@@ -185,8 +208,9 @@ static int pan_sw_fl_del(unsigned long cookie)
 	mutex_unlock(&pan_sw_fl_lock);
 
 	uni_di = fl->uni_di;
+	cnt = uni_di ? fl->cnt : 2;
 
-	pan_sw_fl_hw_del_n_free(fl->mcam_idx, uni_di ? 1 : 2);
+	pan_sw_fl_hw_del_n_free(fl->mcam_idx, cnt);
 
 	pan_tuple_hash_set(&tuple, fl->match_id[0]);
 	err = pan_fl_tbl_offl_del(&tuple);
@@ -200,7 +224,7 @@ static int pan_sw_fl_del(unsigned long cookie)
 	if (fl->match_id[0])
 		pan_free_matchid(&gbl->rsrc, fl->match_id[0]);
 
-	if (uni_di)
+	if (cnt == 1)
 		goto done;
 
 	pan_tuple_hash_set(&tuple, fl->match_id[1]);
@@ -262,7 +286,7 @@ fail_alloc_entry:
 }
 
 static int pan_sw_fl_hw_flow_install(u16 mcam_idx, struct fl_tuple *ftuple, u16 match_id,
-				     struct pan_tuple *tuple)
+				     struct pan_tuple *tuple, u64 act)
 {
 	u8 pan_mac_mask[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	struct npc_install_flow_req *req;
@@ -274,17 +298,6 @@ static int pan_sw_fl_hw_flow_install(u16 mcam_idx, struct fl_tuple *ftuple, u16 
 
 	gbl = pan_rvu_get_gbl();
 	npc_rx_features = gbl->npc_rx_features;
-
-	features = ftuple->features;
-
-	if (!(features & (BIT_ULL(NPC_DMAC) | BIT_ULL(NPC_SMAC) |
-			  BIT_ULL(NPC_DIP_IPV4) |
-			  BIT_ULL(NPC_SIP_IPV4) |
-			  BIT_ULL(NPC_ETYPE) |
-			  BIT_ULL(NPC_IPPROTO_TCP) |
-			  BIT_ULL(NPC_IPPROTO_UDP)))) {
-		return 0;
-	}
 
 	mutex_lock(&otx2_nic->mbox.lock);
 	req = otx2_mbox_alloc_msg_npc_install_flow(&otx2_nic->mbox);
@@ -299,6 +312,7 @@ static int pan_sw_fl_hw_flow_install(u16 mcam_idx, struct fl_tuple *ftuple, u16 
 	/* nf tables does not support L2 offload
 	 * So no need for mac addresses
 	 */
+	features = ftuple->features;
 	if (features & BIT_ULL(NPC_DMAC) & npc_rx_features) {
 		ether_addr_copy(pkt->dmac, tuple->dmac);
 		ether_addr_copy(pmask->dmac, pan_mac_mask);
@@ -324,9 +338,14 @@ static int pan_sw_fl_hw_flow_install(u16 mcam_idx, struct fl_tuple *ftuple, u16 
 	}
 
 	if (features & BIT_ULL(NPC_ETYPE) & npc_rx_features) {
-		pkt->etype = tuple->l3proto;
-		pmask->etype = ftuple->m_eth_type;
-		req->features |= BIT_ULL(NPC_ETYPE);
+		if (tuple->l3proto != htons(ETH_P_IPV6)  &&
+		    tuple->l3proto != htons(ETH_P_IP)) {
+			return -EINVAL;
+		} else {
+			pkt->etype = tuple->l3proto;
+			pmask->etype = ftuple->m_eth_type;
+			req->features |= BIT_ULL(NPC_ETYPE);
+		}
 	}
 
 	if (features & BIT_ULL(NPC_IPPROTO_TCP) & npc_rx_features) {
@@ -576,12 +595,21 @@ static int pan_sw_fl_tbl_entry_add(struct fl_tuple *ftuple, u16 match_id, u8 dir
 
 	features = ftuple->features;
 
-	if (features & BIT_ULL(NPC_DMAC))
+	opq.eg_dmac_can_set = 1;
+
+	if (features & BIT_ULL(NPC_DMAC)) {
 		ether_addr_copy(tuple->dmac, ftuple->dmac);
+		if (!is_zero_ether_addr((u8 *)tuple->dmac)) {
+			ether_addr_copy(opq.eg_dmac, (u8 *)tuple->dmac);
+			opq.eg_dmac_is_set = 1;
+		}
+	}
 
 	if (!is_zero_ether_addr(ftuple->smac)) {
 		ether_addr_copy(tuple->smac, ftuple->smac);
-		ether_addr_copy(opq.eg_smac, ftuple->smac);
+
+		if (!is_zero_ether_addr((u8 *)ftuple->smac))
+			ether_addr_copy(opq.eg_smac, ftuple->smac);
 	}
 
 	if (features & BIT_ULL(NPC_SIP_IPV4))
@@ -590,8 +618,14 @@ static int pan_sw_fl_tbl_entry_add(struct fl_tuple *ftuple, u16 match_id, u8 dir
 	if (features & BIT_ULL(NPC_DIP_IPV4))
 		tuple->dst_ip4.s_addr = ftuple->ip4dst;
 
-	if (features & BIT_ULL(NPC_ETYPE))
+	if (features & BIT_ULL(NPC_ETYPE)) {
 		tuple->l3proto = ftuple->eth_type;
+		if (tuple->l3proto != htons(ETH_P_IPV6)  &&
+		    tuple->l3proto != htons(ETH_P_IP)) {
+			pan_stats_gen_inc(PAN_STAT_GEN_FL_ADD_FAIL_WRONG_PROTO);
+			return -EINVAL;
+		}
+	}
 
 	if (features & BIT_ULL(NPC_IPPROTO_TCP)) {
 		tuple->sport = ftuple->sport;
@@ -605,8 +639,6 @@ static int pan_sw_fl_tbl_entry_add(struct fl_tuple *ftuple, u16 match_id, u8 dir
 		tuple->l4proto = IPPROTO_UDP;
 	}
 
-	opq.eg_dmac_can_set = 1;
-
 	if (dir == IP_CT_DIR_ORIGINAL) {
 		if (!is_zero_ether_addr((u8 *)minfo->dmac) && (features & BIT_ULL(NPC_DMAC))) {
 			ether_addr_copy(opq.eg_dmac, (u8 *)minfo->dmac);
@@ -614,7 +646,7 @@ static int pan_sw_fl_tbl_entry_add(struct fl_tuple *ftuple, u16 match_id, u8 dir
 		}
 
 		if (!is_zero_ether_addr((u8 *)minfo->smac))
-			ether_addr_copy(opq.eg_smac, (u8 *)minfo->dmac);
+			ether_addr_copy(opq.eg_smac, (u8 *)minfo->smac);
 
 		if (minfo->sip && (features & BIT_ULL(NPC_SIP_IPV4))) {
 			switch (act) {
@@ -686,6 +718,13 @@ static int pan_sw_fl_tbl_entry_add(struct fl_tuple *ftuple, u16 match_id, u8 dir
 
 	}
 
+	if (is_zero_ether_addr(opq.eg_dmac) &&
+	    (features & BIT_ULL(NPC_DMAC) &&
+	     (!(act & PAN_FL_TBL_ACT_L2_FWD)) && opq.eg_dmac_is_set)) {
+		pan_stats_gen_inc(PAN_STAT_GEN_FLD_INVAL_DMAC);
+		return -EINVAL;
+	}
+
 	/* MAC addr copied won't affect hash */
 	err = pan_fl_tbl_offl_add(tuple, &res);
 	if (err) {
@@ -703,57 +742,87 @@ static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 	struct pan_sw_fl *nfl, *ofl;
 	struct pan_sw_fl_mangle_info minfo = { 0 };
 	struct pan_tuple tuple = { 0 };
+	u64 features;
 	u64 act = 0;
 	int match_id[2];
 	u16  mcam_idx[2];
 	bool uni_di;
 	int rc;
+	int idx;
 
-	/* allocate memory for the new flow and it's node */
-	nfl = kzalloc(sizeof(*nfl), GFP_KERNEL);
-	if (!nfl)
-		return -ENOMEM;
+	features = ftuple->features;
+
+	if (!(features & (BIT_ULL(NPC_DMAC) | BIT_ULL(NPC_SMAC) |
+			  BIT_ULL(NPC_DIP_IPV4) |
+			  BIT_ULL(NPC_SIP_IPV4) |
+			  BIT_ULL(NPC_ETYPE) |
+			  BIT_ULL(NPC_IPPROTO_TCP) |
+			  BIT_ULL(NPC_IPPROTO_UDP)))) {
+		pan_stats_gen_inc(PAN_STAT_GEN_FL_ADD_FAIL_FEATURE_INVALID);
+		return -EINVAL;
+	}
 
 	mutex_lock(&pan_sw_fl_lock);
 	ofl = __pan_sw_fl_entry_by_cookie(cookie);
-	if (ofl) {
+	if (ofl && !ftuple->uni_di) {
 		mutex_unlock(&pan_sw_fl_lock);
 		return 0;
 	}
+
 	uni_di = ftuple->uni_di;
 	mutex_unlock(&pan_sw_fl_lock);
+
+	if (uni_di && ofl && ofl->cnt >= 2) {
+		pr_err("%s:%d Request to add more than 2 flows\n", __func__, __LINE__);
+		pan_stats_gen_inc(PAN_STAT_GEN_FL_ADD_MORE_THAN_TWO);
+
+		return -EINVAL;
+	}
+
+	/* allocate memory for the new flow and it's node */
+	if (!ofl) {
+		nfl = kzalloc(sizeof(*nfl), GFP_KERNEL);
+		if (!nfl)
+			return -ENOMEM;
+
+		INIT_LIST_HEAD(&nfl->list);
+		nfl->cookie = cookie;
+	} else {
+		nfl = ofl;
+	}
 
 	pan_rvu_gbl = pan_rvu_get_gbl();
 
 	pan_sw_fl_mangle_parse(ftuple, &act, &minfo);
 
-	match_id[0] = pan_alloc_matchid(&pan_rvu_gbl->rsrc);
-	rc = pan_sw_fl_tbl_entry_add(ftuple, match_id[0], IP_CT_DIR_ORIGINAL, &minfo, act, &tuple);
+	idx = nfl->cnt;
+
+	match_id[idx] = pan_alloc_matchid(&pan_rvu_gbl->rsrc);
+	rc = pan_sw_fl_tbl_entry_add(ftuple, match_id[idx],
+				     IP_CT_DIR_ORIGINAL, &minfo, act, &tuple);
 	if (rc) {
 		pr_err("%s:%d Error to install flow tuple\n", __func__, __LINE__);
 		goto free;
 	}
 
-	rc = pan_sw_fl_hw_alloc_mcam_entry(mcam_idx, uni_di ? 1 : 2);
+	rc = pan_sw_fl_hw_alloc_mcam_entry(mcam_idx + idx, uni_di ? 1 : 2);
 	if (rc) {
 		pr_err("%s:%d Error to alloc mcam idxs\n", __func__, __LINE__);
 		goto free;
 	}
 
-	rc = pan_sw_fl_hw_flow_install(mcam_idx[0], ftuple, match_id[0], &tuple);
+	rc = pan_sw_fl_hw_flow_install(mcam_idx[idx], ftuple, match_id[idx], &tuple, act);
 	if (rc) {
 		pr_err("%s:%d Error to install original dir flow", __func__, __LINE__);
 		goto free;
 	}
 
-	INIT_LIST_HEAD(&nfl->list);
-	nfl->cookie = cookie;
-
-	nfl->mcam_idx[0] = mcam_idx[0];
-	nfl->match_id[0] = match_id[0];
+	nfl->mcam_idx[idx] = mcam_idx[idx];
+	nfl->match_id[idx] = match_id[idx];
 
 	if (uni_di) {
 		nfl->uni_di = uni_di;
+		nfl->cnt++;
 		goto done;
 	}
 
@@ -770,7 +839,7 @@ static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 		goto free;
 	}
 
-	rc = pan_sw_fl_hw_flow_install(mcam_idx[1], &reply_ftuple, match_id[1], &tuple);
+	rc = pan_sw_fl_hw_flow_install(mcam_idx[1], &reply_ftuple, match_id[1], &tuple, act);
 	if (rc) {
 		pr_err("%s:%d Error to install reply dir flow", __func__, __LINE__);
 		goto free;
@@ -780,6 +849,12 @@ static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 	nfl->match_id[1] = match_id[1];
 
 done:
+
+	if (ofl) {
+		pan_sw_fl_stats_node_inc_fl_cnt(cookie);
+		return 0;
+	}
+
 	rc = pan_sw_fl_stats_add_node(cookie, mcam_idx, uni_di);
 	if (rc) {
 		pr_err("%s:%d Error to install stats node", __func__, __LINE__);
@@ -789,7 +864,6 @@ done:
 	mutex_lock(&pan_sw_fl_lock);
 	list_add_tail(&nfl->list, &pan_sw_fl_lh);
 	mutex_unlock(&pan_sw_fl_lock);
-
 	return 0;
 free:
 	pan_free_matchid(&pan_rvu_gbl->rsrc, match_id[0]);
@@ -809,7 +883,7 @@ static void pan_sw_fl_dwork(struct work_struct *dwork)
 	unsigned long fcookie = 0;
 	u16 mcam_idx[64][2];
 	bool disabled[64];
-	bool uni_di[64];
+	u8 ecnt[64];
 	LIST_HEAD(local_lh);
 	int iter = 64;
 	int ret, cnt = 0;
@@ -855,7 +929,8 @@ static void pan_sw_fl_dwork(struct work_struct *dwork)
 		mcam_idx[cnt][0] = snode->mcam_idx[0];
 		mcam_idx[cnt][1] = snode->mcam_idx[1];
 		disabled[cnt] = snode->disabled;
-		uni_di[cnt] = snode->uni_di;
+		ecnt[cnt] = snode->cnt;
+
 		cnt++;
 
 		if (snode->disabled)
@@ -879,7 +954,7 @@ static void pan_sw_fl_dwork(struct work_struct *dwork)
 		req->fl[i].cookie = cookie[i];
 		req->fl[i].mcam_idx[0] = mcam_idx[i][0];
 		req->fl[i].mcam_idx[1] = mcam_idx[i][1];
-		req->fl[i].uni_di = uni_di[i];
+		req->fl[i].uni_di = ecnt[i] == 1;
 		req->fl[i].dis = disabled[i];
 	}
 

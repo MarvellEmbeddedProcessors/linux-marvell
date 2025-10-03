@@ -42,7 +42,10 @@ struct pan_sw_event {
 	union {
 		struct fib_entry fe;
 		u8 mac[16];
-		struct fl_tuple tuple;
+		struct {
+			struct fl_tuple tuple;
+			unsigned long cookie;
+		};
 	};
 };
 
@@ -105,10 +108,15 @@ static int pan_sw_debugfs_show(struct seq_file *m, void *v)
 				str_prot = "TCP";
 			else if (t->proto == 17)
 				str_prot = "UDP";
+			else if (t->proto == 1)
+				str_prot = "icmp";
 
-			seq_printf(m, "%pI4(%u) to %pI4(%u)  %s %s\n",
-				   &t->ip4src, t->sport, &t->ip4dst, t->dport,
-				   (t->eth_type == htonl(0x86dd)) ? "IPv6" : "IPv4",
+			seq_printf(m, "%s cookie=%lu (%pM, %pI4:%u) to (%pM, %pI4:%u) %s %s\n",
+				   ev->cmd == FL_ADD ? "ADD" : "DEL",
+				   ev->cookie,
+				   t->smac, &t->ip4src, t->sport,
+				   t->dmac, &t->ip4dst, t->dport,
+				   (t->eth_type == htons(ETH_P_IPV6)) ? "IPv6" : "IPv4",
 				   str_prot);
 			continue;
 		}
@@ -141,7 +149,9 @@ static void pan_sw_event_log(struct af2swdev_notify_req *req)
 	else if (req->flags & FL_DEL)
 		cmd = FL_DEL;
 
-	if (cmd == FDB_ADD || cmd == FDB_DEL) {
+	switch (cmd) {
+	case FDB_ADD:
+	case FDB_DEL:
 		ev = kcalloc(1, sizeof(*ev), GFP_KERNEL);
 		ev->cmd = cmd;
 		ev->jiffies = jiffies;
@@ -151,38 +161,39 @@ static void pan_sw_event_log(struct af2swdev_notify_req *req)
 		idx = __pan_sw_event_get_slot();
 		ev_arr[idx] = ev;
 		mutex_unlock(&ev_lk);
+		break;
 
-		return;
-	}
-
-	if (cmd == FL_ADD || cmd == FL_DEL) {
+	case FL_ADD:
+	case FL_DEL:
 		ev = kcalloc(1, sizeof(*ev), GFP_KERNEL);
 		ev->cmd = cmd;
 		ev->jiffies = jiffies;
 		ev->tuple = req->tuple;
+		ev->cookie = req->cookie;
 
 		mutex_lock(&ev_lk);
 		idx = __pan_sw_event_get_slot();
 		ev_arr[idx] = ev;
 		mutex_unlock(&ev_lk);
+		break;
 
-		return;
-	}
+	case FIB_CMD:
+		fe = req->entry;
+		for (int i = 0; i < req->cnt; i++, fe++) {
+			if (fe->cmd == OTX2_NEIGH_UPDATE)
+				continue;
 
-	fe = req->entry;
-	for (int i = 0; i < req->cnt; i++, fe++) {
-		if (fe->cmd == OTX2_NEIGH_UPDATE)
-			continue;
+			ev = kcalloc(1, sizeof(*ev), GFP_KERNEL);
+			ev->cmd = cmd;
+			ev->fe = *fe;
+			ev->jiffies = jiffies;
 
-		ev = kcalloc(1, sizeof(*ev), GFP_KERNEL);
-		ev->cmd = cmd;
-		ev->fe = *fe;
-		ev->jiffies = jiffies;
-
-		mutex_lock(&ev_lk);
-		idx = __pan_sw_event_get_slot();
-		ev_arr[idx] = ev;
-		mutex_unlock(&ev_lk);
+			mutex_lock(&ev_lk);
+			idx = __pan_sw_event_get_slot();
+			ev_arr[idx] = ev;
+			mutex_unlock(&ev_lk);
+		}
+		break;
 	}
 }
 
