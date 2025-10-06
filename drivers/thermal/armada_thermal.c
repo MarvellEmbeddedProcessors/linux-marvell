@@ -62,6 +62,7 @@
 
 /* Thermal sensor flags */
 #define RESET_ON_CHANNEL_SELECTION	BIT(0)
+#define SINGLE_CHANNEL			BIT(1)
 
 struct armada_thermal_data;
 
@@ -355,6 +356,10 @@ static int armada_select_channel(struct armada_thermal_priv *priv, int channel)
 
 	if (channel < 0 || channel > priv->data->cpu_nr)
 		return -EINVAL;
+
+	/* Skip channel selection if the platform only has one channel */
+	if (priv->data->flags & SINGLE_CHANNEL)
+		return 0;
 
 	if (priv->current_channel == channel)
 		return 0;
@@ -726,6 +731,7 @@ static const struct armada_thermal_data armada_cp110_data = {
 	.dfx_overheat_irq = BIT(20),
 	.dfx_server_irq_mask_off = 0x104,
 	.dfx_server_irq_en = BIT(1),
+	.flags = SINGLE_CHANNEL,
 };
 
 static const struct of_device_id armada_thermal_id_table[] = {
