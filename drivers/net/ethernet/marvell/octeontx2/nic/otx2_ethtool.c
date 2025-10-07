@@ -1360,6 +1360,7 @@ static int otx2_set_link_ksettings(struct net_device *netdev,
 	struct cgx_set_link_mode_rsp *rsp;
 	struct mbox *mbox = &pf->mbox;
 	int err = 0;
+	bool if_up;
 
 	memset(&cur_ks, 0, sizeof(struct ethtool_link_ksettings));
 
@@ -1377,6 +1378,10 @@ static int otx2_set_link_ksettings(struct net_device *netdev,
 	if (!linkmode_subset(cmd->link_modes.advertising,
 			     cur_ks.link_modes.supported))
 		return -EINVAL;
+
+	if_up = netif_running(netdev);
+	if (if_up)
+		netdev->netdev_ops->ndo_stop(netdev);
 
 	mutex_lock(&mbox->lock);
 	req = otx2_mbox_alloc_msg_cgx_set_link_mode(&pf->mbox);
@@ -1414,6 +1419,8 @@ static int otx2_set_link_ksettings(struct net_device *netdev,
 	}
 end:
 	mutex_unlock(&mbox->lock);
+	if (if_up)
+		netdev->netdev_ops->ndo_open(netdev);
 	return err;
 }
 
