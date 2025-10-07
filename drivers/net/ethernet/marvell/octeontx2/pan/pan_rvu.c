@@ -856,8 +856,8 @@ pan_rvu_modify_l2_l3_l4_hdr(struct otx2_nic *pfvf,
 		if (unlikely(netif_is_bridge_port(in_dev))) {
 			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
 			if (!l2_node) {
-				pan_stats_gen_inc(PAN_STAT_GEN_FLD_NO_IN_L2);
 				pan_sw_inject_fdb_add_event(pfvf, dev, eth->h_source);
+				pan_stats_err_inc(PAN_STAT_ERR_NO_SMAC_L2_HASH);
 				return -ENOENT;
 			}
 
@@ -879,7 +879,7 @@ pan_rvu_modify_l2_l3_l4_hdr(struct otx2_nic *pfvf,
 		}
 
 		if (unlikely(!neigh)) {
-			pan_stats_gen_inc(PAN_STAT_GEN_FLD_NO_DIP_NEIGH);
+			pan_stats_err_inc(PAN_STAT_ERR_DIP_NEIGH);
 			return -ENOENT;
 		}
 
@@ -894,7 +894,7 @@ pan_rvu_modify_l2_l3_l4_hdr(struct otx2_nic *pfvf,
 		l2_node = __pan_sw_l2_mac_tbl_lookup(dmac);
 		if (!l2_node) {
 			pan_sw_inject_fdb_add_event(pfvf, dev, dmac);
-			pan_stats_gen_inc(PAN_STAT_GEN_FLD_NO_OUT_L2);
+			pan_stats_err_inc(PAN_STAT_ERR_NO_DMAC_L2_HASH);
 			return -ENOENT;
 		}
 	}
@@ -975,7 +975,7 @@ pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
 	pcifunc = pan_rvu_gbl.sqoff2pcifunc[res->pcifuncoff];
 	dev = xa_load(&pan_rvu_gbl.pfunc2dev, pcifunc);
 	if (unlikely(!dev)) {
-		pan_stats_gen_inc(PAN_STAT_GEN_FLD_NO_DEV);
+		pan_stats_err_inc(PAN_STAT_ERR_DEV);
 		pr_debug("%s:%d Could not find outdev for pcifunc=%#x, exception\n",
 			 __func__, __LINE__, pcifunc);
 		return -ENOENT;
@@ -998,8 +998,8 @@ pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
 		if (unlikely(netif_is_bridge_port(in_dev))) {
 			l2_node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
 			if (!l2_node) {
-				pan_stats_gen_inc(PAN_STAT_GEN_FLD_NO_IN_L2);
 				pan_sw_inject_fdb_add_event(pfvf, dev, eth->h_source);
+				pan_stats_err_inc(PAN_STAT_ERR_NO_SMAC_L2_HASH);
 				pr_debug("%s:%d Could not find l2_node for src mac=%pM, exception\n",
 					 __func__, __LINE__, eth->h_source);
 				return -ENOENT;
@@ -1031,7 +1031,7 @@ pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
 
 		neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
 		if (unlikely(!neigh)) {
-			pan_stats_gen_inc(PAN_STAT_GEN_FLD_NO_DIP_NEIGH);
+			pan_stats_err_inc(PAN_STAT_ERR_DIP_NEIGH);
 			pr_debug("%s:%d neigh dest failed destip=%pI4 dev=%s\n",
 				 __func__, __LINE__, &iphdr->daddr, dev->name);
 			return -ENOENT;
@@ -1044,7 +1044,7 @@ pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
 		l2_node = __pan_sw_l2_mac_tbl_lookup(dmac);
 		if (!l2_node) {
 			pan_sw_inject_fdb_add_event(pfvf, dev, dmac);
-			pan_stats_gen_inc(PAN_STAT_GEN_FLD_NO_OUT_L2);
+			pan_stats_err_inc(PAN_STAT_ERR_NO_DMAC_L2_HASH);
 			return -ENOENT;
 		}
 	}
@@ -1220,7 +1220,7 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		break;
 #endif
 	default:
-		pan_stats_gen_inc(PAN_STAT_GEN_FLD_NO_OUT_L2);
+		pan_stats_err_inc(PAN_STAT_ERR_INVAL_ACTION);
 		xmit_pcifunc_off = res->pcifuncoff;
 		break;
 	}

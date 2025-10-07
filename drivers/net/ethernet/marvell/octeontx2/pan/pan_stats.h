@@ -33,22 +33,22 @@ struct pan_stats {
 	u64 fld[PAN_STATS_FLD_MAX];
 };
 
-enum pan_stats_gen_fld {
-	PAN_STAT_GEN_FLD_NO_SIP_NEIGH,
-	PAN_STAT_GEN_FLD_NO_DIP_NEIGH,
-	PAN_STAT_GEN_FLD_NO_DEV,
-	PAN_STAT_GEN_FLD_NO_IN_L2,
-	PAN_STAT_GEN_FLD_NO_OUT_L2,
-	PAN_STAT_GEN_FLD_INVAL_ACT,
-	PAN_STAT_GEN_FLD_INVAL_DMAC,
-	PAN_STAT_GEN_FL_ADD_FAIL_FEATURE_INVALID,
-	PAN_STAT_GEN_FL_ADD_MORE_THAN_TWO,
-	PAN_STAT_GEN_FL_ADD_FAIL_WRONG_PROTO,
-	PAN_STATS_GEN_FLD_MAX,
+enum pan_stats_err_fld {
+	PAN_STAT_ERR_SIP_NEIGH,
+	PAN_STAT_ERR_DIP_NEIGH,
+	PAN_STAT_ERR_DEV,
+	PAN_STAT_ERR_NO_SMAC_L2_HASH,
+	PAN_STAT_ERR_NO_DMAC_L2_HASH,
+	PAN_STAT_ERR_INVAL_ACTION,
+	PAN_STAT_ERR_INVAL_DMAC,
+	PAN_STAT_ERR_FEATURE,
+	PAN_STAT_ERR_FL_CNT,
+	PAN_STAT_ERR_INVAL_ETYPE,
+	PAN_STATS_ERR_MAX,
 };
 
-struct pan_stats_gen {
-	atomic_t fld[PAN_STATS_GEN_FLD_MAX];
+struct pan_stats_err {
+	atomic_t fld[PAN_STATS_ERR_MAX];
 };
 
 void pan_stats_inc(enum pan_stats_fld fld);
@@ -56,6 +56,6 @@ void pan_stats_add(enum pan_stats_fld fld, u32 cnt);
 u64 pan_stats_get(enum pan_stats_fld fld, int cpu);
 int pan_stats_init(void);
 void pan_stats_deinit(void);
-void pan_stats_gen_inc(enum pan_stats_gen_fld fld);
+void pan_stats_err_inc(enum pan_stats_err_fld fld);
 
 #endif // End of PAN_STATS_H_

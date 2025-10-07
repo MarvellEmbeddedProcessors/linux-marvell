@@ -620,7 +620,7 @@ static int pan_sw_fl_tbl_entry_add(struct fl_tuple *ftuple, u16 match_id, u8 dir
 		tuple->l3proto = ftuple->eth_type;
 		if (tuple->l3proto != htons(ETH_P_IPV6)  &&
 		    tuple->l3proto != htons(ETH_P_IP)) {
-			pan_stats_gen_inc(PAN_STAT_GEN_FL_ADD_FAIL_WRONG_PROTO);
+			pan_stats_err_inc(PAN_STAT_ERR_INVAL_ETYPE);
 			return -EINVAL;
 		}
 	}
@@ -719,7 +719,7 @@ static int pan_sw_fl_tbl_entry_add(struct fl_tuple *ftuple, u16 match_id, u8 dir
 	if (is_zero_ether_addr(opq.eg_dmac) &&
 	    (features & BIT_ULL(NPC_DMAC) &&
 	     (!(act & PAN_FL_TBL_ACT_L2_FWD)) && opq.eg_dmac_is_set)) {
-		pan_stats_gen_inc(PAN_STAT_GEN_FLD_INVAL_DMAC);
+		pan_stats_err_inc(PAN_STAT_ERR_INVAL_DMAC);
 		return -EINVAL;
 	}
 
@@ -755,7 +755,7 @@ static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 			  BIT_ULL(NPC_ETYPE) |
 			  BIT_ULL(NPC_IPPROTO_TCP) |
 			  BIT_ULL(NPC_IPPROTO_UDP)))) {
-		pan_stats_gen_inc(PAN_STAT_GEN_FL_ADD_FAIL_FEATURE_INVALID);
+		pan_stats_err_inc(PAN_STAT_ERR_FEATURE);
 		return -EINVAL;
 	}
 
@@ -771,7 +771,7 @@ static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 
 	if (uni_di && ofl && ofl->cnt >= 2) {
 		pr_err("%s:%d Request to add more than 2 flows\n", __func__, __LINE__);
-		pan_stats_gen_inc(PAN_STAT_GEN_FL_ADD_MORE_THAN_TWO);
+		pan_stats_err_inc(PAN_STAT_ERR_FL_CNT);
 
 		return -EINVAL;
 	}

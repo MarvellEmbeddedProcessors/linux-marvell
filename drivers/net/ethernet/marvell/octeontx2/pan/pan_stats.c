@@ -14,45 +14,45 @@
 
 #include "pan_cmn.h"
 
-static struct pan_stats_gen stats_gen;
+static struct pan_stats_err stats_err;
 
-static char *pan_stats_gen_fld_name[PAN_STATS_GEN_FLD_MAX] = {
-	[PAN_STAT_GEN_FLD_NO_SIP_NEIGH]		= "No neigh for sip :",
-	[PAN_STAT_GEN_FLD_NO_DIP_NEIGH]		= "No neigh for dip :",
-	[PAN_STAT_GEN_FLD_NO_DEV]		= "netdev not found  :",
-	[PAN_STAT_GEN_FLD_NO_IN_L2]		= "No l2 src entry in flow table :",
-	[PAN_STAT_GEN_FLD_NO_OUT_L2]		= "No l2 dest entry in flow table :",
-	[PAN_STAT_GEN_FLD_INVAL_ACT]		= "Invalid action :",
-	[PAN_STAT_GEN_FLD_INVAL_DMAC]		= "Invalid dmac :",
-	[PAN_STAT_GEN_FL_ADD_FAIL_FEATURE_INVALID]	= "Invalid features :",
-	[PAN_STAT_GEN_FL_ADD_MORE_THAN_TWO]		= "Adding more than two flows :",
-	[PAN_STAT_GEN_FL_ADD_FAIL_WRONG_PROTO]	= "Wrong ether type :",
+static char *pan_stats_err_name[PAN_STATS_ERR_MAX] = {
+	[PAN_STAT_ERR_SIP_NEIGH]	= "ERR_SIP_NEIGH :",
+	[PAN_STAT_ERR_DIP_NEIGH]	= "ERR_DIP_NEIGH :",
+	[PAN_STAT_ERR_DEV]		= "ERR_DEV :",
+	[PAN_STAT_ERR_NO_SMAC_L2_HASH]	= "NO_SMAC_L2_HASH :",
+	[PAN_STAT_ERR_NO_DMAC_L2_HASH]	= "NO_DMAC_L2_HASH :",
+	[PAN_STAT_ERR_INVAL_ACTION]	= "INVAL_ACTION :",
+	[PAN_STAT_ERR_INVAL_DMAC]	= "INVAL_DMAC :",
+	[PAN_STAT_ERR_FEATURE]		= "ERR_FEATURE :",
+	[PAN_STAT_ERR_FL_CNT]		= "ERR_FL_CNT : ",
+	[PAN_STAT_ERR_INVAL_ETYPE]	= "INVAL_ETYPE :",
 };
 
-static int pan_stats_exp_dbg_show(struct seq_file *s, void *file)
+static int pan_stats_err_dbg_show(struct seq_file *s, void *file)
 {
-	for (int i = 0; i < PAN_STATS_GEN_FLD_MAX; i++) {
-		seq_printf(s, "%s", pan_stats_gen_fld_name[i]);
-		seq_printf(s, "%u\n", atomic_read(&stats_gen.fld[i]));
+	for (int i = 0; i < PAN_STATS_ERR_MAX; i++) {
+		seq_printf(s, "%s", pan_stats_err_name[i]);
+		seq_printf(s, "%u\n", atomic_read(&stats_err.fld[i]));
 	}
 	return 0;
 }
 
-static int pan_stats_exp_dbg_open(struct inode *inode, struct file *file)
+static int pan_stats_err_dbg_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, pan_stats_exp_dbg_show, inode->i_private);
+	return single_open(file, pan_stats_err_dbg_show, inode->i_private);
 }
 
-static const struct file_operations pan_stats_exp_dbg_ops = {
-	.open		= pan_stats_exp_dbg_open,
+static const struct file_operations pan_stats_err_dbg_ops = {
+	.open		= pan_stats_err_dbg_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
-void pan_stats_gen_inc(enum pan_stats_gen_fld fld)
+void pan_stats_err_inc(enum pan_stats_err_fld fld)
 {
-	atomic_inc(&stats_gen.fld[fld]);
+	atomic_inc(&stats_err.fld[fld]);
 }
 
 static DEFINE_PER_CPU(struct pan_stats, pan_stats);
@@ -284,7 +284,7 @@ int pan_stats_init(void)
 		pr_err("%s", "Debugfs creation failed for pan stats\n");
 
 	file = debugfs_create_file("exp", 0600, parent, NULL,
-				   &pan_stats_exp_dbg_ops);
+				   &pan_stats_err_dbg_ops);
 
 	if (!file)
 		pr_err("%s", "Debugfs exp stats creation failed\n");
