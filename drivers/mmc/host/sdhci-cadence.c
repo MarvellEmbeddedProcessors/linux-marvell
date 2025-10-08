@@ -35,6 +35,7 @@
 #define SDHCI_CDNS_TUNE_START		16
 #define SDHCI_CDNS_TUNE_STEP		6
 #define SDHCI_CDNS_TUNE_ITERATIONS	40
+#define SDHCI_CDNS_TUNE_MAX_VALUE	256
 #define SDHCI_CDNS_SD6_DEFAULT_DELAY_ELEMENT	8
 #define DEFAULT_READ_DQS_CMD_DELAY	64
 #define DEFAULT_CLK_WRDQS_DELAY		0
@@ -1372,6 +1373,24 @@ static int sdhci_cdns_sd6_get_delay_params(struct device *dev, struct sdhci_cdns
 	if (ret)
 		max_tune_iter = SDHCI_CDNS_TUNE_ITERATIONS;
 
+	/*
+	 * Device tree contains values for the tuning parameters
+	 * The expectation for a proper 8 bit tune value, by JESD84-B51 Spec. is:
+	 *     'tune_start_value + (tune_step * tune_iterations) <= 256'
+	 * If the DT-populated values cross 256, then these values may be
+	 * re-adjusted to default values, accordingly.
+	 */
+	pr_info("%s: Get Tuning params: Start[%d], Step[%d], Iterations[%d].\n",
+		__func__,  tune_val_start, tune_val_step, max_tune_iter);
+	if (WARN_ON((tune_val_start + (max_tune_iter * tune_val_step)) > SDHCI_CDNS_TUNE_MAX_VALUE)) {
+		tune_val_start = SDHCI_CDNS_TUNE_START;
+		tune_val_step = SDHCI_CDNS_TUNE_STEP;
+		max_tune_iter = SDHCI_CDNS_TUNE_ITERATIONS;
+		pr_info("%s: EMMC Tuning - params out-of-range, Check the Device Tree!\n", __func__);
+	}
+	pr_info("%s: Selected Tuning params: Start[%d], Step[%d], Iterations[%d].\n",
+		__func__,  tune_val_start, tune_val_step, max_tune_iter);
+
 	read_dqs_cmd_delay = phy->settings.cp_read_dqs_cmd_delay;
 	clk_wrdqs_delay = phy->settings.cp_clk_wrdqs_delay;
 	clk_wr_delay = phy->settings.cp_clk_wr_delay;
@@ -1965,6 +1984,7 @@ static int sdhci_cdns_sd6_execute_tuning(struct sdhci_host *host, u32 opcode)
 		 end_of_streak);
 
 	midpoint = end_of_streak - (((max_streak - 1) * tune_val_step) / 2);
+	pr_info("%s: Tuning Midpoint value = %d\n", __func__, midpoint);
 
 	return priv->cdns_data->set_tune_val(host, midpoint);
 }
