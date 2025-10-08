@@ -622,7 +622,7 @@ static int tmc_etr_alloc_flat_buf(struct tmc_drvdata *drvdata,
 						&flat_buf->daddr,
 						DMA_FROM_DEVICE,
 						GFP_KERNEL | __GFP_NOWARN);
-	if (!flat_buf->vaddr) {
+	if (dma_mapping_error(real_dev, flat_buf->daddr)) {
 		kfree(flat_buf);
 		return -ENOMEM;
 	}
