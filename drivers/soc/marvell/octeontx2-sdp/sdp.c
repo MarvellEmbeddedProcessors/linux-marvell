@@ -83,6 +83,7 @@ static void sdp_req_chan_bcast(struct sdp_dev *sdp)
 	sdp_nix_bcast_xon(rvu, BLKADDR_NIX1);
 
 	pci_dev_put(pdev);
+	return;
 err:
 	dev_warn(&sdp->pdev->dev,
 		 "Failed to broadcast XON on SDP channel\n");
