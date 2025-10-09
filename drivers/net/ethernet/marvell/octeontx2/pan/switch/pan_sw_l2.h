@@ -39,4 +39,5 @@ int pan_sw_l2_ev_enq(struct otx2_nic *pf, u32 switch_id,
 
 struct pan_sw_l2_offl_node *pan_sw_l2_mac_tbl_lookup(const u8 *mac);
 struct pan_sw_l2_offl_node *__pan_sw_l2_mac_tbl_lookup(const u8 *mac);
+int pan_sw_inject_fdb_add_event(struct otx2_nic *pf, struct net_device *dev, u8 *mac);
 #endif //PAN_SWITCH_H_

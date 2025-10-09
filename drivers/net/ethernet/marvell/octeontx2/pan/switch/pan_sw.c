@@ -16,6 +16,7 @@
 #include <linux/netdevice.h>
 #include <net/switchdev.h>
 #include <linux/hashtable.h>
+#include <linux/if_bridge.h>
 
 #include "pan_cmn.h"
 #include "../nic/switch/sw_nb.h"
@@ -41,7 +42,10 @@ struct pan_sw_event {
 
 	union {
 		struct fib_entry fe;
-		u8 mac[16];
+		struct {
+			u8 mac[16];
+			bool dp_added;
+		};
 		struct {
 			struct fl_tuple tuple;
 			unsigned long cookie;
@@ -97,7 +101,10 @@ static int pan_sw_debugfs_show(struct seq_file *m, void *v)
 		if (ev->cmd == FDB_ADD || ev->cmd == FDB_DEL) {
 			seq_printf(m, "%lu %s\t", ev->jiffies,
 				   pan_sw_event_cmd2str[ev->cmd]);
-			seq_printf(m, "mac=%pM\n", ev->mac);
+			seq_printf(m, "mac=%pM", ev->mac);
+			if (ev->dp_added)
+				seq_puts(m, " (Added by DP)");
+			seq_puts(m, "\n");
 			continue;
 		}
 
@@ -156,6 +163,7 @@ static void pan_sw_event_log(struct af2swdev_notify_req *req)
 		ev->cmd = cmd;
 		ev->jiffies = jiffies;
 		ether_addr_copy(ev->mac, req->mac);
+		ev->dp_added = !!(req->flags & DP_ADD);
 
 		mutex_lock(&ev_lk);
 		idx = __pan_sw_event_get_slot();
@@ -237,6 +245,97 @@ done:
 	if (err)
 		pr_debug("%s:%d Error happened while pushing rule to PAN\n",
 			 __func__, __LINE__);
+	return 0;
+}
+
+static DEFINE_SPINLOCK(pan_sw_fdb_lk);
+static LIST_HEAD(pan_sw_fdb_lh);
+
+struct pan_sw_fdb {
+	struct list_head list;
+	struct otx2_nic *pf;
+	struct net_device *dev;
+	u8 mac[6];
+	u64 flags;
+};
+
+static void
+pan_sw_dp_add_fdb(struct work_struct *unused)
+{
+	struct af2swdev_notify_req req = { };
+	struct net_device *port;
+	struct otx2_nic *nic;
+	struct msg_rsp rsp = { };
+	LIST_HEAD(llh);
+	struct pan_sw_fdb *entry;
+
+	spin_lock(&pan_sw_fdb_lk);
+	list_splice_init(&pan_sw_fdb_lh, &llh);
+	spin_unlock(&pan_sw_fdb_lk);
+
+	if (list_empty(&llh))
+		return;
+
+	while ((entry = list_first_entry_or_null(&llh,
+						 struct pan_sw_fdb, list))) {
+		list_del_init(&entry->list);
+
+		if (pan_sw_l2_mac_tbl_lookup(entry->mac)) {
+			dev_put(entry->dev);
+			kfree(entry);
+			continue;
+		}
+
+		rtnl_lock();
+		port = br_fdb_find_port(entry->dev, entry->mac, 0);
+		if (!port) {
+			dev_put(entry->dev);
+			rtnl_unlock();
+			kfree(entry);
+			continue;
+		}
+
+		nic = netdev_priv(port);
+		req.port_id = nic->pcifunc;
+		req.flags = entry->flags;
+		ether_addr_copy(req.mac, entry->mac);
+		rtnl_unlock();
+
+		otx2_mbox_up_handler_af2swdev_notify(entry->pf, &req, &rsp);
+		dev_put(entry->dev);
+		kfree(entry);
+	}
+}
+
+static DECLARE_WORK(pan_sw_dp_work, pan_sw_dp_add_fdb);
+
+// Hack
+int pan_sw_inject_fdb_add_event(struct otx2_nic *pf, struct net_device *br_dev, u8 *mac)
+{
+	struct pan_sw_fdb *fdb_info;
+
+	if (!is_valid_ether_addr(mac))
+		return 0;
+
+	if (pan_sw_l2_mac_tbl_lookup(mac))
+		return 0;
+
+	fdb_info = kcalloc(1, sizeof(*fdb_info), GFP_ATOMIC);
+	if (!fdb_info)
+		return -ENOMEM;
+
+	dev_hold(br_dev);
+	fdb_info->dev = br_dev;
+	fdb_info->flags = FDB_ADD | DP_ADD;
+	fdb_info->pf = pf;
+	ether_addr_copy(fdb_info->mac, mac);
+	INIT_LIST_HEAD(&fdb_info->list);
+
+	spin_lock(&pan_sw_fdb_lk);
+	list_add_tail(&fdb_info->list, &pan_sw_fdb_lh);
+	spin_unlock(&pan_sw_fdb_lk);
+
+	schedule_work(&pan_sw_dp_work);
 	return 0;
 }
 

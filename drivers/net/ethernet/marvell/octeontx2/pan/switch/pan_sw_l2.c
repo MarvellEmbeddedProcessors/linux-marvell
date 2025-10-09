@@ -262,6 +262,7 @@ static void pan_sw_l2_dwork(struct work_struct *dwork)
 {
 	struct pan_sw_l2_offl_node *node;
 	struct swdev2af_notify_req *req;
+	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	struct otx2_nic *pan;
 	unsigned long timeout;
 	unsigned long long hits;
@@ -301,8 +302,12 @@ static void pan_sw_l2_dwork(struct work_struct *dwork)
 				continue;
 			}
 
+			pan_rvu_gbl = pan_rvu_get_gbl();
+			pan_free_matchid(&pan_rvu_gbl->rsrc, node->match_id);
+
 			pr_debug("Deleted node %pM mcam_idx=%u state=%d\n",
 				 node->mac, node->mcam_idx, node->state);
+
 			kfree(node);
 			continue;
 
@@ -423,6 +428,9 @@ pan_sw_l2_offl_ev_enq(struct otx2_nic *pf, u32 switch_id,
 		      unsigned int port_id, u8 *mac)
 {
 	struct pan_sw_l2_offl_node *node;
+
+	if (pan_sw_l2_mac_tbl_lookup(mac))
+		return 0;
 
 	node = kcalloc(1, sizeof(*node), GFP_KERNEL);
 	if (!node)
