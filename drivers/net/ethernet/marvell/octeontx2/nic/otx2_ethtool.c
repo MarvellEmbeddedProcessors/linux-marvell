@@ -143,7 +143,6 @@ static void otx2_get_strings(struct net_device *netdev, u32 sset, u8 *data)
 		return;
 	}
 
-
 	if (sset != ETH_SS_STATS)
 		return;
 
@@ -294,7 +293,6 @@ static int otx2_get_sset_count(struct net_device *netdev, int sset)
 
 	if (sset == ETH_SS_PRIV_FLAGS)
 		return ARRAY_SIZE(otx2_priv_flags_strings);
-
 
 	if (sset != ETH_SS_STATS)
 		return -EINVAL;

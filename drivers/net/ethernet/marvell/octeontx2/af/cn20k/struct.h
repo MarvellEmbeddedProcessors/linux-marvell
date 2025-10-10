@@ -8,8 +8,7 @@
 #ifndef STRUCT_H
 #define STRUCT_H
 
-/*
- * CN20k RVU PF MBOX Interrupt Vector Enumeration
+/* CN20k RVU PF MBOX Interrupt Vector Enumeration
  *
  * Vectors 0 - 3 are compatible with pre cn20k and hence
  * existing macros are being reused.
