@@ -194,7 +194,6 @@ static int pan_sw_l2_del_flow_tbl(struct pan_sw_l2_offl_node *node)
 
 static int pan_sw_l2_add_flow_tbl(struct pan_sw_l2_offl_node *node)
 {
-	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	struct pan_fl_tbl_res res = { 0 };
 	struct pan_tuple *tuple;
 	u16 npc_matchid;
@@ -204,8 +203,7 @@ static int pan_sw_l2_add_flow_tbl(struct pan_sw_l2_offl_node *node)
 	tuple = &node->tuple;
 	tuple->flags = PAN_TUPLE_FLAG_L3_PROTO_V4;
 
-	pan_rvu_gbl = pan_rvu_get_gbl();
-	npc_matchid = pan_alloc_matchid(&pan_rvu_gbl->rsrc);
+	npc_matchid = pan_rvu_alloc_matchid();
 	pcifunc = pan_sw_get_pcifunc(node->port_id);
 	if (pcifunc == -1) {
 		pr_err("pcifunc is -1 for port_id=%#x\n", node->port_id);
@@ -262,7 +260,6 @@ static void pan_sw_l2_dwork(struct work_struct *dwork)
 {
 	struct pan_sw_l2_offl_node *node;
 	struct swdev2af_notify_req *req;
-	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	struct otx2_nic *pan;
 	unsigned long timeout;
 	unsigned long long hits;
@@ -302,8 +299,7 @@ static void pan_sw_l2_dwork(struct work_struct *dwork)
 				continue;
 			}
 
-			pan_rvu_gbl = pan_rvu_get_gbl();
-			pan_free_matchid(&pan_rvu_gbl->rsrc, node->match_id);
+			pan_rvu_free_matchid(node->match_id);
 
 			pr_debug("Deleted node %pM mcam_idx=%u state=%d\n",
 				 node->mac, node->mcam_idx, node->state);

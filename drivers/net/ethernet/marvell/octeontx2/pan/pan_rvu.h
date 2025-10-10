@@ -75,8 +75,8 @@ int pan_rvu_pcifunc2_sq_off(u16 pcifunc);
 // NPC related functions
 int pan_rvu_alloc_mcam_entry(struct otx2_nic *pan_nic, u16 *mcam_entry);
 int pan_rvu_install_flow(struct otx2_nic *pan_nic, struct pan_tuple *tuple);
-int pan_alloc_matchid(struct matchid_bmap *rsrc);
-void pan_free_matchid(struct matchid_bmap *rsrc, int id);
+int pan_rvu_alloc_matchid(void);
+void pan_rvu_free_matchid(int id);
 int pan_rvu_free_mcam_entry(u16 entry);
 int pan_rvu_delete_flow(u16 entry);
 struct otx2_nic *pan_rvu_get_pan_nic(void);

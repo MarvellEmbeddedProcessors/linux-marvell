@@ -1810,9 +1810,12 @@ static void otx2_free_mcam_entries(struct otx2_nic *pan)
 	mutex_unlock(&pan->mbox.lock);
 }
 
-int pan_alloc_matchid(struct matchid_bmap *rsrc)
+int pan_rvu_alloc_matchid(void)
 {
+	struct matchid_bmap *rsrc;
 	int id;
+
+	rsrc = &pan_rvu_gbl.rsrc;
 
 	if (!rsrc->bmap)
 		return -EINVAL;
@@ -1826,10 +1829,14 @@ int pan_alloc_matchid(struct matchid_bmap *rsrc)
 	return id;
 }
 
-void pan_free_matchid(struct matchid_bmap *rsrc, int id)
+void pan_rvu_free_matchid(int id)
 {
+	struct matchid_bmap *rsrc;
+
+	rsrc = &pan_rvu_gbl.rsrc;
 	if (!rsrc->bmap)
 		return;
+
 	__clear_bit(id, rsrc->bmap);
 }
 

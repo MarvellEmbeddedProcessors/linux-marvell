@@ -192,7 +192,6 @@ static int pan_sw_fl_hw_del_n_free(u16 *mcam_idx, int cnt)
 static int pan_sw_fl_del(unsigned long cookie)
 {
 	struct pan_tuple tuple = { 0 };
-	struct pan_rvu_gbl_t *gbl;
 	struct pan_sw_fl *fl;
 	bool uni_di;
 	int err;
@@ -220,9 +219,8 @@ static int pan_sw_fl_del(unsigned long cookie)
 		return err;
 	}
 
-	gbl = pan_rvu_get_gbl();
 	if (fl->match_id[0])
-		pan_free_matchid(&gbl->rsrc, fl->match_id[0]);
+		pan_rvu_free_matchid(fl->match_id[0]);
 
 	if (cnt == 1)
 		goto done;
@@ -236,7 +234,7 @@ static int pan_sw_fl_del(unsigned long cookie)
 	}
 
 	if (fl->match_id[1])
-		pan_free_matchid(&gbl->rsrc, fl->match_id[1]);
+		pan_rvu_free_matchid(fl->match_id[1]);
 
 done:
 	pan_sw_fl_stats_node_mark_for_del(cookie);
@@ -737,7 +735,6 @@ static int pan_sw_fl_tbl_entry_add(struct fl_tuple *ftuple, u16 match_id, u8 dir
 
 static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 {
-	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	struct fl_tuple reply_ftuple = { 0 };
 	struct pan_sw_fl *nfl, *ofl;
 	struct pan_sw_fl_mangle_info minfo = { 0 };
@@ -791,13 +788,11 @@ static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 		nfl = ofl;
 	}
 
-	pan_rvu_gbl = pan_rvu_get_gbl();
-
 	pan_sw_fl_mangle_parse(ftuple, &act, &minfo);
 
 	idx = nfl->cnt;
 
-	match_id[idx] = pan_alloc_matchid(&pan_rvu_gbl->rsrc);
+	match_id[idx] = pan_rvu_alloc_matchid();
 	rc = pan_sw_fl_tbl_entry_add(ftuple, match_id[idx],
 				     IP_CT_DIR_ORIGINAL, &minfo, act, &tuple);
 	if (rc) {
@@ -826,7 +821,7 @@ static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 		goto done;
 	}
 
-	match_id[1] = pan_alloc_matchid(&pan_rvu_gbl->rsrc);
+	match_id[1] = pan_rvu_alloc_matchid();
 	reply_ftuple = *ftuple;
 
 	pan_sw_fl_get_reply_ftuple(&reply_ftuple);
@@ -866,9 +861,9 @@ done:
 	mutex_unlock(&pan_sw_fl_lock);
 	return 0;
 free:
-	pan_free_matchid(&pan_rvu_gbl->rsrc, match_id[0]);
+	pan_rvu_free_matchid(match_id[0]);
 	if (!uni_di)
-		pan_free_matchid(&pan_rvu_gbl->rsrc, match_id[1]);
+		pan_rvu_free_matchid(match_id[1]);
 	pan_sw_fl_del(cookie);
 	kfree_rcu(nfl, rcu);
 	return rc;

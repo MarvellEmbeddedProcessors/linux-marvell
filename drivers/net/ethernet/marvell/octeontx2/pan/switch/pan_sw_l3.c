@@ -632,9 +632,6 @@ pan_sw_l3_tnode_alloc(struct otx2_nic *pf,
 {
 	struct pan_sw_l3_offl_tnode *tnode;
 	struct pan_sw_l3_offl_node *node;
-	struct pan_rvu_gbl_t *pan_rvu_gbl;
-
-	pan_rvu_gbl = pan_rvu_get_gbl();
 
 	tnode = kcalloc(1, sizeof(*tnode), GFP_KERNEL);
 	if (!tnode)
@@ -649,7 +646,7 @@ pan_sw_l3_tnode_alloc(struct otx2_nic *pf,
 	node->port_id = entry->port_id;
 	node->jiffies = jiffies;
 	node->pf = pf;
-	node->match_id = pan_alloc_matchid(&pan_rvu_gbl->rsrc);
+	node->match_id = pan_rvu_alloc_matchid();
 	node->mcam_idx = -1;
 
 	node->entry = kcalloc(1, sizeof(*entry), GFP_KERNEL);
@@ -759,10 +756,7 @@ static int
 pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool *me_deleted)
 {
 	struct pan_sw_l3_offl_tnode *tn, *walk, *p, *next;
-	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	u32 sbit, cnt, dst;
-
-	pan_rvu_gbl = pan_rvu_get_gbl();
 
 	pr_debug("%s:%d route DEL request for  dst=%#x dst_len=%d got Added\n",
 		 __func__, __LINE__, entry->dst, entry->dst_len);
@@ -784,7 +778,7 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool 
 		*mcam_idx = tn->node->mcam_idx;
 
 		kfree(tn->node->entry);
-		pan_free_matchid(&pan_rvu_gbl->rsrc, tn->node->match_id);
+		pan_rvu_free_matchid(tn->node->match_id);
 
 		kfree(tn->node);
 		tn->node = NULL;
@@ -872,7 +866,7 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool 
 		 entry->dst, entry->dst_len);
 
 	kfree(entry);
-	pan_free_matchid(&pan_rvu_gbl->rsrc, walk->node->match_id);
+	pan_rvu_free_matchid(walk->node->match_id);
 	kfree(walk->node);
 	walk->node = NULL;
 
@@ -996,7 +990,6 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 		  bool *reshuffle)
 {
 	struct pan_sw_l3_offl_tnode *tnode, *tmp;
-	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	int mcam_idx, match_id;
 	bool me_deleted;
 	int err;
@@ -1027,8 +1020,7 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 				spin_unlock(&offl_l3_lock);
 				kfree(tnode->node->entry);
 
-				pan_rvu_gbl = pan_rvu_get_gbl();
-				pan_free_matchid(&pan_rvu_gbl->rsrc, tnode->node->match_id);
+				pan_rvu_free_matchid(tnode->node->match_id);
 				kfree(tnode->node);
 				kfree(tnode);
 				continue;
