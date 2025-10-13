@@ -547,6 +547,7 @@
 		num-lanes = <1>;
 		clock-names = "core", "reg";
 		clocks = <&CP11X_LABEL(clk) 1 13>, <&CP11X_LABEL(clk) 1 14>;
+		marvell,system-controller = <&CP11X_LABEL(syscon0)>;
 		status = "disabled";
 	};
 
@@ -572,6 +573,7 @@
 		num-lanes = <1>;
 		clock-names = "core", "reg";
 		clocks = <&CP11X_LABEL(clk) 1 11>, <&CP11X_LABEL(clk) 1 14>;
+		marvell,system-controller = <&CP11X_LABEL(syscon0)>;
 		status = "disabled";
 	};
 
@@ -597,6 +599,7 @@
 		num-lanes = <1>;
 		clock-names = "core", "reg";
 		clocks = <&CP11X_LABEL(clk) 1 12>, <&CP11X_LABEL(clk) 1 14>;
+		marvell,system-controller = <&CP11X_LABEL(syscon0)>;
 		status = "disabled";
 	};
 };
