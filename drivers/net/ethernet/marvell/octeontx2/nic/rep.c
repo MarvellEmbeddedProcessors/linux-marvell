@@ -738,9 +738,9 @@ static void rvu_rep_remove(struct pci_dev *pdev)
 {
 	struct otx2_nic *priv = pci_get_drvdata(pdev);
 
-	otx2_unregister_dl(priv);
 	if (!(priv->flags & OTX2_FLAG_INTF_DOWN))
 		rvu_rep_destroy(priv);
+	otx2_unregister_dl(priv);
 	otx2_detach_resources(&priv->mbox);
 	if (priv->hw.lmt_info)
 		free_percpu(priv->hw.lmt_info);

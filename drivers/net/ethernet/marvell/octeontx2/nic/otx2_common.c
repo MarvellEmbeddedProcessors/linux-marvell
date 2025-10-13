@@ -1543,7 +1543,8 @@ int otx2_pool_aq_init(struct otx2_nic *pfvf, u16 pool_id,
 	if (type != AURA_NIX_RQ)
 		return 0;
 
-	if (pfvf->af_xdp_zc_qidx && !test_bit(pool_id, pfvf->af_xdp_zc_qidx)) {
+	if (otx2_rep_dev(pfvf->pdev) || (pfvf->af_xdp_zc_qidx &&
+	    !test_bit(pool_id, pfvf->af_xdp_zc_qidx))) {
 		sz = ALIGN(ALIGN(SKB_DATA_ALIGN(buf_size), OTX2_ALIGN), PAGE_SIZE);
 		pp_params.order = (sz / PAGE_SIZE) - 1;
 		pp_params.flags = PP_FLAG_PAGE_FRAG | PP_FLAG_DMA_MAP;
