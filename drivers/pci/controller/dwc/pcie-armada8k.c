@@ -60,6 +60,10 @@ struct armada8k_pcie {
 #define PCIE_INT_C_ASSERT_MASK		BIT(11)
 #define PCIE_INT_D_ASSERT_MASK		BIT(12)
 
+#define PCIE_GLOBAL_INT_CAUSE2_REG	(PCIE_VENDOR_REGS_OFFSET + 0x24)
+#define PCIE_GLOBAL_INT_MASK2_REG	(PCIE_VENDOR_REGS_OFFSET + 0x28)
+#define PCIE_INT2_PHY_RST_LINK_DOWN	BIT(1)
+
 #define PCIE_ARCACHE_TRC_REG		(PCIE_VENDOR_REGS_OFFSET + 0x50)
 #define PCIE_AWCACHE_TRC_REG		(PCIE_VENDOR_REGS_OFFSET + 0x54)
 #define PCIE_ARUSER_REG			(PCIE_VENDOR_REGS_OFFSET + 0x5C)
@@ -78,6 +82,8 @@ struct armada8k_pcie {
 #define UNIT_SOFT_RESET_CONFIG_REG	0x268
 
 #define to_armada8k_pcie(x)	dev_get_drvdata((x)->dev)
+
+static int armada8k_pcie_host_init(struct dw_pcie_rp *pp);
 
 static void armada8k_pcie_disable_phys(struct armada8k_pcie *pcie)
 {
@@ -192,6 +198,35 @@ static void armada8k_pcie_mac_reset(struct dw_pcie *pci)
 	udelay(1);
 }
 
+static int armada8k_pcie_reset_root_port(struct pci_dev *pdev)
+{
+	struct pci_bus *bus = pdev->bus;
+	struct dw_pcie_rp *pp = bus->sysdata;
+	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+	struct armada8k_pcie *pcie = to_armada8k_pcie(pci);
+	struct device *dev = pcie->pci->dev;
+	int ret;
+
+	ret = armada8k_pcie_host_init(pp);
+	if (ret) {
+		dev_err(dev, "failed to initialize host\n");
+		return ret;
+	}
+
+	ret = dw_pcie_setup_rc(pp);
+	if (ret) {
+		dev_err(dev, "failed to setup rc\n");
+		return ret;
+	}
+
+	dw_pcie_start_link(pci);
+	dw_pcie_wait_for_link(pci);
+
+	dev_dbg(dev, "Root Port reset completed\n");
+
+	return 0;
+}
+
 static int armada8k_pcie_host_init(struct dw_pcie_rp *pp)
 {
 	u32 reg;
@@ -252,6 +287,11 @@ static int armada8k_pcie_host_init(struct dw_pcie_rp *pp)
 	       PCIE_INT_C_ASSERT_MASK | PCIE_INT_D_ASSERT_MASK;
 	dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_MASK1_REG, reg);
 
+	/* Also enable link down interrupts */
+	reg = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_INT_MASK2_REG);
+	reg |= PCIE_INT2_PHY_RST_LINK_DOWN;
+	dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_MASK2_REG, reg);
+
 	return 0;
 }
 
@@ -268,6 +308,65 @@ static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
 	 */
 	val = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_INT_CAUSE1_REG);
 	dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_CAUSE1_REG, val);
+
+	/* Now clear the second interrupt cause. */
+	val = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_INT_CAUSE2_REG);
+	dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_CAUSE2_REG, val);
+
+	if (PCIE_INT2_PHY_RST_LINK_DOWN & val) {
+		/*
+		 * The link went down. Disable LTSSM immediately to kick
+		 * off the flush mode.
+		 */
+		val = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_CONTROL_REG);
+		val &= ~(PCIE_APP_LTSSM_EN);
+		dw_pcie_writel_dbi(pci, PCIE_GLOBAL_CONTROL_REG, val);
+
+		/*
+		 * Mask link down interrupts. They can be re-enabled once
+		 * the link is retrained.
+		 */
+		val = dw_pcie_readl_dbi(pci, PCIE_GLOBAL_INT_MASK2_REG);
+		val &= ~PCIE_INT2_PHY_RST_LINK_DOWN;
+		dw_pcie_writel_dbi(pci, PCIE_GLOBAL_INT_MASK2_REG, val);
+
+		return IRQ_WAKE_THREAD;
+	}
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t armada8k_pcie_irq_thread(int irq, void *arg)
+{
+	struct armada8k_pcie *pcie = arg;
+	struct dw_pcie *pci = pcie->pci;
+	struct dw_pcie_rp *pp = &pci->pp;
+	struct device *dev = pci->dev;
+	struct pci_dev *port;
+	struct pci_dev *child, *tmp;
+
+	dev_dbg(dev, "hot reset or link-down reset\n");
+
+	pci_lock_rescan_remove();
+
+	for_each_pci_bridge(port, pp->bridge->bus) {
+		if (pci_pcie_type(port) == PCI_EXP_TYPE_ROOT_PORT) {
+			list_for_each_entry_safe(child, tmp,
+						 &port->subordinate->devices, bus_list)
+				pci_stop_and_remove_bus_device(child);
+
+			armada8k_pcie_reset_root_port(port);
+		}
+	}
+
+	if (armada8k_pcie_link_up(pci)) {
+		msleep(100);
+		dev_dbg(dev, "Link is recovered. Starting enumeration!\n");
+		/* Rescan the bus to enumerate endpoint devices */
+		pci_rescan_bus(pp->bridge->bus);
+	}
+
+	pci_unlock_rescan_remove();
 
 	return IRQ_HANDLED;
 }
@@ -290,8 +389,9 @@ static int armada8k_add_pcie_port(struct armada8k_pcie *pcie,
 	if (pp->irq < 0)
 		return pp->irq;
 
-	ret = devm_request_irq(dev, pp->irq, armada8k_pcie_irq_handler,
-			       IRQF_SHARED, "armada8k-pcie", pcie);
+	ret = devm_request_threaded_irq(dev, pp->irq, armada8k_pcie_irq_handler,
+					armada8k_pcie_irq_thread,
+					IRQF_ONESHOT, "armada8k-pcie", pcie);
 	if (ret) {
 		dev_err(dev, "failed to request irq %d\n", pp->irq);
 		return ret;
