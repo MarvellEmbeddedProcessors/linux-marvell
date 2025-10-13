@@ -17,11 +17,13 @@
 #include <linux/gpio/consumer.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/mfd/syscon.h>
 #include <linux/of.h>
 #include <linux/of_pci.h>
 #include <linux/pci.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/regmap.h>
 #include <linux/resource.h>
 
 #include "pcie-designware.h"
@@ -35,6 +37,8 @@ struct armada8k_pcie {
 	struct phy *phy[ARMADA8K_PCIE_MAX_LANES];
 	unsigned int phy_count;
 	struct gpio_desc *reset_gpio;
+	struct regmap *sysctrl_base;
+	u32 mac_reset_bit_mask;
 };
 
 #define PCIE_VENDOR_REGS_OFFSET		0x8000
@@ -70,6 +74,8 @@ struct armada8k_pcie {
 #define DOMAIN_OUTER_SHAREABLE		0x2
 #define AX_USER_DOMAIN_MASK		0x3
 #define AX_USER_DOMAIN_SHIFT		4
+
+#define UNIT_SOFT_RESET_CONFIG_REG	0x268
 
 #define to_armada8k_pcie(x)	dev_get_drvdata((x)->dev)
 
@@ -168,6 +174,24 @@ static int armada8k_pcie_start_link(struct dw_pcie *pci)
 	return 0;
 }
 
+static void armada8k_pcie_mac_reset(struct dw_pcie *pci)
+{
+	struct armada8k_pcie *pcie = to_armada8k_pcie(pci);
+
+	if (!pcie->sysctrl_base || !pcie->mac_reset_bit_mask)
+		return;
+
+	dev_dbg(pci->dev, "resetting mac\n");
+
+	regmap_write_bits(pcie->sysctrl_base, UNIT_SOFT_RESET_CONFIG_REG,
+			  pcie->mac_reset_bit_mask, 0x0);
+	udelay(1);
+
+	regmap_write_bits(pcie->sysctrl_base, UNIT_SOFT_RESET_CONFIG_REG,
+			  pcie->mac_reset_bit_mask, pcie->mac_reset_bit_mask);
+	udelay(1);
+}
+
 static int armada8k_pcie_host_init(struct dw_pcie_rp *pp)
 {
 	u32 reg;
@@ -194,7 +218,11 @@ static int armada8k_pcie_host_init(struct dw_pcie_rp *pp)
 			msleep(100);
 			/* Deassert #PERST */
 			gpiod_set_value_cansleep(pcie->reset_gpio, 0);
-		}
+		} else
+			mdelay(100);
+
+		/* Reset the MAC */
+		armada8k_pcie_mac_reset(pci);
 	}
 
 	/* Set the device to root complex mode */
@@ -283,6 +311,41 @@ static const struct dw_pcie_ops dw_pcie_ops = {
 	.start_link = armada8k_pcie_start_link,
 };
 
+static void armada8k_mac_reset_init(struct armada8k_pcie *pcie)
+{
+	u32 comphy_id;
+	int ret;
+
+	if (!pcie->sysctrl_base || !pcie->phy_count)
+		return;
+
+	ret = of_property_read_u32(pcie->phy[0]->dev.of_node,
+				   "reg",
+				   &comphy_id);
+	if (ret)
+		return;
+
+	if (pcie->phy_count == 1) {
+		switch (comphy_id) {
+		case 0:
+			pcie->mac_reset_bit_mask = BIT(13); /* PCIE x4 instance */
+			break;
+		case 4:
+			pcie->mac_reset_bit_mask = BIT(11); /* PCIE x1 instance 0 */
+			break;
+		case 5:
+			pcie->mac_reset_bit_mask = BIT(12); /* PCIE x1 instance 1 */
+			break;
+
+		default:
+			break;
+		}
+	} else if (pcie->phy_count == 2 || pcie->phy_count == 4) {
+		if (comphy_id == 0)
+			pcie->mac_reset_bit_mask = BIT(13); /* PCIE x4 instance */
+	}
+}
+
 static int armada8k_pcie_probe(struct platform_device *pdev)
 {
 	struct dw_pcie *pci;
@@ -340,6 +403,15 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
 	ret = armada8k_pcie_setup_phys(pcie);
 	if (ret)
 		goto fail_clkreg;
+
+	pcie->sysctrl_base = syscon_regmap_lookup_by_phandle(dev->of_node,
+							     "marvell,system-controller");
+	if (IS_ERR(pcie->sysctrl_base)) {
+		dev_warn(dev, "failed to get system controller\n");
+		pcie->sysctrl_base = NULL;
+	}
+
+	armada8k_mac_reset_init(pcie);
 
 	platform_set_drvdata(pdev, pcie);
 
