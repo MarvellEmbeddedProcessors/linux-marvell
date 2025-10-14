@@ -27,6 +27,7 @@
 #include <rvu_trace.h>
 #include "otx2_bphypf.h"
 #include <rvu_cplt_mbox.h>
+#include <mbox.h>
 
 #define DRV_NAME	"rvu_bphy_nicpf"
 #define DRV_STRING	"Marvell BPHY RVU PF Ethernet Driver"
@@ -693,6 +694,39 @@ MBOX_UP_MCS_MESSAGES
 	return 0;
 }
 
+int otx2_mbox_up_handler_cgx_rpm_bitmap_info(struct otx2_nic *pf,
+					     struct cgx_rpm_bitmap_info_req *req,
+					     struct msg_rsp *rsp)
+{
+	int pfid = (pf->pcifunc >> RVU_OTX2_PFVF_PF_SHIFT) & RVU_OTX2_PFVF_PF_MASK;
+	int err;
+
+	if (!pf->netdev) {
+		pr_err("PF%d: netdev is NULL, cannot register\n", pfid);
+		rsp->hdr.rc = -EINVAL;
+		return -EINVAL;
+	}
+
+	/* Avoid duplicate registration */
+	if (pf->netdev_registered) {
+		rsp->hdr.rc = 0;
+		return 0;
+	}
+
+	if (pf->netdev) {
+		err = register_netdev(pf->netdev);
+		if (err) {
+			pr_err("PF%d: Failed to register netdev: %d\n", pfid, err);
+			rsp->hdr.rc = err;
+			return err;
+		}
+	}
+
+	pf->netdev_registered = true;
+	rsp->hdr.rc = 0;
+	return 0;
+}
+
 static int otx2_cgx_config_linkevents(struct otx2_nic *pf, bool enable)
 {
 	struct msg_req *msg;
@@ -1193,6 +1227,7 @@ static int otx2_bphypf_probe(struct pci_dev *pdev,
 	pf->netdev = netdev;
 	pf->pdev = pdev;
 	pf->dev = dev;
+	pf->netdev_registered = false;
 	pf->flags |= OTX2_FLAG_INTF_DOWN;
 
 	hw = &pf->hw;
@@ -1285,12 +1320,6 @@ static int otx2_bphypf_probe(struct pci_dev *pdev,
 	netdev->max_mtu = otx2_get_max_mtu(pf);
 	hw->max_mtu = netdev->max_mtu;
 
-	err = register_netdev(netdev);
-	if (err) {
-		dev_err(dev, "Failed to register netdevice\n");
-		goto err_mcs_free;
-	}
-
 	err = otx2_bphypf_wq_init(pf);
 	if (err)
 		goto err_unreg_netdev;
@@ -1329,8 +1358,8 @@ err_shutdown_tc:
 err_mcam_flow_del:
 	otx2_mcam_flow_del(pf);
 err_unreg_netdev:
-	unregister_netdev(netdev);
-err_mcs_free:
+	if (pf->netdev_registered)
+		unregister_netdev(netdev);
 	cn10k_mcs_free(pf);
 err_del_mcam_entries:
 	otx2_mcam_flow_del(pf);

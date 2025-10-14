@@ -92,12 +92,69 @@ void pf_bmap_to_cpltlmac(u16 pf2cpltlmac_map, u8 *chiplet_id,
 	*lmac_id = (pf2cpltlmac_map & 0xff);
 }
 
+/* Notify PFs using CGX message instead of CPLT */
+static void cgx_notify_up_bitmap_info(struct rvu *rvu, int pf, u32 bitmap, int num_chiplets)
+{
+	struct cgx_rpm_bitmap_info_req *msg;
+
+	/* Allocate message via CGX up-message API */
+	msg = otx2_mbox_alloc_msg_cgx_rpm_bitmap_info(rvu, pf);
+	if (!msg) {
+		dev_err(rvu->dev, "AF: Failed to alloc CGX bitmap info msg for PF %d\n", pf);
+		return;
+	}
+
+	dev_info(rvu->dev,
+		 "AF: Sending CGX_RPM_BITMAP_INFO: pf=%d bitmap=0x%x num_chiplets=%d\n",
+		 pf, bitmap, num_chiplets);
+
+	/* Send message upward (AF → PF) */
+	otx2_mbox_wait_for_zero(&rvu->afpf_wq_info.mbox_up, pf);
+	otx2_mbox_msg_send_up(&rvu->afpf_wq_info.mbox_up, pf);
+	otx2_mbox_wait_for_rsp(&rvu->afpf_wq_info.mbox_up, pf);
+}
+
+/* Handler for CPLT RPM port ready, now notifying PFs via CGX */
 int rvu_mbox_handler_cplt_rpm_port_ready(struct rvu *rvu,
 					 struct cplt_rpm_port_ready_req *req,
 					 struct msg_rsp *rsp)
 {
-	if (req->num_bphy_chiplets && req->valid_interface_bitmap)
-		rvu->cplt_rpm->ready = 1;
+	int num_chiplets = req->num_bphy_chiplets;
+	u32 bitmap = req->valid_interface_bitmap;
+	int bit, rpm_id, lmac_id;
+	unsigned long pf_map;
+	u8 chiplet_id;
+	int pf;
+
+	if (!num_chiplets || !bitmap)
+		return 0;
+
+	rvu->cplt_rpm->ready = 1;
+
+	/* Iterate all bits in the 32-bit bitmap */
+	for (bit = 0; bit < 32; bit++) {
+		if (!(bitmap & (1U << bit)))
+			continue;
+
+		/* Calculate chiplet/rpm/lmac from bit position */
+		chiplet_id = bit / 16;        // each chiplet has 16 bits
+		rpm_id     = (bit % 16) / 4;  // 4 LMACs per RPM
+		lmac_id    = (bit % 16) % 4;
+
+		pf_map = cpltlmac_to_pfmap(rvu, chiplet_id, rpm_id, lmac_id);
+
+		dev_info(rvu->dev, "AF: BPHY chiplet=%u rpm=%u lmac=%u pf_map=0x%lx\n",
+			 chiplet_id, rpm_id, lmac_id, pf_map);
+
+		/* Notify each PF mapped to this LMAC */
+		for_each_set_bit(pf, &pf_map, 64) {
+			dev_info(rvu->dev,
+				 "AF: notifying PF=%d (via CGX) for "
+				 "chiplet=%u rpm=%u lmac=%u\n",
+				 pf, chiplet_id, rpm_id, lmac_id);
+			cgx_notify_up_bitmap_info(rvu, pf, bitmap, num_chiplets);
+		}
+	}
 
 	return 0;
 }

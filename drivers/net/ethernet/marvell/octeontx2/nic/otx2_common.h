@@ -658,6 +658,7 @@ struct otx2_nic {
 	unsigned long		*af_xdp_zc_qidx;
 
 	struct sdp_vf_cfg	sdp_cfg;
+	bool			netdev_registered;
 };
 
 static inline bool is_otx2_lbkvf(struct pci_dev *pdev)

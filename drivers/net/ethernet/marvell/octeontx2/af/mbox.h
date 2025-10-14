@@ -548,7 +548,8 @@ M(MCS_GET_MCS_ID,	0xa022, mcs_get_mcs_id, mcs_get_id_req,		\
 
 #define MBOX_UP_CGX_MESSAGES						\
 M(CGX_LINK_EVENT,	0xC00, cgx_link_event, cgx_link_info_msg, msg_rsp) \
-M(CGX_PTP_RX_INFO,	0xC01, cgx_ptp_rx_info,	cgx_ptp_rx_info_msg, msg_rsp)
+M(CGX_PTP_RX_INFO,	0xC01, cgx_ptp_rx_info,	cgx_ptp_rx_info_msg, msg_rsp)\
+M(CGX_RPM_BITMAP_INFO,  0xC02, cgx_rpm_bitmap_info, cgx_rpm_bitmap_info_req, msg_rsp)
 
 #define MBOX_UP_CPT_MESSAGES						\
 M(CPT_INST_LMTST,	0xD00, cpt_inst_lmtst, cpt_inst_lmtst_req, msg_rsp)
@@ -827,6 +828,10 @@ struct phy_s {
 		u32 brfec_corr_blks;
 		u32 brfec_uncorr_blks;
 	} fec_stats;
+};
+
+struct cgx_rpm_bitmap_info_req {
+	struct mbox_msghdr hdr;
 };
 
 struct cgx_lmac_fwdata_s {
