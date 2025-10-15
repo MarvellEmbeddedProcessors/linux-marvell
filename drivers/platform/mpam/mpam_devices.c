@@ -1643,7 +1643,6 @@ static void mpam_pcc_rx_callback(struct mbox_client *cl, void *msg)
 static int mpam_msc_drv_probe(struct platform_device *pdev)
 {
 	int err;
-	char name[20];
 	void * __iomem io;
 	struct mpam_msc *msc;
 	struct resource *msc_res;
@@ -1746,9 +1745,6 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 		list_add_rcu(&msc->glbl_list, &mpam_all_msc);
 		platform_set_drvdata(pdev, msc);
 
-		snprintf(name, sizeof(name), "msc.%u", msc->id);
-		msc->debugfs = debugfs_create_dir(name, mpam_debugfs);
-		debugfs_create_x32("max_nrdy_usec", 0400, msc->debugfs, &msc->nrdy_usec);
 	} while (0);
 	mutex_unlock(&mpam_list_lock);
 
@@ -2109,6 +2105,7 @@ static void mpam_debugfs_setup(void)
 	int idx;
 	char name[40];
 	char path[40];
+	struct dentry *d;
 	struct mpam_msc *msc;
 	struct mpam_class *class;
 	struct mpam_msc_ris *ris;
@@ -2119,7 +2116,12 @@ static void mpam_debugfs_setup(void)
 	idx = srcu_read_lock(&mpam_srcu);
 	list_for_each_entry_srcu(msc, &mpam_all_msc, glbl_list,
 				 srcu_read_lock_held(&mpam_srcu)) {
-		debugfs_create_x32("iface", 0400, msc->debugfs, &msc->iface);
+		snprintf(name, sizeof(name), "msc.%u", msc->id);
+		msc->debugfs = debugfs_create_dir(name, mpam_debugfs);
+
+		d = msc->debugfs;
+		debugfs_create_x32("iface", 0400, d, &msc->iface);
+		debugfs_create_x32("max_nrdy_usec", 0400, d, &msc->nrdy_usec);
 		list_for_each_entry(ris, &msc->ris, msc_list) {
 			snprintf(name, sizeof(name), "ris.%u", ris->ris_idx);
 			ris->debugfs = debugfs_create_dir(name, msc->debugfs);
