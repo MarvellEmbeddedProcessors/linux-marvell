@@ -903,7 +903,8 @@ static int otx2_mbox_up_handler_rep_event_up_notify(struct otx2_nic *pf,
 	struct net_device *netdev = pf->netdev;
 
 	/* Drop the events as rep netdev not yet created */
-	if (!(pf->flags & OTX2_FLAG_REP_MODE_ENABLED))
+	if (otx2_rep_dev(pf->pdev) &&
+	    !(pf->flags & OTX2_FLAG_REP_MODE_ENABLED))
 		return 0;
 
 	if (info->event == RVU_EVENT_MTU_CHANGE) {
