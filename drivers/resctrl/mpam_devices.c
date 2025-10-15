@@ -2033,7 +2033,6 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 {
 	int err;
 	u32 tmp;
-	char name[20];
 	struct mpam_msc *msc;
 	struct resource *msc_res;
 	struct device *dev = &pdev->dev;
@@ -2100,10 +2099,6 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 
 	list_add_rcu(&msc->all_msc_list, &mpam_all_msc);
 	platform_set_drvdata(pdev, msc);
-
-	snprintf(name, sizeof(name), "msc.%u", msc->id);
-	msc->debugfs = debugfs_create_dir(name, mpam_debugfs);
-	debugfs_create_x32("max_nrdy_usec", 0400, msc->debugfs, &msc->nrdy_usec);
 
 	return msc;
 }
@@ -2787,11 +2782,15 @@ static void mpam_debugfs_setup(void)
 
 	list_for_each_entry_srcu(msc, &mpam_all_msc, all_msc_list,
 				 srcu_read_lock_held(&mpam_srcu)) {
+		snprintf(name, sizeof(name), "msc.%u", msc->id);
+		msc->debugfs = debugfs_create_dir(name, mpam_debugfs);
+
 		d = msc->debugfs;
 		debugfs_create_u32("fw_id", 0400, d, &msc->pdev->id);
 		debugfs_create_x32("iface", 0400, d, &msc->iface);
 		debugfs_create_x32("mpamf_iidr", 0400, d, &msc->iidr);
 		debugfs_create_x64("nrdy_retry_count", 0400, d, &msc->nrdy_retry_count);
+		debugfs_create_x32("max_nrdy_usec", 0400, d, &msc->nrdy_usec);
 		list_for_each_entry(ris, &msc->ris, msc_list)
 			mpam_debugfs_setup_ris(ris);
 	}
