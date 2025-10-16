@@ -88,12 +88,15 @@ static irqreturn_t pem_rst_perst_handler(int irq, struct uio_info *uio_info)
 	pem_ep = container_of(uio_info, struct mv_pem_ep, uio_rst_int_perst);
 
 	regval = pem_ep_reg_read(pem_ep, PEM_RST_INT);
-	if (regval & PEM_RST_INT_B_PERST)
-		pem_ep_reg_write(pem_ep, PEM_RST_INT, PEM_RST_INT_B_PERST);
-	else
-		return IRQ_NONE;
+	if (regval & (PEM_RST_INT_B_PERST | PEM_RST_INT_B_LINKDOWN)) {
+		regval = pem_ep_reg_read(pem_ep, PEM_RST_INT);
+		regval &= (PEM_RST_INT_B_PERST | PEM_RST_INT_B_LINKDOWN);
+		pem_ep_reg_write(pem_ep, PEM_RST_INT, regval);
 
-	return IRQ_HANDLED;
+		return IRQ_HANDLED;
+	}
+
+	return IRQ_NONE;
 }
 
 static int register_perst_uio_dev(struct platform_device *pdev, struct mv_pem_ep *pem_ep)
