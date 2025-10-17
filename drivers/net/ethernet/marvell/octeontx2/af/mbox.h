@@ -405,6 +405,8 @@ M(NPC_MCAM_GET_MUL_STATS, 0x6021, npc_mcam_mul_stats,			\
 M(NPC_MCAM_GET_FEATURES, 0x6022, npc_mcam_get_features,			\
 				   msg_req,				\
 				   npc_mcam_get_features_rsp)		\
+M(NPC_MCAM_READ_DEFAULT_RULE, 0x6023, npc_read_default_rule, msg_req,   \
+				      npc_mcam_read_base_rule_rsp)      \
 /* NIX mbox IDs (range 0x8000 - 0xFFFF) */				\
 M(NIX_LF_ALLOC,		0x8000, nix_lf_alloc,				\
 				 nix_lf_alloc_req, nix_lf_alloc_rsp)	\
