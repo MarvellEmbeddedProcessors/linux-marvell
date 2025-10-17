@@ -222,15 +222,28 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
 						 void *platform_data,
 						 struct device *parent)
 {
+	struct device_node *cpu_node;
 	struct amba_device *dev;
 	const void *prop;
 	int ret;
+	int cpu;
 
 	pr_debug("Creating amba device %pOF\n", node);
 
 	if (!of_device_is_available(node) ||
 	    of_node_test_and_set_flag(node, OF_POPULATED))
 		return NULL;
+
+	/* Check if a device is bound to a CPU that is offline.
+	 * If so, skip it.
+	 */
+	cpu_node = of_parse_phandle(node, "cpu", 0);
+	if (cpu_node) {
+		cpu = of_cpu_node_to_id(cpu_node);
+		of_node_put(cpu_node);
+		if ((cpu < 0) || !cpu_online(cpu))
+			return NULL;
+	}
 
 	dev = amba_device_alloc(NULL, 0, 0);
 	if (!dev)
