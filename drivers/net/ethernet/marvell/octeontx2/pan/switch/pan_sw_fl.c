@@ -374,6 +374,7 @@ static int pan_sw_fl_hw_flow_install(u16 mcam_idx, struct fl_tuple *ftuple, u16 
 	req->channel = 0;
 	req->chan_mask = 0;
 	req->set_chanmask = 1;
+	req->flow_key_alg = otx2_nic->hw.flowkey_alg_idx;
 
 	/* Send message to AF */
 	rc = otx2_sync_mbox_msg(&otx2_nic->mbox);

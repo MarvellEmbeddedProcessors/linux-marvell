@@ -122,6 +122,7 @@ static int pan_sw_l2_hw_install_dmac_flow(u16 mcam_idx, u8 *mac_addr,
 	req->channel = 0;
 	req->chan_mask = 0;
 	req->set_chanmask = 1;
+	req->flow_key_alg = otx2_nic->hw.flowkey_alg_idx;
 
 	err = otx2_sync_mbox_msg(&otx2_nic->mbox);
 	if (err) {
