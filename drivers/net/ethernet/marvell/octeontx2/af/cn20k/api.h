@@ -44,4 +44,5 @@ int npa_cn20k_dpc_alloc(struct rvu *rvu, struct npa_cn20k_dpc_alloc_req *req,
 			struct npa_cn20k_dpc_alloc_rsp *rsp);
 int npa_cn20k_dpc_free(struct rvu *rvu, struct npa_cn20k_dpc_free_req *req);
 void npa_cn20k_dpc_free_all(struct rvu *rvu, u16 pcifunc);
+int cplt_lmac_cnt(struct rvu *rvu, int node);
 #endif /* CN20K_API_H */
