@@ -17,7 +17,7 @@ rvu_nicpf-y += switch/sw_nb.o switch/sw_fib.o switch/sw_trace.o
 endif
 
 rvu_nicvf-y := otx2_vf.o
-rvu_rep-y := rep.o
+rvu_rep-y := rep.o rep_devlink.o
 
 rvu_nicpf-$(CONFIG_DCB) += otx2_dcbnl.o
 rvu_nicpf-$(CONFIG_MACSEC) += cn10k_macsec.o
