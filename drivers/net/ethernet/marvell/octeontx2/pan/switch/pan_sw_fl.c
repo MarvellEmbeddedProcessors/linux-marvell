@@ -390,7 +390,7 @@ static int pan_sw_fl_hw_flow_install(u16 mcam_idx, struct fl_tuple *ftuple, u16 
 static void
 pan_sw_fl_get_reply_ftuple(struct fl_tuple *tuple)
 {
-	u8 eth_addr[16];
+	u8 eth_addr[ETH_ALEN];
 	u32 ip_addr;
 	u16 port;
 	u16 pf;

@@ -43,7 +43,7 @@ struct pan_sw_event {
 	union {
 		struct fib_entry fe;
 		struct {
-			u8 mac[16];
+			u8 mac[ETH_ALEN];
 			bool dp_added;
 		};
 		struct {
@@ -111,11 +111,11 @@ static int pan_sw_debugfs_show(struct seq_file *m, void *v)
 		if (ev->cmd == FL_ADD || ev->cmd == FL_DEL) {
 			t = &ev->tuple;
 
-			if (t->proto == 6)
+			if (t->proto == IPPROTO_TCP)
 				str_prot = "TCP";
-			else if (t->proto == 17)
+			else if (t->proto == IPPROTO_UDP)
 				str_prot = "UDP";
-			else if (t->proto == 1)
+			else if (t->proto == IPPROTO_ICMP)
 				str_prot = "icmp";
 
 			seq_printf(m, "%s cookie=%lu (%pM, %pI4:%u) to (%pM, %pI4:%u) %s %s\n",

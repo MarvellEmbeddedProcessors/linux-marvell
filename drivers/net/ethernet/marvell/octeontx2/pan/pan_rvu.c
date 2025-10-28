@@ -143,7 +143,7 @@ static DEFINE_HASHTABLE(mac2dev_tbl, 8);
 
 struct pan_rvu_mac2dev_node {
 	struct hlist_node hnode;
-	u8 mac[6];
+	u8 mac[ETH_ALEN];
 	struct net_device *dev;
 };
 
