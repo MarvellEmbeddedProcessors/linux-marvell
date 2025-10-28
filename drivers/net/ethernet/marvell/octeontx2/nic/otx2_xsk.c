@@ -207,8 +207,8 @@ void otx2_zc_napi_handler(struct otx2_nic *pfvf, struct xsk_buff_pool *pool,
 			  int queue, int budget)
 {
 	struct xdp_desc *xdp_desc = pool->tx_descs;
-	int err, i, work_done = 0, batch;
 	struct xdp_frame xdpf = {0};
+	int err, i, batch;
 
 	budget = min(budget, otx2_read_free_sqe(pfvf, queue));
 	batch = xsk_tx_peek_release_desc_batch(pool, budget);
@@ -224,9 +224,6 @@ void otx2_zc_napi_handler(struct otx2_nic *pfvf, struct xsk_buff_pool *pool,
 			netdev_err(pfvf->netdev, "AF_XDP: Unable to transfer packet err%d\n", err);
 			break;
 		}
-		work_done++;
 	}
 
-	if (work_done)
-		xsk_tx_release(pool);
 }
