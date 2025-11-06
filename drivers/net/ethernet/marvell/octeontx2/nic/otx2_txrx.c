@@ -1608,26 +1608,23 @@ handle_xdp_verdict:
 		return otx2_xdp_sq_append_pkt(pfvf, xdpf, iova,
 					      len, qidx, OTX2_XDP_TX);
 	case XDP_REDIRECT:
-		cq->pool_ptrs++;
 		if (xsk_buff) {
 			err = xdp_do_redirect(pfvf->netdev, xsk_buff, prog);
 			if (!err) {
 				*need_xdp_flush = true;
+				cq->pool_ptrs++;
 				return true;
 			}
 			return false;
 		}
 
 		err = xdp_do_redirect(pfvf->netdev, &xdp, prog);
-		otx2_dma_unmap_page(pfvf, iova, pfvf->rbsize,
-				    DMA_FROM_DEVICE);
 		if (!err) {
 			*need_xdp_flush = true;
+			cq->pool_ptrs++;
 			return true;
 		}
-		otx2_dma_unmap_page(pfvf, iova, pfvf->rbsize,
-				    DMA_FROM_DEVICE);
-		xdp_return_frame(xdpf);
+		goto outfailure;
 		break;
 	default:
 		bpf_warn_invalid_xdp_action(pfvf->netdev, prog, act);
@@ -1637,6 +1634,9 @@ handle_xdp_verdict:
 			xsk_buff_free(xsk_buff);
 		trace_xdp_exception(pfvf->netdev, prog, act);
 		break;
+outfailure:
+	trace_xdp_exception(pfvf->netdev, prog, act);
+	fallthrough;
 	case XDP_DROP:
 		cq->pool_ptrs++;
 		if (xsk_buff) {
