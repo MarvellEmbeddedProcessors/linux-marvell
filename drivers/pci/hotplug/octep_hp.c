@@ -148,7 +148,7 @@ octep_hp_register_slot(struct octep_hp_controller *hp_ctrl,
 
 	snprintf(slot_name, sizeof(slot_name), "octep_hp_%u", slot_number);
 	ret = pci_hp_register(&hp_slot->slot, hp_ctrl->pdev->bus,
-			      PCI_SLOT(pdev->devfn), slot_name);
+			      slot_number, slot_name);
 	if (ret) {
 		kfree(hp_slot);
 		return ERR_PTR(ret);
