@@ -69,6 +69,11 @@ static int queue_mode = MVPP2_QDIST_MULTI_MODE;
 module_param(queue_mode, int, 0444);
 MODULE_PARM_DESC(queue_mode, "Set queue_mode (single=0, multi=1)");
 
+static int override_percpu_pools = 1;
+module_param(override_percpu_pools, int, 0444);
+MODULE_PARM_DESC(override_percpu_pools,
+		 "Override per-cpu pool scheme, force shared pools (default=1)");
+
 /* Utility/helper methods */
 
 void mvpp2_write(struct mvpp2 *priv, u32 offset, u32 data)
@@ -5093,7 +5098,7 @@ static int mvpp2_change_mtu(struct net_device *dev, int mtu)
 			}
 
 		/* No port is using jumbo frames */
-		if (!jumbo) {
+		if (!jumbo && !override_percpu_pools) {
 			dev_info(port->dev->dev.parent,
 				 "all ports have a low MTU, switching to per-cpu buffers");
 			mvpp2_bm_switch_buffers(priv, true);
@@ -7530,8 +7535,12 @@ static int mvpp2_probe(struct platform_device *pdev)
 			priv->sysctrl_base = NULL;
 	}
 
+	if (override_percpu_pools)
+		dev_info(&pdev->dev, "override per-CPU pools\n");
+
 	if (priv->hw_version >= MVPP22 &&
-	    mvpp2_get_nrxqs(priv) * 2 <= MVPP2_BM_MAX_POOLS)
+	    mvpp2_get_nrxqs(priv) * 2 <= MVPP2_BM_MAX_POOLS &&
+	    override_percpu_pools == 0)
 		priv->percpu_pools = 1;
 
 	mvpp2_setup_bm_pool();
