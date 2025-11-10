@@ -865,6 +865,7 @@
 /* Port flags */
 #define MVPP2_F_LOOPBACK		BIT(0)
 #define MVPP2_F_DT_COMPAT		BIT(1)
+#define MVPP22_F_IF_MUSDK		BIT(2)
 
 /* Marvell tag types */
 enum mvpp2_tag_type {

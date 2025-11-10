@@ -42,6 +42,7 @@
 #include "mvpp2.h"
 #include "mvpp2_prs.h"
 #include "mvpp2_cls.h"
+#include "mvpp2_musdk.h"
 
 enum mvpp2_bm_pool_log_num {
 	MVPP2_BM_SHORT,
@@ -1986,11 +1987,22 @@ static const struct mvpp2_ethtool_counter mvpp2_ethtool_xdp[] = {
 						 (ARRAY_SIZE(mvpp2_ethtool_rxq_regs) * (nrxqs)) + \
 						 ARRAY_SIZE(mvpp2_ethtool_xdp))
 
+
+static const char mvpp2_ethtool_priv_flags_strings[][ETH_GSTRING_LEN] = {
+	"musdk",
+};
+
+#define MVPP22_F_IF_MUSDK_PRIV	BIT(0)
+
 static void mvpp2_ethtool_get_strings(struct net_device *netdev, u32 sset,
 				      u8 *data)
 {
 	struct mvpp2_port *port = netdev_priv(netdev);
 	int i, q;
+
+	if (sset == ETH_SS_PRIV_FLAGS)
+		memcpy(data, mvpp2_ethtool_priv_flags_strings,
+		       ARRAY_SIZE(mvpp2_ethtool_priv_flags_strings) * ETH_GSTRING_LEN);
 
 	if (sset != ETH_SS_STATS)
 		return;
@@ -2176,6 +2188,10 @@ static int mvpp2_ethtool_get_sset_count(struct net_device *dev, int sset)
 
 	if (sset == ETH_SS_STATS)
 		return MVPP2_N_ETHTOOL_STATS(port->ntxqs, port->nrxqs);
+
+	if (sset == ETH_SS_PRIV_FLAGS)
+		return (port->priv->hw_version == MVPP21) ?
+			0 : ARRAY_SIZE(mvpp2_ethtool_priv_flags_strings);
 
 	return -EOPNOTSUPP;
 }
@@ -3452,6 +3468,13 @@ static void mvpp2_isr_handle_link(struct mvpp2_port *port,
 	if (!netif_running(dev))
 		return;
 
+	/* When the port is in MUSDK mode, link status
+	 * will be polled and further handled by user
+	 * space.
+	 */
+	if (IS_MUSDK_PORT(port))
+		return;
+
 	if (link) {
 		mvpp2_interrupts_enable(port);
 
@@ -4623,11 +4646,17 @@ static void mvpp2_start_dev(struct mvpp2_port *port)
 
 	mvpp2_txp_max_tx_size_set(port);
 
-	for (i = 0; i < port->nqvecs; i++)
-		napi_enable(&port->qvecs[i].napi);
+	/* When the port is in MUSDK mode, NAPI and interrupts are not used.
+	 * The kernel driver is only used to configure the Ethernet PHY and
+	 * kick off the phylink state machine.
+	 */
+	if (!IS_MUSDK_PORT(port)) {
+		for (i = 0; i < port->nqvecs; i++)
+			napi_enable(&port->qvecs[i].napi);
 
-	/* Enable interrupts on all threads */
-	mvpp2_interrupts_enable(port);
+		/* Enable interrupts on all threads */
+		mvpp2_interrupts_enable(port);
+	}
 
 	if (port->priv->hw_version >= MVPP22)
 		mvpp22_mode_reconfigure(port, port->phy_interface);
@@ -4638,7 +4667,11 @@ static void mvpp2_start_dev(struct mvpp2_port *port)
 		mvpp2_acpi_start(port);
 	}
 
-	netif_tx_start_all_queues(port->dev);
+	/* When the port is in MUSDK mode, TXQ is managed
+	 * by user space, so do not start the queues here.
+	 */
+	if (!IS_MUSDK_PORT(port))
+		netif_tx_start_all_queues(port->dev);
 
 	clear_bit(0, &port->state);
 }
@@ -4783,8 +4816,12 @@ static void mvpp2_irqs_deinit(struct mvpp2_port *port)
 
 static bool mvpp22_rss_is_supported(struct mvpp2_port *port)
 {
+	/* When the port is in MUSDK mode, dedicated RSS tables
+	 * are used to map RXQs to CPU cores.
+	 */
 	return (queue_mode == MVPP2_QDIST_MULTI_MODE) &&
-		!(port->flags & MVPP2_F_LOOPBACK);
+		!(port->flags & MVPP2_F_LOOPBACK) &&
+		!IS_MUSDK_PORT(port);
 }
 
 static int mvpp2_open(struct net_device *dev)
@@ -5067,6 +5104,14 @@ static int mvpp2_change_mtu(struct net_device *dev, int mtu)
 	bool running = netif_running(dev);
 	struct mvpp2 *priv = port->priv;
 	int err;
+
+	/* When the port is in MUSDK mode, MTU as well as
+	 * BM pools are managed by user space.
+	 */
+	if (IS_MUSDK_PORT(port)) {
+		netdev_err(dev, "MTU cannot be modified in MUSDK mode\n");
+		return -EPERM;
+	}
 
 	if (!IS_ALIGNED(MVPP2_RX_PKT_SIZE(mtu), 8)) {
 		netdev_info(dev, "illegal MTU value %d, round to %d\n", mtu,
@@ -5477,12 +5522,17 @@ mvpp2_ethtool_get_coalesce(struct net_device *dev,
 static void mvpp2_ethtool_get_drvinfo(struct net_device *dev,
 				      struct ethtool_drvinfo *drvinfo)
 {
+	struct mvpp2_port *port = netdev_priv(dev);
+
 	strscpy(drvinfo->driver, MVPP2_DRIVER_NAME,
 		sizeof(drvinfo->driver));
 	strscpy(drvinfo->version, MVPP2_DRIVER_VERSION,
 		sizeof(drvinfo->version));
 	strscpy(drvinfo->bus_info, dev_name(&dev->dev),
 		sizeof(drvinfo->bus_info));
+
+	drvinfo->n_priv_flags = (port->priv->hw_version == MVPP21) ?
+			0 : ARRAY_SIZE(mvpp2_ethtool_priv_flags_strings);
 }
 
 static void
@@ -5775,6 +5825,84 @@ static int mvpp2_ethtool_set_rxfh(struct net_device *dev,
 	return mvpp2_modify_rxfh_context(dev, NULL, rxfh, extack);
 }
 
+static u32 mvpp22_get_priv_flags(struct net_device *dev)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	u32 priv_flags = 0;
+
+	if (IS_MUSDK_PORT(port))
+		priv_flags |= MVPP22_F_IF_MUSDK_PRIV;
+
+	return priv_flags;
+}
+
+static int mvpp2_port_musdk_enable_callback(struct mvpp2_port *port)
+{
+	port->flags |= MVPP22_F_IF_MUSDK;
+
+	netdev_info(port->dev, "switched to MUSDK mode\n");
+
+	return 0;
+}
+
+static int mvpp2_port_musdk_disable_callback(struct mvpp2_port *port)
+{
+	int rxq;
+
+	port->flags &= ~MVPP22_F_IF_MUSDK;
+
+	/* Restore RxQ/pool association */
+	for (rxq = 0; rxq < port->nrxqs; rxq++) {
+		if (port->pool_long && port->pool_short) {
+			mvpp2_rxq_long_pool_set(port, rxq, port->pool_long->id);
+			mvpp2_rxq_short_pool_set(port, rxq, port->pool_short->id);
+		}
+	}
+
+	netdev_info(port->dev, "switched to Kernel mode\n");
+
+	return 0;
+}
+
+static int mvpp2_port_musdk_set(struct net_device *dev, bool ena)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	bool running = netif_running(dev);
+	int err;
+
+	if (running)
+		mvpp2_stop(dev);
+
+	if (ena)
+		err = mvpp2_musdk_port_enable(port, mvpp2_port_musdk_enable_callback);
+	else
+		err = mvpp2_musdk_port_disable(port, mvpp2_port_musdk_disable_callback);
+	if (err) {
+		netdev_err(dev, "failed to %s musdk mode: %d\n",
+			   ena ? "enable" : "disable", err);
+		return err;
+	}
+
+	if (running)
+		mvpp2_open(dev);
+
+	return 0;
+}
+
+static int mvpp22_set_priv_flags(struct net_device *dev, u32 priv_flags)
+{
+	struct mvpp2_port *port = netdev_priv(dev);
+	bool f_old, f_new;
+	int err = 0;
+
+	f_old = port->flags & MVPP22_F_IF_MUSDK;
+	f_new = priv_flags & MVPP22_F_IF_MUSDK_PRIV;
+	if (f_old != f_new)
+		err = mvpp2_port_musdk_set(dev, f_new);
+
+	return err;
+}
+
 /* Device ops */
 
 static const struct net_device_ops mvpp2_netdev_ops = {
@@ -5820,6 +5948,8 @@ static const struct ethtool_ops mvpp2_eth_tool_ops = {
 	.create_rxfh_context	= mvpp2_create_rxfh_context,
 	.modify_rxfh_context	= mvpp2_modify_rxfh_context,
 	.remove_rxfh_context	= mvpp2_remove_rxfh_context,
+	.get_priv_flags		= mvpp22_get_priv_flags,
+	.set_priv_flags		= mvpp22_set_priv_flags,
 };
 
 /* Used for PPv2.1, or PPv2.2 with the old Device Tree binding that
@@ -6632,28 +6762,38 @@ static void mvpp2_mac_link_up(struct phylink_config *config,
 			     val);
 	}
 
-	if (port->priv->global_tx_fc) {
-		port->tx_fc = tx_pause;
-		if (tx_pause)
-			mvpp2_rxq_enable_fc(port);
-		else
-			mvpp2_rxq_disable_fc(port);
-		if (port->priv->percpu_pools) {
-			for (i = 0; i < port->nrxqs; i++)
-				mvpp2_bm_pool_update_fc(port, &port->priv->bm_pools[i], tx_pause);
-		} else {
-			mvpp2_bm_pool_update_fc(port, port->pool_long, tx_pause);
-			mvpp2_bm_pool_update_fc(port, port->pool_short, tx_pause);
+	/* When the port is in MUSDK mode, RXQs, TXQs, and Flow Control are
+	 * managed by user space. The kernel driver is only responsible for
+	 * enabling the port MACs when PHY link is up.
+	 */
+
+	if (!IS_MUSDK_PORT(port)) {
+		if (port->priv->global_tx_fc) {
+			port->tx_fc = tx_pause;
+			if (tx_pause)
+				mvpp2_rxq_enable_fc(port);
+			else
+				mvpp2_rxq_disable_fc(port);
+			if (port->priv->percpu_pools) {
+				for (i = 0; i < port->nrxqs; i++)
+					mvpp2_bm_pool_update_fc(port, &port->priv->bm_pools[i],
+								tx_pause);
+			} else {
+				mvpp2_bm_pool_update_fc(port, port->pool_long, tx_pause);
+				mvpp2_bm_pool_update_fc(port, port->pool_short, tx_pause);
+			}
+			if (port->priv->hw_version == MVPP23)
+				mvpp23_rx_fifo_fc_en(port->priv, port->id, tx_pause);
 		}
-		if (port->priv->hw_version == MVPP23)
-			mvpp23_rx_fifo_fc_en(port->priv, port->id, tx_pause);
 	}
 
 	mvpp2_port_enable(port);
 
-	mvpp2_egress_enable(port);
-	mvpp2_ingress_enable(port);
-	netif_tx_wake_all_queues(port->dev);
+	if (!IS_MUSDK_PORT(port)) {
+		mvpp2_egress_enable(port);
+		mvpp2_ingress_enable(port);
+		netif_tx_wake_all_queues(port->dev);
+	}
 }
 
 static void mvpp2_mac_link_down(struct phylink_config *config,
@@ -6676,9 +6816,16 @@ static void mvpp2_mac_link_down(struct phylink_config *config,
 		}
 	}
 
-	netif_tx_stop_all_queues(port->dev);
-	mvpp2_egress_disable(port);
-	mvpp2_ingress_disable(port);
+	/* When the port is in MUSDK mode, RXQs, TXQs, and Flow Control are
+	 * managed by user space. The kernel driver is only responsible for
+	 * disabling the port MACs when PHY link is down.
+	 */
+
+	if (!IS_MUSDK_PORT(port)) {
+		netif_tx_stop_all_queues(port->dev);
+		mvpp2_egress_disable(port);
+		mvpp2_ingress_disable(port);
+	}
 
 	mvpp2_port_disable(port);
 }
@@ -6750,6 +6897,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	bool has_tx_irqs;
 	u32 id;
 	int phy_mode;
+	int priv_size;
 	int err, i;
 
 	has_tx_irqs = mvpp2_port_has_irqs(priv, port_node, &flags);
@@ -6762,7 +6910,10 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 	ntxqs = MVPP2_MAX_TXQ;
 	nrxqs = mvpp2_get_nrxqs(priv);
 
-	dev = alloc_etherdev_mqs(sizeof(*port), ntxqs, nrxqs);
+	priv_size = ALIGN(sizeof(*port), NETDEV_ALIGN);
+	priv_size += mvpp2_musdk_port_priv_size();
+
+	dev = alloc_etherdev_mqs(priv_size, ntxqs, nrxqs);
 	if (!dev)
 		return -ENOMEM;
 
@@ -7066,6 +7217,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
 
 	priv->port_list[priv->port_count++] = port;
 
+	mvpp2_musdk_port_init(port);
+
 	return 0;
 
 err_phylink:
@@ -7092,6 +7245,8 @@ err_free_netdev:
 static void mvpp2_port_remove(struct mvpp2_port *port)
 {
 	int i;
+
+	mvpp2_port_musdk_set(port->dev, false);
 
 	unregister_netdev(port->dev);
 	if (port->phylink)
