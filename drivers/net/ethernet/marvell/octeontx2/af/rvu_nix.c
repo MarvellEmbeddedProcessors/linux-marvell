@@ -6015,10 +6015,27 @@ static void nix_inline_ipsec_cfg(struct rvu *rvu, struct nix_inline_ipsec_cfg *r
 	}
 }
 
+static int nix_inline_ipsec_validate_platform(struct rvu *rvu, u16 msg_id)
+{
+	if (is_cn20k(rvu->pdev)) {
+		dev_err(rvu->dev, "Mbox %s not supported for CN20K\n",
+			otx2_mbox_id2name(msg_id));
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
 int rvu_mbox_handler_nix_inline_ipsec_cfg(struct rvu *rvu,
 					  struct nix_inline_ipsec_cfg *req,
 					  struct msg_rsp *rsp)
 {
+	int err;
+
+	err = nix_inline_ipsec_validate_platform(rvu, req->hdr.id);
+	if (err)
+		return err;
+
 	if (!is_block_implemented(rvu->hw, BLKADDR_CPT0))
 		return 0;
 
@@ -6034,7 +6051,12 @@ int rvu_mbox_handler_nix_read_inline_ipsec_cfg(struct rvu *rvu,
 					       struct nix_inline_ipsec_cfg *rsp)
 
 {
+	int err;
 	u64 val;
+
+	err = nix_inline_ipsec_validate_platform(rvu, req->hdr.id);
+	if (err)
+		return err;
 
 	if (!is_block_implemented(rvu->hw, BLKADDR_CPT0))
 		return 0;
@@ -6059,6 +6081,10 @@ int rvu_mbox_handler_nix_inline_ipsec_lf_cfg(struct rvu *rvu,
 {
 	int lf, blkaddr, err;
 	u64 val;
+
+	err = nix_inline_ipsec_validate_platform(rvu, req->hdr.id);
+	if (err)
+		return err;
 
 	if (!is_block_implemented(rvu->hw, BLKADDR_CPT0))
 		return 0;
