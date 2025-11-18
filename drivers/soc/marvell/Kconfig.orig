@@ -1,0 +1,182 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# MARVELL SoC drivers
+#
+
+menu "Marvell SoC drivers"
+
+config OCTEONTX2_SDP_PF
+	tristate "OcteonTX2 SDP PF driver"
+	depends on ARM64 && PCI && OCTEONTX2_AF && OCTEONTX2_MBOX
+	default y
+	help
+	  This driver configures the SDP RVU PF when OcteonTx is in PCIe EndPoint
+	  mode. It sets up the SDP rings  and the VFs to be used in packet transfer
+	  using the NIX block.
+
+	  To compile this as a module choose M here.
+
+config OCTEONTX2_DPI_PF
+	tristate "OcteonTX2 DPI-DMA PF driver"
+	depends on ARM64 && PCI
+	default m
+	help
+	  Select this option to enable DPI PF driver support.
+	  DPI (DMA packet interface) provides DMA support for MAC.
+	  This driver intializes DPI PF device and enables VFs for supporting
+	  different types of DMA transfers.
+
+config OCTEONTX2_PCI_CONSOLE
+	tristate "OcteonTX2/CN10K PCI Endpoint console driver"
+	depends on ARM64 && PCI
+	default n
+	help
+	  Select this option to enable the PCI console driver when
+	  OcteonTX2/CN10K is configured as an Endpoint.  This allows the
+	  host [PC] to connect to the Linux console via PCI
+	  (using the host remote console utility).
+	  To enable this console, specify 'console=pci0' on the kernel
+	  command line.
+	  To compile this as a module, choose M here.  However, when used
+	  as a module, some kernel boot messages may be missing from the
+	  console.
+
+config OCTEONTX2_PCI_CONSOLE_DEBUG
+	bool "OcteonTX2/CN10K PCI Endpoint console driver verbose debug messages"
+	depends on OCTEONTX2_PCI_CONSOLE
+	help
+	  Say Y here if you want the OcteonTX2/CN10K PCI console driver
+	  to write verbose debug messages to the system log.
+	  Select this if you are having a problem with the OcteonTX2/CN10K
+	  PCI console and want to see more details of the console's
+	  operation.
+
+	  If you are unsure about this, say N here.
+
+config OCTEONTX2_PCI_CONSOLE_TRACE
+	bool "OcteonTX2/CN10K PCI Endpoint console driver trace messages"
+	depends on OCTEONTX2_PCI_CONSOLE
+	depends on DYNAMIC_FTRACE
+	help
+	  Say Y here if you want the OcteonTX2/CN10K PCI console driver
+	  to write verbose debug messages to the dynamic ftrace infrastructure.
+	  Select this if you are having a problem with the OcteonTX2/CN10K PCI console
+	  and want to see more details of the parts that are not debuggable
+	  with traditional prints coming from OCTEONTX2_PCI_CONSOLE_DEBUG.
+
+	  If you are unsure about this, say N here.
+
+config MRVL_PHY_DIAGNOSTICS
+	tristate "Marvell PHY diagnostics debugfs driver"
+	default m
+	depends on DEBUG_FS
+	help
+	  Select this option if you want an additional interface for
+	  extended diagnostics functions for the PHY. This complements
+	  functionality offered by ethtool. Requires PHY driver support in ATF.
+
+config HW_CSR_ACCESS
+	tristate "Access HW Device Config Space"
+	depends on OCTEONTX2_AF
+	default m
+	help
+	  provides an interface which enables user space utility to read from or to write
+	  to HW Device Config Space Registers, Contexts, Memory.
+
+config OCTEONTX_SERDES
+	tristate "OcteonTX2 serdes debug commands"
+	default m
+	depends on ARM64 && HAVE_ARM_SMCCC && DEBUG_FS
+	help
+	  Provides debugfs commands which allows to collect serdes information,
+	  capture eye, use PRBS, configure serdes in loopback mode, and
+	  read/write TX tuning parameters.
+
+config MARVELL_FWLOG
+	tristate "firmware log interface"
+	depends on ARM64
+	help
+	  Provides interface to read firmware boot logs. Firmware bootlogs are saved
+	  in memory that is accessible from kernel. Enabling this option allows the
+	  user to dump the firmware boot logs.
+
+	  Firmware needs to build with `RECORD_FWLOG=1` to see the boot logs and
+	  U-boot config `CONFIG_FWLOG_TTYMEM` is also required to have this feature
+	  validated from linux.
+
+	  Say Y here if you want to dump the firmware boot logs from linux shell. This
+	  option is available only for Octeon10 and OcteonTX2 platforms.
+
+config MARVELL_CN10K_SERDES_DIAGNOSTICS
+	tristate "Marvell SerDes diagnostics debugfs driver"
+	default m
+	depends on DEBUG_FS && ARM64
+	help
+	  Select this option if you want to enable SerDes diagnostics
+	  interface for performing PRBS, setting Loopback mode or
+	  reading/writing Tx/Rx tuning parameters.
+
+config OCTEONTX2_GHES_BERT
+	bool "OcteonTX2 GHES Boot Error Record support"
+	depends on ARM64 && ACPI_APEI
+	default n
+	help
+	  Select this option to enable reporting of fatal Marvell GHES
+	  errors on subsequent Linux boot.  Normally, fatal errors will
+	  reset the system.  Enabling support here will allow such errors
+	  to be reported when Linux is started again.
+
+config OCTEONTX2_EINJ
+	tristate "OcteonTX2 ECC Injection"
+	help
+	  Provides support for error injection to OcteonTX2
+	  memory controllers (LMC) and cache blocks.
+	  This facilitates testing of the memory controller RAS features and
+	  is intended to be used by test personnel when conducting system tests.
+	  To compile this as a module, choose M here. The module will be
+	  called otx2-einj.
+	  Unless testing, say N here.
+
+config OCTEONTX2_GHES
+	bool "OcteonTX2 GHES support"
+	depends on ARM64 && ACPI_APEI
+	default n
+	help
+	  Select this option to enable Marvell GHES support. This will
+	  init and enable the MSI-X interrupts for LMC, MDC and MCC.
+	  This config will also make sure that this is enabled only
+	  for ARM64 platforms.
+
+config MARVELL_CN10K_EINJ
+	tristate "CN10K ECC Injection"
+	depends on ARM64 && ACPI_APEI
+	default n
+	help
+	  Provides support for error injection to CN10K
+	  Pseudo-fault Generation processor error,
+	  dram memory subsystem (DSS).
+	  This facilitates testing of the memory controller RAS features and
+	  is intended to be used by test personnel when conducting system tests.
+	  To compile this as a module, choose M here. The module will be
+	  called cn10k-einj.
+	  Unless testing, say N here.
+
+config OCTEONTX_INFO
+	tristate "OcteonTX Info driver"
+	depends on PROC_FS
+	help
+	  provides procfs interface to board information like board name, board revision
+	  mac addresses, board serial number and more. These are boards housing Marvell
+	  OcteonTX family chipsets.
+
+config MRVL_SWUP
+        tristate "Marvell firmware secure update"
+        depends on ARM64
+        help
+          Provide debugfs interface for firmware update.
+          Supported on cnXX family.
+          Currently supported operations:
+            -> TIM Version check
+            -> TIM Hash verification
+            -> TIM firmware update
+endmenu
