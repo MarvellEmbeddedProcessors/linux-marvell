@@ -5,6 +5,8 @@
  *
  */
 
+#ifdef CONFIG_DEBUG_FS
+
 #include <linux/fs.h>
 #include <linux/debugfs.h>
 #include <linux/module.h>
@@ -962,3 +964,5 @@ void rvu_cn20ka_handle_port_mapped_stats(struct rvu *rvu, struct mcs *mcs, int d
 		debugfs_create_file("port_mapped", 0600, parent,
 				    mcs, &rvu_dbg_mcs_tx_port_mapped_fops);
 }
+
+#endif /* CONFIG_DEBUG_FS */
