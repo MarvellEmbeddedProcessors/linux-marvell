@@ -51,7 +51,7 @@ static u64 sdp_read64(struct sdp_dev *rvu, u64 b, u64 s, u64 o)
  * XOFF state on SDP channels during a reset. As a workaround, the driver
  * needs to broadcast an XON message after programming the SDP_LINK_CFG csr.
  */
-void sdp_nix_bcast_xon(struct rvu *rvu, int blkaddr)
+static void sdp_nix_bcast_xon(struct rvu *rvu, int blkaddr)
 {
 	u64 cfg;
 
@@ -1318,9 +1318,9 @@ static int sdp_parse_rinfo(struct pci_dev *pdev,
 		dev_err(sdev, "SDP DTS: Wrong field length: num-rvu-vfs\n");
 		return -EINVAL;
 	}
-	info->max_rvu_vfs =  be32_to_cpup((u32 *)ptr);
+	info->max_vfs =  be32_to_cpup((u32 *)ptr);
 
-	if (info->max_rvu_vfs > pci_sriov_get_totalvfs(pdev)) {
+	if (info->max_vfs > pci_sriov_get_totalvfs(pdev)) {
 		dev_err(sdev, "SDP DTS: Invalid field value: num-rvu-vfs\n");
 		return -EINVAL;
 	}
@@ -1366,13 +1366,13 @@ static int sdp_parse_rinfo(struct pci_dev *pdev,
 		num_vfs += val;
 	}
 
-	if (info->max_rvu_vfs < num_vfs) {
+	if (info->max_vfs < num_vfs) {
 		dev_err(sdev, "Error: Max RVU VFs(%d) is less than required SDP VFs(%d)",
-			info->max_rvu_vfs, num_vfs);
+			info->max_vfs, num_vfs);
 	}
 
 	/* Do not have more than num_vfs of RVU VFs */
-	info->max_rvu_vfs = num_vfs;
+	info->max_vfs = num_vfs;
 
 	/* Get number of rings per PF */
 	ptr = of_get_property(dev, "num-sdp-pf-rings", &len);
@@ -1518,7 +1518,7 @@ static void program_sdp_rinfo(struct sdp_dev *sdp)
 
 	/* populate total rings into vf_rings[] */
 	pf = 0;
-	for (vf = 0; vf < sdp->info.max_rvu_vfs; vf++) {
+	for (vf = 0; vf < sdp->info.max_vfs; vf++) {
 		if (vf == (sdp->epf[pf].start_vf_idx + numvf[pf]))
 			pf++;
 
@@ -1776,7 +1776,7 @@ static int sdp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	regval |= (1 << 2); /* BPFLR_D disable clearing BP in FLR */
 	writeq(regval, sdp->sdp_base + SDPX_GBL_CONTROL);
 
-	sdp_sriov_configure(sdp->pdev, sdp->info.max_rvu_vfs);
+	sdp_sriov_configure(sdp->pdev, sdp->info.max_vfs);
 
 	spin_lock(&sdp_lst_lock);
 	list_add(&sdp->list, &sdp_dev_lst_head);
