@@ -18,6 +18,7 @@ Performance monitor support
    arm-cmn
    arm-ni
    xgene-pmu
+   mrvl-odyssey-ddr-pmu
    arm_dsu_pmu
    thunderx2-pmu
    alibaba_pmu
