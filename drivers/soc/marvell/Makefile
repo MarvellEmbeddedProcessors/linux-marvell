@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 obj-y           += octeontx2-sdp/
+obj-y		+= octeontx2-ghes/
 obj-y 		+= hw-access/
 obj-y		+= octeontx2-dpi/
 obj-$(CONFIG_MVMDIO_UIO) += mvmdio_uio.o
