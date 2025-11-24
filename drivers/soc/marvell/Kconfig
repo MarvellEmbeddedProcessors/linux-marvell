@@ -44,4 +44,12 @@ config MARVELL_PTM_EP
 	  To compile this as a module, choose M here. The module will be called
 	  mrvl-ptm-ep.
 
+config MVMDIO_UIO
+	tristate "Marvell MDIO interface driver"
+	  default m
+	select MDIO_THUNDER
+	help
+	  Select this option if you want to provide an interface for userspace
+	  PHY drivers to access Marvell's MDIO bus.
+
 endmenu

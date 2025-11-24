@@ -2,4 +2,5 @@
 obj-y           += octeontx2-sdp/
 obj-y 		+= hw-access/
 obj-y		+= octeontx2-dpi/
+obj-$(CONFIG_MVMDIO_UIO) += mvmdio_uio.o
 obj-y		+= ptm-ep/
