@@ -44,6 +44,15 @@ config MARVELL_PTM_EP
 	  To compile this as a module, choose M here. The module will be called
 	  mrvl-ptm-ep.
 
+config MARVELL_CN10K_SERDES_DIAGNOSTICS
+	tristate "Marvell SerDes diagnostics debugfs driver"
+	default m
+	depends on DEBUG_FS
+	help
+	  Select this option if you want to enable SerDes diagnostics
+	  interface for performing PRBS, setting Loopback mode or
+	  reading/writing Tx/Rx tuning parameters.
+
 config MVMDIO_UIO
 	tristate "Marvell MDIO interface driver"
 	  default m
