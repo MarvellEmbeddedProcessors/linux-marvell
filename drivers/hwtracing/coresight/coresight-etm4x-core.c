@@ -65,6 +65,7 @@ static void etm4_set_default_config(struct etmv4_config *config);
 static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
 				  struct perf_event *event);
 static u64 etm4_get_access_type(struct etmv4_config *config);
+static u64 etm4_get_comparator_access_type(struct etmv4_config *config);
 
 static enum cpuhp_state hp_online;
 
@@ -1088,6 +1089,7 @@ static void etm4_disable(struct coresight_device *csdev,
 
 	switch (mode) {
 	case CS_MODE_DISABLED:
+	case CS_MODE_READ_PREVBOOT:
 		break;
 	case CS_MODE_SYSFS:
 		etm4_disable_sysfs(csdev);
@@ -1438,9 +1440,8 @@ static void etm4_set_victlr_access(struct etmv4_config *config)
 
 static void etm4_set_default_config(struct etmv4_config *config)
 {
-	/* disable all events tracing */
-	config->eventctrl0 = 0x0;
-	config->eventctrl1 = 0x0;
+	int rselector = 2; /* 0 and 1 are reserved */
+	int comp_idx = 0;
 
 	/* disable stalling */
 	config->stall_ctrl = 0x0;
@@ -1456,6 +1457,17 @@ static void etm4_set_default_config(struct etmv4_config *config)
 
 	/* TRCVICTLR::EXLEVEL_NS:EXLEVELS: Set kernel / user filtering */
 	etm4_set_victlr_access(config);
+
+	/* Configure the comparator with kernel panic address */
+	config->addr_val[comp_idx] = (u64)panic;
+	config->addr_acc[comp_idx] = etm4_get_comparator_access_type(config);
+	config->addr_type[comp_idx] = ETM_ADDR_TYPE_STOP;
+	config->res_ctrl[rselector] = ETM_RESGRP_SADDRCMP << 16 | BIT(comp_idx);
+
+	/* Connect external output [0] with comparator out */
+	config->eventctrl0 = 0x0 << 7 | rselector;
+
+	config->eventctrl1 = 0x0;
 }
 
 static u64 etm4_get_ns_access_type(struct etmv4_config *config)

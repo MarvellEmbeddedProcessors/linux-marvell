@@ -34,7 +34,7 @@ static int __tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
 	writel_relaxed(TMC_MODE_CIRCULAR_BUFFER, drvdata->base + TMC_MODE);
 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
-		       TMC_FFCR_TRIGON_TRIGIN,
+		       TMC_FFCR_TRIGON_TRIGIN | TMC_FFCR_STOP_ON_FLUSH,
 		       drvdata->base + TMC_FFCR);
 
 	writel_relaxed(drvdata->trigger_cntr, drvdata->base + TMC_TRG);
@@ -590,6 +590,63 @@ out:
 	return to_read;
 }
 
+static int tmc_panic_sync_etf(struct coresight_device *csdev)
+{
+	u32 val;
+	struct tmc_register_snapshot *tmc;
+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+
+	/* Make sure we have valid reserved memory */
+	if (!drvdata->reg_metadata.vaddr || !drvdata->resrv_mem.vaddr)
+		return 0;
+
+	tmc = (struct tmc_register_snapshot *)drvdata->reg_metadata.vaddr;
+	tmc->valid = 0x0;
+
+	CS_UNLOCK(drvdata->base);
+
+	/* Proceed only if ETF is enabled or configured as sink */
+	val = readl(drvdata->base + TMC_CTL);
+	if (!(val & TMC_CTL_CAPT_EN))
+		goto out;
+
+	val = readl(drvdata->base + TMC_MODE);
+	if (val != TMC_MODE_CIRCULAR_BUFFER)
+		goto out;
+
+	val = readl(drvdata->base + TMC_FFSR);
+	/* Do manual flush and stop only if its not auto-stopped */
+	if (!(val & TMC_FFSR_FT_STOPPED)) {
+		dev_info(&csdev->dev,
+			 "%s: Triggering manual flush\n", __func__);
+		tmc_flush_and_stop(drvdata);
+	}
+
+	/* Sync registers from hardware to metadata region */
+	tmc->sts = readl(drvdata->base + TMC_STS);
+	tmc->trc_addrhi = drvdata->resrv_mem.paddr >> 32;
+	tmc->trc_addr =  drvdata->resrv_mem.paddr & 0xffffffff;
+
+	/* Sync Internal SRAM to reserved trace buffer region */
+	tmc_etb_dump_hw(drvdata);
+	memcpy(drvdata->resrv_mem.vaddr, drvdata->buf, drvdata->len);
+	tmc->size = drvdata->len;
+
+	/*
+	 * Make sure all previous writes are completed,
+	 * before we mark valid
+	 */
+	dsb(sy);
+	tmc->valid = 0x1;
+
+	tmc_disable_hw(drvdata);
+
+	dev_info(&csdev->dev, "%s: success\n", __func__);
+out:
+	CS_UNLOCK(drvdata->base);
+	return 0;
+}
+
 static const struct coresight_ops_sink tmc_etf_sink_ops = {
 	.enable		= tmc_enable_etf_sink,
 	.disable	= tmc_disable_etf_sink,
@@ -603,6 +660,10 @@ static const struct coresight_ops_link tmc_etf_link_ops = {
 	.disable	= tmc_disable_etf_link,
 };
 
+static const struct coresight_ops_panic tmc_etf_sync_ops = {
+	.sync		= tmc_panic_sync_etf,
+};
+
 const struct coresight_ops tmc_etb_cs_ops = {
 	.sink_ops	= &tmc_etf_sink_ops,
 };
@@ -610,6 +671,7 @@ const struct coresight_ops tmc_etb_cs_ops = {
 const struct coresight_ops tmc_etf_cs_ops = {
 	.sink_ops	= &tmc_etf_sink_ops,
 	.link_ops	= &tmc_etf_link_ops,
+	.panic_ops	= &tmc_etf_sync_ops,
 };
 
 int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
@@ -622,6 +684,25 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
 	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
 			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
 		return -EINVAL;
+
+	if (drvdata->mode == CS_MODE_READ_PREVBOOT && drvdata->reg_metadata.vaddr) {
+		struct tmc_register_snapshot *reg_ptr;
+		u64 trace_addr;
+
+		reg_ptr = drvdata->reg_metadata.vaddr;
+		trace_addr = reg_ptr->trc_addr | ((u64)reg_ptr->trc_addrhi << 32);
+
+		drvdata->buf = memremap(trace_addr, reg_ptr->size, MEMREMAP_WC);
+		if (IS_ERR(drvdata->buf))
+			return -ENOMEM;
+
+		drvdata->len = reg_ptr->size;
+
+		if (reg_ptr->sts & 0x1)
+			coresight_insert_barrier_packet(drvdata->buf);
+		drvdata->reading = true;
+		return 0;
+	}
 
 	spin_lock_irqsave(&drvdata->spinlock, flags);
 
@@ -671,6 +752,13 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
 	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
 			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
 		return -EINVAL;
+
+	if (drvdata->mode == CS_MODE_READ_PREVBOOT) {
+		drvdata->reading = false;
+		memunmap(drvdata->buf);
+		drvdata->buf = NULL;
+		return 0;
+	}
 
 	spin_lock_irqsave(&drvdata->spinlock, flags);
 

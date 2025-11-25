@@ -23,6 +23,7 @@
 #include <linux/spinlock.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/coresight.h>
 #include <linux/amba/bus.h>
 #include <linux/platform_device.h>
@@ -440,6 +441,58 @@ static inline bool tmc_etr_has_secure_access(struct tmc_drvdata *drvdata)
 	return (auth & TMC_AUTH_SID_MASK) == 0x30;
 }
 
+static inline bool is_tmc_reserved_region_valid(struct device *dev)
+{
+	struct tmc_drvdata *drvdata = dev_get_drvdata(dev);
+
+	if (drvdata->resrv_mem.paddr &&
+		drvdata->resrv_mem.size &&
+		drvdata->reg_metadata.paddr &&
+		drvdata->reg_metadata.size)
+		return true;
+	return false;
+}
+
+static void tmc_get_reserved_region(struct device *parent)
+{
+	struct tmc_drvdata *drvdata = dev_get_drvdata(parent);
+	struct device_node *node;
+	struct resource res;
+	int rc;
+
+	node = of_parse_phandle(parent->of_node, "memory-region", 0);
+	if (!node) {
+		dev_dbg(parent, "No memory-region specified\n");
+		goto out;
+	}
+
+	rc = of_address_to_resource(node, 0, &res);
+	of_node_put(node);
+	if (rc) {
+		dev_err(parent, "No address assigned to the memory-region\n");
+		goto out;
+	}
+
+	if (res.start != 0 && resource_size(&res) != 0) {
+		drvdata->resrv_mem.vaddr = memremap(res.start, resource_size(&res), MEMREMAP_WC);
+		if (IS_ERR(drvdata->resrv_mem.vaddr)) {
+			dev_err(parent, "Failed to map destination address for reserved memory\n");
+			rc = PTR_ERR(drvdata->resrv_mem.vaddr);
+			goto out;
+		}
+
+		drvdata->resrv_mem.paddr = res.start;
+		drvdata->resrv_mem.size  = resource_size(&res);
+
+		/* Size of contiguous buffer space for TMC ETR */
+		drvdata->size = drvdata->resrv_mem.size;
+	}
+
+
+out:
+	return;
+}
+
 static const struct amba_id tmc_ids[];
 
 /* Detect and initialise the capabilities of a TMC ETR */
@@ -463,6 +516,12 @@ static int tmc_etr_setup_caps(struct device *parent, u32 devid,
 
 	if (!(devid & TMC_DEVID_NOSCAT) && tmc_etr_can_use_sg(parent))
 		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
+
+	/* Get reserved memory region if specified and
+	 * set capability to use reserved memory for trace buffer.
+	 */
+	if (is_tmc_reserved_region_valid(parent))
+		tmc_etr_set_cap(drvdata, TMC_ETR_RESRV_MEM);
 
 	/* Check if the AXI address width is available */
 	if (devid & TMC_DEVID_AXIAW_VALID)
@@ -489,6 +548,38 @@ static int tmc_etr_setup_caps(struct device *parent, u32 devid,
 	if (rc)
 		dev_err(parent, "Failed to setup DMA mask: %d\n", rc);
 	return rc;
+}
+
+static void tmc_parse_register_metadata_region(struct device *parent)
+{
+	struct tmc_drvdata *drvdata = dev_get_drvdata(parent);
+	const __be32 *metadata;
+	phys_addr_t paddr;
+	size_t size;
+	int len;
+
+	metadata = of_get_property(parent->of_node, "metadata-region", &len);
+	len /= sizeof(*metadata);
+
+	if (!metadata || len != 4)
+		goto out;
+
+	paddr = of_translate_address(parent->of_node, metadata);
+	size =  be32_to_cpup(metadata + 3);
+
+	if (paddr == 0 || size == 0)
+		goto out;
+
+	drvdata->reg_metadata.vaddr = memremap(paddr, size, MEMREMAP_WC);
+	if (IS_ERR_OR_NULL(drvdata->reg_metadata.vaddr)) {
+		dev_err(parent, "Failed to map destination address for registers metadata\n");
+		goto out;
+	}
+
+	drvdata->reg_metadata.paddr = paddr;
+	drvdata->reg_metadata.size = size;
+out:
+	return;
 }
 
 static u32 tmc_etr_get_default_buffer_size(struct device *dev)
@@ -577,6 +668,9 @@ static int __tmc_probe(struct device *dev, struct resource *res)
 			goto out;
 		}
 	}
+
+	tmc_get_reserved_region(dev);
+	tmc_parse_register_metadata_region(dev);
 
 	desc.dev = dev;
 

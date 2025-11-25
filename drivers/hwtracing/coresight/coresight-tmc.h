@@ -78,6 +78,9 @@
 #define TMC_AXICTL_AXCACHE_OS	(0xf << 2)
 #define TMC_AXICTL_ARCACHE_OS	(0xf << 16)
 
+/* TMC_FFSR - 0x300 */
+#define TMC_FFSR_FT_STOPPED	BIT(1)
+
 /* TMC_FFCR - 0x304 */
 #define TMC_FFCR_FLUSHMAN_BIT	6
 #define TMC_FFCR_EN_FMT		BIT(0)
@@ -129,6 +132,8 @@ enum tmc_mem_intf_width {
  * so we have to rely on PID of the IP to detect the functionality.
  */
 #define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
+/* TMC ETR to use reserved memory for trace buffer*/
+#define TMC_ETR_RESRV_MEM		(0x1U << 3)
 
 /* Coresight SoC-600 TMC-ETR unadvertised capabilities */
 #define CORESIGHT_SOC_600_ETR_CAPS	\
@@ -143,6 +148,7 @@ enum etr_mode {
 	ETR_MODE_CATU,		/* Use SG mechanism in CATU */
 	ETR_MODE_AUTO,		/* Use the default mechanism */
 	ETR_MODE_SECURE,	/* Use Secure buffer */
+	ETR_MODE_RESRV,		/* Use reserved region contiguous buffer */
 };
 
 struct etr_buf_operations;
@@ -169,6 +175,28 @@ struct etr_buf {
 	s64				len;
 	const struct etr_buf_operations	*ops;
 	void				*private;
+};
+
+/**
+ * @paddr	: Start address of reserved memory region.
+ * @vaddr	: Corresponding CPU virtual address.
+ * @size	: Size of reserved memory region.
+ */
+struct etr_resrv_mem {
+	phys_addr_t     paddr;
+	void		*vaddr;
+	size_t		size;
+};
+
+/**
+ * @paddr	: Start address for previous boot register metadata region.
+ * @vaddr	: Corresponding CPU virtual address.
+ * @size	: Size of register metadata region.
+ */
+struct tmc_reg_metadata {
+	phys_addr_t     paddr;
+	void		*vaddr;
+	size_t		size;
 };
 
 /**
@@ -210,6 +238,8 @@ struct etr_tsync_data {
  * @idr_mutex:	Access serialisation for idr.
  * @sysfs_buf:	SYSFS buffer for ETR.
  * @perf_buf:	PERF buffer for ETR.
+ * @resrv_mem:	Reserved Memory for ETR buffer.
+ * @reg_metadata: Previous boot register metadata.
  */
 struct tmc_drvdata {
 	struct clk		*pclk;
@@ -242,6 +272,8 @@ struct tmc_drvdata {
 	void			*etm_source;
 	struct etr_tsync_data	tsync_data;
 	struct hrtimer		timer;
+	struct etr_resrv_mem	resrv_mem;
+	struct tmc_reg_metadata reg_metadata;
 };
 
 struct etr_buf_operations {
@@ -283,6 +315,19 @@ struct tmc_sg_table {
 	int node;
 	struct tmc_pages table_pages;
 	struct tmc_pages data_pages;
+};
+
+struct tmc_register_snapshot {
+	uint32_t valid;         /* Indicate if this ETF/ETR was enabled */
+	uint32_t size;          /* Size of trace data */
+	uint32_t rrphi;         /* Read Pointer High Address bits */
+	uint32_t rrp;           /* Read Pointer */
+	uint32_t rwphi;         /* Write Pointer High Address bits */
+	uint32_t rwp;           /* Write Pointer */
+	uint32_t sts;           /* Status Register */
+	uint32_t trc_addrhi;    /* High Address bits of trace data in preserved region */
+	uint32_t trc_addr;      /* Address bits of trace data in preserved region */
+	uint32_t reserved[7];
 };
 
 /* Generic functions */
