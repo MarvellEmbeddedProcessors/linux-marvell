@@ -1169,7 +1169,7 @@ static long cnf20k_cpri_cdev_ioctl(struct file *filp, unsigned int cmd,
 {
 	struct cnf20k_cdev_priv *cdev = filp->private_data;
 	struct cnf20k_bphy_cpri_netdev_comm_intf_cfg *intf_cfg = NULL;
-	int ret = 0;
+	int ret = 0, irq0 = 0, irq1 = 0, num_chiplets = 0;
 
 	if (!cdev) {
 		pr_warn("ioctl: device not opened\n");
@@ -1238,6 +1238,20 @@ static long cnf20k_cpri_cdev_ioctl(struct file *filp, unsigned int cmd,
 			}
 
 			kthread_run(cpri_polling_thread, NULL, "cpri_poll");
+
+			/* probe CPRI GPINT0 handler driver */
+			if (intf_cfg->bphy_chiplet_mask & 1) {
+				irq0 = msix_entries[0].vector;
+				num_chiplets = 1;
+			}
+			if (intf_cfg->bphy_chiplet_mask & 2) {
+				int msix_idx = (intf_cfg->bphy_chiplet_mask == 3) ? 2 : 0;
+
+				irq1 = msix_entries[msix_idx].vector;
+				num_chiplets++;
+			}
+			mrvl_cpri_gpint_create_dev(CPRI_REG_BASE, CPRI_REG_SIZE,
+						   irq0, irq1, num_chiplets);
 			break;
 			}
 

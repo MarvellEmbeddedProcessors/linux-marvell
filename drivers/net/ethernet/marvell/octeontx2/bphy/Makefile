@@ -7,7 +7,7 @@ obj-$(CONFIG_OCTEONTX2_BPHY_RFOE_NETDEV) += octeontx2_bphy_netdev.o
 
 obj-$(CONFIG_OCTEONTX2_BPHY_CNF20K_CPRI_PF) += rvu_bphy_cnf20k_cpri_pf.o
 
-rvu_bphy_cnf20k_cpri_pf-y := cnf20k_cpri.o cnf20k_cpri_ethtool.o
+rvu_bphy_cnf20k_cpri_pf-y := cnf20k_cpri.o cnf20k_cpri_ethtool.o cnf20k_cpri_gpint.o
 
 #EXTRA_CFLAGS += -DDEBUG
 

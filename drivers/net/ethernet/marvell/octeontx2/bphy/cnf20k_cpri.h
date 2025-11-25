@@ -264,3 +264,6 @@ struct bphy_netdev_cpri_link_event {
 
 void cnf20k_cpri_set_ethtool_ops(struct net_device *netdev);
 void cnf20k_cpri_update_stats(struct cnf20k_cpri_ndev_priv *priv);
+int mrvl_cpri_gpint_create_dev(phys_addr_t regbase, size_t size,
+			       int irq0, int irq1,
+			       u32 num_chiplets);
