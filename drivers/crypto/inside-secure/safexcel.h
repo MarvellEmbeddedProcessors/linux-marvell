@@ -789,12 +789,13 @@ struct safexcel_register_offsets {
 };
 
 enum safexcel_flags {
-	EIP197_TRC_CACHE	= BIT(0),
-	SAFEXCEL_HW_EIP197	= BIT(1),
-	EIP197_PE_ARB		= BIT(2),
-	EIP197_ICE		= BIT(3),
-	EIP197_SIMPLE_TRC	= BIT(4),
-	EIP197_OCE		= BIT(5),
+	EIP197_TRC_CACHE		= BIT(0),
+	SAFEXCEL_HW_EIP197		= BIT(1),
+	EIP197_PE_ARB			= BIT(2),
+	EIP197_ICE			= BIT(3),
+	EIP197_SIMPLE_TRC		= BIT(4),
+	EIP197_OCE			= BIT(5),
+	SAFEXCEL_ALGS_NOT_REGISTERED	= BIT(6),
 };
 
 struct safexcel_hwconfig {
