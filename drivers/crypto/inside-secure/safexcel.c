@@ -28,6 +28,16 @@ static u32 max_rings = EIP197_MAX_RINGS;
 module_param(max_rings, uint, 0644);
 MODULE_PARM_DESC(max_rings, "Maximum number of rings to use.");
 
+#define MAX_ENGINES	3 /* Max CP_NUM */
+
+/* Module param to save the assigned rings to the Kernel */
+static int rings[MAX_ENGINES] = {-1, -1, -1};
+module_param_array(rings, int, NULL, 0644);
+MODULE_PARM_DESC(rings, "Number of rings assigned to the Kernel driver.");
+
+/* Use module (legacy) param 'rings' instead of 'max_rings' */
+static bool use_legacy_param;
+
 static void eip197_trc_cache_setupvirt(struct safexcel_crypto_priv *priv)
 {
 	int i;
@@ -1414,6 +1424,42 @@ static int safexcel_probe_generic(void *pdev,
 	struct device *dev = priv->dev;
 	u32 peid, version, mask, val, hiaopt, hwopt, peopt;
 	int i, ret, hwctg;
+
+	if (!is_pci_dev &&
+	    of_machine_is_compatible("marvell,cn9130")) {
+		struct device_node *p_node, *pp_node;
+		int id = -1;
+
+		p_node = of_get_parent(dev->of_node);
+		if (!p_node)
+			return -EINVAL;
+
+		pp_node = of_get_parent(p_node);
+		if (!pp_node) {
+			of_node_put(p_node);
+			return -EINVAL;
+		}
+
+		sscanf(pp_node->name, "cp%d", &id);
+
+		if (id >= 0 && id < MAX_ENGINES) {
+			if (rings[id] != -1) {
+				max_rings = min_t(int, EIP197_MAX_RINGS,
+					rings[id]);
+				use_legacy_param = true;
+			} else if (use_legacy_param)
+				max_rings = EIP197_MAX_RINGS;
+		}
+
+		if (use_legacy_param) {
+			dev_warn(dev, "Using legacy module param (rings).\n");
+			dev_warn(dev, "cp-%d: reserved %d rings for MUSDK.",
+				 id, (EIP197_MAX_RINGS - max_rings));
+		}
+
+		of_node_put(pp_node);
+		of_node_put(p_node);
+	}
 
 	priv->context_pool = dmam_pool_create("safexcel-context", dev,
 					      sizeof(struct safexcel_context_record),
