@@ -26,6 +26,7 @@
 #include <linux/regmap.h>
 #include <linux/resource.h>
 
+#include "../../pci.h"
 #include "pcie-designware.h"
 
 #define ARMADA8K_PCIE_MAX_LANES PCIE_LNK_X4
@@ -336,6 +337,60 @@ static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
 	return IRQ_HANDLED;
 }
 
+void pcibios_reset_secondary_bus(struct pci_dev *dev)
+{
+	struct dw_pcie_rp *pp;
+	struct dw_pcie *pci;
+	int ret;
+
+	if (!pci_is_root_bus(dev->bus))
+		goto reset_secondary_bus;
+
+	pp = dev->bus->sysdata;
+	if (!pp)
+		goto reset_secondary_bus;
+
+	pci = to_dw_pcie_from_pp(pp);
+	if (!pci->dev)
+		goto reset_secondary_bus;
+
+	if (!of_device_is_compatible(pci->dev->of_node, "marvell,armada8k-pcie"))
+		goto reset_secondary_bus;
+
+	/*
+	 * Save the config space of the Root Port before doing the
+	 * reset, since the state could be lost. The Endpoint state
+	 * should've been saved by the caller.
+	 */
+	pci_save_state(dev);
+	ret = armada8k_pcie_reset_root_port(dev);
+	if (ret)
+		pci_err(dev, "Failed to reset Root Port: %d\n", ret);
+	else
+		/* Now restore it on success */
+		pci_restore_state(dev);
+
+	return;
+
+reset_secondary_bus:
+	pci_reset_secondary_bus(dev);
+}
+
+static pci_ers_result_t armada8k_pcie_reset_link(struct pci_dev *dev)
+{
+	int ret;
+
+	ret = pci_bus_error_reset(dev);
+	if (ret) {
+		pci_err(dev, "Failed to reset Root Port: %d\n", ret);
+		return PCI_ERS_RESULT_DISCONNECT;
+	}
+
+	pci_info(dev, "Root Port has been reset\n");
+
+	return PCI_ERS_RESULT_RECOVERED;
+}
+
 static irqreturn_t armada8k_pcie_irq_thread(int irq, void *arg)
 {
 	struct armada8k_pcie *pcie = arg;
@@ -351,11 +406,18 @@ static irqreturn_t armada8k_pcie_irq_thread(int irq, void *arg)
 
 	for_each_pci_bridge(port, pp->bridge->bus) {
 		if (pci_pcie_type(port) == PCI_EXP_TYPE_ROOT_PORT) {
-			list_for_each_entry_safe(child, tmp,
-						 &port->subordinate->devices, bus_list)
-				pci_stop_and_remove_bus_device(child);
-
-			armada8k_pcie_reset_root_port(port);
+#if IS_ENABLED(CONFIG_PCIEAER)
+			pcie_do_recovery(port, pci_channel_io_frozen,
+					 armada8k_pcie_reset_link);
+#else
+			armada8k_pcie_reset_link(port);
+#endif
+			if (port->subordinate) {
+				list_for_each_entry_safe(child, tmp,
+							 &port->subordinate->devices,
+							 bus_list)
+					pci_stop_and_remove_bus_device(child);
+			}
 		}
 	}
 
