@@ -28,7 +28,7 @@ struct dentry *mrvl_spi_debug_root;
 
 #define CDNS_XSPI_MAGIC_NUM_VALUE	0x6522
 #define CDNS_XSPI_MAX_BANKS		8
-#define CDNS_XSPI_NAME			"cadence-xspi"
+#define CDNS_XSPI_NAME			"cadence-xspi-cn10xx"
 
 /*
  * Note: below are additional auxiliary registers to
