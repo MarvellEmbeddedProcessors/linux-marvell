@@ -391,7 +391,7 @@ static int armada8k_add_pcie_port(struct armada8k_pcie *pcie,
 
 	ret = devm_request_threaded_irq(dev, pp->irq, armada8k_pcie_irq_handler,
 					armada8k_pcie_irq_thread,
-					IRQF_ONESHOT, "armada8k-pcie", pcie);
+					IRQF_SHARED, "armada8k-pcie", pcie);
 	if (ret) {
 		dev_err(dev, "failed to request irq %d\n", pp->irq);
 		return ret;
