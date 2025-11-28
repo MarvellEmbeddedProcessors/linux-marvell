@@ -1267,7 +1267,7 @@ static int cdns_xspi_transfer_one_message_wo(struct spi_controller *host,
 	struct cdns_xspi_dev *cdns_xspi = spi_controller_get_devdata(host);
 	struct spi_device *spi = m->spi;
 	struct spi_transfer *t = NULL;
-	int cs = spi->chip_select;
+	int cs = spi_get_chipselect(spi, 0);
 
 	cdns_xspi->cur_cs = cs;
 
