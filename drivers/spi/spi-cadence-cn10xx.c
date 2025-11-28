@@ -1493,7 +1493,6 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 		// For compatibility with older firmware
 		cdns_xspi->xferbase = cdns_xspi->iobase + 0x8000;
 	}
-#endif
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 4);
 	if (res)
@@ -1507,6 +1506,7 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 		spin_lock_init(&cdns_xspi->lock);
 		lock->k_support = 0x01;
 	}
+#endif
 
 	cdns_xspi->irq = platform_get_irq(pdev, 0);
 	if (cdns_xspi->irq < 0)
@@ -1550,8 +1550,10 @@ static int cdns_xspi_probe(struct platform_device *pdev)
 	}
 
 	dev_info(dev, "Successfully registered SPI host\n");
+#if IS_ENABLED(CONFIG_SPI_CADENCE_MRVL_XSPI)
 	if (cdns_xspi->wo_mode)
 		mrvl_spi_setup_debugfs(cdns_xspi);
+#endif
 
 	return 0;
 }
