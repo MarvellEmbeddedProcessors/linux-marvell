@@ -777,8 +777,7 @@ static bool cdns_xspi_sdma_ready(struct cdns_xspi_dev *cdns_xspi, bool sleep)
 
 static int cdns_xspi_send_stig_command(struct cdns_xspi_dev *cdns_xspi,
 				       const struct spi_mem_op *op,
-				       bool data_phase,
-				       bool pstore_sleep)
+				       bool data_phase)
 {
 	u32 cmd_regs[6];
 	u32 cmd_status;
@@ -830,7 +829,7 @@ static int cdns_xspi_send_stig_command(struct cdns_xspi_dev *cdns_xspi,
 
 		cdns_xspi_trigger_command(cdns_xspi, cmd_regs);
 
-		if (cdns_xspi->irq && pstore_sleep) {
+		if (cdns_xspi->irq) {
 			wait_for_completion(&cdns_xspi->sdma_complete);
 			if (cdns_xspi->sdma_error) {
 				cdns_xspi_set_interrupts(cdns_xspi, false);
@@ -838,7 +837,7 @@ static int cdns_xspi_send_stig_command(struct cdns_xspi_dev *cdns_xspi,
 				goto fail;
 			}
 		} else {
-			if (cdns_xspi_sdma_ready(cdns_xspi, pstore_sleep)) {
+			if (cdns_xspi_sdma_ready(cdns_xspi, true)) {
 				ret = -EIO;
 				goto fail;
 			}
@@ -846,11 +845,11 @@ static int cdns_xspi_send_stig_command(struct cdns_xspi_dev *cdns_xspi,
 		cdns_xspi_sdma_handle(cdns_xspi);
 	}
 
-	if (cdns_xspi->irq && pstore_sleep) {
+	if (cdns_xspi->irq) {
 		wait_for_completion(&cdns_xspi->cmd_complete);
 		cdns_xspi_set_interrupts(cdns_xspi, false);
 	} else {
-		if (cdns_xspi_stig_ready(cdns_xspi, pstore_sleep)) {
+		if (cdns_xspi_stig_ready(cdns_xspi, true)) {
 			ret = -EIO;
 			goto fail;
 		}
@@ -871,8 +870,7 @@ fail:
 
 static int cdns_xspi_mem_op(struct cdns_xspi_dev *cdns_xspi,
 			    struct spi_mem *mem,
-			    const struct spi_mem_op *op,
-			    bool pstore)
+			    const struct spi_mem_op *op)
 {
 	enum spi_mem_data_dir dir = op->data.dir;
 
@@ -884,8 +882,7 @@ static int cdns_xspi_mem_op(struct cdns_xspi_dev *cdns_xspi,
 #endif
 
 	return cdns_xspi_send_stig_command(cdns_xspi, op,
-					   (dir != SPI_MEM_NO_DATA),
-					   !pstore);
+					   (dir != SPI_MEM_NO_DATA));
 }
 
 #ifdef CONFIG_ACPI
@@ -954,10 +951,9 @@ static int cdns_xspi_mem_op_execute(struct spi_mem *mem,
 {
 	struct cdns_xspi_dev *cdns_xspi =
 		spi_controller_get_devdata(mem->spi->controller);
-	struct spi_nor *nor = spi_mem_get_drvdata(mem);
 	int ret = 0;
 
-	ret = cdns_xspi_mem_op(cdns_xspi, mem, op, nor->pstore);
+	ret = cdns_xspi_mem_op(cdns_xspi, mem, op);
 
 	return ret;
 }
@@ -1028,8 +1024,8 @@ static irqreturn_t cdns_xspi_irq_handler(int this_irq, void *dev)
 static int cdns_xspi_of_get_plat_data(struct platform_device *pdev)
 {
 	struct fwnode_handle *fwnode_child;
-	struct spi_master *master = platform_get_drvdata(pdev);
-	struct cdns_xspi_dev *cdns_xspi = spi_master_get_devdata(master);
+	struct spi_controller *controller = platform_get_drvdata(pdev);
+	struct cdns_xspi_dev *cdns_xspi = spi_controller_get_devdata(controller);
 	unsigned int cs;
 	unsigned int read_size = 0;
 
@@ -1088,7 +1084,7 @@ static void cdns_xspi_print_phy_config(struct cdns_xspi_dev *cdns_xspi)
 #if IS_ENABLED(CONFIG_SPI_CADENCE_MRVL_XSPI)
 static int cdns_xspi_setup(struct spi_device *spi_dev)
 {
-	struct cdns_xspi_dev *cdns_xspi = spi_master_get_devdata(spi_dev->master);
+	struct cdns_xspi_dev *cdns_xspi = spi_controller_get_devdata(spi_dev->controller);
 
 	cdns_xspi_setup_clock(cdns_xspi, spi_dev->max_speed_hz);
 
@@ -1199,13 +1195,13 @@ static int cdns_xspi_prepare_transfer(int cs, int dir, int len, u32 *cmd_regs)
 static int cdns_xspi_transfer_one_message(struct spi_controller *host,
 					  struct spi_message *m)
 {
-	struct cdns_xspi_dev *cdns_xspi = spi_master_get_devdata(host);
+	struct cdns_xspi_dev *cdns_xspi = spi_controller_get_devdata(host);
 	struct spi_device *spi = m->spi;
 	struct spi_transfer *t = NULL;
 
 	const int max_len = XFER_QWORD_BYTECOUNT * XFER_QWORD_COUNT;
 	int current_cycle_count;
-	int cs = spi->chip_select;
+	int cs = spi_get_chipselect(spi, 0);
 	int cs_change = 0;
 
 	if (cdns_xspi_wait_for_controller_idle(cdns_xspi) < 0)
@@ -1367,7 +1363,7 @@ static int cdns_xspi_transfer_one_message_wo(struct spi_controller *host,
 	struct cdns_xspi_dev *cdns_xspi = spi_controller_get_devdata(host);
 	struct spi_device *spi = m->spi;
 	struct spi_transfer *t = NULL;
-	int cs = spi->chip_select;
+	int cs = spi_get_chipselect(spi, 0);
 
 	cdns_xspi->cur_cs = cs;
 
