@@ -76,6 +76,7 @@
 #include <linux/tty_driver.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
+#include <linux/of_platform.h>
 #include "otx2-pci-console.h"
 
 #define DRV_NAME       "pci-console"
@@ -113,11 +114,14 @@ static struct platform_driver pci_console_driver;
 static int pci_console_dev_tty_open(struct tty_struct *tty, struct file *filp);
 static void pci_console_dev_tty_close(struct tty_struct *tty,
 				      struct file *filp);
-static int pci_console_dev_tty_write(struct tty_struct *tty,
-				     const unsigned char *buf, int count);
+static ssize_t pci_console_dev_tty_write(struct tty_struct *tty,
+				     const u8 *buf, size_t count);
 static unsigned int pci_console_dev_tty_write_room(struct tty_struct *tty);
 static unsigned int pci_console_dev_tty_chars_in_buffer(struct tty_struct *tty);
-static void pci_console_dev_tty_send_xchar(struct tty_struct *tty, char ch);
+static void pci_console_dev_tty_send_xchar(struct tty_struct *tty, u8 ch);
+void pci_console_dev_tty_poll(struct timer_list *timer);
+static int octeontx_console_output_truncate(struct octeontx_pcie_console *console,
+					    size_t bytes_to_clear);
 
 /* TTY driver operations table */
 static const struct tty_operations pci_console_dev_tty_ops = {
@@ -230,7 +234,6 @@ exit:
 
 static int pci_console_nexus_de_init_resources(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
 	struct pci_console_nexus *pci_cons_nexus = platform_get_drvdata(pdev);
 
 	if (pci_cons_nexus && pci_cons_nexus->desc) {
@@ -394,13 +397,13 @@ exit:
 
 static void pci_console_nexus_shutdown(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
+	return;
 }
 
 /*
  * Linux driver callback.
  */
-static int pci_console_nexus_remove(struct platform_device *pdev)
+static void pci_console_nexus_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct pci_console_nexus *pci_cons_nexus = platform_get_drvdata(pdev);
@@ -414,8 +417,6 @@ static int pci_console_nexus_remove(struct platform_device *pdev)
 	pci_console_nexus_de_init_resources(pdev);
 
 	devm_kfree(dev, pci_cons_nexus);
-
-	return 0;
 }
 
 static const struct of_device_id pci_console_nexus_of_match[] = {
@@ -672,8 +673,8 @@ octeontx_console_acquire(struct octeontx_pcie_console_nexus __iomem *nexus_desc,
  *              If the size of pending data is less than 'bytes_to_clear',
  *              the return value equals the count of pending data.
  */
-int octeontx_console_output_truncate(struct octeontx_pcie_console *console,
-				     size_t bytes_to_clear)
+static int octeontx_console_output_truncate(struct octeontx_pcie_console *console,
+					    size_t bytes_to_clear)
 {
 	u64 old_val;
 	u64 new_val;
@@ -1164,19 +1165,15 @@ exit:
 
 static void pci_console_shutdown(struct platform_device *pdev)
 {
-	struct device *dev = &pdev->dev;
-
 	pci_console_de_init(pdev);
 }
 
-static int pci_console_remove(struct platform_device *pdev)
+static void pci_console_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct pci_console *pci_cons = platform_get_drvdata(pdev);
 
 	devm_kfree(dev, pci_cons);
-
-	return 0;
 }
 
 static const struct of_device_id pci_console_of_match[] = {
@@ -1306,8 +1303,8 @@ static void pci_console_dev_tty_close(struct tty_struct *tty,
 /*
  * Linux TTY driver callback.
  */
-static int pci_console_dev_tty_write(struct tty_struct *tty,
-				     const unsigned char *buf, int count)
+static ssize_t pci_console_dev_tty_write(struct tty_struct *tty,
+					 const u8 *buf, size_t count)
 {
 	struct pci_console *pci_cons = tty->driver->driver_state;
 	struct device *dev = pci_cons->device;
@@ -1345,7 +1342,7 @@ static unsigned int pci_console_dev_tty_chars_in_buffer(struct tty_struct *tty)
 	return 0;
 }
 
-static void pci_console_dev_tty_send_xchar(struct tty_struct *tty, char ch)
+static void pci_console_dev_tty_send_xchar(struct tty_struct *tty, u8 ch)
 {
 	pci_console_dev_tty_write(tty, (const u8 *)&ch, sizeof(ch));
 }
