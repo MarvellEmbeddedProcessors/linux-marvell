@@ -18,9 +18,14 @@
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
-#define OCTEP_HP_INTR_OFFSET(x) (0x20400 + ((x) << 4))
+#define OCTEP_HP_INTR_OFFSET(x, shift) (0x20400 + ((x) << (shift)))
+#define OCTEP_HP_REG_SHIFT_CN10K 4
+#define OCTEP_HP_REG_SHIFT_CN20K 3
 #define OCTEP_HP_INTR_VECTOR(x) (16 + (x))
 #define OCTEP_HP_DRV_NAME "octep_hp"
+
+#define PCI_SUBSYS_DEVID_CNF10K_A 0xBA00
+#define PCI_SUBSYS_DEVID_CN20KA 0xC200
 
 /*
  * Type of MSI-X interrupts. OCTEP_HP_INTR_VECTOR() and
@@ -64,6 +69,7 @@ struct octep_hp_controller {
 	struct mutex slot_lock; /* Protects slot_list */
 	struct list_head hp_cmd_list;
 	spinlock_t hp_cmd_lock; /* Protects hp_cmd_list */
+	u8 reg_shift;
 };
 
 static void octep_hp_enable_pdev(struct octep_hp_controller *hp_ctrl,
@@ -268,8 +274,8 @@ static irqreturn_t octep_hp_intr_handler(int irq, void *data)
 	}
 
 	/* Read and clear the interrupt */
-	intr_val = readq(hp_ctrl->base + OCTEP_HP_INTR_OFFSET(type));
-	writeq(intr_val, hp_ctrl->base + OCTEP_HP_INTR_OFFSET(type));
+	intr_val = readq(hp_ctrl->base + OCTEP_HP_INTR_OFFSET(type, hp_ctrl->reg_shift));
+	writeq(intr_val, hp_ctrl->base + OCTEP_HP_INTR_OFFSET(type, hp_ctrl->reg_shift));
 
 	hp_cmd = kzalloc(sizeof(*hp_cmd), GFP_ATOMIC);
 	if (!hp_cmd)
@@ -331,6 +337,19 @@ static int octep_hp_controller_setup(struct pci_dev *pdev,
 		return dev_err_probe(dev, ret, "Failed to iomap PCI device region");
 
 	hp_ctrl->base = pcim_iomap_table(pdev)[0];
+
+	switch (pdev->subsystem_device) {
+	case PCI_SUBSYS_DEVID_CNF10K_A:
+		hp_ctrl->reg_shift = OCTEP_HP_REG_SHIFT_CN10K;
+		break;
+	case PCI_SUBSYS_DEVID_CN20KA:
+		hp_ctrl->reg_shift = OCTEP_HP_REG_SHIFT_CN20K;
+		break;
+	default:
+		return dev_err_probe(dev, -ENODEV,
+				     "Unsupported subsystem device ID: 0x%x\n",
+				     pdev->subsystem_device);
+	}
 
 	pci_set_master(pdev);
 	pci_set_drvdata(pdev, hp_ctrl);
