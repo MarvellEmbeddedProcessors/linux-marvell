@@ -7409,14 +7409,15 @@ int rvu_nix_tl1_xoff_wait_for_link_credits(struct rvu *rvu, u16 pcifunc)
 
 int rvu_nix_tl1_xoff_clear(struct rvu *rvu, u16 pcifunc)
 {
-	int blkaddr;
+	int blkaddr, link;
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, pcifunc);
 	if (blkaddr < 0)
 		return NIX_AF_ERR_AF_LF_INVALID;
 
-	nix_clear_tx_xoff(rvu, blkaddr, NIX_TXSCH_LVL_TL1,
-			  nix_get_tx_link(rvu, pcifunc));
+	/* clear TL1 sw_xoff */
+	link = nix_get_tx_link(rvu, pcifunc);
+	rvu_write64(rvu, blkaddr, NIX_AF_TL1X_SW_XOFF(link), 0);
 	return 0;
 }
 
