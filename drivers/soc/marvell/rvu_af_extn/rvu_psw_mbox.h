@@ -35,6 +35,7 @@ M(PSW_TST_MODIFY_ENTRY, 0x120E, psw_tst_modify_entry, psw_tst_modify_entry_req, 
 				msg_rsp)				\
 M(PSW_MBOX_MSIX_CFG,    0x120F, psw_mbox_msix_cfg, psw_mbox_msix_cfg_req, \
 				msg_rsp)				\
+M(PSW_EPFVF_MSIX_WRITE, 0x1210, psw_epfvf_msix_write, psw_epfvf_msix_write_req, msg_rsp) \
 
 enum {
 #define M(_name, _id, _1, _2, _3) MBOX_MSG_ ## _name = _id,
@@ -284,6 +285,15 @@ struct psw_mbox_msix_cfg_req {
 	u16 evf_id;  /* Host VF ID */
 	u16 mbox_msix;
 	u16 rsvd[2];
+};
+
+struct psw_epfvf_msix_write_req {
+	struct mbox_msghdr hdr;
+	u16 evf_id;
+	u16 rid;
+	u32 data;
+	u8 offset;
+	u8 rsvd[7];
 };
 
 /* PSW debugfs context structure */
