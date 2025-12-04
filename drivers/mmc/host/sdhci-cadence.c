@@ -1749,7 +1749,7 @@ static u32 sdhci_cdns_sd6_get_mode(struct sdhci_host *host,
 static uint32_t sdhci_cdns_sd6_irq(struct sdhci_host *host, u32 intmask)
 {
 	struct sdhci_cdns_priv *priv;
-	uint64_t reg1, reg;
+	uint64_t reg;
 
 	/* If errata workaround is not required, return */
 	if (!cn10k_irq_workaround)
@@ -1762,7 +1762,7 @@ static uint32_t sdhci_cdns_sd6_irq(struct sdhci_host *host, u32 intmask)
 		sdhci_cdns_sd6_writel(host, intmask, SDHCI_INT_STATUS);
 
 	writeq(reg, priv->hrs_addr + CN10K_MSIX_INTR);
-	reg1 = readq(priv->hrs_addr + CN10K_MSIX_INTR);
+	reg = readq(priv->hrs_addr + CN10K_MSIX_INTR);
 
 	return intmask;
 }
