@@ -1229,6 +1229,8 @@ static int otx2vf_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (err)
 		goto err_unreg_netdev;
 
+	otx2_set_hw_capabilities(vf);
+
 	err = otx2_init_tc(vf);
 	if (err)
 		goto err_unreg_netdev;

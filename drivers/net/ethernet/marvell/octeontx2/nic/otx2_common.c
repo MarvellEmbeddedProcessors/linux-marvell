@@ -809,7 +809,8 @@ int otx2_txsch_alloc(struct otx2_nic *pfvf)
 	for (lvl = 0; lvl < NIX_TXSCH_LVL_CNT; lvl++)
 		req->schq[lvl] = 1;
 
-	if (is_otx2_sdp_rep(pfvf->pdev) && chan_cnt > 1) {
+	if (is_otx2_sdp_rep(pfvf->pdev) && chan_cnt > 1 &&
+	    !test_bit(HW_NIX_FIXED_TXSCHQ_MAPPING, &pfvf->hw.cap_flag)) {
 		req->schq[NIX_TXSCH_LVL_SMQ] = chan_cnt;
 		req->schq[NIX_TXSCH_LVL_TL4] = chan_cnt;
 	}
@@ -2114,6 +2115,9 @@ int otx2_set_hw_capabilities(struct otx2_nic *pfvf)
 
 	if (rsp->hw_caps & HW_CAP_MACSEC_SCI_MATCH)
 		__set_bit(HW_MACSEC_SCI_MATCH, &hw->cap_flag);
+
+	if (rsp->nix_fixed_txschq_mapping)
+		__set_bit(HW_NIX_FIXED_TXSCHQ_MAPPING, &hw->cap_flag);
 
 	mutex_unlock(&mbox->lock);
 

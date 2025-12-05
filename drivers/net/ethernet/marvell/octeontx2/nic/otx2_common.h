@@ -281,6 +281,7 @@ struct otx2_hw {
 #define CN10K_HW_MACSEC		5
 #define QOS_CIR_PIR_SUPPORT	6
 #define HW_MACSEC_SCI_MATCH	7
+#define HW_NIX_FIXED_TXSCHQ_MAPPING 8
 	unsigned long		cap_flag;
 
 #define LMT_LINE_SIZE		128
