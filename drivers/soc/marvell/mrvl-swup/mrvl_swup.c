@@ -120,7 +120,7 @@ static void prepare_names(struct smc_version_info *info, uint32_t objects)
 	}
 }
 
-struct arm_smccc_res mrvl_exec_smc(uint64_t smc, uint64_t buf, uint64_t size)
+static struct arm_smccc_res mrvl_exec_smc(uint64_t smc, uint64_t buf, uint64_t size)
 {
 	struct arm_smccc_res res;
 
