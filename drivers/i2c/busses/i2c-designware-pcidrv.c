@@ -37,6 +37,7 @@ enum dw_pci_ctl_id_t {
 	haswell,
 	elkhartlake,
 	navi_amd,
+	marvell,
 };
 
 /*
@@ -159,6 +160,17 @@ static int navi_amd_setup(struct pci_dev *pdev, struct dw_pci_controller *c)
 	return 0;
 }
 
+static int marvell_setup(struct pci_dev *pdev, struct dw_pci_controller *c)
+{
+	struct dw_i2c_dev *dev = dev_get_drvdata(&pdev->dev);
+	u64 intr_val;
+
+	/* Enable interrupt for Marvell CN20K I2C controllers */
+	intr_val = readq(dev->base + CN20K_IC_INTR_ENA_W1S);
+	writeq(intr_val | 0x1, dev->base + CN20K_IC_INTR_ENA_W1S);
+	return 0;
+}
+
 static struct dw_pci_controller dw_pci_controllers[] = {
 	[medfield] = {
 		.bus_num = -1,
@@ -191,6 +203,10 @@ static struct dw_pci_controller dw_pci_controllers[] = {
 		.scl_sda_cfg = &navi_amd_config,
 		.setup =  navi_amd_setup,
 		.get_clk_rate_khz = navi_amd_get_clk_rate_khz,
+	},
+	[marvell] = {
+		.bus_num = -1,
+		.setup = marvell_setup,
 	},
 };
 
@@ -352,7 +368,9 @@ static const struct pci_device_id i2c_designware_pci_ids[] = {
 	{ PCI_VDEVICE(ATI,  0x73c4), navi_amd },
 	{ PCI_VDEVICE(ATI,  0x7444), navi_amd },
 	{ PCI_VDEVICE(ATI,  0x7464), navi_amd },
-	{}
+	/* Marvell CN20K */
+	{ PCI_VDEVICE(CAVIUM, 0xa0a9), marvell },
+	{ 0, }
 };
 MODULE_DEVICE_TABLE(pci, i2c_designware_pci_ids);
 
