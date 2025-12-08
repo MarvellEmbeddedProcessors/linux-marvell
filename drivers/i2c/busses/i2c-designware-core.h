@@ -317,6 +317,9 @@ struct dw_i2c_dev {
 #define AMD_UCSI_INTR_REG			0x474
 #define AMD_UCSI_INTR_EN			0xd
 
+/* Marvell CN20K SOC interrupt enable */
+#define CN20K_IC_INTR_ENA_W1S			0x178
+
 #define TXGBE_TX_FIFO_DEPTH			4
 #define TXGBE_RX_FIFO_DEPTH			1
 
