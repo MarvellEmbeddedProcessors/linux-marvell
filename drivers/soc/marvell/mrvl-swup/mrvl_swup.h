@@ -399,8 +399,13 @@ enum read_flash_ret {
 	READ_FL_UNKNOWN_ERROR = -1000,
 };
 
-#define READ_VERSION			0x0100
-#define READ_VERSION_PREV		0x0000
+/** Minimum version that includes log support */
+#define READ_LOG_VERSION		0x0100
+/** Include data for eMMC/SD in cs field */
+#define READ_EMMC_DATA_VERSION		0x0101
+/** Current smc_read_flash_descriptor version */
+#define READ_VERSION			0x0101
+#define READ_VERSION_PREV		0x0100
 
 /** Log progress */
 #define READ_FLAG_LOG_PROGRESS	BIT(0)
