@@ -26,6 +26,8 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
 
 #include "mpam_internal.h"
 
@@ -459,6 +461,71 @@ mpam_vmsc_find(struct mpam_component *comp, struct mpam_msc *msc)
 	return mpam_vmsc_alloc(comp, msc);
 }
 
+static unsigned long cache_of_get_id(struct device_node *np)
+{
+	struct device_node *cpu;
+	unsigned long min_id = ~0UL;
+
+	for_each_of_cpu_node(cpu) {
+		struct device_node *cache_node = cpu;
+		u64 id = of_get_cpu_hwid(cache_node, 0);
+
+		while ((cache_node = of_find_next_cache_node(cache_node))) {
+			if ((cache_node == np) && (id < min_id)) {
+				min_id = id;
+				of_node_put(cache_node);
+				break;
+			}
+			of_node_put(cache_node);
+		}
+	}
+
+	return min_id;
+}
+
+static int get_dt_cpumask_from_cache_id(u32 cache_id, u32 cache_level,
+				     cpumask_t *affinity)
+{
+	int cpu, err;
+	u32 iter_level;
+	int iter_cache_id;
+	struct device_node *iter;
+
+	for_each_possible_cpu(cpu) {
+		iter = of_get_cpu_node(cpu, NULL);
+		if (!iter) {
+			pr_err("Failed to find cpu%d device node\n", cpu);
+			return -ENOENT;
+		}
+
+		while ((iter = of_find_next_cache_node(iter))) {
+			err = of_property_read_u32(iter, "cache-level",
+						   &iter_level);
+			if (err || (iter_level != cache_level)) {
+				of_node_put(iter);
+				continue;
+			}
+
+			/*
+			 * get_cpu_cacheinfo_id() isn't ready until sometime
+			 * during device_initcall(). Use cache_of_get_id().
+			 */
+			iter_cache_id = cache_of_get_id(iter);
+			if (cache_id == ~0UL) {
+				of_node_put(iter);
+				continue;
+			}
+
+			if (iter_cache_id == cache_id)
+				cpumask_set_cpu(cpu, affinity);
+
+			of_node_put(iter);
+		}
+	}
+
+	return 0;
+}
+
 /*
  * The cacheinfo structures are only populated when CPUs are online.
  * This helper walks the acpi tables to include offline CPUs too.
@@ -466,7 +533,10 @@ mpam_vmsc_find(struct mpam_component *comp, struct mpam_msc *msc)
 int mpam_get_cpumask_from_cache_id(unsigned long cache_id, u32 cache_level,
 				   cpumask_t *affinity)
 {
-	return acpi_pptt_get_cpumask_from_cache_id(cache_id, affinity);
+	if (!acpi_disabled)
+		return acpi_pptt_get_cpumask_from_cache_id(cache_id, affinity);
+	else
+		return get_dt_cpumask_from_cache_id(cache_id, cache_level, affinity);
 }
 
 /*
@@ -481,6 +551,28 @@ static void get_cpumask_from_node_id(u32 node_id, cpumask_t *affinity)
 		if (node_id == cpu_to_node(cpu))
 			cpumask_set_cpu(cpu, affinity);
 	}
+}
+
+static int get_cpumask_from_cache(struct device_node *cache,
+				  cpumask_t *affinity)
+{
+	int err;
+	u32 cache_level;
+	int cache_id;
+
+	err = of_property_read_u32(cache, "cache-level", &cache_level);
+	if (err) {
+		pr_err("Failed to read cache-level from cache node\n");
+		return -ENOENT;
+	}
+
+	cache_id = cache_of_get_id(cache);
+	if (cache_id == ~0UL) {
+		pr_err("Failed to calculate cache-id from cache node\n");
+		return -ENOENT;
+	}
+
+	return get_dt_cpumask_from_cache_id(cache_id, cache_level, affinity);
 }
 
 static int mpam_ris_get_affinity(struct mpam_msc *msc, cpumask_t *affinity,
@@ -1705,6 +1797,91 @@ static void mpam_wa_t241_force_mbw_min_to_one(struct mpam_config *cfg,
 	cfg->mbw_min = min_hw_granule + 1;
 }
 
+static int mpam_dt_count_msc(void)
+{
+	int count = 0;
+	struct device_node *np;
+
+	for_each_compatible_node(np, NULL, "arm,mpam-msc")
+		count++;
+
+	return count;
+}
+
+static int mpam_dt_parse_resource(struct mpam_msc *msc, struct device_node *np,
+				  u32 ris_idx)
+{
+	int err = 0;
+	u32 level = 0;
+	unsigned long cache_id;
+	struct device_node *cache = NULL;
+
+	do {
+		if (!of_property_match_string(np->parent, "device_type",
+					      "memory")) {
+			err = mpam_ris_create(msc, ris_idx, MPAM_CLASS_MEMORY,
+					      0x4, 0x0);
+			break;
+		} else if (of_device_is_compatible(np, "arm,mpam-cache")) {
+			cache = of_parse_phandle(np, "arm,mpam-device", 0);
+			if (!cache) {
+				pr_err("Failed to read phandle\n");
+				break;
+			}
+		} else if (of_device_is_compatible(np->parent, "cache")) {
+			cache = of_node_get(np->parent);
+		} else {
+			/* For now, only caches are supported */
+			cache = NULL;
+			pr_err("Nither cache nor memory\n");
+			break;
+		}
+
+		err = of_property_read_u32(cache, "cache-level", &level);
+		if (err) {
+			pr_err("Failed to read cache-level\n");
+			break;
+		}
+
+		cache_id = cache_of_get_id(cache);
+		if (cache_id == ~0UL) {
+			err = -ENOENT;
+			break;
+		}
+
+		err = mpam_ris_create(msc, ris_idx, MPAM_CLASS_CACHE, level,
+				      cache_id);
+	} while (0);
+	of_node_put(cache);
+
+	return err;
+}
+
+static int mpam_dt_parse_resources(struct mpam_msc *msc, void *ignored)
+{
+	int err, num_ris = 0;
+	const u32 *ris_idx_p;
+	struct device_node *iter, *np;
+
+	np = msc->pdev->dev.of_node;
+	for_each_child_of_node(np, iter) {
+		ris_idx_p = of_get_property(iter, "reg", NULL);
+		if (ris_idx_p) {
+			num_ris++;
+			err = mpam_dt_parse_resource(msc, iter, *ris_idx_p);
+			if (err) {
+				of_node_put(iter);
+				return err;
+			}
+		}
+	}
+
+	if (!num_ris)
+		mpam_dt_parse_resource(msc, np, 0);
+
+	return err;
+}
+
 /*
  * Called via smp_call_on_cpu() to prevent migration, while still being
  * pre-emptible. Caller must hold mpam_srcu.
@@ -1983,15 +2160,41 @@ static int mpam_msc_setup_error_irq(struct mpam_msc *msc)
  */
 static void update_msc_accessibility(struct mpam_msc *msc)
 {
+	struct device_node *parent;
 	u32 affinity_id;
 	int err;
 
-	err = device_property_read_u32(&msc->pdev->dev, "cpu_affinity",
-				       &affinity_id);
-	if (err)
-		cpumask_copy(&msc->accessibility, cpu_possible_mask);
-	else
-		acpi_pptt_get_cpus_from_container(affinity_id, &msc->accessibility);
+	if (!acpi_disabled) {
+		err = device_property_read_u32(&msc->pdev->dev, "cpu_affinity",
+					       &affinity_id);
+		if (err)
+			cpumask_copy(&msc->accessibility, cpu_possible_mask);
+		else
+			acpi_pptt_get_cpus_from_container(affinity_id, &msc->accessibility);
+
+	} else {
+		/* This depends on the path to of_node */
+		parent = of_get_parent(msc->pdev->dev.of_node);
+		if (parent == of_root) {
+			cpumask_copy(&msc->accessibility, cpu_possible_mask);
+			err = 0;
+		} else {
+			if (of_device_is_compatible(parent, "cache")) {
+				err = get_cpumask_from_cache(parent,
+							     &msc->accessibility);
+			} else if (!of_property_match_string(parent, "device_type",
+							     "memory")) {
+				cpumask_copy(&msc->accessibility, cpu_possible_mask);
+				err = 0;
+			} else {
+				err = -EINVAL;
+				pr_err("Cannot determine accessibility of MSC: %s\n",
+				       dev_name(&msc->pdev->dev));
+			}
+		}
+		of_node_put(parent);
+	}
+
 }
 
 /*
@@ -2062,7 +2265,7 @@ static struct mpam_msc *do_mpam_msc_drv_probe(struct platform_device *pdev)
 		return ERR_PTR(err);
 
 	mpam_mon_sel_lock_init(msc);
-	msc->id = pdev->id;
+	msc->id = atomic_add_return(1, &mpam_num_msc);
 	msc->pdev = pdev;
 	INIT_LIST_HEAD_RCU(&msc->all_msc_list);
 	INIT_LIST_HEAD_RCU(&msc->ris);
@@ -2118,23 +2321,35 @@ static int mpam_msc_drv_probe(struct platform_device *pdev)
 	if (IS_ERR(msc))
 		return PTR_ERR(msc);
 
+
 	/* Create RIS entries described by firmware */
-	err = acpi_mpam_parse_resources(msc, plat_data);
+	if (!acpi_disabled)
+		err = acpi_mpam_parse_resources(msc, plat_data);
+	else
+		err = mpam_dt_parse_resources(msc, plat_data);
+
 	if (err) {
 		mpam_msc_drv_remove(pdev);
 		return err;
 	}
 
-	if (atomic_add_return(1, &mpam_num_msc) == fw_num_msc)
+	if (atomic_read(&mpam_num_msc) == fw_num_msc)
 		mpam_register_cpuhp_callbacks(mpam_discovery_cpu_online, NULL,
 					      "mpam:drv_probe");
 
 	return 0;
 }
 
+static const struct of_device_id mpam_of_match[] = {
+	{ .compatible = "arm,mpam-msc", },
+	{},
+};
+MODULE_DEVICE_TABLE(of, mpam_of_match);
+
 static struct platform_driver mpam_msc_driver = {
 	.driver = {
 		.name = "mpam_msc",
+		.of_match_table = of_match_ptr(mpam_of_match),
 	},
 	.probe = mpam_msc_drv_probe,
 	.remove = mpam_msc_drv_remove,
@@ -3137,6 +3352,29 @@ int mpam_apply_config(struct mpam_component *comp, u16 partid,
 	return 0;
 }
 
+/*
+ * MSC that are hidden under caches/memory are not created as platform devices
+ * as there is no cache driver. Caches are also special-cased in
+ * get_msc_affinity().
+ */
+static void mpam_dt_create_foundling_msc(void)
+{
+	int err;
+	struct device_node *cache, *memory;
+
+	for_each_compatible_node(cache, NULL, "cache") {
+		err = of_platform_populate(cache, mpam_of_match, NULL, NULL);
+		if (err)
+			pr_err("Failed to create MSC devices under caches\n");
+	}
+
+	for_each_node_by_type(memory, "memory") {
+		err = of_platform_populate(memory, mpam_of_match, NULL, NULL);
+		if (err)
+			pr_err("Failed to create MSC devices under memory controllers\n");
+	}
+}
+
 static int __init mpam_msc_driver_init(void)
 {
 	if (!system_supports_mpam())
@@ -3144,11 +3382,16 @@ static int __init mpam_msc_driver_init(void)
 
 	init_srcu_struct(&mpam_srcu);
 
-	fw_num_msc = acpi_mpam_count_msc();
-	if (fw_num_msc <= 0) {
-		pr_err("No MSC devices found in firmware\n");
+	if (!acpi_disabled)
+		fw_num_msc = acpi_mpam_count_msc();
+	else
+		fw_num_msc = mpam_dt_count_msc();
+
+	if (fw_num_msc <= 0)
 		return -EINVAL;
-	}
+
+	if (acpi_disabled)
+		mpam_dt_create_foundling_msc();
 
 	mpam_debugfs = debugfs_create_dir("mpam", NULL);
 
