@@ -76,6 +76,7 @@ static void cnf10k_rfoe_update_ptp_clock(struct cnf10k_rfoe_ndev_priv *priv, s64
 {
 	bool neg_adj = false, atomic_inc_dec = false;
 	u64 regval, ptp_clock_hi;
+	unsigned long flags;
 
 	if (delta < 0) {
 		delta = -delta;
@@ -87,6 +88,7 @@ static void cnf10k_rfoe_update_ptp_clock(struct cnf10k_rfoe_ndev_priv *priv, s64
 		atomic_inc_dec = true;
 
 	if (!atomic_inc_dec) {
+		spin_lock_irqsave(&priv->lock, flags);
 		ptp_clock_hi = readq(priv->ptp_reg_base + MIO_PTP_CLOCK_HI);
 		if (neg_adj) {
 			if (ptp_clock_hi > delta)
@@ -97,6 +99,7 @@ static void cnf10k_rfoe_update_ptp_clock(struct cnf10k_rfoe_ndev_priv *priv, s64
 			ptp_clock_hi += delta;
 		}
 		cnf10k_rfoe_ptp_atomic_update(priv, ptp_clock_hi);
+		spin_unlock_irqrestore(&priv->lock, flags);
 	} else {
 		writeq(delta, priv->ptp_reg_base + MIO_PTP_NANO_TIMESTAMP);
 		writeq(0, priv->ptp_reg_base + MIO_PTP_FRNS_TIMESTAMP);
