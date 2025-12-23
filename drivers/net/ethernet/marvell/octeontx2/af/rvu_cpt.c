@@ -41,11 +41,6 @@
 	(_rsp)->free_sts_##etype = free_sts;                        \
 })
 
-#define MAX_RE  GENMASK_ULL(63, 48)
-#define MAX_AE  GENMASK_ULL(47, 32)
-#define MAX_IE  GENMASK_ULL(31, 16)
-#define MAX_SE  GENMASK_ULL(15, 0)
-
 static u16 cpt_max_engines_get(struct rvu *rvu)
 {
 	u16 max_ses, max_ies, max_aes, max_re;
@@ -106,6 +101,9 @@ static irqreturn_t cpt_af_flt_intr_handler(int vec, void *ptr)
 			eng = i + 192;
 			break;
 		}
+
+		if (cpt_cn20k_re_flt_handler(eng, rvu))
+			continue;
 		grp = rvu_read64(rvu, blkaddr, CPT_AF_EXEX_CTL2(eng)) & 0xFF;
 		/* Disable and enable the engine which triggers fault */
 		rvu_write64(rvu, blkaddr, CPT_AF_EXEX_CTL2(eng), 0x0);
@@ -223,6 +221,7 @@ static void cpt_cnxk_unregister_interrupts(struct rvu_block *block, int off)
 			free_irq(pci_irq_vector(rvu->pdev, off + i), block);
 			rvu->irq_allocated[off + i] = false;
 		}
+	cpt_cn20k_re_flt_destroy();
 }
 
 static void cpt_unregister_interrupts(struct rvu *rvu, int blkaddr)
@@ -342,6 +341,10 @@ static int cpt_20k_register_interrupts(struct rvu_block *block, int off)
 	if (ret)
 		goto err;
 	rvu_write64(rvu, blkaddr, CPT_AF_RAS_INT_ENA_W1S, 0x1);
+
+	ret = cpt_cn20k_re_flt_init(rvu);
+	if (ret)
+		goto err;
 
 	return 0;
 err:

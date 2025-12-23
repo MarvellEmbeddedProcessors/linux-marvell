@@ -11,6 +11,101 @@
 #include "struct.h"
 #include "../rvu.h"
 
+static struct workqueue_struct *re_flt_wq;
+struct cpt_re_flt_work_data {
+	struct work_struct cpt_re_wd_work;
+	u32 tile_start_eng;
+	struct rvu *rvu;
+};
+
+#define NUM_RE_ENGINES_PER_TILE 8
+/* Each RE tile is in multiple of 8 engines */
+#define GET_RE_ENGINE_TILE_ID(_re) ((_re) / NUM_RE_ENGINES_PER_TILE)
+
+#define ERR_CODE_MASK  GENMASK_ULL(31, 24)
+#define ERR_EID_MASK   GENMASK_ULL(7, 0)
+#define WD_TIMEOUT_ERR_CODE 0x4
+/* No. of AE 16 bits for FLT_INTR_VEC_2 */
+#define AE_ENG_NR_BITS_FLT_INTR_VEC_2 16
+/* Compute bit index inside FLTX_INT_VEC3 (vector 3) for an absolute RE
+ * engine index. Subtract MAX AE bits to no.of bits already represented in
+ * earlier vector(i.e FLTX_INT_VEC2).
+ */
+#define GET_FLT_INTR_VEC3_REG_RE_IDX(_reg) ({ \
+	FIELD_GET(MAX_AE, reg) - \
+	min_t(u64, FIELD_GET(MAX_AE, reg), AE_ENG_NR_BITS_FLT_INTR_VEC_2); \
+})
+static int re_start_eng;
+static int re_max_engines;
+/* RE tile start vector 3 register index */
+static int re_tile_start_vec3_reg_idx;
+static inline bool cpt_re_check_eng_wd_timeout(int eng, struct rvu *rvu)
+{
+	u64 reg;
+
+	reg = rvu_read64(rvu, BLKADDR_CPT0, CPT_AF_EXE_ERR_INFO);
+
+	return ((FIELD_GET(ERR_CODE_MASK, reg) == WD_TIMEOUT_ERR_CODE) &&
+		(FIELD_GET(ERR_EID_MASK, reg) == (eng & ERR_EID_MASK)));
+}
+
+static inline bool cpt_is_re_eng_valid(int eng)
+{
+	if (eng < re_start_eng ||
+	    eng >= (re_start_eng + re_max_engines))
+		return false;
+
+	return true;
+}
+
+static inline int cpt_re_get_tile_start_eng(int eng)
+{
+	u32 tile_id;
+
+	tile_id = GET_RE_ENGINE_TILE_ID(eng - re_start_eng);
+	return re_start_eng + tile_id * NUM_RE_ENGINES_PER_TILE;
+}
+
+static void cpt_re_eng_intr_set(u32 reg_eng_idx, struct rvu *rvu, u64 reg)
+{
+	u64 regval;
+
+	regval = rvu_read64(rvu, BLKADDR_CPT0, reg);
+	regval |= (1 << reg_eng_idx);
+	rvu_write64(rvu, BLKADDR_CPT0, reg, regval);
+}
+
+static int cpt_re_eng_intr_disable(u32 re_tile_start_eng_id, struct rvu *rvu)
+{
+	u32 tile_start_idx;
+	u64 reg;
+	u32 eng;
+
+	tile_start_idx = re_tile_start_eng_id - re_start_eng;
+	reg = rvu_read64(rvu, BLKADDR_CPT0, CPT_AF_FLTX_INT_ENA_W1S(3));
+	/* check if intr of re tile starting engine already masked */
+	if ((reg & BIT_ULL(tile_start_idx + re_tile_start_vec3_reg_idx)) == 0)
+		return -EALREADY;
+
+	for (eng = tile_start_idx;
+	     eng < tile_start_idx + NUM_RE_ENGINES_PER_TILE; eng++)
+		cpt_re_eng_intr_set(eng + re_tile_start_vec3_reg_idx, rvu,
+				    CPT_AF_FLTX_INT_ENA_W1C(3));
+	return 0;
+}
+
+static void cpt_re_eng_intr_enable(u32 re_tile_start_eng_id, struct rvu *rvu)
+{
+	u32 tile_start_idx;
+	u32 eng;
+
+	tile_start_idx = re_tile_start_eng_id - re_start_eng;
+	for (eng = tile_start_idx;
+	     eng < tile_start_idx + NUM_RE_ENGINES_PER_TILE; eng++)
+		cpt_re_eng_intr_set(eng + re_tile_start_vec3_reg_idx, rvu,
+				    CPT_AF_FLTX_INT_ENA_W1S(3));
+}
+
 void cpt_cn20k_rxc_time_cfg(struct rvu *rvu, int blkaddr,
 			    struct cpt_rxc_time_cfg_req *req,
 			    struct cpt_rxc_time_cfg_req *save)
@@ -353,4 +448,124 @@ void rvu_cn20k_cpt_init(struct rvu *rvu)
 	cpt_cn20k_cfg_ucc_cq_err_codes(rvu, BLKADDR_CPT0);
 
 	cpt_rx_qid_init(rvu);
+}
+
+void cpt_cn20k_re_flt_destroy(void)
+{
+	if (!re_flt_wq)
+		return;
+	flush_workqueue(re_flt_wq);
+	destroy_workqueue(re_flt_wq);
+	re_flt_wq = NULL;
+}
+
+int cpt_cn20k_re_flt_init(struct rvu *rvu)
+{
+	u64 reg;
+
+	reg = rvu_read64(rvu, BLKADDR_CPT0, CPT_AF_CONSTANTS1);
+	re_max_engines = FIELD_GET(MAX_RE, reg);
+	if (!re_max_engines)
+		return 0;
+
+	re_start_eng = FIELD_GET(MAX_SE, reg) + FIELD_GET(MAX_IE, reg) +
+		       FIELD_GET(MAX_AE, reg);
+	re_tile_start_vec3_reg_idx = GET_FLT_INTR_VEC3_REG_RE_IDX(reg);
+	re_flt_wq = alloc_workqueue("cpt_re_flt_wq",
+				    WQ_UNBOUND | WQ_MEM_RECLAIM, 0);
+	if (!re_flt_wq) {
+		dev_err(rvu->dev,
+			"CPT_RE: Reset FLT workqueue creation failed\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static inline bool cpt_re_check_flt_wd_timeout(int eng, struct rvu *rvu)
+{
+	if (!re_max_engines || !cpt_is_re_eng_valid(eng))
+		return false;
+	return cpt_re_check_eng_wd_timeout(eng, rvu);
+}
+
+static void cpt_re_flt_work_handler(struct work_struct *work)
+{
+	u8 eng_grp_mask[NUM_RE_ENGINES_PER_TILE] = {0};
+	struct cpt_re_flt_work_data *work_data;
+	struct rvu *rvu;
+	int start_eng;
+	int end_eng;
+	int eng;
+	u64 reg;
+
+	work_data = container_of(work, struct cpt_re_flt_work_data,
+				 cpt_re_wd_work);
+	start_eng = work_data->tile_start_eng;
+	end_eng = start_eng + NUM_RE_ENGINES_PER_TILE;
+	rvu = work_data->rvu;
+	/* Clear group masks for all the engines in the tile */
+	for (eng = start_eng; eng < end_eng; eng++) {
+		reg = rvu_read64(rvu, BLKADDR_CPT0, CPT_AF_EXEX_CTL2(eng));
+		eng_grp_mask[eng - start_eng] = reg & 0xFF;
+		rvu_write64(rvu, BLKADDR_CPT0, CPT_AF_EXEX_CTL2(eng), 0x0);
+	}
+	/* Wait for all the engines in the tile to be idle */
+	for (eng = start_eng; eng < end_eng; eng++) {
+		u32 timeout = 5000;
+
+		do {
+			reg = rvu_read64(rvu, BLKADDR_CPT0,
+					 CPT_AF_EXEX_STS(eng));
+			if ((reg & CPT_AF_EXE_STS_MASK) == 0)
+				break;
+			udelay(1);
+			if (--timeout == 0) {
+				dev_warn(rvu->dev,
+					 "CPT FLT RE engine %d failed to go idle\n",
+					 eng);
+				break;
+			}
+		} while (1);
+	}
+	/* Disable and enable all the engines in the tile */
+	for (eng = start_eng; eng < end_eng; eng++) {
+		reg = rvu_read64(rvu, BLKADDR_CPT0, CPT_AF_EXEX_CTL(eng));
+		rvu_write64(rvu, BLKADDR_CPT0,
+			    CPT_AF_EXEX_CTL(eng), reg & ~1ULL);
+		rvu_write64(rvu, BLKADDR_CPT0,
+			    CPT_AF_EXEX_CTL(eng), reg | 1ULL);
+	}
+	/* Put all the engines in the tile group mask back */
+	for (eng = start_eng; eng < end_eng; eng++) {
+		rvu_write64(rvu, BLKADDR_CPT0, CPT_AF_EXEX_CTL2(eng),
+			    eng_grp_mask[eng - start_eng]);
+	}
+	/* enable RE engines interrupts again */
+	cpt_re_eng_intr_enable(start_eng, rvu);
+	kfree(work_data);
+}
+
+bool cpt_cn20k_re_flt_handler(int eng, struct rvu *rvu)
+{
+	struct cpt_re_flt_work_data *work_data;
+	u32 tile_start_eng;
+
+	if (!cpt_re_check_flt_wd_timeout(eng, rvu))
+		return false;
+
+	tile_start_eng = cpt_re_get_tile_start_eng(eng);
+	if (cpt_re_eng_intr_disable(tile_start_eng, rvu) < 0)
+		return true;
+
+	work_data = kmalloc(sizeof(*work_data), GFP_ATOMIC);
+	if (!work_data) {
+		cpt_re_eng_intr_enable(tile_start_eng, rvu);
+		return true;
+	}
+
+	work_data->rvu = rvu;
+	work_data->tile_start_eng = tile_start_eng;
+	INIT_WORK(&work_data->cpt_re_wd_work, cpt_re_flt_work_handler);
+	queue_work(re_flt_wq, &work_data->cpt_re_wd_work);
+	return true;
 }
