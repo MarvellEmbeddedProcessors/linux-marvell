@@ -53,6 +53,12 @@
 #define CPT_AF_UCC_CTL_CQ_ENA_MASK	(CPT_AF_UCC_CTL_CQ_ENA | \
 					 CPT_AF_UCC_CTL_CQ_ENA_SWARN)
 
+/* CPT_AF_CONSTANTS1 bits: MAX_SE, MAX_IE, MAX_AE, MAX_RE */
+#define MAX_RE  GENMASK_ULL(63, 48)
+#define MAX_AE  GENMASK_ULL(47, 32)
+#define MAX_IE  GENMASK_ULL(31, 16)
+#define MAX_SE  GENMASK_ULL(15, 0)
+
 struct rvu_cpt {
 	/* PCIFUNC to CPT RX Queue map */
 	u16                     cptpfvf_map[CPT_AF_MAX_RXC_QUEUES];
@@ -66,5 +72,7 @@ void cpt_cn20k_rxc_time_cfg(struct rvu *rvu, int blkaddr,
 			    struct cpt_rxc_time_cfg_req *save);
 void cpt_cn20k_rxc_teardown(struct rvu *rvu, u16 pcifunc, int blkaddr);
 int cpt_cn20k_ctx_flush(struct rvu *rvu, int blkaddr, u16 pcifunc);
-
+int cpt_cn20k_re_flt_init(struct rvu *rvu);
+void cpt_cn20k_re_flt_destroy(void);
+bool cpt_cn20k_re_flt_handler(int eng, struct rvu *rvu);
 #endif /* RVU_CPT_H */

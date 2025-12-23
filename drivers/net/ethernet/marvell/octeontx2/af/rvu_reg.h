@@ -883,6 +883,7 @@
 #define CPT_AF_LF_CTL2_SHIFT		3
 #define CPT_AF_LF_SSO_PF_FUNC_SHIFT	32
 
+#define CPT_AF_EXE_STS_MASK 0x3ULL
 /* NPC */
 #define NPC_AF_CFG			(is_cn20k(rvu->pdev) ? (0x00800) : (0x00000))
 #define NPC_AF_ACTIVE_PC		(is_cn20k(rvu->pdev) ? (0x00820) : (0x00010))
