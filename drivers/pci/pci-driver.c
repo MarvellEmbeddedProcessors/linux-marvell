@@ -1648,13 +1648,13 @@ static int pci_bus_num_vf(struct device *dev)
  */
 static int pci_dma_configure(struct device *dev)
 {
-	struct pci_driver *driver = to_pci_driver(dev->driver);
+	const struct device_driver *driver = READ_ONCE(dev->driver);
 	struct device *bridge;
 	int ret = 0;
 
 	bridge = pci_get_host_bridge_device(to_pci_dev(dev));
 
-	if (IS_ENABLED(CONFIG_OF) && bridge->parent &&
+i	if (IS_ENABLED(CONFIG_OF) && bridge->parent &&
 	    bridge->parent->of_node) {
 		ret = of_dma_configure(dev, bridge->parent->of_node, true);
 	} else if (has_acpi_companion(bridge)) {
@@ -1665,7 +1665,7 @@ static int pci_dma_configure(struct device *dev)
 
 	pci_put_host_bridge_device(bridge);
 
-	if (!ret && !driver->driver_managed_dma) {
+	if (!ret && driver && !to_pci_driver(drv)->driver_managed_dma) {
 		ret = iommu_device_use_default_domain(dev);
 		if (ret)
 			arch_teardown_dma_ops(dev);
