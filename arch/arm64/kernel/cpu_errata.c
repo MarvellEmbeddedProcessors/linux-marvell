@@ -12,7 +12,26 @@
 #include <asm/cputype.h>
 #include <asm/cpufeature.h>
 #include <asm/kvm_asm.h>
+#include <asm/kvm_host.h>
 #include <asm/smp_plat.h>
+
+struct arm64_erratum {
+	u64			erratum_num;
+	struct midr_range	range;
+};
+
+static const struct arm64_erratum *is_midr_in_erratum_list(const struct arm64_erratum *erratum_list)
+{
+	const struct arm64_erratum *erratum = erratum_list;
+	u32 midr = read_cpuid_id();
+
+	while (erratum->range.model) {
+		if (is_midr_in_range(midr, &erratum->range))
+			return erratum;
+		erratum++;
+	}
+	return NULL;
+}
 
 static bool __maybe_unused
 is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
@@ -304,28 +323,58 @@ has_neoverse_n1_erratum_1542419(const struct arm64_cpu_capabilities *entry,
 	return is_midr_in_range(midr, &range) && has_dic;
 }
 
-static const struct midr_range erratum_bad_tc_tlb_cpus[] = {
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_A77),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_A78),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_A78C),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_A78AE),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_A710),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_X1),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_X1C),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_X2),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_X3),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_X4),
-	MIDR_ALL_VERSIONS(MIDR_CORTEX_X925),
-	MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N2),
-	MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V1),
-	MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V2),
-	MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V3),
+static const struct arm64_erratum erratum_bad_tc_tlb_cpus[] = {
+	{4299122, MIDR_ALL_VERSIONS(MIDR_CORTEX_A77)},
+	{4299126, MIDR_ALL_VERSIONS(MIDR_CORTEX_A78)},
+	/* Yes, A78C has two erratum numbers */
+	{4299130, MIDR_ALL_VERSIONS(MIDR_CORTEX_A78C)},
+	{4299132, MIDR_ALL_VERSIONS(MIDR_CORTEX_A78C)},
+	{4299131, MIDR_ALL_VERSIONS(MIDR_CORTEX_A78AE)},
+	{4299133, MIDR_ALL_VERSIONS(MIDR_CORTEX_A710)},
+	{4299126, MIDR_ALL_VERSIONS(MIDR_CORTEX_X1)},
+	{4299130, MIDR_ALL_VERSIONS(MIDR_CORTEX_X1C)},
+	{4299133, MIDR_ALL_VERSIONS(MIDR_CORTEX_X2)},
+	{4299135, MIDR_ALL_VERSIONS(MIDR_CORTEX_X3)},
+	{4299137, MIDR_ALL_VERSIONS(MIDR_CORTEX_X4)},
+	{4299139, MIDR_ALL_VERSIONS(MIDR_CORTEX_X925)},
+	{4299134, MIDR_ALL_VERSIONS(MIDR_NEOVERSE_N2)},
+	{4299123, MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V1)},
+	{4299136, MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V2)},
+	{4299138, MIDR_ALL_VERSIONS(MIDR_NEOVERSE_V3)},
 	{ /* Sentinel */  },
 };
 
 static bool has_bad_tc_tlb(const struct arm64_cpu_capabilities *entry, int scope)
 {
-	return is_midr_in_range_list(read_cpuid_id(), erratum_bad_tc_tlb_cpus);
+	int ret;
+	const struct arm64_erratum *erratum;
+
+	erratum = is_midr_in_erratum_list(erratum_bad_tc_tlb_cpus);
+
+	/*
+	 * Probe for unaffected platforms. Under Nested-Virt the hypervisor can
+	 * use this to indicate virtual EL2 does not need to workaround this
+	 * erratum. e.g. because its stage2 page tables are never used by the
+	 * hardware.
+	 *
+	 * Because Cortex-A78C has two entries, a second call may be needed if
+	 * firmware only accepts the 'other' erratum id.
+	 */
+	do {
+		if (!erratum)
+			return false;
+
+		ret = arm_smccc_em_cpu_features(erratum->erratum_num);
+		if (ret == -EOPNOTSUPP)
+			break;
+		if (ret == SMCCC_EM_RET_NOT_AFFECTED)
+			return false;
+
+		/* Try another entry in the list */
+		erratum = is_midr_in_erratum_list(++erratum);
+	} while (erratum);
+
+	return true;
 }
 
 #ifdef CONFIG_ARM64_WORKAROUND_REPEAT_TLBI
