@@ -571,14 +571,26 @@ static int update_engines_offset(struct device *dev,
 				 struct otx2_cpt_engs_available *avail,
 				 struct otx2_cpt_engs_rsvd *engs)
 {
-	/* 10x supports Symmetric Engines (SE), Ipsec Engines (IE) and
-	 * Asymmetric Engines (AE). 20x does not support IE engines while
-	 * it supports new engine type (RE) for quantum cryptography.
-	 * So, 20x does not support IE engines but support RE engines
-	 * and 10x does not support RE engines but support IE engines.
-	 * CPT have array of engines in which SE engines are at the
-	 * start, followed by IE (10x) or RE (20x) engines. AE engines
-	 * are after IE on 10x and after RE on 20x.
+	/*
+	 * CPT Engines supported on 10x:
+	 *   - Symmetric Engines (SE): encryption/decryption operations
+	 *   - IPsec Engines (IE): IPsec protocol processing
+	 *   - Asymmetric Engines (AE): public key cryptography
+	 *
+	 * CPT Engines supported on 20x:
+	 *   - Symmetric Engines (SE): encryption/decryption operations
+	 *   - IPsec Engines (IE): removed, no longer supported
+	 *   - Asymmetric Engines (AE): public key cryptography
+	 *   - Random/RISC-V Engines (RE): post-quantum cryptography support
+	 *
+	 * CPT Engines enumeration on 10x and 20x:
+	 *   20x: [SE engines] -> [AE engines] -> [RE engines]
+	 *   10x: [SE engines] -> [IE engines] -> [AE engines]
+	 *
+	 *   SE engines are always positioned at the start.
+	 *   On 10x, IE engines follow SE engines, then AE engines.
+	 *   On 20x, AE engines directly follow SE engines (no IE),
+	 *   with RE engines positioned after AE engines.
 	 */
 	switch (engs->type) {
 	case OTX2_CPT_SE_TYPES:
@@ -590,8 +602,7 @@ static int update_engines_offset(struct device *dev,
 		break;
 
 	case OTX2_CPT_AE_TYPES:
-		engs->offset = avail->max_se_cnt + avail->max_ie_cnt +
-				avail->max_re_cnt;
+		engs->offset = avail->max_se_cnt + avail->max_ie_cnt;
 		break;
 
 	default:
