@@ -1249,6 +1249,7 @@ static void npc_enadis_default_entries(struct rvu *rvu, u16 pcifunc,
 {
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, pcifunc);
 	struct npc_mcam *mcam = &rvu->hw->mcam;
+	int type = NIXLF_UCAST_ENTRY;
 	int index, blkaddr;
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
@@ -1259,8 +1260,21 @@ static void npc_enadis_default_entries(struct rvu *rvu, u16 pcifunc,
 	if (npc_is_feature_supported(rvu, BIT_ULL(NPC_DMAC),
 				     pfvf->nix_rx_intf) &&
 	    (!is_rep_dev(rvu, pcifunc))) {
+		if (is_cn20k(rvu->pdev) && is_lbk_vf(rvu, pcifunc))
+			type = NIXLF_PROMISC_ENTRY;
+
 		index = npc_get_nixlf_mcam_index(rvu, mcam, pcifunc,
-						 nixlf, NIXLF_UCAST_ENTRY);
+						 nixlf, type);
+
+		if (index == USHRT_MAX)
+			dev_err(rvu->dev,
+				"%s:%d idx=%u pfunc=%#x lf=%u %s lbkvf=%u vf=%u cgx=%u sdp=%u\n",
+				__func__, __LINE__, index, pcifunc, nixlf,
+				enable ? "enable" : "disable",
+				is_lbk_vf(rvu, pcifunc), is_vf(pcifunc),
+				is_pf_cgxmapped(rvu, rvu_get_pf(pcifunc)),
+				is_sdp_pfvf(pcifunc));
+
 		npc_enable_mcam_entry(rvu, mcam, blkaddr, index, enable);
 	}
 
