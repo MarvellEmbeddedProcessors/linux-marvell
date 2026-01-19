@@ -289,7 +289,7 @@ config PCI_OCTEON_PEM
 	bool "Marvell Octeon PEM (PCIe MAC) controller"
 	depends on ARM64 || COMPILE_TEST
 	depends on PCI
-	depends on PCI_MSI_IRQ_DOMAIN
+	depends on PCI_MSI
 	depends on HOTPLUG_PCI_PCIE
 	help
 	  Say Y here if you want PEM controller support for Marvell ARM64 Octeon SoCs.
