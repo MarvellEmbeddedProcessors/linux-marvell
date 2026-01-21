@@ -610,16 +610,6 @@ config MARVELL_CN10K_DPI
 	  To compile this driver as a module, choose M here: the module
 	  will be called mrvl_cn10k_dpi.
 
-config MARVELL_OTX_BPHY_CTR
-	bool "Marvell OcteonTX BPHY Control driver"
-	select MRVL_OCTEONTX_EL0_INTR
-	help
-	default y
-	  Enables BPHY control driver which handles ioctl calls
-	  to set/clear IRQ handlers in EL3 using SMC calls.
-	  The purpose of this is to handle some BPHY Interrupts in
-	  user space directly without kernel's intervention.
-
 config MARVELL_LOKI
 	bool "Marvell Loki driver"
 	default y
