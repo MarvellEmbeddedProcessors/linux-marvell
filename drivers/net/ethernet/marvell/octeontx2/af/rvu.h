@@ -1155,17 +1155,17 @@ bool is_sdp_pfvf(u16 pcifunc);
 bool is_sdp_pf(u16 pcifunc);
 bool is_sdp_vf(struct rvu *rvu, u16 pcifunc);
 
-static inline bool is_rep_dev(struct rvu *rvu, u16 pcifunc)
-{
-	if (rvu->rep_pcifunc && rvu->rep_pcifunc == pcifunc)
-		return true;
-
-	return false;
-}
-
 static inline int rvu_get_pf(u16 pcifunc)
 {
 	return (pcifunc >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
+}
+
+static inline bool is_rep_dev(struct rvu *rvu, u16 pcifunc)
+{
+	if (rvu->rep_pcifunc && rvu_get_pf(rvu->rep_pcifunc) == rvu_get_pf(pcifunc))
+		return true;
+
+	return false;
 }
 
 /* CGX APIs */
