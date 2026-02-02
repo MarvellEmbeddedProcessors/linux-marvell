@@ -45,6 +45,9 @@ struct mrvl_loki {
 
 struct mrvl_loki *g_ml;
 
+int mrvl_loki_register_irq_cb(connip_irq_cb_t func);
+void mrvl_loki_unregister_irq_cb(void);
+
 int mrvl_loki_register_irq_cb(connip_irq_cb_t func)
 {
 	if (!g_ml) {
