@@ -307,4 +307,10 @@ struct psw_dbg_ctx {
 
 void rvu_psw_dbg_init(struct rvu *rvu, struct psw_dbg_ctx *dbg_ctx, int blkaddr);
 
+#define M(_name, _id, fn_name, req, rsp)\
+int rvu_mbox_handler_ ## fn_name(struct rvu *, struct req *, struct rsp *);
+MBOX_EBLOCK_PSW_MESSAGES
+MBOX_EBLOCK_UP_PSW_MESSAGES
+#undef M
+
 #endif /* __RVU_PSW_MBOX_H__ */
