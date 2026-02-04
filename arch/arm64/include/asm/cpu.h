@@ -9,6 +9,14 @@
 #include <linux/init.h>
 #include <linux/percpu.h>
 
+#define ARCH_CPU_VULN_DEF	CPU_SHOW_VULN_FALLBACK(arm_tc_erratum)
+#define ARCH_CPU_VULN_ATTR	static DEVICE_ATTR(arm_tc_erratum, 0444,    \
+						   cpu_show_arm_tc_erratum, \
+						   NULL)
+#define ARCH_CPU_VULN_ENTRY	&dev_attr_arm_tc_erratum.attr,
+
+ssize_t cpu_show_arm_tc_erratum(struct device *dev, struct device_attribute *attr, char *buf);
+
 /*
  * Records attributes of an individual CPU.
  */
