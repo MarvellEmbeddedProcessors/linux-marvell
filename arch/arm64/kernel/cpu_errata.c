@@ -442,6 +442,13 @@ static enum wa_bad_tc_tlb_workaround_idx wa_bad_tc_tlb_get_state(void)
 	return BAD_TC_TLB_DYNAMIC;
 }
 
+ssize_t cpu_show_arm_tc_erratum(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	const char *desc = wa_bad_tc_tlb_workarounds[wa_bad_tc_tlb_mode].name;
+
+	return sysfs_emit(buf, "%s\n", desc);
+}
+
 static int em_configure_workaround(const struct arm64_erratum *erratum_list, u64 arg)
 {
 	int ret = -EOPNOTSUPP;
