@@ -613,6 +613,7 @@ config MARVELL_CN10K_DPI
 config MARVELL_LOKI
 	bool "Marvell Loki driver"
 	default y
+	depends on ARM64
 	help
 	  Handles GPINT0 interrupt on Loki SoC.
 
