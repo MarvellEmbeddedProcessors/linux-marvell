@@ -404,6 +404,8 @@ static int sw_fl_parse_flow(struct otx2_nic *nic, struct flow_cls_offload *f,
 			   BIT_ULL(NPC_SMAC) |
 			   BIT_ULL(NPC_DIP_IPV4) |
 			   BIT_ULL(NPC_SIP_IPV4) |
+			   BIT_ULL(NPC_DIP_IPV6) |
+			   BIT_ULL(NPC_SIP_IPV6) |
 			   BIT_ULL(NPC_DPORT_UDP) |
 			   BIT_ULL(NPC_SPORT_UDP) |
 			   BIT_ULL(NPC_DPORT_TCP) |

@@ -67,6 +67,8 @@ static int rvu_sw_l3_offl_rule_push(struct list_head *lh)
 	int sz, cnt;
 	int tot_cnt = 0;
 
+	BUILD_BUG_ON(sizeof(*req) > 1024);
+
 	l3_entry = list_first_entry_or_null(lh, struct l3_entry, list);
 	if (!l3_entry)
 		return 0;
@@ -129,7 +131,7 @@ static void sw_l3_offl_work_handler(struct work_struct *work)
 		if (!l3_entry)
 			break;
 
-		if (lcnt + l3_entry->cnt > 16) {
+		if (lcnt + l3_entry->cnt > 8) {
 			req = atomic64_read(&req_cnt);
 			atomic64_set(&ack_cnt, req);
 			atomic64_set(&req_processed, req);

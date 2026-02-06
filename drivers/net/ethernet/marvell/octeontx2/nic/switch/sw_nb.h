@@ -27,5 +27,9 @@ int otx2_mbox_up_handler_af2pf_fdb_refresh(struct otx2_nic *pf,
 					   struct af2pf_fdb_refresh_req *req,
 					   struct msg_rsp *rsp);
 
+bool sw_nb_is_cavium_dev(struct net_device *netdev);
+int sw_nb_fib_event_to_otx2_event(int event);
+int sw_nb_inetaddr_event_to_otx2_event(int event);
+
 const char *sw_nb_get_cmd2str(int cmd);
 #endif // SW_NB_H__

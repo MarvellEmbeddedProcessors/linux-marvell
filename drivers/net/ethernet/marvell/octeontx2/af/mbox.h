@@ -2380,10 +2380,19 @@ struct fib_entry {
 	u64 vlan_valid: 1;
 	u64 host    : 1;
 	u64 bridge  : 1;
+	u64 ipv6    : 1;
 	u16 vlan_tag;
-	u32 dst;
-	u32 dst_len;
-	u32 gw;
+	u8 dst_len;
+	u8 dst6_plen;
+	u8 gw6_plen;
+	union {
+		u32 dst;
+		u32 dst6[4];
+	};
+	union {
+		u32 gw;
+		u32 gw6[4];
+	};
 	u16 port_id;
 	u8 nud_state;
 	u8 mac[ETH_ALEN];
@@ -2457,6 +2466,7 @@ struct fl_tuple {
 	u64 is_xdev_br : 1;
 	u64 is_indev_br : 1;
 	u64 uni_di  : 1;
+	u64 is_ipv6 : 1;
 	u16 in_pf;
 	u16 xmit_pf;
 	u64 features;
@@ -2501,7 +2511,7 @@ struct af2swdev_notify_req {
 		};
 		struct {
 			u8 cnt;
-			struct fib_entry entry[16];
+			struct fib_entry entry[12];
 		};
 
 		struct {
