@@ -151,6 +151,11 @@ static u32 navi_amd_get_clk_rate_khz(struct dw_i2c_dev *dev)
 	return 100000;
 }
 
+static u32 marvell_get_clk_rate_khz(struct dw_i2c_dev *dev)
+{
+	return 100000;
+}
+
 static int navi_amd_setup(struct pci_dev *pdev, struct dw_pci_controller *c)
 {
 	struct dw_i2c_dev *dev = pci_get_drvdata(pdev);
@@ -207,6 +212,7 @@ static struct dw_pci_controller dw_pci_controllers[] = {
 	[marvell] = {
 		.bus_num = -1,
 		.setup = marvell_setup,
+		.get_clk_rate_khz = marvell_get_clk_rate_khz,
 	},
 };
 
