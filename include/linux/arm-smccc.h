@@ -293,6 +293,12 @@
 			   ARM_SMCCC_OWNER_STANDARD,		\
 			   0xF2)
 
+#define ARM_SMCCC_EM_CPU_WORKAROUND_CONFIG			\
+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
+			   ARM_SMCCC_SMC_32,			\
+			   ARM_SMCCC_OWNER_STANDARD,		\
+			   0xF5)
+
 /*
  * Return codes defined in ARM DEN 0070A
  * ARM DEN 0070A is now merged/consolidated into ARM DEN 0028 C
@@ -363,9 +369,14 @@ s32 arm_smccc_get_soc_id_version(void);
 s32 arm_smccc_get_soc_id_revision(void);
 
 #ifdef CONFIG_ARM_SMCCC_EM
+int arm_smccc_em_cpu_workaround_config(u32 erratum_id, u64 midr_el1, u64 arg0);
 int arm_smccc_em_cpu_features(u32 erratum_id);
 int __init arm_smccc_em_init(void);
 #else
+static inline int arm_smccc_em_cpu_workaround_config(u32 erratum_id, u64 midr_el1, u64 arg0)
+{
+	return  -EOPNOTSUPP;
+}
 static inline int arm_smccc_em_cpu_features(u32 erratum_id)
 {
 	return  -EOPNOTSUPP;
