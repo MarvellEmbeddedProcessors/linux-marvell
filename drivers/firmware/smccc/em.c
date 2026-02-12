@@ -19,13 +19,37 @@
 
 #include <uapi/linux/psci.h>
 
-static u32 supported;
+static bool em_features_supported;
+static bool em_workaround_config_supported;
+
+int arm_smccc_em_cpu_workaround_config(u32 erratum_id, u64 midr_el1, u64 arg0)
+{
+	struct arm_smccc_res res;
+
+	if (!READ_ONCE(em_workaround_config_supported))
+		return -EOPNOTSUPP;
+
+	arm_smccc_1_1_invoke(ARM_SMCCC_EM_CPU_WORKAROUND_CONFIG, erratum_id,
+			     midr_el1, arg0, &res);
+	switch (res.a0) {
+	case SMCCC_RET_NOT_SUPPORTED:
+		return -EOPNOTSUPP;
+	case SMCCC_EM_RET_INVALID_PARAMTER:
+		return -EINVAL;
+	case SMCCC_EM_RET_UNKNOWN:
+		return -ENOENT;
+	};
+
+	if ((signed long)res.a0 >= 0)
+		return res.a0;
+	return -EIO;
+}
 
 int arm_smccc_em_cpu_features(u32 erratum_id)
 {
 	struct arm_smccc_res res;
 
-	if (!READ_ONCE(supported))
+	if (!READ_ONCE(em_features_supported))
 		return -EOPNOTSUPP;
 
 	arm_smccc_1_1_invoke(ARM_SMCCC_EM_CPU_ERRATUM_FEATURES, erratum_id, 0, &res);
@@ -71,7 +95,12 @@ int __init arm_smccc_em_init(void)
 	pr_info("SMCCC Errata Management Interface v%d.%d\n",
 		major_ver, minor_ver);
 
-	WRITE_ONCE(supported, 1);
+	WRITE_ONCE(em_features_supported, true);
+
+	arm_smccc_1_1_invoke(ARM_SMCCC_EM_FEATURES,
+			     ARM_SMCCC_EM_CPU_WORKAROUND_CONFIG, &res);
+	if (res.a0 != SMCCC_RET_NOT_SUPPORTED)
+		WRITE_ONCE(em_workaround_config_supported, true);
 
 	return 0;
 }
