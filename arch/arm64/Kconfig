@@ -1141,6 +1141,38 @@ config ARM64_ERRATUM_3194386
 
 	  If unsure, say Y.
 
+config ARM64_ERRATUM_4299121
+	bool "Cortex-*/Neoverse-*: workaround for TC structure stage2 bypass"
+	default y
+	select ARM_SMCCC_EM
+	help
+	  This option adds the workaround for the following errata:
+	  * ARM Cortex-A77 erratum 4299122
+	  * ARM Cortex-A78 erratum 4299126
+	  * ARM Cortex-A78C erratum 4299130
+	  * ARM Cortex-A78C erratum 4299132
+	  * ARM Cortex-A710 erratum 4299133
+	  * ARM Cortex-X1 erratum 4299126
+	  * ARM Cortex-X1C erratum 4299130
+	  * ARM Cortex-X2 erratum 4299133
+	  * ARM Cortex-X3 erratum 4299135
+	  * ARM Cortex-X4 erratum 4299137
+	  * ARM Cortex-X925 erratum 4299139
+	  * ARM Neoverse-N2 erratum 4299134
+	  * ARM Neoverse-V1 erratum 4299123
+	  * ARM Neoverse-V2 erratum 4299136
+	  * ARM Neoverse-V3 erratum 4299138
+
+	  On affected cores a malicious guest can mis-use the page table
+	  walker to read and modify memory that was not permitted by the
+	  hypervisor.
+
+	  Work around this problem by configuring one of the three workaround
+	  modes provided by platform firmware. For platforms without the firmware
+	  update constrain KVMs use of stage2 to avoid the erratum conditions.
+
+	  If unsure, say Y.
+
 config CAVIUM_ERRATUM_22375
 	bool "Cavium erratum 22375, 24313"
 	default y

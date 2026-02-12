@@ -377,6 +377,102 @@ static bool has_bad_tc_tlb(const struct arm64_cpu_capabilities *entry, int scope
 	return true;
 }
 
+enum bad_tc_tlb_el3_wa_state {
+	STATIC_OFF = 0,
+	STATIC_ON = 1,
+	DYNAMIC = 2,
+};
+
+enum wa_bad_tc_tlb_workaround_idx {
+	BAD_TC_TLB_UNAFFECTED = 0,
+	BAD_TC_TLB_MITIGATIONS_OFF,
+	BAD_TC_TLB_BUILDBOOT_CFG,
+	BAD_TC_TLB_PKVM,
+	BAD_TC_TLB_DYNAMIC,
+};
+
+static const struct {
+	enum bad_tc_tlb_el3_wa_state		el3_state;
+	const char				*name;
+} wa_bad_tc_tlb_workarounds[] = {
+	[BAD_TC_TLB_UNAFFECTED]      = { STATIC_OFF, "Not affected"},
+	[BAD_TC_TLB_MITIGATIONS_OFF] = { STATIC_OFF, "Vulnerable"},
+	[BAD_TC_TLB_BUILDBOOT_CFG]   = { STATIC_OFF, "Mitigation: Off; kernel build or platform configuration"},
+	[BAD_TC_TLB_PKVM]            = { DYNAMIC,    "Mitigation: Dynamic; pKVM enabled"},
+	[BAD_TC_TLB_DYNAMIC]         = { DYNAMIC,    "Mitigation: Dynamic"},
+};
+
+/* The chosen mode, reported to user-space. Defaults to not-affected. */
+static enum wa_bad_tc_tlb_workaround_idx wa_bad_tc_tlb_mode;
+
+static enum wa_bad_tc_tlb_workaround_idx wa_bad_tc_tlb_get_state(void)
+{
+	/*
+	 * If every stage2 mapping created is at least 64KB, or stage2 is not
+	 * in use, the erratum can not occur.
+	 */
+	if (IS_ENABLED(CONFIG_PAGE_SIZE_64KB) || !IS_ENABLED(CONFIG_KVM) ||
+	    !is_hyp_mode_available() || kvm_get_mode() == KVM_MODE_NONE)
+		return BAD_TC_TLB_BUILDBOOT_CFG;
+
+	if (cpu_mitigations_off())
+		return BAD_TC_TLB_MITIGATIONS_OFF;
+
+	if (kvm_get_mode() == KVM_MODE_PROTECTED)
+		return BAD_TC_TLB_PKVM;
+
+	return BAD_TC_TLB_DYNAMIC;
+}
+
+static int em_configure_workaround(const struct arm64_erratum *erratum_list, u64 arg)
+{
+	int ret = -EOPNOTSUPP;
+	const struct arm64_erratum *erratum = is_midr_in_erratum_list(erratum_list);
+
+	/*
+	 * Because Cortex-A78C has two entries, a second call may be needed if
+	 * firmware only accepts the 'other' erratum id.
+	 */
+	do {
+		if (!erratum)
+			return ret;
+
+		ret = arm_smccc_em_cpu_workaround_config(erratum->erratum_num,
+							 read_cpuid_id(), arg);
+		if (ret == -EOPNOTSUPP)
+			break;
+		if (ret > 0)
+			return ret;
+
+		/* Try another entry in the list */
+		erratum = is_midr_in_erratum_list(++erratum);
+	} while (erratum);
+
+	return ret;
+}
+
+/* Set the EL3 workaround to the desired mode */
+static void cpu_enable_bad_tc_tlb(const struct arm64_cpu_capabilities *__unused)
+{
+	int ret;
+	enum bad_tc_tlb_el3_wa_state el3_state;
+	enum wa_bad_tc_tlb_workaround_idx mode;
+
+	if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_4299121)) {
+		WRITE_ONCE(wa_bad_tc_tlb_mode, BAD_TC_TLB_MITIGATIONS_OFF);
+		return;
+	}
+
+	mode = wa_bad_tc_tlb_get_state();
+	el3_state = wa_bad_tc_tlb_workarounds[mode].el3_state;
+
+	ret = em_configure_workaround(erratum_bad_tc_tlb_cpus, el3_state);
+	if (ret < 0 && el3_state != STATIC_OFF)
+		mode = BAD_TC_TLB_MITIGATIONS_OFF;
+
+	WRITE_ONCE(wa_bad_tc_tlb_mode, mode);
+}
+
 #ifdef CONFIG_ARM64_WORKAROUND_REPEAT_TLBI
 static const struct arm64_cpu_capabilities arm64_repeat_tlbi_list[] = {
 #ifdef CONFIG_QCOM_FALKOR_ERRATUM_1009
@@ -1042,6 +1138,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		.capability = ARM64_WORKAROUND_4299121,
 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
 		.matches = has_bad_tc_tlb,
+		.cpu_enable = cpu_enable_bad_tc_tlb,
 	},
 	{
 	}
