@@ -24,6 +24,17 @@
 #define OCTEP_HP_INTR_VECTOR(x) (16 + (x))
 #define OCTEP_HP_DRV_NAME "octep_hp"
 
+#define OCTEP_HP_SCRATCH_OFFSET_CN10K 0x209E0
+#define OCTEP_HP_SCRATCH_OFFSET_CN20K 0x28000
+
+/* State flags are mutually exclusive, only one is set at a time */
+#define OCTEP_HP_SCRATCH_ON  BIT_ULL(63)
+#define OCTEP_HP_SCRATCH_OFF BIT_ULL(62)
+
+/* Interrupt value layout: bits [31:0] slot mask, bits [63:32] cookie */
+#define OCTEP_HP_INTR_SLOT_MASK GENMASK_ULL(31, 0)
+#define OCTEP_HP_INTR_COOKIE_SHIFT 32
+
 #define PCI_SUBSYS_DEVID_CNF10K_A 0xBA00
 #define PCI_SUBSYS_DEVID_CN20KA 0xC200
 
@@ -69,6 +80,7 @@ struct octep_hp_controller {
 	struct mutex slot_lock; /* Protects slot_list */
 	struct list_head hp_cmd_list;
 	spinlock_t hp_cmd_lock; /* Protects hp_cmd_list */
+	u32 scratch_offset;
 	u8 reg_shift;
 };
 
@@ -180,6 +192,21 @@ static void octep_hp_deregister_slot(void *data)
 	kfree(hp_slot);
 }
 
+static void octep_hp_scratch_write(struct octep_hp_controller *hp_ctrl, u64 val)
+{
+	writeq(val, hp_ctrl->base + hp_ctrl->scratch_offset);
+}
+
+static u32 octep_hp_intr_slot_mask(u64 intr_val)
+{
+	return intr_val & OCTEP_HP_INTR_SLOT_MASK;
+}
+
+static u32 octep_hp_intr_cookie(u64 intr_val)
+{
+	return intr_val >> OCTEP_HP_INTR_COOKIE_SHIFT;
+}
+
 static const char *octep_hp_cmd_name(enum octep_hp_intr_type type)
 {
 	switch (type) {
@@ -195,18 +222,21 @@ static const char *octep_hp_cmd_name(enum octep_hp_intr_type type)
 static void octep_hp_cmd_handler(struct octep_hp_controller *hp_ctrl,
 				 struct octep_hp_cmd *hp_cmd)
 {
+	u32 slot_mask = octep_hp_intr_slot_mask(hp_cmd->intr_val);
+	u32 cookie = octep_hp_intr_cookie(hp_cmd->intr_val);
 	struct octep_hp_slot *hp_slot;
 
 	/*
 	 * Enable or disable the slots based on the slot mask.
-	 * intr_val is a bit mask where each bit represents a slot.
+	 * Bits [31:0] of intr_val are the slot bitmask.
+	 * Bits [63:32] carry the cookie for command acknowledgement.
 	 */
 	list_for_each_entry(hp_slot, &hp_ctrl->slot_list, list) {
-		if (!(hp_cmd->intr_val & BIT(hp_slot->slot_number)))
+		if (!(slot_mask & BIT(hp_slot->slot_number)))
 			continue;
 
-		pci_info(hp_ctrl->pdev, "Received %s command for slot %s\n",
-			 octep_hp_cmd_name(hp_cmd->intr_type),
+		pci_info(hp_ctrl->pdev, "Received %s command (cookie=%x) for slot %s\n",
+			 octep_hp_cmd_name(hp_cmd->intr_type), cookie,
 			 hotplug_slot_name(&hp_slot->slot));
 
 		switch (hp_cmd->intr_type) {
@@ -220,6 +250,9 @@ static void octep_hp_cmd_handler(struct octep_hp_controller *hp_ctrl,
 			break;
 		}
 	}
+
+	/* Acknowledge command completion, keep ON flag set */
+	octep_hp_scratch_write(hp_ctrl, OCTEP_HP_SCRATCH_ON | cookie);
 }
 
 static void octep_hp_work_handler(struct work_struct *work)
@@ -299,6 +332,7 @@ static void octep_hp_irq_cleanup(void *data)
 
 	pci_free_irq_vectors(hp_ctrl->pdev);
 	flush_work(&hp_ctrl->work);
+	octep_hp_scratch_write(hp_ctrl, OCTEP_HP_SCRATCH_OFF);
 }
 
 static int octep_hp_request_irq(struct octep_hp_controller *hp_ctrl,
@@ -341,9 +375,11 @@ static int octep_hp_controller_setup(struct pci_dev *pdev,
 	switch (pdev->subsystem_device) {
 	case PCI_SUBSYS_DEVID_CNF10K_A:
 		hp_ctrl->reg_shift = OCTEP_HP_REG_SHIFT_CN10K;
+		hp_ctrl->scratch_offset = OCTEP_HP_SCRATCH_OFFSET_CN10K;
 		break;
 	case PCI_SUBSYS_DEVID_CN20KA:
 		hp_ctrl->reg_shift = OCTEP_HP_REG_SHIFT_CN20K;
+		hp_ctrl->scratch_offset = OCTEP_HP_SCRATCH_OFFSET_CN20K;
 		break;
 	default:
 		return dev_err_probe(dev, -ENODEV,
@@ -425,6 +461,7 @@ static int octep_hp_pci_probe(struct pci_dev *pdev,
 		slot_number++;
 	}
 
+	octep_hp_scratch_write(hp_ctrl, OCTEP_HP_SCRATCH_ON);
 	return 0;
 }
 
