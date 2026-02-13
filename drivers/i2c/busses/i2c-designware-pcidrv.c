@@ -10,6 +10,7 @@
  * Copyright (C) 2011, 2015, 2016 Intel Corporation.
  */
 #include <linux/delay.h>
+#include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/i2c.h>
@@ -251,6 +252,13 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 	r = pcim_iomap_regions(pdev, 1 << 0, pci_name(pdev));
 	if (r)
 		return dev_err_probe(device, r, "I/O memory remapping failed\n");
+
+	/* Marvell DesignWare: prefer 48-bit DMA */
+	if (id->driver_data == marvell) {
+		r = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(48));
+		if (r)
+			dev_warn(&pdev->dev, "Failed to set 48-bit DMA mask, using default\n");
+	}
 
 	dev = devm_kzalloc(device, sizeof(*dev), GFP_KERNEL);
 	if (!dev)
