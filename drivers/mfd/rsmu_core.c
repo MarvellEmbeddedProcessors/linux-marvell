@@ -83,6 +83,7 @@ EXPORT_SYMBOL_GPL(rsmu_core_init);
 void rsmu_core_exit(struct rsmu_ddata *rsmu)
 {
 	mutex_destroy(&rsmu->lock);
+	regmap_exit(rsmu->regmap);
 }
 EXPORT_SYMBOL_GPL(rsmu_core_exit);
 

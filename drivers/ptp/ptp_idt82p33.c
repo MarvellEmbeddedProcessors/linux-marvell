@@ -485,7 +485,6 @@ static int _idt82p33_adjtime_internal_triggered(struct idt82p33_channel *channel
 	char buf[TOD_BYTE_COUNT];
 	struct timespec64 ts;
 	const u8 delay_ns = 32;
-	s32 remainder;
 	s64 ns;
 	int err;
 
@@ -496,7 +495,7 @@ static int _idt82p33_adjtime_internal_triggered(struct idt82p33_channel *channel
 
 	if (ts.tv_nsec > (NSEC_PER_SEC - 5 * NSEC_PER_MSEC)) {
 		/*  Too close to miss next trigger, so skip it */
-		mdelay(6);
+		udelay(5 * USEC_PER_MSEC + 100);
 		ns = (ts.tv_sec + 2) * NSEC_PER_SEC + delta_ns + delay_ns;
 	} else
 		ns = (ts.tv_sec + 1) * NSEC_PER_SEC + delta_ns + delay_ns;
@@ -512,8 +511,7 @@ static int _idt82p33_adjtime_internal_triggered(struct idt82p33_channel *channel
 		return err;
 
 	/* Schedule to implement the workaround in one second */
-	(void)div_s64_rem(delta_ns, NSEC_PER_SEC, &remainder);
-	if (remainder != 0)
+	if (delta_ns % NSEC_PER_SEC != 0)
 		schedule_delayed_work(&channel->adjtime_work, HZ);
 
 	return idt82p33_set_tod_trigger(channel, HW_TOD_TRIG_SEL_TOD_PPS, true);
@@ -575,8 +573,8 @@ static int _idt82p33_adjfine(struct idt82p33_channel *channel, long scaled_ppm)
 /* ppb = scaled_ppm * 125 / 2^13 */
 static s32 idt82p33_ddco_scaled_ppm(long current_ppm, s32 ddco_ppb)
 {
-	s64 scaled_ppm = div_s64(((s64)ddco_ppb << 13), 125);
-	s64 max_scaled_ppm = div_s64(((s64)DCO_MAX_PPB << 13), 125);
+	s64 scaled_ppm = (ddco_ppb << 13) / 125;
+	s64 max_scaled_ppm = (DCO_MAX_PPB << 13) / 125;
 
 	current_ppm += scaled_ppm;
 
@@ -978,23 +976,24 @@ static int idt82p33_enable(struct ptp_clock_info *ptp,
 	return err;
 }
 
-static s32 idt82p33_getmaxphase(__always_unused struct ptp_clock_info *ptp)
-{
-	return WRITE_PHASE_OFFSET_LIMIT;
-}
-
 static int idt82p33_adjwritephase(struct ptp_clock_info *ptp, s32 offset_ns)
 {
 	struct idt82p33_channel *channel =
 		container_of(ptp, struct idt82p33_channel, caps);
 	struct idt82p33 *idt82p33 = channel->idt82p33;
-	s64 offset_regval;
+	s64 offset_regval, offset_fs;
 	u8 val[4] = {0};
 	int err;
 
+	offset_fs = (s64)(-offset_ns) * 1000000;
+
+	if (offset_fs > WRITE_PHASE_OFFSET_LIMIT)
+		offset_fs = WRITE_PHASE_OFFSET_LIMIT;
+	else if (offset_fs < -WRITE_PHASE_OFFSET_LIMIT)
+		offset_fs = -WRITE_PHASE_OFFSET_LIMIT;
+
 	/* Convert from phaseoffset_fs to register value */
-	offset_regval = div_s64((s64)(-offset_ns) * 1000000000ll,
-				IDT_T0DPLL_PHASE_RESOL);
+	offset_regval = div_s64(offset_fs * 1000, IDT_T0DPLL_PHASE_RESOL);
 
 	val[0] = offset_regval & 0xFF;
 	val[1] = (offset_regval >> 8) & 0xFF;
@@ -1171,10 +1170,9 @@ static void idt82p33_caps_init(u32 index, struct ptp_clock_info *caps,
 	caps->owner = THIS_MODULE;
 	caps->max_adj = DCO_MAX_PPB;
 	caps->n_per_out = MAX_PER_OUT;
-	caps->n_ext_ts = MAX_PHC_PLL;
-	caps->n_pins = max_pins;
-	caps->adjphase = idt82p33_adjwritephase;
-	caps->getmaxphase = idt82p33_getmaxphase;
+	caps->n_ext_ts = MAX_PHC_PLL,
+	caps->n_pins = max_pins,
+	caps->adjphase = idt82p33_adjwritephase,
 	caps->adjfine = idt82p33_adjfine;
 	caps->adjtime = idt82p33_adjtime;
 	caps->gettime64 = idt82p33_gettime;
@@ -1461,7 +1459,7 @@ static struct platform_driver idt82p33_driver = {
 		.name = "82p33x1x-phc",
 	},
 	.probe = idt82p33_probe,
-	.remove_new = idt82p33_remove,
+	.remove	= idt82p33_remove,
 };
 
 module_platform_driver(idt82p33_driver);

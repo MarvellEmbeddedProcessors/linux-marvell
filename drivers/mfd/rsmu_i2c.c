@@ -22,8 +22,8 @@
  * from the offset addr byte and the upper 24 bits come from the page register.
  */
 #define	RSMU_CM_PAGE_ADDR		0xFC
-#define RSMU_CM_PAGE_MASK		0xFFFFFF00
-#define RSMU_CM_ADDRESS_MASK		0x000000FF
+#define RSMU_CM_PAGE_MASK               0xFFFFFF00
+#define RSMU_CM_ADDRESS_MASK    	0x000000FF
 
 /*
  * 15-bit register address: the lower 7 bits of the register address come
@@ -31,8 +31,6 @@
  */
 #define	RSMU_SABRE_PAGE_ADDR		0x7F
 #define	RSMU_SABRE_PAGE_WINDOW		128
-
-typedef int (*rsmu_rw_device)(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u8 bytes);
 
 static const struct regmap_range_cfg rsmu_sabre_range_cfg[] = {
 	{
@@ -56,28 +54,7 @@ static bool rsmu_sabre_volatile_reg(struct device *dev, unsigned int reg)
 	}
 }
 
-static int rsmu_smbus_i2c_write_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u8 bytes)
-{
-	struct i2c_client *client = to_i2c_client(rsmu->dev);
-
-	return i2c_smbus_write_i2c_block_data(client, reg, bytes, buf);
-}
-
-static int rsmu_smbus_i2c_read_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u8 bytes)
-{
-	struct i2c_client *client = to_i2c_client(rsmu->dev);
-	int ret;
-
-	ret = i2c_smbus_read_i2c_block_data(client, reg, bytes, buf);
-	if (ret == bytes)
-		return 0;
-	else if (ret < 0)
-		return ret;
-	else
-		return -EIO;
-}
-
-static int rsmu_i2c_read_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u8 bytes)
+static int rsmu_read_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u16 bytes)
 {
 	struct i2c_client *client = to_i2c_client(rsmu->dev);
 	struct i2c_msg msg[2];
@@ -96,7 +73,7 @@ static int rsmu_i2c_read_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u8 byt
 	cnt = i2c_transfer(client->adapter, msg, 2);
 
 	if (cnt < 0) {
-		dev_err(rsmu->dev, "i2c_transfer failed at addr: %04x!", reg);
+		dev_err(rsmu->dev, "i2c_transfer failed at at addr: %04x!",reg);
 		return cnt;
 	} else if (cnt != 2) {
 		dev_err(rsmu->dev,
@@ -107,7 +84,7 @@ static int rsmu_i2c_read_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u8 byt
 	return 0;
 }
 
-static int rsmu_i2c_write_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u8 bytes)
+static int rsmu_write_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u16 bytes)
 {
 	struct i2c_client *client = to_i2c_client(rsmu->dev);
 	/* we add 1 byte for device register */
@@ -131,8 +108,7 @@ static int rsmu_i2c_write_device(struct rsmu_ddata *rsmu, u8 reg, u8 *buf, u8 by
 	return 0;
 }
 
-static int rsmu_write_page_register(struct rsmu_ddata *rsmu, u32 reg,
-				    rsmu_rw_device rsmu_write_device)
+static int rsmu_write_page_register(struct rsmu_ddata *rsmu, u32 reg)
 {
 	u32 page = reg & RSMU_CM_PAGE_MASK;
 	u8 buf[4];
@@ -161,35 +137,35 @@ static int rsmu_write_page_register(struct rsmu_ddata *rsmu, u32 reg,
 	return err;
 }
 
-static int rsmu_i2c_reg_read(void *context, unsigned int reg, unsigned int *val)
+static int rsmu_reg_read(void *context, unsigned int reg, unsigned int *val)
 {
 	struct rsmu_ddata *rsmu = i2c_get_clientdata((struct i2c_client *)context);
 	u8 addr = (u8)(reg & RSMU_CM_ADDRESS_MASK);
 	int err;
 
-	err = rsmu_write_page_register(rsmu, reg, rsmu_i2c_write_device);
+	err = rsmu_write_page_register(rsmu, reg);
 	if (err)
 		return err;
 
-	err = rsmu_i2c_read_device(rsmu, addr, (u8 *)val, 1);
+	err = rsmu_read_device(rsmu, addr, (u8 *)val, 1);
 	if (err)
 		dev_err(rsmu->dev, "Failed to read offset address 0x%x\n", addr);
 
 	return err;
 }
 
-static int rsmu_i2c_reg_write(void *context, unsigned int reg, unsigned int val)
+static int rsmu_reg_write(void *context, unsigned int reg, unsigned int val)
 {
 	struct rsmu_ddata *rsmu = i2c_get_clientdata((struct i2c_client *)context);
 	u8 addr = (u8)(reg & RSMU_CM_ADDRESS_MASK);
 	u8 data = (u8)val;
 	int err;
 
-	err = rsmu_write_page_register(rsmu, reg, rsmu_i2c_write_device);
+	err = rsmu_write_page_register(rsmu, reg);
 	if (err)
 		return err;
 
-	err = rsmu_i2c_write_device(rsmu, addr, &data, 1);
+	err = rsmu_write_device(rsmu, addr, &data, 1);
 	if (err)
 		dev_err(rsmu->dev,
 			"Failed to write offset address 0x%x\n", addr);
@@ -197,57 +173,12 @@ static int rsmu_i2c_reg_write(void *context, unsigned int reg, unsigned int val)
 	return err;
 }
 
-static int rsmu_smbus_i2c_reg_read(void *context, unsigned int reg, unsigned int *val)
-{
-	struct rsmu_ddata *rsmu = i2c_get_clientdata((struct i2c_client *)context);
-	u8 addr = (u8)(reg & RSMU_CM_ADDRESS_MASK);
-	int err;
-
-	err = rsmu_write_page_register(rsmu, reg, rsmu_smbus_i2c_write_device);
-	if (err)
-		return err;
-
-	err = rsmu_smbus_i2c_read_device(rsmu, addr, (u8 *)val, 1);
-	if (err)
-		dev_err(rsmu->dev, "Failed to read offset address 0x%x\n", addr);
-
-	return err;
-}
-
-static int rsmu_smbus_i2c_reg_write(void *context, unsigned int reg, unsigned int val)
-{
-	struct rsmu_ddata *rsmu = i2c_get_clientdata((struct i2c_client *)context);
-	u8 addr = (u8)(reg & RSMU_CM_ADDRESS_MASK);
-	u8 data = (u8)val;
-	int err;
-
-	err = rsmu_write_page_register(rsmu, reg, rsmu_smbus_i2c_write_device);
-	if (err)
-		return err;
-
-	err = rsmu_smbus_i2c_write_device(rsmu, addr, &data, 1);
-	if (err)
-		dev_err(rsmu->dev,
-			"Failed to write offset address 0x%x\n", addr);
-
-	return err;
-}
-
-static const struct regmap_config rsmu_i2c_cm_regmap_config = {
+static const struct regmap_config rsmu_cm_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 8,
 	.max_register = 0x20120000,
-	.reg_read = rsmu_i2c_reg_read,
-	.reg_write = rsmu_i2c_reg_write,
-	.cache_type = REGCACHE_NONE,
-};
-
-static const struct regmap_config rsmu_smbus_i2c_cm_regmap_config = {
-	.reg_bits = 32,
-	.val_bits = 8,
-	.max_register = 0x20120000,
-	.reg_read = rsmu_smbus_i2c_reg_read,
-	.reg_write = rsmu_smbus_i2c_reg_write,
+	.reg_read = rsmu_reg_read,
+	.reg_write = rsmu_reg_write,
 	.cache_type = REGCACHE_NONE,
 };
 
@@ -258,7 +189,7 @@ static const struct regmap_config rsmu_sabre_regmap_config = {
 	.ranges = rsmu_sabre_range_cfg,
 	.num_ranges = ARRAY_SIZE(rsmu_sabre_range_cfg),
 	.volatile_reg = rsmu_sabre_volatile_reg,
-	.cache_type = REGCACHE_MAPLE,
+	.cache_type = REGCACHE_RBTREE,
 	.can_multi_write = true,
 };
 
@@ -289,15 +220,7 @@ static int rsmu_i2c_probe(struct i2c_client *client)
 
 	switch (rsmu->type) {
 	case RSMU_CM:
-		if (i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-			cfg = &rsmu_i2c_cm_regmap_config;
-		} else if (i2c_check_functionality(client->adapter,
-						   I2C_FUNC_SMBUS_I2C_BLOCK)) {
-			cfg = &rsmu_smbus_i2c_cm_regmap_config;
-		} else {
-			dev_err(rsmu->dev, "Unsupported i2c adapter\n");
-			return -ENOTSUPP;
-		}
+		cfg = &rsmu_cm_regmap_config;
 		break;
 	case RSMU_SABRE:
 		cfg = &rsmu_sabre_regmap_config;
@@ -314,7 +237,6 @@ static int rsmu_i2c_probe(struct i2c_client *client)
 		rsmu->regmap = devm_regmap_init(&client->dev, NULL, client, cfg);
 	else
 		rsmu->regmap = devm_regmap_init_i2c(client, cfg);
-
 	if (IS_ERR(rsmu->regmap)) {
 		ret = PTR_ERR(rsmu->regmap);
 		dev_err(rsmu->dev, "Failed to allocate register map: %d\n", ret);
@@ -356,7 +278,7 @@ MODULE_DEVICE_TABLE(of, rsmu_i2c_of_match);
 static struct i2c_driver rsmu_i2c_driver = {
 	.driver = {
 		.name = "rsmu-i2c",
-		.of_match_table = rsmu_i2c_of_match,
+		.of_match_table = of_match_ptr(rsmu_i2c_of_match),
 	},
 	.probe = rsmu_i2c_probe,
 	.remove	= rsmu_i2c_remove,
