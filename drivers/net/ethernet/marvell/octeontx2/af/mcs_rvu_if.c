@@ -864,7 +864,7 @@ void rvu_cn20k_mcs_set_channel(struct rvu *rvu, u16 base)
 	}
 }
 
-void rvu_cn20ka_mcs_set_lmac_cnt(struct rvu *rvu)
+static void rvu_cn20ka_mcs_set_lmac_cnt(struct rvu *rvu)
 {
 	/* Set LMAC channel mapping for CN20KA MCS blocks */
 	rvu_cn20k_mcs_set_channel(rvu, rvu->hw->cgx_chan_base);

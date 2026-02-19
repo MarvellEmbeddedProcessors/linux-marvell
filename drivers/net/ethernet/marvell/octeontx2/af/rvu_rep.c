@@ -440,7 +440,7 @@ int rvu_mbox_handler_esw_cfg(struct rvu *rvu, struct esw_cfg_req *req,
 	return 0;
 }
 
-int rvu_rep_get_rep_map(struct rvu *rvu, struct msg_req *req,
+static int rvu_rep_get_rep_map(struct rvu *rvu, struct msg_req *req,
 			struct get_rep_cnt_rsp *rsp)
 {
 	int rep;

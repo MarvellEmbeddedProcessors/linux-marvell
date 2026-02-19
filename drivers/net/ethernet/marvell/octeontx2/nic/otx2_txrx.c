@@ -109,7 +109,6 @@ static void otx2_xdp_snd_pkt_handler(struct otx2_nic *pfvf,
 {
 	struct nix_send_comp_s *snd_comp = &cqe->comp;
 	struct sg_list *sg;
-	struct page *page;
 	u64 pa, iova;
 
 	sg = &sq->sg[snd_comp->sqe_id];
@@ -121,7 +120,6 @@ static void otx2_xdp_snd_pkt_handler(struct otx2_nic *pfvf,
 
 	iova = sg->dma_addr[0];
 	pa = otx2_iova_to_phys(pfvf->iommu_domain, iova);
-	page = virt_to_page(phys_to_virt(pa));
 	if (sg->flags & OTX2_XDP_REDIRECT)
 		otx2_dma_unmap_page(pfvf, sg->dma_addr[0], sg->size[0], DMA_TO_DEVICE);
 
