@@ -418,6 +418,11 @@ static const struct {
 /* The chosen mode, reported to user-space. Defaults to not-affected. */
 static enum wa_bad_tc_tlb_workaround_idx wa_bad_tc_tlb_mode;
 
+bool is_bad_tc_tlb_mitigated(void)
+{
+	return wa_bad_tc_tlb_mode != BAD_TC_TLB_MITIGATIONS_OFF;
+}
+
 static enum wa_bad_tc_tlb_workaround_idx wa_bad_tc_tlb_get_state(void)
 {
 	/*
