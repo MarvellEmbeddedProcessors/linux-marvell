@@ -45,6 +45,10 @@
 #include <kvm/arm_pmu.h>
 #include <kvm/arm_psci.h>
 
+#include "sys_regs.h"
+
+#define ONLY_TRUSTED_GUESTS_WARNING "Only trusted guests should be used on this system.\n"
+
 static enum kvm_mode kvm_mode = KVM_MODE_DEFAULT;
 
 DECLARE_KVM_HYP_PER_CPU(unsigned long, kvm_hyp_vector);
@@ -2430,7 +2434,11 @@ static __init int kvm_arm_init(void)
 	if (cpus_have_final_cap(ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE) ||
 	    cpus_have_final_cap(ARM64_WORKAROUND_1508412))
 		kvm_info("Guests without required CPU erratum workarounds can deadlock system!\n" \
-			 "Only trusted guests should be used on this system.\n");
+			 ONLY_TRUSTED_GUESTS_WARNING);
+
+	if (!is_bad_tc_tlb_mitigated())
+		kvm_info("Guests without required CPU erratum workarounds can corrupt memory!\n" \
+			 ONLY_TRUSTED_GUESTS_WARNING);
 
 	err = kvm_set_ipa_limit();
 	if (err)

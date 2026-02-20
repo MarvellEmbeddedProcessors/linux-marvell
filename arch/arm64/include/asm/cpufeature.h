@@ -673,6 +673,8 @@ static inline bool supports_clearbhb(int scope)
 						    ID_AA64ISAR2_EL1_CLRBHB_SHIFT);
 }
 
+bool is_bad_tc_tlb_mitigated(void);
+
 const struct cpumask *system_32bit_el0_cpumask(void);
 DECLARE_STATIC_KEY_FALSE(arm64_mismatched_32bit_el0);
 
