@@ -13,6 +13,7 @@
 #include "rvu_struct.h"
 #include "rvu_reg.h"
 #include "rvu_eblock.h"
+#include "rvu_eb_sdp.h"
 #include "rvu_eblock_reg.h"
 #include "rvu_trace.h"
 #include "rvu_psw_mbox.h"
@@ -877,6 +878,242 @@ int rvu_mbox_handler_psw_flr_done(struct rvu *rvu, struct psw_flr_done_req *req,
 	pci_dev_put(pcp_pdev);
 
 	return 0;
+}
+
+#define PSW_HTOF_COMPL_COOKIE 0x48544F46
+#define PSW_HTON_COMPL_COOKIE 0x48544F4E
+#define OCTEP_HP_SCRATCH_READY_BIT 63
+
+static int pcp_hp_req_compl_poll(struct rvu *rvu, struct pcp_mbox_hotplug_onoff_req *pcp_req)
+{
+	u32 cookie = pcp_req->compl_cookie;
+	u32 timeout = 2000;
+	u64 reg;
+
+	while (pcp_req->hdr.rc == 0xffff && timeout) {
+		udelay(1);
+		timeout--;
+	}
+	if (!timeout) {
+		dev_warn(rvu->dev, "[0x%x] hotplug PCP completion timeout\n", pcp_req->epf_mask);
+		return -EIO;
+	}
+	if (pcp_req->hdr.rc) {
+		dev_err(rvu->dev, "[0x%x] hotplug onoff received an error : %d\n",
+			pcp_req->epf_mask, pcp_req->hdr.rc);
+		return -EIO;
+	}
+	timeout = 300000;
+	do {
+		mdelay(1);
+		reg = rvu_read64(rvu, BLKADDR_SDP, SDP_AF_EPFX_SCRATCH(0));
+		reg &= GENMASK_ULL(31, 0);
+		timeout--;
+	} while (reg != cookie && timeout);
+
+	if (!timeout) {
+		dev_warn(rvu->dev, "[0x%x] timeout waiting for host hotplug completion cookie 0x%llx, got 0x%llx\n",
+			 pcp_req->epf_mask, (u64)cookie, reg);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int psw_epf_hotplug_off(struct rvu *rvu, struct psw_rsrc *psw, struct pci_dev *pcp_pdev,
+			       u8 epf)
+{
+	struct pcp_mbox_hotplug_onoff_req *pcp_req;
+	u32 cfg_w;
+
+	pcp_req = (struct pcp_mbox_hotplug_onoff_req *)psw->pcp_mbox_addr;
+	pcp_req->hdr.version = PCP_MBOX_VERSION;
+	pcp_req->hdr.signature = 0x1221;
+	pcp_req->hdr.mbox_msg_id = PCP_MBOX_HOTPLUG_OFF_MSG_ID;
+	pcp_req->hdr.rc = 0xffff;
+
+	pcp_req->pemid = PSW_PEM_ID(epf);
+	pcp_req->epf_mask = 1 << PSW_PEM_EPF(epf);
+	pcp_req->compl_cookie = PSW_HTOF_COMPL_COOKIE;
+
+	pci_read_config_dword(pcp_pdev, PCP_MBOX_ADDR_OFFSET, &cfg_w);
+
+	return pcp_hp_req_compl_poll(rvu, pcp_req);
+}
+
+static int psw_epf_hotplug_on(struct rvu *rvu, struct psw_rsrc *psw, struct pci_dev *pcp_pdev,
+			      u8 epf)
+{
+	struct pcp_mbox_hotplug_onoff_req *pcp_req;
+	u32 cfg_w;
+
+	pcp_req = (struct pcp_mbox_hotplug_onoff_req *)psw->pcp_mbox_addr;
+	pcp_req->hdr.version = PCP_MBOX_VERSION;
+	pcp_req->hdr.signature = 0x1221;
+	pcp_req->hdr.mbox_msg_id = PCP_MBOX_HOTPLUG_ON_MSG_ID;
+	pcp_req->hdr.rc = 0xffff;
+
+	pcp_req->pemid = PSW_PEM_ID(epf);
+	pcp_req->epf_mask = 1 << PSW_PEM_EPF(epf);
+	pcp_req->compl_cookie = PSW_HTON_COMPL_COOKIE;
+
+	pci_read_config_dword(pcp_pdev, PCP_MBOX_ADDR_OFFSET, &cfg_w);
+
+	return pcp_hp_req_compl_poll(rvu, pcp_req);
+}
+
+int rvu_mbox_handler_psw_epf_hotplug_onoff(struct rvu *rvu, struct psw_epf_hotplug_req *req,
+					   struct msg_rsp *rsp)
+{
+	struct psw_rsrc *psw = rvu->hw->psw;
+	struct pci_dev *pcp_pdev = NULL;
+	u8 pf, epf;
+	u64 reg;
+	int rc;
+
+	/* Hotplug driver uses EPF0 */
+	reg = rvu_read64(rvu, BLKADDR_SDP, SDP_AF_EPFX_SCRATCH(0));
+	if (!(reg & BIT_ULL(OCTEP_HP_SCRATCH_READY_BIT)))
+		return -ENODEV;
+
+	pf = rvu_get_pf(rvu->pdev, req->hdr.pcifunc);
+	epf = psw->pf2epf_map[pf];
+
+	pcp_pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, PCP_MBOX_PCI_DEV_ID, pcp_pdev);
+	if (!pcp_pdev) {
+		dev_err(rvu->dev, "No device found to communicate with the PCP firmware\n");
+		return -ENODEV;
+	}
+	if (req->enable)
+		rc = psw_epf_hotplug_on(rvu, psw, pcp_pdev, epf);
+	else
+		rc = psw_epf_hotplug_off(rvu, psw, pcp_pdev, epf);
+
+	pci_dev_put(pcp_pdev);
+
+	return rc;
+}
+
+int rvu_mbox_handler_psw_epfvf_config_write(struct rvu *rvu, struct psw_epfvf_config_write_req *req,
+					    struct msg_rsp *rsp)
+{
+	struct pcp_mbox_config_write_req *pcp_req;
+	struct psw_rsrc *psw = rvu->hw->psw;
+	struct pci_dev *pcp_pdev = NULL;
+	int timeout = 2000;
+	int rc = 0;
+	u8 pf, epf;
+	u32 cfg_w;
+
+	pf = rvu_get_pf(rvu->pdev, req->hdr.pcifunc);
+	epf = psw->pf2epf_map[pf];
+
+	pcp_pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, PCP_MBOX_PCI_DEV_ID, pcp_pdev);
+	if (!pcp_pdev) {
+		dev_err(rvu->dev, "No device found to communicate with the PCP firmware\n");
+		return -ENODEV;
+	}
+	pcp_req = (struct pcp_mbox_config_write_req *)psw->pcp_mbox_addr;
+	pcp_req->hdr.version = PCP_MBOX_VERSION;
+	pcp_req->hdr.signature = 0x1221;
+	pcp_req->hdr.mbox_msg_id = PCP_MBOX_CONFIG_WRITE_MSG_ID;
+	pcp_req->hdr.rc = 0xffff;
+
+	pcp_req->pemid = PSW_PEM_ID(epf);
+	pcp_req->epf = PSW_PEM_EPF(epf);
+	if (!req->evf_id)
+		pcp_req->evf = 0xFF;
+	else
+		pcp_req->evf = req->evf_id - 1;
+
+	pcp_req->cfg_offset = req->cfg_offset;
+	pcp_req->size = req->size;
+	memcpy(pcp_req->cfg_data, req->cfg_data, req->size);
+
+	pci_read_config_dword(pcp_pdev, PCP_MBOX_ADDR_OFFSET, &cfg_w);
+
+	while (pcp_req->hdr.rc == 0xffff && timeout) {
+		udelay(1);
+		timeout--;
+	}
+	if (!timeout) {
+		dev_warn(rvu->dev, "PSW EPFVF[%d] config write timeout\n", req->evf_id);
+		rc = -EIO;
+		goto exit;
+	}
+	if (pcp_req->hdr.rc) {
+		dev_err(rvu->dev, "PSW EPFVF[%d] config write received an error : %d\n",
+			req->evf_id, pcp_req->hdr.rc);
+		rc = -EIO;
+		goto exit;
+	}
+exit:
+	pci_dev_put(pcp_pdev);
+
+	return rc;
+}
+
+int rvu_mbox_handler_psw_epfvf_config_read(struct rvu *rvu, struct psw_epfvf_config_read_req *req,
+					   struct psw_epfvf_config_read_rsp *rsp)
+{
+	struct pcp_mbox_config_read_req *pcp_req;
+	struct pcp_mbox_config_read_rsp *pcp_rsp;
+	struct psw_rsrc *psw = rvu->hw->psw;
+	struct pci_dev *pcp_pdev = NULL;
+	int timeout = 2000;
+	int rc = 0;
+	u8 pf, epf;
+	u32 cfg_w;
+
+	pf = rvu_get_pf(rvu->pdev, req->hdr.pcifunc);
+	epf = psw->pf2epf_map[pf];
+
+	pcp_pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, PCP_MBOX_PCI_DEV_ID, pcp_pdev);
+	if (!pcp_pdev) {
+		dev_err(rvu->dev, "No device found to communicate with the PCP firmware\n");
+		return -ENODEV;
+	}
+	pcp_req = (struct pcp_mbox_config_read_req *)psw->pcp_mbox_addr;
+	pcp_req->hdr.version = PCP_MBOX_VERSION;
+	pcp_req->hdr.signature = 0x1221;
+	pcp_req->hdr.mbox_msg_id = PCP_MBOX_CONFIG_READ_MSG_ID;
+	pcp_req->hdr.rc = 0xffff;
+
+	pcp_req->pemid = PSW_PEM_ID(epf);
+	pcp_req->epf = PSW_PEM_EPF(epf);
+	if (!req->evf_id)
+		pcp_req->evf = 0xFF;
+	else
+		pcp_req->evf = req->evf_id - 1;
+
+	pcp_req->cfg_offset = req->cfg_offset;
+	pcp_req->size = req->size;
+
+	pci_read_config_dword(pcp_pdev, PCP_MBOX_ADDR_OFFSET, &cfg_w);
+
+	while (pcp_req->hdr.rc == 0xffff && timeout) {
+		udelay(1);
+		timeout--;
+	}
+	if (!timeout) {
+		dev_warn(rvu->dev, "PSW EPFVF[%d] config read timeout\n", req->evf_id);
+		rc = -EIO;
+		goto exit;
+	}
+
+	pcp_rsp = (struct pcp_mbox_config_read_rsp *)psw->pcp_mbox_addr;
+	if (pcp_rsp->hdr.rc) {
+		dev_err(rvu->dev, "PSW EPFVF[%d] config read received an error : %d\n",
+			req->evf_id, pcp_rsp->hdr.rc);
+		rc = -EIO;
+		goto exit;
+	}
+	memcpy(rsp->cfg_data, pcp_rsp->cfg_data, req->size);
+
+exit:
+	pci_dev_put(pcp_pdev);
+
+	return rc;
 }
 
 int rvu_mbox_handler_psw_epfvf_msix_write(struct rvu *rvu, struct psw_epfvf_msix_write_req *req,
