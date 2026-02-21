@@ -37,6 +37,10 @@ M(PSW_MBOX_MSIX_CFG,    0x120F, psw_mbox_msix_cfg, psw_mbox_msix_cfg_req, \
 				msg_rsp)				\
 M(PSW_EPFVF_MSIX_WRITE, 0x1210, psw_epfvf_msix_write, psw_epfvf_msix_write_req, msg_rsp) \
 M(PSW_FLR_DONE,         0x1211, psw_flr_done, psw_flr_done_req, msg_rsp) \
+M(PSW_EPFVF_CONFIG_READ,  0x1212, psw_epfvf_config_read, psw_epfvf_config_read_req, \
+				  psw_epfvf_config_read_rsp)            \
+M(PSW_EPFVF_CONFIG_WRITE, 0x1213, psw_epfvf_config_write, psw_epfvf_config_write_req, msg_rsp) \
+M(PSW_EPF_HOTPLUG_ONOFF,  0x1214, psw_epf_hotplug_onoff, psw_epf_hotplug_req, msg_rsp) \
 
 enum {
 #define M(_name, _id, _1, _2, _3) MBOX_MSG_ ## _name = _id,
@@ -304,6 +308,42 @@ struct psw_flr_done_req {
 	u64 rsvd2;
 };
 
+#define PSW_EPFVF_CFG_RW_MAX_SIZE 4096
+
+/* Mailbox message format for writing/reading EPFVF config space */
+struct psw_epfvf_config_read_req {
+	struct mbox_msghdr hdr;
+	u16 evf_id;
+	u16 cfg_offset;
+	u16 size;
+	u16 rsvd1;
+	u64 rsvd2;
+};
+
+struct psw_epfvf_config_read_rsp {
+	struct mbox_msghdr hdr;
+	u16 evf_id;
+	u16 cfg_offset;
+	u16 size;
+	u16 rsvd;
+	u8 cfg_data[PSW_EPFVF_CFG_RW_MAX_SIZE];
+};
+
+struct psw_epfvf_config_write_req {
+	struct mbox_msghdr hdr;
+	u16 evf_id;
+	u16 cfg_offset;
+	u16 size;
+	u16 rsvd;
+	u8 cfg_data[PSW_EPFVF_CFG_RW_MAX_SIZE];
+};
+
+struct psw_epf_hotplug_req {
+	struct mbox_msghdr hdr;
+	bool enable;
+	u8 rsvd[7];
+};
+
 /* PSW debugfs context structure */
 struct psw_dbg_ctx {
 	struct rvu *rvu;
@@ -318,6 +358,8 @@ enum pcp_mbox_msg_id {
 	PCP_MBOX_CONFIG_READ_MSG_ID = 0x1,
 	PCP_MBOX_CONFIG_WRITE_MSG_ID,
 	PCP_MBOX_FLR_DONE_MSG_ID,
+	PCP_MBOX_HOTPLUG_ON_MSG_ID,
+	PCP_MBOX_HOTPLUG_OFF_MSG_ID,
 };
 
 struct pcp_mbox_hdr {
@@ -334,6 +376,42 @@ struct pcp_mbox_flr_done_req {
 	u16 pemid;
 	u16 epf;
 	u8 evf;
+};
+
+struct pcp_mbox_hotplug_onoff_req {
+	struct pcp_mbox_hdr hdr;
+	u16 pemid;
+	u16 epf_mask;
+	u32 compl_cookie;
+};
+
+struct pcp_mbox_config_read_req {
+	struct pcp_mbox_hdr hdr;
+	u16 pemid;
+	u16 epf;
+	u8 evf;
+	u16 cfg_offset;
+	u16 size;
+};
+
+struct pcp_mbox_config_read_rsp {
+	struct pcp_mbox_hdr hdr;
+	u16 pemid;
+	u16 epf;
+	u8 evf;
+	u16 cfg_offset;
+	u16 size;
+	u8 cfg_data[];
+};
+
+struct pcp_mbox_config_write_req {
+	struct pcp_mbox_hdr hdr;
+	u16 pemid;
+	u16 epf;
+	u8 evf;
+	u16 cfg_offset;
+	u16 size;
+	u8 cfg_data[];
 };
 
 void rvu_psw_dbg_init(struct rvu *rvu, struct psw_dbg_ctx *dbg_ctx, int blkaddr);
