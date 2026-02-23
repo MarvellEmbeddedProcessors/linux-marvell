@@ -16,6 +16,7 @@
 #include <linux/smp.h>
 
 #include <asm/cacheflush.h>
+#include <asm/cpu_errata.h>
 #include <asm/cpu_ops.h>
 #include <asm/daifflags.h>
 #include <asm/memory.h>

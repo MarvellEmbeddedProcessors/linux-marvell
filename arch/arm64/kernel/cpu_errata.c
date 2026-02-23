@@ -11,27 +11,10 @@
 #include <asm/cpu.h>
 #include <asm/cputype.h>
 #include <asm/cpufeature.h>
+#include <asm/cpu_errata.h>
 #include <asm/kvm_asm.h>
 #include <asm/kvm_host.h>
 #include <asm/smp_plat.h>
-
-struct arm64_erratum {
-	u64			erratum_num;
-	struct midr_range	range;
-};
-
-static const struct arm64_erratum *is_midr_in_erratum_list(const struct arm64_erratum *erratum_list)
-{
-	const struct arm64_erratum *erratum = erratum_list;
-	u32 midr = read_cpuid_id();
-
-	while (erratum->range.model) {
-		if (is_midr_in_range(midr, &erratum->range))
-			return erratum;
-		erratum++;
-	}
-	return NULL;
-}
 
 static bool __maybe_unused
 is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
@@ -323,7 +306,7 @@ has_neoverse_n1_erratum_1542419(const struct arm64_cpu_capabilities *entry,
 	return is_midr_in_range(midr, &range) && has_dic;
 }
 
-static const struct arm64_erratum erratum_bad_tc_tlb_cpus[] = {
+const struct arm64_erratum erratum_bad_tc_tlb_cpus[] = {
 	{4299122, MIDR_ALL_VERSIONS(MIDR_CORTEX_A77)},
 	{4299126, MIDR_ALL_VERSIONS(MIDR_CORTEX_A78)},
 	/* Yes, A78C has two erratum numbers */

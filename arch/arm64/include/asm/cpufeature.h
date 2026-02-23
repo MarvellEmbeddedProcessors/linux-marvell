@@ -1057,8 +1057,6 @@ static inline bool cpu_has_lpa2(void)
 #endif
 }
 
-void cpu_disable_bad_tc_tlb(void);
-
 #endif /* __ASSEMBLY__ */
 
 #endif
