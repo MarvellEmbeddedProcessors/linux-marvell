@@ -17,6 +17,7 @@
 #include "rvu_eblock_reg.h"
 #include "rvu_trace.h"
 #include "rvu_psw_mbox.h"
+#include "rvu_dpi_mbox.h"
 
 #define PSW_EPFS_PER_PORT 8
 #define PCI_DEVID_PSW_PF  0xEA
@@ -2167,10 +2168,17 @@ static int rvu_psw_init_block(struct rvu_block *block, void *data)
 	if (!epf2pf_map)
 		return -ENOMEM;
 
-	for (pf_id = 0, epf_id = 0; pf_id < hw->total_pfs && epf_id < max_epfs; pf_id++) {
+	for (pf_id = 0, epf_id = 0; pf_id < hw->total_pfs && epf_id < max_epfs;) {
 		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_CFG(pf_id));
-		if (!(cfg & BIT_ULL(20)))
+		if (!(cfg & BIT_ULL(20))) {
+			pf_id++;
 			continue;
+		}
+		cfg = rvu_read64(rvu, BLKADDR_DPI0, DPI_AF_EPFX_CFG(epf_id));
+		if (!(cfg & BIT_ULL(1))) {
+			epf_id++;
+			continue;
+		}
 
 		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_ID_CFG(pf_id));
 		if ((cfg & 0xFF) == PCI_DEVID_PSW_PF) {
@@ -2179,6 +2187,7 @@ static int rvu_psw_init_block(struct rvu_block *block, void *data)
 			epf_id++;
 			dev_info(rvu->dev, "pf2epf_map[%u]: %u\n", pf_id, pf2epf_map[pf_id]);
 		}
+		pf_id++;
 	}
 	psw->num_epfs = epf_id;
 	psw->pf2epf_map = pf2epf_map;
