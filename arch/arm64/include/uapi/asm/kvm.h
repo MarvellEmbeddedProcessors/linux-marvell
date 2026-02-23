@@ -360,6 +360,7 @@ struct kvm_arm_counter_offset {
 
 enum {
 	KVM_REG_ARM_STD_BIT_TRNG_V1_0	= 0,
+	KVM_REG_ARM_STD_BIT_EM_V1_0     = 0,
 #ifdef __KERNEL__
 	KVM_REG_ARM_STD_BMAP_BIT_COUNT,
 #endif
