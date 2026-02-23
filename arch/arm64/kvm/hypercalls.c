@@ -105,6 +105,11 @@ static bool kvm_smccc_test_fw_bmap(struct kvm_vcpu *vcpu, u32 func_id)
 	case ARM_SMCCC_TRNG_RND64:
 		return test_bit(KVM_REG_ARM_STD_BIT_TRNG_V1_0,
 				&smccc_feat->std_bmap);
+	case ARM_SMCCC_EM_VERSION:
+	case ARM_SMCCC_EM_FEATURES:
+	case ARM_SMCCC_EM_CPU_ERRATUM_FEATURES:
+		return test_bit(KVM_REG_ARM_STD_BIT_EM_V1_0,
+				&smccc_feat->std_bmap);
 	case ARM_SMCCC_HV_PV_TIME_FEATURES:
 	case ARM_SMCCC_HV_PV_TIME_ST:
 		return test_bit(KVM_REG_ARM_STD_HYP_BIT_PV_TIME,
@@ -332,6 +337,13 @@ int kvm_smccc_call_handler(struct kvm_vcpu *vcpu)
 				     &smccc_feat->std_hyp_bmap))
 				val[0] = SMCCC_RET_SUCCESS;
 			break;
+		case ARM_SMCCC_EM_VERSION:
+		case ARM_SMCCC_EM_FEATURES:
+		case ARM_SMCCC_EM_CPU_ERRATUM_FEATURES:
+			if (test_bit(KVM_REG_ARM_STD_BIT_EM_V1_0,
+				     &smccc_feat->std_bmap))
+				val[0] = SMCCC_RET_SUCCESS;
+			break;
 		}
 		break;
 	case ARM_SMCCC_HV_PV_TIME_FEATURES:
@@ -360,6 +372,10 @@ int kvm_smccc_call_handler(struct kvm_vcpu *vcpu)
 	case ARM_SMCCC_TRNG_RND32:
 	case ARM_SMCCC_TRNG_RND64:
 		return kvm_trng_call(vcpu);
+	case ARM_SMCCC_EM_VERSION:
+	case ARM_SMCCC_EM_FEATURES:
+	case ARM_SMCCC_EM_CPU_ERRATUM_FEATURES:
+		return kvm_erratum_management_call(vcpu);
 	default:
 		return kvm_psci_call(vcpu);
 	}
