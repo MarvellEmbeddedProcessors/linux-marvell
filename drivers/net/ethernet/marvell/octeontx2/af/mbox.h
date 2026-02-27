@@ -191,6 +191,8 @@ M(FL_GET_STATS,		0x015,  fl_get_stats,				\
 				fl_get_stats_req, fl_get_stats_rsp)	\
 M(ATTACH_SLOT_LF,	0x016, attach_slot_lf, slot_attach, msg_rsp)	\
 M(DETACH_SLOT_LF,	0x017, detach_slot_lf, slot_detach, msg_rsp) \
+M(MSIX_SLOT_GET,	0x018, msix_slot_get, msix_slot_get_req,	\
+				msix_slot_get_rsp)			\
 /* CGX mbox IDs (range 0x200 - 0x3FF) */				\
 M(CGX_START_RXTX,	0x200, cgx_start_rxtx, msg_req, msg_rsp)	\
 M(CGX_STOP_RXTX,	0x201, cgx_stop_rxtx, msg_req, msg_rsp)		\
@@ -282,6 +284,7 @@ M(SSO_AGGR_SET_CONFIG,	0x615, sso_aggr_setconfig, sso_aggr_setconfig, msg_rsp)\
 M(SSO_AGGR_GET_STATS,	0x616, sso_aggr_get_stats, sso_info_req,	\
 				sso_aggr_stats)				\
 M(SSO_GET_HW_INFO,	0x617, sso_get_hw_info, msg_req, sso_hw_info)	\
+M(SSOW_LF_FREE_ONE,     0x618, ssow_lf_free_one, ssow_lf_free_one_req, msg_rsp)	\
 /* TIM mbox IDs (range 0x800 - 0x9FF) */				\
 M(TIM_LF_ALLOC,		0x800, tim_lf_alloc,				\
 				tim_lf_alloc_req, tim_lf_alloc_rsp)	\
@@ -704,6 +707,17 @@ struct msix_offset_rsp {
 	u16  cpt1_lf_msixoff[MAX_RVU_BLKLF_CNT];
 	u16  ree0_lf_msixoff[MAX_RVU_BLKLF_CNT];
 	u16  ree1_lf_msixoff[MAX_RVU_BLKLF_CNT];
+};
+
+struct msix_slot_get_req {
+	struct mbox_msghdr hdr;
+	u16 blkaddr;
+	u16 slot;
+};
+
+struct msix_slot_get_rsp {
+	struct mbox_msghdr hdr;
+	u16 msixoff;
 };
 
 struct get_hw_cap_rsp {
@@ -2015,6 +2029,12 @@ struct ssow_lf_inv_req {
 	struct mbox_msghdr hdr;
 	u16 nb_hws;
 	u16 hws[MAX_RVU_BLKLF_CNT];
+};
+
+struct ssow_lf_free_one_req {
+	struct mbox_msghdr hdr;
+	int node;
+	u16 hws_slot_id;
 };
 
 struct ssow_config_lsw {
