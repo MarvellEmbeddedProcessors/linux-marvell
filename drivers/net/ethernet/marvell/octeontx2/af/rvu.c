@@ -234,17 +234,19 @@ void rvu_free_bitmap(struct rsrc_bmap *rsrc)
 /* Get block LF's HW index from a PF_FUNC's block slot number */
 int rvu_get_lf(struct rvu *rvu, struct rvu_block *block, u16 pcifunc, u16 slot)
 {
-	u16 match = 0;
+	u64 reg;
 	int lf;
 
 	mutex_lock(&rvu->rsrc_lock);
 	for (lf = 0; lf < block->lf.max; lf++) {
 		if (block->fn_map[lf] == pcifunc) {
-			if (slot == match) {
+			reg = rvu_read64(rvu, block->addr,
+					 block->lfcfg_reg |
+						 (lf << block->lfshift));
+			if (slot == (reg & GENMASK_ULL(7, 0))) {
 				mutex_unlock(&rvu->rsrc_lock);
 				return lf;
 			}
-			match++;
 		}
 	}
 	mutex_unlock(&rvu->rsrc_lock);
@@ -2351,6 +2353,31 @@ int rvu_mbox_handler_msix_offset(struct rvu *rvu, struct msg_req *req,
 		rsp->ree1_lf_msixoff[slot] =
 			rvu_get_msix_offset(rvu, pfvf, BLKADDR_REE1, lf);
 	}
+
+	return 0;
+}
+
+int rvu_mbox_handler_msix_slot_get(struct rvu *rvu,
+				   struct msix_slot_get_req *req,
+				   struct msix_slot_get_rsp *rsp)
+{
+	struct rvu_hwinfo *hw = rvu->hw;
+	u16 pcifunc = req->hdr.pcifunc;
+	struct rvu_pfvf *pfvf;
+	int lf;
+
+	if (!is_block_implemented(rvu->hw, req->blkaddr))
+		return -EINVAL;
+
+	pfvf = rvu_get_pfvf(rvu, pcifunc);
+	if (!pfvf->msix.bmap)
+		return 0;
+
+	lf = rvu_get_lf(rvu, &hw->block[req->blkaddr], pcifunc, req->slot);
+	if (lf < 0)
+		return lf;
+
+	rsp->msixoff = rvu_get_msix_offset(rvu, pfvf, req->blkaddr, lf);
 
 	return 0;
 }

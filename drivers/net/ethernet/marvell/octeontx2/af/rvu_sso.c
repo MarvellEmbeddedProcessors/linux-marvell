@@ -1627,6 +1627,35 @@ int rvu_mbox_handler_ssow_lf_free(struct rvu *rvu,
 	return 0;
 }
 
+int rvu_mbox_handler_ssow_lf_free_one(struct rvu *rvu,
+				      struct ssow_lf_free_one_req *req,
+				      struct msg_rsp *rsp)
+{
+	struct rvu_hwinfo *hw = rvu->hw;
+	u16 pcifunc = req->hdr.pcifunc;
+	int ssowlf, err, blkaddr;
+
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_SSOW, pcifunc);
+	if (blkaddr < 0)
+		return SSOW_AF_ERR_LF_INVALID;
+
+	ssowlf =
+		rvu_get_lf(rvu, &hw->block[blkaddr], pcifunc, req->hws_slot_id);
+	if (ssowlf < 0)
+		return SSOW_AF_ERR_LF_INVALID;
+
+	err = rvu_ssow_lf_teardown(rvu, pcifunc, ssowlf, req->hws_slot_id);
+	if (err)
+		return err;
+
+	/* Reset this SSOW LF */
+	err = rvu_lf_reset(rvu, &hw->block[blkaddr], ssowlf);
+	if (err)
+		dev_err(rvu->dev, "SSOW%d free: failed to reset\n", ssowlf);
+
+	return 0;
+}
+
 int rvu_mbox_handler_ssow_config_lsw(struct rvu *rvu,
 				     struct ssow_config_lsw *req,
 				     struct msg_rsp *rsp)
