@@ -26,13 +26,13 @@
 #define VERIFY_LOG_SIZE		1024
 #define VERSION_DATA_LENGTH	32
 
-#define MARLIN_CHECK_PREDEFINED_OBJ		(1<<0)
-#define MARLIN_DEBUG					(1<<10)
-#define MARLIN_SKIP_EBF_ERASE			(1<<11)
-#define MARLIN_SKIP_FAIL_CLONE_CHECK	(1<<12)
-#define MARLIN_FORCE_ASYNC				(1<<13)
-#define MARLIN_FORCE_CLONE				(1<<14)
-#define MARLIN_PRINT_CONSOLE_LOGS		(1<<15)
+#define CN10KA_CHECK_PREDEFINED_OBJ		(1<<0)
+#define CN10KA_DEBUG				(1<<10)
+#define CN10KA_SKIP_EBF_ERASE			(1<<11)
+#define CN10KA_SKIP_FAIL_CLONE_CHECK		(1<<12)
+#define CN10KA_FORCE_ASYNC			(1<<13)
+#define CN10KA_FORCE_CLONE			(1<<14)
+#define CN10KA_PRINT_CONSOLE_LOGS		(1<<15)
 
 
 #define VERSION_FLAG_BACKUP	                BIT(0)
@@ -439,7 +439,7 @@ struct smc_read_flash_descriptor_prev {
 	uint32_t	reserved;	/** Space to add stuff */
 };
 
-enum marlin_bootflash_clone_op {
+enum cn10ka_bootflash_clone_op {
 	CLONE_SPI = 0,
 	CLONE_MMC = 1,
 	CLONE_OFFSET = 2,
@@ -468,7 +468,7 @@ struct mrvl_clone_fw {
 	uint32_t cs;               /** SPI chip select number */
 	uint32_t target_bus;	   /** Target SPI BUS number */
 	uint32_t target_cs;	   /** Target SPI chip select number */
-	enum marlin_bootflash_clone_op	clone_op; /** Clone configuration */
+	enum cn10ka_bootflash_clone_op	clone_op; /** Clone configuration */
 	uint16_t  version_flags;    /** Flags to specify options */
 	uint32_t  selected_objects; /** Mask of a selection of TIMs (32 max) */
 	uint64_t reserved[5];	   /** Reserved for future growth */
