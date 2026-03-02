@@ -177,7 +177,7 @@ static enum smc_version_entry_retcode mrvl_get_version(unsigned long arg, uint8_
 	if (calculate_hash)
 		swup_info->version_flags |= SMC_VERSION_CHECK_VALIDATE_HASH;
 
-	if (user_desc->version_flags & MARLIN_CHECK_PREDEFINED_OBJ) {
+	if (user_desc->version_flags & CN10KA_CHECK_PREDEFINED_OBJ) {
 		swup_info->version_flags |= SMC_VERSION_CHECK_SPECIFIC_OBJECTS;
 		prepare_names(swup_info, user_desc->selected_objects);
 		swup_info->num_objects = hweight_long(user_desc->selected_objects);
@@ -185,10 +185,10 @@ static enum smc_version_entry_retcode mrvl_get_version(unsigned long arg, uint8_
 		swup_info->num_objects = SMC_MAX_OBJECTS;
 	}
 
-	if (user_desc->version_flags & MARLIN_FORCE_ASYNC)
+	if (user_desc->version_flags & CN10KA_FORCE_ASYNC)
 		swup_info->version_flags |= SMC_VERSION_ASYNC_HASH;
 
-	if (user_desc->version_flags & MARLIN_DEBUG)
+	if (user_desc->version_flags & CN10KA_DEBUG)
 		swup_info->version_flags |= SMC_VERSION_DEBUG;
 
 	swup_info->version_flags |= SMC_VERSION_LOG_PROGRESS;
@@ -281,13 +281,13 @@ static int mrvl_clone_fw(unsigned long arg)
 	swup_info->cs = user_desc->cs;
 	swup_info->version_flags |= SMC_VERSION_CHECK_VALIDATE_HASH;
 
-	if (user_desc->version_flags & MARLIN_FORCE_CLONE)
+	if (user_desc->version_flags & CN10KA_FORCE_CLONE)
 		swup_info->version_flags |= SMC_VERSION_FORCE_COPY_OBJECTS;
 
-	if (user_desc->version_flags & MARLIN_FORCE_ASYNC)
+	if (user_desc->version_flags & CN10KA_FORCE_ASYNC)
 		swup_info->version_flags |= SMC_VERSION_ASYNC_HASH;
 
-	if (user_desc->version_flags & MARLIN_CHECK_PREDEFINED_OBJ) {
+	if (user_desc->version_flags & CN10KA_CHECK_PREDEFINED_OBJ) {
 		swup_info->version_flags |= SMC_VERSION_CHECK_SPECIFIC_OBJECTS;
 		prepare_names(swup_info, user_desc->selected_objects);
 		swup_info->num_objects = hweight_long(user_desc->selected_objects);
@@ -295,10 +295,10 @@ static int mrvl_clone_fw(unsigned long arg)
 		swup_info->num_objects = SMC_MAX_OBJECTS;
 	}
 
-	if (user_desc->version_flags & MARLIN_SKIP_FAIL_CLONE_CHECK)
+	if (user_desc->version_flags & CN10KA_SKIP_FAIL_CLONE_CHECK)
 		swup_info->version_flags |= SMC_VERSION_SKIP_FAIL_CHECK;
 
-	if (!(user_desc->version_flags & MARLIN_SKIP_EBF_ERASE))
+	if (!(user_desc->version_flags & CN10KA_SKIP_EBF_ERASE))
 		swup_info->version_flags |= SMC_VERSION_ERASE_EBF_CONFIG;
 
 	switch (user_desc->clone_op) {
