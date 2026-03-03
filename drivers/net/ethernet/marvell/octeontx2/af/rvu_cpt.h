@@ -52,6 +52,75 @@
 #define CPT_AF_UCC_CTL_CQ_ENA_SWARN	BIT_ULL(1)
 #define CPT_AF_UCC_CTL_CQ_ENA_MASK	(CPT_AF_UCC_CTL_CQ_ENA | \
 					 CPT_AF_UCC_CTL_CQ_ENA_SWARN)
+/* Risc-V related registers*/
+#define CPT_RV_BOOT_ADDR 0x7c2
+#define CPT_RV_MTVEC_ADDR 0x305
+#define CPT_RV_MTVEC_MEM 0x7ff800
+
+#define CPT_RV_EXE_AXS_CTL_ADDR (0x10)
+#define CPT_RV_EXE_AXS_CTL_REGION_DMEM 0
+#define CPT_RV_EXE_AXS_CTL_REGION_CSR 1
+/* RVT EXE Access Control register */
+union otx2_cpt_rvt_exe_axs_ctl {
+	u64 u;
+	struct {
+		u64 addr : 18;
+		u64 rsvd : 14;
+		u64 region : 2;
+		u64 rsvd1 : 29;
+		u64 auto_incr : 1;
+	} s;
+};
+
+#define INIT_RV_EXE_AXS_CTL(_reg, _addr, _region, _auto_incr) \
+	do { \
+		typeof(_reg) *__r = &(_reg); \
+		__r->u = 0; \
+		__r->s.addr = (_addr); \
+		__r->s.region = (_region); \
+		__r->s.auto_incr = (_auto_incr); \
+	} while (0)
+
+#define CPT_RV_EXE_AXS_DAT_ADDR (0x18)
+/* RVT EXE Access Data register */
+union otx2_cpt_rvt_exe_axs_dat {
+	u64 u;
+	struct {
+		u64 addr : 64;
+	} s;
+};
+
+#define INIT_RV_EXE_AXS_DAT(_reg, _addr) \
+	do { \
+		typeof(_reg) *__r = &(_reg); \
+		__r->u = 0; \
+		__r->s.addr = (_addr); \
+	} while (0)
+
+/* CPT Engine Control Bus Command Enumeration */
+#define CPT_RV_EXE_CTL_CMD_E__RD_CFG_REG_M  0x1
+#define CPT_RV_EXE_CTL_CMD_E__WR_CFG_REG_M  0x0
+
+union otx2_cpt_af_exe_cfg_cmd {
+	u64 u;
+	struct {
+		u64 exe : 8;
+		u64 rsvd1 : 24;
+		u64 addr : 16;
+		u64 dat_ld_busy: 1;
+		u64 rsvd2 : 14;
+		u64 cmd : 1;
+	} s;
+};
+
+#define INIT_AF_EXE_CFG_CMD(_reg, _exe, _addr, _cmd) \
+	do { \
+		typeof(_reg) *__r = &(_reg); \
+		__r->u = 0; \
+		__r->s.exe = (_exe); \
+		__r->s.addr = (_addr); \
+		__r->s.cmd = (_cmd); \
+	} while (0)
 
 /* CPT_AF_CONSTANTS1 bits: MAX_SE, MAX_IE, MAX_AE, MAX_RE */
 #define MAX_RE  GENMASK_ULL(63, 48)

@@ -882,6 +882,8 @@ static bool validate_and_update_reg_offset(struct rvu *rvu,
 		case CPT_AF_CTX_FLUSH_TIMER:
 		case CPT_AF_CTX_PSP_TIMER_CTL:
 		case CPT_AF_RXC_CFG1:
+		case CPT_AF_CN20K_EXE_CFG_CMD:
+		case CPT_AF_CN20K_EXE_CFG_DAT:
 			return true;
 		}
 

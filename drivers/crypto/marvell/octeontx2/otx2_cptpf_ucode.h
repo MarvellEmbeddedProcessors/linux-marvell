@@ -57,7 +57,13 @@ enum otx2_cpt_ucode_type {
 				    * Non IPsec IE image. Similar to 30, but
 				    * without Fast Path IPsec.
 				    */
+	OTX2_CPT_RE_UC_TYPE = 60, /* RE-Image */
 
+};
+
+enum otx2_cpt_reucode_type {
+	OTX2_CPT_RE_UC_IMEM_SEC = 0x1,
+	OTX2_CPT_RE_UC_DMEM_SEC = 0x2,
 };
 
 struct otx2_cpt_bitmap {
@@ -78,12 +84,25 @@ struct otx2_cpt_ucode_ver_num {
 	u8 zz;
 };
 
+struct otx2_cpt_ucode_sub_hdr {
+	u8 type;
+	u8 hdr_length;
+	__be32 offset;
+	__be32 sec_length;
+	__be32 load_length;
+	__be32 load_addr;
+	__be32 entry_point;
+	u8 padding[10];
+} __packed;
+
 struct otx2_cpt_ucode_hdr {
 	struct otx2_cpt_ucode_ver_num ver_num;
 	u8 ver_str[OTX2_CPT_UCODE_VER_STR_SZ];
 	__be32 code_length;
-	u32 padding[3];
-};
+	u8 img_fw_version;/* image firmware version */
+	u8 numb_sub_hdr;
+	u8 padding[10];
+} __packed;
 
 struct otx2_cpt_ucode {
 	u8 ver_str[OTX2_CPT_UCODE_VER_STR_SZ + 1];/*
@@ -95,7 +114,17 @@ struct otx2_cpt_ucode {
 	dma_addr_t dma;		/* phys address of ucode image */
 	void *va;		/* virt address of ucode image */
 	u32 size;		/* ucode image size */
-	int type;		/* ucode image type SE, IE, AE or SE+IE */
+	int type;		/* ucode image type SE, IE, AE, RE or SE+IE */
+	struct otx2_cpt_reucode_data *reuc_data;
+};
+
+struct otx2_cpt_reucode_data {
+	u32 imem_entry_point;
+	u32 imem_offset;
+	u32 imem_size;
+	u32 dmem_offset;
+	u32 dmem_size;
+	void *dmem_data;
 };
 
 struct otx2_cpt_uc_info_t {
@@ -165,6 +194,7 @@ struct otx2_cpt_eng_grps {
 	int engs_num;			/* total number of engines supported */
 	u8 eng_ref_cnt[OTX2_CPT_MAX_ENGINES];/* engines reference count */
 	bool is_grps_created; /* Is the engine groups are already created */
+	int etype_opt_disabled; /* Bitmap of engine types optionally disabled */
 	u16 rid;
 };
 struct otx2_cptpf_dev;

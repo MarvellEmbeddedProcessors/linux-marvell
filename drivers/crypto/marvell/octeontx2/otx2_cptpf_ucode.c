@@ -92,6 +92,10 @@ static char *get_eng_type_str(int eng_type)
 	case OTX2_CPT_AE_TYPES:
 		str = "AE";
 		break;
+
+	case OTX2_CPT_RE_TYPES:
+		str = "RE";
+		break;
 	}
 	return str;
 }
@@ -111,6 +115,10 @@ static char *get_ucode_type_str(int ucode_type)
 
 	case (1 << OTX2_CPT_AE_TYPES):
 		str = "AE";
+		break;
+
+	case (1 << OTX2_CPT_RE_TYPES):
+		str = "RE";
 		break;
 
 	case (1 << OTX2_CPT_SE_TYPES | 1 << OTX2_CPT_IE_TYPES):
@@ -140,7 +148,7 @@ static bool is_engine_type_supported(struct device *dev,
 		break;
 
 	case OTX2_CPT_RE_TYPES:
-		/* RE engines are not supported */
+		is_supported = eng_grps->avail.max_re_cnt ? true : false;
 		break;
 
 	default:
@@ -179,7 +187,9 @@ static int get_ucode_type(struct device *dev,
 	if (strnstr(tmp_ver_str, "ae", OTX2_CPT_UCODE_VER_STR_SZ) &&
 	    nn == OTX2_CPT_AE_UC_TYPE)
 		val |= 1 << OTX2_CPT_AE_TYPES;
-
+	if (strnstr(tmp_ver_str, "re", OTX2_CPT_UCODE_VER_STR_SZ) &&
+	    nn == OTX2_CPT_RE_UC_TYPE)
+		val |= 1 << OTX2_CPT_RE_TYPES;
 	*ucode_type = val;
 
 	if (!val)
@@ -194,6 +204,208 @@ static int __write_ucode_base(struct otx2_cptpf_dev *cptpf, int eng,
 	return otx2_cpt_write_af_reg(&cptpf->afpf_mbox, cptpf->pdev,
 				     CPT_AF_EXEX_UCODE_BASE(eng),
 				     (u64)dma_addr, blkaddr);
+}
+
+static int wait_data_ld_complete(struct otx2_cptpf_dev *cptpf, int blkaddr)
+{
+	union otx2_cpt_af_exe_cfg_cmd val = {0};
+	int timeout = 200;
+	int ret = 0;
+
+	do {
+		ret = otx2_cpt_read_af_reg(&cptpf->afpf_mbox, cptpf->pdev,
+					   CPT_AF_CN20K_EXE_CFG_CMD, &val.u,
+					   blkaddr);
+		if (ret)
+			return ret;
+		udelay(1);
+	} while (val.s.dat_ld_busy && --timeout);
+
+	if (!timeout) {
+		dev_err(&cptpf->pdev->dev, "Timeout while waiting for data load complete\n");
+		return -ETIMEDOUT;
+	}
+
+	return ret;
+}
+
+/*
+ * CPT RE Engine Indirect Access Path
+ * ===================================
+ *
+ * Software → CPT_AF_EXE_CFG_DAT/CMD (in CPT_CTL)
+ *              ↓ CFG_BUS
+ *            EXE_AXS_CTL - Access control window
+ *              ↓ configures
+ *            EXE_AXS_DAT - Data staging register
+ *              ↓ triggers access to
+ *            RV Core Resources:
+ *              • CSRs (REGION=1): Control/Status registers
+ *              • DMEM (REGION=0): 64KB data memory
+ *              • GPRs (REGION=2): General purpose registers
+ *              • IOMEM (REGION=3): Accelerator interfaces
+ *
+ * Two-step process:
+ *   Step 1: Configure access window (write EXE_AXS_CTL)
+ *   Step 2: Perform access (write/read EXE_AXS_DAT)
+ */
+
+/**
+ * cptpf_rv_exe_write_axs_ctl() - program the RE engine
+ *				  EXE Access Control register
+ * @cptpf: CPT PF device
+ * @rv_reg_addr: For region CSR: RV CSR offset.
+ *		 For region DMEM: byte offset in engine DMEM
+ * @region: Access space selector (e.g. DMEM vs CSR),
+ *	    per RV_EXE_AXS_CTL layout
+ * @auto_incr: If true, hardware may advance the DMEM address
+ *	       after each DAT write.
+ * @eng: Engine index within the CPT instance
+ * @blkaddr: CPT block address (CPT0)
+ *
+ * Return: 0 on success, negative errno on AF mailbox or
+ *	   data load timeout failure.
+ */
+
+static int cptpf_rv_exe_write_axs_ctl(struct otx2_cptpf_dev *cptpf,
+				      u32 rv_reg_addr, int region,
+				      bool auto_incr, int eng, int blkaddr)
+{
+	union otx2_cpt_af_exe_cfg_cmd reg_af_exe_cmd = {0};
+	union otx2_cpt_rvt_exe_axs_ctl reg_axs_ctl = {0};
+	int ret = 0;
+
+	/* Write RV CSR register address to EXE_AXS_CTL register */
+	INIT_RV_EXE_AXS_CTL(reg_axs_ctl, rv_reg_addr, region, auto_incr);
+	ret = otx2_cpt_write_af_reg(&cptpf->afpf_mbox, cptpf->pdev,
+				    CPT_AF_CN20K_EXE_CFG_DAT, reg_axs_ctl.u,
+				    blkaddr);
+	if (ret)
+		return ret;
+
+	INIT_AF_EXE_CFG_CMD(reg_af_exe_cmd, eng, CPT_RV_EXE_AXS_CTL_ADDR,
+			    CPT_RV_EXE_CTL_CMD_E__WR_CFG_REG_M);
+	ret = otx2_cpt_write_af_reg(&cptpf->afpf_mbox, cptpf->pdev,
+				    CPT_AF_CN20K_EXE_CFG_CMD, reg_af_exe_cmd.u,
+				    blkaddr);
+	if (ret)
+		return ret;
+
+	return wait_data_ld_complete(cptpf, blkaddr);
+}
+
+/**
+ * cptpf_rv_exe_write_axs_dat() - program the RE engine
+ *				  EXE Access data register
+ * @cptpf: CPT PF device
+ * @rv_reg_data: Data to be written to the EXE Access data register
+ * @eng: Engine index within the CPT instance
+ * @blkaddr: CPT block address (CPT0)
+ *
+ * Return: 0 on success, negative errno on AF mailbox or
+ *	   data load timeout failure.
+ */
+
+static int cptpf_rv_exe_write_axs_dat(struct otx2_cptpf_dev *cptpf,
+				      u64 rv_reg_data, int eng, int blkaddr)
+{
+	union otx2_cpt_af_exe_cfg_cmd reg_af_exe_cmd = {0};
+	union otx2_cpt_rvt_exe_axs_dat reg_axs_dat = {0};
+	int ret = 0;
+
+	/* Write RV CSR register data to EXE_AXS_DAT register */
+	INIT_RV_EXE_AXS_DAT(reg_axs_dat, rv_reg_data);
+	ret = otx2_cpt_write_af_reg(&cptpf->afpf_mbox, cptpf->pdev,
+				    CPT_AF_CN20K_EXE_CFG_DAT, reg_axs_dat.u,
+				    blkaddr);
+	if (ret)
+		return ret;
+
+	INIT_AF_EXE_CFG_CMD(reg_af_exe_cmd, eng, CPT_RV_EXE_AXS_DAT_ADDR,
+			    CPT_RV_EXE_CTL_CMD_E__WR_CFG_REG_M);
+	ret = otx2_cpt_write_af_reg(&cptpf->afpf_mbox, cptpf->pdev,
+				    CPT_AF_CN20K_EXE_CFG_CMD, reg_af_exe_cmd.u,
+				    blkaddr);
+	if (ret)
+		return ret;
+
+	return wait_data_ld_complete(cptpf, blkaddr);
+}
+
+static int init_rv_imem(struct otx2_cptpf_dev *cptpf, int eng,
+			struct otx2_cpt_reucode_data *reucode_data,
+			int blkaddr)
+{
+	int ret = 0;
+
+	/* Initialize RV Boot Address */
+	ret = cptpf_rv_exe_write_axs_ctl(cptpf, CPT_RV_BOOT_ADDR,
+					 CPT_RV_EXE_AXS_CTL_REGION_CSR,
+					 false, eng, blkaddr);
+	if (ret)
+		return ret;
+
+	ret = cptpf_rv_exe_write_axs_dat(cptpf, reucode_data->imem_entry_point,
+					 eng, blkaddr);
+	if (ret)
+		return ret;
+
+	/* Initialize RV MTVEC Address */
+	ret = cptpf_rv_exe_write_axs_ctl(cptpf, CPT_RV_MTVEC_ADDR,
+					 CPT_RV_EXE_AXS_CTL_REGION_CSR,
+					 false, eng, blkaddr);
+	if (ret)
+		return ret;
+
+	return cptpf_rv_exe_write_axs_dat(cptpf, (u64)CPT_RV_MTVEC_MEM,
+					  eng, blkaddr);
+}
+
+static int init_rv_dmem(struct otx2_cptpf_dev *cptpf, int eng,
+			struct otx2_cpt_reucode_data *reucode_data,
+			int blkaddr)
+{
+	u32 numb_bytes_to_write = reucode_data->dmem_size;
+	u32 dmem_offset = 0;
+	u64 reg_data = 0;
+	int ret;
+
+	/* Initialize RV DMEM Address */
+	ret = cptpf_rv_exe_write_axs_ctl(cptpf, dmem_offset,
+					 CPT_RV_EXE_AXS_CTL_REGION_DMEM,
+					 true, eng, blkaddr);
+	if (ret)
+		return ret;
+
+	/* Write RV DMEM Data */
+	while (numb_bytes_to_write > dmem_offset) {
+		reg_data = *((u64 *)(reucode_data->dmem_data + dmem_offset));
+		ret = cptpf_rv_exe_write_axs_dat(cptpf, reg_data, eng, blkaddr);
+		if (ret)
+			return ret;
+		dmem_offset += sizeof(u64);
+	}
+	return 0;
+}
+
+static int cpt_reucode_init(struct otx2_cptpf_dev *cptpf, int eng,
+			    struct otx2_cpt_reucode_data *reucode_data,
+			    int blkaddr)
+{
+	int ret;
+
+	ret = init_rv_imem(cptpf, eng, reucode_data, blkaddr);
+	if (ret) {
+		dev_err(&cptpf->pdev->dev, "Failed to initialize RV IMEM\n");
+		return ret;
+	}
+
+	ret = init_rv_dmem(cptpf, eng, reucode_data, blkaddr);
+	if (ret) {
+		dev_err(&cptpf->pdev->dev, "Failed to initialize RV DMEM\n");
+		return ret;
+	}
+	return 0;
 }
 
 static int cptx_set_ucode_base(struct otx2_cpt_eng_grp_info *eng_grp,
@@ -229,6 +441,16 @@ static int cptx_set_ucode_base(struct otx2_cpt_eng_grp_info *eng_grp,
 							 blkaddr);
 				if (ret)
 					return ret;
+				if (engs->ucode->reuc_data) {
+					struct otx2_cpt_reucode_data *r_data;
+
+					r_data = engs->ucode->reuc_data;
+					ret = cpt_reucode_init(cptpf, bit,
+							       r_data,
+							       blkaddr);
+					if (ret)
+						return ret;
+				}
 			}
 	}
 	return 0;
@@ -393,9 +615,55 @@ static int cpt_attach_and_enable_cores(struct otx2_cpt_eng_grp_info *eng_grp,
 	return cptx_attach_and_enable_cores(eng_grp, cptpf, bmap, BLKADDR_CPT0);
 }
 
+static int fill_reucode_data(struct device *dev,
+			     struct otx2_cpt_reucode_data *reucode_data,
+			     const void *fw_data, int numb_sub_hdr)
+{
+	u8 *fw_data_ptr = (u8 *)fw_data;
+	u32 sec_length;
+	u32 load_length;
+	u32 i;
+
+	fw_data_ptr += sizeof(struct otx2_cpt_ucode_hdr);
+	for (i = 0; i < numb_sub_hdr; i++) {
+		struct otx2_cpt_ucode_sub_hdr *sub_hdr =
+			(struct otx2_cpt_ucode_sub_hdr *)fw_data_ptr;
+		sec_length = ntohl(sub_hdr->sec_length);
+		load_length = ntohl(sub_hdr->load_length);
+		if (sub_hdr->type == OTX2_CPT_RE_UC_IMEM_SEC) {
+			if (sec_length < load_length) {
+				dev_err(dev,
+					"Invalid RE imem sec length %d < %d\n",
+					sec_length, load_length);
+				return -EINVAL;
+			}
+			reucode_data->imem_entry_point =
+					ntohl(sub_hdr->entry_point);
+			reucode_data->imem_offset = ntohl(sub_hdr->offset);
+			reucode_data->imem_size = load_length;
+		} else if (sub_hdr->type == OTX2_CPT_RE_UC_DMEM_SEC) {
+			if (sec_length < load_length) {
+				dev_err(dev,
+					"Invalid RE dmem sec length %d < %d\n",
+					sec_length, load_length);
+				return -EINVAL;
+			}
+			reucode_data->dmem_offset = ntohl(sub_hdr->offset);
+			reucode_data->dmem_size = load_length;
+		} else {
+			dev_err(dev, "Invalid RE ucode sub header type %d\n",
+				sub_hdr->type);
+			return -EINVAL;
+		}
+		fw_data_ptr += sub_hdr->hdr_length;
+	}
+	return 0;
+}
+
 static int load_fw(struct device *dev, struct fw_info_t *fw_info,
 		   char *filename, u16 rid)
 {
+	struct otx2_cpt_reucode_data *reucode_data = NULL;
 	struct otx2_cpt_ucode_hdr *ucode_hdr;
 	struct otx2_cpt_uc_info_t *uc_info;
 	int ucode_type, ucode_size;
@@ -413,8 +681,22 @@ static int load_fw(struct device *dev, struct fw_info_t *fw_info,
 	ret = get_ucode_type(dev, ucode_hdr, &ucode_type, rid);
 	if (ret)
 		goto release_fw;
+	if (ucode_type == (1 << OTX2_CPT_RE_TYPES)) {
+		reucode_data = kzalloc(sizeof(*reucode_data), GFP_KERNEL);
+		if (!reucode_data) {
+			ret = -ENOMEM;
+			goto release_fw;
+		}
+		if (fill_reucode_data(dev, reucode_data, uc_info->fw->data,
+				      ucode_hdr->numb_sub_hdr)) {
+			ret = -EINVAL;
+			goto release_fw;
+		}
+		ucode_size = ntohl(ucode_hdr->code_length);
+	} else {
+		ucode_size = ntohl(ucode_hdr->code_length) * 2;
+	}
 
-	ucode_size = ntohl(ucode_hdr->code_length) * 2;
 	if (!ucode_size) {
 		dev_err(dev, "Ucode %s invalid size\n", filename);
 		ret = -EINVAL;
@@ -428,6 +710,7 @@ static int load_fw(struct device *dev, struct fw_info_t *fw_info,
 	uc_info->ucode.ver_num = ucode_hdr->ver_num;
 	uc_info->ucode.type = ucode_type;
 	uc_info->ucode.size = ucode_size;
+	uc_info->ucode.reuc_data = reucode_data;
 	list_add_tail(&uc_info->list, &fw_info->ucodes);
 
 	return 0;
@@ -436,6 +719,7 @@ release_fw:
 	release_firmware(uc_info->fw);
 free_uc_info:
 	kfree(uc_info);
+	kfree(reucode_data);
 	return ret;
 }
 
@@ -449,6 +733,7 @@ static void cpt_ucode_release_fw(struct fw_info_t *fw_info)
 	list_for_each_entry_safe(curr, temp, &fw_info->ucodes, list) {
 		list_del(&curr->list);
 		release_firmware(curr->fw);
+		kfree(curr->ucode.reuc_data);
 		kfree(curr);
 	}
 }
@@ -506,8 +791,15 @@ static int cpt_ucode_load_fw(struct pci_dev *pdev, struct fw_info_t *fw_info,
 			 rid, eng_type);
 		/* Request firmware for each engine type */
 		ret = load_fw(&pdev->dev, fw_info, filename, rid);
-		if (ret)
-			goto release_fw;
+		if (ret) {
+			if (e == OTX2_CPT_RE_TYPES)
+				eng_grps->etype_opt_disabled |= 1 << e;
+			else
+				goto release_fw;
+		} else {
+			if (e == OTX2_CPT_RE_TYPES)
+				eng_grps->etype_opt_disabled &= ~(1 << e);
+		}
 	}
 	print_uc_info(fw_info);
 	return 0;
@@ -560,6 +852,10 @@ static int update_engines_avail_count(struct device *dev,
 		avail->ae_cnt += val;
 		break;
 
+	case OTX2_CPT_RE_TYPES:
+		avail->re_cnt += val;
+		break;
+
 	default:
 		dev_err(dev, "Invalid engine type %d\n", engs->type);
 		return -EINVAL;
@@ -603,6 +899,11 @@ static int update_engines_offset(struct device *dev,
 
 	case OTX2_CPT_AE_TYPES:
 		engs->offset = avail->max_se_cnt + avail->max_ie_cnt;
+		break;
+
+	case OTX2_CPT_RE_TYPES:
+		engs->offset = avail->max_se_cnt +
+			       avail->max_ie_cnt + avail->max_ae_cnt;
 		break;
 
 	default:
@@ -691,6 +992,10 @@ static int check_engines_availability(struct device *dev,
 		avail_cnt = grp->g->avail.ae_cnt;
 		break;
 
+	case OTX2_CPT_RE_TYPES:
+		avail_cnt = grp->g->avail.re_cnt;
+		break;
+
 	default:
 		dev_err(dev, "Invalid engine type %d\n", req_eng->type);
 		return -EINVAL;
@@ -737,7 +1042,13 @@ static void ucode_unload(struct device *dev, struct otx2_cpt_ucode *ucode)
 		ucode->dma = 0;
 		ucode->size = 0;
 	}
-
+	if (ucode->reuc_data) {
+		kfree(ucode->reuc_data->dmem_data);
+		ucode->reuc_data->dmem_data = NULL;
+		ucode->reuc_data->dmem_size = 0;
+		kfree(ucode->reuc_data);
+		ucode->reuc_data = NULL;
+	}
 	memset(&ucode->ver_str, 0, OTX2_CPT_UCODE_VER_STR_SZ);
 	memset(&ucode->ver_num, 0, sizeof(struct otx2_cpt_ucode_ver_num));
 	set_ucode_filename(ucode, "");
@@ -749,23 +1060,54 @@ static int copy_ucode_to_dma_mem(struct device *dev,
 				 const u8 *ucode_data)
 {
 	u32 i;
-
+	int ret;
+	u8 *ucode_data_ptr;
 	/*  Allocate DMAable space */
 	ucode->va = dma_alloc_coherent(dev, OTX2_CPT_UCODE_SZ, &ucode->dma,
 				       GFP_KERNEL);
 	if (!ucode->va)
 		return -ENOMEM;
 
-	memcpy(ucode->va, ucode_data + sizeof(struct otx2_cpt_ucode_hdr),
-	       ucode->size);
+	if (ucode->type == (1 << OTX2_CPT_RE_TYPES)) {
+		struct otx2_cpt_reucode_data *reucode_data = ucode->reuc_data;
 
-	/* Byte swap 64-bit */
-	for (i = 0; i < (ucode->size / 8); i++)
-		cpu_to_be64s(&((u64 *)ucode->va)[i]);
-	/*  Ucode needs 16-bit swap */
-	for (i = 0; i < (ucode->size / 2); i++)
-		cpu_to_be16s(&((u16 *)ucode->va)[i]);
+		if (reucode_data->imem_size > OTX2_CPT_UCODE_SZ) {
+			dev_err(dev, "Ucode size %d exceeds max supported %d\n",
+				ucode->size, OTX2_CPT_UCODE_SZ);
+			ret = -EINVAL;
+			goto free_re_ucode;
+		}
+		u32 dmem_size = round_up(reucode_data->dmem_size, sizeof(u64));
+
+		ucode_data_ptr = (u8 *)ucode_data + reucode_data->dmem_offset;
+		reucode_data->dmem_data = kzalloc(dmem_size, GFP_KERNEL);
+		if (!reucode_data->dmem_data) {
+			ret = -ENOMEM;
+			goto free_re_ucode;
+		}
+		memcpy(reucode_data->dmem_data, ucode_data_ptr,
+		       reucode_data->dmem_size);
+		ucode_data_ptr = (u8 *)ucode_data + reucode_data->imem_offset;
+		memcpy(ucode->va, ucode_data_ptr, reucode_data->imem_size);
+	} else {
+		ucode_data_ptr = (u8 *)ucode_data +
+				 sizeof(struct otx2_cpt_ucode_hdr);
+		memcpy(ucode->va, ucode_data_ptr, ucode->size);
+		/* Byte swap 64-bit */
+		for (i = 0; i < (ucode->size / 8); i++)
+			cpu_to_be64s(&((u64 *)ucode->va)[i]);
+		/*  Ucode needs 16-bit swap */
+		for (i = 0; i < (ucode->size / 2); i++)
+			cpu_to_be16s(&((u16 *)ucode->va)[i]);
+	}
 	return 0;
+free_re_ucode:
+	dma_free_coherent(dev, OTX2_CPT_UCODE_SZ, ucode->va,
+			  ucode->dma);
+	ucode->va = NULL;
+	ucode->dma = 0;
+	ucode->size = 0;
+	return ret;
 }
 
 static int enable_eng_grp(struct otx2_cpt_eng_grp_info *eng_grp,
@@ -1057,6 +1399,7 @@ static int create_engine_group(struct device *dev,
 	for (i = 0; i < ucodes_cnt; i++) {
 		uc_info = (struct otx2_cpt_uc_info_t *) ucode_data[i];
 		eng_grp->ucode[i] = uc_info->ucode;
+		uc_info->ucode.reuc_data = NULL;
 		ret = copy_ucode_to_dma_mem(dev, &eng_grp->ucode[i],
 					    uc_info->fw->data);
 		if (ret)
@@ -1281,10 +1624,28 @@ int otx2_cpt_create_eng_grps(struct otx2_cptpf_dev *cptpf,
 	engs[0].count = eng_grps->avail.max_ae_cnt;
 
 	ret = create_engine_group(&pdev->dev, eng_grps, engs, 1,
-				  (void **) uc_info, 1);
+				  (void **)uc_info, 1);
 	if (ret)
 		goto delete_eng_grp;
 
+	if (eng_grps->avail.max_re_cnt) {
+		/*
+		 * Create engine group with RE engines for PQC functionality.
+		 */
+		uc_info[0] = get_ucode(&fw_info, OTX2_CPT_RE_TYPES);
+		if (!uc_info[0]) {
+			dev_warn(&pdev->dev,
+				 "Unable to find firmware for RE\n");
+		} else {
+			engs[0].type = OTX2_CPT_RE_TYPES;
+			engs[0].count = eng_grps->avail.max_re_cnt;
+
+			ret = create_engine_group(&pdev->dev, eng_grps, engs,
+						  1, (void **)uc_info, 1);
+			if (ret)
+				goto delete_eng_grp;
+		}
+	}
 	eng_grps->is_grps_created = true;
 
 	cpt_ucode_release_fw(&fw_info);
@@ -1539,6 +1900,22 @@ static int create_eng_caps_discovery_grps(struct pci_dev *pdev,
 			goto delete_eng_grp;
 	}
 
+	if (eng_grps->avail.max_re_cnt) {
+		uc_info[0] = get_ucode(&fw_info, OTX2_CPT_RE_TYPES);
+		if (!uc_info[0]) {
+			dev_warn(&pdev->dev,
+				 "Unable to find firmware for RE\n");
+		} else {
+			engs[0].type = OTX2_CPT_RE_TYPES;
+			engs[0].count = 1;
+
+			ret = create_engine_group(&pdev->dev, eng_grps, engs,
+						  1, (void **)uc_info, 0);
+			if (ret)
+				goto delete_eng_grp;
+		}
+	}
+
 	cpt_ucode_release_fw(&fw_info);
 	mutex_unlock(&eng_grps->lock);
 	return 0;
@@ -1629,7 +2006,8 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 
 	for (etype = 1; etype < OTX2_CPT_MAX_ENG_TYPES; etype++) {
 		if (!is_engine_type_supported(&pdev->dev, &cptpf->eng_grps,
-					      etype))
+			etype) || (cptpf->eng_grps.etype_opt_disabled &
+			(1 << etype)))
 			continue;
 
 		result->s.compcode = OTX2_CPT_COMPLETION_CODE_INIT;
