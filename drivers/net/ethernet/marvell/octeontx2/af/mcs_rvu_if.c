@@ -93,6 +93,55 @@ void rvu_mcs_ptp_cfg(struct rvu *rvu, u8 rpm_id, u8 lmac_id, bool ena)
 	mcs_reg_write(mcs, MCSX_PEX_RX_SLAVE_PORT_CFGX(port), cfg);
 }
 
+int rvu_mbox_handler_mcs_get_mcs_id(struct rvu *rvu, struct mcs_get_id_req *req,
+				    struct mcs_get_id_rsp *rsp)
+{
+	struct mcs *mcs;
+	u8 devtype;
+
+	if (!rvu->mcs_blk_cnt)
+		return MCS_AF_ERR_INVALID_MCSID;
+
+	mcs = mcs_get_pdata(0);
+	devtype = mcs->hw->mcs_devtype;
+
+	/* CNF10K-B */
+	if (devtype == CNF10KB_MCS) {
+		rsp->rfoe_id = req->rfoe_id;
+		rsp->mcs_id = req->rfoe_id;
+		return 0;
+	}
+
+	/* CN20KA_MCS: single MCS block, id is always 0 */
+	if (devtype == CN10KB_MCS || devtype == CN20KA_MCS) {
+		rsp->mcs_id = 0;
+		return 0;
+	}
+
+	if (devtype == CNF20KA_MCS) {
+		/* Validate node 0, node 1 = chiplet1, node 2 = chiplet2 */
+		if (!req->node || req->node > 2)
+			return MCS_AF_ERR_INVALID_MCSID;
+
+		if (!rvu->n2_mcs_cnt) {
+			/* MP half variant: rfoe_id maps directly to mcs_id */
+			if (req->rfoe_id >= rvu->n1_mcs_cnt)
+				return MCS_AF_ERR_INVALID_MCSID;
+			rsp->mcs_id = req->rfoe_id;
+		} else {
+			/* MP full variant: mcs_id = (node-1)*n1_mcs_cnt + rfoe_id */
+			if (req->rfoe_id >= rvu->n1_mcs_cnt)
+				return MCS_AF_ERR_INVALID_MCSID;
+			rsp->mcs_id = ((req->node - 1) * rvu->n1_mcs_cnt) +
+					req->rfoe_id;
+		}
+		rsp->rfoe_id = req->rfoe_id;
+		rsp->node = req->node;
+		return 0;
+	}
+	return 0;
+}
+
 int rvu_mbox_handler_mcs_set_lmac_mode(struct rvu *rvu,
 				       struct mcs_set_lmac_mode *req,
 				       struct msg_rsp *rsp)
@@ -916,12 +965,30 @@ static void rvu_cnf20ka_mcs_set_lmac_cnt(struct rvu *rvu)
 			continue;
 		hw = mcs->hw;
 		hw->lmac_cnt = CNF20KA_LMAC_COUNT;
-		if (mcs_id == CNF20KA_MCS_ID_WITH_SINGLE_LMAC)
-			hw->lmac_cnt = 1;
+		/* MP half variant: last MCS block has 3 LMACs (RPM0/1/2) */
+		if (!rvu->n2_mcs_cnt && (mcs_id == (rvu->n1_mcs_cnt - 1)))
+			hw->lmac_cnt = 3;
 		hw->lmac_bmap = GENMASK_ULL(hw->lmac_cnt - 1, 0);
 	}
 	chan_base = rvu->hw->cgx_chan_base + (16 * 4);
 	rvu_cn20k_mcs_set_channel(rvu, chan_base);
+}
+
+static void cn20k_rvu_set_mcs_cnt(struct rvu *rvu)
+{
+	int rpm, rpm_cnt = 0;
+
+	if (!rvu->fwdata)
+		return;
+
+	for (rpm = 0; rpm < NODE_ETH_MAX; rpm++)
+		if (rvu->fwdata->csr_rpmx_cmr_num_lmacs[1][rpm])
+			rpm_cnt++;
+
+	rvu->n1_mcs_cnt =  rpm_cnt > 2 ? (rpm_cnt * 2) - 1 : rpm_cnt * 2;
+
+	if (rvu->fwdata->csr_rpmx_cmr_num_lmacs[2][0])
+		rvu->n2_mcs_cnt = 4;
 }
 
 int rvu_mcs_init(struct rvu *rvu)
@@ -945,14 +1012,17 @@ int rvu_mcs_init(struct rvu *rvu)
 		/* Set active lmacs */
 		rvu_mcs_set_lmac_bmap(rvu);
 	}
+
+	if (is_cn20k(rvu->pdev)) {
+		cn20k_rvu_set_mcs_cnt(rvu);
+		cn20k_mcs_assign_ids(mcs);
+	}
+
 	if (mcs->hw->mcs_devtype == CN20KA_MCS)
 		rvu_cn20ka_mcs_set_lmac_cnt(rvu);
 
 	if (mcs->hw->mcs_devtype == CNF20KA_MCS)
 		rvu_cnf20ka_mcs_set_lmac_cnt(rvu);
-
-	if (mcs->hw->mcs_devtype == CN20KA_MCS || mcs->hw->mcs_devtype == CNF20KA_MCS)
-		cn20k_mcs_assign_ids(mcs);
 
 	/* Install default tcam bypass entry and set port to operational mode */
 	for (mcs_id = 0; mcs_id < rvu->mcs_blk_cnt; mcs_id++) {
