@@ -1113,19 +1113,39 @@ static int cdns_xspi_transfer_one_message(struct spi_controller *controller,
 	writel(FIELD_PREP(CDNS_XSPI_CTRL_WORK_MODE, CDNS_XSPI_WORK_MODE_STIG),
 	       cdns_xspi->iobase + CDNS_XSPI_CTRL_CONFIG_REG);
 
-	/* Enable xfer state machine */
-	if (!cdns_xspi->xfer_in_progress) {
-		u32 xfer_control = readl(cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
+	/* Always reset the XFER read pointer for each new SPI message so that
+	 * the software read index matches the hardware write pointer which is
+	 * reset by MRVL_XFER_SOFT_RESET.  Without this, short transfers (e.g.
+	 * TPM SPI flow-control polls) that follow a non-qword-aligned transfer
+	 * read from the wrong qword and always see 0x00. */
+	cdns_xspi->current_xfer_qword = 0;
 
-		cdns_xspi->current_xfer_qword = 0;
+	/* Enable xfer state machine.
+	 * NOTE: MRVL_XFER_FUNC_CTRL is a 64-bit register; use readq/writeq
+	 * so Simics (and hardware) process the access atomically. */
+	if (!cdns_xspi->xfer_in_progress) {
+		u64 xfer_control =
+			readq(cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
+
 		cdns_xspi->xfer_in_progress = true;
-		xfer_control |= (MRVL_XFER_RECEIVE_ENABLE |
-				 MRVL_XFER_CLK_CAPTURE_POL |
-				 MRVL_XFER_FUNC_START |
-				 MRVL_XFER_SOFT_RESET |
-				 FIELD_PREP(MRVL_XFER_CS_N_HOLD, (1 << cs)));
-		xfer_control &= ~(MRVL_XFER_FUNC_ENABLE | MRVL_XFER_CLK_DRIVE_POL);
-		writel(xfer_control, cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
+		xfer_control |=
+			(MRVL_XFER_RECEIVE_ENABLE | MRVL_XFER_CLK_CAPTURE_POL |
+			 MRVL_XFER_FUNC_START | MRVL_XFER_SOFT_RESET |
+			 FIELD_PREP(MRVL_XFER_CS_N_HOLD, (1 << cs)));
+		xfer_control &=
+			~(MRVL_XFER_FUNC_ENABLE | MRVL_XFER_CLK_DRIVE_POL);
+		writeq(xfer_control, cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
+	} else {
+		/* cs_change=1 kept xfer active across messages; soft-reset the
+		 * XFER capture FIFO so the hardware write pointer also returns
+		 * to 0, matching the software read pointer reset above. */
+		u64 xfer_control =
+			readq(cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
+
+		xfer_control |= MRVL_XFER_SOFT_RESET;
+		writeq(xfer_control, cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
+		xfer_control &= ~MRVL_XFER_SOFT_RESET;
+		writeq(xfer_control, cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
 	}
 
 	list_for_each_entry(t, &m->transfers, transfer_list) {
@@ -1187,11 +1207,12 @@ static int cdns_xspi_transfer_one_message(struct spi_controller *controller,
 	}
 
 	if (!cs_change) {
-		u32 xfer_control = readl(cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
+		u64 xfer_control =
+			readq(cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
 
-		xfer_control &= ~(MRVL_XFER_RECEIVE_ENABLE |
-				  MRVL_XFER_SOFT_RESET);
-		writel(xfer_control, cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
+		xfer_control &=
+			~(MRVL_XFER_RECEIVE_ENABLE | MRVL_XFER_SOFT_RESET);
+		writeq(xfer_control, cdns_xspi->xferbase + MRVL_XFER_FUNC_CTRL);
 		cdns_xspi->xfer_in_progress = false;
 	}
 
