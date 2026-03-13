@@ -380,7 +380,20 @@ static bool has_bad_tc_tlb(const struct arm64_cpu_capabilities *entry, int scope
 enum bad_tc_tlb_el3_wa_state {
 	STATIC_OFF = 0,
 	STATIC_ON = 1,
+
+	/*
+	 * The EL3 imp-def traps leave SPE/TRBE exposed to the erratum conditions.
+	 * 'Dynamic' sets the SPE/TRBE buffer owner to secure, to prevent the
+	 * erratum conditions at the cost of the feature.
+	 */
 	DYNAMIC = 2,
+
+	/*
+	 * This incomplete workaround leaves SPE/TRBE enabled. When set EL2 must
+	 * ensure it does not use "a configuration which can translate a virtual
+	 * address in a translation regime that has stage2 enabled."
+	 */
+	DYNAMIC_INCOMPLETE = 3,
 };
 
 enum wa_bad_tc_tlb_workaround_idx {
@@ -399,7 +412,7 @@ static const struct {
 	[BAD_TC_TLB_MITIGATIONS_OFF] = { STATIC_OFF, "Vulnerable"},
 	[BAD_TC_TLB_BUILDBOOT_CFG]   = { STATIC_OFF, "Mitigation: Off; kernel build or platform configuration"},
 	[BAD_TC_TLB_PKVM]            = { DYNAMIC,    "Mitigation: Dynamic; pKVM enabled"},
-	[BAD_TC_TLB_DYNAMIC]         = { DYNAMIC,    "Mitigation: Dynamic"},
+	[BAD_TC_TLB_DYNAMIC]         = { DYNAMIC_INCOMPLETE, "Mitigation: Dynamic"},
 };
 
 /* The chosen mode, reported to user-space. Defaults to not-affected. */
@@ -471,6 +484,12 @@ static void cpu_enable_bad_tc_tlb(const struct arm64_cpu_capabilities *__unused)
 		mode = BAD_TC_TLB_MITIGATIONS_OFF;
 
 	WRITE_ONCE(wa_bad_tc_tlb_mode, mode);
+}
+
+/* Called on kexec to prevent handing over the incomplete workaround */
+void cpu_disable_bad_tc_tlb(void)
+{
+	em_configure_workaround(erratum_bad_tc_tlb_cpus, STATIC_OFF);
 }
 
 #ifdef CONFIG_ARM64_WORKAROUND_REPEAT_TLBI

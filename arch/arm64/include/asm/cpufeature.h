@@ -925,6 +925,8 @@ extern struct arm64_ftr_override arm64_sw_feature_override;
 u32 get_kvm_ipa_limit(void);
 void dump_cpu_features(void);
 
+void cpu_disable_bad_tc_tlb(void);
+
 #endif /* __ASSEMBLY__ */
 
 #endif
