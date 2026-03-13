@@ -360,7 +360,7 @@ static int npc_mcam_mismatch_show(struct seq_file *s, void *unused)
 }
 DEFINE_SHOW_ATTRIBUTE(npc_mcam_mismatch);
 
-static u64 dstats[MAX_NUM_BANKS][MAX_SUBBANK_DEPTH * MAX_NUM_SUB_BANKS] = {};
+static u64 (*dstats)[MAX_NUM_BANKS][MAX_SUBBANK_DEPTH * MAX_NUM_SUB_BANKS];
 static int npc_mcam_dstats_show(struct seq_file *s, void *unused)
 {
 	struct npc_priv_t *npc_priv;
@@ -390,11 +390,11 @@ static int npc_mcam_dstats_show(struct seq_file *s, void *unused)
 					   NPC_AF_CN20K_MCAMEX_BANKX_STAT_EXT(idx, bank));
 			if (!stats)
 				continue;
-			if (stats == dstats[bank][idx])
+			if (stats == (*dstats)[bank][idx])
 				continue;
 
-			if (stats < dstats[bank][idx])
-				dstats[bank][idx] = 0;
+			if (stats < (*dstats)[bank][idx])
+				(*dstats)[bank][idx] = 0;
 
 			pf = 0xFFFF;
 			map = xa_load(&npc_priv->xa_idx2pf_map, mcam_idx);
@@ -402,8 +402,8 @@ static int npc_mcam_dstats_show(struct seq_file *s, void *unused)
 				pf = xa_to_value(map);
 
 			seq_printf(s, "%u\t%#04x\t%llu\n",
-				   mcam_idx, pf, abs(dstats[bank][idx] - stats));
-			dstats[bank][idx] = stats;
+				   mcam_idx, pf, abs((*dstats)[bank][idx] - stats));
+			(*dstats)[bank][idx] = stats;
 		}
 	}
 	return 0;
@@ -548,6 +548,10 @@ int npc_cn20k_debugfs_init(struct rvu *rvu)
 					 &npc_defrag_fops);
 	if (!npc_dentry)
 		return -EFAULT;
+
+	dstats = devm_kzalloc(rvu->dev, sizeof(*dstats), GFP_KERNEL);
+	if (!dstats)
+		return -ENOMEM;
 
 	npc_dentry = debugfs_create_file("dstats", 0444, rvu->rvu_dbg.npc, rvu,
 					 &npc_mcam_dstats_fops);
