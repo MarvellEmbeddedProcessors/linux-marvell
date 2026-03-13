@@ -35,7 +35,7 @@ static void __tlb_switch_to_guest(struct kvm_s2_mmu *mmu,
 		 */
 		val = cxt->tcr = read_sysreg_el1(SYS_TCR);
 		val |= TCR_EPD1_MASK | TCR_EPD0_MASK;
-		write_sysreg_el1(val, SYS_TCR);
+		write_tcr_el1(val);
 		val = cxt->sctlr = read_sysreg_el1(SYS_SCTLR);
 		val |= SCTLR_ELx_M;
 		write_sysreg_el1(val, SYS_SCTLR);
