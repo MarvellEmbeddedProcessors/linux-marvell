@@ -174,6 +174,10 @@ void machine_kexec(struct kimage *kimage)
 	WARN(in_kexec_crash && (stuck_cpus || smp_crash_stop_failed()),
 		"Some CPUs may be stale, kdump will be unreliable.\n");
 
+	/* Do not leave the dynamic-incomplete workaround set in firmware */
+	if (cpus_have_final_cap(ARM64_WORKAROUND_4299121))
+		cpu_disable_bad_tc_tlb();
+
 	pr_info("Bye!\n");
 
 	local_daif_mask();
