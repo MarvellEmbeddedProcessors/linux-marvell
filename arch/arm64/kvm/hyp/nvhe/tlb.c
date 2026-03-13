@@ -85,7 +85,7 @@ static void enter_vmid_context(struct kvm_s2_mmu *mmu,
 		 */
 		val = cxt->tcr = read_sysreg_el1(SYS_TCR);
 		val |= TCR_EPD1_MASK | TCR_EPD0_MASK;
-		write_sysreg_el1(val, SYS_TCR);
+		write_tcr_el1(val);
 		isb();
 
 		if (vcpu) {
@@ -141,7 +141,7 @@ static void exit_vmid_context(struct tlb_inv_context *cxt)
 			isb();
 		}
 
-		write_sysreg_el1(cxt->tcr, SYS_TCR);
+		write_tcr_el1(cxt->tcr);
 	}
 }
 

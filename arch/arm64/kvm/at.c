@@ -442,11 +442,11 @@ static void __mmu_config_restore(struct mmu_config *config)
 
 	write_sysreg_el1(config->ttbr0,	SYS_TTBR0);
 	write_sysreg_el1(config->ttbr1,	SYS_TTBR1);
-	write_sysreg_el1(config->tcr,	SYS_TCR);
+	write_tcr_el1(config->tcr);
 	write_sysreg_el1(config->mair,	SYS_MAIR);
 	write_sysreg_el1(config->sctlr,	SYS_SCTLR);
 	write_sysreg(config->vttbr,	vttbr_el2);
-	write_sysreg(config->vtcr,	vtcr_el2);
+	write_vtcr_el2(config->vtcr);
 }
 
 static bool at_s1e1p_fast(struct kvm_vcpu *vcpu, u32 op, u64 vaddr)
@@ -912,7 +912,7 @@ static u64 __kvm_at_s1e01_fast(struct kvm_vcpu *vcpu, u32 op, u64 vaddr)
 
 	write_sysreg_el1(vcpu_read_sys_reg(vcpu, TTBR0_EL1),	SYS_TTBR0);
 	write_sysreg_el1(vcpu_read_sys_reg(vcpu, TTBR1_EL1),	SYS_TTBR1);
-	write_sysreg_el1(vcpu_read_sys_reg(vcpu, TCR_EL1),	SYS_TCR);
+	write_tcr_el1(vcpu_read_sys_reg(vcpu, TCR_EL1));
 	write_sysreg_el1(vcpu_read_sys_reg(vcpu, MAIR_EL1),	SYS_MAIR);
 	write_sysreg_el1(vcpu_read_sys_reg(vcpu, SCTLR_EL1),	SYS_SCTLR);
 	__load_stage2(mmu, mmu->arch);

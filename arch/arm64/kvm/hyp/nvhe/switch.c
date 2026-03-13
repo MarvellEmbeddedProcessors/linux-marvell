@@ -114,7 +114,7 @@ static void __activate_traps(struct kvm_vcpu *vcpu)
 		 */
 		write_sysreg_el1(ctxt_sys_reg(ctxt, SCTLR_EL1),	SYS_SCTLR);
 		isb();
-		write_sysreg_el1(ctxt_sys_reg(ctxt, TCR_EL1),	SYS_TCR);
+		write_tcr_el1(ctxt_sys_reg(ctxt, TCR_EL1));
 	}
 }
 
@@ -134,7 +134,7 @@ static void __deactivate_traps(struct kvm_vcpu *vcpu)
 		 * ensure that things happen in this exact order.
 		 */
 		val = read_sysreg_el1(SYS_TCR);
-		write_sysreg_el1(val | TCR_EPD1_MASK | TCR_EPD0_MASK, SYS_TCR);
+		write_tcr_el1(val | TCR_EPD1_MASK | TCR_EPD0_MASK);
 		isb();
 		val = read_sysreg_el1(SYS_SCTLR);
 		write_sysreg_el1(val | SCTLR_ELx_M, SYS_SCTLR);
