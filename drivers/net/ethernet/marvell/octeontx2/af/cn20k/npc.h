@@ -110,7 +110,7 @@ struct npc_defrag_show_node {
 
 struct npc_priv_t {
 	int bank_depth;
-	const int num_banks;
+	int num_banks;
 	int num_subbanks;
 	int subbank_depth;
 	DECLARE_BITMAP(en_map, MAX_NUM_BANKS *
