@@ -546,7 +546,9 @@ M(MCS_PORT_CFG_GET,	0xa020, mcs_port_cfg_get, mcs_port_cfg_get_req,		\
 				mcs_port_cfg_get_rsp)				\
 M(MCS_CUSTOM_TAG_CFG_GET, 0xa021, mcs_custom_tag_cfg_get,			\
 				  mcs_custom_tag_cfg_get_req,			\
-				  mcs_custom_tag_cfg_get_rsp)
+				  mcs_custom_tag_cfg_get_rsp)	\
+M(MCS_GET_MCS_ID,	0xa022, mcs_get_mcs_id, mcs_get_id_req,		\
+				mcs_get_id_rsp)
 
 /* Messages initiated by AF (range 0xC00 - 0xEFF) */
 
@@ -3367,6 +3369,21 @@ struct mcs_custom_tag_cfg_get_rsp {
 	u8 cstm_etype_en;
 	u8 mcs_id;
 	u8 dir;
+	u64 rsvd;
+};
+
+struct mcs_get_id_req {
+	struct mbox_msghdr hdr;
+	u8 node;
+	u8 rfoe_id;
+	u64 rsvd;
+};
+
+struct mcs_get_id_rsp {
+	struct mbox_msghdr hdr;
+	u8 node;
+	u8 rfoe_id;
+	u8 mcs_id;
 	u64 rsvd;
 };
 
