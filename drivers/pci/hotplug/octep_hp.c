@@ -413,7 +413,7 @@ static int octep_hp_controller_setup(struct pci_dev *pdev,
 	if (ret < 0)
 		return dev_err_probe(dev, ret, "Failed to alloc MSI-X vectors\n");
 
-	ret = devm_add_action(&pdev->dev, octep_hp_irq_cleanup, hp_ctrl);
+	ret = devm_add_action_or_reset(&pdev->dev, octep_hp_irq_cleanup, hp_ctrl);
 	if (ret)
 		return dev_err_probe(&pdev->dev, ret, "Failed to add IRQ cleanup action\n");
 
@@ -462,8 +462,8 @@ static int octep_hp_pci_probe(struct pci_dev *pdev,
 					     "Failed to register hotplug slot %u\n",
 					     slot_number);
 
-		ret = devm_add_action(&pdev->dev, octep_hp_deregister_slot,
-				      hp_slot);
+		ret = devm_add_action_or_reset(&pdev->dev, octep_hp_deregister_slot,
+					       hp_slot);
 		if (ret)
 			return dev_err_probe(&pdev->dev, ret,
 					     "Failed to add action for deregistering slot %u\n",
@@ -471,7 +471,7 @@ static int octep_hp_pci_probe(struct pci_dev *pdev,
 		slot_number++;
 	}
 
-	ret = devm_add_action(&pdev->dev, octep_hp_work_cleanup, hp_ctrl);
+	ret = devm_add_action_or_reset(&pdev->dev, octep_hp_work_cleanup, hp_ctrl);
 	if (ret)
 		return dev_err_probe(&pdev->dev, ret,
 				     "Failed to add work cleanup action\n");
