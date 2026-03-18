@@ -331,8 +331,18 @@ static void octep_hp_irq_cleanup(void *data)
 	struct octep_hp_controller *hp_ctrl = data;
 
 	pci_free_irq_vectors(hp_ctrl->pdev);
-	flush_work(&hp_ctrl->work);
 	octep_hp_scratch_write(hp_ctrl, OCTEP_HP_SCRATCH_OFF);
+}
+
+static void octep_hp_work_cleanup(void *data)
+{
+	struct octep_hp_controller *hp_ctrl = data;
+	enum octep_hp_intr_type type;
+
+	for (type = OCTEP_HP_INTR_ENA; type < OCTEP_HP_INTR_MAX; type++)
+		disable_irq(hp_ctrl->intr[type].number);
+
+	flush_work(&hp_ctrl->work);
 }
 
 static int octep_hp_request_irq(struct octep_hp_controller *hp_ctrl,
@@ -460,6 +470,11 @@ static int octep_hp_pci_probe(struct pci_dev *pdev,
 					     slot_number);
 		slot_number++;
 	}
+
+	ret = devm_add_action(&pdev->dev, octep_hp_work_cleanup, hp_ctrl);
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret,
+				     "Failed to add work cleanup action\n");
 
 	octep_hp_scratch_write(hp_ctrl, OCTEP_HP_SCRATCH_ON);
 	return 0;
