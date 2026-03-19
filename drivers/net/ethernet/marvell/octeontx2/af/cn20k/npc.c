@@ -1099,7 +1099,7 @@ done:
 
 u16 npc_cn20k_vidx2idx(u16 idx)
 {
-	if (!npc_priv->init_done)
+	if (!npc_priv)
 		return idx;
 
 	if (!npc_is_vidx(idx))
@@ -1110,7 +1110,7 @@ u16 npc_cn20k_vidx2idx(u16 idx)
 
 u16 npc_cn20k_idx2vidx(u16 idx)
 {
-	if (!npc_priv->init_done)
+	if (!npc_priv)
 		return idx;
 
 	if (npc_is_vidx(idx))
@@ -3517,7 +3517,7 @@ int npc_cn20k_dft_rules_idx_get(struct rvu *rvu, u16 pcifunc, u16 *bcast,
 	void *val;
 	int i, j;
 
-	if (!npc_priv->init_done)
+	if (!npc_priv)
 		return 0;
 
 	for (int i = 0; i < ARRAY_SIZE(ptr); i++) {
@@ -3685,7 +3685,7 @@ void npc_cn20k_dft_rules_free(struct rvu *rvu, u16 pcifunc)
 	int rc, i;
 	void *map;
 
-	if (!npc_priv->init_done)
+	if (!npc_priv)
 		return;
 
 	if (!npc_is_cgx_or_lbk(rvu, pcifunc)) {
@@ -3785,7 +3785,7 @@ int npc_cn20k_dft_rules_alloc(struct rvu *rvu, u16 pcifunc)
 	unsigned long index;
 	u16 b, m, p, u;
 
-	if (!npc_priv->init_done)
+	if (!npc_priv)
 		return 0;
 
 	if (!npc_is_cgx_or_lbk(rvu, pcifunc)) {
@@ -4357,6 +4357,8 @@ int npc_cn20k_deinit(struct rvu *rvu)
 	kfree(npc_priv->xa_pf2idx_map);
 	kfree(npc_priv->sb);
 	kfree(subbank_srch_order);
+	kfree(npc_priv);
+	npc_priv = NULL;
 
 	return 0;
 }
@@ -4365,13 +4367,6 @@ int npc_cn20k_init(struct rvu *rvu)
 {
 	int err;
 
-	err = npc_setup_mcam_section(rvu, NPC_MCAM_KEY_X2);
-	if (err) {
-		dev_err(rvu->dev, "%s: mcam section configuration failure\n",
-			__func__);
-		return err;
-	}
-
 	err = npc_priv_init(rvu);
 	if (err) {
 		dev_err(rvu->dev, "%s:%d Error to init\n",
@@ -4379,7 +4374,18 @@ int npc_cn20k_init(struct rvu *rvu)
 		return err;
 	}
 
+	err = npc_setup_mcam_section(rvu, NPC_MCAM_KEY_X2);
+	if (err) {
+		dev_err(rvu->dev, "%s: mcam section configuration failure\n",
+			__func__);
+		goto fail;
+	}
+
 	npc_priv->init_done = true;
 
 	return 0;
+fail:
+	kfree(npc_priv);
+	npc_priv = NULL;
+	return err;
 }
