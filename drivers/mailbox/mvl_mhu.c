@@ -22,67 +22,33 @@
 #include <linux/of_irq.h>
 #include <linux/acpi.h>
 #include <linux/mailbox_controller.h>
+#include <linux/soc/marvell/silicons.h>
+#include <soc/marvell/octeontx/octeontx_smc.h>
 
 #define MHU_PCHANS_NUM	1
 #define BAR0		0
 #define SCP_INDEX	0x0
-#define DEV_AP0		0x2
 #define SCP_TO_AP_INTERRUPT	2
 
-#define XCPX_DEVY_XCP_MBOX_LINT_OFFSET	0x000E1C00
-#define XCP_TO_DEV_XCP_MBOX_LINT(xcp_core, device_id)  \
-	(XCPX_DEVY_XCP_MBOX_LINT_OFFSET | \
-	((uint64_t)(xcp_core) << 36) | \
-	((uint64_t)(device_id) << 4))
+/* Mailbox Register offsets. */
 
-#define AP0_TO_SCP_MBOX_LINT    XCP_TO_DEV_XCP_MBOX_LINT(SCP_INDEX, DEV_AP0)
+#define XCPX_DEVY_XCP_MBOX_OFFSET		0x000E1000
+/* CN20K */
+#define CN20K_DEV_AP0				0x20
+#define CN20K_XCP_DEVY_MBOX_RINT_OFFSET		0x000D3000
+#define CN20K_XCP_DEVY_MBOX_RINT_ENA_OFFSET	0x000D3400
+/* Non-CN20K */
+#define DEV_AP0					0x2
+#define XCP_DEVY_MBOX_RINT_OFFSET		0x000D1C00
+#define XCP_DEVY_MBOX_RINT_ENA_OFFSET		0x000D1C40
 
 /*
- * Doorbell-Register: XCP(0..1)_DEV(0..7)_XCP_MBOX
- * Communication data from devices to XCP. When written, sets
- * XCP(0..1)_DEV(0..7)_XCP_MBOX.
+ * DEV-to-XCP Mailbox Doorbell-data
  * PS: it doesn't matter what is written into this register,
  * Attempting to writing 'anything' would cause an interrupt
  * to the target!
  */
-
-#define DONT_CARE_DATA			0xFF
-#define XCPX_DEVY_XCP_MBOX_OFFSET	0x000E1000
-#define XCP_TO_DEV_XCP_MBOX(xcp_core, device_id) \
-	(XCPX_DEVY_XCP_MBOX_OFFSET | \
-	((uint64_t)(xcp_core) << 36) | \
-	((uint64_t)(device_id) << 4))
-
-/* AP0-to-SCP doorbell */
-#define AP0_TO_SCP_MBOX         XCP_TO_DEV_XCP_MBOX(SCP_INDEX, DEV_AP0)
-
-/*  Register offset: Enable interrupt from SCP to AP */
-#define XCP0_XCP_DEV0_MBOX_RINT_ENA_W1S	0x000D1C40
-#define XCP0_XCP_DEV1_MBOX_RINT_ENA_W1S	0x000D1C50
-#define XCP0_XCP_DEV2_MBOX_RINT_ENA_W1S	0x000D1C60
-#define XCP0_XCP_DEV3_MBOX_RINT_ENA_W1S	0x000D1C70
-
-/* Rx interrupt from SCP to Non-secure AP (linux kernel) */
-#define XCPX_XCP_DEVY_MBOX_RINT_OFFSET 0x000D1C00
-#define XCPX_XCP_DEVY_MBOX_RINT(xcp_core, device_id) \
-	(XCPX_XCP_DEVY_MBOX_RINT_OFFSET | \
-	((uint64_t)(xcp_core) << 36) | \
-	((uint64_t)(device_id) << 4))
-
-/* The interrupt status register */
-#define SCP_TO_AP0_MBOX_RINT  XCPX_XCP_DEVY_MBOX_RINT(SCP_INDEX, DEV_AP0)
-
-#define XCPX_XCP_DEVY_MBOX_RINT_OFFSET	0x000D1C00
-#define XCPX_XCP_DEVY_MBOX_RINT(xcp_core, device_id) \
-	(XCPX_XCP_DEVY_MBOX_RINT_OFFSET | \
-	((uint64_t)(xcp_core) << 36) | \
-	((uint64_t)(device_id) << 4))
-
-#define SCP_TO_AP0_MBOX_RINT  XCPX_XCP_DEVY_MBOX_RINT(SCP_INDEX, DEV_AP0)
-#define SCP_TO_DEV0 XCPX_XCP_DEVY_MBOX_RINT(0, 0)
-#define SCP_TO_DEV1 XCPX_XCP_DEVY_MBOX_RINT(0, 1)
-#define SCP_TO_DEV2 XCPX_XCP_DEVY_MBOX_RINT(0, 2)
-#define SCP_TO_DEV3 XCPX_XCP_DEVY_MBOX_RINT(0, 3)
+#define DOORBELL_DATA				0xFF
 
 struct mhu {
 	struct device *dev;
@@ -91,6 +57,14 @@ struct mhu {
 	void __iomem *base; /* tx_reg, rx_reg */
 	void __iomem *payload; /* Shared mem */
 	struct mbox_chan *chan;
+
+	/* Mailbox registers offsets*/
+	/* AP0-to-SCP doorbell */
+	u64 ap0_to_scp_mbox_off;
+	/* The interrupt status register */
+	u64 scp_to_ap0_rint_off;
+	/* Enable interrupt from SCP to AP0 */
+	u64 scp_to_ap0_rint_ena_off;
 };
 
 #define MHU_CHANNEL_INDEX(mhu, chan) (chan - &mhu->chan[0])
@@ -108,6 +82,33 @@ struct int_src_data_s {
 	uint64_t int_src_data;
 };
 
+static void mhu_set_mbox_offsets(struct mhu *mhu, bool is_cn20k)
+{
+	u64 off;
+
+	if (is_cn20k) {
+		off = XCPX_DEVY_XCP_MBOX_OFFSET |
+			((u64)(SCP_INDEX) << 36) | ((u64)(CN20K_DEV_AP0) << 4);
+		mhu->ap0_to_scp_mbox_off = off;
+		off = CN20K_XCP_DEVY_MBOX_RINT_OFFSET |
+			((u64)(SCP_INDEX) << 36) | ((u64)(CN20K_DEV_AP0) << 4);
+		mhu->scp_to_ap0_rint_off = off;
+		off = CN20K_XCP_DEVY_MBOX_RINT_ENA_OFFSET |
+			((u64)(SCP_INDEX) << 36) | ((u64)(CN20K_DEV_AP0) << 4);
+		mhu->scp_to_ap0_rint_ena_off = off;
+	} else {
+		off = XCPX_DEVY_XCP_MBOX_OFFSET |
+			((u64)(SCP_INDEX) << 36) | ((u64)(DEV_AP0) << 4);
+		mhu->ap0_to_scp_mbox_off = off;
+		off = XCP_DEVY_MBOX_RINT_OFFSET |
+			((u64)(SCP_INDEX) << 36) | ((u64)(DEV_AP0) << 4);
+		mhu->scp_to_ap0_rint_off = off;
+		off = XCP_DEVY_MBOX_RINT_ENA_OFFSET |
+			((u64)(SCP_INDEX) << 36) | ((u64)(DEV_AP0) << 4);
+		mhu->scp_to_ap0_rint_ena_off = off;
+	}
+}
+
 static irqreturn_t mhu_rx_interrupt(int irq, void *p)
 {
 	struct mhu *mhu = (struct mhu *)p;
@@ -122,7 +123,7 @@ static irqreturn_t mhu_rx_interrupt(int irq, void *p)
 	static u64 event_counter[INDEX_INT_SRC_NONE] = {0};
 
 	/* Read interrupt status register */
-	val = readq_relaxed(mhu->base + SCP_TO_AP0_MBOX_RINT);
+	val = readq_relaxed(mhu->base + mhu->scp_to_ap0_rint_off);
 	if (!val)
 		return IRQ_NONE;
 
@@ -142,7 +143,7 @@ static irqreturn_t mhu_rx_interrupt(int irq, void *p)
 
 handled:
 	/* Clear the interrupt : Write on clear */
-	writeq_relaxed(1ul, mhu->base + SCP_TO_AP0_MBOX_RINT);
+	writeq_relaxed(1ul, mhu->base + mhu->scp_to_ap0_rint_off);
 
 	return IRQ_HANDLED;
 }
@@ -151,7 +152,7 @@ static int mhu_send_data(struct mbox_chan *chan, void *data)
 {
 	struct mhu *mhu = chan->con_priv;
 
-	iowrite64(DONT_CARE_DATA, mhu->base + AP0_TO_SCP_MBOX);
+	iowrite64(DOORBELL_DATA, mhu->base + mhu->ap0_to_scp_mbox_off);
 
 	return 0;
 }
@@ -161,7 +162,7 @@ static bool mhu_last_tx_done(struct mbox_chan *chan)
 	struct mhu *mhu = chan->con_priv;
 	u64 status;
 
-	status = ioread64(mhu->base + XCPX_XCP_DEVY_MBOX_RINT(0, 2));
+	status = ioread64(mhu->base + mhu->ap0_to_scp_mbox_off);
 	pr_debug("last_tx_done status: %#llx\n", status);
 
 	return status != 0;
@@ -172,7 +173,7 @@ static int mhu_startup(struct mbox_chan *chan)
 	struct mhu *mhu = chan->con_priv;
 
 	/* Enable interrupts only if there is client for data */
-	writeq_relaxed(1ul, mhu->base + XCP0_XCP_DEV2_MBOX_RINT_ENA_W1S);
+	writeq_relaxed(1ul, mhu->base + mhu->scp_to_ap0_rint_ena_off);
 
 	return 0;
 }
@@ -256,6 +257,7 @@ static int mhu_plat_probe(struct platform_device *pdev)
 	struct mhu *mhu;
 	struct resource *res;
 	struct device *dev;
+	bool is_cn20k = false;
 	int ret;
 
 	dev = &pdev->dev;
@@ -263,6 +265,9 @@ static int mhu_plat_probe(struct platform_device *pdev)
 	if (!mhu)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, mhu);
+
+	is_cn20k = is_soc_cn20kx();
+	mhu_set_mbox_offsets(mhu, is_cn20k);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	pr_debug("base: %llx, len: %llx\n", res->start, resource_size(res));
@@ -350,6 +355,8 @@ static int mhu_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!mhu)
 		return -ENOMEM;
 	pci_set_drvdata(pdev, mhu);
+
+	mhu_set_mbox_offsets(mhu, is_cn20k(pdev));
 
 	ret = pcim_enable_device(pdev);
 	if (ret)
