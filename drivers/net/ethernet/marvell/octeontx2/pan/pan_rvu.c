@@ -29,6 +29,7 @@ MODULE_DEVICE_TABLE(pci, pan_rvu_id_table);
 #define DRV_NAME        "pan_rvu"
 
 static struct pan_rvu_gbl_t pan_rvu_gbl;
+static DEFINE_STATIC_KEY_FALSE(ipv6_support);
 
 struct otx2_nic *pan_rvu_get_pan_nic(void)
 {
@@ -701,6 +702,17 @@ static bool pan_rvu_buf_xmit(struct pan_fl_tbl_res *res,
 	return true;
 }
 
+#define V4_PKT (BIT_ULL(NPC_LT_LC_IP) | BIT_ULL(NPC_LT_LC_IP_OPT))
+
+static inline u64 pan_rvu_get_tuple_flag(struct nix_rx_parse_s *parse)
+{
+	if (!static_branch_unlikely(&ipv6_support))
+		return PAN_TUPLE_FLAG_L3_PROTO_V4;
+
+	return	(BIT_ULL(parse->lctype) & V4_PKT) ?
+		PAN_TUPLE_FLAG_L3_PROTO_V4 : PAN_TUPLE_FLAG_L3_PROTO_V6;
+}
+
 static int
 pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 			 struct pan_rvu_cq_info *cq_info,
@@ -779,7 +791,7 @@ pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 		node = __pan_sw_l2_mac_tbl_lookup(eth->h_source);
 		if (node) {
 			pan_tuple_hash_set(&tuple, node->match_id);
-			tuple.flags |= PAN_TUPLE_FLAG_L3_PROTO_V4;
+			tuple.flags |= pan_rvu_get_tuple_flag(parse);
 			if (!__pan_fl_tbl_offl_lookup_n_res(&tuple, &pres)) {
 				pres->dir = IP_CT_DIR_REPLY;
 				res->dir = IP_CT_DIR_REPLY;
@@ -953,6 +965,7 @@ pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
 	struct pan_tuple tuple = {};
 	struct pan_fl_tbl_res *pres;
 	struct neighbour *neigh;
+	struct ipv6hdr *ip6hdr;
 	struct iphdr *iphdr;
 	struct vlan_ethhdr *vhdr;
 	struct ethhdr *eth;
@@ -965,6 +978,7 @@ pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
 	void *start;
 	void *va;
 	u8 *dmac;
+	bool is_v4;
 	u16 vprot;
 
 	start = (void *)sg;
@@ -992,6 +1006,9 @@ pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
 	} else {
 		iphdr = (struct iphdr *)((void *)eth + ETH_HLEN);
 	}
+
+	is_v4 = iphdr->version == 4;
+	ip6hdr = (struct ipv6hdr *)iphdr;
 
 	in_dev = pan_rvu_find_in_dev(eth->h_dest, eth->h_source, parse->chan);
 	if (likely(in_dev)) {
@@ -1029,11 +1046,31 @@ pan_rvu_modify_l2_hdr(struct otx2_nic *pfvf,
 			return -EINVAL;
 		}
 
-		neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
+		if (is_v4)
+			neigh = __ipv4_neigh_lookup_noref(dev, (__force u32)iphdr->daddr);
+		else
+			neigh = __ipv6_neigh_lookup_noref(dev, &ip6hdr->daddr);
+
 		if (unlikely(!neigh)) {
 			pan_stats_err_inc(PAN_STAT_ERR_DIP_NEIGH);
-			pr_debug("%s:%d neigh dest failed destip=%pI4 dev=%s\n",
-				 __func__, __LINE__, &iphdr->daddr, dev->name);
+			neigh = neigh_create(is_v4 ? &arp_tbl : &nd_tbl,
+					     is_v4 ? (void *)&iphdr->daddr : (void *)&ip6hdr->daddr,
+					     dev);
+
+			if (!IS_ERR(neigh)) {
+				neigh_event_send(neigh, NULL);
+				neigh_release(neigh);
+			} else {
+				pan_stats_err_inc(PAN_STAT_ERR_NEIGH_CREATE);
+			}
+
+			if (is_v4)
+				pr_debug("%s:%d neigh dest failed destip=%pI4 dev=%s\n",
+					 __func__, __LINE__, &iphdr->daddr, dev->name);
+			else
+				pr_debug("%s:%d neigh dest failed destip=%pI6 dev=%s\n",
+					 __func__, __LINE__, &ip6hdr->daddr, dev->name);
+
 			return -ENOENT;
 		}
 
@@ -1110,7 +1147,8 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 		}
 	} else {
 		pan_tuple_hash_set(&tuple, parse->match_id);
-		tuple.flags |= PAN_TUPLE_FLAG_L3_PROTO_V4;
+
+		tuple.flags |= pan_rvu_get_tuple_flag(parse);
 
 		if (__pan_fl_tbl_offl_lookup_n_res(&tuple, &res)) {
 			/* Send packet to stack thru pan device */
@@ -2015,9 +2053,9 @@ exit:
 static int pan_rvu_open(struct net_device *netdev)
 {
 	struct pan_rvu_dev_priv *pan_priv;
+	struct iface_info *info, *iter;
 	struct otx2_nic *otx2_nic;
 	struct pan_rvu_gbl_t *gbl;
-	struct iface_info *info;
 	struct net_device *dev;
 	int err, cnt, i;
 
@@ -2036,24 +2074,23 @@ static int pan_rvu_open(struct net_device *netdev)
 	pan_priv = netdev_priv(netdev);
 	otx2_nic = pan_priv->otx2_nic;
 
-	pan_rvu_get_mcam_features(otx2_nic);
-
 	err = pan_rvu_get_iface_info(info, &cnt, false);
 	if (err) {
 		netdev_err(netdev, "Error happened while getting info\n");
 		return err;
 	}
 
-	for (i = 0; i < cnt; i++, info++) {
-		dev = __pan_rvu_get_kernel_netdev_by_pcifunc(info->pcifunc);
+	iter = info;
+	for (i = 0; i < cnt; i++, iter++) {
+		dev = __pan_rvu_get_kernel_netdev_by_pcifunc(iter->pcifunc);
 		if (!dev)
 			continue;
 
 		xa_store(&pan_rvu_gbl.chan2dev,
-			 info->rx_chan_base, dev, GFP_KERNEL);
+			 iter->rx_chan_base, dev, GFP_KERNEL);
 
 		xa_store(&pan_rvu_gbl.pfunc2dev,
-			 info->pcifunc, dev, GFP_KERNEL);
+			 iter->pcifunc, dev, GFP_KERNEL);
 	}
 	kfree(info);
 
@@ -2263,6 +2300,7 @@ static int pan_rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct device *dev = &pdev->dev;
 	struct pan_rvu_dev_priv *pan_priv;
+	u64 npc_rx_features, mask;
 	struct otx2_nic *otx2_nic;
 	struct net_device *netdev;
 	struct otx2_hw *hw;
@@ -2455,6 +2493,13 @@ static int pan_rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		dev_err(dev, "Failed to send swdev up notification to AF\n");
 		goto err_ktls_deinit;
 	}
+
+	pan_rvu_get_mcam_features(otx2_nic);
+	npc_rx_features = pan_rvu_gbl.npc_rx_features;
+	mask = BIT_ULL(NPC_SIP_IPV6) | BIT_ULL(NPC_DIP_IPV6);
+
+	if ((npc_rx_features & mask) == mask)
+		static_branch_enable(&ipv6_support);
 
 	dev_info(dev, "Pan probe called successfully, pci_func of PAN=0x%x\n", otx2_nic->pcifunc);
 
@@ -2825,6 +2870,30 @@ static struct otx2_cmn_fops pan_cmn_fops = {
 	.tx_schq_free_one = pan_tl_txschq_free_one,
 };
 
+bool pan_is_match_id_ipv4(u16 match_id)
+{
+	void *map;
+
+	map = xa_load(&pan_rvu_gbl.xa_v6_matchid,  match_id);
+	return !map;
+}
+
+void pan_insert_match_id(u16 match_id)
+{
+	int rc;
+
+	rc = xa_insert(&pan_rvu_gbl.xa_v6_matchid, match_id,
+		       xa_mk_value(1), GFP_KERNEL);
+	if (rc)
+		pr_err("%s%d Error during inserting matchid=%u\n",
+		       __func__, __LINE__, match_id);
+}
+
+void pan_erase_match_id(u16 match_id)
+{
+	xa_erase(&pan_rvu_gbl.xa_v6_matchid, match_id);
+}
+
 int pan_rvu_init(void)
 {
 #if IS_ENABLED(CONFIG_OCTEONTX_PAN_POLLING_MODE)
@@ -2839,10 +2908,12 @@ int pan_rvu_init(void)
 	}
 
 #endif
+
 	pan_rvu_mac2dev_map_create();
 	otx2_cmn_fops_arr_add(PCI_DEVID_PAN_RVU, &pan_cmn_fops);
 	xa_init(&pan_rvu_gbl.pfunc2dev);
 	xa_init(&pan_rvu_gbl.chan2dev);
+	xa_init_flags(&pan_rvu_gbl.xa_v6_matchid, XA_FLAGS_ALLOC);
 	return pci_register_driver(&pan_rvu_driver);
 }
 
@@ -2852,6 +2923,7 @@ void pan_rvu_deinit(void)
 	xa_destroy(&pan_rvu_gbl.pcifunc2sqoff);
 	xa_destroy(&pan_rvu_gbl.pfunc2dev);
 	xa_destroy(&pan_rvu_gbl.chan2dev);
+	xa_destroy(&pan_rvu_gbl.xa_v6_matchid);
 	pci_unregister_driver(&pan_rvu_driver);
 	otx2_cmn_fops_arr_del(PCI_DEVID_PAN_RVU);
 }

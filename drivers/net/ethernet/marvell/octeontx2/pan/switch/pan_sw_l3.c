@@ -30,7 +30,8 @@ static DEFINE_HASHTABLE(fib_h_tbl, 8);
 static HLIST_HEAD(fib_root_lh);
 static struct pan_sw_l3_offl_tnode *root;
 
-static struct hlist_head fib_hnodes[33];
+#define MAX_FIB_NODES 129
+static struct hlist_head fib_hnodes[MAX_FIB_NODES];
 
 struct pan_sw_l3_offl_tnode  {
 	struct pan_sw_l3_offl_node *node;
@@ -40,7 +41,7 @@ struct pan_sw_l3_offl_tnode  {
 	struct hlist_node hnode2; // For dst_len
 };
 
-static unsigned long valid_route;
+static DECLARE_BITMAP(valid_route, MAX_FIB_NODES);
 static int cnt_routes;
 
 static int pan_sw_l3_fl_tbl_del_one_entry(struct pan_sw_l3_offl_node *node)
@@ -54,6 +55,8 @@ static int pan_sw_l3_fl_tbl_del_one_entry(struct pan_sw_l3_offl_node *node)
 		return 0;
 
 	pan_tuple_hash_set(&node->tuple, node->match_id);
+	node->tuple.flags = pan_is_match_id_ipv4(node->match_id) ? PAN_TUPLE_FLAG_L3_PROTO_V4 :
+		PAN_TUPLE_FLAG_L3_PROTO_V6;
 	err = pan_fl_tbl_offl_del(&node->tuple);
 	if (err) {
 		pr_err("%s:%d Failed to del tbl flow match_id %d\n",
@@ -243,8 +246,11 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 	if (node->tuple_installed)
 		return 0;
 
+	entry = node->entry;
+
 	tuple = &node->tuple;
-	tuple->flags = PAN_TUPLE_FLAG_L3_PROTO_V4;
+	tuple->flags = entry->ipv6 ? PAN_TUPLE_FLAG_L3_PROTO_V6 :
+		PAN_TUPLE_FLAG_L3_PROTO_V4;
 
 	pan_rvu_gbl = pan_rvu_get_gbl();
 	pcifunc = pan_sw_get_pcifunc(node->port_id);
@@ -253,8 +259,6 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 		       __func__, __LINE__, node->port_id);
 		return -EFAULT;
 	}
-
-	entry = node->entry;
 
 	if (entry->vlan_valid)
 		opq.vlan_tag = entry->vlan_tag;
@@ -288,10 +292,18 @@ static int pan_sw_l3_flow_tbl_entry_add(struct pan_sw_l3_offl_node *node)
 	if (entry->mac_valid)
 		ether_addr_copy(tuple->dmac, entry->mac);
 
-	if (entry->gw_valid)
-		tuple->dst_ip4.s_addr = htonl(entry->gw);
-	else
-		tuple->dst_ip4.s_addr = htonl(entry->dst);
+	if (entry->ipv6) {
+		if (entry->gw_valid && ipv6_addr_any((struct in6_addr *)entry->dst6))
+			memcpy(&tuple->dst_ip6, entry->gw6, sizeof(tuple->dst_ip6));
+		else
+			memcpy(&tuple->dst_ip6, entry->dst6, sizeof(tuple->dst_ip6));
+
+	} else {
+		if (entry->gw_valid && !entry->dst)
+			tuple->dst_ip4.s_addr = htonl(entry->gw);
+		else
+			tuple->dst_ip4.s_addr = htonl(entry->dst);
+	}
 
 	pr_debug("%s:%d Adding to PAN table mac=%pM pcifunc=%#x pcifuncoff=%u\n",
 		 __func__, __LINE__,
@@ -313,6 +325,7 @@ static int pan_sw_l3_hw_install_flow(struct pan_sw_l3_offl_node *node)
 {
 	u8 mac_mask[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	struct npc_install_flow_req *req;
+	DECLARE_BITMAP(mask6, 128);
 	struct flow_msg *pkt, *pmask;
 	struct fib_entry *entry;
 	int bits, err;
@@ -340,16 +353,38 @@ static int pan_sw_l3_hw_install_flow(struct pan_sw_l3_offl_node *node)
 		req->features |= BIT_ULL(NPC_DMAC);
 	}
 
-	if (entry->gw_valid) {
-		pkt->ip4dst = htonl(entry->gw);
-		pmask->ip4dst = 0xffffffff;
-		req->features |= BIT_ULL(NPC_DIP_IPV4);
+	if (entry->gw_valid && ipv6_addr_any((struct in6_addr *)entry->gw6)) {
+		if (entry->ipv6) {
+			memcpy(pkt->ip6dst, entry->gw6, sizeof(pkt->ip6dst));
+			bitmap_zero(mask6, 128);
+			bitmap_set(mask6, 0, 128);
+			memcpy(&pmask->ip6dst, mask6, sizeof(pmask->ip6dst));
+			req->features |= BIT_ULL(NPC_DIP_IPV6);
+
+		} else {
+			pkt->ip4dst = htonl(entry->gw);
+			pmask->ip4dst = 0xffffffff;
+			req->features |= BIT_ULL(NPC_DIP_IPV4);
+		}
+
 	} else {
-		pkt->ip4dst = htonl(entry->dst);
-		bits = entry->dst_len;
-		mask = ((1ULL << bits) - 1) << (31 - bits + 1);
-		pmask->ip4dst = htonl(mask);
-		req->features |= BIT_ULL(NPC_DIP_IPV4);
+		if (entry->ipv6) {
+			memcpy(pkt->ip6dst, entry->dst6, sizeof(pkt->ip6dst));
+			bitmap_zero(mask6, 128);
+			bits = entry->dst6_plen;
+			if (entry->host)
+				bitmap_set(mask6, 0, 128);
+			else
+				bitmap_set(mask6, 0, 127 - bits + 1);
+			memcpy(&pmask->ip6dst, mask6, sizeof(pmask->ip6dst));
+			req->features |= BIT_ULL(NPC_DIP_IPV6);
+		} else {
+			pkt->ip4dst = htonl(entry->dst);
+			bits = entry->dst_len;
+			mask = ((1ULL << bits) - 1) << (31 - bits + 1);
+			pmask->ip4dst = htonl(mask);
+			req->features |= BIT_ULL(NPC_DIP_IPV4);
+		}
 	}
 
 	req->entry = node->mcam_idx;
@@ -377,24 +412,47 @@ fail_flow:
 
 static void pan_sw_l3_fib_dump(struct fib_entry *entry)
 {
-	pr_debug("%s:%d cmd=%s gw_valid=%d mac_valid=%d dst=%#x len=%d gw=%#x mac=%pM nud_state=%#x\n",
+	pr_debug("%s:%d cmd=%s gw_valid=%d mac_valid=%d mac=%pM nud_state=%#x\n",
 		 __func__, __LINE__,
 		 sw_nb_get_cmd2str(entry->cmd),
-		 entry->gw_valid, entry->mac_valid, entry->dst, entry->dst_len,
-		 entry->gw, entry->mac, entry->nud_state);
+		 entry->gw_valid, entry->mac_valid,
+		 entry->mac, entry->nud_state);
+
+	if (entry->ipv6) {
+		pr_debug("%s:%d dst=%pI6 len=%d gw=%pI6\n",
+			 __func__, __LINE__, entry->dst6, entry->dst6_plen,
+			 entry->gw6);
+		return;
+	}
+
+	pr_debug("%s:%d dst=%#x len=%d gw=%#x\n",
+		 __func__, __LINE__, entry->dst, entry->dst_len,
+		 entry->gw);
 }
 
 static void pan_sw_l3_node_dump(struct pan_sw_l3_offl_node *node)
 {
 	struct fib_entry *entry = node->entry;
-
 	pr_debug("%s:%d port_id=%#x mcam_idx=%d match_id=%d\n",
 		 __func__, __LINE__, node->port_id, node->mcam_idx, node->match_id);
-	pr_debug("%s:%d cmd=%s gw_valid=%d mac_valid=%d dst=%#x len=%d gw=%#x mac=%pM nud_state=%#x\n",
+
+	pr_debug("%s:%d cmd=%s gw_valid=%d mac_valid=%d mac=%pM nud_state=%#x\n",
 		 __func__, __LINE__,
 		 sw_nb_get_cmd2str(entry->cmd),
-		 entry->gw_valid, entry->mac_valid, entry->dst, entry->dst_len,
-		 entry->gw, entry->mac, entry->nud_state);
+		 entry->gw_valid, entry->mac_valid,
+		 entry->mac, entry->nud_state);
+
+	if (entry->ipv6) {
+		pr_debug("%s:%d dst=%pI6 len=%d gw=%pI6\n",
+			 __func__, __LINE__,
+			 entry->dst6, entry->dst6_plen, entry->gw6);
+
+		return;
+	}
+
+	pr_debug("%s:%d dst=%#x len=%d gw=%#x\n",
+		 __func__, __LINE__,
+		 entry->dst, entry->dst_len, entry->gw);
 }
 
 static struct workqueue_struct *pan_sw_l3_fib_wq;
@@ -450,7 +508,7 @@ static void pan_sw_l3_fib_work_handler(struct work_struct *work)
 	emidx = num_routes - 1;
 
 	spin_lock(&offl_l3_lock);
-	for_each_set_bit(bitnr, &valid_route, 33) {
+	for_each_set_bit(bitnr, valid_route, MAX_FIB_NODES) {
 		int bucket = bitnr;
 
 		if (hlist_empty(&fib_hnodes[bucket])) {
@@ -505,22 +563,29 @@ pan_sw_l3_fib_h_tbl_add_entry(struct pan_sw_l3_offl_tnode *tnode)
 	struct hlist_node *p, *n, *s = NULL;
 	struct fib_entry *fe;
 	unsigned int hash;
+	int dst_len;
 
 	fe = tnode->node->entry;
 	hash = fe->gw_valid ? fe->gw : fe->dst;
 
+	dst_len = fe->ipv6 ?  tnode->node->entry->dst6_plen :
+		tnode->node->entry->dst_len;
+
+	if (fe->ipv6 && fe->host)
+		dst_len = 128;
+
 	hash_add(fib_h_tbl, &tnode->hnode, hash);
 
-	if (hlist_empty(&fib_hnodes[fe->dst_len])) {
-		hlist_add_head(&tnode->hnode2, &fib_hnodes[fe->dst_len]);
+	if (hlist_empty(&fib_hnodes[dst_len])) {
+		hlist_add_head(&tnode->hnode2, &fib_hnodes[dst_len]);
 	} else {
-		hlist_for_each_safe(p, n, &fib_hnodes[fe->dst_len])
+		hlist_for_each_safe(p, n, &fib_hnodes[dst_len])
 			s = p;
 
 		hlist_add_behind(&tnode->hnode2, s);
 	}
 
-	set_bit(fe->dst_len, &valid_route);
+	set_bit(dst_len, valid_route);
 	cnt_routes++;
 }
 
@@ -536,9 +601,14 @@ pan_sw_l3_fib_h_tbl_del_entry(struct pan_sw_l3_offl_tnode *tnode)
 	if (tnode->node) {
 		fe = tnode->node->entry;
 
-		dst_len = tnode->node->entry->dst_len;
+		dst_len = fe->ipv6 ?  tnode->node->entry->dst6_plen :
+			tnode->node->entry->dst_len;
+
+		if (fe->ipv6 && fe->host)
+			dst_len = 128;
+
 		if (hlist_empty(&fib_hnodes[dst_len]))
-			clear_bit(dst_len, &valid_route);
+			clear_bit(dst_len, valid_route);
 		cnt_routes--;
 	}
 }
@@ -547,6 +617,7 @@ static struct pan_sw_l3_offl_tnode *
 pan_sw_l3_fib_h_tbl_lookup(struct fib_entry *entry)
 {
 	unsigned int hash = entry->gw_valid ? entry->gw : entry->dst;
+	bool v6 = !!entry->ipv6;
 	struct pan_sw_l3_offl_tnode *tentry;
 	struct fib_entry *fe;
 
@@ -558,20 +629,32 @@ pan_sw_l3_fib_h_tbl_lookup(struct fib_entry *entry)
 		}
 
 		fe = tentry->node->entry;
-		if (entry->gw_valid && fe->gw_valid) {
-			if (fe->gw == entry->gw)
-				return tentry;
+		if (!v6) {
+			if (entry->gw_valid && fe->gw_valid) {
+				if (fe->gw == entry->gw)
+					return tentry;
 
-			continue;
+				continue;
+			}
+
+			if (fe->dst != entry->dst)
+				continue;
+
+			if (fe->dst_len != entry->dst_len)
+				continue;
+
+			return tentry;
 		}
 
-		if (fe->dst != entry->dst)
+		if (entry->gw_valid && fe->gw_valid)
+			if (!memcmp(fe->gw6, entry->gw6, sizeof(fe->gw6)))
+				return tentry;
+
+		if (fe->dst6_plen != entry->dst6_plen)
 			continue;
 
-		if (fe->dst_len != entry->dst_len)
-			continue;
-
-		return tentry;
+		if (!memcmp(fe->dst6, entry->dst6, sizeof(fe->dst6)))
+			return tentry;
 	}
 	return NULL;
 }
@@ -585,18 +668,26 @@ pan_sw_l3_neigh_update(struct fib_entry *entry)
 
 	/* Check if it is a host ? */
 	entry->dst_len = 32;
+	entry->dst6_plen = 128;
 	tnode = pan_sw_l3_fib_h_tbl_lookup(entry);
 	if (!tnode) {
 		/* Check if it a gw */
 		entry->gw_valid = 1;
 		entry->gw = entry->dst;
+		memcpy(entry->gw6, entry->dst6, sizeof(entry->gw6));
 		tnode = pan_sw_l3_fib_h_tbl_lookup(entry);
 	}
 
 	if (!tnode) {
-		pr_debug("%s:%d Failed to find tnode for dst=%#x entry->mac=%pM\n",
-			 __func__, __LINE__,
-			 entry->dst, entry->mac);
+		if (entry->ipv6)
+			pr_debug("%s:%d Failed to find tnode for dst=%#x entry->mac=%pM\n",
+				 __func__, __LINE__,
+				 entry->dst, entry->mac);
+		else
+			pr_debug("%s:%d Failed to find tnode for dst=%pI6 entry->mac=%pM\n",
+				 __func__, __LINE__,
+				 entry->dst6, entry->mac);
+
 		return -ESRCH;
 	}
 
@@ -607,23 +698,52 @@ pan_sw_l3_neigh_update(struct fib_entry *entry)
 		if (ether_addr_equal(fe->mac, entry->mac))
 			return 0;
 
-		pr_debug("%s:%d Changing mac to %pM from %pM for DST=%#x gw=%#x\n",
-			 __func__, __LINE__,
-			 fe->mac, entry->mac, entry->dst, entry->gw);
+		if (entry->ipv6)
+			pr_debug("%s:%d Changing mac to %pM from %pM for DST=%pI6 gw=%#x\n",
+				 __func__, __LINE__,
+				 fe->mac, entry->mac, entry->dst6, entry->gw);
+
+		else
+			pr_debug("%s:%d Changing mac to %pM from %pM for DST=%#x gw=%#x\n",
+				 __func__, __LINE__,
+				 fe->mac, entry->mac, entry->dst, entry->gw);
 		ether_addr_copy(fe->mac, entry->mac);
 		fe->mac_valid = 1;
 		return 0;
 	}
 
 	if (fe->nud_state == NUD_FAILED) {
-		pr_debug("%s:%d Resetting mac to 0 from %pM for DST=%#x gw=%#x\n",
-			 __func__, __LINE__,
-			 fe->mac, entry->dst, entry->gw);
+		if (entry->ipv6)
+			pr_debug("%s:%d Resetting mac to 0 from %pM for DST=%pI6 gw=%pI6\n",
+				 __func__, __LINE__,
+				 fe->mac, entry->dst6, entry->gw6);
+		else
+			pr_debug("%s:%d Resetting mac to 0 from %pM for DST=%#x gw=%#x\n",
+				 __func__, __LINE__,
+				 fe->mac, entry->dst, entry->gw);
 		fe->mac_valid = 0;
 		eth_zero_addr(fe->mac);
 	}
 
 	return 0;
+}
+
+static struct pan_sw_l3_offl_tnode *__pan_sw_l3_tnode_alloc(void)
+{
+	struct pan_sw_l3_offl_tnode *tnode;
+
+	tnode = kcalloc(1, sizeof(*tnode), GFP_ATOMIC);
+	if (!tnode) {
+		pr_err("%s:%d Memory allocation failed\n",
+		       __func__, __LINE__);
+		return NULL;
+	}
+
+	INIT_HLIST_NODE(&tnode->lh);
+	INIT_HLIST_NODE(&tnode->hnode);
+	INIT_HLIST_NODE(&tnode->hnode2);
+	tnode->node = NULL;
+	return tnode;
 }
 
 static struct pan_sw_l3_offl_tnode *
@@ -634,20 +754,20 @@ pan_sw_l3_tnode_alloc(struct otx2_nic *pf,
 	struct pan_sw_l3_offl_tnode *tnode;
 	struct pan_sw_l3_offl_node *node;
 
-	tnode = kcalloc(1, sizeof(*tnode), GFP_KERNEL);
+	tnode = __pan_sw_l3_tnode_alloc();
 	if (!tnode)
 		return NULL;
 
 	tnode->node = kcalloc(1, sizeof(*tnode->node), GFP_KERNEL);
-	INIT_HLIST_NODE(&tnode->lh);
-	INIT_HLIST_NODE(&tnode->hnode);
-	INIT_HLIST_NODE(&tnode->hnode2);
 	node = tnode->node;
 
 	node->port_id = entry->port_id;
 	node->jiffies = jiffies;
 	node->pf = pf;
 	node->match_id = pan_rvu_alloc_matchid();
+	if (entry->ipv6)
+		pan_insert_match_id(node->match_id);
+
 	node->mcam_idx = -1;
 
 	node->entry = kcalloc(1, sizeof(*entry), GFP_KERNEL);
@@ -664,13 +784,15 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 	struct pan_sw_l3_offl_tnode *tn = NULL, *walk;
 	struct pan_sw_l3_offl_node *node = tnode->node;
 	struct fib_entry *entry = node->entry;
+	DECLARE_BITMAP(mask6, 128);
+	u32 *dst, *mptr;
+	bool set;
 	u32 sbit;
 	u32 cnt;
-	u32 dst;
 
 	pan_sw_l3_fib_dump(entry);
 
-	if (entry->gw_valid) {
+	if (entry->gw_valid && ipv6_addr_any((struct in6_addr *)entry->dst6)) {
 		pan_sw_l3_fib_h_tbl_add_entry(tnode);
 
 		if (!root) {
@@ -715,17 +837,22 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 	kfree(tnode);
 
 	walk = root;
-	cnt = entry->dst_len;
-	dst = entry->dst;
-	sbit = 31;
+	cnt = 128;
+
+	sbit = 127;
+	bitmap_zero(mask6, 128);
+	dst = entry->ipv6 ? entry->dst6 : &entry->dst;
+	mptr = (u32 *)mask6;
 
 	while (cnt) {
-		u32 mask = 1 << sbit;
+		bitmap_set(mask6, sbit, 1);
 
 		if (!tn)
-			tn = kcalloc(1, sizeof(*tn), GFP_ATOMIC);
+			tn = __pan_sw_l3_tnode_alloc();
 
-		if (dst & mask) {
+		set = !!(dst[0] & mptr[0] || dst[1] & mptr[1] ||
+			 dst[2] & mptr[2] || dst[3] & mptr[3]);
+		if (set) {
 			if (!walk->r) {
 				walk->r = tn;
 				tn->p = walk;
@@ -740,6 +867,7 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 			}
 			walk = walk->l;
 		}
+		bitmap_clear(mask6, sbit, 1);
 		sbit--;
 		cnt--;
 	}
@@ -747,8 +875,12 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 	walk->node = node;
 	pan_sw_l3_fib_h_tbl_add_entry(walk);
 
-	pr_debug("%s:%d new route dst=%#x dst_len=%d got Added, match_id=%d\n",
-		 __func__, __LINE__, entry->dst, entry->dst_len, node->match_id);
+	if (entry->ipv6)
+		pr_debug("%s:%d new route dst=%pI6 dst_len=%d got Added, match_id=%d\n",
+			 __func__, __LINE__, entry->dst6, entry->dst6_plen, node->match_id);
+	else
+		pr_debug("%s:%d new route dst=%#x dst_len=%d got Added, match_id=%d\n",
+			 __func__, __LINE__, entry->dst, entry->dst_len, node->match_id);
 
 	return 0;
 }
@@ -757,10 +889,16 @@ static int
 pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool *me_deleted)
 {
 	struct pan_sw_l3_offl_tnode *tn, *walk, *p, *next;
-	u32 sbit, cnt, dst;
+	u32 sbit, cnt, *dst, *mptr;
+	DECLARE_BITMAP(mask6, 128);
+	bool set;
 
-	pr_debug("%s:%d route DEL request for  dst=%#x dst_len=%d got Added\n",
-		 __func__, __LINE__, entry->dst, entry->dst_len);
+	if (entry->ipv6)
+		pr_debug("%s:%d route DEL request for  dst=%pI6 dst_len=%d got Added\n",
+			 __func__, __LINE__, entry->dst6, entry->dst_len);
+	else
+		pr_debug("%s:%d route DEL request for  dst=%#x dst_len=%d got Added\n",
+			 __func__, __LINE__, entry->dst, entry->dst_len);
 
 	*me_deleted = false;
 
@@ -778,8 +916,12 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool 
 		*match_id = tn->node->match_id;
 		*mcam_idx = tn->node->mcam_idx;
 
-		kfree(tn->node->entry);
 		pan_rvu_free_matchid(tn->node->match_id);
+
+		if (tn->node->entry->ipv6)
+			pan_erase_match_id(tn->node->match_id);
+
+		kfree(tn->node->entry);
 
 		kfree(tn->node);
 		tn->node = NULL;
@@ -827,18 +969,23 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool 
 	pan_sw_l3_fib_h_tbl_del_entry(tn);
 	hlist_del_init(&tn->lh);
 
-	sbit = 31;
-	cnt = entry->dst_len;
-	dst = entry->dst;
+	sbit = 127;
+	dst = entry->ipv6 ? entry->dst6 : &entry->dst;
 	walk = root;
-	while (cnt) {
-		u32 mask = 1 << sbit;
 
-		if (dst & mask)
+	cnt = 128;
+	bitmap_zero(mask6, 128);
+	mptr = (u32 *)mask6;
+	while (cnt) {
+		bitmap_set(mask6, sbit, 1);
+		set = !!(dst[0] & mptr[0] || dst[1] & mptr[1] ||
+			 dst[2] & mptr[2] || dst[3] & mptr[3]);
+		if (set)
 			walk = walk->r;
 		else
 			walk = walk->l;
 
+		bitmap_clear(mask6, sbit, 1);
 		sbit--;
 		cnt--;
 	}
@@ -950,6 +1097,8 @@ static int pan_sw_l3_remove_one_fl_tb_entry(int mcam_idx, int match_id)
 	int err;
 
 	pan_tuple_hash_set(&tuple, match_id);
+	tuple.flags = pan_is_match_id_ipv4(match_id) ? PAN_TUPLE_FLAG_L3_PROTO_V4 :
+		PAN_TUPLE_FLAG_L3_PROTO_V6;
 	err = pan_fl_tbl_offl_del(&tuple);
 	if (err) {
 		pr_debug("%s:%d Failed to del tbl flow mcam=%d match_id=%d\n",
@@ -962,9 +1111,31 @@ static int pan_sw_l3_remove_one_fl_tb_entry(int mcam_idx, int match_id)
 
 int pan_sw_l3_ev_enq(struct otx2_nic *otx2_nic, int cnt, struct fib_entry *fe)
 {
+	struct pan_rvu_gbl_t *gbl;
+	u64 npc_rx_features;
 	struct pan_sw_l3_ev *ev;
-	int sz = sizeof(*ev) + cnt * sizeof(*fe);
+	int sz;
 
+	if (fe->ipv6) {
+		gbl = pan_rvu_get_gbl();
+		npc_rx_features = gbl->npc_rx_features;
+
+		if (!(npc_rx_features & BIT_ULL(NPC_SIP_IPV6))) {
+			pan_stats_err_inc(PAN_STAT_ERR_UNSUPP_IPV6_RL_PUSH);
+			pr_debug("%s:%d No ipv6 SIP support in profile\n",
+				 __func__, __LINE__);
+			return -EOPNOTSUPP;
+		}
+
+		if (!(npc_rx_features & BIT_ULL(NPC_DIP_IPV6))) {
+			pan_stats_err_inc(PAN_STAT_ERR_UNSUPP_IPV6_RL_PUSH);
+			pr_debug("%s:%d No ipv6 DIP support in profile\n",
+				 __func__, __LINE__);
+			return -EOPNOTSUPP;
+		}
+	}
+
+	sz = sizeof(*ev) + cnt * sizeof(*fe);
 	ev = kcalloc(1, sz, GFP_KERNEL);
 	if (!ev)
 		return -ENOMEM;
@@ -1005,18 +1176,28 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 		case OTX2_FIB_ENTRY_REPLACE:
 			tnode =	pan_sw_l3_tnode_alloc(pf, switch_id, entry);
 			if (!tnode) {
-				pr_err("%s:%d tnode creation failed for dst=%#x dst_len=%d gw=%#x\n",
-				       __func__, __LINE__,
-				       entry->dst, entry->dst_len, entry->gw);
+				if (entry->ipv6)
+					pr_err("%s:%d tnode creation failed for dst=%pI6 dst_len=%d gw=%pI6\n",
+					       __func__, __LINE__,
+					       entry->dst6, entry->dst6_plen, entry->gw6);
+				else
+					pr_err("%s:%d tnode creation failed for dst=%#x dst_len=%d gw=%#x\n",
+					       __func__, __LINE__,
+					       entry->dst, entry->dst_len, entry->gw);
 				continue;
 			}
 
 			spin_lock(&offl_l3_lock);
 			tmp = pan_sw_l3_fib_h_tbl_lookup(entry);
 			if (tmp) {
-				pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x already exist\n",
-					 __func__, __LINE__,
-					 entry->dst, entry->dst_len, entry->gw);
+				if (entry->ipv6)
+					pr_debug("%s:%d dst=%pI6 dst_len=%d gw=%pI6 already exist\n",
+						 __func__, __LINE__,
+						 entry->dst6, entry->dst6_plen, entry->gw6);
+				else
+					pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x already exist\n",
+						 __func__, __LINE__,
+						 entry->dst, entry->dst_len, entry->gw);
 
 				spin_unlock(&offl_l3_lock);
 				kfree(tnode->node->entry);
@@ -1030,9 +1211,15 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 			pan_sw_l3_route_add(tnode);
 
 			spin_unlock(&offl_l3_lock);
-			pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x got added\n",
-				 __func__, __LINE__,
-				 entry->dst, entry->dst_len, entry->gw);
+			if (entry->ipv6)
+				pr_debug("%s:%d dst=%pI6 dst_len=%d gw=%pI6 got added\n",
+					 __func__, __LINE__,
+					 entry->dst6, entry->dst6_plen, entry->gw6);
+
+			else
+				pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x got added\n",
+					 __func__, __LINE__,
+					 entry->dst, entry->dst_len, entry->gw);
 			*reshuffle = true;
 			break;
 
@@ -1042,9 +1229,14 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 			tmp = pan_sw_l3_fib_h_tbl_lookup(entry);
 			spin_unlock(&offl_l3_lock);
 			if (!tmp) {
-				pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x does not exist\n",
-					 __func__, __LINE__,
-					 entry->dst, entry->dst_len, entry->gw);
+				if (entry->ipv6)
+					pr_debug("%s:%d dst=%pI6 dst_len=%d gw=%pI6does not exist\n",
+						 __func__, __LINE__,
+						 entry->dst6, entry->dst6_plen, entry->gw6);
+				else
+					pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x does not exist\n",
+						 __func__, __LINE__,
+						 entry->dst, entry->dst_len, entry->gw);
 				continue;
 			}
 
@@ -1059,9 +1251,15 @@ pan_sw_l3_process(struct otx2_nic *pf, u32 switch_id,
 						 __func__, __LINE__, mcam_idx, match_id);
 			}
 
-			pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x got deleted err=%d\n",
-				 __func__, __LINE__,
-				 entry->dst, entry->dst_len, entry->gw, err);
+			if (entry->ipv6)
+				pr_debug("%s:%d dst=%pI6 dst_len=%d gw=%pI6 got deleted err=%d\n",
+					 __func__, __LINE__,
+					 entry->dst6, entry->dst6_plen, entry->gw6, err);
+			else
+				pr_debug("%s:%d dst=%#x dst_len=%d gw=%#x got deleted err=%d\n",
+					 __func__, __LINE__,
+					 entry->dst, entry->dst_len, entry->gw, err);
+
 			*reshuffle = true;
 			break;
 
@@ -1101,45 +1299,82 @@ static int pan_sw_l3_ev_process(bool *reshuffle)
 	return 0;
 }
 
-static void pan_sw_l3_fib_entry_dump(struct pan_sw_l3_offl_node *node,
-				     struct seq_file *m)
+static void pan_sw_l3_fib_v6_entry_dump(struct pan_sw_l3_offl_node *node,
+					struct seq_file *m)
 {
+	const char *ip6_fmt = "%pI6c\t%d\t%pI6c\t\t%pM\t%#x\t%d\t\t%d\n";
+	struct in6_addr zero_ipv6_addr = { 0 };
 	struct fib_entry *entry = node->entry;
 
 	if (entry->gw_valid) {
-		seq_printf(m, "0.0.0.0\t\t%d\t%pI4h\t%pM\t%#x\t%d\t\t%d\n",
-			   entry->dst_len, &entry->gw, entry->mac, node->port_id,
+		seq_printf(m, ip6_fmt, &zero_ipv6_addr, entry->dst6_plen,
+			   &entry->gw6, entry->mac, node->port_id,
 			   node->match_id, node->mcam_idx);
 
 		return;
 	}
 
-	seq_printf(m, "%pI4h\t%d\t0.0.0.0\t\t%pM\t%#x\t%d\t\t%d\n",
-		   &entry->dst, entry->dst_len, entry->mac, node->port_id,
+	seq_printf(m, ip6_fmt, &entry->dst6, entry->host ? 128 : entry->dst6_plen,
+		   &zero_ipv6_addr, entry->mac, node->port_id,
 		   node->match_id, node->mcam_idx);
 }
 
+static void pan_sw_l3_fib_v4_entry_dump(struct pan_sw_l3_offl_node *node,
+					struct seq_file *m)
+{
+	const char *ip4_fmt = "%pI4h\t%d\t%pI4h\t\t%pM\t%#x\t%d\t\t%d\n";
+	struct in_addr zero_ipv4_addr = { 0 };
+	struct fib_entry *entry = node->entry;
+
+	if (entry->gw_valid) {
+		seq_printf(m, ip4_fmt, &zero_ipv4_addr, entry->dst_len,
+			   &entry->gw, entry->mac, node->port_id,
+			   node->match_id, node->mcam_idx);
+		return;
+	}
+
+	seq_printf(m, ip4_fmt, &entry->dst, entry->dst_len,
+		   &zero_ipv4_addr, entry->mac, node->port_id,
+		   node->match_id, node->mcam_idx);
+}
+
+static void pan_sw_l3_fib_entry_dump(struct pan_sw_l3_offl_node *node,
+				     struct seq_file *m, bool print_v6)
+{
+	struct fib_entry *entry = node->entry;
+	bool is_node_ipv6 = !!entry->ipv6;
+
+	if (print_v6 != is_node_ipv6)
+		return;
+
+	if (print_v6)
+		return  pan_sw_l3_fib_v6_entry_dump(node, m);
+
+	return pan_sw_l3_fib_v4_entry_dump(node, m);
+}
+
 static void
-pan_sw_l3_offl_tnode_traverse(struct pan_sw_l3_offl_tnode *walk, struct seq_file *m)
+pan_sw_l3_offl_tnode_traverse(struct pan_sw_l3_offl_tnode *walk,
+			      struct seq_file *m, bool print_ipv6)
 {
 	struct pan_sw_l3_offl_tnode *pos;
 
 	if (!walk)
 		return;
 
-	pan_sw_l3_offl_tnode_traverse(walk->l, m);
-	pan_sw_l3_offl_tnode_traverse(walk->r, m);
+	pan_sw_l3_offl_tnode_traverse(walk->l, m, print_ipv6);
+	pan_sw_l3_offl_tnode_traverse(walk->r, m, print_ipv6);
 
 	if (!walk->node)
 		return;
 
 	if (walk != root) {
-		pan_sw_l3_fib_entry_dump(walk->node, m);
+		pan_sw_l3_fib_entry_dump(walk->node, m, print_ipv6);
 		return;
 	}
 
 	hlist_for_each_entry(pos, &fib_root_lh, lh)
-		pan_sw_l3_fib_entry_dump(pos->node, m);
+		pan_sw_l3_fib_entry_dump(pos->node, m, print_ipv6);
 }
 
 static int pan_sw_l3_show(struct seq_file *m, void *v)
@@ -1148,7 +1383,8 @@ static int pan_sw_l3_show(struct seq_file *m, void *v)
 	seq_puts(m, "Dest\t\tMask\tGW\t\tMAC\t\t\tPcifunc\tmatch_id\tmcam_idx\n");
 
 	spin_lock(&offl_l3_lock);
-	pan_sw_l3_offl_tnode_traverse(root, m);
+	pan_sw_l3_offl_tnode_traverse(root, m, false);
+	pan_sw_l3_offl_tnode_traverse(root, m, true);
 	spin_unlock(&offl_l3_lock);
 
 	return 0;
@@ -1187,9 +1423,11 @@ int pan_sw_l3_init(void)
 
 	pan_sw_l3_fib_wq = alloc_workqueue("pan_sw_l3_fib_wq", 0, 0);
 
+	bitmap_zero(valid_route, MAX_FIB_NODES);
+
 	otx2_nic = pan_rvu_get_pan_nic();
 
-	for (i = 0; i < 33; i++)
+	for (i = 0; i < MAX_FIB_NODES; i++)
 		INIT_HLIST_HEAD(&fib_hnodes[i]);
 
 	pan_sw_l3_debugfs_add();

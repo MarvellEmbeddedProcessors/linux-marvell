@@ -25,6 +25,7 @@ static DEFINE_SPINLOCK(l2_offl_lock);
 static struct otx2_nic *otx2_nic;
 
 static DEFINE_HASHTABLE(mac_h_tbl, 8);
+static DEFINE_STATIC_KEY_FALSE(ipv6_support);
 
 static inline unsigned int pan_sw_l2_mac_hash(const u8 *mac)
 {
@@ -184,9 +185,20 @@ static int pan_sw_l2_del_flow_tbl(struct pan_sw_l2_offl_node *node)
 	int err;
 
 	pan_tuple_hash_set(&tuple, node->match_id);
+	tuple.flags = PAN_TUPLE_FLAG_L3_PROTO_V4;
 	err = pan_fl_tbl_offl_del(&tuple);
 	if (err) {
-		pr_err("Failed to del tbl flow\n");
+		pr_err("Failed to del from v4 tbl flow\n");
+		return err;
+	}
+
+	if (!static_branch_unlikely(&ipv6_support))
+		return 0;
+
+	tuple.flags = PAN_TUPLE_FLAG_L3_PROTO_V6;
+	err = pan_fl_tbl_offl_del(&tuple);
+	if (err) {
+		pr_err("Failed to del from v6 tbl flow\n");
 		return err;
 	}
 
@@ -195,8 +207,8 @@ static int pan_sw_l2_del_flow_tbl(struct pan_sw_l2_offl_node *node)
 
 static int pan_sw_l2_add_flow_tbl(struct pan_sw_l2_offl_node *node)
 {
+	struct pan_tuple *tuple, ipv6_tuple = { 0 };
 	struct pan_fl_tbl_res res = { 0 };
-	struct pan_tuple *tuple;
 	u16 npc_matchid;
 	u16 pcifunc;
 	int err;
@@ -227,7 +239,19 @@ static int pan_sw_l2_add_flow_tbl(struct pan_sw_l2_offl_node *node)
 	/* MAC addr copied won't affect hash */
 	err = pan_fl_tbl_add(tuple, &res, NULL);
 	if (err) {
-		pr_err("Failed to add tbl flow\n");
+		pr_err("Failed to add v4 tbl flow\n");
+		return err;
+	}
+
+	if (!static_branch_unlikely(&ipv6_support))
+		return 0;
+
+	ipv6_tuple.flags = PAN_TUPLE_FLAG_L3_PROTO_V6;
+	ether_addr_copy(ipv6_tuple.dmac, node->mac);
+	pan_tuple_hash_set(&ipv6_tuple, npc_matchid);
+	err = pan_fl_tbl_add(&ipv6_tuple, &res, NULL);
+	if (err) {
+		pr_err("Failed to add v6 tbl flow\n");
 		return err;
 	}
 
@@ -257,13 +281,14 @@ static int pan_sw_l2_offl_hw(struct pan_sw_l2_offl_node *node,
 	return 0;
 }
 
+static struct pan_tuple v6_tuple = { .flags = PAN_TUPLE_FLAG_L3_PROTO_V6, };
 static void pan_sw_l2_dwork(struct work_struct *dwork)
 {
+	unsigned long long hits4, hits6, tot;
 	struct pan_sw_l2_offl_node *node;
 	struct swdev2af_notify_req *req;
 	struct otx2_nic *pan;
 	unsigned long timeout;
-	unsigned long long hits;
 	int ret;
 	u16 mcam_idx;
 	int iter = 3;
@@ -340,14 +365,21 @@ static void pan_sw_l2_dwork(struct work_struct *dwork)
 			node->jiffies = jiffies;
 
 			/* TODO: race with hits ? */
-			ret =  __pan_fl_tbl_offl_get_hit_cnt(&node->tuple, &hits);
+			ret =  __pan_fl_tbl_offl_get_hit_cnt(&node->tuple, &hits4);
 			if (ret)
 				break;
 
-			if (node->hits == hits)
+			hits6 = 0;
+			if (static_branch_unlikely(&ipv6_support)) {
+				pan_tuple_hash_set(&v6_tuple, pan_tuple_hash_get(&node->tuple));
+				ret =  __pan_fl_tbl_offl_get_hit_cnt(&v6_tuple, &hits6);
+			}
+
+			tot = hits4 + hits6;
+			if (node->hits == tot)
 				break;
 
-			node->hits = hits;
+			node->hits = tot;
 
 			pr_debug("UPdating mac=%pM port_id=%#x\n", node->mac, node->port_id);
 
@@ -452,6 +484,18 @@ pan_sw_l2_offl_ev_enq(struct otx2_nic *pf, u32 switch_id,
 int pan_sw_l2_ev_enq(struct otx2_nic *pf, u32 switch_id,
 		     unsigned int port_id, u8 *mac, u64 flags)
 {
+	struct pan_rvu_gbl_t *gbl;
+	u64 npc_rx_features;
+
+	gbl = pan_rvu_get_gbl();
+	npc_rx_features = gbl->npc_rx_features;
+
+	if (!(npc_rx_features & BIT_ULL(NPC_DMAC))) {
+		pr_err("%s:%d No DMAC support in profile\n",
+		       __func__, __LINE__);
+		return -EOPNOTSUPP;
+	}
+
 	if (flags & FDB_ADD)
 		return pan_sw_l2_offl_ev_enq(pf, switch_id, port_id, mac);
 
@@ -506,7 +550,17 @@ static int pan_sw_l2_debugfs_add(void)
 
 int pan_sw_l2_init(void)
 {
+	struct pan_rvu_gbl_t *gbl;
+	u64 npc_rx_features, mask;
+
 	otx2_nic = pan_rvu_get_pan_nic();
+
+	gbl = pan_rvu_get_gbl();
+	npc_rx_features = gbl->npc_rx_features;
+	mask = BIT_ULL(NPC_SIP_IPV6) | BIT_ULL(NPC_DIP_IPV6);
+
+	if ((npc_rx_features & mask) == mask)
+		static_branch_enable(&ipv6_support);
 
 	hash_init(mac_h_tbl);
 

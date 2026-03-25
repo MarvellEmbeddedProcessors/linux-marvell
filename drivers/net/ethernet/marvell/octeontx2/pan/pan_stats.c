@@ -19,6 +19,7 @@ static struct pan_stats_err stats_err;
 static char *pan_stats_err_name[PAN_STATS_ERR_MAX] = {
 	[PAN_STAT_ERR_SIP_NEIGH]	= "ERR_SIP_NEIGH :",
 	[PAN_STAT_ERR_DIP_NEIGH]	= "ERR_DIP_NEIGH :",
+	[PAN_STAT_ERR_NEIGH_CREATE]	= "ERR_NEIGH_CREATE :",
 	[PAN_STAT_ERR_DEV]		= "ERR_DEV :",
 	[PAN_STAT_ERR_NO_SMAC_L2_HASH]	= "NO_SMAC_L2_HASH :",
 	[PAN_STAT_ERR_NO_DMAC_L2_HASH]	= "NO_DMAC_L2_HASH :",
@@ -27,6 +28,7 @@ static char *pan_stats_err_name[PAN_STATS_ERR_MAX] = {
 	[PAN_STAT_ERR_FEATURE]		= "ERR_FEATURE :",
 	[PAN_STAT_ERR_FL_CNT]		= "ERR_FL_CNT : ",
 	[PAN_STAT_ERR_INVAL_ETYPE]	= "INVAL_ETYPE :",
+	[PAN_STAT_ERR_UNSUPP_IPV6_RL_PUSH] = "UNSUPP IPv6 RL PUSH :"
 };
 
 static int pan_stats_err_dbg_show(struct seq_file *s, void *file)

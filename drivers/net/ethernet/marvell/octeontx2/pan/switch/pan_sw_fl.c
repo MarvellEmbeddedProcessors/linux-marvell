@@ -69,6 +69,21 @@ pan_sw_fl_ev_enq(struct otx2_nic *pf, u16 switch_id, u32 port_id,
 		 unsigned long cookie)
 {
 	struct pan_sw_fl_ev *fl_ev_node;
+	struct pan_rvu_gbl_t *gbl;
+	bool is_ipv6;
+	u64 npc_rx_features;
+
+	gbl = pan_rvu_get_gbl();
+	npc_rx_features = gbl->npc_rx_features;
+
+	is_ipv6 = !!(ftuple->is_ipv6);
+	if (is_ipv6 &&
+	    !(npc_rx_features & (BIT_ULL(NPC_SIP_IPV6) | BIT_ULL(NPC_DIP_IPV6)))) {
+		pan_stats_err_inc(PAN_STAT_ERR_UNSUPP_IPV6_RL_PUSH);
+		pr_debug("%s:%d No ipv6 SIP support in profile\n",
+			 __func__, __LINE__);
+		return -EOPNOTSUPP;
+	}
 
 	fl_ev_node = kcalloc(1, sizeof(*fl_ev_node), GFP_KERNEL);
 	if (!fl_ev_node)
@@ -212,6 +227,8 @@ static int pan_sw_fl_del(unsigned long cookie)
 	pan_sw_fl_hw_del_n_free(fl->mcam_idx, cnt);
 
 	pan_tuple_hash_set(&tuple, fl->match_id[0]);
+	tuple.flags = pan_is_match_id_ipv4(fl->match_id[0]) ? PAN_TUPLE_FLAG_L3_PROTO_V4 :
+		PAN_TUPLE_FLAG_L3_PROTO_V6;
 	err = pan_fl_tbl_offl_del(&tuple);
 	if (err) {
 		pr_err("%s:%d Failed to del tbl flow match_id=%d\n",
@@ -753,6 +770,8 @@ static int pan_sw_fl_add(unsigned long cookie, struct fl_tuple *ftuple)
 	if (!(features & (BIT_ULL(NPC_DMAC) | BIT_ULL(NPC_SMAC) |
 			  BIT_ULL(NPC_DIP_IPV4) |
 			  BIT_ULL(NPC_SIP_IPV4) |
+			  BIT_ULL(NPC_DIP_IPV6) |
+			  BIT_ULL(NPC_SIP_IPV6) |
 			  BIT_ULL(NPC_ETYPE) |
 			  BIT_ULL(NPC_IPPROTO_TCP) |
 			  BIT_ULL(NPC_IPPROTO_UDP)))) {

@@ -41,6 +41,7 @@ struct pan_rvu_gbl_t {
 	struct otx2_nic *pan_nic;
 	u64 npc_rx_features;
 	u64 npc_tx_features;
+	struct xarray xa_v6_matchid;
 };
 
 struct pan_rvu_cq_info {
@@ -80,5 +81,8 @@ void pan_rvu_free_matchid(int id);
 int pan_rvu_free_mcam_entry(u16 entry);
 int pan_rvu_delete_flow(u16 entry);
 struct otx2_nic *pan_rvu_get_pan_nic(void);
+void pan_insert_match_id(u16 match_id);
+void pan_erase_match_id(u16 match_id);
+bool pan_is_match_id_ipv4(u16 match_id);
 
 #endif // PAN_RVU_H_

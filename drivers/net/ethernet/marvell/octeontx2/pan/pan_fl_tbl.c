@@ -187,13 +187,16 @@ int __pan_fl_tbl_offl_lookup_n_res(struct pan_tuple *tuple, struct pan_fl_tbl_re
 	struct pan_fl_tbl_rdx_node *rdx;
 	struct pan_fl_tbl_node *node;
 	int err = 0;
+	bool is_v4;
 
+	is_v4 = !!(tuple->flags & PAN_TUPLE_FLAG_L3_PROTO_V4);
 	rcu_read_lock_bh();
 
 	/* TODO: fix PAN_FL_TBL_TYPE_IPV4 ? */
-	rdx = radix_tree_lookup(&tbls_rdx_tree_h, PAN_FL_TBL_TYPE_IPV4);
+	rdx = radix_tree_lookup(&tbls_rdx_tree_h,
+				is_v4 ? PAN_FL_TBL_TYPE_IPV4 : PAN_FL_TBL_TYPE_IPV6);
 	if (unlikely(!rdx)) {
-		pr_err("Not able to find radix node for type=%u\n", PAN_FL_TBL_TYPE_IPV4);
+		pr_err("Not able to find radix node for type=%u\n", is_v4);
 		err = -ENOENT;
 		goto err;
 	}
@@ -226,7 +229,8 @@ int __pan_fl_tbl_lookup_n_res(struct pan_tuple *tuple, struct pan_fl_tbl_res **r
 	type = pan_fl_tbl_find_type(tuple);
 	rdx = radix_tree_lookup(&tbls_rdx_tree_h, type);
 	if (unlikely(!rdx)) {
-		pr_err("Not able to find radix node for type=%u\n", type);
+		pr_err("%s:%d Not able to find radix node for type=%u\n",
+		       __func__, __LINE__, type);
 		err = -ENOENT;
 		goto err;
 	}
@@ -266,7 +270,8 @@ int pan_fl_tbl_lookup(struct pan_tuple *tuple)
 
 	node = rhashtable_lookup_fast(&rdx->ht, tuple, rdx->rht_params);
 	if (!node) {
-		pr_err("Not able to find node\n");
+		pr_err("%s:%d Not able to find node type=%u\n",
+		       __func__, __LINE__, type);
 		PAN_TUPLE_DUMP(tuple);
 		err = -ESRCH;
 		goto err;
@@ -340,7 +345,8 @@ static int pan_fl_tbl_register_cb(struct pan_tuple *tuple, tbl_node_cb cb,
 	node = rhashtable_lookup_fast(&rdx->ht, tuple, rdx->rht_params);
 	if (!node) {
 		spin_unlock(&rdx->lock);
-		pr_err("Not able to find node\n");
+		pr_err("%s:%d Not able to find nodei, type=%u\n",
+		       __func__, __LINE__, type);
 		PAN_TUPLE_DUMP(tuple);
 		return -ESRCH;
 	}
@@ -389,12 +395,14 @@ int __pan_fl_tbl_offl_get_hit_cnt(struct pan_tuple *tuple, u64 *hits)
 {
 	struct pan_fl_tbl_rdx_node *rdx;
 	struct pan_fl_tbl_node *node;
+	enum pan_fl_tbl_type type;
 	int err = 0;
 
 	rcu_read_lock_bh();
+	type = pan_fl_tbl_find_type(tuple);
 
 	/* TODO: fix PAN_FL_TBL_TYPE_IPV4 ? */
-	rdx = radix_tree_lookup(&tbls_rdx_tree_h, PAN_FL_TBL_TYPE_IPV4);
+	rdx = radix_tree_lookup(&tbls_rdx_tree_h, type);
 	if (unlikely(!rdx)) {
 		pr_err("Not able to find radix node for type=%u\n",
 		       PAN_FL_TBL_TYPE_IPV4);
@@ -404,7 +412,8 @@ int __pan_fl_tbl_offl_get_hit_cnt(struct pan_tuple *tuple, u64 *hits)
 
 	node = rhashtable_lookup_fast(&rdx->ht, tuple, rht_offl_params);
 	if (!node) {
-		pr_err("Not able to find node\n");
+		pr_err("%s:%d Not able to find node, type=%u\n",
+		       __func__, __LINE__, type);
 		PAN_TUPLE_DUMP(tuple);
 		err = -ESRCH;
 		goto err;
@@ -556,24 +565,31 @@ int pan_fl_tbl_offl_del(struct pan_tuple *tuple)
 	struct pan_fl_tbl_res *res, *rpair;
 	struct pan_fl_tbl_rdx_node *rdx;
 	struct pan_fl_tbl_node *node;
+	struct pan_tuple dtuple = { 0 };
+	bool is_v4;
 	int err;
 
+	is_v4 = !!(tuple->flags & PAN_TUPLE_FLAG_L3_PROTO_V4);
 	rcu_read_lock_bh();
 
 	/* TODO: fix this */
-	rdx = radix_tree_lookup(&tbls_rdx_tree_h, PAN_FL_TBL_TYPE_IPV4);
+	rdx = radix_tree_lookup(&tbls_rdx_tree_h,
+				is_v4 ? PAN_FL_TBL_TYPE_IPV4 : PAN_FL_TBL_TYPE_IPV6);
 	if (unlikely(!rdx)) {
-		pr_err("Not able to find radix node for type=%u\n",
-		       PAN_FL_TBL_TYPE_IPV4);
+		pr_err("Not able to find radix node for is_v4=%u\n",
+		       is_v4);
 		err = -ENOENT;
 		goto err;
 	}
 
+	pan_tuple_hash_set(&dtuple, pan_tuple_hash_get(tuple));
+
 	spin_lock(&rdx->lock);
-	node = rhashtable_lookup_fast(&rdx->ht, tuple, rht_offl_params);
+	node = rhashtable_lookup_fast(&rdx->ht, &dtuple, rht_offl_params);
 	if (!node) {
 		spin_unlock(&rdx->lock);
-		pr_err("Not able to find node\n");
+		pr_err("%s:%d Not able to find node, is_v4=%u\n",
+		       __func__, __LINE__, is_v4);
 		PAN_TUPLE_DUMP(tuple);
 		err = -ESRCH;
 		goto err;
@@ -768,6 +784,7 @@ int pan_fl_tbl_offl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res)
 	struct pan_fl_tbl_opaque *opq = NULL;
 	struct pan_fl_tbl_node *node, *tmp;
 	struct pan_fl_tbl_rdx_node *rdx;
+	u8 tbl_type;
 	int err = 0;
 
 	node = kvzalloc(sizeof(*node), GFP_KERNEL_ACCOUNT);
@@ -790,7 +807,10 @@ int pan_fl_tbl_offl_add(struct pan_tuple *tuple, struct pan_fl_tbl_res *res)
 	rcu_read_lock_bh();
 
 	/* TODO: fix IPV4 table ? */
-	rdx = radix_tree_lookup(&tbls_rdx_tree_h, PAN_FL_TBL_TYPE_IPV4);
+	tbl_type = (tuple->flags & PAN_TUPLE_FLAG_L3_PROTO_V6) ? PAN_FL_TBL_TYPE_IPV6 :
+			PAN_FL_TBL_TYPE_IPV4;
+
+	rdx = radix_tree_lookup(&tbls_rdx_tree_h, tbl_type);
 	if (unlikely(!rdx)) {
 		pr_err("Not able to find radix node for type=%u\n",
 		       PAN_FL_TBL_TYPE_IPV4);

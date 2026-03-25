@@ -130,8 +130,16 @@ static int pan_sw_debugfs_show(struct seq_file *m, void *v)
 
 		fe = &ev->fe;
 		seq_printf(m, "%lu %s\t", ev->jiffies, sw_nb_get_cmd2str(fe->cmd));
-		seq_printf(m, "dst=%pI4h len=%u vlan_id=%#x\n", fe->gw_valid ? &fe->gw : &fe->dst,
-			   fe->dst_len, fe->vlan_tag);
+
+		if (fe->ipv6)
+			seq_printf(m, "dst=%pI6h len=%u vlan_id=%#x\n",
+				   fe->gw_valid ? fe->gw6 : fe->dst6,
+				   fe->dst6_plen, fe->vlan_tag);
+
+		else
+			seq_printf(m, "dst=%pI4h len=%u vlan_id=%#x\n",
+				   fe->gw_valid ? &fe->gw : &fe->dst,
+				   fe->dst_len, fe->vlan_tag);
 	}
 	mutex_unlock(&ev_lk);
 	return 0;

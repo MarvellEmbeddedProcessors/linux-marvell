@@ -50,8 +50,8 @@ void pan_tuple_dump2console(struct pan_tuple *tuple)
 		pr_info("(sip %pI4b),", &tuple->src_ip4);
 		pr_info("(dip %pI4b),", &tuple->dst_ip4);
 	} else {
-		pr_info("(sip %pI6b),", &tuple->src_ip6);
-		pr_info("(dip %pI6b),", &tuple->dst_ip6);
+		pr_info("(sip %pI6c),", &tuple->src_ip6);
+		pr_info("(dip %pI6c),", &tuple->dst_ip6);
 	}
 
 	pr_info("(sport %u),", ntohs(tuple->sport));
@@ -92,8 +92,8 @@ void pan_tuple_dump2sysfs(struct seq_file *m, struct pan_tuple *tuple,
 		seq_printf(m, "(sip %pI4b),", &tuple->src_ip4);
 		seq_printf(m, "(dip %pI4b),", &tuple->dst_ip4);
 	} else {
-		seq_printf(m, "(sip %pI6b),", &tuple->src_ip6);
-		seq_printf(m, "(dip %pI6b),", &tuple->dst_ip6);
+		seq_printf(m, "(sip %pI6c),", &tuple->src_ip6);
+		seq_printf(m, "(dip %pI6c),", &tuple->dst_ip6);
 	}
 
 	seq_printf(m, "(sport %u),", ntohs(tuple->sport));
