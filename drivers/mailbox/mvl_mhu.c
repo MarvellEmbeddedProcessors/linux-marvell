@@ -22,7 +22,6 @@
 #include <linux/of_irq.h>
 #include <linux/acpi.h>
 #include <linux/mailbox_controller.h>
-#include <linux/spinlock.h>
 #include <linux/soc/marvell/silicons.h>
 #include <soc/marvell/octeontx/octeontx_smc.h>
 
@@ -82,9 +81,6 @@ struct int_src_data_s {
 	uint64_t int_src_cnt;
 	uint64_t int_src_data;
 };
-
-/* Secures static data processed in the irq handler */
-DEFINE_SPINLOCK(mhu_irq_spinlock);
 
 static void mhu_set_mbox_offsets(struct mhu *mhu, bool is_cn20k)
 {
