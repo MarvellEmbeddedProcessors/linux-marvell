@@ -22,7 +22,6 @@
 #include <linux/of_irq.h>
 #include <linux/acpi.h>
 #include <linux/mailbox_controller.h>
-#include <linux/spinlock.h>
 
 #define MHU_PCHANS_NUM	1
 #define BAR0		0
@@ -108,9 +107,6 @@ struct int_src_data_s {
 	uint64_t int_src_cnt;
 	uint64_t int_src_data;
 };
-
-/* Secures static data processed in the irq handler */
-DEFINE_SPINLOCK(mhu_irq_spinlock);
 
 static irqreturn_t mhu_rx_interrupt(int irq, void *p)
 {
