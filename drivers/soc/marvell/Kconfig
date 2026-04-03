@@ -202,4 +202,12 @@ config MARVELL_OCTEON_RVU_GEN_PF
 	 PCIe FLR for VFs.
 
 	 Say ‘Yes’ to this driver if you have such a RVU PF device.
+
+config MARVELL_CN10K_DEV_SEC
+	tristate "Marvell CN10K device security driver"
+	depends on ARM64
+	default m
+	help
+	 Driver for CN10K OTP provisioning and secure boot key management.
+
 endmenu

@@ -14,3 +14,4 @@ obj-$(CONFIG_MARVELL_FWLOG) += fwlog.o
 obj-$(CONFIG_OCTEONTX_INFO) += octeontx_info.o
 obj-y		+= ptm-ep/
 obj-$(CONFIG_MARVELL_OCTEON_RVU_GEN_PF) += rvu_gen_pf/
+obj-$(CONFIG_MARVELL_CN10K_DEV_SEC) += cn10k-dev-sec/
