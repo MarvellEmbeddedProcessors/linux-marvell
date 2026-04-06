@@ -139,7 +139,9 @@ static int otx2_mbox_up_handler_sdp_rings_update(struct otx2_nic *vf,
 static int otx2_mbox_up_handler_sdp_create_vfs(struct otx2_nic *vf,
 					       struct sdp_create_vfs_req *msg,
 					       struct msg_rsp *rsp);
-
+static int otx2_mbox_up_handler_sdp_free_vfs(struct otx2_nic *vf,
+					     struct sdp_free_vfs_req *msg,
+					     struct msg_rsp *rsp);
 static int otx2vf_process_mbox_msg_up(struct otx2_nic *vf,
 				      struct mbox_msghdr *req)
 {
@@ -210,7 +212,20 @@ static int otx2vf_process_mbox_msg_up(struct otx2_nic *vf,
 							  (struct sdp_create_vfs_req *)req
 							  , rsp);
 		return err;
+	case MBOX_MSG_SDP_FREE_VFS:
+		rsp = (struct msg_rsp *)otx2_mbox_alloc_msg(&vf->mbox.mbox_up,
+						0, sizeof(struct msg_rsp));
+		if (!rsp)
+			return -ENOMEM;
 
+		rsp->hdr.id = MBOX_MSG_SDP_FREE_VFS;
+		rsp->hdr.sig = OTX2_MBOX_RSP_SIG;
+		rsp->hdr.pcifunc = req->pcifunc;
+		rsp->hdr.rc = 0;
+		err = otx2_mbox_up_handler_sdp_free_vfs(vf,
+							(struct sdp_free_vfs_req *)req
+							, rsp);
+		return err;
 	case MBOX_MSG_AF2PF_FDB_REFRESH:
 		err = otx2_mbox_up_handler_af2pf_fdb_refresh(vf,
 							     (struct af2pf_fdb_refresh_req *)req,
@@ -747,6 +762,47 @@ err_detach_rsrc:
 		qmem_free(vf->dev, vf->dync_lmt);
 	otx2_detach_resources(&vf->mbox);
 	return err;
+}
+
+static int otx2_mbox_up_handler_sdp_free_vfs(struct otx2_nic *vf,
+					     struct sdp_free_vfs_req *msg,
+					     struct msg_rsp *rsp)
+{
+	struct net_device *netdev = vf->netdev;
+
+	otx2vf_set_ethtool_ops(netdev);
+	netdev->netdev_ops = &otx2vf_netdev_ops;
+
+	netdev->netdev_ops = &otx2vf_netdev_null_ops;
+	netdev->ethtool_ops = NULL;
+
+	otx2_shutdown_qos(vf);
+
+	vf->ethtool_flags &= ~OTX2_PRIV_FLAG_DEF_MODE;
+
+	bitmap_free(vf->af_xdp_zc_qidx);
+
+	otx2_unregister_dl(vf);
+
+	otx2_shutdown_tc(vf);
+
+	otx2_mcam_flow_del(vf);
+
+	if (vf->otx2_wq) {
+		cancel_work_sync(&vf->reset_task);
+		cancel_work_sync(&vf->rx_mode_work);
+		destroy_workqueue(vf->otx2_wq);
+	}
+
+	otx2_ptp_destroy(vf);
+
+	free_percpu(vf->hw.lmt_info);
+	if (test_bit(CN10K_LMTST, &vf->hw.cap_flag))
+		qmem_free(vf->dev, vf->dync_lmt);
+
+	otx2_detach_resources(&vf->mbox);
+
+	return 0;
 }
 
 static struct otx2_nic *otx2_pci_mbox_init(struct pci_dev *pdev)
