@@ -38,11 +38,14 @@
 M(SDP_READY, 0x1001, sdp_ready, msg_req, msg_rsp)		\
 M(SDP_RINGS_ALLOC, 0x1002, sdp_rings_alloc, sdp_rings_alloc_req, sdp_rings_alloc_rsp) \
 M(SDP_RINGS_FREE, 0x1003, sdp_rings_free, sdp_rings_free_req, msg_rsp) \
-M(SDP_RINGS_DEFAULT, 0x1004, sdp_rings_default, msg_req, sdp_rings_default_rsp)
+M(SDP_RINGS_DEFAULT, 0x1004, sdp_rings_default, msg_req, sdp_rings_default_rsp) \
+M(SDP_HOST_ALLOC_VFS, 0x1005, sdp_host_alloc_vfs, sdp_host_alloc_vfs_req, msg_rsp) \
+M(SDP_HOST_FREE_VFS, 0x1006, sdp_host_free_vfs, msg_req, msg_rsp)
 
 #define MBOX_EBLOCK_UP_SDP_MESSAGES					\
 M(SDP_RINGS_UPDATE,	0xE40, sdp_rings_update, sdp_rings_cfg, msg_rsp) \
-M(SDP_CREATE_VFS,	0xE41, sdp_create_vfs, sdp_create_vfs_req, msg_rsp)
+M(SDP_CREATE_VFS,	0xE41, sdp_create_vfs, sdp_create_vfs_req, msg_rsp) \
+M(SDP_FREE_VFS,		0xE42, sdp_free_vfs, sdp_free_vfs_req, msg_rsp)
 
 enum {
 #define M(_name, _id, _1, _2, _3) MBOX_MSG_ ## _name = _id,
@@ -110,6 +113,18 @@ struct sdp_rings_default_rsp {
 };
 
 struct sdp_create_vfs_req {
+	struct mbox_msghdr hdr;
+	unsigned long vf_bmap1;
+	unsigned long vf_bmap2;
+};
+
+struct sdp_host_alloc_vfs_req {
+	struct mbox_msghdr hdr;
+	u16 nr_vfs;
+	u16 rsvd[16];	/* Reserved */
+};
+
+struct sdp_free_vfs_req {
 	struct mbox_msghdr hdr;
 	unsigned long vf_bmap1;
 	unsigned long vf_bmap2;

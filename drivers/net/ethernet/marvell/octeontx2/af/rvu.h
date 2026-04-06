@@ -299,6 +299,7 @@ struct sdp_config {
 	struct delayed_work dwork;
 	struct rvu *rvu; /* Unused for VFs pfvf struct */
 	u8 rvu_pf_num; /* Unused for VFs pfvf struct */
+	u64 nr_host_vfs;
 };
 
 #define MAX_EPFS		32

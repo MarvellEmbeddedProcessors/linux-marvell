@@ -122,10 +122,8 @@ static void cn20k_sdp_events_task(struct work_struct *work)
 {
 	struct sdp_config *pf_sdp_cfg, *target_sdp_cfg;
 	struct sdp_vf_msg *msg, *tmp;
-	struct sdp_rings_cfg *req;
 	struct rvu_pfvf *pfvf;
 	struct rvu *rvu;
-	u64 flags;
 	int pfid;
 	u16 ring;
 	int vf;
@@ -139,6 +137,9 @@ static void cn20k_sdp_events_task(struct work_struct *work)
 	list_for_each_entry_safe(msg, tmp, &pf_sdp_cfg->msg_list, list) {
 		switch (msg->id) {
 		case MBOX_MSG_SDP_RINGS_UPDATE:
+			struct sdp_rings_cfg *req;
+			u64 flags;
+
 			req = otx2_mbox_alloc_msg_sdp_rings_update(rvu, pfid);
 			if (!req) {
 				dev_err(rvu->dev, "No memory to send %s msg\n",
@@ -165,6 +166,46 @@ static void cn20k_sdp_events_task(struct work_struct *work)
 			for (ring = 0; ring < target_sdp_cfg->nr_rings; ring++)
 				req->sq2chan_map[ring] = target_sdp_cfg->channels[ring];
 			break;
+		case MBOX_MSG_SDP_CREATE_VFS:
+			struct sdp_create_vfs_req *vfs_req;
+			u64 nr_vfs = msg->flags;
+
+			vfs_req = otx2_mbox_alloc_msg_sdp_create_vfs(rvu, pfid);
+			if (!vfs_req) {
+				dev_err(rvu->dev, "No memory to send %s msg\n",
+					otx2_mbox_id2name(msg->id));
+				continue;
+			}
+			/* Set VF bitmap so gen PF driver can fwd to its VFs.
+			 * GEN PFs VF0 always exist to handle IO for host PFs
+			 * rest of the VFs handle IO for VFs of host PFs. So
+			 * a VF0 of GEN PF must not receive CREATE_VFS request
+			 * since it is always ready to handle IO of host PF.
+			 */
+			for (vf = 1; vf <= nr_vfs; vf++)
+				vf < 64 ? set_bit(vf, &vfs_req->vf_bmap1) :
+					  set_bit(vf - 64, &vfs_req->vf_bmap2);
+			break;
+		case MBOX_MSG_SDP_FREE_VFS:
+			struct sdp_free_vfs_req *free_req;
+			u64 free_vfs = msg->flags;
+
+			free_req = otx2_mbox_alloc_msg_sdp_free_vfs(rvu, pfid);
+			if (!free_req) {
+				dev_err(rvu->dev, "No memory to send %s msg\n",
+					otx2_mbox_id2name(msg->id));
+				continue;
+			}
+			/* Set VF bitmap so gen PF driver can fwd to its VFs.
+			 * GEN PFs VF0 always exist to handle IO for host PFs
+			 * rest of the VFs handle IO for VFs of host PFs. So
+			 * a VF0 of GEN PF must not receive FREE_VFS request
+			 * since it is always ready to handle IO of host PF.
+			 */
+			for (vf = 1; vf <= free_vfs; vf++)
+				vf < 64 ? set_bit(vf, &free_req->vf_bmap1) :
+					  set_bit(vf - 64, &free_req->vf_bmap2);
+			break;
 		default:
 			break;
 		}
@@ -179,8 +220,8 @@ static void cn20k_sdp_events_task(struct work_struct *work)
 	mutex_unlock(&rvu->mbox_lock);
 }
 
-static int cn20k_sdp_send_ring_msg(struct rvu *rvu, u16 target,
-				   u16 msg_id, u64 flags)
+static int cn20k_sdp_schedule_msg_to_pf(struct rvu *rvu, u16 target,
+					u16 msg_id, u64 flags)
 {
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
 	struct sdp_config *sdp_pf_cfg;
@@ -500,8 +541,9 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 	}
 
 	if (rsp->count) {
-		cn20k_sdp_send_ring_msg(rvu, rvu_pcifunc, MBOX_MSG_SDP_RINGS_UPDATE,
-					SDP_RING_F_ALLOC);
+		cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
+					     MBOX_MSG_SDP_RINGS_UPDATE,
+					     SDP_RING_F_ALLOC);
 	} else if (host_vf) { /* None of rings configuration is successful */
 		rvu_free_rsrc(&sdp->vf_rids, vf_rid);
 		sdp->vf_rsrc_map[vf_rid] = 0xFFFF;
@@ -592,12 +634,53 @@ int rvu_mbox_handler_sdp_rings_free(struct rvu *rvu,
 		}
 	}
 
-	cn20k_sdp_send_ring_msg(rvu, rvu_pcifunc, MBOX_MSG_SDP_RINGS_UPDATE,
-				SDP_RING_F_FREE);
+	cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
+				     MBOX_MSG_SDP_RINGS_UPDATE,
+				     SDP_RING_F_FREE);
 
 	mutex_unlock(&sdp->cfg_lock);
 
 	return rc;
+}
+
+int rvu_mbox_handler_sdp_host_alloc_vfs(struct rvu *rvu,
+					struct sdp_host_alloc_vfs_req *req,
+					struct msg_rsp *rsp)
+{
+	u16 rvu_pcifunc = cn20k_get_rvu_pcifunc(rvu, req->hdr.pcifunc);
+	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, rvu_pcifunc);
+	struct sdp_config *sdp_cfg = &pfvf->sdp_cfg;
+	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+
+	mutex_lock(&sdp->cfg_lock);
+
+	sdp_cfg->nr_host_vfs = req->nr_vfs;
+	cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
+				     MBOX_MSG_SDP_CREATE_VFS, req->nr_vfs);
+	mutex_unlock(&sdp->cfg_lock);
+
+	return 0;
+}
+
+int rvu_mbox_handler_sdp_host_free_vfs(struct rvu *rvu,
+				       struct msg_req *req,
+				       struct msg_rsp *rsp)
+{
+	u16 rvu_pcifunc = cn20k_get_rvu_pcifunc(rvu, req->hdr.pcifunc);
+	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, rvu_pcifunc);
+	struct sdp_config *sdp_cfg = &pfvf->sdp_cfg;
+	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+
+	mutex_lock(&sdp->cfg_lock);
+
+	cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
+				     MBOX_MSG_SDP_FREE_VFS,
+				     sdp_cfg->nr_host_vfs);
+	sdp_cfg->nr_host_vfs = 0;
+
+	mutex_unlock(&sdp->cfg_lock);
+
+	return 0;
 }
 
 int rvu_mbox_handler_sdp_rings_default(struct rvu *rvu,
