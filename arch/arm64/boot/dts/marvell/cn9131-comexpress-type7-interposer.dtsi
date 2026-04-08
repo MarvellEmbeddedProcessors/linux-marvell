@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (C) 2023 Marvell International Ltd.
+ *
+ * Device tree for the CN9131 COM Express Type 7 interposer board.
+ */
+
+#include "cn9131-db-comexpress.dtsi"
+
+/ {
+	cp1_reg_usb3_vbus1: regulator-7 {
+		compatible = "regulator-fixed";
+		regulator-name = "cp1-xhci1-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		enable-active-high;
+	};
+
+	cp1_usb3_0_phy1: usb-phy-4 {
+		compatible = "usb-nop-xceiv";
+		vcc-supply = <&cp1_reg_usb3_vbus1>;
+	};
+};
+
+&cp0_i2c0 {
+	status = "disabled";
+};
+
+&cp0_i2c1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&cp0_i2c1_pins>;
+	status = "disabled";
+};
+
+&cp0_rtc {
+	status = "disabled";
+};
+
+&cp0_mdio {
+	pinctrl-names = "default";
+};
+
+&cp0_eth0 {
+	status = "disabled";
+};
+
+&cp0_eth1 {
+	status = "disabled";
+};
+
+&cp0_pcie0 {
+	status = "disabled";
+};
+
+&cp0_pcie2 {
+	num-lanes = <1>;
+	phys = <&cp0_comphy5 2>;
+	status = "disabled";
+};
+
+&cp0_sdhci0 {
+	status = "disabled";
+};
+
+&cp1_usb3_0 {
+	status = "disabled";
+	usb-phy = <&cp1_usb3_0_phy1>;
+	phys = <&cp1_utmi0>;
+	phy-names = "utmi";
+};
+
+&cp1_usb3_1 {
+	status = "disabled";
+	usb-phy = <&cp1_usb3_0_phy0>;
+	phys = <&cp1_utmi1>;
+	phy-names = "utmi";
+};
