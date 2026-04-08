@@ -83,6 +83,15 @@ properties:
           - const: marvell,armada-ap807
 
       - description:
+          CN9131 COM Express Type 7 DB carrier board with CN9131 CPU module
+        items:
+          - const: marvell,cn9131-comexpress-type7-db-carrier
+          - const: marvell,cn9131-cpu-module
+          - const: marvell,cn9131
+          - const: marvell,armada-ap807-quad
+          - const: marvell,armada-ap807
+
+      - description:
           SolidRun CN9130 SoM based single-board computers
         items:
           - enum:
