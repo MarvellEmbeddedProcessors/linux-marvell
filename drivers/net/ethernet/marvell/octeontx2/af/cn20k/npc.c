@@ -3033,10 +3033,8 @@ void npc_cn20k_enable_mcam_entry(struct rvu *rvu, int blkaddr, int index, bool e
 	u64 cfg, hw_prio;
 	u8 kw_type;
 
-	if (index < 0 || index >= mcam->total_entries) {
-		WARN(1, "Wrong mcam index %d\n", index);
+	if (index < 0 || index >= mcam->total_entries)
 		return;
-	}
 
 	enable ? set_bit(index, npc_priv->en_map) :
 		clear_bit(index, npc_priv->en_map);
@@ -3273,10 +3271,7 @@ void npc_cn20k_config_mcam_entry(struct rvu *rvu, int blkaddr, int index, u8 int
 	int kw = 0;
 	u8 kw_type;
 
-	if (index < 0 || index >= mcam->total_entries) {
-		WARN(1, "Wrong mcam index %d\n", index);
-		return;
-	}
+	WARN_ON(index < 0 || index >= mcam->total_entries);
 
 	/* Disable before mcam entry update */
 	npc_cn20k_enable_mcam_entry(rvu, blkaddr, index, false);
@@ -3354,10 +3349,8 @@ void npc_cn20k_copy_mcam_entry(struct rvu *rvu, int blkaddr, u16 src, u16 dest)
 	int dbank, sbank;
 	int bank, i;
 
-	if (src >= mcam->total_entries || dest >= mcam->total_entries) {
-		WARN(1, "Wrong mcam index src=%u dest=%u\n", src, dest);
-		return;
-	}
+	WARN_ON(src >= mcam->total_entries);
+	WARN_ON(dest >= mcam->total_entries);
 
 	dbank = npc_get_bank(rvu, mcam, dest);
 	sbank = npc_get_bank(rvu, mcam, src);
@@ -3416,10 +3409,7 @@ void npc_cn20k_read_mcam_entry(struct rvu *rvu, int blkaddr, u16 index,
 	u64 cam0, cam1, bank_cfg;
 	u8 kw_type;
 
-	if (index >= mcam->total_entries) {
-		WARN(1, "Wrong mcam index %u\n", index);
-		return;
-	}
+	WARN_ON(index >= mcam->total_entries);
 
 	npc_mcam_idx_2_key_type(rvu, index, &kw_type);
 
@@ -3669,7 +3659,7 @@ int rvu_mbox_handler_npc_get_dft_rl_idxs(struct rvu *rvu, struct msg_req *req,
 	return 0;
 }
 
-bool npc_is_cgx_or_lbk(struct rvu *rvu, u16 pcifunc)
+static bool npc_is_cgx_or_lbk(struct rvu *rvu, u16 pcifunc)
 {
 	return is_pf_cgxmapped(rvu, rvu_get_pf(pcifunc)) ||
 		is_lbk_vf(rvu, pcifunc);
