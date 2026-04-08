@@ -253,5 +253,4 @@ const int *npc_cn20k_search_order_get(bool *restricted_order);
 int npc_mcam_idx_2_subbank_idx(struct rvu *rvu, u16 mcam_idx,
 			       struct npc_subbank **sb,
 			       int *sb_off);
-bool npc_is_cgx_or_lbk(struct rvu *rvu, u16 pcifunc);
 #endif /* NPC_CN20K_H */

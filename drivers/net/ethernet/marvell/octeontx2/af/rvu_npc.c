@@ -1246,10 +1246,6 @@ static void npc_enadis_default_entries(struct rvu *rvu, u16 pcifunc,
 	int type = NIXLF_UCAST_ENTRY;
 	int index, blkaddr;
 
-	/* only CGX or LBK interfaces have default entries */
-	if (is_cn20k(rvu->pdev) && !npc_is_cgx_or_lbk(rvu, pcifunc))
-		return;
-
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 	if (blkaddr < 0)
 		return;
@@ -1343,10 +1339,6 @@ void rvu_npc_disable_mcam_entries(struct rvu *rvu, u16 pcifunc, int nixlf)
 	struct npc_mcam *mcam = &rvu->hw->mcam;
 	struct rvu_npc_mcam_rule *rule, *tmp;
 	int blkaddr;
-
-	/* only CGX or LBK interfaces have default entries */
-	if (is_cn20k(rvu->pdev) && !npc_is_cgx_or_lbk(rvu, pcifunc))
-		return;
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 	if (blkaddr < 0)
@@ -2694,9 +2686,8 @@ void npc_mcam_clear_bit(struct npc_mcam *mcam, u16 index)
 static void npc_mcam_free_all_entries(struct rvu *rvu, struct npc_mcam *mcam,
 				      int blkaddr, u16 pcifunc)
 {
-	u16 dft_idxs[NPC_DFT_RULE_MAX_ID] = {[0 ... NPC_DFT_RULE_MAX_ID - 1] = USHRT_MAX};
+	u16 dft_idxs[NPC_DFT_RULE_MAX_ID];
 	u16 index, cntr;
-	bool dft_rl;
 	int rc;
 
 	npc_cn20k_dft_rules_idx_get(rvu, pcifunc,
@@ -2711,21 +2702,8 @@ static void npc_mcam_free_all_entries(struct rvu *rvu, struct npc_mcam *mcam,
 			continue;
 
 		mcam->entry2pfvf_map[index] = NPC_MCAM_INVALID_MAP;
-
-		dft_rl = false;
-		if (is_cn20k(rvu->pdev)) {
-			if (dft_idxs[NPC_DFT_RULE_BCAST_ID] == index ||
-			    dft_idxs[NPC_DFT_RULE_MCAST_ID] == index ||
-			    dft_idxs[NPC_DFT_RULE_PROMISC_ID] == index ||
-			    dft_idxs[NPC_DFT_RULE_UCAST_ID] == index) {
-				dft_rl = true;
-			}
-		}
-
 		/* Free the entry in bitmap */
-		if (!dft_rl)
-			npc_mcam_clear_bit(mcam, index);
-
+		npc_mcam_clear_bit(mcam, index);
 		/* Disable the entry */
 		npc_enable_mcam_entry(rvu, mcam, blkaddr, index, false);
 
@@ -2736,9 +2714,11 @@ static void npc_mcam_free_all_entries(struct rvu *rvu, struct npc_mcam *mcam,
 						      blkaddr, index,
 						      cntr);
 		mcam->entry2target_pffunc[index] = 0x0;
-
 		if (is_cn20k(rvu->pdev)) {
-			if (dft_rl)
+			if ((dft_idxs[NPC_DFT_RULE_BCAST_ID] == index) ||
+			    (dft_idxs[NPC_DFT_RULE_MCAST_ID] == index) ||
+			    (dft_idxs[NPC_DFT_RULE_PROMISC_ID] == index) ||
+			    (dft_idxs[NPC_DFT_RULE_UCAST_ID] == index))
 				continue;
 
 			rc = npc_cn20k_idx_free(rvu, &index, 1);
