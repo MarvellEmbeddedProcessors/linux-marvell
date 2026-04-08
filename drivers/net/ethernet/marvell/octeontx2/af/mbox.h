@@ -950,6 +950,7 @@ struct npc_set_pkind {
 			 */
 	u8 var_len_off_mask; /* Mask for length with in offset */
 	u8 shift_dir; /* shift direction to get length of the header at var_len_off */
+	u8 skip_size; /* l2 size to skip */
 };
 
 struct cgx_set_link_state_msg {
