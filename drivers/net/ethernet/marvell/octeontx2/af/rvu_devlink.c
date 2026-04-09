@@ -1918,6 +1918,10 @@ static const struct devlink_param rvu_af_dl_params[] = {
 			     rvu_af_dl_nix_maxlf_get,
 			     rvu_af_dl_nix_maxlf_set,
 			     rvu_af_dl_nix_maxlf_validate),
+};
+
+/* CN20K-only: NPA_AF_{INT,EXT}_REQ_DWRR registers don't exist on CN10K */
+static const struct devlink_param rvu_af_dl_param_npa_dwrr[] = {
 	DEVLINK_PARAM_DRIVER(RVU_AF_DEVLINK_PARAM_ID_NPA_INT_REQ_DWRR,
 			     "npa_internal_requestors_weights", DEVLINK_PARAM_TYPE_STRING,
 			     BIT(DEVLINK_PARAM_CMODE_RUNTIME),
@@ -2056,6 +2060,14 @@ int rvu_register_dl(struct rvu *rvu)
 				"devlink defrag params register failed with error %d", err);
 			goto err_dl_exact_match;
 		}
+
+		err = devlink_params_register(dl, rvu_af_dl_param_npa_dwrr,
+					      ARRAY_SIZE(rvu_af_dl_param_npa_dwrr));
+		if (err) {
+			dev_err(rvu->dev,
+				"devlink NPA DWRR params register failed with error %d", err);
+			goto err_dl_exact_match;
+		}
 	}
 
 	/* Register exact match devlink only for CN10K-B */
@@ -2095,6 +2107,10 @@ void rvu_unregister_dl(struct rvu *rvu)
 	devlink_unregister(dl);
 
 	devlink_params_unregister(dl, rvu_af_dl_params, ARRAY_SIZE(rvu_af_dl_params));
+
+	if (is_cn20k(rvu->pdev))
+		devlink_params_unregister(dl, rvu_af_dl_param_npa_dwrr,
+					  ARRAY_SIZE(rvu_af_dl_param_npa_dwrr));
 
 	if (!cn10k_tim_adjust_gti_errata(rvu->pdev))
 		devlink_params_unregister(dl, rvu_af_dl_param_tim_adj_gti,

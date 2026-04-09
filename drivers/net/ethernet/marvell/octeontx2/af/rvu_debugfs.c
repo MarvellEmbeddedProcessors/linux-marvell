@@ -2867,8 +2867,9 @@ static void rvu_dbg_npa_init(struct rvu *rvu)
 
 	debugfs_create_file("qsize", 0600, rvu->rvu_dbg.npa, rvu,
 			    &rvu_dbg_npa_qsize_fops);
-	debugfs_create_file("dwrr", 0400, rvu->rvu_dbg.npa, rvu,
-			    &rvu_dbg_npa_dwrr_fops);
+	if (is_cn20k(rvu->pdev))
+		debugfs_create_file("dwrr", 0400, rvu->rvu_dbg.npa, rvu,
+				    &rvu_dbg_npa_dwrr_fops);
 	debugfs_create_file("aura_ctx", 0600, rvu->rvu_dbg.npa, rvu,
 			    &rvu_dbg_npa_aura_ctx_fops);
 	if (is_cn20k(rvu->pdev))
