@@ -632,6 +632,7 @@ int rvu_mbox_handler_tim_get_hw_info(struct rvu *rvu, struct msg_req *req,
 	rsp->max_prd_timers = rvu_tim_has_inflight_wqe_errata(rvu) ?
 				      TIM_ERRATA_MAX_PERIODIC_TIMERS :
 				      0;
+	rsp->hwwqe_ver = (reg >> 35) & 0xF;
 
 	return 0;
 }

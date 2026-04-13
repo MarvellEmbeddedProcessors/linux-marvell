@@ -2804,8 +2804,10 @@ struct tim_hw_info {
 	u8	hwwqe : 1;
 	u8	intvl_ext : 1;
 	u16	max_prd_timers;
-	u8	rsvd8[2];
-	u64 rsvd[2];
+	u8	hwwqe_ver : 4;
+	u8	rsvd4 : 4;
+	u8	rsvd8;
+	u64	rsvd[2];
 };
 
 struct tim_lf_alloc_rsp {
