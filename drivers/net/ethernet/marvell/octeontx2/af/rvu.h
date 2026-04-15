@@ -1176,6 +1176,9 @@ static inline bool is_rep_dev(struct rvu *rvu, u16 pcifunc)
 
 static inline bool is_pf_cgxmapped(struct rvu *rvu, u8 pf)
 {
+	if (!rvu->pf2cgxlmac_map)
+		return false;
+
 	return ((pf >= PF_CGXMAP_BASE && pf <= rvu->cgx_mapped_pfs) ||
 		is_pf_cgxcpltmapped(rvu, pf)) &&
 		!is_sdp_pf(pf << RVU_PFVF_PF_SHIFT);
