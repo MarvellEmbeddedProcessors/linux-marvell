@@ -2289,7 +2289,6 @@ static void sdhci_cdns_mmc_hw_reset(struct mmc_host *mmc)
 
 #ifdef CONFIG_DMI
 
-static char *part_no;
 #define DMI_ENTRY_PROCESSOR_MIN_LENGTH	48
 #define DMI_PROC_PART_NUMBER		0x22
 #define DMI_MAX_STRLEN			80
@@ -2310,26 +2309,32 @@ static void find_proc_part(const struct dmi_header *dm, void *private)
 				ptr++;
 			ptr++;
 		}
-		strcpy(private, ptr);
+		strscpy(private, ptr, DMI_MAX_STRLEN);
 	}
 }
 #endif
 
 static int dmi_check_part_no(void)
 {
+	int ret = 0;
 #ifdef CONFIG_DMI
+	char *part_no;
+
 	part_no = kcalloc(DMI_MAX_STRLEN, sizeof(char), GFP_KERNEL);
-	if ((part_no) && !dmi_walk(find_proc_part, part_no)) {
+	if (!part_no)
+		return 0;
+
+	if (!dmi_walk(find_proc_part, part_no)) {
 		if (!strncmp(part_no, "MV-CN10624-A", 12) ||
 		    !strncmp(part_no, "MV-CN10624SA", 12) ||
 		    !strncmp(part_no, "MV-CN10518-A", 12)) {
-			kfree(part_no);
-			return 1;
+			ret = 1;
 		}
-		kfree(part_no);
 	}
+
+	kfree(part_no);
 #endif
-	return 0;
+	return ret;
 }
 
 static int sdhci_cdns_probe(struct platform_device *pdev)
