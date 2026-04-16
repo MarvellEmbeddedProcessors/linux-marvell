@@ -118,12 +118,15 @@ static int cn20k_get_sdp_pfs(struct rvu *rvu, u8 *sdp_pfs, u8 *count)
 static void cn20k_sdp_events_task(struct work_struct *work)
 {
 	struct sdp_config *pf_sdp_cfg, *target_sdp_cfg;
+	struct sdp_create_vfs_req *vfs_req;
+	struct sdp_free_vfs_req *free_req;
 	struct sdp_vf_msg *msg, *tmp;
+	u64 free_vfs, nr_vfs, flags;
+	struct sdp_rings_cfg *req;
 	struct rvu_pfvf *pfvf;
 	struct rvu *rvu;
-	int pfid;
+	int pfid, vf;
 	u16 ring;
-	int vf;
 
 	pf_sdp_cfg = container_of(work, struct sdp_config, dwork.work);
 	rvu = pf_sdp_cfg->rvu;
@@ -134,9 +137,6 @@ static void cn20k_sdp_events_task(struct work_struct *work)
 	list_for_each_entry_safe(msg, tmp, &pf_sdp_cfg->msg_list, list) {
 		switch (msg->id) {
 		case MBOX_MSG_SDP_RINGS_UPDATE:
-			struct sdp_rings_cfg *req;
-			u64 flags;
-
 			req = otx2_mbox_alloc_msg_sdp_rings_update(rvu, pfid);
 			if (!req) {
 				dev_err(rvu->dev, "No memory to send %s msg\n",
@@ -164,8 +164,7 @@ static void cn20k_sdp_events_task(struct work_struct *work)
 				req->sq2chan_map[ring] = target_sdp_cfg->channels[ring];
 			break;
 		case MBOX_MSG_SDP_CREATE_VFS:
-			struct sdp_create_vfs_req *vfs_req;
-			u64 nr_vfs = msg->flags;
+			nr_vfs = msg->flags;
 
 			vfs_req = otx2_mbox_alloc_msg_sdp_create_vfs(rvu, pfid);
 			if (!vfs_req) {
@@ -184,8 +183,7 @@ static void cn20k_sdp_events_task(struct work_struct *work)
 					  set_bit(vf - 64, &vfs_req->vf_bmap2);
 			break;
 		case MBOX_MSG_SDP_FREE_VFS:
-			struct sdp_free_vfs_req *free_req;
-			u64 free_vfs = msg->flags;
+			free_vfs = msg->flags;
 
 			free_req = otx2_mbox_alloc_msg_sdp_free_vfs(rvu, pfid);
 			if (!free_req) {
