@@ -3033,8 +3033,10 @@ void npc_cn20k_enable_mcam_entry(struct rvu *rvu, int blkaddr, int index, bool e
 	u64 cfg, hw_prio;
 	u8 kw_type;
 
-	if (index < 0 || index >= mcam->total_entries)
+	if (index < 0 || index >= mcam->total_entries) {
+		WARN(1, "Wrong mcam index %u\n", index);
 		return;
+	}
 
 	enable ? set_bit(index, npc_priv->en_map) :
 		clear_bit(index, npc_priv->en_map);
@@ -3271,7 +3273,10 @@ void npc_cn20k_config_mcam_entry(struct rvu *rvu, int blkaddr, int index, u8 int
 	int kw = 0;
 	u8 kw_type;
 
-	WARN_ON(index < 0 || index >= mcam->total_entries);
+	if (index < 0 || index >= mcam->total_entries) {
+		WARN(1, "Wrong mcam_idx = %d\n", index);
+		return;
+	}
 
 	/* Disable before mcam entry update */
 	npc_cn20k_enable_mcam_entry(rvu, blkaddr, index, false);
@@ -3349,8 +3354,10 @@ void npc_cn20k_copy_mcam_entry(struct rvu *rvu, int blkaddr, u16 src, u16 dest)
 	int dbank, sbank;
 	int bank, i;
 
-	WARN_ON(src >= mcam->total_entries);
-	WARN_ON(dest >= mcam->total_entries);
+	if (src >= mcam->total_entries || dest >= mcam->total_entries) {
+		WARN(1, "Wrong mcam index src=%u dest=%u\n", src, dest);
+		return;
+	}
 
 	dbank = npc_get_bank(rvu, mcam, dest);
 	sbank = npc_get_bank(rvu, mcam, src);
@@ -3409,7 +3416,10 @@ void npc_cn20k_read_mcam_entry(struct rvu *rvu, int blkaddr, u16 index,
 	u64 cam0, cam1, bank_cfg;
 	u8 kw_type;
 
-	WARN_ON(index >= mcam->total_entries);
+	if (index >= mcam->total_entries) {
+		WARN(1, "Wrong mcam index %u\n", index);
+		return;
+	}
 
 	npc_mcam_idx_2_key_type(rvu, index, &kw_type);
 
@@ -3659,7 +3669,7 @@ int rvu_mbox_handler_npc_get_dft_rl_idxs(struct rvu *rvu, struct msg_req *req,
 	return 0;
 }
 
-static bool npc_is_cgx_or_lbk(struct rvu *rvu, u16 pcifunc)
+bool npc_is_cgx_or_lbk(struct rvu *rvu, u16 pcifunc)
 {
 	return is_pf_cgxmapped(rvu, rvu_get_pf(pcifunc)) ||
 		is_lbk_vf(rvu, pcifunc);
@@ -3668,10 +3678,11 @@ static bool npc_is_cgx_or_lbk(struct rvu *rvu, u16 pcifunc)
 void npc_cn20k_dft_rules_free(struct rvu *rvu, u16 pcifunc)
 {
 	struct npc_mcam *mcam = &rvu->hw->mcam;
+	u16 ptr[4] = {[0 ... 3] = USHRT_MAX};
 	struct rvu_npc_mcam_rule *rule, *tmp;
 	unsigned long index;
+	struct xarray xa;
 	int blkaddr;
-	u16 ptr[4];
 	int rc, i;
 	void *map;
 
@@ -3694,12 +3705,14 @@ void npc_cn20k_dft_rules_free(struct rvu *rvu, u16 pcifunc)
 	if (is_lbk_vf(rvu, pcifunc)) {
 		index = NPC_DFT_RULE_ID_MK(pcifunc, NPC_DFT_RULE_PROMISC_ID);
 		map = xa_erase(&npc_priv->xa_pf2dfl_rmap, index);
-		if (!map)
+		if (!map) {
 			dev_err(rvu->dev,
 				"%s:%d Err from delete %s mcam idx from xarray (pcifunc=%#x\n",
 				__func__, __LINE__,
 				npc_dft_rule_name[NPC_DFT_RULE_PROMISC_ID],
 				pcifunc);
+			return;
+		}
 
 		goto free_rules;
 	}
@@ -3708,34 +3721,41 @@ void npc_cn20k_dft_rules_free(struct rvu *rvu, u16 pcifunc)
 	if (is_vf(pcifunc)) {
 		index = NPC_DFT_RULE_ID_MK(pcifunc, NPC_DFT_RULE_UCAST_ID);
 		map = xa_erase(&npc_priv->xa_pf2dfl_rmap, index);
-		if (!map)
+		if (!map) {
 			dev_err(rvu->dev,
 				"%s:%d Err from delete %s mcam idx from xarray (pcifunc=%#x\n",
 				__func__, __LINE__,
 				npc_dft_rule_name[NPC_DFT_RULE_UCAST_ID],
 				pcifunc);
+			return;
+		}
 
 		goto free_rules;
 	}
 
 	/* PF */
+	xa = npc_priv->xa_pf2dfl_rmap;
 	for (i = NPC_DFT_RULE_START_ID; i < NPC_DFT_RULE_MAX_ID; i++)  {
 		index = NPC_DFT_RULE_ID_MK(pcifunc, i);
 		map = xa_erase(&npc_priv->xa_pf2dfl_rmap, index);
-		if (!map)
+		if (!map) {
 			dev_err(rvu->dev,
 				"%s:%d Err from delete %s mcam idx from xarray (pcifunc=%#x\n",
 				__func__, __LINE__, npc_dft_rule_name[i],
 				pcifunc);
+			npc_priv->xa_pf2dfl_rmap = xa;
+			return;
+		}
 	}
 
 free_rules:
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
+	if (blkaddr < 0)
+		return;
 
 	for (int i = 0; i < 4; i++) {
 		if (ptr[i] == USHRT_MAX)
 			continue;
-
-		blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPC, 0);
 
 		mutex_lock(&mcam->lock);
 		npc_mcam_clear_bit(mcam, ptr[i]);
@@ -3745,10 +3765,12 @@ free_rules:
 		mutex_unlock(&mcam->lock);
 
 		rc = npc_cn20k_idx_free(rvu, &ptr[i], 1);
-		if (rc)
+		if (rc) {
 			dev_err(rvu->dev,
 				"%s:%d Error deleting default entries (pcifunc=%#x) mcam_idx=%u\n",
 				__func__, __LINE__, pcifunc, ptr[i]);
+			ptr[i] = USHRT_MAX;
+		}
 	}
 
 	mutex_lock(&mcam->lock);
