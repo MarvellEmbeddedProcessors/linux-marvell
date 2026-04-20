@@ -16,6 +16,7 @@
 #include <linux/netdevice.h>
 #include <net/switchdev.h>
 #include <linux/hashtable.h>
+#include <linux/bitmap.h>
 #include <linux/debugfs.h>
 
 #include "pan_cmn.h"
@@ -786,6 +787,7 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 	struct fib_entry *entry = node->entry;
 	DECLARE_BITMAP(mask6, 128);
 	u32 *dst, *mptr;
+	u32 tarr[4];
 	bool set;
 	u32 sbit;
 	u32 cnt;
@@ -837,11 +839,23 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 	kfree(tnode);
 
 	walk = root;
-	cnt = 128;
+
+	if (entry->ipv6)
+		cnt = entry->host ? 128 : entry->dst6_plen;
+	else
+		cnt = entry->host ? 128 : (128 - 32 + entry->dst_len);
 
 	sbit = 127;
 	bitmap_zero(mask6, 128);
-	dst = entry->ipv6 ? entry->dst6 : &entry->dst;
+	for (int i = 0; i < 4; i++)
+		tarr[i] = entry->dst6[i];
+
+	/* Tree always in big endian */
+	if (!entry->ipv6)
+		tarr[0] = htonl(tarr[0]);
+
+	dst = tarr;
+
 	mptr = (u32 *)mask6;
 
 	while (cnt) {
@@ -891,6 +905,7 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool 
 	struct pan_sw_l3_offl_tnode *tn, *walk, *p, *next;
 	u32 sbit, cnt, *dst, *mptr;
 	DECLARE_BITMAP(mask6, 128);
+	u32 tarr[4];
 	bool set;
 
 	if (entry->ipv6)
@@ -946,6 +961,11 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool 
 		next = hlist_entry(fib_root_lh.first,
 				   struct pan_sw_l3_offl_tnode,
 				   lh);
+
+		/* There could be nodes under root; */
+		if (!next)
+			return 0;
+
 		hlist_del_init(&root->lh);
 		next->l = root->l;
 		next->r = root->r;
@@ -970,10 +990,20 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool 
 	hlist_del_init(&tn->lh);
 
 	sbit = 127;
-	dst = entry->ipv6 ? entry->dst6 : &entry->dst;
+	for (int i = 0; i < 4; i++)
+		tarr[i] = entry->dst6[i];
+
+	if (!entry->ipv6)
+		tarr[0] = htonl(tarr[0]);
+
+	dst = tarr;
 	walk = root;
 
-	cnt = 128;
+	if (entry->ipv6)
+		cnt = entry->host ? 128 : entry->dst6_plen;
+	else
+		cnt = entry->host ? 128 : (128 - 32 + entry->dst_len);
+
 	bitmap_zero(mask6, 128);
 	mptr = (u32 *)mask6;
 	while (cnt) {
@@ -1042,51 +1072,67 @@ pan_sw_l3_route_lookup(u32 dst)
 	struct pan_sw_l3_offl_tnode *walk, *cur = NULL;
 	struct pan_rvu_gbl_t *pan_rvu_gbl;
 	struct fib_entry *entry;
-	struct net_device *dev;
-	u32 sbit = 31;
-	u16 pcifunc;
-	u32 mask;
-	int bit;
+	struct net_device *dev = NULL;
+	DECLARE_BITMAP(mask6, 128);
+	u32 addr[4];
+	u32 *mptr;
+	bool set;
+	u32 sbit;
+	u32 cnt;
 
-	dst = ntohl(dst);
+	/*
+	 * pan_sw_l3_route_add() inserts IPv4 routes using the same 128-bit
+	 * Patricia shape as IPv6: upper 96 bits come from dst[1..3] (zero for
+	 * typical v4 fib entries), lower 32 from dst[0]. Mirror that here.
+	 */
+	addr[0] = dst;
+	addr[1] = 0;
+	addr[2] = 0;
+	addr[3] = 0;
 
 	pan_rvu_gbl = pan_rvu_get_gbl();
 
 	rcu_read_lock();
 
 	walk = root;
-	while (walk && sbit) {
+	cnt = 128;
+	sbit = 127;
+	bitmap_zero(mask6, 128);
+	mptr = (u32 *)mask6;
+
+	while (walk && cnt) {
 		if (walk->node)
 			cur = walk;
 
-		mask = 1UL << sbit;
-		bit = dst & mask;
-
-		if (bit)
+		bitmap_set(mask6, sbit, 1);
+		set = !!(addr[0] & mptr[0] || addr[1] & mptr[1] ||
+			 addr[2] & mptr[2] || addr[3] & mptr[3]);
+		if (set)
 			walk = walk->r;
 		else
 			walk = walk->l;
-
+		bitmap_clear(mask6, sbit, 1);
 		sbit--;
+		cnt--;
 	}
 
-	if (!cur) {
+	if (walk && walk->node)
+		cur = walk;
+
+	if (!cur || !cur->node) {
 		pr_err("Failed to find route %#x\n", dst);
 		rcu_read_unlock();
 		return NULL;
 	}
 
-	if (cur) {
-		entry = cur->node->entry;
-		pcifunc = entry->port_id;
-		dev = xa_load(&pan_rvu_gbl->pfunc2dev, pcifunc);
-	}
-
-	rcu_read_unlock();
+	entry = cur->node->entry;
+	dev = xa_load(&pan_rvu_gbl->pfunc2dev, entry->port_id);
 
 	pr_debug("%s:%d Found route for %#x , dst=%#x dst_len=%d gw=%#x\n",
 		 __func__, __LINE__,
 		 dst, entry->dst, entry->dst_len, entry->gw);
+
+	rcu_read_unlock();
 
 	return dev;
 }
