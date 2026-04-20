@@ -177,8 +177,6 @@ static void cnf10k_rfoe_set_msglevel(struct net_device *netdev, u32 level)
 static int cnf10k_rfoe_get_link_ksettings(struct net_device *netdev,
 					  struct ethtool_link_ksettings *cmd)
 {
-	struct cnf10k_rfoe_ndev_priv *priv = netdev_priv(netdev);
-
 	ethtool_link_ksettings_zero_link_mode(cmd, supported);
 	ethtool_link_ksettings_zero_link_mode(cmd, advertising);
 	ethtool_link_ksettings_zero_link_mode(cmd, lp_advertising);
