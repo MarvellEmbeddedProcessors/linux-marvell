@@ -14,12 +14,15 @@
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/io.h>
+#include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/overflow.h>
 #include <linux/uaccess.h>
 #include <linux/pci.h>
 #include <linux/stddef.h>
 #include <linux/debugfs.h>
 #include <linux/arm-smccc.h>
+#include <soc/marvell/octeontx/octeontx_smc.h>
 
 #include "rvu_struct.h"
 #include "rvu.h"
@@ -84,38 +87,94 @@ struct hw_priv_data {
 };
 
 struct hw_csr_lookup_tbl {
-	u64 base;       /* Base BAR address for each HW */
-	u64 size;	/* Size of mapping */
-	u8 alpha;       /* Alpha component in CSRs */
-	u8 alpha_shift; /* Alpha shift */
-	u8 beta;	/* Beta component in CSRs */
-	u8 beta_shift;  /* Beta shift */
-	u64 mask;	/* Mask for extracting the CSR offsets */
+	u64 base; /* Base BAR address for each HW */
+	u64 size; /* Per-instance ioremap size; must equal mask + 1 and be a power of 2 */
+	u8 alpha; /* Outer instance count (e.g. PF for RVU, LMAC for CGX/RPM) */
+	u8 alpha_shift; /* Bit shift for alpha index; 1 << alpha_shift must be >= size */
+	u16 beta; /* Inner instance count (e.g. FUNC for RVU, VF for DPI) */
+	u8 beta_shift; /* Bit shift for beta index; 1 << beta_shift must be >= size */
+	u64 mask; /* Low-bit mask for extracting in-instance CSR offset */
 };
 
-const struct hw_csr_lookup_tbl lkp_tbl[] = {
+static const struct hw_csr_lookup_tbl lkp_tbl_cn9x[] = {
 	/* [BASE] [SIZE] [ALPHA] [ALPHA SHIFT] [BETA] [BETA SHIFT] [MASK] */
-	/* RVU BAR0 */
-	{ 0x840000000000, 0xa000000, 32, 28, 1,   0,  0xFFFFFFF },
-	/* RVU BAR2 */
-	{ 0x840200000000, 0x2000000, 32, 36, 129, 25, 0xFFFFFF },
-	/* DPI PF BAR0 */
-	{ 0x86E000000000, 0x100000000, 1, 0, 1, 0, 0xFFFFFFFF },
-	/* DPI VF BAR0 */
-	{ 0x86E200000000, 0x100000, 1, 0, 32, 20, 0xFFFFF},
-	/* RST */
-	{ 0x87E006000000, 0x10000,   1,  0,  1,   0,  0xFFFF },
-	/* MCS */
-	{ 0x87E080000000, 0xFF0008,  7,  24,  1,  0,  0xFFFFFF },
-	/* RPM */
-	{ 0x87E0E0000000, 0x900000,  5,  24, 1,   0,  0xFFFFFF },
-	/* NCB */
-	{ 0x87E0F0000000, 0x100000,  3,  24, 1,   0,  0xFFFFF },
-	/* LMC */
-	{ 0x87E088000000, 0x10000,   6,  24, 1,   0,  0xFFFF },
-	/* TAD Common */
-	{ 0x87E053000000, 0x10000, 127, 3, 1, 0, 0xFFF },
+	/*
+	 * RVU_PF(0..31)_BAR0 : per-PF stride is 1<<36 (64 GB); each PF hosts
+	 * many 256 MB "block slots" (RVUM, LMT, NPA, NIX0/1, NPC, SSO, SSOW,
+	 * TIM, CPTX, NDCX, REEX, APR; see RVU_BLOCK_ADDR_E). Block 0x16 (APR)
+	 * sits at +5.5 GB, so we expose the first 8 GB (next power of 2) of
+	 * each PF's register window.
+	 */
+	{ 0x840000000000, 0x200000000, 32, 36, 1, 0, 0x1FFFFFFFF },
+	/*
+	 * RVU_PF(0..31)_FUNC(0..128)_BAR2 : 32 MB per FUNC
+	 * (HRM pcc_bar_size_bits=25). Per-FUNC layout is
+	 * block_addr[24:20] | slot[19:12] | reg[11:0]; FUNC stride is 1<<25,
+	 * so size fills the FUNC window exactly.
+	 */
+	{ 0x840200000000, 0x2000000, 32, 36, 129, 25, 0x1FFFFFF },
+	/*
+	 * DPI(0..1)_PF_BAR0 : 4 GB per DPI (HRM pcc_bar_size_bits=32). Hosts
+	 * DPI engine CSRs in the low MB plus SDP counters / VDMA shadow
+	 * registers at multi-GB offsets.
+	 */
+	{ 0x86E000000000, 0x100000000, 2, 36, 1, 0, 0xFFFFFFFF },
+	/* DPI(0..1)_VF(0..7)_BAR0 : 8 VFs per DPI, 1 MB each */
+	{ 0x86E200000000, 0x100000, 2, 36, 8, 20, 0xFFFFF },
+	/* RST_PF_BAR0 */
+	{ 0x87E006000000, 0x10000, 1, 0, 1, 0, 0xFFFF },
+	/* CGX(0..4)_PF_BAR0 : 5 on CN98XX, 3 on CN96XX; BAR0 = 1 MB */
+	{ 0x87E0E0000000, 0x100000, 5, 24, 1, 0, 0xFFFFF },
+	/* IOBN(0..2)_PF_BAR0 : 3 on CN98XX, 2 on CN96XX */
+	{ 0x87E0F0000000, 0x100000, 3, 24, 1, 0, 0xFFFFF },
+	/* LMC(0..5)_PF_BAR0 : 6 on CN98XX, 3 on CN96XX; BAR0 = 8 MB */
+	{ 0x87E088000000, 0x800000, 6, 24, 1, 0, 0x7FFFFF },
+	/* OCLA(0..6)_PF_BAR0 : 7 on CN98XX, 5 on CN96XX; BAR0 = 8 MB */
+	{ 0x87E0B0000000, 0x800000, 7, 24, 1, 0, 0x7FFFFF },
+	/* DTX RSL window : 16 MB flat */
+	{ 0x87E0FE000000, 0x1000000, 1, 0, 1, 0, 0xFFFFFF },
 };
+
+static const struct hw_csr_lookup_tbl lkp_tbl_cn10k[] = {
+	/* RVU_PF(0..31)_BAR0 : see CN9 row for block-slot layout rationale */
+	{ 0x840000000000, 0x200000000, 32, 36, 1, 0, 0x1FFFFFFFF },
+	/* RVU_PF(0..31)_FUNC(0..128)_BAR2 : see CN9 row, 32 MB per FUNC */
+	{ 0x840200000000, 0x2000000, 32, 36, 129, 25, 0x1FFFFFF },
+	/* DPI(0)_PF_BAR0 : 4 GB (HRM pcc_bar_size_bits=32); see CN9 row */
+	{ 0x86E000000000, 0x100000000, 1, 36, 1, 0, 0xFFFFFFFF },
+	/* DPI(0)_VF(0..31)_BAR0 : 32 VFs */
+	{ 0x86E200000000, 0x100000, 1, 36, 32, 20, 0xFFFFF },
+	/* RST_PF_BAR0 */
+	{ 0x87E006000000, 0x10000, 1, 0, 1, 0, 0xFFFF },
+	/* TAD_CMN_PF_BAR0 : single instance, 64 KB */
+	{ 0x87E053000000, 0x10000, 1, 0, 1, 0, 0xFFFF },
+	/* MCS(0..7)_PF_BAR0 : BAR0 is 15 MB; expose low 8 MB (power of 2) */
+	{ 0x87E080000000, 0x800000, 8, 24, 1, 0, 0x7FFFFF },
+	/* RPM(0..2)_PF_BAR0 : BAR0 = 8 MB */
+	{ 0x87E0E0000000, 0x800000, 3, 24, 1, 0, 0x7FFFFF },
+	/* IOBN(0..2)_PF_BAR0 : moved from 0x87E0F0 on CN9 to 0x87E120 on CN10K */
+	{ 0x87E120000000, 0x100000, 3, 24, 1, 0, 0xFFFFF },
+	/* NCB(0..4)_PF_BAR0 : CN10K-only block */
+	{ 0x87E140000000, 0x100000, 5, 24, 1, 0, 0xFFFFF },
+	/* DSS(0..5)_PF_BAR0 : CN10K rename of LMC; BAR0 = 4 MB */
+	{ 0x87E1C0000000, 0x400000, 6, 24, 1, 0, 0x3FFFFF },
+	/* TAD(0..47)_PF_BAR0 : 48 mesh TADs on CN10K, 8 MB each */
+	{ 0x87E280000000, 0x800000, 48, 24, 1, 0, 0x7FFFFF },
+	/* DTX RSL window : 16 MB flat, shared address with CN9 */
+	{ 0x87E0FE000000, 0x1000000, 1, 0, 1, 0, 0xFFFFFF },
+	/*
+	 * OCLA(0..23,64)_PF_BAR0 : 24 dense + 1 sparse at index 64; alpha=65
+	 * covers index 64. Indices 24..63 are reserved on silicon and will not
+	 * match any valid user address (benign dead branches in the loop).
+	 */
+	{ 0x87E380000000, 0x800000, 65, 24, 1, 0, 0x7FFFFF },
+};
+
+/* Selected at module init based on SoC family */
+static const struct hw_csr_lookup_tbl *csr_tbl;
+static unsigned int csr_tbl_len;
+static unsigned int csr_tbl_max_alpha;
+static unsigned int csr_tbl_max_beta;
 
 #define HW_ACCESS_TYPE			120
 
@@ -125,11 +184,94 @@ const struct hw_csr_lookup_tbl lkp_tbl[] = {
 #define HW_ACCESS_CGX_INFO_IOCTL	_IO(HW_ACCESS_TYPE, 4)
 #define HW_ACCESS_LINK_INFO_IOCTL	_IO(HW_ACCESS_TYPE, 5)
 
-#define MAX_ALPHA	32
+/*
+ * Hard upper bounds kept in reach of a single page for the per-open map array.
+ * Any new table entry must respect these (enforced by validate_csr_tbl()).
+ */
+#define MAX_ALPHA	128
 #define MAX_BETA	129
 
 static struct class *hw_reg_class;
 static int major_no;
+
+/*
+ * Pick the CSR lookup table matching the running SoC family. Invoked once at
+ * module init. Populates csr_tbl*, csr_tbl_len and csr_tbl_max_alpha/beta.
+ */
+static int select_csr_tbl(void)
+{
+	const struct hw_csr_lookup_tbl *t;
+	unsigned int n, i, ma = 0, mb = 0;
+
+	if (is_soc_cn10kx()) {
+		t = lkp_tbl_cn10k;
+		n = ARRAY_SIZE(lkp_tbl_cn10k);
+	} else if (is_soc_cn9x()) {
+		t = lkp_tbl_cn9x;
+		n = ARRAY_SIZE(lkp_tbl_cn9x);
+	} else {
+		pr_err("hw_access: unsupported SoC; driver handles CN9XXX and CN10K only\n");
+		return -ENODEV;
+	}
+
+	for (i = 0; i < n; i++) {
+		if (t[i].alpha > ma)
+			ma = t[i].alpha;
+		if (t[i].beta > mb)
+			mb = t[i].beta;
+	}
+
+	csr_tbl = t;
+	csr_tbl_len = n;
+	csr_tbl_max_alpha = ma;
+	csr_tbl_max_beta = mb;
+	return 0;
+}
+
+/*
+ * Enforce the invariants the rest of the driver assumes:
+ *   1. size == mask + 1  (so addr & mask is the in-instance offset)
+ *   2. size is a power of 2 (so mask is a contiguous low-bit mask)
+ *   3. size <= 1 << alpha_shift when alpha > 1 (no overlap with alpha bits)
+ *   4. size <= 1 << beta_shift  when beta  > 1 (no overlap with beta  bits)
+ *   5. alpha in [1, MAX_ALPHA], beta in [1, MAX_BETA]
+ *   6. (base & mask) == 0 (base is aligned to the window)
+ */
+static int validate_csr_tbl(const struct hw_csr_lookup_tbl *t, unsigned int n)
+{
+	unsigned int i;
+
+	for (i = 0; i < n; i++) {
+		if (t[i].size == 0 || t[i].size != t[i].mask + 1 ||
+		    (t[i].size & (t[i].size - 1)) != 0) {
+			pr_err("hw_access: row %u size/mask inconsistent (size=0x%llx mask=0x%llx)\n",
+			       i, t[i].size, t[i].mask);
+			return -EINVAL;
+		}
+		if (t[i].alpha == 0 || t[i].alpha > MAX_ALPHA ||
+		    t[i].beta == 0 || t[i].beta > MAX_BETA) {
+			pr_err("hw_access: row %u alpha/beta out of range (alpha=%u beta=%u)\n",
+			       i, t[i].alpha, t[i].beta);
+			return -EINVAL;
+		}
+		if (t[i].alpha > 1 && t[i].size > (1ULL << t[i].alpha_shift)) {
+			pr_err("hw_access: row %u size overlaps alpha_shift (size=0x%llx shift=%u)\n",
+			       i, t[i].size, t[i].alpha_shift);
+			return -EINVAL;
+		}
+		if (t[i].beta > 1 && t[i].size > (1ULL << t[i].beta_shift)) {
+			pr_err("hw_access: row %u size overlaps beta_shift (size=0x%llx shift=%u)\n",
+			       i, t[i].size, t[i].beta_shift);
+			return -EINVAL;
+		}
+		if (t[i].base & t[i].mask) {
+			pr_err("hw_access: row %u base 0x%llx not aligned to mask 0x%llx\n",
+			       i, t[i].base, t[i].mask);
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
 
 /* Check if mapping already exists else create a new one */
 static int
@@ -160,51 +302,47 @@ create_mapping(struct hw_priv_data *priv_data, void __iomem **reg_base,
  * identified based on HW (eg. RVU, RPM), alpha (PF in case of RVU, CGX in RPM),
  * beta (FUNC/VF in RVU) attributes. Since each HW may have different alpha/beta
  * components, sizes to map, masking the register offsets, a lookup table is
- * defined where each index represents different values for differetn HWs.
+ * defined where each index represents different values for different HWs.
  */
 static int
 setup_csr_mapping(struct hw_priv_data *priv_data, u64 addr,
 		  void __iomem **reg_base, u64 *offset)
 {
-	int i, j, k, idx;
-	u64 base = 0;
+	const struct hw_csr_lookup_tbl *row;
+	unsigned int i, j, k, idx;
+	u64 base;
+	int rc;
 
-	for (i = 0; i < ARRAY_SIZE(lkp_tbl); i++) {
-		for (j = 0; j < lkp_tbl[i].alpha; j++) {
-			for (k = 0; k < lkp_tbl[i].beta; k++) {
-				/* Base address is prepared based on different
-				 * attr and then compared with user address if
-				 * it falls in the range.
-				 */
-				base = lkp_tbl[i].base |
-					((u64)j << lkp_tbl[i].alpha_shift) |
-					((u64)k << lkp_tbl[i].beta_shift);
+	for (i = 0; i < csr_tbl_len; i++) {
+		row = &csr_tbl[i];
+		for (j = 0; j < row->alpha; j++) {
+			for (k = 0; k < row->beta; k++) {
+				/* Per-instance base: row->base OR alpha OR beta */
+				base = row->base |
+				       ((u64)j << row->alpha_shift) |
+				       ((u64)k << row->beta_shift);
 
-				if (addr < base || (addr > (u64)(u8 *)base +
-						      lkp_tbl[i].size))
+				/* Half-open range [base, base + size) */
+				if (addr < base || addr >= base + row->size)
 					continue;
 
-				/* Found the base address range for user addr,
-				 * create a new mapping at the specific index.
-				 */
-				idx = ((i * MAX_ALPHA * MAX_BETA) +
-				       (j * MAX_BETA) + k);
+				idx = ((i * csr_tbl_max_alpha *
+					csr_tbl_max_beta) +
+				       (j * csr_tbl_max_beta) + k);
 
-				if (create_mapping(priv_data, reg_base, idx,
-						   base, lkp_tbl[i].size))
-					goto err;
+				rc = create_mapping(priv_data, reg_base, idx,
+						    base, row->size);
+				if (rc)
+					return rc;
 
-				/* Extract the register offset from user addr.*/
-				*offset = addr & lkp_tbl[i].mask;
+				*offset = addr & row->mask;
 				return 0;
 			}
 		}
 	}
 
-err:
-	/* User address not in any range of HW defined in lookup table */
-	pr_err("Address [0x%llx] out of range\n", addr);
-	return -1;
+	pr_err_ratelimited("hw_access: address 0x%llx out of range\n", addr);
+	return -ERANGE;
 }
 
 static void
@@ -226,33 +364,53 @@ destroy_mapping(struct hw_priv_data *priv_data, int idx)
 static void
 release_csr_mapping(struct hw_priv_data *priv_data)
 {
-	int i, j, k, idx;
+	unsigned int i, j, k, idx;
 
-	for (i = 0 ; i < ARRAY_SIZE(lkp_tbl); i++) {
-		for (j = 0; j < lkp_tbl[i].alpha; j++) {
-			for (k = 0; k < lkp_tbl[i].beta; k++) {
-				idx = ((i * MAX_ALPHA * MAX_BETA) +
-				       (j * MAX_BETA) + k);
+	if (!priv_data->map)
+		return;
+
+	for (i = 0; i < csr_tbl_len; i++) {
+		for (j = 0; j < csr_tbl[i].alpha; j++) {
+			for (k = 0; k < csr_tbl[i].beta; k++) {
+				idx = ((i * csr_tbl_max_alpha *
+					csr_tbl_max_beta) +
+				       (j * csr_tbl_max_beta) + k);
 				destroy_mapping(priv_data, idx);
 			}
 		}
 	}
 
 	if (priv_data->total_mappings != 0)
-		pr_err("All mappings not released, %d are remaining\n",
+		pr_err("All mappings not released, %u are remaining\n",
 		       priv_data->total_mappings);
 }
 
 static int hw_access_open(struct inode *inode, struct file *filp)
 {
-	struct hw_priv_data *priv_data = NULL;
+	struct hw_priv_data *priv_data;
+	size_t map_entries;
+
+	if (!csr_tbl || !csr_tbl_len)
+		return -ENODEV;
 
 	priv_data = kzalloc(sizeof(*priv_data), GFP_KERNEL);
 	if (!priv_data)
 		return -ENOMEM;
 
-	priv_data->map = kzalloc(ARRAY_SIZE(lkp_tbl) * MAX_ALPHA * MAX_BETA *
-				 sizeof(struct hw_csr_mapping), GFP_KERNEL);
+	/*
+	 * idx = i*max_alpha*max_beta + j*max_beta + k, with j<alpha<=max_alpha
+	 * and k<beta<=max_beta, so the array must be sized accordingly. Use
+	 * kvmalloc_array to tolerate multi-MB allocations on fragmented heaps.
+	 */
+	if (check_mul_overflow((size_t)csr_tbl_len,
+			       (size_t)csr_tbl_max_alpha * csr_tbl_max_beta,
+			       &map_entries)) {
+		kfree(priv_data);
+		return -EOVERFLOW;
+	}
+	priv_data->map = kvmalloc_array(map_entries,
+					sizeof(struct hw_csr_mapping),
+					GFP_KERNEL | __GFP_ZERO);
 	if (!priv_data->map) {
 		kfree(priv_data);
 		return -ENOMEM;
@@ -260,7 +418,21 @@ static int hw_access_open(struct inode *inode, struct file *filp)
 
 	priv_data->pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM,
 					 PCI_DEVID_OCTEONTX2_RVU_AF, NULL);
+	if (!priv_data->pdev) {
+		pr_err("hw_access: RVU AF PCI device not found\n");
+		kvfree(priv_data->map);
+		kfree(priv_data);
+		return -ENODEV;
+	}
+
 	priv_data->rvu = pci_get_drvdata(priv_data->pdev);
+	if (!priv_data->rvu) {
+		pr_err("hw_access: RVU AF driver not bound\n");
+		pci_dev_put(priv_data->pdev);
+		kvfree(priv_data->map);
+		kfree(priv_data);
+		return -ENODEV;
+	}
 
 	filp->private_data = priv_data;
 
@@ -273,6 +445,7 @@ hw_access_csr_read(struct hw_priv_data *priv_data, unsigned long arg)
 	void __iomem *reg_base;
 	struct hw_reg_cfg reg_cfg;
 	u64 regoff;
+	int rc;
 
 	if (copy_from_user(&reg_cfg, (void __user *)arg,
 			   sizeof(struct hw_reg_cfg))) {
@@ -281,13 +454,14 @@ hw_access_csr_read(struct hw_priv_data *priv_data, unsigned long arg)
 		return -EFAULT;
 	}
 
-	if (setup_csr_mapping(priv_data, reg_cfg.regaddr, &reg_base, &regoff))
-		return -1;
+	rc = setup_csr_mapping(priv_data, reg_cfg.regaddr, &reg_base, &regoff);
+	if (rc)
+		return rc;
 
+	/* Only 64-bit MMIO is supported; 32-bit-only CSRs will trap or alias. */
 	reg_cfg.regval = readq(reg_base + regoff);
 
-	if (copy_to_user((void __user *)(unsigned long)arg,
-			 &reg_cfg,
+	if (copy_to_user((void __user *)arg, &reg_cfg,
 			 sizeof(struct hw_reg_cfg))) {
 		pr_err("Fault in copy to user\n");
 
@@ -302,6 +476,7 @@ hw_access_csr_write(struct hw_priv_data *priv_data, unsigned long arg)
 	struct hw_reg_cfg reg_cfg;
 	void __iomem *reg_base;
 	u64 regoff;
+	int rc;
 
 	if (copy_from_user(&reg_cfg, (void __user *)arg,
 			   sizeof(struct hw_reg_cfg))) {
@@ -310,9 +485,9 @@ hw_access_csr_write(struct hw_priv_data *priv_data, unsigned long arg)
 		return -EFAULT;
 	}
 
-	/* Only 64 bit reads/writes are allowed */
-	if (setup_csr_mapping(priv_data, reg_cfg.regaddr, &reg_base, &regoff))
-		return -1;
+	rc = setup_csr_mapping(priv_data, reg_cfg.regaddr, &reg_base, &regoff);
+	if (rc)
+		return rc;
 
 	writeq(reg_cfg.regval, reg_base + regoff);
 
@@ -337,8 +512,8 @@ hw_access_nix_ctx_read(struct rvu *rvu, struct hw_ctx_cfg *ctx_cfg,
 		return -EINVAL;
 	}
 
-	if (copy_to_user((struct nix_aq_enq_rsp *)arg,
-			 &rsp, sizeof(struct nix_aq_enq_rsp))) {
+	if (copy_to_user((void __user *)arg, &rsp,
+			 sizeof(struct nix_aq_enq_rsp))) {
 		pr_err("Fault in copy to user\n");
 		return -EFAULT;
 	}
@@ -364,8 +539,8 @@ hw_access_npa_ctx_read(struct rvu *rvu, struct hw_ctx_cfg *ctx_cfg,
 		return -EINVAL;
 	}
 
-	if (copy_to_user((struct npa_aq_enq_rsp *)arg,
-			 &rsp, sizeof(struct npa_aq_enq_rsp))) {
+	if (copy_to_user((void __user *)arg, &rsp,
+			 sizeof(struct npa_aq_enq_rsp))) {
 		pr_err("Fault in copy to user\n");
 		return -EFAULT;
 	}
@@ -379,7 +554,7 @@ hw_access_ctx_read(struct rvu *rvu, unsigned long arg)
 	struct hw_ctx_cfg ctx_cfg;
 	int rc;
 
-	if (copy_from_user(&ctx_cfg, (struct hw_ctx_cfg *)arg,
+	if (copy_from_user(&ctx_cfg, (void __user *)arg,
 			   sizeof(struct hw_ctx_cfg))) {
 		pr_err("Write Fault in copy from user\n");
 		return -EFAULT;
@@ -419,14 +594,12 @@ hw_access_cgx_info(struct rvu *rvu, unsigned long arg)
 	}
 
 	pfvf = &rvu->pf[pf];
-	rvu_get_cgx_lmac_id(rvu->pf2cgxlmac_map[pf], &cgx_id,
-			    &lmac_id);
+	rvu_get_cgx_lmac_id(rvu->pf2cgxlmac_map[pf], &cgx_id, &lmac_id);
 	cgx_info.cgx_id = cgx_id;
 	cgx_info.lmac_id = lmac_id;
 	cgx_info.nix_idx = (pfvf->nix_blkaddr == BLKADDR_NIX0) ? 0 : 1;
 
-	if (copy_to_user((void __user *)(unsigned long)arg,
-			 &cgx_info,
+	if (copy_to_user((void __user *)arg, &cgx_info,
 			 sizeof(struct hw_cgx_info))) {
 		pr_err("Fault in copy to user\n");
 
@@ -464,7 +637,7 @@ hw_access_link_info(struct rvu *rvu, unsigned long arg)
 
 	memcpy(&linfo.link_info, &lmac->link_info, sizeof(lmac->link_info));
 
-	if (copy_to_user((void __user *)(unsigned long)arg, &linfo,
+	if (copy_to_user((void __user *)arg, &linfo,
 			 sizeof(struct hw_link_info))) {
 		pr_err("Fault in copy to user\n");
 
@@ -477,7 +650,11 @@ static long hw_access_ioctl(struct file *filp, unsigned int cmd,
 			    unsigned long arg)
 {
 	struct hw_priv_data *priv_data = filp->private_data;
-	struct rvu *rvu = priv_data->rvu;
+	struct rvu *rvu;
+
+	if (!priv_data || !priv_data->rvu)
+		return -ENODEV;
+	rvu = priv_data->rvu;
 
 	switch (cmd) {
 	case HW_ACCESS_CSR_READ_IOCTL:
@@ -506,13 +683,14 @@ static int hw_access_release(struct inode *inode, struct file *filp)
 {
 	struct hw_priv_data *priv_data = filp->private_data;
 
+	if (!priv_data)
+		return 0;
+
 	release_csr_mapping(priv_data);
 	pci_dev_put(priv_data->pdev);
 	filp->private_data = NULL;
-	kfree(priv_data->map);
-	priv_data->map = NULL;
+	kvfree(priv_data->map);
 	kfree(priv_data);
-	priv_data = NULL;
 
 	return 0;
 }
@@ -547,9 +725,9 @@ static ssize_t reg_data_read(struct file *fp, char __user *user_buffer,
 static ssize_t reg_data_write(struct file *fp, const char __user *user_buffer,
 			      size_t count, loff_t *position)
 {
-	int ret;
 	struct arm_smccc_res smc_resp;
-	u64 reg_data;
+	u64 reg_data = 0;
+	int ret;
 
 	if (!reg_addr) {
 		pr_err("Secure Reg Write failure : Invalid Reg_Addr\n");
@@ -557,10 +735,12 @@ static ssize_t reg_data_write(struct file *fp, const char __user *user_buffer,
 	}
 
 	if (size_32) {
-		ret = kstrtou32_from_user(user_buffer, count, 0,
-					  (void *)&reg_data);
+		u32 v;
+
+		ret = kstrtou32_from_user(user_buffer, count, 0, &v);
 		if (ret)
 			return ret;
+		reg_data = v;
 	} else {
 		ret = kstrtou64_from_user(user_buffer, count, 0,
 					  &reg_data);
@@ -588,6 +768,15 @@ static const struct file_operations fops_reg_data = {
 static int __init hw_access_module_init(void)
 {
 	static struct device *hw_reg_device;
+	int rc;
+
+	rc = select_csr_tbl();
+	if (rc)
+		return rc;
+
+	rc = validate_csr_tbl(csr_tbl, csr_tbl_len);
+	if (rc)
+		return rc;
 
 	major_no = register_chrdev(0, DEVICE_NAME, &mmap_fops);
 	if (major_no < 0) {
