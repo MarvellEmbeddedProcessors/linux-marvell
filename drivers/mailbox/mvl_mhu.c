@@ -37,10 +37,12 @@
 #define CN20K_DEV_AP0				0x20
 #define CN20K_XCP_DEVY_MBOX_RINT_OFFSET		0x000D3000
 #define CN20K_XCP_DEVY_MBOX_RINT_ENA_OFFSET	0x000D3400
+#define CN20K_XCP_DEVY_MBOX_RINT_CLR_OFFSET	0x000D3C00
 /* Non-CN20K */
 #define DEV_AP0					0x2
 #define XCP_DEVY_MBOX_RINT_OFFSET		0x000D1C00
 #define XCP_DEVY_MBOX_RINT_ENA_OFFSET		0x000D1C40
+#define XCP_DEVY_MBOX_RINT_CLR_OFFSET		0x000D1CC0
 
 /*
  * DEV-to-XCP Mailbox Doorbell-data
@@ -61,26 +63,15 @@ struct mhu {
 	/* Mailbox registers offsets*/
 	/* AP0-to-SCP doorbell */
 	u64 ap0_to_scp_mbox_off;
-	/* The interrupt status register */
+	/* The interrupt status register (W1C) */
 	u64 scp_to_ap0_rint_off;
-	/* Enable interrupt from SCP to AP0 */
+	/* Enable (unmask) interrupt from SCP to AP0 */
 	u64 scp_to_ap0_rint_ena_off;
+	/* Disable (mask) interrupt from SCP to AP0 */
+	u64 scp_to_ap0_rint_clr_off;
 };
 
 #define MHU_CHANNEL_INDEX(mhu, chan) (chan - &mhu->chan[0])
-
-/* Sources of interrupt */
-enum {
-	INDEX_INT_SRC_SCMI_TX,
-	INDEX_INT_SRC_AVS_STS,
-	INDEX_INT_SRC_NONE,
-};
-
-/* information of interrupts from SCP */
-struct int_src_data_s {
-	uint64_t int_src_cnt;
-	uint64_t int_src_data;
-};
 
 static void mhu_set_mbox_offsets(struct mhu *mhu, bool is_cn20k)
 {
@@ -96,6 +87,9 @@ static void mhu_set_mbox_offsets(struct mhu *mhu, bool is_cn20k)
 		off = CN20K_XCP_DEVY_MBOX_RINT_ENA_OFFSET |
 			((u64)(SCP_INDEX) << 36) | ((u64)(CN20K_DEV_AP0) << 4);
 		mhu->scp_to_ap0_rint_ena_off = off;
+		off = CN20K_XCP_DEVY_MBOX_RINT_CLR_OFFSET |
+			((u64)(SCP_INDEX) << 36) | ((u64)(CN20K_DEV_AP0) << 4);
+		mhu->scp_to_ap0_rint_clr_off = off;
 	} else {
 		off = XCPX_DEVY_XCP_MBOX_OFFSET |
 			((u64)(SCP_INDEX) << 36) | ((u64)(DEV_AP0) << 4);
@@ -106,44 +100,43 @@ static void mhu_set_mbox_offsets(struct mhu *mhu, bool is_cn20k)
 		off = XCP_DEVY_MBOX_RINT_ENA_OFFSET |
 			((u64)(SCP_INDEX) << 36) | ((u64)(DEV_AP0) << 4);
 		mhu->scp_to_ap0_rint_ena_off = off;
+		off = XCP_DEVY_MBOX_RINT_CLR_OFFSET |
+			((u64)(SCP_INDEX) << 36) | ((u64)(DEV_AP0) << 4);
+		mhu->scp_to_ap0_rint_clr_off = off;
 	}
 }
 
 static irqreturn_t mhu_rx_interrupt(int irq, void *p)
 {
-	struct mhu *mhu = (struct mhu *)p;
-	struct int_src_data_s *data = (struct int_src_data_s *)mhu->payload;
-	u64 val, scmi_tx_cnt;
-
-	/*
-	 * Local copy of event counters. A mismatch of received
-	 * count value and the local copy means additional events
-	 * are being flagged that needs to be attended by AP
-	 */
-	static u64 event_counter[INDEX_INT_SRC_NONE] = {0};
+	struct mhu *mhu = p;
+	u64 val;
 
 	/* Read interrupt status register */
 	val = readq_relaxed(mhu->base + mhu->scp_to_ap0_rint_off);
 	if (!val)
 		return IRQ_NONE;
 
-	if (!mhu || !mhu->chan) {
-		/* Interrupt has been ACKED, but there's no client for data */
-		pr_debug("No handle to MHU or mailbox\n");
-		goto handled;
-	}
+	/*
+	 * Follow the mask -> ack -> process -> unmask pattern so that any
+	 * event raised by the SCP while we are processing the current one
+	 * is latched in the RINT register and re-fires the IRQ line once
+	 * we unmask, instead of being lost in the window between the
+	 * status read and the write-on-clear.
+	 */
 
-	/* scmi interrupt */
-	scmi_tx_cnt = readq(&data[INDEX_INT_SRC_SCMI_TX].int_src_cnt);
-	if (event_counter[INDEX_INT_SRC_SCMI_TX] != scmi_tx_cnt) {
-		mbox_chan_received_data(mhu->chan, (void *)&val);
-		/* Update the memory to prepare for next */
-		event_counter[INDEX_INT_SRC_SCMI_TX] = scmi_tx_cnt;
-	}
+	/* Mask: disable mailbox interrupt at the device */
+	writeq_relaxed(1ul, mhu->base + mhu->scp_to_ap0_rint_clr_off);
 
-handled:
-	/* Clear the interrupt : Write on clear */
+	/* Ack: write-1-to-clear the RINT status bit */
 	writeq_relaxed(1ul, mhu->base + mhu->scp_to_ap0_rint_off);
+
+	if (mhu->chan)
+		mbox_chan_received_data(mhu->chan, (void *)&val);
+	else
+		pr_debug("No handle to MHU or mailbox\n");
+
+	/* Unmask: re-enable mailbox interrupt at the device */
+	writeq_relaxed(1ul, mhu->base + mhu->scp_to_ap0_rint_ena_off);
 
 	return IRQ_HANDLED;
 }
