@@ -223,6 +223,7 @@ static inline u64 pf_to_bitoff(u8 pf)
 
 #define SDP_AF_OUT_BP_ENX_W1S(a)		(0x4093040 | (a) << 3)
 #define SDP_AF_OUT_DROP_STATEX(a)		(0x4093080 | (a) << 3)
+#define SDP_AF_VFRIDX_TBL(a)			(0x40a0000 | (a) << 3)
 
 /* CPT Registers */
 #define CPT_AF_CN20K_INST_GENERIC0_PC		(0x15000)
