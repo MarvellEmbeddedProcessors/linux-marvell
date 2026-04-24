@@ -37,6 +37,10 @@ enum {
 	RVU_VF_INT_VEC_MBOX = 0x0,
 };
 
+static int otx2_sdp_create_vfs(struct otx2_nic *vf);
+static int otx2_sdp_free_vfs(struct otx2_nic *vf);
+static void otx2_sdp_vf_task(struct work_struct *work);
+
 static void otx2vf_process_vfaf_mbox_msg(struct otx2_nic *vf,
 					 struct mbox_msghdr *msg)
 {
@@ -136,15 +140,41 @@ static int otx2_mbox_up_handler_sdp_rings_update(struct otx2_nic *vf,
 	return 0;
 }
 
-static int otx2_mbox_up_handler_sdp_create_vfs(struct otx2_nic *vf,
-					       struct sdp_create_vfs_req *msg,
-					       struct msg_rsp *rsp);
-static int otx2_mbox_up_handler_sdp_free_vfs(struct otx2_nic *vf,
-					     struct sdp_free_vfs_req *msg,
-					     struct msg_rsp *rsp);
+static void otx2_sdp_vf_task(struct work_struct *work)
+{
+	struct mbox_msghdr msg;
+	struct sdp_vf_cfg *cfg;
+	struct otx2_nic *vf;
+	int err;
+
+	cfg = container_of(work, struct sdp_vf_cfg, sdp_vf_work.work);
+	vf = container_of(cfg, struct otx2_nic, sdp_cfg);
+
+	memcpy(&msg, cfg->msg_buff, sizeof(struct mbox_msghdr));
+
+	switch (msg.id) {
+	case MBOX_MSG_SDP_CREATE_VFS:
+		err = otx2_sdp_create_vfs(vf);
+		if (err)
+			dev_err(vf->dev, "SDP create VFs request failed\n");
+		break;
+	case MBOX_MSG_SDP_FREE_VFS:
+		err = otx2_sdp_free_vfs(vf);
+		if (err)
+			dev_err(vf->dev, "SDP free VFs request failed\n");
+		break;
+	default:
+		break;
+	}
+}
+
 static int otx2vf_process_mbox_msg_up(struct otx2_nic *vf,
 				      struct mbox_msghdr *req)
 {
+	struct sdp_vf_cfg *cfg = &vf->sdp_cfg;
+	struct sdp_create_vfs_req *create_req;
+	struct sdp_free_vfs_req *free_req;
+	struct delayed_work *dwork;
 	struct msg_rsp *rsp;
 	int err;
 
@@ -153,6 +183,9 @@ static int otx2vf_process_mbox_msg_up(struct otx2_nic *vf,
 		otx2_reply_invalid_msg(&vf->mbox.mbox_up, 0, 0, req->id);
 		return -ENODEV;
 	}
+
+	dwork = &cfg->sdp_vf_work;
+	INIT_DELAYED_WORK(dwork, otx2_sdp_vf_task);
 
 	switch (req->id) {
 	case MBOX_MSG_CGX_LINK_EVENT:
@@ -208,10 +241,14 @@ static int otx2vf_process_mbox_msg_up(struct otx2_nic *vf,
 		rsp->hdr.sig = OTX2_MBOX_RSP_SIG;
 		rsp->hdr.pcifunc = req->pcifunc;
 		rsp->hdr.rc = 0;
-		err = otx2_mbox_up_handler_sdp_create_vfs(vf,
-							  (struct sdp_create_vfs_req *)req
-							  , rsp);
-		return err;
+
+		create_req = (struct sdp_create_vfs_req *)req;
+		WARN_ON(sizeof(*create_req) > sizeof(cfg->msg_buff));
+
+		memcpy(cfg->msg_buff, create_req, sizeof(*create_req));
+		schedule_delayed_work(dwork, msecs_to_jiffies(10));
+
+		break;
 	case MBOX_MSG_SDP_FREE_VFS:
 		rsp = (struct msg_rsp *)otx2_mbox_alloc_msg(&vf->mbox.mbox_up,
 						0, sizeof(struct msg_rsp));
@@ -222,10 +259,14 @@ static int otx2vf_process_mbox_msg_up(struct otx2_nic *vf,
 		rsp->hdr.sig = OTX2_MBOX_RSP_SIG;
 		rsp->hdr.pcifunc = req->pcifunc;
 		rsp->hdr.rc = 0;
-		err = otx2_mbox_up_handler_sdp_free_vfs(vf,
-							(struct sdp_free_vfs_req *)req
-							, rsp);
-		return err;
+
+		free_req = (struct sdp_free_vfs_req *)req;
+		WARN_ON(sizeof(*free_req) > sizeof(cfg->msg_buff));
+
+		memcpy(cfg->msg_buff, free_req, sizeof(*free_req));
+		schedule_delayed_work(dwork, msecs_to_jiffies(10));
+
+		break;
 	case MBOX_MSG_AF2PF_FDB_REFRESH:
 		err = otx2_mbox_up_handler_af2pf_fdb_refresh(vf,
 							     (struct af2pf_fdb_refresh_req *)req,
@@ -676,9 +717,7 @@ static int otx2vf_realloc_msix_vectors(struct otx2_nic *vf)
 	return otx2vf_register_mbox_intr(vf, false);
 }
 
-static int otx2_mbox_up_handler_sdp_create_vfs(struct otx2_nic *vf,
-					       struct sdp_create_vfs_req *msg,
-					       struct msg_rsp *rsp)
+static int otx2_sdp_create_vfs(struct otx2_nic *vf)
 {
 	struct net_device *netdev = vf->netdev;
 	int err, qcount, qos_txqs;
@@ -759,9 +798,7 @@ err_detach_rsrc:
 	return err;
 }
 
-static int otx2_mbox_up_handler_sdp_free_vfs(struct otx2_nic *vf,
-					     struct sdp_free_vfs_req *msg,
-					     struct msg_rsp *rsp)
+static int otx2_sdp_free_vfs(struct otx2_nic *vf)
 {
 	struct net_device *netdev = vf->netdev;
 

@@ -517,6 +517,9 @@ struct pf_irq_data {
 struct sdp_vf_cfg {
 	u16 sq2chan_map[SDP_MAX_RINGS_PER_VF];
 	u16 nr_rings;
+#define SDP_VF_MAX_MSG_SIZE	512
+	u8 msg_buff[SDP_VF_MAX_MSG_SIZE];
+	struct delayed_work sdp_vf_work;
 };
 
 struct otx2_nic {

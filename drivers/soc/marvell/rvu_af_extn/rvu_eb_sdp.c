@@ -22,6 +22,10 @@
 
 #define SDP_AF_CONST_RINGS		GENMASK_ULL(31, 16)
 
+#define SDP_AF_VFRID_TBL_VLD		BIT_ULL(0)
+#define SDP_AF_VFRID_TBL_VF		GENMASK_ULL(9, 1)
+#define SDP_AF_VFRID_TBL_EPF		GENMASK_ULL(13, 10)
+
 #define SDP_EVF_RSRCID_MAX		256
 
 #define SDP_MAX_VECS			81
@@ -454,9 +458,9 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 	int qcount = num_online_cpus();
 	struct sdp_config *sdp_cfg;
 	int ring, rx_entry, slot;
+	u64 cfg, rid_cfg;
 	int vf_rid, err;
 	u16 host_vf;
-	u64 cfg;
 
 	host_vf = get_sdp_evf(epcifunc);
 	sdp_cfg = &pfvf->sdp_cfg;
@@ -466,14 +470,14 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 
 	if (req->nr_rings > qcount) {
 		dev_err(rvu->dev,
-			"Could not allocate queues more than active cpus(%d)",
+			"Could not allocate queues more than active cpus(%d)\n",
 			qcount);
 		return -EINVAL;
 	}
 
 	if (sdp_cfg->nr_rings) {
 		dev_err(rvu->dev,
-			"Rings already allocated, free existing rings and try");
+			"Rings already allocated, free existing rings and try\n");
 		return -EINVAL;
 	}
 
@@ -515,8 +519,18 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 		/* Use hardware ring number as channel number */
 		cfg |= FIELD_PREP(SDP_R_MAP_CHAN_MASK, ring);
 		cfg |= FIELD_PREP(SDP_R_MAP_VLD_MASK, 1);
-		if (host_vf)
+		if (host_vf) {
 			cfg |= FIELD_PREP(SDP_R_MAP_VFRSID_MASK, vf_rid);
+
+			/* Zero based VF id here */
+			rid_cfg = FIELD_PREP(SDP_AF_VFRID_TBL_VF,
+					     get_sdp_evf(epcifunc) - 1);
+			rid_cfg |= FIELD_PREP(SDP_AF_VFRID_TBL_EPF,
+					      get_sdp_epf(epcifunc));
+			rid_cfg |= FIELD_PREP(SDP_AF_VFRID_TBL_VLD, 1);
+			rvu_write64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(vf_rid),
+				    rid_cfg);
+		}
 
 		rvu_write64(rvu, BLKADDR_SDP, SDP_AF_RX_EPF_VF_MAP(ring), cfg);
 
@@ -620,6 +634,8 @@ int rvu_mbox_handler_sdp_rings_free(struct rvu *rvu,
 		}
 
 		if (rid < sdp->vf_rids.max) {
+			rvu_write64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(rid),
+				    FIELD_PREP(SDP_AF_VFRID_TBL_VLD, 0));
 			rvu_free_rsrc(&sdp->vf_rids, rid);
 			sdp->vf_rsrc_map[rid] = 0xFFFF;
 		} else {
