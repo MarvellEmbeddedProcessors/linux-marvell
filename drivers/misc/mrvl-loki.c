@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Marvell Loki driver
+/* Marvell BPHY GPINT handler driver
  *
  * Copyright (C) 2018 Marvell International Ltd.
  *
@@ -34,7 +34,7 @@
 
 typedef int (*connip_irq_cb_t)(uint32_t instance, uint32_t pss_int);
 
-struct mrvl_loki {
+struct mrvl_gpint_ctx {
 	struct pci_dev *pdev;
 	struct msix_entry msix_ent;
 	void __iomem *psm_gpint;
@@ -43,7 +43,7 @@ struct mrvl_loki {
 	connip_irq_cb_t irq_cb;
 };
 
-struct mrvl_loki *g_ml;
+struct mrvl_gpint_ctx *g_ml;
 
 int mrvl_loki_register_irq_cb(connip_irq_cb_t func);
 void mrvl_loki_unregister_irq_cb(void);
@@ -51,7 +51,7 @@ void mrvl_loki_unregister_irq_cb(void);
 int mrvl_loki_register_irq_cb(connip_irq_cb_t func)
 {
 	if (!g_ml) {
-		pr_err("Error: mrvl_loki is NULL\n");
+		pr_err("mrvl_bphy_gpint: driver not initialized (probe incomplete?)\n");
 		return -ENOENT;
 	}
 
@@ -70,9 +70,9 @@ void mrvl_loki_unregister_irq_cb(void)
 }
 EXPORT_SYMBOL(mrvl_loki_unregister_irq_cb);
 
-static irqreturn_t mrvl_loki_handler(int irq, void *dev)
+static irqreturn_t mrvl_bphy_gpint_handler(int irq, void *dev)
 {
-	struct mrvl_loki *ml =
+	struct mrvl_gpint_ctx *ml =
 		platform_get_drvdata((struct platform_device *)dev);
 	uint32_t instance, pss_int, val;
 	uint8_t cpri, mac;
@@ -81,6 +81,11 @@ static irqreturn_t mrvl_loki_handler(int irq, void *dev)
 	/* clear GPINT */
 	val = readq_relaxed(ml->psm_gpint + PSM_GPINT0_SUM_W1C) & CPRI_INT_MASK;
 	writeq_relaxed((u64)val, ml->psm_gpint + PSM_GPINT0_SUM_W1C);
+
+	if (unlikely(!ml)) {
+		dev_err(dev, "gpint: null context in IRQ handler\n");
+		return IRQ_NONE;
+	}
 
 	for (instance = 0; instance < CONNIP_MAX_INST; instance++) {
 		if (!(val & (1 << instance)))
@@ -93,7 +98,7 @@ static irqreturn_t mrvl_loki_handler(int irq, void *dev)
 			ret = ml->irq_cb(instance, pss_int);
 			if (ret < 0)
 				dev_err(dev,
-					"Error %d from loki CPRI callback\n",
+					"Error %d from GPINT irq callback\n",
 					ret);
 		}
 
@@ -114,10 +119,10 @@ static inline void msix_enable_ctrl(struct pci_dev *dev)
 	pci_write_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, control);
 }
 
-static int mrvl_loki_probe(struct platform_device *pdev)
+static int mrvl_bphy_gpint_probe(struct platform_device *pdev)
 {
-	struct mrvl_loki *ml;
 	struct device *dev = &pdev->dev;
+	struct mrvl_gpint_ctx *ml;
 	struct pci_dev *bphy_pdev;
 	struct resource *res;
 	int ret = 0;
@@ -177,8 +182,8 @@ static int mrvl_loki_probe(struct platform_device *pdev)
 	/* register interrupt */
 	ml->intr_num = irq_of_parse_and_map(dev->of_node, 0);
 
-	if (request_irq(ml->intr_num, mrvl_loki_handler, 0,
-			"mrvl loki handler", pdev)) {
+	if (request_irq(ml->intr_num, mrvl_bphy_gpint_handler, 0,
+			"mrvl bphy gpint handler", pdev)) {
 		dev_err(dev, "failed to register irq handler\n");
 		ret = -ENOMEM;
 		goto err;
@@ -194,31 +199,31 @@ err:
 	return ret;
 }
 
-static void mrvl_loki_remove(struct platform_device *pdev)
+static void mrvl_bphy_gpint_remove(struct platform_device *pdev)
 {
-	struct mrvl_loki *ml = platform_get_drvdata(pdev);
+	struct mrvl_gpint_ctx *ml = platform_get_drvdata(pdev);
 
 	free_irq(ml->intr_num, pdev);
 	devm_kfree(&pdev->dev, ml);
 }
 
-static const struct of_device_id mrvl_loki_of_match[] = {
+static const struct of_device_id mrvl_bphy_gpint_of_match[] = {
 	{ .compatible = "marvell,loki", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, mrvl_loki_of_match);
+MODULE_DEVICE_TABLE(of, mrvl_bphy_gpint_of_match);
 
-static struct platform_driver mrvl_loki_driver = {
-	.probe = mrvl_loki_probe,
-	.remove = mrvl_loki_remove,
+static struct platform_driver mrvl_bphy_gpint_driver = {
+	.probe = mrvl_bphy_gpint_probe,
+	.remove = mrvl_bphy_gpint_remove,
 	.driver = {
 		.name = "mrvl-loki",
-		.of_match_table = of_match_ptr(mrvl_loki_of_match),
+		.of_match_table = of_match_ptr(mrvl_bphy_gpint_of_match),
 	},
 };
 
-module_platform_driver(mrvl_loki_driver);
+module_platform_driver(mrvl_bphy_gpint_driver);
 
-MODULE_DESCRIPTION("Marvell Loki Driver");
+MODULE_DESCRIPTION("Marvell BPHY GPINT handler driver");
 MODULE_AUTHOR("Radha Mohan Chintakuntla");
 MODULE_LICENSE("GPL v2");
