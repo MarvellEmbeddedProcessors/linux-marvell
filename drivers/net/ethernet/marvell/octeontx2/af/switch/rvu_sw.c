@@ -9,6 +9,7 @@
 #include "rvu.h"
 #include "rvu_sw_l2.h"
 #include "rvu_sw_fl.h"
+#include "rvu_sw.h"
 
 u32 rvu_sw_port_id(struct rvu *rvu, u16 pcifunc)
 {
