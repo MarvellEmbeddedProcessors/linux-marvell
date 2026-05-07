@@ -1417,7 +1417,10 @@ static void otx2_bphypf_remove(struct pci_dev *pdev)
 	otx2_cgx_config_linkevents(pf, false);
 
 	otx2_unregister_dl(pf);
-	unregister_netdev(netdev);
+	if (pf->netdev_registered) {
+		unregister_netdev(netdev);
+		pf->netdev_registered = false;
+	}
 	cn10k_mcs_free(pf);
 	otx2_ptp_destroy(pf);
 	if (pf->otx2_wq)
