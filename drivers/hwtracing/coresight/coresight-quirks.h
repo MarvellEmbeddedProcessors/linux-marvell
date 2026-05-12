@@ -11,8 +11,8 @@
 #define CORESIGHT_QUIRK_ETM_SW_SYNC		0x1 /* No Hardware sync */
 #define CORESIGHT_QUIRK_ETM_TREAT_ETMv43	0x2 /* ETMv4.2 as ETMv4.3 */
 
-/* Marvell OcteonTx CN9xxx ETR device */
-#define OCTEONTX_CN9XXX_ETR			0x000cc213
+/* Marvell OcteonTx CN9xxx ETR device (full PIDR0..3 matches coresight_get_pid()) */
+#define OCTEONTX_CN9XXX_ETR			0x011cc213
 
 /* Coresight ETR Hardware quirks */
 #define CORESIGHT_QUIRK_ETR_BUFFSIZE_8BX	0x10 /* 8 byte size multiplier */
