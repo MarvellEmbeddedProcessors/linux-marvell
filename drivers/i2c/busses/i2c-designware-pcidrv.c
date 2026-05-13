@@ -357,6 +357,7 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 	adap->owner = THIS_MODULE;
 	adap->class = 0;
 	ACPI_COMPANION_SET(&adap->dev, ACPI_COMPANION(&pdev->dev));
+	adap->dev.of_node = pdev->dev.of_node;
 	adap->nr = controller->bus_num;
 
 	r = i2c_dw_probe(dev);
