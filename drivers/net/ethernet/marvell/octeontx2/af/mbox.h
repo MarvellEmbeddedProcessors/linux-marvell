@@ -547,6 +547,8 @@ M(MCS_CUSTOM_TAG_CFG_GET, 0xa021, mcs_custom_tag_cfg_get,			\
 				  mcs_custom_tag_cfg_get_rsp) \
 M(MCS_GET_MCS_ID,	0xa022, mcs_get_mcs_id, mcs_get_id_req,		\
 				mcs_get_id_rsp)				\
+M(MCS_SET_SC_TIMER,	0xa023, mcs_set_sc_timer, mcs_set_sc_timer_req,		\
+				msg_rsp)					\
 /* Messages initiated by AF (range 0xC00 - 0xEFF) */
 
 #define MBOX_UP_CGX_MESSAGES						\
@@ -3399,6 +3401,15 @@ struct mcs_get_id_rsp {
 	u8 node;
 	u8 rfoe_id;
 	u8 mcs_id;
+	u64 rsvd;
+};
+
+struct mcs_set_sc_timer_req {
+	struct mbox_msghdr hdr;
+	u64 timer_val; /* 0:38 SLAVE_SC_TIMER_MEM */
+	u16 sc_id;
+	u8 mcs_id;
+	u8 dir;
 	u64 rsvd;
 };
 

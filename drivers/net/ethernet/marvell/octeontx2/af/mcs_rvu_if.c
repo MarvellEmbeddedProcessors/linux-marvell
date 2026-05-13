@@ -93,6 +93,32 @@ void rvu_mcs_ptp_cfg(struct rvu *rvu, u8 rpm_id, u8 lmac_id, bool ena)
 	mcs_reg_write(mcs, MCSX_PEX_RX_SLAVE_PORT_CFGX(port), cfg);
 }
 
+int rvu_mbox_handler_mcs_set_sc_timer(struct rvu *rvu, struct mcs_set_sc_timer_req *req,
+				      struct msg_rsp *rsp)
+{
+	struct mcs *mcs;
+	u64 reg;
+
+	if (req->mcs_id >= rvu->mcs_blk_cnt)
+		return MCS_AF_ERR_INVALID_MCSID;
+
+	mcs = mcs_get_pdata(req->mcs_id);
+
+	if (!is_cn20k(mcs->pdev))
+		return MCS_AF_ERR_NOT_MAPPED ;
+
+	if (req->sc_id >= mcs->hw->sc_entries)
+		return MCS_AF_ERR_INVALID_MCSID;
+
+	if (req->dir == MCS_RX)
+		reg = MCSX_CPM_RX_SLAVE_SC_TIMER_MEM(req->sc_id);
+	else
+		reg = MCSX_CPM_TX_SLAVE_SC_TIMER_MEM(req->sc_id);
+
+	mcs_reg_write(mcs, reg, req->timer_val);
+	return 0;
+}
+
 int rvu_mbox_handler_mcs_get_mcs_id(struct rvu *rvu, struct mcs_get_id_req *req,
 				    struct mcs_get_id_rsp *rsp)
 {

@@ -1081,4 +1081,6 @@ enum mcs_devtype {
 #define MCSX_CPM_RX_SLAVE_PNX_THR_MEM1(a)	(0x18e60 + (a) * 0x10)
 #define MCSX_CPM_TX_SLAVE_PNX_THR_MEM0(a)	(0x275e8 + (a) * 0x10)
 #define MCSX_CPM_TX_SLAVE_PNX_THR_MEM1(a)	(0x275f0 + (a) * 0x10)
+#define MCSX_CPM_RX_SLAVE_SC_TIMER_MEM(a)	(0x1d6d8 + (a) * 0x8)
+#define MCSX_CPM_TX_SLAVE_SC_TIMER_MEM(a)	(0x2a648 + (a) * 0x8)
 #endif
