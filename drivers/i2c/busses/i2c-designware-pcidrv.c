@@ -300,6 +300,7 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
 	adap = &dev->adapter;
 	adap->owner = THIS_MODULE;
 	adap->class = 0;
+	adap->dev.of_node = pdev->dev.of_node;
 	adap->nr = controller->bus_num;
 
 	r = i2c_dw_probe(dev);
