@@ -1918,7 +1918,6 @@ int rvu_mbox_handler_nix_lf_alloc(struct rvu *rvu,
 		/* Setting the TX link as that of LBK */
 		rsp->tx_link = hw->cgx_links;
 		rvu_npc_set_pkind(rvu, NPC_RX_LBK_PKIND, pfvf);
-		rc = -EFAULT;
 		goto exit;
 	}
 
