@@ -28,7 +28,7 @@ int kvm_erratum_management_call(struct kvm_vcpu *vcpu)
 		break;
 	case ARM_SMCCC_EM_CPU_ERRATUM_FEATURES:
 		u32 erratum_num = smccc_get_arg1(vcpu);
-		u64 midr_el1 = kvm_read_vm_id_reg(vcpu->kvm, SYS_MIDR_EL1);
+		u64 midr_el1 = read_sysreg(MIDR_EL1);
 
 		if (cpus_have_final_cap(ARM64_WORKAROUND_4299121) &&
 		    is_erratum_in_erratum_list(erratum_bad_tc_tlb_cpus,
