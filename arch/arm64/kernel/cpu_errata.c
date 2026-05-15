@@ -412,7 +412,7 @@ static enum wa_bad_tc_tlb_workaround_idx wa_bad_tc_tlb_get_state(void)
 	 * If every stage2 mapping created is at least 64KB, or stage2 is not
 	 * in use, the erratum can not occur.
 	 */
-	if (IS_ENABLED(CONFIG_PAGE_SIZE_64KB) || !IS_ENABLED(CONFIG_KVM) ||
+	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES) || !IS_ENABLED(CONFIG_KVM) ||
 	    !is_hyp_mode_available() || kvm_get_mode() == KVM_MODE_NONE)
 		return BAD_TC_TLB_BUILDBOOT_CFG;
 
