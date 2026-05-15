@@ -67,13 +67,72 @@ static void thunder_i2c_hlc_int_disable(struct octeon_i2c *i2c)
 
 static u32 thunderx_i2c_functionality(struct i2c_adapter *adap)
 {
-	return I2C_FUNC_I2C | (I2C_FUNC_SMBUS_EMUL & ~I2C_FUNC_SMBUS_QUICK) |
-	       I2C_FUNC_SMBUS_READ_BLOCK_DATA | I2C_SMBUS_BLOCK_PROC_CALL;
+	u32 func = I2C_FUNC_I2C |
+		   (I2C_FUNC_SMBUS_EMUL & ~I2C_FUNC_SMBUS_QUICK) |
+		   I2C_FUNC_SMBUS_READ_BLOCK_DATA |
+		   I2C_SMBUS_BLOCK_PROC_CALL;
+
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	func |= I2C_FUNC_SLAVE | I2C_FUNC_10BIT_ADDR;
+#endif
+
+	return func;
 }
+
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+static int thunderx_i2c_slave_reg_target(struct i2c_client *slave)
+{
+	struct octeon_i2c *i2c = i2c_get_adapdata(slave->adapter);
+	unsigned long flags;
+	int ret = 0;
+
+	spin_lock_irqsave(&i2c->lock, flags);
+	if (i2c->slave) {
+		/* Already have a slave registered */
+		ret = -EBUSY;
+		goto out_unlock;
+	}
+
+	WRITE_ONCE(i2c->slave, slave);
+	if (i2c->is_master_xfer) {
+		/*
+		 * Master transfer in progress - just register the slave
+		 * but don't enable it yet. The master xfer will enable
+		 * slave mode when it completes.
+		 */
+		goto out_unlock;
+	}
+	octeon_i2c_enable_slave(i2c);
+
+out_unlock:
+	spin_unlock_irqrestore(&i2c->lock, flags);
+	return ret;
+}
+
+static int thunderx_i2c_slave_unreg_target(struct i2c_client *slave)
+{
+	struct octeon_i2c *i2c = i2c_get_adapdata(slave->adapter);
+	/*
+	 * Wait for any ongoing master transfer to complete.
+	 * This ensures master xfer restores slave properly before we disable.
+	 */
+	disable_irq(i2c->irq);
+	octeon_i2c_disable_slave(i2c);
+
+	WRITE_ONCE(i2c->slave, NULL);
+
+	enable_irq(i2c->irq);
+	return 0;
+}
+#endif
 
 static const struct i2c_algorithm thunderx_i2c_algo = {
 	.xfer = octeon_i2c_xfer,
 	.functionality = thunderx_i2c_functionality,
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	.reg_target = thunderx_i2c_slave_reg_target,
+	.unreg_target = thunderx_i2c_slave_unreg_target,
+#endif
 };
 
 static const struct i2c_adapter thunderx_i2c_ops = {
@@ -172,6 +231,11 @@ static int thunder_i2c_probe_pci(struct pci_dev *pdev,
 	i2c->roff.block_sts = 0x1050;
 	i2c->roff.block_fifo = 0x1058;
 
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	spin_lock_init(&i2c->lock);
+	i2c->is_master_xfer = false;
+#endif
+
 	i2c->dev = dev;
 	pci_set_drvdata(pdev, i2c);
 	ret = pcim_enable_device(pdev);
@@ -209,8 +273,20 @@ static int thunder_i2c_probe_pci(struct pci_dev *pdev,
 	if (ret < 0)
 		goto error;
 
-	ret = devm_request_irq(dev, pci_irq_vector(pdev, 0), octeon_i2c_isr, 0,
+	i2c->irq = pci_irq_vector(pdev, 0);
+#if !IS_ENABLED(CONFIG_I2C_SLAVE)
+	ret = devm_request_irq(dev, i2c->irq, octeon_i2c_isr, 0,
 			       DRV_NAME, i2c);
+#else
+	/* Use threaded IRQ so slave transactions are handled outside hard IRQ context */
+	ret = devm_request_threaded_irq(dev,
+				i2c->irq,
+				octeon_i2c_isr,
+				octeon_i2c_slave_isr,
+				IRQF_ONESHOT,
+				DRV_NAME,
+				i2c);
+#endif
 	if (ret)
 		goto error;
 

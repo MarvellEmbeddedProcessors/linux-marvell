@@ -30,10 +30,12 @@
 
 /* Controller extended opcode word (bits 34:32) */
 #define SW_TWSI_EOP_SHIFT	32
+#define SW_TWSI_EOP_TWSI_SLAVE_ADD	(SW_TWSI_OP_EOP | 0ULL << SW_TWSI_EOP_SHIFT)
 #define SW_TWSI_EOP_TWSI_DATA	(SW_TWSI_OP_EOP | 1ULL << SW_TWSI_EOP_SHIFT)
 #define SW_TWSI_EOP_TWSI_CTL	(SW_TWSI_OP_EOP | 2ULL << SW_TWSI_EOP_SHIFT)
 #define SW_TWSI_EOP_TWSI_CLKCTL	(SW_TWSI_OP_EOP | 3ULL << SW_TWSI_EOP_SHIFT)
 #define SW_TWSI_EOP_TWSI_STAT	(SW_TWSI_OP_EOP | 3ULL << SW_TWSI_EOP_SHIFT)
+#define SW_TWSI_EOP_TWSI_SLAVE_ADD_EXT	(SW_TWSI_OP_EOP | 4ULL << SW_TWSI_EOP_SHIFT)
 #define SW_TWSI_EOP_TWSI_RST	(SW_TWSI_OP_EOP | 7ULL << SW_TWSI_EOP_SHIFT)
 
 /* Controller command and status bits */
@@ -57,18 +59,18 @@
 #define STAT_RXADDR_NAK		0x48
 #define STAT_RXDATA_ACK		0x50
 #define STAT_RXDATA_NAK		0x58
-#define STAT_SLAVE_60		0x60
+#define STAT_SLAVE_WRITE	0x60
 #define STAT_LOST_ARB_68	0x68
 #define STAT_SLAVE_70		0x70
 #define STAT_LOST_ARB_78	0x78
-#define STAT_SLAVE_80		0x80
+#define STAT_SLAVE_RXDATA_ACK	0x80
 #define STAT_SLAVE_88		0x88
 #define STAT_GENDATA_ACK	0x90
 #define STAT_GENDATA_NAK	0x98
-#define STAT_SLAVE_A0		0xA0
-#define STAT_SLAVE_A8		0xA8
+#define STAT_SLAVE_STOP_START	0xA0
+#define STAT_SLAVE_READ		0xA8
 #define STAT_LOST_ARB_B0	0xB0
-#define STAT_SLAVE_LOST		0xB8
+#define STAT_SLAVE_TXDATA_ACK	0xB8
 #define STAT_SLAVE_NAK		0xC0
 #define STAT_SLAVE_ACK		0xC8
 #define STAT_AD2W_ACK		0xD0
@@ -144,6 +146,11 @@ struct octeon_i2c {
 	atomic_t hlc_int_enable_cnt;
 	struct i2c_smbus_alert_setup alert_data;
 	struct i2c_client *ara;
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	struct i2c_client *slave;
+	bool is_master_xfer;
+	spinlock_t lock;
+#endif
 };
 
 static inline void octeon_i2c_writeq_flush(u64 val, void __iomem *addr)
@@ -177,6 +184,10 @@ static inline void octeon_i2c_reg_write(struct octeon_i2c *i2c, u64 eop_reg, u8 
 	octeon_i2c_reg_write(i2c, SW_TWSI_EOP_TWSI_CTL, val)
 #define octeon_i2c_data_write(i2c, val)					\
 	octeon_i2c_reg_write(i2c, SW_TWSI_EOP_TWSI_DATA, val)
+#define octeon_i2c_slave_add_write(i2c, val)				\
+	octeon_i2c_reg_write(i2c, SW_TWSI_EOP_TWSI_SLAVE_ADD, val)
+#define octeon_i2c_slave_add_ext_write(i2c, val)			\
+	octeon_i2c_reg_write(i2c, SW_TWSI_EOP_TWSI_SLAVE_ADD_EXT, val)
 
 /**
  * octeon_i2c_reg_read - read lower bits of an I2C core register
@@ -253,9 +264,54 @@ static inline bool octeon_i2c_is_otx2(struct pci_dev *pdev)
 		chip_id == PCI_SUBSYS_DEVID_CN20X);
 }
 
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+/**
+ * octeon_i2c_is_slave_status - Check if status code is for slave mode
+ * @status: TWSI status register value
+ *
+ * Return: true if status is a slave-related code, false otherwise
+ */
+static inline bool octeon_i2c_is_slave_status(u8 status)
+{
+	switch (status) {
+	case STAT_SLAVE_WRITE:
+	case STAT_LOST_ARB_68:
+	case STAT_SLAVE_70:
+	case STAT_LOST_ARB_78:
+	case STAT_SLAVE_RXDATA_ACK:
+	case STAT_SLAVE_88:
+	case STAT_GENDATA_ACK:
+	case STAT_GENDATA_NAK:
+	case STAT_SLAVE_STOP_START:
+	case STAT_SLAVE_READ:
+	case STAT_LOST_ARB_B0:
+	case STAT_SLAVE_TXDATA_ACK:
+	case STAT_SLAVE_NAK:
+	case STAT_SLAVE_ACK:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/**
+ * octeon_i2c_clear_iflg - Clear the TWSI interrupt flag
+ * @i2c: The struct octeon_i2c
+ */
+static inline void octeon_i2c_clear_iflg(struct octeon_i2c *i2c)
+{
+	octeon_i2c_ctl_write(i2c, octeon_i2c_ctl_read(i2c) & ~TWSI_CTL_IFLG);
+}
+#endif
+
 /* Prototypes */
 irqreturn_t octeon_i2c_isr(int irq, void *dev_id);
 int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num);
 int octeon_i2c_init_lowlevel(struct octeon_i2c *i2c);
 void octeon_i2c_set_clock(struct octeon_i2c *i2c);
 extern struct i2c_bus_recovery_info octeon_i2c_recovery_info;
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+void octeon_i2c_enable_slave(struct octeon_i2c *i2c);
+void octeon_i2c_disable_slave(struct octeon_i2c *i2c);
+irqreturn_t octeon_i2c_slave_isr(int irq, void *dev_id);
+#endif

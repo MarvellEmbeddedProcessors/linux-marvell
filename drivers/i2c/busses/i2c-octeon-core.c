@@ -25,12 +25,41 @@
 #define TWSI_MASTER_CLK_REG_DEF_VAL	0x18
 #define TWSI_MASTER_CLK_REG_OTX2_VAL	0x3
 
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+#define TWSI_SLAVE_ADDR_10BIT_BASE	0xf0
+#define TWSI_SLAVE_ADDR_10BIT_BITS	0x3
+#define TWSI_SLAVE_ADDR_EXT_MASK	0xff
+#define TWSI_SLAVE_ADDR_SHIFT		1
+#endif
+
 /* interrupt service routine */
 irqreturn_t octeon_i2c_isr(int irq, void *dev_id)
 {
 	struct octeon_i2c *i2c = dev_id;
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	unsigned long flags;
+	bool has_slave;
+	u8 status;
+#endif
 
 	i2c->int_disable(i2c);
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	spin_lock_irqsave(&i2c->lock, flags);
+	/*
+	 * Skip slave status check during master transfer because
+	 * octeon_i2c_stat_read() writes to SW_TWSI register which
+	 * would corrupt any in-progress HLC command.
+	 */
+	has_slave = (READ_ONCE(i2c->slave) != NULL) && !i2c->is_master_xfer;
+	spin_unlock_irqrestore(&i2c->lock, flags);
+
+	if (has_slave) {
+		status = octeon_i2c_stat_read(i2c);
+		if (octeon_i2c_is_slave_status(status))
+			return IRQ_WAKE_THREAD;
+	}
+#endif
+
 	wake_up(&i2c->queue);
 
 	return IRQ_HANDLED;
@@ -229,6 +258,10 @@ static int octeon_i2c_check_status(struct octeon_i2c *i2c, int final_read)
 {
 	u8 stat;
 	u64 mode;
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	u8 val = 0;
+	struct i2c_client *slave;
+#endif
 
 	/*
 	 * This is ugly... in HLC mode the status is not in the status register
@@ -262,24 +295,47 @@ static int octeon_i2c_check_status(struct octeon_i2c *i2c, int final_read)
 
 	/* Arbitration lost */
 	case STAT_LOST_ARB_38:
-	case STAT_LOST_ARB_68:
 	case STAT_LOST_ARB_78:
-	case STAT_LOST_ARB_B0:
 		return -EAGAIN;
 
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	/* Arbitration lost, addressed as slave for read */
+	case STAT_LOST_ARB_B0:
+		slave = READ_ONCE(i2c->slave);
+		if (slave) {
+			i2c_slave_event(slave, I2C_SLAVE_READ_REQUESTED, &val);
+			octeon_i2c_data_write(i2c, val);
+			octeon_i2c_clear_iflg(i2c);
+		}
+		return -EAGAIN;
+
+	/* Arbitration lost, addressed as slave for write */
+	case STAT_LOST_ARB_68:
+		slave = READ_ONCE(i2c->slave);
+		if (slave) {
+			i2c_slave_event(slave, I2C_SLAVE_WRITE_REQUESTED, NULL);
+			octeon_i2c_clear_iflg(i2c);
+		}
+		return -EAGAIN;
+#else
+	case STAT_LOST_ARB_B0:
+	case STAT_LOST_ARB_68:
+		return -EAGAIN;
+#endif
+
 	/* Being addressed as local target, should back off & listen */
-	case STAT_SLAVE_60:
+	case STAT_SLAVE_WRITE:
 	case STAT_SLAVE_70:
 	case STAT_GENDATA_ACK:
 	case STAT_GENDATA_NAK:
 		return -EOPNOTSUPP;
 
 	/* Core busy as local target */
-	case STAT_SLAVE_80:
+	case STAT_SLAVE_RXDATA_ACK:
 	case STAT_SLAVE_88:
-	case STAT_SLAVE_A0:
-	case STAT_SLAVE_A8:
-	case STAT_SLAVE_LOST:
+	case STAT_SLAVE_STOP_START:
+	case STAT_SLAVE_READ:
+	case STAT_SLAVE_TXDATA_ACK:
 	case STAT_SLAVE_NAK:
 	case STAT_SLAVE_ACK:
 		return -EOPNOTSUPP;
@@ -767,11 +823,26 @@ err:
  * @num: Length of the MSGS array
  *
  * Returns: the number of messages processed, or a negative errno on failure.
+ *
+ * Note: When slave mode is registered, master operations may disable slave
+ * temporarily, perform the transfer, and then restore slave mode at the end.
  */
 int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	struct octeon_i2c *i2c = i2c_get_adapdata(adap);
 	int i, ret = 0;
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	unsigned long flags;
+	bool has_slave;
+
+	spin_lock_irqsave(&i2c->lock, flags);
+	has_slave = (READ_ONCE(i2c->slave) != NULL);
+	if (has_slave)
+		i2c->is_master_xfer = true;
+	spin_unlock_irqrestore(&i2c->lock, flags);
+	if (has_slave)
+		synchronize_irq(i2c->irq);
+#endif
 
 	if (IS_LS_FREQ(i2c->twsi_freq)) {
 		if (num == 1) {
@@ -816,7 +887,7 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 
 		ret = octeon_i2c_start(i2c);
 		if (ret)
-			return ret;
+			goto out;
 
 		if (pmsg->flags & I2C_M_RD)
 			ret = octeon_i2c_read(i2c, pmsg->addr, pmsg->buf,
@@ -827,6 +898,13 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	}
 	octeon_i2c_stop(i2c);
 out:
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	spin_lock_irqsave(&i2c->lock, flags);
+	if (READ_ONCE(i2c->slave))
+		octeon_i2c_enable_slave(i2c);
+	i2c->is_master_xfer = false;
+	spin_unlock_irqrestore(&i2c->lock, flags);
+#endif
 	return (ret != 0) ? ret : num;
 }
 
@@ -1010,3 +1088,128 @@ struct i2c_bus_recovery_info octeon_i2c_recovery_info = {
 	.prepare_recovery = octeon_i2c_prepare_recovery,
 	.unprepare_recovery = octeon_i2c_unprepare_recovery,
 };
+
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+/**
+ * octeon_i2c_slave_isr - Threaded IRQ handler for I2C slave mode
+ * @irq: IRQ number
+ * @dev_id: Device pointer (octeon_i2c structure)
+ *
+ * Handles the I2C slave state machine by reading the status register
+ * and notifying the I2C slave backend of events. This runs in thread
+ * context to allow sleeping operations in the backend.
+ *
+ * Return: IRQ_HANDLED after processing the event
+ */
+irqreturn_t octeon_i2c_slave_isr(int irq, void *dev_id)
+{
+	struct octeon_i2c *i2c = dev_id;
+	struct i2c_client *slave;
+	int result = 0;
+	u8 status = 0;
+	u8 val = 0;
+
+	slave = READ_ONCE(i2c->slave);
+
+	/* If slave was unregistered, just clear interrupt and return */
+	if (!slave) {
+		octeon_i2c_clear_iflg(i2c);
+		i2c->int_enable(i2c);
+		return IRQ_HANDLED;
+	}
+
+	status = octeon_i2c_stat_read(i2c);
+
+	switch (status) {
+	/* Master wants to read from slave - send first byte */
+	case STAT_SLAVE_READ:
+	/* Arbitration lost, addressed as slave for read */
+	case STAT_LOST_ARB_B0:
+		i2c_slave_event(slave, I2C_SLAVE_READ_REQUESTED, &val);
+		octeon_i2c_data_write(i2c, val);
+		break;
+	/* Master ACKed previous byte - send next byte */
+	case STAT_SLAVE_TXDATA_ACK:
+		i2c_slave_event(slave, I2C_SLAVE_READ_PROCESSED, &val);
+		octeon_i2c_data_write(i2c, val);
+		break;
+	/* STOP or repeated START detected */
+	case STAT_SLAVE_STOP_START:
+	/* Master NAKed - transfer complete */
+	case STAT_SLAVE_NAK:
+		i2c_slave_event(slave, I2C_SLAVE_STOP, NULL);
+		break;
+	/* Master wants to write to slave - prepare to receive */
+	case STAT_SLAVE_WRITE:
+	/* Arbitration lost, addressed as slave for write */
+	case STAT_LOST_ARB_68:
+		i2c_slave_event(slave, I2C_SLAVE_WRITE_REQUESTED, NULL);
+		break;
+	/* Received data byte from master */
+	case STAT_SLAVE_RXDATA_ACK:
+		val = octeon_i2c_data_read(i2c, &result);
+		if (result) {
+			dev_err(i2c->dev, "i2c slave invalid data received\n");
+			break;
+		}
+		i2c_slave_event(slave, I2C_SLAVE_WRITE_RECEIVED, &val);
+		break;
+	case STAT_IDLE:
+		break;
+	default:
+		dev_err(i2c->dev, "i2c slave unhandled status code received %u\n", status);
+	}
+
+	/* Clear interrupt flag and re-enable interrupts for next event */
+	octeon_i2c_clear_iflg(i2c);
+	i2c->int_enable(i2c);
+
+	return IRQ_HANDLED;
+}
+
+/**
+ * octeon_i2c_enable_slave - Configure and enable I2C slave mode
+ * @i2c: The struct octeon_i2c
+ *
+ * Programs the slave address registers and enables the controller
+ * to respond to transactions addressed to the configured address.
+ * Supports both 7-bit and 10-bit addressing modes.
+ *
+ * For 10-bit addressing:
+ *   - SLAVE_ADD register: 11110XX0 where XX are addr bits [9:8]
+ *   - SLAVE_ADD_EXT register: lower 8 bits of address
+ */
+void octeon_i2c_enable_slave(struct octeon_i2c *i2c)
+{
+	u16 addr = i2c->slave->addr;
+
+	i2c->hlc_int_disable(i2c);
+	i2c->int_disable(i2c);
+
+	if (i2c->slave->flags & I2C_CLIENT_TEN) {
+		octeon_i2c_slave_add_write(i2c, TWSI_SLAVE_ADDR_10BIT_BASE | (((addr >> 8) & TWSI_SLAVE_ADDR_10BIT_BITS) << TWSI_SLAVE_ADDR_SHIFT));
+		octeon_i2c_slave_add_ext_write(i2c, addr & TWSI_SLAVE_ADDR_EXT_MASK);
+	} else {
+		octeon_i2c_slave_add_write(i2c, (u8)addr << TWSI_SLAVE_ADDR_SHIFT);
+		octeon_i2c_slave_add_ext_write(i2c, 0x0);
+	}
+
+	octeon_i2c_ctl_write(i2c, TWSI_CTL_AAK | TWSI_CTL_ENAB);
+	i2c->int_enable(i2c);
+}
+
+/**
+ * octeon_i2c_disable_slave - Disable I2C slave mode
+ * @i2c: The struct octeon_i2c
+ *
+ * Disables the slave mode by clearing control and address registers.
+ */
+void octeon_i2c_disable_slave(struct octeon_i2c *i2c)
+{
+	i2c->int_disable(i2c);
+
+	octeon_i2c_ctl_write(i2c, 0x0);
+	octeon_i2c_slave_add_write(i2c, 0x0);
+	octeon_i2c_slave_add_ext_write(i2c, 0x0);
+}
+#endif
