@@ -1730,12 +1730,11 @@ static void rvu_sso_af_intr_moderate(int vector)
 		int blkaddr = rvu_get_blkaddr(intr_mod->rvu, BLKTYPE_SSO, 0);
 		int count = atomic_xchg(&intr_mod->count, 0);
 
+		intr_mod->timeout = jiffies + SSO_AF_INT_MOD_TMO;
 		if (count > SSO_AF_INT_MOD_THRESH) {
 			rvu_write64(intr_mod->rvu, blkaddr,
 				    intr_mod->vec_ena_clr_off, ~0ULL);
-			mod_timer(&intr_mod->timer, SSO_AF_INT_MOD_TMO);
-		} else {
-			intr_mod->timeout = jiffies + SSO_AF_INT_MOD_TMO;
+			mod_timer(&intr_mod->timer, intr_mod->timeout);
 		}
 	} else {
 		atomic_inc(&intr_mod->count);
