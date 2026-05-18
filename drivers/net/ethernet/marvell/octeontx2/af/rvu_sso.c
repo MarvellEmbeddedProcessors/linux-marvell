@@ -64,6 +64,7 @@ struct rvu_sso_intr_mod {
 	unsigned long timeout;
 	atomic_t count;
 	int vec_ena_off;
+	int vec_ena_clr_off;
 } *sso_intr_mod;
 
 void rvu_sso_hwgrp_config_thresh(struct rvu *rvu, int blkaddr, int lf,
@@ -1681,7 +1682,7 @@ static void rvu_sso_af_intr_moderate(int vector)
 
 		if (count > SSO_AF_INT_MOD_THRESH) {
 			rvu_write64(intr_mod->rvu, blkaddr,
-				    intr_mod->vec_ena_off, 0ULL);
+				    intr_mod->vec_ena_clr_off, ~0ULL);
 			mod_timer(&intr_mod->timer, SSO_AF_INT_MOD_TMO);
 		} else {
 			intr_mod->timeout = jiffies + SSO_AF_INT_MOD_TMO;
@@ -1948,13 +1949,14 @@ static void rvu_sso_intr_mod_cb(struct timer_list *t)
 }
 
 static void rvu_sso_af_intr_mod_setup(struct rvu *rvu, int vector,
-				      int vec_ena_off)
+				      int vec_ena_off, int vec_ena_clr_off)
 {
 	struct rvu_sso_intr_mod *intr_mod = &sso_intr_mod[vector];
 
 	intr_mod->rvu = rvu;
 	intr_mod->timeout = jiffies + SSO_AF_INT_MOD_TMO;
 	intr_mod->vec_ena_off = vec_ena_off;
+	intr_mod->vec_ena_clr_off = vec_ena_clr_off;
 	timer_setup(&intr_mod->timer, rvu_sso_intr_mod_cb, 0);
 }
 
@@ -1986,7 +1988,7 @@ int rvu_sso_register_interrupts(struct rvu *rvu)
 	}
 
 	rvu_sso_af_intr_mod_setup(rvu, SSO_AF_INT_VEC_ERR0,
-				  SSO_AF_ERR0_ENA_W1S);
+				  SSO_AF_ERR0_ENA_W1S, SSO_AF_ERR0_ENA_W1C);
 	ret = rvu_sso_do_register_interrupt(rvu, offs + SSO_AF_INT_VEC_ERR0,
 					    rvu_sso_af_err0_intr_handler,
 					    "SSO_AF_ERR0");
@@ -1995,7 +1997,7 @@ int rvu_sso_register_interrupts(struct rvu *rvu)
 	rvu_write64(rvu, blkaddr, SSO_AF_ERR0_ENA_W1S, ~0ULL);
 
 	rvu_sso_af_intr_mod_setup(rvu, SSO_AF_INT_VEC_ERR2,
-				  SSO_AF_ERR2_ENA_W1S);
+				  SSO_AF_ERR2_ENA_W1S, SSO_AF_ERR2_ENA_W1C);
 	ret = rvu_sso_do_register_interrupt(rvu, offs + SSO_AF_INT_VEC_ERR2,
 					    rvu_sso_af_err2_intr_handler,
 					    "SSO_AF_ERR2");
@@ -2003,7 +2005,8 @@ int rvu_sso_register_interrupts(struct rvu *rvu)
 		goto err;
 	rvu_write64(rvu, blkaddr, SSO_AF_ERR2_ENA_W1S, ~0ULL);
 
-	rvu_sso_af_intr_mod_setup(rvu, SSO_AF_INT_VEC_RAS, SSO_AF_RAS_ENA_W1S);
+	rvu_sso_af_intr_mod_setup(rvu, SSO_AF_INT_VEC_RAS,
+				  SSO_AF_RAS_ENA_W1S, SSO_AF_RAS_ENA_W1C);
 	ret = rvu_sso_do_register_interrupt(rvu, offs + SSO_AF_INT_VEC_RAS,
 					    rvu_sso_af_ras_intr_handler,
 					    "SSO_AF_RAS");
