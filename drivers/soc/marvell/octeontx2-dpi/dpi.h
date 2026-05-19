@@ -61,6 +61,9 @@
 #define DPI_DMA_IDS_DMA_STRM(x)			((uint64_t)((x) & 0xff) << 32)
 #define DPI_DMA_IDS_GET_DMA_STRM(x)		(((x) >> 32) & 0xff)
 
+#define DPI_DMA_IDS_SEC_DMA_STRM(x)		((uint64_t)((x) & 0xff) << 48)
+#define DPI_DMA_IDS_GET_SEC_DMA_STRM(x)		(((x) >> 48) & 0xff)
+
 #define DPI_DMA_IDS_DMA_NPA_PF_FUNC(x)		((uint64_t)((x) & 0xffff) << 16)
 #define DPI_DMA_IDS_GET_DMA_NPA_PF_FUNC(x)	(((x) >> 16) & 0xffff)
 
@@ -349,6 +352,7 @@ struct dpivf_config {
 	uint32_t aura;
 	uint16_t sso_pf_func;
 	uint16_t npa_pf_func;
+	uint8_t sec_strm_id;
 };
 
 struct dpipf_vf {
@@ -393,7 +397,11 @@ union dpi_mbox_message_t {
 		/* Work queue completion status enable */
 		uint64_t wqecs		:1;
 		/* Work queue completion status byte offset */
-		uint64_t wqecsoff	:7;
+		uint64_t wqecsoff	:8;
+		/* Priority */
+		uint64_t pri		:1;
+		/* Secondary stream ID */
+		uint64_t sec_strm_id    :8;
 	} s;
 };
 

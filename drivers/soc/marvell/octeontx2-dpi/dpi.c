@@ -81,6 +81,7 @@ static int dpi_queue_init(struct dpipf *dpi, struct dpipf_vf *dpivf, u8 vf)
 	u16 csize = dpivf->vf_config.csize;
 	u16 sso_pf_func = dpivf->vf_config.sso_pf_func;
 	u16 npa_pf_func = dpivf->vf_config.npa_pf_func;
+	u16 sec_vf = dpivf->vf_config.sec_strm_id;
 
 	spin_lock(&dpi->vf_lock);
 
@@ -144,6 +145,7 @@ static int dpi_queue_init(struct dpipf *dpi, struct dpipf_vf *dpivf, u8 vf)
 	reg |= DPI_DMA_IDS_DMA_NPA_PF_FUNC(npa_pf_func);
 	reg |= DPI_DMA_IDS_DMA_SSO_PF_FUNC(sso_pf_func);
 	reg |= DPI_DMA_IDS_DMA_STRM(vf + 1);
+	reg |= DPI_DMA_IDS_SEC_DMA_STRM(sec_vf);
 	reg |= DPI_DMA_IDS_INST_STRM(vf + 1);
 	dpi_reg_write(dpi, DPI_DMAX_IDS(queue), reg);
 
@@ -535,6 +537,7 @@ static int queue_config(struct dpipf *dpi, struct dpipf_vf *dpivf,
 		dpivf->vf_config.csize = msg->s.csize / 8;
 		dpivf->vf_config.sso_pf_func = msg->s.sso_pf_func;
 		dpivf->vf_config.npa_pf_func = msg->s.npa_pf_func;
+		dpivf->vf_config.sec_strm_id = msg->s.sec_strm_id;
 		dpi_queue_init(dpi, dpivf, msg->s.vfid);
 		if (msg->s.wqecs)
 			dpi_wqe_cs_offset(dpi, msg->s.wqecsoff);
@@ -545,6 +548,7 @@ static int queue_config(struct dpipf *dpi, struct dpipf_vf *dpivf,
 		dpivf->vf_config.csize = msg->s.csize;
 		dpivf->vf_config.sso_pf_func = msg->s.sso_pf_func;
 		dpivf->vf_config.npa_pf_func = msg->s.npa_pf_func;
+		dpivf->vf_config.sec_strm_id = msg->s.sec_strm_id;
 		dpi_queue_init(dpi, dpivf, msg->s.vfid);
 		if (msg->s.wqecs)
 			dpi_wqe_cs_offset(dpi, msg->s.wqecsoff);
@@ -555,6 +559,7 @@ static int queue_config(struct dpipf *dpi, struct dpipf_vf *dpivf,
 		dpivf->vf_config.csize = 0;
 		dpivf->vf_config.sso_pf_func = 0;
 		dpivf->vf_config.npa_pf_func = 0;
+		dpivf->vf_config.sec_strm_id = 0;
 		dpi_queue_fini(dpi, dpivf, msg->s.vfid);
 		dpivf->setup_done = false;
 		break;
