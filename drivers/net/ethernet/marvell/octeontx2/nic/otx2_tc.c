@@ -1591,6 +1591,118 @@ static int otx2_setup_tc_block(struct net_device *netdev,
 					  nic, nic, ingress);
 }
 
+static int
+otx2_teardown_tc_mqprio(struct otx2_nic *pfvf,
+			struct tc_mqprio_qopt_offload *mqprio)
+{
+	struct tc_mqprio_qopt *qopt = &mqprio->qopt;
+	struct net_device *netdev = pfvf->netdev;
+	bool if_up = netif_running(netdev);
+
+	if (!if_up) {
+		netdev_err(netdev, "Can apply clear on UP interfaces");
+		return -ENOTSUPP;
+	}
+
+	pfvf->flags &= ~OTX2_FLAG_PER_Q_RATE_LIMIT_ENABLED;
+	otx2_stop(pfvf->netdev);
+	otx2_open(pfvf->netdev);
+
+	otx2_nix_tm_clear_queue_shaper(pfvf);
+
+	qopt->hw = 0;
+	netdev_set_num_tc(netdev, 0);
+
+	return 0;
+}
+
+static int
+otx2_setup_tc_mqprio(struct net_device *netdev,
+		     struct tc_mqprio_qopt_offload *mqprio)
+{
+	struct otx2_nic *pfvf = netdev_priv(netdev);
+	struct tc_mqprio_qopt *qopt = &mqprio->qopt;
+	bool if_up = netif_running(netdev);
+	int min_rate, max_rate;
+	int tc, txq, err;
+
+	if (!if_up) {
+		netdev_err(netdev, "Can apply only on UP interfaces");
+		return -ENOTSUPP;
+	}
+
+	/* Teardown path: hw=0 means reset */
+	if (!qopt->hw) {
+		otx2_teardown_tc_mqprio(pfvf, mqprio);
+		return 0;
+	}
+
+	if (mqprio->shaper != TC_MQPRIO_SHAPER_BW_RATE) {
+		netdev_err(netdev, "Invalid shaper %#x", mqprio->shaper);
+		return -ENOTSUPP;
+	}
+
+	/* Validate num_tc against NIX TM tree capacity */
+	if (qopt->num_tc >  pfvf->hw.non_qos_queues) {
+		netdev_err(netdev, "Number of tc(%u) is more than hw queues %u\n",
+			   qopt->num_tc,  pfvf->hw.non_qos_queues);
+		return -EINVAL;
+	}
+
+	pfvf->flags |= OTX2_FLAG_PER_Q_RATE_LIMIT_ENABLED;
+
+	otx2_stop(pfvf->netdev);
+	otx2_open(pfvf->netdev);
+
+	/* Configure NIX TM tree: one SMQ/TL4 per TC */
+	for (tc = 0; tc < qopt->num_tc; tc++) {
+		for (txq = qopt->offset[tc];
+		     txq < qopt->count[tc] + qopt->offset[tc];
+		     txq++) {
+
+			if (txq >= qopt->num_tc) {
+				otx2_teardown_tc_mqprio(pfvf, mqprio);
+				return -EINVAL;
+			}
+
+			if (mqprio->flags & TC_MQPRIO_F_MIN_RATE)
+				min_rate = mqprio->min_rate[tc];  /* bps */
+
+			if (mqprio->flags & TC_MQPRIO_F_MAX_RATE)
+				max_rate = mqprio->max_rate[tc];  /* bps */
+
+			if (min_rate > max_rate) {
+				otx2_teardown_tc_mqprio(pfvf, mqprio);
+				netdev_err(netdev,
+					   "Error to set min_rate=%u max_rate=%u to tc(%u)\n",
+					   min_rate, max_rate, tc);
+				return -EFAULT;
+			}
+			netdev_err(netdev,
+				   "seting min_rate=%u max_rate=%u to tc(%u)\n",
+				   min_rate, max_rate, tc);
+
+			err = otx2_nix_tm_set_queue_shaper(pfvf, txq,
+							   min_rate, max_rate);
+			if (err)
+				goto cleanup;
+		}
+	}
+
+    /* Tell kernel the queue mapping */
+    netdev_set_num_tc(netdev, qopt->num_tc);
+    for (int i = 0; i < qopt->num_tc; i++)
+        netdev_set_tc_queue(netdev, i, qopt->count[i], qopt->offset[i]);
+
+    /* Indicate HW offload is active */
+    qopt->hw = TC_MQPRIO_HW_OFFLOAD_TCS;
+    return 0;
+
+cleanup:
+    otx2_teardown_tc_mqprio(pfvf, mqprio);
+    return err;
+}
+
 int otx2_setup_tc(struct net_device *netdev, enum tc_setup_type type,
 		  void *type_data)
 {
@@ -1608,6 +1720,9 @@ int otx2_setup_tc(struct net_device *netdev, enum tc_setup_type type,
 		return otx2_setup_tc_block(netdev, type_data);
 	case TC_SETUP_QDISC_HTB:
 		return otx2_setup_tc_htb(netdev, type_data);
+
+	case TC_SETUP_QDISC_MQPRIO:
+		return otx2_setup_tc_mqprio(netdev, type_data);
 
 	case TC_SETUP_FT:
 		return flow_block_cb_setup_simple(type_data,
