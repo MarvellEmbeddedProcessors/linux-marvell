@@ -319,7 +319,7 @@ int sw_nb_unregister(void)
 		pr_err("Failed to unregister addr event\n");
 
 #if IS_ENABLED(CONFIG_IPV6)
-	err = unregister_inetaddr_notifier(&sw_nb_v6_inetaddr);
+	err = unregister_inet6addr_notifier(&sw_nb_v6_inetaddr);
 	if (err)
 		pr_err("Failed to unregister addr event\n");
 #endif
