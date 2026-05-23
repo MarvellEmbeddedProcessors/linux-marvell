@@ -230,7 +230,7 @@ static int __init ghes_bed_of_match_resource(struct mrvl_bed_source *bsrc)
 		res = of_get_address(child_node, 0, &size, NULL);
 		if (!res)
 			goto err;
-	} else if (is_soc_cn10kx()) {
+	} else if (is_soc_cn10kx() || is_soc_cn20kx()) {
 		res = of_get_address(child_node, 1, &size, NULL);
 		if (!res)
 			goto err;
@@ -318,7 +318,7 @@ static int __init ghes_bert_init(void)
 
 	if (is_soc_cn9x())
 		len = sizeof(struct bed_bert_mem_entry) * err_ring->size;
-	else if (is_soc_cn10kx())
+	else if (is_soc_cn10kx() || is_soc_cn20kx())
 		len = bed_src.estatus_sz;
 
 	buff = kzalloc(len, GFP_KERNEL);
