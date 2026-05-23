@@ -174,6 +174,15 @@ static void octeontx_edac_inject_error(struct octeontx_edac_pvt *pvt)
 			arg[4] = pvt->address;		// Address is in arg[4] instead of arg[2].
 		}
 		arm_smccc_smc(arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], &res);
+	} else if (is_soc_cn20kx()) {
+		arg[0] = CN10K_EDAC_INJECT;
+		arg[1] = 0xD;
+		if (pvt->error_type & CN10K_DSS_EINJ_CAP) {
+			// error injection bitmask
+			arg[2] = pvt->error_type;
+		}
+		arm_smccc_smc(arg[0], arg[1], arg[2], arg[3], arg[4],
+				arg[5], arg[6], arg[7], &res);
 	} else {
 		arg[0] = OCTEONTX2_EDAC_INJECT;
 		arg[1] = 0x3;
@@ -684,7 +693,7 @@ static void octeontx_edac_msix_init(void)
 	struct pci_dev *pdev;
 	size_t i;
 
-	if (soc_device_match(cn10_socinfo))
+	if (soc_device_match(cn10_socinfo) || is_soc_cn20kx())
 		return;
 
 	for (i = 0; i < ARRAY_SIZE(octeontx_edac_pci_tbl); i++) {
@@ -971,7 +980,7 @@ static int octeontx_mdc_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	if (soc_device_match(cn10_socinfo))
+	if (soc_device_match(cn10_socinfo) || is_soc_cn20kx())
 		ghes->ecc_cap = 0;
 	else
 		ghes->ecc_cap = OCTEONTX2_MDC_EINJ_CAP;
@@ -1207,7 +1216,7 @@ static int __init octeontx_edac_init(void)
 	ret = octeontx_ghes_of_match_resource(&ghes_list);
 	if (ret)
 		goto exit0;
-	if (soc_device_match(cn10_socinfo)) {
+	if (soc_device_match(cn10_socinfo) || is_soc_cn20kx()) {
 
 		ret = platform_driver_register(&dss_edac_drv);
 		if (!ret)
@@ -1287,7 +1296,7 @@ exit0:
 
 static void __exit octeontx_edac_exit(void)
 {
-	if (soc_device_match(cn10_socinfo)) {
+	if (soc_device_match(cn10_socinfo) || is_soc_cn20kx()) {
 		platform_driver_unregister(&dss_edac_drv);
 		platform_driver_unregister(&tad_edac_drv);
 		platform_driver_unregister(&cpu_edac_drv);
