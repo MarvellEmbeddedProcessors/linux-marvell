@@ -5196,7 +5196,7 @@ static int nix_calibrate_x2p(struct rvu *rvu, int blkaddr)
 	}
 
 	/* Check if LBK is ready */
-	if (!(status & BIT_ULL(19))) {
+	if (!(status & (is_cn20k(rvu->pdev) ? BIT_ULL(21) : BIT_ULL(19)))) {
 		dev_err(rvu->dev,
 			"LBK didn't respond to NIX X2P calibration\n");
 		err = -EBUSY;
