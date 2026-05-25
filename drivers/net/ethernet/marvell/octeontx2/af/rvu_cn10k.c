@@ -108,8 +108,13 @@ static int rvu_get_lmtaddr(struct rvu *rvu, u16 pcifunc,
 	/* PA[51:12] = RVU_AF_SMMU_TLN_FLIT0[57:18]
 	 * PA[11:0] = IOVA[11:0]
 	 */
-	pa = rvu_read64(rvu, BLKADDR_RVUM, RVU_AF_SMMU_TLN_FLIT0) >> 18;
-	pa &= GENMASK_ULL(39, 0);
+	if (is_cn20k(rvu->pdev)) {
+		pa = rvu_read64(rvu, BLKADDR_RVUM, RVU_AF_SMMU_TLN_FLIT0) >> 14;
+		pa &= GENMASK_ULL(35, 0);
+	} else {
+		pa = rvu_read64(rvu, BLKADDR_RVUM, RVU_AF_SMMU_TLN_FLIT0) >> 18;
+		pa &= GENMASK_ULL(39, 0);
+	}
 	*lmt_addr = (pa << 12) | (iova  & 0xFFF);
 exit:
 	mutex_unlock(&rvu->rsrc_lock);
