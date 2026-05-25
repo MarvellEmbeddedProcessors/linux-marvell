@@ -444,6 +444,7 @@ void mcs_ena_dis_flowid_entry(struct mcs *mcs, int flow_id, int dir, int ena)
 	}
 
 	/* Enable/Disable the tcam entry */
+	flow_id &= 0x3f;
 	if (ena)
 		val = mcs_reg_read(mcs, reg) | BIT_ULL(flow_id);
 	else
