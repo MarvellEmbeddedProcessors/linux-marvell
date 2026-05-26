@@ -457,6 +457,9 @@ static void cnf10k_rfoe_ptp_tx_work(struct work_struct *work)
 		return;
 	}
 
+	if (!netif_carrier_ok(priv->netdev))
+		goto tx_tstmp_error;
+
 	if (!(skb_shinfo(priv->ptp_tx_skb)->tx_flags & SKBTX_IN_PROGRESS)) {
 		netif_err(priv, tx_done, priv->netdev,
 			  "ptp tx skb SKBTX_IN_PROGRESS not set\n");
@@ -516,7 +519,7 @@ submit_next_req:
 		dev_kfree_skb_any(priv->ptp_tx_skb);
 	priv->ptp_tx_skb = NULL;
 
-	if (txq && netif_tx_queue_stopped(txq))
+	if (txq && netif_tx_queue_stopped(txq) && netif_carrier_ok(priv->netdev))
 		netif_tx_wake_queue(txq);
 	spin_unlock_irqrestore(&priv->tx_ptp_job_cfg.lock, flags);
 }
@@ -1112,8 +1115,11 @@ static netdev_tx_t cnf10k_rfoe_ptp_xmit(struct sk_buff *skb,
 
 	spin_lock_irqsave(&job_cfg->lock, flags);
 
-	if (cnf10k_rfoe_check_update_tx_stats(priv, pkt_stats_type))
-		goto exit;
+	if (cnf10k_rfoe_check_update_tx_stats(priv, pkt_stats_type)) {
+		spin_unlock_irqrestore(&job_cfg->lock, flags);
+		dev_kfree_skb_any(skb);
+		return NETDEV_TX_OK;
+	}
 
 	/* get psm queue number */
 	psm_queue_id = job_cfg->psm_queue_id;
