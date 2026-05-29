@@ -281,13 +281,32 @@ static int pan_ktls_submit(struct otx2_nic *pf, struct otx2_rcv_queue *rq,
 static int pan_tls_add_conn(struct otx2_nic *pf, struct pan_fl_tbl_res *res)
 {
 	struct pan_ktls_ctx *ctx = &res->opq->ctx;
+	struct pan_ktls_seg_ctx *seg;
 	struct pan_cpt_tls_ctx_s *cptr;
 	u8 conn = ctx->conn_id;
 	int i, j = 0;
+	int ret;
 
 	cptr = cn10k_ktls_new_conn(pf, conn);
 	if (!cptr)
 		return -ENOSPC;
+
+	seg = &pan_ktls.seg[conn];
+
+	/* Allocate coherent DMA buffer used to assemble a full TLS record when
+	 * it spans multiple TCP segments.  Sized for the worst-case TLS record.
+	 */
+	if (!seg->io_buf) {
+		ret = qmem_alloc(pf->dev, &seg->io_buf, 1, PAN_KTLS_IOBUF_SIZE);
+		if (ret) {
+			dev_err(pf->dev, "KTLS: io_buf alloc failed for conn %u\n",
+				conn);
+			return ret;
+		}
+	}
+	seg->state = PAN_KTLS_SEG_IDLE;
+	seg->npkts = 0;
+	seg->collected_len = 0;
 
 	memset(cptr, 0, sizeof(*cptr));
 
@@ -402,6 +421,32 @@ static int pan_ktls_conn_add(struct pan_ktls_add_conn_req *req)
 	return 0;
 }
 
+static void pan_ktls_seg_reset(struct pan_ktls_seg_ctx *seg, u8 conn_id)
+{
+	struct pan_ktls_pkt_ref *ref;
+	int i;
+
+	/* Drop any packets buffered mid-record to avoid buffer leaks */
+	if (seg->state == PAN_KTLS_SEG_COLLECTING && seg->npkts > 0) {
+		pr_warn("KTLS: conn %u deleted mid-record; dropping %d buffered pkts\n",
+			conn_id, seg->npkts);
+		for (i = 0; i < seg->npkts; i++) {
+			ref = &seg->pkts[i];
+			pan_nic->hw_ops->aura_freeptr(pan_nic,
+						      seg->cq->cq_idx,
+						      ref->cqe.sg.seg_addr &
+						      ~0x07ULL);
+		}
+	}
+
+	if (seg->io_buf && pan_nic) {
+		qmem_free(pan_nic->dev, seg->io_buf);
+		seg->io_buf = NULL;
+	}
+
+	memset(seg, 0, sizeof(*seg));
+}
+
 static int pan_ktls_conn_del(struct pan_ktls_del_conn_req *req)
 {
 	struct pan_ktls_mbox_ctx *ctx;
@@ -422,6 +467,7 @@ static int pan_ktls_conn_del(struct pan_ktls_del_conn_req *req)
 	if (info->ctx_handle)
 		pan_fl_tbl_del_by_handle(info->ctx_handle);
 
+	pan_ktls_seg_reset(&pan_ktls.seg[req->conn_id], req->conn_id);
 	memset(ctx, 0, sizeof(*ctx));
 	memset(info, 0, sizeof(*info));
 	pr_info("PAN offload rule deleted for conn_id:%d\n", req->conn_id);
@@ -447,6 +493,7 @@ static void pan_ktls_conn_del_all(void)
 		if (info->ctx_handle)
 			pan_fl_tbl_del_by_handle(info->ctx_handle);
 
+		pan_ktls_seg_reset(&pan_ktls.seg[i], i);
 		memset(ctx, 0, sizeof(*ctx));
 		memset(info, 0, sizeof(*info));
 		pr_info("PAN offload rule deleted for conn_id:%d\n", i);
@@ -477,44 +524,146 @@ void pan_ktls_process_mbox(struct otx2_nic *pf, struct mbox_msghdr *msg)
 	}
 }
 
+/*
+ * Encrypt the full TLS record assembled in seg->io_buf using the NONSEG
+ * CPT opcode.  The io_buf must be laid out as:
+ *   [0 .. 4]                  TLS record header (5 B, used as AAD)
+ *   [5 .. 12]                 explicit IV (8 B)
+ *   [13 .. 13+plen-1]         plaintext (plen B)
+ *   [13+plen .. 13+plen+15]   auth-tag space (16 B, zeroed, filled by CPT)
+ *
+ * On success the same region holds the encrypted output in-place.
+ */
+static int pan_ktls_encrypt_iobuf(struct otx2_nic *pf,
+				  struct otx2_rcv_queue *rq,
+				  struct pan_ktls_seg_ctx *seg, u8 conn_id)
+{
+	struct qmem *ctx = kcpt_ctx.ctx;
+	dma_addr_t cptr_iova;
+	struct cpt_inst_s inst;
+	struct cpt_res_s *res;
+
+	cptr_iova = ctx->iova +
+		    conn_id * ALIGN(sizeof(struct pan_cpt_tls_ctx_s), 128);
+
+	memset(&inst, 0, sizeof(struct cpt_inst_s));
+
+	res = (struct cpt_res_s *)(rq->cpt_resp->base);
+	res->compcode = 0;
+	inst.res_addr = rq->cpt_resp->iova;
+
+	inst.qord = 1;
+
+	inst.dlen      = seg->tls_record_plen;
+	inst.opcode_major = CN10K_KTLS_MAJOR_OP;
+	inst.param2    = 0x17; /* application data */
+	inst.param1    = seg->tls_record_plen;
+
+	/* dptr → start of plaintext; rptr = dptr - 13 → start of TLS header */
+	inst.dptr = seg->io_buf->iova +
+		    TLS_RECORD_HDR_LEN + TLS_GCM_EXPLICIT_IV_LEN;
+	inst.rptr = seg->io_buf->iova; /* = inst.dptr - (TLS_RECORD_HDR_LEN +
+					*                TLS_GCM_EXPLICIT_IV_LEN) */
+
+	inst.cptr    = cptr_iova;
+	inst.ctx_val = 1;
+	inst.egrp    = CN10K_CPT_DFLT_ENG_GRP_SE;
+
+	pan_cpt_inst_flush(pf, &inst, sizeof(struct cpt_inst_s),
+			   kcpt_ctx.io_addr);
+	dmb(sy);
+	return pan_cpt_wait_for_respose(res);
+}
+
+/*
+ * After pan_ktls_encrypt_iobuf() has written ciphertext into seg->io_buf,
+ * distribute the result back to the original per-segment packet buffers.
+ *
+ * io_buf layout after encryption:
+ *   offset 0..4:           TLS header       (unchanged, skip)
+ *   offset 5..12:          explicit IV      (8 B, CPT may update)
+ *   offset 13..13+N-1:     ciphertext       (N = tls_record_plen bytes)
+ *   offset 13+N..13+N+15:  auth tag         (16 B)
+ *
+ * For pkt[0]: copy io_buf[5 ..] → tcp_payload[5 ..] (IV + ciphertext start)
+ * For pkt[i>0]: copy io_buf[..] → tcp_payload[0 ..] (ciphertext continuation)
+ * The last packet's tcp_payload ends with the 16-byte auth tag.
+ */
+static void pan_ktls_copyback(struct pan_ktls_seg_ctx *seg)
+{
+	u32 io_offset = TLS_RECORD_HDR_LEN; /* skip TLS header in io_buf */
+	struct pan_ktls_pkt_ref *ref;
+	u8 *pkt_tls_start;
+	u16 copy_len;
+	int i;
+
+	for (i = 0; i < seg->npkts; i++) {
+		ref = &seg->pkts[i];
+		pkt_tls_start = ref->va + ref->tcp_payload_off;
+
+		if (i == 0) {
+			/* Skip the TLS header already in the packet; copy IV +
+			 * first portion of ciphertext.
+			 */
+			copy_len = ref->tcp_payload_len - TLS_RECORD_HDR_LEN;
+			memcpy(pkt_tls_start + TLS_RECORD_HDR_LEN,
+			       (u8 *)seg->io_buf->base + io_offset,
+			       copy_len);
+		} else {
+			/* Continuation: copy ciphertext (+ auth tag for last) */
+			copy_len = ref->tcp_payload_len;
+			memcpy(pkt_tls_start,
+			       (u8 *)seg->io_buf->base + io_offset,
+			       copy_len);
+		}
+		io_offset += copy_len;
+	}
+}
+
 int pan_tls_encrypt(struct otx2_nic *pf, struct pan_fl_tbl_res *res,
 		    u8 conn_id, struct otx2_cq_queue *cq,
 		    struct nix_cqe_rx_s *cqe, struct pan_tuple *tuple,
-		    struct pan_tuple_hdr *hdr, int *len)
+		    struct pan_tuple_hdr *hdr, int *len,
+		    u16 xmit_pcifunc_off, u16 *data_off)
 {
-	struct nix_rx_parse_s *parse;
-	struct nix_rx_sg_s *rx_sg_s;
+	struct pan_ktls_seg_ctx *seg = &pan_ktls.seg[conn_id];
+	struct nix_rx_parse_s *parse = &cqe->parse;
+	struct nix_rx_sg_s *rx_sg_s = &cqe->sg;
+	bool current_pkt_saved = false;
+	struct pan_ktls_pkt_ref *ref;
 	struct otx2_rcv_queue *rq;
-	int num_rx_desc;
-	int ret;
-	int sz;
+	u32 pkt_plain, remaining;
+	u16 tls_len_field;
+	u16 tcp_payload_off;
+	u16 tcp_payload_len;
+	int num_rx_desc, sz;
+	struct tcphdr *th;
+	u8 *tls_start;
+	int num_sgs;
+	bool is_last;
+	int ret, i;
 	u8 *va;
 
 	rq = &pf->qset.rq[cq->cq_idx];
-
 	if (!rq)
 		return -EOPNOTSUPP;
 
-	parse = &cqe->parse;
 	sz = (parse->desc_sizem1) ?
 		((parse->desc_sizem1 + 1) * 16) :
 		sizeof(struct nix_rx_sg_s);
-
 	num_rx_desc = sz / sizeof(struct nix_rx_sg_s);
-	rx_sg_s = &cqe->sg;
 
-	/* Non SG case */
+	/* Only single-buffer non-SG packets are supported */
 	if (likely(num_rx_desc == 1) && rx_sg_s->segs == 1) {
-		if (rx_sg_s->seg_size  < sizeof(struct ethhdr)) {
+		if (rx_sg_s->seg_size < sizeof(struct ethhdr)) {
 			dev_err(pf->dev, "buffer size(%u) is less than eth hdr\n",
 				rx_sg_s->seg_size);
 			return -ENOBUFS;
 		}
-
 		va = (u8 *)phys_to_virt(otx2_iova_to_phys(pf->iommu_domain,
-							  rx_sg_s->seg_addr));
-
-		*len = rx_sg_s->seg_size;
+							   rx_sg_s->seg_addr));
+		*len  = rx_sg_s->seg_size;
+		num_sgs = 1;
 	} else {
 		return -EOPNOTSUPP;
 	}
@@ -522,11 +671,185 @@ int pan_tls_encrypt(struct otx2_nic *pf, struct pan_fl_tbl_res *res,
 	pan_parse_buf(va, tuple, hdr);
 	hdr->flags |= tuple->flags;
 
-	ret = pan_ktls_submit(pf, rq, va, *len, hdr, conn_id);
-	if (ret)
-		return ret;
+	th = (struct tcphdr *)(hdr->l4hdr);
+	if (!th) {
+		dev_err(pf->dev, "%s: TCP header not found\n", __func__);
+		return -EINVAL;
+	}
 
-	return 0;
+	tcp_payload_off = (hdr->l4hdr - hdr->l2hdr) + __tcp_hdrlen(th);
+	tcp_payload_len = *len - tcp_payload_off;
+
+	/* Pure ACK: no TLS payload, let caller forward as-is */
+	if (!tcp_payload_len)
+		return 0;
+
+	tls_start = va + tcp_payload_off;
+
+	switch (seg->state) {
+	case PAN_KTLS_SEG_IDLE:
+		if (tcp_payload_len < TLS_RECORD_HDR_LEN) {
+			dev_err(pf->dev,
+				"%s: TCP payload (%u B) shorter than TLS hdr\n",
+				__func__, tcp_payload_len);
+			return -EINVAL;
+		}
+
+		/* TLS record-length field = explicit-IV + ciphertext + auth-tag */
+		tls_len_field = (tls_start[3] << 8) | tls_start[4];
+		if (tls_len_field < TLS_GCM_EXPLICIT_IV_LEN + TLS_GCM_AUTH_TAG_LEN) {
+			dev_err(pf->dev,
+				"%s: invalid TLS record length %u\n",
+				__func__, tls_len_field);
+			return -EINVAL;
+		}
+
+		seg->tls_record_plen = tls_len_field -
+				       TLS_GCM_EXPLICIT_IV_LEN -
+				       TLS_GCM_AUTH_TAG_LEN;
+
+		/* NONSEG: the full TLS record fits in this single packet */
+		if (tcp_payload_len >= seg->tls_record_plen + TLS_GCM_OVERHEAD)
+			return pan_ktls_submit(pf, rq, va, *len, hdr, conn_id);
+
+		/* COLLECTING: first segment of a multi-segment TLS record */
+		seg->collected_len = 0;
+		seg->npkts         = 0;
+		seg->cq            = cq;
+		seg->state         = PAN_KTLS_SEG_COLLECTING;
+
+		/* Copy TLS header + explicit IV into io_buf header area */
+		memcpy(seg->io_buf->base, tls_start,
+		       TLS_RECORD_HDR_LEN + TLS_GCM_EXPLICIT_IV_LEN);
+
+		/* Kernel guarantees the first segment contains at least the
+		 * TLS header and explicit IV (13 bytes), so no underflow here.
+		 */
+		pkt_plain = tcp_payload_len -
+			    TLS_RECORD_HDR_LEN - TLS_GCM_EXPLICIT_IV_LEN;
+		memcpy((u8 *)seg->io_buf->base +
+		       TLS_RECORD_HDR_LEN + TLS_GCM_EXPLICIT_IV_LEN,
+		       tls_start + TLS_RECORD_HDR_LEN + TLS_GCM_EXPLICIT_IV_LEN,
+		       pkt_plain);
+		seg->collected_len = pkt_plain;
+		printk("%s: PAN_KTLS_SEG_IDLE pkt_plain:%d\n", __func__, pkt_plain);
+		break; /* → save current pkt ref and return -EAGAIN */
+
+	case PAN_KTLS_SEG_COLLECTING:
+		remaining = seg->tls_record_plen - seg->collected_len;
+
+		/* Last segment when remaining plaintext + auth-tag exactly fit */
+		is_last = (tcp_payload_len >= remaining + TLS_GCM_AUTH_TAG_LEN);
+		pkt_plain = is_last ? remaining : tcp_payload_len;
+
+		memcpy((u8 *)seg->io_buf->base +
+		       TLS_RECORD_HDR_LEN + TLS_GCM_EXPLICIT_IV_LEN +
+		       seg->collected_len,
+		       tls_start, pkt_plain);
+		seg->collected_len += pkt_plain;
+
+		if (!is_last)
+			break; /* → save current pkt ref and return -EAGAIN */
+
+		/* FULL: all segments collected.  Save current (last) pkt ref,
+		 * encrypt the assembled record, copy ciphertext back to every
+		 * original buffer, then transmit.
+		 */
+		if (seg->npkts >= PAN_KTLS_MAX_SEG_PKTS) {
+			dev_err(pf->dev,
+				"%s: too many segments for conn %u\n",
+				__func__, conn_id);
+			goto seg_error;
+		}
+
+		ref = &seg->pkts[seg->npkts];
+		memcpy(&ref->cqe, cqe, sizeof(ref->cqe));
+		ref->hdr              = *hdr;
+		memcpy(ref->data_off, data_off, sizeof(ref->data_off));
+		ref->xmit_pcifunc_off = xmit_pcifunc_off;
+		ref->num_sgs          = num_sgs;
+		ref->len              = *len;
+		ref->va               = va;
+		ref->tcp_payload_off  = tcp_payload_off;
+		ref->tcp_payload_len  = tcp_payload_len;
+		seg->npkts++;
+		current_pkt_saved = true;
+
+		ret = pan_ktls_encrypt_iobuf(pf, rq, seg, conn_id);
+		if (ret) {
+			dev_err(pf->dev,
+				"%s: CPT encryption failed (%d)\n",
+				__func__, ret);
+			goto seg_error;
+		}
+
+		/* Write ciphertext + auth-tag back to original packet buffers */
+		pan_ktls_copyback(seg);
+
+		/* Transmit all buffered packets except the last one; the outer
+		 * caller (pan_rvu_process_buf) transmits the last packet via the
+		 * live CQE it already holds.
+		 */
+		for (i = 0; i < seg->npkts - 1; i++) {
+			ref = &seg->pkts[i];
+			pan_rvu_ktls_buf_xmit(res, seg->cq, &ref->cqe,
+					      ref->num_sgs, ref->len,
+					      &ref->hdr, pf,
+					      ref->xmit_pcifunc_off,
+					      ref->data_off);
+		}
+
+		seg->state         = PAN_KTLS_SEG_IDLE;
+		seg->npkts         = 0;
+		seg->collected_len = 0;
+		printk("%s: PAN_KTLS_SEG_COLLECTING pkt_plain:%d\n", __func__, pkt_plain);
+		return 0; /* caller transmits the last (current) packet */
+	}
+
+	/* --- common path: buffer the current packet and wait for more --- */
+	if (seg->npkts >= PAN_KTLS_MAX_SEG_PKTS) {
+		dev_err(pf->dev,
+			"%s: too many segments for conn %u\n",
+			__func__, conn_id);
+		goto seg_error;
+	}
+
+	ref = &seg->pkts[seg->npkts];
+	memcpy(&ref->cqe, cqe, sizeof(ref->cqe));
+	ref->hdr              = *hdr;
+	memcpy(ref->data_off, data_off, sizeof(ref->data_off));
+	ref->xmit_pcifunc_off = xmit_pcifunc_off;
+	ref->num_sgs          = num_sgs;
+	ref->len              = *len;
+	ref->va               = va;
+	ref->tcp_payload_off  = tcp_payload_off;
+	ref->tcp_payload_len  = tcp_payload_len;
+	seg->npkts++;
+	return -EAGAIN;
+
+seg_error:
+	/*
+	 * Drop all BUFFERED packets by returning their buffers to the NPA pool.
+	 * If the current packet was already added to pkts[] (current_pkt_saved),
+	 * it occupies pkts[npkts-1]; skip it so the caller's live CQE still
+	 * points to a valid buffer and can safely re-inject it to the stack.
+	 * If it was not yet saved the loop covers all of pkts[0..npkts-1] and
+	 * the current packet is left for the caller to handle.
+	 */
+	{
+		int free_count = current_pkt_saved ? seg->npkts - 1 : seg->npkts;
+
+		for (i = 0; i < free_count; i++) {
+			ref = &seg->pkts[i];
+			pf->hw_ops->aura_freeptr(pf, cq->cq_idx,
+						 ref->cqe.sg.seg_addr &
+						 ~0x07ULL);
+		}
+	}
+	seg->state         = PAN_KTLS_SEG_IDLE;
+	seg->npkts         = 0;
+	seg->collected_len = 0;
+	return -EINVAL;
 }
 
 void pan_ktls_hw_exit(void)

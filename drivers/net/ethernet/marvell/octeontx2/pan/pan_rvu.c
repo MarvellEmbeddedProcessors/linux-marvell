@@ -713,6 +713,29 @@ static inline u64 pan_rvu_get_tuple_flag(struct nix_rx_parse_s *parse)
 		PAN_TUPLE_FLAG_L3_PROTO_V4 : PAN_TUPLE_FLAG_L3_PROTO_V6;
 }
 
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
+/*
+ * Exported wrapper used by pan_ktls.c to transmit a previously buffered
+ * TLS segment once its ciphertext has been written back in-place.
+ * Mirrors the pool_ptrs accounting done in pan_rvu_process_buf() for
+ * the non-buffered transmit path.
+ */
+bool pan_rvu_ktls_buf_xmit(struct pan_fl_tbl_res *res,
+			    struct otx2_cq_queue *cq,
+			    struct nix_cqe_rx_s *cqe,
+			    int num_sgs, int len,
+			    struct pan_tuple_hdr *hdr,
+			    struct otx2_nic *rxpfvf,
+			    u16 off, u16 *data_off)
+{
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_TX_COMPLETION)
+	cq->pool_ptrs += num_sgs;
+#endif
+	return pan_rvu_buf_xmit(res, cq, cqe, num_sgs, len, hdr,
+				rxpfvf, off, data_off);
+}
+#endif
+
 static int
 pan_rvu_inject_buf2stack(struct otx2_nic *pfvf,
 			 struct pan_rvu_cq_info *cq_info,
@@ -1248,13 +1271,31 @@ static void pan_rvu_process_buf(struct otx2_nic *pfvf,
 
 #if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
 	case PAN_FL_TBL_ACT_TLS_ENC:
-		/* pcifunc for eth0 from /sys/kernel/debug/cn10k/pan/info is
-		 * 0x400
-		 */
-		res->pcifuncoff = pan_rvu_pcifunc2_sq_off(0x400);
-		pan_tls_encrypt(pfvf, res, parse->match_id & 0xFF,
-				cq, cqe, &tuple, &hdr, &len);
-		xmit_pcifunc_off = res->pcifuncoff;
+		ret = pan_rvu_modify_l2_hdr(pfvf, cq_info, cq, cqe, res, data_off,
+					    &xmit_pcifunc_off);
+		/* Incase of error reinject the packet back to stack */
+		if (ret) {
+			pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe, res,
+						 PAN_FL_TBL_ACT_EXP);
+			return;
+		}
+
+		ret = pan_tls_encrypt(pfvf, res, parse->match_id & 0xFF,
+				      cq, cqe, &tuple, &hdr, &len,
+				      xmit_pcifunc_off, data_off);
+		if (ret) {
+			/*
+			 * -EAGAIN: packet buffered for a multi-segment TLS
+			 * record; pan_tls_encrypt() owns the buffer until the
+			 * full record is assembled.  Any other negative value
+			 * is a hard error — reinject to stack.
+			 */
+			if (ret != -EAGAIN)
+				pan_rvu_inject_buf2stack(pfvf, cq_info, cq, cqe,
+							 res,
+							 PAN_FL_TBL_ACT_EXP);
+			return;
+		}
 		break;
 #endif
 	default:

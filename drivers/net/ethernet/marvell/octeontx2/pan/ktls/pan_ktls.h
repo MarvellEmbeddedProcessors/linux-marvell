@@ -19,9 +19,27 @@
 
 #define PAN_KTLS_MAX_CONN	8
 
+/* TLS record framing constants (RFC 5246 / RFC 5288 AES-GCM) */
+#define TLS_RECORD_HDR_LEN	5
+#define TLS_GCM_EXPLICIT_IV_LEN	8
+#define TLS_GCM_AUTH_TAG_LEN	16
+#define TLS_GCM_OVERHEAD	(TLS_RECORD_HDR_LEN + TLS_GCM_EXPLICIT_IV_LEN + \
+				 TLS_GCM_AUTH_TAG_LEN)
+
+/*
+ * io_buf size: one full TLS plaintext record (up to TLS_MAX_PAYLOAD_SIZE) plus
+ * TLS header, explicit IV and auth-tag overhead.
+ */
+#define PAN_KTLS_IOBUF_SIZE	((size_t)(TLS_MAX_PAYLOAD_SIZE + TLS_GCM_OVERHEAD))
+
+/*
+ * Upper bound on TCP segments that can carry a single TLS record.
+ * Max TLS payload 16 KiB / min MSS ~1460 B ≈ 12; use 64 as a safe margin.
+ */
+#define PAN_KTLS_MAX_SEG_PKTS	64
+
 struct otx2_nic;
 struct mbox_msghdr;
-struct nix_cqe_rx_s;
 struct otx2_cq_queue;
 struct pan_fl_tbl_res;
 
@@ -83,10 +101,47 @@ struct pan_ktls_mbox_ctx {
 	__u8 rsvd_back[64];
 };
 
+/*
+ * Per-packet metadata saved while buffering segments of a multi-segment
+ * TLS record.  The nix_cqe_rx_s is copied verbatim so that the saved
+ * segment addresses remain valid after the live CQE slot is recycled.
+ */
+struct pan_ktls_pkt_ref {
+	struct nix_cqe_rx_s  cqe;		/* full copy of RX CQE */
+	struct pan_tuple_hdr hdr;		/* L2/L3/L4 header pointers */
+	u16		     data_off[3];	/* per-segment data offset array */
+	u16		     xmit_pcifunc_off;	/* TX SQ selection offset */
+	int		     num_sgs;		/* RX scatter-gather count */
+	int		     len;		/* total frame length */
+	u8		    *va;		/* packet buffer virtual address */
+	u16		     tcp_payload_off;	/* offset to TCP payload in frame */
+	u16		     tcp_payload_len;	/* TCP payload byte count */
+};
+
+enum pan_ktls_seg_state {
+	PAN_KTLS_SEG_IDLE = 0,
+	PAN_KTLS_SEG_COLLECTING,
+};
+
+/*
+ * Per-connection state for buffering a TLS record that spans multiple TCP
+ * segments.  One instance per conn_id, zero-initialised on connection setup.
+ */
+struct pan_ktls_seg_ctx {
+	enum pan_ktls_seg_state  state;
+	u32			 tls_record_plen;  /* expected plaintext length */
+	u32			 collected_len;	   /* plaintext bytes in io_buf */
+	int			 npkts;		   /* saved packet count */
+	struct qmem		*io_buf;	   /* DMA plaintext/ciphertext buf */
+	struct otx2_cq_queue	*cq;		   /* RX CQ common to all segments */
+	struct pan_ktls_pkt_ref	 pkts[PAN_KTLS_MAX_SEG_PKTS];
+};
+
 struct pan_ktls_dev {
 	struct pan_ktls_npc_info info[PAN_KTLS_MAX_CONN];
 	struct pan_ktls_mbox_ctx ktls_ctx[PAN_KTLS_MAX_CONN];
 	struct workqueue_struct *work;
+	struct pan_ktls_seg_ctx  seg[PAN_KTLS_MAX_CONN];
 };
 
 int pan_ktls_init(void);
@@ -94,7 +149,9 @@ void pan_ktls_process_mbox(struct otx2_nic *pf, struct mbox_msghdr *msg);
 int pan_ktls_hw_init(struct otx2_nic *oct);
 void pan_ktls_hw_exit(void);
 int pan_tls_encrypt(struct otx2_nic *pf, struct pan_fl_tbl_res *res,
-		    u8 conn_id, struct otx2_cq_queue *cq, struct nix_cqe_rx_s *cqe,
-		    struct pan_tuple *tuple, struct pan_tuple_hdr *hdr, int *len);
+		    u8 conn_id, struct otx2_cq_queue *cq,
+		    struct nix_cqe_rx_s *cqe, struct pan_tuple *tuple,
+		    struct pan_tuple_hdr *hdr, int *len,
+		    u16 xmit_pcifunc_off, u16 *data_off);
 #endif
 #endif /* __PAN_H__ */

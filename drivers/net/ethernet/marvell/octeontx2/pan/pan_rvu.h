@@ -85,4 +85,19 @@ void pan_insert_match_id(u16 match_id);
 void pan_erase_match_id(u16 match_id);
 bool pan_is_match_id_ipv4(u16 match_id);
 
+#if IS_ENABLED(CONFIG_OCTEONTX_PAN_KTLS_TX)
+/*
+ * Transmit a single buffered TLS segment stored in @ref after ciphertext
+ * has been written back to the original buffer.  Handles pool_ptrs accounting
+ * for TX-completion mode and delegates to the internal pan_rvu_buf_xmit().
+ */
+bool pan_rvu_ktls_buf_xmit(struct pan_fl_tbl_res *res,
+			    struct otx2_cq_queue *cq,
+			    struct nix_cqe_rx_s *cqe,
+			    int num_sgs, int len,
+			    struct pan_tuple_hdr *hdr,
+			    struct otx2_nic *rxpfvf,
+			    u16 off, u16 *data_off);
+#endif
+
 #endif // PAN_RVU_H_
