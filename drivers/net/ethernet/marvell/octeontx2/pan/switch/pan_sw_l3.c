@@ -850,9 +850,13 @@ pan_sw_l3_route_add(struct pan_sw_l3_offl_tnode *tnode)
 	for (int i = 0; i < 4; i++)
 		tarr[i] = entry->dst6[i];
 
-	/* Tree always in big endian */
-	if (!entry->ipv6)
-		tarr[0] = htonl(tarr[0]);
+	/* Tree always in little endian */
+	if (entry->ipv6) {
+		tarr[0] = ntohl(tarr[0]);
+		tarr[1] = ntohl(tarr[1]);
+		tarr[2] = ntohl(tarr[2]);
+		tarr[3] = ntohl(tarr[3]);
+	}
 
 	dst = tarr;
 
@@ -993,8 +997,12 @@ pan_sw_l3_route_del(struct fib_entry *entry, int *mcam_idx, int *match_id, bool 
 	for (int i = 0; i < 4; i++)
 		tarr[i] = entry->dst6[i];
 
-	if (!entry->ipv6)
-		tarr[0] = htonl(tarr[0]);
+	if (entry->ipv6) {
+		tarr[0] = ntohl(tarr[0]);
+		tarr[1] = ntohl(tarr[1]);
+		tarr[2] = ntohl(tarr[2]);
+		tarr[3] = ntohl(tarr[3]);
+	}
 
 	dst = tarr;
 	walk = root;
@@ -1085,7 +1093,7 @@ pan_sw_l3_route_lookup(u32 dst)
 	 * Patricia shape as IPv6: upper 96 bits come from dst[1..3] (zero for
 	 * typical v4 fib entries), lower 32 from dst[0]. Mirror that here.
 	 */
-	addr[0] = dst;
+	addr[0] = ntohl(dst);
 	addr[1] = 0;
 	addr[2] = 0;
 	addr[3] = 0;
