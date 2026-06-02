@@ -195,6 +195,7 @@ static int pan_sw_l2_del_flow_tbl(struct pan_sw_l2_offl_node *node)
 	if (!static_branch_unlikely(&ipv6_support))
 		return 0;
 
+	pan_tuple_hash_set(&tuple, node->match_id);
 	tuple.flags = PAN_TUPLE_FLAG_L3_PROTO_V6;
 	err = pan_fl_tbl_offl_del(&tuple);
 	if (err) {
