@@ -4384,11 +4384,18 @@ static void rvu_update_module_params(struct rvu *rvu)
 		kpu_profile ? kpu_profile : default_pfl_name, KPU_NAME_LEN);
 }
 
+static atomic_t device_bound = ATOMIC_INIT(0);
+
 static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct device *dev = &pdev->dev;
 	struct rvu *rvu;
 	int    err;
+
+	if (atomic_cmpxchg(&device_bound, 0, 1) != 0) {
+		dev_warn(dev, "Only one af device is supported.\n");
+		return -EBUSY;
+	}
 
 	rvu = devm_kzalloc(dev, sizeof(*rvu), GFP_KERNEL);
 	if (!rvu)
