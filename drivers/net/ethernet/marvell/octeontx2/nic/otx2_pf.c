@@ -1886,17 +1886,19 @@ void otx2_free_hw_resources(struct otx2_nic *pf)
 
 	/* Free RQ buffer pointers*/
 	otx2_free_aura_ptr(pf, AURA_NIX_RQ);
-	cn10k_ipsec_free_aura_ptrs(pf);
+
+	/* Free the IPsec aura buffers and flows (if SAs are installed) */
+	if (pf->flags & OTX2_FLAG_IPSEC_OFFLOAD_ENABLED) {
+		cn10k_ipsec_free_aura_ptrs(pf);
+		if (!list_empty(&pf->ipsec.inb_sw_ctx_list))
+			cn10k_ipsec_inb_disable_flows(pf);
+	}
 
 	otx2_free_cq_res(pf);
 
 	/* Free all ingress bandwidth profiles allocated */
 	if (!otx2_rep_dev(pf->pdev))
 		cn10k_free_all_ipolicers(pf);
-
-	/* Delete Inbound IPSec flows if any SA's are installed */
-	if (!list_empty(&pf->ipsec.inb_sw_ctx_list))
-		cn10k_ipsec_inb_disable_flows(pf);
 
 	mutex_lock(&mbox->lock);
 	/* Reset NIX LF */

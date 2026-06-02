@@ -1919,7 +1919,7 @@ void cn10k_ipsec_free_aura_ptrs(struct otx2_nic *pfvf)
 			if (!iova)
 				break;
 			otx2_free_bufs(pfvf, pool, iova - OTX2_HEAD_ROOM,
-				       pfvf->rbsize);
+				       pool->rbsize);
 		} while (1);
 	}
 }
@@ -2078,7 +2078,7 @@ static int cn10k_ipsec_configure_cpt_bpid(struct otx2_nic *pfvf)
 int cn10k_ipsec_ethtool_init(struct net_device *netdev, bool enable)
 {
 	struct otx2_nic *pf = netdev_priv(netdev);
-	int err;
+	int err = 0;
 
 	/* IPsec offload supported on cn10k */
 	if (!is_dev_support_ipsec_offload(pf->pdev))
@@ -2102,8 +2102,13 @@ int cn10k_ipsec_ethtool_init(struct net_device *netdev, bool enable)
 			goto out;
 
 		err = cn10k_inb_cpt_init(netdev);
-		if (err)
+		if (err) {
+			/* Set CPT device available here since it's
+			 * needed in cn10k_ipsec_free_hw_resources()
+			 */
+			cn10k_cpt_device_set_available(pf);
 			goto out;
+		}
 
 		/* Set ipsec offload enabled for this device */
 		pf->flags |= OTX2_FLAG_IPSEC_OFFLOAD_ENABLED;
@@ -2121,6 +2126,9 @@ out:
 	/* Cleanup IPsec SQs and CPT */
 	if (netif_running(netdev))
 		cn10k_ipsec_cleanup_send_queues(pf);
+
+	/* Disable the IPsec offload flag for this device */
+	pf->flags &= ~OTX2_FLAG_IPSEC_OFFLOAD_ENABLED;
 
 	cn10k_ipsec_free_hw_resources(pf);
 	cn10k_cpt_device_set_unavailable(pf);

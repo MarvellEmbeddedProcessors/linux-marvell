@@ -226,7 +226,7 @@ static bool otx2_skb_add_frag(struct otx2_nic *pfvf, struct sk_buff *skb,
 		off += pfvf->xtra_hdr;
 	}
 
-	if (parse->chan & 0x800)
+	if ((pfvf->flags & OTX2_FLAG_IPSEC_OFFLOAD_ENABLED) && (parse->chan & 0x800))
 		off = 0;
 
 	page = virt_to_page(va);
@@ -234,7 +234,7 @@ static bool otx2_skb_add_frag(struct otx2_nic *pfvf, struct sk_buff *skb,
 		skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, page,
 				va - page_address(page) + off,
 				len - off, pfvf->rbsize);
-		if (parse->chan & 0x800)
+		if ((pfvf->flags & OTX2_FLAG_IPSEC_OFFLOAD_ENABLED) && (parse->chan & 0x800))
 			return false;
 		return true;
 	}
@@ -390,7 +390,7 @@ static void otx2_rcv_pkt_handler(struct otx2_nic *pfvf,
 	if (unlikely(!skb))
 		return;
 
-	if (parse->chan & 0x800) {
+	if ((pfvf->flags & OTX2_FLAG_IPSEC_OFFLOAD_ENABLED) && (parse->chan & 0x800)) {
 		orig_pkt_wqe = cn10k_ipsec_process_cpt_metapkt(pfvf, skb, sg->seg_addr);
 		if (!orig_pkt_wqe) {
 			netdev_err(pfvf->netdev, "Invalid WQE in CPT metapacket\n");

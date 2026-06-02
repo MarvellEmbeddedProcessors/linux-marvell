@@ -410,7 +410,7 @@ struct nix_wqe_rx_s *cn10k_ipsec_process_cpt_metapkt(struct otx2_nic *pfvf,
 }
 
 static inline __maybe_unused
-void cn10k_ipsec_inb_delete_flows(struct otx2_nic *pfvf)
+void cn10k_ipsec_inb_disable_flows(struct otx2_nic *pfvf)
 {
 }
 
