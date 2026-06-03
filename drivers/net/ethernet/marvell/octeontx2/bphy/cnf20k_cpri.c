@@ -1217,17 +1217,32 @@ static long cnf20k_cpri_cdev_ioctl(struct file *filp, unsigned int cmd,
 				break;
 			}
 
-			/* Enable CPRI ETH UL INT */
-			for (int idx = 0; idx < MAX_NUM_BPHY_CHIPLET; idx++) {
-				for (int i = 0; i < MAX_CPRI_INST; i++) {
+		/* Enable CPRI ETH UL INT only for active chiplets/instances */
+		{
+			int max_chiplet = (intf_cfg->bphy_chiplet_mask == 3) ?
+				MAX_NUM_BPHY_CHIPLET : MAX_NUM_HALF_BPHY_CHIPLET;
+			int max_mhab = (intf_cfg->bphy_chiplet_mask == 3) ?
+				CNF20K_BPHY_CPRI_MAX_MHAB :
+				CNF20K_HALF_BPHY_CPRI_MAX_MHAB;
+
+			for (int idx = 0; idx < max_chiplet; idx++) {
+				for (int i = 0; i < max_mhab; i++) {
+					struct cnf20k_bphy_ndev_cpri_intf_cfg *c =
+						&intf_cfg->cpri_if_cfg[idx][i];
+
+					if (!c->active_lane_mask)
+						continue;
+
 					u64 base_offset =
 					CNF20K_CPRIX_ETH_UL_INT_ENA_W1S(idx);
 					u64 offset =
-					cnf20k_get_cpri_regaddr(base_offset, i);
+					cnf20k_get_cpri_regaddr(base_offset,
+								c->cpri_id);
 					writeq(0x1, cnf20k_cpri_reg_base +
-					offset);
+					       offset);
 				}
 			}
+		}
 
 			/* Enable GPINT Rx and Tx interrupts */
 			for (int idx = 0; idx < MAX_NUM_BPHY_CHIPLET; idx++) {
