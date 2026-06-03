@@ -2219,11 +2219,25 @@ static int spi_nor_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 		addr = spi_nor_convert_addr(nor, addr);
 
+		/*
+		 * Each page program must be preceded by a Write Enable and
+		 * followed by a wait for the program to complete. Without the
+		 * wait, the flash is still busy (WIP set) and silently ignores
+		 * the subsequent WREN/PAGE_PROGRAM, so only one page lands per
+		 * program-time window and the data ends up scattered.
+		 */
+		ret = spi_nor_write_enable(nor);
+		if (ret)
+			return ret;
+
 		ret = spi_nor_write_data(nor, addr, page_remain, buf + i);
 		if (ret < 0)
 			return ret;
 
 		written = ret;
+
+		while (!spi_nor_ready(nor))
+			;
 
 		*retlen += written;
 		i += written;
