@@ -201,3 +201,7 @@ static void __exit fwlog_dev_exit(void)
 
 module_init(fwlog_dev_init);
 module_exit(fwlog_dev_exit);
+
+MODULE_AUTHOR("Pragnesh Patel <pragneshp@marvell.com>");
+MODULE_DESCRIPTION("Marvell firmware bootlog interface");
+MODULE_LICENSE("GPL v2");
