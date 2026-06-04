@@ -2134,6 +2134,7 @@ out:
 	cn10k_cpt_device_set_unavailable(pf);
 	return err;
 }
+EXPORT_SYMBOL(cn10k_ipsec_ethtool_init);
 
 int cn10k_ipsec_init(struct net_device *netdev)
 {
