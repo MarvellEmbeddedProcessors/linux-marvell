@@ -472,60 +472,60 @@ static ssize_t dpi_device_config_show(struct device *dev,
 {
 	struct pci_dev *pdev = container_of(dev, struct pci_dev, dev);
 	struct dpipf *dpi = pci_get_drvdata(pdev);
+	int vf_idx, len  = 0;
 	u64 reg_val = 0;
-	int vf_idx, i;
 
 	for (vf_idx = 0; vf_idx < dpi->total_vfs; vf_idx++) {
 		struct dpipf_vf *dpivf = &dpi->vf[vf_idx];
 
-		if (!dpivf->setup_done)
+		if (!dpivf->setup_done && !dpivf->get_reg_cfg)
 			continue;
-		sprintf(buf + strlen(buf),
-			"VF:%d command buffer size:%d aura:%d",
-			vf_idx, dpivf->vf_config.csize, dpivf->vf_config.aura);
-		sprintf(buf + strlen(buf),
-			"sso_pf_func:%x npa_pf_func:%x\n",
-			dpivf->vf_config.sso_pf_func,
-			dpivf->vf_config.npa_pf_func);
-	}
-	for (i = 0; i < DPI_MAX_REQQ_INT; i++) {
-		reg_val = dpi_reg_read(dpi, DPI_REQQX_INT(i));
-		sprintf(buf + strlen(buf), "DPI_REQQ%d_INT: 0x%016llx\n", i, reg_val);
-		reg_val = dpi_reg_read(dpi, DPI_DMAX_REQBANK0(i));
-		sprintf(buf + strlen(buf), "DPI_DMA%d_REQBANK0: 0x%016llx\n", i, reg_val);
-		reg_val = dpi_reg_read(dpi, DPI_DMAX_REQBANK1(i));
-		sprintf(buf + strlen(buf), "DPI_DMA%d_REQBANK1: 0x%016llx\n", i, reg_val);
-		reg_val = dpi_reg_read(dpi, DPI_DMAX_ERR_RSP_STATUS(i));
-		sprintf(buf + strlen(buf), "DPI_DMA%d_ERR_RSP_STATUS: 0x%016llx\n", i, reg_val);
-	}
-	reg_val = dpi_reg_read(dpi, DPI_REQ_ERR_RSP);
-	sprintf(buf + strlen(buf), "DPI_REQ_ERR_RSP: 0x%016llx\n", reg_val);
-	reg_val = dpi_reg_read(dpi, DPI_PKT_ERR_RSP);
-	sprintf(buf + strlen(buf), "DPI_PKT_ERR_RSP: 0x%016llx\n", reg_val);
-	reg_val = dpi_reg_read(dpi, DPI_EBUS_PORTX_ERR(0));
-	sprintf(buf + strlen(buf), "DPI_EBUS_PORT0_ERR: 0x%016llx\n", reg_val);
-	reg_val = dpi_reg_read(dpi, DPI_EBUS_PORTX_ERR(1));
-	sprintf(buf + strlen(buf), "DPI_EBUS_PORT1_ERR: 0x%016llx\n", reg_val);
-	reg_val = dpi_reg_read(dpi, DPI_EBUS_PORTX_ERR_INFO(0));
-	sprintf(buf + strlen(buf), "DPI_EBUS_PORT0_ERR_INFO: 0x%016llx\n", reg_val);
-	reg_val = dpi_reg_read(dpi, DPI_EBUS_PORTX_ERR_INFO(1));
-	sprintf(buf + strlen(buf), "DPI_EBUS_PORT1_ERR_INFO: 0x%016llx\n", reg_val);
-	for (i = 0; i < DPI_EPFX_MAX_CNT; i++) {
-		reg_val = dpi_reg_read(dpi, DPI_EPFX_DMA_VF_LINTX(i, 0));
-		sprintf(buf + strlen(buf), "DPI_EPF%d_DMA_VF_LINT0: 0x%016llx\n", i, reg_val);
-		reg_val = dpi_reg_read(dpi, DPI_EPFX_PP_VF_LINTX(i, 0));
-		sprintf(buf + strlen(buf), "DPI_EPF%d_PP_VF_LINT0: 0x%016llx\n", i, reg_val);
-		reg_val = dpi_reg_read(dpi, DPI_EPFX_MISC_LINTX(i));
-		sprintf(buf + strlen(buf), "DPI_EPF%d_MISC_LINT: 0x%016llx\n", i, reg_val);
-		if (is_cn10k_dpi(dpi))
-			continue;
-		reg_val = dpi_reg_read(dpi, DPI_EPFX_DMA_VF_LINTX(i, 1));
-		sprintf(buf + strlen(buf), "DPI_EPF%d_DMA_VF_LINT1: 0x%016llx\n", i, reg_val);
-		reg_val = dpi_reg_read(dpi, DPI_EPFX_PP_VF_LINTX(i, 1));
-		sprintf(buf + strlen(buf), "DPI_EPF%d_PP_VF_LINT1: 0x%016llx\n", i, reg_val);
+
+		len += sysfs_emit_at(buf, len, "VF:%d command buffer size:%d aura:%d",
+				     vf_idx, dpivf->vf_config.csize, dpivf->vf_config.aura);
+		len += sysfs_emit_at(buf, len, "sso_pf_func:%x npa_pf_func:%x\n",
+				     dpivf->vf_config.sso_pf_func, dpivf->vf_config.npa_pf_func);
+		/* Clear the flag for this vf_idx */
+		dpivf->get_reg_cfg = false;
+		break;
 	}
 
-	return strlen(buf);
+	if (vf_idx < dpi->total_vfs) {
+		reg_val = dpi_reg_read(dpi, DPI_REQQX_INT(vf_idx));
+		len += sysfs_emit_at(buf, len, "DPI_REQQ%d_INT: 0x%016llx\n", vf_idx, reg_val);
+		reg_val = dpi_reg_read(dpi, DPI_DMAX_REQBANK0(vf_idx));
+		len += sysfs_emit_at(buf, len, "DPI_DMA%d_REQBANK0: 0x%016llx\n", vf_idx, reg_val);
+		reg_val = dpi_reg_read(dpi, DPI_DMAX_REQBANK1(vf_idx));
+		len += sysfs_emit_at(buf, len, "DPI_DMA%d_REQBANK1: 0x%016llx\n", vf_idx, reg_val);
+		reg_val = dpi_reg_read(dpi, DPI_DMAX_ERR_RSP_STATUS(vf_idx));
+		len += sysfs_emit_at(buf, len, "DMA%d_ERR_RSP_STS: 0x%016llx\n", vf_idx, reg_val);
+	}
+	reg_val = dpi_reg_read(dpi, DPI_REQ_ERR_RSP);
+	len += sysfs_emit_at(buf, len, "DPI_REQ_ERR_RSP: 0x%016llx\n", reg_val);
+	reg_val = dpi_reg_read(dpi, DPI_PKT_ERR_RSP);
+	len += sysfs_emit_at(buf, len, "DPI_PKT_ERR_RSP: 0x%016llx\n", reg_val);
+	reg_val = dpi_reg_read(dpi, DPI_EBUS_PORTX_ERR(0));
+	len += sysfs_emit_at(buf, len, "DPI_EBUS_PORT0_ERR: 0x%016llx\n", reg_val);
+	reg_val = dpi_reg_read(dpi, DPI_EBUS_PORTX_ERR(1));
+	len += sysfs_emit_at(buf, len, "DPI_EBUS_PORT1_ERR: 0x%016llx\n", reg_val);
+	reg_val = dpi_reg_read(dpi, DPI_EBUS_PORTX_ERR_INFO(0));
+	len += sysfs_emit_at(buf, len, "DPI_EBUS_PORT0_ERR_INFO: 0x%016llx\n", reg_val);
+	reg_val = dpi_reg_read(dpi, DPI_EBUS_PORTX_ERR_INFO(1));
+	len += sysfs_emit_at(buf, len, "DPI_EBUS_PORT1_ERR_INFO: 0x%016llx\n", reg_val);
+	reg_val = dpi_reg_read(dpi, DPI_EPFX_DMA_VF_LINTX(0, 0));
+	len += sysfs_emit_at(buf, len, "DPI_EPF0_DMA_VF_LINT0: 0x%016llx\n", reg_val);
+	reg_val = dpi_reg_read(dpi, DPI_EPFX_PP_VF_LINTX(0, 0));
+	len += sysfs_emit_at(buf, len, "DPI_EPF0_PP_VF_LINT0: 0x%016llx\n", reg_val);
+	reg_val = dpi_reg_read(dpi, DPI_EPFX_MISC_LINTX(0));
+	len += sysfs_emit_at(buf, len, "DPI_EPF0_MISC_LINT: 0x%016llx\n", reg_val);
+	if (!is_cn10k_dpi(dpi)) {
+		reg_val = dpi_reg_read(dpi, DPI_EPFX_DMA_VF_LINTX(0, 1));
+		len += sysfs_emit_at(buf, len, "DPI_EPF0_DMA_VF_LINT1: 0x%016llx\n", reg_val);
+		reg_val = dpi_reg_read(dpi, DPI_EPFX_PP_VF_LINTX(0, 1));
+		len += sysfs_emit_at(buf, len, "DPI_EPF0_PP_VF_LINT1: 0x%016llx\n", reg_val);
+	}
+
+	return len;
 }
 
 static int queue_config(struct dpipf *dpi, struct dpipf_vf *dpivf,
@@ -562,6 +562,9 @@ static int queue_config(struct dpipf *dpi, struct dpipf_vf *dpivf,
 		dpivf->vf_config.sec_strm_id = 0;
 		dpi_queue_fini(dpi, dpivf, msg->s.vfid);
 		dpivf->setup_done = false;
+		break;
+	case DPI_GET_REG_CFG:
+		dpivf->get_reg_cfg = true;
 		break;
 	default:
 		return -1;
