@@ -2138,6 +2138,7 @@ static int spi_nor_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
 {
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
 	size_t page_offset, page_remain, i;
+	u32 page_size = nor->params->page_size;
 	ssize_t ret;
 
 	if (nor->controller_ops &&  nor->controller_ops->prepare) {
@@ -2153,11 +2154,11 @@ static int spi_nor_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
 		ssize_t written;
 		loff_t addr = to + i;
 
-		page_offset = addr & (nor->info->page_size - 1);
+		page_offset = addr & (page_size - 1);
 
 		/* the size of data remaining on the first page */
 		page_remain = min_t(size_t,
-				    nor->info->page_size - page_offset, len - i);
+				    page_size - page_offset, len - i);
 
 		ret = spi_nor_write_enable(nor);
 		if (ret)
