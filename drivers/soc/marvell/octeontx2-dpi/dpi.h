@@ -355,6 +355,7 @@ struct dpipf_vf {
 	uint8_t this_vfid;
 	bool setup_done;
 	struct dpivf_config vf_config;
+	bool get_reg_cfg;
 };
 
 struct dpipf {
