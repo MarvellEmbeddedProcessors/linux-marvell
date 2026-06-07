@@ -1008,9 +1008,25 @@ static int aead_hmac_init(struct crypto_aead *cipher,
 			goto calc_fail;
 
 		authkeylen = ds;
+	} else {
+		memcpy(ctx->key, keys->authkey, authkeylen);
 	}
 
 	ctx->auth_key_len = authkeylen;
+
+	/*
+	 * When the cipher is NULL the standalone HMAC opcode is used. It
+	 * consumes the raw authentication key directly (no ipad/opad and no
+	 * encryption key), so the key installed above is all the engine
+	 * needs. This mirrors the octeontx (v1) driver, which returns from
+	 * aead_hmac_init() for the NULL cipher right after the key is stored.
+	 */
+	if (ctx->cipher_type == OTX2_CPT_CIPHER_NULL) {
+		if (keys->enckeylen)
+			return -EINVAL;
+		ctx->enc_key_len = 0;
+		return 0;
+	}
 
 	ipad = ctx->ipad;
 	opad = ctx->opad;
@@ -1059,8 +1075,13 @@ static int otx2_cpt_aead_cbc_aes_sha_setkey(struct crypto_aead *cipher,
 	if (ret)
 		return ret;
 
+	/*
+	 * The NULL cipher has no encryption key and uses the standalone HMAC
+	 * opcode; let aead_hmac_init() install the auth key and return, so we
+	 * skip the AES-specific key-length switch below.
+	 */
 	if (ctx->cipher_type == OTX2_CPT_CIPHER_NULL)
-		return authenc_keys.enckeylen ? -EINVAL : 0;
+		return aead_hmac_init(cipher, &authenc_keys);
 
 	switch (authenc_keys.enckeylen) {
 	case AES_KEYSIZE_128:
