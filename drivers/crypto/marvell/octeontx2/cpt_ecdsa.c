@@ -328,10 +328,16 @@ static int cpt_ecdsa_verify(struct akcipher_request *req)
 	*(uint64_t *)dptr = fpm_table_iova;
 	dptr += sizeof(fpm_table_iova);
 
-	memcpy(dptr, sig_ctx.r, key_len);
+	/*
+	 * ecdsa_parse_signature() now returns r/s as native VLI digits
+	 * (ecc_digits_from_bytes), but the AE engine consumes them
+	 * big-endian like every other operand, so convert via
+	 * fill_curve_param() instead of a raw memcpy.
+	 */
+	fill_curve_param(dptr, sig_ctx.r, key_len, curve->g.ndigits);
 	dptr += p_align;
 
-	memcpy(dptr, sig_ctx.s, key_len);
+	fill_curve_param(dptr, sig_ctx.s, key_len, curve->g.ndigits);
 	dptr += p_align;
 
 	memcpy(dptr, buffer + req->src_len, msg_len);
