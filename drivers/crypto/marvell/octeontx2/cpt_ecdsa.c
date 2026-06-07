@@ -110,7 +110,8 @@ static int cpt_ecdsa_k_gen(struct cpt_asym_ctx *ctx, ssize_t hash_sz, u8 *hash, 
 
 	rng = cpt_rfc6979_alloc_rng(&ctx->ecdsa, hash_sz, hash);
 	if (IS_ERR(rng)) {
-		dev_err(dev, "failed to get default rng, ret = %d!\n", ret);
+		dev_err(dev, "failed to get default rng, ret = %ld!\n",
+			PTR_ERR(rng));
 		return PTR_ERR(rng);
 	}
 	do {
