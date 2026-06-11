@@ -3114,13 +3114,13 @@ static void npc_populate_restricted_idxs(int num_subbanks)
 	npc_subbank_restricted_idxs[1] = 0;
 }
 
-static int *subbank_srch_order;
+static u32 *subbank_srch_order;
 
 static void npc_create_srch_order(int cnt)
 {
 	int val = 0;
 
-	subbank_srch_order = kcalloc(cnt, sizeof(int),
+	subbank_srch_order = kcalloc(cnt, sizeof(u32),
 				     GFP_KERNEL);
 
 	for (int i = 0; i < cnt; i += 2) {
@@ -4316,83 +4316,118 @@ fail:
 	return err;
 }
 
-int npc_cn20k_search_order_set(struct rvu *rvu, int (*arr)[2], int cnt)
+int npc_cn20k_search_order_set(struct rvu *rvu,
+			       u64 narr[MAX_NUM_SUB_BANKS], int cnt)
 {
 	struct npc_mcam *mcam = &rvu->hw->mcam;
-	u8 (*fslots)[2], (*uslots)[2];
-	int fcnt = 0, ucnt = 0;
+	int rsrc[2][MAX_NUM_SUB_BANKS] = { };
+	u8 save[MAX_NUM_SUB_BANKS] = { };
 	struct npc_subbank *sb;
-	unsigned long index;
-	int idx, val;
-	void *v;
+	struct xarray *xa;
+	int prio, rc, err;
+	int sb_idx;
+	enum {
+		FREE = 0,
+		USED = 1,
+	};
 
-	if (cnt != npc_priv->num_subbanks)
+	if (cnt != npc_priv->num_subbanks) {
+		dev_err(rvu->dev, "Number of entries(%u) != %u\n",
+			cnt, npc_priv->num_subbanks);
 		return -EINVAL;
-
-	fslots = kcalloc(cnt, sizeof(*fslots), GFP_KERNEL);
-	if (!fslots)
-		return -ENOMEM;
-
-	uslots = kcalloc(cnt, sizeof(*uslots), GFP_KERNEL);
-	if (!uslots)
-		return -ENOMEM;
-
-	for (int i = 0; i < cnt; i++, arr++) {
-		idx = (*arr)[0];
-		val = (*arr)[1];
-
-		subbank_srch_order[idx] = val;
 	}
 
-	/* Lock mcam */
 	mutex_lock(&mcam->lock);
 	npc_lock_all_subbank();
 
+	for (sb_idx = 0; sb_idx < cnt; sb_idx++) {
+		sb = &npc_priv->sb[sb_idx];
+		save[sb->idx] = sb->arr_idx;
+	}
+
+	for (prio = 0; prio < cnt; prio++) {
+		sb_idx = narr[prio];
+		sb = &npc_priv->sb[sb_idx];
+
+		if (sb->flags & NPC_SUBBANK_FLAG_USED)
+			xa = &npc_priv->xa_sb_used;
+		else
+			xa = &npc_priv->xa_sb_free;
+
+		rc = xa_err(xa_store(xa, prio,
+				     xa_mk_value(sb_idx), GFP_KERNEL));
+		if (rc) {
+			dev_err(rvu->dev,
+				"Setting arr_idx=%d for sb=%d failed\n",
+				sb->arr_idx, sb_idx);
+			goto fail;
+		}
+
+		if (sb->flags & NPC_SUBBANK_FLAG_USED) {
+			rsrc[USED][sb->arr_idx] -= 1;
+			rsrc[USED][prio] += 1;
+		} else {
+			rsrc[FREE][sb->arr_idx] -= 1;
+			rsrc[FREE][prio] += 1;
+		}
+
+		sb->arr_idx = prio;
+	}
+
+	for (prio = 0; prio < cnt; prio++) {
+		if (rsrc[FREE][prio] == -1)
+			xa_erase(&npc_priv->xa_sb_free, prio);
+
+		if (rsrc[USED][prio] == -1)
+			xa_erase(&npc_priv->xa_sb_used, prio);
+	}
+
+	for (int i = 0; i < cnt; i++)
+		subbank_srch_order[i] = (u32)narr[i];
+
 	restrict_valid = false;
 
-	xa_for_each(&npc_priv->xa_sb_used, index, v) {
-		val = xa_to_value(v);
-		(*(uslots + ucnt))[0] = index;
-		(*(uslots + ucnt))[1] = val;
-		xa_erase(&npc_priv->xa_sb_used, index);
-		ucnt++;
+	npc_unlock_all_subbank();
+	mutex_unlock(&mcam->lock);
+
+	return 0;
+
+fail:
+	for (prio = 0; prio < cnt; prio++) {
+		if (rsrc[FREE][prio] == 1)
+			xa_erase(&npc_priv->xa_sb_free, prio);
+
+		if (rsrc[USED][prio] == 1)
+			xa_erase(&npc_priv->xa_sb_used, prio);
 	}
 
-	xa_for_each(&npc_priv->xa_sb_free, index, v) {
-		val = xa_to_value(v);
-		(*(fslots + fcnt))[0] = index;
-		(*(fslots + fcnt))[1] = val;
-		xa_erase(&npc_priv->xa_sb_free, index);
-		fcnt++;
-	}
+	for (sb_idx = 0; sb_idx < cnt; sb_idx++) {
+		sb = &npc_priv->sb[sb_idx];
+		sb->arr_idx = save[sb_idx];
 
-	for (int i = 0; i < ucnt; i++) {
-		idx  = (*(uslots + i))[1];
-		sb = &npc_priv->sb[idx];
-		sb->arr_idx = subbank_srch_order[sb->idx];
-		xa_store(&npc_priv->xa_sb_used, sb->arr_idx,
-			 xa_mk_value(sb->idx), GFP_KERNEL);
-	}
+		if (sb->flags & NPC_SUBBANK_FLAG_USED)
+			xa = &npc_priv->xa_sb_used;
+		else
+			xa = &npc_priv->xa_sb_free;
 
-	for (int i = 0; i < fcnt; i++) {
-		idx  = (*(fslots + i))[1];
-		sb = &npc_priv->sb[idx];
-		sb->arr_idx = subbank_srch_order[sb->idx];
-		xa_store(&npc_priv->xa_sb_free, sb->arr_idx,
-			 xa_mk_value(sb->idx), GFP_KERNEL);
+		/* Since the entry already exists, xa_store() replaces
+		 * the value without a kmalloc(), making failure highly unlikely.
+		 */
+		err = xa_err(xa_store(xa, sb->arr_idx,
+				      xa_mk_value(sb->idx), GFP_KERNEL));
+		WARN(!!err, "Failed to rollback sb=%u idx=%u\n",
+		     sb->idx, sb->arr_idx);
 	}
 
 	npc_unlock_all_subbank();
 	mutex_unlock(&mcam->lock);
 
-	kfree(fslots);
-	kfree(uslots);
-
-	return 0;
+	return rc;
 }
 
-const int *npc_cn20k_search_order_get(bool *restricted_order)
+const u32 *npc_cn20k_search_order_get(bool *restricted_order, u32 *sz)
 {
 	*restricted_order = restrict_valid;
+	*sz = npc_priv->num_subbanks;
 	return subbank_srch_order;
 }
