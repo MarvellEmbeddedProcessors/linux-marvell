@@ -6,6 +6,9 @@
 
 #include "devl_internal.h"
 
+/* DEVLINK_ATTR_PARAM_TYPE u8 on wire (net-next DEVLINK_VAR_ATTR_TYPE_U64_ARRAY) */
+#define DEVLINK_PARAM_NLA_TYPE_U64_ARRAY 129
+
 static const struct devlink_param devlink_param_generic[] = {
 	{
 		.id = DEVLINK_PARAM_GENERIC_ID_INT_ERR_RESET,
@@ -180,6 +183,8 @@ devlink_param_type_to_nla_type(enum devlink_param_type param_type)
 		return NLA_STRING;
 	case DEVLINK_PARAM_TYPE_BOOL:
 		return NLA_FLAG;
+	case DEVLINK_PARAM_TYPE_U64_ARRAY:
+		return DEVLINK_PARAM_NLA_TYPE_U64_ARRAY;
 	default:
 		return -EINVAL;
 	}
@@ -224,6 +229,19 @@ devlink_nl_param_value_fill_one(struct sk_buff *msg,
 		    nla_put_flag(msg, DEVLINK_ATTR_PARAM_VALUE_DATA))
 			goto value_nest_cancel;
 		break;
+	case DEVLINK_PARAM_TYPE_U64_ARRAY: {
+		int j;
+
+		if (val->u64arr.size > __DEVLINK_PARAM_MAX_ARRAY_SIZE)
+			goto value_nest_cancel;
+
+		for (j = 0; j < val->u64arr.size; j++) {
+			if (nla_put_uint(msg, DEVLINK_ATTR_PARAM_VALUE_DATA,
+					 val->u64arr.val[j]))
+				goto value_nest_cancel;
+		}
+		break;
+	}
 	}
 
 	nla_nest_end(msg, param_value_attr);
@@ -458,6 +476,9 @@ devlink_param_type_get_from_info(struct genl_info *info,
 	case NLA_FLAG:
 		*param_type = DEVLINK_PARAM_TYPE_BOOL;
 		break;
+	case DEVLINK_PARAM_NLA_TYPE_U64_ARRAY:
+		*param_type = DEVLINK_PARAM_TYPE_U64_ARRAY;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -471,11 +492,13 @@ devlink_param_value_get_from_info(const struct devlink_param *param,
 				  union devlink_param_value *value)
 {
 	struct nlattr *param_data;
-	int len;
+	int len, cnt, rem;
 
 	param_data = info->attrs[DEVLINK_ATTR_PARAM_VALUE_DATA];
 
-	if (param->type != DEVLINK_PARAM_TYPE_BOOL && !param_data)
+	if (param->type != DEVLINK_PARAM_TYPE_BOOL &&
+	    param->type != DEVLINK_PARAM_TYPE_U64_ARRAY &&
+	    !param_data)
 		return -EINVAL;
 
 	switch (param->type) {
@@ -506,6 +529,34 @@ devlink_param_value_get_from_info(const struct devlink_param *param,
 			return -EINVAL;
 		value->vbool = nla_get_flag(param_data);
 		break;
+
+	case DEVLINK_PARAM_TYPE_U64_ARRAY: {
+		struct nlattr *pos;
+
+		cnt = 0;
+		if (!param_data) {
+			value->u64arr.size = 0;
+			break;
+		}
+		nla_for_each_attr_type(pos, DEVLINK_ATTR_PARAM_VALUE_DATA,
+				       genlmsg_data(info->genlhdr),
+				       genlmsg_len(info->genlhdr), rem) {
+			if (cnt >= __DEVLINK_PARAM_MAX_ARRAY_SIZE)
+				return -EMSGSIZE;
+
+			if ((nla_len(pos) != sizeof(u64)) &&
+			    (nla_len(pos) != sizeof(u32))) {
+				NL_SET_BAD_ATTR(info->extack, pos);
+				return -EINVAL;
+			}
+
+			value->u64arr.val[cnt] = nla_get_uint(pos);
+			cnt++;
+		}
+
+		value->u64arr.size = cnt;
+		break;
+	}
 	}
 	return 0;
 }
