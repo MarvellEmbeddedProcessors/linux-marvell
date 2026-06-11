@@ -1234,12 +1234,12 @@ static u64 rvu_af_dl_tim_param_id_to_offset(u32 id)
 
 /* Devlink Params APIs */
 static int rvu_af_dl_dwrr_mtu_validate(struct devlink *devlink, u32 id,
-				       union devlink_param_value val,
+				       union devlink_param_value *val,
 				       struct netlink_ext_ack *extack)
 {
 	struct rvu_devlink *rvu_dl = devlink_priv(devlink);
 	struct rvu *rvu = rvu_dl->rvu;
-	int dwrr_mtu = val.vu32;
+	int dwrr_mtu = val->vu32;
 	struct nix_txsch *txsch;
 	struct nix_hw *nix_hw;
 
@@ -1330,10 +1330,10 @@ static int rvu_af_dl_tim_capture_timers_set(struct devlink *devlink, u32 id,
 
 static int rvu_af_dl_tim_capture_timers_validate(struct devlink *devlink,
 						 u32 id,
-						 union devlink_param_value val,
+						 union devlink_param_value *val,
 						 struct netlink_ext_ack *extack)
 {
-	if (val.vu8 > TIM_AF_CAPTURE_TIMERS_MASK) {
+	if (val->vu8 > TIM_AF_CAPTURE_TIMERS_MASK) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Invalid value to set tim capture timers");
 		return -EINVAL;
@@ -1442,12 +1442,12 @@ static int rvu_af_dl_tim_adjust_timer_set(struct devlink *devlink, u32 id,
 }
 
 static int rvu_af_dl_tim_adjust_timer_validate(struct devlink *devlink, u32 id,
-					       union devlink_param_value val,
+					       union devlink_param_value *val,
 					       struct netlink_ext_ack *extack)
 {
 	u64 delta;
 
-	if (kstrtoull(val.vstr, 10, &delta)) {
+	if (kstrtoull(val->vstr, 10, &delta)) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Invalid value to set tim adjust timer");
 		return -EINVAL;
@@ -1484,14 +1484,14 @@ static int rvu_af_npc_defrag(struct devlink *devlink, u32 id,
 }
 
 static int rvu_af_npc_defrag_feature_validate(struct devlink *devlink, u32 id,
-					      union devlink_param_value val,
+					      union devlink_param_value *val,
 					      struct netlink_ext_ack *extack)
 {
 	struct rvu_devlink *rvu_dl = devlink_priv(devlink);
 	struct rvu *rvu = rvu_dl->rvu;
 	u64 enable;
 
-	if (kstrtoull(val.vstr, 10, &enable)) {
+	if (kstrtoull(val->vstr, 10, &enable)) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Only 1 value is supported");
 		return -EINVAL;
@@ -1539,14 +1539,14 @@ static int rvu_af_npc_exact_feature_disable(struct devlink *devlink, u32 id,
 }
 
 static int rvu_af_npc_exact_feature_validate(struct devlink *devlink, u32 id,
-					     union devlink_param_value val,
+					     union devlink_param_value *val,
 					     struct netlink_ext_ack *extack)
 {
 	struct rvu_devlink *rvu_dl = devlink_priv(devlink);
 	struct rvu *rvu = rvu_dl->rvu;
 	u64 enable;
 
-	if (kstrtoull(val.vstr, 10, &enable)) {
+	if (kstrtoull(val->vstr, 10, &enable)) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Only 1 value is supported");
 		return -EINVAL;
@@ -1601,7 +1601,7 @@ static int rvu_af_dl_npc_mcam_high_zone_percent_set(struct devlink *devlink, u32
 }
 
 static int rvu_af_dl_npc_mcam_high_zone_percent_validate(struct devlink *devlink, u32 id,
-							 union devlink_param_value val,
+							 union devlink_param_value *val,
 							 struct netlink_ext_ack *extack)
 {
 	struct rvu_devlink *rvu_dl = devlink_priv(devlink);
@@ -1609,7 +1609,7 @@ static int rvu_af_dl_npc_mcam_high_zone_percent_validate(struct devlink *devlink
 	struct npc_mcam *mcam;
 
 	/* The percent of high prio zone must range from 12% to 100% of unreserved mcam space */
-	if (val.vu8 < 12 || val.vu8 > 100) {
+	if (val->vu8 < 12 || val->vu8 > 100) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "mcam high zone percent must be between 12% to 100%");
 		return -EINVAL;
@@ -1689,7 +1689,7 @@ static int rvu_af_dl_nix_maxlf_set(struct devlink *devlink, u32 id,
 }
 
 static int rvu_af_dl_nix_maxlf_validate(struct devlink *devlink, u32 id,
-					union devlink_param_value val,
+					union devlink_param_value *val,
 					struct netlink_ext_ack *extack)
 {
 	struct rvu_devlink *rvu_dl = devlink_priv(devlink);
@@ -1722,13 +1722,13 @@ static int rvu_af_dl_nix_maxlf_validate(struct devlink *devlink, u32 id,
 		blkaddr = rvu_get_next_nix_blkaddr(rvu, blkaddr);
 	}
 
-	if (max_nix0_lf && val.vu16 > max_nix0_lf) {
+	if (max_nix0_lf && val->vu16 > max_nix0_lf) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "requested nixlf is greater than the max supported nix0_lf");
 		return -EPERM;
 	}
 
-	if (max_nix1_lf && val.vu16 > max_nix1_lf) {
+	if (max_nix1_lf && val->vu16 > max_nix1_lf) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "requested nixlf is greater than the max supported nix1_lf");
 		return -EINVAL;
@@ -1767,12 +1767,12 @@ static int rvu_af_dl_npa_int_req_dwrr_set(struct devlink *devlink, u32 id,
 }
 
 static int rvu_af_dl_npa_int_req_dwrr_validate(struct devlink *devlink, u32 id,
-					       union devlink_param_value val,
+					       union devlink_param_value *val,
 					       struct netlink_ext_ack *extack)
 {
 	u64 dwrr;
 
-	if (kstrtoull(val.vstr, 0, &dwrr)) {
+	if (kstrtoull(val->vstr, 0, &dwrr)) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Invalid value, use hex e.g. 0x80808080808080");
 		return -EINVAL;
@@ -1811,12 +1811,12 @@ static int rvu_af_dl_npa_ext_req_dwrr_set(struct devlink *devlink, u32 id,
 }
 
 static int rvu_af_dl_npa_ext_req_dwrr_validate(struct devlink *devlink, u32 id,
-					       union devlink_param_value val,
+					       union devlink_param_value *val,
 					       struct netlink_ext_ack *extack)
 {
 	u64 dwrr;
 
-	if (kstrtoull(val.vstr, 0, &dwrr)) {
+	if (kstrtoull(val->vstr, 0, &dwrr)) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Invalid value, use hex e.g. 0x80808080808080");
 		return -EINVAL;

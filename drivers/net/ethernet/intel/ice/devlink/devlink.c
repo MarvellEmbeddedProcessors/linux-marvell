@@ -663,10 +663,10 @@ static int ice_devlink_tx_sched_layers_set(struct devlink *devlink, u32 id,
  * error.
  */
 static int ice_devlink_tx_sched_layers_validate(struct devlink *devlink, u32 id,
-						union devlink_param_value val,
+						union devlink_param_value *val,
 						struct netlink_ext_ack *extack)
 {
-	if (val.vu8 != ICE_SCHED_5_LAYERS && val.vu8 != ICE_SCHED_9_LAYERS) {
+	if (val->vu8 != ICE_SCHED_5_LAYERS && val->vu8 != ICE_SCHED_9_LAYERS) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Wrong number of tx scheduler layers provided.");
 		return -EINVAL;
@@ -1335,7 +1335,7 @@ static int ice_devlink_enable_roce_set(struct devlink *devlink, u32 id,
 
 static int
 ice_devlink_enable_roce_validate(struct devlink *devlink, u32 id,
-				 union devlink_param_value val,
+				 union devlink_param_value *val,
 				 struct netlink_ext_ack *extack)
 {
 	struct ice_pf *pf = devlink_priv(devlink);
@@ -1386,7 +1386,7 @@ static int ice_devlink_enable_iw_set(struct devlink *devlink, u32 id,
 
 static int
 ice_devlink_enable_iw_validate(struct devlink *devlink, u32 id,
-			       union devlink_param_value val,
+			       union devlink_param_value *val,
 			       struct netlink_ext_ack *extack)
 {
 	struct ice_pf *pf = devlink_priv(devlink);
@@ -1510,10 +1510,10 @@ static int ice_devlink_local_fwd_set(struct devlink *devlink, u32 id,
  * error.
  */
 static int ice_devlink_local_fwd_validate(struct devlink *devlink, u32 id,
-					  union devlink_param_value val,
+					  union devlink_param_value *val,
 					  struct netlink_ext_ack *extack)
 {
-	if (ice_devlink_local_fwd_str_to_mode(val.vstr) < 0) {
+	if (ice_devlink_local_fwd_str_to_mode(val->vstr) < 0) {
 		NL_SET_ERR_MSG_MOD(extack, "Error: Requested value is not supported.");
 		return -EINVAL;
 	}

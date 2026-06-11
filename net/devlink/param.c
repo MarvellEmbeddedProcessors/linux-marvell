@@ -189,7 +189,7 @@ static int
 devlink_nl_param_value_fill_one(struct sk_buff *msg,
 				enum devlink_param_type type,
 				enum devlink_param_cmode cmode,
-				union devlink_param_value val)
+				union devlink_param_value *val)
 {
 	struct nlattr *param_value_attr;
 
@@ -203,24 +203,24 @@ devlink_nl_param_value_fill_one(struct sk_buff *msg,
 
 	switch (type) {
 	case DEVLINK_PARAM_TYPE_U8:
-		if (nla_put_u8(msg, DEVLINK_ATTR_PARAM_VALUE_DATA, val.vu8))
+		if (nla_put_u8(msg, DEVLINK_ATTR_PARAM_VALUE_DATA, val->vu8))
 			goto value_nest_cancel;
 		break;
 	case DEVLINK_PARAM_TYPE_U16:
-		if (nla_put_u16(msg, DEVLINK_ATTR_PARAM_VALUE_DATA, val.vu16))
+		if (nla_put_u16(msg, DEVLINK_ATTR_PARAM_VALUE_DATA, val->vu16))
 			goto value_nest_cancel;
 		break;
 	case DEVLINK_PARAM_TYPE_U32:
-		if (nla_put_u32(msg, DEVLINK_ATTR_PARAM_VALUE_DATA, val.vu32))
+		if (nla_put_u32(msg, DEVLINK_ATTR_PARAM_VALUE_DATA, val->vu32))
 			goto value_nest_cancel;
 		break;
 	case DEVLINK_PARAM_TYPE_STRING:
 		if (nla_put_string(msg, DEVLINK_ATTR_PARAM_VALUE_DATA,
-				   val.vstr))
+				   val->vstr))
 			goto value_nest_cancel;
 		break;
 	case DEVLINK_PARAM_TYPE_BOOL:
-		if (val.vbool &&
+		if (val->vbool &&
 		    nla_put_flag(msg, DEVLINK_ATTR_PARAM_VALUE_DATA))
 			goto value_nest_cancel;
 		break;
@@ -309,7 +309,7 @@ static int devlink_nl_param_fill(struct sk_buff *msg, struct devlink *devlink,
 		if (!param_value_set[i])
 			continue;
 		err = devlink_nl_param_value_fill_one(msg, param->type,
-						      i, param_value[i]);
+						      i, &param_value[i]);
 		if (err)
 			goto values_list_nest_cancel;
 	}
@@ -553,7 +553,7 @@ static int __devlink_nl_cmd_param_set_doit(struct devlink *devlink,
 	if (err)
 		return err;
 	if (param->validate) {
-		err = param->validate(devlink, param->id, value, info->extack);
+		err = param->validate(devlink, param->id, &value, info->extack);
 		if (err)
 			return err;
 	}
@@ -798,13 +798,13 @@ EXPORT_SYMBOL_GPL(devl_param_driverinit_value_get);
  *
  *	@devlink: devlink
  *	@param_id: parameter ID
- *	@init_val: value of parameter to set for driverinit configuration mode
+ *	@init_val: pointer to value of parameter to set for driverinit configuration mode
  *
  *	This function should be used by the driver to set driverinit
  *	configuration mode default value.
  */
 void devl_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
-				     union devlink_param_value init_val)
+				     union devlink_param_value *init_val)
 {
 	struct devlink_param_item *param_item;
 
@@ -818,7 +818,7 @@ void devl_param_driverinit_value_set(struct devlink *devlink, u32 param_id,
 						      DEVLINK_PARAM_CMODE_DRIVERINIT)))
 		return;
 
-	param_item->driverinit_value = init_val;
+	param_item->driverinit_value = *init_val;
 	param_item->driverinit_value_valid = true;
 
 	devlink_param_notify(devlink, 0, param_item, DEVLINK_CMD_PARAM_NEW);

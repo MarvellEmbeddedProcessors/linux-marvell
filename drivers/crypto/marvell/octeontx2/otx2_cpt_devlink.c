@@ -279,10 +279,10 @@ static int cn20k_cpt_dl_set_psp_timer_jitter_correct(struct devlink *dl, u32 id,
 }
 
 static int cn20k_cpt_dl_validate_psp_timer_jitter_correct(struct devlink *devlink, u32 id,
-							  union devlink_param_value val,
+							  union devlink_param_value *val,
 							  struct netlink_ext_ack *extack)
 {
-	return (val.vu8 > 1) ? -EINVAL : 0;
+	return (val->vu8 > 1) ? -EINVAL : 0;
 }
 
 static int cn20k_cpt_dl_get_psp_timer_add_value(struct devlink *dl, u32 id,
@@ -330,12 +330,12 @@ static int cn20k_cpt_dl_set_psp_timer_add_value(struct devlink *dl, u32 id,
 #define PSP_TIMER_MAX_ADD_VALUE PSP_TIMER_ADD_VALUE_MASK
 
 static int cn20k_cpt_dl_validate_psp_timer_add_value(struct devlink *devlink, u32 id,
-						     union devlink_param_value val,
+						     union devlink_param_value *val,
 						     struct netlink_ext_ack *extack)
 {
 	u64 usrval = 0;
 
-	if (kstrtoull(val.vstr, 0, &usrval))
+	if (kstrtoull(val->vstr, 0, &usrval))
 		return -EINVAL;
 
 	if (usrval > PSP_TIMER_MAX_ADD_VALUE)
@@ -347,11 +347,11 @@ static int cn20k_cpt_dl_validate_psp_timer_add_value(struct devlink *devlink, u3
 #undef PSP_TIMER_MAX_ADD_VALUE
 
 static int cn20k_cpt_dl_check_pdb_config_egrp(struct devlink *devlink, u32 id,
-					      union devlink_param_value val,
+					      union devlink_param_value *val,
 					      struct netlink_ext_ack *extack)
 {
 	/* valid engine group [0-7] */
-	if (val.vu8 > 0x7)
+	if (val->vu8 > 0x7)
 		return -EINVAL;
 	return 0;
 }
@@ -379,10 +379,10 @@ static int cn20k_cpt_dl_set_pdb_config_egrp(struct devlink *dl, u32 id,
 #define DL_PDB_GRP_THR_MASK 0x00FF
 
 static int cn20k_cpt_dl_check_pdb_config_value(struct devlink *devlink, u32 id,
-					       union devlink_param_value val,
+					       union devlink_param_value *val,
 					       struct netlink_ext_ack *extack)
 {
-	u8 pdb_pkt_max = FIELD_GET(DL_PDB_PKT_MAX_MASK, val.vu16);
+	u8 pdb_pkt_max = FIELD_GET(DL_PDB_PKT_MAX_MASK, val->vu16);
 
 	if (pdb_pkt_max > 0x3F)
 		return -EINVAL;

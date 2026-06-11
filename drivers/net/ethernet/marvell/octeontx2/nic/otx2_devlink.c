@@ -8,7 +8,7 @@
 
 /* Devlink Params APIs */
 static int otx2_dl_mcam_count_validate(struct devlink *devlink, u32 id,
-				       union devlink_param_value val,
+				       union devlink_param_value *val,
 				       struct netlink_ext_ack *extack)
 {
 	struct otx2_devlink *otx2_dl = devlink_priv(devlink);
@@ -101,7 +101,7 @@ static int otx2_dl_ucast_flt_cnt_get(struct devlink *devlink, u32 id,
 }
 
 static int otx2_dl_ucast_flt_cnt_validate(struct devlink *devlink, u32 id,
-					  union devlink_param_value val,
+					  union devlink_param_value *val,
 					  struct netlink_ext_ack *extack)
 {
 	struct otx2_devlink *otx2_dl = devlink_priv(devlink);
@@ -136,7 +136,7 @@ static int otx2_dl_ucast_flt_cnt_validate(struct devlink *devlink, u32 id,
 }
 
 static int otx2_dl_tl1_rr_prio_validate(struct devlink *devlink, u32 id,
-					union devlink_param_value val,
+					union devlink_param_value *val,
 					struct netlink_ext_ack *extack)
 {
 	struct otx2_devlink *otx2_dl = devlink_priv(devlink);
@@ -160,7 +160,7 @@ static int otx2_dl_tl1_rr_prio_validate(struct devlink *devlink, u32 id,
 		return -EOPNOTSUPP;
 	}
 
-	if (val.vu8 > 7) {
+	if (val->vu8 > 7) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Valid priority range 0 - 7");
 		return -EINVAL;
@@ -215,13 +215,13 @@ static int otx2_dl_tl1_rr_prio_set(struct devlink *devlink, u32 id,
 }
 
 static int otx2_dl_rbuf_size_validate(struct devlink *devlink, u32 id,
-				      union devlink_param_value val,
+				      union devlink_param_value *val,
 				      struct netlink_ext_ack *extack)
 {
 	/* Hardware supports max size of 32k for a receive buffer
 	 * and 1536 is typical ethernet frame size.
 	 */
-	if (val.vu16 < 1536 || val.vu16 > 32768) {
+	if (val->vu16 < 1536 || val->vu16 > 32768) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Receive buffer range is 1536 - 32768");
 		return -EINVAL;
@@ -269,10 +269,10 @@ static int otx2_dl_rbuf_size_get(struct devlink *devlink, u32 id,
 }
 
 static int otx2_dl_cqe_size_validate(struct devlink *devlink, u32 id,
-				     union devlink_param_value val,
+				     union devlink_param_value *val,
 				     struct netlink_ext_ack *extack)
 {
-	if (val.vu16 != 128 && val.vu16 != 512) {
+	if (val->vu16 != 128 && val->vu16 != 512) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "Only 128 or 512 byte descriptor allowed");
 		return -EINVAL;
@@ -356,7 +356,7 @@ static int otx2_dl_serdes_link_get(struct devlink *devlink, u32 id,
 }
 
 static int otx2_dl_serdes_link_validate(struct devlink *devlink, u32 id,
-					union devlink_param_value val,
+					union devlink_param_value *val,
 					struct netlink_ext_ack *extack)
 {
 	struct otx2_devlink *otx2_dl = devlink_priv(devlink);
@@ -397,7 +397,7 @@ static int otx2_dl_mac_stats_reset_set(struct devlink *devlink, u32 id,
 }
 
 static int otx2_dl_mac_stats_reset_validate(struct devlink *devlink, u32 id,
-					    union devlink_param_value val,
+					    union devlink_param_value *val,
 					    struct netlink_ext_ack *extack)
 {
 	struct otx2_devlink *otx2_dl = devlink_priv(devlink);
@@ -444,10 +444,10 @@ static int otx2_dl_pb_caching_set(struct devlink *devlink, u32 id,
 }
 
 static int otx2_dl_pb_caching_validate(struct devlink *devlink, u32 id,
-				       union devlink_param_value val,
+				       union devlink_param_value *val,
 				       struct netlink_ext_ack *extack)
 {
-	if (val.vu8 > 3 || val.vu8 < 0) {
+	if (val->vu8 > 3 || val->vu8 < 0) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "PB_CACHING must be 0-3: 0=no cache, 1=cache "
 				   "all, 2=first cache line, 3=first two cache lines");
