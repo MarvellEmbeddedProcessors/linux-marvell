@@ -379,12 +379,25 @@ error:
 static void thunder_mmc_remove(struct pci_dev *pdev)
 {
 	struct cvm_mmc_host *host = pci_get_drvdata(pdev);
+	bool has_acpi;
 	u64 dma_cfg;
 	int i;
 
-	for (i = 0; i < CAVIUM_MAX_MMC; i++)
+	has_acpi = has_acpi_companion(&pdev->dev);
+
+	for (i = 0; i < CAVIUM_MAX_MMC; i++) {
 		if (host->slot[i])
 			cvm_mmc_of_slot_remove(host->slot[i]);
+		if (host->slot_pdev[i]) {
+			get_device(&host->slot_pdev[i]->dev);
+			if (has_acpi)
+				platform_device_unregister(host->slot_pdev[i]);
+			else
+				of_platform_device_destroy(&host->slot_pdev[i]->dev, NULL);
+			put_device(&host->slot_pdev[i]->dev);
+			host->slot_pdev[i] = NULL;
+		}
+	}
 
 	dma_cfg = readq(host->dma_base + MIO_EMM_DMA_CFG(host));
 	dma_cfg |= MIO_EMM_DMA_CFG_CLR;
