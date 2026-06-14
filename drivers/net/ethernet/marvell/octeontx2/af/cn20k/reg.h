@@ -173,33 +173,12 @@ static inline u64 pf_to_bitoff(u8 pf)
 	offset = (0xb000000ull | (a) << 4 | (b) << 20);		\
 	offset; })
 
-/* NIX Registers */
-#define NIX_AF_LSO_ALT_FLAGS_CFG(a)	(0x4B00 | (a) << 3)
-#define NIX_AF_LSO_ALT_FLAGS_CFG1(a)	(0x4B20 | (a) << 3)
-#define NIX_AF_RX_CPT_CHAN_CFG			(0x0E8)
-#define NIX_AF_RX_DEF_INLINEX(a)		(0x2c0 | (a) << 3)
-#define NIX_AF_RX_INLINE_GEN_CFGX(a)		(0x340 | (a) << 3)
-#define NIX_AF_RX_EXTRACT_INLINEX(a)		(0x380 | (a) << 3)
-#define NIX_AF_RX_PROT_FIELDX_INLINEX(a, b)	(0x4c00 | (a) << 6 | (b) << 3)
-#define NIX_AF_LFX_RX_INLINE_SA_BASE(a, b)	(0x4240 | (a) << 17 | (b) << 3)
-#define NIX_AF_LFX_RX_INLINE_CFG0(a, b)		(0x4280 | (a) << 17 | (b) << 3)
-#define NIX_AF_LFX_RX_INLINE_CFG1(a, b)		(0x42c0 | (a) << 17 | (b) << 3)
-
 /* NPA Registers */
 #define NPA_AF_DPCX_CFG(a)		(0x800 | (a) << 6)
 #define NPA_AF_DPC_PERMITX(a)		(0x1000 | (a) << 3)
 
 #define NPA_DPC_MAX			32
 #define NPA_DPC_LFS_PER_REG		64
-
-#define NIX_AF_LSO_ALT_FLAGS_CFG(a)	(0x4B00 | (a) << 3)
-#define NIX_AF_LSO_ALT_FLAGS_CFG1(a)	(0x4B20 | (a) << 3)
-
-/* NIX Registers */
-#define NIX_AF_RX_DEF_INLINEX(a)                (0x2c0 | (a) << 3)
-#define NIX_AF_RX_INLINE_GEN_CFGX(a)            (0x340 | (a) << 3)
-#define NIX_AF_RX_EXTRACT_INLINEX(a)            (0x380 | (a) << 3)
-#define NIX_AF_RX_PROT_FIELDX_INLINEX(a, b)     (0x4c00 | (a) << 6 | (b) << 3)
 
 /* SDP Regsiters */
 #define SDP_AF_BLK_RST				0xc000030
