@@ -23,11 +23,11 @@
 #include "otx2_bphy.h"
 #include "cnf10k_bphy_hw.h"
 #include "cnf10k_bphy_netdev_comm_if.h"
+#include "cpri_common.h"
 
 #define CNF10K_BPHY_CPRI_MAX_MHAB		3
 #define CNF10K_BPHY_CPRI_MAX_LMAC		4
 #define CNF10K_BPHY_CPRI_MAX_INTF		12
-#define CNF10K_BPHY_CPRI_PKT_BUF_SIZE		1664	/* wqe 128 bytes + 1536 bytes */
 #define CNF10K_BPHY_CPRI_WQE_SIZE		128
 
 #define CNF10K_CPRI_RX_INTR_MASK(a)		((1 << (a)) << 29)
@@ -71,34 +71,6 @@ struct cnf10k_cpri_stats {
 	spinlock_t			lock;
 };
 
-/* cpri dl cbuf cfg */
-struct cnf10k_dl_cbuf_cfg {
-	int				num_entries;
-	u64				cbuf_iova_addr;
-	void __iomem			*cbuf_virt_addr;
-	/* sw */
-	u64				sw_wr_ptr;
-	/* dl lock */
-	spinlock_t			lock;
-};
-
-/* cpri ul cbuf cfg */
-struct cnf10k_ul_cbuf_cfg {
-	int				num_entries;
-	u64				cbuf_iova_addr;
-	void __iomem			*cbuf_virt_addr;
-	/* sw */
-	int				sw_rd_ptr;
-	/* ul lock */
-	spinlock_t			lock;
-};
-
-struct cnf10k_cpri_common_cfg {
-	struct cnf10k_dl_cbuf_cfg	dl_cfg;
-	struct cnf10k_ul_cbuf_cfg	ul_cfg;
-	u8				refcnt;
-};
-
 struct cnf10k_cpri_link_event {
 	u8				cpri_num;
 	u8				lmac_id;
@@ -116,7 +88,7 @@ struct cnf10k_cpri_ndev_priv {
 	void __iomem			*bphy_reg_base;
 	void __iomem			*cpri_reg_base;
 	struct iommu_domain		*iommu_domain;
-	struct cnf10k_cpri_common_cfg	*cpri_common;
+	struct cpri_common_cfg		*cpri_common;
 	struct napi_struct		napi;
 	unsigned long			state;
 	struct cnf10k_cpri_stats	stats;
