@@ -23,12 +23,12 @@
 #include "otx2_bphy.h"
 #include "otx2_bphy_hw.h"
 #include "rfoe_bphy_netdev_comm_if.h"
+#include "cpri_common.h"
 
 #define OTX2_BPHY_CPRI_MAX_MHAB		3
 #define OTX2_BPHY_CPRI_MAX_LMAC		4
 #define OTX2_BPHY_CPRI_MAX_INTF		10
 
-#define OTX2_BPHY_CPRI_PKT_BUF_SIZE	1664	/* wqe 128 bytes + 1536 bytes */
 #define OTX2_BPHY_CPRI_WQE_SIZE		128
 
 #define CPRI_RX_INTR_MASK(a)		((1UL << (a)) << 13)
@@ -69,34 +69,6 @@ struct otx2_cpri_stats {
 	u64				tx_dropped;
 	/* stats lock */
 	spinlock_t			lock;
-};
-
-/* cpri dl cbuf cfg */
-struct dl_cbuf_cfg {
-	int				num_entries;
-	u64				cbuf_iova_addr;
-	void __iomem			*cbuf_virt_addr;
-	/* sw */
-	u64				sw_wr_ptr;
-	/* dl lock */
-	spinlock_t			lock;
-};
-
-/* cpri ul cbuf cfg */
-struct ul_cbuf_cfg {
-	int				num_entries;
-	u64				cbuf_iova_addr;
-	void __iomem			*cbuf_virt_addr;
-	/* sw */
-	int				sw_rd_ptr;
-	/* ul lock */
-	spinlock_t			lock;
-};
-
-struct cpri_common_cfg {
-	struct dl_cbuf_cfg		dl_cfg;
-	struct ul_cbuf_cfg		ul_cfg;
-	u8				refcnt;
 };
 
 struct otx2_cpri_link_event {

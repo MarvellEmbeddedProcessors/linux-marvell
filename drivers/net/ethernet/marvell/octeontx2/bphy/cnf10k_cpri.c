@@ -157,7 +157,7 @@ static int cnf10k_cpri_process_rx_pkts(struct cnf10k_cpri_ndev_priv *priv,
 {
 	int count, head, processed_pkts = 0;
 	struct cnf10k_cpri_ndev_priv *priv2;
-	struct cnf10k_ul_cbuf_cfg *ul_cfg;
+	struct cpri_ul_cbuf_cfg *ul_cfg;
 	struct cpri_pkt_ul_wqe_hdr *wqe;
 	struct net_device *netdev;
 	u16 nxt_wr_ptr, len;
@@ -179,9 +179,21 @@ static int cnf10k_cpri_process_rx_pkts(struct cnf10k_cpri_ndev_priv *priv,
 		count = head - ul_cfg->sw_rd_ptr;
 	}
 
+	if (!count) {
+		int last_rd_ptr = 0;
+
+		if (ul_cfg->sw_rd_ptr > 0)
+			last_rd_ptr = ul_cfg->sw_rd_ptr - 1;
+		else
+			last_rd_ptr = ul_cfg->num_entries - 1;
+
+		if (!cpri_rx_buf_is_poisoned(last_rd_ptr, ul_cfg))
+			count = ul_cfg->num_entries;
+        }
+
 	while (likely((processed_pkts < budget) && (processed_pkts < count))) {
 		pkt_buf = (u8 __force *)ul_cfg->cbuf_virt_addr +
-			  (CNF10K_BPHY_CPRI_PKT_BUF_SIZE * ul_cfg->sw_rd_ptr);
+			  (BPHY_CPRI_PKT_BUF_SIZE * ul_cfg->sw_rd_ptr);
 		wqe = (struct cpri_pkt_ul_wqe_hdr *)pkt_buf;
 		netdev = cnf10k_cpri_get_netdev(wqe->mhab_id, wqe->lane_id);
 		if (unlikely(!netdev)) {
@@ -245,9 +257,19 @@ update_processed_pkts:
 			ul_cfg->sw_rd_ptr = 0;
 	}
 
-	if (processed_pkts)
+	if (processed_pkts) {
+		int last_rd_ptr = 0;
+
+		if (ul_cfg->sw_rd_ptr > 0)
+			last_rd_ptr = ul_cfg->sw_rd_ptr - 1;
+		else
+			last_rd_ptr = ul_cfg->num_entries - 1;
+
+                cpri_rx_buf_poison(last_rd_ptr, ul_cfg);
+
 		writeq(processed_pkts, priv->cpri_reg_base +
 		       CNF10K_CPRIX_RXD_GMII_UL_RD_DOORBELL(priv->cpri_num));
+	}
 
 	return processed_pkts;
 }
@@ -380,7 +402,7 @@ static netdev_tx_t cnf10k_cpri_eth_start_xmit(struct sk_buff *skb,
 					      struct net_device *netdev)
 {
 	struct cnf10k_cpri_ndev_priv *priv = netdev_priv(netdev);
-	struct cnf10k_dl_cbuf_cfg *dl_cfg;
+	struct cpri_dl_cbuf_cfg *dl_cfg;
 	struct cpri_pkt_dl_wqe_hdr *wqe;
 	u16 nxt_rd_ptr, sw_wr_ptr;
 	int tail, head, count;
@@ -438,7 +460,7 @@ static netdev_tx_t cnf10k_cpri_eth_start_xmit(struct sk_buff *skb,
 	}
 
 	buf_ptr = (u8 __force *)dl_cfg->cbuf_virt_addr +
-		  (CNF10K_BPHY_CPRI_PKT_BUF_SIZE * dl_cfg->sw_wr_ptr);
+		  (BPHY_CPRI_PKT_BUF_SIZE * dl_cfg->sw_wr_ptr);
 	wqe = (struct cpri_pkt_dl_wqe_hdr *)buf_ptr;
 	wqe->mhab_id = priv->cpri_num;
 	wqe->lane_id = priv->lmac_id;
@@ -514,7 +536,7 @@ static const struct net_device_ops cnf10k_cpri_netdev_ops = {
 
 static void cnf10k_cpri_dump_ul_cbuf(struct cnf10k_cpri_ndev_priv *priv)
 {
-	struct cnf10k_ul_cbuf_cfg *ul_cfg = &priv->cpri_common->ul_cfg;
+	struct cpri_ul_cbuf_cfg *ul_cfg = &priv->cpri_common->ul_cfg;
 
 	pr_debug("%s: num_entries=%d iova=0x%llx\n",
 		 __func__, ul_cfg->num_entries, ul_cfg->cbuf_iova_addr);
@@ -522,7 +544,7 @@ static void cnf10k_cpri_dump_ul_cbuf(struct cnf10k_cpri_ndev_priv *priv)
 
 static void cnf10k_cpri_dump_dl_cbuf(struct cnf10k_cpri_ndev_priv *priv)
 {
-	struct cnf10k_dl_cbuf_cfg *dl_cfg = &priv->cpri_common->dl_cfg;
+	struct cpri_dl_cbuf_cfg *dl_cfg = &priv->cpri_common->dl_cfg;
 
 	pr_debug("%s: num_entries=%d iova=0x%llx\n",
 		 __func__, dl_cfg->num_entries, dl_cfg->cbuf_iova_addr);
@@ -531,9 +553,10 @@ static void cnf10k_cpri_dump_dl_cbuf(struct cnf10k_cpri_ndev_priv *priv)
 static void cnf10k_cpri_fill_dl_ul_cfg(struct cnf10k_cpri_ndev_priv *priv,
 				       struct cnf10k_bphy_ndev_cpri_intf_cfg *cpri_cfg)
 {
-	struct cnf10k_dl_cbuf_cfg *dl_cfg;
-	struct cnf10k_ul_cbuf_cfg *ul_cfg;
+	struct cpri_dl_cbuf_cfg *dl_cfg;
+	struct cpri_ul_cbuf_cfg *ul_cfg;
 	u64 iova;
+	int index;
 
 	dl_cfg = &priv->cpri_common->dl_cfg;
 	dl_cfg->num_entries = cpri_cfg->num_dl_buf;
@@ -552,6 +575,9 @@ static void cnf10k_cpri_fill_dl_ul_cfg(struct cnf10k_cpri_ndev_priv *priv,
 	ul_cfg->sw_rd_ptr = 0;
 	spin_lock_init(&ul_cfg->lock);
 	cnf10k_cpri_dump_ul_cbuf(priv);
+
+	for (index = 0; index < ul_cfg->num_entries; index++)
+		cpri_rx_buf_poison(index, ul_cfg);
 }
 
 int cnf10k_cpri_parse_and_init_intf(struct otx2_bphy_cdev_priv *cdev,
@@ -582,7 +608,7 @@ int cnf10k_cpri_parse_and_init_intf(struct otx2_bphy_cdev_priv *cdev,
 			memset(priv, 0, sizeof(*priv));
 			if (!priv2) {
 				priv->cpri_common =
-					kzalloc(sizeof(struct cnf10k_cpri_common_cfg),
+					kzalloc(sizeof(struct cpri_common_cfg),
 						GFP_KERNEL);
 				if (!priv->cpri_common) {
 					dev_err(cdev->dev, "kzalloc failed\n");
