@@ -3132,7 +3132,30 @@ static void npc_create_srch_order(int cnt)
 	subbank_srch_order[cnt - 1] = cnt / 2;
 }
 
-static void npc_subbank_init(struct rvu *rvu, struct npc_subbank *sb, int idx)
+static void npc_subbanks_srch_oder_init(struct rvu *rvu)
+{
+	struct npc_subbank *sb;
+	int sb_idx;
+	int i;
+
+	for (i = 0; i < npc_priv->num_subbanks; i++) {
+		sb_idx = subbank_srch_order[i];
+		sb = &npc_priv->sb[sb_idx];
+		sb->arr_idx = i;
+
+		dev_dbg(rvu->dev, "%s:%d sb->idx=%u sb->arr_idx=%u\n",
+			__func__, __LINE__, sb->idx, sb->arr_idx);
+
+		/* Keep first and last subbank at end of free array; so that
+		 * it will be used at last
+		 */
+		xa_store(&npc_priv->xa_sb_free, sb->arr_idx,
+			 xa_mk_value(sb->idx), GFP_KERNEL);
+	}
+}
+
+static void npc_subbank_init(struct rvu *rvu __maybe_unused,
+			     struct npc_subbank *sb, int idx)
 {
 	mutex_init(&sb->lock);
 
@@ -3144,16 +3167,6 @@ static void npc_subbank_init(struct rvu *rvu, struct npc_subbank *sb, int idx)
 
 	sb->flags = NPC_SUBBANK_FLAG_FREE;
 	sb->idx = idx;
-	sb->arr_idx = subbank_srch_order[idx];
-
-	dev_dbg(rvu->dev, "%s:%d sb->idx=%u sb->arr_idx=%u\n",
-		__func__, __LINE__, sb->idx, sb->arr_idx);
-
-	/* Keep first and last subbank at end of free array; so that
-	 * it will be used at last
-	 */
-	xa_store(&npc_priv->xa_sb_free, sb->arr_idx,
-		 xa_mk_value(sb->idx), GFP_KERNEL);
 }
 
 static int npc_pcifunc_map_create(struct rvu *rvu)
@@ -4231,6 +4244,8 @@ static int npc_priv_init(struct rvu *rvu)
 	/* Initialize subbanks */
 	for (i = 0, sb = npc_priv->sb; i < num_subbanks; i++, sb++)
 		npc_subbank_init(rvu, sb, i);
+
+	npc_subbanks_srch_oder_init(rvu);
 
 	/* Get number of pcifuncs in the system */
 	npc_priv->pf_cnt = npc_pcifunc_map_create(rvu);
