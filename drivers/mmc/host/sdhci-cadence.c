@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/mmc.h>
+#include <linux/gpio/consumer.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/reset.h>
@@ -225,6 +226,8 @@ struct sdhci_cdns_priv {
 	bool enhanced_strobe;
 	void (*priv_writel)(struct sdhci_cdns_priv *priv, u32 val, void __iomem *reg);
 	struct reset_control *rst_hw;
+	/** eMMC RST_n when not wired through Emmc Controller; use reset-gpios in DT */
+	struct gpio_desc *rst_gpio;
 	const struct sdhci_cdns_data *cdns_data;
 	void *phy;
 	unsigned int nr_phy_params;
@@ -1481,7 +1484,7 @@ static int sdhci_cdns_sd6_phy_init(struct sdhci_cdns_priv *priv)
 	reg |= FIELD_PREP(SDHCI_CDNS_SD6_PHY_GATE_LPBK_RD_DEL_SEL,
 			phy->settings.cp_rd_del_sel);
 	reg |= FIELD_PREP(SDHCI_CDNS_SD6_PHY_GATE_LPBK_UNDERRUN_SUPPRESS,
-			phy->settings.cp_gate_cfg_always_on);
+			phy->settings.cp_underrun_suppress);
 	reg |= FIELD_PREP(SDHCI_CDNS_SD6_PHY_GATE_LPBK_GATE_CFG_ALWAYS_ON,
 			phy->settings.cp_gate_cfg_always_on);
 	sdhci_cdns_sd6_write_phy_reg(priv, SDHCI_CDNS_SD6_PHY_GATE_LPBK, reg);
@@ -2354,15 +2357,28 @@ static void sdhci_cdns_mmc_hw_reset(struct mmc_host *mmc)
 	struct sdhci_host *host = mmc_priv(mmc);
 	struct sdhci_cdns_priv *priv = sdhci_cdns_priv(host);
 
-	dev_dbg(mmc_dev(host->mmc), "emmc hardware reset\n");
+	if (priv->rst_hw) {
+		dev_dbg(mmc_dev(host->mmc), "eMMC hardware reset (reset controller)\n");
 
-	reset_control_assert(priv->rst_hw);
-	/* For eMMC, minimum is 1us but give it 3us for good measure */
-	udelay(3);
+		reset_control_assert(priv->rst_hw);
+		/* For eMMC, minimum is 1us but give it 3us for good measure */
+		udelay(3);
 
-	reset_control_deassert(priv->rst_hw);
-	/* For eMMC, minimum is 200us but give it 300us for good measure */
-	usleep_range(300, 1000);
+		reset_control_deassert(priv->rst_hw);
+		/* For eMMC, minimum is 200us but give it 300us for good measure */
+		usleep_range(300, 1000);
+	} else if (priv->rst_gpio) {
+		/*
+		 * RST_n via GPIO (DT: reset-gpios, typically GPIO_ACTIVE_LOW).
+		 * JESD84-B51: assert >= 1 us, then >= 200 us after deassert before CMD0.
+		 */
+		dev_dbg(mmc_dev(host->mmc), "eMMC hardware reset (GPIO)\n");
+
+		gpiod_set_value_cansleep(priv->rst_gpio, 1);
+		udelay(10);
+		gpiod_set_value_cansleep(priv->rst_gpio, 0);
+		usleep_range(300, 1000);
+	}
 }
 
 #ifdef CONFIG_DMI
@@ -2509,8 +2525,27 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 		if (IS_ERR(priv->rst_hw))
 			return dev_err_probe(mmc_dev(host->mmc), PTR_ERR(priv->rst_hw),
 					    "reset controller error\n");
-		if (priv->rst_hw)
+
+		if (!priv->rst_hw) {
+			/*
+			 * SoC reset line to RST_n may be absent (e.g. Marvell CN20K vs
+			 * CN10K). Optional GPIO drives the card RST_n directly.
+			 */
+			priv->rst_gpio = devm_gpiod_get_optional(dev, "reset",
+								 GPIOD_OUT_LOW);
+			if (IS_ERR(priv->rst_gpio))
+				return dev_err_probe(mmc_dev(host->mmc),
+						     PTR_ERR(priv->rst_gpio),
+						     "eMMC reset GPIO error\n");
+		}
+
+		if (priv->rst_hw || priv->rst_gpio) {
 			host->mmc_host_ops.card_hw_reset = sdhci_cdns_mmc_hw_reset;
+		} else {
+			dev_warn(dev,
+				 "cap-mmc-hw-reset but neither resets nor reset-gpios; disabling HW reset\n");
+			host->mmc->caps &= ~MMC_CAP_HW_RESET;
+		}
 	}
 
 	/*

@@ -32,6 +32,13 @@ properties:
   resets:
     maxItems: 1
 
+  reset-gpios:
+    maxItems: 1
+    description: |
+      Optional eMMC RST_n line when the controller reset output is not wired
+      to the card reset. Use GPIO_ACTIVE_LOW for standard RST_n.
+      Requires cap-mmc-hw-reset; see mmc-controller.yaml.
+
   # PHY DLL input delays:
   # They are used to delay the data valid window, and align the window to
   # sampling clock. The delay starts from 5ns (for delay parameter equal to 0)
