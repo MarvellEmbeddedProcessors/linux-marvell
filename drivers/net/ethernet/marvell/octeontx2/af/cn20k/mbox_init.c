@@ -240,7 +240,7 @@ int cn20k_rvu_get_mbox_regions(struct rvu *rvu, void **mbox_addr,
 			if (!test_bit(region, pf_bmap))
 				continue;
 
-			bar = (u64)phys_to_virt((u64)rvu->ng_rvu->vf_mbox_addr->base);
+			bar = (u64)rvu->ng_rvu->vf_mbox_addr->base;
 			bar += region * MBOX_SIZE;
 			mbox_addr[region] = (void *)bar;
 
@@ -254,7 +254,7 @@ int cn20k_rvu_get_mbox_regions(struct rvu *rvu, void **mbox_addr,
 		if (!test_bit(region, pf_bmap))
 			continue;
 
-		bar = (u64)phys_to_virt((u64)rvu->ng_rvu->pf_mbox_addr->base);
+		bar = (u64)rvu->ng_rvu->pf_mbox_addr->base;
 		bar += region * MBOX_SIZE;
 
 		mbox_addr[region] = (void *)bar;
