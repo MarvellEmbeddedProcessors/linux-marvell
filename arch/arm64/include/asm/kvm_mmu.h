@@ -292,20 +292,6 @@ static __always_inline u64 kvm_get_vttbr(struct kvm_s2_mmu *mmu)
 	return kvm_phys_to_vttbr(baddr) | vmid_field | cnp;
 }
 
-/*
- * The arm 'TC' erratum workaround traps writes to VTCR_EL2. Avoid this if no
- * change is required.
- */
-static inline void write_vtcr_el2(u64 val)
-{
-	if (cpus_have_final_cap(ARM64_WORKAROUND_4299121)) {
-		if (read_sysreg(vtcr_el2) != val)
-			write_sysreg(val, vtcr_el2);
-	} else {
-		write_sysreg(val, vtcr_el2);
-	}
-}
-
 static inline void write_tcr_el1(u64 val)
 {
 	if (cpus_have_final_cap(ARM64_WORKAROUND_4299121)) {
@@ -323,7 +309,7 @@ static inline void write_tcr_el1(u64 val)
 static __always_inline void __load_stage2(struct kvm_s2_mmu *mmu,
 					  struct kvm_arch *arch)
 {
-	write_vtcr_el2(arch->vtcr);
+	write_sysreg(arch->vtcr, vtcr_el2);
 	write_sysreg(kvm_get_vttbr(mmu), vttbr_el2);
 
 	/*
