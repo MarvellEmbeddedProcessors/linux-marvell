@@ -2004,6 +2004,7 @@ anq_dma_addr_unmap:
 	dma_unmap_single(rvu->dev, anq_dma_addr, q_sz, DMA_BIDIRECTIONAL);
 anq_base_free:
 	devm_kfree(rvu->dev, psw->anq_base);
+	psw->anq_base = NULL;
 	return ret;
 }
 
@@ -2018,12 +2019,18 @@ psw_af_api_notif_q_fini(struct rvu *rvu, struct psw_rsrc *psw, int blkaddr)
 	reg &= ~BIT_ULL(0);
 	rvu_write64(rvu, blkaddr, PSW_AF_API_NOTIF_QCX(0), reg);
 
-	destroy_workqueue(psw->notif_wq);
+	if (psw->notif_wq) {
+		destroy_workqueue(psw->notif_wq);
+		psw->notif_wq = NULL;
+	}
 
-	q_sz = (PSW_ANQ_DESC_SZ * PSW_ANQ_NUM_DESC) + PSW_ANQ_ALIGN;
-	dma_unmap_single(rvu->dev, psw->anq_dma_addr, q_sz,
-			 DMA_BIDIRECTIONAL);
-	devm_kfree(rvu->dev, psw->anq_base);
+	if (psw->anq_base) {
+		q_sz = (PSW_ANQ_DESC_SZ * PSW_ANQ_NUM_DESC) + PSW_ANQ_ALIGN;
+		dma_unmap_single(rvu->dev, psw->anq_dma_addr, q_sz,
+				 DMA_BIDIRECTIONAL);
+		devm_kfree(rvu->dev, psw->anq_base);
+		psw->anq_base = NULL;
+	}
 }
 
 static void psw_tsp_free(struct rvu *rvu, struct psw_rsrc *psw)
@@ -2032,12 +2039,19 @@ static void psw_tsp_free(struct rvu *rvu, struct psw_rsrc *psw)
 
 	if (!rvu->fwdata)
 		return;
-	pst_sz = psw->tst_t.max * PSW_PST_ENTRY_SZ;
-	dma_unmap_single(rvu->dev, psw->pst_dma_addr, pst_sz,
-			 DMA_BIDIRECTIONAL);
-	devm_kfree(rvu->dev, psw->pst_base_addr);
+
+	if (psw->pst_base_addr) {
+		pst_sz = psw->tst_t.max * PSW_PST_ENTRY_SZ;
+		dma_unmap_single(rvu->dev, psw->pst_dma_addr, pst_sz,
+				 DMA_BIDIRECTIONAL);
+		devm_kfree(rvu->dev, psw->pst_base_addr);
+		psw->pst_base_addr = NULL;
+	}
+
 	kfree(psw->tst_t.bmap);
+	psw->tst_t.bmap = NULL;
 	kfree(psw->tpt_t.bmap);
+	psw->tpt_t.bmap = NULL;
 }
 
 static int psw_tsp_setup(struct rvu *rvu, int blkaddr)
@@ -2095,8 +2109,10 @@ pst_base_addr_free:
 	devm_kfree(rvu->dev, pst_base_addr);
 tst_t_free:
 	kfree(psw->tst_t.bmap);
+	psw->tst_t.bmap = NULL;
 tpt_t_free:
 	kfree(psw->tpt_t.bmap);
+	psw->tpt_t.bmap = NULL;
 	return ret;
 }
 
@@ -2128,8 +2144,10 @@ static int psw_gid_setup(struct rvu *rvu, struct psw_rsrc *psw, int blkaddr)
 
 qid_t_free:
 	kfree(psw->qid_t.bmap);
+	psw->qid_t.bmap = NULL;
 gid_t_free:
 	kfree(psw->gid_t.bmap);
+	psw->gid_t.bmap = NULL;
 	return ret;
 }
 
@@ -2200,34 +2218,21 @@ static int rvu_psw_init_block(struct rvu_block *block, void *data)
 	psw->fid_t.max = FIELD_GET(GENMASK_ULL(31, 16), psw->const1);
 	ret = rvu_alloc_bitmap(&psw->fid_t);
 	if (ret)
-		goto gid_free;
+		return ret;
 
 	ret = psw_tsp_setup(rvu, blkaddr);
 	if (ret)
-		goto fid_free;
+		return ret;
 
 	ret = psw_af_api_notif_q_init(rvu, psw, BLKADDR_PSW);
 	if (ret)
-		goto tsp_free;
+		return ret;
 
 	ret = pcp_mbox_setup(rvu, psw);
 	if (ret)
-		goto notif_q_fini;
+		return ret;
 
 	return 0;
-
-notif_q_fini:
-	psw_af_api_notif_q_fini(rvu, psw, BLKADDR_PSW);
-tsp_free:
-	psw_tsp_free(rvu, psw);
-fid_free:
-	kfree(psw->fid_t.bmap);
-gid_free:
-	kfree(psw->gid_t.bmap);
-	kfree(psw->qid_t.bmap);
-	kfree(psw->mid_t.bmap);
-
-	return ret;
 }
 
 static void *rvu_psw_probe(struct rvu *rvu, int blkaddr)
