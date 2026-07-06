@@ -5,6 +5,7 @@
  *
  */
 
+#include <linux/bitfield.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 
@@ -153,4 +154,41 @@ int rvu_mbox_handler_npa_cn20k_dpc_free(struct rvu *rvu,
 					struct msg_rsp *rsp)
 {
 	return npa_cn20k_dpc_free(rvu, req);
+}
+
+int rvu_mbox_handler_npa_cn20k_cache_sync(struct rvu *rvu,
+					  struct msg_req *req,
+					  struct msg_rsp *rsp)
+{
+	struct rvu_hwinfo *hw = rvu->hw;
+	u16 pcifunc = req->hdr.pcifunc;
+	int blkaddr, lf, err;
+
+	/* Unlike earlier silicon, cn20k NPA does not use NDC; it has its own
+	 * cache inside the block. Sync that cache back to LLC/DRAM for the
+	 * requesting LF via NPA_AF_CACHE_SYNC.
+	 */
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPA, pcifunc);
+	if (blkaddr < 0)
+		return NPA_AF_ERR_AF_LF_INVALID;
+
+	lf = rvu_get_lf(rvu, &hw->block[blkaddr], pcifunc, 0);
+	if (lf < 0)
+		return NPA_AF_ERR_AF_LF_INVALID;
+
+	/* Select the LF and set [EXEC]; hardware writes back all dirty lines
+	 * for this LF and clears [EXEC] when the sync completes.
+	 */
+	rvu_write64(rvu, blkaddr, NPA_AF_CACHE_SYNC,
+		    NPA_AF_CACHE_SYNC_EXEC |
+		    FIELD_PREP(NPA_AF_CACHE_SYNC_LF, lf));
+
+	err = rvu_poll_reg(rvu, blkaddr, NPA_AF_CACHE_SYNC,
+			   NPA_AF_CACHE_SYNC_EXEC, true);
+	if (err) {
+		dev_err(rvu->dev, "NPA cache sync failed for LF %d\n", lf);
+		return NPA_AF_ERR_AF_LF_INVALID;
+	}
+
+	return 0;
 }

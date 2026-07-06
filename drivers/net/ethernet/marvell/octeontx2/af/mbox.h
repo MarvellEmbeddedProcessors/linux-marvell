@@ -249,6 +249,7 @@ M(NPA_CN20K_DPC_ALLOC,	0x405, npa_cn20k_dpc_alloc, npa_cn20k_dpc_alloc_req, \
 				npa_cn20k_dpc_alloc_rsp)		\
 M(NPA_CN20K_DPC_FREE,	0x406, npa_cn20k_dpc_free, npa_cn20k_dpc_free_req, \
 				msg_rsp)				\
+M(NPA_CN20K_CACHE_SYNC,	0x407, npa_cn20k_cache_sync, msg_req, msg_rsp)	\
 /* SSO/SSOW mbox IDs (range 0x600 - 0x7FF) */				\
 M(SSO_LF_ALLOC,		0x600, sso_lf_alloc,				\
 				sso_lf_alloc_req, sso_lf_alloc_rsp)	\

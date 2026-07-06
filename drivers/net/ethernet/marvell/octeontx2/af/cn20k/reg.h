@@ -174,11 +174,16 @@ static inline u64 pf_to_bitoff(u8 pf)
 	offset; })
 
 /* NPA Registers */
+#define NPA_AF_CACHE_SYNC		(0x0050)
 #define NPA_AF_DPCX_CFG(a)		(0x800 | (a) << 6)
 #define NPA_AF_DPC_PERMITX(a)		(0x1000 | (a) << 3)
 
 #define NPA_DPC_MAX			32
 #define NPA_DPC_LFS_PER_REG		64
+
+/* NPA_AF_CACHE_SYNC register fields */
+#define NPA_AF_CACHE_SYNC_LF		GENMASK_ULL(7, 0)
+#define NPA_AF_CACHE_SYNC_EXEC		BIT_ULL(12)
 
 /* SDP Regsiters */
 #define SDP_AF_BLK_RST				0xc000030
