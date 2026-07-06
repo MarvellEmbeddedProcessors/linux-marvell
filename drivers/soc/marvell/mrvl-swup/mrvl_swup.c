@@ -24,6 +24,7 @@
 #include <linux/dmapool.h>
 #include <linux/device.h>
 #include <linux/gfp.h>
+#include <linux/mm.h>
 
 #include <soc/marvell/octeontx/octeontx_smc.h>
 #include "mrvl_swup.h"
@@ -681,6 +682,34 @@ static const struct file_operations mrvl_fops = {
 	.unlocked_ioctl		= mrvl_swup_ioctl,
 };
 
+/*
+ * MAX_PAGE_ORDER (inclusive upper bound) was renamed from MAX_ORDER - 1
+ * (exclusive) in kernel 6.11.  Define a local alias so the same code
+ * compiles on both 6.6 and 6.12+.
+ */
+#ifndef MAX_PAGE_ORDER
+#define MAX_PAGE_ORDER (MAX_ORDER - 1)
+#endif
+
+/*
+ * alloc_buffers - allocate physically contiguous buffers for ATF SMC calls.
+ *
+ * dma_alloc_coherent() is backed by the buddy allocator which is capped at
+ * MAX_PAGE_ORDER (= 10 on most configs).  On 64K-page kernels this equals
+ * 64 MB so dma_alloc_coherent() handles all buffers fine.  On 4K and 16K
+ * page kernels the cap is 4 MB and 16 MB respectively, making a 32 MB
+ * request fail with a WARN.
+ *
+ * When CONFIG_CONTIG_ALLOC is available, fall back to alloc_contig_pages()
+ * for any buffer whose required order exceeds MAX_PAGE_ORDER.  That function
+ * uses memory compaction/migration to satisfy large physically-contiguous
+ * requests regardless of the page size.  The resulting pages live in the
+ * ARM64 linear map so page_address() / page_to_phys() give the kernel VA
+ * and real physical address that ATF (EL3) needs.
+ *
+ * Buffers that fit within MAX_PAGE_ORDER continue to use dma_alloc_coherent()
+ * unchanged (e.g. 64K-page kernels, or the small 1 MB buffers on any kernel).
+ */
 static int alloc_buffers(struct memory_desc *memdesc, uint32_t required_buf)
 {
 	int i = 0, j, ret = 0;
@@ -699,16 +728,38 @@ static int alloc_buffers(struct memory_desc *memdesc, uint32_t required_buf)
 		if (memdesc[i].virt != NULL)
 			continue;
 
-		memdesc[i].virt = dma_alloc_coherent(&dev, memdesc[i].size,
-						     &memdesc[i].phys, GFP_KERNEL);
+		if (!memdesc[i].size)
+			continue;
+
+#ifdef CONFIG_CONTIG_ALLOC
+		if (get_order(memdesc[i].size) > MAX_PAGE_ORDER) {
+			unsigned long nr_pages =
+				PAGE_ALIGN(memdesc[i].size) >> PAGE_SHIFT;
+			struct page *page;
+
+			page = alloc_contig_pages(nr_pages, GFP_KERNEL,
+						  first_online_node, NULL);
+			if (page) {
+				memdesc[i].virt = page_address(page);
+				memdesc[i].phys = page_to_phys(page);
+				memset(memdesc[i].virt, 0, memdesc[i].size);
+			}
+		} else
+#endif
+		{
+			memdesc[i].virt = dma_alloc_coherent(&dev,
+							     memdesc[i].size,
+							     &memdesc[i].phys,
+							     GFP_KERNEL);
+			if (memdesc[i].virt)
+				memset(memdesc[i].virt, 0x00, memdesc[i].size);
+		}
 
 		if (!memdesc[i].virt) {
 			pr_err("Failed to alloc for %s\n", memdesc[i].pool_name);
 			ret = -ENOMEM;
 			break;
 		}
-
-		memset(memdesc[i].virt, 0x00, memdesc[i].size);
 	}
 
 	for (j = 0; j < BUF_COUNT; j++)
@@ -721,11 +772,26 @@ static int alloc_buffers(struct memory_desc *memdesc, uint32_t required_buf)
 	return ret;
 }
 
-
-/* As we are going to use CMA buffers do not deallocate here */
 static void free_buffers(void)
 {
+	int i;
 
+	for (i = 0; i < BUF_COUNT; i++) {
+		if (!memdesc[i].virt || !memdesc[i].size)
+			continue;
+
+#ifdef CONFIG_CONTIG_ALLOC
+		if (get_order(memdesc[i].size) > MAX_PAGE_ORDER)
+			free_contig_range(PFN_DOWN(memdesc[i].phys),
+					  PAGE_ALIGN(memdesc[i].size) >> PAGE_SHIFT);
+		else
+#endif
+			dma_free_coherent(&dev, memdesc[i].size,
+					  memdesc[i].virt, memdesc[i].phys);
+
+		memdesc[i].virt = NULL;
+		memdesc[i].phys = 0;
+	}
 }
 
 static int mrvl_swup_setup_debugfs(void)
@@ -765,8 +831,9 @@ static int __init mrvl_swup_init(void)
 		return ret;
 	}
 
-	/* Will not be used bt any HW, so use mask with ones only */
-	dev.coherent_dma_mask = ~0;
+	/* Not attached to any HW; set up DMA masks for the fallback path. */
+	dev.coherent_dma_mask = DMA_BIT_MASK(64);
+	dev.dma_mask = &dev.coherent_dma_mask;
 
 	return mrvl_swup_setup_debugfs();
 }
