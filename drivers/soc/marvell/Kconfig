@@ -172,6 +172,7 @@ config OCTEONTX_INFO
 config MRVL_SWUP
         tristate "Marvell firmware secure update"
         depends on ARM64
+        select CMA if ARM64_4K_PAGES || ARM64_16K_PAGES
         help
           Provide debugfs interface for firmware update.
           Supported on cnXX family.
