@@ -123,6 +123,7 @@
 #define	SDHCI_CDNS_SD6_PHY_GATE_LPBK_SYNC_METHOD		BIT(31)
 #define	SDHCI_CDNS_SD6_PHY_GATE_LPBK_SW_HALF_CYCLE_SHIFT	BIT(28)
 #define	SDHCI_CDNS_SD6_PHY_GATE_LPBK_RD_DEL_SEL			GENMASK(24, 19)
+#define	SDHCI_CDNS_SD6_PHY_GATE_LPBK_UNDERRUN_SUPPRESS		BIT(18)
 #define	SDHCI_CDNS_SD6_PHY_GATE_LPBK_GATE_CFG_ALWAYS_ON		BIT(6)
 
 #define SDHCI_CDNS_SD6_PHY_DLL_MASTER				0x200C
@@ -1471,6 +1472,7 @@ static int sdhci_cdns_sd6_phy_init(struct sdhci_cdns_priv *priv)
 	reg &= ~SDHCI_CDNS_SD6_PHY_GATE_LPBK_SYNC_METHOD;
 	reg &= ~SDHCI_CDNS_SD6_PHY_GATE_LPBK_SW_HALF_CYCLE_SHIFT;
 	reg &= ~SDHCI_CDNS_SD6_PHY_GATE_LPBK_RD_DEL_SEL;
+	reg &= ~SDHCI_CDNS_SD6_PHY_GATE_LPBK_UNDERRUN_SUPPRESS;
 	reg &= ~SDHCI_CDNS_SD6_PHY_GATE_LPBK_GATE_CFG_ALWAYS_ON;
 	reg |= FIELD_PREP(SDHCI_CDNS_SD6_PHY_GATE_LPBK_SYNC_METHOD,
 			phy->settings.cp_sync_method);
@@ -1478,6 +1480,8 @@ static int sdhci_cdns_sd6_phy_init(struct sdhci_cdns_priv *priv)
 			phy->settings.cp_sw_half_cycle_shift);
 	reg |= FIELD_PREP(SDHCI_CDNS_SD6_PHY_GATE_LPBK_RD_DEL_SEL,
 			phy->settings.cp_rd_del_sel);
+	reg |= FIELD_PREP(SDHCI_CDNS_SD6_PHY_GATE_LPBK_UNDERRUN_SUPPRESS,
+			phy->settings.cp_gate_cfg_always_on);
 	reg |= FIELD_PREP(SDHCI_CDNS_SD6_PHY_GATE_LPBK_GATE_CFG_ALWAYS_ON,
 			phy->settings.cp_gate_cfg_always_on);
 	sdhci_cdns_sd6_write_phy_reg(priv, SDHCI_CDNS_SD6_PHY_GATE_LPBK, reg);
