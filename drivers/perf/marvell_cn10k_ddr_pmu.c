@@ -13,6 +13,12 @@
 #include <linux/hrtimer.h>
 #include <linux/acpi.h>
 #include <linux/platform_device.h>
+#include <linux/bits.h>
+
+/* SoC variant flags for struct ddr_pmu_platform_data (mutually exclusive in pdata) */
+#define IS_CN10K	BIT(0)
+#define IS_ODY		BIT(1)
+#define IS_CN20K	BIT(2)
 
 /* Performance Counters Operating Mode Control Registers */
 #define CN10K_DDRC_PERF_CNT_OP_MODE_CTRL	0x8020
@@ -44,7 +50,6 @@
 #define ODY_DDRC_PERF_CFG_BASE			0x20160
 #define CN20K_DDRC_PERF_CFG_BASE		0x20140
 #define CN20K_DDRC_PERF_CFG1_BASE		0x20180
-
 
 /* 8 Generic event counter + 2 fixed event counters */
 #define DDRC_PERF_NUM_GEN_COUNTERS	8
@@ -81,14 +86,14 @@
 #define EVENT_OP_IS_ENTER_DSM			44
 #define EVENT_OP_IS_RFM				43
 
+
+#define EVENT_CN20K_OP_IS_ZQLATCH			62
+#define EVENT_CN20K_OP_IS_ZQSTART			63
 #define EVENT_CN20K_OP_IS_TCR_MRR			50
 #define EVENT_CN20K_OP_IS_DQSOSC_MRR			49
 #define EVENT_CN20K_OP_IS_DQSOSC_MPC			48
 #define EVENT_CN20K_VISIBLE_WIN_LIMIT_REACHED_WR	47
 #define EVENT_CN20K_VISIBLE_WIN_LIMIT_REACHED_RD	46
-#define EVENT_CN20K_OP_IS_ZQLATCH			21
-#define EVENT_CN20K_OP_IS_ZQSTART			22
-
 
 #define EVENT_DFI_CMD_IS_RETRY			61
 #define EVENT_RD_UC_ECC_ERROR			60
@@ -119,7 +124,6 @@
 #define EVENT_OP_IS_CAS_WCK_SUS			38
 #define EVENT_OP_IS_CAS_WS_OFF			37
 #define EVENT_OP_IS_CAS_WS			36
-#define EVENT_OP_IS_CAS				35
 #define EVENT_OP_IS_ENTER_MPSM			35
 #define EVENT_OP_IS_ENTER_POWERDOWN		31
 #define EVENT_OP_IS_ENTER_SELFREF		27
@@ -228,10 +232,7 @@ struct ddr_pmu_platform_data {
 	u64 cnt_value_wr_op;
 	u64 cnt_value_rd_op;
 	u64 cfg1_base;
-#define IS_CN10K	BIT_ULL(0)
-#define IS_ODY		BIT_ULL(1)
-#define IS_CN20K	BIT_ULL(2)
-	u8 silicon_id;	/* Each bit identify Silicon CN10K:1b ODY:2b CN20K:3b*/
+	unsigned int silicon_flags; /* IS_CN10K, IS_ODY, or IS_CN20K */
 	bool cust_mbwc;
 };
 
@@ -260,10 +261,8 @@ static struct attribute *cn10k_ddr_perf_events_attrs[] = {
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_hif_pri_rdaccess, EVENT_HIF_HI_PRI_RD),
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_rd_bypass_access, EVENT_READ_BYPASS),
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_act_bypass_access, EVENT_ACT_BYPASS),
-	CN10K_DDR_PMU_EVENT_ATTR(ddr_dfi_wr_data_access,
-				 EVENT_DFI_WR_DATA_CYCLES),
-	CN10K_DDR_PMU_EVENT_ATTR(ddr_dfi_rd_data_access,
-				 EVENT_DFI_RD_DATA_CYCLES),
+	CN10K_DDR_PMU_EVENT_ATTR(ddr_dif_wr_data_access, EVENT_DFI_WR_DATA_CYCLES),
+	CN10K_DDR_PMU_EVENT_ATTR(ddr_dif_rd_data_access, EVENT_DFI_RD_DATA_CYCLES),
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_hpri_sched_rd_crit_access,
 					EVENT_HPR_XACT_WHEN_CRITICAL),
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_lpri_sched_rd_crit_access,
@@ -429,7 +428,6 @@ static struct attribute *cn20k_ddr_perf_events_attrs[] = {
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_enter_selfref, EVENT_OP_IS_ENTER_SELFREF),
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_enter_powerdown,
 				 EVENT_OP_IS_ENTER_POWERDOWN),
-	CN10K_DDR_PMU_EVENT_ATTR(ddr_cas_command, EVENT_OP_IS_CAS),
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_cas_ws, EVENT_OP_IS_CAS_WS),
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_cas_ws_off, EVENT_OP_IS_CAS_WS_OFF),
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_cas_wck_sus, EVENT_OP_IS_CAS_WCK_SUS),
@@ -458,6 +456,7 @@ static struct attribute *cn20k_ddr_perf_events_attrs[] = {
 	CN10K_DDR_PMU_EVENT_ATTR(ddr_ddr_writes, EVENT_DDR_WRITES),
 	NULL
 };
+
 static struct attribute_group cn20k_ddr_perf_events_attr_group = {
 	.name = "events",
 	.attrs = cn20k_ddr_perf_events_attrs,
@@ -545,16 +544,42 @@ static ktime_t cn10k_ddr_pmu_timer_period(void)
 static int ddr_perf_get_event_bitmap(int eventid, u64 *event_bitmap,
 				     struct cn10k_ddr_pmu *ddr_pmu)
 {
+	int err = 0;
+
 	switch (eventid) {
-	case EVENT_HIF_RD_OR_WR ... EVENT_WAW_HAZARD:
-	case EVENT_OP_IS_REFRESH ... EVENT_OP_IS_ZQLATCH:
-		*event_bitmap = (1ULL << (eventid - 1));
+	case EVENT_CN20K_OP_IS_ZQLATCH ... EVENT_CN20K_OP_IS_ZQSTART:
+		if (ddr_pmu->p_data->silicon_flags & IS_CN20K) {
+			*event_bitmap = (1ULL << (eventid - 42));
+			break;
+		}
+		err = -EINVAL;
 		break;
 	case EVENT_DFI_PARITY_POISON ...EVENT_DFI_CMD_IS_RETRY:
-		if (ddr_pmu->p_data->silicon_id & IS_ODY)
+		/*
+		 * 58..61: CN20K perf width events share numeric IDs with Odyssey
+		 * DFI events; same 1ULL << (eventid - 1) bitmap on both paths.
+		 */
+		if (eventid >= EVENT_PERF_OP_IS_WR32 &&
+		    eventid <= EVENT_PERF_OP_IS_RD16) {
+			if (ddr_pmu->p_data->silicon_flags & IS_CN20K) {
+				*event_bitmap = (1ULL << (eventid - 1));
+				break;
+			}
+			if (!(ddr_pmu->p_data->silicon_flags & IS_ODY)) {
+				err = -EINVAL;
+				break;
+			}
 			*event_bitmap = (1ULL << (eventid - 1));
-		else
-			goto err;
+			break;
+		}
+		if (!(ddr_pmu->p_data->silicon_flags & IS_ODY)) {
+			err = -EINVAL;
+			break;
+		}
+		fallthrough;
+	case EVENT_HIF_RD_OR_WR ... EVENT_WAW_HAZARD:
+	case EVENT_OP_IS_CAS_WS ... EVENT_OP_IS_ZQLATCH:
+		*event_bitmap = (1ULL << (eventid - 1));
 		break;
 	case EVENT_OP_IS_ENTER_SELFREF:
 	case EVENT_OP_IS_ENTER_POWERDOWN:
@@ -562,11 +587,12 @@ static int ddr_perf_get_event_bitmap(int eventid, u64 *event_bitmap,
 		*event_bitmap = (0xFULL << (eventid - 1));
 		break;
 	default:
-err:		pr_err("%s Invalid eventid %d\n", __func__, eventid);
-		return -EINVAL;
+		err = -EINVAL;
 	}
 
-	return 0;
+	if (err)
+		pr_err("%s Invalid eventid %d\n", __func__, eventid);
+	return err;
 }
 
 static int cn10k_ddr_perf_alloc_counter(struct cn10k_ddr_pmu *pmu,
@@ -576,7 +602,7 @@ static int cn10k_ddr_perf_alloc_counter(struct cn10k_ddr_pmu *pmu,
 	int i;
 
 	/* DDR Memory bandwidth counter index */
-	if (config == EVENT_MBWC_READS) {
+	if (pmu->p_data->cust_mbwc  && config == EVENT_MBWC_READS) {
 		pmu->events[DDRC_PERF_READ_MBWC_IDX] = event;
 		return DDRC_PERF_READ_MBWC_IDX;
 	}
@@ -641,11 +667,33 @@ static int cn10k_ddr_perf_event_init(struct perf_event *event)
 	return 0;
 }
 
+static void cn10k_ddr_perf_counter_start(struct cn10k_ddr_pmu *ddr_pmu,
+					 int counter)
+{
+	const struct ddr_pmu_platform_data *p_data = ddr_pmu->p_data;
+	u64 ctrl_reg = p_data->cnt_start_op_ctrl;
+
+	writeq_relaxed(START_OP_CTRL_VAL_START, ddr_pmu->base +
+		       DDRC_PERF_REG(ctrl_reg, counter));
+}
+
+static void cn10k_ddr_perf_counter_stop(struct cn10k_ddr_pmu *ddr_pmu,
+					int counter)
+{
+	const struct ddr_pmu_platform_data *p_data = ddr_pmu->p_data;
+	u64 ctrl_reg = p_data->cnt_end_op_ctrl;
+
+	writeq_relaxed(END_OP_CTRL_VAL_END, ddr_pmu->base +
+		       DDRC_PERF_REG(ctrl_reg, counter));
+}
+
 static void cn10k_ddr_perf_counter_enable(struct cn10k_ddr_pmu *pmu,
 					  int counter, u16 partid,
 					  bool enable)
 {
 	const struct ddr_pmu_platform_data *p_data = pmu->p_data;
+	unsigned int silicon_flags = pmu->p_data->silicon_flags;
+	u64 ctrl_reg = pmu->p_data->cnt_op_mode_ctrl;
 	const struct ddr_pmu_ops *ops = pmu->ops;
 	u32 reg;
 	u64 val;
@@ -655,10 +703,12 @@ static void cn10k_ddr_perf_counter_enable(struct cn10k_ddr_pmu *pmu,
 		return;
 	}
 
-	if (counter == DDRC_PERF_READ_MBWC_IDX) {
-		if (enable && p_data->cust_mbwc)
+	if (p_data->cust_mbwc && (counter == DDRC_PERF_READ_MBWC_IDX)) {
+		if (enable)
 			writel(partid, pmu->mbw_base + PART_SEL);
-	} else if (counter < DDRC_PERF_NUM_GEN_COUNTERS) {
+	}
+
+	if (counter < DDRC_PERF_NUM_GEN_COUNTERS) {
 		reg = DDRC_PERF_CFG(p_data->cfg_base, counter);
 		val = readq_relaxed(pmu->base + reg);
 
@@ -668,6 +718,15 @@ static void cn10k_ddr_perf_counter_enable(struct cn10k_ddr_pmu *pmu,
 			val &= ~EVENT_ENABLE;
 
 		writeq_relaxed(val, pmu->base + reg);
+		if ((silicon_flags & IS_ODY) || (silicon_flags & IS_CN20K)) {
+			if (enable) {
+				reg = DDRC_PERF_REG(ctrl_reg, counter);
+				writeq_relaxed(OP_MODE_CTRL_VAL_MANUAL, pmu->base + reg);
+				cn10k_ddr_perf_counter_start(pmu, counter);
+			} else {
+				cn10k_ddr_perf_counter_stop(pmu, counter);
+			}
+		}
 	} else {
 		if (counter == DDRC_PERF_READ_COUNTER_IDX)
 			ops->enable_read_freerun_counter(pmu, enable);
@@ -719,9 +778,8 @@ static u64 cn10k_ddr_perf_read_counter(struct cn10k_ddr_pmu *pmu, int counter)
 	const struct ddr_pmu_platform_data *p_data = pmu->p_data;
 	u64 val = 0;
 
-	if (counter == DDRC_PERF_READ_MBWC_IDX) {
-		if (p_data->cust_mbwc)
-			val = cn10k_ddr_perf_get_mbw(pmu);
+	if (p_data->cust_mbwc && (counter == DDRC_PERF_READ_MBWC_IDX)) {
+		val = cn10k_ddr_perf_get_mbw(pmu);
 		return val;
 	}
 
@@ -755,45 +813,16 @@ static void cn10k_ddr_perf_event_update(struct perf_event *event)
 	local64_add((new_count - prev_count) & mask, &event->count);
 }
 
-static void cn10k_ddr_perf_counter_start(struct cn10k_ddr_pmu *ddr_pmu,
-					 int counter)
-{
-	const struct ddr_pmu_platform_data *p_data = ddr_pmu->p_data;
-	u64 ctrl_reg = p_data->cnt_start_op_ctrl;
-
-	writeq_relaxed(START_OP_CTRL_VAL_START, ddr_pmu->base +
-		       DDRC_PERF_REG(ctrl_reg, counter));
-}
-
-static void cn10k_ddr_perf_counter_stop(struct cn10k_ddr_pmu *ddr_pmu,
-					int counter)
-{
-	const struct ddr_pmu_platform_data *p_data = ddr_pmu->p_data;
-	u64 ctrl_reg = p_data->cnt_end_op_ctrl;
-
-	writeq_relaxed(END_OP_CTRL_VAL_END, ddr_pmu->base +
-		       DDRC_PERF_REG(ctrl_reg, counter));
-}
-
 static void cn10k_ddr_perf_event_start(struct perf_event *event, int flags)
 {
 	struct cn10k_ddr_pmu *pmu = to_cn10k_ddr_pmu(event->pmu);
-	u64 ctrl_reg = pmu->p_data->cnt_op_mode_ctrl;
 	struct hw_perf_event *hwc = &event->hw;
-	u8 silicon_id = pmu->p_data->silicon_id;
 	u16 partid = event->attr.config1;
 	int counter = hwc->idx;
 
 	local64_set(&hwc->prev_count, 0);
 
 	cn10k_ddr_perf_counter_enable(pmu, counter, partid, true);
-	if ((silicon_id & IS_ODY) || (silicon_id & IS_CN20K)) {
-	/* Setup the PMU counter to work in manual mode */
-		writeq_relaxed(OP_MODE_CTRL_VAL_MANUAL, pmu->base +
-			       DDRC_PERF_REG(ctrl_reg, counter));
-
-		cn10k_ddr_perf_counter_start(pmu, counter);
-	}
 
 	hwc->state = 0;
 }
@@ -802,9 +831,9 @@ static int cn10k_ddr_perf_event_add(struct perf_event *event, int flags)
 {
 	struct cn10k_ddr_pmu *pmu = to_cn10k_ddr_pmu(event->pmu);
 	const struct ddr_pmu_platform_data *p_data = pmu->p_data;
+	unsigned int silicon_flags = pmu->p_data->silicon_flags;
 	const struct ddr_pmu_ops *ops = pmu->ops;
 	struct hw_perf_event *hwc = &event->hw;
-	u8 silicon_id = pmu->p_data->silicon_id;
 	u8 config = event->attr.config;
 	int counter, ret;
 	u32 reg_offset;
@@ -821,25 +850,39 @@ static int cn10k_ddr_perf_event_add(struct perf_event *event, int flags)
 		hrtimer_start(&pmu->hrtimer, cn10k_ddr_pmu_timer_period(),
 			      HRTIMER_MODE_REL_PINNED);
 
-	if (counter == DDRC_PERF_READ_MBWC_IDX) {
+	if (p_data->cust_mbwc && counter == DDRC_PERF_READ_MBWC_IDX) {
 		/*
 		 * Memory bandwidth counters are not
 		 * configurable, it just count once proper
 		 * partid is programmed into partition select
 		 * register.
 		 */
-	} else if (counter < DDRC_PERF_NUM_GEN_COUNTERS) {
+		goto start_counter;
+	}
+
+	if (counter < DDRC_PERF_NUM_GEN_COUNTERS) {
 		/* Generic counters, configure event id */
 		reg_offset = DDRC_PERF_CFG(p_data->cfg_base, counter);
-		if (silicon_id & IS_CN20K) {
-			val =  (1ULL << (config - 1));
+
+		ret = ddr_perf_get_event_bitmap(config, &val, pmu);
+		if (ret)
+			goto err_free_counter;
+
+		if (silicon_flags & IS_CN20K) {
 			if (config == EVENT_CN20K_OP_IS_ZQSTART ||
-			    config == EVENT_CN20K_OP_IS_ZQLATCH)
-				reg_offset = DDRC_PERF_CFG(p_data->cfg1_base, counter);
-		} else {
-			ret = ddr_perf_get_event_bitmap(config, &val, pmu);
-			if (ret)
-				return ret;
+			    config == EVENT_CN20K_OP_IS_ZQLATCH) {
+				/* ZQ lives in CFG1; clear stale event mask in CFG0 */
+				writeq_relaxed(0, pmu->base +
+					       DDRC_PERF_CFG(p_data->cfg_base,
+							     counter));
+				reg_offset = DDRC_PERF_CFG(p_data->cfg1_base,
+							   counter);
+			} else {
+				/* Clear CFG1 so a prior ZQ select cannot linger */
+				writeq_relaxed(0, pmu->base +
+					       DDRC_PERF_CFG(p_data->cfg1_base,
+							     counter));
+			}
 		}
 		writeq_relaxed(val, pmu->base + reg_offset);
 	} else {
@@ -850,26 +893,31 @@ static int cn10k_ddr_perf_event_add(struct perf_event *event, int flags)
 			ops->clear_write_freerun_counter(pmu);
 	}
 
+start_counter:
 	hwc->state |= PERF_HES_STOPPED;
 
 	if (flags & PERF_EF_START)
 		cn10k_ddr_perf_event_start(event, flags);
 
 	return 0;
+
+err_free_counter:
+	if (pmu->active_events == 1)
+		hrtimer_cancel(&pmu->hrtimer);
+	pmu->active_events--;
+	cn10k_ddr_perf_free_counter(pmu, counter);
+	hwc->idx = -1;
+	return ret;
 }
 
 static void cn10k_ddr_perf_event_stop(struct perf_event *event, int flags)
 {
 	struct cn10k_ddr_pmu *pmu = to_cn10k_ddr_pmu(event->pmu);
 	struct hw_perf_event *hwc = &event->hw;
-	u8 silicon_id = pmu->p_data->silicon_id;
 	u16 partid = event->attr.config1;
 	int counter = hwc->idx;
 
 	cn10k_ddr_perf_counter_enable(pmu, counter, partid, false);
-
-	if (silicon_id & IS_ODY)
-		cn10k_ddr_perf_counter_stop(pmu, counter);
 
 	if (flags & PERF_EF_UPDATE)
 		cn10k_ddr_perf_event_update(event);
@@ -1091,7 +1139,6 @@ static irqreturn_t cn10k_ddr_pmu_overflow_handler(struct cn10k_ddr_pmu *pmu)
 
 		value = cn10k_ddr_perf_read_counter(pmu, i);
 		if (value == p_data->counter_max_val) {
-			pr_info("Counter-(%d) reached max value\n", i);
 			ops->pmu_overflow_handler(pmu, i);
 		}
 	}
@@ -1155,7 +1202,26 @@ static const struct ddr_pmu_platform_data cn10k_ddr_pmu_pdata = {
 	.cnt_value_wr_op = CN10K_DDRC_PERF_CNT_VALUE_WR_OP,
 	.cnt_value_rd_op = CN10K_DDRC_PERF_CNT_VALUE_RD_OP,
 	.cust_mbwc = TRUE,
-	.silicon_id = IS_CN10K,
+	.silicon_flags = IS_CN10K,
+};
+
+static const struct ddr_pmu_platform_data cn20k_ddr_pmu_pdata = {
+	.counter_overflow_val = 0,
+	.counter_max_val = GENMASK_ULL(63, 0),
+	.cnt_base = ODY_DDRC_PERF_CNT_VALUE_BASE,
+	.cfg_base = CN20K_DDRC_PERF_CFG_BASE,
+	.cfg1_base = CN20K_DDRC_PERF_CFG1_BASE,
+	.cnt_op_mode_ctrl = CN20K_DDRC_PERF_CNT_OP_MODE_CTRL,
+	.cnt_start_op_ctrl = CN20K_DDRC_PERF_CNT_START_OP_CTRL,
+	.cnt_end_op_ctrl = CN20K_DDRC_PERF_CNT_END_OP_CTRL,
+	.cnt_end_status = CN20K_DDRC_PERF_CNT_END_STATUS,
+	.cnt_freerun_en = 0,
+	.cnt_freerun_ctrl = ODY_DDRC_PERF_CNT_FREERUN_CTRL,
+	.cnt_freerun_clr = ODY_DDRC_PERF_CNT_FREERUN_CLR,
+	.cnt_value_wr_op = ODY_DDRC_PERF_CNT_VALUE_WR_OP,
+	.cnt_value_rd_op = ODY_DDRC_PERF_CNT_VALUE_RD_OP,
+	.cust_mbwc = FALSE,
+	.silicon_flags = IS_CN20K,
 };
 #endif
 
@@ -1183,28 +1249,10 @@ static const struct ddr_pmu_platform_data odyssey_ddr_pmu_pdata = {
 	.cnt_value_wr_op = ODY_DDRC_PERF_CNT_VALUE_WR_OP,
 	.cnt_value_rd_op = ODY_DDRC_PERF_CNT_VALUE_RD_OP,
 	.cust_mbwc = FALSE,
-	.silicon_id = IS_ODY,
-};
-
-static const struct ddr_pmu_platform_data cn20k_ddr_pmu_pdata = {
-	.counter_overflow_val = 0,
-	.counter_max_val = GENMASK_ULL(63, 0),
-	.cnt_base = ODY_DDRC_PERF_CNT_VALUE_BASE,
-	.cfg_base = CN20K_DDRC_PERF_CFG_BASE,
-	.cfg1_base = CN20K_DDRC_PERF_CFG1_BASE,
-	.cnt_op_mode_ctrl = CN20K_DDRC_PERF_CNT_OP_MODE_CTRL,
-	.cnt_start_op_ctrl = CN20K_DDRC_PERF_CNT_START_OP_CTRL,
-	.cnt_end_op_ctrl = CN20K_DDRC_PERF_CNT_END_OP_CTRL,
-	.cnt_end_status = CN20K_DDRC_PERF_CNT_END_STATUS,
-	.cnt_freerun_en = 0,
-	.cnt_freerun_ctrl = ODY_DDRC_PERF_CNT_FREERUN_CTRL,
-	.cnt_freerun_clr = ODY_DDRC_PERF_CNT_FREERUN_CLR,
-	.cnt_value_wr_op = ODY_DDRC_PERF_CNT_VALUE_WR_OP,
-	.cnt_value_rd_op = ODY_DDRC_PERF_CNT_VALUE_RD_OP,
-	.cust_mbwc = FALSE,
-	.silicon_id = IS_CN20K,
+	.silicon_flags = IS_ODY,
 };
 #endif
+
 
 static int cn10k_ddr_get_speed(struct device *dev)
 {
@@ -1226,7 +1274,7 @@ static int cn10k_ddr_perf_probe(struct platform_device *pdev)
 	struct cn10k_ddr_pmu *ddr_pmu;
 	struct resource *res;
 	void __iomem *base;
-	u8 silicon_id;
+	unsigned int silicon_flags;
 	char *name;
 	int ret;
 
@@ -1250,9 +1298,9 @@ static int cn10k_ddr_perf_probe(struct platform_device *pdev)
 	ddr_pmu->base = base;
 
 	ddr_pmu->p_data = dev_data;
-	silicon_id = ddr_pmu->p_data->silicon_id;
+	silicon_flags = ddr_pmu->p_data->silicon_flags;
 
-	if (silicon_id & IS_CN10K) {
+	if (silicon_flags & IS_CN10K) {
 		ddr_pmu->ops = &ddr_pmu_ops;
 		/* Setup the PMU counter to work in manual mode */
 		writeq_relaxed(OP_MODE_CTRL_VAL_MANUAL, ddr_pmu->base +
@@ -1284,7 +1332,7 @@ static int cn10k_ddr_perf_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (silicon_id & IS_ODY) {
+	if (silicon_flags & IS_ODY) {
 		ddr_pmu->ops = &ddr_pmu_ody_ops;
 
 		ddr_pmu->pmu = (struct pmu) {
@@ -1301,7 +1349,7 @@ static int cn10k_ddr_perf_probe(struct platform_device *pdev)
 		};
 	}
 
-	if (silicon_id & IS_CN20K) {
+	if (silicon_flags & IS_CN20K) {
 		ddr_pmu->ops = &ddr_pmu_ody_ops;
 
 		ddr_pmu->pmu = (struct pmu) {
@@ -1348,6 +1396,12 @@ error:
 static void cn10k_ddr_perf_remove(struct platform_device *pdev)
 {
 	struct cn10k_ddr_pmu *ddr_pmu = platform_get_drvdata(pdev);
+
+	/*
+	 * Cancel the poll timer before further teardown so the handler
+	 * cannot run after this function returns.
+	 */
+	hrtimer_cancel(&ddr_pmu->hrtimer);
 
 	cpuhp_state_remove_instance_nocalls(
 				CPUHP_AP_PERF_ARM_MARVELL_CN10K_DDR_ONLINE,
