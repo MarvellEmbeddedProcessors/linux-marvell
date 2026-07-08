@@ -1625,6 +1625,9 @@ static irqreturn_t cgx_fwi_event_handler(int irq, void *data)
 	offset     = cgx->mac_ops->int_register;
 	clear_bit  = cgx->mac_ops->int_ena_bit;
 
+	/* ACK the interrupt */
+	cgx_write(lmac->cgx, lmac->lmac_id, offset, clear_bit);
+
 	event = cgx_read(cgx, lmac->lmac_id, CGX_EVENT_REG);
 
 	if (!FIELD_GET(EVTREG_ACK, event))
@@ -1657,10 +1660,8 @@ static irqreturn_t cgx_fwi_event_handler(int irq, void *data)
 
 	/* Any new event or command response will be posted by firmware
 	 * only after the current status is acked.
-	 * Ack the interrupt register as well.
 	 */
 	cgx_write(lmac->cgx, lmac->lmac_id, CGX_EVENT_REG, 0);
-	cgx_write(lmac->cgx, lmac->lmac_id, offset, clear_bit);
 
 	return IRQ_HANDLED;
 }
@@ -1945,6 +1946,10 @@ static int cgx_configure_interrupt(struct cgx *cgx, struct lmac *lmac,
 	err = request_irq(irq, cgx_fwi_event_handler, 0, lmac->name, lmac);
 	if (err)
 		return err;
+
+	/* Avoid stale SW_INT from firmware. Clear SW_INT before enabling it */
+	cgx_write(cgx, lmac->lmac_id, CGX_EVENT_REG, 0);
+	cgx_write(cgx, lmac->lmac_id, mac_ops->int_register, ena_bit);
 
 	/* Enable interrupt */
 	cgx_write(cgx, lmac->lmac_id, offset, ena_bit);
