@@ -163,6 +163,11 @@ static int rvu_tim_disable_lf(struct rvu *rvu, int lf, int blkaddr)
 	regval &= ~GENMASK_ULL(39, 20);
 	rvu_write64(rvu, blkaddr, TIM_AF_RINGX_CTL1(lf), regval);
 
+	/* Clear CTL3 (HWWQE config) if HWWQE is supported. */
+	regval = rvu_read64(rvu, blkaddr, TIM_AF_CONST);
+	if (regval & BIT(24))
+		rvu_write64(rvu, blkaddr, TIM_AF_RINGX_CTL3(lf), 0);
+
 	return 0;
 }
 
@@ -369,6 +374,11 @@ int rvu_mbox_handler_tim_config_ring(struct rvu *rvu,
 	/* CTL2 */
 	regval = ((u64)req->chunksize / TIM_CHUNKSIZE_MULTIPLE) << 40;
 	rvu_write64(rvu, blkaddr, TIM_AF_RINGX_CTL2(lf), regval);
+
+	/* CTL3: Will be programmed later. */
+	regval = rvu_read64(rvu, blkaddr, TIM_AF_CONST);
+	if (regval & BIT(24))
+		rvu_write64(rvu, blkaddr, TIM_AF_RINGX_CTL3(lf), 0);
 
 	return 0;
 }
