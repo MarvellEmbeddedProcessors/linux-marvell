@@ -257,6 +257,7 @@ int mcs_clear_all_stats(struct mcs *mcs, u16 pcifunc, int dir);
 int mcs_set_force_clk_en(struct mcs *mcs, bool set);
 
 int mcs_add_intr_wq_entry(struct mcs *mcs, struct mcs_intr_event *event);
+int cn20k_mcs_trigger_hw_init(struct mcs *mcs);
 
 /* Devlink APIs */
 int mcs_register_dl(struct mcs *mcs);

@@ -1063,6 +1063,30 @@ enum mcs_devtype {
 	offset = MCS_CHOOSE_OFFSET(0x3d498ull, 0x54a8ull, 0x3d498ull);	\
 	offset; })
 
+#define MCSX_RS_MCS_BBE_RX_SLAVE_HW_INIT ({	\
+	u64 offset;			\
+					\
+	offset = MCS_CHOOSE_OFFSET(0x740ull, 0x740ull, 0x740ull);	\
+	offset; })
+
+#define MCSX_RS_MCS_BBE_TX_SLAVE_HW_INIT ({	\
+	u64 offset;			\
+					\
+	offset = MCS_CHOOSE_OFFSET(0x8a0ull, 0x8a0ull, 0x8a0ull);	\
+	offset; })
+
+#define MCSX_RS_MCS_PAB_RX_SLAVE_HW_INIT ({	\
+	u64 offset;			\
+					\
+	offset = MCS_CHOOSE_OFFSET(0x908ull, 0x908ull, 0x908ull);	\
+	offset; })
+
+#define MCSX_RS_MCS_PAB_TX_SLAVE_HW_INIT ({	\
+	u64 offset;			\
+					\
+	offset = MCS_CHOOSE_OFFSET(0xe38ull, 0xe38ull, 0xe38ull);	\
+	offset; })
+
 #define MCSX_PEX_RX_SLAVE_TCP_CFG		0x15d0
 #define MCSX_PEX_RX_SLAVE_UDP_CFG		0x15c8
 #define MCSX_PEX_RX_SLAVE_IPV4_CFG		0x15b8

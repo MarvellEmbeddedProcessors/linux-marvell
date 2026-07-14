@@ -1514,9 +1514,13 @@ static void mcs_set_external_bypass(struct mcs *mcs, bool bypass)
 	mcs->bypass = bypass;
 }
 
-static void mcs_global_cfg(struct mcs *mcs)
+static int mcs_global_cfg(struct mcs *mcs)
 {
 	u64 val;
+
+	if (is_cn20k(mcs->pdev))
+		mcs_reg_write(mcs, MCSX_IP_MODE, BIT_ULL(4));
+
 	/* Disable external bypass */
 	mcs_set_external_bypass(mcs, false);
 
@@ -1538,15 +1542,17 @@ static void mcs_global_cfg(struct mcs *mcs)
 	mcs_reg_write(mcs, MCSX_CSE_TX_SLAVE_STATS_CLEAR, 0x1F);
 
 	if (is_cn20k(mcs->pdev))
-		return;
+		return cn20k_mcs_trigger_hw_init(mcs);
+
 	/* Set MCS to perform standard IEEE802.1AE macsec processing */
 	if (mcs->hw->mcs_blks == 1) {
 		mcs_reg_write(mcs, MCSX_IP_MODE, BIT_ULL(3));
-		return;
+		return 0;
 	}
 
 	mcs_reg_write(mcs, MCSX_BBE_RX_SLAVE_CAL_ENTRY, 0xe4);
 	mcs_reg_write(mcs, MCSX_BBE_RX_SLAVE_CAL_LEN, 4);
+	return 0;
 }
 
 void cn10kb_mcs_set_hw_capabilities(struct mcs *mcs)
@@ -1638,7 +1644,9 @@ static int mcs_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* Set hardware capabilities */
 	mcs->mcs_ops->mcs_set_hw_capabilities(mcs);
 
-	mcs_global_cfg(mcs);
+	err = mcs_global_cfg(mcs);
+	if (err)
+		goto err_x2p;
 
 	/* Perform X2P clibration */
 	err = mcs_x2p_calibration(mcs);

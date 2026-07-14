@@ -28,6 +28,76 @@ static void cn20k_mcs_set_hw_capabilities(struct mcs *mcs)
 #define MCS_XPN_THR_0		GENMASK_ULL(63, 32)
 #define MCS_XPN_THR_1		GENMASK_ULL(31, 0)
 
+/**
+ * mcs_poll_one_hw_init - Trigger BBE/PAB dynamic buffer pool HW init, wait for done.
+ * @mcs: MCS device.
+ * @reg: MCSX_RS_MCS_*_SLAVE_HW_INIT CSR offset. Bit 0 is trigger (R/W); reads as 1 until HW
+ *	finishes, then 0.
+ * @name: Short label for logs (e.g. "BBE_RX").
+ *
+ * Return: 0 when bit 0 clears, %-ETIMEDOUT after 5 ms.
+ */
+static int mcs_poll_one_hw_init(struct mcs *mcs, u64 reg, const char *name)
+{
+	unsigned long deadline = jiffies + usecs_to_jiffies(5000);
+	u64 val;
+
+	mcs_reg_write(mcs, reg, BIT_ULL(0));
+
+	while (time_before(jiffies, deadline)) {
+		val = mcs_reg_read(mcs, reg);
+		if (!(val & BIT_ULL(0)))
+			return 0;
+		usleep_range(10, 30);
+	}
+
+	dev_err(mcs->dev, "MCS: HW init timeout (%s)\n", name);
+	return -ETIMEDOUT;
+}
+
+/**
+ * mcs_poll_mil_ip_hw_init_done - Wait until MIL IP memory init is reported complete.
+ * @mcs: MCS device.
+ *
+ * Polls MCSX_MIL_IP_GBL_STATUS bit 3 (hw_init_done).
+ *
+ * Return: 0 when bit 3 is set, %-ETIMEDOUT after 5 ms.
+ */
+static int mcs_poll_mil_ip_hw_init_done(struct mcs *mcs)
+{
+	unsigned long deadline = jiffies + usecs_to_jiffies(5000);
+	u64 val;
+
+	while (time_before(jiffies, deadline)) {
+		val = mcs_reg_read(mcs, MCSX_MIL_IP_GBL_STATUS);
+		if (val & BIT_ULL(3))
+			return 0;
+		usleep_range(10, 30);
+	}
+
+	dev_err(mcs->dev, "MCS: MIL_IP_GBL_STATUS hw_init_done (bit 3) timeout\n");
+	return -ETIMEDOUT;
+}
+
+int cn20k_mcs_trigger_hw_init(struct mcs *mcs)
+{
+	int err;
+
+	err = mcs_poll_one_hw_init(mcs, MCSX_RS_MCS_BBE_RX_SLAVE_HW_INIT, "BBE_RX");
+	if (err)
+		return err;
+	err = mcs_poll_one_hw_init(mcs, MCSX_RS_MCS_BBE_TX_SLAVE_HW_INIT, "BBE_TX");
+	if (err)
+		return err;
+	err = mcs_poll_one_hw_init(mcs, MCSX_RS_MCS_PAB_RX_SLAVE_HW_INIT, "PAB_RX");
+	if (err)
+		return err;
+	err = mcs_poll_one_hw_init(mcs, MCSX_RS_MCS_PAB_TX_SLAVE_HW_INIT, "PAB_TX");
+	if (err)
+		return err;
+	return mcs_poll_mil_ip_hw_init_done(mcs);
+}
+
 void cn20k_mcs_pn_threshold_set(struct mcs *mcs, struct mcs_set_pn_threshold *pn)
 {
 	u64 reg0, reg1, val;
