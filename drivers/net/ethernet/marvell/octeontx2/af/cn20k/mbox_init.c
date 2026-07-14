@@ -371,6 +371,10 @@ void cn20k_rvu_enable_afvf_intr(struct rvu *rvu, int vfs)
 	rvupf_write64(rvu, RVU_PF_VFFLR_INTX(0), INTR_MASK(vfs));
 	rvupf_write64(rvu, RVU_PF_VFFLR_INT_ENA_W1SX(0), INTR_MASK(vfs));
 
+	/* ME */
+	rvupf_write64(rvu, RVU_PF_VFME_INTX(0), INTR_MASK(vfs));
+	rvupf_write64(rvu, RVU_PF_VFME_INT_ENA_W1SX(0), INTR_MASK(vfs));
+
 	/* Same for remaining VFs, if any. */
 	if (vfs <= 64)
 		return;
@@ -382,6 +386,7 @@ void cn20k_rvu_enable_afvf_intr(struct rvu *rvu, int vfs)
 
 	rvupf_write64(rvu, RVU_PF_VFFLR_INTX(1), INTR_MASK(vfs - 64));
 	rvupf_write64(rvu, RVU_PF_VFFLR_INT_ENA_W1SX(1), INTR_MASK(vfs - 64));
+	rvupf_write64(rvu, RVU_PF_VFME_INTX(1), INTR_MASK(vfs - 64));
 	rvupf_write64(rvu, RVU_PF_VFME_INT_ENA_W1SX(1), INTR_MASK(vfs - 64));
 }
 

@@ -39,6 +39,7 @@ static int rvu_mbox_init(struct rvu *rvu, struct mbox_wq_info *mw,
 			 void (mbox_up_handler)(struct work_struct *));
 static irqreturn_t rvu_mbox_pf_intr_handler(int irq, void *rvu_irq);
 static irqreturn_t rvu_mbox_intr_handler(int irq, void *rvu_irq);
+static void rvu_afvf_clear_vftrpend(struct rvu *rvu, int vf);
 
 /* Supported devices */
 static const struct pci_device_id rvu_id_table[] = {
@@ -1724,7 +1725,21 @@ int rvu_mbox_handler_detach_resources(struct rvu *rvu,
 				      struct rsrc_detach *detach,
 				      struct msg_rsp *rsp)
 {
-	return rvu_detach_rsrcs(rvu, detach, detach->hdr.pcifunc);
+	u16 pcifunc = detach->hdr.pcifunc;
+	int ret;
+
+	ret = rvu_detach_rsrcs(rvu, detach, pcifunc);
+	if (ret)
+		return ret;
+
+	/* AF-managed VFs: clear PCIe TRPND after driver detach */
+	if (is_vf(pcifunc) && !rvu_get_pf(rvu->pdev, pcifunc)) {
+		u16 vf = pcifunc & RVU_PFVF_FUNC_MASK;
+
+		rvu_afvf_clear_vftrpend(rvu, vf - 1);
+	}
+
+	return 0;
 }
 
 int rvu_get_nix_blkaddr(struct rvu *rvu, u16 pcifunc)
@@ -2646,10 +2661,14 @@ int rvu_mbox_handler_vf_flr(struct rvu *rvu, struct msg_req *req,
 			 RVU_PRIV_PFX_CFG(rvu_get_pf(rvu->pdev, pcifunc)));
 	numvfs = (cfg >> 12) & 0xFF;
 
-	if (vf && vf <= numvfs)
+	if (vf && vf <= numvfs) {
 		__rvu_flr_handler(rvu, pcifunc);
-	else
+		/* AF-managed VFs: NIC PF writes VFTRPEND locally */
+		if (!rvu_get_pf(rvu->pdev, pcifunc))
+			rvu_afvf_clear_vftrpend(rvu, vf - 1);
+	} else {
 		return RVU_INVALID_VF_ID;
+	}
 
 	return 0;
 }
@@ -3729,20 +3748,32 @@ void __rvu_flr_handler(struct rvu *rvu, u16 pcifunc)
 	mutex_unlock(&rvu->flr_lock);
 }
 
+static void rvu_afvf_clear_vftrpend(struct rvu *rvu, int vf)
+{
+	int reg = 0;
+
+	if (vf >= 64) {
+		reg = 1;
+		vf -= 64;
+	}
+
+	rvupf_write64(rvu, RVU_PF_VFTRPENDX(reg), BIT_ULL(vf));
+}
+
 static void rvu_afvf_flr_handler(struct rvu *rvu, int vf)
 {
 	int reg = 0;
 
 	/* pcifunc = 0(PF0) | (vf + 1) */
 	__rvu_flr_handler(rvu, vf + 1);
+	rvu_afvf_clear_vftrpend(rvu, vf);
 
 	if (vf >= 64) {
 		reg = 1;
 		vf = vf - 64;
 	}
 
-	/* Signal FLR finish and enable IRQ */
-	rvupf_write64(rvu, RVU_PF_VFTRPENDX(reg), BIT_ULL(vf));
+	/* Re-enable FLR interrupt */
 	rvupf_write64(rvu, RVU_PF_VFFLR_INT_ENA_W1SX(reg), BIT_ULL(vf));
 }
 
