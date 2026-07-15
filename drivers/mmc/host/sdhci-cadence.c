@@ -36,7 +36,9 @@
 #define SDHCI_CDNS_TUNE_STEP		6
 #define SDHCI_CDNS_TUNE_ITERATIONS	40
 #define SDHCI_CDNS_TUNE_MAX_VALUE	256
+#define SDHCI_CDNS_PHY_INIT_TIMEOUT_US	100000
 #define SDHCI_CDNS_SD6_DEFAULT_DELAY_ELEMENT	8
+#define SDHCI_CDNS_SD6_MAX_DELAY_ELEMENT	255
 #define DEFAULT_READ_DQS_CMD_DELAY	64
 #define DEFAULT_CLK_WRDQS_DELAY		0
 #define DEFAULT_CLK_WR_DELAY		0
@@ -346,6 +348,7 @@ struct sdhci_cdns_sd6_phy {
 	bool tune_dat;
 	bool strobe_cmd;
 	bool strobe_dat;
+	bool phy_init_done;
 	int mode;
 	int t_sdclk;
 };
@@ -819,6 +822,23 @@ static void sdhci_cdns_sd6_phy_calc_dat_in(struct sdhci_cdns_sd6_phy *phy)
 	} else {
 		phy->settings.cp_use_phony_dqs = 1;
 		phy->settings.cp_read_dqs_delay = 0;
+
+		/*
+		 * sdhc_rdcmd_en/sdhc_rddata_en control HRS09.RDCMD_EN/RDDATA_EN,
+		 * which enable PHY read capture. If either bit is left cleared, the
+		 * controller never latches read data and all data reads fail with
+		 * -EIO, even though card enumeration on the CMD path still works.
+		 */
+		phy->settings.sdhc_rdcmd_en = 1;
+		phy->settings.sdhc_rddata_en = 1;
+		phy->settings.cp_use_ext_lpbk_dqs = 1;
+		phy->settings.cp_use_lpbk_dqs = 1;
+		phy->settings.cp_sync_method = 1;
+		phy->settings.cp_rd_del_sel = 52;
+		phy->settings.cp_dll_start_point = 4;
+		phy->settings.cp_data_select_oe_end = 1;
+		phy->settings.cp_io_mask_always_on = 0;
+		phy->settings.cp_gate_cfg_always_on = 1;
 	}
 
 	if (phy->mode == MMC_TIMING_MMC_HS200)
@@ -1071,7 +1091,8 @@ static int sdhci_cdns_sd6_dll_reset(struct sdhci_cdns_priv *priv, bool reset)
 					 reg,
 					 (reg &
 					  SDHCI_CDNS_HRS09_PHY_INIT_COMPLETE),
-					 0, 0);
+					 1,
+					 SDHCI_CDNS_PHY_INIT_TIMEOUT_US);
 
 	return ret;
 }
@@ -1253,6 +1274,7 @@ static int sdhci_cdns_sd6_get_delay_element(struct sdhci_host *host)
 	bool locked = false;
 	u32 reg = 0;
 	u8 dll_lock_value = 0xff;
+	int ret;
 
 	phy->settings.cp_dll_bypass_mode = 0;
 
@@ -1290,10 +1312,16 @@ static int sdhci_cdns_sd6_get_delay_element(struct sdhci_host *host)
 
 	/* Reset PHY */
 	writel(0xf1c00003, priv->hrs_addr + SDHCI_CDNS_HRS09);
-	/* Wait for init to complete */
-	do {
-		reg = readl(priv->hrs_addr + SDHCI_CDNS_HRS09);
-	} while (!(reg & SDHCI_CDNS_HRS09_PHY_INIT_COMPLETE));
+	/*
+	 * Wait for init to complete.  This is bounded on purpose: if the PHY
+	 * is wedged (e.g. after an earlier failed init) PHY_INIT_COMPLETE may
+	 * never assert, and an unbounded spin here hangs the CPU forever.
+	 */
+	ret = readl_poll_timeout(priv->hrs_addr + SDHCI_CDNS_HRS09, reg,
+				 (reg & SDHCI_CDNS_HRS09_PHY_INIT_COMPLETE),
+				 1, SDHCI_CDNS_PHY_INIT_TIMEOUT_US);
+	if (ret)
+		return -1;
 
 	mdelay(1);
 	if (sdhci_cdns_sd6_get_dll_parameters(priv, &lock_mode, &locked,
@@ -1470,6 +1498,9 @@ static int sdhci_cdns_sd6_phy_init(struct sdhci_cdns_priv *priv)
 		phy->settings.slew);
 	sdhci_cdns_sd6_write_phy_reg(priv, SDHCI_CDNS_SD6_PHY_GPIO_CTRL0, reg);
 
+	/* Ensure PHY writes are visible before releasing PHY reset */
+	wmb();
+
 	ret = sdhci_cdns_sd6_dll_reset(priv, false);
 	if (ret)
 		return ret;
@@ -1488,6 +1519,9 @@ static int sdhci_cdns_sd6_phy_init(struct sdhci_cdns_priv *priv)
 	reg |= FIELD_PREP(SDHCI_CDNS_SD6_PHY_DQ_TIMING_DATA_SELECT_OE_END,
 			phy->settings.cp_data_select_oe_end);
 	sdhci_cdns_sd6_write_phy_reg(priv, SDHCI_CDNS_SD6_PHY_DQ_TIMING, reg);
+
+	/* Ensure DQ timing programming is visible before HRS09 update */
+	wmb();
 
 	reg = readl(priv->hrs_addr + SDHCI_CDNS_HRS09);
 	if (phy->settings.sdhc_extended_wr_mode)
@@ -1518,7 +1552,13 @@ static int sdhci_cdns_sd6_phy_init(struct sdhci_cdns_priv *priv)
 	reg = FIELD_PREP(SDHCI_CDNS_HRS10_HCSDCLKADJ, phy->settings.sdhc_hcsdclkadj);
 	writel(reg, priv->hrs_addr + SDHCI_CDNS_HRS10);
 
-	if (phy->mode != MMC_TIMING_MMC_HS && phy->mode != MMC_TIMING_MMC_DDR52) {
+	/*
+	 * Only MMC_HS uses a fixed HRS16.  Every other mode -- including DDR52 --
+	 * uses the computed write timings so that DDR gets WRDATA*_SDCLK_DLY=1
+	 * (the half-clock launch shift); hardcoding DDR52 here mis-launches write
+	 * data and corrupts transitioning bytes.
+	 */
+	if (phy->mode != MMC_TIMING_MMC_HS) {
 		reg = 0x0;
 		reg = FIELD_PREP(SDHCI_CDNS_HRS16_WRDATA1_SDCLK_DLY,
 				 phy->settings.sdhc_wrdata1_sdclk_dly);
@@ -1622,6 +1662,18 @@ static void sdhci_cdns_set_uhs_signaling(struct sdhci_host *host,
 	case MMC_TIMING_SD_HS:
 		mode = SDHCI_CDNS_HRS06_MODE_SD;
 		break;
+	case MMC_TIMING_LEGACY:
+		/* Non-removable slot is typically eMMC: keep MMC legacy mode. */
+		if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+			mode = SDHCI_CDNS_HRS06_MODE_LEGACY;
+		else
+			mode = SDHCI_CDNS_HRS06_MODE_SD;
+		break;
+	case MMC_TIMING_UHS_SDR12:
+	case MMC_TIMING_UHS_SDR25:
+	case MMC_TIMING_UHS_SDR50:
+	case MMC_TIMING_UHS_SDR104:
+	case MMC_TIMING_UHS_DDR50:
 	default:
 		mode = SDHCI_CDNS_HRS06_MODE_LEGACY;
 		break;
@@ -1720,8 +1772,21 @@ static u32 sdhci_cdns_sd6_get_mode(struct sdhci_host *host,
 	case MMC_TIMING_SD_HS:
 		mode = SDHCI_CDNS_HRS06_MODE_SD;
 		break;
+	case MMC_TIMING_LEGACY:
+		if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
+			mode = SDHCI_CDNS_HRS06_MODE_LEGACY;
+		else
+			mode = SDHCI_CDNS_HRS06_MODE_SD;
+		break;
+	case MMC_TIMING_UHS_SDR12:
+	case MMC_TIMING_UHS_SDR25:
+	case MMC_TIMING_UHS_SDR50:
+	case MMC_TIMING_UHS_SDR104:
+	case MMC_TIMING_UHS_DDR50:
+		mode = SDHCI_CDNS_HRS06_MODE_SD;
+		break;
 	default:
-		mode = SDHCI_CDNS_HRS06_MODE_MMC_SDR;
+		mode = SDHCI_CDNS_HRS06_MODE_LEGACY;
 		break;
 	}
 
@@ -1765,6 +1830,8 @@ static void sdhci_cdns_sd6_set_uhs_signaling(struct sdhci_host *host,
 
 	if (sdhci_cdns_sd6_phy_init(priv))
 		pr_debug("%s: phy init failed\n", __func__);
+	else
+		phy->phy_init_done = true;
 }
 
 static void sdhci_cdns_sd6_set_clock(struct sdhci_host *host,
@@ -1780,11 +1847,15 @@ static void sdhci_cdns_sd6_set_clock(struct sdhci_host *host,
 
 	pr_debug("%s %d %d\n", __func__, phy->mode, clock);
 
-	if (sdhci_cdns_sd6_phy_update_timings(host))
-		pr_debug("%s: update timings failed\n", __func__);
+	if (!phy->phy_init_done) {
+		if (sdhci_cdns_sd6_phy_update_timings(host))
+			pr_debug("%s: update timings failed\n", __func__);
 
-	if (sdhci_cdns_sd6_phy_init(priv))
-		pr_debug("%s: phy init failed\n", __func__);
+		if (sdhci_cdns_sd6_phy_init(priv))
+			pr_debug("%s: phy init failed\n", __func__);
+		else
+			phy->phy_init_done = true;
+	}
 
 	sdhci_set_clock(host, clock);
 
@@ -1849,9 +1920,13 @@ static int sdhci_cdns_sd6_phy_probe(struct platform_device *pdev)
 				   &phy->d.delay_element);
 	if (ret) {
 		ret = sdhci_cdns_sd6_get_delay_element(host);
-		if (ret < 0)
-			return ret;
-		phy->d.delay_element = ret;
+		if (ret <= 0 || ret > SDHCI_CDNS_SD6_MAX_DELAY_ELEMENT)
+			phy->d.delay_element = SDHCI_CDNS_SD6_DEFAULT_DELAY_ELEMENT;
+		else
+			phy->d.delay_element = ret;
+	} else if (phy->d.delay_element == 0 ||
+		   phy->d.delay_element > SDHCI_CDNS_SD6_MAX_DELAY_ELEMENT) {
+		phy->d.delay_element = SDHCI_CDNS_SD6_DEFAULT_DELAY_ELEMENT;
 	}
 
 	ret = device_property_read_string(dev, "cdns,mode", &mode_name);
@@ -1873,8 +1948,7 @@ static int sdhci_cdns_sd6_phy_probe(struct platform_device *pdev)
 	}
 
 	phy->d.delay_element_org = phy->d.delay_element;
-	phy->d.iocell_input_delay = 650;
-	phy->d.iocell_output_delay = 1800;
+	phy->phy_init_done = false;
 
 	switch (phy->mode) {
 	case MMC_TIMING_MMC_HS:
@@ -2338,9 +2412,17 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 	if (ret)
 		goto free;
 
-	if (of_device_is_compatible(dev->of_node, "cdns,sd6hc"))
-		ret = sdhci_cdns_sd6_phy_init(priv);
-	else {
+	/*
+	 * Do NOT run the SD6 PHY init here.  At probe time the MMC
+	 * core has not enabled SDCLK yet, so the DLL cannot lock and
+	 * HRS09.PHY_INIT_COMPLETE never asserts -> dll_reset() times
+	 * out with -110 and leaves the PHY/DLL wedged, which makes the
+	 * next probe hang in sdhci_cdns_sd6_get_delay_element().  The
+	 * PHY is initialized later from set_clock()/set_uhs_signaling()
+	 * once the bus clock is actually running (guarded by
+	 * phy_init_done).
+	 */
+	if (!of_device_is_compatible(dev->of_node, "cdns,sd6hc")) {
 		sdhci_cdns_sd4_phy_param_parse(dev, priv);
 		ret = sdhci_cdns_sd4_phy_init(priv);
 	}
@@ -2360,6 +2442,40 @@ static int sdhci_cdns_probe(struct platform_device *pdev)
 		}
 		if (priv->rst_hw)
 			host->mmc_host_ops.card_hw_reset = sdhci_cdns_mmc_hw_reset;
+	}
+
+	/*
+	 * Honor the SD6 "cdns,mode" as an upper bound on the bus timing -- but
+	 * only when the device tree has not already requested a faster mode via
+	 * the standard MMC bindings.
+	 *
+	 * sdhci_setup_host() (called from sdhci_add_host() below) promotes caps2
+	 * to HS200 whenever the controller advertises SDR104, regardless of the
+	 * device tree (see the SDHCI_SUPPORT_SDR104 branch in sdhci_setup_host()).
+	 * mmc_select_timing() then always prefers HS200 over DDR52, so an eMMC
+	 * that is only wired/tuned for DDR52 would come up in HS200 instead.
+	 * Capping via SDHCI_QUIRK2_BROKEN_HS200 (which must be set before
+	 * sdhci_add_host()) suppresses that unwanted promotion.
+	 *
+	 * However, if the DT explicitly enabled HS200/HS400 (mmc-hs200-1_8v /
+	 * mmc-hs400-1_8v -- already parsed into caps2 by mmc_of_parse() above),
+	 * that is a deliberate request which must win over the vendor cdns,mode
+	 * hint, so skip the cap entirely in that case.
+	 */
+	if (of_device_is_compatible(dev->of_node, "cdns,sd6hc") && priv->phy) {
+		struct sdhci_cdns_sd6_phy *phy = priv->phy;
+		bool support_hs200_hs400 = !!(host->mmc->caps2 &
+					      (MMC_CAP2_HS200 | MMC_CAP2_HS400 |
+					       MMC_CAP2_HS400_ES));
+
+		if (!support_hs200_hs400 &&
+		    (phy->mode == MMC_TIMING_MMC_DDR52 ||
+		     phy->mode == MMC_TIMING_MMC_HS ||
+		     phy->mode == MMC_TIMING_SD_HS)) {
+			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
+			host->mmc->caps2 &= ~(MMC_CAP2_HS200 | MMC_CAP2_HS400 |
+					      MMC_CAP2_HS400_ES);
+		}
 	}
 
 	ret = sdhci_add_host(host);
