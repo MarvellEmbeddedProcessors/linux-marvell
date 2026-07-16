@@ -1804,8 +1804,11 @@ static int mpam_dt_count_msc(void)
 	int count = 0;
 	struct device_node *np;
 
-	for_each_compatible_node(np, NULL, "arm,mpam-msc")
+	for_each_compatible_node(np, NULL, "arm,mpam-msc") {
+		if (!of_device_is_available(np))
+			continue;
 		count++;
+	}
 
 	return count;
 }
