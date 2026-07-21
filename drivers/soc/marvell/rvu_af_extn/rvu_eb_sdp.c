@@ -911,7 +911,7 @@ static int sdp_get_mbox_regions(struct rvu *rvu, void **mbox_addr,
 	int region;
 	u64 bar;
 
-	bar = rvu_read64(rvu, blkaddr, SDP_AF_EPFX_SCRATCH(0));
+	bar = rvu_read64(rvu, blkaddr, SDP_AF_EPFX_SCRATCH(0)) & ~BIT_ULL(0);
 	if (!bar) {
 		dev_warn(rvu->dev,
 			 "PEM BAR Mbox region not configured\n");
