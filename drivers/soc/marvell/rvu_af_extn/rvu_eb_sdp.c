@@ -1021,6 +1021,11 @@ static int sdp_mbox_init(struct rvu *rvu, struct mbox_wq_info *mw,
 		mwork = &mw->mbox_wrk_up[i];
 		mwork->rvu = rvu;
 		INIT_WORK(&mwork->work, mbox_up_handler);
+
+		/* Signal to EPF i that mbox is ready */
+		rvu_write64(rvu, BLKADDR_SDP,
+		SDP_AF_EPFX_SCRATCH(i),
+		rvu_read64(rvu, BLKADDR_SDP, SDP_AF_EPFX_SCRATCH(i)) | BIT_ULL(0));
 	}
 
 	kfree(mbox_regions);
