@@ -349,10 +349,12 @@ int rvu_mbox_handler_tim_config_ring(struct rvu *rvu,
 	/* CTL0 */
 	/* EXPIRE_OFFSET = 0 and is set correctly when enabling. */
 	regval = intvl;
-	if (intvl_ext)
+	if (intvl_ext) {
+		rvu_write64(rvu, blkaddr, TIM_AF_RINGX_EXP_OFF(lf), 0);
 		rvu_write64(rvu, blkaddr, TIM_AF_RINGX_INTRVL(lf), regval);
-	else
+	} else {
 		rvu_write64(rvu, blkaddr, TIM_AF_RINGX_CTL0(lf), regval);
+	}
 
 	/* CTL1 */
 	regval = (((u64)req->bigendian) << 53) |
