@@ -1309,8 +1309,10 @@ int rvu_mbox_handler_cgx_set_fec_param(struct rvu *rvu,
 				       struct fec_mode *req,
 				       struct fec_mode *rsp)
 {
+	struct cgx_link_user_info linfo;
 	int pf = rvu_get_pf(req->hdr.pcifunc);
 	u8 cgx_id, lmac_id;
+	int err = 0;
 
 	if (!is_pf_cgxmapped(rvu, pf))
 		return LMAC_AF_ERR_PF_NOT_MAPPED;
@@ -1319,6 +1321,16 @@ int rvu_mbox_handler_cgx_set_fec_param(struct rvu *rvu,
 		req->fec = OTX2_FEC_NONE;
 	rvu_get_cgx_lmac_id(rvu->pf2cgxlmac_map[pf], &cgx_id, &lmac_id);
 	rsp->fec = cgx_set_fec(req->fec, cgx_id, lmac_id);
+
+	if (!rsp->fec) {
+		err = cgx_get_link_info(rvu_cgx_pdata(cgx_id, rvu), lmac_id, &linfo);
+		if (err)
+			return err;
+	} else
+		return rsp->fec;
+
+	rsp->fec =  linfo.fec;
+
 	return 0;
 }
 

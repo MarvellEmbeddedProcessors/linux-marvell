@@ -1775,15 +1775,8 @@ int cgx_set_fec(u64 fec, int cgx_id, int lmac_id)
 	err = cgx_fwi_cmd_generic(req, &resp, cgx, lmac_id);
 	if (err)
 		return err;
-
-	lmac->link_info.fec = FIELD_GET(RESP_LINKSTAT_FEC, resp);
-
-	/* Reset stale fec counters */
-	if (fec == lmac->link_info.fec) {
-		lmac->fec_corr_blks = 0;
-		lmac->fec_uncorr_blks = 0;
-	}
-	return lmac->link_info.fec;
+	else
+		return 0;
 }
 
 int cgx_get_phy_fec_stats(void *cgxd, int lmac_id)
