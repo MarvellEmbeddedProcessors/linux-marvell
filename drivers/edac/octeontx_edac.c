@@ -521,6 +521,44 @@ static void octeontx_edac_ea_msg(struct octeontx_ghes_record *rec, char msg[SIZE
 	msg[n] = '\0';
 }
 
+static size_t octeontx_ghes_record_size(void)
+{
+	if (octeontx_ghes_record_ver == OCTEONTX_GHES_REC_OLD_VER)
+		return sizeof(struct octeontx_ghes_record) -
+			sizeof(struct processor_error_new);
+
+	return sizeof(struct octeontx_ghes_record);
+}
+
+static bool octeontx_ghes_read_record(struct octeontx_edac *ghes, u32 index,
+					struct octeontx_ghes_record *rec)
+{
+	struct octeontx_ghes_ring *ring = ghes->ring;
+	size_t header_size = sizeof(*ring);
+	size_t record_size = octeontx_ghes_record_size();
+	size_t max_records = 0;
+
+	if (header_size > ghes->ring_sz)
+		goto invalid;
+
+	max_records = ring->size;
+
+	if (index >= max_records)
+		goto invalid;
+
+	memset(rec, 0, sizeof(*rec));
+	memcpy_fromio(rec, (u8 __iomem *)ring->records + record_size * index,
+		      record_size);
+
+	return true;
+
+invalid:
+	otx_printk(KERN_ERR,
+		   "%s invalid ring record for index %u with header size %zu ring size %zu max records %zu\n",
+		   ghes->name, index, header_size, ghes->ring_sz, max_records);
+	return false;
+}
+
 static void octeontx_edac_mc_wq(struct work_struct *work)
 {
 	struct delayed_work *dw = to_delayed_work(work);
@@ -533,8 +571,6 @@ static void octeontx_edac_mc_wq(struct work_struct *work)
 	u32 head = 0;
 	u32 tail = 0;
 	char msg[SIZE];
-	u64 start_addr_ghes_record;
-	u32 size_rec_in_old_firmware;
 
 	mutex_lock(&ghes->lock);
 
@@ -548,16 +584,8 @@ loop:
 	if (head == tail)
 		goto exit;
 
-	if (octeontx_ghes_record_ver == OCTEONTX_GHES_REC_OLD_VER) {
-		start_addr_ghes_record = (u64)ring->records;
-		size_rec_in_old_firmware = sizeof(struct octeontx_ghes_record)
-			- sizeof(struct processor_error_new);
-		memcpy_fromio(&rec, (void *)(start_addr_ghes_record +
-			(size_rec_in_old_firmware * tail)),
-				size_rec_in_old_firmware);
-	} else {
-		memcpy_fromio(&rec, ring->records + tail, sizeof(rec));
-	}
+	if (!octeontx_ghes_read_record(ghes, tail, &rec))
+		goto exit;
 
 	type = octeontx_edac_severity(rec.error_severity);
 
@@ -611,7 +639,8 @@ loop:
 	if (head == tail)
 		goto exit;
 
-	memcpy_fromio(&rec, ring->records + tail, sizeof(rec));
+	if (!octeontx_ghes_read_record(ghes, tail, &rec))
+		goto exit;
 
 	type = octeontx_edac_severity(rec.error_severity);
 
