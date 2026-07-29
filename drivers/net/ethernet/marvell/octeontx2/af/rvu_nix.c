@@ -3026,7 +3026,7 @@ static bool is_txschq_hierarchy_valid(struct rvu *rvu, u16 pcifunc, int blkaddr,
 	if (!is_valid_txschq(rvu, blkaddr, lvl, pcifunc, schq))
 		return false;
 
-	parent = (regval >> 16) & 0x1FF;
+	parent = (regval >> 16) & (is_cn20k(rvu->pdev) ? 0x7FF : 0x1FF);
 	/* Validate MDQ's TL4 parent */
 	if (regbase == NIX_AF_MDQX_PARENT(0) &&
 	    !is_valid_txschq(rvu, blkaddr, NIX_TXSCH_LVL_TL4, pcifunc, parent))
