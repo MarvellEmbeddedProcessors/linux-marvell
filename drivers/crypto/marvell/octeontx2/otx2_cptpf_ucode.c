@@ -1088,7 +1088,11 @@ static int copy_ucode_to_dma_mem(struct device *dev,
 		memcpy(reucode_data->dmem_data, ucode_data_ptr,
 		       reucode_data->dmem_size);
 		ucode_data_ptr = (u8 *)ucode_data + reucode_data->imem_offset;
-		memcpy(ucode->va, ucode_data_ptr, reucode_data->imem_size);
+		memcpy(ucode->va + reucode_data->imem_entry_point,
+		       ucode_data_ptr, reucode_data->imem_size);
+		/* Byte swap 64-bit */
+		for (i = 0; i < reucode_data->imem_size / sizeof(u64); i++)
+			cpu_to_be64s(&((u64 *)ucode->va)[i]);
 	} else {
 		ucode_data_ptr = (u8 *)ucode_data +
 				 sizeof(struct otx2_cpt_ucode_hdr);
@@ -2011,6 +2015,7 @@ release_fw:
 int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 {
 	struct otx2_cptlfs_info *lfs = &cptpf->lfs;
+	union otx2_cpt_iq_cmd_word0 lecmd, becmd;
 	struct otx2_cpt_iq_command iq_cmd;
 	union otx2_cpt_opcode opcode;
 	union otx2_cpt_res_s *result;
@@ -2071,12 +2076,12 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 	/* Fill in the command */
 	opcode.s.major = LOADFVC_MAJOR_OP;
 	opcode.s.minor = LOADFVC_MINOR_OP;
-
-	iq_cmd.cmd.u = 0;
-	iq_cmd.cmd.s.opcode = cpu_to_be16(opcode.flags);
+	becmd.s.opcode = cpu_to_be16(opcode.flags);
+	lecmd.s.opcode = cpu_to_be16(opcode.flags);
 
 	/* 64-bit swap for microcode data reads, not needed for addresses */
-	cpu_to_be64s(&iq_cmd.cmd.u);
+	cpu_to_be64s(&becmd.u);
+	cpu_to_le64s(&lecmd.u);
 	iq_cmd.dptr = 0;
 	iq_cmd.rptr = rptr_baddr;
 	iq_cmd.cptr.u = 0;
@@ -2090,6 +2095,12 @@ int otx2_cpt_discover_eng_capabilities(struct otx2_cptpf_dev *cptpf)
 		result->s.compcode = OTX2_CPT_COMPLETION_CODE_INIT;
 		iq_cmd.cptr.s.grp = otx2_cpt_get_eng_grp(&cptpf->eng_grps,
 							 etype);
+
+		if (etype != OTX2_CPT_RE_TYPES)
+			iq_cmd.cmd.u = becmd.u;
+		else
+			iq_cmd.cmd.u = lecmd.u;
+
 		otx2_cpt_fill_inst(&inst, &iq_cmd, result_baddr, 0);
 		lfs->ops->send_cmd(&inst, 1, &cptpf->lfs.lf[0]);
 		timeout = 10000;
