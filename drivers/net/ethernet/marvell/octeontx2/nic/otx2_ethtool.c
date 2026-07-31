@@ -1107,7 +1107,7 @@ static int otx2_get_fecparam(struct net_device *netdev,
 		if (!rsp->fwdata.supported_fec)
 			fecparam->fec = ETHTOOL_FEC_NONE;
 		else
-			fecparam->fec = fec[rsp->fwdata.supported_fec];
+			fecparam->fec = fec[pfvf->linfo.fec];
 	}
 	return 0;
 }
