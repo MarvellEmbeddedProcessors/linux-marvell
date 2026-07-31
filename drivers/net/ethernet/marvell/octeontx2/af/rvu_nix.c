@@ -779,7 +779,7 @@ static int nix_bp_disable(struct rvu *rvu,
 			    cfg & ~BIT_ULL(16));
 
 		if (type == NIX_INTF_TYPE_LBK) {
-			bpid = cfg & GENMASK(8, 0);
+			bpid = cfg & GENMASK(10, 0);
 			mutex_lock(&rvu->rsrc_lock);
 			rvu_free_rsrc(&bp->bpids, bpid - bp->free_pool_base);
 			for (bpid = 0; bpid < bp->bpids.max; bpid++) {
@@ -940,9 +940,9 @@ static int nix_bp_enable(struct rvu *rvu,
 		chan_v = nix_get_channel(chan, cpt_link);
 
 		cfg = rvu_read64(rvu, blkaddr, NIX_AF_RX_CHANX_CFG(chan_v));
-		cfg &= ~GENMASK_ULL(8, 0);
+		cfg &= ~GENMASK_ULL(10, 0);
 		rvu_write64(rvu, blkaddr, NIX_AF_RX_CHANX_CFG(chan_v),
-			    cfg | (bpid & GENMASK_ULL(8, 0)) | BIT_ULL(16));
+			    cfg | (bpid & GENMASK_ULL(10, 0)) | BIT_ULL(16));
 		chan_id++;
 		if (chan_id < req->chan_cnt)
 			bpid = rvu_nix_get_bpid(rvu, req, type, chan_id);
