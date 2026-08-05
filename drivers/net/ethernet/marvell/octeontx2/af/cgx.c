@@ -1771,9 +1771,7 @@ int cgx_set_fec(u64 fec, int cgx_id, int lmac_id)
 	if (err)
 		return err;
 
-	cgx->lmac_idmap[lmac_id]->link_info.fec =
-			FIELD_GET(RESP_LINKSTAT_FEC, resp);
-	return cgx->lmac_idmap[lmac_id]->link_info.fec;
+	return 0;
 }
 
 int cgx_get_phy_fec_stats(void *cgxd, int lmac_id)
