@@ -616,6 +616,7 @@ int otx2_cptvf_register_dl(struct otx2_cptvf_dev *cptvf)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(otx2_cptvf_register_dl);
 
 void otx2_cptvf_unregister_dl(struct otx2_cptvf_dev *cptvf)
 {
@@ -631,6 +632,7 @@ void otx2_cptvf_unregister_dl(struct otx2_cptvf_dev *cptvf)
 					  psize);
 	devlink_free(dl);
 }
+EXPORT_SYMBOL_GPL(otx2_cptvf_unregister_dl);
 
 int otx2_cpt_register_dl(struct otx2_cptpf_dev *cptpf)
 {
