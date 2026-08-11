@@ -679,6 +679,7 @@ int otx2_cpt_register_dl(struct otx2_cptpf_dev *cptpf)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(otx2_cpt_register_dl);
 
 void otx2_cpt_unregister_dl(struct otx2_cptpf_dev *cptpf)
 {
@@ -695,3 +696,4 @@ void otx2_cpt_unregister_dl(struct otx2_cptpf_dev *cptpf)
 					  ARRAY_SIZE(cn20k_cpt_dl_params));
 	devlink_free(dl);
 }
+EXPORT_SYMBOL_GPL(otx2_cpt_unregister_dl);
