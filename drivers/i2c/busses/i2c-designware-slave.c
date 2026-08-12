@@ -76,7 +76,14 @@ static int i2c_dw_reg_slave(struct i2c_client *slave)
 	regmap_write(dev->map, DW_IC_SAR, slave->addr);
 	dev->slave = slave;
 
-	__i2c_dw_enable(dev);
+	/*
+	 * Per the Synopsys DW_apb_i2c DataBook (Multiple SAR feature),
+	 * controllers synthesised with multiple SARs only acknowledge traffic
+	 * to IC_SAR when IC_ENABLE.SAR_EN is set; a plain enable is not enough.
+	 * The bit is reserved (ignored) on single-SAR controllers.
+	 */
+	regmap_write(dev->map, DW_IC_ENABLE,
+		     DW_IC_ENABLE_ENABLE | DW_IC_ENABLE_SAR_EN);
 
 	dev->status = 0;
 
