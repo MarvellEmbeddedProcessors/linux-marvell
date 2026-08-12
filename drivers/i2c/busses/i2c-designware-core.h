@@ -110,6 +110,14 @@
 
 #define DW_IC_ENABLE_ENABLE			BIT(0)
 #define DW_IC_ENABLE_ABORT			BIT(1)
+/*
+ * IC_ENABLE.SAR_EN, per the Synopsys DW_apb_i2c DataBook (Multiple SAR
+ * feature): on controllers synthesised with multiple SARs (e.g. Marvell
+ * CN20K) the primary slave address (IC_SAR) is only acknowledged when this
+ * bit is set. Must be programmed while IC_ENABLE.ENABLE is 0. Reserved on
+ * single-SAR controllers.
+ */
+#define DW_IC_ENABLE_SAR_EN			BIT(19)
 
 #define DW_IC_STATUS_ACTIVITY			BIT(0)
 #define DW_IC_STATUS_TFE			BIT(2)
