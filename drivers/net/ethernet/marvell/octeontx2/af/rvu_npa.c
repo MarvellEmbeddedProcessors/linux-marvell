@@ -67,6 +67,25 @@ static int npa_aq_enqueue_wait(struct rvu *rvu, struct rvu_block *block,
 	return 0;
 }
 
+static int npa_lf_cache_sync(struct rvu *rvu, int blkaddr, int lf)
+{
+	int err;
+
+	if (!is_cn20k(rvu->pdev))
+		return 0;
+
+	rvu_write64(rvu, blkaddr, NPA_AF_CACHE_SYNC,
+		    NPA_AF_CACHE_SYNC_EXEC |
+		    FIELD_PREP(NPA_AF_CACHE_SYNC_LF, lf));
+
+	err = rvu_poll_reg(rvu, blkaddr, NPA_AF_CACHE_SYNC,
+			   NPA_AF_CACHE_SYNC_EXEC, true);
+	if (err)
+		dev_err(rvu->dev, "NPA cache sync failed for LF %d\n", lf);
+
+	return err;
+}
+
 int rvu_npa_aq_enq_inst(struct rvu *rvu, struct npa_aq_enq_req *req,
 			struct npa_aq_enq_rsp *rsp)
 {
@@ -114,6 +133,12 @@ int rvu_npa_aq_enq_inst(struct rvu *rvu, struct npa_aq_enq_req *req,
 	 * so always choose first entry in result memory.
 	 */
 	inst.res_addr = (u64)aq->res->iova;
+
+	/* For a READ, flush this LF's dirty context cache to DRAM first so the
+	 * AQ read returns the latest context.
+	 */
+	if (req->op == NPA_AQ_INSTOP_READ)
+		npa_lf_cache_sync(rvu, blkaddr, npalf);
 
 	/* Hardware uses same aq->res->base for updating result of
 	 * previous instruction hence wait here till it is done.
@@ -227,6 +252,12 @@ int rvu_npa_aq_enq_inst(struct rvu *rvu, struct npa_aq_enq_req *req,
 	}
 	spin_unlock(&aq->lock);
 
+	/* After an INIT or WRITE, flush the just-updated context out of the
+	 * NPA cache.
+	 */
+	if (req->op == NPA_AQ_INSTOP_INIT || req->op == NPA_AQ_INSTOP_WRITE)
+		npa_lf_cache_sync(rvu, blkaddr, npalf);
+
 	if (rsp) {
 		/* Copy read context into mailbox */
 		if (req->op == NPA_AQ_INSTOP_READ) {
@@ -280,7 +311,9 @@ static int npa_lf_hwctx_disable(struct rvu *rvu, struct hwctx_disable_req *req)
 {
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, req->hdr.pcifunc);
 	u16 pcifunc = req->hdr.pcifunc;
+	struct rvu_hwinfo *hw = rvu->hw;
 	struct npa_aq_enq_req aq_req;
+	int blkaddr, npalf = -1;
 	unsigned long *bmap;
 	int id, cnt = 0;
 	int err = 0, rc;
@@ -288,6 +321,10 @@ static int npa_lf_hwctx_disable(struct rvu *rvu, struct hwctx_disable_req *req)
 	if (!pfvf->pool_ctx || !pfvf->aura_ctx ||
 	    npa_ctype_invalid(rvu, req->ctype))
 		return NPA_AF_ERR_AQ_ENQUEUE;
+
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPA, pcifunc);
+	if (blkaddr >= 0)
+		npalf = rvu_get_lf(rvu, &hw->block[blkaddr], pcifunc, 0);
 
 	/* Combined AURA teardown path. The netdev issues a single AURA
 	 * disable; the AF disables, per assigned aura, the linked POOL first
@@ -321,6 +358,10 @@ static int npa_lf_hwctx_disable(struct rvu *rvu, struct hwctx_disable_req *req)
 					"Failed to disable Aura:%d context\n",
 					id);
 			}
+
+			/* 3) Flush this LF's NPA context cache */
+			if (npalf >= 0)
+				npa_lf_cache_sync(rvu, blkaddr, npalf);
 		}
 
 		return err;
@@ -466,12 +507,16 @@ int rvu_mbox_handler_npa_lf_alloc(struct rvu *rvu,
 	if (npalf < 0)
 		return NPA_AF_ERR_AF_LF_INVALID;
 
+	npa_lf_cache_sync(rvu, blkaddr, npalf);
+
 	/* Reset this NPA LF */
 	err = rvu_lf_reset(rvu, block, npalf);
 	if (err) {
 		dev_err(rvu->dev, "Failed to reset NPALF%d\n", npalf);
 		return NPA_AF_ERR_LF_RESET;
 	}
+
+	npa_lf_cache_sync(rvu, blkaddr, npalf);
 
 	ctx_cfg = rvu_read64(rvu, blkaddr, NPA_AF_CONST1);
 
@@ -575,12 +620,16 @@ int rvu_mbox_handler_npa_lf_free(struct rvu *rvu, struct msg_req *req,
 	if (npalf < 0)
 		return NPA_AF_ERR_AF_LF_INVALID;
 
+	npa_lf_cache_sync(rvu, blkaddr, npalf);
+
 	/* Reset this NPA LF */
 	err = rvu_lf_reset(rvu, block, npalf);
 	if (err) {
 		dev_err(rvu->dev, "Failed to reset NPALF%d\n", npalf);
 		return NPA_AF_ERR_LF_RESET;
 	}
+
+	npa_lf_cache_sync(rvu, blkaddr, npalf);
 
 	if (is_cn20k(rvu->pdev))
 		npa_cn20k_dpc_free_all(rvu, pcifunc);
