@@ -1497,12 +1497,14 @@ void mpam_msmon_reset_all_mbwu(struct mpam_component *comp)
 		return;
 
 	idx = srcu_read_lock(&mpam_srcu);
-	list_for_each_entry_rcu(vmsc, &comp->vmsc, comp_list) {
+	list_for_each_entry_srcu(vmsc, &comp->vmsc, comp_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		if (!mpam_has_feature(mpam_feat_msmon_mbwu, &vmsc->props))
 			continue;
 
 		msc = vmsc->msc;
-		list_for_each_entry_rcu(ris, &msc->ris, vmsc_list) {
+		list_for_each_entry_srcu(ris, &msc->ris, vmsc_list,
+					 srcu_read_lock_held(&mpam_srcu)) {
 			if (!mpam_has_feature(mpam_feat_msmon_mbwu, &ris->props))
 				continue;
 
@@ -2956,7 +2958,8 @@ static void mpam_debugfs_setup_vmsc(struct mpam_component *comp,
 	debugfs_create_ulong("features", 0400, d, &vmsc->props.features[0]);
 	vmsc->debugfs = d;
 
-	list_for_each_entry_rcu(ris, &vmsc->ris, vmsc_list) {
+	list_for_each_entry_srcu(ris, &vmsc->ris, vmsc_list,
+				 srcu_read_lock_held(&mpam_srcu)) {
 		ris_idx = ris->ris_idx;
 
 		snprintf(name, sizeof(name), "msc.%u_ris.%u", msc_id,
@@ -2978,7 +2981,8 @@ static void mpam_debugfs_setup_comp(struct mpam_class *class,
 	d = debugfs_create_dir(name, class->debugfs);
 	comp->debugfs = d;
 
-	list_for_each_entry_rcu(vmsc, &comp->vmsc, comp_list)
+	list_for_each_entry_srcu(vmsc, &comp->vmsc, comp_list,
+				 srcu_read_lock_held(&mpam_srcu))
 		mpam_debugfs_setup_vmsc(comp, vmsc);
 }
 
