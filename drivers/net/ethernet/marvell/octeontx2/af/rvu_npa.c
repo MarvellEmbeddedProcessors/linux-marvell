@@ -139,13 +139,11 @@ int rvu_npa_aq_enq_inst(struct rvu *rvu, struct npa_aq_enq_req *req,
 				req->aura.pool_addr = pfvf->pool_ctx->iova +
 				(req->aura.pool_addr * pfvf->pool_ctx->entry_sz);
 			}
-			memcpy(mask, &req->aura_mask,
-			       sizeof(struct npa_aura_s));
+			memcpy(mask, &req->aura_mask, sizeof(struct npa_aura_s));
 			memcpy(ctx, &req->aura, sizeof(struct npa_aura_s));
 		} else { /* Applies to both pool and halo as the size is compatible */
-			memcpy(mask, &req->pool_mask,
-			       sizeof(struct npa_pool_s));
-			memcpy(ctx, &req->pool, sizeof(struct npa_pool_s));
+			memcpy(mask, &req->pool_mask, NIX_MAX_CTX_SIZE);
+			memcpy(ctx, &req->pool, NIX_MAX_CTX_SIZE);
 		}
 		break;
 	case NPA_AQ_INSTOP_INIT:
@@ -159,7 +157,7 @@ int rvu_npa_aq_enq_inst(struct rvu *rvu, struct npa_aq_enq_req *req,
 			(req->aura.pool_addr * pfvf->pool_ctx->entry_sz);
 			memcpy(ctx, &req->aura, sizeof(struct npa_aura_s));
 		} else { /* Applies to both pool and halo as the size is compatible */
-			memcpy(ctx, &req->pool, sizeof(struct npa_pool_s));
+			memcpy(ctx, &req->pool, NIX_MAX_CTX_SIZE);
 		}
 		break;
 	case NPA_AQ_INSTOP_NOP:
@@ -244,9 +242,44 @@ int rvu_npa_aq_enq_inst(struct rvu *rvu, struct npa_aq_enq_req *req,
 	return 0;
 }
 
+static int npa_hwctx_disable_pool(struct rvu *rvu, u16 pcifunc, int id)
+{
+	struct npa_aq_enq_req aq_req;
+
+	memset(&aq_req, 0, sizeof(aq_req));
+	aq_req.hdr.pcifunc = pcifunc;
+	aq_req.ctype = NPA_AQ_CTYPE_POOL;
+	aq_req.op = NPA_AQ_INSTOP_WRITE;
+	aq_req.pool.ena = 0;
+	aq_req.pool_mask.ena = 1;
+	aq_req.pool.fc_ena = 0;
+	aq_req.pool_mask.fc_ena = 1;
+	aq_req.aura_id = id;
+	return rvu_npa_aq_enq_inst(rvu, &aq_req, NULL);
+}
+
+static int npa_hwctx_disable_aura(struct rvu *rvu, u16 pcifunc, int id)
+{
+	struct npa_aq_enq_req aq_req;
+
+	memset(&aq_req, 0, sizeof(aq_req));
+	aq_req.hdr.pcifunc = pcifunc;
+	aq_req.ctype = NPA_AQ_CTYPE_AURA;
+	aq_req.op = NPA_AQ_INSTOP_WRITE;
+	aq_req.aura.ena = 0;
+	aq_req.aura_mask.ena = 1;
+	aq_req.aura.bp_ena = 0;
+	aq_req.aura_mask.bp_ena = 1;
+	aq_req.aura.fc_ena = 0;
+	aq_req.aura_mask.fc_ena = 1;
+	aq_req.aura_id = id;
+	return rvu_npa_aq_enq_inst(rvu, &aq_req, NULL);
+}
+
 static int npa_lf_hwctx_disable(struct rvu *rvu, struct hwctx_disable_req *req)
 {
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, req->hdr.pcifunc);
+	u16 pcifunc = req->hdr.pcifunc;
 	struct npa_aq_enq_req aq_req;
 	unsigned long *bmap;
 	int id, cnt = 0;
@@ -256,21 +289,53 @@ static int npa_lf_hwctx_disable(struct rvu *rvu, struct hwctx_disable_req *req)
 	    npa_ctype_invalid(rvu, req->ctype))
 		return NPA_AF_ERR_AQ_ENQUEUE;
 
+	/* Combined AURA teardown path. The netdev issues a single AURA
+	 * disable; the AF disables, per assigned aura, the linked POOL first
+	 * (while the aura is still readable so NPA can follow aura->pool_addr),
+	 * then the AURA, then flushes this LF's NPA context cache to DRAM
+	 */
+	if (req->ctype == NPA_AQ_CTYPE_AURA) {
+		cnt = pfvf->aura_ctx->qsize;
+		bmap = pfvf->aura_bmap;
+
+		for (id = 0; id < cnt; id++) {
+			if (!test_bit(id, bmap))
+				continue;
+
+			/* 1) Disable the POOL linked to this aura */
+			if (test_bit(id, pfvf->pool_bmap)) {
+				rc = npa_hwctx_disable_pool(rvu, pcifunc, id);
+				if (rc) {
+					err = rc;
+					dev_err(rvu->dev,
+						"Failed to disable Pool:%d context\n",
+						id);
+				}
+			}
+
+			/* 2) Disable the AURA */
+			rc = npa_hwctx_disable_aura(rvu, pcifunc, id);
+			if (rc) {
+				err = rc;
+				dev_err(rvu->dev,
+					"Failed to disable Aura:%d context\n",
+					id);
+			}
+		}
+
+		return err;
+	}
+
 	memset(&aq_req, 0, sizeof(struct npa_aq_enq_req));
-	aq_req.hdr.pcifunc = req->hdr.pcifunc;
+	aq_req.hdr.pcifunc = pcifunc;
 
 	if (req->ctype == NPA_AQ_CTYPE_POOL) {
 		aq_req.pool.ena = 0;
 		aq_req.pool_mask.ena = 1;
+		aq_req.pool.fc_ena = 0;
+		aq_req.pool_mask.fc_ena = 1;
 		cnt = pfvf->pool_ctx->qsize;
 		bmap = pfvf->pool_bmap;
-	} else if (req->ctype == NPA_AQ_CTYPE_AURA) {
-		aq_req.aura.ena = 0;
-		aq_req.aura_mask.ena = 1;
-		aq_req.aura.bp_ena = 0;
-		aq_req.aura_mask.bp_ena = 1;
-		cnt = pfvf->aura_ctx->qsize;
-		bmap = pfvf->aura_bmap;
 	} else if (req->ctype == NPA_AQ_CTYPE_HALO) {
 		aq_req.aura.ena = 0;
 		aq_req.aura_mask.ena = 1;
@@ -290,8 +355,8 @@ static int npa_lf_hwctx_disable(struct rvu *rvu, struct hwctx_disable_req *req)
 		if (rc) {
 			err = rc;
 			dev_err(rvu->dev, "Failed to disable %s:%d context\n",
-				(req->ctype == NPA_AQ_CTYPE_AURA) ?
-				"Aura" : "Pool", id);
+				(req->ctype == NPA_AQ_CTYPE_POOL) ?
+				"Pool" : "Halo", id);
 		}
 	}
 
@@ -456,7 +521,7 @@ skip_pool_ctx:
 	cfg = rvu_read64(rvu, blkaddr, NPA_AF_LFX_AURAS_CFG(npalf));
 	/* Clear way partition mask and set aura offset to '0' */
 	cfg &= ~(BIT_ULL(34) - 1);
-	/* Set aura size & enable caching of contexts */
+	/* Set aura size & enable caching of contexts (BIT34) */
 	cfg |= (req->aura_sz << 16) | BIT_ULL(34) | req->way_mask;
 
 	rvu_write64(rvu, blkaddr, NPA_AF_LFX_AURAS_CFG(npalf), cfg);
@@ -619,12 +684,7 @@ void rvu_npa_lf_teardown(struct rvu *rvu, u16 pcifunc, int npalf)
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, pcifunc);
 	struct hwctx_disable_req ctx_req;
 
-	/* Disable all pools */
 	ctx_req.hdr.pcifunc = pcifunc;
-	ctx_req.ctype = NPA_AQ_CTYPE_POOL;
-	npa_lf_hwctx_disable(rvu, &ctx_req);
-
-	/* Disable all auras */
 	ctx_req.ctype = NPA_AQ_CTYPE_AURA;
 	npa_lf_hwctx_disable(rvu, &ctx_req);
 

@@ -278,6 +278,9 @@ struct npa_aura_s {
 	u64 reserved_448_511;		/* W7 */
 };
 
+/* Aura context is 512 bits (64 bytes) on both cn10k and cn20k. */
+static_assert(sizeof(struct npa_aura_s) == 64);
+
 struct npa_pool_s {
 	u64 stack_base;			/* W0 */
 	u64 ena                   : 1;
@@ -333,6 +336,8 @@ struct npa_pool_s {
 	u64 reserved_896_959;		/* W14 */
 	u64 reserved_960_1023;		/* W15 */
 };
+
+static_assert(sizeof(struct npa_pool_s) == NIX_MAX_CTX_SIZE);
 
 /* NIX admin queue completion status */
 enum nix_aq_comp {
