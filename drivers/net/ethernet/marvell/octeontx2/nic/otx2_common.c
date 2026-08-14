@@ -1418,14 +1418,22 @@ void otx2_free_aura_ptr(struct otx2_nic *pfvf, int type)
 
 	/* Free SQB and RQB pointers from the aura pool */
 	for (pool_id = pool_start; pool_id < pool_end; pool_id++) {
+		int drained = 0;
+
 		pool = &pfvf->qset.pool[pool_id];
 		iova = otx2_aura_allocptr(pfvf, pool_id);
 		while (iova) {
 			if (type == AURA_NIX_RQ)
 				iova -= OTX2_HEAD_ROOM;
 			otx2_free_bufs(pfvf, pool, iova, size);
+			drained++;
 			iova = otx2_aura_allocptr(pfvf, pool_id);
 		}
+
+		/* Decrement aura COUNT by the number of pointers we just
+		 * extracted so NPA_AURA_S[COUNT] does not underflow.
+		 */
+		otx2_aura_op_cnt_add(pfvf, pool_id, -(s64)drained);
 
 		for (idx = 0 ; idx < pool->xdp_cnt; idx++) {
 			if (!pool->xdp[idx])
@@ -1498,7 +1506,7 @@ int otx2_aura_aq_init(struct otx2_nic *pfvf, int aura_id,
 	aq->aura.pool_addr = pool_id;
 	aq->aura.pool_caching = 1;
 	aq->aura.shift = ilog2(numptrs) - 8;
-	aq->aura.count = numptrs;
+	aq->aura.count = 0;
 	aq->aura.limit = numptrs;
 	aq->aura.avg_level = 255;
 	aq->aura.ena = 1;
@@ -1628,6 +1636,39 @@ int otx2_pool_aq_init(struct otx2_nic *pfvf, u16 pool_id,
 	return 0;
 }
 
+void otx2_aura_op_cnt_set(struct otx2_nic *pfvf, int aura, u64 count)
+{
+	void __iomem *ptr = otx2_get_regaddr(pfvf, NPA_LF_AURA_OP_CNT);
+	int shift = is_cn20k(pfvf->pdev) ? 47 : 44;
+	u64 reg, rb;
+
+	/* Absolute set of count[35:0] for this aura. */
+	reg = (count & (BIT_ULL(36) - 1)) | ((u64)aura << shift);
+	writeq(reg, ptr);
+
+	/* Read back (atomic add of 0) to confirm the write landed. */
+	rb = otx2_atomic64_add((u64)aura << shift, ptr);
+	if (!(rb & BIT_ULL(42)) /* OP_ERR */ &&
+	    (rb & GENMASK_ULL(35, 0)) != count)
+		netdev_dbg(pfvf->netdev,
+			   "aura %d count set %llu readback %llu\n",
+			   aura, count, rb & GENMASK_ULL(35, 0));
+}
+
+void otx2_aura_op_cnt_add(struct otx2_nic *pfvf, int aura, s64 delta)
+{
+	void __iomem *ptr = otx2_get_regaddr(pfvf, NPA_LF_AURA_OP_CNT);
+	int shift = is_cn20k(pfvf->pdev) ? 47 : 44;
+	u64 reg;
+
+	if (!delta)
+		return;
+
+	/* CNT_ADD is a two's-complement value in COUNT[35:0]. */
+	reg = ((u64)delta & GENMASK_ULL(35, 0)) | ((u64)aura << shift);
+	writeq(reg, ptr);
+}
+
 int otx2_sq_aura_pool_init(struct otx2_nic *pfvf)
 {
 	int qidx, pool_id, stack_pages, num_sqbs;
@@ -1681,6 +1722,8 @@ int otx2_sq_aura_pool_init(struct otx2_nic *pfvf)
 			err = -ENOMEM;
 			goto err_mem;
 		}
+
+		otx2_aura_op_cnt_set(pfvf, pool_id, num_sqbs);
 
 		for (ptr = 0; ptr < num_sqbs; ptr++) {
 			err = otx2_alloc_rbuf(pfvf, pool, &bufptr, pool_id, ptr);
@@ -1744,6 +1787,8 @@ int otx2_rq_aura_pool_init(struct otx2_nic *pfvf)
 	/* Allocate pointers and free them to aura/pool */
 	for (pool_id = 0; pool_id < hw->rqpool_cnt; pool_id++) {
 		pool = &pfvf->qset.pool[pool_id];
+
+		otx2_aura_op_cnt_set(pfvf, pool_id, num_ptrs);
 
 		for (ptr = 0; ptr < num_ptrs; ptr++) {
 			err = otx2_alloc_rbuf(pfvf, pool, &bufptr, pool_id, ptr);

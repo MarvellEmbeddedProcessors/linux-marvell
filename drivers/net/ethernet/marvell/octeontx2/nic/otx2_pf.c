@@ -7,6 +7,7 @@
 
 #include <linux/module.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/etherdevice.h>
 #include <linux/of.h>
@@ -1615,8 +1616,6 @@ static void otx2_free_cq_res(struct otx2_nic *pf)
 	struct otx2_cq_queue *cq;
 	int qidx;
 
-	/* Disable CQs */
-	otx2_ctx_disable(&pf->mbox, NIX_AQ_CTYPE_CQ, false);
 	for (qidx = 0; qidx < qset->cq_cnt; qidx++) {
 		cq = &qset->cq[qidx];
 		qmem_free(pf->dev, cq->cqe);
@@ -1629,8 +1628,6 @@ static void otx2_free_sq_res(struct otx2_nic *pf)
 	struct otx2_snd_queue *sq;
 	int qidx;
 
-	/* Disable SQs */
-	otx2_ctx_disable(&pf->mbox, NIX_AQ_CTYPE_SQ, false);
 	/* Free SQB pointers */
 	otx2_sq_free_sqbs(pf);
 
@@ -1807,6 +1804,8 @@ int otx2_init_hw_resources(struct otx2_nic *pf)
 err_free_ipsec_queues:
 	cn10k_ipsec_send_queues_cleanup(pf);
 err_free_nix_queues:
+	otx2_ctx_disable(mbox, NIX_AQ_CTYPE_SQ, false);
+	otx2_ctx_disable(mbox, NIX_AQ_CTYPE_CQ, false);
 	otx2_free_sq_res(pf);
 	otx2_free_cq_res(pf);
 	otx2_ctx_disable(mbox, NIX_AQ_CTYPE_RQ, false);
@@ -1816,7 +1815,7 @@ err_free_sq_ptrs:
 	otx2_sq_free_sqbs(pf);
 err_free_rq_ptrs:
 	otx2_free_aura_ptr(pf, AURA_NIX_RQ);
-	otx2_ctx_disable(mbox, NPA_AQ_CTYPE_POOL, true);
+	/* AURA disable also disables the linked pool in the AF */
 	otx2_ctx_disable(mbox, NPA_AQ_CTYPE_AURA, true);
 	otx2_aura_pool_free(pf);
 err_free_nix_lf:
@@ -1882,9 +1881,30 @@ void otx2_free_hw_resources(struct otx2_nic *pf)
 	}
 	otx2_free_pending_sqe(pf);
 
+	/* Disable SQ and CQ hw contexts (memory freed later, after drain) */
+	otx2_ctx_disable(mbox, NIX_AQ_CTYPE_SQ, false);
+	otx2_ctx_disable(mbox, NIX_AQ_CTYPE_CQ, false);
+
+	/* Free all ingress bandwidth profiles allocated */
+	if (!otx2_rep_dev(pf->pdev))
+		cn10k_free_all_ipolicers(pf);
+
+	mutex_lock(&mbox->lock);
+	free_req = otx2_mbox_alloc_msg_nix_lf_free(mbox);
+	if (free_req) {
+		free_req->flags = NIX_LF_DISABLE_FLOWS | NIX_LF_DONT_FREE_DFT_IDXS;
+		if (!(pf->flags & OTX2_FLAG_PF_SHUTDOWN))
+			free_req->flags |= NIX_LF_DONT_FREE_TX_VTAG;
+		if (otx2_sync_mbox_msg(mbox))
+			dev_err(pf->dev, "%s failed to free nixlf\n", __func__);
+	}
+	mutex_unlock(&mbox->lock);
+
+	/* As per HRM, delay is required after quiescing requesters */
+	usleep_range(10, 20);
+
 	otx2_free_sq_res(pf);
 
-	/* Free RQ buffer pointers*/
 	otx2_free_aura_ptr(pf, AURA_NIX_RQ);
 
 	/* Free the IPsec aura buffers and flows (if SAs are installed) */
@@ -1896,24 +1916,9 @@ void otx2_free_hw_resources(struct otx2_nic *pf)
 
 	otx2_free_cq_res(pf);
 
-	/* Free all ingress bandwidth profiles allocated */
-	if (!otx2_rep_dev(pf->pdev))
-		cn10k_free_all_ipolicers(pf);
-
-	mutex_lock(&mbox->lock);
-	/* Reset NIX LF */
-	free_req = otx2_mbox_alloc_msg_nix_lf_free(mbox);
-	if (free_req) {
-		free_req->flags = NIX_LF_DISABLE_FLOWS | NIX_LF_DONT_FREE_DFT_IDXS;
-		if (!(pf->flags & OTX2_FLAG_PF_SHUTDOWN))
-			free_req->flags |= NIX_LF_DONT_FREE_TX_VTAG;
-		if (otx2_sync_mbox_msg(mbox))
-			dev_err(pf->dev, "%s failed to free nixlf\n", __func__);
-	}
-	mutex_unlock(&mbox->lock);
-
-	/* Disable NPA Pool and Aura hw context */
-	otx2_ctx_disable(mbox, NPA_AQ_CTYPE_POOL, true);
+	/* Disable NPA hw context. Issue only the AURA disable: the AF disables,
+	 * per aura, the linked pool first, then the aura.
+	 */
 	otx2_ctx_disable(mbox, NPA_AQ_CTYPE_AURA, true);
 	otx2_aura_pool_free(pf);
 

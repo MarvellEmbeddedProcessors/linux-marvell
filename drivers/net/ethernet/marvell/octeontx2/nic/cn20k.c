@@ -552,13 +552,19 @@ static int cn20k_aura_aq_init(struct otx2_nic *pfvf, int aura_id,
 	aq->aura.pool_addr = pool_id;
 	aq->aura.pool_caching = 1;
 	aq->aura.shift = ilog2(numptrs) - 8;
-	aq->aura.count = numptrs;
+	/* Count is programmed post-INIT via NPA_LF_AURA_OP_CNT */
+	aq->aura.count = 0;
 	aq->aura.limit = numptrs;
 	aq->aura.avg_level = 255;
 	aq->aura.ena = 1;
 	aq->aura.fc_ena = 1;
 	aq->aura.fc_addr = pool->fc_addr->iova;
 	aq->aura.fc_hyst_bits = 0; /* Store count on all updates */
+
+	/* Enable aura error interrupts:
+	 * FREE_UNDER(0), ADD_OVER(1), ADD_UNDER(2), POOL_DIS(3).
+	 */
+	aq->aura.err_int_ena = BIT(0) | BIT(1) | BIT(2) | BIT(3);
 
 	/* Enable backpressure for RQ aura */
 	if (aura_id < pfvf->hw.rqpool_cnt && !is_otx2_lbkvf(pfvf->pdev)) {
@@ -635,6 +641,10 @@ static int cn20k_pool_aq_init(struct otx2_nic *pfvf, u16 pool_id,
 	aq->pool.shift = ilog2(numptrs) - 8;
 	aq->pool.ptr_start = 0;
 	aq->pool.ptr_end = ~0ULL;
+	/* Enable pool error interrupts:
+	 * OVFLS(0), RANGE(1), PERR(2).
+	 */
+	aq->pool.err_int_ena = BIT(0) | BIT(1) | BIT(2);
 
 	/* Fill AQ info */
 	aq->ctype = NPA_AQ_CTYPE_POOL;

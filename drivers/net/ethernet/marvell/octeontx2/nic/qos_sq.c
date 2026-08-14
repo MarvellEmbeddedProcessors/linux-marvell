@@ -81,6 +81,8 @@ static int otx2_qos_sq_aura_pool_init(struct otx2_nic *pfvf, int qidx)
 		goto pool_free;
 	}
 
+	otx2_aura_op_cnt_set(pfvf, pool_id, num_sqbs);
+
 	for (ptr = 0; ptr < num_sqbs; ptr++) {
 		err = otx2_alloc_rbuf(pfvf, pool, &bufptr, pool_id, ptr);
 		if (err)

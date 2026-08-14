@@ -791,6 +791,8 @@ static int cn10k_ipsec_aura_and_pool_init(struct otx2_nic *pfvf, int pool_id,
 	if (err)
 		goto fail;
 
+	otx2_aura_op_cnt_set(pfvf, pool_id, num_ptrs);
+
 	/* Allocate pointers and free them to aura/pool */
 	for (ptr = 0; ptr < num_ptrs; ptr++) {
 		err = otx2_alloc_rbuf(pfvf, pool, &bufptr, pool_id, ptr);
