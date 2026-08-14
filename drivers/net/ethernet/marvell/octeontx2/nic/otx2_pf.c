@@ -2676,8 +2676,25 @@ int otx2_config_hwtstamp_set(struct net_device *netdev,
 		pfvf->flags |= OTX2_FLAG_PTP_ONESTEP_SYNC;
 		schedule_delayed_work(&pfvf->ptp->synctstamp_work,
 				      msecs_to_jiffies(500));
-		fallthrough;
+		otx2_config_hw_tx_tstamp(pfvf, true);
+		break;
 	case HWTSTAMP_TX_ON:
+		/* Switching from one-step to two-step must clear one-step state
+		 * and refresh HW TX/RX config.  Only look at the previously
+		 * stored tx_type (not OTX2_FLAG_PTP_ONESTEP_SYNC) so the
+		 * one-step case above does not trip this on fallthrough.
+		 */
+		if (pfvf->tstamp.tx_type == HWTSTAMP_TX_ONESTEP_SYNC) {
+			bool rx_en = !!(pfvf->flags & OTX2_FLAG_RX_TSTAMP_ENABLED);
+			bool tx_en = !!(pfvf->flags & OTX2_FLAG_TX_TSTAMP_ENABLED);
+
+			pfvf->flags &= ~OTX2_FLAG_PTP_ONESTEP_SYNC;
+			cancel_delayed_work(&pfvf->ptp->synctstamp_work);
+			if (tx_en)
+				otx2_config_hw_tx_tstamp(pfvf, false);
+			if (rx_en)
+				otx2_config_hw_rx_tstamp(pfvf, false);
+		}
 		otx2_config_hw_tx_tstamp(pfvf, true);
 		break;
 	default:
