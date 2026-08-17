@@ -834,6 +834,17 @@ struct rvu {
 	int			n2_mcs_cnt; /* MCS blocks on chiplet2 */
 };
 
+static inline void rvu_write32(struct rvu *rvu, u64 block, u64 offset, u32 val)
+{
+	writel(val, rvu->afreg_base + ((block << 28) | offset));
+}
+
+static inline u32 rvu_read32(struct rvu *rvu, u64 block, u64 offset)
+{
+	return readl(rvu->afreg_base + ((block << 28) | offset));
+}
+
+
 static inline void rvu_write64(struct rvu *rvu, u64 block, u64 offset, u64 val)
 {
 	writeq(val, rvu->afreg_base + ((block << 28) | offset));
