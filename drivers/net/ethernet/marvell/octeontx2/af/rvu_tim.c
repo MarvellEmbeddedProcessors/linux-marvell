@@ -9,6 +9,8 @@
 #include <linux/irq.h>
 #include <linux/types.h>
 #include <linux/bitfield.h>
+#include <linux/pci.h>
+#include <linux/delay.h>
 
 #include "rvu_struct.h"
 #include "rvu_reg.h"
@@ -131,7 +133,60 @@ static inline int tim_get_min_intvl(struct rvu *rvu, u8 clocksource,
 	return 0;
 }
 
-static int rvu_tim_disable_lf(struct rvu *rvu, int lf, int blkaddr)
+static int rvu_tim_pcp_curr_itr_fixup(struct rvu *rvu, u16 pcifunc, int slot)
+{
+	struct pci_dev *pdev = rvu->pdev;
+	u32 trigger, res = 0, status = 0, curr = 0;
+	int i;
+
+	/* The AF (pcifunc 0) owns no TIM ring needing this. */
+	if (!rvu_get_pf(pdev, pcifunc))
+		return 0;
+
+	/* slot == ring id; carried as an 8-bit field in the TRIGGER data word. */
+	if (slot < 0 || slot >= TIM_WA_MAX_SLOTS)
+		return -EINVAL;
+
+	/*
+	 * Doorbell on the AF's own config space (rvu->pdev). PCP reconstructs
+	 * the AF's identity (pcifunc 0) from the trap and, recognising the
+	 * kernel, resolves the LF from the (victim) pcifunc carried in the
+	 * payload rather than confining to its own rings. The AF is always
+	 * alive, so this works even while the victim is mid-FLR (its own config
+	 * space would be unresponsive and cannot be the doorbell).
+	 */
+	trigger = ((u32)TIM_WA_REQ_FIXUP << 24) | ((u32)pcifunc << 8) |
+		  (slot & 0xFF);
+	pci_write_config_dword(pdev, TIM_WA_CFG_TRIGGER, trigger);
+
+	for (i = 0; i < TIM_WA_POLL_ITERS; i++) {
+		pci_read_config_dword(pdev, TIM_WA_CFG_AF_RESULT, &res);
+		status = TIM_WA_RES_STATUS(res);
+		if (status == TIM_WA_STATUS_DONE ||
+		    status == TIM_WA_STATUS_ERROR)
+			break;
+		usleep_range(200, 400);
+	}
+
+	curr = TIM_WA_RES_CURR_ITR(res);
+
+	if (status == TIM_WA_STATUS_DONE) {
+		dev_dbg(rvu->dev,
+			"TIM WA: pcifunc 0x%x slot %d curr_itr 0x%x\n", pcifunc,
+			slot, curr);
+		return 0;
+	}
+
+	dev_err(rvu->dev,
+		"TIM WA: pcifunc 0x%x slot %d fixup %s (status %u curr_itr 0x%x)\n",
+		pcifunc, slot,
+		status == TIM_WA_STATUS_ERROR ? "error" : "timeout", status,
+		curr);
+	return status == TIM_WA_STATUS_ERROR ? -EIO : -ETIMEDOUT;
+}
+
+static int rvu_tim_disable_lf(struct rvu *rvu, u16 pcifunc, int slot, int lf,
+			      int blkaddr)
 {
 	u64 regval;
 
@@ -141,6 +196,17 @@ static int rvu_tim_disable_lf(struct rvu *rvu, int lf, int blkaddr)
 	regval = rvu_read64(rvu, blkaddr, TIM_AF_RINGX_CTL1(lf));
 	if ((regval & TIM_AF_RINGX_CTL1_ENA) == 0)
 		return TIM_AF_RING_ALREADY_DISABLED;
+
+	/*
+	 * The PCP CURR_ITR fixup only applies to HWWQE version 0 hardware,
+	 * and only for rings that actually have HWWQE enabled.
+	 */
+	regval = rvu_read64(rvu, blkaddr, TIM_AF_CONST);
+	if (pcifunc && (regval & TIM_AF_CONST_HWWQE) &&
+	    TIM_AF_CONST_HWWQE_VER(regval) == 0 &&
+	    (rvu_read64(rvu, blkaddr, TIM_AF_RINGX_CTL3(lf)) &
+	     TIM_AF_RINGX_CTL3_HWWQE_ENA))
+		rvu_tim_pcp_curr_itr_fixup(rvu, pcifunc, slot);
 
 	/* Clear TIM_AF_RING(0..255)_CTL1[ENA]. */
 	regval = rvu_read64(rvu, blkaddr, TIM_AF_RINGX_CTL1(lf));
@@ -583,7 +649,7 @@ int rvu_mbox_handler_tim_disable_ring(struct rvu *rvu,
 	if (lf < 0)
 		return TIM_AF_LF_INVALID;
 
-	return rvu_tim_disable_lf(rvu, lf, blkaddr);
+	return rvu_tim_disable_lf(rvu, pcifunc, req->ring, lf, blkaddr);
 }
 
 int rvu_mbox_handler_tim_capture_counters(struct rvu *rvu, struct msg_req *req,
@@ -658,7 +724,7 @@ int rvu_tim_lf_teardown(struct rvu *rvu, u16 pcifunc, int lf, int slot)
 		return TIM_AF_LF_INVALID;
 
 	/* Ensure TIM ring is disabled prior to clearing the mapping */
-	rvu_tim_disable_lf(rvu, lf, blkaddr);
+	rvu_tim_disable_lf(rvu, pcifunc, slot, lf, blkaddr);
 
 	rvu_write64(rvu, blkaddr, TIM_AF_RINGX_GMCTL(lf), 0);
 
@@ -820,7 +886,10 @@ int rvu_tim_init(struct rvu *rvu)
 			if (!(regval & TIM_AF_RINGX_CTL1_ENA))
 				continue;
 
-			rvu_tim_disable_lf(rvu, lf, blkaddr);
+			/* Block-reset path: owning function unknown; pcifunc 0
+			 * skips the PCP CURR_ITR fixup (block is reset anyway).
+			 */
+			rvu_tim_disable_lf(rvu, 0, 0, lf, blkaddr);
 		}
 
 		/* Disable the TIM block. */

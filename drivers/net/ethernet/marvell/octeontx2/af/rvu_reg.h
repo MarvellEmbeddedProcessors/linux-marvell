@@ -785,6 +785,20 @@
 #define TIM_AF_RINGX_INTRVL(a)		(0x52000 | (a) << 3)
 #define TIM_AF_RINGX_HWWQE_RES_EC_OFF(a)	(0x54000 | (a) << 3)
 
+#define TIM_AF_CONST_HWWQE		 BIT_ULL(24)
+#define TIM_AF_CONST_HWWQE_VER(c)	 (((c) >> 35) & 0xF)
+#define TIM_AF_RINGX_CTL3_HWWQE_ENA	 BIT_ULL(0)
+
+#define TIM_WA_CFG_TRIGGER		 0x208
+#define TIM_WA_CFG_AF_RESULT		 0x230
+#define TIM_WA_REQ_FIXUP		 0
+#define TIM_WA_RES_STATUS(w)		 (((w) >> 30) & 0x3)
+#define TIM_WA_RES_CURR_ITR(w)		 ((w) & 0xffffff)
+#define TIM_WA_STATUS_DONE		 2
+#define TIM_WA_STATUS_ERROR		 3
+#define TIM_WA_MAX_SLOTS		 256
+#define TIM_WA_POLL_ITERS		 1000
+
 /* CPT */
 #define CPT_AF_CONSTANTS0               (0x0000)
 #define CPT_AF_CONSTANTS1               (0x1000)
