@@ -49,6 +49,9 @@
 #define ML_AF_ANBX_BACKP_DISABLE(a)   (0x18000ull | (uint64_t)(a) << 12)
 #define ML_AF_ANBX_NCBI_P_OVR(a)      (0x18010ull | (uint64_t)(a) << 12)
 #define ML_AF_ANBX_NCBI_NP_OVR(a)     (0x18020ull | (uint64_t)(a) << 12)
+#define ML_SW_RST_CTRL		      0xA084000
+#define ML_A35_0_RST_VECTOR_BASE_W(a) (0xA084014 + (a) * (0x04))
+#define ML_A35_1_RST_VECTOR_BASE_W(a) (0xA08401c + (a) * (0x04))
 
 /* ML interrupt and error masks */
 #define ML_AF_CORE_INT_LO_INT_LO	     BIT_ULL(0)

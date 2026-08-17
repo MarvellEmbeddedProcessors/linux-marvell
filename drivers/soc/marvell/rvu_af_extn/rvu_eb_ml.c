@@ -74,7 +74,7 @@ static bool is_ml_valid_af_reg(struct rvu *rvu, struct ml_rd_wr_reg_msg *req)
 	u64 offset = req->reg_offset;
 	u16 i;
 
-	if (offset & 0x7)
+	if (offset & 0x3)
 		return false;
 
 	/* Registers accessible from PF */
@@ -103,6 +103,9 @@ static bool is_ml_valid_af_reg(struct rvu *rvu, struct ml_rd_wr_reg_msg *req)
 		case ML_AF_MLR_SIZE:
 		case ML_AF_AXI_BRIDGE_CTRLX(0) ... ML_AF_AXI_BRIDGE_CTRLX(1):
 		case ML_AF_SCRATCHX(0) ... ML_AF_SCRATCHX(ML_SCRATCH_NR - 1):
+		case ML_SW_RST_CTRL:
+		case ML_A35_0_RST_VECTOR_BASE_W(0) ... ML_A35_0_RST_VECTOR_BASE_W(1):
+		case ML_A35_1_RST_VECTOR_BASE_W(0) ... ML_A35_1_RST_VECTOR_BASE_W(1):
 			return true;
 		}
 
@@ -122,6 +125,21 @@ static bool is_ml_valid_af_reg(struct rvu *rvu, struct ml_rd_wr_reg_msg *req)
 	switch (offset) {
 	case ML_AF_LFX_MLR_BASE(0) ... ML_AF_LFX_MLR_BASE(ML_RVU_LF_COUNT - 1):
 	case ML_AF_LFX_MLR_SIZE(0) ... ML_AF_LFX_MLR_SIZE(ML_RVU_LF_COUNT - 1):
+		return true;
+	}
+
+	dev_err(rvu->dev,
+		 "Func 0x%x: Invalid ML AF reg access offset 0x%llx\n",
+		 req->hdr.pcifunc, offset);
+	return false;
+}
+
+static bool is_reg_32b(u64 offset)
+{
+	switch (offset) {
+	case ML_SW_RST_CTRL:
+	case ML_A35_0_RST_VECTOR_BASE_W(0) ... ML_A35_0_RST_VECTOR_BASE_W(1):
+	case ML_A35_1_RST_VECTOR_BASE_W(0) ... ML_A35_1_RST_VECTOR_BASE_W(1):
 		return true;
 	}
 
@@ -176,10 +194,19 @@ int rvu_mbox_handler_ml_rd_wr_register(struct rvu *rvu,
 	rsp->ret_val = req->ret_val;
 	rsp->is_write = req->is_write;
 
-	if (req->is_write)
-		rvu_write64(rvu, BLKADDR_ML, req->reg_offset, req->val);
-	else
-		rsp->val = rvu_read64(rvu, BLKADDR_ML, req->reg_offset);
+	if (is_reg_32b(req->reg_offset)) {
+		if (req->is_write)
+			rvu_write32(rvu, BLKADDR_ML, req->reg_offset,
+				    (u32)req->val);
+		else
+			rsp->val = (u32)rvu_read32(rvu, BLKADDR_ML,
+						   req->reg_offset);
+	} else {
+		if (req->is_write)
+			rvu_write64(rvu, BLKADDR_ML, req->reg_offset, req->val);
+		else
+			rsp->val = rvu_read64(rvu, BLKADDR_ML, req->reg_offset);
+	}
 
 	return 0;
 }
