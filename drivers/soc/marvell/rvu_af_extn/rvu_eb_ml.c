@@ -22,6 +22,17 @@ struct ml_drvdata {
 	int res_idx;
 };
 
+static inline void rvu_ml_write32(struct rvu *rvu, u64 block, u64 offset,
+				  u32 val)
+{
+	writel(val, rvu->afreg_base + ((block << 28) | offset));
+}
+
+static inline u32 rvu_ml_read32(struct rvu *rvu, u64 block, u64 offset)
+{
+	return readl(rvu->afreg_base + ((block << 28) | offset));
+}
+
 static void rvu_ml_unregister_interrupts_block(struct rvu_block *block,
 					       void *data);
 
@@ -196,11 +207,11 @@ int rvu_mbox_handler_ml_rd_wr_register(struct rvu *rvu,
 
 	if (is_reg_32b(req->reg_offset)) {
 		if (req->is_write)
-			rvu_write32(rvu, BLKADDR_ML, req->reg_offset,
-				    (u32)req->val);
+			rvu_ml_write32(rvu, BLKADDR_ML, req->reg_offset,
+				       (u32)req->val);
 		else
-			rsp->val = (u32)rvu_read32(rvu, BLKADDR_ML,
-						   req->reg_offset);
+			rsp->val = (u32)rvu_ml_read32(rvu, BLKADDR_ML,
+						      req->reg_offset);
 	} else {
 		if (req->is_write)
 			rvu_write64(rvu, BLKADDR_ML, req->reg_offset, req->val);
