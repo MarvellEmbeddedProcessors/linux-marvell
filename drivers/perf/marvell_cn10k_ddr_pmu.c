@@ -1220,7 +1220,7 @@ static const struct ddr_pmu_platform_data cn20k_ddr_pmu_pdata = {
 	.cnt_freerun_clr = ODY_DDRC_PERF_CNT_FREERUN_CLR,
 	.cnt_value_wr_op = ODY_DDRC_PERF_CNT_VALUE_WR_OP,
 	.cnt_value_rd_op = ODY_DDRC_PERF_CNT_VALUE_RD_OP,
-	.cust_mbwc = FALSE,
+	.cust_mbwc = TRUE,
 	.silicon_flags = IS_CN20K,
 };
 #endif
@@ -1253,6 +1253,19 @@ static const struct ddr_pmu_platform_data odyssey_ddr_pmu_pdata = {
 };
 #endif
 
+static int cn20k_ddr_get_speed(struct device *dev)
+{
+	int ret;
+
+	ret = device_property_read_u32(dev, "marvell,lpddr-speed", &ddr_speed);
+	if (ret) {
+		pr_err("marvell,lpddr-speed property not found\n");
+		ddr_speed = 7200;
+		return ret;
+	}
+
+	return 0;
+}
 
 static int cn10k_ddr_get_speed(struct device *dev)
 {
@@ -1364,6 +1377,16 @@ static int cn10k_ddr_perf_probe(struct platform_device *pdev)
 			.stop        = cn10k_ddr_perf_event_stop,
 			.read        = cn10k_ddr_perf_event_update,
 		};
+
+		ddr_pmu->mbw_base = ioremap(res->start + MBW_BASE,
+					    resource_size(res));
+
+		if (!is_probed_once) {
+			if (cn20k_ddr_get_speed(dev))
+				pr_err("Couldn't fetch speed for %s\n",
+				       pdev->name);
+			is_probed_once = true;
+		}
 	}
 	/* Choose this cpu to collect perf data */
 	ddr_pmu->cpu = raw_smp_processor_id();
