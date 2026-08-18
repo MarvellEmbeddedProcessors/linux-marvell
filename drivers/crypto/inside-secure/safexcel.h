@@ -817,6 +817,7 @@ enum safexcel_flags {
 	EIP197_ICE		= BIT(3),
 	EIP197_SIMPLE_TRC	= BIT(4),
 	EIP197_OCE		= BIT(5),
+	SAFEXCEL_ALGS_NOT_REGISTERED  = BIT(6),
 };
 
 struct safexcel_hwconfig {

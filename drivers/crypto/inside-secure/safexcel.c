@@ -1311,9 +1311,24 @@ static struct safexcel_alg_template *safexcel_algs[] = {
 	&safexcel_alg_rfc4309_ccm,
 };
 
-static int safexcel_register_algorithms(struct safexcel_crypto_priv *priv)
+static int safexcel_register_algorithms_once(struct safexcel_crypto_priv *priv)
 {
+	static bool registered;
 	int i, j, ret = 0;
+
+	/*
+	 * Kernel crypto API doesn't allow to register multiple engines.
+	 * Allowing working with multiple engines requires additional modification
+	 * which are planned as future work (Modify the Kernel crypto API or
+	 * implement load balance in EIP driver to handle multiple engines).
+	 *
+	 * Currently we want to register the first probed engine.
+	 */
+	if (registered || !priv->config.rings) {
+		priv->flags |= SAFEXCEL_ALGS_NOT_REGISTERED;
+		dev_dbg(priv->dev, "skip algorithm registration\n");
+		return 0;
+	}
 
 	for (i = 0; i < ARRAY_SIZE(safexcel_algs); i++) {
 		safexcel_algs[i]->priv = priv;
@@ -1334,6 +1349,8 @@ static int safexcel_register_algorithms(struct safexcel_crypto_priv *priv)
 		if (ret)
 			goto fail;
 	}
+
+	registered = true;
 
 	return 0;
 
@@ -1359,6 +1376,9 @@ fail:
 static void safexcel_unregister_algorithms(struct safexcel_crypto_priv *priv)
 {
 	int i;
+
+	if (priv->flags & SAFEXCEL_ALGS_NOT_REGISTERED)
+		return;
 
 	for (i = 0; i < ARRAY_SIZE(safexcel_algs); i++) {
 		/* Do we have all required base algorithms available? */
@@ -1781,7 +1801,7 @@ static int safexcel_probe_generic(void *pdev,
 		goto err_cleanup_rings;
 	}
 
-	ret = safexcel_register_algorithms(priv);
+	ret = safexcel_register_algorithms_once(priv);
 	if (ret) {
 		dev_err(dev, "Failed to register algorithms (%d)\n", ret);
 		goto err_cleanup_rings;
