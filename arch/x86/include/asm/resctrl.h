@@ -4,6 +4,7 @@
 
 #ifdef CONFIG_X86_CPU_RESCTRL
 
+#include <linux/iommu.h>
 #include <linux/jump_label.h>
 #include <linux/percpu.h>
 #include <linux/resctrl_types.h>
@@ -190,6 +191,23 @@ static inline void resctrl_arch_mon_ctx_free(struct rdt_resource *r,
 					     void *ctx) { }
 
 void resctrl_cpu_detect(struct cpuinfo_x86 *c);
+
+/* Not supported: */
+static inline int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group,
+						     u32 closid, u32 rmid)
+{
+	return -EOPNOTSUPP;
+}
+static inline bool resctrl_arch_match_iommu_closid(struct iommu_group *group,
+						   u32 closid)
+{
+	return false;
+}
+static inline bool resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group,
+							u32 closid, u32 rmid)
+{
+	return false;
+}
 
 #else
 
