@@ -3579,6 +3579,94 @@ static int arm_smmu_dev_disable_feature(struct device *dev,
 	}
 }
 
+static int arm_smmu_group_set_mpam(struct iommu_group *group, u16 partid,
+				   u8 pmg)
+{
+	int i;
+	u32 sid;
+	struct arm_smmu_ste *step;
+	unsigned long flags;
+	struct iommu_domain *domain;
+	struct arm_smmu_device *smmu;
+	struct arm_smmu_master *master;
+	struct arm_smmu_master_domain *master_domain;
+	struct arm_smmu_cmdq_batch cmds;
+	struct arm_smmu_domain *smmu_domain;
+	struct arm_smmu_cmdq_ent cmd = {
+		.opcode	= CMDQ_OP_CFGI_STE,
+		.cfgi	= {
+			.leaf	= true,
+		},
+	};
+
+	domain = iommu_get_domain_for_group(group);
+	smmu_domain = to_smmu_domain(domain);
+	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_MPAM))
+		return -EIO;
+	smmu = smmu_domain->smmu;
+
+	arm_smmu_cmdq_batch_init(smmu, &cmds, &cmd);
+
+	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
+	list_for_each_entry(master_domain, &smmu_domain->devices, devices_elm) {
+		master = master_domain->master;
+		for (i = 0; i < master->num_streams; i++) {
+			sid = master->streams[i].id;
+			step = arm_smmu_get_step_for_sid(smmu, sid);
+
+			/* These need locking if the VMSPtr is ever used */
+			step->data[4] = FIELD_PREP(STRTAB_STE_4_PARTID, partid);
+			step->data[5] = FIELD_PREP(STRTAB_STE_5_PMG, pmg);
+
+			cmd.cfgi.sid = sid;
+			arm_smmu_cmdq_batch_add(smmu, &cmds, &cmd);
+		}
+
+		master->partid = partid;
+		master->pmg = pmg;
+	}
+	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
+
+	arm_smmu_cmdq_batch_submit(smmu, &cmds);
+
+	return 0;
+}
+
+static int arm_smmu_group_get_mpam(struct iommu_group *group, u16 *partid,
+				   u8 *pmg)
+{
+	int err = -EINVAL;
+	unsigned long flags;
+	struct iommu_domain *domain;
+	struct arm_smmu_master *master;
+	struct arm_smmu_master_domain *master_domain;
+	struct arm_smmu_domain *smmu_domain;
+
+	domain = iommu_get_domain_for_group(group);
+	smmu_domain = to_smmu_domain(domain);
+	if (!(smmu_domain->smmu->features & ARM_SMMU_FEAT_MPAM))
+		return -EIO;
+
+	if (!partid && !pmg)
+		return 0;
+
+	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
+	master_domain = list_first_entry_or_null(&smmu_domain->devices,
+						 typeof(*master_domain),
+						 devices_elm);
+	if (master_domain) {
+		master = master_domain->master;
+		if (partid)
+			*partid = master->partid;
+		if (pmg)
+			*pmg = master->pmg;
+		err = 0;
+	}
+	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
+
+	return err;
+}
+
 /*
  * HiSilicon PCIe tune and trace device can be used to trace TLP headers on the
  * PCIe link and save the data to memory by DMA. The hardware is restricted to
@@ -3616,6 +3704,8 @@ static struct iommu_ops arm_smmu_ops = {
 	.dev_disable_feat	= arm_smmu_dev_disable_feature,
 	.page_response		= arm_smmu_page_response,
 	.def_domain_type	= arm_smmu_def_domain_type,
+	.get_group_qos_params	= arm_smmu_group_get_mpam,
+	.set_group_qos_params	= arm_smmu_group_set_mpam,
 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
 	.owner			= THIS_MODULE,
 	.default_domain_ops = &(const struct iommu_domain_ops) {
