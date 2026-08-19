@@ -86,6 +86,13 @@ struct rdt_resource;
 void *resctrl_arch_mon_ctx_alloc(struct rdt_resource *r, enum resctrl_event_id evtid);
 void resctrl_arch_mon_ctx_free(struct rdt_resource *r, enum resctrl_event_id evtid, void *ctx);
 
+struct iommu_group;
+int resctrl_arch_set_iommu_closid_rmid(struct iommu_group *group, u32 closid,
+				       u32 rmid);
+bool resctrl_arch_match_iommu_closid(struct iommu_group *group, u32 closid);
+bool resctrl_arch_match_iommu_closid_rmid(struct iommu_group *group, u32 closid,
+					  u32 rmid);
+
 /*
  * The CPU configuration for MPAM is cheap to write, and is only written if it
  * has changed. No need for fine grained enables.
