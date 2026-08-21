@@ -324,6 +324,8 @@ M(CPT_RX_INLINE_LF_CFG, 0xBFE, cpt_rx_inline_lf_cfg, cpt_rx_inline_lf_cfg_msg, \
 /* SDP mbox IDs (range 0x1000 - 0x11FF) */				\
 M(SET_SDP_CHAN_INFO, 0x1000, set_sdp_chan_info, sdp_chan_info_msg, msg_rsp) \
 M(GET_SDP_CHAN_INFO, 0x1001, get_sdp_chan_info, msg_req, sdp_get_chan_info_msg) \
+M(SDP_VF_LINK_STATE_NOTIFY, 0x1007, sdp_vf_link_state_notify,		\
+				sdp_vf_link_state_notify_msg, msg_rsp)	\
 /* NPC mbox IDs (range 0x6000 - 0x7FFF) */				\
 M(NPC_MCAM_ALLOC_ENTRY,	0x6000, npc_mcam_alloc_entry, npc_mcam_alloc_entry_req,\
 				npc_mcam_alloc_entry_rsp)		\
@@ -3194,6 +3196,11 @@ struct sdp_get_chan_info_msg {
 	struct mbox_msghdr hdr;
 	u16 chan_base;
 	u16 num_chan;
+};
+
+struct sdp_vf_link_state_notify_msg {
+	struct mbox_msghdr hdr;
+	u8  up;          /* 1 = ndo_open, 0 = ndo_stop */
 };
 
 /* CGX mailbox error codes

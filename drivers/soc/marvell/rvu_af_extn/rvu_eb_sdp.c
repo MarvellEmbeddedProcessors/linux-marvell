@@ -68,6 +68,63 @@ static u16 get_sdp_epf(u16 epcifunc)
 	return (epcifunc >> EPF_PF_SHIFT) & EPF_PF_MASK;
 }
 
+static struct sdp_vf_link_state_req *
+sdp_alloc_epf_up_vf_link_state(struct rvu *rvu, int epf_id)
+{
+	struct sdp_vf_link_state_req *req;
+
+	req = (struct sdp_vf_link_state_req *)otx2_mbox_alloc_msg_rsp(
+		&sdp_data.afepf_wq_info.mbox_up, epf_id,
+		sizeof(struct sdp_vf_link_state_req), sizeof(struct msg_rsp));
+	if (!req)
+		return NULL;
+	req->hdr.sig = OTX2_MBOX_REQ_SIG;
+	req->hdr.id = MBOX_MSG_SDP_VF_LINK_STATE;
+	trace_otx2_msg_alloc(rvu->pdev, MBOX_MSG_SDP_VF_LINK_STATE,
+			     sizeof(*req), 0);
+	return req;
+}
+
+static int cn20k_sdp_notify_epf_vf_link_state(struct rvu *rvu, u16 epcifunc,
+					      bool up)
+{
+	struct otx2_mbox *mbox = &sdp_data.afepf_wq_info.mbox_up;
+	struct sdp_vf_link_state_req *req;
+	u16 epf_id = get_sdp_epf(epcifunc);
+	u16 vf_idx;
+
+	if (epf_id >= SDP_MAX_EPF) {
+		dev_err(rvu->dev,
+			"SDP AFEPF_UP: epf_id %u out of range (max %u)\n",
+			epf_id, SDP_MAX_EPF);
+		return -EINVAL;
+	}
+
+	if (!mbox->dev) {
+		dev_warn(rvu->dev,
+			 "SDP AFEPF_UP: mailbox not initialized (no host EPF attached?), dropping notify for epf_id=%u\n",
+			 epf_id);
+		return -ENODEV;
+	}
+
+	/* Caller already holds rvu->mbox_lock; do not re-acquire */
+	req = sdp_alloc_epf_up_vf_link_state(rvu, epf_id);
+	if (!req) {
+		dev_err(rvu->dev,
+			"SDP AFEPF_UP: alloc failed for epf_id=%u\n", epf_id);
+		return -ENOMEM;
+	}
+	vf_idx = get_sdp_evf(epcifunc);
+	req->hdr.pcifunc = epcifunc;
+	req->vf_idx = vf_idx;
+	req->up = up ? 1 : 0;
+
+	otx2_mbox_wait_for_zero(mbox, epf_id);
+	otx2_mbox_msg_send_up(mbox, epf_id);
+
+	return 0;
+}
+
 /* Given a host pcifunc returns corresponding RVU pcifunc of VF handling IO */
 static u16 cn20k_get_rvu_pcifunc(struct rvu *rvu, u16 epcifunc)
 {
@@ -724,6 +781,41 @@ int rvu_mbox_handler_stop_up_msgs(struct rvu *rvu,
 	bitmap_clear(sdp->ready_pfs, pf, 1);
 
 	return 0;
+}
+
+int rvu_mbox_handler_sdp_vf_link_state_notify(struct rvu *rvu,
+					      struct sdp_vf_link_state_notify_msg *req,
+					      struct msg_rsp *rsp)
+{
+	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+	u16 rvu_pf, func, epcifunc;
+	int host_pf;
+
+	rvu_pf = (req->hdr.pcifunc >> EPF_PF_SHIFT) & EPF_PF_MASK;
+	func = req->hdr.pcifunc & RVU_PFVF_FUNC_MASK;
+
+	/* Reverse cn20k_get_rvu_pcifunc(): RVU VF func = host func + 1 */
+	if (!func) {
+		dev_err(rvu->dev,
+			"SDP AFEPF_UP: unexpected PF pcifunc=0x%04x\n",
+			req->hdr.pcifunc);
+		return -EINVAL;
+	}
+	func -= 1;
+
+	for (host_pf = 0; host_pf < SDP_MAX_EPF; host_pf++)
+		if (sdp->host2rvupf[host_pf] == rvu_pf)
+			break;
+	if (host_pf == SDP_MAX_EPF) {
+		dev_err(rvu->dev,
+			"SDP AFEPF_UP: no host_pf mapping for rvu_pf=%u\n",
+			rvu_pf);
+		return -EINVAL;
+	}
+
+	epcifunc = (host_pf << EPF_PF_SHIFT) | func;
+
+	return cn20k_sdp_notify_epf_vf_link_state(rvu, epcifunc, req->up);
 }
 
 /* SDP Mbox handler */

@@ -61,6 +61,7 @@ enum {
 MBOX_EBLOCK_SDP_MESSAGES
 MBOX_EBLOCK_UP_SDP_MESSAGES
 #undef M
+	MBOX_MSG_SDP_VF_LINK_STATE = 0xE43,
 };
 
 /* SDP mailbox error codes
@@ -137,6 +138,13 @@ struct sdp_free_vfs_req {
 	struct mbox_msghdr hdr;
 	unsigned long vf_bmap1;
 	unsigned long vf_bmap2;
+};
+
+struct sdp_vf_link_state_req {
+	struct mbox_msghdr hdr;
+	u16 vf_idx;   /* 0 = EPF itself, n = VF (n - 1) under it */
+	u8  up;       /* 1 = UP, 0 = DOWN */
+	u8  reserved;
 };
 
 #define M(_name, _id, fn_name, req, rsp)\
