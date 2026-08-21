@@ -521,6 +521,24 @@ exit:
 	return err;
 }
 
+static void otx2_sdpvf_notify_link_state(struct otx2_nic *vf, u8 up)
+{
+	struct sdp_vf_link_state_notify_msg *msg;
+
+	mutex_lock(&vf->mbox.lock);
+	msg = otx2_mbox_alloc_msg_sdp_vf_link_state_notify(&vf->mbox);
+	if (!msg) {
+		mutex_unlock(&vf->mbox.lock);
+		return;
+	}
+	msg->up = up;
+	/* Fire-and-forget: AF acks with msg_rsp, VF discards */
+	otx2_mbox_msg_send(&vf->mbox.mbox, 0);
+	/* Ensure AF has consumed the doorbell before the next mbox round */
+	otx2_mbox_wait_for_zero(&vf->mbox.mbox, 0);
+	mutex_unlock(&vf->mbox.lock);
+}
+
 static int otx2vf_open(struct net_device *netdev)
 {
 	struct otx2_nic *vf;
@@ -539,11 +557,24 @@ static int otx2vf_open(struct net_device *netdev)
 		netif_tx_start_all_queues(netdev);
 	}
 
+	if (is_otx2_sdpvf(vf->pdev) && is_cn20k(vf->pdev)) {
+		/* Notify AF: this SDP VF is UP */
+		otx2_sdpvf_notify_link_state(vf, 1);
+	}
+
 	return 0;
 }
 
 static int otx2vf_stop(struct net_device *netdev)
 {
+	struct otx2_nic *vf = netdev_priv(netdev);
+
+	/* Must be before otx2_stop() so mbox path is still valid */
+	if (is_otx2_sdpvf(vf->pdev) && is_cn20k(vf->pdev)) {
+		/* Notify AF: this SDP VF is DOWN */
+		otx2_sdpvf_notify_link_state(vf, 0);
+	}
+
 	return otx2_stop(netdev);
 }
 
