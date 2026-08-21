@@ -340,10 +340,13 @@ void nix_free_rx_inl_queues(struct rvu *rvu, u16 pcifunc)
 			    0x0);
 		val = rvu_read64(rvu, BLKADDR_NIX0,
 				 NIX_AF_CN20K_RX_CPTX_CREDIT(queue_idx));
+		/* Mask to the additive INST_CRED_CNT field so the credit-return
+		 * write does not corrupt BPID/INST_CREDIT_TH/HYSTERESIS.
+		 */
 		if ((val & 0x3FFFFF) != 0x3FFFFF)
 			rvu_write64(rvu, BLKADDR_NIX0,
 				    NIX_AF_CN20K_RX_CPTX_CREDIT(queue_idx),
-				    0x3FFFFF - val);
+				    0x3FFFFF - (val & 0x3FFFFF));
 	}
 }
 
@@ -360,10 +363,13 @@ static int nix_rx_inline_queue_cfg(struct rvu *rvu,
 			    0x0);
 		val = rvu_read64(rvu, blkaddr,
 				 NIX_AF_CN20K_RX_CPTX_CREDIT(qsel));
+		/* Mask to the additive INST_CRED_CNT field so the credit-return
+		 * write does not corrupt BPID/INST_CREDIT_TH/HYSTERESIS.
+		 */
 		if ((val & 0x3FFFFF) != 0x3FFFFF)
 			rvu_write64(rvu, blkaddr,
 				    NIX_AF_CN20K_RX_CPTX_CREDIT(qsel),
-				    0x3FFFFF - val);
+				    0x3FFFFF - (val & 0x3FFFFF));
 		return 0;
 	}
 
@@ -372,11 +378,13 @@ static int nix_rx_inline_queue_cfg(struct rvu *rvu,
 	val |= FIELD_PREP(CPT_INST_QSEL_PF_FUNC, req->cpt_pf_func);
 	val |= FIELD_PREP(CPT_INST_QSEL_BLOCK, BLKADDR_CPT0);
 	rvu_write64(rvu, blkaddr, NIX_AF_CN20K_RX_CPTX_INST_QSEL(qsel), val);
-	/* Set CPT credit */
+	/* Set CPT credit. Mask to the additive INST_CRED_CNT field so the
+	 * credit-return write does not corrupt BPID/INST_CREDIT_TH/HYSTERESIS.
+	 */
 	val = rvu_read64(rvu, blkaddr, NIX_AF_CN20K_RX_CPTX_CREDIT(qsel));
 	if ((val & 0x3FFFFF) != 0x3FFFFF)
-		rvu_write64(rvu, blkaddr,
-			    NIX_AF_CN20K_RX_CPTX_CREDIT(qsel), 0x3FFFFF - val);
+		rvu_write64(rvu, blkaddr, NIX_AF_CN20K_RX_CPTX_CREDIT(qsel),
+			    0x3FFFFF - (val & 0x3FFFFF));
 
 	val = FIELD_PREP(CPT_INST_CREDIT_CNT, req->cpt_credit);
 	val |= FIELD_PREP(NIX_AF_CN20K_CPT_INST_CREDIT_BPID, req->bpid);
