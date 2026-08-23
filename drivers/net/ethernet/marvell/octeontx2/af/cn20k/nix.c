@@ -19,6 +19,7 @@ int rvu_mbox_handler_nix_cn20k_aq_enq(struct rvu *rvu,
 	return rvu_nix_aq_enq_inst(rvu, (struct nix_aq_enq_req *)req,
 				  (struct nix_aq_enq_rsp *)rsp);
 }
+EXPORT_SYMBOL(rvu_mbox_handler_nix_cn20k_aq_enq);
 
 void rvu_nix_block_cn20k_init(struct rvu *rvu, struct nix_hw *nix_hw)
 {

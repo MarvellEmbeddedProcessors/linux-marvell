@@ -17,6 +17,7 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/overflow.h>
+#include <linux/log2.h>
 #include <linux/uaccess.h>
 #include <linux/pci.h>
 #include <linux/stddef.h>
@@ -170,11 +171,84 @@ static const struct hw_csr_lookup_tbl lkp_tbl_cn10k[] = {
 	{ 0x87E380000000, 0x800000, 65, 24, 1, 0, 0x7FFFFF },
 };
 
-/* Selected at module init based on SoC family */
-static const struct hw_csr_lookup_tbl *csr_tbl;
-static unsigned int csr_tbl_len;
-static unsigned int csr_tbl_max_alpha;
-static unsigned int csr_tbl_max_beta;
+/*
+ * CN20K relocated the RVU PCIe apertures. Verified on silicon from the
+ * kernel PCI BAR assignments:
+ *
+ *   AF BAR0 : 0x600400000000-0x6007ffffffff (16 GB)  <- was 0x840000000000
+ *   AF BAR2 : 0x600200000000-0x600203ffffff (64 MB)  <- was 0x840200000000
+ *
+ * CN9K/CN10K gave every RVU_PF a fixed 64 GB BAR0 window and kept BAR2 in
+ * one contiguous pf<<36|func<<25 aperture. On CN20K only the AF exposes a
+ * BAR0 (hosting every block's AF register bank via the block_addr<<28 slot
+ * layout) and each PF/VF BAR2 is a standalone 64 MB window placed by PCIe
+ * enumeration. The block-slot layout inside BAR0 is unchanged, so AF and
+ * RVU_PRIV_* access (device discovery, NIX_AF/NPA_AF/NPC_AF) only needs the
+ * new base; the per-PF/VF BAR2 windows are discovered at runtime by
+ * build_cn20k_csr_tbl().
+ *
+ * The non-RVU rows below are inherited from CN10K: the RSL/NCB blocks (RST,
+ * MCS, RPM, IOBN, NCB, DSS, TAD, OCLA, DTX) sit at architecturally fixed
+ * 0x87E0_xxxx_xxxx addresses that are stable across generations.
+ */
+static const struct hw_csr_lookup_tbl lkp_tbl_cn20k[] = {
+	/* RVU AF BAR0 : map the low 8 GB of the 16 GB block_addr<<28 window */
+	{ 0x600400000000, 0x200000000, 1, 0, 1, 0, 0x1FFFFFFFF },
+	/*
+	 * RVU per-PF/VF BAR2 : 64 MB placeholder (index 1), skipped and
+	 * replaced at first open() by build_cn20k_csr_tbl() with the real
+	 * PCIe-assigned windows. The 64 MB window (mask 0x3FFFFFF) holds the
+	 * LF block_addr[24:20]|slot[19:12]|reg[11:0] decode plus the MSI-X
+	 * table and mailbox alias.
+	 */
+	{ 0x600800000000, 0x4000000, 32, 26, 1, 0, 0x3FFFFFF },
+	/* DPI(0)_PF_BAR0 : inherited CN10K standalone DPI aperture */
+	{ 0x86E000000000, 0x100000000, 1, 36, 1, 0, 0xFFFFFFFF },
+	/* DPI(0)_VF(0..31)_BAR0 */
+	{ 0x86E200000000, 0x100000, 1, 36, 32, 20, 0xFFFFF },
+	/* RST_PF_BAR0 : RSL bus, fixed address */
+	{ 0x87E006000000, 0x10000, 1, 0, 1, 0, 0xFFFF },
+	/* TAD_CMN_PF_BAR0 */
+	{ 0x87E053000000, 0x10000, 1, 0, 1, 0, 0xFFFF },
+	/* MCS(0..7)_PF_BAR0 */
+	{ 0x87E080000000, 0x800000, 8, 24, 1, 0, 0x7FFFFF },
+	/* RPM(0..2)_PF_BAR0 */
+	{ 0x87E0E0000000, 0x800000, 3, 24, 1, 0, 0x7FFFFF },
+	/* IOBN(0..2)_PF_BAR0 */
+	{ 0x87E120000000, 0x100000, 3, 24, 1, 0, 0xFFFFF },
+	/* NCB(0..4)_PF_BAR0 */
+	{ 0x87E140000000, 0x100000, 5, 24, 1, 0, 0xFFFFF },
+	/* DSS(0..5)_PF_BAR0 */
+	{ 0x87E1C0000000, 0x400000, 6, 24, 1, 0, 0x3FFFFF },
+	/* TAD(0..47)_PF_BAR0 */
+	{ 0x87E280000000, 0x800000, 48, 24, 1, 0, 0x7FFFFF },
+	/* DTX RSL window */
+	{ 0x87E0FE000000, 0x1000000, 1, 0, 1, 0, 0xFFFFFF },
+	/* OCLA(0..23,64)_PF_BAR0 */
+	{ 0x87E380000000, 0x800000, 65, 24, 1, 0, 0x7FFFFF },
+};
+
+/*
+ * All CSR lookup-table state, selected once at module init. The struct lives
+ * in .bss (statically allocated); only .dyn (the CN20K rows) is heap-allocated.
+ * CN9K/CN10K point .tbl at the static per-SoC table. CN20K has no fixed BAR2
+ * formula, so .tbl is swapped to .dyn once it is built from the live PCIe BAR2
+ * assignments at first open(); .cn20k_ready gates that build to run only once.
+ * /dev/hw_access is opened once by a single agent, so no locking is needed.
+ */
+struct hw_csr_tbl_state {
+	const struct hw_csr_lookup_tbl *tbl;	/* effective table (static or .dyn) */
+	unsigned int len;
+	unsigned int max_alpha;
+	unsigned int max_beta;
+	struct hw_csr_lookup_tbl *dyn;		/* CN20K heap table, else NULL */
+	bool cn20k_ready;			/* CN20K table built? */
+};
+
+static struct hw_csr_tbl_state csr;
+
+/* Upper bound on RVU PF/VF BAR2 windows discovered via PCI enumeration. */
+#define MAX_RVU_BAR2_WINS	256
 
 #define HW_ACCESS_TYPE			120
 
@@ -195,22 +269,113 @@ static struct class *hw_reg_class;
 static int major_no;
 
 /*
+ * Build the CN20K CSR table: keep the fixed rows from lkp_tbl_cn20k[] (AF BAR0,
+ * DPI, RSL blocks), skip its placeholder RVU BAR2 row (index 1), and append one
+ * window per enumerated Cavium RVU function using its PCIe-assigned BAR2. Each
+ * window is alpha=beta=1 with mask=size-1.
+ */
+static int build_cn20k_csr_tbl(void)
+{
+	struct hw_csr_lookup_tbl *tbl;
+	struct pci_dev *pdev = NULL;
+	unsigned int i, n = 0;
+	size_t cap;
+
+	cap = (ARRAY_SIZE(lkp_tbl_cn20k) - 1) + MAX_RVU_BAR2_WINS;
+	tbl = kcalloc(cap, sizeof(*tbl), GFP_KERNEL);
+	if (!tbl)
+		return -ENOMEM;
+
+	/* Fixed-address rows: keep index 0 (AF BAR0) and 2.. (DPI/RSL). */
+	tbl[n++] = lkp_tbl_cn20k[0];
+	for (i = 2; i < ARRAY_SIZE(lkp_tbl_cn20k); i++)
+		tbl[n++] = lkp_tbl_cn20k[i];
+
+	/* Dynamic rows: one per RVU function BAR2 the OS enumerated. */
+	while ((pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, PCI_ANY_ID, pdev))) {
+		u64 base = pci_resource_start(pdev, 2);
+		u64 size = pci_resource_len(pdev, 2);
+
+		if (!base || !(pci_resource_flags(pdev, 2) & IORESOURCE_MEM))
+			continue;
+		if (!is_power_of_2(size) || (base & (size - 1))) {
+			pr_warn("hw_access: skip %s BAR2 base=0x%llx size=0x%llx\n",
+				pci_name(pdev), base, size);
+			continue;
+		}
+		if (n >= cap) {
+			pr_warn("hw_access: RVU BAR2 table full (%zu); some LFs unmapped\n",
+				cap);
+			pci_dev_put(pdev);
+			break;
+		}
+		tbl[n].base        = base;
+		tbl[n].size        = size;
+		tbl[n].alpha       = 1;
+		tbl[n].alpha_shift = 0;
+		tbl[n].beta        = 1;
+		tbl[n].beta_shift  = 0;
+		tbl[n].mask        = size - 1;
+		n++;
+	}
+
+	/* Refresh max_alpha/beta; the per-open map array is sized from these. */
+	csr.max_alpha = 1;
+	csr.max_beta  = 1;
+	for (i = 0; i < n; i++) {
+		if (tbl[i].alpha > csr.max_alpha)
+			csr.max_alpha = tbl[i].alpha;
+		if (tbl[i].beta > csr.max_beta)
+			csr.max_beta = tbl[i].beta;
+	}
+
+	csr.dyn = tbl;
+	csr.tbl = tbl;
+	csr.len = n;
+	pr_info("hw_access: CN20K table built (%u rows, %u dynamic BAR2)\n",
+		n, n - (unsigned int)(ARRAY_SIZE(lkp_tbl_cn20k) - 1));
+	return 0;
+}
+
+/*
+ * Undo build_cn20k_csr_tbl(): free the dynamic table, re-arm the build and
+ * restore the static rows so the next open()'s csr.tbl guard still holds.
+ * Called on release() and on the open() build-failure path.
+ */
+static void cn20k_tbl_reset(void)
+{
+	kfree(csr.dyn);
+	csr.dyn = NULL;
+	csr.cn20k_ready = false;
+	csr.tbl = lkp_tbl_cn20k;
+	csr.len = ARRAY_SIZE(lkp_tbl_cn20k);
+}
+
+/*
  * Pick the CSR lookup table matching the running SoC family. Invoked once at
- * module init. Populates csr_tbl*, csr_tbl_len and csr_tbl_max_alpha/beta.
+ * module init. Populates csr.tbl, csr.len and csr.max_alpha/max_beta.
  */
 static int select_csr_tbl(void)
 {
 	const struct hw_csr_lookup_tbl *t;
 	unsigned int n, i, ma = 0, mb = 0;
 
-	if (is_soc_cn10kx()) {
+	if (is_soc_cn20kx()) {
+		/*
+		 * Only the fixed rows are known at init; the RVU BAR2 windows
+		 * are read from PCI on first open() (build_cn20k_csr_tbl), so
+		 * boot stays PCI-free.
+		 */
+		t = lkp_tbl_cn20k;
+		n = ARRAY_SIZE(lkp_tbl_cn20k);
+	} else if (is_soc_cn10kx()) {
 		t = lkp_tbl_cn10k;
 		n = ARRAY_SIZE(lkp_tbl_cn10k);
 	} else if (is_soc_cn9x()) {
 		t = lkp_tbl_cn9x;
 		n = ARRAY_SIZE(lkp_tbl_cn9x);
 	} else {
-		pr_err("hw_access: unsupported SoC; driver handles CN9XXX and CN10K only\n");
+		pr_err("hw_access: unsupported SoC; driver handles CN9XXX, CN10K and CN20K only\n");
 		return -ENODEV;
 	}
 
@@ -221,10 +386,10 @@ static int select_csr_tbl(void)
 			mb = t[i].beta;
 	}
 
-	csr_tbl = t;
-	csr_tbl_len = n;
-	csr_tbl_max_alpha = ma;
-	csr_tbl_max_beta = mb;
+	csr.tbl = t;
+	csr.len = n;
+	csr.max_alpha = ma;
+	csr.max_beta = mb;
 	return 0;
 }
 
@@ -313,8 +478,8 @@ setup_csr_mapping(struct hw_priv_data *priv_data, u64 addr,
 	u64 base;
 	int rc;
 
-	for (i = 0; i < csr_tbl_len; i++) {
-		row = &csr_tbl[i];
+	for (i = 0; i < csr.len; i++) {
+		row = &csr.tbl[i];
 		for (j = 0; j < row->alpha; j++) {
 			for (k = 0; k < row->beta; k++) {
 				/* Per-instance base: row->base OR alpha OR beta */
@@ -326,9 +491,9 @@ setup_csr_mapping(struct hw_priv_data *priv_data, u64 addr,
 				if (addr < base || addr >= base + row->size)
 					continue;
 
-				idx = ((i * csr_tbl_max_alpha *
-					csr_tbl_max_beta) +
-				       (j * csr_tbl_max_beta) + k);
+				idx = ((i * csr.max_alpha *
+					csr.max_beta) +
+				       (j * csr.max_beta) + k);
 
 				rc = create_mapping(priv_data, reg_base, idx,
 						    base, row->size);
@@ -369,12 +534,12 @@ release_csr_mapping(struct hw_priv_data *priv_data)
 	if (!priv_data->map)
 		return;
 
-	for (i = 0; i < csr_tbl_len; i++) {
-		for (j = 0; j < csr_tbl[i].alpha; j++) {
-			for (k = 0; k < csr_tbl[i].beta; k++) {
-				idx = ((i * csr_tbl_max_alpha *
-					csr_tbl_max_beta) +
-				       (j * csr_tbl_max_beta) + k);
+	for (i = 0; i < csr.len; i++) {
+		for (j = 0; j < csr.tbl[i].alpha; j++) {
+			for (k = 0; k < csr.tbl[i].beta; k++) {
+				idx = ((i * csr.max_alpha *
+					csr.max_beta) +
+				       (j * csr.max_beta) + k);
 				destroy_mapping(priv_data, idx);
 			}
 		}
@@ -390,8 +555,27 @@ static int hw_access_open(struct inode *inode, struct file *filp)
 	struct hw_priv_data *priv_data;
 	size_t map_entries;
 
-	if (!csr_tbl || !csr_tbl_len)
+	if (!csr.tbl || !csr.len)
 		return -ENODEV;
+
+	/*
+	 * CN20K has no fixed BAR2 formula: build the table from the live PCIe
+	 * BAR2 windows on open(). release() frees it and re-arms the build, so
+	 * a reopen (e.g. SoI restart) re-walks PCI and picks up functions added
+	 * since, such as newly created VFs. Single opener, so the ready flag
+	 * needs no lock.
+	 */
+	if (is_soc_cn20kx() && !csr.cn20k_ready) {
+		int rc = build_cn20k_csr_tbl();
+
+		if (!rc)
+			rc = validate_csr_tbl(csr.tbl, csr.len);
+		if (rc) {
+			cn20k_tbl_reset();
+			return rc;
+		}
+		csr.cn20k_ready = true;
+	}
 
 	priv_data = kzalloc(sizeof(*priv_data), GFP_KERNEL);
 	if (!priv_data)
@@ -402,8 +586,8 @@ static int hw_access_open(struct inode *inode, struct file *filp)
 	 * and k<beta<=max_beta, so the array must be sized accordingly. Use
 	 * kvmalloc_array to tolerate multi-MB allocations on fragmented heaps.
 	 */
-	if (check_mul_overflow((size_t)csr_tbl_len,
-			       (size_t)csr_tbl_max_alpha * csr_tbl_max_beta,
+	if (check_mul_overflow((size_t)csr.len,
+			       (size_t)csr.max_alpha * csr.max_beta,
 			       &map_entries)) {
 		kfree(priv_data);
 		return -EOVERFLOW;
@@ -501,6 +685,32 @@ hw_access_nix_ctx_read(struct rvu *rvu, struct hw_ctx_cfg *ctx_cfg,
 	struct nix_aq_enq_req aq_req;
 	struct nix_aq_enq_rsp rsp;
 
+	/* CN20K has wider RQ/SQ/CQ context layouts; route to the CN20K handler. */
+	if (is_cn20k(rvu->pdev)) {
+		struct nix_cn20k_aq_enq_req cn20k_req;
+		struct nix_cn20k_aq_enq_rsp cn20k_rsp;
+
+		memset(&cn20k_req, 0, sizeof(cn20k_req));
+		cn20k_req.hdr.pcifunc = ctx_cfg->pcifunc;
+		cn20k_req.ctype = ctx_cfg->ctype;
+		cn20k_req.op = ctx_cfg->op;
+		cn20k_req.qidx = ctx_cfg->qidx;
+
+		if (rvu_mbox_handler_nix_cn20k_aq_enq(rvu, &cn20k_req,
+						      &cn20k_rsp)) {
+			pr_err("Failed to read the context\n");
+			return -EINVAL;
+		}
+
+		if (copy_to_user((void __user *)arg, &cn20k_rsp,
+				 sizeof(cn20k_rsp))) {
+			pr_err("Fault in copy to user\n");
+			return -EFAULT;
+		}
+
+		return 0;
+	}
+
 	memset(&aq_req, 0, sizeof(struct nix_aq_enq_req));
 	aq_req.hdr.pcifunc = ctx_cfg->pcifunc;
 	aq_req.ctype = ctx_cfg->ctype;
@@ -527,6 +737,32 @@ hw_access_npa_ctx_read(struct rvu *rvu, struct hw_ctx_cfg *ctx_cfg,
 {
 	struct npa_aq_enq_req aq_req;
 	struct npa_aq_enq_rsp rsp;
+
+	/* CN20K has wider Aura/Pool context layouts; route to the CN20K handler. */
+	if (is_cn20k(rvu->pdev)) {
+		struct npa_cn20k_aq_enq_req cn20k_req;
+		struct npa_cn20k_aq_enq_rsp cn20k_rsp;
+
+		memset(&cn20k_req, 0, sizeof(cn20k_req));
+		cn20k_req.hdr.pcifunc = ctx_cfg->pcifunc;
+		cn20k_req.ctype = ctx_cfg->ctype;
+		cn20k_req.op = ctx_cfg->op;
+		cn20k_req.aura_id = ctx_cfg->aura;
+
+		if (rvu_mbox_handler_npa_cn20k_aq_enq(rvu, &cn20k_req,
+						      &cn20k_rsp)) {
+			pr_err("Failed to read the npa context\n");
+			return -EINVAL;
+		}
+
+		if (copy_to_user((void __user *)arg, &cn20k_rsp,
+				 sizeof(cn20k_rsp))) {
+			pr_err("Fault in copy to user\n");
+			return -EFAULT;
+		}
+
+		return 0;
+	}
 
 	memset(&aq_req, 0, sizeof(struct npa_aq_enq_req));
 	aq_req.hdr.pcifunc = ctx_cfg->pcifunc;
@@ -589,8 +825,15 @@ hw_access_cgx_info(struct rvu *rvu, unsigned long arg)
 
 	pf = cgx_info.pf;
 	if (!(pf >= PF_CGXMAP_BASE && pf <= rvu->cgx_mapped_pfs)) {
-		pr_err("Invalid PF value %d\n", pf);
-		return -EFAULT;
+		/* Not a CGX/RPM-mapped PF (e.g. LBK, SDP or other internal NIX
+		 * PFs). User space probes every NIX PF for RPM info and skips
+		 * the ones that return an error, so this is an expected result
+		 * that must not spam dmesg on every periodic poll. Keep it at
+		 * debug level and return -ENODEV (no such device) rather than
+		 * -EFAULT (bad address), which is the accurate errno here.
+		 */
+		pr_debug("PF %d is not CGX/RPM-mapped\n", pf);
+		return -ENODEV;
 	}
 
 	pfvf = &rvu->pf[pf];
@@ -692,6 +935,14 @@ static int hw_access_release(struct inode *inode, struct file *filp)
 	kvfree(priv_data->map);
 	kfree(priv_data);
 
+	/*
+	 * CN20K: drop this session's built table and re-arm the build so the
+	 * next open() re-walks PCI. Must follow release_csr_mapping(), which
+	 * walks csr.tbl to iounmap. Single opener, so nothing else uses csr.dyn.
+	 */
+	if (is_soc_cn20kx())
+		cn20k_tbl_reset();
+
 	return 0;
 }
 
@@ -774,9 +1025,12 @@ static int __init hw_access_module_init(void)
 	if (rc)
 		return rc;
 
-	rc = validate_csr_tbl(csr_tbl, csr_tbl_len);
-	if (rc)
+	rc = validate_csr_tbl(csr.tbl, csr.len);
+	if (rc) {
+		kfree(csr.dyn);
+		csr.dyn = NULL;
 		return rc;
+	}
 
 	major_no = register_chrdev(0, DEVICE_NAME, &mmap_fops);
 	if (major_no < 0) {
@@ -818,6 +1072,8 @@ static void __exit hw_access_module_exit(void)
 	class_destroy(hw_reg_class);
 	unregister_chrdev(major_no, DEVICE_NAME);
 	debugfs_remove_recursive(dirret);
+	kfree(csr.dyn);
+	csr.dyn = NULL;
 }
 
 module_init(hw_access_module_init);
