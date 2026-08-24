@@ -631,6 +631,37 @@ static void rvu_block_reset(struct rvu *rvu, int blkaddr, u64 rst_reg)
 	}
 }
 
+static void rvu_do_sdp_reset(struct rvu *rvu)
+{
+	bool preserve_scratch = is_cn20k(rvu->pdev);
+	u64 scratch[SDP_MAX_EPF];
+	u64 mac_pf_ena[SDP_MAX_MAC];
+	int i;
+
+	if (preserve_scratch) {
+		for (i = 0; i < SDP_MAX_EPF; i++)
+			scratch[i] = rvu_read64(rvu, BLKADDR_SDP,
+						SDP_AF_EPFX_SCRATCH(i));
+		/* PF enable bitmask is programmed by firmware (ATF) and must
+		 * survive the SDP block reset.
+		 */
+		for (i = 0; i < SDP_MAX_MAC; i++)
+			mac_pf_ena[i] = rvu_read64(rvu, BLKADDR_SDP,
+						   SDP_AF_MACX_PF_ENA(i));
+	}
+
+	rvu_block_reset(rvu, BLKADDR_SDP, SDP_AF_BLK_RST);
+
+	if (preserve_scratch) {
+		for (i = 0; i < SDP_MAX_EPF; i++)
+			rvu_write64(rvu, BLKADDR_SDP,
+				    SDP_AF_EPFX_SCRATCH(i), scratch[i]);
+		for (i = 0; i < SDP_MAX_MAC; i++)
+			rvu_write64(rvu, BLKADDR_SDP,
+				    SDP_AF_MACX_PF_ENA(i), mac_pf_ena[i]);
+	}
+}
+
 static void rvu_reset_all_blocks(struct rvu *rvu)
 {
 	/* Do a HW reset of all RVU blocks */
@@ -649,7 +680,7 @@ static void rvu_reset_all_blocks(struct rvu *rvu)
 	rvu_block_reset(rvu, BLKADDR_NDC_NPA0, NDC_AF_BLK_RST);
 	rvu_block_reset(rvu, BLKADDR_REE0, REE_AF_BLK_RST);
 	rvu_block_reset(rvu, BLKADDR_REE1, REE_AF_BLK_RST);
-	rvu_block_reset(rvu, BLKADDR_SDP, SDP_AF_BLK_RST);
+	rvu_do_sdp_reset(rvu);
 	rvu_block_reset(rvu, BLKADDR_ML, ML_AF_BLK_RST);
 }
 

@@ -188,6 +188,10 @@ static inline u64 pf_to_bitoff(u8 pf)
 /* SDP Regsiters */
 #define SDP_AF_BLK_RST				0xc000030
 #define SDP_AF_AP_EPFX_MBOX_SEND_INT		0x40c0000
+#define SDP_AF_EPFX_SCRATCH(a)			(0x4018000 + 0x400000 * ((a) & 0xf))
+#define SDP_MAX_EPF				0x10
+#define SDP_AF_MACX_PF_ENA(a)			(0x4090120 + 0x8 * ((a) & 0x1))
+#define SDP_MAX_MAC				0x2
 #define SDP_AF_RX_EPF_VF_MAP(a)			(0x4091000 | (a) << 3)
 #define SDP_AF_MAC_CHANX_RING_MAP(a)		(0x4098000 | (a) << 3)
 #define SDP_AF_CONST				(0x4090038)
