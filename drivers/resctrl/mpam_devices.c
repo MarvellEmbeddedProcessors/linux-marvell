@@ -2432,9 +2432,21 @@ static void __props_mismatch(struct mpam_props *parent,
 		parent->cpbm_wd = child->cpbm_wd;
 	} else if (MISMATCHED_FEAT(parent, child, mpam_feat_cpor_part,
 				   cpbm_wd, alias)) {
-		pr_debug("cleared cpor_part\n");
-		mpam_clear_feature(mpam_feat_cpor_part, parent);
-		parent->cpbm_wd = 0;
+		if (mpam_has_feature(mpam_feat_cpor_part, child)) {
+			/*
+			 * The cn20k LLC exposes tag (LTG) and data (DTG) as two
+			 * aliasing CPOR resources with different portion counts
+			 * (e.g. 16 vs 12). Both back the same cache and are
+			 * programmed per-RIS from the same CPBM, so keep cache
+			 * portioning enabled using the smaller common width
+			 * rather than dropping the feature entirely.
+			 */
+			parent->cpbm_wd = min(parent->cpbm_wd, child->cpbm_wd);
+		} else {
+			pr_debug("cleared cpor_part\n");
+			mpam_clear_feature(mpam_feat_cpor_part, parent);
+			parent->cpbm_wd = 0;
+		}
 	}
 
 	if (CAN_MERGE_FEAT(parent, child, mpam_feat_mbw_part, alias)) {
