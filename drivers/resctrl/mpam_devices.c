@@ -1877,7 +1877,7 @@ static int mpam_dt_parse_resource(struct mpam_msc *msc, struct device_node *np,
 static int mpam_dt_parse_resources(struct mpam_msc *msc, void *ignored)
 {
 	int err, num_ris = 0;
-	const u32 *ris_idx_p;
+	const __be32 *ris_idx_p;
 	struct device_node *iter, *np;
 
 	np = msc->pdev->dev.of_node;
@@ -1885,7 +1885,14 @@ static int mpam_dt_parse_resources(struct mpam_msc *msc, void *ignored)
 		ris_idx_p = of_get_property(iter, "reg", NULL);
 		if (ris_idx_p) {
 			num_ris++;
-			err = mpam_dt_parse_resource(msc, iter, *ris_idx_p);
+			/*
+			 * DT property values are big-endian; convert before use.
+			 * mpam_ris_create() takes ris_idx as a u8, so without the
+			 * byte-swap reg=<1>/<2> become 0x01000000/0x02000000 and
+			 * both truncate to RIS 0, colliding with -EBUSY.
+			 */
+			err = mpam_dt_parse_resource(msc, iter,
+						     be32_to_cpup(ris_idx_p));
 			if (err) {
 				of_node_put(iter);
 				return err;
