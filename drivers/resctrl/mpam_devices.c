@@ -229,8 +229,20 @@ static u64 mpam_msc_read_idr(struct mpam_msc *msc)
 	lockdep_assert_held(&msc->part_sel_lock);
 
 	idr_low = mpam_read_partsel_reg(msc, IDR);
-	if (FIELD_GET(MPAMF_IDR_EXT, idr_low))
-		idr_high = mpam_read_partsel_reg(msc, IDR + 4);
+	if (FIELD_GET(MPAMF_IDR_EXT, idr_low)) {
+		/*
+		 * The extended (high) half of MPAMF_IDR carries HAS_RIS and
+		 * RIS_MAX. On some implementations (e.g. Marvell cn20k, where
+		 * the MPAM feature page sits on 64-bit-only ARF CSRs) a 32-bit
+		 * read at IDR+4 aliases the low word instead of returning the
+		 * high word, so RIS_MAX would read as 0 and RIS enumeration
+		 * would stop at RIS 0. Fetch the whole register with a single
+		 * 64-bit access and take the high word from that.
+		 */
+		u64 idr64 = readq_relaxed(msc->mapped_hwpage + MPAMF_IDR);
+
+		idr_high = idr64 >> 32;
+	}
 
 	return (idr_high << 32) | idr_low;
 }
