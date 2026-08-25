@@ -157,7 +157,13 @@ static int rvu_tim_pcp_curr_itr_fixup(struct rvu *rvu, u16 pcifunc, int slot)
 	 */
 	trigger = ((u32)TIM_WA_REQ_FIXUP << 24) | ((u32)pcifunc << 8) |
 		  (slot & 0xFF);
-	pci_write_config_dword(pdev, TIM_WA_CFG_TRIGGER, trigger);
+	/*
+	 * Use the AF-dedicated trigger offset (0x22c), not the mailbox-shared
+	 * 0x208: the AF's VSEC window shares 0x208/0x20c with the AF<->PCP
+	 * mailbox address doorbell, so a trigger there would be taken as a
+	 * mailbox write.
+	 */
+	pci_write_config_dword(pdev, TIM_WA_CFG_AF_TRIGGER, trigger);
 
 	for (i = 0; i < TIM_WA_POLL_ITERS; i++) {
 		pci_read_config_dword(pdev, TIM_WA_CFG_AF_RESULT, &res);

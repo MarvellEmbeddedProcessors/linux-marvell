@@ -789,7 +789,13 @@
 #define TIM_AF_CONST_HWWQE_VER(c)	 (((c) >> 35) & 0xF)
 #define TIM_AF_RINGX_CTL3_HWWQE_ENA	 BIT_ULL(0)
 
-#define TIM_WA_CFG_TRIGGER		 0x208
+/*
+ * The AF's own additional-VSEC window (config 0x208+) is shared with the AF<->PCP
+ * mailbox doorbell, which owns offsets 0x208/0x20c. The AF therefore writes its
+ * FLR-fixup trigger at a dedicated offset (must match TIM_WA_OFF_AF_TRIGGER in
+ * the PCP firmware) so it is not mistaken for a mailbox address latch.
+ */
+#define TIM_WA_CFG_AF_TRIGGER		 0x22c
 #define TIM_WA_CFG_AF_RESULT		 0x230
 #define TIM_WA_REQ_FIXUP		 0
 #define TIM_WA_RES_STATUS(w)		 (((w) >> 30) & 0x3)
