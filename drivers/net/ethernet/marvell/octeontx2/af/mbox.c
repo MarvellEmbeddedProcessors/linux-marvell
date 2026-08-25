@@ -133,6 +133,8 @@ int cn20k_mbox_setup(struct otx2_mbox *mbox, struct pci_dev *pdev,
 	case MBOX_DIR_AFEPF_UP:
 		mbox->trigger = (((u64)BLKADDR_SDP << 28) | SDP_AF_AP_EPFX_MBOX_SEND_INT);
 		mbox->tr_shift = 22;
+		/* SDP_AF_AP_EPFX_MBOX_SEND_INT is write-only register */
+		mbox->trigger_wo = true;
 		break;
 	default:
 		return -ENODEV;
@@ -361,11 +363,18 @@ static void otx2_mbox_msg_send_data(struct otx2_mbox *mbox, int devid, u64 data)
 
 	spin_unlock(&mdev->mbox_lock);
 
-	/* Check if interrupt pending */
-	intr_val = readq((void __iomem *)mbox->reg_base +
-		     (mbox->trigger | (devid << mbox->tr_shift)));
+	/* Some trigger registers (e.g. SDP_AF_AP_EPFX_MBOX_SEND_INT) are
+	 * write-only
+	 */
+	if (mbox->trigger_wo) {
+		intr_val = data;
+	} else {
+		/* Check if interrupt pending */
+		intr_val = readq((void __iomem *)mbox->reg_base +
+			     (mbox->trigger | (devid << mbox->tr_shift)));
+		intr_val |= data;
+	}
 
-	intr_val |= data;
 	/* The interrupt should be fired after num_msgs is written
 	 * to the shared memory
 	 */
@@ -388,6 +397,10 @@ EXPORT_SYMBOL(otx2_mbox_msg_send_up);
 bool otx2_mbox_wait_for_zero(struct otx2_mbox *mbox, int devid)
 {
 	u64 data;
+
+	/* Write-only trigger registers cannot be read back */
+	if (mbox->trigger_wo)
+		return true;
 
 	data = readq((void __iomem *)mbox->reg_base +
 		     (mbox->trigger | (devid << mbox->tr_shift)));

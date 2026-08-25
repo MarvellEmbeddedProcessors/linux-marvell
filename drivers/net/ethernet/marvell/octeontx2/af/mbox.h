@@ -88,6 +88,7 @@ struct otx2_mbox {
 	void   *reg_base;/* CSR base for this dev */
 	u64    trigger;  /* Trigger mbox notification */
 	u16    tr_shift; /* Mbox trigger shift */
+	bool   trigger_wo; /* Trigger reg is write-only (e.g. SDP SEND_INT) */
 	u64    rx_start; /* Offset of Rx region in mbox memory */
 	u64    tx_start; /* Offset of Tx region in mbox memory */
 	u16    rx_size;  /* Size of Rx region */
