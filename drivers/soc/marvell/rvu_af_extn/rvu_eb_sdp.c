@@ -53,9 +53,9 @@ static struct _req_type __maybe_unused					\
 MBOX_EBLOCK_UP_SDP_MESSAGES
 #undef M
 
-//todo adjust according to 020
-#define RVU_PFVF_PF_SHIFT	10
-#define RVU_PFVF_PF_MASK	0x3F
+#define EPF_PF_SHIFT	RVU_CN20K_PFVF_PF_SHIFT
+#define EPF_PF_MASK	RVU_CN20K_PFVF_PF_MASK
+
 /* Given a host pcifunc returns host VF number + 1 */
 static u16 get_sdp_evf(u16 epcifunc)
 {
@@ -65,7 +65,7 @@ static u16 get_sdp_evf(u16 epcifunc)
 /* Given a host pcifunc returns host PF number */
 static u16 get_sdp_epf(u16 epcifunc)
 {
-	return (epcifunc >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
+	return (epcifunc >> EPF_PF_SHIFT) & EPF_PF_MASK;
 }
 
 /* Given a host pcifunc returns corresponding RVU pcifunc of VF handling IO */
@@ -76,11 +76,11 @@ static u16 cn20k_get_rvu_pcifunc(struct rvu *rvu, u16 epcifunc)
 	u16 rvu_pcifunc;
 
 	host_vf = epcifunc & RVU_PFVF_FUNC_MASK;
-	host_pf = (epcifunc >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
+	host_pf = (epcifunc >> EPF_PF_SHIFT) & EPF_PF_MASK;
 
 	rvu_pf = sdp->host2rvupf[host_pf];
 	/* Form RVU pcifunc */
-	rvu_pcifunc = (rvu_pf & RVU_PFVF_PF_MASK) << RVU_PFVF_PF_SHIFT;
+	rvu_pcifunc = (rvu_pf & RVU_CN20K_PFVF_PF_MASK) << RVU_CN20K_PFVF_PF_SHIFT;
 	/* Host PF's IO are handled by first VFs of PF. Hence on RVU side
 	 * PFs are only to receive message from AF and forward to VFs.
 	 */
@@ -89,35 +89,19 @@ static u16 cn20k_get_rvu_pcifunc(struct rvu *rvu, u16 epcifunc)
 	return rvu_pcifunc;
 }
 
+#define RVU_GEN_PF_START	61
 static int cn20k_get_sdp_pfs(struct rvu *rvu, u8 *sdp_pfs, u8 *count)
 {
-	struct pci_dev *pdev = NULL;
-	u8 pf = 0;
-	u8 pf_num;
+	u8 pf;
 
 	if (!sdp_pfs)
 		return -EINVAL;
 
-	while (true) {
-		pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM,
-				      PCI_DEVID_OCTEONTX2_GEN_PF, pdev);
-		if (!pdev)
-			break;
-
-		if (pf >= MAX_EPFS) {
-			dev_err(rvu->dev, "SDP RVU PFs exceeded MAX EPFs\n");
-			pci_dev_put(pdev);
-			return -EINVAL;
-		}
-
-		pf_num = pdev->bus->number - 1;
-		/* RVU domain starts at 2. Each domain has max of 32 PFs */
-		sdp_pfs[pf] = ((pci_domain_nr(pdev->bus) - 2) << 5) + pf_num;
-		pf++;
-	}
+	for (pf = 0; pf < MAX_EPFS; pf++)
+		sdp_pfs[pf] = RVU_GEN_PF_START + pf;
 
 	if (count)
-		*count = pf;
+		*count = MAX_EPFS;
 
 	return 0;
 }
@@ -328,8 +312,10 @@ static int cn20k_sdp_rings_init(struct rvu *rvu)
 	mutex_init(&sdp->cfg_lock);
 
 	sdp->ready_pfs = bitmap_zalloc(rvu->hw->total_pfs, GFP_KERNEL);
-	if (err)
+	if (!sdp->ready_pfs) {
+		err = -ENOMEM;
 		goto free_fn_map;
+	}
 
 	sdp->rings.max = max_rings;
 	err = rvu_alloc_bitmap(&sdp->rings);
@@ -348,8 +334,8 @@ static int cn20k_sdp_rings_init(struct rvu *rvu)
 		sdp->fn_map[ring] = 0xFFFF;
 
 	for (pf = 0; pf < count; pf++) {
-		rvu_pcifunc = (sdp->host2rvupf[pf] & RVU_PFVF_PF_MASK) <<
-			      RVU_PFVF_PF_SHIFT;
+		rvu_pcifunc = (sdp->host2rvupf[pf] & RVU_CN20K_PFVF_PF_MASK) <<
+			      RVU_CN20K_PFVF_PF_SHIFT;
 		pfvf = rvu_get_pfvf(rvu, rvu_pcifunc & ~RVU_PFVF_FUNC_MASK);
 		sdp_cfg = &pfvf->sdp_cfg;
 
@@ -884,8 +870,8 @@ static void __sdp_mbox_handler(struct rvu_work *mwork, int type, bool poll)
 		switch (type) {
 		case TYPE_AFEPF:
 			msg->pcifunc &=
-				~(RVU_PFVF_PF_MASK << RVU_PFVF_PF_SHIFT);
-			msg->pcifunc |= (devid << RVU_PFVF_PF_SHIFT);
+				~(EPF_PF_MASK << EPF_PF_SHIFT);
+			msg->pcifunc |= (devid << EPF_PF_SHIFT);
 			break;
 		}
 
@@ -1036,6 +1022,10 @@ static int sdp_mbox_init(struct rvu *rvu, struct mbox_wq_info *mw,
 		mwork->rvu = rvu;
 		INIT_WORK(&mwork->work, mbox_up_handler);
 	}
+
+	kfree(mbox_regions);
+	bitmap_free(pf_bmap);
+
 	return 0;
 
 exit:
@@ -1316,7 +1306,33 @@ static void rvu_sdp_remove(struct rvu_block *hwblock, void *data)
 
 static void rvu_sdp_free(struct rvu_block *block, void *data)
 {
-	//nothing
+	struct rvu *rvu = block->rvu;
+	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+
+	if (!is_cn20k(rvu->pdev))
+		return;
+
+	/* Stop the FLR workqueue before releasing the resources its work
+	 * items reference.
+	 */
+	if (sdp->flr_wq) {
+		destroy_workqueue(sdp->flr_wq);
+		sdp->flr_wq = NULL;
+	}
+
+	rvu_free_bitmap(&sdp->vf_rids);
+	rvu_free_bitmap(&sdp->rings);
+
+	bitmap_free(sdp->ready_pfs);
+	sdp->ready_pfs = NULL;
+
+	kfree(sdp->fn_map);
+	sdp->fn_map = NULL;
+
+	kfree(sdp->vf_rsrc_map);
+	sdp->vf_rsrc_map = NULL;
+
+	mutex_destroy(&sdp->cfg_lock);
 }
 
 static struct rvu_eblock_driver_ops sdp_ops = {

@@ -302,7 +302,7 @@ struct sdp_config {
 	u64 nr_host_vfs;
 };
 
-#define MAX_EPFS		32
+#define MAX_EPFS		16
 
 struct sdp_flr_work {
 	struct	work_struct work;

@@ -1006,15 +1006,19 @@ static int otx2_setup_netdev(struct otx2_nic *vf)
 	/* VF number is VF number + 1 in pcifunc */
 	vfid -= 1;
 
+#define RVU_GEN_PF_START	61
 	/* Host PF0 -> epf0
 	 * Host PF0 VF0 -> epf0-vf0
 	 */
 	if (vfid)
 		snprintf(netdev->name, sizeof(netdev->name), "epf%d-vf%d",
-			 pdev->bus->number, vfid - 1);
+			 (((vf->pcifunc >> RVU_CN20K_PFVF_PF_SHIFT) &
+			 RVU_CN20K_PFVF_PF_MASK) - RVU_GEN_PF_START),
+			 vfid - 1);
 	else
 		snprintf(netdev->name, sizeof(netdev->name), "epf%d",
-			 pdev->bus->number);
+			 (((vf->pcifunc >> RVU_CN20K_PFVF_PF_SHIFT) &
+			 RVU_CN20K_PFVF_PF_MASK) - RVU_GEN_PF_START));
 
 	err = register_netdev(netdev);
 	if (err) {
