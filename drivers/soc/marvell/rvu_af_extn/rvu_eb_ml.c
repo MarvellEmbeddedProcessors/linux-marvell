@@ -136,6 +136,8 @@ static bool is_ml_valid_af_reg(struct rvu *rvu, struct ml_rd_wr_reg_msg *req)
 	switch (offset) {
 	case ML_AF_LFX_MLR_BASE(0) ... ML_AF_LFX_MLR_BASE(ML_RVU_LF_COUNT - 1):
 	case ML_AF_LFX_MLR_SIZE(0) ... ML_AF_LFX_MLR_SIZE(ML_RVU_LF_COUNT - 1):
+	case ML_AF_LFX_ACC_CONTROL(0) ... ML_AF_LFX_ACC_CONTROL(ML_RVU_LF_COUNT - 1):
+	case ML_AF_LFX_JOB_IN_JMGR(0) ... ML_AF_LFX_JOB_IN_JMGR(ML_RVU_LF_COUNT - 1):
 		return true;
 	}
 
