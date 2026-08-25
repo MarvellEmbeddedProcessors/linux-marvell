@@ -430,8 +430,10 @@ int rvu_mbox_handler_ml_lf_free(struct rvu *rvu, struct msg_req *req,
 		/* Reset LF */
 		err = rvu_lf_reset(rvu, block, mllf);
 		if (err) {
-			dev_err(rvu->dev, "Failed to reset blkaddr %d LF%d\n",
-				block->addr, mllf);
+			/* Support to handle FLR is yet to be implemented in ML
+			 * firmware. Suppress error reporting temporarily.
+			 */
+			continue;
 		}
 	}
 
@@ -568,6 +570,7 @@ static int rvu_ml_setup_hw_resource(struct rvu_block *block, void *data)
 	block->lfcfg_reg = ML_PRIV_LFX_CFG;
 	block->msixcfg_reg = ML_PRIV_LFX_INT_CFG;
 	block->lfreset_reg = ML_AF_LF_RST;
+	block->blk_reset_reg = ML_AF_BLK_RST;
 	block->rvu = rvu;
 	sprintf(block->name, "ML");
 
@@ -594,6 +597,11 @@ free_bmap:
 	rvu_free_bitmap(&block->lf);
 
 	return err;
+}
+
+static void rvu_ml_reset_block(struct rvu_block *block, void *data)
+{
+	rvu_eblock_reset(block->rvu, block->addr, block->blk_reset_reg);
 }
 
 static void rvu_ml_freemem_block(struct rvu_block *block, void *data)
@@ -867,6 +875,7 @@ static struct rvu_eblock_driver_ops ml_ops = {
 	.remove = rvu_ml_remove,
 	.init = rvu_ml_init_block,
 	.setup = rvu_ml_setup_hw_resource,
+	.reset = rvu_ml_reset_block,
 	.free = rvu_ml_freemem_block,
 	.register_interrupt = rvu_ml_register_interrupts_block,
 	.unregister_interrupt = rvu_ml_unregister_interrupts_block,
