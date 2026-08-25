@@ -704,6 +704,10 @@ static irqreturn_t rvu_ml_af_wrap_err_intr_handler(int irq, void *ptr)
 		dev_err_ratelimited(
 			rvu->dev,
 			"ML: MLIP ACC write response error from CSR bus\n");
+	if (intr & ML_AF_WRAP_ERR_INT_ACC_LF_EN_CSR_WR_ERR)
+		dev_err_ratelimited(
+			rvu->dev,
+			"ML: MLIP ACC illegal write access to ACC_CONTROL CSR\n");
 	if (intr & ML_AF_WRAP_ERR_INT_DMA_RADDR_ERR)
 		dev_err_ratelimited(
 			rvu->dev,
@@ -728,6 +732,14 @@ static irqreturn_t rvu_ml_af_wrap_err_intr_handler(int irq, void *ptr)
 		dev_err_ratelimited(
 			rvu->dev,
 			"ML: MLIP DMA write response error from CSR bus\n");
+	if (intr & ML_AF_WRAP_ERR_INT_DMA_AF_RADDR_SIZE_ERR)
+		dev_err_ratelimited(
+			rvu->dev,
+			"ML: MLIP DMA read address beyond programmed AF size\n");
+	if (intr & ML_AF_WRAP_ERR_INT_DMA_AF_WADDR_SIZE_ERR)
+		dev_err_ratelimited(
+			rvu->dev,
+			"ML: MLIP DMA write address beyond programmed AF size\n");
 
 	/* Clear interrupts */
 	rvu_write64(rvu, blkaddr, ML_AF_WRAP_ERR_INT, intr);
