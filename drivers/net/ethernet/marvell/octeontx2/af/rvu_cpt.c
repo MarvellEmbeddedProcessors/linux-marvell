@@ -24,6 +24,7 @@
 
 /* Default CPT_AF_RXC_CFG1:max_rxc_icb_cnt */
 #define CPT_DFLT_MAX_RXC_ICB_CNT  0xC0ULL
+#define CPT_CN20K_DFLT_RXC_ICB_CNT 0x12CULL
 
 /* CPT LMTST */
 #define LMT_LINE_SIZE   128 /* LMT line size in bytes */
@@ -2130,7 +2131,7 @@ static int rvu_cpt_lmt_init(struct rvu *rvu)
 int rvu_cpt_init(struct rvu *rvu)
 {
 	struct rvu_hwinfo *hw = rvu->hw;
-	u64 reg_val;
+	u64 reg_val, val;
 	int ret;
 
 	/* Retrieve CPT PF number */
@@ -2145,8 +2146,8 @@ int rvu_cpt_init(struct rvu *rvu)
 		 */
 		reg_val = rvu_read64(rvu, BLKADDR_CPT0, CPT_AF_RXC_CFG1);
 		reg_val &= ~MAX_RXC_ICB_CNT;
-		reg_val |= FIELD_PREP(MAX_RXC_ICB_CNT,
-				      CPT_DFLT_MAX_RXC_ICB_CNT);
+		val = is_cn20k(rvu->pdev) ? CPT_CN20K_DFLT_RXC_ICB_CNT : CPT_DFLT_MAX_RXC_ICB_CNT;
+		reg_val |= FIELD_PREP(MAX_RXC_ICB_CNT, val);
 		rvu_write64(rvu, BLKADDR_CPT0, CPT_AF_RXC_CFG1, reg_val);
 	}
 
