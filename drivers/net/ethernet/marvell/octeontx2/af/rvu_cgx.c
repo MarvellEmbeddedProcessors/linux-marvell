@@ -792,8 +792,8 @@ int rvu_mbox_handler_cgx_mac_addr_set(struct rvu *rvu,
 	struct rvu_pfvf *pfvf;
 	u8 cgx_id, lmac_id;
 
-	if (!is_pf_cgxmapped(rvu, pf))
-		return LMAC_AF_ERR_PF_NOT_MAPPED;
+	if (!is_cgx_config_permitted(rvu, req->hdr.pcifunc))
+		return LMAC_AF_ERR_PERM_DENIED;
 
 	if (rvu_npc_exact_has_match_table(rvu))
 		return rvu_npc_exact_mac_addr_set(rvu, req, rsp);
