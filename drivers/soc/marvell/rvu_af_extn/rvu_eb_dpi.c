@@ -129,9 +129,20 @@ static int validate_and_get_dpi_blkaddr(int req_blkaddr)
 
 	blkaddr = req_blkaddr ? req_blkaddr : BLKADDR_DPI0;
 	if (blkaddr != BLKADDR_DPI0 && blkaddr != BLKADDR_DPI1)
-		return -EINVAL;
+		return DPI_AF_ERR_PARAM;
 
 	return blkaddr;
+}
+
+static struct dpi_rsrc *get_dpi_rsrc_ptr(struct rvu *rvu, int req_blkaddr)
+{
+	if (req_blkaddr != BLKADDR_DPI0 && req_blkaddr != BLKADDR_DPI1)
+		return NULL;
+
+	if (req_blkaddr == BLKADDR_DPI1)
+		return rvu->hw->dpi1;
+
+	return rvu->hw->dpi;
 }
 
 static void dpi_lf_disable_iqueue(struct rvu *rvu, int blkaddr, int slot)
@@ -199,6 +210,9 @@ int rvu_mbox_handler_dpi_lf_ring_cfg(struct rvu *rvu,
 	u64 cfg;
 	int lf;
 
+	if (validate_and_get_dpi_blkaddr(req->dpi_blkaddr) < 0)
+		return DPI_AF_ERR_PARAM;
+
 	cfg = ((u64)req->err_rsp_en << 36) | ((u64)(req->xtype & 0x7) << 12);
 	cfg |= ((u64)(req->pri & 0x3) << 8);
 
@@ -208,8 +222,12 @@ int rvu_mbox_handler_dpi_lf_ring_cfg(struct rvu *rvu,
 	if (req->rport)
 		cfg |= DPI_RPORT;
 
-	lf = rvu_get_lf(rvu, &hw->block[req->dpi_blkaddr], pcifunc,
-			req->lf_slot);
+	lf = rvu_get_lf(rvu, &hw->block[req->dpi_blkaddr], pcifunc, req->lf_slot);
+	if (lf < 0)
+		return DPI_AF_ERR_LF_INVALID;
+
+	if (req->ring_idx >= 2)
+		return DPI_AF_ERR_PARAM;
 
 	rvu_write64(rvu, req->dpi_blkaddr,
 		    DPI_AF_LFX_RINGX_CFG(lf, req->ring_idx), cfg);
@@ -521,10 +539,13 @@ int rvu_mbox_handler_dpi_lf_chan_tbl_free(struct rvu *rvu,
 					  struct msg_rsp *rsp)
 {
 	struct dpi_rsrc *dpi;
-	int blknr;
 
-	blknr = (req->dpi_blkaddr == BLKADDR_DPI0) ? 0 : 1;
-	dpi = &rvu->hw->dpi[blknr];
+	dpi = get_dpi_rsrc_ptr(rvu, req->dpi_blkaddr);
+	if (!dpi)
+		return DPI_AF_ERR_PARAM;
+
+	if (req->tbl_num >= DPI_MAX_CHAN_TBL)
+		return DPI_AF_ERR_PARAM;
 
 	mutex_lock(&dpi->chan_tbl_lock);
 
@@ -533,12 +554,12 @@ int rvu_mbox_handler_dpi_lf_chan_tbl_free(struct rvu *rvu,
 		return DPI_AF_ERR_PARAM;
 	}
 
-	if (dpi->dpi_ctx[req->tbl_num])
-		qmem_free(rvu->dev, dpi->dpi_ctx[req->tbl_num]);
-	else
-		dev_err(rvu->dev, "RVUAF: Channel table %d not found\n",
-			req->tbl_num);
+	if (!dpi->dpi_ctx[req->tbl_num]) {
+		mutex_unlock(&dpi->chan_tbl_lock);
+		return DPI_AF_ERR_PARAM;
+	}
 
+	qmem_free(rvu->dev, dpi->dpi_ctx[req->tbl_num]);
 	dpi_free_chan_tbl(dpi, req->tbl_num);
 	/* Config DPI table sel, enable */
 	rvu_write64(rvu, req->dpi_blkaddr, DPI_AF_CHAN_TBLX_CFG(req->tbl_num),
@@ -557,6 +578,9 @@ int rvu_mbox_handler_dpi_lf_chan_tbl_sel(struct rvu *rvu,
 	struct rvu_block *block;
 	int dpilf;
 	u64 val;
+
+	if (validate_and_get_dpi_blkaddr(req->dpi_blkaddr) < 0)
+		return DPI_AF_ERR_PARAM;
 
 	block = &rvu->hw->block[req->dpi_blkaddr];
 
@@ -581,6 +605,9 @@ int rvu_mbox_handler_dpi_lf_chan_tbl_ena_dis(struct rvu *rvu,
 	int dpilf;
 	u64 val;
 
+	if (validate_and_get_dpi_blkaddr(req->dpi_blkaddr) < 0)
+		return DPI_AF_ERR_PARAM;
+
 	block = &rvu->hw->block[req->dpi_blkaddr];
 
 	dpilf = rvu_get_lf(rvu, block, pcifunc, req->lf_slot);
@@ -602,24 +629,29 @@ int rvu_mbox_handler_dpi_lf_chan_tbl_update(struct rvu *rvu,
 					    struct dpi_lf_chan_tbl_update_req *req,
 					    struct msg_rsp *rsp)
 {
-	u64 *req_base, *alloc_end;
 	struct qmem *tbl_entry;
 	struct dpi_rsrc *dpi;
 	u32 tot_entries;
 	u64 *chan_base;
-	int blknr, cnt;
+	int cnt;
 
-	blknr = (req->dpi_blkaddr == BLKADDR_DPI0) ? 0 : 1;
-	if (blknr)
-		dpi = &rvu->hw->dpi1[blknr];
-	else
-		dpi = &rvu->hw->dpi[blknr];
+	dpi = get_dpi_rsrc_ptr(rvu, req->dpi_blkaddr);
+	if (!dpi)
+		return DPI_AF_ERR_PARAM;
+
+	if (req->chan_tbl >= DPI_MAX_CHAN_TBL)
+		return DPI_AF_ERR_PARAM;
 
 	tbl_entry = dpi->dpi_ctx[req->chan_tbl];
+	if (!tbl_entry)
+		return DPI_AF_ERR_PARAM;
+
+	if (req->num_entries > ARRAY_SIZE(req->config))
+		return DPI_AF_ERR_PARAM;
+
 	tot_entries = tbl_entry->alloc_sz / tbl_entry->entry_sz;
-	req_base = tbl_entry->base + req->idx_offset;
-	alloc_end = tbl_entry->base + tbl_entry->alloc_sz;
-	if (tot_entries < req->num_entries || req_base > alloc_end)
+	if (req->idx_offset > tot_entries ||
+	    req->num_entries > tot_entries - req->idx_offset)
 		return DPI_AF_ERR_PARAM;
 
 	chan_base = tbl_entry->base;
