@@ -912,7 +912,7 @@ int rvu_mbox_handler_cpt_rd_wr_register(struct rvu *rvu,
 					struct cpt_rd_wr_reg_msg *rsp)
 {
 	u16 pcifunc = req->hdr.pcifunc;
-	u64 offset = req->reg_offset;
+	u64 offset;
 	int blkaddr;
 
 	blkaddr = validate_and_get_cpt_blkaddr(req->blkaddr);
@@ -922,6 +922,10 @@ int rvu_mbox_handler_cpt_rd_wr_register(struct rvu *rvu,
 	/* Allow if accessed by CPT PF or LF is attached to given PF/VF */
 	if (!otx2_cpt_validate_access(rvu, pcifunc, blkaddr))
 		return CPT_AF_ERR_ACCESS_DENIED;
+
+	/* Clamp offset to block register window to prevent cross-block access */
+	req->reg_offset &= GENMASK_ULL(27, 0);
+	offset = req->reg_offset;
 
 	if (!validate_and_update_reg_offset(rvu, req, &offset))
 		return CPT_AF_ERR_ACCESS_DENIED;
