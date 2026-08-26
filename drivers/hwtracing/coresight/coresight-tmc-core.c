@@ -441,9 +441,9 @@ static void tmc_get_reserved_region(struct device *parent)
 
 	if (res.start != 0 && resource_size(&res) != 0) {
 		drvdata->resrv_mem.vaddr = memremap(res.start, resource_size(&res), MEMREMAP_WC);
-		if (IS_ERR(drvdata->resrv_mem.vaddr)) {
+		if (!drvdata->resrv_mem.vaddr) {
 			dev_err(parent, "Failed to map destination address for reserved memory\n");
-			rc = PTR_ERR(drvdata->resrv_mem.vaddr);
+			rc = -ENOMEM;
 			goto out;
 		}
 

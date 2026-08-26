@@ -688,10 +688,23 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
 		u64 trace_addr;
 
 		reg_ptr = drvdata->reg_metadata.vaddr;
+		if (reg_ptr->valid != 1)
+			return -EINVAL;
+
+		if (!reg_ptr->size)
+			return -EINVAL;
+
 		trace_addr = reg_ptr->trc_addr | ((u64)reg_ptr->trc_addrhi << 32);
 
+		if (trace_addr < drvdata->resrv_mem.paddr ||
+		    reg_ptr->size > drvdata->resrv_mem.size ||
+		    trace_addr + reg_ptr->size < trace_addr ||
+		    trace_addr + reg_ptr->size >
+		    drvdata->resrv_mem.paddr + drvdata->resrv_mem.size)
+			return -EINVAL;
+
 		drvdata->buf = memremap(trace_addr, reg_ptr->size, MEMREMAP_WC);
-		if (IS_ERR(drvdata->buf))
+		if (!drvdata->buf)
 			return -ENOMEM;
 
 		drvdata->len = reg_ptr->size;
