@@ -91,6 +91,9 @@ int rvu_mbox_handler_nix_spi_to_sa_delete(struct rvu *rvu,
 	if (!hw->cap.spi_to_sas)
 		return NIX_AF_ERR_PARAM;
 
+	if (req->way >= 4 || req->hash_index >= hw->cap.spi_to_sas / 4)
+		return NIX_AF_ERR_PARAM;
+
 	if (!is_nixlf_attached(rvu, pcifunc)) {
 		ret = NIX_AF_ERR_AF_LF_INVALID;
 		goto exit;
