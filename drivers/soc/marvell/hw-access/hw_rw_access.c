@@ -20,6 +20,7 @@
 #include <linux/stddef.h>
 #include <linux/debugfs.h>
 #include <linux/arm-smccc.h>
+#include <linux/capability.h>
 
 #include "rvu_struct.h"
 #include "rvu.h"
@@ -329,7 +330,7 @@ hw_access_nix_ctx_read(struct rvu *rvu, struct hw_ctx_cfg *ctx_cfg,
 	memset(&aq_req, 0, sizeof(struct nix_aq_enq_req));
 	aq_req.hdr.pcifunc = ctx_cfg->pcifunc;
 	aq_req.ctype = ctx_cfg->ctype;
-	aq_req.op = ctx_cfg->op;
+	aq_req.op = NIX_AQ_INSTOP_READ;
 	aq_req.qidx = ctx_cfg->qidx;
 
 	if (rvu_mbox_handler_nix_aq_enq(rvu, &aq_req, &rsp)) {
@@ -356,7 +357,7 @@ hw_access_npa_ctx_read(struct rvu *rvu, struct hw_ctx_cfg *ctx_cfg,
 	memset(&aq_req, 0, sizeof(struct npa_aq_enq_req));
 	aq_req.hdr.pcifunc = ctx_cfg->pcifunc;
 	aq_req.ctype = ctx_cfg->ctype;
-	aq_req.op = ctx_cfg->op;
+	aq_req.op = NPA_AQ_INSTOP_READ;
 	aq_req.aura_id = ctx_cfg->aura;
 
 	if (rvu_mbox_handler_npa_aq_enq(rvu, &aq_req, &rsp)) {
@@ -480,6 +481,9 @@ static long hw_access_ioctl(struct file *filp, unsigned int cmd,
 {
 	struct hw_priv_data *priv_data = filp->private_data;
 	struct rvu *rvu = priv_data->rvu;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
 
 	switch (cmd) {
 	case HW_ACCESS_CSR_READ_IOCTL:
