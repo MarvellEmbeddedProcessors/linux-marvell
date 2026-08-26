@@ -2365,8 +2365,6 @@ int npc_mcam_rsrcs_init(struct rvu *rvu, int blkaddr)
 	for (cntr = 0; cntr < mcam->counters.max; cntr++)
 		mcam->cntr2pfvf_map[cntr] = NPC_MCAM_INVALID_MAP;
 
-	mutex_init(&mcam->lock);
-
 	return 0;
 
 free_cntr_refcnt:
@@ -2623,6 +2621,7 @@ int rvu_npc_init(struct rvu *rvu)
 	err = npc_mcam_rsrcs_init(rvu, blkaddr);
 	if (err)
 		return err;
+	mutex_init(&rvu->hw->mcam.lock);
 
 	err = npc_flow_steering_init(rvu, blkaddr);
 	if (err) {
