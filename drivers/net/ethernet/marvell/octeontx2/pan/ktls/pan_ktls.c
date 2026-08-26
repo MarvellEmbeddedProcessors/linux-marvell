@@ -224,9 +224,12 @@ static int pan_ktls_submit(struct otx2_nic *pf, struct otx2_rcv_queue *rq,
 	}
 
 	tcp_payload_len = len - ((hdr->l4hdr - hdr->l2hdr) + __tcp_hdrlen(th));
-	/* Pure ACK - do nothing */
-	if (!tcp_payload_len)
+	/* Pure ACK or too-short segment for TLS overhead - do nothing */
+	if (tcp_payload_len < (5 + 8 + 16))
 		return 0;
+
+	if (conn_id >= CN10K_CPT_MAX_KTLS_CTX)
+		return -EINVAL;
 
 	cptr_iova = ctx->iova +
 		    conn_id * (ALIGN(sizeof(struct pan_cpt_tls_ctx_s), 128));
