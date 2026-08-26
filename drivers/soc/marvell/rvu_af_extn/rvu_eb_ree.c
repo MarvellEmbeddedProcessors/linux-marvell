@@ -739,8 +739,14 @@ int rvu_mbox_handler_ree_rule_db_prog(struct rvu *rvu,
 	if (ree->ruledb_len != req->offset)
 		return REE_AF_ERR_RULE_DB_WRONG_OFFSET;
 	/* All messages should be in block size, apart for last one */
+	if (req->len > REE_RULE_DB_REQ_BLOCK_SIZE)
+		return REE_AF_ERR_RULE_DB_WRONG_LENGTH;
 	if (req->len < REE_RULE_DB_REQ_BLOCK_SIZE && !req->is_last)
 		return REE_AF_ERR_RULE_DB_SHOULD_FILL_REQUEST;
+	/* A single request must not spill past the end of its 4 MB block */
+	if ((ree->ruledb_len % REE_RULE_DB_ALLOC_SIZE) + req->len >
+			REE_RULE_DB_ALLOC_SIZE)
+		return REE_AF_ERR_RULE_DB_WRONG_LENGTH;
 	/* Each mbox is 32KB each ruledb block is 4096KB
 	 * Single mbox shouldn't spread over blocks
 	 */
@@ -820,12 +826,19 @@ rvu_mbox_handler_ree_rule_db_get(struct rvu *rvu,
 		rsp->len = REE_RULE_DB_RSP_BLOCK_SIZE;
 	}
 
+	if (!rsp->len)
+		return 0;
+
 	/* Copy DB chunk to response */
 	if (req->is_dbi) {
 		memcpy(rsp->rule_db, ree->ruledbi + req->offset, rsp->len);
 	} else {
-		db_block = req->offset >> 22;
-		memcpy(rsp->rule_db, ree->ruledb[db_block] + req->offset,
+		db_block = req->offset >> REE_RULE_DB_ALLOC_SHIFT;
+		if (db_block >= ree->ruledb_blocks)
+			return REE_AF_ERR_RULE_DB_BLOCK_TOO_BIG;
+		memcpy(rsp->rule_db,
+		       ree->ruledb[db_block] + req->offset -
+		       (u64)db_block * REE_RULE_DB_ALLOC_SIZE,
 		       rsp->len);
 	}
 
