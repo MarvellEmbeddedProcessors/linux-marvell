@@ -828,6 +828,8 @@ static void pci_console_dev_write(struct console *cons, const char *buf,
 	output_ring = pci_cons->output_ring;
 
 	cons_idx = le32_to_cpu(readl(&ring_descr->host.cons_idx));
+	if (cons_idx >= OCTEONTX_PCIE_MAX_CONSOLES)
+		return;
 
 	octeontx_console_write(dev, buf, len, ring_descr, output_ring,
 			       &pci_cons->excl_lock[cons_idx]);
@@ -1319,6 +1321,8 @@ static ssize_t pci_console_dev_tty_write(struct tty_struct *tty,
 	output_ring = pci_cons->output_ring;
 
 	cons_idx = le32_to_cpu(readl(&ring_descr->host.cons_idx));
+	if (cons_idx >= OCTEONTX_PCIE_MAX_CONSOLES)
+		return -EINVAL;
 
 	return octeontx_console_write(dev, buf, count, ring_descr,
 				      output_ring,
