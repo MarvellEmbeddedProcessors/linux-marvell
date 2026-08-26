@@ -188,6 +188,9 @@ int rvu_mbox_handler_fib_notify(struct rvu *rvu,
 	if (!(rvu->rswitch.flags & RVU_SWITCH_FLAG_FW_READY))
 		return 0;
 
+	if (!req->cnt || req->cnt > ARRAY_SIZE(req->entry))
+		return -EINVAL;
+
 	sz = req->cnt * sizeof(struct fib_entry);
 
 	l3_entry = kcalloc(1, sizeof(*l3_entry) + sz, GFP_KERNEL);
