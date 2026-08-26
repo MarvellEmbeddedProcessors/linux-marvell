@@ -189,6 +189,9 @@ int rvu_mbox_handler_lmtst_tbl_setup(struct rvu *rvu,
 	 * pcifunc (will be the one who is calling this mailbox).
 	 */
 	if (req->base_pcifunc) {
+		if (rvu_get_pf(req->base_pcifunc) >= rvu->hw->total_pfs)
+			return -EINVAL;
+
 		/* Calculating the LMT table index equivalent to primary
 		 * pcifunc.
 		 */
