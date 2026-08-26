@@ -537,8 +537,8 @@ pan_sw_fl_mangle_parse(struct fl_tuple *ftuple, u64 *act,
 			continue;
 		}
 
-		if ((ftuple->mangle_map[FLOW_ACT_MANGLE_HDR_TYPE_TCP] & BIT(i)) ||
-		    (ftuple->mangle_map[FLOW_ACT_MANGLE_HDR_TYPE_UDP] & BIT(i))) {
+		/* TCP/UDP mangle actions share slot 0 (UNSPEC, never set otherwise) */
+		if (ftuple->mangle_map[0] & BIT(i)) {
 			val = ftuple->mangle[i].val;
 			mask = ftuple->mangle[i].mask;
 			offset = ftuple->mangle[i].offset;

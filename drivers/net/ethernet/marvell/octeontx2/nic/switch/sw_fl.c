@@ -128,14 +128,13 @@ static int sw_fl_parse_actions(struct otx2_nic *nic,
 	struct otx2_nic *out_nic;
 	int err;
 	int used = 0;
+	u8 map_idx;
 	int i;
 
 	if (!flow_action_has_entries(flow_action))
 		return -EINVAL;
 
 	flow_action_for_each(i, act, flow_action) {
-		WARN_ON(used >= MANGLE_ARR_SZ);
-
 		switch (act->id) {
 		case FLOW_ACTION_REDIRECT:
 			trace_sw_act_dump(__func__, __LINE__, act->id);
@@ -161,11 +160,29 @@ static int sw_fl_parse_actions(struct otx2_nic *nic,
 
 		case FLOW_ACTION_MANGLE:
 			trace_sw_act_dump(__func__, __LINE__, act->id);
+			if (used >= MANGLE_ARR_SZ)
+				return -E2BIG;
+
+			switch (act->mangle.htype) {
+			case FLOW_ACT_MANGLE_HDR_TYPE_TCP:
+			case FLOW_ACT_MANGLE_HDR_TYPE_UDP:
+				/* share slot 0; UNSPEC is never set by real actions */
+				map_idx = 0;
+				break;
+			case FLOW_ACT_MANGLE_HDR_TYPE_ETH:
+			case FLOW_ACT_MANGLE_HDR_TYPE_IP4:
+			case FLOW_ACT_MANGLE_HDR_TYPE_IP6:
+				map_idx = act->mangle.htype;
+				break;
+			default:
+				return -EINVAL;
+			}
+
 			tuple->mangle[used].type = act->mangle.htype;
 			tuple->mangle[used].val = act->mangle.val;
 			tuple->mangle[used].mask = act->mangle.mask;
 			tuple->mangle[used].offset = act->mangle.offset;
-			tuple->mangle_map[act->mangle.htype] |= BIT(used);
+			tuple->mangle_map[map_idx] |= BIT(used);
 			used++;
 			break;
 
