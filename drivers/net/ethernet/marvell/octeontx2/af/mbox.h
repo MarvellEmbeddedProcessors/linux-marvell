@@ -3428,6 +3428,7 @@ struct mcs_get_id_rsp {
 enum mcs_af_status {
 	MCS_AF_ERR_INVALID_MCSID        = -1201,
 	MCS_AF_ERR_NOT_MAPPED           = -1202,
+	MCS_AF_ERR_PARAM                = -1203,
 };
 
 struct mcs_set_pn_threshold {

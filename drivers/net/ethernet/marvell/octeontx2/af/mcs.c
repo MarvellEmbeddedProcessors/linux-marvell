@@ -609,12 +609,18 @@ int mcs_free_ctrlpktrule(struct mcs *mcs, struct mcs_free_ctrl_pkt_rule_req *req
 		return 0;
 	}
 
+	if (req->rule_idx >= map->ctrlpktrule.max)
+		return MCS_AF_ERR_PARAM;
+
 	rc = mcs_free_rsrc(&map->ctrlpktrule, map->ctrlpktrule2pf_map, req->rule_idx, pcifunc);
+	if (rc)
+		return rc;
+
 	dis = mcs_reg_read(mcs, reg);
 	dis &= ~BIT_ULL(req->rule_idx);
 	mcs_reg_write(mcs, reg, dis);
 
-	return rc;
+	return 0;
 }
 
 int mcs_ctrlpktrule_write(struct mcs *mcs, struct mcs_ctrl_pkt_rule_write_req *req)

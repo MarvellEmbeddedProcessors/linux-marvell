@@ -32,6 +32,9 @@ void cn20k_mcs_pn_threshold_set(struct mcs *mcs, struct mcs_set_pn_threshold *pn
 {
 	u64 reg0, reg1, val;
 
+	if (pn->pn_id >= mcs->hw->sa_entries)
+		return;
+
 	if (pn->dir == MCS_RX) {
 		reg0 = MCSX_CPM_RX_SLAVE_PNX_THR_MEM0(pn->pn_id);
 		reg1 = MCSX_CPM_RX_SLAVE_PNX_THR_MEM1(pn->pn_id);

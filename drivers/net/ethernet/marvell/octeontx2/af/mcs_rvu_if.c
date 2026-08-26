@@ -153,6 +153,9 @@ int rvu_mbox_handler_mcs_set_lmac_mode(struct rvu *rvu,
 
 	mcs = mcs_get_pdata(req->mcs_id);
 
+	if (req->lmac_id >= mcs->hw->lmac_cnt)
+		return MCS_AF_ERR_PARAM;
+
 	if (BIT_ULL(req->lmac_id) & mcs->hw->lmac_bmap)
 		mcs_set_lmac_mode(mcs, req->lmac_id, req->mode);
 
@@ -301,6 +304,9 @@ int rvu_mbox_handler_mcs_port_reset(struct rvu *rvu, struct mcs_port_reset_req *
 
 	mcs = mcs_get_pdata(req->mcs_id);
 
+	if (req->port_id >= mcs->hw->lmac_cnt)
+		return MCS_AF_ERR_PARAM;
+
 	mcs_reset_port(mcs, req->port_id, req->reset);
 
 	return 0;
@@ -448,7 +454,7 @@ int rvu_mbox_handler_mcs_set_active_lmac(struct rvu *rvu,
 	if (!mcs)
 		return MCS_AF_ERR_NOT_MAPPED;
 
-	mcs->hw->lmac_bmap = req->lmac_bmap;
+	mcs->hw->lmac_bmap = req->lmac_bmap & GENMASK_ULL(mcs->hw->lmac_cnt - 1, 0);
 	mcs_set_lmac_channels(req->mcs_id, req->chan_base);
 	return 0;
 }
@@ -571,6 +577,10 @@ int rvu_mbox_handler_mcs_rx_sc_sa_map_write(struct rvu *rvu,
 		return MCS_AF_ERR_INVALID_MCSID;
 
 	mcs = mcs_get_pdata(req->mcs_id);
+
+	if (req->sc_id >= mcs->hw->sc_entries || req->an > 3)
+		return MCS_AF_ERR_PARAM;
+
 	mcs->mcs_ops->mcs_rx_sa_mem_map_write(mcs, req);
 	return 0;
 }
@@ -585,6 +595,10 @@ int rvu_mbox_handler_mcs_tx_sc_sa_map_write(struct rvu *rvu,
 		return MCS_AF_ERR_INVALID_MCSID;
 
 	mcs = mcs_get_pdata(req->mcs_id);
+
+	if (req->sc_id >= mcs->hw->sc_entries)
+		return MCS_AF_ERR_PARAM;
+
 	mcs->mcs_ops->mcs_tx_sa_mem_map_write(mcs, req);
 
 	if (is_cn20k(mcs->pdev))
@@ -606,9 +620,12 @@ int rvu_mbox_handler_mcs_sa_plcy_write(struct rvu *rvu,
 
 	mcs = mcs_get_pdata(req->mcs_id);
 
-	for (i = 0; i < req->sa_cnt; i++)
+	for (i = 0; i < req->sa_cnt && i < ARRAY_SIZE(req->plcy); i++) {
+		if (req->sa_index[i] >= mcs->hw->sa_entries)
+			return MCS_AF_ERR_PARAM;
 		mcs_sa_plcy_write(mcs, &req->plcy[i][0],
 				  req->sa_index[i], req->dir);
+	}
 	return 0;
 }
 
@@ -622,6 +639,11 @@ int rvu_mbox_handler_mcs_rx_sc_cam_write(struct rvu *rvu,
 		return MCS_AF_ERR_INVALID_MCSID;
 
 	mcs = mcs_get_pdata(req->mcs_id);
+
+	if (req->sc_id >= mcs->hw->sc_entries ||
+	    req->secy_id >= mcs->hw->secy_entries)
+		return MCS_AF_ERR_PARAM;
+
 	mcs_rx_sc_cam_write(mcs, req->sci, req->secy_id, req->sc_id);
 	return 0;
 }
@@ -629,12 +651,16 @@ int rvu_mbox_handler_mcs_rx_sc_cam_write(struct rvu *rvu,
 int rvu_mbox_handler_mcs_secy_plcy_write(struct rvu *rvu,
 					 struct mcs_secy_plcy_write_req *req,
 					 struct msg_rsp *rsp)
-{	struct mcs *mcs;
+{
+	struct mcs *mcs;
 
 	if (req->mcs_id >= rvu->mcs_blk_cnt)
 		return MCS_AF_ERR_INVALID_MCSID;
 
 	mcs = mcs_get_pdata(req->mcs_id);
+
+	if (req->secy_id >= mcs->hw->secy_entries)
+		return MCS_AF_ERR_PARAM;
 
 	mcs_secy_plcy_write(mcs, req->plcy,
 			    req->secy_id, req->dir);
@@ -653,7 +679,11 @@ int rvu_mbox_handler_mcs_flowid_entry_write(struct rvu *rvu,
 
 	mcs = mcs_get_pdata(req->mcs_id);
 
-	/* TODO validate the flowid */
+	if (req->flow_id >= mcs->hw->tcam_entries ||
+	    req->secy_id >= mcs->hw->secy_entries ||
+	    req->sc_id >= mcs->hw->sc_entries)
+		return MCS_AF_ERR_PARAM;
+
 	mcs_flowid_entry_write(mcs, req->data, req->mask,
 			       req->flow_id, req->dir);
 	map.secy = req->secy_id;
@@ -674,7 +704,7 @@ int rvu_mbox_handler_mcs_free_resources(struct rvu *rvu,
 {
 	u16 pcifunc = req->hdr.pcifunc;
 	struct mcs_rsrc_map *map;
-	int rc = -EINVAL;
+	int rc = MCS_AF_ERR_PARAM;
 	struct mcs *mcs;
 
 	if (req->mcs_id >= rvu->mcs_blk_cnt)
@@ -696,20 +726,35 @@ int rvu_mbox_handler_mcs_free_resources(struct rvu *rvu,
 
 	switch (req->rsrc_type) {
 	case MCS_RSRC_TYPE_FLOWID:
+		if (req->rsrc_id >= map->flow_ids.max) {
+			rc = MCS_AF_ERR_PARAM;
+			goto exit;
+		}
 		rc = mcs_free_rsrc(&map->flow_ids, map->flowid2pf_map, req->rsrc_id, pcifunc);
 		mcs_ena_dis_flowid_entry(mcs, req->rsrc_id, req->dir, false);
 		break;
 	case MCS_RSRC_TYPE_SECY:
-		rc =  mcs_free_rsrc(&map->secy, map->secy2pf_map, req->rsrc_id, pcifunc);
+		if (req->rsrc_id >= map->secy.max) {
+			rc = MCS_AF_ERR_PARAM;
+			goto exit;
+		}
+		rc = mcs_free_rsrc(&map->secy, map->secy2pf_map, req->rsrc_id, pcifunc);
 		mcs_clear_secy_plcy(mcs, req->rsrc_id, req->dir);
 		break;
 	case MCS_RSRC_TYPE_SC:
+		if (req->rsrc_id >= map->sc.max) {
+			rc = MCS_AF_ERR_PARAM;
+			goto exit;
+		}
 		rc = mcs_free_rsrc(&map->sc, map->sc2pf_map, req->rsrc_id, pcifunc);
-		/* Disable SC CAM only on RX side */
 		if (req->dir == MCS_RX)
 			mcs_ena_dis_sc_cam_entry(mcs, req->rsrc_id, false);
 		break;
 	case MCS_RSRC_TYPE_SA:
+		if (req->rsrc_id >= map->sa.max) {
+			rc = MCS_AF_ERR_PARAM;
+			goto exit;
+		}
 		rc = mcs_free_rsrc(&map->sa, map->sa2pf_map, req->rsrc_id, pcifunc);
 		break;
 	}
