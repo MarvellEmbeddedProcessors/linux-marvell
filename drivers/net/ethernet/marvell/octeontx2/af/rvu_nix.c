@@ -623,11 +623,19 @@ int rvu_mbox_handler_nix_rx_chan_cfg(struct rvu *rvu,
 				     struct nix_rx_chan_cfg *rsp)
 {
 	struct rvu_pfvf *pfvf;
-	int blkaddr;
+	int blkaddr, nixlf;
 	u16 chan;
+	int err;
+
+	err = nix_get_nixlf(rvu, req->hdr.pcifunc, &nixlf, &blkaddr);
+	if (err)
+		return err;
 
 	pfvf = rvu_get_pfvf(rvu, req->hdr.pcifunc);
-	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, req->hdr.pcifunc);
+
+	if (req->chan >= pfvf->rx_chan_cnt)
+		return NIX_AF_ERR_PARAM;
+
 	chan = pfvf->rx_chan_base + req->chan;
 
 	if (req->type == NIX_INTF_TYPE_CPT)
@@ -657,6 +665,9 @@ int rvu_mbox_handler_nix_alloc_bpids(struct rvu *rvu,
 	if (err)
 		return err;
 
+	if (req->bpid_cnt > ARRAY_SIZE(rsp->bpids))
+		return NIX_AF_ERR_PARAM;
+
 	bp = &nix_hw->bp;
 
 	/* For interface like sso uses same bpid across multiple
@@ -667,6 +678,8 @@ int rvu_mbox_handler_nix_alloc_bpids(struct rvu *rvu,
 	if (req->type > NIX_INTF_TYPE_CPT || req->type == NIX_INTF_TYPE_LBK) {
 		for (bpid = 0; bpid < bp->bpids.max; bpid++) {
 			if (bp->intf_map[bpid] == req->type) {
+				if (cnt >= ARRAY_SIZE(rsp->bpids))
+					break;
 				rsp->bpids[cnt] = bpid + bp->free_pool_base;
 				rsp->bpid_cnt++;
 				bp->ref_cnt[bpid]++;
@@ -707,9 +720,15 @@ int rvu_mbox_handler_nix_free_bpids(struct rvu *rvu,
 		return err;
 
 	bp = &nix_hw->bp;
+
+	if (req->bpid_cnt > ARRAY_SIZE(req->bpids))
+		return NIX_AF_ERR_PARAM;
+
 	mutex_lock(&rvu->rsrc_lock);
 	for (cnt = 0; cnt < req->bpid_cnt; cnt++) {
 		bpid = req->bpids[cnt] - bp->free_pool_base;
+		if (bpid >= bp->bpids.max)
+			continue;
 		bp->ref_cnt[bpid]--;
 		if (bp->ref_cnt[bpid])
 			continue;
@@ -2962,6 +2981,10 @@ static int nix_txschq_free_one(struct rvu *rvu,
 
 	lvl = req->schq_lvl;
 	schq = req->schq;
+
+	if (lvl >= NIX_TXSCH_LVL_CNT)
+		return NIX_AF_ERR_TLX_INVALID;
+
 	txsch = &nix_hw->txsch[lvl];
 
 	if ((lvl >= hw->cap.nix_tx_aggr_lvl &&
@@ -3321,6 +3344,9 @@ static int nix_tx_vtag_free(struct rvu *rvu, int blkaddr,
 		return NIX_AF_ERR_INVALID_NIXBLK;
 
 	vlan = &nix_hw->txvlan;
+	if (index < 0 || index >= vlan->rsrc.max)
+		return NIX_AF_ERR_PARAM;
+
 	if (vlan->entry2pfvf_map[index] != pcifunc)
 		return NIX_AF_ERR_PARAM;
 
@@ -3408,6 +3434,15 @@ static int nix_tx_vtag_decfg(struct rvu *rvu, int blkaddr,
 		return NIX_AF_ERR_INVALID_NIXBLK;
 
 	vlan = &nix_hw->txvlan;
+
+	if (req->tx.free_vtag0 &&
+	    (idx0 < 0 || idx0 >= vlan->rsrc.max))
+		return NIX_AF_ERR_PARAM;
+
+	if (req->tx.free_vtag1 &&
+	    (idx1 < 0 || idx1 >= vlan->rsrc.max))
+		return NIX_AF_ERR_PARAM;
+
 	if (req->tx.free_vtag0 && req->tx.free_vtag1)
 		if (vlan->entry2pfvf_map[idx0] != pcifunc ||
 		    vlan->entry2pfvf_map[idx1] != pcifunc)
@@ -7271,13 +7306,16 @@ int rvu_mbox_handler_nix_mcast_grp_update(struct rvu *rvu,
 	struct nix_mcast_grp_elem *elem;
 	struct nix_mcast_grp *mcast_grp;
 	int blkaddr, err, npc_blkaddr;
-	u16 prev_count, new_count;
+	u64 prev_count, new_count;
 	struct nix_mcast *mcast;
 	struct nix_hw *nix_hw;
 	int i, ret;
 
 	if (!req->num_mce_entry)
 		return 0;
+
+	if (req->num_mce_entry > NIX_MCE_ENTRY_MAX)
+		return NIX_AF_ERR_PARAM;
 
 	err = nix_get_struct_ptrs(rvu, req->hdr.pcifunc, &nix_hw, &blkaddr);
 	if (err)
