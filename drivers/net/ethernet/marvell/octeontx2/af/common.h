@@ -7,6 +7,7 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <linux/overflow.h>
 #include "rvu_struct.h"
 
 #define OTX2_ALIGN			128  /* Align to cacheline */
@@ -59,7 +60,9 @@ static inline int qmem_alloc(struct device *dev, struct qmem **q,
 	qmem = *q;
 
 	qmem->entry_sz = entry_sz;
-	qmem->alloc_sz = (qsize * entry_sz) + OTX2_ALIGN;
+	if (check_mul_overflow(qsize, entry_sz, &qmem->alloc_sz) ||
+	    check_add_overflow(qmem->alloc_sz, (int)OTX2_ALIGN, &qmem->alloc_sz))
+		return -ENOMEM;
 	qmem->base = dma_alloc_attrs(dev, qmem->alloc_sz, &qmem->iova,
 				     GFP_ATOMIC, DMA_ATTR_FORCE_CONTIGUOUS);
 	if (!qmem->base)
