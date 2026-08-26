@@ -152,41 +152,42 @@ static void __init otx2_bert_print_all(struct acpi_bert_region *region, unsigned
 					pr_info("%s error_type: %d, %s\n",
 						pfx, mem_err->error_type,
 						otx2_cper_mem_err_type_str(mem_err->error_type));
+				n = 0;
 				if (mem_err->validation_bits & CPER_MEM_VALID_NODE)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 							"node:%d ", mem_err->node);
 				if (mem_err->validation_bits & CPER_MEM_VALID_CARD)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"card:%d ", mem_err->card);
 				if (mem_err->validation_bits & CPER_MEM_VALID_MODULE)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"module:%d ", mem_err->module);
 				if (mem_err->validation_bits & CPER_MEM_VALID_RANK_NUMBER)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"rank:%d ", mem_err->rank);
 				if (mem_err->validation_bits & CPER_MEM_VALID_BANK)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"bank:%d ", mem_err->bank);
 				if (mem_err->validation_bits & CPER_MEM_VALID_DEVICE)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"device:%d ", mem_err->device);
 				if (mem_err->validation_bits & CPER_MEM_VALID_ROW)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"row:%d ", mem_err->row);
 				if (mem_err->validation_bits & CPER_MEM_VALID_COLUMN)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"column:%d ", mem_err->column);
 				if (mem_err->validation_bits & CPER_MEM_VALID_BIT_POSITION)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"bit_position:%d ", mem_err->bit_pos);
 				if (mem_err->validation_bits & CPER_MEM_VALID_REQUESTOR_ID)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"requestor_id:0x%016llx ", mem_err->requestor_id);
 				if (mem_err->validation_bits & CPER_MEM_VALID_RESPONDER_ID)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"responder_id:0x%016llx ", mem_err->responder_id);
 				if (mem_err->validation_bits & CPER_MEM_VALID_TARGET_ID)
-					n += scnprintf(msg + n, sizeof(msg) - n,
+					n += scnprintf(msg + n, sizeof(buff) - n,
 						"target_id:0x%016llx ", mem_err->target_id);
 				pr_info("%s%s\n", pfx, buff);
 			} else if (guid_equal(sec_type, &CPER_SEC_PROC_ARM)) {
