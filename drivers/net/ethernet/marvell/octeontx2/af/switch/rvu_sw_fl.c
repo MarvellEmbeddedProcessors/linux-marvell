@@ -124,6 +124,9 @@ int rvu_sw_fl_stats_sync2db(struct rvu *rvu, struct fl_info *fl, int cnt)
 	u64 pkts;
 	int idx;
 
+	if (cnt <= 0 || cnt > 64)
+		return -EINVAL;
+
 	for (int i = 0; i < cnt; i++) {
 		tot++;
 		if (fl[i].uni_di)
