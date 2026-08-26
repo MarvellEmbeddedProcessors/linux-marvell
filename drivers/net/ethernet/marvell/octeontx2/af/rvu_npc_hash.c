@@ -1250,7 +1250,8 @@ done:
  *	table.
  *	Return: 0 upon success.
  */
-static int rvu_npc_exact_del_table_entry_by_id(struct rvu *rvu, u32 seq_id)
+static int rvu_npc_exact_del_table_entry_by_id(struct rvu *rvu, u32 seq_id,
+					       u16 pcifunc)
 {
 	struct npc_exact_table_entry *entry = NULL;
 	struct npc_exact_table *table;
@@ -1269,6 +1270,11 @@ static int rvu_npc_exact_del_table_entry_by_id(struct rvu *rvu, u32 seq_id)
 		dev_dbg(rvu->dev, "%s: failed to find entry for id=%d\n", __func__, seq_id);
 		mutex_unlock(&table->lock);
 		return -ENODATA;
+	}
+
+	if (entry->pcifunc != pcifunc) {
+		mutex_unlock(&table->lock);
+		return -ESRCH;
 	}
 
 	cnt = (entry->opc_type == NPC_EXACT_OPC_CAM) ? &table->cam_tbl_entry_cnt :
@@ -1586,7 +1592,7 @@ int rvu_npc_exact_mac_addr_reset(struct rvu *rvu, struct cgx_mac_addr_reset_req 
 
 	pfvf = rvu_get_pfvf(rvu, req->hdr.pcifunc);
 
-	rc = rvu_npc_exact_del_table_entry_by_id(rvu, seq_id);
+	rc = rvu_npc_exact_del_table_entry_by_id(rvu, seq_id, req->hdr.pcifunc);
 	if (rc) {
 		/* TODO: how to handle this error case ? */
 		dev_err(rvu->dev, "%s MAC (%pM) del PF=%d failed\n", __func__, pfvf->mac_addr, pf);
@@ -1639,6 +1645,10 @@ int rvu_npc_exact_mac_addr_update(struct rvu *rvu,
 		mutex_unlock(&table->lock);
 		return LMAC_AF_ERR_EXACT_MATCH_TBL_LOOK_UP_FAILED;
 	}
+	if (entry->pcifunc != req->hdr.pcifunc) {
+		mutex_unlock(&table->lock);
+		return LMAC_AF_ERR_PERM_DENIED;
+	}
 	ether_addr_copy(old_mac, entry->mac);
 	seq_id = entry->seq_id;
 	mcam_idx = entry->mcam_idx;
@@ -1655,7 +1665,7 @@ int rvu_npc_exact_mac_addr_update(struct rvu *rvu,
 	}
 
 	/* Try deleting and adding it again */
-	rc = rvu_npc_exact_del_table_entry_by_id(rvu, req->index);
+	rc = rvu_npc_exact_del_table_entry_by_id(rvu, req->index, req->hdr.pcifunc);
 	if (rc) {
 		/* This could be a new entry */
 		dev_dbg(rvu->dev, "%s MAC (%pM) del PF=%d failed\n", __func__,
@@ -1730,7 +1740,7 @@ int rvu_npc_exact_mac_addr_del(struct rvu *rvu,
 	int pf = rvu_get_pf(req->hdr.pcifunc);
 	int rc;
 
-	rc = rvu_npc_exact_del_table_entry_by_id(rvu, req->index);
+	rc = rvu_npc_exact_del_table_entry_by_id(rvu, req->index, req->hdr.pcifunc);
 	if (!rc) {
 		dev_dbg(rvu->dev, "%s del to PF=%d success (seq_id=%u)\n",
 			__func__, pf, req->index);
@@ -1778,7 +1788,7 @@ int rvu_npc_exact_mac_addr_set(struct rvu *rvu, struct cgx_mac_addr_set_or_get *
 	}
 
 	/* Try deleting and adding it again */
-	rc = rvu_npc_exact_del_table_entry_by_id(rvu, req->index);
+	rc = rvu_npc_exact_del_table_entry_by_id(rvu, req->index, req->hdr.pcifunc);
 	if (rc) {
 		dev_dbg(rvu->dev, "%s MAC (%pM) del PF=%d failed\n",
 			__func__, pfvf->mac_addr, pf);
@@ -1860,7 +1870,7 @@ void rvu_npc_exact_reset(struct rvu *rvu, u16 pcifunc)
 			pcifunc, seq_id);
 
 		mutex_unlock(&table->lock);
-		rvu_npc_exact_del_table_entry_by_id(rvu, seq_id);
+		rvu_npc_exact_del_table_entry_by_id(rvu, seq_id, pcifunc);
 		mutex_lock(&table->lock);
 	}
 	mutex_unlock(&table->lock);
