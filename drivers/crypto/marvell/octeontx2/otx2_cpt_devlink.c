@@ -32,10 +32,10 @@ static int cn20k_cpt_set_cq_enable(struct devlink *dl, u32 id,
 		}
 		cn20k_setup_completion_queues(lfs);
 		lfs->cq_ena = ctx->val.vbool;
-	} else if (!ctx->val.vbool && lfs->cq_ena){
+	} else if (!ctx->val.vbool && lfs->cq_ena) {
+		lfs->cq_ena = false;
 		cn20k_cptlf_disable_cqueues(lfs);
 		cn20k_cpt_free_completion_queues(lfs);
-		lfs->cq_ena = ctx->val.vbool;
 	}
 
 	return 0;
