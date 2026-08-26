@@ -597,15 +597,18 @@ static ssize_t dpi_device_config_store(struct device *dev,
 	struct dpipf *dpi = pci_get_drvdata(pdev);
 	struct dpipf_vf *dpivf;
 
+	if (count > sizeof(mbox_msg))
+		return -EINVAL;
+
 	memcpy(&mbox_msg, buf, count);
 	if (mbox_msg.s.vfid > dpi->total_vfs) {
 		dev_err(dev, "Invalid vfid:%d\n", mbox_msg.s.vfid);
-		return -1;
+		return -EINVAL;
 	}
 	dpivf = &dpi->vf[mbox_msg.s.vfid];
 
 	if (queue_config(dpi, dpivf, &mbox_msg) < 0)
-		return -1;
+		return -EINVAL;
 
 	return sizeof(mbox_msg);
 }
