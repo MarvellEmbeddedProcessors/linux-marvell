@@ -221,7 +221,7 @@ int rvu_mbox_handler_ml_attach_resources(struct rvu *rvu,
 	struct rvu_hwinfo *hw = rvu->hw;
 	struct rvu_block *block;
 	u64 lf_map[ML_NUM_LF_MAPS];
-	int slot, lf;
+	int slot, lf, err = 0;
 	int map_idx;
 	int map_shift;
 	u64 cfg;
@@ -243,6 +243,7 @@ int rvu_mbox_handler_ml_attach_resources(struct rvu *rvu,
 		dev_err(&rvu->pdev->dev,
 			"Func 0x%x: Invalid MLLF req, %d > max %d\n", pcifunc,
 			attach->mllfs, block->lf.max);
+		mutex_unlock(&rvu->rsrc_lock);
 		return -EINVAL;
 	}
 
@@ -259,8 +260,10 @@ int rvu_mbox_handler_ml_attach_resources(struct rvu *rvu,
 	for (slot = 0; slot < attach->mllfs; slot++) {
 		/* Allocate the resource */
 		lf = rvu_alloc_rsrc(&block->lf);
-		if (lf < 0)
-			return 0;
+		if (lf < 0) {
+			err = lf;
+			goto exit;
+		}
 
 		cfg = (1ULL << 63) | (pcifunc << 8) | slot;
 		rvu_write64(rvu, BLKADDR_ML,
@@ -278,7 +281,7 @@ int rvu_mbox_handler_ml_attach_resources(struct rvu *rvu,
 exit:
 	mutex_unlock(&rvu->rsrc_lock);
 
-	return 0;
+	return err;
 
 fail:
 	mutex_unlock(&rvu->rsrc_lock);
