@@ -397,7 +397,7 @@ static int ecdsa_sign(struct akcipher_request *req)
 	} else if (diff < 0) {
 		/* given hash is longer, we take the left-most bytes */
 		sg_copy_to_buffer(req->src, sg_nents_for_len(req->src, req->src_len),
-				  rawhash_k, req->src_len);
+				  rawhash_k, keylen);
 	}
 
 	ecc_swap_digits((u64 *)rawhash_k, hash, ctx->curve->g.ndigits);
@@ -495,15 +495,20 @@ int ecc_get_pub_key(void *context, size_t hdrlen, unsigned char tag,
 		     const void *value, size_t vlen)
 {
 	struct ecc_ctx *ctx = context;
+	unsigned int ndigits = ctx->curve->g.ndigits;
+	/* 1 byte unused-bits count + 1 byte '04' point-format tag + X,Y coordinates */
+	size_t expected = 2 + 2 * ndigits * sizeof(u64);
+	const u64 *digits;
 	const char *d = value;
-	const u64 *digits = (const u64 *)&d[2];
-	unsigned int ndigits;
+
+	if (vlen < expected)
+		return -EINVAL;
 
 	/* we only accept uncompressed format indicated by '4' */
 	if (d[1] != 4)
 		return -EINVAL;
 
-	ndigits = ctx->curve->g.ndigits;
+	digits = (const u64 *)&d[2];
 	memcpy(ctx->pub_key.x, digits, ndigits * sizeof(u64));
 	memcpy(ctx->pub_key.y, &digits[ndigits], ndigits * sizeof(u64));
 
