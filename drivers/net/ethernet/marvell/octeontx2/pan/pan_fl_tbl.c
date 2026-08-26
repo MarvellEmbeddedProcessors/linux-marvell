@@ -560,6 +560,16 @@ static int pan_fl_tbl_debugfs_init(void)
 	return 0;
 }
 
+static void pan_fl_tbl_node_free_rcu(struct rcu_head *head)
+{
+	struct pan_fl_tbl_node *node = container_of(head,
+						    struct pan_fl_tbl_node,
+						    rcu);
+
+	free_percpu(node->hits);
+	kvfree(node);
+}
+
 int pan_fl_tbl_offl_del(struct pan_tuple *tuple)
 {
 	struct pan_fl_tbl_res *res, *rpair;
@@ -595,8 +605,6 @@ int pan_fl_tbl_offl_del(struct pan_tuple *tuple)
 		goto err;
 	}
 
-	free_percpu(node->hits);
-
 	res = &node->res;
 
 	if (res->pair) {
@@ -624,7 +632,7 @@ int pan_fl_tbl_offl_del(struct pan_tuple *tuple)
 	if (res->opq)
 		kfree_rcu(res->opq, rcu);
 
-	kvfree_rcu(node, rcu);
+	call_rcu(&node->rcu, pan_fl_tbl_node_free_rcu);
 
 err:
 	rcu_read_unlock_bh();
@@ -659,8 +667,6 @@ int pan_fl_tbl_del(struct pan_tuple *tuple)
 		goto err;
 	}
 
-	free_percpu(node->hits);
-
 	res = &node->res;
 
 	if (res->pair) {
@@ -687,7 +693,8 @@ int pan_fl_tbl_del(struct pan_tuple *tuple)
 
 	if (res->opq)
 		kfree_rcu(res->opq, rcu);
-	kvfree_rcu(node, rcu);
+
+	call_rcu(&node->rcu, pan_fl_tbl_node_free_rcu);
 
 err:
 	rcu_read_unlock_bh();
