@@ -1219,6 +1219,13 @@ void rvu_npc_update_flowkey_alg_idx(struct rvu *rvu, u16 pcifunc, int nixlf,
 	}
 
 	if (index < 0) {
+		/* CN20K GEN PF/VF (SDP) functions have no reserved NIXLF_UCAST
+		 * MCAM entry; RSS/flow steering is done via per-ring MCAM rules
+		 * installed by the SDP extension driver. Skip quietly instead of
+		 * logging a spurious error.
+		 */
+		if (is_cn20k(rvu->pdev) && is_sdp_pfvf(rvu, pcifunc))
+			return;
 		dev_err(rvu->dev,
 			"%s: Error to get ucast entry for pcifunc=%#x\n",
 			__func__, pcifunc);

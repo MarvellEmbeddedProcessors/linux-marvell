@@ -1253,8 +1253,13 @@ static int rvu_sdp_init_block(struct rvu_block *block, void *data)
 	/* Channel Configuration */
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, 0);
 	num_chan = rvu_read64(rvu, blkaddr, NIX_AF_CONST1) & 0XFFFUL;
-	regval = rvu->hw->sdp_chan_base;
-	regval |= ilog2(num_chan) << 16;
+	regval = FIELD_PREP(SDP_AF_LINK_CFG_BASE_CHAN_MASK, rvu->hw->sdp_chan_base);
+	regval |= FIELD_PREP(SDP_AF_LINK_CFG_LOG2_RANGE_MASK, ilog2(num_chan));
+	/* Select a valid x2p req bus so the SDP link is active for both
+	 * directions (p2x and x2p); BUS_SELECT == 0 disables the link.
+	 */
+	regval |= FIELD_PREP(SDP_AF_LINK_CFG_BUS_SELECT_MASK,
+			     SDP_AF_LINK_CFG_BUS_SELECT_X2P);
 	rvu_write64(rvu, block->addr, SDP_AF_LINK_CFG, regval);
 
 	/* BPFLR_D disable clearing BP in FLR */

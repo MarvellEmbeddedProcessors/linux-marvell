@@ -17,10 +17,20 @@
 /* SDP PF number */
 static int sdp_pf_num[MAX_SDP] = {-1, -1};
 
+/* On CN20K the SoC-side SDP endpoints are the GEN PFs
+ * (PF61 .. PF61+MAX_EPFS-1), provisioned by firmware rather than
+ * enumerated as legacy SDP PCI PFs.
+ */
+#define RVU_GEN_PF_START	61
+
 bool is_sdp_pfvf(struct rvu *rvu, u16 pcifunc)
 {
 	u16 pf = rvu_get_pf(rvu->pdev, pcifunc);
 	u32 found = 0, i = 0;
+
+	if (is_cn20k(rvu->pdev))
+		return (pf >= RVU_GEN_PF_START &&
+			pf < RVU_GEN_PF_START + MAX_EPFS);
 
 	while (i < MAX_SDP) {
 		if (pf == sdp_pf_num[i])

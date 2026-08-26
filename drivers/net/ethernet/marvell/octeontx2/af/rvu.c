@@ -1796,7 +1796,8 @@ int rvu_get_nix_blkaddr(struct rvu *rvu, u16 pcifunc)
 	}
 
 	/* if SDP1 then the blkaddr is NIX1 */
-	if (is_sdp_pfvf(rvu, pcifunc) && pf->sdp_info->node_id == 1)
+	if (is_sdp_pfvf(rvu, pcifunc) && pf->sdp_info &&
+	    pf->sdp_info->node_id == 1)
 		blkaddr = BLKADDR_NIX1;
 
 	switch (blkaddr) {

@@ -13,6 +13,15 @@
 /* SDP CSR */
 #define SDP_AF_GBL_CONTROL		           (0x4090000)
 #define SDP_AF_LINK_CFG		                   (0x4090100)
+/* SDP_AF_LINK_CFG fields */
+#define SDP_AF_LINK_CFG_BASE_CHAN_MASK		   GENMASK_ULL(11, 0)
+#define SDP_AF_LINK_CFG_LOG2_RANGE_MASK		   GENMASK_ULL(19, 16)
+#define SDP_AF_LINK_CFG_BUS_SELECT_MASK		   GENMASK_ULL(21, 20)
+/* BUS_SELECT picks one of the two x2p req buses; valid values are 1 and 2.
+ * A zero BUS_SELECT leaves the SDP<->NIX link inactive in both directions
+ * (p2x/x2p), so a valid bus must be programmed for packets to flow.
+ */
+#define SDP_AF_LINK_CFG_BUS_SELECT_X2P		   1ULL
 #define SDP_AF_CONST				   (0x4090038)
 #define SDP_AF_ACCESS_CTL			   (0x4090018)
 #define SDP_NUMBER_OF_RINGS_IMPL		   GENMASK_ULL(31, 16)

@@ -453,6 +453,30 @@ static int nix_interface_init(struct rvu *rvu, u16 pcifunc, int type, int nixlf,
 
 		break;
 	case NIX_INTF_TYPE_SDP:
+		/* CN20K GEN PF/VF: the SDP extension driver owns SDP ring
+		 * allocation and installs per-ring MCAM entries. Here we only
+		 * need to point the NIXLF at the SDP channel range and SDP TX
+		 * link. No promisc entry is installed (the per-ring MCAM
+		 * entries already steer traffic to the LF).
+		 */
+		if (is_cn20k(rvu->pdev)) {
+			pfvf->rx_chan_base = rvu_nix_chan_sdp(rvu, 0);
+			pfvf->rx_chan_cnt = 1;
+			pfvf->tx_chan_base = pfvf->rx_chan_base;
+			pfvf->tx_chan_cnt = 1;
+			rsp->tx_link = hw->cgx_links + hw->lbk_links;
+			/* The SDP extension driver owns SDP ring MCAM entries
+			 * and steers traffic to this LF via per-ring rules.
+			 * Skip the promisc/ucast/bcast entries and the bcast
+			 * MCE replication list update installed below (there is
+			 * no NIXLF_UCAST/BCAST MCAM entry reserved for these
+			 * GEN PF/VF functions, so those installs would fail).
+			 */
+			pfvf->maxlen = NIC_HW_MIN_FRS;
+			pfvf->minlen = NIC_HW_MIN_FRS;
+			return 0;
+		}
+
 		from_vf = !!(pcifunc & RVU_PFVF_FUNC_MASK);
 		parent_pf = &rvu->pf[rvu_get_pf(rvu->pdev, pcifunc)];
 		sdp_info = parent_pf->sdp_info;
