@@ -108,6 +108,9 @@ int npa_cn20k_dpc_free(struct rvu *rvu, struct npa_cn20k_dpc_free_req *req)
 	struct rvu_pfvf *pfvf;
 	u64 val, lfmask;
 
+	if (req->cntr_id >= rvu->npa_dpc.max)
+		return -EINVAL;
+
 	pfvf = rvu_get_pfvf(rvu, pcifunc);
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NPA, 0);
