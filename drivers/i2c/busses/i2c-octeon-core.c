@@ -518,7 +518,7 @@ static int octeon_i2c_hlc_read(struct octeon_i2c *i2c, struct i2c_msg *msgs)
 	/* SIZE */
 	cmd |= (u64)(msgs[0].len - 1) << SW_TWSI_SIZE_SHIFT;
 	/* A */
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
+	cmd |= (u64)(msgs[0].addr & 0x3ffull) << SW_TWSI_ADDR_SHIFT;
 
 	octeon_i2c_writeq_flush(cmd, i2c->twsi_base + OCTEON_REG_SW_TWSI(i2c));
 	ret = octeon_i2c_hlc_wait(i2c);
@@ -555,7 +555,7 @@ static int octeon_i2c_hlc_write(struct octeon_i2c *i2c, struct i2c_msg *msgs)
 	/* SIZE */
 	cmd |= (u64)(msgs[0].len - 1) << SW_TWSI_SIZE_SHIFT;
 	/* A */
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
+	cmd |= (u64)(msgs[0].addr & 0x3ffull) << SW_TWSI_ADDR_SHIFT;
 
 	for (i = 0, j = msgs[0].len - 1; i  < msgs[0].len && i < 4; i++, j--)
 		cmd |= (u64)msgs[0].buf[j] << (8 * i);
@@ -632,7 +632,7 @@ static int octeon_i2c_hlc_comp_read(struct octeon_i2c *i2c, struct i2c_msg *msgs
 	/* SIZE */
 	cmd |= (u64)(msgs[1].len - 1) << SW_TWSI_SIZE_SHIFT;
 	/* A */
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
+	cmd |= (u64)(msgs[0].addr & 0x3ffull) << SW_TWSI_ADDR_SHIFT;
 
 	/* Send core command */
 	ret = octeon_i2c_hlc_read_cmd(i2c, msgs[0], cmd);
@@ -669,7 +669,7 @@ static int octeon_i2c_hlc_comp_write(struct octeon_i2c *i2c, struct i2c_msg *msg
 	/* SIZE */
 	cmd |= (u64)(msgs[1].len - 1) << SW_TWSI_SIZE_SHIFT;
 	/* A */
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
+	cmd |= (u64)(msgs[0].addr & 0x3ffull) << SW_TWSI_ADDR_SHIFT;
 
 	/* Set parameters for extended message (if required) */
 	set_ext = octeon_i2c_hlc_ext(i2c, msgs[0], &cmd, &ext);
@@ -724,7 +724,7 @@ static int octeon_i2c_hlc_block_comp_read(struct octeon_i2c *i2c, struct i2c_msg
 
 	/* Prepare core command */
 	cmd = SW_TWSI_V | SW_TWSI_R | SW_TWSI_SOVR | SW_TWSI_OP_7_IA;
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
+	cmd |= (u64)(msgs[0].addr & 0x3ffull) << SW_TWSI_ADDR_SHIFT;
 
 	/* Send core command */
 	ret = octeon_i2c_hlc_read_cmd(i2c, msgs[0], cmd);
@@ -779,7 +779,7 @@ static int octeon_i2c_hlc_block_comp_write(struct octeon_i2c *i2c, struct i2c_ms
 
 	/* Prepare core command */
 	cmd = SW_TWSI_V | SW_TWSI_SOVR | SW_TWSI_OP_7_IA;
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
+	cmd |= (u64)(msgs[0].addr & 0x3ffull) << SW_TWSI_ADDR_SHIFT;
 
 	/* Set parameters for extended message (if required) */
 	set_ext = octeon_i2c_hlc_ext(i2c, msgs[0], &cmd, &ext);
