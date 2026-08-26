@@ -28,18 +28,33 @@ int rvu_mbox_handler_swdev2af_notify(struct rvu *rvu,
 				     struct swdev2af_notify_req *req,
 				     struct msg_rsp *rsp)
 {
+	u16 pcifunc = req->hdr.pcifunc;
 	int rc = 0;
 
 	switch (req->msg_type) {
 	case SWDEV2AF_MSG_TYPE_FW_STATUS:
-		rc = rvu_sw_l2_init_offl_wq(rvu, req->pcifunc, req->fw_up);
+		if (req->fw_up) {
+			if (rvu->rswitch.flags & RVU_SWITCH_FLAG_FW_READY)
+				return -EEXIST;
+		} else {
+			if (!(rvu->rswitch.flags & RVU_SWITCH_FLAG_FW_READY) ||
+			    pcifunc != rvu->rswitch.pcifunc)
+				return -EPERM;
+		}
+		rc = rvu_sw_l2_init_offl_wq(rvu, pcifunc, req->fw_up);
 		break;
 
 	case SWDEV2AF_MSG_TYPE_REFRESH_FDB:
+		if (!(rvu->rswitch.flags & RVU_SWITCH_FLAG_FW_READY) ||
+		    pcifunc != rvu->rswitch.pcifunc)
+			return -EPERM;
 		rc = rvu_sw_l2_fdb_list_entry_add(rvu, req->pcifunc, req->mac);
 		break;
 
 	case SWDEV2AF_MSG_TYPE_REFRESH_FL:
+		if (!(rvu->rswitch.flags & RVU_SWITCH_FLAG_FW_READY) ||
+		    pcifunc != rvu->rswitch.pcifunc)
+			return -EPERM;
 		rc = rvu_sw_fl_stats_sync2db(rvu, req->fl, req->cnt);
 		break;
 	}
