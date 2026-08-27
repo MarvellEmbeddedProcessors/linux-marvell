@@ -7,6 +7,7 @@
 #include <linux/bitfield.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/sched.h>
 
 #include "cn20k/api.h"
 #include "rvu_struct.h"
@@ -478,6 +479,121 @@ static void npa_ctx_free(struct rvu *rvu, struct rvu_pfvf *pfvf)
 	pfvf->npa_qints_ctx = NULL;
 }
 
+/* CN20K NPA context-cache flood workaround.
+ *
+ * On CN20K the shared NPA context CAM can retain stale (invalidated) tags
+ * after an LF reset. When a real context later reuses the same IOVA, the stale
+ * tag causes a false hit that blocks the context write-back. Work around it by
+ * flooding the CAM, right after the LF reset, with filler aura+pool contexts
+ * that live in permanent, disjoint DMA buffers: every INIT is a CAM miss that
+ * evicts a resident (stale) tag, and the filler tags only ever alias the
+ * never-reused flood buffers rather than any real context IOVA.
+ *
+ * Flood size is fixed at 8K auras + 8K pools.
+ */
+#define NPA_FLOOD_AURA_SZ	NPA_AURA_SZ_8K
+#define NPA_FLOOD_COUNT		NPA_AURA_COUNT(NPA_FLOOD_AURA_SZ)	/* 8192 */
+
+static void npa_cache_flood(struct rvu *rvu, int blkaddr,
+			    struct rvu_block *block, int npalf)
+{
+	struct admin_queue *aq = block->aq;
+	u32 aura_hwctx_size, pool_hwctx_size;
+	struct npa_aq_inst_s inst;
+	u64 ctx_cfg, cfg;
+	u32 i, count;
+	int rc = 0;
+
+	if (!is_cn20k(rvu->pdev) || !aq)
+		return;
+
+	ctx_cfg = rvu_read64(rvu, blkaddr, NPA_AF_CONST1);
+	aura_hwctx_size = 1UL << (ctx_cfg & 0xF);
+	pool_hwctx_size = 1UL << ((ctx_cfg >> 4) & 0xF);
+
+	/* Allocate the flood buffers once and keep them for the lifetime of the
+	 * driver so their IOVA ranges are never recycled into a real context.
+	 */
+	if (!rvu->npa_flood_ctx &&
+	    qmem_alloc(rvu->dev, &rvu->npa_flood_ctx,
+		       NPA_FLOOD_COUNT, aura_hwctx_size)) {
+		rvu->npa_flood_ctx = NULL;
+		dev_warn(rvu->dev, "NPA cache flood: aura buffer alloc failed, skipping\n");
+		return;
+	}
+	if (!rvu->npa_flood_pool_ctx &&
+	    qmem_alloc(rvu->dev, &rvu->npa_flood_pool_ctx,
+		       NPA_FLOOD_COUNT, pool_hwctx_size)) {
+		rvu->npa_flood_pool_ctx = NULL;
+		dev_warn(rvu->dev, "NPA cache flood: pool buffer alloc failed, skipping\n");
+		return;
+	}
+
+	count = min3((u32)NPA_FLOOD_COUNT, rvu->npa_flood_ctx->qsize,
+		     rvu->npa_flood_pool_ctx->qsize);
+
+	/* Point the LF's local aura table at the flood buffer, size it to cover
+	 * the filler auras and enable context caching (BIT34). The alloc path
+	 * reprograms this to the real context base afterwards, so there is
+	 * nothing to undo here.
+	 */
+	cfg = rvu_read64(rvu, blkaddr, NPA_AF_LFX_AURAS_CFG(npalf));
+	cfg &= ~(BIT_ULL(34) - 1);
+	cfg |= ((u64)NPA_FLOOD_AURA_SZ << 16) | BIT_ULL(34);
+	rvu_write64(rvu, blkaddr, NPA_AF_LFX_AURAS_CFG(npalf), cfg);
+	rvu_write64(rvu, blkaddr, NPA_AF_LFX_LOC_AURAS_BASE(npalf),
+		    (u64)rvu->npa_flood_ctx->iova);
+
+	memset(&inst, 0, sizeof(inst));
+	inst.lf = npalf;
+	inst.res_addr = (u64)aq->res->iova;
+
+	for (i = 0; i < count; i++) {
+		u64 pool_iova = rvu->npa_flood_pool_ctx->iova +
+				(u64)i * rvu->npa_flood_pool_ctx->entry_sz;
+		struct npa_aura_s *au;
+
+		inst.cindex = i;
+
+		/* Keep aq->lock across the aura and pool INIT: they share the
+		 * single result buffer. The AURA INIT installs filler aura[i]
+		 * carrying pool_addr into the disjoint pool buffer, so the POOL
+		 * INIT can resolve aura->pool. INIT is the CAM miss that drives
+		 * eviction; no WRITE/READ is needed.
+		 */
+		spin_lock(&aq->lock);
+
+		memset(aq->res->base, 0, aq->res->entry_sz);
+		au = (struct npa_aura_s *)(aq->res->base + 128);
+		au->pool_addr = pool_iova;
+		inst.ctype = NPA_AQ_CTYPE_AURA;
+		inst.op = NPA_AQ_INSTOP_INIT;
+		rc = npa_aq_enqueue_wait(rvu, block, &inst);
+		if (rc) {
+			spin_unlock(&aq->lock);
+			break;
+		}
+
+		memset(aq->res->base, 0, aq->res->entry_sz);
+		inst.ctype = NPA_AQ_CTYPE_POOL;
+		inst.op = NPA_AQ_INSTOP_INIT;
+		rc = npa_aq_enqueue_wait(rvu, block, &inst);
+
+		spin_unlock(&aq->lock);
+		if (rc)
+			break;
+	}
+
+	if (rc)
+		dev_warn(rvu->dev, "NPA cache flood aborted at %u/%u (%d)\n",
+			 i, count, rc);
+	else
+		dev_dbg(rvu->dev,
+			 "NPA cache flood done: %u aura+pool INIT at aura base 0x%llx pool base 0x%llx\n",
+			 count, (u64)rvu->npa_flood_ctx->iova,
+			 (u64)rvu->npa_flood_pool_ctx->iova);
+}
+
 int rvu_mbox_handler_npa_lf_alloc(struct rvu *rvu,
 				  struct npa_lf_alloc_req *req,
 				  struct npa_lf_alloc_rsp *rsp)
@@ -515,6 +631,9 @@ int rvu_mbox_handler_npa_lf_alloc(struct rvu *rvu,
 		dev_err(rvu->dev, "Failed to reset NPALF%d\n", npalf);
 		return NPA_AF_ERR_LF_RESET;
 	}
+
+	/* Flood the shared NPA context CAM after the reset (CN20K workaround) */
+	npa_cache_flood(rvu, blkaddr, block, npalf);
 
 	npa_lf_cache_sync(rvu, blkaddr, npalf);
 
@@ -726,6 +845,11 @@ void rvu_npa_freemem(struct rvu *rvu)
 	block = &hw->block[blkaddr];
 	rvu_aq_free(rvu, block->aq);
 	kfree(rvu->npa_dpc.bmap);
+
+	qmem_free(rvu->dev, rvu->npa_flood_ctx);
+	rvu->npa_flood_ctx = NULL;
+	qmem_free(rvu->dev, rvu->npa_flood_pool_ctx);
+	rvu->npa_flood_pool_ctx = NULL;
 }
 
 void rvu_npa_lf_teardown(struct rvu *rvu, u16 pcifunc, int npalf)

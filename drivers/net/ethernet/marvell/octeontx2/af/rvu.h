@@ -810,6 +810,12 @@ struct rvu {
 
 	/* NPA */
 	struct rsrc_bmap	npa_dpc;
+	/* Persistent, disjoint DMA buffers used by the CN20K NPA context-cache
+	 * flood workaround. Allocated once and kept for the driver lifetime so
+	 * their IOVA ranges are never recycled into a real context.
+	 */
+	struct qmem		*npa_flood_ctx;
+	struct qmem		*npa_flood_pool_ctx;
 
 	struct rvu_cpt		cpt;
 
