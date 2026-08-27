@@ -1089,26 +1089,18 @@ static int otx2_get_fecparam(struct net_device *netdev,
 			     struct ethtool_fecparam *fecparam)
 {
 	struct otx2_nic *pfvf = netdev_priv(netdev);
-	struct cgx_fw_data *rsp;
-	const int fec[] = {
-		ETHTOOL_FEC_OFF,
-		ETHTOOL_FEC_BASER,
-		ETHTOOL_FEC_RS,
-		ETHTOOL_FEC_BASER | ETHTOOL_FEC_RS};
-#define FEC_MAX_INDEX 4
-	if (pfvf->linfo.fec < FEC_MAX_INDEX)
-		fecparam->active_fec = fec[pfvf->linfo.fec];
 
-	rsp = otx2_get_fwdata(pfvf);
-	if (IS_ERR(rsp))
-		return PTR_ERR(rsp);
-
-	if (rsp->fwdata.supported_fec < FEC_MAX_INDEX) {
-		if (!rsp->fwdata.supported_fec)
-			fecparam->fec = ETHTOOL_FEC_NONE;
-		else
-			fecparam->fec = fec[pfvf->linfo.fec];
+	if (pfvf->configured_fec_valid) {
+		otx2_nic_fill_fecparam(pfvf, fecparam);
+		return 0;
 	}
+
+	if (pfvf->linfo.link_up && pfvf->linfo.fec <= OTX2_FEC_RS)
+		fecparam->active_fec = otx2_fec_to_ethtool(pfvf->linfo.fec);
+	else
+		fecparam->active_fec = ETHTOOL_FEC_NONE;
+	fecparam->fec = ETHTOOL_FEC_NONE;
+
 	return 0;
 }
 
@@ -1138,7 +1130,7 @@ static int otx2_set_fecparam(struct net_device *netdev,
 		return -EINVAL;
 	}
 
-	if (fec == pfvf->linfo.fec)
+	if (otx2_nic_fec_is_configured(pfvf, fec))
 		return 0;
 
 	mutex_lock(&mbox->lock);
@@ -1160,7 +1152,7 @@ static int otx2_set_fecparam(struct net_device *netdev,
 	}
 
 	if (rsp->fec >= 0)
-		pfvf->linfo.fec = rsp->fec;
+		otx2_nic_fec_set_configured(pfvf, fec);
 	else
 		err = rsp->fec;
 end:

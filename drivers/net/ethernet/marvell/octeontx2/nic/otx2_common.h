@@ -593,6 +593,8 @@ struct otx2_nic {
 	u16			bpid[NIX_MAX_BPID_CHAN];
 	struct otx2_vf_config	*vf_configs;
 	struct cgx_link_user_info linfo;
+	int  configured_fec;
+	bool configured_fec_valid;
 
 	/* NPC MCAM */
 	struct otx2_flow_config	*flow_cfg;
@@ -680,6 +682,44 @@ struct otx2_nic {
 	struct sdp_vf_cfg	sdp_cfg;
 	bool			netdev_registered;
 };
+
+static inline u32 otx2_fec_to_ethtool(int fec)
+{
+	switch (fec) {
+	case OTX2_FEC_NONE:
+	case OTX2_FEC_OFF:
+		return ETHTOOL_FEC_OFF;
+	case OTX2_FEC_BASER:
+		return ETHTOOL_FEC_BASER;
+	case OTX2_FEC_RS:
+		return ETHTOOL_FEC_RS;
+	default:
+		return ETHTOOL_FEC_NONE;
+	}
+}
+
+static inline bool otx2_nic_fec_is_configured(struct otx2_nic *pfvf, int fec)
+{
+	return pfvf->configured_fec_valid && pfvf->configured_fec == fec;
+}
+
+static inline void otx2_nic_fec_set_configured(struct otx2_nic *pfvf, int fec)
+{
+	pfvf->configured_fec = fec;
+	pfvf->configured_fec_valid = true;
+}
+
+static inline void otx2_nic_fill_fecparam(struct otx2_nic *pfvf,
+					  struct ethtool_fecparam *fecparam)
+{
+	u32 configured = otx2_fec_to_ethtool(pfvf->configured_fec);
+
+	fecparam->fec = configured;
+	if (pfvf->linfo.link_up && pfvf->linfo.fec <= OTX2_FEC_RS)
+		fecparam->active_fec = otx2_fec_to_ethtool(pfvf->linfo.fec);
+	else
+		fecparam->active_fec = configured;
+}
 
 static inline bool is_otx2_lbkvf(struct pci_dev *pdev)
 {
