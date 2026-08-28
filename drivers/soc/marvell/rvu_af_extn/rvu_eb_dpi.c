@@ -20,22 +20,27 @@
 /* DPI_ENGX_BUF 8 KB FIFO for 0,1,2,3 engines, 16KB for 4,5
  * need to check for 6,7!!
  */
-static unsigned long eng_fifo_buf = 0x101008080808;
+static unsigned long eng_fifo_buf = 0x12001E183C3C1E1E;
 
-#define DPI_MAX_ENGINES	6
+#define DPI_MAX_ENGINES        8
 
 #define DPI_ENG_BUF_BLKS(x)			((x) & 0x1fULL)
 #define DPI_ENG_BUF_GET_BLKS(x)			((x) & 0x1fULL)
-#define DPI_DMA_CONTROL_DMA_ENB(x)              (((x) & 0x3fULL) << 48)
+#define DPI_DMA_CONTROL_DMA_ENB(x)              (((x) & 0xffULL) << 48)
 #define DPI_CTL_EN                              (0x1ULL)
 
 #define DPI_EBUS_MRRS_MIN			128
 #define DPI_EBUS_MRRS_MAX			1024
 #define DPI_EBUS_MPS_MIN			128
 #define DPI_EBUS_MPS_MAX			1024
+#define DPI_EBUS_MRRS_DEFAULT			512
+#define DPI_EBUS_MPS_DEFAULT			512
 #define DPI_EBUS_MAX_PORTS			2
 #define DPI_EBUS_PORTX_CFG_MRRS(x)		(((x) & 0x7) << 0)
 #define DPI_EBUS_PORTX_CFG_MPS(x)		(((x) & 0x7) << 4)
+#define DPI_EBUS_PORTX_CFG_MOLR(x)		((((x) & 0x3ffULL)) << 8)
+#define DPI_EBUS_PORTX_CFG_MOLR_MASK		GENMASK_ULL(17, 8)
+#define DPI_EBUS_PORTX_CFG_MPS_LIM		BIT_ULL(20)
 
 #define RL_PERIOD 8
 #define RL_BURST_TH 64
@@ -74,9 +79,10 @@ static unsigned long eng_fifo_buf = 0x101008080808;
 #define DPI_DMA_CONTROL_ZBWCSEN			(0x1ULL << 39)
 #define DPI_DMA_CONTROL_WQECSOFF(offset)	(((u64)offset) << 40)
 #define DPI_DMA_CONTROL_WQECSDIS		(0x1ULL << 47)
-#define DPI_DMA_CONTROL_UIO_DIS			(0x1ULL << 55)
-#define DPI_DMA_CONTROL_PKT_EN			(0x1ULL << 56)
-#define DPI_DMA_CONTROL_PORT1_EN		(0x1ULL << 57)
+#define DPI_DMA_CONTROL_UIO_DIS			(0x1ULL << 56)
+#define DPI_DMA_CONTROL_PKT_EN			(0x1ULL << 57)
+#define DPI_DMA_CONTROL_PORT1_EN		(0x1ULL << 58)
+#define DPI_DMA_CONTROL_DMA_ENG6_EN		(0x1ULL << 54)
 #define DPI_DMA_CONTROL_FFP_DIS			(0x1ULL << 59)
 
 #define DPI_WPORT				(0x1ULL << 4)
@@ -1129,10 +1135,11 @@ static int rvu_dpi_init_block(struct rvu_block *block, void *data)
 	rvu_write64(rvu, blkaddr, DPI_AF_CHAN_HSEL, 0ULL);
 
 	val = 0ULL;
-	val =  (DPI_DMA_CONTROL_ZBWCSEN | DPI_DMA_CONTROL_PKT_EN |
-		DPI_DMA_CONTROL_LDWB | DPI_DMA_CONTROL_O_MODE);
+	val = (DPI_DMA_CONTROL_ZBWCSEN | DPI_DMA_CONTROL_PKT_EN |
+	       DPI_DMA_CONTROL_LDWB | DPI_DMA_CONTROL_O_MODE |
+	       DPI_DMA_CONTROL_UIO_DIS);
 
-	val |= DPI_DMA_CONTROL_DMA_ENB(0x3fULL);
+	val |= DPI_DMA_CONTROL_DMA_ENB(0xffULL);
 
 	rvu_write64(rvu, blkaddr, DPI_AF_DMA_CONTROL, val);
 	rvu_write64(rvu, blkaddr, DPI_AF_CTL, DPI_CTL_EN);
@@ -1141,22 +1148,24 @@ static int rvu_dpi_init_block(struct rvu_block *block, void *data)
 	val = (DPI_RD_FIFO_MAX_TH << 16) | DPI_NCB_MAX_MOLR;
 	rvu_write64(rvu, blkaddr, DPI_AF_NCB_CFG, val);
 
-	/* Configure MPS and MRRS for DPI */
-	mrrs = DPI_EBUS_MRRS_MIN;
+	/* Configure MPS and MRRS for DPI (512 bytes per CN20K CSR settings) */
+	mrrs = DPI_EBUS_MRRS_DEFAULT;
 	mrrs_val = fls(mrrs) - 8;
 
-	mps = DPI_EBUS_MPS_MIN;
+	mps = DPI_EBUS_MPS_DEFAULT;
 	mps_val = fls(mps) - 8;
 
 	for (port = 0; port < DPI_EBUS_MAX_PORTS; port++) {
 		val = rvu_read64(rvu, blkaddr,
 				 DPI_AF_EBUS_PORTX_CFG(port));
 		val &= ~(DPI_EBUS_PORTX_CFG_MRRS(0x7) |
-			 DPI_EBUS_PORTX_CFG_MPS(0x7));
-		val |= (DPI_EBUS_PORTX_CFG_MPS(mps_val) |
-			DPI_EBUS_PORTX_CFG_MRRS(mrrs_val));
-		/* EXACT_RD_DIS, MOLR, MPS_LIM, MRRS */
-		val |= (DPI_EBUS_MAX_MOLR << 8) | BIT_ULL(7) | BIT_ULL(20);
+			 DPI_EBUS_PORTX_CFG_MPS(0x7) |
+			 DPI_EBUS_PORTX_CFG_MOLR_MASK |
+			 BIT_ULL(7) | DPI_EBUS_PORTX_CFG_MPS_LIM);
+		val |= DPI_EBUS_PORTX_CFG_MPS(mps_val) |
+		       DPI_EBUS_PORTX_CFG_MRRS(mrrs_val) |
+		       DPI_EBUS_PORTX_CFG_MOLR(DPI_EBUS_MAX_MOLR) |
+		       DPI_EBUS_PORTX_CFG_MPS_LIM;
 		rvu_write64(rvu, blkaddr,
 			    DPI_AF_EBUS_PORTX_CFG(port), val);
 	}
