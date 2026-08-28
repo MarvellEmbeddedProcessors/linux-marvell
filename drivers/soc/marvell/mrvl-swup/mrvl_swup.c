@@ -396,6 +396,7 @@ static int mrvl_run_fw_update(unsigned long arg)
 	struct smc_update_descriptor *smc_desc;
 	struct arm_smccc_res res, res_update;
 	int spi_in_progress = 0;
+	bool async;
 
 	ktime_t tstart, tsyncend, tend;
 
@@ -417,7 +418,9 @@ static int mrvl_run_fw_update(unsigned long arg)
 		return -EFAULT;
 	}
 
-	pr_info("Update request: SPI: %d, CS: %d, Image Size: %llx, User Size: %llx, Timeout: %d, Flags: %llx/%llx/%llx\n",
+	async = !(ioctl_desc.compatibility_flags & UPDATE_COMPAT_FLAG_FORCE_SYNC);
+
+	pr_info("Update request: SPI: %d, CS: %d, Image Size: %llx, User Size: %llx, Timeout: %d, Flags: %llx/%llx/%llx, Async: %d\n",
 							ioctl_desc.bus,
 							ioctl_desc.cs,
 							ioctl_desc.image_size,
@@ -425,7 +428,8 @@ static int mrvl_run_fw_update(unsigned long arg)
 							ioctl_desc.timeout,
 							ioctl_desc.flags,
 							ioctl_desc.user_flags,
-							ioctl_desc.compatibility_flags);
+							ioctl_desc.compatibility_flags,
+							async);
 
 	/*Verify data size*/
 	if (ioctl_desc.image_size > memdesc[BUF_CPIO].size) {
@@ -459,15 +463,22 @@ static int mrvl_run_fw_update(unsigned long arg)
 	smc_desc->output_console = memdesc[BUF_SMCLOG].phys;
 	smc_desc->output_console_size = memdesc[BUF_SMCLOG].size;
 
-	/* In linux use asynchronous SPI operation */
-	smc_desc->async_spi = 1;
-
 	/* SPI config */
 	smc_desc->bus        = ioctl_desc.bus;
 	smc_desc->cs	     = ioctl_desc.cs;
 
-	/* Use full async update*/
-	smc_desc->retcode = 0x01;
+	/*
+	 * Default to asynchronous SPI operation; the caller can request a
+	 * synchronous update via UPDATE_COMPAT_FLAG_FORCE_SYNC.
+	 */
+	if (async) {
+		smc_desc->async_spi = 1;
+		/* Use full async update */
+		smc_desc->retcode = 0x01;
+	} else {
+		smc_desc->async_spi = 0;
+		smc_desc->retcode = 0;
+	}
 
 	tstart = ktime_get();
 	if (ioctl_desc.compatibility_flags & UPDATE_COMPAT_FLAG_USE_OLD_VERSION_BEFORE_LOG) {
@@ -487,23 +498,28 @@ static int mrvl_run_fw_update(unsigned long arg)
 	}
 
 	tsyncend = ktime_get();
-	do {
-		msleep(500);
-		res = mrvl_exec_smc(PLAT_CN10K_ASYNC_STATUS, 0, 0);
-		spi_in_progress = res.a0;
-	} while (spi_in_progress);
+	if (async) {
+		do {
+			msleep(500);
+			res = mrvl_exec_smc(PLAT_CN10K_ASYNC_STATUS, 0, 0);
+			spi_in_progress = res.a0;
+		} while (spi_in_progress);
 
-	/* Detect if ATF will use async operations
-	 * ATF without full async support won't modify
-	 * smc_desc->retcode field
-	 */
+		/* Detect if ATF will use async operations
+		 * ATF without full async support won't modify
+		 * smc_desc->retcode field
+		 */
 
-	if (smc_desc->retcode == 0x01) {
-		pr_info("ATF - partial async enabled\n");
-		ioctl_desc.ret = res_update.a1;
+		if (smc_desc->retcode == 0x01) {
+			pr_info("ATF - partial async enabled\n");
+			ioctl_desc.ret = res_update.a1;
+		} else {
+			pr_info("ATF - full async enabled\n");
+			ioctl_desc.ret = smc_desc->retcode;
+		}
 	} else {
-		pr_info("ATF - full async enabled\n");
-		ioctl_desc.ret = smc_desc->retcode;
+		pr_info("ATF - synchronous update\n");
+		ioctl_desc.ret = res_update.a1;
 	}
 
 

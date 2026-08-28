@@ -317,6 +317,8 @@ struct smc_update_obj_info {
 /** Compatibility flag */
 #define UPDATE_COMPAT_FLAG_USE_OLD_VERSION_BEFORE_LOG	BIT(0)
 #define UPDATE_COMPAT_FLAG_USE_OLD_VERSION_100			BIT(1)
+/** Force synchronous SMC update; when clear the update runs asynchronously */
+#define UPDATE_COMPAT_FLAG_FORCE_SYNC				BIT(2)
 
 /** Offset from the beginning of the flash where the backup image is located */
 #define BACKUP_IMAGE_OFFSET	0x2000000
@@ -408,6 +410,8 @@ enum read_flash_ret {
 #define READ_FLAG_DEBUG			BIT(1)
 /** Compatibility flag */
 #define READ_COMPAT_FLAG_USE_OLD_VERSION_BEFORE_LOG	BIT(0)
+/** Reserved: force synchronous read; requires ATF sync-read support (not yet available) */
+#define READ_COMPAT_FLAG_FORCE_SYNC			BIT(2)
 /** Read flag */
 #define READ_IOCTL_FLAG_DEBUG	BIT(0)
 
