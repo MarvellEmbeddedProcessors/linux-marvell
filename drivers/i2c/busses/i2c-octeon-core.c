@@ -31,6 +31,23 @@
 #define TWSI_SLAVE_ADDR_EXT_MASK	0xff
 #define TWSI_SLAVE_ADDR_SHIFT		1
 #endif
+/*
+ * Build the address bytes for a 10-bit I2C transfer on the LLC (low-level
+ * controller / manual bit-bang) path.
+ *
+ * 10-bit I2C address format:
+ *   first byte  = 11110 A9 A8 R/W
+ *   second byte = A7..A0
+ */
+static inline u8 octeon_i2c_10bit_addr_hi(int target, bool read)
+{
+	return 0xf0 | ((target >> 7) & 0x06) | read;
+}
+
+static inline u8 octeon_i2c_10bit_addr_lo(int target)
+{
+	return target & 0xff;
+}
 
 /* interrupt service routine */
 irqreturn_t octeon_i2c_isr(int irq, void *dev_id)
@@ -391,10 +408,24 @@ error:
 	return (ret) ? ret : -EAGAIN;
 }
 
-/* send STOP to the bus */
-static void octeon_i2c_stop(struct octeon_i2c *i2c)
+/**
+ * octeon_i2c_stop - send STOP to the bus, waiting for the controller to
+ *                   confirm the STOP condition has actually completed
+ * @i2c: The struct octeon_i2c
+ *
+ * Returns 0 on success, otherwise a negative errno.
+ */
+static int octeon_i2c_stop(struct octeon_i2c *i2c)
 {
+	int ret;
+
 	octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB | TWSI_CTL_STP);
+
+	ret = octeon_i2c_wait(i2c);
+	if (ret == -ETIMEDOUT)
+		return octeon_i2c_recovery(i2c);
+
+	return 0;
 }
 
 /**
@@ -410,12 +441,56 @@ static void octeon_i2c_stop(struct octeon_i2c *i2c)
  * Returns: 0 on success, otherwise a negative errno.
  */
 static int octeon_i2c_read(struct octeon_i2c *i2c, int target,
-			   u8 *data, u16 *rlength, bool recv_len)
+			   u8 *data, u16 *rlength, bool recv_len,
+			   bool ten_bit, bool ten_bit_addr_pending)
 {
 	int i, result, length = *rlength;
 	bool final_read = false;
 
-	octeon_i2c_data_write(i2c, (target << 1) | 1);
+	if (ten_bit) {
+		if (ten_bit_addr_pending) {
+			/*
+			 * Standalone 10-bit read: address not yet selected
+			 * on the bus, so send the full write-address phase
+			 * before the repeated START.
+			 */
+			octeon_i2c_data_write(i2c, octeon_i2c_10bit_addr_hi(target, false));
+			octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
+
+			result = octeon_i2c_wait(i2c);
+			if (result)
+				return result;
+
+			result = octeon_i2c_check_status(i2c, false);
+			if (result)
+				return result;
+
+			octeon_i2c_data_write(i2c, octeon_i2c_10bit_addr_lo(target));
+			octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
+
+			result = octeon_i2c_wait(i2c);
+			if (result)
+				return result;
+
+			result = octeon_i2c_check_status(i2c, false);
+			if (result)
+				return result;
+
+			result = octeon_i2c_start(i2c);
+			if (result)
+				return result;
+		}
+		/*
+		 * Address already selected -- either by the preceding
+		 * write to the same 10-bit address (repeated START was
+		 * already issued by the caller), or by the repeated
+		 * START just issued above. Only the high address byte
+		 * with R/W=1 is required here.
+		 */
+		octeon_i2c_data_write(i2c, octeon_i2c_10bit_addr_hi(target, true));
+	} else {
+		octeon_i2c_data_write(i2c, (target << 1) | 1);
+	}
 	octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
 
 	result = octeon_i2c_wait(i2c);
@@ -478,16 +553,33 @@ static int octeon_i2c_read(struct octeon_i2c *i2c, int target,
  * Returns: 0 on success, otherwise a negative errno.
  */
 static int octeon_i2c_write(struct octeon_i2c *i2c, int target,
-			    const u8 *data, int length)
+			    const u8 *data, int length, bool ten_bit)
 {
 	int i, result;
 
-	octeon_i2c_data_write(i2c, target << 1);
+	if (ten_bit)
+		octeon_i2c_data_write(i2c, octeon_i2c_10bit_addr_hi(target, false));
+	else
+		octeon_i2c_data_write(i2c, target << 1);
 	octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
 
 	result = octeon_i2c_wait(i2c);
 	if (result)
 		return result;
+
+	if (ten_bit) {
+		result = octeon_i2c_check_status(i2c, false);
+		if (result)
+			return result;
+
+		/* Send the 10-bit low address byte before the payload. */
+		octeon_i2c_data_write(i2c, octeon_i2c_10bit_addr_lo(target));
+		octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB);
+
+		result = octeon_i2c_wait(i2c);
+		if (result)
+			return result;
+	}
 
 	for (i = 0; i < length; i++) {
 		result = octeon_i2c_check_status(i2c, false);
@@ -502,7 +594,14 @@ static int octeon_i2c_write(struct octeon_i2c *i2c, int target,
 			return result;
 	}
 
-	return 0;
+	/*
+	 * Confirm (and clear) the ACK status of the final byte too --
+	 * otherwise it is left pending for whatever operation the
+	 * caller issues next (e.g. a repeated START for a following
+	 * message, or a fresh START from an unrelated transaction),
+	 * which can corrupt that next operation.
+	 */
+	return octeon_i2c_check_status(i2c, false);
 }
 
 /* high-level-controller pure read of up to 8 bytes */
@@ -701,6 +800,53 @@ err:
 	return ret;
 }
 
+/*
+ * Legacy "0x78 trick" compatibility.
+ *
+ * Stock tools (i2cget/i2cset/i2ctransfer -f) cannot request 10-bit
+ * addressing, so a 10-bit device is historically reached via a 7-bit address
+ * in the I2C-reserved range 0x78-0x7b (11110 A9 A8) with the low address byte
+ * passed as the first written data byte. Rebuild that pattern into a proper
+ * I2C_M_TEN transfer. Only local copies of the descriptors are touched; the
+ * caller's msgs array is left intact so retries stay safe.
+ *
+ * 0x78-0x7f are reserved and never used by a compliant 7-bit device, so this
+ * cannot hijack a legitimate transfer.
+ */
+static int octeon_i2c_convert_10bit_trick(struct i2c_msg *msgs, int num,
+					  struct i2c_msg *conv)
+{
+	u16 real_addr;
+	int i, ci = 0;
+
+	if (num < 1 || num > 2 ||
+	    (msgs[0].flags & (I2C_M_TEN | I2C_M_RD)) ||
+	    msgs[0].addr < 0x78 || msgs[0].addr > 0x7b || msgs[0].len < 1)
+		return 0;
+
+	real_addr = ((msgs[0].addr & 0x03) << 8) | msgs[0].buf[0];
+
+	/* Rebuilt write, minus the consumed low 10-bit address byte. */
+	if (msgs[0].len > 1) {
+		conv[ci] = msgs[0];
+		conv[ci].buf++;
+		conv[ci].len--;
+		ci++;
+	}
+
+	/* Trailing message, typically the read. */
+	if (num == 2)
+		conv[ci++] = msgs[1];
+
+	/* Retarget the rebuilt message(s) at the real 10-bit address. */
+	for (i = 0; i < ci; i++) {
+		conv[i].addr = real_addr;
+		conv[i].flags |= I2C_M_TEN;
+	}
+
+	return ci;
+}
+
 /**
  * octeon_i2c_hlc_block_comp_read - high-level-controller composite block read
  * @i2c: The struct octeon_i2c
@@ -836,7 +982,10 @@ err:
 int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	struct octeon_i2c *i2c = i2c_get_adapdata(adap);
-	int i, ret = 0;
+	int i, ret = 0, stop_ret;
+	struct i2c_msg conv[2];
+	int orig_num = num;
+	int conv_num;
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 	unsigned long flags;
 	bool has_slave;
@@ -849,7 +998,18 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	if (has_slave)
 		synchronize_irq(i2c->irq);
 #endif
-
+	/*
+	 * Transparently convert the legacy 0x78-0x7b "trick" addressing into a
+	 * real 10-bit transfer so unmodified stock tools keep working. Note the
+	 * conversion may collapse the caller's two messages (address-only write
+	 * plus read) into a single 10-bit message; orig_num is reported back on
+	 * success so the caller still sees all of its messages as processed.
+	 */
+	conv_num = octeon_i2c_convert_10bit_trick(msgs, num, conv);
+	if (conv_num) {
+		msgs = conv;
+		num = conv_num;
+	}
 	if (IS_LS_FREQ(i2c->twsi_freq)) {
 		if (num == 1) {
 			if (msgs[0].len > 0 && msgs[0].len <= 8) {
@@ -884,11 +1044,29 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 
 	for (i = 0; ret == 0 && i < num; i++) {
 		struct i2c_msg *pmsg = &msgs[i];
+		bool ten_bit = pmsg->flags & I2C_M_TEN;
+		bool ten_bit_addr_pending = true;
 
 		/* zero-length messages are not supported */
 		if (!pmsg->len) {
 			ret = -EOPNOTSUPP;
 			break;
+		}
+
+		/*
+		 * A 10-bit read immediately following a 10-bit write to the
+		 * same address has already had its address phase sent as
+		 * part of that write, and the repeated START below already
+		 * provides the required bus condition -- only the high
+		 * address byte with R/W=1 needs to be resent.
+		 */
+		if (ten_bit && (pmsg->flags & I2C_M_RD) && i > 0) {
+			struct i2c_msg *prev = &msgs[i - 1];
+
+			if (!(prev->flags & I2C_M_RD) &&
+			    (prev->flags & I2C_M_TEN) &&
+			    prev->addr == pmsg->addr)
+				ten_bit_addr_pending = false;
 		}
 
 		ret = octeon_i2c_start(i2c);
@@ -897,12 +1075,15 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 
 		if (pmsg->flags & I2C_M_RD)
 			ret = octeon_i2c_read(i2c, pmsg->addr, pmsg->buf,
-					      &pmsg->len, pmsg->flags & I2C_M_RECV_LEN);
+					      &pmsg->len, pmsg->flags & I2C_M_RECV_LEN,
+					      ten_bit, ten_bit_addr_pending);
 		else
 			ret = octeon_i2c_write(i2c, pmsg->addr, pmsg->buf,
-					       pmsg->len);
+					       pmsg->len, ten_bit);
 	}
-	octeon_i2c_stop(i2c);
+	stop_ret = octeon_i2c_stop(i2c);
+	if (ret == 0)
+		ret = stop_ret;
 out:
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 	spin_lock_irqsave(&i2c->lock, flags);
@@ -911,7 +1092,7 @@ out:
 	i2c->is_master_xfer = false;
 	spin_unlock_irqrestore(&i2c->lock, flags);
 #endif
-	return (ret != 0) ? ret : num;
+	return (ret != 0) ? ret : orig_num;
 }
 
 /* calculate and set clock divisors */
