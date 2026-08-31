@@ -117,7 +117,8 @@ static void octeon_i2c_hlc_int_enable(struct octeon_i2c *i2c)
 
 static u32 octeon_i2c_functionality(struct i2c_adapter *adap)
 {
-	return I2C_FUNC_I2C | (I2C_FUNC_SMBUS_EMUL & ~I2C_FUNC_SMBUS_QUICK) |
+	return I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR |
+	       (I2C_FUNC_SMBUS_EMUL & ~I2C_FUNC_SMBUS_QUICK) |
 	       I2C_FUNC_SMBUS_READ_BLOCK_DATA | I2C_SMBUS_BLOCK_PROC_CALL;
 }
 

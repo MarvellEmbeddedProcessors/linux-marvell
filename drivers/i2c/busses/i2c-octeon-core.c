@@ -518,6 +518,33 @@ static int octeon_i2c_write(struct octeon_i2c *i2c, int target,
 	return octeon_i2c_check_status(i2c, false);
 }
 
+/*
+ * Compose the opcode + device-address field of an HLC core command.
+ *
+ * @msg: message whose addr/flags select the addressing mode
+ * @op7: the 7-bit master-mode opcode for this operation
+ *       (SW_TWSI_OP_7 for a plain op, SW_TWSI_OP_7_IA for a combined op)
+ *
+ * When the message carries I2C_M_TEN the native 10-bit opcode is selected
+ * (SW_TWSI_OP_7 -> SW_TWSI_OP_10, SW_TWSI_OP_7_IA -> SW_TWSI_OP_10_IA) and the
+ * full 10-bit device address is placed in ADDR<9:0>. The controller then
+ * generates both 10-bit address phases (11110 A9 A8 R/W + low byte) in
+ * hardware, so no software emulation of the address bytes is required.
+ * Otherwise a 7-bit op with ADDR<6:0> is used.
+ */
+static u64 octeon_i2c_hlc_op_addr(const struct i2c_msg *msg, u64 op7)
+{
+	u64 op = op7;
+	u64 addr = msg->addr & 0x7full;
+
+	if (msg->flags & I2C_M_TEN) {
+		op |= SW_TWSI_OP_10;
+		addr = msg->addr & 0x3ffull;
+	}
+
+	return op | (addr << SW_TWSI_ADDR_SHIFT);
+}
+
 /* high-level-controller pure read of up to 8 bytes */
 static int octeon_i2c_hlc_read(struct octeon_i2c *i2c, struct i2c_msg *msgs)
 {
@@ -530,13 +557,8 @@ static int octeon_i2c_hlc_read(struct octeon_i2c *i2c, struct i2c_msg *msgs)
 	cmd = SW_TWSI_V | SW_TWSI_R | SW_TWSI_SOVR;
 	/* SIZE */
 	cmd |= (u64)(msgs[0].len - 1) << SW_TWSI_SIZE_SHIFT;
-	/* A */
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
-
-	if (msgs[0].flags & I2C_M_TEN)
-		cmd |= SW_TWSI_OP_10;
-	else
-		cmd |= SW_TWSI_OP_7;
+	/* OP + device address (native 7-bit or 10-bit addressing) */
+	cmd |= octeon_i2c_hlc_op_addr(&msgs[0], SW_TWSI_OP_7);
 
 	octeon_i2c_writeq_flush(cmd, i2c->twsi_base + SW_TWSI(i2c));
 	ret = octeon_i2c_hlc_wait(i2c);
@@ -572,13 +594,8 @@ static int octeon_i2c_hlc_write(struct octeon_i2c *i2c, struct i2c_msg *msgs)
 	cmd = SW_TWSI_V | SW_TWSI_SOVR;
 	/* SIZE */
 	cmd |= (u64)(msgs[0].len - 1) << SW_TWSI_SIZE_SHIFT;
-	/* A */
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
-
-	if (msgs[0].flags & I2C_M_TEN)
-		cmd |= SW_TWSI_OP_10;
-	else
-		cmd |= SW_TWSI_OP_7;
+	/* OP + device address (native 7-bit or 10-bit addressing) */
+	cmd |= octeon_i2c_hlc_op_addr(&msgs[0], SW_TWSI_OP_7);
 
 	for (i = 0, j = msgs[0].len - 1; i  < msgs[0].len && i < 4; i++, j--)
 		cmd |= (u64)msgs[0].buf[j] << (8 * i);
@@ -615,13 +632,8 @@ static int octeon_i2c_hlc_comp_read(struct octeon_i2c *i2c, struct i2c_msg *msgs
 	cmd = SW_TWSI_V | SW_TWSI_R | SW_TWSI_SOVR;
 	/* SIZE */
 	cmd |= (u64)(msgs[1].len - 1) << SW_TWSI_SIZE_SHIFT;
-	/* A */
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
-
-	if (msgs[0].flags & I2C_M_TEN)
-		cmd |= SW_TWSI_OP_10_IA;
-	else
-		cmd |= SW_TWSI_OP_7_IA;
+	/* OP + device address (native 7-bit or 10-bit addressing) */
+	cmd |= octeon_i2c_hlc_op_addr(&msgs[0], SW_TWSI_OP_7_IA);
 
 	if (msgs[0].len == 2) {
 		u64 ext = 0;
@@ -670,13 +682,8 @@ static int octeon_i2c_hlc_comp_write(struct octeon_i2c *i2c, struct i2c_msg *msg
 	cmd = SW_TWSI_V | SW_TWSI_SOVR;
 	/* SIZE */
 	cmd |= (u64)(msgs[1].len - 1) << SW_TWSI_SIZE_SHIFT;
-	/* A */
-	cmd |= (u64)(msgs[0].addr & 0x7full) << SW_TWSI_ADDR_SHIFT;
-
-	if (msgs[0].flags & I2C_M_TEN)
-		cmd |= SW_TWSI_OP_10_IA;
-	else
-		cmd |= SW_TWSI_OP_7_IA;
+	/* OP + device address (native 7-bit or 10-bit addressing) */
+	cmd |= octeon_i2c_hlc_op_addr(&msgs[0], SW_TWSI_OP_7_IA);
 
 	if (msgs[0].len == 2) {
 		cmd |= SW_TWSI_EIA;
@@ -790,7 +797,20 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	}
 
 	if (num == 1 && i2c->twsi_freq <= FREQ_400KHZ) {
-		if (msgs[0].len > 0 && msgs[0].len <= 8) {
+		/*
+		 * A standalone 10-bit read must first select the device with
+		 * a write-direction address phase (11110 A9 A8 0 + low byte),
+		 * then repeated-START into the read phase (11110 A9 A8 1). No
+		 * HLC fast path does this: the native OP_10 read emits only
+		 * the read phase, and the base OP_7_IA combined read stalls on
+		 * the reserved 0x78 prefix -- both return the R bit clear and
+		 * silently yield all-zero data (the classic "w1@0x78 <lo> r5"
+		 * failure, seen with and without 10-bit support). Only the LLC
+		 * loop (octeon_i2c_read()) emits both phases, so keep 10-bit
+		 * reads off the fast path.
+		 */
+		if (msgs[0].len > 0 && msgs[0].len <= 8 &&
+		    !((msgs[0].flags & I2C_M_RD) && (msgs[0].flags & I2C_M_TEN))) {
 			if (msgs[0].flags & I2C_M_RD)
 				ret = octeon_i2c_hlc_read(i2c, msgs);
 			else
