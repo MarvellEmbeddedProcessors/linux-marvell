@@ -1012,7 +1012,20 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	}
 	if (IS_LS_FREQ(i2c->twsi_freq)) {
 		if (num == 1) {
-			if (msgs[0].len > 0 && msgs[0].len <= 8) {
+			/*
+			 * A standalone 10-bit read must first select the device with
+			 * a write-direction address phase (11110 A9 A8 0 + low byte),
+			 * then repeated-START into the read phase (11110 A9 A8 1). No
+			 * HLC fast path does this: the native OP_10 read emits only
+			 * the read phase, and the base OP_7_IA combined read stalls on
+			 * the reserved 0x78 prefix -- both return the R bit clear and
+			 * silently yield all-zero data (the classic "w1@0x78 <lo> r5"
+			 * failure, seen with and without 10-bit support). Only the LLC
+			 * loop (octeon_i2c_read()) emits both phases, so keep 10-bit
+			 * reads off the fast path.
+			 */
+			if (msgs[0].len > 0 && msgs[0].len <= 8 &&
+			    !((msgs[0].flags & I2C_M_RD) && (msgs[0].flags & I2C_M_TEN))) {
 				if (msgs[0].flags & I2C_M_RD)
 					ret = octeon_i2c_hlc_read(i2c, msgs);
 				else
