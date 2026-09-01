@@ -43,6 +43,7 @@ static const u32 cgx_speed_mbps[CGX_LINK_SPEED_MAX] = {
 	[CGX_LINK_50G] = 50000,
 	[CGX_LINK_80G] = 80000,
 	[CGX_LINK_100G] = 100000,
+	[CGX_LINK_200G] = 200000,
 };
 
 /* Convert firmware lmac type encoding to string */
@@ -56,6 +57,7 @@ static const char *cgx_lmactype_string[LMAC_MODE_MAX] = {
 	[LMAC_MODE_25G_R] = "25G_R",
 	[LMAC_MODE_50G_R] = "50G_R",
 	[LMAC_MODE_100G_R] = "100G_R",
+	[LMAC_MODE_200G_R] = "200G_R",
 	[LMAC_MODE_USXGMII] = "USXGMII",
 	[LMAC_MODE_USGMII] = "USGMII",
 };
@@ -2284,7 +2286,7 @@ static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		err = -ENOMEM;
 		goto err_release_regions;
 	}
-	
+
 	cgx->cgx_id = (pci_resource_start(pdev, PCI_CFG_REG_BAR_NUM) >> 24)
 		& CGX_ID_MASK;
 
