@@ -165,7 +165,13 @@ int rvu_mbox_handler_cplt_rpm_link_event(struct rvu *rvu,
 {
 	struct cplt_evq_entry *qentry;
 	unsigned long flags;
-	int err;
+
+	if (!rvu->cplt_rpm || !rvu->cplt_rpm->cplt_evh_wq) {
+		dev_err(rvu->dev,
+			"CPLT RPM link event before init (chiplet=%u rpm=%u lmac=%u)\n",
+			req->chiplet_id, req->rpm_id, req->lmac_id);
+		return -ENODEV;
+	}
 
 	qentry = kmalloc(sizeof(*qentry), GFP_KERNEL);
 	if (!qentry)
@@ -178,12 +184,7 @@ int rvu_mbox_handler_cplt_rpm_link_event(struct rvu *rvu,
 	qentry->link_event.chiplet_id = req->chiplet_id;
 	qentry->link_event.rpm_id = req->rpm_id;
 	qentry->link_event.lmac_id = req->lmac_id;
-	if (err) {
-		kfree(qentry);
-		goto skip_add;
-	}
 	list_add_tail(&qentry->evq_node, &rvu->cplt_rpm->cplt_evq_head);
-skip_add:
 	spin_unlock_irqrestore(&rvu->cplt_rpm->cplt_evq_lock, flags);
 
 	/* start worker to process the events */
