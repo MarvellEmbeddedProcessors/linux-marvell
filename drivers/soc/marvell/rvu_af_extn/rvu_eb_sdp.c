@@ -493,6 +493,34 @@ static int cn20k_sdp_get_vfrid(struct rvu *rvu, u16 epcifunc)
 	return rid;
 }
 
+static int cn20k_sdp_find_vfrid(struct rvu *rvu, u16 epcifunc)
+{
+	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+	int rid;
+
+	for (rid = 0; rid < sdp->vf_rids.max; rid++) {
+		if (sdp->vf_rsrc_map[rid] == epcifunc)
+			return rid;
+	}
+
+	return -ENOENT;
+}
+
+static void cn20k_sdp_put_vfrid(struct rvu *rvu, u16 epcifunc)
+{
+	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+	int rid;
+
+	rid = cn20k_sdp_find_vfrid(rvu, epcifunc);
+	if (rid < 0)
+		return;
+
+	rvu_write64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(rid),
+		    FIELD_PREP(SDP_AF_VFRID_TBL_VLD, 0));
+	rvu_free_rsrc(&sdp->vf_rids, rid);
+	sdp->vf_rsrc_map[rid] = 0xFFFF;
+}
+
 int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 				     struct sdp_rings_alloc_req *req,
 				     struct sdp_rings_alloc_rsp *rsp)
@@ -504,7 +532,7 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 	int qcount = num_online_cpus();
 	struct sdp_config *sdp_cfg;
 	int ring, rx_entry, slot;
-	u64 cfg, rid_cfg;
+	u64 cfg;
 	int vf_rid, err;
 	u16 host_vf;
 
@@ -529,11 +557,12 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 
 	mutex_lock(&sdp->cfg_lock);
 
-	/* In case of host VF get VF resource id of it */
 	if (host_vf) {
-		vf_rid = cn20k_sdp_get_vfrid(rvu, epcifunc);
+		vf_rid = cn20k_sdp_find_vfrid(rvu, epcifunc);
 		if (vf_rid < 0) {
-			dev_err(rvu->dev, "VF resource id allocation failed\n");
+			dev_err(rvu->dev,
+				"No VF resource id for pcifunc 0x%x (EVF:%d), VF not created\n",
+				epcifunc, host_vf - 1);
 			mutex_unlock(&sdp->cfg_lock);
 			return vf_rid;
 		}
@@ -565,18 +594,8 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 		/* Use hardware ring number as channel number */
 		cfg |= FIELD_PREP(SDP_R_MAP_CHAN_MASK, ring);
 		cfg |= FIELD_PREP(SDP_R_MAP_VLD_MASK, 1);
-		if (host_vf) {
+		if (host_vf)
 			cfg |= FIELD_PREP(SDP_R_MAP_VFRSID_MASK, vf_rid);
-
-			/* Zero based VF id here */
-			rid_cfg = FIELD_PREP(SDP_AF_VFRID_TBL_VF,
-					     get_sdp_evf(epcifunc) - 1);
-			rid_cfg |= FIELD_PREP(SDP_AF_VFRID_TBL_EPF,
-					      get_sdp_epf(epcifunc));
-			rid_cfg |= FIELD_PREP(SDP_AF_VFRID_TBL_VLD, 1);
-			rvu_write64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(vf_rid),
-				    rid_cfg);
-		}
 
 		rvu_write64(rvu, BLKADDR_SDP, SDP_AF_RX_EPF_VF_MAP(ring), cfg);
 
@@ -599,9 +618,6 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 		cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
 					     MBOX_MSG_SDP_RINGS_UPDATE,
 					     SDP_RING_F_ALLOC);
-	} else if (host_vf) { /* None of rings configuration is successful */
-		rvu_free_rsrc(&sdp->vf_rids, vf_rid);
-		sdp->vf_rsrc_map[vf_rid] = 0xFFFF;
 	}
 
 	mutex_unlock(&sdp->cfg_lock);
@@ -653,13 +669,9 @@ int rvu_mbox_handler_sdp_rings_free(struct rvu *rvu,
 	u16 rvu_pcifunc = cn20k_get_rvu_pcifunc(rvu, req->hdr.pcifunc);
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, rvu_pcifunc);
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
-	u16 nr_rings, epcifunc, host_vf;
 	struct sdp_config *sdp_cfg;
-	int rid, rc = 0;
+	u16 nr_rings;
 	u16 slot;
-
-	epcifunc = req->hdr.pcifunc;
-	host_vf = get_sdp_evf(epcifunc);
 
 	sdp_cfg = &pfvf->sdp_cfg;
 	if (!sdp_cfg->nr_rings) {
@@ -673,31 +685,13 @@ int rvu_mbox_handler_sdp_rings_free(struct rvu *rvu,
 	for (slot = 0; slot < nr_rings; slot++)
 		_rvu_sdp_ring_free(rvu, sdp_cfg, slot);
 
-	if (host_vf) {
-		for (rid = 0; rid < sdp->vf_rids.max; rid++) {
-			if (sdp->vf_rsrc_map[rid] == epcifunc)
-				break;
-		}
-
-		if (rid < sdp->vf_rids.max) {
-			rvu_write64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(rid),
-				    FIELD_PREP(SDP_AF_VFRID_TBL_VLD, 0));
-			rvu_free_rsrc(&sdp->vf_rids, rid);
-			sdp->vf_rsrc_map[rid] = 0xFFFF;
-		} else {
-			dev_err(rvu->dev, "VF resource id for EVF:%d not found",
-				host_vf - 1);
-			rc = -EINVAL;
-		}
-	}
-
 	cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
 				     MBOX_MSG_SDP_RINGS_UPDATE,
 				     SDP_RING_F_FREE);
 
 	mutex_unlock(&sdp->cfg_lock);
 
-	return rc;
+	return 0;
 }
 
 int rvu_mbox_handler_sdp_host_alloc_vfs(struct rvu *rvu,
@@ -708,8 +702,34 @@ int rvu_mbox_handler_sdp_host_alloc_vfs(struct rvu *rvu,
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, rvu_pcifunc);
 	struct sdp_config *sdp_cfg = &pfvf->sdp_cfg;
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+	u16 epcifunc = req->hdr.pcifunc;
+	u16 host_epf = get_sdp_epf(epcifunc);
+	u16 vf;
+	int vf_rid;
+	u64 rid_cfg;
+
+	if (req->nr_vfs > SDP_EVF_RSRCID_MAX)
+		return -EINVAL;
 
 	mutex_lock(&sdp->cfg_lock);
+
+	for (vf = 0; vf < req->nr_vfs; vf++) {
+		u16 vf_epcifunc = (host_epf << EPF_PF_SHIFT) |
+				  ((vf + 1) & RVU_PFVF_FUNC_MASK);
+
+		vf_rid = cn20k_sdp_get_vfrid(rvu, vf_epcifunc);
+		if (vf_rid < 0) {
+			dev_err(rvu->dev,
+				"VF resource id allocation failed for VF%d/%d\n",
+				vf, req->nr_vfs);
+			goto unwind;
+		}
+
+		rid_cfg = FIELD_PREP(SDP_AF_VFRID_TBL_VF, vf);
+		rid_cfg |= FIELD_PREP(SDP_AF_VFRID_TBL_EPF, host_epf);
+		rid_cfg |= FIELD_PREP(SDP_AF_VFRID_TBL_VLD, 1);
+		rvu_write64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(vf_rid), rid_cfg);
+	}
 
 	sdp_cfg->nr_host_vfs = req->nr_vfs;
 	cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
@@ -717,6 +737,16 @@ int rvu_mbox_handler_sdp_host_alloc_vfs(struct rvu *rvu,
 	mutex_unlock(&sdp->cfg_lock);
 
 	return 0;
+
+unwind:
+	while (vf--) {
+		u16 vf_epcifunc = (host_epf << EPF_PF_SHIFT) |
+				  ((vf + 1) & RVU_PFVF_FUNC_MASK);
+		cn20k_sdp_put_vfrid(rvu, vf_epcifunc);
+	}
+	mutex_unlock(&sdp->cfg_lock);
+
+	return -ENOSPC;
 }
 
 int rvu_mbox_handler_sdp_host_free_vfs(struct rvu *rvu,
@@ -727,8 +757,17 @@ int rvu_mbox_handler_sdp_host_free_vfs(struct rvu *rvu,
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, rvu_pcifunc);
 	struct sdp_config *sdp_cfg = &pfvf->sdp_cfg;
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+	u16 epcifunc = req->hdr.pcifunc;
+	u16 host_epf = get_sdp_epf(epcifunc);
+	u16 vf;
 
 	mutex_lock(&sdp->cfg_lock);
+
+	for (vf = 0; vf < sdp_cfg->nr_host_vfs; vf++) {
+		u16 vf_epcifunc = (host_epf << EPF_PF_SHIFT) |
+				  ((vf + 1) & RVU_PFVF_FUNC_MASK);
+		cn20k_sdp_put_vfrid(rvu, vf_epcifunc);
+	}
 
 	cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
 				     MBOX_MSG_SDP_FREE_VFS,
