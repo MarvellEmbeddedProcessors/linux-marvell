@@ -1092,7 +1092,7 @@ static int copy_ucode_to_dma_mem(struct device *dev,
 		       ucode_data_ptr, reucode_data->imem_size);
 		/* Byte swap 64-bit */
 		for (i = 0; i < reucode_data->imem_size / sizeof(u64); i++)
-			cpu_to_be64s(&((u64 *)ucode->va)[i]);
+			cpu_to_be64s(&((u64 *)(ucode->va + reucode_data->imem_entry_point))[i]);
 	} else {
 		ucode_data_ptr = (u8 *)ucode_data +
 				 sizeof(struct otx2_cpt_ucode_hdr);
