@@ -863,9 +863,12 @@ void rvu_sso_deinit_xaq_aura(struct rvu *rvu, int blkaddr, int npa_blkaddr,
 			     int aura, int lf)
 {
 	void *free_addr;
+	u8 xaq_64B;
 	u64 reg;
 
 	reg = rvu_read64(rvu, blkaddr, SSO_AF_CONST1);
+	xaq_64B = !!(reg & BIT_ULL(54));
+
 	free_addr = rvu->afreg_base + ((npa_blkaddr << 28) |
 			NPA_AF_BAR2_ALIASX(0, NPA_LF_AURA_OP_FREE0));
 	reg = rvu_read64(rvu, blkaddr, SSO_AF_HWGRPX_AW_CFG(lf));
@@ -881,8 +884,11 @@ void rvu_sso_deinit_xaq_aura(struct rvu *rvu, int blkaddr, int npa_blkaddr,
 	reg = rvu_read64(rvu, blkaddr, SSO_AF_HWGRPX_AW_STATUS(lf));
 	if (reg & SSO_HWGRP_AW_STS_TPTR_NEXT_VLD) {
 		reg = rvu_read64(rvu, blkaddr, SSO_AF_XAQX_TAIL_NEXT(lf));
-		if (npa_blkaddr && reg)
+		if (npa_blkaddr && reg) {
+			if (xaq_64B)
+				reg <<= 1;
 			rvu_sso_store_pair(reg, (u64)aura, free_addr);
+		}
 
 		rvu_write64(rvu, blkaddr, SSO_AF_HWGRPX_AW_STATUS(lf),
 			    SSO_HWGRP_AW_STS_TPTR_NEXT_VLD);
@@ -893,8 +899,11 @@ void rvu_sso_deinit_xaq_aura(struct rvu *rvu, int blkaddr, int npa_blkaddr,
 	if (reg & SSO_HWGRP_AW_STS_TPTR_VLD) {
 		reg = rvu_read64(rvu, blkaddr, SSO_AF_XAQX_TAIL_PTR(lf));
 		reg &= ~0x3F;
-		if (npa_blkaddr && reg)
+		if (npa_blkaddr && reg) {
+			if (xaq_64B)
+				reg <<= 1;
 			rvu_sso_store_pair(reg, (u64)aura, free_addr);
+		}
 
 		rvu_write64(rvu, blkaddr, SSO_AF_HWGRPX_AW_STATUS(lf),
 			    SSO_HWGRP_AW_STS_TPTR_VLD);
