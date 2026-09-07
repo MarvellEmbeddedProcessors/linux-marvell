@@ -1265,8 +1265,9 @@ static long cnf20k_cpri_cdev_ioctl(struct file *filp, unsigned int cmd,
 				irq1 = msix_entries[msix_idx].vector;
 				num_chiplets++;
 			}
-			mrvl_cpri_gpint_create_dev(CPRI_REG_BASE, CPRI_REG_SIZE,
-						   irq0, irq1, num_chiplets);
+		mrvl_cpri_gpint_create_dev(CPRI_REG_BASE, CPRI_REG_SIZE,
+					   irq0, irq1, num_chiplets,
+					   cdev->reg_base);
 			break;
 			}
 

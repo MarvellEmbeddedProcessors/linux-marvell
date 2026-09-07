@@ -38,12 +38,14 @@ typedef int (*connip_irq_cb_t)(u32 instance, u32 pss_int);
 struct mrvl_cpri_hwcfg {
 	u8 num_chiplets;
 	u8 max_mhabs;	/* per chiplet */
+	void __iomem *bphy_reg_base;
 };
 
 struct mrvl_cpri_gpint_ctx {
 	struct pci_dev *pdev;
 	struct msix_entry msix_ent;
 	void __iomem *cpri_regbase;
+	void __iomem *bphy_reg_base;
 	u8 num_chiplets;
 	u8 max_mhabs;
 	int irq[MAX_NUM_CHIPLETS];
@@ -52,6 +54,7 @@ struct mrvl_cpri_gpint_ctx {
 
 struct mrvl_cpri_gpint_ctx *g_drv_ctx;
 
+/* Read/write CPRI IP registers via CPRI BAR (for AXI_INT etc.) */
 static u64 cpri_read_reg(struct mrvl_cpri_gpint_ctx *ml, int chiplet_id, u64 offset)
 {
 	u64 blkaddr;
@@ -92,9 +95,51 @@ static void cpri_write_reg(struct mrvl_cpri_gpint_ctx *ml, int chiplet_id, u64 o
 	writeq(val, ml->cpri_regbase + offset);
 }
 
+/* Read/write PSM registers via BPHY PF BAR (for GP_SUM etc.) */
+static u64 bphy_read_reg(struct mrvl_cpri_gpint_ctx *ml, int chiplet_id, u64 offset)
+{
+	u64 blkaddr;
+
+	switch (chiplet_id) {
+	case 0:
+		blkaddr = 0x20;
+		break;
+	case 1:
+		blkaddr = 0x28;
+		break;
+	default:
+		break;
+	}
+	offset &= ~(BPHY_BLKADDR_MASK << RVU_FUNC_BLKADDR_SHIFT);
+	offset |= (blkaddr << RVU_FUNC_BLKADDR_SHIFT);
+
+	return readq(ml->bphy_reg_base + offset);
+}
+
+static void bphy_write_reg(struct mrvl_cpri_gpint_ctx *ml, int chiplet_id, u64 offset, u64 val)
+{
+	u64 blkaddr;
+
+	switch (chiplet_id) {
+	case 0:
+		blkaddr = 0x20;
+		break;
+	case 1:
+		blkaddr = 0x28;
+		break;
+	default:
+		break;
+	}
+	offset &= ~(BPHY_BLKADDR_MASK << RVU_FUNC_BLKADDR_SHIFT);
+	offset |= (blkaddr << RVU_FUNC_BLKADDR_SHIFT);
+
+	writeq(val, ml->bphy_reg_base + offset);
+}
+
 int mrvl_cpri_gpint_create_dev(phys_addr_t regbase, size_t size,
 			       int irq0, int irq1,
-			       u32 num_chiplets)
+			       u32 num_chiplets,
+			       void __iomem *bphy_reg_base)
 {
 	struct platform_device_info pinfo;
 	struct platform_device *pdev;
@@ -123,6 +168,7 @@ int mrvl_cpri_gpint_create_dev(phys_addr_t regbase, size_t size,
 		pdata.max_mhabs = 3;
 	else
 		pdata.max_mhabs = 5;
+	pdata.bphy_reg_base = bphy_reg_base;
 
 	memset(&pinfo, 0, sizeof(pinfo));
 	pinfo.name = "mrvl-cpri-gpint";
@@ -186,10 +232,10 @@ static irqreturn_t mrvl_cpri_gpint_handler(int irq, void *dev)
 	/* GPINT0 offset */
 	gpint_regoff = PSM_CNF20K_INT_GP_SUM_W1C(0);
 
-	/* Clear GPINT status */
-	regval = cpri_read_reg(ml, chiplet_id, gpint_regoff);
+	/* Clear GPINT status — use BPHY PF BAR for PSM registers */
+	regval = bphy_read_reg(ml, chiplet_id, gpint_regoff);
 	regval &= 0xFFFFFFFF;
-	cpri_write_reg(ml, chiplet_id, gpint_regoff, regval);
+	bphy_write_reg(ml, chiplet_id, gpint_regoff, regval);
 
 	num_mhabs = ml->num_chiplets * ml->max_mhabs;
 
@@ -273,6 +319,7 @@ static int mrvl_cpri_gpint_probe(struct platform_device *pdev)
 
 	ml->num_chiplets = pdata->num_chiplets;
 	ml->max_mhabs = pdata->max_mhabs;
+	ml->bphy_reg_base = pdata->bphy_reg_base;
 
 	g_drv_ctx = ml;
 
