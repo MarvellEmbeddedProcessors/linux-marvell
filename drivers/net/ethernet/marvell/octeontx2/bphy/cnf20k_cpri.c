@@ -1252,6 +1252,13 @@ static long cnf20k_cpri_cdev_ioctl(struct file *filp, unsigned int cmd,
 				writeq(0xFFFFFFFF, cdev->reg_base + offset);
 			}
 
+			/* Enable GPINT vector 0 for CONNIP AXI INT */
+			for (int idx = 0; idx < MAX_NUM_BPHY_CHIPLET; idx++) {
+				u64 offset = bphy_get_regaddr(idx, 0) +
+				PSM_CNF20K_INT_GP_ENA_W1S(0);
+				writeq(0xFFFFFFFF, cdev->reg_base + offset);
+			}
+
 			kthread_run(cpri_polling_thread, NULL, "cpri_poll");
 
 			/* probe CPRI GPINT0 handler driver */
@@ -1355,16 +1362,27 @@ static int cnf20k_cpri_cdev_release(struct inode *inode, struct file *filp)
 	mutex_lock(&cdev->mutex_lock);
 
 	if (cnf20k_cpri_reg_base) {
-		// Disable GPINT Rx and Tx interrupts and clear interrupt status
+		/* Disable GPINT Rx and Tx interrupts and clear interrupt status */
 		for (int i = 0; i < MAX_NUM_BPHY_CHIPLET; i++) {
-			// Disable GPINT interrupt
+			/* Disable GPINT vector 1 (ETH UL PKTIO) */
 			offset = bphy_get_regaddr(i, 0) +
 				 PSM_CNF20K_INT_GP_ENA_W1C(1);
 			writeq(0xFFFFFFFF, cdev->reg_base + offset);
 
-			// Clear interrupt status
+			/* Clear vector 1 interrupt status */
 			offset = bphy_get_regaddr(i, 0) +
 				 PSM_CNF20K_INT_GP_SUM_W1C(1);
+			status = readq(cdev->reg_base + offset) & 0xFFFFFFFF;
+			writeq(status, cdev->reg_base + offset);
+
+			/* Disable GPINT vector 0 (CONNIP AXI INT) */
+			offset = bphy_get_regaddr(i, 0) +
+				 PSM_CNF20K_INT_GP_ENA_W1C(0);
+			writeq(0xFFFFFFFF, cdev->reg_base + offset);
+
+			/* Clear vector 0 interrupt status */
+			offset = bphy_get_regaddr(i, 0) +
+				 PSM_CNF20K_INT_GP_SUM_W1C(0);
 			status = readq(cdev->reg_base + offset) & 0xFFFFFFFF;
 			writeq(status, cdev->reg_base + offset);
 		}
