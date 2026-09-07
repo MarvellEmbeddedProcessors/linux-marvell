@@ -390,6 +390,9 @@ struct cdns_xspi_dev {
 	bool wo_mode;
 };
 
+static int cdns_xspi_wait_for_controller_idle(struct cdns_xspi_dev *cdns_xspi,
+					      bool sleep);
+
 static void cdns_xspi_reset_dll(struct cdns_xspi_dev *cdns_xspi)
 {
 	u32 dll_cntrl = readl(cdns_xspi->iobase +
@@ -468,6 +471,13 @@ static bool cdns_mrvl_xspi_setup_clock(struct cdns_xspi_dev *cdns_xspi,
 	int clk_val;
 	u32 clk_reg;
 	bool update_clk = false;
+
+	/* Wait for controller to become idle before updating the clock */
+	if (cdns_xspi_wait_for_controller_idle(cdns_xspi, true) < 0) {
+		dev_info(cdns_xspi->dev,
+			"Controller didn't reach idle state for clock configuration\n");
+		return false;
+	}
 
 	while (i < (ARRAY_SIZE(cdns_mrvl_xspi_clk_div_list) - 1)) {
 		clk_val = MRVL_XSPI_CLOCK_DIVIDED(
@@ -1142,6 +1152,10 @@ static int cdns_xspi_transfer_one_message(struct spi_controller *controller,
 
 	if (cdns_xspi_wait_for_controller_idle(cdns_xspi, true) < 0)
 		return -EIO;
+
+	/* Setup clock based on the current CS device requirement */
+	cdns_xspi->cur_cs = cs;
+	cdns_mrvl_xspi_setup_clock(cdns_xspi, spi->max_speed_hz);
 
 	writel(FIELD_PREP(CDNS_XSPI_CTRL_WORK_MODE, CDNS_XSPI_WORK_MODE_STIG),
 	       cdns_xspi->iobase + CDNS_XSPI_CTRL_CONFIG_REG);
