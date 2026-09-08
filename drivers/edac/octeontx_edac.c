@@ -9,6 +9,7 @@
 #include <linux/of_address.h>
 #include <linux/cper.h>
 #include <linux/arm_sdei.h>
+#include <linux/irq_work.h>
 #include <linux/arm-smccc.h>
 #include <linux/sys_soc.h>
 #include <linux/cper.h>
@@ -388,12 +389,24 @@ static void octeontx_sdei_unregister(struct octeontx_edac *ghes)
 	wmb();
 }
 
+/*
+ * irq_work handler: runs in safe interrupt context after being
+ * triggered from NMI-like SDEI context. It is now safe to call
+ * edac_queue_work() which takes regular spinlocks.
+ */
+static void octeontx_edac_irq_work_handler(struct irq_work *work)
+{
+	struct octeontx_edac *ghes = container_of(work, struct octeontx_edac,
+						  irq_work);
+
+	edac_queue_work(ghes->sdei_dwork, msecs_to_jiffies(0));
+}
+
 static int octeontx_mc_sdei_callback(u32 event_id, struct pt_regs *regs, void *arg)
 {
 	struct octeontx_edac *ghes = arg;
-	struct mem_ctl_info *mci = ghes->mci;
 
-	edac_queue_work(&mci->work, msecs_to_jiffies(0));
+	irq_work_queue(&ghes->irq_work);
 
 	return 0;
 }
@@ -401,9 +414,8 @@ static int octeontx_mc_sdei_callback(u32 event_id, struct pt_regs *regs, void *a
 static int octeontx_device_sdei_callback(u32 event_id, struct pt_regs *regs, void *arg)
 {
 	struct octeontx_edac *ghes = arg;
-	struct edac_device_ctl_info *edac_dev = ghes->edac_dev;
 
-	edac_queue_work(&edac_dev->work, msecs_to_jiffies(0));
+	irq_work_queue(&ghes->irq_work);
 
 	return 0;
 }
@@ -412,7 +424,7 @@ static int octeontx_cpu_sdei_callback(u32 event_id, struct pt_regs *regs, void *
 {
 	struct octeontx_edac *ghes = arg;
 
-	edac_queue_work(&ghes->work, msecs_to_jiffies(0));
+	irq_work_queue(&ghes->irq_work);
 
 	return 0;
 }
@@ -894,6 +906,9 @@ static int octeontx_edac_mc_init(struct platform_device *pdev,
 	INIT_DELAYED_WORK(&mci->work, octeontx_edac_mc_wq);
 	edac_stop_work(&mci->work);
 
+	init_irq_work(&ghes->irq_work, octeontx_edac_irq_work_handler);
+	ghes->sdei_dwork = &mci->work;
+
 	ret = octeontx_sdei_register(ghes, octeontx_mc_sdei_callback);
 	if (ret)
 		goto err1;
@@ -950,6 +965,9 @@ static int octeontx_edac_device_init(struct platform_device *pdev,
 	INIT_DELAYED_WORK(&edac_dev->work, octeontx_edac_device_wq);
 
 	edac_stop_work(&edac_dev->work);
+
+	init_irq_work(&ghes->irq_work, octeontx_edac_irq_work_handler);
+	ghes->sdei_dwork = &edac_dev->work;
 
 	ret = octeontx_sdei_register(ghes, octeontx_device_sdei_callback);
 	if (ret)
@@ -1082,6 +1100,9 @@ static int octeontx_cpu_probe(struct platform_device *pdev)
 
 		INIT_DELAYED_WORK(&ghes->work, octeontx_edac_cpu_wq);
 		edac_stop_work(&ghes->work);
+
+		init_irq_work(&ghes->irq_work, octeontx_edac_irq_work_handler);
+		ghes->sdei_dwork = &ghes->work;
 
 		octeontx_sdei_register(ghes, octeontx_cpu_sdei_callback);
 	}
