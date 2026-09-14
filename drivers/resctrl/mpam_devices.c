@@ -2883,14 +2883,44 @@ static void mpam_reset_component_cfg(struct mpam_component *comp)
 	if (!comp->cfg)
 		return;
 
+	/*
+	 * Set the feature bit alongside each default so the reset config is
+	 * actually written to hardware by mpam_reprogram_ris_partid(); without
+	 * the bit that write is skipped and the MSC keeps its silicon reset
+	 * value (e.g. MBW_MAX=0x800 => 3.1%) while resctrl reports 100%.
+	 */
 	for (i = 0; i <= mpam_partid_max; i++) {
 		comp->cfg[i] = (struct mpam_config) {};
-		if (cprops->cpbm_wd)
+		if (cprops->cpbm_wd) {
 			comp->cfg[i].cpbm = GENMASK(cprops->cpbm_wd - 1, 0);
-		if (cprops->mbw_pbm_bits)
+			mpam_set_feature(mpam_feat_cpor_part, &comp->cfg[i]);
+		}
+		if (cprops->mbw_pbm_bits) {
 			comp->cfg[i].mbw_pbm = GENMASK(cprops->mbw_pbm_bits - 1, 0);
-		if (cprops->bwa_wd)
+			mpam_set_feature(mpam_feat_mbw_part, &comp->cfg[i]);
+		}
+		if (cprops->bwa_wd) {
+			u16 res0_bits = 16 - cprops->bwa_wd;
+			u16 max_hw_value = ((1 << cprops->bwa_wd) - 1) << res0_bits;
+			u16 min_hw_granule = ~max_hw_value;
+			u16 delta = ((5 * MPAMCFG_MBW_MAX_MAX) / 100) - 1;
+			u16 min;
+
 			comp->cfg[i].mbw_max = GENMASK(15, 16 - cprops->bwa_wd);
+			mpam_set_feature(mpam_feat_mbw_max, &comp->cfg[i]);
+
+			/*
+			 * Derive MBW_MIN = MAX - 5% as mpam_extend_config() does
+			 * for resctrl groups.
+			 */
+			if (comp->cfg[i].mbw_max > delta)
+				min = comp->cfg[i].mbw_max - delta;
+			else
+				min = 0;
+
+			comp->cfg[i].mbw_min = max(min, min_hw_granule);
+			mpam_set_feature(mpam_feat_mbw_min, &comp->cfg[i]);
+		}
 		if (mpam_has_quirk(T241_FORCE_MBW_MIN_TO_ONE, class))
 			mpam_wa_t241_force_mbw_min_to_one(&comp->cfg[i],
 							  &class->props);
