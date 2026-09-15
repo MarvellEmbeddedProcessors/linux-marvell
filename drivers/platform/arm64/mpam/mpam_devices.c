@@ -2675,17 +2675,29 @@ static void __destroy_component_cfg(struct mpam_component *comp)
 
 	lockdep_assert_held(&mpam_list_lock);
 
+	/*
+	 * The component config (and per-RIS mbwu_state) is only allocated once
+	 * partid sizes are fixed, in mpam_enable(). If a probe fails or defers
+	 * (e.g. -EPROBE_DEFER while cacheinfo is not yet populated) the MSC is
+	 * torn down before that, so comp->cfg is still NULL - guard against it,
+	 * as add_to_garbage() dereferences its argument.
+	 */
+	if (!comp->cfg)
+		return;
+
 	add_to_garbage(comp->cfg);
 	list_for_each_entry(vmsc, &comp->vmsc, comp_list) {
 		msc = vmsc->msc;
 
 		mpam_mon_sel_outer_lock(msc);
 		if (mpam_mon_sel_inner_lock(msc)) {
-			list_for_each_entry(ris, &vmsc->ris, vmsc_list)
-				add_to_garbage(ris->mbwu_state);
+			list_for_each_entry(ris, &vmsc->ris, vmsc_list) {
+				if (ris->mbwu_state)
+					add_to_garbage(ris->mbwu_state);
+			}
 			mpam_mon_sel_inner_unlock(msc);
 		}
-		mpam_mon_sel_outer_lock(msc);
+		mpam_mon_sel_outer_unlock(msc);
 	}
 }
 
