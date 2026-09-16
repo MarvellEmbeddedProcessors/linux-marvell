@@ -1121,45 +1121,43 @@ static int sdhci_cdns_sd6_dll_reset(struct sdhci_cdns_priv *priv, bool reset)
 
 static void sdhci_cdns_sd6_calc_phy(struct sdhci_cdns_sd6_phy *phy)
 {
-	if (phy->mode == MMC_TIMING_MMC_HS) {
-		phy->settings.cp_clk_wr_delay = 0;
-		phy->settings.cp_clk_wrdqs_delay = 0;
-		phy->settings.cp_data_select_oe_end = 1;
-		phy->settings.cp_dll_bypass_mode = 1;
-		phy->settings.cp_dll_locked_mode = 3;
-		phy->settings.cp_dll_start_point = 4;
-		phy->settings.cp_gate_cfg_always_on = 1;
-		phy->settings.cp_io_mask_always_on = 0;
-		phy->settings.cp_io_mask_end = 0;
-		phy->settings.cp_io_mask_start = 0;
-		phy->settings.cp_rd_del_sel = 52;
-		phy->settings.cp_read_dqs_cmd_delay = 0;
-		phy->settings.cp_read_dqs_delay = 0;
-		phy->settings.cp_sw_half_cycle_shift = 0;
-		phy->settings.cp_sync_method = 1;
-		phy->settings.cp_underrun_suppress = 1;
-		phy->settings.cp_use_ext_lpbk_dqs = 1;
-		phy->settings.cp_use_lpbk_dqs = 1;
-		phy->settings.cp_use_phony_dqs = 1;
-		phy->settings.cp_use_phony_dqs_cmd = 1;
-		phy->settings.sdhc_extended_rd_mode = 1;
-		phy->settings.sdhc_extended_wr_mode = 1;
-		phy->settings.sdhc_hcsdclkadj = 2;
-		phy->settings.sdhc_idelay_val = 0;
-		phy->settings.sdhc_rdcmd_en = 1;
-		phy->settings.sdhc_rddata_en = 1;
-		phy->settings.sdhc_rw_compensate = 9;
-		phy->settings.sdhc_sdcfsh = 0;
-		phy->settings.sdhc_sdcfsl = 4;
-		phy->settings.sdhc_wrcmd0_dly = 1;
-		phy->settings.sdhc_wrcmd0_sdclk_dly = 0;
-		phy->settings.sdhc_wrcmd1_dly = 0;
-		phy->settings.sdhc_wrcmd1_sdclk_dly = 0;
-		phy->settings.sdhc_wrdata0_dly = 1;
-		phy->settings.sdhc_wrdata0_sdclk_dly = 0;
-		phy->settings.sdhc_wrdata1_dly = 0;
-		phy->settings.sdhc_wrdata1_sdclk_dly = 0;
-	}
+	phy->settings.cp_clk_wr_delay = 0;
+	phy->settings.cp_clk_wrdqs_delay = 0;
+	phy->settings.cp_data_select_oe_end = 1;
+	phy->settings.cp_dll_bypass_mode = 1;
+	phy->settings.cp_dll_locked_mode = 3;
+	phy->settings.cp_dll_start_point = 4;
+	phy->settings.cp_gate_cfg_always_on = 1;
+	phy->settings.cp_io_mask_always_on = 0;
+	phy->settings.cp_io_mask_end = 0;
+	phy->settings.cp_io_mask_start = 0;
+	phy->settings.cp_rd_del_sel = 52;
+	phy->settings.cp_read_dqs_cmd_delay = 0;
+	phy->settings.cp_read_dqs_delay = 0;
+	phy->settings.cp_sw_half_cycle_shift = 0;
+	phy->settings.cp_sync_method = 1;
+	phy->settings.cp_underrun_suppress = 1;
+	phy->settings.cp_use_ext_lpbk_dqs = 1;
+	phy->settings.cp_use_lpbk_dqs = 1;
+	phy->settings.cp_use_phony_dqs = 1;
+	phy->settings.cp_use_phony_dqs_cmd = 1;
+	phy->settings.sdhc_extended_rd_mode = 1;
+	phy->settings.sdhc_extended_wr_mode = 1;
+	phy->settings.sdhc_hcsdclkadj = 2;
+	phy->settings.sdhc_idelay_val = 0;
+	phy->settings.sdhc_rdcmd_en = 1;
+	phy->settings.sdhc_rddata_en = 1;
+	phy->settings.sdhc_rw_compensate = 9;
+	phy->settings.sdhc_sdcfsh = 0;
+	phy->settings.sdhc_sdcfsl = 4;
+	phy->settings.sdhc_wrcmd0_dly = 1;
+	phy->settings.sdhc_wrcmd0_sdclk_dly = 0;
+	phy->settings.sdhc_wrcmd1_dly = 0;
+	phy->settings.sdhc_wrcmd1_sdclk_dly = 0;
+	phy->settings.sdhc_wrdata0_dly = 1;
+	phy->settings.sdhc_wrdata0_sdclk_dly = 0;
+	phy->settings.sdhc_wrdata1_dly = 0;
+	phy->settings.sdhc_wrdata1_sdclk_dly = 0;
 }
 
 #ifdef CONFIG_MMC_SDHCI_CADENCE_DEBUG
