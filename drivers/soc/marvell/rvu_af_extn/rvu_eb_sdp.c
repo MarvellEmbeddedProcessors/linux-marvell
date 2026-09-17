@@ -822,11 +822,36 @@ int rvu_mbox_handler_stop_up_msgs(struct rvu *rvu,
 	return 0;
 }
 
+/* Deferred work for sending link-state notification to Host EPF.
+ * Runs in its own workqueue context so the AFPF mbox handler
+ * (which holds rvu->mbox_lock) is not blocked by the AFEPF send.
+ */
+struct sdp_link_notify_work {
+	struct work_struct work;
+	struct rvu *rvu;
+	u16 epcifunc;
+	bool up;
+};
+
+static void sdp_link_notify_task(struct work_struct *work)
+{
+	struct sdp_link_notify_work *lnw =
+		container_of(work, struct sdp_link_notify_work, work);
+	struct rvu *rvu = lnw->rvu;
+
+	mutex_lock(&rvu->mbox_lock);
+	cn20k_sdp_notify_epf_vf_link_state(rvu, lnw->epcifunc, lnw->up);
+	mutex_unlock(&rvu->mbox_lock);
+
+	kfree(lnw);
+}
+
 int rvu_mbox_handler_sdp_vf_link_state_notify(struct rvu *rvu,
 					      struct sdp_vf_link_state_notify_msg *req,
 					      struct msg_rsp *rsp)
 {
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+	struct sdp_link_notify_work *lnw;
 	u16 rvu_pf, func, epcifunc;
 	int host_pf;
 
@@ -854,7 +879,21 @@ int rvu_mbox_handler_sdp_vf_link_state_notify(struct rvu *rvu,
 
 	epcifunc = (host_pf << EPF_PF_SHIFT) | func;
 
-	return cn20k_sdp_notify_epf_vf_link_state(rvu, epcifunc, req->up);
+	/* Defer the AFEPF UP send to a separate work context so we
+	 * don't block the AFPF mbox handler (which holds mbox_lock).
+	 */
+	lnw = kzalloc(sizeof(*lnw), GFP_ATOMIC);
+	if (!lnw)
+		return -ENOMEM;
+
+	INIT_WORK(&lnw->work, sdp_link_notify_task);
+	lnw->rvu = rvu;
+	lnw->epcifunc = epcifunc;
+	lnw->up = req->up;
+
+	queue_work(sdp->flr_wq, &lnw->work);
+
+	return 0;
 }
 
 /* SDP Mbox handler */

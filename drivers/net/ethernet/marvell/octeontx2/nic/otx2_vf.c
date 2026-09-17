@@ -532,10 +532,9 @@ static void otx2_sdpvf_notify_link_state(struct otx2_nic *vf, u8 up)
 		return;
 	}
 	msg->up = up;
-	/* Fire-and-forget: AF acks with msg_rsp, VF discards */
-	otx2_mbox_msg_send(&vf->mbox.mbox, 0);
-	/* Ensure AF has consumed the doorbell before the next mbox round */
-	otx2_mbox_wait_for_zero(&vf->mbox.mbox, 0);
+
+	otx2_sync_mbox_msg(&vf->mbox);
+
 	mutex_unlock(&vf->mbox.lock);
 }
 
@@ -585,6 +584,14 @@ static netdev_tx_t otx2vf_xmit(struct sk_buff *skb, struct net_device *netdev)
 	struct otx2_dev_stats *dev_stats;
 	struct otx2_snd_queue *sq;
 	struct netdev_queue *txq;
+
+	/* SQs may not be allocated yet (between create_vfs and RINGS_UPDATE)
+	 * or may have been freed during a reset.  Drop silently.
+	 */
+	if (!vf->qset.sq) {
+		dev_kfree_skb(skb);
+		return NETDEV_TX_OK;
+	}
 
 	/* Check for minimum and maximum packet length */
 	if (skb->len <= ETH_HLEN ||
@@ -670,6 +677,7 @@ static int otx2vf_change_mtu(struct net_device *netdev, int new_mtu)
 static void otx2vf_reset_task(struct work_struct *work)
 {
 	struct otx2_nic *vf = container_of(work, struct otx2_nic, reset_task);
+	int err;
 
 	rtnl_lock();
 
@@ -679,7 +687,12 @@ static void otx2vf_reset_task(struct work_struct *work)
 
 		otx2vf_stop(vf->netdev);
 		vf->reset_count++;
-		otx2vf_open(vf->netdev);
+		err = otx2vf_open(vf->netdev);
+		if (err) {
+			dev_err(vf->dev, "open failed while reset (%d)\n", err);
+			rtnl_unlock();
+			return;
+		}
 
 		netif_carrier_on(vf->netdev);
 		netif_tx_start_all_queues(vf->netdev);
