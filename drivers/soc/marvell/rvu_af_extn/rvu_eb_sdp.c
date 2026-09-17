@@ -28,6 +28,8 @@
 
 #define SDP_EVF_RSRCID_MAX		256
 
+#define SDP_RID_LUT_INVALID		0xFFFF
+
 #define SDP_MAX_VECS			81
 
 struct sdp_drvdata sdp_data; /*global struct to hold mbox_wqs */
@@ -334,6 +336,39 @@ static void sdp_flr_handler(struct work_struct *work)
 			    SDP_AF_FLR_RING_LINT_ENA_W1SX(vec), ~0ULL);
 }
 
+static void cn20k_sdp_load_vfrid_cache(struct rvu *rvu)
+{
+	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+	unsigned int loaded = 0;
+	int rid;
+
+	for (rid = 0; rid < SDP_EVF_RSRCID_MAX; rid++) {
+		u16 epf, vf;
+		u64 val;
+
+		val = rvu_read64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(rid));
+		if (!FIELD_GET(SDP_AF_VFRID_TBL_VLD, val))
+			continue;
+
+		epf = FIELD_GET(SDP_AF_VFRID_TBL_EPF, val);
+		vf = FIELD_GET(SDP_AF_VFRID_TBL_VF, val);
+
+		if (epf >= MAX_EPFS || vf >= SDP_EVF_RSRCID_MAX) {
+			dev_err(rvu->dev,
+				"SDP: VFRID%d has invalid EPF%u/VF%u\n",
+				rid, epf, vf);
+			continue;
+		}
+
+		sdp->vf_rsrc_map[rid] = (epf << EPF_PF_SHIFT) | (vf + 1);
+		sdp->vf_rid_lut[epf * SDP_EVF_RSRCID_MAX + vf] = rid;
+		loaded++;
+	}
+
+	dev_info(rvu->dev, "SDP: VFRID cache loaded, %u/%u entries valid\n",
+		 loaded, SDP_EVF_RSRCID_MAX);
+}
+
 static int cn20k_sdp_rings_init(struct rvu *rvu)
 {
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
@@ -342,7 +377,6 @@ static int cn20k_sdp_rings_init(struct rvu *rvu)
 	int ring, err, pf;
 	u16 rvu_pcifunc;
 	u16 max_rings;
-	int vf_rid;
 	u8 count;
 	u64 cfg;
 
@@ -357,13 +391,24 @@ static int cn20k_sdp_rings_init(struct rvu *rvu)
 	if (!sdp->vf_rsrc_map)
 		return  -ENOMEM;
 
+	sdp->vf_rid_lut = kcalloc((size_t)MAX_EPFS * SDP_EVF_RSRCID_MAX,
+				  sizeof(u16), GFP_KERNEL);
+	if (!sdp->vf_rid_lut) {
+		err = -ENOMEM;
+		goto free_vf_rsrc_map;
+	}
+
+	memset(sdp->vf_rsrc_map, 0xFF, SDP_EVF_RSRCID_MAX * sizeof(u16));
+	memset(sdp->vf_rid_lut, 0xFF,
+	       (size_t)MAX_EPFS * SDP_EVF_RSRCID_MAX * sizeof(u16));
+
 	cfg = rvu_read64(rvu, BLKADDR_SDP, SDP_AF_CONST);
 	max_rings = FIELD_GET(SDP_AF_CONST_RINGS, cfg);
 
 	sdp->fn_map = kcalloc(max_rings, sizeof(u16), GFP_KERNEL);
 	if (!sdp->fn_map) {
 		err =  -ENOMEM;
-		goto free_vf_rsrc_map;
+		goto free_vf_rid_lut;
 	}
 
 	mutex_init(&sdp->cfg_lock);
@@ -379,16 +424,10 @@ static int cn20k_sdp_rings_init(struct rvu *rvu)
 	if (err)
 		goto free_pfs_bmap;
 
-	sdp->vf_rids.max = SDP_EVF_RSRCID_MAX;
-	err = rvu_alloc_bitmap(&sdp->vf_rids);
-	if (err)
-		goto free_rings_bmap;
-
-	for (vf_rid = 0; vf_rid < sdp->vf_rids.max; vf_rid++)
-		sdp->vf_rsrc_map[vf_rid] = 0xFFFF;
-
 	for (ring = 0; ring < sdp->rings.max; ring++)
 		sdp->fn_map[ring] = 0xFFFF;
+
+	cn20k_sdp_load_vfrid_cache(rvu);
 
 	for (pf = 0; pf < count; pf++) {
 		rvu_pcifunc = (sdp->host2rvupf[pf] & RVU_CN20K_PFVF_PF_MASK) <<
@@ -406,7 +445,7 @@ static int cn20k_sdp_rings_init(struct rvu *rvu)
 				      WQ_HIGHPRI | WQ_MEM_RECLAIM, 0);
 	if (!sdp->flr_wq) {
 		err = -ENOMEM;
-		goto free_vfrids_bmap;
+		goto free_rings_bmap;
 	}
 
 	sdp->flr_wrk.rvu = rvu;
@@ -416,14 +455,14 @@ static int cn20k_sdp_rings_init(struct rvu *rvu)
 
 	return 0;
 
-free_vfrids_bmap:
-	rvu_free_bitmap(&sdp->vf_rids);
-free_pfs_bmap:
-	bitmap_free(sdp->ready_pfs);
 free_rings_bmap:
 	rvu_free_bitmap(&sdp->rings);
+free_pfs_bmap:
+	bitmap_free(sdp->ready_pfs);
 free_fn_map:
 	kfree(sdp->fn_map);
+free_vf_rid_lut:
+	kfree(sdp->vf_rid_lut);
 free_vf_rsrc_map:
 	kfree(sdp->vf_rsrc_map);
 	return err;
@@ -483,42 +522,27 @@ free_entries:
 static int cn20k_sdp_get_vfrid(struct rvu *rvu, u16 epcifunc)
 {
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
-	int rid;
+	u16 epf = get_sdp_epf(epcifunc);
+	u16 vf = get_sdp_evf(epcifunc);
+	u16 rid;
 
-	/* Allocate a new VF_RSRC_ID */
-	rid = rvu_alloc_rsrc(&sdp->vf_rids);
-	if (rid >= 0)
-		sdp->vf_rsrc_map[rid] = epcifunc;
+	if (epf >= MAX_EPFS || !vf || vf - 1 >= SDP_EVF_RSRCID_MAX) {
+		dev_err(rvu->dev,
+			"SDP: epcifunc 0x%04x -> EPF%u VF%u out of VFRID lookup range\n",
+			epcifunc, epf, vf);
+		return -EINVAL;
+	}
+	vf -= 1;
 
-	return rid;
-}
-
-static int cn20k_sdp_find_vfrid(struct rvu *rvu, u16 epcifunc)
-{
-	struct sdp_rsrc *sdp = &rvu->hw->sdp;
-	int rid;
-
-	for (rid = 0; rid < sdp->vf_rids.max; rid++) {
-		if (sdp->vf_rsrc_map[rid] == epcifunc)
-			return rid;
+	rid = sdp->vf_rid_lut[epf * SDP_EVF_RSRCID_MAX + vf];
+	if (rid == SDP_RID_LUT_INVALID) {
+		dev_err(rvu->dev,
+			"SDP: no VFRID cached for EPF%u VF%u (epcifunc 0x%04x)\n",
+			epf, vf, epcifunc);
+		return -ENOENT;
 	}
 
-	return -ENOENT;
-}
-
-static void cn20k_sdp_put_vfrid(struct rvu *rvu, u16 epcifunc)
-{
-	struct sdp_rsrc *sdp = &rvu->hw->sdp;
-	int rid;
-
-	rid = cn20k_sdp_find_vfrid(rvu, epcifunc);
-	if (rid < 0)
-		return;
-
-	rvu_write64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(rid),
-		    FIELD_PREP(SDP_AF_VFRID_TBL_VLD, 0));
-	rvu_free_rsrc(&sdp->vf_rids, rid);
-	sdp->vf_rsrc_map[rid] = 0xFFFF;
+	return rid;
 }
 
 int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
@@ -532,9 +556,9 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 	int qcount = num_online_cpus();
 	struct sdp_config *sdp_cfg;
 	int ring, rx_entry, slot;
-	u64 cfg;
 	int vf_rid, err;
 	u16 host_vf;
+	u64 cfg;
 
 	host_vf = get_sdp_evf(epcifunc);
 	sdp_cfg = &pfvf->sdp_cfg;
@@ -558,11 +582,8 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 	mutex_lock(&sdp->cfg_lock);
 
 	if (host_vf) {
-		vf_rid = cn20k_sdp_find_vfrid(rvu, epcifunc);
+		vf_rid = cn20k_sdp_get_vfrid(rvu, epcifunc);
 		if (vf_rid < 0) {
-			dev_err(rvu->dev,
-				"No VF resource id for pcifunc 0x%x (EVF:%d), VF not created\n",
-				epcifunc, host_vf - 1);
 			mutex_unlock(&sdp->cfg_lock);
 			return vf_rid;
 		}
@@ -614,11 +635,10 @@ int rvu_mbox_handler_sdp_rings_alloc(struct rvu *rvu,
 		sdp->fn_map[ring] = epcifunc;
 	}
 
-	if (rsp->count) {
+	if (rsp->count)
 		cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
 					     MBOX_MSG_SDP_RINGS_UPDATE,
 					     SDP_RING_F_ALLOC);
-	}
 
 	mutex_unlock(&sdp->cfg_lock);
 
@@ -702,34 +722,8 @@ int rvu_mbox_handler_sdp_host_alloc_vfs(struct rvu *rvu,
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, rvu_pcifunc);
 	struct sdp_config *sdp_cfg = &pfvf->sdp_cfg;
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
-	u16 epcifunc = req->hdr.pcifunc;
-	u16 host_epf = get_sdp_epf(epcifunc);
-	u16 vf;
-	int vf_rid;
-	u64 rid_cfg;
-
-	if (req->nr_vfs > SDP_EVF_RSRCID_MAX)
-		return -EINVAL;
 
 	mutex_lock(&sdp->cfg_lock);
-
-	for (vf = 0; vf < req->nr_vfs; vf++) {
-		u16 vf_epcifunc = (host_epf << EPF_PF_SHIFT) |
-				  ((vf + 1) & RVU_PFVF_FUNC_MASK);
-
-		vf_rid = cn20k_sdp_get_vfrid(rvu, vf_epcifunc);
-		if (vf_rid < 0) {
-			dev_err(rvu->dev,
-				"VF resource id allocation failed for VF%d/%d\n",
-				vf, req->nr_vfs);
-			goto unwind;
-		}
-
-		rid_cfg = FIELD_PREP(SDP_AF_VFRID_TBL_VF, vf);
-		rid_cfg |= FIELD_PREP(SDP_AF_VFRID_TBL_EPF, host_epf);
-		rid_cfg |= FIELD_PREP(SDP_AF_VFRID_TBL_VLD, 1);
-		rvu_write64(rvu, BLKADDR_SDP, SDP_AF_VFRIDX_TBL(vf_rid), rid_cfg);
-	}
 
 	sdp_cfg->nr_host_vfs = req->nr_vfs;
 	cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
@@ -737,16 +731,6 @@ int rvu_mbox_handler_sdp_host_alloc_vfs(struct rvu *rvu,
 	mutex_unlock(&sdp->cfg_lock);
 
 	return 0;
-
-unwind:
-	while (vf--) {
-		u16 vf_epcifunc = (host_epf << EPF_PF_SHIFT) |
-				  ((vf + 1) & RVU_PFVF_FUNC_MASK);
-		cn20k_sdp_put_vfrid(rvu, vf_epcifunc);
-	}
-	mutex_unlock(&sdp->cfg_lock);
-
-	return -ENOSPC;
 }
 
 int rvu_mbox_handler_sdp_host_free_vfs(struct rvu *rvu,
@@ -757,17 +741,8 @@ int rvu_mbox_handler_sdp_host_free_vfs(struct rvu *rvu,
 	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, rvu_pcifunc);
 	struct sdp_config *sdp_cfg = &pfvf->sdp_cfg;
 	struct sdp_rsrc *sdp = &rvu->hw->sdp;
-	u16 epcifunc = req->hdr.pcifunc;
-	u16 host_epf = get_sdp_epf(epcifunc);
-	u16 vf;
 
 	mutex_lock(&sdp->cfg_lock);
-
-	for (vf = 0; vf < sdp_cfg->nr_host_vfs; vf++) {
-		u16 vf_epcifunc = (host_epf << EPF_PF_SHIFT) |
-				  ((vf + 1) & RVU_PFVF_FUNC_MASK);
-		cn20k_sdp_put_vfrid(rvu, vf_epcifunc);
-	}
 
 	cn20k_sdp_schedule_msg_to_pf(rvu, rvu_pcifunc,
 				     MBOX_MSG_SDP_FREE_VFS,
@@ -1495,7 +1470,6 @@ static void rvu_sdp_free(struct rvu_block *block, void *data)
 		sdp->flr_wq = NULL;
 	}
 
-	rvu_free_bitmap(&sdp->vf_rids);
 	rvu_free_bitmap(&sdp->rings);
 
 	bitmap_free(sdp->ready_pfs);
@@ -1503,6 +1477,9 @@ static void rvu_sdp_free(struct rvu_block *block, void *data)
 
 	kfree(sdp->fn_map);
 	sdp->fn_map = NULL;
+
+	kfree(sdp->vf_rid_lut);
+	sdp->vf_rid_lut = NULL;
 
 	kfree(sdp->vf_rsrc_map);
 	sdp->vf_rsrc_map = NULL;

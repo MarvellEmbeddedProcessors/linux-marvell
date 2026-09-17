@@ -313,9 +313,9 @@ struct sdp_flr_work {
 
 struct sdp_rsrc {
 	struct rsrc_bmap	rings;
-	struct rsrc_bmap	vf_rids;
 	u16  *fn_map; /* Ring to Host PF/VF mapping */
-	u16 *vf_rsrc_map; /* VF_RES_IDs to host VFs mapping */
+	u16 *vf_rsrc_map; /* VF_RES_ID to host VFs mapping */
+	u16 *vf_rid_lut; /* host EPF/VF to VF_RES_ID mapping */
 	struct mutex		cfg_lock;
 	u8 host2rvupf[MAX_EPFS];
 	unsigned long *ready_pfs; /* bitmap to store GEN PFs */
