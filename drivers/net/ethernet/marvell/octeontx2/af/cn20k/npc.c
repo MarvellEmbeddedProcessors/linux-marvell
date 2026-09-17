@@ -1812,6 +1812,9 @@ int npc_cn20k_ref_idx_alloc(struct rvu *rvu, int pcifunc, int key_type,
 	bool ref_valid;
 	u16 vidx;
 
+	if (count > NPC_MAX_NONCONTIG_ENTRIES)
+		return NPC_MCAM_INVALID_REQ;
+
 	bd = npc_priv->bank_depth;
 
 	/* Special case: ref == 0 && limit= 0 && prio == HIGH && count == 1

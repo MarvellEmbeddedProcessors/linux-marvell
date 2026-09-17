@@ -3664,10 +3664,8 @@ static int __npc_mcam_alloc_counter(struct rvu *rvu,
 		return NPC_MCAM_INVALID_REQ;
 
 	/* Check if unused counters are available or not */
-	if (!rvu_rsrc_free_count(&mcam->counters)) {
-		mutex_unlock(&mcam->lock);
+	if (!rvu_rsrc_free_count(&mcam->counters))
 		return NPC_MCAM_ALLOC_FAILED;
-	}
 
 	rsp->count = 0;
 
@@ -3733,10 +3731,8 @@ static int __npc_mcam_free_counter(struct rvu *rvu,
 		return NPC_MCAM_INVALID_REQ;
 
 	err = npc_mcam_verify_counter(mcam, req->hdr.pcifunc, req->cntr);
-	if (err) {
-		mutex_unlock(&mcam->lock);
+	if (err)
 		return err;
-	}
 
 	/* Mark counter as free/unused */
 	mcam->cntr2pfvf_map[req->cntr] = NPC_MCAM_INVALID_MAP;
@@ -3884,8 +3880,10 @@ int rvu_mbox_handler_npc_mcam_clear_counter(struct rvu *rvu,
 		return NPC_MCAM_INVALID_REQ;
 
 	if (is_cn20k(rvu->pdev)) {
-		index = req->cntr & (mcam->banksize - 1);
 		bank = npc_get_bank(rvu, mcam, req->cntr);
+		if (bank >= mcam->banks)
+			return NPC_MCAM_INVALID_REQ;
+		index = req->cntr & (mcam->banksize - 1);
 		rvu_write64(rvu, blkaddr,
 			    NPC_AF_CN20K_MCAMEX_BANKX_STAT_EXT(index, bank), 0);
 		return 0;
@@ -3914,8 +3912,10 @@ int rvu_mbox_handler_npc_mcam_counter_stats(struct rvu *rvu,
 		return NPC_MCAM_INVALID_REQ;
 
 	if (is_cn20k(rvu->pdev)) {
-		index = req->cntr & (mcam->banksize - 1);
 		bank = npc_get_bank(rvu, mcam, req->cntr);
+		if (bank >= mcam->banks)
+			return NPC_MCAM_INVALID_REQ;
+		index = req->cntr & (mcam->banksize - 1);
 		rsp->stat = rvu_read64(rvu, blkaddr,
 				       NPC_AF_CN20K_MCAMEX_BANKX_STAT_EXT(index, bank));
 		return 0;
@@ -3926,6 +3926,7 @@ int rvu_mbox_handler_npc_mcam_counter_stats(struct rvu *rvu,
 	mutex_unlock(&mcam->lock);
 	if (err)
 		return err;
+
 	rsp->stat = rvu_read64(rvu, blkaddr, NPC_AF_MATCH_STATX(req->cntr));
 	rsp->stat &= BIT_ULL(48) - 1;
 	return 0;
