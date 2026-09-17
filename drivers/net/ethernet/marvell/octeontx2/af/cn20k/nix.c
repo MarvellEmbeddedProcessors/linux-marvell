@@ -295,6 +295,24 @@ unlock:
 	return err;
 }
 
+static void nix_free_ipsec_vlan_cfg(struct rvu *rvu, u16 pcifunc,
+				    struct nix_cn20k_hw *nix_cn20k_hw,
+				    int blkaddr)
+{
+	int idx;
+
+	for_each_set_bit(idx, nix_cn20k_hw->ipsec_vlan_cfg_bmap,
+			 NIX_RX_IPSEC_VLAN_CFG_CNT) {
+		if (nix_cn20k_hw->ipsec_vlan_cfg_owner[idx] != pcifunc)
+			continue;
+
+		rvu_write64(rvu, blkaddr,
+			    NIX_AF_RX_IPSEC_VLAN_CFGX(idx), 0x0);
+		nix_cn20k_hw->ipsec_vlan_cfg_owner[idx] = 0;
+		clear_bit(idx, nix_cn20k_hw->ipsec_vlan_cfg_bmap);
+	}
+}
+
 int rvu_nix_cn20k_free_resources(struct rvu *rvu, u16 pcifunc)
 {
 	struct nix_cn20k_hw *nix_cn20k_hw;
@@ -315,6 +333,7 @@ int rvu_nix_cn20k_free_resources(struct rvu *rvu, u16 pcifunc)
 	mutex_lock(&nix_cn20k_hw->rx_inl_lock);
 	nix_free_rx_inl_profiles(rvu, pcifunc, nix_cn20k_hw, blkaddr, nixlf);
 	nix_free_rx_inl_queues(rvu, pcifunc);
+	nix_free_ipsec_vlan_cfg(rvu, pcifunc, nix_cn20k_hw, blkaddr);
 	rvu_write64(rvu, blkaddr, NIX_AF_CN20K_LFX_RX_INLINE_REPLAY(nixlf),
 		    0x0);
 	mutex_unlock(&nix_cn20k_hw->rx_inl_lock);
@@ -412,4 +431,68 @@ int rvu_mbox_handler_nix_rx_inl_queue_cfg(struct rvu *rvu,
 		return CPT_AF_ERR_QUEUE_PCIFUNC_MAP_INVALID;
 
 	return nix_rx_inline_queue_cfg(rvu, req, BLKADDR_NIX0);
+}
+
+int rvu_mbox_handler_nix_rx_ipsec_vlan_cfg(struct rvu *rvu,
+					   struct nix_rx_ipsec_vlan_cfg_req *req,
+					   struct nix_rx_ipsec_vlan_cfg_rsp *rsp)
+{
+	struct nix_cn20k_hw *nix_cn20k_hw;
+	struct rvu_cpt *cpt = &rvu->cpt;
+	struct nix_hw *nix_hw;
+	int blkaddr, tbl_idx;
+	u64 val = 0;
+	int i;
+
+	if (!is_block_implemented(rvu->hw, BLKADDR_CPT0))
+		return 0;
+
+	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_NIX, req->hdr.pcifunc);
+	if (blkaddr < 0)
+		return blkaddr;
+
+	nix_hw = get_nix_hw(rvu->hw, blkaddr);
+	if (!nix_hw)
+		return NIX_AF_ERR_INVALID_NIXBLK;
+
+	/* Validate each PCP-to-CPTQ value: must be a valid HW queue
+	 * owned by the requesting pcifunc.
+	 */
+	for (i = 0; i < NIX_RX_INL_IPSEC_PCP_QSEL_CNT; i++) {
+		if (req->pcp_qsel[i] >= CPT_AF_MAX_RXC_QUEUES)
+			return CPT_AF_ERR_RXC_QUEUE_INVALID;
+
+		if (cpt->cptpfvf_map[req->pcp_qsel[i]] != req->hdr.pcifunc)
+			return CPT_AF_ERR_QUEUE_PCIFUNC_MAP_INVALID;
+	}
+
+	nix_cn20k_hw = &nix_hw->cn20k;
+
+	mutex_lock(&nix_cn20k_hw->rx_inl_lock);
+
+	/* Allocate a free VLAN_CFG table entry (0..15) */
+	tbl_idx = find_first_zero_bit(nix_cn20k_hw->ipsec_vlan_cfg_bmap,
+				      NIX_RX_IPSEC_VLAN_CFG_CNT);
+	if (tbl_idx >= NIX_RX_IPSEC_VLAN_CFG_CNT) {
+		mutex_unlock(&nix_cn20k_hw->rx_inl_lock);
+		return -ENOSPC;
+	}
+
+	set_bit(tbl_idx, nix_cn20k_hw->ipsec_vlan_cfg_bmap);
+	nix_cn20k_hw->ipsec_vlan_cfg_owner[tbl_idx] = req->hdr.pcifunc;
+
+	/* Pack PCP[0..7] to CPTQ mapping into 64-bit register value.
+	 * NIX_AF_RX_IPSEC_VLAN_CFGX layout (little-endian):
+	 *   [7:0]=pcp0, [15:8]=pcp1, ... [63:56]=pcp7
+	 */
+	for (i = 0; i < NIX_RX_INL_IPSEC_PCP_QSEL_CNT; i++)
+		val |= (u64)req->pcp_qsel[i] << (i * 8);
+
+	rvu_write64(rvu, blkaddr, NIX_AF_RX_IPSEC_VLAN_CFGX(tbl_idx), val);
+
+	rsp->vlan_cfg_idx = tbl_idx;
+
+	mutex_unlock(&nix_cn20k_hw->rx_inl_lock);
+
+	return 0;
 }

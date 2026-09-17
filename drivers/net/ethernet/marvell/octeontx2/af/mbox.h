@@ -504,6 +504,9 @@ M(NIX_RX_INL_QUEUE_CFG,	0x8033, nix_rx_inl_queue_cfg,				\
 				nix_rx_inline_qcfg_req, msg_rsp)		\
 M(NIX_AF_RX_FLOW_VEC_CTRL_SET, 0x8034, nix_af_rx_flow_vec_ctrl_set,		\
 				       nix_af_rx_flow_vec_ctrl_write_req, msg_rsp)	\
+M(NIX_RX_IPSEC_VLAN_CFG, 0x8035, nix_rx_ipsec_vlan_cfg,			\
+				nix_rx_ipsec_vlan_cfg_req,			\
+				nix_rx_ipsec_vlan_cfg_rsp)			\
 /* MCS mbox IDs (range 0xA000 - 0xBFFF) */					\
 M(MCS_ALLOC_RESOURCES,	0xa000, mcs_alloc_resources, mcs_alloc_rsrc_req,	\
 				mcs_alloc_rsrc_rsp)				\
@@ -1461,6 +1464,8 @@ struct nix_vtag_config {
 			u8 strip_vtag :1;
 			/* rx vtag capture */
 			u8 capture_vtag :1;
+			/* Index into NIX_AF_RX_IPSEC_VLAN_CFG(0..15) */
+			u8 ipsec_qsel_alg;
 		} rx;
 	};
 };
@@ -1914,6 +1919,20 @@ struct nix_af_rx_flow_vec_ctrl_write_req {
 	struct mbox_msghdr hdr;
 	union nix_af_rx_flow_vec_ctrl0x ctrl0x[NIX_AF_RX_FLOW_VEC_CTRL_MAX];
 	union nix_af_rx_flow_vec_ctrl1x ctrl1x[NIX_AF_RX_FLOW_VEC_CTRL_MAX];
+};
+
+#define NIX_RX_INL_IPSEC_PCP_QSEL_CNT 8
+
+/* Configure PCP-to-CPTQ mapping for inline IPsec queue selection */
+struct nix_rx_ipsec_vlan_cfg_req {
+	struct mbox_msghdr hdr;
+	u8 pcp_qsel[NIX_RX_INL_IPSEC_PCP_QSEL_CNT];
+	u8 rsvd[32];
+};
+
+struct nix_rx_ipsec_vlan_cfg_rsp {
+	struct mbox_msghdr hdr;
+	u8 vlan_cfg_idx;
 };
 
 /* SSO mailbox error codes

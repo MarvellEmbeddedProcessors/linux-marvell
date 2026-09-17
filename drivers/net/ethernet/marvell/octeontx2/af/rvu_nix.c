@@ -18,6 +18,7 @@
 #include "rvu_npc_hash.h"
 #include "rvu_switch.h"
 #include "cn20k/npc.h"
+#include "cn20k/nix.h"
 
 #define NIX_LSO_ALT_FLAGS_MAX	4
 
@@ -3324,6 +3325,14 @@ static int nix_rx_vtag_cfg(struct rvu *rvu, int nixlf, int blkaddr,
 		regval |= BIT_ULL(5);
 	if (req->rx.strip_vtag)
 		regval |= BIT_ULL(4);
+
+	/* Program ipsec_qsel_alg field [11:8] for PCP-based CPT queue selection.
+	 * This provides an index into NIX_AF_RX_IPSEC_VLAN_CFG(0..15).
+	 * This field is only available on CN20K.
+	 */
+	if (is_cn20k(rvu->pdev))
+		regval |= FIELD_PREP(NIX_AF_RX_VTAG_TYPE_IPSEC_QSEL_ALG,
+				     req->rx.ipsec_qsel_alg);
 
 	rvu_write64(rvu, blkaddr,
 		    NIX_AF_LFX_RX_VTAG_TYPEX(nixlf, req->rx.vtag_type), regval);
