@@ -323,23 +323,12 @@ error:
 }
 
 /**
- * octeon_i2c_stop - send STOP to the bus, waiting for the controller to
- *                   confirm the STOP condition has actually completed
+ * octeon_i2c_stop - send STOP to the bus
  * @i2c: The struct octeon_i2c
- *
- * Returns 0 on success, otherwise a negative errno.
  */
-static int octeon_i2c_stop(struct octeon_i2c *i2c)
+static void  octeon_i2c_stop(struct octeon_i2c *i2c)
 {
-	int ret;
-
 	octeon_i2c_ctl_write(i2c, TWSI_CTL_ENAB | TWSI_CTL_STP);
-
-	ret = octeon_i2c_wait(i2c);
-	if (ret == -ETIMEDOUT)
-		return octeon_i2c_recovery(i2c);
-
-	return 0;
 }
 
 /**
@@ -778,9 +767,8 @@ static int octeon_i2c_convert_10bit_trick(struct i2c_msg *msgs, int num,
 int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	struct octeon_i2c *i2c = i2c_get_adapdata(adap);
-	int i, ret = 0, stop_ret;
+	int i, conv_num, ret = 0;
 	struct i2c_msg conv[2];
-	int conv_num;
 	int orig_num = num;
 
 	/*
@@ -870,9 +858,7 @@ int octeon_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 			ret = octeon_i2c_write(i2c, pmsg->addr, pmsg->buf,
 					       pmsg->len, ten_bit);
 	}
-	stop_ret = octeon_i2c_stop(i2c);
-	if (ret == 0)
-		ret = stop_ret;
+	octeon_i2c_stop(i2c);
 out:
 	return (ret != 0) ? ret : orig_num;
 }
