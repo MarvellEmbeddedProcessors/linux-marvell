@@ -564,8 +564,13 @@ static int otx2_cpt_devlink_info_get(struct devlink *dl,
 	if (err)
 		return err;
 
-	return otx2_cpt_dl_info_firmware_version_put(req, cptpf->eng_grps.grp,
+	err = otx2_cpt_dl_info_firmware_version_put(req, cptpf->eng_grps.grp,
 						    "fw.ie", OTX2_CPT_IE_TYPES);
+	if (err)
+		return err;
+
+	return otx2_cpt_dl_info_firmware_version_put(req, cptpf->eng_grps.grp,
+						    "fw.re", OTX2_CPT_RE_TYPES);
 }
 
 static int otx2_cptvf_devlink_info_get(struct devlink *dl,

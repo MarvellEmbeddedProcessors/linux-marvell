@@ -1568,6 +1568,9 @@ static int otx2_cpt_get_eng_grp_type(struct otx2_cpt_eng_grps *eng_grps,
 
 	if (eng_grp_has_eng_type(grp, OTX2_CPT_AE_TYPES))
 		return OTX2_CPT_AE_TYPES;
+
+	if (eng_grp_has_eng_type(grp, OTX2_CPT_RE_TYPES))
+		return OTX2_CPT_RE_TYPES;
 	return 0;
 }
 
@@ -2139,13 +2142,13 @@ int otx2_cpt_dl_custom_egrp_create(struct otx2_cptpf_dev *cptpf,
 {
 	struct otx2_cpt_engines engs[OTX2_CPT_MAX_ETYPES_PER_GRP] = { { 0 } };
 	struct otx2_cpt_uc_info_t *uc_info[OTX2_CPT_MAX_ETYPES_PER_GRP] = {};
+	bool has_se = false, has_ie = false, has_ae = false, has_re = false;
 	struct otx2_cpt_eng_grps *eng_grps = &cptpf->eng_grps;
 	char *ucode_filename[OTX2_CPT_MAX_ETYPES_PER_GRP];
 	char tmp_buf[OTX2_CPT_NAME_LENGTH] = { 0 };
 	struct device *dev = &cptpf->pdev->dev;
 	char *start, *val, *err_msg, *tmp;
 	int grp_idx = 0, ret = -EINVAL;
-	bool has_se, has_ie, has_ae;
 	struct fw_info_t fw_info;
 	int ucode_idx = 0;
 	int egrp;
@@ -2157,8 +2160,6 @@ int otx2_cpt_dl_custom_egrp_create(struct otx2_cptpf_dev *cptpf,
 	err_msg = "Invalid engine group format";
 	strscpy(tmp_buf, ctx->val.vstr, strlen(ctx->val.vstr) + 1);
 	start = tmp_buf;
-
-	has_se = has_ie = has_ae = false;
 
 	for (;;) {
 		val = strsep(&start, ";");
@@ -2198,6 +2199,25 @@ int otx2_cpt_dl_custom_egrp_create(struct otx2_cptpf_dev *cptpf,
 				goto err_print;
 			engs[grp_idx++].type = OTX2_CPT_AE_TYPES;
 			has_ae = true;
+		} else if (!strncasecmp(val, "re", 2) && strchr(val, ':')) {
+			if (has_re || ucode_idx)
+				goto err_print;
+			tmp = strsep(&val, ":");
+			if (!tmp)
+				goto err_print;
+			if (!eng_grps->avail.max_re_cnt) {
+				err_msg = "RE engine not supported";
+				goto err_print;
+			}
+			tmp = strim(tmp);
+			if (!val)
+				goto err_print;
+			if (strlen(tmp) != 2)
+				goto err_print;
+			if (kstrtoint(strim(val), 10, &engs[grp_idx].count))
+				goto err_print;
+			engs[grp_idx++].type = OTX2_CPT_RE_TYPES;
+			has_re = true;
 		} else if (!strncasecmp(val, "ie", 2) && strchr(val, ':')) {
 			if (has_ie || ucode_idx)
 				goto err_print;
