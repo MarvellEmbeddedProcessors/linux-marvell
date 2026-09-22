@@ -690,11 +690,13 @@ int rvu_sso_lf_teardown(struct rvu *rvu, u16 pcifunc, int lf, int slot)
 			    (add & SSO_AF_TAQ_RSVD_FREE_MASK) <<
 			    SSO_AF_TAQ_ADD_RSVD_FREE_SHIFT);
 
-	reg = rvu_read64(rvu, blkaddr, SSO_AF_HWGRPX_TAQ_THR(lf)) >>
-		SSO_HWGRP_TAQ_GRP_CNT_SHIFT;
-	if (reg)
-		rvu_write64(rvu, blkaddr, SSO_AF_TAQ_ADD,
-			    reg << SSO_AF_TAQ_ADD_RSVD_FREE_SHIFT);
+	if (!is_cn20k(rvu->pdev)) {
+		reg = rvu_read64(rvu, blkaddr, SSO_AF_HWGRPX_TAQ_THR(lf)) >>
+		      SSO_HWGRP_TAQ_GRP_CNT_SHIFT;
+		if (reg)
+			rvu_write64(rvu, blkaddr, SSO_AF_TAQ_ADD,
+				    reg << SSO_AF_TAQ_ADD_RSVD_FREE_SHIFT);
+	}
 
 	rvu_write64(rvu, blkaddr, SSO_AF_XAQX_HEAD_PTR(lf), 0x0);
 	rvu_write64(rvu, blkaddr, SSO_AF_XAQX_TAIL_PTR(lf), 0x0);
