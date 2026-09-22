@@ -854,6 +854,8 @@ int rvu_mbox_handler_sdp_vf_link_state_notify(struct rvu *rvu,
 
 	epcifunc = (host_pf << EPF_PF_SHIFT) | func;
 
+	rvu_get_pfvf(rvu, req->hdr.pcifunc)->sdp_cfg.link_up = req->up;
+
 	/* Defer the AFEPF UP send to a separate work context so we
 	 * don't block the AFPF mbox handler (which holds mbox_lock).
 	 */
@@ -867,6 +869,44 @@ int rvu_mbox_handler_sdp_vf_link_state_notify(struct rvu *rvu,
 	lnw->up = req->up;
 
 	queue_work(sdp->flr_wq, &lnw->work);
+
+	return 0;
+}
+
+int rvu_mbox_handler_sdp_vf_link_state_get(struct rvu *rvu,
+					   struct msg_req *req,
+					   struct sdp_vf_link_state_req *rsp)
+{
+	struct sdp_rsrc *sdp = &rvu->hw->sdp;
+	u16 epcifunc = req->hdr.pcifunc;
+	u16 epf_id = get_sdp_epf(epcifunc);
+	u16 vf_idx = get_sdp_evf(epcifunc);
+	u16 rvu_pcifunc;
+	struct rvu_pfvf *pfvf;
+
+	if (epf_id >= SDP_MAX_EPF || vf_idx > SDP_EVF_RSRCID_MAX) {
+		dev_err(rvu->dev,
+			"SDP GET_LINK_STATE: epcifunc 0x%04x -> EPF%u VF%u out of range\n",
+			epcifunc, epf_id, vf_idx);
+		return -EINVAL;
+	}
+
+	/* vf_idx 0 (EPF itself) always exists; a real VF must have an
+	 * ATF-provisioned VFRID, same check as cn20k_sdp_get_vfrid().
+	 */
+	if (vf_idx && sdp->vf_rid_lut[epf_id * SDP_EVF_RSRCID_MAX + vf_idx - 1] ==
+	    SDP_RID_LUT_INVALID) {
+		dev_err(rvu->dev,
+			"SDP GET_LINK_STATE: EPF%u VF%u not provisioned\n",
+			epf_id, vf_idx);
+		return -EINVAL;
+	}
+
+	rvu_pcifunc = cn20k_get_rvu_pcifunc(rvu, epcifunc);
+	pfvf = rvu_get_pfvf(rvu, rvu_pcifunc);
+
+	rsp->vf_idx = vf_idx;
+	rsp->up = pfvf->sdp_cfg.link_up;
 
 	return 0;
 }
@@ -888,21 +928,24 @@ static int sdp_process_mbox_msg(struct otx2_mbox *mbox, int devid,
 		rsp = (struct _rsp_type *)otx2_mbox_alloc_msg(		\
 			mbox, devid,					\
 			sizeof(struct _rsp_type));			\
-		if (rsp) {						\
-			rsp->hdr.id = _id;				\
-			rsp->hdr.sig = OTX2_MBOX_RSP_SIG;		\
-			rsp->hdr.pcifunc = req->pcifunc;		\
-			rsp->hdr.rc = 0;				\
+		if (!rsp) {						\
+			trace_otx2_msg_process(mbox->pdev, _id, -ENOMEM, req->pcifunc); \
+			return -ENOMEM;				\
 		}							\
+									\
+		rsp->hdr.id = _id;					\
+		rsp->hdr.sig = OTX2_MBOX_RSP_SIG;			\
+		rsp->hdr.pcifunc = req->pcifunc;			\
+		rsp->hdr.rc = 0;					\
 									\
 		err = rvu_mbox_handler_ ## _fn_name(rvu,		\
 						    (struct _req_type *)req, \
 						    rsp);		\
-		if (rsp && err)						\
+		if (err)						\
 			rsp->hdr.rc = err;				\
 									\
 		trace_otx2_msg_process(mbox->pdev, _id, err, req->pcifunc); \
-		return rsp ? err : -ENOMEM;				\
+		return err;						\
 	}								\
 	}
 		MBOX_EBLOCK_SDP_MESSAGES

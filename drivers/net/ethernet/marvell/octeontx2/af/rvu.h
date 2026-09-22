@@ -300,6 +300,7 @@ struct sdp_config {
 	struct rvu *rvu; /* Unused for VFs pfvf struct */
 	u8 rvu_pf_num; /* Unused for VFs pfvf struct */
 	u64 nr_host_vfs;
+	u8 link_up; /* Last link state reported via SDP_VF_LINK_STATE_NOTIFY */
 };
 
 #define MAX_EPFS		16

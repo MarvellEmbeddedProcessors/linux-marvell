@@ -49,7 +49,8 @@ M(SDP_RINGS_ALLOC, 0x1002, sdp_rings_alloc, sdp_rings_alloc_req, sdp_rings_alloc
 M(SDP_RINGS_FREE, 0x1003, sdp_rings_free, sdp_rings_free_req, msg_rsp) \
 M(SDP_RINGS_DEFAULT, 0x1004, sdp_rings_default, msg_req, sdp_rings_default_rsp) \
 M(SDP_HOST_ALLOC_VFS, 0x1005, sdp_host_alloc_vfs, sdp_host_alloc_vfs_req, msg_rsp) \
-M(SDP_HOST_FREE_VFS, 0x1006, sdp_host_free_vfs, msg_req, msg_rsp)
+M(SDP_HOST_FREE_VFS, 0x1006, sdp_host_free_vfs, msg_req, msg_rsp) \
+M(SDP_VF_LINK_STATE_GET, 0x1007, sdp_vf_link_state_get, msg_req, sdp_vf_link_state_req)
 
 #define MBOX_EBLOCK_UP_SDP_MESSAGES					\
 M(SDP_RINGS_UPDATE,	0xE40, sdp_rings_update, sdp_rings_cfg, msg_rsp) \
@@ -144,7 +145,7 @@ struct sdp_vf_link_state_req {
 	struct mbox_msghdr hdr;
 	u16 vf_idx;   /* 0 = EPF itself, n = VF (n - 1) under it */
 	u8  up;       /* 1 = UP, 0 = DOWN */
-	u8  reserved;
+	u8  reserved[5];
 };
 
 #define M(_name, _id, fn_name, req, rsp)\
