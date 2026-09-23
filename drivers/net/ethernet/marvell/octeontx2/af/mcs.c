@@ -567,15 +567,17 @@ void mcs_clear_secy_plcy(struct mcs *mcs, int secy_id, int dir)
 	}
 }
 
-int mcs_alloc_ctrlpktrule(struct rsrc_bmap *rsrc, u16 *pf_map, u16 offset, u16 pcifunc)
+int mcs_alloc_ctrlpktrule(struct rsrc_bmap *rsrc, u16 *pf_map,
+			  u16 offset, u16 max, u16 pcifunc)
 {
 	int rsrc_id;
 
 	if (!rsrc->bmap)
 		return -EINVAL;
 
-	rsrc_id = bitmap_find_next_zero_area(rsrc->bmap, rsrc->max, offset, 1, 0);
-	if (rsrc_id >= rsrc->max)
+	rsrc_id = bitmap_find_next_zero_area(rsrc->bmap, offset + max,
+					     offset, 1, 0);
+	if (rsrc_id >= offset + max)
 		return -ENOSPC;
 
 	bitmap_set(rsrc->bmap, rsrc_id, 1);
@@ -623,13 +625,47 @@ int mcs_free_ctrlpktrule(struct mcs *mcs, struct mcs_free_ctrl_pkt_rule_req *req
 	return 0;
 }
 
+int mcs_ctrlpkt_rule_range(u8 rule_type, u16 *offset, u16 *max)
+{
+	switch (rule_type) {
+	case MCS_CTRL_PKT_RULE_TYPE_ETH:
+		*offset = MCS_CTRLPKT_ETYPE_RULE_OFFSET;
+		*max = MCS_CTRLPKT_ETYPE_RULE_MAX;
+		break;
+	case MCS_CTRL_PKT_RULE_TYPE_DA:
+		*offset = MCS_CTRLPKT_DA_RULE_OFFSET;
+		*max = MCS_CTRLPKT_DA_RULE_MAX;
+		break;
+	case MCS_CTRL_PKT_RULE_TYPE_RANGE:
+		*offset = MCS_CTRLPKT_DA_RANGE_RULE_OFFSET;
+		*max = MCS_CTRLPKT_DA_RANGE_RULE_MAX;
+		break;
+	case MCS_CTRL_PKT_RULE_TYPE_COMBO:
+		*offset = MCS_CTRLPKT_COMBO_RULE_OFFSET;
+		*max = MCS_CTRLPKT_COMBO_RULE_MAX;
+		break;
+	case MCS_CTRL_PKT_RULE_TYPE_MAC:
+		*offset = MCS_CTRLPKT_MAC_EN_RULE_OFFSET;
+		*max = MCS_CTRLPKT_MAC_RULE_MAX;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
 int mcs_ctrlpktrule_write(struct mcs *mcs, struct mcs_ctrl_pkt_rule_write_req *req)
 {
 	u64 reg, enb;
+	u16 offset, max;
 	u64 idx;
 
 	if (is_cn20k(mcs->pdev))
 		return 0;
+
+	if (mcs_ctrlpkt_rule_range(req->rule_type, &offset, &max) ||
+	    req->rule_idx < offset || req->rule_idx >= offset + max)
+		return MCS_AF_ERR_PARAM;
 
 	switch (req->rule_type) {
 	case MCS_CTRL_PKT_RULE_TYPE_ETH:

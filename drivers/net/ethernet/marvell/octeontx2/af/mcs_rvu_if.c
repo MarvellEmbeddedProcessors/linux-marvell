@@ -855,7 +855,7 @@ int rvu_mbox_handler_mcs_alloc_ctrl_pkt_rule(struct rvu *rvu,
 	struct mcs_rsrc_map *map;
 	struct mcs *mcs;
 	int rsrc_id;
-	u16 offset;
+	u16 offset, max;
 
 	if (req->mcs_id >= rvu->mcs_blk_cnt)
 		return MCS_AF_ERR_INVALID_MCSID;
@@ -869,26 +869,13 @@ int rvu_mbox_handler_mcs_alloc_ctrl_pkt_rule(struct rvu *rvu,
 
 	mutex_lock(&rvu->rsrc_lock);
 
-	switch (req->rule_type) {
-	case MCS_CTRL_PKT_RULE_TYPE_ETH:
-		offset = MCS_CTRLPKT_ETYPE_RULE_OFFSET;
-		break;
-	case MCS_CTRL_PKT_RULE_TYPE_DA:
-		offset = MCS_CTRLPKT_DA_RULE_OFFSET;
-		break;
-	case MCS_CTRL_PKT_RULE_TYPE_RANGE:
-		offset = MCS_CTRLPKT_DA_RANGE_RULE_OFFSET;
-		break;
-	case MCS_CTRL_PKT_RULE_TYPE_COMBO:
-		offset = MCS_CTRLPKT_COMBO_RULE_OFFSET;
-		break;
-	case MCS_CTRL_PKT_RULE_TYPE_MAC:
-		offset = MCS_CTRLPKT_MAC_EN_RULE_OFFSET;
-		break;
+	if (mcs_ctrlpkt_rule_range(req->rule_type, &offset, &max)) {
+		rsrc_id = MCS_AF_ERR_PARAM;
+		goto exit;
 	}
 
-	rsrc_id = mcs_alloc_ctrlpktrule(&map->ctrlpktrule, map->ctrlpktrule2pf_map, offset,
-					pcifunc);
+	rsrc_id = mcs_alloc_ctrlpktrule(&map->ctrlpktrule, map->ctrlpktrule2pf_map,
+					offset, max, pcifunc);
 	if (rsrc_id < 0)
 		goto exit;
 

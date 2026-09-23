@@ -212,7 +212,9 @@ void mcs_get_port_cfg(struct mcs *mcs, struct mcs_port_cfg_get_req *req,
 		      struct mcs_port_cfg_get_rsp *rsp);
 void mcs_get_custom_tag_cfg(struct mcs *mcs, struct mcs_custom_tag_cfg_get_req *req,
 			    struct mcs_custom_tag_cfg_get_rsp *rsp);
-int mcs_alloc_ctrlpktrule(struct rsrc_bmap *rsrc, u16 *pf_map, u16 offset, u16 pcifunc);
+int mcs_ctrlpkt_rule_range(u8 rule_type, u16 *offset, u16 *max);
+int mcs_alloc_ctrlpktrule(struct rsrc_bmap *rsrc, u16 *pf_map,
+			  u16 offset, u16 max, u16 pcifunc);
 int mcs_free_ctrlpktrule(struct mcs *mcs, struct mcs_free_ctrl_pkt_rule_req *req);
 int mcs_ctrlpktrule_write(struct mcs *mcs, struct mcs_ctrl_pkt_rule_write_req *req);
 bool is_mcs_bypass(int mcs_id);
