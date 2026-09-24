@@ -90,6 +90,7 @@ config MVPP2
 	select MVMDIO
 	select PHYLINK
 	select PAGE_POOL
+	select UIO
 	help
 	  This driver supports the network interface units in the
 	  Marvell ARMADA 375, 7K and 8K SoCs.

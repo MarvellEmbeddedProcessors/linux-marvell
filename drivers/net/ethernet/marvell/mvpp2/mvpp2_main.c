@@ -7855,6 +7855,11 @@ static int mvpp2_probe(struct platform_device *pdev)
 
 	mvpp2_dbgfs_init(priv, pdev->name);
 
+	err = mvpp2_musdk_uio_init(pdev, priv);
+	if (err)
+		dev_warn(&pdev->dev, "MUSDK UIO registration failed (%d), userspace SDK access unavailable\n",
+			 err);
+
 	platform_set_drvdata(pdev, priv);
 	return 0;
 
@@ -7878,6 +7883,8 @@ static void mvpp2_remove(struct platform_device *pdev)
 {
 	struct mvpp2 *priv = platform_get_drvdata(pdev);
 	int i, poolnum = MVPP2_BM_POOLS_NUM;
+
+	mvpp2_musdk_uio_exit(priv);
 
 	mvpp2_dbgfs_cleanup(priv);
 

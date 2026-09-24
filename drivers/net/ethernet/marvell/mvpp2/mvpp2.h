@@ -12,6 +12,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
+#include <linux/uio_driver.h>
 #include <linux/net_tstamp.h>
 #include <linux/phy.h>
 #include <linux/phylink.h>
@@ -1112,6 +1113,9 @@ struct mvpp2 {
 
 	/* Spinlock for shared PRS parser memory and shadow table */
 	spinlock_t prs_spinlock;
+
+	/* UIO device for MUSDK userspace access */
+	struct uio_info *uio;
 };
 
 struct mvpp2_pcpu_stats {
