@@ -65,6 +65,7 @@ struct rvu_sso_intr_mod {
 	atomic_t count;
 	int vec_ena_off;
 	int vec_ena_clr_off;
+	u64 vec_ena_mask;
 } *sso_intr_mod;
 
 void rvu_sso_hwgrp_config_thresh(struct rvu *rvu, int blkaddr, int lf,
@@ -639,7 +640,8 @@ int rvu_sso_lf_teardown(struct rvu *rvu, u16 pcifunc, int lf, int slot)
 
 	rvu_write64(rvu, blkaddr, SSO_AF_ERR0, ~0ULL);
 	/* Re-enable error reporting once we're finished */
-	rvu_write64(rvu, blkaddr, SSO_AF_ERR0_ENA_W1S, ~0ULL);
+	rvu_write64(rvu, blkaddr, SSO_AF_ERR0_ENA_W1C, SSO_AF_ERR0_AGGR_NPA_ERR);
+	rvu_write64(rvu, blkaddr, SSO_AF_ERR0_ENA_W1S, SSO_AF_ERR0_ENA_MASK);
 
 	/* HRM 14.13.4 (13) */
 	rvu_write64(rvu, blkaddr, SSO_AF_HWGRPX_AW_STATUS(lf), 0x0);
@@ -2005,11 +2007,12 @@ static void rvu_sso_intr_mod_cb(struct timer_list *t)
 	}
 
 	intr_mod->timeout = jiffies + SSO_AF_INT_MOD_TMO;
-	rvu_write64(rvu, blkaddr, intr_mod->vec_ena_off, ~0ULL);
+	rvu_write64(rvu, blkaddr, intr_mod->vec_ena_off, intr_mod->vec_ena_mask);
 }
 
 static void rvu_sso_af_intr_mod_setup(struct rvu *rvu, int vector,
-				      int vec_ena_off, int vec_ena_clr_off)
+				      int vec_ena_off, int vec_ena_clr_off,
+				      u64 vec_ena_mask)
 {
 	struct rvu_sso_intr_mod *intr_mod = &sso_intr_mod[vector];
 
@@ -2017,6 +2020,7 @@ static void rvu_sso_af_intr_mod_setup(struct rvu *rvu, int vector,
 	intr_mod->timeout = jiffies + SSO_AF_INT_MOD_TMO;
 	intr_mod->vec_ena_off = vec_ena_off;
 	intr_mod->vec_ena_clr_off = vec_ena_clr_off;
+	intr_mod->vec_ena_mask = vec_ena_mask;
 	timer_setup(&intr_mod->timer, rvu_sso_intr_mod_cb, 0);
 }
 
@@ -2048,16 +2052,19 @@ int rvu_sso_register_interrupts(struct rvu *rvu)
 	}
 
 	rvu_sso_af_intr_mod_setup(rvu, SSO_AF_INT_VEC_ERR0,
-				  SSO_AF_ERR0_ENA_W1S, SSO_AF_ERR0_ENA_W1C);
+				  SSO_AF_ERR0_ENA_W1S, SSO_AF_ERR0_ENA_W1C,
+				  SSO_AF_ERR0_ENA_MASK);
 	ret = rvu_sso_do_register_interrupt(rvu, offs + SSO_AF_INT_VEC_ERR0,
 					    rvu_sso_af_err0_intr_handler,
 					    "SSO_AF_ERR0");
 	if (ret)
 		goto err;
-	rvu_write64(rvu, blkaddr, SSO_AF_ERR0_ENA_W1S, ~0ULL);
+	rvu_write64(rvu, blkaddr, SSO_AF_ERR0_ENA_W1C, SSO_AF_ERR0_AGGR_NPA_ERR);
+	rvu_write64(rvu, blkaddr, SSO_AF_ERR0_ENA_W1S, SSO_AF_ERR0_ENA_MASK);
 
 	rvu_sso_af_intr_mod_setup(rvu, SSO_AF_INT_VEC_ERR2,
-				  SSO_AF_ERR2_ENA_W1S, SSO_AF_ERR2_ENA_W1C);
+				  SSO_AF_ERR2_ENA_W1S, SSO_AF_ERR2_ENA_W1C,
+				  ~0ULL);
 	ret = rvu_sso_do_register_interrupt(rvu, offs + SSO_AF_INT_VEC_ERR2,
 					    rvu_sso_af_err2_intr_handler,
 					    "SSO_AF_ERR2");
@@ -2066,7 +2073,8 @@ int rvu_sso_register_interrupts(struct rvu *rvu)
 	rvu_write64(rvu, blkaddr, SSO_AF_ERR2_ENA_W1S, ~0ULL);
 
 	rvu_sso_af_intr_mod_setup(rvu, SSO_AF_INT_VEC_RAS,
-				  SSO_AF_RAS_ENA_W1S, SSO_AF_RAS_ENA_W1C);
+				  SSO_AF_RAS_ENA_W1S, SSO_AF_RAS_ENA_W1C,
+				  ~0ULL);
 	ret = rvu_sso_do_register_interrupt(rvu, offs + SSO_AF_INT_VEC_RAS,
 					    rvu_sso_af_ras_intr_handler,
 					    "SSO_AF_RAS");
