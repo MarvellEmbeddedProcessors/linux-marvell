@@ -293,18 +293,32 @@ static int npa_hwctx_disable_pool(struct rvu *rvu, u16 pcifunc, int id)
 static int npa_hwctx_disable_aura(struct rvu *rvu, u16 pcifunc, int id)
 {
 	struct npa_aq_enq_req aq_req;
+	int rc;
 
 	memset(&aq_req, 0, sizeof(aq_req));
 	aq_req.hdr.pcifunc = pcifunc;
 	aq_req.ctype = NPA_AQ_CTYPE_AURA;
 	aq_req.op = NPA_AQ_INSTOP_WRITE;
+	aq_req.aura_id = id;
+
+	/* CN20K: abrupt VF teardown can leave NIX_RX_BPIDX_STATUS AURA_CNT
+	 * latched while the aura is depleted. AQ WRITE count=0 sends an XON
+	 * pulse to NIX; aura disable alone does not clear the latch.
+	 */
+	if (is_cn20k(rvu->pdev)) {
+		aq_req.aura.count = 0;
+		aq_req.aura_mask.count = GENMASK_ULL(35, 0);
+		rc = rvu_npa_aq_enq_inst(rvu, &aq_req, NULL);
+		if (rc)
+			return rc;
+	}
+
 	aq_req.aura.ena = 0;
 	aq_req.aura_mask.ena = 1;
 	aq_req.aura.bp_ena = 0;
 	aq_req.aura_mask.bp_ena = 1;
 	aq_req.aura.fc_ena = 0;
 	aq_req.aura_mask.fc_ena = 1;
-	aq_req.aura_id = id;
 	return rvu_npa_aq_enq_inst(rvu, &aq_req, NULL);
 }
 
