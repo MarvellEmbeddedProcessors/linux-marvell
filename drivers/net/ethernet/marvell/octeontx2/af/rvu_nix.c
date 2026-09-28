@@ -4262,6 +4262,8 @@ int rvu_mbox_handler_nix_get_hw_info(struct rvu *rvu, struct msg_req *req,
 
 	if (is_lbk_vf(rvu, pcifunc))
 		rvu_get_lbk_link_max_frs(rvu, &rsp->max_mtu);
+	else if (is_sdp_pfvf(rvu, pcifunc))
+		rsp->max_mtu = SDP_HW_MAX_FRS;
 	else
 		rvu_get_lmac_link_max_frs(rvu, &rsp->max_mtu);
 
