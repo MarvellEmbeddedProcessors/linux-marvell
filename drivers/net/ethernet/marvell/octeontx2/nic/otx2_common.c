@@ -2115,6 +2115,11 @@ static u32 get_dwrr_mtu(struct otx2_nic *pfvf, struct nix_hw_info *hw)
 		return hw->lbk_dwrr_mtu;
 	}
 
+	if (is_otx2_sdpvf(pfvf->pdev)) {
+		pfvf->hw.smq_link_type = SMQ_LINK_TYPE_SDP;
+		return hw->sdp_dwrr_mtu;
+	}
+
 	pfvf->hw.smq_link_type = SMQ_LINK_TYPE_RPM;
 	return hw->rpm_dwrr_mtu;
 }
