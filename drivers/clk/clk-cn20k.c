@@ -18,6 +18,11 @@
 #include <linux/platform_device.h>
 #include <linux/seq_file.h>
 #include <linux/delay.h>
+#include <linux/sysfs.h>
+
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+#include <linux/scmi_protocol.h>
+#endif
 
 #include <dt-bindings/clock/marvell,cn20k.h>
 
@@ -156,9 +161,20 @@ struct cn20k_clk_provider {
 	struct cn20k_clk	clks[CN20K_NUM_CLKS];
 	struct clk_hw_onecell_data *hw_data;
 	struct dentry		*debugfs_root;
+	struct kobject		*clk_kobj;
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+	const struct scmi_clk_proto_ops *scmi_clk_ops;
+	struct scmi_protocol_handle *scmi_ph;
+	int scmi_clk_map[CN20K_NUM_CLKS];
+#endif
 };
 
 #define to_cn20k_clk(hw)	container_of(hw, struct cn20k_clk, hw)
+
+/* Global pointer for SCMI callback — set when platform driver probes */
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+static struct cn20k_clk_provider *g_cn20k_prov;
+#endif
 
 static inline void __iomem *cn20k_clk_reg(struct cn20k_clk *clk, u32 offset)
 {
@@ -233,9 +249,61 @@ static int cn20k_clk_is_enabled(struct clk_hw *hw)
 	return cur_sel != SEL_OFF;
 }
 
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+/*
+ * Round the requested rate to the nearest supported value.
+ * Accept any rate and let SCP firmware validate/clamp it.
+ *
+ * @hw: the clock handle
+ * @rate: the requested rate
+ * @parent_rate: the rate of the parent clock
+ *
+ * @return: the rounded rate
+ */
+static long cn20k_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+				 unsigned long *parent_rate)
+{
+	/* Round to nearest MHz; SCP will clamp to valid range */
+	return (rate / 1000000) * 1000000;
+}
+
+/*
+ * Set the clock rate via SCMI. SCP firmware handles PLL reprogramming
+ * and voltage scaling (AVS) safely.
+ *
+ * @hw: the clock handle
+ * @rate: the target rate in Hz
+ * @parent_rate: the rate of the parent clock
+ *
+ * @return: 0 on success, negative error code otherwise
+ */
+static int cn20k_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+			      unsigned long parent_rate)
+{
+	struct cn20k_clk *clk = to_cn20k_clk(hw);
+	int idx, scmi_id;
+
+	if (!g_cn20k_prov || !g_cn20k_prov->scmi_clk_ops ||
+	    !g_cn20k_prov->scmi_ph)
+		return -EOPNOTSUPP;
+
+	idx = clk - g_cn20k_prov->clks;
+	scmi_id = g_cn20k_prov->scmi_clk_map[idx];
+	if (scmi_id < 0)
+		return -EOPNOTSUPP;
+
+	return g_cn20k_prov->scmi_clk_ops->rate_set(g_cn20k_prov->scmi_ph,
+						     scmi_id, (u64)rate);
+}
+#endif /* CONFIG_ARM_SCMI_PROTOCOL */
+
 static const struct clk_ops cn20k_clk_ops = {
 	.recalc_rate = cn20k_clk_recalc_rate,
 	.is_enabled = cn20k_clk_is_enabled,
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+	.round_rate = cn20k_clk_round_rate,
+	.set_rate = cn20k_clk_set_rate,
+#endif
 };
 
 static int cn20k_index_to_array(u16 index)
@@ -454,6 +522,213 @@ static int cn20k_droop_status_show(struct seq_file *s, void *data)
 }
 DEFINE_SHOW_ATTRIBUTE(cn20k_droop_status);
 
+/* ---- sysfs interface for clock frequency control ---- */
+
+struct cn20k_clk_sysfs_entry {
+	struct cn20k_clk_provider *prov;
+	int clk_idx;
+	struct kobj_attribute attr_cur_freq;
+	struct kobj_attribute attr_target_freq;
+};
+
+static ssize_t cn20k_cur_freq_show(struct kobject *kobj,
+				   struct kobj_attribute *attr, char *buf)
+{
+	struct cn20k_clk_sysfs_entry *entry =
+		container_of(attr, struct cn20k_clk_sysfs_entry, attr_cur_freq);
+	struct cn20k_clk *clk = &entry->prov->clks[entry->clk_idx];
+	unsigned long rate;
+
+	rate = cn20k_clk_recalc_rate(&clk->hw, 0);
+	return sysfs_emit(buf, "%lu\n", rate / 1000000);
+}
+
+static ssize_t cn20k_target_freq_store(struct kobject *kobj,
+				       struct kobj_attribute *attr,
+				       const char *buf, size_t count)
+{
+	struct cn20k_clk_sysfs_entry *entry =
+		container_of(attr, struct cn20k_clk_sysfs_entry, attr_target_freq);
+	unsigned long freq_mhz;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &freq_mhz);
+	if (ret)
+		return ret;
+
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+	{
+		int scmi_id;
+
+		if (!entry->prov->scmi_clk_ops || !entry->prov->scmi_ph)
+			return -EOPNOTSUPP;
+
+		scmi_id = entry->prov->scmi_clk_map[entry->clk_idx];
+		if (scmi_id < 0)
+			return -EOPNOTSUPP;
+
+		ret = entry->prov->scmi_clk_ops->rate_set(entry->prov->scmi_ph,
+							   scmi_id,
+							   (u64)freq_mhz * 1000000);
+		if (ret)
+			return ret;
+	}
+#else
+	return -EOPNOTSUPP;
+#endif
+
+	return count;
+}
+
+static ssize_t cn20k_target_freq_show(struct kobject *kobj,
+				      struct kobj_attribute *attr, char *buf)
+{
+	struct cn20k_clk_sysfs_entry *entry =
+		container_of(attr, struct cn20k_clk_sysfs_entry, attr_target_freq);
+	struct cn20k_clk *clk = &entry->prov->clks[entry->clk_idx];
+	unsigned long rate;
+
+	rate = cn20k_clk_recalc_rate(&clk->hw, 0);
+	return sysfs_emit(buf, "%lu\n", rate / 1000000);
+}
+
+/*
+ * All clocks exposed via sysfs — SCP firmware will reject
+ * unsupported rate changes for clocks it cannot control.
+ */
+#define CN20K_NUM_SYSFS_CLKS	CN20K_NUM_CLKS
+
+static int cn20k_create_sysfs(struct cn20k_clk_provider *prov)
+{
+	struct device *dev = prov->dev;
+	struct cn20k_clk_sysfs_entry *entry;
+	int i, ret;
+
+	prov->clk_kobj = kobject_create_and_add("cn20k_clocks", &dev->kobj);
+	if (!prov->clk_kobj)
+		return -ENOMEM;
+
+	for (i = 0; i < CN20K_NUM_SYSFS_CLKS; i++) {
+		struct kobject *clk_kobj;
+
+		entry = devm_kzalloc(dev, sizeof(*entry), GFP_KERNEL);
+		if (!entry)
+			continue;
+
+		entry->prov = prov;
+		entry->clk_idx = i;
+
+		clk_kobj = kobject_create_and_add(prov->clks[i].desc->name,
+						  prov->clk_kobj);
+		if (!clk_kobj)
+			continue;
+
+		sysfs_attr_init(&entry->attr_cur_freq.attr);
+		entry->attr_cur_freq.attr.name = "cur_freq_mhz";
+		entry->attr_cur_freq.attr.mode = 0444;
+		entry->attr_cur_freq.show = cn20k_cur_freq_show;
+
+		sysfs_attr_init(&entry->attr_target_freq.attr);
+		entry->attr_target_freq.attr.name = "target_freq_mhz";
+		entry->attr_target_freq.attr.mode = 0644;
+		entry->attr_target_freq.show = cn20k_target_freq_show;
+		entry->attr_target_freq.store = cn20k_target_freq_store;
+
+		ret = sysfs_create_file(clk_kobj, &entry->attr_cur_freq.attr);
+		if (ret)
+			dev_warn(dev, "Failed to create cur_freq for %s\n",
+				 prov->clks[i].desc->name);
+
+		ret = sysfs_create_file(clk_kobj, &entry->attr_target_freq.attr);
+		if (ret)
+			dev_warn(dev, "Failed to create target_freq for %s\n",
+				 prov->clks[i].desc->name);
+	}
+
+	return 0;
+}
+
+/* ---- SCMI clock protocol integration ---- */
+
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+static int cn20k_scmi_clk_probe(struct scmi_device *sdev)
+{
+	const struct scmi_handle *handle = sdev->handle;
+	struct scmi_protocol_handle *ph;
+	const struct scmi_clk_proto_ops *clk_ops;
+	int count, i, j;
+
+	if (!handle)
+		return -ENODEV;
+
+	clk_ops = handle->devm_protocol_get(sdev, SCMI_PROTOCOL_CLOCK, &ph);
+	if (IS_ERR(clk_ops))
+		return PTR_ERR(clk_ops);
+
+	if (!g_cn20k_prov)
+		return -EPROBE_DEFER;
+
+	g_cn20k_prov->scmi_clk_ops = clk_ops;
+	g_cn20k_prov->scmi_ph = ph;
+
+	count = clk_ops->count_get(ph);
+	dev_info(&sdev->dev,
+		 "CN20K CLKGEN: SCMI clock control enabled (%d clocks from SCP)\n",
+		 count);
+
+	/* Match SCMI clocks to CLKGEN clocks by name */
+	for (i = 0; i < count; i++) {
+		const struct scmi_clock_info *ci = clk_ops->info_get(ph, i);
+		int matched = 0;
+
+		if (IS_ERR_OR_NULL(ci))
+			continue;
+		dev_info(&sdev->dev, "  SCMI clock %d: '%s'\n", i, ci->name);
+
+		/*
+		 * Match SCP clock names to our CLKGEN names.
+		 * Our names may have a "cn20k_" prefix that SCP omits,
+		 * and SCP may use a group name like "coreclk" for all
+		 * per-core clocks "coreclk0" .. "coreclk41".
+		 */
+		for (j = 0; j < CN20K_NUM_CLKS; j++) {
+			const char *our = cn20k_clkgen_descs[j].name;
+			size_t scp_len = strlen(ci->name);
+
+			if (!strcmp(our, ci->name) ||
+			    (!strncmp(our, ci->name, scp_len) &&
+			     our[scp_len] >= '0' &&
+			     our[scp_len] <= '9')) {
+				g_cn20k_prov->scmi_clk_map[j] = i;
+				matched++;
+			}
+		}
+		if (matched)
+			dev_info(&sdev->dev,
+				 "  Mapped '%s' -> SCMI clock %d (%d clocks)\n",
+				 ci->name, i, matched);
+		else
+			dev_info(&sdev->dev,
+				 "  SCMI clock '%s' has no CLKGEN match\n",
+				 ci->name);
+	}
+
+	return 0;
+}
+
+static const struct scmi_device_id cn20k_scmi_clk_id_table[] = {
+	{ SCMI_PROTOCOL_CLOCK, "cn20k-clocks" },
+	{ },
+};
+MODULE_DEVICE_TABLE(scmi, cn20k_scmi_clk_id_table);
+
+static struct scmi_driver cn20k_scmi_clk_driver = {
+	.name = "cn20k-scmi-clk",
+	.probe = cn20k_scmi_clk_probe,
+	.id_table = cn20k_scmi_clk_id_table,
+};
+#endif /* CONFIG_ARM_SCMI_PROTOCOL */
+
 static int cn20k_clkgen_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -514,6 +789,14 @@ static int cn20k_clkgen_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+	g_cn20k_prov = prov;
+	for (i = 0; i < CN20K_NUM_CLKS; i++)
+		prov->scmi_clk_map[i] = -1;
+	/* Register SCMI clock driver to get protocol handle from SCP */
+	scmi_register(&cn20k_scmi_clk_driver);
+#endif
+
 	/* debugfs: /sys/kernel/debug/cn20k-clkgen/ */
 	prov->debugfs_root = debugfs_create_dir("cn20k-clkgen", NULL);
 	debugfs_create_file("pll_status", 0444, prov->debugfs_root,
@@ -527,6 +810,9 @@ static int cn20k_clkgen_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, prov);
 
+	/* sysfs: /sys/devices/platform/<dev>/cn20k_clocks/<clock>/ */
+	cn20k_create_sysfs(prov);
+
 	dev_info(dev, "Registered %d CLKGEN clocks\n", (int)CN20K_NUM_CLKS);
 	return 0;
 }
@@ -535,8 +821,13 @@ static void cn20k_clkgen_remove(struct platform_device *pdev)
 {
 	struct cn20k_clk_provider *prov = platform_get_drvdata(pdev);
 
+	if (prov->clk_kobj)
+		kobject_put(prov->clk_kobj);
 	debugfs_remove_recursive(prov->debugfs_root);
-
+#ifdef CONFIG_ARM_SCMI_PROTOCOL
+	scmi_unregister(&cn20k_scmi_clk_driver);
+	g_cn20k_prov = NULL;
+#endif
 }
 
 static const struct of_device_id cn20k_clkgen_of_match[] = {

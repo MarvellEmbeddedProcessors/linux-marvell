@@ -547,10 +547,16 @@ config CLK_FD_KUNIT_TEST
 config COMMON_CLK_CN20K
 	tristate "Marvell CN20K CLKGEN clock driver"
 	depends on COMMON_CLK && (ARM64 || COMPILE_TEST)
+	select ARM_SCMI_PROTOCOL if ARM64
 	help
 	  Support for the CLKGEN clock generators on Marvell CN20K (CN206XX)
 	  SoCs. Registers all CLKGEN instances in the Linux Common Clock
 	  Framework and exposes PLL/ARO lock status, reference clock detection,
 	  droop monitoring and hardware frequency measurement via debugfs.
+
+	  When ARM_SCMI_PROTOCOL is enabled, this driver also supports
+	  setting clock frequencies via SCMI to SCP firmware. Controllable
+	  clocks (SCLK, MESHCLK, CPTCLK, MLCLK, NETCLK, CORECLK) are
+	  exposed via sysfs at /sys/devices/platform/<dev>/cn20k_clocks/.
 
 endif
