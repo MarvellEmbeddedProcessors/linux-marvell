@@ -20,6 +20,7 @@
 #include <linux/mutex.h>
 #include <soc/marvell/octeontx/octeontx_smc.h>
 #include "cn10k_dev_sec_provision.h"
+#include "cn10k_dev_sec_auth_cmd.h"
 
 static DEFINE_MUTEX(cn10k_dev_sec_mutex);
 
@@ -43,6 +44,64 @@ static struct miscdevice cn10k_dev_sec_drv = {
 static void *cn10k_dev_sec_dma_virt;
 static dma_addr_t cn10k_dev_sec_dma_phys;
 
+
+int cn10k_dev_sec_generate_challenge(unsigned long arg)
+{
+	struct auth_cmd_package *cmd_pkg = (struct auth_cmd_package *)cn10k_dev_sec_dma_virt;
+	struct arm_smccc_res res;
+	enum auth_cmd_id cmd_id;
+	int ret = 0;
+
+	memset(cn10k_dev_sec_dma_virt, 0, sizeof(struct auth_cmd_package));
+
+	if (copy_from_user(cmd_pkg, (void __user *)arg,
+			   sizeof(struct auth_cmd_package))) {
+		pr_err("copy_from_user failed for auth_cmd_package\n");
+		return -EFAULT;
+	}
+
+	cmd_id = cmd_pkg->cmd_id;
+	arm_smccc_smc(PLAT_OCTEONTX_EHSM_GET_CHALLENGE, cmd_id,
+		      cn10k_dev_sec_dma_phys,
+		      sizeof(struct auth_cmd_package),
+		      0, 0, 0, 0, &res);
+	if (res.a0) {
+		pr_err("GET_CHALLENGE failed for cmd_id %d: 0x%lx\n",
+		       cmd_id, res.a0);
+		return -EFAULT;
+	}
+
+	if (copy_to_user((void __user *)arg, cmd_pkg,
+			 sizeof(struct auth_cmd_package))) {
+		pr_err("copy_to_user failed for auth_cmd_package\n");
+		return -EFAULT;
+	}
+
+	return ret;
+}
+
+int cn10k_dev_sec_execute_auth_cmd(unsigned long arg)
+{
+	struct arm_smccc_res res;
+	int ret = 0;
+
+	memset(cn10k_dev_sec_dma_virt, 0, sizeof(struct auth_cmd));
+
+	if (copy_from_user(cn10k_dev_sec_dma_virt, (void __user *)arg,
+			   sizeof(struct auth_cmd))) {
+		pr_err("copy_from_user failed for auth_cmd\n");
+		return -EFAULT;
+	}
+
+	arm_smccc_smc(PLAT_OCTEONTX_EHSM_AUTH_CMD, cn10k_dev_sec_dma_phys,
+		      sizeof(struct auth_cmd), 0, 0, 0, 0, 0, &res);
+	if (res.a0) {
+		pr_err("AUTH_CMD failed: 0x%lx\n", res.a0);
+		return -EFAULT;
+	}
+
+	return ret;
+}
 
 static long cn10k_dev_sec_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -142,7 +201,12 @@ static long cn10k_dev_sec_ioctl(struct file *file, unsigned int cmd, unsigned lo
 		}
 
 		break;
-	
+	case GENERATE_CHALLENGE_PACKAGE:
+		ret = cn10k_dev_sec_generate_challenge(arg);
+		break;
+	case EXECUTE_AUTH_CMD:
+		ret = cn10k_dev_sec_execute_auth_cmd(arg);
+		break;
 	default:
 		ret = -EINVAL;
 		break;
