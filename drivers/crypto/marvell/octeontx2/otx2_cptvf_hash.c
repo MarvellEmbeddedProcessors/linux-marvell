@@ -525,6 +525,9 @@ static int cpt_hmac_sha_setkey(struct crypto_ahash *tfm, const u8 *key,
 {
 	struct cpt_hmac_ctx *ctx = crypto_tfm_ctx(crypto_ahash_tfm(tfm));
 
+	if (keylen > CPT_HMAC_KEY_SIZE_MAX)
+		return -EINVAL;
+
 	memcpy(ctx->key, key, keylen);
 	ctx->key_len = keylen;
 

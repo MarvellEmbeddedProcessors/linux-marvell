@@ -201,10 +201,10 @@ static int cpt_ecdsa_sign(struct akcipher_request *req)
 	req_info->req.cptr = ctx->er_ctx.hw_ctx;
 	req_info->req.cptr_dma = ctx->er_ctx.cptr_dma;
 
-	sg_copy_to_buffer(req->src, sg_nents_for_len(req->src, req->src_len),
-			  hash, req->src_len);
+	sg_copy_to_buffer(req->src, sg_nents_for_len(req->src, msg_len),
+			  hash, msg_len);
 
-	ret = cpt_ecdsa_k_gen(ctx, req->src_len, hash, k);
+	ret = cpt_ecdsa_k_gen(ctx, msg_len, hash, k);
 	if (ret)
 		goto dma_unmap;
 

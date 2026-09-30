@@ -1062,6 +1062,10 @@ static int otx2_cpt_aead_cbc_aes_sha_setkey(struct crypto_aead *cipher,
 	if (ctx->cipher_type == OTX2_CPT_CIPHER_NULL)
 		return authenc_keys.enckeylen ? -EINVAL : 0;
 
+	if (authenc_keys.authkeylen + authenc_keys.enckeylen >
+	    OTX2_CPT_MAX_KEY_SIZE)
+		return -EINVAL;
+
 	switch (authenc_keys.enckeylen) {
 	case AES_KEYSIZE_128:
 		ctx->key_type = OTX2_CPT_AES_128_BIT;
@@ -1100,6 +1104,10 @@ static int otx2_cpt_aead_rfc3686_ctr_aes_sha_setkey(struct crypto_aead *cipher,
 
 	if (ctx->cipher_type == OTX2_CPT_CIPHER_NULL)
 		return authenc_keys.enckeylen ? -EINVAL : 0;
+
+	if (authenc_keys.authkeylen + authenc_keys.enckeylen >
+	    OTX2_CPT_MAX_KEY_SIZE)
+		return -EINVAL;
 
 	switch (authenc_keys.enckeylen) {
 	case AES_KEYSIZE_128 + CTR_RFC3686_NONCE_SIZE:
