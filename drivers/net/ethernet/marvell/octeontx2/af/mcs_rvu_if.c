@@ -151,6 +151,10 @@ int rvu_mbox_handler_mcs_set_lmac_mode(struct rvu *rvu,
 	if (req->mcs_id >= rvu->mcs_blk_cnt)
 		return MCS_AF_ERR_INVALID_MCSID;
 
+	/* Only the MACsec-owning PF may change LMAC mode */
+	if (is_vf(req->hdr.pcifunc))
+		return MCS_AF_ERR_PARAM;
+
 	mcs = mcs_get_pdata(req->mcs_id);
 
 	if (req->lmac_id >= mcs->hw->lmac_cnt)
@@ -269,7 +273,11 @@ int rvu_mbox_handler_mcs_intr_cfg(struct rvu *rvu,
 	else
 		pfvf = &mcs->pf[rvu_get_pf(pcifunc)];
 
-	mcs->pf_map[0] = pcifunc;
+	/* Block-level notification owner is PF-only; a VF must not
+	 * redirect other functions' MACsec event delivery.
+	 */
+	if (!is_vf(pcifunc))
+		mcs->pf_map[0] = pcifunc;
 	pfvf->intr_mask = req->intr_mask;
 
 	return 0;
@@ -301,6 +309,10 @@ int rvu_mbox_handler_mcs_port_reset(struct rvu *rvu, struct mcs_port_reset_req *
 
 	if (req->mcs_id >= rvu->mcs_blk_cnt)
 		return MCS_AF_ERR_INVALID_MCSID;
+
+	/* Only the MACsec-owning PF may reset a port */
+	if (is_vf(req->hdr.pcifunc))
+		return MCS_AF_ERR_PARAM;
 
 	mcs = mcs_get_pdata(req->mcs_id);
 
@@ -450,6 +462,10 @@ int rvu_mbox_handler_mcs_set_active_lmac(struct rvu *rvu,
 	if (req->mcs_id >= rvu->mcs_blk_cnt)
 		return MCS_AF_ERR_INVALID_MCSID;
 
+	/* Only the MACsec-owning PF may change the active LMAC set */
+	if (is_vf(req->hdr.pcifunc))
+		return MCS_AF_ERR_PARAM;
+
 	mcs = mcs_get_pdata(req->mcs_id);
 	if (!mcs)
 		return MCS_AF_ERR_NOT_MAPPED;
@@ -466,6 +482,10 @@ int rvu_mbox_handler_mcs_port_cfg_set(struct rvu *rvu, struct mcs_port_cfg_set_r
 
 	if (req->mcs_id >= rvu->mcs_blk_cnt)
 		return MCS_AF_ERR_INVALID_MCSID;
+
+	/* Only the MACsec-owning PF may reprogram port config */
+	if (is_vf(req->hdr.pcifunc))
+		return MCS_AF_ERR_PARAM;
 
 	mcs = mcs_get_pdata(req->mcs_id);
 
