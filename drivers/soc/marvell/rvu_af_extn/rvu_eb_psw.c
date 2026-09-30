@@ -1029,6 +1029,10 @@ int rvu_mbox_handler_psw_epfvf_config_write(struct rvu *rvu, struct psw_epfvf_co
 
 	pcp_req->cfg_offset = req->cfg_offset;
 	pcp_req->size = req->size;
+	if (req->size > PSW_EPFVF_CFG_RW_MAX_SIZE) {
+		pci_dev_put(pcp_pdev);
+		return -EINVAL;
+	}
 	memcpy(pcp_req->cfg_data, req->cfg_data, req->size);
 
 	pci_read_config_dword(pcp_pdev, PCP_MBOX_ADDR_OFFSET, &cfg_w);
@@ -1068,6 +1072,9 @@ int rvu_mbox_handler_psw_epfvf_config_read(struct rvu *rvu, struct psw_epfvf_con
 
 	pf = rvu_get_pf(req->hdr.pcifunc);
 	epf = psw->pf2epf_map[pf];
+
+	if (req->size > PSW_EPFVF_CFG_RW_MAX_SIZE)
+		return -EINVAL;
 
 	pcp_pdev = pci_get_device(PCI_VENDOR_ID_CAVIUM, PCP_MBOX_PCI_DEV_ID, pcp_pdev);
 	if (!pcp_pdev) {
@@ -1429,6 +1436,9 @@ int rvu_mbox_handler_psw_fid_free_entry(struct rvu *rvu,
 {
 	struct psw_rsrc *psw = rvu->hw->psw;
 	int blkaddr = BLKADDR_PSW;
+
+	if (req->fid_idx >= psw->fid_t.max || is_rsrc_free(&psw->fid_t, req->fid_idx))
+		return -EINVAL;
 
 	rvu_write64(rvu, blkaddr, PSW_AF_FID_ATTR(req->fid_idx), 0x0ULL);
 	rvu_free_rsrc(&psw->fid_t, req->fid_idx);
