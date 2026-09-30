@@ -3479,7 +3479,7 @@ static void rvu_npa_lf_mapped_sso_lf_teardown(struct rvu *rvu, u16 pcifunc)
 static void rvu_sso_hw_flr(struct rvu *rvu, u16 pcifunc)
 {
 	int blkaddr, ssow_blkaddr;
-	u64 reg;
+	u64 reg, flr_mask;
 
 	blkaddr = rvu_get_blkaddr(rvu, BLKTYPE_SSO, 0);
 	if (blkaddr < 0)
@@ -3494,12 +3494,15 @@ static void rvu_sso_hw_flr(struct rvu *rvu, u16 pcifunc)
 	if (!(reg & SSO_AF_CONST1_HW_FLR))
 		return;
 
+	flr_mask = is_cn20k(rvu->pdev) ? CN20K_SSOW_AF_LF_FLR_MASK :
+		   SSOW_AF_LF_FLR_MASK;
+
 	/* Perform complete HW FLR */
 	rvu_write64(rvu, ssow_blkaddr, SSOW_AF_LF_FLR,
-		    pcifunc | SSOW_AF_LF_FLR_MASK);
+		    pcifunc | flr_mask);
 
 	/* Wait for FLR completion */
-	if (rvu_poll_reg(rvu, ssow_blkaddr, SSOW_AF_LF_FLR, SSOW_AF_LF_FLR_MASK,
+	if (rvu_poll_reg(rvu, ssow_blkaddr, SSOW_AF_LF_FLR, flr_mask,
 			 true)) {
 		if (rvu_read64(rvu, ssow_blkaddr, SSOW_AF_LF_FLR) &
 		    SSOW_AF_LF_FLR_ERROR) {
